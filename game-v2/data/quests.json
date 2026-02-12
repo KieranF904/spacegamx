@@ -1,0 +1,237 @@
+{
+  "quests": [
+    {
+      "id": "tutorial_basics",
+      "name": "Welcome Pilot",
+      "description": "Learn the basics of ship control and combat.",
+      "giver": "dr_vance",
+      "level": 1,
+      "stages": [
+        {
+          "id": "move",
+          "type": "travel",
+          "description": "Use WASD to move your ship around.",
+          "objective": { "distance": 500 },
+          "dialogue": {
+            "start": "Welcome aboard, pilot! Let's start with the basics. Use WASD to move your ship."
+          }
+        },
+        {
+          "id": "boost",
+          "type": "action",
+          "description": "Hold SHIFT to boost.",
+          "objective": { "action": "boost", "count": 1 },
+          "dialogue": {
+            "start": "Excellent movement! Now try your boost - hold SHIFT to accelerate rapidly."
+          }
+        },
+        {
+          "id": "shoot",
+          "type": "action",
+          "description": "Left-click to fire your weapon.",
+          "objective": { "action": "fire", "count": 5 },
+          "dialogue": {
+            "start": "Now for combat training. Left-click to fire your blaster."
+          }
+        }
+      ],
+      "rewards": {
+        "xp": 50,
+        "credits": 100,
+        "items": []
+      },
+      "prerequisites": [],
+      "repeatable": false
+    },
+    {
+      "id": "ice_sprite_hunt",
+      "name": "Sprite Slayer",
+      "description": "The Borealis system is overrun with Ice Sprites. Cull their numbers.",
+      "giver": "researcher_maya",
+      "level": 3,
+      "stages": [
+        {
+          "id": "travel_borealis",
+          "type": "travel",
+          "description": "Travel to the Borealis system.",
+          "objective": { "system": "borealis" },
+          "dialogue": {
+            "start": "The Borealis system has been overrun by Ice Sprites. They're interfering with our research. Travel there through the portal and eliminate some of them."
+          }
+        },
+        {
+          "id": "kill_sprites",
+          "type": "kill",
+          "description": "Defeat 10 Ice Sprites.",
+          "objective": { "enemy": "ice_sprite", "count": 10 },
+          "dialogue": {
+            "start": "You've arrived. Now hunt down those Ice Sprites. Be careful - they're more dangerous than they look."
+          }
+        },
+        {
+          "id": "return",
+          "type": "interact",
+          "description": "Return to Researcher Maya.",
+          "objective": { "npc": "researcher_maya" },
+          "dialogue": {
+            "start": "Excellent work! Return to me for your reward."
+          }
+        }
+      ],
+      "rewards": {
+        "xp": 200,
+        "credits": 500,
+        "items": ["laser_mk1"]
+      },
+      "prerequisites": ["tutorial_basics"],
+      "repeatable": true
+    },
+    {
+      "id": "mining_expedition",
+      "name": "Mining 101",
+      "description": "Learn to mine asteroids for valuable resources.",
+      "giver": "merchant_joe",
+      "level": 2,
+      "stages": [
+        {
+          "id": "get_mining_laser",
+          "type": "acquire",
+          "description": "Obtain a Mining Laser.",
+          "objective": { "item": "mining_laser_mk1", "count": 1 },
+          "dialogue": {
+            "start": "Want to make some credits? Mining is honest work. First, you'll need a mining laser. I've got one here for you."
+          }
+        },
+        {
+          "id": "equip_laser",
+          "type": "action",
+          "description": "Equip the Mining Laser.",
+          "objective": { "action": "equip", "item": "mining_laser_mk1" },
+          "dialogue": {
+            "start": "Great! Now equip it to one of your weapon slots."
+          }
+        },
+        {
+          "id": "mine_asteroids",
+          "type": "gather",
+          "description": "Mine 20 Iron Ore from asteroids.",
+          "objective": { "item": "ore_iron", "count": 20 },
+          "dialogue": {
+            "start": "Perfect! Now head to the asteroid belt and start mining. Hold your fire button on an asteroid to extract ore."
+          }
+        },
+        {
+          "id": "sell_ore",
+          "type": "interact",
+          "description": "Sell your ore at the station.",
+          "objective": { "station": "sol_station_trade", "action": "sell" },
+          "dialogue": {
+            "start": "Nice haul! Bring that ore to the trading station to sell it."
+          }
+        }
+      ],
+      "rewards": {
+        "xp": 150,
+        "credits": 300,
+        "items": []
+      },
+      "prerequisites": ["tutorial_basics"],
+      "repeatable": false
+    },
+    {
+      "id": "system_explorer",
+      "name": "Explorer's Journey",
+      "description": "Visit all discovered star systems.",
+      "giver": "dr_vance",
+      "level": 5,
+      "stages": [
+        {
+          "id": "visit_sol",
+          "type": "travel",
+          "description": "Visit the Sol System.",
+          "objective": { "system": "sol" },
+          "dialogue": {
+            "start": "As an explorer, you should familiarize yourself with all known systems. Start here in Sol."
+          }
+        },
+        {
+          "id": "visit_borealis",
+          "type": "travel",
+          "description": "Visit the Borealis System.",
+          "objective": { "system": "borealis" },
+          "dialogue": {
+            "start": "The Borealis system awaits. Use the portal to travel there."
+          }
+        },
+        {
+          "id": "visit_nebula",
+          "type": "travel",
+          "description": "Visit Nebula Prime.",
+          "objective": { "system": "nebula_prime" },
+          "dialogue": {
+            "start": "Beautiful, isn't it? Now venture into Nebula Prime."
+          }
+        },
+        {
+          "id": "return_vance",
+          "type": "interact",
+          "description": "Report back to Dr. Vance.",
+          "objective": { "npc": "dr_vance" },
+          "dialogue": {
+            "start": "You've seen much of known space. Return to me and share your findings."
+          }
+        }
+      ],
+      "rewards": {
+        "xp": 500,
+        "credits": 1000,
+        "items": ["booster_mk2"]
+      },
+      "prerequisites": ["tutorial_basics"],
+      "repeatable": false
+    },
+    {
+      "id": "weapon_mastery",
+      "name": "Weapons Expert",
+      "description": "Test different weapon types in combat.",
+      "giver": "dr_vance",
+      "level": 4,
+      "stages": [
+        {
+          "id": "use_laser",
+          "type": "kill",
+          "description": "Defeat 5 enemies with a Laser weapon.",
+          "objective": { "weaponType": "laser", "count": 5 },
+          "dialogue": {
+            "start": "Every weapon has its strengths. Let's test your skills with different loadouts. Start with a laser weapon."
+          }
+        },
+        {
+          "id": "use_missile",
+          "type": "kill",
+          "description": "Defeat 5 enemies with Missiles.",
+          "objective": { "weaponType": "missile", "count": 5 },
+          "dialogue": {
+            "start": "Lasers are precise. Now try missiles - they track targets but move slower."
+          }
+        },
+        {
+          "id": "use_scatter",
+          "type": "kill",
+          "description": "Defeat 5 enemies with a Scatter Gun.",
+          "objective": { "weaponType": "scatter", "count": 5 },
+          "dialogue": {
+            "start": "Devastating power! Now test the scatter gun - deadly at close range."
+          }
+        }
+      ],
+      "rewards": {
+        "xp": 400,
+        "credits": 800,
+        "items": ["pulse_mk1"]
+      },
+      "prerequisites": ["tutorial_basics", "ice_sprite_hunt"],
+      "repeatable": false
+    }
+  ]
+}

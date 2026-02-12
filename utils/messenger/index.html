@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0a0a0f">
+  <meta name="description" content="Communicate with GitHub Copilot">
+  
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  
+  <title>Copilot Messenger</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --surface-2: #1a1a25;
+      --primary: #6366f1;
+      --primary-dim: #4f46e5;
+      --text: #e5e5e5;
+      --text-dim: #888;
+      --copilot: #3b82f6;
+      --user: #22c55e;
+      --border: #2a2a35;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: var(--surface);
+      padding: calc(12px + var(--safe-top)) 16px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .logo {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, var(--primary), var(--copilot));
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .header-text {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .header-text h1 {
+      font-size: 17px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .header-text .status {
+      font-size: 12px;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ef4444;
+      flex-shrink: 0;
+    }
+
+    .status-dot.connected {
+      background: #22c55e;
+      box-shadow: 0 0 8px #22c55e;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .icon-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .icon-btn:active {
+      transform: scale(0.95);
+      background: var(--border);
+    }
+
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .message {
+      max-width: 85%;
+      padding: 10px 14px;
+      border-radius: 18px;
+      font-size: 15px;
+      line-height: 1.4;
+      word-wrap: break-word;
+      animation: slideIn 0.2s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .message.copilot {
+      align-self: flex-start;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-bottom-left-radius: 6px;
+    }
+
+    .message.user {
+      align-self: flex-end;
+      background: var(--primary);
+      border-bottom-right-radius: 6px;
+    }
+
+    .message-text {
+      white-space: pre-wrap;
+    }
+
+    .message-meta {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .message.user .message-meta {
+      color: rgba(255,255,255,0.7);
+      justify-content: flex-end;
+    }
+
+    .input-area {
+      background: var(--surface);
+      padding: 12px 16px;
+      padding-bottom: calc(12px + var(--safe-bottom));
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+      flex-shrink: 0;
+    }
+
+    .input-wrapper {
+      flex: 1;
+      background: var(--surface-2);
+      border-radius: 24px;
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: flex-end;
+      min-height: 44px;
+      transition: border-color 0.2s;
+    }
+
+    .input-wrapper:focus-within {
+      border-color: var(--primary);
+    }
+
+    textarea {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-size: 16px;
+      padding: 10px 16px;
+      resize: none;
+      max-height: 120px;
+      line-height: 1.4;
+      font-family: inherit;
+    }
+
+    textarea::placeholder {
+      color: var(--text-dim);
+    }
+
+    .send-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--primary);
+      border: none;
+      color: white;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+
+    .send-btn:active {
+      transform: scale(0.92);
+      background: var(--primary-dim);
+    }
+
+    .send-btn:disabled {
+      background: var(--surface-2);
+      cursor: not-allowed;
+    }
+
+    .empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-dim);
+      text-align: center;
+      padding: 40px 20px;
+    }
+
+    .empty-state .icon {
+      font-size: 56px;
+      margin-bottom: 16px;
+      opacity: 0.7;
+    }
+
+    .empty-state p {
+      max-width: 260px;
+    }
+
+    .date-divider {
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-dim);
+      padding: 8px 0;
+    }
+
+    .install-banner {
+      background: linear-gradient(135deg, var(--primary), var(--copilot));
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .install-banner.hidden {
+      display: none;
+    }
+
+    .install-banner p {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .install-btn {
+      background: white;
+      color: var(--primary);
+      border: none;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .close-banner {
+      background: transparent;
+      border: none;
+      color: white;
+      font-size: 20px;
+      cursor: pointer;
+      padding: 4px;
+      opacity: 0.8;
+    }
+
+    /* Scrollbar */
+    .messages::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .messages::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .messages::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="install-banner hidden" id="installBanner">
+    <p>📱 Install for the best experience</p>
+    <button class="install-btn" id="installBtn">Install</button>
+    <button class="close-banner" onclick="dismissInstall()">×</button>
+  </div>
+
+  <header>
+    <div class="logo">🤖</div>
+    <div class="header-text">
+      <h1>Copilot Messenger</h1>
+      <div class="status">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Connecting...</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" id="notifBtn" onclick="toggleNotifications()" title="Notifications">🔕</button>
+      <button class="icon-btn" onclick="clearMessages()" title="Clear chat">🗑️</button>
+    </div>
+  </header>
+
+  <div class="messages" id="messages">
+    <div class="empty-state" id="emptyState">
+      <div class="icon">🤖</div>
+      <p><strong>Copilot Messenger</strong></p>
+      <p style="font-size: 13px; margin-top: 8px; opacity: 0.7;">Messages from Copilot will appear here. Send "Implement" to start a task.</p>
+    </div>
+  </div>
+
+  <div class="input-area">
+    <div class="input-wrapper">
+      <textarea 
+        id="input" 
+        placeholder="Message Copilot..." 
+        rows="1"
+        onkeydown="handleKeydown(event)"
+        oninput="autoResize(this)"
+      ></textarea>
+    </div>
+    <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="22" y1="2" x2="11" y2="13"></line>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+      </svg>
+    </button>
+  </div>
+
+  <script>
+    const messagesContainer = document.getElementById('messages');
+    const emptyState = document.getElementById('emptyState');
+    const input = document.getElementById('input');
+    const sendBtn = document.getElementById('sendBtn');
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const installBanner = document.getElementById('installBanner');
+    const installBtn = document.getElementById('installBtn');
+
+    let ws;
+    let messages = [];
+    let reconnectAttempts = 0;
+    let deferredPrompt;
+    let notificationsEnabled = false;
+
+    // Request notification permission
+    async function requestNotificationPermission() {
+      if (!('Notification' in window)) {
+        console.log('Notifications not supported');
+        return false;
+      }
+      
+      if (Notification.permission === 'granted') {
+        notificationsEnabled = true;
+        return true;
+      }
+      
+      if (Notification.permission !== 'denied') {
+        const permission = await Notification.requestPermission();
+        notificationsEnabled = permission === 'granted';
+        return notificationsEnabled;
+      }
+      
+      return false;
+    }
+
+    // Show notification
+    function showNotification(title, body) {
+      if (!notificationsEnabled) return;
+      
+      // Don't notify if app is focused
+      if (document.hasFocus()) return;
+      
+      const notification = new Notification(title, {
+        body: body,
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        tag: 'copilot-message', // Replaces previous notification
+        renotify: true,
+        vibrate: [100, 50, 100]
+      });
+      
+      notification.onclick = () => {
+        window.focus();
+        notification.close();
+      };
+      
+      // Auto-close after 5 seconds
+      setTimeout(() => notification.close(), 5000);
+    }
+
+    // Request permission on first interaction
+    document.addEventListener('click', () => {
+      if (!notificationsEnabled && Notification.permission !== 'denied') {
+        requestNotificationPermission();
+      }
+    }, { once: true });
+
+    // PWA Install
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      if (!localStorage.getItem('installDismissed')) {
+        installBanner.classList.remove('hidden');
+      }
+    });
+
+    installBtn?.addEventListener('click', async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+          installBanner.classList.add('hidden');
+        }
+        deferredPrompt = null;
+      }
+    });
+
+    function dismissInstall() {
+      installBanner.classList.add('hidden');
+      localStorage.setItem('installDismissed', 'true');
+    }
+
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then((reg) => console.log('SW registered'))
+        .catch((err) => console.log('SW failed:', err));
+    }
+
+    function connect() {
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${protocol}//${location.host}`);
+
+      ws.onopen = () => {
+        statusDot.classList.add('connected');
+        statusText.textContent = 'Connected';
+        reconnectAttempts = 0;
+      };
+
+      ws.onclose = () => {
+        statusDot.classList.remove('connected');
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+        statusText.textContent = `Reconnecting in ${Math.round(delay/1000)}s...`;
+        reconnectAttempts++;
+        setTimeout(connect, delay);
+      };
+
+      ws.onerror = () => {
+        statusText.textContent = 'Connection error';
+      };
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'init') {
+          messages = data.messages;
+          renderMessages();
+        } else if (data.type === 'new_message') {
+          messages.push(data.message);
+          renderMessages();
+          
+          // Vibrate and show notification on new copilot message
+          if (data.message.from === 'copilot') {
+            if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+            showNotification('🤖 Copilot', data.message.text);
+          }
+        } else if (data.type === 'messages_updated') {
+          // Handle file updates from Copilot
+          const newCopilotMessages = data.messages.filter(
+            m => m.from === 'copilot' && !messages.find(old => old.id === m.id)
+          );
+          messages = data.messages;
+          renderMessages();
+          
+          // Notify for new copilot messages
+          if (newCopilotMessages.length > 0) {
+            if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+            showNotification('🤖 Copilot', newCopilotMessages[newCopilotMessages.length - 1].text);
+          }
+        }
+      };
+    }
+
+    function renderMessages() {
+      if (messages.length === 0) {
+        emptyState.style.display = 'flex';
+        messagesContainer.innerHTML = '';
+        messagesContainer.appendChild(emptyState);
+        return;
+      }
+
+      emptyState.style.display = 'none';
+      
+      let html = '';
+      let lastDate = '';
+      
+      messages.forEach((msg, i) => {
+        const date = new Date(msg.timestamp).toLocaleDateString();
+        if (date !== lastDate) {
+          html += `<div class="date-divider">${date === new Date().toLocaleDateString() ? 'Today' : date}</div>`;
+          lastDate = date;
+        }
+        
+        html += `
+          <div class="message ${msg.from}">
+            <div class="message-text">${escapeHtml(msg.text)}</div>
+            <div class="message-meta">
+              ${msg.from === 'copilot' ? '🤖' : '👤'} ${formatTime(msg.timestamp)}
+            </div>
+          </div>
+        `;
+      });
+      
+      messagesContainer.innerHTML = html;
+      
+      // Scroll to bottom with smooth animation
+      requestAnimationFrame(() => {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      });
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML.replace(/\n/g, '<br>');
+    }
+
+    function formatTime(timestamp) {
+      return new Date(timestamp).toLocaleTimeString([], { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+    }
+
+    function sendMessage() {
+      const text = input.value.trim();
+      if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+      ws.send(JSON.stringify({ type: 'user_message', text }));
+      input.value = '';
+      autoResize(input);
+      input.focus();
+    }
+
+    function handleKeydown(event) {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendMessage();
+      }
+    }
+
+    function autoResize(el) {
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+    }
+
+    async function clearMessages() {
+      if (!confirm('Clear all messages?')) return;
+      
+      try {
+        await fetch('/api/messages', { method: 'DELETE' });
+        messages = [];
+        renderMessages();
+      } catch (e) {
+        console.error('Failed to clear:', e);
+      }
+    }
+
+    // Start
+    connect();
+    
+    // Request notification permission on load
+    requestNotificationPermission().then(enabled => {
+      updateNotifButton();
+    });
+    
+    const notifBtn = document.getElementById('notifBtn');
+    
+    function updateNotifButton() {
+      if (Notification.permission === 'granted') {
+        notifBtn.textContent = '🔔';
+        notifBtn.title = 'Notifications enabled';
+      } else if (Notification.permission === 'denied') {
+        notifBtn.textContent = '🔕';
+        notifBtn.title = 'Notifications blocked - enable in browser settings';
+      } else {
+        notifBtn.textContent = '🔔';
+        notifBtn.title = 'Click to enable notifications';
+      }
+    }
+    
+    async function toggleNotifications() {
+      if (Notification.permission === 'default') {
+        await requestNotificationPermission();
+        updateNotifButton();
+      } else if (Notification.permission === 'denied') {
+        alert('Notifications are blocked. Please enable them in your browser settings.');
+      } else {
+        // Already granted - show test notification
+        showNotification('🤖 Copilot', 'Notifications are working!');
+      }
+    }
+    
+    // Focus input when app becomes visible
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        input.focus();
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+{
+  "npcs": [
+    {
+      "id": "dr_vance",
+      "name": "Dr. Vance",
+      "title": "Station Commander",
+      "description": "A veteran space explorer and scientist who runs the Sol Station.",
+      "system": "sol",
+      "position": { "x": 5000, "y": 2000 },
+      "radius": 30,
+      "sprite": "npc_scientist",
+      "dialogue": {
+        "greeting": "Welcome, pilot! I'm Dr. Vance. If you need guidance, I'm here to help.",
+        "idle": [
+          "Space is vast, but humanity perseveres.",
+          "Have you visited the Borealis system yet? Fascinating phenomena there.",
+          "Always keep your ship in good condition."
+        ],
+        "farewell": "Safe travels, pilot."
+      },
+      "quests": ["tutorial_basics", "system_explorer", "weapon_mastery"],
+      "shop": null,
+      "services": ["repair", "heal"]
+    },
+    {
+      "id": "merchant_joe",
+      "name": "Merchant Joe",
+      "title": "Trader",
+      "description": "A shrewd merchant who deals in all manner of goods.",
+      "system": "sol",
+      "position": { "x": 8000, "y": -3000 },
+      "radius": 30,
+      "sprite": "npc_merchant",
+      "dialogue": {
+        "greeting": "Looking to buy or sell? You've come to the right place!",
+        "idle": [
+          "Best prices in the sector, guaranteed!",
+          "Mining is profitable if you know where to look.",
+          "I've got weapons, equipment, you name it."
+        ],
+        "farewell": "Come back when you've got credits to spend!"
+      },
+      "quests": ["mining_expedition"],
+      "shop": {
+        "buyMultiplier": 1.0,
+        "sellMultiplier": 0.5,
+        "inventory": [
+          { "itemId": "blaster_mk1", "stock": -1, "price": 100 },
+          { "itemId": "blaster_mk2", "stock": 5, "price": 500 },
+          { "itemId": "laser_mk1", "stock": -1, "price": 150 },
+          { "itemId": "scatter_mk1", "stock": -1, "price": 200 },
+          { "itemId": "mining_laser_mk1", "stock": -1, "price": 100 },
+          { "itemId": "booster_mk1", "stock": -1, "price": 200 },
+          { "itemId": "cockpit_mk1", "stock": -1, "price": 200 }
+        ]
+      },
+      "services": []
+    },
+    {
+      "id": "researcher_maya",
+      "name": "Researcher Maya",
+      "title": "Xenobiologist",
+      "description": "Studies the mysterious Ice Sprites and other alien life.",
+      "system": "borealis",
+      "position": { "x": -5000, "y": 1000 },
+      "radius": 30,
+      "sprite": "npc_scientist",
+      "dialogue": {
+        "greeting": "Oh, a visitor! I don't get many out here. The Ice Sprites usually scare everyone off.",
+        "idle": [
+          "The Ice Sprites are fascinating creatures. Dangerous, but fascinating.",
+          "This cold is nothing compared to the mysteries it hides.",
+          "I believe the sprites are protecting something. But what?"
+        ],
+        "farewell": "Don't let the cold get to you!"
+      },
+      "quests": ["ice_sprite_hunt"],
+      "shop": {
+        "buyMultiplier": 1.2,
+        "sellMultiplier": 0.4,
+        "inventory": [
+          { "itemId": "laser_mk2", "stock": 3, "price": 1200 },
+          { "itemId": "cockpit_mk2", "stock": 2, "price": 1500 }
+        ]
+      },
+      "services": ["repair"]
+    },
+    {
+      "id": "scientist_quinn",
+      "name": "Dr. Quinn",
+      "title": "Astrophysicist",
+      "description": "Studies the radiation anomalies in Nebula Prime.",
+      "system": "nebula_prime",
+      "position": { "x": 0, "y": 5000 },
+      "radius": 30,
+      "sprite": "npc_scientist",
+      "dialogue": {
+        "greeting": "Careful with the radiation out here. It does strange things to equipment... and people.",
+        "idle": [
+          "The nebula's colors are caused by ionized gas. Beautiful, isn't it?",
+          "My sensors keep picking up anomalous readings from the core.",
+          "Something is generating massive energy bursts. I need more data."
+        ],
+        "farewell": "Watch your radiation levels!"
+      },
+      "quests": [],
+      "shop": {
+        "buyMultiplier": 1.1,
+        "sellMultiplier": 0.5,
+        "inventory": [
+          { "itemId": "blaster_mk3", "stock": 1, "price": 3000 },
+          { "itemId": "missile_mk2", "stock": 2, "price": 2500 }
+        ]
+      },
+      "services": ["repair", "heal"]
+    }
+  ]
+}

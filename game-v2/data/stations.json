@@ -1,0 +1,131 @@
+{
+  "stations": [
+    {
+      "id": "sol_station_central",
+      "name": "Sol Central Station",
+      "description": "The main hub of the Sol system. All services available.",
+      "system": "sol",
+      "position": { "x": 4500, "y": 0 },
+      "orbit": {
+        "orbitType": 0,
+        "semiMajorAxis": 4500,
+        "eccentricity": 0,
+        "argPeriapsis": 0,
+        "meanAnomaly0": 0,
+        "epochTick": 0
+      },
+      "radius": 300,
+      "sprite": "station_large",
+      "dockingRadius": 800,
+      "services": ["repair", "refuel", "shop", "bank", "quests"],
+      "shop": {
+        "buyMultiplier": 1.0,
+        "sellMultiplier": 0.6,
+        "inventory": [
+          { "itemId": "blaster_mk1", "stock": -1, "price": 100 },
+          { "itemId": "blaster_mk2", "stock": 5, "price": 500 },
+          { "itemId": "laser_mk1", "stock": -1, "price": 150 },
+          { "itemId": "scatter_mk1", "stock": -1, "price": 200 },
+          { "itemId": "missile_mk1", "stock": 3, "price": 400 },
+          { "itemId": "mining_laser_mk1", "stock": -1, "price": 100 },
+          { "itemId": "booster_mk1", "stock": -1, "price": 200 },
+          { "itemId": "booster_mk2", "stock": 3, "price": 800 },
+          { "itemId": "cockpit_mk1", "stock": -1, "price": 200 }
+        ]
+      },
+      "repairCostPerHp": 2,
+      "refuelCostPerUnit": 1
+    },
+    {
+      "id": "sol_station_mining",
+      "name": "Sol Mining Outpost",
+      "description": "A small outpost near the asteroid belt. Specializes in mining equipment.",
+      "system": "sol",
+      "position": { "x": 25000, "y": 15000 },
+      "radius": 150,
+      "sprite": "station_small",
+      "dockingRadius": 500,
+      "services": ["repair", "refuel", "shop"],
+      "shop": {
+        "buyMultiplier": 0.9,
+        "sellMultiplier": 0.7,
+        "inventory": [
+          { "itemId": "mining_laser_mk1", "stock": -1, "price": 90 },
+          { "itemId": "mining_laser_mk2", "stock": 5, "price": 400 },
+          { "itemId": "mining_laser_mk3", "stock": 1, "price": 1500 }
+        ]
+      },
+      "repairCostPerHp": 1,
+      "refuelCostPerUnit": 0.5
+    },
+    {
+      "id": "sol_station_trade",
+      "name": "Sol Trade Hub",
+      "description": "The best place to buy and sell goods in Sol.",
+      "system": "sol",
+      "position": { "x": -20000, "y": 10000 },
+      "radius": 200,
+      "sprite": "station_medium",
+      "dockingRadius": 600,
+      "services": ["shop", "bank"],
+      "shop": {
+        "buyMultiplier": 1.1,
+        "sellMultiplier": 0.8,
+        "inventory": [
+          { "itemId": "ore_iron", "stock": -1, "price": 8 },
+          { "itemId": "ore_crystal", "stock": -1, "price": 20 },
+          { "itemId": "ore_plasma", "stock": -1, "price": 80 }
+        ]
+      },
+      "repairCostPerHp": 3,
+      "refuelCostPerUnit": 2
+    },
+    {
+      "id": "borealis_station_outpost",
+      "name": "Borealis Research Station",
+      "description": "A cold, isolated station dedicated to studying the Ice Sprites.",
+      "system": "borealis",
+      "position": { "x": -5000, "y": 0 },
+      "radius": 180,
+      "sprite": "station_medium",
+      "dockingRadius": 600,
+      "services": ["repair", "refuel", "shop", "quests"],
+      "shop": {
+        "buyMultiplier": 1.2,
+        "sellMultiplier": 0.5,
+        "inventory": [
+          { "itemId": "laser_mk1", "stock": -1, "price": 180 },
+          { "itemId": "laser_mk2", "stock": 3, "price": 900 },
+          { "itemId": "cockpit_mk2", "stock": 2, "price": 1200 },
+          { "itemId": "ice_sprite_drop", "stock": -1, "price": 12 }
+        ]
+      },
+      "repairCostPerHp": 3,
+      "refuelCostPerUnit": 2
+    },
+    {
+      "id": "nebula_research_station",
+      "name": "Nebula Prime Observatory",
+      "description": "An observatory studying the nebula's unique radiation patterns.",
+      "system": "nebula_prime",
+      "position": { "x": 0, "y": 8000 },
+      "radius": 250,
+      "sprite": "station_large",
+      "dockingRadius": 700,
+      "services": ["repair", "refuel", "shop", "quests"],
+      "shop": {
+        "buyMultiplier": 1.1,
+        "sellMultiplier": 0.6,
+        "inventory": [
+          { "itemId": "blaster_mk2", "stock": 5, "price": 550 },
+          { "itemId": "blaster_mk3", "stock": 2, "price": 2500 },
+          { "itemId": "pulse_mk1", "stock": 3, "price": 600 },
+          { "itemId": "pulse_mk2", "stock": 1, "price": 2000 },
+          { "itemId": "booster_mk3", "stock": 1, "price": 3000 }
+        ]
+      },
+      "repairCostPerHp": 2,
+      "refuelCostPerUnit": 1
+    }
+  ]
+}

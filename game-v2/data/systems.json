@@ -1,0 +1,90 @@
+{
+  "systems": [
+    {
+      "id": "sol",
+      "name": "Sol System",
+      "description": "The home system of humanity. A warm yellow star with several stations.",
+      "starColor": "#FFDD44",
+      "starRadius": 1000,
+      "position": { "x": -60000, "y": 0 },
+      "hazards": [],
+      "asteroidDensity": 1.0,
+      "asteroidBelt": {
+        "innerRadius": 15000,
+        "outerRadius": 45000,
+        "count": 400
+      },
+      "asteroidField": "sol_belt",
+      "stations": ["sol_station_central", "sol_station_mining", "sol_station_trade"],
+      "npcs": ["dr_vance", "merchant_joe"],
+      "enemies": [],
+      "portals": [
+        { "id": "portal_sol_to_borealis", "targetSystem": "borealis", "position": { "x": 60000, "y": 0 } }
+      ]
+    },
+    {
+      "id": "borealis",
+      "name": "Borealis System",
+      "description": "A frozen system dominated by ice and strange creatures.",
+      "starColor": "#88CCFF",
+      "starRadius": 800,
+      "position": { "x": 60000, "y": 0 },
+      "hazards": ["cold"],
+      "asteroidDensity": 0.6,
+      "asteroidBelt": {
+        "innerRadius": 12000,
+        "outerRadius": 50000,
+        "count": 250
+      },
+      "asteroidField": "borealis_belt",
+      "stations": ["borealis_station_outpost"],
+      "npcs": ["researcher_maya"],
+      "enemies": ["ice_sprite"],
+      "portals": [
+        { "id": "portal_borealis_to_sol", "targetSystem": "sol", "position": { "x": -60000, "y": 0 } }
+      ]
+    },
+    {
+      "id": "nebula_prime",
+      "name": "Nebula Prime",
+      "description": "A colorful nebula filled with valuable resources but reduced visibility.",
+      "starColor": "#FF66AA",
+      "starRadius": 1200,
+      "position": { "x": 0, "y": 80000 },
+      "hazards": ["radiation", "low_visibility"],
+      "asteroidDensity": 1.5,
+      "asteroidBelt": {
+        "innerRadius": 20000,
+        "outerRadius": 60000,
+        "count": 500
+      },
+      "asteroidField": "nebula_belt",
+      "stations": ["nebula_research_station"],
+      "npcs": ["scientist_quinn"],
+      "enemies": [],
+      "portals": [
+        { "id": "portal_nebula_to_sol", "targetSystem": "sol", "position": { "x": 0, "y": -60000 } }
+      ]
+    },
+    {
+      "id": "void_sector",
+      "name": "Void Sector",
+      "description": "A dark region of space. Few return from its depths.",
+      "starColor": "#440066",
+      "starRadius": 600,
+      "position": { "x": 0, "y": -80000 },
+      "hazards": ["darkness", "gravitational_anomalies"],
+      "asteroidDensity": 0.3,
+      "asteroidBelt": {
+        "innerRadius": 10000,
+        "outerRadius": 30000,
+        "count": 100
+      },
+      "asteroidField": "void_belt",
+      "stations": [],
+      "npcs": [],
+      "enemies": ["void_wraith"],
+      "portals": []
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+app = "spacegame-v2"
+primary_region = "iad"
+
+[build]
+  dockerfile = "server-browser/Dockerfile"
+
+[env]
+  BROWSER_PORT = "8787"
+  NODE_ENV = "production"
+
+[http_service]
+  internal_port = 8787
+  force_https = true
+  auto_start_machines = true
+  auto_stop_machines = "off"
+  min_machines_running = 1
+  max_machines_running = 1
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1

@@ -1,0 +1,1596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Game - System Designer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            background: #0a0a12;
+            color: #ddd;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        
+        /* Layout */
+        .app {
+            display: flex;
+            height: 100vh;
+        }
+        
+        .sidebar {
+            width: 340px;
+            background: #12121a;
+            border-right: 1px solid #2a2a3a;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        /* Sidebar Navigation */
+        .nav-tabs {
+            display: flex;
+            background: #0a0a12;
+            border-bottom: 1px solid #2a2a3a;
+            flex-shrink: 0;
+        }
+        
+        .nav-tab {
+            flex: 1;
+            padding: 12px 8px;
+            background: none;
+            border: none;
+            color: #666;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .nav-tab:hover { color: #aaa; background: #1a1a24; }
+        .nav-tab.active { color: #6af; background: #1a1a24; border-bottom: 2px solid #6af; }
+        
+        /* Layer Toggles */
+        .layer-toggles {
+            padding: 12px;
+            background: #0e0e16;
+            border-bottom: 1px solid #2a2a3a;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
+        .layer-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            background: #1a1a24;
+            border: 1px solid #2a2a3a;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            color: #888;
+            transition: all 0.2s;
+        }
+        
+        .layer-toggle:hover { border-color: #4a4a5a; }
+        .layer-toggle.active { color: #fff; border-color: #6af; background: #1a2a3a; }
+        .layer-toggle input { display: none; }
+        .layer-toggle .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #444;
+        }
+        .layer-toggle.active .dot { background: var(--layer-color, #6af); }
+        
+        /* Panel Content */
+        .panel-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+        
+        .panel-section {
+            margin-bottom: 20px;
+        }
+        
+        .section-title {
+            font-size: 10px;
+            color: #6af;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #2a2a3a;
+        }
+        
+        /* Controls */
+        .control-row {
+            margin-bottom: 10px;
+        }
+        
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+        
+        .control-label span {
+            font-size: 12px;
+            color: #aaa;
+        }
+        
+        .control-value {
+            font-size: 11px;
+            color: #6f6;
+            font-family: 'Consolas', monospace;
+            min-width: 60px;
+            text-align: right;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            height: 4px;
+            appearance: none;
+            -webkit-appearance: none;
+            background: #2a2a3a;
+            border-radius: 2px;
+            outline: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: #6af;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb:hover {
+            background: #8cf;
+        }
+
+        select {
+            width: 100%;
+            padding: 6px 8px;
+            background: #1a1a24;
+            border: 1px solid #2a2a3a;
+            border-radius: 4px;
+            color: #ddd;
+            font-size: 12px;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #6af;
+        }
+        
+        /* Preview Area */
+        .preview-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background: #000008;
+        }
+        
+        #preview {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        
+        /* Toolbar */
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            padding: 10px 16px;
+            background: #12121a;
+            border-bottom: 1px solid #2a2a3a;
+            align-items: center;
+        }
+        
+        .toolbar-btn {
+            padding: 6px 14px;
+            background: #2a2a3a;
+            border: none;
+            border-radius: 4px;
+            color: #ddd;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .toolbar-btn:hover { background: #3a3a4a; }
+        .toolbar-btn.primary { background: #2a4a6a; }
+        .toolbar-btn.primary:hover { background: #3a5a7a; }
+        
+        .toolbar-spacer { flex: 1; }
+        
+        /* Status Bar */
+        .status-bar {
+            padding: 8px 16px;
+            background: #0a0a12;
+            border-top: 1px solid #2a2a3a;
+            font-size: 11px;
+            color: #666;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .zoom-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .zoom-btn {
+            padding: 2px 8px;
+            background: #2a2a3a;
+            border: none;
+            border-radius: 3px;
+            color: #aaa;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        
+        .zoom-btn:hover { background: #3a3a4a; color: #fff; }
+        
+        #zoom-level {
+            min-width: 50px;
+            text-align: center;
+            color: #6af;
+        }
+        
+        /* Hidden panels */
+        .panel { display: none; }
+        .panel.active { display: block; }
+        
+        /* Seed display */
+        .seed-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            padding: 8px;
+            background: #1a1a24;
+            border-radius: 4px;
+        }
+        
+        .seed-row label {
+            font-size: 11px;
+            color: #888;
+        }
+        
+        .seed-row input {
+            flex: 1;
+            padding: 4px 8px;
+            background: #0a0a12;
+            border: 1px solid #2a2a3a;
+            border-radius: 3px;
+            color: #6f6;
+            font-family: 'Consolas', monospace;
+            font-size: 11px;
+        }
+        
+        .seed-row button {
+            padding: 4px 8px;
+            background: #2a2a3a;
+            border: none;
+            border-radius: 3px;
+            color: #aaa;
+            font-size: 10px;
+            cursor: pointer;
+        }
+        
+        .seed-row button:hover { background: #3a3a4a; }
+        
+        /* Layer info boxes */
+        .layer-info {
+            background: #1a1a24;
+            padding: 8px 10px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            border-left: 3px solid #6af;
+            font-size: 11px;
+        }
+        
+        .layer-info strong {
+            color: #fff;
+        }
+        
+        .layer-info span {
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="nav-tabs">
+                <button class="nav-tab active" data-panel="stars">Stars</button>
+                <button class="nav-tab" data-panel="atmosphere">Atmos</button>
+                <button class="nav-tab" data-panel="sun">Sun</button>
+                <button class="nav-tab" data-panel="spawn">Spawn</button>
+            </div>
+            
+            <!-- Layer Toggles -->
+            <div class="layer-toggles">
+                <label class="layer-toggle active" style="--layer-color: #aaf;">
+                    <input type="checkbox" id="layer-stars" checked>
+                    <span class="dot"></span>
+                    Stars
+                </label>
+                <label class="layer-toggle active" style="--layer-color: #f80;">
+                    <input type="checkbox" id="layer-atmosphere" checked>
+                    <span class="dot"></span>
+                    Atmosphere
+                </label>
+                <label class="layer-toggle active" style="--layer-color: #ff0;">
+                    <input type="checkbox" id="layer-sun" checked>
+                    <span class="dot"></span>
+                    Sun
+                </label>
+                <label class="layer-toggle active" style="--layer-color: #888;">
+                    <input type="checkbox" id="layer-asteroids" checked>
+                    <span class="dot"></span>
+                    Asteroids
+                </label>
+                <label class="layer-toggle" style="--layer-color: #6af;">
+                    <input type="checkbox" id="layer-guides">
+                    <span class="dot"></span>
+                    Guides
+                </label>
+            </div>
+            
+            <div class="panel-content">
+                <!-- Stars Panel -->
+                <div class="panel active" id="panel-stars">
+                    <div class="panel-section">
+                        <div class="section-title">Perspective Projection</div>
+                        
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Focal Distance</span>
+                                <span class="control-value" id="stars-focal-val">1000</span>
+                            </div>
+                            <input type="range" id="stars-focal" min="500" max="2000" step="50" value="1000">
+                        </div>
+                        
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Grid Snap Size</span>
+                                <span class="control-value" id="stars-snap-val">3000</span>
+                            </div>
+                            <input type="range" id="stars-snap" min="1000" max="6000" step="500" value="3000">
+                        </div>
+                    </div>
+                    
+                    <div class="panel-section">
+                        <div class="section-title">Depth Layers (6 Total)</div>
+                        
+                        <div class="layer-info">
+                            <strong>Layer 0 (Close):</strong> z 400-800, size 6-10px<br>
+                            <span>Giant stars, sparse clusters</span>
+                        </div>
+                        <div class="layer-info">
+                            <strong>Layer 1:</strong> z 800-1500, size 4-7px<br>
+                            <span>Large stars, minZoom 0.15</span>
+                        </div>
+                        <div class="layer-info">
+                            <strong>Layer 2:</strong> z 900-1500, size 2.5-4.5px<br>
+                            <span>Medium stars, minZoom 0.25</span>
+                        </div>
+                        <div class="layer-info">
+                            <strong>Layer 3:</strong> z 1500-2200, size 1.5-3px<br>
+                            <span>Small stars, minZoom 0.4</span>
+                        </div>
+                        <div class="layer-info">
+                            <strong>Layer 4:</strong> z 2200-3000, size 1-2px<br>
+                            <span>Tiny stars, minZoom 0.6</span>
+                        </div>
+                        <div class="layer-info">
+                            <strong>Layer 5 (Far):</strong> z 3000-4500, size 0.6-1.2px<br>
+                            <span>Star dust, minZoom 0.8</span>
+                        </div>
+                    </div>
+                    
+                    <div class="panel-section">
+                        <div class="section-title">Global Adjustments</div>
+                        
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Brightness</span>
+                                <span class="control-value" id="stars-brightness-val">1.0</span>
+                            </div>
+                            <input type="range" id="stars-brightness" min="0.2" max="2.0" step="0.1" value="1.0">
+                        </div>
+                        
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Glow Intensity</span>
+                                <span class="control-value" id="stars-glow-val">1.0</span>
+                            </div>
+                            <input type="range" id="stars-glow" min="0" max="2.0" step="0.1" value="1.0">
+                        </div>
+                        
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Twinkle Speed</span>
+                                <span class="control-value" id="stars-twinkle-val">1.0</span>
+                            </div>
+                            <input type="range" id="stars-twinkle" min="0" max="3.0" step="0.1" value="1.0">
+                        </div>
+                        
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Hue Shift</span>
+                                <span class="control-value" id="stars-hue-val">0</span>
+                            </div>
+                            <input type="range" id="stars-hue" min="-60" max="60" value="0">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Atmosphere Panel -->
+                <div class="panel" id="panel-atmosphere">
+                    <div class="panel-section">
+                        <div class="section-title">Atmospheric Glow</div>
+                        
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Inner Radius</span>
+                                <span class="control-value" id="atmos-inner-val">500</span>
+                            </div>
+                            <input type="range" id="atmos-inner" min="100" max="2000" step="50" value="500">
+                        </div>
+                        
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Outer Radius</span>
+                                <span class="control-value" id="atmos-outer-val">4000</span>
+                            </div>
+                            <input type="range" id="atmos-outer" min="1000" max="10000" step="100" value="4000">
+                        </div>
+                        
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Intensity</span>
+                                <span class="control-value" id="atmos-intensity-val">0.6</span>
+                            </div>
+                            <input type="range" id="atmos-intensity" min="0" max="1" step="0.05" value="0.6">
+                        </div>
+                        
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Falloff Power</span>
+                                <span class="control-value" id="atmos-falloff-val">2.0</span>
+                            </div>
+                            <input type="range" id="atmos-falloff" min="0.5" max="5" step="0.1" value="2.0">
+                        </div>
+                    </div>
+                    
+                    <div class="panel-section">
+                        <div class="section-title">Color</div>
+                        
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Base Hue</span>
+                                <span class="control-value" id="atmos-hue-val">40</span>
+                            </div>
+                            <input type="range" id="atmos-hue" min="0" max="360" value="40">
+                        </div>
+                        
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Saturation</span>
+                                <span class="control-value" id="atmos-sat-val">0.8</span>
+                            </div>
+                            <input type="range" id="atmos-sat" min="0" max="1" step="0.05" value="0.8">
+                        </div>
+                        
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Hue Shift (edge)</span>
+                                <span class="control-value" id="atmos-hue-shift-val">-20</span>
+                            </div>
+                            <input type="range" id="atmos-hue-shift" min="-60" max="60" value="-20">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Sun Panel -->
+                <div class="panel" id="panel-sun">
+                    <div class="panel-section">
+                        <div class="section-title">Sun Body</div>
+                        
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Radius</span>
+                                <span class="control-value" id="sun-radius-val">350</span>
+                            </div>
+                            <input type="range" id="sun-radius" min="100" max="800" step="10" value="350">
+                        </div>
+                        
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Base Hue</span>
+                                <span class="control-value" id="sun-hue-val">40</span>
+                            </div>
+                            <input type="range" id="sun-hue" min="0" max="360" value="40">
+                        </div>
+                    </div>
+
+                    <div class="panel-section">
+                        <div class="section-title">Sun Shader</div>
+
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Style</span>
+                                <span class="control-value" id="sun-style-name">--</span>
+                            </div>
+                            <select id="sun-style-select"></select>
+                        </div>
+
+                        <div id="sun-style-params"></div>
+                    </div>
+                    
+                    <div class="panel-section">
+                        <div class="section-title">3D Shading</div>
+                        
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Light X</span>
+                                <span class="control-value" id="sun-light-x-val">-0.15</span>
+                            </div>
+                            <input type="range" id="sun-light-x" min="-1" max="1" step="0.05" value="-0.15">
+                        </div>
+                        
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Light Y</span>
+                                <span class="control-value" id="sun-light-y-val">0.2</span>
+                            </div>
+                            <input type="range" id="sun-light-y" min="-1" max="1" step="0.05" value="0.2">
+                        </div>
+                        
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Specular Intensity</span>
+                                <span class="control-value" id="sun-specular-int-val">0.4</span>
+                            </div>
+                            <input type="range" id="sun-specular-int" min="0" max="1" step="0.05" value="0.4">
+                        </div>
+                    </div>
+                    
+                    <div class="panel-section">
+                        <div class="section-title">Corona</div>
+                        
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Corona Size</span>
+                                <span class="control-value" id="sun-corona-val">2.2</span>
+                            </div>
+                            <input type="range" id="sun-corona" min="1.2" max="4" step="0.1" value="2.2">
+                        </div>
+                        
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Corona Intensity</span>
+                                <span class="control-value" id="sun-corona-int-val">0.7</span>
+                            </div>
+                            <input type="range" id="sun-corona-int" min="0" max="1" step="0.05" value="0.7">
+                        </div>
+                    </div>
+
+                    <div class="panel-section">
+                        <div class="section-title">Corona Shader</div>
+
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Style</span>
+                                <span class="control-value" id="corona-style-name">--</span>
+                            </div>
+                            <select id="corona-style-select"></select>
+                        </div>
+
+                        <div id="corona-style-params"></div>
+                    </div>
+                </div>
+                
+                <!-- Spawn Panel -->
+                <div class="panel" id="panel-spawn">
+                    <div class="seed-row">
+                        <label>Seed:</label>
+                        <input type="number" id="spawn-seed" value="12345">
+                        <button id="randomize-seed">🎲</button>
+                    </div>
+                    
+                    <div class="panel-section">
+                        <div class="section-title">Asteroid Distribution</div>
+                        
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Count</span>
+                                <span class="control-value" id="spawn-count-val">60</span>
+                            </div>
+                            <input type="range" id="spawn-count" min="10" max="300" value="60">
+                        </div>
+                        
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Inner Radius</span>
+                                <span class="control-value" id="spawn-inner-val">1200</span>
+                            </div>
+                            <input type="range" id="spawn-inner" min="100" max="3000" step="100" value="1200">
+                        </div>
+                        
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Outer Radius</span>
+                                <span class="control-value" id="spawn-outer-val">15200</span>
+                            </div>
+                            <input type="range" id="spawn-outer" min="2000" max="20000" step="100" value="15200">
+                        </div>
+                        
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Size Min</span>
+                                <span class="control-value" id="spawn-size-min-val">10</span>
+                            </div>
+                            <input type="range" id="spawn-size-min" min="5" max="50" value="10">
+                        </div>
+                        
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Size Max</span>
+                                <span class="control-value" id="spawn-size-max-val">44</span>
+                            </div>
+                            <input type="range" id="spawn-size-max" min="20" max="100" value="44">
+                        </div>
+                    </div>
+                    
+                    <div class="panel-section">
+                        <div class="section-title">Radial Falloff</div>
+                        
+                        <div class="control-row">
+                            <div class="control-label">
+                                <span>Falloff Exponent</span>
+                                <span class="control-value" id="spawn-falloff-val">1.0</span>
+                            </div>
+                            <input type="range" id="spawn-falloff" min="0.5" max="3" step="0.1" value="1.0">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="main">
+            <div class="toolbar">
+                <button class="toolbar-btn primary" id="btn-export">Export JSON</button>
+                <button class="toolbar-btn" id="btn-copy-code">Copy as Code</button>
+                <a href="../game-v2/client/sandbox.html" class="toolbar-btn" target="_blank" style="text-decoration: none;">🎮 Visual Sandbox</a>
+                <span class="toolbar-spacer"></span>
+                <span style="font-size: 11px; color: #666;">Scroll to zoom • Drag to pan</span>
+            </div>
+            
+            <div class="preview-container">
+                <canvas id="preview"></canvas>
+            </div>
+            
+            <div class="status-bar">
+                <span id="status-info">World: 0, 0</span>
+                <div class="zoom-controls">
+                    <button class="zoom-btn" id="zoom-out">−</button>
+                    <span id="zoom-level">100%</span>
+                    <button class="zoom-btn" id="zoom-in">+</button>
+                    <button class="zoom-btn" id="zoom-reset">Reset</button>
+                </div>
+                <span id="status-fps">FPS: --</span>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // ============================================
+        // Configuration State (matching reference game)
+        // ============================================
+        
+        const config = {
+            stars: {
+                focalDistance: 1000,
+                gridSnap: 3000,
+                brightness: 1.0,
+                glowIntensity: 1.0,
+                twinkleSpeed: 1.0,
+                hueShift: 0
+            },
+            atmosphere: {
+                innerRadius: 500,
+                outerRadius: 4000,
+                intensity: 0.6,
+                falloff: 2.0,
+                hue: 40,
+                saturation: 0.8,
+                hueShift: -20
+            },
+            sun: {
+                radius: 350,
+                hue: 40,
+                lightX: -0.15,
+                lightY: 0.2,
+                specularIntensity: 0.4,
+                coronaSize: 2.2,
+                coronaIntensity: 0.7,
+                sunStyle: 'granular',
+                sunStyleParams: {},
+                coronaStyle: 'plasmaStreams',
+                coronaStyleParams: {}
+            },
+            spawn: {
+                seed: 12345,
+                count: 60,
+                innerRadius: 1200,
+                outerRadius: 15200,
+                sizeMin: 10,
+                sizeMax: 44,
+                falloff: 1.0
+            }
+        };
+        
+        // Star layers matching reference game exactly
+        const STAR_LAYERS = [
+            { zMin: 400, zMax: 800, minSize: 6.0, maxSize: 10.0, baseCount: 4, minZoom: 0, noiseScale: 0.00008, noiseSeed: 100, noiseThreshold: 0.5 },
+            { zMin: 800, zMax: 1500, minSize: 4.0, maxSize: 7.0, baseCount: 8, minZoom: 0.15, noiseScale: 0.00015, noiseSeed: 200, noiseThreshold: 0.5 },
+            { zMin: 900, zMax: 1500, minSize: 2.5, maxSize: 4.5, baseCount: 10, minZoom: 0.25, noiseScale: 0.0008, noiseSeed: 300, noiseThreshold: 0 },
+            { zMin: 1500, zMax: 2200, minSize: 1.5, maxSize: 3.0, baseCount: 14, minZoom: 0.4, noiseScale: 0.001, noiseSeed: 400, noiseThreshold: 0 },
+            { zMin: 2200, zMax: 3000, minSize: 1.0, maxSize: 2.0, baseCount: 20, minZoom: 0.6, noiseScale: 0.0015, noiseSeed: 500, noiseThreshold: 0 },
+            { zMin: 3000, zMax: 4500, minSize: 0.6, maxSize: 1.2, baseCount: 28, minZoom: 0.8, noiseScale: 0.002, noiseSeed: 600, noiseThreshold: 0 }
+        ];
+        
+        // Layer visibility
+        const layers = {
+            stars: true,
+            atmosphere: true,
+            sun: true,
+            asteroids: true,
+            guides: false
+        };
+        
+        // Cached star and asteroid data
+        const starCache = new Map();
+        let asteroids = [];
+        
+        // ============================================
+        // Seeded Random Number Generator (mulberry32)
+        // ============================================
+        
+        function mulberry32(seed) {
+            return function() {
+                let t = seed += 0x6D2B79F5;
+                t = Math.imul(t ^ t >>> 15, t | 1);
+                t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+                return ((t ^ t >>> 14) >>> 0) / 4294967296;
+            };
+        }
+        
+        // Hash function for region keys
+        function hash2(x, y, seed) {
+            let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(seed, 1442695041);
+            h = Math.imul(h ^ (h >>> 13), 1274126177);
+            h ^= h >>> 16;
+            return (h >>> 0) / 4294967296;
+        }
+        
+        // 2D Simplex noise for star density variation
+        const SIMPLEX_F2 = 0.5 * (Math.sqrt(3) - 1);
+        const SIMPLEX_G2 = (3 - Math.sqrt(3)) / 6;
+        const SIMPLEX_GRAD = [[1,1],[-1,1],[1,-1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1]];
+
+        function simplexNoise2D(x, y, seed = 0) {
+            const s = (x + y) * SIMPLEX_F2;
+            const i = Math.floor(x + s);
+            const j = Math.floor(y + s);
+            const t = (i + j) * SIMPLEX_G2;
+            const X0 = i - t;
+            const Y0 = j - t;
+            const x0 = x - X0;
+            const y0 = y - Y0;
+            
+            let i1, j1;
+            if (x0 > y0) { i1 = 1; j1 = 0; }
+            else { i1 = 0; j1 = 1; }
+            
+            const x1 = x0 - i1 + SIMPLEX_G2;
+            const y1 = y0 - j1 + SIMPLEX_G2;
+            const x2 = x0 - 1 + 2 * SIMPLEX_G2;
+            const y2 = y0 - 1 + 2 * SIMPLEX_G2;
+            
+            const perm = (n) => {
+                let h = Math.imul(n, 374761393) ^ Math.imul(seed, 668265263);
+                h = Math.imul(h ^ (h >>> 13), 1274126177);
+                return (h >>> 0) % 8;
+            };
+            
+            const ii = i & 0xff;
+            const jj = j & 0xff;
+            const gi0 = perm(ii + perm(jj));
+            const gi1 = perm(ii + i1 + perm(jj + j1));
+            const gi2 = perm(ii + 1 + perm(jj + 1));
+            
+            let n0 = 0, n1 = 0, n2 = 0;
+            
+            let t0 = 0.5 - x0*x0 - y0*y0;
+            if (t0 >= 0) {
+                t0 *= t0;
+                n0 = t0 * t0 * (SIMPLEX_GRAD[gi0][0] * x0 + SIMPLEX_GRAD[gi0][1] * y0);
+            }
+            
+            let t1 = 0.5 - x1*x1 - y1*y1;
+            if (t1 >= 0) {
+                t1 *= t1;
+                n1 = t1 * t1 * (SIMPLEX_GRAD[gi1][0] * x1 + SIMPLEX_GRAD[gi1][1] * y1);
+            }
+            
+            let t2 = 0.5 - x2*x2 - y2*y2;
+            if (t2 >= 0) {
+                t2 *= t2;
+                n2 = t2 * t2 * (SIMPLEX_GRAD[gi2][0] * x2 + SIMPLEX_GRAD[gi2][1] * y2);
+            }
+            
+            return 70 * (n0 + n1 + n2);
+        }
+        
+        // Generate stars for a region
+        function getStarsForRegion(regionX, regionY, layer) {
+            const key = `${regionX},${regionY},${layer.noiseSeed}`;
+            
+            if (starCache.has(key)) {
+                return starCache.get(key);
+            }
+            
+            const stars = [];
+            const SNAP = config.stars.gridSnap;
+            
+            // Simplex noise for density variation
+            const noiseVal = simplexNoise2D(regionX * layer.noiseScale * 1000, regionY * layer.noiseScale * 1000, layer.noiseSeed);
+            const noiseNorm = noiseVal * 0.5 + 0.5;
+            
+            // Skip region if noise below threshold (creates sparse clusters)
+            if (layer.noiseThreshold > 0 && noiseNorm < layer.noiseThreshold) {
+                starCache.set(key, stars);
+                return stars;
+            }
+            
+            const noiseFactor = layer.noiseThreshold > 0 
+                ? (noiseNorm - layer.noiseThreshold) / (1 - layer.noiseThreshold)
+                : 0.3 + 0.7 * noiseNorm;
+            const starCount = Math.floor(layer.baseCount * noiseFactor);
+            
+            if (starCount <= 0) {
+                starCache.set(key, stars);
+                return stars;
+            }
+            
+            // Deterministic RNG for this region
+            const seed = Math.floor(hash2(regionX, regionY, layer.noiseSeed + 7919) * 0xffffffff);
+            const rng = mulberry32(seed);
+            
+            for (let i = 0; i < starCount; i++) {
+                const rx = (rng() - 0.5) * SNAP;
+                const ry = (rng() - 0.5) * SNAP;
+                const zRand = rng();
+                
+                // Blue-white color range (matching reference)
+                const hue = 180 + rng() * 80 + config.stars.hueShift;
+                
+                stars.push({
+                    x: regionX * SNAP + SNAP * 0.5 + rx,
+                    y: regionY * SNAP + SNAP * 0.5 + ry,
+                    z: layer.zMin + zRand * (layer.zMax - layer.zMin),
+                    size: layer.minSize + rng() * (layer.maxSize - layer.minSize),
+                    hue,
+                    phase: rng() * Math.PI * 2,
+                    brightness: 0.5 + rng() * 0.5
+                });
+            }
+            
+            starCache.set(key, stars);
+            return stars;
+        }
+        
+        function generateAsteroids() {
+            const cfg = config.spawn;
+            const rand = mulberry32(cfg.seed);
+            asteroids = [];
+            
+            for (let i = 0; i < cfg.count; i++) {
+                const u = rand();
+                const r = cfg.innerRadius + (cfg.outerRadius - cfg.innerRadius) * Math.pow(u, 1 / cfg.falloff);
+                const angle = rand() * Math.PI * 2;
+                const size = cfg.sizeMin + rand() * (cfg.sizeMax - cfg.sizeMin);
+                
+                asteroids.push({
+                    x: Math.cos(angle) * r,
+                    y: Math.sin(angle) * r,
+                    size,
+                    brightness: 0.3 + rand() * 0.5
+                });
+            }
+        }
+        
+        generateAsteroids();
+        
+        // ============================================
+        // Tab Navigation
+        // ============================================
+        
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById('panel-' + tab.dataset.panel).classList.add('active');
+            });
+        });
+        
+        // ============================================
+        // Layer Toggles
+        // ============================================
+        
+        document.querySelectorAll('.layer-toggle').forEach(toggle => {
+            const checkbox = toggle.querySelector('input');
+            checkbox.addEventListener('change', () => {
+                layers[checkbox.id.replace('layer-', '')] = checkbox.checked;
+                toggle.classList.toggle('active', checkbox.checked);
+            });
+        });
+        
+        // ============================================
+        // Slider Bindings
+        // ============================================
+        
+        function bindSlider(id, configPath, formatter = v => v, onChange = null) {
+            const slider = document.getElementById(id);
+            const valueEl = document.getElementById(id + '-val');
+            if (!slider) return;
+            
+            slider.addEventListener('input', () => {
+                const value = parseFloat(slider.value);
+                valueEl.textContent = formatter(value);
+                const [section, key] = configPath.split('.');
+                config[section][key] = value;
+                if (onChange) onChange(value);
+            });
+        }
+
+        let sunShaderDefs = null;
+
+        function formatParamValue(value, step) {
+            if (step >= 1) return value.toFixed(0);
+            if (step >= 0.1) return value.toFixed(1);
+            return value.toFixed(2);
+        }
+
+        async function loadSunShaderDefs() {
+            try {
+                const res = await fetch('../game-v2/common/src/data/definitions/sun-shader-defs.json');
+                if (!res.ok) throw new Error(`Failed to load shader defs: ${res.status}`);
+                return await res.json();
+            } catch (err) {
+                console.warn('Shader defs not loaded:', err);
+                return null;
+            }
+        }
+
+        function buildStyleUI(styles, selectId, paramsContainerId, nameElId, configStyleKey, configParamsKey) {
+            const select = document.getElementById(selectId);
+            const container = document.getElementById(paramsContainerId);
+            const nameEl = document.getElementById(nameElId);
+            if (!select || !container) return;
+
+            select.innerHTML = '';
+            styles.forEach((style) => {
+                const opt = document.createElement('option');
+                opt.value = style.id;
+                opt.textContent = style.label;
+                select.appendChild(opt);
+            });
+
+            const applyStyle = (styleId) => {
+                const style = styles.find((s) => s.id === styleId) || styles[0];
+                if (nameEl) nameEl.textContent = style.label;
+                config.sun[configStyleKey] = style.id;
+                if (!config.sun[configParamsKey]) config.sun[configParamsKey] = {};
+
+                container.innerHTML = '';
+                style.params.forEach((param) => {
+                    const row = document.createElement('div');
+                    row.className = 'control-row';
+                    const value = (config.sun[configParamsKey][param.key] ?? param.default);
+                    row.innerHTML = `
+                        <div class="control-label">
+                            <span>${param.label}</span>
+                            <span class="control-value" id="${configStyleKey}-${param.key}-val">${formatParamValue(value, param.step)}</span>
+                        </div>
+                        <input type="range" id="${configStyleKey}-${param.key}" min="${param.min}" max="${param.max}" step="${param.step}" value="${value}">
+                    `;
+                    container.appendChild(row);
+
+                    const slider = row.querySelector('input');
+                    const valueEl = row.querySelector('.control-value');
+                    slider.addEventListener('input', () => {
+                        const v = parseFloat(slider.value);
+                        valueEl.textContent = formatParamValue(v, param.step);
+                        config.sun[configParamsKey][param.key] = v;
+                    });
+
+                    config.sun[configParamsKey][param.key] = value;
+                });
+            };
+
+            const initialStyle = styles.some((s) => s.id === config.sun[configStyleKey])
+                ? config.sun[configStyleKey]
+                : styles[0].id;
+            select.value = initialStyle;
+            applyStyle(initialStyle);
+
+            select.addEventListener('change', () => applyStyle(select.value));
+        }
+        
+        // Stars
+        bindSlider('stars-focal', 'stars.focalDistance', v => v.toFixed(0), () => starCache.clear());
+        bindSlider('stars-snap', 'stars.gridSnap', v => v.toFixed(0), () => starCache.clear());
+        bindSlider('stars-brightness', 'stars.brightness', v => v.toFixed(1));
+        bindSlider('stars-glow', 'stars.glowIntensity', v => v.toFixed(1));
+        bindSlider('stars-twinkle', 'stars.twinkleSpeed', v => v.toFixed(1));
+        bindSlider('stars-hue', 'stars.hueShift', v => v.toFixed(0), () => starCache.clear());
+        
+        // Atmosphere
+        bindSlider('atmos-inner', 'atmosphere.innerRadius', v => v.toFixed(0));
+        bindSlider('atmos-outer', 'atmosphere.outerRadius', v => v.toFixed(0));
+        bindSlider('atmos-intensity', 'atmosphere.intensity', v => v.toFixed(2));
+        bindSlider('atmos-falloff', 'atmosphere.falloff', v => v.toFixed(1));
+        bindSlider('atmos-hue', 'atmosphere.hue', v => v.toFixed(0));
+        bindSlider('atmos-sat', 'atmosphere.saturation', v => v.toFixed(2));
+        bindSlider('atmos-hue-shift', 'atmosphere.hueShift', v => v.toFixed(0));
+        
+        // Sun
+        bindSlider('sun-radius', 'sun.radius', v => v.toFixed(0));
+        bindSlider('sun-hue', 'sun.hue', v => v.toFixed(0));
+        bindSlider('sun-light-x', 'sun.lightX', v => v.toFixed(2));
+        bindSlider('sun-light-y', 'sun.lightY', v => v.toFixed(2));
+        bindSlider('sun-specular-int', 'sun.specularIntensity', v => v.toFixed(2));
+        bindSlider('sun-corona', 'sun.coronaSize', v => v.toFixed(1));
+        bindSlider('sun-corona-int', 'sun.coronaIntensity', v => v.toFixed(2));
+        
+        // Spawn
+        bindSlider('spawn-count', 'spawn.count', v => v.toFixed(0), generateAsteroids);
+        bindSlider('spawn-inner', 'spawn.innerRadius', v => v.toFixed(0), generateAsteroids);
+        bindSlider('spawn-outer', 'spawn.outerRadius', v => v.toFixed(0), generateAsteroids);
+        bindSlider('spawn-size-min', 'spawn.sizeMin', v => v.toFixed(0), generateAsteroids);
+        bindSlider('spawn-size-max', 'spawn.sizeMax', v => v.toFixed(0), generateAsteroids);
+        bindSlider('spawn-falloff', 'spawn.falloff', v => v.toFixed(1), generateAsteroids);
+        
+        // Seed input
+        const seedInput = document.getElementById('spawn-seed');
+        seedInput.addEventListener('change', () => {
+            config.spawn.seed = parseInt(seedInput.value) || 12345;
+            generateAsteroids();
+        });
+        
+        document.getElementById('randomize-seed').addEventListener('click', () => {
+            config.spawn.seed = Math.floor(Math.random() * 1000000);
+            seedInput.value = config.spawn.seed;
+            generateAsteroids();
+        });
+
+        loadSunShaderDefs().then((defs) => {
+            sunShaderDefs = defs;
+            if (!sunShaderDefs) return;
+            buildStyleUI(sunShaderDefs.sunStyles, 'sun-style-select', 'sun-style-params', 'sun-style-name', 'sunStyle', 'sunStyleParams');
+            buildStyleUI(sunShaderDefs.coronaStyles, 'corona-style-select', 'corona-style-params', 'corona-style-name', 'coronaStyle', 'coronaStyleParams');
+        });
+        
+        // ============================================
+        // Canvas Setup
+        // ============================================
+        
+        const canvas = document.getElementById('preview');
+        const ctx = canvas.getContext('2d');
+        let time = 0;
+        let lastTime = performance.now();
+        let frameCount = 0;
+        let fpsTime = 0;
+        
+        function resize() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            canvas.style.width = rect.width + 'px';
+            canvas.style.height = rect.height + 'px';
+        }
+        
+        window.addEventListener('resize', resize);
+        resize();
+        
+        // ============================================
+        // Camera/View (matching game: zoom=1 at start)
+        // ============================================
+        
+        let viewX = 0;
+        let viewY = 0;
+        let zoom = 1.0;
+        const minZoom = 0.1;
+        const maxZoom = 2.0;
+        
+        let isPanning = false;
+        let panStartX = 0, panStartY = 0;
+        let viewStartX = 0, viewStartY = 0;
+        
+        canvas.addEventListener('mousedown', (e) => {
+            isPanning = true;
+            panStartX = e.clientX;
+            panStartY = e.clientY;
+            viewStartX = viewX;
+            viewStartY = viewY;
+            canvas.style.cursor = 'grabbing';
+        });
+        
+        window.addEventListener('mousemove', (e) => {
+            if (isPanning) {
+                const dx = (e.clientX - panStartX) / zoom;
+                const dy = (e.clientY - panStartY) / zoom;
+                viewX = viewStartX - dx;
+                viewY = viewStartY - dy;
+            }
+            const rect = canvas.getBoundingClientRect();
+            const mx = (e.clientX - rect.left - rect.width / 2) / zoom + viewX;
+            const my = (e.clientY - rect.top - rect.height / 2) / zoom + viewY;
+            document.getElementById('status-info').textContent = `World: ${mx.toFixed(0)}, ${my.toFixed(0)}`;
+        });
+        
+        window.addEventListener('mouseup', () => {
+            isPanning = false;
+            canvas.style.cursor = 'grab';
+        });
+        
+        canvas.style.cursor = 'grab';
+        
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+            zoom = Math.max(minZoom, Math.min(maxZoom, zoom * zoomFactor));
+            document.getElementById('zoom-level').textContent = `${(zoom * 100).toFixed(0)}%`;
+        });
+        
+        document.getElementById('zoom-in').addEventListener('click', () => {
+            zoom = Math.min(maxZoom, zoom * 1.2);
+            document.getElementById('zoom-level').textContent = `${(zoom * 100).toFixed(0)}%`;
+        });
+        
+        document.getElementById('zoom-out').addEventListener('click', () => {
+            zoom = Math.max(minZoom, zoom / 1.2);
+            document.getElementById('zoom-level').textContent = `${(zoom * 100).toFixed(0)}%`;
+        });
+        
+        document.getElementById('zoom-reset').addEventListener('click', () => {
+            zoom = 1.0;
+            viewX = 0;
+            viewY = 0;
+            document.getElementById('zoom-level').textContent = '100%';
+        });
+        
+        // ============================================
+        // Render Functions
+        // ============================================
+        
+        function render() {
+            const now = performance.now();
+            const dt = (now - lastTime) / 1000;
+            lastTime = now;
+            time += dt;
+            
+            frameCount++;
+            if (now - fpsTime >= 1000) {
+                document.getElementById('status-fps').textContent = `FPS: ${frameCount}`;
+                frameCount = 0;
+                fpsTime = now;
+            }
+            
+            const dpr = window.devicePixelRatio || 1;
+            const w = canvas.width / dpr;
+            const h = canvas.height / dpr;
+            
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            
+            // Clear with dark blue background
+            ctx.fillStyle = '#000008';
+            ctx.fillRect(0, 0, w, h);
+            
+            // Render layers in order (back to front)
+            if (layers.stars) renderStars(w, h);
+            if (layers.atmosphere) renderAtmosphere(w, h);
+            if (layers.sun) renderSun(w, h);
+            if (layers.asteroids) renderAsteroids(w, h);
+            if (layers.guides) renderGuides(w, h);
+            
+            requestAnimationFrame(render);
+        }
+        
+        function renderStars(w, h) {
+            const SNAP = config.stars.gridSnap;
+            const FOCAL = config.stars.focalDistance;
+            const centerX = w / 2;
+            const centerY = h / 2;
+            
+            // Calculate grid coverage
+            const viewW = w / zoom;
+            const viewH = h / zoom;
+            const gridRadius = Math.ceil(Math.max(viewW, viewH) / SNAP) + 1;
+            const snapX = Math.floor(viewX / SNAP);
+            const snapY = Math.floor(viewY / SNAP);
+            
+            // Draw each layer (back to front)
+            for (let layerIdx = STAR_LAYERS.length - 1; layerIdx >= 0; layerIdx--) {
+                const layer = STAR_LAYERS[layerIdx];
+                
+                // Skip layer if zoom is too low
+                if (zoom < layer.minZoom) continue;
+                
+                // Fade layer in as zoom approaches minZoom
+                const layerAlphaMultiplier = layer.minZoom > 0 
+                    ? Math.min(1, (zoom - layer.minZoom) / (layer.minZoom * 0.5 + 0.1))
+                    : 1;
+                if (layerAlphaMultiplier <= 0) continue;
+                
+                const depthRatio = (layer.zMin - 400) / (3000 - 400);
+                
+                // Loop through grid regions
+                for (let dy = -gridRadius; dy <= gridRadius; dy++) {
+                    for (let dx = -gridRadius; dx <= gridRadius; dx++) {
+                        const regionX = snapX + dx;
+                        const regionY = snapY + dy;
+                        const stars = getStarsForRegion(regionX, regionY, layer);
+                        
+                        for (const star of stars) {
+                            // Perspective projection (matching reference)
+                            const scale = (FOCAL / star.z) * zoom;
+                            const screenX = centerX + (star.x - viewX) * scale;
+                            const screenY = centerY + (star.y - viewY) * scale;
+                            
+                            // Cull off-screen stars
+                            const margin = star.size * 10;
+                            if (screenX < -margin || screenX > w + margin || 
+                                screenY < -margin || screenY > h + margin) continue;
+                            
+                            // Blink/twinkle effect
+                            const blinkSpeed = (0.2 + (1 - depthRatio) * 0.3) * config.stars.twinkleSpeed;
+                            const blink = 0.75 + 0.25 * Math.sin(time * blinkSpeed + star.phase);
+                            
+                            // Alpha based on depth and layer visibility
+                            const baseAlpha = 0.5 + 0.5 * (1 - depthRatio);
+                            const alpha = baseAlpha * blink * layerAlphaMultiplier * star.brightness * config.stars.brightness;
+                            
+                            if (alpha < 0.05) continue;
+                            
+                            const starRadius = Math.max(1, star.size * scale * 0.8);
+                            
+                            // Draw outer glow (radial gradient, matching reference)
+                            const glowRadius = starRadius * 5 * config.stars.glowIntensity;
+                            if (glowRadius > 0.5) {
+                                const glow = ctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, glowRadius);
+                                glow.addColorStop(0, `hsla(${star.hue}, 50%, 95%, ${alpha * 0.5})`);
+                                glow.addColorStop(0.15, `hsla(${star.hue}, 45%, 85%, ${alpha * 0.3})`);
+                                glow.addColorStop(0.4, `hsla(${star.hue}, 35%, 70%, ${alpha * 0.1})`);
+                                glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                                ctx.beginPath();
+                                ctx.arc(screenX, screenY, glowRadius, 0, Math.PI * 2);
+                                ctx.fillStyle = glow;
+                                ctx.fill();
+                            }
+                            
+                            // Star core body
+                            ctx.beginPath();
+                            ctx.arc(screenX, screenY, starRadius, 0, Math.PI * 2);
+                            ctx.fillStyle = `hsla(${star.hue}, 25%, 90%, ${alpha})`;
+                            ctx.fill();
+                            
+                            // Bright center for larger stars
+                            if (starRadius > 1.5) {
+                                const centerRadius = starRadius * 0.4;
+                                const centerGlow = ctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, centerRadius);
+                                centerGlow.addColorStop(0, `hsla(${star.hue}, 10%, 100%, ${alpha})`);
+                                centerGlow.addColorStop(0.5, `hsla(${star.hue}, 20%, 98%, ${alpha * 0.8})`);
+                                centerGlow.addColorStop(1, `hsla(${star.hue}, 30%, 92%, ${alpha * 0.4})`);
+                                ctx.beginPath();
+                                ctx.arc(screenX, screenY, centerRadius, 0, Math.PI * 2);
+                                ctx.fillStyle = centerGlow;
+                                ctx.fill();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        function worldToScreen(wx, wy, w, h) {
+            return {
+                x: w / 2 + (wx - viewX) * zoom,
+                y: h / 2 + (wy - viewY) * zoom
+            };
+        }
+        
+        function hslToRgb(h, s, l) {
+            h = ((h % 360) + 360) % 360 / 360;
+            const c = (1 - Math.abs(2 * l - 1)) * s;
+            const x = c * (1 - Math.abs((h * 6) % 2 - 1));
+            const m = l - c / 2;
+            let r, g, b;
+            if (h < 1/6) { r = c; g = x; b = 0; }
+            else if (h < 2/6) { r = x; g = c; b = 0; }
+            else if (h < 3/6) { r = 0; g = c; b = x; }
+            else if (h < 4/6) { r = 0; g = x; b = c; }
+            else if (h < 5/6) { r = x; g = 0; b = c; }
+            else { r = c; g = 0; b = x; }
+            return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+        }
+
+        function getStyleDefinition(styles, styleId) {
+            if (!styles || !styles.length) return null;
+            return styles.find((s) => s.id === styleId) || styles[0];
+        }
+
+        function getStyleParam(styleDef, paramsMap, key, fallback) {
+            if (!styleDef) return fallback;
+            const def = styleDef.params.find((p) => p.key === key);
+            if (!def) return fallback;
+            const value = paramsMap?.[key];
+            return value !== undefined ? value : def.default;
+        }
+        
+        function renderAtmosphere(w, h) {
+            const cfg = config.atmosphere;
+            const center = worldToScreen(0, 0, w, h);
+            
+            const innerR = cfg.innerRadius * zoom;
+            const outerR = cfg.outerRadius * zoom;
+            
+            const grad = ctx.createRadialGradient(center.x, center.y, innerR, center.x, center.y, outerR);
+            const [r1, g1, b1] = hslToRgb(cfg.hue, cfg.saturation, 0.6);
+            const [r2, g2, b2] = hslToRgb(cfg.hue + cfg.hueShift, cfg.saturation * 0.7, 0.3);
+            
+            grad.addColorStop(0, `rgba(${r1}, ${g1}, ${b1}, ${cfg.intensity * 0.5})`);
+            grad.addColorStop(0.5, `rgba(${r1}, ${g1}, ${b1}, ${cfg.intensity * 0.2})`);
+            grad.addColorStop(1, `rgba(${r2}, ${g2}, ${b2}, 0)`);
+            
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, outerR, 0, Math.PI * 2);
+            ctx.fillStyle = grad;
+            ctx.fill();
+        }
+        
+        function renderSun(w, h) {
+            const cfg = config.sun;
+            const center = worldToScreen(0, 0, w, h);
+            const r = cfg.radius * zoom;
+
+            const sunStyleDef = getStyleDefinition(sunShaderDefs?.sunStyles, cfg.sunStyle);
+            const coronaStyleDef = getStyleDefinition(sunShaderDefs?.coronaStyles, cfg.coronaStyle);
+            const sunParams = cfg.sunStyleParams || {};
+            const coronaParams = cfg.coronaStyleParams || {};
+
+            const coreRadius = getStyleParam(sunStyleDef, sunParams, 'coreRadius', 0.6);
+            const rimIntensity = getStyleParam(sunStyleDef, sunParams, 'rimIntensity', 0.8);
+            const heatBias = getStyleParam(sunStyleDef, sunParams, 'heatBias', 0.55);
+            const grainContrast = getStyleParam(sunStyleDef, sunParams, 'grainContrast', 0.85);
+            const flowScale = getStyleParam(sunStyleDef, sunParams, 'flowScale', 1.2);
+
+            const coronaRadius = getStyleParam(coronaStyleDef, coronaParams, 'radius', 1.1);
+            const coronaFalloff = getStyleParam(coronaStyleDef, coronaParams, 'falloff', 1.6);
+            const coronaIntensity = getStyleParam(coronaStyleDef, coronaParams, 'intensity', 0.9);
+            const streamCount = Math.floor(getStyleParam(coronaStyleDef, coronaParams, 'streamCount', 6));
+            const streamWidth = getStyleParam(coronaStyleDef, coronaParams, 'streamWidth', 0.08);
+            const streamSpeed = getStyleParam(coronaStyleDef, coronaParams, 'streamSpeed', 0.9);
+            const streamTurbulence = getStyleParam(coronaStyleDef, coronaParams, 'turbulence', 0.4);
+            const pulseSpeed = getStyleParam(coronaStyleDef, coronaParams, 'pulseSpeed', 0.3);
+            const noiseAmount = getStyleParam(coronaStyleDef, coronaParams, 'noiseAmount', 0.25);
+            
+            // Corona
+            const coronaR = r * cfg.coronaSize * coronaRadius;
+            const coronaGrad = ctx.createRadialGradient(center.x, center.y, r * 0.95, center.x, center.y, coronaR);
+            const [cr, cg, cb] = hslToRgb(cfg.hue - 5, 0.8, 0.6);
+            const pulse = 0.85 + 0.15 * Math.sin(time * pulseSpeed);
+            const baseCoronaAlpha = cfg.coronaIntensity * coronaIntensity * pulse;
+            const midStop = Math.min(0.7, Math.max(0.2, 1.0 / Math.max(0.1, coronaFalloff)));
+            coronaGrad.addColorStop(0, `rgba(${cr}, ${cg}, ${cb}, ${baseCoronaAlpha * 0.55})`);
+            coronaGrad.addColorStop(midStop, `rgba(${cr}, ${cg}, ${cb}, ${baseCoronaAlpha * 0.2})`);
+            coronaGrad.addColorStop(1, `rgba(${cr}, ${cg}, ${cb}, 0)`);
+            
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, coronaR, 0, Math.PI * 2);
+            ctx.fillStyle = coronaGrad;
+            ctx.fill();
+            
+            // Sun body with 3D gradient
+            const bodyGrad = ctx.createRadialGradient(
+                center.x + r * cfg.lightX * 0.3, 
+                center.y + r * cfg.lightY * 0.3, 
+                0,
+                center.x, center.y, r
+            );
+            
+            const heatShift = (heatBias - 0.5) * 20;
+            const [centerR, centerG, centerB] = hslToRgb(cfg.hue + 5 + heatShift, 0.5, 0.95);
+            const [midR, midG, midB] = hslToRgb(cfg.hue + heatShift, 0.7, 0.75);
+            const [edgeR, edgeG, edgeB] = hslToRgb(cfg.hue - 10 + heatShift, 0.9, 0.55);
+            
+            bodyGrad.addColorStop(0, `rgb(${centerR}, ${centerG}, ${centerB})`);
+            bodyGrad.addColorStop(Math.max(0.25, Math.min(0.6, coreRadius * 0.9)), `rgb(${midR}, ${midG}, ${midB})`);
+            bodyGrad.addColorStop(0.85, `rgb(${edgeR}, ${edgeG}, ${edgeB})`);
+            bodyGrad.addColorStop(1, `rgb(${edgeR}, ${edgeG}, ${edgeB})`);
+            
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, r, 0, Math.PI * 2);
+            ctx.fillStyle = bodyGrad;
+            ctx.fill();
+
+            if (sunStyleDef?.id === 'granular') {
+                const granuleAlpha = Math.min(0.35, grainContrast * 0.2);
+                ctx.globalAlpha = granuleAlpha;
+                ctx.beginPath();
+                ctx.arc(center.x, center.y, r * 0.92, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(${edgeR}, ${edgeG}, ${edgeB}, ${granuleAlpha})`;
+                ctx.lineWidth = Math.max(1, r * 0.01);
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            }
+            
+            // Specular highlight
+            const specX = center.x + r * cfg.lightX * 0.4;
+            const specY = center.y + r * cfg.lightY * 0.4;
+            const specR = r * (0.2 + flowScale * 0.12);
+            const specGrad = ctx.createRadialGradient(specX, specY, 0, specX, specY, specR);
+            specGrad.addColorStop(0, `rgba(255, 255, 250, ${cfg.specularIntensity * 0.7})`);
+            specGrad.addColorStop(0.5, `rgba(255, 255, 240, ${cfg.specularIntensity * 0.2})`);
+            specGrad.addColorStop(1, 'rgba(255, 255, 230, 0)');
+            
+            ctx.beginPath();
+            ctx.arc(specX, specY, specR, 0, Math.PI * 2);
+            ctx.fillStyle = specGrad;
+            ctx.fill();
+
+            if (coronaStyleDef?.id === 'plasmaStreams') {
+                const streams = Math.max(2, Math.min(12, streamCount));
+                const baseAngle = time * streamSpeed * 0.25;
+                ctx.save();
+                ctx.translate(center.x, center.y);
+                for (let i = 0; i < streams; i++) {
+                    const angle = baseAngle + (i / streams) * Math.PI * 2;
+                    const jitter = Math.sin(time * 0.6 + i * 2.1) * streamTurbulence * 0.3;
+                    const length = r * (1.05 + 0.35 * Math.abs(Math.sin(time * 0.5 + i)) + jitter);
+                    const lineWidth = Math.max(1, r * streamWidth);
+                    const grad = ctx.createLinearGradient(0, 0, Math.cos(angle) * length, Math.sin(angle) * length);
+                    grad.addColorStop(0, `rgba(${cr}, ${cg}, ${cb}, ${baseCoronaAlpha * (0.25 + noiseAmount * 0.3)})`);
+                    grad.addColorStop(1, `rgba(${cr}, ${cg}, ${cb}, 0)`);
+                    ctx.strokeStyle = grad;
+                    ctx.lineWidth = lineWidth;
+                    ctx.beginPath();
+                    ctx.moveTo(Math.cos(angle) * r * 0.98, Math.sin(angle) * r * 0.98);
+                    ctx.lineTo(Math.cos(angle) * length, Math.sin(angle) * length);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+        }
+        
+        function renderAsteroids(w, h) {
+            for (const ast of asteroids) {
+                const pos = worldToScreen(ast.x, ast.y, w, h);
+                const screenSize = ast.size * zoom;
+                if (pos.x < -screenSize || pos.x > w + screenSize || 
+                    pos.y < -screenSize || pos.y > h + screenSize) continue;
+                
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, Math.max(1, screenSize), 0, Math.PI * 2);
+                const gray = Math.floor(100 + ast.brightness * 80);
+                ctx.fillStyle = `rgb(${gray}, ${gray - 10}, ${gray - 20})`;
+                ctx.fill();
+            }
+        }
+        
+        function renderGuides(w, h) {
+            const center = worldToScreen(0, 0, w, h);
+            ctx.lineWidth = 1;
+            
+            // Sun radius
+            ctx.strokeStyle = 'rgba(255, 200, 50, 0.4)';
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, config.sun.radius * zoom, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Atmosphere inner/outer
+            ctx.strokeStyle = 'rgba(255, 150, 50, 0.3)';
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, config.atmosphere.innerRadius * zoom, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, config.atmosphere.outerRadius * zoom, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Spawn inner/outer
+            ctx.strokeStyle = 'rgba(100, 255, 100, 0.4)';
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, config.spawn.innerRadius * zoom, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            ctx.setLineDash([10, 5]);
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, config.spawn.outerRadius * zoom, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Center crosshair
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.beginPath();
+            ctx.moveTo(center.x - 20, center.y);
+            ctx.lineTo(center.x + 20, center.y);
+            ctx.moveTo(center.x, center.y - 20);
+            ctx.lineTo(center.x, center.y + 20);
+            ctx.stroke();
+        }
+        
+        // ============================================
+        // Export
+        // ============================================
+        
+        document.getElementById('btn-export').addEventListener('click', () => {
+            const json = JSON.stringify(config, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'space-game-config.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+        
+        document.getElementById('btn-copy-code').addEventListener('click', () => {
+            const code = `// Generated by Space Game System Designer
+export const gameConfig = ${JSON.stringify(config, null, 2)};`;
+            navigator.clipboard.writeText(code).then(() => {
+                document.getElementById('status-info').textContent = 'Copied to clipboard!';
+                setTimeout(() => {
+                    document.getElementById('status-info').textContent = 'World: 0, 0';
+                }, 2000);
+            });
+        });
+        
+        // Start
+        render();
+    </script>
+</body>
+</html>

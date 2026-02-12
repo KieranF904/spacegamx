@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Space Game v2</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+    }
+    
+    #game-container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    
+    canvas {
+      display: block;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+    
+    #ui-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #cfd5ff;
+      z-index: 10;
+    }
+    
+    .ui-element {
+      pointer-events: auto;
+    }
+
+    /* ============================================
+       XP HUD - Bottom Center
+       ============================================ */
+    #xpHud {
+      position: absolute;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      display: none;
+      align-items: center;
+      gap: 10px;
+      z-index: 25;
+      pointer-events: none;
+    }
+
+    #xpLevel {
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.95);
+    }
+
+    #xpBar {
+      position: relative;
+      width: 260px;
+      height: 14px;
+      border-radius: 999px;
+      border: 2px solid rgba(255, 255, 255, 0.9);
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.25);
+    }
+
+    #xpFill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 0%;
+      background: rgba(120, 200, 255, 0.95);
+      transition: width 0.15s ease-out;
+    }
+
+    #xpTicks {
+      position: absolute;
+      inset: 2px 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+    }
+
+    .xp-tick {
+      width: 2px;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: 2px;
+    }
+
+    #xpNumber {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.8);
+      margin-left: 8px;
+      min-width: 50px;
+    }
+
+    /* ============================================
+       HP HUD - Above XP Bar
+       ============================================ */
+    #hpHud {
+      position: absolute;
+      left: 50%;
+      bottom: 58px;
+      transform: translateX(-50%);
+      display: none;
+      align-items: center;
+      gap: 10px;
+      z-index: 25;
+      pointer-events: none;
+    }
+
+    #hpLabel {
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(255, 80, 80, 0.95);
+    }
+
+    #hpBar {
+      position: relative;
+      width: 200px;
+      height: 10px;
+      border-radius: 999px;
+      border: 2px solid rgba(255, 100, 100, 0.9);
+      background: rgba(255, 100, 100, 0.1);
+      overflow: hidden;
+      box-shadow: 0 0 10px rgba(255, 80, 80, 0.25);
+    }
+
+    #hpFill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+      background: rgba(255, 80, 80, 0.9);
+      transition: width 0.15s ease-out;
+    }
+
+    #hpNumber {
+      font-size: 11px;
+      color: rgba(255, 150, 150, 0.9);
+      min-width: 45px;
+    }
+
+    /* ============================================
+       Weapon HUD - Between HP and XP
+       ============================================ */
+    #weaponHud {
+      position: absolute;
+      left: 50%;
+      bottom: 42px;
+      transform: translateX(-50%);
+      display: none;
+      align-items: center;
+      gap: 8px;
+      z-index: 26;
+      pointer-events: none;
+      width: 260px;
+    }
+
+    .weapon-bar {
+      position: relative;
+      flex: 1;
+      height: 10px;
+      border-radius: 999px;
+      border: 2px solid rgba(255, 255, 255, 0.85);
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+    }
+
+    .weapon-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 0%;
+      background: rgba(120, 200, 255, 0.9);
+      transition: width 0.08s ease-out;
+    }
+
+    /* Inventory/Equipment panels are styled by InventoryUI.ts */
+
+    /* ============================================
+       Top HUD - System Info & Credits
+       ============================================ */
+    #topHud {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      display: none;
+      justify-content: space-between;
+      align-items: flex-start;
+      z-index: 25;
+      pointer-events: none;
+    }
+
+    #systemInfo {
+      font-size: 14px;
+      letter-spacing: 0.05em;
+      color: rgba(200, 220, 255, 0.9);
+      text-shadow: 0 0 10px rgba(100, 150, 255, 0.5);
+    }
+
+    #creditsDisplay {
+      font-size: 14px;
+      letter-spacing: 0.05em;
+      color: rgba(255, 220, 100, 0.95);
+      text-shadow: 0 0 10px rgba(255, 200, 50, 0.4);
+    }
+
+    /* ============================================
+       Boost Indicator - Bottom Right
+       ============================================ */
+    #boostHud {
+      position: absolute;
+      right: 20px;
+      bottom: 20px;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      z-index: 25;
+      pointer-events: none;
+    }
+
+    #boostBar {
+      width: 8px;
+      height: 100px;
+      border-radius: 4px;
+      border: 2px solid rgba(100, 180, 255, 0.7);
+      background: rgba(100, 180, 255, 0.1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    #boostFill {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 100%;
+      background: rgba(100, 180, 255, 0.8);
+      transition: height 0.1s ease-out;
+    }
+
+    #boostLabel {
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(100, 180, 255, 0.8);
+    }
+
+    /* ============================================
+       Minimap - Bottom Right
+       ============================================ */
+    #minimapContainer {
+      position: absolute;
+      bottom: 140px;
+      right: 16px;
+      z-index: 20;
+    }
+
+    #minimap-canvas {
+      width: 160px;
+      height: 160px;
+      border-radius: 10px;
+      border: 1px solid rgba(120, 160, 220, 0.3);
+      background: rgba(6, 10, 24, 0.7);
+    }
+
+    /* ============================================
+       Loading & Debug
+       ============================================ */
+    #loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 24px;
+      color: #88ccff;
+      text-shadow: 0 0 20px rgba(100, 150, 255, 0.6);
+    }
+
+    #debug {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      font-size: 11px;
+      color: rgba(150, 170, 200, 0.7);
+      text-shadow: 1px 1px 2px #000;
+      text-align: right;
+      display: none;
+    }
+
+    /* ============================================
+       Ping Display - Top Center
+       ============================================ */
+    #pingDisplay {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      display: none;
+      flex-direction: column;
+      align-items: flex-end;
+      z-index: 30;
+      pointer-events: none;
+    }
+
+    #pingText {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      color: rgba(200, 220, 255, 0.92);
+      text-shadow: 0 0 8px rgba(100, 150, 255, 0.4);
+      margin-bottom: 6px;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    #pingGraphCanvas {
+      width: 360px;
+      height: 120px;
+      border-radius: 8px;
+      border: 1px solid rgba(120, 160, 220, 0.25);
+      background: rgba(6, 10, 24, 0.7);
+    }
+
+    /* ============================================
+       Quest Tracker - Top Right
+       ============================================ */
+    #questTracker {
+      position: absolute;
+      top: 60px;
+      right: 16px;
+      width: 220px;
+      background: rgba(6, 10, 24, 0.75);
+      border: 1px solid rgba(120, 160, 220, 0.25);
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 12px;
+      display: none;
+      z-index: 20;
+    }
+
+    #questTracker h3 {
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(200, 220, 255, 0.8);
+      margin-bottom: 8px;
+    }
+
+    /* ============================================
+       Chat Box - Bottom Left
+       ============================================ */
+    #chatBox {
+      position: absolute;
+      bottom: 20px;
+      left: 16px;
+      width: 320px;
+      z-index: 30;
+      pointer-events: auto;
+    }
+
+    #chatMessages {
+      max-height: 180px;
+      overflow-y: auto;
+      padding: 10px;
+      background: rgba(6, 10, 24, 0.7);
+      border: 1px solid rgba(120, 160, 220, 0.25);
+      border-radius: 10px 10px 0 0;
+      font-size: 12px;
+      line-height: 1.5;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(100, 150, 255, 0.3) transparent;
+    }
+
+    #chatMessages::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    #chatMessages::-webkit-scrollbar-thumb {
+      background: rgba(100, 150, 255, 0.3);
+      border-radius: 3px;
+    }
+
+    .chat-message {
+      margin-bottom: 4px;
+      word-wrap: break-word;
+    }
+
+    .chat-message .player-name {
+      color: rgba(120, 200, 255, 0.95);
+      font-weight: 600;
+    }
+
+    .chat-message .message-text {
+      color: rgba(220, 230, 255, 0.9);
+    }
+
+    .chat-message.system {
+      color: rgba(255, 200, 100, 0.9);
+      font-style: italic;
+    }
+
+    #chatInputContainer {
+      display: flex;
+      gap: 0;
+    }
+
+    #chatInput {
+      flex: 1;
+      padding: 10px 12px;
+      background: rgba(6, 10, 24, 0.85);
+      border: 1px solid rgba(120, 160, 220, 0.3);
+      border-top: none;
+      border-radius: 0 0 0 10px;
+      color: #fff;
+      font-size: 12px;
+      font-family: inherit;
+      outline: none;
+    }
+
+    #chatInput:focus {
+      background: rgba(10, 16, 36, 0.95);
+      border-color: rgba(120, 160, 220, 0.5);
+    }
+
+    #chatInput::placeholder {
+      color: rgba(150, 170, 200, 0.5);
+    }
+
+    #chatSendBtn {
+      padding: 10px 16px;
+      background: rgba(60, 100, 180, 0.7);
+      border: 1px solid rgba(120, 160, 220, 0.3);
+      border-top: none;
+      border-left: none;
+      border-radius: 0 0 10px 0;
+      color: rgba(200, 220, 255, 0.95);
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    #chatSendBtn:hover {
+      background: rgba(80, 130, 220, 0.8);
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <div id="ui-overlay">
+      <div id="loading">Connecting...</div>
+      
+      <!-- Top HUD: System name & Credits -->
+      <div id="topHud">
+        <div id="systemInfo">Sol System</div>
+        <div id="creditsDisplay">💰 <span id="credits">0</span></div>
+      </div>
+
+      <!-- HP Bar -->
+      <div id="hpHud">
+        <span id="hpLabel">HP</span>
+        <div id="hpBar">
+          <div id="hpFill"></div>
+        </div>
+        <span id="hpNumber">100/100</span>
+      </div>
+
+      <!-- Weapon Cooldown Bars -->
+      <div id="weaponHud">
+        <div class="weapon-bar">
+          <div class="weapon-fill" id="weaponLeftFill"></div>
+        </div>
+        <div class="weapon-bar">
+          <div class="weapon-fill" id="weaponRightFill"></div>
+        </div>
+      </div>
+
+      <!-- XP Bar -->
+      <div id="xpHud">
+        <span id="xpLevel">LVL <span id="level">1</span></span>
+        <div id="xpBar">
+          <div id="xpFill"></div>
+          <div id="xpTicks">
+            <div class="xp-tick"></div>
+            <div class="xp-tick"></div>
+            <div class="xp-tick"></div>
+            <div class="xp-tick"></div>
+            <div class="xp-tick"></div>
+            <div class="xp-tick"></div>
+            <div class="xp-tick"></div>
+            <div class="xp-tick"></div>
+            <div class="xp-tick"></div>
+          </div>
+        </div>
+        <span id="xpNumber"><span id="xp">0</span>/<span id="xpToNext">100</span></span>
+      </div>
+
+      <!-- Inventory and Equipment Panels are created dynamically by InventoryUI.ts -->
+
+      <!-- Boost Indicator -->
+      <div id="boostHud">
+        <div id="boostBar">
+          <div id="boostFill"></div>
+        </div>
+        <span id="boostLabel">BOOST</span>
+      </div>
+
+      <!-- Minimap -->
+      <div id="minimapContainer">
+        <canvas id="minimap-canvas" width="160" height="160"></canvas>
+      </div>
+
+      <!-- Debug Info -->
+      <div id="debug">
+        FPS: <span id="fps">0</span><br>
+        Ping: <span id="ping">0</span>ms<br>
+        Entities: <span id="entity-count">0</span>
+      </div>
+
+      <!-- Ping Display - Top Center -->
+      <div id="pingDisplay">
+        <div id="pingText">PING: 0ms | JITTER: 0ms</div>
+        <canvas id="pingGraphCanvas" width="720" height="240"></canvas>
+      </div>
+
+      <!-- Quest Tracker -->
+      <div id="questTracker">
+        <h3>Active Quests</h3>
+        <div id="questList"></div>
+      </div>
+
+      <!-- Chat Box -->
+      <div id="chatBox" class="ui-element">
+        <div id="chatMessages"></div>
+        <div id="chatInputContainer">
+          <input type="text" id="chatInput" placeholder="Press Enter to chat..." maxlength="200" autocomplete="off">
+          <button id="chatSendBtn">Send</button>
+        </div>
+      </div>
+
+      <!-- Inventory Modal Container (for detailed inventory UI) -->
+      <div id="inventory-container"></div>
+    </div>
+  </div>
+  
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

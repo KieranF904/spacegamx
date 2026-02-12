@@ -1,0 +1,159 @@
+{
+  "enemies": [
+    {
+      "id": "ice_sprite",
+      "name": "Ice Sprite",
+      "description": "Crystalline creatures that thrive in cold environments. Hostile to all intruders.",
+      "hp": 40,
+      "damage": 5,
+      "xp": 20,
+      "speed": 2.5,
+      "radius": 25,
+      "attackRange": 600,
+      "attackCooldown": 90,
+      "projectileSpeed": 8,
+      "behaviors": ["aggressive", "flanker", "sniper", "swarm"],
+      "drops": [
+        { "itemId": "ice_sprite_drop", "chance": 0.8, "minCount": 1, "maxCount": 3 },
+        { "itemId": "ore_crystal", "chance": 0.2, "minCount": 1, "maxCount": 1 }
+      ],
+      "spawnInfo": {
+        "maxCount": 12,
+        "spawnInterval": 180,
+        "minRadius": 40000,
+        "maxRadius": 70000,
+        "systems": ["borealis"]
+      },
+      "visuals": {
+        "color": "#88DDFF",
+        "glowColor": "#AAEEFF",
+        "trailColor": "#66CCFF",
+        "shape": "crystal"
+      },
+      "ai": {
+        "detectionRange": 1500,
+        "loseAggroRange": 2500,
+        "attackPattern": "projectile",
+        "fleeThreshold": 0.2,
+        "groupBehavior": true
+      }
+    },
+    {
+      "id": "void_wraith",
+      "name": "Void Wraith",
+      "description": "Shadowy entities from the darkest reaches of space. Extremely dangerous.",
+      "hp": 120,
+      "damage": 15,
+      "xp": 80,
+      "speed": 4.0,
+      "radius": 35,
+      "attackRange": 400,
+      "attackCooldown": 60,
+      "projectileSpeed": 12,
+      "behaviors": ["aggressive", "teleport"],
+      "drops": [
+        { "itemId": "ore_plasma", "chance": 0.5, "minCount": 1, "maxCount": 2 }
+      ],
+      "spawnInfo": {
+        "maxCount": 4,
+        "spawnInterval": 600,
+        "minRadius": 15000,
+        "maxRadius": 25000,
+        "systems": ["void_sector"]
+      },
+      "visuals": {
+        "color": "#660088",
+        "glowColor": "#8800AA",
+        "trailColor": "#440066",
+        "shape": "wraith"
+      },
+      "ai": {
+        "detectionRange": 2000,
+        "loseAggroRange": 3000,
+        "attackPattern": "melee",
+        "fleeThreshold": 0,
+        "groupBehavior": false,
+        "teleportCooldown": 120,
+        "teleportRange": 500
+      }
+    },
+    {
+      "id": "asteroid_worm",
+      "name": "Asteroid Worm",
+      "description": "Giant creatures that burrow through asteroids. Territorial.",
+      "hp": 200,
+      "damage": 25,
+      "xp": 150,
+      "speed": 1.5,
+      "radius": 60,
+      "attackRange": 200,
+      "attackCooldown": 120,
+      "projectileSpeed": 0,
+      "behaviors": ["territorial", "burrow"],
+      "drops": [
+        { "itemId": "ore_iron", "chance": 1.0, "minCount": 5, "maxCount": 15 },
+        { "itemId": "ore_crystal", "chance": 0.4, "minCount": 2, "maxCount": 5 }
+      ],
+      "spawnInfo": {
+        "maxCount": 2,
+        "spawnInterval": 1800,
+        "minRadius": 20000,
+        "maxRadius": 40000,
+        "systems": ["sol", "nebula_prime"]
+      },
+      "visuals": {
+        "color": "#AA8866",
+        "glowColor": "#CC9977",
+        "trailColor": "#886644",
+        "shape": "worm"
+      },
+      "ai": {
+        "detectionRange": 800,
+        "loseAggroRange": 1200,
+        "attackPattern": "charge",
+        "fleeThreshold": 0,
+        "groupBehavior": false,
+        "burrowCooldown": 300,
+        "territoryRadius": 1000
+      }
+    },
+    {
+      "id": "pirate_scout",
+      "name": "Pirate Scout",
+      "description": "Light pirate ship. Fast but fragile.",
+      "hp": 60,
+      "damage": 8,
+      "xp": 35,
+      "speed": 3.5,
+      "radius": 20,
+      "attackRange": 800,
+      "attackCooldown": 45,
+      "projectileSpeed": 10,
+      "behaviors": ["aggressive", "flanker", "flee_when_damaged"],
+      "drops": [
+        { "itemId": "ore_iron", "chance": 0.6, "minCount": 1, "maxCount": 5 },
+        { "itemId": "blaster_mk1", "chance": 0.1, "minCount": 1, "maxCount": 1 }
+      ],
+      "spawnInfo": {
+        "maxCount": 6,
+        "spawnInterval": 300,
+        "minRadius": 30000,
+        "maxRadius": 60000,
+        "systems": ["sol", "nebula_prime"]
+      },
+      "visuals": {
+        "color": "#CC4444",
+        "glowColor": "#FF6666",
+        "trailColor": "#AA3333",
+        "shape": "ship"
+      },
+      "ai": {
+        "detectionRange": 1800,
+        "loseAggroRange": 2500,
+        "attackPattern": "strafe",
+        "fleeThreshold": 0.3,
+        "groupBehavior": true
+      }
+    }
+  ]
+}

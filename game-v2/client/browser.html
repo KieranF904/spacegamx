@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Game - Server Browser</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #0a0a12 0%, #1a1a2e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+        }
+        
+        h1 {
+            color: #8af;
+            font-size: 3rem;
+            margin-bottom: 10px;
+            text-shadow: 0 0 30px rgba(136, 170, 255, 0.4);
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 40px;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 800px;
+        }
+        
+        .section-title {
+            color: #6af;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 16px;
+        }
+        
+        .server-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 40px;
+        }
+        
+        .server-card {
+            background: rgba(30, 30, 50, 0.9);
+            border: 1px solid rgba(100, 100, 150, 0.3);
+            border-radius: 12px;
+            padding: 20px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        
+        .server-card:hover {
+            background: rgba(40, 40, 70, 0.95);
+            border-color: rgba(136, 170, 255, 0.5);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+        }
+        
+        .server-info h2 {
+            color: #fff;
+            font-size: 1.3rem;
+            margin-bottom: 6px;
+        }
+        
+        .server-meta {
+            display: flex;
+            gap: 16px;
+            color: #888;
+            font-size: 0.85rem;
+        }
+        
+        .region-tag {
+            background: rgba(136, 170, 255, 0.2);
+            color: #8af;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+        }
+        
+        .server-right {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+        
+        .server-players {
+            font-size: 2rem;
+            color: #4f8;
+            font-weight: bold;
+        }
+        
+        .server-players span {
+            font-size: 1rem;
+            color: #666;
+        }
+        
+        .join-btn {
+            padding: 14px 32px;
+            background: linear-gradient(135deg, #4a8 0%, #38a 100%);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .join-btn:hover {
+            background: linear-gradient(135deg, #5b9 0%, #49b 100%);
+            transform: scale(1.05);
+        }
+        
+        .no-servers {
+            text-align: center;
+            color: #666;
+            padding: 60px;
+            background: rgba(30, 30, 50, 0.5);
+            border-radius: 12px;
+        }
+        
+        .no-servers h3 {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+            color: #888;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(136, 170, 255, 0.2);
+            border-top-color: #8af;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .direct-connect {
+            background: rgba(30, 30, 50, 0.7);
+            border: 1px solid rgba(100, 100, 150, 0.3);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+        
+        .direct-connect h3 {
+            color: #8af;
+            margin-bottom: 16px;
+            font-size: 1rem;
+        }
+        
+        .direct-connect-form {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .direct-connect input {
+            flex: 1;
+            padding: 12px 16px;
+            background: rgba(20, 20, 35, 0.9);
+            border: 1px solid rgba(100, 100, 150, 0.3);
+            border-radius: 6px;
+            color: #fff;
+            font-size: 1rem;
+        }
+        
+        .direct-connect input:focus {
+            outline: none;
+            border-color: #8af;
+        }
+        
+        .direct-connect button {
+            padding: 12px 24px;
+            background: #2a3a4a;
+            border: 1px solid #3a4a5a;
+            border-radius: 6px;
+            color: #8af;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .direct-connect button:hover {
+            background: #3a4a5a;
+        }
+        
+        .refresh-btn {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 24px;
+            background: transparent;
+            border: 1px solid rgba(136, 170, 255, 0.3);
+            color: #8af;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .refresh-btn:hover {
+            background: rgba(136, 170, 255, 0.1);
+        }
+        
+        .error-msg {
+            background: rgba(255, 80, 80, 0.1);
+            border: 1px solid rgba(255, 80, 80, 0.3);
+            color: #f88;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚀 Space Game</h1>
+    <p class="subtitle">Select a server to begin your adventure</p>
+    
+    <div class="container">
+        <div class="direct-connect">
+            <h3>🔗 Direct Connect</h3>
+            <div class="direct-connect-form">
+                <input type="text" id="direct-host" placeholder="localhost:3000" value="localhost:3000">
+                <button onclick="directConnect()">Connect</button>
+            </div>
+        </div>
+        
+        <div class="section-title">🌐 Public Servers</div>
+        <div id="error-container"></div>
+        <div id="server-list" class="server-list">
+            <div class="loading">
+                <div class="loading-spinner"></div>
+                <p>Loading servers...</p>
+            </div>
+        </div>
+        
+        <button class="refresh-btn" onclick="loadServers()">🔄 Refresh</button>
+    </div>
+    
+    <script>
+        const BROWSER_URL = 'https://spacegame-v2.fly.dev';
+        
+        async function loadServers() {
+            const container = document.getElementById('server-list');
+            const errorContainer = document.getElementById('error-container');
+            errorContainer.innerHTML = '';
+            
+            container.innerHTML = `
+                <div class="loading">
+                    <div class="loading-spinner"></div>
+                    <p>Loading servers...</p>
+                </div>
+            `;
+            
+            try {
+                const response = await fetch(`${BROWSER_URL}/list`);
+                const data = await response.json();
+                
+                if (data.servers.length === 0) {
+                    container.innerHTML = `
+                        <div class="no-servers">
+                            <h3>No servers online</h3>
+                            <p>Try direct connect or start your own server!</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = data.servers.map(s => `
+                    <div class="server-card" onclick="joinServer('${s.host}', ${s.port}, ${s.secure})">
+                        <div class="server-info">
+                            <h2>${escapeHtml(s.name)}</h2>
+                            <div class="server-meta">
+                                <span class="region-tag">${escapeHtml(s.region)}</span>
+                                <span>v${escapeHtml(s.version)}</span>
+                                <span>${s.secure ? '🔒' : '🔓'}</span>
+                            </div>
+                        </div>
+                        <div class="server-right">
+                            <div class="server-players">${s.players}<span>/${s.maxPlayers}</span></div>
+                            <button class="join-btn">Play</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                errorContainer.innerHTML = `
+                    <div class="error-msg">
+                        ⚠️ Could not connect to server browser. Try direct connect.
+                    </div>
+                `;
+                container.innerHTML = `
+                    <div class="no-servers">
+                        <h3>Server browser unavailable</h3>
+                        <p>Use direct connect above</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+        
+        function joinServer(host, port, secure) {
+            const proto = secure ? 'wss' : 'ws';
+            // Store connection info and redirect to game
+            sessionStorage.setItem('gameServer', JSON.stringify({ host, port, secure }));
+            window.location.href = '/';
+        }
+        
+        function directConnect() {
+            const input = document.getElementById('direct-host');
+            const value = input.value.trim();
+            if (!value) return;
+            
+            const [host, portStr] = value.split(':');
+            const port = parseInt(portStr) || 3000;
+            
+            sessionStorage.setItem('gameServer', JSON.stringify({ 
+                host: host || 'localhost', 
+                port, 
+                secure: false 
+            }));
+            window.location.href = '/';
+        }
+        
+        // Enter key for direct connect
+        document.getElementById('direct-host').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') directConnect();
+        });
+        
+        // Load servers on page load
+        loadServers();
+        
+        // Auto-refresh every 10 seconds
+        setInterval(loadServers, 10000);
+    </script>
+</body>
+</html>

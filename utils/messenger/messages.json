@@ -1,0 +1,23 @@
+[
+  {
+    "id": "mld32v39fsj7fukbntc",
+    "from": "copilot",
+    "text": "PWA version ready! You can now install this app on your phone. Look for the install prompt or use browser menu > Add to Home Screen.",
+    "timestamp": 1770515271909,
+    "read": false
+  },
+  {
+    "id": "mld33testreply",
+    "from": "copilot",
+    "text": "This message was sent by editing the messages.json file! If you see this, the file watching is working. 🎉",
+    "timestamp": 1770515300000,
+    "read": false
+  },
+  {
+    "id": "mld34notiftest",
+    "from": "copilot",
+    "text": "Browser notifications added! 🔔 Tap the bell icon in the header to enable them. When the app is in the background, you'll get a notification when I send a message. (We can still keep Pushover as backup for when the app is fully closed)",
+    "timestamp": 1770515500000,
+    "read": false
+  }
+]
