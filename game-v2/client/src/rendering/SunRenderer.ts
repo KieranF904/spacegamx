@@ -38,6 +38,8 @@ const FRAGMENT_SHADER = `#version 300 es
   uniform float uNoiseScale;
   uniform float uCoronaSize;
   uniform float uCoronaIntensity;
+  uniform vec2 uAtmosphereRadii; // x=inner radius, y=outer radius (sun-radius multipliers)
+  uniform vec2 uCoronaRadii;     // x=inner radius, y=outer radius (sun-radius multipliers)
   uniform float uLOD; // 0.0 = far/simple, 1.0+ = close/detailed (can go higher)
   uniform float uSunStyle;
   uniform float uCoronaStyle;
@@ -64,6 +66,8 @@ const FRAGMENT_SHADER = `#version 300 es
   uniform vec3 uPlasmaColor;
   // Center light: x=intensity, y=radius, z=falloff
   uniform vec3 uCenterLight;
+  // Luminance midpoint for center contrast split (0=very dark, 1=very bright)
+  uniform float uCenterMidpoint;
   // Inside adjust: x=innerDarkening, y=whiteBalance, z=saturation
   uniform vec3 uInsideAdjust;
   // Center light color
@@ -454,8 +458,9 @@ const FRAGMENT_SHADER = `#version 300 es
     
     // ========== Outer atmospheric glow (far corona) ==========
     // Start inside the sun for smooth overlap
-    float glowStart = sunRadius * 0.7;
-    float glowEnd = sunRadius * uCoronaSize * coronaRadius;
+    float glowStart = sunRadius * uAtmosphereRadii.x;
+    float glowEnd = sunRadius * uAtmosphereRadii.y;
+    glowEnd = max(glowEnd, glowStart + 0.0001);
     
     if (dist > glowStart && dist < glowEnd) {
       float t = (dist - glowStart) / (glowEnd - glowStart);
@@ -467,8 +472,9 @@ const FRAGMENT_SHADER = `#version 300 es
     
     // ========== Plasma corona rim (the colorful edge) ==========
     // Start well inside the sun for large overlap
-    float coronaInner = sunRadius * 0.6;
-    float coronaOuter = sunRadius * (1.25 + 0.25 * coronaRadius);
+    float coronaInner = sunRadius * uCoronaRadii.x;
+    float coronaOuter = sunRadius * uCoronaRadii.y;
+    coronaOuter = max(coronaOuter, coronaInner + 0.0001);
     
     if (dist > coronaInner && dist < coronaOuter) {
       float t = (dist - coronaInner) / (coronaOuter - coronaInner);
@@ -742,6 +748,7 @@ const FRAGMENT_SHADER = `#version 300 es
         float centerDarken = uCenterLight.x;    // How much to darken darks toward center
         float centerHighlight = uCenterLight.y; // How much to highlight brights toward center
         float centerFalloff = uCenterLight.z;   // Falloff curve
+        float centerMidpoint = clamp(uCenterMidpoint, 0.05, 0.95);
         
         if (centerDarken > 0.01 || centerHighlight > 0.01) {
           float sunT_center = dist / sunRadius;
@@ -752,15 +759,26 @@ const FRAGMENT_SHADER = `#version 300 es
           float luma = dot(cellColor, vec3(0.299, 0.587, 0.114));
           
           // Dark areas (low luminance) get darker toward center
-          float darkFactor = 1.0 - smoothstep(0.0, 0.5, luma); // 1.0 for dark, 0.0 for bright
+          float darkStart = max(0.0, centerMidpoint - 0.35);
+          float darkEnd = max(darkStart + 0.001, centerMidpoint);
+          float darkFactor = 1.0 - smoothstep(darkStart, darkEnd, luma); // 1.0 for dark, 0.0 for bright
           float darkenAmount = darkFactor * centerDarken * centerMask;
           cellColor *= (1.0 - darkenAmount * 0.7);
           
           // Bright areas (high luminance) get highlighted toward center
-          float brightFactor = smoothstep(0.4, 0.8, luma); // 0.0 for dark, 1.0 for bright
-          float highlightAmount = brightFactor * centerHighlight * centerMask;
-          vec3 highlightColor = mix(cellColor, uCenterColor, highlightAmount * 0.5);
-          cellColor = cellColor + highlightColor * highlightAmount * 0.3;
+          float brightStart = min(centerMidpoint, 1.0 - 0.001);
+          float brightEnd = min(1.0, centerMidpoint + 0.35);
+          brightEnd = max(brightStart + 0.001, brightEnd);
+          float brightFactor = smoothstep(brightStart, brightEnd, luma); // 0.0 for dark, 1.0 for bright
+          float centerHotspot = pow(1.0 - sunT_center, max(0.35, centerFalloff * 0.6));
+          float highlightAmount = clamp(brightFactor * centerHighlight * centerMask * (0.6 + centerHotspot * 0.4), 0.0, 1.0);
+
+          // Pull bright center regions toward center color and increase local contrast
+          vec3 targetHighlight = max(cellColor, uCenterColor);
+          cellColor = mix(cellColor, targetHighlight, highlightAmount * 0.65);
+
+          float centerContrast = 1.0 + highlightAmount * 1.4;
+          cellColor = clamp((cellColor - 0.5) * centerContrast + 0.5, 0.0, 1.2);
         }
         
         // ============================================
@@ -804,14 +822,15 @@ const FRAGMENT_SHADER = `#version 300 es
         cellColor = mix(cellColor, uEdgeColor * edgeBrightness, brightEdge * 0.6 * edgeSharpness);
         
         // Clean alpha edge - fade ends strictly at sunRadius
-        // Use noise for organic edge but ensure it stays inside sunRadius
+        // Use noise for organic edge and allow slight overlap beyond sunRadius
+        // so atmosphere/corona blend without a dark seam.
         float edgeNoise = snoise(uv * 30.0 + uTime * 0.5) * 0.01;
         float edgeFadeStart = sunRadius * (1.0 - edgeThickness);
-        float edgeFadeEnd = sunRadius * 0.995; // Stop slightly inside to leave gap for corona
+        float edgeFadeEnd = sunRadius * 1.002;
         float edgeFade = 1.0 - smoothstep(edgeFadeStart + edgeNoise * sunRadius, edgeFadeEnd, dist);
         
-        color = cellColor;
-        alpha = edgeFade;
+        color = mix(color, cellColor, edgeFade);
+        alpha = max(alpha, edgeFade);
       }
       
       // For styles 0 and 1, continue with standard color processing
@@ -921,6 +940,8 @@ export class SunRenderer {
           uNoiseScale: { value: 1.0, type: 'f32' },
           uCoronaSize: { value: 2.2, type: 'f32' },
           uCoronaIntensity: { value: 0.7, type: 'f32' },
+          uAtmosphereRadii: { value: new Float32Array([0.7, 2.2]), type: 'vec2<f32>' },
+          uCoronaRadii: { value: new Float32Array([0.6, 1.5]), type: 'vec2<f32>' },
           uLOD: { value: 1.0, type: 'f32' },
           uSunStyle: { value: 0, type: 'f32' },
           uCoronaStyle: { value: 0, type: 'f32' },
@@ -939,6 +960,7 @@ export class SunRenderer {
           uEdgeGlow: { value: new Float32Array([0.5, 0.4, 0.1]), type: 'vec3<f32>' },
           uPlasmaColor: { value: new Float32Array([1.0, 0.6, 0.2]), type: 'vec3<f32>' },
           uCenterLight: { value: new Float32Array([0.0, 0.3, 2.0]), type: 'vec3<f32>' },
+          uCenterMidpoint: { value: 0.5, type: 'f32' },
           uInsideAdjust: { value: new Float32Array([0.0, 0.0, 1.0]), type: 'vec3<f32>' },
           uCenterColor: { value: new Float32Array([1.0, 0.9, 0.7]), type: 'vec3<f32>' },
         },
@@ -962,6 +984,8 @@ export class SunRenderer {
   private noiseScale: number = 1.0;
   private coronaSize: number = 2.2;
   private coronaIntensity: number = 0.7;
+  private atmosphereRadii: [number, number] = [0.7, 2.2];
+  private coronaRadii: [number, number] = [0.6, 1.5];
   private animationSpeed: number = 1.0;
   private lod: number = 1.0; // Level of detail: 0 = far/simple, 1 = close/detailed
   private sunStyle: number = 0;
@@ -997,6 +1021,8 @@ export class SunRenderer {
       group.uniforms.uNoiseScale = this.noiseScale;
       group.uniforms.uCoronaSize = this.coronaSize;
       group.uniforms.uCoronaIntensity = this.coronaIntensity;
+      group.uniforms.uAtmosphereRadii = new Float32Array(this.atmosphereRadii);
+      group.uniforms.uCoronaRadii = new Float32Array(this.coronaRadii);
       group.uniforms.uLOD = this.lod;
       group.uniforms.uSunStyle = this.sunStyle;
       group.uniforms.uCoronaStyle = this.coronaStyle;
@@ -1021,6 +1047,7 @@ export class SunRenderer {
       group.uniforms.uEdgeGlow = new Float32Array(this.edgeGlow);
       // Center light
       group.uniforms.uCenterLight = new Float32Array(this.centerLight);
+      group.uniforms.uCenterMidpoint = this.centerMidpoint;
       group.uniforms.uCenterColor = new Float32Array(this.centerColor);
       // Inside adjustments
       group.uniforms.uInsideAdjust = new Float32Array(this.insideAdjust);
@@ -1060,6 +1087,24 @@ export class SunRenderer {
    */
   setCoronaIntensity(intensity: number): void {
     this.coronaIntensity = intensity;
+  }
+
+  /**
+   * Set atmospheric glow radii as sun-radius multipliers
+   */
+  setAtmosphereRadii(innerRadius: number, outerRadius: number): void {
+    const inner = Math.max(0.0, innerRadius);
+    const outer = Math.max(inner + 0.0001, outerRadius);
+    this.atmosphereRadii = [inner, outer];
+  }
+
+  /**
+   * Set plasma corona rim radii as sun-radius multipliers
+   */
+  setCoronaRadii(innerRadius: number, outerRadius: number): void {
+    const inner = Math.max(0.0, innerRadius);
+    const outer = Math.max(inner + 0.0001, outerRadius);
+    this.coronaRadii = [inner, outer];
   }
   
   /**
@@ -1147,8 +1192,9 @@ export class SunRenderer {
   /**
    * Set center light parameters
    */
-  setCenterLight(intensity: number, radius: number, falloff: number): void {
+  setCenterLight(intensity: number, radius: number, falloff: number, midpoint: number = 0.5): void {
     this.centerLight = [intensity, radius, falloff];
+    this.centerMidpoint = midpoint;
   }
   
   /**
@@ -1176,6 +1222,7 @@ export class SunRenderer {
   private edgeStyle: [number, number, number] = [1.0, 0.03, 0.5];
   private edgeGlow: [number, number, number] = [0.5, 0.4, 0.1];
   private centerLight: [number, number, number] = [0.0, 0.3, 2.0];
+  private centerMidpoint: number = 0.5;
   private centerColor: [number, number, number] = [1.0, 0.9, 0.7];
   private insideAdjust: [number, number, number] = [0.0, 0.0, 1.0];
   

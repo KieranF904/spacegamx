@@ -35,6 +35,8 @@ const FRAGMENT_SHADER = `#version 300 es
   uniform float uHue;
   uniform float uInnerRadius;
   uniform float uIntensity;
+  uniform vec3 uInnerColor;
+  uniform vec3 uOuterColor;
   uniform vec2 uParallax;  // Camera-based parallax offset
   uniform float uLOD;      // Level of detail: 0 = simple, 1 = detailed
   
@@ -142,12 +144,11 @@ const FRAGMENT_SHADER = `#version 300 es
     // Very slight color variation
     float hueShift = (wave1 - 0.5) * 3.0;
     
-    // Glow color - warm yellow-orange
+    // Color ramp controlled by UI color pickers + subtle hue variation
     float hue = uHue + hueShift;
-    float sat = mix(0.7, 0.4, t);  // More saturated near sun
-    float lit = mix(0.75, 0.6, t); // Brighter near sun
-    
-    vec3 color = hsl2rgb(hue, sat, lit);
+    vec3 hueTint = hsl2rgb(hue, 0.25, 0.55);
+    vec3 ramp = mix(uInnerColor, uOuterColor, clamp(t, 0.0, 1.0));
+    vec3 color = mix(ramp, ramp * hueTint * 1.1, 0.18);
     
     // Alpha with smooth edges
     float alpha = falloff * uIntensity;
@@ -209,6 +210,8 @@ export class GlowRenderer {
           uHue: { value: 40, type: 'f32' },
           uInnerRadius: { value: 0.15, type: 'f32' },
           uIntensity: { value: 0.6, type: 'f32' },
+          uInnerColor: { value: new Float32Array([1.0, 0.75, 0.4]), type: 'vec3<f32>' },
+          uOuterColor: { value: new Float32Array([1.0, 0.6, 0.4]), type: 'vec3<f32>' },
           uParallax: { value: new Float32Array([0, 0]), type: 'vec2<f32>' },
           uLOD: { value: 1.0, type: 'f32' },
         },
@@ -231,7 +234,18 @@ export class GlowRenderer {
   
   private lod: number = 1.0;
   
-  update(delta: number, hue: number, sunRadius: number, glowRadius: number, cameraX: number = 0, cameraY: number = 0): void {
+  update(
+    delta: number,
+    hue: number,
+    sunRadius: number,
+    glowRadius: number,
+    cameraX: number = 0,
+    cameraY: number = 0,
+    intensity: number = 0.6,
+    glowSize: number = 0.1,
+    innerColor: [number, number, number] = [1.0, 0.75, 0.4],
+    outerColor: [number, number, number] = [1.0, 0.6, 0.4],
+  ): void {
     this.time += delta * 0.016;
     
     if (this.shader) {
@@ -239,9 +253,16 @@ export class GlowRenderer {
       const group = this.shader.resources.glowUniforms as any;
       group.uniforms.uTime = this.time;
       group.uniforms.uHue = hue;
-      group.uniforms.uInnerRadius = sunRadius / glowRadius;
-      group.uniforms.uIntensity = 0.6;
+      const innerMul = 1.0 + Math.max(0, glowSize) * 2.0;
+      group.uniforms.uInnerRadius = Math.min(0.95, (sunRadius * innerMul) / Math.max(1, glowRadius));
+      group.uniforms.uIntensity = intensity;
       group.uniforms.uLOD = this.lod;
+      group.uniforms.uInnerColor[0] = innerColor[0];
+      group.uniforms.uInnerColor[1] = innerColor[1];
+      group.uniforms.uInnerColor[2] = innerColor[2];
+      group.uniforms.uOuterColor[0] = outerColor[0];
+      group.uniforms.uOuterColor[1] = outerColor[1];
+      group.uniforms.uOuterColor[2] = outerColor[2];
       // Parallax scale from debug config (adjustable via F3 debug panel)
       const parallaxScale = debugConfig.parallaxScale;
       group.uniforms.uParallax[0] = -cameraX * parallaxScale;

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Space Game - Visual Sandbox</title>
+    <link rel="icon" href="data:,">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -13,7 +14,10 @@
             user-select: none;
         }
         #game-canvas { 
-            width: 100vw; 
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
         .toolbar {
             position: fixed;
             top: 10px;
@@ -89,6 +93,61 @@
             background: #2a3a4a;
             color: #6af;
             border-color: #6af;
+        }
+
+        /* ===== Draggable Windows ===== */
+        .window {
+            position: fixed;
+            width: 260px;
+            max-height: calc(100vh - 80px);
+            background: rgba(10, 10, 20, 0.96);
+            border: 1px solid #2a2a3a;
+            border-radius: 8px;
+            overflow: hidden;
+            display: none;
+            z-index: 1002;
+        }
+
+        .window.visible {
+            display: block;
+        }
+
+        .window-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 10px;
+            background: #141420;
+            border-bottom: 1px solid #2a2a3a;
+            cursor: move;
+        }
+
+        .window-title {
+            color: #ddd;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .window-close {
+            width: 22px;
+            height: 22px;
+            border: 1px solid #3a3a4a;
+            border-radius: 4px;
+            background: #1a1a24;
+            color: #aaa;
+            cursor: pointer;
+        }
+
+        .window-close:hover {
+            color: #fff;
+            border-color: #666;
+            background: #2a2a36;
+        }
+
+        .window-content {
+            padding: 10px;
+            overflow-y: auto;
+            max-height: calc(100vh - 140px);
         }
         
         /* ===== Control Styles ===== */
@@ -261,36 +320,119 @@
             margin-bottom: 6px;
         }
         
-        /* ===== Status Bar ===== */
-        .status-bar {
+        /* ===== Bottom Bar ===== */
+        .bottom-bar {
             position: fixed;
-            bottom: 10px;
-            left: 10px;
-            background: rgba(10, 10, 20, 0.9);
-            padding: 8px 12px;
-            border-radius: 4px;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 32px;
+            background: rgba(10, 10, 20, 0.95);
+            border-top: 1px solid rgba(60, 80, 120, 0.3);
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
             font-size: 11px;
             color: #888;
             z-index: 1000;
+            gap: 6px;
         }
-        
-        .status-bar span { margin-right: 16px; }
-        .status-bar .highlight { color: #6af; }
-        
-        /* ===== Help ===== */
-        .help-text {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-            background: rgba(10, 10, 20, 0.9);
-            padding: 8px 12px;
-            border-radius: 4px;
+
+        .bottom-bar .status-section {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .bottom-bar .status-section span { white-space: nowrap; }
+        .bottom-bar .highlight { color: #6af; }
+
+        .bottom-bar .separator {
+            width: 1px;
+            height: 16px;
+            background: rgba(100, 120, 160, 0.3);
+            margin: 0 6px;
+        }
+
+        .bottom-bar .zoom-section {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: auto;
+        }
+
+        .bottom-bar .zoom-section label {
+            font-size: 11px;
+            color: #888;
+            white-space: nowrap;
+        }
+
+        .bottom-bar .zoom-section .zoom-value {
+            color: #6af;
+            font-family: monospace;
+            font-size: 11px;
+            min-width: 48px;
+            text-align: right;
+        }
+
+        .bottom-bar .zoom-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 180px;
+            height: 4px;
+            background: #1a1a2e;
+            border-radius: 2px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .bottom-bar .zoom-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #6af;
+            cursor: pointer;
+            border: none;
+        }
+
+        .bottom-bar .zoom-slider::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #6af;
+            cursor: pointer;
+            border: none;
+        }
+
+        .bottom-bar .zoom-btn {
+            background: rgba(40, 50, 70, 0.6);
+            border: 1px solid rgba(80, 100, 140, 0.3);
+            color: #aac;
+            font-size: 14px;
+            width: 22px;
+            height: 22px;
+            border-radius: 3px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+            padding: 0;
+        }
+
+        .bottom-bar .zoom-btn:hover {
+            background: rgba(60, 80, 120, 0.6);
+            color: #fff;
+        }
+
+        .bottom-bar .help-keys {
             font-size: 10px;
-            color: #666;
-            z-index: 1000;
+            color: #555;
         }
-        
-        .help-text kbd {
+
+        .bottom-bar .help-keys kbd {
             background: #2a2a3a;
             padding: 1px 5px;
             border-radius: 3px;
@@ -301,19 +443,25 @@
 </head>
 <body>
     <canvas id="game-canvas"></canvas>
+    <canvas id="grid-overlay" style="position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:1;"></canvas>
     
     <!-- Toolbar -->
     <div class="toolbar">
-        <button class="toolbar-btn active" data-tool="pan" title="Pan (Space)">✋</button>
+        <button class="toolbar-btn" id="mode-toggle-btn" title="Toggle Galaxy/System Mode" style="font-size:11px;white-space:nowrap;padding:4px 10px;">⭐ System</button>
+        <div class="toolbar-sep"></div>
+        <button class="toolbar-btn active" data-tool="pan" title="Pan Tool">✋</button>
         <button class="toolbar-btn" data-tool="spawn" title="Spawn Tool">➕</button>
         <div class="toolbar-sep"></div>
         <button class="toolbar-btn" data-window="stars" title="Star Settings">✨</button>
         <button class="toolbar-btn" data-window="library" title="Element Library">🧰</button>
         <button class="toolbar-btn" data-window="element" title="Element Properties">🧪</button>
+        <button class="toolbar-btn" data-window="entities" title="Entity List">📑</button>
+        <button class="toolbar-btn" data-window="history" title="Undo / Redo History">🕘</button>
         <button class="toolbar-btn" data-window="spawn" title="Spawn Panel">🎯</button>
         <button class="toolbar-btn" data-window="admin" title="Admin Panel">🔧</button>
         <div class="toolbar-sep"></div>
         <button class="toolbar-btn" data-action="reset" title="Reset View (Shift+R)">🔄</button>
+        <button class="toolbar-btn" data-action="reset-layout" title="Reset Panel Layout">🗔</button>
     </div>
 
     <!-- Tool Panel -->
@@ -339,10 +487,6 @@
             <div class="section">
                 <div class="section-title">Editor</div>
                 <div class="checkbox-row">
-                    <input type="checkbox" id="editor-show-grid" checked>
-                    <label for="editor-show-grid">Show Grid</label>
-                </div>
-                <div class="checkbox-row">
                     <input type="checkbox" id="editor-snap-grid" checked>
                     <label for="editor-snap-grid">Snap to Grid</label>
                 </div>
@@ -360,7 +504,12 @@
                     <button class="spawn-btn" id="elements-save">💾 Save</button>
                     <button class="spawn-btn" id="elements-load">📂 Load</button>
                 </div>
+                <div class="spawn-grid" style="margin-top: 6px;">
+                    <button class="spawn-btn" id="system-save">🌌 Save System</button>
+                    <button class="spawn-btn" id="system-load">🪐 Load System</button>
+                </div>
                 <input type="file" id="elements-load-input" accept=".sgx,.json" style="display:none;">
+                <input type="file" id="system-load-input" accept=".sgsys" style="display:none;">
             </div>
         </div>
     </div>
@@ -379,59 +528,38 @@
             </div>
         </div>
     </div>
-    
-    <!-- Glow Window -->
-    <div class="window" id="window-glow" style="top: 60px; left: 270px;">
+
+    <!-- Entity List Window -->
+    <div class="window" id="window-entities" style="top: 60px; left: 1090px; width: 300px;">
         <div class="window-header">
-            <span class="window-title">🌟 Ambient Glow</span>
+            <span class="window-title">📑 Entity List</span>
             <button class="window-close">×</button>
         </div>
         <div class="window-content">
             <div class="section">
-                <div class="section-title">Effect</div>
-                <div class="control-row">
-                    <div class="control-label">
-                        <span>Intensity</span>
-                        <span class="control-value" id="glow-intensity-val">0.6</span>
-                    </div>
-                    <input type="range" id="glow-intensity" min="0" max="1" step="0.05" value="0.6">
+                <div class="section-title">Elements</div>
+                <div style="font-size:10px;color:#666;margin-bottom:8px;">
+                    Click to select. Drag item onto another to parent. Drop on "Unparent" to detach.
                 </div>
-                <div class="control-row">
-                    <div class="control-label">
-                        <span>Radius</span>
-                        <span class="control-value" id="glow-radius-val">8000</span>
-                    </div>
-                    <input type="range" id="glow-radius" min="2000" max="25000" step="500" value="8000">
-                </div>
+                <button class="spawn-btn" id="entity-unparent" style="width:100%;margin-bottom:8px;">↩ Unparent Selected</button>
+                <div id="entity-list" style="max-height: 340px; overflow-y: auto;"></div>
             </div>
-            
+        </div>
+    </div>
+
+    <!-- History Window -->
+    <div class="window" id="window-history" style="top: 420px; left: 1090px; width: 300px;">
+        <div class="window-header">
+            <span class="window-title">🕘 Edit History</span>
+            <button class="window-close">×</button>
+        </div>
+        <div class="window-content">
             <div class="section">
-                <div class="section-title">Parallax</div>
-                <div class="control-row">
-                    <div class="control-label">
-                        <span>Scale</span>
-                        <span class="control-value" id="glow-parallax-val">0.00005</span>
-                    </div>
-                    <input type="range" id="glow-parallax" min="0" max="0.0003" step="0.00001" value="0.00005">
+                <div class="spawn-grid" style="margin-bottom: 8px;">
+                    <button class="spawn-btn" id="history-undo-btn">↶ Undo</button>
+                    <button class="spawn-btn" id="history-redo-btn">↷ Redo</button>
                 </div>
-            </div>
-            
-            <div class="section">
-                <div class="section-title">Animation</div>
-                <div class="control-row">
-                    <div class="control-label">
-                        <span>Wave Speed</span>
-                        <span class="control-value" id="glow-speed-val">1.0</span>
-                    </div>
-                    <input type="range" id="glow-speed" min="0" max="3" step="0.1" value="1">
-                </div>
-                <div class="control-row">
-                    <div class="control-label">
-                        <span>Ripple Scale</span>
-                        <span class="control-value" id="glow-ripple-val">1.0</span>
-                    </div>
-                    <input type="range" id="glow-ripple" min="0.2" max="3" step="0.1" value="1">
-                </div>
+                <div id="history-list" style="max-height: 260px; overflow-y: auto;"></div>
             </div>
         </div>
     </div>
@@ -448,9 +576,23 @@
                 <div class="control-row">
                     <div class="control-label">
                         <span>Brightness</span>
-                        <span class="control-value" id="star-brightness-val">1.0</span>
+                        <span class="control-value" id="star-brightness-val">6.0</span>
                     </div>
-                    <input type="range" id="star-brightness" min="0.2" max="2" step="0.1" value="1">
+                    <input type="range" id="star-brightness" min="0.1" max="8" step="0.05" value="6">
+                </div>
+                <div class="control-row">
+                    <div class="control-label">
+                        <span>Star Size</span>
+                        <span class="control-value" id="star-size-val">6.0</span>
+                    </div>
+                    <input type="range" id="star-size" min="0.2" max="8" step="0.1" value="6">
+                </div>
+                <div class="control-row">
+                    <div class="control-label">
+                        <span>Density</span>
+                        <span class="control-value" id="star-density-val">6.0</span>
+                    </div>
+                    <input type="range" id="star-density" min="0.2" max="8" step="0.1" value="6">
                 </div>
                 <div class="control-row">
                     <div class="control-label">
@@ -459,15 +601,8 @@
                     </div>
                     <input type="range" id="star-hue" min="-60" max="60" value="0">
                 </div>
-                <div class="control-row">
-                    <div class="control-label">
-                        <span>Density</span>
-                        <span class="control-value" id="star-density-val">1.0</span>
-                    </div>
-                    <input type="range" id="star-density" min="0.2" max="3" step="0.1" value="1">
-                </div>
             </div>
-            
+
             <div class="section">
                 <div class="section-title">Animation</div>
                 <div class="control-row">
@@ -485,32 +620,33 @@
                     <input type="range" id="star-twinkle-amt" min="0" max="0.5" step="0.05" value="0.3">
                 </div>
             </div>
-            
+
             <div class="section">
-                <div class="section-title">Layers</div>
-                <div class="checkbox-row">
-                    <input type="checkbox" id="star-layer-0" checked>
-                    <label for="star-layer-0">Layer 1 (Near)</label>
+                <div class="section-title">Parallax</div>
+                <div class="control-row">
+                    <div class="control-label">
+                        <span>Parallax Strength</span>
+                        <span class="control-value" id="star-parallax-val">0.4</span>
+                    </div>
+                    <input type="range" id="star-parallax" min="0" max="1" step="0.05" value="0.4">
                 </div>
-                <div class="checkbox-row">
-                    <input type="checkbox" id="star-layer-1" checked>
-                    <label for="star-layer-1">Layer 2</label>
+            </div>
+
+            <div class="section">
+                <div class="section-title">LOD</div>
+                <div class="control-row">
+                    <div class="control-label">
+                        <span>Cell Size</span>
+                        <span class="control-value" id="star-basecell-val">10</span>
+                    </div>
+                    <input type="range" id="star-basecell" min="10" max="800" step="10" value="10">
                 </div>
-                <div class="checkbox-row">
-                    <input type="checkbox" id="star-layer-2" checked>
-                    <label for="star-layer-2">Layer 3</label>
-                </div>
-                <div class="checkbox-row">
-                    <input type="checkbox" id="star-layer-3" checked>
-                    <label for="star-layer-3">Layer 4</label>
-                </div>
-                <div class="checkbox-row">
-                    <input type="checkbox" id="star-layer-4" checked>
-                    <label for="star-layer-4">Layer 5</label>
-                </div>
-                <div class="checkbox-row">
-                    <input type="checkbox" id="star-layer-5" checked>
-                    <label for="star-layer-5">Layer 6 (Far)</label>
+                <div class="control-row">
+                    <div class="control-label">
+                        <span>Blend Width</span>
+                        <span class="control-value" id="star-lodblend-val">0.65</span>
+                    </div>
+                    <input type="range" id="star-lodblend" min="0.1" max="1" step="0.05" value="0.65">
                 </div>
             </div>
         </div>
@@ -638,17 +774,100 @@
         </div>
     </div>
     
-    <!-- Status Bar -->
-    <div class="status-bar">
-        <span>FPS: <span class="highlight" id="fps">--</span></span>
-        <span>Camera: <span class="highlight" id="camera-pos">0, 0</span></span>
-        <span>Zoom: <span class="highlight" id="zoom-level">1.0x</span></span>
-        <span>Entities: <span class="highlight" id="entity-count">0</span></span>
+    <!-- Galaxy Panel Window -->
+    <div class="window" id="window-galaxy" style="top: 60px; left: 10px; width: 280px;">
+        <div class="window-header">
+            <span class="window-title">🌌 Galaxy Editor</span>
+            <button class="window-close">×</button>
+        </div>
+        <div class="window-content">
+            <div class="section">
+                <div class="section-title">Systems</div>
+                <div id="galaxy-system-list" style="max-height: 180px; overflow-y: auto; margin-bottom: 8px;"></div>
+                <div class="spawn-grid">
+                    <button class="spawn-btn" id="galaxy-add-system">➕ Add System</button>
+                    <button class="spawn-btn danger" id="galaxy-delete-system">🗑️ Delete</button>
+                </div>
+                <div style="margin-top: 6px;">
+                    <button class="spawn-btn" id="galaxy-edit-system" style="width: 100%;">🚀 Edit Selected System</button>
+                </div>
+            </div>
+            <div class="section">
+                <div class="section-title">Properties</div>
+                <div id="galaxy-properties-empty" style="font-size: 11px; color: #555; text-align: center; padding: 12px;">
+                    Select a system to edit
+                </div>
+                <div id="galaxy-properties-content" style="display: none;">
+                    <div class="control-row" style="margin-bottom: 6px;">
+                        <label style="font-size: 11px; color: #888; display: block; margin-bottom: 3px;">Name</label>
+                        <input type="text" id="galaxy-system-name" placeholder="System name"
+                               style="width: 100%; padding: 5px 8px; background: #1a1a24; border: 1px solid #2a2a3a; 
+                                      border-radius: 4px; color: #fff; font-size: 12px;">
+                    </div>
+                    <div class="control-row">
+                        <div class="control-label">
+                            <span>Boundary Radius</span>
+                            <input type="number" id="galaxy-boundary-radius-input" min="10000" max="200000" step="1000" value="50000"
+                                   style="width: 70px; padding: 2px 4px; background: #1a1a24; border: 1px solid #2a2a3a; 
+                                          border-radius: 3px; color: #fff; font-size: 11px; text-align: right;">
+                        </div>
+                        <input type="range" id="galaxy-boundary-radius" min="10000" max="200000" step="1000" value="50000">
+                    </div>
+                    <div class="control-row" style="margin-top: 6px;">
+                        <label style="font-size: 11px; color: #888; display: block; margin-bottom: 3px;">Position</label>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span style="font-size: 10px; color: #666;">X:</span>
+                            <input type="number" id="galaxy-system-pos-x" step="100" value="0"
+                                   style="width: 70px; padding: 2px 4px; background: #1a1a24; border: 1px solid #2a2a3a; 
+                                          border-radius: 3px; color: #fff; font-size: 11px; text-align: right;">
+                            <span style="font-size: 10px; color: #666;">Y:</span>
+                            <input type="number" id="galaxy-system-pos-y" step="100" value="0"
+                                   style="width: 70px; padding: 2px 4px; background: #1a1a24; border: 1px solid #2a2a3a; 
+                                          border-radius: 3px; color: #fff; font-size: 11px; text-align: right;">
+                        </div>
+                    </div>
+                    <div class="control-row" style="margin-top: 6px;">
+                        <label style="font-size: 11px; color: #888; display: block; margin-bottom: 3px;">Color</label>
+                        <input type="color" id="galaxy-system-color" value="#6666ff"
+                               style="width: 32px; height: 24px; border: 1px solid #2a2a3a; background: #1a1a24; 
+                                      border-radius: 3px; cursor: pointer; padding: 0;">
+                    </div>
+                    <div id="galaxy-overlap-info" style="margin-top: 8px; font-size: 10px; color: #666;"></div>
+                </div>
+            </div>
+            <div class="section">
+                <div class="section-title">Universe Save / Load</div>
+                <div class="spawn-grid">
+                    <button class="spawn-btn" id="galaxy-save-universe">💾 Save Universe</button>
+                    <button class="spawn-btn" id="galaxy-load-universe">📂 Load Universe</button>
+                </div>
+                <input type="file" id="galaxy-load-input" accept=".sguniverse" style="display:none;">
+            </div>
+        </div>
     </div>
     
-    <!-- Help -->
-    <div class="help-text">
-        <kbd>Drag</kbd> Pan · <kbd>Scroll</kbd> Zoom · <kbd>R</kbd> Reset · <kbd>1-4</kbd> Toggle windows
+    <!-- Bottom Bar -->
+    <div class="bottom-bar">
+        <div class="status-section">
+            <span>FPS: <span class="highlight" id="fps">--</span></span>
+            <span>Pos: <span class="highlight" id="camera-pos">0, 0</span></span>
+            <span>Entities: <span class="highlight" id="entity-count">0</span></span>
+        </div>
+        <div class="separator"></div>
+        <div class="help-keys">
+            <kbd>Drag</kbd> Pan · <kbd>Scroll</kbd> Zoom · <kbd>Shift+R</kbd> Reset
+        </div>
+        <div class="grid-toggle" style="display:flex;align-items:center;gap:4px;margin-right:12px;">
+            <input type="checkbox" id="editor-show-grid" checked style="margin:0;accent-color:#4fc3f7;">
+            <label for="editor-show-grid" style="font-size:11px;color:#aaa;cursor:pointer;white-space:nowrap;">Grid</label>
+        </div>
+        <div class="zoom-section">
+            <button class="zoom-btn" id="zoom-out-btn" title="Zoom Out">−</button>
+            <input type="range" class="zoom-slider" id="zoom-slider"
+                   min="-3.5" max="2.7" step="0.01" value="0">
+            <button class="zoom-btn" id="zoom-in-btn" title="Zoom In">+</button>
+            <span class="zoom-value" id="zoom-level">1.00x</span>
+        </div>
     </div>
     
     <script type="module" src="/src/sandbox.ts"></script>

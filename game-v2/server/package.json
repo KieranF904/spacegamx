@@ -9,6 +9,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@space-game/common": "file:../common",
     "better-sqlite3": "^12.6.2",
     "bitecs": "^0.3.40",
     "ws": "^8.16.0"

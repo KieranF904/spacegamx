@@ -18,6 +18,7 @@ export class LoginUI {
   private container: HTMLElement;
   private panel: HTMLElement;
   private visible = true;
+  private debugPanelVisible = false;
   private startTime = Date.now();
   
   // PixiJS WebGL rendering
@@ -66,6 +67,10 @@ export class LoginUI {
     // === CORONA ===
     coronaSize: 2.0,
     coronaIntensity: 0.8,
+    atmosphereInnerRadius: 0.7,
+    atmosphereOuterRadius: 2.2,
+    coronaInnerRadius: 0.6,
+    coronaOuterRadius: 1.5,
     // === COLORS (hex strings) ===
     darkColor: '#1a0500',   // Darkest
     midColor: '#661100',    // Mid-tone
@@ -180,9 +185,12 @@ export class LoginUI {
     const w = this.app.screen.width;
     const h = this.app.screen.height;
     
-    // Position sun at bottom center, partially visible (top half showing)
+    // Position sun so the visible top 25% arc spans exactly the view width
+    // (touching both bottom corners).
     const sunX = w / 2;
-    const sunY = h * 0.85; // 85% down = sun rises from bottom with top half visible
+    const visibleFraction = 0.25;
+    const renderedRadius = w / (4 * Math.sqrt(visibleFraction * (1 - visibleFraction)));
+    const sunY = h + (1 - 2 * visibleFraction) * renderedRadius;
     
     this.sunRenderer.setPosition(sunX, sunY);
     this.glowRenderer.setPosition(sunX, sunY);
@@ -196,13 +204,23 @@ export class LoginUI {
     const w = this.app.screen.width;
     const h = this.app.screen.height;
     
-    // Update sun shader
-    const sunRadius = Math.min(w, h) * 0.3;
-    const glowRadius = sunRadius * 4;
+    // Update sun + glow shaders.
+    // For top 25% visibility to span view width: chord = 4R*sqrt(f*(1-f)), f=0.25.
+    // SunRenderer effective pixel radius is 2 * worldRadius
+    // (quadSize=2, meshScale=worldRadius*2.5, uRadius=0.4).
+    const visibleFraction = 0.25;
+    const renderedRadius = w / (4 * Math.sqrt(visibleFraction * (1 - visibleFraction)));
+    const sunWorldRadius = renderedRadius / 2;
+
+    // Keep ambient glow fade in sync with the atmosphere radius sliders.
+    const atmosphereInner = Math.max(0.0, this.debugParams.atmosphereInnerRadius);
+    const atmosphereOuter = Math.max(atmosphereInner + 0.001, this.debugParams.atmosphereOuterRadius);
+    const glowInnerRadius = renderedRadius * atmosphereInner;
+    const glowOuterRadius = renderedRadius * atmosphereOuter;
     const hue = 30;
     
-    this.sunRenderer.update(delta, hue, sunRadius, { width: w, height: h });
-    this.glowRenderer.update(delta, hue, sunRadius, glowRadius, 0, 0);
+    this.sunRenderer.update(delta, hue, sunWorldRadius, { width: w, height: h });
+    this.glowRenderer.update(delta, hue, glowInnerRadius, glowOuterRadius, 0, 0);
     
     // Draw stars
     this.drawStars(time);
@@ -546,7 +564,7 @@ export class LoginUI {
       /* Debug Panel Styles */
       .debug-panel {
         position: fixed;
-        top: 10px;
+        top: 44px;
         left: 10px;
         background: rgba(0, 0, 0, 0.85);
         border: 1px solid rgba(255, 150, 50, 0.4);
@@ -559,6 +577,31 @@ export class LoginUI {
         min-width: 220px;
         max-height: 90vh;
         overflow-y: auto;
+      }
+
+      .debug-panel.hidden {
+        display: none;
+      }
+
+      .debug-toggle-btn {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        z-index: 10000;
+        height: 28px;
+        padding: 0 10px;
+        border-radius: 6px;
+        border: 1px solid rgba(255, 150, 50, 0.5);
+        background: rgba(0, 0, 0, 0.8);
+        color: #ffaa66;
+        font-family: monospace;
+        font-size: 11px;
+        cursor: pointer;
+      }
+
+      .debug-toggle-btn:hover {
+        background: rgba(255, 120, 30, 0.2);
+        border-color: rgba(255, 170, 80, 0.8);
       }
       
       .debug-panel-header {
@@ -690,10 +733,19 @@ export class LoginUI {
   private createDebugPanel(): void {
     const existingPanel = document.getElementById('sun-debug-panel');
     if (existingPanel) existingPanel.remove();
+    const existingToggle = document.getElementById('sun-debug-toggle');
+    if (existingToggle) existingToggle.remove();
+
+    const toggleBtn = document.createElement('button');
+    toggleBtn.id = 'sun-debug-toggle';
+    toggleBtn.className = 'debug-toggle-btn';
+    toggleBtn.type = 'button';
+    toggleBtn.textContent = this.debugPanelVisible ? 'Hide Sun Settings' : 'Show Sun Settings';
     
     const panel = document.createElement('div');
     panel.id = 'sun-debug-panel';
     panel.className = 'debug-panel';
+    if (!this.debugPanelVisible) panel.classList.add('hidden');
     
     const sliders = [
       // fBM Core
@@ -729,6 +781,10 @@ export class LoginUI {
       // Corona
       { key: 'coronaSize', label: 'Size', min: 0.5, max: 4, step: 0.1, group: 'Corona' },
       { key: 'coronaIntensity', label: 'Intensity', min: 0, max: 2, step: 0.1, group: 'Corona' },
+      { key: 'atmosphereInnerRadius', label: 'Atmo Inner', min: 0.2, max: 2.5, step: 0.05, group: 'Corona' },
+      { key: 'atmosphereOuterRadius', label: 'Atmo Outer', min: 0.3, max: 4.0, step: 0.05, group: 'Corona' },
+      { key: 'coronaInnerRadius', label: 'Corona Inner', min: 0.2, max: 2.5, step: 0.05, group: 'Corona' },
+      { key: 'coronaOuterRadius', label: 'Corona Outer', min: 0.3, max: 4.0, step: 0.05, group: 'Corona' },
     ];
     
     const colors = [
@@ -777,7 +833,14 @@ export class LoginUI {
       </div>
     `;
     
+    document.body.appendChild(toggleBtn);
     document.body.appendChild(panel);
+
+    toggleBtn.addEventListener('click', () => {
+      this.debugPanelVisible = !this.debugPanelVisible;
+      panel.classList.toggle('hidden', !this.debugPanelVisible);
+      toggleBtn.textContent = this.debugPanelVisible ? 'Hide Sun Settings' : 'Show Sun Settings';
+    });
     
     // Toggle collapse
     const header = panel.querySelector('.debug-panel-header');
@@ -829,6 +892,14 @@ export class LoginUI {
     // Apply corona settings
     this.sunRenderer.setCoronaSize(this.debugParams.coronaSize);
     this.sunRenderer.setCoronaIntensity(this.debugParams.coronaIntensity);
+    this.sunRenderer.setAtmosphereRadii(
+      this.debugParams.atmosphereInnerRadius,
+      this.debugParams.atmosphereOuterRadius
+    );
+    this.sunRenderer.setCoronaRadii(
+      this.debugParams.coronaInnerRadius,
+      this.debugParams.coronaOuterRadius
+    );
     
     // Apply custom colors (4 colors: dark, mid, bright, edge)
     const darkRgb = this.hexToRgb(this.debugParams.darkColor);
@@ -1046,11 +1117,19 @@ export class LoginUI {
   show(): void {
     this.visible = true;
     this.panel.style.display = 'flex';
+    const debugToggle = document.getElementById('sun-debug-toggle') as HTMLElement | null;
+    const debugPanel = document.getElementById('sun-debug-panel') as HTMLElement | null;
+    if (debugToggle) debugToggle.style.display = '';
+    if (debugPanel) debugPanel.style.display = '';
   }
 
   hide(): void {
     this.visible = false;
     this.panel.style.display = 'none';
+    const debugToggle = document.getElementById('sun-debug-toggle') as HTMLElement | null;
+    const debugPanel = document.getElementById('sun-debug-panel') as HTMLElement | null;
+    if (debugToggle) debugToggle.style.display = 'none';
+    if (debugPanel) debugPanel.style.display = 'none';
     window.removeEventListener('resize', this.handleResize);
   }
 
@@ -1060,6 +1139,10 @@ export class LoginUI {
   
   destroy(): void {
     window.removeEventListener('resize', this.handleResize);
+    const debugPanel = document.getElementById('sun-debug-panel');
+    if (debugPanel) debugPanel.remove();
+    const debugToggle = document.getElementById('sun-debug-toggle');
+    if (debugToggle) debugToggle.remove();
     
     // Clean up PixiJS
     if (this.sunRenderer) {

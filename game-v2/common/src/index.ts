@@ -30,3 +30,4 @@ export * from './physics/index.js';
 
 // Game systems
 export * from './game/quests.js';
+export * from './starfield';

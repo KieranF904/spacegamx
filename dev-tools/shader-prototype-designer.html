@@ -1,0 +1,932 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shader Prototype Designer</title>
+  <style>
+    :root {
+      --bg: #0a0a10;
+      --panel: #131722;
+      --panel-2: #0f1320;
+      --line: #2a3245;
+      --text: #d7deef;
+      --muted: #8d98b6;
+      --accent: #5aa9ff;
+      --ok: #7bd88f;
+      --err: #ff6b7a;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: Segoe UI, system-ui, sans-serif; }
+
+    .app { display: grid; grid-template-columns: 360px 1fr; grid-template-rows: auto 1fr auto; height: 100%; }
+
+    .topbar {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .topbar h1 {
+      margin: 0 8px 0 0;
+      font-size: 13px;
+      letter-spacing: .8px;
+      text-transform: uppercase;
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .topbar .spacer { flex: 1; }
+
+    .panel {
+      grid-row: 2;
+      background: var(--panel-2);
+      border-right: 1px solid var(--line);
+      overflow: auto;
+      padding: 14px;
+    }
+
+    .preview-wrap {
+      grid-row: 2;
+      position: relative;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 50%, #0b1020 0%, #02040a 68%, #000 100%);
+    }
+
+    #preview {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .statusbar {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 12px;
+      border-top: 1px solid var(--line);
+      background: #0d111c;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .section { margin-bottom: 16px; }
+    .section h2 {
+      margin: 0 0 10px;
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--accent);
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 6px;
+    }
+
+    .row { margin-bottom: 10px; }
+
+    label, .label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 4px;
+      font-size: 12px;
+      color: var(--text);
+    }
+
+    .value { color: var(--ok); font-family: Consolas, monospace; font-size: 11px; }
+
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+    select, button, textarea {
+      background: #1a2233;
+      border: 1px solid var(--line);
+      color: var(--text);
+      border-radius: 6px;
+      font-size: 12px;
+    }
+
+    select { height: 32px; padding: 0 8px; min-width: 250px; }
+    button { height: 32px; padding: 0 12px; cursor: pointer; }
+    button:hover { border-color: #3f567f; }
+
+    .btn-primary { background: #1a3a5a; border-color: #2b5f91; }
+
+    .hint { color: var(--muted); font-size: 11px; line-height: 1.4; }
+
+    .codebox {
+      width: 100%;
+      min-height: 120px;
+      padding: 8px;
+      font-family: Consolas, monospace;
+      resize: vertical;
+    }
+
+    .error { color: var(--err); }
+    .ok { color: var(--ok); }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <h1>Shader Prototype Designer</h1>
+      <select id="effect-select" title="Choose prototype effect"></select>
+      <button id="btn-reload">Reload Effect</button>
+      <button id="btn-reset">Reset Sliders</button>
+      <button id="btn-export" class="btn-primary">Export Settings</button>
+      <button id="btn-copy">Copy Export</button>
+      <div class="spacer"></div>
+      <span id="fps">FPS: --</span>
+    </div>
+
+    <aside class="panel">
+      <div class="section">
+        <h2>Prototype Controls</h2>
+        <div id="control-list"></div>
+      </div>
+
+      <div class="section">
+        <h2>Export Defaults</h2>
+        <p class="hint">Use this output directly as your default parameter block when moving into sandbox.</p>
+        <textarea id="export-output" class="codebox" spellcheck="false" readonly></textarea>
+      </div>
+
+      <div class="section">
+        <h2>Notes</h2>
+        <p class="hint">- Switch effect from the top dropdown (no page restart required).<br>
+          - Reload Effect recompiles current shader only.<br>
+          - Press <b>R</b> to reload current effect quickly.</p>
+      </div>
+    </aside>
+
+    <main class="preview-wrap">
+      <canvas id="preview"></canvas>
+    </main>
+
+    <div class="statusbar">
+      <span id="status" class="ok">Ready.</span>
+      <span>First effect: <b>Codementor-style Nebula</b> (procedural fBM + domain warp).</span>
+    </div>
+  </div>
+
+  <script type="module">
+    const canvas = document.getElementById('preview');
+    const gl = canvas.getContext('webgl2', { antialias: false, alpha: false });
+    const statusEl = document.getElementById('status');
+    const fpsEl = document.getElementById('fps');
+    const selectEl = document.getElementById('effect-select');
+    const controlListEl = document.getElementById('control-list');
+    const exportOutEl = document.getElementById('export-output');
+
+    if (!gl) {
+      statusEl.textContent = 'WebGL2 unavailable in this browser.';
+      statusEl.className = 'error';
+      throw new Error('WebGL2 unavailable');
+    }
+
+    const VERT_SRC = `#version 300 es
+      in vec2 a_pos;
+      out vec2 v_uv;
+      void main() {
+        v_uv = a_pos * 0.5 + 0.5;
+        gl_Position = vec4(a_pos, 0.0, 1.0);
+      }
+    `;
+
+    const EFFECTS = {
+      nebula_codementor_v1: {
+        label: 'Nebula — Codementor Inspired v1',
+        description: 'Layered fBM noise, domain warp, contrast masks, star field.',
+        params: [
+          { key: 'density', label: 'Density', min: 0.1, max: 2.5, step: 0.01, value: 1.05 },
+          { key: 'contrast', label: 'Contrast', min: 0.3, max: 2.5, step: 0.01, value: 1.35 },
+          { key: 'shapeScale', label: 'Shape Scale', min: 0.2, max: 3.0, step: 0.01, value: 1.0 },
+          { key: 'warp', label: 'Warp', min: 0.0, max: 2.0, step: 0.01, value: 0.45 },
+          { key: 'flowSpeed', label: 'Flow Speed', min: 0.0, max: 1.5, step: 0.01, value: 0.12 },
+          { key: 'noiseDetail', label: 'Noise Detail', min: 0.3, max: 2.0, step: 0.01, value: 1.0 },
+          { key: 'coreBoost', label: 'Core Boost', min: 0.0, max: 2.0, step: 0.01, value: 0.8 },
+          { key: 'colorShift', label: 'Color Shift', min: -1.0, max: 1.0, step: 0.01, value: 0.0 },
+          { key: 'subtleColorVar', label: 'Subtle Color Var', min: 0.0, max: 4.0, step: 0.01, value: 1.0 },
+          { key: 'colorStreaks', label: 'Color Streaks', min: 0.0, max: 1.5, step: 0.01, value: 0.95 },
+          { key: 'streakWidth', label: 'Streak Width', min: 0.4, max: 2.5, step: 0.01, value: 0.8 },
+          { key: 'streakColorBias', label: 'Streak Color Bias', min: -1.0, max: 1.0, step: 0.01, value: 0.0 },
+          { key: 'outerFalloff', label: 'Outer Falloff', min: 0.0, max: 4.0, step: 0.01, value: 1.35 },
+          { key: 'posterize', label: 'Posterize', min: 0.0, max: 1.0, step: 0.01, value: 0.22 },
+          { key: 'starAmount', label: 'Stars', min: 0.0, max: 2.0, step: 0.01, value: 0.35 },
+          { key: 'grain', label: 'Film Grain', min: 0.0, max: 0.2, step: 0.001, value: 0.03 },
+        ],
+        fragment: `#version 300 es
+          precision highp float;
+
+          in vec2 v_uv;
+          out vec4 fragColor;
+
+          uniform vec2 u_resolution;
+          uniform float u_time;
+          uniform float density;
+          uniform float contrast;
+          uniform float shapeScale;
+          uniform float warp;
+          uniform float flowSpeed;
+          uniform float noiseDetail;
+          uniform float coreBoost;
+          uniform float colorShift;
+          uniform float subtleColorVar;
+          uniform float colorStreaks;
+          uniform float streakWidth;
+          uniform float streakColorBias;
+          uniform float outerFalloff;
+          uniform float posterize;
+          uniform float starAmount;
+          uniform float grain;
+
+          float fbm(vec2 p);
+
+          float nebulaHeight(vec2 ws) {
+            float base = fbm(ws * (0.9 + noiseDetail * 0.8));
+            float detail = fbm(ws * 2.5 + vec2(7.1, -3.4));
+            float ridge = 1.0 - abs(2.0 * detail - 1.0);
+            float h = mix(base, ridge, 0.32) * density;
+            return pow(max(0.0, h), contrast);
+          }
+
+          vec2 hash22(vec2 p) {
+            p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
+            return fract(sin(p) * 43758.5453123);
+          }
+
+          float noise(vec2 p) {
+            vec2 i = floor(p);
+            vec2 f = fract(p);
+            vec2 u = f * f * (3.0 - 2.0 * f);
+            float a = dot(hash22(i + vec2(0,0)) * 2.0 - 1.0, f - vec2(0,0));
+            float b = dot(hash22(i + vec2(1,0)) * 2.0 - 1.0, f - vec2(1,0));
+            float c = dot(hash22(i + vec2(0,1)) * 2.0 - 1.0, f - vec2(0,1));
+            float d = dot(hash22(i + vec2(1,1)) * 2.0 - 1.0, f - vec2(1,1));
+            return mix(mix(a,b,u.x), mix(c,d,u.x), u.y) * 0.5 + 0.5;
+          }
+
+          float fbm(vec2 p) {
+            float v = 0.0;
+            float a = 0.55;
+            float f = 1.0;
+            for (int i = 0; i < 6; i++) {
+              v += a * noise(p * f);
+              f *= 1.85;
+              a *= 0.55;
+            }
+            return v;
+          }
+
+          float stars(vec2 uv, float t) {
+            vec2 p = uv * 300.0;
+            vec2 i = floor(p);
+            vec2 f = fract(p) - 0.5;
+            vec2 h = hash22(i + floor(t * 0.1));
+            float d = length(f - (h - 0.5) * 0.5);
+            float s = smoothstep(0.05, 0.0, d);
+            return pow(s, 8.0);
+          }
+
+          void main() {
+            vec2 uv = v_uv;
+            vec2 p = (uv - 0.5) * vec2(u_resolution.x / u_resolution.y, 1.0) * shapeScale;
+            float t = u_time * flowSpeed;
+
+            vec2 q = vec2(fbm(p + vec2(0.0, t)), fbm(p + vec2(5.2, 1.3) - vec2(0.0, t * 0.8)));
+            vec2 w = p + (q - 0.5) * warp;
+
+            float nebula = nebulaHeight(w);
+
+            float radial = 1.0 - length((uv - 0.5) * vec2(1.15, 1.0));
+            radial = smoothstep(0.0, 1.0, radial);
+            nebula *= mix(0.6, 1.25 + coreBoost * 0.35, radial);
+
+            vec3 deep = vec3(0.03, 0.06, 0.14);
+            vec3 mid = vec3(0.20, 0.10, 0.33);
+            vec3 hot = vec3(0.75, 0.42, 0.86);
+
+            // Subtle built-in palette variation (slow, cloud-like color drift)
+            float cVarA = fbm(w * 0.55 + vec2(2.4, -1.1));
+            float cVarB = fbm(w * 0.95 + vec2(-4.2, 3.7));
+            float cVarC = fbm(w * 1.65 + vec2(8.3, -6.6));
+            float cVar = (cVarA * 0.7 + cVarB * 0.3) - 0.5;
+            float cVar2 = (cVarC - 0.5);
+            vec3 varTint = vec3(
+              cVar * 0.28 + cVar2 * 0.14,
+              cVar * -0.12 + cVar2 * 0.08,
+              cVar * 0.34 - cVar2 * 0.10
+            ) * subtleColorVar;
+            deep += varTint * 0.85;
+            mid += varTint * 1.15;
+            hot += varTint * 1.45;
+
+            vec3 gas = mix(deep, mid, smoothstep(0.08, 0.55, nebula));
+            gas = mix(gas, hot, smoothstep(0.45, 1.0, nebula));
+
+            // Nebula-integrated color bias regions: cloud segments shift hue, not overlay stripes.
+            float segA = fbm(w * (1.05 / streakWidth) + vec2(t * 0.10, -t * 0.06));
+            float segB = fbm(w * (2.20 / streakWidth) + vec2(-3.7, 5.1) + vec2(t * 0.04, t * 0.03));
+            float segField = mix(segA, segB, 0.42);
+
+            // Favor coherent segments inside denser cloud bodies.
+            float densityMask = smoothstep(0.14, 0.82, nebula);
+            float segmentMask = smoothstep(0.56, 0.87, segField);
+            segmentMask *= (0.55 + 0.45 * smoothstep(0.35, 0.90, cVarA));
+            segmentMask *= densityMask;
+
+            // Multi-color accent palette for richer cloud-region variety.
+            float streakPicker = fbm(w * 0.72 + vec2(-6.2, 4.3));
+            float streakPicker2 = fbm(w * 1.41 + vec2(9.7, -2.1));
+            float picker = clamp(streakPicker * 0.65 + streakPicker2 * 0.35, 0.0, 1.0);
+            float bias = clamp(streakColorBias * 0.5 + 0.5, 0.0, 1.0);
+
+            // Cool side includes cyan + violet, warm side includes amber + magenta.
+            vec3 coolA = vec3(0.05, 0.82, 0.98);
+            vec3 coolB = vec3(0.50, 0.34, 1.00);
+            vec3 warmA = vec3(1.00, 0.62, 0.16);
+            vec3 warmB = vec3(0.98, 0.22, 0.72);
+
+            float coolWarm = smoothstep(0.25, 0.75, mix(picker, bias, 0.35));
+            float intra = fract(picker * 3.17 + segB * 0.61);
+            vec3 coolColor = mix(coolA, coolB, smoothstep(0.2, 0.8, intra));
+            vec3 warmColor = mix(warmA, warmB, smoothstep(0.2, 0.8, 1.0 - intra));
+            vec3 biasColor = mix(coolColor, warmColor, coolWarm);
+
+            // Saturation lift in accented segments.
+            float lum = dot(biasColor, vec3(0.299, 0.587, 0.114));
+            biasColor = mix(vec3(lum), biasColor, 1.35);
+            biasColor = clamp(biasColor, 0.0, 1.25);
+
+            // Blend toward bias color while preserving base cloud structure.
+            float streakStrength = clamp(segmentMask * colorStreaks * 1.15, 0.0, 1.0);
+            vec3 biasedGas = mix(gas, mix(gas, biasColor, 0.72), streakStrength);
+            gas = mix(gas, biasedGas, densityMask);
+
+            // Extra mid-band hue drift so variation remains visible in denser zones
+            float hueBand = smoothstep(0.18, 0.72, nebula) * (0.6 + 0.4 * (cVarA + cVarB) * 0.5);
+            gas += vec3(0.08, -0.02, 0.11) * hueBand * subtleColorVar;
+
+            float shift = colorShift * 0.25;
+            gas = gas.brg * max(0.0, shift) + gas * (1.0 - max(0.0, shift));
+            gas = gas.grb * max(0.0, -shift) + gas * (1.0 - max(0.0, -shift));
+
+            float s = stars(uv, u_time) * starAmount;
+            vec3 starCol = vec3(s);
+            vec3 col = gas;
+
+            float g = (noise(uv * u_resolution.xy * 0.6 + u_time * 0.7) - 0.5) * grain;
+            col += g;
+
+            // Gentle posterization blend (0 = off, 1 = strongest in this range)
+            float levels = mix(64.0, 8.0, clamp(posterize, 0.0, 1.0));
+            vec3 postCol = floor(max(col, 0.0) * levels + 0.5) / levels;
+            col = mix(col, postCol, clamp(posterize, 0.0, 1.0) * 0.85);
+
+            // Outer falloff for cleaner edge rolloff
+            float edgeDist = length((uv - 0.5) * vec2(1.15, 1.0));
+            float edgeMask = clamp(1.0 - edgeDist, 0.0, 1.0);
+            edgeMask = pow(edgeMask, 0.4 + outerFalloff * 0.9);
+            col *= edgeMask;
+
+            // Composite stars after nebula falloff so stars remain visible at edges.
+            col += starCol;
+
+            col = pow(max(col, 0.0), vec3(0.9));
+            fragColor = vec4(col, 1.0);
+          }
+        `,
+      },
+
+      nebula_ink_v2: {
+        label: 'Nebula — Ink Clouds v2',
+        description: 'Softer cloud bands with dark dust lanes.',
+        params: [
+          { key: 'density', label: 'Density', min: 0.1, max: 3.0, step: 0.01, value: 1.2 },
+          { key: 'contrast', label: 'Contrast', min: 0.2, max: 3.0, step: 0.01, value: 1.7 },
+          { key: 'shapeScale', label: 'Shape Scale', min: 0.2, max: 3.0, step: 0.01, value: 1.15 },
+          { key: 'warp', label: 'Warp', min: 0.0, max: 2.0, step: 0.01, value: 0.65 },
+          { key: 'flowSpeed', label: 'Flow Speed', min: 0.0, max: 1.5, step: 0.01, value: 0.08 },
+          { key: 'dust', label: 'Dust Lanes', min: 0.0, max: 1.0, step: 0.01, value: 0.45 },
+          { key: 'starAmount', label: 'Stars', min: 0.0, max: 2.0, step: 0.01, value: 0.22 },
+        ],
+        fragment: `#version 300 es
+          precision highp float;
+          in vec2 v_uv;
+          out vec4 fragColor;
+
+          uniform vec2 u_resolution;
+          uniform float u_time;
+          uniform float density;
+          uniform float contrast;
+          uniform float shapeScale;
+          uniform float warp;
+          uniform float flowSpeed;
+          uniform float dust;
+          uniform float starAmount;
+
+          float hash12(vec2 p) {
+            vec3 p3 = fract(vec3(p.xyx) * .1031);
+            p3 += dot(p3, p3.yzx + 33.33);
+            return fract((p3.x + p3.y) * p3.z);
+          }
+
+          float noise(vec2 p){
+            vec2 i = floor(p), f = fract(p);
+            f = f*f*(3.0-2.0*f);
+            float a = hash12(i + vec2(0,0));
+            float b = hash12(i + vec2(1,0));
+            float c = hash12(i + vec2(0,1));
+            float d = hash12(i + vec2(1,1));
+            return mix(mix(a,b,f.x), mix(c,d,f.x), f.y);
+          }
+
+          float fbm(vec2 p){
+            float v = 0.0;
+            float a = 0.55;
+            for (int i=0;i<6;i++) {
+              v += a * noise(p);
+              p *= 2.03;
+              a *= 0.56;
+            }
+            return v;
+          }
+
+          float starfield(vec2 uv) {
+            vec2 p = uv * 420.0;
+            vec2 i = floor(p);
+            float h = hash12(i);
+            float m = step(0.9972, h);
+            return m * smoothstep(0.999, 1.0, h);
+          }
+
+          void main() {
+            vec2 uv = v_uv;
+            vec2 p = (uv - 0.5) * vec2(u_resolution.x / u_resolution.y, 1.0) * shapeScale;
+            float t = u_time * flowSpeed;
+
+            vec2 flow = vec2(fbm(p + vec2(t, 0.0)), fbm(p + vec2(0.0, -t))) - 0.5;
+            vec2 w = p + flow * warp;
+
+            float n0 = fbm(w * 0.95);
+            float n1 = fbm(w * 2.1 + vec2(4.2, 1.7));
+            float mask = smoothstep(0.1, 0.95, n0);
+
+            float neb = mix(n0, n1, 0.35) * density;
+            neb = pow(max(0.0, neb), contrast);
+
+            float dustMask = smoothstep(0.35, 0.85, n1) * dust;
+            vec3 col = mix(vec3(0.01,0.03,0.08), vec3(0.33,0.18,0.45), neb * mask);
+            col = mix(col, vec3(0.75,0.55,0.85), smoothstep(0.45, 1.0, neb));
+            col *= (1.0 - dustMask * 0.5);
+
+            col += vec3(starfield(uv) * starAmount);
+            fragColor = vec4(col, 1.0);
+          }
+        `,
+      },
+
+      blackhole_bruneton_inspired_v1: {
+        label: 'Black Hole — Bruneton Inspired v1',
+        description: 'Prototype black hole with lensing, photon ring, and accretion disc.',
+        params: [
+          { key: 'holeRadius', label: 'Hole Radius', min: 0.04, max: 0.35, step: 0.001, value: 0.14 },
+          { key: 'lensStrength', label: 'Lens Strength', min: 0.0, max: 2.5, step: 0.01, value: 1.25 },
+          { key: 'ringIntensity', label: 'Photon Ring', min: 0.0, max: 3.0, step: 0.01, value: 1.35 },
+          { key: 'ringWidth', label: 'Ring Width', min: 0.002, max: 0.08, step: 0.001, value: 0.018 },
+          { key: 'discInner', label: 'Disc Inner', min: 0.10, max: 0.50, step: 0.005, value: 0.20 },
+          { key: 'discOuter', label: 'Disc Outer', min: 0.20, max: 1.30, step: 0.005, value: 0.62 },
+          { key: 'discThickness', label: 'Disc Thickness', min: 0.02, max: 0.45, step: 0.005, value: 0.13 },
+          { key: 'discTurbulence', label: 'Disc Turbulence', min: 0.0, max: 1.5, step: 0.01, value: 0.5 },
+          { key: 'spin', label: 'Spin', min: -4.0, max: 4.0, step: 0.01, value: 1.2 },
+          { key: 'discHue', label: 'Disc Hue', min: 0.0, max: 360.0, step: 1.0, value: 32.0 },
+          { key: 'discSaturation', label: 'Disc Saturation', min: 0.0, max: 1.0, step: 0.01, value: 0.9 },
+          { key: 'bloom', label: 'Bloom', min: 0.0, max: 2.0, step: 0.01, value: 0.75 },
+          { key: 'bgStars', label: 'Background Stars', min: 0.0, max: 2.0, step: 0.01, value: 0.9 },
+          { key: 'bgTint', label: 'Background Tint', min: 0.0, max: 1.0, step: 0.01, value: 0.25 },
+        ],
+        fragment: `#version 300 es
+          precision highp float;
+
+          in vec2 v_uv;
+          out vec4 fragColor;
+
+          uniform vec2 u_resolution;
+          uniform float u_time;
+
+          uniform float holeRadius;
+          uniform float lensStrength;
+          uniform float ringIntensity;
+          uniform float ringWidth;
+          uniform float discInner;
+          uniform float discOuter;
+          uniform float discThickness;
+          uniform float discTurbulence;
+          uniform float spin;
+          uniform float discHue;
+          uniform float discSaturation;
+          uniform float bloom;
+          uniform float bgStars;
+          uniform float bgTint;
+
+          float hash12(vec2 p) {
+            vec3 p3 = fract(vec3(p.xyx) * .1031);
+            p3 += dot(p3, p3.yzx + 33.33);
+            return fract((p3.x + p3.y) * p3.z);
+          }
+
+          float noise(vec2 p) {
+            vec2 i = floor(p);
+            vec2 f = fract(p);
+            f = f * f * (3.0 - 2.0 * f);
+            float a = hash12(i + vec2(0.0, 0.0));
+            float b = hash12(i + vec2(1.0, 0.0));
+            float c = hash12(i + vec2(0.0, 1.0));
+            float d = hash12(i + vec2(1.0, 1.0));
+            return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+          }
+
+          float fbm(vec2 p) {
+            float v = 0.0;
+            float a = 0.5;
+            for (int i = 0; i < 5; i++) {
+              v += a * noise(p);
+              p *= 2.02;
+              a *= 0.53;
+            }
+            return v;
+          }
+
+          vec3 hsl2rgb(float h, float s, float l) {
+            h = mod(h, 360.0) / 360.0;
+            float c = (1.0 - abs(2.0 * l - 1.0)) * s;
+            float x = c * (1.0 - abs(mod(h * 6.0, 2.0) - 1.0));
+            float m = l - c * 0.5;
+            vec3 rgb;
+            if (h < 1.0/6.0) rgb = vec3(c, x, 0.0);
+            else if (h < 2.0/6.0) rgb = vec3(x, c, 0.0);
+            else if (h < 3.0/6.0) rgb = vec3(0.0, c, x);
+            else if (h < 4.0/6.0) rgb = vec3(0.0, x, c);
+            else if (h < 5.0/6.0) rgb = vec3(x, 0.0, c);
+            else rgb = vec3(c, 0.0, x);
+            return rgb + m;
+          }
+
+          mat2 rot(float a) {
+            float c = cos(a), s = sin(a);
+            return mat2(c, -s, s, c);
+          }
+
+          float stars(vec2 uv, float amount) {
+            vec2 p = uv * 700.0;
+            vec2 i = floor(p);
+            vec2 f = fract(p) - 0.5;
+            float h = hash12(i);
+            float spawn = step(0.9965 - amount * 0.0025, h);
+            float d = length(f - (vec2(hash12(i + 12.7), hash12(i + 53.1)) - 0.5) * 0.6);
+            float core = smoothstep(0.035, 0.0, d);
+            return spawn * pow(core, 7.0);
+          }
+
+          void main() {
+            vec2 uv = v_uv;
+            vec2 p = (uv - 0.5) * vec2(u_resolution.x / u_resolution.y, 1.0);
+            float r = length(p);
+
+            float safeR = max(r, 0.02);
+            float lens = lensStrength / (safeR * safeR + 0.08);
+
+            vec2 bent = p * (1.0 + lens * 0.16);
+            float swirl = lensStrength * exp(-safeR * 7.0) * 0.55;
+            bent = rot(swirl * sign(spin)) * bent;
+
+            vec3 bg = vec3(0.006, 0.008, 0.015);
+            float bgN = fbm(bent * 2.5 + vec2(5.2, -3.7));
+            bg += vec3(0.03, 0.045, 0.08) * bgN * bgTint;
+            bg += vec3(stars(bent * 0.5 + 0.5, bgStars));
+
+            float inner = min(discInner, discOuter - 0.02);
+            float outer = max(discOuter, inner + 0.02);
+
+            vec2 dp = p;
+            dp.y *= mix(0.20, 0.75, discThickness);
+            float dr = length(dp);
+            float az = atan(dp.y, dp.x);
+
+            float discBand = smoothstep(inner, inner + 0.04, dr) * (1.0 - smoothstep(outer - 0.05, outer, dr));
+            float flow = az * 5.0 + dr * 28.0 - u_time * spin * 0.85;
+            float turb = fbm(vec2(az * 2.5 + u_time * spin * 0.05, dr * 10.0 - u_time * 0.08));
+            float streaks = 0.5 + 0.5 * sin(flow + turb * 6.2831853 * discTurbulence);
+            float discMask = discBand * mix(0.45, 1.45, streaks);
+
+            vec3 baseDisc = hsl2rgb(discHue, discSaturation, 0.56);
+            vec3 hotDisc = hsl2rgb(discHue + 18.0, min(1.0, discSaturation * 0.9), 0.72);
+            float doppler = 0.5 + 0.5 * sin(az - u_time * spin * 0.16);
+            vec3 discCol = mix(baseDisc, hotDisc, doppler);
+
+            float ringR = holeRadius * 1.06;
+            float ring = exp(-pow((r - ringR) / max(0.001, ringWidth), 2.0));
+            vec3 ringCol = hsl2rgb(discHue + 26.0, min(1.0, discSaturation), 0.78);
+
+            float shadow = 1.0 - smoothstep(holeRadius * 0.92, holeRadius * 1.08, r);
+
+            vec3 col = bg;
+            col += discCol * discMask;
+            col += ringCol * ring * ringIntensity;
+
+            // Gravitational darkening toward the event horizon
+            float horizonDark = smoothstep(holeRadius * 0.95, holeRadius * 1.45, r);
+            col *= mix(0.18, 1.0, horizonDark);
+
+            // Black hole core
+            col = mix(col, vec3(0.0), shadow);
+
+            // Soft bloom from ring + disc
+            float glow = ring * ringIntensity * 0.55 + discMask * 0.2;
+            col += ringCol * glow * bloom;
+
+            col = pow(max(col, 0.0), vec3(0.9));
+            fragColor = vec4(col, 1.0);
+          }
+        `,
+      },
+    };
+
+    let currentEffectId = 'nebula_codementor_v1';
+    let program = null;
+    let vao = null;
+    let uniformLocations = new Map();
+    let paramState = {};
+    let startTime = performance.now();
+    let prevTime = performance.now();
+    let frameCount = 0;
+    let fpsTimer = 0;
+
+    function setStatus(text, isError = false) {
+      statusEl.textContent = text;
+      statusEl.className = isError ? 'error' : 'ok';
+    }
+
+    function createShader(type, source) {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        const err = gl.getShaderInfoLog(shader) || 'Unknown shader compile error';
+        gl.deleteShader(shader);
+        throw new Error(err);
+      }
+      return shader;
+    }
+
+    function createProgram(effect) {
+      const vs = createShader(gl.VERTEX_SHADER, VERT_SRC);
+      const fs = createShader(gl.FRAGMENT_SHADER, effect.fragment);
+      const p = gl.createProgram();
+      gl.attachShader(p, vs);
+      gl.attachShader(p, fs);
+      gl.bindAttribLocation(p, 0, 'a_pos');
+      gl.linkProgram(p);
+
+      gl.deleteShader(vs);
+      gl.deleteShader(fs);
+
+      if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+        const err = gl.getProgramInfoLog(p) || 'Unknown program link error';
+        gl.deleteProgram(p);
+        throw new Error(err);
+      }
+
+      return p;
+    }
+
+    function initGeometry() {
+      vao = gl.createVertexArray();
+      gl.bindVertexArray(vao);
+
+      const quad = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+      gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array([
+          -1, -1,
+           1, -1,
+          -1,  1,
+          -1,  1,
+           1, -1,
+           1,  1,
+        ]),
+        gl.STATIC_DRAW,
+      );
+
+      gl.enableVertexAttribArray(0);
+      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+      gl.bindVertexArray(null);
+    }
+
+    function buildUniformLocations(effect) {
+      uniformLocations.clear();
+      uniformLocations.set('u_resolution', gl.getUniformLocation(program, 'u_resolution'));
+      uniformLocations.set('u_time', gl.getUniformLocation(program, 'u_time'));
+      for (const p of effect.params) {
+        uniformLocations.set(p.key, gl.getUniformLocation(program, p.key));
+      }
+    }
+
+    function populateEffectsDropdown() {
+      selectEl.innerHTML = '';
+      for (const [id, effect] of Object.entries(EFFECTS)) {
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = effect.label;
+        selectEl.appendChild(opt);
+      }
+      selectEl.value = currentEffectId;
+    }
+
+    function rebuildControls() {
+      const effect = EFFECTS[currentEffectId];
+      controlListEl.innerHTML = '';
+
+      for (const def of effect.params) {
+        if (paramState[def.key] === undefined) paramState[def.key] = def.value;
+
+        const row = document.createElement('div');
+        row.className = 'row';
+
+        const label = document.createElement('label');
+        const left = document.createElement('span');
+        left.textContent = def.label;
+
+        const right = document.createElement('span');
+        right.className = 'value';
+        right.id = `val-${def.key}`;
+        right.textContent = Number(paramState[def.key]).toFixed(def.step < 1 ? 2 : 0);
+
+        label.appendChild(left);
+        label.appendChild(right);
+
+        const input = document.createElement('input');
+        input.type = 'range';
+        input.min = String(def.min);
+        input.max = String(def.max);
+        input.step = String(def.step);
+        input.value = String(paramState[def.key]);
+        input.addEventListener('input', () => {
+          paramState[def.key] = Number(input.value);
+          right.textContent = Number(paramState[def.key]).toFixed(def.step < 1 ? 2 : 0);
+          updateExport();
+        });
+
+        row.appendChild(label);
+        row.appendChild(input);
+        controlListEl.appendChild(row);
+      }
+
+      updateExport();
+    }
+
+    function updateExport() {
+      const effect = EFFECTS[currentEffectId];
+      const payload = {
+        effectId: currentEffectId,
+        effectLabel: effect.label,
+        defaults: Object.fromEntries(effect.params.map(p => [p.key, Number(paramState[p.key])])),
+      };
+
+      exportOutEl.value = JSON.stringify(payload, null, 2);
+    }
+
+    function resetParams() {
+      const effect = EFFECTS[currentEffectId];
+      for (const p of effect.params) {
+        paramState[p.key] = p.value;
+      }
+      rebuildControls();
+      setStatus('Parameters reset to effect defaults.');
+    }
+
+    function loadEffect(effectId, { preserveValues = true } = {}) {
+      const effect = EFFECTS[effectId];
+      if (!effect) return;
+
+      if (!preserveValues) {
+        paramState = {};
+      }
+
+      currentEffectId = effectId;
+      selectEl.value = effectId;
+
+      let newProgram = null;
+      try {
+        newProgram = createProgram(effect);
+      } catch (err) {
+        setStatus(`Shader compile/link failed: ${err.message}`, true);
+        return;
+      }
+
+      if (program) gl.deleteProgram(program);
+      program = newProgram;
+
+      buildUniformLocations(effect);
+      rebuildControls();
+      startTime = performance.now();
+      setStatus(`Loaded effect: ${effect.label}`);
+    }
+
+    function resize() {
+      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      const w = Math.floor(canvas.clientWidth * dpr);
+      const h = Math.floor(canvas.clientHeight * dpr);
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+      gl.viewport(0, 0, canvas.width, canvas.height);
+    }
+
+    function render(now) {
+      resize();
+      const effect = EFFECTS[currentEffectId];
+      if (!program || !effect) {
+        requestAnimationFrame(render);
+        return;
+      }
+
+      const dt = now - prevTime;
+      prevTime = now;
+      frameCount++;
+      fpsTimer += dt;
+      if (fpsTimer >= 500) {
+        const fps = (frameCount * 1000) / fpsTimer;
+        fpsEl.textContent = `FPS: ${fps.toFixed(1)}`;
+        frameCount = 0;
+        fpsTimer = 0;
+      }
+
+      gl.useProgram(program);
+      gl.bindVertexArray(vao);
+
+      const t = (now - startTime) * 0.001;
+      gl.uniform2f(uniformLocations.get('u_resolution'), canvas.width, canvas.height);
+      gl.uniform1f(uniformLocations.get('u_time'), t);
+
+      for (const p of effect.params) {
+        const loc = uniformLocations.get(p.key);
+        if (loc) gl.uniform1f(loc, Number(paramState[p.key] ?? p.value));
+      }
+
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      gl.bindVertexArray(null);
+
+      requestAnimationFrame(render);
+    }
+
+    document.getElementById('btn-reload').addEventListener('click', () => {
+      loadEffect(currentEffectId, { preserveValues: true });
+      setStatus(`Reloaded: ${EFFECTS[currentEffectId].label}`);
+    });
+
+    document.getElementById('btn-reset').addEventListener('click', () => {
+      resetParams();
+    });
+
+    document.getElementById('btn-export').addEventListener('click', () => {
+      updateExport();
+      setStatus('Export payload generated.');
+    });
+
+    document.getElementById('btn-copy').addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(exportOutEl.value);
+        setStatus('Export copied to clipboard.');
+      } catch {
+        setStatus('Clipboard unavailable. Copy manually from export box.', true);
+      }
+    });
+
+    selectEl.addEventListener('change', () => {
+      loadEffect(selectEl.value, { preserveValues: false });
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key.toLowerCase() === 'r') {
+        loadEffect(currentEffectId, { preserveValues: true });
+        setStatus(`Reloaded with shortcut: ${EFFECTS[currentEffectId].label}`);
+      }
+    });
+
+    window.addEventListener('resize', resize);
+
+    populateEffectsDropdown();
+    initGeometry();
+    loadEffect(currentEffectId, { preserveValues: false });
+    requestAnimationFrame(render);
+  </script>
+</body>
+</html>
