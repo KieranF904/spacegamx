@@ -7,8 +7,135 @@ harness on the real GPU (RTX 5070 Ti, moderngl, GPU timer queries, best of two r
 otherwise, against the game's own shaders read from its TypeScript, set up the way `Renderer` sets them up for each
 system.
 
-There are three rounds. **Round 3** (just below) answers Kieran's review of round 2, and round 2 answers his review of
-round 1. The older rounds are kept below as they were.
+There are four rounds. **Round 4** (just below) answers Kieran's review of round 3; each round answers his review of
+the one before. The older rounds are kept below as they were.
+
+# Round 4 (after Kieran's review of round 3)
+
+Kieran's review of round 3:
+
+- The plasma is very promising.
+- The limb should blend into the atmosphere instead of being a disc with an alpha fade.
+- Colour and contrast are too uniform across the face: they should change with the viewing angle, like a real sphere.
+- Everything should be per-star data.
+- Fix plasma lite's four-lobed corona on Cinder Reach.
+- Keep rainbow saturated up close.
+- Give the lab a much wider zoom range.
+
+Round 4 is `#define PLASMA_R4` in `PLASMA_FRAG`, so round 3's plasma is unchanged and shown beside it for reference. The
+variants are `plasma4`, `plasma4@0.5`, `plasma4.lite`, `plasma4.rainbow@0.5` and `plasma4.aurora@0.5`.
+
+1. **The face by viewing angle.** Everything is driven by μ, the cosine of the view angle (1 face-on, 0 at the limb):
+   - **Limb darkening:** how dark the edge gets, and the curve's power.
+   - **Colour:** toward the limb it deepens to a per-star limb colour (deeper, redder for Sol, magenta for Nebula
+     Prime, deep blue for Borealis, near-black red for Cinder Reach).
+   - **Contrast:** the cells and filaments flatten toward the limb, down to a per-star share.
+   - **Bump:** a fake normal from the noise. The plasma's height is compared a step along a fixed light, one more
+     read, so ridges catch light on one side and shade on the other. It's strongest at grazing angles, so the surface
+     has relief where it's seen edge-on.
+   - The squash of the pattern toward the limb is kept.
+2. **The edge into the atmosphere.**
+   - **Chromosphere:** a thin, hotter, tinted band straddling the limb (per-star colour and width), so the surface
+     runs into the atmosphere.
+   - **Haze:** light scattered over the limb from inside, and a wide halo outside.
+   - **Spicules:** tongues of gas off the limb that shade from the chromosphere's colour into the corona's.
+   - **The disc's soft fade:** its width is now a share of the radius but at most 60 px, and the band's at most
+     20 px. Zoomed in on a big star they were hundreds of px of haze, which round 3's plasma still is at zoom 1.
+3. **Per-star data** (`PlasmaParams`; in the game, `centralBody.plasma` in systems.json):
+   - **The limb:** `limbDarkening`, `limbPower`, `limbContrast`, `limbTint`, `limbTintStrength`, `bump`.
+   - **The edge:** `rim`, `rimColor`, `rimWidth`, `halo`, `spicules`.
+   - **Tuning:** `PLASMA4_TUNING` in `scripts/sun-sky-proto/layers.ts` has values for Sol, Borealis, Nebula Prime and
+     Cinder Reach. Cinder Reach is the deep red giant: strongly limb-darkened, low contrast at the limb, a thick,
+     hazy, extended atmosphere.
+   - **Defaults:** they come from each star's own palette.
+   - **Multicolour:** the multicolour looks use the same limb and edge.
+4. **Fixes.**
+   - **Lite's corona** reads the fine rays too (one more read in the corona only), and the broad streamers ring is
+     1.8 times wider, so no star gets a two- or four-lobed corona.
+   - **Rainbow** stays saturated where it's bright, instead of fading to pastel and white.
+5. **The lab's zoom.** It runs 0.005 to 20 (the game allows 0.04 to 2):
+   - A zoom slider (logarithmic) has the game's range shaded on its track, and the value is shown, in amber when
+     beyond the game.
+   - The wheel goes as far.
+   - New presets: "surface up close" (zoom 8), "the limb up close" (zoom 6) and "far out" (zoom 0.008).
+   - The live graph marks each zoom change, and crossing the game's limits.
+   - **At the extremes:**
+     - The plasma's fine detail octaves stop at 3 (the surface just gets softer past about zoom 4 on these stars).
+     - The sprite sky stays bounded: far layers fade out as before, and the near cells only get bigger.
+     - The measurement repeats adapt as before.
+
+**Recommendation (round 4).** Plasma R4 at half resolution (`plasma4@0.5`), with plasma R4 lite on Low. It's 3 to
+15 times cheaper than today (4K: 0.8 to 2.2 ms → 0.13 to 0.29 ms). Round 4 costs about 25% more than round 3 for the
+bump read and the edge. **Don't use R4 at full res:** it is only 0.8 to 5x cheaper, and over the disc on Borealis it
+costs what current does.
+
+### Cost, ms per frame (sun, glow and corona; speedup against current; native harness, best of two runs)
+
+"whole" is zoom 0.04, "limb" zoom 0.15, "disc" over the disc at zoom 0.5. 1080p unless marked 4K.
+
+| star | view | current | R3 plasma ½ | R4 plasma | R4 plasma ½ | R4 plasma lite | R4 rainbow ½ |
+|---|---|---|---|---|---|---|---|
+| Sol | whole | 0.282 | 0.054 (5.2x) | 0.189 (1.5x) | 0.066 (4.3x) | 0.067 (4.2x) | 0.070 (4.0x) |
+| Sol | limb | 0.194 | 0.033 (5.9x) | 0.121 (1.6x) | 0.042 (4.6x) | 0.040 (4.8x) | 0.046 (4.2x) |
+| Sol | disc | 0.311 | 0.050 (6.2x) | 0.202 (1.5x) | 0.062 (5.0x) | 0.065 (4.8x) | 0.069 (4.5x) |
+| Borealis | whole | 0.367 | 0.033 (11.3x) | 0.109 (3.4x) | 0.044 (8.4x) | 0.059 (6.2x) | 0.047 (7.8x) |
+| Borealis | limb | 0.494 | 0.029 (17.0x) | 0.101 (4.9x) | 0.037 (13.2x) | 0.042 (11.8x) | 0.042 (11.9x) |
+| Borealis | disc | 0.202 | 0.067 (3.0x) | 0.246 (0.8x) | 0.068 (3.0x) | 0.066 (3.1x) | 0.074 (2.7x) |
+| Nebula Prime | whole | 0.462 | 0.077 (6.0x) | 0.206 (2.2x) | 0.092 (5.0x) | 0.069 (6.6x) | 0.095 (4.8x) |
+| Nebula Prime | limb | 0.385 | 0.033 (11.7x) | 0.122 (3.1x) | 0.043 (9.0x) | 0.041 (9.4x) | 0.047 (8.2x) |
+| Nebula Prime | disc | 0.521 | 0.079 (6.6x) | 0.250 (2.1x) | 0.091 (5.7x) | 0.066 (8.0x) | 0.094 (5.5x) |
+| Cinder Reach | whole | 0.312 | 0.083 (3.8x) | 0.244 (1.3x) | 0.093 (3.4x) | 0.068 (4.6x) | 0.086 (3.7x) |
+| Cinder Reach | limb | 0.203 | 0.033 (6.2x) | 0.122 (1.7x) | 0.043 (4.7x) | 0.042 (4.9x) | 0.047 (4.3x) |
+| Cinder Reach | disc | 0.313 | 0.058 (5.4x) | 0.231 (1.4x) | 0.070 (4.4x) | 0.065 (4.8x) | 0.078 (4.0x) |
+| Sol | whole 4K | 1.210 | 0.203 (6.0x) | 0.730 (1.7x) | 0.228 (5.3x) | 0.259 (4.7x) | 0.244 (5.0x) |
+| Sol | limb 4K | 0.804 | 0.123 (6.5x) | 0.422 (1.9x) | 0.155 (5.2x) | 0.158 (5.1x) | 0.171 (4.7x) |
+| Sol | disc 4K | 1.357 | 0.192 (7.1x) | 0.806 (1.7x) | 0.236 (5.7x) | 0.258 (5.3x) | 0.265 (5.1x) |
+| Borealis | whole 4K | 1.511 | 0.110 (13.8x) | 0.377 (4.0x) | 0.143 (10.5x) | 0.194 (7.8x) | 0.162 (9.3x) |
+| Borealis | limb 4K | 2.074 | 0.107 (19.5x) | 0.384 (5.4x) | 0.135 (15.4x) | 0.159 (13.1x) | 0.150 (13.8x) |
+| Borealis | disc 4K | 0.837 | 0.218 (3.8x) | 0.808 (1.0x) | 0.254 (3.3x) | 0.260 (3.2x) | 0.280 (3.0x) |
+| Nebula Prime | whole 4K | 1.967 | 0.226 (8.7x) | 0.787 (2.5x) | 0.246 (8.0x) | 0.266 (7.4x) | 0.263 (7.5x) |
+| Nebula Prime | limb 4K | 1.616 | 0.124 (13.0x) | 0.456 (3.5x) | 0.156 (10.4x) | 0.158 (10.2x) | 0.171 (9.4x) |
+| Nebula Prime | disc 4K | 2.191 | 0.246 (8.9x) | 1.075 (2.0x) | 0.284 (7.7x) | 0.258 (8.5x) | 0.310 (7.1x) |
+| Cinder Reach | whole 4K | 1.328 | 0.286 (4.6x) | 0.696 (1.9x) | 0.290 (4.6x) | 0.264 (5.0x) | 0.284 (4.7x) |
+| Cinder Reach | limb 4K | 0.790 | 0.123 (6.4x) | 0.427 (1.8x) | 0.156 (5.1x) | 0.161 (4.9x) | 0.172 (4.6x) |
+| Cinder Reach | disc 4K | 1.314 | 0.217 (6.1x) | 0.960 (1.4x) | 0.265 (5.0x) | 0.258 (5.1x) | 0.293 (4.5x) |
+
+The lab's live graph (Sol at the limb, 1600×900; current 0.127 to 0.148 ms) shows the same steps:
+
+| option | live cost |
+|---|---|
+| round 3 plasma ½ | 0.050 ms (2.9×) |
+| R4 plasma ½ | 0.048 ms (2.8×) |
+| R4 lite | 0.033 ms (4.2×) |
+| R4 rainbow ½ | 0.055 ms (2.3×) |
+
+Beyond the game's zoom:
+
+| view | zoom | sun | sky |
+|---|---|---|---|
+| surface up close | 8 | 0.052 ms (4.9×) | skipped under the disc |
+| the limb up close | 6 | 0.080 ms (2.3×) | |
+| far out | 0.008 | 0.035 ms | 0.063 ms |
+
+The browser adds a floor of about 0.04 ms a draw, so these read a little high.
+
+### Images (round 4)
+
+All in `C:\Users\Kieran\AppData\Local\Temp\claude\c--Users-Kieran-Desktop-Spacegame\b24c970b-6148-4883-b4f6-ab3b6971e1b5\scratchpad\proto\`.
+
+- **Sun sheets** (current first, round 3's plasma ½ for reference, then round 4: full, ½, lite, rainbow ½,
+  aurora ½, and round 3's rainbow for comparison): `r4-sun-<sol|borealis|nebula_prime|cinder_reach>-<full|limb|close>.png`.
+- **The edge up close** (current, round 3, round 4 ½, round 4 lite, at the limb):
+  `r4-edge-<star>-z0.3.png` and `r4-edge-<star>-z1.png`. Start with `r4-edge-sol-z0.3.png`,
+  `r4-edge-nebula_prime-z1.png` and `r4-edge-borealis-z0.3.png`.
+- **Animations** (limb at zoom 0.3, 15 s of game time at 3×; current, round 3 ½, round 4 ½, round 4 lite,
+  rainbow ½, aurora ½): `r4-anim-sun-<star>.gif`.
+- **The lab:** `lab-r4-graph.png` (the live graph through round 3 and round 4 options), `lab-r4-surface-z8.png`
+  (beyond the game's zoom).
+- **Raw data:** `bench4.final.json`.
+
+To reproduce, run `node scripts/sun-sky-proto/run.mjs <set> <out dir>`, where the set is `v4`, `stills4`, `gif4` or
+`bench4`.
 
 # Round 3 (after Kieran's review of round 2)
 

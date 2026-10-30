@@ -218,7 +218,14 @@ function prepare(layers: Layer[]): () => void {
   };
 }
 
-// The camera: a view preset, then panned and zoomed by hand
+// The camera: a view preset, then panned and zoomed by hand. The lab zooms far past the game, both ways
+// (GAME_ZOOM is InputManager's flight range), to look at the surface and the limb up close.
+const LAB_ZOOM = [0.005, 20] as const;
+const GAME_ZOOM = [0.04, 2] as const;
+const inGame = (z: number) => z >= GAME_ZOOM[0] * 0.999 && z <= GAME_ZOOM[1] * 1.001;
+/** The zoom slider runs 0..1000 on a log scale */
+const toSlider = (z: number) => Math.round((Math.log(z / LAB_ZOOM[0]) / Math.log(LAB_ZOOM[1] / LAB_ZOOM[0])) * 1000);
+const fromSlider = (v: number) => LAB_ZOOM[0] * Math.pow(LAB_ZOOM[1] / LAB_ZOOM[0], v / 1000);
 let cam: [number, number] = [0, 0], zoom = 0.15, time = 120, held = false;
 function preset(): void {
   const s = shown.find((x) => x.id === $<HTMLSelectElement>('system').value)!;
@@ -228,6 +235,9 @@ function preset(): void {
   else if (v === 'limb') { zoom = 0.15; cam = [R + (0.1 * w) / zoom, 0]; }
   else if (v === 'close') { zoom = 1; cam = [R * Math.SQRT1_2 - 150, -R * Math.SQRT1_2 + 100]; }
   else if (v === 'disc') { zoom = 0.5; cam = [0.3 * R, 0.1 * R]; }
+  else if (v === 'surface') { zoom = 8; cam = [0.4 * R, -0.2 * R]; }
+  else if (v === 'edge') { zoom = 6; cam = [R - 40, 0]; }
+  else if (v === 'far') { zoom = 0.008; cam = [0, 0]; }
   else { zoom = 0.3; cam = [1.6 * R, 0]; }
 }
 for (const id of ['system', 'view']) $(id).addEventListener('change', preset);
@@ -252,7 +262,20 @@ canvas.addEventListener('pointermove', (e) => {
   drag = { x: e.clientX, y: e.clientY };
 });
 canvas.addEventListener('pointerup', () => { drag = null; });
-canvas.addEventListener('wheel', (e) => { zoom = Math.max(0.04, Math.min(2, zoom * (e.deltaY > 0 ? 1 / 1.15 : 1.15))); e.preventDefault(); }, { passive: false });
+/** Zoom about the screen's middle; a marker on the graph when it crosses the game's limits */
+function setZoom(z: number): void {
+  const was = inGame(zoom);
+  zoom = Math.max(LAB_ZOOM[0], Math.min(LAB_ZOOM[1], z));
+  if (was !== inGame(zoom)) graph.mark(inGame(zoom) ? `Zoom ${zoom.toFixed(3)}: back in the game's range` : `Zoom ${zoom.toFixed(3)}: beyond the game's range`);
+}
+canvas.addEventListener('wheel', (e) => { setZoom(zoom * (e.deltaY > 0 ? 1 / 1.15 : 1.15)); e.preventDefault(); }, { passive: false });
+{
+  // The slider's track: the game's range shaded
+  const a = toSlider(GAME_ZOOM[0]) / 10, b = toSlider(GAME_ZOOM[1]) / 10;
+  $('zoom').style.background = `linear-gradient(90deg, #151b26 ${a}%, #2c4a6e ${a}%, #2c4a6e ${b}%, #151b26 ${b}%)`;
+  $('zoom').addEventListener('input', () => setZoom(fromSlider(Number($<HTMLInputElement>('zoom').value))));
+  $('zoom').addEventListener('change', () => graph.mark(`Zoom ${zoom.toFixed(3)}`));
+}
 addEventListener('keydown', (e) => {
   if (e.code !== 'Space') return;
   e.preventDefault();
@@ -336,6 +359,8 @@ function frame(now: number): void {
   sky.forEach((l) => draw(l, w, h));
   star.forEach((l) => draw(l, w, h));
   $('stats').textContent = `${w}×${h}  ${fps.toFixed(0)} fps  zoom ${zoom.toFixed(3)}`;
+  if (document.activeElement !== $('zoom')) $<HTMLInputElement>('zoom').value = String(toSlider(zoom));
+  $('zoomval').innerHTML = inGame(zoom) ? `${zoom.toFixed(3)}` : `<span class="beyond">${zoom.toFixed(3)}: beyond the game's range</span>`;
   graph.draw(held ? 'current (Space held)' : plain ? chosen('sun') : `${chosen('sun')} (this body keeps its own shader)`, held ? 'current (Space held)' : chosen('sky'), paused);
   requestAnimationFrame(frame);
 }

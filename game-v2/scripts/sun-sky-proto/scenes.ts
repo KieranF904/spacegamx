@@ -60,15 +60,17 @@ const SUN_VARIANTS: SunVariant[] = ['cur', 'port', 'photo', 'lite'];
 const FAITHFUL: SunVariant[] = ['port', 'exact', 'cur@0.5', 'exact@0.5', 'exact@0.33'];
 const ALTERNATIVE: SunVariant[] = ['plasma', 'plasma.lite', 'plasma@0.5'];
 /** Round 3: the revised plasma, and the multicolour examples */
+/** Round 4: the plasma with its limb by viewing angle and its edge into the atmosphere (round 3's half-res plasma for reference) */
+const ROUND4: SunVariant[] = ['cur', 'plasma@0.5', 'plasma4', 'plasma4@0.5', 'plasma4.lite', 'plasma4.rainbow@0.5', 'plasma4.aurora@0.5', 'plasma.rainbow@0.5'];
 const ROUND3: SunVariant[] = ['cur', 'plasma', 'plasma.lite', 'plasma@0.5', 'plasma.rainbow@0.5', 'plasma.aurora@0.5', 'photo2', 'lite2', 'exact@0.5', 'fix@0.5'];
 const ROUND2: SunVariant[] = ['cur', ...FAITHFUL, ...ALTERNATIVE];
 const LOOK_LABEL: Record<string, string> = {
-  cur: 'current', port: 'A port', exact: 'A-exact', fix: 'current (edge fixed)', photo2: 'B2 photosphere, big cells', lite2: 'B2-lite, big cells', 'plasma.rainbow': 'plasma rainbow', 'plasma.aurora': 'plasma aurora', photo: 'B: photosphere', lite: 'B-lite (low tier)',
+  cur: 'current', port: 'A port', exact: 'A-exact', fix: 'current (edge fixed)', plasma4: 'plasma R4', 'plasma4.lite': 'plasma R4 lite', 'plasma4.rainbow': 'plasma R4 rainbow', 'plasma4.aurora': 'plasma R4 aurora', photo2: 'B2 photosphere, big cells', lite2: 'B2-lite, big cells', 'plasma.rainbow': 'plasma rainbow', 'plasma.aurora': 'plasma aurora', photo: 'B: photosphere', lite: 'B-lite (low tier)',
   plasma: 'plasma', 'plasma.lite': 'plasma lite', current: 'current',
 };
 function variantLabel(variant: SunVariant): string {
   const [look, scale] = variant.split('@');
-  const kind = variant === 'cur' ? '' : look.startsWith('plasma') ? (look.includes('rainbow') || look.includes('aurora') ? 'ALT multicolour: ' : 'ALT: ') : look.startsWith('photo') || look.startsWith('lite') ? 'ALT: ' : 'FAITHFUL: ';
+  const kind = variant === 'cur' ? '' : look.startsWith('plasma') ? `${look.startsWith('plasma4') ? 'R4 ' : 'R3 '}${look.includes('rainbow') || look.includes('aurora') ? 'ALT multicolour: ' : 'ALT: '}` : look.startsWith('photo') || look.startsWith('lite') ? 'ALT: ' : 'FAITHFUL: ';
   const res = scale ? ` ${scale === '0.5' ? '½' : scale === '0.33' ? '⅓' : scale} res` : '';
   return `${kind}${LOOK_LABEL[look] ?? look}${res}`;
 }
@@ -329,6 +331,67 @@ if (set === 'stills3' || set === 'v3') {
         return { file, label: variantLabel(variant) };
       });
       composites.push({ out: `r3-sun-${id}-${vn}.png`, cols: 4, cells, metric: true, scale: vn === 'full' ? 0.6 : 0.5, title: `${s.name}, ${vn}: current first, then the plasma alternative (round 3), its multicolour examples, and the closest faithful options. Diff: mean difference from current.` });
+    }
+  }
+}
+
+if (set === 'stills4' || set === 'v4') {
+  // Round 4: current first, round 3's plasma for reference, then round 4's
+  for (const id of PLAIN) {
+    const s = sysOf(id), cb = s.centralBody as CentralBody, R = radiusOf(cb), b = systemBiome(s);
+    const views = STAR_VIEWS(R, 120);
+    for (const [vn, v] of Object.entries(set === 'v4' ? { full: views.full, limb: views.limb } : views)) {
+      const cells = ROUND4.map((variant) => {
+        const file = `${set}/${id}.${vn}.${variant}.png`;
+        job(`${set}.${id}.${vn}.${variant}`, v, [...(vn === 'full' ? [] : currentSkyLayers(b, v, 0)), ...sunLayers(id, v, variant)], { out: file });
+        return { file, label: variantLabel(variant) };
+      });
+      composites.push({ out: `r4-sun-${id}-${vn}.png`, cols: 4, cells, metric: true, scale: vn === 'full' ? 0.6 : 0.5, title: `${s.name}, ${vn}: current first, round 3's plasma for reference, then round 4 (limb by viewing angle, chromosphere, haze, spicules, bump).` });
+    }
+    // The edge up close: the limb at zoom 0.3 and 1, crops of current, round 3 and round 4
+    const crops = ['cur', 'plasma@0.5', 'plasma4@0.5', 'plasma4.lite'];
+    for (const zoom of [0.3, 1]) {
+      const v: View = { w: 640, h: 400, dpr: 1, cam: [R + (zoom === 1 ? 60 : 200), 0], zoom, t: 120 };
+      const cells = crops.map((variant) => {
+        const file = `${set}/edge.${id}.z${zoom}.${variant}.png`;
+        job(`${set}.edge.${id}.${zoom}.${variant}`, v, [...currentSkyLayers(b, v, 0), ...sunLayers(id, v, variant)], { out: file });
+        return { file, label: variantLabel(variant) };
+      });
+      composites.push({ out: `r4-edge-${id}-z${zoom}.png`, cols: 4, cells, title: `${s.name}: the limb up close at zoom ${zoom} (current, round 3, round 4, round 4 lite)` });
+    }
+  }
+}
+
+if (set === 'gif4') {
+  const panels = ['cur', 'plasma@0.5', 'plasma4@0.5', 'plasma4.lite', 'plasma4.rainbow@0.5', 'plasma4.aurora@0.5'];
+  for (const id of PLAIN) {
+    const s = sysOf(id), cb = s.centralBody as CentralBody, R = radiusOf(cb), b = systemBiome(s);
+    const frames: string[] = [];
+    for (let f = 0; f < 30; f++) {
+      const t = 120 + f * 0.5;
+      const v: View = { w: 480, h: 300, dpr: 1, cam: [R + 0.1 * 480 / 0.3, 0], zoom: 0.3, t };
+      const cells = panels.map((variant) => {
+        const file = `gif4/${id}.${variant}.${f}.png`;
+        job(`gif4.${id}.${variant}.${f}`, v, [...currentSkyLayers(b, v, 0), ...sunLayers(id, v, variant)], { out: file });
+        return { file, label: variantLabel(variant) };
+      });
+      const sheet = `gif4/${id}.sheet.${f}.png`;
+      composites.push({ out: sheet, cols: 3, cells });
+      frames.push(sheet);
+    }
+    gifs.push({ out: `r4-anim-sun-${id}.gif`, frames, ms: 167, scale: 0.75 });
+  }
+}
+
+if (set === 'bench4') {
+  const reps = 10;
+  for (const dpr of [1, 2]) {
+    for (const id of PLAIN) {
+      const cb = sysOf(id).centralBody as CentralBody, R = radiusOf(cb);
+      for (const [name, v] of Object.entries(sunViews(R, 120, dpr))) {
+        if (name === 'corona') continue;
+        for (const variant of ['cur', 'plasma@0.5', 'plasma4', 'plasma4@0.5', 'plasma4.lite', 'plasma4.rainbow@0.5']) job(`sun|${id}|${name}|${variant}|${dpr}`, v, sunLayers(id, v, variant), { bench: true, reps });
+      }
     }
   }
 }

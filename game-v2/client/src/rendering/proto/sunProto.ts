@@ -349,6 +349,7 @@ export function sunPhotoLook(id: string, cb: SunBodyData, time = 0, zoom = 0.3, 
  * drops the warp, the fine detail octaves, the flame fringe and the fine rays.
  */
 export const PLASMA_FRAG = `#version 300 es
+  // (#define PLASMA_R4 for round 4: the limb by viewing angle, a fake bump normal, the chromosphere, haze and spicules)
   precision highp float;
   precision highp sampler3D;
   in vec2 vUV;
@@ -375,6 +376,11 @@ export const PLASMA_FRAG = `#version 300 es
   uniform vec3 uTintA;   // ... its tints
   uniform vec3 uTintB;
   uniform vec3 uTintC;
+  // Round 4: the limb by viewing angle (mu, the cosine of it), and the edge into the atmosphere
+  uniform vec4 uLimbD;     // x limb darkening (how dark at the edge), y its power, z contrast left at the limb, w bump
+  uniform vec4 uLimbTint;  // rgb the colour the limb deepens toward, a how far
+  uniform vec4 uChromo;    // x chromosphere strength, y its width (radii), z halo (scattered light), w spicule height (radii)
+  uniform vec3 uChromoCol;
 
   vec3 ramp(float I) {
     vec3 c = mix(uDark, uMid, smoothstep(0.0, 0.32, I));
@@ -388,7 +394,11 @@ export const PLASMA_FRAG = `#version 300 es
     if (uIrid.y > 0.5) {
       // A rainbow: the hue runs along the field and drifts with time
       vec3 q = clamp(abs(fract(h * uIrid.w + uTime * uIrid.z + vec3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0) - 1.0, 0.0, 1.0);
+  #ifdef PLASMA_R4
+      return mix(vec3(1.0), q, 0.85);
+  #else
       return mix(vec3(1.0), q, 0.6);
+  #endif
     }
     float a = h * uIrid.w + uTime * uIrid.z;
     return mix(mix(uTintA, uTintB, smoothstep(0.3, 0.7, fract(a))), uTintC, smoothstep(0.45, 0.85, k));
@@ -398,7 +408,13 @@ export const PLASMA_FRAG = `#version 300 es
   vec3 iridesce(vec3 c, vec3 t, float I) {
     float l = dot(c, vec3(0.3, 0.55, 0.15));
     vec3 tinted = t * l * 1.7;
+  #ifdef PLASMA_R4
+    // Bright places keep their hue (brighter, not whiter), so a rainbow stays a rainbow up close
+    vec3 bright = t * (0.55 + 0.55 * I);
+    return mix(c, mix(tinted, bright, smoothstep(0.75, 1.15, I)), uIrid.x);
+  #else
     return mix(c, mix(tinted, c, smoothstep(0.95, 1.25, I)), uIrid.x);
+  #endif
   }
 
   void main() {
@@ -419,9 +435,16 @@ export const PLASMA_FRAG = `#version 300 es
     vec3 Px = dFdx(P), Py = dFdy(P);
     float boil = uTime * uMotion.z;
 
+  #ifdef PLASMA_R4
+    // (the soft edge and the chromosphere a share of the radius, but no more than this many pixels: zoomed in on a big
+    // star they'd otherwise be hundreds of px of haze)
+    float limbW = min(uLimb.x, 60.0 * px);
+  #else
+    float limbW = uLimb.x;
+  #endif
     vec3 col = vec3(0.0);
-    // The disc fades out over its last uLimb.x of radius (a soft edge into the glow, as the game's sun does)
-    float cover = 1.0 - smoothstep(1.0 - uLimb.x - px, 1.0 + px * 0.5, r);
+    // The disc fades out over its last limbW of radius (a soft edge into the glow, as the game's sun does)
+    float cover = 1.0 - smoothstep(1.0 - limbW - px, 1.0 + px * 0.5, r);
     if (cover > 0.0) {
       float mu = sqrt(max(1.0 - rc * rc, 0.0));
   #ifndef PLASMA_LITE
@@ -454,9 +477,30 @@ export const PLASMA_FRAG = `#version 300 es
         k *= 4.0; amp *= 0.7;
       }
   #endif
+  #ifdef PLASMA_R4
+      float edgeOn = 1.0 - mu;   // 0 face-on, 1 seen edge-on at the limb
+      // Contrast falls toward the limb (the cells seen through more atmosphere, and edge-on)
+      I = 0.65 + (I - 0.65) * mix(uLimbD.z, 1.0, mu);
+    #ifndef PLASMA_LITE
+      if (uLimbD.w > 0.0) {
+        // A fake normal: the plasma's height compared a step along a fixed light, so its ridges catch light on one side
+        // and shade on the other; strongest at grazing angles, where relief shows most
+        vec3 Ld = vec3(0.55, -0.6, 0.58);
+        float hb = textureGrad(uNoise3, (Q + Ld * 0.35) * 0.37 + vec3(boil, 0.0, 0.0), Px * 0.37, Py * 0.37).r;
+        I *= 1.0 + uLimbD.w * clamp((f.r - hb) * 5.0, -0.6, 0.6) * (0.3 + 0.7 * edgeOn);
+      }
+    #endif
+      // Limb darkening (its depth and curve per star), and a core
+      I = (I * mix(1.0 - uLimbD.x, 1.0, pow(mu, uLimbD.y)) + uSurf.w * pow(mu, 6.0) * 0.45) * uLimb.y;
+      col = ramp(I);
+      // Toward the limb the colour deepens (cooler, higher layers), and light scattered in the atmosphere hazes it
+      col = mix(col, uLimbTint.rgb * (0.35 + dot(col, vec3(0.3, 0.55, 0.15))), uLimbTint.a * pow(edgeOn, 1.6));
+      col += uCorona * uChromo.z * 0.15 * pow(edgeOn, 4.0);
+  #else
       // A warm core, a darker, redder limb, and a bright rim right at the edge (the plasma seen edge-on)
       I = (I * mix(0.55, 1.0, pow(mu, 0.45)) + uSurf.w * pow(mu, 6.0) * 0.45) * uLimb.y;
       col = ramp(I) + uRim * pow(1.0 - mu, 6.0) * 0.4;
+  #endif
       if (uIrid.x > 0.0) {
         // Multicolour: a slow field of its own (a few regions across the ball), pushed by the warp so the colours swirl
         // round each other; one more read, only for those stars
@@ -470,14 +514,24 @@ export const PLASMA_FRAG = `#version 300 es
     // Outside, and over the soft edge: flame at the limb, then glow and rays streaming outward
     float d = max(r - 1.0, 0.0);
     vec3 glow = vec3(0.0);
-    if (d < uReach - 1.0 && r > 1.0 - uLimb.x - 3.0 * px) {
+  #ifdef PLASMA_R4
+    float inner = 1.0 - limbW - 3.0 * uChromo.y - 3.0 * px;
+  #else
+    float inner = 1.0 - limbW - 3.0 * px;
+  #endif
+    if (d < uReach - 1.0 && r > inner) {
       float outward = uTime * uMotion.w;
       float kr = uCor.y * 0.04;
+  #ifdef PLASMA_R4
+      // (a wider ring for the broad streamers: more of them round, so no two- or four-lobed shapes)
+      float s1 = textureLod(uNoise3, vec3(dir * kr * 1.8, d * 0.12 - outward) + uSeed, 0.0).r;
+  #else
       // Broad streamers: a ring through the volume (a function of the angle), its third axis scrolling slowly with
       // height and time, so they run out straight and flow outward
       float s1 = textureLod(uNoise3, vec3(dir * kr, d * 0.12 - outward) + uSeed, 0.0).r;
+  #endif
       float streams = smoothstep(0.3, 0.85, s1);
-  #ifndef PLASMA_LITE
+  #if !defined(PLASMA_LITE) || defined(PLASMA_R4)
       // Fine rays: a ring four times as fast round, ridged, so they come out thin, straight and bright
       float s2 = textureLod(uNoise3, vec3(dir * kr * 4.0, d * 0.2 - outward * 1.6) + uSeed.zxy, 0.0).b;
       float rays = pow(s2, 3.0);
@@ -487,18 +541,35 @@ export const PLASMA_FRAG = `#version 300 es
       float reach = uCor.z * (0.25 + 0.75 * streams);
       float corona = exp(-d * uCor.w) * 0.28 + exp(-d / max(reach, 0.02)) * (0.12 + 0.4 * streams) * (0.3 + 1.1 * rays);
       // (rising through the disc's fading edge, so the two meet without a line)
-      corona *= smoothstep(uReach - 1.0, (uReach - 1.0) * 0.55, d) * smoothstep(1.0 - uLimb.x - 2.0 * px, 1.0, r);
+      corona *= smoothstep(uReach - 1.0, (uReach - 1.0) * 0.55, d) * smoothstep(1.0 - limbW - 2.0 * px, 1.0, r);
       vec3 cc = mix(uRim, uCorona, smoothstep(0.0, 0.25, d));
       if (uIrid.x > 0.0) cc = mix(cc, tint(s1, streams) * dot(cc, vec3(0.3, 0.55, 0.15)) * 1.7, uIrid.x * 0.8);
       glow = cc * corona * uCor.x;
-  #ifndef PLASMA_LITE
+  #ifdef PLASMA_R4
+      // The chromosphere: a thin hotter band straddling the limb, so the surface runs into the atmosphere; a wide
+      // halo of scattered light round it; and spicules, tongues of gas off the limb that fade from its colour into
+      // the corona's
+      float cw = min(uChromo.y, 20.0 * px) + 2.0 * px;
+      float band = exp(-pow((r - 1.0 + cw * 0.3) / cw, 2.0));
+      glow += uChromoCol * band * uChromo.x * 0.32 * (0.7 + 0.6 * streams);
+      glow += uCorona * uChromo.z * 0.1 * exp(-d * 3.5) * smoothstep(1.0 - limbW - 2.0 * px, 1.0, r);
+    #ifndef PLASMA_LITE
+      float sh = uChromo.w;
+      if (d < sh) {
+        float lod = log2(max(px * kr * 12.0 * 64.0, 1.0));
+        float t = textureLod(uNoise3, vec3(dir * kr * 12.0, d / sh * 0.8 - outward * 6.0) + uSeed.yzx, lod).b;
+        float tongue = smoothstep(0.55, 0.95, t + 0.3 * (1.0 - d / sh)) * (1.0 - d / sh);
+        glow += mix(uChromoCol, cc, d / sh) * tongue * (0.35 + 0.6 * streams) * 0.4 * smoothstep(1.0 - limbW - 2.0 * px, 1.0, r);
+      }
+    #endif
+  #elif !defined(PLASMA_LITE)
       if (d < 0.04) {
         // The flame fringe: ridged tongues of plasma licking up off the limb, rising
         float lod = log2(max(px * kr * 12.0 * 64.0, 1.0));
         float t = textureLod(uNoise3, vec3(dir * kr * 12.0, d * 20.0 - outward * 6.0) + uSeed.yzx, lod).b;
         float tongue = smoothstep(0.6, 0.95, t + 0.3 * (1.0 - d / 0.04)) * (1.0 - d / 0.04);
         // (faded in across the disc's soft edge, as the corona is, so it starts without a line)
-        glow += uRim * tongue * (0.3 + 0.6 * streams) * 0.5 * smoothstep(1.0 - uLimb.x - 2.0 * px, 1.0, r);
+        glow += uRim * tongue * (0.3 + 0.6 * streams) * 0.5 * smoothstep(1.0 - limbW - 2.0 * px, 1.0, r);
       }
   #endif
     }
@@ -517,6 +588,20 @@ export interface PlasmaParams {
   heat?: number;
   /** How far in from the edge the disc fades into its glow (radii) */
   softEdge?: number;
+  /** Round 4, the limb by viewing angle: how dark it gets (0..1) and the curve's power, the contrast left there (0..1),
+   * the colour it deepens toward and how far, and a fake bump normal's strength */
+  limbDarkening?: number;
+  limbPower?: number;
+  limbContrast?: number;
+  limbTint?: string;
+  limbTintStrength?: number;
+  bump?: number;
+  /** Round 4, the edge: the chromosphere's strength, colour and width (radii), the scattered halo, spicule height (radii) */
+  rim?: number;
+  rimColor?: string;
+  rimWidth?: number;
+  halo?: number;
+  spicules?: number;
   /** Multicolour swirls: a rainbow, or tints (two or three colours) carried round by the flow */
   iridescence?: { mode: 'rainbow' | 'tints'; colors?: string[]; strength?: number; drift?: number; spread?: number };
 }
@@ -573,6 +658,11 @@ export function plasmaLook(id: string, cb: SunBodyData & { plasma?: PlasmaParams
       uDetail: plasmaDetail(pxPerRadius),
       uIrid: ir ? [ir.strength ?? 0.85, ir.mode === 'rainbow' ? 1 : 0, ir.drift ?? 0.01, ir.spread ?? (ir.mode === 'rainbow' ? 1.6 : 1.2)] : [0, 0, 0, 1],
       uTintA: tints[0], uTintB: tints[1] ?? tints[0], uTintC: tints[2] ?? tints[1] ?? tints[0],
+      // Round 4 (unused by round 3): defaults from the star's own palette
+      uLimbD: [o.limbDarkening ?? 0.5, o.limbPower ?? 0.6, o.limbContrast ?? 0.45, o.bump ?? 0.5],
+      uLimbTint: [...(o.limbTint ? hex(o.limbTint) : palette.dark.map((c) => c * 1.6)), o.limbTintStrength ?? 0.45],
+      uChromo: [o.rim ?? 0.6, o.rimWidth ?? 0.008, o.halo ?? 0.4, o.spicules ?? 0.035],
+      uChromoCol: o.rimColor ? hex(o.rimColor) : lift(palette.rim, 0.1),
     },
   };
 }

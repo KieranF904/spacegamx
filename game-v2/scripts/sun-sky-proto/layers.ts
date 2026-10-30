@@ -221,13 +221,26 @@ export const PLASMA_EXAMPLES: Record<string, PlasmaParams> = {
   aurora: { iridescence: { mode: 'tints', colors: ['#3cffc0', '#8a5cff', '#ff5fd2'], strength: 0.8, drift: 0.005, spread: 1.1 } },
 };
 
-/** The plasma star (the alternative) for the same star: one quad, ±reach radii (`lite`: the low tier; `extra`: per-star settings) */
-export function plasmaSunLayers(id: string, cb: CentralBody, v: View, lite = false, extra?: PlasmaParams): Layer[] {
+/**
+ * Round 4's per-star tuning, as each system's centralBody.plasma would give it in systems.json: Sol a yellow star with
+ * a pinkish-orange chromosphere; Borealis hot and blue, little limb darkening, a cyan-white rim; Nebula Prime pink with
+ * a deep magenta limb; Cinder Reach a red giant, strongly limb-darkened, with a thick, hazy, extended atmosphere.
+ */
+export const PLASMA4_TUNING: Record<string, PlasmaParams> = {
+  sol: { limbDarkening: 0.55, limbPower: 0.6, limbContrast: 0.45, limbTint: '#a82800', limbTintStrength: 0.5, bump: 0.6, rim: 0.7, rimColor: '#ffb37a', rimWidth: 0.008, halo: 0.35, spicules: 0.035 },
+  borealis: { limbDarkening: 0.35, limbPower: 0.5, limbContrast: 0.55, limbTint: '#2a5cff', limbTintStrength: 0.4, bump: 0.45, rim: 0.65, rimColor: '#c8f0ff', rimWidth: 0.007, halo: 0.5, spicules: 0.03 },
+  nebula_prime: { limbDarkening: 0.45, limbPower: 0.55, limbContrast: 0.5, limbTint: '#6e0a5e', limbTintStrength: 0.5, bump: 0.5, rim: 0.7, rimColor: '#ffc4ee', rimWidth: 0.008, halo: 0.45, spicules: 0.035 },
+  cinder_reach: { limbDarkening: 0.72, limbPower: 0.8, limbContrast: 0.35, limbTint: '#3a0400', limbTintStrength: 0.6, bump: 0.75, rim: 0.5, rimColor: '#ff5a2a', rimWidth: 0.014, halo: 0.45, spicules: 0.045 },
+};
+
+/** The plasma star (the alternative) for the same star: one quad, ±reach radii (`lite`: the low tier; `extra`: per-star settings; `r4`: round 4) */
+export function plasmaSunLayers(id: string, cb: CentralBody, v: View, lite = false, extra?: PlasmaParams, r4 = false): Layer[] {
   const R = cb.detailParams?.radius ?? cb.radius ?? 1000;
-  const look = plasmaLook(id, { ...cb, plasma: { ...(cb as { plasma?: PlasmaParams }).plasma, ...extra } }, v.t, R * v.zoom);
+  const tuned = r4 ? PLASMA4_TUNING[id] : undefined;
+  const look = plasmaLook(id, { ...cb, plasma: { ...tuned, ...(cb as { plasma?: PlasmaParams }).plasma, ...extra } }, v.t, R * v.zoom);
   const h = R * look.reach;
   if (!onScreen(v, 0, 0, h, h)) return [];
-  return [{ name: 'sun', program: lite ? 'plasma.lite' : 'plasma', blend: 'normal', textures: { uNoise3: 'noise3' }, verts: worldQuad(v, 0, 0, h, h), uniforms: look.uniforms }];
+  return [{ name: 'sun', program: `plasma${r4 ? '4' : ''}${lite ? '.lite' : ''}`, blend: 'normal', textures: { uNoise3: 'noise3' }, verts: worldQuad(v, 0, 0, h, h), uniforms: look.uniforms }];
 }
 
 /**
@@ -237,7 +250,7 @@ export function plasmaSunLayers(id: string, cb: CentralBody, v: View, lite = fal
 export function sunVariantLayers(id: string, cb: CentralBody, v: View, variant: string): Layer[] {
   const [look, scale] = variant.split('@');
   const layers = look === 'cur' || look === 'port' || look === 'exact' || look === 'fix' ? currentSunLayers(id, cb, v, look === 'cur' ? false : look)
-    : look.startsWith('plasma') ? plasmaSunLayers(id, cb, v, look.includes('.lite'), PLASMA_EXAMPLES[look.split('.').find((k) => k in PLASMA_EXAMPLES) ?? ''])
+    : look.startsWith('plasma') ? plasmaSunLayers(id, cb, v, look.includes('.lite'), PLASMA_EXAMPLES[look.split('.').find((k) => k in PLASMA_EXAMPLES) ?? ''], look.startsWith('plasma4'))
     : photoSunLayers(id, cb, v, look === 'lite' || look === 'lite2', look === 'photo2' || look === 'lite2');
   return scale ? atScale(layers, Number(scale)) : layers;
 }
@@ -285,6 +298,8 @@ export function sunPrograms(src: Sources, desktop = true): Programs {
     photo: { vert: SUN_PHOTO_VERT, frag: SUN_PHOTO_FRAG },
     plasma: { vert: SUN_PHOTO_VERT, frag: PLASMA_FRAG },
     'plasma.lite': { vert: SUN_PHOTO_VERT, frag: PLASMA_FRAG.replace('#version 300 es', '#version 300 es\n  #define PLASMA_LITE 1') },
+    plasma4: { vert: SUN_PHOTO_VERT, frag: PLASMA_FRAG.replace('#version 300 es', '#version 300 es\n  #define PLASMA_R4 1') },
+    'plasma4.lite': { vert: SUN_PHOTO_VERT, frag: PLASMA_FRAG.replace('#version 300 es', '#version 300 es\n  #define PLASMA_R4 1\n  #define PLASMA_LITE 1') },
     'photo.lite': { vert: SUN_PHOTO_VERT, frag: SUN_PHOTO_FRAG.replace('#version 300 es', '#version 300 es\n  #define SUN_PHOTO_LITE 1') },
   };
   for (const n of ['BLACK_HOLE', 'PULSAR', 'BROWN_DWARF'] as const) {

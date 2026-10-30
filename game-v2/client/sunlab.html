@@ -14,6 +14,9 @@
     #panel .row { display: grid; grid-template-columns: 70px 1fr; gap: 6px; align-items: center; margin: 4px 0; }
     select, button, input { background: #151b26; color: #d6deea; border: 1px solid #263044; border-radius: 3px; font: inherit; padding: 2px 4px; width: 100%; }
     button { cursor: pointer; }
+    #zoom { background: transparent; }
+    .zoomnote { margin: -2px 0 4px 76px; color: #7f8ca0; font-size: 11px; }
+    .zoomnote .beyond { color: #e8c070; }
     #stats { margin-top: 6px; color: #9fb0c8; white-space: pre; font: 11px Consolas, monospace; }
     #perf { position: fixed; right: 8px; bottom: 8px; width: 560px; background: rgba(10, 13, 19, 0.9); border: 1px solid #1d2532; border-radius: 4px; padding: 8px 10px; }
     #perf h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #6f86a6; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
@@ -39,8 +42,13 @@
         <option value="cur@0.5">current, half res</option><option value="fix@0.5">current (edge fixed), half res</option>
         <option value="exact@0.5">A-exact, half res</option><option value="exact@0.33">A-exact, third res</option>
       </optgroup>
+      <optgroup label="Alternative: plasma (round 4: limb by angle, chromosphere, haze, bump)">
+        <option value="plasma4@0.5">plasma R4, half res</option><option value="plasma4">plasma R4</option><option value="plasma4.lite">plasma R4 lite</option>
+        <option value="plasma4.rainbow@0.5">plasma R4 rainbow, half res</option><option value="plasma4.aurora@0.5">plasma R4 aurora, half res</option>
+        <option value="plasma4.lite.rainbow">plasma R4 lite rainbow</option>
+      </optgroup>
       <optgroup label="Alternative: plasma (round 3)">
-        <option value="plasma">plasma</option><option value="plasma.lite">plasma lite</option><option value="plasma@0.5" selected>plasma, half res</option>
+        <option value="plasma">plasma</option><option value="plasma.lite">plasma lite</option><option value="plasma@0.5">plasma, half res</option>
       </optgroup>
       <optgroup label="Alternative: multicolour plasma (round 3)">
         <option value="plasma.rainbow@0.5">plasma rainbow, half res</option><option value="plasma.aurora@0.5">plasma aurora, half res</option>
@@ -62,7 +70,11 @@
     <div class="row"><label>View</label><select id="view">
       <option value="whole">whole (zoom 0.04)</option><option value="limb" selected>limb (zoom 0.15)</option>
       <option value="close">close (zoom 1)</option><option value="disc">over the disc</option><option value="corona">corona</option>
+      <option value="surface">surface up close (zoom 8, beyond the game)</option><option value="edge">the limb up close (zoom 6, beyond the game)</option>
+      <option value="far">far out (zoom 0.008, beyond the game)</option>
     </select></div>
+    <div class="row"><label>Zoom</label><input id="zoom" type="range" min="0" max="1000" step="1"></div>
+    <div class="zoomnote"><span id="zoomval"></span> <span class="game">shaded: the game's range, 0.04 to 2</span></div>
     <div class="row"><label>Time ×</label><input id="speed" type="range" min="0" max="20" step="0.5" value="1"></div>
     <div class="row"><label>Resolution</label><select id="dpr"><option value="1">1× CSS</option><option value="dpr" selected>device</option></select></div>
     <div id="stats"></div>
