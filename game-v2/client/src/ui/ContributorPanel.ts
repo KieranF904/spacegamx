@@ -132,7 +132,7 @@ select.ctb-in { padding: 3px 4px; }
 .ctb-banner { position: fixed; left: 50%; top: 64px; transform: translateX(-50%); z-index: 2601; padding: 6px 14px; border-radius: 999px; display: none;
   background: rgba(6, 26, 26, 0.92); border: 1px solid rgba(45, 212, 191, 0.6); color: #ccfbf1; font: 12px 'Segoe UI', sans-serif; pointer-events: none; }
 .ctb-banner.on { display: block; }
-.ctb-fab { position: fixed; left: 12px; bottom: 210px; z-index: 900; display: none; padding: 5px 10px; border-radius: 999px; cursor: pointer;
+.ctb-fab { position: fixed; left: 346px; bottom: 210px; z-index: 900; display: none; padding: 5px 10px; border-radius: 999px; cursor: pointer;
   background: rgba(6, 26, 26, 0.85); border: 1px solid rgba(45, 212, 191, 0.5); color: #99f6e4; font: 600 11px 'Segoe UI', sans-serif; letter-spacing: 1px; user-select: none; }
 .ctb-fab.on { display: block; }
 .ctb-fab.lit { background: rgba(45, 212, 191, 0.25); color: #fff; }
