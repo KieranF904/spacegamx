@@ -51,6 +51,10 @@ uniform vec4 uBand;
 uniform vec4 uField;
 uniform vec4 uLens;
 uniform vec2 uRot;
+uniform vec3 uSunHole;  // the star's opaque disc on screen: xy its middle (px from the screen's), z its radius (0: none)
+
+/** Is a quad of half-size hs round screen point c wholly behind the star's disc? (nothing of it would show) */
+bool hidden(vec2 c, float hs) { return uSunHole.z > 0.0 && length(c - uSunHole.xy) + hs * 1.42 < uSunHole.z; }
 
 vec2 turned(vec2 v) { return vec2(uRot.x * v.x - uRot.y * v.y, uRot.y * v.x + uRot.x * v.y); }
 vec2 unturned(vec2 v) { return vec2(uRot.x * v.x + uRot.y * v.y, -uRot.y * v.x + uRot.x * v.y); }
@@ -107,10 +111,18 @@ in vec2 aPosition;
 in vec2 aUV;            // the quad's corner, 0..1
 ${FIELDS}
 uniform float uTime;
+#ifdef SKY_ONE_DRAW
+// Every layer in one draw: the same per layer, in arrays, and where each layer's instances start
+uniform vec4 uLs[6];
+uniform vec4 uLooks[6];
+uniform vec4 uGrids[6];
+uniform vec4 uStarts[2];  // instance where layers 0..5 start (0..3 in [0], 4..5 in [1].xy)
+#else
 uniform vec4 uL;        // this layer: x scale, y cell size (layer units), z share of cells with a star, w alpha
 uniform vec4 uLook;     // x px a star can light, y core radius, z brightness, w how far (band and dust apply)
 uniform vec4 uGrid;     // xy the first cell, z columns
 uniform float uLayer;
+#endif
 uniform vec4 uStarMix;
 uniform vec3 uTint;
 uniform vec2 uStreak;
@@ -126,7 +138,17 @@ vec3 starColor(float t) {
 }
 
 void main() {
+#ifdef SKY_ONE_DRAW
+  float fid = float(gl_InstanceID);
+  float starts[6] = float[6](uStarts[0].x, uStarts[0].y, uStarts[0].z, uStarts[0].w, uStarts[1].x, uStarts[1].y);
+  int li = 0;
+  for (int k = 1; k < 6; k++) if (fid >= starts[k]) li = k;
+  vec4 uL = uLs[li], uLook = uLooks[li], uGrid = uGrids[li];
+  float uLayer = float(li);
+  int id = gl_InstanceID - int(starts[li]);
+#else
   int id = gl_InstanceID;
+#endif
   int cols = int(uGrid.z);
   vec2 cell = uGrid.xy + vec2(float(id % cols), float(id / cols));
   vec2 s = cell + uLayer * 71.37;
@@ -175,7 +197,9 @@ void main() {
   vStar = vec4(r, lum, spikes, reach);
   vStreakV = sv;
   vec3 img = imageOf(src + sv * 0.5);
-  gl_Position = cornerAt(img.xy, (reach + length(sv) * 0.5) * img.z + 1.0, aUV, vScreen);
+  float hs = (reach + length(sv) * 0.5) * img.z + 1.0;
+  if (hidden(img.xy, hs)) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+  gl_Position = cornerAt(img.xy, hs, aUV, vScreen);
 }
 `;
 
@@ -262,6 +286,7 @@ void main() {
     vSrc = src; vSeed = s;
     vObj = vec4(h < uDeep.z ? 1.0 : 2.0, R, 1.0 - F.dust * 0.85, 0.0);
     vec3 img = imageOf(src);
+    if (hidden(img.xy, R * 2.4 * img.z + 1.0)) return;
     gl_Position = cornerAt(img.xy, R * 2.4 * img.z + 1.0, aUV, vScreen);
   } else {
     int k = id - int(uCounts.x);
@@ -278,6 +303,7 @@ void main() {
     vSrc = src; vStreakV = sv;
     vObj = vec4(3.0, 0.0, 0.0, uMotes.z * (0.4 + 0.6 * hash(s * 3.3)));
     vec3 img = imageOf(src + sv * 0.5);
+    if (hidden(img.xy, (3.2 + sl * 0.5) * img.z + 1.0)) return;
     gl_Position = cornerAt(img.xy, (3.2 + sl * 0.5) * img.z + 1.0, aUV, vScreen);
   }
 }
@@ -461,4 +487,46 @@ export function ringBox(v: SkyView, lens: number): [number, number, number, numb
   const hx = c * lx + s * ly, hy = -s * lx + c * ly;
   const x0 = Math.max(-v.w / 2, hx - E), x1 = Math.min(v.w / 2, hx + E), y0 = Math.max(-v.h / 2, hy - E), y1 = Math.min(v.h / 2, hy + E);
   return x0 < x1 && y0 < y1 ? [x0, y0, x1, y1] : null;
+}
+
+/**
+ * The game's haze or star shader (skyShaders) with an early out for the pixels behind the star's opaque disc
+ * (`uSunHole`, as for the sprites): they'd be covered anyway. The disc is a circle on screen, so a pixel's test is one
+ * length; whole 2×2 quads and warps inside it skip all the work.
+ */
+export function withSunHole(frag: string): string {
+  const hazeMain = 'void main() {\n  vec2 sky = uCamera + lensed(turned((vUV - 0.5) * uRes)) / uSky.x;';
+  const starsMain = 'void main() {\n  vec2 sc = turned((vUV - 0.5) * uRes);';
+  const starsMain0 = 'void main() {\n  vec2 off = lensed(turned((vUV - 0.5) * uRes));';
+  const hole = 'uniform vec3 uSunHole;\nvoid main() {\n  if (uSunHole.z > 0.0 && length((vUV - 0.5) * uRes - uSunHole.xy) < uSunHole.z) { fragColor = vec4(0.0, 0.0, 0.0, 1.0); return; }\n';
+  for (const m of [hazeMain, starsMain, starsMain0]) if (frag.includes(m)) return frag.replace('void main() {\n', hole);
+  throw new Error('withSunHole: the sky shader has changed');
+}
+
+/** The star's opaque disc on screen for uSunHole: [x, y, radius] in px from the screen's middle (the star is at the world's origin) */
+export function sunHole(v: SkyView, opaqueRadius: number): [number, number, number] {
+  const a = v.angle ?? 0, c = Math.cos(a), s = Math.sin(a);
+  const lx = -v.cam[0] * v.zoom, ly = -v.cam[1] * v.zoom;
+  return [c * lx + s * ly, -s * lx + c * ly, opaqueRadius * v.zoom];
+}
+
+/** Does the star's opaque disc cover the whole screen? Then the sky needn't be drawn at all. */
+export function sunCovers(v: SkyView, opaqueRadius: number): boolean {
+  const [x, y, r] = sunHole(v, opaqueRadius);
+  return [[-1, -1], [1, -1], [-1, 1], [1, 1]].every(([sx, sy]) => Math.hypot((sx * v.w) / 2 - x, (sy * v.h) / 2 - y) < r);
+}
+
+/** One draw for every star layer (SKY_ONE_DRAW): the per-layer uniforms in arrays, and the instance count */
+export function oneDrawGrid(b: SkyBiome, v: SkyView, lens = 0, layerOn: readonly boolean[] = [true, true, true, true, true, true]): { count: number; uniforms: Record<string, number | number[] | number[][]> } | null {
+  const Ls: number[][] = [], looks: number[][] = [], grids: number[][] = [], starts: number[] = [];
+  let count = 0;
+  for (let i = 0; i < 6; i++) {
+    const g = spriteGrid(b, v, i, lens, layerOn[i]);
+    starts.push(count);
+    if (!g) { Ls.push([0, 1, 0, 0]); looks.push([0, 1, 0, 0]); grids.push([0, 0, 1, 0]); continue; }
+    Ls.push(g.uniforms.uL as number[]); looks.push(g.uniforms.uLook as number[]); grids.push(g.uniforms.uGrid as number[]);
+    count += g.count;
+  }
+  if (!count) return null;
+  return { count, uniforms: { uLs: Ls, uLooks: looks, uGrids: grids, uStarts: [starts.slice(0, 4), [starts[4], starts[5], count, count]] } };
 }

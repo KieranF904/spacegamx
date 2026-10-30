@@ -89,7 +89,8 @@ export class ViewerScene {
     this.host.appendChild(app.canvas);
     this.sky = new SkyRenderer(app);
     this.bloom = new Bloom(app);
-    app.stage.addChild(this.sky.container, this.world, this.bloom.sprite);
+    app.stage.addChild(this.sky.container, this.world);
+    this.bloom.addTo(app.stage);
     this.world.addChild(this.shipLayer, this.gridLayer, this.labelLayer);
     const source: ShipSource = {
       catalog: this.data.catalog, tuning: this.data.tuning, bodies: this.bodies,

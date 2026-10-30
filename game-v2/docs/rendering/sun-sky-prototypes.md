@@ -7,7 +7,231 @@ harness on the real GPU (RTX 5070 Ti, moderngl, GPU timer queries, best of two r
 otherwise, against the game's own shaders read from its TypeScript, set up the way `Renderer` sets them up for each
 system.
 
-## Recommendation
+There are two rounds. **Round 2** (just below) answers Kieran's review of round 1. Round 1 is kept further down as it
+was.
+
+# Round 2 (after Kieran's review)
+
+Kieran's review:
+
+- B and B-lite are not good replacements.
+- A is a fair compromise; the current sun is higher quality.
+- He wants two kinds of option, both cheaper than today: **faithful** (as close to the current look as possible) and
+  **alternative** (new looks that are at least as good).
+- The sky costs a lot even where the sun covers it.
+- The star field should stay as good-looking as it is.
+
+Every option is selectable in the lab (<http://localhost:5273/sunlab.html>; hold Space for the current shaders in
+place). Every comparison sheet puts **current first** and labels each option **FAITHFUL** or **ALT**, with its mean
+difference from current (0 to 255 a channel).
+
+## Recommendation (round 2)
+
+1. **Star, faithful: "A-exact at half resolution"** (`exact@0.5`). It's the game's own sun, glow and corona shaders,
+   with two changes:
+   - Their simplex noise is read from a baked texture of the same function.
+   - They are drawn into a render target half the screen's size and stretched over it.
+
+   It costs **7 to 13 times less than today** (4K: 0.75 to 2.15 ms → 0.11 to 0.18 ms) and compiles in 629 ms instead of
+   1,821 ms. It differs from current by about 1 to 2 levels in a whole-disc view and 1 to 10 at the limb (mainly where
+   the noise runs past the baked area; see below).
+
+   If any visible difference is unacceptable, use **"current at half resolution"** (`cur@0.5`) instead. It's today's
+   shader untouched, drawn at half size: 3.3 to 3.9 times cheaper, and indistinguishable (0.2 to 0.5 levels).
+   `exact@0.33` goes further, 10 to 24 times cheaper, at the same difference as `exact@0.5`.
+2. **Star, alternative: "plasma"**. It's a new star; judge it on looks, in the sheets, the GIFs and the lab. Run it at
+   half resolution (`plasma@0.5`, 4 to 20 times cheaper than today and close to full-res plasma) and use plasma lite
+   on Low. Full-res plasma is 1.3 to 8 times cheaper.
+3. **Sky: sprite stars in one draw, skipped under the sun** (`one+skip`). It's faithful: the same stars as today.
+   - The sun covers the screen: **0.81 ms → 0** at 4K (nothing drawn).
+   - The limb is in view: 0.75 → 0.06 ms.
+   - Open sky: 0.80 → 0.065 ms.
+
+   The skip alone, on today's star shader, takes the sun-fills-the-screen case to 0 and saves about 25% at the limb.
+   The "better stars" alternative (C) costs the same.
+4. **Central bodies: keep their current shaders.** The texture port made the black holes and the brown dwarf slower
+   (round 1), and they're cheap already. The lab and the sheets draw them with their own shaders in every option.
+
+## The star: faithful options
+
+| option | what it is |
+|---|---|
+| A `port` | Round 1's: simplex replaced by one read of a small tiling Perlin texture. A different noise, so a different pattern of the same character. |
+| A-exact `exact` | `withExactNoise`: simplex replaced by one read of **the game's own simplex function baked** into a 2048² R16F texture (`bakeSimplex`, 32 texels a lattice unit over −32..32, 0.3 s to bake; mirrored outside, so it's continuous everywhere). Within the baked area the values are the procedural ones; past it (fine octaves, and offsets that grow with game time) it is the same noise mirrored, statistically identical but not the same pattern. |
+| current ½ `cur@0.5` | Today's three sun layers drawn unchanged into a half-size render target (premultiplied), then stretched over the screen. The sun's finest detail is far bigger than a pixel at every zoom, and its limb is soft, so this is indistinguishable. |
+| A-exact ½, ⅓ `exact@0.5`, `exact@0.33` | Both together. |
+
+Ways to close the remaining gap, if wanted:
+
+- Bake more area (4096², 32 MB as R16F; or 16 texels a unit), or wrap the game's `uTime` so its noise offsets stay inside
+  the baked square.
+- Temporal reuse: the sun moves slowly, so the half-res target could be redrawn at 30 Hz with the last frame
+  reprojected. Not built; the half-res cost is already small.
+
+## The star: alternative, "plasma" (`PLASMA_FRAG`, `plasmaLook`, `plasmaDetail` in `proto/sunProto.ts`)
+
+The star as a ball of glowing, turning plasma, in the spirit of the Sun's 304 Å imagery but in each system's own
+colours.
+
+- **Surface.** The noise is a 64³ 3D volume (`noise3Data`, 115 ms to build, 1 MB) read at points on the sphere. The ball
+  really turns: features swing across the disc and over the limb, about an axis tilted toward the viewer, with no seam
+  or pole. On it, domain-warped fBM plasma with bright ridged filaments and active regions.
+- **Detail.** More octaves fade in as the star grows on screen (`uDetail`, up to 3), so there's detail at every zoom.
+- **Shading.** A hot core, a darker, redder limb with a bright rim, and a fringe of flame tongues at the limb.
+- **Corona.** Glow and straight rays that **stream outward** over time.
+- **Per system:** detail stars (Sol, Cinder Reach) take their detail colours; the others take their hue. Flow stars
+  warp hardest, granular ones are finer.
+- **Cost.** 4 to 7 reads of the 3D texture a disc pixel (more when close), 2 to 3 a corona pixel.
+- **Lite.** Plasma lite drops the warp, the fine octaves, the fringe and the fine rays.
+
+It is deliberately not the current look (difference 5 to 7 levels on a whole disc, 25 to 80 close up). Look at
+`r2-sun-*-full.png` and the GIFs first. Things to tune on review:
+
+- The streaky foreshortening right at the limb at zoom 1.
+- How bright the rim and corona are.
+- How fast it turns and the corona flows (`uMotion`).
+
+### Cost, ms per frame (sun, glow and corona together; speedup against current)
+
+1080p is 1920×1080 at DPR 1; 4K is the same view at DPR 2. "whole" is zoom 0.04, "limb" zoom 0.15, "disc" over the disc
+at zoom 0.5.
+
+| star | view | current | A port | A-exact | current ½ | A-exact ½ | A-exact ⅓ | ALT plasma | ALT plasma lite | ALT plasma ½ |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Sol | whole | 0.280 | 0.091 (3.1x) | 0.102 (2.7x) | 0.081 (3.5x) | 0.042 (6.7x) | 0.028 (9.9x) | 0.125 (2.2x) | 0.056 (5.0x) | 0.042 (6.7x) |
+| Sol | limb | 0.191 | 0.064 (3.0x) | 0.075 (2.5x) | 0.059 (3.2x) | 0.029 (6.6x) | 0.018 (10.5x) | 0.087 (2.2x) | 0.035 (5.5x) | 0.032 (5.9x) |
+| Sol | disc | 0.309 | 0.090 (3.4x) | 0.104 (3.0x) | 0.086 (3.6x) | 0.035 (8.7x) | 0.021 (15.0x) | 0.149 (2.1x) | 0.063 (4.9x) | 0.047 (6.5x) |
+| Borealis | whole | 0.364 | 0.099 (3.7x) | 0.116 (3.1x) | 0.104 (3.5x) | 0.040 (9.2x) | 0.023 (15.6x) | 0.067 (5.5x) | 0.043 (8.6x) | 0.028 (12.9x) |
+| Borealis | limb | 0.492 | 0.120 (4.1x) | 0.145 (3.4x) | 0.134 (3.7x) | 0.047 (10.6x) | 0.027 (18.5x) | 0.070 (7.1x) | 0.035 (14.0x) | 0.028 (17.6x) |
+| Borealis | disc | 0.201 | 0.056 (3.6x) | 0.064 (3.1x) | 0.059 (3.4x) | 0.025 (8.0x) | 0.016 (12.5x) | 0.153 (1.3x) | 0.063 (3.2x) | 0.053 (3.8x) |
+| Nebula Prime | whole | 0.458 | 0.107 (4.3x) | 0.126 (3.6x) | 0.127 (3.6x) | 0.043 (10.8x) | 0.025 (18.7x) | 0.131 (3.5x) | 0.064 (7.2x) | 0.062 (7.4x) |
+| Nebula Prime | limb | 0.383 | 0.106 (3.6x) | 0.128 (3.0x) | 0.108 (3.6x) | 0.043 (9.0x) | 0.025 (15.5x) | 0.089 (4.3x) | 0.035 (11.0x) | 0.033 (11.7x) |
+| Nebula Prime | disc | 0.515 | 0.107 (4.8x) | 0.128 (4.0x) | 0.139 (3.7x) | 0.042 (12.3x) | 0.024 (21.5x) | 0.184 (2.8x) | 0.063 (8.2x) | 0.110 (4.7x) |
+| Cinder Reach | whole | 0.310 | 0.094 (3.3x) | 0.106 (2.9x) | 0.087 (3.6x) | 0.036 (8.6x) | 0.021 (14.5x) | 0.126 (2.5x) | 0.064 (4.8x) | 0.047 (6.6x) |
+| Cinder Reach | limb | 0.201 | 0.068 (3.0x) | 0.079 (2.5x) | 0.061 (3.3x) | 0.030 (6.8x) | 0.018 (10.9x) | 0.088 (2.3x) | 0.035 (5.8x) | 0.032 (6.3x) |
+| Cinder Reach | disc | 0.309 | 0.092 (3.4x) | 0.104 (3.0x) | 0.087 (3.6x) | 0.035 (8.8x) | 0.021 (15.0x) | 0.178 (1.7x) | 0.063 (4.9x) | 0.058 (5.3x) |
+| Sol | whole 4K | 1.147 | 0.345 (3.3x) | 0.393 (2.9x) | 0.318 (3.6x) | 0.136 (8.5x) | 0.081 (14.1x) | 0.450 (2.5x) | 0.218 (5.3x) | 0.160 (7.2x) |
+| Sol | limb 4K | 0.755 | 0.245 (3.1x) | 0.282 (2.7x) | 0.227 (3.3x) | 0.108 (7.0x) | 0.068 (11.2x) | 0.314 (2.4x) | 0.137 (5.5x) | 0.120 (6.3x) |
+| Sol | disc 4K | 1.306 | 0.363 (3.6x) | 0.412 (3.2x) | 0.344 (3.8x) | 0.137 (9.5x) | 0.079 (16.5x) | 0.592 (2.2x) | 0.251 (5.2x) | 0.183 (7.2x) |
+| Borealis | whole 4K | 1.455 | 0.373 (3.9x) | 0.444 (3.3x) | 0.399 (3.6x) | 0.149 (9.8x) | 0.085 (17.1x) | 0.243 (6.0x) | 0.157 (9.2x) | 0.099 (14.7x) |
+| Borealis | limb 4K | 2.041 | 0.459 (4.4x) | 0.561 (3.6x) | 0.526 (3.9x) | 0.178 (11.5x) | 0.098 (20.8x) | 0.253 (8.1x) | 0.137 (14.9x) | 0.103 (19.9x) |
+| Borealis | disc 4K | 0.823 | 0.218 (3.8x) | 0.254 (3.2x) | 0.234 (3.5x) | 0.097 (8.5x) | 0.061 (13.4x) | 0.597 (1.4x) | 0.252 (3.3x) | 0.186 (4.4x) |
+| Nebula Prime | whole 4K | 1.892 | 0.415 (4.6x) | 0.494 (3.8x) | 0.493 (3.8x) | 0.160 (11.8x) | 0.090 (21.0x) | 0.498 (3.8x) | 0.252 (7.5x) | 0.165 (11.5x) |
+| Nebula Prime | limb 4K | 1.584 | 0.404 (3.9x) | 0.482 (3.3x) | 0.417 (3.8x) | 0.161 (9.9x) | 0.091 (17.4x) | 0.312 (5.1x) | 0.138 (11.5x) | 0.122 (13.0x) |
+| Nebula Prime | disc 4K | 2.146 | 0.418 (5.1x) | 0.501 (4.3x) | 0.550 (3.9x) | 0.161 (13.3x) | 0.090 (23.8x) | 0.733 (2.9x) | 0.251 (8.5x) | 0.217 (9.9x) |
+| Cinder Reach | whole 4K | 1.285 | 0.368 (3.5x) | 0.417 (3.1x) | 0.345 (3.7x) | 0.139 (9.3x) | 0.080 (16.1x) | 0.491 (2.6x) | 0.253 (5.1x) | 0.159 (8.1x) |
+| Cinder Reach | limb 4K | 0.787 | 0.262 (3.0x) | 0.299 (2.6x) | 0.234 (3.4x) | 0.112 (7.0x) | 0.069 (11.4x) | 0.312 (2.5x) | 0.138 (5.7x) | 0.121 (6.5x) |
+| Cinder Reach | disc 4K | 1.290 | 0.363 (3.6x) | 0.411 (3.1x) | 0.344 (3.8x) | 0.137 (9.5x) | 0.079 (16.4x) | 0.700 (1.8x) | 0.251 (5.1x) | 0.211 (6.1x) |
+
+### How far each looks from current (mean difference, 0 to 255 a channel)
+
+"full" is the whole disc and corona, "limb" is zoom 0.15 with the sky behind, "close" is zoom 1 at the limb.
+
+| star | view | A port | A-exact | current ½ | A-exact ½ | A-exact ⅓ | ALT plasma | ALT plasma lite | ALT plasma ½ |
+|---|---|---|---|---|---|---|---|---|---|
+| Sol | full | 2.8 | 2.3 | 0.3 | 2.2 | 2.2 | 7.2 | 7.2 | 7.2 |
+| Sol | limb | 9.8 | 10.5 | 0.2 | 10.5 | 10.5 | 38.3 | 37.9 | 38.3 |
+| Sol | close | 7.5 | 8.1 | 0.3 | 8.1 | 8.1 | 75.2 | 81.1 | 75.2 |
+| Borealis | full | 3.1 | 2.2 | 0.3 | 2.3 | 2.3 | 5.2 | 5.4 | 5.1 |
+| Borealis | limb | 11.3 | 6.8 | 0.4 | 6.9 | 6.9 | 26.7 | 25.3 | 26.6 |
+| Borealis | close | 5.9 | 1.2 | 0.2 | 1.3 | 1.3 | 45.2 | 57.5 | 45.1 |
+| Nebula Prime | full | 3.9 | 2.6 | 0.5 | 2.7 | 2.7 | 5.5 | 5.5 | 5.5 |
+| Nebula Prime | limb | 9.9 | 4.7 | 0.4 | 4.7 | 4.8 | 29.9 | 34.8 | 29.8 |
+| Nebula Prime | close | 3.6 | 0.9 | 0.2 | 0.9 | 0.9 | 65.5 | 51.7 | 65.4 |
+| Cinder Reach | full | 1.9 | 1.7 | 0.2 | 1.7 | 1.7 | 7.3 | 8.1 | 7.3 |
+| Cinder Reach | limb | 5.7 | 3.5 | 0.2 | 3.6 | 3.6 | 31.7 | 34.3 | 31.7 |
+| Cinder Reach | close | 1.7 | 2.2 | 0.3 | 2.3 | 2.3 | 40.5 | 55.7 | 40.5 |
+
+Cold compile in Chrome (fresh profile, ANGLE/D3D11), the disc program:
+
+| current | A port | A-exact | plasma | plasma lite |
+|---|---|---|---|---|
+| 1,821 ms | 469 ms | 629 ms | 38 ms | 27 ms |
+
+The half-res options compile the same programs as their full-res versions.
+
+## The sky (round 2)
+
+- **Skip under the sun** (`+skip`). The sun's disc is opaque within 0.95 of its radius, for today's sun and every
+  option.
+  - `sunCovers`: when the disc covers all four corners of the screen, the sky isn't drawn at all, not even the haze.
+  - `withSunHole` (haze and star shaders): otherwise, pixels behind the disc return at once. It's one length test, and
+    whole 2×2 quads and warps behind the disc skip all the work.
+  - The sprites drop any star or galaxy wholly behind the disc in the vertex shader (`hidden`).
+  - The pictures are identical: the difference with the star in view is 0.
+- **One draw** (`SKY_ONE_DRAW`, `oneDrawGrid`): all six star layers in one instanced draw, each instance finding its
+  layer from a start table. Seven draw calls become two (stars, then deep sky). That's slightly cheaper on the GPU, and
+  saves Pixi's per-draw CPU cost, which the profile found the largest CPU item.
+- **The look.** The sprite stars are today's stars (same hashes, same placement, same profile; difference 0.15 to 0.85
+  levels, all of it individual stars whose hash rounds differently, as explained in round 1).
+- **Alternative: C** ("better stars", `SKY_BETTER`) is the round-1 photographic profile (Moffat halo, colour with
+  brightness, finer spikes, irregular twinkle). It's subtle, and costs the same.
+
+| system | where | current | current +skip | sprites | sprites +skip | sprites, one draw +skip | ALT better +skip |
+|---|---|---|---|---|---|---|---|
+| Sol | sun fills the screen, 4K | 0.812 | 0 (not drawn) | 0.068 | 0 (not drawn) | 0 (not drawn) | 0 (not drawn) |
+| Sol | limb in view, 4K | 0.747 | 0.568 | 0.069 | 0.060 | 0.057 | 0.057 |
+| Sol | just off the disc, 4K | 0.773 | 0.799 | 0.069 | 0.069 | 0.067 | 0.067 |
+| Sol | open sky, 4K | 0.797 | 0.855 | 0.067 | 0.067 | 0.065 | 0.065 |
+| Borealis | sun fills, 4K | 0.881 | 0 (not drawn) | 0.084 | 0 (not drawn) | 0 (not drawn) | 0 (not drawn) |
+| Borealis | limb, 4K | 0.850 | 0.605 | 0.083 | 0.069 | 0.066 | 0.066 |
+| Nebula Prime | sun fills, 4K | 0.834 | 0 (not drawn) | 0.074 | 0 (not drawn) | 0 (not drawn) | 0 (not drawn) |
+| Nebula Prime | limb, 4K | 0.806 | 0.603 | 0.074 | 0.065 | 0.062 | 0.062 |
+| The Maw | open sky, 4K | 0.682 | 0.705 | 0.058 | 0.058 | 0.054 | 0.054 |
+| Glasswater | open sky, 4K | 0.809 | 0.810 | 0.070 | 0.069 | 0.067 | 0.068 |
+| Sol | sun fills, 1080p | 0.227 | 0 (not drawn) | 0.029 | 0 (not drawn) | 0 (not drawn) | 0 (not drawn) |
+| Sol | limb, 1080p | 0.220 | 0.169 | 0.029 | 0.025 | 0.023 | 0.023 |
+| Sol | open sky, 1080p | 0.226 | 0.234 | 0.028 | 0.028 | 0.026 | 0.026 |
+
+The early-out costs a few percent where the sun isn't in view (current +skip, open sky). In the game, only bind the hole
+uniform while the disc is on screen. Compile: one-draw sprites 53 ms; the hole versions of the full-screen shaders
+compile as their originals do (about 520 ms for the stars).
+
+## Adopting round 2
+
+- **`cur@0.5` (zero look risk).** Render the sun's three layers into a `RenderTexture` half the screen's size and draw it
+  as a sprite with the normal (premultiplied) blend. It's the same pattern as `SkyRenderer`'s haze: in `Renderer.update`'s
+  `plainSun` branch, move `glowRenderer`, `corona` and `sunRenderer` under one container rendered into the target each
+  frame. No shader changes.
+- **`exact@0.5`.** As above, plus `withExactNoise(FRAGMENT_SHADER)` in `SunRenderer` and `CoronaRaysRenderer`, and a
+  `uSimplexTex` resource: an R16F texture from `bakeSimplex(EXACT_SIZE, EXACT_UNITS)`, linear, clamp. Bake it in a
+  worker (0.3 s), or ship it as a 2048² half-float asset (8 MB raw, compresses well).
+- **Plasma.** A `Mesh` with `SUN_PHOTO_VERT`/`PLASMA_FRAG` over ±R·3, and a 3D texture resource from `noise3Data()`.
+  Pixi v8 has no 3D texture source, so it needs a small custom `TextureSource` upload, or the noise packed into a 2D
+  atlas of slices with a two-tap lookup. Uniforms: `plasmaLook(systemId, centralBody)` once; `uTime` and
+  `uDetail = plasmaDetail(R·zoom)` each frame. Draw it at half res as above.
+- **Sky.**
+  - Do as round 1's step 4, but with one mesh for the six layers (`SKY_ONE_DRAW`, `oneDrawGrid`).
+  - Each frame compute `sunCovers(view, R·OPAQUE)`. While it's true, hide `SkyRenderer.container` and skip its update;
+    the sun covers it.
+  - Otherwise pass `uSunHole = sunHole(view, R·OPAQUE)` to the sky's shaders while the disc is on screen.
+  - The skip also works on today's shaders without sprites (`withSunHole(hazeFrag | starsFrag)`).
+
+## Images (round 2)
+
+All in `C:\Users\Kieran\AppData\Local\Temp\claude\c--Users-Kieran-Desktop-Spacegame\b24c970b-6148-4883-b4f6-ab3b6971e1b5\scratchpad\proto\`.
+
+- **Sun sheets** (current first, then FAITHFUL, then ALT): `r2-sun-<star>-<full|limb|close>.png` for sol, borealis,
+  nebula_prime and cinder_reach. Start with `r2-sun-sol-full.png`.
+- **Sun animations** (limb at zoom 0.3, 15 s of game time at 3×; current, A-exact, current ½, A-exact ½, plasma,
+  plasma lite): `r2-anim-sun-sol.gif`, `r2-anim-sun-borealis.gif`, `r2-anim-sun-nebula_prime.gif`,
+  `r2-anim-sun-cinder_reach.gif`.
+- **Sky sheets** (current first, then each option; with the sun in view, and open sky):
+  - `r2-sky-<sol|borealis|nebula_prime|cinder_reach>-limb.png`
+  - `r2-sky-<sol|borealis|nebula_prime|cinder_reach|glasswater|the_maw>-sky.png`
+- **The lab in Chrome:** `lab-r2-sol-plasma.png`, `lab-r2-nebula-exact-half.png`.
+- **Raw data:** `bench2.final.json` (timings), `r2-diffs.json` (differences), `compile-times-r2.json`.
+
+To reproduce, run `node scripts/sun-sky-proto/run.mjs <set> <out dir>` with one of these sets:
+
+- `v2`: a quick look;
+- `stills2`: the sheets;
+- `bench2`: timings, about 15 s of GPU;
+- `gif2`: the animations.
+
+# Round 1
+
+## Recommendation (round 1, superseded by round 2: B and B-lite were judged not good enough)
 
 1. **Star: adopt B ("photosphere")**, with B-lite on the Medium and Low tiers. It is **6 to 32 times cheaper on the GPU**
    than the current sun, glow and corona together wherever the disc is on screen (4 to 9 times with only the corona

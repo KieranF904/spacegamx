@@ -29,6 +29,32 @@ const TEXTURE_VALUE_NOISE = `
   float noise(vec2 p) { return textureLod(uNoiseTex, p * ${(1 / SUN_NOISE_PERIOD).toFixed(5)}, 0.0).b; }
 `;
 
+/** The baked simplex texture (protoNoise.bakeSimplex): this many texels across this many lattice units */
+export const EXACT_SIZE = 2048;
+export const EXACT_UNITS = 64;
+
+/**
+ * The exact stand-in for `snoise`: the game's own simplex values, baked (bakeSimplex; R16F, linear, clamped) and read
+ * back with the coordinate mirrored into the baked square, so it's continuous everywhere and needs no tiling
+ */
+const TEXTURE_SNOISE_EXACT = `
+  uniform sampler2D uSimplexTex;
+  float snoise(vec2 v) {
+    vec2 u = v * ${(1 / EXACT_UNITS).toFixed(6)} + 0.5;
+    return textureLod(uSimplexTex, 1.0 - abs(1.0 - mod(u, 2.0)), 0.0).r;
+  }
+`;
+
+/**
+ * "A-exact": a game shader whose `snoise` reads the baked simplex texture (bind it as `uSimplexTex`): the same
+ * values as the procedural noise, so the same picture, bar the texture's filtering between texels
+ */
+export function withExactNoise(src: string): string {
+  const simplex = /float snoise\(vec2 v\) \{[\s\S]*?return 130\.0 \* dot\(m, g\);\s*\}/;
+  if (!simplex.test(src)) throw new Error('withExactNoise: no snoise function in this shader');
+  return src.replace(simplex, TEXTURE_SNOISE_EXACT);
+}
+
 /**
  * A game shader with its per-pixel noise read from the noise texture (bind protoNoise's texture, repeat
  * wrap, linear, as `uNoiseTex`). The reads use LOD 0, so the picture stays the procedural one's, aliasing and
@@ -288,6 +314,176 @@ export function sunPhotoLook(id: string, cb: SunBodyData, time = 0, zoom = 0.3):
       uCor: [0.75 + rnd() * 0.3, 0.55 + rnd() * 0.35, Math.round(7 + rnd() * 8), 0.4 + rnd() * 0.4],
       uProm: [0.6, 0.12 + rnd() * 0.1, 0.006 + rnd() * 0.004, 1.5 + rnd() * 1.5],
       uFine: [sunPhotoFine(radius, zoom), heat],
+    },
+  };
+}
+
+/**
+ * ALTERNATIVE (round 2): the plasma star. Not a photosphere but the star as it looks in the ultraviolet (or in a
+ * game's imagination): glowing, domain-warped plasma with bright ridged filaments and active regions on a ball that
+ * really turns (the noise is a 3D volume read at points on its sphere, about an axis tilted toward us, so features
+ * swing across the disc and over the limb), a hot core, a fringe of flame at the limb, and a corona of soft glow and
+ * rays that stream outward (rings through the volume that scroll along its third axis). Bind protoNoise.noise3Data
+ * as `uNoise3` (a 64³ RGBA 3D texture, repeat, trilinear with mipmaps). `#define PLASMA_LITE` drops the warp, the fine
+ * detail octave, the flame fringe and the fine rays.
+ */
+export const PLASMA_FRAG = `#version 300 es
+  precision highp float;
+  precision highp sampler3D;
+  in vec2 vUV;
+  out vec4 fragColor;
+
+  uniform sampler3D uNoise3;
+  uniform float uTime;
+  uniform float uReach;  // the quad's half-size, in star radii
+  uniform vec3 uSeed;
+  // The palette, coolest to hottest
+  uniform vec3 uDark;
+  uniform vec3 uMid;
+  uniform vec3 uBright;
+  uniform vec3 uCore;
+  uniform vec3 uHot;
+  uniform vec3 uRim;     // the flame fringe and the inner corona
+  uniform vec3 uCorona;
+  uniform vec4 uSurf;    // x feature scale, y warp, z contrast, w core glow
+  uniform vec4 uMotion;  // x spin (rad/s), y axis tilt toward us (rad), z boil rate, w corona outflow
+  uniform vec4 uCor;     // x strength, y ray frequency, z ray reach (radii), w glow falloff
+  uniform float uDetail; // 0..3: how many fine octaves (each 4x finer) show, faded in as the star grows on screen
+
+  vec3 ramp(float I) {
+    vec3 c = mix(uDark, uMid, smoothstep(0.0, 0.32, I));
+    c = mix(c, uBright, smoothstep(0.28, 0.6, I));
+    c = mix(c, uCore, smoothstep(0.55, 0.85, I));
+    return mix(c, uHot, smoothstep(0.82, 1.1, I));
+  }
+
+  void main() {
+    vec2 p = (vUV - 0.5) * 2.0 * uReach;
+    float r = length(p);
+    float px = fwidth(r);
+    vec2 dir = p / max(r, 1e-5);
+
+    // The point on the ball under this pixel, turned about a tilted axis
+    float rc = min(r, 0.999);
+    vec3 n = vec3(dir * rc, sqrt(1.0 - rc * rc));
+    float ct = cos(uMotion.y), st = sin(uMotion.y);
+    n = vec3(n.x, ct * n.y - st * n.z, st * n.y + ct * n.z);
+    float a = uTime * uMotion.x, ca = cos(a), sa = sin(a);
+    n = vec3(ca * n.x + sa * n.z, n.y, -sa * n.x + ca * n.z);
+    vec3 P = n * uSurf.x + uSeed;
+    // Filter widths here, where every pixel runs
+    vec3 Px = dFdx(P), Py = dFdy(P);
+    float boil = uTime * uMotion.z;
+
+    vec3 col = vec3(0.0);
+    float cover = 1.0 - smoothstep(1.0 - px * 1.5, 1.0 + px * 0.5, r);
+    if (cover > 0.0) {
+      float mu = sqrt(max(1.0 - rc * rc, 0.0));
+  #ifndef PLASMA_LITE
+      // Domain warp: the plasma pushed about by a slower field of itself, which drifts on its own clock
+      vec4 w = textureGrad(uNoise3, P * 0.21 + vec3(0.0, 0.0, boil * 0.5), Px * 0.21, Py * 0.21);
+      vec3 Q = P + (w.rgb - 0.5) * uSurf.y;
+      vec4 f = textureGrad(uNoise3, Q * 0.37 + vec3(boil, 0.0, 0.0), Px * 0.37, Py * 0.37);
+      vec4 f2 = textureGrad(uNoise3, Q * 1.13 + vec3(0.31, boil * 1.7, 0.7), Px * 1.13, Py * 1.13);
+      float body = f.r * 0.62 + f2.r * 0.38;
+      float fil = pow(clamp(f.b * 0.55 + f2.b * 0.45, 0.0, 1.0), 3.0);
+      float act = smoothstep(0.45, 0.8, w.g);
+  #else
+      // (no warp: two octaves straight off the ball)
+      vec4 f = textureGrad(uNoise3, P * 0.37 + vec3(boil, 0.0, 0.0), Px * 0.37, Py * 0.37);
+      vec4 f2 = textureGrad(uNoise3, P * 1.13 + vec3(0.31, boil * 1.7, 0.7), Px * 1.13, Py * 1.13);
+      float body = f.r * 0.62 + f2.r * 0.38;
+      float fil = pow(clamp(f.b * 0.55 + f2.b * 0.45, 0.0, 1.0), 3.0);
+      float act = smoothstep(0.45, 0.8, f.g);
+  #endif
+      float I = 0.5 + (body - 0.5) * 1.3 * uSurf.z + fil * (0.45 + 0.6 * act);
+  #ifndef PLASMA_LITE
+      // Finer octaves as the zoom shows them (the loop's bound is a uniform: whole screens agree, and pay only when close)
+      float k = 4.1, amp = 0.3;
+      for (int o = 0; o < 3; o++) {
+        float wo = clamp(uDetail - float(o), 0.0, 1.0);
+        if (wo <= 0.0) break;
+        vec4 g = textureGrad(uNoise3, Q * k + float(o) * 0.37, Px * k, Py * k);
+        I += ((o == 1 ? g.r : g.a) - 0.5) * amp * wo;
+        k *= 4.0; amp *= 0.7;
+      }
+  #endif
+      // A hot core, a darker, redder limb, and a bright rim right at the edge (the plasma seen edge-on)
+      I = I * mix(0.55, 1.0, pow(mu, 0.45)) + uSurf.w * pow(mu, 5.0) * 0.35;
+      col = (ramp(I) + uRim * pow(1.0 - mu, 6.0) * 0.45) * cover;
+    }
+
+    // Outside: flame at the limb, then glow and rays streaming outward
+    float d = max(r - 1.0, 0.0);
+    vec3 glow = vec3(0.0);
+    if (d < uReach - 1.0 && r > 1.0 - 3.0 * px) {
+      float outward = uTime * uMotion.w;
+      float k = uCor.y * 0.04;
+      // Broad streamers: a ring through the volume (a function of the angle), its third axis scrolling slowly with
+      // height and time, so they run out straight and flow outward
+      float s1 = textureLod(uNoise3, vec3(dir * k, d * 0.12 - outward) + uSeed, 0.0).r;
+      float streams = smoothstep(0.3, 0.85, s1);
+  #ifndef PLASMA_LITE
+      // Fine rays: a ring four times as fast round, ridged, so they come out thin, straight and bright
+      float s2 = textureLod(uNoise3, vec3(dir * k * 4.0, d * 0.2 - outward * 1.6) + uSeed.zxy, 0.0).b;
+      float rays = pow(s2, 3.0);
+  #else
+      float rays = 0.35;
+  #endif
+      float reach = uCor.z * (0.25 + 0.75 * streams);
+      float corona = exp(-d * uCor.w) * 0.28 + exp(-d / max(reach, 0.02)) * (0.12 + 0.4 * streams) * (0.3 + 1.1 * rays);
+      corona *= smoothstep(uReach - 1.0, (uReach - 1.0) * 0.55, d) * smoothstep(1.0 - 2.0 * px, 1.0 + 2.0 * px, r);
+      glow = mix(uRim, uCorona, smoothstep(0.0, 0.25, d)) * corona * uCor.x;
+  #ifndef PLASMA_LITE
+      if (d < 0.04) {
+        // The flame fringe: ridged tongues of plasma licking up off the limb, rising
+        float lod = log2(max(px * k * 12.0 * 64.0, 1.0));
+        float t = textureLod(uNoise3, vec3(dir * k * 12.0, d * 20.0 - outward * 6.0) + uSeed.yzx, lod).b;
+        float tongue = smoothstep(0.6, 0.95, t + 0.3 * (1.0 - d / 0.04)) * (1.0 - d / 0.04);
+        glow += uRim * tongue * (0.3 + 0.6 * streams) * 0.5;
+      }
+  #endif
+    }
+
+    fragColor = vec4(col + glow, cover);
+  }
+`;
+
+export interface PlasmaLook { reach: number; uniforms: Record<string, number | number[]> }
+
+/** uDetail for a star this many px in radius on screen: a fine octave from 1,500 px, another each 4x bigger, up to 3 */
+export function plasmaDetail(pxPerRadius: number): number {
+  return Math.max(0, Math.min(3, Math.log2(pxPerRadius / 1500) / 2 + 0.5));
+}
+
+/**
+ * The plasma star's uniforms for a system: its palette from its detail colours or its hue (as the game's sun takes
+ * them), its surface from its style (flow stars warp hard, granular ones are finer and contrastier), and its motion
+ * and corona seeded by its id. Each frame: uTime, and uDetail from plasmaDetail.
+ */
+export function plasmaLook(id: string, cb: SunBodyData, time = 0, pxPerRadius = 3000): PlasmaLook {
+  const rnd = mulberry32(hashString(`plasma:${id}`));
+  const hue = cb.detailParams?.hue ?? cb.hue ?? 40;
+  const dc = cb.detailColors;
+  let scale = 3.2, warp = 1.4, contrast = 1, core = 1.8;
+  if (cb.detailStar) { core = 0.8; warp = 0.9 + (cb.detailParams?.warpAmount ?? 0.4) * 1.5; contrast = cb.detailParams?.fbmContrast ?? 1; }
+  else if (cb.sunStyle === 'flow') { warp = 2.4; scale = 2.6; }
+  else if (cb.sunStyle === 'granular') { warp = 0.8; scale = 4.6; contrast = 1.2; }
+  const palette = dc
+    ? { dark: hex(dc.darkColor ?? '#5a1a00'), mid: hex(dc.midColor ?? '#cc4400'), bright: hex(dc.brightColor ?? '#ffaa22'), core: hex(dc.edgeColor ?? '#ffdd66'),
+        hot: hex(dc.centerColor ?? '#fff2cc'), rim: lift(hex(dc.plasmaColor ?? dc.edgeColor ?? '#ffbb44'), 0.2), corona: hex(dc.brightColor ?? '#ffaa22') }
+    : { dark: hsl(hue - 20, 0.95, 0.16), mid: hsl(hue - 8, 0.95, 0.38), bright: hsl(hue, 0.9, 0.58), core: hsl(hue + 8, 0.85, 0.78),
+        hot: hsl(hue + 15, 0.5, 0.95), rim: hsl(hue + 12, 0.9, 0.72), corona: hsl(hue, 0.85, 0.6) };
+  const reach = 3.0;
+  return {
+    reach,
+    uniforms: {
+      uTime: time, uReach: reach, uSeed: [rnd() * 10, rnd() * 10, rnd() * 10],
+      uDark: palette.dark, uMid: palette.mid, uBright: palette.bright, uCore: palette.core, uHot: palette.hot, uRim: palette.rim, uCorona: palette.corona,
+      uSurf: [scale, warp, contrast, core],
+      uMotion: [0.004 + rnd() * 0.003, 0.5 + rnd() * 0.4, 0.004 + rnd() * 0.003, 0.012 + rnd() * 0.008],
+      uCor: [0.85 + rnd() * 0.3, 9 + Math.round(rnd() * 6), 0.7 + rnd() * 0.4, 10],
+      uDetail: plasmaDetail(pxPerRadius),
     },
   };
 }

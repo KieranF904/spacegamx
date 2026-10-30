@@ -4,12 +4,18 @@
  * of the screen's size, which is blurred (at that size) and added over the
  * scene. Only those layers go in, so nothing needs thresholding, and at a
  * sixteenth of the pixels the extra draw and the blur cost next to nothing.
+ *
+ * The second draw happens inside the main pass, just before the bloom sprite: by then Pixi has placed and batched every
+ * glow layer for the screen, so their draw lists are replayed into the bloom texture as they are (one pass for all of
+ * them, nothing placed or batched twice). The texture has the screen's size in CSS pixels at a quarter of the
+ * resolution, so the layers' screen transforms draw into it unchanged.
  */
 
-import { Application, BlurFilter, Container, Graphics, Matrix, ParticleContainer, RenderTexture, Sprite } from 'pixi.js';
+import { Application, BlurFilter, Container, Graphics, ParticleContainer, RenderContainer, RenderTexture, Sprite, executeInstructions, type Renderer } from 'pixi.js';
 
 /** The bloom texture's size, as a fraction of the screen's (the quality setting changes it: see settings/quality.ts) */
 const SCALE = 0.25;
+const CLEAR: [number, number, number, number] = [0, 0, 0, 0];
 
 /** A layer with nothing drawn in it (a cleared Graphics, a particle container with no particles, a plain container holding only such): no pass for it */
 function isEmpty(c: Container): boolean {
@@ -21,25 +27,32 @@ function isEmpty(c: Container): boolean {
 export class Bloom {
   /** Goes over the world, under the UI */
   readonly sprite: Sprite;
+  /** Draws the glow layers into the bloom texture during the main pass: goes just before `sprite` (see `addTo`) */
+  readonly pass: RenderContainer;
   private rt: RenderTexture;
   private sources: Container[] = [];
-  private m = new Matrix();
-  private chain: Container[] = [];
+  /** The layers with something on screen this frame */
+  private live: Container[] = [];
   private scale = SCALE;
   private blur: BlurFilter;
   enabled = true;
 
   constructor(private app: Application) {
-    this.rt = RenderTexture.create({ width: 4, height: 4, resolution: 1, dynamic: true });
+    this.rt = RenderTexture.create({ width: 4, height: 4, resolution: SCALE, dynamic: true });
     this.sprite = new Sprite(this.rt);
     this.sprite.blendMode = 'add';
-    this.sprite.scale.set(1 / SCALE);
     const blur = new BlurFilter({ strength: 3, quality: 2 });
     // The blur runs at the bloom texture's own size
     blur.resolution = SCALE;
     this.blur = blur;
     this.sprite.filters = [blur];
+    this.pass = new RenderContainer({ render: (r) => this.draw(r as Renderer) });
     this.resize();
+  }
+
+  /** Puts the bloom (its pass, then its sprite) on top of `parent`'s children */
+  addTo(parent: Container): void {
+    parent.addChild(this.pass, this.sprite);
   }
 
   /** The glow texture's size (a fraction of the screen's) and the blur's passes */
@@ -48,55 +61,53 @@ export class Bloom {
     this.scale = scale;
     this.blur.quality = blurQuality;
     this.blur.resolution = scale;
-    this.sprite.scale.set(1 / scale);
     this.resize();
   }
 
   /** A layer of glowing things (kept where it is in the scene; it's drawn again into the bloom) */
   add(c: Container): void {
+    // Its own draw list, to replay (the old one-render-per-layer bloom made every layer a render group too)
+    c.enableRenderGroup();
     this.sources.push(c);
   }
 
   resize(): void {
     const { width, height } = this.app.screen;
-    this.rt.resize(Math.max(1, Math.ceil(width * this.scale)), Math.max(1, Math.ceil(height * this.scale)));
+    this.rt.resize(Math.max(1, width), Math.max(1, height), this.scale);
   }
 
-  /** Once a frame, after everything is placed */
+  /** Once a frame, after everything is placed: which layers the main pass draws into the bloom */
   render(): void {
-    this.sprite.visible = this.enabled;
-    if (!this.enabled) return;
-    const r = this.app.renderer;
-    let first = true;
-    for (const c of this.sources) {
-      if (!this.onScreen(c) || isEmpty(c)) continue;
-      r.render({ container: c, target: this.rt, clear: first, transform: this.transformOf(c) });
-      first = false;
+    const live = this.live;
+    live.length = 0;
+    if (this.enabled) for (const c of this.sources) if (this.onScreen(c) && !isEmpty(c)) live.push(c);
+    // Nothing glowing on screen: no blur pass at all
+    const show = live.length > 0;
+    if (this.sprite.visible !== show) this.sprite.visible = show;
+  }
+
+  /** During the main pass, just before the sprite: every live layer's draw list, as Pixi built it for this frame */
+  private draw(r: Renderer): void {
+    if (!this.sprite.visible || this.live.length === 0) return;
+    const target = r.renderTarget, uniforms = r.globalUniforms, pipes = r.renderPipes;
+    target.push(this.rt, true, CLEAR);
+    for (const c of this.live) {
+      const g = c.renderGroup;
+      if (!g || !g.isRenderable) continue;
+      uniforms.push({ worldTransformMatrix: g.worldTransform, worldColor: g.worldColorAlpha });
+      executeInstructions(g, pipes);
+      uniforms.pop();
     }
-    // Nothing glowing on screen: no blur pass at all (the next layer drawn clears what's left)
-    if (first) this.sprite.visible = false;
+    target.finishRenderPass();
+    target.pop();
   }
 
   /** In the scene and shown (every ancestor visible) */
   private onScreen(c: Container): boolean {
     for (let n: Container | null = c; n; n = n.parent) {
-      if (!n.visible) return false;
+      if (!n.visible || !n.renderable) return false;
       if (n === this.app.stage) return true;
     }
     return false;
-  }
-
-  /** Where the layer is on screen, scaled down to the bloom texture */
-  private transformOf(c: Container): Matrix {
-    const chain = this.chain;
-    chain.length = 0;
-    for (let n: Container | null = c; n && n !== this.app.stage; n = n.parent) chain.push(n);
-    const m = this.m.identity().scale(this.scale, this.scale);
-    for (let i = chain.length - 1; i >= 0; i--) {
-      chain[i].updateLocalTransform();
-      // world = parent × local; scaled down at the end (prepended above)
-      m.append(chain[i].localTransform);
-    }
-    return m;
   }
 }

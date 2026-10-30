@@ -251,9 +251,8 @@ export class ContextActions {
   /** Each frame: the menu, the order's progress, the marks */
   update(): void {
     const c = this.host.cursor();
-    const targets = this.targets();
     // (The order goes on under the map, as the autopilot does)
-    this.stepAuto(targets);
+    this.stepAuto();
     if (!this.host.enabled()) {
       this.closeMenu();
       this.ui.hideAll();
@@ -437,7 +436,7 @@ export class ContextActions {
   }
 
   /** The autopilot's order: keep a moving target's point on it, and act when it's due */
-  private stepAuto(targets: Target[]): void {
+  private stepAuto(): void {
     const o = this.auto;
     if (!o) return;
     const ap = this.host.autopilot;
@@ -445,8 +444,8 @@ export class ContextActions {
     const ours = ap.active && ap.destination === o.dest;
     const t = o.target;
     if (!t) { if (!ours) this.auto = null; return; }
-    // (The same thing this frame: moons and planets move)
-    const now = targets.find((x) => x.key === t.key) ?? t;
+    // (The same thing this frame: moons and planets move. The list is only built while an order is on)
+    const now = this.targets().find((x) => x.key === t.key) ?? t;
     o.target = now;
     if (now.pos) {
       const p = now.pos();

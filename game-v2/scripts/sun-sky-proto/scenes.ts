@@ -8,11 +8,12 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join, resolve } from 'path';
 import { spawnSync } from 'child_process';
-import { sunNoiseData, SUN_NOISE_SIZE } from '../../client/src/rendering/proto/protoNoise';
+import { bakeSimplex, noise3Data, NOISE3_SIZE, sunNoiseData, SUN_NOISE_SIZE } from '../../client/src/rendering/proto/protoNoise';
+import { EXACT_SIZE, EXACT_UNITS } from '../../client/src/rendering/proto/sunProto';
 import { skyNoiseTexture } from '../../client/src/rendering/sky/noiseTexture';
 import { GLSL_COMMON } from '../../client/src/rendering/shaderQuad';
-import { centralLayers, currentSunLayers, photoSunLayers, sourcesFrom, sunPrograms, type CentralBody, type Layer, type View } from './layers';
-import { currentSkyLayers, skyPrograms, spriteSkyLayers, systemBiome } from './skyLayers';
+import { centralLayers, currentSunLayers, sourcesFrom, sunPrograms, sunVariantLayers, type CentralBody, type Layer, type View } from './layers';
+import { currentSkyLayers, skyOption, skyPrograms, spriteSkyLayers, systemBiome, SKY_LABEL, SKY_OPTIONS } from './skyLayers';
 
 const root = resolve(process.env.SUN_SKY_ROOT ?? '.');
 const here = join(root, 'scripts/sun-sky-proto');
@@ -33,7 +34,11 @@ const SPECIAL = systems.filter((s) => ['black_hole', 'pulsar', 'brown_dwarf'].in
 writeFileSync(join(out, 'sunNoise.rgba'), sunNoiseData());
 const skySrc = skyNoiseTexture().source as unknown as { resource: Uint8Array; width: number };
 writeFileSync(join(out, 'skyNoise.rgba'), skySrc.resource);
+writeFileSync(join(out, 'simplex.f32'), bakeSimplex(EXACT_SIZE, EXACT_UNITS));
+writeFileSync(join(out, 'noise3.rgba'), noise3Data());
 const textures = {
+  noise3: { w: NOISE3_SIZE, h: NOISE3_SIZE, d: NOISE3_SIZE, file: join(out, 'noise3.rgba') },
+  simplex: { w: EXACT_SIZE, h: EXACT_SIZE, file: join(out, 'simplex.f32'), float: true, mip: false, repeat: false },
   sunNoise: { w: SUN_NOISE_SIZE, h: SUN_NOISE_SIZE, file: join(out, 'sunNoise.rgba'), mip: true, repeat: true },
   skyNoise: { w: skySrc.width, h: skySrc.width, file: join(out, 'skyNoise.rgba'), mip: true, repeat: true },
 };
@@ -45,14 +50,28 @@ const gifs: any[] = [];
 const job = (id: string, v: View, layers: Layer[], opts: Partial<Job> = {}) => jobs.push({ id, w: Math.round(v.w * v.dpr), h: Math.round(v.h * v.dpr), layers, ...opts });
 
 const radiusOf = (cb: CentralBody) => cb.detailParams?.radius ?? cb.radius ?? 1000;
-type SunVariant = 'cur' | 'port' | 'photo' | 'lite';
+/**
+ * A sun variant: a look, then optionally `@scale` to draw it into a render target that size and stretch it (`exact@0.5`).
+ * Looks: cur (the game's), port (A), exact (A-exact), photo and lite (B, round 1), plasma and plasma.lite (round 2).
+ */
+type SunVariant = string;
 const SUN_VARIANTS: SunVariant[] = ['cur', 'port', 'photo', 'lite'];
-const VARIANT_LABEL: Record<SunVariant, string> = { cur: 'current', port: 'A: port (texture noise)', photo: 'B: photosphere', lite: 'B-lite (low tier)' };
-function sunLayers(id: string, v: View, variant: SunVariant): Layer[] {
-  const cb = sysOf(id).centralBody as CentralBody;
-  if (variant === 'cur' || variant === 'port') return currentSunLayers(id, cb, v, variant === 'port');
-  return photoSunLayers(id, cb, v, variant === 'lite');
+/** Round 2: the faithful options (the current look, cheaper), then the alternatives (new looks) */
+const FAITHFUL: SunVariant[] = ['port', 'exact', 'cur@0.5', 'exact@0.5', 'exact@0.33'];
+const ALTERNATIVE: SunVariant[] = ['plasma', 'plasma.lite', 'plasma@0.5'];
+const ROUND2: SunVariant[] = ['cur', ...FAITHFUL, ...ALTERNATIVE];
+const LOOK_LABEL: Record<string, string> = {
+  cur: 'current', port: 'A port', exact: 'A-exact', photo: 'B: photosphere', lite: 'B-lite (low tier)',
+  plasma: 'plasma', 'plasma.lite': 'plasma lite', current: 'current',
+};
+function variantLabel(variant: SunVariant): string {
+  const [look, scale] = variant.split('@');
+  const kind = variant === 'cur' ? '' : ALTERNATIVE.includes(variant) || look.startsWith('plasma') ? 'ALT: ' : FAITHFUL.includes(variant) || scale ? 'FAITHFUL: ' : '';
+  const res = scale ? ` ${scale === '0.5' ? '½' : scale === '0.33' ? '⅓' : scale} res` : '';
+  return `${kind}${LOOK_LABEL[look] ?? look}${res}`;
 }
+const VARIANT_LABEL = new Proxy({} as Record<string, string>, { get: (_, k: string) => variantLabel(k) });
+const sunLayers = (id: string, v: View, variant: SunVariant): Layer[] => sunVariantLayers(id, sysOf(id).centralBody as CentralBody, v, variant);
 
 /** The in-game views a star is timed and shown in (R its radius), CSS px */
 function sunViews(R: number, t: number, dpr = 1): Record<string, View> {
@@ -85,6 +104,25 @@ if (set === 'verify') {
     job(`sky.${id}.cur`, v, currentSkyLayers(b, v, lens), { out: `verify/sky.${id}.cur.png` });
     job(`sky.${id}.sprite`, v, spriteSkyLayers(b, v, lens), { out: `verify/sky.${id}.sprite.png` });
     job(`sky.${id}.better`, v, spriteSkyLayers(b, v, lens, { better: true }), { out: `verify/sky.${id}.better.png` });
+  }
+}
+
+if (set === 'v2') {
+  // Round 2 at a glance: every star whole and at the limb, current first, then the faithful options and the alternatives
+  for (const id of PLAIN) {
+    const s = sysOf(id), cb = s.centralBody as CentralBody, R = radiusOf(cb), b = systemBiome(s);
+    const views: Record<string, View> = {
+      full: { w: 800, h: 800, dpr: 1, cam: [0, 0], zoom: 800 / (2 * 3.3 * R), t: 120 },
+      limb: { w: 960, h: 540, dpr: 1, cam: [R + 0.1 * 960 / 0.15, 0], zoom: 0.15, t: 120 },
+    };
+    for (const [vn, v] of Object.entries(views)) {
+      const cells = ROUND2.map((variant) => {
+        const file = `v2/${id}.${vn}.${variant}.png`;
+        job(`v2.${id}.${vn}.${variant}`, v, [...(vn === 'full' ? [] : currentSkyLayers(b, v, 0)), ...sunLayers(id, v, variant)], { out: file });
+        return { file, label: variantLabel(variant) };
+      });
+      composites.push({ out: `v2-${id}-${vn}.png`, cols: 4, cells, metric: true, scale: 0.5 });
+    }
   }
 }
 
@@ -184,6 +222,95 @@ if (set === 'parity') {
         job(`parity.${id}.z${zoom}.L${i}.sprite`, v, spriteSkyLayers(b, v, 0, { only: i }), { out: `parity/${id}.z${zoom}.L${i}.sprite.png` });
       }
     }
+  }
+}
+
+// Round 2 (after Kieran's review): the faithful options and the alternatives, each against the game's look, current first
+const STAR_VIEWS = (R: number, t: number, dpr = 1): Record<string, View> => ({
+  full: { w: 800, h: 800, dpr, cam: [0, 0], zoom: 800 / (2 * 3.3 * R), t },
+  limb: { w: 960, h: 540, dpr, cam: [R + 0.1 * 960 / 0.15, 0], zoom: 0.15, t },
+  close: { w: 960, h: 540, dpr, cam: [R * Math.SQRT1_2 - 150, -R * Math.SQRT1_2 + 100], zoom: 1, t },
+});
+
+if (set === 'stills2') {
+  for (const id of PLAIN) {
+    const s = sysOf(id), cb = s.centralBody as CentralBody, R = radiusOf(cb), b = systemBiome(s);
+    for (const [vn, v] of Object.entries(STAR_VIEWS(R, 120))) {
+      const cells = ROUND2.map((variant) => {
+        const file = `stills2/${id}.${vn}.${variant}.png`;
+        job(`s2.${id}.${vn}.${variant}`, v, [...(vn === 'full' ? [] : currentSkyLayers(b, v, 0)), ...sunLayers(id, v, variant)], { out: file });
+        return { file, label: variantLabel(variant) };
+      });
+      composites.push({ out: `r2-sun-${id}-${vn}.png`, cols: 4, cells, metric: true, scale: vn === 'full' ? 0.6 : 0.5, title: `${s.name}, ${vn}: current first, then FAITHFUL options (the current look, cheaper), then ALTERNATIVES (new looks). Diff: mean difference from current, 0-255.` });
+    }
+  }
+  // Skies: the game's against each option, with the star in view (the limb) and without (a clear patch of sky)
+  for (const id of ['sol', 'borealis', 'nebula_prime', 'cinder_reach', 'glasswater', 'the_maw']) {
+    const s = sysOf(id), cb = s.centralBody as CentralBody, b = systemBiome(s);
+    const plain = cb.type === 'sun', R = plain ? radiusOf(cb) : 0;
+    const lens = cb.type === 'black_hole' ? cb.radius ?? 0 : 0;
+    const views: Record<string, View> = plain
+      ? { limb: { w: 960, h: 540, dpr: 1, cam: [R + 0.1 * 960 / 0.15, 0], zoom: 0.15, t: 120 }, sky: { w: 960, h: 540, dpr: 1, cam: [30000 + R * 2, -12000], zoom: 1, t: 120 } }
+      : { sky: { w: 960, h: 540, dpr: 1, cam: [30000, -12000], zoom: 1, t: 120 } };
+    for (const [vn, v] of Object.entries(views)) {
+      const cells = SKY_OPTIONS.map((o) => {
+        const file = `stills2/sky.${id}.${vn}.${o.replace('+', '_')}.png`;
+        const star = plain && vn === 'limb' ? sunLayers(id, v, 'cur') : [];
+        job(`s2sky.${id}.${vn}.${o}`, v, [...skyOption(o, b, v, lens, R), ...star], { out: file });
+        return { file, label: SKY_LABEL[o].replace(', skipped under the sun', ' +skip').replace('FAITHFUL: ', 'F: ') };
+      });
+      composites.push({ out: `r2-sky-${id}-${vn}.png`, cols: 3, cells, metric: true, scale: 0.6, title: `${s.name} sky, ${vn === 'limb' ? 'with the star (current) in view' : 'open sky, zoom 1'}: current first. +skip: nothing drawn behind the star's disc.` });
+    }
+  }
+}
+
+if (set === 'bench2') {
+  const reps = 10;
+  for (const dpr of [1, 2]) {
+    for (const id of PLAIN) {
+      const cb = sysOf(id).centralBody as CentralBody, R = radiusOf(cb);
+      for (const [name, v] of Object.entries(sunViews(R, 120, dpr))) {
+        if (name === 'corona') continue;
+        for (const variant of ROUND2) job(`sun|${id}|${name}|${variant}|${dpr}`, v, sunLayers(id, v, variant), { bench: true, reps });
+      }
+    }
+    // The sky where the star fills the screen (over its disc), covers half of it (the limb) and none of it (just off it)
+    for (const id of ['sol', 'borealis', 'nebula_prime']) {
+      const s = sysOf(id), cb = s.centralBody as CentralBody, R = radiusOf(cb), b = systemBiome(s);
+      const views = sunViews(R, 120, dpr);
+      for (const name of ['disc', 'limb', 'corona']) {
+        for (const o of SKY_OPTIONS) job(`sky|${id}|${name}|${o}|${dpr}`, views[name], skyOption(o, b, views[name], 0, R), { bench: true, reps });
+      }
+    }
+    // Skies with no star in view, and the black hole's
+    for (const id of ['sol', 'the_maw', 'glasswater']) {
+      const s = sysOf(id), cb = s.centralBody as CentralBody, b = systemBiome(s);
+      const lens = cb.type === 'black_hole' ? cb.radius ?? 0 : 0;
+      const v: View = { w: 1920, h: 1080, dpr, cam: [30000 + (cb.type === 'sun' ? radiusOf(cb) * 3 : 0), -12000], zoom: 1, t: 120 };
+      for (const o of SKY_OPTIONS) job(`sky|${id}|open|${o}|${dpr}`, v, skyOption(o, b, v, lens, cb.type === 'sun' ? radiusOf(cb) : 0), { bench: true, reps });
+    }
+  }
+}
+
+if (set === 'gif2') {
+  // Each sun's limb animating: current, the closest faithful options and the alternatives; 15 s of game time at 3x
+  const panels = ['cur', 'exact', 'cur@0.5', 'exact@0.5', 'plasma', 'plasma.lite'];
+  for (const id of PLAIN) {
+    const s = sysOf(id), cb = s.centralBody as CentralBody, R = radiusOf(cb), b = systemBiome(s);
+    const frames: string[] = [];
+    for (let f = 0; f < 30; f++) {
+      const t = 120 + f * 0.5;
+      const v: View = { w: 480, h: 300, dpr: 1, cam: [R + 0.1 * 480 / 0.3, 0], zoom: 0.3, t };
+      const cells = panels.map((variant) => {
+        const file = `gif2/${id}.${variant}.${f}.png`;
+        job(`gif2.${id}.${variant}.${f}`, v, [...currentSkyLayers(b, v, 0), ...sunLayers(id, v, variant)], { out: file });
+        return { file, label: variantLabel(variant) };
+      });
+      const sheet = `gif2/${id}.sheet.${f}.png`;
+      composites.push({ out: sheet, cols: 3, cells });
+      frames.push(sheet);
+    }
+    gifs.push({ out: `r2-anim-sun-${id}.gif`, frames, ms: 167, scale: 0.75 });
   }
 }
 

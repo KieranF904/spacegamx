@@ -143,6 +143,9 @@ export class WeaponFx {
     return this.glow.container;
   }
 
+  /** Share of the impact sparks and smoke puffs made (the quality setting's particles) */
+  particleKeep = 1;
+
   constructor(layer: Container) {
     this.crackle.blendMode = 'add';
     this.crackleGroup.addChild(this.crackle);
@@ -174,8 +177,7 @@ export class WeaponFx {
     const seen = this.seenShots;
     seen.clear();
 
-    for (const e of state.entities.values()) {
-      if (e.type !== EntityType.Projectile) continue;
+    for (const e of state.entities.ofType(EntityType.Projectile)) {
       seen.add(e.id);
       let shot = this.shots.get(e.id);
       if (!shot) {
@@ -247,7 +249,7 @@ export class WeaponFx {
       normal = Math.atan2(-shot.vy, -shot.vx);
     }
     const imp = style.impact;
-    for (let i = 0; i < imp.sparks * size; i++) {
+    for (let i = 0; i < imp.sparks * size * this.particleKeep; i++) {
       const a = normal + (Math.random() - 0.5) * 2.2;
       const s = imp.speed * (0.4 + Math.random());
       this.sparks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0, max: imp.life * (0.6 + Math.random() * 0.6), color: Math.random() < 0.25 ? 0xffffff : imp.color });
@@ -257,6 +259,7 @@ export class WeaponFx {
     if (imp.ring !== undefined) this.rings.push({ x, y, life: 0, max: 16, size: imp.flash * size * 1.8, color: imp.ring });
     // A puff of vapourised hull
     for (let i = 0; i < 2; i++) {
+      if (this.particleKeep < 1 && Math.random() > this.particleKeep) continue;
       const a = normal + (Math.random() - 0.5) * 1.2;
       this.smoke.push({ x, y, vx: Math.cos(a) * 0.8, vy: Math.sin(a) * 0.8, life: 0, max: 40 + Math.random() * 20, size: 6 * size });
     }
@@ -374,6 +377,7 @@ export class WeaponFx {
     });
     // Smoke puffs out ahead of the barrel, carried a little by the shot, and left behind as the ship flies on
     for (let i = 0; i < m.smoke; i++) {
+      if (this.particleKeep < 1 && Math.random() > this.particleKeep) continue;
       const a = angle + (Math.random() - 0.5) * 0.8, s = 0.8 + Math.random() * 1.6;
       const ahead = size * (0.4 + Math.random() * 0.5);
       this.smoke.push({ x: x + Math.cos(angle) * ahead, y: y + Math.sin(angle) * ahead, vx: Math.cos(a) * s + shot.vx * 0.04, vy: Math.sin(a) * s + shot.vy * 0.04,

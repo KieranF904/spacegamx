@@ -1,6 +1,8 @@
 /**
  * Graphics quality: the tiers behind the Display setting (Low, Medium, High, or Auto, which starts at High and
  * steps down while the frame rate stays poor), and what each one changes. High is how the game has always drawn.
+ * Medium and Low lighten the GPU's work (pixels, multisampling, sky, bloom) and the CPU's too (fewer small effect
+ * particles, the HUD's overlays and the maps redrawn less often), so a slow processor gains from Auto stepping down.
  */
 
 export type QualitySetting = 'auto' | 'low' | 'medium' | 'high';
@@ -20,16 +22,24 @@ export interface QualityProfile {
   starLayers: readonly boolean[];
   /** The sky haze texture's size as a fraction of the screen's */
   hazeScale: number;
-  /** Share of the small effect particles (sparks, debris) spawned */
+  /** Share of the small effect particles spawned (sparks, smoke and dust: the renderer's, weapons' and damage's) */
   particles: number;
+  /** Most damage-effect particles alive at once (ships/DamageFx.ts) */
+  effectCap: number;
+  /** The HUD's overlays (nav markers, damage indicators, floating rewards) are redrawn every this many frames */
+  hudEvery: number;
+  /** Minimap redraws a second */
+  minimapHz: number;
+  /** The system map is redrawn every this many frames while left alone (every frame while it's being moved or pointed at) */
+  mapEvery: number;
   /** The cold's frost texture, pixels wide (0: a gradient tint only: ui/FrostVignette.ts) */
   frostTexture: number;
 }
 
 export const PROFILES: Record<QualityTier, QualityProfile> = {
-  high: { msaa: true, maxDpr: 2, bloomScale: 0.25, bloomQuality: 2, starLayers: [true, true, true, true, true, true], hazeScale: 1 / 2, particles: 1, frostTexture: 1024 },
-  medium: { msaa: true, maxDpr: 1.5, bloomScale: 0.2, bloomQuality: 2, starLayers: [true, true, true, false, true, true], hazeScale: 0.4, particles: 0.7, frostTexture: 640 },
-  low: { msaa: false, maxDpr: 1, bloomScale: 0.125, bloomQuality: 1, starLayers: [true, false, true, false, true, true], hazeScale: 1 / 3, particles: 0.4, frostTexture: 0 },
+  high: { msaa: true, maxDpr: 2, bloomScale: 0.25, bloomQuality: 2, starLayers: [true, true, true, true, true, true], hazeScale: 1 / 2, particles: 1, effectCap: 2500, hudEvery: 1, minimapHz: 20, mapEvery: 1, frostTexture: 1024 },
+  medium: { msaa: true, maxDpr: 1.5, bloomScale: 0.2, bloomQuality: 2, starLayers: [true, true, true, false, true, true], hazeScale: 0.4, particles: 0.7, effectCap: 1600, hudEvery: 2, minimapHz: 15, mapEvery: 2, frostTexture: 640 },
+  low: { msaa: false, maxDpr: 1, bloomScale: 0.125, bloomQuality: 1, starLayers: [true, false, true, false, true, true], hazeScale: 1 / 3, particles: 0.4, effectCap: 900, hudEvery: 2, minimapHz: 10, mapEvery: 2, frostTexture: 0 },
 };
 
 const ORDER: QualityTier[] = ['high', 'medium', 'low'];

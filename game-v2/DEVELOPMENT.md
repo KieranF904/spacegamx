@@ -208,7 +208,7 @@ up, or its own frozen one on 5299; Chrome runs at Idle priority on the real GPU,
 `scripts/boss-shots/shoot.mjs` (live game shots) uses the same daemon. Don't use either for plain stills.
 
 **Sun and sky prototypes** (not in the game yet; `docs/rendering/sun-sky-prototypes.md`): the live lab is
-<http://localhost:5273/sunlab.html> (dev server only), and `node scripts/sun-sky-proto/run.mjs verify|bench|stills|gif|parity <out dir>`
+<http://localhost:5273/sunlab.html> (dev server only), and `node scripts/sun-sky-proto/run.mjs verify|bench|stills|gif|parity|v2|stills2|bench2|gif2 <out dir>`
 draws and times the game's sun and sky against them natively (moderngl, no browser).
 
 ## Website (site/)

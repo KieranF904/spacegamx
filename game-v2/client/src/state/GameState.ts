@@ -152,6 +152,8 @@ const SNAPSHOT_BUFFER_SIZE = 6;    // Keep last N snapshots for interpolation
 const RENDER_SMOOTH_SELF = 1.0;    // Render lerp rate for local player (1.0 = no smoothing, instant)
 const RENDER_SMOOTH_OTHER = 0.25;  // Render lerp rate for other entities
 const SNAP_THRESHOLD = 260;        // Teleport if error > this
+/** Rocks out of sight are placed every this many ticks (see orbitFocus) */
+const ORBIT_FAR_TICKS = 8;
 const SMOOTH_THRESHOLD = 12;       // Snap if error < this
 const RECONCILE_SMOOTH = 0.5;      // Reconciliation smoothing rate
 
@@ -165,9 +167,51 @@ const TICK_OFFSET_SMOOTHING = 0.03;
 /** The prediction re-syncs to the clock estimate (rather than stepping to it) when this far out */
 const PREDICT_RESYNC_TICKS = 30;
 
+const NONE: ReadonlySet<InterpolatedEntity> = new Set();
+
+/**
+ * The entities by id, each type also kept in a set of its own as they come and go, for the passes a frame makes over
+ * one kind (the shots, the stations) without walking the hundreds of rocks and ships besides. An entity's type never changes.
+ */
+export class EntityMap extends Map<number, InterpolatedEntity> {
+  private byType = new Map<EntityType, Set<InterpolatedEntity>>();
+
+  override set(id: number, e: InterpolatedEntity): this {
+    const old = super.get(id);
+    if (old && old !== e) this.byType.get(old.type)?.delete(old);
+    super.set(id, e);
+    let s = this.byType.get(e.type);
+    if (!s) this.byType.set(e.type, (s = new Set()));
+    s.add(e);
+    return this;
+  }
+
+  override delete(id: number): boolean {
+    const old = super.get(id);
+    if (old) this.byType.get(old.type)?.delete(old);
+    return super.delete(id);
+  }
+
+  override clear(): void {
+    this.byType.clear();
+    super.clear();
+  }
+
+  /** The entities of one type (live: don't add or remove while going through it) */
+  ofType(type: EntityType): ReadonlySet<InterpolatedEntity> {
+    return this.byType.get(type) ?? NONE;
+  }
+}
+
 export class GameState {
   /** Asteroid composition (set by the game from the mining data), deterministic like the server's */
   composeAsteroid: ((type: string, key: string, size: number, systemId: string, stage?: number) => Composition) | null = null;
+  /**
+   * Where asteroids must be exactly placed this frame: boxes of half size (hw, hh) round the camera and round the pilot
+   * (set by the game each frame from the view). Rocks outside both are placed every ORBIT_FAR_TICKS ticks, in turn, so a
+   * system's hundreds of rocks aren't all solved every frame. Null: every rock, every tick.
+   */
+  orbitFocus: { cx: number; cy: number; px: number; py: number; hw: number; hh: number } | null = null;
 
   // ============================================
   // PLAYER STATE
@@ -287,7 +331,7 @@ export class GameState {
   // ============================================
   // ENTITY STATE
   // ============================================
-  public entities: Map<number, InterpolatedEntity> = new Map();
+  public entities = new EntityMap();
   private snapshotBuffer: BufferedSnapshot[] = [];
   
   // Screen shake
@@ -986,6 +1030,7 @@ export class GameState {
     }
     
     const t = Math.max(0, Math.min(1.2, (renderTick - from.tick) / (to.tick - from.tick)));
+    const focus = this.orbitFocus;
     
     for (const entity of this.entities.values()) {
       if (entity.id === this.playerId) continue;
@@ -1005,7 +1050,13 @@ export class GameState {
       // Deterministic asteroids — calculate position from orbit params
       if (entity.isDeterministic && entity.orbitType !== undefined) {
         // An asteroid is placed by the whole tick: nothing to do until the tick changes
-        if (entity.orbitTimeScale === undefined && entity.orbitTick === rawTickRounded) continue;
+        if (entity.orbitTimeScale === undefined) {
+          if (entity.orbitTick === rawTickRounded) continue;
+          // Out of sight: every few ticks, each rock on its own turn (and at once if it has gone a while)
+          if (focus && (rawTickRounded + entity.id) % ORBIT_FAR_TICKS !== 0 && rawTickRounded - (entity.orbitTick ?? -1e9) < 2 * ORBIT_FAR_TICKS
+            && (Math.abs(entity.x - focus.cx) > focus.hw || Math.abs(entity.y - focus.cy) > focus.hh)
+            && (Math.abs(entity.x - focus.px) > focus.hw || Math.abs(entity.y - focus.py) > focus.hh)) continue;
+        }
         entity.orbitTick = rawTickRounded;
         const { x, y } = calcAsteroidPosition({
           orbitType: entity.orbitType ?? 0,

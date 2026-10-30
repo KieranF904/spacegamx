@@ -113,9 +113,9 @@ Severity is my estimate of user-visible cost on a mid/weak machine in a busy sce
 
 Fixed earlier (per the profile): 1, 2, 3, 4, 6, 7, 8, 9, 10, 13, 14 (partly: see below), 21, 22.
 
-**Still open:** 5 (ShipBatch chunk policy), 11 (shared entity partition), 12 (ship labels as BitmapText), 17, 18, 19, 20
-(NavMarkers rebuilt every frame), 23 (minimap Graphics), 24 (MobView Graphics redrawn), and bloom still issues one
-`renderer.render` per glow source (14).
+**Still open:** 5 (partly: big hulls already have chunks of their own; lazy far geometry and grow-only merge buffers
+not done), 11 (partly: see the second pass below), 12 (ship labels as BitmapText), 17, 18, 19, 20 (partly), 23, 24.
+Since the second pass, 14 is done.
 
 **Done in this pass (effects, profile item #2):**
 - The big effect pools (WeaponFx tracers/flashes/sparks and gun smoke, DamageFx sparks/fire/shields and smoke) are
@@ -144,3 +144,25 @@ blend per sprite so this can't happen to it.
 **Measured, not worth it:** making `worldContainer` a render group (camera moves as one matrix) saved nothing measurable
 in fights (the cost moves to `updateRenderGroupTransforms`) and shifts thin edges by float rounding, so it was dropped.
 Parking unused pool sprites at alpha 0 instead of hiding them was slower (they stay in the batches).
+
+**Second CPU pass (31 October 2026, the rest of the profile's list).** Measured in one session per change, switched on and
+off at runtime in alternating new/old/old/new windows of 3 s (machine noise makes separate runs incomparable), the
+boss fight at the Redtooth picket lair unless said; ms are main-thread ms per frame on the profile machine (multiply by
+about 3 for a laptop). The switches are gone. Visual changes on High were checked with seeded stills (clock and
+`Math.random` frozen, the same frame drawn new, old, new in one task, so new against new is the noise floor).
+
+| item | before | after | notes |
+|---|---|---|---|
+| 14 bloom: one pass | RT passes 0.19 + main 0.51 | main 0.70 (replay 0.05) | **CPU-neutral** (2.04 vs 2.01 total, noise). The glow layers' draw lists are now replayed into the bloom texture from inside the main pass (`Bloom.pass`, a RenderContainer before the sprite; the texture is the screen's CSS size at a quarter resolution, so the layers' screen transforms draw into it as they are). What the old per-layer renders cost was Pixi updating those layers, which now happens once in the main pass instead. Kept: one render-texture pass instead of 3 to 4 (GPU, weak drivers). Stills: new against old under the noise floor. **Bloom every 2nd frame: not done**: at most 0.02 to 0.04 ms, and the glow would trail a moving camera by a frame |
+| DamageFx Graphics | main 0.58, DamageFx 0.090 | main 0.53, DamageFx 0.081 | Rings and boss charge rings/discs are particles in a `ParticlePool('add', 'rings')` (a true circle per pixel, one quad each, the ring's width carried in the particle's rotation); beams are two white quads (butt-ended strokes are rectangles); a hot chunk edge is its outline stroked once for its size, kept with the chunk. Only electric arcs are still drawn a frame. Shapes in the shared Graphics a frame: ~8 to ~0.4. Stills: identical at 4× zoom |
+| asteroid orbits | interpolate 0.253 (idle, 560 rocks) | 0.081 | `GameState.orbitFocus`: rocks within the view (plus 600) round the camera or round the pilot are placed every tick as before; the rest every 8 ticks in turn (`ORBIT_FAR_TICKS`). Under the map, hangar or menu only round the pilot. Checked: 40 rocks on screen, none ever stale |
+| HUD: context actions | 0.052 | 0.003 | The action targets are built only while an order is on (they were only read then) |
+| HUD under the map | Game.update 0.54 | 0.29 | NavMarkers do nothing while hidden (−0.085); the hidden world (`Renderer.update`) runs at 10 Hz with the time since, no lighting (−0.10); it's whole the frame the map lifts. The map's own canvas (0.49 ms JS + ~1.2 ms of the browser's canvas raster) is redrawn every frame on High; see the tiers |
+| `Lighting.levelAt` | 0.091 | 0.038 | Squared-distance reject before any square root (`Math.hypot` was the cost); the same in `fill`/`fillShades`. Results identical (max difference 0 over ~430 points) |
+| quality tiers (CPU) | Low = High on the CPU | Low 1.22 vs High 1.36 total (−11%) | New profile fields: `effectCap`, `hudEvery`, `minimapHz`, `mapEvery`, and `particles` now also thins DamageFx sparks/smoke/dust and WeaponFx impact sparks and smoke (not missile trails or exhaust). Medium/Low: damage particles capped 1,600/900, nav markers, damage indicators and floating rewards every 2nd frame, minimap 15/10 Hz, the system map redrawn every 2nd frame unless moved, zoomed or pointed at in the last 0.4 s. In the fight: damage particles 862 → 338, DamageFx −0.04, markers −0.03, indicators −0.03, rewards −0.013, Pixi main pass −0.04. High unchanged by construction. Far-ship detail not done: ShipRenderer is ~0.15 ms in all and what it could drop (guns, labels, bars) tells the player something |
+| particle shaders warmed | compiled on first effect | linked behind the sign-in | `particlePrograms()` (the sprite and ring programs) are in `gameShaders.ts`; checked linked before any effect drew |
+| 11 entity index (partly) | updateSounds 0.045, WeaponFx.update 0.074 | 0.036, 0.061 | `GameState.entities` is an `EntityMap`: each type kept in a set as entities come and go (`ofType`). Used for the shots (WeaponFx, sounds) and stations (DamageFx). The other full walks (renderEntities, NavMarkers' 150 ms list) are left |
+
+Not done (measured too small to justify, or a visual risk on High): 19 (`setDamage` 0.006 ms, turret tints 0.013), 23
+(minimap 0.01 to 0.02 ms at 20 Hz; the rate is now a tier knob), 12 (BitmapText labels would change how names look),
+24 (legacy mobs, rare), the rest of 5 (spawn and part-loss hitches, not steady-state cost; not measured here).

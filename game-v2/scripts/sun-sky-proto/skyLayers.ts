@@ -6,7 +6,7 @@
 
 import { skyBiome, type SkyBiome } from '../../client/src/rendering/sky/skyBiome';
 import { hazeFrag, skyVert, starsFrag } from '../../client/src/rendering/sky/skyShaders';
-import { SKY_LAYERS, SKY_DEPTH, MOTE_DEPTH, SKY_TILE, skySpriteUniforms, SKY_SPRITE_VERT, SKY_SPRITE_FRAG, SKY_DEEP_VERT, SKY_DEEP_FRAG, spriteGrid, insideRingOnly, ringBox } from '../../client/src/rendering/proto/skyProto';
+import { SKY_LAYERS, SKY_DEPTH, MOTE_DEPTH, SKY_TILE, skySpriteUniforms, SKY_SPRITE_VERT, SKY_SPRITE_FRAG, SKY_DEEP_VERT, SKY_DEEP_FRAG, spriteGrid, insideRingOnly, ringBox, withSunHole, sunHole, sunCovers, oneDrawGrid } from '../../client/src/rendering/proto/skyProto';
 import { SCREEN, toDesktop, type Layer, type Programs, type View } from './layers';
 
 const scaleAt = (zoom: number, depth: number) => 1 / (1 / zoom + depth);
@@ -40,19 +40,19 @@ export function hazeUniforms(b: SkyBiome, v: View, lens: number): Record<string,
 }
 
 /** The haze into its texture and stretched over the screen (the game's way; the cached prototype only changes how often) */
-function hazeLayers(b: SkyBiome, v: View, lens: number, hazeScale: number, program = 'haze.cur'): Layer[] {
+function hazeLayers(b: SkyBiome, v: View, lens: number, hazeScale: number, program = 'haze.cur', hole?: number[]): Layer[] {
   const scale = hazeScale / v.dpr;
   return [
-    { name: 'haze', program, uniforms: hazeUniforms(b, v, lens), textures: { uNoise: 'skyNoise' }, verts: SCREEN, blend: 'none', target: 'haze', scale },
+    { name: 'haze', program: hole ? 'haze.hole' : program, uniforms: { ...hazeUniforms(b, v, lens), uSunHole: hole ?? [0, 0, 0] }, textures: { uNoise: 'skyNoise' }, verts: SCREEN, blend: 'none', target: 'haze', scale },
     { name: 'haze.blit', blit: 'haze', blitScale: scale, blend: 'none' } as unknown as Layer,
   ];
 }
 
 /** The game's sky: haze, then the star shader over the whole screen */
-export function currentSkyLayers(b: SkyBiome, v: View, lens = 0, hazeScale = 0.5, layerOn = [true, true, true, true, true, true]): Layer[] {
+export function currentSkyLayers(b: SkyBiome, v: View, lens = 0, hazeScale = 0.5, layerOn = [true, true, true, true, true, true], hole?: number[]): Layer[] {
   return [
-    ...hazeLayers(b, v, lens, hazeScale),
-    { name: 'stars', program: 'stars.cur', uniforms: currentStarUniforms(b, v, lens, layerOn), textures: { uNoise: 'skyNoise' }, verts: SCREEN, blend: 'add' },
+    ...hazeLayers(b, v, lens, hazeScale, 'haze.cur', hole),
+    { name: 'stars', program: hole ? 'stars.hole' : 'stars.cur', uniforms: { ...currentStarUniforms(b, v, lens, layerOn), uSunHole: hole ?? [0, 0, 0] }, textures: { uNoise: 'skyNoise' }, verts: SCREEN, blend: 'add' },
   ];
 }
 
@@ -78,15 +78,19 @@ function currentStarUniforms(b: SkyBiome, v: View, lens: number, layerOn = [true
  * shader), then the deep sky and motes as one more; `better`: prototype C's star look. `hazeEveryFrame` false is the
  * cached haze: drawn once, then only its blit each frame (the bench times the blit alone).
  */
-export function spriteSkyLayers(b: SkyBiome, v: View, lens = 0, opts: { better?: boolean; haze?: 'drawn' | 'cached'; hazeScale?: number; only?: number } = {}): Layer[] {
+export function spriteSkyLayers(b: SkyBiome, v: View, lens = 0, opts: { better?: boolean; haze?: 'drawn' | 'cached'; hazeScale?: number; only?: number; hole?: number[]; oneDraw?: boolean } = {}): Layer[] {
   const better = !!opts.better;
   const prog = better ? 'sprite.better' : 'sprite';
   const out: Layer[] = [];
-  const hz = hazeLayers(b, v, lens, opts.hazeScale ?? 0.5, 'haze.cur');
+  const hz = hazeLayers(b, v, lens, opts.hazeScale ?? 0.5, 'haze.cur', opts.hole);
   if (opts.haze === 'cached') { (hz[0] as any).name = 'haze (cached: not timed)'; (hz[0] as any).untimed = true; }
   out.push(...hz);
-  const shared = skySpriteUniforms(b, v, lens);
-  SKY_LAYERS.forEach((_, i) => {
+  const shared = { ...skySpriteUniforms(b, v, lens), uSunHole: opts.hole ?? [0, 0, 0] };
+  if (opts.oneDraw) {
+    const g = oneDrawGrid(b, v, lens);
+    if (g) out.push({ name: 'stars (one draw)', program: better ? 'sprite1.better' : 'sprite1', uniforms: { ...shared, ...g.uniforms } as Layer['uniforms'], textures: { uNoise: 'skyNoise' }, verts: SCREEN, blend: 'add', instances: g.count });
+  }
+  else SKY_LAYERS.forEach((_, i) => {
     if (opts.only !== undefined && opts.only !== i) return;
     const g = spriteGrid(b, v, i, lens);
     if (!g) return;
@@ -99,7 +103,7 @@ export function spriteSkyLayers(b: SkyBiome, v: View, lens = 0, opts: { better?:
     const [x0, y0, x1, y1] = ring;
     const cx = (x: number) => x / (v.w / 2), cy = (y: number) => -y / (v.h / 2), u = (x: number) => x / v.w + 0.5, w = (y: number) => y / v.h + 0.5;
     const verts = [cx(x0), cy(y0), u(x0), w(y0), cx(x1), cy(y0), u(x1), w(y0), cx(x0), cy(y1), u(x0), w(y1), cx(x1), cy(y1), u(x1), w(y1)];
-    out.push({ name: 'stars (ring)', program: 'stars.ring', uniforms: currentStarUniforms(b, v, lens), textures: { uNoise: 'skyNoise' }, verts, blend: 'add' });
+    out.push({ name: 'stars (ring)', program: opts.hole ? 'stars.ring.hole' : 'stars.ring', uniforms: { ...currentStarUniforms(b, v, lens), uSunHole: opts.hole ?? [0, 0, 0] }, textures: { uNoise: 'skyNoise' }, verts, blend: 'add' });
   }
   if (deep) out.push({ name: 'deep+motes', program: 'deep', uniforms: { ...shared, ...deep.uniforms }, textures: { uNoise: 'skyNoise' }, verts: SCREEN, blend: 'add', instances: deep.count });
   return out;
@@ -112,10 +116,39 @@ export function skyPrograms(desktop = true): Programs {
     
     'stars.cur': { vert: skyVert, frag: starsFrag },
     'stars.ring': { vert: skyVert, frag: insideRingOnly(starsFrag) },
+    'haze.hole': { vert: skyVert, frag: withSunHole(hazeFrag) },
+    'stars.hole': { vert: skyVert, frag: withSunHole(starsFrag) },
+    'stars.ring.hole': { vert: skyVert, frag: withSunHole(insideRingOnly(starsFrag)) },
+    sprite1: { vert: SKY_SPRITE_VERT.replace('#version 300 es', '#version 300 es\n#define SKY_ONE_DRAW 1'), frag: SKY_SPRITE_FRAG },
+    'sprite1.better': { vert: better(SKY_SPRITE_VERT).replace('#version 300 es', '#version 300 es\n#define SKY_ONE_DRAW 1'), frag: better(SKY_SPRITE_FRAG) },
     sprite: { vert: SKY_SPRITE_VERT, frag: SKY_SPRITE_FRAG },
     'sprite.better': { vert: better(SKY_SPRITE_VERT), frag: better(SKY_SPRITE_FRAG) },
     deep: { vert: SKY_DEEP_VERT, frag: SKY_DEEP_FRAG },
   };
   if (desktop) for (const k of Object.keys(p)) p[k] = { vert: toDesktop(p[k].vert), frag: toDesktop(p[k].frag) };
   return p;
+}
+
+/** The star's opaque radius, as a share of its radius: inside it nothing behind the disc shows (the game's sun, and both prototypes) */
+export const OPAQUE = 0.95;
+
+/** Round 2's sky options, each by name: the faithful ones first, then the alternative look */
+export const SKY_OPTIONS = ['cur', 'cur+skip', 'sprite', 'sprite+skip', 'one+skip', 'better+skip'] as const;
+export const SKY_LABEL: Record<string, string> = {
+  cur: 'current', 'cur+skip': 'FAITHFUL: current, skipped under the sun', sprite: 'FAITHFUL: sprite stars (B)',
+  'sprite+skip': 'FAITHFUL: sprite stars, skipped under the sun', 'one+skip': 'FAITHFUL: sprite stars in one draw, skipped under the sun',
+  'better+skip': 'ALT: better stars (C), skipped under the sun',
+};
+
+/**
+ * A sky option for a view. "+skip": nothing at all when the star's disc (`starRadius`, 0 for none) covers the
+ * screen, and otherwise no work behind it (the shaders' early out, the sprites' cull).
+ */
+export function skyOption(option: string, b: SkyBiome, v: View, lens: number, starRadius: number): Layer[] {
+  const skip = option.endsWith('+skip') && starRadius > 0;
+  if (skip && sunCovers(v, starRadius * OPAQUE)) return [];
+  const hole = skip ? sunHole(v, starRadius * OPAQUE) : undefined;
+  const base = option.replace('+skip', '');
+  if (base === 'cur') return currentSkyLayers(b, v, lens, 0.5, undefined, hole);
+  return spriteSkyLayers(b, v, lens, { hole, better: base === 'better', oneDraw: base === 'one' || base === 'better' });
 }

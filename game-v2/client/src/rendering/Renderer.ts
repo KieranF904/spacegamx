@@ -384,7 +384,7 @@ export class Renderer {
     // Bloom over the world, under the UI (see Bloom.ts)
     this.bloom = new Bloom(app);
     this.bloom.add(this.weaponFx.glowLayer);
-    this.app.stage.addChild(this.bloom.sprite);
+    this.bloom.addTo(this.app.stage);
     this.app.stage.addChild(this.uiContainer);
     // The vignette under the rest of the UI
     this.uiContainer.addChild(this.vignette);
@@ -529,13 +529,18 @@ export class Renderer {
     this.renderDamageNumbers(delta);
     
     // Update minimap
-    if (performance.now() - this.minimapAt >= 50) {
+    if (performance.now() - this.minimapAt >= this.minimapMs) {
       this.minimapAt = performance.now();
       this.updateMinimap();
     }
     this.updateScreen();
-    // The 2D overlay canvases, in step with this frame
-    stepOverlays(delta);
+    // The 2D overlay canvases, in step with this frame (every few frames on the lower tiers)
+    this.overlayDelta += delta;
+    if (++this.overlayFrames >= this.hudEvery) {
+      stepOverlays(this.overlayDelta);
+      this.overlayDelta = 0;
+      this.overlayFrames = 0;
+    }
   }
 
   /** Screen-space extras: the vignette, and the death screen easing in */
@@ -566,6 +571,18 @@ export class Renderer {
   inView(x: number, y: number, r: number): boolean {
     const v = this.viewBox();
     return Math.abs(x - this.cameraX) <= v.hw + r && Math.abs(y - this.cameraY) <= v.hh + r;
+  }
+
+  /**
+   * Where asteroids must be exact this frame (GameState.orbitFocus): the view round the camera and round the pilot (the
+   * camera moves after the rocks are placed, and snaps to the pilot on a jump), with a margin; `shown` false (the world
+   * hidden under the map or the hangar): just round the pilot.
+   */
+  orbitFocus(px: number, py: number, shown: boolean, out: { cx: number; cy: number; px: number; py: number; hw: number; hh: number }): void {
+    const v = this.viewBox(), m = 600;
+    out.px = px; out.py = py;
+    if (shown) { out.cx = this.cameraX; out.cy = this.cameraY; out.hw = v.hw + m; out.hh = v.hh + m; }
+    else { out.cx = px; out.cy = py; out.hw = out.hh = 2000; }
   }
 
   /** Half-size (world units) of the box round the view, turned or not */
@@ -1830,12 +1847,20 @@ export class Renderer {
 
   /** Share of the small effect particles spawned (the quality setting) */
   private particleKeep = 1;
+  private minimapMs = 50;
+  /** The overlays are stepped every hudEvery frames, with the time since */
+  private hudEvery = 1;
+  private overlayFrames = 0;
+  private overlayDelta = 0;
 
   /** Apply a graphics quality tier (settings/quality.ts) */
   setQuality(q: QualityProfile): void {
     this.bloom.setQuality(q.bloomScale, q.bloomQuality);
     this.sky.setDetail(q.hazeScale, q.starLayers);
     this.particleKeep = q.particles;
+    this.weaponFx.particleKeep = q.particles;
+    this.minimapMs = 1000 / q.minimapHz;
+    this.hudEvery = q.hudEvery;
   }
 
   /** A layer of glowing things for the bloom */

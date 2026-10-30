@@ -49,7 +49,19 @@ class Harness:
         self.textures = {}
         for name, t in scenes['textures'].items():
             data = open(t['file'], 'rb').read()
-            tex = self.ctx.texture((t['w'], t['h']), 4, data)
+            if t.get('d'):
+                tex = self.ctx.texture3d((t['w'], t['h'], t['d']), 4, data)
+                tex.build_mipmaps()
+                tex.filter = (moderngl.LINEAR_MIPMAP_LINEAR, moderngl.LINEAR)
+                tex.repeat_x = tex.repeat_y = tex.repeat_z = True
+                self.textures[name] = tex
+                continue
+            if t.get('float'):
+                # (one channel of float32 on disk, uploaded as half floats: filterable everywhere, as in WebGL2)
+                data = np.frombuffer(data, np.float32).astype(np.float16).tobytes()
+                tex = self.ctx.texture((t['w'], t['h']), 1, data, dtype='f2')
+            else:
+                tex = self.ctx.texture((t['w'], t['h']), 4, data)
             if t.get('mip'):
                 tex.build_mipmaps()
                 tex.filter = (moderngl.LINEAR_MIPMAP_LINEAR, moderngl.LINEAR)
@@ -76,7 +88,9 @@ class Harness:
         if name not in prog:
             return
         u = prog[name]
-        if isinstance(v, list):
+        if isinstance(v, list) and v and isinstance(v[0], list):
+            u.write(np.array(v, np.float32).tobytes())
+        elif isinstance(v, list):
             u.value = tuple(v)
         else:
             u.value = v
@@ -235,6 +249,13 @@ def composite(out_dir, c):
     font = label_font(22)
     if title:
         draw.text((12, 10), title, fill=(230, 230, 235), font=label_font(26))
+    if c.get('metric'):
+        # How far each cell is from the first (the game's current look): mean absolute difference, 0..255 a channel
+        ref = np.asarray(imgs[0].convert('RGB'), np.float32)
+        for im, cell in zip(imgs[1:], c['cells'][1:]):
+            d = float(np.abs(np.asarray(im.convert('RGB'), np.float32) - ref).mean())
+            cell['label'] = f"{cell.get('label', '')}  (diff {d:.1f})"
+            cell['diff'] = round(d, 2)
     for k, (im, cell) in enumerate(zip(imgs, c['cells'])):
         x, y = (k % cols) * (cw + 4), top + (k // cols) * (ch + 4)
         sheet.paste(im, (x, y))
@@ -269,7 +290,8 @@ def main():
     for job in scenes['jobs']:
         print(json.dumps(h.run(job)), flush=True)
     for c in scenes.get('composites', []):
-        print(json.dumps({'composite': composite(out_dir, c)}), flush=True)
+        path = composite(out_dir, c)
+        print(json.dumps({'composite': path, 'diffs': {cell['file']: cell['diff'] for cell in c['cells'] if 'diff' in cell}}), flush=True)
     for g in scenes.get('gifs', []):
         print(json.dumps({'gif': gif(out_dir, g)}), flush=True)
     print(json.dumps({'done': round(time.perf_counter() - t0, 2)}), flush=True)

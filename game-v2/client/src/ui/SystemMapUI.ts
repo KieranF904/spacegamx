@@ -290,10 +290,12 @@ export class SystemMapUI {
 
     this.canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
+      this.touchedAt = performance.now();
       const r = this.canvas.getBoundingClientRect();
       this.zoomAt(e.clientX - r.left, e.clientY - r.top, Math.exp(-e.deltaY * 0.0015));
     }, { passive: false });
     this.canvas.addEventListener('mousedown', (e) => {
+      this.touchedAt = performance.now();
       const sys = this.view === 'system';
       if (sys && this.placeHook && e.button !== 1) {
         const w = this.eventWorld(e);
@@ -327,6 +329,7 @@ export class SystemMapUI {
     window.addEventListener('mousemove', (e) => {
       this.client = { x: e.clientX, y: e.clientY };
       if (!this.visible) return;
+      this.touchedAt = performance.now();
       const r = this.canvas.getBoundingClientRect();
       this.mouse = { x: e.clientX - r.left, y: e.clientY - r.top };
       if (this.placeHook && this.view === 'system') { const w = this.eventWorld(e); this.placeHook.move(w.x, w.y); }
@@ -357,6 +360,7 @@ export class SystemMapUI {
     });
     this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     window.addEventListener('keydown', (e) => {
+      if (this.visible) this.touchedAt = performance.now();
       if (this.visible && e.code === 'Escape') { this.hide(); e.stopPropagation(); }
       else if (this.visible && e.code === 'KeyC' && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) this.centreOnMe();
     }, true);
@@ -643,11 +647,24 @@ export class SystemMapUI {
   // Rendering
   // ============================================
 
+  /** Redrawn every this many frames while left alone (the quality tier: settings/quality.ts) */
+  private redrawEvery = 1;
+  private skipped = 0;
+  /** When it was last moved, zoomed or pointed at (redrawn every frame for a moment after) */
+  private touchedAt = 0;
+  setRedrawEvery(n: number): void {
+    this.redrawEvery = Math.max(1, n);
+  }
+
   private startLoop(): void {
     if (this.rafId !== null) cancelAnimationFrame(this.rafId);
+    this.skipped = this.redrawEvery;
     const loop = () => {
       if (!this.visible) return;
-      this.draw();
+      if (++this.skipped >= this.redrawEvery || performance.now() - this.touchedAt < 400) {
+        this.skipped = 0;
+        this.draw();
+      }
       this.rafId = requestAnimationFrame(loop);
     };
     this.rafId = requestAnimationFrame(loop);

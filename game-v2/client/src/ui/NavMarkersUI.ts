@@ -67,7 +67,11 @@ export class NavMarkersUI {
     document.body.appendChild(this.root);
   }
 
+  /** Hidden (under the map, the hangar, the menu): nothing to place */
+  private hidden = false;
+
   setHidden(hidden: boolean): void {
+    this.hidden = hidden;
     setStyle(this.root, 'display', hidden ? 'none' : 'block');
   }
 
@@ -135,6 +139,7 @@ export class NavMarkersUI {
   private avoidAt = -1e9;
 
   update(): void {
+    if (this.hidden) return;
     if (!this.enabled) { for (const el of this.pool) setStyle(el, 'display', 'none'); return; }
     const me = this.state.entities.get(this.state.playerId);
     if (!me) { for (const el of this.pool) setStyle(el, 'display', 'none'); return; }

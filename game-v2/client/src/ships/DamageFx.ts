@@ -16,12 +16,14 @@
  *
  * Particles live in world units and move per tick, like everything else.
  * The many small ones (sparks, glows, smoke) and the shield bubbles are pooled
- * sprites of painted textures; the few big shapes (rings, arcs, tumbling
- * chunks) are drawn as lines, which cost nothing while there are none.
+ * sprites of painted textures; rings and beams are particles too (rings worked
+ * out per pixel, see rendering/particlePool.ts), chunks are one shared shape
+ * placed, and a hot chunk's edge is its outline stroked once. Only electric
+ * arcs are drawn as lines a frame, which cost nothing while there are none.
  */
 
 import { clearIfDrawn } from '../rendering/gfx';
-import { Container, Graphics, GraphicsContext } from 'pixi.js';
+import { Container, Graphics, GraphicsContext, Texture } from 'pixi.js';
 import { ParticlePool } from '../rendering/particlePool';
 import { BUBBLE_RIM, DOT_SIZE, bubble, glowBall, puff, streak, streakScale } from '../rendering/fxTextures';
 import { EntityType, isRuined, lookFn, ServerContactMessage, ServerPartDestroyedMessage } from '@space-game/common';
@@ -41,6 +43,8 @@ interface P {
   rot: number; vr: number;
   /** Arcs: jagged points, regenerated as they flicker; beams: [dx, dy] to the far end */
   pts?: number[];
+  /** Chunks: the hot edge while it glows (its outline, stroked once for the chunk's size) */
+  hot?: Graphics;
 }
 
 interface Pending { at: number; run: () => void }
@@ -48,12 +52,19 @@ interface Pending { at: number; run: () => void }
 const MAX_PARTICLES = 2500;
 /** A debris chunk's outline, a unit across (scaled to each chunk's size) */
 const CHUNK = [-1, -0.6, 0.8, -0.8, 1, 0.5, -0.5, 1];
+/** A parked hot edge's (nothing) */
+const EMPTY = new GraphicsContext();
 
 export class DamageFx {
   private add = new Graphics();
   /** Redrawn every frame, so a render group of its own: Pixi rebuilds its draw list, not the whole glow layer's */
   private addGroup = new Container({ isRenderGroup: true });
   private addSprites = new ParticlePool('add');
+  /** Shockwave and charge rings, charge glows */
+  private rings = new ParticlePool('add', 'rings');
+  /** Chunks' hot edges: one per glowing chunk, kept for it (its outline stroked once), spares parked */
+  private hotLayer = new Container({ isRenderGroup: true });
+  private hotSpare: Graphics[] = [];
   private glowRoot = new Container();
   /** The additive layer: sparks, fire, flashes, shields (for the bloom) */
   get glowLayer(): Container { return this.glowRoot; }
@@ -72,13 +83,21 @@ export class DamageFx {
   private time = 0;
   private lastCrumbleSound = 0;
   private emberClock = 0;
+  /** Share of the sparks, smoke and dust made, and most particles alive (the quality setting) */
+  private keep = 1;
+  private cap = MAX_PARTICLES;
+  setQuality(keep: number, cap: number): void {
+    this.keep = keep;
+    this.cap = Math.min(MAX_PARTICLES, cap);
+  }
+
   /** Ships with a repair kit at work (glints like station repair) */
   readonly kitShips = new Set<number>();
 
   constructor(layer: Container, private source: ShipSource, private state: GameState, private sound: Sound, private repairRange: number) {
     this.add.blendMode = 'add';
     this.addGroup.addChild(this.add);
-    this.glowRoot.addChild(this.addSprites.container, this.addGroup);
+    this.glowRoot.addChild(this.addSprites.container, this.rings.container, this.hotLayer, this.addGroup);
     layer.addChild(this.smokeSprites.container, this.chunkLayer, this.glowRoot);
   }
 
@@ -469,7 +488,9 @@ export class DamageFx {
   // ---------------------------------------------------------------------------
 
   private push(p: P): void {
-    if (this.ps.length < MAX_PARTICLES) this.ps.push(p);
+    // (The lower quality tiers: fewer of the small ones, and fewer in all)
+    if (this.keep < 1 && (p.kind === 'spark' || p.kind === 'smoke' || p.kind === 'dust') && Math.random() > this.keep) return;
+    if (this.ps.length < this.cap) this.ps.push(p);
   }
 
   private spark(x: number, y: number, vx: number, vy: number, life: number, color: number): void {
@@ -629,12 +650,14 @@ export class DamageFx {
     this.fires(frames);
     this.addSprites.begin();
     this.smokeSprites.begin();
+    this.rings.begin();
     this.draw(frames);
     this.drawShields(frames);
     this.drawRipples(frames);
     this.drawCharges();
     this.addSprites.end();
     this.smokeSprites.end();
+    this.rings.end();
   }
 
   /** Flames licking off burning parts, and smoke and fire pouring off wrecked ones (a boss's ruined pieces) */
@@ -681,8 +704,8 @@ export class DamageFx {
       const k = Math.min(1, (this.time - c.start) / Math.max(0.01, c.until - c.start));
       const r = ship.derived.radius + 40;
       const color = c.kind === 'emp' ? 0x7dd3fc : c.kind === 'singularity' ? 0xc084fc : c.kind === 'prism_shard' ? 0xf0abfc : 0xffa04a;
-      g.circle(e.renderX, e.renderY, r * (2.2 - 1.2 * k)).stroke({ color, width: 2 + 6 * k, alpha: 0.25 + 0.6 * k });
-      g.circle(e.renderX, e.renderY, r * (0.4 + 0.5 * k)).fill({ color, alpha: 0.06 + 0.16 * k });
+      this.rings.ring(e.renderX, e.renderY, r * (2.2 - 1.2 * k), 2 + 6 * k, color, 0.25 + 0.6 * k);
+      this.rings.disc(e.renderX, e.renderY, r * (0.4 + 0.5 * k), color, 0.06 + 0.16 * k);
       if (Math.random() < 0.6) {
         const a = Math.random() * Math.PI * 2, d = r * (1.6 - k * 0.6);
         this.push({ kind: 'spark', x: e.renderX + Math.cos(a) * d, y: e.renderY + Math.sin(a) * d, vx: -Math.cos(a) * 5 + e.vx, vy: -Math.sin(a) * 5 + e.vy,
@@ -699,7 +722,7 @@ export class DamageFx {
     this.emberClock += dt;
     if (this.emberClock < 0.08) return;
     this.emberClock = 0;
-    const stations = [...this.state.entities.values()].filter((e) => e.type === EntityType.Station);
+    const stations = [...this.state.entities.ofType(EntityType.Station)];
     for (const [id, ship] of this.source.bodies) {
       const e = this.state.entities.get(id);
       if (!e) continue;
@@ -733,7 +756,10 @@ export class DamageFx {
     let w = 0, chunks = 0;
     for (const p of this.ps) {
       p.life += frames;
-      if (p.life >= p.max) continue;
+      if (p.life >= p.max) {
+        if (p.hot) this.coolEdge(p);
+        continue;
+      }
       const drag = Math.pow(p.drag, frames);
       p.vx *= drag; p.vy *= drag;
       p.x += p.vx * frames; p.y += p.vy * frames;
@@ -755,7 +781,7 @@ export class DamageFx {
           break;
         }
         case 'ring':
-          ga.circle(p.x, p.y, p.size).stroke({ color: p.color, width: 2 + 6 * fade, alpha: p.alpha * fade });
+          this.rings.ring(p.x, p.y, p.size, 2 + 6 * fade, p.color, p.alpha * fade);
           break;
         case 'smoke':
         case 'dust': {
@@ -772,20 +798,20 @@ export class DamageFx {
           body.alpha = Math.min(1, fade * 2);
           // Glowing hot for the first moments
           if (k < 0.35) {
-            const c = Math.cos(p.rot), sn = Math.sin(p.rot), pts: number[] = [];
-            for (let i = 0; i < CHUNK.length; i += 2) {
-              const u = CHUNK[i] * s, v = CHUNK[i + 1] * s;
-              pts.push(p.x + u * c - v * sn, p.y + u * sn + v * c);
-            }
-            ga.poly(pts).stroke({ color: 0xff9a4a, width: 1.5, alpha: (1 - k / 0.35) * 0.9 });
-          }
+            const hot = p.hot ?? this.hotEdge(p);
+            hot.position.set(p.x, p.y);
+            hot.rotation = p.rot;
+            hot.alpha = (1 - k / 0.35) * 0.9;
+          } else if (p.hot) this.coolEdge(p);
           break;
         }
         case 'beam': {
           // A soft wide glow round a hot core, both thinning as it fades
+          // (Two straight strokes with butt ends, as they were drawn: rectangles along the beam)
           const [bx, by] = p.pts!;
-          ga.moveTo(p.x, p.y).lineTo(p.x + bx, p.y + by).stroke({ color: p.color, width: p.size * (0.4 + fade) * 1.6, alpha: 0.35 * fade });
-          ga.moveTo(p.x, p.y).lineTo(p.x + bx, p.y + by).stroke({ color: 0xffffff, width: p.size * 0.35 * (0.3 + fade), alpha: fade });
+          const len = Math.hypot(bx, by), a = Math.atan2(by, bx), mx = p.x + bx / 2, my = p.y + by / 2;
+          this.addSprites.take(Texture.WHITE, mx, my, 0.5, 0.5, p.color, 0.35 * fade, a, len, p.size * (0.4 + fade) * 1.6);
+          this.addSprites.take(Texture.WHITE, mx, my, 0.5, 0.5, 0xffffff, fade, a, len, p.size * 0.35 * (0.3 + fade));
           break;
         }
         case 'arc': {
@@ -805,6 +831,27 @@ export class DamageFx {
       this.chunkBodies[i].scale.set(0);
     }
     this.chunksDrawn = chunks;
+  }
+
+  /** A glowing chunk's hot edge: its outline, stroked 1.5 wide at its size (scaled with it, so the width is in world units) */
+  private hotEdge(p: P): Graphics {
+    const g = this.hotSpare.pop() ?? this.hotLayer.addChild(new Graphics());
+    g.blendMode = 'add';
+    g.context = new GraphicsContext().poly(CHUNK).stroke({ color: 0xff9a4a, width: 1.5 / p.size });
+    g.scale.set(p.size);
+    p.hot = g;
+    return g;
+  }
+
+  /** The chunk has cooled (or gone): its edge parked for the next */
+  private coolEdge(p: P): void {
+    const g = p.hot!;
+    p.hot = undefined;
+    const ctx = g.context;
+    g.context = EMPTY;
+    ctx.destroy();
+    g.alpha = 0;
+    this.hotSpare.push(g);
   }
 
   /** The i-th chunk body this frame (made the first time there are that many) */

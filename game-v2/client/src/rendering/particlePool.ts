@@ -76,7 +76,65 @@ void main(void){
 }
 `;
 
+/**
+ * Rings (shockwaves, charge rings, filled discs): one quad each, the band worked out per pixel, a true circle with a
+ * pixel's soft edge (as the stroked circles drawn before looked under MSAA). Rings don't turn, so the particle's rotation
+ * carries the band's width; its radius is what's left of the quad's half size (the quad is a ring's outer edge plus RING_PAD).
+ */
+const RING_PAD = 6;
+
+const ringVertex = `
+attribute vec2 aVertex;
+attribute vec2 aUV;
+attribute vec4 aColor;
+attribute vec2 aPosition;
+attribute float aRotation;
+
+uniform mat3 uTranslationMatrix;
+uniform vec2 uResolution;
+uniform vec4 uColor;
+
+varying vec2 vLocal;
+varying vec4 vColor;
+varying float vRadius;
+varying float vHalfWidth;
+varying float vPixels;
+
+void main(void){
+    gl_Position = vec4((uTranslationMatrix * vec3(aVertex + aPosition, 1.0)).xy, 0.0, 1.0);
+    // Pixels a world unit (clip space is 2 across the target's pixels)
+    vPixels = length(uTranslationMatrix[0].xy) * 0.5 * uResolution.x;
+    // (aUV unused, but read: Pixi warns of an attribute the program doesn't have)
+    vLocal = aVertex + aUV * 0.0;
+    vHalfWidth = aRotation * 0.5;
+    vRadius = abs(aVertex.x) - vHalfWidth - ${RING_PAD.toFixed(1)};
+    vColor = vec4(aColor.rgb * aColor.a, aColor.a) * uColor;
+}
+`;
+
+const ringFragment = `
+varying vec2 vLocal;
+varying vec4 vColor;
+varying float vRadius;
+varying float vHalfWidth;
+varying float vPixels;
+
+void main(void){
+    // Distance outside the band, in pixels
+    float e = (abs(length(vLocal) - vRadius) - vHalfWidth) * vPixels;
+    gl_FragColor = vColor * clamp(0.5 - e, 0.0, 1.0);
+}
+`;
+
 let program: GlProgram | null = null;
+let ringProgram: GlProgram | null = null;
+
+/** The pools' shader programs (for the shader warm-up: see rendering/gameShaders.ts) */
+export function particlePrograms(): GlProgram[] {
+  program ??= GlProgram.from({ vertex, fragment, name: 'particle-pool' });
+  ringProgram ??= GlProgram.from({ vertex: ringVertex, fragment: ringFragment, name: 'particle-rings' });
+  return [program, ringProgram];
+}
 
 export class ParticlePool {
   readonly container = new Container({ isRenderGroup: true });
@@ -89,7 +147,8 @@ export class ParticlePool {
   private drawn = 0;
   private spare: Particle[] = [];
 
-  constructor(private blendMode: 'add' | 'normal' = 'normal') {}
+  /** `rings`: a pool of rings and discs (`ring`, `disc`), not of textured particles */
+  constructor(private blendMode: 'add' | 'normal' = 'normal', private shape: 'sprites' | 'rings' = 'sprites') {}
 
   begin(): void {
     this.used = 0;
@@ -118,6 +177,17 @@ export class ParticlePool {
     p.color = ((tint & 0xff) << 16) + (tint & 0xff00) + ((tint >> 16) & 0xff) + (((a * 255) | 0) << 24);
   }
 
+  /** A ring (rings pools): centre (x, y), `r` to the middle of its band, `width` across, tinted and faded */
+  ring(x: number, y: number, r: number, width: number, tint: number, alpha: number): void {
+    const size = 2 * (r + width / 2 + RING_PAD);
+    this.take(Texture.WHITE, x, y, 0.5, 0.5, tint, alpha, width, size, size);
+  }
+
+  /** A filled disc of radius `r` (rings pools) */
+  disc(x: number, y: number, r: number, tint: number, alpha: number): void {
+    this.ring(x, y, r / 2, r, tint, alpha);
+  }
+
   end(): void {
     const pc = this.pc;
     if (!pc) return;
@@ -132,10 +202,10 @@ export class ParticlePool {
 
   /** The container, the first time anything's taken (its texture is the first one's) */
   private make(texture: Texture): ParticleContainer {
-    program ??= GlProgram.from({ vertex, fragment, name: 'particle-pool' });
+    const [sprites, rings] = particlePrograms();
     const white = Texture.WHITE.source;
     this.shader = new Shader({
-      glProgram: program,
+      glProgram: this.shape === 'rings' ? rings : sprites,
       resources: {
         // (uTexture and uniforms are set by Pixi's particle pipe as it draws)
         uTexture: white,

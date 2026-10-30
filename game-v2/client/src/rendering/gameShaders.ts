@@ -14,6 +14,7 @@ import { shipHullProgram } from './lighting/ShipBatch';
 import { asteroidPrograms } from './lighting/AsteroidBatch';
 import { stationProgram } from './stations/StationMaterials';
 import { nestProgram } from './nests/nestShader';
+import { particlePrograms } from './particlePool';
 
 const styleIndex = (styles: { id: string }[], id: string | undefined, fallback: string) =>
   Math.max(0, styles.findIndex((s) => s.id === (id ?? fallback)));
@@ -41,7 +42,7 @@ export function gameShaders(renderer: Renderer, signIn: Container | null, stage:
   // (The world's sun is on its placeholder style until a system's visuals come: the systems' own styles are below)
   const world = programsUnder(stage).filter((p) => !isSunProgram(p));
   // (litProgram(2): a single lit object's, a station's before its bake or a stillstone)
-  for (const p of [...skyPrograms(), ...world, ...pipePrograms(renderer), shipHullProgram(), stationProgram(), litProgram(2), ...asteroidPrograms(), nestProgram(), planetProgram(), ...sunPrograms(systems)]) {
+  for (const p of [...skyPrograms(), ...world, ...pipePrograms(renderer), shipHullProgram(), stationProgram(), litProgram(2), ...asteroidPrograms(), ...particlePrograms(), nestProgram(), planetProgram(), ...sunPrograms(systems)]) {
     if (!out.includes(p)) out.push(p);
   }
   return out;

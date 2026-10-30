@@ -23,11 +23,23 @@
   <div id="panel">
     <div class="row"><label>System</label><select id="system"></select></div>
     <div class="row"><label>Sun</label><select id="sun">
-      <option value="cur">current</option><option value="port">A: port (texture noise)</option>
-      <option value="photo" selected>B: photosphere</option><option value="lite">B-lite (low tier)</option>
+      <option value="cur">current</option>
+      <optgroup label="Faithful (the current look, cheaper)">
+        <option value="port">A: port (texture noise)</option><option value="exact">A-exact (baked simplex)</option>
+        <option value="cur@0.5">current, half res</option><option value="exact@0.5" selected>A-exact, half res</option><option value="exact@0.33">A-exact, third res</option>
+      </optgroup>
+      <optgroup label="Alternative (new looks)">
+        <option value="plasma">plasma</option><option value="plasma.lite">plasma lite</option><option value="plasma@0.5">plasma, half res</option>
+        <option value="photo">B: photosphere (round 1)</option><option value="lite">B-lite (round 1)</option>
+      </optgroup>
     </select></div>
     <div class="row"><label>Sky</label><select id="sky">
-      <option value="cur">current</option><option value="sprite" selected>B: sprite stars</option><option value="better">C: sprite stars, better look</option>
+      <option value="cur">current</option>
+      <optgroup label="Faithful">
+        <option value="cur+skip">current, skipped under the sun</option><option value="sprite">sprite stars (B)</option>
+        <option value="sprite+skip">sprite stars, skipped under the sun</option><option value="one+skip" selected>sprite stars, one draw, skipped under the sun</option>
+      </optgroup>
+      <optgroup label="Alternative"><option value="better+skip">better stars (C), skipped under the sun</option></optgroup>
     </select></div>
     <div class="row"><label>View</label><select id="view">
       <option value="whole">whole (zoom 0.04)</option><option value="limb" selected>limb (zoom 0.15)</option>

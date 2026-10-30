@@ -198,26 +198,28 @@ export class Lighting {
 
   /** Light falling on an up-facing point (for things tinted rather than lit per vertex), 0..1.6 per channel */
   levelAt(x: number, y: number, out: Rgb = [0, 0, 0]): Rgb {
-    const [ar, ag, ab] = this.enabled ? this.ambient : [1, 1, 1];
-    out[0] = ar; out[1] = ag; out[2] = ab;
-    if (!this.enabled) return out;
-    const s = this.sun;
-    const d2 = (s.x - x) ** 2 + (s.y - y) ** 2;
-    const k = (s.power / (1 + d2 / (s.falloff * s.falloff))) * Math.sin(s.elevation);
-    out[0] += s.color[0] * k; out[1] += s.color[1] * k; out[2] += s.color[2] * k;
-    for (const l of this.merged) {
-      const dd = Math.hypot(l.x - x, l.y - y);
-      if (dd >= l.radius) continue;
+    if (!this.enabled) { out[0] = out[1] = out[2] = 1; return out; }
+    const am = this.ambient, s = this.sun;
+    const sx = s.x - x, sy = s.y - y;
+    const k = (s.power / (1 + (sx * sx + sy * sy) / (s.falloff * s.falloff))) * Math.sin(s.elevation);
+    let r = am[0] + s.color[0] * k, g = am[1] + s.color[1] * k, b = am[2] + s.color[2] * k;
+    const merged = this.merged;
+    for (let i = 0; i < merged.length; i++) {
+      const l = merged[i];
+      // (Out of reach on the square first: most lights are, and a square root per light per ship adds up)
+      const lx = x - l.x, ly = y - l.y, d2 = lx * lx + ly * ly;
+      if (d2 >= l.radius * l.radius) continue;
+      const dd = Math.sqrt(d2);
       let a = 1 - dd / l.radius;
-      a *= a * l.power * (l.height / Math.hypot(dd, l.height));
+      a *= a * l.power * (l.height / Math.sqrt(d2 + l.height * l.height));
       if (l.cosOuter > -1.5 && dd > 1) {
-        const c = ((x - l.x) * l.dx + (y - l.y) * l.dy) / dd;
+        const c = (lx * l.dx + ly * l.dy) / dd;
         const t = Math.max(0, Math.min(1, (c - l.cosOuter) / (l.cosInner - l.cosOuter)));
         a *= t * t * (3 - 2 * t);
       }
-      out[0] += l.r * a; out[1] += l.g * a; out[2] += l.b * a;
+      r += l.r * a; g += l.g * a; b += l.b * a;
     }
-    for (let i = 0; i < 3; i++) out[i] = Math.min(1.6, out[i]);
+    out[0] = Math.min(1.6, r); out[1] = Math.min(1.6, g); out[2] = Math.min(1.6, b);
     return out;
   }
 
@@ -255,7 +257,8 @@ export class Lighting {
     const pick = this.pick;
     pick.length = 0;
     for (const l of this.merged) {
-      if (Math.hypot(l.x - cx, l.y - cy) < l.radius + cr) pick.push(l);
+      const dx = l.x - cx, dy = l.y - cy, reach = l.radius + cr;
+      if (dx * dx + dy * dy < reach * reach) pick.push(l);
     }
     if (pick.length > MAX_LIGHTS) pick.sort((a, b) => b.power * b.radius - a.power * a.radius);
     const n = Math.min(MAX_LIGHTS, pick.length);
@@ -273,8 +276,8 @@ export class Lighting {
     const u = lm.uniforms, pick = this.shadePick;
     pick.length = 0;
     if (!lm.chunk) for (let i = 0; i < this.shadeCount; i++) {
-      const d = this.shades[i];
-      if (Math.hypot(d.x - cx, d.y - cy) < d.r + cr) pick.push(d);
+      const d = this.shades[i], dx = d.x - cx, dy = d.y - cy, reach = d.r + cr;
+      if (dx * dx + dy * dy < reach * reach) pick.push(d);
     }
     if (pick.length > MAX_SHADES) pick.sort((a, b) => Math.hypot(a.x - cx, a.y - cy) - a.r - (Math.hypot(b.x - cx, b.y - cy) - b.r));
     const n = Math.min(MAX_SHADES, pick.length);

@@ -7,7 +7,7 @@
 
 import { hashString, mulberry32 } from '@space-game/common';
 import { sunShaderDefs } from '../../common/src/data/definitions/SunShaderDefs';
-import { sunPhotoLook, withTextureNoise, SUN_PHOTO_FRAG, SUN_PHOTO_VERT } from '../../client/src/rendering/proto/sunProto';
+import { plasmaLook, sunPhotoLook, withExactNoise, withTextureNoise, PLASMA_FRAG, SUN_PHOTO_FRAG, SUN_PHOTO_VERT } from '../../client/src/rendering/proto/sunProto';
 
 export interface Sources {
   sunVert: string; sunFrag: string;
@@ -94,10 +94,13 @@ function sunDefaults(): Record<string, number | number[]> {
   };
 }
 
-/** The game's star for `id` (a plain sun: glow, corona rays, the disc), as Renderer sets it up; `port` reads noise from the texture */
-export function currentSunLayers(id: string, cb: CentralBody, v: View, port = false): Layer[] {
-  const tag = port ? 'port' : 'cur';
-  const tex = port ? { uNoiseTex: 'sunNoise' } : undefined;
+/**
+ * The game's star for `id` (a plain sun: glow, corona rays, the disc), as Renderer sets it up; its noise computed (as in
+ * the game), or read from the noise texture (`port`, A) or from the baked simplex (`exact`, A-exact)
+ */
+export function currentSunLayers(id: string, cb: CentralBody, v: View, noise: boolean | 'port' | 'exact' = false): Layer[] {
+  const tag = noise === true || noise === 'port' ? 'port' : noise === 'exact' ? 'exact' : 'cur';
+  const tex = tag === 'port' ? { uNoiseTex: 'sunNoise' } : tag === 'exact' ? { uSimplexTex: 'simplex' } : undefined;
   const lod = lodOf(v.zoom);
   const layers: Layer[] = [];
   const R = cb.detailStar ? cb.detailParams?.radius ?? cb.radius ?? 1000 : cb.radius ?? 1000;
@@ -187,6 +190,19 @@ export function currentSunLayers(id: string, cb: CentralBody, v: View, port = fa
   return layers;
 }
 
+/**
+ * Layers drawn into a render target `scale` the size of the screen (cleared first), then stretched over it with the
+ * premultiplied blend: the star at half (or less) resolution. Its own detail is far coarser than a pixel at every zoom,
+ * so the picture barely changes and the shading cost drops with the pixel count.
+ */
+export function atScale(layers: Layer[], scale: number, target = 'sunrt'): Layer[] {
+  if (!layers.length) return layers;
+  return [
+    ...layers.map((l, i) => ({ ...l, target, scale, clearTarget: i === 0 })),
+    { name: `${target}.blit`, blit: target, blitScale: scale, blend: 'normal' } as unknown as Layer,
+  ];
+}
+
 /** Prototype B for the same star: one quad, ±reach radii (`lite`: the low tier) */
 export function photoSunLayers(id: string, cb: CentralBody, v: View, lite = false): Layer[] {
   const look = sunPhotoLook(id, cb, v.t, v.zoom);
@@ -194,6 +210,27 @@ export function photoSunLayers(id: string, cb: CentralBody, v: View, lite = fals
   const h = R * look.reach;
   if (!onScreen(v, 0, 0, h, h)) return [];
   return [{ name: 'sun', program: lite ? 'photo.lite' : 'photo', blend: 'normal', textures: { uNoiseTex: 'sunNoise' }, verts: worldQuad(v, 0, 0, h, h), uniforms: look.uniforms }];
+}
+
+/** The plasma star (round 2's alternative) for the same star: one quad, ±reach radii (`lite`: the low tier) */
+export function plasmaSunLayers(id: string, cb: CentralBody, v: View, lite = false): Layer[] {
+  const R = cb.detailParams?.radius ?? cb.radius ?? 1000;
+  const look = plasmaLook(id, cb, v.t, R * v.zoom);
+  const h = R * look.reach;
+  if (!onScreen(v, 0, 0, h, h)) return [];
+  return [{ name: 'sun', program: lite ? 'plasma.lite' : 'plasma', blend: 'normal', textures: { uNoise3: 'noise3' }, verts: worldQuad(v, 0, 0, h, h), uniforms: look.uniforms }];
+}
+
+/**
+ * A sun option by name: a look, then optionally `@scale` to draw it into a render target that size and stretch it.
+ * Looks: cur (the game's), port (A), exact (A-exact), photo and lite (B, round 1), plasma and plasma.lite (round 2).
+ */
+export function sunVariantLayers(id: string, cb: CentralBody, v: View, variant: string): Layer[] {
+  const [look, scale] = variant.split('@');
+  const layers = look === 'cur' || look === 'port' || look === 'exact' ? currentSunLayers(id, cb, v, look === 'cur' ? false : look)
+    : look.startsWith('plasma') ? plasmaSunLayers(id, cb, v, look === 'plasma.lite')
+    : photoSunLayers(id, cb, v, look === 'lite');
+  return scale ? atScale(layers, Number(scale)) : layers;
 }
 
 /** CentralBodyShaders for a black hole, pulsar or brown dwarf (`port`: noise from the texture) */
@@ -228,9 +265,14 @@ export function sunPrograms(src: Sources, desktop = true): Programs {
     'glow.cur': { vert: src.glowVert, frag: src.glowFrag },
     // (the glow's own noise is a cheap value noise, left as it is)
     'glow.port': { vert: src.glowVert, frag: src.glowFrag },
+    'sun.exact': { vert: src.sunVert, frag: withExactNoise(src.sunFrag) },
+    'glow.exact': { vert: src.glowVert, frag: src.glowFrag },
+    'rays.exact': { vert: src.raysVert, frag: withExactNoise(src.raysFrag) },
     'rays.cur': { vert: src.raysVert, frag: src.raysFrag },
     'rays.port': { vert: src.raysVert, frag: withTextureNoise(src.raysFrag) },
     photo: { vert: SUN_PHOTO_VERT, frag: SUN_PHOTO_FRAG },
+    plasma: { vert: SUN_PHOTO_VERT, frag: PLASMA_FRAG },
+    'plasma.lite': { vert: SUN_PHOTO_VERT, frag: PLASMA_FRAG.replace('#version 300 es', '#version 300 es\n  #define PLASMA_LITE 1') },
     'photo.lite': { vert: SUN_PHOTO_VERT, frag: SUN_PHOTO_FRAG.replace('#version 300 es', '#version 300 es\n  #define SUN_PHOTO_LITE 1') },
   };
   for (const n of ['BLACK_HOLE', 'PULSAR', 'BROWN_DWARF'] as const) {

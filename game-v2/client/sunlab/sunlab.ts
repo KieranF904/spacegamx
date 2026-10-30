@@ -11,10 +11,11 @@ import centralText from '../src/rendering/CentralBodyShaders.ts?raw';
 import quadText from '../src/rendering/shaderQuad.ts?raw';
 import { GLSL_COMMON } from '../src/rendering/shaderQuad';
 import { skyNoiseTexture } from '../src/rendering/sky/noiseTexture';
-import { sunNoiseData, SUN_NOISE_SIZE } from '../src/rendering/proto/protoNoise';
+import { bakeSimplex, noise3Data, NOISE3_SIZE, sunNoiseData, SUN_NOISE_SIZE } from '../src/rendering/proto/protoNoise';
+import { EXACT_SIZE, EXACT_UNITS } from '../src/rendering/proto/sunProto';
 import systemsJson from '../../data/systems.json';
-import { centralLayers, currentSunLayers, photoSunLayers, sourcesFrom, sunPrograms, type CentralBody, type Layer, type View } from '../../scripts/sun-sky-proto/layers';
-import { currentSkyLayers, skyPrograms, spriteSkyLayers, systemBiome } from '../../scripts/sun-sky-proto/skyLayers';
+import { centralLayers, sourcesFrom, sunPrograms, sunVariantLayers, type CentralBody, type Layer, type View } from '../../scripts/sun-sky-proto/layers';
+import { skyOption, skyPrograms, systemBiome } from '../../scripts/sun-sky-proto/skyLayers';
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, premultipliedAlpha: true })!;
@@ -67,7 +68,33 @@ function texture(data: Uint8Array, size: number): WebGLTexture {
   return t;
 }
 const skySrc = skyNoiseTexture().source as unknown as { resource: Uint8Array; width: number };
+/** The baked simplex (A-exact): one float channel, linear, clamped (its shader mirrors the coordinate) */
+function floatTexture(data: Float32Array, size: number): WebGLTexture {
+  const t = gl.createTexture()!;
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.R16F, size, size, 0, gl.RED, gl.FLOAT, data);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return t;
+}
+/** The plasma star's noise volume: repeat, trilinear with mipmaps */
+function volume(data: Uint8Array, size: number): WebGLTexture {
+  const t = gl.createTexture()!;
+  gl.bindTexture(gl.TEXTURE_3D, t);
+  gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA8, size, size, size, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+  gl.generateMipmap(gl.TEXTURE_3D);
+  gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+  gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  for (const w of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T, gl.TEXTURE_WRAP_R]) gl.texParameteri(gl.TEXTURE_3D, w, gl.REPEAT);
+  return t;
+}
 const textures: Record<string, WebGLTexture> = { sunNoise: texture(sunNoiseData(), SUN_NOISE_SIZE), skyNoise: texture(skySrc.resource, skySrc.width) };
+// (made on first use: the simplex bake takes a few hundred ms)
+const lazyTextures: Record<string, () => WebGLTexture> = { simplex: () => floatTexture(bakeSimplex(EXACT_SIZE, EXACT_UNITS), EXACT_SIZE) };
+const volumes: Record<string, () => WebGLTexture> = { noise3: () => volume(noise3Data(), NOISE3_SIZE) };
+const made3: Record<string, WebGLTexture> = {};
 
 /** Render targets by name (the haze's), remade at a new size */
 const targets = new Map<string, { fb: WebGLFramebuffer; tex: WebGLTexture; w: number; h: number }>();
@@ -99,7 +126,12 @@ function draw(layer: Layer & { blit?: string; blitScale?: number }, w: number, h
   gl.useProgram(p);
   if (layer.blend === 'none') gl.disable(gl.BLEND);
   else { gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, layer.blend === 'add' ? gl.ONE : gl.ONE_MINUS_SRC_ALPHA); }
-  if (layer.target) { const t = target(layer.target, ...size(layer.scale ?? 1)); gl.bindFramebuffer(gl.FRAMEBUFFER, t.fb); gl.viewport(0, 0, t.w, t.h); }
+  if (layer.target) {
+    const t = target(layer.target, ...size(layer.scale ?? 1));
+    gl.bindFramebuffer(gl.FRAMEBUFFER, t.fb);
+    gl.viewport(0, 0, t.w, t.h);
+    if (layer.clearTarget) { gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); }
+  }
   else { gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, w, h); }
   const verts = layer.blit ? [-1, -1, 0, 0, 1, -1, 1, 0, -1, 1, 0, 1, 1, 1, 1, 1] : layer.verts;
   gl.bindVertexArray(vao);
@@ -124,13 +156,15 @@ function draw(layer: Layer & { blit?: string; blitScale?: number }, w: number, h
       const loc = gl.getUniformLocation(p, name);
       if (!loc) continue;
       if (typeof v === 'number') gl.uniform1f(loc, v);
+      else if (Array.isArray(v[0])) gl.uniform4fv(loc, (v as unknown as number[][]).flat());
       else if (v.length === 2) gl.uniform2fv(loc, v);
       else if (v.length === 3) gl.uniform3fv(loc, v);
       else gl.uniform4fv(loc, v);
     }
     Object.entries(layer.textures ?? {}).forEach(([sampler, name], i) => {
       gl.activeTexture(gl.TEXTURE0 + i);
-      gl.bindTexture(gl.TEXTURE_2D, textures[name]);
+      if (volumes[name]) gl.bindTexture(gl.TEXTURE_3D, made3[name] ??= volumes[name]());
+      else gl.bindTexture(gl.TEXTURE_2D, textures[name] ??= lazyTextures[name]());
       gl.uniform1i(gl.getUniformLocation(p, sampler), i);
     });
   }
@@ -199,11 +233,11 @@ function frame(now: number): void {
   const sunKind = held ? 'cur' : $<HTMLSelectElement>('sun').value;
   const skyKind = held ? 'cur' : $<HTMLSelectElement>('sky').value;
   const biome = systemBiome(s);
-  const sky = skyKind === 'cur' ? currentSkyLayers(biome, v, lens) : spriteSkyLayers(biome, v, lens, { better: skyKind === 'better' });
   const plain = cb.type === 'sun';
-  const star = plain
-    ? (sunKind === 'cur' || sunKind === 'port' ? currentSunLayers(s.id, cb, v, sunKind === 'port') : photoSunLayers(s.id, cb, v, sunKind === 'lite'))
-    : centralLayers(cb, v, sunKind === 'port');
+  const R = plain ? cb.detailParams?.radius ?? cb.radius ?? 1000 : 0;
+  const sky = skyOption(skyKind, biome, v, lens, R);
+  // (black holes, the pulsar and the brown dwarf keep their own shaders in every option)
+  const star = plain ? sunVariantLayers(s.id, cb, v, sunKind) : centralLayers(cb, v, false);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0, 0, w, h);
   gl.clearColor(0, 0, 0, 1);
@@ -213,7 +247,7 @@ function frame(now: number): void {
   collect();
   $('stats').textContent = `${w}×${h}  ${fps.toFixed(0)} fps  zoom ${zoom.toFixed(3)}\n`
     + (timer ? `GPU  sky ${gpu.sky.toFixed(3)} ms   star ${gpu.sun.toFixed(3)} ms` : 'GPU timer queries not available in this browser')
-    + `\nshowing  sun: ${plain || sunKind !== 'port' ? sunKind : 'port'}   sky: ${skyKind}${held ? '  (Space: current)' : ''}`;
+    + `\nshowing  sun: ${plain ? sunKind : 'its own shader'}   sky: ${skyKind}${held ? '  (Space: current)' : ''}`;
   requestAnimationFrame(frame);
 }
 /**

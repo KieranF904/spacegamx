@@ -41,6 +41,7 @@ import type { PilotState } from '../econ/clientEcon';
 import type { ThrustCommand } from './ThrusterFx';
 import { settings } from '../settings/Settings';
 import { boundKeyName } from '../input/keybindings';
+import type { QualityProfile } from '../settings/quality';
 
 /** A pulse laser's sound by its grade, Mk I-V: subtle, and centred low (the wide Mk IV deepest, the x-ray Mk V a touch brighter) */
 const PULSE_GRADE_PITCH = [0.98, 0.94, 1.01, 0.9, 1.04];
@@ -301,6 +302,13 @@ export class ShipClient {
     return jumpPhase(JumpFx.counter(e, false), this.jump).phase === 'burn';
   }
 
+  /** The graphics tier's effect settings (kept for the effects made at init) */
+  private quality: Pick<QualityProfile, 'particles' | 'effectCap'> = { particles: 1, effectCap: Infinity };
+  setQuality(q: QualityProfile): void {
+    this.quality = q;
+    this.damageFx?.setQuality(q.particles, q.effectCap);
+  }
+
   init(app: Application, renderer: Renderer): void {
     void app;
     this.scene = renderer;
@@ -328,6 +336,7 @@ export class ShipClient {
     this.zoom = () => renderer.getZoom();
     this.damageFx = new DamageFx(renderer.getEffectLayer(), this.store, this.opts.state,
       (id, at, volume) => { this.opts.sound?.(id, at, volume); }, this.opts.tuning.repair?.range ?? 0);
+    this.damageFx.setQuality(this.quality.particles, this.quality.effectCap);
     this.bossFx = new BossFx(renderer.getEffectLayer(), this.opts.state, (id, at, volume, pitch) => this.opts.sound?.(id, at, volume, pitch) ?? null);
     // What glows gets bloom
     for (const c of [...this.renderer.glowLayers(), this.damageFx.glowLayer, this.beamFx.glowLayer, this.bossFx.glowLayer]) renderer.addBloomSource(c);

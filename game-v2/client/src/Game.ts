@@ -229,6 +229,13 @@ export class Game {
   private autoQuality = new AutoQuality();
   /** A full-screen window (hangar, menu) hides the world: it isn't updated or drawn until this is set again (a resize, a setting changed) or the window closes */
   private worldPaused = false;
+  /** The shots in the world this frame (updateSounds; reused) */
+  private shotsAlive = new Set<number>();
+  /** The nav markers are placed every hudEvery frames (the quality tier) */
+  private hudEvery = 1;
+  private navFrames = 0;
+  /** Time since the world was last updated under the map (see update) */
+  private coveredDelta = 0;
   private refreshWorld = false;
   private lastFrameTime = 0;
   private frameCount = 0;
@@ -853,22 +860,21 @@ this.xpFillEl = document.getElementById('xpFill');
     const me = this.state.entities.get(this.state.playerId);
     const settled = now - this.systemArrivedAt > 1500; // don't play everything already there on arrival
     let shots = 0;
-    const alive = new Set<number>();
-    for (const e of this.state.entities.values()) {
-      if (e.type === EntityType.Projectile) {
-        alive.add(e.id);
-        if (this.heard.has(e.id)) continue;
-        this.heard.add(e.id);
-        if (settled && shots < 4) {
-          shots++;
-          const own = e.data?.[6] === this.state.playerId;
-          // data[0]: weapon type; data[8]: fired by a turret (cannons)
-          const wt = e.data?.[0] ?? 1;
-          const id = this.audio.shotSound(wt, e.data?.[8] === 1);
-          // data[1]: the gun's grade: a cannon's heavier marks boom deeper, its fast slugs crack higher
-          const pitch = wt === 1 ? CANNON_GRADE_PITCH[Math.max(0, Math.min(4, (e.data?.[1] ?? 1) - 1))] : 1;
-          if (id) this.audio.play(id, e.spawnX ?? e.x, e.spawnY ?? e.y, { volume: own ? 0.6 : 0.8, pitch: pitch * (0.94 + Math.random() * 0.12) });
-        }
+    const alive = this.shotsAlive;
+    alive.clear();
+    for (const e of this.state.entities.ofType(EntityType.Projectile)) {
+      alive.add(e.id);
+      if (this.heard.has(e.id)) continue;
+      this.heard.add(e.id);
+      if (settled && shots < 4) {
+        shots++;
+        const own = e.data?.[6] === this.state.playerId;
+        // data[0]: weapon type; data[8]: fired by a turret (cannons)
+        const wt = e.data?.[0] ?? 1;
+        const id = this.audio.shotSound(wt, e.data?.[8] === 1);
+        // data[1]: the gun's grade: a cannon's heavier marks boom deeper, its fast slugs crack higher
+        const pitch = wt === 1 ? CANNON_GRADE_PITCH[Math.max(0, Math.min(4, (e.data?.[1] ?? 1) - 1))] : 1;
+        if (id) this.audio.play(id, e.spawnX ?? e.x, e.spawnY ?? e.y, { volume: own ? 0.6 : 0.8, pitch: pitch * (0.94 + Math.random() * 0.12) });
       }
     }
     for (const id of this.heard) if (!alive.has(id)) this.heard.delete(id);
@@ -1334,7 +1340,13 @@ this.xpFillEl = document.getElementById('xpFill');
       }
     }
 
-    // Interpolate entities
+    // Interpolate entities (rocks out of sight placed less often: see GameState.orbitFocus)
+    {
+      const me = this.state.entities.get(this.state.playerId);
+      const shown = !this.systemMapUI.covers() && !(this.loggedIn && (this.shipClient.hangarOpen || this.menu.isOpen));
+      if (me) this.renderer.orbitFocus(me.renderX, me.renderY, shown, this.state.orbitFocus ??= { cx: 0, cy: 0, px: 0, py: 0, hw: 0, hh: 0 });
+      else this.state.orbitFocus = null;
+    }
     this.state.interpolate(delta);
     this.proto?.afterInterpolate(this.state);
     this.shipClient.update(now);
@@ -1344,7 +1356,11 @@ this.xpFillEl = document.getElementById('xpFill');
     if (this.navMarkers) {
       this.navMarkers.setHidden(!this.loggedIn || this.shipClient.hangarOpen || this.systemMapUI.isOpen || this.menu.isOpen);
     this.regionUI.setHidden(!this.loggedIn || this.shipClient.hangarOpen || this.menu.isOpen || this.stationOpen);
-      this.navMarkers.update();
+      // (Every few frames on the lower tiers: see settings/quality.ts)
+      if (++this.navFrames >= this.hudEvery) {
+        this.navFrames = 0;
+        this.navMarkers.update();
+      }
     }
     if (this.peopleUI) {
       this.peopleUI.setHidden(!this.loggedIn || this.shipClient.hangarOpen || this.systemMapUI.isOpen || this.menu.isOpen);
@@ -1405,13 +1421,19 @@ this.xpFillEl = document.getElementById('xpFill');
     this.worldPaused = paused;
     const covered = this.systemMapUI.covers();
     // (Nor under the sign-in screen, whose backdrop is drawn instead: its shaders are still compiling ahead)
+    // Under a map that covers the screen the world isn't drawn at all (the GPU gets a rest), and kept up ten times a
+    // second, not every frame (its effects run their course and views come and go; it's whole again as the map lifts)
+    this.coveredDelta = covered ? this.coveredDelta + delta : 0;
     if ((!paused || this.refreshWorld) && !this.loginUI.backdrop()) {
-      // Update renderer
-      this.renderer.update(delta);
-      // Under a map that covers the screen the world isn't drawn at all (the GPU gets a rest)
       if (this.app.stage.visible === covered) this.app.stage.visible = !covered;
-      this.renderer.applyLighting();
-      if (!covered) this.renderer.renderBloom();
+      if (!covered) {
+        this.renderer.update(delta);
+        this.renderer.applyLighting();
+        this.renderer.renderBloom();
+      } else if (this.coveredDelta >= 0.1) {
+        this.renderer.update(this.coveredDelta);
+        this.coveredDelta = 0;
+      }
     }
     
     // Periodic state hash for snapshot-on-mismatch (1 Hz). Proto has no prediction to check.
@@ -2597,8 +2619,12 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'none';
 
   /** Hand the tier's settings to the renderer, and resize if its pixel density changed */
   private applyQuality(): void {
-    this.renderer.setQuality(PROFILES[this.qualityTier()]);
-    this.frost.setQuality(PROFILES[this.qualityTier()]);
+    const q = PROFILES[this.qualityTier()];
+    this.renderer.setQuality(q);
+    this.frost.setQuality(q);
+    this.shipClient.setQuality(q);
+    this.systemMapUI?.setRedrawEvery(q.mapEvery);
+    this.hudEvery = q.hudEvery;
     const res = this.renderResolution();
     if (Math.abs(this.app.renderer.resolution - res) > 1e-3) this.onResize();
   }

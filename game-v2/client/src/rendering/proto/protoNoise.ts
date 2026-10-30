@@ -125,3 +125,115 @@ export function sunNoiseData(): Uint8Array {
   }
   return cached = data;
 }
+
+/**
+ * The game's own 2D simplex noise (the `snoise` in SunRenderer, CoronaRaysRenderer: the same function, ported), baked
+ * into a float texture: `size` texels across `units` lattice units centred on 0, value −1..1 at each texel's centre. It doesn't tile,
+ * so it's read with mirrored repeat (continuous everywhere; the mirror lines hide in the octaves). The stand-in
+ * `snoise` then returns the procedural one's own values, bilinearly filtered: "A-exact" in sunProto.ts.
+ */
+export function bakeSimplex(size: number, units: number): Float32Array {
+  const C0 = 0.211324865405187, C1 = 0.366025403784439, C2 = -0.577350269189626, C3 = 0.024390243902439;
+  const mod289 = (x: number) => x - Math.floor(x / 289) * 289;
+  const permute = (x: number) => mod289((x * 34 + 1) * x);
+  const fract = (x: number) => x - Math.floor(x);
+  const out = new Float32Array(size * size);
+  // (centred on 0: the sun's coordinates run both ways from its middle)
+  const step = units / size, o = units / 2;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const vx = (x + 0.5) * step - o, vy = (y + 0.5) * step - o;
+      const s = (vx + vy) * C1;
+      let ix = Math.floor(vx + s), iy = Math.floor(vy + s);
+      const t = (ix + iy) * C0;
+      const x0 = vx - ix + t, y0 = vy - iy + t;
+      const i1x = x0 > y0 ? 1 : 0, i1y = x0 > y0 ? 0 : 1;
+      const x1 = x0 + C0 - i1x, y1 = y0 + C0 - i1y, x2 = x0 + C2, y2 = y0 + C2;
+      ix = mod289(ix); iy = mod289(iy);
+      const p0 = permute(permute(iy) + ix), p1 = permute(permute(iy + i1y) + ix + i1x), p2 = permute(permute(iy + 1) + ix + 1);
+      let sum = 0;
+      for (const [p, dx, dy] of [[p0, x0, y0], [p1, x1, y1], [p2, x2, y2]]) {
+        let m = Math.max(0.5 - (dx * dx + dy * dy), 0);
+        m = m * m; m = m * m;
+        const gx = 2 * fract(p * C3) - 1, h = Math.abs(gx) - 0.5, a0 = gx - Math.floor(gx + 0.5);
+        m *= 1.79284291400159 - 0.85373472095314 * (a0 * a0 + h * h);
+        sum += m * (a0 * dx + h * dy);
+      }
+      out[y * size + x] = 130 * sum;
+    }
+  }
+  return out;
+}
+
+export const NOISE3_SIZE = 64;
+
+/** 3D Perlin noise whose lattice repeats every `period` cells across the volume; about −0.8..0.8 */
+function gradient3(period: number, rnd: () => number): (x: number, y: number, z: number) => number {
+  const n = period * period * period;
+  const g = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    // A random direction on the sphere
+    const u = rnd() * 2 - 1, a = rnd() * Math.PI * 2, s = Math.sqrt(1 - u * u);
+    g[i * 3] = s * Math.cos(a); g[i * 3 + 1] = s * Math.sin(a); g[i * 3 + 2] = u;
+  }
+  const scale = period / NOISE3_SIZE;
+  const fade = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
+  const dot = (cx: number, cy: number, cz: number, dx: number, dy: number, dz: number) => {
+    const i = (((cz % period) * period + (cy % period)) * period + (cx % period)) * 3;
+    return g[i] * dx + g[i + 1] * dy + g[i + 2] * dz;
+  };
+  return (x, y, z) => {
+    const fx = x * scale, fy = y * scale, fz = z * scale;
+    const ix = Math.floor(fx), iy = Math.floor(fy), iz = Math.floor(fz);
+    const tx = fx - ix, ty = fy - iy, tz = fz - iz;
+    const u = fade(tx), v = fade(ty), w = fade(tz);
+    const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+    const c00 = lerp(dot(ix, iy, iz, tx, ty, tz), dot(ix + 1, iy, iz, tx - 1, ty, tz), u);
+    const c10 = lerp(dot(ix, iy + 1, iz, tx, ty - 1, tz), dot(ix + 1, iy + 1, iz, tx - 1, ty - 1, tz), u);
+    const c01 = lerp(dot(ix, iy, iz + 1, tx, ty, tz - 1), dot(ix + 1, iy, iz + 1, tx - 1, ty, tz - 1), u);
+    const c11 = lerp(dot(ix, iy + 1, iz + 1, tx, ty - 1, tz - 1), dot(ix + 1, iy + 1, iz + 1, tx - 1, ty - 1, tz - 1), u);
+    return lerp(lerp(c00, c10, v), lerp(c01, c11, v), w);
+  };
+}
+
+let cached3: Uint8Array | null = null;
+
+/**
+ * The plasma star's noise (sunProto.ts, PLASMA_FRAG): a 64³ RGBA volume that tiles on every axis, read at points on
+ * the star's sphere (so features sit on the ball and turn with it, with no seam or pole) and, for the corona, along
+ * rings that scroll outward through the third axis:
+ *   r  fBM, periods 2, 4, 8 across the volume (pre-summed: three octaves in one read)
+ *   g  the same from another seed (the warp's second axis, active regions)
+ *   b  ridged fBM, periods 2, 4, 8: thin bright ridges (filaments, rays)
+ *   a  one octave, period 8: fine detail
+ */
+export function noise3Data(): Uint8Array {
+  if (cached3) return cached3;
+  const S = NOISE3_SIZE, n = S * S * S;
+  const rnd = (seed: number) => {
+    const r = mulberry32(seed);
+    return [gradient3(2, r), gradient3(4, r), gradient3(8, r)];
+  };
+  const A = rnd(11), B = rnd(23), Cr = rnd(37), D = gradient3(8, mulberry32(41));
+  const ch = [new Float32Array(n), new Float32Array(n), new Float32Array(n), new Float32Array(n)];
+  for (let z = 0, i = 0; z < S; z++) {
+    for (let y = 0; y < S; y++) {
+      for (let x = 0; x < S; x++, i++) {
+        const X = x + 0.5, Y = y + 0.5, Z = z + 0.5;
+        ch[0][i] = A[0](X, Y, Z) + A[1](X, Y, Z) * 0.5 + A[2](X, Y, Z) * 0.25;
+        ch[1][i] = B[0](X, Y, Z) + B[1](X, Y, Z) * 0.5 + B[2](X, Y, Z) * 0.25;
+        let r = 0, amp = 1;
+        for (const o of Cr) { const v = 1 - Math.abs(o(X, Y, Z) * 1.6); r += v * v * amp; amp *= 0.5; }
+        ch[2][i] = r;
+        ch[3][i] = D(X, Y, Z);
+      }
+    }
+  }
+  const data = new Uint8Array(n * 4);
+  for (let c = 0; c < 4; c++) {
+    let lo = Infinity, hi = -Infinity;
+    for (const v of ch[c]) { if (v < lo) lo = v; if (v > hi) hi = v; }
+    for (let i = 0; i < n; i++) data[i * 4 + c] = Math.round(((ch[c][i] - lo) / (hi - lo)) * 255);
+  }
+  return cached3 = data;
+}
