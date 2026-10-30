@@ -505,10 +505,15 @@ export class ShipRenderer {
       }
       // Docked: inside the station, out of sight
       const away = this.hidden(eid);
-      view.container.visible = view.barrels.visible = view.flames.visible = !away;
+      // Off screen, with room for its light to reach in: no hull, engine, lamp or gun work this frame (below). Each part's
+      // visibility is set once a frame, as it'll be drawn: a change, even one undone, has Pixi rebuild the scene's draw list
+      const shown = !away && (eid === this.state.playerId || this.renderer.inView(entity.renderX, entity.renderY, ship.derived.radius + OFFSCREEN_MARGIN));
+      view.container.visible = view.flames.visible = shown;
+      // (too small on screen to see a gun: see drawTurrets)
+      view.barrels.visible = shown && cs * this.renderer.getZoom() >= GUN_MIN_PX;
       if (view.frame) view.frame.c.visible = !away;
-      if (view.label) view.label.visible = !away;
-      if (view.bar) view.bar.visible = !away;
+      if (view.label) view.label.visible = shown;
+      if (view.bar) view.bar.visible = shown;
       if (away) {
         view.lamps = 0;
         if (view.beam) view.beam.visible = false;
@@ -522,11 +527,7 @@ export class ShipRenderer {
       this.hulls.track(eid, entity.renderX, entity.renderY);
       // A boss's hull is built off the main thread from the moment its body arrives, on screen or not: ready by the time it's seen
       if (isRigid(ship)) this.ask(ship, cs, tint);
-      // Off screen, with room for its light to reach in: no hull, engine, lamp or gun work this frame
-      if (eid !== this.state.playerId && !this.renderer.inView(entity.renderX, entity.renderY, ship.derived.radius + OFFSCREEN_MARGIN)) {
-        view.container.visible = view.barrels.visible = view.flames.visible = false;
-        if (view.label) view.label.visible = false;
-        if (view.bar) view.bar.visible = false;
+      if (!shown) {
         if (view.beam) view.beam.visible = false;
         if (view.wires) view.wires.g.visible = view.wires.glow.visible = false;
         continue;

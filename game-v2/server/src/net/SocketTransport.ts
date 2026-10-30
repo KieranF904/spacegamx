@@ -63,11 +63,11 @@ export class SocketTransport {
 
       // Auth endpoints
       if (req.method === 'POST' && req.url === '/auth/register') {
-        this.server.handleHttpAuth(req, res, 'register');
+        this.server.handleHttpAuth(req, res, 'register', clientAddress(req));
         return;
       }
       if (req.method === 'POST' && req.url === '/auth/login') {
-        this.server.handleHttpAuth(req, res, 'login');
+        this.server.handleHttpAuth(req, res, 'login', clientAddress(req));
         return;
       }
       if (req.method === 'POST' && req.url === '/auth/validate') {
@@ -126,7 +126,7 @@ export class SocketTransport {
 
     let link: ReturnType<GameServer['connect']>;
     try {
-      link = this.server.connect(socket);
+      link = this.server.connect(socket, ip);
     } catch (e) {
       console.error('[Socket] could not take a connection:', e);
       this.release(ip);

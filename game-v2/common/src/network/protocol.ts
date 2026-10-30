@@ -6,7 +6,7 @@ export * from './socialProtocol.js';
 export * from './contributorProtocol.js';
 export * from './replication.js';
 export * from './binaryCodec.js';
-import { encodeBinary, BinaryReader, DICTIONARY } from './binaryCodec.js';
+import { encodeBinary, BinaryReader, BinaryWriter, DICTIONARY } from './binaryCodec.js';
 import { quantizeCursorAngle, dequantizeCursorAngle } from './cursorState.js';
 /**
  * Network Protocol - All client/server message types
@@ -1338,7 +1338,8 @@ function unpackProjectile(r: (number | null)[], tick: number): EntityState {
   return s;
 }
 
-export function packSnapshot(m: ServerSnapshotMessage): PackedSnapshot {
+/** A snapshot's entity rows and projectile rows */
+function packEntities(m: ServerSnapshotMessage): { e: unknown[][]; p: (number | null)[][] } {
   const p: (number | null)[][] = [];
   const e = m.entities.filter((s) => {
     const row = s.type === EntityType.Projectile ? packProjectile(s, m.tick) : null;
@@ -1349,6 +1350,11 @@ export function packSnapshot(m: ServerSnapshotMessage): PackedSnapshot {
     while (row.length && row[row.length - 1] === null) row.pop();
     return row;
   });
+  return { e, p };
+}
+
+export function packSnapshot(m: ServerSnapshotMessage): PackedSnapshot {
+  const { e, p } = packEntities(m);
   const out: PackedSnapshot = { type: 'snapshot', t: m.tick, lp: m.lastProcessedInput };
   if (e.length) out.e = e;
   if (p.length) out.p = p;
@@ -1427,7 +1433,63 @@ export const SERVER_FRAME = 0x02;
 
 /** A server message's bytes (encode once, send to every client it's for) */
 export function encodeServerMessage(msg: ServerMessage): Uint8Array {
+  if (msg.type === 'snapshot') return encodeSnapshot(msg);
   return encodeBinary(packCompact(msg) ?? msg);
+}
+
+/**
+ * A snapshot's bytes: exactly what encodeBinary(packCompact(snapshot)) gives (protocol.test.ts holds it to that),
+ * but each keyframe and control row is encoded once and its bytes kept with it. The server makes those rows once a
+ * snapshot for every client that gets them (its Replication) and never changes one after, so each client's snapshot
+ * copies them in rather than encoding them again. A control row's id goes as the step from the one before (see
+ * packCtlIds), so what's kept of one is the rest of it.
+ */
+const keyframeBytes = new WeakMap<readonly number[], Uint8Array>();
+const ctlTailBytes = new WeakMap<readonly number[], Uint8Array>();
+const rowWriter = new BinaryWriter();
+const snapWriter = new BinaryWriter();
+const SNAPSHOT_CODE = COMPACT_CODE.get('snapshot')!.code;
+
+function rowBytes(cache: WeakMap<readonly number[], Uint8Array>, row: readonly number[], from: number): Uint8Array {
+  let b = cache.get(row);
+  if (!b) {
+    if (from === 0) rowWriter.value(row);
+    else for (let i = from; i < row.length; i++) rowWriter.value(row[i]);
+    b = rowWriter.take();
+    cache.set(row, b);
+  }
+  return b;
+}
+
+function encodeSnapshot(m: ServerSnapshotMessage): Uint8Array {
+  const { e, p } = packEntities(m);
+  // (The compact row: [code, t, lp, e, p, r, k, c, o, f], absent ones null and trailing nulls dropped)
+  const row: unknown[] = [SNAPSHOT_CODE, m.tick ?? null, m.lastProcessedInput ?? null, e.length ? e : null, p.length ? p : null,
+    m.removed.length ? m.removed : null, m.ships?.length ? m.ships : null, m.ctl?.length ? m.ctl : null,
+    m.out?.length ? m.out : null, m.fire?.length ? packFire(m.fire) : null];
+  while (row.length > 1 && row[row.length - 1] === null) row.pop();
+  const w = snapWriter;
+  w.arrayHeader(row.length);
+  for (let i = 0; i < row.length; i++) {
+    if (i === 6 && m.ships?.length) {
+      w.arrayHeader(m.ships.length);
+      for (const k of m.ships) w.bytes(rowBytes(keyframeBytes, k, 0));
+    } else if (i === 7 && m.ctl?.length) {
+      // (As packCtlIds: in id order, each id the step from the one before, doubled, plus 1 for a run row)
+      const ided = m.ctl.map((r) => (r[0] < 0 ? { id: -1 - r[0], run: 1, r } : { id: r[0], run: 0, r })).sort((a, b) => a.id - b.id);
+      w.arrayHeader(ided.length);
+      let prev = 0;
+      for (const { id, run, r } of ided) {
+        w.arrayHeader(r.length);
+        w.number((id - prev) * 2 + run);
+        w.bytes(rowBytes(ctlTailBytes, r, 1));
+        prev = id;
+      }
+    } else {
+      w.value(row[i]);
+    }
+  }
+  return w.take();
 }
 
 /** A frame of encoded messages */

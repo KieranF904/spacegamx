@@ -39,6 +39,8 @@ import { itemIcon, shipIcon } from './itemIcons';
 import { storeControls } from './storeControls';
 import { shipSummary } from '../ships/shipSummary';
 import type { QuestClient } from './QuestUI';
+import { boundKeyName } from '../input/keybindings';
+import { settings } from '../settings/Settings';
 
 type Tab = 'overview' | 'ships' | 'contracts' | 'market' | 'vendors' | 'refinery' | 'fabricator' | 'outpost';
 
@@ -449,7 +451,7 @@ export class StationWindow {
     if (this.d.quests.currentHint() === 'hangar') hangar.classList.add('hint');
     const inv = document.createElement('button');
     inv.className = 'sgw-btn';
-    inv.textContent = 'Cargo & storage (I)';
+    inv.textContent = `Cargo & storage (${boundKeyName('inventory', settings.data.bindings)})`;
     inv.onclick = () => this.d.openInventory();
     row.append(hangar, inv);
     left.append(row);

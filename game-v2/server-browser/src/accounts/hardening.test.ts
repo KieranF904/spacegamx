@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync, readdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -45,26 +45,52 @@ function request(chunks: (string | Buffer)[], headers: Record<string, string> = 
 }
 
 describe('sign-in limits', () => {
-  it('locks an account\'s sign-in after 10 wrong passwords, whatever the addresses, and not the right password either', async () => {
+  it('after 10 wrong passwords for a name from one address, that address is locked out of it (the right password too); the pilot elsewhere is not', async () => {
     const s = new JsonUserStore(join(tmp(), 'users.json'));
     await s.register('victim', 'victim@example.com', 'right');
+    // (Before the routes: their limits keep the clock they were made with)
+    vi.useFakeTimers({ toFake: ['Date'] });
     const call = await routes(s);
-    for (let i = 0; i < 10; i++) expect((await call('/auth/login', { username: 'victim', password: `guess${i}` }, `10.1.0.${i}`)).status).toBe(401);
-    const locked = await call('/auth/login', { username: 'VICTIM', password: 'right' }, '10.2.0.1');
-    expect(locked.status).toBe(429);
-    expect(locked.body).toEqual({ success: false, error: expect.stringMatching(/Too many wrong passwords for this account\. Try again in 15 minutes/) });
-    // Other accounts are fine
-    await s.register('bystander', 'by@example.com', 'pw');
-    expect((await call('/auth/login', { username: 'bystander', password: 'pw' }, '10.3.0.1')).status).toBe(200);
+    try {
+      for (let i = 0; i < 10; i++) expect((await call('/auth/login', { username: 'victim', password: `guess${i}` }, '10.1.0.1')).status).toBe(401);
+      // (A minute on, so it's the wrong passwords that hold it, not the address's 10 attempts a minute)
+      vi.setSystemTime(Date.now() + 61_000);
+      const locked = await call('/auth/login', { username: 'VICTIM', password: 'right' }, '10.1.0.1');
+      expect(locked.status).toBe(429);
+      expect(locked.body).toEqual({ success: false, error: expect.stringMatching(/Too many wrong passwords for this account\. Try again in 14 minutes/) });
+      // The pilot, from their own address, gets in
+      expect((await call('/auth/login', { username: 'victim', password: 'right' }, '10.2.0.1')).status).toBe(200);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
-  it('a right password clears the wrong ones', async () => {
+  it('locks a name from every address after 100 wrong passwords from anywhere (guessing shared out); other names are fine', async () => {
+    const s = new JsonUserStore(join(tmp(), 'users.json'));
+    await s.register('victim', 'victim@example.com', 'right');
+    await s.register('bystander', 'by@example.com', 'pw');
+    const call = await routes(s);
+    for (let i = 0; i < 100; i++) expect((await call('/auth/login', { username: 'victim', password: `guess${i}` }, `10.1.${i >> 3}.${i & 7}`)).status).toBe(401);
+    const locked = await call('/auth/login', { username: 'VICTIM', password: 'right' }, '10.9.0.1');
+    expect(locked.status).toBe(429);
+    expect(locked.body).toEqual({ success: false, error: expect.stringMatching(/Too many wrong passwords for this account\. Try again in 15 minutes/) });
+    expect((await call('/auth/login', { username: 'bystander', password: 'pw' }, '10.9.0.2')).status).toBe(200);
+  });
+
+  it('a right password clears that address\'s wrong ones', async () => {
     const s = new JsonUserStore(join(tmp(), 'users.json'));
     await s.register('forgetful', 'f@example.com', 'right');
+    // (Before the routes: their limits keep the clock they were made with)
+    vi.useFakeTimers({ toFake: ['Date'] });
     const call = await routes(s);
-    for (let i = 0; i < 9; i++) await call('/auth/login', { username: 'forgetful', password: 'x' }, `10.4.0.${i}`);
-    expect((await call('/auth/login', { username: 'forgetful', password: 'right' }, '10.5.0.1')).status).toBe(200);
-    for (let i = 0; i < 9; i++) expect((await call('/auth/login', { username: 'forgetful', password: 'x' }, `10.6.0.${i}`)).status).toBe(401);
+    try {
+      for (let i = 0; i < 9; i++) await call('/auth/login', { username: 'forgetful', password: 'x' }, '10.5.0.1');
+      expect((await call('/auth/login', { username: 'forgetful', password: 'right' }, '10.5.0.1')).status).toBe(200);
+      vi.setSystemTime(Date.now() + 61_000);
+      for (let i = 0; i < 9; i++) expect((await call('/auth/login', { username: 'forgetful', password: 'x' }, '10.5.0.1')).status).toBe(401);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('still limits each address to 10 attempts a minute', async () => {

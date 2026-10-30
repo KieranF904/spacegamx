@@ -55,7 +55,8 @@ export interface ShaderQuad {
  */
 const programs = new Map<string, GlProgram>();
 
-export function createShaderQuad(fragmentBody: string, uniforms: Record<string, UniformDef>, halfSize: number): ShaderQuad {
+/** The program a quad with this fragment body and these uniforms (their names and types) draws with */
+export function shaderQuadProgram(fragmentBody: string, uniforms: Record<string, UniformDef>): GlProgram {
   const decls = Object.entries(uniforms).map(([name, d]) => {
     const glsl = d.type === 'f32' ? 'float' : d.type === 'vec2<f32>' ? 'vec2' : 'vec3';
     return `uniform ${glsl} ${name};`;
@@ -68,14 +69,19 @@ export function createShaderQuad(fragmentBody: string, uniforms: Record<string, 
     ${GLSL_COMMON}
     ${fragmentBody}
   `;
+  let glProgram = programs.get(fragment);
+  if (!glProgram) programs.set(fragment, glProgram = new GlProgram({ vertex: VERTEX_SHADER, fragment }));
+  return glProgram;
+}
+
+export function createShaderQuad(fragmentBody: string, uniforms: Record<string, UniformDef>, halfSize: number): ShaderQuad {
+  const glProgram = shaderQuadProgram(fragmentBody, uniforms);
   const h = halfSize;
   const geometry = new MeshGeometry({
     positions: new Float32Array([-h, -h, h, -h, h, h, -h, h]),
     uvs: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]),
     indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
   });
-  let glProgram = programs.get(fragment);
-  if (!glProgram) programs.set(fragment, glProgram = new GlProgram({ vertex: VERTEX_SHADER, fragment }));
   const shader = new Shader({
     glProgram,
     resources: { u: uniforms },

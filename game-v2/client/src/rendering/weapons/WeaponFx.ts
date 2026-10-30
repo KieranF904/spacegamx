@@ -27,7 +27,7 @@
 
 import { Container, Graphics, Texture } from 'pixi.js';
 import { disc, softDot, streak, streakScale, petal, petalScale, DOT_SIZE } from '../fxTextures';
-import { SpritePool } from '../spritePool';
+import { ParticlePool } from '../particlePool';
 import { EntityType, WeaponType } from '@space-game/common';
 import type { GameState, InterpolatedEntity } from '../../state/GameState';
 import { WeaponStyle, weaponStyle } from './weaponStyles';
@@ -116,9 +116,15 @@ const TEX = { get disc() { return disc(); }, get dot() { return softDot(0.5, 0.1
 
 export class WeaponFx {
   /** Light (additive) and smoke (normal blending) */
-  private glow = new SpritePool('add');
-  private smokeG = new SpritePool('normal');
+  /**
+   * Normal blending, as these have always been drawn: the pool's 'add' never reached its sprites once the bloom made
+   * it a render group (Pixi doesn't pass a render group's blend mode on). Additive would be brighter, a look to choose.
+   */
+  private glow = new ParticlePool('normal');
+  private smokeG = new ParticlePool('normal');
   private crackle = new Graphics();
+  /** Redrawn every frame it's crackling, so a render group of its own (Pixi rebuilds its draw list, not the scene's) */
+  private crackleGroup = new Container({ isRenderGroup: true });
   private crackling = false;
   private smoke: Smoke[] = [];
   private shots = new Map<number, Shot>();
@@ -139,22 +145,21 @@ export class WeaponFx {
 
   constructor(layer: Container) {
     this.crackle.blendMode = 'add';
-    layer.addChild(this.smokeG.container, this.glow.container, this.crackle);
+    this.crackleGroup.addChild(this.crackle);
+    layer.addChild(this.smokeG.container, this.glow.container, this.crackleGroup);
   }
 
   /** A line from (x0, y0) to (x1, y1), `width` thick with soft round ends */
   private line(x0: number, y0: number, x1: number, y1: number, width: number, color: number, alpha: number): void {
     const len = Math.hypot(x1 - x0, y1 - y0);
-    const s = this.glow.take(TEX.streak, (x0 + x1) / 2, (y0 + y1) / 2, 0.5, 0.5, color, alpha);
-    s.rotation = Math.atan2(y1 - y0, x1 - x0);
     const k = streakScale(len, width);
-    s.scale.set(k.x, k.y);
+    this.glow.take(TEX.streak, (x0 + x1) / 2, (y0 + y1) / 2, 0.5, 0.5, color, alpha, Math.atan2(y1 - y0, x1 - x0), k.x, k.y);
   }
 
   /** A filled circle (smooth-edged) */
-  private circle(pool: SpritePool, tex: Texture, x: number, y: number, r: number, color: number, alpha: number): void {
-    const s = pool.take(tex, x, y, 0.5, 0.5, color, alpha);
-    s.scale.set((r * 2) / DOT_SIZE);
+  private circle(pool: ParticlePool, tex: Texture, x: number, y: number, r: number, color: number, alpha: number): void {
+    const k = (r * 2) / DOT_SIZE;
+    pool.take(tex, x, y, 0.5, 0.5, color, alpha, 0, k, k);
   }
 
   /** Projectile ids seen this frame (reused) */
@@ -435,10 +440,8 @@ export class WeaponFx {
       // Soft bloom, then the flash shape: a long tongue forward and two short petals to the sides
       this.circle(g, TEX.dot, f.x, f.y, f.size * (0.7 + 0.5 * n) * 1.4 * f.girth, f.color, 0.3 * fade);
       const petal = (dir: number, len: number, wid: number, color: number, alpha: number) => {
-        const s = g.take(TEX.petal, f.x, f.y, 0, 0.5, color, alpha);
-        s.rotation = f.angle + dir;
         const k = petalScale(f.size * len * (0.7 + 0.5 * n), f.size * wid * fade * f.girth);
-        s.scale.set(k.x, k.y);
+        g.take(TEX.petal, f.x, f.y, 0, 0.5, color, alpha, f.angle + dir, k.x, k.y);
       };
       petal(0, f.petals[0], 0.32, f.color, 0.75 * fade);
       petal(0, f.petals[0] * 0.6, 0.16, 0xffffff, 0.9 * fade);

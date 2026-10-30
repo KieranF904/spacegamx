@@ -123,7 +123,7 @@ import { GameData } from './data/GameData.js';
 import type { UserStore } from './auth/types.js';
 import type { ClientSocket, ClientLink } from '@space-game/common';
 import type { ShipBridge, ShipHost } from './ships/ShipBridge.js';
-import { Blueprint, ShipState, parseBlueprint, quantizeShipValue, skillValue, hasAll, removeAll, Economy, Bag, StarterKit, jumpTuning, jumpPhase, partItemId, rateShip, ratingOf, createShipState, gradeReward, gradeOf, accrueTraces, releaseTraces, unlocks, isStructural, stationPerks, hazardFlight, stationTable, blueprintGrade, lookFn, fixModelMaterials, warmthPercent, type ShipDerived } from '@space-game/common';
+import { Blueprint, ShipState, parseBlueprint, quantizeShipValue, skillValue, hasAll, removeAll, Economy, Bag, StarterKit, jumpTuning, jumpPhase, partItemId, rateShip, ratingOf, createShipState, gradeReward, gradeOf, accrueTraces, releaseTraces, unlocks, isStructural, stationPerks, hazardFlight, stationTable, blueprintGrade, lookFn, fixModelMaterials, warmthPercent, nearerThan, fartherThan, stationReachMax, type ShipDerived } from '@space-game/common';
 
 /** A station site by id */
 const stationPerksSite = (id: string | undefined) => (id ? stationTable()?.sites.find((s) => s.id === id) : undefined);
@@ -448,6 +448,8 @@ const deadEnter = enterQuery(deadQuery);
 
 interface ClientConnection {
   ws: ClientSocket;
+  /** The player's address as the transport saw it (passed on to the lobby with a sign-in, for its attempt limits) */
+  address?: string;
   playerId: number;  // Entity ID
   lastInputSeq: number;
   lastPingTime: number;
@@ -479,12 +481,13 @@ interface ClientConnection {
   /** Berthed at a station (hangar open): the ship rides along at this offset */
   /** Berthed in a station: held at its centre (ox, oy: 0), and put back out at `exit` (where it came in) when it leaves */
   docked: { station: number; ox: number; oy: number; exit?: { x: number; y: number } } | null;
-  /** Ship bodies this client has been synced to: entity id → the ship state and rebuild count sent */
-  shipSynced: Map<number, { ship: ShipState; rebuilds: number }>;
+  /**
+   * Ship bodies this client has been synced to: entity id → the ship state and rebuild count sent, and the snapshot
+   * its HP was last brought up to date at (`hpAt`: skip it while the ship's HP hasn't changed since)
+   */
+  shipSynced: Map<number, { ship: ShipState; rebuilds: number; hpAt?: number }>;
   /** Last part HP sent to this client, per ship body */
   shipHpSent: Map<number, number[]>;
-  /** The snapshot each ship's HP was last brought up to date at (skip it while the ship's HP hasn't changed since) */
-  shipHpAt: Map<number, number>;
   /** Entity names this client has been sent (names go once) */
   sentNames: Map<number, string>;
   /** Ship keyframe versions this client has (replication) */
@@ -2683,7 +2686,7 @@ this.devTeleport = opts.devTeleport ?? false;
    * Register a new client. The transport owns the socket; it decodes incoming
    * data and feeds messages through the returned link.
    */
-  connect(ws: ClientSocket): ClientLink {
+  connect(ws: ClientSocket, address?: string): ClientLink {
     console.log('Client connected');
     this.totalConnectionsEver++;
 
@@ -2693,6 +2696,7 @@ this.devTeleport = opts.devTeleport ?? false;
 
     const conn: ClientConnection = {
       ws,
+      address,
       playerId,
       lastInputSeq: 0,
       lastPingTime: Date.now(),
@@ -2716,7 +2720,6 @@ this.devTeleport = opts.devTeleport ?? false;
       docked: null,
       shipSynced: new Map(),
       shipHpSent: new Map(),
-      shipHpAt: new Map(),
       sentNames: new Map(),
       repKnown: new Map(),
       shipView: new Set(),
@@ -3160,7 +3163,10 @@ case 'join':
   private stationInRange(eid: number): number {
     for (const st of stationQuery(this.world)) {
       if (InSystem.systemId[st] !== InSystem.systemId[eid]) continue;
-      if (Math.hypot(Position.x[st] - Position.x[eid], Position.y[st] - Position.y[eid]) < stationInteractRadius(Radius.value[st], this.gameData.getStationByNum(Station.stationId[st])?.design)) return st;
+      const dx = Position.x[st] - Position.x[eid], dy = Position.y[st] - Position.y[eid];
+      // (Further than any station of its size reaches: no need to look up its design. Enemies ask this of every pilot they might go for)
+      if (fartherThan(dx, dy, stationReachMax(Radius.value[st]))) continue;
+      if (Math.hypot(dx, dy) < stationInteractRadius(Radius.value[st], this.gameData.getStationByNum(Station.stationId[st])?.design)) return st;
     }
     return -1;
   }
@@ -3482,6 +3488,13 @@ case 'join':
       // Guest join
       // (A name only: a string, no control characters, a sensible length; it goes to everyone near)
       const name = typeof msg.username === 'string' ? msg.username.replace(/[\u0000-\u001f\u007f-\u009f]/g, '').trim().slice(0, 24) : '';
+      // (Nor anyone's account: a guest can't pose as a known pilot or an admin)
+      // (Only asking the lobby waits: with no lobby to ask, a guest's join goes through at once, as it always has)
+      const owner = name ? this.signedInOwner(name) ?? (this.userDB.admin ? await this.accountOwner(name) : null) : null;
+      if (owner) {
+        this.rejectAuth(conn, `"${name}" is ${owner === 'admin' ? "an admin's" : "a registered pilot's"} name. Sign in to fly as them, or pick another name.`);
+        return;
+      }
       conn.username = name || `Guest_${Math.floor(Math.random() * 10000)}`;
       conn.userId = null;
       conn.isAdmin = this.everyoneAdmin || this.guestAdmin;
@@ -3499,7 +3512,7 @@ case 'join':
   }
 
   private async handleAuthLogin(conn: ClientConnection, msg: any): Promise<void> {
-    const result = await this.userDB.login(msg.username, msg.password);
+    const result = await this.userDB.login(msg.username, msg.password, conn.address);
     if (result.success) {
       conn.username = result.user.username;
       conn.userId = result.user.id;
@@ -3522,6 +3535,27 @@ case 'join':
   }
 
   /**
+   * Whose account a guest's name is (whatever its case): an admin's or a registered pilot's, or nobody's (null).
+   * signedInOwner knows those signed in here; accountOwner asks the lobby (when this server may: its admin secret,
+   * `userDB.admin`), and a lobby that can't be reached doesn't keep guests out.
+   */
+  private signedInOwner(name: string): 'admin' | 'pilot' | null {
+    const lower = name.toLowerCase();
+    for (const c of this.clients.values()) {
+      if (c.userId !== null && c.username.toLowerCase() === lower) return c.isAdmin ? 'admin' : 'pilot';
+    }
+    return null;
+  }
+  private async accountOwner(name: string): Promise<'admin' | 'pilot' | null> {
+    try {
+      const account = await this.userDB.admin?.get(name);
+      return account ? (account.isAdmin ? 'admin' : 'pilot') : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * A wrong password or a refused registration: say why, then hang up, so the
    * connection doesn't stay in the world as a nameless pilot.
    */
@@ -3532,7 +3566,7 @@ case 'join':
   }
 
   private async handleAuthRegister(conn: ClientConnection, msg: any): Promise<void> {
-    const result = await this.userDB.register(msg.username, msg.email, msg.password);
+    const result = await this.userDB.register(msg.username, msg.email, msg.password, conn.address);
     if (result.success) {
       conn.username = result.user.username;
       conn.userId = result.user.id;
@@ -4763,29 +4797,43 @@ case 'join':
     return next;
   }
 
+  /** A ship's structure as a sync sends it, worked out once a snapshot for every client that's synced to it (cleared each snapshot) */
+  private syncWire = new Map<number, { ship: ShipState; rebuilds: number; hp: number[]; detached: number[]; ghosts?: number[]; maxHp?: number[]; design?: string }>();
+  private syncWireOf(id: number, ship: ShipState): { hp: number[]; detached: number[]; ghosts?: number[]; maxHp?: number[]; design?: string } {
+    const e = this.syncWire.get(id);
+    if (e && e.ship === ship && e.rebuilds === ship.rebuilds) return e;
+    const next = {
+      ship, rebuilds: ship.rebuilds, hp: ship.rebuildHp.map(hpWire), detached: ship.detached.flatMap((d, i) => (d ? [i] : [])),
+      ghosts: ship.ghost.some(Boolean) ? ship.ghost.flatMap((g, i) => (g ? [i] : [])) : undefined,
+    };
+    this.syncWire.set(id, next);
+    return next;
+  }
+
   private sendShipUpdates(conn: ClientConnection, systemId: number): void {
     for (const id of conn.shipSynced.keys()) {
-      if (!this.ships.has(id)) { conn.shipSynced.delete(id); conn.shipHpSent.delete(id); conn.shipHpAt.delete(id); }
+      if (!this.ships.has(id)) { conn.shipSynced.delete(id); conn.shipHpSent.delete(id); }
     }
     const hps: [number, [number, number][]][] = [];
-    for (const [id, ship] of this.ships.bodies) {
-      if (InSystem.systemId[id] !== systemId) continue;
-      const synced = conn.shipSynced.get(id);
-      // Ships out of view wait (the client keeps what it had, and catches up when one comes back)
-      const near = conn.shipView.has(id);
+    // Ships out of view wait (the client keeps what it had, and catches up when one comes back). The view was
+    // made this snapshot from the system's bodies in their order (updateShipView), so this goes in that order too
+    for (const id of conn.shipView) {
+      const ship = this.ships.bodies.get(id);
+      if (!ship || InSystem.systemId[id] !== systemId) continue;
+      let synced = conn.shipSynced.get(id);
       // A refit or respawn replaces the ShipState (its rebuild count restarts), so compare both
       if (!synced || synced.ship !== ship || synced.rebuilds !== ship.rebuilds) {
-        if (!near) continue;
         const fresh = !synced || synced.ship !== ship;
-        conn.shipSynced.set(id, { ship, rebuilds: ship.rebuilds });
-        const hp = ship.rebuildHp.map(hpWire);
+        synced = { ship, rebuilds: ship.rebuilds };
+        conn.shipSynced.set(id, synced);
+        const sync = this.syncWireOf(id, ship);
+        const hp = sync.hp;
         // After a rebuild the client has this ship's HP already, bar what changed since
         const had = fresh ? undefined : conn.shipHpSent.get(id);
         const hpd = had && had.length === hp.length ? hp.flatMap((h, i) => (had[i] !== h ? [[i, h] as [number, number]] : [])) : undefined;
         conn.shipHpSent.set(id, [...hp]);
-        conn.shipHpAt.delete(id);
         // A design this client has seen (another ship of it) goes by its hash
-        const design = fresh ? designHash(ship.blueprint) : undefined;
+        const design = fresh ? (sync.design ??= designHash(ship.blueprint)) : undefined;
         const known = design !== undefined && conn.designs.has(design);
         if (design !== undefined) conn.designs.add(design);
         this.send(conn.ws, {
@@ -4796,17 +4844,16 @@ case 'join':
           design,
           hp: hpd ? undefined : hp,
           hpd: hpd?.length ? hpd : undefined,
-          maxHp: !hpd && ship.scaledHp ? ship.maxHp.map(hpWire) : undefined,
-          detached: ship.detached.flatMap((d, i) => (d ? [i] : [])),
+          maxHp: !hpd && ship.scaledHp ? (sync.maxHp ??= ship.maxHp.map(hpWire)) : undefined,
+          detached: sync.detached,
           rebuilds: ship.rebuilds,
-          ghosts: ship.ghost.some(Boolean) ? ship.ghost.flatMap((g, i) => (g ? [i] : [])) : undefined,
+          ghosts: sync.ghosts,
         });
       }
-      if (!near) continue;
       // HP for the visuals: to a tenth, and only what changed (nothing to look at if it hasn't changed since this client was last brought up to date)
       const wire = this.hpWireOf(id, ship);
-      const at = conn.shipHpAt.get(id);
-      conn.shipHpAt.set(id, this.snapshotCount);
+      const at = synced.hpAt;
+      synced.hpAt = this.snapshotCount;
       if (at !== undefined && at >= wire.since) continue;
       const sent = conn.shipHpSent.get(id)!;
       const changes: [number, number][] = [];
@@ -4830,8 +4877,9 @@ case 'join':
    */
   private systemRows(num: number): SnapRow[] {
     const rows: SnapRow[] = [];
+    // (Each key is interned: see internKey. Ships and projectiles are keyed by their values: rowKey)
     const add = (state: EntityState, kind: SnapRow['kind'], name?: string, key?: string) => {
-      const row: SnapRow = { id: state.id, kind, x: state.x, y: state.y, state, name, key: key ?? JSON.stringify(state) };
+      const row: SnapRow = { id: state.id, kind, x: state.x, y: state.y, state, name, key: key ?? this.internKey(state.id, JSON.stringify(state)) };
       rows.push(row);
       return row;
     };
@@ -4884,7 +4932,7 @@ case 'join':
         data: [Math.round(this.ships.shieldFraction(eid) * 20) * 5, this.ships.isEmped(eid) ? 1 : 0, Math.round(heat.heat * 10), heat.over ? 1 : 0,
           Math.round(beam.hit * 10), this.ships.weaponBeamState(eid).on ? 1 : 0, beam.on ? 1 : 0, Math.round(Input.cursorDist[eid] / 100)],
       };
-      row.other = { state: status, key: `${status.hp},${status.maxHp},${status.data!.join(',')}` };
+      row.other = { state: status, key: this.internKey(-1 - eid, `${status.hp},${status.maxHp},${status.data!.join(',')}`) };
     }
 
     // Ship bodies without a pilot (dummies, hostiles, freighters, wrecks, debris)
@@ -4906,7 +4954,7 @@ case 'join':
         y: quantizeShipValue('pos', Position.y[eid]),
         angle: quantizeShipValue('angle', Rotation.angle[eid]),
         data,
-      }, 'ship', named?.name, data.join(','));
+      }, 'ship', named?.name, this.rowKey(eid, data));
     }
 
     // Single-body enemies: where they are and their HP (data: [their kind's index in data/mobs.json])
@@ -4936,7 +4984,7 @@ case 'join':
       // The rounded velocity drifts from the real one by up to 0.005 a tick
       const onLine = off(data[3]) < 0.5 + 0.006 * (this.currentTick - data[3]);
       const row = add({ id: eid, type: EntityType.Projectile, x: onLine ? undefined! : x, y: onLine ? undefined! : y, vx, vy, data },
-        'projectile', undefined, `${vx},${vy},${data.join(',')}`);
+        'projectile', undefined, this.rowKey(eid, [vx, vy, ...data]));
       row.x = x; row.y = y;
     }
 
@@ -4953,6 +5001,28 @@ case 'join':
     return rows;
   }
 
+  /**
+   * The rows' keys by entity (status keys by -1 - id), the last snapshot's and this one's (see systemRows). A key
+   * that hasn't changed since the last snapshot is made the very string it was then, so each pilot's "changed?" test
+   * in sendSnapshots is a pointer comparison rather than a character-by-character one.
+   */
+  private keysWere = new Map<number, { key: string; values?: readonly number[] }>();
+  private keysNow = new Map<number, { key: string; values?: readonly number[] }>();
+  private internKey(id: number, key: string): string {
+    const was = this.keysWere.get(id)?.key;
+    const k = was === key ? was : key;
+    this.keysNow.set(id, { key: k });
+    return k;
+  }
+  /** A row's key from its values (joined with commas), without joining them again while they're unchanged */
+  private rowKey(id: number, values: readonly number[]): string {
+    const was = this.keysWere.get(id);
+    const same = !!was?.values && was.values.length === values.length && values.every((v, i) => v === was.values![i]);
+    const key = same ? was!.key : values.join(',');
+    this.keysNow.set(id, { key, values });
+    return key;
+  }
+
   private snapshotCount = 0;
 
   private sendSnapshots(): void {
@@ -4965,6 +5035,7 @@ case 'join':
     }
     this.snapshotCount++;
     for (const id of this.hpWire.keys()) if (!this.ships.has(id)) this.hpWire.delete(id);
+    this.syncWire.clear();
     const bySystem = new Map<number, SnapRow[]>();
     this.replication.beginSnapshot();
 
@@ -4992,7 +5063,7 @@ case 'join':
       // Ships that left its view: it forgets them, and gets each again on its own when it comes back
       const out = this.updateShipView(conn, playerSystemId, px, py);
       // (its structure too: the client drops a ship it hasn't seen for a moment, so it's synced afresh when it comes back)
-      for (const id of out) { conn.sentNames.delete(id); conn.shipSynced.delete(id); conn.shipHpSent.delete(id); conn.shipHpAt.delete(id); }
+      for (const id of out) { conn.sentNames.delete(id); conn.shipSynced.delete(id); conn.shipHpSent.delete(id); }
       // Ship motion: keyframes where needed, control changes otherwise
       const rep = this.replication.forClient(playerSystemId, conn.playerId, conn.repKnown, this.currentTick, conn.shipView);
       // Shots from ships it replicates go as fire events: it builds the shells itself (launch.ts).
@@ -5011,10 +5082,8 @@ case 'join':
       for (const r of rows) {
         if ((r.kind === 'player' || r.kind === 'ship') && !conn.shipView.has(r.id)) continue;
         if (r.kind === 'projectile' && covered.has(r.id)) { newStates.set(r.id, r.key); continue; }
-        const d = Math.hypot(r.x - px, r.y - py);
-        if (r.kind === 'projectile' && d > SNAP_PROJECTILE_RANGE) continue;
-        if (r.kind === 'pod' && d > SNAP_POD_RANGE) continue;
-        if (r.kind === 'mob' && d > SNAP_PROJECTILE_RANGE) continue;
+        if ((r.kind === 'projectile' || r.kind === 'mob') && fartherThan(r.x - px, r.y - py, SNAP_PROJECTILE_RANGE)) continue;
+        if (r.kind === 'pod' && fartherThan(r.x - px, r.y - py, SNAP_POD_RANGE)) continue;
         if (r.id === conn.playerId) {
           // Its own ship: only when its prediction needs correcting, its status changed (its warmth too), or now and then
           const d = r.state.data ?? [];
@@ -5119,6 +5188,8 @@ case 'join':
     this.pendingRemovedEntities.clear();
     this.replication.endSnapshot();
     this.ships.fired.length = 0;
+    [this.keysWere, this.keysNow] = [this.keysNow, this.keysWere];
+    this.keysNow.clear();
     const dotsDue = this.currentTick - this.lastMapDotsTick >= MAP_DOTS_TICKS;
     if (dotsDue) this.lastMapDotsTick = this.currentTick;
     this.sendMapDots(dotsDue);
@@ -5205,10 +5276,9 @@ case 'join':
     const party = this.party.partyId(conn) ? new Set(this.party.members(conn).map((m) => m.playerId)) : null;
     const target = this.ships.targetOf(conn.playerId);
     const left: number[] = [];
-    for (const [eid] of this.ships.bodies) {
+    for (const eid of this.ships.bodies.keys()) {
       if (InSystem.systemId[eid] !== systemId) continue;
-      const d = Math.hypot(Position.x[eid] - px, Position.y[eid] - py);
-      if (eid === conn.playerId || d < (was.has(eid) ? SHIP_VIEW_OUT : SHIP_VIEW_IN) || party?.has(eid) || eid === target) now.add(eid);
+      if (eid === conn.playerId || nearerThan(Position.x[eid] - px, Position.y[eid] - py, was.has(eid) ? SHIP_VIEW_OUT : SHIP_VIEW_IN) || party?.has(eid) || eid === target) now.add(eid);
       else if (was.has(eid)) left.push(eid);
     }
     // (Ships gone from the system entirely are removals, sent as before)
@@ -5237,7 +5307,6 @@ case 'join':
     conn.knownEntities.clear();
     conn.shipSynced.clear();
     conn.shipHpSent.clear();
-    conn.shipHpAt.clear();
     conn.sentNames.clear();
     conn.repKnown.clear();
     conn.shipView.clear();
@@ -5441,7 +5510,7 @@ case 'join':
   /**
    * Handle HTTP auth requests (register, login, validate)
    */
-  async handleHttpAuth(req: IncomingMessage, res: ServerResponse, action: 'register' | 'login' | 'validate'): Promise<void> {
+  async handleHttpAuth(req: IncomingMessage, res: ServerResponse, action: 'register' | 'login' | 'validate', address?: string): Promise<void> {
     // (A sign-in is a few hundred bytes: anything past 16 KB is refused, not held in memory)
     let body = '', tooBig = false;
     req.on('data', (chunk: { toString(): string }) => {
@@ -5458,7 +5527,7 @@ case 'join':
         res.setHeader('Content-Type', 'application/json');
 
         if (action === 'register') {
-          const result = await this.userDB.register(data.username, data.email, data.password);
+          const result = await this.userDB.register(data.username, data.email, data.password, address);
           if (result.success) {
             res.writeHead(200);
             res.end(JSON.stringify({ success: true, username: result.user.username, token: result.token, isAdmin: result.user.is_admin }));
@@ -5467,7 +5536,7 @@ case 'join':
             res.end(JSON.stringify({ success: false, error: result.error }));
           }
         } else if (action === 'login') {
-          const result = await this.userDB.login(data.username, data.password);
+          const result = await this.userDB.login(data.username, data.password, address);
           if (result.success) {
             res.writeHead(200);
             res.end(JSON.stringify({ success: true, username: result.user.username, token: result.token, isAdmin: result.user.is_admin }));

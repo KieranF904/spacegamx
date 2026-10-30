@@ -115,7 +115,7 @@ export class PostgresUserStore implements UserStore {
       }
 
       const salt = generateSalt();
-      const passwordHash = hashPassword(password, salt);
+      const passwordHash = await hashPassword(password, salt);
 
       const result = await client.query(
         `INSERT INTO users (username, email, password_hash, salt, is_admin)
@@ -139,7 +139,7 @@ export class PostgresUserStore implements UserStore {
       [username]
     );
     const row = result.rows[0] as UserRow | undefined;
-    if (!row || !verifyPassword(password, row.salt, row.password_hash)) {
+    if (!row || !(await verifyPassword(password, row.salt, row.password_hash))) {
       return { success: false, error: 'Invalid username or password' };
     }
     // (Only told once the password is right, so it doesn't say which names are banned)
@@ -229,12 +229,12 @@ export class PostgresUserStore implements UserStore {
   async checkPassword(userId: number, password: string): Promise<boolean> {
     const result = await this.pool.query('SELECT password_hash, salt FROM users WHERE id = $1', [userId]);
     const row = result.rows[0];
-    return !!row && verifyPassword(password, row.salt, row.password_hash);
+    return !!row && await verifyPassword(password, row.salt, row.password_hash);
   }
 
   async setPassword(userId: number, password: string): Promise<void> {
     const salt = generateSalt();
-    await this.pool.query('UPDATE users SET password_hash = $1, salt = $2 WHERE id = $3', [hashPassword(password, salt), salt, userId]);
+    await this.pool.query('UPDATE users SET password_hash = $1, salt = $2 WHERE id = $3', [await hashPassword(password, salt), salt, userId]);
   }
 
   async setEmail(userId: number, email: string): Promise<string | null> {

@@ -55,7 +55,7 @@ Profiles are `game-v2/data/profiles/<accountId>.json` (gitignored, kept by deplo
 |---|---|---|
 | Client (Vite) | 5273 | Game client + sandbox |
 | Game server | 3000 | WebSocket game server + HTTP auth |
-| Admin server | 3005 | Live admin dashboard (password: `admin`) |
+| Admin server | 3005 | Live admin dashboard (password: `admin` in dev; see `ADMIN_SERVER_PASSWORD`) |
 | Server browser | 8787 | Lobby/server list registry |
 | Website | 5310 | `site/`: updates, community, accounts, Play (see "Website" below) |
 
@@ -99,12 +99,38 @@ The JSON data is 1:1 compatible with the schema — copy the `users` array entri
 |---|---|---|
 | `PORT` | 3000 | Game server port |
 | `ADMIN_PORT` | 3005 | Admin dashboard port |
+| `ADMIN_SERVER_PASSWORD` | dev: `admin`; production: none | The admin dashboard's password (then `ADMIN_PASSWORD`, then `LOBBY_ADMIN_SECRET`). In production with none of them the dashboard doesn't start. The VPS deploy makes one in `/etc/spacegame/secrets.env` (`sudo grep ADMIN_SERVER_PASSWORD` it there) |
 | `BROWSER_URL` | `http://localhost:8787` | Server browser URL |
 | `LOBBY_ADMIN_SECRET` | dev: a fixed one; production: none | Shared by the lobby and the game servers so the admin tools can manage accounts (admin rank, bans). The same value on both; with none in production those commands are refused. The VPS deploy makes one in `/etc/spacegame/secrets.env` |
 | `PUBLIC_HOST` | `localhost` | Host reported to the browser |
 | `USER_STORE_BACKEND` | `json` | `json` or `postgres` |
 | `DATABASE_URL` | — | PostgreSQL connection string |
 | `VITE_BROWSER_URL` | `http://localhost:8787` | Client-side browser URL (Vite) |
+
+## Generated assets: the asset cache
+
+**Anything the client generates goes through the asset cache** (`client/src/assets/assetCache.ts`): textures, atlases,
+built geometry, icons, pictures. It's then made once per browser, not on every visit: from memory, else IndexedDB, else
+built and stored in the background (copied at once, compressed and written when the thread is idle; least recently
+used past 256 MB dropped). Without IndexedDB it just builds. To add a generator:
+
+- give it a version constant beside it, `export const MY_THING_VERSION = 1;`, and **bump it whenever its output
+  changes** (the old ones are then never read and get cleared out). A test fails a kind without one;
+- declare a kind once, `const things = assetKind<Uint8Array>('myThing', MY_THING_VERSION)`, and ask for it:
+  `things.get(hashOf(input), () => build(input))`. Everything the output depends on belongs in the key; game data
+  too (`assets/gameData.ts`, or hash the JSON as `hullWorker.ts` does). Values are anything structured clone takes;
+- build in a worker where it's heavy, and declare the kind in the worker (`proceduralWorker.ts`, `hullWorker.ts`):
+  the lookup, decompression and storing then never touch the main thread. `{ memory: false }` for anything handed
+  away by transfer. Pictures drawn one at a time use `assets/pictureSheet.ts`.
+
+Kept now: the rock, hull and station atlases, stillstone maps, station bakes, intact hull geometry (damaged hulls are
+built each time), the sky noise, item icons, Component Guide pictures and the frost texture. Clear it from DevTools
+(Application, IndexedDB, `space-assets`) to see a first visit.
+
+Shaders are compiled ahead too (`client/src/rendering/shaderWarmup.ts`): the game's programs are listed in
+`rendering/gameShaders.ts` and compiled with `KHR_parallel_shader_compile` behind the sign-in screen, whose backdrop is
+drawn by the game's own renderer (one WebGL context). Add a new shader's program to that list. To measure a first visit
+(cold GPU program cache, empty IndexedDB) and a reload: `node scripts/profile/loadTime.mjs <client url>`.
 
 ## Asset viewer and renders
 
@@ -180,6 +206,10 @@ kept on the viewer (`npm run render-daemon`; its API is on 127.0.0.1:5281, `REND
 up, or its own frozen one on 5299; Chrome runs at Idle priority on the real GPU, and the daemon quits after idle minutes
 (`RENDER_IDLE_MIN`)). `npm run render -- --browser --ui ship:corsair --out viewer.png` shoots the viewer page itself.
 `scripts/boss-shots/shoot.mjs` (live game shots) uses the same daemon. Don't use either for plain stills.
+
+**Sun and sky prototypes** (not in the game yet; `docs/rendering/sun-sky-prototypes.md`): the live lab is
+<http://localhost:5273/sunlab.html> (dev server only), and `node scripts/sun-sky-proto/run.mjs verify|bench|stills|gif|parity <out dir>`
+draws and times the game's sun and sky against them natively (moderngl, no browser).
 
 ## Website (site/)
 

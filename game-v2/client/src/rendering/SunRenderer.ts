@@ -6,6 +6,7 @@
  */
 
 import { Container, Mesh, MeshGeometry, Shader, GlProgram, State } from 'pixi.js';
+import { shaderReady } from './shaderWarmup';
 
 // Vertex shader - creates a quad and passes UV coordinates
 const VERTEX_SHADER = `#version 300 es
@@ -885,6 +886,29 @@ const FRAGMENT_SHADER = `#version 300 es
   }
 `;
 
+const programs = new Map<string, GlProgram>();
+
+/**
+ * The program for one sun style and corona style. The style uniforms become constants, so the driver drops the styles
+ * not drawn (the whole shader is 1 to 2 s to compile cold; one style 0.2 to 1.3 s); what's drawn is the same.
+ * One program per pair, shared by every SunRenderer (the sign-in screen's and the game's), named so its source is the
+ * same from visit to visit (the GPU program cache's key).
+ */
+export function sunProgram(sunStyle: number, coronaStyle: number): GlProgram {
+  const key = `${sunStyle}-${coronaStyle}`;
+  let p = programs.get(key);
+  if (!p) {
+    const fragment = FRAGMENT_SHADER
+      .replace('uniform float uSunStyle;', `const float uSunStyle = ${sunStyle.toFixed(1)};`)
+      .replace('uniform float uCoronaStyle;', `const float uCoronaStyle = ${coronaStyle.toFixed(1)};`);
+    programs.set(key, (p = new GlProgram({ vertex: VERTEX_SHADER, fragment, name: `sun-${key}` })));
+  }
+  return p;
+}
+
+/** Whether this is one of the suns' programs */
+export const isSunProgram = (p: GlProgram) => [...programs.values()].includes(p);
+
 export class SunRenderer {
   private container: Container;
   private mesh: Mesh<MeshGeometry, Shader> | null = null;
@@ -926,15 +950,9 @@ export class SunRenderer {
       indices,
     });
     
-    // Create GL program
-    const glProgram = new GlProgram({
-      vertex: VERTEX_SHADER,
-      fragment: FRAGMENT_SHADER,
-    });
-    
-    // Create shader with inline uniform definitions (PixiJS v8 style)
+    // Create shader with inline uniform definitions (PixiJS v8 style); its program follows the style (update)
     this.shader = new Shader({
-      glProgram,
+      glProgram: sunProgram(this.sunStyle, this.coronaStyle),
       resources: {
         sunUniforms: {
           uTime: { value: 0, type: 'f32' },
@@ -1032,6 +1050,8 @@ export class SunRenderer {
       group.uniforms.uLOD = this.lod;
       group.uniforms.uSunStyle = this.sunStyle;
       group.uniforms.uCoronaStyle = this.coronaStyle;
+      // The disc waits for its style's program to be compiled rather than freeze a frame for it
+      if (this.mesh) this.mesh.visible = shaderReady(this.useStyleProgram());
       group.uniforms.uSunParamsA = this.sunParamsA;
       group.uniforms.uSunParamsB = this.sunParamsB;
       group.uniforms.uCoronaParamsA = this.coronaParamsA;
@@ -1151,6 +1171,7 @@ export class SunRenderer {
     this.sunStyle = styleIndex;
     this.sunParams = params.slice(0, 6);
     this.syncParamArrays();
+    this.useStyleProgram();
   }
 
   /**
@@ -1160,6 +1181,14 @@ export class SunRenderer {
     this.coronaStyle = styleIndex;
     this.coronaParams = params.slice(0, 6);
     this.syncParamArrays();
+    this.useStyleProgram();
+  }
+
+  /** The program for the styles set (see sunProgram) */
+  private useStyleProgram(): GlProgram {
+    const program = sunProgram(this.sunStyle, this.coronaStyle);
+    if (this.shader && this.shader.glProgram !== program) this.shader.glProgram = program;
+    return program;
   }
   
   /**

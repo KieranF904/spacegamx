@@ -1,14 +1,18 @@
 /**
- * Item icons, drawn once per item on a canvas and cached as data URLs.
+ * Item icons, drawn once per item on a canvas and cached as data URLs (kept between visits: pictureSheet).
  * Each category has its own look; ship parts are their real piece outline
  * in the material's colour, marked with what they do.
  */
 
 import { isWeaponFn, lookFn, placeGeometry, type Economy, type ItemDef, type PlacedPart } from '@space-game/common';
 import { ENGINE_FNS, drawDecor2d } from '../ships/partDecor';
+import { pictureSheet } from '../assets/pictureSheet';
+import { pictureData } from '../assets/gameData';
 
 const SIZE = 64;
-const cache = new Map<string, string>();
+/** What it draws, by version (assetCache.ts): bump it whenever the icons change */
+export const ITEM_ICONS_VERSION = 1;
+const cache = pictureSheet<string>('itemIcons', ITEM_ICONS_VERSION, pictureData);
 
 function hash(s: string): number {
   let h = 2166136261;
@@ -43,7 +47,7 @@ export function itemIcon(econ: Economy, id: string): string {
   g.translate(SIZE / 2, SIZE / 2);
   if (def) draw(g, def, econ);
   const url = c.toDataURL();
-  cache.set(id, url);
+  cache.add(id, url);
   return url;
 }
 

@@ -25,8 +25,10 @@
  *
  * Sign-in and registration are limited per address (a few a minute), so the
  * one place every password is checked can't be used to guess them. Wrong
- * passwords are limited per account too (from any address, so many addresses
- * can't share out the guessing). A banned
+ * passwords are limited per account and address (FAIL_LIMIT: a stranger who
+ * knows a pilot's name can lock only their own address out, not the pilot),
+ * and per account from anywhere under a far higher ceiling (NAME_FAIL_LIMIT, so
+ * many addresses still can't share out the guessing). A banned
  * account can't sign in, and its sessions stop validating (the answer says why
  * and until when).
  *
@@ -58,8 +60,13 @@ type Body = (req: http.IncomingMessage) => Promise<any>;
 /** Attempts allowed per address per window */
 const LIMIT = 10;
 const WINDOW_MS = 60_000;
-/** Wrong passwords allowed per account (by the name signed in with, or the account changing itself) per window, from anywhere */
+/**
+ * Wrong passwords allowed per window: signing in, for a name from one address (FAIL_LIMIT) and for a name from
+ * anywhere (NAME_FAIL_LIMIT, far higher: guessing spread over many addresses); changing an account, for the account
+ * (FAIL_LIMIT: that needs its session already)
+ */
 const FAIL_LIMIT = 10;
+const NAME_FAIL_LIMIT = 100;
 const FAIL_WINDOW_MS = 15 * 60_000;
 const SLOW_DOWN = 'Too many attempts. Wait a minute and try again.';
 /** (Why sign-in is refused after many wrong passwords for one account) */
@@ -92,8 +99,10 @@ function adminUser(u: UserSummary, now = Date.now()) {
 export class AccountRoutes {
   /** Every sign-in, registration and account change, by address */
   private attempts = new RateLimiter(LIMIT, WINDOW_MS);
-  /** Wrong passwords, by "name:<what was typed>" or "id:<account>" (a spread-out guesser has many addresses) */
+  /** Wrong passwords, by "name:<what was typed>@<address>" or "id:<account>" */
   private failures = new RateLimiter(FAIL_LIMIT, FAIL_WINDOW_MS);
+  /** Wrong passwords by "name:<what was typed>" from any address (a spread-out guesser has many) */
+  private nameFailures = new RateLimiter(NAME_FAIL_LIMIT, FAIL_WINDOW_MS);
 
   private constructor(private store: UserStore, private sendJson: Json, private parseJson: Body, private ipOf: (req: http.IncomingMessage) => string, private adminSecret: string, private deleted: DeletedAccounts) {}
 
@@ -117,21 +126,23 @@ export class AccountRoutes {
     const str = (v: unknown) => (typeof v === 'string' ? v : '');
 
     if (action === 'login' || action === 'register') {
-      if (!this.allow(this.ipOf(req))) {
+      const ip = this.ipOf(req);
+      if (!this.allow(ip)) {
         this.sendJson(res, 429, { success: false, error: SLOW_DOWN });
         return true;
       }
-      const name = `name:${str(body.username).trim().toLowerCase()}`;
-      if (action === 'login' && this.failures.blocked(name)) {
-        this.sendJson(res, 429, { success: false, error: lockedOut(this.failures.retryAfter(name)) });
+      const name = `name:${str(body.username).trim().toLowerCase()}`, here = `${name}@${ip}`;
+      if (action === 'login' && (this.failures.blocked(here) || this.nameFailures.blocked(name))) {
+        this.sendJson(res, 429, { success: false, error: lockedOut(Math.max(this.failures.retryAfter(here), this.nameFailures.retryAfter(name))) });
         return true;
       }
       const result = action === 'login'
         ? await this.store.login(str(body.username), str(body.password))
         : await this.store.register(str(body.username), str(body.email), str(body.password));
       if (action === 'login') {
-        if (result.success) this.failures.reset(name);
-        else if (result.error === 'Invalid username or password') this.failures.record(name);
+        // (A right password clears this address's count; the ceiling across addresses stays, as a spread-out guesser's)
+        if (result.success) this.failures.reset(here);
+        else if (result.error === 'Invalid username or password') { this.failures.record(here); this.nameFailures.record(name); }
       }
       if (!result.success) { this.sendJson(res, action === 'login' ? 401 : 400, { success: false, error: result.error }); return true; }
       this.sendJson(res, 200, { success: true, username: result.user.username, token: result.token, isAdmin: result.user.is_admin });

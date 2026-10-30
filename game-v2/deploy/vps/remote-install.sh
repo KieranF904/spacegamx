@@ -42,9 +42,12 @@ chown -R spacegame:spacegame "$APP"
 # Secrets, each made once here (root-only, never printed) and read by the services (EnvironmentFile):
 #   LOBBY_ADMIN_SECRET  shared by the lobby, the game server and the website (managing accounts: ranks, bans)
 #   SITE_SECRET         the website's own (it signs its forms)
+#   ADMIN_SERVER_PASSWORD  the game server's admin dashboard (127.0.0.1:3105 only; see it with
+#                       sudo grep ADMIN_SERVER_PASSWORD /etc/spacegame/secrets.env). Not ADMIN_PASSWORD: the lobby
+#                       reads that one to make an admin account
 SECRETS=/etc/spacegame/secrets.env
 install -d -m 700 /etc/spacegame
-for name in LOBBY_ADMIN_SECRET SITE_SECRET; do
+for name in LOBBY_ADMIN_SECRET SITE_SECRET ADMIN_SERVER_PASSWORD; do
   if ! grep -q "^$name=" "$SECRETS" 2>/dev/null; then
     (umask 077; echo "$name=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')" >> "$SECRETS")
   fi

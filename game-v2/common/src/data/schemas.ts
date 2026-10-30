@@ -683,10 +683,6 @@ export interface QuestData {
 // DATA FILE ROOTS
 // ============================================
 
-export interface LegacyItemsFile {
-  items: ItemData[];
-}
-
 export interface SystemsFile {
   systems: StarSystemData[];
 }
@@ -701,8 +697,4 @@ export interface NPCsFile {
 
 export interface StationsFile {
   stations: StationData[];
-}
-
-export interface LegacyQuestsFile {
-  quests: QuestData[];
 }

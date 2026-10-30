@@ -223,3 +223,24 @@ describe('a deleted account', () => {
     }
   });
 });
+
+describe('guest names', () => {
+  it("a guest can't take a registered pilot's or an admin's name, whatever its case, and is told why", async () => {
+    const { join } = world(true);
+    for (const [name, whose] of [['PILOT', "a registered pilot's"], ['Boss', "an admin's"], ['away', "a registered pilot's"]] as const) {
+      const g = await join(name, true);
+      const r = of(g.got, 'authResult').at(-1)!;
+      expect(r.success).toBe(false);
+      expect(r.error).toBe(`"${name}" is ${whose} name. Sign in to fly as them, or pick another name.`);
+    }
+    const ok = await join('Stranger', true);
+    expect(of(ok.got, 'authResult').at(-1)).toMatchObject({ success: true, username: 'Stranger' });
+  });
+
+  it("without the lobby to ask, the pilots signed in here still can't be posed as", async () => {
+    const { join } = world(false);
+    await join('chief');
+    expect(of((await join('CHIEF', true)).got, 'authResult').at(-1)).toMatchObject({ success: false, error: expect.stringContaining("an admin's name") });
+    expect(of((await join('helper', true)).got, 'authResult').at(-1)).toMatchObject({ success: true, username: 'helper' });
+  });
+});

@@ -79,7 +79,7 @@ export interface ContextTarget {
 }
 
 /** Small and specific first; big places (planets) last */
-export const TIER: Record<ContextKind, number> = {
+const TIER: Record<ContextKind, number> = {
   person: 0,
   pilot: 1, hostile: 1, boss: 1, derelict: 1, civilian: 1, ship: 1, loot: 1, wreck: 1,
   rock: 2,
@@ -88,7 +88,7 @@ export const TIER: Record<ContextKind, number> = {
 };
 
 /** At most this many things in one menu */
-export const MAX_GROUPS = 4;
+const MAX_GROUPS = 4;
 
 /**
  * Everything under the cursor, the menu's sections in order: by tier, then
@@ -201,7 +201,7 @@ export interface DriveFacts {
 /** Closer than this, flying there is nothing to do (the autopilot's own arrival radius) */
 export const MIN_FLY = 350;
 /** The jump drive goes no shorter than its minRange; a little over it, the coast at the end eats some */
-export const JUMP_MIN_SLACK = 1.1;
+const JUMP_MIN_SLACK = 1.1;
 
 /** Why the drive can't jump `dist` now, or null */
 export function jumpBlocked(dist: number, d: DriveFacts): string | null {
@@ -291,7 +291,7 @@ export function orderStep(o: { selfActing: boolean }, s: { autopilot: boolean; a
 }
 
 /** Line up this close (radians) before charging, as the autopilot does: the jump goes along the nose */
-export const JUMP_ALIGN = 0.04;
+const JUMP_ALIGN = 0.04;
 /** Give up lining up after this long (ticks) */
 export const JUMP_ALIGN_TICKS = 60 * 5;
 

@@ -120,6 +120,11 @@ export class PlayerStatsUI {
         left: 50%;
         transform: translate(-50%, -50%);
         width: 450px;
+        /* Fits short screens: the panel scrolls rather than running off the top and bottom */
+        max-height: calc(100vh - 32px);
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(125, 160, 210, 0.3) transparent;
         background: rgba(0, 10, 30, 0.95);
         backdrop-filter: blur(10px);
         border: 1px solid rgba(100, 180, 255, 0.3);
@@ -324,7 +329,7 @@ export class PlayerStatsUI {
     this.panelEl.innerHTML = `
       <div class="stats-header">
         <span class="stats-title">Pilot Statistics</span>
-        <button class="stats-close">✕</button>
+        <button class="stats-close" title="Close (Esc)">✕</button>
       </div>
       <div class="stats-content">
         <div class="stats-grid">

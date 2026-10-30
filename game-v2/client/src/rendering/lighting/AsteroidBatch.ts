@@ -25,6 +25,8 @@ import { ROCK_LOD, rockAtlas, rockLitProgram, rockProgram, rockUniforms } from '
 import type { AsteroidRock } from '../AsteroidLook';
 
 const PER_CHUNK = 32;
+/** The programs the rocks draw with (for compiling ahead: shaderWarmup) */
+export const asteroidPrograms = () => [rockLitProgram(PER_CHUNK), rockProgram(PER_CHUNK)];
 /** Chunk rebuilds per frame at most (more wait a frame) */
 const REBUILDS_PER_FRAME = 2;
 /** A rock joins the nearest chunk with room only if that chunk's rocks are within this (world units); otherwise it starts an empty or new one */

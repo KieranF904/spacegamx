@@ -9,10 +9,13 @@ import { NetworkManager } from './network/NetworkManager';
 import { InputManager } from './input/InputManager';
 import { Renderer } from './rendering/Renderer';
 import { noseUpAngle } from './rendering/cameraView';
+import { attachShaderWarmup, warmShaders } from './rendering/shaderWarmup';
+import { gameShaders } from './rendering/gameShaders';
 import { GameState } from './state/GameState';
 import { InventoryWindow } from './ui/InventoryWindow';
-import { ComponentGuideUI } from './ui/ComponentGuideUI';
-import { StationWindow } from './ui/StationWindow';
+import type { ComponentGuideUI } from './ui/ComponentGuideUI';
+import { Lazy, prefetchIdle } from './lazy';
+import type { StationWindow } from './ui/StationWindow';
 import { PilotHud, ToastUI } from './ui/PilotHud';
 import { CargoPanelUI } from './ui/CargoPanelUI';
 import { RegionUI } from './ui/RegionUI';
@@ -43,7 +46,7 @@ import { ContextActions } from './input/ContextActions';
 import { GuideUI } from './ui/GuideUI';
 import { BossUI } from './ui/BossUI';
 import { QuickBar } from './ui/QuickBar';
-import { GameMenuUI } from './ui/GameMenuUI';
+import { GameMenuUI, fieldGuide } from './ui/GameMenuUI';
 import { settings, SettingsData } from './settings/Settings';
 import { AutoQuality, PROFILES, type QualityTier } from './settings/quality';
 import { ACTIONS, boundKeyName } from './input/keybindings';
@@ -52,8 +55,8 @@ import { SystemMapUI } from './ui/SystemMapUI';
 import { DamageIndicatorUI } from './ui/DamageIndicatorUI';
 import { FloatingRewardsUI } from './ui/FloatingRewardsUI';
 import { ShipClient } from './ships/ShipClient';
-import { AdminPanel } from './ui/AdminPanel';
-import { ContributorPanel } from './ui/ContributorPanel';
+import type { AdminPanel } from './ui/AdminPanel';
+import type { ContributorPanel } from './ui/ContributorPanel';
 import { RenderTuningPanel } from './ui/RenderTuningPanel';
 import { DevShipPanel } from './ui/DevShipPanel';
 import { ObjectiveBanner } from './ui/ObjectiveBanner';
@@ -154,8 +157,13 @@ export class Game {
   private loginUI!: LoginUI;
   private serverBrowserUI!: ServerBrowserUI;
   private inventoryWindow!: InventoryWindow;
-  private componentGuide!: ComponentGuideUI;
-  private stationWindow!: StationWindow;
+  /** Split out of the main chunk (see prefetchScreens) */
+  private componentGuide!: Lazy<ComponentGuideUI>;
+  /** Split out of the main chunk (see prefetchScreens; calls made before it arrives run when it does, in order) */
+  private stationWindow!: Lazy<StationWindow>;
+  private get stationOpen(): boolean {
+    return this.stationWindow?.value?.isOpen ?? false;
+  }
   /** The pilot's progress, cargo and storage as the server reports them */
   readonly pilot: PilotState;
   private pilotHud!: PilotHud;
@@ -314,9 +322,9 @@ private xpFillEl: HTMLElement | null;
       catalog: shipCatalog,
       pilot: this.pilot,
       grantAllParts: !!options.proto,
-      onDocked: () => this.stationWindow.open(),
-      stationOpen: () => this.stationWindow?.isOpen ?? false,
-      onHangarBackToStation: () => this.stationWindow.showAgain(),
+      onDocked: () => this.stationWindow.use((w) => w.open()),
+      stationOpen: () => this.stationOpen,
+      onHangarBackToStation: () => this.stationWindow.use((w) => w.showAgain()),
       miningHeld: () => this.rightHeld() && !this.menu?.isOpen,
       tuning: shipTuningData,
       state: this.state,
@@ -397,6 +405,9 @@ this.xpFillEl = document.getElementById('xpFill');
       (r as unknown as { render: (o: unknown) => void }).render = (o) => {
         const opts = o as { container?: unknown; target?: unknown } | undefined;
         if (opts?.container === this.app.stage && !opts.target) {
+          // While the sign-in screen is up its backdrop is drawn instead of the world (one renderer: shaders compile once)
+          const backdrop = this.loginUI?.backdrop();
+          if (backdrop) { base({ ...opts, container: backdrop }); return; }
           if (this.worldPaused && !this.refreshWorld) return;
           this.refreshWorld = false;
         }
@@ -420,10 +431,14 @@ this.xpFillEl = document.getElementById('xpFill');
     
     // Initialize UI components
     const uiOverlay = document.getElementById('ui-overlay')!;
-    this.loginUI = new LoginUI(uiOverlay);
+    this.loginUI = new LoginUI(uiOverlay, this.app);
+    // Load time: the shaders compiled ahead, off the main thread, while the sign-in screen is up (see shaderWarmup)
+    attachShaderWarmup(this.app.renderer);
+    warmShaders(gameShaders(this.app.renderer, this.loginUI.backdrop(), this.app.stage, (systemsDataForMenu as unknown as { systems: StarSystemData[] }).systems));
     this.serverBrowserUI = new ServerBrowserUI(uiOverlay);
     this.inventoryWindow = new InventoryWindow(this.pilot, (m) => this.network.send(m), (id) => this.audio.playUI(id, id === 'ui_click' ? 0.4 : 0.6));
-    this.componentGuide = new ComponentGuideUI({ catalog: this.pilot.econ.ships, tuning: shipTuning as ShipTuning, pilot: this.pilot, sound: (id, v) => this.audio.playUI(id, v ?? 0.6) });
+    this.componentGuide = new Lazy(() => import('./ui/ComponentGuideUI').then(({ ComponentGuideUI }) =>
+      new ComponentGuideUI({ catalog: this.pilot.econ.ships, tuning: shipTuning as ShipTuning, pilot: this.pilot, sound: (id, v) => this.audio.playUI(id, v ?? 0.6) })));
     this.pilotHud = new PilotHud(this.pilot);
     this.cargoPanel = new CargoPanelUI(this.pilot, (m) => this.network.send(m), (id) => this.audio.playUI(id, 0.4));
     this.cargoPanel.ceiling = () => this.pilotHud.bottom();
@@ -443,15 +458,15 @@ this.xpFillEl = document.getElementById('xpFill');
       return [...out];
     };
     this.quests = new QuestClient({ pilot: this.pilot, send: (m) => this.network.send(m), sound: (id, v) => this.audio.playUI(id, v ?? 0.6) });
-    this.stationWindow = new StationWindow({
+    this.stationWindow = new Lazy(() => import('./ui/StationWindow').then(({ StationWindow }) => new StationWindow({
       quests: this.quests,
       pilot: this.pilot,
       send: (m) => this.network.send(m),
       sound: (id, v) => this.audio.playUI(id, v ?? 0.6),
-      openHangar: (slot) => { this.stationWindow.hideForHangar(); this.shipClient.openHangar(slot); },
+      openHangar: (slot) => { this.stationWindow.value?.hideForHangar(); this.shipClient.openHangar(slot); },
       openInventory: () => this.inventoryWindow.open(),
       onClose: () => { if (!this.shipClient.hangarOpen) this.shipClient.undock(); },
-    });
+    })));
     this.toasts = new ToastUI();
     this.dialogue = new DialogueUI({
       pilot: this.pilot, send: (m) => this.network.send(m), sound: (id, v) => this.audio.playUI(id, v ?? 0.6),
@@ -476,7 +491,7 @@ this.xpFillEl = document.getElementById('xpFill');
         this.audio.playUI('ui_open', 0.5);
         if (station) {
           this.showSystemMessage(`Autopilot: arrived at ${station}`, '#86efac');
-          if (!this.stationWindow.isOpen) this.shipClient.onKey('KeyH');
+          if (!this.stationOpen) this.shipClient.onKey('KeyH');
         }
       },
       message: (text, color) => this.showSystemMessage(text, color),
@@ -503,7 +518,7 @@ this.xpFillEl = document.getElementById('xpFill');
       people: () => this.peopleUI?.here() ?? [],
       talkRange: TALK_RANGE,
       enabled: () => this.loggedIn && !this.localDead && !this.shipClient.hangarOpen && !this.menu.isOpen && !this.systemMapUI.isOpen
-        && !this.stationWindow.isOpen && !this.inventoryWindow.isOpen && !this.tradeWindow.isOpen && !this.social.window.isOpen && !this.quests.log.isOpen && !this.componentGuide.isOpen
+        && !this.stationOpen && !this.inventoryWindow.isOpen && !this.tradeWindow.isOpen && !this.social.window.isOpen && !this.quests.log.isOpen && !this.componentGuide.value?.isOpen
         && !this.adminPanel?.capturesFlight,
       menuModifier: () => this.input.isKeyDown('KeyZ'),
       autopilot: this.autopilot,
@@ -567,8 +582,8 @@ this.xpFillEl = document.getElementById('xpFill');
       worldToScreen: (x, y) => this.renderer.worldToScreen(x, y),
       oreInHold: () => this.pilot.cargo.filter((s) => ['mineral', 'gem', 'volatile'].includes(this.pilot.econ.items.get(s.id)?.category ?? '')).reduce((t, s) => t + s.n, 0),
       inventoryOpen: () => this.inventoryWindow.isOpen,
-      stationOpen: () => this.stationWindow.isOpen,
-      stationTab: () => (this.stationWindow.isOpen ? this.stationWindow.currentTab : ''),
+      stationOpen: () => this.stationOpen,
+      stationTab: () => (this.stationOpen ? this.stationWindow.value!.currentTab : ''),
       inDockRing: () => this.shipClient.isDocked(),
       autopilotOn: () => this.autopilot.active,
       sound: (id, v) => this.audio.playUI(id, v ?? 0.5),
@@ -579,7 +594,6 @@ this.xpFillEl = document.getElementById('xpFill');
     this.killFeedUI = new KillFeedUI(uiOverlay);
     this.playerStatsUI = new PlayerStatsUI(uiOverlay);
     this.systemMapUI = new SystemMapUI(uiOverlay, this.state);
-    this.systemMapUI.onWarp = (systemId, x, y) => this.network.send({ type: 'devTeleport', systemId, x, y });
     this.systemMapUI.onFlyTo = (dest) => this.flyTo(dest);
     this.systemMapUI.wreck = () => (this.wreck && this.wreck.until > Date.now() ? this.wreck : null);
     this.systemMapUI.jump = () => ({ aiming: this.shipClient.jumpAiming(), phase: this.shipClient.localJump().phase, reach: this.shipClient.jumpReach() });
@@ -690,6 +704,16 @@ this.xpFillEl = document.getElementById('xpFill');
     this.signedIn(await lobbyAuth('register', { username, password, email }));
   }
 
+  /** The screens split out of the main chunk were asked for (prefetchScreens) */
+  private screensFetched = false;
+
+  /** Fetches the split-out screens in idle time once past the sign-in screen, so none waits when first opened */
+  private prefetchScreens(): void {
+    if (this.screensFetched) return;
+    this.screensFetched = true;
+    void prefetchIdle([() => this.stationWindow.load(), () => this.shipClient.hangar.load(), () => this.componentGuide.load(), () => fieldGuide.load()]);
+  }
+
   /** The lobby's answer to a sign-in: on to the server list with a token, or the reason it was refused */
   private signedIn(r: LobbyAuthResult): void {
     if (!r.success || !r.token) {
@@ -704,6 +728,7 @@ this.xpFillEl = document.getElementById('xpFill');
     this.loginUI.setLoading(false);
     this.loginUI.hide();
     this.serverBrowserUI.show();
+    this.prefetchScreens();
   }
 
   /** A saved session from last time: if the lobby still knows it, skip the sign-in screen */
@@ -727,6 +752,7 @@ this.xpFillEl = document.getElementById('xpFill');
     this.pendingAuth = { type: 'guest', username: guestName };
     this.loginUI.hide();
     this.serverBrowserUI.show();
+    this.prefetchScreens();
   }
 
   private handleServerSelect(server: ServerInfo): void {
@@ -814,7 +840,7 @@ this.xpFillEl = document.getElementById('xpFill');
       level: () => this.pilot.profile?.level ?? this.state.level,
       xp: () => this.pilot.profile?.xp ?? this.state.xp,
       icon: (id) => itemIcon(this.pilot.econ, id),
-      openComponents: () => this.componentGuide.open(),
+      openComponents: () => this.componentGuide.use((g) => g.open()),
     });
   }
 
@@ -1041,13 +1067,13 @@ this.xpFillEl = document.getElementById('xpFill');
     // A conversation: digits answer, Space skips ahead, Esc walks away
     if (this.dialogue.onKey(code)) return;
     // The component guide sits over everything else (the hangar, the station)
-    if (this.componentGuide.isOpen) {
-      if (code === 'Escape' || code === 'KeyC') this.componentGuide.close();
+    if (this.componentGuide.value?.isOpen) {
+      if (code === 'Escape' || code === 'KeyC') this.componentGuide.value.close();
       return;
     }
     // C: the component guide (anywhere but the map, which centres on C)
     if (code === 'KeyC' && this.loggedIn && !this.systemMapUI.isOpen) {
-      this.componentGuide.open();
+      this.componentGuide.use((g) => g.open());
       return;
     }
     if (this.inventoryWindow.isOpen) {
@@ -1068,8 +1094,8 @@ this.xpFillEl = document.getElementById('xpFill');
       else if (code === 'KeyK') this.quests.log.toggle('skills');
       return;
     }
-    if (this.stationWindow.isOpen && !this.shipClient.hangarOpen) {
-      if (code === 'Escape' || code === 'KeyH') this.stationWindow.close();
+    if (this.stationOpen && !this.shipClient.hangarOpen) {
+      if (code === 'Escape' || code === 'KeyH') this.stationWindow.value!.close();
       else if (code === 'KeyI') this.inventoryWindow.open();
       return;
     }
@@ -1124,9 +1150,10 @@ this.xpFillEl = document.getElementById('xpFill');
       return;
     }
 
-    // Escape opens the menu (the map and the hangar close themselves first)
+    // Escape opens the menu (the map and the hangar close themselves first; the stats panel closes instead)
     if (code === 'Escape' && this.loggedIn) {
-      this.menu.open();
+      if (this.playerStatsUI.isVisible()) this.playerStatsUI.hide();
+      else this.menu.open();
       return;
     }
     
@@ -1213,7 +1240,7 @@ this.xpFillEl = document.getElementById('xpFill');
   /** Engage the autopilot (map clicks, the job tracker, party members, right-clicks) */
   flyTo(dest: AutoDest, note?: string): void {
     if (!this.loggedIn || this.proto) return;
-    if (this.stationWindow.isOpen) this.stationWindow.close();
+    if (this.stationOpen) this.stationWindow.value!.close();
     // (Somewhere new: a menu jump lining up is off)
     if (this.context.jumpMark()) this.context.cancel();
     this.autopilot.engage(dest, note);
@@ -1224,7 +1251,7 @@ this.xpFillEl = document.getElementById('xpFill');
     if (this.autopilot.active) { this.autopilot.cancel('Autopilot off'); return; }
     const t = this.objective();
     const q = this.quests.current() ?? this.quests.trackedLead();
-    if (!t || !q) { this.showSystemMessage('Follow a job or a lead with a destination first (L), or click a place on the map (M)', '#f2d24b'); return; }
+    if (!t || !q) { this.showSystemMessage(`Follow a job or a lead with a destination first (${boundKeyName('log', settings.data.bindings)}), or click a place on the map (${boundKeyName('map', settings.data.bindings)})`, '#f2d24b'); return; }
     this.flyTo({ kind: 'objective', name: t.label || q.name });
   }
 
@@ -1316,7 +1343,7 @@ this.xpFillEl = document.getElementById('xpFill');
     this.updateSounds(now);
     if (this.navMarkers) {
       this.navMarkers.setHidden(!this.loggedIn || this.shipClient.hangarOpen || this.systemMapUI.isOpen || this.menu.isOpen);
-    this.regionUI.setHidden(!this.loggedIn || this.shipClient.hangarOpen || this.menu.isOpen || this.stationWindow.isOpen);
+    this.regionUI.setHidden(!this.loggedIn || this.shipClient.hangarOpen || this.menu.isOpen || this.stationOpen);
       this.navMarkers.update();
     }
     if (this.peopleUI) {
@@ -1326,12 +1353,12 @@ this.xpFillEl = document.getElementById('xpFill');
     this.updateGuide();
     this.context.update();
     this.bossUI.hidden = !this.loggedIn || this.shipClient.hangarOpen || this.systemMapUI.isOpen;
-    if (!this.loggedIn || this.shipClient.hangarOpen || this.menu.isOpen || this.stationWindow.isOpen) this.autopilot.setHidden(true);
+    if (!this.loggedIn || this.shipClient.hangarOpen || this.menu.isOpen || this.stationOpen) this.autopilot.setHidden(true);
     this.bossUI.update();
     this.farMarkers.setHidden(!this.loggedIn || this.shipClient.hangarOpen || this.systemMapUI.isOpen || this.menu.isOpen);
     this.farMarkers.update();
     const blocked = !this.loggedIn || this.shipClient.hangarOpen || this.systemMapUI.isOpen || this.menu.isOpen;
-    const windowOpen = this.stationWindow.isOpen || this.inventoryWindow.isOpen || this.tradeWindow.isOpen || this.social.window.isOpen || this.quests.log.isOpen || this.componentGuide.isOpen;
+    const windowOpen = this.stationOpen || this.inventoryWindow.isOpen || this.tradeWindow.isOpen || this.social.window.isOpen || this.quests.log.isOpen || !!this.componentGuide.value?.isOpen;
     this.targetUI.setHidden(blocked);
     this.targetUI.update();
     this.infoPanel.update(!blocked && !windowOpen && !this.localDead);
@@ -1340,13 +1367,13 @@ this.xpFillEl = document.getElementById('xpFill');
     // A construct job's site, while a piece is going on: the constructor beam
     const building = this.opsUI.ops.find((o) => o.kind === 'construct' && o.system === this.state.systemId && o.markers[0]?.state === 'active');
     this.buildSites?.update(1 / 60, building ? building.markers[0] : null);
-    this.tutorial.update(blocked || this.localDead);
+    this.tutorial.update(blocked || this.localDead || this.playerStatsUI.isVisible());
     this.pingUI.setHidden(blocked);
     this.pingUI.update();
     // The hold above the chat: not while docked (the station's storage has it) or behind a full-screen view
     {
       const me = this.state.entities.get(this.state.playerId);
-      this.cargoPanel.update(blocked || this.stationWindow.isOpen || !me, !!me && !inSafeSpace(this.currentSystem(), me.renderX, me.renderY));
+      this.cargoPanel.update(blocked || this.stationOpen || !me, !!me && !inSafeSpace(this.currentSystem(), me.renderX, me.renderY));
     }
     this.updateHeatGauge();
 
@@ -1377,7 +1404,8 @@ this.xpFillEl = document.getElementById('xpFill');
     const paused = this.loggedIn && (this.shipClient.hangarOpen || this.menu.isOpen);
     this.worldPaused = paused;
     const covered = this.systemMapUI.covers();
-    if (!paused || this.refreshWorld) {
+    // (Nor under the sign-in screen, whose backdrop is drawn instead: its shaders are still compiling ahead)
+    if ((!paused || this.refreshWorld) && !this.loginUI.backdrop()) {
       // Update renderer
       this.renderer.update(delta);
       // Under a map that covers the screen the world isn't drawn at all (the GPU gets a rest)
@@ -1479,7 +1507,7 @@ this.xpFillEl = document.getElementById('xpFill');
     if (fireLeft && this.context.jumpMark()) this.context.cancel('Jump cancelled');
     // The autopilot flies until a click (or a flight key) takes over
     if (this.autopilot.active && (fireLeft || fireRight)) this.autopilot.cancel('Autopilot off');
-    const auto = this.loggedIn && inputEnabled && !this.stationWindow.isOpen ? this.autopilot.tick() : null;
+    const auto = this.loggedIn && inputEnabled && !this.stationOpen ? this.autopilot.tick() : null;
     if (auto) { fireLeft = fireRight = false; }
     
     // Gun sounds come from the shots themselves (updateSounds); firing stirs the combat music
@@ -1779,15 +1807,15 @@ this.xpFillEl = document.getElementById('xpFill');
         break;
 
       case 'station':
-        this.stationWindow.setStation(msg);
+        this.stationWindow.use((w) => w.setStation(msg));
         break;
 
       case 'vendors':
-        this.stationWindow.setVendors(msg);
+        this.stationWindow.use((w) => w.setVendors(msg));
         break;
 
       case 'marketScan':
-        this.stationWindow.setScan(msg);
+        this.stationWindow.use((w) => w.setScan(msg));
         break;
 
       case 'quests':
@@ -2128,6 +2156,8 @@ this.xpFillEl = document.getElementById('xpFill');
 
   private onConnected(): void {
     console.log('Connected to server');
+    // (proto mode skips the server list)
+    this.prefetchScreens();
     this.clearLoadingClick();
     if (this.loadingEl) this.loadingEl.style.display = 'none';
     // The sign-in backdrop has done its job: free its renderer (it's rebuilt if the sign-in screen comes back)
@@ -2226,6 +2256,8 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'none';
         try { localStorage.setItem('authToken', msg.token); } catch (e) {}
       }
       this.isAdmin = !!msg.isAdmin;
+      // Map warp (Ctrl-click) is an admin tool: the server refuses it for anyone else, so only admins see it offered
+      this.systemMapUI.onWarp = this.isAdmin ? (systemId, x, y) => this.network.send({ type: 'devTeleport', systemId, x, y }) : null;
       
       if (this.isAdmin) this.startAdmin();
       else this.stopAdmin();
@@ -2280,25 +2312,34 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'none';
   /** The admin panel (admins only; F2 opens it) */
   private adminPanel: AdminPanel | null = null;
 
+  /** Its chunk is on its way (split out of the main chunk: only admins fetch it) */
+  private adminLoading = false;
+
   private startAdmin(): void {
-    if (this.adminPanel) return;
-    this.adminPanel = new AdminPanel({
-      send: (m) => this.network.send(m),
-      state: this.state,
-      econ: this.pilot.econ,
-      cursorWorld: () => this.renderer.screenToWorld(this.input.mouseX, this.input.mouseY),
-      screenToWorld: (x, y) => this.renderer.screenToWorld(x, y),
-      setCamera: (t) => this.renderer.setCameraTarget(t),
-      zoom: () => this.input.zoom,
-      isKeyDown: (c) => this.input.isKeyDown(c),
-      clientStats: () => {
-        const s = this.state;
-        return `<b>Prediction</b><span>${s.predErrorPre.toFixed(1)}px before · ${s.predErrorPost.toFixed(1)}px after (avg ${s.predErrorPreAvg.toFixed(1)})</span>
-          <b>Snaps</b><span>${s.predSnapCount}</span><b>Pending</b><span>${s.predPendingCount} inputs</span>
-          <b>Input delay</b><span>${s.inputDelayTicks} ticks (${(s.inputDelayTicks * 16.67).toFixed(0)} ms)</span>`;
-      },
-    });
-    this.addChatMessage('', 'Admin: F2 opens the admin panel, F3 teleports to the cursor, F4 frees the camera. /help lists the chat commands.', true, '#ff8a6a');
+    if (this.adminPanel || this.adminLoading) return;
+    this.adminLoading = true;
+    void import('./ui/AdminPanel').then(({ AdminPanel }) => {
+      this.adminLoading = false;
+      // (signed out while it loaded)
+      if (this.adminPanel || !this.isAdmin) return;
+      this.adminPanel = new AdminPanel({
+        send: (m) => this.network.send(m),
+        state: this.state,
+        econ: this.pilot.econ,
+        cursorWorld: () => this.renderer.screenToWorld(this.input.mouseX, this.input.mouseY),
+        screenToWorld: (x, y) => this.renderer.screenToWorld(x, y),
+        setCamera: (t) => this.renderer.setCameraTarget(t),
+        zoom: () => this.input.zoom,
+        isKeyDown: (c) => this.input.isKeyDown(c),
+        clientStats: () => {
+          const s = this.state;
+          return `<b>Prediction</b><span>${s.predErrorPre.toFixed(1)}px before · ${s.predErrorPost.toFixed(1)}px after (avg ${s.predErrorPreAvg.toFixed(1)})</span>
+            <b>Snaps</b><span>${s.predSnapCount}</span><b>Pending</b><span>${s.predPendingCount} inputs</span>
+            <b>Input delay</b><span>${s.inputDelayTicks} ticks (${(s.inputDelayTicks * 16.67).toFixed(0)} ms)</span>`;
+        },
+      });
+      this.addChatMessage('', 'Admin: F2 opens the admin panel, F3 teleports to the cursor, F4 frees the camera. /help lists the chat commands.', true, '#ff8a6a');
+    }, (e) => { this.adminLoading = false; console.error('Admin panel failed to load:', e); });
   }
 
   private stopAdmin(): void {
@@ -2309,25 +2350,32 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'none';
 
   /** Contributor notes (contributors and admins; F6) */
   private contribPanel: ContributorPanel | null = null;
+  /** Started and not stopped since (its chunk loads first: only contributors fetch it) */
+  private contribWanted = false;
 
   private startContrib(): void {
     if (this.contribPanel || this.proto) return;
-    this.contribPanel = new ContributorPanel({
-      send: (m) => this.network.send(m),
-      state: this.state,
-      me: () => this.state.playerName,
-      isAdmin: () => this.isAdmin,
-      screenToWorld: (x, y) => this.renderer.screenToWorld(x, y),
-      worldToScreen: (x, y) => this.renderer.worldToScreen(x, y),
-      zoom: () => this.renderer.getZoom(),
-      map: this.systemMapUI,
-      flyTo: (d) => this.flyTo(d),
-      setCamera: (t) => this.renderer.setCameraTarget(t),
-      warp: (systemId, x, y) => this.network.send({ type: 'devTeleport', systemId, x, y }),
-    });
+    this.contribWanted = true;
+    void import('./ui/ContributorPanel').then(({ ContributorPanel }) => {
+      if (this.contribPanel || !this.contribWanted) return;
+      this.contribPanel = new ContributorPanel({
+        send: (m) => this.network.send(m),
+        state: this.state,
+        me: () => this.state.playerName,
+        isAdmin: () => this.isAdmin,
+        screenToWorld: (x, y) => this.renderer.screenToWorld(x, y),
+        worldToScreen: (x, y) => this.renderer.worldToScreen(x, y),
+        zoom: () => this.renderer.getZoom(),
+        map: this.systemMapUI,
+        flyTo: (d) => this.flyTo(d),
+        setCamera: (t) => this.renderer.setCameraTarget(t),
+        warp: (systemId, x, y) => this.network.send({ type: 'devTeleport', systemId, x, y }),
+      });
+    }, (e) => console.error('Contributor panel failed to load:', e));
   }
 
   private stopContrib(): void {
+    this.contribWanted = false;
     this.contribPanel?.destroy();
     this.contribPanel = null;
   }

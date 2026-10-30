@@ -20,11 +20,11 @@ export type AuthResult =
 
 /** What the game server needs of the accounts */
 export interface UserStore {
-  /** Create a new account and start a session */
-  register(username: string, email: string, password: string): Promise<AuthResult>;
+  /** Create a new account and start a session (`ip`: the player's address, for the attempt limits) */
+  register(username: string, email: string, password: string, ip?: string): Promise<AuthResult>;
 
-  /** Verify credentials and start a session */
-  login(username: string, password: string): Promise<AuthResult>;
+  /** Verify credentials and start a session (`ip`: the player's address, for the attempt limits) */
+  login(username: string, password: string, ip?: string): Promise<AuthResult>;
 
   /** Resolve a session token to a user, or null if invalid/expired */
   validateSession(token: string): Promise<UserRecord | null>;

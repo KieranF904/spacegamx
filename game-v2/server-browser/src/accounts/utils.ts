@@ -27,8 +27,16 @@ export function banMessage(user: { banned_until: number | null; ban_reason: stri
  * PBKDF2-SHA512 password hashing.
  * Same parameters as the original SQLite UserDB, so existing hashes
  * remain valid if you migrate old data.
+ * Asynchronous (on libuv's thread pool): each hash is ~50-100 ms of CPU, and a flood of sign-ins mustn't stall
+ * everything else the lobby does. The Sync forms are for start-up only (seeding the admin account).
  */
-export function hashPassword(password: string, salt: string): string {
+export function hashPassword(password: string, salt: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    crypto.pbkdf2(password, salt, 100000, 64, 'sha512', (err, key) => (err ? reject(err) : resolve(key.toString('hex'))));
+  });
+}
+
+export function hashPasswordSync(password: string, salt: string): string {
   return crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
 }
 
@@ -41,13 +49,24 @@ export function generateToken(): string {
 }
 
 /** Constant-time password verification (safe against malformed stored hashes) */
-export function verifyPassword(password: string, salt: string, expectedHash: string): boolean {
+export async function verifyPassword(password: string, salt: string, expectedHash: string): Promise<boolean> {
   try {
-    const hash = hashPassword(password, salt);
-    return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(expectedHash));
+    return sameHash(await hashPassword(password, salt), expectedHash);
   } catch {
     return false;
   }
+}
+
+export function verifyPasswordSync(password: string, salt: string, expectedHash: string): boolean {
+  try {
+    return sameHash(hashPasswordSync(password, salt), expectedHash);
+  } catch {
+    return false;
+  }
+}
+
+function sameHash(hash: string, expected: string): boolean {
+  return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(expected));
 }
 
 /**

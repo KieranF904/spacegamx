@@ -258,7 +258,7 @@ const SHAPES: Record<string, Spec> = {
   'items.json': strict({
     items: arr(strict({
       id: 'string', name: 'string', category: oneOf(...ITEM_CATEGORIES), rarity: oneOf(...RARITIES), value: 'number', color: 'string', description: 'string',
-      'volume?': 'number', 'part?': obj({ material: 'string', fn: 'string', piece: 'string' }), 'plan?': 'string', 'quest?': 'string', 'teaches?': 'string[]',
+      'volume?': 'number', 'part?': obj({ material: 'string', fn: 'string', piece: 'string' }), 'plan?': 'string', 'quest?': 'string',
       'repair?': obj({ budget: 'number', hpPerSec: 'number', restoreSec: 'number' }),
       'family?': oneOf(...MINERAL_FAMILIES), 'tier?': 'number', 'trace?': 'boolean', 'short?': 'string', 'socket?': obj({ type: 'string', level: 'number' }),
       'ammoFor?': obj({ weapon: 'string', rounds: 'number', 'mods?': 'any' }), 'codex?': 'string',
@@ -812,7 +812,6 @@ export function validateGameData(files: GameDataFiles, opts: ValidateOptions = {
     const F = 'items.json', P = `items[${i}]`;
     if (it?.plan !== undefined) plan(F, `${P}.plan`, it.plan);
     if (it?.quest !== undefined) quest(F, `${P}.quest`, it.quest);
-    list(it?.teaches).forEach((l, j) => licence(F, `${P}.teaches[${j}]`, l));
     if (it?.codex !== undefined) record(F, `${P}.codex`, it.codex);
     if (isObj(it?.part)) { material(F, `${P}.part.material`, it.part.material); fn(F, `${P}.part.fn`, it.part.fn); piece(F, `${P}.part.piece`, it.part.piece); }
   });

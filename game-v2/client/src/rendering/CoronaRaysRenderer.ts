@@ -155,6 +155,8 @@ const FRAGMENT_SHADER = `#version 300 es
   }
 `;
 
+let program: GlProgram | null = null;
+
 export class CoronaRaysRenderer {
   private container: Container;
   private mesh: Mesh<MeshGeometry, Shader> | null = null;
@@ -184,7 +186,8 @@ export class CoronaRaysRenderer {
     const indices = new Uint32Array([0, 1, 2, 0, 2, 3]);
     const geometry = new MeshGeometry({ positions, uvs, indices });
 
-    const glProgram = new GlProgram({ vertex: VERTEX_SHADER, fragment: FRAGMENT_SHADER });
+    // (One for every corona, compiled once)
+    const glProgram = (program ??= new GlProgram({ vertex: VERTEX_SHADER, fragment: FRAGMENT_SHADER, name: 'corona-rays' }));
 
     this.shader = new Shader({
       glProgram,

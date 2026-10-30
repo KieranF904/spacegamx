@@ -29,7 +29,8 @@ import type { Renderer } from '../rendering/Renderer';
 import { ShipStore } from './ShipStore';
 import { ShipRenderer } from './ShipRenderer';
 import { ShipHud } from './ShipHud';
-import { HangarUI } from './HangarUI';
+import type { HangarUI } from './HangarUI';
+import { Lazy } from '../lazy';
 import { JumpFx } from './JumpFx';
 import { terrainFor } from '../rendering/terrainData';
 import { BossFx } from './BossFx';
@@ -83,7 +84,8 @@ export class ShipClient {
   private renderer: ShipRenderer | null = null;
   private scene: Renderer | null = null;
   private hud: ShipHud;
-  private hangar: HangarUI;
+  /** Split out of the main chunk (Game prefetches it after sign-in) */
+  readonly hangar: Lazy<HangarUI>;
   private helm = false;
   /** The settings' control mode last applied (V's switch holds until the setting itself changes) */
   private appliedMode: string | null = null;
@@ -150,7 +152,7 @@ export class ShipClient {
     this.repairHint.style.display = 'none';
     document.body.appendChild(this.repairHint);
     this.hud = new ShipHud(this.store, () => opts.state.playerId, () => this.helm);
-    this.hangar = new HangarUI({
+    this.hangar = new Lazy(() => import('./HangarUI').then(({ HangarUI }) => new HangarUI({
       catalog: opts.catalog,
       tuning: opts.tuning,
       econ: opts.pilot.econ,
@@ -188,8 +190,8 @@ export class ShipClient {
         else this.undock();
         opts.onHangarClose?.();
       },
-    });
-    opts.pilot.onChange(() => this.hangar.onHangarUpdate());
+    })));
+    opts.pilot.onChange(() => this.hangar.value?.onHangarUpdate());
     this.store.onMissing = (id) => opts.send({ type: 'shipNeed', id });
     this.replicas = new ShipReplicaSet(opts.tuning, (id) => this.store.get(id)?.derived, () => ({ gravity: this.gravity, central: this.central, lodestones: this.lodestones, hazard: this.hazardFor, terrain: this.terrain }),
       (station) => {
@@ -316,7 +318,7 @@ export class ShipClient {
     this.beamFx = new MiningBeamFx(renderer.getEffectLayer(), this.store, this.opts.state, this.opts.tuning, () => {
       const aim = this.opts.localAim();
       const ship = this.store.get(this.opts.state.playerId);
-      return { firing: !!this.opts.miningHeld?.() && !!ship?.derived.miners.length && !this.hangar.isOpen, aim: aim.angle, dist: aim.dist };
+      return { firing: !!this.opts.miningHeld?.() && !!ship?.derived.miners.length && !this.hangarOpen, aim: aim.angle, dist: aim.dist };
     });
     // A pulse laser's pulse: its charge whine, the crack at its peak and its fading tail (pitched by its grade)
     this.beamFx.onPulse = (x, y, grade, own) => { this.opts.sound?.('laser_pulse', own ? undefined : { x, y }, own ? 0.42 : 0.7, PULSE_GRADE_PITCH[Math.max(0, Math.min(4, grade - 1))]); };
@@ -493,10 +495,10 @@ export class ShipClient {
   /** Is the jump control on this tick? (J latches it; it releases once the burn starts.) */
   jumpHeld(): boolean {
     // Hold mode: the key itself is the control (let go while spooling to abort)
-    if (settings.data.gameplay.jumpMode === 'hold') return !this.hangar.isOpen && this.opts.isKeyDown('KeyJ');
+    if (settings.data.gameplay.jumpMode === 'hold') return !this.hangarOpen && this.opts.isKeyDown('KeyJ');
     if (this.jumpLatched) {
       const ph = this.localJump().phase;
-      if (ph === 'burn' || ph === 'cooldown' || this.hangar.isOpen) this.jumpLatched = false;
+      if (ph === 'burn' || ph === 'cooldown' || this.hangarOpen) this.jumpLatched = false;
     }
     return this.jumpLatched;
   }
@@ -505,7 +507,7 @@ export class ShipClient {
   private localThrustCommand(): ThrustCommand {
     const me = this.opts.state.entities.get(this.opts.state.playerId);
     const idle: ThrustCommand = { dir: [0, 0], turn: 0, boost: false };
-    if (!me || this.hangar.isOpen || !(this.opts.inputEnabled?.() ?? true)) return idle;
+    if (!me || this.hangarOpen || !(this.opts.inputEnabled?.() ?? true)) return idle;
     if (this.localJump().phase !== 'ready' && this.localJump().phase !== 'cooldown') return idle; // the drive has the engines
     const k = (...codes: string[]) => (codes.some((c) => this.opts.isKeyDown(c)) ? 1 : 0);
     const fwd = k('KeyW', 'ArrowUp'), back = k('KeyS', 'ArrowDown'), left = k('KeyA', 'ArrowLeft'), right = k('KeyD', 'ArrowRight');
@@ -587,7 +589,7 @@ export class ShipClient {
   }
 
   get hangarOpen(): boolean {
-    return this.hangar.isOpen;
+    return this.hangar.value?.isOpen ?? false;
   }
 
   helmMode(): boolean {
@@ -674,7 +676,7 @@ export class ShipClient {
           if (this.docked) this.opts.showMessage(`Docked at ${msg.station}`, '#7dd3fc');
           this.opts.sound?.(this.docked ? 'dock' : 'ui_open');
           if (this.opts.onDocked && this.docked) this.opts.onDocked(msg.station ?? 'Station');
-          else this.hangar.open();
+          else this.hangar.use((h) => h.open());
         } else {
           this.opts.showMessage(`Can't dock: ${msg.error ?? 'refused'}`, '#f2d24b');
           this.opts.sound?.('error');
@@ -739,7 +741,7 @@ export class ShipClient {
 
   /** Open the hangar (from the station screen), on a slot or the ship you fly */
   openHangar(slot?: number): void {
-    this.hangar.open(slot);
+    this.hangar.use((h) => h.open(slot));
   }
 
   /** Leave the berth (station screen closed) */
@@ -757,7 +759,7 @@ export class ShipClient {
   }
 
   onKey(code: string): boolean {
-    if (this.hangar.isOpen) return this.hangar.handleKey(code);
+    if (this.hangarOpen) return this.hangar.value!.handleKey(code);
     if (code === 'KeyV') {
       this.helm = !this.helm;
       return true;
@@ -776,10 +778,10 @@ export class ShipClient {
       return true;
     }
     if (code === 'KeyH') {
-      if (this.opts.editAnywhere) this.hangar.open();
+      if (this.opts.editAnywhere) this.hangar.use((h) => h.open());
       else if (this.dockPending) return true;
       else if (this.isDocked()) { this.dockPending = true; this.opts.send({ type: 'dock' }); }
-      else this.opts.showMessage("Fly into a station's docking ring and press H to dock", '#f2d24b');
+      else this.opts.showMessage(`Fly into a station's docking ring and press ${boundKeyName('dock', settings.data.bindings)} to dock`, '#f2d24b');
       return true;
     }
     return false;
@@ -891,7 +893,7 @@ export class ShipClient {
     this.lastFrame = now;
     const me = state.entities.get(state.playerId);
     this.jumpFx?.update(dt, {
-      hidden: this.hangar.isOpen || !this.store.get(state.playerId), latched: this.jumpLatched,
+      hidden: this.hangarOpen || !this.store.get(state.playerId), latched: this.jumpLatched,
       aiming: this.jumpAiming(), aimDist: this.jumpAimInfo.dist, aimLabel: this.jumpAimInfo.label,
       reach: this.jumpReach(), field: me ? this.gaugeField() : undefined, danger: this.jumpAiming() ? this.jumpDanger() : null,
     });
@@ -903,8 +905,8 @@ export class ShipClient {
 
     // "Press H to dock" while inside a station's docking ring (not while docked: the station's screen is up);
     // in orbit close over a planet you can land on, "X to descend"
-    const station = !this.opts.editAnywhere && !this.hangar.isOpen && !this.dockPending && !this.opts.stationOpen?.() ? this.stationInRange() : null;
-    const planet = !station && !this.hangar.isOpen ? this.planetHint : null;
+    const station = !this.opts.editAnywhere && !this.hangarOpen && !this.dockPending && !this.opts.stationOpen?.() ? this.stationInRange() : null;
+    const planet = !station && !this.hangarOpen ? this.planetHint : null;
     setStyle(this.dockHint, 'display', station || planet ? 'block' : 'none');
     if (station) setHtml(this.dockHint, `<kbd>${boundKeyName('dock', settings.data.bindings)}</kbd> Dock at <b>${station.name ?? 'station'}</b>`);
     else if (planet) setHtml(this.dockHint, `<kbd>${boundKeyName('interact', settings.data.bindings)}</kbd> ${this.planetVerb} <b>${planet}</b>`);
@@ -916,7 +918,7 @@ export class ShipClient {
     const me = this.opts.state.entities.get(this.opts.state.playerId);
     const range = this.opts.tuning.repair?.range ?? 0;
     let text = '';
-    if (ship && me && range > 0 && ship.derived.root >= 0 && !this.hangar.isOpen) {
+    if (ship && me && range > 0 && ship.derived.root >= 0 && !this.hangarOpen) {
       let near = false;
       for (const e of this.opts.state.entities.values()) {
         if (e.type === EntityType.Station && Math.hypot(e.x - me.x, e.y - me.y) < (e.data?.[8] ?? 200) + range) { near = true; break; }

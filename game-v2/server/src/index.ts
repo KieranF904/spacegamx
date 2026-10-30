@@ -6,7 +6,7 @@ import { join, dirname } from 'path';
 import { appendFile, mkdir, writeFile, rename } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { GameServer } from './GameServer.js';
-import { AdminServer } from './AdminServer.js';
+import { AdminServer, adminPassword } from './AdminServer.js';
 import { createUserStore } from './auth/index.js';
 import { readGameDataFiles } from './data/loadGameDataFromDisk.js';
 import { GameData } from './data/GameData.js';
@@ -36,10 +36,16 @@ console.log('Starting Space Game Server v2...');
 console.log(`Data path: ${dataPath}`);
 console.log(`Mode: ${DEV_MODE ? 'DEVELOPMENT' : 'PRODUCTION'}`);
 
-// Start admin server (both dev and production for live editing)
+// Start admin server (both dev and production for live editing), with a password from the environment
+// (adminPassword: development falls back to 'admin'; production has none, so without one it stays off)
 let adminServer: AdminServer | null = null;
-adminServer = new AdminServer(ADMIN_PORT);
-console.log(`Admin server running on port ${ADMIN_PORT}`);
+const ADMIN_PASSWORD = adminPassword();
+if (ADMIN_PASSWORD) {
+  adminServer = new AdminServer(ADMIN_PORT, ADMIN_PASSWORD);
+  console.log(`Admin server running on port ${ADMIN_PORT}`);
+} else {
+  console.log("Admin server not started: no ADMIN_SERVER_PASSWORD, ADMIN_PASSWORD or LOBBY_ADMIN_SECRET is set (production has no default password)");
+}
 
 // Accounts: the lobby keeps them (one account for every server); we ask it
 const userStore = createUserStore(BROWSER_URL, LOBBY_ADMIN_SECRET);

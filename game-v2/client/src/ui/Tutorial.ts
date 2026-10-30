@@ -8,8 +8,15 @@
 
 import { EntityType } from '@space-game/common';
 import type { GameState } from '../state/GameState';
+import { boundKeyName } from '../input/keybindings';
+import { settings } from '../settings/Settings';
 
 const DONE_KEY = 'sg.tutorialDone';
+
+/** The key an action is bound to now, as a key cap (read as each step shows, so a rebind mid-tour shows too) */
+const k = (id: string) => `<kbd>${boundKeyName(id, settings.data.bindings)}</kbd>`;
+/** Boost: either Shift works while it's on a Shift key */
+const boostKey = () => ((settings.data.bindings.boost ?? 'ShiftLeft').startsWith('Shift') ? '<kbd>Shift</kbd>' : k('boost'));
 
 export interface TutorialDeps {
   state: GameState;
@@ -33,7 +40,7 @@ export interface TutorialDeps {
 }
 
 interface Step {
-  text: string;
+  text(): string;
   /** Key caps to show */
   keys?: string[];
   /** Where the arrow points (world), if anywhere */
@@ -61,7 +68,7 @@ export class Tutorial {
   constructor(private d: TutorialDeps) {
     const css = document.createElement('style');
     css.textContent = `
-.tut { position: fixed; left: 50%; bottom: 168px; transform: translateX(-50%); z-index: 2100; display: none; max-width: min(560px, calc(100vw - 32px));
+.tut { position: fixed; left: 50%; bottom: 236px; transform: translateX(-50%); z-index: 2100; display: none; max-width: min(560px, calc(100vw - 32px));
   padding: 12px 16px 10px; border-radius: 12px; background: linear-gradient(180deg, rgba(16, 30, 52, 0.95), rgba(8, 16, 30, 0.95));
   border: 1px solid rgba(251, 191, 36, 0.55); box-shadow: 0 0 30px rgba(251, 191, 36, 0.15), 0 12px 40px rgba(0,0,0,0.5);
   color: #e5ecf7; font: 14px 'Segoe UI', system-ui, sans-serif; line-height: 1.45; animation: tutin .25s ease-out; }
@@ -99,38 +106,38 @@ export class Tutorial {
     };
     this.steps = [
       {
-        text: 'Fly with <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>. Your ship turns to face the mouse cursor.',
+        text: () => `Fly with ${k('forward')}${k('left')}${k('backward')}${k('right')}. Your ship turns to face the mouse cursor.`,
         done: () => this.flown > 700,
       },
       {
-        text: 'Hold <kbd>Shift</kbd> while thrusting to boost. The blue gauge on the right is your boost fuel; it refills on its own.',
+        text: () => `Hold ${boostKey()} while thrusting to boost. The <b>ENERGY</b> gauge on the right is your boost fuel; it refills on its own.`,
         done: () => { if (d.isKeyDown('ShiftLeft') || d.isKeyDown('ShiftRight')) this.boostTicks++; return this.boostTicks > 40; },
       },
       {
-        text: 'Ore comes from asteroids. Aim at one and hold the <b>left mouse button</b>: chunks of ore break off. Then fly through them to scoop them into your hold.',
+        text: () => 'Ore comes from asteroids. Aim at one and hold the <b>left mouse button</b>: chunks of ore break off. Then fly through them to scoop them into your hold.',
         target: nearest(EntityType.Asteroid, () => 'Asteroid'),
         done: () => d.oreInHold() > 0,
       },
       {
-        text: 'Got some. Press <kbd>I</kbd> to look in your hold (and your station storage, when you\'re docked).',
+        text: () => `Got some. Press ${k('inventory')} to look in your hold (and your station storage, when you're docked).`,
         done: () => d.inventoryOpen(),
       },
       {
-        text: 'Now head for the station: follow the arrow. Or open the map with <kbd>M</kbd> and click the station, and the autopilot flies you there (<kbd>G</kbd> does the same for the job you\'re following). Any flight key takes back control.',
+        text: () => `Now head for the station: follow the arrow. Or open the map with ${k('map')} and click the station, and the autopilot flies you there (${k('autopilot')} does the same for the job you're following). Any flight key takes back control.`,
         target: nearest(EntityType.Station, (e) => e.name ?? 'Station'),
         done: () => d.inDockRing() || d.stationOpen(),
       },
       {
-        text: 'You\'re in the docking ring. Press <kbd>H</kbd> to dock: the station repairs you, buys your ore, and has jobs on its board.',
+        text: () => `You're in the docking ring. Press ${k('dock')} to dock: the station repairs you, buys your ore, and has jobs on its board.`,
         done: () => d.stationOpen(),
       },
       {
-        text: 'Open the <b>Ships</b> tab: your hangar slots, the plans you know, and building ships part by part.',
+        text: () => 'Open the <b>Ships</b> tab: your hangar slots, the plans you know, and building ships part by part.',
         element: () => [...document.querySelectorAll<HTMLElement>('.sgw-tab')].find((el) => el.textContent === 'Ships' && el.offsetParent !== null) ?? null,
         done: () => d.stationTab() === 'ships',
       },
       {
-        text: 'Target practice. Leave the station, and a stray <b>Helios drone</b> drifts out in front of you: harmless. <kbd>Tab</kbd> targets it; hold the <b>left mouse button</b> to shoot it down. Hits that flash <b style="color:#94a3b8">grey</b> are glancing: that gun is too weak for the armour it hit.',
+        text: () => `Target practice. Leave the station, and a stray <b>Helios drone</b> drifts out in front of you: harmless. ${k('targetNext')} targets it; hold the <b>left mouse button</b> to shoot it down. Hits that flash <b style="color:#94a3b8">grey</b> are glancing: that gun is too weak for the armour it hit.`,
         keys: ['Tab'],
         target: () => {
           const m = me();
@@ -151,12 +158,12 @@ export class Tutorial {
         },
       },
       {
-        text: 'Your <b>jump drive</b> crosses space in seconds. Point the cursor where you want to go (a marker at the screen edge locks it on), then press <kbd>J</kbd>. The ring is how far it reaches; the reticle turns <b style="color:#f87171">red</b> if you\'d land somewhere bad. Then it recharges for a few seconds, so just fly the short hops. A bigger ship needs jump coils to jump as far.',
+        text: () => `Your <b>jump drive</b> crosses space in seconds. Point the cursor where you want to go (a marker at the screen edge locks it on), then press ${k('jump')}. The ring is how far it reaches; the reticle turns <b style="color:#f87171">red</b> if you'd land somewhere bad. Then it recharges for a few seconds, so just fly the short hops. A bigger ship needs jump coils to jump as far.`,
         keys: ['J'],
         done: () => d.jumpPhase() === 'burn',
       },
       {
-        text: 'That\'s the basics. Inner Sol is <b style="color:#5eead4">safe space</b>: hostiles keep out, and a ship lost here comes back whole. Past Jovan it gets rough, and the gates show what\'s beyond them. <kbd>L</kbd> jobs · <kbd>M</kbd> map · <kbd>P</kbd> party · <kbd>1</kbd>–<kbd>5</kbd> quick bar. Good flying!',
+        text: () => `That's the basics. Inner Sol is <b style="color:#5eead4">safe space</b>: hostiles keep out, and a ship lost here comes back whole. Past Jovan it gets rough, and the gates show what's beyond them. ${k('log')} jobs · ${k('map')} map · ${k('party')} party · ${k('quick1')}–${k('quick5')} quick bar · hold ${k('contextMenu')} and right-click anything for what you can do with it. Good flying!`,
         done: () => performance.now() - this.stepStart > 14000,
       },
     ];
@@ -189,7 +196,7 @@ export class Tutorial {
     if (i >= this.steps.length) return this.finish();
     if (i > 0) this.d.sound('scan_ping', 0.4);
     const s = this.steps[i];
-    this.card.innerHTML = `<div class="h"><span>FLIGHT SCHOOL · ${i + 1} OF ${this.steps.length}</span><button>Skip tutorial ✕</button></div><div>${s.text}</div>
+    this.card.innerHTML = `<div class="h"><span>FLIGHT SCHOOL · ${i + 1} OF ${this.steps.length}</span><button>Skip tutorial ✕</button></div><div>${s.text()}</div>
       <div class="dots">${this.steps.map((_, k) => `<i class="${k <= i ? 'on' : ''}"></i>`).join('')}</div>`;
     this.card.querySelector('button')!.onclick = () => this.finish();
     this.card.style.display = 'block';

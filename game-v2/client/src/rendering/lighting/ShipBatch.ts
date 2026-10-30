@@ -337,6 +337,10 @@ void main() {
 }`;
 
 let program: GlProgram | null = null;
+/** The hulls' program (one for every chunk) */
+export function shipHullProgram(): GlProgram {
+  return (program ??= new GlProgram({ vertex: vertex(PER_CHUNK), fragment, name: `ship-hull-${PER_CHUNK}` }));
+}
 
 /** A ship's hull: as built close in, and its light version for far off */
 export interface ShipHull { full: ShipGeometry; far: ShipGeometry }
@@ -456,7 +460,6 @@ export class ShipBatch {
   }
 
   private newChunk(solo = false): Chunk {
-    program ??= new GlProgram({ vertex: vertex(PER_CHUNK), fragment, name: `ship-hull-${PER_CHUNK}` });
     const geoFull = new ShipGeometry().toShipGeometry(), geoFar = new ShipGeometry().toShipGeometry();
     const lit = new LitMesh(geoFull, { slots: PER_CHUNK, chunk: true });
     lit.area = { x: 0, y: 0, r: 0 };
@@ -473,7 +476,7 @@ export class ShipBatch {
     });
     const detail = hullAtlas();
     lit.mesh.shader = new Shader({
-      glProgram: program,
+      glProgram: shipHullProgram(),
       resources: { litUniforms: (lit.shader.resources as Record<string, unknown>).litUniforms, shipUniforms, uDamage: damageTex.source, uDetail: detail.source },
     });
     const chunk: Chunk = {

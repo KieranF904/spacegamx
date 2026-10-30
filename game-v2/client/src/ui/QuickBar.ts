@@ -62,7 +62,7 @@ export class QuickBar {
       });
       el.addEventListener('mousemove', (e) => {
         const id = this.pilot.profile?.quickbar?.[i];
-        showTip(id ? itemTipHtml(this.pilot.econ, id, { count: this.count(id), hint: `${this.keyName(i)} or click to use · right-click to clear` }) : 'Empty slot: drag an item here from your cargo (I)', e.clientX, e.clientY);
+        showTip(id ? itemTipHtml(this.pilot.econ, id, { count: this.count(id), hint: `${this.keyName(i)} or click to use · right-click to clear` }) : `Empty slot: drag an item here from your cargo (${boundKeyName('inventory', settings.data.bindings)})`, e.clientX, e.clientY);
       });
       el.addEventListener('mouseleave', hideTip);
       this.root.appendChild(el);

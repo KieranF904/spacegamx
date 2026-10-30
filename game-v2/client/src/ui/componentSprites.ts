@@ -11,11 +11,16 @@ import { isWeaponFn, partNeedsFacing, placeGeometry, type Catalog, type PlacedPa
 import { ENGINE_FNS, decorOf, drawDecor2d } from '../ships/partDecor';
 import { gradeGlow, partColors } from '../ships/hullPreview2d';
 import { mix, numToCss } from '../ships/shipColors';
+import { pictureSheet } from '../assets/pictureSheet';
+import { pictureData } from '../assets/gameData';
 
 /** CSS pixels a cell */
 export const CELL_PX = 34;
 const DPR = 2;
-const cache = new Map<string, { url: string; w: number; h: number }>();
+/** What it draws, by version (assetCache.ts): bump it whenever the pictures change */
+export const PART_SPRITES_VERSION = 1;
+/** (Kept between visits: pictureSheet) */
+const cache = pictureSheet<{ url: string; w: number; h: number }>('partSprites', PART_SPRITES_VERSION, pictureData);
 
 /** One part, or several side by side (structure: hull, armour, cargo) */
 export interface SpritePart { fn: string; material: string; piece: string; x?: number; y?: number }
@@ -79,7 +84,7 @@ export function partSprite(catalog: Catalog, parts: SpritePart[]): { url: string
   o.shadowOffsetY = dy;
   o.drawImage(art, box.x, box.y, box.w, box.h, sh, sh, box.w, box.h);
   const res = { url: out.toDataURL(), w: out.width / DPR, h: out.height / DPR };
-  cache.set(key, res);
+  cache.add(key, res);
   return res;
 }
 

@@ -29,6 +29,12 @@ export interface HullJob {
 }
 export interface HullDone { id: number; full: WireGeometry; far: WireGeometry; barrels: BarrelSpec[]; bones: { sk: number; cover: number; g: WireGeometry }[] }
 
+/**
+ * What a job makes, by version (assetCache.ts: intact hulls are kept): bump it whenever the hull build's output changes
+ * (hullBuild, skeletonBuild, bakeHull, ShipGeometry's fields). Changes to the ship data are caught without it
+ */
+export const HULL_GEOMETRY_VERSION = 1;
+
 const LIT = ['pos', 'nrm', 'col', 'slot'], SHIP = ['part', 'kind', 'tone', 'hullMat', 'grade', 'engine', 'expo', 'bend', 'dep'];
 
 export function toWire(g: LitGeometry): WireGeometry {
@@ -78,7 +84,11 @@ export function runHullJob(catalog: Catalog, tuning: ShipTuning, job: HullJob, c
       for (const [cover, piece] of skeletonCovered(g, geoms, ship.derived.com, cs, over)) bones.push({ sk: i, cover, g: toWire(piece) });
     });
   }
-  const full = toWire(hull.full), far = toWire(hull.far);
-  const moved = [full, far, ...bones.map((b) => b.g)].flatMap((w) => Object.values(w.f).map((a) => a.buffer as ArrayBuffer));
-  return { done: { id, full, far, barrels, bones }, moved };
+  const done = { id, full: toWire(hull.full), far: toWire(hull.far), barrels, bones };
+  return { done, moved: hullBuffers(done) };
+}
+
+/** A built hull's buffers (to move with it) */
+export function hullBuffers(h: Omit<HullDone, 'id'>): ArrayBuffer[] {
+  return [h.full, h.far, ...h.bones.map((b) => b.g)].flatMap((w) => Object.values(w.f).map((a) => a.buffer as ArrayBuffer));
 }

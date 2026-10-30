@@ -63,12 +63,15 @@ export class BossFx {
   private scorches: Scorch[] = [];
   private rings: Ring[] = [];
   private t = 0;
+  /** Round the Graphics: drawn again into the bloom, a layer is a render group, and a Graphics redrawn as one rebuilds the scene's draw list */
+  private root = new Container();
   /** The beams and warnings (for the bloom) */
-  get glowLayer(): Graphics { return this.g; }
+  get glowLayer(): Container { return this.root; }
 
   constructor(layer: Container, private state: GameState, private sound: (id: string, at?: { x: number; y: number }, volume?: number, pitch?: number) => (() => void) | null) {
     this.g.blendMode = 'add';
-    layer.addChild(this.g);
+    this.root.addChild(this.g);
+    layer.addChild(this.root);
   }
 
   onTelegraph(m: ServerBossTelegraphMessage): void {

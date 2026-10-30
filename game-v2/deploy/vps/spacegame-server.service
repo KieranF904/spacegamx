@@ -13,7 +13,7 @@ Environment=NODE_ENV=production
 Environment=PORT=3100
 Environment=ADMIN_PORT=3105
 Environment=BROWSER_URL=http://127.0.0.1:8790
-# LOBBY_ADMIN_SECRET (shared with the lobby: admin ranks and bans; remote-install.sh makes it)
+# LOBBY_ADMIN_SECRET (shared with the lobby: admin ranks and bans) and ADMIN_SERVER_PASSWORD (the admin dashboard's); remote-install.sh makes them
 EnvironmentFile=-/etc/spacegame/secrets.env
 Environment=PUBLIC_HOST=space.brotherk3d.com
 Environment="SERVER_NAME=Space Game v2"

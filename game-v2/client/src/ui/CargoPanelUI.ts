@@ -129,6 +129,8 @@ export class CargoPanelUI {
     }
     // The list's height: as the pilot left it, but no taller than the room between the chat and the readout above
     if (this.hidden || this.collapsed) return;
+    // An empty hold is one line, not a tall blank box
+    if (!this.pilot.cargo.length) { this.grid.style.height = 'auto'; return; }
     const chrome = this.root.offsetHeight - this.grid.offsetHeight;
     const room = floor - (this.ceiling?.() ?? 0) - 8 - chrome;
     this.grid.style.height = `${Math.round(Math.max(MIN_H, Math.min(this.want, room)))}px`;
@@ -200,8 +202,9 @@ export class CargoPanelUI {
     if (!p.cargo.length) {
       const e = document.createElement('div');
       e.className = 'sgc-empty';
-      e.textContent = 'Hold empty';
+      e.textContent = 'Empty: shoot asteroids, then fly through the ore';
       this.grid.appendChild(e);
+      this.place();
       return;
     }
     // (sortStacks keeps the stacks themselves, so they key secureHold's map)
@@ -223,6 +226,8 @@ export class CargoPanelUI {
       it.addEventListener('contextmenu', (e) => { e.preventDefault(); hideTip(); this.jettisonMenu(s.id, e); });
       this.grid.appendChild(it);
     }
+    // (Back from the one-line empty hold to its own height)
+    if (this.grid.style.height === 'auto') this.place();
   }
 
   /** The same choices as the inventory window's */

@@ -50,6 +50,36 @@ describe('snapshot frames', () => {
     expect(decodeServerFrame(wire)).toEqual([snap]);
   });
 
+  it('a snapshot encodes to exactly the bytes of its compact row, with its keyframes and control rows shared between clients', async () => {
+    const { encodeServerMessage, packSnapshot, COMPACT_TYPES } = await import('./protocol.js');
+    const { encodeBinary } = await import('./binaryCodec.js');
+    // (What the compact row is: see packCompact)
+    const generic = (m: any) => {
+      const p = packSnapshot(m) as any;
+      const row = [COMPACT_TYPES.indexOf('snapshot'), ...['t', 'lp', 'e', 'p', 'r', 'k', 'c', 'o', 'f'].map((f) => p[f] ?? null)];
+      while (row.length > 1 && row[row.length - 1] === null) row.pop();
+      return encodeBinary(row);
+    };
+    let seed = 7;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const num = () => (rnd() < 0.3 ? Math.round(rnd() * 300) - 40 : Math.round((rnd() - 0.5) * 2e6) / 100);
+    // Rows made once and sent to several clients, as the server's Replication does
+    const keyframes = Array.from({ length: 40 }, (_, i) => [3000 + i, ...Array.from({ length: 8 + (i % 6) }, num)]);
+    const ctls = Array.from({ length: 40 }, (_, i) => [i % 3 ? 3000 + i * 7 : -1 - (3000 + i * 7), ...Array.from({ length: 1 + (i % 5) }, num)]);
+    const pick = <T,>(xs: T[]) => xs.filter(() => rnd() < 0.4);
+    for (let n = 0; n < 60; n++) {
+      const snap: any = {
+        type: 'snapshot', tick: 1000 + n, lastProcessedInput: n % 4 ? n : 0, removed: n % 3 ? [] : [5, 6],
+        entities: n % 2 ? [{ id: 1, type: 1, x: 10.5, y: -3, angle: 0.25, hp: 100, data: [1, 2, 3], name: 'Ash' },
+          { id: 40, type: 7, vx: 8.38, vy: -31.3, data: [1, 1, 0, 990 + n, 27286.2, 21513.6, 2247, 1, 0] }] : [],
+        ships: n % 5 ? pick(keyframes) : undefined, ctl: n % 7 ? pick(ctls) : undefined, out: n % 4 ? undefined : [9, 10],
+        fire: n % 6 ? undefined : [[3001, 2, 3, 4100, 5000, 5001]],
+      };
+      if (n === 13) { snap.ships = keyframes; snap.ctl = ctls; } // (more than 31: the longer array header)
+      expect([...encodeServerMessage(snap)]).toEqual([...generic(snap)]);
+    }
+  });
+
   it('frequent messages go as arrays of values; anything unexpected goes as it is', async () => {
     const { encodeMessage, decodeServerFrame } = await import('./protocol.js');
     const msgs = [

@@ -47,6 +47,9 @@ interface Shadow {
   events: number[];
   /** The aim as of the last snapshot (what clients have: control rows step from it) */
   qSent: number;
+  /** This snapshot's keyframe and control row, each packed once for every client that gets it */
+  keyRow?: KeyframeRow;
+  ctlRow?: ControlRow;
 }
 
 const sameDock = (a: Shadow['dock'], b: Shadow['dock']) => (!a && !b) || (!!a && !!b && a.station === b.station && a.ox === b.ox && a.oy === b.oy);
@@ -108,12 +111,13 @@ export class Replication {
       if (s.diverged || mode === ReplicaMode.Docked) continue;
       if (occupied && !occupied.has(InSystem.systemId[eid])) { s.diverged = true; continue; }
       replicaStep(mode, s.body, { bits, targetAngle: replicaAngle(mode, q) }, rec?.derived ?? ship.derived, this.ships.tuning, this.host.env(eid), tick);
-      const r = this.real(eid);
+      // (The real state, as real() has it, read in place: this runs for every ship every tick)
+      const rx = Position.x[eid], ry = Position.y[eid], rvx = Velocity.x[eid], rvy = Velocity.y[eid], ra = Rotation.angle[eid];
       const b = s.body;
-      if (b.x !== r.x || b.y !== r.y || b.vx !== r.vx || b.vy !== r.vy || b.angle !== r.angle || b.angVel !== r.angVel
-        || (b.jump ?? 0) !== (r.jump ?? 0) || (b.jumpScale ?? 1) !== (r.jumpScale ?? 1)) {
+      if (b.x !== rx || b.y !== ry || b.vx !== rvx || b.vy !== rvy || b.angle !== ra || b.angVel !== ship.angVel
+        || (b.jump ?? 0) !== (ship.jump ?? 0) || (b.jumpScale ?? 1) !== (ship.jumpScale ?? 1)) {
         s.diverged = true;
-        this.why(`${ReplicaMode[mode]}:${b.x !== r.x || b.y !== r.y ? 'pos' : b.vx !== r.vx || b.vy !== r.vy ? 'vel' : b.angle !== r.angle || b.angVel !== r.angVel ? 'turn' : 'jump'}`);
+        this.why(`${ReplicaMode[mode]}:${b.x !== rx || b.y !== ry ? 'pos' : b.vx !== rvx || b.vy !== rvy ? 'vel' : b.angle !== ra || b.angVel !== ship.angVel ? 'turn' : 'jump'}`);
       }
     }
     this.ships.replicaCtl.clear();
@@ -129,6 +133,7 @@ export class Replication {
     for (const [eid, s] of this.shadows) {
       // Gone since the tick ended (taken out of the world between): nothing to send
       if (!this.ships.has(eid)) { this.shadows.delete(eid); continue; }
+      s.keyRow = s.ctlRow = undefined;
       if (!s.diverged) continue;
       s.diverged = false;
       s.version++;
@@ -158,12 +163,15 @@ export class Replication {
       if (view && !view.has(eid)) { known.delete(eid); continue; }
       if (known.get(eid) !== s.version) {
         known.set(eid, s.version);
-        ships.push(packKeyframe({ id: eid, mode: s.mode, body: this.real(eid), ctl: { bits: s.bits, targetAngle: 0 }, q: s.q, dock: s.dock ?? undefined }));
+        ships.push(s.keyRow ??= packKeyframe({ id: eid, mode: s.mode, body: this.real(eid), ctl: { bits: s.bits, targetAngle: 0 }, q: s.q, dock: s.dock ?? undefined }));
         this.keyframes++;
       } else if (s.events.length) {
-        const events: [number, number, number][] = [];
-        for (let i = 0; i < s.events.length; i += 3) events.push([snapshotTick - s.events[i], s.events[i + 1], s.events[i + 2]]);
-        ctl.push(packControlRow(eid, events, s.qSent));
+        if (!s.ctlRow) {
+          const events: [number, number, number][] = [];
+          for (let i = 0; i < s.events.length; i += 3) events.push([snapshotTick - s.events[i], s.events[i + 1], s.events[i + 2]]);
+          s.ctlRow = packControlRow(eid, events, s.qSent);
+        }
+        ctl.push(s.ctlRow);
       }
     }
     return { ships, ctl };

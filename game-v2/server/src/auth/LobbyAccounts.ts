@@ -12,6 +12,9 @@ import type { AccountAdmin, AccountInfo, AuthResult, UserRecord, UserStore } fro
 
 const UNREACHABLE = 'Accounts are unavailable right now. Try again shortly.';
 
+/** An address worth passing on (IPv4 or IPv6, nothing else: it goes in a header) */
+const ADDRESS = /^[0-9A-Fa-f:.]{2,64}$/;
+
 export class LobbyAccounts implements UserStore {
   readonly admin: AccountAdmin | null;
 
@@ -19,10 +22,16 @@ export class LobbyAccounts implements UserStore {
     this.admin = adminSecret ? new LobbyAccountAdmin(lobbyUrl, adminSecret) : null;
   }
 
-  private async post(path: string, body: unknown): Promise<any> {
+  /**
+   * `ip`: the player's address. A sign-in relayed through here reaches the lobby from this machine, which it trusts to
+   * say who it's for (X-Forwarded-For, as from nginx), so its attempt limits count each player, not this server as one
+   */
+  private async post(path: string, body: unknown, ip?: string): Promise<any> {
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (ip && ADDRESS.test(ip)) headers['X-Forwarded-For'] = ip;
       const r = await fetch(`${this.lobbyUrl}/auth/${path}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        method: 'POST', headers, body: JSON.stringify(body),
         signal: AbortSignal.timeout(5000),
       });
       return await r.json();
@@ -32,8 +41,8 @@ export class LobbyAccounts implements UserStore {
     }
   }
 
-  private async signIn(path: 'login' | 'register', body: unknown): Promise<AuthResult> {
-    const r = await this.post(path, body);
+  private async signIn(path: 'login' | 'register', body: unknown, ip?: string): Promise<AuthResult> {
+    const r = await this.post(path, body, ip);
     if (!r?.success) return { success: false, error: r?.error ?? 'Sign-in failed' };
     // The lobby's answer doesn't carry the id: ask for it with the new token
     const user = await this.validateSession(r.token);
@@ -41,12 +50,12 @@ export class LobbyAccounts implements UserStore {
     return { success: true, user, token: r.token };
   }
 
-  login(username: string, password: string): Promise<AuthResult> {
-    return this.signIn('login', { username, password });
+  login(username: string, password: string, ip?: string): Promise<AuthResult> {
+    return this.signIn('login', { username, password }, ip);
   }
 
-  register(username: string, email: string, password: string): Promise<AuthResult> {
-    return this.signIn('register', { username, email, password });
+  register(username: string, email: string, password: string, ip?: string): Promise<AuthResult> {
+    return this.signIn('register', { username, email, password }, ip);
   }
 
   async validateSession(token: string): Promise<UserRecord | null> {

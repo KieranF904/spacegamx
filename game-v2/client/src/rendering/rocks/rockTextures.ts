@@ -13,6 +13,8 @@ export type RockMaterial = 'stone' | 'metal' | 'ice' | 'crystal' | 'tar' | 'lees
 export const ROCK_MATERIALS: RockMaterial[] = ['stone', 'metal', 'ice', 'crystal', 'tar', 'leestone'];
 /** A tile's side (texels) */
 export const ROCK_TILE = 512;
+/** What it makes, by version (assetCache.ts): bump it whenever the output changes */
+export const ROCK_ATLAS_VERSION = 1;
 
 const N = ROCK_TILE;
 const wrap = (v: number) => ((v % N) + N) % N;

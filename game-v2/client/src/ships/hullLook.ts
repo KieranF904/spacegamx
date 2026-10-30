@@ -99,7 +99,8 @@ export function hullAtlas(): Texture {
     const inline = () => void import('./hullTextures').then((m) => done(m.buildHullAtlas()));
     try {
       const w = new Worker(new URL('./hullAtlasWorker.ts', import.meta.url), { type: 'module' });
-      w.onmessage = (e: MessageEvent<Uint8Array>) => { done(e.data); w.terminate(); };
+      // (Ended once it has stored the atlas, too)
+      w.onmessage = (e: MessageEvent<Uint8Array | 'stored'>) => { if (e.data === 'stored') w.terminate(); else done(e.data); };
       w.onerror = () => { w.terminate(); inline(); };
       w.postMessage(0);
     } catch {

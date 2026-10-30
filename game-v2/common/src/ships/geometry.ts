@@ -11,6 +11,24 @@ import type { Segment, Vec2 } from './types.js';
 const DEG = Math.PI / 180;
 export const EPS = 1e-9;
 
+/**
+ * Math.hypot(dx, dy) < r and > r, decided exactly as hypot decides them but without its cost (for loops that ask it
+ * of every body or row): the squared distance settles it unless it's within a hair of r², and only then is hypot
+ * asked. (NaN is never nearer nor farther, as with hypot.)
+ */
+export function nearerThan(dx: number, dy: number, r: number): boolean {
+  const q = dx * dx + dy * dy, r2 = r * r;
+  if (q < r2 * (1 - 1e-9)) return true;
+  if (q > r2 * (1 + 1e-9)) return false;
+  return Math.hypot(dx, dy) < r;
+}
+export function fartherThan(dx: number, dy: number, r: number): boolean {
+  const q = dx * dx + dy * dy, r2 = r * r;
+  if (q > r2 * (1 + 1e-9)) return true;
+  if (q < r2 * (1 - 1e-9)) return false;
+  return Math.hypot(dx, dy) > r;
+}
+
 export function cross(ax: number, ay: number, bx: number, by: number): number {
   return ax * by - ay * bx;
 }

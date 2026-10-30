@@ -334,6 +334,7 @@ export class JumpFx {
   }
 }
 
+/** A distance with its unit, as the action menu writes it (input/contextClick.ts km) */
 function fmtK(d: number): string {
-  return d >= 1000 ? `${(d / 1000).toFixed(d >= 10000 ? 0 : 1)}k` : `${Math.round(d)}`;
+  return d >= 1000 ? `${(d / 1000).toFixed(d >= 10000 ? 0 : 1)} km` : `${Math.round(d)} m`;
 }

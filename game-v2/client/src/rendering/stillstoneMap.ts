@@ -18,6 +18,8 @@
 import { hashString, mulberry32, type LodestoneData } from '@space-game/common';
 
 export const STILLSTONE_MAP = 256;
+/** What it makes, by version (assetCache.ts): bump it whenever the output changes (or it reads more of the stone than id, rough, scar and state) */
+export const STILLSTONE_MAP_VERSION = 1;
 /** The map's half-width, in stone radii (the stone itself reaches about 0.95 of its radius) */
 export const STILLSTONE_MAP_SPAN = 1.1;
 /** Albedo is stored as a share of this */

@@ -6,7 +6,8 @@
  *   Esc  open · back to the main list from a page · close
  */
 
-import { GUIDE_CSS, GUIDE_TABS, GuideTab, guideHtml, wireGuideCharts } from './fieldGuide';
+import type { GuideTab } from './fieldGuide';
+import { Lazy } from '../lazy';
 import { ACTIONS, ActionDef, RESERVED_KEYS, keyName } from '../input/keybindings';
 import { settings, SettingsData, defaultSettings } from '../settings/Settings';
 import { FPS_CAPS, type QualitySetting } from '../settings/quality';
@@ -83,7 +84,17 @@ export interface MenuDeps {
 type Page = 'main' | 'status' | 'guide' | 'settings' | 'controls' | 'server';
 type SettingsTab = 'audio' | 'display' | 'ui' | 'gameplay';
 
-const CSS = GUIDE_CSS + `
+/** The field guide's pages, split out of the main chunk (Game prefetches it after sign-in) */
+export const fieldGuide = new Lazy(() => import('./fieldGuide').then((m) => {
+  // (its CSS goes just ahead of the menu's, as it always has)
+  const style = document.createElement('style');
+  style.textContent = m.GUIDE_CSS;
+  const menu = document.getElementById('game-menu-css');
+  if (menu) menu.before(style); else document.head.appendChild(style);
+  return m;
+}));
+
+const CSS = `
 #game-menu { position: fixed; inset: 0; z-index: 3000; display: none; color: #d6deeb;
   font: 14px 'Segoe UI', system-ui, sans-serif; background: radial-gradient(ellipse at 30% 40%, rgba(12, 24, 48, 0.82), rgba(3, 6, 14, 0.93));
   backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); user-select: none; }
@@ -93,7 +104,7 @@ const CSS = GUIDE_CSS + `
 #game-menu .gm-title { font: 700 13px 'Segoe UI', sans-serif; letter-spacing: 5px; color: #7dd3fc; margin-bottom: 4px; }
 #game-menu .gm-sub { font-size: 12px; color: #6f8099; margin-bottom: 26px; }
 #game-menu .gm-item { all: unset; cursor: pointer; padding: 10px 14px; border-radius: 8px; font-size: 16px; letter-spacing: 0.5px;
-  color: #c9d4e5; display: flex; align-items: center; gap: 12px; border: 1px solid transparent; transition: background 0.12s, color 0.12s; }
+  color: #c9d4e5; display: flex; align-items: center; gap: 12px; border: 1px solid transparent; transition: background 0.12s, color 0.12s; white-space: nowrap; }
 #game-menu .gm-item:hover, #game-menu .gm-item:focus-visible { background: rgba(125, 211, 252, 0.08); color: #fff; border-color: rgba(125, 211, 252, 0.18); }
 #game-menu .gm-item.active { background: rgba(125, 211, 252, 0.13); color: #fff; border-color: rgba(125, 211, 252, 0.35); }
 #game-menu .gm-item .ic { width: 20px; text-align: center; color: #7dd3fc; opacity: 0.85; }
@@ -187,6 +198,7 @@ export class GameMenuUI {
 
   constructor(private deps: MenuDeps) {
     const style = document.createElement('style');
+    style.id = 'game-menu-css';
     style.textContent = CSS;
     document.head.appendChild(style);
     this.root = document.createElement('div');
@@ -384,6 +396,13 @@ export class GameMenuUI {
   }
 
   private guidePage(panel: HTMLElement): void {
+    const fg = fieldGuide.value;
+    if (!fg) {
+      panel.innerHTML = '<h2>Field guide</h2><p class="muted">Loading…</p>';
+      fieldGuide.use(() => { if (this.isOpen && this.page === 'guide') this.renderMain(); });
+      return;
+    }
+    const { GUIDE_TABS, guideHtml, wireGuideCharts } = fg;
     const k = (id: string) => `<kbd>${keyName(settings.data.bindings[id] ?? ACTIONS.find((a) => a.id === id)!.key)}</kbd>`;
     panel.classList.add('fg');
     panel.innerHTML = `<div class="fg-head"><h2>Field guide</h2><p class="muted">What a pilot needs to know${this.deps.replayTutorial ? ' · <button class="btn" data-a="tutorial" style="padding:3px 10px">Replay flight school</button>' : ''}</p></div>

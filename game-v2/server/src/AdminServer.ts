@@ -11,10 +11,18 @@ import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import crypto from 'crypto';
 
-// Generate secure password hash (bcrypt-style salted hash simulation)
-// The actual password is: Kx9#mP$vL2@nQ7&wR4!
-const ADMIN_PASSWORD = 'admin';
-const PASSWORD_HASH = crypto.createHash('sha256').update(ADMIN_PASSWORD + 'spacegame-admin-salt-v2').digest('hex');
+/**
+ * The admin password: ADMIN_SERVER_PASSWORD (the VPS deploy makes one in /etc/spacegame/secrets.env), else
+ * ADMIN_PASSWORD, else the lobby's LOBBY_ADMIN_SECRET. Development falls back to 'admin'; production has no fallback
+ * ('': index.ts then doesn't start this server). The VPS is shared, so nothing on it should get in with a password
+ * anyone could guess. (The deploy's is ADMIN_SERVER_PASSWORD, not ADMIN_PASSWORD: the lobby reads that one, and would
+ * make an `admin` account with it.)
+ */
+export function adminPassword(env: NodeJS.ProcessEnv = process.env): string {
+  return env.ADMIN_SERVER_PASSWORD || env.ADMIN_PASSWORD || env.LOBBY_ADMIN_SECRET || (env.NODE_ENV === 'production' ? '' : 'admin');
+}
+
+const passwordHash = (password: string) => crypto.createHash('sha256').update(password + 'spacegame-admin-salt-v2').digest('hex');
 
 // Session management
 const activeSessions = new Map<string, { expires: number; ip: string }>();
@@ -24,9 +32,9 @@ function generateSessionToken(): string {
   return crypto.randomBytes(32).toString('hex');
 }
 
-function validatePassword(password: string): boolean {
-  const hash = crypto.createHash('sha256').update(password + 'spacegame-admin-salt-v2').digest('hex');
-  return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(PASSWORD_HASH));
+function validatePassword(password: unknown, expected: string): boolean {
+  if (typeof password !== 'string') return false;
+  return crypto.timingSafeEqual(Buffer.from(passwordHash(password)), Buffer.from(expected));
 }
 
 function createSession(ip: string): string {
@@ -117,7 +125,12 @@ export class AdminServer {
   private eventCallbacks: AdminEventCallback[] = [];
   private startTime: number;
   
-  constructor(port: number) {
+  /** The password's hash (see adminPassword) */
+  private readonly passwordHash: string;
+
+  constructor(port: number, password: string) {
+    if (!password) throw new Error('AdminServer needs a password (adminPassword())');
+    this.passwordHash = passwordHash(password);
     this.startTime = Date.now();
     
     // Initialize default runtime config
@@ -172,7 +185,7 @@ export class AdminServer {
     this.wss = new WebSocketServer({ server: this.httpServer });
     this.wss.on('connection', (ws) => this.handleConnection(ws));
     
-    // This machine only: it predates in-game admin (AdminTools) and has a fixed password
+    // This machine only: it predates in-game admin (AdminTools). Its password: see adminPassword
     this.httpServer.listen(port, '127.0.0.1', () => {
       console.log(`🔧 Admin server started on http://localhost:${port}`);
       console.log(`   Auth: enabled`);
@@ -227,7 +240,7 @@ export class AdminServer {
       this.readBody(req).then((body) => {
         try {
           const { password } = JSON.parse(body);
-          if (validatePassword(password)) {
+          if (validatePassword(password, this.passwordHash)) {
             const token = createSession(ip);
             console.log(`🔧 Admin authenticated from ${ip}`);
             res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -323,7 +336,7 @@ export class AdminServer {
         
         // Handle auth message
         if (msg.type === 'auth') {
-          if (validatePassword(msg.password)) {
+          if (validatePassword(msg.password, this.passwordHash)) {
             authenticated = true;
             const token = createSession('websocket');
             this.clients.add(ws);

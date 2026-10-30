@@ -36,6 +36,9 @@ export interface BakePiece {
   rotor: boolean;
   domes: StationDome[];
 }
+/** What it makes, by version (assetCache.ts): bump it whenever the output changes */
+export const STATION_BAKE_VERSION = 1;
+
 export interface BakeInput {
   design: string; R: number; tileW: number;
   /** The body first, then the parts that turn */

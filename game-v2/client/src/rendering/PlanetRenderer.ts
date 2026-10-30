@@ -8,7 +8,7 @@
 
 import { Container, Text, TextStyle } from 'pixi.js';
 import { PlanetData, PlanetKind, planetPosition, moonOffset } from '@space-game/common';
-import { createShaderQuad, ShaderQuad } from './shaderQuad';
+import { createShaderQuad, shaderQuadProgram, ShaderQuad, type UniformDef } from './shaderQuad';
 import { cameraView } from './cameraView';
 
 const KIND_INDEX: Record<PlanetKind, number> = { rocky: 0, desert: 1, ice: 2, gas: 3, lava: 4, ocean: 5, toxic: 6 };
@@ -190,11 +190,10 @@ interface Body {
   radius: number;
 }
 
-function makeBody(kind: PlanetKind, radius: number, hue: number, seed: number, rings?: PlanetData['rings']): Body {
-  const extent = Math.max(1.3, rings?.outer ?? 0);
+function planetUniforms(kind: PlanetKind, hue: number, seed: number, extent: number, rings?: PlanetData['rings']): Record<string, UniformDef> {
   const atmo = kind === 'rocky' ? 0.15 : kind === 'lava' ? 0.4 : kind === 'desert' ? 0.45 : 0.8;
   const atmoHue = kind === 'ocean' ? 205 : kind === 'toxic' ? 75 : kind === 'lava' ? 20 : hue;
-  const quad = createShaderQuad(FRAGMENT, {
+  return {
     uTime: { value: 0, type: 'f32' },
     uKind: { value: KIND_INDEX[kind], type: 'f32' },
     uHue: { value: hue, type: 'f32' },
@@ -208,7 +207,15 @@ function makeBody(kind: PlanetKind, radius: number, hue: number, seed: number, r
     uSpin: { value: kind === 'gas' ? 0.02 : 0.008, type: 'f32' },
     uAtmo: { value: atmo, type: 'f32' },
     uAtmoColor: { value: hueToRgb(atmoHue, 0.6, 0.65), type: 'vec3<f32>' },
-  }, radius * extent);
+  };
+}
+
+/** The planets' program (one for every kind), for compiling ahead */
+export const planetProgram = () => shaderQuadProgram(FRAGMENT, planetUniforms('rocky', 0, 0, 1.3));
+
+function makeBody(kind: PlanetKind, radius: number, hue: number, seed: number, rings?: PlanetData['rings']): Body {
+  const extent = Math.max(1.3, rings?.outer ?? 0);
+  const quad = createShaderQuad(FRAGMENT, planetUniforms(kind, hue, seed, extent, rings), radius * extent);
   const container = new Container();
   container.addChild(quad.mesh);
   return { quad, container, radius: radius * extent };

@@ -23,6 +23,10 @@ import { GameWindow, costHtml, injectWindowStyles } from './windowKit';
 import ribbonsData from '../../../data/achievements.json';
 import { settings } from '../settings/Settings';
 import { setText, setStyle } from './domWrite';
+import { boundKeyName } from '../input/keybindings';
+
+/** The key an action is bound to now (for the hints) */
+const keyOf = (id: string) => boundKeyName(id, settings.data.bindings);
 
 export const CHAIN: Record<string, { label: string; color: string }> = {
   main: { label: 'Story', color: '#fbbf24' },
@@ -385,7 +389,7 @@ export class QuestClient {
     const ch = chainOf(q.chain);
     c.style.setProperty('--qc', ch.color);
     c.innerHTML = `<h5><span class="c">${ch.label}</span>${esc(q.name)}<span class="lv">${q.level > 1 ? `lvl ${q.level}` : ''}</span></h5>
-      <div class="who">${esc(q.npc ?? q.giverName)}${q.chain === 'fleet' ? ' · <b style="color:#86efac">needs a party of 2+ (P)</b>' : ''}</div>
+      <div class="who">${esc(q.npc ?? q.giverName)}${q.chain === 'fleet' ? ` · <b style="color:#86efac">needs a party of 2+ (${esc(keyOf('party'))})</b>` : ''}</div>
       <div class="intro">${esc(q.intro)}</div>
       <ol>${q.steps.map((s, i) => `<li style="${mine && i < q.stage ? 'color:#6b8f74;text-decoration:line-through' : ''}">${esc(s.text)}</li>`).join('')}</ol>
       ${rewardsHtml(this.d.pilot, q.rewards)}
@@ -454,7 +458,7 @@ class QuestTracker {
     if (!list.length && !lead && !fresh) return;
     // Hidden: just the header, to bring it back
     if (!settings.data.ui.questTracker) {
-      this.root.innerHTML = `<div class="qt-head"><span>QUESTS · L</span>${newHtml}<button data-a="show" title="Show the quest tracker">SHOW</button></div>`;
+      this.root.innerHTML = `<div class="qt-head"><span>QUESTS · ${esc(keyOf('log'))}</span>${newHtml}<button data-a="show" title="Show the quest tracker">SHOW</button></div>`;
       (this.root.querySelector('[data-a="show"]') as HTMLElement).onclick = () => settings.update((d) => { d.ui.questTracker = true; });
       this.root.querySelector<HTMLElement>('[data-a="new"]')?.addEventListener('click', () => this.q.log.open('jobs'));
       return;
@@ -466,17 +470,17 @@ class QuestTracker {
       const ch = chainOf(lead.chain);
       return `<div class="qt-q tracked" data-lead="${esc(lead.id)}" style="--qc:${ch.color}" title="A lead you're following: right-click for the log">
         <div class="qt-n"><span class="c">Lead</span><span class="t">${esc(lead.name)}</span></div>
-        <div class="qt-s">▸ ${lead.state === 'locked' ? `Needs ${esc(lead.needs.join(', '))}` : `Talk to <b>${esc(lead.who)}</b> · ${esc(lead.where)}`}${lead.target ? ' <button class="qt-ap" title="Autopilot there (G)">▶ G</button>' : ''}</div>
+        <div class="qt-s">▸ ${lead.state === 'locked' ? `Needs ${esc(lead.needs.join(', '))}` : `Talk to <b>${esc(lead.who)}</b> · ${esc(lead.where)}`}${lead.target ? ` <button class="qt-ap" title="Autopilot there (${esc(keyOf('autopilot'))})">▶ ${esc(keyOf('autopilot'))}</button>` : ''}</div>
         ${guide}</div>`;
     })() : '';
-    this.root.innerHTML = `<div class="qt-head"><span>QUESTS · L</span>${newHtml}<button data-a="fold">${this.collapsed ? 'SHOW ALL' : 'FOLD'}</button><button data-a="hide" title="Hide the tracker (Settings › Interface brings it back too)">HIDE</button></div>`
+    this.root.innerHTML = `<div class="qt-head"><span>QUESTS · ${esc(keyOf('log'))}</span>${newHtml}<button data-a="fold">${this.collapsed ? 'SHOW ALL' : 'FOLD'}</button><button data-a="hide" title="Hide the tracker (Settings › Interface brings it back too)">HIDE</button></div>`
       + leadHtml
       + shown.map((x) => {
         const ch = chainOf(x.chain);
         const p = stepProgress(x);
         return `<div class="qt-q${x === cur ? ' tracked' : ''}" data-q="${esc(x.id)}" style="--qc:${ch.color}" title="Click to follow this job">
           <div class="qt-n"><span class="c">${ch.label}</span><span class="t">${esc(x.name)}</span></div>
-          <div class="qt-s">${x === cur ? '▸ ' : ''}${esc(p.text)}${p.count ? ` <b>${p.count}</b>` : ''}${x === cur && x.target ? ' <button class="qt-ap" title="Autopilot there (G)">▶ G</button>' : ''}</div>
+          <div class="qt-s">${x === cur ? '▸ ' : ''}${esc(p.text)}${p.count ? ` <b>${p.count}</b>` : ''}${x === cur && x.target ? ` <button class="qt-ap" title="Autopilot there (${esc(keyOf('autopilot'))})">▶ ${esc(keyOf('autopilot'))}</button>` : ''}</div>
           ${p.frac > 0 || p.count ? `<div class="qt-bar"><i style="width:${Math.min(100, p.frac * 100)}%"></i></div>` : ''}
           ${x === cur ? guide : ''}
         </div>`;
@@ -637,7 +641,7 @@ class QuestLogWindow {
     for (const l of leads) if (l.fresh) this.newIds.add(l.id);
     this.q.markSeen();
     if (!list.length && !leads.length && !finished.length) {
-      b.innerHTML = '<div class="sgw-empty">No jobs yet. Talk to people (docked: the station\'s Overview; out in space: fly close and press X), or check a station\'s Contracts.</div>';
+      b.innerHTML = `<div class="sgw-empty">No jobs yet. Talk to people (docked: the station's Overview; out in space: fly close and press ${esc(keyOf('interact'))}), or check a station's Contracts.</div>`;
       return;
     }
     const all = new Set([...list.map((x) => x.id), ...leads.map((x) => x.id), ...finished.map((x) => x.id)]);
@@ -686,7 +690,7 @@ class QuestLogWindow {
       const btn = document.createElement('button');
       btn.className = 'sgw-btn' + (id === this.q.tracked ? ' off' : ' primary');
       btn.textContent = id === this.q.tracked ? 'Following' : 'Follow';
-      btn.title = 'The marker, the guide and the autopilot (G) take you there';
+      btn.title = `The marker, the guide and the autopilot (${keyOf('autopilot')}) take you there`;
       btn.onclick = () => this.q.track(id);
       row.appendChild(btn);
     };
@@ -802,6 +806,7 @@ class QuestLogWindow {
       const btn = document.createElement('button');
       btn.className = `sgw-btn${pts > 0 && lv < sk.max ? ' primary' : ' off'}`;
       btn.textContent = '+';
+      btn.title = `Spend a skill point on ${sk.name}`;
       btn.onclick = () => { this.q.d.send({ type: 'skillUp', skill: id }); this.q.d.sound('craft_done', 0.5); };
       c.querySelector('.sk-pips')!.appendChild(btn);
       grid.appendChild(c);

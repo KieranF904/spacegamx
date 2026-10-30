@@ -50,8 +50,10 @@ const newRun = (owner: number, part: number, start: number): PulseRun => ({ owne
 
 export class MiningBeamFx {
   private g = new Graphics();
+  /** Round the Graphics: drawn again into the bloom, a layer is a render group, and a Graphics redrawn as one rebuilds the scene's draw list */
+  private root = new Container();
   /** The beams (for the bloom) */
-  get glowLayer(): Graphics { return this.g; }
+  get glowLayer(): Container { return this.root; }
   private sparks: Spark[] = [];
   private t = 0;
   /** Is your own beam on (for the loop sound) */
@@ -60,7 +62,8 @@ export class MiningBeamFx {
   constructor(layer: Container, private source: ShipSource, private state: GameState, private tuning: ShipTuning,
     private local: () => { firing: boolean; aim: number; dist: number }) {
     this.g.blendMode = 'add';
-    layer.addChild(this.g);
+    this.root.addChild(this.g);
+    layer.addChild(this.root);
   }
 
   /** The frame's step (seconds) */

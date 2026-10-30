@@ -51,14 +51,39 @@ export function deciding(catalog: Catalog, ship: ShipState, i: number): boolean 
   return !!pc.ruin || !ruining(catalog, ship).has(pc.stage);
 }
 
+/**
+ * A design's stages, worked out once (a design's parts and the catalog's pieces don't change; like RUINING): its
+ * deciding parts, earliest stage first (in part order within one), and each stage's parts in part order
+ */
+const STAGED = new WeakMap<Blueprint, { deciders: number[]; parts: Map<number, number[]> }>();
+function staged(catalog: Catalog, ship: ShipState): { deciders: number[]; parts: Map<number, number[]> } {
+  let s = STAGED.get(ship.blueprint);
+  if (!s) {
+    const parts = new Map<number, number[]>();
+    const deciders: number[] = [];
+    ship.blueprint.parts.forEach((_, i) => {
+      const st = stageOf(catalog, ship, i);
+      if (!st) return;
+      if (!parts.has(st)) parts.set(st, []);
+      parts.get(st)!.push(i);
+      if (deciding(catalog, ship, i)) deciders.push(i);
+    });
+    deciders.sort((a, b) => stageOf(catalog, ship, a) - stageOf(catalog, ship, b) || a - b);
+    s = { deciders, parts };
+    STAGED.set(ship.blueprint, s);
+  }
+  return s;
+}
+
 /** The earliest stage with a deciding part standing (0: it has no stages, or nothing stands) */
 export function currentStage(catalog: Catalog, ship: ShipState): number {
-  let first = 0;
-  ship.blueprint.parts.forEach((_, i) => {
-    const st = stageOf(catalog, ship, i);
-    if (st && (!first || st < first) && deciding(catalog, ship, i) && standing(catalog, ship, i)) first = st;
-  });
-  return first;
+  for (const i of staged(catalog, ship).deciders) if (standing(catalog, ship, i)) return stageOf(catalog, ship, i);
+  return 0;
+}
+
+/** A stage's parts, in part order (none: an empty list) */
+export function stageParts(catalog: Catalog, ship: ShipState, stage: number): readonly number[] {
+  return staged(catalog, ship).parts.get(stage) ?? [];
 }
 
 /** How whole a staged ship is (0..1), or null if it has no stages */

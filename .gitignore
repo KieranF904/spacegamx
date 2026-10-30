@@ -60,3 +60,6 @@ game-v2/data/world/
 
 # Scratch screenshots
 dev-tools/_look*.png
+
+# UX pass screenshots (large; kept locally)
+game-v2/docs/ux/polish-*/

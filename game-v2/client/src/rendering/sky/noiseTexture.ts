@@ -11,9 +11,16 @@
 
 import { BufferImageSource, Texture } from 'pixi.js';
 import { mulberry32 } from '@space-game/common';
+import { assetKind } from '../../assets/assetCache';
 
 const SIZE = 256;
 let cached: Texture | null = null;
+
+/** What it makes, by version (assetCache.ts): bump it whenever the output changes */
+export const SKY_NOISE_VERSION = 1;
+const skyNoise = assetKind<Uint8Array>('skyNoise', SKY_NOISE_VERSION);
+// (Read ahead: by the time the sky is made it's usually here; if not, it's built, as before)
+void skyNoise.preload('');
 
 /** Value noise whose lattice repeats every `period` cells across the tile */
 function lattice(period: number, rnd: () => number): (x: number, y: number) => number {
@@ -57,12 +64,21 @@ function fbm(first: number, octaves: number, seed: number, ridged = false): Floa
   return out;
 }
 
-export function skyNoiseTexture(): Texture {
-  if (cached) return cached;
+function build(): Uint8Array {
   const channels = [fbm(4, 5, 1013), fbm(8, 4, 2027), fbm(4, 4, 3041, true), fbm(16, 4, 4057)];
   const data = new Uint8Array(SIZE * SIZE * 4);
   for (let i = 0; i < SIZE * SIZE; i++) {
     for (let c = 0; c < 4; c++) data[i * 4 + c] = Math.round(channels[c][i] * 255);
+  }
+  return data;
+}
+
+export function skyNoiseTexture(): Texture {
+  if (cached) return cached;
+  let data = skyNoise.peek('');
+  if (!data) {
+    const built = (data = build());
+    void skyNoise.get('', () => built);
   }
   cached = new Texture({
     source: new BufferImageSource({

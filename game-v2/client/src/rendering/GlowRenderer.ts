@@ -170,6 +170,8 @@ const FRAGMENT_SHADER = `#version 300 es
   }
 `;
 
+let program: GlProgram | null = null;
+
 export class GlowRenderer {
   private container: Container;
   private mesh: Mesh<MeshGeometry, Shader> | null = null;
@@ -203,11 +205,8 @@ export class GlowRenderer {
       indices,
     });
     
-    // Create GL program
-    const glProgram = new GlProgram({
-      vertex: VERTEX_SHADER,
-      fragment: FRAGMENT_SHADER,
-    });
+    // Create GL program (one for every glow: the sign-in screen's and the game's, compiled once)
+    const glProgram = (program ??= new GlProgram({ vertex: VERTEX_SHADER, fragment: FRAGMENT_SHADER, name: 'sun-glow' }));
     
     // Create shader with inline uniform definitions (PixiJS v8 style)
     this.shader = new Shader({

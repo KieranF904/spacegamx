@@ -216,5 +216,20 @@ function frame(now: number): void {
     + `\nshowing  sun: ${plain || sunKind !== 'port' ? sunKind : 'port'}   sky: ${skyKind}${held ? '  (Space: current)' : ''}`;
   requestAnimationFrame(frame);
 }
-preset();
-requestAnimationFrame(frame);
+/**
+ * ?compile: how long each program takes to compile and link from cold (a fresh browser profile has no program cache),
+ * the game's against the prototypes'; the results in window.compileTimes
+ */
+if (location.search.includes('compile')) {
+  const times: Record<string, { ms: number; chars: number }> = {};
+  for (const [name, src] of Object.entries(programSources)) {
+    const t0 = performance.now();
+    const p = compile(src.vert, src.frag);
+    times[name] = { ms: Math.round(performance.now() - t0), chars: src.frag.length };
+    gl.deleteProgram(p);
+  }
+  (window as any).compileTimes = times;
+} else {
+  preset();
+  requestAnimationFrame(frame);
+}

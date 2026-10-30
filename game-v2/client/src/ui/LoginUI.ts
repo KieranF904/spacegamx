@@ -2,16 +2,17 @@
  * Login UI - Cinematic Login/Registration screen
  * 
  * Features:
- * - Huge animated sun using WebGL shader (same as in-game)
+ * - Huge animated sun using WebGL shader (same as in-game), drawn by the game's own renderer
  * - Stylized glowing title
  * - Animated starfield background
  * - Particle effects
  * - Sleek modern login form
  */
 
-import { Application, Container, Graphics } from 'pixi.js';
+import { Application, Container, Graphics, type GlProgram } from 'pixi.js';
 import { SunRenderer } from '../rendering/SunRenderer';
 import { GlowRenderer } from '../rendering/GlowRenderer';
+import { batchProgram, programsUnder, shaderReady } from '../rendering/shaderWarmup';
 import { sunShaderDefs } from '@space-game/common';
 
 export class LoginUI {
@@ -20,16 +21,17 @@ export class LoginUI {
   private visible = true;
   private startTime = Date.now();
   
-  // PixiJS WebGL rendering
-  private app: Application | null = null;
+  // The backdrop: drawn by the game's renderer in the world's place while the screen is up (one WebGL context, so its
+  // shaders compile once, and ahead: see shaderWarmup), on the game's canvas, borrowed into the panel
+  private app: Application;
   private worldContainer: Container | null = null;
   private sunRenderer: SunRenderer | null = null;
   private glowRenderer: GlowRenderer | null = null;
   private starsGraphics: Graphics | null = null;
-  private pixiInitialized = false;
-  /** Bumped when the backdrop is released, so an init still in flight throws its app away */
-  private backdropGen = 0;
-  private pixiStarting = false;
+  /** The backdrop's parts and the programs each waits for: shown once they're compiled (a first visit's first frames aren't held up) */
+  private parts: [Container, GlProgram[]][] = [];
+  /** Where the game's canvas goes back to when the screen is hidden */
+  private canvasHome: { parent: Node; next: Node | null } | null = null;
   
   // Star field
   private stars: Array<{ x: number; y: number; z: number; size: number; phase: number }> = [];
@@ -91,8 +93,9 @@ export class LoginUI {
   private errorMessage = '';
   private loading = false;
 
-  constructor(container: HTMLElement) {
+  constructor(container: HTMLElement, app: Application) {
     this.container = container;
+    this.app = app;
     
     // Create login panel
     this.panel = document.createElement('div');
@@ -103,43 +106,18 @@ export class LoginUI {
     this.setupStyles();
     this.initStars();
     this.render();
-    this.initPixi();
+    this.attachBackdrop();
   }
   
-  private async initPixi(): Promise<void> {
-    if (this.app || this.pixiStarting) return;
-    this.pixiStarting = true;
-    const gen = this.backdropGen;
-    // Create PixiJS application
-    const app = new Application();
-    await app.init({
-      width: window.innerWidth,
-      height: window.innerHeight,
-      backgroundColor: 0x000005,
-      resolution: window.devicePixelRatio || 1,
-      autoDensity: true,
-      antialias: true,
-      eventFeatures: { move: false, globalMove: false, click: false, wheel: false },
-    });
-    this.pixiStarting = false;
-    // Released (signed in) while it was starting: not needed after all
-    if (gen !== this.backdropGen) { app.destroy({ removeView: true }); if (this.visible) void this.initPixi(); return; }
-    this.app = app;
-    
-    // Insert canvas into the login panel before other content
-    const canvas = this.app.canvas as HTMLCanvasElement;
-    canvas.id = 'login-canvas';
-    canvas.style.position = 'absolute';
-    canvas.style.top = '0';
-    canvas.style.left = '0';
-    canvas.style.width = '100%';
-    canvas.style.height = '100%';
-    canvas.style.zIndex = '0';
-    this.panel.insertBefore(canvas, this.panel.firstChild);
-    
+  /** The sign-in screen's scene while it's up (the game draws it instead of the world), else null */
+  backdrop(): Container | null {
+    return this.visible ? this.worldContainer : null;
+  }
+
+  private buildBackdrop(): void {
+    if (this.worldContainer) return;
     // Create container hierarchy
     this.worldContainer = new Container();
-    this.app.stage.addChild(this.worldContainer);
     
     // Stars layer
     this.starsGraphics = new Graphics();
@@ -149,6 +127,8 @@ export class LoginUI {
     this.glowRenderer = new GlowRenderer();
     this.glowRenderer.initialize();
     this.worldContainer.addChild(this.glowRenderer.getContainer());
+    const batch = batchProgram(this.app.renderer);
+    this.parts = [[this.starsGraphics, batch ? [batch] : []], [this.glowRenderer.getContainer(), programsUnder(this.glowRenderer.getContainer())]];
     
     this.sunRenderer = new SunRenderer();
     this.sunRenderer.initialize();
@@ -156,18 +136,26 @@ export class LoginUI {
     
     // Set up the brownian sun style
     this.setupBrownianSunStyle();
-    
-    // Position sun at bottom center
-    this.updateSunPosition();
-    
-    // Handle resize
-    window.addEventListener('resize', this.handleResize);
-    
-    // Start animation loop (only while shown)
-    this.app.ticker.add(() => this.updateAnimation());
-    if (!this.visible) this.app.ticker.stop();
-    
-    this.pixiInitialized = true;
+  }
+
+  /** Show the backdrop: the game's canvas into the panel, under the form, and animated */
+  private attachBackdrop(): void {
+    this.buildBackdrop();
+    const canvas = this.app.canvas as HTMLCanvasElement;
+    if (canvas.parentNode && canvas.parentNode !== this.panel) {
+      this.canvasHome = { parent: canvas.parentNode, next: canvas.nextSibling };
+      this.panel.insertBefore(canvas, this.panel.firstChild);
+    }
+    this.app.ticker.remove(this.updateAnimation);
+    this.app.ticker.add(this.updateAnimation);
+  }
+
+  /** The game's canvas back where it was; nothing more to animate */
+  private detachBackdrop(): void {
+    this.app.ticker.remove(this.updateAnimation);
+    const canvas = this.app.canvas as HTMLCanvasElement, home = this.canvasHome;
+    if (home && canvas.parentNode === this.panel) home.parent.insertBefore(canvas, home.next?.parentNode === home.parent ? home.next : null);
+    this.canvasHome = null;
   }
   
   private setupBrownianSunStyle(): void {
@@ -191,7 +179,7 @@ export class LoginUI {
   }
   
   private updateSunPosition(): void {
-    if (!this.sunRenderer || !this.glowRenderer || !this.app) return;
+    if (!this.sunRenderer || !this.glowRenderer) return;
     
     const w = this.app.screen.width;
     const h = this.app.screen.height;
@@ -207,8 +195,11 @@ export class LoginUI {
     this.glowRenderer.setPosition(sunX, sunY);
   }
   
-  private updateAnimation(): void {
-    if (!this.visible || !this.app || !this.sunRenderer || !this.glowRenderer) return;
+  private updateAnimation = (): void => {
+    if (!this.visible || !this.sunRenderer || !this.glowRenderer) return;
+    // (The game's renderer follows the window; the sun follows the screen)
+    this.updateSunPosition();
+    for (const [part, programs] of this.parts) part.visible = programs.every(shaderReady);
     
     const time = (Date.now() - this.startTime) / 1000;
     const delta = this.app.ticker.deltaMS / 1000;
@@ -235,16 +226,19 @@ export class LoginUI {
     
     // Draw stars
     this.drawStars(time);
-  }
+  };
   
   private drawStars(time: number): void {
-    if (!this.starsGraphics || !this.app) return;
+    if (!this.starsGraphics) return;
     
     const g = this.starsGraphics;
     const w = this.app.screen.width;
     const h = this.app.screen.height;
     
     g.clear();
+    // The backdrop's own black (the game's renderer clears to its own)
+    g.rect(0, 0, w, h);
+    g.fill({ color: 0x000005 });
     
     for (const star of this.stars) {
       const parallax = 0.5 + star.z * 0.5;
@@ -711,8 +705,8 @@ export class LoginUI {
   private render(): void {
     const isLogin = this.mode === 'login';
     
-    // Keep existing canvas if PixiJS already initialized
-    const existingCanvas = this.panel.querySelector('#login-canvas');
+    // Keep the backdrop's canvas (the game's, borrowed)
+    const existingCanvas = this.canvasHome ? (this.app.canvas as HTMLCanvasElement) : null;
     
     this.panel.innerHTML = `
       <div class="login-content">
@@ -776,13 +770,6 @@ export class LoginUI {
     this.setupEventListeners();
   }
   
-  private handleResize = (): void => {
-    if (this.app) {
-      this.app.renderer.resize(window.innerWidth, window.innerHeight);
-      this.updateSunPosition();
-    }
-  };
-
   private setupEventListeners(): void {
     // Tab switching
     const tabs = this.panel.querySelectorAll('.login-tab');
@@ -845,27 +832,19 @@ export class LoginUI {
     this.visible = true;
     this.panel.style.display = 'flex';
     // The backdrop: running again, or rebuilt if it was released
-    if (this.app) {
-      window.addEventListener('resize', this.handleResize);
-      this.handleResize();
-      this.app.ticker.start();
-    } else {
-      void this.initPixi();
-    }
+    this.attachBackdrop();
   }
 
   hide(): void {
     this.visible = false;
     this.panel.style.display = 'none';
-    window.removeEventListener('resize', this.handleResize);
-    // Nothing to see: stop drawing the hidden canvas
-    this.app?.ticker.stop();
+    // The world is drawn again, on its canvas back in the game's container
+    this.detachBackdrop();
   }
 
-  /** Free the backdrop's renderer (the game is up); show() builds it again */
+  /** Free the backdrop (the game is up); show() builds it again */
   releaseBackdrop(): void {
     if (this.visible) return;
-    this.backdropGen++;
     this.disposePixi();
   }
 
@@ -874,14 +853,12 @@ export class LoginUI {
   }
   
   destroy(): void {
-    window.removeEventListener('resize', this.handleResize);
-    
+    this.detachBackdrop();
     this.disposePixi();
   }
 
   private disposePixi(): void {
-    window.removeEventListener('resize', this.handleResize);
-    // Clean up PixiJS
+    // Clean up PixiJS (the meshes; the renderer is the game's)
     if (this.sunRenderer) {
       this.sunRenderer.destroy();
       this.sunRenderer = null;
@@ -890,13 +867,9 @@ export class LoginUI {
       this.glowRenderer.destroy();
       this.glowRenderer = null;
     }
-    if (this.app) {
-      // Not destroy(true): that also releases Pixi's global pools, wrecking the batches the game's renderer is still using
-      this.app.destroy({ removeView: true });
-      this.app = null;
-    }
+    this.worldContainer?.destroy({ children: true });
     this.worldContainer = null;
     this.starsGraphics = null;
-    this.pixiInitialized = false;
+    this.parts = [];
   }
 }

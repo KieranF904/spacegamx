@@ -10,6 +10,8 @@ WorkingDirectory=/opt/spacegame/server-browser
 ExecStart=/usr/bin/node dist/index.js
 Environment=NODE_ENV=production
 Environment=BROWSER_PORT=8790
+# This machine only: nginx, the game server and the site all reach it at 127.0.0.1:8790
+Environment=BROWSER_HOST=127.0.0.1
 # LOBBY_ADMIN_SECRET (shared with the game server; remote-install.sh makes it)
 EnvironmentFile=-/etc/spacegame/secrets.env
 Restart=always

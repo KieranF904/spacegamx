@@ -368,6 +368,7 @@ export class StationView {
     for (const p of this.layout.chase) this.chaseSprites.push(add(sp.glow, p.x, p.y, R * 0.11, color, 0.45));
   }
 
+  // (Blinks by alpha, not visibility: a change of `visible` has Pixi rebuild the scene's draw list; additive at no alpha is nothing)
   private drawLights(chase: number): void {
     const R = this.radius;
     this.navTips.forEach((n, i) => {
@@ -375,12 +376,13 @@ export class StationView {
       if (!s) return;
       if (s.star) {
         // A welder: a spark while it's on, a dim glow between
-        s.star.visible = on;
+        s.star.alpha = on ? 0.85 : 0;
         s.dot.tint = on ? 0xffffff : n.color;
         s.dot.alpha = on ? 0.9 : 0.5;
         return;
       }
-      s.glow!.visible = s.core!.visible = on;
+      s.glow!.alpha = on ? 0.55 : 0;
+      s.core!.alpha = on ? 0.9 : 0;
       s.dot.width = s.dot.height = R * (on ? 0.2 : 0.12);
       s.dot.alpha = on ? 1 : 0.5;
     });

@@ -108,3 +108,39 @@ Severity is my estimate of user-visible cost on a mid/weak machine in a busy sce
 - Off-screen ship early-out with a light margin (ShipRenderer.ts:415) and the `built[]` guard against drawing stale slots.
 - Sky haze at reduced resolution and only redrawn when the view moves; bloom at a quarter size, skipped when nothing glows.
 - `domWrite` dedup, `clearIfDrawn` for shared FX Graphics, `SpritePool`/`ParticleContainer` for effects, throttled layout reads in NavMarkersUI, hull atlas generated in a worker, hidden `stage` under the system map.
+
+## 7. Status (31 October 2026, CPU pass after `profile-2026-10-31.md`)
+
+Fixed earlier (per the profile): 1, 2, 3, 4, 6, 7, 8, 9, 10, 13, 14 (partly: see below), 21, 22.
+
+**Still open:** 5 (ShipBatch chunk policy), 11 (shared entity partition), 12 (ship labels as BitmapText), 17, 18, 19, 20
+(NavMarkers rebuilt every frame), 23 (minimap Graphics), 24 (MobView Graphics redrawn), and bloom still issues one
+`renderer.render` per glow source (14).
+
+**Done in this pass (effects, profile item #2):**
+- The big effect pools (WeaponFx tracers/flashes/sparks and gun smoke, DamageFx sparks/fire/shields and smoke) are
+  `ParticlePool`s (`rendering/particlePool.ts`): one ParticleContainer each, drawn in take order, with a copy of Pixi's
+  particle shader that picks one of up to four textures per particle the way Pixi's sprite batcher does. Busy-fight
+  census: 2,600 to 4,400 display objects become 1,200 to 1,650 (the effects container 1,800 to 3,500 become 400 to 850).
+- `SpritePool` (the small pools left) is its own render group, hides rather than destroys, trims its surplus every 4 s,
+  skips unchanged tints (Pixi parses a colour on every set) and takes the rotation in `take()` (no rotation set twice).
+- Things that made Pixi rebuild the **whole stage's** draw list every frame (any `visible`/`renderable` change, any child
+  added or removed, and any Graphics redrawn marks its render group): off-screen ships' parts shown then hidden each frame
+  and zoomed-out barrels likewise (ShipRenderer), every undamaged ship's health bar on then off (renderEntities), an empty
+  view made and dropped per projectile, damage numbers added and removed in the effects layer, station nav lights
+  blinking by `visible`, BossFx/MiningBeamFx Graphics being render-group roots, DamageFx's per-frame Graphics and chunk
+  fills, WeaponFx's EMP crackle. Each is fixed (set once a frame, own small render group, alpha, pooled chunk bodies with
+  one shared GraphicsContext); in a fight the stage now rebuilds rarely instead of ~once a frame.
+- Visual check: same frame drawn both ways, seeded: 2,000 to 8,000 pixels of 1.3 M differ, almost all by 1 to 4 levels
+  along thin tracer edges (float rounding of vertex positions; MSAA coverage). No visible change.
+
+**Found: a Pixi 8 behaviour that shapes the current look.** A render group's own `blendMode` is not passed to its
+children, and `renderer.render({ container })` turns a container into a render group. So once the bloom has drawn it,
+WeaponFx's glow pool (`blendMode = 'add'` on the container) has been drawing its tracers, flashes and sparks with
+**normal** blending in the main pass. That's how the game looks now and it is kept (`ParticlePool('normal')`, commented
+in WeaponFx.ts). Making them additive is a one-word change and a brighter look: a design call. `SpritePool` now sets the
+blend per sprite so this can't happen to it.
+
+**Measured, not worth it:** making `worldContainer` a render group (camera moves as one matrix) saved nothing measurable
+in fights (the cost moves to `updateRenderGroupTransforms`) and shifts thin edges by float rounding, so it was dropped.
+Parking unused pool sprites at alpha 0 instead of hiding them was slower (they stay in the batches).

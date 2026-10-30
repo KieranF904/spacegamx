@@ -13,6 +13,8 @@ import {
 import type { GameState } from '../state/GameState';
 import type { AutoDest } from '../ships/Autopilot';
 import { GameWindow, injectWindowStyles, openMenu } from './windowKit';
+import { boundKeyName } from '../input/keybindings';
+import { settings } from '../settings/Settings';
 import systemsData from '../../../data/systems.json';
 
 const SYSTEMS = new Map((systemsData as { systems: StarSystemData[] }).systems.map((s) => [s.id, s]));
@@ -167,7 +169,7 @@ export class SocialUI {
     this.rally.replaceChildren();
     const home = document.createElement('button');
     home.className = 'sgw-btn';
-    home.textContent = 'Respawn at home (R)';
+    home.textContent = `Respawn at home (${boundKeyName('respawn', settings.data.bindings)})`;
     home.onclick = () => this.d.send({ type: 'respawn' });
     this.rally.appendChild(home);
     for (const m of others) {
@@ -214,7 +216,7 @@ export class SocialUI {
       items.push({ label: 'Remove from party', bad: true, run: () => this.d.send({ type: 'partyKick', name: m.name }) });
     }
     if (self) items.push({ label: 'Leave party', bad: true, run: () => this.d.send({ type: 'partyLeave' }) });
-    items.push({ label: 'Party window (P)', run: () => this.openWindow() });
+    items.push({ label: `Party window (${boundKeyName('party', settings.data.bindings)})`, run: () => this.openWindow() });
     openMenu(x, y, items);
   }
 
@@ -310,7 +312,7 @@ export class SocialUI {
       row.append(t, f);
       right.appendChild(row);
     }
-    right.insertAdjacentHTML('beforeend', '<div style="color:#8394ad; font-size:11px; margin-top:8px">Hover over a ship to see who flies it, and press P to invite them.</div>');
+    right.insertAdjacentHTML('beforeend', `<div style="color:#8394ad; font-size:11px; margin-top:8px">Hover over a ship to see who flies it, and press ${boundKeyName('party', settings.data.bindings)} to invite them.</div>`);
     grid.append(left, right);
     b.appendChild(grid);
   }

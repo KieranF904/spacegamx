@@ -21,8 +21,8 @@
  */
 
 import { clearIfDrawn } from '../rendering/gfx';
-import { Container, Graphics } from 'pixi.js';
-import { SpritePool } from '../rendering/spritePool';
+import { Container, Graphics, GraphicsContext } from 'pixi.js';
+import { ParticlePool } from '../rendering/particlePool';
 import { BUBBLE_RIM, DOT_SIZE, bubble, glowBall, puff, streak, streakScale } from '../rendering/fxTextures';
 import { EntityType, isRuined, lookFn, ServerContactMessage, ServerPartDestroyedMessage } from '@space-game/common';
 import type { GameState } from '../state/GameState';
@@ -46,15 +46,24 @@ interface P {
 interface Pending { at: number; run: () => void }
 
 const MAX_PARTICLES = 2500;
+/** A debris chunk's outline, a unit across (scaled to each chunk's size) */
+const CHUNK = [-1, -0.6, 0.8, -0.8, 1, 0.5, -0.5, 1];
 
 export class DamageFx {
   private add = new Graphics();
-  private addSprites = new SpritePool('add');
+  /** Redrawn every frame, so a render group of its own: Pixi rebuilds its draw list, not the whole glow layer's */
+  private addGroup = new Container({ isRenderGroup: true });
+  private addSprites = new ParticlePool('add');
   private glowRoot = new Container();
   /** The additive layer: sparks, fire, flashes, shields (for the bloom) */
   get glowLayer(): Container { return this.glowRoot; }
-  private normal = new Graphics();
-  private smokeSprites = new SpritePool('normal');
+  /** Debris chunks' bodies: one shape, filled once, each placed, turned, sized, tinted and faded (none redrawn a frame) */
+  private chunkShape = new GraphicsContext().poly(CHUNK).fill(0xffffff);
+  private chunkLayer = new Container();
+  private chunkBodies: Graphics[] = [];
+  /** Chunk bodies drawn last frame (those after are parked: no alpha, no size) */
+  private chunksDrawn = 0;
+  private smokeSprites = new ParticlePool('normal');
   /** Where shields were struck: a bright patch on the bubble's rim, facing the hit */
   /** Shield ripples: where the shot struck, about the ship's centre in its own frame (angle and distance), so it rides with it */
   private ripples: { id: number; a: number; d: number; life: number }[] = [];
@@ -68,8 +77,9 @@ export class DamageFx {
 
   constructor(layer: Container, private source: ShipSource, private state: GameState, private sound: Sound, private repairRange: number) {
     this.add.blendMode = 'add';
-    this.glowRoot.addChild(this.addSprites.container, this.add);
-    layer.addChild(this.smokeSprites.container, this.normal, this.glowRoot);
+    this.addGroup.addChild(this.add);
+    this.glowRoot.addChild(this.addSprites.container, this.addGroup);
+    layer.addChild(this.smokeSprites.container, this.chunkLayer, this.glowRoot);
   }
 
   // ---------------------------------------------------------------------------
@@ -560,8 +570,8 @@ export class DamageFx {
       if (shieldPct > 0 || flash > 0) {
         const k = shieldPct / 100;
         const wob = 1 + 0.015 * Math.sin(this.time * 3 + id);
-        const b = this.addSprites.take(bubble(), e.renderX, e.renderY, 0.5, 0.5, flash > 0.3 ? 0xc8f4ff : 0x7fd6fa, 0.12 + 0.26 * k + 0.7 * flash);
-        b.scale.set((r * wob * (1 + 0.04 * flash)) / (64 * BUBBLE_RIM));
+        const b = (r * wob * (1 + 0.04 * flash)) / (64 * BUBBLE_RIM);
+        this.addSprites.take(bubble(), e.renderX, e.renderY, 0.5, 0.5, flash > 0.3 ? 0xc8f4ff : 0x7fd6fa, 0.12 + 0.26 * k + 0.7 * flash, 0, b, b);
       }
       if (emp && Math.random() < 0.5 * frames) {
         const a = Math.random() * Math.PI * 2;
@@ -600,11 +610,9 @@ export class DamageFx {
       if (rp.life >= 18 || !e || !ship) { this.ripples.splice(i, 1); continue; }
       const k = rp.life / 18, r = ship.derived.radius * 1.12 + 10, a = rp.a + e.renderAngle;
       // A patch of shield over the struck spot, spreading as it fades
-      const s = this.addSprites.take(glowBall(), e.renderX + Math.cos(a) * rp.d, e.renderY + Math.sin(a) * rp.d, 0.5, 0.5, 0xe0faff, Math.pow(1 - k, 1.5));
-      s.rotation = a;
       // (Sized to the strike, capped: a boss's bubble is huge, and its whole rim lighting up read as the shot meeting a circle)
       const rr = Math.min(r, 90);
-      s.scale.set((rr * 0.3) / DOT_SIZE, (rr * (0.6 + 1.0 * k)) / DOT_SIZE);
+      this.addSprites.take(glowBall(), e.renderX + Math.cos(a) * rp.d, e.renderY + Math.sin(a) * rp.d, 0.5, 0.5, 0xe0faff, Math.pow(1 - k, 1.5), a, (rr * 0.3) / DOT_SIZE, (rr * (0.6 + 1.0 * k)) / DOT_SIZE);
     }
   }
 
@@ -720,10 +728,9 @@ export class DamageFx {
   }
 
   private draw(frames: number): void {
-    const ga = this.add, gn = this.normal;
+    const ga = this.add;
     clearIfDrawn(ga);
-    clearIfDrawn(gn);
-    let w = 0;
+    let w = 0, chunks = 0;
     for (const p of this.ps) {
       p.life += frames;
       if (p.life >= p.max) continue;
@@ -738,15 +745,13 @@ export class DamageFx {
           // A streak back along its motion
           const len = 2.2, w = p.size * 1.4;
           const sl = Math.hypot(p.vx, p.vy) * len;
-          const s = this.addSprites.take(streak(), p.x - p.vx * len * 0.5, p.y - p.vy * len * 0.5, 0.5, 0.5, p.color, p.alpha * fade);
-          s.rotation = Math.atan2(p.vy, p.vx);
           const sc = streakScale(sl, w);
-          s.scale.set(sc.x, sc.y);
+          this.addSprites.take(streak(), p.x - p.vx * len * 0.5, p.y - p.vy * len * 0.5, 0.5, 0.5, p.color, p.alpha * fade, Math.atan2(p.vy, p.vx), sc.x, sc.y);
           break;
         }
         case 'glow': {
-          const s = this.addSprites.take(glowBall(), p.x, p.y, 0.5, 0.5, p.color, Math.min(1, p.alpha * fade * fade * 1.1));
-          s.scale.set((p.size * (0.75 + 0.3 * k) * 2) / DOT_SIZE);
+          const s = (p.size * (0.75 + 0.3 * k) * 2) / DOT_SIZE;
+          this.addSprites.take(glowBall(), p.x, p.y, 0.5, 0.5, p.color, Math.min(1, p.alpha * fade * fade * 1.1), 0, s, s);
           break;
         }
         case 'ring':
@@ -754,17 +759,26 @@ export class DamageFx {
           break;
         case 'smoke':
         case 'dust': {
-          const s = this.smokeSprites.take(puff(), p.x, p.y, 0.5, 0.5, p.color, p.alpha * fade * Math.min(1, k * 6));
-          s.scale.set((p.size * 2.3) / DOT_SIZE);
-          s.rotation = p.rot;
+          const s = (p.size * 2.3) / DOT_SIZE;
+          this.smokeSprites.take(puff(), p.x, p.y, 0.5, 0.5, p.color, p.alpha * fade * Math.min(1, k * 6), p.rot, s, s);
           break;
         }
         case 'chunk': {
-          const s = p.size, c = Math.cos(p.rot), sn = Math.sin(p.rot);
-          const pts = [[-s, -s * 0.6], [s * 0.8, -s * 0.8], [s, s * 0.5], [-s * 0.5, s]].flatMap(([u, v]) => [p.x + u * c - v * sn, p.y + u * sn + v * c]);
-          gn.poly(pts).fill({ color: p.color, alpha: Math.min(1, fade * 2) });
+          const s = p.size, body = this.chunkBody(chunks++);
+          body.position.set(p.x, p.y);
+          body.rotation = p.rot;
+          body.scale.set(s);
+          if (body.tint !== p.color) body.tint = p.color;
+          body.alpha = Math.min(1, fade * 2);
           // Glowing hot for the first moments
-          if (k < 0.35) ga.poly(pts).stroke({ color: 0xff9a4a, width: 1.5, alpha: (1 - k / 0.35) * 0.9 });
+          if (k < 0.35) {
+            const c = Math.cos(p.rot), sn = Math.sin(p.rot), pts: number[] = [];
+            for (let i = 0; i < CHUNK.length; i += 2) {
+              const u = CHUNK[i] * s, v = CHUNK[i + 1] * s;
+              pts.push(p.x + u * c - v * sn, p.y + u * sn + v * c);
+            }
+            ga.poly(pts).stroke({ color: 0xff9a4a, width: 1.5, alpha: (1 - k / 0.35) * 0.9 });
+          }
           break;
         }
         case 'beam': {
@@ -786,5 +800,21 @@ export class DamageFx {
       this.ps[w++] = p;
     }
     this.ps.length = w;
+    for (let i = chunks; i < this.chunksDrawn; i++) {
+      this.chunkBodies[i].alpha = 0;
+      this.chunkBodies[i].scale.set(0);
+    }
+    this.chunksDrawn = chunks;
+  }
+
+  /** The i-th chunk body this frame (made the first time there are that many) */
+  private chunkBody(i: number): Graphics {
+    let g = this.chunkBodies[i];
+    if (!g) {
+      g = new Graphics(this.chunkShape);
+      this.chunkBodies.push(g);
+      this.chunkLayer.addChild(g);
+    }
+    return g;
   }
 }

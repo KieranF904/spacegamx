@@ -43,8 +43,6 @@ export interface ItemDef {
   plan?: string;
   /** Job items: the job it belongs to (taken back if you abandon it) */
   quest?: string;
-  /** (Retired with the schematics, 2026-10-30: no item carries it now; kept so old readers still compile) */
-  teaches?: string[];
   /** Repair kits: credits of repairs, HP healed per second (fraction of each part's max), seconds per missing part rebuilt */
   repair?: { budget: number; hpPerSec: number; restoreSec: number };
   /** Minerals: which family of rock carries it, and the tier it first turns up in useful amounts */

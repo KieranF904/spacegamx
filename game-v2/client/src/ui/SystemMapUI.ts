@@ -1729,7 +1729,7 @@ export class SystemMapUI {
     } else if (hit.kind === 'station') {
       html = `<div class="t-name">${escapeHtml(hit.name)}</div><div class="t-sub">Station · shipyard</div><div class="t-act">Click: autopilot there · Ctrl-click: warp <span>(dev)</span></div>`;
     } else if (hit.kind === 'gate') {
-      html = `<div class="t-name">Jump gate</div><div class="t-sub">to ${escapeHtml(hit.target?.name ?? '?')}</div>${this.destRows(hit.target)}<div class="t-desc">Fly in and press X to jump.</div>${hazardRows(hit.target?.hazardRatings, this.myShip?.() ?? null)}<div class="t-act">Click: autopilot there · Ctrl-click: warp <span>(dev)</span></div>`;
+      html = `<div class="t-name">Jump gate</div><div class="t-sub">to ${escapeHtml(hit.target?.name ?? '?')}</div>${this.destRows(hit.target)}<div class="t-desc">Fly in and press ${escapeHtml(boundKeyName('interact', settings.data.bindings))} to jump.</div>${hazardRows(hit.target?.hazardRatings, this.myShip?.() ?? null)}<div class="t-act">Click: autopilot there · Ctrl-click: warp <span>(dev)</span></div>`;
     } else if (hit.kind === 'rift') {
       html = `<div class="t-name">${escapeHtml(hit.label)}</div><div class="t-sub">Rift to ${escapeHtml(hit.dest?.name ?? '?')}</div>${this.destRows(hit.dest)}<div class="t-desc">Fly into the vortex to be pulled through.</div><div class="t-act">Click: autopilot there · Ctrl-click: warp <span>(dev)</span></div>`;
     } else if (hit.kind === 'region') {

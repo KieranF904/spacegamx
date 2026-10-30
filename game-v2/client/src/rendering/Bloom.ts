@@ -6,15 +6,16 @@
  * sixteenth of the pixels the extra draw and the blur cost next to nothing.
  */
 
-import { Application, BlurFilter, Container, Graphics, Matrix, RenderTexture, Sprite } from 'pixi.js';
+import { Application, BlurFilter, Container, Graphics, Matrix, ParticleContainer, RenderTexture, Sprite } from 'pixi.js';
 
 /** The bloom texture's size, as a fraction of the screen's (the quality setting changes it: see settings/quality.ts) */
 const SCALE = 0.25;
 
-/** A layer with nothing drawn in it (a cleared Graphics, a plain container with no children): no pass for it. Anything else (a particle container) is assumed to have something. */
+/** A layer with nothing drawn in it (a cleared Graphics, a particle container with no particles, a plain container holding only such): no pass for it */
 function isEmpty(c: Container): boolean {
   if (c instanceof Graphics) return c.children.length === 0 && c.context.instructions.length === 0;
-  return c.constructor === Container && c.children.length === 0;
+  if (c instanceof ParticleContainer) return c.particleChildren.length === 0;
+  return c.constructor === Container && c.children.every(isEmpty);
 }
 
 export class Bloom {

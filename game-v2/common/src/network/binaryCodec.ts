@@ -154,7 +154,7 @@ export class BinaryWriter {
     }
     if (v === null) { this.byte(0x80); return; }
     if (Array.isArray(v)) {
-      if (v.length < 32) this.byte(0xa0 | v.length); else { this.byte(0x8e); this.varint(v.length); }
+      this.arrayHeader(v.length);
       for (const x of v) this.value(x);
       return;
     }
@@ -164,6 +164,11 @@ export class BinaryWriter {
     this.byte(0x8f);
     this.varint(keys.length);
     for (const k of keys) { this.string(k); this.value(o[k]); }
+  }
+
+  /** An array of n items starts (the items follow, each a value) */
+  arrayHeader(n: number): void {
+    if (n < 32) this.byte(0xa0 | n); else { this.byte(0x8e); this.varint(n); }
   }
 
   /** What's been written, as its own bytes; the writer starts over */

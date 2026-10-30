@@ -58,6 +58,8 @@ import { AsteroidBatch } from './lighting/AsteroidBatch';
 import { CoronaRaysRenderer } from './CoronaRaysRenderer';
 import { skyBiome, SkyBiome } from './sky/skyBiome';
 import type { NestData, ServerSystemInfoMessage, StarSystemData } from '@space-game/common';
+import { boundKeyName } from '../input/keybindings';
+import { settings } from '../settings/Settings';
 
 interface DamageNumber {
   /** Where it was hit (world) */
@@ -312,6 +314,8 @@ export class Renderer {
   private fxPool = new SpritePool('normal');
   /** Damage numbers: a bitmap font (digits drawn once), pooled */
   private numberPool: BitmapText[] = [];
+  /** Over the other effects. Its own render group: a number coming or going rebuilds its draw list, not the scene's */
+  private numberLayer = new Container({ isRenderGroup: true });
   private tractorBeams: TractorBeam[] = [];
   /** Tractor beams: pooled streaks and dots */
   private beamPool = new SpritePool('add');
@@ -417,6 +421,7 @@ export class Renderer {
     this.debugAsteroidGraphics = new Graphics();
     this.debugAsteroidGraphics.name = 'debugAsteroidMarkers';
     this.effectContainer.addChild(this.debugAsteroidGraphics);
+    this.effectContainer.addChild(this.numberLayer);
     
     // Initialize minimap
     this.initMinimap();
@@ -988,6 +993,8 @@ export class Renderer {
     const k = this.tagScale;
 
     for (const entity of this.state.entities.values()) {
+      // Shots are drawn by WeaponFx: no view of their own (one made and dropped per shot rebuilt the scene's draw list)
+      if (entity.type === EntityType.Projectile) continue;
       aliveIds.add(entity.id);
 
       // Culling - skip entities outside viewport (but always render player)
@@ -1010,8 +1017,8 @@ export class Renderer {
         container = this.createEntityGraphics(entity.type, entity.id, entity.data);
         this.entityGraphics.set(entity.id, container);
         this.entityContainer.addChild(container);
-        // It fades in (asteroids are drawn in batches, which don't fade: they just appear; projectiles and ship bodies are drawn elsewhere)
-        if (entity.type !== EntityType.Projectile && entity.type !== EntityType.ShipBody && entity.type !== EntityType.Asteroid) {
+        // It fades in (asteroids are drawn in batches, which don't fade: they just appear; ship bodies are drawn elsewhere)
+        if (entity.type !== EntityType.ShipBody && entity.type !== EntityType.Asteroid) {
           container.alpha = 0;
           this.fadingIn.set(entity.id, 0);
         }
@@ -1020,7 +1027,8 @@ export class Renderer {
       // Make visible (modular ships keep only their name tag and health bar here)
       container.visible = true;
       if (this.hiddenEntityIds.has(entity.id)) {
-        for (const c of container.children) c.visible = c.label === 'nameTag' || c.label === 'healthBar';
+        // (the tag's name and bar are shown or not below: set here too, an undamaged ship's bar went on and off every frame)
+        for (const c of container.children) if (c.label !== 'nameTag' && c.label !== 'healthBar') c.visible = false;
       }
       const fade = this.fadingIn.get(entity.id);
       if (fade !== undefined) {
@@ -1282,9 +1290,8 @@ export class Renderer {
       if (p.life <= 0) continue;
       p.rot += p.rotSpeed * delta;
       const k = p.life / p.maxLife;
-      const sp = pool.take(p.tex, p.x, p.y, 0.5, 0.5, p.color, p.alpha * k);
+      const sp = pool.take(p.tex, p.x, p.y, 0.5, 0.5, p.color, p.alpha * k, p.rot);
       sp.scale.set(k * p.size * (p.radius * 2) / DOT_SIZE);
-      sp.rotation = p.rot;
       this.particles[w++] = p;
     }
     this.particles.length = w;
@@ -1362,7 +1369,7 @@ export class Renderer {
       dn.ox += dn.drift * k * delta * dn.lifetime;
       
       if (dn.lifetime <= 0) {
-        this.effectContainer.removeChild(dn.text);
+        this.numberLayer.removeChild(dn.text);
         this.numberPool.push(dn.text);
         this.damageNumbers.splice(i, 1);
       } else {
@@ -1445,7 +1452,7 @@ export class Renderer {
     text.alpha = 1;
     text.visible = this.showDamageNumbers;
     text.rotation = this.cameraAngle;
-    this.effectContainer.addChild(text);
+    this.numberLayer.addChild(text);
 
     text.scale.set(1.6 * this.tagScale);
     const jx = (Math.random() - 0.5) * 24 * this.tagScale;
@@ -1747,7 +1754,7 @@ export class Renderer {
     }
 
     const subText = new Text({
-      text: 'Press R to respawn',
+      text: `Press ${boundKeyName('respawn', settings.data.bindings)} to respawn`,
       style: new TextStyle({ fontFamily: 'Arial', fontSize: 24, fill: 0xffffff }),
     });
     subText.anchor.set(0.5);

@@ -16,6 +16,8 @@
 
 /** A tile's side (texels); the atlas is 4 tiles across and HULL_ROWS down */
 export const HULL_TILE = 256;
+/** What it makes, by version (assetCache.ts): bump it whenever the output changes */
+export const HULL_ATLAS_VERSION = 1;
 export const HULL_ROWS = 6;
 
 const N = HULL_TILE;

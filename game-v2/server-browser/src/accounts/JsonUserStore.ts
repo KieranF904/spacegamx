@@ -31,9 +31,11 @@ import {
   generateSalt,
   generateToken,
   hashPassword,
+  hashPasswordSync,
   validateEmail,
   validateRegistration,
   verifyPassword,
+  verifyPasswordSync,
   writeFileDurable,
 } from './utils.js';
 
@@ -157,7 +159,7 @@ export class JsonUserStore implements UserStore {
         existing.is_admin = true;
         this.save();
       }
-      if (production && verifyPassword('admin', existing.salt, existing.password_hash)) {
+      if (production && verifyPasswordSync('admin', existing.salt, existing.password_hash)) {
         console.warn('[UserStore] WARNING: the admin account still has the default password "admin". Change it.');
       }
       return;
@@ -172,7 +174,7 @@ export class JsonUserStore implements UserStore {
       return;
     }
     const salt = generateSalt();
-    const passwordHash = hashPassword(password, salt);
+    const passwordHash = hashPasswordSync(password, salt);
     const user: StoredUser = {
       id: this.nextUserId++,
       username: 'admin',
@@ -200,6 +202,10 @@ export class JsonUserStore implements UserStore {
       return { success: false, error: validationError };
     }
 
+    // (Hashed first: from the checks below to adding the account nothing waits, so two at once can't both take a name)
+    const salt = generateSalt();
+    const passwordHash = await hashPassword(password, salt);
+
     // Check for existing user (case-insensitive, matching SQL COLLATE NOCASE)
     const byUsername = this.users.find(u => u.username.toLowerCase() === username.toLowerCase());
     if (byUsername) {
@@ -209,9 +215,6 @@ export class JsonUserStore implements UserStore {
     if (byEmail) {
       return { success: false, error: 'Email already registered' };
     }
-
-    const salt = generateSalt();
-    const passwordHash = hashPassword(password, salt);
 
     const user: StoredUser = {
       id: this.nextUserId++,
@@ -236,7 +239,8 @@ export class JsonUserStore implements UserStore {
       u => u.username.toLowerCase() === username.toLowerCase() || u.email.toLowerCase() === username.toLowerCase()
     );
 
-    if (!user || !verifyPassword(password, user.salt, user.password_hash)) {
+    // (Deleted while the hash was worked out: gone)
+    if (!user || !(await verifyPassword(password, user.salt, user.password_hash)) || !this.users.includes(user)) {
       return { success: false, error: 'Invalid username or password' };
     }
     // (Only told once the password is right, so it doesn't say which names are banned)
@@ -324,14 +328,17 @@ export class JsonUserStore implements UserStore {
 
   async checkPassword(userId: number, password: string): Promise<boolean> {
     const user = this.users.find(u => u.id === userId);
-    return !!user && verifyPassword(password, user.salt, user.password_hash);
+    return !!user && await verifyPassword(password, user.salt, user.password_hash);
   }
 
   async setPassword(userId: number, password: string): Promise<void> {
     const user = this.users.find(u => u.id === userId);
     if (!user) return;
-    user.salt = generateSalt();
-    user.password_hash = hashPassword(password, user.salt);
+    // (Both at once, after the hash: a sign-in meanwhile checks against the old pair)
+    const salt = generateSalt();
+    const passwordHash = await hashPassword(password, salt);
+    user.salt = salt;
+    user.password_hash = passwordHash;
     this.save();
   }
 

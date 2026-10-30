@@ -56,6 +56,12 @@ function fieldUniforms() {
   return { uCamera: vec2(), uRes: vec2(), uSky: vec4(), uBand: vec4(), uField: vec4(), uLens: vec4(), uRot: vec2() };
 }
 
+let programs: [GlProgram, GlProgram] | null = null;
+/** The haze's program and the stars' (one each for every sky), for compiling ahead too */
+export function skyPrograms(): [GlProgram, GlProgram] {
+  return (programs ??= [new GlProgram({ vertex: skyVert, fragment: hazeFrag, name: 'sky-haze' }), new GlProgram({ vertex: skyVert, fragment: starsFrag, name: 'sky-stars' })]);
+}
+
 export class SkyRenderer {
   /** Goes at the very back of the stage */
   readonly container = new Container();
@@ -77,7 +83,7 @@ export class SkyRenderer {
   constructor(private app: Application) {
     const noise = skyNoiseTexture();
     this.hazeShader = new Shader({
-      glProgram: new GlProgram({ vertex: skyVert, fragment: hazeFrag }),
+      glProgram: skyPrograms()[0],
       resources: {
         uNoise: noise.source,
         hazeUniforms: {
@@ -89,7 +95,7 @@ export class SkyRenderer {
       },
     });
     this.starShader = new Shader({
-      glProgram: new GlProgram({ vertex: skyVert, fragment: starsFrag }),
+      glProgram: skyPrograms()[1],
       resources: {
         uNoise: noise.source,
         starUniforms: {

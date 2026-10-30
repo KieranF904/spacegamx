@@ -10,6 +10,8 @@
  */
 
 export const STATION_TILE = 256;
+/** What it makes, by version (assetCache.ts): bump it whenever the output changes */
+export const STATION_ATLAS_VERSION = 1;
 export const STATION_ATLAS_W = STATION_TILE * 4;
 export const STATION_ATLAS_H = STATION_TILE * 3;
 
