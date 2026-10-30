@@ -5,9 +5,12 @@
  *           links and rift routes, a detail card on hover. Click a system and
  *           the autopilot takes you there, gate by gate.
  *   System  the current system live: central body and gravity horizon, belt,
- *           stations with their orbits, gates, rifts, other ships and you.
- *           Click a station, gate or wreck to fly there; right-click empty
- *           space to fly to that point. Ctrl-click warps (dev tool). Danger
+ *           stations with their orbits, gates, rifts, other ships (past your
+ *           view too: the system's far ships and other pilots, FarShips) and
+ *           you. Click a station, gate or wreck to fly there; right-click
+ *           anywhere to fly to that point (the map's own: in flight a plain
+ *           right-click fires, and with the menu modifier opens the action
+ *           menu, ContextActions.ts). Ctrl-click warps (dev tool). Danger
  *           bands, belts, hostiles, your wreck and the jump drive's reach.
  *
  * You keep flying in the system view: the flight keys work as ever, the ship
@@ -698,13 +701,14 @@ export class SystemMapUI {
     this.updateTooltip();
 
     // Footer: what the mouse does here
-    const jumpKey = boundKeyName('jump', settings.data.bindings);
-    const hintKey = `${this.view}|${jumpKey}`;
+    const jumpKey = boundKeyName('jump', settings.data.bindings), menuKey = boundKeyName('contextMenu', settings.data.bindings);
+    const hintKey = `${this.view}|${jumpKey}|${menuKey}`;
     if (hintKey !== this.hintKey) {
       this.hintKey = hintKey;
+      // (Right-click is the map's here: in flight it fires, and with the menu key held opens the action menu)
       this.hintEl.textContent = this.view === 'galaxy'
         ? 'Scroll to zoom · drag to pan · click a system to fly there (autopilot) · Esc to close'
-        : `Your ship faces the cursor · hold left to fire · ${jumpKey} jumps there · click a marker: autopilot · right-drag pans · right-click: fly to a point · Shift + right-click: ping · C follows your ship`;
+        : `Your ship faces the cursor · hold left to fire · ${jumpKey} jumps there · click a marker or right-click a spot: autopilot · right-drag pans · Shift + right-click: ping · C follows your ship · in flight, ${menuKey} + right-click: action menu`;
     }
 
     // Header
@@ -1416,10 +1420,12 @@ export class SystemMapUI {
       this.hits.push({ kind: 'rift', label: rift.label ?? 'Rift', dest, x: rift.position.x, y: rift.position.y, sx: x, sy: y });
     }
 
-    // Other ships (your party in green, with a ring)
+    // Other pilots, near (entities) and far (FarShips: past your view; your party in green, with a ring)
     const party = new Set((this.party?.() ?? []).map((m) => m.eid));
-    for (const e of this.state.entities.values()) {
-      if (e.type !== EntityType.Player || e.id === this.state.playerId) continue;
+    const pilots: { id: number; name?: string; renderX: number; renderY: number }[] = [];
+    for (const e of this.state.entities.values()) if (e.type === EntityType.Player && e.id !== this.state.playerId) pilots.push(e);
+    for (const f of this.state.farShips.list(this.state.systemId, this.state.getRawServerTick(), (id) => this.state.entities.has(id) || id === this.state.playerId)) if (f.kind === 4) pilots.push(f);
+    for (const e of pilots) {
       const x = sx(e.renderX), y = sy(e.renderY);
       const mate = party.has(e.id);
       ctx.fillStyle = mate ? '#4ade80' : '#60a5fa';
@@ -1553,6 +1559,8 @@ export class SystemMapUI {
     for (const e of this.state.entities.values()) if (e.type === EntityType.ShipBody) out.push(e);
     const tick = this.state.getRawServerTick();
     for (const f of this.state.farShips.list(this.state.systemId, tick, (id) => this.state.entities.has(id))) {
+      // (Other pilots are drawn with the near ones)
+      if (f.kind === 4) continue;
       out.push({ id: f.id, name: f.name, renderX: f.renderX, renderY: f.renderY, renderAngle: Math.hypot(f.vx, f.vy) > 0.05 ? Math.atan2(f.vy, f.vx) : 0,
         data: [f.kind, 0, 0, f.faction, f.rank, 0, 0, 0, f.rating, f.calm ? 1 : 0] });
     }

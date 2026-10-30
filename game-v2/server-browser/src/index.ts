@@ -227,7 +227,8 @@ async function handleRegister(req: http.IncomingMessage, res: http.ServerRespons
       sendPushoverNotification('Server Online', `${name} (${region})`, -1);
     }
     
-    sendJson(res, 200, { ok: true });
+    // (Each heartbeat tells the server which accounts are gone, so it deletes their profiles)
+    sendJson(res, 200, { ok: true, deletedAccounts: accounts.deletedAccounts() });
   } catch (err) {
     logEvent('register error', { error: String(err) });
     sendJson(res, 400, { ok: false, error: 'Invalid request' });

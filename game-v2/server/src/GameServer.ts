@@ -96,8 +96,13 @@ import {
   asteroidSpin,
   countOf,
   PROTOCOL_VERSION,
-  packMapDot,
-  type MapDot,
+  packMapLeg,
+  unpackMapLegs,
+  packMapRoute,
+  mapDotFlags,
+  legAt,
+  MAP_DOT_SLACK,
+  type Leg,
   ReplicaEnv,
   PROTOCOL_MISMATCH_CLOSE,
   PROTOCOL_MISMATCH_REASON,
@@ -118,13 +123,14 @@ import { GameData } from './data/GameData.js';
 import type { UserStore } from './auth/types.js';
 import type { ClientSocket, ClientLink } from '@space-game/common';
 import type { ShipBridge, ShipHost } from './ships/ShipBridge.js';
-import { Blueprint, ShipState, parseBlueprint, quantizeShipValue, skillValue, hasAll, removeAll, Economy, Bag, StarterKit, jumpTuning, jumpPhase, partItemId, rateShip, ratingOf, createShipState, gradeReward, gradeOf, accrueTraces, releaseTraces, unlocks, isStructural, stationPerks, hazardFlight, stationTable, blueprintGrade, lookFn, fixModelMaterials, type ShipDerived } from '@space-game/common';
+import { Blueprint, ShipState, parseBlueprint, quantizeShipValue, skillValue, hasAll, removeAll, Economy, Bag, StarterKit, jumpTuning, jumpPhase, partItemId, rateShip, ratingOf, createShipState, gradeReward, gradeOf, accrueTraces, releaseTraces, unlocks, isStructural, stationPerks, hazardFlight, stationTable, blueprintGrade, lookFn, fixModelMaterials, warmthPercent, type ShipDerived } from '@space-game/common';
 
 /** A station site by id */
 const stationPerksSite = (id: string | undefined) => (id ? stationTable()?.sites.find((s) => s.id === id) : undefined);
 import { Pilots, PilotHost, type PilotConn } from './game/Pilots.js';
 import { Ammo } from './game/Ammo.js';
 import { Hazards } from './game/Hazards.js';
+import { Warmth } from './game/Warmth.js';
 import { Outpost } from './game/Outpost.js';
 import { HomeStations } from './game/HomeStations.js';
 import { LootPods, PodHost } from './game/LootPods.js';
@@ -151,7 +157,8 @@ import { Trade } from './game/Trade.js';
 import { Operations } from './game/Operations.js';
 import { Market } from './game/Market.js';
 import { Replication } from './net/Replication.js';
-import { SimLod } from './ships/SimLod.js';
+import { SimLod, type Plan, type Intent, type FarPose } from './ships/SimLod.js';
+import { SystemMemory, shipMemory, restoreHp, type WorldStore, type MemoryHost, type ShipMemory } from './game/SystemMemory.js';
 import { Achievements } from './game/Achievements.js';
 import { huntedBoss, RibbonsFile, mineFalloff, rayTerrain, type Terrain } from '@space-game/common';
 import { repRank, replicaAngle, quantizeReplicaAngle, ReplicaMode } from '@space-game/common';
@@ -483,9 +490,11 @@ interface ClientConnection {
   repKnown: Map<number, number>;
   /** Ships in this client's view (the rest of the system's ships cost it nothing) */
   shipView: Set<number>;
-  /** Ships out of view it's been told the names of, for the map (mapDots), and whether the last list had any */
+  /** Ships out of view it's been told the names of, for the map (mapDots) */
   mapNamed: Set<number>;
-  mapDotsSent?: boolean;
+  /** The map's dots as it has them (each one's leg as sent, from when; its route's leg count; its look), and whether the next list is a fresh one */
+  mapSent?: Map<number, { leg: Leg; tick: number; seq: number; look: number }>;
+  mapFresh?: boolean;
   /** Its system map is open (mapView), and it's owed a list now (just opened) */
   mapOpen?: boolean;
   mapDotsDue?: boolean;
@@ -539,6 +548,8 @@ const SHIP_VIEW_IN = 40000;
 const SHIP_VIEW_OUT = 48000;
 /** Ships past the view go to the system map this often (ticks) */
 const MAP_DOTS_TICKS = 60;
+/** A pilot this close past a gate's or rift's edge has where it goes brought back (SystemMemory), before they're through */
+const MEMORY_GATE_MOUTH = 3000;
 /** Messages that can wait for the next frame (see GameServer.lazy), and for how many ticks at most */
 const LAZY_TYPES = new Set(['damage', 'projectileHit', 'partDestroyed', 'contact', 'detonation', 'ignite', 'stationFire']);
 const LAZY_TICKS = 2;
@@ -626,6 +637,8 @@ export interface GameServerOptions {
   telemetry?: TelemetryWriter;
   /** Where contributor notes and ranks are kept (contribFileStore: data/contributor); none: in memory */
   contributorStore?: ContribStore;
+  /** Where the world's memory is kept between restarts (worldFileStore: data/world/memory.json); none: in memory only */
+  worldStore?: WorldStore;
 }
 
 /** A player who quits within this long of taking damage leaves their ship in space... */
@@ -711,6 +724,7 @@ export class GameServer {
   private services: StationServices;
   private ammo!: Ammo;
   private hazards!: Hazards;
+  private warmth!: Warmth;
   private outpost?: Outpost;
   private homes!: HomeStations;
   private weapons: Weapons;
@@ -738,8 +752,10 @@ export class GameServer {
   readonly ops: Operations;
   readonly market: Market;
   readonly replication: Replication;
-  /** Pilotless ships far from every pilot go distant: out of the pipeline, moved coarsely (ships/SimLod.ts) */
+  /** Pilotless ships far from every pilot go distant: out of the pipeline, flown by routes worked out by time (ships/SimLod.ts) */
   readonly lod: SimLod;
+  /** A system nobody's in is put away whole and brought back as it was, through restarts too (game/SystemMemory.ts) */
+  readonly memory: SystemMemory;
   readonly achievements: Achievements;
   /** Pilotless ships players protect (escorted freighters, outposts): their names */
   private wards = new Map<number, string>();
@@ -844,6 +860,17 @@ export class GameServer {
       flying: () => [...this.clients.values()].filter((c) => this.flying(c.playerId)).map((c) => ({ conn: c, eid: c.playerId })),
       system: (eid) => this.gameData.getSystemByNum(InSystem.systemId[eid]),
       position: (eid) => ({ x: Position.x[eid], y: Position.y[eid] }),
+      toast: (conn, text, kind) => this.pilots.toast(conn as ClientConnection, text, kind),
+      tick: () => this.currentTick,
+    }, this.ships, this.gameData.hazardRules);
+    // Cold building up on pilots' ships, and heat bringing them back (game/Warmth.ts)
+    this.warmth = new Warmth({
+      flying: () => [...this.clients.values()].filter((c) => this.flying(c.playerId)).map((c) => ({ conn: c, eid: c.playerId })),
+      system: (eid) => this.gameData.getSystemByNum(InSystem.systemId[eid]),
+      systemNum: (eid) => InSystem.systemId[eid],
+      position: (eid) => ({ x: Position.x[eid], y: Position.y[eid] }),
+      docked: (eid) => this.dockedShips.has(eid),
+      stations: (eid) => [...stationQuery(this.world)].filter((st) => InSystem.systemId[st] === InSystem.systemId[eid]).map((st) => ({ x: Position.x[st], y: Position.y[st], radius: Radius.value[st] })),
       toast: (conn, text, kind) => this.pilots.toast(conn as ClientConnection, text, kind),
       tick: () => this.currentTick,
     }, this.ships, this.gameData.hazardRules);
@@ -955,7 +982,7 @@ export class GameServer {
     this.lod = new SimLod({
       tick: () => this.currentTick,
       observers: () => this.lodObservers(),
-      intent: (eid) => this.enemies.intent(eid),
+      intent: (eid, at) => this.trafficIntent(eid, at) ?? this.enemies.intent(eid, at),
       busy: (eid) => (this.wards.has(eid) && this.lodOccupied.has(InSystem.systemId[eid])) || this.bosses.busy(eid),
       watched: () => {
         const out = new Set<number>();
@@ -963,6 +990,10 @@ export class GameServer {
         return out;
       },
     }, this.ships);
+    // (A distant pack sent somewhere new is flown there from where its route has it)
+    this.enemies.onOrders = (eid) => this.lod.replan(eid);
+    this.memory = new SystemMemory(this.createMemoryHost(), this.gameData.rulesFile.memory, opts.worldStore);
+    if (this.scene === 'sectors') this.memory.load();
     this.trade = new Trade({
       send: (conn, msg) => this.send((conn as ClientConnection).ws, msg),
       byEntity: (eid) => this.liveConn(eid),
@@ -1208,6 +1239,8 @@ this.devTeleport = opts.devTeleport ?? false;
         plan: (file: string) => this.ships.library.get(file)?.name ?? file,
         recipe: (id: string) => {
           const [kind, what] = id.split(':');
+          // (a plain recipe, an item's own: Quench Slugs)
+          if (what === undefined) return `${this.econ.items.name(kind)} (recipe)`;
           return `${pretty(what)} fabrication`;
         },
       },
@@ -2192,11 +2225,30 @@ this.devTeleport = opts.devTeleport ?? false;
     return true;
   }
 
+  /** Accounts already dealt with (the lobby repeats the list on every heartbeat) */
+  private forgotten = new Set<number>();
+
+  /** Accounts the lobby has deleted: disconnect anyone on them and delete their profiles and ranks */
+  async forgetAccounts(ids: number[]): Promise<void> {
+    for (const id of ids) {
+      if (!Number.isInteger(id) || id <= 0 || this.forgotten.has(id)) continue;
+      try {
+        for (const conn of await this.pilots.forgetAccount(id)) this.rejectAuth(conn as ClientConnection, 'This account has been deleted.');
+        this.achievements.forget(id);
+        this.forgotten.add(id);
+      } catch (e) {
+        console.error(`[Accounts] could not delete the profile of account ${id}:`, e);
+      }
+    }
+    await this.achievements.save();
+  }
+
   /** Save everyone (server shutdown) */
   async saveAll(): Promise<void> {
     await this.pilots.saveAll();
     await this.contrib.flush();
     await this.achievements.save(true);
+    await this.memory.save();
   }
 
   /** This week's hunted boss: double rewards */
@@ -2273,6 +2325,8 @@ this.devTeleport = opts.devTeleport ?? false;
       canDamage: (a, b) => this.canDamage(a, b),
       invulnerable: (eid) => (this.admin?.isGod(eid) ?? false) || this.dockedShips.has(eid) || this.personCraft.has(eid) || !!this.bosses?.brainOf(eid)?.invulnerable?.(),
       takenScale: (eid) => this.bosses?.brainOf(eid)?.taken?.() ?? 1,
+      stageCover: (eid) => this.bosses?.stageCover(eid),
+      baneFaction: (eid) => { const e = this.enemies?.info(eid); return e && !e.boss ? e.faction : undefined; },
       sheltered: (eid) => this.dockedShips.has(eid),
       mineBeam: (eid, x, y, angle, range, damage, material, gas, full) => this.mineBeam(eid, x, y, angle, range, damage, material, gas, full),
       nearRepairSite: (eid) => {
@@ -2331,7 +2385,8 @@ this.devTeleport = opts.devTeleport ?? false;
       for (const d of system.derelicts ?? []) {
         const slot = { data: d, systemNum, eid: -1, respawnTick: 0, spawns: 0 };
         this.derelicts.push(slot);
-        this.spawnDerelict(slot);
+        // (A system remembered has its own back as they were: SystemMemory)
+        if (!this.memory.remembers(system.id)) this.spawnDerelict(slot);
       }
       for (const t of system.traffic ?? []) {
         const slot = { data: t, systemNum, eid: -1, leg: 0, dwell: 0, respawnTick: 0 };
@@ -2776,7 +2831,7 @@ this.devTeleport = opts.devTeleport ?? false;
       case 'mapView':
         // (Opened: the far ships at once, then once a second while it's open)
         conn.mapOpen = msg.open === true;
-        if (conn.mapOpen) conn.mapDotsDue = true;
+        if (conn.mapOpen) { conn.mapDotsDue = true; conn.mapFresh = true; conn.mapSent?.clear(); }
         break;
       case 'chat':
         this.handleChat(conn, msg);
@@ -3463,6 +3518,8 @@ case 'join':
     const target = this.gameData.getSystemByNum(systemNum);
     if (!target) return;
     const fromSystem = InSystem.systemId[eid];
+    // (A system that was put away is back before the pilot's there: SystemMemory)
+    this.memory.enter(systemNum);
     if (fromSystem !== systemNum && !target.private && !target.surface && !target.pocket) this.pilots.track(conn, `visit_${target.id}`, { from: this.gameData.getSystemByNum(fromSystem)?.id }, true);
     this.broadcastToSystem(fromSystem, { type: 'effect', effectType: EffectType.WarpOut, x: Position.x[eid], y: Position.y[eid] });
     InSystem.systemId[eid] = systemNum;
@@ -3718,6 +3775,8 @@ case 'join':
     
     // (Asteroids aren't moved: their positions are worked out when something needs them, see placeAsteroid)
     this.stationOrbitSystem();
+    // Systems pilots are in or coming to are in the world; ones left a while are put away (before anything's spawned)
+    if (this.scene === 'sectors') this.memory.tick();
 
     // Reset spatial grid and rebuild
     this.spatialGrid.clear();
@@ -3740,6 +3799,7 @@ case 'join':
     this.pods.tick();
     this.mining.tick();
     this.hazards.tick();
+    this.warmth.tick();
     this.homes.tick();
     this.watchComet();
     if (this.outpost && this.currentTick % 60 === 0) for (const c of this.clients.values()) this.outpost.finish(c);
@@ -4206,6 +4266,7 @@ case 'join':
    */
   private trafficSystem(): void {
     for (const slot of this.traffic) {
+      if (!this.memory.isResident(slot.systemNum)) continue;
       if (slot.eid >= 0 && !this.ships.has(slot.eid)) {
         slot.eid = -1;
         slot.respawnTick = this.currentTick + TRAFFIC_RESPAWN_TICKS;
@@ -4220,6 +4281,8 @@ case 'join':
         slot.leg = 1 % slot.data.route.length;
         slot.dwell = 0;
       }
+      // (Distant: its route's planned leg by leg, trafficIntent)
+      if (this.ships.isDormant(slot.eid)) continue;
       const st = this.stationEntity(slot.data.route[slot.leg], slot.systemNum);
       if (st < 0) continue;
       const dist = Math.hypot(Position.x[st] - Position.x[slot.eid], Position.y[st] - Position.y[slot.eid]);
@@ -4231,6 +4294,110 @@ case 'join':
       }
       this.ships.setAutopilot(slot.eid, { x: Position.x[st], y: Position.y[st], arriveRadius: TRAFFIC_ARRIVE_RADIUS });
     }
+  }
+
+  /**
+   * A distant freighter's next leg (ships/SimLod.ts), as trafficSystem flies a
+   * live one: on to its next station, holding there a while first; re-aimed
+   * now and then (stations go round). undefined: not a freighter.
+   */
+  private trafficIntent(eid: number, at: Plan): Intent | undefined {
+    const slot = this.traffic.find((t) => t.eid === eid);
+    if (!slot) return undefined;
+    let st = this.stationEntity(slot.data.route[slot.leg], slot.systemNum);
+    if (st >= 0 && Math.hypot(Position.x[st] - at.x, Position.y[st] - at.y) < TRAFFIC_ARRIVE_RADIUS + 200) {
+      const left = TRAFFIC_DWELL_TICKS - slot.dwell;
+      if (left > 0) { slot.dwell = TRAFFIC_DWELL_TICKS; return { kind: 'hold', until: at.tick + left }; }
+      slot.leg = (slot.leg + 1) % slot.data.route.length;
+      slot.dwell = 0;
+      st = this.stationEntity(slot.data.route[slot.leg], slot.systemNum);
+    }
+    if (st < 0) return { kind: 'hold' };
+    return { kind: 'goto', x: Position.x[st], y: Position.y[st], arrive: TRAFFIC_ARRIVE_RADIUS, until: at.tick + 60 * 30 };
+  }
+
+  /**
+   * What SystemMemory puts away and brings back of a system: its packs and
+   * bosses (Enemies, Bosses), its freighters and derelicts (here)
+   */
+  private createMemoryHost(): MemoryHost {
+    const where = (eid: number) => this.lod.where(eid);
+    const pose = (m: ShipMemory): FarPose => ({ x: m.x, y: m.y, vx: m.vx, vy: m.vy, angle: m.a, angVel: m.av ?? 0 });
+    return {
+      tick: () => this.currentTick,
+      now: () => this.clock(),
+      // The world's own systems (an arena's copies, surfaces and pilots' stations look after their own)
+      systems: () => this.gameData.getAllSystems().filter((s) => !s.private && !s.surface && !s.instance).map((s) => ({ num: this.gameData.getSystemNum(s.id), id: s.id })),
+      occupied: () => {
+        const out = new Set<number>();
+        for (const c of this.clients.values()) out.add(InSystem.systemId[c.playerId]);
+        for (const l of this.lingering.keys()) out.add(InSystem.systemId[l]);
+        return out;
+      },
+      // Pilots at a gate's or a rift's mouth: where it goes is brought back before they're through
+      approaching: () => {
+        const out = new Set<number>();
+        for (const c of this.clients.values()) {
+          const p = c.playerId;
+          if (!this.flying(p)) continue;
+          for (const g of portalQuery(this.world)) {
+            if (InSystem.systemId[g] !== InSystem.systemId[p]) continue;
+            if (Math.hypot(Position.x[g] - Position.x[p], Position.y[g] - Position.y[p]) < Radius.value[g] + MEMORY_GATE_MOUTH) out.add(Portal.targetSystem[g]);
+          }
+        }
+        return out;
+      },
+      capture: (num, offset, evict) => {
+        const now = this.currentTick;
+        const ship = (eid: number) => shipMemory(this.ships.get(eid)!, where(eid));
+        const due = (t: number) => (t > now ? { respawnAt: t + offset } : {});
+        const snap = {
+          packs: this.enemies.capture(num, where, offset, evict),
+          bosses: this.bosses.capture(num, where, evict),
+          traffic: this.traffic.filter((t) => t.systemNum === num).map((t) => ({ id: t.data.id, leg: t.leg, dwell: t.dwell, ...(t.eid >= 0 && this.ships.has(t.eid) ? { ship: ship(t.eid) } : due(t.respawnTick)) })),
+          derelicts: this.derelicts.filter((d) => d.systemNum === num).map((d) => ({ id: d.data.id, spawns: d.spawns, ...(d.eid >= 0 && this.ships.has(d.eid) ? { ship: ship(d.eid) } : due(d.respawnTick)) })),
+        };
+        if (evict) {
+          for (const t of this.traffic) if (t.systemNum === num && t.eid >= 0) { if (this.ships.has(t.eid)) this.ships.removeShip(t.eid); t.eid = -1; }
+          for (const d of this.derelicts) if (d.systemNum === num && d.eid >= 0) { if (this.ships.has(d.eid)) this.ships.removeShip(d.eid); d.eid = -1; d.respawnTick = 0; }
+        }
+        return snap;
+      },
+      restore: (num, snap, offset, mend, from) => {
+        // Each straight to sleep, flown on from when it was left (a pilot near wakes it as ever)
+        const adopt = (eid: number, at: FarPose) => { if (this.ships.sleep(eid, { damaged: 0, fired: 0 })) this.lod.adopt(eid, from, at); };
+        const local = (t?: number) => (t === undefined ? this.currentTick : t - offset);
+        this.enemies.restore(num, snap.packs ?? [], offset, mend.ships, adopt);
+        this.bosses.restore(num, snap.bosses ?? [], mend.bosses, adopt);
+        for (const m of snap.traffic ?? []) {
+          const slot = this.traffic.find((t) => t.systemNum === num && t.data.id === m.id);
+          if (!slot || slot.eid >= 0) continue;
+          slot.leg = m.leg % slot.data.route.length;
+          slot.dwell = m.dwell;
+          const bp = this.ships.library.get(slot.data.blueprint);
+          if (!m.ship || !bp) { slot.respawnTick = local(m.respawnAt); continue; }
+          slot.eid = this.ships.spawnDummy(bp, m.ship.x, m.ship.y, m.ship.a, num);
+          Velocity.x[slot.eid] = m.ship.vx; Velocity.y[slot.eid] = m.ship.vy;
+          restoreHp(this.ships, slot.eid, m.ship.hp, mend.ships);
+          adopt(slot.eid, pose(m.ship));
+        }
+        for (const m of snap.derelicts ?? []) {
+          const slot = this.derelicts.find((d) => d.systemNum === num && d.data.id === m.id);
+          if (!slot || slot.eid >= 0) continue;
+          if (!m.ship) { slot.spawns = m.spawns; slot.respawnTick = local(m.respawnAt); continue; }
+          // The same hulk (its seeded look), where it had drifted, as broken as it was (wrecks don't mend)
+          slot.spawns = Math.max(0, m.spawns - 1);
+          this.spawnDerelict(slot);
+          if (slot.eid < 0) continue;
+          this.ships.teleport(slot.eid, m.ship.x, m.ship.y);
+          Rotation.angle[slot.eid] = m.ship.a;
+          restoreHp(this.ships, slot.eid, m.ship.hp, 0);
+          adopt(slot.eid, pose(m.ship));
+        }
+      },
+      timers: (offset) => ({ enemies: this.enemies.timers(offset), bosses: this.bosses.timers(offset) }),
+      setTimers: (t, offset) => { this.enemies.setTimers(t.enemies ?? {}, offset); this.bosses.setTimers(t.bosses ?? {}, offset); },
+    };
   }
 
   /** What each system's (and siege moon's) hostiles are rated, for the maps and the HUD (worked out once: the data doesn't change) */
@@ -4316,6 +4483,7 @@ case 'join':
   private derelictRespawnSystem(): void {
     if (this.currentTick % 60 !== 0) return;
     for (const slot of this.derelicts) {
+      if (!this.memory.isResident(slot.systemNum)) continue;
       if (slot.eid >= 0 && !this.ships.has(slot.eid)) {
         slot.eid = -1;
         slot.respawnTick = this.currentTick + DERELICT_RESPAWN_TICKS;
@@ -4615,6 +4783,7 @@ case 'join':
           Math.round(charge.d * 100) / 100,
           Math.round(charge.w * 100) / 100,
           field.prime,                           // a lodestone's priming left, ticks (prediction)
+          warmthPercent(this.ships.warmthOf(eid)), // warmth % (common/src/ships/warmth.ts: the frost vignette, and the stage prediction flies and fires with)
         ],
       }, 'player', names.get(eid));
       // Everyone else: status only (motion is replicated). data: [shield %, EMP'd, beam heat (tenths), overheated,
@@ -4756,9 +4925,9 @@ case 'join':
         if (r.kind === 'pod' && d > SNAP_POD_RANGE) continue;
         if (r.kind === 'mob' && d > SNAP_PROJECTILE_RANGE) continue;
         if (r.id === conn.playerId) {
-          // Its own ship: only when its prediction needs correcting, its status changed, or now and then
+          // Its own ship: only when its prediction needs correcting, its status changed (its warmth too), or now and then
           const d = r.state.data ?? [];
-          const key = JSON.stringify([r.state.hp, r.state.maxHp, d[4], d[5], Math.round((d[6] ?? 0) / 10), d[7], d[9]]);
+          const key = JSON.stringify([r.state.hp, r.state.maxHp, d[4], d[5], Math.round((d[6] ?? 0) / 10), d[7], d[9], d[13]]);
           const version = this.replication.versionOf(r.id);
           const need = conn.forceSnapshot || conn.selfLate || version !== conn.selfVersion || key !== conn.selfKey
             || this.currentTick - conn.selfSentTick >= SELF_SAFETY_TICKS || !prevStates.has(r.id);
@@ -4867,45 +5036,71 @@ case 'join':
   private lastMapDotsTick = -Infinity;
 
   /**
-   * The system map's ships past the snapshot's ship view (distant ones too:
-   * ships/SimLod.ts), once a second to clients with their map open (mapView):
-   * derelicts, traffic and hostiles, where they are and how they're moving
-   * (the client carries them on between).
+   * The system map's ships past the snapshot's ship view, once a second to
+   * clients with their map open (mapView): derelicts, traffic, hostiles
+   * (distant ones too: ships/SimLod.ts) and other pilots. Only what's changed
+   * goes: each dot is a leg in closed form the client carries on exactly as
+   * it's reckoned here (common ships/farRoute.ts), or for one on patrol round
+   * a home that stays put, the patrol itself (the client works out its legs
+   * as SimLod does). So a distant ship is sent again only when its route
+   * changes (a patrol not at all while it's on it), a live one when it's
+   * strayed MAP_DOT_SLACK from where the client has it; a new one's look
+   * (kind, rank, faction, rating) once and when it changes, and the ones gone.
    */
   private sendMapDots(due: boolean): void {
-    const bySystem = new Map<number, { eid: number; dot: MapDot; name?: string }[]>();
+    type Row = { eid: number; name?: string; look: number; rating: number; leg: Leg; seq: number; patrol?: NonNullable<ReturnType<SimLod['track']>>['patrol'] };
+    const bySystem = new Map<number, Row[]>();
     const rowsFor = (num: number) => {
       let rows = bySystem.get(num);
       if (rows) return rows;
       rows = [];
+      const add = (eid: number, kind: number, name: string | undefined, foe?: ReturnType<Enemies['info']>) => {
+        // A distant ship's leg from its route; a live one's as it's going now, held
+        const far = this.lod.track(eid);
+        const leg = far?.leg ?? { x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid], wx: Velocity.x[eid], wy: Velocity.y[eid], thrust: -1 };
+        const look = mapDotFlags({ kind, rank: foe?.boss ? 2 : foe?.elite ? 1 : 0, calm: !!foe && this.enemies.isCalm(eid), faction: foe?.factionIndex ?? -1 });
+        rows!.push({ eid, name, look, rating: Math.round(foe?.rating ?? 0), leg, seq: far?.seq ?? -1, patrol: far?.patrol });
+      };
       for (const [eid, ship] of this.ships.bodies) {
         if (InSystem.systemId[eid] !== num || ship.kind !== 'ship' || hasComponent(this.world, Player, eid)) continue;
         const named = this.namedBody(eid);
-        if (!named) continue;
-        const foe = named.kind === 3 ? this.enemies.info(eid) : undefined;
-        rows.push({ eid, name: named.name, dot: {
-          id: eid, x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid], kind: named.kind,
-          rank: foe?.boss ? 2 : foe?.elite ? 1 : 0, calm: !!foe && this.enemies.isCalm(eid), faction: foe?.factionIndex ?? -1, rating: foe?.rating ?? 0,
-        } });
+        if (named) add(eid, named.kind, named.name, named.kind === 3 ? this.enemies.info(eid) : undefined);
       }
+      // Other pilots, wherever they are in the system
+      for (const c of this.clients.values()) if (this.flying(c.playerId) && InSystem.systemId[c.playerId] === num) add(c.playerId, 4, c.username);
       bySystem.set(num, rows);
       return rows;
     };
+    const now = this.currentTick;
     for (const conn of this.clients.values()) {
       if (!conn.mapOpen || !(due || conn.mapDotsDue) || !conn.ws.isOpen() || !hasComponent(this.world, Player, conn.playerId)) continue;
       conn.mapDotsDue = false;
-      const rows = rowsFor(InSystem.systemId[conn.playerId]);
-      const dots: number[] = [];
+      const sent = (conn.mapSent ??= new Map());
+      const full = conn.mapFresh === true;
+      conn.mapFresh = false;
+      const dots: number[] = [], routes: number[] = [], info: number[] = [], gone: number[] = [];
       const names: (number | string)[] = [];
-      for (const r of rows) {
-        if (conn.shipView.has(r.eid)) continue;
-        packMapDot(dots, r.dot);
+      const on = new Set<number>();
+      for (const r of rowsFor(InSystem.systemId[conn.playerId])) {
+        if (r.eid === conn.playerId || conn.shipView.has(r.eid)) continue;
+        on.add(r.eid);
+        const was = sent.get(r.eid);
+        // (A live one: how far it's strayed from where the client has it, carried on along what it was sent)
+        const off = was && r.seq < 0 ? (() => { const p = legAt(was.leg, now - was.tick); return Math.hypot(p.x - r.leg.x, p.y - r.leg.y); })() : 0;
+        if (!was || was.seq !== r.seq || off > MAP_DOT_SLACK) {
+          const at = dots.length;
+          if (r.patrol) packMapRoute(routes, r.eid, now, r.patrol.p, r.patrol.s);
+          else packMapLeg(dots, r.eid, r.leg);
+          sent.set(r.eid, { leg: r.patrol ? r.leg : unpackMapLegs(dots.slice(at))[0].leg, tick: now, seq: r.seq, look: was?.look ?? -1 });
+        }
+        const s = sent.get(r.eid)!;
+        if (s.look !== r.look * 4096 + r.rating) { s.look = r.look * 4096 + r.rating; info.push(r.eid, r.look, r.rating); }
         if (r.name && !conn.mapNamed.has(r.eid)) { conn.mapNamed.add(r.eid); names.push(r.eid, r.name); }
       }
-      // (Nothing out there, and nothing was: nothing to say)
-      if (!dots.length && !conn.mapDotsSent) continue;
-      conn.mapDotsSent = dots.length > 0;
-      this.send(conn.ws, { type: 'mapDots', tick: this.currentTick, dots, ...(names.length ? { names } : {}) });
+      for (const id of sent.keys()) if (!on.has(id)) { gone.push(id); sent.delete(id); }
+      // (Nothing's changed: nothing to say)
+      if (!full && !dots.length && !routes.length && !info.length && !gone.length && !names.length) continue;
+      this.send(conn.ws, { type: 'mapDots', tick: now, dots, ...(routes.length ? { routes } : {}), ...(info.length ? { info } : {}), ...(gone.length ? { gone } : {}), ...(names.length ? { names } : {}), ...(full ? { full: 1 as const } : {}) });
     }
   }
 
@@ -4956,6 +5151,8 @@ case 'join':
     conn.repKnown.clear();
     conn.shipView.clear();
     conn.mapNamed.clear();
+    conn.mapSent?.clear();
+    conn.mapFresh = true;
 
     const systemData = this.gameData.getSystemByNum(playerSystemId);
     const belt = systemData?.asteroidBelt;

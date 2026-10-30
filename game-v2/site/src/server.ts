@@ -11,7 +11,14 @@ import { FilePilotSource } from './pilots.js';
 import { createSiteStore } from './store/index.js';
 import { Uploads } from './uploads.js';
 
-const cfg = loadConfig();
+let cfg: ReturnType<typeof loadConfig>;
+try {
+  cfg = loadConfig();
+} catch (e) {
+  // (A missing setting in production: the message says what, no stack needed)
+  console.error(`[Site] ${(e as Error).message}`);
+  process.exit(1);
+}
 const store = await createSiteStore(cfg.dataDir);
 const app = createApp({
   cfg,

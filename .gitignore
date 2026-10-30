@@ -55,5 +55,8 @@ game-v2/data/site/
 # Pilot telemetry (runtime data)
 game-v2/data/telemetry/
 
+# The world's memory: what's alive, dead and due back in each system (runtime data, kept on the server between deploys)
+game-v2/data/world/
+
 # Scratch screenshots
 dev-tools/_look*.png

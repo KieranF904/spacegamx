@@ -801,5 +801,12 @@
       "raidGapSeconds": 22,
       "ring": 3400
     }
+  },
+  "memory": {
+    "evictAfterSeconds": 20,
+    "healPerMinute": 0.04,
+    "bossHealPerMinute": 0.02,
+    "fastForwardMinutes": 2,
+    "saveSeconds": 60
   }
 }

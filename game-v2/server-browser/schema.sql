@@ -47,6 +47,13 @@ CREATE TABLE IF NOT EXISTS profiles (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Game-wide documents (the rankings), by name; the game server creates this too if it is missing.
+CREATE TABLE IF NOT EXISTS game_docs (
+    key        TEXT PRIMARY KEY,
+    data       JSONB NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Seed admin account (username: admin, password: admin)
 -- Hash/salt generated with PBKDF2-SHA512 (100k iterations, 64-byte output)
 -- Change the password after first login!

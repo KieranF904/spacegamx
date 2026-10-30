@@ -488,7 +488,7 @@ export class Hangar {
       const left = n - avail(id);
       if (left <= 0) continue;
       const r = this.econ.recipes.recipeFor(id);
-      if (!r || !canCraft(r, p.recipes, p.level)) { out.short.push(this.econ.items.name(id)); continue; }
+      if (!r || !canCraft(r, this.services.learned(p), p.level)) { out.short.push(this.econ.items.name(id)); continue; }
       const fab = this.services.workshop(conn, 'fabricator');
       const k = fab ? this.services.makeFor(conn, fab, id, left, tag) : 0;
       out.fabricating += k;

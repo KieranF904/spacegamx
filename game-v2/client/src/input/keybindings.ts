@@ -37,6 +37,7 @@ export const ACTIONS: ActionDef[] = [
   { id: 'interact', label: 'Use jump gate / descend to a planet', category: 'Ship & world', key: 'KeyX', hint: 'In orbit close to a planet you can land on' },
   { id: 'autopilot', label: 'Autopilot to the job you follow', category: 'Ship & world', key: 'KeyG', hint: 'Or click a place on the map (M). Any flight key takes back control' },
   { id: 'pickup', label: 'Tractor beam pickup', category: 'Ship & world', key: 'KeyF' },
+  { id: 'contextMenu', label: 'Action menu (hold, then right-click)', category: 'Ship & world', key: 'KeyZ', hint: 'What you can do with what is under the cursor: dock, travel, land, hail, target, fly or jump there. A plain right-click fires' },
   { id: 'respawn', label: 'Respawn', category: 'Ship & world', key: 'KeyR', hint: 'After being destroyed' },
   { id: 'menu', label: 'Menu', category: 'Interface', key: 'Escape', rebindable: false },
   { id: 'map', label: 'Galaxy / system map', category: 'Interface', key: 'KeyM' },

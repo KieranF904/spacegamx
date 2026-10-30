@@ -17,7 +17,7 @@ import { createProtoServer } from '../proto/createProtoServer.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigFromDisk } from './loadShipConfig.js';
-import type { ShipBridge } from './ShipBridge.js';
+import { STAGE_COVER, type ShipBridge } from './ShipBridge.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -245,6 +245,59 @@ for (const design of ['scrap_mother', 'giant_mammoth']) {
     });
   });
 }
+
+describe('the stage cover', () => {
+  /** Scrap Mother at her first stage: a later stage's standing part, and a current-stage plate that decides it */
+  const parts = (w: ReturnType<typeof setup>) => {
+    const s = w.ship(), cat = w.bridge.catalog, first = currentStage(cat, s);
+    const all = w.bridge.geometry(s).map((_, i) => i).filter((i) => standing(cat, s, i));
+    const later = all.find((i) => stageOf(cat, s, i) > first)!;
+    const plate = all.find((i) => stageOf(cat, s, i) === first && deciding(cat, s, i))!;
+    expect(later).toBeDefined();
+    expect(plate).toBeDefined();
+    return { s, later, plate };
+  };
+  const total = (before: number[], after: number[]) => before.reduce((a, h, i) => a + (h - after[i]), 0);
+
+  it("a hit on a later stage's part passes to a current-stage plate at the stage-cover share: beams, shells and splash alike", () => {
+    expect(STAGE_COVER).toBeGreaterThanOrEqual(0.35);
+    expect(STAGE_COVER).toBeLessThanOrEqual(0.5);
+    const w = setup('scrap_mother');
+    const { s, later, plate } = parts(w);
+    // A beam (no impact point): its full damage on a plate it strikes, a share of it through the plates over a later stage
+    expect(w.bridge.damagePartBy(w.boss, plate, 10, -1)).toBeCloseTo(10, 5);
+    let before = s.hp.slice();
+    expect(w.bridge.damagePartBy(w.boss, later, 10, -1)).toBeCloseTo(10 * STAGE_COVER, 5);
+    expect(s.hp[later]).toBe(before[later]);
+    expect(hurtParts(before, s.hp).every((i) => stageOf(w.bridge.catalog, s, i) === currentStage(w.bridge.catalog, s))).toBe(true);
+    // A shell (struck where it lands)
+    before = s.hp.slice();
+    expect(w.bridge.hurt(w.boss, s, later, 10, -1, { at: w.bridge.geometry(s)[later].centroid })).toBeCloseTo(10 * STAGE_COVER, 5);
+    expect(s.hp[later]).toBe(before[later]);
+    // Splash in the middle of the later part: less than the same blast does with the cover passing all of it
+    const [x, y] = shipPointToWorld(s, { x: 0, y: 0, angle: w.angle }, w.bridge.geometry(s)[later].centroid, w.bridge.tuning.cellSize);
+    const blast = (share: number) => {
+      const v = setup('scrap_mother');
+      (v.bridge as any).host.stageCover = () => share;
+      const b = v.ship().hp.slice();
+      v.bridge.splashAt(v.sys, x, y, 60, 30, -1);
+      return total(b, v.ship().hp);
+    };
+    const full = blast(1), covered = blast(STAGE_COVER);
+    expect(full).toBeGreaterThan(0);
+    expect(covered).toBeLessThan(full);
+    expect(covered).toBeGreaterThanOrEqual(full * STAGE_COVER - 1e-6);
+  });
+
+  it("a boss's own share (bosses.json stageCover) overrides the default", () => {
+    const w = setup('scrap_mother');
+    const { later } = parts(w);
+    (w.bridge as any).host.stageCover = () => 0.5;
+    expect(w.bridge.damagePartBy(w.boss, later, 10, -1)).toBeCloseTo(5, 5);
+    (w.bridge as any).host.stageCover = () => undefined;
+    expect(w.bridge.damagePartBy(w.boss, later, 10, -1)).toBeCloseTo(10 * STAGE_COVER, 5);
+  });
+});
 
 describe('wide hits', () => {
   it("a beam's width catches a hull its centre line just misses (and no further)", () => {

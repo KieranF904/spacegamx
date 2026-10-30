@@ -17,6 +17,7 @@ import { loadShipConfigFromDisk } from './ships/loadShipConfig.js';
 import { createShipBridge } from './proto/createProtoServer.js';
 import { createProfileStore } from './profile/index.js';
 import { contribFileStore } from './game/contribFiles.js';
+import { worldFileStore } from './game/SystemMemory.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dataPath = join(__dirname, '../../data');
@@ -78,6 +79,8 @@ const gameServer = new GameServer({
   telemetry: telemetryFile(join(dataPath, 'telemetry', 'pilots.jsonl')),
   // Contributor notes and who has the rank (data/contributor/, kept between deploys)
   contributorStore: contribFileStore(join(dataPath, 'contributor')),
+  // What's alive, dead and due back in every system, so a restart picks the world up where it was (data/world/, kept between deploys)
+  worldStore: worldFileStore(join(dataPath, 'world', 'memory.json')),
 });
 new SocketTransport(gameServer, PORT);
 
@@ -132,6 +135,9 @@ async function registerWithBrowser() {
     });
     if (response.ok) {
       console.log('✓ Registered with server browser');
+      // Accounts deleted at the lobby: their profiles go here
+      const body = await response.json().catch(() => null) as { deletedAccounts?: unknown } | null;
+      if (Array.isArray(body?.deletedAccounts)) void gameServer.forgetAccounts(body.deletedAccounts.map(Number));
     } else {
       console.log(`⚠ Browser registration failed: ${response.status}`);
     }

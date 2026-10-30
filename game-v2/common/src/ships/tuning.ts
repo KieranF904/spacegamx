@@ -147,7 +147,7 @@ export interface WeaponTuning {
   stagger?: boolean;
   /** Shots per trigger pull, fanned across `spread` (the hive) */
   burst?: number;
-  /** Beam: held on one ship this long, it seizes up (an EMP) for `ticks` */
+  /** Beam: each tick on a ship takes 1/holdTicks of its warmth (warmth.ts: held this long on a warm ship, it's frozen through), and frozen through it seizes up (an EMP) for `ticks` */
   chill?: { holdTicks: number; ticks: number };
   /** The part hit burns (damage over time), spreading to parts within `radius` cells */
   ignite?: { dps: number; ticks: number; radius: number };
@@ -164,8 +164,10 @@ export interface WeaponTuning {
   vsHull?: number;
   /** Lightning: from what it hits it leaps to `count` more ships within `radius`, each time × `falloff` */
   chain?: { count: number; radius: number; falloff: number };
-  /** Each hit chills the ship it lands on by `perHit`; chilled through (1), it seizes up for `ticks` */
+  /** Each hit takes `perHit` of the warmth of the ship it lands on (warmth.ts); frozen through (0), it seizes up for `ticks` */
   frost?: { perHit: number; ticks: number };
+  /** Hits on one faction's ships (not its bosses) do `damage` times as much (an ammunition made for them: Quench Slugs on the Cinder Cult) */
+  bane?: { faction: string; damage: number };
   /**
    * Fires ammunition: crates of `item` in the hold, `rounds` volleys a crate.
    * Out of it, the gun fires plain rounds: the same shells at `dry` (default

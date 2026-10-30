@@ -49,7 +49,9 @@ All in `common/src/ships/stages.ts`, `ShipBridge`, `ShipRenderer` and the brain 
 Behaviour the server gives you for free:
 
 - A hit on a later stage's part goes to the **nearest standing deciding part of the current stage**
-  (`ShipBridge.cover`). Wrecks pass hits to the nearest piece still whole.
+  (`ShipBridge.cover`), at a reduced share: `bosses.json` `rules.stageCover` (0.4), or the boss's own
+  `stageCover`. So the stage being fought is what to aim at, but a shot elsewhere still counts. Wrecks pass
+  hits to the nearest piece still whole, in full.
 - `stagedIntegrity`: each stage is an equal share of the health bar; phases in `bosses.json` key off it
   (thresholds at 0.667 and 0.334 are the stage boundaries).
 - Brain hooks (`server/src/game/brains/kit.ts` `BossBrain`): `orders`, `integrity`, `invulnerable` (between stages),

@@ -269,7 +269,10 @@ and dev's aren't a pilot's to build with.
 - Fabricator recipe levels: buoy parts 2 (and Cleared for Departure), field crucible 4 (and The Crucible Pattern),
   servo motor 10, targeting chip 12, insurance bond 15; special ammunition a few levels after its gun: frag 6,
   incendiary 8, chaff 10 (flak 4); shaped 13, seeker 15, cryo 17 (missile 11); sabot 15, aurum 18, tungsten 20
-  (railgun 13). (The outpost armoury's "special ammunition" perk now adds nothing: a perk to replace.)
+  (railgun 13). The outpost armoury's dead "special ammunition" perk (tier 3) is now its **Quench line**: it presses
+  Quench Slugs (railgun; 30% less damage, ×2.5 on Cinder Cult ships, not bosses: `set.bane`), a recipe that opens at 25
+  and is taught only by Forgemaster Hale's job Cold Iron (`cinder_quench`, after main_10). Both locks: the job teaches
+  it, and only your own station's armoury (tier 3 `rounds`) makes it.
 - Level-up toasts name the models and materials it unlocked; the field guide shows the track.
 - Fixes: per-kill credits rise with enemy grade (no inversion); the top reputation rank is reachable; skill caps rise to
   20 each and a level gives a point up to 60 points.

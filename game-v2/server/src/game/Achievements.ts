@@ -170,6 +170,15 @@ export class Achievements {
     this.ranksDirty = true;
   }
 
+  /** The account was deleted: off the boards */
+  forget(userId: number): void {
+    const id = String(userId);
+    if (!(id in this.ranks.weekly) && !(id in this.ranks.allTime)) return;
+    delete this.ranks.weekly[id];
+    delete this.ranks.allTime[id];
+    this.ranksDirty = true;
+  }
+
   /** A new week: the weekly boards start again */
   private roll(): void {
     const week = weekOf(this.host.now());

@@ -1,6 +1,6 @@
 /**
  * How a model is presented in the hangar palette and the fabricator: every family named, every model a trade-off
- * line, its size by its piece (not every model "Small"), its key numbers, and a locked model's level and schematic.
+ * line, its size by its piece (not every model "Small"), its key numbers, and a locked model's level.
  */
 import { describe, expect, it } from 'vitest';
 import { join } from 'path';

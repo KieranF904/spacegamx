@@ -15,6 +15,8 @@ export interface ProfileStore {
   /** The saved document, or null for an account that has never played */
   load(userId: number): Promise<unknown | null>;
   save(userId: number, profile: unknown): Promise<void>;
+  /** Forget an account's save for good (its account was deleted); nothing if there is none */
+  delete(userId: number): Promise<void>;
   /** Game-wide documents (the rankings), by name */
   loadDoc(key: string): Promise<unknown | null>;
   saveDoc(key: string, doc: unknown): Promise<void>;
@@ -31,6 +33,9 @@ export class MemoryProfileStore implements ProfileStore {
   }
   async save(userId: number, profile: unknown): Promise<void> {
     this.docs.set(userId, JSON.stringify(profile));
+  }
+  async delete(userId: number): Promise<void> {
+    this.docs.delete(userId);
   }
   private named = new Map<string, string>();
   async loadDoc(key: string): Promise<unknown | null> {

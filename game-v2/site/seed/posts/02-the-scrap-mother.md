@@ -44,8 +44,8 @@ Small and quick, darting to a new angle before every move.
 - **Seekers** from her greyseam spikes, and **spirals** of scrap spun out of her core.
 - **Iris**: her iris opens (a breathing green ring) and throws rings of chunks. It's the only time she takes full damage. The rest of the time she's braced and your hits glance off, unless you've shot her spikes away and she can't brace at all.
 
-> "Something huge and patched together stirs in the hollow at the heart of the junk, grey veins glinting in the rock around it. The Scrap Mother wakes, and the nest hums with drones."
+> "Something huge and patched together stirs in the hollow at the heart of the junk, grey veins glinting in the rock around it."
 
-That's what the game tells you as you arrive. She's tuned for pilots around **level 8**, comes back ten minutes after she falls, and drops servo motors, power couplings, scrap electronics, alloy plate and repair kits.
+That's how the game opens the fight as you arrive. She's tuned for pilots around **level 8**, comes back ten minutes after she falls, and drops servo motors, power couplings, scrap electronics, alloy plate and repair kits.
 
 Bring friends. Tell us how it went in the [shoutbox](/#shout-h).

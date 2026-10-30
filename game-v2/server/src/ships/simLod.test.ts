@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
-import { Position, Velocity, Rotation, InSystem, Input, ServerMessage, unpackMapDots, type ServerMapDotsMessage } from '@space-game/common';
+import { Position, Velocity, Rotation, InSystem, Input, ServerMessage, unpackMapLegs, unpackMapRoutes, unpackMapInfo, legAt, patrolNext, MAP_DOT_SLACK, type ServerMapDotsMessage, type Leg, type Patrol, type PatrolState } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigFromDisk } from './loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
-import { PROMOTE_RADIUS, DEMOTE_RADIUS, DEMOTE_AFTER, DEMOTE_CHECK, STEP, RECENT, cruiseOf } from './SimLod.js';
+import { PROMOTE_RADIUS, DEMOTE_RADIUS, DEMOTE_AFTER, DEMOTE_CHECK, RECENT, cruiseOf } from './SimLod.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -36,7 +36,9 @@ function world() {
   // The pilot somewhere, sitting still (god mode: nothing it meets ends the test)
   const hold = (x: number, y: number) => { Position.x[pid] = x; Position.y[pid] = y; Velocity.x[pid] = 0; Velocity.y[pid] = 0; };
   server['admin'].god.add(server.pilots.connOf(pid) as any);
-  return { server, t, got, pid, conn, bridge, step, num, hold, lod: server.lod, enemies: server.enemies };
+  // (Where a ship is: a distant one's route worked out, its components being written only now and then)
+  const at = (eid: number) => server.lod.where(eid);
+  return { server, t, got, pid, conn, bridge, step, num, hold, at, lod: server.lod, enemies: server.enemies };
 }
 
 /** The pilot out in Sol's open middle, away from its safe space */
@@ -94,17 +96,17 @@ describe('simulation level of detail', () => {
       if (w.bridge.isDormant(foe)) slept = i;
     }
     expect(slept).toBeGreaterThanOrEqual(0);
-    // Going distant moves nothing (the tick it went, SimLod hasn't moved it yet, or by at most a step's flight)
-    expect(Math.hypot(Position.x[foe] - before[0], Position.y[foe] - before[1])).toBeLessThan(cruiseOf(ship, w.bridge.tuning).speed * STEP + 1);
+    // Going distant moves nothing (its route starts where it was: at most a tick's flight)
+    expect(Math.hypot(w.at(foe).x - before[0], w.at(foe).y - before[1])).toBeLessThan(cruiseOf(ship, w.bridge.tuning).speed * 2 + 1);
     expect(ship.hp).toEqual(hp);
     ship.cooldown.fill(500);
-    w.step(STEP * 10);
+    w.step(120);
     expect(w.bridge.isDormant(foe)).toBe(true);
     expect(ship.hp).toEqual(hp);
     expect(ship.shield).toBe(0); // (caught up when it wakes, not while it sleeps)
-    const at = [Position.x[foe], Position.y[foe], Velocity.x[foe], Velocity.y[foe], Rotation.angle[foe]];
-    // Woken: the same ship, where it was, its shield and guns caught up
-    w.hold(Position.x[foe] + 30000, Position.y[foe]);
+    const p = w.at(foe), at = [p.x, p.y, p.vx, p.vy, p.angle];
+    // Woken: the same ship, where its route had it, its shield and guns caught up
+    w.hold(p.x + 30000, p.y);
     w.lod.tick();
     expect(w.bridge.isDormant(foe)).toBe(false);
     expect(ship.hp).toEqual(hp);
@@ -136,11 +138,13 @@ describe('simulation level of detail', () => {
     w.step(60 * 6, () => { w.hold(100000, 100000); check(); });
     expect(fought).toBe(true);
     // The pilot jumps clean away mid-fight: they break off in time, and only then go distant
-    w.step(DEMOTE_AFTER + RECENT.damaged + 60 * 4, () => { w.hold(-100000, -150000); check(); });
-    expect(pack.filter((e) => w.bridge.has(e)).every((e) => w.bridge.isDormant(e))).toBe(true);
+    // (once nothing's hurt them for RECENT.damaged: packmates bumping as they regroup counts)
+    const asleep = () => pack.filter((e) => w.bridge.has(e)).every((e) => w.bridge.isDormant(e));
+    for (let i = 0; i < 60 * 60 && !asleep(); i++) w.step(1, () => { w.hold(-100000, -150000); check(); });
+    expect(asleep()).toBe(true);
   });
 
-  it('a system nobody is in goes distant at once, and its packs still leave when they always did', () => {
+  it('a system nobody is in goes distant at once, moving all the while, and is put away once it has been left a while', () => {
     const w = world();
     inSol(w, 120000, 0);
     const ash = w.num('ashfall');
@@ -150,13 +154,14 @@ describe('simulation level of detail', () => {
     ];
     w.step(DEMOTE_CHECK + 1);
     expect(eids.every((e) => w.bridge.isDormant(e))).toBe(true);
-    // Moving all the while (they patrol), and gone after the idle time (factions.json rules.idleDespawnSeconds)
-    const x0 = Position.x[eids[0]], y0 = Position.y[eids[0]];
-    w.step(60 * 20);
-    expect(Math.hypot(Position.x[eids[0]] - x0, Position.y[eids[0]] - y0)).toBeGreaterThan(50);
-    const idle = (files.factions as any).rules.idleDespawnSeconds * 60;
-    w.step(idle);
+    // Moving all the while (they patrol)...
+    const x0 = w.at(eids[0]).x, y0 = w.at(eids[0]).y;
+    w.step(60 * 10);
+    expect(Math.hypot(w.at(eids[0]).x - x0, w.at(eids[0]).y - y0)).toBeGreaterThan(50);
+    // ...then out of the world altogether (rules.json memory.evictAfterSeconds: game/SystemMemory.ts)
+    w.step(60 * w.server.memory.rules.evictAfterSeconds);
     expect(eids.some((e) => w.bridge.has(e))).toBe(false);
+    expect(w.server.memory.remembers('ashfall')).toBe(true);
   });
 
   it('a pilot spooling a jump wakes what it could land beside before it gets there', () => {
@@ -183,6 +188,8 @@ describe('simulation level of detail', () => {
 
   it('a distant ship flies like a real one: no jumps, never faster than it can fly, turning as it can', () => {
     const w = world();
+    // (Ashfall's left empty all the while: kept in the world for this)
+    (w.server.memory.rules as any).evictAfterSeconds = 1e6;
     inSol(w, 120000, 0);
     const ash = w.num('ashfall');
     const [foe] = w.enemies.spawnPack(ash, { faction: 'pirates', ships: ['pirate_raider'] }, 30000, -20000);
@@ -193,19 +200,19 @@ describe('simulation level of detail', () => {
     const ship = w.bridge.get(foe)!;
     const c = cruiseOf(ship, w.bridge.tuning);
     expect(c.speed).toBeGreaterThan(1);
-    let px = Position.x[foe], py = Position.y[foe], pa = Rotation.angle[foe], fastest = 0, turned = 0;
+    let { x: px, y: py, angle: pa } = w.at(foe), fastest = 0, turned = 0;
     for (let i = 0; i < 60 * 60; i++) {
       w.step(1);
-      const d = Math.hypot(Position.x[foe] - px, Position.y[foe] - py);
-      fastest = Math.max(fastest, d);
-      turned = Math.max(turned, Math.abs(Math.atan2(Math.sin(Rotation.angle[foe] - pa), Math.cos(Rotation.angle[foe] - pa))));
-      px = Position.x[foe]; py = Position.y[foe]; pa = Rotation.angle[foe];
+      const p = w.at(foe);
+      fastest = Math.max(fastest, Math.hypot(p.x - px, p.y - py));
+      turned = Math.max(turned, Math.abs(Math.atan2(Math.sin(p.angle - pa), Math.cos(p.angle - pa))));
+      px = p.x; py = p.y; pa = p.angle;
     }
-    // A step's flight at most (its cruise speed × STEP ticks), and a step's turn
-    expect(fastest).toBeLessThanOrEqual(c.speed * STEP * 1.02 + 0.1);
-    expect(turned).toBeLessThanOrEqual(c.turn * STEP + 1e-3);
+    // Never faster than it flies, nor turning faster than it can, from one tick to the next (no jumps)
+    expect(fastest).toBeLessThanOrEqual(c.speed * 1.02 + 0.1);
+    expect(turned).toBeLessThanOrEqual(c.turn + 1e-3);
     // And it got (most of the way) there at about the speed it flies
-    const left = Math.hypot(Position.x[foe] + 20000, Position.y[foe] - 30000);
+    const left = Math.hypot(w.at(foe).x + 20000, w.at(foe).y - 30000);
     expect(left).toBeLessThan(Math.hypot(50000, 50000) - c.speed * 60 * 60 * 0.5);
   });
 
@@ -218,7 +225,7 @@ describe('simulation level of detail', () => {
     const far = w.bridge.spawnDummy(bp, 0, 5000, 0, ash);
     w.bridge.setAutopilot(live, { x: 120000, y: 25000, arriveRadius: 500 });
     w.bridge.setAutopilot(far, { x: 0, y: 25000, arriveRadius: 500 });
-    const arrived = (e: number, x: number, y: number) => Math.hypot(Position.x[e] - x, Position.y[e] - y) < 1200;
+    const arrived = (e: number, x: number, y: number) => Math.hypot(w.at(e).x - x, w.at(e).y - y) < 1200;
     let tLive = -1, tFar = -1;
     for (let i = 0; i < 60 * 240 && (tLive < 0 || tFar < 0); i++) {
       w.step(1, () => w.hold(120000, 0));
@@ -233,44 +240,86 @@ describe('simulation level of detail', () => {
     expect(tFar / tLive).toBeLessThan(1.4);
   });
 
-  it('far ships still reach the system map (mapDots) while it is open, where they are', () => {
+  it('far ships and other pilots reach the system map (mapDots) while it is open: a leg or a patrol each, sent again only when it changes', () => {
     const w = world();
     const sol = w.num('sol');
     inSol(w, 120000, 0);
     const [foe] = w.enemies.spawnPack(sol, { faction: 'pirates', ships: ['pirate_raider'] }, -60000, 120000);
-    w.step(DEMOTE_AFTER + DEMOTE_CHECK * 2, () => w.hold(120000, 0));
+    // Another pilot, far off across the system
+    const t2 = new LocalTransport(w.server);
+    t2.connect();
+    t2.send({ type: 'join', username: 'faraway' } as any);
+    const p2 = t2.getPlayerId();
+    (w.server as any).travelTo(w.server.pilots.connOf(p2), sol, -120000, -60000, false);
+    const both = () => { w.hold(120000, 0); Position.x[p2] = -120000; Position.y[p2] = -60000; Velocity.x[p2] = Velocity.y[p2] = 0; };
+    w.step(DEMOTE_AFTER + DEMOTE_CHECK * 2, both);
     expect(w.bridge.isDormant(foe)).toBe(true);
     const dots = () => w.got.filter((m): m is ServerMapDotsMessage => m.type === 'mapDots');
     // Map closed: nothing sent
     expect(dots().length).toBe(0);
     w.t.send({ type: 'mapView', open: true } as any);
-    w.step(5, () => w.hold(120000, 0));
+    w.step(5, both);
     expect(dots().length).toBe(1);
-    const first = unpackMapDots(dots()[0].dots).find((d) => d.id === foe)!;
-    expect(first).toBeTruthy();
-    expect(first.kind).toBe(3);
-    const k0 = (w.server as any).currentTick - dots()[0].tick;
-    expect(Math.hypot(first.x + first.vx * k0 - Position.x[foe], first.y + first.vy * k0 - Position.y[foe])).toBeLessThan(60 + k0 * 0.2);
-    // Named once
-    expect(dots()[0].names).toContain(foe);
-    w.step(125, () => w.hold(120000, 0));
-    expect(dots().length).toBe(3);
-    const last = dots()[2];
-    expect(last.names?.includes(foe) ?? false).toBe(false);
-    // Where it is now, carried on along its velocity from when it was sent (as the map does: FarShips)
-    const d = unpackMapDots(last.dots).find((x) => x.id === foe)!;
-    const k = (w.server as any).currentTick - last.tick;
-    expect(Math.hypot(d.x + d.vx * k - Position.x[foe], d.y + d.vy * k - Position.y[foe])).toBeLessThan(60 + k * 0.2);
+    const first = dots()[0];
+    expect(first.full).toBe(1);
+    // The client's view of a dot: the last leg it was sent carried on from then, or its patrol's legs worked out (as FarShips does)
+    const legs = new Map<number, { leg: Leg; tick: number; patrol?: { p: Patrol; s: PatrolState } }>();
+    const take = (m: ServerMapDotsMessage) => {
+      for (const r of unpackMapLegs(m.dots)) legs.set(r.id, { leg: r.leg, tick: m.tick });
+      for (const r of unpackMapRoutes(m.routes ?? [], m.tick)) legs.set(r.id, { leg: r.state.leg, tick: r.state.t0, patrol: { p: r.patrol, s: r.state } });
+      for (const id of m.gone ?? []) legs.delete(id);
+    };
+    const drawn = (id: number) => {
+      const l = legs.get(id)!, now = (w.server as any).currentTick;
+      while (l.patrol && now >= l.patrol.s.end) { l.patrol.s = patrolNext(l.patrol.p, l.patrol.s); l.leg = l.patrol.s.leg; l.tick = l.patrol.s.t0; }
+      return legAt(l.leg, now - l.tick);
+    };
+    take(first);
+    expect(unpackMapInfo(first.info ?? []).find((d) => d.id === foe)?.kind).toBe(3);
+    expect(unpackMapInfo(first.info ?? []).find((d) => d.id === p2)?.kind).toBe(4);
+    expect(first.names).toContain(foe);
+    expect(first.names).toContain('faraway');
+    // On patrol round where it was spawned: sent as its patrol, drawn exactly where it is
+    expect(legs.get(foe)?.patrol).toBeTruthy();
+    expect(Math.hypot(drawn(foe).x - w.at(foe).x, drawn(foe).y - w.at(foe).y)).toBeLessThan(1);
+    // A minute on: always exactly where it is, its patrol never sent again (nor named), however many legs it flies
+    let resent = 0;
+    for (let s = 0; s < 60; s++) {
+      const n = dots().length;
+      w.step(60, both);
+      for (const m of dots().slice(n)) { take(m); if (unpackMapLegs(m.dots).concat(unpackMapRoutes(m.routes ?? [], m.tick) as any).some((r) => r.id === foe)) resent++; expect(m.names?.includes(foe) ?? false).toBe(false); }
+      expect(Math.hypot(drawn(foe).x - w.at(foe).x, drawn(foe).y - w.at(foe).y)).toBeLessThan(1);
+      expect(Math.hypot(drawn(p2).x - Position.x[p2], drawn(p2).y - Position.y[p2])).toBeLessThan(MAP_DOT_SLACK);
+    }
+    expect(resent).toBe(0);
     // In view, it's an entity (not a dot)
-    w.step(1, () => w.hold(Position.x[foe] + 20000, Position.y[foe]));
-    w.step(65, () => w.hold(Position.x[foe] + 20000, Position.y[foe]));
-    expect(unpackMapDots(dots()[dots().length - 1].dots).some((x) => x.id === foe)).toBe(false);
+    const p = w.at(foe);
+    w.step(66, () => { w.hold(p.x + 20000, p.y); Position.x[p2] = -120000; Position.y[p2] = -60000; });
+    expect(legs.has(foe) || dots().some((m) => m.gone?.includes(foe))).toBe(true);
+    for (const m of dots()) take(m);
+    expect(legs.has(foe)).toBe(false);
     // Closed again: nothing more
     w.t.send({ type: 'mapView', open: false } as any);
     const n = dots().length;
-    w.step(130, () => w.hold(120000, 0));
+    w.step(130, both);
     expect(dots().length).toBe(n);
   });
+
+  it("a distant ship's route is the same whether it's looked at every tick or once a minute", () => {
+    const run = (every: number) => {
+      const w = world();
+      (w.server.memory.rules as any).evictAfterSeconds = 1e6;
+      inSol(w, 120000, 0);
+      const [foe] = w.enemies.spawnPack(w.num('ashfall'), { faction: 'pirates', ships: ['pirate_raider'] }, 20000, -10000);
+      const seen: number[][] = [];
+      for (let i = 1; i <= 60 * 60 * 3; i++) {
+        w.step(1, () => w.hold(120000, 0));
+        if (i % every === 0 || i % 3600 === 0) { const p = w.at(foe); if (i % 3600 === 0) seen.push([p.x, p.y, p.angle]); }
+      }
+      return seen;
+    };
+    expect(run(1)).toEqual(run(3600));
+  }, 120000);
 
   it('a boss idle at its lair sleeps far from pilots and wakes as one comes; one fighting never does', () => {
     const w = world();

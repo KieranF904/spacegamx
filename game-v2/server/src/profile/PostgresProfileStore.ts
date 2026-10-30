@@ -49,6 +49,10 @@ export class PostgresProfileStore implements ProfileStore {
     );
   }
 
+  async delete(userId: number): Promise<void> {
+    await this.pool.query('DELETE FROM profiles WHERE user_id = $1', [userId]);
+  }
+
   async loadDoc(key: string): Promise<unknown | null> {
     const r = await this.pool.query('SELECT data FROM game_docs WHERE key = $1', [key]);
     return r.rows[0]?.data ?? null;

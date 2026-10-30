@@ -96,6 +96,9 @@ export function partTipHtml(p: Pick<PlacedPart, 'fn' | 'material' | 'piece'> & P
   html += row('Armour · build', `${st.armour} · ${Math.round(partBuildPoints(catalog, p) * 10) / 10} pts`);
   const res = resistText(st.resist);
   if (res) html += row('Takes', res);
+  // (Cold builds up slower through it: ships/warmth.ts)
+  const ins = mat?.insulation;
+  if (ins) html += row('Insulation', `${Math.round(ins * 100)}% of the cold kept out`);
   if (fn.weapon) {
     const def = tuning.weapons?.[fn.weapon];
     const w = d?.weapons.find((x) => x.part === i);

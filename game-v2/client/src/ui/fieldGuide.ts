@@ -13,9 +13,10 @@
 
 import {
   threatLevel, xpToReach, GRADE_LEVEL, LEVEL_CAP, SKILL_POINT_CAP, jumpTuning, unlockTrack, nextBuildUnlock, nextUnlockHint, materialUnlockName,
-  type FunctionDef, type ShipTuning, type TrackStep,
+  secondsToFreeze, warmthStage, type FunctionDef, type ShipTuning, type TrackStep, type HazardRules,
 } from '@space-game/common';
 import shipTuning from '../../../data/ships/tuning.json';
+import hazardData from '../../../data/hazards.json';
 import materialsData from '../../../data/ships/materials.json';
 import shipFunctions from '../../../data/ships/functions.json';
 import shipModels from '../../../data/ships/models.json';
@@ -123,7 +124,7 @@ export const GUIDE_CSS = `
 const JUMP = jumpTuning(shipTuning as unknown as ShipTuning);
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
-interface Material { id: string; name: string; grade: number; output: number; toughness: number; density: number }
+interface Material { id: string; name: string; grade: number; output: number; toughness: number; density: number; insulation?: number }
 const MATERIALS: Material[] = ((materialsData as unknown as { materials?: Material[] }).materials ?? (materialsData as unknown as Material[]));
 /** One material per grade (the main line: alloy, steel, titanium, cobalt, neutronium) */
 const LADDER: Material[] = [1, 2, 3, 4, 5].map((g) => MATERIALS.filter((m) => m.grade === g).sort((a, b) => b.toughness - a.toughness)[0]).filter(Boolean);
@@ -160,9 +161,28 @@ export function guideHtml(tab: GuideTab, d: GuideDeps): string {
   }
 }
 
+/** Cold (ships/warmth.ts): the numbers from hazards.json and the stages */
+function coldGuide(): string {
+  const w = (hazardData as unknown as HazardRules).warmth;
+  if (!w) return 'Cold systems slowly freeze a ship that stays away from heat.';
+  const pct = (x: number) => `${Math.round((x - 1) * 100)}%`;
+  const chilled = warmthStage(49), numb = warmthStage(24);
+  // (The coldest system, by its rating)
+  const systems = ((systemsData as unknown as { systems?: unknown[] }).systems ?? []) as { name: string; hazardRatings?: Record<string, number> }[];
+  const coldest = systems.filter((s) => (s.hazardRatings?.cryo ?? 0) > 0).sort((a, b) => b.hazardRatings!.cryo - a.hazardRatings!.cryo)[0];
+  const insulators = MATERIALS.filter((m) => (m.insulation ?? 0) > 0).sort((a, b) => (b.insulation ?? 0) - (a.insulation ?? 0));
+  return `In a cold system, cold builds up on your ship while you're away from heat, and frost creeps in from the edges of your screen as your warmth runs down (the chip under the hazard warnings gives the number). `
+    + (coldest ? `In ${esc(coldest.name)} it takes about ${Math.round(secondsToFreeze(w, coldest.hazardRatings!.cryo, 0) / 60)} minutes from warm to frozen through.` : '')
+    + `<br><br>Below half warmth your guns recycle ${pct(chilled.guns)} slower. Below a quarter they're ${pct(numb.guns)} slower and thrust and steering drop by ${Math.round((1 - numb.control) * 100)}%. `
+    + `Frozen through, your ship seizes up for ${Math.round(w.seizeTicks / 60)} seconds and comes out of it with a little warmth back.`
+    + `<br><br><b>Heat</b> brings it back: near a star, close by a station (docked is quickest), beside a ship that's on fire (yours counts), or near a lava world. Away from the cold it comes back by itself. Plan your routes from one warm spot to the next.`
+    + (insulators.length ? `<br><br><b>Insulation</b>: hulls of ${insulators.map((m) => `${m.name ?? m.id} (${Math.round((m.insulation ?? 0) * 100)}%)`).join(', ')} keep out that share of the cold, by how much of the hull they make. It only buys time: heat still matters.` : '')
+    + `<br><br>Frost weapons, and foes that hit with cold, take warmth off the same meter.`;
+}
+
 /** Each section's icon */
 const ICONS: Record<string, string> = {
-  Flying: '✈', 'Jump drive': '⤳', 'Getting around': '◎', Autopilot: '▶', Stations: '⌂', 'The info panel': 'ⓘ', Hazards: '☢',
+  Flying: '✈', 'Jump drive': '⤳', 'Getting around': '◎', Autopilot: '▶', Stations: '⌂', 'The info panel': 'ⓘ', Hazards: '☢', 'Cold and warmth': '❄',
   Combat: '✦', Targets: '⌖', Repairs: '✚', 'Losing a ship': '↺', 'Danger & PvP': '⚠', Ratings: '◆', Sieges: '☾', 'Bosses & events': '☠', Salvage: '⚙',
   'The hangar': '⬢', 'Build orders': '☰', Energy: 'ϟ', Engines: '▲', Scrapping: '♻',
   Mining: '⛏', Refining: '♨', Fabricating: '⚒', 'Markets & quartermasters': '¤', 'Your hold': '▤',
@@ -182,10 +202,12 @@ function basics({ k }: GuideDeps): string {
       `<b>${JUMP.lodestoneName}s</b> (◈ on the map and edge markers) are huge bodies of grey stone, from about fifty kilometres to a few hundred across, and rarely more than a handful to a system. From a way off they look like lone rocks. Closer, pilots say, the faces are a touch too flat, the edges meet at the same angles, and the veins branch in the same pattern at every scale, glowing faintly on the side away from the star; they turn slowly and never slow down. Geologists call them a mineral formation; settlers say someone put them there. Nobody knows why a jump drive works better near one, but it does, so routes are built round them. Inside one's field the drive recharges ${1 + JUMP.lodestoneCharge} times as fast, and it stays primed: your next jump within ${Math.round(JUMP.lodestonePrimeTicks / 60)} seconds of leaving reaches ${Math.round((JUMP.lodestoneRangeBoost - 1) * 100)}% further. If you're also inside a star's charging ring, you get whichever boost is better, not both. A jump locked on to one drops you inside its field.`,
       `Now and then a stretch of one goes dark, its veins dead and its faces fractured: a <b>scarred</b> ${JUMP.lodestoneShort.toLowerCase()} gives a drive about ${Math.round(JUMP.lodestoneScarredCharge * 100)}% of the usual help. Very rarely a whole one is lost, dead or shattered into a field of fragments, and gives nothing at all. People build on them anyway, and some have raiders camped by them.`)}
     ${sec('Getting around', `<b>Jump gates</b> link systems: fly in and press ${k('interact')}. Close to one, a card says where it goes, what it's like there against your ship and what it needs; the first time a gate leads somewhere deadly for your ship, it asks you to press again. <b>Rifts</b> pull you through the moment you touch them. Some systems need a licence (Jobs & pilots, Leaving Sol). ${k('map')} opens the galaxy and system maps; ${k('nav')} toggles the markers on the screen edge.`)}
-    ${sec('Autopilot', `${k('autopilot')} flies you to the job you're following, gate by gate if it's in another system, using the jump drive on long legs. Or open the map (${k('map')}) and click a station, gate, wreck or system; right-click anywhere in a system to fly to that point. Any flight key or a click takes back control.`)}
+    ${sec('Autopilot', `${k('autopilot')} flies you to the job you're following, gate by gate if it's in another system, using the jump drive on long legs. Or open the map (${k('map')}) and click a station, gate, wreck or system; right-click anywhere in a system to fly to that point. Any flight key or a click takes back control.`,
+      `In flight, hold ${k('contextMenu')} and right-click anything (or open space) for what you can do with it: dock, travel through, land, hail, target, inspect, trade, fly there or jump there. A plain right-click is the right-hand guns and the mining laser, firing at once.`)}
     ${sec('Stations', `Fly into a station's docking ring and press ${k('dock')}. While docked you're safe: your ship is inside. Stations have storage (shared between every station), a market, a refinery and a fabricator, and post contracts. ${k('inventory')} shows your cargo; storage opens while you're docked.`)}
     ${sec('The info panel', `Rest the cursor on anything (another pilot, a ship, an asteroid) and the panel at the bottom right reads it out: who they are and their ship, a hostile's faction and rating against yours, or roughly what ore a rock holds. It stays a moment after you move off.`)}
     ${sec('Hazards', `Radiation, cold, darkness and low visibility make some systems harder to read. Black holes pull on everything; past the event horizon nothing survives. Watch for the red warning.`)}
+    ${sec('Cold and warmth', coldGuide())}
   </div>`;
 }
 
@@ -231,7 +253,7 @@ function ships(d: GuideDeps): string {
     ${sec('Energy', `Generators make power, carried along the ship's wires (or to whatever touches them). Steady loads (shields, scanners, jump coils) take theirs first. <b>Engines come next</b>: they take the spare power as it streams in, then batteries. Whatever they leave charges the batteries: the core's and standard ones serve everything, <b>drive batteries</b> only the engines, <b>weapon batteries</b> only guns and mining lasers.`,
       `Guns spend a packet of stored energy per shot, and mining lasers pay for a quarter second at a time: with nothing stored, they stop. So thrusting on empty batteries, the engines get every bit of power and the guns fall silent. Boosting needs stored charge and drinks it fast. The hangar's ENERGY panel shows how long a full battery lasts cruising, fighting and boosting. Better grades of gun draw more: give better guns better generators.`)}
     ${sec('Engines', `Ion thrusters are steady and efficient. Afterburners kick hard when you boost but drain fuel fast; plasma drives are big, powerful and hungry. Bigger engines give more thrust per cell.`)}
-    ${sec('Ammunition', `Railguns, flak, missiles, torpedoes, mortars and charge launchers fire from crates in your hold; with none left they fire plain rounds at a share of the damage. Cannons fire free, but take HV slugs too, and other guns have special crates (sabot, incendiary, seekers...) that change their rounds. Make crates at a fabricator.`,
+    ${sec('Ammunition', `Railguns, flak, missiles, torpedoes, mortars and charge launchers fire from crates in your hold; with none left they fire plain rounds at a share of the damage. Cannons fire free, but take HV slugs too, and other guns have special crates (sabot, incendiary, seekers...) that change their rounds. Make crates at a fabricator. A few crates are made for one enemy: <b>Quench Slugs</b> (railgun) are poor slugs on anything else but hit the Cinder Cult's ships, though not their great ones, two and a half times as hard. Forgemaster Hale teaches the pattern, and only your own station's armoury presses them (its Quench line).`,
       `Each ship has a <b>loadout</b>, set in the hangar's AMMUNITION panel: how many of each crate to carry, and which opens first (★). Docking, launching and flying the ship top your hold up to it from storage, and say what's short (order more right there). Loadout crates stay aboard when you store, and are opened before any others.`)}
     ${sec('Scrapping', `Scrap a ship (from its slot) or a module (from storage) for 70% of its minerals as ore and its components in full. A loaner just goes back.`)}
   </div>`;

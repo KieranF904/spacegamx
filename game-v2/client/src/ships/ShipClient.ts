@@ -10,7 +10,7 @@
  *   J  jump drive: spool up, then fly far and fast along the nose (J again aborts)
  */
 
-import { payMining, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules } from '@space-game/common';
+import { payMining, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, warmthStage, withNumb, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules } from '@space-game/common';
 import hazardData from '../../../data/hazards.json';
 
 const HAZARD_RULES = hazardData as unknown as HazardRules;
@@ -411,7 +411,9 @@ export class ShipClient {
     const pose = { x: player.x, y: player.y, angle: player.angle };
     // Each shot spends stored energy, then the mining lasers pay for their segment, as on the server (energy.ts)
     const energy = { charge };
-    const { shots, pulses } = stepGuns(ship, pose, { firing, aimWorld: input.targetAngle, aimDist: input.cursorDist ?? 0, energy }, tick, this.opts.tuning);
+    // (Cold guns recycle slower, from the warmth the server tells: warmth.ts)
+    const slow = warmthStage(player.warmth ?? 100).guns;
+    const { shots, pulses } = stepGuns(ship, pose, { firing, aimWorld: input.targetAngle, aimDist: input.cursorDist ?? 0, energy, slow }, tick, this.opts.tuning);
     for (const { w } of pulses) this.beamFx?.startPulse(player.id, w.part, tick);
     if (burning) ship.mineUntil = 0;
     payMining(ship, !!input.fireRight && hasMiners && !burning, tick, energy);
@@ -813,7 +815,8 @@ export class ShipClient {
     const body = { x: player.x, y: player.y, vx: player.vx, vy: player.vy, angle: player.angle, angVel: player.angVel ?? 0, jump: player.jump ?? 0, jumpScale: player.jumpScale };
     // Hit by an EMP (or frozen through): the drive crippled and no jump starting, exactly as the server has it (ShipBridge.stepMovement)
     const emp = tick < (player.empUntil ?? 0);
-    const hazard = this.hazardFor(ship.derived, player.x, player.y);
+    // (and numb with cold, a sluggish drive: warmth.ts, from the warmth the server tells)
+    const hazard = withNumb(this.hazardFor(ship.derived, player.x, player.y), warmthStage(player.warmth ?? 100));
     // Charging fields round the step, exactly as the server has them (ShipBridge.stepMovement): the range boost from
     // where it starts, then a faster cooldown and a lodestone's priming from where it ends
     let res!: ReturnType<typeof stepShipPhysics>;

@@ -109,6 +109,7 @@ Each needs an attributed line or record with its innocent reading (lore-integrat
   - osei_01 says the Kestrel is "south of Sol Central", which doesn't match its position.
   - ice_03's "came off the same line as the first crews' own" reads a little oddly.
   - Kerr lost her six years when the hab's drives froze one winter.
+  - The Scrap Mother's boss intro (`bosses.json`, `boss_scrap_mother.intro`) ends "The Scrap Mother wakes, and the nest hums with drones." That is the narration saying a machine woke, and "waking" is a pilots' word for cores (Marrow: "it's settling in"). Neutralise it (she "stirs", "comes up out of the junk") or put it in someone's mouth. The website's first update post (`site/seed/posts/02-the-scrap-mother.md`) quotes the intro and now stops before that sentence.
 - **From pass 2:**
   - The Helios Seat has the same index-based accent problem as the Hall: it should read Directorate white.
   - "Bellwether mast one" (bw_04) and the stalled drone (bw_02) are only markers; nothing is drawn there.

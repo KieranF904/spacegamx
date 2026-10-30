@@ -1,5 +1,5 @@
 {
-  "_comment": "Your station (server/src/game/Outpost.ts): chartered at a level, for credits and plate, at one of the sites (beside an existing station). Each track has five tiers: a tier costs its cost (from storage) and builds for its minutes, wall-clock (it carries on while you're away). A tier's perks: refineTime/fabTime multiply job times, refineYield adds plate a batch, traceMul multiplies traces, fabSlots/hangarSlots add to the unlocks, cutFail takes off a gem cut's fail chance, sidegrades lets the fabricator make special ammunition (now open by level anyway: a perk to replace), rumours brings rumours from anywhere. Perks stack: a track gives everything up to its tier.",
+  "_comment": "Your station (server/src/game/Outpost.ts): chartered at a level, for credits and plate, at one of the sites (beside an existing station). Each track has five tiers: a tier costs its cost (from storage) and builds for its minutes, wall-clock (it carries on while you're away). A tier's perks: refineTime/fabTime multiply job times, refineYield adds plate a batch, traceMul multiplies traces, fabSlots/hangarSlots add to the unlocks, cutFail takes off a gem cut's fail chance, rounds are ammunition only an armoury presses (the recipe still has to be learned: Quench Slugs, from Forgemaster Hale's job cinder_quench), rumours brings rumours from anywhere. Perks stack: a track gives everything up to its tier.",
   "charter": {
     "level": 25,
     "credits": 20000,
@@ -163,7 +163,7 @@
     "armoury": {
       "name": "Armoury",
       "group": "make",
-      "about": "An ammunition plant: standard and special crates, and (later) rare-weapon rounds.",
+      "about": "An ammunition plant: standard and special crates, Quench Slugs for the Cinder Cult, and (later) rare-weapon rounds.",
       "tiers": [
         {
           "name": "Shell press: standard crates",
@@ -185,16 +185,18 @@
           "minutes": 45
         },
         {
-          "name": "Special ammunition: sabot, chaff, seekers and the rest",
+          "name": "Quench line: Quench Slugs, once Forgemaster Hale has shown you how",
           "cost": {
             "steel_plate": 260,
             "titanium_plate": 60,
             "copper_wire": 200,
-            "crystal_lens": 30,
-            "aurum_ingot": 20,
+            "cryogen": 60,
             "propellant": 180
           },
-          "minutes": 120
+          "minutes": 120,
+          "rounds": [
+            "railgun_quench"
+          ]
         },
         {
           "name": "Proving range",

@@ -1,5 +1,5 @@
 {
-  "_comment": "Materials are grades (Mk I-V): a part's material sets its toughness (hit points per cell), its density (mass per cell) and its output (weapon damage, generator power, shield strength; graded parts draw that much more power too). Mk I has two: alloy, and lighter, frailer composite. traits: what a material is (light, heavy, brittle, conductive, mass_anchor, costly_repair: ships/hazards.ts); hazards: the tolerance (0-5) a hull made wholly of it has to each system hazard; a ship has its cells' share of it.",
+  "_comment": "Materials are grades (Mk I-V): a part's material sets its toughness (hit points per cell), its density (mass per cell) and its output (weapon damage, generator power, shield strength; graded parts draw that much more power too). Mk I has two: alloy, and lighter, frailer composite. traits: what a material is (light, heavy, brittle, conductive, mass_anchor, costly_repair: ships/hazards.ts); hazards: the tolerance (0-5) a hull made wholly of it has to each system hazard; a ship has its cells' share of it. insulation: the share of cold (0..1) a hull made wholly of it keeps out, so cold builds up that much slower (warmth.ts; again by share of cells): it only buys time.",
   "materials": [
     {
       "id": "alloy",
@@ -107,9 +107,7 @@
       "traits": [
         "conductive"
       ],
-      "hazards": {
-        "cryo": 4
-      },
+      "insulation": 0.3,
       "resist": {
         "energy": 0.45,
         "cryo": 0.7,
@@ -167,6 +165,7 @@
       "traits": [
         "brittle"
       ],
+      "insulation": 0.15,
       "hazards": {
         "thermal": 4
       },
@@ -188,6 +187,7 @@
       "traits": [
         "costly_repair"
       ],
+      "insulation": 0.1,
       "hazards": {
         "corrosive": 4
       },

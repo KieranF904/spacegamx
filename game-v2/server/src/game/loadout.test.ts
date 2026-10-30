@@ -116,7 +116,7 @@ describe('ammunition loadouts', () => {
 });
 
 describe('quick storage controls', () => {
-  const HOLD = ['iron_ore', 'ruby', 'helium3', 'alloy_plate', 'scrap_electronics', 'ancient_relic', 'gem_frost_1', 'schematic_railgun',
+  const HOLD = ['iron_ore', 'ruby', 'helium3', 'alloy_plate', 'scrap_electronics', 'ancient_relic', 'gem_frost_1', 'frost_heart',
     'repair_kit', 'boost_cell', 'railgun_slugs', 'cannon_hv', 'fractured_plating'];
   const sweep = (what: string) => {
     const { server, t, pid, profile } = liveServer();
@@ -133,8 +133,8 @@ describe('quick storage controls', () => {
     expect(sweep('ores').stored).toEqual(['alloy_plate', 'helium3', 'iron_ore', 'ruby']);
   });
 
-  it('loot: components, artefacts, cut gems, plans', () => {
-    expect(sweep('loot').stored).toEqual(['ancient_relic', 'gem_frost_1', 'schematic_railgun', 'scrap_electronics']);
+  it('loot: components, artefacts, cut gems', () => {
+    expect(sweep('loot').stored).toEqual(['ancient_relic', 'frost_heart', 'gem_frost_1', 'scrap_electronics']);
   });
 
   it('safe: everything but ammunition, the loadout, utility and job items', () => {

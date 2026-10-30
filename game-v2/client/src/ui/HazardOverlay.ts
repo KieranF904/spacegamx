@@ -1,7 +1,8 @@
 /**
  * System hazards on screen: a full-screen treatment per hazard (haze for low
- * visibility, a heavy vignette for darkness, a pulsing edge for radiation, a
- * frost rim for cold) plus warning chips. The gravity well itself is real
+ * visibility, a heavy vignette for darkness, a pulsing edge for radiation)
+ * plus warning chips. Cold has no fixed treatment: the frost comes in as the
+ * ship's warmth runs down (FrostVignette). The gravity well itself is real
  * physics; here it only gets a warning, which turns urgent near the horizon.
  */
 
@@ -19,10 +20,7 @@ const HAZARDS: Record<string, { label: string; color: string; layer?: string; an
     layer: 'radial-gradient(ellipse at center, rgba(255,170,40,0) 60%, rgba(255,150,30,0.16) 100%)',
     anim: 'hazardPulse 2.4s ease-in-out infinite',
   },
-  cold: {
-    label: 'COLD', color: '#9fd8ff',
-    layer: 'radial-gradient(ellipse at center, rgba(150,210,255,0) 62%, rgba(170,220,255,0.18) 100%)',
-  },
+  cold: { label: 'COLD', color: '#9fd8ff' },
   gravitational_anomalies: { label: 'GRAVITY WELL', color: '#f2a6ff' },
 };
 

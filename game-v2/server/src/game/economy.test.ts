@@ -243,6 +243,33 @@ describe('station services', () => {
     expect(countOf(profile().storage, 'buoy_frame')).toBe(1);
   });
 
+  it("Quench Slugs need both Forgemaster Hale's job and your own station's armoury (its Quench line)", () => {
+    const { server, t, pid, profile, got } = world();
+    atStation(server, pid);
+    server.pilots.give(server.pilots.connOf(pid)!, { steel_plate: 10, copper_wire: 5, cryogen: 5 }, { toStorage: true, quiet: true });
+    profile().level = 30;
+    const made = () => countOf(profile().storage, 'railgun_quench') + profile().jobs.filter((j) => j.recipe === 'railgun_quench').length;
+    // Level alone: nothing (its job teaches it)
+    t.send({ type: 'craft', recipe: 'railgun_quench', n: 1 });
+    expect(made()).toBe(0);
+    // Taught, but no station of your own: still nothing, and it says where they're pressed
+    profile().recipes.push('railgun_quench');
+    t.send({ type: 'craft', recipe: 'railgun_quench', n: 1 });
+    expect(made()).toBe(0);
+    expect(got.some((m) => m.type === 'toast' && /armoury/i.test((m as any).text) && /Quench line/.test((m as any).text))).toBe(true);
+    // A station whose armoury stops short of the Quench line, then one built to it
+    profile().outpost = { site: 'sol_outer', tracks: { armoury: 2 } };
+    t.send({ type: 'craft', recipe: 'railgun_quench', n: 1 });
+    expect(made()).toBe(0);
+    profile().outpost.tracks.armoury = 3;
+    t.send({ type: 'craft', recipe: 'railgun_quench', n: 1 });
+    expect(made()).toBe(1);
+    // (the armoury presses only what you've learned: the line without the job is nothing)
+    profile().recipes = profile().recipes.filter((r) => r !== 'railgun_quench');
+    t.send({ type: 'craft', recipe: 'railgun_quench', n: 1 });
+    expect(made()).toBe(1);
+  });
+
   it('the market buys at its demand price and sells only what it stocks', () => {
     const { server, t, pid, profile } = world();
     atStation(server, pid, 'sol_station_trade');

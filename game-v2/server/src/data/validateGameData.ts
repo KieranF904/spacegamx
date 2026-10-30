@@ -285,7 +285,10 @@ const SHAPES: Record<string, Spec> = {
     }
   },
   'hazards.json': (v, path, c) => {
-    check(c, obj({ 'nearStar?': obj({ 'radii?': 'number', 'margin?': 'number', ratings: rec('number') }), 'nearBlackHole?': obj({ 'radii?': 'number', 'margin?': 'number', ratings: rec('number') }), 'tolerance?': 'any', 'effects?': rec(obj({ summary: 'string' })) }), v, path);
+    check(c, obj({ 'nearStar?': obj({ 'radii?': 'number', 'margin?': 'number', ratings: rec('number') }), 'nearBlackHole?': obj({ 'radii?': 'number', 'margin?': 'number', ratings: rec('number') }), 'tolerance?': 'any', 'effects?': rec(obj({ summary: 'string' })),
+      'warmth?': obj({ coldPerPoint: 'number', ambient: 'number', seizeTicks: 'number', sources: obj({
+        'star?': obj({ margin: 'number', rate: 'number' }), 'station?': obj({ margin: 'number', rate: 'number', docked: 'number' }),
+        'burning?': obj({ radius: 'number', rate: 'number' }), 'planet?': obj({ kinds: 'string[]', margin: 'number', rate: 'number' }) }) }) }), v, path);
     for (const k of ['nearStar', 'nearBlackHole', 'effects', 'tolerance']) {
       const r = isObj(v) ? (k === 'nearStar' || k === 'nearBlackHole' ? v[k]?.ratings : v[k]) : undefined;
       for (const h of Object.keys(isObj(r) ? r : {})) if (!h.startsWith('_') && !(HAZARDS as readonly string[]).includes(h)) c.err(join(k, h), `not a hazard (${HAZARDS.join(', ')})`);
@@ -320,7 +323,7 @@ const SHAPES: Record<string, Spec> = {
     },
   }),
   'bosses.json': strict({
-    rules: obj({ creditRange: 'number', creditWindowTicks: 'number', resetAfterSeconds: 'number', barRange: 'number' }),
+    rules: obj({ creditRange: 'number', creditWindowTicks: 'number', barRange: 'number', 'stageCover?': 'number' }),
     bosses: rec(strict({
       name: 'string', title: 'string', faction: 'string', system: 'string', lair: 'xy', level: 'number', hp: 'number', damage: 'number',
       xp: 'number', credits: 'number', respawnSeconds: 'number', behaviour: behaviourSpec, intro: 'string',
@@ -328,7 +331,7 @@ const SHAPES: Record<string, Spec> = {
         at: 'number', 'say?': 'string', 'escorts?': 'string[]', 'enrage?': 'number', 'heal?': 'number', 'blink?': 'number',
         'nova?': obj({ every: 'number', kind: 'string', count: 'number', warnTicks: 'number' }),
       })),
-      loot: lootSpec, 'design?': 'string', 'arena?': 'boolean', 'fixed?': 'boolean', 'grade?': 'number', 'plating?': 'number', 'asDesigned?': 'boolean', 'speed?': 'number', 'turn?': 'number',
+      loot: lootSpec, 'design?': 'string', 'arena?': 'boolean', 'fixed?': 'boolean', 'grade?': 'number', 'plating?': 'number', 'asDesigned?': 'boolean', 'speed?': 'number', 'turn?': 'number', 'stageCover?': 'number',
       'roam?': obj({ radius: 'number', everySeconds: 'number' }), 'brain?': oneOf(...BRAIN_IDS),
     })),
   }),
@@ -453,6 +456,7 @@ const SHIP_SHAPES: Record<string, Spec> = {
     materials: arr(strict({ id: 'string', 'name?': 'string', 'exclusive?': 'string', 'grade?': 'number', 'output?': 'number', color: 'string', density: 'number', toughness: 'number',
       'traits?': (v, path, c) => { check(c, 'string[]', v, path); for (const t of list(v)) if (typeof t === 'string' && !(t in MATERIAL_TRAITS)) c.warn(path, `"${t}" is not a known trait (${Object.keys(MATERIAL_TRAITS).join(', ')})`); },
       'hazards?': (v, path, c) => { check(c, rec('number'), v, path); for (const k of Object.keys(isObj(v) ? v : {})) if (!(HAZARDS as readonly string[]).includes(k)) c.err(join(path, k), `not a hazard (${HAZARDS.join(', ')})`); },
+      'insulation?': (v, path, c) => { check(c, 'number', v, path); if (typeof v === 'number' && (v < 0 || v >= 1)) c.err(path, 'a share of cold kept out: 0 to under 1'); },
       'resist?': (v, path, c) => { check(c, rec('number'), v, path); for (const k of Object.keys(isObj(v) ? v : {})) if (!(DAMAGE_TYPES as readonly string[]).includes(k)) c.err(join(path, k), `not a damage type (${DAMAGE_TYPES.join(', ')})`); } })),
   }),
   'ships/pieces.json': strict({

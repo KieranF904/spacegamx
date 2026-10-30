@@ -613,6 +613,20 @@
       "level": 18
     },
     {
+      "id": "railgun_quench",
+      "out": {
+        "railgun_quench": 1
+      },
+      "inputs": {
+        "steel_plate": 2,
+        "copper_wire": 1,
+        "cryogen": 1
+      },
+      "time": 15,
+      "level": 25,
+      "quest": "cinder_quench"
+    },
+    {
       "id": "flak_incendiary",
       "out": {
         "flak_incendiary": 1

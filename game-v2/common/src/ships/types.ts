@@ -277,6 +277,8 @@ export interface MaterialDef {
   traits?: TraitId[];
   /** Hazard tolerance (0-5) a hull made wholly of it has; a ship's is the share of its cells (rebuild.ts makeup) */
   hazards?: Record<string, number>;
+  /** The share of cold it keeps out (0..1; warmth.ts): a hull wholly of it builds up cold that much slower */
+  insulation?: number;
   /** The share of each damage type it takes (damage.ts: 0.6 shrugs much of it off, 1.3 takes more); absent: 1 */
   resist?: Partial<Record<'kinetic' | 'explosive' | 'thermal' | 'energy' | 'cryo' | 'exotic', number>>;
 }
@@ -352,7 +354,7 @@ export interface WeaponMods {
 export type WeaponModNumber = 'damage' | 'speed' | 'life' | 'size' | 'spread' | 'range' | 'dps' | 'heatPerSec' | 'coolPerSec' | 'armorBonus' | 'homing' | 'accel' | 'maxSpeed' | 'fuse' | 'rate' | 'hp' | 'width' | 'splashDamage' | 'splashRadius';
 export const WEAPON_MOD_NUMBERS: WeaponModNumber[] = ['damage', 'speed', 'life', 'size', 'spread', 'range', 'dps', 'heatPerSec', 'coolPerSec', 'armorBonus', 'homing', 'accel', 'maxSpeed', 'fuse', 'rate', 'hp', 'width', 'splashDamage', 'splashRadius'];
 /** What `set` may give a gun */
-export const WEAPON_MOD_SETS = ['ignite', 'split', 'pull', 'chill', 'frost', 'splash', 'emp', 'pierceKeep', 'homing', 'fuse', 'color'];
+export const WEAPON_MOD_SETS = ['ignite', 'split', 'pull', 'chill', 'frost', 'splash', 'emp', 'pierceKeep', 'homing', 'fuse', 'color', 'bane'];
 
 export type Mount = 'fixed' | 'turret';
 

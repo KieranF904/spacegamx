@@ -354,6 +354,8 @@ export class ComponentGuideUI {
       if (m.traits?.length) left += kv('Traits', esc(m.traits.join(', ').replace(/_/g, ' ')));
       const res = resistText(m.resist);
       if (res) left += kv('Takes', res);
+      // (Cold builds up slower in it: ships/warmth.ts)
+      if (m.insulation) left += kv('Insulation', `keeps out ${Math.round(m.insulation * 100)}% of the cold, by its share of the hull`);
       right += `<h5>Built in ${esc(m.name ?? m.id)} (a square)</h5><table class="cg-t"><tr><th>Part</th><th class="n">HP</th><th class="n">Armour</th><th class="n">Mass</th><th>Takes</th></tr>`;
       for (const f of [...STRUCTURE_FNS, 'core']) {
         const st = partStats(catalog, tuning, { fn: f, material: r.material, piece: 'sq' });

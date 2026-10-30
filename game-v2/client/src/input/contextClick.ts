@@ -1,7 +1,8 @@
 /**
  * The right-click menu, the pure part (ContextActions.ts drives it):
- *   tap or hold  a quick, still right-click opens the menu; holding is the
- *                mining laser and the right-hand guns, as ever
+ *   pressing     the menu modifier (Z, rebindable) + right-click opens
+ *                the menu; a plain right-click is the mining laser and the
+ *                right-hand guns, firing at once
  *   picking      everything under the cursor, nearest kind first: people, then
  *                ships, pods and wrecks, then rocks, then stations, gates,
  *                rifts, cave mouths and nests' ways in, then planets and moons
@@ -14,57 +15,37 @@
  * No DOM, no game state.
  */
 
-/** A right-click let go within this (ms), having moved no more than TAP_MOVE_PX, opens the menu */
-export const TAP_MS = 200;
-export const TAP_MOVE_PX = 6;
-
-interface Press { t: number; x: number; y: number; moved: boolean }
+/** What a right press is: the menu (its modifier held, in flight) or the right-hand guns and the mining laser */
+export function rightPress(s: { modifier: boolean; enabled: boolean }): 'menu' | 'fire' {
+  return s.modifier && s.enabled ? 'menu' : 'fire';
+}
 
 /**
- * Tells a right-click (the menu) from holding the button (mining, the right
- * guns). Every press holds the right fire back for the tap window, so a click
- * that opens the menu never flashes the guns or the mining laser; held past
- * the window, it fires as any hold does.
+ * The right fire, press by press. A plain press fires at once; a press that
+ * opened the menu holds the right fire back until it's let go, so closing
+ * the menu with the button still down (Esc, the cursor wandering off) never
+ * flashes the guns or the mining laser.
  */
 export class RightClick {
-  private press: Press | null = null;
+  private menuPress = false;
 
-  /** The button went down at (x, y), screen px */
-  down(t: number, x: number, y: number): void {
-    this.press = { t, x, y, moved: false };
+  /** The button went down; `menu`: this press opened the menu */
+  down(menu: boolean): void {
+    this.menuPress = menu;
   }
 
-  move(x: number, y: number): void {
-    const p = this.press;
-    if (p && !p.moved && Math.hypot(x - p.x, y - p.y) > TAP_MOVE_PX) p.moved = true;
+  up(): void {
+    this.menuPress = false;
   }
 
-  /** The button came up: where the click was (the menu opens there), or null (a hold, a drag, or no press) */
-  up(t: number, x: number, y: number): { x: number; y: number } | null {
-    const p = this.press;
-    this.press = null;
-    if (!p) return null;
-    return isTap(p, { t, x, y }, p.moved) ? { x: p.x, y: p.y } : null;
-  }
-
-  /** Is the right fire held back now (a press still inside the tap window)? */
-  withholding(t: number): boolean {
-    const p = this.press;
-    return !!p && t - p.t < TAP_MS && !p.moved;
-  }
-
-  get pressed(): boolean {
-    return this.press !== null;
+  /** Is the right fire held back now (the press that opened the menu, still down)? */
+  get withholding(): boolean {
+    return this.menuPress;
   }
 
   reset(): void {
-    this.press = null;
+    this.menuPress = false;
   }
-}
-
-/** Quick and still: a click */
-export function isTap(down: { t: number; x: number; y: number }, up: { t: number; x: number; y: number }, moved = false): boolean {
-  return !moved && up.t - down.t < TAP_MS && Math.hypot(up.x - down.x, up.y - down.y) <= TAP_MOVE_PX;
 }
 
 // ---------------------------------------------------------------------------

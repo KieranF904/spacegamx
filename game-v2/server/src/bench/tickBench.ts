@@ -8,7 +8,9 @@
  * pilot at the edge of Sol with `--packs N` hostile packs (default 40) spread
  * over the whole system, and as many again in Ashfall with nobody there;
  * `--no-lod` runs it with every ship live (the old cost) to compare; `--map`
- * has the pilots' system maps open (the far ships' dots are sent: mapDots).
+ * has the pilots' system maps open (the far ships' dots are sent: mapDots);
+ * `--keep` keeps systems nobody's in in the world (not put away: game/SystemMemory.ts),
+ * to weigh the distant tier on the same ships as before.
  * With node's profiler: node --cpu-prof --import tsx src/bench/tickBench.ts
  */
 
@@ -65,6 +67,15 @@ const spots: { system: string; x: number; y: number }[] = [
   { system: 'borealis', x: 30000, y: 0 },
 ];
 if (process.argv.includes('--no-lod') && anyServer.lod) anyServer.lod.enabled = false;
+if (process.argv.includes('--keep')) anyServer.memory.rules.evictAfterSeconds = 1e9;
+// Time spent in the distant tier (SimLod) and building the map's dots, apart from the rest of the tick
+const spent = { lod: 0, dots: 0 };
+const timed = (obj: any, fn: string, key: keyof typeof spent) => {
+  const orig = obj[fn].bind(obj);
+  obj[fn] = (...a: unknown[]) => { const s = performance.now(); try { return orig(...a); } finally { spent[key] += performance.now() - s; } };
+};
+if (anyServer.lod) timed(anyServer.lod, 'tick', 'lod');
+timed(anyServer, 'sendMapDots', 'dots');
 // Out to their spots
 pilots.forEach((pid, i) => {
   const at = SPREAD ? { system: 'sol', x: 165000, y: 0 } : spots[i % spots.length];
@@ -116,6 +127,7 @@ const enemies = [...(server.getShips() as any).bodies.keys()].filter((e: number)
 console.log(`${PILOTS} pilots, ${secs}s simulated (${ticks} ticks) in ${(wall / 1000).toFixed(1)}s wall`);
 console.log(`tick ms: mean ${mean.toFixed(2)} · p50 ${pct(0.5)} · p95 ${pct(0.95)} · p99 ${pct(0.99)} · worst ${times[times.length - 1].toFixed(2)}  (budget 16.67)`);
 if (anyServer.lod) console.log(`lod: ${JSON.stringify(anyServer.lod.stats())}`);
+console.log(`distant tier ${(spent.lod / ticks * 1000).toFixed(1)} µs/tick · map dots ${(spent.dots / ticks * 1000).toFixed(1)} µs/tick`);
 console.log(`by type (KiB/s): ${Object.entries(byType).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, v]) => `${k} ${(v / 1024 / secs).toFixed(2)}`).join(' · ')}`);
 console.log(`ship bodies ${(server.getShips() as any).bodies.size} · hostiles ${enemies} · sent ${(bytes / 1024 / secs).toFixed(1)} KiB/s to all pilots`);
 const live = (bitecs as any).getAllEntities(anyServer.world).length;

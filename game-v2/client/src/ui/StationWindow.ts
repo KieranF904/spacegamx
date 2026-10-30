@@ -19,7 +19,7 @@ import {
   ClientMessage, ServerStationMessage, ServerVendorsMessage, ServerMarketScanMessage, Bag, CraftRecipe, ItemCatalog, QuestsFile,
   sellPrice, buyPrice, canCraft, licenceName, partItemId, parsePartItemId, registeredFunction, materialLicensed, MATERIAL_LEVEL, materialUnlockName, isWeaponFn, PIECE_NAMES, RARITY_COLOR, Stack, unitSellPrice, saleTotal,
   FN_NAMES, isStructural, partStats, gradeOf, markName, OrderPlan, OrderLine, JobView, countOf, DOCK_FEE_LEVEL, unlocks,
-  socketsFor, cutInputs, gemItemId, CATEGORY_LABEL, WIRE_ITEM, SEGMENTS_PER_SPOOL, type GemsFile, type StationFile, type Blueprint, type ItemDef, type FunctionDef,
+  socketsFor, cutInputs, gemItemId, CATEGORY_LABEL, WIRE_ITEM, SEGMENTS_PER_SPOOL, stationLearned, armouryRound, type GemsFile, type StationFile, type Blueprint, type ItemDef, type FunctionDef,
 } from '@space-game/common';
 import { SHIP_FUNCTIONS } from '../ships/shipFunctionData';
 import { FAMILY_LABEL, familyLabel, familyRank, keyStats, modelLock, sizeText, tradeOff } from '../ships/modelCards';
@@ -669,7 +669,7 @@ export class StationWindow {
         const row = document.createElement('div');
         row.style.cssText = `display:flex; align-items:center; gap:10px; padding:6px 4px; border-bottom:1px solid rgba(140,170,220,0.07); opacity:${s.locked ? 0.55 : 1}`;
         row.innerHTML = `<img src="${itemIcon(this.d.pilot.econ, s.item)}" style="width:32px; height:32px; flex-shrink:0">
-          <div style="flex:1; min-width:0"><div style="color:${d ? RARITY_COLOR[d.rarity] : '#ccc'}">${esc(items.name(s.item))}${s.known ? ' <small style="color:#86efac">known</small>' : ''}</div>
+          <div style="flex:1; min-width:0"><div style="color:${d ? RARITY_COLOR[d.rarity] : '#ccc'}">${esc(items.name(s.item))}</div>
           <div style="color:#8394ad; font-size:11px">${s.locked ? `🔒 needs ${esc(s.rankName)}` : `<span class="sgw-credits">${s.price.toLocaleString()} cr</span>`}</div></div>`;
         row.addEventListener('mousemove', (e) => showTip(itemTipHtml(this.d.pilot.econ, s.item, { count: this.have(s.item) }), e.clientX, e.clientY));
         row.addEventListener('mouseleave', hideTip);
@@ -678,7 +678,7 @@ export class StationWindow {
           btn.className = 'sgw-btn primary';
           btn.style.padding = '5px 10px';
           btn.textContent = 'Buy';
-          if (this.d.pilot.credits < s.price || s.known) btn.classList.add('off');
+          if (this.d.pilot.credits < s.price) btn.classList.add('off');
           btn.onclick = () => { this.d.send({ type: 'vendorBuy', faction: v.faction, item: s.item, n: 1 }); this.d.sound('credits', 0.6); };
           row.appendChild(btn);
         }
@@ -820,7 +820,8 @@ export class StationWindow {
    */
   private renderFabricator(b: HTMLElement): void {
     const econ = this.d.pilot.econ;
-    const learned = this.d.pilot.profile?.recipes ?? [];
+    // (an armoury's own rounds only once your station's armoury presses them)
+    const learned = stationLearned(this.d.pilot.profile?.recipes ?? [], this.d.pilot.profile?.outpost ?? undefined, STATION);
     const grid = document.createElement('div');
     grid.style.cssText = 'display:grid; grid-template-columns: 232px minmax(0, 1fr) 250px; gap:12px; height: min(580px, calc(100vh - 230px));';
     const nav = document.createElement('div');
@@ -1397,7 +1398,11 @@ function partOf(r: CraftRecipe): { material: string; fn: string; piece: string }
 /** What a locked recipe waits on: "pilot level 12", "pilot level 5 (Steel structure)", "Core fabrication" (nothing opens early) */
 function licenceFor(r: CraftRecipe, learned: string[], items: ItemCatalog, level: number): string {
   const p = parsePartItemId(r.id);
-  if (!p) return r.level !== undefined && level < r.level ? `pilot level ${r.level}` : r.quest ? 'its job' : 'the recipe';
+  if (!p) {
+    if (r.level !== undefined && level < r.level) return `pilot level ${r.level}`;
+    if (armouryRound(r.id, STATION)) return r.quest ? "its job, and your own station's armoury" : "your own station's armoury";
+    return r.quest ? 'its job' : 'the recipe';
+  }
   const fn = registeredFunction(p.fn);
   if (fn?.model) return fn.unlock ? `pilot level ${fn.unlock.level}` : 'a model no pilot makes';
   if (!materialLicensed(p.material, learned, level)) {

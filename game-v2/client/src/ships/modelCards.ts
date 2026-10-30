@@ -176,8 +176,6 @@ export interface ModelLock {
   badge: string;
   /** "Learned at level 12 (you're 5)" */
   why: string;
-  /** (Retired with the schematics, 2026-10-30: never set; nothing opens a model early) */
-  schematic?: string;
 }
 
 /** Whether a pilot of this level can make a model, and if not, the level that will (`items`: unused now, kept for callers) */

@@ -76,22 +76,6 @@ export const BULLET_DAMAGE = 14;               // Base damage
 export const BLASTER_LIFE_TICKS = 150;         // 2.5 seconds (~3600 units of range)
 
 // ============================================
-// ENEMIES - ICE SPRITES
-// ============================================
-
-export const ICE_SPRITE_HP = 40;
-export const ICE_SPRITE_DAMAGE = 5;
-export const ICE_SPRITE_XP = 20;
-export const ICE_SPRITE_SPEED = 2.5;
-export const ICE_SPRITE_ATTACK_RANGE = 600;
-export const ICE_SPRITE_ATTACK_COOLDOWN = 90;
-export const ICE_SPRITE_PROJECTILE_SPEED = 8;
-export const ICE_SPRITE_MAX_COUNT = 12;
-export const ICE_SPRITE_SPAWN_INTERVAL = 180;
-export const ICE_SPRITE_SPAWN_RADIUS_MIN = 40000;
-export const ICE_SPRITE_SPAWN_RADIUS_MAX = 70000;
-
-// ============================================
 // ASTEROIDS
 // ============================================
 

@@ -226,24 +226,32 @@ describe('bosses: the fight', () => {
     expect(bosses.isAlive('boss_rustjaw')).toBe(false);
   });
 
-  it('left alone, a hurt boss resets', () => {
+  it('left alone, a hurt boss is remembered as it was, and mends slowly with time away (not reset)', () => {
     const { server, pid, step, bosses, bridge } = world();
-    const rules = bosses.file.rules;
-    const was = rules.resetAfterSeconds;
-    rules.resetAfterSeconds = 4;
     visit(server, pid, 'boss_prism_colossus');
     const eid = bosses.spawn('boss_prism_colossus');
     wear(server, eid, 0.8, pid);
-    // Leave for Sol
-    InSystem.systemId[pid] = server['gameData'].getSystemNum('sol');
-    hold(pid, 30000, 30000);
-    for (let i = 0; i < 6 * 60; i++) { hold(pid, 30000, 30000); step(); }
-    rules.resetAfterSeconds = was;
+    // Leave for Sol: once its system's been empty a while it's put away (SystemMemory), not reset
+    const leave = (s: number) => { InSystem.systemId[pid] = server['gameData'].getSystemNum('sol'); for (let i = 0; i < s * 60; i++) { hold(pid, 30000, 30000); step(); } };
+    leave(server.memory.rules.evictAfterSeconds - 1);
+    const hurt = bridge.integrity(eid);
+    expect(hurt).toBeLessThan(0.85);
+    leave(3);
     expect(bosses.isAlive('boss_prism_colossus')).toBe(false);
+    expect(server.memory.remembers(bossFile.bosses.boss_prism_colossus.system)).toBe(true);
+    // Straight back: as hurt as it was (a few seconds' mending), no new sighting
     visit(server, pid, 'boss_prism_colossus');
-    for (let i = 0; i < 70; i++) { visit(server, pid, 'boss_prism_colossus'); step(); }
+    step(2);
     expect(bosses.isAlive('boss_prism_colossus')).toBe(true);
-    expect(bridge.integrity(bosses.eidOf('boss_prism_colossus'))).toBeCloseTo(1, 2);
+    const back = bridge.integrity(bosses.eidOf('boss_prism_colossus'));
+    expect(back).toBeGreaterThanOrEqual(hurt - 0.01);
+    expect(back).toBeLessThan(hurt + 0.05);
+    // Away half an hour (the world's clock moved on): mended by memory.bossHealPerMinute a minute, part by part
+    leave(server.memory.rules.evictAfterSeconds + 2);
+    server.memory.offset += 60 * 60 * 30;
+    visit(server, pid, 'boss_prism_colossus');
+    step(2);
+    expect(bridge.integrity(bosses.eidOf('boss_prism_colossus'))).toBeGreaterThan(back + 0.1);
   });
 });
 

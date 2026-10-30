@@ -138,17 +138,14 @@ export function teachKeys(row: CompRow): string[] {
   return row.kind === 'core' ? ['fn:core'] : [];
 }
 
-/** Where a licence is learned: schematics by name, jobs as “Name” */
-export function teachSources(keys: string[], ctx: Pick<GateCtx, 'items' | 'quests'>): { schematics: string[]; jobs: string[] } {
+/** Where a licence is learned: the jobs that teach it, by name */
+export function teachSources(keys: string[], ctx: Pick<GateCtx, 'quests'>): string[] {
   const want = new Set(keys);
-  return {
-    schematics: ctx.items.filter((d) => d.teaches?.some((t) => want.has(t))).map((d) => d.name),
-    jobs: ctx.quests.filter((q) => q.teaches.some((t) => want.has(t))).map((q) => q.name),
-  };
+  return ctx.quests.filter((q) => q.teaches.some((t) => want.has(t))).map((q) => q.name);
 }
 
 const listOr = (xs: string[]) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} or ${xs[xs.length - 1]}`);
-const sourceText = (s: { schematics: string[]; jobs: string[] }) => listOr([...s.schematics.slice(0, 2).map((n) => `the ${n}`), ...s.jobs.slice(0, 2).map((n) => `the job “${n}”`)]);
+const sourceText = (jobs: string[]) => listOr(jobs.slice(0, 2).map((n) => `the job “${n}”`));
 
 /** Rare parts in its recipe: inputs a boss drops (artefacts and the like) */
 export function rareParts(ctx: Pick<GateCtx, 'items' | 'drops' | 'inputs'>): { id: string; n: number; name: string; drops: BossDrop[] }[] {

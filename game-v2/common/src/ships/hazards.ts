@@ -5,6 +5,8 @@
  * nose and a titanium engine bay is partial cover (rebuild.ts makeup).
  */
 
+import type { WarmthRules } from './warmth.js';
+
 export const HAZARDS = ['radiation', 'thermal', 'cryo', 'corrosive', 'gravitational', 'electromagnetic'] as const;
 export type Hazard = typeof HAZARDS[number];
 
@@ -26,10 +28,11 @@ export interface HazardRules {
   tolerance?: {
     gravitational?: { massFloor: number; massPerPoint: number };
     thermal?: { massOver: number; points: number };
-    cryo?: { conduitsOver: number; points: number };
     electromagnetic?: { conductiveConduits: number };
   };
   effects?: Record<string, { summary: string; [k: string]: number | string }>;
+  /** Cold builds up on a ship (cryo): how fast, and what warms it (warmth.ts) */
+  warmth?: WarmthRules;
 }
 export type HazardRatings = Partial<Record<Hazard, number>>;
 
@@ -55,7 +58,6 @@ export function hazardTolerance(rules: HazardRules, d: { mass: number; makeup: {
   for (const h of HAZARDS) out[h] = m.tolerance[h] ?? 0;
   if (t.gravitational) out.gravitational! += Math.max(0, d.mass + m.anchorMass - t.gravitational.massFloor) / t.gravitational.massPerPoint;
   if (t.thermal && d.mass > t.thermal.massOver) out.thermal! += t.thermal.points;
-  if (t.cryo && m.conduits > t.cryo.conduitsOver) out.cryo! += t.cryo.points;
   if (t.electromagnetic && m.conduits > 0) out.electromagnetic! += (m.conductiveConduits / m.conduits) * t.electromagnetic.conductiveConduits;
   for (const h of HAZARDS) out[h] = Math.min(5, out[h]!);
   return out;
@@ -89,7 +91,8 @@ export function hazardFlight(rules: HazardRules, sys: Parameters<typeof hazardsA
     control: Math.max(0.2, 1 + grav * e('gravitational', 'control')),
     driftAccel: grav * e('gravitational', 'driftAccel'),
     jump: Math.max(0.2, 1 + grav * e('gravitational', 'jumpRange')),
-    cap: Math.max(0.2, 1 + (short.radiation ?? 0) * e('radiation', 'batteryCap') + (short.cryo ?? 0) * e('cryo', 'batteryCap')),
+    // (Cold doesn't drain the batteries: it builds up on the ship instead, warmth.ts)
+    cap: Math.max(0.2, 1 + (short.radiation ?? 0) * e('radiation', 'batteryCap')),
   };
 }
 

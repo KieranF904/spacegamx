@@ -172,9 +172,10 @@ export interface ShipDerived {
    * What the ship is made of, by share of its intact cells: each material
    * trait's share (0..1), and the hazard tolerance its materials add up to
    * (an all-iridium hull: radiation 5; half of one: 2.5); conduits, how many
-   * of them are of a conductive material, and the mass in mass-anchor material
+   * of them are of a conductive material, and the mass in mass-anchor material;
+   * the share of cold its materials keep out (insulation, warmth.ts)
    */
-  makeup: { traits: Record<string, number>; tolerance: Record<string, number>; conduits: number; conductiveConduits: number; anchorMass: number };
+  makeup: { traits: Record<string, number>; tolerance: Record<string, number>; conduits: number; conductiveConduits: number; anchorMass: number; insulation: number };
 }
 
 export interface RebuildInput {
@@ -537,12 +538,13 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
 
 function makeupOf(alive: boolean[], area: number[], mats: MaterialDef[], fns: FunctionDef[]): ShipDerived['makeup'] {
   const traits: Record<string, number> = {}, tolerance: Record<string, number> = {};
-  let cells = 0, conduits = 0, conductiveConduits = 0, anchorMass = 0;
+  let cells = 0, conduits = 0, conductiveConduits = 0, anchorMass = 0, insulation = 0;
   for (let i = 0; i < alive.length; i++) {
     if (!alive[i]) continue;
     cells += area[i];
     for (const t of mats[i].traits ?? []) traits[t] = (traits[t] ?? 0) + area[i];
     for (const [h, r] of Object.entries(mats[i].hazards ?? {})) tolerance[h] = (tolerance[h] ?? 0) + area[i] * r;
+    insulation += area[i] * (mats[i].insulation ?? 0);
     if (fns[i].id === 'conduit') {
       conduits++;
       if (mats[i].traits?.includes('conductive')) conductiveConduits++;
@@ -552,6 +554,7 @@ function makeupOf(alive: boolean[], area: number[], mats: MaterialDef[], fns: Fu
   if (cells > 0) {
     for (const k in traits) traits[k] /= cells;
     for (const k in tolerance) tolerance[k] /= cells;
+    insulation /= cells;
   }
-  return { traits, tolerance, conduits, conductiveConduits, anchorMass };
+  return { traits, tolerance, conduits, conductiveConduits, anchorMass, insulation };
 }

@@ -27,9 +27,13 @@ stages.
 
 The gimmick set, and what makes each different from the two bosses before her:
 
-- **Chill (NEW read, existing mechanic).** `ShipBridge.frostHit(eid, amount, ticks)` already accumulates a per-ship
-  meter and seizes the ship (an EMP: engines and guns dead) when it passes 1. Her attacks add to it. The Frostbite Lance
-  uses the same meter, so this is a known quantity. The HUD does not show it yet (see section 9).
+- **Chill (existing mechanic, one system with the cold).** Her chill takes **warmth**: `ShipBridge.frostHit(eid,
+  amount, ticks)` takes `amount` off the ship's warmth meter (0..1, less the hull's insulation), the same meter
+  Borealis's cold runs down (`server/src/game/Warmth.ts`, `common/src/ships/warmth.ts`); frozen through (0) the ship
+  seizes up (an EMP) for `ticks` and comes out with a little warmth back (`THAW`, 0.15), and not again inside the EMP
+  immunity window. The Frostbite Lance and frost-gemmed guns use the same meter. The pilot reads it as the **frost
+  vignette** (`client/src/ui/FrostVignette.ts`: ice in from the screen's edges, a flash at the rim on a sharp hit, and a
+  small chip with the percent). So a pilot who flew a long way out through the cold arrives with less to spare.
 - **Tether (NEW).** A rope from the tip of one of her arms to your ship that reels you towards her tail. You beat it by
   thrusting away, or by **shooting the arm tip off** (a part, so "parts matter" is satisfied, and the tip is small enough
   that side-mount and turret builds can do it while fixed guns keep their nose on her body).
@@ -54,10 +58,13 @@ such claim is a question for Kieran.
   at 92k radius (period 2400 s) and may pass within ~14k of the lair. Nothing aggros into her fight: her `aggro` is 3600
   and `leash` 8000, and every neighbour is more than 20k away. A pilot arriving from the Curtain flies past roosts of
   `frost_shard` / `frost_warden` on the way, which is the right warm-up and needs no change.
-- **Hazard.** Borealis rates `cryo` 3 (`systems.json hazardRatings`); each unmet point costs 10% battery capacity
-  (`hazards.json`), and a ship with more than 6 conduits has one point of tolerance. The fight must not stack a second
-  hazard on top of that, so chill is a **separate meter** (seize, not battery loss), and the doc below never touches
-  battery capacity. Worth knowing for counterplay: capacitor / battery-heavy builds already start the fight down 30%.
+- **Hazard.** Borealis rates `cryo` 3 (`systems.json hazardRatings`): away from heat, cold builds up on a ship, about
+  5 minutes from warm to frozen through (`hazards.json warmth`). Below half warmth guns recycle 15% slower, below a
+  quarter thrust and steering drop 20% too (`WARMTH_STAGES`). Her lair is 77.8k out, far from the star's warmth (it
+  reaches 9000 past the surface, so 23k from the centre) and from either station, so pilots arrive part-chilled and her
+  chill lands on top: **her chill numbers below were set for a meter of their own and should be retuned against the
+  shared one** (see section 11, question 5). Cold no longer costs battery capacity, and has no tolerance (conduits are
+  gone); insulating hulls (`materials.json insulation`, at most 30%) only slow it.
 - **Home.** `homeR: 5000` (the Scrap Mother's), `leash 8000`. She keeps within 5000 of the lair; her darts and swim use
   `homeward()` to bend back in. In open space with nothing to hide behind, the only cover is the larvae and the rings
   she makes, so she must never leave rock-free "loose" debris: **crumble everything** (`ships.shed` crumble, section 3).
@@ -376,17 +383,16 @@ Checklist, in rough build order.
       idle fire; `taken()` for the brace/window; `onStop()` clearing patches, tether state and window.
 - [ ] **NEW primitive `tetherPull(pilot, x, y, r, k)`** on `StagedBrain` (a single-pilot `pull`).
 - [ ] **NEW primitive `shove(x, y, r, speed)`** (sets Velocity away from a point), for `smother`.
-- [ ] **NEW `chill(pilot, amount)` helper** wrapping `host.ships.frostHit(pilot, amount, SEIZE)` with a **per-pilot
-      immunity window** (seize 75 ticks, then 300 ticks immune), so a cone plus a larva plus a wake patch cannot chain a
-      pilot into a permanent seize. Reuses the existing `frostHit` / `emp`; no change to `ShipBridge`.
+- [ ] **NEW `chill(pilot, amount)` helper** wrapping `host.ships.frostHit(pilot, amount, SEIZE)`. `ShipBridge.warm`
+      already refuses a second seize while seized or inside `EMP_IMMUNE_TICKS` (240) after one (the meter sits at 0
+      till then); if 300 ticks immune is still wanted, lengthen it here.
 - [ ] Chill rider on `beam()` (an optional argument), used by `antlers`.
 - [ ] `BossFx.ts` (client): telegraph kinds `flick`, `tether`, `breath`, `wake`/`pool`, `smother`, `hatch`, `whiteout`;
       beam kind `antler`; colour set pale violet/magenta that reads against Borealis's blue-white aurora (guide
       pitfall: test the real background).
 - [ ] `client/src/rendering/weapons/weaponStyles.ts`: `rime_shard` look.
-- [ ] A HUD chill indicator on the ship (the meter lives in `ShipBridge.frost`; **check whether the client already gets
-      it**: if not, one `chill` field on the player's snapshot or a small `chill` message). Without it the cold is
-      unreadable. Open question 5.
+- [x] A HUD chill read: the warmth meter (`ShipBridge.warmthOf`) goes to the pilot as snapshot `data[13]` (percent)
+      and shows as the frost vignette and its chip (`client/src/ui/FrostVignette.ts`). Open question 5.
 - [ ] `server/src/game/Bosses.ts` `BRAINS` and `brains/ids.ts` `BRAIN_IDS` already list `brood_mother`; nothing to add.
 
 **Tests** (`server/src/game/broodMother.test.ts`, copy `scrapMother.test.ts`'s `world()`, `place()`, `advance()`):
@@ -400,7 +406,8 @@ Checklist, in rough build order.
       within 900, at most once a 720 ticks; wake patches cap at 10; no larvae;
 - [ ] stage 3: `clutch` -> `antlers` -> `whiteout`; `taken()` is 0.5 with an egg standing, 1.5 for 150 ticks after a
       hatch, 1.0 with no eggs; caps 7 solo; chill inside 900 is zero and outside it nonzero during `whiteout`;
-- [ ] chill: one seize at most per 375 ticks per pilot; `frostHit` meter does not leak between pilots;
+- [ ] chill: one seize at most per seize + immunity window per pilot; the warmth meter does not leak between pilots
+      (`server/src/game/warmth.test.ts` covers the meter itself);
 - [ ] redirect: a hit on a later stage's part goes to the current stage; wrecks pass hits on;
 - [ ] each stage ends: invulnerable, blown away piece by piece, the next can be hurt;
 - [ ] death: last deciding piece wrecked, shudder, everything thrown at once, `bossDefeated` sent.
@@ -426,7 +433,7 @@ Checklist, in rough build order.
 
 - **Existing loot** (keep): `frost_gland` 3 to 6 (100%), `aurora_rime` 6 to 12 (100%), `ice` 6 to 12 (100%),
   `sapphire` 1 to 2 (40%); 2400 xp, 2400 credits (the Scrap Mother's figures).
-- **Legendary.** `docs/parts-redesign.md` §6: legendaries need one very rare boss part, rolled per pilot per kill and
+- **Legendary: none for now (Kieran, 2026-10-31: undecided).** The notes below stay as options. `docs/parts-redesign.md` §6: legendaries need one very rare boss part, rolled per pilot per kill and
   only while you do not already hold one. Currently mapped: Prism Shard (Prism Colossus 6%), Rustjaw's Cog (Rustjaw 5%),
   **Heart of Hoarfrost (Hoarfrost Matriarch 5%)**, Warden's Ember (Cinder Warden 4%, the Pyreclast 6%), Void Pearl (Void
   Leviathan 4%), Fragment of the Maw (3%). **No legendary is tied to the Brood Mother**, and there are exactly six
@@ -469,7 +476,12 @@ Proposals (all observational; nothing says what she is, what she wants, or where
   2. 0.667: **"Her fins tear away."**
   3. 0.334: **"Her shell falls away. A long violet light burns inside."**
   4. 0.15: **"She is coming apart, and faster for it."**
-  (None names her as a Brood or a mother; the in-game *name* "Brood Mother" stays on `name` pending open question 1.)
+  (None names her as a Brood or a mother.)
+
+**Applied (2026-10-31)**, with Kieran's answer to open question 1: title and phase lines 2 to 4 as above, but in "it"
+("Its fins tear away."; line 1 is for when her moves exist). The intro drops "Frost Brood drift in round her" (no
+Brood spawn at her lair, so a pilot wouldn't see it) and ends "Pilots call it the Brood Mother." so the name has an
+owner: the pilots, not the narration.
 
 Where a lore claim would need an owner:
 - Who calls her "the Brood Mother", and why? Names in this game are given by someone. A pilot's label, a line from
@@ -484,24 +496,26 @@ Where a lore claim would need an owner:
 
 ## 11. Open questions for Kieran
 
-1. **Her name and who owns it.** Is "Brood Mother" a name a character gives her (pilots, Maya, Sander, a codex entry),
-   and which? And is the *title* "Pale Giant of the Aurora" acceptable, or do you want one that says she is a Frost
-   Brood (which is a lore claim: whose)?
-2. **Level.** 8 (same as the Scrap Mother and Rimeback) or 9 (same as the Hushwing)? 8 keeps Borealis's top jobs
-   (levels 6 to 9) gated by her; 9 makes her the system's top boss.
-3. **Stage 1 length.** Stage 1 has no `ruin` pieces, so it is only beaten by shooting off **all 70 plating pieces**.
-   That is the Scrap Mother's rule too, but she has fewer, bigger slabs. Is 70 pieces in ~2 minutes acceptable, or
-   should some fin pieces be marked `ruin` in `brood_mother.mjs` (a change to the look generator) so a handful of
-   deciding fin pieces end it?
-4. **A second Heart of Hoarfrost source.** Is it right for the Frostbite Lance to be feedable from two Brood bosses
-   (rewording the item to name both)? That implies Brood leave hearts; do you want to own that? Or do you want a seventh,
-   dedicated legendary (a larva-throwing launcher or a tether beam)?
-5. **A chill meter on the HUD.** The seize mechanic exists but I have not confirmed the client shows the meter. A small
-   status icon or ring on the ship is the minimum for the fight to be readable. Do you want that built, or should chill
-   be reduced to "hits cause an instant 1.2 s freeze" with no meter (simpler, less readable)?
-6. **Arena features.** She sits in open space. Do you want any ice floes or obstacles round her lair (needs terrain
-   support that open-system bosses do not have), or keep it open?
-7. **Turn rate.** 5 proposed. Fine, or tune to the Scrap Mother's 7?
-8. **Peaks.** May the heartbeat peak interact with her (see section 10)? Recommended: no, not without canon.
-9. **Hazard tolerance.** Should I mention in the field guide that conduits give cryo tolerance, since she compounds a
-   cold system? It is already in `hazards.json`, so it is a text decision, not a design one.
+Answered by Kieran (2026-10-31). Decided items are applied; "later" items stay open.
+
+1. **Her name and who owns it.** *Answered:* "Brood Mother" is only what people call it. It is a mysterious, ancient
+   entity whose lore will be fleshed out later. In game the name is attributed to pilots (her intro ends "Pilots call it
+   the Brood Mother.") and nothing says what it is, where it came from, or that it is a Brood or a mother. Her text now
+   uses "it". **Applied** in `bosses.json`: title "Pale Giant of the Aurora", the observational intro from section 10,
+   and the phase lines without the name. Nothing in game states that it is ancient: that is canon for later, with an
+   owner when it's written.
+2. **Level.** *Decide later.* Stays 8 for now.
+3. **Stage 1 length.** *Decide later.*
+4. **Legendary.** *Decide later; no legendary drop for now.* Her loot has none (it never had one; `frost_heart` stays
+   the Hoarfrost Matriarch's alone). The section 9 proposal and the seventh-legendary alternative are both undecided.
+5. **Chill.** *Answered and built:* her chill feeds the warmth meter (the same one the cold runs down) and the frost
+   vignette (`ShipBridge.frostHit` -> `warm`). *Open:* her per-move chill amounts (breath 0.02 a tick, larva 0.35,
+   whiteout 0.02 a tick, and so on) were tuned for a meter that starts full every fight; against a pilot already
+   part-chilled from the flight out they bite harder. Retune when her moves go in.
+6. **Arena.** *Answered:* a separate enterable area will be designed later, away from the open world. Not in this doc;
+   she stays at her open-space lair until then.
+7. **Turn rate.** *Decide later.*
+8. **Peaks (the heartbeat).** *Decide later.* Still not designed; no interaction until there is canon for it.
+9. **Cold tolerance.** *Answered and built:* a warmth meter (cold builds up away from heat; insulating materials slow
+   it, nothing stops it). The conduit rule is gone from `hazards.json`; the field guide's "Cold and warmth" section
+   explains it.

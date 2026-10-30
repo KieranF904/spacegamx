@@ -52,6 +52,8 @@ interface StoredUser {
 /** On-disk file format */
 interface StoreFile {
   version: 1;
+  /** The next account id, kept so a deleted account's id is never given out again */
+  nextUserId?: number;
   users: StoredUser[];
   sessions: SessionRecord[];
 }
@@ -94,9 +96,10 @@ export class JsonUserStore implements UserStore {
           ? [raw.users]
           : [];
       this.sessions = Array.isArray(raw.sessions) ? raw.sessions : [];
-      this.nextUserId = this.users.length > 0
-        ? Math.max(...this.users.map(u => u.id)) + 1
-        : 1;
+      this.nextUserId = Math.max(
+        Number(raw.nextUserId) || 1,
+        this.users.length > 0 ? Math.max(...this.users.map(u => u.id)) + 1 : 1,
+      );
     } catch (err) {
       console.error(`[UserStore] Failed to parse ${this.filePath}, starting fresh:`, err);
       this.users = [];
@@ -110,6 +113,7 @@ export class JsonUserStore implements UserStore {
     if (this.closed) return;
     const data: StoreFile = {
       version: 1,
+      nextUserId: this.nextUserId,
       users: this.users,
       sessions: this.sessions,
     };

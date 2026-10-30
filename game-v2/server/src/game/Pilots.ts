@@ -270,6 +270,22 @@ export class Pilots {
     return { ...p, ship: st.rec, hangar, activeSlot: st.slot };
   }
 
+  /**
+   * The account was deleted: its connections stop being saved (so a disconnect can't bring the profile back),
+   * then the saved profile goes. Returns those connections, for the caller to disconnect.
+   */
+  async forgetAccount(userId: number): Promise<PilotConn[]> {
+    const gone: PilotConn[] = [];
+    for (const s of this.sessions.values()) {
+      if (s.conn.userId !== userId) continue;
+      s.loading = true;
+      s.dirty = false;
+      gone.push(s.conn);
+    }
+    await this.store.delete(userId);
+    return gone;
+  }
+
   /** Save every account (shutdown) */
   async saveAll(): Promise<void> {
     await Promise.all([...this.sessions.values()].filter((s) => !s.loading).map((s) => { this.capture(s); return this.save(s); }));

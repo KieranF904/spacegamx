@@ -23,6 +23,13 @@ Then open http://localhost:5273
 
 Making a new boss: follow [docs/boss-design.md](docs/boss-design.md) (stages, look, fight, tuning, tools).
 
+Cold and warmth: in a system with a `cryo` rating, cold builds up on a pilot's ship away from heat (stars, stations,
+ships on fire, lava worlds), slower through insulating materials (`materials.json insulation`). The numbers are in
+`data/hazards.json` `warmth`; the stages (guns slower, then a numb drive, then a seize) in
+`common/src/ships/warmth.ts`; the server meter in `server/src/game/Warmth.ts` and `ShipBridge.warm`, where frost hits
+(gemmed guns, the Frostbite Lance, the Brood Mother) take warmth too. The pilot gets it as snapshot `data[13]`
+(percent) and sees it as the frost vignette (`client/src/ui/FrostVignette.ts`; a tint only on Low quality).
+
 Watching the VPS live: `npm run monitor` opens a dashboard of the box's CPU, memory, network, disk, each service and the game's tick times. It streams over SSH as a read-only `vpsmon` account (key `~/.ssh/vpsmon_ed25519`; set up by `deploy/vps/monitor/setup.sh`, which only lets that key run the stats script).
 
 ## Default Admin Account
@@ -33,6 +40,10 @@ The JSON user store auto-seeds an admin account on first run:
 - **Password:** `admin`
 
 Accounts are stored in `game-v2/data/users.json` (gitignored). Delete the file to reset all accounts.
+
+## The world's memory
+
+A system nobody's in isn't simulated: after `memory.evictAfterSeconds` it's written down and taken out of the world, and brought back (moved on, mended a little) as a pilot arrives, so a boss you killed or a nest you cleared stays so until it's due back, through restarts too. It's kept in `game-v2/data/world/memory.json` (gitignored, never overwritten by a deploy). Delete `data/world/` (with the server stopped) for a fresh world. The knobs are `memory` in `data/rules.json`: `evictAfterSeconds`, `healPerMinute` (a share of each part's max HP mended a minute away), `bossHealPerMinute`, `fastForwardMinutes` (most of the time away ships are flown on for), `saveSeconds`. See `docs/engine-map.md`, "Far ships and the world's memory".
 
 ## Services
 
@@ -192,9 +203,22 @@ Tests run with the rest: `npx vitest run --pool=forks --no-file-parallelism` (si
   (like `data/lobby`).
 - **Pilot data, read-only**: `data/profiles/<userId>.json` (pilot card), `data/profiles/_rankings.json` (boards) and
   `data/status/live.json` (pilots online), behind `PilotSource` (src/pilots.ts).
-- **Settings**: environment variables, listed at the top of `site/src/config.ts` (`SITE_PORT`, `SITE_ORIGIN`,
-  `SITE_SECRET`, `LOBBY_URL`, `LOBBY_ADMIN_SECRET`, `GAME_MODE`, ...). In production set `NODE_ENV=production`,
-  `SITE_SECRET`, `SITE_ORIGIN` and `LOBBY_ADMIN_SECRET`.
+- **Settings**: environment variables, listed at the top of `site/src/config.ts` and in `site/.env.example` (`SITE_PORT`,
+  `SITE_ORIGIN`, `SITE_SECRET`, `LOBBY_URL`, `LOBBY_ADMIN_SECRET`, `GAME_MODE`, ...). In production
+  (`NODE_ENV=production`) `SITE_SECRET` (32+ characters), `LOBBY_ADMIN_SECRET` and an https `SITE_ORIGIN` are required:
+  the site stops at start with a message naming what's missing.
+- **Deleting an account** (at the lobby, from the site's account page or anywhere else) deletes the pilot's profile too.
+  The lobby keeps the ids of accounts deleted in the last 30 days (`data/lobby/deleted-accounts.json`) and answers every
+  game server's 10-second heartbeat (`POST /register`) with them; the server disconnects anyone on the account,
+  deletes `data/profiles/<id>.json` (or the Postgres row) and takes the pilot off the rankings
+  (`GameServer.forgetAccounts`). Account ids are never reused (the JSON store keeps `nextUserId`).
+- **Production** (`deploy/vps`): `spacegame-site.service` runs the site on 127.0.0.1:8791 as `spacegame`, writing only
+  `data/site/` (never touched by a deploy). `remote-install.sh` makes `SITE_SECRET` once in
+  `/etc/spacegame/secrets.env` and installs the site's nginx routes as the snippet
+  `/etc/nginx/snippets/spacegame-site.conf` (refreshed every deploy), which the certbot-edited site file includes in
+  place of its old `location /`: the website is at the root and the game at `/play`. See `site/REVIEW.md`.
+- **PostgreSQL**: the stores (`site/src/store`, the lobby's `PostgresUserStore`, the game server's `PostgresProfileStore`)
+  run their tests against a scratch database when `SITE_TEST_DATABASE_URL` / `DATABASE_URL` is set (`site/REVIEW.md`, Tests).
 
 ### Play: opening the game signed in
 

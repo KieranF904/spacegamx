@@ -6,7 +6,8 @@
  * corrosion wears armour and makes repairs dearer, heat makes beams run hot
  * and shields slow to come back, an electromagnetic storm seizes the ship up
  * now and then. Only what the server works out alone: nothing here moves a
- * ship or changes its battery, so clients' prediction is untouched.
+ * ship or changes its battery, so clients' prediction is untouched. Cold is
+ * game/Warmth.ts's: it builds up over time instead.
  */
 
 import { hazardsAt, hazardTolerance, hazardDeficit, HAZARDS, type HazardRules, type HazardRatings, type StarSystemData } from '@space-game/common';
@@ -98,7 +99,8 @@ export class Hazards {
     if (key === (this.told.get(eid) ?? '')) return;
     this.told.set(eid, key);
     if (!key) return this.host.toast(conn, 'Your ship stands up to everything here', 'good');
-    const lines = HAZARDS.filter((h) => short[h]).map((h) => `${NAME[h]} ${ratings[h]} against your ${(tol[h] ?? 0).toFixed(1)}: ${this.rules.effects?.[h]?.summary ?? ''}`);
+    // (Cold has no tolerance to weigh: it builds up over time, game/Warmth.ts)
+    const lines = HAZARDS.filter((h) => short[h]).map((h) => `${NAME[h]} ${ratings[h]}${h === 'cryo' ? '' : ` against your ${(tol[h] ?? 0).toFixed(1)}`}: ${this.rules.effects?.[h]?.summary ?? ''}`);
     this.host.toast(conn, lines.join(' · '), 'warn');
   }
 }

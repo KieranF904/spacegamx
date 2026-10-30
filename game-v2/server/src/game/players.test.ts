@@ -9,6 +9,9 @@ import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
 import type { AccountAdmin, AccountInfo } from '../auth/types.js';
+import { JsonProfileStore } from '../profile/JsonProfileStore.js';
+import { mkdtempSync, existsSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
@@ -41,13 +44,13 @@ function fakeLobby(names: string[]) {
   };
 }
 
-function world(lobby: boolean) {
+function world(lobby: boolean, profileStore?: JsonProfileStore) {
   resetGlobals();
   const fake = fakeLobby(['boss', 'chief', 'pilot', 'helper', 'away', 'awol']);
   const userDB = lobby ? fake.userDB : { ...fake.userDB, admin: null };
   const server = new GameServer({
     gameData: new GameData(files), userDB: userDB as any, scene: 'sectors', autoStart: false,
-    ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
+    ships: createShipBridge(loadShipConfigFromDisk(dataDir)), profileStore,
   });
   const flush = async () => { for (let i = 0; i < 3; i++) await new Promise((r) => setTimeout(r, 0)); };
   const join = async (name: string, guest = false) => {
@@ -186,5 +189,37 @@ describe('managing players (online or not)', () => {
     const list = of(boss.got, 'adminAccounts').at(-1)!;
     expect(list.error).toMatch(/no lobby/);
     expect(list.players.map((p) => p.name)).toEqual(['boss', 'pilot']);
+  });
+});
+
+describe('a deleted account', () => {
+  it('has its profile deleted (and rank removed), its connection ended, and nothing written back on disconnect', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'profiles-'));
+    try {
+      const store = new JsonProfileStore(dir);
+      const { server, join: signIn, lobby } = world(true, store);
+      const pilot = await signIn('pilot');
+      const id = lobby.users.get('pilot')!.id;
+      const file = join(dir, `${id}.json`);
+      // (the profile loads from disk, so give the sign-in a moment before saving)
+      await new Promise((r) => setTimeout(r, 100));
+      await server.saveAll();
+      expect(existsSync(file)).toBe(true);
+
+      await server.forgetAccounts([id]);
+      expect(existsSync(file)).toBe(false);
+      expect(of(pilot.got, 'authResult').at(-1)).toMatchObject({ success: false, error: 'This account has been deleted.' });
+
+      // Their socket closing, and the next autosave or shutdown, must not bring the profile back
+      pilot.t.disconnect();
+      await server.saveAll();
+      await store.close();
+      expect(existsSync(file)).toBe(false);
+
+      // The lobby repeats the list every heartbeat: no harm, and other pilots' saves are untouched
+      await server.forgetAccounts([id, id]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

@@ -61,6 +61,7 @@ import { SiegePanel } from './ui/SiegePanel';
 import { moonOffset, planetPosition, pocketAt, inSafeSpace, jumpRange, jumpTuning, type StarSystemData } from '@space-game/common';
 import { Autopilot, AutoDest } from './ships/Autopilot';
 import { HazardOverlay } from './ui/HazardOverlay';
+import { FrostVignette } from './ui/FrostVignette';
 import shipPieces from '../../data/ships/pieces.json';
 import shipFunctions from '../../data/ships/functions.json';
 import shipMaterials from '../../data/ships/materials.json';
@@ -140,6 +141,8 @@ export class Game {
   private proto: ProtoHooks | null;
   private shipClient: ShipClient;
   private hazards = new HazardOverlay();
+  /** The cold on screen: frost in from the edges as the ship's warmth runs down */
+  private frost = new FrostVignette();
   /** System id → display name (from systemInfo) */
   private systemNames = new Map<string, string>();
   private input: InputManager;
@@ -502,6 +505,7 @@ this.xpFillEl = document.getElementById('xpFill');
       enabled: () => this.loggedIn && !this.localDead && !this.shipClient.hangarOpen && !this.menu.isOpen && !this.systemMapUI.isOpen
         && !this.stationWindow.isOpen && !this.inventoryWindow.isOpen && !this.tradeWindow.isOpen && !this.social.window.isOpen && !this.quests.log.isOpen && !this.componentGuide.isOpen
         && !this.adminPanel?.capturesFlight,
+      menuModifier: () => this.input.isKeyDown('KeyZ'),
       autopilot: this.autopilot,
       flyTo: (d, note) => this.flyTo(d, note),
       dock: () => { this.shipClient.onKey('KeyH'); },
@@ -648,7 +652,7 @@ this.xpFillEl = document.getElementById('xpFill');
     // Set up input handlers
     this.input.init(this.app.canvas as HTMLCanvasElement);
     this.input.onFocusLost = () => { this.context.resetPress(); this.sendNeutralInput(); };
-    this.input.onMouseButton = (button, down, x, y, t) => this.context.mouse(button, down, x, y, t);
+    this.input.onMouseButton = (button, down, x, y) => this.context.mouse(button, down, x, y);
     this.context.attach(this.app.canvas as HTMLCanvasElement);
     this.input.onZoomChange = (zoom) => {
       this.renderer.setZoom(zoom);
@@ -968,6 +972,7 @@ this.xpFillEl = document.getElementById('xpFill');
     this.shipClient.setDisplay({ hud: s.ui.shipHud, jumpScreenEffects: s.display.jumpEffects });
     this.shipClient.applyControlMode();
     this.hazards.setEffectsVisible(s.ui.hazardEffects);
+    this.frost.setVisible(s.ui.hazardEffects);
     if (this.navMarkers) this.navMarkers.enabled = s.ui.navMarkers;
     if (this.loggedIn) {
       if (this.debugEl) this.debugEl.style.display = s.ui.netStats ? 'block' : 'none';
@@ -1200,7 +1205,7 @@ this.xpFillEl = document.getElementById('xpFill');
     this.guide.update(this.renderer.worldToScreen(me.renderX, me.renderY), this.renderer.worldToScreen(wp.x, wp.y), dist);
   }
 
-  /** The right mouse button as the guns and mining laser see it: held, but not a press that may yet be a click (the menu) */
+  /** The right mouse button as the guns and mining laser see it: held, but not while the right-click menu is up (or the press that opened it) */
   private rightHeld(): boolean {
     return this.input.isMouseDown(2) && !this.context?.withholdingFire();
   }
@@ -1307,6 +1312,7 @@ this.xpFillEl = document.getElementById('xpFill');
     this.proto?.afterInterpolate(this.state);
     this.shipClient.update(now);
     this.hazards.setHorizonDanger(this.shipClient.horizonDanger());
+    this.frost.update(this.loggedIn ? this.state.entities.get(this.state.playerId)?.warmth ?? null : null, delta);
     this.updateSounds(now);
     if (this.navMarkers) {
       this.navMarkers.setHidden(!this.loggedIn || this.shipClient.hangarOpen || this.systemMapUI.isOpen || this.menu.isOpen);
@@ -2544,6 +2550,7 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'none';
   /** Hand the tier's settings to the renderer, and resize if its pixel density changed */
   private applyQuality(): void {
     this.renderer.setQuality(PROFILES[this.qualityTier()]);
+    this.frost.setQuality(PROFILES[this.qualityTier()]);
     const res = this.renderResolution();
     if (Math.abs(this.app.renderer.resolution - res) > 1e-3) this.onResize();
   }

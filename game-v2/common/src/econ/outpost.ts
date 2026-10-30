@@ -24,8 +24,8 @@ export interface TrackTier {
   hangarSlots?: number;
   /** Taken off a gem cut's fail chance */
   cutFail?: number;
-  /** Special ammunition (open by level for everyone now: a perk to replace) */
-  sidegrades?: number;
+  /** Rounds only an armoury presses (its recipe still has to be learned: Quench Slugs, from Forgemaster Hale's job) */
+  rounds?: string[];
   /** Rumours of hidden jobs from anywhere */
   rumours?: number;
 }
@@ -45,10 +45,10 @@ export interface Outpost {
 
 export interface StationPerks {
   refineTime: number; fabTime: number; refineYield: number; traceMul: number;
-  fabSlots: number; hangarSlots: number; cutFail: number; sidegrades: boolean; rumours: boolean;
+  fabSlots: number; hangarSlots: number; cutFail: number; rounds: string[]; rumours: boolean;
 }
 
-const NONE: StationPerks = { refineTime: 1, fabTime: 1, refineYield: 0, traceMul: 1, fabSlots: 0, hangarSlots: 0, cutFail: 0, sidegrades: false, rumours: false };
+const NONE: StationPerks = { refineTime: 1, fabTime: 1, refineYield: 0, traceMul: 1, fabSlots: 0, hangarSlots: 0, cutFail: 0, rounds: [], rumours: false };
 
 /** A track's colour, and the kind of plating that marks it */
 const LOOK: Record<string, { paint: string; fn: string }> = {
@@ -89,12 +89,12 @@ export function stationTable(): StationFile | null {
   return table;
 }
 
-/** What a pilot's station gives them (nothing, without one) */
-export function stationPerks(o: Outpost | undefined): StationPerks {
-  if (!o || !table) return NONE;
-  const out = { ...NONE };
+/** What a pilot's station gives them (nothing, without one). `file`: the table (the client has its own copy) */
+export function stationPerks(o: Outpost | undefined, file: StationFile | null = table): StationPerks {
+  if (!o || !file) return NONE;
+  const out = { ...NONE, rounds: [] as string[] };
   for (const [id, tier] of Object.entries(o.tracks)) {
-    const tiers = table.tracks[id]?.tiers ?? [];
+    const tiers = file.tracks[id]?.tiers ?? [];
     for (let t = 0; t < Math.min(tier, tiers.length); t++) {
       const r = tiers[t];
       if (r.refineTime !== undefined) out.refineTime = r.refineTime;
@@ -104,9 +104,26 @@ export function stationPerks(o: Outpost | undefined): StationPerks {
       if (r.cutFail !== undefined) out.cutFail = r.cutFail;
       out.fabSlots += r.fabSlots ?? 0;
       out.hangarSlots += r.hangarSlots ?? 0;
-      if (r.sidegrades) out.sidegrades = true;
+      out.rounds.push(...(r.rounds ?? []));
       if (r.rumours) out.rumours = true;
     }
   }
   return out;
+}
+
+/**
+ * What a pilot can make of the recipes they've learned: a round only an
+ * armoury presses (any tier's `rounds`) is theirs to make only once their own
+ * station's armoury is built that far.
+ */
+export function stationLearned(recipes: string[], o: Outpost | undefined, file: StationFile | null = table): string[] {
+  const pressed = new Set(Object.values(file?.tracks ?? {}).flatMap((t) => t.tiers.flatMap((r) => r.rounds ?? [])));
+  if (!pressed.size) return recipes;
+  const own = stationPerks(o, file).rounds;
+  return recipes.filter((id) => !pressed.has(id) || own.includes(id));
+}
+
+/** Is this one of the rounds only an armoury presses */
+export function armouryRound(id: string, file: StationFile | null = table): boolean {
+  return Object.values(file?.tracks ?? {}).some((t) => t.tiers.some((r) => r.rounds?.includes(id)));
 }

@@ -18,7 +18,7 @@ import {
   stepShipPhysics, quantizeShipBody, validateBlueprint, ValidationResult, GravityWell, FlightConstants,
   createShipState, rebuildShip, damagePart, repairShip, coreHp, healPart, restorePart, computeJoins, hitMultiplier, weaponHit, shooterGrade, type HitInfo,
   stepFlight, stepDrift, buildShot, localToWorldDir, worldToLocalDir,
-  withEmp, jumpPhase, jumpTuning, jumpFieldAt, fieldRangeBoost, pilotJumpStep, stepPrime, NO_FIELD, NO_FIELDS, type JumpField, type FieldEnv,
+  withEmp, withNumb, warmthStage, warmthPercent, insulationOf, THAW, WARMTH_STAGES, type WarmthStage, jumpPhase, jumpTuning, jumpFieldAt, fieldRangeBoost, pilotJumpStep, stepPrime, NO_FIELD, NO_FIELDS, type JumpField, type FieldEnv,
   stepFixedGunAim,
   blueprintGeometry, castParts, nearestParts, partDistance, pointInConvex, standing, deciding, stageOf, currentStage, RUIN_HP, convexPenetration, seededRng, hashInts, stepTurretAim, shipPointToWorld,
   WeaponInfo, WeaponTuning,
@@ -40,7 +40,7 @@ export interface ShipHost {
   /** Returns the shells' entity ids, in spawn order */
   fireBaseShot(ownerEid: number, x: number, y: number, angle: number, damageScale: number, shape?: { speedScale: number; sizeScale: number; turret: boolean; kind?: string; target?: number; seed?: string; mods?: WeaponMods; dry?: boolean; ammoMods?: WeaponMods; reach?: number; grade?: number; size?: number; model?: WeaponMods }): number[] | void;
   /** A shot's damage against shields and hull (pulse lasers), if it has its own */
-  shotVs?(proj: number): { shield?: number; hull?: number; hit?: HitInfo } | undefined;
+  shotVs?(proj: number): { shield?: number; hull?: number; hit?: HitInfo; bane?: { faction: string; damage: number } } | undefined;
   /** Where a hazard bites: beam heat or shield regeneration × this (1 where nothing does) */
   hazardScale?(eid: number, what: 'heat' | 'shield'): number;
   /** A part with gems in it was destroyed (the gems go with it) */
@@ -93,6 +93,10 @@ export interface ShipHost {
   invulnerable?(eid: number): boolean;
   /** What share of a hit it takes (a boss braced, or laid open): absent, all of it */
   takenScale?(eid: number): number;
+  /** A staged boss: what share of a hit on a later stage's part passes to the current stage's plate (absent: STAGE_COVER) */
+  stageCover?(eid: number): number | undefined;
+  /** The faction a hostile ship flies for, when ammunition made for it counts (not a boss): Quench Slugs' bane */
+  baneFaction?(eid: number): string | undefined;
   /** Inside a station (docked): nothing touches it, and it fires nothing */
   sheltered?(eid: number): boolean;
   /**
@@ -134,6 +138,13 @@ export interface PilotOrders {
 
 /** A hit that gets less than this share through the armour it strikes shows as glancing */
 const GLANCING = 0.6;
+
+/**
+ * A staged boss hit on a later stage's part (its back, under the plates): the nearest current-stage plate takes this
+ * share of it (bosses.json rules.stageCover, or the boss's own stageCover, says otherwise). Under half, so aiming at
+ * the stage being fought is plainly better; well above nothing, so a shot that lands still counts.
+ */
+export const STAGE_COVER = 0.4;
 
 interface PendingBlast { due: number; systemId: number; x: number; y: number; radius: number; damage: number; source: number }
 
@@ -230,25 +241,56 @@ export class ShipBridge {
   private joinCache = new WeakMap<Blueprint, [number, number][]>();
   /** EMP'd ships: engines and guns dead until this tick */
   private empUntil = new Map<number, number>();
-  /** Frost from gemmed guns: how chilled each ship is (seizes up at 1) */
-  private frost = new Map<number, number>();
+  /**
+   * Warmth, 0 (frozen through) to 1 (warm; not kept): the cold builds it down (server/src/game/Warmth.ts steps it),
+   * frost hits take it off, and frozen through a ship seizes up (common/src/ships/warmth.ts)
+   */
+  private warmth = new Map<number, number>();
 
   /** Seize a ship up (as an EMP) for `ticks`: hazards' storms */
   emp(eid: number, ticks: number): void {
     this.empUntil.set(eid, Math.max(this.empUntil.get(eid) ?? 0, this.host.getTick() + ticks));
   }
 
-  /** A frost shot landed: chilled through, the ship seizes up (as an EMP) for `ticks` */
+  /** A frost hit landed (a gemmed gun, the Brood Mother's cold): it takes `amount` of warmth, less what the hull keeps out; frozen through, the ship seizes up for `ticks` */
   frostHit(eid: number, amount: number, ticks: number): void {
-    const v = (this.frost.get(eid) ?? 0) + amount;
-    if (v < 1) { this.frost.set(eid, v); return; }
-    this.frost.delete(eid);
-    this.empUntil.set(eid, Math.max(this.empUntil.get(eid) ?? 0, this.host.getTick() + ticks));
+    const ship = this.bodies.get(eid);
+    if (!ship || ship.kind !== 'ship') return;
+    this.warm(eid, -amount * (1 - insulationOf(ship.derived)), ticks);
+  }
+
+  /** A ship's warmth (0 frozen through .. 1 warm) */
+  warmthOf(eid: number): number {
+    return this.warmth.get(eid) ?? 1;
+  }
+
+  /** Ships that aren't fully warm */
+  chilled(): IterableIterator<number> {
+    return this.warmth.keys();
+  }
+
+  /**
+   * Change a ship's warmth by `delta`. Reaching 0, it seizes up (as an EMP) for `seizeTicks` and comes out of it
+   * with THAW back; not while it's already seized up, nor just after (EMP_IMMUNE_TICKS): it stays at 0 till then.
+   */
+  warm(eid: number, delta: number, seizeTicks: number): void {
+    const w = Math.max(0, Math.min(1, this.warmthOf(eid) + delta));
+    if (w >= 1) { this.warmth.delete(eid); return; }
+    if (w > 0) { this.warmth.set(eid, w); return; }
+    const now = this.host.getTick();
+    const until = this.empUntil.get(eid) ?? -Infinity;
+    if (now < until + EMP_IMMUNE_TICKS) { this.warmth.set(eid, 0); return; }
+    this.empUntil.set(eid, now + seizeTicks);
+    this.warmth.set(eid, THAW);
+  }
+
+  /** What the cold costs a pilot's ship now (others aren't slowed: the meter only seizes them up) */
+  private coldStage(eid: number): WarmthStage {
+    if (!this.warmth.has(eid) || !hasComponent(this.host.world, Player, eid)) return WARMTH_STAGES[0];
+    return warmthStage(warmthPercent(this.warmthOf(eid)));
   }
   /** Burning parts (incendiary hits): damage over time, spreading to neighbours as parts go */
   private burns: { eid: number; part: number; until: number; dps: number; radius: number; source: number; hit?: HitInfo }[] = [];
-  /** Freezing beams: how long each attacker has held its beam on one ship */
-  private chillHold = new Map<number, { target: number; ticks: number }>();
   /** Weapon beams on this tick, per ship: how far along the nearest one hit (0..1) */
   private weaponBeams = new Map<number, number>();
   /** Pulse lasers mid-pulse, per ship: which part, and the tick its pulse started (common/src/ships/pulse.ts) */
@@ -320,7 +362,7 @@ export class ShipBridge {
     if (now - (this.lastDamaged.get(eid) ?? -Infinity) < recentTicks.damaged) return 'damaged';
     if (now - (this.lastFired.get(eid) ?? -Infinity) < recentTicks.fired) return 'firing';
     if (this.pulsing.has(eid) || this.weaponBeams.has(eid) || this.beams.has(eid)) return 'firing';
-    if (this.isEmped(eid) || this.frost.has(eid)) return 'emp';
+    if (this.isEmped(eid) || this.warmth.has(eid)) return 'emp';
     if (this.isJumping(ship)) return 'jumping';
     if (this.kits.has(eid)) return 'repairing';
     if (this.host.sheltered?.(eid)) return 'docked';
@@ -338,7 +380,6 @@ export class ShipBridge {
     if (!this.anchored.has(eid)) ship.angVel = 0;
     this.replicaCtl.delete(eid);
     this.apHeading.delete(eid);
-    this.chillHold.delete(eid);
     return true;
   }
 
@@ -567,7 +608,7 @@ export class ShipBridge {
     this.lastDamaged.delete(eid);
     this.restoreProgress.delete(eid);
     this.empUntil.delete(eid);
-    this.chillHold.delete(eid);
+    this.warmth.delete(eid);
     this.weaponBeams.delete(eid);
     this.pulsing.delete(eid);
     this.replicaCtl.delete(eid);
@@ -582,7 +623,6 @@ export class ShipBridge {
     this.dormant.delete(eid);
     this.lastFired.delete(eid);
     this.ungridded.delete(eid);
-    for (const [k, v] of this.chillHold) if (v.target === eid) this.chillHold.delete(k);
     for (const [k, v] of this.targets) if (v === eid) this.targets.delete(k);
   }
 
@@ -872,10 +912,15 @@ export class ShipBridge {
    * penetration against the part's armour and material: damage.ts).
    * Returns the damage dealt (shield + hull).
    */
-  hurt(eid: number, ship: ShipState, part: number, amount: number, source = -1, vs?: { shield?: number; hull?: number; hit?: HitInfo; at?: Vec2 }): number {
+  hurt(eid: number, ship: ShipState, part: number, amount: number, source = -1, vs?: { shield?: number; hull?: number; hit?: HitInfo; at?: Vec2; bane?: { faction: string; damage: number } }): number {
     if (amount <= 0 || this.host.invulnerable?.(eid)) return 0;
+    const struck = part;
     part = this.cover(ship, part, vs?.at);
     if (part < 0) return 0;
+    // (a later stage's part: the plate covering it takes only a share, so the stage being fought is what to aim at)
+    if (part !== struck && stageOf(this.catalog, ship, struck) > currentStage(this.catalog, ship)) amount *= this.host.stageCover?.(eid) ?? STAGE_COVER;
+    // (ammunition made for one faction's ships: Quench Slugs on the Cinder Cult)
+    if (vs?.bane && this.host.baneFaction?.(eid) === vs.bane.faction) amount *= vs.bane.damage;
     const taken = this.host.takenScale?.(eid) ?? 1;
     amount *= taken;
     const tick = this.host.getTick();
@@ -1152,14 +1197,16 @@ export class ShipBridge {
     // An EMP cripples the drive (thrust and steering × EMP_CONTROL) and stops a jump starting; the pilot's prediction flies it the same
     const emp = this.isEmped(eid);
     const jump = Input.jump[eid] === 1 && !emp;
-    const hazard = this.host.hazardFlight?.(eid, ship.derived, body.x, body.y);
+    // Numb with cold, the drive is sluggish (warmth.ts): its pilot's prediction works it out from the warmth it's told, replicas from CTL.numb
+    const cold = this.coldStage(eid);
+    const hazard = withNumb(this.host.hazardFlight?.(eid, ship.derived, body.x, body.y), cold);
     this.replicaCtl.set(eid, {
       mode: ReplicaMode.Player, q, derived: ship.derived,
       bits: controlBits({
         forward: Input.forward[eid] === 1, backward: Input.backward[eid] === 1, left: Input.left[eid] === 1, right: Input.right[eid] === 1,
         boost: Input.boost[eid] === 1, helm: Input.helm[eid] === 1, strafeLeft: Input.strafeLeft[eid] === 1, strafeRight: Input.strafeRight[eid] === 1,
         jump,
-      }) | (emp ? CTL.emp : 0),
+      }) | (emp ? CTL.emp : 0) | (cold.control < 1 ? CTL.numb : 0),
     });
     // Charging fields round the step (a star's ring, a lodestone's): the range boost from where it starts, then a faster
     // cooldown and a lodestone's priming from where it ends (the pilot's prediction runs the same: ShipClient.predict)
@@ -1286,7 +1333,7 @@ export class ShipBridge {
     let beamHit = -1;
     const beamed = new Set<number>();
     // The guns' tick (shared with the pilot's client, which fires its own shells on the same tick: guns.ts)
-    const { shots, beams, pulses } = stepGuns(ship, pose, { firing, aimWorld, aimDist, energy }, tick, this.tuning);
+    const { shots, beams, pulses } = stepGuns(ship, pose, { firing, aimWorld, aimDist, energy, slow: this.coldStage(eid).guns }, tick, this.tuning);
     for (const w of beams) {
       beamed.add(w.part);
       const t = this.fireBeam(eid, ship, w, def(w));
@@ -1408,15 +1455,8 @@ export class ShipBridge {
     }
     if (shipHit && rockT >= 0.999) {
       if (def.chill) {
-        // Held on one ship long enough, its systems seize up
-        const h = this.chillHold.get(eid);
-        const held = h && h.target === shipHit.eid ? h.ticks + 1 : 1;
-        const now = this.host.getTick();
-        const immune = !this.isEmped(shipHit.eid) && now < (this.empUntil.get(shipHit.eid) ?? -Infinity) + EMP_IMMUNE_TICKS;
-        if (held >= def.chill.holdTicks && !immune) {
-          this.empUntil.set(shipHit.eid, Math.max(this.empUntil.get(shipHit.eid) ?? 0, now + def.chill.ticks));
-          this.chillHold.set(eid, { target: shipHit.eid, ticks: 0 });
-        } else this.chillHold.set(eid, { target: shipHit.eid, ticks: held });
+        // Each tick on a ship takes its warmth (frozen through from warm in holdTicks), and frozen through it seizes up
+        this.frostHit(shipHit.eid, 1 / def.chill.holdTicks, def.chill.ticks);
       }
       const armor = shipHit.ship.blueprint.parts[shipHit.part].fn === 'armor' ? def.armorBonus ?? 1 : 1;
       // Past its effective range a fading beam (the laser's) burns ever weaker, out to where it gives out (pulse.ts beamFalloff)

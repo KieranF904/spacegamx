@@ -13,6 +13,7 @@ import { quantizeCursorAngle, dequantizeCursorAngle } from './cursorState.js';
  */
 
 import type { Blueprint } from '../ships/types.js';
+import { patrolFrom, type Leg, type Patrol, type PatrolState } from '../ships/farRoute.js';
 import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
 
 /**
@@ -25,9 +26,9 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
  * the snapshot packing changes; protocol.test.ts hashes those and fails until
  * PROTOCOL_WIRE_HASH is updated too.
  */
-export const PROTOCOL_VERSION = 12;
+export const PROTOCOL_VERSION = 13;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
-export const PROTOCOL_WIRE_HASH = '23c43c00';
+export const PROTOCOL_WIRE_HASH = '5d89761e';
 /** WebSocket close code (and reason) for a client on another protocol version */
 export const PROTOCOL_MISMATCH_CLOSE = 4002;
 export const PROTOCOL_MISMATCH_REASON = 'version';
@@ -742,35 +743,90 @@ export type ServerMessage =
 
 /**
  * The ships of a client's system it doesn't have in view (further than the
- * snapshot's ship view, distant or live), for the system map: once a second
- * while its map is open (mapView), the whole list (anything not in it is gone). `dots` is MAP_DOT_STRIDE
- * numbers a ship: [id, x / 10, y / 10, vx × 10, vy × 10 (world units a tick),
- * flags, rating]; flags = kind (1 derelict, 2 traffic, 3 hostile) | rank
- * (1 elite, 2 boss) << 2 | calm << 4 | (faction index + 1) << 5. `names`:
- * [id, name, ...] for the ones it hasn't been told the name of.
+ * snapshot's ship view: pilotless ones, distant or live, and other pilots),
+ * for the system map: once a second while its map is open (mapView), only
+ * what's changed. Each ship's way is a leg in closed form (common
+ * ships/farRoute.ts) the client carries it on along exactly as the server
+ * reckons it, so a distant ship's dot is sent again only when its route turns,
+ * a live one's when it's strayed MAP_DOT_SLACK from where the client has it.
+ *   dots   MAP_DOT_STRIDE numbers a ship: [id, x / 10, y / 10, vx × 100, vy × 100,
+ *          wx × 100, wy × 100, thrust] (its leg as from `tick`: velocity, the
+ *          top speed it's thrusting towards, for `thrust` more ticks, -1 for good)
+ *   routes MAP_ROUTE_STRIDE numbers a ship on patrol round a home that stays
+ *          put: [id, age, x, y, vx, vy, tx, ty, hx, hy, roam, speed, seed], the
+ *          leg it's on (from where it was `age` ticks before `tick`, for (tx, ty))
+ *          and its patrol (common ships/farRoute.ts Patrol, with its dice), all
+ *          as the server has them: the map works out every leg after as the
+ *          server does, so it's told a patrol once
+ *   info   MAP_INFO_STRIDE numbers a ship that's new or looks different:
+ *          [id, flags, rating]; flags = kind (1 derelict, 2 traffic, 3 hostile,
+ *          4 pilot) | rank (1 elite, 2 boss) << 3 | calm << 5 | (faction index + 1) << 6
+ *   gone   ships no longer on it
+ *   names  [id, name, ...] for the ones it hasn't been told the name of
+ *   full   a fresh list (just opened, or another system): anything not in it is gone
  */
 export interface ServerMapDotsMessage {
   type: 'mapDots';
   tick: number;
   dots: number[];
+  routes?: number[];
+  info?: number[];
+  gone?: number[];
   names?: (number | string)[];
+  full?: 1;
 }
-export const MAP_DOT_STRIDE = 7;
+export const MAP_DOT_STRIDE = 8;
+export const MAP_ROUTE_STRIDE = 13;
+export const MAP_INFO_STRIDE = 3;
+/** How far a live ship's dot may stray from where the client carries it before it's sent again (world units) */
+export const MAP_DOT_SLACK = 250;
 
-/** A map dot, decoded */
-export interface MapDot { id: number; x: number; y: number; vx: number; vy: number; kind: number; rank: number; calm: boolean; faction: number; rating: number }
+/** What a map dot is (MAP_INFO rows, decoded) */
+export interface MapDot { id: number; kind: number; rank: number; calm: boolean; faction: number; rating: number }
 
-export function packMapDot(out: number[], d: MapDot): void {
-  out.push(d.id, Math.round(d.x / 10), Math.round(d.y / 10), Math.round(d.vx * 10), Math.round(d.vy * 10),
-    (d.kind & 3) | ((d.rank & 3) << 2) | (d.calm ? 16 : 0) | ((d.faction + 1) << 5), Math.round(d.rating));
+/** A ship's leg as the map is sent it (rounded: what the client will have) */
+export function packMapLeg(out: number[], id: number, l: Leg): void {
+  out.push(id, Math.round(l.x / 10), Math.round(l.y / 10), Math.round(l.vx * 100), Math.round(l.vy * 100),
+    Math.round(l.wx * 100), Math.round(l.wy * 100), l.thrust < 0 ? -1 : Math.round(l.thrust));
 }
 
-export function unpackMapDots(dots: number[]): MapDot[] {
-  const out: MapDot[] = [];
+export function unpackMapLegs(dots: number[]): { id: number; leg: Leg }[] {
+  const out: { id: number; leg: Leg }[] = [];
   for (let i = 0; i + MAP_DOT_STRIDE <= dots.length; i += MAP_DOT_STRIDE) {
-    const f = dots[i + 5];
-    out.push({ id: dots[i], x: dots[i + 1] * 10, y: dots[i + 2] * 10, vx: dots[i + 3] / 10, vy: dots[i + 4] / 10,
-      kind: f & 3, rank: (f >> 2) & 3, calm: (f & 16) !== 0, faction: (f >> 5) - 1, rating: dots[i + 6] });
+    out.push({ id: dots[i], leg: { x: dots[i + 1] * 10, y: dots[i + 2] * 10, vx: dots[i + 3] / 100, vy: dots[i + 4] / 100,
+      wx: dots[i + 5] / 100, wy: dots[i + 6] / 100, thrust: dots[i + 7] } });
+  }
+  return out;
+}
+
+/** A patrolling ship's route as the map is sent it (`tick`: the message's) */
+export function packMapRoute(out: number[], id: number, tick: number, p: Patrol, s: PatrolState): void {
+  out.push(id, tick - s.t0, s.from.x, s.from.y, s.from.vx, s.from.vy, s.tx, s.ty, p.hx, p.hy, p.roam, p.speed, s.seed);
+}
+
+export function unpackMapRoutes(routes: number[], tick: number): { id: number; patrol: Patrol; state: PatrolState }[] {
+  const out: { id: number; patrol: Patrol; state: PatrolState }[] = [];
+  for (let i = 0; i + MAP_ROUTE_STRIDE <= routes.length; i += MAP_ROUTE_STRIDE) {
+    const r = (k: number) => routes[i + k];
+    const patrol: Patrol = { hx: r(8), hy: r(9), roam: r(10), speed: r(11) };
+    out.push({ id: r(0), patrol, state: patrolFrom(patrol, tick - r(1), { x: r(2), y: r(3), vx: r(4), vy: r(5) }, r(6), r(7), r(12)) });
+  }
+  return out;
+}
+
+export function mapDotFlags(d: Omit<MapDot, 'id' | 'rating'>): number {
+  return (d.kind & 7) | ((d.rank & 3) << 3) | (d.calm ? 32 : 0) | ((d.faction + 1) << 6);
+}
+
+export function packMapInfo(out: number[], d: MapDot): void {
+  out.push(d.id, mapDotFlags(d), Math.round(d.rating));
+}
+
+export function unpackMapInfo(info: number[]): MapDot[] {
+  const out: MapDot[] = [];
+  for (let i = 0; i + MAP_INFO_STRIDE <= info.length; i += MAP_INFO_STRIDE) {
+    const f = info[i + 1];
+    out.push({ id: info[i], kind: f & 7, rank: (f >> 3) & 3, calm: (f & 32) !== 0, faction: (f >> 6) - 1, rating: info[i + 2] });
   }
   return out;
 }
@@ -1202,7 +1258,7 @@ const COMPACT: [string, string[]][] = [
   ['playerState', ['hp', 'maxHp', 'boostFuel', 'maxBoostFuel', 'xp', 'level', 'credits', 'systemId']],
   // (Packed first: see packSnapshot)
   ['snapshot', ['t', 'lp', 'e', 'p', 'r', 'k', 'c', 'o', 'f']],
-  ['mapDots', ['tick', 'dots', 'names']],
+  ['mapDots', ['tick', 'dots', 'routes', 'info', 'gone', 'names', 'full']],
 ];
 const COMPACT_CODE = new Map(COMPACT.map(([type, fields], i) => [type, { code: i, fields, known: new Set(['type', ...fields]) }]));
 /** Message types by compact code (for tools that count traffic) */

@@ -51,6 +51,13 @@ export class JsonProfileStore implements ProfileStore {
     return next;
   }
 
+  /** Drops a queued save, waits for one in flight, then removes the file */
+  async delete(userId: number): Promise<void> {
+    this.pending.delete(userId);
+    await this.writing.get(userId);
+    await fs.rm(this.file(userId), { force: true });
+  }
+
   /** Game-wide documents live beside the profiles as _<key>.json */
   async loadDoc(key: string): Promise<unknown | null> {
     try {

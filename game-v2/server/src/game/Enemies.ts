@@ -3,7 +3,9 @@
  * flown by a simple AI, in packs by faction (data/factions.json).
  *
  * Packs appear in a system while players are there: out of sight of players,
- * well away from stations. A system can also have zones (a ring between two
+ * well away from stations. They stay (far from pilots they're distant:
+ * ships/SimLod.ts), and a system left empty is remembered as it is, through
+ * restarts too, each spawner keeping its own clock (SystemMemory.ts). A system can also have zones (a ring between two
  * distances from its centre, like outer Sol's Drift) with packs of their own,
  * which appear only around pilots inside the ring. Most live in nests
  * (systems.json `nests`): orbiting homes they launch from while pilots are
@@ -33,7 +35,8 @@ import {
   nestPosition, NEST_RADIUS, type NestData, type PlanetData, type StarSystemData } from '@space-game/common';
 import { nestBand, clampBand, stepRound, placesOfInterest, looseWaypoint, nomadDestination, LOOSE_REACH, type RoamStyle, type Band, type XY } from './Roaming.js';
 import type { ShipBridge, PilotOrders } from '../ships/ShipBridge.js';
-import type { Intent } from '../ships/SimLod.js';
+import type { Intent, Plan, FarPose } from '../ships/SimLod.js';
+import { shipMemory, restoreHp, type ShipMemory } from './SystemMemory.js';
 
 export interface FactionDef {
   name: string;
@@ -108,6 +111,7 @@ export interface FactionsFile {
     eliteHp: number;
     eliteLoot: number;
     respawnSeconds: number;
+    /** A zone's packs nobody's been near this long (in a system with pilots: one without is remembered whole, SystemMemory.ts) are recycled, so new ones come in where the pilots are */
     idleDespawnSeconds: number;
     assistXpShare: number;
     /** Kill credits: the ship type's × this by the enemy's grade (Mk I-V at 0-4; none: gradeReward, as XP), never falling with grade */
@@ -157,6 +161,48 @@ export function withNests(data: FactionsFile, system: (id: string) => StarSystem
 
 export interface StationGun { range: number; damage: number; interval: number; splash?: number }
 
+/** Who sent a pack: the system's roaming packs, a zone's, a nest's, a boss's escorts (what's remembered of a system left empty) */
+export type PackOrigin = 'system' | 'zone' | 'nest' | 'escort';
+
+/** A hostile as remembered (SystemMemory.ts): what it is, and what it was doing (a fight's forgotten: it's on its way home) */
+export interface EnemyMemory extends ShipMemory {
+  type: string;
+  faction: string;
+  elite: boolean;
+  grade: number;
+  plating?: number;
+  state: 'patrol' | 'return';
+  waypoint: XY;
+  strafe: number;
+  flank: number;
+  /** Retuned (a leash it was sent with) */
+  behaviour?: Behaviour;
+}
+
+/** What a hostile was doing (a boss's, remembered with it: Bosses.capture) */
+export interface EnemyAi { state: 'patrol' | 'return'; waypoint: XY; home: XY; behaviour?: Behaviour }
+
+/** A pack as remembered (times are world ticks); `nest` is its nest's id in the system */
+export interface PackMemory {
+  origin: PackOrigin;
+  home: XY;
+  members: EnemyMemory[];
+  passive?: boolean;
+  angryUntil?: number;
+  zone?: string;
+  size0?: number;
+  nest?: string;
+  group?: number;
+  roam?: number;
+  style?: RoamStyle;
+  wp?: XY;
+  wpUntil?: number;
+  pauseUntil?: number;
+  pace?: number;
+  dest?: XY;
+  settleUntil?: number;
+}
+
 export interface EnemyHost {
   readonly world: IWorld;
   tick(): number;
@@ -205,8 +251,9 @@ interface Enemy {
   behaviour?: Behaviour;
   pack: number;
   elite: boolean;
-  /** Mk I-V: what it's built of */
+  /** Mk I-V: what it's built of, and its armour this many grades better (an elite's one more) */
   grade: number;
+  plating?: number;
   /** Its ship rating as spawned (ships/rating.ts) */
   rating: number;
   state: 'patrol' | 'engage' | 'flee' | 'return';
@@ -232,9 +279,12 @@ interface Pack {
   systemNum: number;
   home: { x: number; y: number };
   members: Set<number>;
+  /** Last tick a pilot was in its zone (zone packs nobody's near are recycled: rules.idleDespawnSeconds) */
   lastSeen: number;
-  /** Boss packs stay until Bosses resets them */
+  /** A boss's (Bosses has it) */
   boss?: boolean;
+  /** Sent by the system's own spawners (its roaming packs, a zone, a nest, a boss's escorts): what's remembered of a system left empty (SystemMemory.ts); the rest (events', jobs', tests') go with it */
+  origin?: PackOrigin;
   /** Minds its own business until provoked (safe systems) */
   passive?: boolean;
   /** Provoked: fights back until this tick */
@@ -403,6 +453,18 @@ export class Enemies {
       e.waypoint = { ...home };
       e.state = 'return';
       if (leash) e.behaviour = { ...(e.behaviour ?? this.data.factions[e.faction].behaviour), leash };
+      this.onOrders?.(eid);
+    }
+  }
+
+  /** A ship's orders changed (a distant one's route is planned again from now: GameServer hands it to SimLod.replan) */
+  onOrders?: (eid: number) => void;
+
+  /** These ships' pack was sent by the system's own spawners (what's remembered of a system left empty: SystemMemory.ts) */
+  own(eids: number[], origin: PackOrigin): void {
+    for (const eid of eids) {
+      const p = this.packs.get(this.enemies.get(eid)?.pack ?? -1);
+      if (p) p.origin = origin;
     }
   }
 
@@ -420,37 +482,54 @@ export class Enemies {
   }
 
   /**
-   * What a hostile is doing, coarsely, for a distant one (ships/SimLod.ts):
-   * on patrol, flying to its waypoint at its pack's pace (picked as fly()
-   * picks it: round its home, or a loose or nomad pack's shared wander);
-   * going home, flying straight there; fighting or fleeing, null (it stays
-   * live). undefined: not a hostile.
+   * What a hostile is doing, coarsely, for a distant one (ships/SimLod.ts),
+   * from where its route has it (`at`, at the tick its last leg ended, with
+   * its own dice): on patrol, flying from point to point round its home at
+   * its pack's pace (as fly() picks them; a home that stays put, a patrol the
+   * map can follow on its own), a loose or nomad pack's lead
+   * on the pack's shared wander and the rest keeping their places off it;
+   * going home, flying straight back inside its leash; fighting or fleeing,
+   * null (it stays live). undefined: not a hostile.
    */
-  intent(eid: number): Intent | null | undefined {
+  intent(eid: number, at: Plan): Intent | null | undefined {
     const e = this.enemies.get(eid);
     if (!e) return undefined;
     if (e.state === 'engage' || e.state === 'flee' || e.target >= 0) return null;
-    const now = this.host.tick();
+    const now = at.tick;
     const b = e.behaviour ?? this.data.factions[e.faction].behaviour;
     const pack = this.packs.get(e.pack);
-    const x = Position.x[eid], y = Position.y[eid];
-    const home = pack?.home ?? { x, y };
+    const x = at.x, y = at.y;
+    const home = pack ? this.homeAt(pack, now) : { x, y };
     if (e.state === 'return') {
-      if (Math.hypot(x - home.x, y - home.y) >= b.leash * 0.5) return { kind: 'goto', x: home.x, y: home.y, arrive: 200 };
+      if (Math.hypot(x - home.x, y - home.y) >= b.leash * 0.5) return { kind: 'goto', x: home.x, y: home.y, arrive: b.leash * 0.5 };
       e.state = 'patrol';
     }
+    let until: number | undefined;
     if (pack?.nestDef && pack.style !== 'anchored') {
-      const lead = pack.members.values().next().value ?? eid;
-      const wp = this.wander(pack, lead, now), k = [...pack.members].indexOf(eid);
-      e.waypoint = k <= 0 ? wp : { x: wp.x + Math.cos(k * 2.4) * 380, y: wp.y + Math.sin(k * 2.4) * 380 };
+      const lead = pack.members.values().next().value ?? eid, k = [...pack.members].indexOf(eid);
+      const off = { x: Math.cos(k * 2.4) * 380, y: Math.sin(k * 2.4) * 380 };
+      if (k > 0 && this.ships.isDormant(lead)) return { kind: 'follow', lead, dx: off.x, dy: off.y };
+      const wp = this.wander(pack, lead, now, k <= 0 ? at : undefined, at.rng);
+      e.waypoint = k <= 0 ? wp : { x: wp.x + off.x, y: wp.y + off.y };
+      until = pack.wpUntil;
+    } else if (!pack?.nestDef) {
+      // Round a home that stays put: a patrol worked out by its own dice (the map's told it once: SimLod, common farRoute.ts)
+      return { kind: 'patrol', x: home.x, y: home.y, roam: pack?.roam ?? 2400, pace: pack?.pace ?? 0.58, wp: e.waypoint };
     } else if (Math.hypot(x - e.waypoint.x, y - e.waypoint.y) < 300) {
       const roam = pack?.roam ?? 2400;
-      const a = this.rng() * Math.PI * 2, r = 600 + this.rng() * (roam - 600);
+      const a = at.rng() * Math.PI * 2, r = 600 + at.rng() * (roam - 600);
       e.waypoint = { x: home.x + Math.cos(a) * r, y: home.y + Math.sin(a) * r };
     }
     // (Packs cruise in pulses at their own pace, and a loose one stops a while now and then)
-    const pace = now < (pack?.pauseUntil ?? 0) ? 0 : pack?.pace ?? 0.58;
-    return { kind: 'goto', x: e.waypoint.x, y: e.waypoint.y, arrive: 200, pace };
+    const paused = now < (pack?.pauseUntil ?? 0);
+    if (paused) return { kind: 'hold', until: pack!.pauseUntil };
+    return { kind: 'goto', x: e.waypoint.x, y: e.waypoint.y, arrive: 300, pace: pack?.pace ?? 0.58, until };
+  }
+
+  /** Where a pack's home is at tick t: a nest's goes round with it (tendNest keeps it so while it's watched), a nomad's is where it's got to */
+  private homeAt(p: Pack, t: number): XY {
+    const n = p.nestDef;
+    return n?.place && p.style !== 'nomad' ? nestPosition(n.place, n.planets, t) : p.home;
   }
 
   /** Take a ship out of the world quietly (an event's leftovers leaving) */
@@ -481,34 +560,41 @@ export class Enemies {
   /** Spawn a pack now (tests, events). Returns the ship entities. */
   spawnPack(systemNum: number, group: { faction: string; ships: string[]; passive?: boolean; grade?: number; plating?: number }, x: number, y: number, zone?: string): number[] {
     const pack: Pack = { id: this.nextPack++, systemNum, home: { x, y }, members: new Set(), lastSeen: this.host.tick(), passive: group.passive, zone };
-    const hpScale = this.data.factions[group.faction]?.hpScale ?? 1;
     this.packs.set(pack.id, pack);
     const out: number[] = [];
     const grade = Math.max(1, Math.min(MAX_GRADE, Math.round(group.grade ?? this.gradeOf(systemNum))));
     group.ships.forEach((type, i) => {
       // An elite: tougher, and plated a grade better
       const elite = i === 0 && this.rng() < this.data.rules.eliteChance;
-      const bp = this.design(type, grade, (group.plating ?? 0) + (elite ? 1 : 0));
-      if (!bp) return;
       const a = (i / Math.max(1, group.ships.length)) * Math.PI * 2;
       const r = i === 0 ? 0 : 260 + i * 90;
-      const eid = this.ships.spawnDummy(bp, x + Math.cos(a) * r, y + Math.sin(a) * r, this.rng() * Math.PI * 2, systemNum);
-      const hp = hpScale * (elite ? this.data.rules.eliteHp : 1);
-      if (hp !== 1) this.ships.scaleHp(eid, hp);
-      const dmg = this.data.factions[group.faction]?.damageScale;
-      if (dmg !== undefined && dmg !== 1) this.ships.setDamageScale?.(eid, dmg);
-      const ship = this.ships.get(eid);
-      const rating = ship ? rateShip(this.ships.catalog, this.ships.tuning, ship).rating : 0;
       // The leader takes the front; the rest fan out either side of it
       const flank = i === 0 ? 0 : (i % 2 ? 1 : -1) * Math.min(1.6, 0.55 * Math.ceil(i / 2));
-      const e: Enemy = { eid, type, faction: group.faction, pack: pack.id, elite, grade, rating, state: 'patrol', target: -1, waypoint: { x, y }, strafe: this.rng() < 0.5 ? 1 : -1, nextThink: 0, aimErr: 0, flank };
-      this.enemies.set(eid, e);
-      pack.members.add(eid);
+      const eid = this.spawnShip(pack, type, group.faction, grade, group.plating ?? 0, elite, x + Math.cos(a) * r, y + Math.sin(a) * r, null, flank);
+      if (eid < 0) return;
+      this.enemies.get(eid)!.waypoint = { x, y };
       pack.size0 = pack.members.size;
-      this.ships.setController(eid, (id, ship) => this.fly(e, ship));
       out.push(eid);
     });
     return out;
+  }
+
+  /** One of a pack's ships: its design in its grade (an elite's plated a grade better, and tougher), its faction's hull and guns, and its AI (-1: no such design) */
+  private spawnShip(pack: Pack, type: string, faction: string, grade: number, plating: number, elite: boolean, x: number, y: number, angle: number | null, flank: number): number {
+    const bp = this.design(type, grade, plating + (elite ? 1 : 0));
+    if (!bp) return -1;
+    const eid = this.ships.spawnDummy(bp, x, y, angle ?? this.rng() * Math.PI * 2, pack.systemNum);
+    const hp = (this.data.factions[faction]?.hpScale ?? 1) * (elite ? this.data.rules.eliteHp : 1);
+    if (hp !== 1) this.ships.scaleHp(eid, hp);
+    const dmg = this.data.factions[faction]?.damageScale;
+    if (dmg !== undefined && dmg !== 1) this.ships.setDamageScale?.(eid, dmg);
+    const ship = this.ships.get(eid);
+    const rating = ship ? rateShip(this.ships.catalog, this.ships.tuning, ship).rating : 0;
+    const e: Enemy = { eid, type, faction, pack: pack.id, elite, grade, plating, rating, state: 'patrol', target: -1, waypoint: { x, y }, strafe: this.rng() < 0.5 ? 1 : -1, nextThink: 0, aimErr: 0, flank };
+    this.enemies.set(eid, e);
+    pack.members.add(eid);
+    this.ships.setController(eid, (id, ship) => this.fly(e, ship));
+    return eid;
   }
 
   tick(): void {
@@ -526,7 +612,7 @@ export class Enemies {
       if (p.nest) this.nestCleared(p, now);
     }
 
-    // Keep each occupied system stocked; empty out systems nobody is in
+    // Keep each occupied system stocked (one nobody's in is put away whole: SystemMemory.ts)
     if (now % 30 === 0) {
       for (const [sysId, sp] of Object.entries(this.data.spawns)) {
         const num = this.host.systemNum(sysId);
@@ -534,8 +620,7 @@ export class Enemies {
         const players = this.host.players(num);
         const all = [...this.packs.values()].filter((p) => p.systemNum === num && !p.boss);
         const packs = all.filter((p) => !p.zone && !p.nest);
-        if (players.length) for (const p of packs) p.lastSeen = now;
-        // Zones: kept stocked around the pilots inside them, and left to go idle when nobody is
+        // Zones: kept stocked around the pilots inside them; a zone's packs nobody's been near for a while are recycled (new ones come in where the pilots are)
         for (const z of sp.zones ?? []) {
           const inside = players.filter((p) => { const r = Math.hypot(Position.x[p] - (z.x ?? 0), Position.y[p] - (z.y ?? 0)); return r > z.inner - 3000 && r < z.outer + 3000; });
           const mine = all.filter((p) => p.zone === z.id);
@@ -547,14 +632,7 @@ export class Enemies {
         }
         for (const n of sp.nests ?? []) this.tendNest(num, n, players, all, now);
         for (const p of all) {
-          if ((p.zone || p.nest) && now - p.lastSeen > this.data.rules.idleDespawnSeconds * 60) {
-            for (const m of p.members) this.ships.removeShip(m);
-            this.packs.delete(p.id);
-          }
-        }
-        // Idle packs (no players for a while) go away
-        for (const p of packs) {
-          if (!p.boss && now - p.lastSeen > this.data.rules.idleDespawnSeconds * 60) {
+          if (p.zone && players.length && now - p.lastSeen > this.data.rules.idleDespawnSeconds * 60 && [...p.members].every((m) => this.ships.isDormant(m))) {
             for (const m of p.members) this.ships.removeShip(m);
             this.packs.delete(p.id);
           }
@@ -572,6 +650,7 @@ export class Enemies {
       this.arrivals.splice(i, 1);
       this.host.effect?.(a.num, a.x, a.y, 'warpIn');
       const eids = this.spawnPack(a.num, a.group, a.x, a.y, a.zone);
+      this.own(eids, a.zone ? 'zone' : 'system');
       if (a.approach) this.sendPack(eids, a.approach);
     }
 
@@ -586,7 +665,8 @@ export class Enemies {
   /**
    * A nest, every half second: its packs' home follows it round its orbit;
    * while a pilot is near it, it keeps its packs out (launching one at a
-   * time, paced), and its packs stay; nobody near for a while, they go back in.
+   * time, paced). Its packs stay out (far from pilots they're distant:
+   * SimLod; a system left empty is remembered as it is: SystemMemory).
    * Woken with none out (and not just cleared), it's already stocked: all its
    * packs are out on patrol round it as the pilot arrives, none seen launching.
    */
@@ -602,11 +682,10 @@ export class Enemies {
       out++;
       // A nomad is awake while a pilot is near it, wherever it's got to; the rest go where the nest goes
       if (p.style === 'nomad') {
-        if (players.some((q) => Math.hypot(Position.x[q] - p.home.x, Position.y[q] - p.home.y) < wake)) { p.lastSeen = now; this.steerNomad(num, n, p, players, now); }
+        if (players.some((q) => Math.hypot(Position.x[q] - p.home.x, Position.y[q] - p.home.y) < wake)) this.steerNomad(num, n, p, players, now);
         continue;
       }
       p.home = at;
-      if (near) p.lastSeen = now;
     }
     // Nobody near it: it still sends its nomads out while there are pilots in its band of the system for them to find
     const band = n.band;
@@ -664,7 +743,7 @@ export class Enemies {
     const pack = eids.length ? this.packs.get(this.enemies.get(eids[0])!.pack) : undefined;
     if (!pack) return eids;
     const style: RoamStyle = g.style ?? n.style ?? 'loose', roam = n.roam ?? 2400, now = this.host.tick();
-    Object.assign(pack, { nest: key, nestDef: n, group: gi, roam, home: { ...at }, style, pace: 0.4 + this.rng() * 0.45 });
+    Object.assign(pack, { nest: key, nestDef: n, group: gi, roam, home: { ...at }, style, pace: 0.4 + this.rng() * 0.45, origin: 'nest' });
     const f = this.data.factions[g.faction];
     // A loose pack's leash reaches past where it strays; a nomad's is round wherever it's got to
     const leash = style === 'loose' ? Math.max(n.leash ?? f?.behaviour.leash ?? 0, roam * LOOSE_REACH + 2500) : n.leash;
@@ -685,13 +764,13 @@ export class Enemies {
   }
 
   /** Places a pack might head for: planets, belts, stations' outskirts, gates, the system's other nests (in its band) */
-  private places(num: number, n: SpawnNest, now: number): XY[] {
+  private places(num: number, n: SpawnNest, now: number, rng = this.rng): XY[] {
     const extra: XY[] = [];
     const out = (x: number, y: number, d: number) => { const r = Math.hypot(x, y) || 1; extra.push({ x: x + (x / r) * d, y: y + (y / r) * d }); };
     for (const st of this.host.stations(num)) out(Position.x[st], Position.y[st], 9000);
     for (const g of this.host.gates?.(num) ?? []) out(g.x, g.y, 6000);
     for (const o of this.data.spawns[this.host.systemId(num) ?? '']?.nests ?? []) if (o !== n && o.place) extra.push(nestPosition(o.place, o.planets, now));
-    return placesOfInterest(n.sys, n.planets, now, extra, n.band ?? { min: 0, max: 1e9 }, this.rng);
+    return placesOfInterest(n.sys, n.planets, now, extra, n.band ?? { min: 0, max: 1e9 }, rng);
   }
 
   /** A nomad pack, every half second while awake: its home slides on to where it's heading; settled a while, it picks somewhere new */
@@ -707,18 +786,22 @@ export class Enemies {
     p.dest = nomadDestination(p.home, this.places(num, n, now), players.map((q) => ({ x: Position.x[q], y: Position.y[q] })), band, this.rng);
   }
 
-  /** A loose or nomad pack's waypoint (the pack's, shared): re-picked once its lead gets there or it's taken too long */
-  private wander(p: Pack, lead: number, now: number): XY {
+  /**
+   * A loose or nomad pack's waypoint (the pack's, shared): re-picked once its
+   * lead gets there or it's taken too long. `from`: where the lead is, if not
+   * its components (a distant one's route: SimLod), with that route's dice.
+   */
+  private wander(p: Pack, lead: number, now: number, from?: XY, rng = this.rng): XY {
     const n = p.nestDef!;
     // Travelling: a little ahead of its home, on the way
     if (p.style === 'nomad' && p.dest) return stepRound(p.home, p.dest, 2500).at;
-    const at = { x: Position.x[lead], y: Position.y[lead] };
+    const at = from ? { x: from.x, y: from.y } : { x: Position.x[lead], y: Position.y[lead] };
     if (p.wp && now < (p.wpUntil ?? 0) && Math.hypot(at.x - p.wp.x, at.y - p.wp.y) > 600) return p.wp;
     const lane = p.style !== 'nomad' && n.place && n.place.around === undefined ? n.place.orbit.radius : 0;
-    const w = looseWaypoint(at, p.home, p.roam ?? 2400, n.bias ?? 0.5, n.band ?? { min: 0, max: 1e9 }, this.places(p.systemNum, n, now), lane, this.rng);
+    const w = looseWaypoint(at, this.homeAt(p, now), p.roam ?? 2400, n.bias ?? 0.5, n.band ?? { min: 0, max: 1e9 }, this.places(p.systemNum, n, now, rng), lane, rng);
     p.wp = w.wp;
-    p.wpUntil = now + 60 * (25 + this.rng() * 35);
-    if (w.pause) p.pauseUntil = now + 60 * (6 + this.rng() * 10);
+    p.wpUntil = now + 60 * (25 + rng() * 35);
+    if (w.pause) p.pauseUntil = now + 60 * (6 + rng() * 10);
     return p.wp;
   }
 
@@ -741,6 +824,124 @@ export class Enemies {
     const key = `${systemNum}:${id}`;
     const packs = [...this.packs.values()].filter((p) => p.nest === key).map((p) => [...p.members]);
     return { ...nestPosition(n.place, n.planets, this.host.tick()), packs };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Memory: a system left empty is put away, and comes back as it was (SystemMemory.ts)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * A system's packs as they are: the ones its own spawners sent (PackOrigin),
+   * each ship where it is (`where`: a distant one's route worked out) and every
+   * part's HP; times as world ticks (`offset` on). `evict`: and every pack
+   * there is taken out of the world (the rest, an event's or a job's, go as
+   * they always did when a system emptied), never counted as wiped out (no
+   * nest starts rebuilding). A boss's own pack is Bosses' to remember.
+   */
+  capture(num: number, where: (eid: number) => FarPose, offset: number, evict: boolean): PackMemory[] {
+    const out: PackMemory[] = [];
+    const w = (t?: number) => (t === undefined ? undefined : t + offset);
+    for (const [id, p] of this.packs) {
+      if (p.systemNum !== num || p.boss) continue;
+      const members: EnemyMemory[] = [];
+      for (const m of p.origin ? p.members : []) {
+        const e = this.enemies.get(m), ship = this.ships.get(m);
+        if (!e || !ship) continue;
+        members.push({
+          ...shipMemory(ship, where(m)), type: e.type, faction: e.faction, elite: e.elite, grade: e.grade, plating: e.plating,
+          state: e.state === 'patrol' ? 'patrol' : 'return', waypoint: { ...e.waypoint }, strafe: e.strafe, flank: e.flank, ...(e.behaviour ? { behaviour: { ...e.behaviour } } : {}),
+        });
+      }
+      if (members.length) {
+        out.push({
+          origin: p.origin!, home: { ...p.home }, members, passive: p.passive, angryUntil: w(p.angryUntil), zone: p.zone, size0: p.size0,
+          nest: p.nest?.slice(p.nest.indexOf(':') + 1), group: p.group, roam: p.roam, style: p.style, wp: p.wp, wpUntil: w(p.wpUntil),
+          pauseUntil: w(p.pauseUntil), pace: p.pace, dest: p.dest, settleUntil: w(p.settleUntil),
+        });
+      }
+      if (!evict) continue;
+      for (const m of p.members) { this.enemies.delete(m); if (this.ships.has(m)) this.ships.removeShip(m); }
+      this.packs.delete(id);
+    }
+    if (evict) this.arrivals = this.arrivals.filter((a) => a.num !== num);
+    return out;
+  }
+
+  /**
+   * A remembered system's packs back: each ship where it was, as hurt as it
+   * was less `heal` (a share of each part's max: time away mends), handed to
+   * `adopt` (put to sleep and flown on from then: SimLod.adopt)
+   */
+  restore(num: number, packs: PackMemory[], offset: number, heal: number, adopt: (eid: number, pose: FarPose) => void): void {
+    const nests = this.data.spawns[this.host.systemId(num) ?? '']?.nests ?? [];
+    const l = (t?: number) => (t === undefined ? undefined : t - offset);
+    for (const m of packs) {
+      const n = m.nest !== undefined ? nests.find((q) => q.id === m.nest) : undefined;
+      // (A nest since gone from the data takes its packs with it)
+      if (m.nest !== undefined && !n) continue;
+      const pack: Pack = {
+        id: this.nextPack++, systemNum: num, home: { ...m.home }, members: new Set(), lastSeen: this.host.tick(), origin: m.origin, passive: m.passive,
+        angryUntil: l(m.angryUntil), zone: m.zone, size0: m.size0, wp: m.wp, wpUntil: l(m.wpUntil), pauseUntil: l(m.pauseUntil), pace: m.pace, dest: m.dest, settleUntil: l(m.settleUntil),
+        ...(n ? { nest: `${num}:${n.id}`, nestDef: n, group: m.group, roam: m.roam, style: m.style } : {}),
+      };
+      this.packs.set(pack.id, pack);
+      for (const s of m.members) {
+        if (!this.data.factions[s.faction]) continue;
+        const eid = this.spawnShip(pack, s.type, s.faction, s.grade, s.plating ?? 0, s.elite, s.x, s.y, s.a, s.flank);
+        if (eid < 0) continue;
+        const e = this.enemies.get(eid)!;
+        e.state = s.state; e.waypoint = { ...s.waypoint }; e.strafe = s.strafe;
+        if (s.behaviour) e.behaviour = { ...s.behaviour };
+        Velocity.x[eid] = s.vx; Velocity.y[eid] = s.vy;
+        restoreHp(this.ships, eid, s.hp, heal);
+        adopt(eid, { x: s.x, y: s.y, vx: s.vx, vy: s.vy, angle: s.a, angVel: 0 });
+      }
+      if (!pack.members.size) this.packs.delete(pack.id);
+      else pack.size0 ??= pack.members.size;
+    }
+  }
+
+  /** What a hostile is doing, to remember it by (a fight's forgotten: it's on its way home) */
+  aiOf(eid: number): EnemyAi | undefined {
+    const e = this.enemies.get(eid), pack = e && this.packs.get(e.pack);
+    if (!e || !pack) return undefined;
+    return { state: e.state === 'patrol' ? 'patrol' : 'return', waypoint: { ...e.waypoint }, home: { ...pack.home }, ...(e.behaviour ? { behaviour: { ...e.behaviour } } : {}) };
+  }
+
+  setAi(eid: number, ai: EnemyAi): void {
+    const e = this.enemies.get(eid), pack = e && this.packs.get(e.pack);
+    if (!e || !pack) return;
+    e.state = ai.state; e.waypoint = { ...ai.waypoint }; pack.home = { ...ai.home };
+    if (ai.behaviour) e.behaviour = { ...ai.behaviour };
+  }
+
+  /** Every spawner's clock still to run (when each may next send, launch, rebuild), keyed by system id, as world ticks */
+  timers(offset: number): Record<string, Record<string, number>> {
+    const now = this.host.tick();
+    const out: Record<string, Record<string, number>> = {};
+    for (const [name, map] of this.clocks()) {
+      const o: Record<string, number> = (out[name] = {});
+      for (const [k, t] of map) {
+        const s = String(k), i = s.indexOf(':'), id = this.host.systemId(Number(i < 0 ? s : s.slice(0, i)));
+        if (id !== undefined && t > now) o[i < 0 ? id : id + s.slice(i)] = t + offset;
+      }
+    }
+    return out;
+  }
+
+  setTimers(t: Record<string, Record<string, number>>, offset: number): void {
+    for (const [name, map] of this.clocks()) {
+      for (const [k, at] of Object.entries(t[name] ?? {})) {
+        const i = k.indexOf(':'), num = this.host.systemNum(i < 0 ? k : k.slice(0, i));
+        if (num < 0 || typeof at !== 'number') continue;
+        (map as Map<string | number, number>).set(i < 0 ? num : `${num}${k.slice(i)}`, at - offset);
+      }
+    }
+  }
+
+  /** The spawners' clocks, by name (keys: a system's number, or `${number}:...`) */
+  private clocks(): [string, Map<string, number> | Map<number, number>][] {
+    return [['spawn', this.nextSpawn], ['zone', this.nextZoneSpawn], ['nestNext', this.nestNext], ['nestRebuilt', this.nestRebuilt], ['nestLock', this.nestLock]];
   }
 
   private pickGroup(groups: { faction: string; ships: string[]; weight: number }[]) {
@@ -794,6 +995,7 @@ export class Enemies {
       const x = base.x + Math.cos(a) * base.r, y = base.y + Math.sin(a) * base.r;
       this.host.effect?.(num, x, y, 'launch');
       const eids = this.spawnPack(num, group, x, y, zone?.id);
+      this.own(eids, zone ? 'zone' : 'system');
       const to = towards();
       if (to) this.sendPack(eids, to);
       return;
@@ -811,6 +1013,7 @@ export class Enemies {
     const at = zone ? this.zonePoint(num, players, zone) : this.spawnPoint(num, players, passive);
     if (!at) return;
     const eids = this.spawnPack(num, group, at.x, at.y, zone?.id);
+    this.own(eids, zone ? 'zone' : 'system');
     const to = towards();
     if (to) this.sendPack(eids, to);
   }

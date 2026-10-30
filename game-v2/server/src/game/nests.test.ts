@@ -80,15 +80,18 @@ describe('nests', () => {
     expect(flashes).toBeGreaterThan(0);
   });
 
-  it('a nest sleeps while nobody is near it, and its packs go home once it has been left a while', () => {
-    const { step, nest, watch } = world();
+  it('a nest sleeps while nobody is near it; once it has sent its packs out they stay out, distant, after it is left', () => {
+    const { step, nest, watch, bridge } = world();
     step(60 * 5, () => watch(DIG, 60000));
     expect(nest(DIG).packs.length).toBe(0);
     step(60 * 20, () => watch(DIG));
-    expect(nest(DIG).packs.length).toBeGreaterThan(0);
+    const out = nest(DIG).packs.length;
+    expect(out).toBeGreaterThan(0);
+    // (Nothing goes back in: far from pilots they cost next to nothing, and a system left empty is remembered whole)
     const idle = (files.factions as any).rules.idleDespawnSeconds;
     step(60 * (idle + 5), () => watch(DIG, 80000));
-    expect(nest(DIG).packs.length).toBe(0);
+    expect(nest(DIG).packs.length).toBe(out);
+    expect(nest(DIG).packs.flat().every((e) => bridge.isDormant(e))).toBe(true);
   });
 
   it('its ships roam within a leash of it, following it round its orbit, and come back when dragged off', () => {
@@ -199,7 +202,7 @@ describe('nests', () => {
     expect((enemies as any).packs.get((enemies as any).enemies.get(nest(BELT).packs[0][0]).pack).style).toBe('loose');
   }, 60000);
 
-  it("nomads travel Sol's middle between places, never into the safe space, and sleep once left alone", () => {
+  it("nomads travel Sol's middle between places, never into the safe space, and stay out, distant, once left alone", () => {
     const CAMP = 'sol_camp_lanes';
     const { server, step, enemies, hold } = world((f) => {
       f.factions.spawns.sol.nests = [{ id: CAMP, packs: 1, respawnSeconds: 10, style: 'nomad', groups: [{ faction: 'redtooth', ships: ['redtooth_cutter', 'redtooth_cutter'], weight: 1 }] }];
@@ -227,12 +230,12 @@ describe('nests', () => {
     for (let i = 1; i < homes.length; i++) travelled += Math.hypot(homes[i].x - homes[i - 1].x, homes[i].y - homes[i - 1].y);
     expect(travelled).toBeGreaterThan(30000);
     for (const h of homes) expect(Math.hypot(h.x, h.y)).toBeGreaterThan(76000);
-    // Left alone (the pilot back in inner Sol): it goes to sleep, and none come out while nobody's in its band
+    // Left alone (the pilot back in inner Sol): its pack stays out where it got to, distant, and no more come out
     const idle = (files.factions as any).rules.idleDespawnSeconds;
     step(60 * (idle + 5), () => hold(40000, 0));
-    expect(enemies.nest(sol, CAMP)!.packs.length).toBe(0);
+    expect(enemies.nest(sol, CAMP)!.packs.length).toBe(1);
     step(60 * 60, () => hold(40000, 0));
-    expect(enemies.nest(sol, CAMP)!.packs.length).toBe(0);
+    expect(enemies.nest(sol, CAMP)!.packs.length).toBe(1);
   }, 120000);
 
   it("Ashfall's nests mix small, medium and rare heavy hostiles", () => {

@@ -5,6 +5,7 @@ import { join } from 'path';
 import type http from 'http';
 import { JsonUserStore } from './JsonUserStore.js';
 import { AccountRoutes } from './routes.js';
+import { DeletedAccounts } from './DeletedAccounts.js';
 import { BAN_FOREVER } from './utils.js';
 
 const dirs: string[] = [];
@@ -202,6 +203,35 @@ describe('lobby account management', () => {
     expect((await new JsonUserStore(file).login('ace', 'old-pw')).success).toBe(false);
     // The name is free again
     expect((await new JsonUserStore(file).register('ace', 'ace@example.com', 'pw')).success).toBe(true);
+  });
+
+  it('lists a deleted account for the game servers to delete its profile, and never gives its id to anyone else', async () => {
+    const { file, s, token, id } = await pilot();
+    const deletedFile = join(file, '../deleted-accounts.json');
+    let out: { status: number; body: any } = { status: 0, body: null };
+    const r = await AccountRoutes.create((_, status, b) => { out = { status, body: b }; }, async () => ({ token, password: 'old-pw' }), () => '127.0.0.1',
+      { store: s, adminSecret: 'sssh', deleted: new DeletedAccounts(deletedFile) });
+    expect(r.deletedAccounts()).toEqual([]);
+    await r.handle({ method: 'POST', headers: {} } as unknown as http.IncomingMessage, {} as http.ServerResponse, '/auth/delete-account');
+    expect(out.body).toEqual({ success: true, id });
+    expect(r.deletedAccounts()).toEqual([id]);
+    // Kept across a lobby restart
+    expect(new DeletedAccounts(deletedFile).recent()).toEqual([id]);
+    // That was the newest account, yet its id isn't handed out again (not even after a restart)
+    await s.close();
+    const reg = await new JsonUserStore(file).register('newcomer', 'new@example.com', 'pw');
+    if (!reg.success) throw new Error(reg.error);
+    expect(reg.user.id).toBeGreaterThan(id);
+  });
+
+  it('forgets a deleted account after a month', () => {
+    let t = 1_000_000;
+    const list = new DeletedAccounts(null, () => t);
+    list.add(5);
+    t += 29 * 24 * 3600_000;
+    expect(list.recent()).toEqual([5]);
+    t += 2 * 24 * 3600_000;
+    expect(list.recent()).toEqual([]);
   });
 
   it('a banned account can\'t manage itself', async () => {

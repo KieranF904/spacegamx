@@ -16,6 +16,10 @@
  *   POST /auth/logout-all      { token }                          -> { success, ended }  (every session, this one too)
  *   POST /auth/delete-account  { token, password }                -> { success, id }     (for good; its sessions go too)
  *
+ * Deleting an account also deletes the pilot's profile: the lobby keeps the ids of lately deleted accounts
+ * (DeletedAccounts) and answers each game server's heartbeat (POST /register, index.ts) with them as
+ * `deletedAccounts`, and the server deletes those profiles (GameServer.forgetAccounts).
+ *
  * Game servers call /auth/validate when a pilot joins with a token, and get
  * the account's id (their profiles are kept by it) and admin flag.
  *
@@ -42,6 +46,7 @@ import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createUserStore } from './index.js';
+import { DeletedAccounts } from './DeletedAccounts.js';
 import type { UserStore, UserSummary } from './types.js';
 import { BAN_FOREVER, banMessage, validatePassword } from './utils.js';
 
@@ -74,15 +79,16 @@ function adminUser(u: UserSummary, now = Date.now()) {
 export class AccountRoutes {
   private attempts = new Map<string, number[]>();
 
-  private constructor(private store: UserStore, private sendJson: Json, private parseJson: Body, private ipOf: (req: http.IncomingMessage) => string, private adminSecret: string) {}
+  private constructor(private store: UserStore, private sendJson: Json, private parseJson: Body, private ipOf: (req: http.IncomingMessage) => string, private adminSecret: string, private deleted: DeletedAccounts) {}
 
   /** (Tests pass their own store and secret) */
-  static async create(sendJson: Json, parseJson: Body, ipOf: (req: http.IncomingMessage) => string, opts: { store?: UserStore; adminSecret?: string } = {}): Promise<AccountRoutes> {
+  static async create(sendJson: Json, parseJson: Body, ipOf: (req: http.IncomingMessage) => string, opts: { store?: UserStore; adminSecret?: string; deleted?: DeletedAccounts } = {}): Promise<AccountRoutes> {
     const store = opts.store ?? await createUserStore(DATA_DIR);
     if (!opts.store) setInterval(() => void store.cleanupExpiredSessions(), 60 * 60 * 1000);
     const secret = opts.adminSecret ?? ADMIN_SECRET;
     if (!secret) console.log("[Accounts] LOBBY_ADMIN_SECRET isn't set: the game servers' admin tools can't manage accounts");
-    return new AccountRoutes(store, sendJson, parseJson, ipOf, secret);
+    const deleted = opts.deleted ?? new DeletedAccounts(opts.store ? null : path.join(DATA_DIR, 'deleted-accounts.json'));
+    return new AccountRoutes(store, sendJson, parseJson, ipOf, secret, deleted);
   }
 
   /** Handles /auth/* and /admin/* (true when it did) */
@@ -165,6 +171,7 @@ export class AccountRoutes {
     }
     // delete-account
     await this.store.deleteUser(user.id);
+    this.deleted.add(user.id);
     console.log(`[Accounts] ${user.username} (id ${user.id}) deleted their account`);
     this.sendJson(res, 200, { success: true, id: user.id });
   }
@@ -201,6 +208,11 @@ export class AccountRoutes {
     const user = (await this.store.getUserById(found.id))!;
     if (action !== 'user') console.log(`[Accounts] ${action} ${user.username}${action === 'ban' ? ` by ${str(body.by)}` : action === 'set-admin' ? `: ${user.is_admin}` : ''}`);
     this.sendJson(res, 200, { success: true, user: adminUser(user) });
+  }
+
+  /** The ids of accounts deleted lately, for the game servers to delete their profiles */
+  deletedAccounts(): number[] {
+    return this.deleted.recent();
   }
 
   async close(): Promise<void> {

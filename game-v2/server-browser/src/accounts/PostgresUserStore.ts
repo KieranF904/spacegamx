@@ -10,12 +10,10 @@
  *
  * Uses node-postgres (pg) via a small connection pool. Enable by setting
  * DATABASE_URL and USER_STORE_BACKEND=postgres in createUserStore().
+ * NOTE: 'pg' is intentionally NOT in package.json dependencies yet. On the VPS, in server-browser/ (the lobby)
+ * and in server/ (the game server keeps profiles in the same database), run `npm install pg`, then:
  *
- * NOTE: 'pg' is intentionally NOT in package.json dependencies yet.
- * When you launch your VPS PostgreSQL server, run:
- *
- *   cd game-v2/server && npm install pg @types/pg
- *   psql $DATABASE_URL -f schema.sql
+ *   psql $DATABASE_URL -f server-browser/schema.sql
  *   USER_STORE_BACKEND=postgres DATABASE_URL=postgres://... npm start
  */
 
@@ -137,7 +135,7 @@ export class PostgresUserStore implements UserStore {
     username = username.trim();
 
     const result = await this.pool.query(
-      `SELECT ${PUBLIC}, password_hash, salt FROM users WHERE username = $1 OR email = $1`,
+      `SELECT ${PUBLIC}, password_hash, salt FROM users WHERE lower(username) = lower($1) OR lower(email) = lower($1)`,
       [username]
     );
     const row = result.rows[0] as UserRow | undefined;
@@ -271,14 +269,14 @@ export class PostgresUserStore implements UserStore {
 
   private toPublicRecord(row: any): UserRecord {
     return {
-      id: row.id,
+      // (BIGINT comes back as a string; ids are numbers everywhere else)
+      id: Number(row.id),
       username: row.username,
       email: row.email,
       is_admin: !!row.is_admin,
       created_at: row.created_at instanceof Date
         ? row.created_at.toISOString()
         : String(row.created_at || ''),
-      // (BIGINT comes back as a string)
       banned_until: row.banned_until == null ? null : Number(row.banned_until),
       ban_reason: row.ban_reason ?? null,
       banned_by: row.banned_by ?? null,

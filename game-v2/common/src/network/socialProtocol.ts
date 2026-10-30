@@ -146,8 +146,6 @@ export interface VendorItemView {
   rank: number;
   rankName: string;
   locked: boolean;
-  /** (Schematics you already knew: there are none now, always false) */
-  known?: boolean;
 }
 
 export interface VendorView {

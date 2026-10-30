@@ -9,6 +9,7 @@ import type { SiegeRules } from '../game/Sieges.js';
 import type { SurfaceRules } from '../game/Surfaces.js';
 import type { EventRules } from '../game/Events.js';
 import type { OpsRules } from '../game/Operations.js';
+import type { MemoryRules } from '../game/SystemMemory.js';
 
 /** data/rules.json: one section per module, each merged over that module's defaults */
 export interface RulesFile {
@@ -16,6 +17,8 @@ export interface RulesFile {
   surfaces?: RulesPatch<SurfaceRules>;
   events?: RulesPatch<EventRules>;
   operations?: RulesPatch<OpsRules>;
+  /** What's remembered of a system left empty, and how it mends (game/SystemMemory.ts) */
+  memory?: RulesPatch<MemoryRules>;
 }
 
 /** data/strings.json: flat, dotted keys (`people.goodbye`) to text with `{name}` placeholders */

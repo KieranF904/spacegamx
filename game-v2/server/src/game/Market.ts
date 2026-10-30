@@ -105,8 +105,7 @@ export class Market {
         discount: RANK_DISCOUNT[Math.max(0, rank.rank)] ?? 0,
         stock: r.vendor.stock.filter((s) => this.econ.items.has(s.item)).map((s) => ({
           item: s.item, price: vendorPrice(this.econ.items, s.item, rank.rank), rank: s.rank, rankName: REP_RANKS[s.rank]?.name ?? REP_RANKS[0].name,
-          // (`known`: a schematic you'd learned; there are none now)
-          locked: rank.rank < s.rank, known: false,
+          locked: rank.rank < s.rank,
         })),
       });
     }

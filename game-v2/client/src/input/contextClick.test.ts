@@ -1,49 +1,40 @@
 /**
- * The right-click menu's rules: a tap opens it and a hold doesn't, what's
+ * The right-click menu's rules: the modifier opens it and a plain right-click fires, what's
  * picked under the cursor, which options each kind of thing offers (and why
  * one can't be taken), where the menu goes on screen, and when an order's
  * action is due (and how a jump lines up, charges and fires).
  */
 import { describe, it, expect } from 'vitest';
 import {
-  RightClick, isTap, pickTargets, targetOptions, openSpaceOptions, jumpBlocked, defaultIndex, stepIndex,
+  RightClick, rightPress, pickTargets, targetOptions, openSpaceOptions, jumpBlocked, defaultIndex, stepIndex,
   placeMenu, outsideBy, orderStep, jumpStep,
-  TAP_MS, TAP_MOVE_PX, MIN_FLY, TRADE_RANGE, MENU_GAP, MENU_MARGIN, JUMP_ALIGN_TICKS, JUMP_ASK_TICKS,
+  MIN_FLY, TRADE_RANGE, MENU_GAP, MENU_MARGIN, JUMP_ALIGN_TICKS, JUMP_ASK_TICKS,
   type ContextTarget, type TargetFacts, type MenuOption, type DriveFacts,
 } from './contextClick';
 
-describe('tap or hold', () => {
-  it('a quick, still click is a tap; a long press or a drag is not', () => {
-    expect(isTap({ t: 0, x: 10, y: 10 }, { t: 120, x: 12, y: 11 })).toBe(true);
-    expect(isTap({ t: 0, x: 10, y: 10 }, { t: TAP_MS, x: 10, y: 10 })).toBe(false);
-    expect(isTap({ t: 0, x: 10, y: 10 }, { t: 50, x: 10 + TAP_MOVE_PX + 1, y: 10 })).toBe(false);
+describe('menu or fire', () => {
+  it('a plain right-click fires at once; with the modifier held, in flight, it opens the menu', () => {
+    expect(rightPress({ modifier: false, enabled: true })).toBe('fire');
+    expect(rightPress({ modifier: true, enabled: true })).toBe('menu');
+    // (A window, the map or the hangar over the world: no menu, it's the guns as ever)
+    expect(rightPress({ modifier: true, enabled: false })).toBe('fire');
   });
 
-  it('a tap comes back as where to open the menu; a hold never does', () => {
+  it('a plain press never holds the right fire back', () => {
     const c = new RightClick();
-    c.down(1000, 100, 100);
-    expect(c.up(1150, 101, 100)).toEqual({ x: 100, y: 100 });
-    c.down(2000, 100, 100);
-    expect(c.up(2600, 100, 100)).toBeNull();
-    // Out and back during the press: a drag, even if it ends where it began
-    c.down(3000, 100, 100);
-    c.move(140, 100);
-    c.move(100, 100);
-    expect(c.up(3100, 100, 100)).toBeNull();
-    // A release with no press (it began off the canvas)
-    expect(c.up(4000, 100, 100)).toBeNull();
+    c.down(false);
+    expect(c.withholding).toBe(false);
   });
 
-  it('every press holds the right fire back for the tap window, so a click never fires', () => {
+  it('the press that opened the menu holds the right fire back until it is let go', () => {
     const c = new RightClick();
-    c.down(0, 0, 0);
-    expect(c.withholding(10)).toBe(true);
-    expect(c.withholding(TAP_MS + 1)).toBe(false); // held: mining and the guns as ever
-    c.down(0, 0, 0);
-    c.move(30, 0);
-    expect(c.withholding(10)).toBe(false); // dragging: it's not a click
-    c.up(20, 30, 0);
-    expect(c.withholding(20)).toBe(false);
+    c.down(true);
+    expect(c.withholding).toBe(true);
+    c.up();
+    expect(c.withholding).toBe(false);
+    c.down(true);
+    c.reset(); // focus lost
+    expect(c.withholding).toBe(false);
   });
 });
 

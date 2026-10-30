@@ -19,7 +19,7 @@
 import {
   Economy, StationData, Bag, CraftRecipe, ServerMessage, CraftJob,
   canCraft, sellPrice, buyPrice, queueSlots, unlocks, countOf, removeFrom, isStructuralItem, cutInputs, gemItemId, type GemsFile,
-  stationPerks, type Outpost,
+  stationPerks, stationLearned, armouryRound, stationTable, type Outpost,
 } from '@space-game/common';
 import type { Pilots, PilotConn } from './Pilots.js';
 import type { Market } from './Market.js';
@@ -88,10 +88,16 @@ export class StationServices {
     return this.host.stationAt(conn);
   }
 
-  /** What a pilot can make: what they've learned, and (an armoury at their station) special ammunition */
+  /** What a pilot can make: what they've learned (an armoury's own rounds once their station's armoury presses them) */
   learned(p: { recipes: string[]; outpost?: Outpost }): string[] {
-    if (!stationPerks(p.outpost).sidegrades) return p.recipes;
-    return [...p.recipes, ...this.econ.items.all().filter((d) => d.ammoFor?.mods).map((d) => d.id)];
+    return stationLearned(p.recipes, p.outpost);
+  }
+
+  /** The armoury tier that presses a round ("Quench line") */
+  private pressLine(id: string): string {
+    const tiers = stationTable()?.tracks.armoury?.tiers ?? [];
+    const at = tiers.findIndex((t) => t.rounds?.includes(id));
+    return at >= 0 ? `tier ${at + 1}, the ${tiers[at].name.split(':')[0]}` : 'armoury';
   }
 
   /** A cut job's inputs (for calling it off, or a failed cut's half) */
@@ -179,7 +185,10 @@ export class StationServices {
     const r: CraftRecipe | null = this.econ.recipes.recipeFor(String(msg.recipe));
     if (!r) return;
     if (isStructuralItem(r.id)) return this.pilots.toast(conn, 'Hull, armour, conduits and holds are built from materials in the hangar', 'info');
-    if (!canCraft(r, this.learned(p), p.level)) return this.pilots.toast(conn, `You don't know how to make that yet`, 'warn');
+    if (!canCraft(r, this.learned(p), p.level)) {
+      const pressed = armouryRound(r.id) && canCraft(r, p.recipes, p.level);
+      return this.pilots.toast(conn, pressed ? `Only your own station's armoury presses ${this.econ.items.name(r.id)}: build it up to its ${this.pressLine(r.id)}` : `You don't know how to make that yet`, 'warn');
+    }
     const n = Math.max(1, Math.min(MAX_BATCH, Math.floor(Number(msg.n) || 1)));
     if (r.time > 0 && this.fabJobs(p) >= queueSlots(p)) return this.pilots.toast(conn, 'Fabricator queue is full', 'warn');
     const need: Bag = {};

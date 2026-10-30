@@ -22,12 +22,14 @@ export interface QualityProfile {
   hazeScale: number;
   /** Share of the small effect particles (sparks, debris) spawned */
   particles: number;
+  /** The cold's frost texture, pixels wide (0: a gradient tint only: ui/FrostVignette.ts) */
+  frostTexture: number;
 }
 
 export const PROFILES: Record<QualityTier, QualityProfile> = {
-  high: { msaa: true, maxDpr: 2, bloomScale: 0.25, bloomQuality: 2, starLayers: [true, true, true, true, true, true], hazeScale: 1 / 2, particles: 1 },
-  medium: { msaa: true, maxDpr: 1.5, bloomScale: 0.2, bloomQuality: 2, starLayers: [true, true, true, false, true, true], hazeScale: 0.4, particles: 0.7 },
-  low: { msaa: false, maxDpr: 1, bloomScale: 0.125, bloomQuality: 1, starLayers: [true, false, true, false, true, true], hazeScale: 1 / 3, particles: 0.4 },
+  high: { msaa: true, maxDpr: 2, bloomScale: 0.25, bloomQuality: 2, starLayers: [true, true, true, true, true, true], hazeScale: 1 / 2, particles: 1, frostTexture: 1024 },
+  medium: { msaa: true, maxDpr: 1.5, bloomScale: 0.2, bloomQuality: 2, starLayers: [true, true, true, false, true, true], hazeScale: 0.4, particles: 0.7, frostTexture: 640 },
+  low: { msaa: false, maxDpr: 1, bloomScale: 0.125, bloomQuality: 1, starLayers: [true, false, true, false, true, true], hazeScale: 1 / 3, particles: 0.4, frostTexture: 0 },
 };
 
 const ORDER: QualityTier[] = ['high', 'medium', 'low'];

@@ -2,9 +2,10 @@
  * Bosses (data/bosses.json): one big hostile per lair, with phases.
  *
  * A boss appears at its lair while players are in its system, and after it
- * dies comes back `respawnSeconds` later. Left alone for a while (nobody in
- * the system), it resets to full health. It's flown by the enemy AI with its
- * own behaviour; this module adds what makes it a boss:
+ * dies comes back `respawnSeconds` later (and not before: its system left
+ * empty is remembered as it is, through restarts too, a living boss as hurt
+ * as it was, mending slowly while it's alone: SystemMemory.ts). It's flown by
+ * the enemy AI with its own behaviour; this module adds what makes it a boss:
  *   - phases as its hull falls (escorts, rage, healing, blinking, novas)
  *   - novas: a telegraphed ring of shots (clients see it charging first)
  *   - an intro title card the first time it's hurt, announcements to the system
@@ -17,9 +18,11 @@
  */
 
 import { IWorld } from 'bitecs';
-import { Position, InSystem, Bag, Blueprint, ShipState, ServerMessage, mulberry32, plated } from '@space-game/common';
+import { Position, Velocity, Rotation, InSystem, Bag, Blueprint, ShipState, ServerMessage, mulberry32, plated, stagedIntegrity } from '@space-game/common';
 import type { ShipBridge } from '../ships/ShipBridge.js';
-import type { Enemies, Behaviour } from './Enemies.js';
+import type { Enemies, Behaviour, EnemyAi } from './Enemies.js';
+import type { FarPose } from '../ships/SimLod.js';
+import { shipMemory, restoreHp, type ShipMemory } from './SystemMemory.js';
 import type { Mobs } from './Mobs.js';
 import type { BossBrain, BrainHost } from './brains/kit.js';
 import { PyreclastBrain } from './brains/pyreclast.js';
@@ -82,13 +85,17 @@ export interface BossDef {
   roam?: { radius: number; everySeconds: number };
   /** Flown by its own brain (server/src/game/brains), not just the enemy AI: dashes, charges, telegraphed attacks */
   brain?: string;
+  /** Staged: what share of a hit on a later stage's part reaches the current stage's plates (unset: rules.stageCover) */
+  stageCover?: number;
 }
 
 export interface BossesFile {
   rules: {
-    creditRange: number; creditWindowTicks: number; resetAfterSeconds: number; barRange: number;
+    creditRange: number; creditWindowTicks: number; barRange: number;
     /** A pilot's credits for a boss they've killed before, as a share of the full pay (1: no change) */
     repeatCredits?: number;
+    /** Staged bosses: what share of a hit on a later stage's part passes to the nearest current-stage plate (unset: ShipBridge STAGE_COVER) */
+    stageCover?: number;
   };
   bosses: Record<string, BossDef>;
 }
@@ -145,7 +152,13 @@ interface Live {
   home: { x: number; y: number };
   /** Damage dealt by each player, and when they last hit */
   dealt: Map<number, { amount: number; last: number }>;
-  lastSeen: number;
+}
+
+/** A lair boss as remembered (SystemMemory.ts): its hull, how far into its phases, and what it was doing (a wanderer's spot) */
+export interface BossMemory extends ShipMemory {
+  id: string;
+  phase: number;
+  ai?: EnemyAi;
 }
 
 export class Bosses {
@@ -215,7 +228,8 @@ export class Bosses {
     if (b) this.despawn(b);
   }
 
-  private create(key: string, id: string, def: BossDef, num: number, x: number, y: number): number {
+  /** `quiet`: brought back as it was (SystemMemory), not newly sighted */
+  private create(key: string, id: string, def: BossDef, num: number, x: number, y: number, quiet = false): number {
     const design = this.designs[def.design ?? id];
     if (!design || this.live.has(key)) return this.live.get(key)?.eid ?? -1;
     const built = def.asDesigned ? design : plated(this.ships.catalog, design, def.grade ?? this.enemies.gradeOf(num), def.plating ?? 1);
@@ -229,7 +243,7 @@ export class Bosses {
     if (def.fixed) this.ships.pin(eid);
     const b: Live = {
       key, id, def, eid, systemNum: num, phase: 0, rage: 1, blinkEvery: 0, nextBlink: 0, nova: null, nextNova: 0, novaAt: -1,
-      engaged: false, dealt: new Map(), lastSeen: this.host.tick(), home: { x, y }, told: new Set(),
+      engaged: false, dealt: new Map(), home: { x, y }, told: new Set(),
     };
     const make = def.brain ? BRAINS[def.brain] : undefined;
     if (make) {
@@ -242,7 +256,7 @@ export class Bosses {
     }
     this.live.set(key, b);
     this.byEid.set(eid, b);
-    if (!def.arena) this.host.announce(num, `${def.name} has been sighted in this system.`, 'warn');
+    if (!def.arena && !quiet) this.host.announce(num, `${def.name} has been sighted in this system.`, 'warn');
     return eid;
   }
 
@@ -290,20 +304,13 @@ export class Bosses {
 
   tick(): void {
     const now = this.host.tick();
-    // Spawn at lairs where players are, reset bosses left alone
+    // Spawn at lairs where players are, once each is due (one left alone is remembered as it is: SystemMemory.ts)
     if (now % 60 === 0) {
       for (const [id, def] of Object.entries(this.file.bosses)) {
-        if (def.arena) continue;
+        if (def.arena || this.live.has(id)) continue;
         const num = this.host.systemNum(def.system);
         if (num < 0) continue;
-        const here = this.host.players(num).length > 0;
-        const b = this.live.get(id);
-        if (b) {
-          if (here) b.lastSeen = now;
-          else if (now - b.lastSeen > this.file.rules.resetAfterSeconds * 60) this.despawn(b);
-          continue;
-        }
-        if (here && now >= (this.nextSpawn.get(id) ?? 0)) this.spawn(id);
+        if (this.host.players(num).length > 0 && now >= (this.nextSpawn.get(id) ?? 0)) this.spawn(id);
       }
     }
     for (const b of [...this.live.values()]) {
@@ -383,6 +390,7 @@ export class Bosses {
       const lx = x + Math.cos(a) * r, ly = y + Math.sin(a) * r;
       this.host.effect?.(b.systemNum, lx, ly, 'launch');
       const eids = this.enemies.spawnPack(b.systemNum, { faction: b.def.faction, ships: p.escorts }, lx, ly);
+      this.enemies.own(eids, 'escort');
       // They fight round their mother ship
       this.enemies.sendPack(eids, { x, y }, 9000);
     }
@@ -424,6 +432,62 @@ export class Bosses {
     return bag;
   }
 
+  /**
+   * A system's lair bosses as they are (`where`: a distant one's route worked
+   * out). `evict`: and taken out of the world, quietly (not a kill: no respawn
+   * clock, nothing paid)
+   */
+  capture(num: number, where: (eid: number) => FarPose, evict: boolean): BossMemory[] {
+    const out: BossMemory[] = [];
+    for (const b of [...this.live.values()]) {
+      if (b.systemNum !== num || b.def.arena || b.key !== b.id) continue;
+      const ship = this.ships.get(b.eid);
+      if (ship) out.push({ id: b.id, phase: b.phase, ...shipMemory(ship, where(b.eid)), ai: this.enemies.aiOf(b.eid) });
+      if (evict) this.despawn(b);
+    }
+    return out;
+  }
+
+  /**
+   * A remembered system's bosses back where they were, as hurt as they were
+   * less `heal` of each part's max, in the phases their hulls now call for
+   * (mended past one, it's back before it), quietly; handed to `adopt`
+   */
+  restore(num: number, list: BossMemory[], heal: number, adopt: (eid: number, pose: FarPose) => void): void {
+    for (const m of list) {
+      const def = this.file.bosses[m.id];
+      if (!def || def.arena || this.live.has(m.id) || this.host.systemNum(def.system) !== num) continue;
+      const eid = this.create(m.id, m.id, def, num, m.x, m.y, true);
+      const b = this.byEid.get(eid), ship = this.ships.get(eid);
+      if (!b || !ship) continue;
+      Rotation.angle[eid] = m.a; Velocity.x[eid] = m.vx; Velocity.y[eid] = m.vy;
+      restoreHp(this.ships, eid, m.hp, heal);
+      // (A staged boss's own reckoning, from its pieces: its brain hasn't flown it yet)
+      const integrity = (b.brain?.integrity ? stagedIntegrity(this.ships.catalog, ship) : undefined) ?? this.ships.integrity(eid);
+      while (b.phase < Math.min(m.phase, def.phases.length) && integrity < def.phases[b.phase].at) {
+        const p = def.phases[b.phase++];
+        if (p.enrage) b.rage = p.enrage;
+        if (p.blink) b.blinkEvery = p.blink;
+        if (p.nova) b.nova = p.nova;
+      }
+      if (b.rage !== 1) this.ships.setDamageScale(eid, def.damage * b.rage);
+      if (m.ai) this.enemies.setAi(eid, m.ai);
+      adopt(eid, { x: m.x, y: m.y, vx: m.vx, vy: m.vy, angle: m.a, angVel: 0 });
+    }
+  }
+
+  /** When each lair boss killed is due back (world ticks: `offset` on) */
+  timers(offset: number): Record<string, number> {
+    const now = this.host.tick();
+    const out: Record<string, number> = {};
+    for (const [id, t] of this.nextSpawn) if (t > now) out[id] = t + offset;
+    return out;
+  }
+
+  setTimers(t: Record<string, number>, offset: number): void {
+    for (const [id, at] of Object.entries(t)) if (this.file.bosses[id] && typeof at === 'number') this.nextSpawn.set(id, at - offset);
+  }
+
   private despawn(b: Live): void {
     this.ships.removeShip(b.eid);
     this.forget(b);
@@ -454,6 +518,12 @@ export class Bosses {
   /** Living bosses in a system, for the snapshot */
   inSystem(num: number): number[] {
     return [...this.live.values()].filter((b) => b.systemNum === num).map((b) => b.eid);
+  }
+
+  /** A staged boss's share of a hit on a later stage's part that reaches its current plates (its own, else the rules'; unset: the bridge's default) */
+  stageCover(eid: number): number | undefined {
+    const b = this.byEid.get(eid);
+    return b ? (b.def.stageCover ?? this.file.rules.stageCover) : undefined;
   }
 
   /** How far into the fight a boss is (for tests) */

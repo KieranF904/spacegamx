@@ -612,6 +612,48 @@ describe('quests: Dr. Osei and steel', () => {
   });
 });
 
+describe('quests: Cold Iron (Forgemaster Hale)', () => {
+  it('Hale presses test crates of Quench Slugs from your cryogen and steel; after six Cult ships, the pattern is yours', () => {
+    const w = world();
+    const { server, conn, pid, profile, last } = w;
+    hangUp(w);
+    profile().quests.done.push('main_10');
+    profile().level = 25;
+    goTo(server, pid, 'cinder_station_forge');
+    talk(w, 'hale');
+    pick(w, /Cold Iron/);
+    pick(w, /accept|take|I'll|yes/i);
+    hangUp(w);
+    expect(profile().quests.active.cinder_quench).toBeDefined();
+    server.pilots.give(conn, { cryogen: 4, steel_plate: 8 });
+    talk(w, 'hale');
+    pick(w, /Cold Iron/);
+    hangUp(w);
+    expect(profile().quests.active.cinder_quench.stage).toBe(1);
+    expect(server.pilots.available(conn, 'railgun_quench')).toBe(2);
+    expect(server.pilots.available(conn, 'cryogen')).toBe(0);
+    // Not taught yet: only the job's own crates
+    expect(profile().recipes).not.toContain('railgun_quench');
+    profile().quests.active.cinder_quench.stage = 2;
+    talk(w, 'hale');
+    pick(w, /Cold Iron/);
+    expect(profile().quests.done).toContain('cinder_quench');
+    expect(profile().recipes).toContain('railgun_quench');
+    void last;
+  });
+
+  it("the job's kill step wants the Cult, in Cinder Reach", () => {
+    const q = files.quests.quests.find((x: any) => x.id === 'cinder_quench')! as any;
+    expect(q.person).toBe('hale');
+    expect(q.requires).toEqual(['main_10']);
+    expect(q.steps.find((s: any) => s.type === 'kill')).toMatchObject({ faction: 'cinder', system: 'cinder_reach' });
+    // (and the recipe it teaches is the job's: nobody else teaches it)
+    const r = files.recipes.craft.find((x: any) => x.id === 'railgun_quench')! as any;
+    expect(r.quest).toBe('cinder_quench');
+    expect(files.quests.quests.filter((x: any) => x.rewards?.recipes?.includes('railgun_quench')).map((x: any) => x.id)).toEqual(['cinder_quench']);
+  });
+});
+
 describe('quests: bounties', () => {
   it('bounties are the same for everyone in a window and rebuild from their id', () => {
     const ctx = { station: { id: 'sol_station_central', name: 'Sol Central', system: 'sol' }, danger: 1, factions: ['pirates'], ores: ['iron_ore'] };

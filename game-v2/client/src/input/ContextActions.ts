@@ -1,8 +1,9 @@
 /**
- * The right-click menu in flight. A quick right-click (contextClick.ts: let
- * go within TAP_MS, barely moved) opens a menu of what can be done with
- * whatever's under the cursor; nothing happens until an option is chosen.
- * Holding the button is the mining laser and the right-hand guns, as ever.
+ * The right-click menu in flight. Right-click with the menu modifier held
+ * (Z by default, rebindable: keybindings.ts 'contextMenu') opens a menu of
+ * what can be done with whatever's under the cursor; nothing happens until an
+ * option is chosen. A plain right-click is the mining laser and the
+ * right-hand guns, firing at once.
  *   station     dock (H, or the autopilot flies there and docks) · fly to
  *   gate        travel through (X, asking first as X does for a system that
  *               outclasses you; or fly there and take it) · fly to
@@ -38,7 +39,7 @@ import { ContextMenuUI, type MenuSection } from '../ui/ContextMenuUI';
 import { shipKind } from '../ui/shipReadout';
 import miningTable from '../../../data/mining.json';
 import {
-  RightClick, pickTargets, targetOptions, openSpaceOptions, orderStep, jumpStep, wrapAngle, km, MENU_LEAVE_PX,
+  RightClick, rightPress, pickTargets, targetOptions, openSpaceOptions, orderStep, jumpStep, wrapAngle, km, MENU_LEAVE_PX,
   type ContextTarget, type ContextKind, type TargetFacts, type MenuOption, type DriveFacts,
 } from './contextClick';
 
@@ -60,6 +61,8 @@ export interface ContextHost {
   talkRange: number;
   /** Flying, with nothing over the world (no window, map, menu or hangar) */
   enabled(): boolean;
+  /** The menu modifier is held (keybindings 'contextMenu') */
+  menuModifier(): boolean;
   autopilot: Autopilot;
   flyTo(dest: AutoDest, note: string): void;
   /** The dock key; the station whose docking ring we're in */
@@ -185,27 +188,25 @@ export class ContextActions {
     return this.menu !== null;
   }
 
-  /** A mouse button on the canvas (and its release anywhere; screen px; ms, when it happened: a slow frame doesn't make a click a hold) */
-  mouse(button: number, down: boolean, x: number, y: number, t = performance.now()): void {
+  /** A mouse button on the canvas (and its release anywhere; screen px) */
+  mouse(button: number, down: boolean, x: number, y: number): void {
     if (button === 0) {
       if (down && this.menu) { this.closeMenu(); this.swallowLeft = true; }
       if (!down) this.swallowLeft = false;
       return;
     }
     if (button !== 2) return;
-    if (down) {
-      // (Another right-click: this menu's done; a tap opens the next where it lands)
-      this.closeMenu();
-      this.click.down(t, x, y);
-      return;
-    }
-    const at = this.click.up(t, x, y);
-    if (at && this.host.enabled()) this.openMenu(at.x, at.y);
+    if (!down) { this.click.up(); return; }
+    // (Another right-click: this menu's done; with the modifier, the next opens where it lands)
+    this.closeMenu();
+    const menu = rightPress({ modifier: this.host.menuModifier(), enabled: this.host.enabled() }) === 'menu';
+    this.click.down(menu);
+    if (menu) this.openMenu(x, y);
   }
 
-  /** The right fire held back this tick (a press still inside the tap window: it may be a click) */
-  withholdingFire(t = performance.now()): boolean {
-    return this.click.withholding(t) || this.menu !== null;
+  /** The right fire held back this tick (the menu's open, or the press that opened it is still down) */
+  withholdingFire(): boolean {
+    return this.click.withholding || this.menu !== null;
   }
 
   /** The left fire held back (the press that closed the menu) */
@@ -250,7 +251,6 @@ export class ContextActions {
   /** Each frame: the menu, the order's progress, the marks */
   update(): void {
     const c = this.host.cursor();
-    this.click.move(c.x, c.y);
     const targets = this.targets();
     // (The order goes on under the map, as the autopilot does)
     this.stepAuto(targets);

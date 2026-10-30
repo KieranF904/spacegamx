@@ -64,7 +64,7 @@ export class Weapons {
     // The gun's own mods (gems), then its ammunition's, its grade's and its size's: the same as the pilot's client builds the shells from (launch.ts gunDef)
     const full = gunDef(this.tuning, kind, { mods: shape.mods, ammo: shape.ammoMods, grade: shape.grade, size: shape.size, model: shape.model });
     // A plain round (out of ammunition): the same shell, none of its effects (and no fuse: with nothing to burst, it has to hit)
-    const def = shape.dry ? { ...full, splash: undefined, emp: undefined, ignite: undefined, split: undefined, pull: undefined, pierce: 0, fuse: undefined } : full;
+    const def = shape.dry ? { ...full, splash: undefined, emp: undefined, ignite: undefined, split: undefined, pull: undefined, pierce: 0, fuse: undefined, bane: undefined } : full;
     // A burst: the rest of the volley, fanned out (the main shell is the volley's last)
     let index = shape.index ?? 0;
     if ((def.burst ?? 1) > 1 && !shape.noBurst) {
@@ -114,11 +114,12 @@ export class Weapons {
     return !!this.extras.get(proj)?.def.lob;
   }
 
-  /** A shot's damage against shields and hull, if its weapon has its own, and what it hits with (damage.ts) */
-  vsOf(proj: number): { shield?: number; hull?: number; hit: HitInfo } {
+  /** A shot's damage against shields and hull, if its weapon has its own, what it hits with (damage.ts), and the faction its ammunition is made for */
+  vsOf(proj: number): { shield?: number; hull?: number; hit: HitInfo; bane?: { faction: string; damage: number } } {
     const x = this.extras.get(proj), d = x?.def;
     const hit = this.hitOf(proj);
-    return d && (d.vsShield !== undefined || d.vsHull !== undefined) ? { shield: d.vsShield, hull: d.vsHull, hit } : { hit };
+    const vs = d && (d.vsShield !== undefined || d.vsHull !== undefined) ? { shield: d.vsShield, hull: d.vsHull, hit } : { hit };
+    return d?.bane ? { ...vs, bane: d.bane } : vs;
   }
 
   /** What a shot hits with: its weapon's damage type, and the gun's grade plus its penetration */

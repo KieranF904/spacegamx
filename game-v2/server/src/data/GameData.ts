@@ -104,7 +104,7 @@ export class GameData {
     this.recipesFile = files.recipes;
     this.miningTable = files.mining;
     this.factionsFile = files.factions;
-    this.bossesFile = files.bosses ?? { rules: { creditRange: 5000, creditWindowTicks: 3600, resetAfterSeconds: 300, barRange: 7000 }, bosses: {} };
+    this.bossesFile = files.bosses ?? { rules: { creditRange: 5000, creditWindowTicks: 3600, barRange: 7000 }, bosses: {} };
     this.mobsFile = files.mobs ?? { mobs: {} };
     this.terrainFiles = files.terrain ?? {};
     this.loadItems(files.items);

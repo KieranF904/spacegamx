@@ -3606,6 +3606,77 @@
           "crystal_lens": 1
         }
       }
+    },
+    {
+      "id": "cinder_quench",
+      "chain": "side",
+      "name": "Cold Iron",
+      "person": "hale",
+      "giver": "cinder_station_forge",
+      "level": 25,
+      "requires": [
+        "main_10"
+      ],
+      "intro": "You've been close to Cult ships. They run hot, drives wide open, and they never let their plate cool. Any smith knows what cold does to hot iron. I've a pattern for a railgun slug with a cryogen core: on a cold hull it's a poor slug, but on theirs I think it cracks the plate. Bring me cryogen and steel and I'll press you a test batch.",
+      "steps": [
+        {
+          "type": "talk",
+          "person": "hale",
+          "take": {
+            "cryogen": 4,
+            "steel_plate": 8
+          },
+          "give": {
+            "railgun_quench": 2
+          },
+          "text": "Bring Forgemaster Hale 4 cryogen and 8 steel plate (the Ember Forge, Cinder Reach)",
+          "lines": [
+            {
+              "say": "Good and cold. Give me a minute at the press."
+            },
+            {
+              "say": "Two crates. Load them in a railgun (your ammunition loadout, in the hangar) and go and find the Cult."
+            }
+          ]
+        },
+        {
+          "type": "kill",
+          "faction": "cinder",
+          "system": "cinder_reach",
+          "count": 6,
+          "text": "Try the slugs on the Cult: destroy 6 Cinder Cult ships in Cinder Reach"
+        },
+        {
+          "type": "talk",
+          "person": "hale",
+          "text": "Tell Forgemaster Hale how the slugs did",
+          "lines": [
+            {
+              "say": "Cracked through? Thought so."
+            },
+            {
+              "say": "Nothing strange in it. Plate that's run hot and chilled fast goes brittle: thermal shock. Every apprentice learns it by ruining a good blade."
+            },
+            {
+              "say": "Don't waste them on anything else; on a cold hull they're poor slugs. And not on the Warden, or the Cult's other big ones: too much metal to chill through."
+            },
+            {
+              "say": "The pattern's yours. A press at your own station's armoury can make them, once it has a quench line."
+            }
+          ]
+        }
+      ],
+      "outro": "Hale chalks the pattern on the forge wall long enough for you to copy it, then wipes it off. \"I'd rather the Cult didn't find it here.\"",
+      "rewards": {
+        "xp": 6000,
+        "credits": 900,
+        "recipes": [
+          "railgun_quench"
+        ],
+        "items": {
+          "cryogen": 4
+        }
+      }
     }
   ]
 }

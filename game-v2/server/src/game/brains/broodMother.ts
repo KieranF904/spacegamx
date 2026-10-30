@@ -1,6 +1,6 @@
 /**
- * The Brood Mother (out past Borealis's belt, east of the Curtain): a Frost Brood grown huge
- * (scripts/bespoke/brood_mother.mjs). Her look only, for now: three stages (the veil, the mantle, the clutch) and no
+ * The Brood Mother (out past Borealis's belt, east of the Curtain): only what pilots call it; what it is stays
+ * unexplained until its lore is written (scripts/bespoke/brood_mother.mjs). Her look only, for now: three stages (the veil, the mantle, the clutch) and no
  * moves yet. She flies as every staged boss does between moves (staged.ts), and the dev tool steps through her
  * stages (`forceShed`), so each can be seen without a fight.
  */

@@ -1,11 +1,12 @@
 {
-  "_comment": "Bosses. Each lairs at a fixed point in its system and appears while players are there (respawnSeconds after it dies). hp scales every part; damage scales its guns; speed is its engine output (up to 2.5, above any player design: how fast it flies and turns). Phases trigger as its hull integrity falls below `at`: say (announced to the system), escorts (ships that join it), enrage (damage multiplier from then on), heal (fraction of every part restored), blink (teleports next to its target every N ticks), nova (a telegraphed ring of shots every N ticks: kind, count, warnTicks). Everyone who damaged it (or was close when it died) gets XP, credits and their own loot roll, straight into storage.",
+  "_comment": "Bosses. Each lairs at a fixed point in its system and appears while players are there (respawnSeconds after it dies; its system left empty is remembered as it is, a living boss mending slowly: rules.json memory). hp scales every part; damage scales its guns; speed is its engine output (up to 2.5, above any player design: how fast it flies and turns). Phases trigger as its hull integrity falls below `at`: say (announced to the system), escorts (ships that join it), enrage (damage multiplier from then on), heal (fraction of every part restored), blink (teleports next to its target every N ticks), nova (a telegraphed ring of shots every N ticks: kind, count, warnTicks). Everyone who damaged it (or was close when it died) gets XP, credits and their own loot roll, straight into storage.",
   "rules": {
     "creditRange": 5000,
     "creditWindowTicks": 3600,
-    "resetAfterSeconds": 300,
     "barRange": 7000,
-    "repeatCredits": 0.25
+    "repeatCredits": 0.25,
+    "_stageCover": "Staged bosses: a hit on a later stage's part (under the plates) passes to the nearest current-stage plate at this share. A boss's own stageCover overrides it.",
+    "stageCover": 0.4
   },
   "bosses": {
     "boss_scrap_mother": {
@@ -1705,9 +1706,9 @@
       ]
     },
     "boss_brood_mother": {
-      "_placeholder": "Look prototype: her title, intro and phase lines are placeholders until her fight is built",
+      "_placeholder": "Look prototype: her fight is not built yet. \"Brood Mother\" is only what pilots call it (Kieran: an old, unexplained thing; lore later), so the text attributes the name and says nothing of what it is. No legendary drop for now (undecided: docs/bosses/brood-mother.md section 9)",
       "name": "Brood Mother",
-      "title": "Frost Brood Giant",
+      "title": "Pale Giant of the Aurora",
       "faction": "frost",
       "system": "borealis",
       "lair": {
@@ -1733,19 +1734,19 @@
         "leash": 8000,
         "accuracy": 0.85
       },
-      "intro": "Something vast unfolds out of the aurora: fins of pale shell, arms trailing behind, eggs glowing in them.",
+      "intro": "Something vast and pale unfolds out of the aurora, past the belt: broad fins, arms trailing behind, a violet light glowing in them. Pilots call it the Brood Mother.",
       "phases": [
         {
           "at": 0.667,
-          "say": "The Brood Mother's fins tear away from her."
+          "say": "Its fins tear away."
         },
         {
           "at": 0.334,
-          "say": "The Brood Mother's shell falls away. Something violet glows inside."
+          "say": "Its shell falls away. A long violet light burns inside."
         },
         {
           "at": 0.15,
-          "say": "The Brood Mother is coming apart, and faster for it.",
+          "say": "It is coming apart, and faster for it.",
           "enrage": 1.3
         }
       ],

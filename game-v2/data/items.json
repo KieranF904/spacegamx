@@ -690,7 +690,7 @@
       "rarity": "uncommon",
       "value": 35,
       "color": "#a1887f",
-      "description": "Cryo hull plating; conduits run cooler in it."
+      "description": "Insulating hull plating: a hull of it builds up cold slower. Turns energy fire, but heat goes through it."
     },
     {
       "id": "cryogen",
@@ -1123,6 +1123,30 @@
         "mods": {
           "mul": {
             "damage": 0.25
+          }
+        }
+      }
+    },
+    {
+      "id": "railgun_quench",
+      "name": "Quench Slugs",
+      "category": "ammo",
+      "rarity": "uncommon",
+      "value": 55,
+      "color": "#4fc3f7",
+      "description": "Railgun slugs with a cryogen core: poor slugs, 30% less damage, but Cinder Cult ships take two and a half times that (Forgemaster Hale's pattern: \"cold cracks hot plate\"). Not the Cult's great ones. 200 a crate. Pressed only by your own station's armoury.",
+      "ammoFor": {
+        "weapon": "railgun",
+        "rounds": 200,
+        "mods": {
+          "mul": {
+            "damage": -0.3
+          },
+          "set": {
+            "bane": {
+              "faction": "cinder",
+              "damage": 2.5
+            }
           }
         }
       }

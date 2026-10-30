@@ -30,6 +30,8 @@ export interface GunOrders {
    * waits. Updated in place. Absent: guns fire for free (no accounting).
    */
   energy?: { charge: Charge };
+  /** Intervals × this (a cold ship's guns recycle slower: warmth.ts); absent: 1 */
+  slow?: number;
 }
 
 export interface GunShot {
@@ -150,7 +152,7 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
     if (weapons[w.kind]?.type === 'beam') pulses.push({ w, aimQ });
     else shots.push({ w, aimQ, shot: buildShot(w, ship, pose, tick, tuning) });
     // Fired on time, it keeps the fraction of a tick it was late by (so an interval of 14.3 averages 14.3); after a wait, it starts afresh
-    ship.cooldown[w.part] = (cd > -1 ? cd : 0) + w.interval;
+    ship.cooldown[w.part] = (cd > -1 ? cd : 0) + w.interval * (orders.slow ?? 1);
     if (weapons[w.kind]?.stagger) stagger(ship, w);
   }
   return { shots, beams, pulses };
