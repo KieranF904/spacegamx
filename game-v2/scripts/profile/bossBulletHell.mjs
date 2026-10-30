@@ -251,6 +251,24 @@ try {
   results.stage3 = await measureHell('pyre-stage3', 24);
   // The GPU probe in the same phase (readPixels after the main pass)
   results.stage3gpu = await measureHell('pyre-stage3-gpu', 8, { profile: false, gpu: true });
+  // LAYERS=1: the GPU probe with one layer off at a time (renderable / enabled: nothing the game itself touches), then at DPR 2
+  if (process.env.LAYERS) {
+    const toggles = [
+      ['no-effects', 'window.__game.renderer.effectContainer.renderable = false', 'window.__game.renderer.effectContainer.renderable = true'],
+      ['no-bloom', 'window.__game.renderer.bloom.enabled = false', 'window.__game.renderer.bloom.enabled = true'],
+      ['no-ships', 'window.__game.renderer.shipLayer.renderable = false', 'window.__game.renderer.shipLayer.renderable = true'],
+    ];
+    for (const [name, off, on] of toggles) {
+      await ev(`${off}, 1`);
+      try { results[name] = await measureHell(`pyre-stage3-${name}`, 6, { profile: false, gpu: true }); } finally { await ev(`${on}, 1`); }
+    }
+    results.again = await measureHell('pyre-stage3-again', 6, { profile: false, gpu: true });
+    await metrics(1920, 1080, 2); await sleep(1500);
+    results.dpr2 = await measureHell('pyre-stage3-dpr2', 6, { profile: false, gpu: true });
+    await ev('window.__game.renderer.effectContainer.renderable = false, 1');
+    try { results.dpr2noFx = await measureHell('pyre-stage3-dpr2-no-effects', 6, { profile: false, gpu: true }); } finally { await ev('window.__game.renderer.effectContainer.renderable = true, 1'); }
+    await metrics();
+  }
   await fire(false);
   // The same spot with nothing hostile (the GPU floor and a quiet frame for comparison)
   await chat('/clear 9000'); await sleep(4000);

@@ -6,9 +6,13 @@
  * Reports tick time (mean/p50/p95/p99/worst), the tick by part, live projectiles (the boss's, its escorts', the
  * pilots'), and every byte sent to each pilot, with the share that is projectile rows (and their removals) worked
  * out exactly by re-encoding each snapshot without them.
+ * Staged bosses are also put in their last phase (enraged: what its last 15% looks like); --calm leaves that out.
+ * The pilots fly Lancers (forward cannons; --ship <library id> for another) in god mode, weaving and firing at it.
  * Run (in server/):
- *   npx tsx src/bench/bulletHellBench.ts --boss boss_pyreclast [--pilots 4] [--seconds 40] [--warm 5] [--bossDamage 0.02] [--json out.json]
- *   npx tsx src/bench/bulletHellBench.ts --survey [--seconds 40]       (every boss, 1 pilot: peak projectiles only)
+ *   npx tsx src/bench/bulletHellBench.ts --boss boss_pyreclast[,boss_scrap_mother] [--pilots 1,4,8] [--seconds 40] [--warm 5] [--bossDamage 0.02] [--json out.json]
+ *   npx tsx src/bench/bulletHellBench.ts --survey [--seconds 40]       (every boss, 1 pilot: a table of peak projectiles)
+ *   --nofire: the pilots hold fire (the boss's own shots only) · --debug: the first pilot's guns, every 2 s
+ * Results and what they mean: docs/audits/boss-bullet-hell.md
  */
 
 import { join, dirname } from 'path';
