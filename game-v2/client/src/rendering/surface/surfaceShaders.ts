@@ -1,5 +1,7 @@
 /**
- * A planet surface's two shaders (see SurfaceRenderer):
+ * A planet surface's shaders (see SurfaceRenderer). The ground the game draws
+ * is groundShader.ts (the art pass), built on GROUND_HEAD here; the one below
+ * (groundFragClassic) is the ground from before it, kept for the dev toggle:
  *   ground  terrain from a height field: sea, shore, lowland, forest, rock and
  *           snow, shaded by its slopes against the sun; a city's street grid;
  *           cloud shadows; haze thickening towards the edge of the map
@@ -16,7 +18,7 @@
 
 export { skyVert as surfaceVert } from '../sky/skyShaders';
 
-const COMMON = `
+export const COMMON = `
 uniform sampler2D uNoise;
 uniform vec2 uCamera;
 uniform vec2 uRes;
@@ -50,7 +52,8 @@ float clouds(vec2 w) {
 }
 `;
 
-export const groundFrag = `#version 300 es
+/** The ground's uniforms and shared pieces (a cavern's floor, the terrain's height): both ground shaders start with it */
+export const GROUND_HEAD = `#version 300 es
 precision highp float;
 in vec2 vUV;
 out vec4 fragColor;
@@ -132,6 +135,10 @@ float height(vec2 w) {
   return h;
 }
 
+`;
+
+/** The ground as it was before the art pass (dev toggle: SurfaceRenderer.setClassic, localStorage sg.surfaceLook = classic) */
+export const groundFragClassic = `${GROUND_HEAD}
 void main() {
   vec2 w = worldAt((vUV - 0.5) * uRes, 1.0);
   if (uCave > 0.5) { fragColor = vec4(caveFloor(w), 1.0); return; }
@@ -193,6 +200,7 @@ in vec2 vUV;
 out vec4 fragColor;
 ${COMMON}
 uniform float uFade;    // fewer clouds as you zoom in (you're down among the ships)
+uniform vec3 uTint;     // the clouds' colour (white; a lava world's are ash and smoke)
 
 void main() {
   // Nearer the camera than the ground: bigger on screen, and they slide faster
@@ -202,7 +210,7 @@ void main() {
   if (c < 0.01) discard;
   // Lit on the sun's side, grey underneath
   float lit = clouds(w + uSun * 260.0);
-  vec3 col = mix(vec3(0.97, 0.98, 1.0), vec3(0.72, 0.76, 0.82), clamp(lit - c + 0.5, 0.0, 1.0) * 0.6);
+  vec3 col = mix(vec3(0.97, 0.98, 1.0), vec3(0.72, 0.76, 0.82), clamp(lit - c + 0.5, 0.0, 1.0) * 0.6) * uTint;
   float a = c * 0.62 * uFade * (1.0 - 0.5 * uNight);
   fragColor = vec4(night(col) * a, a);
 }

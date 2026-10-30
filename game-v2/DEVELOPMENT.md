@@ -211,6 +211,10 @@ up, or its own frozen one on 5299; Chrome runs at Idle priority on the real GPU,
 <http://localhost:5273/sunlab.html> (dev server only), and `node scripts/sun-sky-proto/run.mjs verify|bench|stills|gif|parity|v2|stills2|bench2|gif2|v3|stills3|bench3|gif3|edge|v4|stills4|bench4|gif4|v5|stills5|bench5|gif5|panel5 <out dir>`
 draws and times the game's sun and sky against them natively (moderngl, no browser).
 
+**Planet surfaces** (the ground seen from inside the atmosphere; `docs/rendering/surface-art-pass.md`): each surface's look is
+data in `client/src/rendering/surface/surfaceLooks.ts`, drawn by `groundShader.ts`. `node scripts/surface-art/run.mjs stills|bench <out dir>`
+draws and times it natively. In dev, `__game.renderer.surface.setClassic(true)` shows the ground as it was before the art pass.
+
 **Planet prototypes** (not in the game yet; `docs/rendering/planet-prototypes.md`): the live lab is
 <http://localhost:5273/planetlab.html> (dev server only; pick a planet, hold Space for the current shader, live cost
 graph), and `node scripts/planet-proto/run.mjs verify|stills|edges|bench|gif|panels <out dir>` draws and times the

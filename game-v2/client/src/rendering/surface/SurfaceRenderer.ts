@@ -3,8 +3,11 @@
  * ground (drawn at half the screen's size: it's soft, and its many noise
  * lookups are the costly part) and a layer of clouds above the ships.
  *
- * Each kind of world has its own palette (terran seas and forests, desert
- * dunes, ice, lava, toxic swamps, bare rock); the seed moves the continents.
+ * Each kind of world has its own look, and some surfaces their own within
+ * it (surfaceLooks.ts: palette and features; groundShader.ts draws them); the
+ * seed moves the continents. In dev, `localStorage['sg.surfaceLook'] = 'classic'`
+ * (or `__game.renderer.surface.setClassic(true)`) draws the ground as it was
+ * before the art pass, to compare.
  *
  * The ground is drawn from a camera snapped to its texels (a few spare round
  * the edge), the picture slid back by what was snapped off, so it stays put
@@ -19,29 +22,15 @@
 import { Application, Container, GlProgram, Mesh, MeshGeometry, RenderTexture, Shader, Sprite, State } from 'pixi.js';
 import type { SurfaceData } from '@space-game/common';
 import { skyNoiseTexture } from '../sky/noiseTexture';
-import { cloudFrag, groundFrag, surfaceVert } from './surfaceShaders';
+import { cloudFrag, groundFragClassic, surfaceVert } from './surfaceShaders';
+import { groundFrag } from './groundShader';
+import { hexRgb, lookOf, lookUniforms } from './surfaceLooks';
 
 const SCALE = 1 / 2;
 /** Spare texels round the ground's picture (it slides by up to one, and a shake's roll swings its corners) */
 const MARGIN = 3;
 
 type Rgb = [number, number, number];
-const hex = (h: number): Rgb => [((h >> 16) & 255) / 255, ((h >> 8) & 255) / 255, (h & 255) / 255];
-
-interface Palette {
-  sea: number; snow: number; cloud: number;
-  deep: number; shallow: number; shore: number; low: number; high: number; rock: number; peak: number; haze: number; urban: number;
-}
-
-const PALETTES: Record<SurfaceData['kind'], Palette> = {
-  terran: { sea: 0.47, snow: 0.8, cloud: 0.36, deep: 0x0d2c4f, shallow: 0x1f6a8f, shore: 0xcdbb8b, low: 0x5b8a3e, high: 0x2e5a2b, rock: 0x75705f, peak: 0xeef3f6, haze: 0xb9d3ea, urban: 0x8d939b },
-  rocky: { sea: 0.0, snow: 0.9, cloud: 0.05, deep: 0x3a3631, shallow: 0x4a453e, shore: 0x8a8174, low: 0x8a8174, high: 0x6d665c, rock: 0x5a544c, peak: 0xb8b2a6, haze: 0xc8c2b8, urban: 0x7d8086 },
-  desert: { sea: 0.0, snow: 0.95, cloud: 0.1, deep: 0x7a5a3a, shallow: 0x8a6a48, shore: 0xd8b07a, low: 0xc99a62, high: 0xb07a48, rock: 0x8a5a3a, peak: 0xe3c08f, haze: 0xe6c9a4, urban: 0x9a8f80 },
-  ice: { sea: 0.36, snow: 0.55, cloud: 0.35, deep: 0x1f3f63, shallow: 0x3f78a0, shore: 0xcfe0ee, low: 0xdfe9f2, high: 0xb9cfe2, rock: 0x8aa0b6, peak: 0xffffff, haze: 0xe8f2fb, urban: 0x9aa4ae },
-  lava: { sea: 0.42, snow: 0.95, cloud: 0.3, deep: 0xff4a12, shallow: 0xffa040, shore: 0x2a201d, low: 0x3a2f2c, high: 0x2d2422, rock: 0x241c1a, peak: 0x4a3a34, haze: 0x5a2a1a, urban: 0x5a5658 },
-  cavern: { sea: 0.0, snow: 1.0, cloud: 0.0, deep: 0xff5a14, shallow: 0xffa040, shore: 0x1a1416, low: 0x1c1517, high: 0x1c1517, rock: 0x1c1517, peak: 0x1c1517, haze: 0x5a2416, urban: 0x1c1517 },
-  toxic: { sea: 0.45, snow: 0.95, cloud: 0.6, deep: 0x2d4a14, shallow: 0x7fae2c, shore: 0x8a8a4a, low: 0x6b6a3a, high: 0x4f5a2a, rock: 0x5a5440, peak: 0xa8a87a, haze: 0xb8c27a, urban: 0x7c8270 },
-};
 
 /** The way sunlight travels across the ground (from the top left) */
 export const SUN_DIR: [number, number] = [0.6, 0.8];
@@ -73,25 +62,24 @@ export class SurfaceRenderer {
   private direct: Mesh<MeshGeometry, Shader>;
   private full = false;
   private groundShader: Shader;
+  /** The ground from before the art pass (dev only: setClassic) */
+  private classicShader: Shader | null = null;
+  private classic = false;
+  private surfaceId: string | undefined;
   private cloudShader: Shader;
   private surface: SurfaceData | null = null;
   private time = 0;
 
   constructor(private app: Application) {
     const noise = skyNoiseTexture();
-    this.groundShader = new Shader({
-      glProgram: new GlProgram({ vertex: surfaceVert, fragment: groundFrag }),
-      resources: {
-        uNoise: noise.source,
-        groundUniforms: {
-          ...common(), uLand: v4(), uCity: v2(), uCave: f(), uPx: f(2),
-          uDeep: v3(), uShallow: v3(), uShore: v3(), uLow: v3(), uHigh: v3(), uRock: v3(), uPeak: v3(), uHaze: v3(), uUrban: v3(),
-        },
-      },
-    });
+    this.groundShader = this.makeGround(groundFrag);
+    if (import.meta.env.DEV) {
+      this.classicShader = this.makeGround(groundFragClassic);
+      try { this.classic = localStorage.getItem('sg.surfaceLook') === 'classic'; } catch { /* (no storage) */ }
+    }
     this.cloudShader = new Shader({
       glProgram: new GlProgram({ vertex: surfaceVert, fragment: cloudFrag }),
-      resources: { uNoise: noise.source, cloudUniforms: { ...common(), uFade: f(1) } },
+      resources: { uNoise: noise.source, cloudUniforms: { ...common(), uFade: f(1), uTint: v3() } },
     });
     this.rt = RenderTexture.create({ width: 4, height: 4, resolution: 1, dynamic: true });
     this.mesh = new Mesh({ geometry: quad(0, 0, 4, 4), shader: this.groundShader, state: State.for2d() });
@@ -106,6 +94,36 @@ export class SurfaceRenderer {
     this.ground.visible = false;
     this.clouds.visible = false;
     this.resize();
+  }
+
+  private makeGround(fragment: string): Shader {
+    return new Shader({
+      glProgram: new GlProgram({ vertex: surfaceVert, fragment }),
+      resources: {
+        uNoise: skyNoiseTexture().source,
+        groundUniforms: {
+          ...common(), uLand: v4(), uCity: v2(), uCave: f(), uPx: f(2),
+          uDeep: v3(), uShallow: v3(), uShore: v3(), uLow: v3(), uHigh: v3(), uRock: v3(), uPeak: v3(), uHaze: v3(), uUrban: v3(),
+          uDry: v3(), uSoil: v3(), uSkylight: v3(), uSunlight: v3(), uFeat: v4(), uFeat2: v4(), uStyle: v4(),
+        },
+      },
+    });
+  }
+
+  /** The shader the ground's drawn with now */
+  private get ground_(): Shader {
+    return this.classic && this.classicShader ? this.classicShader : this.groundShader;
+  }
+
+  /** Dev: draw the ground as it was before the art pass (to compare); remembered in localStorage */
+  setClassic(on: boolean): void {
+    if (!this.classicShader) return;
+    this.classic = on;
+    try { localStorage.setItem('sg.surfaceLook', on ? 'classic' : 'new'); } catch { /* (no storage) */ }
+    this.mesh.shader = this.direct.shader = this.ground_;
+    const s = this.surface;
+    this.surface = null;
+    this.setSurface(s, this.surfaceId);
   }
 
   /** How dark it is (0 day .. 1 night), eased towards what it's set to */
@@ -127,10 +145,11 @@ export class SurfaceRenderer {
     this.mesh.geometry = quad(0, 0, w, h);
   }
 
-  /** The surface you're on (null: you're in space) */
-  setSurface(s: SurfaceData | null): void {
-    if (s === this.surface) return;
+  /** The surface you're on (null: you're in space), and its system's id (some surfaces have a look of their own) */
+  setSurface(s: SurfaceData | null, id?: string): void {
+    if (s === this.surface && id === this.surfaceId) return;
     this.surface = s;
+    this.surfaceId = id;
     this.ground.visible = this.clouds.visible = !!s;
     this.night = this.nightTarget = 0;
     if (!s) return;
@@ -139,9 +158,10 @@ export class SurfaceRenderer {
     this.full = s.kind === 'cavern';
     this.direct.visible = this.full;
     this.sprite.visible = !this.full;
-    const p = PALETTES[s.kind] ?? PALETTES.rocky;
+    const p = lookOf({ kind: s.kind, id }, this.classic);
     const seed = s.seed ?? 1;
-    const gu = (this.groundShader.resources.groundUniforms as any).uniforms;
+    this.mesh.shader = this.direct.shader = this.ground_;
+    const gu = (this.ground_.resources.groundUniforms as any).uniforms;
     const cu = (this.cloudShader.resources.cloudUniforms as any).uniforms;
     for (const u of [gu, cu]) {
       u.uSeed.set([(seed * 0.618) % 1, (seed * 0.382) % 1]);
@@ -149,11 +169,11 @@ export class SurfaceRenderer {
       u.uCloud.set([p.cloud, 15000, 22, 0.3]);
     }
     const city = s.city;
+    cu.uTint.set(hexRgb(p.cloudTint));
     gu.uLand.set([p.sea, p.snow, city ? city.radius : 0, s.radius]);
     gu.uCity.set(city ? [city.x, city.y] : [0, 0]);
     gu.uCave = s.kind === 'cavern' ? 1 : 0;
-    gu.uDeep.set(hex(p.deep)); gu.uShallow.set(hex(p.shallow)); gu.uShore.set(hex(p.shore)); gu.uLow.set(hex(p.low));
-    gu.uHigh.set(hex(p.high)); gu.uRock.set(hex(p.rock)); gu.uPeak.set(hex(p.peak)); gu.uHaze.set(hex(p.haze)); gu.uUrban.set(hex(p.urban));
+    for (const [k, v] of Object.entries(lookUniforms(p))) gu[k].set(v);
   }
 
   /**
@@ -164,11 +184,11 @@ export class SurfaceRenderer {
    */
   light(): { ambient: number; tint: Rgb; ground: Rgb; sun: boolean } | null {
     if (!this.surface) return null;
-    const p = PALETTES[this.surface.kind] ?? PALETTES.rocky;
-    if (this.surface.kind === 'cavern') return { ambient: 0.13, tint: hex(p.haze), ground: hex(p.deep).map((v) => v * 0.3) as Rgb, sun: false };
+    const p = lookOf({ kind: this.surface.kind, id: this.surfaceId }, this.classic);
+    if (this.surface.kind === 'cavern') return { ambient: 0.13, tint: hexRgb(p.haze), ground: hexRgb(p.deep).map((v) => v * 0.3) as Rgb, sun: false };
     const lava = this.surface.kind === 'lava';
-    const ground = (lava ? hex(p.deep).map((v) => v * 0.5) : hex(p.low).map((v) => v * 0.22)) as Rgb;
-    return { ambient: lava ? 0.36 : 0.6, tint: hex(p.haze), ground, sun: true };
+    const ground = (lava ? hexRgb(p.deep).map((v) => v * 0.5) : hexRgb(p.low).map((v) => v * 0.22)) as Rgb;
+    return { ambient: lava ? 0.36 : 0.6, tint: hexRgb(p.haze), ground, sun: true };
   }
 
   /** `shake`: the screen's shake this frame (x, y in pixels, its roll) */
@@ -177,7 +197,7 @@ export class SurfaceRenderer {
     this.time += deltaMs / 1000;
     this.night += (this.nightTarget - this.night) * Math.min(1, deltaMs / 900);
     const { width: w, height: h } = this.app.screen;
-    const gu = (this.groundShader.resources.groundUniforms as any).uniforms;
+    const gu = (this.ground_.resources.groundUniforms as any).uniforms;
     const cu = (this.cloudShader.resources.cloudUniforms as any).uniforms;
     // The ground's camera snapped to its texels, its picture slid back by the difference (or, full size, just the camera)
     const texel = 1 / (SCALE * zoom), sx = this.full ? camX : Math.round(camX / texel) * texel, sy = this.full ? camY : Math.round(camY / texel) * texel;

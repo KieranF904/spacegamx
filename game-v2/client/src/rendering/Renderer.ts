@@ -793,7 +793,7 @@ export class Renderer {
     // On a planet: its ground and clouds instead of the sky, and its city
     const here = this.sys.data;
     const surface = here?.surface ?? null;
-    this.surface.setSurface(surface);
+    this.surface.setSurface(surface, here?.id);
     this.setCity(surface ? here! : null);
     // Its rock (built once, when you arrive)
     if (this.terrainId !== this.currentSystemId) {
