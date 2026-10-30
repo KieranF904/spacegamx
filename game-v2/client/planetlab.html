@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<!-- Planet prototype lab: dev server only (not a build input in vite.config.ts). See docs/rendering/planet-prototypes.md. -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Space Game - Planet lab</title>
+  <link rel="icon" href="data:,">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #000; color: #c9d3e0; font: 12px 'Segoe UI', system-ui, sans-serif; }
+    canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+    #panel { position: fixed; top: 8px; left: 8px; background: rgba(10, 13, 19, 0.88); border: 1px solid #1d2532; border-radius: 4px; padding: 8px 10px; width: 290px; }
+    #panel .row { display: grid; grid-template-columns: 70px 1fr; gap: 6px; align-items: center; margin: 4px 0; }
+    select, button, input { background: #151b26; color: #d6deea; border: 1px solid #263044; border-radius: 3px; font: inherit; padding: 2px 4px; width: 100%; }
+    button { cursor: pointer; }
+    #zoom { background: transparent; }
+    .zoomnote { margin: -2px 0 4px 76px; color: #7f8ca0; font-size: 11px; }
+    .zoomnote .beyond { color: #e8c070; }
+    #stats { margin-top: 6px; color: #9fb0c8; white-space: pre; font: 11px Consolas, monospace; }
+    #perf { position: fixed; right: 8px; bottom: 8px; width: 520px; background: rgba(10, 13, 19, 0.9); border: 1px solid #1d2532; border-radius: 4px; padding: 8px 10px; }
+    #perf h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #6f86a6; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+    #perf h3 button { width: auto; padding: 2px 8px; text-transform: none; letter-spacing: 0; }
+    #graph { width: 100%; height: 200px; display: block; }
+    #readout .big { font-size: 15px; color: #e6edf6; margin: 6px 0 2px; line-height: 1.35; }
+    #readout .ms { font-size: 20px; font-weight: 600; font-family: Consolas, monospace; margin-right: 6px; }
+    #readout b { color: #9fe6a0; }
+    #readout b.worse { color: #ff9a8a; }
+    #readout .paused { color: #e8e0a0; }
+    #perf .note, .hint { color: #66748a; margin-top: 6px; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="panel">
+    <div class="row"><label>Body</label><select id="body"></select></div>
+    <div class="row"><label>Look</label><select id="look">
+      <option value="proto">prototype</option><option value="proto.lite">prototype lite (Low tier)</option><option value="cur">current</option>
+    </select></div>
+    <div class="row"><label>View</label><select id="view">
+      <option value="whole" selected>whole</option><option value="limb">lit limb up close</option><option value="term">limb at the terminator</option>
+      <option value="far">widest game zoom (0.04)</option><option value="close">limb at zoom 1</option><option value="surface">surface at zoom 2 (closest in game)</option>
+      <option value="surface+">surface up close (beyond the game)</option><option value="edge+">the limb up close (beyond the game)</option>
+      <option value="tiny">far out (zoom 0.004, beyond the game)</option>
+    </select></div>
+    <div class="row"><label>Zoom</label><input id="zoom" type="range" min="0" max="1000" step="1"></div>
+    <div class="zoomnote"><span id="zoomval"></span> <span>shaded: the game's range, 0.04 to 2</span></div>
+    <div class="row"><label>Sun from</label><input id="light" type="range" min="-180" max="180" step="1" value="-160"></div>
+    <div class="row"><label>Time ×</label><input id="speed" type="range" min="0" max="40" step="0.5" value="1"></div>
+    <div class="row"><label>Resolution</label><select id="dpr"><option value="1">1× CSS</option><option value="dpr" selected>device</option></select></div>
+    <div id="stats"></div>
+    <div class="hint">Drag to pan, wheel to zoom. Hold Space to see the current shader in place of the prototype. Speed the time up to
+      watch the bands flow and the storms turn.</div>
+  </div>
+  <div id="perf">
+    <h3><span>Cost, live (last 30 s)</span><button id="pause">Pause measuring</button></h3>
+    <canvas id="graph"></canvas>
+    <div id="readout"></div>
+    <div class="note">Each point: the shown option drawn several times offscreen at this resolution, timed with a forced GPU sync
+      (as the sun lab measures). Dashed: the current shader, measured the same way. Figures: the median of the last 2 s. The
+      browser adds a floor of about 0.04 ms a draw; the native harness has the exact numbers.</div>
+  </div>
+  <script type="module" src="/planetlab/planetlab.ts"></script>
+</body>
+</html>
