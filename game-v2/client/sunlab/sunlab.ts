@@ -1,7 +1,8 @@
 /**
  * Sun and sky prototype lab (sunlab.html, dev server only): the game's sun, sky and central bodies against the
- * prototypes (src/rendering/proto), live, with GPU timings when the browser exposes timer queries. It draws the
- * same layers as the native harness (scripts/sun-sky-proto/layers.ts and skyLayers.ts) with a small WebGL2 runner.
+ * prototypes (src/rendering/proto), live, with a graph of what each costs (perf.ts; measured as `measure` says). It
+ * draws the same layers as the native harness (scripts/sun-sky-proto/layers.ts and skyLayers.ts) with a small WebGL2
+ * runner.
  */
 
 import sunText from '../src/rendering/SunRenderer.ts?raw';
@@ -14,12 +15,12 @@ import { skyNoiseTexture } from '../src/rendering/sky/noiseTexture';
 import { bakeSimplex, noise3Data, NOISE3_SIZE, sunNoiseData, SUN_NOISE_SIZE } from '../src/rendering/proto/protoNoise';
 import { EXACT_SIZE, EXACT_UNITS } from '../src/rendering/proto/sunProto';
 import systemsJson from '../../data/systems.json';
+import { PerfGraph, type Series } from './perf';
 import { centralLayers, sourcesFrom, sunPrograms, sunVariantLayers, type CentralBody, type Layer, type View } from '../../scripts/sun-sky-proto/layers';
 import { skyOption, skyPrograms, systemBiome } from '../../scripts/sun-sky-proto/skyLayers';
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, premultipliedAlpha: true })!;
-const timer = gl.getExtension('EXT_disjoint_timer_query_webgl2');
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 const systems: any[] = (systemsJson as any).systems ?? systemsJson;
@@ -50,6 +51,21 @@ function compile(vert: string, frag: string): WebGLProgram {
   return p;
 }
 const programs = new Map<string, WebGLProgram>();
+/** Uniform and attribute locations by program (looked up once: the draws' CPU cost stays small next to the GPU's) */
+const uniformLocs = new Map<WebGLProgram, Map<string, WebGLUniformLocation | null>>();
+const attribLocs = new Map<WebGLProgram, Map<string, number>>();
+function uloc(p: WebGLProgram, name: string): WebGLUniformLocation | null {
+  let m = uniformLocs.get(p);
+  if (!m) uniformLocs.set(p, m = new Map());
+  if (!m.has(name)) m.set(name, gl.getUniformLocation(p, name));
+  return m.get(name)!;
+}
+function aloc(p: WebGLProgram, name: string): number {
+  let m = attribLocs.get(p);
+  if (!m) attribLocs.set(p, m = new Map());
+  if (!m.has(name)) m.set(name, gl.getAttribLocation(p, name));
+  return m.get(name)!;
+}
 const program = (name: string) => {
   let p = programs.get(name);
   if (!p) programs.set(name, p = name === 'blit' ? compile(BLIT_VERT, BLIT_FRAG) : compile(programSources[name].vert, programSources[name].frag));
@@ -115,9 +131,14 @@ function target(name: string, w: number, h: number) {
   return made;
 }
 
+/** Where layers without a target of their own draw: the canvas, or the measuring target */
+let outFb: WebGLFramebuffer | null = null;
 const vbo = gl.createBuffer()!;
 const vao = gl.createVertexArray()!;
 const IDENTITY = new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
+
+/** A layer's quad already in its own vertex array (measuring draws each layer many times: upload it once) */
+const prepared = new Map<Layer, WebGLVertexArrayObject>();
 
 /** One layer as the harness draws it */
 function draw(layer: Layer & { blit?: string; blitScale?: number }, w: number, h: number): void {
@@ -132,28 +153,27 @@ function draw(layer: Layer & { blit?: string; blitScale?: number }, w: number, h
     gl.viewport(0, 0, t.w, t.h);
     if (layer.clearTarget) { gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); }
   }
-  else { gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, w, h); }
-  const verts = layer.blit ? [-1, -1, 0, 0, 1, -1, 1, 0, -1, 1, 0, 1, 1, 1, 1, 1] : layer.verts;
-  gl.bindVertexArray(vao);
-  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STREAM_DRAW);
-  for (const [name, offset] of [['aPosition', 0], ['aUV', 8]] as const) {
-    const loc = gl.getAttribLocation(p, name);
-    if (loc < 0) continue;
-    gl.enableVertexAttribArray(loc);
-    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 16, offset);
+  else { gl.bindFramebuffer(gl.FRAMEBUFFER, outFb); gl.viewport(0, 0, w, h); }
+  const ready = prepared.get(layer);
+  if (ready) gl.bindVertexArray(ready);
+  else {
+    const verts = layer.blit ? [-1, -1, 0, 0, 1, -1, 1, 0, -1, 1, 0, 1, 1, 1, 1, 1] : layer.verts;
+    gl.bindVertexArray(vao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STREAM_DRAW);
+    bindAttribs(p);
   }
   if (layer.blit) {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, target(layer.blit, ...size(layer.blitScale ?? 1)).tex);
-    gl.uniform1i(gl.getUniformLocation(p, 'uTex'), 0);
+    gl.uniform1i(uloc(p, 'uTex'), 0);
   } else {
     for (const m of ['uProjectionMatrix', 'uWorldTransformMatrix', 'uTransformMatrix']) {
-      const loc = gl.getUniformLocation(p, m);
+      const loc = uloc(p, m);
       if (loc) gl.uniformMatrix3fv(loc, false, IDENTITY);
     }
     for (const [name, v] of Object.entries(layer.uniforms)) {
-      const loc = gl.getUniformLocation(p, name);
+      const loc = uloc(p, name);
       if (!loc) continue;
       if (typeof v === 'number') gl.uniform1f(loc, v);
       else if (Array.isArray(v[0])) gl.uniform4fv(loc, (v as unknown as number[][]).flat());
@@ -165,10 +185,37 @@ function draw(layer: Layer & { blit?: string; blitScale?: number }, w: number, h
       gl.activeTexture(gl.TEXTURE0 + i);
       if (volumes[name]) gl.bindTexture(gl.TEXTURE_3D, made3[name] ??= volumes[name]());
       else gl.bindTexture(gl.TEXTURE_2D, textures[name] ??= lazyTextures[name]());
-      gl.uniform1i(gl.getUniformLocation(p, sampler), i);
+      gl.uniform1i(uloc(p, sampler), i);
     });
   }
   gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, layer.instances ?? 1);
+}
+
+function bindAttribs(p: WebGLProgram): void {
+  for (const [name, offset] of [['aPosition', 0], ['aUV', 8]] as const) {
+    const loc = aloc(p, name);
+    if (loc < 0) continue;
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 16, offset);
+  }
+}
+
+/** Give each layer its own vertex array for a measurement (and take them away after) */
+function prepare(layers: Layer[]): () => void {
+  const made: [WebGLVertexArrayObject, WebGLBuffer][] = [];
+  for (const layer of layers as (Layer & { blit?: string })[]) {
+    const a = gl.createVertexArray()!, b = gl.createBuffer()!;
+    gl.bindVertexArray(a);
+    gl.bindBuffer(gl.ARRAY_BUFFER, b);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(layer.blit ? [-1, -1, 0, 0, 1, -1, 1, 0, -1, 1, 0, 1, 1, 1, 1, 1] : layer.verts), gl.STATIC_DRAW);
+    bindAttribs(program(layer.blit ? 'blit' : layer.program));
+    prepared.set(layer, a);
+    made.push([a, b]);
+  }
+  return () => {
+    for (const layer of layers) prepared.delete(layer);
+    for (const [a, b] of made) { gl.deleteVertexArray(a); gl.deleteBuffer(b); }
+  };
 }
 
 // The camera: a view preset, then panned and zoomed by hand
@@ -184,6 +231,19 @@ function preset(): void {
   else { zoom = 0.3; cam = [1.6 * R, 0]; }
 }
 for (const id of ['system', 'view']) $(id).addEventListener('change', preset);
+
+// The performance graph: a marker for every change, so the step before and after is plain to see
+const graph = new PerfGraph($('graph') as HTMLCanvasElement, $('readout'));
+const chosen = (id: string) => { const e = $<HTMLSelectElement>(id); return e.selectedOptions[0]?.text ?? e.value; };
+for (const [id, what] of [['sun', 'Sun'], ['sky', 'Sky'], ['system', 'System'], ['view', 'View'], ['dpr', 'Resolution']]) {
+  $(id).addEventListener('change', () => graph.mark(`${what}: ${chosen(id)}`));
+}
+let paused = false;
+$('pause').addEventListener('click', () => {
+  paused = !paused;
+  $('pause').textContent = paused ? 'Resume measuring' : 'Pause measuring';
+  graph.mark(paused ? 'paused' : 'resumed');
+});
 let drag: { x: number; y: number } | null = null;
 canvas.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId); });
 canvas.addEventListener('pointermove', (e) => {
@@ -193,27 +253,49 @@ canvas.addEventListener('pointermove', (e) => {
 });
 canvas.addEventListener('pointerup', () => { drag = null; });
 canvas.addEventListener('wheel', (e) => { zoom = Math.max(0.04, Math.min(2, zoom * (e.deltaY > 0 ? 1 / 1.15 : 1.15))); e.preventDefault(); }, { passive: false });
-addEventListener('keydown', (e) => { if (e.code === 'Space') { held = true; e.preventDefault(); } });
-addEventListener('keyup', (e) => { if (e.code === 'Space') held = false; });
+addEventListener('keydown', (e) => {
+  if (e.code !== 'Space') return;
+  e.preventDefault();
+  if (!held) graph.mark('Space: current shaders');
+  held = true;
+});
+addEventListener('keyup', (e) => { if (e.code === 'Space') { held = false; graph.mark('Space released'); } });
 
-// GPU time of the sky and of the star, each frame (when the browser has timer queries), smoothed
-const gpu = { sky: 0, sun: 0 };
-const pending: { q: WebGLQuery; key: 'sky' | 'sun' }[] = [];
-function timed(key: 'sky' | 'sun', fn: () => void): void {
-  if (!timer) return fn();
-  const q = gl.createQuery()!;
-  gl.beginQuery(timer.TIME_ELAPSED_EXT, q);
-  fn();
-  gl.endQuery(timer.TIME_ELAPSED_EXT);
-  pending.push({ q, key });
+/**
+ * What a set of layers costs, in ms, by the clock and a forced sync, since in a browser neither WebGL timer queries
+ * (ANGLE counts the gaps between submissions) nor the frame time (vsync) say it. Read one pixel back so the GPU has
+ * finished everything before; time a second read with nothing queued (the sync's own cost); then draw the layers
+ * `reps` times into an offscreen target the canvas's size and read a pixel again, which waits for all of them. The cost
+ * is the difference over `reps`. It includes the driver's cost of submitting the draws (as the game would pay too),
+ * which is a floor of a few hundredths of a ms for the very cheapest options.
+ */
+function measure(layers: Layer[], w: number, h: number, reps: number): number {
+  if (!layers.length) return 0;
+  const t = target('measure', w, h);
+  const release = prepare(layers);
+  outFb = t.fb;
+  const px = new Uint8Array(4);
+  const sync = () => { gl.bindFramebuffer(gl.FRAMEBUFFER, t.fb); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); };
+  sync();
+  const t0 = performance.now();
+  sync();
+  const t1 = performance.now();
+  for (let k = 0; k < reps; k++) layers.forEach((l) => draw(l, w, h));
+  sync();
+  const t2 = performance.now();
+  outFb = null;
+  release();
+  return Math.max(0, (t2 - t1) - (t1 - t0)) / reps;
 }
-function collect(): void {
-  const disjoint = timer && gl.getParameter(timer.GPU_DISJOINT_EXT);
-  while (pending.length && gl.getQueryParameter(pending[0].q, gl.QUERY_RESULT_AVAILABLE)) {
-    const { q, key } = pending.shift()!;
-    if (!disjoint) gpu[key] += (gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6 - gpu[key]) * 0.1;
-    gl.deleteQuery(q);
-  }
+
+/** Measuring: four times a second, the option shown and (every other time) the current shader, each repeated to about 5 ms */
+const MEASURE_EVERY = 250;
+const reps: Record<Series, number> = { sun: 4, sunRef: 4, sky: 4, skyRef: 4 };
+let lastMeasure = 0, tick = 0;
+function sample(series: Series, layers: Layer[], w: number, h: number): void {
+  const ms = measure(layers, w, h, reps[series]);
+  reps[series] = Math.max(1, Math.min(40, Math.round(5 / Math.max(ms, 0.02))));
+  graph.add(series, ms);
 }
 
 let last = performance.now(), fps = 60;
@@ -238,16 +320,23 @@ function frame(now: number): void {
   const sky = skyOption(skyKind, biome, v, lens, R);
   // (black holes, the pulsar and the brown dwarf keep their own shaders in every option)
   const star = plain ? sunVariantLayers(s.id, cb, v, sunKind) : centralLayers(cb, v, false);
+  // (paused, or the tab hidden: nothing measured, so the GPU idles but for the picture)
+  if (!paused && !document.hidden && now - lastMeasure > MEASURE_EVERY) {
+    lastMeasure = now;
+    if (tick++ % 2 === 0) { sample('sun', star, w, h); sample('sky', sky, w, h); }
+    else {
+      sample('sunRef', plain ? sunVariantLayers(s.id, cb, v, 'cur') : centralLayers(cb, v, false), w, h);
+      sample('skyRef', skyOption('cur', biome, v, lens, R), w, h);
+    }
+  }
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0, 0, w, h);
   gl.clearColor(0, 0, 0, 1);
   gl.clear(gl.COLOR_BUFFER_BIT);
-  timed('sky', () => sky.forEach((l) => draw(l, w, h)));
-  timed('sun', () => star.forEach((l) => draw(l, w, h)));
-  collect();
-  $('stats').textContent = `${w}×${h}  ${fps.toFixed(0)} fps  zoom ${zoom.toFixed(3)}\n`
-    + (timer ? `GPU  sky ${gpu.sky.toFixed(3)} ms   star ${gpu.sun.toFixed(3)} ms` : 'GPU timer queries not available in this browser')
-    + `\nshowing  sun: ${plain ? sunKind : 'its own shader'}   sky: ${skyKind}${held ? '  (Space: current)' : ''}`;
+  sky.forEach((l) => draw(l, w, h));
+  star.forEach((l) => draw(l, w, h));
+  $('stats').textContent = `${w}×${h}  ${fps.toFixed(0)} fps  zoom ${zoom.toFixed(3)}`;
+  graph.draw(held ? 'current (Space held)' : plain ? chosen('sun') : `${chosen('sun')} (this body keeps its own shader)`, held ? 'current (Space held)' : chosen('sky'), paused);
   requestAnimationFrame(frame);
 }
 /**

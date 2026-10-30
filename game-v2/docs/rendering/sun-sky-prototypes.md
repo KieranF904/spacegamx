@@ -25,6 +25,24 @@ Every option is selectable in the lab (<http://localhost:5273/sunlab.html>; hold
 place). Every comparison sheet puts **current first** and labels each option **FAITHFUL** or **ALT**, with its mean
 difference from current (0 to 255 a channel).
 
+**Live cost in the lab** (bottom right, `client/sunlab/perf.ts`):
+
+- **What it shows:**
+  - A graph of the last 30 s, the sun's cost and the sky's in two plots, in ms a frame. Each has a dashed line for the
+    current shader, measured the same way.
+  - A labelled marker at every change: option, system, view, resolution, and holding or releasing Space.
+  - A plain readout: the option, its typical ms over the last 2 s (the median), and "N× cheaper than current".
+- **How it measures.** WebGL timer queries are unreliable on ANGLE, and frame time is capped by vsync, so the lab uses
+  a forced sync:
+  1. Read back one pixel, so the GPU is idle.
+  2. Time a second read with nothing queued: the cost of the sync itself.
+  3. Draw the layers K times into an offscreen target the size of the canvas, read a pixel again, and divide the
+     difference by K. K adapts so each measurement is about 5 ms.
+- **Load.** Four measurements a second, alternating the option and the current shader: about 2% of the GPU's time.
+  "Pause measuring" stops it, and it stops while the tab is hidden.
+- **Accuracy.** The browser adds a floor of about 0.04 ms a draw (the driver's submit cost, which the game pays too),
+  so the cheapest options read a little high there. The harness tables below are the exact GPU numbers.
+
 ## Recommendation (round 2)
 
 1. **Star, faithful: "A-exact at half resolution"** (`exact@0.5`). It's the game's own sun, glow and corona shaders,
