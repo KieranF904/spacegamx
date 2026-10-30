@@ -7,8 +7,147 @@ harness on the real GPU (RTX 5070 Ti, moderngl, GPU timer queries, best of two r
 otherwise, against the game's own shaders read from its TypeScript, set up the way `Renderer` sets them up for each
 system.
 
-There are two rounds. **Round 2** (just below) answers Kieran's review of round 1. Round 1 is kept further down as it
-was.
+There are three rounds. **Round 3** (just below) answers Kieran's review of round 2, and round 2 answers his review of
+round 1. The older rounds are kept below as they were.
+
+# Round 3 (after Kieran's review of round 2)
+
+Kieran's review of round 2:
+
+- The plasma star is very promising, but:
+  - its swirls were much larger than the current sun's features;
+  - its edge was hard;
+  - its middle a little too bright;
+  - the Cinder Reach sun didn't read right.
+- Try a multicolour look.
+- Fix the jagged edge in the half-res options.
+- Revisit B with much bigger cells.
+
+What changed:
+
+1. **Feature scale.** Plasma's swirls and filaments are now about the size of the current sun's own fBM features, three
+   times finer than round 2 (`uSurf.x` 9.5; flow stars 8, granular 12). Compare `r3-sun-*-full.png` and `-limb.png`.
+2. **Soft edge.** The disc fades out over its last 2.5% of radius into a glow that rises through the same band, like
+   the current sun's 0.97 to 1.0 fade; detail stars use 80% of their own `edgeThickness`. The flame fringe fades in
+   across it too, so nothing draws a line. The limb is still crisp-ish at the widest zoom, and soft close up.
+3. **Brightness and colour.**
+   - The core glow is lower (detail stars 0.55, was 0.8).
+   - A per-star **heat** comes from the brightness of the system's own middle colour, so a dark palette burns dark.
+     **Cinder Reach** (the red giant, which Kieran meant by "cinder") now reads as a deep red giant, close to current,
+     instead of bright orange. Sol is orange-gold with a warm middle.
+   - The blue and pink stars (Borealis, Nebula Prime) keep a near-white hot middle, a touch under the game's.
+   - All of it is data: `centralBody.plasma` in systems.json can set `scale`, `warp`, `contrast`, `core`, `heat` and
+     `softEdge` per star (`PlasmaParams` in `proto/sunProto.ts`).
+4. **Multicolour (per star: `centralBody.plasma.iridescence`).**
+   - One more slow field on the ball, a few regions across it, pushed by the warp, picks each place's colour. Colours
+     swirl round each other with the flow, and drift slowly.
+   - The modes are `rainbow`, or `tints` with two or three colours. Brightness and the white-hot peaks are kept, and
+     the corona is tinted the same way.
+   - Two examples run on every star in the sheets: **rainbow**, and **aurora** (teal, violet and pink;
+     `PLASMA_EXAMPLES` in `scripts/sun-sky-proto/layers.ts`).
+   - The cost is one more 3D read per disc pixel: within a few percent of plain plasma.
+5. **The jagged edge in "current, half res" isn't the half-res target. It's a bug in the game's sun shader**, visible
+   at full res too (`edge/sol.cur.png`).
+   - The detail style's rim highlight is `smoothstep(1.0 - edgeThickness, 0.97, sunT)`. With Sol's `edgeThickness`
+     of 0.03 both edges are 0.97: undefined in GLSL, a hard step in practice (the disc's brightness jumps 309 → 441 in
+     one pixel). Cinder Reach (0.05) doesn't hit it.
+   - `withEdgeFix` gives the ramp a width. All the faithful options now use it, and "current (edge fixed) ½"
+     (`fix@0.5`) is today's shader with only that fix.
+   - For the game, the one-line fix is in `SunRenderer.ts`'s fragment shader:
+     `smoothstep(min(brightEdgeStart, 0.955), 0.97, sunT)`.
+   - The half-res path itself was fine: linear filtering, premultiplied (`edge/` crops: full and half res show the
+     same step; the fixed ones are smooth).
+6. **B2, the photosphere with big cells** (`photo2`, `lite2`). Round 1's B with granules 500 world units across
+   (was 60), and the smallest cell shown 48 px on screen (was 10), so the cells read at play zooms. It's the
+   cheapest star of all (6.5 to 25 times cheaper than current).
+
+**Recommendation (round 3).** Plasma at half resolution (`plasma@0.5`) as the new look, with plasma lite on Low, and
+multicolour as a per-system option where it fits the setting. It's 3 to 19 times cheaper than today (4K: 0.8 to
+2.1 ms → 0.11 to 0.29 ms), and compiles in about 40 ms instead of 1.8 s. If the look should stay the game's, use
+A-exact ½ (`exact@0.5`), with the edge fix.
+
+### Cost, ms per frame (sun, glow and corona; speedup against current; native harness, best of two runs)
+
+"whole" is zoom 0.04, "limb" zoom 0.15, "disc" over the disc at zoom 0.5. 1080p unless marked 4K.
+
+| star | view | current | ALT plasma | ALT plasma lite | ALT plasma ½ | ALT rainbow ½ | ALT aurora ½ | ALT B2 | ALT B2-lite | FAITHFUL A-exact ½ | FAITHFUL current (edge fixed) ½ |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Sol | whole | 0.281 | 0.163 (1.7x) | 0.064 (4.4x) | 0.053 (5.3x) | 0.057 (4.9x) | 0.057 (4.9x) | 0.030 (9.2x) | 0.022 (12.5x) | 0.042 (6.7x) | 0.081 (3.5x) |
+| Sol | limb | 0.191 | 0.088 (2.2x) | 0.037 (5.2x) | 0.032 (6.0x) | 0.035 (5.4x) | 0.035 (5.4x) | 0.026 (7.2x) | 0.020 (9.4x) | 0.029 (6.6x) | 0.059 (3.2x) |
+| Sol | disc | 0.308 | 0.155 (2.0x) | 0.063 (4.9x) | 0.050 (6.2x) | 0.057 (5.4x) | 0.057 (5.4x) | 0.031 (10.1x) | 0.024 (13.1x) | 0.036 (8.6x) | 0.086 (3.6x) |
+| Borealis | whole | 0.364 | 0.076 (4.8x) | 0.062 (5.9x) | 0.032 (11.4x) | 0.035 (10.4x) | 0.035 (10.4x) | 0.028 (13.0x) | 0.021 (17.2x) | 0.040 (9.2x) | 0.104 (3.5x) |
+| Borealis | limb | 0.492 | 0.073 (6.8x) | 0.038 (12.9x) | 0.029 (17.0x) | 0.032 (15.2x) | 0.033 (15.1x) | 0.026 (18.9x) | 0.021 (23.8x) | 0.047 (10.6x) | 0.134 (3.7x) |
+| Borealis | disc | 0.201 | 0.177 (1.1x) | 0.064 (3.1x) | 0.064 (3.1x) | 0.061 (3.3x) | 0.061 (3.3x) | 0.031 (6.5x) | 0.024 (8.5x) | 0.025 (8.0x) | 0.059 (3.4x) |
+| Nebula Prime | whole | 0.460 | 0.185 (2.5x) | 0.068 (6.7x) | 0.076 (6.0x) | 0.076 (6.1x) | 0.076 (6.0x) | 0.043 (10.7x) | 0.024 (19.2x) | 0.043 (10.8x) | 0.127 (3.6x) |
+| Nebula Prime | limb | 0.385 | 0.090 (4.3x) | 0.037 (10.4x) | 0.033 (11.7x) | 0.036 (10.7x) | 0.036 (10.7x) | 0.033 (11.8x) | 0.021 (18.8x) | 0.043 (9.0x) | 0.108 (3.6x) |
+| Nebula Prime | disc | 0.518 | 0.206 (2.5x) | 0.064 (8.1x) | 0.079 (6.5x) | 0.081 (6.4x) | 0.080 (6.5x) | 0.045 (11.6x) | 0.024 (21.7x) | 0.042 (12.4x) | 0.139 (3.7x) |
+| Cinder Reach | whole | 0.312 | 0.242 (1.3x) | 0.066 (4.7x) | 0.082 (3.8x) | 0.080 (3.9x) | 0.080 (3.9x) | 0.030 (10.2x) | 0.024 (13.3x) | 0.036 (8.6x) | 0.087 (3.6x) |
+| Cinder Reach | limb | 0.202 | 0.089 (2.3x) | 0.037 (5.4x) | 0.033 (6.2x) | 0.036 (5.6x) | 0.036 (5.5x) | 0.028 (7.1x) | 0.021 (9.7x) | 0.030 (6.8x) | 0.061 (3.3x) |
+| Cinder Reach | disc | 0.311 | 0.182 (1.7x) | 0.064 (4.9x) | 0.058 (5.4x) | 0.064 (4.9x) | 0.064 (4.8x) | 0.031 (10.0x) | 0.024 (13.0x) | 0.035 (8.8x) | 0.087 (3.6x) |
+| Sol | whole 4K | 1.125 | 0.548 (2.1x) | 0.231 (4.9x) | 0.200 (5.6x) | 0.201 (5.6x) | 0.201 (5.6x) | 0.118 (9.5x) | 0.089 (12.7x) | 0.137 (8.2x) | 0.318 (3.5x) |
+| Sol | limb 4K | 0.755 | 0.324 (2.3x) | 0.143 (5.3x) | 0.122 (6.2x) | 0.135 (5.6x) | 0.135 (5.6x) | 0.104 (7.3x) | 0.080 (9.4x) | 0.108 (7.0x) | 0.227 (3.3x) |
+| Sol | disc 4K | 1.241 | 0.587 (2.1x) | 0.254 (4.9x) | 0.192 (6.5x) | 0.218 (5.7x) | 0.218 (5.7x) | 0.124 (10.0x) | 0.093 (13.4x) | 0.138 (9.0x) | 0.344 (3.6x) |
+| Borealis | whole 4K | 1.424 | 0.260 (5.5x) | 0.181 (7.9x) | 0.109 (13.1x) | 0.124 (11.5x) | 0.125 (11.4x) | 0.106 (13.4x) | 0.082 (17.3x) | 0.149 (9.5x) | 0.398 (3.6x) |
+| Borealis | limb 4K | 1.971 | 0.269 (7.3x) | 0.144 (13.7x) | 0.106 (18.6x) | 0.119 (16.6x) | 0.119 (16.6x) | 0.101 (19.5x) | 0.080 (24.6x) | 0.178 (11.1x) | 0.524 (3.8x) |
+| Borealis | disc 4K | 0.804 | 0.601 (1.3x) | 0.255 (3.1x) | 0.216 (3.7x) | 0.233 (3.5x) | 0.233 (3.5x) | 0.122 (6.6x) | 0.092 (8.7x) | 0.097 (8.3x) | 0.235 (3.4x) |
+| Nebula Prime | whole 4K | 1.833 | 0.652 (2.8x) | 0.259 (7.1x) | 0.225 (8.2x) | 0.222 (8.3x) | 0.223 (8.2x) | 0.128 (14.4x) | 0.092 (19.9x) | 0.160 (11.5x) | 0.492 (3.7x) |
+| Nebula Prime | limb 4K | 1.520 | 0.329 (4.6x) | 0.143 (10.6x) | 0.123 (12.4x) | 0.136 (11.2x) | 0.137 (11.1x) | 0.114 (13.3x) | 0.081 (18.8x) | 0.161 (9.4x) | 0.415 (3.7x) |
+| Nebula Prime | disc 4K | 2.067 | 0.819 (2.5x) | 0.263 (7.9x) | 0.242 (8.5x) | 0.261 (7.9x) | 0.262 (7.9x) | 0.144 (14.3x) | 0.093 (22.2x) | 0.161 (12.8x) | 0.551 (3.8x) |
+| Cinder Reach | whole 4K | 1.249 | 0.502 (2.5x) | 0.259 (4.8x) | 0.285 (4.4x) | 0.271 (4.6x) | 0.272 (4.6x) | 0.119 (10.5x) | 0.092 (13.6x) | 0.139 (9.0x) | 0.346 (3.6x) |
+| Cinder Reach | limb 4K | 0.789 | 0.330 (2.4x) | 0.145 (5.4x) | 0.123 (6.4x) | 0.136 (5.8x) | 0.137 (5.8x) | 0.113 (7.0x) | 0.081 (9.7x) | 0.112 (7.0x) | 0.234 (3.4x) |
+| Cinder Reach | disc 4K | 1.243 | 0.725 (1.7x) | 0.254 (4.9x) | 0.217 (5.7x) | 0.244 (5.1x) | 0.244 (5.1x) | 0.143 (8.7x) | 0.094 (13.2x) | 0.138 (9.0x) | 0.345 (3.6x) |
+
+The lab's live graph agrees on the steps: Cinder Reach limb, 1600×900, current 0.133 to 0.143 ms. It measured:
+
+| option | live cost |
+|---|---|
+| plasma ½ | 0.040 ms (3.6×) |
+| plasma lite | 0.035 ms (4.0×) |
+| aurora ½ | 0.047 ms (2.9×) |
+| B2 | 0.025 ms (5.6×) |
+| current (edge fixed) ½ | 0.065 ms (2.2×) |
+
+The browser adds a floor of about 0.04 ms a draw, so the cheapest options read a little high there.
+
+### How far each looks from current (mean difference, 0 to 255 a channel)
+
+These are new looks, so the alternatives' numbers say how different they are, not how good. The faithful columns
+should be small.
+
+| star | view | ALT plasma | ALT plasma lite | ALT plasma ½ | ALT rainbow ½ | ALT aurora ½ | ALT B2 | ALT B2-lite | FAITHFUL A-exact ½ | FAITHFUL current (edge fixed) ½ |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Sol | full | 5.7 | 5.8 | 5.7 | 8.9 | 11.2 | 8.1 | 7.8 | 2.2 | 0.3 |
+| Sol | limb | 37.3 | 37.4 | 37.3 | 57.1 | 69.3 | 31.3 | 27.2 | 11.4 | 1.3 |
+| Sol | close | 63.0 | 52.5 | 63.1 | 83.3 | 87.9 | 63.5 | 62.4 | 8.6 | 0.8 |
+| Borealis | full | 5.1 | 5.3 | 5.0 | 7.2 | 5.9 | 5.5 | 5.3 | 2.3 | 0.3 |
+| Borealis | limb | 27.1 | 24.7 | 26.9 | 40.1 | 35.1 | 32.5 | 29.4 | 6.9 | 0.4 |
+| Borealis | close | 52.6 | 58.5 | 52.5 | 51.9 | 50.0 | 71.9 | 84.3 | 1.3 | 0.2 |
+| Nebula Prime | full | 5.3 | 5.3 | 5.2 | 7.2 | 7.8 | 5.7 | 5.6 | 2.7 | 0.5 |
+| Nebula Prime | limb | 27.9 | 27.3 | 27.8 | 34.3 | 36.9 | 33.7 | 32.1 | 4.7 | 0.4 |
+| Nebula Prime | close | 66.5 | 72.9 | 66.4 | 62.5 | 67.5 | 85.5 | 112.8 | 0.9 | 0.2 |
+| Cinder Reach | full | 4.3 | 4.5 | 4.2 | 6.2 | 7.2 | 7.8 | 7.0 | 1.7 | 0.2 |
+| Cinder Reach | limb | 35.4 | 38.5 | 35.5 | 46.9 | 53.6 | 38.9 | 21.7 | 3.6 | 0.2 |
+| Cinder Reach | close | 43.4 | 30.3 | 43.4 | 46.6 | 46.8 | 45.8 | 37.1 | 2.3 | 0.3 |
+
+### Images (round 3)
+
+All in `C:\Users\Kieran\AppData\Local\Temp\claude\c--Users-Kieran-Desktop-Spacegame\b24c970b-6148-4883-b4f6-ab3b6971e1b5\scratchpad\proto\`.
+
+- **Sun sheets** (current first, then the plasma alternative, its multicolour examples, B2, then the two closest
+  faithful options): `r3-sun-<sol|borealis|nebula_prime|cinder_reach>-<full|limb|close>.png`. Start with
+  `r3-sun-cinder_reach-full.png` and `r3-sun-sol-limb.png`.
+- **Sun animations** (limb at zoom 0.3, 15 s of game time at 3×; current, plasma ½, plasma lite, rainbow ½,
+  aurora ½, A-exact ½): `r3-anim-sun-<star>.gif`.
+- **The edge bug:** `edge/sol.cur.png`, `edge/sol.cur@0.5.png`, `edge/sol.fix@0.5.png`, `edge/sol.exact@0.5.png`
+  (1600×900, the limb at zoom 0.15).
+- **The lab:**
+  - `lab-r3-cinder-graph.png`: the live graph through six options on Cinder Reach;
+  - `lab-r3-nebula-rainbow.png`;
+  - `lab-r3-sol-plasma.png`.
+- **Raw data:** `bench3.final.json`, `stills3.results.json`.
+
+To reproduce, run `node scripts/sun-sky-proto/run.mjs <set> <out dir>`, where the set is `stills3`, `gif3`, `bench3`
+or `edge`. Every option is in the lab's Sun menu.
 
 # Round 2 (after Kieran's review)
 

@@ -36,10 +36,18 @@
       <option value="cur">current</option>
       <optgroup label="Faithful (the current look, cheaper)">
         <option value="port">A: port (texture noise)</option><option value="exact">A-exact (baked simplex)</option>
-        <option value="cur@0.5">current, half res</option><option value="exact@0.5" selected>A-exact, half res</option><option value="exact@0.33">A-exact, third res</option>
+        <option value="cur@0.5">current, half res</option><option value="fix@0.5">current (edge fixed), half res</option>
+        <option value="exact@0.5">A-exact, half res</option><option value="exact@0.33">A-exact, third res</option>
       </optgroup>
-      <optgroup label="Alternative (new looks)">
-        <option value="plasma">plasma</option><option value="plasma.lite">plasma lite</option><option value="plasma@0.5">plasma, half res</option>
+      <optgroup label="Alternative: plasma (round 3)">
+        <option value="plasma">plasma</option><option value="plasma.lite">plasma lite</option><option value="plasma@0.5" selected>plasma, half res</option>
+      </optgroup>
+      <optgroup label="Alternative: multicolour plasma (round 3)">
+        <option value="plasma.rainbow@0.5">plasma rainbow, half res</option><option value="plasma.aurora@0.5">plasma aurora, half res</option>
+        <option value="plasma.lite.rainbow">plasma lite rainbow</option><option value="plasma.lite.aurora">plasma lite aurora</option>
+      </optgroup>
+      <optgroup label="Alternative: photosphere">
+        <option value="photo2">B2: photosphere, big cells (round 3)</option><option value="lite2">B2-lite, big cells (round 3)</option>
         <option value="photo">B: photosphere (round 1)</option><option value="lite">B-lite (round 1)</option>
       </optgroup>
     </select></div>

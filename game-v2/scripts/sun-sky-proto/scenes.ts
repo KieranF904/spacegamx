@@ -59,14 +59,16 @@ const SUN_VARIANTS: SunVariant[] = ['cur', 'port', 'photo', 'lite'];
 /** Round 2: the faithful options (the current look, cheaper), then the alternatives (new looks) */
 const FAITHFUL: SunVariant[] = ['port', 'exact', 'cur@0.5', 'exact@0.5', 'exact@0.33'];
 const ALTERNATIVE: SunVariant[] = ['plasma', 'plasma.lite', 'plasma@0.5'];
+/** Round 3: the revised plasma, and the multicolour examples */
+const ROUND3: SunVariant[] = ['cur', 'plasma', 'plasma.lite', 'plasma@0.5', 'plasma.rainbow@0.5', 'plasma.aurora@0.5', 'photo2', 'lite2', 'exact@0.5', 'fix@0.5'];
 const ROUND2: SunVariant[] = ['cur', ...FAITHFUL, ...ALTERNATIVE];
 const LOOK_LABEL: Record<string, string> = {
-  cur: 'current', port: 'A port', exact: 'A-exact', photo: 'B: photosphere', lite: 'B-lite (low tier)',
+  cur: 'current', port: 'A port', exact: 'A-exact', fix: 'current (edge fixed)', photo2: 'B2 photosphere, big cells', lite2: 'B2-lite, big cells', 'plasma.rainbow': 'plasma rainbow', 'plasma.aurora': 'plasma aurora', photo: 'B: photosphere', lite: 'B-lite (low tier)',
   plasma: 'plasma', 'plasma.lite': 'plasma lite', current: 'current',
 };
 function variantLabel(variant: SunVariant): string {
   const [look, scale] = variant.split('@');
-  const kind = variant === 'cur' ? '' : ALTERNATIVE.includes(variant) || look.startsWith('plasma') ? 'ALT: ' : FAITHFUL.includes(variant) || scale ? 'FAITHFUL: ' : '';
+  const kind = variant === 'cur' ? '' : look.startsWith('plasma') ? (look.includes('rainbow') || look.includes('aurora') ? 'ALT multicolour: ' : 'ALT: ') : look.startsWith('photo') || look.startsWith('lite') ? 'ALT: ' : 'FAITHFUL: ';
   const res = scale ? ` ${scale === '0.5' ? '½' : scale === '0.33' ? '⅓' : scale} res` : '';
   return `${kind}${LOOK_LABEL[look] ?? look}${res}`;
 }
@@ -312,6 +314,65 @@ if (set === 'gif2') {
     }
     gifs.push({ out: `r2-anim-sun-${id}.gif`, frames, ms: 167, scale: 0.75 });
   }
+}
+
+if (set === 'stills3' || set === 'v3') {
+  // Round 3: current first, then the revised plasma (full, lite, half res), the multicolour examples, and the two
+  // closest faithful options (with the edge fix)
+  for (const id of PLAIN) {
+    const s = sysOf(id), cb = s.centralBody as CentralBody, R = radiusOf(cb), b = systemBiome(s);
+    const views = STAR_VIEWS(R, 120);
+    for (const [vn, v] of Object.entries(set === 'v3' ? { full: views.full, limb: views.limb } : views)) {
+      const cells = ROUND3.map((variant) => {
+        const file = `${set}/${id}.${vn}.${variant}.png`;
+        job(`${set}.${id}.${vn}.${variant}`, v, [...(vn === 'full' ? [] : currentSkyLayers(b, v, 0)), ...sunLayers(id, v, variant)], { out: file });
+        return { file, label: variantLabel(variant) };
+      });
+      composites.push({ out: `r3-sun-${id}-${vn}.png`, cols: 4, cells, metric: true, scale: vn === 'full' ? 0.6 : 0.5, title: `${s.name}, ${vn}: current first, then the plasma alternative (round 3), its multicolour examples, and the closest faithful options. Diff: mean difference from current.` });
+    }
+  }
+}
+
+if (set === 'gif3') {
+  const panels = ['cur', 'plasma@0.5', 'plasma.lite', 'plasma.rainbow@0.5', 'plasma.aurora@0.5', 'exact@0.5'];
+  for (const id of PLAIN) {
+    const s = sysOf(id), cb = s.centralBody as CentralBody, R = radiusOf(cb), b = systemBiome(s);
+    const frames: string[] = [];
+    for (let f = 0; f < 30; f++) {
+      const t = 120 + f * 0.5;
+      const v: View = { w: 480, h: 300, dpr: 1, cam: [R + 0.1 * 480 / 0.3, 0], zoom: 0.3, t };
+      const cells = panels.map((variant) => {
+        const file = `gif3/${id}.${variant}.${f}.png`;
+        job(`gif3.${id}.${variant}.${f}`, v, [...currentSkyLayers(b, v, 0), ...sunLayers(id, v, variant)], { out: file });
+        return { file, label: variantLabel(variant) };
+      });
+      const sheet = `gif3/${id}.sheet.${f}.png`;
+      composites.push({ out: sheet, cols: 3, cells });
+      frames.push(sheet);
+    }
+    gifs.push({ out: `r3-anim-sun-${id}.gif`, frames, ms: 167, scale: 0.75 });
+  }
+}
+
+if (set === 'bench3') {
+  const reps = 10;
+  for (const dpr of [1, 2]) {
+    for (const id of PLAIN) {
+      const cb = sysOf(id).centralBody as CentralBody, R = radiusOf(cb);
+      for (const [name, v] of Object.entries(sunViews(R, 120, dpr))) {
+        if (name === 'corona') continue;
+        for (const variant of ROUND3) job(`sun|${id}|${name}|${variant}|${dpr}`, v, sunLayers(id, v, variant), { bench: true, reps });
+      }
+    }
+  }
+}
+
+if (set === 'edge') {
+  // The limb at the lab's view (1600 x 900, zoom 0.15): is a stair-step the half-res target's, or the shader's own?
+  const s = sysOf('sol'), cb = s.centralBody as CentralBody, R = radiusOf(cb), b = systemBiome(s);
+  const v: View = { w: 1600, h: 900, dpr: 1, cam: [R + 0.1 * 1600 / 0.15, 0], zoom: 0.15, t: 120 };
+  for (const only of ['disc', 'rays']) job(`edge.only.${only}`, v, sunLayers('sol', v, 'cur').filter((l) => l.name === only), { out: `edge/sol.only.${only}.png` });
+  for (const variant of ['cur', 'cur@0.5', 'fix@0.5', 'exact@0.5', 'plasma@0.5']) job(`edge.${variant}`, v, [...currentSkyLayers(b, v, 0), ...sunLayers('sol', v, variant)], { out: `edge/sol.${variant}.png` });
 }
 
 if (set === 'gif') {

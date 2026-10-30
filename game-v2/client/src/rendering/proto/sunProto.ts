@@ -29,6 +29,17 @@ const TEXTURE_VALUE_NOISE = `
   float noise(vec2 p) { return textureLod(uNoiseTex, p * ${(1 / SUN_NOISE_PERIOD).toFixed(5)}, 0.0).b; }
 `;
 
+/**
+ * The game's sun has a hard ring inside its limb on stars whose edgeThickness is 0.03 (Sol): its rim highlight is
+ * `smoothstep(1 - edgeThickness, 0.97, sunT)`, both edges 0.97, which GLSL leaves undefined (a step, in practice).
+ * This gives that ramp a width (1.5% of the radius at least); nothing else changes. The faithful options all use it.
+ */
+export function withEdgeFix(src: string): string {
+  const line = 'float brightEdge = smoothstep(brightEdgeStart, 0.97, sunT);';
+  if (!src.includes(line)) return src;
+  return src.replace(line, 'float brightEdge = smoothstep(min(brightEdgeStart, 0.955), 0.97, sunT);');
+}
+
 /** The baked simplex texture (protoNoise.bakeSimplex): this many texels across this many lattice units */
 export const EXACT_SIZE = 2048;
 export const EXACT_UNITS = 64;
@@ -256,16 +267,21 @@ function hsl(h: number, s: number, l: number): Rgb {
 }
 const lift = (c: Rgb, k: number): Rgb => c.map((v) => v + (1 - v) * k) as Rgb;
 
-/** Granules this many world units across, whatever the star's size */
-const GRANULE = 60;
+/**
+ * The cells' size: granules this many world units across whatever the star's size, and the smallest cell shown this
+ * many px on screen. Round 1 had 60 and 10 (too fine to read at play zooms, Kieran found); B2 (round 3) has 500 and 48.
+ */
+export interface PhotoCells { granule: number; minPx: number }
+const ROUND1_CELLS: PhotoCells = { granule: 60, minPx: 10 };
+export const B2_CELLS: PhotoCells = { granule: 500, minPx: 48 };
 
 /**
- * uLevel for a zoom (CSS px per world unit): the finest size of cell still at least 10 px across at the disc's
- * middle. Cells are GRANULE units at level 0 and 4.2 times bigger each level up; down to −2 zoomed right in.
+ * uLevel for a zoom (CSS px per world unit): the finest size of cell still at least `minPx` across at the disc's
+ * middle. Cells are `granule` units at level 0 and 4.2 times bigger each level up; down to −2 zoomed right in.
  */
-export function sunPhotoLevel(zoom: number): number {
-  const cellPx = (GRANULE * zoom) / 0.637;
-  return Math.max(-2, Math.min(4, Math.log(10 / cellPx) / Math.log(1 / 0.237)));
+export function sunPhotoLevel(zoom: number, cells: PhotoCells = ROUND1_CELLS): number {
+  const cellPx = (cells.granule * zoom) / 0.637;
+  return Math.max(-2, Math.min(5, Math.log(cells.minPx / cellPx) / Math.log(1 / 0.237)));
 }
 
 /** uFine.x for a star of `radius` at a zoom: its corona's fine striations about 30 px apart round the limb */
@@ -279,7 +295,7 @@ export function sunPhotoFine(radius: number, zoom: number): number {
  * take their warp), and the details that tell stars apart (spots, prominences, streamers) seeded by its id.
  * Set uTime and uLevel (sunPhotoLevel) each frame.
  */
-export function sunPhotoLook(id: string, cb: SunBodyData, time = 0, zoom = 0.3): SunPhotoLook {
+export function sunPhotoLook(id: string, cb: SunBodyData, time = 0, zoom = 0.3, cells: PhotoCells = ROUND1_CELLS): SunPhotoLook {
   // (uFine.x, uLevel and uTime follow the zoom and the clock: set them each frame, from sunPhotoFine and sunPhotoLevel)
   const rnd = mulberry32(hashString(`sunphoto:${id}`));
   const hue = cb.detailParams?.hue ?? cb.hue ?? 40;
@@ -307,9 +323,9 @@ export function sunPhotoLook(id: string, cb: SunBodyData, time = 0, zoom = 0.3):
   return {
     reach,
     uniforms: {
-      uTime: time, uReach: reach, uSeed: [rnd(), rnd()], uLevel: sunPhotoLevel(zoom),
+      uTime: time, uReach: reach, uSeed: [rnd(), rnd()], uLevel: sunPhotoLevel(zoom, cells),
       uHot: palette.hot, uCore: palette.core, uBright: palette.bright, uMid: palette.mid, uDark: palette.dark, uRim: palette.rim, uCorona: palette.corona,
-      uGran: [radius / GRANULE, contrast, boilRate, swirl],
+      uGran: [radius / cells.granule, contrast, boilRate, swirl],
       uSurf: [cb.detailParams?.limbDarkening !== undefined ? 0.3 + cb.detailParams.limbDarkening * 0.6 : 0.65, 0.8, sunlike ? 0.55 + rnd() * 0.3 : 0.15 * rnd(), 0.004 + rnd() * 0.004],
       uCor: [0.75 + rnd() * 0.3, 0.55 + rnd() * 0.35, Math.round(7 + rnd() * 8), 0.4 + rnd() * 0.4],
       uProm: [0.6, 0.12 + rnd() * 0.1, 0.006 + rnd() * 0.004, 1.5 + rnd() * 1.5],
@@ -319,13 +335,18 @@ export function sunPhotoLook(id: string, cb: SunBodyData, time = 0, zoom = 0.3):
 }
 
 /**
- * ALTERNATIVE (round 2): the plasma star. Not a photosphere but the star as it looks in the ultraviolet (or in a
+ * ALTERNATIVE: the plasma star (round 3). Not a photosphere but the star as it looks in the ultraviolet (or in a
  * game's imagination): glowing, domain-warped plasma with bright ridged filaments and active regions on a ball that
  * really turns (the noise is a 3D volume read at points on its sphere, about an axis tilted toward us, so features
- * swing across the disc and over the limb), a hot core, a fringe of flame at the limb, and a corona of soft glow and
- * rays that stream outward (rings through the volume that scroll along its third axis). Bind protoNoise.noise3Data
- * as `uNoise3` (a 64³ RGBA 3D texture, repeat, trilinear with mipmaps). `#define PLASMA_LITE` drops the warp, the fine
- * detail octave, the flame fringe and the fine rays.
+ * swing across the disc and over the limb), a warm core, a limb that fades softly into its glow, a fringe of flame,
+ * and a corona of soft glow and rays that stream outward (rings through the volume that scroll along its third axis).
+ *
+ * Multicolour (optional, per star: centralBody.plasma.iridescence): the plasma's own fields pick a hue for each place,
+ * so colours swirl round each other with the flow: a rainbow, or two or three tints. Costs nothing extra: the fields
+ * are reads the shader already makes.
+ *
+ * Bind protoNoise.noise3Data as `uNoise3` (a 64³ RGBA 3D texture, repeat, trilinear with mipmaps). `#define PLASMA_LITE`
+ * drops the warp, the fine detail octaves, the flame fringe and the fine rays.
  */
 export const PLASMA_FRAG = `#version 300 es
   precision highp float;
@@ -348,13 +369,36 @@ export const PLASMA_FRAG = `#version 300 es
   uniform vec4 uSurf;    // x feature scale, y warp, z contrast, w core glow
   uniform vec4 uMotion;  // x spin (rad/s), y axis tilt toward us (rad), z boil rate, w corona outflow
   uniform vec4 uCor;     // x strength, y ray frequency, z ray reach (radii), w glow falloff
+  uniform vec2 uLimb;    // x how far in from the edge the disc fades into its glow (radii), y heat (brightness overall)
   uniform float uDetail; // 0..3: how many fine octaves (each 4x finer) show, faded in as the star grows on screen
+  uniform vec4 uIrid;    // multicolour: x strength (0 off), y 1 rainbow / 0 tints, z drift (per s), w hue spread
+  uniform vec3 uTintA;   // ... its tints
+  uniform vec3 uTintB;
+  uniform vec3 uTintC;
 
   vec3 ramp(float I) {
     vec3 c = mix(uDark, uMid, smoothstep(0.0, 0.32, I));
     c = mix(c, uBright, smoothstep(0.28, 0.6, I));
-    c = mix(c, uCore, smoothstep(0.55, 0.85, I));
-    return mix(c, uHot, smoothstep(0.82, 1.1, I));
+    c = mix(c, uCore, smoothstep(0.55, 0.88, I));
+    return mix(c, uHot, smoothstep(0.86, 1.2, I));
+  }
+
+  /** The multicolour tint for a place, from two of the plasma's own fields (h, k in 0..1) */
+  vec3 tint(float h, float k) {
+    if (uIrid.y > 0.5) {
+      // A rainbow: the hue runs along the field and drifts with time
+      vec3 q = clamp(abs(fract(h * uIrid.w + uTime * uIrid.z + vec3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0) - 1.0, 0.0, 1.0);
+      return mix(vec3(1.0), q, 0.6);
+    }
+    float a = h * uIrid.w + uTime * uIrid.z;
+    return mix(mix(uTintA, uTintB, smoothstep(0.3, 0.7, fract(a))), uTintC, smoothstep(0.45, 0.85, k));
+  }
+
+  /** Recolour a ramp colour by a tint, keeping its brightness and the white-hot peaks */
+  vec3 iridesce(vec3 c, vec3 t, float I) {
+    float l = dot(c, vec3(0.3, 0.55, 0.15));
+    vec3 tinted = t * l * 1.7;
+    return mix(c, mix(tinted, c, smoothstep(0.95, 1.25, I)), uIrid.x);
   }
 
   void main() {
@@ -376,7 +420,8 @@ export const PLASMA_FRAG = `#version 300 es
     float boil = uTime * uMotion.z;
 
     vec3 col = vec3(0.0);
-    float cover = 1.0 - smoothstep(1.0 - px * 1.5, 1.0 + px * 0.5, r);
+    // The disc fades out over its last uLimb.x of radius (a soft edge into the glow, as the game's sun does)
+    float cover = 1.0 - smoothstep(1.0 - uLimb.x - px, 1.0 + px * 0.5, r);
     if (cover > 0.0) {
       float mu = sqrt(max(1.0 - rc * rc, 0.0));
   #ifndef PLASMA_LITE
@@ -395,6 +440,7 @@ export const PLASMA_FRAG = `#version 300 es
       float body = f.r * 0.62 + f2.r * 0.38;
       float fil = pow(clamp(f.b * 0.55 + f2.b * 0.45, 0.0, 1.0), 3.0);
       float act = smoothstep(0.45, 0.8, f.g);
+      vec3 Q = P;
   #endif
       float I = 0.5 + (body - 0.5) * 1.3 * uSurf.z + fil * (0.45 + 0.6 * act);
   #ifndef PLASMA_LITE
@@ -408,39 +454,51 @@ export const PLASMA_FRAG = `#version 300 es
         k *= 4.0; amp *= 0.7;
       }
   #endif
-      // A hot core, a darker, redder limb, and a bright rim right at the edge (the plasma seen edge-on)
-      I = I * mix(0.55, 1.0, pow(mu, 0.45)) + uSurf.w * pow(mu, 5.0) * 0.35;
-      col = (ramp(I) + uRim * pow(1.0 - mu, 6.0) * 0.45) * cover;
+      // A warm core, a darker, redder limb, and a bright rim right at the edge (the plasma seen edge-on)
+      I = (I * mix(0.55, 1.0, pow(mu, 0.45)) + uSurf.w * pow(mu, 6.0) * 0.45) * uLimb.y;
+      col = ramp(I) + uRim * pow(1.0 - mu, 6.0) * 0.4;
+      if (uIrid.x > 0.0) {
+        // Multicolour: a slow field of its own (a few regions across the ball), pushed by the warp so the colours swirl
+        // round each other; one more read, only for those stars
+        float hs = 1.3 / uSurf.x;
+        vec4 hz = textureGrad(uNoise3, (P + (Q - P) * 0.6) * hs + uSeed.zyx + vec3(0.0, uTime * uIrid.z * 3.0, 0.0), Px * hs, Py * hs);
+        col = iridesce(col, tint(hz.r, hz.g), I);
+      }
+      col *= cover;
     }
 
-    // Outside: flame at the limb, then glow and rays streaming outward
+    // Outside, and over the soft edge: flame at the limb, then glow and rays streaming outward
     float d = max(r - 1.0, 0.0);
     vec3 glow = vec3(0.0);
-    if (d < uReach - 1.0 && r > 1.0 - 3.0 * px) {
+    if (d < uReach - 1.0 && r > 1.0 - uLimb.x - 3.0 * px) {
       float outward = uTime * uMotion.w;
-      float k = uCor.y * 0.04;
+      float kr = uCor.y * 0.04;
       // Broad streamers: a ring through the volume (a function of the angle), its third axis scrolling slowly with
       // height and time, so they run out straight and flow outward
-      float s1 = textureLod(uNoise3, vec3(dir * k, d * 0.12 - outward) + uSeed, 0.0).r;
+      float s1 = textureLod(uNoise3, vec3(dir * kr, d * 0.12 - outward) + uSeed, 0.0).r;
       float streams = smoothstep(0.3, 0.85, s1);
   #ifndef PLASMA_LITE
       // Fine rays: a ring four times as fast round, ridged, so they come out thin, straight and bright
-      float s2 = textureLod(uNoise3, vec3(dir * k * 4.0, d * 0.2 - outward * 1.6) + uSeed.zxy, 0.0).b;
+      float s2 = textureLod(uNoise3, vec3(dir * kr * 4.0, d * 0.2 - outward * 1.6) + uSeed.zxy, 0.0).b;
       float rays = pow(s2, 3.0);
   #else
       float rays = 0.35;
   #endif
       float reach = uCor.z * (0.25 + 0.75 * streams);
       float corona = exp(-d * uCor.w) * 0.28 + exp(-d / max(reach, 0.02)) * (0.12 + 0.4 * streams) * (0.3 + 1.1 * rays);
-      corona *= smoothstep(uReach - 1.0, (uReach - 1.0) * 0.55, d) * smoothstep(1.0 - 2.0 * px, 1.0 + 2.0 * px, r);
-      glow = mix(uRim, uCorona, smoothstep(0.0, 0.25, d)) * corona * uCor.x;
+      // (rising through the disc's fading edge, so the two meet without a line)
+      corona *= smoothstep(uReach - 1.0, (uReach - 1.0) * 0.55, d) * smoothstep(1.0 - uLimb.x - 2.0 * px, 1.0, r);
+      vec3 cc = mix(uRim, uCorona, smoothstep(0.0, 0.25, d));
+      if (uIrid.x > 0.0) cc = mix(cc, tint(s1, streams) * dot(cc, vec3(0.3, 0.55, 0.15)) * 1.7, uIrid.x * 0.8);
+      glow = cc * corona * uCor.x;
   #ifndef PLASMA_LITE
       if (d < 0.04) {
         // The flame fringe: ridged tongues of plasma licking up off the limb, rising
-        float lod = log2(max(px * k * 12.0 * 64.0, 1.0));
-        float t = textureLod(uNoise3, vec3(dir * k * 12.0, d * 20.0 - outward * 6.0) + uSeed.yzx, lod).b;
+        float lod = log2(max(px * kr * 12.0 * 64.0, 1.0));
+        float t = textureLod(uNoise3, vec3(dir * kr * 12.0, d * 20.0 - outward * 6.0) + uSeed.yzx, lod).b;
         float tongue = smoothstep(0.6, 0.95, t + 0.3 * (1.0 - d / 0.04)) * (1.0 - d / 0.04);
-        glow += uRim * tongue * (0.3 + 0.6 * streams) * 0.5;
+        // (faded in across the disc's soft edge, as the corona is, so it starts without a line)
+        glow += uRim * tongue * (0.3 + 0.6 * streams) * 0.5 * smoothstep(1.0 - uLimb.x - 2.0 * px, 1.0, r);
       }
   #endif
     }
@@ -449,6 +507,20 @@ export const PLASMA_FRAG = `#version 300 es
   }
 `;
 
+/** Per-star plasma settings a system can give (centralBody.plasma in systems.json): all optional */
+export interface PlasmaParams {
+  /** Feature scale (bigger: finer swirls), warp, contrast, core glow, brightness overall */
+  scale?: number;
+  warp?: number;
+  contrast?: number;
+  core?: number;
+  heat?: number;
+  /** How far in from the edge the disc fades into its glow (radii) */
+  softEdge?: number;
+  /** Multicolour swirls: a rainbow, or tints (two or three colours) carried round by the flow */
+  iridescence?: { mode: 'rainbow' | 'tints'; colors?: string[]; strength?: number; drift?: number; spread?: number };
+}
+
 export interface PlasmaLook { reach: number; uniforms: Record<string, number | number[]> }
 
 /** uDetail for a star this many px in radius on screen: a fine octave from 1,500 px, another each 4x bigger, up to 3 */
@@ -456,34 +528,51 @@ export function plasmaDetail(pxPerRadius: number): number {
   return Math.max(0, Math.min(3, Math.log2(pxPerRadius / 1500) / 2 + 0.5));
 }
 
+const luma = (c: Rgb) => 0.3 * c[0] + 0.55 * c[1] + 0.15 * c[2];
+
 /**
  * The plasma star's uniforms for a system: its palette from its detail colours or its hue (as the game's sun takes
- * them), its surface from its style (flow stars warp hard, granular ones are finer and contrastier), and its motion
- * and corona seeded by its id. Each frame: uTime, and uDetail from plasmaDetail.
+ * them), its surface from its style (flow stars warp hardest, granular ones are finer and contrastier), its brightness
+ * from how hot its palette is (a red giant's dark reds stay dark), its motion and corona seeded by its id, and anything
+ * its `plasma` settings say. Each frame: uTime, and uDetail from plasmaDetail.
  */
-export function plasmaLook(id: string, cb: SunBodyData, time = 0, pxPerRadius = 3000): PlasmaLook {
+export function plasmaLook(id: string, cb: SunBodyData & { plasma?: PlasmaParams }, time = 0, pxPerRadius = 3000): PlasmaLook {
   const rnd = mulberry32(hashString(`plasma:${id}`));
   const hue = cb.detailParams?.hue ?? cb.hue ?? 40;
   const dc = cb.detailColors;
-  let scale = 3.2, warp = 1.4, contrast = 1, core = 1.8;
-  if (cb.detailStar) { core = 0.8; warp = 0.9 + (cb.detailParams?.warpAmount ?? 0.4) * 1.5; contrast = cb.detailParams?.fbmContrast ?? 1; }
-  else if (cb.sunStyle === 'flow') { warp = 2.4; scale = 2.6; }
-  else if (cb.sunStyle === 'granular') { warp = 0.8; scale = 4.6; contrast = 1.2; }
+  const o = cb.plasma ?? {};
+  // Features about the size of the game's sun's own (its fBM's first octaves); flow stars a little broader
+  let scale = 9.5, warp = 1.4, contrast = 1, core = 1.2, soft = 0.025;
+  if (cb.detailStar) {
+    warp = 0.9 + (cb.detailParams?.warpAmount ?? 0.4) * 1.5;
+    contrast = cb.detailParams?.fbmContrast ?? 1;
+    core = 0.55;
+    soft = Math.max(0.015, (cb.detailParams?.edgeThickness ?? 0.03) * 0.8);
+  } else if (cb.sunStyle === 'flow') { warp = 2.4; scale = 8; core = 1.6; }
+  else if (cb.sunStyle === 'granular') { warp = 0.8; scale = 12; contrast = 1.2; core = 1.6; }
   const palette = dc
     ? { dark: hex(dc.darkColor ?? '#5a1a00'), mid: hex(dc.midColor ?? '#cc4400'), bright: hex(dc.brightColor ?? '#ffaa22'), core: hex(dc.edgeColor ?? '#ffdd66'),
         hot: hex(dc.centerColor ?? '#fff2cc'), rim: lift(hex(dc.plasmaColor ?? dc.edgeColor ?? '#ffbb44'), 0.2), corona: hex(dc.brightColor ?? '#ffaa22') }
     : { dark: hsl(hue - 20, 0.95, 0.16), mid: hsl(hue - 8, 0.95, 0.38), bright: hsl(hue, 0.9, 0.58), core: hsl(hue + 8, 0.85, 0.78),
         hot: hsl(hue + 15, 0.5, 0.95), rim: hsl(hue + 12, 0.9, 0.72), corona: hsl(hue, 0.85, 0.6) };
+  // A dark palette (a red giant's) burns lower: its middle colour's brightness sets the heat
+  // (a red giant's dark reds stay dark; a blue or pink star's hot core stays nearly white, a touch under the game's)
+  const heat = o.heat ?? (dc ? Math.max(0.5, Math.min(0.9, 0.2 + luma(palette.mid) * 1.6)) : 0.95);
+  const ir = o.iridescence;
+  const tints = (ir?.colors ?? ['#ff5fa2', '#5fd0ff', '#b6ff6a']).map(hex);
   const reach = 3.0;
   return {
     reach,
     uniforms: {
       uTime: time, uReach: reach, uSeed: [rnd() * 10, rnd() * 10, rnd() * 10],
       uDark: palette.dark, uMid: palette.mid, uBright: palette.bright, uCore: palette.core, uHot: palette.hot, uRim: palette.rim, uCorona: palette.corona,
-      uSurf: [scale, warp, contrast, core],
+      uSurf: [o.scale ?? scale, o.warp ?? warp, o.contrast ?? contrast, o.core ?? core],
       uMotion: [0.004 + rnd() * 0.003, 0.5 + rnd() * 0.4, 0.004 + rnd() * 0.003, 0.012 + rnd() * 0.008],
       uCor: [0.85 + rnd() * 0.3, 9 + Math.round(rnd() * 6), 0.7 + rnd() * 0.4, 10],
+      uLimb: [o.softEdge ?? soft, heat],
       uDetail: plasmaDetail(pxPerRadius),
+      uIrid: ir ? [ir.strength ?? 0.85, ir.mode === 'rainbow' ? 1 : 0, ir.drift ?? 0.01, ir.spread ?? (ir.mode === 'rainbow' ? 1.6 : 1.2)] : [0, 0, 0, 1],
+      uTintA: tints[0], uTintB: tints[1] ?? tints[0], uTintC: tints[2] ?? tints[1] ?? tints[0],
     },
   };
 }

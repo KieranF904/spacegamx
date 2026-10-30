@@ -7,7 +7,7 @@
 
 import { hashString, mulberry32 } from '@space-game/common';
 import { sunShaderDefs } from '../../common/src/data/definitions/SunShaderDefs';
-import { plasmaLook, sunPhotoLook, withExactNoise, withTextureNoise, PLASMA_FRAG, SUN_PHOTO_FRAG, SUN_PHOTO_VERT } from '../../client/src/rendering/proto/sunProto';
+import { B2_CELLS, plasmaLook, sunPhotoLook, withEdgeFix, withExactNoise, withTextureNoise, PLASMA_FRAG, SUN_PHOTO_FRAG, SUN_PHOTO_VERT, type PlasmaParams } from '../../client/src/rendering/proto/sunProto';
 
 export interface Sources {
   sunVert: string; sunFrag: string;
@@ -98,8 +98,8 @@ function sunDefaults(): Record<string, number | number[]> {
  * The game's star for `id` (a plain sun: glow, corona rays, the disc), as Renderer sets it up; its noise computed (as in
  * the game), or read from the noise texture (`port`, A) or from the baked simplex (`exact`, A-exact)
  */
-export function currentSunLayers(id: string, cb: CentralBody, v: View, noise: boolean | 'port' | 'exact' = false): Layer[] {
-  const tag = noise === true || noise === 'port' ? 'port' : noise === 'exact' ? 'exact' : 'cur';
+export function currentSunLayers(id: string, cb: CentralBody, v: View, noise: boolean | 'port' | 'exact' | 'fix' = false): Layer[] {
+  const tag = noise === true || noise === 'port' ? 'port' : noise === 'exact' ? 'exact' : noise === 'fix' ? 'fix' : 'cur';
   const tex = tag === 'port' ? { uNoiseTex: 'sunNoise' } : tag === 'exact' ? { uSimplexTex: 'simplex' } : undefined;
   const lod = lodOf(v.zoom);
   const layers: Layer[] = [];
@@ -204,18 +204,27 @@ export function atScale(layers: Layer[], scale: number, target = 'sunrt'): Layer
 }
 
 /** Prototype B for the same star: one quad, ±reach radii (`lite`: the low tier) */
-export function photoSunLayers(id: string, cb: CentralBody, v: View, lite = false): Layer[] {
-  const look = sunPhotoLook(id, cb, v.t, v.zoom);
+export function photoSunLayers(id: string, cb: CentralBody, v: View, lite = false, big = false): Layer[] {
+  const look = sunPhotoLook(id, cb, v.t, v.zoom, big ? B2_CELLS : undefined);
   const R = cb.detailParams?.radius ?? cb.radius ?? 1000;
   const h = R * look.reach;
   if (!onScreen(v, 0, 0, h, h)) return [];
   return [{ name: 'sun', program: lite ? 'photo.lite' : 'photo', blend: 'normal', textures: { uNoiseTex: 'sunNoise' }, verts: worldQuad(v, 0, 0, h, h), uniforms: look.uniforms }];
 }
 
-/** The plasma star (round 2's alternative) for the same star: one quad, ±reach radii (`lite`: the low tier) */
-export function plasmaSunLayers(id: string, cb: CentralBody, v: View, lite = false): Layer[] {
+/**
+ * Multicolour examples for the plasma star (a system would give these as centralBody.plasma.iridescence): `plasma.rainbow`
+ * and `plasma.aurora` (and `plasma.lite.rainbow` ...) apply them to whichever star is drawn
+ */
+export const PLASMA_EXAMPLES: Record<string, PlasmaParams> = {
+  rainbow: { iridescence: { mode: 'rainbow', strength: 0.75, drift: 0.006, spread: 0.9 } },
+  aurora: { iridescence: { mode: 'tints', colors: ['#3cffc0', '#8a5cff', '#ff5fd2'], strength: 0.8, drift: 0.005, spread: 1.1 } },
+};
+
+/** The plasma star (the alternative) for the same star: one quad, ±reach radii (`lite`: the low tier; `extra`: per-star settings) */
+export function plasmaSunLayers(id: string, cb: CentralBody, v: View, lite = false, extra?: PlasmaParams): Layer[] {
   const R = cb.detailParams?.radius ?? cb.radius ?? 1000;
-  const look = plasmaLook(id, cb, v.t, R * v.zoom);
+  const look = plasmaLook(id, { ...cb, plasma: { ...(cb as { plasma?: PlasmaParams }).plasma, ...extra } }, v.t, R * v.zoom);
   const h = R * look.reach;
   if (!onScreen(v, 0, 0, h, h)) return [];
   return [{ name: 'sun', program: lite ? 'plasma.lite' : 'plasma', blend: 'normal', textures: { uNoise3: 'noise3' }, verts: worldQuad(v, 0, 0, h, h), uniforms: look.uniforms }];
@@ -227,9 +236,9 @@ export function plasmaSunLayers(id: string, cb: CentralBody, v: View, lite = fal
  */
 export function sunVariantLayers(id: string, cb: CentralBody, v: View, variant: string): Layer[] {
   const [look, scale] = variant.split('@');
-  const layers = look === 'cur' || look === 'port' || look === 'exact' ? currentSunLayers(id, cb, v, look === 'cur' ? false : look)
-    : look.startsWith('plasma') ? plasmaSunLayers(id, cb, v, look === 'plasma.lite')
-    : photoSunLayers(id, cb, v, look === 'lite');
+  const layers = look === 'cur' || look === 'port' || look === 'exact' || look === 'fix' ? currentSunLayers(id, cb, v, look === 'cur' ? false : look)
+    : look.startsWith('plasma') ? plasmaSunLayers(id, cb, v, look.includes('.lite'), PLASMA_EXAMPLES[look.split('.').find((k) => k in PLASMA_EXAMPLES) ?? ''])
+    : photoSunLayers(id, cb, v, look === 'lite' || look === 'lite2', look === 'photo2' || look === 'lite2');
   return scale ? atScale(layers, Number(scale)) : layers;
 }
 
@@ -261,11 +270,14 @@ function centralFrag(src: Sources, name: keyof Sources['central'], port: boolean
 export function sunPrograms(src: Sources, desktop = true): Programs {
   const out: Programs = {
     'sun.cur': { vert: src.sunVert, frag: src.sunFrag },
-    'sun.port': { vert: src.sunVert, frag: withTextureNoise(src.sunFrag) },
+    'sun.port': { vert: src.sunVert, frag: withEdgeFix(withTextureNoise(src.sunFrag)) },
+    'sun.fix': { vert: src.sunVert, frag: withEdgeFix(src.sunFrag) },
+    'glow.fix': { vert: src.glowVert, frag: src.glowFrag },
+    'rays.fix': { vert: src.raysVert, frag: src.raysFrag },
     'glow.cur': { vert: src.glowVert, frag: src.glowFrag },
     // (the glow's own noise is a cheap value noise, left as it is)
     'glow.port': { vert: src.glowVert, frag: src.glowFrag },
-    'sun.exact': { vert: src.sunVert, frag: withExactNoise(src.sunFrag) },
+    'sun.exact': { vert: src.sunVert, frag: withEdgeFix(withExactNoise(src.sunFrag)) },
     'glow.exact': { vert: src.glowVert, frag: src.glowFrag },
     'rays.exact': { vert: src.raysVert, frag: withExactNoise(src.raysFrag) },
     'rays.cur': { vert: src.raysVert, frag: src.raysFrag },
