@@ -10,7 +10,7 @@ TGZ=/root/spacegame.tgz
 SRC=$(cd "$(dirname "$0")" && pwd)
 # The website only when asked (WITH_SITE=1): it takes over / from the game client
 SITE=$([ "${WITH_SITE:-0}" = 1 ] && echo 1 || echo 0)
-PARTS="common server server-browser client$([ $SITE = 1 ] && echo ' site')"
+PARTS="common server server-browser client"; [ $SITE = 1 ] && PARTS="$PARTS site"
 
 id spacegame >/dev/null 2>&1 || useradd --system --home-dir "$APP" --shell /usr/sbin/nologin spacegame
 mkdir -p "$APP"
@@ -53,7 +53,7 @@ for name in LOBBY_ADMIN_SECRET SITE_SECRET ADMIN_SERVER_PASSWORD; do
   fi
 done
 
-UNITS="spacegame-browser spacegame-server$([ $SITE = 1 ] && echo ' spacegame-site')"
+UNITS="spacegame-browser spacegame-server"; [ $SITE = 1 ] && UNITS="$UNITS spacegame-site"
 for u in $UNITS; do install -m 644 "$SRC/$u.service" /etc/systemd/system/; done
 systemctl daemon-reload
 systemctl enable $UNITS
