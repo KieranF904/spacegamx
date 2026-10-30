@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<!-- Sun and sky prototype lab: dev server only (not a build input in vite.config.ts). See docs/rendering/sun-sky-prototypes.md. -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Space Game - Sun and sky lab</title>
+  <link rel="icon" href="data:,">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #000; color: #c9d3e0; font: 12px 'Segoe UI', system-ui, sans-serif; }
+    canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+    #panel { position: fixed; top: 8px; left: 8px; background: rgba(10, 13, 19, 0.88); border: 1px solid #1d2532; border-radius: 4px; padding: 8px 10px; width: 270px; }
+    #panel .row { display: grid; grid-template-columns: 70px 1fr; gap: 6px; align-items: center; margin: 4px 0; }
+    select, button, input { background: #151b26; color: #d6deea; border: 1px solid #263044; border-radius: 3px; font: inherit; padding: 2px 4px; width: 100%; }
+    button { cursor: pointer; }
+    #stats { margin-top: 6px; color: #9fb0c8; white-space: pre; font: 11px Consolas, monospace; }
+    .hint { color: #66748a; margin-top: 6px; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="panel">
+    <div class="row"><label>System</label><select id="system"></select></div>
+    <div class="row"><label>Sun</label><select id="sun">
+      <option value="cur">current</option><option value="port">A: port (texture noise)</option>
+      <option value="photo" selected>B: photosphere</option><option value="lite">B-lite (low tier)</option>
+    </select></div>
+    <div class="row"><label>Sky</label><select id="sky">
+      <option value="cur">current</option><option value="sprite" selected>B: sprite stars</option><option value="better">C: sprite stars, better look</option>
+    </select></div>
+    <div class="row"><label>View</label><select id="view">
+      <option value="whole">whole (zoom 0.04)</option><option value="limb" selected>limb (zoom 0.15)</option>
+      <option value="close">close (zoom 1)</option><option value="disc">over the disc</option><option value="corona">corona</option>
+    </select></div>
+    <div class="row"><label>Time ×</label><input id="speed" type="range" min="0" max="20" step="0.5" value="1"></div>
+    <div class="row"><label>Resolution</label><select id="dpr"><option value="1">1× CSS</option><option value="dpr" selected>device</option></select></div>
+    <div id="stats"></div>
+    <div class="hint">Drag to pan, wheel to zoom. Hold Space to see the current shaders in place of the prototypes.</div>
+  </div>
+  <script type="module" src="/sunlab/sunlab.ts"></script>
+</body>
+</html>

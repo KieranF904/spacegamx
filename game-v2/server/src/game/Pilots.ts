@@ -214,7 +214,17 @@ export class Pilots {
     if (!s || conn.userId !== userId) return; // left (or switched account) while loading
     // A save we couldn't read isn't an empty one: never start them afresh over it
     if (failed) { s.loading = true; this.toast(conn, 'Your save could not be loaded right now: progress this session will not be saved. Try reconnecting.', 'bad'); return; }
-    s.profile = raw ? migrateProfile(raw, this.opts.starter, this.econ.ships) : newProfile(this.opts.starter);
+    // A save we can't make sense of is kept as it is (never saved over), like one we couldn't read
+    let profile: PlayerProfile;
+    try {
+      profile = raw ? migrateProfile(raw, this.opts.starter, this.econ.ships) : newProfile(this.opts.starter);
+    } catch (e) {
+      s.loading = true;
+      console.error(`[Pilots] could not migrate profile ${userId}:`, e);
+      this.toast(conn, 'Your save could not be loaded right now: progress this session will not be saved. Try reconnecting.', 'bad');
+      return;
+    }
+    s.profile = profile;
     s.dirty = !raw;
     if (this.structureToMaterials(s.profile)) s.dirty = true;
     if (this.grantStarterBonds(s.profile)) s.dirty = true;
@@ -693,7 +703,8 @@ export class Pilots {
     const s = this.sessions.get(conn);
     const eid = conn.playerId;
     if (!s || typeof msg.id !== 'string' || !hasComponent(this.host.world, Player, eid) || hasComponent(this.host.world, Dead, eid)) return;
-    const n = removeFrom(s.profile.cargo, msg.id, Math.max(1, Math.floor(msg.n || 1)));
+    const want = Math.floor(Number(msg.n));
+    const n = removeFrom(s.profile.cargo, msg.id, Number.isFinite(want) && want >= 1 ? want : 1);
     if (n <= 0) return;
     const a = Rotation.angle[eid] + Math.PI;
     const r = (this.ships.get(eid)?.derived.radius ?? 40) + 40;

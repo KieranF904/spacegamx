@@ -31,7 +31,8 @@
  */
 
 import { readFileSync, renameSync } from 'fs';
-import { mkdir, writeFile, rename } from 'fs/promises';
+import { mkdir } from 'fs/promises';
+import { writeFileDurable } from '../profile/durableWrite.js';
 import { dirname } from 'path';
 import type { ShipState } from '@space-game/common';
 import type { ShipBridge } from '../ships/ShipBridge.js';
@@ -287,11 +288,16 @@ function batches(snap: SystemSnapshot, n: number): SystemSnapshot[] {
 
 /** The memory as a JSON file, written whole and swapped in (never half written) */
 export function worldFileStore(file: string): WorldStore {
+  // A file that's there but couldn't be read (permissions, say) isn't saved over by this run's fresh world
+  let keepOff = false;
   return {
     load: () => {
       let text: string;
       try { text = readFileSync(file, 'utf8'); } catch (e) {
-        if ((e as NodeJS.ErrnoException).code !== 'ENOENT') console.warn(`[Memory] couldn't read ${file}: ${(e as Error).message}: starting a fresh world`);
+        if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
+          keepOff = true;
+          console.error(`[Memory] couldn't read ${file}: ${(e as Error).message}: starting a fresh world, and not saving it over that file`);
+        }
         return null;
       }
       try { return JSON.parse(text); } catch {
@@ -302,10 +308,10 @@ export function worldFileStore(file: string): WorldStore {
       }
     },
     save: async (data) => {
+      if (keepOff) return;
       await mkdir(dirname(file), { recursive: true });
-      const tmp = `${file}.tmp`;
-      await writeFile(tmp, JSON.stringify(data));
-      await rename(tmp, file);
+      // (Flushed to disk before it's swapped in: a power cut can't leave an empty file)
+      await writeFileDurable(file, JSON.stringify(data));
     },
   };
 }

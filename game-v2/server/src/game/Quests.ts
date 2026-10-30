@@ -107,6 +107,12 @@ export class Quests {
     return this.defs.get(id) ?? null;
   }
 
+  /** A generated job's id is one the station's board offers, this window or the last */
+  private onBoard(st: string, id: string): boolean {
+    const now = this.host.now();
+    return [now, now - BOUNTY_WINDOW_MS].some((t) => bountyIds(st, t).includes(id) || fleetIds(st, t).includes(id));
+  }
+
   /** Generated jobs (bounties, fleet ops) are dropped from the done list after their window */
   private static generated(id: string): boolean {
     return id.startsWith('bounty:') || id.startsWith('fleet:');
@@ -146,6 +152,8 @@ export class Quests {
     if (q.person) return this.pilots.toast(conn, `Talk to ${this.personName(q.person)} about this job`, 'warn');
     const st = this.host.stationAt(conn);
     if (!q.giver || st !== q.giver) return this.pilots.toast(conn, `Pick this up at ${q.giver ? this.host.names.station(q.giver) : 'its station'}`, 'warn');
+    // A bounty or fleet op is rebuilt from its id: only ones the board offers (now, or just before it turned over) are taken
+    if (Quests.generated(q.id) && !this.onBoard(st, q.id)) return this.pilots.toast(conn, 'That job is no longer on the board', 'warn');
     const err = this.canTake(conn, p, q);
     if (err) return this.pilots.toast(conn, err, 'warn');
     const party = this.host.party?.(conn) ?? [conn];
@@ -224,7 +232,8 @@ export class Quests {
   /** Spend a skill point */
   skillUp(conn: PilotConn, msg: { skill: string }): void {
     const p = this.pilots.get(conn);
-    const sk = SKILLS[String(msg.skill)];
+    // (Own keys only: '__proto__' or 'toString' would find something on a plain object)
+    const sk = Object.hasOwn(SKILLS, String(msg.skill)) ? SKILLS[String(msg.skill)] : undefined;
     if (!p || !sk || p.skillPoints < 1) return;
     const cur = p.skills[msg.skill] ?? 0;
     if (cur >= sk.max) return;

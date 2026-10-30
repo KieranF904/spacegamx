@@ -4,7 +4,8 @@
  * which bundles the server, never pulls in fs.
  */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync, renameSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, renameSync } from 'fs';
+import { writeFileDurableSync } from '../profile/durableWrite.js';
 import { join } from 'path';
 import type { ContribStore } from './ContributorNotes.js';
 
@@ -39,9 +40,7 @@ function readJson(path: string): unknown {
   }
 }
 
-/** Temp file, then rename: a crash mid-write never leaves half a file */
+/** Temp file, flushed, then rename: a crash or a full disk never leaves half a file (durableWrite.ts) */
 function writeAtomic(path: string, text: string): void {
-  const tmp = `${path}.tmp`;
-  writeFileSync(tmp, text);
-  renameSync(tmp, path);
+  writeFileDurableSync(path, text);
 }

@@ -215,6 +215,7 @@ export class Achievements {
     try {
       await this.store.saveDoc(RANKINGS_DOC, this.ranks);
     } catch (e) {
+      this.ranksDirty = true; // (tried again next time)
       console.error('[Achievements] could not save rankings:', e);
     }
   }

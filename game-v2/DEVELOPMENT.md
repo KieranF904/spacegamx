@@ -45,6 +45,10 @@ Accounts are stored in `game-v2/data/users.json` (gitignored). Delete the file t
 
 A system nobody's in isn't simulated: after `memory.evictAfterSeconds` it's written down and taken out of the world, and brought back (moved on, mended a little) as a pilot arrives, so a boss you killed or a nest you cleared stays so until it's due back, through restarts too. It's kept in `game-v2/data/world/memory.json` (gitignored, never overwritten by a deploy). Delete `data/world/` (with the server stopped) for a fresh world. The knobs are `memory` in `data/rules.json`: `evictAfterSeconds`, `healPerMinute` (a share of each part's max HP mended a minute away), `bossHealPerMinute`, `fastForwardMinutes` (most of the time away ships are flown on for), `saveSeconds`. See `docs/engine-map.md`, "Far ships and the world's memory".
 
+## Pilots' saves and backups
+
+Profiles are `game-v2/data/profiles/<accountId>.json` (gitignored, kept by deploys). Each write goes to a temp file, is flushed to disk and renamed into place, so a crash or a full disk never leaves half a save; a failed write leaves the last good one. The first save of an account each day copies the previous save to `data/profiles/backups/<accountId>/<yyyy-mm-dd>.json`, keeping the last 7 days (`BACKUP_DAYS` in `server/src/profile/JsonProfileStore.ts`). A save that won't parse is moved aside (`<id>.json.broken-<time>`) and the newest backup is loaded instead. To roll a pilot back by hand: stop the server, copy a backup over `<id>.json`, start it. See `docs/audits/server-robustness.md` for what else guards the live server.
+
 ## Services
 
 | Service | Port | Purpose |

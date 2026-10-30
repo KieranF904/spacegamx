@@ -13,6 +13,8 @@ import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import crypto from 'crypto';
 import { AccountRoutes } from './accounts/routes.js';
+import { BodyError, clientIp, readJson } from './accounts/request.js';
+import { MAX_SERVERS, parseHeartbeat, type ServerEntry } from './servers.js';
 
 // ============================================
 // CONFIGURATION
@@ -23,6 +25,9 @@ const TTL_MS = parseInt(process.env.BROWSER_TTL_MS || '15000', 10);
 const DEBUG = process.env.BROWSER_DEBUG !== 'false';
 const LOG_LIMIT = parseInt(process.env.BROWSER_LOG_LIMIT || '500', 10);
 const STATS_HISTORY_LIMIT = 60;
+/** Stats of servers not heard from in this long are dropped, and at most this many are kept */
+const STATS_TTL_MS = 10 * 60_000;
+const STATS_MAX = 200;
 
 // Pushover notifications
 const PUSHOVER_USER_KEY = process.env.PUSHOVER_USER_KEY || '';
@@ -31,19 +36,6 @@ const PUSHOVER_APP_TOKEN = process.env.PUSHOVER_APP_TOKEN || '';
 // ============================================
 // TYPES
 // ============================================
-
-interface ServerEntry {
-  host: string;
-  port: number;
-  name: string;
-  region: string;
-  maxPlayers: number;
-  players: number;
-  secure: boolean;
-  version: string;
-  lastSeen: number;
-  adminPort?: number;
-}
 
 interface ServerStats {
   history: Array<{
@@ -103,28 +95,15 @@ function logEvent(message: string, data?: any): void {
   }
 }
 
-function getClientIp(req: http.IncomingMessage): string {
-  const xff = req.headers['x-forwarded-for'];
-  if (xff) return String(xff).split(',')[0].trim();
-  return req.socket.remoteAddress || '';
-}
+/** (X-Forwarded-For only believed from this machine: see clientIp) */
+const getClientIp = clientIp;
 
-function parseJson(req: http.IncomingMessage): Promise<any> {
-  return new Promise((resolve, reject) => {
-    let body = '';
-    req.on('data', (chunk: Buffer) => {
-      body += chunk.toString();
-      if (body.length > 1e6) req.destroy();
-    });
-    req.on('end', () => {
-      if (!body) return resolve({});
-      try {
-        resolve(JSON.parse(body));
-      } catch (err) {
-        reject(err);
-      }
-    });
-  });
+/** A JSON object body, at most 64 KB (BodyError otherwise) */
+const parseJson = (req: http.IncomingMessage) => readJson(req);
+
+/** Status for a body that couldn't be read */
+function bodyStatus(err: unknown): number {
+  return err instanceof BodyError ? err.status : 400;
 }
 
 function setCors(res: http.ServerResponse): void {
@@ -135,7 +114,9 @@ function setCors(res: http.ServerResponse): void {
 }
 
 function sendJson(res: http.ServerResponse, statusCode: number, payload: any): void {
-  res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+  if (res.headersSent || res.writableEnded) return;
+  // (A body too large is left unread: close rather than keep reading it)
+  res.writeHead(statusCode, statusCode === 413 ? { 'Content-Type': 'application/json', Connection: 'close' } : { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(payload));
 }
 
@@ -181,6 +162,10 @@ function cleanup(): void {
   if (removed) {
     logEvent(`cleanup removed ${removed} entries`);
   }
+  const statsCutoff = now() - STATS_TTL_MS;
+  for (const [name, stats] of serverStats) {
+    if (!stats.latest || stats.latest.time < statsCutoff) serverStats.delete(name);
+  }
 }
 
 // ============================================
@@ -190,31 +175,24 @@ function cleanup(): void {
 async function handleRegister(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
   try {
     const body = await parseJson(req);
-    const host = body.host || getClientIp(req);
-    const port = Number(body.port || 3000);
-    const name = String(body.name || 'Game Server');
-    const region = String(body.region || 'unknown');
-    const maxPlayers = Number(body.maxPlayers || 32);
-    const players = Number(body.players || 0);
-    const secure = Boolean(body.secure);
-    const version = String(body.version || '1.0.0');
-    const adminPort = body.adminPort ? Number(body.adminPort) : undefined;
+    const beat = parseHeartbeat(body, getClientIp(req));
+    if ('error' in beat) {
+      sendJson(res, 400, { ok: false, error: beat.error });
+      return;
+    }
+    const { host, port, name, region } = beat;
     
     const key = `${host}:${port}`;
     const isNew = !servers.has(key);
+    if (isNew && servers.size >= MAX_SERVERS) {
+      cleanup();
+      if (servers.size >= MAX_SERVERS) {
+        sendJson(res, 503, { ok: false, error: 'Server list is full' });
+        return;
+      }
+    }
     
-    servers.set(key, {
-      host,
-      port,
-      name,
-      region,
-      maxPlayers,
-      players,
-      secure,
-      version,
-      lastSeen: now(),
-      adminPort
-    });
+    servers.set(key, { ...beat, lastSeen: now() });
     
     if (isNew) {
       logEvent('server registered', { key, name, region });
@@ -231,7 +209,7 @@ async function handleRegister(req: http.IncomingMessage, res: http.ServerRespons
     sendJson(res, 200, { ok: true, deletedAccounts: accounts.deletedAccounts() });
   } catch (err) {
     logEvent('register error', { error: String(err) });
-    sendJson(res, 400, { ok: false, error: 'Invalid request' });
+    sendJson(res, bodyStatus(err), { ok: false, error: 'Invalid request' });
   }
 }
 
@@ -254,9 +232,14 @@ function handleList(res: http.ServerResponse): void {
 async function handleStats(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
   try {
     const body = await parseJson(req);
-    const serverName = String(body.server || 'Unknown');
+    const serverName = String(body.server || 'Unknown').slice(0, 128);
     
     if (!serverStats.has(serverName)) {
+      if (serverStats.size >= STATS_MAX) cleanup();
+      if (serverStats.size >= STATS_MAX) {
+        sendJson(res, 503, { ok: false });
+        return;
+      }
       serverStats.set(serverName, {
         history: [],
         latest: null,
@@ -268,12 +251,12 @@ async function handleStats(req: http.IncomingMessage, res: http.ServerResponse):
     
     stats.latest = {
       time: now(),
-      tick: body.tick || 0,
-      players: body.players || [],
-      playerCount: body.playerCount || 0,
-      maxPlayers: body.maxPlayers || 32,
-      entityCount: body.entityCount || 0,
-      tickTime: body.tickTime || 0
+      tick: Number(body.tick) || 0,
+      players: Array.isArray(body.players) ? body.players.slice(0, 256).map((p: unknown) => String(p).slice(0, 64)) : [],
+      playerCount: Number(body.playerCount) || 0,
+      maxPlayers: Number(body.maxPlayers) || 32,
+      entityCount: Number(body.entityCount) || 0,
+      tickTime: Number(body.tickTime) || 0
     };
     
     stats.history.push({
@@ -296,9 +279,9 @@ async function handleStats(req: http.IncomingMessage, res: http.ServerResponse):
 async function handleLog(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
   try {
     const body = await parseJson(req);
-    const type = String(body.type || 'info');
-    const message = String(body.message || '');
-    const server = String(body.server || '');
+    const type = String(body.type || 'info').slice(0, 32);
+    const message = String(body.message || '').slice(0, 2000);
+    const server = String(body.server || '').slice(0, 128);
     const data = body.data || null;
     
     const entry: LogEntry = {
@@ -636,7 +619,8 @@ const server = http.createServer(async (req, res) => {
 // START SERVER
 // ============================================
 
-server.listen(PORT, () => {
+// (BROWSER_HOST=127.0.0.1 keeps it off the network entirely, when everything that calls it is on this machine)
+server.listen({ port: PORT, host: process.env.BROWSER_HOST || undefined }, () => {
   console.log(`🌐 Server Browser started on http://localhost:${PORT}`);
   console.log(`   Endpoints:`);
   console.log(`     GET  /           - Server browser UI`);
@@ -655,6 +639,21 @@ server.listen(PORT, () => {
 setInterval(cleanup, 5000);
 
 // Finish writing accounts before exiting (systemd stop, Ctrl+C)
-for (const sig of ['SIGTERM', 'SIGINT'] as const) {
-  process.once(sig, () => { void accounts.close().finally(() => process.exit(0)); });
+let stopping = false;
+function stop(code: number): void {
+  if (stopping) return;
+  stopping = true;
+  accounts.close()
+    .catch((err) => console.error('[browser] closing the accounts failed:', err))
+    .finally(() => process.exit(code));
 }
+for (const sig of ['SIGTERM', 'SIGINT'] as const) {
+  process.once(sig, () => stop(0));
+}
+// One bad request (or a lost database) mustn't take the lobby down unseen: a stray rejection is logged;
+// a thrown error leaves the process in an unknown state, so save and exit (systemd starts it again)
+process.on('unhandledRejection', (err) => console.error('[browser] unhandled rejection:', err));
+process.on('uncaughtException', (err) => {
+  console.error('[browser] uncaught exception:', err);
+  stop(1);
+});

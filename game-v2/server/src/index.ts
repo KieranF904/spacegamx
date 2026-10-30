@@ -82,7 +82,7 @@ const gameServer = new GameServer({
   // What's alive, dead and due back in every system, so a restart picks the world up where it was (data/world/, kept between deploys)
   worldStore: worldFileStore(join(dataPath, 'world', 'memory.json')),
 });
-new SocketTransport(gameServer, PORT);
+const transport = new SocketTransport(gameServer, PORT);
 
 // How it's running, every 2 s, for the box's resource monitor (deploy/vps/monitor): written whole, then swapped in
 const statusDir = join(dataPath, 'status');
@@ -94,23 +94,53 @@ setInterval(() => {
     .catch(() => {});
 }, 2000).unref();
 
-// Save every pilot before exiting (systemd stop, Ctrl+C)
+// Save every pilot before exiting (systemd stop, Ctrl+C). systemd waits 90 s (TimeoutStopSec) before it
+// kills the process; the saves are given SHUTDOWN_SAVE_MS of that, so a hung store can't keep it from exiting.
+const SHUTDOWN_SAVE_MS = 20_000;
 let shuttingDown = false;
-async function shutdown(signal: string) {
+async function shutdown(signal: string, code = 0) {
   if (shuttingDown) return;
   shuttingDown = true;
   console.log(`${signal}: saving pilots...`);
+  // No new pilots while the last ones are saved
+  try { transport.stopAccepting(); } catch { /* already closed */ }
+  const deadline = new Promise<'late'>((r) => setTimeout(() => r('late'), SHUTDOWN_SAVE_MS).unref());
   try {
-    await gameServer.saveAll();
-    await profileStore.close();
-    await userStore.close();
+    const saved = await Promise.race([
+      (async () => {
+        // (The stores are closed, so their writes in flight finish, even if a save failed)
+        let failed: unknown = null;
+        await gameServer.saveAll().catch((e) => { failed = e; });
+        await profileStore.close().catch((e) => { failed ??= e; });
+        await userStore.close().catch((e) => { failed ??= e; });
+        if (failed) throw failed;
+        return 'ok' as const;
+      })(),
+      deadline,
+    ]);
+    if (saved === 'late') console.error(`Shutdown: saves still running after ${SHUTDOWN_SAVE_MS / 1000} s; exiting anyway`);
+    else console.log('Shutdown: everything saved');
   } catch (e) {
     console.error('Shutdown save failed:', e);
+    code ||= 1;
   }
-  process.exit(0);
+  process.exit(code);
 }
+
 process.on('SIGTERM', () => void shutdown('SIGTERM'));
 process.on('SIGINT', () => void shutdown('SIGINT'));
+
+// A promise nobody waited on failed: logged loudly, and the server goes on (the game state isn't
+// touched halfway by these: they're saves, lobby calls and timers, each on its own)
+process.on('unhandledRejection', (reason) => {
+  console.error('[Process] unhandled promise rejection (kept running):', reason);
+});
+// Something threw outside every guard (the tick, the messages and the sockets each have their own):
+// the process may be in a bad state, so save who we can and exit; systemd starts it again (Restart=always)
+process.on('uncaughtException', (e) => {
+  console.error('[Process] uncaught exception, saving and restarting:', e);
+  void shutdown('uncaughtException', 1);
+});
 
 // Register with server browser
 async function registerWithBrowser() {

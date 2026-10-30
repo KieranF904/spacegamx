@@ -2,14 +2,18 @@ import { defineConfig } from 'vite';
 import { resolve } from 'path';
 import { shipsDevApi } from './shipsDevApi';
 
-export default defineConfig(({ mode }) => ({
+/** Built for the browser, Node's built-ins (imported by the server code the sandbox and replays bundle) are stubs */
+const nodeStubs = (on: boolean) => (on ? [{ find: /^(fs|fs\/promises|path|os|url|zlib)$/, replacement: resolve(__dirname, 'src/nodeStubs.ts') }] : []);
+
+export default defineConfig(({ command, mode }) => ({
   plugins: [shipsDevApi()],
   // (module workers, split like the rest: the hull worker brings in the hull builder and what it needs)
   worker: { format: 'es' },
   resolve: {
-    alias: {
-      '@space-game/common': resolve(__dirname, '../common/src'),
-    },
+    alias: [
+      { find: '@space-game/common', replacement: resolve(__dirname, '../common/src') },
+      ...nodeStubs(command === 'build'),
+    ],
   },
   server: {
     port: 5273,

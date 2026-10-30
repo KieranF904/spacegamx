@@ -40,7 +40,18 @@ export class PostgresProfileStore implements ProfileStore {
     return r.rows[0]?.data ?? null;
   }
 
-  async save(userId: number, profile: unknown): Promise<void> {
+  /** Saves of one account go one at a time, newest last (the pool would otherwise run them side by side, in any order) */
+  private writing = new Map<number, Promise<unknown>>();
+
+  save(userId: number, profile: unknown): Promise<void> {
+    const prev = this.writing.get(userId) ?? Promise.resolve();
+    const run = prev.catch(() => {}).then(() => this.write(userId, profile));
+    this.writing.set(userId, run);
+    void run.catch(() => {}).then(() => { if (this.writing.get(userId) === run) this.writing.delete(userId); });
+    return run;
+  }
+
+  private async write(userId: number, profile: unknown): Promise<void> {
     const version = (profile as { version?: number }).version ?? 0;
     await this.pool.query(
       `INSERT INTO profiles (user_id, version, data, updated_at) VALUES ($1, $2, $3, now())
@@ -50,6 +61,7 @@ export class PostgresProfileStore implements ProfileStore {
   }
 
   async delete(userId: number): Promise<void> {
+    await this.writing.get(userId)?.catch(() => {});
     await this.pool.query('DELETE FROM profiles WHERE user_id = $1', [userId]);
   }
 
@@ -67,6 +79,7 @@ export class PostgresProfileStore implements ProfileStore {
   }
 
   async close(): Promise<void> {
+    await Promise.allSettled([...this.writing.values()]);
     await this.pool.end();
   }
 }

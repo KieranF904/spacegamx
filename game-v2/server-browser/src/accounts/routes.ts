@@ -24,7 +24,9 @@
  * the account's id (their profiles are kept by it) and admin flag.
  *
  * Sign-in and registration are limited per address (a few a minute), so the
- * one place every password is checked can't be used to guess them. A banned
+ * one place every password is checked can't be used to guess them. Wrong
+ * passwords are limited per account too (from any address, so many addresses
+ * can't share out the guessing). A banned
  * account can't sign in, and its sessions stop validating (the answer says why
  * and until when).
  *
@@ -41,14 +43,14 @@
  * these are off.
  */
 
-import crypto from 'crypto';
 import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createUserStore } from './index.js';
 import { DeletedAccounts } from './DeletedAccounts.js';
 import type { UserStore, UserSummary } from './types.js';
-import { BAN_FOREVER, banMessage, validatePassword } from './utils.js';
+import { BAN_FOREVER, banMessage, safeEqual, validatePassword } from './utils.js';
+import { RateLimiter } from './RateLimiter.js';
 
 type Json = (res: http.ServerResponse, status: number, body: unknown) => void;
 type Body = (req: http.IncomingMessage) => Promise<any>;
@@ -56,6 +58,12 @@ type Body = (req: http.IncomingMessage) => Promise<any>;
 /** Attempts allowed per address per window */
 const LIMIT = 10;
 const WINDOW_MS = 60_000;
+/** Wrong passwords allowed per account (by the name signed in with, or the account changing itself) per window, from anywhere */
+const FAIL_LIMIT = 10;
+const FAIL_WINDOW_MS = 15 * 60_000;
+const SLOW_DOWN = 'Too many attempts. Wait a minute and try again.';
+/** (Why sign-in is refused after many wrong passwords for one account) */
+const lockedOut = (seconds: number) => `Too many wrong passwords for this account. Try again in ${Math.ceil(seconds / 60)} minute${seconds > 60 ? 's' : ''}.`;
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 /** Accounts live beside the game's data (kept across deploys): ../../data/lobby from dist/accounts or src/accounts */
@@ -67,6 +75,11 @@ const ACCOUNT_ACTIONS = ['account', 'change-password', 'change-email', 'logout-a
 /** Most users in one page of /admin/users */
 const PAGE_MAX = 100;
 
+/** What to answer a body that couldn't be read (413 too large, else 400) */
+function bodyStatus(err: unknown): number {
+  return (err as { status?: unknown })?.status === 413 ? 413 : 400;
+}
+
 /** A user as the game servers' admin tools see them */
 function adminUser(u: UserSummary, now = Date.now()) {
   const banned = u.banned_until !== null && u.banned_until > now;
@@ -77,7 +90,10 @@ function adminUser(u: UserSummary, now = Date.now()) {
 }
 
 export class AccountRoutes {
-  private attempts = new Map<string, number[]>();
+  /** Every sign-in, registration and account change, by address */
+  private attempts = new RateLimiter(LIMIT, WINDOW_MS);
+  /** Wrong passwords, by "name:<what was typed>" or "id:<account>" (a spread-out guesser has many addresses) */
+  private failures = new RateLimiter(FAIL_LIMIT, FAIL_WINDOW_MS);
 
   private constructor(private store: UserStore, private sendJson: Json, private parseJson: Body, private ipOf: (req: http.IncomingMessage) => string, private adminSecret: string, private deleted: DeletedAccounts) {}
 
@@ -97,17 +113,26 @@ export class AccountRoutes {
     if (!url.startsWith('/auth/') || req.method !== 'POST') return false;
     const action = url.slice('/auth/'.length);
     let body: any;
-    try { body = await this.parseJson(req); } catch { this.sendJson(res, 400, { success: false, error: 'Invalid request' }); return true; }
+    try { body = await this.parseJson(req); } catch (err) { this.sendJson(res, bodyStatus(err), { success: false, error: 'Invalid request' }); return true; }
     const str = (v: unknown) => (typeof v === 'string' ? v : '');
 
     if (action === 'login' || action === 'register') {
       if (!this.allow(this.ipOf(req))) {
-        this.sendJson(res, 429, { success: false, error: 'Too many attempts. Wait a minute and try again.' });
+        this.sendJson(res, 429, { success: false, error: SLOW_DOWN });
+        return true;
+      }
+      const name = `name:${str(body.username).trim().toLowerCase()}`;
+      if (action === 'login' && this.failures.blocked(name)) {
+        this.sendJson(res, 429, { success: false, error: lockedOut(this.failures.retryAfter(name)) });
         return true;
       }
       const result = action === 'login'
         ? await this.store.login(str(body.username), str(body.password))
         : await this.store.register(str(body.username), str(body.email), str(body.password));
+      if (action === 'login') {
+        if (result.success) this.failures.reset(name);
+        else if (result.error === 'Invalid username or password') this.failures.record(name);
+      }
       if (!result.success) { this.sendJson(res, action === 'login' ? 401 : 400, { success: false, error: result.error }); return true; }
       this.sendJson(res, 200, { success: true, username: result.user.username, token: result.token, isAdmin: result.user.is_admin });
       return true;
@@ -150,8 +175,14 @@ export class AccountRoutes {
       return;
     }
     // The rest change the account: the password again, limited like sign-in
-    if (!this.allow(this.ipOf(req))) { this.sendJson(res, 429, { success: false, error: 'Too many attempts. Wait a minute and try again.' }); return; }
-    if (!(await this.store.checkPassword(user.id, str(body.password)))) { this.sendJson(res, 401, { success: false, error: 'That password is wrong' }); return; }
+    if (!this.allow(this.ipOf(req))) { this.sendJson(res, 429, { success: false, error: SLOW_DOWN }); return; }
+    const who = `id:${user.id}`;
+    if (this.failures.blocked(who)) { this.sendJson(res, 429, { success: false, error: lockedOut(this.failures.retryAfter(who)) }); return; }
+    if (!(await this.store.checkPassword(user.id, str(body.password)))) {
+      this.failures.record(who);
+      this.sendJson(res, 401, { success: false, error: 'That password is wrong' });
+      return;
+    }
 
     if (action === 'change-password') {
       const next = str(body.newPassword);
@@ -178,14 +209,13 @@ export class AccountRoutes {
 
   /** The game servers' account admin (see the top) */
   private async handleAdmin(req: http.IncomingMessage, res: http.ServerResponse, action: string): Promise<void> {
-    const given = Buffer.from(String(req.headers.authorization ?? '').replace(/^Bearer\s+/i, ''));
-    const secret = Buffer.from(this.adminSecret);
-    if (!this.adminSecret || given.length !== secret.length || !crypto.timingSafeEqual(given, secret)) {
+    const given = String(req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
+    if (!this.adminSecret || !safeEqual(given, this.adminSecret)) {
       this.sendJson(res, 403, { success: false, error: 'Forbidden' });
       return;
     }
     let body: any;
-    try { body = await this.parseJson(req); } catch { this.sendJson(res, 400, { success: false, error: 'Invalid request' }); return; }
+    try { body = await this.parseJson(req); } catch (err) { this.sendJson(res, bodyStatus(err), { success: false, error: 'Invalid request' }); return; }
     const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 
     if (action === 'users') {
@@ -220,12 +250,6 @@ export class AccountRoutes {
   }
 
   private allow(ip: string): boolean {
-    const now = Date.now();
-    const list = (this.attempts.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
-    if (list.length >= LIMIT) { this.attempts.set(ip, list); return false; }
-    list.push(now);
-    this.attempts.set(ip, list);
-    if (this.attempts.size > 10_000) this.attempts.clear();
-    return true;
+    return this.attempts.hit(ip);
   }
 }

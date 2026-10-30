@@ -52,7 +52,7 @@ export class Party {
   private of = new Map<PilotConn, number>();
   private invites = new Map<PilotConn, { from: PilotConn; at: number }>();
   private wing = new Map<PilotConn, number>();
-  private lastPing = new Map<PilotConn, number>();
+  private lastPing = new WeakMap<PilotConn, number>();
   private nextId = 1;
   private ticks = 0;
 

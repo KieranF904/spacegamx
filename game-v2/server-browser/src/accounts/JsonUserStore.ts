@@ -7,8 +7,10 @@
  *              banned_until, ban_reason, banned_by)
  *   sessions: (token, user_id, expires_at)
  *
- * Data lives in a single JSON file on disk. Writes are atomic
- * (write temp file + rename) so a crash mid-write can't corrupt the store.
+ * Data lives in a single JSON file on disk. Writes are atomic and durable
+ * (temp file, fsync, rename) so a crash mid-write can't corrupt the store.
+ * A file that can't be read at startup is never replaced: the store refuses
+ * to start (users.json.bak, copied at each good start, is there to restore).
  *
  * When you're ready for PostgreSQL, switch to PostgresUserStore in
  * createUserStore() - the data files are 1:1 compatible.
@@ -32,6 +34,7 @@ import {
   validateEmail,
   validateRegistration,
   verifyPassword,
+  writeFileDurable,
 } from './utils.js';
 
 /** Full user row as stored on disk (includes credentials) */
@@ -64,6 +67,8 @@ export class JsonUserStore implements UserStore {
   private sessions: SessionRecord[] = [];
   private nextUserId = 1;
   private writeQueue: Promise<void> = Promise.resolve();
+  /** A write is queued (it takes the state as it is when it runs) */
+  private dirty = false;
   private closed = false;
 
   constructor(filePath: string = 'users.json') {
@@ -87,48 +92,56 @@ export class JsonUserStore implements UserStore {
       return;
     }
 
+    let raw: StoreFile;
     try {
-      const raw = JSON.parse(fs.readFileSync(this.filePath, 'utf-8')) as StoreFile;
-      // Normalize: tolerate a single user object instead of an array
-      this.users = Array.isArray(raw.users)
-        ? raw.users
-        : raw.users
-          ? [raw.users]
-          : [];
-      this.sessions = Array.isArray(raw.sessions) ? raw.sessions : [];
-      this.nextUserId = Math.max(
-        Number(raw.nextUserId) || 1,
-        this.users.length > 0 ? Math.max(...this.users.map(u => u.id)) + 1 : 1,
-      );
+      raw = JSON.parse(fs.readFileSync(this.filePath, 'utf-8')) as StoreFile;
+      if (!raw || typeof raw !== 'object' || (raw.users !== undefined && typeof raw.users !== 'object')) throw new Error('not an accounts file');
     } catch (err) {
-      console.error(`[UserStore] Failed to parse ${this.filePath}, starting fresh:`, err);
-      this.users = [];
-      this.sessions = [];
-      this.nextUserId = 1;
+      // Never start fresh over it: the next save would replace every account with an empty list
+      const backup = `${this.filePath}.bak`;
+      throw new Error(`[UserStore] ${this.filePath} can't be read (${(err as Error).message}). Refusing to start rather than lose the accounts: `
+        + `fix it, or restore ${fs.existsSync(backup) ? backup : 'a backup'} over it.`);
+    }
+    // Normalize: tolerate a single user object instead of an array
+    this.users = Array.isArray(raw.users)
+      ? raw.users
+      : raw.users
+        ? [raw.users]
+        : [];
+    this.sessions = Array.isArray(raw.sessions) ? raw.sessions : [];
+    this.nextUserId = Math.max(
+      Number(raw.nextUserId) || 1,
+      this.users.length > 0 ? Math.max(...this.users.map(u => u.id)) + 1 : 1,
+    );
+    // A known-good copy, for when the file is ever lost or damaged
+    try {
+      fs.copyFileSync(this.filePath, `${this.filePath}.bak`);
+    } catch (err) {
+      console.error('[UserStore] Could not back up the accounts:', err);
     }
   }
 
-  /** Atomic write: temp file + rename. Serialized through a queue. */
+  /**
+   * Durable atomic write (writeFileDurable), serialized through a queue. Saves asked for while one is
+   * queued share it (it writes the latest state). A failed write leaves the old file whole; the next save
+   * writes everything again.
+   */
   private save(): void {
-    if (this.closed) return;
-    const data: StoreFile = {
-      version: 1,
-      nextUserId: this.nextUserId,
-      users: this.users,
-      sessions: this.sessions,
-    };
-    const json = JSON.stringify(data, null, 2);
+    if (this.closed || this.dirty) return;
+    this.dirty = true;
     this.writeQueue = this.writeQueue.then(() => {
-      return new Promise<void>((resolve) => {
-        try {
-          const tmp = `${this.filePath}.tmp`;
-          fs.writeFileSync(tmp, json);
-          fs.renameSync(tmp, this.filePath);
-        } catch (err) {
-          console.error('[UserStore] Failed to save:', err);
-        }
-        resolve();
-      });
+      this.dirty = false;
+      const data: StoreFile = {
+        version: 1,
+        nextUserId: this.nextUserId,
+        users: this.users,
+        sessions: this.sessions,
+      };
+      try {
+        writeFileDurable(this.filePath, JSON.stringify(data, null, 2));
+      } catch (err) {
+        console.error('[UserStore] Failed to save:', err);
+      }
     });
   }
 
@@ -347,6 +360,8 @@ export class JsonUserStore implements UserStore {
     this.users = this.users.filter(u => u.id !== userId);
     this.sessions = this.sessions.filter(s => s.user_id !== userId);
     if (this.users.length !== before) this.save();
+    // (On disk before the game servers are told to delete the pilot's profile)
+    await this.writeQueue;
   }
 
   async cleanupExpiredSessions(): Promise<void> {

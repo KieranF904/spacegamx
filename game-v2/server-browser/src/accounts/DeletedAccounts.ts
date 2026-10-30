@@ -7,6 +7,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { writeFileDurable } from './utils.js';
 
 const RETAIN_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -17,10 +18,22 @@ export class DeletedAccounts {
 
   constructor(private file: string | null, private now: () => number = Date.now) {
     if (!file) return;
+    let text: string;
     try {
-      const raw = JSON.parse(fs.readFileSync(file, 'utf-8'));
-      if (Array.isArray(raw)) this.entries = raw.filter((e) => Number.isInteger(e?.id) && Number.isFinite(e?.at));
-    } catch { /* none yet */ }
+      text = fs.readFileSync(file, 'utf-8');
+    } catch {
+      return; // none yet
+    }
+    try {
+      const raw = JSON.parse(text);
+      if (!Array.isArray(raw)) throw new Error('not a list');
+      this.entries = raw.filter((e) => Number.isInteger(e?.id) && Number.isFinite(e?.at));
+    } catch (err) {
+      // Kept aside, not lost: the next deletion rewrites the file (the game servers then miss these ids)
+      const aside = `${file}.corrupt-${this.now()}`;
+      try { fs.copyFileSync(file, aside); } catch { /* (logged below either way) */ }
+      console.error(`[Accounts] the deleted-accounts list ${file} can't be read (${(err as Error).message}); a copy is at ${aside}`);
+    }
   }
 
   add(id: number): void {
@@ -41,9 +54,7 @@ export class DeletedAccounts {
     this.entries = this.entries.filter((e) => e.at >= cutoff);
     try {
       fs.mkdirSync(path.dirname(this.file), { recursive: true });
-      const tmp = `${this.file}.tmp`;
-      fs.writeFileSync(tmp, JSON.stringify(this.entries));
-      fs.renameSync(tmp, this.file);
+      writeFileDurable(this.file, JSON.stringify(this.entries));
     } catch (err) {
       console.error('[Accounts] could not save the deleted-accounts list:', err);
     }

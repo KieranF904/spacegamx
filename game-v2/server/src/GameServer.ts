@@ -163,6 +163,7 @@ import { Achievements } from './game/Achievements.js';
 import { huntedBoss, RibbonsFile, mineFalloff, rayTerrain, type Terrain } from '@space-game/common';
 import { repRank, replicaAngle, quantizeReplicaAngle, ReplicaMode } from '@space-game/common';
 import { MemoryProfileStore, type ProfileStore } from './profile/ProfileStore.js';
+import { MessageLimiter } from './net/MessageLimits.js';
 
 // ============================================
 // SPATIAL PARTITIONING
@@ -1048,11 +1049,11 @@ this.devTeleport = opts.devTeleport ?? false;
   step(): void {
     this.batching++;
     try {
-      this.drainInputQueue();
+      this.guard('inputs', () => this.drainInputQueue());
       this.tick();
       if (this.currentTick - this.lastSnapshotTick >= TICK_RATE / SNAPSHOT_RATE) {
-        this.sendSnapshots();
         this.lastSnapshotTick = this.currentTick;
+        this.guard('snapshots', () => this.sendSnapshots());
       }
     } finally {
       this.batching--;
@@ -1425,7 +1426,25 @@ this.devTeleport = opts.devTeleport ?? false;
     });
   }
 
-  private lastShare = new Map<ClientConnection, number>();
+  private lastShare = new WeakMap<ClientConnection, number>();
+
+  /**
+   * A design a client sent, parsed (throws if it isn't one). Sizes are checked
+   * before any work's done on it: parts have unique uids 0..255, so a real design
+   * never has more than 256; and the strings in it are kept to a sensible length
+   * (they're saved and sent to everyone near).
+   */
+  private clientBlueprint(raw: unknown): Blueprint {
+    const r = raw as { parts?: unknown } | null;
+    if (!r || typeof r !== 'object' || !Array.isArray(r.parts) || r.parts.length > 256) throw new Error('not a blueprint');
+    const bp = fixModelMaterials(this.ships.catalog, parseBlueprint(JSON.stringify(raw)));
+    bp.name = bp.name.slice(0, 64);
+    for (const p of bp.parts) {
+      if (p.facing !== undefined && (typeof p.facing !== 'string' || p.facing.length > 16)) delete p.facing;
+      if (p.gems) p.gems = p.gems.map((g) => g.slice(0, 40));
+    }
+    return bp;
+  }
 
   /** Send a ship design to your party (they can load it into their hangar) */
   private handleShareDesign(conn: ClientConnection, raw: unknown): void {
@@ -1434,7 +1453,7 @@ this.devTeleport = opts.devTeleport ?? false;
     this.lastShare.set(conn, now);
     let bp: Blueprint;
     try {
-      bp = fixModelMaterials(this.ships.catalog, parseBlueprint(JSON.stringify(raw)));
+      bp = this.clientBlueprint(raw);
     } catch {
       return this.pilots.toast(conn, "That isn't a ship design", 'warn');
     }
@@ -2188,7 +2207,7 @@ this.devTeleport = opts.devTeleport ?? false;
       const dead = !hasComponent(this.world, Player, eid) || hasComponent(this.world, Dead, eid);
       if (!dead && this.currentTick < l.until) continue;
       this.lingering.delete(eid);
-      void this.pilots.detach(l.conn);
+      this.pilots.detach(l.conn).catch((e) => this.fault('detach', e));
       if (!dead) addComponent(this.world, Dead, eid);
     }
   }
@@ -2245,10 +2264,16 @@ this.devTeleport = opts.devTeleport ?? false;
 
   /** Save everyone (server shutdown) */
   async saveAll(): Promise<void> {
-    await this.pilots.saveAll();
-    await this.contrib.flush();
-    await this.achievements.save(true);
-    await this.memory.save();
+    // (Each on its own: one store failing mustn't keep the others from being saved)
+    const results = await Promise.allSettled([
+      () => this.pilots.saveAll(),
+      () => this.contrib.flush(),
+      () => this.achievements.save(true),
+      () => this.memory.save(),
+    ].map(async (save) => save()));
+    const failed = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+    for (const f of failed) console.error('[Save] a store failed to save:', f.reason);
+    if (failed.length) throw new Error(`${failed.length} store(s) failed to save`);
   }
 
   /** This week's hunted boss: double rewards */
@@ -2730,7 +2755,8 @@ this.devTeleport = opts.devTeleport ?? false;
         try {
           this.handleMessage(conn, msg);
         } catch (e) {
-          console.error('Failed to handle message:', e);
+          // (Logged a line every 10 s at most per type: a hostile client could send thousands)
+          this.fault(`message:${typeof msg?.type === 'string' ? msg.type.slice(0, 32) : '?'}`, e);
         } finally {
           this.batching--;
           // Answers to requests go now, together (inputs only queue, so usually nothing)
@@ -2740,15 +2766,18 @@ this.devTeleport = opts.devTeleport ?? false;
       close: () => {
         console.log('Client disconnected');
         // Off a siege moon first (paid what they're owed, back in orbit), so that's where they're saved
-        this.sieges.leave(conn);
-        this.people.leave(conn);
-        this.arenas.leave(conn);
+        // (Each step on its own: one that throws mustn't stop the rest, or the save, from happening)
+        this.guard('close', () => this.sieges.leave(conn));
+        this.guard('close', () => this.people.leave(conn));
+        this.guard('close', () => this.arenas.leave(conn));
         this.clients.delete(ws);
-        this.party.remove(conn);
-        this.trade.remove(conn);
-        this.admin.forget(conn);
-        this.contrib.forget(conn);
-        this.ammo.forget(conn);
+        this.outbox.delete(ws);
+        this.lazy.delete(ws);
+        this.guard('close', () => this.party.remove(conn));
+        this.guard('close', () => this.trade.remove(conn));
+        this.guard('close', () => this.admin.forget(conn));
+        this.guard('close', () => this.contrib.forget(conn));
+        this.guard('close', () => this.ammo.forget(conn));
         const eid = conn.playerId;
         const alive = hasComponent(this.world, Player, eid) && !hasComponent(this.world, Dead, eid);
         // Leaving mid-fight doesn't save you: the ship stays put (hands off the controls) for a while
@@ -2757,7 +2786,7 @@ this.devTeleport = opts.devTeleport ?? false;
           this.lingering.set(eid, { conn, until: this.currentTick + LINGER_TICKS });
           return;
         }
-        void this.pilots.detach(conn);
+        this.pilots.detach(conn).catch((e) => this.fault('detach', e));
         if (hasComponent(this.world, Player, eid)) addComponent(this.world, Dead, eid);
       },
     };
@@ -2816,8 +2845,17 @@ this.devTeleport = opts.devTeleport ?? false;
   // MESSAGE HANDLING
   // ============================================
 
+  /** Per-connection rate limits for expensive or broadcast messages (net/MessageLimits.ts) */
+  readonly limiter = new MessageLimiter();
+
   private handleMessage(conn: ClientConnection, msg: ClientMessage): void {
+    // (Anything that isn't a typed message object is dropped: a hostile client can send any JSON)
+    if (!msg || typeof msg !== 'object' || typeof msg.type !== 'string') return;
     if (!conn.joined && !PRE_JOIN.has(msg.type)) return;
+    if (!conn.isAdmin && !this.limiter.allow(conn, msg.type)) {
+      if (msg.type === 'chat') this.send(conn.ws, { type: 'systemMessage', text: 'Slow down: too many messages at once.', color: '#fca5a5' });
+      return;
+    }
     switch (msg.type) {
       case 'input':
         // Queue for next tick boundary — don't apply mid-frame.
@@ -2900,7 +2938,7 @@ case 'respawn':
         this.market.buy(conn, msg);
         break;
       case 'marketScan':
-        this.market.scan(conn, Array.isArray(msg.items) ? msg.items.map(String) : []);
+        this.market.scan(conn, Array.isArray(msg.items) ? msg.items.slice(0, 80).map(String) : []);
         break;
       case 'itemMove':
         this.pilots.handleMove(conn, msg);
@@ -2989,13 +3027,14 @@ case 'respawn':
         this.quests.skillUp(conn, msg);
         break;
 case 'join':
-        this.handleJoin(conn, msg);
+        // (Async: a throw inside is a rejected promise the receive() try/catch can't see)
+        this.handleJoin(conn, msg).catch((e) => this.fault('join', e));
         break;
       case 'authLogin':
-        this.handleAuthLogin(conn, msg);
+        this.handleAuthLogin(conn, msg).catch((e) => this.fault('authLogin', e));
         break;
       case 'authRegister':
-        this.handleAuthRegister(conn, msg);
+        this.handleAuthRegister(conn, msg).catch((e) => this.fault('authRegister', e));
         break;
       case 'stateHash':
         this.handleStateHash(conn, msg as any);
@@ -3018,7 +3057,7 @@ case 'join':
         break;
       case 'designSave': {
         let bp: Blueprint;
-        try { bp = fixModelMaterials(this.ships.catalog, parseBlueprint(JSON.stringify(msg.blueprint))); } catch { break; }
+        try { bp = this.clientBlueprint(msg.blueprint); } catch { break; }
         if (!this.ships.validate(bp).ok) { this.pilots.toast(conn, 'Fix the design first: it has problems', 'warn'); break; }
         this.hangar.saveDesign(conn, Math.floor(Number(msg.slot)), bp);
         break;
@@ -3247,7 +3286,7 @@ case 'join':
     if (!this.shipEditAnywhere && !conn.docked && !this.isDocked(eid)) return reply(false, ['dock at a station to refit your ship']);
     let bp: Blueprint;
     try {
-      bp = fixModelMaterials(this.ships.catalog, parseBlueprint(JSON.stringify(raw)));
+      bp = this.clientBlueprint(raw);
     } catch {
       return reply(false, ['not a blueprint']);
     }
@@ -3269,7 +3308,7 @@ case 'join':
     if (!this.shipEditAnywhere && !conn.docked && !this.isDocked(eid)) return reply(false, ['dock at a station to use the hangar']);
     let bp: Blueprint;
     try {
-      bp = fixModelMaterials(this.ships.catalog, parseBlueprint(JSON.stringify(msg.blueprint)));
+      bp = this.clientBlueprint(msg.blueprint);
     } catch {
       return reply(false, ['not a blueprint']);
     }
@@ -3352,24 +3391,28 @@ case 'join':
     Input.strafeRight[eid] = msg.strafeRight ? 1 : 0;
     Input.helm[eid] = msg.helm ? 1 : 0;
     Input.jump[eid] = msg.jump ? 1 : 0;
-    Input.cursorDist[eid] = msg.cursorDist ?? 0;
+    // (The binary input carries it as a uint16; a JSON one could say NaN, Infinity or a string)
+    const cursorDist = Number(msg.cursorDist);
+    Input.cursorDist[eid] = Number.isFinite(cursorDist) ? Math.min(65535, Math.max(0, cursorDist)) : 0;
     // The client sends dequantized(quantized(rawAngle)) as a float32, which is already on the
     // replicated grid (replicaAngle gives back exactly that value). Anything else (a JSON input,
     // a bot) is put on the grid too, so every client replays this ship's turning exactly.
     Input.targetAngle[eid] = replicaAngle(ReplicaMode.Player, quantizeReplicaAngle(Number(msg.targetAngle) || 0));
-    Input.sequence[eid] = msg.seq;
+    const seq = Number.isFinite(msg.seq) ? msg.seq : 0;
+    Input.sequence[eid] = seq;
     
-    conn.lastInputSeq = msg.seq;
+    conn.lastInputSeq = seq;
   }
 
   private handlePing(conn: ClientConnection, msg: any): void {
     const receiveTime = performance.now();
     const serverNow = Date.now();
     // Rough estimate for admin display (includes clock skew, but close enough)
-    conn.ping = Math.max(0, serverNow - msg.clientTime);
+    const clientTime = Number.isFinite(msg.clientTime) ? msg.clientTime : 0;
+    conn.ping = Math.max(0, serverNow - clientTime);
     this.send(conn.ws, {
       type: 'pong',
-      clientTime: msg.clientTime,
+      clientTime,
       serverTime: serverNow,
       tick: this.currentTick,
       serverProcessing: Math.round((performance.now() - receiveTime) * 100) / 100,
@@ -3428,7 +3471,7 @@ case 'join':
         conn.isAdmin = user.is_admin;
         conn.isContributor = this.contrib.hasRank(user.id, user.username);
         conn.authToken = msg.token;
-        void this.loginPilot(conn, user.id);
+        this.loginPilot(conn, user.id).catch((e) => this.fault('login', e));
         console.log(`Player ${conn.playerId} authenticated as ${user.username}${user.is_admin ? ' (admin)' : ''}`);
       } else {
         // Expired, signed out or banned (or the lobby's unreachable): back to the sign-in screen, not in as a guest
@@ -3437,7 +3480,9 @@ case 'join':
       }
     } else {
       // Guest join
-      conn.username = msg.username || `Guest_${Math.floor(Math.random() * 10000)}`;
+      // (A name only: a string, no control characters, a sensible length; it goes to everyone near)
+      const name = typeof msg.username === 'string' ? msg.username.replace(/[\u0000-\u001f\u007f-\u009f]/g, '').trim().slice(0, 24) : '';
+      conn.username = name || `Guest_${Math.floor(Math.random() * 10000)}`;
       conn.userId = null;
       conn.isAdmin = this.everyoneAdmin || this.guestAdmin;
       conn.isContributor = false;
@@ -3458,7 +3503,7 @@ case 'join':
     if (result.success) {
       conn.username = result.user.username;
       conn.userId = result.user.id;
-      void this.loginPilot(conn, result.user.id);
+      this.loginPilot(conn, result.user.id).catch((e) => this.fault('login', e));
       conn.isAdmin = result.user.is_admin;
       conn.isContributor = this.contrib.hasRank(result.user.id, result.user.username);
       conn.authToken = result.token;
@@ -3491,7 +3536,7 @@ case 'join':
     if (result.success) {
       conn.username = result.user.username;
       conn.userId = result.user.id;
-      void this.loginPilot(conn, result.user.id);
+      this.loginPilot(conn, result.user.id).catch((e) => this.fault('login', e));
       conn.isAdmin = result.user.is_admin;
       conn.isContributor = this.contrib.hasRank(result.user.id, result.user.username);
       conn.authToken = result.token;
@@ -3692,7 +3737,7 @@ case 'join':
       while (this.tickAccumulator >= TICK_MS && ticksThisFrame < maxTicksPerFrame) {
         // Drain queued inputs right before each tick so they take effect
         // on the earliest possible tick boundary.
-        this.drainInputQueue();
+        this.guard('inputs', () => this.drainInputQueue());
       
         this.tick();
         this.tickAccumulator -= TICK_MS;
@@ -3706,12 +3751,16 @@ case 'join':
     
       // Send snapshots at snapshot rate
       if (this.currentTick - this.lastSnapshotTick >= TICK_RATE / SNAPSHOT_RATE) {
-        this.sendSnapshots();
         this.lastSnapshotTick = this.currentTick;
+        this.guard('snapshots', () => this.sendSnapshots());
       }
+    } catch (e) {
+      // (Whatever got past the guards: logged, and the loop goes on: it's scheduled below either way)
+      this.tickAccumulator = 0;
+      this.fault('gameLoop', e);
     } finally {
       this.batching--;
-      this.flushOutbox();
+      this.guard('flushOutbox', () => this.flushOutbox());
     }
     
     // Schedule the next iteration with a precise delay instead of busy-spinning.
@@ -3738,7 +3787,8 @@ case 'join':
     // 1. Process newly received inputs (may schedule them for future ticks)
     for (let i = 0; i < this.inputQueue.length; i++) {
       const { conn, msg } = this.inputQueue[i];
-      this.handleInput(conn, msg);
+      // (One bad input is dropped on its own; the queue's still cleared below)
+      this.guard('input', () => this.handleInput(conn, msg));
     }
     this.inputQueue.length = 0; // clear without re-allocation
     
@@ -3754,7 +3804,7 @@ case 'join':
       const due = scheduled.filter((s) => s.targetTick <= nextTick);
       if (due.length) {
         due.sort((a, b) => a.targetTick - b.targetTick || (a.msg.seq ?? 0) - (b.msg.seq ?? 0));
-        for (const s of due) this.applyInputToEntity(conn, s.msg);
+        for (const s of due) this.guard('input', () => this.applyInputToEntity(conn, s.msg));
         drainedCount += due.length;
         conn.scheduledInputs = scheduled.filter((s) => s.targetTick > nextTick);
       }
@@ -3769,58 +3819,96 @@ case 'join':
     Input.strafeLeft[eid] = 0; Input.strafeRight[eid] = 0; Input.jump[eid] = 0;
   }
 
+  // ---- Crash isolation (server robustness audit, docs/audits/server-robustness.md) ----
+  /** Errors by where they happened: how many, and when it was last logged */
+  private faults = new Map<string, { count: number; unlogged: number; loggedAt: number }>();
+
+  /**
+   * Run one part of the tick (or one message, or one client's share of it): if it
+   * throws, it's logged and counted and the rest of the tick still runs, so one
+   * bad entity can't stop the world. The first error is logged whole, then at most
+   * one line every 10 s per place, with how many there were since.
+   */
+  guard(where: string, fn: () => void): void {
+    try {
+      fn();
+    } catch (e) {
+      this.fault(where, e);
+    }
+  }
+
+  fault(where: string, e: unknown): void {
+    const now = Date.now();
+    let f = this.faults.get(where);
+    if (!f) { f = { count: 0, unlogged: 0, loggedAt: 0 }; this.faults.set(where, f); }
+    f.count++;
+    if (now - f.loggedAt < 10_000) { f.unlogged++; return; }
+    const more = f.unlogged ? ` (and ${f.unlogged} more since the last report)` : '';
+    f.loggedAt = now;
+    f.unlogged = 0;
+    console.error(`[Fault] ${where} threw at tick ${this.currentTick}${more}:`, e);
+  }
+
+  /** Errors caught so far, by where (admin stats, tests) */
+  faultCounts(): Record<string, number> {
+    return Object.fromEntries([...this.faults].map(([k, f]) => [k, f.count]));
+  }
+  // ---- end crash isolation ----
+
   private tick(): void {
     const tickStart = performance.now();
     this.currentTick++;
     
     // (Asteroids aren't moved: their positions are worked out when something needs them, see placeAsteroid)
-    this.stationOrbitSystem();
+    this.guard('stationOrbitSystem', () => this.stationOrbitSystem());
     // Systems pilots are in or coming to are in the world; ones left a while are put away (before anything's spawned)
-    if (this.scene === 'sectors') this.memory.tick();
+    if (this.scene === 'sectors') this.guard('memory', () => this.memory.tick());
 
     // Reset spatial grid and rebuild
-    this.spatialGrid.clear();
-    this.buildSpatialGrid();
+    this.guard('spatialGrid', () => { this.spatialGrid.clear(); this.buildSpatialGrid(); });
     
     // Run systems
-    this.playerMovementSystem();
-    this.dockingSystem();
-    this.riftSystem();
+    this.guard('playerMovementSystem', () => this.playerMovementSystem());
+    this.guard('dockingSystem', () => this.dockingSystem());
+    this.guard('riftSystem', () => this.riftSystem());
     // (Boost fuel is the ship's battery now: it charges in the flight step, energy.ts)
-    this.weaponSystem();
-    this.projectileSystem();
-    if (this.scene === 'sectors') { this.enemies.tick(); this.bosses.tick(); this.mobs.tick(); this.events.tick(); this.surfaces.tick(); this.sieges.tick(); this.arenas.tick(); }
-    this.collisionSystem();
-    this.asteroidDeathSystem();  // Check for destroyed asteroids
-    this.lod.tick();
-    this.ships.tick();
-    this.replication.endTick();
-    this.recordSelfHashes();
-    this.pods.tick();
-    this.mining.tick();
-    this.hazards.tick();
-    this.warmth.tick();
-    this.homes.tick();
-    this.watchComet();
-    if (this.outpost && this.currentTick % 60 === 0) for (const c of this.clients.values()) this.outpost.finish(c);
-    this.pilots.tick();
-    this.quests.tick();
-    this.codex.tick();
-    this.party.tick();
-    this.trade.tick(this.currentTick);
+    this.guard('weaponSystem', () => this.weaponSystem());
+    this.guard('projectileSystem', () => this.projectileSystem());
+    if (this.scene === 'sectors') {
+      this.guard('enemies', () => this.enemies.tick()); this.guard('bosses', () => this.bosses.tick()); this.guard('mobs', () => this.mobs.tick());
+      this.guard('events', () => this.events.tick()); this.guard('surfaces', () => this.surfaces.tick()); this.guard('sieges', () => this.sieges.tick()); this.guard('arenas', () => this.arenas.tick());
+    }
+    this.guard('collisionSystem', () => this.collisionSystem());
+    this.guard('asteroidDeathSystem', () => this.asteroidDeathSystem());  // Check for destroyed asteroids
+    this.guard('lod', () => this.lod.tick());
+    this.guard('ships', () => this.ships.tick());
+    this.guard('replication.endTick', () => this.replication.endTick());
+    this.guard('recordSelfHashes', () => this.recordSelfHashes());
+    this.guard('pods', () => this.pods.tick());
+    this.guard('mining', () => this.mining.tick());
+    this.guard('hazards', () => this.hazards.tick());
+    this.guard('warmth', () => this.warmth.tick());
+    this.guard('homes', () => this.homes.tick());
+    this.guard('watchComet', () => this.watchComet());
+    if (this.outpost && this.currentTick % 60 === 0) for (const c of this.clients.values()) this.guard('outpost', () => this.outpost!.finish(c));
+    this.guard('pilots', () => this.pilots.tick());
+    this.guard('quests', () => this.quests.tick());
+    this.guard('codex', () => this.codex.tick());
+    this.guard('party', () => this.party.tick());
+    this.guard('trade', () => this.trade.tick(this.currentTick));
     if (this.currentTick % 60 === 0) {
       for (const c of this.clients.values()) {
-        if (this.flying(c.playerId)) this.achievements.visit(c, this.gameData.getSystemByNum(InSystem.systemId[c.playerId])?.id ?? '');
+        if (this.flying(c.playerId)) this.guard('achievements', () => this.achievements.visit(c, this.gameData.getSystemByNum(InSystem.systemId[c.playerId])?.id ?? ''));
       }
-      void this.achievements.save();
+      this.achievements.save().catch((e) => console.error('[Achievements] save failed:', e));
     }
-    if (this.scene === 'sectors') this.ops.tick();
-    if (this.currentTick % 60 === 0) for (const c of this.clients.values()) { this.services.tick(c); this.hangar.tick(c); this.hangar.fill(c); }
-    this.lingerSystem();
-    this.derelictRespawnSystem();
-    this.trafficSystem();
-    this.lifetimeSystem();
-    this.cleanupSystem();
+    if (this.scene === 'sectors') this.guard('ops', () => this.ops.tick());
+    if (this.currentTick % 60 === 0) for (const c of this.clients.values()) this.guard('services', () => { this.services.tick(c); this.hangar.tick(c); this.hangar.fill(c); });
+    this.guard('lingerSystem', () => this.lingerSystem());
+    this.guard('derelictRespawnSystem', () => this.derelictRespawnSystem());
+    this.guard('trafficSystem', () => this.trafficSystem());
+    this.guard('lifetimeSystem', () => this.lifetimeSystem());
+    this.guard('cleanupSystem', () => this.cleanupSystem());
     
     // Report to admin server and update performance metrics
     const tickTime = performance.now() - tickStart;
@@ -4558,6 +4646,9 @@ case 'join':
     for (const eid of dead) {
       // Ensure all dead entities are in the removed set (safety net)
       this.pendingRemovedEntities.add(eid);
+      // (What was kept by this entity's id goes with it: a left player's last snapshot states, its rift cooldown)
+      this.lastEntityStates.delete(eid);
+      this.riftCooldown.delete(eid);
       removeEntity(this.world, eid);
     }
   }
@@ -5351,11 +5442,19 @@ case 'join':
    * Handle HTTP auth requests (register, login, validate)
    */
   async handleHttpAuth(req: IncomingMessage, res: ServerResponse, action: 'register' | 'login' | 'validate'): Promise<void> {
-    let body = '';
-    req.on('data', (chunk: { toString(): string }) => { body += chunk.toString(); });
+    // (A sign-in is a few hundred bytes: anything past 16 KB is refused, not held in memory)
+    let body = '', tooBig = false;
+    req.on('data', (chunk: { toString(): string }) => {
+      if (tooBig) return;
+      body += chunk.toString();
+      if (body.length > 16 * 1024) { tooBig = true; body = ''; }
+    });
+    req.on('error', () => {});
     req.on('end', async () => {
       try {
+        if (tooBig) throw new Error('request too large');
         const data = JSON.parse(body);
+        if (!data || typeof data !== 'object') throw new Error('not an object');
         res.setHeader('Content-Type', 'application/json');
 
         if (action === 'register') {
@@ -5387,6 +5486,7 @@ case 'join':
           }
         }
       } catch (e) {
+        if (res.headersSent) { res.end(); return; }
         res.writeHead(400);
         res.end(JSON.stringify({ success: false, error: 'Invalid request' }));
       }

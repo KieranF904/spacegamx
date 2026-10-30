@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { noseUpAngle, screenToWorld, smoothAngle, viewHalfExtents, worldToScreen, worldToScreenDir, wrapAngle } from './cameraView';
+import { helmFollow, HELM_FOLLOW_RATE, HELM_TIGHT_RATE, MAX_VIEW_SPIN, HELM_TIGHT_SPIN, noseUpAngle, screenToWorld, smoothAngle, viewHalfExtents, worldToScreen, worldToScreenDir, wrapAngle } from './cameraView';
 
 const PI = Math.PI;
 
@@ -81,5 +81,22 @@ describe('screen ↔ world with rotation', () => {
     expect(q.hh).toBeCloseTo(200);
     const d = viewHalfExtents(W, H, 1, PI / 4);
     expect(d.hw).toBeCloseTo(700 / Math.SQRT2);
+  });
+});
+
+describe('helmFollow', () => {
+  it('starts loose and tightens to a close (not rigid) follow', () => {
+    expect(helmFollow(0)).toEqual({ rate: HELM_FOLLOW_RATE, maxSpin: MAX_VIEW_SPIN });
+    const mid = helmFollow(0.6);
+    expect(mid.rate).toBeGreaterThan(HELM_FOLLOW_RATE);
+    expect(mid.rate).toBeLessThan(HELM_TIGHT_RATE);
+    expect(helmFollow(5)).toEqual({ rate: HELM_TIGHT_RATE, maxSpin: HELM_TIGHT_SPIN });
+    // Settled, a ship turning steadily is followed with only a small lag
+    let cam = 0, ship = 0;
+    const { rate, maxSpin } = helmFollow(5);
+    for (let i = 0; i < 240; i++) { ship += 2 / 60; cam = smoothAngle(cam, ship, rate, 1 / 60, maxSpin); }
+    const lag = Math.abs(wrapAngle(ship - cam));
+    expect(lag).toBeGreaterThan(0.05);
+    expect(lag).toBeLessThan(0.25);
   });
 });

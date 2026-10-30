@@ -8,12 +8,25 @@
 /** Live roll of the camera (radians); written by the Renderer once a frame */
 export const cameraView = { angle: 0 };
 
-/** Helm: how fast the view swings onto the ship's heading (1/s: 63% of the gap closed in 1/rate s) */
+/** Helm: how fast the view swings onto the ship's heading as helm starts (1/s: 63% of the gap closed in 1/rate s) */
 export const HELM_FOLLOW_RATE = 3;
+/** Helm, once the swing is done: it follows the heading closely, with a touch of lag left so turns still read */
+export const HELM_TIGHT_RATE = 12;
+/** Helm: seconds over which the follow tightens from the loose swing to the close follow */
+export const HELM_TIGHTEN_SECONDS = 1.2;
 /** Out of helm: how fast it eases back to north-up */
 export const NORTH_RETURN_RATE = 2.2;
 /** The view never spins faster than this (rad/s), so a big swing is a gentle turn, not a whip */
 export const MAX_VIEW_SPIN = 2.4;
+/** ...but once helm has settled, fast enough to keep up with the quickest-turning ship */
+export const HELM_TIGHT_SPIN = 8;
+
+/** How the view follows the heading `t` seconds into helm: loose at first, then close (smoothstep between the two) */
+export function helmFollow(t: number): { rate: number; maxSpin: number } {
+  const k = Math.min(1, Math.max(0, t / HELM_TIGHTEN_SECONDS));
+  const e = k * k * (3 - 2 * k);
+  return { rate: HELM_FOLLOW_RATE + (HELM_TIGHT_RATE - HELM_FOLLOW_RATE) * e, maxSpin: MAX_VIEW_SPIN + (HELM_TIGHT_SPIN - MAX_VIEW_SPIN) * e };
+}
 
 const TAU = Math.PI * 2;
 

@@ -17,7 +17,7 @@ export function countOf(list: Stack[], id: string): number {
 }
 
 export function addTo(list: Stack[], id: string, n: number): void {
-  if (n <= 0) return;
+  if (!(n > 0)) return; // (NaN too: a count from a client that isn't one)
   const s = list.find((x) => x.id === id);
   if (s) s.n += n;
   else list.push({ id, n });
@@ -26,7 +26,7 @@ export function addTo(list: Stack[], id: string, n: number): void {
 /** Remove up to n; returns how many were removed */
 export function removeFrom(list: Stack[], id: string, n: number): number {
   const i = list.findIndex((x) => x.id === id);
-  if (i < 0 || n <= 0) return 0;
+  if (i < 0 || !(n > 0)) return 0;
   const take = Math.min(n, list[i].n);
   list[i].n -= take;
   if (list[i].n <= 0) list.splice(i, 1);

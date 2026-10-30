@@ -7,7 +7,7 @@ import type { QualityProfile } from '../settings/quality';
 import { SpritePool } from './spritePool';
 import { disc, ring, rock, glowBall, softDot, streak, streakScale, vignette, DOT_SIZE } from './fxTextures';
 import { stepOverlays, screenTint } from './overlayFrame';
-import { cameraView, HELM_FOLLOW_RATE, MAX_VIEW_SPIN, NORTH_RETURN_RATE, screenToWorld, screenToWorldDir, smoothAngle, viewHalfExtents, worldToScreen, worldToScreenDir } from './cameraView';
+import { cameraView, helmFollow, MAX_VIEW_SPIN, NORTH_RETURN_RATE, screenToWorld, screenToWorldDir, smoothAngle, viewHalfExtents, worldToScreen, worldToScreenDir } from './cameraView';
 import { FACTION_COLORS } from '../ships/ShipRenderer';
 import { PlanetRenderer } from './PlanetRenderer';
 import { SceneryRenderer } from './Scenery';
@@ -243,6 +243,8 @@ export class Renderer {
   private cameraZoom = 1;
   /** The view's roll (cameraView.ts): eases onto this heading in helm, back to north-up (null) otherwise */
   private cameraAngle = 0;
+  /** Seconds the view has been following a heading (helm): it follows loosely at first, then closely */
+  private helmTime = 0;
   private cameraHeading: number | null = null;
   /** Where the pilot has dragged the view from their ship (middle mouse), in world units along the screen's axes; it always keeps the ship PAN_MARGIN inside the screen */
   private pan = { x: 0, y: 0 };
@@ -709,7 +711,9 @@ export class Renderer {
     // The roll: onto the heading in helm, back to north-up out of it (gentle, and the same at any frame rate)
     // (Not on a free camera or someone else's ship)
     const heading = own ? this.cameraHeading : null;
-    this.cameraAngle = smoothAngle(this.cameraAngle, heading ?? 0, heading === null ? NORTH_RETURN_RATE : HELM_FOLLOW_RATE, Math.min(0.1, dt), MAX_VIEW_SPIN);
+    this.helmTime = heading === null ? 0 : this.helmTime + dt;
+    const roll = heading === null ? { rate: NORTH_RETURN_RATE, maxSpin: MAX_VIEW_SPIN } : helmFollow(this.helmTime);
+    this.cameraAngle = smoothAngle(this.cameraAngle, heading ?? 0, roll.rate, Math.min(0.1, dt), roll.maxSpin);
     if (heading === null && Math.abs(this.cameraAngle) < 1e-4) this.cameraAngle = 0;
     cameraView.angle = this.cameraAngle;
     const pw = own ? screenToWorldDir(this.pan.x, this.pan.y, this.cameraAngle) : { x: 0, y: 0 };
