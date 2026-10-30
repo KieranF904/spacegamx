@@ -233,14 +233,25 @@ export const PLASMA4_TUNING: Record<string, PlasmaParams> = {
   cinder_reach: { limbDarkening: 0.72, limbPower: 0.8, limbContrast: 0.35, limbTint: '#3a0400', limbTintStrength: 0.6, bump: 0.75, rim: 0.5, rimColor: '#ff5a2a', rimWidth: 0.014, halo: 0.45, spicules: 0.045 },
 };
 
-/** The plasma star (the alternative) for the same star: one quad, ±reach radii (`lite`: the low tier; `extra`: per-star settings; `r4`: round 4) */
-export function plasmaSunLayers(id: string, cb: CentralBody, v: View, lite = false, extra?: PlasmaParams, r4 = false): Layer[] {
+/** Round 5's per-star evolution rates (on top of round 4's tuning): a red giant's slow churn, a hot star's quicker boil */
+export const PLASMA5_TUNING: Record<string, PlasmaParams> = {
+  sol: { evolve: 0.012, warpEvolve: 0.006, warpWander: 0.15 },
+  borealis: { evolve: 0.018, warpEvolve: 0.009, warpWander: 0.18 },
+  nebula_prime: { evolve: 0.014, warpEvolve: 0.008, warpWander: 0.22 },
+  cinder_reach: { evolve: 0.007, warpEvolve: 0.004, warpWander: 0.12 },
+};
+
+/**
+ * The plasma star (the alternative) for the same star: one quad, ±reach radii. `lite`: the old low tier (kept, not a
+ * candidate); `extra`: per-star settings; `round`: 3, 4 or 5 (4 and 5 take their per-star tuning); `low`: round 5's low tier
+ */
+export function plasmaSunLayers(id: string, cb: CentralBody, v: View, lite = false, extra?: PlasmaParams, round = 3, low = false): Layer[] {
   const R = cb.detailParams?.radius ?? cb.radius ?? 1000;
-  const tuned = r4 ? PLASMA4_TUNING[id] : undefined;
+  const tuned = round >= 4 ? { ...PLASMA4_TUNING[id], ...(round >= 5 ? PLASMA5_TUNING[id] : {}) } : undefined;
   const look = plasmaLook(id, { ...cb, plasma: { ...tuned, ...(cb as { plasma?: PlasmaParams }).plasma, ...extra } }, v.t, R * v.zoom);
   const h = R * look.reach;
   if (!onScreen(v, 0, 0, h, h)) return [];
-  return [{ name: 'sun', program: `plasma${r4 ? '4' : ''}${lite ? '.lite' : ''}`, blend: 'normal', textures: { uNoise3: 'noise3' }, verts: worldQuad(v, 0, 0, h, h), uniforms: look.uniforms }];
+  return [{ name: 'sun', program: `plasma${round >= 4 ? round : ''}${lite ? '.lite' : low ? '.low' : ''}`, blend: 'normal', textures: { uNoise3: 'noise3' }, verts: worldQuad(v, 0, 0, h, h), uniforms: look.uniforms }];
 }
 
 /**
@@ -250,7 +261,7 @@ export function plasmaSunLayers(id: string, cb: CentralBody, v: View, lite = fal
 export function sunVariantLayers(id: string, cb: CentralBody, v: View, variant: string): Layer[] {
   const [look, scale] = variant.split('@');
   const layers = look === 'cur' || look === 'port' || look === 'exact' || look === 'fix' ? currentSunLayers(id, cb, v, look === 'cur' ? false : look)
-    : look.startsWith('plasma') ? plasmaSunLayers(id, cb, v, look.includes('.lite'), PLASMA_EXAMPLES[look.split('.').find((k) => k in PLASMA_EXAMPLES) ?? ''], look.startsWith('plasma4'))
+    : look.startsWith('plasma') ? plasmaSunLayers(id, cb, v, look.includes('.lite'), PLASMA_EXAMPLES[look.split('.').find((k) => k in PLASMA_EXAMPLES) ?? ''], look.startsWith('plasma5') ? 5 : look.startsWith('plasma4') ? 4 : 3, look.includes('.low'))
     : photoSunLayers(id, cb, v, look === 'lite' || look === 'lite2', look === 'photo2' || look === 'lite2');
   return scale ? atScale(layers, Number(scale)) : layers;
 }
@@ -298,6 +309,9 @@ export function sunPrograms(src: Sources, desktop = true): Programs {
     photo: { vert: SUN_PHOTO_VERT, frag: SUN_PHOTO_FRAG },
     plasma: { vert: SUN_PHOTO_VERT, frag: PLASMA_FRAG },
     'plasma.lite': { vert: SUN_PHOTO_VERT, frag: PLASMA_FRAG.replace('#version 300 es', '#version 300 es\n  #define PLASMA_LITE 1') },
+    plasma5: { vert: SUN_PHOTO_VERT, frag: PLASMA_FRAG.replace('#version 300 es', '#version 300 es\n  #define PLASMA_R4 1\n  #define PLASMA_R5 1') },
+    'plasma5.lite': { vert: SUN_PHOTO_VERT, frag: PLASMA_FRAG.replace('#version 300 es', '#version 300 es\n  #define PLASMA_R4 1\n  #define PLASMA_R5 1\n  #define PLASMA_LITE 1') },
+    'plasma5.low': { vert: SUN_PHOTO_VERT, frag: PLASMA_FRAG.replace('#version 300 es', '#version 300 es\n  #define PLASMA_R4 1\n  #define PLASMA_R5 1\n  #define PLASMA_LOW 1') },
     plasma4: { vert: SUN_PHOTO_VERT, frag: PLASMA_FRAG.replace('#version 300 es', '#version 300 es\n  #define PLASMA_R4 1') },
     'plasma4.lite': { vert: SUN_PHOTO_VERT, frag: PLASMA_FRAG.replace('#version 300 es', '#version 300 es\n  #define PLASMA_R4 1\n  #define PLASMA_LITE 1') },
     'photo.lite': { vert: SUN_PHOTO_VERT, frag: SUN_PHOTO_FRAG.replace('#version 300 es', '#version 300 es\n  #define SUN_PHOTO_LITE 1') },

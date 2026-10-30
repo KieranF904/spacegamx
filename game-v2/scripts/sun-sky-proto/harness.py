@@ -244,7 +244,8 @@ def composite(out_dir, c):
     cw, ch = max(i.width for i in imgs), max(i.height for i in imgs)
     title = c.get('title')
     top = 44 if title else 0
-    sheet = Image.new('RGB', (cols * cw + (cols - 1) * 4, top + rows * ch + (rows - 1) * 4), (24, 24, 28))
+    foot = 40 if c.get('footnote') else 0
+    sheet = Image.new('RGB', (cols * cw + (cols - 1) * 4, top + rows * ch + (rows - 1) * 4 + foot), (24, 24, 28))
     draw = ImageDraw.Draw(sheet)
     font = label_font(22)
     if title:
@@ -259,10 +260,23 @@ def composite(out_dir, c):
     for k, (im, cell) in enumerate(zip(imgs, c['cells'])):
         x, y = (k % cols) * (cw + 4), top + (k // cols) * (ch + 4)
         sheet.paste(im, (x, y))
+        if cell.get('note'):
+            # A readable box over the bottom of the tile: semi-transparent, a line per entry
+            lines = cell['note']
+            nf = label_font(c.get('noteSize', 19))
+            lh = int(c.get('noteSize', 19) * 1.35)
+            bh = lh * len(lines) + 14
+            box = Image.new('RGBA', (cw, bh), (8, 10, 16, 190))
+            bd = ImageDraw.Draw(box)
+            for i, line in enumerate(lines):
+                bd.text((12, 7 + i * lh), line, fill=(235, 238, 245, 255), font=nf)
+            sheet.paste(box, (x, y + ch - bh), box)
         if cell.get('label'):
             tw = draw.textlength(cell['label'], font=font)
             draw.rectangle([x + 6, y + 6, x + 18 + tw, y + 36], fill=(0, 0, 0))
             draw.text((x + 12, y + 8), cell['label'], fill=(255, 255, 255), font=font)
+    if c.get('footnote'):
+        draw.text((12, sheet.height - 30), c['footnote'], fill=(170, 178, 192), font=label_font(18))
     path = os.path.join(out_dir, c['out'])
     sheet.save(path, compress_level=6)
     return path

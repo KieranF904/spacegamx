@@ -7,8 +7,147 @@ harness on the real GPU (RTX 5070 Ti, moderngl, GPU timer queries, best of two r
 otherwise, against the game's own shaders read from its TypeScript, set up the way `Renderer` sets them up for each
 system.
 
-There are four rounds. **Round 4** (just below) answers Kieran's review of round 3; each round answers his review of
+There are five rounds. **Round 5** (just below) answers Kieran's review of round 4; each round answers his review of
 the one before. The older rounds are kept below as they were.
+
+# Round 5 (after Kieran's review of round 4)
+
+Kieran's review of round 4:
+
+- R4 looks quite good.
+- The edge effects should lie over the disc's feathered edge and break it up, so the fade never reads as a ramp; and
+  nothing in the haze should end in a line.
+- The lite versions aren't Low-tier candidates; propose a better Low tier. The lite versions stay in the code, the lab
+  and here.
+- Multicolour should come from the plasma's own structure, not be laid over it.
+- The pattern should evolve over time, without speeding up the turning.
+
+Round 5 is `#define PLASMA_R5` on top of R4 (`plasma5`, `plasma5@0.5`, `plasma5@0.33`, `plasma5.low@0.5`,
+`plasma5.rainbow@0.5`, `plasma5.aurora@0.5`; `plasma5.lite` is kept).
+
+1. **The edge.**
+   - **Ragged fade:** where the disc's fade starts and ends now varies round the limb and along the radius (one read,
+     only near the limb), so there's no clean ring where the disc ends.
+   - **Over the fade:** the chromosphere band, the haze and the spicules lie over it. The spicules rise from inside
+     the limb, over the fade, and thin out smoothly at a height that varies round it with the streamers.
+   - **Sized by zoom:** the edge's noise follows the star's size on screen (`uPxR`), so its features are always tens
+     of pixels apart along the limb.
+   - **The haze line:** it was the band and the spicule tips all ending at one height down the whole view. The noise
+     that set that height was sized for the whole star, so a zoomed-in view only ever saw one or two of its features.
+     A third, short falloff now keeps the light past the fringe fading smoothly instead of levelling off. Measured
+     across the crop, the drop-then-plateau is gone (`r5-edge-sol-z0.3.png`).
+   - **Two artifacts on the way, both fixed:**
+     - Sizing that noise from each pixel's own footprint (`fwidth`) made screen-aligned blocks, because neighbouring
+       pixels' slight differences jumped the noise ring. It's now sized from a uniform.
+     - A fixed radial frequency let the 64³ volume's voxels show up close. The radial frequency now follows the zoom
+       too.
+2. **The low tier, instead of lite.** Two proposals, both R5 with the R5 look:
+   - `plasma5@0.33`: R5 at ⅓ resolution.
+   - `plasma5.low@0.5`: R5 at ½ res without the bump, the spicules and the fine octaves (`#define PLASMA_LOW`). It
+     keeps the warp, the two octaves, the limb by angle, the ragged edge, the band and the haze.
+
+   On these views both cost about what lite did, and they look like R5 rather than a flatter star. The lite versions
+   remain selectable (labelled "kept, not a candidate").
+3. **Multicolour from the structure.** The colour of a place comes from the plasma's own fields: the warp (so colour
+   regions ride the same flow), the body and filaments, and the heat. Lanes take a deeper hue than hot cores, so each
+   swirl and filament carries its own colour along the flow. There's no separate hue field and no extra read (round 4's
+   multicolour had one of each). Rainbow and aurora are both redone this way.
+4. **Evolution.**
+   - **In place:** the sampling sphere slides through the noise volume along the line of sight (the volume's own
+     turned z axis), so features grow, morph and dissolve where they are instead of sliding across the ball.
+   - **The warp:** it evolves on its own clock, with a slow wander independent of the turning. The turning is
+     unchanged.
+   - **Per star** (`evolve`, `warpEvolve`, `warpWander`; `PLASMA5_TUNING`): Cinder Reach's giant churns slowest
+     (0.007), Borealis boils fastest (0.018), Sol 0.012, Nebula Prime 0.014. At these rates fine features re-form in
+     roughly 10 s, and the large ones over about a minute.
+   - **Cost:** none (the offset is a uniform-derived vector added to existing reads).
+
+**Recommendation (round 5).** R5 at half resolution (`plasma5@0.5`). For Low, `plasma5.low@0.5` or `plasma5@0.33`.
+Multicolour (rainbow, aurora) is a per-system option at the same cost.
+
+### Cost, ms per frame (sun, glow and corona; speedup against current; native harness, best of two runs)
+
+"whole" is zoom 0.04, "limb" zoom 0.15, "disc" over the disc at zoom 0.5. 1080p unless marked 4K.
+
+| star | view | current | R4 plasma ½ | R5 plasma | R5 plasma ½ | R5 plasma ⅓ (Low?) | R5 low ½ (Low?) | R5 rainbow ½ |
+|---|---|---|---|---|---|---|---|---|
+| Sol | whole | 0.281 | 0.066 (4.3x) | 0.175 (1.6x) | 0.062 (4.6x) | 0.035 (8.0x) | 0.046 (6.2x) | 0.062 (4.5x) |
+| Sol | limb | 0.191 | 0.042 (4.6x) | 0.111 (1.7x) | 0.039 (4.9x) | 0.023 (8.2x) | 0.025 (7.7x) | 0.040 (4.8x) |
+| Sol | disc | 0.307 | 0.062 (5.0x) | 0.186 (1.6x) | 0.057 (5.4x) | 0.032 (9.5x) | 0.032 (9.5x) | 0.058 (5.3x) |
+| Borealis | whole | 0.364 | 0.043 (8.5x) | 0.101 (3.6x) | 0.043 (8.5x) | 0.025 (14.6x) | 0.033 (11.2x) | 0.043 (8.5x) |
+| Borealis | limb | 0.491 | 0.037 (13.2x) | 0.093 (5.3x) | 0.035 (14.1x) | 0.022 (22.6x) | 0.026 (19.1x) | 0.036 (13.7x) |
+| Borealis | disc | 0.202 | 0.067 (3.0x) | 0.204 (1.0x) | 0.062 (3.2x) | 0.035 (5.7x) | 0.033 (6.1x) | 0.063 (3.2x) |
+| Nebula Prime | whole | 0.461 | 0.089 (5.1x) | 0.192 (2.4x) | 0.084 (5.5x) | 0.051 (9.1x) | 0.059 (7.8x) | 0.084 (5.5x) |
+| Nebula Prime | limb | 0.385 | 0.043 (9.0x) | 0.112 (3.4x) | 0.040 (9.7x) | 0.024 (16.2x) | 0.025 (15.4x) | 0.041 (9.4x) |
+| Nebula Prime | disc | 0.518 | 0.088 (5.9x) | 0.234 (2.2x) | 0.084 (6.2x) | 0.036 (14.5x) | 0.033 (15.9x) | 0.084 (6.2x) |
+| Cinder Reach | whole | 0.312 | 0.089 (3.5x) | 0.240 (1.3x) | 0.086 (3.7x) | 0.044 (7.1x) | 0.036 (8.7x) | 0.085 (3.7x) |
+| Cinder Reach | limb | 0.202 | 0.043 (4.7x) | 0.112 (1.8x) | 0.040 (5.1x) | 0.024 (8.4x) | 0.025 (8.0x) | 0.041 (4.9x) |
+| Cinder Reach | disc | 0.311 | 0.070 (4.4x) | 0.216 (1.4x) | 0.067 (4.6x) | 0.046 (6.8x) | 0.032 (9.7x) | 0.068 (4.6x) |
+| Sol | whole 4K | 1.126 | 0.229 (4.9x) | 0.643 (1.8x) | 0.210 (5.3x) | 0.117 (9.6x) | 0.134 (8.4x) | 0.213 (5.3x) |
+| Sol | limb 4K | 0.755 | 0.155 (4.9x) | 0.406 (1.9x) | 0.145 (5.2x) | 0.084 (9.0x) | 0.092 (8.2x) | 0.148 (5.1x) |
+| Sol | disc 4K | 1.246 | 0.236 (5.3x) | 0.708 (1.8x) | 0.221 (5.6x) | 0.121 (10.3x) | 0.126 (9.9x) | 0.224 (5.6x) |
+| Borealis | whole 4K | 1.430 | 0.143 (10.0x) | 0.350 (4.1x) | 0.135 (10.6x) | 0.082 (17.5x) | 0.112 (12.7x) | 0.139 (10.3x) |
+| Borealis | limb 4K | 1.979 | 0.135 (14.7x) | 0.347 (5.7x) | 0.126 (15.7x) | 0.077 (25.6x) | 0.093 (21.2x) | 0.131 (15.2x) |
+| Borealis | disc 4K | 0.807 | 0.252 (3.2x) | 0.726 (1.1x) | 0.239 (3.4x) | 0.121 (6.7x) | 0.127 (6.3x) | 0.241 (3.3x) |
+| Nebula Prime | whole 4K | 1.835 | 0.244 (7.5x) | 0.722 (2.5x) | 0.228 (8.0x) | 0.185 (9.9x) | 0.139 (13.2x) | 0.229 (8.0x) |
+| Nebula Prime | limb 4K | 1.525 | 0.156 (9.8x) | 0.410 (3.7x) | 0.146 (10.4x) | 0.086 (17.7x) | 0.092 (16.5x) | 0.150 (10.2x) |
+| Nebula Prime | disc 4K | 2.077 | 0.283 (7.3x) | 0.921 (2.3x) | 0.271 (7.7x) | 0.139 (15.0x) | 0.128 (16.3x) | 0.272 (7.6x) |
+| Cinder Reach | whole 4K | 1.249 | 0.289 (4.3x) | 0.626 (2.0x) | 0.283 (4.4x) | 0.116 (10.8x) | 0.131 (9.5x) | 0.282 (4.4x) |
+| Cinder Reach | limb 4K | 0.790 | 0.156 (5.1x) | 0.413 (1.9x) | 0.146 (5.4x) | 0.085 (9.3x) | 0.093 (8.5x) | 0.149 (5.3x) |
+| Cinder Reach | disc 4K | 1.246 | 0.265 (4.7x) | 0.861 (1.4x) | 0.252 (4.9x) | 0.139 (9.0x) | 0.126 (9.9x) | 0.254 (4.9x) |
+
+**The whole sun in view** (the Sol panel's framing; the sun is small on screen there, so everything is cheap):
+
+| option | 1080p | 4K |
+|---|---|---|
+| current | 0.034 ms | 0.131 ms |
+| R5 ½ | 0.015 ms | 0.058 ms |
+| R5 ⅓ | 0.011 ms | 0.043 ms |
+| R5 low ½ | 0.014 ms | 0.052 ms |
+
+`r5-panel-sol-perf.png` has every option.
+
+**Live graph** (the lab, Sol at the limb, 1600×900; current 0.125 to 0.143 ms):
+
+| option | live cost |
+|---|---|
+| R4 ½ | 0.045 ms (2.9×) |
+| R5 ½ | 0.060 ms (2.4×) |
+| R5 ⅓ | 0.040 ms (3.1×) |
+| R5 low ½ | 0.035 ms (3.6×) |
+| R5 rainbow ½ | 0.048 ms (2.8×) |
+
+The browser adds a floor of about 0.04 ms a draw, so these read a little high.
+
+**Cold compile** (Chrome, fresh profile):
+
+| shader | compile |
+|---|---|
+| current sun | 1,833 ms |
+| R4 | 110 ms |
+| R5 | 123 ms |
+| R5 low | 100 ms |
+| R5 lite | 99 ms |
+
+### Images (round 5)
+
+All in `C:\Users\Kieran\AppData\Local\Temp\claude\c--Users-Kieran-Desktop-Spacegame\b24c970b-6148-4883-b4f6-ab3b6971e1b5\scratchpad\proto\`.
+
+- **The Sol panels** (the whole sun, the same framing and exposure in every tile; the original first):
+  - `r5-panel-sol.png`;
+  - `r5-panel-sol-perf.png`, with each option's cost for that view at 1080p and 4K, its speedup against current,
+    compile time and resolution.
+- **Sun sheets** (current first, R4 ½ for reference, then R5 full, ½, ⅓, low ½, rainbow ½, aurora ½):
+  `r5-sun-<sol|borealis|nebula_prime|cinder_reach>-<full|limb|close>.png`.
+- **The edge up close** (current, R4 ½, R5 ½, R5 low ½): `r5-edge-<star>-z0.3.png` and `r5-edge-<star>-z1.png`.
+- **Animations:** a minute of game time at about 6× (60 frames a second apart): current, R4 ½, R5 ½, R5 rainbow ½
+  side by side, so the evolution shows against R4. `r5-anim-sun-<star>.gif`.
+- **The lab:** `lab-r5-graph.png`.
+- **Raw data:** `bench5.final.json`, `panel5.results.json`, `compile-times-r5.json`.
+
+To reproduce, run `node scripts/sun-sky-proto/run.mjs <set> <out dir>`, where the set is `v5`, `stills5`, `gif5`,
+`bench5` or `panel5`. Then run `python scripts/sun-sky-proto/panel5perf.py <out dir> <panel5 results...>` for the
+performance panel.
 
 # Round 4 (after Kieran's review of round 3)
 

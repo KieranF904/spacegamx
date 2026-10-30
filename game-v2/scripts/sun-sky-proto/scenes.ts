@@ -62,15 +62,17 @@ const ALTERNATIVE: SunVariant[] = ['plasma', 'plasma.lite', 'plasma@0.5'];
 /** Round 3: the revised plasma, and the multicolour examples */
 /** Round 4: the plasma with its limb by viewing angle and its edge into the atmosphere (round 3's half-res plasma for reference) */
 const ROUND4: SunVariant[] = ['cur', 'plasma@0.5', 'plasma4', 'plasma4@0.5', 'plasma4.lite', 'plasma4.rainbow@0.5', 'plasma4.aurora@0.5', 'plasma.rainbow@0.5'];
+/** Round 5: R4 for reference, then R5 (evolving, ragged edge under the fringe, colour from the structure) and its low tiers */
+const ROUND5: SunVariant[] = ['cur', 'plasma4@0.5', 'plasma5', 'plasma5@0.5', 'plasma5@0.33', 'plasma5.low@0.5', 'plasma5.rainbow@0.5', 'plasma5.aurora@0.5'];
 const ROUND3: SunVariant[] = ['cur', 'plasma', 'plasma.lite', 'plasma@0.5', 'plasma.rainbow@0.5', 'plasma.aurora@0.5', 'photo2', 'lite2', 'exact@0.5', 'fix@0.5'];
 const ROUND2: SunVariant[] = ['cur', ...FAITHFUL, ...ALTERNATIVE];
 const LOOK_LABEL: Record<string, string> = {
-  cur: 'current', port: 'A port', exact: 'A-exact', fix: 'current (edge fixed)', plasma4: 'plasma R4', 'plasma4.lite': 'plasma R4 lite', 'plasma4.rainbow': 'plasma R4 rainbow', 'plasma4.aurora': 'plasma R4 aurora', photo2: 'B2 photosphere, big cells', lite2: 'B2-lite, big cells', 'plasma.rainbow': 'plasma rainbow', 'plasma.aurora': 'plasma aurora', photo: 'B: photosphere', lite: 'B-lite (low tier)',
+  cur: 'current', port: 'A port', exact: 'A-exact', fix: 'current (edge fixed)', plasma4: 'plasma R4', plasma5: 'plasma R5', 'plasma5.low': 'plasma R5 low (no bump, spicules, fine octaves)', 'plasma5.lite': 'plasma R5 lite', 'plasma5.rainbow': 'plasma R5 rainbow', 'plasma5.aurora': 'plasma R5 aurora', 'plasma4.lite': 'plasma R4 lite', 'plasma4.rainbow': 'plasma R4 rainbow', 'plasma4.aurora': 'plasma R4 aurora', photo2: 'B2 photosphere, big cells', lite2: 'B2-lite, big cells', 'plasma.rainbow': 'plasma rainbow', 'plasma.aurora': 'plasma aurora', photo: 'B: photosphere', lite: 'B-lite (low tier)',
   plasma: 'plasma', 'plasma.lite': 'plasma lite', current: 'current',
 };
 function variantLabel(variant: SunVariant): string {
   const [look, scale] = variant.split('@');
-  const kind = variant === 'cur' ? '' : look.startsWith('plasma') ? `${look.startsWith('plasma4') ? 'R4 ' : 'R3 '}${look.includes('rainbow') || look.includes('aurora') ? 'ALT multicolour: ' : 'ALT: '}` : look.startsWith('photo') || look.startsWith('lite') ? 'ALT: ' : 'FAITHFUL: ';
+  const kind = variant === 'cur' ? '' : look.startsWith('plasma') ? `${look.startsWith('plasma5') ? 'R5 ' : look.startsWith('plasma4') ? 'R4 ' : 'R3 '}${look.includes('rainbow') || look.includes('aurora') ? 'ALT multicolour: ' : 'ALT: '}` : look.startsWith('photo') || look.startsWith('lite') ? 'ALT: ' : 'FAITHFUL: ';
   const res = scale ? ` ${scale === '0.5' ? '½' : scale === '0.33' ? '⅓' : scale} res` : '';
   return `${kind}${LOOK_LABEL[look] ?? look}${res}`;
 }
@@ -358,6 +360,102 @@ if (set === 'stills4' || set === 'v4') {
         return { file, label: variantLabel(variant) };
       });
       composites.push({ out: `r4-edge-${id}-z${zoom}.png`, cols: 4, cells, title: `${s.name}: the limb up close at zoom ${zoom} (current, round 3, round 4, round 4 lite)` });
+    }
+  }
+}
+
+if (set === 'stills5' || set === 'v5') {
+  // Round 5: current first, round 4 for reference, then round 5 and its low tiers and multicolour
+  for (const id of PLAIN) {
+    const s = sysOf(id), cb = s.centralBody as CentralBody, R = radiusOf(cb), b = systemBiome(s);
+    const views = STAR_VIEWS(R, 120);
+    for (const [vn, v] of Object.entries(set === 'v5' ? { full: views.full, limb: views.limb } : views)) {
+      const cells = ROUND5.map((variant) => {
+        const file = `${set}/${id}.${vn}.${variant}.png`;
+        job(`${set}.${id}.${vn}.${variant}`, v, [...(vn === 'full' ? [] : currentSkyLayers(b, v, 0)), ...sunLayers(id, v, variant)], { out: file });
+        return { file, label: variantLabel(variant) };
+      });
+      composites.push({ out: `r5-sun-${id}-${vn}.png`, cols: 4, cells, metric: true, scale: vn === 'full' ? 0.6 : 0.5, title: `${s.name}, ${vn}: current first, round 4 for reference, then round 5 (evolving, ragged edge under the fringe, colour from the structure) and its low tiers.` });
+    }
+    const crops = ['cur', 'plasma4@0.5', 'plasma5@0.5', 'plasma5.low@0.5'];
+    for (const zoom of [0.3, 1]) {
+      const v: View = { w: 640, h: 400, dpr: 1, cam: [R + (zoom === 1 ? 60 : 200), 0], zoom, t: 120 };
+      const cells = crops.map((variant) => {
+        const file = `${set}/edge.${id}.z${zoom}.${variant}.png`;
+        job(`${set}.edge.${id}.${zoom}.${variant}`, v, [...currentSkyLayers(b, v, 0), ...sunLayers(id, v, variant)], { out: file });
+        return { file, label: variantLabel(variant) };
+      });
+      composites.push({ out: `r5-edge-${id}-z${zoom}.png`, cols: 4, cells, title: `${s.name}: the limb up close at zoom ${zoom} (current, round 4, round 5, round 5 low)` });
+    }
+  }
+}
+
+/** The Sol panels' tiles: the original first, round 4 for reference, then every round 5 option (lite kept, labelled) */
+const PANEL5: [SunVariant, string][] = [
+  ['cur', 'Current (original)'], ['plasma4@0.5', 'R4 plasma, ½ res (reference)'], ['plasma5', 'R5 plasma, full res'],
+  ['plasma5@0.5', 'R5 plasma, ½ res'], ['plasma5@0.33', 'R5 plasma, ⅓ res (proposed Low)'], ['plasma5.low@0.5', 'R5 low, ½ res (proposed Low)'],
+  ['plasma5.rainbow@0.5', 'R5 rainbow, ½ res'], ['plasma5.aurora@0.5', 'R5 aurora, ½ res'], ['plasma5.lite', 'R5 lite (kept, not a candidate)'],
+];
+
+if (set === 'panel5') {
+  // Sol whole (disc and corona in the tile), the same framing and exposure for every tile; and that framing timed at
+  // 1080p and 4K (the perf panel is made from these numbers by panel5perf.py)
+  const s = sysOf('sol'), R = radiusOf(s.centralBody as CentralBody);
+  const cells = PANEL5.map(([variant, label]) => {
+    const v: View = { w: 600, h: 600, dpr: 1, cam: [0, 0], zoom: 600 / (2 * 3.3 * R), t: 120 };
+    const file = `panel5/sol.${variant}.png`;
+    job(`panel5.${variant}`, v, sunLayers('sol', v, variant), { out: file });
+    for (const dpr of [1, 2]) {
+      const vb: View = { w: 1920, h: 1080, dpr, cam: [0, 0], zoom: 1080 / (2 * 3.3 * R), t: 120 };
+      job(`panel|${variant}|${dpr}`, vb, sunLayers('sol', vb, variant), { bench: true, reps: 10 });
+    }
+    return { file, label };
+  });
+  composites.push({ out: 'r5-panel-sol.png', cols: 3, cells, title: 'Sol, the whole sun: the original first, then round 5 (and round 4 for reference). Same framing and exposure in every tile.' });
+}
+
+if (set === 'panels5') {
+  // Clean before/after panels for docs/panels (nothing overlaid): each star whole, the game's sun and round 5's best
+  for (const id of PLAIN) {
+    const R = radiusOf(sysOf(id).centralBody as CentralBody);
+    const v: View = { w: 900, h: 900, dpr: 1, cam: [0, 0], zoom: 900 / (2 * 3.3 * R), t: 120 };
+    const topic = `${id.replace(/_/g, '-')}-sun-r5`;
+    job(`panels5.${id}.before`, v, sunLayers(id, v, 'cur'), { out: `panels5/${topic}-before.png` });
+    job(`panels5.${id}.after`, v, sunLayers(id, v, 'plasma5@0.5'), { out: `panels5/${topic}-after.png` });
+  }
+}
+
+if (set === 'gif5') {
+  // A minute of game time at about 6x (60 frames a second apart): round 4 against round 5, to see the pattern evolve
+  const panels = ['cur', 'plasma4@0.5', 'plasma5@0.5', 'plasma5.rainbow@0.5'];
+  for (const id of PLAIN) {
+    const s = sysOf(id), cb = s.centralBody as CentralBody, R = radiusOf(cb), b = systemBiome(s);
+    const frames: string[] = [];
+    for (let f = 0; f < 60; f++) {
+      const t = 120 + f;
+      const v: View = { w: 420, h: 280, dpr: 1, cam: [R * 0.75, 0], zoom: 0.15 * 21000 / R, t };
+      const cells = panels.map((variant) => {
+        const file = `gif5/${id}.${variant}.${f}.png`;
+        job(`gif5.${id}.${variant}.${f}`, v, [...currentSkyLayers(b, v, 0), ...sunLayers(id, v, variant)], { out: file });
+        return { file, label: variantLabel(variant) };
+      });
+      const sheet = `gif5/${id}.sheet.${f}.png`;
+      composites.push({ out: sheet, cols: 2, cells });
+      frames.push(sheet);
+    }
+    gifs.push({ out: `r5-anim-sun-${id}.gif`, frames, ms: 167, scale: 0.8 });
+  }
+}
+
+if (set === 'bench5') {
+  const reps = 10;
+  for (const dpr of [1, 2]) {
+    for (const id of PLAIN) {
+      const cb = sysOf(id).centralBody as CentralBody, R = radiusOf(cb);
+      for (const [name, v] of Object.entries(sunViews(R, 120, dpr))) {
+        if (name === 'corona') continue;
+        for (const variant of ['cur', 'plasma4@0.5', 'plasma5', 'plasma5@0.5', 'plasma5@0.33', 'plasma5.low@0.5', 'plasma5.rainbow@0.5']) job(`sun|${id}|${name}|${variant}|${dpr}`, v, sunLayers(id, v, variant), { bench: true, reps });
+      }
     }
   }
 }
