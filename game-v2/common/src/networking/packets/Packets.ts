@@ -1,6 +1,6 @@
-import { BitBuffer } from '../BitBuffer';
-import { getEntitySchemaRequired, EntityTypeId, EntityTypeIdValue } from '../EntitySchema';
-import { NetworkModule } from '../modules/NetworkModule';
+import { BitBuffer } from '../BitBuffer.js';
+import { getEntitySchemaRequired, EntityTypeId, EntityTypeIdValue } from '../EntitySchema.js';
+import { NetworkModule } from '../modules/NetworkModule.js';
 
 /**
  * Packet types for the networking system

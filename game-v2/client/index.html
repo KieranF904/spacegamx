@@ -1,4 +1,4 @@
-push this <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -81,6 +81,16 @@ push this <!DOCTYPE html>
       box-shadow: 0 0 10px rgba(255, 255, 255, 0.25);
     }
 
+    /* XP coming in: the bar glows; a new level: it flares gold and the level number pops */
+    #xpBar.gain { animation: xpGain 0.6s ease-out; }
+    #xpBar.lvl { animation: xpLvl 1.4s ease-out; }
+    #xpLevel.lvl { animation: lvlPop 0.9s cubic-bezier(0.2, 1.6, 0.4, 1); color: #ffd166; }
+    @keyframes xpGain { 0% { box-shadow: 0 0 18px rgba(120, 200, 255, 0.95); border-color: #d8f0ff; } }
+    @keyframes xpLvl { 0%, 30% { box-shadow: 0 0 30px rgba(255, 209, 102, 1); border-color: #ffd166; } }
+    @keyframes lvlPop { 0% { transform: scale(1); } 30% { transform: scale(1.45); } 100% { transform: scale(1); } }
+    #xpLevel { display: inline-block; transition: color 1s; }
+    @media (prefers-reduced-motion: reduce) { #xpBar.gain, #xpBar.lvl, #xpLevel.lvl { animation: none; } }
+
     #xpFill {
       position: absolute;
       left: 0;
@@ -112,92 +122,6 @@ push this <!DOCTYPE html>
       color: rgba(255, 255, 255, 0.8);
       margin-left: 8px;
       min-width: 50px;
-    }
-
-    /* ============================================
-       HP HUD - Above XP Bar
-       ============================================ */
-    #hpHud {
-      position: absolute;
-      left: 50%;
-      bottom: 58px;
-      transform: translateX(-50%);
-      display: none;
-      align-items: center;
-      gap: 10px;
-      z-index: 25;
-      pointer-events: none;
-    }
-
-    #hpLabel {
-      font-size: 12px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: rgba(255, 80, 80, 0.95);
-    }
-
-    #hpBar {
-      position: relative;
-      width: 200px;
-      height: 10px;
-      border-radius: 999px;
-      border: 2px solid rgba(255, 100, 100, 0.9);
-      background: rgba(255, 100, 100, 0.1);
-      overflow: hidden;
-      box-shadow: 0 0 10px rgba(255, 80, 80, 0.25);
-    }
-
-    #hpFill {
-      position: absolute;
-      left: 0;
-      top: 0;
-      bottom: 0;
-      width: 100%;
-      background: rgba(255, 80, 80, 0.9);
-      transition: width 0.15s ease-out;
-    }
-
-    #hpNumber {
-      font-size: 11px;
-      color: rgba(255, 150, 150, 0.9);
-      min-width: 45px;
-    }
-
-    /* ============================================
-       Weapon HUD - Between HP and XP
-       ============================================ */
-    #weaponHud {
-      position: absolute;
-      left: 50%;
-      bottom: 42px;
-      transform: translateX(-50%);
-      display: none;
-      align-items: center;
-      gap: 8px;
-      z-index: 26;
-      pointer-events: none;
-      width: 260px;
-    }
-
-    .weapon-bar {
-      position: relative;
-      flex: 1;
-      height: 10px;
-      border-radius: 999px;
-      border: 2px solid rgba(255, 255, 255, 0.85);
-      background: rgba(255, 255, 255, 0.08);
-      overflow: hidden;
-      box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
-    }
-
-    .weapon-fill {
-      position: absolute;
-      left: 0;
-      top: 0;
-      bottom: 0;
-      width: 0%;
-      background: rgba(120, 200, 255, 0.9);
-      transition: width 0.08s ease-out;
     }
 
     /* Inventory/Equipment panels are styled by InventoryUI.ts */
@@ -276,21 +200,6 @@ push this <!DOCTYPE html>
     /* ============================================
        Minimap - Bottom Right
        ============================================ */
-    #minimapContainer {
-      position: absolute;
-      bottom: 140px;
-      right: 16px;
-      z-index: 20;
-    }
-
-    #minimap-canvas {
-      width: 160px;
-      height: 160px;
-      border-radius: 10px;
-      border: 1px solid rgba(120, 160, 220, 0.3);
-      background: rgba(6, 10, 24, 0.7);
-    }
-
     /* ============================================
        Loading & Debug
        ============================================ */
@@ -304,10 +213,11 @@ push this <!DOCTYPE html>
       text-shadow: 0 0 20px rgba(100, 150, 255, 0.6);
     }
 
+    /* Net stats sit left of the minimap (Renderer: 180 px, 15 px in from the top right) */
     #debug {
       position: absolute;
-      top: 16px;
-      right: 16px;
+      top: 132px;
+      right: 212px;
       font-size: 11px;
       color: rgba(150, 170, 200, 0.7);
       text-shadow: 1px 1px 2px #000;
@@ -320,8 +230,8 @@ push this <!DOCTYPE html>
        ============================================ */
     #pingDisplay {
       position: absolute;
-      top: 12px;
-      right: 12px;
+      top: 14px;
+      right: 212px;
       display: none;
       flex-direction: column;
       align-items: flex-end;
@@ -330,7 +240,7 @@ push this <!DOCTYPE html>
     }
 
     #pingText {
-      font-size: 14px;
+      font-size: 11px;
       font-weight: 600;
       letter-spacing: 0.06em;
       color: rgba(200, 220, 255, 0.92);
@@ -341,8 +251,8 @@ push this <!DOCTYPE html>
     }
 
     #pingGraphCanvas {
-      width: 360px;
-      height: 120px;
+      width: 270px;
+      height: 90px;
       border-radius: 8px;
       border: 1px solid rgba(120, 160, 220, 0.25);
       background: rgba(6, 10, 24, 0.7);
@@ -482,25 +392,6 @@ push this <!DOCTYPE html>
         <div id="creditsDisplay">💰 <span id="credits">0</span></div>
       </div>
 
-      <!-- HP Bar -->
-      <div id="hpHud">
-        <span id="hpLabel">HP</span>
-        <div id="hpBar">
-          <div id="hpFill"></div>
-        </div>
-        <span id="hpNumber">100/100</span>
-      </div>
-
-      <!-- Weapon Cooldown Bars -->
-      <div id="weaponHud">
-        <div class="weapon-bar">
-          <div class="weapon-fill" id="weaponLeftFill"></div>
-        </div>
-        <div class="weapon-bar">
-          <div class="weapon-fill" id="weaponRightFill"></div>
-        </div>
-      </div>
-
       <!-- XP Bar -->
       <div id="xpHud">
         <span id="xpLevel">LVL <span id="level">1</span></span>
@@ -528,12 +419,7 @@ push this <!DOCTYPE html>
         <div id="boostBar">
           <div id="boostFill"></div>
         </div>
-        <span id="boostLabel">BOOST</span>
-      </div>
-
-      <!-- Minimap -->
-      <div id="minimapContainer">
-        <canvas id="minimap-canvas" width="160" height="160"></canvas>
+        <span id="boostLabel">ENERGY</span>
       </div>
 
       <!-- Debug Info -->

@@ -1,10 +1,10 @@
-import { NetworkModule, moduleRegistry } from './modules/NetworkModule';
-import { InputModule } from './modules/InputModule';
-import { TransformModule } from './modules/TransformModule';
-import { VelocityModule } from './modules/VelocityModule';
-import { OrbitModule } from './modules/OrbitModule';
-import { HealthModule } from './modules/HealthModule';
-import { AIModule } from './modules/AIModule';
+import { NetworkModule, moduleRegistry } from './modules/NetworkModule.js';
+import { InputModule } from './modules/InputModule.js';
+import { TransformModule } from './modules/TransformModule.js';
+import { VelocityModule } from './modules/VelocityModule.js';
+import { OrbitModule } from './modules/OrbitModule.js';
+import { HealthModule } from './modules/HealthModule.js';
+import { AIModule } from './modules/AIModule.js';
 
 // Register all modules
 moduleRegistry.register(InputModule);

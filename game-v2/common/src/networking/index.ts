@@ -1,5 +1,5 @@
 // BitBuffer - Core serialization
-export { BitBuffer } from './BitBuffer';
+export { BitBuffer } from './BitBuffer.js';
 
 // Precision - Shared quantization for deterministic simulation
 export {
@@ -34,31 +34,31 @@ export {
   needsPositionCorrection,
   needsVelocityCorrection,
   needsAngleCorrection,
-} from './Precision';
-export type { QuantizedState } from './Precision';
+} from './Precision.js';
+export type { QuantizedState } from './Precision.js';
 
 // Network Modules
 export type { 
   NetworkModule, 
   ModuleCategory
-} from './modules/NetworkModule';
+} from './modules/NetworkModule.js';
 export { 
   NetworkModuleRegistry, 
   moduleRegistry,
   createModule 
-} from './modules/NetworkModule';
+} from './modules/NetworkModule.js';
 
-export { InputModule, createEmptyInput, inputsEqual } from './modules/InputModule';
-export type { InputData } from './modules/InputModule';
-export { TransformModule, createDefaultTransform } from './modules/TransformModule';
-export type { TransformData } from './modules/TransformModule';
-export { VelocityModule, createZeroVelocity } from './modules/VelocityModule';
-export type { VelocityData } from './modules/VelocityModule';
-export { OrbitModule, createNoOrbit } from './modules/OrbitModule';
-export { HealthModule, createHealth, isAlive, healthPercent } from './modules/HealthModule';
-export type { HealthData } from './modules/HealthModule';
-export { AIModule, createIdleAI, getAIStateName, NetAIState } from './modules/AIModule';
-export type { AIData, NetAIStateValue } from './modules/AIModule';
+export { InputModule, createEmptyInput, inputsEqual } from './modules/InputModule.js';
+export type { InputData } from './modules/InputModule.js';
+export { TransformModule, createDefaultTransform } from './modules/TransformModule.js';
+export type { TransformData } from './modules/TransformModule.js';
+export { VelocityModule, createZeroVelocity } from './modules/VelocityModule.js';
+export type { VelocityData } from './modules/VelocityModule.js';
+export { OrbitModule, createNoOrbit } from './modules/OrbitModule.js';
+export { HealthModule, createHealth, isAlive, healthPercent } from './modules/HealthModule.js';
+export type { HealthData } from './modules/HealthModule.js';
+export { AIModule, createIdleAI, getAIStateName, NetAIState } from './modules/AIModule.js';
+export type { AIData, NetAIStateValue } from './modules/AIModule.js';
 
 // Entity Schema
 export {
@@ -66,8 +66,8 @@ export {
   getEntitySchemaRequired,
   getAllModules,
   hasModule,
-} from './EntitySchema';
-export type { EntitySchema, EntityTypeId, EntityTypeIdValue } from './EntitySchema';
+} from './EntitySchema.js';
+export type { EntitySchema, EntityTypeId, EntityTypeIdValue } from './EntitySchema.js';
 
 // Packets
 export {
@@ -83,7 +83,7 @@ export {
   readStateCorrection,
   writeTickSync,
   readTickSync,
-} from './packets/Packets';
+} from './packets/Packets.js';
 export type {
   PacketType,
   PacketTypeValue,
@@ -93,14 +93,14 @@ export type {
   EntityDespawnPacket,
   StateCorrectionPacket,
   TickSyncPacket,
-} from './packets/Packets';
+} from './packets/Packets.js';
 
 // Sync Manager
 export {
   ServerSyncManager,
   ClientSyncManager,
-} from './SyncManager';
+} from './SyncManager.js';
 export type {
   TimestampedInput,
   PendingCorrection,
-} from './SyncManager';
+} from './SyncManager.js';

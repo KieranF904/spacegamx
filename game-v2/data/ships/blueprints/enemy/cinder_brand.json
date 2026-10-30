@@ -1,0 +1,302 @@
+{
+ "name": "Cinder Brand",
+ "catalogVersion": 1,
+ "parts": [
+  {
+   "uid": 0,
+   "piece": "sq",
+   "fn": "weapon",
+   "material": "steel",
+   "x": -3,
+   "y": -2,
+   "rot": 0,
+   "flip": false,
+   "facing": "N"
+  },
+  {
+   "uid": 1,
+   "piece": "rect2",
+   "fn": "lance",
+   "material": "steel",
+   "x": 0,
+   "y": -2,
+   "rot": 0,
+   "flip": false,
+   "facing": "N"
+  },
+  {
+   "uid": 2,
+   "piece": "sq",
+   "fn": "weapon",
+   "material": "steel",
+   "x": 3,
+   "y": -2,
+   "rot": 0,
+   "flip": false,
+   "facing": "N"
+  },
+  {
+   "uid": 3,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "steel",
+   "x": -3,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 4,
+   "piece": "sq",
+   "fn": "armor",
+   "material": "steel",
+   "x": -2,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 5,
+   "piece": "sq",
+   "fn": "armor",
+   "material": "steel",
+   "x": -1,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 6,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "steel",
+   "x": 0,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 7,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "steel",
+   "x": 1,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 8,
+   "piece": "sq",
+   "fn": "armor",
+   "material": "steel",
+   "x": 2,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 9,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "steel",
+   "x": 3,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 10,
+   "piece": "tri",
+   "fn": "hull",
+   "material": "steel",
+   "x": -4,
+   "y": 0,
+   "rot": 2,
+   "flip": false
+  },
+  {
+   "uid": 11,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "steel",
+   "x": -3,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 12,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "steel",
+   "x": -2,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 13,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "steel",
+   "x": -1,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 14,
+   "piece": "sq",
+   "fn": "core",
+   "material": "steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 15,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "steel",
+   "x": 1,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 16,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "steel",
+   "x": 2,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 17,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "steel",
+   "x": 3,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 18,
+   "piece": "tri",
+   "fn": "hull",
+   "material": "steel",
+   "x": 4,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 19,
+   "piece": "sq",
+   "fn": "armor",
+   "material": "steel",
+   "x": -3,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 20,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "steel",
+   "x": -2,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 21,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "steel",
+   "x": -1,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 22,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "steel",
+   "x": 0,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 23,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "steel",
+   "x": 1,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 24,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "steel",
+   "x": 2,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 25,
+   "piece": "sq",
+   "fn": "armor",
+   "material": "steel",
+   "x": 3,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 26,
+   "piece": "sq",
+   "fn": "thruster",
+   "material": "steel",
+   "x": -2,
+   "y": 2,
+   "rot": 0,
+   "flip": false,
+   "facing": "S"
+  },
+  {
+   "uid": 27,
+   "piece": "sq",
+   "fn": "thruster",
+   "material": "steel",
+   "x": 0,
+   "y": 2,
+   "rot": 0,
+   "flip": false,
+   "facing": "S"
+  },
+  {
+   "uid": 28,
+   "piece": "sq",
+   "fn": "thruster",
+   "material": "steel",
+   "x": 2,
+   "y": 2,
+   "rot": 0,
+   "flip": false,
+   "facing": "S"
+  }
+ ]
+}

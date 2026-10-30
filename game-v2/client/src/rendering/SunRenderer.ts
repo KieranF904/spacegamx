@@ -853,10 +853,13 @@ const FRAGMENT_SHADER = `#version 300 es
         
         // Plasma edge
         float edgeT = smoothstep(0.88, 0.99, sunT);
-        float edgeNoise = turbulentFractal(uv * 5.0 * uNoiseScale, lod, uTime * 1.2);
-        vec3 rimPlasma = plasmaColor(normAngle + edgeNoise * 0.15, baseHue, uTime);
-        rimPlasma = mix(rimPlasma, vec3(1.0, 0.98, 0.85), 0.3);
-        sunColor = mix(sunColor, rimPlasma, edgeT * (0.4 + sunRimIntensity * 0.6));
+        // (The rim's fractal only where the rim shows: it's most of the cost of the whole disc otherwise)
+        if (edgeT > 0.0) {
+          float edgeNoise = turbulentFractal(uv * 5.0 * uNoiseScale, lod, uTime * 1.2);
+          vec3 rimPlasma = plasmaColor(normAngle + edgeNoise * 0.15, baseHue, uTime);
+          rimPlasma = mix(rimPlasma, vec3(1.0, 0.98, 0.85), 0.3);
+          sunColor = mix(sunColor, rimPlasma, edgeT * (0.4 + sunRimIntensity * 0.6));
+        }
         
         // Thin edge
         float thinEdge = smoothstep(0.96, 0.995, sunT);
@@ -998,10 +1001,11 @@ export class SunRenderer {
   private coronaParamsB = new Float32Array(2);
 
   private syncParamArrays(): void {
-    this.sunParamsA.set(this.sunParams.slice(0, 4));
-    this.sunParamsB.set(this.sunParams.slice(4, 6));
-    this.coronaParamsA.set(this.coronaParams.slice(0, 4));
-    this.coronaParamsB.set(this.coronaParams.slice(4, 6));
+    for (let i = 0; i < 6; i++) {
+      const a = i < 4 ? this.sunParamsA : this.sunParamsB, c = i < 4 ? this.coronaParamsA : this.coronaParamsB;
+      a[i % 4] = this.sunParams[i] ?? 0;
+      c[i % 4] = this.coronaParams[i] ?? 0;
+    }
   }
   
   /**
@@ -1015,14 +1019,16 @@ export class SunRenderer {
     if (this.shader) {
       // Access uniforms through the group
       const group = this.shader.resources.sunUniforms as any;
+      // Vector uniforms are written into their own arrays (no allocation per frame)
+      const u = group.uniforms;
       group.uniforms.uTime = this.time;
       group.uniforms.uHue = hue;
       group.uniforms.uRadius = this.radius;
       group.uniforms.uNoiseScale = this.noiseScale;
       group.uniforms.uCoronaSize = this.coronaSize;
       group.uniforms.uCoronaIntensity = this.coronaIntensity;
-      group.uniforms.uAtmosphereRadii = new Float32Array(this.atmosphereRadii);
-      group.uniforms.uCoronaRadii = new Float32Array(this.coronaRadii);
+      u.uAtmosphereRadii.set(this.atmosphereRadii);
+      u.uCoronaRadii.set(this.coronaRadii);
       group.uniforms.uLOD = this.lod;
       group.uniforms.uSunStyle = this.sunStyle;
       group.uniforms.uCoronaStyle = this.coronaStyle;
@@ -1031,26 +1037,26 @@ export class SunRenderer {
       group.uniforms.uCoronaParamsA = this.coronaParamsA;
       group.uniforms.uCoronaParamsB = this.coronaParamsB;
       // Custom colors for style 2
-      group.uniforms.uDarkColor = new Float32Array(this.darkColor);
-      group.uniforms.uMidColor = new Float32Array(this.midColor);
-      group.uniforms.uBrightColor = new Float32Array(this.brightColor);
-      group.uniforms.uEdgeColor = new Float32Array(this.edgeColor);
+      u.uDarkColor.set(this.darkColor);
+      u.uMidColor.set(this.midColor);
+      u.uBrightColor.set(this.brightColor);
+      u.uEdgeColor.set(this.edgeColor);
       // Warp params
-      group.uniforms.uWarpParams = new Float32Array(this.warpParams);
+      u.uWarpParams.set(this.warpParams);
       // fBM params
-      group.uniforms.uFbmParams = new Float32Array(this.fbmParams);
+      u.uFbmParams.set(this.fbmParams);
       // Plasma overlay
-      group.uniforms.uPlasmaParams = new Float32Array(this.plasmaParams);
-      group.uniforms.uPlasmaColor = new Float32Array(this.plasmaColor);
+      u.uPlasmaParams.set(this.plasmaParams);
+      u.uPlasmaColor.set(this.plasmaColor);
       // Edge styling
-      group.uniforms.uEdgeStyle = new Float32Array(this.edgeStyle);
-      group.uniforms.uEdgeGlow = new Float32Array(this.edgeGlow);
+      u.uEdgeStyle.set(this.edgeStyle);
+      u.uEdgeGlow.set(this.edgeGlow);
       // Center light
-      group.uniforms.uCenterLight = new Float32Array(this.centerLight);
+      u.uCenterLight.set(this.centerLight);
       group.uniforms.uCenterMidpoint = this.centerMidpoint;
-      group.uniforms.uCenterColor = new Float32Array(this.centerColor);
+      u.uCenterColor.set(this.centerColor);
       // Inside adjustments
-      group.uniforms.uInsideAdjust = new Float32Array(this.insideAdjust);
+      u.uInsideAdjust.set(this.insideAdjust);
     }
     
     if (this.mesh) {
@@ -1058,7 +1064,26 @@ export class SunRenderer {
       // The mesh is 2x2 in local space, and we want it to be worldRadius * 5 to include corona
       const scale = worldRadius * 2.5;
       this.mesh.scale.set(scale, scale);
+      this.fitQuad();
     }
+  }
+
+  /** How far out the quad reaches, in the shader's uv (1 = the full ±5 radii) */
+  private extent = 1;
+
+  /**
+   * Cut the quad down to what the shader can draw: the disc, its flares (to 1.6 radii), and any
+   * atmosphere and corona. Past that every pixel is transparent, and the full quad reaches five
+   * radii, so anywhere near a star (Sol Central included) it ran over the whole screen for nothing.
+   */
+  private fitQuad(): void {
+    const reach = Math.max(1.6, this.atmosphereRadii[1], this.coronaRadii[1]);
+    const e = Math.min(1, this.radius * reach + 0.001);
+    if (e === this.extent || !this.mesh) return;
+    this.extent = e;
+    const p = 2 * e, u0 = 0.5 - e / 2, u1 = 0.5 + e / 2;
+    this.mesh.geometry.positions = new Float32Array([-p, -p, p, -p, p, p, -p, p]);
+    this.mesh.geometry.uvs = new Float32Array([u0, u0, u1, u0, u1, u1, u0, u1]);
   }
   
   /**
@@ -1066,6 +1091,11 @@ export class SunRenderer {
    */
   setRadius(radius: number): void {
     this.radius = radius;
+  }
+
+  /** The disc's radius as drawn, as a multiple of the world radius passed to update (the quad spans ±5 of it) */
+  get discScale(): number {
+    return this.radius * 5;
   }
   
   /**

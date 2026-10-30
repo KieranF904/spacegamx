@@ -1,0 +1,151 @@
+{
+ "name": "Pirate Raider",
+ "catalogVersion": 1,
+ "parts": [
+  {
+   "uid": 0,
+   "piece": "sq",
+   "fn": "weapon",
+   "material": "alloy",
+   "x": -1,
+   "y": -2,
+   "rot": 0,
+   "flip": false,
+   "facing": "N"
+  },
+  {
+   "uid": 1,
+   "piece": "sq",
+   "fn": "weapon",
+   "material": "alloy",
+   "x": 1,
+   "y": -2,
+   "rot": 0,
+   "flip": false,
+   "facing": "N"
+  },
+  {
+   "uid": 2,
+   "piece": "tri",
+   "fn": "hull",
+   "material": "alloy",
+   "x": -2,
+   "y": -1,
+   "rot": 3,
+   "flip": false
+  },
+  {
+   "uid": 3,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "alloy",
+   "x": -1,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 4,
+   "piece": "sq",
+   "fn": "weapon",
+   "material": "alloy",
+   "x": 0,
+   "y": -1,
+   "rot": 0,
+   "flip": false,
+   "facing": "N"
+  },
+  {
+   "uid": 5,
+   "piece": "sq",
+   "fn": "conduit",
+   "material": "alloy",
+   "x": 1,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 6,
+   "piece": "tri",
+   "fn": "hull",
+   "material": "alloy",
+   "x": 2,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 7,
+   "piece": "sq",
+   "fn": "armor",
+   "material": "alloy",
+   "x": -2,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 8,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "alloy",
+   "x": -1,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 9,
+   "piece": "sq",
+   "fn": "core",
+   "material": "alloy",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 10,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "alloy",
+   "x": 1,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 11,
+   "piece": "sq",
+   "fn": "armor",
+   "material": "alloy",
+   "x": 2,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 12,
+   "piece": "sq",
+   "fn": "thruster",
+   "material": "alloy",
+   "x": -1,
+   "y": 1,
+   "rot": 0,
+   "flip": false,
+   "facing": "S"
+  },
+  {
+   "uid": 13,
+   "piece": "sq",
+   "fn": "thruster",
+   "material": "alloy",
+   "x": 1,
+   "y": 1,
+   "rot": 0,
+   "flip": false,
+   "facing": "S"
+  }
+ ]
+}

@@ -1,0 +1,29 @@
+{
+  "_comment": "Ribbons: earned when a pilot stat reaches `at` (stat: a profile stat; 'level': pilot level; 'systems': star systems visited). Rewards go straight to the pilot. Rare ones are announced to the whole galaxy.",
+  "ribbons": [
+    { "id": "first_blood", "name": "First Blood", "icon": "✦", "stat": "kills", "at": 1, "description": "Destroy a hostile ship.", "reward": { "credits": 10, "xp": 50 } },
+    { "id": "hunter", "name": "Hunter", "icon": "✸", "stat": "kills", "at": 50, "description": "Destroy 50 hostile ships.", "reward": { "credits": 150, "xp": 600 } },
+    { "id": "ace", "name": "Ace", "icon": "✪", "stat": "kills", "at": 250, "description": "Destroy 250 hostile ships.", "reward": { "credits": 800, "xp": 3000 }, "rare": true },
+    { "id": "giant_slayer", "name": "Giant Slayer", "icon": "☠", "stat": "bosses", "at": 1, "description": "Help bring down a boss.", "reward": { "credits": 200, "xp": 1000 }, "rare": true },
+    { "id": "boss_hunter", "name": "Boss Hunter", "icon": "♛", "stat": "bosses", "at": 6, "description": "Take part in six boss kills.", "reward": { "credits": 1000, "xp": 4000 }, "rare": true },
+    { "id": "prospector", "name": "Prospector", "icon": "⛏", "stat": "mined", "at": 500, "description": "Mine 500 ore.", "reward": { "credits": 40, "xp": 200 } },
+    { "id": "deep_core", "name": "Deep Core", "icon": "◆", "stat": "mined", "at": 5000, "description": "Mine 5,000 ore.", "reward": { "credits": 400, "xp": 1500 } },
+    { "id": "merchant", "name": "Merchant", "icon": "¤", "stat": "earned", "at": 10000, "description": "Earn 10,000 credits trading.", "reward": { "xp": 500 } },
+    { "id": "tycoon", "name": "Tycoon", "icon": "$", "stat": "earned", "at": 100000, "description": "Earn 100,000 credits trading.", "reward": { "xp": 4000 }, "rare": true },
+    { "id": "contractor", "name": "Contractor", "icon": "✎", "stat": "quests", "at": 10, "description": "Finish 10 jobs.", "reward": { "credits": 80, "xp": 300 } },
+    { "id": "veteran_contractor", "name": "Veteran Contractor", "icon": "✐", "stat": "quests", "at": 50, "description": "Finish 50 jobs.", "reward": { "credits": 500, "xp": 2000 } },
+    { "id": "wingmate", "name": "Wingmate", "icon": "⟁", "stat": "fleetOps", "at": 1, "description": "Complete a fleet operation with your party.", "reward": { "credits": 80, "xp": 400 } },
+    { "id": "fleet_admiral", "name": "Fleet Admiral", "icon": "⚑", "stat": "fleetOps", "at": 10, "description": "Complete 10 fleet operations.", "reward": { "credits": 800, "xp": 3000 }, "rare": true },
+    { "id": "bodyguard", "name": "Bodyguard", "icon": "⛨", "stat": "escorts", "at": 5, "description": "See five freighters safely docked.", "reward": { "credits": 150, "xp": 600 } },
+    { "id": "bulwark", "name": "Bulwark", "icon": "▣", "stat": "defences", "at": 5, "description": "Hold five outposts against their raiders.", "reward": { "credits": 150, "xp": 600 } },
+    { "id": "defender", "name": "Defender", "icon": "⛊", "stat": "raidsDefended", "at": 3, "description": "Help drive off three station raids.", "reward": { "credits": 120, "xp": 500 } },
+    { "id": "salvager", "name": "Salvager", "icon": "⚙", "stat": "salvaged", "at": 5, "description": "Break five derelict cores for salvage.", "reward": { "credits": 60, "xp": 250 } },
+    { "id": "fabricator", "name": "Fabricator", "icon": "⚒", "stat": "crafted", "at": 100, "description": "Fabricate 100 things.", "reward": { "credits": 80, "xp": 300 } },
+    { "id": "refiner", "name": "Refiner", "icon": "♨", "stat": "refined", "at": 1000, "description": "Refine 1,000 units.", "reward": { "credits": 60, "xp": 250 } },
+    { "id": "trader", "name": "Handshake", "icon": "⇄", "stat": "trades", "at": 5, "description": "Trade with other pilots five times.", "reward": { "credits": 50, "xp": 200 } },
+    { "id": "explorer", "name": "Explorer", "icon": "✧", "stat": "systems", "at": 4, "description": "Visit four star systems.", "reward": { "credits": 100, "xp": 500 } },
+    { "id": "cartographer", "name": "Cartographer", "icon": "✺", "stat": "systems", "at": 7, "description": "Visit every star system.", "reward": { "credits": 600, "xp": 2500 }, "rare": true },
+    { "id": "level_10", "name": "Seasoned", "icon": "✦", "stat": "level", "at": 25, "description": "Reach pilot level 25.", "reward": { "credits": 200 } },
+    { "id": "level_25", "name": "Legend", "icon": "★", "stat": "level", "at": 50, "description": "Reach pilot level 50.", "reward": { "credits": 1500 }, "rare": true }
+  ]
+}

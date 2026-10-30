@@ -1,0 +1,192 @@
+{
+  "catalogVersion": 1,
+  "pieces": [
+    {
+      "id": "sq", "tier": 1,
+      "cells": [[0, 0]],
+      "outline": [
+        { "type": "line", "a": [0, 0], "b": [1, 0] },
+        { "type": "line", "a": [1, 0], "b": [1, 1] },
+        { "type": "line", "a": [1, 1], "b": [0, 1] },
+        { "type": "line", "a": [0, 1], "b": [0, 0] }
+      ],
+      "connectors": [
+        { "cell": [0, 0], "side": "N" },
+        { "cell": [0, 0], "side": "E" },
+        { "cell": [0, 0], "side": "S" },
+        { "cell": [0, 0], "side": "W" }
+      ]
+    },
+    {
+      "id": "rect2", "tier": 1,
+      "cells": [[0, 0], [1, 0]],
+      "outline": [
+        { "type": "line", "a": [0, 0], "b": [2, 0] },
+        { "type": "line", "a": [2, 0], "b": [2, 1] },
+        { "type": "line", "a": [2, 1], "b": [0, 1] },
+        { "type": "line", "a": [0, 1], "b": [0, 0] }
+      ],
+      "connectors": [
+        { "cell": [0, 0], "side": "N" },
+        { "cell": [1, 0], "side": "N" },
+        { "cell": [1, 0], "side": "E" },
+        { "cell": [0, 0], "side": "S" },
+        { "cell": [1, 0], "side": "S" },
+        { "cell": [0, 0], "side": "W" }
+      ]
+    },
+    {
+      "id": "tri", "tier": 1,
+      "cells": [[0, 0]],
+      "outline": [
+        { "type": "line", "a": [0, 0], "b": [1, 1] },
+        { "type": "line", "a": [1, 1], "b": [0, 1] },
+        { "type": "line", "a": [0, 1], "b": [0, 0] }
+      ],
+      "connectors": [
+        { "cell": [0, 0], "side": "W" },
+        { "cell": [0, 0], "side": "S" },
+        { "cell": [0, 0], "diag": "NW" }
+      ]
+    },
+    {
+      "id": "slope2", "tier": 1,
+      "cells": [[0, 0], [1, 0]],
+      "outline": [
+        { "type": "line", "a": [0, 0], "b": [2, 1] },
+        { "type": "line", "a": [2, 1], "b": [0, 1] },
+        { "type": "line", "a": [0, 1], "b": [0, 0] }
+      ],
+      "connectors": [
+        { "cell": [0, 0], "side": "S" },
+        { "cell": [1, 0], "side": "S" },
+        { "cell": [0, 0], "side": "W" }
+      ]
+    },
+    {
+      "id": "cap", "tier": 1,
+      "cells": [[0, 0], [1, 0]],
+      "outline": [
+        { "type": "arc", "c": [1, 1], "r": 1, "a0": 0, "a1": -180 },
+        { "type": "line", "a": [0, 1], "b": [2, 1] }
+      ],
+      "connectors": [
+        { "cell": [0, 0], "side": "S" },
+        { "cell": [1, 0], "side": "S" }
+      ]
+    },
+    {
+      "id": "round", "tier": 1,
+      "cells": [[0, 0]],
+      "outline": [
+        { "type": "line", "a": [0, 1], "b": [0, 0] },
+        { "type": "arc", "c": [0, 1], "r": 1, "a0": -90, "a1": 0 },
+        { "type": "line", "a": [1, 1], "b": [0, 1] }
+      ],
+      "connectors": [
+        { "cell": [0, 0], "side": "W" },
+        { "cell": [0, 0], "side": "S" }
+      ]
+    },
+    {
+      "id": "fillet", "tier": 1,
+      "cells": [[0, 0]],
+      "outline": [
+        { "type": "line", "a": [0, 0], "b": [1, 0] },
+        { "type": "line", "a": [1, 0], "b": [1, 1] },
+        { "type": "arc", "c": [0, 1], "r": 1, "a0": 0, "a1": -90 }
+      ],
+      "connectors": [
+        { "cell": [0, 0], "side": "N" },
+        { "cell": [0, 0], "side": "E" }
+      ]
+    },
+    {
+      "id": "block2", "tier": 2,
+      "cells": [[0, 0], [1, 0], [0, 1], [1, 1]],
+      "outline": [
+        { "type": "line", "a": [0, 0], "b": [2, 0] },
+        { "type": "line", "a": [2, 0], "b": [2, 2] },
+        { "type": "line", "a": [2, 2], "b": [0, 2] },
+        { "type": "line", "a": [0, 2], "b": [0, 0] }
+      ],
+      "connectors": [
+        { "cell": [0, 0], "side": "N" },
+        { "cell": [1, 0], "side": "N" },
+        { "cell": [1, 0], "side": "E" },
+        { "cell": [1, 1], "side": "E" },
+        { "cell": [0, 1], "side": "S" },
+        { "cell": [1, 1], "side": "S" },
+        { "cell": [0, 0], "side": "W" },
+        { "cell": [0, 1], "side": "W" }
+      ]
+    },
+    {
+      "id": "block3", "tier": 3,
+      "cells": [[0, 0], [1, 0], [2, 0], [0, 1], [1, 1], [2, 1], [0, 2], [1, 2], [2, 2]],
+      "outline": [
+        { "type": "line", "a": [0, 0], "b": [3, 0] },
+        { "type": "line", "a": [3, 0], "b": [3, 3] },
+        { "type": "line", "a": [3, 3], "b": [0, 3] },
+        { "type": "line", "a": [0, 3], "b": [0, 0] }
+      ],
+      "connectors": [
+        { "cell": [0, 0], "side": "N" },
+        { "cell": [1, 0], "side": "N" },
+        { "cell": [2, 0], "side": "N" },
+        { "cell": [2, 0], "side": "E" },
+        { "cell": [2, 1], "side": "E" },
+        { "cell": [2, 2], "side": "E" },
+        { "cell": [0, 2], "side": "S" },
+        { "cell": [1, 2], "side": "S" },
+        { "cell": [2, 2], "side": "S" },
+        { "cell": [0, 0], "side": "W" },
+        { "cell": [0, 1], "side": "W" },
+        { "cell": [0, 2], "side": "W" }
+      ]
+    },
+    {
+      "id": "round2", "tier": 2,
+      "cells": [[0, 0], [1, 0], [0, 1], [1, 1]],
+      "outline": [
+        { "type": "line", "a": [0, 2], "b": [0, 0] },
+        { "type": "arc", "c": [0, 2], "r": 2, "a0": -90, "a1": 0 },
+        { "type": "line", "a": [2, 2], "b": [0, 2] }
+      ],
+      "connectors": [
+        { "cell": [0, 0], "side": "W" },
+        { "cell": [0, 1], "side": "W" },
+        { "cell": [0, 1], "side": "S" },
+        { "cell": [1, 1], "side": "S" }
+      ]
+    },
+    {
+      "id": "fillet2", "tier": 2,
+      "cells": [[0, 0], [1, 0], [1, 1]],
+      "outline": [
+        { "type": "line", "a": [0, 0], "b": [2, 0] },
+        { "type": "line", "a": [2, 0], "b": [2, 2] },
+        { "type": "arc", "c": [0, 2], "r": 2, "a0": 0, "a1": -90 }
+      ],
+      "connectors": [
+        { "cell": [0, 0], "side": "N" },
+        { "cell": [1, 0], "side": "N" },
+        { "cell": [1, 0], "side": "E" },
+        { "cell": [1, 1], "side": "E" }
+      ]
+    },
+    {
+      "id": "nose2", "tier": 2, "contact": 0.4,
+      "cells": [[0, 0], [1, 0], [0, 1], [1, 1]],
+      "outline": [
+        { "type": "line", "a": [0, 2], "b": [1, 0] },
+        { "type": "line", "a": [1, 0], "b": [2, 2] },
+        { "type": "line", "a": [2, 2], "b": [0, 2] }
+      ],
+      "connectors": [
+        { "cell": [0, 1], "side": "S" },
+        { "cell": [1, 1], "side": "S" }
+      ]
+    }
+  ]
+}

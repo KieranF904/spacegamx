@@ -1,0 +1,68 @@
+{
+  "_comment": "System hazards (common/src/ships/hazards.ts). Each system rates its hazards 0-5 (systems.json hazardRatings); places within a system can add to them (nearStar, nearBlackHole: within `radii` × the central body's radius, a rating is at least this). A ship's tolerance comes from what it's built of: its materials' hazard ratings by share of its cells (materials.json hazards), plus the bulk rules below. Rating minus tolerance (floored at 0) is the deficit; effects are per point of deficit (hazard effects come later: see the plan).",
+  "nearStar": {
+    "margin": 1500,
+    "ratings": {
+      "thermal": 3
+    }
+  },
+  "nearBlackHole": {
+    "margin": 2500,
+    "ratings": {
+      "gravitational": 3
+    }
+  },
+  "tolerance": {
+    "gravitational": {
+      "massFloor": 20,
+      "massPerPoint": 25,
+      "_comment": "a point per massPerPoint of mass over massFloor; mass in mass-anchor material counts double"
+    },
+    "thermal": {
+      "massOver": 100,
+      "points": 1,
+      "_comment": "bulk soaks heat: a point for mass over massOver"
+    },
+    "cryo": {
+      "conduitsOver": 6,
+      "points": 1,
+      "_comment": "a conduit spine keeps power warm: a point for more than conduitsOver conduits"
+    },
+    "electromagnetic": {
+      "conductiveConduits": 3,
+      "_comment": "grounded: the share of conduits in a conductive material × this"
+    }
+  },
+  "effects": {
+    "radiation": {
+      "summary": "Hull cells lose 0.4% HP a minute and battery capacity drops 8%, per point",
+      "hullWearPerMin": 0.004,
+      "batteryCap": -0.08
+    },
+    "thermal": {
+      "summary": "Beam heat builds 20% faster and shield regen drops 15%, per point",
+      "beamHeat": 0.2,
+      "shieldRegen": -0.15
+    },
+    "cryo": {
+      "summary": "Battery capacity drops 10% per point",
+      "batteryCap": -0.1
+    },
+    "corrosive": {
+      "summary": "Armour cells lose 0.3% HP a minute and station repairs cost 25% more, per point",
+      "armourWearPerMin": 0.003,
+      "repairCost": 0.25
+    },
+    "gravitational": {
+      "summary": "Light ships are pulled towards the well and lose 10% of their steering and thrust per point; jump range −15% a point",
+      "control": -0.1,
+      "jumpRange": -0.15,
+      "driftAccel": 0.0035
+    },
+    "electromagnetic": {
+      "summary": "A 2-second EMP every 40 s while short",
+      "empEverySeconds": 40,
+      "empSeconds": 2
+    }
+  }
+}

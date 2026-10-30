@@ -3,7 +3,7 @@
  */
 
 import { BaseRegistry } from '../registries.js';
-import { ItemDefinition, ItemCategory, ItemRarity, DEFAULT_ITEMS } from '../definitions/ItemDefinition.js';
+import { ItemDefinition, LegacyItemCategory, LegacyItemRarity, DEFAULT_ITEMS } from '../definitions/ItemDefinition.js';
 
 export class ItemRegistry extends BaseRegistry<string, ItemDefinition> {
   private static instance: ItemRegistry;
@@ -35,11 +35,11 @@ export class ItemRegistry extends BaseRegistry<string, ItemDefinition> {
 
   // === Helper methods ===
 
-  getByCategory(category: ItemCategory): ItemDefinition[] {
+  getByCategory(category: LegacyItemCategory): ItemDefinition[] {
     return Array.from(this.items.values()).filter((i) => i.category === category);
   }
 
-  getByRarity(rarity: ItemRarity): ItemDefinition[] {
+  getByRarity(rarity: LegacyItemRarity): ItemDefinition[] {
     return Array.from(this.items.values()).filter((i) => i.rarity === rarity);
   }
 
@@ -108,7 +108,7 @@ export class ItemRegistry extends BaseRegistry<string, ItemDefinition> {
   /**
    * Get rarity color for UI
    */
-  getRarityColor(rarity: ItemRarity): string {
+  getRarityColor(rarity: LegacyItemRarity): string {
     switch (rarity) {
       case 'common': return '#ffffff';
       case 'uncommon': return '#00ff00';

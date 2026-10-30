@@ -1,0 +1,202 @@
+{
+ "name": "Void Reaver",
+ "catalogVersion": 1,
+ "parts": [
+  {
+   "uid": 0,
+   "piece": "sq",
+   "fn": "emp",
+   "material": "titanium",
+   "x": 0,
+   "y": -2,
+   "rot": 0,
+   "flip": false,
+   "facing": "N"
+  },
+  {
+   "uid": 1,
+   "piece": "sq",
+   "fn": "laser",
+   "material": "titanium",
+   "x": -1,
+   "y": -1,
+   "rot": 0,
+   "flip": false,
+   "facing": "N"
+  },
+  {
+   "uid": 2,
+   "piece": "sq",
+   "fn": "shield",
+   "material": "titanium",
+   "x": 0,
+   "y": -1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 3,
+   "piece": "sq",
+   "fn": "laser",
+   "material": "titanium",
+   "x": 1,
+   "y": -1,
+   "rot": 0,
+   "flip": false,
+   "facing": "N"
+  },
+  {
+   "uid": 4,
+   "piece": "tri",
+   "fn": "hull",
+   "material": "titanium",
+   "x": -2,
+   "y": 0,
+   "rot": 3,
+   "flip": false
+  },
+  {
+   "uid": 5,
+   "piece": "sq",
+   "fn": "shield",
+   "material": "titanium",
+   "x": -1,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 6,
+   "piece": "sq",
+   "fn": "core",
+   "material": "titanium",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 7,
+   "piece": "sq",
+   "fn": "shield",
+   "material": "titanium",
+   "x": 1,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 8,
+   "piece": "tri",
+   "fn": "hull",
+   "material": "titanium",
+   "x": 2,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 9,
+   "piece": "sq",
+   "fn": "hull",
+   "material": "titanium",
+   "x": -3,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 10,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "titanium",
+   "x": -2,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 11,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "titanium",
+   "x": -1,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 12,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "titanium",
+   "x": 0,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 13,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "titanium",
+   "x": 1,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 14,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "titanium",
+   "x": 2,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 15,
+   "piece": "sq",
+   "fn": "hull",
+   "material": "titanium",
+   "x": 3,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 16,
+   "piece": "sq",
+   "fn": "thruster",
+   "material": "titanium",
+   "x": -2,
+   "y": 2,
+   "rot": 0,
+   "flip": false,
+   "facing": "S"
+  },
+  {
+   "uid": 17,
+   "piece": "sq",
+   "fn": "thruster",
+   "material": "titanium",
+   "x": 0,
+   "y": 2,
+   "rot": 0,
+   "flip": false,
+   "facing": "S"
+  },
+  {
+   "uid": 18,
+   "piece": "sq",
+   "fn": "thruster",
+   "material": "titanium",
+   "x": 2,
+   "y": 2,
+   "rot": 0,
+   "flip": false,
+   "facing": "S"
+  }
+ ]
+}

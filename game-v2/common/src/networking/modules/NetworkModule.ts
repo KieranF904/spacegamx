@@ -1,4 +1,4 @@
-import { BitBuffer } from '../BitBuffer';
+import { BitBuffer } from '../BitBuffer.js';
 
 /**
  * Module category determines when data is sent:

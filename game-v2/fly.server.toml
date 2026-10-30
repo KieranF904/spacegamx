@@ -6,7 +6,7 @@ primary_region = 'syd'
 
 [env]
   PORT = "3000"
-  ADMIN_PORT = "3001"
+  ADMIN_PORT = "3005"
   NODE_ENV = "production"
   SERVER_NAME = "Space Game v2 (Australia)"
   SERVER_REGION = "syd"

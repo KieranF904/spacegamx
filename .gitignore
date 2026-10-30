@@ -33,3 +33,27 @@ coverage/
 # Cache
 .cache/
 .parcel-cache/
+
+# Local account database (JSON user store)
+game-v2/data/users.json
+game-v2/data/users.json.tmp
+game-v2/data/lobby/
+
+# Players' saved ships (runtime data)
+game-v2/data/ships/players/
+
+# Players' saved progress (runtime data)
+game-v2/data/profiles/
+
+# Contributor notes and ranks (runtime data, kept on the server between deploys)
+game-v2/data/contributor/
+game-v2/data/status/
+
+# Website posts, comments and uploads (runtime data)
+game-v2/data/site/
+
+# Pilot telemetry (runtime data)
+game-v2/data/telemetry/
+
+# Scratch screenshots
+dev-tools/_look*.png

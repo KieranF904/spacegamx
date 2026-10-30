@@ -1,5 +1,5 @@
-import { BitBuffer } from '../BitBuffer';
-import { createModule, NetworkModule } from './NetworkModule';
+import { BitBuffer } from '../BitBuffer.js';
+import { createModule, NetworkModule } from './NetworkModule.js';
 
 /**
  * Health data for damageable entities

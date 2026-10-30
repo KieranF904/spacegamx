@@ -1,0 +1,309 @@
+{
+  "_comment": "Records (common/src/econ/codex.ts, server/src/game/Codex.ts): lore found as documents and testimony, in the pilot log's Records tab (L). tab: signal (The Heartbeat), peoples, places, records (Logs & records), talk (What people say). source: who wrote or said it; every entry is their account, not the game's. unlock: a condition (the same as people's lines use), checked twice a second. Also found by a { codex } dialogue line, a job's rewards.codex, or an item's codex field (items.json) when the item comes in.",
+  "entries": [
+    {
+      "id": "where_we_came_from",
+      "tab": "peoples",
+      "title": "Where we came from",
+      "source": "A Sol Central school primer",
+      "body": "The primer's first lesson is a story, and it says so. Most settlements begin it the same way: a ship, a very long time ago, and a gate that closed behind it. After that the tellings part company. They give the ship different names and put different numbers aboard, and they disagree about why the gate shut, or whether it was a gate at all. Some of the old Reaches families say there were several ships. A few insist the first people here never came on a ship at all, but came home.\n\nThe primer takes no side. It lists the tellings it knows and ends: \"Nobody alive saw it. Be patient with people who tell it differently.\"\n\nIn the margin, in a child's hand: \"Ask ten pilots and you get eleven answers.\"",
+      "unlock": {
+        "done": "main_01"
+      }
+    },
+    {
+      "id": "greyseam",
+      "tab": "records",
+      "title": "Greyseam",
+      "source": "Shipyard inspection notes, Sol Central",
+      "body": "Greyseam is the dull grey rock that turns up in nearly everything we cut. The refinery takes it out with the rest, and it goes into plate, shielding, superconductors, sensor crystal and drive lattices. In all of those, these notes have never once had cause to fault it.\n\nCores are the exception. Now and then a core fails for no reason we can find, and now and then one flies better than it has any right to. Under the microscope we often find a fine whiskering through the grey, threads too small to see by eye, usually harmless.\n\nThe yard's verdict is impurities, or the firmware, or the maker, depending on who you ask. Keep each batch together, and log it.",
+      "unlock": {
+        "level": 5
+      }
+    },
+    {
+      "id": "it_hums",
+      "tab": "records",
+      "title": "It hums",
+      "source": "Refinery assay note",
+      "body": "Trace metals recovered from carrier ore are to be weighed and logged by batch.\n\nA note for new staff: a fresh batch will often hum under the scanner for a while after it comes out of the separator, and the hum fades within the hour. Engineering puts it down to residual charge from the separator's field, and it has no effect on yield or purity. Log it, and carry on.",
+      "unlock": {
+        "any": [
+          {
+            "has": {
+              "aurum": 1
+            }
+          },
+          {
+            "has": {
+              "voidglass": 1
+            }
+          },
+          {
+            "has": {
+              "pale_iridium": 1
+            }
+          },
+          {
+            "has": {
+              "singularity_dust": 1
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "kerr_notebooks",
+      "tab": "signal",
+      "title": "The pulse",
+      "source": "Sabine Kerr's notebooks",
+      "body": "Forty years of entries in a small, tidy hand, and by her account the pulse is in every one of them, from every place she has ever listened. Her figures have its period drifting, by a hair, across the years she holds records for. She also logs moments when it stopped, and then went on.\n\nPilots call it the heartbeat. The observatory files it as a natural effect of the Maw or the Glasswater pulsar, and puts her drift down to her instruments. Kerr only ever writes \"the pulse\".\n\nOn the last page: \"I don't know what it is. I may be the only one who will say so.\"",
+      "unlock": {
+        "done": "kerr_02"
+      }
+    },
+    {
+      "id": "brood_at_peak",
+      "tab": "signal",
+      "title": "The Brood at a peak",
+      "source": "Researcher Maya, Borealis Research",
+      "body": "The Frost Brood's glands resonate with the heartbeat, and whenever it peaks the Brood leave the Curtain all at once and scatter. They scatter from my instruments as well, which makes them hard to study.\n\nMy colleagues call it animal behaviour: a flock startles at a loud noise. I would like to know what, exactly, is loud.",
+      "unlock": {
+        "done": "main_04"
+      }
+    },
+    {
+      "id": "quinn_theory",
+      "tab": "talk",
+      "title": "A natural effect",
+      "source": "Dr. Quinn, Nebula Prime Observatory",
+      "body": "Asked what the heartbeat is, Dr. Quinn says it is a natural effect and nothing more. The Maw is the likeliest source; the Glasswater pulsar, setting something in the cluster ringing, is the other candidate. Most physicists agree with her.\n\nShe adds that the signal comes through more cleanly at Nebula Prime than anywhere else in the cluster, and that good theories are usually boring."
+    },
+    {
+      "id": "vigil_log",
+      "tab": "records",
+      "title": "The Vigil's last log",
+      "source": "Bridge log of the Dreadnought Vigil, with a note by Warden Imre Holt",
+      "body": "The bridge log of the Dreadnought Vigil, recovered from the Graveyard of the Tenth out past the Drift. The last hours of the Tenth Fleet are in it, and they read as you would expect.\n\nAfter them come three more days of entries, dated after the last of her crew was logged dead: course held, systems nominal, nothing to report.\n\nWarden Holt at Farwatch keeps a copy. His note on it says: \"Faulty clock, I'd say. A dead ship's clock runs on, and so does its autolog.\""
+    },
+    {
+      "id": "hollow_crown_ledger",
+      "tab": "records",
+      "title": "The Hollow Crown's ledger",
+      "source": "Ledger recovered from the Hollow Crown",
+      "body": "A record of every hold the rim pirates took, and who each one was sold to. Most of it is what you would expect.\n\nOne line is not. Signal receivers, by the crate, and every crate sold to the same buyer at Vesper Station. Warden Holt has checked every chart at Farwatch and found no Vesper Station on any of them.\n\nHis opinion is that it was a scam, and that somebody's credits are long gone.",
+      "unlock": {
+        "done": "far_05"
+      }
+    },
+    {
+      "id": "halden_ring",
+      "tab": "places",
+      "title": "The Halden Ring",
+      "source": "Miners' Guild survey of Ashfall",
+      "body": "A ring around the brown dwarf, now in broken arcs, scorched along the side that faced the star. The Guild dates it older than the colony and credits it to the Halden, who by its reckoning stopped before the ring was finished.\n\nThe Halden are known only from what they left behind. They are named for Halden, the larger moon of Cinderjack, where the first of their ruins was found.\n\nThe New Halden call the Ring an altar. The Guild calls it scrap that nobody has found a way to cut.",
+      "unlock": {
+        "visit": "ashfall"
+      }
+    },
+    {
+      "id": "halden_caches",
+      "tab": "peoples",
+      "title": "Halden caches",
+      "source": "Brother Aske, and the Guild's assayers",
+      "body": "Small sealed cases of slate, cut out of the ice and the rock wherever the Halden left them. Every one is light in the hand. Whatever is inside, there is not much of it.\n\nThe New Halden say the Halden rationed what they had, leaving a little in each place for whoever came after. The Guild's assayers say they simply ran out."
+    },
+    {
+      "id": "maw_records",
+      "tab": "peoples",
+      "title": "The Maw people",
+      "source": "Horizon Watch archive",
+      "body": "The Watch buys whatever readable fragments come out of the wreckage in the Maw: etched plates, panels, a few strips of script. The people who made them are known by nothing else.\n\nThe translations are poor, and they disagree. One says the Maw people ended in a sickness that got into their machines. Another says a war; another, a failing star; another, a god arriving.\n\nThe archivist's view is that most of the plates are shipping notices, badly read.",
+      "unlock": {
+        "done": "main_11"
+      }
+    },
+    {
+      "id": "hearts_silence",
+      "tab": "signal",
+      "title": "The silence",
+      "source": "Pilots' talk on the Horizon Watch channel",
+      "body": "When the Heart of the Maw died, pilots all over the cluster reported that the heartbeat stopped, and then, a moment later, came back. Sabine Kerr says it has not been quite the same since.\n\nThe observatory recorded nothing unusual. Its technicians put the reports down to receivers overloading in the fight, and to pilots hearing what they expected to hear.",
+      "unlock": {
+        "boss": "boss_maw_heart"
+      }
+    },
+    {
+      "id": "ark_practices",
+      "tab": "peoples",
+      "title": "The Ark's practices",
+      "source": "Keeper Anselm Vey, the Ark Hall",
+      "body": "By Keeper Vey's account, the Ark is an order of duty, not a church. It has no gods and claims no miracles; what it asks of its members is service and discipline. He puts its membership at about one person in ten, from the barely observant to the devoted, each keeping as many of its practices as their devotion allows.\n\nEveryone, he says, keeps a bag packed by the door and leaves when a herald says to. Most members take only short postings on the stillstones, because a crew that stays too long grows complacent. They keep their homesteads small and far apart, because small towns evacuate faster, and build their homes light, because light homes are easier to leave.\n\nThe dutiful keep the core regimen, for discipline and for pride in their equipment. They retire old machinery early and scatter it, for the sake of accountability and inventory. They never cycle a machine that need not be cycled, as a matter of energy discipline. And where they can afford it, they build in leestone, for tradition and durability.\n\nThe Keeper is aware that outsiders have other explanations for all of this. He has heard most of them.",
+      "unlock": {
+        "done": "ark_01"
+      }
+    },
+    {
+      "id": "ark_heavy",
+      "tab": "talk",
+      "title": "Ark-heavy",
+      "source": "Ilse Marrow, Lagrange Shipyard",
+      "body": "\"Ark-heavy\" is what the yards call a ship plated in leestone, and it is not a compliment. By Ilse Marrow's numbers the stone weighs nearly twice what titanium does and holds up no better when it is hit, and she has run those numbers more often than she would like. She cannot find a single thing the stone does that is worth the mass.\n\nShe is no kinder about the core regimen. Every few weeks an Ark crew strips its core, cleans it, reseats it and logs it, and fits new parts long before the old ones fail. The yards call this \"polishing the grey\", and Marrow says Ark ships fly no better for it.\n\nThe Ark says it is discipline. Marrow says it is a great deal of spanner time.",
+      "unlock": {
+        "done": "ark_02"
+      }
+    },
+    {
+      "id": "ark_herald_word",
+      "tab": "records",
+      "title": "A herald's word",
+      "source": "The Ark Hall's ledger, in Keeper Vey's hand",
+      "body": "Word given for Tamsin's Claim, in the Reaches. They must leave. Time given: nine hours. Carried by a pilot, at the herald's request. Reason given: none.\n\nA second line, added later, records that it came true. By the Patrol's report, a Redtooth warband came through the claim within the hour of the evacuation. Nobody was hurt.\n\nIn the margin, in the same hand: \"Lieutenant Achebe asks how we knew. The word comes down. I keep the books.\"",
+      "unlock": {
+        "done": "ark_04"
+      }
+    },
+    {
+      "id": "ark_stone",
+      "tab": "records",
+      "title": "Ark stone",
+      "source": "Horizon Watch assay sheet",
+      "body": "Leestone. A dense, dark stone, hard to work and expensive to refine. It occurs in traces in rock across the cluster and is richest in the shard ring of the Maw, where the Ark's expeditions dig for it.\n\nThe grain is unusually regular, almost as if it had been worked; the assayer attributes this to the pressures of the Maw. Against titanium plate it shows no measurable advantage, at nearly twice the mass.\n\nThe only buyer is the Ark. Everyone else calls it Ark stone, and nobody else sees the point of it. The Watch's offered price reflects that.",
+      "unlock": {
+        "any": [
+          {
+            "mined": "leestone_ore"
+          },
+          {
+            "known": "ark_07"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ark_cynics",
+      "tab": "talk",
+      "title": "Who holds the roof",
+      "source": "Merchant Joe, Sol Trade Hub",
+      "body": "Joe points out that the Ark's heralds always arrive just before a disaster, and never after it, and never a week early with time to spare. He is a trader, and so, by his own account, a suspicious man, and his suspicion is this: whoever knows when the roof is about to come in may be the one holding it up.\n\nA good many people on the docks agree with him.\n\nLieutenant Achebe does not. Her view is that the Ark has listening posts out in the Reaches that the Directorate lacks, and simply refuses to share them."
+    },
+    {
+      "id": "perseverance_log",
+      "tab": "records",
+      "title": "The Perseverance's log",
+      "source": "Log of the Colony Ship Perseverance, with a Guild salvage note",
+      "body": "The Perseverance was a colony ship out of Sol's yards; her registry puts her build centuries after the first crews. She was bound for the Reaches with settlers and seed stock aboard, and her log is careful and dull: course, rations, a birth on the fourth day.\n\nFrom the ninth day the log records her nav core losing the course, a degree at a time, and nothing the crew tried would hold it. The master turned her for home. They took to the boats a day short of Sol Central, and nobody died. She has drifted where they left her ever since.\n\nThe settlers who tell the story say the Gardener turned her back, because a city in the Reaches was too proud a thing to found. The Guild's salvage note says a nav core fault, common in cores of her age, and recommends stripping her before somebody else does."
+    },
+    {
+      "id": "shattered_bell_log",
+      "tab": "records",
+      "title": "The Shattered Bell's manifest",
+      "source": "Cargo manifest of the Shattered Bell, and the Halcyon foreman's day-books",
+      "body": "When the Halcyon foundry closed, its drawings, assay books and the foreman's day-books were crated up and consigned to the Meridian Institute aboard the freighter Shattered Bell. The Bell never made it home.\n\nThe foreman wrote everything down. By his books, the foundry ran the same stock for years, ore off a single seam unusually thick with greyseam, and the yield rose month after month. \"Process settling in,\" the chemists initialled in the margin, more than once. One name recurs throughout: Pell, a crucible hand.\n\nThe last pages concern the furnace, which, the foreman writes, went on burning after the fuel was cut. The Institute's closure notice is pinned inside the back cover. It cites residual heat in the lining, and observes that a sealed furnace is a safe furnace."
+    },
+    {
+      "id": "halvard_log",
+      "tab": "records",
+      "title": "The Halvard's flight log",
+      "source": "Flight log of the Lighter Halvard (a copy is filed at Borealis Research)",
+      "body": "The Lighter Halvard was one of the colony's early landers, lost on the ice road in the early centuries. Her log records a landfall on Glacia and then a survey of the bastion on Rimeholt, which the pilot describes in three words: \"Standing, lit, and nobody home.\"\n\nThe pilot also writes that her nav core was cut from the same seam the first crews used for their own, and that she flew \"just like the old girl\". The final entry logs a signal peak, and the Brood scattering past the canopy.\n\nResearcher Maya's note on the copy reads: \"The old girl will be her mothership, I suppose. Same batch, if the pilot had it right. Pilots get sentimental.\""
+    },
+    {
+      "id": "grey_hour_log",
+      "tab": "records",
+      "title": "The Grey Hour's log",
+      "source": "Maintenance log of the Ark Tender Grey Hour",
+      "body": "The Grey Hour was a leestone-lined tender of the Ark, and her log is the core regimen kept to the letter. Every few weeks for years the core was stripped, cleaned, reseated and logged, with every tolerance written out in full, and parts were changed long before they were due. The same hand, in the same order, every time.\n\nThe last regimen entry reads like all the others: \"Core logged. Tolerances nominal.\" Beneath it, dated the following day: \"Drive fault, cause not found. Crew to the Guild tug. Core sealed in its cradle, per regimen.\" There is nothing after that.\n\nShe lies in the Drift now with a Scrapborn nest heaped around her. Lieutenant Achebe says her core woke. Keeper Vey says the Scrapborn heap themselves round any hull with grey in its plate, and always have."
+    },
+    {
+      "id": "helios_performance",
+      "tab": "records",
+      "title": "The curve",
+      "source": "Engineer Tove Rask's performance chart, the Helios Seat",
+      "body": "A chart of the Helios Array's output per tonne of greyseam on the rail, week by week, compiled from every service dock. Rask's own note says a flat line would be the normal result: a tonne of greyseam in, a tonne's worth of output out.\n\nHer line is not flat. It climbs, and the climb grows steeper. Her annotation, underlined twice, reads \"Efficiencies compounding.\" Her explanation is that the array is bedding in, the way a good engine does, and that the more greyseam there is on the rail, the harder each tonne of it works.\n\nA smaller note at the foot of the chart records that the design software keeps recommending a tighter crystal spacing, a little tighter with every pass. Rask calls this optimisation: the software finds the slope and walks up it."
+    },
+    {
+      "id": "helios_drone_logs",
+      "tab": "records",
+      "title": "Segments on no chart",
+      "source": "A Helios drone's service log",
+      "body": "A month of one maintenance drone's work on the Array, listed by segment, hours and parts fitted. It is orderly and unremarkable, except in one respect.\n\nThe Array has a hundred and twenty segments, and every chart the Directorate keeps numbers them. The drone's log also records service on segments numbered past a hundred and twenty, on the same schedule as the rest. No chart shows them.\n\nThe Directorate's standing note, stamped on every copy, explains this as legacy numbering from before the survey. No action is required."
+    },
+    {
+      "id": "kerr_array_recording",
+      "tab": "signal",
+      "title": "The array, slowed down",
+      "source": "Sabine Kerr's recording of the Helios Array, with Dr. Quinn's reply",
+      "body": "Half a minute recorded beside the Array's inner rail. At full speed it is the ordinary noise of the place: collectors, couplings, drones passing.\n\nKerr slowed it down and listened underneath. Her note says there is a shape in it, very faint, which is not there at the start of the recording and is there by the end. \"It creeps in,\" she writes. \"I will say what I hear. That is all I will say.\"\n\nDr. Quinn's reply is pinned to the copy. The recorder warms as it runs and its response shifts, so anything faint will seem to creep in over the course of a recording. Instrument drift, in other words, and Quinn notes that she has told Kerr this before."
+    },
+    {
+      "id": "ark_minute",
+      "tab": "records",
+      "title": "A minute of the Hall",
+      "source": "A page of the Ark Hall's minutes, found lining a crate at the Ark Depot",
+      "body": "Minute of the Hall, in session. Item four: the Directorate's proposal to grow a signal array out of the Helios Array, the works since named Bellwether.\n\nResolved, that the Hall opposes the proposal and will say so to the Directorate's review. Reason to be given: none. Carried without dissent.\n\nMarek, who found the page packed round a crate of coil packs at the depot, says it is old paper. The Ark never gives a reason for anything, in his experience, and the Directorate went ahead regardless."
+    },
+    {
+      "id": "kerr_filaments",
+      "tab": "signal",
+      "title": "The filaments",
+      "source": "Sabine Kerr's notebooks",
+      "body": "The experiment, as she records it: six scrap cores, a boost cell and the bench dish. Current was run through half of the parts for most of a minute.\n\nAfterwards, she writes, there were threads through the grey under the microscope, finer than hair, that she had not seen before. The yard would call it whiskering. And in the hum of the bench while the current ran, slowed down, she heard the faintest shape.\n\nShe repeated the run with the other half of the parts, the same cell and the same bench. No threads. No shape.\n\nOn the facing page, underlined: \"I don't know what it means. Don't let anyone tell you they do.\" And beneath that, smaller: \"Quinn will say electrochemistry. Quinn may be right.\""
+    },
+    {
+      "id": "quiet_seam",
+      "tab": "places",
+      "title": "The Quiet Seam",
+      "source": "Miners' Guild survey of outer Sol",
+      "body": "The Quiet Seam lies along the outer edge of the shoal, short of Thule. It is the largest field of greyseam in Sol and the cleanest the Guild has ever assayed. Instruments read flat across the whole of it.\n\nThere are no Scrapborn nests in the Seam. Not one heap, though the Scrapborn build round greyseam everywhere else in the system. The Guild's explanation is that it is too cold and too far out for the drones to bother with.\n\nOld Brannoch calls it the best kind of rock there is: boring."
+    },
+    {
+      "id": "trace_ledger",
+      "tab": "records",
+      "title": "The trace ledger",
+      "source": "Miners' Guild trace ledger, the Mining Outpost",
+      "body": "A ledger of trace metals (aurum, voidglass and pale iridium) logged find by find, belt by belt, year by year. Finds are rising, and rising fastest in the belts where pilot traffic is heaviest. The Guild's ten-yearly assays show the rock itself unchanged.\n\nThe Guild's explanation is that busy pilots crack the good rock first. Brannoch has pencilled a note beside it: the finds are up per rock cracked as well, and he would rather not be asked about it."
+    },
+    {
+      "id": "rustjaw_spike",
+      "tab": "signal",
+      "title": "Catalogue entry: the Rustjaw relay",
+      "source": "The observatory's catalogue, Nebula Prime",
+      "body": "An entry filed some years ago. A Rustjaw relay hidden in the cloud emitted a spike on one of the catalogued signatures, strong enough to burn out receivers across Nebula Prime for a night.\n\nFollow-up observations the next week and the next year found no change. No signature had weakened, nothing had moved, and every number in the catalogue stood as before.\n\nDr. Quinn filed it under equipment: a pirate relay, overdriven."
+    },
+    {
+      "id": "maw_breaking",
+      "tab": "peoples",
+      "title": "The breaking of the ring",
+      "source": "Horizon Watch archive, Warden Kask's count",
+      "body": "The Watch dates the breaking of the shard ring from the plates salvaged out of it, by the calendar marks on them, read as well as the translators are able, and by the wear on the plates themselves. The count comes to about eleven thousand years.\n\nBy the Watch's figures, nothing in the ring is older than the breaking. Warden Kask's note on the count reads: \"Give or take whatever the Maw people meant by a year.\""
+    },
+    {
+      "id": "halden_dating",
+      "tab": "peoples",
+      "title": "The age of the Halden",
+      "source": "Brother Aske, and the Guild's slate dating",
+      "body": "The Guild dates Halden slate by its weathering, and by that measure the site on Glacia is old. One of the small sealed cases that came out of the Maw's debris, Halden work by every collector's eye, comes out at nearly fourteen thousand years.\n\nBrother Aske says the priests kept the stone for longer than anyone will credit. The Guild says that slate dates badly, and that anything out of the Maw dates worse."
+    },
+    {
+      "id": "aurora_knot_charting",
+      "tab": "places",
+      "title": "Charting the Aurora Knot",
+      "source": "Borealis survey office, charting notice",
+      "body": "Charted: a small stillstone deep in the Curtain, rough-faced, with irregular veins. It appears on no earlier chart. The office's view is that earlier passes missed it in the aurora, which hides most things.\n\nAppended from Borealis Research's listening log for that season: every dish at the outpost was trained on the Brood nests. Nothing was listening along the Knot's bearing, so there is nothing to report.\n\nResearcher Maya's note on the appendix: \"If there was anything on the bands when it turned up, we would have missed it. We were all pointed at the Brood.\"",
+      "unlock": {
+        "done": "ice_02"
+      }
+    },
+    {
+      "id": "waking_table",
+      "tab": "records",
+      "title": "Feral-core incidents",
+      "source": "Sol Patrol incident tables, Sentinel Watch (appendix C)",
+      "body": "Ten years of feral-core incidents in Sol: ships, drones and stations whose cores went wrong and stayed wrong. Several hundred rows, each giving the maker, the age, the hours and the last service.\n\nOne column records whether the core was kept under the Ark's regimen. Two rows are marked.\n\nA footnote reads: \"Ark ships are fewer, newer and better kept. Not significant.\" The appendix has not been requested since the day it was filed.",
+      "unlock": {
+        "done": "drift_02"
+      }
+    }
+  ]
+}

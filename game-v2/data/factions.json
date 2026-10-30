@@ -1,0 +1,2414 @@
+{
+  "_comment": "Enemy factions and where they spawn. behaviour: aggro (range they notice you), range (distance they like to fight at), flee (core HP fraction they run at; 0 = never), leash (how far they chase from home). ships: XP and credits per kill. loot: rolled per kill; partSalvage: chance each intact part drops as a salvageable part. spawns.<system>.nests: packs launched from that system's nests (systems.json nests: where each orbits), `packs` out at once while a pilot is near, roaming `roam` round it and chasing no further than `leash`; a wiped-out pack is replaced after `respawnSeconds`, and a group's own `respawnSeconds` and `limit` keep its heavies rare. A system's own `groups` roam free only if its `packs` > 0; otherwise they're just who its raids and events send.",
+  "factions": {
+    "scrapborn": {
+      "name": "Scrapborn",
+      "color": "#c9a46a",
+      "description": "Feral machines heaping greyseam into nests in Sol's outer Drift. A fault that happens to some cores, rarely, the yards say; every pilot has a theory. Heavy, slow and half blind. Good practice, fair pay.",
+      "hpScale": 0.3,
+      "behaviour": {
+        "aggro": 1700,
+        "range": 520,
+        "flee": 0,
+        "leash": 5500,
+        "accuracy": 0.55,
+        "strafe": 0.35
+      },
+      "ships": {
+        "scrap_mite": {
+          "xp": 15,
+          "credits": 2
+        },
+        "scrap_spitter": {
+          "xp": 20,
+          "credits": 3
+        },
+        "scrap_crawler": {
+          "xp": 40,
+          "credits": 8
+        },
+        "scrap_swarmer": {
+          "xp": 8,
+          "credits": 1
+        },
+        "scrap_lobber": {
+          "xp": 45,
+          "credits": 9
+        },
+        "scrap_hulk": {
+          "xp": 70,
+          "credits": 14
+        },
+        "scrap_nest": {
+          "xp": 120,
+          "credits": 30
+        },
+        "boss_scrap_mother": {
+          "xp": 450,
+          "credits": 90
+        },
+        "giant_midden": {
+          "xp": 300,
+          "credits": 160
+        }
+      },
+      "loot": [
+        {
+          "item": "iron_ore",
+          "chance": 0.7,
+          "min": 2,
+          "max": 6
+        },
+        {
+          "item": "copper_ore",
+          "chance": 0.5,
+          "min": 1,
+          "max": 4
+        },
+        {
+          "item": "scrap_electronics",
+          "chance": 0.35,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "item": "alloy_plate",
+          "chance": 0.2,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "repair_kit",
+          "chance": 0.04,
+          "min": 1,
+          "max": 1
+        }
+      ],
+      "partSalvage": 0.1
+    },
+    "pirates": {
+      "name": "Pirates",
+      "color": "#e05a4a",
+      "behaviour": {
+        "aggro": 2600,
+        "range": 700,
+        "flee": 0.25,
+        "leash": 9000,
+        "accuracy": 0.8
+      },
+      "ships": {
+        "pirate_skiff": {
+          "xp": 30,
+          "credits": 9
+        },
+        "pirate_raider": {
+          "xp": 60,
+          "credits": 24
+        },
+        "pirate_gunship": {
+          "xp": 150,
+          "credits": 85
+        },
+        "boss_rustjaw": {
+          "xp": 900,
+          "credits": 180
+        },
+        "boss_hollow_crown": {
+          "xp": 1100,
+          "credits": 220
+        },
+        "giant_ironmonger": {
+          "xp": 1000,
+          "credits": 640
+        }
+      },
+      "loot": [
+        {
+          "item": "scrap_electronics",
+          "chance": 0.8,
+          "min": 1,
+          "max": 3
+        },
+        {
+          "item": "iron_ore",
+          "chance": 0.5,
+          "min": 3,
+          "max": 8
+        },
+        {
+          "item": "copper_wire",
+          "chance": 0.35,
+          "min": 2,
+          "max": 5
+        },
+        {
+          "item": "targeting_chip",
+          "chance": 0.08,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "item": "servo_motor",
+          "chance": 0.06,
+          "min": 1,
+          "max": 1
+        }
+      ],
+      "partSalvage": 0.12
+    },
+    "scavengers": {
+      "name": "Scavenger Drones",
+      "color": "#9ccc65",
+      "behaviour": {
+        "aggro": 1800,
+        "range": 500,
+        "flee": 0,
+        "leash": 6000,
+        "accuracy": 0.75
+      },
+      "ships": {
+        "scav_drone": {
+          "xp": 12,
+          "credits": 2
+        },
+        "scav_harvester": {
+          "xp": 45,
+          "credits": 17
+        },
+        "scav_dredge": {
+          "xp": 110,
+          "credits": 40
+        },
+        "boss_prism_colossus": {
+          "xp": 1200,
+          "credits": 240
+        },
+        "giant_dredge": {
+          "xp": 466,
+          "credits": 260
+        }
+      },
+      "loot": [
+        {
+          "item": "scrap_electronics",
+          "chance": 0.9,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "silicate",
+          "chance": 0.5,
+          "min": 2,
+          "max": 6
+        },
+        {
+          "item": "crystal",
+          "chance": 0.12,
+          "min": 1,
+          "max": 2
+        }
+      ],
+      "partSalvage": 0.08
+    },
+    "frost": {
+      "name": "Frost Brood",
+      "color": "#81d4fa",
+      "behaviour": {
+        "aggro": 2400,
+        "range": 800,
+        "flee": 0,
+        "leash": 8000,
+        "accuracy": 0.85
+      },
+      "ships": {
+        "frost_shard": {
+          "xp": 70,
+          "credits": 20
+        },
+        "frost_warden": {
+          "xp": 160,
+          "credits": 66
+        },
+        "frost_bulwark": {
+          "xp": 110,
+          "credits": 22
+        },
+        "frost_elder": {
+          "xp": 260,
+          "credits": 70
+        },
+        "boss_hoarfrost": {
+          "xp": 900,
+          "credits": 180
+        },
+        "boss_hushwing": {
+          "xp": 1000,
+          "credits": 200
+        },
+        "giant_rimeback": {
+          "xp": 800,
+          "credits": 440
+        }
+      },
+      "loot": [
+        {
+          "item": "frost_gland",
+          "chance": 0.6,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "ice",
+          "chance": 0.6,
+          "min": 4,
+          "max": 10
+        },
+        {
+          "item": "sapphire",
+          "chance": 0.06,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "item": "shield_emitter",
+          "chance": 0.04,
+          "min": 1,
+          "max": 1
+        }
+      ],
+      "partSalvage": 0.1
+    },
+    "cinder": {
+      "name": "Cinder Cult",
+      "color": "#ff7043",
+      "behaviour": {
+        "aggro": 2800,
+        "range": 330,
+        "flee": 0,
+        "leash": 10000,
+        "accuracy": 0.85
+      },
+      "ships": {
+        "cinder_zealot": {
+          "xp": 110,
+          "credits": 44
+        },
+        "cinder_brand": {
+          "xp": 260,
+          "credits": 135
+        },
+        "boss_cinder_warden": {
+          "xp": 1200,
+          "credits": 240
+        },
+        "giant_pilgrim": {
+          "xp": 1666,
+          "credits": 1100
+        }
+      },
+      "loot": [
+        {
+          "item": "cinder_ash",
+          "chance": 0.6,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "titanium_ore",
+          "chance": 0.5,
+          "min": 3,
+          "max": 8
+        },
+        {
+          "item": "power_coupling",
+          "chance": 0.12,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "item": "ruby",
+          "chance": 0.05,
+          "min": 1,
+          "max": 1
+        }
+      ],
+      "partSalvage": 0.12
+    },
+    "wraiths": {
+      "name": "Void Wraiths",
+      "color": "#b388ff",
+      "behaviour": {
+        "aggro": 3200,
+        "range": 850,
+        "flee": 0,
+        "leash": 12000,
+        "accuracy": 0.9
+      },
+      "ships": {
+        "void_phantom": {
+          "xp": 140,
+          "credits": 52
+        },
+        "void_reaver": {
+          "xp": 320,
+          "credits": 168
+        },
+        "boss_void_leviathan": {
+          "xp": 1800,
+          "credits": 360
+        },
+        "giant_shroud": {
+          "xp": 2333,
+          "credits": 1600
+        }
+      },
+      "loot": [
+        {
+          "item": "void_ichor",
+          "chance": 0.6,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "cobalt_ore",
+          "chance": 0.4,
+          "min": 2,
+          "max": 6
+        },
+        {
+          "item": "shield_emitter",
+          "chance": 0.08,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "item": "void_opal",
+          "chance": 0.04,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "item": "nav_computer",
+          "chance": 0.05,
+          "min": 1,
+          "max": 1
+        }
+      ],
+      "partSalvage": 0.1
+    },
+    "maw": {
+      "name": "Maw Spawn",
+      "color": "#ffb347",
+      "behaviour": {
+        "aggro": 3400,
+        "range": 1100,
+        "flee": 0,
+        "leash": 14000,
+        "accuracy": 0.9
+      },
+      "ships": {
+        "maw_lurker": {
+          "xp": 260,
+          "credits": 125
+        },
+        "maw_colossus": {
+          "xp": 700,
+          "credits": 493
+        },
+        "boss_maw_heart": {
+          "xp": 1600,
+          "credits": 320
+        }
+      },
+      "loot": [
+        {
+          "item": "cobalt_ore",
+          "chance": 0.6,
+          "min": 4,
+          "max": 10
+        },
+        {
+          "item": "quantum_core",
+          "chance": 0.05,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "item": "cobalt_alloy",
+          "chance": 0.3,
+          "min": 1,
+          "max": 3
+        },
+        {
+          "item": "ancient_relic",
+          "chance": 0.05,
+          "min": 1,
+          "max": 1
+        }
+      ],
+      "partSalvage": 0.12
+    },
+    "redtooth": {
+      "name": "Redtooth Raiders",
+      "color": "#ff8a3d",
+      "behaviour": {
+        "aggro": 3200,
+        "range": 600,
+        "flee": 0.1,
+        "leash": 10000,
+        "accuracy": 0.65
+      },
+      "hpScale": 0.9,
+      "ships": {
+        "redtooth_cutter": {
+          "xp": 22,
+          "credits": 7
+        },
+        "redtooth_brawler": {
+          "xp": 50,
+          "credits": 16
+        },
+        "redtooth_sledge": {
+          "xp": 110,
+          "credits": 36
+        },
+        "boss_redtooth_hold": {
+          "xp": 400,
+          "credits": 80
+        },
+        "giant_mammoth": {
+          "xp": 333,
+          "credits": 180
+        }
+      },
+      "loot": [
+        {
+          "item": "scrap_electronics",
+          "chance": 0.7,
+          "min": 1,
+          "max": 3
+        },
+        {
+          "item": "iron_ore",
+          "chance": 0.5,
+          "min": 2,
+          "max": 6
+        },
+        {
+          "item": "copper_wire",
+          "chance": 0.3,
+          "min": 1,
+          "max": 4
+        },
+        {
+          "item": "repair_kit",
+          "chance": 0.06,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "item": "targeting_chip",
+          "chance": 0.05,
+          "min": 1,
+          "max": 1
+        }
+      ],
+      "partSalvage": 0.12
+    },
+    "helios": {
+      "name": "Helios Drones",
+      "color": "#e8c86a",
+      "description": "Maintenance drones strayed from the Helios Directorate's Array: slow, half-blind, and armed with welding torches. They keep a schedule nobody at the Array wrote. Harmless unless you start it, and not much even then.",
+      "behaviour": {
+        "aggro": 900,
+        "range": 420,
+        "flee": 0,
+        "leash": 4000,
+        "accuracy": 0.35,
+        "strafe": 0.2
+      },
+      "hpScale": 0.35,
+      "damageScale": 0.12,
+      "angrySeconds": 10,
+      "ships": {
+        "helios_drone": {
+          "xp": 6,
+          "credits": 1
+        }
+      },
+      "loot": [
+        {
+          "item": "scrap_electronics",
+          "chance": 0.5,
+          "min": 1,
+          "max": 1
+        },
+        {
+          "item": "copper_wire",
+          "chance": 0.3,
+          "min": 1,
+          "max": 2
+        },
+        {
+          "item": "alloy_plate",
+          "chance": 0.1,
+          "min": 1,
+          "max": 1
+        }
+      ],
+      "partSalvage": 0.05
+    }
+  },
+  "spawns": {
+    "sol": {
+      "grade": 1,
+      "zones": [
+        {
+          "id": "helios_swarm",
+          "inner": 24000,
+          "outer": 40000,
+          "packs": 0,
+          "respawnSeconds": 40,
+          "groups": [
+            {
+              "faction": "helios",
+              "ships": [
+                "helios_drone",
+                "helios_drone",
+                "helios_drone"
+              ],
+              "weight": 5,
+              "passive": true
+            },
+            {
+              "faction": "helios",
+              "ships": [
+                "helios_drone",
+                "helios_drone"
+              ],
+              "weight": 3,
+              "passive": true
+            }
+          ]
+        },
+        {
+          "id": "drift",
+          "inner": 96000,
+          "outer": 120000,
+          "packs": 0,
+          "respawnSeconds": 40,
+          "groups": [
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_mite",
+                "scrap_mite",
+                "scrap_mite"
+              ],
+              "weight": 6
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_spitter",
+                "scrap_mite",
+                "scrap_mite"
+              ],
+              "weight": 4
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_crawler",
+                "scrap_mite",
+                "scrap_spitter"
+              ],
+              "weight": 3
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_crawler",
+                "scrap_spitter",
+                "scrap_spitter",
+                "scrap_mite"
+              ],
+              "weight": 1
+            }
+          ]
+        },
+        {
+          "id": "lanes",
+          "inner": 78000,
+          "outer": 95000,
+          "packs": 0,
+          "respawnSeconds": 45,
+          "groups": [
+            {
+              "faction": "pirates",
+              "ships": [
+                "pirate_skiff",
+                "pirate_skiff"
+              ],
+              "weight": 5
+            },
+            {
+              "faction": "pirates",
+              "ships": [
+                "pirate_raider",
+                "pirate_skiff"
+              ],
+              "weight": 3
+            },
+            {
+              "faction": "redtooth",
+              "ships": [
+                "redtooth_cutter",
+                "redtooth_cutter"
+              ],
+              "weight": 3
+            },
+            {
+              "faction": "redtooth",
+              "ships": [
+                "redtooth_brawler",
+                "redtooth_cutter"
+              ],
+              "weight": 1
+            }
+          ]
+        },
+        {
+          "id": "graveyard",
+          "inner": 0,
+          "outer": 9000,
+          "packs": 0,
+          "respawnSeconds": 50,
+          "groups": [
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_hulk",
+                "scrap_mite",
+                "scrap_mite"
+              ],
+              "weight": 4
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_lobber",
+                "scrap_spitter",
+                "scrap_mite"
+              ],
+              "weight": 3
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_hulk",
+                "scrap_lobber"
+              ],
+              "weight": 1
+            }
+          ]
+        },
+        {
+          "id": "reaches",
+          "inner": 140000,
+          "outer": 215000,
+          "packs": 0,
+          "respawnSeconds": 50,
+          "groups": [
+            {
+              "faction": "pirates",
+              "ships": [
+                "pirate_raider",
+                "pirate_raider"
+              ],
+              "weight": 4,
+              "plating": 1
+            },
+            {
+              "faction": "pirates",
+              "ships": [
+                "pirate_gunship",
+                "pirate_skiff",
+                "pirate_skiff"
+              ],
+              "weight": 3
+            },
+            {
+              "faction": "redtooth",
+              "ships": [
+                "redtooth_brawler",
+                "redtooth_brawler",
+                "redtooth_cutter"
+              ],
+              "weight": 3,
+              "plating": 1
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_hulk",
+                "scrap_lobber",
+                "scrap_lobber"
+              ],
+              "weight": 2
+            }
+          ]
+        },
+        {
+          "id": "lodestone_wardens",
+          "inner": 0,
+          "outer": 6000,
+          "packs": 0,
+          "respawnSeconds": 60,
+          "groups": [
+            {
+              "faction": "redtooth",
+              "ships": [
+                "redtooth_brawler",
+                "redtooth_cutter",
+                "redtooth_cutter"
+              ],
+              "weight": 1
+            },
+            {
+              "faction": "pirates",
+              "ships": [
+                "pirate_gunship",
+                "pirate_skiff",
+                "pirate_skiff"
+              ],
+              "weight": 1
+            }
+          ]
+        }
+      ],
+      "packs": 0,
+      "groups": [
+        {
+          "faction": "pirates",
+          "ships": [
+            "pirate_skiff"
+          ],
+          "weight": 5,
+          "passive": true
+        },
+        {
+          "faction": "pirates",
+          "ships": [
+            "pirate_skiff",
+            "pirate_skiff"
+          ],
+          "weight": 3,
+          "passive": true
+        }
+      ],
+      "_comment": "Inner Sol (systems.json regions) is safe: the system-wide packs are passive, and hostiles never come in after pilots there. Middle Sol has the Lanes, the Drift and the Graveyard; the Reaches are hostile, in better plate.",
+      "events": {
+        "raidStations": [
+          "sol_station_farwatch"
+        ],
+        "raidZone": "lanes",
+        "salvageBelt": 1,
+        "salvageZone": "reaches",
+        "warband": {
+          "zone": "reaches",
+          "share": 0.4,
+          "groups": [
+            {
+              "faction": "redtooth",
+              "ships": [
+                "redtooth_brawler",
+                "redtooth_brawler",
+                "redtooth_cutter"
+              ],
+              "weight": 3
+            },
+            {
+              "faction": "pirates",
+              "ships": [
+                "pirate_gunship",
+                "pirate_raider"
+              ],
+              "weight": 2
+            },
+            {
+              "faction": "pirates",
+              "ships": [
+                "pirate_raider",
+                "pirate_raider",
+                "pirate_skiff"
+              ],
+              "weight": 3
+            }
+          ]
+        }
+      },
+      "nests": [
+        {
+          "id": "sol_nest_nereid",
+          "packs": 2,
+          "respawnSeconds": 60,
+          "roam": 3000,
+          "groups": [
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_mite",
+                "scrap_mite",
+                "scrap_mite"
+              ],
+              "weight": 5
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_spitter",
+                "scrap_mite",
+                "scrap_swarmer",
+                "scrap_swarmer"
+              ],
+              "weight": 3
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_crawler",
+                "scrap_spitter",
+                "scrap_mite"
+              ],
+              "weight": 2,
+              "limit": 1
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_hulk",
+                "scrap_lobber",
+                "scrap_mite"
+              ],
+              "weight": 1,
+              "limit": 1,
+              "respawnSeconds": 300
+            }
+          ]
+        },
+        {
+          "id": "sol_dock_helios_east",
+          "packs": 2,
+          "respawnSeconds": 40,
+          "roam": 3000,
+          "groups": [
+            {
+              "faction": "helios",
+              "ships": [
+                "helios_drone",
+                "helios_drone",
+                "helios_drone"
+              ],
+              "weight": 5,
+              "passive": true
+            },
+            {
+              "faction": "helios",
+              "ships": [
+                "helios_drone",
+                "helios_drone"
+              ],
+              "weight": 3,
+              "passive": true
+            }
+          ]
+        },
+        {
+          "id": "sol_dock_helios_west",
+          "packs": 2,
+          "respawnSeconds": 40,
+          "roam": 3000,
+          "groups": [
+            {
+              "faction": "helios",
+              "ships": [
+                "helios_drone",
+                "helios_drone",
+                "helios_drone"
+              ],
+              "weight": 5,
+              "passive": true
+            },
+            {
+              "faction": "helios",
+              "ships": [
+                "helios_drone",
+                "helios_drone"
+              ],
+              "weight": 3,
+              "passive": true
+            }
+          ]
+        },
+        {
+          "id": "sol_dock_helios_survey",
+          "packs": 1,
+          "respawnSeconds": 40,
+          "roam": 3000,
+          "groups": [
+            {
+              "faction": "helios",
+              "ships": [
+                "helios_drone",
+                "helios_drone",
+                "helios_drone"
+              ],
+              "weight": 5,
+              "passive": true
+            },
+            {
+              "faction": "helios",
+              "ships": [
+                "helios_drone",
+                "helios_drone"
+              ],
+              "weight": 3,
+              "passive": true
+            }
+          ]
+        },
+        {
+          "id": "sol_den_greyback",
+          "packs": 2,
+          "respawnSeconds": 60,
+          "leash": 5000,
+          "roam": 2500,
+          "groups": [
+            {
+              "faction": "pirates",
+              "ships": [
+                "pirate_skiff"
+              ],
+              "weight": 5,
+              "passive": true
+            },
+            {
+              "faction": "pirates",
+              "ships": [
+                "pirate_skiff",
+                "pirate_skiff"
+              ],
+              "weight": 3,
+              "passive": true
+            }
+          ]
+        },
+        {
+          "id": "sol_nest_drift_east",
+          "packs": 2,
+          "respawnSeconds": 40,
+          "roam": 3500,
+          "groups": [
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_mite",
+                "scrap_mite",
+                "scrap_mite"
+              ],
+              "weight": 6
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_spitter",
+                "scrap_mite",
+                "scrap_mite"
+              ],
+              "weight": 4
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_crawler",
+                "scrap_mite",
+                "scrap_spitter"
+              ],
+              "weight": 3,
+              "limit": 2
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_crawler",
+                "scrap_spitter",
+                "scrap_spitter",
+                "scrap_mite"
+              ],
+              "weight": 1,
+              "limit": 1,
+              "respawnSeconds": 120
+            }
+          ]
+        },
+        {
+          "id": "sol_nest_grey_hour",
+          "packs": 1,
+          "respawnSeconds": 40,
+          "roam": 3500,
+          "groups": [
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_mite",
+                "scrap_mite",
+                "scrap_mite"
+              ],
+              "weight": 6
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_spitter",
+                "scrap_mite",
+                "scrap_mite"
+              ],
+              "weight": 4
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_crawler",
+                "scrap_mite",
+                "scrap_spitter"
+              ],
+              "weight": 3,
+              "limit": 2
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_crawler",
+                "scrap_spitter",
+                "scrap_spitter",
+                "scrap_mite"
+              ],
+              "weight": 1,
+              "limit": 1,
+              "respawnSeconds": 120
+            }
+          ]
+        },
+        {
+          "id": "sol_nest_drift_west",
+          "packs": 2,
+          "respawnSeconds": 40,
+          "roam": 3500,
+          "groups": [
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_mite",
+                "scrap_mite",
+                "scrap_mite"
+              ],
+              "weight": 6
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_spitter",
+                "scrap_mite",
+                "scrap_mite"
+              ],
+              "style": "nomad",
+              "limit": 1,
+              "weight": 4
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_crawler",
+                "scrap_mite",
+                "scrap_spitter"
+              ],
+              "weight": 3,
+              "limit": 2
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_crawler",
+                "scrap_spitter",
+                "scrap_spitter",
+                "scrap_mite"
+              ],
+              "weight": 1,
+              "limit": 1,
+              "respawnSeconds": 120
+            }
+          ]
+        },
+        {
+          "id": "sol_den_lanes",
+          "packs": 2,
+          "respawnSeconds": 45,
+          "leash": 6500,
+          "roam": 3000,
+          "groups": [
+            {
+              "faction": "pirates",
+              "ships": [
+                "pirate_skiff",
+                "pirate_skiff"
+              ],
+              "weight": 5
+            },
+            {
+              "faction": "pirates",
+              "ships": [
+                "pirate_raider",
+                "pirate_skiff"
+              ],
+              "style": "nomad",
+              "weight": 3,
+              "limit": 2
+            }
+          ]
+        },
+        {
+          "id": "sol_camp_lanes",
+          "style": "nomad",
+          "packs": 1,
+          "respawnSeconds": 45,
+          "leash": 7000,
+          "roam": 3000,
+          "groups": [
+            {
+              "faction": "redtooth",
+              "ships": [
+                "redtooth_cutter",
+                "redtooth_cutter"
+              ],
+              "weight": 3
+            },
+            {
+              "faction": "redtooth",
+              "ships": [
+                "redtooth_brawler",
+                "redtooth_cutter"
+              ],
+              "weight": 1,
+              "limit": 1,
+              "respawnSeconds": 180
+            }
+          ]
+        },
+        {
+          "id": "sol_nest_graveyard",
+          "style": "anchored",
+          "packs": 3,
+          "respawnSeconds": 50,
+          "roam": 3500,
+          "groups": [
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_hulk",
+                "scrap_mite",
+                "scrap_mite"
+              ],
+              "weight": 4,
+              "limit": 2
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_lobber",
+                "scrap_spitter",
+                "scrap_mite"
+              ],
+              "weight": 3
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_hulk",
+                "scrap_lobber"
+              ],
+              "weight": 1,
+              "limit": 1,
+              "respawnSeconds": 240
+            }
+          ]
+        },
+        {
+          "id": "sol_den_reaches",
+          "packs": 2,
+          "respawnSeconds": 50,
+          "leash": 9000,
+          "roam": 4000,
+          "groups": [
+            {
+              "faction": "pirates",
+              "ships": [
+                "pirate_raider",
+                "pirate_raider"
+              ],
+              "style": "nomad",
+              "limit": 1,
+              "weight": 4,
+              "plating": 1
+            },
+            {
+              "faction": "pirates",
+              "ships": [
+                "pirate_gunship",
+                "pirate_skiff",
+                "pirate_skiff"
+              ],
+              "weight": 3,
+              "limit": 1,
+              "respawnSeconds": 150
+            }
+          ]
+        },
+        {
+          "id": "sol_camp_thule",
+          "style": "nomad",
+          "packs": 1,
+          "respawnSeconds": 50,
+          "leash": 9000,
+          "roam": 4000,
+          "groups": [
+            {
+              "faction": "redtooth",
+              "ships": [
+                "redtooth_brawler",
+                "redtooth_brawler",
+                "redtooth_cutter"
+              ],
+              "weight": 3,
+              "plating": 1
+            },
+            {
+              "faction": "redtooth",
+              "ships": [
+                "redtooth_brawler",
+                "redtooth_cutter",
+                "redtooth_cutter"
+              ],
+              "weight": 2,
+              "plating": 1
+            }
+          ]
+        },
+        {
+          "id": "sol_nest_shoal",
+          "packs": 1,
+          "respawnSeconds": 60,
+          "roam": 3500,
+          "groups": [
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_lobber",
+                "scrap_spitter",
+                "scrap_mite"
+              ],
+              "weight": 1
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_hulk",
+                "scrap_lobber",
+                "scrap_lobber"
+              ],
+              "weight": 2,
+              "limit": 1,
+              "respawnSeconds": 180
+            }
+          ]
+        },
+        {
+          "id": "sol_camp_wardens",
+          "style": "anchored",
+          "packs": 1,
+          "respawnSeconds": 60,
+          "leash": 6000,
+          "roam": 2500,
+          "groups": [
+            {
+              "faction": "redtooth",
+              "ships": [
+                "redtooth_brawler",
+                "redtooth_cutter",
+                "redtooth_cutter"
+              ],
+              "weight": 1
+            }
+          ]
+        },
+        {
+          "id": "sol_den_wardens",
+          "style": "anchored",
+          "packs": 1,
+          "respawnSeconds": 60,
+          "leash": 6000,
+          "roam": 2500,
+          "groups": [
+            {
+              "faction": "pirates",
+              "ships": [
+                "pirate_gunship",
+                "pirate_skiff",
+                "pirate_skiff"
+              ],
+              "weight": 1
+            }
+          ]
+        }
+      ]
+    },
+    "glasswater": {
+      "grade": 1,
+      "packs": 0,
+      "groups": [
+        {
+          "faction": "scavengers",
+          "ships": [
+            "scav_drone",
+            "scav_drone",
+            "scav_harvester"
+          ],
+          "weight": 5
+        },
+        {
+          "faction": "pirates",
+          "ships": [
+            "pirate_skiff",
+            "pirate_raider"
+          ],
+          "weight": 3
+        }
+      ],
+      "nests": [
+        {
+          "id": "glasswater_sift_halcyon",
+          "packs": 3,
+          "respawnSeconds": 60,
+          "leash": 6000,
+          "roam": 3000,
+          "groups": [
+            {
+              "faction": "scavengers",
+              "ships": [
+                "scav_drone",
+                "scav_drone",
+                "scav_drone"
+              ],
+              "style": "nomad",
+              "limit": 1,
+              "weight": 5
+            },
+            {
+              "faction": "scavengers",
+              "ships": [
+                "scav_harvester",
+                "scav_drone",
+                "scav_drone"
+              ],
+              "weight": 4
+            },
+            {
+              "faction": "scavengers",
+              "ships": [
+                "scav_harvester",
+                "scav_harvester"
+              ],
+              "weight": 2,
+              "limit": 2
+            },
+            {
+              "faction": "scavengers",
+              "ships": [
+                "scav_dredge",
+                "scav_drone",
+                "scav_drone"
+              ],
+              "weight": 1,
+              "limit": 1,
+              "respawnSeconds": 300
+            }
+          ]
+        },
+        {
+          "id": "glasswater_den",
+          "packs": 2,
+          "respawnSeconds": 75,
+          "leash": 7000,
+          "roam": 3000,
+          "groups": [
+            {
+              "faction": "pirates",
+              "ships": [
+                "pirate_skiff",
+                "pirate_skiff"
+              ],
+              "weight": 5
+            },
+            {
+              "faction": "pirates",
+              "ships": [
+                "pirate_raider",
+                "pirate_skiff"
+              ],
+              "style": "nomad",
+              "limit": 1,
+              "weight": 3
+            },
+            {
+              "faction": "pirates",
+              "ships": [
+                "pirate_gunship",
+                "pirate_skiff"
+              ],
+              "weight": 1,
+              "limit": 1,
+              "respawnSeconds": 300
+            }
+          ]
+        }
+      ]
+    },
+    "borealis": {
+      "grade": 2,
+      "packs": 0,
+      "groups": [
+        {
+          "faction": "frost",
+          "ships": [
+            "frost_shard",
+            "frost_shard",
+            "frost_shard"
+          ],
+          "weight": 5
+        },
+        {
+          "faction": "frost",
+          "ships": [
+            "frost_warden",
+            "frost_shard",
+            "frost_shard"
+          ],
+          "weight": 3
+        },
+        {
+          "faction": "scavengers",
+          "ships": [
+            "scav_harvester",
+            "scav_drone",
+            "scav_drone"
+          ],
+          "weight": 2
+        }
+      ],
+      "nests": [
+        {
+          "id": "borealis_roost_glacia",
+          "packs": 3,
+          "respawnSeconds": 60,
+          "leash": 7000,
+          "roam": 3500,
+          "groups": [
+            {
+              "faction": "frost",
+              "ships": [
+                "frost_shard",
+                "frost_shard",
+                "frost_shard"
+              ],
+              "weight": 5
+            },
+            {
+              "faction": "frost",
+              "ships": [
+                "frost_warden",
+                "frost_shard",
+                "frost_shard"
+              ],
+              "weight": 3
+            },
+            {
+              "faction": "frost",
+              "ships": [
+                "frost_bulwark",
+                "frost_warden"
+              ],
+              "weight": 2,
+              "limit": 2
+            },
+            {
+              "faction": "frost",
+              "ships": [
+                "frost_elder",
+                "frost_shard",
+                "frost_shard"
+              ],
+              "weight": 1,
+              "limit": 1,
+              "respawnSeconds": 300
+            }
+          ]
+        },
+        {
+          "id": "borealis_roost_boreas",
+          "packs": 2,
+          "respawnSeconds": 75,
+          "leash": 7500,
+          "roam": 3500,
+          "groups": [
+            {
+              "faction": "frost",
+              "ships": [
+                "frost_shard",
+                "frost_shard"
+              ],
+              "weight": 4
+            },
+            {
+              "faction": "frost",
+              "ships": [
+                "frost_warden",
+                "frost_shard",
+                "frost_shard"
+              ],
+              "weight": 3
+            },
+            {
+              "faction": "frost",
+              "ships": [
+                "frost_bulwark",
+                "frost_bulwark"
+              ],
+              "weight": 2,
+              "limit": 1
+            },
+            {
+              "faction": "frost",
+              "ships": [
+                "frost_elder",
+                "frost_warden"
+              ],
+              "weight": 1,
+              "limit": 1,
+              "respawnSeconds": 360
+            }
+          ]
+        },
+        {
+          "id": "borealis_sift",
+          "style": "nomad",
+          "packs": 1,
+          "respawnSeconds": 90,
+          "leash": 6000,
+          "roam": 3000,
+          "groups": [
+            {
+              "faction": "scavengers",
+              "ships": [
+                "scav_harvester",
+                "scav_drone",
+                "scav_drone"
+              ],
+              "weight": 5
+            },
+            {
+              "faction": "scavengers",
+              "ships": [
+                "scav_harvester",
+                "scav_harvester",
+                "scav_drone"
+              ],
+              "weight": 2
+            },
+            {
+              "faction": "scavengers",
+              "ships": [
+                "scav_dredge",
+                "scav_drone"
+              ],
+              "weight": 1,
+              "limit": 1,
+              "respawnSeconds": 300
+            }
+          ]
+        },
+        {
+          "id": "borealis_roost_shoal",
+          "packs": 2,
+          "respawnSeconds": 80,
+          "leash": 6500,
+          "roam": 3000,
+          "groups": [
+            {
+              "faction": "frost",
+              "ships": [
+                "frost_shard",
+                "frost_shard",
+                "frost_shard"
+              ],
+              "weight": 5
+            },
+            {
+              "faction": "frost",
+              "ships": [
+                "frost_warden",
+                "frost_shard"
+              ],
+              "weight": 3
+            }
+          ]
+        }
+      ],
+      "events": {
+        "peak": {
+          "share": 0.5,
+          "x": 30000,
+          "y": 42000,
+          "pods": 8,
+          "goods": [
+            "aurora_rime",
+            "frost_gland",
+            "ice"
+          ],
+          "flock": {
+            "faction": "frost",
+            "ships": [
+              "frost_shard",
+              "frost_shard",
+              "frost_shard",
+              "frost_warden"
+            ],
+            "weight": 1
+          }
+        }
+      }
+    },
+    "nebula_prime": {
+      "grade": 2,
+      "packs": 0,
+      "groups": [
+        {
+          "faction": "pirates",
+          "ships": [
+            "pirate_raider",
+            "pirate_raider"
+          ],
+          "weight": 5
+        },
+        {
+          "faction": "pirates",
+          "ships": [
+            "pirate_gunship",
+            "pirate_skiff",
+            "pirate_skiff"
+          ],
+          "weight": 2
+        }
+      ],
+      "nests": [
+        {
+          "id": "nebula_den_opaline",
+          "packs": 3,
+          "respawnSeconds": 60,
+          "leash": 8000,
+          "roam": 3500,
+          "groups": [
+            {
+              "faction": "pirates",
+              "ships": [
+                "pirate_raider",
+                "pirate_raider"
+              ],
+              "weight": 5
+            },
+            {
+              "faction": "pirates",
+              "ships": [
+                "pirate_skiff",
+                "pirate_skiff",
+                "pirate_skiff"
+              ],
+              "style": "nomad",
+              "limit": 1,
+              "weight": 3
+            },
+            {
+              "faction": "pirates",
+              "ships": [
+                "pirate_gunship",
+                "pirate_skiff",
+                "pirate_skiff"
+              ],
+              "weight": 2,
+              "limit": 1,
+              "respawnSeconds": 180
+            },
+            {
+              "faction": "pirates",
+              "ships": [
+                "pirate_gunship",
+                "pirate_gunship",
+                "pirate_raider"
+              ],
+              "weight": 1,
+              "limit": 1,
+              "respawnSeconds": 360
+            }
+          ]
+        },
+        {
+          "id": "nebula_den_cloud",
+          "packs": 2,
+          "respawnSeconds": 75,
+          "leash": 8000,
+          "roam": 3500,
+          "groups": [
+            {
+              "faction": "pirates",
+              "ships": [
+                "pirate_raider",
+                "pirate_raider"
+              ],
+              "style": "nomad",
+              "limit": 1,
+              "weight": 4
+            },
+            {
+              "faction": "pirates",
+              "ships": [
+                "pirate_skiff",
+                "pirate_skiff"
+              ],
+              "weight": 3
+            },
+            {
+              "faction": "pirates",
+              "ships": [
+                "pirate_gunship",
+                "pirate_raider"
+              ],
+              "weight": 1,
+              "limit": 1,
+              "respawnSeconds": 300
+            }
+          ]
+        }
+      ]
+    },
+    "cinder_reach": {
+      "grade": 3,
+      "packs": 0,
+      "groups": [
+        {
+          "faction": "cinder",
+          "ships": [
+            "cinder_zealot",
+            "cinder_zealot"
+          ],
+          "weight": 5
+        },
+        {
+          "faction": "cinder",
+          "ships": [
+            "cinder_brand",
+            "cinder_zealot"
+          ],
+          "weight": 2
+        },
+        {
+          "faction": "pirates",
+          "ships": [
+            "pirate_gunship",
+            "pirate_raider"
+          ],
+          "weight": 2
+        }
+      ],
+      "nests": [
+        {
+          "id": "cinder_shrine_ember",
+          "packs": 2,
+          "respawnSeconds": 60,
+          "leash": 8000,
+          "roam": 3500,
+          "groups": [
+            {
+              "faction": "cinder",
+              "ships": [
+                "cinder_zealot",
+                "cinder_zealot"
+              ],
+              "style": "nomad",
+              "limit": 1,
+              "weight": 5
+            },
+            {
+              "faction": "cinder",
+              "ships": [
+                "cinder_zealot",
+                "cinder_zealot",
+                "cinder_zealot"
+              ],
+              "weight": 3
+            },
+            {
+              "faction": "cinder",
+              "ships": [
+                "cinder_brand",
+                "cinder_zealot"
+              ],
+              "weight": 2,
+              "limit": 1,
+              "respawnSeconds": 240
+            }
+          ]
+        },
+        {
+          "id": "cinder_shrine_furnace",
+          "packs": 2,
+          "respawnSeconds": 70,
+          "leash": 8000,
+          "roam": 3500,
+          "groups": [
+            {
+              "faction": "cinder",
+              "ships": [
+                "cinder_zealot",
+                "cinder_zealot"
+              ],
+              "weight": 4
+            },
+            {
+              "faction": "cinder",
+              "ships": [
+                "cinder_brand",
+                "cinder_zealot"
+              ],
+              "weight": 2,
+              "limit": 1
+            },
+            {
+              "faction": "cinder",
+              "ships": [
+                "cinder_brand",
+                "cinder_brand",
+                "cinder_zealot"
+              ],
+              "weight": 1,
+              "limit": 1,
+              "respawnSeconds": 360
+            }
+          ]
+        },
+        {
+          "id": "cinder_den",
+          "style": "nomad",
+          "packs": 1,
+          "respawnSeconds": 80,
+          "leash": 8000,
+          "roam": 3500,
+          "groups": [
+            {
+              "faction": "pirates",
+              "ships": [
+                "pirate_raider",
+                "pirate_raider"
+              ],
+              "weight": 3
+            },
+            {
+              "faction": "pirates",
+              "ships": [
+                "pirate_gunship",
+                "pirate_raider"
+              ],
+              "weight": 2,
+              "limit": 1,
+              "respawnSeconds": 240
+            }
+          ]
+        }
+      ]
+    },
+    "void_sector": {
+      "grade": 5,
+      "packs": 0,
+      "groups": [
+        {
+          "faction": "wraiths",
+          "ships": [
+            "void_phantom",
+            "void_phantom",
+            "void_phantom"
+          ],
+          "weight": 4
+        },
+        {
+          "faction": "wraiths",
+          "ships": [
+            "void_reaver",
+            "void_phantom",
+            "void_phantom"
+          ],
+          "weight": 3
+        },
+        {
+          "faction": "wraiths",
+          "ships": [
+            "void_reaver",
+            "void_reaver",
+            "void_phantom"
+          ],
+          "weight": 2
+        }
+      ],
+      "nests": [
+        {
+          "id": "void_knot_nyx",
+          "packs": 3,
+          "respawnSeconds": 60,
+          "leash": 9000,
+          "roam": 3500,
+          "groups": [
+            {
+              "faction": "wraiths",
+              "ships": [
+                "void_phantom",
+                "void_phantom",
+                "void_phantom"
+              ],
+              "weight": 4
+            },
+            {
+              "faction": "wraiths",
+              "ships": [
+                "void_reaver",
+                "void_phantom",
+                "void_phantom"
+              ],
+              "weight": 3
+            },
+            {
+              "faction": "wraiths",
+              "ships": [
+                "void_reaver",
+                "void_reaver",
+                "void_phantom"
+              ],
+              "weight": 2,
+              "limit": 1,
+              "respawnSeconds": 240
+            }
+          ]
+        },
+        {
+          "id": "void_knot_outer",
+          "packs": 3,
+          "respawnSeconds": 70,
+          "leash": 9000,
+          "roam": 3500,
+          "groups": [
+            {
+              "faction": "wraiths",
+              "ships": [
+                "void_phantom",
+                "void_phantom"
+              ],
+              "style": "nomad",
+              "limit": 1,
+              "weight": 4
+            },
+            {
+              "faction": "wraiths",
+              "ships": [
+                "void_reaver",
+                "void_phantom"
+              ],
+              "weight": 3
+            },
+            {
+              "faction": "wraiths",
+              "ships": [
+                "void_reaver",
+                "void_reaver",
+                "void_reaver"
+              ],
+              "weight": 1,
+              "limit": 1,
+              "respawnSeconds": 300
+            }
+          ]
+        }
+      ]
+    },
+    "the_maw": {
+      "grade": 4,
+      "packs": 0,
+      "groups": [
+        {
+          "faction": "maw",
+          "ships": [
+            "maw_lurker",
+            "maw_lurker"
+          ],
+          "weight": 5
+        },
+        {
+          "faction": "maw",
+          "ships": [
+            "maw_colossus",
+            "maw_lurker"
+          ],
+          "weight": 1
+        },
+        {
+          "faction": "wraiths",
+          "ships": [
+            "void_reaver",
+            "void_phantom"
+          ],
+          "weight": 2
+        }
+      ],
+      "nests": [
+        {
+          "id": "maw_knot_pyre",
+          "packs": 3,
+          "respawnSeconds": 60,
+          "leash": 9000,
+          "roam": 3500,
+          "groups": [
+            {
+              "faction": "maw",
+              "ships": [
+                "maw_lurker",
+                "maw_lurker"
+              ],
+              "style": "nomad",
+              "limit": 1,
+              "weight": 5
+            },
+            {
+              "faction": "maw",
+              "ships": [
+                "maw_lurker",
+                "maw_lurker",
+                "maw_lurker"
+              ],
+              "weight": 2
+            },
+            {
+              "faction": "maw",
+              "ships": [
+                "maw_colossus",
+                "maw_lurker"
+              ],
+              "weight": 1,
+              "limit": 1,
+              "respawnSeconds": 300
+            }
+          ]
+        },
+        {
+          "id": "maw_knot_shard",
+          "packs": 2,
+          "respawnSeconds": 70,
+          "leash": 9000,
+          "roam": 3500,
+          "groups": [
+            {
+              "faction": "wraiths",
+              "ships": [
+                "void_reaver",
+                "void_phantom"
+              ],
+              "weight": 4
+            },
+            {
+              "faction": "wraiths",
+              "ships": [
+                "void_phantom",
+                "void_phantom",
+                "void_phantom"
+              ],
+              "weight": 3
+            },
+            {
+              "faction": "wraiths",
+              "ships": [
+                "void_reaver",
+                "void_reaver"
+              ],
+              "weight": 1,
+              "limit": 1,
+              "respawnSeconds": 240
+            }
+          ]
+        }
+      ],
+      "zones": [
+        {
+          "id": "ark_camp",
+          "inner": 0,
+          "outer": 6000,
+          "packs": 0,
+          "groups": [
+            {
+              "faction": "cinder",
+              "ships": [
+                "cinder_zealot",
+                "cinder_zealot"
+              ],
+              "weight": 3
+            },
+            {
+              "faction": "cinder",
+              "ships": [
+                "cinder_brand",
+                "cinder_zealot"
+              ],
+              "weight": 1
+            }
+          ]
+        }
+      ]
+    },
+    "ashfall": {
+      "grade": 1,
+      "packs": 0,
+      "groups": [
+        {
+          "faction": "redtooth",
+          "ships": [
+            "redtooth_cutter",
+            "redtooth_cutter"
+          ],
+          "weight": 5
+        },
+        {
+          "faction": "redtooth",
+          "ships": [
+            "redtooth_cutter"
+          ],
+          "weight": 3
+        },
+        {
+          "faction": "redtooth",
+          "ships": [
+            "redtooth_brawler",
+            "redtooth_cutter"
+          ],
+          "weight": 2
+        },
+        {
+          "faction": "scrapborn",
+          "ships": [
+            "scrap_mite",
+            "scrap_mite",
+            "scrap_spitter"
+          ],
+          "weight": 3,
+          "passive": true
+        }
+      ],
+      "nests": [
+        {
+          "id": "ashfall_dig_cinderjack",
+          "packs": 3,
+          "respawnSeconds": 60,
+          "leash": 7000,
+          "roam": 3500,
+          "groups": [
+            {
+              "faction": "redtooth",
+              "ships": [
+                "redtooth_cutter",
+                "redtooth_cutter"
+              ],
+              "weight": 5
+            },
+            {
+              "faction": "redtooth",
+              "ships": [
+                "redtooth_cutter",
+                "redtooth_cutter",
+                "redtooth_cutter"
+              ],
+              "weight": 3
+            },
+            {
+              "faction": "redtooth",
+              "ships": [
+                "redtooth_brawler",
+                "redtooth_cutter"
+              ],
+              "weight": 3,
+              "limit": 2
+            },
+            {
+              "faction": "redtooth",
+              "ships": [
+                "redtooth_sledge",
+                "redtooth_cutter",
+                "redtooth_cutter"
+              ],
+              "weight": 1,
+              "limit": 1,
+              "respawnSeconds": 300
+            }
+          ]
+        },
+        {
+          "id": "ashfall_dig_belt",
+          "packs": 2,
+          "respawnSeconds": 70,
+          "leash": 6500,
+          "roam": 3000,
+          "groups": [
+            {
+              "faction": "redtooth",
+              "ships": [
+                "redtooth_cutter",
+                "redtooth_cutter"
+              ],
+              "style": "nomad",
+              "limit": 1,
+              "weight": 5
+            },
+            {
+              "faction": "redtooth",
+              "ships": [
+                "redtooth_cutter"
+              ],
+              "weight": 2
+            },
+            {
+              "faction": "redtooth",
+              "ships": [
+                "redtooth_brawler",
+                "redtooth_cutter"
+              ],
+              "weight": 3,
+              "limit": 1
+            },
+            {
+              "faction": "redtooth",
+              "ships": [
+                "redtooth_brawler",
+                "redtooth_brawler"
+              ],
+              "weight": 1,
+              "limit": 1,
+              "respawnSeconds": 180
+            }
+          ]
+        },
+        {
+          "id": "ashfall_nest_scrap",
+          "packs": 2,
+          "respawnSeconds": 80,
+          "roam": 3000,
+          "groups": [
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_mite",
+                "scrap_mite",
+                "scrap_spitter"
+              ],
+              "weight": 5,
+              "passive": true
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_swarmer",
+                "scrap_swarmer",
+                "scrap_swarmer",
+                "scrap_mite"
+              ],
+              "style": "nomad",
+              "limit": 1,
+              "weight": 3,
+              "passive": true
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_crawler",
+                "scrap_lobber",
+                "scrap_mite"
+              ],
+              "weight": 2,
+              "passive": true,
+              "limit": 1
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_hulk",
+                "scrap_mite",
+                "scrap_mite"
+              ],
+              "weight": 1,
+              "passive": true,
+              "limit": 1,
+              "respawnSeconds": 360
+            }
+          ]
+        }
+      ],
+      "_comment": "Ashfall is a starter system, but the Redtooth are aggressive: they come for anyone they see near their digs. Everything here launches from a nest; its own groups are who raids and events send. Their outpost (bosses.json boss_redtooth_hold) sits in the belt."
+    }
+  },
+  "rules": {
+    "minStationDistance": 7000,
+    "minPlayerDistance": 3200,
+    "eliteChance": 0.1,
+    "eliteHp": 1.7,
+    "eliteLoot": 2,
+    "respawnSeconds": 75,
+    "idleDespawnSeconds": 120,
+    "assistXpShare": 0.5,
+    "gradeCredits": [
+      6,
+      6.5,
+      7,
+      7.5,
+      8
+    ],
+    "gradeCredits_comment": "kill credits are the ship's credits × this by the enemy's grade (Mk I-V), rising with grade (XP scales by gradeReward instead). The ship types already pay more the deadlier their systems (a skiff 9, a Maw colossus 493): this only adds to that, so a Mk I kill pays about what mining in Sol does after repairs and nothing tougher ever pays less",
+    "stationDefence": {
+      "laser": {
+        "range": 2600,
+        "damage": 112,
+        "interval": 48
+      },
+      "flak": {
+        "range": 2000,
+        "damage": 20,
+        "interval": 9,
+        "splash": 280
+      },
+      "lance": {
+        "range": 3400,
+        "damage": 238,
+        "interval": 90
+      }
+    }
+  }
+}

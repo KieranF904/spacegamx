@@ -130,9 +130,19 @@ vec3 starLayer(vec2 worldPos, float cellSize, float depth, float layerSeed, floa
     vec2 cell = floor(pPos / cellSize);
     vec3 col = vec3(0.0);
 
-    // 3×3 neighborhood — 1 star per cell max
+    // A star lights only what's within STAR_REACH of it (in cells: the early-out below), so a
+    // neighbouring cell's star can only reach us if we're that close to the shared edge. Most
+    // fragments are in no such strip and look at their own cell alone, rather than all nine.
+    const float STAR_REACH = 0.04;
+    vec2 f = pPos / cellSize - cell;
+    int dxMin = f.x < STAR_REACH ? -1 : 0, dxMax = f.x > 1.0 - STAR_REACH ? 1 : 0;
+    int dyMin = f.y < STAR_REACH ? -1 : 0, dyMax = f.y > 1.0 - STAR_REACH ? 1 : 0;
+
+    // 1 star per cell max
     for (int dy = -1; dy <= 1; dy++) {
+        if (dy < dyMin || dy > dyMax) continue;
         for (int dx = -1; dx <= 1; dx++) {
+            if (dx < dxMin || dx > dxMax) continue;
             vec2 c = cell + vec2(float(dx), float(dy));
             vec2 seed = c + layerSeed;
 
@@ -146,7 +156,7 @@ vec3 starLayer(vec2 worldPos, float cellSize, float depth, float layerSeed, floa
             float d = length(pPos - starPos) / cellSize;
 
             // Early out — if fragment is far from this star, skip
-            if (d > 0.04) continue;
+            if (d > STAR_REACH) continue;
 
             // Star properties
             float temp = hash(seed * 0.317);

@@ -3,16 +3,25 @@
   "version": "2.0.0",
   "private": true,
   "scripts": {
+    "monitor": "node scripts/vpsmon/server.mjs",
     "build:common": "cd common && npm run build",
     "build:server": "cd server && npm run build",
     "build:client": "cd client && npm run build",
     "build": "npm run build:common && npm run build:server && npm run build:client",
     "dev:server": "cd server && npm run dev",
     "dev:client": "cd client && npm run dev",
+    "dev:browser": "cd server-browser && npm run dev",
+    "dev": "npm run dev:browser & npm run dev:server & npm run dev:client",
     "start": "cd server && npm start",
-    "install:all": "cd common && npm install && cd ../server && npm install && cd ../client && npm install"
+    "proto": "cd client && npx vite --open \"/?proto\"",
+    "test": "vitest run",
+    "install:all": "cd common && npm install && cd ../server && npm install && cd ../client && npm install",
+    "gen:sfx": "node --env-file=.env scripts/gen-sfx.mjs",
+    "render-daemon": "node scripts/render/daemon.mjs",
+    "render": "node scripts/render/render.mjs"
   },
   "devDependencies": {
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^2.1.9"
   }
 }

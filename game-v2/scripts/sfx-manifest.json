@@ -1,0 +1,301 @@
+{
+ "_comment": "Sound effects generated with fal-ai/elevenlabs/sound-effects/v2 by scripts/gen-sfx.mjs. influence = prompt_influence (0..1); variants = separate takes, picked at random in game.",
+ "sounds": [
+  {
+   "id": "shot",
+   "prompt": "Bassy cannon sound",
+   "duration": 1,
+   "influence": 1
+  },
+  {
+   "id": "turret_shot",
+   "prompt": "Single heavy autocannon turret shot on a spaceship, punchy metallic mechanical report",
+   "duration": 0.7,
+   "influence": 0.6
+  },
+  {
+   "id": "hit",
+   "prompt": "Heavy projectile impact on a thick armored hull, deep dull thud, deep and muffled, low frequency, soft and rounded, no high-pitched ringing, no hiss, no sharp crackle",
+   "duration": 0.8,
+   "influence": 0.75,
+   "variants": 2
+  },
+  {
+   "id": "hurt",
+   "prompt": "Heavy impact on the hull heard from inside a spaceship cockpit, deep muffled thud with metal groan",
+   "duration": 1.2,
+   "influence": 0.6
+  },
+  {
+   "id": "explosion_small",
+   "prompt": "Small explosion on a spaceship, deep thudding blast with low debris rumble, deep and muffled, low frequency, soft and rounded, no high-pitched ringing, no hiss, no sharp crackle",
+   "duration": 1.8,
+   "influence": 0.75,
+   "variants": 2
+  },
+  {
+   "id": "explosion_large",
+   "prompt": "Massive spaceship reactor core explosion, deep booming blast with a long rumbling tail and debris",
+   "duration": 4,
+   "influence": 0.6
+  },
+  {
+   "id": "part_break",
+   "prompt": "Heavy metal panel breaking off a large ship, dull low crunch and thump, deep and muffled, low frequency, soft and rounded, no high-pitched ringing, no hiss, no sharp crackle",
+   "duration": 1,
+   "influence": 0.75
+  },
+  {
+   "id": "armor_break",
+   "prompt": "Thick heavy armor plates cracking apart, deep low crunching thud, deep and muffled, low frequency, soft and rounded, no high-pitched ringing, no hiss, no sharp crackle",
+   "duration": 1.2,
+   "influence": 0.75
+  },
+  {
+   "id": "generator_blast",
+   "prompt": "Power generator exploding, deep booming blast with a low electrical rumble, deep and muffled, low frequency, soft and rounded, no high-pitched ringing, no hiss, no sharp crackle",
+   "duration": 1.5,
+   "influence": 0.75
+  },
+  {
+   "id": "thruster_blast",
+   "prompt": "Rocket thruster rupturing, fiery whoosh and burst",
+   "duration": 1.5,
+   "influence": 0.6
+  },
+  {
+   "id": "weapon_cookoff",
+   "prompt": "A quick series of muffled distant low explosions, deep thumps, deep and muffled, low frequency, soft and rounded, no high-pitched ringing, no hiss, no sharp crackle",
+   "duration": 1.5,
+   "influence": 0.75
+  },
+  {
+   "id": "conduit_spark",
+   "prompt": "Power system failing with a low electrical hum dropping out and a dull thump, deep and muffled, low frequency, soft and rounded, no high-pitched ringing, no hiss, no sharp crackle",
+   "duration": 1,
+   "influence": 0.75
+  },
+  {
+   "id": "disintegrate",
+   "prompt": "Distant wreckage slowly breaking apart, low creaking groan and soft rumbling, deep and muffled, low frequency, soft and rounded, no high-pitched ringing, no hiss, no sharp crackle",
+   "duration": 1.5,
+   "influence": 0.75
+  },
+  {
+   "id": "bump",
+   "prompt": "Soft deep muffled thud of two huge heavy objects bumping together, dull low bass impact, warm and rounded, no metallic ringing, no scraping, no high frequencies",
+   "duration": 1,
+   "influence": 0.75,
+   "variants": 2
+  },
+  {
+   "id": "repair_part",
+   "prompt": "Gentle low warm hum swelling up and settling with a soft mechanical thunk, deep and muffled, low frequency, soft and rounded, no high-pitched ringing, no hiss, no sharp crackle",
+   "duration": 1.2,
+   "influence": 0.75
+  },
+  {
+   "id": "jump_charge",
+   "prompt": "Spaceship jump drive charging up, rising electrical whine building power",
+   "duration": 1.6,
+   "influence": 0.6
+  },
+  {
+   "id": "jump_launch",
+   "prompt": "Spaceship jump drive launch, deep boom and powerful whoosh as the ship accelerates away",
+   "duration": 2.5,
+   "influence": 0.6
+  },
+  {
+   "id": "jump_arrive",
+   "prompt": "Spaceship dropping out of hyperspace, rushing whoosh ending in a deep thump",
+   "duration": 1.5,
+   "influence": 0.6
+  },
+  {
+   "id": "warp",
+   "prompt": "Passing through a space warp gate, deep resonant whoosh with a low drone",
+   "duration": 2.5,
+   "influence": 0.6
+  },
+  {
+   "id": "dock",
+   "prompt": "Spaceship docking clamps locking on, heavy mechanical clunks and hydraulic hiss",
+   "duration": 2,
+   "influence": 0.6
+  },
+  {
+   "id": "undock",
+   "prompt": "Spaceship docking clamps releasing, hydraulic hiss and a heavy mechanical release clunk",
+   "duration": 1.6,
+   "influence": 0.6
+  },
+  {
+   "id": "credits",
+   "prompt": "Subtle futuristic interface confirmation chime for receiving credits",
+   "duration": 0.7,
+   "influence": 0.5
+  },
+  {
+   "id": "level_up",
+   "prompt": "Futuristic achievement sound, warm rising synth swell",
+   "duration": 2.5,
+   "influence": 0.5
+  },
+  {
+   "id": "error",
+   "prompt": "Futuristic interface error, low muted double buzz",
+   "duration": 0.5,
+   "influence": 0.6
+  },
+  {
+   "id": "warning",
+   "prompt": "Spaceship cockpit warning alarm, two short tones",
+   "duration": 0.8,
+   "influence": 0.6
+  },
+  {
+   "id": "ui_click",
+   "prompt": "Soft futuristic interface button click",
+   "duration": 0.5,
+   "influence": 0.6
+  },
+  {
+   "id": "ui_hover",
+   "prompt": "Very soft subtle interface hover tick",
+   "duration": 0.5,
+   "influence": 0.6
+  },
+  {
+   "id": "ui_open",
+   "prompt": "Futuristic holographic menu opening, soft servo swish",
+   "duration": 0.6,
+   "influence": 0.6
+  },
+  {
+   "id": "ui_close",
+   "prompt": "Futuristic holographic menu closing, soft downward servo swish",
+   "duration": 0.6,
+   "influence": 0.6
+  },
+  {
+   "id": "engine",
+   "prompt": "Spaceship engine hum, deep steady rumble",
+   "duration": 4,
+   "influence": 0.5,
+   "loop": true
+  },
+  {
+   "id": "boost",
+   "prompt": "Spaceship afterburner roaring, intense steady thrust",
+   "duration": 4,
+   "influence": 0.5,
+   "loop": true
+  },
+  {
+   "id": "mining",
+   "prompt": "Industrial mining laser beam cutting rock, steady deep electric hum with soft crackle, no high-pitched whine",
+   "duration": 3,
+   "influence": 0.6,
+   "loop": true
+  },
+  {
+   "id": "scan_ping",
+   "prompt": "Deep sonar scanner ping sweeping outward, soft and resonant, low frequency",
+   "duration": 1.5,
+   "influence": 0.6
+  },
+  {
+   "id": "craft_done",
+   "prompt": "Fabricator machine finishing a part, mechanical clunk and soft confirm chime, warm and low",
+   "duration": 1.2,
+   "influence": 0.6
+  },
+  {
+   "id": "sell",
+   "prompt": "Credits transferred, soft digital cash register with warm coin clinks, gentle",
+   "duration": 0.8,
+   "influence": 0.6
+  },
+  {
+   "id": "railgun_shot",
+   "prompt": "Railgun firing, a deep electromagnetic thump and crack as a slug launches, powerful and low, no high whine",
+   "duration": 1.2,
+   "influence": 0.6
+  },
+  {
+   "id": "flak_shot",
+   "prompt": "Flak cannon firing, a short deep muffled boom",
+   "duration": 0.6,
+   "influence": 0.6
+  },
+  {
+   "id": "missile_launch",
+   "prompt": "Missile launching from a ship, rocket ignition whoosh with a low roar",
+   "duration": 1.4,
+   "influence": 0.6
+  },
+  {
+   "id": "emp_shot",
+   "prompt": "EMP projector firing, deep electrical charge release with a low buzzing thrum",
+   "duration": 1.0,
+   "influence": 0.6
+  },
+  {
+   "id": "laser_loop",
+   "prompt": "Continuous combat laser beam firing, steady deep pulsing energy hum with soft crackle, no shrill whine",
+   "duration": 3,
+   "influence": 0.6,
+   "loop": true
+  },
+  {
+   "id": "lance_loop",
+   "prompt": "Heavy plasma lance beam, steady deep roaring plasma hiss and rumble",
+   "duration": 3,
+   "influence": 0.6,
+   "loop": true
+  },
+  {
+   "id": "shield_hit",
+   "prompt": "Energy shield absorbing a hit, soft deep resonant shimmer thud",
+   "duration": 0.8,
+   "influence": 0.6
+  },
+  {
+   "id": "boss_roar",
+   "prompt": "Enormous deep mechanical roar of a colossal alien warship powering up, low rumbling sub bass, metallic groan, cinematic, no music",
+   "duration": 3,
+   "influence": 0.7
+  },
+  {
+   "id": "hive_launch",
+   "prompt": "Quick rapid volley of four small rocket launches, whooshing hiss, muffled, low thump, sci-fi",
+   "duration": 1.2,
+   "influence": 0.6
+  },
+  {
+   "id": "cinder_shot",
+   "prompt": "Heavy incendiary cannon shot with fiery whoosh and crackle of flames, deep and muffled",
+   "duration": 1,
+   "influence": 0.6
+  },
+  {
+   "id": "prism_shot",
+   "prompt": "Crystal energy bolt fired, glassy shimmering resonance with a soft deep thump, sci-fi, not harsh",
+   "duration": 1,
+   "influence": 0.6
+  },
+  {
+   "id": "phase_shot",
+   "prompt": "Heavy phasing plasma cannon shot, deep warbling bass whoom, sci-fi, smooth",
+   "duration": 1.2,
+   "influence": 0.6
+  },
+  {
+   "id": "singularity_fire",
+   "prompt": "Ominous deep gravitational implosion charge, warping bass drone sucking inward, sci-fi, cinematic",
+   "duration": 2,
+   "influence": 0.7
+  }
+ ]
+}

@@ -1,0 +1,194 @@
+{
+  "shot": {
+    "variants": 1,
+    "loop": false
+  },
+  "turret_shot": {
+    "variants": 1,
+    "loop": false
+  },
+  "hit": {
+    "variants": 2,
+    "loop": false
+  },
+  "hurt": {
+    "variants": 1,
+    "loop": false
+  },
+  "explosion_small": {
+    "variants": 2,
+    "loop": false
+  },
+  "explosion_large": {
+    "variants": 1,
+    "loop": false
+  },
+  "part_break": {
+    "variants": 1,
+    "loop": false
+  },
+  "armor_break": {
+    "variants": 1,
+    "loop": false
+  },
+  "generator_blast": {
+    "variants": 1,
+    "loop": false
+  },
+  "thruster_blast": {
+    "variants": 1,
+    "loop": false
+  },
+  "weapon_cookoff": {
+    "variants": 1,
+    "loop": false
+  },
+  "conduit_spark": {
+    "variants": 1,
+    "loop": false
+  },
+  "disintegrate": {
+    "variants": 1,
+    "loop": false
+  },
+  "bump": {
+    "variants": 2,
+    "loop": false
+  },
+  "repair_part": {
+    "variants": 1,
+    "loop": false
+  },
+  "jump_charge": {
+    "variants": 1,
+    "loop": false
+  },
+  "jump_launch": {
+    "variants": 1,
+    "loop": false
+  },
+  "jump_arrive": {
+    "variants": 1,
+    "loop": false
+  },
+  "warp": {
+    "variants": 1,
+    "loop": false
+  },
+  "dock": {
+    "variants": 1,
+    "loop": false
+  },
+  "undock": {
+    "variants": 1,
+    "loop": false
+  },
+  "credits": {
+    "variants": 1,
+    "loop": false
+  },
+  "level_up": {
+    "variants": 1,
+    "loop": false
+  },
+  "error": {
+    "variants": 1,
+    "loop": false
+  },
+  "warning": {
+    "variants": 1,
+    "loop": false
+  },
+  "ui_click": {
+    "variants": 1,
+    "loop": false
+  },
+  "ui_hover": {
+    "variants": 1,
+    "loop": false
+  },
+  "ui_open": {
+    "variants": 1,
+    "loop": false
+  },
+  "ui_close": {
+    "variants": 1,
+    "loop": false
+  },
+  "engine": {
+    "variants": 1,
+    "loop": true
+  },
+  "boost": {
+    "variants": 1,
+    "loop": true
+  },
+  "mining": {
+    "variants": 1,
+    "loop": true
+  },
+  "scan_ping": {
+    "variants": 1,
+    "loop": false
+  },
+  "craft_done": {
+    "variants": 1,
+    "loop": false
+  },
+  "sell": {
+    "variants": 1,
+    "loop": false
+  },
+  "railgun_shot": {
+    "variants": 1,
+    "loop": false
+  },
+  "flak_shot": {
+    "variants": 1,
+    "loop": false
+  },
+  "missile_launch": {
+    "variants": 1,
+    "loop": false
+  },
+  "emp_shot": {
+    "variants": 1,
+    "loop": false
+  },
+  "laser_loop": {
+    "variants": 1,
+    "loop": true
+  },
+  "lance_loop": {
+    "variants": 1,
+    "loop": true
+  },
+  "shield_hit": {
+    "variants": 1,
+    "loop": false
+  },
+  "boss_roar": {
+    "variants": 1,
+    "loop": false
+  },
+  "hive_launch": {
+    "variants": 1,
+    "loop": false
+  },
+  "cinder_shot": {
+    "variants": 1,
+    "loop": false
+  },
+  "prism_shot": {
+    "variants": 1,
+    "loop": false
+  },
+  "phase_shot": {
+    "variants": 1,
+    "loop": false
+  },
+  "singularity_fire": {
+    "variants": 1,
+    "loop": false
+  }
+}

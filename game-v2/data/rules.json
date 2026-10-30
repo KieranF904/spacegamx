@@ -1,0 +1,805 @@
+{
+  "sieges": {
+    "duskSeconds": 6,
+    "emptySeconds": 60,
+    "lostSeconds": 12,
+    "startSupplies": 150,
+    "killSupplies": 4,
+    "fortGradeBonus": 1,
+    "fortMaxGrade": 5,
+    "profiles": {
+      "selene": {
+        "name": "Scrap Tide",
+        "about": "Scrapborn down three lanes from their scrapyards: slow, but more every night, and their hulks soak up fire",
+        "difficulty": 1,
+        "roster": [
+          {
+            "ship": "scrap_mite",
+            "cost": 1,
+            "from": 1,
+            "until": 12
+          },
+          {
+            "ship": "scrap_spitter",
+            "cost": 1.5,
+            "from": 1
+          },
+          {
+            "ship": "scrap_crawler",
+            "cost": 3,
+            "from": 2
+          },
+          {
+            "ship": "scrap_swarmer",
+            "cost": 2,
+            "from": 3,
+            "group": 3
+          },
+          {
+            "ship": "scrap_hulk",
+            "cost": 6,
+            "from": 4,
+            "hp": 1.6
+          },
+          {
+            "ship": "pirate_skiff",
+            "cost": 2,
+            "from": 5
+          },
+          {
+            "ship": "scrap_lobber",
+            "cost": 5,
+            "from": 6,
+            "range": 1350,
+            "aggro": 2600
+          },
+          {
+            "ship": "pirate_raider",
+            "cost": 3.5,
+            "from": 7
+          },
+          {
+            "ship": "pirate_gunship",
+            "cost": 7,
+            "from": 10
+          },
+          {
+            "ship": "cinder_zealot",
+            "cost": 6,
+            "from": 11
+          },
+          {
+            "ship": "scav_harvester",
+            "cost": 9,
+            "from": 13,
+            "hp": 1.4
+          },
+          {
+            "ship": "frost_warden",
+            "cost": 9,
+            "from": 15
+          },
+          {
+            "ship": "void_reaver",
+            "cost": 13,
+            "from": 18
+          },
+          {
+            "ship": "maw_lurker",
+            "cost": 14,
+            "from": 21
+          }
+        ],
+        "approach": {
+          "kind": "lanes",
+          "angles": [
+            -90,
+            30,
+            150
+          ],
+          "spread": 12,
+          "radius": 0.5
+        },
+        "fronts": {
+          "every": 4,
+          "max": 4,
+          "gapSeconds": 10
+        },
+        "stream": {
+          "from": 3,
+          "share": 0.25,
+          "everySeconds": 4
+        },
+        "bosses": {
+          "every": 5,
+          "from": 5,
+          "ships": [
+            {
+              "ship": "boss_scrap_mother",
+              "cost": 0,
+              "from": 5,
+              "faction": "scrapborn",
+              "hp": 1.6,
+              "damage": 0.6
+            },
+            {
+              "ship": "boss_rustjaw",
+              "cost": 0,
+              "from": 10,
+              "faction": "pirates",
+              "hp": 1,
+              "damage": 0.15
+            }
+          ]
+        },
+        "hpPerNight": 0.07,
+        "objectives": {
+          "from": 2,
+          "everySeconds": 50,
+          "kinds": [
+            "cache",
+            "nest"
+          ],
+          "nest": {
+            "design": "scrap_nest",
+            "faction": "scrapborn"
+          }
+        }
+      },
+      "rimeholt": {
+        "name": "Whiteout",
+        "about": "Everything comes out of the north in a blizzard front: frost ships that fight from range, and bulwarks that shrug off fire",
+        "difficulty": 1.15,
+        "roster": [
+          {
+            "ship": "scrap_mite",
+            "cost": 1,
+            "from": 1,
+            "until": 8
+          },
+          {
+            "ship": "scrap_spitter",
+            "cost": 1.5,
+            "from": 1
+          },
+          {
+            "ship": "frost_shard",
+            "cost": 3.5,
+            "from": 2
+          },
+          {
+            "ship": "scrap_lobber",
+            "cost": 5,
+            "from": 3,
+            "range": 1350,
+            "aggro": 2600
+          },
+          {
+            "ship": "frost_bulwark",
+            "cost": 7,
+            "from": 4,
+            "hp": 1.5
+          },
+          {
+            "ship": "scrap_hulk",
+            "cost": 6,
+            "from": 5,
+            "hp": 1.6
+          },
+          {
+            "ship": "frost_warden",
+            "cost": 8,
+            "from": 6
+          },
+          {
+            "ship": "pirate_gunship",
+            "cost": 7,
+            "from": 9
+          },
+          {
+            "ship": "void_phantom",
+            "cost": 8,
+            "from": 12
+          },
+          {
+            "ship": "maw_lurker",
+            "cost": 14,
+            "from": 16
+          }
+        ],
+        "approach": {
+          "kind": "arc",
+          "angles": [
+            -90
+          ],
+          "spread": 50,
+          "radius": 0.5
+        },
+        "fronts": {
+          "every": 3,
+          "max": 4,
+          "gapSeconds": 12
+        },
+        "stream": {
+          "from": 2,
+          "share": 0.2,
+          "everySeconds": 5
+        },
+        "bosses": {
+          "every": 5,
+          "from": 5,
+          "ships": [
+            {
+              "ship": "boss_hoarfrost",
+              "cost": 0,
+              "from": 5,
+              "faction": "frost",
+              "hp": 2.5,
+              "damage": 0.4
+            }
+          ]
+        },
+        "hpPerNight": 0.08,
+        "objectives": {
+          "from": 2,
+          "everySeconds": 55,
+          "kinds": [
+            "cache",
+            "cache",
+            "nest"
+          ],
+          "nest": {
+            "design": "scrap_nest",
+            "faction": "scrapborn"
+          }
+        }
+      },
+      "cinderhold": {
+        "name": "Ember Rush",
+        "about": "Cinder zealots rush in from every side, a stream of them all night: short reach, but they never stop coming",
+        "difficulty": 1.3,
+        "roster": [
+          {
+            "ship": "scrap_mite",
+            "cost": 1,
+            "from": 1,
+            "until": 6
+          },
+          {
+            "ship": "scrap_swarmer",
+            "cost": 2,
+            "from": 1,
+            "group": 3
+          },
+          {
+            "ship": "cinder_zealot",
+            "cost": 4,
+            "from": 1
+          },
+          {
+            "ship": "scrap_hulk",
+            "cost": 6,
+            "from": 3,
+            "hp": 1.6
+          },
+          {
+            "ship": "pirate_raider",
+            "cost": 3.5,
+            "from": 4
+          },
+          {
+            "ship": "cinder_brand",
+            "cost": 9,
+            "from": 6
+          },
+          {
+            "ship": "scrap_lobber",
+            "cost": 5,
+            "from": 7,
+            "range": 1350,
+            "aggro": 2600
+          },
+          {
+            "ship": "scav_harvester",
+            "cost": 9,
+            "from": 9,
+            "hp": 1.4
+          },
+          {
+            "ship": "void_reaver",
+            "cost": 13,
+            "from": 13
+          }
+        ],
+        "approach": {
+          "kind": "ring",
+          "radius": 0.45
+        },
+        "fronts": {
+          "every": 3,
+          "max": 5,
+          "gapSeconds": 8
+        },
+        "stream": {
+          "from": 1,
+          "share": 0.4,
+          "everySeconds": 3
+        },
+        "bosses": {
+          "every": 4,
+          "from": 4,
+          "ships": [
+            {
+              "ship": "boss_cinder_warden",
+              "cost": 0,
+              "from": 4,
+              "faction": "cinder",
+              "hp": 2.5,
+              "damage": 0.45
+            }
+          ]
+        },
+        "hpPerNight": 0.09,
+        "objectives": {
+          "from": 1,
+          "everySeconds": 45,
+          "kinds": [
+            "nest",
+            "cache"
+          ],
+          "nest": {
+            "design": "scrap_nest",
+            "faction": "scrapborn"
+          }
+        }
+      },
+      "lastlight": {
+        "name": "The Maw's Pincer",
+        "about": "The Maw's things close from two opposite sides by turns: split your guns, or lose a flank",
+        "difficulty": 1.45,
+        "roster": [
+          {
+            "ship": "pirate_raider",
+            "cost": 3,
+            "from": 1
+          },
+          {
+            "ship": "scrap_lobber",
+            "cost": 5,
+            "from": 4,
+            "range": 1350,
+            "aggro": 2600
+          },
+          {
+            "ship": "scrap_hulk",
+            "cost": 6,
+            "from": 4,
+            "hp": 1.6
+          },
+          {
+            "ship": "pirate_gunship",
+            "cost": 8,
+            "from": 1
+          },
+          {
+            "ship": "cinder_brand",
+            "cost": 10,
+            "from": 3
+          },
+          {
+            "ship": "maw_lurker",
+            "cost": 9,
+            "from": 2
+          },
+          {
+            "ship": "void_reaver",
+            "cost": 12,
+            "from": 7
+          },
+          {
+            "ship": "maw_colossus",
+            "cost": 18,
+            "from": 10,
+            "hp": 1.3
+          }
+        ],
+        "approach": {
+          "kind": "pincer",
+          "spread": 20,
+          "radius": 0.5
+        },
+        "fronts": {
+          "every": 2,
+          "max": 6,
+          "gapSeconds": 9
+        },
+        "stream": {
+          "from": 2,
+          "share": 0.25,
+          "everySeconds": 4
+        },
+        "bosses": {
+          "every": 5,
+          "from": 5,
+          "ships": [
+            {
+              "ship": "boss_maw_heart",
+              "cost": 0,
+              "from": 5,
+              "faction": "maw",
+              "hp": 2.5,
+              "damage": 0.5
+            }
+          ]
+        },
+        "hpPerNight": 0.09,
+        "objectives": {
+          "from": 1,
+          "everySeconds": 50,
+          "kinds": [
+            "cache",
+            "nest"
+          ],
+          "nest": {
+            "design": "scrap_nest",
+            "faction": "scrapborn"
+          }
+        }
+      },
+      "gloam": {
+        "name": "Shadowfall",
+        "about": "Wraiths slip out of the dark close in, anywhere: the bastion gets little warning, and they are few but deadly",
+        "difficulty": 1.8,
+        "roster": [
+          {
+            "ship": "scrap_lobber",
+            "cost": 4,
+            "from": 2,
+            "range": 1350,
+            "aggro": 2600
+          },
+          {
+            "ship": "void_phantom",
+            "cost": 4,
+            "from": 1
+          },
+          {
+            "ship": "frost_bulwark",
+            "cost": 5,
+            "from": 2,
+            "hp": 1.5
+          },
+          {
+            "ship": "void_reaver",
+            "cost": 6,
+            "from": 2
+          },
+          {
+            "ship": "maw_lurker",
+            "cost": 8,
+            "from": 4
+          },
+          {
+            "ship": "maw_colossus",
+            "cost": 12,
+            "from": 7,
+            "hp": 1.3
+          }
+        ],
+        "approach": {
+          "kind": "ring",
+          "radius": 0.22
+        },
+        "fronts": {
+          "every": 2,
+          "max": 5,
+          "gapSeconds": 14
+        },
+        "stream": {
+          "from": 2,
+          "share": 0.3,
+          "everySeconds": 6
+        },
+        "bosses": {
+          "every": 5,
+          "from": 5,
+          "ships": [
+            {
+              "ship": "boss_void_leviathan",
+              "cost": 0,
+              "from": 5,
+              "faction": "wraiths",
+              "hp": 3,
+              "damage": 0.45
+            },
+            {
+              "ship": "boss_prism_colossus",
+              "cost": 0,
+              "from": 10,
+              "faction": "scavengers",
+              "hp": 2,
+              "damage": 0.25
+            }
+          ]
+        },
+        "hpPerNight": 0.1,
+        "objectives": {
+          "from": 1,
+          "everySeconds": 60,
+          "kinds": [
+            "cache",
+            "nest"
+          ],
+          "nest": {
+            "design": "scrap_nest",
+            "faction": "scrapborn"
+          }
+        }
+      }
+    },
+    "defaultProfile": "selene",
+    "turrets": {
+      "cannon": {
+        "label": "Cannon turret",
+        "note": "Steady fire at one target",
+        "range": 1500,
+        "shot": 48,
+        "damage": 1,
+        "marks": [
+          {
+            "design": "siege_turret_cannon",
+            "cost": 100
+          },
+          {
+            "design": "siege_turret_cannon_2",
+            "cost": 90
+          },
+          {
+            "design": "siege_turret_cannon_3",
+            "cost": 140
+          }
+        ]
+      },
+      "flak": {
+        "label": "Flak turret",
+        "note": "Bursts that shred swarms",
+        "range": 1250,
+        "shot": 34,
+        "damage": 1,
+        "marks": [
+          {
+            "design": "siege_turret_flak",
+            "cost": 130
+          },
+          {
+            "design": "siege_turret_flak_2",
+            "cost": 110
+          },
+          {
+            "design": "siege_turret_flak_3",
+            "cost": 170
+          }
+        ]
+      },
+      "laser": {
+        "label": "Laser turret",
+        "note": "Never misses; short reach",
+        "range": 940,
+        "shot": 0,
+        "damage": 1.5,
+        "marks": [
+          {
+            "design": "siege_turret_laser",
+            "cost": 140
+          },
+          {
+            "design": "siege_turret_laser_2",
+            "cost": 120
+          },
+          {
+            "design": "siege_turret_laser_3",
+            "cost": 180
+          }
+        ]
+      },
+      "missile": {
+        "label": "Missile turret",
+        "note": "Homing, splash, longest reach",
+        "range": 2400,
+        "shot": 0,
+        "damage": 1.3,
+        "marks": [
+          {
+            "design": "siege_turret_missile",
+            "cost": 170
+          },
+          {
+            "design": "siege_turret_missile_2",
+            "cost": 140
+          },
+          {
+            "design": "siege_turret_missile_3",
+            "cost": 200
+          }
+        ]
+      }
+    },
+    "repair": {
+      "id": "repair",
+      "label": "Patch the bastion and turrets",
+      "cost": 60,
+      "note": "+30% hull to each",
+      "heal": 0.3
+    },
+    "scrapBack": 0.5,
+    "haulBonus": {
+      "per": 0.25,
+      "every": 5
+    },
+    "wave": {
+      "base": 4,
+      "perWave": 3,
+      "perWave2": 0.12,
+      "solo": 0.7,
+      "perPilot": 0.3,
+      "leanChance": 0.55,
+      "leanSpread": 3,
+      "maxPicks": 90
+    },
+    "objectives": {
+      "distance": [
+        2600,
+        4800
+      ],
+      "cache": {
+        "holdSeconds": 8,
+        "radius": 330,
+        "lifeSeconds": 75,
+        "supplies": 45,
+        "suppliesPerNight": 6,
+        "credits": 12
+      },
+      "nest": {
+        "hp": 1,
+        "lifeSeconds": 120,
+        "releaseSeconds": 7,
+        "supplies": 70,
+        "suppliesPerNight": 8,
+        "credits": 25
+      }
+    },
+    "dawn": {
+      "xpBase": 25,
+      "xpPerNight": 20,
+      "creditsBase": 8,
+      "creditsPerNight": 6,
+      "suppliesBase": 70,
+      "suppliesPerNight": 15
+    },
+    "partialHaul": 0.5
+  },
+  "surfaces": {
+    "descendRange": 900,
+    "orbitMargin": 400,
+    "arriveRadius": 0.8,
+    "warningSeconds": 20,
+    "pauseSeconds": 12,
+    "abandonSeconds": 60,
+    "fallenSeconds": 20,
+    "firstSiegeShare": 0.5,
+    "defendRadius": 2.2,
+    "retargetTicks": 120,
+    "wave": {
+      "base": 2,
+      "perWave": 1,
+      "perExtraPilot": 2,
+      "maxSize": 12,
+      "twoFrontsFrom": 3,
+      "spawnRadius": 0.85
+    },
+    "reward": {
+      "xpBase": 120,
+      "xpPerWave": 90,
+      "creditsBase": 150,
+      "creditsPerWave": 110
+    }
+  },
+  "events": {
+    "rollEverySeconds": 60,
+    "cooldownSeconds": 360,
+    "chance": 0.35,
+    "raidShare": 0.5,
+    "emptyEndSeconds": 60,
+    "raid": {
+      "packs": 2,
+      "spread": 0.6,
+      "spawnRing": 7000,
+      "holdRing": 3400,
+      "leash": 6000,
+      "durationSeconds": 300,
+      "rewardRange": 9000,
+      "creditsPerDanger": 40,
+      "xpPerDanger": 120,
+      "reputation": {
+        "sol_patrol": 3
+      }
+    },
+    "salvage": {
+      "goods": [
+        "scrap_electronics",
+        "alloy_plate",
+        "copper_wire",
+        "steel_plate",
+        "power_coupling",
+        "servo_motor",
+        "targeting_chip"
+      ],
+      "rare": [
+        "crystal_lens",
+        "shield_emitter",
+        "nav_computer",
+        "titanium_plate",
+        "cobalt_alloy"
+      ],
+      "podsMin": 10,
+      "podsExtra": 6,
+      "countMin": 2,
+      "countSpread": 3,
+      "rareChancePerDanger": 0.12,
+      "scatterMin": 150,
+      "scatterExtra": 1200,
+      "drift": 0.6,
+      "spawnRing": 5000,
+      "leash": 6000,
+      "durationSeconds": 420,
+      "podLifeSeconds": 480
+    }
+  },
+  "operations": {
+    "scanRange": 700,
+    "scanSpeed": 4,
+    "scanTicks": 150,
+    "awayRange": 12000,
+    "awaySeconds": 50,
+    "doneSeconds": 6,
+    "raid": {
+      "base": 2,
+      "dangerPer": 3,
+      "defendWavesPer": 2
+    },
+    "escort": {
+      "meetRange": 2600,
+      "launchDistance": 1100,
+      "arrive": 650,
+      "arriveRange": 1200,
+      "ambushStart": 0.18,
+      "ambushSpan": 0.62,
+      "ambushRing": 3600,
+      "ambushAngleMin": 0.6,
+      "ambushAngleExtra": 0.6,
+      "freighterNames": [
+        "Ceres Dawn",
+        "Marigold",
+        "Long Haul",
+        "Quiet Ledger",
+        "Pale Mule",
+        "Brightwater"
+      ]
+    },
+    "defend": {
+      "siteDistance": 4500,
+      "arriveRange": 3200,
+      "firstWaveSeconds": 8,
+      "waveGapSeconds": 10,
+      "ring": 3800
+    },
+    "uplink": {
+      "siteDistance": 5200,
+      "beaconRing": 2200,
+      "holdRange": 480,
+      "decay": 3,
+      "raidGapSeconds": 22,
+      "ring": 3400
+    }
+  }
+}

@@ -1,0 +1,254 @@
+/**
+ * The site's routes over real HTTP (port 0), with a fake lobby, fake pilot data,
+ * and a JSON store in a temp folder.
+ */
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import http from 'http';
+import { mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { createApp } from './app.js';
+import { loadConfig } from './config.js';
+import type { AdminUser, Lobby, LobbyUser } from './lobby.js';
+import type { PilotSource } from './pilots.js';
+import { JsonSiteStore } from './store/JsonSiteStore.js';
+import { Uploads } from './uploads.js';
+import { RateLimiter } from './security.js';
+
+interface FakeUser { id: number; username: string; email: string; password: string; isAdmin: boolean }
+
+class FakeLobby implements Lobby {
+  users: FakeUser[] = [{ id: 1, username: 'admin', email: 'a@x.io', password: 'admin', isAdmin: true }];
+  tokens = new Map<string, number>();
+  private n = 0;
+  private session(u: FakeUser) { const t = `tok${++this.n}`.padEnd(32, 'x'); this.tokens.set(t, u.id); return { ok: true as const, token: t, user: this.pub(u) }; }
+  private pub(u: FakeUser): LobbyUser { return { id: u.id, username: u.username, isAdmin: u.isAdmin }; }
+  private by(token: string) { const id = this.tokens.get(token); return this.users.find((u) => u.id === id) ?? null; }
+  async login(username: string, password: string) {
+    const u = this.users.find((x) => x.username.toLowerCase() === username.toLowerCase());
+    return u && u.password === password ? this.session(u) : { ok: false as const, error: 'Invalid username or password', status: 401 };
+  }
+  async register(username: string, email: string, password: string) {
+    if (this.users.some((u) => u.username.toLowerCase() === username.toLowerCase())) return { ok: false as const, error: 'Username already taken', status: 400 };
+    const u = { id: this.users.length + 1, username, email, password, isAdmin: false };
+    this.users.push(u);
+    return this.session(u);
+  }
+  async validate(token: string) { const u = this.by(token); return u ? this.pub(u) : null; }
+  async logout(token: string) { this.tokens.delete(token); }
+  async account(token: string) { const u = this.by(token); return u ? { ok: true as const, account: { ...this.pub(u), email: u.email, createdAt: '2026-10-01T00:00:00Z' } } : { ok: false as const, error: 'x', status: 401 }; }
+  async changePassword(token: string, password: string, next: string) {
+    const u = this.by(token);
+    if (!u || u.password !== password) return { ok: false as const, error: 'That password is wrong', status: 401 };
+    u.password = next;
+    for (const [t, id] of this.tokens) if (id === u.id && t !== token) this.tokens.delete(t);
+    return { ok: true as const };
+  }
+  async changeEmail(token: string, password: string, email: string) {
+    const u = this.by(token);
+    if (!u || u.password !== password) return { ok: false as const, error: 'That password is wrong', status: 401 };
+    u.email = email; return { ok: true as const, email };
+  }
+  async logoutAll(token: string) { const u = this.by(token)!; let n = 0; for (const [t, id] of this.tokens) if (id === u.id) { this.tokens.delete(t); n++; } return { ok: true as const, ended: n }; }
+  async deleteAccount(token: string, password: string) {
+    const u = this.by(token);
+    if (!u || u.password !== password) return { ok: false as const, error: 'That password is wrong', status: 401 };
+    this.users = this.users.filter((x) => x !== u);
+    return { ok: true as const, id: u.id };
+  }
+  private admin(u: FakeUser): AdminUser { return { id: u.id, username: u.username, isAdmin: u.isAdmin, createdAt: '', ban: null }; }
+  async findUser(username: string) { const u = this.users.find((x) => x.username.toLowerCase() === username.toLowerCase()); return u ? this.admin(u) : null; }
+  async listUsers() { return { ok: true as const, users: this.users.map((u) => this.admin(u)), total: this.users.length }; }
+  async ban(username: string) { const u = this.users.find((x) => x.username === username)!; return { ok: true as const, user: this.admin(u) }; }
+  async unban(username: string) { return this.ban(username); }
+}
+
+const pilots: PilotSource = {
+  async card(id) { return id === 2 ? { level: 9, xp: 1, credits: 5, shipName: 'Stubborn', ships: 1, stats: { kills: 3, bosses: 1, quests: 0, mined: 0, earned: 0, crafted: 0, deaths: 0 }, systemsVisited: 2, ribbons: 0, codexFound: 0, bossKills: {}, since: null, lastFlown: null } : null; },
+  async rankings() { return { week: 1, weekly: {}, allTime: { kills: [{ userId: '2', name: 'vega', value: 3 }] } }; },
+  async live() { return { players: 2, ships: 10, at: Date.now(), fresh: true }; },
+};
+
+let server: http.Server;
+let base = '';
+let dir = '';
+const lobby = new FakeLobby();
+let store: JsonSiteStore;
+
+/** A browser: keeps cookies, knows the page's CSRF token */
+class Browser {
+  jar = new Map<string, string>();
+  csrf = '';
+  async req(path: string, init: RequestInit & { form?: Record<string, string>; json?: unknown } = {}) {
+    const headers: Record<string, string> = { ...(init.headers as Record<string, string>) };
+    headers.cookie = [...this.jar].map(([k, v]) => `${k}=${v}`).join('; ');
+    let body = init.body;
+    if (init.form) { headers['content-type'] = 'application/x-www-form-urlencoded'; body = new URLSearchParams({ _csrf: this.csrf, ...init.form }).toString(); }
+    if (init.json !== undefined) { headers['content-type'] = 'application/json'; headers.accept = 'application/json'; headers['x-csrf-token'] ??= this.csrf; body = JSON.stringify(init.json); }
+    const r = await fetch(base + path, { ...init, headers, body, redirect: 'manual' });
+    for (const c of r.headers.getSetCookie()) { const [kv] = c.split(';'); const [k, v] = kv.split('='); if (/Max-Age=0/.test(c)) this.jar.delete(k); else this.jar.set(k, v); }
+    const text = await r.text();
+    const m = /<meta name="csrf-token" content="([^"]+)"/.exec(text);
+    if (m) this.csrf = m[1];
+    return { status: r.status, text, location: r.headers.get('location') ?? '', headers: r.headers };
+  }
+  async page(path: string) { return this.req(path); }
+  async signin(name: string, pw: string) { await this.page('/signin'); return this.req('/signin', { method: 'POST', form: { username: name, password: pw, next: '/' } }); }
+}
+
+beforeAll(async () => {
+  dir = mkdtempSync(join(tmpdir(), 'site-'));
+  store = new JsonSiteStore(join(dir, 'site.json'));
+  const cfg = { ...loadConfig({ SITE_SECRET: 'test-secret', SITE_DATA_DIR: dir, GAME_MODE: 'link', GAME_URL: 'http://game.example' } as NodeJS.ProcessEnv) };
+  const app = createApp({ cfg, store, lobby, pilots, uploads: new Uploads(dir), limiter: new RateLimiter() });
+  server = http.createServer((q, s) => void app.handle(q, s));
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
+  base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  cfg.origin = base;
+});
+afterAll(async () => { server.close(); await store.close(); rmSync(dir, { recursive: true, force: true }); });
+
+describe('site routes', () => {
+  it('pages render with security headers; the session cookie is HttpOnly', async () => {
+    const b = new Browser();
+    const home = await b.page('/');
+    expect(home.status).toBe(200);
+    expect(home.headers.get('content-security-policy')).toContain("script-src 'self'");
+    expect(home.headers.get('x-frame-options')).toBe('DENY');
+    expect(home.text).toContain('2 pilots online');
+    for (const p of ['/updates', '/suggestions', '/pilots', '/signin', '/register', '/rss.xml']) expect((await b.page(p)).status, p).toBe(200);
+    expect((await b.page('/nope')).status).toBe(404);
+    const r = await b.signin('admin', 'admin');
+    expect(r.status).toBe(303);
+    expect(r.headers.getSetCookie().find((c) => c.startsWith('sg_session='))).toMatch(/HttpOnly; Max-Age=/);
+  });
+
+  it('register, comment (escaped), suggest, vote once, shout with limits', async () => {
+    const admin = new Browser();
+    await admin.signin('admin', 'admin');
+    await admin.page('/admin/posts/new');
+    const made = await admin.req('/admin/posts', { method: 'POST', form: { title: 'First light', body: 'Hello **pilots**', tags: 'news', status: 'published' } });
+    expect(made.status).toBe(303);
+
+    const v = new Browser();
+    await v.page('/register');
+    expect((await v.req('/register', { method: 'POST', form: { username: 'vega', email: 'v@x.io', password: 'pw', next: '/updates/first-light' } })).location).toBe('/updates/first-light?ok=registered');
+    await v.page('/updates/first-light');
+    const c = await v.req('/updates/first-light/comments', { method: 'POST', form: { body: 'nice <script>alert(1)</script>' } });
+    expect(c.status).toBe(303);
+    const post = await v.page('/updates/first-light');
+    expect(post.text).toContain('nice &lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(post.text).not.toContain('<script>alert(1)</script>');
+
+    // Without the CSRF token, or from another site: refused
+    const forged = await fetch(`${base}/updates/first-light/comments`, { method: 'POST', headers: { cookie: [...v.jar].map(([k, x]) => `${k}=${x}`).join('; '), 'content-type': 'application/x-www-form-urlencoded' }, body: 'body=forged', redirect: 'manual' });
+    expect(forged.status).toBe(403);
+    expect((await v.req('/shoutbox', { method: 'POST', json: { text: 'hi' }, headers: { origin: 'https://evil.example' } })).status).toBe(403);
+
+    await v.page('/suggestions');
+    expect((await v.req('/suggestions', { method: 'POST', form: { title: 'Name my ships', body: 'please' } })).status).toBe(303);
+    const s = (await store.listSuggestions({ sort: 'top' }))[0];
+    expect(s.votes).toBe(1); // you back your own
+
+    const o = new Browser();
+    await o.page('/register');
+    await o.req('/register', { method: 'POST', form: { username: 'orrin', email: 'o@x.io', password: 'pw' } });
+    await o.page('/suggestions');
+    expect(JSON.parse((await o.req(`/suggestions/${s.id}/vote`, { method: 'POST', json: { on: true } })).text)).toEqual({ votes: 2, voted: true });
+    expect(JSON.parse((await o.req(`/suggestions/${s.id}/vote`, { method: 'POST', json: { on: true } })).text).votes).toBe(2);
+    expect(JSON.parse((await o.req(`/suggestions/${s.id}/vote`, { method: 'POST', json: { on: false } })).text).votes).toBe(1);
+    // Anonymous: no
+    expect((await new Browser().req(`/suggestions/${s.id}/vote`, { method: 'POST', json: { on: true } })).status).toBe(403);
+
+    // Admin: status and reply; voting closes when declined
+    await admin.page('/admin/suggestions');
+    await admin.req(`/admin/suggestions/${s.id}`, { method: 'POST', form: { status: 'declined', reply: 'Not this time' } });
+    expect((await store.getSuggestion(s.id))).toMatchObject({ status: 'declined', reply: 'Not this time', replyBy: 'admin' });
+    expect((await o.req(`/suggestions/${s.id}/vote`, { method: 'POST', json: { on: true } })).status).toBe(409);
+
+    // Shoutbox: length, rate limit, admin delete
+    expect((await o.req('/shoutbox', { method: 'POST', json: { text: 'x'.repeat(281) } })).status).toBe(400);
+    const statuses: number[] = [];
+    for (let i = 0; i < 7; i++) statuses.push((await o.req('/shoutbox', { method: 'POST', json: { text: `hello ${i}` } })).status);
+    expect(statuses.slice(0, 5)).toEqual([200, 200, 200, 200, 200]);
+    expect(statuses).toContain(429);
+    const last = (await store.recentShouts(10)).pop()!;
+    expect((await o.req(`/shoutbox/${last.id}/delete`, { method: 'POST', json: {} })).status).toBe(404); // not an admin
+    await admin.page('/');
+    expect((await admin.req(`/shoutbox/${last.id}/delete`, { method: 'POST', json: {} })).status).toBe(200);
+    expect((await store.recentShouts(10)).some((x) => x.id === last.id)).toBe(false);
+  });
+
+  it('admin pages are hidden from pilots and need sign-in', async () => {
+    expect((await new Browser().page('/admin')).location).toBe('/signin?next=%2Fadmin');
+    const p = new Browser();
+    await p.signin('vega', 'pw');
+    expect((await p.page('/admin')).status).toBe(404);
+    expect((await p.page('/admin/tokens')).status).toBe(404);
+  });
+
+  it('API: tokens from the admin panel, upsert by slug, uploads, drafts hidden', async () => {
+    const admin = new Browser();
+    await admin.signin('admin', 'admin');
+    await admin.page('/admin/tokens');
+    const made = await admin.req('/admin/tokens', { method: 'POST', form: { name: 'cli' } });
+    const token = /value="(sgs_[^"]+)"/.exec(made.text)![1];
+    expect((await store.listTokens()).some((t) => t.hash === token)).toBe(false); // only a hash is kept
+
+    const api = (path: string, init: RequestInit = {}) => fetch(base + path, { ...init, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', ...(init.headers as object) } });
+    expect((await fetch(`${base}/api/v1/me`, { headers: { authorization: 'Bearer sgs_wrong' } })).status).toBe(401);
+    expect(await (await api('/api/v1/me')).json()).toMatchObject({ name: 'admin (cli)', via: 'token' });
+
+    const first = await api('/api/v1/posts', { method: 'POST', body: JSON.stringify({ title: 'From the terminal', body: 'v1', status: 'draft', tags: ['cli'] }) });
+    expect(first.status).toBe(201);
+    expect((await fetch(`${base}/updates/from-the-terminal`)).status).toBe(404); // a draft
+    const again = await api('/api/v1/posts', { method: 'POST', body: JSON.stringify({ title: 'From the terminal', body: 'v2', status: 'published' }) });
+    expect(again.status).toBe(200);
+    expect((await again.json()).created).toBe(false);
+    const page = await fetch(`${base}/updates/from-the-terminal`);
+    expect(await page.text()).toContain('v2');
+    expect((await api('/api/v1/posts/from-the-terminal', { method: 'PATCH', body: JSON.stringify({ status: 'draft' }) })).status).toBe(200);
+    expect((await fetch(`${base}/updates/from-the-terminal`)).status).toBe(404);
+
+    const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64)]);
+    const up = await api('/api/v1/uploads', { method: 'POST', body: png, headers: { 'content-type': 'image/png' } });
+    const { url } = await up.json();
+    expect(url).toMatch(/^\/uploads\/[a-f0-9]{24}\.png$/);
+    const got = await fetch(base + url);
+    expect(got.headers.get('content-type')).toBe('image/png');
+    expect((await api('/api/v1/uploads', { method: 'POST', body: '<svg onload=alert(1)>', headers: { 'content-type': 'image/svg+xml' } })).status).toBe(400);
+
+    // A token can't act as a browser session (no cookies, no pages)
+    expect((await api('/api/v1/posts/from-the-terminal', { method: 'DELETE' })).status).toBe(200);
+    await admin.page('/admin/tokens');
+    const id = (await store.listTokens())[0].id;
+    await admin.req(`/admin/tokens/${id}/revoke`, { method: 'POST', form: {} });
+    expect((await api('/api/v1/me')).status).toBe(401);
+  });
+
+  it('account: change password and email, delete (with confirmation) unsigns content', async () => {
+    const b = new Browser();
+    await b.page('/register');
+    await b.req('/register', { method: 'POST', form: { username: 'dusty', email: 'd@x.io', password: 'pw' } });
+    await b.page('/account');
+    expect((await b.req('/account/password', { method: 'POST', form: { password: 'pw', newPassword: 'a', repeat: 'b' } })).text).toContain('don&#39;t match');
+    expect((await b.req('/account/password', { method: 'POST', form: { password: 'pw', newPassword: 'pw2', repeat: 'pw2' } })).location).toBe('/account?ok=password');
+    expect((await b.req('/account/email', { method: 'POST', form: { password: 'pw2', email: 'new@x.io' } })).location).toBe('/account?ok=email');
+    await b.page('/suggestions');
+    await b.req('/suggestions', { method: 'POST', form: { title: 'Dusty idea here' } });
+    expect((await b.req('/account/delete', { method: 'POST', form: { confirm: 'wrong', password: 'pw2' } })).text).toContain('Type your pilot name');
+    expect((await b.req('/account/delete', { method: 'POST', form: { confirm: 'DUSTY', password: 'pw2' } })).location).toBe('/?ok=deleted');
+    expect(b.jar.has('sg_session')).toBe(false);
+    const s = (await store.listSuggestions({ sort: 'new' })).find((x) => x.title === 'Dusty idea here')!;
+    expect([s.authorId, s.authorName, s.votes]).toEqual([null, 'a former pilot', 0]);
+  });
+
+  it('pilot pages and Play (link mode redirects; no token in the URL)', async () => {
+    const page = await new Browser().page('/pilots/vega');
+    expect(page.text).toContain('Stubborn');
+    expect((await new Browser().page('/pilots/<script>')).status).toBe(404);
+    const play = await new Browser().page('/play');
+    expect(play.status).toBe(302);
+    expect(play.location).toBe('http://game.example');
+  });
+});

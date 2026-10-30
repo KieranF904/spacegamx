@@ -1,0 +1,1433 @@
+{
+  "_comment": "Refining (timed: seconds per batch, queued at a station's refinery), ship part costs (derived from rules), and fabricator recipes. time is in seconds: 0 = instant, otherwise it joins the station's queue. starter recipes are known from the start; the rest are learned from plans. Structure (hull, armour, conduits, cargo) is never fabricated: it's paid in these materials when placed in the hangar (econ/salvage.ts).",
+  "refining": [
+    {
+      "id": "alloy_plate",
+      "inputs": {
+        "iron_ore": 2,
+        "nickel_ore": 1
+      },
+      "out": 1,
+      "time": 2
+    },
+    {
+      "id": "steel_plate",
+      "inputs": {
+        "iron_ore": 4,
+        "nickel_ore": 2
+      },
+      "out": 1,
+      "time": 4
+    },
+    {
+      "id": "composite_sheet",
+      "inputs": {
+        "silicate": 2,
+        "ice": 1
+      },
+      "out": 1,
+      "time": 2
+    },
+    {
+      "id": "copper_wire",
+      "inputs": {
+        "copper_ore": 1
+      },
+      "out": 2,
+      "time": 1
+    },
+    {
+      "id": "titanium_plate",
+      "inputs": {
+        "titanium_ore": 4,
+        "nickel_ore": 1
+      },
+      "out": 1,
+      "time": 8
+    },
+    {
+      "id": "crystal_lens",
+      "inputs": {
+        "crystal": 1,
+        "silicate": 2
+      },
+      "out": 1,
+      "time": 5
+    },
+    {
+      "id": "cobalt_alloy",
+      "inputs": {
+        "cobalt_ore": 5,
+        "nickel_ore": 3
+      },
+      "out": 1,
+      "time": 15
+    },
+    {
+      "id": "neutronium_plate",
+      "inputs": {
+        "neutronium_ore": 6,
+        "cobalt_ore": 3
+      },
+      "out": 1,
+      "time": 30
+    },
+    {
+      "id": "coolant",
+      "inputs": {
+        "ice": 2
+      },
+      "out": 1,
+      "time": 2
+    },
+    {
+      "id": "propellant",
+      "inputs": {
+        "hydrazine_slush": 2
+      },
+      "out": 1,
+      "time": 3
+    },
+    {
+      "id": "ferrite_plate",
+      "inputs": {
+        "ferrite_ore": 4,
+        "iron_ore": 1
+      },
+      "out": 1,
+      "time": 8,
+      "level": 30
+    },
+    {
+      "id": "insulated_polymer",
+      "inputs": {
+        "polymer_precursor": 3,
+        "copper_wire": 1
+      },
+      "out": 1,
+      "time": 6,
+      "level": 10
+    },
+    {
+      "id": "cryogen",
+      "inputs": {
+        "cryo_gas": 1
+      },
+      "out": 1,
+      "time": 2
+    },
+    {
+      "id": "aurum_ingot",
+      "inputs": {
+        "aurum": 1
+      },
+      "out": 1,
+      "time": 6
+    },
+    {
+      "id": "voidglass_pane",
+      "inputs": {
+        "voidglass": 1,
+        "silicate": 2
+      },
+      "out": 1,
+      "time": 8
+    },
+    {
+      "id": "iridium_ingot",
+      "inputs": {
+        "pale_iridium": 1
+      },
+      "out": 1,
+      "time": 10
+    },
+    {
+      "id": "hush_pane",
+      "inputs": {
+        "aurora_rime": 4,
+        "silicate": 1
+      },
+      "out": 1,
+      "time": 12
+    },
+    {
+      "id": "hardened_steel",
+      "inputs": {
+        "steel_plate": 1,
+        "chromite": 2
+      },
+      "out": 1,
+      "time": 12,
+      "level": 35
+    },
+    {
+      "id": "catalyst",
+      "inputs": {
+        "platinoid_ore": 3
+      },
+      "out": 1,
+      "time": 10
+    },
+    {
+      "id": "singularity_grain",
+      "inputs": {
+        "singularity_dust": 1
+      },
+      "out": 1,
+      "time": 20
+    },
+    {
+      "id": "conductive_steel_plate",
+      "inputs": {
+        "steel_plate": 2,
+        "aurum_ingot": 1
+      },
+      "out": 2,
+      "time": 12,
+      "level": 35
+    },
+    {
+      "id": "leaded_iridium_plate",
+      "inputs": {
+        "steel_plate": 2,
+        "iridium_ingot": 1
+      },
+      "out": 1,
+      "time": 20,
+      "level": 45
+    },
+    {
+      "id": "ceramic_plate",
+      "inputs": {
+        "silicate": 3,
+        "voidglass_pane": 1,
+        "coolant": 1
+      },
+      "out": 2,
+      "time": 15,
+      "level": 45
+    },
+    {
+      "id": "sealed_composite_plate",
+      "inputs": {
+        "composite_sheet": 2,
+        "insulated_polymer": 1,
+        "voidglass_pane": 1
+      },
+      "out": 2,
+      "time": 15,
+      "level": 45
+    },
+    {
+      "id": "leestone",
+      "inputs": {
+        "leestone_ore": 4
+      },
+      "out": 1,
+      "time": 10
+    },
+    {
+      "id": "leestone_plate",
+      "inputs": {
+        "leestone": 2,
+        "steel_plate": 1
+      },
+      "out": 1,
+      "time": 15,
+      "level": 12
+    }
+  ],
+  "parts": {
+    "_comment": "A part costs plates of its material per cell of area (× platesPerAreaByGrade for its grade, rounded up), plus extras for its function. Fabricating a part takes secondsPerArea × area × timeByGrade unless instantMaxArea covers it (Mk I and II only: higher grades always take time).",
+    "plates": {
+      "alloy": "alloy_plate",
+      "steel": "steel_plate",
+      "composite": "composite_sheet",
+      "titanium": "titanium_plate",
+      "cobalt": "cobalt_alloy",
+      "neutronium": "neutronium_plate",
+      "insulated_polymer": "insulated_polymer",
+      "conductive_steel": "conductive_steel_plate",
+      "leaded_iridium": "leaded_iridium_plate",
+      "ceramic_laminate": "ceramic_plate",
+      "sealed_composite": "sealed_composite_plate",
+      "dense_ferrite": "ferrite_plate",
+      "leestone": "leestone_plate"
+    },
+    "platesPerArea": 1,
+    "platesPerAreaByGrade": [
+      1,
+      1,
+      1,
+      2,
+      2,
+      3
+    ],
+    "timeByGrade": [
+      1,
+      1,
+      1.5,
+      2.5,
+      4,
+      6
+    ],
+    "extras": {
+      "hull": {},
+      "armor": {
+        "plate": 1
+      },
+      "conduit": {
+        "copper_wire": 1
+      },
+      "generator": {
+        "copper_wire": 2
+      },
+      "battery": {
+        "copper_wire": 2,
+        "plate": 0.5
+      },
+      "drive_battery": {
+        "copper_wire": 3,
+        "plate": 1
+      },
+      "weapon_battery": {
+        "copper_wire": 3,
+        "plate": 1
+      },
+      "thruster": {
+        "copper_wire": 1,
+        "plate": 0.5
+      },
+      "weapon": {
+        "copper_wire": 1,
+        "plate": 0.5
+      },
+      "cargo": {
+        "plate": 0.5
+      },
+      "miner": {
+        "copper_wire": 2,
+        "plate": 0.5
+      },
+      "scanner": {
+        "copper_wire": 2,
+        "crystal_lens": 1
+      },
+      "core": {
+        "plate": 2,
+        "copper_wire": 4,
+        "power_coupling": 0.5
+      },
+      "railgun": {
+        "copper_wire": 3,
+        "power_coupling": 0.5,
+        "plate": 1
+      },
+      "laser": {
+        "copper_wire": 2,
+        "crystal_lens": 1
+      },
+      "flak": {
+        "copper_wire": 1,
+        "plate": 1
+      },
+      "missile": {
+        "copper_wire": 1,
+        "targeting_chip": 0.5,
+        "plate": 0.5
+      },
+      "lance": {
+        "copper_wire": 3,
+        "crystal_lens": 1,
+        "power_coupling": 0.5
+      },
+      "emp": {
+        "copper_wire": 2,
+        "power_coupling": 1
+      },
+      "shield": {
+        "copper_wire": 2,
+        "shield_emitter": 0.5
+      },
+      "jumpcoil": {
+        "copper_wire": 4,
+        "power_coupling": 1,
+        "crystal": 1
+      },
+      "hive": {
+        "plate": 1,
+        "targeting_chip": 1,
+        "servo_motor": 1,
+        "rustjaw_cog": 1
+      },
+      "frostbite": {
+        "copper_wire": 3,
+        "crystal_lens": 1,
+        "frost_gland": 2,
+        "frost_heart": 1
+      },
+      "cinder_bloom": {
+        "plate": 1,
+        "power_coupling": 1,
+        "cinder_ash": 2,
+        "cinder_ember": 1
+      },
+      "prism": {
+        "crystal_lens": 2,
+        "copper_wire": 2,
+        "prism_shard": 1
+      },
+      "phase": {
+        "plate": 1,
+        "nav_computer": 1,
+        "void_ichor": 1,
+        "void_pearl": 1
+      },
+      "singularity": {
+        "plate": 2,
+        "quantum_core": 1,
+        "maw_fragment": 1
+      },
+      "afterburner": {
+        "copper_wire": 1,
+        "plate": 1,
+        "power_coupling": 0.5
+      },
+      "plasma_drive": {
+        "copper_wire": 2,
+        "plate": 1,
+        "power_coupling": 0.5,
+        "crystal_lens": 0.5
+      },
+      "constructor": {
+        "copper_wire": 3,
+        "alloy_plate": 1
+      }
+    },
+    "instantMaxArea": 1,
+    "secondsPerArea": 20,
+    "rebuildFraction": 0.4
+  },
+  "craft": [
+    {
+      "id": "repair_kit",
+      "out": {
+        "repair_kit": 1
+      },
+      "inputs": {
+        "alloy_plate": 2,
+        "copper_wire": 2
+      },
+      "time": 0,
+      "starter": true
+    },
+    {
+      "id": "field_repair_kit",
+      "out": {
+        "field_repair_kit": 1
+      },
+      "inputs": {
+        "steel_plate": 3,
+        "copper_wire": 4,
+        "servo_motor": 1
+      },
+      "time": 30,
+      "starter": true
+    },
+    {
+      "id": "nanite_repair_kit",
+      "out": {
+        "nanite_repair_kit": 1
+      },
+      "inputs": {
+        "titanium_plate": 2,
+        "crystal_lens": 1,
+        "power_coupling": 1,
+        "servo_motor": 1
+      },
+      "time": 90,
+      "starter": true
+    },
+    {
+      "id": "boost_cell",
+      "out": {
+        "boost_cell": 2
+      },
+      "inputs": {
+        "ice": 4,
+        "copper_wire": 1
+      },
+      "time": 0,
+      "starter": true
+    },
+    {
+      "id": "scanner_charge",
+      "out": {
+        "scanner_charge": 3
+      },
+      "inputs": {
+        "silicate": 3,
+        "copper_wire": 1
+      },
+      "time": 0,
+      "starter": true
+    },
+    {
+      "id": "insurance_bond",
+      "out": {
+        "insurance_bond": 1
+      },
+      "inputs": {
+        "steel_plate": 6,
+        "scrap_electronics": 4
+      },
+      "time": 120,
+      "level": 15
+    },
+    {
+      "id": "power_coupling",
+      "out": {
+        "power_coupling": 1
+      },
+      "inputs": {
+        "copper_wire": 6,
+        "scrap_electronics": 3
+      },
+      "time": 60,
+      "starter": true
+    },
+    {
+      "id": "targeting_chip",
+      "out": {
+        "targeting_chip": 1
+      },
+      "inputs": {
+        "scrap_electronics": 5,
+        "crystal_lens": 1
+      },
+      "time": 90,
+      "level": 12
+    },
+    {
+      "id": "servo_motor",
+      "out": {
+        "servo_motor": 1
+      },
+      "inputs": {
+        "steel_plate": 2,
+        "copper_wire": 4,
+        "scrap_electronics": 2
+      },
+      "time": 90,
+      "level": 10
+    },
+    {
+      "id": "field_crucible",
+      "out": {
+        "field_crucible": 1
+      },
+      "inputs": {
+        "alloy_plate": 6,
+        "copper_wire": 4,
+        "crystal": 2,
+        "crucible_pattern": 1
+      },
+      "time": 20,
+      "level": 4,
+      "quest": "osei_02"
+    },
+    {
+      "id": "railgun_slugs",
+      "out": {
+        "railgun_slugs": 1
+      },
+      "inputs": {
+        "steel_plate": 2,
+        "copper_wire": 1
+      },
+      "time": 10,
+      "starter": true
+    },
+    {
+      "id": "flak_canisters",
+      "out": {
+        "flak_canisters": 1
+      },
+      "inputs": {
+        "alloy_plate": 2,
+        "coolant": 1
+      },
+      "time": 10,
+      "starter": true
+    },
+    {
+      "id": "missile_crate",
+      "out": {
+        "missile_crate": 1
+      },
+      "inputs": {
+        "alloy_plate": 3,
+        "propellant": 2,
+        "copper_wire": 1
+      },
+      "time": 15,
+      "starter": true
+    },
+    {
+      "id": "railgun_sabot",
+      "out": {
+        "railgun_sabot": 1
+      },
+      "inputs": {
+        "steel_plate": 2,
+        "copper_wire": 1,
+        "chromite": 1
+      },
+      "time": 15,
+      "level": 15
+    },
+    {
+      "id": "railgun_tungsten",
+      "out": {
+        "railgun_tungsten": 1
+      },
+      "inputs": {
+        "steel_plate": 1,
+        "hardened_steel": 1,
+        "copper_wire": 1
+      },
+      "time": 15,
+      "level": 20
+    },
+    {
+      "id": "railgun_aurum",
+      "out": {
+        "railgun_aurum": 1
+      },
+      "inputs": {
+        "steel_plate": 2,
+        "copper_wire": 1,
+        "aurum_ingot": 1
+      },
+      "time": 15,
+      "level": 18
+    },
+    {
+      "id": "flak_incendiary",
+      "out": {
+        "flak_incendiary": 1
+      },
+      "inputs": {
+        "alloy_plate": 2,
+        "coolant": 1,
+        "propellant": 1
+      },
+      "time": 15,
+      "level": 8
+    },
+    {
+      "id": "flak_chaff",
+      "out": {
+        "flak_chaff": 1
+      },
+      "inputs": {
+        "alloy_plate": 2,
+        "cryogen": 1
+      },
+      "time": 15,
+      "level": 10
+    },
+    {
+      "id": "flak_frag",
+      "out": {
+        "flak_frag": 1
+      },
+      "inputs": {
+        "alloy_plate": 2,
+        "coolant": 1,
+        "nickel_ore": 2
+      },
+      "time": 15,
+      "level": 6
+    },
+    {
+      "id": "missile_shaped",
+      "out": {
+        "missile_shaped": 1
+      },
+      "inputs": {
+        "alloy_plate": 3,
+        "propellant": 2,
+        "copper_wire": 1,
+        "chromite": 1
+      },
+      "time": 20,
+      "level": 13
+    },
+    {
+      "id": "missile_seeker",
+      "out": {
+        "missile_seeker": 1
+      },
+      "inputs": {
+        "alloy_plate": 3,
+        "propellant": 2,
+        "copper_wire": 1,
+        "catalyst": 1
+      },
+      "time": 20,
+      "level": 15
+    },
+    {
+      "id": "missile_cryo",
+      "out": {
+        "missile_cryo": 1
+      },
+      "inputs": {
+        "alloy_plate": 3,
+        "propellant": 2,
+        "cryogen": 1
+      },
+      "time": 20,
+      "level": 17
+    },
+    {
+      "id": "torpedo_crate",
+      "out": {
+        "torpedo_crate": 1
+      },
+      "inputs": {
+        "steel_plate": 4,
+        "propellant": 4,
+        "catalyst": 1
+      },
+      "time": 30,
+      "starter": true
+    },
+    {
+      "id": "mortar_shells",
+      "out": {
+        "mortar_shells": 1
+      },
+      "inputs": {
+        "steel_plate": 3,
+        "propellant": 2
+      },
+      "time": 15,
+      "starter": true
+    },
+    {
+      "id": "mining_charges",
+      "out": {
+        "mining_charges": 1
+      },
+      "inputs": {
+        "alloy_plate": 2,
+        "propellant": 1
+      },
+      "time": 10,
+      "starter": true
+    },
+    {
+      "id": "cannon_hv",
+      "out": {
+        "cannon_hv": 1
+      },
+      "inputs": {
+        "alloy_plate": 2,
+        "copper_wire": 1
+      },
+      "time": 8,
+      "starter": true
+    },
+    {
+      "id": "buoy_frame",
+      "out": {
+        "buoy_frame": 1
+      },
+      "inputs": {
+        "alloy_plate": 3
+      },
+      "time": 0,
+      "level": 2,
+      "quest": "clearance"
+    },
+    {
+      "id": "buoy_mast",
+      "out": {
+        "buoy_mast": 1
+      },
+      "inputs": {
+        "alloy_plate": 2,
+        "copper_wire": 1
+      },
+      "time": 0,
+      "level": 2,
+      "quest": "clearance"
+    },
+    {
+      "id": "buoy_cell",
+      "out": {
+        "buoy_cell": 1
+      },
+      "inputs": {
+        "alloy_plate": 1,
+        "copper_wire": 2
+      },
+      "time": 0,
+      "level": 2,
+      "quest": "clearance"
+    },
+    {
+      "id": "buoy_dish",
+      "out": {
+        "buoy_dish": 1
+      },
+      "inputs": {
+        "alloy_plate": 2,
+        "copper_wire": 2
+      },
+      "time": 0,
+      "level": 2,
+      "quest": "clearance"
+    },
+    {
+      "id": "barrel_assembly",
+      "out": {
+        "barrel_assembly": 1
+      },
+      "inputs": {
+        "steel_plate": 2,
+        "servo_motor": 1
+      },
+      "time": 45,
+      "starter": true
+    },
+    {
+      "id": "coil_winding",
+      "out": {
+        "coil_winding": 1
+      },
+      "inputs": {
+        "copper_wire": 6,
+        "ferrite_plate": 1
+      },
+      "time": 40,
+      "starter": true
+    },
+    {
+      "id": "capacitor_cell",
+      "out": {
+        "capacitor_cell": 1
+      },
+      "inputs": {
+        "copper_wire": 3,
+        "insulated_polymer": 1,
+        "scrap_electronics": 1
+      },
+      "time": 30,
+      "starter": true
+    },
+    {
+      "id": "thrust_nozzle",
+      "out": {
+        "thrust_nozzle": 1
+      },
+      "inputs": {
+        "titanium_plate": 2,
+        "ceramic_plate": 1
+      },
+      "time": 60,
+      "starter": true
+    },
+    {
+      "id": "fuel_injector",
+      "out": {
+        "fuel_injector": 1
+      },
+      "inputs": {
+        "steel_plate": 1,
+        "propellant": 2,
+        "servo_motor": 1
+      },
+      "time": 45,
+      "starter": true
+    },
+    {
+      "id": "reactor_core",
+      "out": {
+        "reactor_core": 1
+      },
+      "inputs": {
+        "hardened_steel": 2,
+        "crystal": 1,
+        "coolant": 2
+      },
+      "time": 90,
+      "starter": true
+    },
+    {
+      "id": "wire_spool",
+      "out": {
+        "wire_spool": 1
+      },
+      "inputs": {
+        "copper_wire": 4,
+        "insulated_polymer": 1
+      },
+      "time": 0,
+      "starter": true
+    }
+  ],
+  "models": {
+    "cannon_pip": {
+      "inputs": {
+        "alloy_plate": 2,
+        "copper_wire": 1
+      },
+      "time": 0
+    },
+    "cannon_hammer": {
+      "inputs": {
+        "alloy_plate": 3,
+        "copper_wire": 2,
+        "barrel_assembly": 1
+      },
+      "time": 40
+    },
+    "cannon_twinlink": {
+      "inputs": {
+        "steel_plate": 3,
+        "copper_wire": 3,
+        "barrel_assembly": 2
+      },
+      "time": 60
+    },
+    "cannon_longbarrel": {
+      "inputs": {
+        "titanium_plate": 3,
+        "copper_wire": 2,
+        "barrel_assembly": 2,
+        "targeting_chip": 1
+      },
+      "time": 100
+    },
+    "cannon_bastion": {
+      "inputs": {
+        "cobalt_alloy": 5,
+        "hardened_steel": 2,
+        "barrel_assembly": 3,
+        "servo_motor": 2
+      },
+      "time": 320
+    },
+    "autocannon_rattler": {
+      "inputs": {
+        "alloy_plate": 2,
+        "copper_wire": 2,
+        "scrap_electronics": 1
+      },
+      "time": 0
+    },
+    "autocannon_chainsaw": {
+      "inputs": {
+        "steel_plate": 3,
+        "copper_wire": 3,
+        "barrel_assembly": 1,
+        "servo_motor": 1
+      },
+      "time": 60
+    },
+    "autocannon_stinger": {
+      "inputs": {
+        "titanium_plate": 2,
+        "barrel_assembly": 1,
+        "targeting_chip": 1
+      },
+      "time": 50
+    },
+    "flak_burst": {
+      "inputs": {
+        "alloy_plate": 2,
+        "copper_wire": 1,
+        "scrap_electronics": 1
+      },
+      "time": 0
+    },
+    "flak_cloudmaker": {
+      "inputs": {
+        "steel_plate": 3,
+        "copper_wire": 2,
+        "barrel_assembly": 1,
+        "targeting_chip": 1
+      },
+      "time": 60
+    },
+    "mortar_lobber": {
+      "inputs": {
+        "alloy_plate": 3,
+        "copper_wire": 1,
+        "servo_motor": 1
+      },
+      "time": 0
+    },
+    "mortar_quake": {
+      "inputs": {
+        "titanium_plate": 3,
+        "barrel_assembly": 2,
+        "servo_motor": 1
+      },
+      "time": 100
+    },
+    "laser_glint": {
+      "inputs": {
+        "alloy_plate": 1,
+        "copper_wire": 2,
+        "crystal_lens": 1,
+        "capacitor_cell": 1
+      },
+      "time": 0
+    },
+    "laser_cutter": {
+      "inputs": {
+        "steel_plate": 2,
+        "copper_wire": 3,
+        "crystal_lens": 2,
+        "capacitor_cell": 1
+      },
+      "time": 60
+    },
+    "laser_searchlight": {
+      "inputs": {
+        "titanium_plate": 1,
+        "crystal_lens": 3,
+        "capacitor_cell": 1,
+        "targeting_chip": 1
+      },
+      "time": 50
+    },
+    "pulse_strobe": {
+      "inputs": {
+        "steel_plate": 1,
+        "copper_wire": 2,
+        "crystal_lens": 1,
+        "capacitor_cell": 1
+      },
+      "time": 0
+    },
+    "pulse_overpulse": {
+      "inputs": {
+        "titanium_plate": 2,
+        "crystal_lens": 1,
+        "capacitor_cell": 3,
+        "power_coupling": 1
+      },
+      "time": 100
+    },
+    "missile_dart": {
+      "inputs": {
+        "steel_plate": 2,
+        "copper_wire": 1,
+        "targeting_chip": 1
+      },
+      "time": 0
+    },
+    "missile_swarm": {
+      "inputs": {
+        "titanium_plate": 2,
+        "copper_wire": 2,
+        "targeting_chip": 2,
+        "servo_motor": 1
+      },
+      "time": 100
+    },
+    "missile_hammerhead": {
+      "inputs": {
+        "cobalt_alloy": 4,
+        "targeting_chip": 2,
+        "servo_motor": 2,
+        "nav_computer": 1
+      },
+      "time": 320
+    },
+    "railgun_needle": {
+      "inputs": {
+        "steel_plate": 2,
+        "copper_wire": 2,
+        "coil_winding": 1,
+        "power_coupling": 1
+      },
+      "time": 60
+    },
+    "railgun_coilgun": {
+      "inputs": {
+        "titanium_plate": 2,
+        "coil_winding": 3,
+        "capacitor_cell": 2
+      },
+      "time": 100
+    },
+    "railgun_spear": {
+      "inputs": {
+        "titanium_plate": 4,
+        "hardened_steel": 2,
+        "coil_winding": 3,
+        "power_coupling": 2
+      },
+      "time": 320
+    },
+    "emp_hush": {
+      "inputs": {
+        "steel_plate": 1,
+        "coil_winding": 1,
+        "power_coupling": 1
+      },
+      "time": 0
+    },
+    "emp_blackout": {
+      "inputs": {
+        "cobalt_alloy": 3,
+        "coil_winding": 3,
+        "power_coupling": 2,
+        "quantum_core": 1
+      },
+      "time": 320
+    },
+    "arc_spark": {
+      "inputs": {
+        "steel_plate": 1,
+        "coil_winding": 2,
+        "power_coupling": 1
+      },
+      "time": 0
+    },
+    "arc_tesla": {
+      "inputs": {
+        "titanium_plate": 2,
+        "coil_winding": 3,
+        "crystal_lens": 1,
+        "power_coupling": 1
+      },
+      "time": 80
+    },
+    "torpedo_eel": {
+      "inputs": {
+        "steel_plate": 3,
+        "copper_wire": 2,
+        "targeting_chip": 1,
+        "servo_motor": 1
+      },
+      "time": 60
+    },
+    "torpedo_leviathan": {
+      "inputs": {
+        "cobalt_alloy": 5,
+        "targeting_chip": 2,
+        "nav_computer": 1,
+        "servo_motor": 2
+      },
+      "time": 480
+    },
+    "lance_lance": {
+      "inputs": {
+        "cobalt_alloy": 2,
+        "copper_wire": 4,
+        "crystal_lens": 2,
+        "power_coupling": 2,
+        "capacitor_cell": 2
+      },
+      "time": 160
+    },
+    "legendary_hive": {
+      "inputs": {
+        "cobalt_alloy": 1,
+        "targeting_chip": 1,
+        "servo_motor": 1,
+        "rustjaw_cog": 1
+      },
+      "time": 80
+    },
+    "legendary_frostbite": {
+      "inputs": {
+        "cobalt_alloy": 1,
+        "copper_wire": 6,
+        "crystal_lens": 2,
+        "frost_gland": 4,
+        "frost_heart": 1
+      },
+      "time": 160
+    },
+    "legendary_cinder_bloom": {
+      "inputs": {
+        "cobalt_alloy": 1,
+        "power_coupling": 1,
+        "cinder_ash": 2,
+        "cinder_ember": 1
+      },
+      "time": 80
+    },
+    "legendary_prism": {
+      "inputs": {
+        "crystal_lens": 2,
+        "copper_wire": 2,
+        "prism_shard": 1
+      },
+      "time": 80
+    },
+    "legendary_phase": {
+      "inputs": {
+        "cobalt_alloy": 2,
+        "nav_computer": 1,
+        "void_ichor": 1,
+        "void_pearl": 1
+      },
+      "time": 160
+    },
+    "legendary_singularity": {
+      "inputs": {
+        "cobalt_alloy": 2,
+        "quantum_core": 1,
+        "maw_fragment": 1
+      },
+      "time": 80
+    },
+    "engine_ion_drive": {
+      "inputs": {
+        "alloy_plate": 2,
+        "copper_wire": 1
+      },
+      "time": 0
+    },
+    "engine_vernier": {
+      "inputs": {
+        "alloy_plate": 1,
+        "copper_wire": 1
+      },
+      "time": 0
+    },
+    "engine_afterburner": {
+      "inputs": {
+        "alloy_plate": 2,
+        "copper_wire": 1,
+        "fuel_injector": 1
+      },
+      "time": 0
+    },
+    "engine_torch": {
+      "inputs": {
+        "alloy_plate": 3,
+        "copper_wire": 2,
+        "fuel_injector": 1,
+        "thrust_nozzle": 1
+      },
+      "time": 40
+    },
+    "engine_plasma_drive": {
+      "inputs": {
+        "steel_plate": 3,
+        "copper_wire": 4,
+        "thrust_nozzle": 1,
+        "power_coupling": 1
+      },
+      "time": 60
+    },
+    "engine_drift_sail": {
+      "inputs": {
+        "titanium_plate": 1,
+        "composite_sheet": 3,
+        "copper_wire": 2,
+        "crystal_lens": 1
+      },
+      "time": 50
+    },
+    "engine_fusion_torch": {
+      "inputs": {
+        "cobalt_alloy": 4,
+        "thrust_nozzle": 2,
+        "reactor_core": 1,
+        "power_coupling": 1
+      },
+      "time": 320
+    },
+    "power_cell_reactor": {
+      "inputs": {
+        "alloy_plate": 1,
+        "copper_wire": 2
+      },
+      "time": 0
+    },
+    "power_isotope_pile": {
+      "inputs": {
+        "steel_plate": 2,
+        "copper_wire": 2,
+        "reactor_core": 1
+      },
+      "time": 0
+    },
+    "power_fusion_plant": {
+      "inputs": {
+        "steel_plate": 6,
+        "copper_wire": 6,
+        "reactor_core": 2,
+        "coolant": 4
+      },
+      "time": 120
+    },
+    "power_overclock_reactor": {
+      "inputs": {
+        "titanium_plate": 3,
+        "copper_wire": 4,
+        "reactor_core": 2,
+        "power_coupling": 2
+      },
+      "time": 100
+    },
+    "power_battery": {
+      "inputs": {
+        "alloy_plate": 1,
+        "copper_wire": 2
+      },
+      "time": 0
+    },
+    "power_capacitor": {
+      "inputs": {
+        "composite_sheet": 1,
+        "capacitor_cell": 1
+      },
+      "time": 0
+    },
+    "power_drive_cell": {
+      "inputs": {
+        "steel_plate": 1,
+        "copper_wire": 2,
+        "capacitor_cell": 1
+      },
+      "time": 0
+    },
+    "power_heavy_bank": {
+      "inputs": {
+        "titanium_plate": 4,
+        "capacitor_cell": 4,
+        "power_coupling": 1
+      },
+      "time": 200
+    },
+    "utility_mining_laser": {
+      "inputs": {
+        "alloy_plate": 2,
+        "copper_wire": 2
+      },
+      "time": 0
+    },
+    "utility_bore": {
+      "inputs": {
+        "steel_plate": 3,
+        "copper_wire": 3,
+        "crystal_lens": 1
+      },
+      "time": 40
+    },
+    "utility_demolition_launcher": {
+      "inputs": {
+        "alloy_plate": 2,
+        "copper_wire": 1,
+        "servo_motor": 1
+      },
+      "time": 0
+    },
+    "utility_siphon": {
+      "inputs": {
+        "steel_plate": 2,
+        "copper_wire": 2,
+        "coolant": 2
+      },
+      "time": 0
+    },
+    "utility_scanner": {
+      "inputs": {
+        "alloy_plate": 1,
+        "copper_wire": 2,
+        "crystal_lens": 1
+      },
+      "time": 0
+    },
+    "utility_long_range_array": {
+      "inputs": {
+        "titanium_plate": 3,
+        "copper_wire": 4,
+        "crystal_lens": 2,
+        "nav_computer": 1
+      },
+      "time": 157
+    },
+    "utility_constructor": {
+      "inputs": {
+        "titanium_plate": 2,
+        "copper_wire": 3,
+        "servo_motor": 2
+      },
+      "time": 50
+    },
+    "shield_deflector": {
+      "inputs": {
+        "steel_plate": 1,
+        "copper_wire": 2,
+        "shield_emitter": 1
+      },
+      "time": 0
+    },
+    "shield_flicker_screen": {
+      "inputs": {
+        "steel_plate": 1,
+        "copper_wire": 2,
+        "shield_emitter": 1,
+        "capacitor_cell": 1
+      },
+      "time": 0
+    },
+    "shield_bulwark_projector": {
+      "inputs": {
+        "titanium_plate": 4,
+        "copper_wire": 4,
+        "shield_emitter": 3,
+        "power_coupling": 1
+      },
+      "time": 200
+    },
+    "utility_jump_coil": {
+      "inputs": {
+        "steel_plate": 1,
+        "coil_winding": 1,
+        "power_coupling": 1,
+        "crystal": 1
+      },
+      "time": 0
+    },
+    "utility_heavy_coil": {
+      "inputs": {
+        "cobalt_alloy": 4,
+        "coil_winding": 4,
+        "power_coupling": 2,
+        "nav_computer": 1
+      },
+      "time": 320
+    },
+    "plating_reactive_armour": {
+      "inputs": {
+        "steel_plate": 2,
+        "propellant": 1,
+        "scrap_electronics": 1
+      },
+      "time": 0,
+      "perCell": true
+    },
+    "plating_spaced_plating": {
+      "inputs": {
+        "titanium_plate": 3,
+        "composite_sheet": 1
+      },
+      "time": 50,
+      "perCell": true
+    }
+  }
+}

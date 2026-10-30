@@ -2,46 +2,79 @@
  * Renderer - PixiJS WebGL rendering
  */
 
+import { Bloom } from './Bloom';
+import type { QualityProfile } from '../settings/quality';
+import { SpritePool } from './spritePool';
+import { disc, ring, rock, glowBall, softDot, streak, streakScale, vignette, DOT_SIZE } from './fxTextures';
+import { stepOverlays, screenTint } from './overlayFrame';
+import { cameraView, HELM_FOLLOW_RATE, MAX_VIEW_SPIN, NORTH_RETURN_RATE, screenToWorld, screenToWorldDir, smoothAngle, viewHalfExtents, worldToScreen, worldToScreenDir } from './cameraView';
+import { FACTION_COLORS } from '../ships/ShipRenderer';
+import { PlanetRenderer } from './PlanetRenderer';
+import { SceneryRenderer } from './Scenery';
+import { NestRenderer, nestColor } from './NestViews';
+import systemsData from '../../../data/systems.json';
 import {
   Application,
+  BitmapFont,
+  BitmapText,
+  Sprite,
+  Texture,
   Container,
   Graphics,
   Text,
   TextStyle,
-  Sprite,
-  Texture,
   Color,
-  BlurFilter,
 } from 'pixi.js';
 import { GameState } from '../state/GameState';
+import { WeaponFx, type PredictedShell } from './weapons/WeaponFx';
+import { LootPodView } from './LootPodView';
+import { TerrainView } from './TerrainView';
+import { terrainFor } from './terrainData';
+import { MobView } from './MobView';
+import { drawAsteroid, AsteroidSeams } from './AsteroidLook';
+import { RiftShader } from './RiftShader';
+import { StationShot, StationView } from './StationView';
+import { CentralBodyShaders, CentralType } from './CentralBodyShaders';
 import { SunRenderer } from './SunRenderer';
 import { GlowRenderer } from './GlowRenderer';
 import {
   EntityType,
   EffectType,
-  WeaponType,
-  WORLD_SIZE,
-  PLAYER_RADIUS,
-  TIER_COLORS,
-  LASER_RANGE,
-  unpackCursorWeaponState,
+  TICK_MS,
   getAsteroidPolygon,
-  raycastPolygon,
   mulberry32,
   hashString,
   sunShaderDefs,
+  nestPosition,
+  pocketsFrom,
+  entranceNest,
 } from '@space-game/common';
-import { ITEM_DATA } from '../data/itemData';
+import { SkyRenderer } from './sky/SkyRenderer';
+import { SurfaceRenderer, SUN_DIR } from './surface/SurfaceRenderer';
+import { CityView } from './surface/CityView';
+import { BastionView } from './surface/BastionView';
+import { Lighting } from './lighting/Lighting';
+import { AsteroidBatch } from './lighting/AsteroidBatch';
+import { CoronaRaysRenderer } from './CoronaRaysRenderer';
+import { skyBiome, SkyBiome } from './sky/skyBiome';
+import type { NestData, ServerSystemInfoMessage, StarSystemData } from '@space-game/common';
 
 interface DamageNumber {
+  /** Where it was hit (world) */
   x: number;
   y: number;
+  /** Its rise and drift from there, along the screen's axes (world units) */
+  ox: number;
+  oy: number;
   amount: number;
   critical: boolean;
   lifetime: number;
-  text: Text;
+  /** Sideways drift (world units a second at the start) */
+  drift: number;
+  text: BitmapText;
 }
 
+/** A short-lived effect particle, drawn from a sprite pool (see updateEffects) */
 interface Particle {
   x: number;
   y: number;
@@ -50,9 +83,18 @@ interface Particle {
   life: number;
   maxLife: number;
   color: number;
+  /** Scale at full life (it shrinks as it fades) */
   size: number;
-  graphic: Graphics;
+  /** Its radius in world units at scale 1 */
+  radius: number;
+  tex: Texture;
+  alpha: number;
+  rot: number;
+  rotSpeed: number;
 }
+
+/** An expanding, fading flash or ring */
+interface Flash { x: number; y: number; radius: number; life: number; max: number; color: number; alpha: number; grow: number; tex: Texture }
 
 interface TractorBeam {
   startX: number;
@@ -60,146 +102,70 @@ interface TractorBeam {
   targetX: number;
   targetY: number;
   progress: number;
-  graphic: Graphics;
 }
 
-// Dying trail for fade effect
-interface DyingTrail {
-  points: { x: number; y: number }[];
-  weaponType: number;
-  tier: number;
-  hue: number;
-  fadeProgress: number; // 0 to 1
+/** A name tag and health bar over an entity (kept, not looked up by name each frame) */
+interface Tag {
+  name: Text | null;
+  bar: Graphics | null;
+  /** What the bar shows now (it's redrawn only when that changes) */
+  barKey: string;
 }
 
-// Fire effect (muzzle flash) - matching original game
-interface FireEffect {
-  x: number;
-  y: number;
-  angle: number;
-  weaponType: string; // 'cannon', 'scatter', 'missile', 'pulse', 'mine', 'mining', 'laser', 'warp'
-  tier: number;
-  hue: number;
-  life: number;
-  maxLife: number;
-  graphic: Graphics;
-}
+/** A jump gate's moving parts */
+interface Gate { outer: Graphics; inner: Graphics; core: Graphics; phase: number; pulse: number }
 
-// Object pool for graphics reuse
-class GraphicsPool {
-  private available: Graphics[] = [];
-  private inUse: Map<number, Graphics> = new Map();
-  
-  acquire(id: number): Graphics {
-    let g = this.available.pop();
-    if (!g) {
-      g = new Graphics();
-    }
-    this.inUse.set(id, g);
-    return g;
-  }
-  
-  release(id: number): Graphics | undefined {
-    const g = this.inUse.get(id);
-    if (g) {
-      g.clear();
-      this.inUse.delete(id);
-      this.available.push(g);
-    }
-    return g;
-  }
-  
-  get(id: number): Graphics | undefined {
-    return this.inUse.get(id);
-  }
-  
-  releaseAll(): void {
-    for (const [id, g] of this.inUse) {
-      g.clear();
-      this.available.push(g);
-    }
-    this.inUse.clear();
-  }
-}
+/** Seconds to fade an entity in as it appears, or out as it goes */
+const FADE = 0.25;
+/** A panned view (middle mouse) keeps your ship at least this fraction of the screen in from every edge */
+const PAN_MARGIN = 0.1;
 
-// Data-driven star layer configuration (matching original game)
-// Each layer: zMin, zMax, minSize, maxSize, baseCount, minZoom threshold
-interface StarLayerConfig {
-  zMin: number;
-  zMax: number;
-  minSize: number;
-  maxSize: number;
-  baseCount: number;
-  minZoom: number;
-  noiseScale: number;
-  noiseSeed: number;
-  noiseThreshold: number;
-}
-
-interface StarData {
-  x: number;
-  y: number;
-  z: number;
-  size: number;
-  hue: number;
-  phase: number;
-  brightness: number;
-}
-
-// Default starfield layers (can be overridden per system)
-const DEFAULT_STAR_LAYERS: StarLayerConfig[] = [
-  { zMin: 400, zMax: 800, minSize: 6.0, maxSize: 10.0, baseCount: 4, minZoom: 0, noiseScale: 0.00008, noiseSeed: 100, noiseThreshold: 0.5 },
-  { zMin: 800, zMax: 1500, minSize: 4.0, maxSize: 7.0, baseCount: 8, minZoom: 0.15, noiseScale: 0.00015, noiseSeed: 200, noiseThreshold: 0.5 },
-  { zMin: 900, zMax: 1500, minSize: 2.5, maxSize: 4.5, baseCount: 10, minZoom: 0.25, noiseScale: 0.0008, noiseSeed: 300, noiseThreshold: 0 },
-  { zMin: 1500, zMax: 2200, minSize: 1.5, maxSize: 3.0, baseCount: 14, minZoom: 0.4, noiseScale: 0.001, noiseSeed: 400, noiseThreshold: 0 },
-  { zMin: 2200, zMax: 3000, minSize: 1.0, maxSize: 2.0, baseCount: 20, minZoom: 0.6, noiseScale: 0.0015, noiseSeed: 500, noiseThreshold: 0 },
-  { zMin: 3000, zMax: 4500, minSize: 0.6, maxSize: 1.2, baseCount: 28, minZoom: 0.8, noiseScale: 0.002, noiseSeed: 600, noiseThreshold: 0 },
-];
-
-// System-specific visual configurations
+// System-specific visual configuration
+// Populated from server 'systemInfo' messages (data-driven via systems.json),
+// with a Sol-like fallback for systems without data.
 interface SystemVisuals {
   starHue: number;          // Base hue for the central star (0-360)
   starRadius: number;       // Size of central star
-  starLayers?: StarLayerConfig[];  // Optional custom star layers
   specialStarChance?: number;      // Chance for special colored stars
   specialStarHue?: number;         // Hue for special stars
   hasNebula?: boolean;
+  /** Hazards here ('darkness' dims the ambient light) */
+  hazards?: string[];
   nebulaHue?: number;
   sunStyle?: string;
   sunStyleParams?: Record<string, number>;
   coronaStyle?: string;
   coronaStyleParams?: Record<string, number>;
+  /** Central body type 'none' (e.g. the proto empty scene): no sun or glow */
+  noCentralBody?: boolean;
+  /** Black holes and pulsars get their own shaders instead of the sun */
+  centralType?: CentralType;
+  centralRadius?: number;
+  centralHue?: number;
+  /** Detail-star mode: full fBM/warp/plasma control (like sandbox detail_sun) */
+  detailStar?: boolean;
+  detailParams?: Record<string, number>;
+  detailColors?: Record<string, string>;
+  /** Starfield shader config (sandbox-style GPU starfield) */
+  starfield?: {
+    starBrightness?: number;
+    twinkleSpeed?: number;
+    twinkleAmount?: number;
+    hueShift?: number;
+    density?: number;
+    starSize?: number;
+    parallaxStrength?: number;
+    baseCell?: number;
+    lodBlendWidth?: number;
+  };
 }
 
-const SYSTEM_VISUALS: Record<string, SystemVisuals> = {
-  'sol': { 
-    starHue: 40,           // Yellow-orange
-    starRadius: 1000,
-    sunStyle: 'granular',
-    coronaStyle: 'plasmaStreams',
-  },
-  'borealis': { 
-    starHue: 200,          // Cyan-blue
-    starRadius: 800,
-    specialStarChance: 0.05,
-    specialStarHue: 240,   // Pure blue special stars
-    sunStyle: 'granular',
-    coronaStyle: 'softGlow',
-  },
-  'nebula_prime': { 
-    starHue: 330,          // Pink-magenta
-    starRadius: 1200,
-    hasNebula: true,
-    nebulaHue: 300,
-    sunStyle: 'flow',
-    coronaStyle: 'plasmaStreams',
-  },
-  'void_sector': { 
-    starHue: 270,          // Purple
-    starRadius: 600,
-    sunStyle: 'flow',
-    coronaStyle: 'softGlow',
-  },
+// Fallback visuals used until the server sends systemInfo
+const DEFAULT_SYSTEM_VISUALS: SystemVisuals = {
+  starHue: 40,
+  starRadius: 1000,
+  sunStyle: 'granular',
+  coronaStyle: 'plasmaStreams',
 };
 
 function buildStyleParams(
@@ -216,6 +182,12 @@ function buildStyleParams(
   return { index, params };
 }
 
+/** A screen-aligned offset (ox, oy) in an entity's turned frame (c, sn: the cos and sin of `up`, the roll that keeps `o` upright) */
+function placeUpright(o: Container, c: number, sn: number, up: number, ox: number, oy: number): void {
+  o.position.set(c * ox - sn * oy, sn * ox + c * oy);
+  o.rotation = up;
+}
+
 export class Renderer {
   private app: Application;
   private state: GameState;
@@ -224,79 +196,140 @@ export class Renderer {
   private worldContainer: Container;
   private backgroundContainer: Container;
   private entityContainer: Container;
+  /** A surface's rock (TerrainView), and the system it's for */
+  private terrainLayer = new Container();
+  private terrainView: TerrainView | null = null;
+  private terrainId: string | null = null;
   private effectContainer: Container;
   private uiContainer: Container;
+  
+  /** Projectile tracers, muzzle flashes and impacts */
+  private weaponFx: WeaponFx;
+  /** Black hole / pulsar central bodies */
+  private centralShaders = new CentralBodyShaders();
+  /** The current system's planets and moons */
+  private planets = new PlanetRenderer();
+  /** Comets, built structures and stillstones */
+  private scenery = new SceneryRenderer();
+  /** Hostile nests (drawn with the scenery) */
+  private nests = new NestRenderer();
+  /** Ways into pockets from this system, drawn as nests (world/pockets.ts entranceNest) */
+  private wayIns: NestData[] = [];
+  /** How brightly a stillstone's veins pulse for the local drive, 0..1 (ShipClient.lodestoneGlow) */
+  lodestoneGlow: ((id: string) => number) | null = null;
+  private scenerySystem = '';
+  /** Rift portal vortex shaders, by entity id */
+  private rifts = new Map<number, RiftShader>();
+  private lootPods = new Map<number, LootPodView>();
+  /** Single-body enemies (data/mobs.json) */
+  private mobs = new Map<number, MobView>();
+  private asteroidSeams = new Map<number, AsteroidSeams>();
+  /** Asteroids just struck (when, how hard): a white flash and a little jolt */
+  private rockHits = new Map<number, { at: number; strength: number }>();
+  private seamTime = 0;
+  /** Station visuals, by entity id */
+  private stations = new Map<number, StationView>();
+  /** Modular ships and debris (drawn by ShipRenderer) */
+  private shipLayer = new Container();
+
+  /** Entities whose body is drawn elsewhere (modular ships): only their name tag and health bar show. */
+  public hiddenEntityIds: Set<number> = new Set();
+  /** Hull radius of those ships (ShipRenderer fills it), so tags sit just outside the hull */
+  public shipRadius = new Map<number, number>();
   
   // Camera
   private cameraX = 0;
   private cameraY = 0;
   private cameraZoom = 1;
-  private targetCameraX = 0;
-  private targetCameraY = 0;
-  
-  // Star field - cached stars per region for performance
-  private starCache: Map<string, StarData[]> = new Map();
-  private starsGraphics: Graphics;
-  private nebulaGraphics: Graphics;
-  private sunGraphics: Graphics;
+  /** The view's roll (cameraView.ts): eases onto this heading in helm, back to north-up (null) otherwise */
+  private cameraAngle = 0;
+  private cameraHeading: number | null = null;
+  /** Where the pilot has dragged the view from their ship (middle mouse), in world units along the screen's axes; it always keeps the ship PAN_MARGIN inside the screen */
+  private pan = { x: 0, y: 0 };
+  private panDrag: number | null = null;
+  private recenterBtn: HTMLButtonElement | null = null;
+  private recenterShown = false;
+  /** Camera catch-up per frame (0..1) */
+  public cameraFollow = 0.1;
+  /** Display settings */
+  public shakeScale = 1;
+  public showDamageNumbers = true;
+  public showNames = true;
   
   // GPU shader renderers for sun and glow
   private sunRenderer: SunRenderer;
   private glowRenderer: GlowRenderer;
   
-  // Starfield constants
-  private readonly STARFIELD_FOCAL = 1000;
-  private readonly STARFIELD_SNAP = 3000;
+  // GPU procedural starfield (sandbox-style)
+  private sky: SkyRenderer;
+  /** A planet's ground and clouds, in place of the sky while you're on one */
+  private surface: SurfaceRenderer;
+  private city: { system: string; view: CityView | null; bastion: BastionView | null } | null = null;
+  /** A surface's daylight (night dims it) */
+  private day = { ambient: [1, 1, 1] as [number, number, number], power: 0 };
+  /** The edge of a surface's map */
+  private surfaceEdge = new Graphics();
+  /** On a surface, ships cast soft shadows on the ground (that's what puts them up in the air) */
+  private shadows = new SpritePool('normal');
+  /** Ships, stations and asteroids lit by the sun, the system's ambient light and every light nearby */
+  readonly lighting: Lighting;
+  /** Asteroid rocks, lit, in batches */
+  private rocks: AsteroidBatch;
+  private lightKey = '';
+  private podLight: [number, number, number] = [1, 1, 1];
+  /** A sun's corona: streamers of plasma reaching out from its edge */
+  private corona: CoronaRaysRenderer;
+  /** Each system's sky, made the first time it's seen */
+  private biomes = new Map<string, SkyBiome>();
   
   // Current system info
   private currentSystemId: string = 'sol';
+  /** Data-driven visuals per system, from server systemInfo messages */
+  private systemVisuals: Map<string, SystemVisuals> = new Map();
   
   // Entity graphics cache
   private entityGraphics: Map<number, Container> = new Map();
-  
-  // Object pools for performance
-  private projectilePool: GraphicsPool = new GraphicsPool();
-  
+  /** Name tags and health bars, by entity id */
+  private tags = new Map<number, Tag>();
+  /** Jump gates, by entity id */
+  private gates = new Map<number, Gate>();
+  /** Entities just made, fading in (id → 0..1) */
+  private fadingIn = new Map<number, number>();
+  /** Entities gone, fading out where they were (then destroyed) */
+  private fadingOut: { id: number; container: Container }[] = [];
+  /** This system's data (looked up once per system, not per frame) */
+  private sys: { id: string; data: (StarSystemData & { visuals?: Record<string, any> }) | undefined } = { id: '', data: undefined };
+  /** The sun's style parameters and the corona's look, made once per system's visuals */
+  private sunLook: { visuals: SystemVisuals | null; id: string; sun: ReturnType<typeof buildStyleParams>; corona: ReturnType<typeof buildStyleParams>; rays: Parameters<CoronaRaysRenderer['update']>[3] | null } | null = null;
+
   // Effects
   private damageNumbers: DamageNumber[] = [];
   private particles: Particle[] = [];
-  private trails: Map<number, { x: number; y: number }[]> = new Map();
-  private dyingTrails: DyingTrail[] = []; // Fading trails from destroyed projectiles
+  private flashes: Flash[] = [];
+  /** Particles and flashes are pooled sprites (no Graphics made and destroyed per spark) */
+  private fxPool = new SpritePool('normal');
+  /** Damage numbers: a bitmap font (digits drawn once), pooled */
+  private numberPool: BitmapText[] = [];
   private tractorBeams: TractorBeam[] = [];
-  private fireEffects: FireEffect[] = []; // Muzzle flash effects
-  private spawnedFireEffectIds: Set<number> = new Set(); // Track which projectiles spawned fire effects
+  /** Tractor beams: pooled streaks and dots */
+  private beamPool = new SpritePool('add');
   
-  // Active laser beams - persists while firing for smooth interpolation
-  private activeLasers: Map<number, {
-    graphic: Graphics;
-    targetEndX: number;
-    targetEndY: number;
-    displayEndX: number;
-    displayEndY: number;
-    collisionDist: number;
-    powerTime: number;
-    hue: number;
-    lastUpdateTime: number;
-    entityId: number;
-    aimAngle: number;
-    range: number;
-  }> = new Map();
-  
-  // Cached laser beam colors (hue=30 orange, avoids hslToRgb per frame)
-  private readonly LASER_COLOR_OUTER = (() => { const [r,g,b] = Renderer.hslToRgbStatic(30,100,60); return (r<<16)|(g<<8)|b; })();
-  private readonly LASER_COLOR_MID = (() => { const [r,g,b] = Renderer.hslToRgbStatic(30,100,80); return (r<<16)|(g<<8)|b; })();
-  
-  // Local laser prediction state
-  private localFireLeft = false;
-  private localFireRight = false;
-  private localTargetAngle = 0;
-
   // Debug asteroid markers (server-provided)
   private debugAsteroidGraphics: Graphics;
   private debugAsteroidMarkers: { x: number; y: number; expiresAt: number }[] = [];
+  private debugDrawn = false;
+  /** Glow over the bright effects (Display settings) */
+  readonly bloom: Bloom;
+  private static fontInstalled = false;
+  /** The minimap redraws at 20 Hz (its dots move a fraction of a pixel a frame) */
+  private minimapAt = 0;
 
   // Death screen
   private deathOverlay: Container | null = null;
+  private deathAt = 0;
+  private killerName: string | undefined;
+  /** A soft dark edge to the screen (reddening when you're hit) */
+  private vignette = new Sprite(vignette());
   
   // Minimap
   private minimapContainer: Container | null = null;
@@ -313,7 +346,8 @@ export class Renderer {
   constructor(app: Application, state: GameState) {
     this.app = app;
     this.state = state;
-    
+    this.initPan();
+
     // Create layer containers
     this.worldContainer = new Container();
     this.backgroundContainer = new Container();
@@ -322,28 +356,60 @@ export class Renderer {
     this.uiContainer = new Container();
     
     this.worldContainer.addChild(this.backgroundContainer);
+    this.worldContainer.addChild(this.shadows.container);
+    // A surface's rock: over the ground and ships' shadows, under everything else
+    this.worldContainer.addChild(this.terrainLayer);
     this.worldContainer.addChild(this.entityContainer);
+    this.lighting = new Lighting(this.worldContainer);
+    this.scenery.lighting = this.lighting;
+    this.nests.lighting = this.lighting;
+    this.rocks = new AsteroidBatch(this.lighting);
+    // Rocks under every other entity
+    this.entityContainer.addChild(this.rocks.container);
+    // Ships draw above stations, gates and other entities
+    this.worldContainer.addChild(this.shipLayer);
     this.worldContainer.addChild(this.effectContainer);
+    this.weaponFx = new WeaponFx(this.effectContainer);
+    this.lighting.addSource((L) => this.collectLights(L));
+    this.effectContainer.addChild(this.fxPool.container);
+    this.effectContainer.addChild(this.beamPool.container);
     
     this.app.stage.addChild(this.worldContainer);
+    // Bloom over the world, under the UI (see Bloom.ts)
+    this.bloom = new Bloom(app);
+    this.bloom.add(this.weaponFx.glowLayer);
+    this.app.stage.addChild(this.bloom.sprite);
     this.app.stage.addChild(this.uiContainer);
-    
-    // Initialize graphics
-    this.nebulaGraphics = new Graphics();
-    this.starsGraphics = new Graphics();
-    this.sunGraphics = new Graphics();
-    this.backgroundContainer.addChild(this.nebulaGraphics);
-    this.backgroundContainer.addChild(this.starsGraphics);
-    // Note: sunGraphics no longer added - replaced by shader renderers
+    // The vignette under the rest of the UI
+    this.uiContainer.addChild(this.vignette);
     
     // Initialize GPU shader renderers for sun and ambient glow
     this.glowRenderer = new GlowRenderer();
     this.glowRenderer.initialize();
     this.backgroundContainer.addChild(this.glowRenderer.getContainer());
     
+    // Solar rays between the glow and the disc
+    this.corona = new CoronaRaysRenderer();
+    this.corona.initialize();
+    this.backgroundContainer.addChild(this.corona.getContainer());
+
     this.sunRenderer = new SunRenderer();
     this.sunRenderer.initialize();
     this.backgroundContainer.addChild(this.sunRenderer.getContainer());
+    this.backgroundContainer.addChild(this.centralShaders.container);
+    this.backgroundContainer.addChild(this.scenery.container);
+    this.backgroundContainer.addChild(this.nests.container);
+    this.backgroundContainer.addChild(this.planets.container);
+
+    // Initialize GPU procedural starfield (sandbox-style)
+    // Added to stage at index 0 (screen-space) so it always fills the viewport
+    this.sky = new SkyRenderer(this.app);
+    this.app.stage.addChildAt(this.sky.container, 0);
+    this.surface = new SurfaceRenderer(this.app);
+    this.app.stage.addChildAt(this.surface.ground, 0);
+    // Clouds over the world (ships fly beneath them), under the bloom and the UI
+    this.app.stage.addChildAt(this.surface.clouds, this.app.stage.getChildIndex(this.worldContainer) + 1);
+    this.backgroundContainer.addChild(this.surfaceEdge);
 
     // Debug asteroid marker layer (above entities, below UI)
     this.debugAsteroidGraphics = new Graphics();
@@ -380,160 +446,47 @@ export class Renderer {
     this.minimapGraphics.mask = mask;
   }
 
-  // Seeded random number generator (mulberry32)
-  private seededRandom(seed: number): () => number {
-    return () => {
-      let t = seed += 0x6D2B79F5;
-      t = Math.imul(t ^ t >>> 15, t | 1);
-      t ^= t + Math.imul(t ^ t >>> 7, t | 61);
-      return ((t ^ t >>> 14) >>> 0) / 4294967296;
-    };
-  }
-  
-  // Simple hash function for region keys
-  private hashRegion(x: number, y: number, seed: number): number {
-    let h = seed;
-    h = Math.imul(h ^ x, 0x9E3779B9);
-    h = Math.imul(h ^ y, 0x85EBCA6B);
-    h = h ^ (h >>> 13);
-    return h >>> 0;
-  }
-  
-  // Hash function matching reference game
-  private hash2(x: number, y: number, seed: number): number {
-    let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(seed, 1442695041);
-    h = Math.imul(h ^ (h >>> 13), 1274126177);
-    h ^= h >>> 16;
-    return (h >>> 0) / 4294967296;
-  }
-  
-  // 2D Simplex noise for starfield density variation (matching reference)
-  private readonly SIMPLEX_F2 = 0.5 * (Math.sqrt(3) - 1);
-  private readonly SIMPLEX_G2 = (3 - Math.sqrt(3)) / 6;
-  private readonly SIMPLEX_GRAD = [[1,1],[-1,1],[1,-1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1]];
-  
-  private simplexNoise2D(x: number, y: number, seed: number = 0): number {
-    const s = (x + y) * this.SIMPLEX_F2;
-    const i = Math.floor(x + s);
-    const j = Math.floor(y + s);
-    const t = (i + j) * this.SIMPLEX_G2;
-    const X0 = i - t;
-    const Y0 = j - t;
-    const x0 = x - X0;
-    const y0 = y - Y0;
-    
-    let i1: number, j1: number;
-    if (x0 > y0) { i1 = 1; j1 = 0; }
-    else { i1 = 0; j1 = 1; }
-    
-    const x1 = x0 - i1 + this.SIMPLEX_G2;
-    const y1 = y0 - j1 + this.SIMPLEX_G2;
-    const x2 = x0 - 1 + 2 * this.SIMPLEX_G2;
-    const y2 = y0 - 1 + 2 * this.SIMPLEX_G2;
-    
-    const perm = (n: number): number => {
-      let h = Math.imul(n, 374761393) ^ Math.imul(seed, 668265263);
-      h = Math.imul(h ^ (h >>> 13), 1274126177);
-      return (h >>> 0) % 8;
-    };
-    
-    const ii = i & 0xff;
-    const jj = j & 0xff;
-    const gi0 = perm(ii + perm(jj));
-    const gi1 = perm(ii + i1 + perm(jj + j1));
-    const gi2 = perm(ii + 1 + perm(jj + 1));
-    
-    let n0 = 0, n1 = 0, n2 = 0;
-    
-    let t0 = 0.5 - x0*x0 - y0*y0;
-    if (t0 >= 0) {
-      t0 *= t0;
-      n0 = t0 * t0 * (this.SIMPLEX_GRAD[gi0][0] * x0 + this.SIMPLEX_GRAD[gi0][1] * y0);
-    }
-    
-    let t1 = 0.5 - x1*x1 - y1*y1;
-    if (t1 >= 0) {
-      t1 *= t1;
-      n1 = t1 * t1 * (this.SIMPLEX_GRAD[gi1][0] * x1 + this.SIMPLEX_GRAD[gi1][1] * y1);
-    }
-    
-    let t2 = 0.5 - x2*x2 - y2*y2;
-    if (t2 >= 0) {
-      t2 *= t2;
-      n2 = t2 * t2 * (this.SIMPLEX_GRAD[gi2][0] * x2 + this.SIMPLEX_GRAD[gi2][1] * y2);
-    }
-    
-    return 70 * (n0 + n1 + n2); // Returns -1 to 1
-  }
-  
-  // Generate stars for a region (cached)
-  private getStarsForRegion(regionX: number, regionY: number, layer: StarLayerConfig): StarData[] {
-    const key = `${regionX},${regionY},${layer.noiseSeed}`;
-    
-    if (this.starCache.has(key)) {
-      return this.starCache.get(key)!;
-    }
-    
-    const stars: StarData[] = [];
-    
-    // Use simplex noise for density variation (matching reference game)
-    const noiseVal = this.simplexNoise2D(regionX * layer.noiseScale * 1000, regionY * layer.noiseScale * 1000, layer.noiseSeed);
-    const noiseNorm = noiseVal * 0.5 + 0.5; // 0 to 1
-    
-    // Skip region if noise below threshold (creates sparse clusters)
-    if (layer.noiseThreshold > 0 && noiseNorm < layer.noiseThreshold) {
-      this.starCache.set(key, stars);
-      return stars;
-    }
-    
-    const noiseFactor = layer.noiseThreshold > 0 
-      ? (noiseNorm - layer.noiseThreshold) / (1 - layer.noiseThreshold) // Remap above threshold
-      : 0.3 + 0.7 * noiseNorm;
-    const starCount = Math.floor(layer.baseCount * noiseFactor);
-    
-    if (starCount <= 0) {
-      this.starCache.set(key, stars);
-      return stars;
-    }
-    
-    // Deterministic RNG for this region+layer (matching reference)
-    const seed = Math.floor(this.hash2(regionX, regionY, layer.noiseSeed + 7919) * 0xffffffff);
-    const rng = this.seededRandom(seed);
-    
-    const systemVisuals = SYSTEM_VISUALS[this.currentSystemId] || SYSTEM_VISUALS['sol'];
-    
-    for (let i = 0; i < starCount; i++) {
-      const rx = (rng() - 0.5) * this.STARFIELD_SNAP;
-      const ry = (rng() - 0.5) * this.STARFIELD_SNAP;
-      const zRand = rng();
-      
-      // Base hue in blue-white range (matching reference: 180-260)
-      let hue = 180 + rng() * 80;
-      
-      // Special star colors for certain systems
-      if (systemVisuals.specialStarChance && rng() < systemVisuals.specialStarChance) {
-        hue = systemVisuals.specialStarHue || hue;
-      }
-      
-      stars.push({
-        x: regionX * this.STARFIELD_SNAP + this.STARFIELD_SNAP * 0.5 + rx,
-        y: regionY * this.STARFIELD_SNAP + this.STARFIELD_SNAP * 0.5 + ry,
-        z: layer.zMin + zRand * (layer.zMax - layer.zMin),
-        size: layer.minSize + rng() * (layer.maxSize - layer.minSize),
-        hue,
-        phase: rng() * Math.PI * 2,
-        brightness: 0.5 + rng() * 0.5,
-      });
-    }
-    
-    this.starCache.set(key, stars);
-    return stars;
-  }
-  
   setCurrentSystem(systemId: string): void {
     this.currentSystemId = systemId;
-    // Clear star cache when changing systems (different star colors)
-    this.starCache.clear();
+  }
+
+  /**
+   * Store data-driven system visuals from a server systemInfo message.
+   * Called when entering a system (or on join).
+   */
+  setSystemInfo(msg: ServerSystemInfoMessage): void {
+    const visuals: SystemVisuals = {
+      starHue: msg.centralBody.hue ?? 40,
+      starRadius: msg.centralBody.radius ?? 1000,
+      sunStyle: msg.centralBody.sunStyle,
+      sunStyleParams: msg.centralBody.sunStyleParams,
+      coronaStyle: msg.centralBody.coronaStyle,
+      coronaStyleParams: msg.centralBody.coronaStyleParams,
+      specialStarChance: msg.visuals.specialStarChance,
+      specialStarHue: msg.visuals.specialStarHue,
+      hasNebula: msg.visuals.hasNebula,
+      hazards: msg.hazards,
+      nebulaHue: msg.visuals.nebulaHue,
+      starfield: {
+        hueShift: msg.visuals.starHueShift,
+      },
+    };
+
+    // Detail-star mode: full fBM/warp/plasma control
+    const cb = msg.centralBody as any;
+    visuals.noCentralBody = cb.type === 'none';
+    if (cb.type === 'black_hole' || cb.type === 'pulsar' || cb.type === 'brown_dwarf') {
+      visuals.centralType = cb.type;
+      visuals.centralRadius = cb.radius ?? 1000;
+      visuals.centralHue = cb.type === 'black_hole' ? (cb.diskHue ?? 30) : cb.type === 'brown_dwarf' ? (cb.hue ?? 14) : (cb.beamHue ?? 190);
+    }
+    if (cb.detailStar) {
+      visuals.detailStar = true;
+      visuals.detailParams = cb.detailParams ?? {};
+      visuals.detailColors = cb.detailColors ?? {};
+    }
+
+    this.systemVisuals.set(msg.systemId, visuals);
   }
 
   update(delta: number): void {
@@ -544,15 +497,20 @@ export class Renderer {
     if (this.state.systemId && this.state.systemId !== this.currentSystemId) {
       this.currentSystemId = this.state.systemId;
     }
+    if (this.sys.id !== this.currentSystemId) {
+      this.sys = { id: this.currentSystemId, data: (systemsData as { systems: StarSystemData[] }).systems.find((s) => s.id === this.currentSystemId) };
+    }
     
     // Update camera to follow player
-    this.updateCamera();
+    this.updateCamera(delta);
     
     // Render background
-    this.renderBackground();
+    this.renderBackground(delta);
+    this.updatePlanets(delta);
     
     // Render entities
-    this.renderEntities();
+    this.renderEntities(delta);
+    this.rocks.update(this.entityGraphics, this.cameraZoom);
 
     // Render debug asteroid markers
     this.renderDebugAsteroidMarkers();
@@ -564,7 +522,71 @@ export class Renderer {
     this.renderDamageNumbers(delta);
     
     // Update minimap
-    this.updateMinimap();
+    if (performance.now() - this.minimapAt >= 50) {
+      this.minimapAt = performance.now();
+      this.updateMinimap();
+    }
+    this.updateScreen();
+    // The 2D overlay canvases, in step with this frame
+    stepOverlays(delta);
+  }
+
+  /** Screen-space extras: the vignette, and the death screen easing in */
+  private updateScreen(): void {
+    const v = this.vignette, w = this.app.screen.width, h = this.app.screen.height;
+    v.width = w;
+    v.height = h;
+    // Subtle on its own; none where a hazard already darkens the edges; red when hit
+    const hz = this.systemVisuals.get(this.currentSystemId)?.hazards;
+    const base = hz && (hz.includes('darkness') || hz.includes('low_visibility')) ? 0 : 0.3;
+    const dmg = screenTint.damage;
+    const red = Math.min(1, dmg / 0.25);
+    v.alpha = Math.max(base, dmg);
+    v.tint = (Math.round(0xc8 * red) << 16) | (Math.round(0x10 * red) << 8);
+    v.visible = v.alpha > 0.01;
+
+    const o = this.deathOverlay;
+    if (o) {
+      const t = Math.min(1, (performance.now() - this.deathAt) / 700);
+      const e = 1 - (1 - t) ** 3;
+      o.alpha = e;
+      const title = o.getChildByLabel('deathTitle');
+      if (title) title.scale.set(1.35 - 0.35 * e);
+    }
+  }
+
+  /** Whether a circle (world units) is on screen (ShipRenderer skips work for ships that aren't) */
+  inView(x: number, y: number, r: number): boolean {
+    const v = this.viewBox();
+    return Math.abs(x - this.cameraX) <= v.hw + r && Math.abs(y - this.cameraY) <= v.hh + r;
+  }
+
+  /** Half-size (world units) of the box round the view, turned or not */
+  private viewBox(): { hw: number; hh: number } {
+    // (Memoised on its inputs: asked once per entity-batch and again per ship, and it only changes with the camera)
+    const m = this.vbMemo, w = this.app.screen.width, h = this.app.screen.height;
+    if (m.w !== w || m.h !== h || m.zoom !== this.cameraZoom || m.angle !== this.cameraAngle) {
+      m.w = w; m.h = h; m.zoom = this.cameraZoom; m.angle = this.cameraAngle;
+      m.box = viewHalfExtents(w, h, m.zoom, m.angle);
+    }
+    return m.box;
+  }
+  private vbMemo = { w: -1, h: -1, zoom: NaN, angle: NaN, box: { hw: 0, hh: 0 } };
+  /** Entities seen this frame (reused: cleared each frame instead of a new Set) */
+  private aliveIds = new Set<number>();
+
+  /** The view's roll: the heading to put up the screen (helm), or null for north-up */
+  setCameraHeading(angle: number | null): void {
+    this.cameraHeading = angle;
+  }
+
+  getCameraAngle(): number {
+    return this.cameraAngle;
+  }
+
+  /** Name tags, health bars and damage numbers: counter-scaled zoomed out (to stay readable), world size zoomed in */
+  get tagScale(): number {
+    return Math.max(1, Math.min(3, 1 / this.cameraZoom));
   }
 
   /**
@@ -585,8 +607,11 @@ export class Renderer {
     this.debugAsteroidMarkers = this.debugAsteroidMarkers.filter(m => m.expiresAt > now);
 
     const g = this.debugAsteroidGraphics;
+    // (Nothing to draw, and nothing drawn last frame: leave it be)
+    if (this.debugAsteroidMarkers.length === 0 && !this.debugDrawn) return;
     g.clear();
-    if (this.debugAsteroidMarkers.length === 0) return;
+    this.debugDrawn = this.debugAsteroidMarkers.length > 0;
+    if (!this.debugDrawn) return;
 
     const size = 20;
     for (const m of this.debugAsteroidMarkers) {
@@ -598,168 +623,373 @@ export class Renderer {
     g.stroke({ color: 0xff3333, width: 2, alpha: 0.9 });
   }
 
-  private updateCamera(): void {
-    const playerPos = this.state.getPlayerPosition();
-    
-    // Smooth camera follow
-    const lerpFactor = 0.1;
-    this.cameraX += (playerPos.x - this.cameraX) * lerpFactor;
-    this.cameraY += (playerPos.y - this.cameraY) * lerpFactor;
-    
-    // Apply camera transform to world container with screen shake
-    const screenCenterX = this.app.screen.width / 2;
-    const screenCenterY = this.app.screen.height / 2;
-    
-    const shakeX = this.state.screenShake.offsetX || 0;
-    const shakeY = this.state.screenShake.offsetY || 0;
-    
-    this.worldContainer.x = screenCenterX - this.cameraX * this.cameraZoom + shakeX;
-    this.worldContainer.y = screenCenterY - this.cameraY * this.cameraZoom + shakeY;
+  setPlanetsVisible(on: boolean): void {
+    this.planets.container.visible = on;
+  }
+
+  setMinimapVisible(on: boolean): void {
+    if (this.minimapContainer) this.minimapContainer.visible = on;
+  }
+
+  private updatePlanets(delta: number): void {
+    const sys = this.sys.data;
+    const { hw, hh } = this.viewBox();
+    const view = { x0: this.cameraX - hw, x1: this.cameraX + hw, y0: this.cameraY - hh, y1: this.cameraY + hh };
+    if (this.scenerySystem !== this.currentSystemId) {
+      this.scenerySystem = this.currentSystemId;
+      this.scenery.set(sys?.comets ?? [], sys?.structures ?? [], sys?.lodestones ?? []);
+      // (and the ways into pockets from here: a boss's nest, drawn as one)
+      this.wayIns = pocketsFrom((systemsData as { systems: StarSystemData[] }).systems, this.currentSystemId).map(entranceNest).filter((n) => n !== null);
+      this.nests.set([...(sys?.nests ?? []), ...this.wayIns], sys?.planets);
+    }
+    this.scenery.update(delta, this.state.getRawServerTick(), view, this.lodestoneGlow ?? undefined);
+    this.nests.update(delta, this.state.getRawServerTick(), view);
+    if (!this.planets.container.visible) return;
+    this.planets.setSystem(this.currentSystemId, sys?.planets ?? [], sys?.centralBody?.type);
+    this.planets.update(delta, this.state.getRawServerTick(), view);
+  }
+
+  /** Admin free camera / watching another pilot: the camera follows this instead of your ship */
+  private cameraTarget: (() => { x: number; y: number } | null) | null = null;
+
+  setCameraTarget(target: (() => { x: number; y: number } | null) | null): void {
+    this.cameraTarget = target;
+  }
+
+  /** Middle mouse drags the view about your ship; a button at the top brings it back */
+  private initPan(): void {
+    const canvas = this.app.canvas as HTMLCanvasElement;
+    // (No browser autoscroll on the middle button)
+    canvas.addEventListener('mousedown', (e) => { if (e.button === 1) e.preventDefault(); });
+    canvas.addEventListener('auxclick', (e) => { if (e.button === 1) e.preventDefault(); });
+    canvas.addEventListener('pointerdown', (e) => {
+      if (e.button !== 1 || this.cameraTarget) return;
+      e.preventDefault();
+      this.panDrag = e.pointerId;
+      canvas.setPointerCapture?.(e.pointerId);
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      if (this.panDrag !== e.pointerId) return;
+      // Grab and drag: the world follows the mouse (clamped to the margin each frame, in updateCamera; along the screen's axes, the view may be turned)
+      this.pan.x -= e.movementX / this.cameraZoom;
+      this.pan.y -= e.movementY / this.cameraZoom;
+    });
+    const end = (e: PointerEvent) => {
+      if (this.panDrag !== e.pointerId) return;
+      this.panDrag = null;
+      canvas.releasePointerCapture?.(e.pointerId);
+    };
+    canvas.addEventListener('pointerup', end);
+    canvas.addEventListener('pointercancel', end);
+    const b = document.createElement('button');
+    b.textContent = '⌖ RECENTER VIEW';
+    b.title = 'Bring the view back onto your ship (middle mouse drags it about)';
+    b.style.cssText = 'position:absolute;top:58px;left:50%;transform:translateX(-50%);z-index:26;display:none;padding:5px 14px;'
+      + 'border-radius:999px;border:1px solid rgba(125,211,252,0.45);background:rgba(8,14,28,0.8);color:#bfe6ff;'
+      + 'font-family:inherit;font-size:11px;font-weight:600;letter-spacing:0.1em;cursor:pointer;';
+    b.addEventListener('click', () => this.recenter());
+    document.body.appendChild(b);
+    this.recenterBtn = b;
+  }
+
+  /** The view back onto your ship */
+  recenter(): void {
+    this.pan.x = 0;
+    this.pan.y = 0;
+  }
+
+  private updateCamera(dt: number): void {
+    const playerPos = this.cameraTarget?.() ?? this.state.getPlayerPosition();
+    // Your own ship (not the admin free camera or someone watched): the view may sit off it, as far as keeps the ship a margin inside every edge
+    const own = !this.cameraTarget;
+    const maxX = Math.max(0, (0.5 - PAN_MARGIN) * this.app.screen.width / this.cameraZoom);
+    const maxY = Math.max(0, (0.5 - PAN_MARGIN) * this.app.screen.height / this.cameraZoom);
+    this.pan.x = Math.max(-maxX, Math.min(maxX, this.pan.x));
+    this.pan.y = Math.max(-maxY, Math.min(maxY, this.pan.y));
+    // The roll: onto the heading in helm, back to north-up out of it (gentle, and the same at any frame rate)
+    // (Not on a free camera or someone else's ship)
+    const heading = own ? this.cameraHeading : null;
+    this.cameraAngle = smoothAngle(this.cameraAngle, heading ?? 0, heading === null ? NORTH_RETURN_RATE : HELM_FOLLOW_RATE, Math.min(0.1, dt), MAX_VIEW_SPIN);
+    if (heading === null && Math.abs(this.cameraAngle) < 1e-4) this.cameraAngle = 0;
+    cameraView.angle = this.cameraAngle;
+    const pw = own ? screenToWorldDir(this.pan.x, this.pan.y, this.cameraAngle) : { x: 0, y: 0 };
+    const tx = playerPos.x + pw.x, ty = playerPos.y + pw.y;
+
+    // Smooth camera follow (tighter mid-jump, or the ship would leave the screen; a slow drift while dead).
+    // cameraFollow is the catch-up per 60 Hz frame, so it's the same at any frame rate.
+    const follow = this.deathOverlay ? this.cameraFollow * 0.12 : this.cameraFollow;
+    const lerpFactor = 1 - Math.pow(1 - Math.min(1, follow), Math.min(0.1, dt) * 60);
+    this.cameraX += (tx - this.cameraX) * lerpFactor;
+    this.cameraY += (ty - this.cameraY) * lerpFactor;
+    if (own) {
+      // However fast the ship goes (a jump's burn), it never slips past the margin (along the screen's axes)
+      const d = worldToScreenDir(this.cameraX - playerPos.x, this.cameraY - playerPos.y, this.cameraAngle);
+      const c = screenToWorldDir(Math.max(-maxX, Math.min(maxX, d.x)), Math.max(-maxY, Math.min(maxY, d.y)), this.cameraAngle);
+      this.cameraX = playerPos.x + c.x;
+      this.cameraY = playerPos.y + c.y;
+    }
+    const off = own && Math.hypot(this.pan.x, this.pan.y) * this.cameraZoom > 24;
+    if (off !== this.recenterShown && this.recenterBtn) {
+      this.recenterShown = off;
+      this.recenterBtn.style.display = off ? 'block' : 'none';
+    }
+
+    // Apply camera transform to world container with screen shake: the camera's point sits at the
+    // screen's centre (plus the shake), and the shake's roll turns about it
+    const shake = this.state.screenShake;
+    this.worldContainer.pivot.set(this.cameraX, this.cameraY);
+    this.worldContainer.x = this.app.screen.width / 2 + (shake.offsetX || 0) * this.shakeScale;
+    this.worldContainer.y = this.app.screen.height / 2 + (shake.offsetY || 0) * this.shakeScale;
+    this.worldContainer.rotation = (shake.rotation || 0) * this.shakeScale - this.cameraAngle;
     this.worldContainer.scale.set(this.cameraZoom);
   }
 
-  private renderBackground(): void {
-    this.starsGraphics.clear();
-    this.nebulaGraphics.clear();
-    this.sunGraphics.clear();
-    
-    const w = this.app.screen.width;
-    const h = this.app.screen.height;
+  private renderBackground(delta: number): void {
     const zoom = this.cameraZoom;
     
-    // Get system visuals
-    const systemVisuals = SYSTEM_VISUALS[this.currentSystemId] || SYSTEM_VISUALS['sol'];
-    const layers = systemVisuals.starLayers || DEFAULT_STAR_LAYERS;
+    // Get system visuals (data-driven from server, with Sol-like fallback)
+    const systemVisuals = this.systemVisuals.get(this.currentSystemId) || DEFAULT_SYSTEM_VISUALS;
     
-    // Calculate grid for star regions
-    const viewW = w / zoom;
-    const viewH = h / zoom;
-    const gridRadius = Math.ceil(Math.max(viewW, viewH) / this.STARFIELD_SNAP) + 1;
-    const snapX = Math.floor(this.cameraX / this.STARFIELD_SNAP);
-    const snapY = Math.floor(this.cameraY / this.STARFIELD_SNAP);
-    const screenCenterX = w / 2;
-    const screenCenterY = h / 2;
-    
-    // Draw each star layer (back to front)
-    for (let layerIdx = layers.length - 1; layerIdx >= 0; layerIdx--) {
-      const layer = layers[layerIdx];
-      
-      // Skip layer if zoom is too low
-      if (zoom < layer.minZoom) continue;
-      
-      // Fade layer in as zoom approaches minZoom
-      const layerAlphaMultiplier = layer.minZoom > 0 
-        ? Math.min(1, (zoom - layer.minZoom) / (layer.minZoom * 0.5 + 0.1))
-        : 1;
-      if (layerAlphaMultiplier <= 0) continue;
-      
-      const depthRatio = (layer.zMin - 400) / (3000 - 400);
-      
-      // Loop through grid regions
-      for (let dy = -gridRadius; dy <= gridRadius; dy++) {
-        for (let dx = -gridRadius; dx <= gridRadius; dx++) {
-          const regionX = snapX + dx;
-          const regionY = snapY + dy;
-          
-          const stars = this.getStarsForRegion(regionX, regionY, layer);
-          
-          for (const star of stars) {
-            // Perspective projection
-            const scale = (this.STARFIELD_FOCAL / star.z) * zoom;
-            const screenX = screenCenterX + (star.x - this.cameraX) * scale;
-            const screenY = screenCenterY + (star.y - this.cameraY) * scale;
-            
-            // Cull off-screen stars
-            const margin = star.size * 10;
-            if (screenX < -margin || screenX > w + margin || 
-                screenY < -margin || screenY > h + margin) continue;
-            
-            // Blink/twinkle effect
-            const blinkSpeed = 0.2 + (1 - depthRatio) * 0.3;
-            const blink = 0.75 + 0.25 * Math.sin(this.time * blinkSpeed + star.phase);
-            
-            // Alpha based on depth and layer visibility
-            const baseAlpha = 0.5 + 0.5 * (1 - depthRatio);
-            const alpha = baseAlpha * blink * layerAlphaMultiplier * star.brightness;
-            
-            if (alpha < 0.05) continue;
-            
-            const starRadius = Math.max(1, star.size * scale * 0.8);
-            
-            // Draw outer glow
-            const glowRadius = starRadius * 4;
-            const glowColor = this.hslToHex(star.hue, 50, 85);
-            this.starsGraphics.circle(screenX, screenY, glowRadius);
-            this.starsGraphics.fill({ color: glowColor, alpha: alpha * 0.2 });
-            
-            // Star core
-            const coreColor = this.hslToHex(star.hue, 25, 92);
-            this.starsGraphics.circle(screenX, screenY, starRadius);
-            this.starsGraphics.fill({ color: coreColor, alpha });
-            
-            // Bright center for larger stars
-            if (starRadius > 2) {
-              this.starsGraphics.circle(screenX, screenY, starRadius * 0.4);
-              this.starsGraphics.fill({ color: 0xffffff, alpha: alpha * 0.8 });
-            }
-          }
-        }
-      }
+    // The sky: this system's biome (made once per system), following the camera
+    let biome = this.biomes.get(this.currentSystemId);
+    if (!biome) {
+      const sys = this.sys.data;
+      const v = sys?.visuals ?? {};
+      biome = skyBiome(this.currentSystemId || 'sol', {
+        biome: v.biome, sector: sys?.sector, position: sys?.position, central: sys?.centralBody?.type,
+        hasNebula: v.hasNebula ?? systemVisuals.hasNebula, nebulaHue: v.nebulaHue ?? systemVisuals.nebulaHue,
+        starHueShift: v.starHueShift, specialStarChance: v.specialStarChance, specialStarHue: v.specialStarHue,
+      });
+      this.biomes.set(this.currentSystemId, biome);
     }
-    
-    // Update and render GPU shader-based sun and glow
-    // Use actual delta time scaled appropriately for animation speed
-    const animDelta = 0.016; // ~60fps equivalent for consistent animation
+    this.sky.setBiome(biome);
+    this.sky.setLens(systemVisuals.centralType === 'black_hole' ? systemVisuals.centralRadius ?? 0 : 0);
+    // On a planet: its ground and clouds instead of the sky, and its city
+    const here = this.sys.data;
+    const surface = here?.surface ?? null;
+    this.surface.setSurface(surface);
+    this.setCity(surface ? here! : null);
+    // Its rock (built once, when you arrive)
+    if (this.terrainId !== this.currentSystemId) {
+      this.terrainId = this.currentSystemId;
+      this.terrainView?.destroy();
+      this.terrainView = null;
+      const t = terrainFor(this.currentSystemId);
+      if (t) { this.terrainView = new TerrainView(t, this.lighting, surface?.kind === 'cavern'); this.terrainLayer.addChild(this.terrainView.container); }
+    }
+    this.terrainView?.update(Math.min(0.1, delta));
+    const lightKey = `${this.currentSystemId}|${this.systemVisuals.has(this.currentSystemId)}`;
+    if (lightKey !== this.lightKey) {
+      this.lightKey = lightKey;
+      this.lightSystem(systemVisuals, biome);
+    }
+    if (surface) {
+      this.sky.container.visible = false;
+      const shake = this.state.screenShake;
+      this.surface.update(Math.min(0.1, delta) * 1000, this.cameraX, this.cameraY, zoom,
+        { x: (shake.offsetX || 0) * this.shakeScale, y: (shake.offsetY || 0) * this.shakeScale, rot: (shake.rotation || 0) * this.shakeScale - this.cameraAngle });
+      this.drawShadows(this.day.power <= 0);
+      // Night falls on the light too (headlights come on by themselves in the dark)
+      const n = this.surface.night;
+      this.lighting.ambient = this.day.ambient.map((a) => a * (1 - 0.86 * n)) as [number, number, number];
+      this.lighting.sun.power = this.day.power * (1 - 0.92 * n);
+      this.shadows.container.alpha = 1 - n * 0.8;
+    } else {
+      this.shadows.begin();
+      this.shadows.end();
+      this.sky.update(Math.min(0.1, delta) * 1000, this.cameraX, this.cameraY, zoom, this.cameraAngle);
+    }
+
+    // Update and render GPU shader-based sun and glow (seconds: the same speed at any frame rate)
+    const animDelta = Math.min(0.1, delta);
     const screenSize = { width: this.app.screen.width, height: this.app.screen.height };
     
     // Position at world origin (0, 0)
     this.glowRenderer.setPosition(0, 0);
     this.sunRenderer.setPosition(0, 0);
+    const plainSun = !systemVisuals.noCentralBody && !systemVisuals.centralType;
+    this.glowRenderer.getContainer().visible = plainSun;
+    this.sunRenderer.getContainer().visible = plainSun;
+    this.corona.getContainer().visible = plainSun;
+    this.centralShaders.set(systemVisuals.centralType ?? null, systemVisuals.centralRadius ?? 1000, systemVisuals.centralHue ?? 30);
+    this.centralShaders.update(animDelta);
     
     // Calculate LOD based on zoom (closer = more detail)
     // Zoom 0.1 = far (LOD 0), Zoom 2+ = close (LOD 1)
     const lodZoom = Math.max(0, Math.min(1, (this.cameraZoom - 0.1) / 1.9));
     this.glowRenderer.setLOD(lodZoom);
+    { const vb = this.viewBox(); this.glowRenderer.setViewHalf(vb.hw, vb.hh); }
     this.sunRenderer.setLOD(lodZoom);
 
-    const sunStyle = buildStyleParams(
-      sunShaderDefs.sunStyles,
-      systemVisuals.sunStyle,
-      systemVisuals.sunStyleParams
-    );
-    const coronaStyle = buildStyleParams(
-      sunShaderDefs.coronaStyles,
-      systemVisuals.coronaStyle,
-      systemVisuals.coronaStyleParams
-    );
-    this.sunRenderer.setSunStyle(sunStyle.index, sunStyle.params);
-    this.sunRenderer.setCoronaStyle(coronaStyle.index, coronaStyle.params);
-    
-    // Update shaders with current system visuals
-    // Pass camera position for parallax effect
-    const glowRadius = systemVisuals.starRadius * 8;
-    this.glowRenderer.update(animDelta, systemVisuals.starHue, systemVisuals.starRadius, glowRadius, this.cameraX, this.cameraY);
-    this.sunRenderer.update(animDelta, systemVisuals.starHue, systemVisuals.starRadius, screenSize);
+    if (systemVisuals.detailStar) {
+      // Detail-star mode: full fBM/warp/plasma control (sandbox detail_sun look)
+      this.updateDetailStar(systemVisuals, animDelta, screenSize);
+    } else {
+      // Standard style-based sun
+      const look = this.lookOf(systemVisuals);
+      this.sunRenderer.setSunStyle(look.sun.index, look.sun.params);
+      this.sunRenderer.setCoronaStyle(look.corona.index, look.corona.params);
+      
+      // Update shaders with current system visuals
+      // Pass camera position for parallax effect
+      const glowRadius = systemVisuals.starRadius * 1.8 + 8000;
+      this.glowRenderer.update(animDelta, systemVisuals.starHue, systemVisuals.starRadius, glowRadius, this.cameraX, this.cameraY);
+      // (The shader draws its disc at discScale × what it's given: give it what makes the disc the star's own radius)
+      this.sunRenderer.update(animDelta, systemVisuals.starHue, systemVisuals.starRadius / this.sunRenderer.discScale, screenSize);
+    }
+    if (plainSun) this.updateCorona(systemVisuals, animDelta);
   }
 
-  private renderEntities(): void {
+  /** The sun's style parameters for these visuals (made when the system or its visuals change, not each frame) */
+  private lookOf(v: SystemVisuals): NonNullable<Renderer['sunLook']> {
+    if (this.sunLook?.visuals !== v || this.sunLook.id !== this.currentSystemId) {
+      this.sunLook = {
+        visuals: v, id: this.currentSystemId, rays: null,
+        sun: buildStyleParams(sunShaderDefs.sunStyles, v.sunStyle, v.sunStyleParams),
+        corona: buildStyleParams(sunShaderDefs.coronaStyles, v.coronaStyle, v.coronaStyleParams),
+      };
+    }
+    return this.sunLook;
+  }
+
+  /**
+   * Configure the sun renderer for detail-star mode.
+   * Mirrors the sandbox's detail_sun element: brownian fBM style with
+   * domain warping, plasma, custom colors, and edge control.
+   */
+  private updateDetailStar(v: SystemVisuals, animDelta: number, screenSize: { width: number; height: number }): void {
+    const p = v.detailParams ?? {};
+    const sp = v.detailColors ?? {};
+    const radius = p.radius ?? v.starRadius;
+    const hue = p.hue ?? v.starHue;
+
+    // Resolve the brownian sun style (same shader used by sandbox detail_sun)
+    const brownianIndex = sunShaderDefs.sunStyles.findIndex(s => s.id === 'brownian');
+    const styleIndex = brownianIndex >= 0 ? brownianIndex : 2;
+    const sunParams = [
+      0.5,                              // coreRadius
+      p.octaves ?? 5.0,                 // octaves (1-8)
+      p.lacunarity ?? 2.0,              // lacunarity (freq multiplier)
+      p.gain ?? 0.5,                    // gain (amplitude multiplier)
+      0.9,                              // unused
+      p.warpAmount ?? 0.4,              // warpAmount for domain warping
+    ];
+    this.sunRenderer.setSunStyle(styleIndex, sunParams);
+
+    // Disable built-in corona — detail stars use the glow renderer for atmosphere
+    this.sunRenderer.setCoronaSize(0);
+    this.sunRenderer.setCoronaIntensity(0);
+
+    this.sunRenderer.setRadius(0.4);
+    this.sunRenderer.setWarpParams(p.warpScale ?? 0.5, 0.0, p.turbulenceMix ?? 0.3);
+    this.sunRenderer.setFbmParams(p.noiseScale ?? 4.0, p.animSpeed ?? 0.15, p.fbmContrast ?? 1.0);
+    this.sunRenderer.setPlasmaParams(p.plasmaIntensity ?? 0.3, p.plasmaScale ?? 3.0, p.plasmaSpeed ?? 1.0);
+    this.sunRenderer.setCenterLight(
+      p.centerDarken ?? 0.5,
+      p.centerHighlight ?? 0.5,
+      p.centerFalloff ?? 1.5,
+      p.centerMidpoint ?? 0.5
+    );
+    this.sunRenderer.setInsideAdjust(p.innerDarkening ?? 0.0, p.whiteBalance ?? 0.0, p.saturation ?? 1.0);
+    this.sunRenderer.setEdgeStyle(p.edgeBrightness ?? 1.0, p.edgeThickness ?? 0.03, p.edgeSharpness ?? 0.5);
+    this.sunRenderer.setEdgeGlow(p.limbDarkening ?? 0.5, 0.0, 0.0);
+    this.sunRenderer.setAtmosphereRadii(0.0, 0.0);
+    this.sunRenderer.setCoronaRadii(0.0, 0.0);
+    this.sunRenderer.setCustomColors(
+      this.hexToRgb(sp.darkColor ?? '#1a0500'),
+      this.hexToRgb(sp.midColor ?? '#661100'),
+      this.hexToRgb(sp.brightColor ?? '#ff6600'),
+      this.hexToRgb(sp.edgeColor ?? '#ffaa33')
+    );
+    this.sunRenderer.setPlasmaColor(this.hexToRgb(sp.plasmaColor ?? '#ff9933'));
+    this.sunRenderer.setCenterColor(this.hexToRgb(sp.centerColor ?? '#ffe6cc'));
+
+    // Atmosphere glow via the glow renderer (like sandbox detail_atmosphere)
+    const glowIntensity = p.glowIntensity ?? 0.6;
+    const glowSize = p.glowSize ?? 0.1;
+    const glowRadius = p.glowRadius ?? radius * 1.8 + 8000;
+    if (glowIntensity > 0) {
+      // Bright glow colors derived from the sun's bright/edge palette
+      const bright = this.hexToRgb(sp.brightColor ?? '#ffaa22');
+      const edge = this.hexToRgb(sp.edgeColor ?? '#ffdd66');
+      this.glowRenderer.update(
+        animDelta, hue, radius, glowRadius,
+        this.cameraX, this.cameraY,
+        glowIntensity, glowSize,
+        // inner color: bright sun tone
+        [Math.min(1, bright[0] * 1.1), Math.min(1, bright[1] * 1.1), Math.min(1, bright[2] * 1.1)],
+        // outer color: softer edge tone
+        [edge[0] * 0.9, edge[1] * 0.85, edge[2] * 0.8],
+      );
+    }
+
+    this.sunRenderer.update(animDelta, hue, radius / this.sunRenderer.discScale, screenSize);
+  }
+
+  /**
+   * The corona's look follows the system: its ray count, reach and motion from
+   * the system's id, its colours from the sun's own palette.
+   */
+  private updateCorona(v: SystemVisuals, dt: number): void {
+    // From the disc's edge (drawn at the star's own radius)
+    const radius = v.detailStar ? v.detailParams?.radius ?? v.starRadius : v.starRadius;
+    const look = this.lookOf(v);
+    if (!look.rays) {
+      // Made once per system: its ray count, reach and motion from its id, its colours from the sun's palette
+      const rnd = mulberry32(hashString(`corona:${this.currentSystemId}`));
+      const c = v.detailColors;
+      look.rays = {
+        intensity: 0.75 + rnd() * 0.3,
+        innerRadiusMul: 0.96,
+        outerRadiusMul: 2.2 + rnd() * 0.9,
+        rayCount: Math.round(7 + rnd() * 8),
+        rayWidth: 0.05 + rnd() * 0.05,
+        rayVariation: 0.3 + rnd() * 0.3,
+        raySpeed: 0.25 + rnd() * 0.3,
+        rayTurbulence: 0.1 + rnd() * 0.25,
+        baseColor: c?.brightColor ? this.hexToRgb(c.brightColor) : this.hslRgb(v.starHue, 0.9, 0.62),
+        tipColor: c?.edgeColor ? this.hexToRgb(c.edgeColor) : this.hslRgb(v.starHue + 12, 0.85, 0.82),
+      };
+    }
+    this.corona.setPosition(0, 0);
+    this.corona.update(dt * 1000, v.starHue, radius, look.rays);
+  }
+
+  private hslRgb(h: number, s: number, l: number): [number, number, number] {
+    const hex = this.hslToHex(h, s * 100, l * 100);
+    return [((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255];
+  }
+
+  /** Parse '#RRGGBB' to [r, g, b] 0-1 floats */
+  private hexToRgb(hex: string): [number, number, number] {
+    const val = hex.startsWith('#') ? hex.slice(1) : hex;
+    const rgb = parseInt(val, 16);
+    if (isNaN(rgb)) return [1, 0, 0];
+    return [
+      ((rgb >> 16) & 0xff) / 255,
+      ((rgb >> 8) & 0xff) / 255,
+      (rgb & 0xff) / 255,
+    ];
+  }
+
+  private renderEntities(dt: number): void {
     // Track which entities are still alive
-    const aliveIds = new Set<number>();
-    
-    // Calculate visible bounds for culling
-    const halfW = (this.app.screen.width / 2) / this.cameraZoom + this.CULL_MARGIN;
-    const halfH = (this.app.screen.height / 2) / this.cameraZoom + this.CULL_MARGIN;
-    const minX = this.cameraX - halfW;
-    const maxX = this.cameraX + halfW;
-    const minY = this.cameraY - halfH;
-    const maxY = this.cameraY + halfH;
-    
+    const aliveIds = this.aliveIds;
+    aliveIds.clear();
+
+    // Calculate visible bounds for culling (each entity's own size is added below, so big ones don't pop at the edge)
+    const vb = this.viewBox();
+    const halfW = vb.hw + this.CULL_MARGIN;
+    const halfH = vb.hh + this.CULL_MARGIN;
+    const k = this.tagScale;
+
     for (const entity of this.state.entities.values()) {
       aliveIds.add(entity.id);
-      
+
       // Culling - skip entities outside viewport (but always render player)
       if (entity.id !== this.state.playerId) {
-        if (entity.x < minX || entity.x > maxX || entity.y < minY || entity.y > maxY) {
+        const r = this.radiusOf(entity);
+        if (Math.abs(entity.x - this.cameraX) > halfW + r || Math.abs(entity.y - this.cameraY) > halfH + r) {
           // Hide if exists but out of view
           const existing = this.entityGraphics.get(entity.id);
           if (existing) {
@@ -768,130 +998,174 @@ export class Renderer {
           continue;
         }
       }
-      
+
       let container = this.entityGraphics.get(entity.id);
-      
+
       if (!container) {
         // Create new graphics for this entity, passing entity data for size/type info
         container = this.createEntityGraphics(entity.type, entity.id, entity.data);
         this.entityGraphics.set(entity.id, container);
         this.entityContainer.addChild(container);
-        
-        // Spawn fire effect for new projectiles (muzzle flash)
-        if (entity.type === EntityType.Projectile && !this.spawnedFireEffectIds.has(entity.id)) {
-          this.spawnedFireEffectIds.add(entity.id);
-          
-          const weaponType = entity.data?.[0] || WeaponType.Cannon;
-          const tier = entity.data?.[1] || 1;
-          const hue = entity.data?.[2] ?? 200;
-          
-          // Map weapon type to string
-          const weaponTypeMap: Record<number, string> = {
-            [WeaponType.Cannon]: 'cannon',
-            [WeaponType.Scatter]: 'scatter',
-            [WeaponType.Missile]: 'missile',
-            [WeaponType.Pulse]: 'pulse',
-            [WeaponType.Mine]: 'mine',
-            [WeaponType.Mining]: 'mining',
-            [WeaponType.Laser]: 'laser',
-          };
-          const weaponTypeStr = weaponTypeMap[weaponType] || 'cannon';
-          
-          // Calculate muzzle position (where projectile spawned from)
-          // Use spawn position if available, otherwise use current position
-          const spawnX = entity.renderX;
-          const spawnY = entity.renderY;
-          
-          this.spawnFireEffect(spawnX, spawnY, entity.renderAngle, weaponTypeStr, tier, hue);
+        // It fades in (asteroids are drawn in batches, which don't fade: they just appear; projectiles and ship bodies are drawn elsewhere)
+        if (entity.type !== EntityType.Projectile && entity.type !== EntityType.ShipBody && entity.type !== EntityType.Asteroid) {
+          container.alpha = 0;
+          this.fadingIn.set(entity.id, 0);
         }
       }
-      
-      // Make visible
+
+      // Make visible (modular ships keep only their name tag and health bar here)
       container.visible = true;
-      
+      if (this.hiddenEntityIds.has(entity.id)) {
+        for (const c of container.children) c.visible = c.label === 'nameTag' || c.label === 'healthBar';
+      }
+      const fade = this.fadingIn.get(entity.id);
+      if (fade !== undefined) {
+        const a = Math.min(1, fade + dt / FADE);
+        container.alpha = a;
+        if (a >= 1) this.fadingIn.delete(entity.id);
+        else this.fadingIn.set(entity.id, a);
+      }
+
       // Update position (use smooth render position)
       container.x = entity.renderX;
       container.y = entity.renderY;
       container.rotation = entity.renderAngle;
-      
-      // Update entity-specific visuals
-      this.updateEntityVisuals(container, entity);
-      
-      // Update nametag (counter-rotate so text stays upright)
-      const nameTag = container.getChildByName('nameTag') as Text;
-      if (nameTag) {
-        // Always counter-rotate to stay upright
-        nameTag.rotation = -entity.renderAngle;
-        if (entity.name) {
-          nameTag.text = entity.name;
-          nameTag.visible = true;
+      if (entity.type === EntityType.Enemy) this.mobs.get(entity.id)?.update(dt, entity.hp);
+
+      if (this.rockHits.size && this.rockHits.has(entity.id)) this.animateRockHit(container, entity.id, entity.data?.[0] || 30);
+
+      // Name tag and health bar: upright, fixed on screen however the ship turns, counter-scaled zoomed out
+      const tag = this.tags.get(entity.id);
+      if (tag) {
+        const r = this.shipRadius.get(entity.id) ?? 20;
+        // (Upright on screen: the view's roll less the ship's)
+        const up = this.cameraAngle - entity.renderAngle;
+        const c = Math.cos(up), sn = Math.sin(up);
+        if (tag.name) {
+          if (entity.name) {
+            if (tag.name.text !== entity.name) tag.name.text = entity.name;
+            tag.name.visible = this.showNames;
+          }
+          tag.name.scale.set(k);
+          placeUpright(tag.name, c, sn, up, 0, r + 14);
+        }
+        if (tag.bar) {
+          this.updateHealthBar(tag, entity);
+          // Drawn from its left edge, 35 × 4 (the shield strip above it)
+          tag.bar.scale.set(k);
+          placeUpright(tag.bar, c, sn, up, -17.5 * k, -(r + 10) - 4 * k);
         }
       }
-      // Also counter-rotate health bar elements (outside name check)
-      const hbBg = container.getChildByName('healthBarBg') as Graphics;
-      const hb = container.getChildByName('healthBar') as Graphics;
-      if (hbBg) hbBg.rotation = -entity.renderAngle;
-      if (hb) hb.rotation = -entity.renderAngle;
     }
-    
-    // Remove dead entities and save their trails for fading
+
+    // Remove dead entities: stations, gates and loot fade out where they were, then go
     for (const [id, container] of this.entityGraphics) {
       if (!aliveIds.has(id)) {
-        // Check if this was a projectile and save trail for fading
-        const trail = this.trails.get(id);
-        if (trail && trail.length > 1) {
-          // Find the entity data for trail color info
-          const dying = this.state.dyingEntities.get(id);
-          if (dying) {
-            const weaponType = dying.entity.data?.[0] || 0;
-            const tier = dying.entity.data?.[1] || 1;
-            const hue = dying.entity.data?.[2] ?? 200;
-            
-            this.dyingTrails.push({
-              points: [...trail],
-              weaponType,
-              tier,
-              hue,
-              fadeProgress: 0
-            });
-          }
-        }
-        
-        this.entityContainer.removeChild(container);
-        container.destroy();
         this.entityGraphics.delete(id);
-        this.trails.delete(id);
-        this.spawnedFireEffectIds.delete(id); // Clean up fire effect tracking
+        this.fadingIn.delete(id);
+        this.tags.delete(id);
+        this.rocks.remove(id);
+        const type = this.typeOf.get(id);
+        this.typeOf.delete(id);
+        if (container.visible && (type === EntityType.Station || type === EntityType.Portal || type === EntityType.DroppedItem)) {
+          this.fadingOut.push({ id, container });
+        } else {
+          this.disposeEntity(id, container);
+        }
       }
+    }
+    let w = 0;
+    for (const f of this.fadingOut) {
+      f.container.alpha -= dt / FADE;
+      if (f.container.alpha <= 0 || this.entityGraphics.has(f.id)) { this.disposeEntity(f.id, f.container); continue; }
+      this.fadingOut[w++] = f;
+    }
+    this.fadingOut.length = w;
+  }
+
+  /** An entity's views gone for good */
+  private disposeEntity(id: number, container: Container): void {
+    // (Its id may be back already, with new views of its own)
+    if (!this.entityGraphics.has(id)) {
+      this.rifts.delete(id);
+      this.gates.delete(id);
+      this.stations.get(id)?.dispose();
+      this.stations.delete(id);
+      this.mobs.delete(id);
+    }
+    this.entityContainer.removeChild(container);
+    container.destroy({ children: true });
+  }
+
+  /** Each entity's type, for when it's gone */
+  private typeOf = new Map<number, EntityType>();
+
+  /** How far an entity reaches from its centre (world units), for culling */
+  private radiusOf(e: { id: number; type: EntityType; data?: number[] }): number {
+    switch (e.type) {
+      // (Its look reaches well past its radius: a citadel's arms nearly four times it)
+      case EntityType.Station: return this.stations.get(e.id)?.reach ?? (e.data?.[8] ?? 200) * 3.8;
+      case EntityType.Asteroid: return (e.data?.[0] || 30) * 1.3;
+      case EntityType.Portal: return e.data?.[1] === 1 ? 600 : 220;
+      case EntityType.Enemy: return 80;
+      // Ships: the hull, and their name tag and health bar
+      default: return (this.shipRadius.get(e.id) ?? 30) + 60;
     }
   }
 
   private createEntityGraphics(type: EntityType, id: number, data?: number[]): Container {
     const container = new Container();
-    
+    this.typeOf.set(id, type);
+
     switch (type) {
       case EntityType.Player:
-        this.createPlayerGraphics(container, id === this.state.playerId);
-        break;
-      case EntityType.Enemy:
-        this.createEnemyGraphics(container);
+        this.createPlayerGraphics(container, id);
         break;
       case EntityType.Asteroid:
         // data[0] = size, data[1] = resourceType
-        this.createAsteroidGraphics(container, id, data?.[0]);
+        {
+          const { rock, seams } = drawAsteroid(container, id, data?.[0] || 30, this.state.entities.get(id)?.composition, this.sys.data?.visuals?.greyseam);
+          const at = this.state.entities.get(id);
+          this.rocks.add(id, rock, at?.x ?? 0, at?.y ?? 0);
+          if (seams) this.asteroidSeams.set(id, seams);
+        }
         break;
       case EntityType.Projectile:
-        // data[0] = weaponType, data[1] = tier  
-        this.createProjectileGraphics(container, data);
+        // Drawn by WeaponFx (tracers placed from the true spawn point)
         break;
-      case EntityType.DroppedItem:
-        this.createDroppedItemGraphics(container);
+      case EntityType.DroppedItem: {
+        // data: [rarity index, kinds of item, item count]
+        const pod = new LootPodView(data?.[0] ?? 0, data?.[2] ?? 1);
+        this.lootPods.set(id, pod);
+        container.addChild(pod.container);
         break;
-      case EntityType.Station:
-        this.createStationGraphics(container);
+      }
+      case EntityType.Station: {
+        // data: [stationId, orbit..., orbitTimeScale, radius, design, turrets, weapon]
+        const view = new StationView(data?.[0] ?? id, data?.[8] ?? 200, this.state.entities.get(id)?.name, this.lighting, data?.[9] ?? 0, data?.[10] ?? 0, data?.[11] ?? 0);
+        this.stations.set(id, view);
+        container.addChild(view.container);
         break;
+      }
       case EntityType.Portal:
-        this.createPortalGraphics(container);
+        // data: [targetSystem, kind (0 jump gate, 1 rift), hue]
+        if (data?.[1] === 1) {
+          const rift = new RiftShader(data[2] ?? 275);
+          this.rifts.set(id, rift);
+          container.addChild(rift.container);
+        } else {
+          this.createPortalGraphics(container, id);
+        }
+        break;
+      case EntityType.Enemy: {
+        // A single-body enemy: data[0] its kind's index in data/mobs.json
+        const view = new MobView(data?.[0] ?? 0);
+        this.mobs.set(id, view);
+        container.addChild(view.container);
+        break;
+      }
+      case EntityType.ShipBody:
+        // Dummies and debris are drawn by the ship renderer
         break;
       default:
         // Default circle
@@ -900,51 +1174,24 @@ export class Renderer {
         g.fill({ color: 0xffffff });
         container.addChild(g);
     }
-    
+
     return container;
   }
 
-  private createPlayerGraphics(container: Container, isLocalPlayer: boolean): void {
-    const g = new Graphics();
-    
-    // Ship body
-    g.moveTo(30, 0);
-    g.lineTo(-15, 15);
-    g.lineTo(-10, 0);
-    g.lineTo(-15, -15);
-    g.closePath();
-    g.fill({ color: isLocalPlayer ? 0x44ff44 : 0x4488ff });
-    g.stroke({ color: 0xffffff, width: 2 });
-    
-    // Engine glow
-    const glow = new Graphics();
-    glow.circle(-15, 0, 8);
-    glow.fill({ color: 0xff8800, alpha: 0.5 });
-    glow.label = 'engineGlow';
-    
-    container.addChild(g);
-    container.addChild(glow);
-    
-    // Health bar (above ship) - old game style: semi-transparent bg, white border, red fill
-    const healthBarBg = new Graphics();
-    healthBarBg.rect(-17, -32, 35, 4);
-    healthBarBg.fill({ color: 0x000000, alpha: 0.5 });
-    healthBarBg.stroke({ color: 0xffffff, width: 1, alpha: 0.3 });
-    healthBarBg.label = 'healthBarBg';
-    healthBarBg.visible = false;  // Only show when damaged
-    
-    const healthBar = new Graphics();
-    healthBar.rect(-17, -32, 35, 4);
-    healthBar.fill({ color: 0xff3333 });
-    healthBar.label = 'healthBar';
-    healthBar.visible = false;  // Only show when damaged
-    
-    container.addChild(healthBarBg);
-    container.addChild(healthBar);
-    
-    // Nametag (below ship)
+  private createPlayerGraphics(container: Container, id: number): void {
+    // The ship itself is drawn by the ship renderer; this container carries
+    // the health bar and name tag
+
+    // Health bar (above ship): drawn from its left edge, so it empties from the right (see updateHealthBar)
+    const bar = new Graphics();
+    bar.label = 'healthBar';
+    bar.visible = false;  // Only show when damaged
+    container.addChild(bar);
+
+    // Nametag (below ship), rastered at 2x so it stays crisp zoomed in
     const nameTag = new Text({
       text: '',
+      resolution: 2,
       style: new TextStyle({
         fontFamily: 'Arial, sans-serif',
         fontSize: 11,
@@ -962,1017 +1209,129 @@ export class Renderer {
     nameTag.position.set(0, 38);
     nameTag.label = 'nameTag';
     container.addChild(nameTag);
+    this.tags.set(id, { name: nameTag, bar, barKey: '' });
   }
 
-  private createEnemyGraphics(container: Container): void {
+  /** A jump gate: a glowing core in two counter-rotating broken rings, breathing slowly (see updateEffects) */
+  private createPortalGraphics(container: Container, id: number): void {
     const g = new Graphics();
-    
-    // Ice sprite - crystalline shape
-    g.moveTo(0, -25);
-    g.lineTo(20, 0);
-    g.lineTo(10, 25);
-    g.lineTo(-10, 25);
-    g.lineTo(-20, 0);
-    g.closePath();
-    g.fill({ color: 0x88ddff, alpha: 0.8 });
-    g.stroke({ color: 0xaaeeff, width: 2 });
-    
-    // Inner glow
-    g.moveTo(0, -12);
-    g.lineTo(10, 0);
-    g.lineTo(5, 12);
-    g.lineTo(-5, 12);
-    g.lineTo(-10, 0);
-    g.closePath();
-    g.fill({ color: 0xaaeeff, alpha: 0.3 });
-    
-    container.addChild(g);
-    
-    // Health bar - old game style: semi-transparent bg, white border, blue fill
-    const healthBarBg = new Graphics();
-    healthBarBg.rect(-20, -40, 40, 5);
-    healthBarBg.fill({ color: 0x000000, alpha: 0.5 });
-    healthBarBg.stroke({ color: 0xffffff, width: 1, alpha: 0.3 });
-    healthBarBg.label = 'healthBarBg';
-    healthBarBg.visible = false;  // Only show when damaged
-    
-    const healthBar = new Graphics();
-    healthBar.rect(-20, -40, 40, 5);
-    healthBar.fill({ color: 0x4488ff });
-    healthBar.label = 'healthBar';
-    healthBar.visible = false;  // Only show when damaged
-    healthBar.label = 'healthBar';
-    
-    container.addChild(healthBarBg);
-    container.addChild(healthBar);
-  }
-
-  private createAsteroidGraphics(container: Container, entityId: number, size?: number): void {
-    const g = new Graphics();
-    g.label = 'asteroidShape';
-    
-    const actualSize = size || 30;
-    
-    // Use the SAME polygon generation as the server (shared from common/).
-    // getAsteroidPolygon(id, cx, cy, size) — pass cx=cy=0 for local-space vertices.
-    const vertices = getAsteroidPolygon(entityId, 0, 0, actualSize);
-    
-    // Draw the polygon
-    g.moveTo(vertices[0].x, vertices[0].y);
-    for (let i = 1; i < vertices.length; i++) {
-      g.lineTo(vertices[i].x, vertices[i].y);
-    }
-    g.closePath();
-    
-    // Determine asteroid color — burn a fresh seeded RNG for cosmetic randomness
-    // (same seed as polygon but the polygon already consumed some values,
-    //  so we re-seed just for color to keep it stable)
-    const colorRng = mulberry32(hashString(`asteroid-color:${entityId}`));
-    const resourceType = Math.floor(colorRng() * 3);
-    const colors = [
-      { fill: 0x666666, stroke: 0x888888 },  // Rock
-      { fill: 0x886644, stroke: 0xaa8866 },  // Iron
-      { fill: 0x4488aa, stroke: 0x66aacc },  // Ice
-    ];
-    const color = colors[resourceType];
-    
-    g.fill({ color: color.fill });
-    g.stroke({ color: color.stroke, width: 2 });
-    
-    // Add some surface detail
-    for (let i = 0; i < 3; i++) {
-      const cx = (colorRng() - 0.5) * actualSize * 1.2;
-      const cy = (colorRng() - 0.5) * actualSize * 1.2;
-      const cr = 3 + colorRng() * 5;
-      g.circle(cx, cy, cr);
-      g.fill({ color: color.fill, alpha: 0.5 });
-    }
-    
-    container.addChild(g);
-    // No scale — vertices are already at the correct size
-  }
-
-  private createProjectileGraphics(container: Container, data?: number[]): void {
-    const g = new Graphics();
-    g.label = 'projectileShape';
-    
-    // data[0] = weaponType, data[1] = tier, data[2] = hue (optional)
-    const weaponType = data?.[0] || WeaponType.Cannon;
-    const tier = data?.[1] || 1;
-    const hue = data?.[2] ?? 200; // Default cyan-ish
-    
-    // Tier-based visual parameters
-    const tierMultiplier = tier === 3 ? 1.3 : tier === 2 ? 1.15 : 1.0;
-    const baseWidth = tier === 3 ? 10 : tier === 2 ? 8 : 6;
-    
-    // Convert hue to hex color
-    const hslToHex = (h: number, s: number, l: number): number => {
-      s /= 100;
-      l /= 100;
-      const a = s * Math.min(l, 1 - l);
-      const f = (n: number) => {
-        const k = (n + h / 30) % 12;
-        return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-      };
-      const r = Math.round(f(0) * 255);
-      const g = Math.round(f(8) * 255);
-      const b = Math.round(f(4) * 255);
-      return (r << 16) | (g << 8) | b;
-    };
-    
-    const mainColor = hslToHex(hue, 100, 75);
-    const brightColor = hslToHex(hue, 100, 88);
-    const glowColor = hslToHex(hue, 100, 60);
-    
-    switch (weaponType) {
-      case WeaponType.Cannon:
-        // Blaster bullet - matching original game style
-        // Outer glow
-        g.circle(0, 0, baseWidth * tierMultiplier);
-        g.fill({ color: glowColor, alpha: 0.25 });
-        // Main body
-        g.circle(0, 0, baseWidth * 0.6 * tierMultiplier);
-        g.fill({ color: mainColor, alpha: 0.9 });
-        // Bright core
-        g.circle(0, 0, baseWidth * 0.3 * tierMultiplier);
-        g.fill({ color: brightColor });
-        // White center
-        g.circle(0, 0, baseWidth * 0.15 * tierMultiplier);
-        g.fill({ color: 0xffffff });
-        break;
-        
-      case WeaponType.Scatter:
-        // Smaller scatter pellets
-        const scatterSize = baseWidth * 0.4 * tierMultiplier;
-        g.circle(0, 0, scatterSize * 1.5);
-        g.fill({ color: glowColor, alpha: 0.3 });
-        g.circle(0, 0, scatterSize);
-        g.fill({ color: mainColor });
-        g.circle(0, 0, scatterSize * 0.4);
-        g.fill({ color: 0xffffff, alpha: 0.8 });
-        break;
-        
-      case WeaponType.Missile:
-        // Missile shape with flame
-        const missileLen = 12 * tierMultiplier;
-        g.moveTo(missileLen, 0);
-        g.lineTo(-missileLen * 0.5, missileLen * 0.4);
-        g.lineTo(-missileLen * 0.3, 0);
-        g.lineTo(-missileLen * 0.5, -missileLen * 0.4);
-        g.closePath();
-        g.fill({ color: 0x666688 });
-        g.stroke({ color: mainColor, width: 1.5 });
-        // Flame trail
-        const flame = new Graphics();
-        flame.label = 'missileFlame';
-        flame.moveTo(-missileLen * 0.3, 0);
-        flame.lineTo(-missileLen, missileLen * 0.35);
-        flame.lineTo(-missileLen * 0.8, 0);
-        flame.lineTo(-missileLen, -missileLen * 0.35);
-        flame.closePath();
-        flame.fill({ color: 0xff6600, alpha: 0.9 });
-        container.addChild(flame);
-        break;
-        
-      case WeaponType.Pulse:
-        // Growing energy pulse
-        const pulseSize = 15 * tierMultiplier;
-        g.circle(0, 0, pulseSize);
-        g.fill({ color: glowColor, alpha: 0.15 });
-        g.circle(0, 0, pulseSize * 0.7);
-        g.fill({ color: mainColor, alpha: 0.35 });
-        g.circle(0, 0, pulseSize * 0.4);
-        g.fill({ color: brightColor, alpha: 0.6 });
-        g.circle(0, 0, pulseSize * 0.2);
-        g.fill({ color: 0xffffff, alpha: 0.9 });
-        break;
-        
-      case WeaponType.Mine:
-        // Mine - spiked ball
-        const mineRadius = 10 * tierMultiplier;
-        const spikes = 8;
-        for (let i = 0; i < spikes; i++) {
-          const angle = (i / spikes) * Math.PI * 2;
-          g.moveTo(Math.cos(angle) * mineRadius * 0.6, Math.sin(angle) * mineRadius * 0.6);
-          g.lineTo(Math.cos(angle) * mineRadius, Math.sin(angle) * mineRadius);
-        }
-        g.stroke({ color: 0xff4444, width: 2.5 });
-        g.circle(0, 0, mineRadius * 0.6);
-        g.fill({ color: 0x331111 });
-        g.stroke({ color: 0xff4444, width: 2 });
-        // Glowing center
-        g.circle(0, 0, mineRadius * 0.25);
-        g.fill({ color: 0xff6666 });
-        break;
-        
-      case WeaponType.Mining:
-        // Mining projectile - golden drill
-        const drillLen = 14 * tierMultiplier;
-        g.moveTo(drillLen, 0);
-        g.lineTo(-drillLen * 0.3, drillLen * 0.4);
-        g.lineTo(-drillLen * 0.3, -drillLen * 0.4);
-        g.closePath();
-        g.fill({ color: 0xffcc00 });
-        g.stroke({ color: 0xff9900, width: 1.5 });
-        // Inner detail
-        g.moveTo(drillLen * 0.5, 0);
-        g.lineTo(-drillLen * 0.1, drillLen * 0.2);
-        g.lineTo(-drillLen * 0.1, -drillLen * 0.2);
-        g.closePath();
-        g.fill({ color: 0xffee88 });
-        break;
-        
-      default:
-        // Default bullet
-        g.circle(0, 0, 5);
-        g.fill({ color: mainColor });
-    }
-    
-    container.addChild(g);
-  }
-
-  private createDroppedItemGraphics(container: Container): void {
-    const g = new Graphics();
-    
-    // Glowing orb
-    g.circle(0, 0, 12);
-    g.fill({ color: 0xffaa00, alpha: 0.8 });
-    g.circle(0, 0, 8);
-    g.fill({ color: 0xffff00 });
-    
-    container.addChild(g);
-  }
-
-  private createStationGraphics(container: Container): void {
-    const g = new Graphics();
-    
-    // Station body
-    g.rect(-100, -100, 200, 200);
-    g.fill({ color: 0x444466 });
-    g.stroke({ color: 0x6666aa, width: 4 });
-    
-    // Docking bay
-    g.rect(-30, 80, 60, 25);
-    g.fill({ color: 0x333344 });
-    
-    // Lights
-    for (let i = 0; i < 4; i++) {
-      const x = -80 + i * 50;
-      g.circle(x, -80, 5);
-      g.fill({ color: 0x44ff44 });
-    }
-    
-    container.addChild(g);
-  }
-
-  private createPortalGraphics(container: Container): void {
-    const g = new Graphics();
-    
-    // Swirling portal effect
     g.circle(0, 0, 150);
     g.fill({ color: 0x4400aa, alpha: 0.3 });
     g.circle(0, 0, 100);
     g.fill({ color: 0x6600cc, alpha: 0.5 });
-    g.circle(0, 0, 50);
-    g.fill({ color: 0x8800ff, alpha: 0.7 });
-    g.circle(0, 0, 20);
-    g.fill({ color: 0xffffff });
-    
     container.addChild(g);
+
+    // Rings broken into arcs, so their turning shows
+    const arcs = (r: number, n: number, gap: number, color: number, width: number, alpha: number) => {
+      const ring = new Graphics();
+      for (let i = 0; i < n; i++) {
+        const a0 = (i / n) * Math.PI * 2, a1 = a0 + (Math.PI * 2 / n) * (1 - gap);
+        ring.moveTo(Math.cos(a0) * r, Math.sin(a0) * r).arc(0, 0, r, a0, a1);
+      }
+      ring.stroke({ color, width, alpha });
+      ring.blendMode = 'add';
+      container.addChild(ring);
+      return ring;
+    };
+    const outer = arcs(138, 6, 0.28, 0xa98bff, 6, 0.65);
+    const inner = arcs(84, 4, 0.35, 0xc9b6ff, 4, 0.7);
+
+    const core = new Graphics();
+    core.circle(0, 0, 50);
+    core.fill({ color: 0x8800ff, alpha: 0.7 });
+    core.circle(0, 0, 20);
+    core.fill({ color: 0xffffff });
+    container.addChild(core);
+    this.gates.set(id, { outer, inner, core, phase: (id * 1.618) % (Math.PI * 2), pulse: 1 });
   }
 
-  private updateEntityVisuals(container: Container, entity: any): void {
-    // Update health bars - only show when damaged (old game style)
-    const healthBar = container.getChildByName('healthBar') as Graphics;
-    const healthBarBg = container.getChildByName('healthBarBg') as Graphics;
-    if (healthBar && entity.hp !== undefined && entity.maxHp) {
-      const healthPercent = entity.hp / entity.maxHp;
-      const isDamaged = healthPercent < 1.0;
-      
-      healthBar.visible = isDamaged;
-      if (healthBarBg) healthBarBg.visible = isDamaged;
-      
-      if (isDamaged) {
-        healthBar.scale.x = healthPercent;
-      }
-    }
-    
-    // Update engine glow for players
-    const engineGlow = container.getChildByName('engineGlow') as Graphics;
-    if (engineGlow) {
-      const speed = Math.sqrt(entity.vx * entity.vx + entity.vy * entity.vy);
-      engineGlow.alpha = Math.min(1, speed / 10) * 0.8;
-    }
-    
-    // Update projectile trails and effects
-    if (entity.type === EntityType.Projectile) {
-      let trail = this.trails.get(entity.id);
-      if (!trail) {
-        trail = [];
-        this.trails.set(entity.id, trail);
-      }
-      
-      trail.push({ x: entity.renderX, y: entity.renderY });
-      
-      // Trail length depends on weapon type
-      const weaponType = entity.data?.[0] || WeaponType.Cannon;
-      const maxTrailLength = this.getTrailLength(weaponType);
-      
-      while (trail.length > maxTrailLength) trail.shift();
-      
-      // Animate missile flame
-      const flame = container.getChildByName('missileFlame') as Graphics;
-      if (flame) {
-        const flicker = 0.6 + Math.random() * 0.4;
-        flame.alpha = flicker;
-      }
-    }
-    
-    // Rotate projectiles to face movement direction
-    if (entity.type === EntityType.Projectile && entity.vx !== undefined && entity.vy !== undefined) {
-      const speed = Math.sqrt(entity.vx * entity.vx + entity.vy * entity.vy);
-      if (speed > 0.1) {
-        container.rotation = Math.atan2(entity.vy, entity.vx);
-      }
-    }
-  }
-  
-  private getTrailLength(weaponType: number): number {
-    // Trail lengths - Cannon/blaster 3x longer for better visibility
-    switch (weaponType) {
-      case WeaponType.Cannon: return 60;    // 3x longer (was 20)
-      case WeaponType.Scatter: return 36;   // 3x longer (was 12)
-      case WeaponType.Missile: return 25;
-      case WeaponType.Pulse: return 18;
-      case WeaponType.Mine: return 5;
-      case WeaponType.Mining: return 15;
-      default: return 60;
-    }
+  /** A pilot's health bar and shield strip, redrawn only when what it shows changes; shown once damaged */
+  private updateHealthBar(tag: Tag, entity: { hp: number; maxHp: number; data?: number[] }): void {
+    const bar = tag.bar!;
+    if (entity.hp === undefined || !entity.maxHp) return;
+    const f = Math.max(0, Math.min(1, entity.hp / entity.maxHp));
+    // Shield (data[4], 0..100): a strip over the bar while it's partly down
+    const sh = Math.max(0, Math.min(1, (entity.data?.[4] ?? 0) / 100));
+    const show = f < 1 || (sh > 0 && sh < 1);
+    bar.visible = show;
+    if (!show) return;
+    const key = `${f.toFixed(3)}|${sh.toFixed(2)}`;
+    if (key === tag.barKey) return;
+    tag.barKey = key;
+    const w = 35;
+    bar.clear();
+    bar.rect(-0.5, -0.5, w + 1, 5).fill({ color: 0x000000, alpha: 0.5 }).stroke({ color: 0xffffff, width: 1, alpha: 0.3 });
+    // Red-orange, amber below half, deep red below a quarter (as the hostiles' bars)
+    bar.rect(0, 0, w * f, 4).fill({ color: f > 0.5 ? 0xff6b5a : f > 0.25 ? 0xffa94d : 0xff3b3b });
+    if (sh > 0) bar.rect(0, -3, w * sh, 2).fill({ color: 0x7dd3fc });
   }
 
   private updateEffects(delta: number): void {
-    // Update particles
-    for (let i = this.particles.length - 1; i >= 0; i--) {
-      const p = this.particles[i] as any;
+    // Particles and flashes: pooled sprites, moved and faded
+    const pool = this.fxPool;
+    pool.begin();
+    let w = 0;
+    for (const p of this.particles) {
       p.x += p.vx * delta * 60;
       p.y += p.vy * delta * 60;
       p.life -= delta;
-      
-      // Handle rotation for debris
-      if (p.rotSpeed) {
-        p.graphic.rotation += p.rotSpeed * delta;
-      }
-      
-      if (p.life <= 0) {
-        this.effectContainer.removeChild(p.graphic);
-        p.graphic.destroy();
-        this.particles.splice(i, 1);
-      } else {
-        p.graphic.x = p.x;
-        p.graphic.y = p.y;
-        p.graphic.alpha = p.life / p.maxLife;
-        p.graphic.scale.set(p.life / p.maxLife * p.size);
-      }
+      if (p.life <= 0) continue;
+      p.rot += p.rotSpeed * delta;
+      const k = p.life / p.maxLife;
+      const sp = pool.take(p.tex, p.x, p.y, 0.5, 0.5, p.color, p.alpha * k);
+      sp.scale.set(k * p.size * (p.radius * 2) / DOT_SIZE);
+      sp.rotation = p.rot;
+      this.particles[w++] = p;
     }
-    
-    // Update dying trails fade
-    this.updateDyingTrails(delta);
-    
+    this.particles.length = w;
+    w = 0;
+    for (const f of this.flashes) {
+      f.life += delta;
+      if (f.life >= f.max) continue;
+      const t = f.life / f.max;
+      const sp = pool.take(f.tex, f.x, f.y, 0.5, 0.5, f.color, f.alpha * (1 - t));
+      sp.scale.set((f.radius * (1 + f.grow * t) * 2) / DOT_SIZE);
+      this.flashes[w++] = f;
+    }
+    this.flashes.length = w;
+    pool.end();
+
     // Update tractor beam animations
     this.updateTractorBeams(delta);
-    
-    // Client-side laser prediction for local player (runs before updateActiveLasers)
-    this.updateLocalLaserPrediction();
-    
-    // All players' lasers from server snapshot data (aim angle + hit distance)
-    this.updateSnapshotLasers();
-    
-    // Update active laser beams (fade out when not receiving updates)
-    this.updateActiveLasers();
-    
-    // Update and render fire effects (muzzle flash)
-    this.updateFireEffects(delta);
-    
-    // Render projectile trails
-    this.renderTrails();
-  }
-  
-  /** Update and remove expired dying trails */
-  private updateDyingTrails(delta: number): void {
-    const TRAIL_FADE_SPEED = 3.0; // Fade out over ~0.33 seconds
-    
-    for (let i = this.dyingTrails.length - 1; i >= 0; i--) {
-      this.dyingTrails[i].fadeProgress += delta * TRAIL_FADE_SPEED;
-      
-      if (this.dyingTrails[i].fadeProgress >= 1.0) {
-        this.dyingTrails.splice(i, 1);
-      }
+
+    for (const rift of this.rifts.values()) rift.update(delta);
+    // Jump gates: the rings turn slowly against each other and the whole gate breathes (its light with it, see collectLights)
+    for (const gate of this.gates.values()) {
+      gate.pulse = 0.82 + 0.18 * Math.sin(this.time * 1.3 + gate.phase);
+      gate.outer.rotation = this.time * 0.12 + gate.phase;
+      gate.inner.rotation = -this.time * 0.2 - gate.phase;
+      gate.outer.alpha = gate.pulse;
+      gate.inner.alpha = 0.6 + 0.4 * Math.sin(this.time * 1.3 + gate.phase + 0.8);
+      gate.core.scale.set(0.94 + 0.06 * gate.pulse);
     }
-  }
-  
-  /** Update and render fire effects (muzzle flash) - matching original game */
-  private updateFireEffects(delta: number): void {
-    for (let i = this.fireEffects.length - 1; i >= 0; i--) {
-      const fx = this.fireEffects[i];
-      fx.life += delta * 60; // Convert to frames (60 fps)
-      
-      if (fx.life >= fx.maxLife) {
-        // Remove effect
-        this.effectContainer.removeChild(fx.graphic);
-        fx.graphic.destroy();
-        this.fireEffects.splice(i, 1);
-      } else {
-        // Redraw with updated fade
-        this.drawFireEffect(fx);
-      }
+    this.seamTime += delta;
+    for (const [id, s] of this.asteroidSeams) {
+      if (!this.entityGraphics.has(id)) { this.asteroidSeams.delete(id); continue; }
+      s.glow.alpha = 0.55 + 0.45 * Math.sin(this.seamTime * 2.2 + s.phase);
     }
-  }
-  
-  /** Draw a single fire effect frame - matching original game's FireEffect.draw() */
-  private drawFireEffect(fx: FireEffect): void {
-    const g = fx.graphic;
-    g.clear();
-    
-    const n = fx.life / fx.maxLife;
-    const fade = 1 - n;
-    const tier = fx.tier;
-    const hue = fx.hue;
-    
-    // Apply position and rotation
-    g.x = fx.x;
-    g.y = fx.y;
-    g.rotation = fx.angle;
-    
-    // Use additive blending for glow
-    g.blendMode = 'add';
-    
-    if (fx.weaponType === 'cannon') {
-      const len = 16 + tier * 4;
-      const width = 6 + tier * 2;
-      
-      // Main flash triangle
-      g.poly([0, -width * 0.6, len, 0, 0, width * 0.6]);
-      g.fill({ color: this.hslToHex(hue, 90, 65), alpha: 0.7 * fade });
-      
-      // Inner ring
-      g.circle(0, 0, 6 + tier * 2);
-      g.stroke({ color: this.hslToHex((hue + 40) % 360, 90, 80), width: 1.5, alpha: 0.6 * fade });
-      
-      // Tier 2+: Outer ring
-      if (tier >= 2) {
-        g.circle(0, 0, 12 + tier * 3);
-        g.stroke({ color: this.hslToHex((hue + 80) % 360, 100, 85), width: 2, alpha: 0.5 * fade });
-      }
-      
-      // Tier 3: Radial lines
-      if (tier >= 3) {
-        for (let i = 0; i < 6; i++) {
-          const ang = (i / 6) * Math.PI * 2;
-          g.moveTo(Math.cos(ang) * 4, Math.sin(ang) * 4);
-          g.lineTo(Math.cos(ang) * 14, Math.sin(ang) * 14);
-          g.stroke({ color: this.hslToHex((hue + 120) % 360, 100, 90), width: 1.4, alpha: 0.45 * fade });
-        }
-      }
-      
-      // Random spark lines
-      for (let i = 0; i < 3 + tier; i++) {
-        const ang = (Math.random() - 0.5) * 0.7;
-        const sLen = 8 + Math.random() * 10;
-        g.moveTo(0, 0);
-        g.lineTo(Math.cos(ang) * sLen, Math.sin(ang) * sLen);
-        g.stroke({ color: this.hslToHex((hue + 20) % 360, 100, 85), width: 1, alpha: 0.35 * fade });
-      }
-      
-    } else if (fx.weaponType === 'scatter') {
-      const len = 12 + tier * 3;
-      const spread = 0.6 + tier * 0.1;
-      
-      // Fan shape
-      g.poly([0, 0, len, -len * spread, len * 1.1, 0, len, len * spread]);
-      g.fill({ color: this.hslToHex(hue, 95, 70), alpha: 0.6 * fade });
-      
-      // Center ring
-      g.circle(0, 0, 8 + tier * 2);
-      g.stroke({ color: this.hslToHex((hue + 30) % 360, 100, 85), width: 1.2, alpha: 0.5 * fade });
-      
-      // Tier 2+: spark lines
-      if (tier >= 2) {
-        for (let i = 0; i < 4 + tier; i++) {
-          const ang = (Math.random() - 0.5) * 1.2;
-          const sLen = 10 + Math.random() * 8;
-          g.moveTo(0, 0);
-          g.lineTo(Math.cos(ang) * sLen, Math.sin(ang) * sLen);
-          g.stroke({ color: this.hslToHex((hue + 60) % 360, 100, 85), width: 1, alpha: 0.45 * fade });
-        }
-      }
-      
-      // Tier 3: Large outer ring
-      if (tier >= 3) {
-        g.circle(0, 0, 16);
-        g.stroke({ color: this.hslToHex((hue + 120) % 360, 100, 90), width: 2.5, alpha: 0.4 * fade });
-      }
-      
-      // Random small sparks
-      for (let i = 0; i < 5 + tier; i++) {
-        const ang = (Math.random() - 0.5) * 1.6;
-        const sLen = 6 + Math.random() * 6;
-        g.moveTo(0, 0);
-        g.lineTo(Math.cos(ang) * sLen, Math.sin(ang) * sLen);
-        g.stroke({ color: this.hslToHex((hue + 90) % 360, 100, 88), width: 0.9, alpha: 0.35 * fade });
-      }
-      
-    } else if (fx.weaponType === 'pulse') {
-      const len = 16 + tier * 5;
-      
-      // Center orb
-      g.circle(0, 0, 8 + tier * 2.5);
-      g.fill({ color: this.hslToHex(hue, 95, 70), alpha: 0.65 * fade });
-      
-      // Outer ring
-      g.circle(0, 0, 14 + tier * 3.5);
-      g.stroke({ color: this.hslToHex((hue + 40) % 360, 100, 85), width: 2.2, alpha: 0.55 * fade });
-      
-      // Spark lines
-      for (let i = 0; i < 5 + tier; i++) {
-        const ang = (Math.random() - 0.5) * 1.2;
-        const sLen = 8 + Math.random() * 10;
-        g.moveTo(0, 0);
-        g.lineTo(Math.cos(ang) * sLen, Math.sin(ang) * sLen);
-        g.stroke({ color: this.hslToHex((hue + 80) % 360, 100, 88), width: 1.2, alpha: 0.4 * fade });
-      }
-      
-      // Directional flash
-      g.moveTo(-4, -6);
-      g.lineTo(len, 0);
-      g.lineTo(-4, 6);
-      g.stroke({ color: this.hslToHex((hue + 140) % 360, 100, 90), width: 1.6, alpha: 0.35 * fade });
-      
-    } else if (fx.weaponType === 'mine') {
-      const size = 10 + tier * 3;
-      
-      // Center
-      g.circle(0, 0, size);
-      g.fill({ color: this.hslToHex(hue, 70, 45), alpha: 0.5 * fade });
-      
-      // Warning pulse ring
-      g.circle(0, 0, size * 1.5 + n * 10);
-      g.stroke({ color: 0xff3333, width: 2, alpha: 0.6 * fade });
-      
-      // Deploy lines
-      for (let i = 0; i < 4; i++) {
-        const ang = (i / 4) * Math.PI * 2 + Math.PI / 4;
-        g.moveTo(Math.cos(ang) * size * 0.5, Math.sin(ang) * size * 0.5);
-        g.lineTo(Math.cos(ang) * size * 2, Math.sin(ang) * size * 2);
-        g.stroke({ color: this.hslToHex(hue, 80, 70), width: 1.5, alpha: 0.4 * fade });
-      }
-      
-      if (tier >= 2) {
-        g.circle(0, 0, size * 2.2);
-        g.stroke({ color: this.hslToHex((hue + 60) % 360, 90, 75), width: 1.4, alpha: 0.35 * fade });
-      }
-      
-      if (tier >= 3) {
-        g.circle(0, 0, 4);
-        g.fill({ color: 0xff4444, alpha: 0.5 * fade });
-      }
-      
-    } else if (fx.weaponType === 'mining') {
-      const len = 14 + tier * 4;
-      
-      // Main beam line
-      g.moveTo(0, 0);
-      g.lineTo(len, 0);
-      g.stroke({ color: this.hslToHex((hue + 80) % 360, 85, 70), width: 2.2, alpha: 0.6 * fade });
-      
-      // Ring
-      g.circle(0, 0, 10 + tier * 3);
-      g.stroke({ color: this.hslToHex((hue + 30) % 360, 90, 80), width: 1.2, alpha: 0.35 * fade });
-      
-      // Spark lines
-      for (let i = 0; i < 4 + tier; i++) {
-        const ang = (Math.random() - 0.5) * 1.4;
-        const sLen = 8 + Math.random() * 8;
-        g.moveTo(0, 0);
-        g.lineTo(Math.cos(ang) * sLen, Math.sin(ang) * sLen);
-        g.stroke({ color: this.hslToHex((hue + 120) % 360, 90, 80), width: 1.4, alpha: 0.45 * fade });
-      }
-      
-      if (tier >= 2) {
-        g.moveTo(4, -6);
-        g.lineTo(4, 6);
-        g.stroke({ color: this.hslToHex((hue + 40) % 360, 100, 85), width: 1.6, alpha: 0.4 * fade });
-      }
-      
-      if (tier >= 3) {
-        g.poly([8, -8, 16, 0, 8, 8]);
-        g.stroke({ color: this.hslToHex((hue + 160) % 360, 100, 90), width: 2, alpha: 0.45 * fade });
-      }
-      
-    } else if (fx.weaponType === 'missile') {
-      const flareLen = 18 + tier * 6;
-      
-      // Exhaust flare (pointing backward)
-      g.poly([-flareLen, -5, 0, 0, -flareLen, 5]);
-      g.fill({ color: this.hslToHex((hue + 10) % 360, 95, 65), alpha: 0.7 * fade });
-      
-      // Exhaust particles
-      for (let i = 0; i < 3 + tier; i++) {
-        const ex = -flareLen * (0.6 + Math.random() * 0.4);
-        const ey = (Math.random() - 0.5) * 8;
-        g.circle(ex, ey, 2 + Math.random() * 2);
-        g.fill({ color: this.hslToHex((hue + 20) % 360, 100, 75), alpha: 0.35 * fade });
-      }
-      
-      // Center glow ring
-      g.circle(-2, 0, 6 + tier * 2);
-      g.stroke({ color: this.hslToHex((hue + 60) % 360, 100, 85), width: 2, alpha: 0.5 * fade });
-      
-      if (tier >= 2) {
-        g.moveTo(-flareLen * 0.8, -8);
-        g.lineTo(-flareLen * 0.2, 0);
-        g.lineTo(-flareLen * 0.8, 8);
-        g.stroke({ color: this.hslToHex((hue + 100) % 360, 100, 88), width: 1.4, alpha: 0.4 * fade });
-      }
-      
-      if (tier >= 3) {
-        g.circle(2, 0, 14);
-        g.stroke({ color: this.hslToHex((hue + 160) % 360, 100, 90), width: 2.4, alpha: 0.45 * fade });
-      }
-      
-    } else if (fx.weaponType === 'laser') {
-      // Central glow
-      g.circle(0, 0, 6 + tier * 2);
-      g.fill({ color: this.hslToHex((hue + 10) % 360, 100, 85), alpha: 0.7 * fade });
-      
-      // Directional flash
-      g.moveTo(0, -2);
-      g.lineTo(22 + tier * 6, 0);
-      g.lineTo(0, 2);
-      g.stroke({ color: this.hslToHex((hue + 40) % 360, 100, 90), width: 2, alpha: 0.5 * fade });
-      
-      if (tier >= 2) {
-        g.circle(0, 0, 12 + tier * 2);
-        g.stroke({ color: this.hslToHex((hue + 80) % 360, 100, 90), width: 1.6, alpha: 0.35 * fade });
-      }
-      
-      if (tier >= 3) {
-        for (let i = 0; i < 5; i++) {
-          const ang = (i / 5) * Math.PI * 2;
-          g.moveTo(Math.cos(ang) * 6, Math.sin(ang) * 6);
-          g.lineTo(Math.cos(ang) * 16, Math.sin(ang) * 16);
-          g.stroke({ color: this.hslToHex((hue + 140) % 360, 100, 92), width: 1.4, alpha: 0.4 * fade });
-        }
-      }
-      
-      // X pattern
-      g.moveTo(-4, -4);
-      g.lineTo(4, 4);
-      g.moveTo(-4, 4);
-      g.lineTo(4, -4);
-      g.stroke({ color: this.hslToHex((hue + 200) % 360, 100, 88), width: 1.2, alpha: 0.3 * fade });
-      
-    } else if (fx.weaponType === 'warp') {
-      // Warp gun fire effect - triplet of expanding orbs
-      for (let i = 0; i < 3; i++) {
-        const spread = Math.PI / 4;
-        const ang = (i - 1) * spread;
-        const dist = 10 + n * 20;
-        const ox = Math.cos(ang) * dist;
-        const oy = Math.sin(ang) * dist;
-        
-        const orbSize = 4 + n * 12;
-        g.circle(ox, oy, orbSize);
-        g.fill({ color: this.hslToHex(hue, 90, 60), alpha: 0.7 * fade });
-        
-        g.circle(ox, oy, orbSize * 1.5);
-        g.stroke({ color: 0xff4444, width: 2, alpha: 0.5 * fade });
-      }
-      
-      // Central flash
-      g.circle(0, 0, 6 * (1 - n));
-      g.fill({ color: this.hslToHex(hue, 100, 85), alpha: 0.8 * fade });
-      
-      // Warning pulse
-      g.circle(0, 0, 20 + n * 30);
-      g.stroke({ color: 0xff3333, width: 1.5, alpha: 0.4 * fade });
+    for (const [id, pod] of this.lootPods) {
+      const c = this.entityGraphics.get(id);
+      if (!c) { this.lootPods.delete(id); continue; }
+      pod.update(delta);
+      if (c.visible) pod.light(this.lighting.levelAt(c.x, c.y, this.podLight));
     }
-    
-    // Burst particles around all effects
-    const burstCount = fx.weaponType === 'laser' ? 4
-      : fx.weaponType === 'missile' ? 5
-      : fx.weaponType === 'mining' ? 4
-      : fx.weaponType === 'scatter' ? 6
-      : fx.weaponType === 'pulse' ? 6
-      : fx.weaponType === 'mine' ? 5
-      : fx.weaponType === 'warp' ? 6
-      : 4;
-    
-    for (let i = 0; i < burstCount; i++) {
-      const ang = (i / burstCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
-      const r = 6 + Math.random() * 10 + tier * 2;
-      g.circle(Math.cos(ang) * r, Math.sin(ang) * r, 1.6 + Math.random() * 1.6);
-      g.fill({ color: this.hslToHex((hue + i * 18) % 360, 100, 70), alpha: 0.35 * fade });
+    const me = this.state.entities.get(this.state.playerId);
+    for (const [id, station] of this.stations) {
+      const e = this.state.entities.get(id);
+      station.update(delta, me && e ? Math.hypot(e.renderX - me.renderX, e.renderY - me.renderY) : Infinity,
+        e ? { x: e.renderX, y: e.renderY } : undefined, this.entityAt);
     }
-  }
-  
-  /** Spawn a fire effect (muzzle flash) - matching original game's spawnFireEffect */
-  spawnFireEffect(x: number, y: number, angle: number, weaponType: string, tier: number, hue: number): void {
-    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-    
-    const maxLife = weaponType === 'laser' ? 10
-      : weaponType === 'missile' ? 14
-      : weaponType === 'pulse' ? 14
-      : weaponType === 'mine' ? 16
-      : 12;
-    
-    const g = new Graphics();
-    this.effectContainer.addChild(g);
-    
-    this.fireEffects.push({
-      x,
-      y,
-      angle,
-      weaponType,
-      tier: tier || 1,
-      hue: Number.isFinite(hue) ? hue : 200,
-      life: 0,
-      maxLife,
-      graphic: g,
-    });
-  }
-  
-  private renderTrails(): void {
-    // Find existing trail graphics or create container
-    let trailGraphics = this.effectContainer.getChildByName('trailLayer') as Graphics;
-    if (!trailGraphics) {
-      trailGraphics = new Graphics();
-      trailGraphics.label = 'trailLayer';
-      this.effectContainer.addChildAt(trailGraphics, 0); // Behind particles
-    }
-    
-    trailGraphics.clear();
-    
-    // Render active projectile trails
-    for (const entity of this.state.entities.values()) {
-      if (entity.type !== EntityType.Projectile) continue;
-      
-      const trail = this.trails.get(entity.id);
-      if (!trail || trail.length < 2) continue;
-      
-      const weaponType = entity.data?.[0] || WeaponType.Cannon;
-      const tier = entity.data?.[1] || 1;
-      const hue = entity.data?.[2] ?? 200;
-      
-      this.drawTrail(trailGraphics, trail, weaponType, tier, hue, 1.0);
-      
-      // Special effects for missiles - engine glow particles
-      if (weaponType === WeaponType.Missile && trail.length > 0) {
-        const lastPos = trail[trail.length - 1];
-        // Add smoke particles occasionally
-        if (Math.random() < 0.3) {
-          this.addTrailParticle(lastPos.x, lastPos.y, 0xff8800);
-        }
-      }
-    }
-    
-    // Render dying trails with fade effect
-    for (const dyingTrail of this.dyingTrails) {
-      const fadeAlpha = 1.0 - dyingTrail.fadeProgress;
-      if (fadeAlpha > 0 && dyingTrail.points.length >= 2) {
-        this.drawTrail(
-          trailGraphics, 
-          dyingTrail.points, 
-          dyingTrail.weaponType, 
-          dyingTrail.tier, 
-          dyingTrail.hue, 
-          fadeAlpha
-        );
-      }
-    }
-  }
-  
-  /** Draw a trail with given fade alpha - matching original game's visual style */
-  private drawTrail(
-    g: Graphics, 
-    trail: Array<{x: number, y: number}>, 
-    weaponType: number, 
-    tier: number, 
-    hue: number, 
-    fadeAlpha: number
-  ): void {
-    if (trail.length < 2) return;
-    
-    const time = performance.now() * 0.001;
-    const trailLen = trail.length;
-    
-    // Tier-based visual parameters (matching original)
-    const baseWidth = tier === 3 ? 10 : tier === 2 ? 8 : 6;
-    const baseAlphaBoost = (tier === 3 ? 1.0 : tier === 2 ? 0.9 : 0.8) * fadeAlpha;
-    
-    // Missile-specific effects
-    if (weaponType === WeaponType.Missile) {
-      const maxTrailLen = trail.length;
-      
-      // Mk3: Draw outer energy aura trail
-      if (tier === 3) {
-        for (let i = 0; i < trailLen - 1; i += 2) {
-          const t = (i + 1) / maxTrailLen;
-          const pulse = 0.5 + 0.5 * Math.sin(time * 8 + i * 0.3);
-          const alpha = (1 - t) * 0.25 * pulse * fadeAlpha;
-          const width = 20 * (1 - t * 0.5);
-          const auraHue = (hue + 30) % 360;
-          const auraColor = this.hslToHex(auraHue, 100, 80);
-          
-          const p1 = this.getWobbledTrailPoint(trail[i], time, i);
-          const p2 = this.getWobbledTrailPoint(trail[i + 1], time, i + 1);
-          
-          g.moveTo(p1.x, p1.y);
-          g.lineTo(p2.x, p2.y);
-          g.stroke({ color: auraColor, width, alpha });
-        }
-      }
-      
-      // Mk2+: Draw secondary trail with complementary color
-      if (tier >= 2) {
-        const secondaryHue = (hue + 180) % 360;
-        const secondaryColor = this.hslToHex(secondaryHue, 80, 70);
-        
-        for (let i = 0; i < trailLen - 1; i += 3) {
-          const t = (i + 1) / maxTrailLen;
-          const alpha = (1 - t) * 0.3 * fadeAlpha;
-          const width = (tier === 3 ? 4 : 2) * (1 - t * 0.5);
-          
-          const p1 = this.getWobbledTrailPoint(trail[i], time, i);
-          const p2 = this.getWobbledTrailPoint(trail[i + 1], time, i + 1);
-          
-          g.moveTo(p1.x, p1.y);
-          g.lineTo(p2.x, p2.y);
-          g.stroke({ color: secondaryColor, width, alpha });
-        }
-      }
-      
-      // Main trail segments with wobble
-      for (let i = 0; i < trailLen - 1; i++) {
-        const t = (i + 1) / maxTrailLen;
-        const alpha = (1 - t) * baseAlphaBoost;
-        const minWidth = 1.2;
-        const maxWidth = baseWidth;
-        const ageShrink = 1 - t * 0.15;
-        const width = (minWidth + (maxWidth - minWidth) * t) * ageShrink;
-        
-        // Mk3: Rainbow shift along trail
-        const trailHue = tier === 3 ? (hue + t * 60) % 360 : hue;
-        const lightness = tier === 3 ? 95 - t * 20 : 90 - t * 30;
-        const trailColor = this.hslToHex(trailHue, 100, lightness);
-        
-        const p1 = this.getWobbledTrailPoint(trail[i], time, i);
-        const p2 = this.getWobbledTrailPoint(trail[i + 1], time, i + 1);
-        
-        g.moveTo(p1.x, p1.y);
-        g.lineTo(p2.x, p2.y);
-        g.stroke({ color: trailColor, width, alpha });
-      }
-      
-      // Mk3: Sparkle particles along trail
-      if (tier === 3 && trailLen > 5) {
-        for (let i = 0; i < Math.min(trailLen, 20); i += 4) {
-          const sparkle = 0.3 + 0.7 * Math.sin(time * 15 + i * 1.5);
-          if (sparkle > 0.6) {
-            const pt = trail[i];
-            const sparkRadius = 3 * sparkle;
-            const sparkColor = this.hslToHex((hue + 60) % 360, 100, 95);
-            g.circle(pt.x, pt.y, sparkRadius);
-            g.fill({ color: sparkColor, alpha: sparkle * 0.8 * fadeAlpha });
-          }
-        }
-      }
-      
-    } else if (weaponType === WeaponType.Cannon || weaponType === WeaponType.Mining) {
-      // Bullet/mining: Single gradient segment trail
-      const trailColor = this.hslToHex(hue, 100, 75);
-      const width = baseWidth * 1.4;
-      
-      // Draw with gradient from tail to head
-      const startPt = trail[0];
-      const endPt = trail[trail.length - 1];
-      
-      g.moveTo(startPt.x, startPt.y);
-      g.lineTo(endPt.x, endPt.y);
-      g.stroke({ color: trailColor, width, alpha: 0.8 * baseAlphaBoost });
-      
-    } else if (weaponType === WeaponType.Scatter) {
-      // Scatter: shorter, fading trails
-      const trailColor = this.hslToHex(hue, 100, 82);
-      const width = baseWidth * 0.3;
-      
-      for (let i = 1; i < trail.length; i++) {
-        const prev = trail[i - 1];
-        const curr = trail[i];
-        const t = i / trail.length;
-        const alpha = t * t * 0.8 * baseAlphaBoost;
-        
-        g.moveTo(prev.x, prev.y);
-        g.lineTo(curr.x, curr.y);
-        g.stroke({ color: trailColor, width: width * (0.3 + t * 0.7), alpha });
-      }
-      
-    } else if (weaponType === WeaponType.Pulse) {
-      // Pulse: Growing trail with scale
-      const trailColor = this.hslToHex(hue, 100, 72);
-      const alpha = baseAlphaBoost * 0.75;
-      const fullSize = 10; // Default pulse size
-      
-      if (trail.length >= 2) {
-        const startPt = trail[0];
-        const endPt = trail[trail.length - 1];
-        
-        g.moveTo(startPt.x, startPt.y);
-        for (let i = 1; i < trail.length; i++) {
-          g.lineTo(trail[i].x, trail[i].y);
-        }
-        g.stroke({ color: trailColor, width: baseWidth * 2, alpha });
-      }
-      
-    } else {
-      // Default trail
-      const trailColor = this.hslToHex(hue, 100, 75);
-      
-      for (let i = 1; i < trail.length; i++) {
-        const prev = trail[i - 1];
-        const curr = trail[i];
-        const t = i / trail.length;
-        const alpha = t * t * 0.8 * fadeAlpha;
-        const width = baseWidth * (0.3 + t * 0.7);
-        
-        g.moveTo(prev.x, prev.y);
-        g.lineTo(curr.x, curr.y);
-        g.stroke({ color: trailColor, width, alpha });
-      }
-    }
-  }
-  
-  /** Get trail point with missile wobble effect */
-  private getWobbledTrailPoint(pt: {x: number, y: number}, time: number, idx: number): {x: number, y: number} {
-    const wobble = Math.sin(time * 6 + pt.x * 0.02 + idx * 0.4) * 2.2
-      + Math.cos(time * 4 + pt.y * 0.015 - idx * 0.25) * 1.6;
-    return { x: pt.x + wobble, y: pt.y + wobble * 0.6 };
-  }
-  
-  private getTrailColor(weaponType: number, tier: number): number {
-    const tierModifiers = [1.0, 0.8, 0.6, 0.4];
-    
-    switch (weaponType) {
-      case WeaponType.Cannon:
-        return [0xffff00, 0x88ff88, 0x88aaff, 0xcc88ff][Math.min(tier, 3)];
-      case WeaponType.Scatter:
-        return [0xffaa00, 0x66ff66, 0x6688ff, 0xaa66ff][Math.min(tier, 3)];
-      case WeaponType.Missile:
-        return 0xff4400; // Always orange-red flame
-      case WeaponType.Pulse:
-        return [0x00ffff, 0x44ffaa, 0x44aaff, 0xaa44ff][Math.min(tier, 3)];
-      case WeaponType.Mine:
-        return 0xff2222;
-      case WeaponType.Mining:
-        return 0xffaa44;
-      default:
-        return 0xffffff;
-    }
-  }
-  
-  private getTrailWidth(weaponType: number): number {
-    switch (weaponType) {
-      case WeaponType.Cannon: return 4;
-      case WeaponType.Scatter: return 2;
-      case WeaponType.Missile: return 6;
-      case WeaponType.Pulse: return 8;
-      case WeaponType.Mine: return 3;
-      case WeaponType.Mining: return 4;
-      default: return 4;
-    }
-  }
-  
-  private addTrailParticle(x: number, y: number, color: number): void {
-    const g = new Graphics();
-    g.circle(0, 0, 2 + Math.random() * 2);
-    g.fill({ color, alpha: 0.6 });
-    g.x = x + (Math.random() - 0.5) * 4;
-    g.y = y + (Math.random() - 0.5) * 4;
-    
-    this.effectContainer.addChild(g);
-    
-    this.particles.push({
-      x: g.x,
-      y: g.y,
-      vx: (Math.random() - 0.5) * 0.5,
-      vy: (Math.random() - 0.5) * 0.5,
-      life: 0.2 + Math.random() * 0.2,
-      maxLife: 0.4,
-      color,
-      size: 0.5,
-      graphic: g,
-    });
-  }
-  
+
+    // Projectile tracers, muzzle flashes and impacts
+    const presentTick = this.state.getRawServerTick();
+    this.weaponFx.update(this.state, delta, presentTick, presentTick - this.state.interpDelayMs / TICK_MS);
+}
+
   /** Convert HSL to hex color (matching original game's color system) */
   private hslToHex(h: number, s: number, l: number): number {
     s /= 100;
@@ -1989,49 +1348,113 @@ export class Renderer {
   }
 
   private renderDamageNumbers(delta: number): void {
+    // Counter-scaled zoomed out (so they stay readable), and they float as far on screen
+    const k = this.tagScale;
     for (let i = this.damageNumbers.length - 1; i >= 0; i--) {
       const dn = this.damageNumbers[i];
       dn.lifetime -= delta;
-      dn.y -= 30 * delta;  // Float up
+      // Float up the screen, slowing, drifting a little to its side (so a burst of hits fans out instead of stacking)
+      dn.oy -= 55 * k * delta * dn.lifetime;
+      dn.ox += dn.drift * k * delta * dn.lifetime;
       
       if (dn.lifetime <= 0) {
         this.effectContainer.removeChild(dn.text);
-        dn.text.destroy();
+        this.numberPool.push(dn.text);
         this.damageNumbers.splice(i, 1);
       } else {
-        dn.text.x = dn.x;
-        dn.text.y = dn.y;
+        const o = screenToWorldDir(dn.ox, dn.oy, this.cameraAngle);
+        dn.text.x = dn.x + o.x;
+        dn.text.y = dn.y + o.y;
+        dn.text.rotation = this.cameraAngle;
         dn.text.alpha = Math.min(1, dn.lifetime * 2);
+        // A pop as it appears: big, settling to size in the first ~0.12 s
+        const age = 1 - dn.lifetime;
+        dn.text.scale.set((age < 0.12 ? 1 + 0.6 * (1 - age / 0.12) : 1) * k);
       }
     }
   }
 
+  /** A particle (see updateEffects) */
+  private spark(x: number, y: number, vx: number, vy: number, life: number, radius: number, color: number, o: Partial<Particle> = {}): void {
+    if (this.particleKeep < 1 && Math.random() > this.particleKeep) return;
+    this.particles.push({ x, y, vx, vy, life, maxLife: o.maxLife ?? life, color, size: o.size ?? 1, radius, tex: o.tex ?? disc(), alpha: o.alpha ?? 1, rot: o.rot ?? 0, rotSpeed: o.rotSpeed ?? 0 });
+  }
+
+  /** A flash: `radius` growing by `grow` (×radius) while it fades from `alpha` over `max` seconds */
+  private flash(x: number, y: number, radius: number, color: number, alpha: number, max: number, grow: number, tex: Texture = disc()): void {
+    this.flashes.push({ x, y, radius, life: 0, max, color, alpha, grow, tex });
+  }
+
   // Public methods for effects
 
-  showDamageNumber(entityId: number, amount: number, critical?: boolean): void {
+  private entityAt = (id: number) => {
+    const e = this.state.entities.get(id);
+    return e ? { x: e.renderX, y: e.renderY } : null;
+  };
+
+  /** A station's turret fired on `target`: it swings onto it; returns where the shot starts (null: no such station or target) */
+  stationFire(station: number, turret: number, target: number): StationShot | null {
+    const view = this.stations.get(station), s = this.state.entities.get(station), t = this.state.entities.get(target);
+    if (!view || !s || !t) return null;
+    return view.fire(turret, target, s.renderX, s.renderY, t.renderX, t.renderY);
+  }
+
+  /** Something took damage: asteroids flash and jolt (ships do their own, ShipRenderer.hit) */
+  hitEntity(id: number, amount: number): void {
+    if (this.state.entities.get(id)?.type !== EntityType.Asteroid) return;
+    this.rockHits.set(id, { at: performance.now(), strength: Math.min(1, 0.45 + amount / 50) });
+  }
+
+  private animateRockHit(container: Container, id: number, size: number): void {
+    const hit = this.rockHits.get(id)!;
+    const k = Math.max(0, 1 - (performance.now() - hit.at) / 170);
+    let flash = container.getChildByLabel('rockFlash') as Graphics | null;
+    if (!flash && k > 0) {
+      // The rock's outline in white, made on its first hit and kept (hidden) after
+      flash = new Graphics().poly(getAsteroidPolygon(id, 0, 0, size).flatMap((v) => [v.x, v.y])).fill({ color: 0xffffff });
+      flash.label = 'rockFlash';
+      flash.blendMode = 'add';
+      container.addChild(flash);
+    }
+    if (flash) {
+      flash.visible = k > 0;
+      flash.alpha = 0.5 * hit.strength * k * k * k;
+    }
+    container.scale.set(1 + 0.03 * hit.strength * k * k);
+    if (k <= 0) this.rockHits.delete(id);
+  }
+
+  /** A hit's number over what it hit: yellow and bigger for a critical, small and grey for a glancing hit (a gun too weak for that armour) */
+  showDamageNumber(entityId: number, amount: number, critical?: boolean, glancing?: boolean): void {
     const entity = this.state.getEntity(entityId);
     if (!entity) return;
-    
-    const style = new TextStyle({
-      fontFamily: 'Arial',
-      fontSize: critical ? 24 : 18,
-      fill: critical ? 0xffff00 : 0xff4444,
-      fontWeight: 'bold',
-    });
-    
-    const text = new Text({
-      text: Math.floor(amount).toString(),
-      style,
-    });
+    // A bitmap font (its digits drawn once), pooled: no text rasterised and uploaded per hit
+    if (!Renderer.fontInstalled) {
+      BitmapFont.install({ name: 'DamageNumbers', style: { fontFamily: 'Arial', fontSize: 36, fill: 0xffffff, fontWeight: 'bold' }, chars: [['0', '9']], resolution: 2 });
+      Renderer.fontInstalled = true;
+    }
+    const text = this.numberPool.pop() ?? new BitmapText({ text: '', style: { fontFamily: 'DamageNumbers', fontSize: 18 } });
+    text.text = Math.floor(amount).toString();
+    text.style.fontSize = critical ? 24 : glancing ? 14 : 18;
+    text.tint = critical ? 0xffff00 : glancing ? 0x94a3b8 : 0xff4444;
     text.anchor.set(0.5);
-    text.x = entity.renderX;
-    text.y = entity.renderY - 30;
-    
+    text.alpha = 1;
+    text.visible = this.showDamageNumbers;
+    text.rotation = this.cameraAngle;
     this.effectContainer.addChild(text);
-    
+
+    text.scale.set(1.6 * this.tagScale);
+    const jx = (Math.random() - 0.5) * 24 * this.tagScale;
+    // (Its rise and drift along the screen's axes, from the hit)
+    const o = screenToWorldDir(jx, -30, this.cameraAngle);
+    text.x = entity.renderX + o.x;
+    text.y = entity.renderY + o.y;
     this.damageNumbers.push({
+      drift: jx * 1.5,
       x: entity.renderX,
-      y: entity.renderY - 30,
+      y: entity.renderY,
+      ox: jx,
+      oy: -30,
       amount,
       critical: critical || false,
       lifetime: 1,
@@ -2042,32 +1465,12 @@ export class Renderer {
   showExplosion(entityId: number): void {
     const entity = this.state.getEntity(entityId);
     if (!entity) return;
-    
-    // Create explosion particles
     const particleCount = 30;
     for (let i = 0; i < particleCount; i++) {
       const angle = (i / particleCount) * Math.PI * 2;
       const speed = 2 + Math.random() * 4;
-      
-      const g = new Graphics();
-      g.circle(0, 0, 5);
-      g.fill({ color: Math.random() > 0.5 ? 0xff8800 : 0xffff00 });
-      g.x = entity.renderX;
-      g.y = entity.renderY;
-      
-      this.effectContainer.addChild(g);
-      
-      this.particles.push({
-        x: entity.renderX,
-        y: entity.renderY,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        life: 0.5 + Math.random() * 0.5,
-        maxLife: 1,
-        color: 0xff8800,
-        size: 1,
-        graphic: g,
-      });
+      this.spark(entity.renderX, entity.renderY, Math.cos(angle) * speed, Math.sin(angle) * speed, 0.5 + Math.random() * 0.5, 5,
+        Math.random() > 0.5 ? 0xff8800 : 0xffff00, { maxLife: 1 });
     }
   }
 
@@ -2096,156 +1499,73 @@ export class Renderer {
       case EffectType.MissileTrail:
         // Handled by trail system
         break;
-      case EffectType.MuzzleFlash:
-        // data: [weaponType, tier, hue, angle]
-        if (data && data.length >= 4) {
-          const weaponTypeNum = data[0];
-          const tier = data[1] || 1;
-          const hue = data[2] ?? 200;
-          const angle = data[3] || 0;
-          
-          // Map weapon type number to string
-          const weaponTypeMap: Record<number, string> = {
-            [WeaponType.Cannon]: 'cannon',
-            [WeaponType.Scatter]: 'scatter',
-            [WeaponType.Missile]: 'missile',
-            [WeaponType.Pulse]: 'pulse',
-            [WeaponType.Mine]: 'mine',
-            [WeaponType.Mining]: 'mining',
-            [WeaponType.Laser]: 'laser',
-          };
-          const weaponTypeStr = weaponTypeMap[weaponTypeNum] || 'cannon';
-          
-          this.spawnFireEffect(x, y, angle, weaponTypeStr, tier, hue);
-        }
+      case EffectType.WarpOut:
+      case EffectType.WarpIn:
+        // (data 2: something's spooling up to come through here, a few seconds off)
+        if (data?.[0] === 2) this.createArrivalWarning(x, y);
+        else this.createWarpEffect(x, y, type === EffectType.WarpOut);
         break;
       // Add more effect types as needed
     }
   }
   
+  /**
+   * A ship went through a gate (out: leaving here; in: arriving): a white-blue
+   * flash and a shockwave ring, as the jump drive's launch and arrival (JumpFx).
+   */
+  private createWarpEffect(x: number, y: number, out: boolean): void {
+    if (out) {
+      this.flash(x, y, 70, 0xe8f6ff, 0.85, 0.45, 1.6);
+      this.flash(x, y, 60, 0x7dd3fc, 0.9, 0.8, 9, ring());
+      this.flash(x, y, 40, 0x3b82f6, 0.6, 0.6, 5, ring());
+    } else {
+      this.flash(x, y, 50, 0xe8f6ff, 0.7, 0.35, 1);
+      this.flash(x, y, 45, 0x7dd3fc, 0.8, 0.55, 4, ring());
+    }
+    for (let i = 0; i < 14; i++) {
+      const a = Math.random() * Math.PI * 2, sp = (out ? 4 : 2.5) + Math.random() * 4;
+      this.spark(x, y, Math.cos(a) * sp, Math.sin(a) * sp, 0.3 + Math.random() * 0.3, 3 + Math.random() * 3, Math.random() > 0.4 ? 0x9fd8ff : 0xffffff,
+        { maxLife: 0.6, size: 0.8, tex: softDot() });
+    }
+  }
+
+  /**
+   * Something is about to come through here (a gate spooling up, a front
+   * arriving out of the dark): slow amber rings drawing in, a few seconds'
+   * warning to get ready or get clear.
+   */
+  private createArrivalWarning(x: number, y: number): void {
+    for (let k = 0; k < 4; k++) this.flash(x, y, 380 - k * 60, 0xffb547, 0.5, 0.9 + k * 0.55, -0.6, ring());
+    this.flash(x, y, 160, 0xffd890, 0.35, 3, 0.4);
+  }
+
   private createMineArmEffect(x: number, y: number): void {
     // Pulsing ring effect when mine arms
-    const g = new Graphics();
-    g.circle(0, 0, 20);
-    g.stroke({ color: 0xff4444, width: 3, alpha: 0.8 });
-    g.x = x;
-    g.y = y;
-    
-    this.effectContainer.addChild(g);
-    
-    let scale = 1;
-    const pulseInterval = setInterval(() => {
-      scale += 0.15;
-      g.scale.set(scale);
-      g.alpha = Math.max(0, 1 - (scale - 1) / 2);
-      
-      if (scale > 3) {
-        clearInterval(pulseInterval);
-        this.effectContainer.removeChild(g);
-        g.destroy();
-      }
-    }, 16);
+    this.flash(x, y, 20, 0xff4444, 0.8, 0.21, 2, ring());
   }
 
   private createExplosionAt(x: number, y: number, radius: number): void {
     const particleCount = Math.floor(radius / 3); // More particles
     const debrisCount = Math.floor(radius / 10); // Add debris
-    
-    // Main explosion particles
+
+    // Main explosion particles: white/yellow core to orange/red edges
     for (let i = 0; i < particleCount; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 1 + Math.random() * 4;
-      const size = 2 + Math.random() * 4;
-      
-      // Vary colors from white/yellow core to orange/red edges
-      const colorRoll = Math.random();
-      const color = colorRoll < 0.2 ? 0xffffff 
-                  : colorRoll < 0.4 ? 0xffffaa 
-                  : colorRoll < 0.7 ? 0xff8800 
-                  : 0xff4400;
-      
-      const g = new Graphics();
-      g.circle(0, 0, size);
-      g.fill({ color });
-      g.x = x;
-      g.y = y;
-      
-      this.effectContainer.addChild(g);
-      
-      this.particles.push({
-        x,
-        y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        life: 0.2 + Math.random() * 0.5,
-        maxLife: 0.7,
-        color,
-        size: 1.2,
-        graphic: g,
-      });
+      const roll = Math.random();
+      const color = roll < 0.2 ? 0xffffff : roll < 0.4 ? 0xffffaa : roll < 0.7 ? 0xff8800 : 0xff4400;
+      this.spark(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, 0.2 + Math.random() * 0.5, 2 + Math.random() * 4, color, { maxLife: 0.7, size: 1.2 });
     }
-    
-    // Debris chunks
+    // Debris chunks, spinning
     for (let i = 0; i < debrisCount; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 2 + Math.random() * 3;
-      const size = 3 + Math.random() * 5;
-      
-      const g = new Graphics();
-      // Random polygon for debris
-      const sides = 3 + Math.floor(Math.random() * 3);
-      const points: number[] = [];
-      for (let j = 0; j < sides; j++) {
-        const a = (j / sides) * Math.PI * 2 + Math.random() * 0.5;
-        const r = size * (0.5 + Math.random() * 0.5);
-        points.push(Math.cos(a) * r, Math.sin(a) * r);
-      }
-      g.poly(points);
-      g.fill({ color: 0x666666 });
-      g.stroke({ color: 0x888888, width: 1 });
-      g.x = x;
-      g.y = y;
-      g.rotation = Math.random() * Math.PI * 2;
-      
-      this.effectContainer.addChild(g);
-      
-      // Add with spin effect
-      const rotSpeed = (Math.random() - 0.5) * 10;
-      this.particles.push({
-        x,
-        y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        life: 0.5 + Math.random() * 0.5,
-        maxLife: 1.0,
-        color: 0x666666,
-        size: 1,
-        graphic: g,
-        rotSpeed, // Custom rotation speed
-      } as any);
+      this.spark(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, 0.5 + Math.random() * 0.5, 3 + Math.random() * 5, 0x6a6a6a,
+        { maxLife: 1, tex: rock(i), rot: Math.random() * Math.PI * 2, rotSpeed: (Math.random() - 0.5) * 10 });
     }
-    
     // Central flash
-    const flash = new Graphics();
-    flash.circle(0, 0, radius * 0.8);
-    flash.fill({ color: 0xffffff, alpha: 0.8 });
-    flash.x = x;
-    flash.y = y;
-    this.effectContainer.addChild(flash);
-    
-    // Animate flash
-    let flashAlpha = 0.8;
-    const flashFade = setInterval(() => {
-      flashAlpha -= 0.2;
-      flash.alpha = Math.max(0, flashAlpha);
-      flash.scale.set(1 + (0.8 - flashAlpha));
-      if (flashAlpha <= 0) {
-        clearInterval(flashFade);
-        this.effectContainer.removeChild(flash);
-        flash.destroy();
-      }
-    }, 32);
-    
+    this.flash(x, y, radius * 0.8, 0xffffff, 0.8, 0.13, 0.8);
+
     // Trigger screen shake for nearby explosions
     const player = this.state.entities.get(this.state.playerId);
     if (player) {
@@ -2260,560 +1580,76 @@ export class Renderer {
     }
   }
 
-  // Helper to spawn laser particles for beam and impact
-  private spawnLaserParticle(x: number, y: number, angle: number, hue: number): void {
-    if (this.particles.length >= 200) return; // Cap to prevent GC pressure / jitter growth
-    const speed = 0.5 + Math.random() * 1;
-    const [r, g, b] = this.hslToRgb(hue, 100, 70);
-    const color = (r << 16) | (g << 8) | b;
-    
-    const spark = new Graphics();
-    spark.circle(0, 0, 1 + Math.random() * 2);
-    spark.fill({ color });
-    spark.x = x;
-    spark.y = y;
-    
-    this.effectContainer.addChild(spark);
-    
-    this.particles.push({
-      x,
-      y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      life: 0.2 + Math.random() * 0.2,
-      maxLife: 0.4,
-      color,
-      size: 0.5,
-      graphic: spark,
-    });
-  }
-  
-  // HSL to RGB conversion (matching original game)
-  private hslToRgb(h: number, s: number, l: number): [number, number, number] {
-    return Renderer.hslToRgbStatic(h, s, l);
-  }
-  
-  private static hslToRgbStatic(h: number, s: number, l: number): [number, number, number] {
-    h = h % 360;
-    s = s / 100;
-    l = l / 100;
-    const a = s * Math.min(l, 1 - l);
-    const f = (n: number) => {
-      const k = (n + h / 30) % 12;
-      return l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-    };
-    return [Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255)];
-  }
-  
-  // Angle lerp helper
-  private lerpAngle(from: number, to: number, t: number): number {
-    let diff = to - from;
-    while (diff > Math.PI) diff -= Math.PI * 2;
-    while (diff < -Math.PI) diff += Math.PI * 2;
-    return from + diff * t;
-  }
-  
-  /**
-   * Client-side laser prediction for the local player.
-   * Shows the beam immediately using the local aim angle and performs
-   * polygon hitscan against interpolated asteroids for pixel-perfect hits.
-   */
-  private updateLocalLaserPrediction(): void {
-    const player = this.state.entities.get(this.state.playerId);
-    if (!player) return;
-    
-    // Check both weapon slots for laser
-    const equipment = this.state.equipment;
-    const slots: { firing: boolean; weaponId: string | null }[] = [
-      { firing: this.localFireLeft, weaponId: equipment.leftWeapon },
-      { firing: this.localFireRight, weaponId: equipment.rightWeapon },
-    ];
-    
-    for (const slot of slots) {
-      if (!slot.firing || !slot.weaponId) continue;
-      
-      const itemInfo = ITEM_DATA.get(slot.weaponId);
-      if (!itemInfo || itemInfo.weaponType !== 'laser') continue;
-      
-      const range = LASER_RANGE * (itemInfo.range || 1);
-      
-      // Laser fires from ship nose in ship's facing direction.
-      // Using ship angle (not aim angle) ensures client-server determinism.
-      const shipAngle = player.renderAngle || player.angle || 0;
-      const SHIP_TIP_OFFSET = 30; // Must match server fireLaser offset
-      const tipX = player.renderX + Math.cos(shipAngle) * SHIP_TIP_OFFSET;
-      const tipY = player.renderY + Math.sin(shipAngle) * SHIP_TIP_OFFSET;
-      
-      // Beam direction also uses ship angle for determinism
-      const rawEndX = tipX + Math.cos(shipAngle) * range;
-      const rawEndY = tipY + Math.sin(shipAngle) * range;
-      
-      // Client-side polygon hitscan against interpolated asteroids + enemies
-      const hitT = this.laserHitscan(tipX, tipY, rawEndX, rawEndY, this.state.playerId);
-      const endX = tipX + (rawEndX - tipX) * hitT;
-      const endY = tipY + (rawEndY - tipY) * hitT;
-      
-      const entityId = this.state.playerId;
-      const hue = 30;
-      
-      let laser = this.activeLasers.get(entityId);
-      if (!laser) {
-        const g = new Graphics();
-        this.effectContainer.addChild(g);
-        laser = {
-          graphic: g,
-          targetEndX: endX,
-          targetEndY: endY,
-          displayEndX: endX,
-          displayEndY: endY,
-          collisionDist: range * hitT,
-          powerTime: 0,
-          hue: hue,
-          lastUpdateTime: performance.now(),
-          entityId: entityId,
-          aimAngle: shipAngle, // Store ship angle for fade-out tracking
-          range: range,
-        };
-        this.activeLasers.set(entityId, laser);
-      }
-      
-      // Update target — the endpoint tracks the hitscan result each frame
-      laser.targetEndX = endX;
-      laser.targetEndY = endY;
-      laser.collisionDist = range * hitT;
-      laser.lastUpdateTime = performance.now();
-      laser.aimAngle = shipAngle; // Track ship angle for fade-out
-      laser.range = range;
-      
-      // Only process first laser weapon (one beam per player)
-      return;
-    }
-  }
-
-  /**
-   * Perform client-side ray vs polygon hitscan against all nearby entities.
-   * Returns parametric t (0–1) along the ray where the nearest hit occurs.
-   * Uses the shared getAsteroidPolygon from common/ for pixel-perfect polygon match.
-   */
-  private laserHitscan(
-    startX: number, startY: number,
-    endX: number, endY: number,
-    shooterId: number,
-  ): number {
-    let bestT = 1.0;
-    
-    // Pre-compute ray direction for circle collision
-    const rdx = endX - startX;
-    const rdy = endY - startY;
-    const len = Math.sqrt(rdx * rdx + rdy * rdy);
-    if (len < 1) return bestT;
-    const nx = rdx / len;
-    const ny = rdy / len;
-    
-    for (const entity of this.state.entities.values()) {
-      if (entity.id === shooterId) continue;
-      
-      if (entity.type === EntityType.Asteroid) {
-        // Polygon hitscan — use true position (entity.x/y) not renderX/Y
-        // renderX/Y has lerp smoothing lag which causes desync with server hitscan
-        const size = entity.data?.[0] || 30;
-        const poly = getAsteroidPolygon(entity.id, entity.x, entity.y, size);
-        const t = raycastPolygon(startX, startY, endX, endY, poly);
-        if (t !== null && t < bestT) {
-          bestT = t;
-        }
-      } else if (entity.type === EntityType.Enemy) {
-        // Circle collision for enemies — use true position
-        const ex = entity.x;
-        const ey = entity.y;
-        const er = 25; // enemy radius
-        const toEx = ex - startX;
-        const toEy = ey - startY;
-        const proj = toEx * nx + toEy * ny;
-        if (proj < 0 || proj > len) continue;
-        const perpDist = Math.abs(toEx * ny - toEy * nx);
-        const t = proj / len;
-        if (perpDist < er && t < bestT) {
-          bestT = t;
-        }
-      }
-    }
-    
-    return bestT;
-  }
-
-  /**
-   * Render ALL players' lasers using snapshot data for aim angle + active flags,
-   * with client-side polygon hitscan for beam endpoint.
-   */
-  private updateSnapshotLasers(): void {
-    for (const entity of this.state.entities.values()) {
-      if (entity.type !== EntityType.Player) continue;
-      if (!entity.data || entity.data.length < 1) continue;
-      
-      const packed = entity.data[0];
-      if (packed === 0 || packed === undefined) continue;
-      
-      const cursor = unpackCursorWeaponState(packed);
-      
-      if (!cursor.leftActive && !cursor.rightActive) continue;
-      
-      // For the local player, updateLocalLaserPrediction already set the target.
-      // We still run hitscan here so the endpoint gets refined each frame,
-      // but we use the local angle (which is more responsive).
-      const isLocal = entity.id === this.state.playerId;
-      const angle = isLocal ? this.localTargetAngle : cursor.aimAngle;
-      
-      // Both tip offset and beam direction use the aim angle (toward cursor)
-      const SHIP_TIP_OFFSET = 30; // Must match server fireLaser offset
-      const tipX = entity.renderX + Math.cos(angle) * SHIP_TIP_OFFSET;
-      const tipY = entity.renderY + Math.sin(angle) * SHIP_TIP_OFFSET;
-      
-      const range = LASER_RANGE;
-      const rawEndX = tipX + Math.cos(angle) * range;
-      const rawEndY = tipY + Math.sin(angle) * range;
-      
-      // Client-side polygon hitscan for beam endpoint
-      const hitT = this.laserHitscan(tipX, tipY, rawEndX, rawEndY, entity.id);
-      const endX = tipX + (rawEndX - tipX) * hitT;
-      const endY = tipY + (rawEndY - tipY) * hitT;
-      
-      const hue = 30;
-      let laser = this.activeLasers.get(entity.id);
-      if (!laser) {
-        const g = new Graphics();
-        this.effectContainer.addChild(g);
-        laser = {
-          graphic: g,
-          targetEndX: endX,
-          targetEndY: endY,
-          displayEndX: endX,
-          displayEndY: endY,
-          collisionDist: range * hitT,
-          powerTime: 0,
-          hue: hue,
-          lastUpdateTime: performance.now(),
-          entityId: entity.id,
-          aimAngle: angle,
-          range: range,
-        };
-        this.activeLasers.set(entity.id, laser);
-      }
-      
-      laser.targetEndX = endX;
-      laser.targetEndY = endY;
-      laser.collisionDist = range * hitT;
-      laser.lastUpdateTime = performance.now();
-      laser.aimAngle = angle;
-      laser.range = range;
-      
-      // Power ramp-up
-      laser.powerTime = Math.min(15, laser.powerTime + 1);
-      const power = laser.powerTime / 15;
-      
-      // Smooth interpolation of hit point
-      const lerpSpeed = isLocal ? 0.5 : 0.3;
-      laser.displayEndX += (laser.targetEndX - laser.displayEndX) * lerpSpeed;
-      laser.displayEndY += (laser.targetEndY - laser.displayEndY) * lerpSpeed;
-      
-      const x1 = tipX;
-      const y1 = tipY;
-      const x2 = laser.displayEndX;
-      const y2 = laser.displayEndY;
-      const beamAngle = Math.atan2(y2 - y1, x2 - x1);
-      
-      const time = performance.now() * 0.01;
-      const flicker = 0.9 + Math.sin(time * 3) * 0.07 + Math.sin(time * 7) * 0.03;
-      const alpha = power * flicker;
-      
-      const gfx = laser.graphic;
-      gfx.clear();
-      
-      // Beam particle (reduced rate to cut GC pressure)
-      if (this.particles.length < 200 && Math.random() < 0.08 * power) {
-        const t = Math.random();
-        const px = x1 + (x2 - x1) * t;
-        const py = y1 + (y2 - y1) * t;
-        this.spawnLaserParticle(px, py, beamAngle + Math.PI / 2, hue);
-      }
-      
-      // Impact particle
-      if (this.particles.length < 200 && alpha > 0.3 && Math.random() < 0.1 * power) {
-        this.spawnLaserParticle(x2, y2, Math.random() * Math.PI * 2, hue);
-      }
-      
-      const outerColor = this.LASER_COLOR_OUTER;
-      const midColor = this.LASER_COLOR_MID;
-      
-      // Outer glow
-      gfx.moveTo(x1, y1);
-      gfx.lineTo(x2, y2);
-      gfx.stroke({ color: outerColor, width: 8 + power * 10, alpha: alpha * 0.2 });
-      
-      // Mid glow
-      gfx.moveTo(x1, y1);
-      gfx.lineTo(x2, y2);
-      gfx.stroke({ color: midColor, width: 3 + power * 4, alpha: alpha * 0.4 });
-      
-      // Core beam
-      gfx.moveTo(x1, y1);
-      gfx.lineTo(x2, y2);
-      gfx.stroke({ color: 0xffffff, width: 1.5 + power * 2, alpha: alpha });
-      
-      // Impact glow
-      if (alpha > 0.1) {
-        const impactSize = 8 + power * 12 + Math.sin(time * 5) * 3 * power;
-        gfx.circle(x2, y2, impactSize);
-        gfx.fill({ color: midColor, alpha: alpha * 0.3 });
-        gfx.circle(x2, y2, 3 + power * 2);
-        gfx.fill({ color: 0xffffff, alpha: alpha * 0.8 });
-      }
-    }
-  }
-
   // Update active lasers (call from render loop)
-  private updateActiveLasers(): void {
-    const now = performance.now();
-    const LASER_TIMEOUT = 200; // ms before laser fades (>1 snapshot interval at 20Hz)
-    
-    for (const [entityId, laser] of this.activeLasers) {
-      const timeSinceUpdate = now - laser.lastUpdateTime;
-      
-      if (timeSinceUpdate > LASER_TIMEOUT) {
-        // Fade out by reducing powerTime
-        laser.powerTime = Math.max(0, laser.powerTime - 1.5);
-
-        if (laser.powerTime <= 0) {
-          // Remove the laser
-          this.effectContainer.removeChild(laser.graphic);
-          laser.graphic.destroy();
-          this.activeLasers.delete(entityId);
-          continue;
-        }
-
-        // Keep the beam attached to the ship while fading
-        // Use the ship's CURRENT angle for both tip position and beam direction
-        const entity = this.state.entities.get(entityId);
-        if (!entity) continue;
-
-        // Ship tip and beam both use ship's facing angle
-        const shipAngle = entity.renderAngle || entity.angle || 0;
-        const SHIP_TIP_OFFSET = 30;
-        const tipX = entity.renderX + Math.cos(shipAngle) * SHIP_TIP_OFFSET;
-        const tipY = entity.renderY + Math.sin(shipAngle) * SHIP_TIP_OFFSET;
-
-        // Beam direction uses ship angle
-        const rawEndX = tipX + Math.cos(shipAngle) * laser.range;
-        const rawEndY = tipY + Math.sin(shipAngle) * laser.range;
-
-        const hitT = this.laserHitscan(tipX, tipY, rawEndX, rawEndY, entityId);
-        const endX = tipX + (rawEndX - tipX) * hitT;
-        const endY = tipY + (rawEndY - tipY) * hitT;
-
-        laser.displayEndX = endX;
-        laser.displayEndY = endY;
-
-        const power = laser.powerTime / 15;
-        const time = performance.now() * 0.01;
-        const flicker = 0.9 + Math.sin(time * 3) * 0.07 + Math.sin(time * 7) * 0.03;
-        const alpha = power * flicker;
-
-        const gfx = laser.graphic;
-        gfx.clear();
-
-        const outerColor = this.LASER_COLOR_OUTER;
-        const midColor = this.LASER_COLOR_MID;
-
-        // Outer glow
-        gfx.moveTo(tipX, tipY);
-        gfx.lineTo(endX, endY);
-        gfx.stroke({ color: outerColor, width: 8 + power * 10, alpha: alpha * 0.2 });
-
-        // Mid glow
-        gfx.moveTo(tipX, tipY);
-        gfx.lineTo(endX, endY);
-        gfx.stroke({ color: midColor, width: 3 + power * 4, alpha: alpha * 0.4 });
-
-        // Core beam
-        gfx.moveTo(tipX, tipY);
-        gfx.lineTo(endX, endY);
-        gfx.stroke({ color: 0xffffff, width: 1.5 + power * 2, alpha: alpha });
-
-        // Impact glow
-        if (alpha > 0.1) {
-          const impactSize = 8 + power * 12 + Math.sin(time * 5) * 3 * power;
-          gfx.circle(endX, endY, impactSize);
-          gfx.fill({ color: midColor, alpha: alpha * 0.3 });
-          gfx.circle(endX, endY, 3 + power * 2);
-          gfx.fill({ color: 0xffffff, alpha: alpha * 0.8 });
-        }
-      }
-    }
-  }
 
   private createTractorBeam(startX: number, startY: number, targetX: number, targetY: number): void {
-    const g = new Graphics();
-    this.effectContainer.addChild(g);
-    
-    this.tractorBeams.push({
-      startX,
-      startY,
-      targetX,
-      targetY,
-      progress: 0,
-      graphic: g,
-    });
+    this.tractorBeams.push({ startX, startY, targetX, targetY, progress: 0 });
   }
-  
+
   private updateTractorBeams(dt: number): void {
-    const completed: TractorBeam[] = [];
-    
+    const pool = this.beamPool;
+    pool.begin();
+    let w = 0;
     for (const beam of this.tractorBeams) {
       beam.progress += dt * 2.5; // ~0.4 second animation
-      
-      if (beam.progress >= 1) {
-        completed.push(beam);
-        continue;
-      }
-      
-      const g = beam.graphic;
-      g.clear();
-      
+      if (beam.progress >= 1) continue;
+      this.tractorBeams[w++] = beam;
+
       // Animate the item moving toward the player
       const t = beam.progress;
       const easeT = 1 - Math.pow(1 - t, 3); // Ease out cubic
-      
       const currentX = beam.startX + (beam.targetX - beam.startX) * easeT;
       const currentY = beam.startY + (beam.targetY - beam.startY) * easeT;
-      
-      // Draw tractor beam
-      const dx = beam.targetX - beam.startX;
-      const dy = beam.targetY - beam.startY;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      
-      // Pulsing energy beam from player to item pickup point
+
+      // Pulsing energy beam from player to item pickup point: a wide glow and a bright core
       const pulse = Math.sin(t * Math.PI * 8) * 0.3 + 0.7;
       const beamWidth = 3 + pulse * 2;
-      
-      // Outer glow
-      g.moveTo(beam.targetX, beam.targetY);
-      g.lineTo(currentX, currentY);
-      g.stroke({ color: 0x00ffff, width: beamWidth + 8, alpha: 0.15 * (1 - t) });
-      
-      // Mid glow
-      g.moveTo(beam.targetX, beam.targetY);
-      g.lineTo(currentX, currentY);
-      g.stroke({ color: 0x44ffff, width: beamWidth + 4, alpha: 0.3 * (1 - t) });
-      
-      // Core beam
-      g.moveTo(beam.targetX, beam.targetY);
-      g.lineTo(currentX, currentY);
-      g.stroke({ color: 0xaaffff, width: beamWidth, alpha: 0.6 * (1 - t) });
-      
-      // Bright center
-      g.moveTo(beam.targetX, beam.targetY);
-      g.lineTo(currentX, currentY);
-      g.stroke({ color: 0xffffff, width: 1, alpha: 0.8 * (1 - t) });
-      
+      const len = Math.hypot(currentX - beam.targetX, currentY - beam.targetY);
+      const rot = Math.atan2(currentY - beam.targetY, currentX - beam.targetX);
+      const fade = 1 - t;
+      for (const [width, color, alpha] of [[beamWidth + 8, 0x00ffff, 0.3], [beamWidth, 0xaaffff, 0.7], [1.5, 0xffffff, 0.8]] as const) {
+        const sp = pool.take(streak(), beam.targetX, beam.targetY, 0, 0.5, color, alpha * fade);
+        const sc = streakScale(len, width);
+        sp.scale.set(sc.x, sc.y);
+        // The streak's tail cap starts half a width behind its anchor
+        sp.position.set(beam.targetX - Math.cos(rot) * width / 2, beam.targetY - Math.sin(rot) * width / 2);
+        sp.rotation = rot;
+      }
+
       // Item dot at current position
       const dotSize = 6 * (1 - t * 0.5);
-      g.circle(currentX, currentY, dotSize + 4);
-      g.fill({ color: 0x00ffff, alpha: 0.3 });
-      g.circle(currentX, currentY, dotSize);
-      g.fill({ color: 0xffffff, alpha: 0.8 });
-      
-      // Sparkle particles along beam
-      if (Math.random() < 0.3) {
+      pool.take(softDot(), currentX, currentY, 0.5, 0.5, 0x00ffff, 0.5).scale.set(((dotSize + 4) * 2) / DOT_SIZE);
+      pool.take(disc(), currentX, currentY, 0.5, 0.5, 0xffffff, 0.8).scale.set((dotSize * 2) / DOT_SIZE);
+
+      // Sparkle particles along beam (about 18 a second)
+      if (Math.random() < dt * 18) {
         const sparkT = Math.random();
         const sparkX = beam.targetX + (currentX - beam.targetX) * sparkT;
         const sparkY = beam.targetY + (currentY - beam.targetY) * sparkT;
-        
-        const spark = new Graphics();
-        spark.circle(0, 0, 2 + Math.random() * 2);
-        spark.fill({ color: 0x88ffff, alpha: 0.8 });
-        spark.x = sparkX + (Math.random() - 0.5) * 10;
-        spark.y = sparkY + (Math.random() - 0.5) * 10;
-        
-        this.effectContainer.addChild(spark);
-        
-        this.particles.push({
-          x: spark.x,
-          y: spark.y,
-          vx: (Math.random() - 0.5) * 2,
-          vy: (Math.random() - 0.5) * 2,
-          life: 0.2,
-          maxLife: 0.2,
-          color: 0x88ffff,
-          size: 0.5,
-          graphic: spark,
-        });
+
+        this.spark(sparkX + (Math.random() - 0.5) * 10, sparkY + (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2,
+          0.2, 2 + Math.random() * 2, 0x88ffff, { size: 0.5, alpha: 0.8 });
       }
     }
-    
-    // Remove completed beams
-    for (const beam of completed) {
-      this.effectContainer.removeChild(beam.graphic);
-      beam.graphic.destroy();
-      const idx = this.tractorBeams.indexOf(beam);
-      if (idx !== -1) this.tractorBeams.splice(idx, 1);
-    }
+    this.tractorBeams.length = w;
+    pool.end();
   }
 
   /**
    * Create a bullet hit effect at a position (hitting asteroid/enemy)
    */
   private createBulletHitEffect(x: number, y: number, damage: number, hue: number): void {
-    // Convert hue to RGB color
     const color = this.hueToColor(hue);
-    
     // Flash at impact point
-    const flash = new Graphics();
-    flash.circle(0, 0, 8 + damage * 0.5);
-    flash.fill({ color: 0xffffff, alpha: 0.8 });
-    flash.circle(0, 0, 5 + damage * 0.3);
-    flash.fill({ color: color, alpha: 0.9 });
-    flash.x = x;
-    flash.y = y;
-    
-    this.effectContainer.addChild(flash);
-    
-    // Fade out flash
-    let alpha = 1;
-    const fadeInterval = setInterval(() => {
-      alpha -= 0.2;
-      flash.alpha = Math.max(0, alpha);
-      if (alpha <= 0) {
-        clearInterval(fadeInterval);
-        this.effectContainer.removeChild(flash);
-        flash.destroy();
-      }
-    }, 16);
-    
+    this.flash(x, y, 8 + damage * 0.5, 0xffffff, 0.8, 0.08, 0);
+    this.flash(x, y, 5 + damage * 0.3, color, 0.9, 0.08, 0);
     // Spark particles
     const sparkCount = Math.min(12, 4 + Math.floor(damage / 5));
     for (let i = 0; i < sparkCount; i++) {
-      const sparkAngle = Math.random() * Math.PI * 2;
-      const sparkSpeed = 2 + Math.random() * 4;
-      
-      const spark = new Graphics();
-      spark.circle(0, 0, 1.5 + Math.random() * 1.5);
-      spark.fill({ color: Math.random() > 0.3 ? color : 0xffffff });
-      spark.x = x;
-      spark.y = y;
-      
-      this.effectContainer.addChild(spark);
-      
-      this.particles.push({
-        x,
-        y,
-        vx: Math.cos(sparkAngle) * sparkSpeed,
-        vy: Math.sin(sparkAngle) * sparkSpeed,
-        life: 0.15 + Math.random() * 0.15,
-        maxLife: 0.3,
-        color,
-        size: 0.6,
-        graphic: spark,
-      });
+      const a = Math.random() * Math.PI * 2;
+      const sp = 2 + Math.random() * 4;
+      this.spark(x, y, Math.cos(a) * sp, Math.sin(a) * sp, 0.15 + Math.random() * 0.15, 1.5 + Math.random() * 1.5, Math.random() > 0.3 ? color : 0xffffff,
+        { maxLife: 0.3, size: 0.6 });
     }
   }
 
@@ -2823,82 +1659,22 @@ export class Renderer {
   private createAsteroidBreakEffect(x: number, y: number, size: number, hue: number): void {
     const color = this.hueToColor(hue);
     const particleCount = Math.min(30, Math.floor(size / 3));
-    
-    // Central flash
-    const flash = new Graphics();
-    flash.circle(0, 0, size * 1.2);
-    flash.fill({ color: 0xffffff, alpha: 0.6 });
-    flash.x = x;
-    flash.y = y;
-    
-    this.effectContainer.addChild(flash);
-    
-    // Expand and fade flash
-    let scale = 1;
-    const expandInterval = setInterval(() => {
-      scale += 0.15;
-      flash.scale.set(scale);
-      flash.alpha = Math.max(0, 0.6 - (scale - 1) * 0.3);
-      if (scale > 2.5) {
-        clearInterval(expandInterval);
-        this.effectContainer.removeChild(flash);
-        flash.destroy();
-      }
-    }, 16);
-    
-    // Rock debris particles
+    // Central flash, expanding as it fades
+    this.flash(x, y, size * 1.2, 0xffffff, 0.6, 0.16, 1.5);
+    // Rock debris
     for (let i = 0; i < particleCount; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 1 + Math.random() * 4;
-      const pSize = 2 + Math.random() * (size / 10);
-      
-      const debris = new Graphics();
-      // Irregular rock shapes
-      const sides = 4 + Math.floor(Math.random() * 3);
-      debris.poly(this.createRockShape(pSize, sides));
-      debris.fill({ color: Math.random() > 0.2 ? color : this.hueToColor(hue + 10) });
-      debris.x = x + (Math.random() - 0.5) * size * 0.5;
-      debris.y = y + (Math.random() - 0.5) * size * 0.5;
-      
-      this.effectContainer.addChild(debris);
-      
-      this.particles.push({
-        x: debris.x,
-        y: debris.y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        life: 0.5 + Math.random() * 0.5,
-        maxLife: 1,
-        color,
-        size: 0.8,
-        graphic: debris,
-      });
+      this.spark(x + (Math.random() - 0.5) * size * 0.5, y + (Math.random() - 0.5) * size * 0.5, Math.cos(angle) * speed, Math.sin(angle) * speed,
+        0.5 + Math.random() * 0.5, 2 + Math.random() * (size / 10), Math.random() > 0.2 ? color : this.hueToColor(hue + 10),
+        { maxLife: 1, size: 0.8, tex: rock(i), rot: Math.random() * Math.PI * 2 });
     }
-    
     // Dust cloud (small fading particles)
     for (let i = 0; i < particleCount / 2; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 0.5 + Math.random() * 2;
-      
-      const dust = new Graphics();
-      dust.circle(0, 0, 3 + Math.random() * 4);
-      dust.fill({ color: color, alpha: 0.4 });
-      dust.x = x;
-      dust.y = y;
-      
-      this.effectContainer.addChild(dust);
-      
-      this.particles.push({
-        x: dust.x,
-        y: dust.y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        life: 0.3 + Math.random() * 0.3,
-        maxLife: 0.6,
-        color,
-        size: 0.5,
-        graphic: dust,
-      });
+      this.spark(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, 0.3 + Math.random() * 0.3, 3 + Math.random() * 4, color,
+        { maxLife: 0.6, size: 0.5, alpha: 0.4 });
     }
   }
 
@@ -2929,125 +1705,299 @@ export class Renderer {
     return (r << 16) | (g << 8) | b;
   }
 
-  /**
-   * Create irregular rock polygon shape
-   */
-  private createRockShape(radius: number, sides: number): number[] {
-    const points: number[] = [];
-    for (let i = 0; i < sides; i++) {
-      const angle = (i / sides) * Math.PI * 2;
-      const r = radius * (0.7 + Math.random() * 0.6);
-      points.push(Math.cos(angle) * r, Math.sin(angle) * r);
-    }
-    return points;
+  showDeathScreen(killerName?: string): void {
+    if (this.deathOverlay) return;
+    this.killerName = killerName;
+    this.deathAt = performance.now();
+    this.buildDeathScreen();
   }
 
-  showDeathScreen(): void {
-    if (this.deathOverlay) return;
-    
+  /** The overlay (it fades and settles in from deathAt, see updateScreen) */
+  private buildDeathScreen(): void {
+    const w = this.app.screen.width, h = this.app.screen.height;
     this.deathOverlay = new Container();
-    
+    this.deathOverlay.alpha = 0;
+
     const bg = new Graphics();
-    bg.rect(0, 0, this.app.screen.width, this.app.screen.height);
+    bg.rect(0, 0, w, h);
     bg.fill({ color: 0x000000, alpha: 0.7 });
-    
-    const style = new TextStyle({
-      fontFamily: 'Arial',
-      fontSize: 48,
-      fill: 0xff4444,
-      fontWeight: 'bold',
-    });
-    
+    this.deathOverlay.addChild(bg);
+
     const text = new Text({
       text: 'DESTROYED',
-      style,
+      style: new TextStyle({ fontFamily: 'Arial', fontSize: 48, fill: 0xff4444, fontWeight: 'bold', letterSpacing: 6 }),
     });
     text.anchor.set(0.5);
-    text.x = this.app.screen.width / 2;
-    text.y = this.app.screen.height / 2 - 50;
-    
-    const subStyle = new TextStyle({
-      fontFamily: 'Arial',
-      fontSize: 24,
-      fill: 0xffffff,
-    });
-    
+    text.position.set(w / 2, h / 2 - 50);
+    text.label = 'deathTitle';
+    this.deathOverlay.addChild(text);
+
+    if (this.killerName) {
+      const by = new Text({
+        text: `by ${this.killerName}`,
+        style: new TextStyle({ fontFamily: 'Arial', fontSize: 20, fill: 0xffb4a8 }),
+      });
+      by.anchor.set(0.5);
+      by.position.set(w / 2, h / 2 - 8);
+      this.deathOverlay.addChild(by);
+    }
+
     const subText = new Text({
       text: 'Press R to respawn',
-      style: subStyle,
+      style: new TextStyle({ fontFamily: 'Arial', fontSize: 24, fill: 0xffffff }),
     });
     subText.anchor.set(0.5);
-    subText.x = this.app.screen.width / 2;
-    subText.y = this.app.screen.height / 2 + 20;
-    
-    this.deathOverlay.addChild(bg);
-    this.deathOverlay.addChild(text);
+    subText.position.set(w / 2, h / 2 + 34);
     this.deathOverlay.addChild(subText);
-    
+
     this.uiContainer.addChild(this.deathOverlay);
   }
 
   hideDeathScreen(): void {
     if (this.deathOverlay) {
       this.uiContainer.removeChild(this.deathOverlay);
-      this.deathOverlay.destroy();
+      this.deathOverlay.destroy({ children: true });
       this.deathOverlay = null;
     }
   }
 
+  /** (Through the view's roll; not the shake) */
   screenToWorld(screenX: number, screenY: number): { x: number; y: number } {
-    const screenCenterX = this.app.screen.width / 2;
-    const screenCenterY = this.app.screen.height / 2;
-    
-    return {
-      x: (screenX - screenCenterX) / this.cameraZoom + this.cameraX,
-      y: (screenY - screenCenterY) / this.cameraZoom + this.cameraY,
-    };
+    return screenToWorld(screenX, screenY, this.pose(), this.app.screen.width, this.app.screen.height);
   }
 
   worldToScreen(worldX: number, worldY: number): { x: number; y: number } {
-    const screenCenterX = this.app.screen.width / 2;
-    const screenCenterY = this.app.screen.height / 2;
-    
-    return {
-      x: (worldX - this.cameraX) * this.cameraZoom + screenCenterX,
-      y: (worldY - this.cameraY) * this.cameraZoom + screenCenterY,
-    };
+    return worldToScreen(worldX, worldY, this.pose(), this.app.screen.width, this.app.screen.height);
+  }
+
+  private pose(): { x: number; y: number; zoom: number; angle: number } {
+    return { x: this.cameraX, y: this.cameraY, zoom: this.cameraZoom, angle: this.cameraAngle };
   }
 
   setZoom(zoom: number): void {
     this.cameraZoom = zoom;
   }
 
+  /** The firing ship's pose on a shell's fire tick (the flash sits exactly on the barrel) */
+  set firePoseOf(fn: WeaponFx['firePose']) {
+    this.weaponFx.firePose = fn;
+  }
+
+  /** A shell your client fired ahead of the server (WeaponFx.predict) */
+  predictShot(p: PredictedShell): void {
+    this.weaponFx.predict(p);
+  }
+
+  /** Called when a shot is seen leaving its gun (owner, muzzle point) */
+  /** Where a shot comes out of its drawn barrel (WeaponFx.barrelTip) */
+  set barrelTip(fn: WeaponFx['barrelTip']) {
+    this.weaponFx.barrelTip = fn;
+  }
+
+  set onMuzzle(fn: ((owner: number, x: number, y: number) => void) | null) {
+    this.weaponFx.onMuzzle = fn;
+  }
+
+  /** The server reported where a projectile hit: stop its tracer there and throw sparks. */
+  showProjectileHit(projectileId: number | undefined, x: number, y: number): void {
+    this.weaponFx.onHit(projectileId, x, y);
+  }
+
+  /** World-space layer for effects (above entities). */
+  getEffectLayer(): Container {
+    return this.effectContainer;
+  }
+
+  /** World-space layer for ships, above every other entity. */
+  getShipLayer(): Container {
+    return this.shipLayer;
+  }
+
   getZoom(): number {
     return this.cameraZoom;
   }
 
-  /** Called by Game.ts each frame to pass local firing state for laser prediction */
-  setLocalFireState(fireLeft: boolean, fireRight: boolean, targetAngle: number): void {
-    this.localFireLeft = fireLeft;
-    this.localFireRight = fireRight;
-    this.localTargetAngle = targetAngle;
+  /** Share of the small effect particles spawned (the quality setting) */
+  private particleKeep = 1;
+
+  /** Apply a graphics quality tier (settings/quality.ts) */
+  setQuality(q: QualityProfile): void {
+    this.bloom.setQuality(q.bloomScale, q.bloomQuality);
+    this.sky.setDetail(q.hazeScale, q.starLayers);
+    this.particleKeep = q.particles;
+  }
+
+  /** A layer of glowing things for the bloom */
+  addBloomSource(c: Container): void {
+    this.bloom.add(c);
+  }
+
+  /** Once a frame, after everything has moved and before the bloom: hand every lit mesh its lights */
+  applyLighting(): void {
+    const w = this.app.screen.width, h = this.app.screen.height;
+    this.lighting.frame({ x: this.cameraX, y: this.cameraY, r: Math.hypot(w, h) / 2 / this.cameraZoom });
+  }
+
+  /**
+   * A system's light: its ambient (from its sky, dimmer in dark systems, or
+   * set in its data) and its central body's (a sun's warm light, a black
+   * hole's disc glow, a pulsar's cold one).
+   */
+  private lightSystem(v: SystemVisuals, biome: SkyBiome): void {
+    const sys = this.sys.data;
+    // A planet's surface: daylight, from the same way the ground is shaded
+    const day = sys?.surface ? this.surface.light() : null;
+    if (day) {
+      const tl = Math.max(...day.tint) || 1;
+      // Underground: no sun, a little dim light, most of it the glow of the cracks in the floor coming up
+      if (!day.sun) {
+        this.lighting.ambient = [0, 1, 2].map((i) => day.ambient * (0.45 + 0.55 * (day.tint[i] / tl))) as [number, number, number];
+        this.lighting.sun.power = 0;
+        this.lighting.ground = day.ground;
+        this.day = { ambient: [...this.lighting.ambient] as [number, number, number], power: 0 };
+        return;
+      }
+      const lava = sys?.surface?.kind === 'lava';
+      // (a lava world's sky is its own haze: the light takes much more of its colour, and the sun comes through it warm)
+      this.lighting.ambient = [0, 1, 2].map((i) => day.ambient * ((lava ? 0.55 : 0.8) + (lava ? 0.45 : 0.2) * (day.tint[i] / tl))) as [number, number, number];
+      Object.assign(this.lighting.sun, { x: -SUN_DIR[0] * 1e8, y: -SUN_DIR[1] * 1e8, falloff: 1e9, power: 0.8, color: lava ? [1, 0.82, 0.66] : [1, 0.96, 0.88], elevation: 0.85 });
+      this.lighting.ground = day.ground;
+      this.day = { ambient: [...this.lighting.ambient] as [number, number, number], power: 0.8 };
+      return;
+    }
+    this.lighting.ground = [0, 0, 0];
+    const AMBIENT: Record<string, number> = { band: 0.3, cluster: 0.32, emission: 0.28, ember: 0.22, remnant: 0.22, void: 0.06, abyss: 0.07 };
+    let level = typeof sys?.visuals?.ambient === 'number' ? sys.visuals.ambient : AMBIENT[biome.kind] ?? 0.25;
+    if (v.hazards?.includes('darkness')) level *= 0.6;
+    // Tinted a little by the sky's own colour
+    const tint = biome.nebula.strength > 0.05 ? biome.nebula.b : biome.band.edge;
+    const tl = Math.max(tint[0], tint[1], tint[2]) || 1;
+    this.lighting.ambient = [0, 1, 2].map((i) => level * (0.75 + 0.25 * (tint[i] / tl))) as [number, number, number];
+    const sun = this.lighting.sun;
+    sun.x = 0; sun.y = 0;
+    if (v.noCentralBody) sun.power = 0;
+    else if (v.centralType === 'black_hole') {
+      Object.assign(sun, { power: 1.1, falloff: (v.centralRadius ?? 1000) * 10, color: this.hslRgb(v.centralHue ?? 30, 0.85, 0.62), elevation: 0.55 });
+    } else if (v.centralType === 'pulsar') {
+      Object.assign(sun, { power: 0.9, falloff: 25000, color: this.hslRgb(v.centralHue ?? 190, 0.6, 0.78), elevation: 0.7 });
+    } else if (v.centralType === 'brown_dwarf') {
+      // Dim and red: the planets and rocks catch a low ember light
+      Object.assign(sun, { power: 0.75, falloff: 30000 + (v.centralRadius ?? 0), color: this.hslRgb(v.centralHue ?? 14, 0.75, 0.6), elevation: 0.45 });
+    } else {
+      const r = v.detailStar ? v.detailParams?.radius ?? v.starRadius : v.starRadius;
+      Object.assign(sun, { power: 1.0, falloff: 39000 + r, color: this.hslRgb(v.starHue, 0.55, 0.84), elevation: 0.55 });
+    }
+  }
+
+  /** How dark it is on this surface (0 day .. 1 night): a moon siege's nights */
+  setNight(k: number): void {
+    this.surface.setNight(k);
+  }
+
+  /** Each ship's shadow on the ground, cast away from the sun */
+  /** `under`: underground (no sun: each falls nearly straight below its ship, darker, the glow all round softening it) */
+  private drawShadows(under = false): void {
+    this.shadows.begin();
+    for (const [id, r] of this.shipRadius) {
+      const e = this.state.entities.get(id);
+      if (!e) continue;
+      const off = under ? 20 + r * 0.25 : 60 + r * 0.9;
+      const s = this.shadows.take(glowBall(), e.renderX + SUN_DIR[0] * off, e.renderY + SUN_DIR[1] * off, 0.5, 0.5, 0x000000, under ? 0.62 : 0.42);
+      s.scale.set((r * (under ? 2.9 : 2.6)) / DOT_SIZE);
+    }
+    this.shadows.end();
+  }
+
+  /** A surface's city (built once while you're there) and the edge of its map */
+  private setCity(sys: StarSystemData | null): void {
+    const id = sys?.id ?? null;
+    if ((this.city?.system ?? null) === id) return;
+    this.city?.view?.dispose();
+    this.city?.bastion?.dispose();
+    this.city = null;
+    this.surfaceEdge.clear();
+    if (!sys?.surface) return;
+    const s = sys.surface;
+    const view = s.city ? new CityView(s.city, s.seed ?? 1, this.lighting) : null;
+    const bastion = s.bastion ? new BastionView(s.bastion, this.lighting) : null;
+    if (view) this.backgroundContainer.addChild(view.container);
+    if (bastion) this.backgroundContainer.addChild(bastion.container);
+    this.city = { system: sys.id, view, bastion };
+    // The edge: a dashed ring (fly past it to climb back to orbit)
+    const R = s.radius, dashes = 120;
+    for (let k = 0; k < dashes; k++) {
+      const a0 = (k / dashes) * Math.PI * 2, a1 = a0 + (Math.PI * 2 / dashes) * 0.55;
+      this.surfaceEdge.moveTo(Math.cos(a0) * R, Math.sin(a0) * R).arc(0, 0, R, a0, a1);
+    }
+    this.surfaceEdge.stroke({ color: 0xe8f4ff, width: 40, alpha: 0.35 });
+  }
+
+  /** The renderer's own lights: old-style flashes, loot, rifts, stations */
+  private collectLights(L: Lighting): void {
+    this.weaponFx.collectLights(L);
+    for (const f of this.flashes) {
+      const t = f.life / f.max;
+      L.point(f.x, f.y, f.color, f.radius * (1 + f.grow * t) * 3 + 40, f.alpha * (1 - t) * 1.2);
+    }
+    const RARITY = [0xc8d0dc, 0x5fd38d, 0x4fa3ff, 0xc77dff, 0xffb347];
+    for (const [id, c] of this.entityGraphics) {
+      if (!c.visible) continue;
+      const e = this.state.entities.get(id);
+      if (!e) continue;
+      if (e.type === EntityType.DroppedItem) L.point(c.x, c.y, RARITY[Math.max(0, Math.min(4, e.data?.[0] ?? 0))], 170, 0.45, 50);
+      else if (e.type === EntityType.Portal) L.point(c.x, c.y, e.data?.[1] === 1 ? 0xb28cff : 0x7dd3fc, 1600, 0.8 * (this.gates.get(id)?.pulse ?? 1), 300);
+      else if (e.type === EntityType.Station) this.stations.get(id)?.collectLights(L, c.x, c.y, c.rotation);
+    }
+    // In space, ships shade the structures under them (on a surface they have their shadows on the ground)
+    if (!this.surface.active) for (const [id, r] of this.shipRadius) {
+      const e = this.state.entities.get(id);
+      if (e) L.shadow(e.renderX, e.renderY, r);
+    }
+  }
+
+  /** Once a frame, after everything has moved */
+  renderBloom(): void {
+    this.bloom.render();
   }
 
   onResize(): void {
-    // Update any screen-space UI
+    this.bloom.resize();
+    this.sky.resize();
+    this.surface.resize();
+    // Update any screen-space UI (the death screen keeps its place in its fade)
     if (this.deathOverlay) {
-      this.hideDeathScreen();
-      this.showDeathScreen();
+      const old = this.deathOverlay;
+      const alpha = old.alpha, titleScale = old.getChildByLabel('deathTitle')?.scale.x;
+      this.uiContainer.removeChild(old);
+      old.destroy({ children: true });
+      this.buildDeathScreen();
+      // (It starts at 0: carry the fade across, so a resize while dead doesn't flash the world back)
+      if (this.deathOverlay) {
+        this.deathOverlay.alpha = alpha;
+        if (titleScale !== undefined) this.deathOverlay.getChildByLabel('deathTitle')?.scale.set(titleScale);
+      }
     }
     
     // Reposition minimap
     if (this.minimapContainer) {
       this.minimapContainer.x = this.app.screen.width - this.MINIMAP_SIZE - 15;
     }
+    
+    // Starfield quad rescales itself in update(), nothing to do here
   }
   
+  /** The minimap's nests and way-ins together (reused) */
+  private nestScratch: typeof this.wayIns = [];
+
   private updateMinimap(): void {
     if (!this.minimapGraphics || !this.minimapContainer) return;
     
     const g = this.minimapGraphics;
     g.clear();
+    // Turned with the view, so it reads the same way as the screen
+    g.pivot.set(this.MINIMAP_SIZE / 2, this.MINIMAP_SIZE / 2);
+    g.position.set(this.MINIMAP_SIZE / 2, this.MINIMAP_SIZE / 2);
+    g.rotation = -this.cameraAngle;
     
     const playerPos = this.state.getPlayerPosition();
     const center = this.MINIMAP_SIZE / 2;
@@ -3062,6 +2012,21 @@ export class Renderer {
       g.fill({ color: 0xffaa00, alpha: 0.9 });
       g.circle(sunX, sunY, 5);
       g.fill({ color: 0xffff88, alpha: 1.0 });
+    }
+
+    // Hostile nests: a triangle in their faction's colour
+    const nestList = this.nestScratch;
+    nestList.length = 0;
+    for (const n of this.sys.data?.nests ?? []) nestList.push(n);
+    for (const n of this.wayIns) nestList.push(n);
+    for (const n of nestList) {
+      const at = nestPosition(n, this.sys.data?.planets, this.state.getRawServerTick());
+      const dx = at.x - playerPos.x, dy = at.y - playerPos.y;
+      if (dx * dx + dy * dy > this.MINIMAP_RANGE * this.MINIMAP_RANGE) continue;
+      const mx = center + dx * scale, my = center + dy * scale;
+      g.poly([mx, my - 6, mx + 5.5, my + 4, mx - 5.5, my + 4]);
+      g.fill({ color: nestColor(n.faction), alpha: 0.35 });
+      g.stroke({ color: nestColor(n.faction), width: 1.5, alpha: 0.95 });
     }
     
     // Draw entities
@@ -3097,6 +2062,24 @@ export class Renderer {
           g.circle(mx, my, 4);
           g.fill({ color: 0xff4444, alpha: 0.9 }); // Red for enemies
           break;
+
+        case EntityType.ShipBody: {
+          // data[0]: 3 hostile (in its faction's colour; bigger for elites and bosses), 2 traffic, 1 wreck/derelict
+          const kind = entity.data?.[0] ?? 0;
+          if (kind === 3) {
+            const rank = entity.data?.[4] ?? 0;
+            g.circle(mx, my, rank === 2 ? 6 : rank === 1 ? 4.5 : 3.5);
+            // (Grey while it's a passive pack nobody's provoked)
+            g.fill({ color: entity.data?.[9] === 1 ? 0x9ca3af : FACTION_COLORS[entity.data?.[3] ?? -1] ?? 0xff4444, alpha: entity.data?.[9] === 1 ? 0.7 : 0.95 });
+          } else if (kind === 2) {
+            g.circle(mx, my, 2.5);
+            g.fill({ color: 0x9fd8ff, alpha: 0.75 }); // Pale blue for traffic
+          } else if (kind === 1) {
+            g.circle(mx, my, 2.5);
+            g.fill({ color: 0x8a8a8a, alpha: 0.7 }); // Grey for wrecks and derelicts
+          }
+          break;
+        }
           
         case EntityType.Station:
           g.rect(mx - 5, my - 5, 10, 10);

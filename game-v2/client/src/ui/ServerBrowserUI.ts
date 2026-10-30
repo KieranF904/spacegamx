@@ -2,6 +2,8 @@
  * Server Browser UI - Shows available servers after login
  */
 
+import { LOBBY_URL } from '../network/lobby';
+
 export interface ServerInfo {
   host: string;
   port: number;
@@ -22,8 +24,8 @@ export class ServerBrowserUI {
   private error = '';
   private sortBy: 'ping' | 'name' = 'ping';
   
-  // Server browser URL
-  private browserUrl = 'https://spacegame-v2.fly.dev';
+  // Server browser URL (override with VITE_BROWSER_URL at build/dev time)
+  private browserUrl = LOBBY_URL;
   
   // Callbacks
   public onServerSelect: ((server: ServerInfo) => void) | null = null;
@@ -519,13 +521,13 @@ export class ServerBrowserUI {
     // Fallback servers in case API is unavailable
     const fallbackServers: ServerInfo[] = [
       {
-        host: 'spacegame-v2-server.fly.dev',
-        port: 443,
-        name: 'Sydney (Primary)',
-        region: 'Sydney',
+        host: window.location.hostname || 'localhost',
+        port: 3000,
+        name: 'Local Dev Server',
+        region: 'local',
         maxPlayers: 32,
         players: 0,
-        secure: true,
+        secure: false,
       }
     ];
     

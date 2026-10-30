@@ -1,237 +1,3611 @@
 {
+  "_comment": "Quests. Steps run in order: travel {system}, dock {station}, mine/loot/refine {item?, count}, craft {item?, category? ('part'), count}, refit {fn?, material?, count?, minParts?}, kill {faction?, enemy?, system?, count}, deliver {items} (handed over at the giver's station), sell {credits}, level {level}, boss {boss}. 'auto' quests start themselves when their prerequisites are met (the story). Rewards: xp, credits, items (to storage), plans (ship blueprints), recipes (fn:* / material:* fabrication licences), licences (system ids), reputation, skillPoints. Station bounties are generated (common/src/econ/quests.ts).",
+  "reputations": {
+    "sol_patrol": {
+      "name": "Sol Patrol",
+      "description": "The system militia. Pays bounties on raiders.",
+      "vendor": {
+        "stations": [
+          "sol_station_sentinel",
+          "sol_station_central",
+          "cinder_station_forge"
+        ],
+        "stock": [
+          {
+            "item": "repair_kit",
+            "rank": 0
+          },
+          {
+            "item": "boost_cell",
+            "rank": 0
+          },
+          {
+            "item": "field_repair_kit",
+            "rank": 1
+          },
+          {
+            "item": "targeting_chip",
+            "rank": 1
+          },
+          {
+            "item": "nanite_repair_kit",
+            "rank": 3
+          }
+        ]
+      }
+    },
+    "miners": {
+      "name": "Miners' Guild",
+      "description": "Every rock-cracker in the inner systems pays dues here.",
+      "vendor": {
+        "stations": [
+          "sol_station_mining",
+          "borealis_station_outpost",
+          "glasswater_station_depot"
+        ],
+        "stock": [
+          {
+            "item": "scanner_charge",
+            "rank": 0
+          },
+          {
+            "item": "repair_kit",
+            "rank": 0
+          },
+          {
+            "item": "servo_motor",
+            "rank": 1
+          },
+          {
+            "item": "titanium_plate",
+            "rank": 2
+          },
+          {
+            "item": "crystal_lens",
+            "rank": 3
+          },
+          {
+            "item": "field_repair_kit",
+            "rank": 3
+          },
+          {
+            "item": "cobalt_alloy",
+            "rank": 4
+          },
+          {
+            "item": "helium3",
+            "rank": 5
+          }
+        ]
+      }
+    },
+    "traders": {
+      "name": "Trade Consortium",
+      "description": "Merchants who keep the stations fed.",
+      "vendor": {
+        "stations": [
+          "sol_station_trade",
+          "glasswater_station_relay",
+          "void_station_lantern",
+          "nebula_research_station"
+        ],
+        "stock": [
+          {
+            "item": "boost_cell",
+            "rank": 0
+          },
+          {
+            "item": "insurance_bond",
+            "rank": 1
+          },
+          {
+            "item": "power_coupling",
+            "rank": 1
+          },
+          {
+            "item": "nav_computer",
+            "rank": 3
+          },
+          {
+            "item": "field_repair_kit",
+            "rank": 2
+          },
+          {
+            "item": "shield_emitter",
+            "rank": 4
+          },
+          {
+            "item": "nanite_repair_kit",
+            "rank": 4
+          },
+          {
+            "item": "quantum_core",
+            "rank": 5
+          }
+        ]
+      }
+    },
+    "shipwrights": {
+      "name": "Lagrange Shipwrights",
+      "description": "The yard that builds half the hulls in Sol.",
+      "vendor": {
+        "stations": [
+          "sol_station_lagrange",
+          "maw_station_watch"
+        ],
+        "stock": [
+          {
+            "item": "power_coupling",
+            "rank": 0
+          },
+          {
+            "item": "servo_motor",
+            "rank": 0
+          },
+          {
+            "item": "steel_plate",
+            "rank": 1
+          }
+        ]
+      }
+    },
+    "ark": {
+      "name": "The Ark",
+      "description": "An old order of duty. Not a church: service and discipline, and leaving when a herald says so.",
+      "vendor": {
+        "stations": ["sol_station_ark"],
+        "stock": [
+          {
+            "item": "repair_kit",
+            "rank": 0
+          },
+          {
+            "item": "insurance_bond",
+            "rank": 0
+          },
+          {
+            "item": "field_repair_kit",
+            "rank": 1
+          },
+          {
+            "item": "leestone",
+            "rank": 1
+          },
+          {
+            "item": "leestone_plate",
+            "rank": 2
+          },
+          {
+            "item": "scanner_charge",
+            "rank": 1
+          },
+          {
+            "item": "servo_motor",
+            "rank": 2
+          }
+        ]
+      }
+    },
+    "helios": {
+      "name": "Helios Directorate",
+      "description": "Runs the cluster's infrastructure from the Helios Array. Pays on time, in full, with a receipt.",
+      "vendor": {
+        "stations": [
+          "sol_station_helios"
+        ],
+        "stock": [
+          {
+            "item": "boost_cell",
+            "rank": 0
+          },
+          {
+            "item": "power_coupling",
+            "rank": 0
+          },
+          {
+            "item": "scanner_charge",
+            "rank": 0
+          },
+          {
+            "item": "field_repair_kit",
+            "rank": 1
+          },
+          {
+            "item": "crystal_lens",
+            "rank": 2
+          },
+          {
+            "item": "shield_emitter",
+            "rank": 2
+          },
+          {
+            "item": "nav_computer",
+            "rank": 3
+          }
+        ]
+      }
+    }
+  },
+  "restricted": {
+    "glasswater": {
+      "name": "Lane clearance",
+      "licence": "outer_lanes",
+      "hint": "You need lane clearance to leave Sol. Talk to Harbourmaster Okafor at Sol Central (job: Cleared for Departure)."
+    },
+    "borealis": {
+      "name": "Lane clearance",
+      "licence": "outer_lanes",
+      "hint": "You need lane clearance to leave Sol. Talk to Harbourmaster Okafor at Sol Central (job: Cleared for Departure)."
+    },
+    "nebula_prime": {
+      "name": "Lane clearance",
+      "licence": "outer_lanes",
+      "hint": "You need lane clearance to leave Sol. Talk to Harbourmaster Okafor at Sol Central (job: Cleared for Departure)."
+    },
+    "cinder_reach": {
+      "name": "Lane clearance",
+      "licence": "outer_lanes",
+      "hint": "You need lane clearance to leave Sol. Talk to Harbourmaster Okafor at Sol Central (job: Cleared for Departure)."
+    },
+    "the_maw": {
+      "name": "Maw transit licence",
+      "hint": "The Maw is sealed by Horizon Watch. You need a Maw transit licence (story: The Cinder Warden)."
+    }
+  },
   "quests": [
     {
-      "id": "tutorial_basics",
-      "name": "Welcome Pilot",
-      "description": "Learn the basics of ship control and combat.",
-      "giver": "dr_vance",
+      "id": "drift_01",
+      "chain": "patrol",
+      "name": "Into the Drift",
+      "person": "achebe",
+      "giver": "sol_station_sentinel",
       "level": 1,
-      "stages": [
-        {
-          "id": "move",
-          "type": "travel",
-          "description": "Use WASD to move your ship around.",
-          "objective": { "distance": 500 },
-          "dialogue": {
-            "start": "Welcome aboard, pilot! Let's start with the basics. Use WASD to move your ship."
-          }
-        },
-        {
-          "id": "boost",
-          "type": "action",
-          "description": "Hold SHIFT to boost.",
-          "objective": { "action": "boost", "count": 1 },
-          "dialogue": {
-            "start": "Excellent movement! Now try your boost - hold SHIFT to accelerate rapidly."
-          }
-        },
-        {
-          "id": "shoot",
-          "type": "action",
-          "description": "Left-click to fire your weapon.",
-          "objective": { "action": "fire", "count": 5 },
-          "dialogue": {
-            "start": "Now for combat training. Left-click to fire your blaster."
-          }
-        }
+      "requires": [
+        "main_01"
       ],
-      "rewards": {
-        "xp": 50,
-        "credits": 100,
-        "items": []
-      },
-      "prerequisites": [],
-      "repeatable": false
-    },
-    {
-      "id": "ice_sprite_hunt",
-      "name": "Sprite Slayer",
-      "description": "The Borealis system is overrun with Ice Sprites. Cull their numbers.",
-      "giver": "researcher_maya",
-      "level": 3,
-      "stages": [
+      "starter": true,
+      "intro": "Past Nereid there's a ring of junk we call the Drift, and it's crawling with Scrapborn: feral machines with cores gone wrong, heaping greyseam into nests. Thin them out. While you're there, one of their relay drones came down in the north-west of the Drift. Bring me its core. The yard wants a look at one that hasn't been shot to pieces.",
+      "steps": [
         {
-          "id": "travel_borealis",
-          "type": "travel",
-          "description": "Travel to the Borealis system.",
-          "objective": { "system": "borealis" },
-          "dialogue": {
-            "start": "The Borealis system has been overrun by Ice Sprites. They're interfering with our research. Travel there through the portal and eliminate some of them."
-          }
-        },
-        {
-          "id": "kill_sprites",
           "type": "kill",
-          "description": "Defeat 10 Ice Sprites.",
-          "objective": { "enemy": "ice_sprite", "count": 10 },
-          "dialogue": {
-            "start": "You've arrived. Now hunt down those Ice Sprites. Be careful - they're more dangerous than they look."
-          }
+          "faction": "scrapborn",
+          "count": 5,
+          "text": "Destroy 5 Scrapborn drones in the Drift (outer Sol)"
         },
         {
-          "id": "return",
-          "type": "interact",
-          "description": "Return to Researcher Maya.",
-          "objective": { "npc": "researcher_maya" },
-          "dialogue": {
-            "start": "Excellent work! Return to me for your reward."
-          }
+          "type": "recover",
+          "system": "sol",
+          "x": -64000,
+          "y": -82000,
+          "item": "drone_core",
+          "guard": 2,
+          "label": "a downed relay drone in the Drift",
+          "text": "Recover a Scrapborn relay drone's core (the Drift, north-west)"
+        },
+        {
+          "type": "deliver",
+          "items": {
+            "drone_core": 1
+          },
+          "text": "Bring the drone core to Lieutenant Achebe (Sentinel Watch)"
         }
       ],
+      "outro": "Not bad. They're dumb, but there are a lot of them. Keep at it and you'll be ready for the pirates in no time.",
       "rewards": {
-        "xp": 200,
-        "credits": 500,
-        "items": ["laser_mk1"]
+        "xp": 220,
+        "credits": 40,
+        "items": {
+          "repair_kit": 2
+        },
+        "reputation": {
+          "sol_patrol": 3
+        }
       },
-      "prerequisites": ["tutorial_basics"],
-      "repeatable": true
+      "rev": 2
     },
     {
-      "id": "mining_expedition",
-      "name": "Mining 101",
-      "description": "Learn to mine asteroids for valuable resources.",
-      "giver": "merchant_joe",
+      "id": "drift_02",
+      "chain": "patrol",
+      "name": "Heavy Junk",
+      "person": "achebe",
+      "giver": "sol_station_sentinel",
       "level": 2,
-      "stages": [
+      "requires": [
+        "drift_01"
+      ],
+      "intro": "The crawlers are the ones that worry the freighters: armoured, slow, and they never give up. Take a few down. Stay out of their reach and chip at them, and mind the Scrap Spitters' lasers.",
+      "steps": [
         {
-          "id": "get_mining_laser",
-          "type": "acquire",
-          "description": "Obtain a Mining Laser.",
-          "objective": { "item": "mining_laser_mk1", "count": 1 },
-          "dialogue": {
-            "start": "Want to make some credits? Mining is honest work. First, you'll need a mining laser. I've got one here for you."
-          }
+          "type": "kill",
+          "enemy": "scrap_crawler",
+          "count": 3,
+          "text": "Destroy 3 Scrap Crawlers"
         },
         {
-          "id": "equip_laser",
-          "type": "action",
-          "description": "Equip the Mining Laser.",
-          "objective": { "action": "equip", "item": "mining_laser_mk1" },
-          "dialogue": {
-            "start": "Great! Now equip it to one of your weapon slots."
-          }
-        },
-        {
-          "id": "mine_asteroids",
-          "type": "gather",
-          "description": "Mine 20 Iron Ore from asteroids.",
-          "objective": { "item": "ore_iron", "count": 20 },
-          "dialogue": {
-            "start": "Perfect! Now head to the asteroid belt and start mining. Hold your fire button on an asteroid to extract ore."
-          }
-        },
-        {
-          "id": "sell_ore",
-          "type": "interact",
-          "description": "Sell your ore at the station.",
-          "objective": { "station": "sol_station_trade", "action": "sell" },
-          "dialogue": {
-            "start": "Nice haul! Bring that ore to the trading station to sell it."
-          }
+          "type": "hold",
+          "system": "sol",
+          "x": 104300,
+          "y": -14400,
+          "radius": 600,
+          "seconds": 15,
+          "raid": 3,
+          "label": "Halcyon's Wake (the tug wreck)",
+          "text": "Plant a warning beacon at Tug Halcyon's Wake: hold steady 15 seconds",
+          "after": [
+            {
+              "say": "Beacon live. Freighters will give the wreck a wide berth now."
+            }
+          ]
         }
       ],
+      "outro": "That's the stuff. Scrap for the yard and a few fewer hazards on the lanes.",
+      "rewards": {
+        "xp": 450,
+        "credits": 75,
+        "items": {
+          "alloy_plate": 6,
+          "boost_cell": 2
+        },
+        "reputation": {
+          "sol_patrol": 4
+        }
+      },
+      "rev": 2
+    },
+    {
+      "id": "drift_03",
+      "chain": "patrol",
+      "name": "The Scrap Mother",
+      "person": "achebe",
+      "giver": "sol_station_sentinel",
+      "level": 8,
+      "requires": [
+        "drift_02"
+      ],
+      "intro": "Every drone out there comes from one place, the old hands say: a nest the size of a station, welded together out of everything that ever drifted past Nereid, round the richest greyseam in the Drift. We call her the Scrap Mother, and nobody has ever brought her core home in one piece. She's slow, but she isn't alone. Bring a friend if you can, and bring repair kits either way.",
+      "steps": [
+        {
+          "type": "boss",
+          "boss": "boss_scrap_mother",
+          "text": "Destroy the Scrap Mother (her nest, in the Drift south-west of Sol)"
+        }
+      ],
+      "outro": "You took down the Mother? Ha! The Drift'll be quiet for a while. Her core went to pieces with the rest of her, same as it always does. Here, you've earned this.",
+      "rewards": {
+        "xp": 900,
+        "credits": 150,
+        "items": {
+          "servo_motor": 1,
+          "repair_kit": 3
+        },
+        "reputation": {
+          "sol_patrol": 6
+        },
+        "skillPoints": 1
+      },
+      "reveal": {
+        "kills": {
+          "n": 20,
+          "of": "scrapborn"
+        }
+      },
+      "rumour": "They say something big sends the Drift scrap out to die, and Lt. Achebe wants it found."
+    },
+    {
+      "id": "main_01",
+      "chain": "main",
+      "name": "First Light",
+      "person": "vance",
+      "giver": "sol_station_central",
+      "level": 1,
+      "starter": true,
+      "intro": "Pilot. Good, you're awake. Three relay buoys in the outer belt went silent last night, and so did the ships sent to look. Before I can send you anywhere, you need a ship that pays its way. Crack some rock in the belt with your guns (your ship pulls the chunks in), then come back and dock.",
+      "steps": [
+        {
+          "type": "mine",
+          "count": 10,
+          "text": "Mine 10 ore: shoot asteroids, then fly through the chunks"
+        },
+        {
+          "type": "dock",
+          "station": "sol_station_central"
+        }
+      ],
+      "outro": "Clean work. Now, that Sparrow won't carry enough to matter. Here are the plans for a Prospector: a mining boat with a proper hold, and a licence to press its core. You build it yourself, part by part. I've thrown in what I can spare towards it.",
       "rewards": {
         "xp": 150,
-        "credits": 300,
-        "items": []
-      },
-      "prerequisites": ["tutorial_basics"],
-      "repeatable": false
+        "credits": 30,
+        "plans": [
+          "prospector"
+        ],
+        "recipes": [
+          "fn:core"
+        ],
+        "items": {
+          "power_coupling": 1,
+          "copper_ore": 8,
+          "iron_ore": 12,
+          "repair_kit": 2
+        },
+        "reputation": {
+          "sol_patrol": 3
+        }
+      }
     },
     {
-      "id": "system_explorer",
-      "name": "Explorer's Journey",
-      "description": "Visit all discovered star systems.",
-      "giver": "dr_vance",
-      "level": 5,
-      "stages": [
+      "id": "main_02",
+      "chain": "main",
+      "name": "The Prospector",
+      "person": "vance",
+      "giver": "sol_station_central",
+      "level": 1,
+      "requires": [
+        "main_01"
+      ],
+      "intro": "Open the station's Ships tab and start the Prospector in an empty hangar slot. Every part you don't have yet shows as a ghost. Make parts and they fit themselves: the small ones are pressed on the spot, the core takes a couple of minutes. Short of plate or wire? Mine more ore; the fabricator refines it for you.",
+      "steps": [
         {
-          "id": "visit_sol",
-          "type": "travel",
-          "description": "Visit the Sol System.",
-          "objective": { "system": "sol" },
-          "dialogue": {
-            "start": "As an explorer, you should familiarize yourself with all known systems. Start here in Sol."
-          }
+          "type": "slot",
+          "plan": "prospector",
+          "text": "Start the Prospector in a hangar slot (station → Ships)"
         },
         {
-          "id": "visit_borealis",
-          "type": "travel",
-          "description": "Visit the Borealis System.",
-          "objective": { "system": "borealis" },
-          "dialogue": {
-            "start": "The Borealis system awaits. Use the portal to travel there."
-          }
+          "type": "build",
+          "plan": "prospector",
+          "text": "Build every part of the Prospector (mine more ore if you run short)"
         },
         {
-          "id": "visit_nebula",
-          "type": "travel",
-          "description": "Visit Nebula Prime.",
-          "objective": { "system": "nebula_prime" },
-          "dialogue": {
-            "start": "Beautiful, isn't it? Now venture into Nebula Prime."
-          }
-        },
-        {
-          "id": "return_vance",
-          "type": "interact",
-          "description": "Report back to Dr. Vance.",
-          "objective": { "npc": "dr_vance" },
-          "dialogue": {
-            "start": "You've seen much of known space. Return to me and share your findings."
-          }
+          "type": "fly",
+          "plan": "prospector",
+          "text": "Take the Prospector out (Ships → Fly)"
         }
       ],
+      "outro": "Now that's a ship. A mining laser, a real hold, and a gun for anyone who argues. Go and earn your keep.",
       "rewards": {
-        "xp": 500,
-        "credits": 1000,
-        "items": ["booster_mk2"]
-      },
-      "prerequisites": ["tutorial_basics"],
-      "repeatable": false
+        "xp": 300,
+        "credits": 45,
+        "plans": [
+          "drum"
+        ],
+        "items": {
+          "boost_cell": 2
+        }
+      }
     },
     {
-      "id": "weapon_mastery",
-      "name": "Weapons Expert",
-      "description": "Test different weapon types in combat.",
-      "giver": "dr_vance",
-      "level": 4,
-      "stages": [
+      "id": "main_03",
+      "chain": "main",
+      "name": "Signal in the Noise",
+      "person": "vance",
+      "giver": "sol_station_central",
+      "level": 2,
+      "requires": [
+        "main_02"
+      ],
+      "intro": "We pulled the last buoy's log. Before it died it recorded a pulse: no words, no source, just a pattern repeating. Pirates have been circling the dead buoys ever since. Bulk your ship up to fifteen parts or more in the hangar (dock, then Hangar), then drive them off.",
+      "steps": [
         {
-          "id": "use_laser",
-          "type": "kill",
-          "description": "Defeat 5 enemies with a Laser weapon.",
-          "objective": { "weaponType": "laser", "count": 5 },
-          "dialogue": {
-            "start": "Every weapon has its strengths. Let's test your skills with different loadouts. Start with a laser weapon."
-          }
+          "type": "refit",
+          "minParts": 15,
+          "text": "Refit your ship to at least 15 parts (dock, then Hangar)"
         },
         {
-          "id": "use_missile",
           "type": "kill",
-          "description": "Defeat 5 enemies with Missiles.",
-          "objective": { "weaponType": "missile", "count": 5 },
-          "dialogue": {
-            "start": "Lasers are precise. Now try missiles - they track targets but move slower."
-          }
-        },
-        {
-          "id": "use_scatter",
-          "type": "kill",
-          "description": "Defeat 5 enemies with a Scatter Gun.",
-          "objective": { "weaponType": "scatter", "count": 5 },
-          "dialogue": {
-            "start": "Devastating power! Now test the scatter gun - deadly at close range."
-          }
+          "faction": "pirates",
+          "system": "sol",
+          "count": 3
         }
       ],
+      "outro": "Pirates don't usually swarm empty space. They're looking for something. Take these Arrow plans (a proper fighter) and a pair of coil windings for when you can fit a jump coil: bolt a coil or two on and your drive will reach a lot further. And talk to Harbourmaster Okafor about lane clearance: you'll need it to follow this anywhere.",
       "rewards": {
         "xp": 400,
-        "credits": 800,
-        "items": ["pulse_mk1"]
+        "credits": 60,
+        "plans": [
+          "arrow"
+        ],
+        "items": {
+          "crystal": 2,
+          "power_coupling": 1,
+          "coil_winding": 2
+        },
+        "reputation": {
+          "sol_patrol": 5
+        }
+      }
+    },
+    {
+      "id": "main_04",
+      "chain": "main",
+      "name": "Listening Post",
+      "person": "maya",
+      "giver": "borealis_station_outpost",
+      "level": 5,
+      "requires": [
+        "main_03",
+        "clearance"
+      ],
+      "intro": "Vance's message reached me. Borealis has the best ears in the inner systems. Take the gate east of Sol, dock here, and bring me frost glands from the Brood: their tissue resonates with exactly the frequency in the buoys' recording.",
+      "steps": [
+        {
+          "type": "travel",
+          "system": "borealis"
+        },
+        {
+          "type": "dock",
+          "station": "borealis_station_outpost"
+        },
+        {
+          "type": "deliver",
+          "items": {
+            "frost_gland": 3
+          },
+          "text": "Bring 3 Frost Glands (Frost Brood drop them) to Borealis Research"
+        }
+      ],
+      "outro": "The glands sing along with it, and the Brood scatter every time it peaks. Pilots call it the heartbeat. The observatory calls it a natural effect, the Maw or the pulsar, and I've no better answer. I'd just like to know why the Brood hate a natural effect so much. Take these couplings: you'll want a bigger ship where this is heading. And if you want thicker plating, Dr. Osei on Terra Nova is the one to ask about steel.",
+      "rewards": {
+        "xp": 700,
+        "credits": 90,
+        "reputation": {
+          "miners": 2
+        },
+        "items": {
+          "power_coupling": 2
+        }
+      }
+    },
+    {
+      "id": "main_05",
+      "chain": "main",
+      "name": "Glass and Echoes",
+      "person": "orrin",
+      "giver": "glasswater_station_depot",
+      "level": 7,
+      "requires": [
+        "main_04"
+      ],
+      "intro": "Maya sent you? Then you've heard it too. The crystals out in Glasswater hum on the same note. I need samples: real crystal, cracked fresh. Your guns won't scratch these rocks; you'll want a mining laser.",
+      "steps": [
+        {
+          "type": "travel",
+          "system": "glasswater"
+        },
+        {
+          "type": "mine",
+          "item": "crystal",
+          "count": 8
+        },
+        {
+          "type": "deliver",
+          "items": {
+            "crystal": 8
+          }
+        }
+      ],
+      "outro": "Every sample rings. The old crystal hands say something out past the Maw is broadcasting and the whole cluster is the bell. Quinn at the observatory says it's the pulsar setting the crystal off, and Quinn's usually right. Here, scanner charges and a couple of lenses: you'll want to see what's inside a rock before you cut it.",
+      "rewards": {
+        "xp": 900,
+        "credits": 135,
+        "items": {
+          "scanner_charge": 6,
+          "crystal_lens": 2
+        }
+      }
+    },
+    {
+      "id": "main_06",
+      "chain": "main",
+      "name": "The Prism Colossus",
+      "person": "orrin",
+      "giver": "glasswater_station_depot",
+      "level": 9,
+      "requires": [
+        "main_05"
+      ],
+      "intro": "There's a construct out in the deep field. We call it the Colossus: a lattice of crystal and stolen hull plate that wakes when the signal peaks. It's been eating our haulers. Kill it, and bring back what's left of its heart.",
+      "steps": [
+        {
+          "type": "boss",
+          "boss": "boss_prism_colossus",
+          "text": "Defeat the Prism Colossus in Glasswater (follow the marker)"
+        }
+      ],
+      "outro": "A prism shard. Hold it to the light and it pulses with the signal. Our lens-makers cut you a set of lenses for this.",
+      "rewards": {
+        "xp": 1500,
+        "credits": 225,
+        "skillPoints": 1,
+        "items": {
+          "crystal_lens": 3
+        }
+      }
+    },
+    {
+      "id": "main_07",
+      "chain": "main",
+      "name": "Quinn's Theory",
+      "person": "quinn",
+      "giver": "nebula_research_station",
+      "level": 11,
+      "requires": [
+        "main_06"
+      ],
+      "intro": "I've been tracking the pirates who swarm the dead buoys. They all answer to one captain, Rustjaw, and they all come from Nebula Prime. He's found something that listens to the signal. Come to the Observatory, and thin out his fleet on the way.",
+      "steps": [
+        {
+          "type": "travel",
+          "system": "nebula_prime"
+        },
+        {
+          "type": "dock",
+          "station": "nebula_research_station"
+        },
+        {
+          "type": "kill",
+          "faction": "pirates",
+          "system": "nebula_prime",
+          "count": 6
+        }
+      ],
+      "outro": "His raiders carry receivers tuned to the pulse. He's using it to find wrecks before anyone else. These Corsair plans came off one of his own ships; turn his design against him.",
+      "rewards": {
+        "xp": 1800,
+        "credits": 270,
+        "plans": [
+          "corsair"
+        ],
+        "reputation": {
+          "sol_patrol": 5
+        }
+      }
+    },
+    {
+      "id": "main_08",
+      "chain": "main",
+      "name": "Rustjaw",
+      "person": "quinn",
+      "giver": "nebula_research_station",
+      "level": 13,
+      "requires": [
+        "main_07"
+      ],
+      "intro": "Rustjaw's flagship has surfaced. It's a scrapyard with engines and he never flies alone. Take him down and recover his receiver.",
+      "steps": [
+        {
+          "type": "boss",
+          "boss": "boss_rustjaw",
+          "text": "Defeat Rustjaw in Nebula Prime"
+        }
+      ],
+      "outro": "The receiver points one way: through Cinder Reach and into the Maw. Rustjaw's gunners left their railgun slugs behind, too: they're yours.",
+      "rewards": {
+        "xp": 2500,
+        "credits": 450,
+        "skillPoints": 1,
+        "items": {
+          "railgun_slugs": 2
+        }
+      }
+    },
+    {
+      "id": "main_09",
+      "chain": "main",
+      "name": "Into the Cinders",
+      "person": "hale",
+      "giver": "cinder_station_forge",
+      "level": 18,
+      "requires": [
+        "main_08"
+      ],
+      "intro": "The Cinder Cult worship the signal. They say it's a summons from the Maw, calling the worthy home, and they burn any other ship flying Maw-ward. Clear a path, and bring me ash from their altars. I want to know what they're burning.",
+      "steps": [
+        {
+          "type": "travel",
+          "system": "cinder_reach"
+        },
+        {
+          "type": "dock",
+          "station": "cinder_station_forge"
+        },
+        {
+          "type": "kill",
+          "faction": "cinder",
+          "count": 8
+        },
+        {
+          "type": "deliver",
+          "items": {
+            "cinder_ash": 5
+          }
+        }
+      ],
+      "outro": "Titanium dust and something else, something that was alive. Take the Lancer plans and this titanium plate. You'll need a real warship for what they worship.",
+      "rewards": {
+        "xp": 3200,
+        "credits": 525,
+        "plans": [
+          "lancer"
+        ],
+        "items": {
+          "titanium_plate": 10
+        }
+      }
+    },
+    {
+      "id": "main_10",
+      "chain": "main",
+      "name": "The Cinder Warden",
+      "person": "hale",
+      "giver": "cinder_station_forge",
+      "level": 21,
+      "requires": [
+        "main_09"
+      ],
+      "intro": "The Cult's idol is a living furnace they call the Cinder Warden, anchored near the Maw gate. While it burns, Horizon Watch keeps the gate sealed. Put it out.",
+      "steps": [
+        {
+          "type": "boss",
+          "boss": "boss_cinder_warden",
+          "text": "Defeat the Cinder Warden in Cinder Reach"
+        }
+      ],
+      "outro": "The Watch has unsealed the gate for you, and only you. Here is your Maw transit licence. If the Cult are right and something's calling, you're the one going to answer it.",
+      "rewards": {
+        "xp": 4000,
+        "credits": 600,
+        "licences": [
+          "the_maw"
+        ],
+        "skillPoints": 1
+      }
+    },
+    {
+      "id": "main_11",
+      "chain": "main",
+      "name": "Horizon Watch",
+      "person": "kask",
+      "giver": "maw_station_watch",
+      "level": 23,
+      "requires": [
+        "main_10"
+      ],
+      "intro": "Welcome to the edge, pilot. The Maw's spawn come in waves when the signal peaks. Hold the line with us, then we'll talk about what's beyond.",
+      "steps": [
+        {
+          "type": "travel",
+          "system": "the_maw"
+        },
+        {
+          "type": "dock",
+          "station": "maw_station_watch"
+        },
+        {
+          "type": "kill",
+          "faction": "maw",
+          "count": 6
+        }
+      ],
+      "outro": "You held. Take these: plans for a Galleon. The Watch builds them to go where nothing else survives.",
+      "rewards": {
+        "xp": 5000,
+        "credits": 900,
+        "plans": [
+          "galleon"
+        ]
+      }
+    },
+    {
+      "id": "main_12",
+      "chain": "main",
+      "name": "Beyond the Horizon",
+      "person": "kask",
+      "giver": "maw_station_watch",
+      "level": 26,
+      "requires": [
+        "main_11"
+      ],
+      "intro": "The Void Sector is where the heartbeat echoes, and the Void Leviathan guards it. The wraiths gather around it like moths. Find it and silence it.",
+      "steps": [
+        {
+          "type": "travel",
+          "system": "void_sector"
+        },
+        {
+          "type": "boss",
+          "boss": "boss_void_leviathan",
+          "text": "Defeat the Void Leviathan"
+        }
+      ],
+      "outro": "The wraiths scattered when the Leviathan died. Our receivers say the heartbeat runs loudest now at the centre of the Maw; the observatory says that's the black hole and nothing more. Take the Hammerhead plans. You're going to need a carrier.",
+      "rewards": {
+        "xp": 7000,
+        "credits": 1200,
+        "plans": [
+          "hammerhead"
+        ],
+        "skillPoints": 1
+      }
+    },
+    {
+      "id": "main_13",
+      "chain": "main",
+      "name": "The Silent Signal",
+      "person": "kask",
+      "giver": "maw_station_watch",
+      "level": 30,
+      "requires": [
+        "main_12"
+      ],
+      "intro": "The heartbeat is loudest at the centre of the Maw, where the Heart is. The Cult say it's calling. The observatory says it's the black hole. All I know is the Heart has killed every crew the Watch has sent in. Go in, pilot, and put it down.",
+      "steps": [
+        {
+          "type": "boss",
+          "boss": "boss_maw_heart",
+          "text": "Defeat the Heart of the Maw"
+        }
+      ],
+      "outro": "When the Heart died, pilots all over the cluster heard the heartbeat stop. A moment later it was back. The observatory says its instruments logged nothing unusual. Kerr says it isn't the same, and that she doesn't know what that means. The Watch builds one Bastion a generation. These plans are yours.",
+      "rewards": {
+        "xp": 12000,
+        "credits": 3750,
+        "plans": [
+          "bastion"
+        ],
+        "skillPoints": 2
+      }
+    },
+    {
+      "id": "guild_01",
+      "chain": "guild",
+      "name": "Guild Dues",
+      "person": "brannoch",
+      "giver": "sol_station_mining",
+      "level": 1,
+      "starter": true,
+      "intro": "New faces pay dues in ore. Mine us a decent load and bring twenty iron. Do that and the Guild knows your name.",
+      "steps": [
+        {
+          "type": "mine",
+          "count": 40
+        },
+        {
+          "type": "deliver",
+          "items": {
+            "iron_ore": 20
+          }
+        }
+      ],
+      "outro": "You'll do. Guild pilots get first word on the good rocks.",
+      "rewards": {
+        "xp": 300,
+        "credits": 50,
+        "reputation": {
+          "miners": 8
+        }
+      }
+    },
+    {
+      "id": "guild_02",
+      "chain": "guild",
+      "name": "Proper Tools",
+      "person": "brannoch",
+      "giver": "sol_station_mining",
+      "level": 2,
+      "requires": [
+        "guild_01"
+      ],
+      "intro": "Shooting rocks is for pirates. Fit a mining laser (any station fabricator can press one) and hold right mouse on a rock. It cracks the harder ores your guns can't.",
+      "steps": [
+        {
+          "type": "refit",
+          "fn": "miner",
+          "count": 1,
+          "text": "Fit a mining laser to your ship"
+        },
+        {
+          "type": "mine",
+          "item": "copper_ore",
+          "count": 10
+        }
+      ],
+      "outro": "Now you're mining. Keep the copper, and have some wire on the Guild: wire is everything.",
+      "rewards": {
+        "xp": 450,
+        "credits": 60,
+        "items": {
+          "copper_wire": 10
+        },
+        "reputation": {
+          "miners": 8
+        }
+      }
+    },
+    {
+      "id": "guild_03",
+      "chain": "guild",
+      "name": "Ice Haul",
+      "person": "brannoch",
+      "giver": "sol_station_mining",
+      "level": 3,
+      "requires": [
+        "guild_02"
+      ],
+      "intro": "Ice is fuel, water and air. The outposts are short. Thirty units, delivered.",
+      "steps": [
+        {
+          "type": "mine",
+          "item": "ice",
+          "count": 30
+        },
+        {
+          "type": "deliver",
+          "items": {
+            "ice": 30
+          }
+        }
+      ],
+      "outro": "That'll keep the lights on for a week. Have some boost cells on the Guild.",
+      "rewards": {
+        "xp": 600,
+        "credits": 105,
+        "items": {
+          "boost_cell": 6
+        },
+        "reputation": {
+          "miners": 8
+        }
+      }
+    },
+    {
+      "id": "guild_04",
+      "chain": "guild",
+      "name": "Deep Seam",
+      "person": "brannoch",
+      "giver": "sol_station_mining",
+      "level": 5,
+      "requires": [
+        "guild_03"
+      ],
+      "intro": "The real money's in crystal and gems. You'll find them in glowing seams in the harder rocks out in Glasswater and Borealis. Bring me crystal and I'll give you something the Guild doesn't hand out lightly.",
+      "steps": [
+        {
+          "type": "mine",
+          "item": "crystal",
+          "count": 12
+        },
+        {
+          "type": "deliver",
+          "items": {
+            "crystal": 12
+          }
+        }
+      ],
+      "outro": "Ceres Hauler plans. Eighty-odd parts of armour and nothing to shoot with, but it'll carry a fortune if you fit cargo pods.",
+      "rewards": {
+        "xp": 1200,
+        "credits": 225,
+        "plans": [
+          "hauler"
+        ],
+        "reputation": {
+          "miners": 10
+        }
+      }
+    },
+    {
+      "id": "guild_05",
+      "chain": "guild",
+      "name": "The Hoarfrost Matriarch",
+      "person": "maya",
+      "giver": "borealis_station_outpost",
+      "level": 7,
+      "requires": [
+        "guild_04",
+        "main_04"
+      ],
+      "intro": "The Brood has a queen, the Hoarfrost Matriarch. She nests in the ice fields of Borealis, and every Guild crew that gets close comes back frozen solid, if it comes back. Brannoch asked me to ask you.",
+      "steps": [
+        {
+          "type": "boss",
+          "boss": "boss_hoarfrost",
+          "text": "Defeat the Hoarfrost Matriarch in Borealis"
+        }
+      ],
+      "outro": "Her heart is still cold to the touch. The Guild is in your debt, and so am I: here are coils and couplings off my own bench, for an EMP when you can fit one. They stop anything with a nervous system or a circuit.",
+      "rewards": {
+        "xp": 2000,
+        "credits": 330,
+        "reputation": {
+          "miners": 15
+        },
+        "skillPoints": 1,
+        "items": {
+          "coil_winding": 2,
+          "power_coupling": 2
+        }
+      }
+    },
+    {
+      "id": "guild_06",
+      "chain": "guild",
+      "name": "Heavy Metal",
+      "person": "brannoch",
+      "giver": "sol_station_mining",
+      "level": 11,
+      "requires": [
+        "guild_05"
+      ],
+      "intro": "Titanium. The big rocks have it, but you need a laser with some bite: a titanium-grade mining laser, or better. Bring me twenty.",
+      "steps": [
+        {
+          "type": "mine",
+          "item": "titanium_ore",
+          "count": 20
+        },
+        {
+          "type": "deliver",
+          "items": {
+            "titanium_ore": 20
+          }
+        }
+      ],
+      "outro": "Finest titanium I've seen out of a freelancer. You're Guild for life.",
+      "rewards": {
+        "xp": 2600,
+        "credits": 525,
+        "items": {
+          "titanium_plate": 6
+        },
+        "reputation": {
+          "miners": 15
+        }
       },
-      "prerequisites": ["tutorial_basics", "ice_sprite_hunt"],
-      "repeatable": false
+      "reveal": {
+        "mined": "titanium_ore"
+      },
+      "rumour": "Old Brannoch wants a miner who's cracked titanium."
+    },
+    {
+      "id": "sw_01",
+      "chain": "shipwright",
+      "name": "Apprentice's Bench",
+      "person": "marrow",
+      "giver": "sol_station_lagrange",
+      "level": 1,
+      "requires": [
+        "main_02"
+      ],
+      "intro": "So Vance thinks you can build. Let's see. Press me eight parts at any fabricator. Mix them up: hull, armour, conduit, whatever you like.",
+      "steps": [
+        {
+          "type": "craft",
+          "category": "part",
+          "count": 8,
+          "text": "Fabricate 8 ship parts"
+        }
+      ],
+      "outro": "Not bad for a first week. Keep them; that's what apprentices are paid in.",
+      "rewards": {
+        "xp": 300,
+        "credits": 45,
+        "items": {
+          "alloy_plate": 10
+        },
+        "reputation": {
+          "shipwrights": 8
+        }
+      }
+    },
+    {
+      "id": "sw_02",
+      "chain": "shipwright",
+      "name": "Armour Up",
+      "person": "marrow",
+      "giver": "sol_station_lagrange",
+      "level": 2,
+      "requires": [
+        "sw_01"
+      ],
+      "intro": "Armour plates soak up hits that would shred hull. Fit four of them to the ship you fly and show me.",
+      "steps": [
+        {
+          "type": "refit",
+          "fn": "armor",
+          "count": 4,
+          "text": "Fly a ship with 4 armour plates"
+        }
+      ],
+      "outro": "Good placement. Here: Bulwark plans. A brick with guns, and the best first warship I know of.",
+      "rewards": {
+        "xp": 500,
+        "credits": 75,
+        "plans": [
+          "bulwark"
+        ],
+        "reputation": {
+          "shipwrights": 8
+        },
+        "items": {
+          "composite_sheet": 6
+        }
+      }
+    },
+    {
+      "id": "sw_03",
+      "chain": "shipwright",
+      "name": "Four Barrels",
+      "person": "marrow",
+      "giver": "sol_station_lagrange",
+      "level": 4,
+      "requires": [
+        "sw_02"
+      ],
+      "intro": "Firepower next. Four guns on one hull, and enough generators to feed them. Then prove they work on some pirates.",
+      "steps": [
+        {
+          "type": "refit",
+          "fn": "weapon",
+          "count": 4,
+          "text": "Fly a ship with 4 guns"
+        },
+        {
+          "type": "kill",
+          "faction": "pirates",
+          "count": 4
+        }
+      ],
+      "outro": "Flak canisters, on the yard. Flak fills the sky with shrapnel; drones hate it.",
+      "rewards": {
+        "xp": 900,
+        "credits": 135,
+        "reputation": {
+          "shipwrights": 10
+        },
+        "items": {
+          "flak_canisters": 2
+        }
+      }
+    },
+    {
+      "id": "sw_04",
+      "chain": "shipwright",
+      "name": "Master's Mark",
+      "person": "marrow",
+      "giver": "sol_station_lagrange",
+      "level": 11,
+      "requires": [
+        "sw_03"
+      ],
+      "intro": "Last lesson. A real ship: fifty parts or more, built by you, flown by you. Then you're no apprentice.",
+      "steps": [
+        {
+          "type": "refit",
+          "minParts": 50,
+          "text": "Fly a ship of at least 50 parts"
+        }
+      ],
+      "outro": "That is a ship. Take a few missile crates from the yard, and my old shield emitter besides.",
+      "rewards": {
+        "xp": 2400,
+        "credits": 375,
+        "reputation": {
+          "shipwrights": 15
+        },
+        "skillPoints": 1,
+        "items": {
+          "missile_crate": 2,
+          "shield_emitter": 1
+        }
+      }
+    },
+    {
+      "id": "trade_01",
+      "chain": "traders",
+      "name": "Margins",
+      "person": "joe",
+      "giver": "sol_station_trade",
+      "level": 1,
+      "intro": "Every station pays different prices. Look for the green demand tags on the market. Earn me five hundred credits in sales and I'll show you a trick or two.",
+      "steps": [
+        {
+          "type": "sell",
+          "credits": 500
+        }
+      ],
+      "outro": "See? Buy low, haul, sell high. Here's an insurance bond. Carry it and losing your ship won't hurt so much.",
+      "rewards": {
+        "xp": 250,
+        "credits": 30,
+        "items": {
+          "insurance_bond": 1
+        },
+        "reputation": {
+          "traders": 8
+        }
+      }
+    },
+    {
+      "id": "trade_02",
+      "chain": "traders",
+      "name": "Supply Line",
+      "person": "joe",
+      "giver": "sol_station_trade",
+      "level": 4,
+      "requires": [
+        "trade_01"
+      ],
+      "intro": "The Lagrange yards are building warships for the Patrol and they're eating steel. Bring me ten steel plate and twenty copper wire and I'll sell it on.",
+      "steps": [
+        {
+          "type": "deliver",
+          "items": {
+            "steel_plate": 10,
+            "copper_wire": 20
+          }
+        }
+      ],
+      "outro": "Lovely. Pleasure doing business.",
+      "rewards": {
+        "xp": 900,
+        "credits": 330,
+        "reputation": {
+          "traders": 10
+        }
+      }
+    },
+    {
+      "id": "trade_03",
+      "chain": "traders",
+      "name": "Long Haul",
+      "person": "joe",
+      "giver": "sol_station_trade",
+      "level": 9,
+      "requires": [
+        "trade_02"
+      ],
+      "intro": "Titanium plate fetches a fortune in Sol. The Ember Forge makes it, if you can live through Cinder Reach. Ten plates.",
+      "steps": [
+        {
+          "type": "deliver",
+          "items": {
+            "titanium_plate": 10
+          }
+        }
+      ],
+      "outro": "You made it back! Here's a nav computer I've been saving. Wraiths drop them, if you're brave.",
+      "rewards": {
+        "xp": 2000,
+        "credits": 750,
+        "items": {
+          "nav_computer": 1
+        },
+        "reputation": {
+          "traders": 15
+        }
+      }
+    },
+    {
+      "id": "patrol_01",
+      "chain": "patrol",
+      "name": "Patrol Contract",
+      "person": "achebe",
+      "giver": "sol_station_sentinel",
+      "level": 3,
+      "requires": [
+        "main_03"
+      ],
+      "intro": "The smugglers have the Lanes timed: they know when the Patrol passes. So we pass faster. Fly the sweep course through the Lanes, then pick up the cache they've stashed out there. They'll be watching it.",
+      "steps": [
+        {
+          "type": "course",
+          "system": "sol",
+          "x": 70000,
+          "y": 50000,
+          "rings": 6,
+          "seconds": 90,
+          "spacing": 2200,
+          "label": "the Lanes sweep marker",
+          "text": "Fly the patrol sweep through the Lanes: 6 rings in 90 seconds"
+        },
+        {
+          "type": "recover",
+          "system": "sol",
+          "x": -60000,
+          "y": -60000,
+          "item": "smuggler_cache",
+          "guard": 3,
+          "label": "the smugglers' stash",
+          "text": "Take the smugglers' cache from its stash in the Lanes"
+        },
+        {
+          "type": "deliver",
+          "items": {
+            "smuggler_cache": 1
+          },
+          "text": "Bring the cache to Lieutenant Achebe (Sentinel Watch)"
+        }
+      ],
+      "outro": "The lanes thank you. The Patrol remembers its friends.",
+      "rewards": {
+        "xp": 800,
+        "credits": 150,
+        "items": {
+          "targeting_chip": 1
+        },
+        "reputation": {
+          "sol_patrol": 10
+        }
+      },
+      "rev": 2
+    },
+    {
+      "id": "clearance",
+      "chain": "main",
+      "name": "Cleared for Departure",
+      "person": "okafor",
+      "giver": "sol_station_central",
+      "level": 2,
+      "requires": [
+        "main_03"
+      ],
+      "intro": "Nobody leaves Sol on my watch without lane clearance, and right now there's nothing to clear you on: the three nav buoys on the departure lanes are gone, scrapped for parts by someone who should know better. So you'll put them back. Here are the patterns for the buoy parts. Fabricate a Constructor and fit it to your ship, make up the parts (frame, mast, power cells, dish: four for each buoy), then fly out to each buoy's site and build it. You don't need everything at once: what you put up stays up. Then Lieutenant Achebe signs you off.",
+      "steps": [
+        {
+          "type": "refit",
+          "fn": "constructor",
+          "count": 1,
+          "text": "Fabricate a Constructor and fit it to your ship (station: Ships)",
+          "after": [
+            {
+              "say": "That's a Constructor. Now make up the buoy parts and get out to Alpha."
+            }
+          ]
+        },
+        {
+          "type": "construct",
+          "system": "sol",
+          "x": 45114,
+          "y": -39099,
+          "label": "nav buoy Alpha",
+          "structure": "nav_buoy",
+          "pieces": [
+            {
+              "id": "frame",
+              "item": "buoy_frame",
+              "name": "frame"
+            },
+            {
+              "id": "mast",
+              "item": "buoy_mast",
+              "name": "mast"
+            },
+            {
+              "id": "cell",
+              "item": "buoy_cell",
+              "name": "power cells"
+            },
+            {
+              "id": "dish",
+              "item": "buoy_dish",
+              "name": "transponder dish"
+            }
+          ],
+          "seconds": 5,
+          "text": "Construct nav buoy Alpha (frame, mast, power cells, dish)",
+          "after": [
+            {
+              "say": "Alpha's up and talking. Beta next."
+            }
+          ]
+        },
+        {
+          "type": "construct",
+          "system": "sol",
+          "x": -55969,
+          "y": 3109,
+          "label": "nav buoy Beta",
+          "structure": "nav_buoy",
+          "pieces": [
+            {
+              "id": "frame",
+              "item": "buoy_frame",
+              "name": "frame"
+            },
+            {
+              "id": "mast",
+              "item": "buoy_mast",
+              "name": "mast"
+            },
+            {
+              "id": "cell",
+              "item": "buoy_cell",
+              "name": "power cells"
+            },
+            {
+              "id": "dish",
+              "item": "buoy_dish",
+              "name": "transponder dish"
+            }
+          ],
+          "seconds": 5,
+          "text": "Construct nav buoy Beta (frame, mast, power cells, dish)",
+          "after": [
+            {
+              "say": "Beta's live. One more."
+            }
+          ]
+        },
+        {
+          "type": "construct",
+          "system": "sol",
+          "x": 8828,
+          "y": 61799,
+          "label": "nav buoy Gamma",
+          "structure": "nav_buoy",
+          "pieces": [
+            {
+              "id": "frame",
+              "item": "buoy_frame",
+              "name": "frame"
+            },
+            {
+              "id": "mast",
+              "item": "buoy_mast",
+              "name": "mast"
+            },
+            {
+              "id": "cell",
+              "item": "buoy_cell",
+              "name": "power cells"
+            },
+            {
+              "id": "dish",
+              "item": "buoy_dish",
+              "name": "transponder dish"
+            }
+          ],
+          "seconds": 5,
+          "text": "Construct nav buoy Gamma (frame, mast, power cells, dish)",
+          "after": [
+            {
+              "say": "That's all three. The departure lanes are lit again. Go and get Lieutenant Achebe's sign-off at Sentinel Watch."
+            }
+          ]
+        },
+        {
+          "type": "talk",
+          "person": "achebe",
+          "text": "Get Lieutenant Achebe's sign-off (Sentinel Watch)",
+          "lines": [
+            {
+              "say": "Okafor sent you for a sign-off? Fine. Three questions, and I don't give hints."
+            },
+            {
+              "ask": "One: you're out past the gates, your hull's in tatters and there's a pack on your tail. What do you do?",
+              "choices": [
+                {
+                  "text": "Turn and fight. Never run.",
+                  "then": [
+                    {
+                      "say": "And then you're a wreck I have to log. Wrong. Think it over and come back."
+                    },
+                    {
+                      "end": true
+                    }
+                  ]
+                },
+                {
+                  "text": "Call the Patrol.",
+                  "then": [
+                    {
+                      "say": "Past the gates? We won't hear you. Wrong. Think it over and come back."
+                    },
+                    {
+                      "end": true
+                    }
+                  ]
+                },
+                {
+                  "text": "Boost for the nearest station: nothing follows you inside.",
+                  "then": [
+                    {
+                      "say": "Good. They break off the moment you're docked."
+                    },
+                    {
+                      "ask": "Two: your batteries are dry and you're still thrusting. What do your guns do?",
+                      "choices": [
+                        {
+                          "text": "Fire at half rate.",
+                          "then": [
+                            {
+                              "say": "They don't. Wrong. Think it over and come back."
+                            },
+                            {
+                              "end": true
+                            }
+                          ]
+                        },
+                        {
+                          "text": "Nothing: the engines take every bit of power first.",
+                          "then": [
+                            {
+                              "say": "Right. So stop thrusting when you need to shoot."
+                            },
+                            {
+                              "ask": "Last one: your ship's coming apart mid-fight. What should be on your quick bar?",
+                              "choices": [
+                                {
+                                  "text": "Boost cells.",
+                                  "then": [
+                                    {
+                                      "say": "Running helps. Running in pieces doesn't. Wrong. Come back when you've thought about it."
+                                    },
+                                    {
+                                      "end": true
+                                    }
+                                  ]
+                                },
+                                {
+                                  "text": "Repair kits.",
+                                  "then": [
+                                    {
+                                      "say": "Good. You listen, which is more than most."
+                                    },
+                                    {
+                                      "say": "Here's my sign-off. Take it to Okafor."
+                                    },
+                                    {
+                                      "advance": true
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "text": "Draw from the hull.",
+                          "then": [
+                            {
+                              "say": "Ships don't run on hull. Wrong. Think it over and come back."
+                            },
+                            {
+                              "end": true
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "talk",
+          "person": "okafor",
+          "text": "Take Lieutenant Achebe's sign-off to Harbourmaster Okafor (Sol Central)",
+          "lines": [
+            {
+              "say": "Achebe signed it? She doesn't sign much."
+            },
+            {
+              "say": "Then you're cleared: Glasswater through the Cyan Rift, and Borealis, Nebula Prime and Cinder Reach through the gates. Glasswater is the gentle one. Start there."
+            }
+          ]
+        }
+      ],
+      "outro": "Fly safe out there, pilot. And if you get in over your head, the gates work both ways.",
+      "rewards": {
+        "xp": 700,
+        "credits": 120,
+        "licences": [
+          "outer_lanes"
+        ],
+        "reputation": {
+          "sol_patrol": 3
+        }
+      },
+      "rev": 3,
+      "onStart": {
+        "recipes": [
+          "buoy_frame",
+          "buoy_mast",
+          "buoy_cell",
+          "buoy_dish"
+        ]
+      }
+    },
+    {
+      "id": "osei_01",
+      "chain": "science",
+      "name": "Brittle Alloys",
+      "person": "osei",
+      "level": 3,
+      "requires": [
+        "main_02"
+      ],
+      "offer": [
+        {
+          "say": "You came down. Good. Most pilots won't leave orbit for a scientist."
+        },
+        {
+          "say": "Alloy is cheap and light, and every pilot in Sol flies it. It also fails. The Kestrel, out in the inner belt, came apart along a seam you could fit your fist in, and nobody asked why. I'm asking."
+        },
+        {
+          "say": "Bring me a piece of her hull, and nickel ore from the belt: I want to see what a better metal would be made of."
+        }
+      ],
+      "intro": "Alloy is cheap and light, and every pilot in Sol flies it. It also fails. The Kestrel, out in the inner belt, came apart along a seam you could fit your fist in, and nobody asked why. I'm asking. Bring me a piece of her hull, and nickel ore from the belt: I want to see what a better metal would be made of.",
+      "steps": [
+        {
+          "type": "visit",
+          "system": "sol",
+          "x": -18805,
+          "y": -33432,
+          "radius": 900,
+          "label": "the Kestrel wreck",
+          "text": "Recover a piece of the Kestrel's hull (the inner belt, Sol)",
+          "give": {
+            "fractured_plating": 1
+          },
+          "after": [
+            {
+              "say": "You have it? Look at the edge: no tearing, just a clean split. It didn't bend at all before it broke. That's what alloy does."
+            },
+            {
+              "say": "Now the nickel. Any metal asteroid in the belt is full of it."
+            }
+          ]
+        },
+        {
+          "type": "mine",
+          "item": "nickel_ore",
+          "count": 12,
+          "text": "Mine 12 nickel ore (metal asteroids)"
+        },
+        {
+          "type": "talk",
+          "person": "osei",
+          "take": {
+            "fractured_plating": 1,
+            "nickel_ore": 12
+          },
+          "text": "Bring the plating and the nickel to Dr. Osei (Terra Nova)",
+          "lines": [
+            {
+              "say": "Put it on the bench. Here, under the scope."
+            },
+            {
+              "say": "Alloy's grains are coarse, so a crack runs straight through them. Iron with enough nickel, worked hot enough, grows fine grains that turn a crack aside. That's steel."
+            },
+            {
+              "say": "Every refinery can press steel plate. But plate isn't parts: to fabricate steel parts that don't crack you need the old foundry methods, and nobody has had them since the Halcyon foundry closed."
+            }
+          ]
+        }
+      ],
+      "outro": "Thank you, pilot. This is the first real evidence I've had. Once you have lane clearance and can get out of Sol, I'll have more for you.",
+      "rewards": {
+        "xp": 500,
+        "credits": 40,
+        "reputation": {
+          "shipwrights": 3
+        }
+      }
+    },
+    {
+      "id": "osei_02",
+      "chain": "science",
+      "name": "The Crucible Pattern",
+      "person": "osei",
+      "level": 4,
+      "requires": [
+        "osei_01",
+        "clearance"
+      ],
+      "intro": "The Halcyon foundry in Glasswater poured the best steel this cluster ever made. Then it closed and its people scattered. Its records went out on a freighter, the Shattered Bell, which never made it home: she's still out in the Glasswater field, and scavengers have been picking at her. Find her logs. If anyone who worked the foundry is still alive, the logs will say who.",
+      "steps": [
+        {
+          "type": "travel",
+          "system": "glasswater",
+          "text": "Travel to Glasswater (through the Cyan Rift in Sol)"
+        },
+        {
+          "type": "kill",
+          "faction": "scavengers",
+          "system": "glasswater",
+          "count": 4,
+          "text": "Drive off the scavengers picking at the Shattered Bell (Glasswater)"
+        },
+        {
+          "type": "visit",
+          "system": "glasswater",
+          "x": -24000,
+          "y": -14000,
+          "radius": 1500,
+          "label": "the Shattered Bell",
+          "text": "Search the Shattered Bell for the foundry's logs",
+          "give": {
+            "foundry_log": 1
+          },
+          "after": [
+            {
+              "say": "The foreman's notes... One name comes up again and again: Pell, a crucible hand. If he's still alive he'll be at the Prism Relay. The old foundry crews all ended up there."
+            }
+          ]
+        },
+        {
+          "type": "talk",
+          "person": "pell",
+          "text": "Find out what Old Pell remembers (Prism Relay)",
+          "lines": [
+            {
+              "say": "Pell. Who's asking, and what do you want with an old man?"
+            },
+            {
+              "ask": "(He keeps one eye on the door.)",
+              "choices": [
+                {
+                  "text": "Dr. Osei, at the Meridian Institute, wants to know how the foundry made its steel.",
+                  "then": [
+                    {
+                      "say": "The Institute. They shut us down. Why would I help them?"
+                    },
+                    {
+                      "choices": [
+                        {
+                          "text": "Because alloy hulls are killing pilots. The Kestrel split in two.",
+                          "then": [
+                            {
+                              "say": "The Kestrel..."
+                            },
+                            {
+                              "say": "My brother flew the Kestrel."
+                            },
+                            {
+                              "say": "Here. I kept the drawings. A field crucible: small enough to fly, hot enough to pour. Any fabricator can build one with the pattern loaded."
+                            },
+                            {
+                              "give": {
+                                "crucible_pattern": 1
+                              }
+                            },
+                            {
+                              "advance": true
+                            },
+                            {
+                              "say": "Tell your doctor the trick is the heat. Too cool and the grains stay coarse. Too hot and it wakes things best left asleep."
+                            }
+                          ]
+                        },
+                        {
+                          "text": "She'll pay you well.",
+                          "then": [
+                            {
+                              "say": "Credits. I've got credits. Go away."
+                            },
+                            {
+                              "end": true
+                            }
+                          ]
+                        },
+                        {
+                          "text": "Forget it.",
+                          "then": [
+                            {
+                              "end": true
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "text": "I found this on the Shattered Bell. (Show him the foundry log.)",
+                  "if": {
+                    "has": {
+                      "foundry_log": 1
+                    }
+                  },
+                  "then": [
+                    {
+                      "say": "That's the foreman's hand. I haven't seen it in forty years."
+                    },
+                    {
+                      "say": "He wrote down everything, the old fool. Except the one thing that mattered. That, I kept."
+                    },
+                    {
+                      "say": "Here. I kept the drawings. A field crucible: small enough to fly, hot enough to pour. Any fabricator can build one with the pattern loaded."
+                    },
+                    {
+                      "give": {
+                        "crucible_pattern": 1
+                      }
+                    },
+                    {
+                      "advance": true
+                    },
+                    {
+                      "say": "Tell your doctor the trick is the heat. Too cool and the grains stay coarse. Too hot and it wakes things best left asleep."
+                    }
+                  ]
+                },
+                {
+                  "text": "Nobody. Just passing through.",
+                  "then": [
+                    {
+                      "say": "Then pass through."
+                    },
+                    {
+                      "end": true
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "craft",
+          "item": "field_crucible",
+          "count": 1,
+          "teach": "field_crucible",
+          "text": "Fabricate a field crucible (Fabricator, Components & supplies)",
+          "after": [
+            {
+              "say": "Osei here. You built it? Then bring it down to me on Terra Nova."
+            }
+          ]
+        },
+        {
+          "type": "talk",
+          "person": "osei",
+          "take": {
+            "field_crucible": 1
+          },
+          "text": "Bring the field crucible to Dr. Osei (Terra Nova)",
+          "lines": [
+            {
+              "say": "Let me see it... Pell's pattern, built by a pilot in a station fabricator. He'd laugh."
+            },
+            {
+              "say": "It will work, I'm sure of it. But it has to be fired where the old foundry was, deep in Halcyon's crust, at full heat."
+            }
+          ]
+        }
+      ],
+      "outro": "I'll arrange transport to Glasswater. When you're ready for the last part, come and find me.",
+      "rewards": {
+        "xp": 900,
+        "credits": 60,
+        "reputation": {
+          "shipwrights": 3
+        }
+      }
+    },
+    {
+      "id": "osei_03",
+      "chain": "science",
+      "name": "Trial by Fire",
+      "person": "osei",
+      "level": 5,
+      "requires": [
+        "osei_02"
+      ],
+      "intro": "I've brought the crucible out to Glasswater myself. My shuttle runs from the Prism Relay to Shardfall Depot, and scavengers have been hitting anything on that lane, so I want you beside me. At Shardfall I'll find the way down to the old foundry, and then we fire the crucible.",
+      "steps": [
+        {
+          "type": "escort",
+          "from": "glasswater_station_relay",
+          "to": "glasswater_station_depot",
+          "ambushes": 2,
+          "ward": "Dr. Osei's shuttle",
+          "text": "Escort Dr. Osei's shuttle from the Prism Relay to Shardfall Depot (Glasswater)",
+          "after": [
+            {
+              "say": "We're docked. Give me a minute to find the foundry shaft..."
+            },
+            {
+              "say": "Found it. Come and see me at the depot when you're ready to go down."
+            }
+          ]
+        },
+        {
+          "type": "boss",
+          "boss": "boss_foundry_warden",
+          "arena": "halcyon_foundry",
+          "person": "osei",
+          "text": "Defeat the Foundry Warden in the Deep Foundry (talk to Dr. Osei at Shardfall Depot when you're ready)",
+          "lines": [
+            {
+              "say": "The shaft runs straight down into Halcyon's crust. The foundry floor is still there, and still warm. Too warm, Pell said."
+            },
+            {
+              "say": "When I light the crucible, whatever has kept that furnace burning for forty years is going to notice. You'll have to deal with it while I work. Bring friends if you have them: your party can follow you down."
+            }
+          ],
+          "after": [
+            {
+              "say": "It's down! The crucible held, pilot, and the pour is perfect. Come back up and see me at Shardfall."
+            }
+          ]
+        },
+        {
+          "type": "talk",
+          "person": "osei",
+          "text": "See Dr. Osei at Shardfall Depot",
+          "lines": [
+            {
+              "say": "Look at it. Fine grains all the way through. Steel that bends before it breaks."
+            },
+            {
+              "say": "I've written the method up for the Institute. You're the first to fly it."
+            }
+          ]
+        }
+      ],
+      "outro": "Every pilot in Sol will be flying steel within the year, and none of them will know your name. I will.",
+      "rewards": {
+        "xp": 1500,
+        "credits": 90,
+        "items": {
+          "steel_plate": 6
+        },
+        "reputation": {
+          "shipwrights": 5
+        }
+      }
+    },
+    {
+      "id": "kerr_01",
+      "chain": "side",
+      "name": "Voices in the Static",
+      "person": "kerr",
+      "level": 2,
+      "requires": [
+        "main_01"
+      ],
+      "intro": "Three of my listening probes stopped talking to me last week. Don't look at me like that: they're the only ones out here who do. One is east past Jovan's orbit, one west beyond Sentinel Watch, and one in the Drift, where the Scrapborn are. Bring me their cores and I'll show you what they were hearing.",
+      "steps": [
+        {
+          "type": "visit",
+          "system": "sol",
+          "x": 79611,
+          "y": -31322,
+          "radius": 800,
+          "label": "probe K-1",
+          "text": "Recover the core of listening probe K-1 (east, past Jovan's orbit)",
+          "give": {
+            "probe_core": 1
+          }
+        },
+        {
+          "type": "visit",
+          "system": "sol",
+          "x": -82914,
+          "y": 28502,
+          "radius": 800,
+          "label": "probe K-2",
+          "text": "Recover the core of listening probe K-2 (west, beyond Sentinel Watch)",
+          "give": {
+            "probe_core": 1
+          }
+        },
+        {
+          "type": "visit",
+          "system": "sol",
+          "x": 105144,
+          "y": 31788,
+          "radius": 800,
+          "label": "probe K-3",
+          "text": "Recover the core of listening probe K-3 (in the Drift: Scrapborn!)",
+          "give": {
+            "probe_core": 1
+          },
+          "after": [
+            {
+              "say": "Kerr here. I saw K-3 come back online for a second. You've got them all? Bring them home."
+            }
+          ]
+        },
+        {
+          "type": "talk",
+          "person": "kerr",
+          "take": {
+            "probe_core": 3
+          },
+          "text": "Bring the probe cores to Sabine Kerr",
+          "lines": [
+            {
+              "say": "Let's hear what they heard..."
+            },
+            {
+              "ask": "(She turns a dial. Static, and something underneath it.) Do you hear that?",
+              "choices": [
+                {
+                  "text": "A pulse. The same one the dead buoys recorded.",
+                  "then": [
+                    {
+                      "say": "You've heard it before. Of course you have. It's everywhere, if you listen long enough. Forty years I've been listening."
+                    }
+                  ]
+                },
+                {
+                  "text": "Just static.",
+                  "then": [
+                    {
+                      "say": "Listen harder. Under the static. There: thump, thump. Like something breathing."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "outro": "Take these fuel injectors. I pulled them off a racing yacht that didn't need them any more. Fit an afterburner when you can: you'll go faster than I ever did.",
+      "rewards": {
+        "xp": 600,
+        "credits": 110,
+        "items": {
+          "fuel_injector": 2
+        }
+      }
+    },
+    {
+      "id": "kerr_02",
+      "chain": "side",
+      "name": "The Long Listen",
+      "person": "kerr",
+      "level": 7,
+      "requires": [
+        "kerr_01",
+        "main_04"
+      ],
+      "intro": "I've built one more probe, the best I've ever made. It needs to listen from somewhere with no noise from Sol at all: the aurora listening point in Borealis. Put it there for me, and we'll hear what the pulse really sounds like.",
+      "steps": [
+        {
+          "type": "travel",
+          "system": "borealis",
+          "text": "Travel to Borealis"
+        },
+        {
+          "type": "visit",
+          "system": "borealis",
+          "x": 29806,
+          "y": 40645,
+          "radius": 900,
+          "label": "the aurora listening point",
+          "text": "Place Kerr's probe at the aurora listening point (Borealis)",
+          "after": [
+            {
+              "say": "It's on! The aurora drowns nearly everything, but what gets through is clean: no Sol in it at all. Come back, I want to show you the recording."
+            }
+          ]
+        },
+        {
+          "type": "talk",
+          "person": "kerr",
+          "text": "Hear Sabine Kerr's recording",
+          "lines": [
+            {
+              "say": "Listen. Slowed down, it isn't a broadcast at all."
+            },
+            {
+              "say": "It beats, like a heart. Now listen to this: a grain of greyseam off my bench, under the same probe."
+            },
+            {
+              "say": "The same shape. Quieter by more zeros than I can count, but the same shape."
+            }
+          ]
+        }
+      ],
+      "outro": "I don't know what that means, pilot, and I won't pretend to. But I have forty years of notebooks, and they say the beat is drifting.",
+      "rewards": {
+        "xp": 1800,
+        "credits": 120,
+        "skillPoints": 1
+      },
+      "reveal": {
+        "visit": "borealis"
+      },
+      "rumour": "The listener Kerr keeps asking pilots bound for Borealis what they hear out there."
+    },
+    {
+      "id": "wren_01",
+      "chain": "side",
+      "name": "Dead in the Water",
+      "person": "wren",
+      "level": 3,
+      "requires": [
+        "clearance"
+      ],
+      "intro": "My hauler's dead. The couplings blew when a scavenger clipped me, and I've been drifting out here on emergency power for two days. Two power couplings and six coils of copper wire and I can limp home. Any fabricator can press couplings.",
+      "steps": [
+        {
+          "type": "talk",
+          "person": "wren",
+          "take": {
+            "power_coupling": 2,
+            "copper_wire": 6
+          },
+          "text": "Bring Tobias Wren 2 power couplings and 6 copper wire",
+          "lines": [
+            {
+              "say": "You brought them! Give me a minute..."
+            },
+            {
+              "say": "(The hauler's lights flicker, then hold.) She's alive! Oh, you beautiful pilot."
+            }
+          ]
+        }
+      ],
+      "outro": "If you're ever at the Relay, buy old Pell a drink from me. He taught me everything I know about engines, back when he still talked to people.",
+      "rewards": {
+        "xp": 450,
+        "credits": 70,
+        "items": {
+          "scanner_charge": 4,
+          "repair_kit": 2
+        },
+        "reputation": {
+          "traders": 3
+        }
+      },
+      "reveal": {
+        "any": [
+          {
+            "event": "salvage"
+          },
+          {
+            "chance": {
+              "p": 0.25,
+              "per": "salvaged"
+            }
+          }
+        ]
+      },
+      "rumour": "Salvagers in Glasswater say there's a dead hauler drifting past the east edge of the crystal field, with someone still aboard."
+    },
+    {
+      "id": "far_01",
+      "chain": "farwatch",
+      "name": "The Edge of the Lamp",
+      "person": "holt",
+      "giver": "sol_station_farwatch",
+      "level": 4,
+      "requires": [],
+      "intro": "You made it out to Farwatch. Good. The Lanes between here and Jovan are crawling with pirates, and my patrol is three ships short. Thin them out.",
+      "steps": [
+        {
+          "type": "kill",
+          "faction": "pirates",
+          "system": "sol",
+          "count": 4,
+          "text": "Destroy 4 pirates (the Smugglers' Lanes, Middle Sol)"
+        },
+        {
+          "type": "hold",
+          "system": "sol",
+          "x": 40000,
+          "y": -78000,
+          "radius": 600,
+          "seconds": 12,
+          "raid": 3,
+          "label": "the smugglers' drop buoy",
+          "text": "Plant a tracker on the smugglers' drop buoy: hold steady 12 seconds",
+          "after": [
+            {
+              "say": "Tracker's live. Now we'll see where their cargo goes."
+            }
+          ]
+        }
+      ],
+      "outro": "Four fewer. The freighters will notice.",
+      "rewards": {
+        "xp": 600,
+        "credits": 120,
+        "items": {
+          "repair_kit": 2,
+          "boost_cell": 2
+        },
+        "reputation": {
+          "sol_patrol": 4
+        }
+      },
+      "rev": 2
+    },
+    {
+      "id": "far_02",
+      "chain": "farwatch",
+      "name": "Graves of the Tenth",
+      "person": "holt",
+      "giver": "sol_station_farwatch",
+      "level": 5,
+      "requires": [
+        "far_01"
+      ],
+      "intro": "The Tenth Fleet died out past the Drift, years ago. The wrecks are still worth stripping, but the Scrapborn found them first: Scrap Hulks the size of tugs, feeding on the plate. Clear them out.",
+      "steps": [
+        {
+          "type": "kill",
+          "enemy": "scrap_hulk",
+          "count": 3,
+          "text": "Destroy 3 Scrap Hulks (the Graveyard of the Tenth)"
+        },
+        {
+          "type": "recover",
+          "system": "sol",
+          "x": -103600,
+          "y": -29700,
+          "item": "vigil_log",
+          "guard": 3,
+          "label": "the Dreadnought Vigil's bridge",
+          "text": "Recover the Vigil's log from its bridge (the Graveyard of the Tenth)"
+        },
+        {
+          "type": "deliver",
+          "items": {
+            "vigil_log": 1
+          },
+          "text": "Bring the log to Warden Holt (Farwatch)"
+        }
+      ],
+      "outro": "Salvagers are already asking about the Vigil. You did that. Odd thing, though: the log runs on three days past the last of her crew. Faulty clock, I'd say.",
+      "rewards": {
+        "xp": 800,
+        "credits": 160,
+        "items": {
+          "alloy_plate": 8,
+          "steel_plate": 4
+        },
+        "reputation": {
+          "sol_patrol": 4
+        }
+      },
+      "rev": 2
+    },
+    {
+      "id": "far_03",
+      "chain": "farwatch",
+      "name": "The Picket",
+      "person": "holt",
+      "giver": "sol_station_farwatch",
+      "level": 5,
+      "requires": [
+        "far_02"
+      ],
+      "intro": "The Redtooth have built a camp inside Sol. Inside it! A picket of welded junk in the Lanes, launching cutters at anything that passes. Knock it down.",
+      "steps": [
+        {
+          "type": "boss",
+          "boss": "boss_redtooth_picket",
+          "text": "Destroy the Redtooth Picket (the Lanes, south-east of Sol)"
+        }
+      ],
+      "outro": "The Picket's down. They'll be back, they always are, but not today.",
+      "rewards": {
+        "xp": 1000,
+        "credits": 220,
+        "items": {
+          "servo_motor": 1,
+          "repair_kit": 2
+        },
+        "reputation": {
+          "sol_patrol": 6
+        }
+      }
+    },
+    {
+      "id": "far_04",
+      "chain": "farwatch",
+      "name": "The Tallyman",
+      "person": "holt",
+      "giver": "sol_station_farwatch",
+      "level": 6,
+      "requires": [
+        "far_03"
+      ],
+      "intro": "There's a gunship that roams the Reaches, black paint, tally marks down its side: one for every pilot it's taken. It never stays in one place. Find it, and wipe its slate.",
+      "steps": [
+        {
+          "type": "boss",
+          "boss": "boss_tallyman",
+          "text": "Defeat the Tallyman (it roams the Reaches, east of Sol)"
+        }
+      ],
+      "outro": "Nobody's going to scratch your name on anything. Well flown.",
+      "rewards": {
+        "xp": 1400,
+        "credits": 300,
+        "items": {
+          "targeting_chip": 2,
+          "field_repair_kit": 1
+        },
+        "reputation": {
+          "sol_patrol": 6
+        }
+      }
+    },
+    {
+      "id": "far_05",
+      "chain": "farwatch",
+      "name": "Hollow Crown",
+      "person": "holt",
+      "giver": "sol_station_farwatch",
+      "level": 7,
+      "requires": [
+        "far_04"
+      ],
+      "intro": "The Hollow Crown is where it all goes: every hold the pirates take on the rim gets sold there. Its guns hit harder and its plate is thicker than anything you're used to. Take friends. Take it apart.",
+      "steps": [
+        {
+          "type": "boss",
+          "boss": "boss_hollow_crown",
+          "text": "Destroy the Hollow Crown (the Reaches, south of Sol)"
+        }
+      ],
+      "outro": "The Crown's broken. The rim will be quiet for a while, and every pilot on it knows who did it. And their ledger came out of the wreck: signal receivers by the crate, all sold to a buyer at Vesper Station. There's no Vesper Station. A pirate scam, likely.",
+      "rewards": {
+        "xp": 2200,
+        "credits": 500,
+        "items": {
+          "titanium_plate": 2,
+          "power_coupling": 2
+        },
+        "reputation": {
+          "sol_patrol": 10
+        },
+        "skillPoints": 1
+      }
+    },
+    {
+      "id": "tn_storms",
+      "chain": "science",
+      "name": "Storm Season",
+      "person": "osei",
+      "level": 3,
+      "requires": [
+        "osei_01"
+      ],
+      "intro": "Terra Nova's storms have been arriving early, and nobody can tell me why. Three of the old weather masts around New Meridian still have instruments in them. Fly down, sit by each one while it uploads, and keep still: they're fussy. Then come and see me at the Institute.",
+      "steps": [
+        {
+          "type": "hold",
+          "system": "terra_nova_surface",
+          "x": 14000,
+          "y": -6000,
+          "radius": 500,
+          "seconds": 10,
+          "label": "weather mast East",
+          "text": "Upload weather mast East (Terra Nova): hold steady 10 seconds"
+        },
+        {
+          "type": "hold",
+          "system": "terra_nova_surface",
+          "x": -12500,
+          "y": 8500,
+          "radius": 500,
+          "seconds": 10,
+          "label": "weather mast West",
+          "text": "Upload weather mast West (Terra Nova): hold steady 10 seconds"
+        },
+        {
+          "type": "hold",
+          "system": "terra_nova_surface",
+          "x": 2500,
+          "y": 16500,
+          "radius": 500,
+          "seconds": 10,
+          "label": "weather mast South",
+          "text": "Upload weather mast South (Terra Nova): hold steady 10 seconds"
+        },
+        {
+          "type": "talk",
+          "person": "osei",
+          "text": "Bring the readings to Dr. Osei (the Meridian Institute, Terra Nova)",
+          "lines": [
+            {
+              "say": "Let's see. Pressure, salinity... that's odd. Before every storm, each mast logged the same pulse, one after another, a minute apart, like clockwork."
+            },
+            {
+              "say": "Weather doesn't keep time like that. And not one of those storms touched the city. Lucky, the Institute will say."
+            },
+            {
+              "say": "Lucky for the city, maybe. The one that missed us in the spring came down on a Guild survey team out on the Pale Reef flats instead. Two crews. The Patrol wrote it up as weather, and it probably was."
+            },
+            {
+              "say": "I'll need to think about this. Thank you, pilot: this is the first real data I've had in months."
+            }
+          ]
+        }
+      ],
+      "outro": "Dr. Osei is still staring at the readings when you leave.",
+      "rewards": {
+        "xp": 800,
+        "credits": 140,
+        "items": {
+          "field_repair_kit": 1,
+          "crystal_lens": 1
+        },
+        "reputation": {
+          "sol_patrol": 2
+        }
+      }
+    },
+    {
+      "id": "tn_beacon",
+      "chain": "side",
+      "name": "The Drowned Beacon",
+      "person": "vance",
+      "giver": "sol_station_central",
+      "level": 2,
+      "requires": [
+        "main_01"
+      ],
+      "intro": "There's a landing beacon down in Terra Nova's Pale Reef that's older than any record we keep. The Museum Guild has argued for years over whose landing it marks: the first crews', say half of them, and the other half have a list. Now they've finally paid to have it fetched. Fly down, dig it out of the reef (hold steady while your tractor works it loose), and bring it up to me.",
+      "steps": [
+        {
+          "type": "hold",
+          "system": "terra_nova_surface",
+          "x": -17000,
+          "y": -11000,
+          "radius": 450,
+          "seconds": 14,
+          "label": "the Pale Reef dig site",
+          "text": "Work the beacon loose at the Pale Reef (Terra Nova): hold steady 14 seconds",
+          "after": [
+            {
+              "say": "It's free! Pull it aboard."
+            }
+          ]
+        },
+        {
+          "type": "recover",
+          "system": "terra_nova_surface",
+          "x": -17300,
+          "y": -11200,
+          "item": "meridian_beacon",
+          "label": "the beacon",
+          "text": "Pull the Drowned Beacon aboard"
+        },
+        {
+          "type": "deliver",
+          "items": {
+            "meridian_beacon": 1
+          },
+          "text": "Bring the beacon to Commander Vance (Sol Central)"
+        }
+      ],
+      "outro": "Vance turns the beacon over in his hands for a long time. \"The first thing anyone ever put down on Terra Nova, if the Guild's right. Whoever put it there, it waited long enough. Thank you.\"",
+      "rewards": {
+        "xp": 600,
+        "credits": 120,
+        "items": {
+          "repair_kit": 2
+        },
+        "reputation": {
+          "sol_patrol": 3
+        }
+      }
+    },
+    {
+      "id": "ice_01",
+      "chain": "borealis",
+      "name": "Cutting Rime",
+      "person": "sander",
+      "giver": "borealis_station_thawline",
+      "level": 6,
+      "requires": ["main_04"],
+      "reveal": {
+        "done": "main_04"
+      },
+      "rumour": "The ice crews at Thawline, out on the edge of Borealis, are short-handed and paying for rime.",
+      "intro": "Two of my cutters froze up last week and I'm behind on panes. Out past the camp there's a belt of aurora floes, the Rime Shoal: crack them for rime, press it into hush panes at a refinery (four rime and a bit of silicate a pane), and bring me three. Mind the roost out there.",
+      "steps": [
+        {
+          "type": "mine",
+          "item": "aurora_rime",
+          "count": 16,
+          "text": "Mine 16 aurora rime from the floes of the Rime Shoal (outer Borealis)"
+        },
+        {
+          "type": "refine",
+          "item": "hush_pane",
+          "count": 3,
+          "text": "Refine 3 hush panes (Refinery: 4 rime and a silicate each)"
+        },
+        {
+          "type": "deliver",
+          "items": {
+            "hush_pane": 3
+          },
+          "text": "Bring 3 hush panes to Foreman Sander (Thawline)"
+        }
+      ],
+      "outro": "Clean panes. You'd make an ice cutter, if you wanted the cold in your bones. There's survey work going, if you'd rather fly.",
+      "rewards": {
+        "xp": 1000,
+        "credits": 160,
+        "items": {
+          "field_repair_kit": 1,
+          "coolant": 4
+        },
+        "reputation": {
+          "miners": 6
+        }
+      }
+    },
+    {
+      "id": "ice_02",
+      "chain": "borealis",
+      "name": "The Curtain Run",
+      "person": "sander",
+      "giver": "borealis_station_thawline",
+      "level": 6,
+      "requires": ["ice_01"],
+      "intro": "The Guild wants the Curtain charted, and I want to know where the rime comes from. Fly the survey line into the aurora, then sit by the Aurora Knot while your scanner reads it. The Brood roost round the Knot. They won't thank you.",
+      "steps": [
+        {
+          "type": "course",
+          "system": "borealis",
+          "x": 22000,
+          "y": 34000,
+          "rings": 6,
+          "seconds": 100,
+          "spacing": 2400,
+          "label": "the Curtain survey marker",
+          "text": "Fly the survey line into the Curtain: 6 rings in 100 seconds"
+        },
+        {
+          "type": "hold",
+          "system": "borealis",
+          "x": 33000,
+          "y": 47000,
+          "radius": 700,
+          "seconds": 25,
+          "raid": 2,
+          "label": "the Aurora Knot",
+          "text": "Survey the Aurora Knot: hold steady 25 seconds",
+          "after": [
+            {
+              "say": "Got it. It's a stillstone, all right, if a small rough one: the angles repeat, and the veins glow on the night side. The Guild only charted it a few years back, and they don't find many. I'll pass it on to Maya."
+            }
+          ]
+        }
+      ],
+      "outro": "That's the first full chart of the Curtain anyone's filed. The Guild will put its name on it, not yours. Here's what I can do instead.",
+      "rewards": {
+        "xp": 1100,
+        "credits": 180,
+        "items": {
+          "scanner_charge": 4,
+          "boost_cell": 3
+        },
+        "reputation": {
+          "miners": 6
+        }
+      }
+    },
+    {
+      "id": "ice_03",
+      "chain": "borealis",
+      "name": "The Lighter Halvard",
+      "person": "maya",
+      "giver": "borealis_station_outpost",
+      "level": 7,
+      "requires": ["ice_02"],
+      "intro": "Sander's survey picked up something else: a transponder on the old ice road, still pinging after more years than anyone has counted. It's the Lighter Halvard, one of the colony's early landers, lost on the ice road back in the early centuries. Her flight log should still be aboard. Bring it to me, and mind the Brood: they like the wreck.",
+      "steps": [
+        {
+          "type": "recover",
+          "system": "borealis",
+          "x": -46000,
+          "y": 21000,
+          "item": "halvard_log",
+          "guard": 3,
+          "label": "the Halvard's flight deck",
+          "text": "Recover the Halvard's flight log from her wreck (the ice road, west Borealis)"
+        },
+        {
+          "type": "talk",
+          "person": "maya",
+          "take": {
+            "halvard_log": 1
+          },
+          "text": "Bring the Halvard's log to Researcher Maya (Borealis Research)",
+          "lines": [
+            {
+              "say": "Let's see... Landfall on Glacia, then a survey of the bastion on Rimeholt. 'Standing, lit, and nobody home,' the pilot wrote. So it was here before us."
+            },
+            {
+              "say": "And this. Her nav core was cut from the same seam as the first crews' own cores, and the pilot says she flew 'just like the old girl'. Her mothership, I suppose. Same batch. Pilots get sentimental."
+            },
+            {
+              "say": "The last entry logs a signal peak, and the Brood scattering past the canopy. All those centuries, and they still do it."
+            }
+          ]
+        }
+      ],
+      "outro": "The first crews saw what I see. I'm not imagining it, then. Or we all are.",
+      "rewards": {
+        "xp": 1300,
+        "credits": 200,
+        "items": {
+          "nav_computer": 1
+        },
+        "reputation": {
+          "miners": 4
+        }
+      }
+    },
+    {
+      "id": "ice_04",
+      "chain": "borealis",
+      "name": "Under the Ice",
+      "person": "aske",
+      "level": 8,
+      "requires": ["ice_03"],
+      "rumour": "A New Halden pilgrim on Glacia's ice wants a pilot with a cutter, and won't say what for.",
+      "reveal": {
+        "done": "ice_03"
+      },
+      "intro": "The Halden sealed a gift under the ice here, as they did on Ashfall. I have prayed over the site for a year and the ice will not give it up to prayer. Your ship has a cutter; I have patience. Cut the shaft for me, pilot, and bring the cache up.",
+      "steps": [
+        {
+          "type": "travel",
+          "system": "glacia_surface",
+          "text": "Descend to Glacia (X in orbit over the planet)"
+        },
+        {
+          "type": "hold",
+          "system": "glacia_surface",
+          "x": 5200,
+          "y": -7800,
+          "radius": 600,
+          "seconds": 20,
+          "label": "the Halden shaft",
+          "text": "Cut down through the ice at the Halden site: hold steady 20 seconds",
+          "after": [
+            {
+              "say": "It's open! There, in the slate. Pull it up, gently."
+            }
+          ]
+        },
+        {
+          "type": "recover",
+          "system": "glacia_surface",
+          "x": 5200,
+          "y": -7800,
+          "item": "halden_cache",
+          "label": "the Halden cache",
+          "text": "Pull the Halden cache up out of the shaft"
+        },
+        {
+          "type": "talk",
+          "person": "aske",
+          "take": {
+            "halden_cache": 1
+          },
+          "text": "Give the cache to Brother Aske (Glacia)",
+          "lines": [
+            {
+              "say": "So small. They always are."
+            },
+            {
+              "say": "The Guild will tell you the Halden ran out of whatever they were sealing. I tell you they were careful. Either way it goes to the faith now, and you'll be remembered in a hundred prayers."
+            },
+            {
+              "say": "And in something more useful than prayers: take this case, from the faith's own store. One gift for another; the sleeper won't mind. The faith pays its friends."
+            }
+          ]
+        }
+      ],
+      "outro": "Aske kneels by the empty shaft long after you've gone.",
+      "rewards": {
+        "xp": 1600,
+        "credits": 220,
+        "items": {
+          "ancient_relic": 1
+        }
+      }
+    },
+    {
+      "id": "ice_05",
+      "chain": "borealis",
+      "name": "A Blind in the Curtain",
+      "person": "maya",
+      "giver": "borealis_station_outpost",
+      "level": 8,
+      "requires": ["ice_03"],
+      "intro": "Every time the signal peaks the Brood scatter, and every time I bring instruments close they scatter from those too. So I want a blind: a listening mast behind a screen of hush panes, out in the Curtain. Fit a Constructor, bring the parts (a hush pane, a servo motor, a power coupling and a crystal lens), build it, then sit with it while it records.",
+      "steps": [
+        {
+          "type": "construct",
+          "system": "borealis",
+          "x": 36000,
+          "y": 40000,
+          "label": "Maya's listening blind",
+          "structure": "nav_buoy",
+          "pieces": [
+            {
+              "id": "frame",
+              "item": "hush_pane",
+              "name": "hush-pane screen"
+            },
+            {
+              "id": "mast",
+              "item": "servo_motor",
+              "name": "mast"
+            },
+            {
+              "id": "cell",
+              "item": "power_coupling",
+              "name": "power coupling"
+            },
+            {
+              "id": "dish",
+              "item": "crystal_lens",
+              "name": "listening lens"
+            }
+          ],
+          "seconds": 6,
+          "text": "Build Maya's listening blind in the Curtain (hush pane, servo motor, power coupling, crystal lens)"
+        },
+        {
+          "type": "hold",
+          "system": "borealis",
+          "x": 36000,
+          "y": 40000,
+          "radius": 700,
+          "seconds": 30,
+          "raid": 3,
+          "label": "the listening blind",
+          "text": "Sit with the blind while it records: hold steady 30 seconds"
+        },
+        {
+          "type": "talk",
+          "person": "maya",
+          "text": "Bring the recording to Researcher Maya (Borealis Research)",
+          "lines": [
+            {
+              "say": "Look at this. Inside the blind the pulse is barely there, and the Brood came right up to the panes, calm as you like."
+            },
+            {
+              "say": "Then the raiders knocked the screen askew for a second, the pulse came through, and they were gone. They don't like the signal. Or they don't like being heard."
+            },
+            {
+              "say": "Animal behaviour, my colleagues will say. I'm writing it all down anyway."
+            }
+          ]
+        }
+      ],
+      "outro": "Maya pins the recording above her bench, next to a photo of a Frost Brood that's been there for years.",
+      "rewards": {
+        "xp": 1700,
+        "credits": 240,
+        "items": {
+          "shield_emitter": 1,
+          "hush_pane": 2
+        },
+        "reputation": {
+          "miners": 6
+        },
+        "skillPoints": 1
+      }
+    },
+    {
+      "id": "ice_06",
+      "chain": "borealis",
+      "name": "The Hushwing",
+      "person": "sander",
+      "giver": "borealis_station_thawline",
+      "level": 9,
+      "requires": ["ice_05"],
+      "intro": "Something's been taking my cutters past the Curtain. Not the Brood we know: something big and pale that comes out of the aurora and goes back into it. The old crews call it the Hushwing. My people won't fly till it's dealt with. Bring friends.",
+      "steps": [
+        {
+          "type": "boss",
+          "boss": "boss_hushwing",
+          "text": "Defeat the Hushwing (south-west of the Curtain, Borealis)"
+        }
+      ],
+      "outro": "The crews are flying again. Maya wants whatever's left of its wings, if you find any. I want a drink.",
+      "rewards": {
+        "xp": 2400,
+        "credits": 380,
+        "items": {
+          "hush_pane": 4,
+          "field_repair_kit": 2
+        },
+        "reputation": {
+          "miners": 12
+        },
+        "skillPoints": 1
+      }
+    },
+    {
+      "id": "ark_01",
+      "chain": "ark",
+      "name": "A Bag by the Door",
+      "person": "ark_keeper",
+      "giver": "sol_station_ark",
+      "level": 3,
+      "requires": ["main_01"],
+      "intro": "The Hall keeps go-bags for anyone in the inner system who wants one, and the shelf is short. Bring me two repair kits and some copper wire. Small job. Most of the Ark's jobs are small.",
+      "steps": [
+        {
+          "type": "deliver",
+          "items": {
+            "repair_kit": 2,
+            "copper_wire": 6
+          },
+          "text": "Bring 2 repair kits and 6 copper wire to the Ark Hall for its go-bags"
+        }
+      ],
+      "outro": "Signed for. Now, the one rule everyone keeps, from the barely observant on up. Keep a bag packed by the door, and when a herald says leave, you leave. You don't wait to be told why, because you won't be. Take this bond. For a pilot, it's the nearest thing to a bag by the door.",
+      "rewards": {
+        "xp": 500,
+        "credits": 60,
+        "items": {
+          "insurance_bond": 1
+        },
+        "reputation": {
+          "ark": 6
+        }
+      }
+    },
+    {
+      "id": "ark_02",
+      "chain": "ark",
+      "name": "Polishing the Grey",
+      "person": "ark_keeper",
+      "giver": "sol_station_ark",
+      "level": 4,
+      "requires": ["ark_01"],
+      "intro": "The core regimen: strip it, clean it, reseat it, log it, all on schedule, and replace it long before it fails. Your core has flown a good while. Fabricate a fresh one in the standard housing, fit it, and bring me the old one to be logged and retired.",
+      "steps": [
+        {
+          "type": "craft",
+          "item": "part:alloy:core:rect2",
+          "count": 1,
+          "text": "Fabricate a fresh core at any fabricator (alloy, the regimen's standard 1×2 housing)",
+          "after": [
+            {
+              "say": "Good. Fit it in the hangar, and bring me the one you took out. Don't scrap it: it has to go in the book."
+            }
+          ]
+        },
+        {
+          "type": "deliver",
+          "items": {
+            "part:alloy:core:rect2": 1
+          },
+          "text": "Fit the new core, then hand the old one in at the Ark Hall to be logged and retired"
+        }
+      ],
+      "outro": "Logged. Serial, hours, condition, date retired. It was a perfectly good core, and that is the point: discipline, and pride in one's equipment. Ilse Marrow at the yard will tell you Ark ships fly no better for it. She's right. That was never why we do it.",
+      "rewards": {
+        "xp": 800,
+        "credits": 90,
+        "items": {
+          "field_repair_kit": 1
+        },
+        "reputation": {
+          "ark": 6
+        }
+      }
+    },
+    {
+      "id": "ark_03",
+      "chain": "ark",
+      "name": "Short Tenures",
+      "person": "ark_keeper",
+      "giver": "sol_station_ark",
+      "level": 6,
+      "requires": ["ark_02"],
+      "intro": "We keep a watch post on the Wardens' Stillstone, out in the Reaches. Forty days, then a fresh crew. The relief is aboard the tender already; I need a pilot to cover the changeover and bring the old crew home. Raiders camp on that stone, but that isn't why we rotate. A crew that stays too long loses its edge, and complacency kills.",
+      "steps": [
+        {
+          "type": "hold",
+          "system": "sol",
+          "x": -125400,
+          "y": -155400,
+          "radius": 700,
+          "seconds": 20,
+          "raid": 3,
+          "label": "the Ark watch post on the Wardens' Stillstone",
+          "text": "Cover the changeover at the Ark watch post on the Wardens' Stillstone: hold steady 20 seconds (the Reaches, Sol)",
+          "after": [
+            {
+              "say": "Changeover's logged. You've four tired people aboard who'd rather have stayed. Bring them home."
+            }
+          ]
+        },
+        {
+          "type": "courier",
+          "station": "sol_station_ark",
+          "seconds": 900,
+          "text": "Bring the relieved crew home to the Ark Hall within 15 minutes"
+        }
+      ],
+      "outro": "Forty days on that stone and not one of them wanted to leave. That is exactly why they had to.",
+      "rewards": {
+        "xp": 1200,
+        "credits": 180,
+        "items": {
+          "repair_kit": 2
+        },
+        "reputation": {
+          "ark": 8
+        }
+      }
+    },
+    {
+      "id": "ark_04",
+      "chain": "ark",
+      "name": "The Word",
+      "person": "ark_keeper",
+      "giver": "sol_station_ark",
+      "level": 7,
+      "requires": ["ark_03"],
+      "intro": "The herald has a word that needs carrying, and asked for a pilot. Asked is generous; the herald pointed at the door. Go and hear the word, then carry it exactly as it's given.",
+      "steps": [
+        {
+          "type": "talk",
+          "person": "ark_herald",
+          "text": "Hear the word from the herald (the Ark Hall)",
+          "lines": [
+            {
+              "say": "Tamsin's Claim. The Reaches, past Farwatch."
+            },
+            {
+              "say": "They must leave."
+            },
+            {
+              "say": "Nine hours."
+            }
+          ]
+        },
+        {
+          "type": "talk",
+          "person": "tamsin",
+          "text": "Carry the word to Bren Tamsin at Tamsin's Claim (the Reaches, Sol)",
+          "lines": [
+            {
+              "say": "You must leave. Nine hours.",
+              "who": "you"
+            },
+            {
+              "say": "A herald sent you. Of course. And did it say why? No. They never do."
+            },
+            {
+              "say": "My uncle stayed, when one came to Corrow. It's legal to stay. It was legal right up to the end."
+            },
+            {
+              "say": "Fine. Get us aboard. Our seed stock stays in the hab, so you're coming back for it. And if this is for nothing, I'm sending the Ark the bill."
+            }
+          ]
+        },
+        {
+          "type": "courier",
+          "station": "sol_station_farwatch",
+          "seconds": 600,
+          "text": "Get the Tamsins to Farwatch within 10 minutes"
+        },
+        {
+          "type": "hold",
+          "system": "sol",
+          "x": 160500,
+          "y": -91600,
+          "radius": 700,
+          "seconds": 20,
+          "raid": 4,
+          "label": "Tamsin's Claim",
+          "text": "Go back for the Tamsins' seed stock and hold steady 20 seconds while it loads (Tamsin's Claim, the Reaches)",
+          "after": [
+            {
+              "say": "That's the claim emptied. Farwatch says there's a warband on the road behind you. Don't stop to look."
+            }
+          ]
+        }
+      ],
+      "outro": "The Tamsins are at Farwatch, furious and alive. Lieutenant Achebe called to ask how we knew. I told her what I tell everyone: the word comes down, and I keep the books. She said the heralds have never been wrong, and she hates it. I've put that in the ledger too.",
+      "rewards": {
+        "xp": 1800,
+        "credits": 260,
+        "items": {
+          "field_repair_kit": 1
+        },
+        "reputation": {
+          "ark": 10
+        }
+      }
+    },
+    {
+      "id": "ark_05",
+      "chain": "ark",
+      "name": "Old Stock",
+      "person": "ark_keeper",
+      "giver": "sol_station_ark",
+      "level": 9,
+      "requires": ["ark_04"],
+      "intro": "The depot out past the Drift has a season's old stock to move. Retired machinery doesn't sit in one place: it goes out a few crates at a time, to people who'll keep it dry and sign for it. That's accountability, and inventory control. Marek has the crates.",
+      "steps": [
+        {
+          "type": "talk",
+          "person": "ark_depot",
+          "give": {
+            "ark_old_stock": 6
+          },
+          "text": "Collect the old stock from Marek at the Ark Depot (Middle Sol)",
+          "lines": [
+            {
+              "say": "Six crates for the road. Pump housings, coil packs, a core cradle that's never had a core in it long enough to warm up."
+            },
+            {
+              "say": "Mind them; the Keeper counts. And don't mind the scorch marks: this place has burned down twice, and Sol Central never tires of the story."
+            }
+          ]
+        },
+        {
+          "type": "talk",
+          "person": "holt",
+          "take": {
+            "ark_old_stock": 3
+          },
+          "text": "Leave 3 crates with Warden Holt at Farwatch",
+          "lines": [
+            {
+              "say": "Ark crates. That's the third lot this year. They'll be back for them one at a time, and off they'll go somewhere else."
+            },
+            {
+              "say": "Stack them in bay four with the others. Tell the Keeper I signed. He'll want it in writing; I'll send it in writing."
+            }
+          ]
+        },
+        {
+          "type": "talk",
+          "person": "brannoch",
+          "take": {
+            "ark_old_stock": 3
+          },
+          "text": "Leave 3 crates with Old Brannoch at the Mining Outpost",
+          "lines": [
+            {
+              "say": "Pumps! Good pumps, too. They'll have run half their hours. The Ark never runs anything to the end."
+            },
+            {
+              "say": "The Guild'll keep them out of the dust. Your Keeper wants a receipt, I suppose. He always wants a receipt."
+            }
+          ]
+        },
+        {
+          "type": "talk",
+          "person": "ark_keeper",
+          "text": "Report to Keeper Vey (the Ark Hall)",
+          "lines": [
+            {
+              "say": "Six out, six signed for, two signatures and a thumbprint I'll assume is Brannoch's. Good."
+            }
+          ]
+        }
+      ],
+      "outro": "Marek told you about the fires; he tells everyone. Ordinary stone and ordinary wiring burn, and the sceptics enjoy that a depot of ours can. Let them. The stock was out both times, and it's out again now.",
+      "rewards": {
+        "xp": 2200,
+        "credits": 320,
+        "items": {
+          "servo_motor": 1
+        },
+        "reputation": {
+          "ark": 8
+        }
+      }
+    },
+    {
+      "id": "ark_06",
+      "chain": "ark",
+      "name": "Ark-Heavy",
+      "person": "ark_keeper",
+      "giver": "sol_station_ark",
+      "level": 12,
+      "requires": ["ark_05"],
+      "onStart": {
+        "recipes": ["material:leestone"],
+        "items": {
+          "leestone_plate": 20
+        }
+      },
+      "intro": "You've carried our word and our crates. Now carry our stone. Here is the fitting licence and a set of leestone plate. Put six pieces of armour on your ship, and then go and let Ilse Marrow see it fly. She'll laugh. Let her.",
+      "steps": [
+        {
+          "type": "refit",
+          "fn": "armor",
+          "material": "leestone",
+          "count": 6,
+          "text": "Fit 6 leestone armour parts to the ship you fly"
+        },
+        {
+          "type": "talk",
+          "person": "marrow",
+          "text": "Show Ilse Marrow your Ark-heavy ship (Lagrange Shipyard)",
+          "lines": [
+            {
+              "say": "Oh, look at that. Ark-heavy. You've put a hall on your hull."
+            },
+            {
+              "say": "All right. There's a run off the yard I use to test new builds. Fly it in under two minutes and I'll stop laughing. I won't, but I'll try."
+            }
+          ]
+        },
+        {
+          "type": "course",
+          "system": "sol",
+          "x": -21500,
+          "y": -44800,
+          "rings": 6,
+          "seconds": 120,
+          "spacing": 2200,
+          "label": "the Lagrange test run",
+          "text": "Fly the Lagrange test run in your leestone-plated ship: 6 rings in 2 minutes"
+        }
+      ],
+      "outro": "Marrow sent us your time, with notes. Most of the notes are laughter. Heavier and slower, yes. We build it for tradition, and for durability. Here are the plans for a tender of our own, plated the same way. Fly it or don't. It will last either way.",
+      "rewards": {
+        "xp": 2600,
+        "credits": 400,
+        "plans": ["ark-tender"],
+        "reputation": {
+          "ark": 10
+        }
+      }
+    },
+    {
+      "id": "ark_07",
+      "chain": "ark",
+      "name": "Expedition",
+      "person": "ark_keeper",
+      "giver": "sol_station_ark",
+      "level": 21,
+      "requires": ["ark_06", "main_10"],
+      "intro": "The most devoted go to the Maw's edge for leestone. Expedition Master Kol's camp sits at the rim of the shard ring, and the Cinder Cult burns anything flying Maw-ward. You've the licence. Go out to Kol, help hold the camp, dig what you can and bring it home. Many don't come back. Kol will tell you the same.",
+      "steps": [
+        {
+          "type": "travel",
+          "system": "the_maw",
+          "text": "Travel to the Maw (Cinder Reach gate)"
+        },
+        {
+          "type": "talk",
+          "person": "ark_expedition",
+          "text": "Report to Expedition Master Kol at the leestone camp (the Maw's edge)",
+          "lines": [
+            {
+              "say": "Vey's pilot. Good. The Cult's been at us since the last tender came through the gate; they'll be back as soon as they see you."
+            },
+            {
+              "say": "Hold the camp while we bring the rigs in. Then dig. Horizon Watch will tell you it's a useless rock. They told the last crew that, too. Half of them are still out here."
+            }
+          ]
+        },
+        {
+          "type": "hold",
+          "system": "the_maw",
+          "x": 28900,
+          "y": 8300,
+          "radius": 800,
+          "seconds": 30,
+          "raid": 5,
+          "label": "the leestone camp",
+          "text": "Hold the leestone camp while the rigs come in: 30 seconds (the Maw's edge)",
+          "after": [
+            {
+              "say": "Kol's word: the rigs are in, and two crews aren't. Dig, and come home."
+            }
+          ]
+        },
+        {
+          "type": "mine",
+          "item": "leestone_ore",
+          "count": 30,
+          "text": "Mine 30 leestone ore (Leestone Shards in the Maw's shard ring)"
+        },
+        {
+          "type": "deliver",
+          "items": {
+            "leestone_ore": 30
+          },
+          "text": "Bring 30 leestone ore home to the Ark Hall"
+        }
+      ],
+      "outro": "Thirty measures of the Maw's stone, and you brought yourself back with it. Kol sends her regards, and two names for the ledger. The cluster says we die over a useless rock. The halls are built of it, and the halls are still standing.",
+      "rewards": {
+        "xp": 4500,
+        "credits": 700,
+        "items": {
+          "leestone": 12
+        },
+        "reputation": {
+          "ark": 15
+        },
+        "skillPoints": 1
+      }
+    },
+    {
+      "id": "bw_01",
+      "chain": "bellwether",
+      "name": "Feedstock",
+      "person": "helios_director",
+      "giver": "sol_station_helios",
+      "level": 8,
+      "reveal": {
+        "visit": "sol_station_helios"
+      },
+      "rumour": "The Helios Directorate is paying pilots to haul for its new works on the Array, and paying on the minute.",
+      "intro": "The Directorate is building something on the Helios Array. We call it Bellwether: a shield for our work, so that what we build stays built. It runs on greyseam and power. Bring Engineer Rask twenty scrap electronics (cracked cores and boards; there's greyseam in every one), and collect our power cells from Harbourmaster Okafor at Sol Central. The cells are on a clock. Everything here is.",
+      "steps": [
+        {
+          "type": "talk",
+          "person": "okafor",
+          "give": {
+            "helios_cell": 6
+          },
+          "text": "Collect the Directorate's power cells from Harbourmaster Okafor (Sol Central)",
+          "lines": [
+            {
+              "say": "Six pallets of Directorate cells, stencilled for the Helios Seat. They've sat in my bays a week waiting on a pilot the Directorate liked the look of."
+            },
+            {
+              "say": "They want them on a clock, naturally. Ten minutes, door to door. The Directorate times its own coffee."
+            }
+          ]
+        },
+        {
+          "type": "courier",
+          "station": "sol_station_helios",
+          "seconds": 600,
+          "text": "Get the cells to the Helios Seat within 10 minutes"
+        },
+        {
+          "type": "talk",
+          "person": "helios_engineer",
+          "take": {
+            "helios_cell": 6,
+            "scrap_electronics": 20
+          },
+          "text": "Hand the cells and 20 scrap electronics to Engineer Rask (the Helios Seat)",
+          "lines": [
+            {
+              "say": "Cells! And on the minute; the Director will put you in a footnote. Scrap, too: cracked cores, dead boards, greyseam in every one."
+            },
+            {
+              "say": "Cheapest feedstock in the cluster. We strip the grey out and it goes onto the rail, into Bellwether's first masts."
+            },
+            {
+              "say": "Every tonne on the rail works harder than the last. I'll show you the chart one day. You'll love the chart."
+            }
+          ]
+        }
+      ],
+      "outro": "Six pallets of cells on the minute, and twenty kilos of other people's broken cores. That is the Directorate, pilot: things arriving when they're meant to. Rask has another job for you, and she will tell you about her chart whether you ask or not.",
+      "rewards": {
+        "xp": 2000,
+        "credits": 300,
+        "items": {
+          "power_coupling": 1
+        },
+        "reputation": {
+          "helios": 8
+        }
+      }
+    },
+    {
+      "id": "bw_02",
+      "chain": "bellwether",
+      "name": "The Curve",
+      "person": "helios_engineer",
+      "giver": "sol_station_helios",
+      "level": 10,
+      "requires": [
+        "bw_01"
+      ],
+      "intro": "The board meets on my chart next month, and I want every number in it. The service docks file their performance logs at the Survey Dock, out on the Array's radius. And a drone stalled on the rail last week with a month of its service log aboard. Bring me both. Mind the drones; they don't mind you.",
+      "steps": [
+        {
+          "type": "recover",
+          "system": "sol",
+          "x": -16900,
+          "y": 23300,
+          "item": "helios_perf_logs",
+          "label": "the Helios Survey Dock",
+          "text": "Recover the docks' performance logs from the Helios Survey Dock (the Array's radius, Sol)"
+        },
+        {
+          "type": "recover",
+          "system": "sol",
+          "x": -19393,
+          "y": -17765,
+          "item": "helios_drone_logs",
+          "label": "the stalled Helios drone",
+          "text": "Recover the service log from a stalled Helios drone (the Array's rail, Sol)"
+        },
+        {
+          "type": "talk",
+          "person": "helios_engineer",
+          "take": {
+            "helios_perf_logs": 1,
+            "helios_drone_logs": 1
+          },
+          "text": "Bring both logs to Engineer Rask (the Helios Seat)",
+          "lines": [
+            {
+              "say": "Give them here. Output per tonne, every dock, every week... there. Look at it."
+            },
+            {
+              "say": "The curve bends. Up. The more greyseam we put on the rail, the better each tonne does. Efficiencies compounding. It's bedding in, like a good engine."
+            },
+            {
+              "say": "And the design software agrees: every pass it asks for the crystals a little closer together. Optimisation. It finds the slope and walks up it."
+            },
+            {
+              "say": "The drone's log is the usual: segments, hours, parts. It lists a few segments past a hundred and twenty, which they always do. Legacy numbering. Don't get excited. Everyone does, once."
+            }
+          ]
+        }
+      ],
+      "outro": "The board has seen the chart. The Director called it the best number the Directorate has put up in ten years, which from her is a parade. She wants Bellwether running before the year is out. So do I. Imagine what the curve does then.",
+      "rewards": {
+        "xp": 2600,
+        "credits": 360,
+        "items": {
+          "crystal_lens": 1
+        },
+        "reputation": {
+          "helios": 8
+        },
+        "codex": [
+          "helios_performance"
+        ]
+      }
+    },
+    {
+      "id": "bw_03",
+      "chain": "bellwether",
+      "name": "A Recording of the Array",
+      "person": "kerr",
+      "level": 12,
+      "requires": [
+        "bw_02",
+        "kerr_02"
+      ],
+      "rumour": "Sabine Kerr has been asking pilots who haul for the Directorate to run an errand for her.",
+      "onStart": {
+        "items": {
+          "kerr_recorder": 1
+        }
+      },
+      "intro": "They're building something on the Helios Array, and everybody has an opinion about what it will stop. Nobody has said what it sounds like. Here, take my recorder. Fly in by the Array's inner rail, sit still for half a minute, and bring it back to me. Gently. It's older than you.",
+      "steps": [
+        {
+          "type": "hold",
+          "system": "sol",
+          "x": 4300,
+          "y": -24932,
+          "radius": 700,
+          "seconds": 30,
+          "label": "the Helios Array's inner rail",
+          "text": "Hold steady by the Helios Array's inner rail 30 seconds while Kerr's recorder listens",
+          "after": [
+            {
+              "say": "That's enough. Bring it home slowly; it doesn't like being shaken."
+            }
+          ]
+        },
+        {
+          "type": "talk",
+          "person": "kerr",
+          "take": {
+            "kerr_recorder": 1
+          },
+          "text": "Bring the recorder back to Sabine Kerr (her hab, past the Lagrange Shipyard)",
+          "lines": [
+            {
+              "say": "Let's hear it. Collectors, couplings, a drone going by. The array's hum. Ordinary."
+            },
+            {
+              "say": "Now under it. Slowed down, there's a shape. Very faint. It isn't there at the start of the recording, and by the end it is. It creeps in."
+            },
+            {
+              "say": "I'll say what I hear, pilot. That's all I'll say."
+            },
+            {
+              "codex": "kerr_array_recording"
+            }
+          ]
+        }
+      ],
+      "outro": "I sent Quinn a copy. Instrument drift, she says: my recorder warming up as it runs. She may be right. She usually thinks she is.",
+      "rewards": {
+        "xp": 3000,
+        "credits": 200,
+        "skillPoints": 1
+      }
+    },
+    {
+      "id": "bw_04",
+      "chain": "bellwether",
+      "name": "Load Test",
+      "person": "helios_director",
+      "giver": "sol_station_helios",
+      "level": 14,
+      "requires": [
+        "bw_02"
+      ],
+      "intro": "Bellwether's first mast is on the rail. Before the board signs for Commissioning it wants a load test, and I want a pilot at the mast while Rask runs it: someone who'll report what they saw, not what they hoped. Bring Rask four power couplings for the mast's feed, then sit by the mast until the load is through.",
+      "steps": [
+        {
+          "type": "talk",
+          "person": "helios_engineer",
+          "take": {
+            "power_coupling": 4
+          },
+          "text": "Bring Engineer Rask 4 power couplings for the mast's feed (the Helios Seat)",
+          "lines": [
+            {
+              "say": "Four couplings, heavy current. Lovely. They go in the mast's feed, between the rail and the crystal stack."
+            },
+            {
+              "say": "Fly out to mast one and sit by it. When the load goes through you'll see nothing at all. That's the point. Nothing at all is what success looks like."
+            }
+          ]
+        },
+        {
+          "type": "hold",
+          "system": "sol",
+          "x": -8406,
+          "y": -24604,
+          "radius": 700,
+          "seconds": 40,
+          "label": "Bellwether mast one",
+          "text": "Hold by Bellwether's first mast on the Array's rail 40 seconds while the load test runs",
+          "after": [
+            {
+              "say": "Rask here. Load's through, every coupling green, and the curve took another step up while it ran. Come back to the Seat; the Director wants you."
+            }
+          ]
+        },
+        {
+          "type": "talk",
+          "person": "helios_director",
+          "text": "Report to Director Mbeki (the Helios Seat)",
+          "lines": [
+            {
+              "say": "Rask's numbers are clean, and you saw nothing at all. Good. The board has signed."
+            },
+            {
+              "say": "Commissioning has a date. When Bellwether comes on, the losses stop. That's what it's for."
+            },
+            {
+              "say": "I want you on the rail when it does: a pilot who saw it built. I'll call you."
+            }
+          ]
+        }
+      ],
+      "outro": "Commissioning is scheduled. The Directorate doesn't announce what it hasn't finished, so you'll hear the date from me and nobody else. Keep your ship in order, pilot. I'll call.",
+      "rewards": {
+        "xp": 3600,
+        "credits": 450,
+        "items": {
+          "shield_emitter": 1
+        },
+        "reputation": {
+          "helios": 10
+        }
+      }
+    },
+    {
+      "id": "kerr_03",
+      "chain": "side",
+      "name": "The Filaments",
+      "person": "kerr",
+      "level": 9,
+      "requires": [
+        "kerr_02"
+      ],
+      "intro": "Greyseam hums. I've proved that much to myself. Now I want to know what it does with current running through it. Bring me six scrap electronics, parts with greyseam in them that have had current through them for years, and a cell to drive them. A boost cell will do; current is current.",
+      "steps": [
+        {
+          "type": "talk",
+          "person": "kerr",
+          "take": {
+            "scrap_electronics": 6,
+            "boost_cell": 1
+          },
+          "text": "Bring Sabine Kerr 6 scrap electronics and a boost cell (her hab, past the Lagrange Shipyard)",
+          "lines": [
+            {
+              "say": "Cracked cores. Lovely. Every one of these had current through it for longer than you've been flying."
+            },
+            {
+              "say": "Half on the dish, half in the drawer for later. Now hold your ship steady close by: my dish doesn't like being bumped, and your engines bump."
+            }
+          ]
+        },
+        {
+          "type": "hold",
+          "system": "sol",
+          "x": -68148,
+          "y": -49800,
+          "radius": 700,
+          "seconds": 40,
+          "label": "Kerr's hab",
+          "text": "Hold steady by Kerr's hab 40 seconds while she runs current through the parts",
+          "after": [
+            {
+              "say": "Off. Come in. Come and look at this."
+            }
+          ]
+        },
+        {
+          "type": "talk",
+          "person": "kerr",
+          "text": "See what Sabine Kerr found",
+          "lines": [
+            {
+              "say": "Under the scope. See them? Threads through the grey, finer than hair. They weren't there when you brought the parts in."
+            },
+            {
+              "say": "And listen. The bench's hum while the current ran, slowed right down. There's a shape in it. The faintest shape."
+            },
+            {
+              "say": "Again. The other half of the parts, the same cell, the same bench. Hold steady for me one more time."
+            }
+          ]
+        },
+        {
+          "type": "hold",
+          "system": "sol",
+          "x": -68148,
+          "y": -49800,
+          "radius": 700,
+          "seconds": 40,
+          "label": "Kerr's hab",
+          "text": "Hold steady by Kerr's hab 40 seconds while she runs it a second time",
+          "after": [
+            {
+              "say": "Off. Come in."
+            }
+          ]
+        },
+        {
+          "type": "talk",
+          "person": "kerr",
+          "text": "Hear what the second run showed",
+          "lines": [
+            {
+              "say": "Nothing. No threads. No shape. Same parts, same cell, same bench, same pilot sitting outside."
+            },
+            {
+              "say": "I don't know what it means. Don't let anyone tell you they do."
+            },
+            {
+              "codex": "kerr_filaments"
+            }
+          ]
+        }
+      ],
+      "outro": "I've written it all down, both runs. Quinn will say electrochemistry. Quinn may even be right; she has to be, now and then.",
+      "rewards": {
+        "xp": 2100,
+        "credits": 160,
+        "items": {
+          "crystal_lens": 1
+        }
+      }
     }
   ]
 }

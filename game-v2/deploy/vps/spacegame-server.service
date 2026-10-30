@@ -1,0 +1,31 @@
+[Unit]
+Description=Space Game v2 game server
+After=network.target spacegame-browser.service
+
+[Service]
+Type=simple
+User=spacegame
+Group=spacegame
+WorkingDirectory=/opt/spacegame/server
+ExecStart=/usr/bin/node dist/index.js
+Environment=NODE_ENV=production
+# Only reachable through nginx (ufw blocks everything but 22/80/443)
+Environment=PORT=3100
+Environment=ADMIN_PORT=3105
+Environment=BROWSER_URL=http://127.0.0.1:8790
+# LOBBY_ADMIN_SECRET (shared with the lobby: admin ranks and bans; remote-install.sh makes it)
+EnvironmentFile=-/etc/spacegame/secrets.env
+Environment=PUBLIC_HOST=space.brotherk3d.com
+Environment="SERVER_NAME=Space Game v2"
+Environment=SERVER_REGION=au
+Restart=always
+RestartSec=3
+# Keep it to its own folder
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/spacegame/data
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

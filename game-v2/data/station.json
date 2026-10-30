@@ -1,0 +1,592 @@
+{
+  "_comment": "Your station (server/src/game/Outpost.ts): chartered at a level, for credits and plate, at one of the sites (beside an existing station). Each track has five tiers: a tier costs its cost (from storage) and builds for its minutes, wall-clock (it carries on while you're away). A tier's perks: refineTime/fabTime multiply job times, refineYield adds plate a batch, traceMul multiplies traces, fabSlots/hangarSlots add to the unlocks, cutFail takes off a gem cut's fail chance, sidegrades lets the fabricator make special ammunition (now open by level anyway: a perk to replace), rumours brings rumours from anywhere. Perks stack: a track gives everything up to its tier.",
+  "charter": {
+    "level": 25,
+    "credits": 20000,
+    "items": {
+      "alloy_plate": 200
+    }
+  },
+  "sites": [
+    {
+      "id": "sol_outer",
+      "name": "Sol outer belt",
+      "station": "sol_station_mining"
+    },
+    {
+      "id": "glasswater",
+      "name": "Glasswater",
+      "station": "glasswater_station_depot"
+    },
+    {
+      "id": "nebula_edge",
+      "name": "Nebula edge",
+      "station": "nebula_research_station"
+    }
+  ],
+  "tracks": {
+    "refinery": {
+      "name": "Refinery",
+      "group": "make",
+      "about": "Ore to plate: faster refining, more plate a batch, more traces out of the ore.",
+      "tiers": [
+        {
+          "name": "Better kilns: refining 10% quicker",
+          "cost": {
+            "alloy_plate": 200,
+            "steel_plate": 60,
+            "coolant": 30
+          },
+          "minutes": 10,
+          "refineTime": 0.9
+        },
+        {
+          "name": "Twin furnaces: 20% quicker",
+          "cost": {
+            "steel_plate": 220,
+            "copper_wire": 120,
+            "coolant": 100
+          },
+          "minutes": 45,
+          "refineTime": 0.8
+        },
+        {
+          "name": "Reclaimers: +10% plate a batch",
+          "cost": {
+            "steel_plate": 260,
+            "titanium_plate": 60,
+            "copper_wire": 200,
+            "crystal_lens": 30,
+            "aurum_ingot": 20,
+            "coolant": 90
+          },
+          "minutes": 120,
+          "refineTime": 0.7,
+          "refineYield": 0.1
+        },
+        {
+          "name": "Arc furnaces: 35% quicker",
+          "cost": {
+            "titanium_plate": 160,
+            "cobalt_alloy": 60,
+            "insulated_polymer": 40,
+            "aurum_ingot": 30,
+            "voidglass_pane": 15,
+            "coolant": 120
+          },
+          "minutes": 300,
+          "refineTime": 0.65,
+          "refineYield": 0.1
+        },
+        {
+          "name": "Trace separators: +20% plate, traces ×1.25",
+          "cost": {
+            "cobalt_alloy": 140,
+            "neutronium_plate": 40,
+            "aurum_ingot": 40,
+            "iridium_ingot": 20,
+            "singularity_grain": 3,
+            "coolant": 150
+          },
+          "minutes": 480,
+          "refineTime": 0.6,
+          "refineYield": 0.2,
+          "traceMul": 1.25
+        }
+      ]
+    },
+    "fabricator": {
+      "name": "Fabricator",
+      "group": "make",
+      "about": "Parts and ammunition: more fabricator slots, quicker builds.",
+      "tiers": [
+        {
+          "name": "A second bench: +1 fabricator slot",
+          "cost": {
+            "alloy_plate": 200,
+            "steel_plate": 60,
+            "copper_wire": 60
+          },
+          "minutes": 10,
+          "fabTime": 0.95
+        },
+        {
+          "name": "Jigs: builds 15% quicker",
+          "cost": {
+            "steel_plate": 220,
+            "copper_wire": 240,
+            "coolant": 40
+          },
+          "minutes": 45,
+          "fabTime": 0.85
+        },
+        {
+          "name": "A third bench: +1 slot",
+          "cost": {
+            "steel_plate": 260,
+            "titanium_plate": 60,
+            "copper_wire": 380,
+            "crystal_lens": 30,
+            "aurum_ingot": 20
+          },
+          "minutes": 120,
+          "fabTime": 0.8
+        },
+        {
+          "name": "Precision tooling: 30% quicker",
+          "cost": {
+            "titanium_plate": 160,
+            "cobalt_alloy": 60,
+            "insulated_polymer": 40,
+            "aurum_ingot": 30,
+            "voidglass_pane": 15,
+            "copper_wire": 240
+          },
+          "minutes": 300,
+          "fabTime": 0.7
+        },
+        {
+          "name": "A fourth bench: +1 slot, 40% quicker",
+          "cost": {
+            "cobalt_alloy": 140,
+            "neutronium_plate": 40,
+            "aurum_ingot": 40,
+            "iridium_ingot": 20,
+            "singularity_grain": 3,
+            "copper_wire": 300
+          },
+          "minutes": 480,
+          "fabTime": 0.6
+        }
+      ]
+    },
+    "armoury": {
+      "name": "Armoury",
+      "group": "make",
+      "about": "An ammunition plant: standard and special crates, and (later) rare-weapon rounds.",
+      "tiers": [
+        {
+          "name": "Shell press: standard crates",
+          "cost": {
+            "alloy_plate": 200,
+            "steel_plate": 60,
+            "propellant": 60
+          },
+          "minutes": 10
+        },
+        {
+          "name": "Primer line",
+          "cost": {
+            "steel_plate": 220,
+            "copper_wire": 120,
+            "coolant": 40,
+            "propellant": 120
+          },
+          "minutes": 45
+        },
+        {
+          "name": "Special ammunition: sabot, chaff, seekers and the rest",
+          "cost": {
+            "steel_plate": 260,
+            "titanium_plate": 60,
+            "copper_wire": 200,
+            "crystal_lens": 30,
+            "aurum_ingot": 20,
+            "propellant": 180
+          },
+          "minutes": 120
+        },
+        {
+          "name": "Proving range",
+          "cost": {
+            "titanium_plate": 160,
+            "cobalt_alloy": 60,
+            "insulated_polymer": 40,
+            "aurum_ingot": 30,
+            "voidglass_pane": 15,
+            "propellant": 240
+          },
+          "minutes": 300
+        },
+        {
+          "name": "Bespoke rounds for rare weapons (coming)",
+          "cost": {
+            "cobalt_alloy": 140,
+            "neutronium_plate": 40,
+            "aurum_ingot": 40,
+            "iridium_ingot": 20,
+            "singularity_grain": 3,
+            "propellant": 300
+          },
+          "minutes": 480
+        }
+      ]
+    },
+    "gem_cutter": {
+      "name": "Gem cutter",
+      "group": "make",
+      "about": "Cuts gems: fewer failed cuts (and, later, higher levels).",
+      "tiers": [
+        {
+          "name": "A cutter's wheel: 5 points fewer failed cuts",
+          "cost": {
+            "alloy_plate": 200,
+            "steel_plate": 60,
+            "crystal_lens": 20
+          },
+          "minutes": 10,
+          "cutFail": 0.05
+        },
+        {
+          "name": "Polishing lathe: 10 fewer",
+          "cost": {
+            "steel_plate": 220,
+            "copper_wire": 120,
+            "coolant": 40,
+            "crystal_lens": 40
+          },
+          "minutes": 45,
+          "cutFail": 0.1
+        },
+        {
+          "name": "Laser scribe: 20 fewer",
+          "cost": {
+            "steel_plate": 260,
+            "titanium_plate": 60,
+            "copper_wire": 200,
+            "crystal_lens": 90,
+            "aurum_ingot": 20
+          },
+          "minutes": 120,
+          "cutFail": 0.2
+        },
+        {
+          "name": "Resonance cutter: 30 fewer",
+          "cost": {
+            "titanium_plate": 160,
+            "cobalt_alloy": 60,
+            "insulated_polymer": 40,
+            "aurum_ingot": 30,
+            "voidglass_pane": 15,
+            "crystal_lens": 80
+          },
+          "minutes": 300,
+          "cutFail": 0.3
+        },
+        {
+          "name": "Void lathe: 40 fewer",
+          "cost": {
+            "cobalt_alloy": 140,
+            "neutronium_plate": 40,
+            "aurum_ingot": 40,
+            "iridium_ingot": 20,
+            "singularity_grain": 3,
+            "crystal_lens": 100
+          },
+          "minutes": 480,
+          "cutFail": 0.4
+        }
+      ]
+    },
+    "hangar": {
+      "name": "Hangar",
+      "group": "keep",
+      "about": "More hangar bays for the ships you keep for each system.",
+      "tiers": [
+        {
+          "name": "A bay of your own: +1 hangar bay",
+          "cost": {
+            "alloy_plate": 200,
+            "steel_plate": 140
+          },
+          "minutes": 10
+        },
+        {
+          "name": "Gantries",
+          "cost": {
+            "steel_plate": 380,
+            "copper_wire": 120,
+            "coolant": 40
+          },
+          "minutes": 45
+        },
+        {
+          "name": "A second bay: +1",
+          "cost": {
+            "steel_plate": 500,
+            "titanium_plate": 60,
+            "copper_wire": 200,
+            "crystal_lens": 30,
+            "aurum_ingot": 20
+          },
+          "minutes": 120
+        },
+        {
+          "name": "Dry dock",
+          "cost": {
+            "titanium_plate": 160,
+            "cobalt_alloy": 60,
+            "insulated_polymer": 40,
+            "aurum_ingot": 30,
+            "voidglass_pane": 15,
+            "steel_plate": 320
+          },
+          "minutes": 300
+        },
+        {
+          "name": "A third bay: +1",
+          "cost": {
+            "cobalt_alloy": 140,
+            "neutronium_plate": 40,
+            "aurum_ingot": 40,
+            "iridium_ingot": 20,
+            "singularity_grain": 3,
+            "steel_plate": 400
+          },
+          "minutes": 480
+        }
+      ]
+    },
+    "storage": {
+      "name": "Storage",
+      "group": "keep",
+      "about": "Cells for what you keep (storage has no cap yet: this track's perks come with one).",
+      "tiers": [
+        {
+          "name": "Racks",
+          "cost": {
+            "alloy_plate": 320,
+            "steel_plate": 60
+          },
+          "minutes": 10
+        },
+        {
+          "name": "Bonded store",
+          "cost": {
+            "steel_plate": 220,
+            "copper_wire": 120,
+            "coolant": 40,
+            "alloy_plate": 240
+          },
+          "minutes": 45
+        },
+        {
+          "name": "Deep vaults",
+          "cost": {
+            "steel_plate": 260,
+            "titanium_plate": 60,
+            "copper_wire": 200,
+            "crystal_lens": 30,
+            "aurum_ingot": 20,
+            "alloy_plate": 360
+          },
+          "minutes": 120
+        },
+        {
+          "name": "Cold store",
+          "cost": {
+            "titanium_plate": 160,
+            "cobalt_alloy": 60,
+            "insulated_polymer": 40,
+            "aurum_ingot": 30,
+            "voidglass_pane": 15,
+            "alloy_plate": 480
+          },
+          "minutes": 300
+        },
+        {
+          "name": "Cross-station transfer (coming)",
+          "cost": {
+            "cobalt_alloy": 140,
+            "neutronium_plate": 40,
+            "aurum_ingot": 40,
+            "iridium_ingot": 20,
+            "singularity_grain": 3,
+            "alloy_plate": 600
+          },
+          "minutes": 480
+        }
+      ]
+    },
+    "scanner": {
+      "name": "Scanner array",
+      "group": "know",
+      "about": "Information: rumours from further off (and, later, trace content and forecasts).",
+      "tiers": [
+        {
+          "name": "A listening mast: rumours of hidden jobs anywhere, not just here",
+          "cost": {
+            "alloy_plate": 200,
+            "steel_plate": 60,
+            "crystal_lens": 30
+          },
+          "minutes": 10
+        },
+        {
+          "name": "Survey drones",
+          "cost": {
+            "steel_plate": 220,
+            "copper_wire": 120,
+            "coolant": 40,
+            "crystal_lens": 60
+          },
+          "minutes": 45
+        },
+        {
+          "name": "Trace readers (coming)",
+          "cost": {
+            "steel_plate": 260,
+            "titanium_plate": 60,
+            "copper_wire": 200,
+            "crystal_lens": 120,
+            "aurum_ingot": 20
+          },
+          "minutes": 120
+        },
+        {
+          "name": "Long-range forecasts (coming)",
+          "cost": {
+            "titanium_plate": 160,
+            "cobalt_alloy": 60,
+            "insulated_polymer": 40,
+            "aurum_ingot": 30,
+            "voidglass_pane": 15,
+            "crystal_lens": 120
+          },
+          "minutes": 300
+        },
+        {
+          "name": "Seam and mega-rock markers (coming)",
+          "cost": {
+            "cobalt_alloy": 140,
+            "neutronium_plate": 40,
+            "aurum_ingot": 40,
+            "iridium_ingot": 20,
+            "singularity_grain": 3,
+            "crystal_lens": 150
+          },
+          "minutes": 480
+        }
+      ]
+    },
+    "market": {
+      "name": "Market link",
+      "group": "know",
+      "about": "Prices and contracts (its perks come later).",
+      "tiers": [
+        {
+          "name": "A trading post",
+          "cost": {
+            "alloy_plate": 200,
+            "steel_plate": 60,
+            "copper_wire": 40
+          },
+          "minutes": 10
+        },
+        {
+          "name": "Price feeds",
+          "cost": {
+            "steel_plate": 220,
+            "copper_wire": 200,
+            "coolant": 40
+          },
+          "minutes": 45
+        },
+        {
+          "name": "Buy orders from nearby stations (coming)",
+          "cost": {
+            "steel_plate": 260,
+            "titanium_plate": 60,
+            "copper_wire": 320,
+            "crystal_lens": 30,
+            "aurum_ingot": 20
+          },
+          "minutes": 120
+        },
+        {
+          "name": "Brokerage",
+          "cost": {
+            "titanium_plate": 160,
+            "cobalt_alloy": 60,
+            "insulated_polymer": 40,
+            "aurum_ingot": 30,
+            "voidglass_pane": 15,
+            "copper_wire": 160
+          },
+          "minutes": 300
+        },
+        {
+          "name": "Contracts (coming)",
+          "cost": {
+            "cobalt_alloy": 140,
+            "neutronium_plate": 40,
+            "aurum_ingot": 40,
+            "iridium_ingot": 20,
+            "singularity_grain": 3,
+            "copper_wire": 200
+          },
+          "minutes": 480
+        }
+      ]
+    },
+    "defences": {
+      "name": "Defences",
+      "group": "hold",
+      "about": "Point defence, mortar batteries and a tractor array, for when raiders come (raids come later).",
+      "tiers": [
+        {
+          "name": "Point-defence flak",
+          "cost": {
+            "alloy_plate": 200,
+            "steel_plate": 160
+          },
+          "minutes": 10
+        },
+        {
+          "name": "Sensor pickets",
+          "cost": {
+            "steel_plate": 420,
+            "copper_wire": 120,
+            "coolant": 40
+          },
+          "minutes": 45
+        },
+        {
+          "name": "A mortar battery and a tractor array",
+          "cost": {
+            "steel_plate": 560,
+            "titanium_plate": 60,
+            "copper_wire": 200,
+            "crystal_lens": 30,
+            "aurum_ingot": 20
+          },
+          "minutes": 120
+        },
+        {
+          "name": "Repair drones",
+          "cost": {
+            "titanium_plate": 160,
+            "cobalt_alloy": 60,
+            "insulated_polymer": 40,
+            "aurum_ingot": 30,
+            "voidglass_pane": 15,
+            "steel_plate": 400
+          },
+          "minutes": 300
+        },
+        {
+          "name": "Shield and three turrets of each kind",
+          "cost": {
+            "cobalt_alloy": 140,
+            "neutronium_plate": 40,
+            "aurum_ingot": 40,
+            "iridium_ingot": 20,
+            "singularity_grain": 3,
+            "steel_plate": 500
+          },
+          "minutes": 480
+        }
+      ]
+    }
+  }
+}

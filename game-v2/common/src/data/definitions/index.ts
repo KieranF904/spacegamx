@@ -51,8 +51,8 @@ export type {
 export * from './ItemDefinition.js';
 export type {
   ItemDefinition,
-  ItemCategory,
-  ItemRarity,
+  LegacyItemCategory,
+  LegacyItemRarity,
   EquipmentConfig,
   StatModifiers,
   ConsumableConfig,

@@ -5,6 +5,8 @@
  * edge pointing toward the source of the damage.
  */
 
+import { onOverlayFrame, screenTint } from '../rendering/overlayFrame';
+
 interface DamageIndicator {
   id: number;
   angle: number; // Direction damage came from (radians)
@@ -19,12 +21,16 @@ export class DamageIndicatorUI {
   private ctx: CanvasRenderingContext2D;
   private indicators: DamageIndicator[] = [];
   private nextId = 0;
-  private animationFrame: number = 0;
+  private stop: () => void;
   private visible = true;
+  /** The canvas has something on it (so it's cleared only when there's something to clear) */
+  private drawn = false;
   
   // Player position (updated externally)
   private playerX = 0;
   private playerY = 0;
+  /** The view's roll: indicators keep the hit's world direction, drawn turned with the view */
+  private viewAngle = 0;
   
   constructor(container: HTMLElement) {
     this.container = container;
@@ -47,7 +53,12 @@ export class DamageIndicatorUI {
     this.handleResize();
     window.addEventListener('resize', this.handleResize);
     
-    this.startAnimation();
+    // Stepped from the renderer's frame (see overlayFrame)
+    this.stop = onOverlayFrame((dt) => {
+      if (!this.visible || (!this.indicators.length && !this.drawn)) return;
+      this.update(Math.min(0.1, dt));
+      this.draw();
+    });
   }
   
   private handleResize = (): void => {
@@ -55,25 +66,14 @@ export class DamageIndicatorUI {
     this.canvas.height = window.innerHeight;
   };
   
-  private startAnimation(): void {
-    const animate = () => {
-      if (this.visible) {
-        this.update();
-        this.draw();
-      }
-      this.animationFrame = requestAnimationFrame(animate);
-    };
-    this.animationFrame = requestAnimationFrame(animate);
-  }
-  
   /**
    * Add a damage indicator from a specific world position
    */
   addDamage(sourceX: number, sourceY: number, intensity: number = 1): void {
-    // Calculate angle from player to damage source
+    // Calculate angle from player to damage source (none known: just the vignette)
     const dx = sourceX - this.playerX;
     const dy = sourceY - this.playerY;
-    const angle = Math.atan2(dy, dx);
+    const angle = dx === 0 && dy === 0 ? NaN : Math.atan2(dy, dx);
     
     this.addDamageFromAngle(angle, intensity);
   }
@@ -102,13 +102,13 @@ export class DamageIndicatorUI {
   /**
    * Update player position for damage direction calculation
    */
-  setPlayerPosition(x: number, y: number): void {
+  setPlayerPosition(x: number, y: number, viewAngle = 0): void {
     this.playerX = x;
     this.playerY = y;
+    this.viewAngle = viewAngle;
   }
   
-  private update(): void {
-    const dt = 1 / 60; // Assume 60fps
+  private update(dt: number): void {
     
     // Update all indicators
     for (let i = this.indicators.length - 1; i >= 0; i--) {
@@ -127,7 +127,9 @@ export class DamageIndicatorUI {
     const h = this.canvas.height;
     
     ctx.clearRect(0, 0, w, h);
-    
+    this.drawn = this.indicators.length > 0;
+    // The red edge is the renderer's vignette (one gradient, not two stacked)
+    screenTint.damage = this.drawn ? Math.max(...this.indicators.map(i => i.intensity * this.easeOutQuad(i.life))) * 0.4 : 0;
     if (this.indicators.length === 0) return;
     
     const cx = w / 2;
@@ -138,13 +140,15 @@ export class DamageIndicatorUI {
     const edgeDistY = h / 2 - 40;
     
     for (const ind of this.indicators) {
+      if (Number.isNaN(ind.angle)) continue;
       // Ease out the intensity as it fades
       const fadeAlpha = this.easeOutQuad(ind.life);
       const alpha = fadeAlpha * ind.intensity;
       
       // Calculate position on screen edge
-      const cosA = Math.cos(ind.angle);
-      const sinA = Math.sin(ind.angle);
+      const screenAngle = ind.angle - this.viewAngle;
+      const cosA = Math.cos(screenAngle);
+      const sinA = Math.sin(screenAngle);
       
       // Find intersection with screen edge
       let x: number, y: number;
@@ -165,13 +169,7 @@ export class DamageIndicatorUI {
       y = Math.max(40, Math.min(h - 40, y));
       
       // Draw damage indicator arc
-      this.drawIndicator(ctx, x, y, ind.angle, alpha, ind.intensity);
-    }
-    
-    // Draw vignette effect if any indicators are active
-    const maxIntensity = Math.max(...this.indicators.map(i => i.intensity * this.easeOutQuad(i.life)));
-    if (maxIntensity > 0) {
-      this.drawVignette(ctx, w, h, maxIntensity * 0.4);
+      this.drawIndicator(ctx, x, y, screenAngle, alpha, ind.intensity);
     }
   }
   
@@ -196,21 +194,23 @@ export class DamageIndicatorUI {
     grad.addColorStop(0.6, `rgba(255, 100, 50, ${alpha})`);
     grad.addColorStop(1, `rgba(255, 50, 50, ${alpha * 0.3})`);
     
-    // Draw arrow/wedge shape pointing inward
-    ctx.beginPath();
-    ctx.moveTo(-size * 0.5, -size * 0.4);
-    ctx.lineTo(size * 0.3, 0);
-    ctx.lineTo(-size * 0.5, size * 0.4);
-    ctx.closePath();
-    
+    // Arrow/wedge shape pointing inward; first larger and faint, for a soft glow (cheaper than shadowBlur, the slowest thing a canvas does)
+    const wedge = (k: number) => {
+      ctx.beginPath();
+      ctx.moveTo(-size * 0.5 * k, -size * 0.4 * k);
+      ctx.lineTo(size * 0.3 * k, 0);
+      ctx.lineTo(-size * 0.5 * k, size * 0.4 * k);
+      ctx.closePath();
+    };
+    wedge(1.7);
+    ctx.fillStyle = `rgba(255, 50, 0, ${alpha * 0.12})`;
+    ctx.fill();
+    wedge(1.3);
+    ctx.fillStyle = `rgba(255, 50, 0, ${alpha * 0.2})`;
+    ctx.fill();
+    wedge(1);
     ctx.fillStyle = grad;
     ctx.fill();
-    
-    // Add glow effect
-    ctx.shadowColor = `rgba(255, 50, 0, ${alpha})`;
-    ctx.shadowBlur = 20;
-    ctx.fill();
-    ctx.shadowBlur = 0;
     
     // Inner bright core
     ctx.beginPath();
@@ -222,26 +222,6 @@ export class DamageIndicatorUI {
     ctx.fill();
     
     ctx.restore();
-  }
-  
-  private drawVignette(
-    ctx: CanvasRenderingContext2D,
-    w: number, h: number,
-    intensity: number
-  ): void {
-    // Create radial gradient from center
-    const cx = w / 2;
-    const cy = h / 2;
-    const radius = Math.sqrt(cx * cx + cy * cy);
-    
-    const grad = ctx.createRadialGradient(cx, cy, radius * 0.3, cx, cy, radius);
-    grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    grad.addColorStop(0.5, 'rgba(100, 0, 0, 0)');
-    grad.addColorStop(0.8, `rgba(150, 0, 0, ${intensity * 0.2})`);
-    grad.addColorStop(1, `rgba(200, 0, 0, ${intensity * 0.4})`);
-    
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, w, h);
   }
   
   private easeOutQuad(t: number): number {
@@ -256,16 +236,17 @@ export class DamageIndicatorUI {
   hide(): void {
     this.visible = false;
     this.canvas.style.display = 'none';
+    screenTint.damage = 0;
   }
   
   clear(): void {
     this.indicators = [];
+    screenTint.damage = 0;
   }
   
   destroy(): void {
-    if (this.animationFrame) {
-      cancelAnimationFrame(this.animationFrame);
-    }
+    this.stop();
+    screenTint.damage = 0;
     window.removeEventListener('resize', this.handleResize);
     this.canvas.remove();
   }

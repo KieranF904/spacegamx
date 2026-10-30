@@ -97,17 +97,25 @@ const FRAGMENT_SHADER = `#version 300 es
     
     float dist = length(uv);
     
+    // Visible glow extent: fraction of the quad radius where glow shows.
+    // The quad is much larger than the visible glow (it also covers the sun),
+    // so beyond this span space stays dark even when the player is inside
+    // the quad — prevents a full-screen color wash.
+    float glowSpan = 0.35;
+    
     // Skip pixels outside the glow area or inside the sun
-    if (dist > 1.0 || dist < uInnerRadius) {
+    if (dist > glowSpan || dist < uInnerRadius) {
       fragColor = vec4(0.0);
       return;
     }
     
-    // Calculate falloff from inner radius to outer edge
-    float t = (dist - uInnerRadius) / (1.0 - uInnerRadius);
-    
-    // Smooth exponential falloff for natural light decay
+    // Falloff from the sun's edge (t=0, full brightness) to the glow span
+    // edge (t=1, zero). Steep enough to concentrate light near the star
+    // while remaining full-brightness right at the rim (no dark gap).
+    float t = (dist - uInnerRadius) / (glowSpan - uInnerRadius);
     float falloff = pow(1.0 - t, 3.0);
+    // Extra rim term: bright band hugging the sun's edge
+    falloff += pow(1.0 - t, 14.0) * 0.8;
     
     // === Organic radial waves with variance ===
     
@@ -152,8 +160,10 @@ const FRAGMENT_SHADER = `#version 300 es
     
     // Alpha with smooth edges
     float alpha = falloff * uIntensity;
-    alpha *= smoothstep(1.0, 0.85, dist);  // Smooth outer edge
-    alpha *= smoothstep(uInnerRadius, uInnerRadius + 0.08, dist);  // Smooth inner edge
+    alpha *= smoothstep(glowSpan, glowSpan * 0.82, dist);  // Smooth outer edge
+    // Inner edge: ramp in fast right at the sun's rim so the glow
+    // meets the sun surface without a dark seam
+    alpha *= smoothstep(uInnerRadius, uInnerRadius + 0.02, dist);
     
     // Use premultiplied alpha for proper blending
     fragColor = vec4(color * alpha, alpha);
@@ -171,8 +181,10 @@ export class GlowRenderer {
   }
   
   initialize(): void {
-    // Large quad for the glow area
-    const quadSize = 2.0;
+    // The glow only reaches GLOW_SPAN of the quad's radius (see the shader), so the quad is cut
+    // down to that: the same picture without running the shader over 8x the area for nothing
+    const GLOW_SPAN = 0.35;
+    const quadSize = 2.0 * GLOW_SPAN;
     const positions = new Float32Array([
       -quadSize, -quadSize,
        quadSize, -quadSize,
@@ -180,12 +192,8 @@ export class GlowRenderer {
       -quadSize,  quadSize,
     ]);
     
-    const uvs = new Float32Array([
-      0, 0,
-      1, 0,
-      1, 1,
-      0, 1,
-    ]);
+    const u0 = 0.5 - GLOW_SPAN / 2, u1 = 0.5 + GLOW_SPAN / 2;
+    const uvs = new Float32Array([u0, u0, u1, u0, u1, u1, u0, u1]);
     
     const indices = new Uint32Array([0, 1, 2, 0, 2, 3]);
     
@@ -233,6 +241,13 @@ export class GlowRenderer {
   }
   
   private lod: number = 1.0;
+  /** Half the view's size in world units (set each frame before `update`, which skips the glow while it's out of view) */
+  private viewHalf = { hw: Infinity, hh: Infinity };
+
+  setViewHalf(hw: number, hh: number): void {
+    this.viewHalf.hw = hw;
+    this.viewHalf.hh = hh;
+  }
   
   update(
     delta: number,
@@ -246,15 +261,26 @@ export class GlowRenderer {
     innerColor: [number, number, number] = [1.0, 0.75, 0.4],
     outerColor: [number, number, number] = [1.0, 0.6, 0.4],
   ): void {
-    this.time += delta * 0.016;
+    // Seconds
+    this.time += delta;
+
+    // The quad reaches GLOW_SPAN of the way out (its half-size is 0.35 of glowRadius): while the view is clear of it
+    // there is nothing to draw, so the mesh is hidden and its uniforms aren't touched
+    const reach = glowRadius * 0.35 + 64;
+    const off = Math.abs(cameraX - this.container.x) - this.viewHalf.hw > reach || Math.abs(cameraY - this.container.y) - this.viewHalf.hh > reach;
+    if (this.mesh) this.mesh.visible = !off;
+    if (off) return;
     
     if (this.shader) {
       // Access uniforms through the group
       const group = this.shader.resources.glowUniforms as any;
       group.uniforms.uTime = this.time;
       group.uniforms.uHue = hue;
-      const innerMul = 1.0 + Math.max(0, glowSize) * 2.0;
-      group.uniforms.uInnerRadius = Math.min(0.95, (sunRadius * innerMul) / Math.max(1, glowRadius));
+      // Inner cutout = the sun's actual disc edge (sunRadius / glowRadius).
+      // glowSize adds a small overlap so the glow tucks under the sun's rim
+      // with no dark seam between them.
+      const overlap = Math.max(0, glowSize) * 0.5;
+      group.uniforms.uInnerRadius = Math.min(0.95, Math.max(0.0, (sunRadius * (1.0 - overlap)) / Math.max(1, glowRadius)));
       group.uniforms.uIntensity = intensity;
       group.uniforms.uLOD = this.lod;
       group.uniforms.uInnerColor[0] = innerColor[0];
@@ -270,8 +296,11 @@ export class GlowRenderer {
     }
     
     if (this.mesh) {
-      // Scale to cover the glow area in world coordinates
-      this.mesh.scale.set(glowRadius, glowRadius);
+      // Scale to cover the glow area in world coordinates.
+      // The quad is 2x2 in local space (half-extent 2), so scale by
+      // glowRadius * 0.5 to make the quad span exactly ±glowRadius.
+      // This keeps uInnerRadius (sunRadius/glowRadius) geometrically exact.
+      this.mesh.scale.set(glowRadius * 0.5, glowRadius * 0.5);
     }
   }
   

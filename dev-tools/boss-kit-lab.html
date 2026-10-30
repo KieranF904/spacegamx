@@ -1,0 +1,2113 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Boss Kit Lab — Scrap Mother (live-geometry concept)</title>
+<style>
+  :root{
+    --bg:#05070c; --panel:#0b101b; --panel2:#0e1522; --line:#1c2740; --txt:#c7d2e8;
+    --dim:#6b7a99; --acc:#7dd3fc; --warn:#ffb37d; --bad:#ff7d6b; --good:#8ce99a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);
+    font:13px/1.45 "Segoe UI",system-ui,sans-serif;overflow:hidden}
+  header{display:flex;align-items:center;gap:10px;height:46px;padding:0 10px;
+    background:var(--panel);border-bottom:1px solid var(--line);flex-shrink:0}
+  header .logo{font-weight:700;letter-spacing:.1em;color:var(--acc);font-size:12.5px;white-space:nowrap}
+  header .sub{color:var(--dim);font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hspace{flex:1}
+  .ctl{display:flex;gap:4px;align-items:center;flex-shrink:0}
+  button{background:var(--panel2);border:1px solid var(--line);color:var(--txt);
+    border-radius:5px;padding:4px 8px;font-size:11px;cursor:pointer;white-space:nowrap}
+  button:hover{border-color:#33507e}
+  button.on{border-color:#33507e;background:#121d30;color:#dbe7ff}
+  aside.hidden{display:none}
+  main{display:flex;height:calc(100% - 46px)}
+  aside{width:248px;min-width:196px;background:var(--panel);border-right:1px solid var(--line);
+    overflow-y:auto;flex-shrink:0}
+  #right{border-right:none;border-left:1px solid var(--line);width:326px}
+  #stageWrap{flex:1;position:relative;min-width:0;background:#05070c}
+  canvas#stage{position:absolute;inset:0;width:100%;height:100%;display:block}
+  #caption{position:absolute;left:0;right:0;bottom:32px;text-align:center;pointer-events:none;
+    font-size:13px;text-shadow:0 2px 6px #000;opacity:0;transition:opacity .3s;padding:0 18px}
+  #caption.warn{color:var(--warn)} #caption.bad{color:var(--bad)}
+  #caption.good{color:var(--good)} #caption.info{color:var(--acc)}
+  #hint{position:absolute;left:10px;bottom:7px;color:var(--dim);font-size:10px;pointer-events:none}
+  /* HUD: plain DOM, so it always lines up with the stage */
+  #hudTop{position:absolute;top:10px;left:10px;right:10px;pointer-events:none;
+    display:flex;align-items:center;gap:10px;background:rgba(8,12,20,0.8);
+    border:1px solid rgba(201,164,106,0.35);border-radius:7px;padding:6px 10px}
+  #hudTop .nm{font-weight:600;font-size:11.5px;color:#e6ecf7}
+  #hudTop .sb{font-size:9.5px;color:#8b9ab5}
+  #hudTop .bar{flex:1;height:7px;background:rgba(255,255,255,0.07);border-radius:2px;
+    position:relative;min-width:50px}
+  #hudTop .bar i{position:absolute;left:0;top:0;bottom:0;background:rgba(201,164,106,0.9);border-radius:2px}
+  #hudTop .bar u{position:absolute;top:-3px;bottom:-3px;width:1px;background:rgba(255,255,255,0.45)}
+  #hudTop .ph{font:9px ui-monospace,Consolas,monospace;color:#96a5c2;white-space:nowrap}
+  #hudBot{position:absolute;left:10px;bottom:24px;width:168px;pointer-events:none;
+    background:rgba(8,12,20,0.8);border:1px solid rgba(125,211,252,0.28);border-radius:6px;padding:5px 8px}
+  #hudBot .lb{font:8.5px ui-monospace,Consolas,monospace;color:#96a5c2;margin-bottom:3px}
+  #hudBot .b{height:5px;background:rgba(255,255,255,0.08);border-radius:2px;margin-top:3px;overflow:hidden}
+  #hudBot .b i{display:block;height:100%;border-radius:2px}
+  /* HUD: plain DOM, so it always lines up with the stage */
+  #hudTop{position:absolute;top:10px;left:10px;right:10px;pointer-events:none;
+    display:flex;align-items:center;gap:10px;background:rgba(8,12,20,0.8);
+    border:1px solid rgba(201,164,106,0.35);border-radius:7px;padding:6px 10px}
+  #hudTop .nm{font-weight:600;font-size:11.5px;color:#e6ecf7;letter-spacing:.02em}
+  #hudTop .sb{font-size:9.5px;color:#8b9ab5}
+  #hudTop .bar{flex:1;height:7px;background:rgba(255,255,255,0.07);border-radius:2px;
+    position:relative;min-width:60px}
+  #hudTop .bar i{position:absolute;left:0;top:0;bottom:0;background:rgba(201,164,106,0.9);border-radius:2px}
+  #hudTop .bar u{position:absolute;top:-3px;bottom:-3px;width:1px;background:rgba(255,255,255,0.45)}
+  #hudTop .ph{font:9px ui-monospace,Consolas,monospace;color:#96a5c2;white-space:nowrap}
+  #hudBot{position:absolute;left:10px;bottom:24px;width:168px;pointer-events:none;
+    background:rgba(8,12,20,0.8);border:1px solid rgba(125,211,252,0.28);border-radius:6px;padding:5px 8px}
+  #hudBot .lb{font:8.5px ui-monospace,Consolas,monospace;color:#96a5c2;margin-bottom:3px}
+  #hudBot .b{height:5px;background:rgba(255,255,255,0.08);border-radius:2px;margin-top:3px;overflow:hidden}
+  #hudBot .b i{display:block;height:100%;border-radius:2px}
+  h3{margin:0;padding:9px 11px 5px;font-size:10px;letter-spacing:.1em;color:var(--dim);
+    text-transform:uppercase;border-bottom:1px solid var(--line);display:flex;justify-content:space-between}
+  h3 span{color:#3d4c68;letter-spacing:0}
+  .row{display:flex;justify-content:space-between;gap:8px;padding:3px 11px;font-size:11px}
+  .row b{font-weight:600;color:#dbe7ff}
+  .row span{color:var(--dim);text-align:right}
+  .kv{padding:3px 11px;font-size:11px;color:#93a3bd;line-height:1.5}
+  .kv b{color:var(--txt);font-weight:600}
+  .swatch{width:9px;height:9px;border-radius:2px;display:inline-block;margin-right:5px;
+    vertical-align:-1px;box-shadow:0 0 0 1px #0006}
+  .badge{font-size:8.5px;padding:1px 4px;border-radius:6px;letter-spacing:.05em;margin-left:4px;
+    border:1px solid #4a3c22;color:#c9a46a;text-transform:uppercase;vertical-align:1px}
+  #report{padding:7px 11px;font-size:10.5px;font-family:ui-monospace,Consolas,monospace;line-height:1.6}
+  .ok{color:var(--good)} .err{color:var(--bad)} .warnT{color:var(--warn)}
+  .card{margin:7px 9px;padding:7px 9px;border:1px solid var(--line);border-radius:7px;
+    background:var(--panel2);font-size:11px}
+  .card .t{font-weight:600;font-size:11.5px}
+  pre{display:none;margin:5px 0 0;padding:6px;background:#060a11;border:1px solid var(--line);
+    border-radius:5px;font-size:9.5px;color:#9fe0c0;overflow:auto;max-height:300px;white-space:pre}
+  .card.open pre{display:block}
+  pre.map{display:block;font-size:10.5px;line-height:1.3;color:#8fb6d8;background:transparent;
+    border:none;padding:4px 11px;max-height:none;overflow:visible}
+  aside::-webkit-scrollbar{width:8px} aside::-webkit-scrollbar-thumb{background:#1c2740;border-radius:4px}
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">BOSS KIT LAB</span>
+  <span class="sub">live geometry · integer cells · lines &amp; quarter-arcs · edge connectors</span>
+  <div class="hspace"></div>
+  <div class="ctl">
+    <button id="tglLeft">Spec</button>
+    <button id="tglRight">Checks</button>
+    <button id="tglGrid">Grid</button>
+    <button id="tglLabels">Names</button>
+    <button id="tglSim" class="on">Sim</button>
+    <button id="btnSpeed">×1</button>
+    <button id="btnRestart">Restart</button>
+  </div>
+</header>
+<main>
+  <aside id="left"></aside>
+  <section id="stageWrap">
+    <canvas id="stage"></canvas>
+    <div id="hudTop">
+      <div>
+        <div class="nm">SCRAP MOTHER</div>
+        <div class="sb" id="hudSub">stationary &middot; Scrapborn</div>
+      </div>
+      <div class="bar" id="hudBar"><i id="hudFill" style="width:100%"></i></div>
+      <div class="ph" id="hudPhase">PHASE 1/4</div>
+    </div>
+    <div id="hudBot">
+      <div class="lb">TEST PILOT</div>
+      <div class="b"><i id="hudShield" style="width:100%;background:rgba(125,211,252,0.85)"></i></div>
+      <div class="b"><i id="hudHull" style="width:100%;background:rgba(255,138,61,0.85)"></i></div>
+    </div>
+    <div id="caption"></div>
+    <div id="hint">hover a part to identify it &middot; click to inspect &middot; Space pause &middot; R restart</div>
+  </section>
+  <aside id="right"></aside>
+</main>
+
+<script>
+"use strict";
+/* ===========================================================================
+   BOSS KIT LAB — a live-geometry concept sandbox for one boss: the Scrap
+   Mother, a stationary junk fortress.
+
+   Everything follows the LIVE part grammar (game-v2/common/src/ships/
+   catalog.ts, grid.ts, blueprint.ts):
+
+     piece  a union of whole unit cells; an outline tracing that union with
+            integer-endpoint lines and 90-degree arcs centred on grid corners;
+            connectors on cell edges or cell diagonals
+     part   piece + function + material + integer cell position + rot + flip
+     ship   parts joined by matching connectors, flood-filled from the core
+
+   The lab draws real piece polygons (arcs included), validates the pieces
+   with validatePiece's rules and the blueprint with validateBlueprint's
+   rules, and exports JSON that drops into data/ships/.
+   =========================================================================== */
+
+const TAU = Math.PI * 2, DEG = Math.PI / 180;
+const CELL = 24;                 // tuning.json cellSize
+const SEGS_PER_QUARTER = 8;      // tuning.json arcSegmentsPerQuarter
+const MAX_PARTS = 255;           // tuning.json maxParts
+
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const lerp = (a, b, t) => a + (b - a) * t;
+const rand = (a, b) => a + Math.random() * (b - a);
+const dist = (ax, ay, bx, by) => Math.hypot(bx - ax, by - ay);
+const angTo = (ax, ay, bx, by) => Math.atan2(bx - ax, -(by - ay));   // 0 = up, y down
+const hexRGB = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+const rgba = (c, a) => "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + a + ")";
+const rgbHex = (c) => "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")";
+const mixTo = (c, v, t) => [
+  Math.round(lerp(c[0], v, t)),
+  Math.round(lerp(c[1], v, t)),
+  Math.round(lerp(c[2], v, t)),
+];
+
+/* ---------------------------------------------------------------------------
+   1. PIECES
+   LIVE_PIECES: verbatim from data/ships/pieces.json.
+   PROPOSED_PIECES: new entries in exactly the same grammar.
+   --------------------------------------------------------------------------- */
+
+const LIVE_PIECES = {
+  sq: { tier: 1, cells: [[0, 0]], outline: [
+    { type: 'line', a: [0, 0], b: [1, 0] }, { type: 'line', a: [1, 0], b: [1, 1] },
+    { type: 'line', a: [1, 1], b: [0, 1] }, { type: 'line', a: [0, 1], b: [0, 0] }],
+    connectors: [{ cell: [0, 0], side: 'N' }, { cell: [0, 0], side: 'E' },
+      { cell: [0, 0], side: 'S' }, { cell: [0, 0], side: 'W' }] },
+
+  rect2: { tier: 1, cells: [[0, 0], [1, 0]], outline: [
+    { type: 'line', a: [0, 0], b: [2, 0] }, { type: 'line', a: [2, 0], b: [2, 1] },
+    { type: 'line', a: [2, 1], b: [0, 1] }, { type: 'line', a: [0, 1], b: [0, 0] }],
+    connectors: [{ cell: [0, 0], side: 'N' }, { cell: [1, 0], side: 'N' },
+      { cell: [1, 0], side: 'E' }, { cell: [0, 0], side: 'S' },
+      { cell: [1, 0], side: 'S' }, { cell: [0, 0], side: 'W' }] },
+
+  tri: { tier: 1, cells: [[0, 0]], outline: [
+    { type: 'line', a: [0, 0], b: [1, 1] }, { type: 'line', a: [1, 1], b: [0, 1] },
+    { type: 'line', a: [0, 1], b: [0, 0] }],
+    connectors: [{ cell: [0, 0], side: 'W' }, { cell: [0, 0], side: 'S' },
+      { cell: [0, 0], diag: 'NW' }] },
+
+  slope2: { tier: 1, cells: [[0, 0], [1, 0]], outline: [
+    { type: 'line', a: [0, 0], b: [2, 1] }, { type: 'line', a: [2, 1], b: [0, 1] },
+    { type: 'line', a: [0, 1], b: [0, 0] }],
+    connectors: [{ cell: [0, 0], side: 'S' }, { cell: [1, 0], side: 'S' },
+      { cell: [0, 0], side: 'W' }] },
+
+  cap: { tier: 1, cells: [[0, 0], [1, 0]], outline: [
+    { type: 'arc', c: [1, 1], r: 1, a0: 0, a1: -180 },
+    { type: 'line', a: [0, 1], b: [2, 1] }],
+    connectors: [{ cell: [0, 0], side: 'S' }, { cell: [1, 0], side: 'S' }] },
+
+  round: { tier: 1, cells: [[0, 0]], outline: [
+    { type: 'line', a: [0, 1], b: [0, 0] }, { type: 'arc', c: [0, 1], r: 1, a0: -90, a1: 0 },
+    { type: 'line', a: [1, 1], b: [0, 1] }],
+    connectors: [{ cell: [0, 0], side: 'W' }, { cell: [0, 0], side: 'S' }] },
+
+  fillet: { tier: 1, cells: [[0, 0]], outline: [
+    { type: 'line', a: [0, 0], b: [1, 0] }, { type: 'line', a: [1, 0], b: [1, 1] },
+    { type: 'arc', c: [0, 1], r: 1, a0: 0, a1: -90 }],
+    connectors: [{ cell: [0, 0], side: 'N' }, { cell: [0, 0], side: 'E' }] },
+
+  block2: { tier: 2, cells: [[0, 0], [1, 0], [0, 1], [1, 1]], outline: [
+    { type: 'line', a: [0, 0], b: [2, 0] }, { type: 'line', a: [2, 0], b: [2, 2] },
+    { type: 'line', a: [2, 2], b: [0, 2] }, { type: 'line', a: [0, 2], b: [0, 0] }],
+    connectors: [{ cell: [0, 0], side: 'N' }, { cell: [1, 0], side: 'N' },
+      { cell: [1, 0], side: 'E' }, { cell: [1, 1], side: 'E' },
+      { cell: [0, 1], side: 'S' }, { cell: [1, 1], side: 'S' },
+      { cell: [0, 0], side: 'W' }, { cell: [0, 1], side: 'W' }] },
+
+  block3: { tier: 3, cells: [
+      [0, 0], [1, 0], [2, 0], [0, 1], [1, 1], [2, 1], [0, 2], [1, 2], [2, 2]], outline: [
+    { type: 'line', a: [0, 0], b: [3, 0] }, { type: 'line', a: [3, 0], b: [3, 3] },
+    { type: 'line', a: [3, 3], b: [0, 3] }, { type: 'line', a: [0, 3], b: [0, 0] }],
+    connectors: [{ cell: [0, 0], side: 'N' }, { cell: [1, 0], side: 'N' },
+      { cell: [2, 0], side: 'N' }, { cell: [2, 0], side: 'E' },
+      { cell: [2, 1], side: 'E' }, { cell: [2, 2], side: 'E' },
+      { cell: [0, 2], side: 'S' }, { cell: [1, 2], side: 'S' },
+      { cell: [2, 2], side: 'S' }, { cell: [0, 0], side: 'W' },
+      { cell: [0, 1], side: 'W' }, { cell: [0, 2], side: 'W' }] },
+
+  round2: { tier: 2, cells: [[0, 0], [1, 0], [0, 1], [1, 1]], outline: [
+    { type: 'line', a: [0, 2], b: [0, 0] }, { type: 'arc', c: [0, 2], r: 2, a0: -90, a1: 0 },
+    { type: 'line', a: [2, 2], b: [0, 2] }],
+    connectors: [{ cell: [0, 0], side: 'W' }, { cell: [0, 1], side: 'W' },
+      { cell: [0, 1], side: 'S' }, { cell: [1, 1], side: 'S' }] },
+
+  fillet2: { tier: 2, cells: [[0, 0], [1, 0], [1, 1]], outline: [
+    { type: 'line', a: [0, 0], b: [2, 0] }, { type: 'line', a: [2, 0], b: [2, 2] },
+    { type: 'arc', c: [0, 2], r: 2, a0: 0, a1: -90 }],
+    connectors: [{ cell: [0, 0], side: 'N' }, { cell: [1, 0], side: 'N' },
+      { cell: [1, 0], side: 'E' }, { cell: [1, 1], side: 'E' }] },
+
+  nose2: { tier: 2, contact: 0.4, cells: [[0, 0], [1, 0], [0, 1], [1, 1]], outline: [
+    { type: 'line', a: [0, 2], b: [1, 0] }, { type: 'line', a: [1, 0], b: [2, 2] },
+    { type: 'line', a: [2, 2], b: [0, 2] }],
+    connectors: [{ cell: [0, 1], side: 'S' }, { cell: [1, 1], side: 'S' }] },
+};
+
+/* --- proposed boss pieces: same grammar, no engine change --- */
+const PROPOSED_PIECES = {
+  /* 4x4 heavy plate, every corner rounded by a quarter-arc of r1. Area 12+pi. */
+  plate4r: { tier: 4, proposed: true,
+    cells: [[0, 0], [1, 0], [2, 0], [3, 0], [0, 1], [1, 1], [2, 1], [3, 1],
+            [0, 2], [1, 2], [2, 2], [3, 2], [0, 3], [1, 3], [2, 3], [3, 3]],
+    outline: [
+      { type: 'line', a: [1, 0], b: [3, 0] },
+      { type: 'arc', c: [3, 1], r: 1, a0: -90, a1: 0 },
+      { type: 'line', a: [4, 1], b: [4, 3] },
+      { type: 'arc', c: [3, 3], r: 1, a0: 0, a1: 90 },
+      { type: 'line', a: [3, 4], b: [1, 4] },
+      { type: 'arc', c: [1, 3], r: 1, a0: 90, a1: 180 },
+      { type: 'line', a: [0, 3], b: [0, 1] },
+      { type: 'arc', c: [1, 1], r: 1, a0: 180, a1: 270 }],
+    connectors: [{ cell: [1, 0], side: 'N' }, { cell: [2, 0], side: 'N' },
+      { cell: [3, 1], side: 'E' }, { cell: [3, 2], side: 'E' },
+      { cell: [1, 3], side: 'S' }, { cell: [2, 3], side: 'S' },
+      { cell: [0, 1], side: 'W' }, { cell: [0, 2], side: 'W' }] },
+
+  /* 4-wide half-disc hatchery blister, one arc of r2. Area 2*pi of 8 cells. */
+  dome4: { tier: 4, proposed: true,
+    cells: [[0, 0], [1, 0], [2, 0], [3, 0], [0, 1], [1, 1], [2, 1], [3, 1]],
+    outline: [
+      { type: 'arc', c: [2, 2], r: 2, a0: 0, a1: -180 },
+      { type: 'line', a: [0, 2], b: [4, 2] }],
+    connectors: [{ cell: [0, 1], side: 'S' }, { cell: [1, 1], side: 'S' },
+      { cell: [2, 1], side: 'S' }, { cell: [3, 1], side: 'S' }] },
+
+  /* 5-wide chamfered prow plate. Area 4.0 of 5 cells. */
+  jaw5: { tier: 4, proposed: true,
+    cells: [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0]],
+    outline: [
+      { type: 'line', a: [0, 1], b: [1, 0] },
+      { type: 'line', a: [1, 0], b: [4, 0] },
+      { type: 'line', a: [4, 0], b: [5, 1] },
+      { type: 'line', a: [5, 1], b: [0, 1] }],
+    connectors: [{ cell: [1, 0], side: 'N' }, { cell: [2, 0], side: 'N' },
+      { cell: [3, 0], side: 'N' }, { cell: [0, 0], side: 'S' },
+      { cell: [1, 0], side: 'S' }, { cell: [2, 0], side: 'S' },
+      { cell: [3, 0], side: 'S' }, { cell: [4, 0], side: 'S' }] },
+};
+
+const PIECES = Object.assign({}, LIVE_PIECES, PROPOSED_PIECES);
+
+/* ---------------------------------------------------------------------------
+   2. FUNCTIONS (data/ships/functions.json) + three boss-only proposals
+   --------------------------------------------------------------------------- */
+
+const GEN_PIECES = ['sq', 'rect2', 'tri', 'slope2', 'round', 'round2', 'block2', 'block3'];
+const CANNON_PIECES = ['sq', 'rect2', 'tri', 'slope2', 'block2', 'block3'];
+
+const FNS = {
+  core:        { name: 'Core',          color: '#dfe6f5', hpScale: 2,   carriesFlow: true,  pieces: '*', source: true },
+  hull:        { name: 'Hull',          color: '#24324d', hpScale: 1,   carriesFlow: false, pieces: '*' },
+  armor:       { name: 'Armour',        color: '#6b7280', hpScale: 2.5, carriesFlow: false, pieces: '*', massScale: 2.5, armour: 1 },
+  conduit:     { name: 'Conduit',       color: '#b0711f', hpScale: 0.6, carriesFlow: true,  pieces: '*' },
+  generator:   { name: 'Generator',     color: '#f5a83a', hpScale: 0.8, carriesFlow: true,  pieces: GEN_PIECES, produce: 35, source: true },
+  battery:     { name: 'Battery',       color: '#2f8f6a', hpScale: 0.6, carriesFlow: true,  pieces: GEN_PIECES },
+  cargo:       { name: 'Cargo hold',    color: '#7a6444', hpScale: 1,   carriesFlow: true,  pieces: '*' },
+  weapon:      { name: 'Cannon',        color: '#e05a4a', hpScale: 0.8, carriesFlow: true,  pieces: CANNON_PIECES, demand: 8, weapon: true, facing: true },
+
+  /* --- boss-only proposals --- */
+  brood_bay:   { name: 'Brood Bay',     color: '#c9a46a', hpScale: 1.2, carriesFlow: true, pieces: ['sq', 'rect2', 'block2', 'round2', 'cap'], demand: 18, proposed: true },
+  welder_dock: { name: 'Welder Dock',   color: '#8ce99a', hpScale: 1.0, carriesFlow: true, pieces: ['sq', 'rect2', 'block2'], demand: 10, proposed: true },
+  ablative:    { name: 'Ablative Slab', color: '#aab3c2', hpScale: 3.2, carriesFlow: false, pieces: ['sq', 'plate4r', 'block2', 'block3'], massScale: 2, armour: 1, proposed: true },
+};
+
+const SIDES = ['N', 'E', 'S', 'W'];
+const SIDE_NORMAL = { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0] };
+
+/* ---------------------------------------------------------------------------
+   3. GEOMETRY — mirrors catalog.ts
+   --------------------------------------------------------------------------- */
+
+function snap(v){ const r = Math.round(v * 1e9) / 1e9; return r === 0 ? 0 : r; }
+function arcPoint(c, r, deg){ return [snap(c[0] + r * Math.cos(deg * DEG)), snap(c[1] + r * Math.sin(deg * DEG))]; }
+
+function transformPoint(p, rot, flip){
+  let x = flip ? 1 - p[0] : p[0];
+  let y = p[1];
+  for (let i = 0; i < rot; i++){ const nx = 1 - y; y = x; x = nx; }
+  return [snap(x), snap(y)];
+}
+
+function flattenOutline(outline){
+  const pts = [];
+  const step = 90 / SEGS_PER_QUARTER;
+  for (const s of outline){
+    if (s.type === 'line'){
+      pts.push([s.b[0], s.b[1]]);
+    } else {
+      const dir = s.a1 >= s.a0 ? 1 : -1;
+      const n = Math.round(Math.abs(s.a1 - s.a0) / step);
+      for (let i = 1; i <= n; i++) pts.push(arcPoint(s.c, s.r, s.a0 + dir * i * step));
+    }
+  }
+  return pts;
+}
+
+const geomCache = new Map();
+function pieceGeom(pieceId, rot, flip){
+  const key = pieceId + '|' + rot + '|' + (flip ? 1 : 0);
+  const hit = geomCache.get(key);
+  if (hit) return hit;
+
+  const def = PIECES[pieceId];
+  const poly = flattenOutline(def.outline).map((p) => transformPoint(p, rot, flip));
+
+  const cells = def.cells.map((c) => {
+    const m = transformPoint([c[0] + 0.5, c[1] + 0.5], rot, flip);
+    return [Math.floor(m[0]), Math.floor(m[1])];
+  });
+
+  const connectors = def.connectors.map((c) => {
+    const m = transformPoint([c.cell[0] + 0.5, c.cell[1] + 0.5], rot, flip);
+    const cell = [Math.floor(m[0]), Math.floor(m[1])];
+    if (c.side){
+      const n = SIDE_NORMAL[c.side];
+      const t = transformPoint([c.cell[0] + 0.5 + n[0], c.cell[1] + 0.5 + n[1]], rot, flip);
+      const dx = Math.round(t[0] - m[0]), dy = Math.round(t[1] - m[1]);
+      let side = 'N';
+      for (const s of SIDES) if (SIDE_NORMAL[s][0] === dx && SIDE_NORMAL[s][1] === dy) side = s;
+      return { cell, side };
+    }
+    const swaps = (rot % 2) + (flip ? 1 : 0);
+    return { cell, diag: swaps % 2 === 0 ? c.diag : (c.diag === 'NE' ? 'NW' : 'NE') };
+  });
+
+  const lines = def.outline
+    .filter((s) => s.type === 'line')
+    .map((s) => [transformPoint(s.a, rot, flip), transformPoint(s.b, rot, flip)]);
+
+  const g = { poly, cells, connectors, lines, def };
+  geomCache.set(key, g);
+  return g;
+}
+
+function connectorEndpoints(c){
+  const x = c.cell[0], y = c.cell[1];
+  if (c.side === 'N') return [[x, y], [x + 1, y]];
+  if (c.side === 'E') return [[x + 1, y], [x + 1, y + 1]];
+  if (c.side === 'S') return [[x, y + 1], [x + 1, y + 1]];
+  if (c.side === 'W') return [[x, y], [x, y + 1]];
+  return c.diag === 'NW' ? [[x, y], [x + 1, y + 1]] : [[x, y + 1], [x + 1, y]];
+}
+
+function pointInPoly(poly, x, y){
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++){
+    const xi = poly[i][0], yi = poly[i][1];
+    const xj = poly[j][0], yj = poly[j][1];
+    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+
+function polyArea(poly){
+  let a = 0;
+  for (let i = 0; i < poly.length; i++){
+    const p = poly[i], q = poly[(i + 1) % poly.length];
+    a += p[0] * q[1] - q[0] * p[1];
+  }
+  return Math.abs(a / 2);
+}
+
+function bboxOf(poly){
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of poly){
+    if (p[0] < minX) minX = p[0];
+    if (p[0] > maxX) maxX = p[0];
+    if (p[1] < minY) minY = p[1];
+    if (p[1] > maxY) maxY = p[1];
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+/* ---------------------------------------------------------------------------
+   4. VALIDATION
+   4a. validatePiece + coverage (catalog.ts)
+   4b. validateBlueprint (blueprint.ts); power reach is a warning, as the
+       live validator does not gate on it
+   --------------------------------------------------------------------------- */
+
+const isInt = (v) => Number.isInteger(v);
+const samePoint = (p, q) => Math.abs(p[0] - q[0]) < 1e-6 && Math.abs(p[1] - q[1]) < 1e-6;
+const segStart = (s) => (s.type === 'line' ? s.a : arcPoint(s.c, s.r, s.a0));
+const segEnd = (s) => (s.type === 'line' ? s.b : arcPoint(s.c, s.r, s.a1));
+
+function segmentOnSegment(p, q, a, b){
+  const ex = b[0] - a[0], ey = b[1] - a[1];
+  const len2 = ex * ex + ey * ey;
+  if (len2 === 0) return false;
+  for (const pt of [p, q]){
+    const cr = ex * (pt[1] - a[1]) - ey * (pt[0] - a[0]);
+    if (Math.abs(cr) > 1e-6) return false;
+    const t = ((pt[0] - a[0]) * ex + (pt[1] - a[1]) * ey) / len2;
+    if (t < -1e-6 || t > 1 + 1e-6) return false;
+  }
+  return true;
+}
+
+function validatePiece(p){
+  const errors = [];
+  const fail = (msg) => errors.push(msg);
+
+  if (!p.id) fail('missing id');
+  if (!isInt(p.tier)) fail('tier must be an integer');
+  if (!p.cells || !p.cells.length) fail('no cells');
+
+  const cellKeys = new Set();
+  for (const c of (p.cells || [])){
+    if (!isInt(c[0]) || !isInt(c[1])) fail('cell ' + JSON.stringify(c) + ' is not integer');
+    const k = c[0] + ',' + c[1];
+    if (cellKeys.has(k)) fail('duplicate cell ' + k);
+    cellKeys.add(k);
+  }
+  if (!cellKeys.has('0,0')) fail('cells must include the origin cell [0,0]');
+
+  if (!p.outline || !p.outline.length) fail('no outline');
+  (p.outline || []).forEach((s, i) => {
+    if (s.type === 'line'){
+      if (![...s.a, ...s.b].every(isInt)) fail('line ' + i + ' has a non-integer endpoint');
+      if (samePoint(s.a, s.b)) fail('line ' + i + ' has zero length');
+    } else if (s.type === 'arc'){
+      if (!isInt(s.c[0]) || !isInt(s.c[1])) fail('arc ' + i + ' centre is not on a grid corner');
+      if (!isInt(s.r) || s.r < 1) fail('arc ' + i + ' radius must be a whole number >= 1');
+      if (s.a0 % 90 !== 0 || s.a1 % 90 !== 0) fail('arc ' + i + ' angles must be multiples of 90');
+      if (s.a0 === s.a1 || Math.abs(s.a1 - s.a0) > 360) fail('arc ' + i + ' has a bad sweep');
+    } else {
+      fail('segment ' + i + ' has unknown type');
+    }
+    const next = p.outline[(i + 1) % p.outline.length];
+    if (!samePoint(segEnd(s), segStart(next))) fail('outline is not closed after segment ' + i);
+  });
+
+  const lines = (p.outline || []).filter((s) => s.type === 'line').map((s) => ({ a: s.a, b: s.b }));
+  for (const c of (p.connectors || [])){
+    if (!cellKeys.has(c.cell[0] + ',' + c.cell[1])) fail('connector on cell ' + c.cell + ' which is not in cells');
+    if (!('side' in c) && !('diag' in c)) fail('connector needs a side or a diag');
+    const e = connectorEndpoints(c);
+    if (!lines.some((l) => segmentOnSegment(e[0], e[1], l.a, l.b))){
+      fail('connector ' + JSON.stringify(c) + ' is not a full straight edge of the outline');
+    }
+  }
+
+  /* Coverage, sampled: the live code is exact, this is enough for a concept tool. */
+  const poly = flattenOutline(p.outline || []);
+  const N = 10;
+  let uncovered = 0, outside = 0;
+  for (const c of (p.cells || [])){
+    let hit = 0;
+    for (let i = 0; i < N; i++){
+      for (let j = 0; j < N; j++){
+        if (pointInPoly(poly, c[0] + (i + 0.5) / N, c[1] + (j + 0.5) / N)) hit++;
+      }
+    }
+    if (hit === 0) uncovered++;
+  }
+  const bb = bboxOf(poly);
+  for (let x = Math.floor(bb.minX); x < Math.ceil(bb.maxX); x++){
+    for (let y = Math.floor(bb.minY); y < Math.ceil(bb.maxY); y++){
+      if (cellKeys.has(x + ',' + y)) continue;
+      for (let i = 0; i < 3; i++){
+        for (let j = 0; j < 3; j++){
+          if (pointInPoly(poly, x + 1 / 6 + i / 3, y + 1 / 6 + j / 3)) outside++;
+        }
+      }
+    }
+  }
+  if (uncovered) fail(uncovered + ' listed cell(s) the shape does not cover');
+  if (outside) fail('shape extends outside its listed cells');
+
+  return { errors, area: polyArea(poly), cellCount: (p.cells || []).length };
+}
+
+/** Unit edges of the straight outline whose outward normal is `n`. */
+function facingEdgesOf(poly, lines, n){
+  const out = [];
+  for (const [a, b] of lines){
+    const dx = b[0] - a[0], dy = b[1] - a[1];
+    if (dx * n[0] + dy * n[1] !== 0) continue;
+    if (dx !== 0 && dy !== 0) continue;
+    const len = Math.abs(dx + dy);
+    if (!isInt(len) || len < 1) continue;
+    const ux = Math.sign(dx), uy = Math.sign(dy);
+    for (let k = 0; k < len; k++){
+      const p = [a[0] + ux * k, a[1] + uy * k];
+      const q = [p[0] + ux, p[1] + uy];
+      const mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2;
+      const outside = !pointInPoly(poly, mx + n[0] * 0.05, my + n[1] * 0.05);
+      const inside = pointInPoly(poly, mx - n[0] * 0.05, my - n[1] * 0.05);
+      if (outside && inside) out.push([p, q]);
+    }
+  }
+  return out;
+}
+
+function validateBlueprint(bp){
+  const problems = [];
+  const err = (code, uids, msg) => problems.push({ level: 'error', code, uids, msg });
+  const warn = (code, uids, msg) => problems.push({ level: 'warn', code, uids, msg });
+
+  if (bp.parts.length > MAX_PARTS) err('tooManyParts', [], bp.parts.length + ' parts (max ' + MAX_PARTS + ')');
+
+  const seenUid = new Set();
+  const usable = [];
+  for (const p of bp.parts){
+    if (!isInt(p.uid) || p.uid < 0 || p.uid > 255) err('badUid', [p.uid], 'uid must be an integer 0..255');
+    else if (seenUid.has(p.uid)) err('duplicateUid', [p.uid], 'uid ' + p.uid + ' is used twice');
+    seenUid.add(p.uid);
+
+    const piece = PIECES[p.piece];
+    const fn = FNS[p.fn];
+    if (!piece) err('unknownPiece', [p.uid], 'unknown piece "' + p.piece + '"');
+    if (!fn) err('unknownFunction', [p.uid], 'unknown function "' + p.fn + '"');
+    if (piece && fn && fn.pieces !== '*' && fn.pieces.indexOf(p.piece) < 0){
+      err('functionNotAllowed', [p.uid], '"' + p.fn + '" cannot go on a "' + p.piece + '"');
+    }
+    if (p.mount !== undefined && p.mount !== 'fixed' && !(p.mount === 'turret' && fn && fn.weapon)){
+      err('badMount', [p.uid], 'mount "' + p.mount + '" only works on weapons');
+    }
+    if (!isInt(p.x) || !isInt(p.y) || [0, 1, 2, 3].indexOf(p.rot) < 0){
+      err('badPlacement', [p.uid], 'part ' + p.uid + ' needs integer x/y and rot 0..3');
+      continue;
+    }
+    if (piece && fn) usable.push(p);
+  }
+
+  const cores = bp.parts.filter((p) => p.fn === 'core');
+  if (cores.length !== 1) err('coreCount', cores.map((p) => p.uid), 'needs exactly one core (has ' + cores.length + ')');
+
+  const G = usable.map((p) => {
+    const g = pieceGeom(p.piece, p.rot, p.flip);
+    return {
+      part: p,
+      poly: g.poly.map((q) => [q[0] + p.x, q[1] + p.y]),
+      connectors: g.connectors.map((c) => ({
+        side: c.side, diag: c.diag, cell: [c.cell[0] + p.x, c.cell[1] + p.y],
+      })),
+      lines: g.lines.map((l) => [[l[0][0] + p.x, l[0][1] + p.y], [l[1][0] + p.x, l[1][1] + p.y]]),
+    };
+  });
+
+  /* overlaps — sampled off the lattice so shared edges never count */
+  for (let i = 0; i < G.length; i++){
+    for (let j = i + 1; j < G.length; j++){
+      const A = G[i].poly, B = G[j].poly;
+      const a = bboxOf(A), b = bboxOf(B);
+      if (a.maxX <= b.minX || b.maxX <= a.minX || a.maxY <= b.minY || b.maxY <= a.minY) continue;
+      let hit = false;
+      const x0 = Math.floor(Math.min(a.minX, b.minX)), x1 = Math.ceil(Math.max(a.maxX, b.maxX));
+      const y0 = Math.floor(Math.min(a.minY, b.minY)), y1 = Math.ceil(Math.max(a.maxY, b.maxY));
+      for (let x = x0; x < x1 && !hit; x++){
+        for (let y = y0; y < y1 && !hit; y++){
+          for (let s = 0; s < 4 && !hit; s++){
+            for (let t = 0; t < 4 && !hit; t++){
+              const px = x + 0.125 + s * 0.25, py = y + 0.125 + t * 0.25;
+              if (pointInPoly(A, px, py) && pointInPoly(B, px, py)) hit = true;
+            }
+          }
+        }
+      }
+      if (hit){
+        err('overlap', [usable[i].uid, usable[j].uid],
+          'parts ' + usable[i].uid + ' and ' + usable[j].uid + ' overlap');
+      }
+    }
+  }
+
+  /* joins: the same cell edge from opposite sides, or the same cell diagonal */
+  const byKey = new Map();
+  G.forEach((g, i) => {
+    for (const c of g.connectors){
+      const e = connectorEndpoints(c);
+      const key = c.diag ? 'D:' + c.cell : 'E:' + e[0] + ':' + e[1];
+      const normal = c.side ? SIDE_NORMAL[c.side] : null;
+      if (!byKey.has(key)) byKey.set(key, []);
+      byKey.get(key).push({ i, normal });
+    }
+  });
+  const adj = G.map(() => []);
+  for (const list of byKey.values()){
+    for (let a = 0; a < list.length; a++){
+      for (let b = a + 1; b < list.length; b++){
+        const A = list[a], B = list[b];
+        if (A.i === B.i) continue;
+        const opposite = A.normal === null || B.normal === null
+          ? A.normal === B.normal
+          : A.normal[0] === -B.normal[0] && A.normal[1] === -B.normal[1];
+        if (!opposite) continue;
+        adj[A.i].push(B.i);
+        adj[B.i].push(A.i);
+      }
+    }
+  }
+
+  /* every part reachable from the core */
+  const coreIdx = G.findIndex((g) => g.part.fn === 'core');
+  if (coreIdx >= 0){
+    const reached = new Array(G.length).fill(false);
+    const stack = [coreIdx];
+    reached[coreIdx] = true;
+    while (stack.length){
+      const i = stack.pop();
+      for (const j of adj[i]) if (!reached[j]){ reached[j] = true; stack.push(j); }
+    }
+    const lost = G.filter((_, i) => !reached[i]).map((g) => g.part.uid);
+    if (lost.length) err('unreachable', lost, lost.length + ' part(s) not joined to the core');
+  }
+
+  /* weapons need a free outward straight edge */
+  G.forEach((g, i) => {
+    const fn = FNS[g.part.fn];
+    if (!fn || !(fn.weapon || fn.facing)) return;
+    const side = g.part.facing;
+    if (!side){ err('facingMissing', [g.part.uid], g.part.fn + ' ' + g.part.uid + ' needs a facing'); return; }
+    const n = SIDE_NORMAL[side];
+    const edges = facingEdgesOf(g.poly, g.lines, n);
+    if (!edges.length){
+      err('facingMissing', [g.part.uid], g.part.fn + ' ' + g.part.uid + ' has no straight edge facing ' + side);
+      return;
+    }
+    for (const e of edges){
+      const probes = [0.1, 0.5, 0.9].map((t) => [
+        e[0][0] + (e[1][0] - e[0][0]) * t + n[0] * 0.05,
+        e[0][1] + (e[1][1] - e[0][1]) * t + n[1] * 0.05,
+      ]);
+      const blocked = G.some((o, j) => j !== i && probes.every((p) => pointInPoly(o.poly, p[0], p[1])));
+      if (blocked){
+        err('facingBlocked', [g.part.uid], g.part.fn + ' ' + g.part.uid + ': its ' + side + ' edge must be free');
+        break;
+      }
+    }
+  });
+
+  /* power reach: a drawing part must reach a source over flow parts */
+  const flowAdj = G.map(() => []);
+  for (let i = 0; i < G.length; i++){
+    for (const j of adj[i]){
+      if (j < i) continue;
+      const fi = FNS[G[i].part.fn], fj = FNS[G[j].part.fn];
+      if (fi && fj && fi.carriesFlow && fj.carriesFlow){ flowAdj[i].push(j); flowAdj[j].push(i); }
+    }
+  }
+  const powered = new Array(G.length).fill(false);
+  const queue = [];
+  G.forEach((g, i) => {
+    const fn = FNS[g.part.fn];
+    if (fn && fn.source){ powered[i] = true; queue.push(i); }
+  });
+  while (queue.length){
+    const i = queue.pop();
+    for (const j of flowAdj[i]) if (!powered[j]){ powered[j] = true; queue.push(j); }
+  }
+  G.forEach((g, i) => {
+    const fn = FNS[g.part.fn];
+    if (!fn || !fn.weapon) return;
+    if (!powered[i]) warn('unpowered', [g.part.uid], 'cannon ' + g.part.uid + ' has no flow path to a generator');
+  });
+
+  return problems;
+}
+
+/* ---------------------------------------------------------------------------
+   5. THE BOSS — Scrap Mother, stationary.
+
+   The body is a solid 9 x 7 block (x -4..4, y -3..3). Every cannon sits on
+   the rim facing outward with empty space beyond it; every cannon's inner
+   neighbour is a conduit, so it has both a free edge and a power path. Two
+   exotic pieces carry the silhouette: a half-disc hatchery blister on top
+   and a chamfered prow plate below.
+
+   Legend: W cannon · c conduit · G generator · b battery · C core
+           A armour · a ablative slab · B brood bay
+   --------------------------------------------------------------------------- */
+
+const LEGEND = {
+  W: 'weapon', c: 'conduit', G: 'generator', b: 'battery', C: 'core',
+  A: 'armor', a: 'ablative', B: 'brood_bay', D: 'welder_dock', H: 'hull',
+};
+
+/*
+  x runs -4..3 (eight columns); index i of a row string is x = -4 + i.
+  A '.' leaves the cell empty, which chamfers the four corners: the silhouette
+  is an octagon, not a rectangle.
+
+  Cannon placement: each sits on an edge midpoint with nothing beyond it, and a
+  flow-carrying part directly behind it, so its facing edge is free and it has a
+  power path. The hatchery dome sits at y = -4, clear of both dorsal cannon.
+*/
+const X0 = -4;
+const ROWS = [
+  { y: -3, s: '.WccccW.' },   // dorsal: two cannon, flanking the dome
+  { y: -2, s: 'acGcccGa' },
+  { y: -1, s: 'AcGcbcGA' },
+  { y:  0, s: 'WccbcCcW' },   // broadside: one cannon each side
+  { y:  1, s: 'AcGDbDGA' },
+  { y:  2, s: 'acBcccBa' },
+  { y:  3, s: '.WccccW.' },   // ventral: two cannon
+];
+
+/* Which way each cannon points. Every one of these has empty space beyond. */
+const FACING = {
+  '-3,-3': 'N', '2,-3': 'N',
+  '-4,0': 'W',  '3,0': 'E',
+  '-3,3': 'S',  '2,3': 'S',
+};
+
+function buildScrapMother(){
+  const parts = [];
+  const push = (piece, fn, x, y, extra) => {
+    const p = { uid: parts.length, piece, fn, material: 'steel', x, y, rot: 0, flip: false };
+    if (extra) Object.assign(p, extra);
+    parts.push(p);
+  };
+
+  /* hatchery blister above the dorsal plate: its S connectors (cell row 1)
+     meet the top row of the body at y = -3 */
+  push('dome4', 'hull', -2, -5);
+
+  for (const row of ROWS){
+    for (let i = 0; i < row.s.length; i++){
+      const ch = row.s[i];
+      if (ch === '.') continue;
+      const fn = LEGEND[ch];
+      const x = X0 + i;
+      if (fn === 'weapon'){
+        push('sq', 'weapon', x, row.y, { facing: FACING[x + ',' + row.y], mount: 'turret' });
+      } else {
+        push('sq', fn, x, row.y);
+      }
+    }
+  }
+
+  return { name: 'Scrap Mother', catalogVersion: 1, parts };
+}
+
+/* ---------------------------------------------------------------------------
+   6. STATE
+   --------------------------------------------------------------------------- */
+
+const cvs = document.getElementById('stage');
+const ctx = cvs.getContext('2d');
+const leftEl = document.getElementById('left');
+const rightEl = document.getElementById('right');
+let W = 0, H = 0, DPR = 1, zoom = 1;
+
+const BP = buildScrapMother();
+const PROBLEMS = validateBlueprint(BP);
+const PIECE_REPORT = Object.keys(PROPOSED_PIECES).map((id) => {
+  const r = validatePiece(Object.assign({ id }, PROPOSED_PIECES[id]));
+  return { id, errors: r.errors, area: r.area, cells: r.cellCount };
+});
+
+const ST = {
+  t: 0, sim: true, speed: 1, showGrid: false, showLabels: false,
+  parts: [], player: null, proj: [], drones: [], welders: [], fx: [],
+  hover: null, selected: null, phase: 0, shake: 0, captionT: 0,
+  broodCd: 6, weldCd: 2,
+};
+
+/* the ship spans y -5..5; centre the view on its middle */
+const SHIP_CY = 0;
+
+const capEl = document.getElementById('caption');
+function setCaption(text, cls, secs){
+  capEl.textContent = text;
+  capEl.className = cls || '';
+  capEl.style.opacity = 1;
+  ST.captionT = secs || 2.5;
+}
+
+const avg = (a) => a.reduce((s, v) => s + v, 0) / a.length;
+
+function resetSim(){
+  ST.t = 0; ST.phase = 0; ST.proj = []; ST.drones = []; ST.welders = [];
+  ST.fx = []; ST.shake = 0; ST.captionT = 0; ST.hover = null; ST.selected = null;
+  ST.broodCd = 6; ST.weldCd = 2;
+
+  ST.parts = BP.parts.map((p, i) => {
+    const g = pieceGeom(p.piece, p.rot, p.flip);
+    const fn = FNS[p.fn];
+    const hp = 100 * (fn.hpScale || 1);
+    return {
+      idx: i, part: p, fn, geom: g,
+      poly: g.poly.map((q) => [q[0] + p.x, q[1] + p.y]),
+      cx: p.x + avg(g.poly.map((q) => q[0])),
+      cy: p.y + avg(g.poly.map((q) => q[1])),
+      hp, maxHp: hp, alive: true,
+      aim: 0, cd: rand(0, 40), flash: 0,
+    };
+  });
+
+  ST.player = { x: -320, y: 30, vx: 0, vy: 0, a: 0, shield: 100, hull: 100, dead: 0, fireCd: 0, hitT: -9 };
+  setCaption('Scrap Mother — stationary junk fortress · ' + BP.parts.length + ' parts · no thrusters', 'info', 4);
+}
+
+function fx(o){ ST.fx.push(Object.assign({ t: 0, life: 0.5 }, o)); }
+function ringFx(x, y, r, c, life, lw){
+  fx({ kind: 'ring', x, y, r0: r * 0.25, r1: r, color: c, life: life || 0.5, lw: lw || 3 });
+}
+function boomFx(x, y, c, big){
+  fx({ kind: 'flash', x, y, r: big ? 54 : 20, color: c, life: big ? 0.4 : 0.2 });
+  ringFx(x, y, big ? 105 : 46, c, big ? 0.5 : 0.32, big ? 4 : 2);
+  const n = big ? 20 : 8;
+  for (let i = 0; i < n; i++){
+    const a = Math.random() * TAU, s = rand(30, big ? 210 : 120);
+    fx({ kind: 'spark', x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, color: c, life: rand(0.25, 0.7) });
+  }
+  if (big) ST.shake = Math.max(ST.shake, 8);
+}
+
+const aliveOf = (fnName) => ST.parts.filter((p) => p.alive && (!fnName || p.part.fn === fnName));
+
+function bossHpFrac(){
+  let cur = 0, max = 0;
+  for (const p of ST.parts){
+    max += p.maxHp;
+    if (p.alive) cur += p.hp;
+  }
+  return max > 0 ? clamp(cur / max, 0, 1) : 0;
+}
+
+const shoot = (o) => ST.proj.push(Object.assign({ t: 0, life: 2.4, size: 1, owner: 'boss', kind: 'cannon' }, o));
+
+const WEAPON_FX = {
+  cannon: { core: 'fff7e6', glow: 'ffb04a', a: 0.34, cw: 2.4, gw: 7, hal: 10 },
+  heavy:  { core: 'ffe0b0', glow: 'ff8a3c', a: 0.38, cw: 3.0, gw: 8, hal: 10 },
+};
+
+/* ---------------------------------------------------------------------------
+   7. SIM
+   --------------------------------------------------------------------------- */
+
+function turretBase(p){
+  const f = p.part.facing;
+  return f === 'W' ? -Math.PI / 2 : f === 'E' ? Math.PI / 2 : f === 'S' ? Math.PI : 0;
+}
+
+function stepTurret(p, dt){
+  const pl = ST.player;
+  if (pl.dead > 0) return;
+
+  const px = p.cx * CELL, py = p.cy * CELL;
+  if (dist(px, py, pl.x, pl.y) > 1700) return;
+
+  const base = turretBase(p);
+  const want = angTo(px, py, pl.x, pl.y);
+  const off = ((want - base + Math.PI * 3) % TAU) - Math.PI;
+  if (Math.abs(off) > Math.PI / 2) return;          // outside the embrasure's arc
+
+  p.aim = lerp(p.aim, off, clamp(dt * 3.2, 0, 1));
+  p.cd -= dt;
+  if (p.cd > 0 || Math.abs(p.aim - off) > 0.16) return;
+
+  p.cd = 1.5 + Math.random() * 0.7;
+  const a = base + p.aim;
+  const heavy = Math.random() < 0.3;
+  shoot({
+    kind: heavy ? 'heavy' : 'cannon',
+    x: px + Math.sin(a) * 26, y: py - Math.cos(a) * 26,
+    vx: Math.sin(a) * 265, vy: -Math.cos(a) * 265,
+    life: 4.4, size: heavy ? 2 : 1.1,
+  });
+  fx({ kind: 'muzzle', x: px + Math.sin(a) * 26, y: py - Math.cos(a) * 26, a, color: 'ffd28a', life: 0.12 });
+}
+
+function stepBrood(dt){
+  const bays = aliveOf('brood_bay');
+  if (!bays.length) return;
+  /* the bays stay shut until the phase script opens them */
+  if (ST.phase < 1) return;
+
+  ST.broodCd -= dt;
+  const alive = ST.drones.filter((d) => d.kind === 'kami').length;
+  if (ST.broodCd <= 0 && alive < 10){
+    ST.broodCd = 7;
+    const bay = bays[Math.floor(Math.random() * bays.length)];
+    for (let i = 0; i < 3; i++){
+      ST.drones.push({
+        kind: 'kami',
+        x: bay.cx * CELL + rand(-18, 18),
+        y: bay.cy * CELL + rand(-8, 8),
+        vx: rand(-40, 40), vy: 150, a: Math.PI,
+        hp: 4, maxHp: 4,
+      });
+    }
+    ringFx(bay.cx * CELL, bay.cy * CELL, 52, hexRGB('#c9a46a'), 0.4, 2);
+    setCaption('A brood bay opens — mites away.', 'warn', 2);
+  }
+
+  for (const d of ST.drones){
+    const pl = ST.player;
+    const a = angTo(d.x, d.y, pl.x, pl.y);
+    d.a = lerp(d.a, a, clamp(dt * 2.4, 0, 1));
+    d.vx = lerp(d.vx, Math.sin(d.a) * 190, clamp(dt * 2.6, 0, 1));
+    d.vy = lerp(d.vy, -Math.cos(d.a) * 190, clamp(dt * 2.6, 0, 1));
+    d.x += d.vx * dt;
+    d.y += d.vy * dt;
+    if (Math.random() < dt * 14){
+      fx({ kind: 'spark', x: d.x, y: d.y, vx: -d.vx * 0.2, vy: -d.vy * 0.2, color: hexRGB('#7dd3fc'), life: 0.22 });
+    }
+    if (dist(d.x, d.y, pl.x, pl.y) < 20 && pl.dead <= 0){
+      d.dead = true;
+      boomFx(d.x, d.y, hexRGB('#ff9a4a'), false);
+      hurtPlayer(6, 3);
+    }
+  }
+}
+
+function stepWelders(dt){
+  const docks = aliveOf('welder_dock');
+  ST.welders = ST.welders.filter((w) => !w.dead);
+  if (!docks.length) return;
+  /* the docks stay cold until the phase script wakes them */
+  if (ST.phase < 2) return;
+
+  ST.weldCd -= dt;
+  if (ST.welders.length < 2 && ST.weldCd <= 0){
+    ST.weldCd = 8;
+    const slot = ST.welders.length % docks.length;
+    const dock = docks[slot];
+    ST.welders.push({ kind: 'welder', x: dock.cx * CELL, y: dock.cy * CELL, t: Math.random() * 3, hp: 6, maxHp: 6, slot, link: dock });
+  }
+
+  for (const w of ST.welders){
+    w.t += dt;
+    const dock = docks[w.slot] || docks[0];
+    w.link = dock;
+    const a = w.t * 1.2;
+    w.x = lerp(w.x, dock.cx * CELL + Math.cos(a) * 54, clamp(dt * 2, 0, 1));
+    w.y = lerp(w.y, dock.cy * CELL + Math.sin(a) * 54, clamp(dt * 2, 0, 1));
+
+    let worst = null;
+    for (const p of ST.parts){
+      if (p.alive && p.hp < p.maxHp && (!worst || p.hp / p.maxHp < worst.hp / worst.maxHp)) worst = p;
+    }
+    if (worst) worst.hp = Math.min(worst.maxHp, worst.hp + 14 * dt);
+
+    if (Math.random() < dt * 6){
+      fx({ kind: 'spark', x: w.x, y: w.y, vx: rand(-24, 24), vy: rand(-24, 24), color: hexRGB('#8ce99a'), life: 0.28 });
+    }
+  }
+}
+
+function hurtPlayer(shield, hull){
+  const pl = ST.player;
+  if (pl.dead > 0) return;
+  const total = shield + hull;
+  const soak = Math.min(pl.shield, total);
+  pl.shield -= soak;
+  pl.hull -= total - soak;
+  pl.hitT = ST.t;
+  if (pl.hull <= 0){
+    pl.dead = 2;
+    boomFx(pl.x, pl.y, hexRGB('#7dd3fc'), true);
+    setCaption('Hull lost — respawning', 'bad', 2);
+  }
+}
+
+function playerStep(dt){
+  const pl = ST.player;
+  if (pl.dead > 0){
+    pl.dead -= dt;
+    if (pl.dead <= 0){
+      pl.x = -320; pl.y = 30;
+      pl.vx = 0; pl.vy = 0;
+      pl.shield = 100; pl.hull = 100;
+    }
+    return;
+  }
+
+  pl.shield = Math.min(100, pl.shield + (ST.t - pl.hitT > 2 ? 7 * dt : 0));
+
+  const R = 320, a = ST.t * 0.21;
+  const tx = Math.cos(a) * R;
+  const ty = Math.sin(a) * R * 0.7;
+  pl.vx = lerp(pl.vx, (tx - pl.x) * 1.6, clamp(dt * 2, 0, 1));
+  pl.vy = lerp(pl.vy, (ty - pl.y) * 1.6, clamp(dt * 2, 0, 1));
+  pl.x += pl.vx * dt;
+  pl.y += pl.vy * dt;
+  pl.a = angTo(pl.x, pl.y, 0, 0);
+
+  pl.fireCd -= dt;
+  if (pl.fireCd <= 0){
+    pl.fireCd = 0.3;
+    const a2 = angTo(pl.x, pl.y, 0, 0) + rand(-0.03, 0.03);
+    shoot({ kind: 'cannon', owner: 'player', x: pl.x, y: pl.y, vx: Math.sin(a2) * 470, vy: -Math.cos(a2) * 470, life: 3.4, size: 1 });
+    fx({ kind: 'muzzle', x: pl.x, y: pl.y, a: a2, color: 'fff7e6', life: 0.1 });
+  }
+}
+
+function applyPlayerHit(pr){
+  for (const p of ST.parts){
+    if (!p.alive) continue;
+    if (!pointInPoly(p.poly, pr.x / CELL, pr.y / CELL)) continue;
+
+    boomFx(pr.x, pr.y, hexRGB('#ffc070'), false);
+    p.hp -= 30;
+    p.flash = 0.16;
+
+    if (p.hp <= 0){
+      p.alive = false;
+      p.hp = 0;
+      boomFx(p.cx * CELL, p.cy * CELL, hexRGB('#ffb04a'), true);
+      if (p.part.fn === 'ablative') setCaption('An ablative slab shorn off.', 'good', 2);
+      else if (p.part.fn === 'brood_bay') setCaption('Brood bay silenced.', 'good', 2);
+      else if (p.part.fn === 'welder_dock') setCaption('Welder dock destroyed.', 'good', 2);
+      else if (p.part.fn === 'weapon') setCaption('Embrasure silenced.', 'good', 1.6);
+    }
+    return true;
+  }
+  return false;
+}
+
+function stepPhase(){
+  const frac = bossHpFrac();
+  if (ST.phase === 0 && frac < 0.72){
+    ST.phase = 1;
+    ST.broodCd = 0;
+    setCaption('The Scrap Mother spits out a brood of mites.', 'warn', 4);
+  } else if (ST.phase === 1 && frac < 0.45){
+    ST.phase = 2;
+    ST.weldCd = 0;
+    setCaption('Her welder scuttles crawl out onto the hull.', 'warn', 4);
+  } else if (ST.phase === 2 && frac < 0.2){
+    ST.phase = 3;
+    setCaption('Plating sheds away. The fortress is stripped and furious.', 'bad', 4);
+    for (const p of ST.parts){
+      if (p.alive && p.part.fn === 'ablative'){
+        p.alive = false;
+        p.hp = 0;
+        boomFx(p.cx * CELL, p.cy * CELL, hexRGB('#aab3c2'), true);
+      }
+    }
+  }
+}
+
+function step(dt){
+  ST.t += dt;
+
+  playerStep(dt);
+  for (const p of ST.parts) if (p.alive && p.part.fn === 'weapon') stepTurret(p, dt);
+  stepBrood(dt);
+  stepWelders(dt);
+  stepPhase();
+
+  for (const pr of ST.proj){
+    pr.x += pr.vx * dt;
+    pr.y += pr.vy * dt;
+    pr.t += dt;
+
+    if (pr.owner === 'boss'){
+      if (dist(pr.x, pr.y, ST.player.x, ST.player.y) < 16 + pr.size * 8){
+        pr.dead = true;
+        boomFx(pr.x, pr.y, hexRGB('#ffb04a'), false);
+        hurtPlayer(pr.kind === 'heavy' ? 9 : 5, 2);
+      }
+    } else if (applyPlayerHit(pr)){
+      pr.dead = true;
+    }
+
+    if (pr.t > pr.life || Math.abs(pr.x) > 4000 || Math.abs(pr.y) > 4000) pr.dead = true;
+  }
+
+  ST.proj = ST.proj.filter((p) => !p.dead);
+  ST.drones = ST.drones.filter((d) => !d.dead);
+
+  for (const p of ST.parts) if (p.flash > 0) p.flash -= dt;
+
+  for (const f of ST.fx){
+    f.t += dt;
+    if (f.kind === 'spark'){
+      f.x += (f.vx || 0) * dt;
+      f.y += (f.vy || 0) * dt;
+      f.vx *= 1 - dt * 1.6;
+      f.vy *= 1 - dt * 1.6;
+    }
+  }
+  ST.fx = ST.fx.filter((f) => f.t < f.life);
+
+  if (ST.shake > 0) ST.shake = Math.max(0, ST.shake - dt * 28);
+  if (ST.captionT > 0){
+    ST.captionT -= dt;
+    if (ST.captionT <= 0) capEl.style.opacity = 0;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   8. RENDER
+   --------------------------------------------------------------------------- */
+
+let stars = [];
+function makeStars(){
+  stars = [];
+  const n = Math.round((W * H) / 2800);
+  for (let i = 0; i < n; i++){
+    stars.push({
+      x: Math.random() * W, y: Math.random() * H,
+      z: Math.random() < 0.7 ? 0.12 : 0.3,
+      r: Math.random() < 0.86 ? 1 : 1.7,
+      a: rand(0.22, 0.85),
+    });
+  }
+}
+
+function resize(){
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  const r = cvs.parentElement.getBoundingClientRect();
+  W = r.width;
+  H = r.height;
+  cvs.width = W * DPR;
+  cvs.height = H * DPR;
+  makeStars();
+}
+
+/* On a narrow window keep the stage playable: drop the side panels, which the
+   header buttons bring back. */
+let leftForced = false, rightForced = false;
+function fitPanels(){
+  const avail = window.innerWidth;
+  if (!leftForced) leftEl.classList.toggle('hidden', avail < 1180);
+  if (!rightForced) rightEl.classList.toggle('hidden', avail < 900);
+}
+
+function pathPoly(poly, s){
+  ctx.beginPath();
+  ctx.moveTo(poly[0][0] * s, poly[0][1] * s);
+  for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i][0] * s, poly[i][1] * s);
+  ctx.closePath();
+}
+
+const MATERIAL_TINT = { steel: '#8d94a3', alloy: '#9aa7b8', titanium: '#b9c4d6' };
+
+function draw(){
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = '#05070c';
+  ctx.fillRect(0, 0, W, H);
+
+  const bg = ctx.createRadialGradient(W / 2, H / 2, 40, W / 2, H / 2, Math.max(W, H) * 0.8);
+  bg.addColorStop(0, '#0a101c');
+  bg.addColorStop(1, '#04060b');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  zoom = clamp(Math.min(W / (12 * CELL), H / (13 * CELL)), 0.35, 1.9);
+  const shX = ST.shake ? rand(-ST.shake, ST.shake) : 0;
+  const shY = ST.shake ? rand(-ST.shake, ST.shake) : 0;
+
+  for (const s of stars){
+    ctx.fillStyle = rgba([200, 215, 240], s.a * (s.z > 0.2 ? 0.9 : 0.5));
+    ctx.fillRect(s.x, s.y, s.r, s.r);
+  }
+
+  ctx.save();
+  ctx.translate(W / 2 + shX, H / 2 + shY);
+  ctx.scale(zoom, zoom);
+  ctx.translate(-SHIP_CY * CELL * 0, -SHIP_CY * CELL);
+
+  const S = CELL;
+  if (ST.showGrid) drawGrid(S, 14);
+
+  drawShip(S);
+
+  for (const d of ST.drones) drawDrone(d);
+  for (const w of ST.welders){
+    if (w.link){
+      ctx.strokeStyle = rgba(hexRGB('#8ce99a'), 0.3 + Math.sin(ST.t * 15) * 0.1);
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(w.x, w.y);
+      ctx.lineTo(w.link.cx * S, w.link.cy * S);
+      ctx.stroke();
+    }
+    drawDrone(w);
+  }
+
+  for (const pr of ST.proj) drawProj(pr);
+  if (ST.player.dead <= 0) drawPlayer(ST.player);
+  for (const f of ST.fx) drawFx(f);
+
+  if (ST.showLabels) drawLabels(S);
+  if (ST.hover) outlinePoly(ST.hover.poly, S, '#ffffff', 1.6, null);
+  if (ST.selected) outlinePoly(ST.selected.poly, S, '#7dd3fc', 1.2, [4, 3]);
+
+  ctx.restore();
+  updateHud();
+}
+
+function outlinePoly(poly, S, color, w, dash){
+  pathPoly(poly, S);  ctx.strokeStyle = color;
+  ctx.lineWidth = w;
+  if (dash) ctx.setLineDash(dash);
+  ctx.stroke();
+  if (dash) ctx.setLineDash([]);
+}
+
+function drawLabels(S){
+  ctx.font = '600 6.5px Segoe UI,system-ui';
+  ctx.textAlign = 'center';
+  const short = {
+    core: 'C', hull: 'h', armor: 'A', ablative: 'a', conduit: '.', generator: 'G',
+    battery: 'b', cargo: 'c', weapon: 'W', brood_bay: 'B', welder_dock: 'D',
+  };
+  for (const p of ST.parts){
+    if (!p.alive) continue;
+    const t = short[p.part.fn] !== undefined ? short[p.part.fn] : p.fn.name.slice(0, 2);
+    const w = ctx.measureText(t).width + 4;
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillRect(p.cx * S - w / 2, p.cy * S - 4, w, 8);
+    ctx.fillStyle = rgba(mixTo(hexRGB(p.fn.color), 245, 0.5), 0.95);
+    ctx.fillText(t, p.cx * S, p.cy * S + 2.4);
+  }
+}
+
+function drawGrid(S, pad){
+  ctx.save();
+  ctx.strokeStyle = 'rgba(120,160,220,0.10)';
+  ctx.lineWidth = 0.6;
+  for (let x = -pad; x <= pad; x++){
+    ctx.beginPath(); ctx.moveTo(x * S, -pad * S); ctx.lineTo(x * S, pad * S); ctx.stroke();
+  }
+  for (let y = -pad; y <= pad; y++){
+    ctx.beginPath(); ctx.moveTo(-pad * S, y * S); ctx.lineTo(pad * S, y * S); ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(120,160,220,0.24)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-pad * S, 0); ctx.lineTo(pad * S, 0);
+  ctx.moveTo(0, -pad * S); ctx.lineTo(0, pad * S);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/* ---------------------------------------------------------------------------
+   THE SHIP
+   Drawn the way the live client draws one: a single silhouette built from
+   every part polygon, shaded as one piece of metal, with the hardware (guns,
+   bays, generators, plate seams) added on top as small details. Parts are NOT
+   individual tiles of colour — that is what made the first attempt a quilt.
+   --------------------------------------------------------------------------- */
+
+const HULL_DARK = '#151b26';
+const HULL_LIGHT = '#2b3648';
+
+function shipSilhouette(S){
+  const path = new Path2D();
+  for (const p of ST.parts){
+    if (!p.alive) continue;
+    const poly = p.poly;
+    path.moveTo(poly[0][0] * S, poly[0][1] * S);
+    for (let i = 1; i < poly.length; i++) path.lineTo(poly[i][0] * S, poly[i][1] * S);
+    path.closePath();
+  }
+  return path;
+}
+
+function drawShip(S){
+  const solid = shipSilhouette(S);
+
+  /* wreckage: destroyed parts stay as burnt frame, so the boss never opens up */
+  for (const p of ST.parts){
+    if (p.alive) continue;
+    ctx.save();
+    pathPoly(p.poly, S);
+    ctx.fillStyle = '#0c1017';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(120,86,60,0.55)';
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([3, 3]);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /* ---- the mass: one fill, lit from the top-left, with a bevelled rim ---- */
+  ctx.save();
+  ctx.fillStyle = HULL_DARK;
+  ctx.fill(solid);
+
+  /* broad plating light: a soft gradient across the whole silhouette */
+  const bb = { minX: 1e9, minY: 1e9, maxX: -1e9, maxY: -1e9 };
+  for (const p of ST.parts){
+    if (!p.alive) continue;
+    for (const q of p.poly){
+      if (q[0] < bb.minX) bb.minX = q[0];
+      if (q[0] > bb.maxX) bb.maxX = q[0];
+      if (q[1] < bb.minY) bb.minY = q[1];
+      if (q[1] > bb.maxY) bb.maxY = q[1];
+    }
+  }
+  const lg = ctx.createLinearGradient(bb.minX * S, bb.minY * S, (bb.maxX) * S, (bb.maxY) * S);
+  lg.addColorStop(0, 'rgba(64,80,104,0.9)');
+  lg.addColorStop(0.45, 'rgba(38,48,64,0.75)');
+  lg.addColorStop(1, 'rgba(16,21,30,0.9)');
+  ctx.fillStyle = lg;
+  ctx.fill(solid);
+  ctx.restore();
+
+  /* panel detail, clipped to the hull so nothing spills over the edge */
+  ctx.save();
+  ctx.clip(solid);
+  drawHullDetail(S);
+  ctx.restore();
+
+  /* armour plate: a continuous band, drawn over the hull detail */
+  drawRimBand(S);
+
+  /* ---- silhouette edge: dark inner line plus a bright rim ---- */
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = 'rgba(7,10,16,0.95)';
+  ctx.lineWidth = 5;
+  ctx.stroke(solid);
+  ctx.strokeStyle = 'rgba(150,175,210,0.75)';
+  ctx.lineWidth = 1.8;
+  ctx.stroke(solid);
+  ctx.restore();
+
+  /* ---- hardware on top: it may overhang the silhouette ---- */
+  drawHardware(S);
+
+  /* damage feedback */
+  for (const p of ST.parts){
+    if (!p.alive || p.flash <= 0) continue;
+    ctx.save();
+    pathPoly(p.poly, S);
+    ctx.fillStyle = rgba([255, 240, 220], Math.min(0.42, p.flash * 2.6));
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+/* Panel work: a few structural ribs and a couple of long plate seams. Deliberately
+   sparse — one line per cell reads as graph paper, not as a hull. */
+function drawHullDetail(S){
+  let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+  for (const p of ST.parts){
+    if (!p.alive) continue;
+    for (const q of p.poly){
+      if (q[0] < minX) minX = q[0];
+      if (q[0] > maxX) maxX = q[0];
+      if (q[1] < minY) minY = q[1];
+      if (q[1] > maxY) maxY = q[1];
+    }
+  }
+
+  ctx.save();
+  ctx.lineWidth = 1.2;
+
+  /* two long horizontal seams, drawn as slightly wavering lines */
+  ctx.strokeStyle = 'rgba(9,13,20,0.55)';
+  for (const t of [0.36, 0.66]){
+    const y = (minY + (maxY - minY) * t) * S;
+    ctx.beginPath();
+    for (let x = minX; x <= maxX; x += 0.5){
+      const yy = y + Math.sin(x * 1.7) * 0.8;
+      if (x === minX) ctx.moveTo(x * S, yy); else ctx.lineTo(x * S, yy);
+    }
+    ctx.stroke();
+  }
+
+  /* three vertical ribs, only where the body is wide */
+  for (const t of [0.28, 0.5, 0.72]){
+    const x = (minX + (maxX - minX) * t) * S;
+    ctx.beginPath();
+    ctx.moveTo(x, (minY + (maxY - minY) * 0.12) * S);
+    ctx.lineTo(x, (minY + (maxY - minY) * 0.9) * S);
+    ctx.stroke();
+  }
+
+  /* a soft highlight along the top-left, as if lit from there */
+  const hl = ctx.createLinearGradient(minX * S, minY * S, minX * S, (minY + (maxY - minY) * 0.45) * S);
+  hl.addColorStop(0, 'rgba(180,200,230,0.14)');
+  hl.addColorStop(1, 'rgba(180,200,230,0)');
+  ctx.fillStyle = hl;
+  ctx.fillRect(minX * S, minY * S, (maxX - minX) * S, (maxY - minY) * 0.45 * S);
+  ctx.restore();
+}
+
+/* The recognisable kit: bays, generators, welders, guns, core. */
+function drawHardware(S){
+  for (const p of ST.parts){
+    if (!p.alive) continue;
+    const x = p.part.x * S, y = p.part.y * S;
+    const cx = p.cx * S, cy = p.cy * S;
+
+    if (p.part.fn === 'generator'){
+      /* a glowing vent slot, not a blob */
+      ctx.save();
+      ctx.fillStyle = 'rgba(10,14,20,0.9)';
+      ctx.fillRect(x + 6, y + 6, S - 12, S - 12);
+      const pulse = 0.55 + Math.sin(ST.t * 3 + p.part.x) * 0.12;
+      ctx.fillStyle = rgba([245, 168, 58], pulse);
+      ctx.fillRect(x + 8, y + 8, S - 16, (S - 16) * 0.45);
+      ctx.fillStyle = 'rgba(255,226,168,0.55)';
+      ctx.fillRect(x + 8, y + 8, S - 16, 1.5);
+      ctx.restore();
+    } else if (p.part.fn === 'core'){
+      ctx.save();
+      ctx.fillStyle = 'rgba(12,17,26,0.95)';
+      ctx.fillRect(x + 2, y + 2, S - 4, S - 4);
+      const pulse = 0.6 + Math.sin(ST.t * 2.2) * 0.2;
+      ctx.strokeStyle = rgba([215, 228, 250], pulse);
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x + 6, y + 6, S - 12, S - 12);
+      ctx.fillStyle = rgba([235, 244, 255], pulse * 0.9);
+      ctx.fillRect(x + S / 2 - 3, y + S / 2 - 3, 6, 6);
+      ctx.restore();
+    } else if (p.part.fn === 'battery'){
+      ctx.save();
+      ctx.fillStyle = 'rgba(10,16,22,0.85)';
+      ctx.fillRect(x + 5, y + 5, S - 10, S - 10);
+      ctx.fillStyle = rgba([47, 143, 106], 0.85);
+      ctx.fillRect(x + 8, y + 8, S - 16, 4);
+      ctx.fillRect(x + 8, y + 16, S - 16, 4);
+      ctx.restore();
+    } else if (p.part.fn === 'brood_bay'){
+      /* a dark hangar mouth with door ribs and an amber interior */
+      ctx.save();
+      ctx.fillStyle = 'rgba(6,9,14,0.98)';
+      ctx.fillRect(x + 3, y + 3, S - 6, S - 6);
+      const glow = 0.5 + Math.sin(ST.t * 2.6) * 0.16;
+      ctx.fillStyle = rgba([201, 164, 106], glow);
+      ctx.fillRect(x + 5, y + S / 2 - 2, S - 10, 4);
+      ctx.strokeStyle = 'rgba(201,164,106,0.7)';
+      ctx.lineWidth = 1.4;
+      for (let k = 0; k < 3; k++){
+        ctx.beginPath();
+        ctx.moveTo(x + 5 + k * (S - 10) / 2, y + 4);
+        ctx.lineTo(x + 5 + k * (S - 10) / 2, y + S - 4);
+        ctx.stroke();
+      }
+      ctx.restore();
+    } else if (p.part.fn === 'welder_dock'){
+      ctx.save();
+      ctx.fillStyle = 'rgba(10,16,20,0.9)';
+      ctx.fillRect(x + 4, y + 4, S - 8, S - 8);
+      ctx.strokeStyle = rgba([140, 233, 154], 0.8);
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 6, 0, TAU);
+      ctx.stroke();
+      ctx.fillStyle = rgba([140, 233, 154], 0.85);
+      ctx.fillRect(cx - 1.5, cy - 1.5, 3, 3);
+      ctx.restore();
+    } else if (p.part.fn === 'armor' || p.part.fn === 'ablative'){
+      /* plate is drawn as a continuous rim band (see drawRimBand), not per cell */
+    } else if (p.part.fn === 'weapon'){
+      drawTurret(p, S);
+    }
+  }
+
+  /* the hatchery dome: a ribbed arc across its crown */
+  const dome = ST.parts.find((p) => p.alive && p.part.piece === 'dome4');
+  if (dome){
+    ctx.save();
+    ctx.strokeStyle = 'rgba(150,175,210,0.3)';
+    ctx.lineWidth = 1.1;
+    for (let i = -2; i <= 2; i++){
+      ctx.beginPath();
+      ctx.arc(dome.part.x * S + 2 * S, dome.part.y * S + 2 * S, 2 * S - 4,
+        -Math.PI / 2 + i * 0.3, -Math.PI / 2 + i * 0.3);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+/* Armour: one continuous band around the rim, not a box per cell. */
+function drawRimBand(S){
+  const plate = ST.parts.filter((p) => p.alive && (p.part.fn === 'armor' || p.part.fn === 'ablative'));
+  if (!plate.length) return;
+
+  const band = new Path2D();
+  for (const p of plate){
+    const poly = p.poly;
+    band.moveTo(poly[0][0] * S, poly[0][1] * S);
+    for (let i = 1; i < poly.length; i++) band.lineTo(poly[i][0] * S, poly[i][1] * S);
+    band.closePath();
+  }
+
+  ctx.save();
+  /* the band as a lit strip: a broad gradient across the whole ring */
+  const bb = { minX: 1e9, minY: 1e9, maxX: -1e9, maxY: -1e9 };
+  for (const p of plate){
+    for (const q of p.poly){
+      if (q[0] < bb.minX) bb.minX = q[0];
+      if (q[0] > bb.maxX) bb.maxX = q[0];
+      if (q[1] < bb.minY) bb.minY = q[1];
+      if (q[1] > bb.maxY) bb.maxY = q[1];
+    }
+  }
+  const g = ctx.createLinearGradient(bb.minX * S, bb.minY * S, bb.maxX * S, bb.maxY * S);
+  g.addColorStop(0, 'rgba(126,142,168,0.55)');
+  g.addColorStop(0.5, 'rgba(86,99,120,0.4)');
+  g.addColorStop(1, 'rgba(54,64,80,0.5)');
+  ctx.fillStyle = g;
+  ctx.fill(band);
+
+  /* the outer edge of the strip catches light */
+  ctx.strokeStyle = 'rgba(196,210,232,0.85)';
+  ctx.lineWidth = 2;
+  ctx.stroke(band);
+  ctx.strokeStyle = 'rgba(9,13,20,0.7)';
+  ctx.lineWidth = 1;
+  ctx.stroke(band);
+
+  /* rivet rows down the middle of the strip */
+  ctx.fillStyle = 'rgba(206,218,236,0.4)';
+  for (const p of plate){
+    const cx = p.cx * S, cy = p.cy * S;
+    ctx.fillRect(cx - 1, cy - 1, 2, 2);
+  }
+  ctx.restore();
+}
+
+/* A turret: a recessed mount flush with the plate, a short armoured barrel. */
+function drawTurret(p, S){
+  const cx = p.cx * S, cy = p.cy * S;
+  const a = turretBase(p) + p.aim;
+
+  ctx.save();
+  /* the embrasure: a dark recess cut into the plate */
+  ctx.fillStyle = 'rgba(7,10,16,0.9)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, S * 0.36, 0, TAU);
+  ctx.fill();
+
+  /* barrel: short, thick, and it stays inside the hull footprint */
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(a);
+  ctx.fillStyle = '#414c5e';
+  ctx.fillRect(-3.4, -S * 0.62, 6.8, S * 0.62);
+  ctx.fillStyle = '#7a8ba3';
+  ctx.fillRect(-3.4, -S * 0.62, 6.8, 2.6);
+  ctx.fillStyle = '#232b38';
+  ctx.fillRect(-4.4, -5, 8.8, 5);
+  ctx.restore();
+
+  /* collar and pivot */
+  ctx.strokeStyle = 'rgba(206,218,236,0.8)';
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.arc(cx, cy, S * 0.3, 0, TAU);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(168,182,205,0.6)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, S * 0.13, 0, TAU);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawDrone(d){
+  ctx.save();
+  ctx.translate(d.x, d.y);
+  ctx.rotate(d.a);
+  if (d.kind === 'kami'){
+    ctx.fillStyle = '#3a3f4d';
+    ctx.beginPath();
+    ctx.moveTo(0, -7); ctx.lineTo(4, 6); ctx.lineTo(0, 3.5); ctx.lineTo(-4, 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = rgba(hexRGB('#7dd3fc'), 0.8);
+    ctx.beginPath();
+    ctx.arc(0, 6, 2 + Math.random(), 0, TAU);
+    ctx.fill();
+    ctx.restore();
+  } else {
+    ctx.fillStyle = '#2b3a30';
+    ctx.fillRect(-3.5, -3.5, 7, 7);
+    ctx.strokeStyle = rgba(hexRGB('#8ce99a'), 0.85);
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-3.5, -3.5, 7, 7);
+  }
+  ctx.restore();
+}
+
+function drawProj(pr){
+  const st = WEAPON_FX[pr.kind] || WEAPON_FX.cannon;
+  const core = hexRGB('#' + st.core), glow = hexRGB('#' + st.glow);
+  const sp = Math.hypot(pr.vx, pr.vy) || 1;
+  const ux = pr.vx / sp, uy = pr.vy / sp, sz = pr.size || 1;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineCap = 'round';
+
+  ctx.strokeStyle = rgba(glow, st.a);
+  ctx.lineWidth = st.gw * sz;
+  ctx.beginPath();
+  ctx.moveTo(pr.x - ux * 22 * sz, pr.y - uy * 22 * sz);
+  ctx.lineTo(pr.x, pr.y);
+  ctx.stroke();
+
+  ctx.strokeStyle = rgba(core, 0.95);
+  ctx.lineWidth = st.cw * sz;
+  ctx.beginPath();
+  ctx.moveTo(pr.x - ux * 12 * sz, pr.y - uy * 12 * sz);
+  ctx.lineTo(pr.x + ux * 3, pr.y + uy * 3);
+  ctx.stroke();
+
+  ctx.fillStyle = rgba(glow, 0.3);
+  ctx.beginPath();
+  ctx.arc(pr.x, pr.y, st.hal * sz * 0.55, 0, TAU);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawPlayer(p){
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(p.a);
+  ctx.fillStyle = '#16283c';
+  ctx.fillRect(-9, -6, 18, 12);
+  ctx.fillRect(-3, -13, 6, 8);
+  ctx.strokeStyle = rgba(hexRGB('#7dd3fc'), 0.85);
+  ctx.lineWidth = 1.1;
+  ctx.strokeRect(-9, -6, 18, 12);
+  ctx.strokeRect(-3, -13, 6, 8);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = rgba([180, 230, 255], 0.8);
+  ctx.fillRect(-7, 6, 3, 5);
+  ctx.fillRect(4, 6, 3, 5);
+  ctx.restore();
+
+  const dtHit = ST.t - p.hitT;
+  if (dtHit < 0.4){
+    ctx.strokeStyle = rgba(hexRGB('#7dd3fc'), 0.6 * (1 - dtHit / 0.4));
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(0, 0, 20, 0, TAU);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawFx(f){
+  const c = f.color;
+  const k = clamp(f.t / f.life, 0, 1);
+  ctx.save();
+
+  if (f.kind === 'ring'){
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = rgba(c, (1 - k) * 0.85);
+    ctx.lineWidth = f.lw;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, lerp(f.r0, f.r1, k), 0, TAU);
+    ctx.stroke();
+  } else if (f.kind === 'flash'){
+    ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r);
+    g.addColorStop(0, rgba(c, 1 - k));
+    g.addColorStop(1, rgba(c, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, f.r, 0, TAU);
+    ctx.fill();
+  } else if (f.kind === 'spark'){
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = rgba(c, 1 - k);
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, 1.7, 0, TAU);
+    ctx.fill();
+  } else if (f.kind === 'muzzle'){
+    ctx.globalCompositeOperation = 'lighter';
+    const mc = hexRGB('#' + f.color);
+    const r = 12 * (1 - k);
+    const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, r + 4);
+    g.addColorStop(0, rgba(mc, 0.9 * (1 - k)));
+    g.addColorStop(1, rgba(mc, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, r + 4, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = rgba(mc, 0.75 * (1 - k));
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(f.x, f.y);
+    ctx.lineTo(f.x + Math.sin(f.a) * r * 1.7, f.y - Math.cos(f.a) * r * 1.7);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function roundRect(x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+/* The HUD lives in the DOM: the canvas only draws the fight. */
+const hudFill = document.getElementById('hudFill');
+const hudPhase = document.getElementById('hudPhase');
+const hudSub = document.getElementById('hudSub');
+const hudShield = document.getElementById('hudShield');
+const hudHull = document.getElementById('hudHull');
+
+function initHudBar(){
+  const bar = document.getElementById('hudBar');
+  for (const at of [0.72, 0.45, 0.2]){
+    const u = document.createElement('u');
+    u.style.left = (at * 100) + '%';
+    bar.appendChild(u);
+  }
+  hudSub.textContent = 'stationary · Scrapborn · ' + BP.parts.length + ' parts';
+}
+
+function updateHud(){
+  hudFill.style.width = (bossHpFrac() * 100).toFixed(1) + '%';
+  hudPhase.textContent = 'PHASE ' + Math.max(1, ST.phase + 1) + '/4';
+  hudShield.style.width = (ST.player.shield) + '%';
+  hudHull.style.width = Math.max(0, ST.player.hull) + '%';
+}
+
+/* ---------------------------------------------------------------------------
+   9. PANELS
+   --------------------------------------------------------------------------- */
+
+function cellCount(){
+  let n = 0;
+  for (const p of BP.parts) n += pieceGeom(p.piece, p.rot, p.flip).cells.length;
+  return n;
+}
+
+function extentText(){
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of ST.parts){
+    for (const q of p.poly){
+      if (q[0] < minX) minX = q[0];
+      if (q[0] > maxX) maxX = q[0];
+      if (q[1] < minY) minY = q[1];
+      if (q[1] > maxY) maxY = q[1];
+    }
+  }
+  return Math.round(maxX - minX) + ' × ' + Math.round(maxY - minY) + ' cells';
+}
+
+function layoutMap(){
+  const lines = [];
+  lines.push('      dome4  <- hatchery blister (arcs, 2*pi of 8 cells)');
+  for (const row of ROWS){
+    lines.push(String(row.y).padStart(3) + '   ' + row.s.split('').join(' '));
+  }
+  lines.push('      jaw5   <- chamfered prow plate (diagonals, 4.0 of 5)');
+  return lines.join('\n');
+}
+
+function buildLeft(){
+  const counts = new Map();
+  for (const p of BP.parts) counts.set(p.fn, (counts.get(p.fn) || 0) + 1);
+  const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+
+  let html = '';
+  html += '<h3>Blueprint <span>' + BP.parts.length + ' parts</span></h3>';
+  html += '<div class="row"><b>Design</b><span>boss_scrap_mother</span></div>';
+  html += '<div class="row"><b>Cells</b><span>' + cellCount() + '</span></div>';
+  html += '<div class="row"><b>Footprint</b><span>' + extentText() + '</span></div>';
+  html += '<div class="row"><b>Core</b><span>1 @ (0, 0)</span></div>';
+  html += '<div class="row"><b>Thrusters</b><span>none — fixed</span></div>';
+  html += '<div class="row"><b>Cannons</b><span>' + (counts.get('weapon') || 0) + ' (turrets)</span></div>';
+  html += '<div class="row"><b>Generators</b><span>' + (counts.get('generator') || 0) + '</span></div>';
+
+  html += '<h3>Parts by function</h3>';
+  for (const [fn, n] of sorted){
+    const f = FNS[fn];
+    html += '<div class="kv"><span class="swatch" style="background:' + f.color + '"></span><b>' +
+      f.name + '</b> ×' + n + (f.proposed ? '<span class="badge">new</span>' : '') + '</div>';
+  }
+
+  html += '<h3>Phase script</h3>';
+  html += '<div class="kv"><b>always</b> — six cannons in armour embrasures sweep the approach; every third shot is heavy.</div>';
+  html += '<div class="kv"><b>0.72</b> — brood bays open: waves of three kamikaze mites, at most 10 alive, every 7 s.</div>';
+  html += '<div class="kv"><b>0.45</b> — two welder drones launch and mend the most damaged part. Kill them first.</div>';
+  html += '<div class="kv"><b>0.20</b> — every ablative slab sheds at once: the armour skirt is gone for good.</div>';
+
+  html += '<h3>Why stationary</h3>';
+  html += '<div class="kv">No thrusters, and <b>fixed: true</b> in bosses.json. It never needs to turn: the ' +
+    'embrasures cover every bearing and the bays and docks do the rest. The fight is <b>kill order</b> — ' +
+    'bays, then welders, then the core down the middle of the plate.</div>';
+
+  html += '<h3>Layout <span>x -4…4</span></h3>';
+  html += '<pre class="map">' + layoutMap() + '</pre>';
+  html += '<div class="kv" style="font-size:10px">W cannon · c conduit · G generator · b battery · ' +
+    'C core · A armour · a ablative · B brood bay</div>';
+
+  leftEl.innerHTML = html;
+}
+
+function buildRight(){
+  const errs = PROBLEMS.filter((p) => p.level === 'error');
+  const warns = PROBLEMS.filter((p) => p.level === 'warn');
+
+  let html = '<h3>Blueprint check <span>validateBlueprint</span></h3><div id="report">';
+  if (!PROBLEMS.length){
+    html += '<span class="ok">PASS</span> — nothing to report:<br>' +
+      '&middot; integer cells, exactly one core<br>' +
+      '&middot; no part overlaps another<br>' +
+      '&middot; every part is joined to the core by connectors<br>' +
+      '&middot; every cannon faces a free straight edge<br>' +
+      '&middot; every cannon reaches a generator over flow parts';
+  } else {
+    for (const p of errs) html += '<span class="err">ERR</span> ' + p.code + ': ' + p.msg + '<br>';
+    for (const p of warns) html += '<span class="warnT">warn</span> ' + p.code + ': ' + p.msg + '<br>';
+  }
+  html += '</div>';
+
+  html += '<h3>Piece check <span>validatePiece</span></h3><div id="report">';
+  const bad = PIECE_REPORT.filter((r) => r.errors.length);
+  if (!bad.length){
+    html += '<span class="ok">PASS</span> — all ' + PIECE_REPORT.length + ' proposed pieces are legal:<br>' +
+      'integer cells incl. [0,0] &middot; closed outline &middot; integer lines<br>' +
+      '90&deg; arcs on grid corners &middot; connectors on real outline edges<br>' +
+      'covers its cells and stays inside them';
+  } else {
+    for (const r of bad) html += '<span class="err">ERR</span> ' + r.id + ': ' + r.errors.join('; ') + '<br>';
+  }
+  html += '</div>';
+
+  html += '<h3>Pieces used <span>grammar</span></h3>';
+  for (const id of [...new Set(BP.parts.map((p) => p.piece))]){
+    const def = PIECES[id];
+    const arcs = def.outline.filter((s) => s.type === 'arc').length;
+    const diags = def.outline.filter((s) => s.type === 'line' && s.a[0] !== s.b[0] && s.a[1] !== s.b[1]).length;
+    const rep = PIECE_REPORT.find((r) => r.id === id);
+    const area = rep ? (Math.round(rep.area * 100) / 100) : null;
+    html += '<div class="kv"><b>' + id + '</b> — ' + def.cells.length + ' cells' +
+      (area !== null ? ', area ' + area : '') +
+      (arcs ? ', ' + arcs + ' arc' + (arcs > 1 ? 's' : '') : '') +
+      (diags ? ', ' + diags + ' diagonal' + (diags > 1 ? 's' : '') : '') +
+      (def.proposed ? '<span class="badge">new</span>' : '') + '</div>';
+  }
+
+  html += '<h3>Export</h3>';
+
+  const bpJson = JSON.stringify({
+    name: BP.name,
+    catalogVersion: BP.catalogVersion,
+    parts: BP.parts.map((p) => {
+      const o = { uid: p.uid, piece: p.piece, fn: p.fn, material: p.material, x: p.x, y: p.y, rot: p.rot, flip: p.flip };
+      if (p.facing) o.facing = p.facing;
+      if (p.mount) o.mount = p.mount;
+      return o;
+    }),
+  }, null, 1);
+
+  const dataJson = JSON.stringify({
+    _note: 'Merge `pieces` into data/ships/pieces.json and `functions` into data/ships/functions.json.',
+    pieces: Object.keys(PROPOSED_PIECES).map((id) => {
+      const c = Object.assign({}, PROPOSED_PIECES[id]);
+      delete c.proposed;
+      return Object.assign({ id }, c);
+    }),
+    functions: [
+      {
+        id: 'brood_bay', name: 'Brood Bay', rarity: 'epic', category: 'weapons', fabOrder: 9,
+        description: 'Boss only. Launches waves of kamikaze drones at nearby pilots.',
+        pieces: ['sq', 'rect2', 'block2', 'round2', 'cap'], hpScale: 1.2, carriesFlow: true,
+        demand: 18, priority: 2,
+        bossBay: { design: 'scrap_mite', wave: 3, maxAlive: 10, everyTicks: 420, warnTicks: 45 },
+      },
+      {
+        id: 'welder_dock', name: 'Welder Dock', rarity: 'rare', category: 'utility', fabOrder: 9.1,
+        description: 'Boss only. Launches repair drones that mend the most damaged part.',
+        pieces: ['sq', 'rect2', 'block2'], hpScale: 1, carriesFlow: true, demand: 10, priority: 3,
+        bossDock: { design: 'welder_drone', count: 2, respawnTicks: 480, repairPerSec: 24 },
+      },
+      {
+        id: 'ablative', name: 'Ablative Slab', rarity: 'rare', category: 'structure',
+        description: 'Boss only. Heavy plate that cracks away for good, leaving the hull exposed.',
+        pieces: ['sq', 'plate4r', 'block2', 'block3'], hpScale: 3.2, carriesFlow: false,
+        armour: 1, massScale: 2, ablative: true,
+      },
+    ],
+  }, null, 1);
+
+  const bossJson = JSON.stringify({
+    boss_scrap_mother: {
+      name: 'Scrap Mother',
+      title: 'Nest of the Drift',
+      faction: 'scrapborn',
+      system: 'sol',
+      lair: { x: -76257, y: 75027 },
+      level: 3,
+      hp: 0.563,
+      damage: 1.08,
+      xp: 650,
+      credits: 600,
+      respawnSeconds: 300,
+      fixed: true,
+      behaviour: { strafe: 0, flee: 0, aggro: 2400, range: 700, leash: 5000, accuracy: 0.65 },
+      intro: 'Something huge and patched together stirs in the junk, round the richest greyseam in the Drift. The Scrap Mother, oldest of the Scrapborn, wakes, and the Drift hums with drones.',
+      phases: [
+        { at: 0.72, say: 'The Scrap Mother spits out a brood of mites.' },
+        { at: 0.45, say: 'Her welder scuttles crawl out onto the hull.' },
+        { at: 0.2, say: 'Plating sheds away. She is stripped and furious.', enrage: 1.25 },
+      ],
+      design: 'boss_scrap_mother',
+      loot: [
+        { item: 'servo_motor', chance: 1, min: 1, max: 2 },
+        { item: 'power_coupling', chance: 0.8, min: 1, max: 2 },
+        { item: 'scrap_electronics', chance: 1, min: 3, max: 6 },
+        { item: 'alloy_plate', chance: 1, min: 4, max: 8 },
+      ],
+    },
+  }, null, 2);
+
+  const cards = [
+    { t: 'Blueprint', sub: 'data/ships/blueprints/enemy/boss_scrap_mother.json', btn: 'expBp', pre: 'preBp', json: bpJson },
+    { t: 'Proposed data', sub: 'new entries for pieces.json and functions.json', btn: 'expData', pre: 'preData', json: dataJson },
+    { t: 'Boss entry', sub: 'data/bosses.json — stationary, with phase hooks', btn: 'expBoss', pre: 'preBoss', json: bossJson },
+  ];
+
+  for (const c of cards){
+    html += '<div class="card"><div class="t">' + c.t + '</div>' +
+      '<div style="color:#8b9ab5;font-size:10px;margin-top:2px">' + c.sub + '</div>' +
+      '<button id="' + c.btn + '" style="margin-top:5px">show / copy</button>' +
+      '<pre id="' + c.pre + '"></pre></div>';
+  }
+
+  rightEl.innerHTML = html;
+
+  for (const c of cards){
+    const btn = document.getElementById(c.btn);
+    const pre = document.getElementById(c.pre);
+    pre.textContent = c.json;
+    btn.onclick = () => {
+      const card = btn.parentElement;
+      card.classList.toggle('open');
+      if (navigator.clipboard && card.classList.contains('open')){
+        navigator.clipboard.writeText(pre.textContent);
+        const old = btn.textContent;
+        btn.textContent = 'copied';
+        setTimeout(() => { btn.textContent = old; }, 900);
+      }
+    };
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   10. INPUT + BOOT
+   --------------------------------------------------------------------------- */
+
+function toWorld(clientX, clientY){
+  const r = cvs.getBoundingClientRect();
+  const px = clientX - r.left;
+  const py = clientY - r.top;
+  return [
+    (px - W / 2) / zoom,
+    (py - H / 2) / zoom + SHIP_CY * CELL,
+  ];
+}
+
+function pick(wx, wy){
+  for (const p of ST.parts){
+    if (p.alive && pointInPoly(p.poly, wx / CELL, wy / CELL)) return p;
+  }
+  return null;
+}
+
+cvs.addEventListener('mousemove', (e) => {
+  const w = toWorld(e.clientX, e.clientY);
+  ST.hover = pick(w[0] / CELL, w[1] / CELL);
+});
+cvs.addEventListener('mouseleave', () => { ST.hover = null; });
+cvs.addEventListener('click', (e) => {
+  const w = toWorld(e.clientX, e.clientY);
+  ST.selected = pick(w[0] / CELL, w[1] / CELL);
+  if (!ST.selected) return;
+  const p = ST.selected;
+  setCaption('uid ' + p.part.uid + ' · ' + p.fn.name + ' · ' + p.part.piece +
+    ' @ (' + p.part.x + ',' + p.part.y + ')' +
+    (p.part.facing ? ' facing ' + p.part.facing : '') +
+    ' · ' + Math.round(p.hp) + '/' + Math.round(p.maxHp) + ' hp', 'info', 4);
+});
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === ' '){ e.preventDefault(); toggleSim(); }
+  if (e.key === 'r' || e.key === 'R') resetSim();
+});
+
+function toggleSim(){
+  ST.sim = !ST.sim;
+  document.getElementById('tglSim').classList.toggle('on', ST.sim);
+}
+
+document.getElementById('tglSim').onclick = toggleSim;
+
+document.getElementById('btnSpeed').onclick = (e) => {
+  ST.speed = ST.speed === 1 ? 2 : ST.speed === 2 ? 0.5 : 1;
+  e.currentTarget.textContent = '×' + ST.speed;
+};
+
+document.getElementById('btnRestart').onclick = () => resetSim();
+
+document.getElementById('tglGrid').onclick = (e) => {
+  ST.showGrid = !ST.showGrid;
+  e.currentTarget.classList.toggle('on', ST.showGrid);
+};
+
+document.getElementById('tglLabels').onclick = (e) => {
+  ST.showLabels = !ST.showLabels;
+  e.currentTarget.classList.toggle('on', ST.showLabels);
+};
+
+document.getElementById('tglLeft').onclick = (e) => {
+  leftEl.classList.toggle('hidden');
+  leftForced = !leftEl.classList.contains('hidden');
+  e.currentTarget.classList.toggle('on', leftEl.classList.contains('hidden'));
+  fitPanels();
+};
+
+document.getElementById('tglRight').onclick = (e) => {
+  rightEl.classList.toggle('hidden');
+  rightForced = !rightEl.classList.contains('hidden');
+  e.currentTarget.classList.toggle('on', rightEl.classList.contains('hidden'));
+  fitPanels();
+};
+
+window.addEventListener('resize', fitPanels);
+
+/* the canvas always matches whatever the stage ends up being */
+new ResizeObserver(() => resize()).observe(cvs.parentElement);
+
+fitPanels();
+resize();
+resetSim();
+buildLeft();
+buildRight();
+initHudBar();
+
+let last = performance.now();
+function frame(now){
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  if (ST.sim){
+    try {
+      step(dt * ST.speed);
+    } catch (err){
+      console.error(err);
+      setCaption('sim hiccup: ' + err.message, 'bad', 3);
+      ST.sim = false;
+    }
+  }
+  draw();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

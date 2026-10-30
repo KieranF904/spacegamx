@@ -1,0 +1,101 @@
+{
+ "name": "Redtooth Cutter",
+ "catalogVersion": 1,
+ "parts": [
+  {
+   "uid": 0,
+   "piece": "sq",
+   "fn": "weapon",
+   "material": "steel",
+   "x": 0,
+   "y": -1,
+   "rot": 0,
+   "flip": false,
+   "facing": "N"
+  },
+  {
+   "uid": 1,
+   "piece": "tri",
+   "fn": "hull",
+   "material": "steel",
+   "x": -1,
+   "y": 0,
+   "rot": 2,
+   "flip": false
+  },
+  {
+   "uid": 2,
+   "piece": "sq",
+   "fn": "core",
+   "material": "steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 3,
+   "piece": "tri",
+   "fn": "hull",
+   "material": "steel",
+   "x": 1,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 4,
+   "piece": "sq",
+   "fn": "hull",
+   "material": "steel",
+   "x": -1,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 5,
+   "piece": "sq",
+   "fn": "generator",
+   "material": "steel",
+   "x": 0,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 6,
+   "piece": "sq",
+   "fn": "hull",
+   "material": "steel",
+   "x": 1,
+   "y": 1,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 7,
+   "piece": "sq",
+   "fn": "thruster",
+   "material": "steel",
+   "x": -1,
+   "y": 2,
+   "rot": 0,
+   "flip": false,
+   "facing": "S"
+  },
+  {
+   "uid": 8,
+   "piece": "sq",
+   "fn": "thruster",
+   "material": "steel",
+   "x": 1,
+   "y": 2,
+   "rot": 0,
+   "flip": false,
+   "facing": "S"
+  }
+ ],
+ "drive": 0.7,
+ "paint": "#9a3f22"
+}

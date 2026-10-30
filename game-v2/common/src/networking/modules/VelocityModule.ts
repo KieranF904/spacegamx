@@ -1,10 +1,10 @@
-import { BitBuffer } from '../BitBuffer';
-import { createModule, NetworkModule } from './NetworkModule';
+import { BitBuffer } from '../BitBuffer.js';
+import { createModule, NetworkModule } from './NetworkModule.js';
 import {
   VELOCITY_BITS, VELOCITY_MIN, VELOCITY_MAX,
   ANGULAR_VEL_BITS, ANGULAR_VEL_MIN, ANGULAR_VEL_MAX,
   VELOCITY_CORRECTION_THRESHOLD,
-} from '../Precision';
+} from '../Precision.js';
 
 /**
  * Velocity data for physics entities

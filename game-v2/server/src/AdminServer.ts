@@ -172,7 +172,8 @@ export class AdminServer {
     this.wss = new WebSocketServer({ server: this.httpServer });
     this.wss.on('connection', (ws) => this.handleConnection(ws));
     
-    this.httpServer.listen(port, () => {
+    // This machine only: it predates in-game admin (AdminTools) and has a fixed password
+    this.httpServer.listen(port, '127.0.0.1', () => {
       console.log(`🔧 Admin server started on http://localhost:${port}`);
       console.log(`   Auth: enabled`);
       console.log(`   WebSocket: ws://localhost:${port}`);

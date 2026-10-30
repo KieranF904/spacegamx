@@ -12,6 +12,7 @@
 import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import crypto from 'crypto';
+import { AccountRoutes } from './accounts/routes.js';
 
 // ============================================
 // CONFIGURATION
@@ -128,6 +129,7 @@ function parseJson(req: http.IncomingMessage): Promise<any> {
 
 function setCors(res: http.ServerResponse): void {
   res.setHeader('Access-Control-Allow-Origin', '*');
+  // (Accounts use a token in the body, never cookies, so open CORS is safe)
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
@@ -549,6 +551,9 @@ function escapeHtml(str: string): string {
 // MAIN HTTP SERVER
 // ============================================
 
+// Accounts: one for every game server (see accounts/routes.ts)
+const accounts = await AccountRoutes.create(sendJson, parseJson, getClientIp);
+
 const server = http.createServer(async (req, res) => {
   setCors(res);
   
@@ -561,6 +566,8 @@ const server = http.createServer(async (req, res) => {
   const url = req.url?.split('?')[0] || '/';
   
   try {
+    if (await accounts.handle(req, res, url)) return;
+
     // Server registration (from game servers)
     if (req.method === 'POST' && url === '/register') {
       await handleRegister(req, res);
@@ -640,7 +647,13 @@ server.listen(PORT, () => {
   console.log(`     GET  /logs       - Get all logs`);
   console.log(`     GET  /stream     - SSE log stream`);
   console.log(`     GET  /health     - Health check`);
+  console.log(`     POST /auth/*     - Accounts: login, register, validate, logout, account, change-password/email, logout-all, delete-account`);
 });
 
 // Periodic cleanup
 setInterval(cleanup, 5000);
+
+// Finish writing accounts before exiting (systemd stop, Ctrl+C)
+for (const sig of ['SIGTERM', 'SIGINT'] as const) {
+  process.once(sig, () => { void accounts.close().finally(() => process.exit(0)); });
+}

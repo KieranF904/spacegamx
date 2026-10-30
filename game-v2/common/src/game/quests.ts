@@ -2,10 +2,10 @@
  * Quest system utilities and helpers
  */
 
-import { QuestData, QuestStage, QuestRewards } from '../data/schemas.js';
+import { QuestData, QuestStage, LegacyQuestRewards } from '../data/schemas.js';
 
 // Re-export for convenience
-export type { QuestData, QuestStage, QuestRewards };
+export type { QuestData, QuestStage, LegacyQuestRewards };
 
 // Quest objective types (for runtime matching)
 export enum QuestObjectiveType {

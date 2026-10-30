@@ -1,6 +1,6 @@
-import { BitBuffer } from '../BitBuffer';
-import { createModule, NetworkModule } from './NetworkModule';
-import { INPUT_ANGLE_BITS } from '../Precision';
+import { BitBuffer } from '../BitBuffer.js';
+import { createModule, NetworkModule } from './NetworkModule.js';
+import { INPUT_ANGLE_BITS } from '../Precision.js';
 
 /**
  * Input state for a player/ship

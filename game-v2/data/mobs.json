@@ -1,0 +1,35 @@
+{
+  "_comment": "Single-body enemies (server/src/game/Mobs.ts): one hit circle (radius), one HP, a simple way of flying. speed/accel in world units a tick, turn in radians a tick, life and arm in ticks; blast: fuse distance from the target's hull, radius, damage (× its owner's damage scale). shape is the look only: world units, nose along +x.",
+  "mobs": {
+    "ember_drone": {
+      "name": "Ember Drone",
+      "behaviour": "kamikaze",
+      "hp": 70,
+      "radius": 26,
+      "speed": 15,
+      "accel": 0.7,
+      "turn": 0.075,
+      "life": 600,
+      "arm": 20,
+      "blast": { "fuse": 40, "radius": 150, "damage": 70 },
+      "shape": [[30, 0], [6, 13], [-16, 22], [-9, 0], [-16, -22], [6, -13]],
+      "color": "#2b1a14",
+      "glow": "#ff7a2a"
+    },
+    "scrap_mite": {
+      "name": "Scrap Mite",
+      "behaviour": "kamikaze",
+      "hp": 55,
+      "radius": 24,
+      "speed": 19,
+      "accel": 0.75,
+      "turn": 0.07,
+      "life": 600,
+      "arm": 20,
+      "blast": { "fuse": 40, "radius": 140, "damage": 60 },
+      "shape": [[26, 0], [14, 14], [-4, 20], [-18, 12], [-12, 0], [-18, -12], [-4, -20], [14, -14]],
+      "color": "#3a3d42",
+      "glow": "#7affd2"
+    }
+  }
+}

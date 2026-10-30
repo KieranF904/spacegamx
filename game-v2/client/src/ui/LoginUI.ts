@@ -18,7 +18,6 @@ export class LoginUI {
   private container: HTMLElement;
   private panel: HTMLElement;
   private visible = true;
-  private debugPanelVisible = false;
   private startTime = Date.now();
   
   // PixiJS WebGL rendering
@@ -28,6 +27,9 @@ export class LoginUI {
   private glowRenderer: GlowRenderer | null = null;
   private starsGraphics: Graphics | null = null;
   private pixiInitialized = false;
+  /** Bumped when the backdrop is released, so an init still in flight throws its app away */
+  private backdropGen = 0;
+  private pixiStarting = false;
   
   // Star field
   private stars: Array<{ x: number; y: number; z: number; size: number; phase: number }> = [];
@@ -105,16 +107,24 @@ export class LoginUI {
   }
   
   private async initPixi(): Promise<void> {
+    if (this.app || this.pixiStarting) return;
+    this.pixiStarting = true;
+    const gen = this.backdropGen;
     // Create PixiJS application
-    this.app = new Application();
-    await this.app.init({
+    const app = new Application();
+    await app.init({
       width: window.innerWidth,
       height: window.innerHeight,
       backgroundColor: 0x000005,
       resolution: window.devicePixelRatio || 1,
       autoDensity: true,
       antialias: true,
+      eventFeatures: { move: false, globalMove: false, click: false, wheel: false },
     });
+    this.pixiStarting = false;
+    // Released (signed in) while it was starting: not needed after all
+    if (gen !== this.backdropGen) { app.destroy({ removeView: true }); if (this.visible) void this.initPixi(); return; }
+    this.app = app;
     
     // Insert canvas into the login panel before other content
     const canvas = this.app.canvas as HTMLCanvasElement;
@@ -153,8 +163,9 @@ export class LoginUI {
     // Handle resize
     window.addEventListener('resize', this.handleResize);
     
-    // Start animation loop
+    // Start animation loop (only while shown)
     this.app.ticker.add(() => this.updateAnimation());
+    if (!this.visible) this.app.ticker.stop();
     
     this.pixiInitialized = true;
   }
@@ -281,7 +292,7 @@ export class LoginUI {
         align-items: center;
         justify-content: center;
         background: #000;
-        z-index: 2000;
+        z-index: 5000; /* over anything a connection left on screen */
         overflow: hidden;
       }
       
@@ -562,315 +573,31 @@ export class LoginUI {
       }
       
       /* Debug Panel Styles */
-      .debug-panel {
-        position: fixed;
-        top: 44px;
-        left: 10px;
-        background: rgba(0, 0, 0, 0.85);
-        border: 1px solid rgba(255, 150, 50, 0.4);
-        border-radius: 8px;
-        padding: 10px;
-        z-index: 9999;
-        font-family: monospace;
-        font-size: 11px;
-        color: #ffaa66;
-        min-width: 220px;
-        max-height: 90vh;
-        overflow-y: auto;
-      }
 
-      .debug-panel.hidden {
-        display: none;
-      }
 
-      .debug-toggle-btn {
-        position: fixed;
-        top: 10px;
-        left: 10px;
-        z-index: 10000;
-        height: 28px;
-        padding: 0 10px;
-        border-radius: 6px;
-        border: 1px solid rgba(255, 150, 50, 0.5);
-        background: rgba(0, 0, 0, 0.8);
-        color: #ffaa66;
-        font-family: monospace;
-        font-size: 11px;
-        cursor: pointer;
-      }
 
-      .debug-toggle-btn:hover {
-        background: rgba(255, 120, 30, 0.2);
-        border-color: rgba(255, 170, 80, 0.8);
-      }
       
-      .debug-panel-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        cursor: pointer;
-        padding-bottom: 8px;
-        border-bottom: 1px solid rgba(255, 150, 50, 0.3);
-        margin-bottom: 8px;
-      }
       
-      .debug-panel-title {
-        font-weight: bold;
-        font-size: 12px;
-      }
       
-      .debug-panel-content {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
       
-      .debug-panel.collapsed .debug-panel-content {
-        display: none;
-      }
       
-      .debug-slider-group {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-      }
       
-      .debug-slider-label {
-        display: flex;
-        justify-content: space-between;
-        font-size: 10px;
-      }
       
-      .debug-slider-label span:last-child {
-        color: #ffcc88;
-      }
       
-      .debug-slider {
-        width: 100%;
-        height: 4px;
-        -webkit-appearance: none;
-        background: rgba(255, 150, 50, 0.2);
-        border-radius: 2px;
-        outline: none;
-      }
       
-      .debug-slider::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        width: 12px;
-        height: 12px;
-        background: #ff8833;
-        border-radius: 50%;
-        cursor: pointer;
-      }
       
-      .debug-slider::-moz-range-thumb {
-        width: 12px;
-        height: 12px;
-        background: #ff8833;
-        border-radius: 50%;
-        cursor: pointer;
-        border: none;
-      }
       
-      .debug-color-section {
-        margin-top: 8px;
-        padding-top: 8px;
-        border-top: 1px solid rgba(255, 150, 50, 0.3);
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
       
-      .debug-color-group {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 2px;
-      }
       
-      .debug-color-group label {
-        font-size: 9px;
-      }
       
-      .debug-color-group input[type="color"] {
-        width: 32px;
-        height: 20px;
-        border: 1px solid rgba(255, 150, 50, 0.4);
-        border-radius: 4px;
-        background: transparent;
-        cursor: pointer;
-        padding: 0;
-      }
       
-      .debug-group {
-        margin-bottom: 6px;
-        padding-bottom: 6px;
-        border-bottom: 1px solid rgba(255, 150, 50, 0.15);
-      }
       
-      .debug-group:last-of-type {
-        border-bottom: none;
-      }
       
-      .debug-group-title {
-        font-weight: bold;
-        font-size: 10px;
-        color: #ff9944;
-        margin-bottom: 4px;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-      }
       
       /* Import Google Font */
       @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@400;500;600&display=swap');
     `;
     document.head.appendChild(style);
-    
-    // Create debug panel
-    this.createDebugPanel();
-  }
-  
-  private createDebugPanel(): void {
-    const existingPanel = document.getElementById('sun-debug-panel');
-    if (existingPanel) existingPanel.remove();
-    const existingToggle = document.getElementById('sun-debug-toggle');
-    if (existingToggle) existingToggle.remove();
-
-    const toggleBtn = document.createElement('button');
-    toggleBtn.id = 'sun-debug-toggle';
-    toggleBtn.className = 'debug-toggle-btn';
-    toggleBtn.type = 'button';
-    toggleBtn.textContent = this.debugPanelVisible ? 'Hide Sun Settings' : 'Show Sun Settings';
-    
-    const panel = document.createElement('div');
-    panel.id = 'sun-debug-panel';
-    panel.className = 'debug-panel';
-    if (!this.debugPanelVisible) panel.classList.add('hidden');
-    
-    const sliders = [
-      // fBM Core
-      { key: 'octaves', label: 'Octaves', min: 1, max: 8, step: 1, group: 'fBM' },
-      { key: 'lacunarity', label: 'Lacunarity', min: 1.5, max: 3.0, step: 0.1, group: 'fBM' },
-      { key: 'gain', label: 'Gain', min: 0.1, max: 0.9, step: 0.05, group: 'fBM' },
-      { key: 'noiseScale', label: 'Noise Scale', min: 1, max: 10, step: 0.5, group: 'fBM' },
-      { key: 'animSpeed', label: 'Anim Speed', min: 0.01, max: 0.5, step: 0.01, group: 'fBM' },
-      { key: 'contrast', label: 'Contrast', min: 0.5, max: 2.0, step: 0.1, group: 'fBM' },
-      // Domain Warping
-      { key: 'warpAmount', label: 'Warp Amount', min: 0, max: 1.5, step: 0.05, group: 'Warp' },
-      { key: 'warpScale', label: 'Warp Scale', min: 0.1, max: 2.0, step: 0.1, group: 'Warp' },
-      { key: 'turbulenceMix', label: 'Turbulence', min: 0, max: 1, step: 0.05, group: 'Warp' },
-      // Plasma
-      { key: 'plasmaIntensity', label: 'Intensity', min: 0, max: 1, step: 0.05, group: 'Plasma' },
-      { key: 'plasmaScale', label: 'Scale', min: 0.5, max: 8, step: 0.5, group: 'Plasma' },
-      { key: 'plasmaSpeed', label: 'Speed', min: 0.1, max: 3, step: 0.1, group: 'Plasma' },
-      // Center Contrast
-      { key: 'centerDarken', label: 'Darken Darks', min: 0, max: 2, step: 0.1, group: 'Center' },
-      { key: 'centerHighlight', label: 'Highlight Brights', min: 0, max: 2, step: 0.1, group: 'Center' },
-      { key: 'centerFalloff', label: 'Falloff', min: 0.5, max: 5, step: 0.25, group: 'Center' },
-      // Inside Adjust
-      { key: 'innerDarkening', label: 'Inner Dark', min: 0, max: 1, step: 0.05, group: 'Inside' },
-      { key: 'whiteBalance', label: 'Warm/Cool', min: -1, max: 1, step: 0.1, group: 'Inside' },
-      { key: 'saturation', label: 'Saturation', min: 0, max: 2, step: 0.1, group: 'Inside' },
-      // Edge Styling
-      { key: 'edgeBrightness', label: 'Brightness', min: 0.2, max: 2, step: 0.1, group: 'Edge' },
-      { key: 'edgeThickness', label: 'Thickness', min: 0.01, max: 0.15, step: 0.01, group: 'Edge' },
-      { key: 'edgeSharpness', label: 'Sharpness', min: 0.1, max: 1, step: 0.05, group: 'Edge' },
-      { key: 'limbDarkening', label: 'Limb Dark', min: 0, max: 1, step: 0.05, group: 'Edge' },
-      { key: 'glowIntensity', label: 'Glow', min: 0, max: 1, step: 0.05, group: 'Edge' },
-      { key: 'glowSize', label: 'Glow Size', min: 0.01, max: 0.3, step: 0.01, group: 'Edge' },
-      // Corona
-      { key: 'coronaSize', label: 'Size', min: 0.5, max: 4, step: 0.1, group: 'Corona' },
-      { key: 'coronaIntensity', label: 'Intensity', min: 0, max: 2, step: 0.1, group: 'Corona' },
-      { key: 'atmosphereInnerRadius', label: 'Atmo Inner', min: 0.2, max: 2.5, step: 0.05, group: 'Corona' },
-      { key: 'atmosphereOuterRadius', label: 'Atmo Outer', min: 0.3, max: 4.0, step: 0.05, group: 'Corona' },
-      { key: 'coronaInnerRadius', label: 'Corona Inner', min: 0.2, max: 2.5, step: 0.05, group: 'Corona' },
-      { key: 'coronaOuterRadius', label: 'Corona Outer', min: 0.3, max: 4.0, step: 0.05, group: 'Corona' },
-    ];
-    
-    const colors = [
-      { key: 'darkColor', label: 'Dark' },
-      { key: 'midColor', label: 'Mid' },
-      { key: 'brightColor', label: 'Bright' },
-      { key: 'edgeColor', label: 'Edge' },
-      { key: 'plasmaColor', label: 'Plasma' },
-      { key: 'centerColor', label: 'Center' },
-    ];
-    
-    // Group sliders by category
-    const groups = ['fBM', 'Warp', 'Plasma', 'Center', 'Inside', 'Edge', 'Corona'];
-    
-    panel.innerHTML = `
-      <div class="debug-panel-header">
-        <span class="debug-panel-title">☀️ Sun Debug</span>
-        <span>▼</span>
-      </div>
-      <div class="debug-panel-content">
-        ${groups.map(group => `
-          <div class="debug-group">
-            <div class="debug-group-title">${group}</div>
-            ${sliders.filter(s => s.group === group).map(s => `
-              <div class="debug-slider-group">
-                <div class="debug-slider-label">
-                  <span>${s.label}</span>
-                  <span id="val-${s.key}">${(this.debugParams as any)[s.key].toFixed(2)}</span>
-                </div>
-                <input type="range" class="debug-slider" 
-                  id="slider-${s.key}" 
-                  min="${s.min}" max="${s.max}" step="${s.step}" 
-                  value="${(this.debugParams as any)[s.key]}">
-              </div>
-            `).join('')}
-          </div>
-        `).join('')}
-        <div class="debug-color-section">
-          ${colors.map(c => `
-            <div class="debug-color-group">
-              <label>${c.label}</label>
-              <input type="color" id="color-${c.key}" value="${(this.debugParams as any)[c.key]}">
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    `;
-    
-    document.body.appendChild(toggleBtn);
-    document.body.appendChild(panel);
-
-    toggleBtn.addEventListener('click', () => {
-      this.debugPanelVisible = !this.debugPanelVisible;
-      panel.classList.toggle('hidden', !this.debugPanelVisible);
-      toggleBtn.textContent = this.debugPanelVisible ? 'Hide Sun Settings' : 'Show Sun Settings';
-    });
-    
-    // Toggle collapse
-    const header = panel.querySelector('.debug-panel-header');
-    header?.addEventListener('click', () => {
-      panel.classList.toggle('collapsed');
-      const arrow = header.querySelector('span:last-child');
-      if (arrow) arrow.textContent = panel.classList.contains('collapsed') ? '▶' : '▼';
-    });
-    
-    // Bind sliders
-    sliders.forEach(s => {
-      const slider = document.getElementById(`slider-${s.key}`) as HTMLInputElement;
-      const valDisplay = document.getElementById(`val-${s.key}`);
-      
-      slider?.addEventListener('input', () => {
-        const val = parseFloat(slider.value);
-        (this.debugParams as any)[s.key] = val;
-        if (valDisplay) valDisplay.textContent = val.toFixed(2);
-        this.applyDebugParams();
-      });
-    });
-    
-    // Bind color pickers
-    colors.forEach(c => {
-      const picker = document.getElementById(`color-${c.key}`) as HTMLInputElement;
-      picker?.addEventListener('input', () => {
-        (this.debugParams as any)[c.key] = picker.value;
-        this.applyDebugParams();
-      });
-    });
   }
   
   // Helper to convert hex color to RGB array
@@ -991,7 +718,7 @@ export class LoginUI {
       <div class="login-content">
         <div class="login-title-container">
           <div class="login-title">SPACE GAME</div>
-          <div class="login-subtitle">Journey to the Stars</div>
+          <div class="login-subtitle">Working Title</div>
         </div>
         
         <div class="login-container">
@@ -1117,20 +844,29 @@ export class LoginUI {
   show(): void {
     this.visible = true;
     this.panel.style.display = 'flex';
-    const debugToggle = document.getElementById('sun-debug-toggle') as HTMLElement | null;
-    const debugPanel = document.getElementById('sun-debug-panel') as HTMLElement | null;
-    if (debugToggle) debugToggle.style.display = '';
-    if (debugPanel) debugPanel.style.display = '';
+    // The backdrop: running again, or rebuilt if it was released
+    if (this.app) {
+      window.addEventListener('resize', this.handleResize);
+      this.handleResize();
+      this.app.ticker.start();
+    } else {
+      void this.initPixi();
+    }
   }
 
   hide(): void {
     this.visible = false;
     this.panel.style.display = 'none';
-    const debugToggle = document.getElementById('sun-debug-toggle') as HTMLElement | null;
-    const debugPanel = document.getElementById('sun-debug-panel') as HTMLElement | null;
-    if (debugToggle) debugToggle.style.display = 'none';
-    if (debugPanel) debugPanel.style.display = 'none';
     window.removeEventListener('resize', this.handleResize);
+    // Nothing to see: stop drawing the hidden canvas
+    this.app?.ticker.stop();
+  }
+
+  /** Free the backdrop's renderer (the game is up); show() builds it again */
+  releaseBackdrop(): void {
+    if (this.visible) return;
+    this.backdropGen++;
+    this.disposePixi();
   }
 
   isVisible(): boolean {
@@ -1139,11 +875,12 @@ export class LoginUI {
   
   destroy(): void {
     window.removeEventListener('resize', this.handleResize);
-    const debugPanel = document.getElementById('sun-debug-panel');
-    if (debugPanel) debugPanel.remove();
-    const debugToggle = document.getElementById('sun-debug-toggle');
-    if (debugToggle) debugToggle.remove();
     
+    this.disposePixi();
+  }
+
+  private disposePixi(): void {
+    window.removeEventListener('resize', this.handleResize);
     // Clean up PixiJS
     if (this.sunRenderer) {
       this.sunRenderer.destroy();
@@ -1154,8 +891,12 @@ export class LoginUI {
       this.glowRenderer = null;
     }
     if (this.app) {
-      this.app.destroy(true);
+      // Not destroy(true): that also releases Pixi's global pools, wrecking the batches the game's renderer is still using
+      this.app.destroy({ removeView: true });
       this.app = null;
     }
+    this.worldContainer = null;
+    this.starsGraphics = null;
+    this.pixiInitialized = false;
   }
 }

@@ -576,7 +576,7 @@ class VisualSandbox {
   // SERVER BROWSER
   // ============================================
   
-  private serverBrowserUrl = 'https://spacegame-v2.fly.dev';
+  private serverBrowserUrl = (import.meta as any).env?.VITE_BROWSER_URL || 'http://localhost:8787';
   
   private setupServerBrowser() {
     const refreshBtn = document.getElementById('refresh-servers-btn');
@@ -622,8 +622,8 @@ class VisualSandbox {
         serverEl.onmouseover = () => serverEl.style.background = '#252535';
         serverEl.onmouseout = () => serverEl.style.background = '#1a1a24';
         
-        // Use adminPort from server info, or fallback to 3001
-        const adminPort = server.adminPort || 3001;
+        // Use adminPort from server info, or fallback to 3005
+        const adminPort = server.adminPort || 3005;
         const protocol = server.secure ? 'wss' : 'ws';
         const adminUrl = `${protocol}://${server.host}:${adminPort}`;
         const hasAdmin = !!server.adminPort;
@@ -2304,7 +2304,7 @@ class VisualSandbox {
     // Elements (embed the base64 as a string — it's already BitBuffer-encoded)
     buf.writeString(this.serializeElementsToBase64());
 
-    const blob = new Blob([buf.getBuffer()], { type: 'application/octet-stream' });
+    const blob = new Blob([buf.getBuffer() as unknown as BlobPart], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -3929,7 +3929,7 @@ class VisualSandbox {
       buf.writeString(sys.elementsBase64 ?? '');
     }
 
-    const blob = new Blob([buf.getBuffer()], { type: 'application/octet-stream' });
+    const blob = new Blob([buf.getBuffer() as unknown as BlobPart], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
