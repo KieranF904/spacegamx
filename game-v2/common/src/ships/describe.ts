@@ -23,14 +23,15 @@ export function describePart(catalog: Catalog, tuning: ShipTuning | undefined, p
   const base = partStats(catalog, tuning, part);
   const fn = catalog.functions.get(part.fn);
   if (!base || !fn) return null;
-  const facts = tuning ? featureFacts({ catalog, tuning, fn, mat: partMaterial(catalog, part), area: base.area }) : [];
+  // (No tuning: a feature reads its defaults from an empty one, as partStats does)
+  const facts = featureFacts({ catalog, tuning: tuning ?? ({} as ShipTuning), fn, mat: partMaterial(catalog, part), area: base.area });
   return { base, facts };
 }
 
 /** Facts of a function on its own (a palette card, no material placed): the first material it names */
 export function describeFn(catalog: Catalog, tuning: ShipTuning | undefined, fnId: string, piece?: string, material?: string): Fact[] {
   const fn = catalog.functions.get(fnId);
-  if (!fn || !tuning) return [];
+  if (!fn) return [];
   const pc = piece ?? (fn.pieces === '*' ? 'sq' : fn.pieces[0]);
   return describePart(catalog, tuning, { fn: fnId, material: fn.model ? fn.material ?? 'alloy' : material ?? fn.material ?? 'alloy', piece: pc })?.facts ?? [];
 }

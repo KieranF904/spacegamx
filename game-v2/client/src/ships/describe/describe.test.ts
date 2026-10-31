@@ -17,7 +17,8 @@ const probe: PartFeature = { id: 'probe', order: 0, applies: (fn) => !!fn.tow, d
 afterEach(() => setPlanForTests(null));
 
 describe('describePart and the renderers', () => {
-  it('with no feature registered, a part has only its base stats and no facts', () => {
+  it('with no feature in the plan, a part has only its base stats and no facts', () => {
+    setPlanForTests(compilePlan([]));
     const d = describePart(catalog, tuning, { fn: 'utility_tow_beam', material: 'steel', piece: 'rect2' })!;
     expect(d.base.tow).toBeDefined();
     expect(d.facts).toEqual([]);

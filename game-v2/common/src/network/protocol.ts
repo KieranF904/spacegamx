@@ -287,7 +287,7 @@ export interface ClientUndockMessage {
 }
 
 /**
- * Tow Beam (common/src/ships/tow.ts): `on` takes hold of the wreck, debris or pod nearest the cursor within reach
+ * Tow Beam (common/src/ships/features/tow/tow.ts): `on` takes hold of the wreck, debris or pod nearest the cursor within reach
  * (the input's aim and cursor distance say where), off lets go. The server answers with a toast and the snapshot
  */
 export interface ClientTowMessage {

@@ -1,5 +1,5 @@
 /**
- * Tow Beams (common/src/ships/tow.ts): pilots latching onto wrecks, debris and loot pods and pulling them along.
+ * Tow Beams (common/src/ships/features/tow/tow.ts), the server half of the `tow` part feature: pilots latching onto wrecks, debris and loot pods and pulling them along.
  *
  * - `request(pilot, true, aim)` takes hold of whatever towable is nearest the aim point within the beam's reach
  *   (a derelict wreck or debris: ShipBridge.towable; a pod: LootPods.near). Never a working ship: no enemies,
@@ -7,38 +7,51 @@
  * - Each tick (after the pilots' flight, before the bodies and pods move: GameServer.gameLoop) the tether pulls
  *   the towed thing (towPull), weaker short of power; it lets go when the beam's lost or out of power, the
  *   thing's gone, the pilot jumps, docks or changes system, or the tether stretches past `snap`.
- * - The pilot carries its load (towLoad): ShipBridge adds `load(pilot)` to the hold's mass, so the pilot's
- *   prediction and replicas fly it. The beam draws while it tows (ShipState.tow: energy.ts gunLoad).
+ * - The pilot carries its load (towLoad): as the feature's cargoMass, ShipBridge adds `load(pilot)` to the hold's mass, so the pilot's
+ *   prediction and replicas fly it. The beam draws while it tows (ShipState.tow: the feature's load()).
  * - Towed into a station's reach, it's delivered: the host salvages it (GameServer: a wreck or debris into
  *   station storage, a derelict's credits too; a pod's contents into storage) and the beam lets go.
  */
 
-import { hasComponent, type IWorld } from 'bitecs';
-import { Position, Velocity, InSystem, Dead, canTow, feedShare, towLoad, towPull, towTuning, type ShipTuning } from '@space-game/common';
-import type { ShipBridge } from '../ships/ShipBridge.js';
-import type { LootPods } from './LootPods.js';
-
-export type TowKind = 'wreck' | 'debris' | 'pod';
-
-export interface TowHost {
-  readonly world: IWorld;
-  getTick(): number;
-  /** A toast for one pilot */
-  tell(pilot: number, text: string, color?: string): void;
-  /** The station a pilot is within reach of (-1: none) */
-  stationInRange(pilot: number): number;
-  /** Berthed at a station */
-  isDocked(pilot: number): boolean;
-  /** Towed into a station's reach: salvage it for the pilot (and take it away) */
-  deliver(pilot: number, target: number, kind: TowKind): void;
-}
+import { hasComponent } from 'bitecs';
+import { Position, Velocity, InSystem, Dead, Input, canTow, feedShare, towLoad, towPull, towTuning, type ShipTuning, type TowKind } from '@space-game/common';
+import type { ShipBridge } from '../../ShipBridge.js';
+import type { LootPods } from '../../../game/LootPods.js';
+import type { FeatureHost, FeatureInstance, FeatureMessageHandler } from '../types.js';
 
 interface Tow { target: number; kind: TowKind }
 
-export class Towing {
+export class Towing implements FeatureInstance {
   private tows = new Map<number, Tow>();
+  private readonly ships: ShipBridge;
+  private readonly pods: LootPods;
+  private readonly tuning: ShipTuning;
 
-  constructor(private host: TowHost, private ships: ShipBridge, private pods: LootPods, private tuning: ShipTuning) {}
+  constructor(private host: FeatureHost) {
+    this.ships = host.ships;
+    this.pods = host.pods;
+    this.tuning = host.tuning;
+  }
+
+  /** The client's `{type:'tow', on}`: take hold of what's nearest the cursor, or let go */
+  readonly messages: Readonly<Record<string, FeatureMessageHandler>> = {
+    tow: (p, msg) => {
+      const a = Input.targetAngle[p], dist = Input.cursorDist[p];
+      this.request(p, !!msg.on, { x: Position.x[p] + Math.cos(a) * dist, y: Position.y[p] + Math.sin(a) * dist });
+    },
+  };
+
+  /** The load the pilot's tow puts on the hold (ShipBridge flight sums it with the cargo) */
+  cargoMass(pilot: number): number { return this.load(pilot); }
+
+  /** The pilot-row value (features.wire.json pilotExtra "tow"): what the pilot tows, entity id + 1, 0 none */
+  wire(pilot: number, out: number[]): number {
+    out[0] = this.wireOf(pilot);
+    return 1;
+  }
+
+  /** The status-row value other pilots get (features.wire.json status[8]) */
+  status(pilot: number): number { return this.wireOf(pilot); }
 
   /** What a pilot tows (an entity id), if anything */
   targetOf(pilot: number): number | undefined {
@@ -78,7 +91,7 @@ export class Towing {
     if (this.tows.has(pilot)) { this.release(pilot, 'Tow Beam: let go', '#cbd5e1'); return; }
     const ship = this.ships.get(pilot);
     if (!ship || ship.kind !== 'ship') return;
-    if (!ship.derived.tow) { this.host.tell(pilot, 'No Tow Beam fitted: build one in the hangar to tow', '#f2d24b'); return; }
+    if (!ship.derived.fx?.tow) { this.host.tell(pilot, 'No Tow Beam fitted: build one in the hangar to tow', '#f2d24b'); return; }
     if (!canTow(ship.derived)) { this.host.tell(pilot, 'The Tow Beam has no power', '#f2d24b'); return; }
     if (this.host.isDocked(pilot) || this.ships.isJumping(ship)) return;
     const t = towTuning(this.tuning);
@@ -137,7 +150,7 @@ export class Towing {
       // Its power this tick (it draws on its circuit like a gun: energy.ts gunLoad)
       let share = 1;
       const c = this.ships.chargeOf(pilot);
-      for (const i of ship.derived.tow?.parts ?? []) share = Math.min(share, feedShare(ship.derived, c, i, 'gun'));
+      for (const i of ship.derived.fx?.tow?.parts ?? []) share = Math.min(share, feedShare(ship.derived, c, i, 'gun'));
       if (share < t.minShare) { this.release(pilot, 'Tow Beam out of power: the tether let go'); continue; }
       const pull = towPull(
         { x: Position.x[pilot], y: Position.y[pilot], vx: Velocity.x[pilot], vy: Velocity.y[pilot], r: ship.derived.radius },

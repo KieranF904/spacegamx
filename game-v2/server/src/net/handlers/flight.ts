@@ -1,6 +1,6 @@
 /**
  * Flight messages, the prediction-sensitive ones: input (queued for the tick boundary), ping, stateHash, mapView,
- * interact, respawn, trainingDrone, target and tow. Moved verbatim from GameServer (the receiver `this` became `ctx`;
+ * interact, respawn, trainingDrone, and target (the Tow Beam's `tow` is a part feature's: ships/features/tow). Moved verbatim from GameServer (the receiver `this` became `ctx`;
  * the helpers take ctx first).
  *
  * Order matters here and was kept to the statement: GameServer.drainInputQueue (still in GameServer, run right before
@@ -52,13 +52,6 @@ export function registerFlightHandlers(t: HandlerRegistry): void {
   });
   t.on('stateHash', (ctx, conn, msg) => {
     handleStateHash(ctx, conn, msg as any);
-  });
-  t.on('tow', (ctx, conn, msg) => {
-    // Tow Beam (game/Towing.ts): take hold of what's nearest the cursor, or let go
-    const p = conn.playerId;
-    if (!hasComponent(ctx.world, Player, p)) return;
-    const a = Input.targetAngle[p], dist = Input.cursorDist[p];
-    ctx.towing.request(p, !!msg.on, { x: Position.x[p] + Math.cos(a) * dist, y: Position.y[p] + Math.sin(a) * dist });
   });
 }
 

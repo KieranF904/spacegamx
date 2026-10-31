@@ -23,14 +23,13 @@ import {
   JumpTuning, jumpPhase, jumpTuning, coreHp, FRICTION, worldToLocalDir, partItemId, inSolarRing, jumpRange,
   jumpFieldAt, fieldRangeBoost, fieldCharge, primeBoost, pilotJumpStep, withEmp, lodestonePosition, type JumpField, type LodestoneData,
   ShipReplicaSet, ServerSnapshotMessage, packCursorWeaponState, rebuildVolley, WEAPON_KIND_TYPE, EntityState, accelAlong, turnAccel, rateShip, stepGuns, volleyShells, firesStraight, partWeaponDef,
-  dodgePhase, strafeForce, chooseDodgeDir, dodgeAffordable, DODGE_LEFT, DODGE_RIGHT, DODGE_FORWARD, DODGE_BACK, pilotExtras, canTow, cargoThrust,
+  dodgePhase, strafeForce, chooseDodgeDir, dodgeAffordable, DODGE_LEFT, DODGE_RIGHT, DODGE_FORWARD, DODGE_BACK,
 } from '@space-game/common';
 import type { MenuShipInfo } from '../ui/GameMenuUI';
 import type { GameState, InterpolatedEntity } from '../state/GameState';
 import type { Renderer } from '../rendering/Renderer';
 import { ShipStore } from './ShipStore';
 import { DodgeIndicator, type DodgeHud } from '../ui/DodgeIndicator';
-import { TowIndicator } from '../ui/TowIndicator';
 import { ShipRenderer } from './ShipRenderer';
 import { ShipHud } from './ShipHud';
 import type { HangarUI } from './HangarUI';
@@ -149,9 +148,7 @@ export class ShipClient {
   private dodgePressAt = -Infinity;
   private dodgeUsed = true;
   private dodgeUi = new DodgeIndicator();
-  /** Tow Beam (tow.ts): its chip */
-  private towUi = new TowIndicator();
-  /** Part features' client side (ships/features/host.ts): keys, pilot-row values, drawing and chips, none registered yet */
+  /** Part features' client side (ships/features/host.ts): keys, pilot-row values, drawing and chips (the Tow Beam's) */
   private features: ClientFeatures;
   private lastFrame = 0;
   /** The local jump charge sound, so an abort can cut it */
@@ -549,7 +546,7 @@ export class ShipClient {
     return this.jumpLatched;
   }
 
-  // ---- Burst Strafer (common/src/ships/strafer.ts) and Tow Beam (tow.ts)
+  // ---- Burst Strafer (common/src/ships/strafer.ts)
   /**
    * The dodge control this input tick. A press of the dodge key (Space, rebindable) asks for one burst; which way is the
    * simulation's to work out from the movement keys sent with it (strafer.ts chooseDodgeDir), so prediction and the server
@@ -609,22 +606,7 @@ export class ShipClient {
     };
   }
 
-  /** What your Tow Beam tows (an entity id), if anything (the server says: strafer.ts pilotExtras) */
-  localTow(): number | undefined {
-    const me = this.opts.state.entities.get(this.opts.state.playerId);
-    const t = pilotExtras(me?.data).tow;
-    return t > 0 ? t - 1 : undefined;
-  }
-
-  /** The tow key (U): take hold of what's nearest the cursor, or let go */
-  private toggleTow(): void {
-    const ship = this.store.get(this.opts.state.playerId);
-    if (this.localTow() !== undefined) { this.opts.send({ type: 'tow', on: false }); return; }
-    if (!ship || ship.kind !== 'ship' || !ship.derived.tow) { this.opts.showMessage('No Tow Beam fitted: build one in the hangar to tow', '#f2d24b'); return; }
-    if (!canTow(ship.derived)) { this.opts.showMessage('The Tow Beam has no power', '#f2d24b'); return; }
-    this.opts.send({ type: 'tow', on: true });
-  }
-  // ---- (end Burst Strafer and Tow Beam)
+  // ---- (end Burst Strafer)
 
   /** What the local pilot's keys ask the engines for (ship grid frame), for the thruster effects */
   private localThrustCommand(): ThrustCommand {
@@ -894,10 +876,6 @@ export class ShipClient {
       this.helm = !this.helm;
       return true;
     }
-    if (code === 'KeyU') {
-      this.toggleTow();
-      return true;
-    }
     if (code === 'KeyJ') {
       const ph = this.localJump();
       const hold = settings.data.gameplay.jumpMode === 'hold';
@@ -1020,6 +998,12 @@ export class ShipClient {
       for (let t = 0; t < ticks; t++) { this.stepTurretVisuals(); this.stepPointDefenceVisuals(now); }
     }
 
+    // (Part features: the pilot row's values, read before anything draws or shows them)
+    { const mine = state.entities.get(state.playerId);
+      if (mine) {
+        if (mine.data && this.features.hasParsers) this.features.parsePilot(mine.data, CHARGE_GROUPS_AT + Math.max(0, Math.min(MAX_CHARGE_GROUPS, mine.data[11] | 0)), mine.fx ??= {});
+        else mine.fx = undefined;
+      } }
     this.renderer?.update();
     this.hud.update();
     const dt = this.lastFrame ? Math.min(0.1, (now - this.lastFrame) / 1000) : 0;
@@ -1030,16 +1014,9 @@ export class ShipClient {
       aiming: this.jumpAiming(), aimDist: this.jumpAimInfo.dist, aimLabel: this.jumpAimInfo.label,
       reach: this.jumpReach(), field: me ? this.gaugeField() : undefined, danger: this.jumpAiming() ? this.jumpDanger() : null,
     });
-    // The Burst Strafer's chip (ready or cooling, and whether the circuit can pay), and the Tow Beam's chip while it tows
+    // The Burst Strafer's chip (ready or cooling, and whether the circuit can pay)
     this.dodgeUi.update(this.hangarOpen ? null : this.localDodge(), boundKeyName('dodge', settings.data.bindings));
-    const towed = this.hangarOpen ? undefined : this.localTow();
-    const towShip = this.store.get(state.playerId);
-    this.towUi.update(towed === undefined || !towShip ? null : {
-      what: state.entities.get(towed)?.type === EntityType.DroppedItem ? 'pod' : 'wreck',
-      thrustLoss: 1 - cargoThrust(towShip.derived, me?.cargoMass ?? 0),
-    }, boundKeyName('tow', settings.data.bindings));
-    // (Part features: the pilot row's values, then each one's chip)
-    if (me?.data && this.features.hasParsers) this.features.parsePilot(me.data, CHARGE_GROUPS_AT + Math.max(0, Math.min(MAX_CHARGE_GROUPS, me.data[11] | 0)), me.fx ??= {});
+    // (Part features' chips: the Tow Beam's while it tows)
     this.features.updateIndicators();
     this.damageFx?.update(dt);
     this.beamFx?.update(dt);

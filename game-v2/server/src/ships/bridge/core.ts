@@ -56,9 +56,7 @@ export interface ShipHost {
   hazardFlight?(eid: number, derived: ShipDerived, x: number, y: number): FlightConstants['hazard'];
   /** Mass of what's in a pilot's hold (ships/load.ts; station storage weighs nothing) */
   cargoMass?(eid: number): number;
-  /** The load of what a pilot's Tow Beam tows (ships/tow.ts towLoad; Towing.ts): carried as cargo */
-  towLoad?(eid: number): number;
-  /** Mass its part features add to a pilot's hold (ships/features/host.ts), carried as cargo like towLoad */
+  /** Mass its part features add to a pilot's hold (ships/features/host.ts: a Tow Beam's load), carried as cargo */
   featureCargo?(eid: number): number;
   /** A ship was rebuilt (ships/features: features re-check what depends on its parts) */
   shipRebuilt?(eid: number): void;

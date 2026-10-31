@@ -185,9 +185,11 @@ export function keyStats(catalog: Catalog, tuning: ShipTuning | undefined, fn: F
   if ((fn.range ?? 0) > 0 && !fn.weapon) out.push(`scan ${n0(fn.range!)} m`);
   if ((fn.jumpCapacity ?? 0) > 0) out.push(`jump ${n0(fn.jumpCapacity! * st.area)} cells`);
   if (st.dodge) out.push(`dodge ${st.dodge.force.toFixed(1)} push · every ${st.dodge.cooldown.toFixed(1)} s · ${n0(st.dodge.energy)} energy a burst`);
-  if (st.tow) out.push(`tows within ${n0(st.tow.range)} m`);
-  out.push(...chips(describeFn(catalog, tuning, fn.id, pc, material)));
-  if (st.draw && !st.supply) out.push(st.dodge ? `draws ${n0(st.draw)} bursting` : st.tow ? `draws ${n0(st.draw)} towing` : `draws ${n0(st.draw)}`);
+  // (What the part features it gives say: chips, and what its power draw applies to: a Tow Beam's "towing")
+  const facts = describeFn(catalog, tuning, fn.id, pc, material);
+  out.push(...chips(facts));
+  const drawWhen = facts.find((f) => f.drawWhen)?.drawWhen;
+  if (st.draw && !st.supply) out.push(st.dodge ? `draws ${n0(st.draw)} bursting` : drawWhen ? `draws ${n0(st.draw)} ${drawWhen}` : `draws ${n0(st.draw)}`);
   if (!out.length || (fn.category === 'shields' && !st.shield)) out.push(`${n0(st.hp)} hp · armour ${st.armour}`);
   return out.join(' · ');
 }

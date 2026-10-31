@@ -2,8 +2,8 @@
 
 A **part feature** is one behaviour a part gives a ship (a Tow Beam's tow, a Burst Strafer's dodge), declared once as a
 `PartFeature` object instead of special cases spread over `rebuild.ts`, `energy.ts`, `flight.ts` and the UI.
-Status: the seam exists and is wired; **no feature is converted yet** (`registry.ts` lists none), so every ship
-rebuilds, draws and flies exactly as before. Tow is CUT 4, Strafer CUT 6.
+Status: the seam exists and is wired; **the Tow Beam is the first feature converted** (`tow/`, Cut 4), the Strafer is
+CUT 6. Ships without a feature rebuild, draw and fly exactly as before.
 
 | File | What |
 |---|---|
@@ -23,7 +23,7 @@ rebuilds, draws and flies exactly as before. Tow is CUT 4, Strafer CUT 6.
   (bit = feature number) and `derived.fxList` (`Int8Array`, plan order). All three are **absent** when a ship has no
   feature, so ships without one are byte-for-byte what they were.
 - **load** (`energy.ts` `gunLoad`, per tick): each feature in `fxList` adds its draw to `out`. Must not allocate.
-- **describe** (`featureFacts(ctx)`): facts of the features a function gives. `describePart()` (common ships/describe.ts) wraps it with partStats; the client renders facts in `client/src/ships/describe/` (tipRows, chips, summaryFields, guideNumber). A feature adds facts; no old row is removed until its conversion (Cut 4).
+- **describe** (`featureFacts(ctx)`): facts of the features a function gives. `describePart()` (common ships/describe.ts) wraps it with partStats; the client renders facts in `client/src/ships/describe/` (tipRows, chips, summaryFields, guideNumber). A feature adds facts; the Tow Beam's replaced its old tooltip, card and compact-tooltip rows (a `Fact` may carry `dim`, `short`, `chip`, `drawWhen` presentation variants).
 - **flight signature** (`replica.ts`): a ship's features that have flight hooks are folded in (`|fx<mask>`).
 - **flight / inputs / replicate**: typed and compiled and validated (per-phase sorted arrays, unique keys and control
   bits, slots pinned in `features.wire.json`), **not called yet**: stepFlight's phases and the input tables are CUT 5.
@@ -31,7 +31,7 @@ rebuilds, draws and flies exactly as before. Tow is CUT 4, Strafer CUT 6.
 ## Rules
 
 - Feature number = position in `plan.features` sorted by `(order, id)`; at most 31 (`fxMask` is an int32).
-- rebuild/energy/replica import only `plan.ts` (and `types.ts` as types) and call `getPlan()` inside functions, never
+- rebuild/energy/replica import only `plan.ts` (partStats and the barrel may also import a feature's pure helper file, e.g. `tow/tow.ts`, never its `index.ts`) (and `types.ts` as types) and call `getPlan()` inside functions, never
   at module scope; a feature's folder may import them back, but must not use an imported value at its module scope.
 - No side-effect registration: a feature is `features/<id>/index.ts` exporting `feature`; then `npm run features:gen`.
 - A feature input with a control bit must use a bit already pinned to it in `features.wire.json`: the binary input
@@ -52,4 +52,4 @@ A feature's world side and UI side live next to the shared part, as plain folder
   `keybindings.ts` ACTIONS, `onKey`, `parsePilot` into `entity.fx`, `drawShip`, `indicator`). `ClientFeatures`
   (host.ts) is owned by ShipClient; ShipRenderer gets it for the draw loop.
 - `npm run features:gen` writes all three lists; `--check` (run by registry.test.ts) fails if any is stale.
-- Not yet used: `FeatureInstance.wire`/`status` (SnapshotBuilder still calls `towing.wireOf`; Cut 4 switches it).
+- `FeatureInstance.wire`/`status` feed SnapshotBuilder's pilot row and status row (the Tow Beam's `[8]`).

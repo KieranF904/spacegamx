@@ -42,7 +42,7 @@ export * from './wires.js';
 export * from './migrate.js';
 export * from './mounting.js';
 export * from './strafer.js';
-export * from './tow.js';
+export * from './features/tow/tow.js';
 export * from './load.js';
 export * from './flightInputs.js';
 export * from './features/index.js';

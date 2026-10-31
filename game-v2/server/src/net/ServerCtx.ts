@@ -16,7 +16,6 @@ import type { ShipBridge } from '../ships/ShipBridge.js';
 import type { Pilots } from '../game/Pilots.js';
 import type { Ammo } from '../game/Ammo.js';
 import type { Outpost } from '../game/Outpost.js';
-import type { Towing } from '../game/Towing.js';
 import type { StationServices } from '../game/StationServices.js';
 import type { Quests } from '../game/Quests.js';
 import type { People } from '../game/People.js';
@@ -77,7 +76,6 @@ export interface ServerCtx {
   readonly pilots: Pilots;
   readonly ammo: Ammo;
   readonly outpost?: Outpost;
-  readonly towing: Towing;
   readonly docking: Docking;
   readonly services: StationServices;
   readonly quests: Quests;

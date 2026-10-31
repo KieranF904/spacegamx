@@ -191,7 +191,7 @@ export interface FunctionDef {
    * the next. It draws its `demand` per cell a second while a burst runs, from the bank it touches first
    */
   strafe?: { kick: number; ticks: number; cooldown: number };
-  /** Tow Beam (ships/tow.ts): latches onto a wreck, debris or a pod and pulls it on a tether; draws its `demand` while towing */
+  /** Tow Beam (ships/features/tow/tow.ts): latches onto a wreck, debris or a pod and pulls it on a tether; draws its `demand` while towing */
   tow?: boolean;
   /** weapons: which weapon this is (data/ships/tuning.json weapons.<kind>) */
   weapon?: string;

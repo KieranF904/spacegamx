@@ -7,7 +7,7 @@
  * callback, the memory host and systemRows read them on hot paths, so those call sites stay as they were.
  */
 import { hasComponent, type IWorld } from 'bitecs';
-import { Player, hashString, isStructural, towTuning, type Bag, type DerelictData, type ClientSocket, type ServerMessage } from '@space-game/common';
+import { Player, hashString, isStructural, towTuning, type TowKind, type Bag, type DerelictData, type ClientSocket, type ServerMessage } from '@space-game/common';
 import type { Economy } from '@space-game/common';
 import type { GameData } from '../data/GameData.js';
 import type { ClientConnection } from '../net/ClientConnection.js';
@@ -17,7 +17,6 @@ import type { LootPods } from './LootPods.js';
 import type { Codex } from './Codex.js';
 import type { People } from './People.js';
 import type { SystemMemory } from './SystemMemory.js';
-import type { TowKind } from './Towing.js';
 
 /** A destroyed derelict is replaced after this long */
 const DERELICT_RESPAWN_TICKS = 60 * 60 * 5;
@@ -104,7 +103,7 @@ export class Derelicts {
     }
   }
 
-  // ---- Tow Beam (game/Towing.ts): towed into a station's reach, a wreck, debris or a pod is salvaged into the pilot's storage
+  // ---- Tow Beam (ships/features/tow/Towing.ts): towed into a station's reach, a wreck, debris or a pod is salvaged into the pilot's storage
   towDelivered(pilot: number, target: number, kind: TowKind): void {
     const pc = this.pilots.connOf(pilot);
     if (!pc) return;

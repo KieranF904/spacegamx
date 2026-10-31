@@ -2,12 +2,14 @@
  * ClientFeatures: the client features flattened once so the per-frame loops walk plain arrays (empty with no feature).
  * ShipClient owns one; ShipRenderer is handed its draw list.
  */
+import type { Container } from 'pixi.js';
 import type { ClientFeature, ClientFeatureHost, IndicatorDef, ShipDrawCtx } from './types';
 
 export class ClientFeatures {
   private readonly keyed: NonNullable<ClientFeature['onKey']>[] = [];
   private readonly parsers: NonNullable<ClientFeature['parsePilot']>[] = [];
   private readonly drawers: NonNullable<ClientFeature['drawShip']>[] = [];
+  private readonly frames: NonNullable<ClientFeature['beginFrame']>[] = [];
   private readonly chips: IndicatorDef[] = [];
 
   constructor(features: readonly ClientFeature[], private readonly host: ClientFeatureHost) {
@@ -18,6 +20,7 @@ export class ClientFeatures {
       if (f.onKey) this.keyed.push(f.onKey.bind(f));
       if (f.parsePilot) this.parsers.push(f.parsePilot.bind(f));
       if (f.drawShip) this.drawers.push(f.drawShip.bind(f));
+      if (f.beginFrame) this.frames.push(f.beginFrame.bind(f));
       if (f.indicator) this.chips.push(f.indicator);
     }
   }
@@ -36,8 +39,13 @@ export class ClientFeatures {
     for (let i = 0; i < this.parsers.length; i++) this.parsers[i](data, at, fx);
   }
 
+  /** Once a frame, before the ships are drawn */
+  beginFrame(shared: Container): void {
+    for (let i = 0; i < this.frames.length; i++) this.frames[i](shared, this.host);
+  }
+
   drawShip(ctx: ShipDrawCtx): void {
-    for (let i = 0; i < this.drawers.length; i++) this.drawers[i](ctx);
+    for (let i = 0; i < this.drawers.length; i++) this.drawers[i](ctx, this.host);
   }
 
   updateIndicators(): void {

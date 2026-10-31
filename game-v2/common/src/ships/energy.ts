@@ -203,9 +203,7 @@ export function gunLoad(ship: GunLoadShip, tick: number): number[] | undefined {
     if (f >= 0 && ship.cooldown[w.part] > 0) out[f] += L.draw[w.part];
   }
   if (tick < (ship.mineUntil ?? 0)) for (const m of ship.derived.miners) { const f = L.feedOf[m.part]; if (f >= 0) out[f] += L.draw[m.part]; }
-  // (A Tow Beam draws while it tows: tow.ts)
-  if (ship.tow !== undefined && ship.derived.tow) for (const i of ship.derived.tow.parts) { const f = L.feedOf[i]; if (f >= 0) out[f] += L.draw[i]; }
-  // (Part features that draw by the tick: features/, in plan order; none on a ship without them)
+  // (Part features that draw by the tick: features/, in plan order; none on a ship without them. A Tow Beam draws while it tows: features/tow)
   const fl = ship.derived.fxList;
   if (fl !== undefined) {
     const load = getPlan().load;

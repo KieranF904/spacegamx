@@ -371,7 +371,7 @@ Close behind: **Spool-up Bore / Spool-up Chainsaw** (stronger the longer it runs
 ## Implemented: Burst Strafer and Tow Beam (§5 #1, #8)
 
 *Built 2026-10-31, awaiting review, not deployed. Code: `common/src/ships/strafer.ts`, `tow.ts`,
-`server/src/game/Towing.ts`; docs/areas/ship-parts.md has the map.*
+`server/src/ships/features/tow/Towing.ts`; docs/areas/ship-parts.md has the map.*
 
 - *Superseded the same day by the rework below ("Burst Strafer rework"); kept as it was first built.*
 - **Burst Strafer** (`engine_burst_strafer`, engine, level 10, Mk I steel, 1×1, must point a facing edge out): no

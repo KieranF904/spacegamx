@@ -99,7 +99,7 @@ export function shipSummary(catalog: Catalog, tuning: ShipTuning, econ: Economy,
     turrets: d.weapons.filter((w) => w.mount === 'turret').length,
     miners: d.miners.length,
     dodge: d.strafe ? Math.round((bestDodge(d.strafe).force * d.strafe.ticks / Math.max(1, d.fullMass ?? d.mass)) * 60) : 0,
-    tow: d.tow?.power ?? 0,
+    tow: d.fx?.tow?.power ?? 0,
     rebuild,
   };
 }

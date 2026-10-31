@@ -5,7 +5,7 @@
  *
  * TYPE-ONLY imports here: the feature folders may import anything, this file must not make a cycle.
  */
-import type { ClientMessage, ShipState, Catalog } from '@space-game/common';
+import type { ClientMessage, ShipState, Catalog, PlacedGeom } from '@space-game/common';
 import type { Container } from 'pixi.js';
 import type { ActionDef } from '../../input/keybindings';
 import type { InterpolatedEntity } from '../../state/GameState';
@@ -35,6 +35,8 @@ export interface ShipDrawCtx {
   now: number;
   /** The layer over every ship's hull, shared by all ships (for effects drawn afresh each frame: add your own child once) */
   shared: Container;
+  /** A ship's parts, placed (the renderer's cached geometry) */
+  geometry(ship: ShipState): PlacedGeom[];
 }
 
 /** A HUD chip: updated once a frame (null state hides it) */
@@ -51,6 +53,8 @@ export interface ClientFeature {
   onKey?(code: string, host: ClientFeatureHost): boolean;
   /** Read this feature's values from the pilot's row (`data`, from `at` = its first pilotExtra index) into `fx` */
   parsePilot?(data: number[], at: number, fx: { [name: string]: number }): void;
-  drawShip?(ctx: ShipDrawCtx): void;
+  /** Once a frame before any ship is drawn (clear what drawShip adds to the shared layer) */
+  beginFrame?(shared: Container, host: ClientFeatureHost): void;
+  drawShip?(ctx: ShipDrawCtx, host: ClientFeatureHost): void;
   indicator?: IndicatorDef;
 }

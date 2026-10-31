@@ -186,10 +186,11 @@ export function partTipHtml(p: Pick<PlacedPart, 'fn' | 'material' | 'piece'> & P
       html += row('On this ship', way ? `pushes ${way}: it helps any dodge with some ${way} in it` : '<span style="color:#fbbf24">has no power: it does nothing</span>');
     }
   }
-  // Tow Beam (tow.ts)
-  if (st.tow) html += row('Tows', `wrecks, debris and pods within ${n0(st.tow.range)} m of your hull · snaps past ${n0(st.tow.snap)} m · into a station to salvage · <span style="color:#8ea0bd; font-weight:400">draws only while towing; never a working ship</span>`);
-  // What the part features it gives say (common ships/features describe)
-  for (const r of tipRows(dp.facts)) html += row(esc(r.label), r.warn ? `<span style="color:#fbbf24">${esc(r.text)}</span>` : esc(r.text));
+  // What the part features it gives say (common ships/features describe): a Tow Beam's Tows row
+  for (const r of tipRows(dp.facts)) {
+    const text = (r.warn ? `<span style="color:#fbbf24">${esc(r.text)}</span>` : esc(r.text)) + (r.dim ? ` · <span style="color:#8ea0bd; font-weight:400">${esc(r.dim)}</span>` : '');
+    html += row(esc(r.label), text);
+  }
   if ((fn.range ?? 0) > 0 && !fn.weapon) html += row('Scan range', `${n0(fn.range!)} m`);
   // Jump coils (and the core's own): cells of hull served, and how the ship's coils stand against its hull
   const coilCells = p.fn === 'core' ? jumpTuning(tuning).coreCapacity : (fn.jumpCapacity ?? 0) * st.area;

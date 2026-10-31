@@ -117,7 +117,7 @@ describe('Tow Beam in the server', () => {
     expect(ships.towable(wreck)?.kind).toBe('wreck');
     t.send({ type: 'tow', on: true } as any);
     run(1);
-    expect((server as any).towing.targetOf(pid)).toBe(wreck);
+    expect((server as any).features.get('tow').targetOf(pid)).toBe(wreck);
     expect(ships.get(pid)!.tow).toBe(wreck);
     // Fly away to the right: the wreck comes after
     const x0 = Position.x[wreck];
@@ -129,7 +129,7 @@ describe('Tow Beam in the server', () => {
     // Let go: the load's gone, it coasts
     t.send({ type: 'tow', on: false } as any);
     run(2);
-    expect((server as any).towing.targetOf(pid)).toBeUndefined();
+    expect((server as any).features.get('tow').targetOf(pid)).toBeUndefined();
     expect(ships.get(pid)!.tow).toBeUndefined();
     expect(ships.get(pid)!.cargo ?? 0).toBe(0);
   });
@@ -158,14 +158,14 @@ describe('Tow Beam in the server', () => {
     expect(ships.has(wreck)).toBe(false);
     expect(storage()).toBeGreaterThan(before);
     expect(server.pilots.get(conn)!.stats.salvaged ?? 0).toBe(salvaged + 1);
-    expect((server as any).towing.targetOf(pid)).toBeUndefined();
+    expect((server as any).features.get('tow').targetOf(pid)).toBeUndefined();
   });
 
   it('never takes hold of a working ship, and nothing out of reach', () => {
     const { t, pid, got, run, ships, server } = withWreck(3000);
     t.send({ type: 'tow', on: true } as any);
     run(1);
-    expect((server as any).towing.targetOf(pid)).toBeUndefined();
+    expect((server as any).features.get('tow').targetOf(pid)).toBeUndefined();
     expect(got.some((m) => m.type === 'systemMessage' && /Nothing to tow/.test((m as any).text))).toBe(true);
     // The pilot's own ship, or any pilot's, isn't towable
     expect(ships.towable(pid)).toBeNull();

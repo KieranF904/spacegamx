@@ -18,7 +18,7 @@ import { HullWorker } from './hullWorkerClient';
 import { fromWire, type HullJob } from './hullWire';
 import { buildHull, skeletonCovered, type HullBuild } from './hullBuild';
 import { beam } from '../rendering/fxTextures';
-import { EntityType, ShipState, SIDE_NORMAL, Side, facingEdges, isOpen, isWeaponFn, wireCells, cellKey, type Blueprint, dodgePhase, dodgeVec, pilotExtras } from '@space-game/common';
+import { EntityType, ShipState, SIDE_NORMAL, Side, facingEdges, isOpen, isWeaponFn, wireCells, cellKey, type Blueprint, dodgePhase, dodgeVec } from '@space-game/common';
 import type { ShipSource } from './ShipStore';
 import type { GameState } from '../state/GameState';
 import type { Renderer } from '../rendering/Renderer';
@@ -341,6 +341,7 @@ export class ShipRenderer {
   private wireLayer = new Container();
   /** The one ctx every feature draw gets (fields reset per ship: no allocation per frame) */
   private featureCtx = {} as ShipDrawCtx;
+  private geometryOf = (ship: ShipState) => this.bridge.geometry(ship);
   private wireGlowLayer = new Container();
   private lights = (L: Lighting) => this.collectLights(L);
   private destroyed = false;
@@ -496,9 +497,8 @@ export class ShipRenderer {
     this.lastFrame = now;
     this.engines.beginFrame(dt);
     this.hulls.begin();
-    // (Tow Beams' tethers: all of them in one graphics, drawn afresh each frame: drawTether)
-    if (!this.tethers) { this.tethers = new Graphics(); this.layer.addChild(this.tethers); }
-    this.tethers.clear();
+    // (Part features' once-a-frame setup: a Tow Beam's tethers are one graphics, cleared here and drawn afresh by each ship's draw)
+    this.features?.beginFrame(this.layer);
 
     for (const [eid, ship] of this.bridge.bodies) {
       const entity = this.state.entities.get(eid);
@@ -568,10 +568,9 @@ export class ShipRenderer {
       this.drawWires(view, ship, cs, now, entity.type === EntityType.ShipBody && (hostile || entity.data?.[0] === 2));
       this.updateLamps(view, ship, entity, dt);
       this.drawDodge(view, ship, entity.dodge, entity.dodgeDir, cs, now);
-      this.drawTether(eid, entity, ship, cs, now);
       if (this.features?.hasDrawers) {
         const fc = this.featureCtx;
-        fc.eid = eid; fc.ship = ship; fc.entity = entity; fc.container = view.container; fc.cs = cs; fc.now = now; fc.shared = this.overLayer;
+        fc.eid = eid; fc.ship = ship; fc.entity = entity; fc.container = view.container; fc.cs = cs; fc.now = now; fc.shared = this.layer; fc.geometry = this.geometryOf;
         this.features.drawShip(fc);
       }
       // Quick: most of the flash gone in ~6 frames
@@ -967,9 +966,7 @@ export class ShipRenderer {
    * hull is in the way. Each barrel is drawn once, in white, and only turned
    * and tinted per frame.
    */
-  // ---- Burst Strafer and Tow Beam (common/src/ships/strafer.ts, tow.ts)
-  private tethers?: Graphics;
-
+  // ---- Burst Strafer (common/src/ships/strafer.ts)
   /**
    * A Burst Strafer's burst: from each strafer firing (those pushing the dodge's way, each by how much of its push goes
    * that way), a hot pink-white jet out of its nozzle (long at first, shrinking as the burst runs out) with a flash at
@@ -1014,42 +1011,7 @@ export class ShipRenderer {
     }
   }
 
-  /**
-   * A Tow Beam's tether (game/Towing.ts): an amber line from the beam's mouth to what it tows, a little slack in it,
-   * with pulses running along it towards the ship. The pilot's own comes from its snapshot row (strafer.ts
-   * pilotExtras), everyone else's from their status row (data[8]).
-   */
-  private drawTether(eid: number, entity: { renderX: number; renderY: number; renderAngle: number; data?: number[]; status?: number[] }, ship: ShipState, cs: number, now: number): void {
-    const w = eid === this.state.playerId ? pilotExtras(entity.data).tow : (entity.status?.[8] ?? 0);
-    if (!(w > 0) || !ship.derived.tow || !this.tethers) return;
-    const t = this.state.entities.get(w - 1);
-    if (!t) return;
-    // From the beam's mouth (its first emitter), in the world
-    const geoms = this.bridge.geometry(ship);
-    const part = ship.derived.tow.parts[0];
-    const nz = part !== undefined && geoms[part] ? decorOf(geoms[part]).nozzles[0] : undefined;
-    const [cx, cy] = ship.derived.com;
-    const geomAt = part !== undefined && geoms[part] ? geoms[part]!.centroid : ship.derived.com;
-    const lx = ((nz?.at[0] ?? geomAt[0]) - cx) * cs, ly = ((nz?.at[1] ?? geomAt[1]) - cy) * cs;
-    const a = entity.renderAngle + Math.PI / 2, c = Math.cos(a), s = Math.sin(a);
-    const x0 = entity.renderX + lx * c - ly * s, y0 = entity.renderY + lx * s + ly * c;
-    const x1 = t.renderX, y1 = t.renderY;
-    const dx = x1 - x0, dy = y1 - y0, d = Math.hypot(dx, dy);
-    if (d < 1) return;
-    // A little sag (perpendicular), less the more it's stretched
-    const sag = Math.max(0, 40 - d * 0.04), mx = (x0 + x1) / 2 - (dy / d) * sag, my = (y0 + y1) / 2 + (dx / d) * sag;
-    const g = this.tethers;
-    g.moveTo(x0, y0).quadraticCurveTo(mx, my, x1, y1).stroke({ width: cs * 0.22, color: 0xfacc15, alpha: 0.18 });
-    g.moveTo(x0, y0).quadraticCurveTo(mx, my, x1, y1).stroke({ width: cs * 0.07, color: 0xfde68a, alpha: 0.85 });
-    // Pulses running in towards the ship
-    for (let i = 0; i < 3; i++) {
-      const u = 1 - (((now / 700) + i / 3) % 1);
-      const px = (1 - u) * (1 - u) * x0 + 2 * (1 - u) * u * mx + u * u * x1, py = (1 - u) * (1 - u) * y0 + 2 * (1 - u) * u * my + u * u * y1;
-      g.circle(px, py, cs * 0.14).fill({ color: 0xfff7cc, alpha: 0.8 });
-    }
-    g.circle(x1, y1, cs * 0.3).stroke({ width: cs * 0.06, color: 0xfacc15, alpha: 0.6 });
-  }
-  // ---- (end Burst Strafer and Tow Beam)
+  // ---- (end Burst Strafer)
 
   private drawTurrets(view: BodyView, ship: ShipState, cs: number, frames: number): void {
     // (too small on screen to see a gun: none drawn, nor turned)

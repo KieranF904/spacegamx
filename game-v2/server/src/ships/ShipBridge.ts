@@ -522,7 +522,7 @@ export class ShipBridge {
   /** For the pilot's snapshot: 1 = in a star's charging ring, 2 = in a lodestone's field (bits), and the priming left */
   jumpFieldState(eid: number): { flags: number; prime: number } { return sync.jumpFieldState(this.ctx, eid); }
 
-  // ---- Tow Beam (Towing.ts; common/src/ships/tow.ts)
+  // ---- Tow Beam (ships/features/tow/Towing.ts; common/src/ships/features/tow/tow.ts)
   /** What a Tow Beam can take hold of: debris you can touch, or a derelict wreck (never a working ship); null otherwise */
   towable(eid: number): { kind: 'wreck' | 'debris'; mass: number; radius: number } | null { return sync.towable(this.ctx, eid); }
   /** Towable bodies in a system within `r` of (x, y) */

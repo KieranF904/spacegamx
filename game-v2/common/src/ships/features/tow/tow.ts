@@ -4,7 +4,7 @@
  *
  * - The tether is a spring with a slack length: inside it nothing pulls; past it the towed thing is drawn towards
  *   the ship, damped, harder the further it stretches, and the heavier it is the less it answers (refMass). Past
- *   `snap` the tether breaks. The server moves the towed thing (server/src/game/Towing.ts); it's never predicted.
+ *   `snap` the tether breaks. The server moves the towed thing (server/src/ships/features/tow/Towing.ts); it's never predicted.
  * - The ship feels the load: what it tows counts as cargo (load.ts), `loadShare` of its mass, so it pushes, turns
  *   and stops slower. That rides the flight body's cargo mass, so the pilot's prediction and every replica fly it.
  * - It draws its `demand` while towing, on its circuit like a gun (energy.ts gunLoad); short of power the pull
@@ -14,7 +14,7 @@
  *   salvageParts × `salvage`), and a pod's contents go to storage too.
  */
 
-import type { ShipTuning } from './tuning.js';
+import type { ShipTuning } from '../../tuning.js';
 
 export interface TowTuning {
   /** How far from the hull's edge the beam takes hold (world units) */
@@ -66,9 +66,20 @@ export function towTuning(t: ShipTuning): TowTuning {
   return a;
 }
 
+/** What a rebuild derives for a ship's Tow Beams (`derived.fx.tow`): the best one's satisfaction (it takes hold from MIN_TOW_POWER), and every powered one (they draw while towing) */
+export interface TowInfo { power: number; parts: number[] }
+
+// (Declared here, not in index.ts, so everything that imports tow.ts (the barrel) sees `derived.fx.tow`)
+declare module '../types.js' {
+  interface FeatureDerived { tow?: TowInfo }
+}
+
+/** What a Tow Beam can take hold of */
+export type TowKind = 'wreck' | 'debris' | 'pod';
+
 /** Can this ship tow (a powered Tow Beam) */
-export function canTow(d: { tow?: { power: number } }): boolean {
-  return (d.tow?.power ?? 0) >= MIN_TOW_POWER;
+export function canTow(d: { fx?: { tow?: { power: number } } }): boolean {
+  return (d.fx?.tow?.power ?? 0) >= MIN_TOW_POWER;
 }
 
 /** The load a ship carries towing this mass (load.ts cargo), for its own mass */

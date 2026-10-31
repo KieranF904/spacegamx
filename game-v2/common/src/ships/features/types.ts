@@ -106,6 +106,12 @@ export interface Fact {
   tier: 'headline' | 'stat' | 'detail' | 'warning';
   when?: 'always' | 'working';
   sentence?: string;
+  /** Presentation variants a feature may author (UI only): a quieter closing clause after the sentence in a full tooltip, the text in a compact tooltip, the text as a card chip */
+  dim?: string;
+  short?: string;
+  chip?: string;
+  /** What this part's power draw applies to ('towing': a card says "draws 24 towing" instead of "draws 24") */
+  drawWhen?: string;
 }
 
 /** A part for describe(): its function, and its material when placed */

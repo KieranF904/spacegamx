@@ -17,7 +17,7 @@ import { pointDefenceOf } from './support.js';
 import { effectiveRange } from './pulse.js';
 import type { WeaponMods } from './types.js';
 import { baseWeaponDps } from './rating.js';
-import { towTuning, DEFAULT_TOW } from './tow.js';
+import { towTuning, DEFAULT_TOW } from './features/tow/tow.js';
 import { partArmour, weaponHit, DAMAGE_TYPES, type DamageType } from './damage.js';
 
 export interface PartStats {
@@ -52,7 +52,7 @@ export interface PartStats {
   cargo?: number;
   /** Burst Strafer (strafer.ts): its push away from its nozzle while a burst runs (force), the burst's seconds, the seconds from one burst to the next, and the energy a burst (pushing straight out) */
   dodge?: { force: number; secs: number; cooldown: number; energy: number };
-  /** Tow Beam (tow.ts): how far past the hull it takes hold, and how far it stretches before it snaps */
+  /** Tow Beam (features/tow/tow.ts): how far past the hull it takes hold, and how far it stretches before it snaps. No text reads it any more (the tow feature's describe says it: features/tow/index.ts); kept because the golden raw partStats snapshot pins it */
   tow?: { range: number; snap: number };
   /** Towards the ship's rating */
   firepower: number;

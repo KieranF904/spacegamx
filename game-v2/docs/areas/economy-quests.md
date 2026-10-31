@@ -20,7 +20,7 @@ Everything a pilot owns and earns: the item catalogue and recipes, cargo/storage
 | server/src/game/Pilots.ts | 1127 | sessions and profile life: login/detach, autosave (30 s), `give/take`, cargo capacity/mass, credits/XP, `onDestroyed` (death, wreck, secure hold), repair/rebuild payments, `sendProfile/sendItems` |
 | server/src/game/Quests.ts | 902 | board, accept/abandon, step tracking (`onKill`, `tick`, `onLogin`), rewards, reveals, rumours, operation steps, `send` (quest views) |
 | server/src/game/StationServices.ts, Hangar.ts, Market.ts, Trade.ts, Outpost.ts, People.ts, Codex.ts, Achievements.ts, Operations.ts | 488/777/133/160/79/453/156/222/844 | refine/craft/sell (services), hangar build orders (`fabOrders`), vendors+market scan, pilot-to-pilot trade, outpost charter/upgrade, conversations, records, ribbons+rankings, out-in-space jobs |
-| server/src/game/LootPods.ts, Towing.ts, Support.ts | 231/158/59 | loot pods (`spawn/take/near`, drift), Tow Beam, support credit ledger |
+| server/src/game/LootPods.ts, Towing.ts, Support.ts | 231/158/59 | loot pods (`spawn/take/near`, drift), Tow Beam (now ships/features/tow/Towing.ts), support credit ledger |
 | client/src/econ/clientEcon.ts; ui/StationWindow.ts, TradeWindow.ts, QuestUI.ts, InventoryWindow.ts, RibbonPopup.ts | | client view of the same data; windows |
 
 ## Public interface

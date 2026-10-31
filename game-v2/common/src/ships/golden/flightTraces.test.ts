@@ -20,7 +20,7 @@ import { stepShipPhysics } from '../physics.js';
 import { pilotJumpStep, NO_FIELDS } from '../jumpFields.js';
 import { FULL_CHARGE, gunLoad, chargeTotal, type Charge } from '../energy.js';
 import { quantizeCargo } from '../load.js';
-import { towLoad, towTuning } from '../tow.js';
+import { towLoad, towTuning } from '../features/tow/tow.js';
 import { ReplicaMode } from '../replica.js';
 import { replicaAngle, quantizeReplicaAngle } from '../../network/replication.js';
 import { quantizeCursorDist, CURSOR_DIST_STEP } from '../../network/protocol.js';

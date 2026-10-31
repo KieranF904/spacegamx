@@ -105,7 +105,7 @@ export class LootPods {
     return this.contents.get(eid);
   }
 
-  // ---- Tow Beam (Towing.ts)
+  // ---- Tow Beam (ships/features/tow/Towing.ts)
   /** Pods in a system within `r` of (x, y) */
   near(systemNum: number, x: number, y: number, r: number): number[] {
     const out: number[] = [];

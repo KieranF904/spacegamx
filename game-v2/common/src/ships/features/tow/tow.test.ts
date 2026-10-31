@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { parseBlueprint } from './blueprint.js';
-import { createShipState } from './state.js';
-import { readShipJson, testCatalog, SHIP_DATA_DIR } from './testData.js';
-import type { ShipTuning } from './tuning.js';
+import { parseBlueprint } from '../../blueprint.js';
+import { createShipState } from '../../state.js';
+import { readShipJson, testCatalog, SHIP_DATA_DIR } from '../../testData.js';
+import type { ShipTuning } from '../../tuning.js';
 import { DEFAULT_TOW, canTow, towAnswer, towLoad, towPull, towTuning } from './tow.js';
-import { gunLoad } from './energy.js';
+import { gunLoad } from '../../energy.js';
 
 const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
@@ -29,14 +29,14 @@ describe('Tow Beam: the part', () => {
     expect(fn.demand).toBeGreaterThan(0);
     expect(canTow(sparrow().derived)).toBe(false);
     const d = sparrow([TOW_PART]).derived;
-    expect(d.tow!.parts.length).toBe(1);
+    expect(d.fx!.tow!.parts.length).toBe(1);
     expect(canTow(d)).toBe(true);
     expect(towTuning(tuning).range).toBeGreaterThan(0);
   });
 
   it('draws only while it tows (on its circuit, as a gun does)', () => {
     const ship = sparrow([TOW_PART]);
-    const part = ship.derived.tow!.parts[0];
+    const part = ship.derived.fx!.tow!.parts[0];
     const f = ship.derived.power!.feedOf[part];
     expect(f).toBeGreaterThanOrEqual(0);
     const idle = gunLoad(ship, 0) ?? [];

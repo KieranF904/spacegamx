@@ -33,11 +33,12 @@ declare module './types.js' {
   interface FeatureDerived { towProbe?: { power: number; parts: number[] } }
 }
 
-/** A stand-in that re-derives the Tow Beam's `derived.tow` and load through the seam (the real conversion is CUT 4) */
+/** A stand-in that re-derives the Tow Beam's `derived.fx.tow` and load through the seam (the real Tow feature is tow/) */
 const towProbe = feature({
   id: 'towProbe',
   order: 10,
   applies: (fn) => !!fn.tow,
+  burst: true,
   derive(c) {
     for (const i of c.parts) {
       if (c.satisfaction[i] <= 0) continue;
@@ -135,19 +136,20 @@ describe('part features: the seam (rebuild, energy, describe, flight signature)'
   });
 
   it('a feature derives its own fx, in plan order, and nothing else changes', () => {
-    setPlanForTests(compilePlan([]));
     const before = sparrow([TOW_PART]).derived, plain = sparrow().derived;
     setPlanForTests(compilePlan([towProbe]));
     const d = sparrow([TOW_PART]).derived;
-    expect(d.fx!.towProbe).toEqual(before.tow);
+    expect(d.fx!.towProbe).toEqual(before.fx!.tow);
     expect(d.fxMask).toBe(1);
     expect([...d.fxList!]).toEqual([0]);
-    expect(strip(d)).toEqual(before);
+    expect(strip(d)).toEqual(strip(before));
     expect(flightSignature(d)).toBe(flightSignature(before));
     // (A ship without the part doesn't have it)
     const p = sparrow().derived;
     expect('fx' in p).toBe(false);
     expect(p).toEqual(plain);
+    // (The real Tow feature gives the same thing under its own key)
+    expect(before.fxMask).toBe(1);
   });
 
   it('load(): a feature draws by the tick through gunLoad, only when it says so', () => {
@@ -198,13 +200,15 @@ describe('part features: import rules (no cycles through the registry)', () => {
     expect(imports(join(__dirname, 'types.ts')).filter((i) => !i.type)).toEqual([]);
   });
 
-  it('outside features/, ships code reaches features only through plan.ts (values) or types.ts (types); the barrel excepted', () => {
+  it('outside features/, ships code reaches features only through plan.ts (values), types.ts (types) or its own pure helper file (tow/tow.ts); the barrel excepted', () => {
     const bad: string[] = [];
     for (const name of readdirSync(SHIPS)) {
       if (!name.endsWith('.ts') || name.endsWith('.test.ts') || name === 'index.ts') continue;
       for (const i of imports(join(SHIPS, name))) {
         if (!i.from.startsWith('./features/')) continue;
         if (i.from === './features/plan.js' || (i.type && i.from === './features/types.js')) continue;
+        // (A feature's own pure helper file, e.g. features/tow/tow.ts: it imports nothing that leads back to the registry)
+        if (/^\.\/features\/\w+\/(?!index)[\w.]+$/.test(i.from)) continue;
         bad.push(`${name}: ${i.from}`);
       }
     }

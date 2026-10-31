@@ -1,6 +1,6 @@
 /**
  * The server feature host (host.ts): flattening, order, refusals, and that the generated list is empty-safe.
- * Stand-in features only: nothing is registered, so the game itself behaves as before.
+ * Stand-in features only (the Tow Beam is the one registered feature).
  */
 import { describe, it, expect } from 'vitest';
 import { ServerFeatures } from './host.js';
@@ -17,7 +17,7 @@ describe('ServerFeatures', () => {
     expect(f.wire(1, [])).toBe(0);
     expect(f.status('tow', 1)).toBe(0);
     expect(f.messages.size).toBe(0);
-    expect(SERVER_FEATURES.length).toBe(0);
+    expect(SERVER_FEATURES.map((s) => s.id)).toEqual(['tow']);
   });
 
   it('runs hooks in id order, sums cargo, concatenates wire values', () => {

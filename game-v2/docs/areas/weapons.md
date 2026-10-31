@@ -15,7 +15,7 @@ How a gun turns into shells, beams and pulses, and what those do to ships. The f
 | common/src/ecs/components.ts | ~L359 | `WEAPON_KIND_TYPE` kind -> snapshot `WeaponType` number (client style lookup) |
 | server/src/game/Weapons.ts | 300 | `Weapons`: `spawn` (one shot + burst), per-tick homing/pull/fuse, `onShipHit/onMobHit/onWallHit/onExpire`, `chain`, `shatter`, `detonate`, `threats`, `intercept` |
 | server/src/game/Ammo.ts | 207 | `Ammo`: crates, rounds, dry-fire at `dry` share |
-| server/src/game/Support.ts, Towing.ts | 59, 158 | support credit window (`SUPPORT_WINDOW_TICKS`); Tow Beam latch (maths in common tow.ts, flight/ship-parts) |
+| server/src/game/Support.ts | 59 | support credit window (`SUPPORT_WINDOW_TICKS`); the Tow Beam is a part feature now (`ships/features/tow`, see flight) |
 | server/src/ships/ShipBridge.ts | 540 | the bridge facade: fields and one-line delegators (the per-tick loop and contacts are in bridge/flight.ts) |
 | server/src/ships/bridge/damage.ts, weapons.ts | 461 / 522 | the combat slices below (ShipBridge delegates to them) |
 | client/src/rendering/weapons/{WeaponFx,weaponStyles}.ts | 496, 242 | all projectile visuals; `WEAPON_STYLES[weaponType]`, `weaponStyle(type, grade)`; predicted own shells (`PredictedShell`) |

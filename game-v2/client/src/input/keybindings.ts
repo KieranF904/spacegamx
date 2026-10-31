@@ -18,6 +18,8 @@ export interface ActionDef {
   hint?: string;
   /** Mouse buttons, wheel, Esc and Enter are fixed */
   rebindable?: false;
+  /** A part feature's action: listed right after this one (default: at the end) */
+  after?: string;
 }
 
 export const ACTIONS: ActionDef[] = [
@@ -31,7 +33,6 @@ export const ACTIONS: ActionDef[] = [
   { id: 'jump', label: 'Jump drive', category: 'Flight', key: 'KeyJ', hint: 'Jumps to your cursor (or the station, gate or marker you point at), within range' },
   { id: 'helm', label: 'Switch mouse-steer / helm', category: 'Flight', key: 'KeyV' },
   { id: 'dodge', label: 'Dodge (Burst Strafer)', category: 'Flight', key: 'Space', hint: 'One hard burst a press, the way you are steering (WASD, diagonals too; forward, back and Q/E at the helm), with whichever strafers push that way; with nothing held, back the other way from last time. Ready again in under half a second; every burst costs a lot of energy' },
-  { id: 'tow', label: 'Tow / let go (Tow Beam)', category: 'Ship & world', key: 'KeyU', hint: 'Takes hold of the wreck, debris or pod nearest your cursor within reach; tow it into a station to salvage it' },
   { id: 'aim', label: 'Aim / steer', category: 'Flight', key: 'Mouse', rebindable: false },
   { id: 'fire', label: 'Fire', category: 'Combat', key: 'Mouse0', alt: 'Mouse2', rebindable: false },
   { id: 'targetNext', label: 'Target the next hostile', category: 'Combat', key: 'Tab', hint: 'Nearest first. Missiles lock on to your target' },
@@ -61,10 +62,11 @@ export const ACTIONS: ActionDef[] = [
   { id: 'zoom', label: 'Zoom', category: 'Interface', key: 'Wheel', rebindable: false },
   { id: 'resetZoom', label: 'Reset zoom', category: 'Interface', key: 'Home' },
 ];
-// Part features' key bindings (ships/features: none registered yet), after the core ones so the order is stable
+// Part features' key bindings (ships/features: the Tow Beam's), after the core ones so the order is stable
 for (const f of CLIENT_FEATURES) for (const a of f.actions ?? []) {
   if (ACTIONS.some((x) => x.id === a.id)) throw new Error(`client feature ${f.id}: action ${a.id} already exists`);
-  ACTIONS.push(a);
+  const at = a.after ? ACTIONS.findIndex((x) => x.id === a.after) : -1;
+  if (at >= 0) ACTIONS.splice(at + 1, 0, a); else ACTIONS.push(a);
 }
 
 /** Keys that can't be bound to an action (they'd fight the browser or the menu). */

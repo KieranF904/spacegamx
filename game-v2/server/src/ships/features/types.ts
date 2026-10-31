@@ -6,7 +6,7 @@
  * TYPE-ONLY imports: GameServer builds the host, features only name types.
  */
 import type { IWorld } from 'bitecs';
-import type { ShipTuning } from '@space-game/common';
+import type { ShipTuning, TowKind } from '@space-game/common';
 import type { ShipBridge } from '../ShipBridge.js';
 import type { LootPods } from '../../game/LootPods.js';
 
@@ -27,6 +27,8 @@ export interface FeatureHost {
   stationInRange(pilot: number): number;
   /** Berthed at a station */
   isDocked(pilot: number): boolean;
+  /** Towed into a station's reach: salvage it for the pilot (and take it away): the Tow Beam's */
+  deliver(pilot: number, target: number, kind: TowKind): void;
 }
 
 /** One message handler: the pilot's entity and the message (already past the drops and limits of net/dispatch.ts) */

@@ -33,7 +33,7 @@ import type { Surfaces } from '../game/Surfaces.js';
 import type { Replication } from './Replication.js';
 import type { Mobs } from '../game/Mobs.js';
 import type { LootPods } from '../game/LootPods.js';
-import type { Towing } from '../game/Towing.js';
+import type { ServerFeatures } from '../ships/features/host.js';
 import { stationQuery } from '../game/Docking.js';
 import { portalQuery } from './handlers/flight.js';
 import { SELF_SAFETY_TICKS, SNAP_PROJECTILE_RANGE, SNAP_POD_RANGE, SHIP_VIEW_IN, SHIP_VIEW_OUT, MAP_DOTS_TICKS } from './snapshot/constants.js';
@@ -119,7 +119,7 @@ export interface SnapshotHost {
   readonly replication: Replication;
   readonly mobs: Mobs;
   readonly pods: LootPods;
-  readonly towing: Towing;
+  readonly features: ServerFeatures;
   /** People's craft (out of every fight) and wards (on the pilots' side), by name: a ship row's side */
   readonly personCraft: ReadonlyMap<number, string>;
   readonly wards: ReadonlyMap<number, string>;
@@ -153,7 +153,9 @@ export class SnapshotBuilder {
   private readonly replication: Replication;
   private readonly mobs: Mobs;
   private readonly pods: LootPods;
-  private readonly towing: Towing;
+  private readonly features: ServerFeatures;
+  /** Scratch for the part features' pilot-row values (spread at once) */
+  private readonly fxRow: number[] = [];
   private readonly personCraft: ReadonlyMap<number, string>;
   private readonly wards: ReadonlyMap<number, string>;
   private readonly lingering: ReadonlyMap<number, { conn: ClientConnection; until: number }>;
@@ -184,7 +186,7 @@ export class SnapshotBuilder {
     this.replication = host.replication;
     this.mobs = host.mobs;
     this.pods = host.pods;
-    this.towing = host.towing;
+    this.features = host.features;
     this.personCraft = host.personCraft;
     this.wards = host.wards;
     this.lingering = host.lingering;
@@ -205,6 +207,14 @@ export class SnapshotBuilder {
    */
   /** Each ship's part HP as sent (to a tenth), worked out once a snapshot, and the snapshot it last changed at */
   private hpWire = new Map<number, { ship: ShipState; at: number; since: number; hp: number[] }>();
+  /** The part features' values for the pilot's own row (fills the scratch array; spread it at once) */
+  private fxWire(eid: number): number[] {
+    const out = this.fxRow;
+    out.length = 0;
+    this.features.wire(eid, out, 0);
+    return out;
+  }
+
   private hpWireOf(id: number, ship: ShipState): { since: number; hp: number[] } {
     const e = this.hpWire.get(id);
     if (e && e.at === this.snapshotCount && e.ship === ship) return e;
@@ -345,8 +355,8 @@ export class SnapshotBuilder {
           warmthPercent(this.ships.warmthOf(eid)), // warmth % (common/src/ships/warmth.ts: the frost vignette, and the stage prediction flies and fires with)
           ship?.cargo ?? 0,                      // [14] the hold's cargo mass (common/src/ships/load.ts: prediction flies it)
           ...charge.groups,                      // [15...] each store group's charge % (CHARGE_GROUPS_AT)
-          // After the groups (common/src/ships/strafer.ts pilotExtras): the Burst Strafer's dodge counter and way, what the Tow Beam tows (+1)
-          ship?.dodge ?? 0, ship?.dodgeDir ?? 0, this.towing.wireOf(eid),
+          // After the groups (common/src/ships/strafer.ts pilotExtras): the Burst Strafer's dodge counter and way, what the Tow Beam tows (+1: ships/features/tow, in features.wire.json pilotExtra order)
+          ship?.dodge ?? 0, ship?.dodgeDir ?? 0, ...this.fxWire(eid),
         ],
       }, 'player', names.get(eid));
       // Everyone else: status only (motion is replicated). data: [shield %, EMP'd, beam heat (tenths), overheated,
@@ -355,8 +365,8 @@ export class SnapshotBuilder {
         id: eid, type: EntityType.Player, x: row.state.x, y: row.state.y, hp: row.state.hp, maxHp: row.state.maxHp,
         data: [Math.round(this.ships.shieldFraction(eid) * 20) * 5, this.ships.isEmped(eid) ? 1 : 0, Math.round(heat.heat * 10), heat.over ? 1 : 0,
           Math.round(beam.hit * 10), this.ships.weaponBeamState(eid).on ? 1 : 0, beam.on ? 1 : 0, Math.round(Input.cursorDist[eid] / 100),
-          // [8] what its Tow Beam tows (entity id + 1, 0 none: game/Towing.ts)
-          this.towing.wireOf(eid)],
+          // [8] what its Tow Beam tows (entity id + 1, 0 none: ships/features/tow, features.wire.json status)
+          this.features.status('tow', eid)],
       };
       row.other = { state: status, key: this.internKey(-1 - eid, `${status.hp},${status.maxHp},${status.data!.join(',')}`) };
     }

@@ -3,14 +3,16 @@
 import type { Fact } from '@space-game/common';
 import { factValue } from './render';
 
-export interface TipRow { label: string; text: string; warn: boolean }
+export interface TipRow { label: string; text: string; warn: boolean; /** A quieter closing clause (full tooltips only) */ dim?: string }
 
 /** Every tier shows in a full tooltip; `compact` (the small item tooltip) drops 'detail' */
 export function tipRows(facts: readonly Fact[], compact = false): TipRow[] {
   const out: TipRow[] = [];
   for (const f of facts) {
     if (compact && f.tier === 'detail') continue;
-    out.push({ label: f.label, text: f.sentence ?? factValue(f), warn: f.tier === 'warning' });
+    const row: TipRow = { label: f.label, text: (compact ? f.short : undefined) ?? f.sentence ?? factValue(f), warn: f.tier === 'warning' };
+    if (f.dim && !compact) row.dim = f.dim;
+    out.push(row);
   }
   return out;
 }

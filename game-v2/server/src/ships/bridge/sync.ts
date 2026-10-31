@@ -87,7 +87,7 @@ export function jumpFieldState(b: BridgeCtx, eid: number): { flags: number; prim
   return { flags: (f.ring ? 1 : 0) | (f.lodestone ? 2 : 0), prime: b.bodies.get(eid)?.jumpPrime ?? 0 };
 }
 
-// ---- Tow Beam (Towing.ts; common/src/ships/tow.ts)
+// ---- Tow Beam (ships/features/tow/Towing.ts; common/src/ships/features/tow/tow.ts)
 /** What a Tow Beam can take hold of: debris you can touch, or a derelict wreck (never a working ship); null otherwise */
 export function towable(b: BridgeCtx, eid: number): { kind: 'wreck' | 'debris'; mass: number; radius: number } | null {
   const ship = b.bodies.get(eid);

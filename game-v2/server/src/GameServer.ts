@@ -129,7 +129,6 @@ import { Warmth } from './game/Warmth.js';
 import { Outpost } from './game/Outpost.js';
 import { HomeStations } from './game/HomeStations.js';
 import { LootPods, PodHost } from './game/LootPods.js';
-import { Towing } from './game/Towing.js';
 import { ServerFeatures } from './ships/features/host.js';
 import { SERVER_FEATURES } from './ships/features/index.js';
 import { Mining, MiningHost } from './game/Mining.js';
@@ -585,8 +584,6 @@ export class GameServer implements ServerCtx {
   /** Each player's progress: profile, cargo, storage, saving */
   readonly pilots: Pilots;
   private pods: LootPods;
-  /** Tow Beams (game/Towing.ts) */
-  towing!: Towing;
   /** Part features' world side (ships/features/host.ts): built once, ticked in the 'towing' entry's place */
   features!: ServerFeatures;
   private mining: Mining;
@@ -672,17 +669,7 @@ export class GameServer implements ServerCtx {
     this.shipEditAnywhere = opts.shipEditAnywhere ?? false;
     this.econ = new Economy(this.gameData.itemsFile, this.gameData.recipesFile, this.ships.catalog, Object.fromEntries(this.ships.library));
     this.pods = new LootPods(this.createPodHost(), this.econ.items);
-    // ---- Tow Beam (game/Towing.ts)
-    this.towing = new Towing({
-      world: this.world,
-      getTick: () => this.currentTick,
-      tell: (pilot, text, color) => { for (const c of this.clients.values()) if (c.playerId === pilot) this.send(c.ws, { type: 'systemMessage', text, color }); },
-      stationInRange: (pilot) => this.stationInRange(pilot),
-      isDocked: (pilot) => this.dockedShips.has(pilot),
-      deliver: (pilot, target, kind) => this.derelictsMod.towDelivered(pilot, target, kind),
-    }, this.ships, this.pods, this.ships.tuning);
-    // ---- (end Tow Beam)
-    // ---- Part features (ships/features: none registered yet; the tick, cargo, wire and message seams are in place)
+    // ---- Part features (ships/features: the Tow Beam; the tick, cargo, wire and message seams)
     this.features = new ServerFeatures(SERVER_FEATURES, {
       world: this.world,
       ships: this.ships,
@@ -692,6 +679,7 @@ export class GameServer implements ServerCtx {
       tell: (pilot, text, color) => { for (const c of this.clients.values()) if (c.playerId === pilot) this.send(c.ws, { type: 'systemMessage', text, color }); },
       stationInRange: (pilot) => this.stationInRange(pilot),
       isDocked: (pilot) => this.dockedShips.has(pilot),
+      deliver: (pilot, target, kind) => this.derelictsMod.towDelivered(pilot, target, kind),
     }, new Set(this.handlers.keys()));
     // A feature's messages join the table (the handlers field is built before the constructor body; the table is a Map)
     for (const [type, fn] of this.features.messages) {
@@ -964,7 +952,7 @@ this.devTeleport = opts.devTeleport ?? false;
       replication: this.replication,
       mobs: this.mobs,
       pods: this.pods,
-      towing: this.towing,
+      features: this.features,
       personCraft: this.personCraft,
       wards: this.wards,
       lingering: this.lingering,
@@ -2311,7 +2299,6 @@ this.devTeleport = opts.devTeleport ?? false;
       },
       partValue: (part) => this.econ.items.get(partItemId(part))?.value ?? 20,
       cargoMass: (eid) => this.pilots.cargoMass(eid),
-      towLoad: (eid) => this.towing?.load(eid) ?? 0,
       featureCargo: (eid) => this.features?.cargoMass(eid) ?? 0,
       shipRebuilt: (eid) => this.features?.onShipRebuilt(eid),
       shipForgotten: (eid) => this.features?.onLeave(eid),
@@ -3224,9 +3211,8 @@ this.devTeleport = opts.devTeleport ?? false;
       // Reset spatial grid and rebuild
       { name: 'spatialGrid', phase: 'pilots-move', run: () => { this.spatialGrid.clear(); this.buildSpatialGrid(); } },
       { name: 'playerMovementSystem', phase: 'pilots-move', run: () => this.playerMovementSystem() },
-      // (Tow Beams pull what they tow, after the pilots fly and before wrecks and pods move: game/Towing.ts)
-      // (Part features tick with it: the same slot, so a converted Tow Beam keeps its place. ships/features/host.ts)
-      { name: 'towing', phase: 'pilots-move', run: () => { this.towing.tick(); this.features.tick(); } },
+      // (Part features tick here, after the pilots fly and before wrecks and pods move: a Tow Beam pulls what it tows. ships/features/host.ts)
+      { name: 'towing', phase: 'pilots-move', run: () => { this.features.tick(); } },
       { name: 'dockingSystem', phase: 'pilots-move', run: () => this.docking.dockingSystem() },
       { name: 'riftSystem', phase: 'pilots-move', run: () => this.riftSystem() },
       // ---- combat ----

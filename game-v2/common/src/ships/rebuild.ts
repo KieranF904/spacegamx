@@ -169,8 +169,6 @@ export interface ShipDerived {
   shieldMax: number;
   /** Burst Strafers (strafer.ts): each one's push (ship-local), the burst's length and the cooldown; absent without a powered one */
   strafe?: StrafeInfo;
-  /** Tow Beam (tow.ts): the best one's satisfaction (it takes hold from MIN_TOW_POWER), and every powered one (they draw while towing) */
-  tow?: { power: number; parts: number[] };
   /**
    * Part features (features/): the ones this ship has (bit = feature number in the plan: a live part they apply to, or
    * global), the same as a list in plan order, and what each one derived. All three absent when it has none.
@@ -322,11 +320,11 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   // 4. Power, per network
   const area = geoms.map((g) => g.area);
   const satisfaction = new Array<number>(n).fill(1);
-  // (Burst Strafers and Tow Beams draw by the tick too, only while they work: strafer.ts, tow.ts)
-  // (Part features: which ones each part's function gives (features/plan.ts); a `burst` feature's parts draw by the tick too)
+  // (Burst Strafers draw by the tick too, only while they work: strafer.ts)
+  // (Part features: which ones each part's function gives (features/plan.ts); a `burst` feature's parts draw by the tick too, as a Tow Beam's)
   const P = getPlan();
   const fxOf = P.features.length ? fns.map((fn) => featureBits(P, fn)) : undefined;
-  const burst = (i: number) => isEngine(fns[i]) || !!fns[i].weapon || isMinerFn(fns[i]) || !!fns[i].strafe || !!fns[i].tow
+  const burst = (i: number) => isEngine(fns[i]) || !!fns[i].weapon || isMinerFn(fns[i]) || !!fns[i].strafe
     || (fxOf !== undefined && (fxOf[i] & P.burstMask) !== 0);
   // (Local circuits: a burst consumer runs wherever its circuit has a generator or a store, it touches a capacitor bank, or the
   // core's store can reach it: on the main circuit, or by its trickle elsewhere. How much it actually gets is the tick's: energy.ts)
@@ -475,9 +473,8 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   let cargoCapacity = hasCore ? CORE_CARGO : 0;
   let scanRange = 0;
   let shieldMax = 0;
-  // (Burst Strafers and Tow Beams: strafer.ts, tow.ts)
+  // (Burst Strafers: strafer.ts)
   let strafe: StrafeInfo | undefined;
-  let tow: { power: number; parts: number[] } | undefined;
   const jt = { ...DEFAULT_JUMP, ...(tuning.jump ?? {}) };
   // The jump drive: coil capacity (the core's own, and powered coils', a little more for better grades) against the hull's cells
   let jumpCap = 0, jumpGradeSum = 0, hullCells = 0;
@@ -506,12 +503,6 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
       strafe.parts.push({ part: i, push: [r(-mounts[i]!.dir[0] * force), r(-mounts[i]!.dir[1] * force)] });
       strafe.ticks = Math.max(strafe.ticks, sf.ticks);
       strafe.cooldown = Math.min(strafe.cooldown, sf.cooldown);
-    }
-    // ---- Tow Beam (tow.ts)
-    if (fns[i].tow && alive[i] && satisfaction[i] > 0) {
-      tow ??= { power: 0, parts: [] };
-      tow.power = Math.max(tow.power, satisfaction[i]);
-      tow.parts.push(i);
     }
     if (satisfaction[i] > 0 && (fns[i].demand ?? 0) > 0) {
       const draw = partDemand(fns[i], area[i], mats[i]);
@@ -598,7 +589,6 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     scanRange: Math.round(scanRange),
     shieldMax: Math.round(shieldMax),
     ...(strafe ? { strafe } : {}),
-    ...(tow ? { tow: { power: Math.round(tow.power * 1000) / 1000, parts: tow.parts } } : {}),
     ...(fxMask ? { fxMask, fxList, fx: fxOut } : {}),
     jumpRange: jump.range,
     jumpCooldown: jump.cooldown,

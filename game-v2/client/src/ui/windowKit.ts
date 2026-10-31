@@ -294,7 +294,6 @@ export function partStatsHtml(econ: Economy, part: { material: string; fn: strin
   if (st.shield) html += row('Shield', `${n0(st.shield)}`);
   if (st.cargo) html += row('Cargo', `${n0(st.cargo)}`);
   if (st.dodge) html += row("Dodge", `${st.dodge.force.toFixed(1)} push · every ${st.dodge.cooldown.toFixed(1)} s · ${Math.round(st.dodge.energy)} energy a burst`);
-  if (st.tow) html += row("Tows", `wrecks, debris and pods within ${Math.round(st.tow.range)} m`);
   for (const r of tipRows(dp.facts, true)) html += row(esc(r.label), esc(r.text));
   html += row('Hull · mass', `${n0(st.hp)} hp · ${st.mass.toFixed(1)}`);
   html += row('Armour · build', `${st.armour} · ${Math.round(partBuildPoints(econ.ships, part) * 10) / 10} pts`);
