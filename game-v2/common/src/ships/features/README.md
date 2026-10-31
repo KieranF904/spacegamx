@@ -23,7 +23,7 @@ rebuilds, draws and flies exactly as before. Tow is CUT 4, Strafer CUT 6.
   (bit = feature number) and `derived.fxList` (`Int8Array`, plan order). All three are **absent** when a ship has no
   feature, so ships without one are byte-for-byte what they were.
 - **load** (`energy.ts` `gunLoad`, per tick): each feature in `fxList` adds its draw to `out`. Must not allocate.
-- **describe** (`featureFacts(ctx)`): facts of the features a function gives. `describePart()` and the renderers are CUT 3.
+- **describe** (`featureFacts(ctx)`): facts of the features a function gives. `describePart()` (common ships/describe.ts) wraps it with partStats; the client renders facts in `client/src/ships/describe/` (tipRows, chips, summaryFields, guideNumber). A feature adds facts; no old row is removed until its conversion (Cut 4).
 - **flight signature** (`replica.ts`): a ship's features that have flight hooks are folded in (`|fx<mask>`).
 - **flight / inputs / replicate**: typed and compiled and validated (per-phase sorted arrays, unique keys and control
   bits, slots pinned in `features.wire.json`), **not called yet**: stepFlight's phases and the input tables are CUT 5.

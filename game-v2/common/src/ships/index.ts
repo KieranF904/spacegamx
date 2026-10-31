@@ -29,6 +29,7 @@ export * from './grades.js';
 export * from './rating.js';
 export * from './damage.js';
 export * from './partStats.js';
+export * from './describe.js';
 export * from './guns.js';
 export * from './energy.js';
 export * from './circuits.js';

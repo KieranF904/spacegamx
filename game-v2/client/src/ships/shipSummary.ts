@@ -5,7 +5,8 @@
  * against the one you saved).
  */
 
-import { Blueprint, Catalog, ShipTuning, Economy, createShipState, FRICTION, jumpTuning, buyPrice, rateShip, salvageOf, SALVAGE, energyTuning, baseWeaponDps, partWeaponDef, bestDodge } from '@space-game/common';
+import { Blueprint, Catalog, ShipTuning, Economy, createShipState, FRICTION, jumpTuning, buyPrice, rateShip, salvageOf, SALVAGE, energyTuning, baseWeaponDps, partWeaponDef, bestDodge, describeFn } from '@space-game/common';
+import { summaryFields, type SummaryField } from './describe';
 
 export interface ShipSummary {
   /** Firepower and toughness together (ships/rating.ts) */
@@ -101,6 +102,18 @@ export function shipSummary(catalog: Catalog, tuning: ShipTuning, econ: Economy,
     tow: d.tow?.power ?? 0,
     rebuild,
   };
+}
+
+/** The headline facts of the part features a design uses (one per feature key; none until a feature describes itself): rows after the fixed ones */
+export function designFields(catalog: Catalog, tuning: ShipTuning, bp: Blueprint): SummaryField[] {
+  const seen = new Set<string>(), facts = [];
+  for (const part of bp.parts) {
+    const k = part.fn + '|' + part.material + '|' + part.piece;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    facts.push(...describeFn(catalog, tuning, part.fn, part.piece, part.material));
+  }
+  return summaryFields(facts);
 }
 
 /** What the coils against the hull mean (flight.ts jumpDriveStats): a word, its colour and a hint */

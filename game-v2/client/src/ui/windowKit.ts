@@ -5,7 +5,8 @@
  */
 
 import { resistText } from '../ships/partTip';
-import { Economy, Stack, Bag, RARITY_COLOR, CATEGORY_LABEL, ItemDef, RARITIES, partStats, partBuildPoints, DAMAGE_NAMES } from '@space-game/common';
+import { Economy, Stack, Bag, RARITY_COLOR, CATEGORY_LABEL, ItemDef, RARITIES, describePart, partBuildPoints, DAMAGE_NAMES } from '@space-game/common';
+import { tipRows } from '../ships/describe';
 import { itemIcon } from './itemIcons';
 
 let styled = false;
@@ -279,8 +280,9 @@ const n0 = (v: number) => Math.round(v).toLocaleString();
 
 /** A part's numbers (ships/partStats.ts) as tooltip rows: what it does, what it takes, and its score */
 export function partStatsHtml(econ: Economy, part: { material: string; fn: string; piece: string }): string {
-  const st = partStats(econ.ships, econ.tuning, part);
-  if (!st) return '';
+  const dp = describePart(econ.ships, econ.tuning, part);
+  const st = dp?.base;
+  if (!dp || !st) return '';
   const row = (k: string, v: string) => `<div class="t-r"><span>${k}</span><b>${v}</b></div>`;
   let html = row('Grade', `${st.mark}${st.size ? ` · ${st.size}` : ''}`);
   if (st.dps !== undefined) html += row('Damage', `${n0(st.dps)}/s${st.range ? ` · reach ${st.effectiveRange ? `${n0(st.effectiveRange)}, fading out to ${n0(st.range)}` : n0(st.range)}` : ''}`);
@@ -293,6 +295,7 @@ export function partStatsHtml(econ: Economy, part: { material: string; fn: strin
   if (st.cargo) html += row('Cargo', `${n0(st.cargo)}`);
   if (st.dodge) html += row("Dodge", `${st.dodge.force.toFixed(1)} push · every ${st.dodge.cooldown.toFixed(1)} s · ${Math.round(st.dodge.energy)} energy a burst`);
   if (st.tow) html += row("Tows", `wrecks, debris and pods within ${Math.round(st.tow.range)} m`);
+  for (const r of tipRows(dp.facts, true)) html += row(esc(r.label), esc(r.text));
   html += row('Hull · mass', `${n0(st.hp)} hp · ${st.mass.toFixed(1)}`);
   html += row('Armour · build', `${st.armour} · ${Math.round(partBuildPoints(econ.ships, part) * 10) / 10} pts`);
   const res = resistText(st.resist);

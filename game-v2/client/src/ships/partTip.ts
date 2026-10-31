@@ -8,11 +8,12 @@
 
 import {
   Catalog, Economy, PlacedPart, ShipTuning, ShipDerived, Side, WeaponMods, Bag,
-  partStats, partItemId, placeCost, isStructural, outputOf, gradeOf, fnOutput, partGrade, partMaterial, energyTuning, circuitTuning, partDischarge, surgeReaction, surgeTuning, bankFor, POWER_TYPES, jumpTuning, coilCapacity, CORE_CARGO, PIECE_NAMES, partBuildPoints, DAMAGE_NAMES, isPowerPart, mountingWords, type DamageType } from '@space-game/common';
+  partStats, describePart, partItemId, placeCost, isStructural, outputOf, gradeOf, fnOutput, partGrade, partMaterial, energyTuning, circuitTuning, partDischarge, surgeReaction, surgeTuning, bankFor, POWER_TYPES, jumpTuning, coilCapacity, CORE_CARGO, PIECE_NAMES, partBuildPoints, DAMAGE_NAMES, isPowerPart, mountingWords, type DamageType } from '@space-game/common';
 import { costHtml } from '../ui/windowKit';
 import { jumpRatioNote } from './shipSummary';
 import { functionColor, numToCss } from './shipColors';
 import { circuitColor } from './wireEdit';
+import { tipRows } from './describe';
 import { MOUNT_TEXT, tradeOff, weaponMount } from './modelCards';
 
 export interface PartTipCtx {
@@ -76,8 +77,9 @@ export function modsText(m: WeaponMods | undefined): string {
 export function partTipHtml(p: Pick<PlacedPart, 'fn' | 'material' | 'piece'> & Partial<PlacedPart>, c: PartTipCtx): string {
   const { catalog, tuning, econ } = c;
   const fn = catalog.functions.get(p.fn), mat = partMaterial(catalog, p);
-  const st = partStats(catalog, tuning, p);
-  if (!fn || !st) return esc(p.fn);
+  const dp = describePart(catalog, tuning, p);
+  const st = dp?.base;
+  if (!fn || !dp || !st) return esc(p.fn);
   const id = partItemId(p);
   const name = econ.items.name(id);
   const piece = PIECE_NAMES[p.piece] ?? p.piece;
@@ -186,6 +188,8 @@ export function partTipHtml(p: Pick<PlacedPart, 'fn' | 'material' | 'piece'> & P
   }
   // Tow Beam (tow.ts)
   if (st.tow) html += row('Tows', `wrecks, debris and pods within ${n0(st.tow.range)} m of your hull · snaps past ${n0(st.tow.snap)} m · into a station to salvage · <span style="color:#8ea0bd; font-weight:400">draws only while towing; never a working ship</span>`);
+  // What the part features it gives say (common ships/features describe)
+  for (const r of tipRows(dp.facts)) html += row(esc(r.label), r.warn ? `<span style="color:#fbbf24">${esc(r.text)}</span>` : esc(r.text));
   if ((fn.range ?? 0) > 0 && !fn.weapon) html += row('Scan range', `${n0(fn.range!)} m`);
   // Jump coils (and the core's own): cells of hull served, and how the ship's coils stand against its hull
   const coilCells = p.fn === 'core' ? jumpTuning(tuning).coreCapacity : (fn.jumpCapacity ?? 0) * st.area;

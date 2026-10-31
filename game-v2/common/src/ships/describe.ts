@@ -1,0 +1,36 @@
+/**
+ * describePart(): what a part says about itself. `base` is partStats (the
+ * grade/size/damage/power core, unchanged); `facts` are what the part
+ * features its function gives add (features/types.ts Fact, run through
+ * features/plan.ts featureFacts). The client renders the facts into tooltip
+ * rows, card chips, summary fields and guide numbers (client/src/ships/describe/).
+ * UI only: may allocate.
+ */
+
+import type { Catalog } from './catalog.js';
+import type { ShipTuning } from './tuning.js';
+import { partStats, type PartStats } from './partStats.js';
+import { partMaterial } from './grades.js';
+import { featureFacts } from './features/plan.js';
+import type { Fact } from './features/types.js';
+
+export interface PartFacts {
+  base: PartStats;
+  facts: Fact[];
+}
+
+export function describePart(catalog: Catalog, tuning: ShipTuning | undefined, part: { material: string; fn: string; piece: string }): PartFacts | null {
+  const base = partStats(catalog, tuning, part);
+  const fn = catalog.functions.get(part.fn);
+  if (!base || !fn) return null;
+  const facts = tuning ? featureFacts({ catalog, tuning, fn, mat: partMaterial(catalog, part), area: base.area }) : [];
+  return { base, facts };
+}
+
+/** Facts of a function on its own (a palette card, no material placed): the first material it names */
+export function describeFn(catalog: Catalog, tuning: ShipTuning | undefined, fnId: string, piece?: string, material?: string): Fact[] {
+  const fn = catalog.functions.get(fnId);
+  if (!fn || !tuning) return [];
+  const pc = piece ?? (fn.pieces === '*' ? 'sq' : fn.pieces[0]);
+  return describePart(catalog, tuning, { fn: fnId, material: fn.model ? fn.material ?? 'alloy' : material ?? fn.material ?? 'alloy', piece: pc })?.facts ?? [];
+}

@@ -55,7 +55,7 @@ import { gradeGlow, partColors } from './hullPreview2d';
 import { HangarLitView } from './HangarLitView';
 import { listBlueprints, loadBlueprint, saveBlueprint } from './blueprintApi';
 import { itemIcon, shipIcon } from '../ui/itemIcons';
-import { shipSummary, ShipSummary, BIGGER_IS_BETTER, jumpRatioNote } from './shipSummary';
+import { shipSummary, designFields, ShipSummary, BIGGER_IS_BETTER, jumpRatioNote } from './shipSummary';
 import { drawDecor2d } from './partDecor';
 import { partTipHtml, PART_TIP_CSS, type PartTipCtx } from './partTip';
 
@@ -1594,6 +1594,7 @@ export class HangarUI {
     if (now.tow > 0) html += row('Tow Beam', now.tow >= 0.5 ? 'ready' : '<span style="color:#f87171">no power</span>', 'tow',
       `Press ${boundKeyName('tow', settings.data.bindings)} to take hold of the wreck, debris or pod nearest your cursor; again to let go. What you tow slows you by its mass. `
       + "Tow it into a station's reach to salvage it into your storage. It draws power only while towing");
+    for (const f of designFields(catalog, tuning, this.bp)) html += row(f.label, f.text);
     html += row('Mass', `${n0(now.mass)}`, 'mass');
     html += row('Loss cost', `${n0(now.rebuild)} cr`, 'rebuild', `If it's destroyed: the ${Math.round((1 - SALVAGE) * 100)}% of its minerals salvage doesn't bring back, at station prices (an insurance bond covers it)`);
     html += energyHtml(now.energy);

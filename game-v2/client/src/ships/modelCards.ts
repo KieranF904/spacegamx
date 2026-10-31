@@ -5,7 +5,8 @@
  * locked, why: the level it's learned at (nothing opens one earlier).
  */
 
-import { circuitTuning, partDischarge, isWeaponFn, mountingOf, mountingWords, partMount, partStats, PIECE_NAMES, type Catalog, type FunctionDef, type ItemDef, type Mount, type ShipTuning } from '@space-game/common';
+import { circuitTuning, partDischarge, isWeaponFn, mountingOf, mountingWords, partMount, partStats, describeFn, PIECE_NAMES, type Catalog, type FunctionDef, type ItemDef, type Mount, type ShipTuning } from '@space-game/common';
+import { chips } from './describe';
 
 /** Families by name, in the palette's order within their category (legendaries share one group) */
 export const FAMILY_LABEL: Record<string, string> = {
@@ -185,6 +186,7 @@ export function keyStats(catalog: Catalog, tuning: ShipTuning | undefined, fn: F
   if ((fn.jumpCapacity ?? 0) > 0) out.push(`jump ${n0(fn.jumpCapacity! * st.area)} cells`);
   if (st.dodge) out.push(`dodge ${st.dodge.force.toFixed(1)} push · every ${st.dodge.cooldown.toFixed(1)} s · ${n0(st.dodge.energy)} energy a burst`);
   if (st.tow) out.push(`tows within ${n0(st.tow.range)} m`);
+  out.push(...chips(describeFn(catalog, tuning, fn.id, pc, material)));
   if (st.draw && !st.supply) out.push(st.dodge ? `draws ${n0(st.draw)} bursting` : st.tow ? `draws ${n0(st.draw)} towing` : `draws ${n0(st.draw)}`);
   if (!out.length || (fn.category === 'shields' && !st.shield)) out.push(`${n0(st.hp)} hp · armour ${st.armour}`);
   return out.join(' · ');
