@@ -75,7 +75,7 @@ const timed = (obj: any, fn: string, key: keyof typeof spent) => {
   obj[fn] = (...a: unknown[]) => { const s = performance.now(); try { return orig(...a); } finally { spent[key] += performance.now() - s; } };
 };
 if (anyServer.lod) timed(anyServer.lod, 'tick', 'lod');
-timed(anyServer, 'sendMapDots', 'dots');
+timed(anyServer.snapshots, 'sendMapDots', 'dots');
 // Out to their spots
 pilots.forEach((pid, i) => {
   const at = SPREAD ? { system: 'sol', x: 165000, y: 0 } : spots[i % spots.length];

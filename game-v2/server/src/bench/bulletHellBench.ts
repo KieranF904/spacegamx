@@ -66,11 +66,12 @@ async function run(bossId: string, PILOTS: number, secs: number, quiet = false):
     ['buildSpatialGrid', 'spatialGrid'], ['playerMovementSystem', 'playerMovement'], ['weaponSystem', 'weaponSystem (pilot guns)'],
     ['projectileSystem', 'projectileSystem (Weapons.tick + move)'], ['collisionSystem', 'collisionSystem'],
     ['lifetimeSystem', 'lifetime'], ['cleanupSystem', 'cleanup (removals)'], ['sendSnapshots', 'sendSnapshots'],
-    ['flushOutbox', 'flushOutbox (encode+send)'], ['systemRows', '  systemRows (rows built per system)'],
+    ['flushOutbox', 'flushOutbox (encode+send)'],
     ['broadcastProjectileHit', '  broadcastProjectileHit'],
   ] as const) wrap(S, fn, key);
   for (const [o, key] of [['enemies', 'enemies'], ['bosses', 'bosses (phases, novas, brains)'], ['mobs', 'mobs'], ['ships', 'ShipBridge.tick'], ['lod', 'SimLod']] as const) wrap(S[o], 'tick', key);
   wrap(S.weapons, 'tick', '  Weapons.tick (homing, fuses)');
+  wrap(S.snapshots, 'systemRows', '  systemRows (rows built per system)');
   wrap(S.replication, 'endTick', 'replication.endTick');
   wrap(bridge, 'hitProjectile', '  hitProjectile (per shot, ships)');
   wrap(bridge, 'segmentHit', '    segmentHit');
