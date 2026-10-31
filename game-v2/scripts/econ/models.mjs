@@ -295,7 +295,7 @@ const OTHER = [
   ['utility_jump_coil', 'Jump Coil', 'jumpcoil', ['sq'], 14, 'steel', { jumpCapacity: 12, demand: 8, priority: 3, hpScale: 0.8 }, 'More jump drive for a bigger hull.', 'engines'],
   ['utility_heavy_coil', 'Heavy Coil', 'jumpcoil', ['block2'], 30, 'cobalt', { jumpCapacity: 16, jumpCooldown: 0.8, demand: 8, priority: 3, hpScale: 0.8 }, 'A dense coil with more jump drive per cell that also cuts the jump cooldown by a fifth.', 'engines'],
   ['plating_reactive_armour', 'Reactive Armour', 'plating', ['sq', 'rect2'], 12, 'steel', { armour: 2, hpScale: 2, massScale: 1.6 }, 'Plate that blunts small fast hits, so it beats streams of fire.', 'shields'],
-  ['plating_spaced_plating', 'Spaced Plating', 'plating', ['sq', 'rect2'], 22, 'titanium', { armour: 1, splashTaken: 0.5, hpScale: 3.2, massScale: 1.3 }, 'Layered plate with room between that takes half damage from blasts.', 'shields'],
+  ['plating_spaced_plating', 'Spaced Plating', 'plating', ['sq', 'rect2'], 22, 'titanium', { grade: 2, armour: 1, splashTaken: 0.5, hpScale: 3.2, massScale: 1.3 }, 'Layered plate with room between that takes half damage from blasts.', 'shields'],
 ];
 const LOOK = {
   reactor: 'generator', battery: 'battery', capacitor: 'weapon_battery', drive_cell: 'drive_battery', mining: 'miner', demolition: 'charge_launcher',
