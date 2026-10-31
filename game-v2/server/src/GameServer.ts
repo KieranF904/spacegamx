@@ -2765,7 +2765,7 @@ this.devTeleport = opts.devTeleport ?? false;
         const alive = hasComponent(this.world, Player, eid) && !hasComponent(this.world, Dead, eid);
         // Leaving mid-fight doesn't save you: the ship stays put (hands off the controls) for a while
         if (alive && conn.userId !== null && this.currentTick - this.ships.lastDamagedTick(eid) < LINGER_COMBAT_TICKS) {
-          this.releaseControls(eid, true);
+          this.releaseControls(eid);
           this.lingering.set(eid, { conn, until: this.currentTick + LINGER_TICKS });
           return;
         }
@@ -3215,7 +3215,7 @@ this.devTeleport = opts.devTeleport ?? false;
     // Inside: at the station's centre, out of reach; back out where it came in
     conn.docked = { station: st, ox: 0, oy: 0, exit: { x: Position.x[eid] - Position.x[st], y: Position.y[eid] - Position.y[st] } };
     this.dockedShips.add(eid);
-    this.releaseControls(eid, true);
+    this.releaseControls(eid);
     const sd = this.gameData.getStationByNum(Station.stationId[st]);
     if (sd?.dockingFee) this.pilots.payDockFee(conn, sd.id, sd.dockingFee);
     // (Quiet when there was nothing to load: every dock shouldn't say so)
@@ -3827,15 +3827,11 @@ this.devTeleport = opts.devTeleport ?? false;
   }
 
   /**
-   * Let go of every key (aim and helm stay as they are: inputFields.ts INPUT_HELD). `keepDodge`: the dock and the
-   * quit-mid-fight linger paths, which have always left the dodge control as it was
+   * Let go of every key (aim and helm stay as they are: inputFields.ts INPUT_HELD). Docking and quitting mid-fight
+   * (the linger) let go the same way, the dodge control included: a dodge held then would fire later with nobody flying
    */
-  private releaseControls(eid: number, keepDodge = false): void {
-    for (let i = 0; i < INPUT_HELD.length; i++) {
-      const k = INPUT_HELD[i];
-      if (keepDodge && k === 'dodge') continue;
-      Input[k][eid] = 0;
-    }
+  private releaseControls(eid: number): void {
+    for (let i = 0; i < INPUT_HELD.length; i++) Input[INPUT_HELD[i]][eid] = 0;
   }
 
   // ---- Crash isolation (server robustness audit, docs/audits/server-robustness.md) ----
