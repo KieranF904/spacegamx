@@ -2336,43 +2336,46 @@ function pieceIcon(catalog: Catalog, id: string, rot: Rot, flip: boolean): strin
  * then on the Output; a bank that feeds nothing counts for nothing, and one that
  * never refills is a single draught.
  */
+/** The load tests behind the hangar's Energy rows, per derived ship */
+const energyRuns = new WeakMap<ShipDerived, { cruise: LoadTestResult; boost: LoadTestResult; fire: LoadTestResult }>();
+const ENERGY_ROW_SECONDS = 20;
+
 function energyHtml(e: ShipSummary['energy'], d: ShipDerived | null, tuning: ShipTuning): string {
   const L = d?.power;
   const row = (label: string, value: string, tip: string) =>
     `<div style="display:flex; justify-content:space-between; padding:2px 0" title="${tip}"><span style="color:#8ea0bd">${label}</span>${value}</div>`;
   const head = `<div style="color:#ffb547; font-weight:bold; margin:10px 0 4px; letter-spacing:1px">ENERGY</div>`;
   if (!L || !d) return head + row('Store', `<b style="color:#e5ecf7">${Math.round(e.max)}</b>`, 'The core store plus batteries') + row('Spare power', `<b style="color:#e5ecf7">${e.spare.toFixed(0)}/s</b>`, 'Generation left after the steady loads');
-  const output = L.spare + L.pool.rate, boost = energyTuning(tuning).boostDraw;
-  const eng = new Set<number>(), gun = new Set<number>();
-  let engDraw = 0, engBoost = 0, gunDraw = 0;
-  for (const t of new Set(d.thrusters.filter((x) => x.force[0] || x.force[1]).map((x) => x.part))) { eng.add(t); engDraw += L.draw[t]; engBoost += L.draw[t] * (1 + boost * L.boostDrain[t]); }
-  for (const w of d.weapons) if (L.feedOf[w.part] >= 0) { gun.add(w.part); gunDraw += gunDrawFlatOut(w, L.draw[w.part]); }
-  const banksOf = (set: Set<number>) => {
-    let cap = 0, rate = 0, dyn = 0;
-    for (const B of L.banks) if (B.feeds.some((p) => set.has(p))) { cap += B.cap; rate += B.rate; dyn += B.dynamo; }
-    return { cap, rate, dyn };
+  const output = L.spare + L.pool.rate;
+  let hasEng = false, hasGun = false, engDraw = 0;
+  for (const t of d.thrusters) if (t.force[0] || t.force[1]) { hasEng = true; engDraw += L.draw[t.part]; }
+  for (const w of d.weapons) if (L.feedOf[w.part] >= 0) hasGun = true;
+  // Each row is the ship's own power code run tick by tick (loadTest): a bank pays only for the parts it touches
+  let runs = energyRuns.get(d);
+  if (!runs) energyRuns.set(d, runs = {
+    cruise: loadTest(d, tuning, { fire: false, thrust: true, boost: false, seconds: ENERGY_ROW_SECONDS }),
+    boost: loadTest(d, tuning, { fire: false, thrust: true, boost: true, seconds: ENERGY_ROW_SECONDS }),
+    fire: loadTest(d, tuning, { fire: true, thrust: true, boost: false, seconds: ENERGY_ROW_SECONDS }),
+  });
+  const dash = '<span style="color:#8ea0bd">—</span>';
+  const show = (r: LoadTestResult, share: number, any: boolean): { html: string; ok: boolean } => {
+    if (!any) return { html: dash, ok: true };
+    if (r.brownAt < 0) return r.end >= 99
+      ? { html: '<span style="color:#4ade80">sustained</span>', ok: true }
+      : { html: `<span style="color:#fbbf24">holds ${ENERGY_ROW_SECONDS} s+ · store ${Math.round(r.end)}%</span>`, ok: true };
+    const t = r.brownAt;
+    return { html: `<span style="color:#f87171">brownout at ${t.toFixed(t < 10 ? 1 : 0)} s · down to ${Math.round(share * 100)}%</span>`, ok: false };
   };
-  /** How a draw fares: the banks it touches first, then the Output left (outAvail) and the spare generation left (spareAvail) */
-  const span = (draw: number, b: { cap: number; rate: number; dyn: number }, outAvail: number, spareAvail: number): { html: string; outUsed: number; spareUsed: number } => {
-    if (draw <= 0) return { html: '<span style="color:#8ea0bd">—</span>', outUsed: 0, spareUsed: 0 };
-    const fromBank = Math.min(draw, b.rate), fromOut = draw - fromBank, outUsed = Math.min(fromOut, outAvail);
-    const sustain = Math.min(draw, spareAvail + b.dyn), spareUsed = Math.min(spareAvail, Math.max(0, draw - b.dyn));
-    const net = draw - sustain, store = L.pool.cap + b.cap;
-    const limited = fromOut > outAvail + 1e-6 ? ` · rate-limited to ${Math.round(((fromBank + outAvail) / draw) * 100)}%` : '';
-    if (net <= 1e-6) return { html: `<span style="color:${limited ? '#fbbf24' : '#4ade80'}">sustained${limited}</span>`, outUsed, spareUsed };
-    if (store <= 0) return { html: '<span style="color:#f87171">no store</span>', outUsed, spareUsed };
-    const t = store / net;
-    return { html: `<span style="color:${t >= 20 && !limited ? '#fbbf24' : '#f87171'}">${t.toFixed(t < 10 ? 1 : 0)} s${limited}</span>`, outUsed, spareUsed };
-  };
-  const eb = banksOf(eng), gb = banksOf(gun);
-  const cruise = span(engDraw, eb, output, L.spare), boosting = span(engBoost, eb, output, L.spare);
-  const firing = span(gunDraw, gb, Math.max(0, output - cruise.outUsed), Math.max(0, L.spare - cruise.spareUsed));
-  const dry = gunDraw > 0 && /s</.test(firing.html) && !/sustained/.test(firing.html);
+  const cruise = show(runs.cruise, runs.cruise.engines, hasEng && engDraw > 0);
+  const boosting = show(runs.boost, runs.boost.engines, hasEng && engDraw > 0);
+  const firing = show(runs.fire, Math.min(runs.fire.engines, runs.fire.guns), hasGun);
+  const dry = hasGun && !firing.ok;
+
   return head
     + row('Store', `<b style="color:#e5ecf7">${Math.round(L.pool.cap)}</b>`, 'The core store plus the batteries: one charge for the whole ship, drawn on after a consuming part own bank')
-    + row('Output', `<b style="color:#e5ecf7">${Math.round(output)}/s</b>`, 'The most the ship gives out a second: spare generation plus what the pool can discharge. Banks add to it for the parts they feed')
-    + row('Cruising', cruise.html, 'Engines thrusting: Drive Cell banks they touch first, then the Output; how long the stores last')
-    + row('Boosting', boosting.html, 'Engines boosting')
-    + row('Firing, cruising', firing.html, 'Every gun firing flat out while the engines thrust: Capacitor banks they touch first, then what the engines leave of the Output')
+    + row('Output', `<b style="color:#e5ecf7">${Math.round(output)}/s</b>`, 'The most the ship gives out a second: spare generation plus what the pool can discharge. Banks add to it only for the parts they feed')
+    + row('Cruising', cruise.html, `Engines thrusting for ${ENERGY_ROW_SECONDS} s, run through the ship's real power code: each bank pays only for the parts it touches`)
+    + row('Boosting', boosting.html, 'Engines boosting, same test')
+    + row('Firing, cruising', firing.html, 'Every gun firing flat out while the engines thrust, same test')
     + (dry ? `<div style="color:#fbbf24; font-size:11px; margin-top:4px">The guns run dry in a fight, then reload slower. Add generation, a battery, or a Capacitor bank touching the guns.</div>` : '');
 }
