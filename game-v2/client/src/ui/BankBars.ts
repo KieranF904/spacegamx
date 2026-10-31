@@ -4,7 +4,7 @@
  * hangar. The ENERGY gauge itself shows the whole ship. A bank that feeds parts short of power this tick flashes red.
  */
 
-import { BROWNOUT, bankCharges, type Charge, type ShipDerived } from '@space-game/common';
+import { BROWNOUT, type Charge, type ShipDerived } from '@space-game/common';
 import { setStyle } from './domWrite';
 
 const CSS = `
@@ -25,8 +25,8 @@ const MAX_BARS = 4;
 
 export class BankBars {
   private wrap: HTMLElement | null = null;
-  private sig = '';
-  private bars: { el: HTMLElement; fill: HTMLElement; bank: number }[] = [];
+  private layout: ShipDerived['power'] | null = null;
+  private bars: { el: HTMLElement; fill: HTMLElement; bank: number; pct: number; brown: boolean }[] = [];
 
   constructor() {
     const hud = document.getElementById('boostHud'), bar = document.getElementById('boostBar');
@@ -45,36 +45,41 @@ export class BankBars {
 
   update(d: ShipDerived | null | undefined, c: Charge): void {
     if (!this.wrap) return;
-    const L = d?.power;
-    const banks = L ? L.banks.slice(0, MAX_BARS) : [];
-    const sig = banks.map((B) => `${B.kind}:${B.cap}`).join('|');
-    if (sig !== this.sig) {
-      this.sig = sig;
+    const L = d?.power ?? null;
+    // (The layout only changes with the ship's derived power layout, so compare its identity: no per-frame string)
+    if (L !== this.layout) {
+      this.layout = L;
       this.wrap.innerHTML = '';
       this.bars = [];
-      banks.forEach((B, k) => {
+      const n = L ? Math.min(L.banks.length, MAX_BARS) : 0;
+      for (let k = 0; k < n; k++) {
+        const B = L!.banks[k];
         const el = document.createElement('div');
         el.className = 'cb';
         const col = B.kind === 'drive' ? '#60a5fa' : '#fbbf24';
         el.innerHTML = `<div class="cb-bar"><div class="cb-fill" style="background:${col}"></div></div><span class="cb-l" style="color:${col}">${k + 1}</span>`;
-        this.wrap!.appendChild(el);
-        this.bars.push({ el, fill: el.querySelector('.cb-fill') as HTMLElement, bank: k });
-      });
+        this.wrap.appendChild(el);
+        this.bars.push({ el, fill: el.querySelector('.cb-fill') as HTMLElement, bank: k, pct: -1, brown: false });
+      }
     }
     if (!L || !this.bars.length) return;
-    const all = bankCharges(d!, c);
     for (const b of this.bars) {
-      const x = all[b.bank + 1];
-      if (!x) continue;
-      setStyle(b.fill, 'height', `${x.pct.toFixed(1)}%`);
+      const v = c.b[b.bank];
+      const pct = v === undefined || !Number.isFinite(v) ? 100 : Math.max(0, Math.min(100, v));
+      setStyle(b.fill, 'height', `${pct.toFixed(1)}%`);
       // (Browning out: a feed group this bank feeds got less than it asked, this tick's predicted power step: energy.ts powerTick)
       let brown = false;
       for (let f = 0; f < L.feeds.length && !brown; f++) {
         if (!L.feeds[f].banks.includes(b.bank)) continue;
         if (Math.min(c.eng?.[f] ?? 1, c.gun?.[f] ?? 1) < BROWNOUT) brown = true;
       }
+      const r = Math.round(pct);
+      if (r === b.pct && brown === b.brown) continue;
+      b.pct = r;
+      b.brown = brown;
       b.el.classList.toggle('brown', brown);
-      b.el.title = `Bank ${b.bank + 1} (${x.kind === 'drive' ? 'Drive Cells' : 'Capacitors'}): ${Math.round(x.pct)}% of ${Math.round(x.cap)}${brown ? ' · short of power' : ''}`;
+      const B = L.banks[b.bank];
+      b.el.title = `Bank ${b.bank + 1} (${B.kind === 'drive' ? 'Drive Cells' : 'Capacitors'}): ${r}% of ${Math.round(B.cap)}${brown ? ' · short of power' : ''}`;
     }
   }
 }
