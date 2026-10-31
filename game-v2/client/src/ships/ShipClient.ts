@@ -240,6 +240,12 @@ export class ShipClient {
   readonly replicas: ShipReplicaSet;
   /** Fire-event shells' firing poses (WeaponFx asks once, when it first sees the shell) */
   private firePoses = new Map<number, { x: number; y: number; angle: number }>();
+  /**
+   * Fire-event shells' gun model and damage, by shell id: client-only, kept from the fire event so the look survives the
+   * server row taking the shell over (WeaponFx asks once, as it first sees the shell; shells first seen in a snapshot
+   * have no entry and take their kind's look)
+   */
+  private shellLooks = new Map<number, { model?: string; damage?: number }>();
 
   /**
    * A snapshot arriving, before anything else: its keyframes and control
@@ -267,6 +273,10 @@ export class ShipClient {
       // The ship's pose as it fired: the muzzle flash sits on the barrel in its frame
       for (const id of ids) this.firePoses.set(id, { x: st.body.x, y: st.body.y, angle: st.body.angle });
       while (this.firePoses.size > 512) this.firePoses.delete(this.firePoses.keys().next().value!);
+      // The gun's model and what a shot of it does (a model's look; the flash, recoil and impact scale with the damage)
+      const look = { model: ship.blueprint.parts[part]?.fn, damage: partWeaponDef(this.opts.tuning, v.kind, ship.blueprint.parts[part], gun).damage };
+      for (const id of ids) this.shellLooks.set(id, look);
+      while (this.shellLooks.size > 512) this.shellLooks.delete(this.shellLooks.keys().next().value!);
       // A pilot's shots move on the tick they're fired (they're fired before shells move; pilotless ships' after)
       const spawnTick = this.opts.state.entities.get(owner)?.type === EntityType.Player ? tick - 1 : tick;
       // (Its gun's grade, as the server's shells carry it: each mark's shells look their own way)
@@ -351,11 +361,12 @@ export class ShipClient {
       id === this.opts.state.playerId ? this.localThrustCommand() : null,
     // Docked ships are inside their station: yours while you're berthed, others as the server says
     (id) => (id === this.opts.state.playerId ? this.docked : this.replicas.isDocked(id)), this.features);
-    renderer.onMuzzle = (owner, x, y) => this.renderer?.kick(owner, x, y);
+    renderer.onMuzzle = (owner, x, y, power) => this.renderer?.kick(owner, x, y, power);
     // Muzzle flashes (and the shells' first stretch) from the drawn barrel's tip, not the facing edge they spawn at
     renderer.barrelTip = (owner, x, y, angle) => this.renderer?.barrelTip(owner, x, y, angle) ?? null;
     renderer.lodestoneGlow = (id) => this.lodestoneGlow(id);
     renderer.firePoseOf = (id) => { const p = this.firePoses.get(id); this.firePoses.delete(id); return p; };
+    renderer.shellLookOf = (id) => { const l = this.shellLooks.get(id); this.shellLooks.delete(id); return l; };
     renderer.lighting.addSource((L) => this.damageFx?.collectLights(L));
     this.jumpFx = new JumpFx(renderer.getShipLayer(), this.store, this.opts.state, this.jump);
     this.beamFx = new MiningBeamFx(renderer.getEffectLayer(), this.store, this.opts.state, this.opts.tuning, () => {
@@ -469,7 +480,7 @@ export class ShipClient {
       if (!firesStraight(partWeaponDef(this.opts.tuning, w.kind, ship.blueprint.parts[w.part], w))) continue;
       // A pilot's shells move on the tick they're fired (as in preSnapshot)
       for (const s of volleyShells(player.id, ship, w, shot, { ...pose, vx: player.vx, vy: player.vy }, tick, this.opts.tuning, this.ownAmmo?.(w.kind))) {
-        this.scene.predictShot({ owner: player.id, type: WEAPON_KIND_TYPE[w.kind] ?? 1, grade: w.grade, spawnX: s.x, spawnY: s.y, spawnTick: tick - 1, vx: s.vx, vy: s.vy, size: s.size, pose });
+        this.scene.predictShot({ owner: player.id, type: WEAPON_KIND_TYPE[w.kind] ?? 1, grade: w.grade, model: ship.blueprint.parts[w.part]?.fn, damage: partWeaponDef(this.opts.tuning, w.kind, ship.blueprint.parts[w.part], w).damage, spawnX: s.x, spawnY: s.y, spawnTick: tick - 1, vx: s.vx, vy: s.vy, size: s.size, pose });
       }
     }
     return energy.charge;

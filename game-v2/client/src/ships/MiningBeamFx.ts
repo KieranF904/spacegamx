@@ -34,6 +34,8 @@ const LASER_COLORS: [number, number, number][] = [
 import type { ShipSource } from './ShipStore';
 import { JumpFx } from './JumpFx';
 import { canHurt, canHeal } from './sides';
+import { beamLook } from '../rendering/weapons/weaponStyles';
+import { drawCone, drawStrands, sputterGain } from './beamLookFx';
 import { PulseFx, type PulseRun } from './PulseFx';
 import { MiningFx } from './MiningFx';
 import { rockMaterial } from '../rendering/rocks/RockMaterials';
@@ -129,7 +131,7 @@ export class MiningBeamFx {
         miningSeen.add(key);
         // (Its newest pulse sets the beam's brightness; older ones are trailing off under it)
         const rock = t < 0.999 ? rockMaterial(this.rockHit) : null;
-        this.miningFx.draw(g, key, prof, now - runs[runs.length - 1].start, !on, x, y, hx, hy, t < 0.999, rock, now, frames, mt.range);
+        this.miningFx.draw(g, key, prof, now - runs[runs.length - 1].start, !on, x, y, hx, hy, t < 0.999, rock, now, frames, mt.range, beamLook(ship.blueprint.parts[m.part]?.fn));
         if (t < 0.999 && Math.random() < 0.35 * frames) {
           const sa = a + Math.PI + (Math.random() - 0.5) * 2.2, s = 1.5 + Math.random() * 4;
           this.sparks.push({ x: hx, y: hy, vx: Math.cos(sa) * s, vy: Math.sin(sa) * s, life: 0, max: 10 + Math.random() * 14 });
@@ -177,14 +179,21 @@ export class MiningBeamFx {
         if (def.heal) { this.repairBeam(g, id, ship, w, pose, def); continue; }
         const { x, y, hx, hy, t } = this.beamLine(id, ship, w, pose, def.range ?? 800, (def.width ?? 0) / 2);
         const lance = w.kind === 'lance';
-        const [outer, mid, core] = lance ? [0x7c3aed, 0xc084fc, 0xf5e8ff] : w.kind === 'frostbite' ? [0x0284c7, 0x7dd3fc, 0xf0fbff] : LASER_COLORS[Math.max(0, Math.min(4, (w.grade ?? 1) - 1))];
+        const look = beamLook(ship.blueprint.parts[w.part]?.fn);
+        let [outer, mid, core] = lance ? [0x7c3aed, 0xc084fc, 0xf5e8ff] : w.kind === 'frostbite' ? [0x0284c7, 0x7dd3fc, 0xf0fbff] : LASER_COLORS[Math.max(0, Math.min(4, (w.grade ?? 1) - 1))];
         const flick = 0.85 + 0.15 * Math.sin(this.t * 53 + id);
         // A wider beam (a better grade's) draws wider, and each mark up a little hotter
-        const wid = (lance ? 13 : w.kind === 'frostbite' ? 10 : 6) * flick * ((def.width ?? 1) / (defs[w.kind]!.width ?? 1)) * (1 + 0.08 * ((w.grade ?? 1) - 1));
-        g.moveTo(x, y).lineTo(hx, hy).stroke({ color: outer, width: wid * 3, alpha: 0.13 });
-        g.moveTo(x, y).lineTo(hx, hy).stroke({ color: mid, width: wid * 1.4, alpha: 0.45 });
-        g.moveTo(x, y).lineTo(hx, hy).stroke({ color: core, width: wid * 0.45, alpha: 0.95 });
-        g.circle(x, y, wid * 1.2).fill({ color: mid, alpha: 0.5 });
+        // (A model's own look, if it has one: BEAM_LOOKS)
+        if (look) { outer = look.outer ?? outer; mid = look.mid ?? mid; core = look.core ?? core; }
+        const wid = (lance ? 13 : w.kind === 'frostbite' ? 10 : 6) * flick * ((def.width ?? 1) / (defs[w.kind]!.width ?? 1)) * (1 + 0.08 * ((w.grade ?? 1) - 1)) * (look?.width ?? 1);
+        const gain = sputterGain(look?.sputter, this.t, id + w.part);
+        const bl = Math.hypot(hx - x, hy - y) || 1, bux = (hx - x) / bl, buy = (hy - y) / bl;
+        if (look?.cone) drawCone(g, x, y, bux, buy, bl, look.cone, mid, 0.22 * gain);
+        g.moveTo(x, y).lineTo(hx, hy).stroke({ color: outer, width: wid * 3, alpha: 0.13 * gain });
+        g.moveTo(x, y).lineTo(hx, hy).stroke({ color: mid, width: wid * 1.4, alpha: 0.45 * gain });
+        g.moveTo(x, y).lineTo(hx, hy).stroke({ color: core, width: wid * 0.45, alpha: 0.95 * gain });
+        if (look?.braid) drawStrands(g, x, y, bux, buy, bl, wid, look.braid.strands, look.braid.color, gain, this.t, id + w.part);
+        g.circle(x, y, wid * 1.2).fill({ color: mid, alpha: 0.5 * gain });
         if (t < 0.999) {
           g.circle(hx, hy, wid * 2.6).fill({ color: mid, alpha: 0.3 });
           g.circle(hx, hy, wid * 1.1).fill({ color: core, alpha: 0.85 });
@@ -301,7 +310,7 @@ export class MiningBeamFx {
         const wk = prof.width[Math.max(0, Math.min(prof.ticks - 1, Math.floor(age)))] ?? 1;
         const { x, y, hx, hy, t } = this.beamLine(p.owner, ship, w, pose, def.range ?? 800, ((def.width ?? 0) * wk) / 2);
         if (!p.sounded) { p.sounded = true; this.onPulse?.(x, y, w.grade ?? 1, own); }
-        this.pulseFx.draw(g, p, prof, age, x, y, hx, hy, t < 0.999, def, w.grade ?? 1, frames);
+        this.pulseFx.draw(g, p, prof, age, x, y, hx, hy, t < 0.999, def, w.grade ?? 1, frames, ship.blueprint.parts[w.part]?.fn);
       }
     }
     if (this.stationRuns.length) {

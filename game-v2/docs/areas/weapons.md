@@ -19,7 +19,7 @@ How a gun turns into shells, beams and pulses, and what those do to ships. The f
 | server/src/ships/features/support/Support.ts | 59 | support credit window (`SUPPORT_WINDOW_TICKS`); the Tow Beam is a part feature now (`ships/features/tow`, see flight) |
 | server/src/ships/ShipBridge.ts | 540 | the bridge facade: fields and one-line delegators (the per-tick loop and contacts are in bridge/flight.ts) |
 | server/src/ships/bridge/damage.ts, weapons.ts | 461 / 522 | the combat slices below (ShipBridge delegates to them) |
-| client/src/rendering/weapons/{WeaponFx,weaponStyles}.ts | 496, 242 | all projectile visuals; `WEAPON_STYLES[weaponType]`, `weaponStyle(type, grade)`; predicted own shells (`PredictedShell`) |
+| client/src/rendering/weapons/{WeaponFx,weaponStyles}.ts | 496, 242 | all projectile visuals; `WEAPON_STYLES[weaponType]`, `weaponStyle(type, grade, modelId)` (`MODEL_STYLES[modelId]` overrides the kind; grade only scales size and brightness), `BEAM_LOOKS[modelId]` for PulseFx/MiningFx/held beams, `shotScale(damage)`; predicted own shells (`PredictedShell`) |
 | client/src/ships/{DamageFx,MiningBeamFx,PulseFx,gunDecor}.ts | 886, 372, 310, 623 | part damage/fire/break visuals; mining + lance beams (`castShips` uses collide.ts); pulse beams (`pulseLook`); per-gun barrel art |
 | docs/audits/collisions.md, boss-bullet-hell.md | | which tests hit what (outline vs circle); cost of boss shot storms |
 

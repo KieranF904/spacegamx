@@ -15,7 +15,7 @@ Everything the client draws that is not a ship hull: the camera and entity layer
 | rendering/lighting/Lighting.ts | 312 | `Lighting` (light direction/colour, point lights), `LitMesh` |
 | rendering/Bloom.ts | 113 | `Bloom`: its own render group, replays registered sources (`Renderer.addBloomSource`) |
 | rendering/{particlePool,spritePool,fxTextures}.ts | 252/75/290 | pooled particles (`ParticlePool`, `particlePrograms`), sprite pool (render group per pool), shared FX textures (`disc, streak, ring, puff, beam, plume*`) |
-| rendering/weapons/{WeaponFx,weaponStyles}.ts | 496/242 | shots, trails, impacts by weapon type: `WEAPON_STYLES`, `weaponStyle(type, grade)` |
+| rendering/weapons/{WeaponFx,weaponStyles}.ts | 496/242 | shots, trails, impacts by weapon type: `WEAPON_STYLES`, `weaponStyle(type, grade, modelId)`, `MODEL_STYLES`, `BEAM_LOOKS` |
 | rendering/{gameShaders,shaderWarmup}.ts | 32/153 | `gameShaders()`: ordered list of programs to compile ahead; `attachShaderWarmup`, `warmShaders`, `shaderReady`, `programsUnder` |
 | client/src/assets/{assetCache,pictureSheet}.ts | 329/44 | IndexedDB asset cache: `assetKind(name, version, {memory})`, `.get/.peek/.preload/.save`, `hashOf`; `BUDGET` 256 MB |
 | rendering/proceduralWorker.ts, procedural.ts | 53/115 | worker generating rock/station/plasma/planet data through the cache |
