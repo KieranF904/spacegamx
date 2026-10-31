@@ -153,6 +153,20 @@ export const STAGE_COVER = 0.4;
 
 export interface PendingBlast { due: number; systemId: number; x: number; y: number; radius: number; damage: number; source: number }
 
+/**
+ * A walking salvo's shell still to fire (features/weaponry walk): from its gun (by part uid), on tick `due`, landing at
+ * `reach` (its fraction of the aim distance when the salvo was fired), with the salvo's damage and ammunition
+ */
+export interface PendingSalvoShell {
+  uid: number;
+  due: number;
+  index: number;
+  reach: number;
+  damageScale: number;
+  dry?: boolean;
+  ammoMods?: WeaponMods;
+}
+
 export interface ShipBridgeConfig {
   catalog: Catalog;
   tuning: ShipTuning;
@@ -225,6 +239,8 @@ export interface BridgeInternals {
   beams: ShipBridge['beams']; pdList: ShipBridge['pdList']; pdOn: ShipBridge['pdOn'];
   ungridded: ShipBridge['ungridded']; castOn: ShipBridge['castOn']; castOk: ShipBridge['castOk'];
   gravityK: ShipBridge['gravityK'];
+  markedUntil: ShipBridge['markedUntil']; slowedUntil: ShipBridge['slowedUntil']; salvos: ShipBridge['salvos'];
+  guides: ShipBridge['guides']; beamStruck: ShipBridge['beamStruck'];
   // Private methods modules call back through
   fieldAt: ShipBridge['fieldAt'];
   rebuildNow: ShipBridge['rebuildNow']; syncHealth: ShipBridge['syncHealth']; cover: ShipBridge['cover'];

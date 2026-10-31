@@ -452,6 +452,26 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
     if (Object.keys(set).length) m.weaponMods = { ...m.weaponMods, set };
   }
   for (const id of Object.keys(FIRE)) if (!models.some((m) => m.id === id && m.weapon)) throw new Error(`fire block for ${id}, which isn't a weapon model`);
+
+  // ---- Shot behaviours (rework 2026-11, the shot-behaviours unit: common/src/ships/features/weaponry): shared options a
+  // model switches on in its weaponMods.set. endAtAim: bursts or splits at the aim distance (or earlier on its fuse or
+  // on impact); walk: a salvo landing at these fractions of the aim distance, `gap` ticks apart; guided: steers to the
+  // cursor (at most `turn` rad a tick) while the trigger is held; mark: a beam whose target takes +20% damage from
+  // everyone while lit and `ticks` after; slow: a beam whose target flies slowed (-40% thrust and turning) while lit and
+  // `ticks` after (the Frostbite's is its kind's: tuning.json weapons.frostbite.slow). A family unit tunes the numbers.
+  const SHOT = {
+    flak_cloudmaker: { endAtAim: true },
+    legendary_prism: { endAtAim: true },
+    emp_blackout: { endAtAim: true },
+    mortar_quake: { walk: { at: [0.7, 1, 1.3], gap: 15 } },
+    missile_hammerhead: { guided: { turn: 0.05 } },
+    laser_searchlight: { mark: { ticks: 120 } },
+  };
+  for (const [id, set] of Object.entries(SHOT)) {
+    const m = models.find((x) => x.id === id && x.weapon);
+    if (!m) throw new Error(`shot behaviour for ${id}, which isn't a weapon model`);
+    m.weaponMods = { ...m.weaponMods, set: { ...(m.weaponMods?.set ?? {}), ...set } };
+  }
 }
 // ---- (end firing models)
 for (const id of Object.keys(MOUNT)) if (!models.some((m) => m.id === id && m.weapon)) throw new Error(`mount for ${id}, which isn't a weapon model`);

@@ -71,7 +71,7 @@ describe('part features: the registry', () => {
     const W = WIRE as WireManifest;
     // Pilot extras, in order after the charge groups (strafer.ts pilotExtras)
     const data = new Array(CHARGE_GROUPS_AT).fill(0);
-    data.push(101, 102, 103);
+    W.pilotExtra.forEach((_, k) => data.push(101 + k));
     const x = pilotExtras(data) as Record<string, number>;
     W.pilotExtra.forEach((e, k) => expect(x[e.name]).toBe(101 + k));
     // Keyframe tail (network/replication.ts packKeyframe)

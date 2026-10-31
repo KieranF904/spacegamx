@@ -37,7 +37,9 @@ export function computeWireHash(): string {
     {
       type: 'snapshot', tick: 1234, lastProcessedInput: 7, removed: [5],
       entities: [{ id: 1, type: 1, x: 10.5, y: -3, angle: 0.25, vx: 1, vy: 0, av: 0.01, hp: 100, maxHp: 120, data: [1, 2, 3], name: 'Ash' },
-        { id: 40, type: 7, vx: 8.38, vy: -31.3, data: [1, 1, (2247 * 137) % 360, 1230, 27286.2, 21513.6, 2247, 1, 0] }],
+        { id: 40, type: 7, vx: 8.38, vy: -31.3, data: [1, 1, (2247 * 137) % 360, 1230, 27286.2, 21513.6, 2247, 1, 0, 0] },
+        // (a shell that ends at a chosen point: its end tick, data[9])
+        { id: 42, type: 7, vx: 12, vy: -5, data: [9, 1, (31 * 137) % 360, 1220, 50, 60, 31, 1.6, 1, 1290] }],
       ships: [[2, 1, 4, 5, 0, 0, 0.5, 0, 0, 1, 16, 4000]], ctl: [[9, 1, 17, 4100], [-2251, 2, 9, 5249, -88, -28]], out: [3], fire: [[2, 1, 0, 100, 50, 51]],
     },
     { type: 'damage', targetId: 2242, amount: 14, sourceId: 2248, critical: true },

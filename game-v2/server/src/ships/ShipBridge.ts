@@ -16,7 +16,7 @@ import {
   WeaponInfo, WeaponTuning, ReplicaMode, FireRecord, type FlightBody, type Charge,
 } from '@space-game/common';
 import {
-  STAGE_COVER, type ShipHost, type PartDestroyedEvent, type PilotOrders, type PendingBlast,
+  STAGE_COVER, type ShipHost, type PartDestroyedEvent, type PilotOrders, type PendingBlast, type PendingSalvoShell,
   type ShipBridgeConfig, type ShipBridgeStats, type ContactPiece, type BridgeCtx,
 } from './bridge/core.js';
 import * as sync from './bridge/sync.js';
@@ -88,6 +88,16 @@ export class ShipBridge {
    * frost hits take it off, and frozen through a ship seizes up (common/src/ships/warmth.ts)
    */
   private warmth = new Map<number, number>();
+  /** Marked ships (a Searchlight's beam, features/weaponry): they take MARK_TAKEN × every hit until this tick */
+  private markedUntil = new Map<number, number>();
+  /** Slowed ships (a Frostbite's beam, features/weaponry): thrust and turning × SLOW_CONTROL until this tick */
+  private slowedUntil = new Map<number, number>();
+  /** Walking salvos under way, per ship: the shells still to fire (bridge/weapons.ts stepSalvos) */
+  private salvos = new Map<number, PendingSalvoShell[]>();
+  /** Where each ship's guns aimed on the last tick they stepped, and whether the trigger was held (guided shells steer to it) */
+  private guides = new Map<number, { tick: number; held: boolean; x: number; y: number }>();
+  /** The ship the last damaging beam tick burned (fireBeam; -1 none): a marking or slowing beam's role reads it */
+  private beamStruck = -1;
   /** Burning parts (incendiary hits): damage over time, spreading to neighbours as parts go */
   private burns: { eid: number; part: number; until: number; dps: number; radius: number; source: number; hit?: HitInfo }[] = [];
   /** Weapon beams on this tick, per ship: how far along the nearest one hit (0..1) */
@@ -288,6 +298,9 @@ export class ShipBridge {
 
   stepWeapons(eid: number): boolean { return wpn.stepWeapons(this.ctx, eid); }
 
+  /** Where a ship's guns aimed and whether its trigger was held, if they stepped this tick or the last (a guided shell steers to it) */
+  guideOf(eid: number, tick: number): { held: boolean; x: number; y: number } | undefined { return wpn.guideOf(this.ctx, eid, tick); }
+
   private stepMiners(eid: number, ship: ShipState, on: boolean, aimWorld: number, aimDist: number): void { return wpn.stepMiners(this.ctx, eid, ship, on, aimWorld, aimDist); }
 
   private fireWeapons(eid: number, ship: ShipState, firing: boolean, aimWorld?: number, aimDist = 0, target = -1, energy?: { charge: Charge }): void { return wpn.fireWeapons(this.ctx, eid, ship, firing, aimWorld, aimDist, target, energy); }
@@ -385,6 +398,18 @@ export class ShipBridge {
 
   /** Damage one part from outside the usual weapons (a boss's beam): hurt, and reported as any hit is */
   damagePartBy(eid: number, part: number, amount: number, source: number, hit?: HitInfo): number { return dmg.damagePartBy(this.ctx, eid, part, amount, source, hit); }
+
+  /** Mark a ship for `ticks` (a Searchlight's beam): it takes MARK_TAKEN × every hit, from everyone */
+  mark(eid: number, ticks: number): void { return dmg.mark(this.ctx, eid, ticks); }
+
+  /** Slow a ship for `ticks` (a Frostbite's beam): thrust and turning × SLOW_CONTROL, as its replicas fly it (CTL.slowed) */
+  slow(eid: number, ticks: number): void { return dmg.slow(this.ctx, eid, ticks); }
+
+  /** Ticks it stays marked (0: it isn't) */
+  markedTicksLeft(eid: number): number { return dmg.markedTicksLeft(this.ctx, eid); }
+
+  /** Ticks it stays slowed (0: it isn't), so the pilot's prediction flies it slowed exactly as long */
+  slowedTicksLeft(eid: number): number { return dmg.slowedTicksLeft(this.ctx, eid); }
 
   /** Is this ship's electronics knocked out by an EMP? */
   isEmped(eid: number): boolean { return dmg.isEmped(this.ctx, eid); }

@@ -207,6 +207,12 @@ export class SnapshotBuilder {
    */
   /** Each ship's part HP as sent (to a tenth), worked out once a snapshot, and the snapshot it last changed at */
   private hpWire = new Map<number, { ship: ShipState; at: number; since: number; hp: number[] }>();
+  /** The tick a pilot's slowing ends (0: not slowed): its own row goes again when it changes (features/weaponry) */
+  private slowEnd(eid: number): number {
+    const left = this.ships.slowedTicksLeft(eid);
+    return left > 0 ? this.currentTick + left : 0;
+  }
+
   /** The part features' values for the pilot's own row (fills the scratch array; spread it at once) */
   private fxWire(eid: number): number[] {
     const out = this.fxRow;
@@ -363,13 +369,15 @@ export class SnapshotBuilder {
         d.length = end;
         if (ship) packGunState(ship, d); else d.push(0); }
       // Everyone else: status only (motion is replicated). data: [shield %, EMP'd, mining beam hit (tenths), weapon beam on,
-      // mining beam on, cursor distance (hundreds), what its Tow Beam tows]
+      // mining beam on, cursor distance (hundreds), what its Tow Beam tows, its statuses (bits: marked 1, slowed 2)]
       const status: EntityState = {
         id: eid, type: EntityType.Player, x: row.state.x, y: row.state.y, hp: row.state.hp, maxHp: row.state.maxHp,
         data: [Math.round(this.ships.shieldFraction(eid) * 20) * 5, this.ships.isEmped(eid) ? 1 : 0,
           Math.round(beam.hit * 10), this.ships.weaponBeamState(eid).on ? 1 : 0, beam.on ? 1 : 0, Math.round(Input.cursorDist[eid] / 100),
           // [6] what its Tow Beam tows (entity id + 1, 0 none: ships/features/tow, features.wire.json status)
-          this.features.status('tow', eid)],
+          this.features.status('tow', eid),
+          // [7] marked and slowed (bits: ships/features/weaponry, features.wire.json status)
+          this.features.status('weaponry', eid)],
       };
       row.other = { state: status, key: this.internKey(-1 - eid, `${status.hp},${status.maxHp},${status.data!.join(',')}`) };
     }
@@ -408,11 +416,12 @@ export class SnapshotBuilder {
       if (InSystem.systemId[eid] !== num) continue;
       const ownerId = Projectile.ownerId[eid];
       const vx = Math.round(Velocity.x[eid] * 100) / 100, vy = Math.round(Velocity.y[eid] * 100) / 100;
-      // data: [weaponType, tier, hue (golden-angle hash of the owner), spawnTick, spawnX, spawnY, ownerId, sizeScale, turret]
+      // data: [weaponType, tier, hue (golden-angle hash of the owner), spawnTick, spawnX, spawnY, ownerId, sizeScale, turret,
+      // endTick (a shell that ends at a chosen point: the tick it lands or bursts, 0 none: Weapons.spawn)]
       const data = [
         Projectile.weaponType[eid], Projectile.tier[eid], (ownerId * 137) % 360, Projectile.spawnTick[eid],
         Math.round(Projectile.spawnX[eid] * 10) / 10, Math.round(Projectile.spawnY[eid] * 10) / 10,
-        ownerId, Math.round((Projectile.sizeScale[eid] || 1) * 100) / 100, Projectile.turret[eid],
+        ownerId, Math.round((Projectile.sizeScale[eid] || 1) * 100) / 100, Projectile.turret[eid], Projectile.endTick[eid],
       ];
       // Where it is goes only if the client can't work it out (spawn + velocity × age: see GameState)
       const x = Math.round(Position.x[eid] * 100) / 100, y = Math.round(Position.y[eid] * 100) / 100;
@@ -526,7 +535,8 @@ export class SnapshotBuilder {
         if (r.id === conn.playerId) {
           // Its own ship: only when its prediction needs correcting, its status changed (its warmth too), or now and then
           const d = r.state.data ?? [];
-          const key = JSON.stringify([r.state.hp, r.state.maxHp, d[4], d[5], d[PILOT_ROW.field], d[PILOT_ROW.warmth]]);
+          // (and when its slowing ends: its prediction flies a slowed ship, features/weaponry)
+          const key = JSON.stringify([r.state.hp, r.state.maxHp, d[4], d[5], d[PILOT_ROW.field], d[PILOT_ROW.warmth], this.slowEnd(r.id)]);
           const version = this.replication.versionOf(r.id);
           const need = conn.forceSnapshot || conn.selfLate || version !== conn.selfVersion || key !== conn.selfKey
             || this.currentTick - conn.selfSentTick >= SELF_SAFETY_TICKS || !prevStates.has(r.id);

@@ -11,7 +11,7 @@
 import { hasComponent, entityExists } from 'bitecs';
 import {
   Position, Velocity, Rotation, Input, Boost, Player, Dead, InSystem, stepShipPhysics, quantizeShipBody, damagePart,
-  stepDrift, withEmp, withNumb, jumpTuning, pilotJumpStep, NO_FIELDS, convexPenetration, ReplicaMode, CTL,
+  stepDrift, withEmp, withNumb, withSlowed, jumpTuning, pilotJumpStep, NO_FIELDS, convexPenetration, ReplicaMode, CTL,
   controlBits, quantizeReplicaAngle, partWeaponDef, partMaterial, powerTick, gunLoad, quantizeCargo,
   buildFlightInputs, newFlightControls, chargeTotal, getPlan,
   type ShipState, type Vec2, type GravityWell, type FlightConstants, type FlightInputSource,
@@ -183,10 +183,12 @@ export function stepMovement(b: BridgeCtx, eid: number): boolean {
   const controls = buildFlightInputs(readInputsInto(eid, MOVE_SRC), emp, MOVE_CTL);
   // Numb with cold, the drive is sluggish (warmth.ts): its pilot's prediction works it out from the warmth it's told, replicas from CTL.numb
   const cold = b.coldStage(eid);
-  const hazard = withNumb(b.host.hazardFlight?.(eid, ship.derived, body.x, body.y), cold);
+  // Slowed by a Frostbite's beam (features/weaponry): after the cold, before an EMP, as its prediction and replicas (CTL.slowed) have it
+  const slowed = b.slowedUntil.size > 0 && b.slowedTicksLeft(eid) > 0;
+  const hazard = withSlowed(withNumb(b.host.hazardFlight?.(eid, ship.derived, body.x, body.y), cold), slowed);
   b.replicaCtl.set(eid, {
     mode: ReplicaMode.Player, q, derived: ship.derived,
-    bits: controlBits(controls) | (emp ? CTL.emp : 0) | (cold.control < 1 ? CTL.numb : 0),
+    bits: controlBits(controls) | (emp ? CTL.emp : 0) | (cold.control < 1 ? CTL.numb : 0) | (slowed ? CTL.slowed : 0),
   });
   // Charging fields round the step (a star's ring, a lodestone's): the range boost from where it starts, then a faster
   // cooldown and a lodestone's priming from where it ends (the pilot's prediction runs the same: ShipClient.predict)

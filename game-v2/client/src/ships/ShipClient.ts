@@ -12,7 +12,7 @@
 
 import { stepPointDefenceAim, pointDefenceOf, chargeGroupsEnd, TELL_CHARGE_START, TELL_CHARGE_CANCEL } from '@space-game/common';
 import { GunSync } from './gunSync';
-import { buildFlightInputs, newFlightControls, payMining, gunLoad, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, warmthStage, withNumb, type WeaponInfo, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules } from '@space-game/common';
+import { buildFlightInputs, newFlightControls, payMining, gunLoad, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, warmthStage, withNumb, withSlowed, type WeaponInfo, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules } from '@space-game/common';
 import hazardData from '../../../data/hazards.json';
 
 const HAZARD_RULES = hazardData as unknown as HazardRules;
@@ -902,8 +902,9 @@ export class ShipClient {
     const body = { x: player.x, y: player.y, vx: player.vx, vy: player.vy, angle: player.angle, angVel: player.angVel ?? 0, jump: player.jump ?? 0, jumpScale: player.jumpScale, cargo: player.cargoMass ?? 0, dodge: player.dodge ?? 0, dodgeDir: player.dodgeDir ?? 0 };
     // Hit by an EMP (or frozen through): the drive crippled and no jump starting, exactly as the server has it (ShipBridge.stepMovement)
     const emp = tick < (player.empUntil ?? 0);
-    // (and numb with cold, a sluggish drive: warmth.ts, from the warmth the server tells)
-    const hazard = withNumb(this.hazardFor(ship.derived, player.x, player.y), warmthStage(player.warmth ?? 100));
+    // (and numb with cold, a sluggish drive: warmth.ts, from the warmth the server tells; then slowed by a Frostbite's
+    // beam, from the slowed ticks it tells: features/weaponry, flight.ts withSlowed)
+    const hazard = withSlowed(withNumb(this.hazardFor(ship.derived, player.x, player.y), warmthStage(player.warmth ?? 100)), tick < (player.slowUntil ?? 0));
     // Charging fields round the step, exactly as the server has them (ShipBridge.stepMovement): the range boost from
     // where it starts, then a faster cooldown and a lodestone's priming from where it ends
     let res!: ReturnType<typeof stepShipPhysics>;

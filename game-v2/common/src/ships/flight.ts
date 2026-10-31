@@ -64,6 +64,27 @@ export interface FlightConstants {
   hazard?: { control: number; driftAccel: number; jump: number; cap: number };
 }
 
+/**
+ * Slowed (a Frostbite beam's status, features/weaponry): thrust and turning × this while lit and a while after. The
+ * server flies it from its own clock, the pilot's prediction from the slowed ticks in its row, replicas from CTL.slowed
+ * (replica.ts): the same hazard on every side, applied after the cold's numbness and before an EMP.
+ */
+export const SLOW_CONTROL = 0.6;
+
+const SLOWED_ALONE: NonNullable<FlightConstants['hazard']> = Object.freeze({ control: SLOW_CONTROL, driftAccel: 0, jump: 1, cap: 1 });
+const slowedScratch: NonNullable<FlightConstants['hazard']> = { control: 1, driftAccel: 0, jump: 1, cap: 1 };
+
+/** What a slowed drive flies with (allocation-free: the result is only good until the next call, so pass it straight on) */
+export function withSlowed(h: FlightConstants['hazard'] | undefined, slowed: boolean): FlightConstants['hazard'] | undefined {
+  if (!slowed) return h;
+  if (!h) return SLOWED_ALONE;
+  slowedScratch.control = h.control * SLOW_CONTROL;
+  slowedScratch.driftAccel = h.driftAccel;
+  slowedScratch.jump = h.jump;
+  slowedScratch.cap = h.cap;
+  return slowedScratch;
+}
+
 /** Pull towards the system origin: a = strength / max(r, minRadius)² */
 export interface GravityWell {
   strength: number;

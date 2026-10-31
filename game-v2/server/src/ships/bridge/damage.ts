@@ -10,13 +10,43 @@ import { hasComponent } from 'bitecs';
 import {
   Position, Velocity, Player, InSystem, ShipState, Vec2, damagePart, coreHp, healPart, restorePart, hitMultiplier,
   type HitInfo, warmthStage, warmthPercent, insulationOf, THAW, WARMTH_STAGES, type WarmthStage, fartherThan,
-  nearestParts, partDistance, standing, stageOf, currentStage, RUIN_HP, seededRng, hashInts,
+  nearestParts, partDistance, standing, stageOf, currentStage, RUIN_HP, seededRng, hashInts, MARK_TAKEN,
 } from '@space-game/common';
 import { GLANCING, STAGE_COVER, EMP_IMMUNE_TICKS, type PendingBlast, type BridgeCtx } from './core.js';
 
 /** Seize a ship up (as an EMP) for `ticks`: hazards' storms */
 export function emp(b: BridgeCtx, eid: number, ticks: number): void {
   b.empUntil.set(eid, Math.max(b.empUntil.get(eid) ?? 0, b.host.getTick() + ticks));
+}
+
+/** Mark a ship for `ticks` (a Searchlight's beam, features/weaponry): every hit on it × MARK_TAKEN till then */
+export function mark(b: BridgeCtx, eid: number, ticks: number): void {
+  const until = b.host.getTick() + ticks;
+  if ((b.markedUntil.get(eid) ?? 0) < until) b.markedUntil.set(eid, until);
+}
+
+/** Slow a ship for `ticks` (a Frostbite's beam, features/weaponry): thrust and turning × SLOW_CONTROL till then */
+export function slow(b: BridgeCtx, eid: number, ticks: number): void {
+  const until = b.host.getTick() + ticks;
+  if ((b.slowedUntil.get(eid) ?? 0) < until) b.slowedUntil.set(eid, until);
+}
+
+export function markedTicksLeft(b: BridgeCtx, eid: number): number {
+  return statusLeft(b, b.markedUntil, eid);
+}
+
+export function slowedTicksLeft(b: BridgeCtx, eid: number): number {
+  return statusLeft(b, b.slowedUntil, eid);
+}
+
+/** Ticks left of a status (worn off: forgotten) */
+function statusLeft(b: BridgeCtx, until: Map<number, number>, eid: number): number {
+  const u = until.get(eid);
+  if (u === undefined) return 0;
+  const left = u - b.host.getTick();
+  if (left > 0) return left;
+  until.delete(eid);
+  return 0;
 }
 
 /** A frost hit landed (a gemmed gun, the Brood Mother's cold): it takes `amount` of warmth, less what the hull keeps out; frozen through, the ship seizes up for `ticks` */
@@ -189,7 +219,8 @@ export function hurt(b: BridgeCtx, eid: number, ship: ShipState, part: number, a
   // (spaced plating: a blast does a share of its damage to the plate it lands on)
   if (vs?.splash) amount *= b.catalog.functions.get(ship.blueprint.parts[part]?.fn)?.splashTaken ?? 1;
   if (vs?.bane && b.host.baneFaction?.(eid) === vs.bane.faction) amount *= vs.bane.damage;
-  const taken = b.host.takenScale?.(eid) ?? 1;
+  // (marked by a Searchlight: more from every source, features/weaponry)
+  const taken = (b.host.takenScale?.(eid) ?? 1) * (b.markedUntil.size && (b.markedUntil.get(eid) ?? 0) > b.host.getTick() ? MARK_TAKEN : 1);
   amount *= taken;
   const tick = b.host.getTick();
   let dealt = 0;

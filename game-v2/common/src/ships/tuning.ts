@@ -145,8 +145,21 @@ export interface WeaponTuning {
   stagger?: boolean;
   /** Shots per trigger pull, fanned across `spread` (the hive) */
   burst?: number;
-  /** Beam: each tick on a ship takes 1/holdTicks of its warmth (warmth.ts: held this long on a warm ship, it's frozen through), and frozen through it seizes up (an EMP) for `ticks` */
-  chill?: { holdTicks: number; ticks: number };
+  // --- Shot behaviours (features/weaponry: weapon roles and shot options; docs/design/rework-2026-11.md) ---
+  /**
+   * Ends at the aim point: its flight is cut to reach the aim distance (the mortar's land-at-cursor maths: launch.ts
+   * lifeToReach), where it bursts (splash, emp) or splits (split); earlier on its fuse (proximity) or on impact
+   */
+  endAtAim?: boolean;
+  /** A walking salvo: shell i lands at `at[i]` × the aim distance, each `gap` ticks after the one before (implies endAtAim) */
+  walk?: { at: number[]; gap: number };
+  /** Guided: while its gun's trigger is held the shell turns toward the cursor (at most `turn` rad a tick); let go, it flies straight */
+  guided?: { turn: number };
+  /** Beam: what it lights is marked (takes MARK_TAKEN × damage from everyone) while lit and `ticks` after */
+  mark?: { ticks: number };
+  /** Beam: what it lights is slowed (thrust and turning × SLOW_CONTROL, flight.ts) while lit and `ticks` after */
+  slow?: { ticks: number };
+  // --- end shot behaviours ---
   /** The part hit burns (damage over time), spreading to parts within `radius` cells */
   ignite?: { dps: number; ticks: number; radius: number };
   /** Shatters on impact into `count` shots of `kind` fanned over `arc` degrees */

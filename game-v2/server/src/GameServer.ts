@@ -3402,6 +3402,7 @@ this.devTeleport = opts.devTeleport ?? false;
     Projectile.spawnTick[eid] = this.currentTick;
     Projectile.spawnX[eid] = spawnX;
     Projectile.spawnY[eid] = spawnY;
+    Projectile.endTick[eid] = 0;
     Bullet.speed[eid] = speed;
     // Slower shells live longer, so the range stays the same
     Lifetime.remaining[eid] = Math.round(BLASTER_LIFE_TICKS / shape.speedScale);

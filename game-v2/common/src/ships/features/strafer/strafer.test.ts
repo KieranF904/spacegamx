@@ -358,7 +358,7 @@ describe('Burst Strafer: the wire', () => {
     const data = new Array(CHARGE_GROUPS_AT).fill(0);
     data[PILOT_ROW.groups] = 2;
     data.push(50, 60, 3, 17, 43);
-    expect(pilotExtras(data)).toEqual({ dodge: 3, dodgeDir: 17, tow: 43 });
-    expect(pilotExtras(undefined)).toEqual({ dodge: 0, dodgeDir: 0, tow: 0 });
+    expect(pilotExtras(data)).toEqual({ dodge: 3, dodgeDir: 17, tow: 43, marked: 0, slowed: 0 });
+    expect(pilotExtras(undefined)).toEqual({ dodge: 0, dodgeDir: 0, tow: 0, marked: 0, slowed: 0 });
   });
 });

@@ -8,7 +8,7 @@
 
 import { collideTerrain, terrainRadius } from '@space-game/common';
 import {
-  Position, Velocity, Rotation, FRICTION, stepFlight, withEmp, ReplicaMode, CTL, controlBits, replicaAngle,
+  Position, Velocity, Rotation, FRICTION, stepFlight, withEmp, withSlowed, ReplicaMode, CTL, controlBits, replicaAngle,
   quantizeReplicaAngle, powerTick, gunLoad, FULL_CHARGE, type ShipState, type FlightConstants,
 } from '@space-game/common';
 import type { PilotOrders, BridgeCtx } from './core.js';
@@ -78,10 +78,12 @@ export function stepPilotless(b: BridgeCtx, eid: number, ship: ShipState, k: Fli
     q = quantizeReplicaAngle(controls.targetAngle);
     controls = { ...controls, targetAngle: replicaAngle(ReplicaMode.Pilotless, q) };
   }
-  // EMP'd: it keeps flying, crippled (as a pilot does)
-  b.replicaCtl.set(eid, { mode: ReplicaMode.Pilotless, bits: (controls === hold ? CTL.hold : controlBits(controls)) | (emp ? CTL.emp : 0), q, derived: ship.derived });
+  // EMP'd: it keeps flying, crippled (as a pilot does); slowed by a Frostbite's beam, sluggish (features/weaponry)
+  const slowed = b.slowedUntil.size > 0 && b.slowedTicksLeft(eid) > 0;
+  b.replicaCtl.set(eid, { mode: ReplicaMode.Pilotless, bits: (controls === hold ? CTL.hold : controlBits(controls)) | (emp ? CTL.emp : 0) | (slowed ? CTL.slowed : 0), q, derived: ship.derived });
   if (orders?.impulse && !emp) { body.vx += orders.impulse[0]; body.vy += orders.impulse[1]; }
-  stepFlight(body, controls, ship.derived, b.tuning, { charge: FULL_CHARGE, drainRate: 0 }, emp ? { ...k, hazard: withEmp(undefined) } : k);
+  const hazard = withSlowed(undefined, slowed);
+  stepFlight(body, controls, ship.derived, b.tuning, { charge: FULL_CHARGE, drainRate: 0 }, emp ? { ...k, hazard: withEmp(hazard) } : hazard ? { ...k, hazard } : k);
   // A surface's rock (as the replicas have it: replicaStep)
   collideTerrain(body, terrainRadius(ship.derived.radius), b.host.terrainAt?.(eid));
   b.writeBody(eid, ship, body);

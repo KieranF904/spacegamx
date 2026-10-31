@@ -30,6 +30,6 @@ describe('the strafer feature (server)', () => {
     const out: number[] = [];
     new ServerFeatures([tow, serverFeature], hostWith({ dodge: 3, dodgeDir: 17 })).wire(1, out);
     const row = [...new Array(CHARGE_GROUPS_AT).fill(0), ...out];
-    expect(pilotExtras(row)).toEqual({ dodge: 3, dodgeDir: 17, tow: 7 });
+    expect(pilotExtras(row)).toEqual({ dodge: 3, dodgeDir: 17, tow: 7, marked: 0, slowed: 0 });
   });
 });

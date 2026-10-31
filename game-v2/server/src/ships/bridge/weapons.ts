@@ -14,8 +14,9 @@ import {
   castParts, partDistance, pointInConvex, standing, deciding, stageOf, currentStage, stageParts, shipPointToWorld,
   WeaponInfo, WeaponTuning, firesStraight, partWeaponDef, stepGuns, ammoCode, outputOf, payMining, MINE_CYCLE,
   MINING_PULSE, MINE_TAIL, mineFalloff, type Charge, pulseProfile, beamFalloff, windupScale, TELL_CHARGE_START, TELL_CHARGE_CANCEL,
+  endsAtAim, aimReach, buildShot,
 } from '@space-game/common';
-import { K, BEAM_PAD, GLANCING, type BridgeCtx } from './core.js';
+import { K, BEAM_PAD, GLANCING, type BridgeCtx, type PendingSalvoShell } from './core.js';
 import { fireBeamHook, tickWeaponHooks } from '../features/weapons.js';
 
 export function lastFiredTick(b: BridgeCtx, eid: number): number {
@@ -162,6 +163,11 @@ export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: 
   let beamHit = -1;
   // The guns' tick (shared with the pilot's client, which fires its own shells on the same tick: guns.ts)
   const { shots, beams, pulses, tells } = stepGuns(ship, pose, { firing, aimWorld, aimDist, energy }, tick, b.tuning);
+  // Where the guns aim this tick and whether the trigger is held: a guided shell steers to it (features/weaponry guided; Weapons.guide)
+  noteGuide(b, eid, tick, firing, pose, aimWorld, aimDist);
+  // A walking salvo's later shells, on their ticks (features/weaponry walk)
+  const pending = b.salvos.get(eid);
+  if (pending) stepSalvos(b, eid, ship, pose, tick, pending);
   // A charge gun starting to charge, or let go early: a fire event with no shells, so everyone sees its tell (ammo code: guns.ts TELL_CHARGE_*)
   for (const t of tells) b.fired.push({ owner: eid, tick, part: t.w.part, aimQ: t.aimQ, ids: [], ammo: t.start ? TELL_CHARGE_START : TELL_CHARGE_CANCEL });
   for (const w of beams) {
@@ -183,9 +189,9 @@ export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: 
   for (const { w, aimQ, shot } of shots) {
     const d = def(w);
     const gunMods = ship.blueprint.parts[w.part].mods;
-    // Missiles lock on to the target given, or the one nearest the aim point
+    // Missiles lock on to the target given, or the one nearest the aim point (a guided one is steered instead)
     let lock = -1;
-    if (d.homing) {
+    if (d.homing && !d.guided) {
       lock = target;
       if (lock < 0 && aimWorld !== undefined) {
         const ax = pose.x + Math.cos(aimWorld) * Math.max(aimDist, 400), ay = pose.y + Math.sin(aimWorld) * Math.max(aimDist, 400);
@@ -195,14 +201,66 @@ export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: 
     // (An ammunition gun's shot costs its `rounds` from the hold; Ammo.ts: an empty hold fires plain rounds, as it always has)
     let round = b.host.spendAmmo?.(eid, w.kind, !d.ammo);
     for (let k = 1; k < (w.fire.model === 'ammo' ? w.fire.rounds ?? 1 : 1); k++) round = b.host.spendAmmo?.(eid, w.kind, !d.ammo) ?? round;
-    const ids = b.host.fireBaseShot(eid, shot.x, shot.y, shot.angle, shot.damageScale * b.damageMul(eid) * (round?.scale ?? 1),
+    const damageScale = shot.damageScale * b.damageMul(eid) * (round?.scale ?? 1);
+    // (A shell that ends at the aim flies the aim distance: a lobbed mortar's, an aim burst's, a walking salvo's first)
+    const ids = b.host.fireBaseShot(eid, shot.x, shot.y, shot.angle, damageScale,
       { speedScale: shot.speedScale, sizeScale: shot.sizeScale, turret: shot.mount === 'turret', kind: w.kind, target: lock, seed: `${eid}:${ship.blueprint.parts[w.part].uid}`, mods: gunMods, dry: round?.dry, ammoMods: round?.mods,
-        reach: d.lob ? Math.max(200, aimDist) : undefined, grade: w.grade, size: w.size, model: w.model });
+        reach: endsAtAim(d) ? aimReach(aimDist, d, 0) : undefined, grade: w.grade, size: w.size, model: w.model });
     if (ids?.length && firesStraight(d)) b.fired.push({ owner: eid, tick, part: w.part, aimQ, ids, ...(round?.item ? { ammo: ammoCode(round.item) } : {}) });
+    // A walking salvo: the rest of its shells, `gap` ticks apart, each landing at its fraction of this aim distance
+    if (d.walk && d.walk.at.length > 1) {
+      let list = b.salvos.get(eid);
+      if (!list) b.salvos.set(eid, (list = []));
+      const uid = ship.blueprint.parts[w.part].uid;
+      for (let i = 1; i < d.walk.at.length; i++) {
+        list.push({ uid, due: tick + d.walk.gap * i, index: i, reach: aimReach(aimDist, d, i), damageScale, dry: round?.dry, ammoMods: round?.mods });
+      }
+    }
   }
   if (beamHit >= 0) b.weaponBeams.set(eid, beamHit);
   else b.weaponBeams.delete(eid);
   if (shots.length || beams.length || pulses.length || tells.length) b.lastFired.set(eid, tick);
+}
+
+/** Note where a ship's guns aim this tick (the cursor point) and whether the trigger is held (allocation-free after its first) */
+function noteGuide(b: BridgeCtx, eid: number, tick: number, firing: boolean, pose: { x: number; y: number }, aimWorld: number | undefined, aimDist: number): void {
+  let g = b.guides.get(eid);
+  if (!g) b.guides.set(eid, (g = { tick, held: false, x: 0, y: 0 }));
+  g.tick = tick;
+  g.held = firing && aimWorld !== undefined;
+  if (aimWorld === undefined) return;
+  // (No cursor distance known: a point well out along the aim, as a missile's lock looks)
+  const d = Math.max(aimDist, 400);
+  g.x = pose.x + Math.cos(aimWorld) * d;
+  g.y = pose.y + Math.sin(aimWorld) * d;
+}
+
+/** Where a ship's guns aimed and whether its trigger was held, if they stepped this tick or the last (undefined: stale, or no guns) */
+export function guideOf(b: BridgeCtx, eid: number, tick: number): { held: boolean; x: number; y: number } | undefined {
+  const g = b.guides.get(eid);
+  return g && tick - g.tick <= 1 ? g : undefined;
+}
+
+/**
+ * A walking salvo's later shells (features/weaponry walk), each on its tick from its gun's barrel as it points now,
+ * landing at its own fraction of the aim distance the salvo was fired at. A gun shot away drops what it had left.
+ */
+function stepSalvos(b: BridgeCtx, eid: number, ship: ShipState, pose: { x: number; y: number; angle: number }, tick: number, list: PendingSalvoShell[]): void {
+  let keep = 0;
+  for (let i = 0; i < list.length; i++) {
+    const p = list[i];
+    if (p.due > tick) { list[keep++] = p; continue; }
+    let w: WeaponInfo | undefined;
+    for (const x of ship.derived.weapons) if (x.uid === p.uid) { w = x; break; }
+    if (!w) continue;
+    const shot = buildShot(w, ship, pose, tick, b.tuning);
+    b.host.fireBaseShot(eid, shot.x, shot.y, shot.angle, p.damageScale,
+      { speedScale: shot.speedScale, sizeScale: shot.sizeScale, turret: shot.mount === 'turret', kind: w.kind, seed: `${eid}:${p.uid}:w${p.index}`, mods: ship.blueprint.parts[w.part]?.mods,
+        dry: p.dry, ammoMods: p.ammoMods, reach: p.reach, grade: w.grade, size: w.size, model: w.model });
+    b.lastFired.set(eid, tick);
+  }
+  list.length = keep;
+  if (!keep) b.salvos.delete(eid);
 }
 
 /** Each pulse under way burns its tick's share along its gun's aim, as wide as its curve says; done, it's dropped */
@@ -279,11 +337,11 @@ export function fireBeam(b: BridgeCtx, eid: number, ship: ShipState, w: WeaponIn
     const stop = rockT * (shipHit ? shipHit.t : 1);
     b.host.beamMobs(InSystem.systemId[eid], x, y, x + (x1 - x) * stop, y + (y1 - y) * stop, half * 2, dmg * beamFalloff(def, stop * range * 0.5), eid);
   }
+  b.beamStruck = -1;
   if (shipHit && rockT >= 0.999) {
-    if (def.chill) {
-      // Each tick on a ship takes its warmth (frozen through from warm in holdTicks), and frozen through it seizes up
-      b.frostHit(shipHit.eid, 1 / def.chill.holdTicks, def.chill.ticks);
-    }
+    // (What it burned: a marking or slowing beam's role reads it, features/weaponry. Beams no longer chill: a
+    // Frostbite slows what it lights instead)
+    b.beamStruck = shipHit.eid;
     const armor = shipHit.ship.blueprint.parts[shipHit.part].fn === 'armor' ? def.armorBonus ?? 1 : 1;
     // Past its effective range a fading beam (the laser's) burns ever weaker, out to where it gives out (pulse.ts beamFalloff)
     const fade = beamFalloff(def, shipHit.t * range);

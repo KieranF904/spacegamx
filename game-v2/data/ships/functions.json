@@ -637,7 +637,7 @@
       "legacy": true,
       "name": "Frostbite Lance",
       "rarity": "legendary",
-      "description": "Legendary. A freezing beam: hold it on a ship and its engines and guns seize up for a moment.",
+      "description": "Legendary. A freezing beam: the ship it touches is slowed, its thrust and turning cut while lit and a moment after.",
       "category": "weapons",
       "fabOrder": 8,
       "color": "#7dd3fc",
