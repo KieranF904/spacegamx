@@ -1,11 +1,13 @@
 # Server core
-The Node process that runs the world: `index.ts` wires stores, data and transports; `GameServer.ts` (4,888 lines, one class) owns the ECS world, the 60 Hz tick (its system table is `buildTickSystems()`, phases in `tickOrder.ts`), the message handler table (`buildMessageHandlers()`, dispatch in `net/dispatch.ts`), snapshots, and the hosts that feed every `server/src/game/*` module. Join and sign-in (`net/auth.ts`), the module-forwarding handlers (`net/handlers/modules.ts`), ship editing and dock messages (`net/handlers/shipEdit.ts`), docking (`game/Docking.ts`) and derelicts and people's craft (`game/Derelicts.ts`) were split out of it in Stages 2 and 3. Most gameplay lives in those modules; GameServer is the glue. Do not read it whole: use the line map below.
+The Node process that runs the world: `index.ts` wires stores, data and transports; `GameServer.ts` (4,168 lines, one class) owns the ECS world, the 60 Hz tick (its system table is `buildTickSystems()`, phases in `tickOrder.ts`), the message handler table (`buildMessageHandlers()`, dispatch in `net/dispatch.ts`), snapshots, and the hosts that feed every `server/src/game/*` module. Join and sign-in (`net/auth.ts`), the module-forwarding handlers (`net/handlers/modules.ts`), ship editing and dock messages (`net/handlers/shipEdit.ts`), docking (`game/Docking.ts`) and derelicts and people's craft (`game/Derelicts.ts`) were split out of it in Stages 2 and 3; the snapshot path (`net/SnapshotBuilder.ts`, `net/snapshot/Outbox.ts`) in Stage 5. Most gameplay lives in those modules; GameServer is the glue. Do not read it whole: use the line map below.
 
 ## Files (what each owns)
 | path | lines | owns |
 |---|---|---|
 | server/src/index.ts | 192 | entry: env (`PORT`, `ADMIN_PORT`, `BROWSER_URL`, `LOBBY_ADMIN_SECRET`, `NODE_ENV`), `createUserStore`, `createProfileStore`, `checkGameData`, builds `GameServer`, `SocketTransport`, writes `data/status/live.json` every 2 s, graceful `shutdown` (20 s save budget), process-level handlers, registers with the lobby every 10 s (also receives `deletedAccounts`) |
-| server/src/GameServer.ts | 5101 | see section map below |
+| server/src/GameServer.ts | 4168 | see section map below |
+| server/src/net/SnapshotBuilder.ts | 828 | `SnapshotBuilder` with its `SnapshotHost` (built once at the end of the constructor, pieces copied into plain fields): `sendSnapshots`, `systemRows`, `sendShipUpdates`, row keys, `sendMapDots`, `updateShipView`, `enterSystem`, `sendPlayerState`, `sendSystemInfo`. GameServer reaches it as `this.snapshots` |
+| server/src/net/snapshot/Outbox.ts, constants.ts | 140 / 25 | `Outbox`: outboxes, lazy effects, broadcasts, byte counters (`this.net`; GameServer bumps `this.net.batching` around a tick or request); the snapshot tuning constants |
 | server/src/game/Docking.ts | 142 | `Docking`: berthing at a station, `dockedShips` (the Set GameServer aliases), `stationInRange`, `dockingSystem`, `handleDock`/`undock` |
 | server/src/game/Derelicts.ts | 202 | `Derelicts`: derelict hulks (spawn, break-up, salvage, respawn, tow delivery), `personCraft`, `onPilotlessShipDestroyed` |
 | server/src/net/auth.ts | 199 | `registerAuthHandlers`: join, authLogin, authRegister; guest-name rules; `handleHttpAuth`, `rejectAuth` |
@@ -28,9 +30,9 @@ The Node process that runs the world: `index.ts` wires stores, data and transpor
 ## GameServer.ts section map (grep the banner text or the method name, then read a slice; no line numbers)
 | section (banner or symbol) | what is there |
 |---|---|
-| imports, module constants | `LAZY_TYPES`/`LAZY_TICKS`, `RIFT_*`, `MEMORY_GATE_MOUTH`. `PRE_JOIN` and `MAX_INPUTS_PER_TICK` are in net/dispatch.ts |
+| imports, module constants | `RIFT_*`, `MEMORY_GATE_MOUTH` (the snapshot constants are in net/snapshot/constants.ts). `PRE_JOIN` and `MAX_INPUTS_PER_TICK` are in net/dispatch.ts |
 | SPATIAL PARTITIONING (`SpatialGrid`) | the per-system collision grid (`addEntity`, `query`, `queryRay`) |
-| PERFORMANCE METRICS, QUERIES | tick timing stats and the bitecs queries |
+| PERFORMANCE METRICS, QUERIES | tick timing stats and the bitecs queries (`playerQuery`, `projectileQuery`, `droppedItemQuery` are imported from net/SnapshotBuilder.ts) |
 | CLIENT CONNECTION | only the pilot-row helpers here; the `ClientConnection` interface is in net/ClientConnection.ts |
 | GameServer class | `GameServerOptions`, class fields (`handlers`, `tickSystems`, `inputQueue`, the `Input` shadows), `constructor` (builds every module in dependency order, `create*Host()` for each) |
 | `step()`, `setPaused`, `getTick`, `getShips` | tests and proto drive `step()` |
@@ -45,7 +47,7 @@ The Node process that runs the world: `index.ts` wires stores, data and transpor
 | SYSTEMS | `weaponSystem`, `projectileSystem`, `placeAsteroid`, `stationOrbitSystem`, `shotWall`, `collisionSystem`, `asteroidDeathSystem`, `trafficSystem`/`trafficIntent`, `createMemoryHost`, `threats`/`regionThreats`, `deathCause`, `lifetimeSystem`, `cleanupSystem` |
 | DERELICTS | a seam only: `getTrafficShips`. Derelict respawn, salvage and tow delivery are game/Derelicts.ts (`derelictRespawnSystem`, `towDelivered`, `onPilotlessShipDestroyed`); GameServer keeps field aliases (`derelicts`, `personCraft`) |
 | docking | the `dockingSystem` tick entry and `handleDock` live in game/Docking.ts; GameServer keeps the `dockedShips` alias and `stationInRange`/`isDocked` one-liners |
-| NETWORKING | `send`, `queue`, `flushOutbox`, `flushLazy`, `broadcastToSystem`, `sendShipUpdates`, `systemRows` (the pilot row), `sendSnapshots`, `sendMapDots`, `updateShipView`, `enterSystem`, `sendPlayerState`, `sendSystemInfo` |
+| NETWORKING | one-line delegates only: `send`, `flushOutbox`, `flushLazy`, `broadcastToSystem`, `broadcastProjectileHit`, `broadcastNear` (net/snapshot/Outbox.ts), `sendSnapshots`, `sendPlayerState` (net/SnapshotBuilder.ts); `terrainOf`, `replicaEnv` (the replication environments) |
 | ADMIN SERVER INTEGRATION | `setupAdminHandlers`, `adminKillAllEnemies`, `adminTeleportPlayer`, `handleHttpAuth` (delegates to net/auth.ts), `reportAdminStats`, `liveStatus` |
 
 ### Tick order (`buildTickSystems()` builds the table; `tick()` walks it)

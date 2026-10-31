@@ -44,7 +44,7 @@ Add a flight-affecting ability (dodge-style):
 2. Feature file `common/src/ships/<x>.ts`: tuning + pure `stepX(counter, want, able, t)`; keep state as ONE integer on `FlightBody`.
 3. flight.ts: add the field to `FlightBody` and the control to `FlightControls`; hook into `stepFlight` at the matching banner (read only that slice).
 4. Controls plumbing, ALL copies: protocol.ts input type + binary flags (bump `PROTOCOL_VERSION`, `npm run wire:bump`), the input list in common/src/network/inputFields.ts (`INPUT_BOOLS`/`INPUT_NUMBERS`) and GameServer `applyInputToEntity`/`releaseControls`, `controlBits`/`flightControls`/`CTL` in replica.ts, ShipBridge.stepMovement (body read + input), ShipClient.predict (body + `player.x` write-back), client input collection (`ui-hud-input`), `GameState.ts` pilot-row parsing (`player.dodge` etc.). The audit flags these hand-copied lists as the top drift risk.
-5. Keyframes/snapshots: pilot row extras (`pilotExtras` in strafer.ts, used by GameServer.systemRows).
+5. Keyframes/snapshots: pilot row extras (`pilotExtras` in strafer.ts, used by SnapshotBuilder.systemRows, net/SnapshotBuilder.ts).
 Tune: edit data/ships/tuning.json, never inline constants; respect the `xxxTuning` default pattern.
 Add a velocity source (gravity, hazard): through `FlightConstants`, not in the bridge.
 
