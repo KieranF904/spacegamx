@@ -62,6 +62,7 @@ const TRADE_OFF: Record<string, string> = {
   laser_glint: 'a long pulse you time, reaches far',
   laser_cutter: 'burns deeper the longer it stays on one part, short reach',
   laser_searchlight: 'reaches furthest, marks what it lights for 20% more damage',
+  legendary_frostbite: 'a held freeze beam; slows what it lights by 40% (thrust and turning)',
   pulse_strobe: 'steady bursts that strip shields',
   pulse_overpulse: 'dumps a clip of bolts into shields, barely scratches hull',
   missile_dart: 'locks on · ammo',

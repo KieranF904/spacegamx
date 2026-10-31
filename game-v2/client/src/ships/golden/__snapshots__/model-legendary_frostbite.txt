@@ -31,7 +31,7 @@ Medium
 Medium · Panel
 
 == tradeOff ==
-The freeze beam
+a held freeze beam; slows what it lights by 40% (thrust and turning)
 
 == keyStats ==
 95 dmg/s · reach 760 · held beam · draws 24
