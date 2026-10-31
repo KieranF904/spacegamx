@@ -241,7 +241,7 @@ function stepClip(ship: ShipState, w: WeaponInfo, share: number): void {
  *   clip) it reloads at its share, then the clip is full; a regrowing clip gets a
  *   round back at a time instead.
  * - charge: held, aligned and cooled, it charges at its share; full, it fires
- *   itself and cools down. Let go early, the charge drains away and nothing fires.
+ *   itself and cools down. Let go early, or held off the aim, the charge drains away and nothing fires.
  * - ammo: a cycle that needs no power (the server spends the rounds).
  * - beam: on while held and aligned; short of power it burns that share of the
  *   ticks, evenly spread (the sputter); a windup ramps its damage in.
@@ -316,8 +316,9 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
     // A spinning gun spins up while it's fired, and down when it isn't
     if (f.spin) ship.spin[p] = want ? Math.min(1, ship.spin[p] + 1 / Math.max(1, f.spin.up)) : Math.max(0, ship.spin[p] - 1 / Math.max(1, f.spin.down));
     if (f.model === 'charge') {
-      // Let go: a charge under way drains away, and nothing fires (held but off target or cooling, it holds)
-      if (!orders.firing) { if (ship.charge[p] > 0) { tell(w, false); ship.charge[p] = -ship.charge[p]; } continue; }
+      // Let go: a charge under way drains away, and nothing fires (held but cooling, it waits)
+      // Held but unable to fire (off the aim, still slewing) counts as let go too: a stalled charge would otherwise keep drawing its energy
+      if (!want) { if (ship.charge[p] > 0) { tell(w, false); ship.charge[p] = -ship.charge[p]; } continue; }
       if (canFire && ship.cooldown[p] <= 0) ready.push(w);
       continue;
     }
