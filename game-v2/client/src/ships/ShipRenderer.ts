@@ -18,7 +18,7 @@ import { HullWorker } from './hullWorkerClient';
 import { fromWire, type HullJob } from './hullWire';
 import { buildHull, skeletonCovered, type HullBuild } from './hullBuild';
 import { beam } from '../rendering/fxTextures';
-import { EntityType, ShipState, SIDE_NORMAL, Side, facingEdges, isOpen, isWeaponFn, wireCells, cellKey, type Blueprint } from '@space-game/common';
+import { EntityType, ShipState, SIDE_NORMAL, Side, facingEdges, isOpen, isWeaponFn, wireCells, cellKey, type Blueprint, type WeaponInfo } from '@space-game/common';
 import type { ShipSource } from './ShipStore';
 import type { GameState } from '../state/GameState';
 import type { Renderer } from '../rendering/Renderer';
@@ -29,6 +29,7 @@ import { decorOf } from './partDecor';
 import type { ClientFeatures } from './features/host';
 import type { ShipDrawCtx } from './features/types';
 import { turretHead, type GunShape } from './gunDecor';
+import { animOf, lightsLit, reloadShare, type GunAnimSpec } from './gunAnim';
 import { cameraView } from '../rendering/cameraView';
 import factionsData from '../../../data/factions.json';
 
@@ -124,6 +125,13 @@ interface Turret {
   /** Recoil (1 just fired, easing back to 0) and barrel heat (builds with sustained fire) */
   kick: number;
   heat: number;
+  /** Its state-driven decor (gunAnim.ts), the Graphics it draws on and what that last showed, and a frame count for its vents */
+  anim?: GunAnimSpec;
+  deco?: Graphics;
+  decoKey?: number;
+  phase?: number;
+  ventT?: number;
+  reloading?: boolean;
 }
 
 interface Barrel {
@@ -146,6 +154,13 @@ interface Barrel {
   kick: number;
   heat: number;
   debris: boolean;
+  /** Its state-driven decor (gunAnim.ts), the Graphics it draws on and what that last showed, and a frame count for its vents */
+  anim?: GunAnimSpec;
+  deco?: Graphics;
+  decoKey?: number;
+  phase?: number;
+  ventT?: number;
+  reloading?: boolean;
 }
 
 /** How far a barrel slides back when it fires (fraction of its length), and how fast it returns and cools (per 60 Hz frame) */
@@ -215,8 +230,8 @@ function showCracks(gun: { crack?: Graphics; look: string }, holder: Container, 
   gun.crack.visible = true;
 }
 /** A gun's Graphics and holder destroyed (its shared look kept for others), its look given back */
-function disposeGun(gun: { metal: Graphics; lit?: Graphics; crack?: Graphics; look: string }, holder: Container): void {
-  gun.metal.destroy(); gun.lit?.destroy(); gun.crack?.destroy();
+function disposeGun(gun: { metal: Graphics; lit?: Graphics; crack?: Graphics; deco?: Graphics; look: string }, holder: Container): void {
+  gun.metal.destroy(); gun.lit?.destroy(); gun.crack?.destroy(); gun.deco?.destroy();
   holder.destroy();
   dropGun(gun.look);
 }
@@ -406,6 +421,29 @@ export class ShipRenderer {
     if (!hit || bestD > hit.len + 40) return;
     hit.kick = Math.min(1.4, power);
     hit.heat = Math.min(1, hit.heat + HEAT_PER_SHOT);
+  }
+
+  /**
+   * How far the spin of the gun a shot left (x, y) from has got (0..1): your own gun's spin, another ship's how hard it is
+   * being fired (its barrel heat). 0 if no gun fits.
+   */
+  spinAt(owner: number, x: number, y: number): number {
+    const view = this.views.get(owner);
+    if (!view || (!view.turrets.length && !view.fixed.length)) return 0;
+    const c = view.container, cos = Math.cos(c.rotation), sin = Math.sin(c.rotation);
+    let best: Turret | Barrel | null = null, bestD = Infinity;
+    for (const t of view.turrets) {
+      const d = Math.hypot(c.x + t.x0 * cos - t.y0 * sin - x, c.y + t.x0 * sin + t.y0 * cos - y);
+      if (d < bestD) { bestD = d; best = t; }
+    }
+    for (const b of view.fixed) {
+      const d = Math.hypot(c.x + b.x0 * cos - b.y0 * sin - x, c.y + b.x0 * sin + b.y0 * cos - y);
+      if (d < bestD) { bestD = d; best = b; }
+    }
+    if (!best) return 0;
+    const ship = view.ship;
+    if (owner === this.state.playerId && ship) return Math.max(0, Math.min(1, ship.spin[best.part] ?? 0));
+    return Math.min(1, best.heat * 1.1);
   }
 
   /**
@@ -799,7 +837,7 @@ export class ShipRenderer {
       bg.position.set(b.x0, b.y0);
       metal.tint = debris ? 0x555555 : GUN_TINT;
       view.barrels.addChild(bg);
-      view.fixed.push({ g: bg, metal, lit, part: b.part, look, x0: b.x0, y0: b.y0, nx: b.nx, ny: b.ny, len: b.len, kick: 0, heat: 0, debris, tm: -1, tl: -1 });
+      view.fixed.push({ g: bg, metal, lit, part: b.part, look, x0: b.x0, y0: b.y0, nx: b.nx, ny: b.ny, len: b.len, kick: 0, heat: 0, debris, tm: -1, tl: -1, anim: debris ? undefined : animOf(ship.blueprint.parts[b.part].fn) });
     }
     this.hulls.set(view.id, build.hull, ship.derived.radius + cs);
     // Under the hull: its frame, if it has one, and its skeleton (a boss's: what's seen as its carapace comes off);
@@ -996,6 +1034,88 @@ export class ShipRenderer {
     }
   }
 
+  private weaponOfPart(ship: ShipState, part: number): WeaponInfo | undefined {
+    for (let i = 0; i < ship.derived.weapons.length; i++) if (ship.derived.weapons[i].part === part) return ship.derived.weapons[i];
+    return undefined;
+  }
+
+  /**
+   * One gun's state-driven decor (gunAnim.ts): the reload glow (returned: 0..1 of the way to its red), vents and
+   * ejects off the housing, a spinning cluster, rail lights. `dx, dy` is the barrel's direction in the container `c`
+   * (a turret's turns with it: 1, 0), `len` its length. Your own guns read the ship's gun state; other ships' guns
+   * keep the resting look (a spin follows how hard they are being fired).
+   */
+  private animate(view: BodyView, ship: ShipState, gun: Turret | Barrel, w: WeaponInfo | undefined, c: Container, x0: number, y0: number,
+    dx: number, dy: number, len: number, frames: number): number {
+    const a = gun.anim!, p = gun.part, mine = view.id === this.state.playerId;
+    const reload = w?.fire.reload ?? 0, left = mine ? ship.reload[p] ?? 0 : 0;
+    const share = reloadShare(left, reload);
+    if (left > 0) {
+      // The housing in the world (a turret's barrel turns with it)
+      const ang = 'barrel' in gun ? gun.barrel.rotation : 0, ca = Math.cos(ang), sa = Math.sin(ang);
+      const cr = view.container.rotation, cc = Math.cos(cr), cs = Math.sin(cr);
+      const bx = (dx * ca - dy * sa), by = (dx * sa + dy * ca);
+      const lx = x0 + bx * len * 0.5, ly = y0 + by * len * 0.5;
+      const fa = cr + Math.atan2(by, bx);
+      gun.ventT = (gun.ventT ?? 0) + frames;
+      if (a.vent && gun.ventT >= a.vent.every) {
+        gun.ventT = 0;
+        this.renderer.ventPuff(view.container.x + lx * cc - ly * cs, view.container.y + lx * cs + ly * cc, fa, a.vent.kind, a.vent.color);
+      }
+      if (!gun.reloading && a.eject !== undefined) {
+        // The spent clip falls out sideways
+        const ex = view.container.x + x0 * cc - y0 * cs, ey = view.container.y + x0 * cs + y0 * cc;
+        this.renderer.ventPuff(ex, ey, fa + Math.PI / 2, 'spark', a.eject);
+        this.renderer.ventPuff(ex, ey, fa - Math.PI / 2, 'spark', a.eject);
+      }
+    }
+    gun.reloading = left > 0;
+    if (a.lights || a.spin) {
+      if (!gun.deco) {
+        gun.deco = new Graphics();
+        gun.deco.blendMode = 'add';
+        c.addChild(gun.deco);
+      }
+      const d = gun.deco;
+      // Along the barrel's line (a turret's frame turns with its head: dx, dy = 1, 0; a fixed gun's is the ship's, from its base)
+      const px = -dy, py = dx;
+      if (a.lights) {
+        const n = a.lights.n, lit = lightsLit(n, mine ? ship.rounds[p] ?? n : n, left, reload);
+        // (redrawn only when what it shows changes: sixths of a light)
+        const key = Math.round(lit * 6) + (left > 0 ? 1000 : 0);
+        if (key !== gun.decoKey) {
+          gun.decoKey = key;
+          d.clear();
+          const r = Math.max(1.3, len * 0.028);
+          for (let i = 0; i < n; i++) {
+            const u = len * (0.3 + 0.55 * (i / (n - 1)));
+            const k = Math.max(0, Math.min(1, lit - i));
+            d.circle(dx * u, dy * u, r * 1.9).fill({ color: a.lights.color, alpha: 0.12 + 0.2 * k });
+            d.circle(dx * u, dy * u, r).fill({ color: k > 0.5 ? 0xe8fbff : a.lights.color, alpha: 0.12 + 0.88 * k });
+          }
+        }
+      }
+      if (a.spin) {
+        // The cluster turns with the gun's spin; another ship's follows how hard it is fired
+        const spin = mine ? ship.spin[p] ?? 0 : Math.min(1, gun.heat * 1.1);
+        if (spin > 0.02 || gun.decoKey) {
+          gun.phase = ((gun.phase ?? 0) + frames * (0.15 + 1.1 * spin)) % (Math.PI * 2);
+          gun.decoKey = spin > 0.02 ? 1 : 0;
+          d.clear();
+          if (spin > 0.02) {
+            const R = Math.max(2, len * 0.06);
+            for (let i = 0; i < 3; i++) {
+              const v = R * Math.sin(gun.phase + (i * Math.PI * 2) / 3), ox = px * v, oy = py * v;
+              d.moveTo(dx * len * 0.35 + ox, dy * len * 0.35 + oy).lineTo(dx * len * 0.95 + ox, dy * len * 0.95 + oy);
+              d.stroke({ color: 0xffd9a0, width: Math.max(1, len * 0.014), alpha: 0.18 + 0.5 * spin });
+            }
+          }
+        }
+      }
+    }
+    return a.reloadGlow !== undefined ? share * 0.7 : 0;
+  }
+
   /**
    * Turret barrels at their current aim: bright when the shot is open, dim when
    * hull is in the way. Each barrel is drawn once, in white, and only turned
@@ -1026,7 +1146,7 @@ export class ShipRenderer {
         const x0 = (w.window.pivot[0] - cx) * cs, y0 = (w.window.pivot[1] - cy) * cs;
         barrel.position.set(x0, y0);
         view.guns.addChild(barrel);
-        view.turrets.push({ part: w.part, weapon: wi, barrel, metal, lit, look, x0, y0, len: w.window.barrel * cs, kick: 0, heat: 0, tm: -1, tl: -1 });
+        view.turrets.push({ part: w.part, weapon: wi, barrel, metal, lit, look, x0, y0, len: w.window.barrel * cs, kick: 0, heat: 0, tm: -1, tl: -1, anim: animOf(fn) });
       }
     }
     for (const t of near ? view.turrets : []) {
@@ -1042,9 +1162,12 @@ export class ShipRenderer {
       const tf = ship.hp[t.part] / (ship.maxHp[t.part] || 1);
       const hot = Math.min(1, t.heat * 0.85 + t.kick * 0.3);
       // (set only when it changes: a tint set marks the Graphics for re-batching)
-      const tm = mix(hurt(shade(open ? GUN_TINT : GUN_BLOCKED, this.lvl), tf), 0xffd9a0, hot);
+      // (a gun reloading glows red; gunAnim.ts)
+      const rg = t.anim ? this.animate(view, ship, t, w, t.barrel, t.x0, t.y0, 1, 0, t.len, frames) : 0;
+      let tm = mix(hurt(shade(open ? GUN_TINT : GUN_BLOCKED, this.lvl), tf), 0xffd9a0, hot);
+      if (rg > 0) tm = mix(tm, t.anim!.reloadGlow!, rg);
       if (tm !== t.tm) t.metal.tint = t.tm = tm;
-      if (t.lit) { const tl = mix(hurt(open ? 0xffffff : 0x9a9a9a, tf), 0xffd9a0, hot); if (tl !== t.tl) t.lit.tint = t.tl = tl; }
+      if (t.lit) { let tl = mix(hurt(open ? 0xffffff : 0x9a9a9a, tf), 0xffd9a0, hot); if (rg > 0) tl = mix(tl, t.anim!.reloadGlow!, rg); if (tl !== t.tl) t.lit.tint = t.tl = tl; }
       showCracks(t, t.barrel, tf);
       t.kick = Math.max(0, t.kick - frames * RECOIL_RETURN);
       t.heat = Math.max(0, t.heat - frames * COOL);
@@ -1052,9 +1175,11 @@ export class ShipRenderer {
     for (const b of view.fixed) {
       const bf = ship.hp[b.part] / (ship.maxHp[b.part] || 1);
       const hot = Math.min(1, b.heat * 0.85 + b.kick * 0.3);
-      const tm = b.debris ? shade(0x555555, this.lvl) : mix(hurt(shade(GUN_TINT, this.lvl), bf), 0xffd9a0, hot);
+      const rg = b.anim ? this.animate(view, ship, b, this.weaponOfPart(ship, b.part), b.g, b.x0, b.y0, b.nx, b.ny, b.len, frames) : 0;
+      let tm = b.debris ? shade(0x555555, this.lvl) : mix(hurt(shade(GUN_TINT, this.lvl), bf), 0xffd9a0, hot);
+      if (rg > 0) tm = mix(tm, b.anim!.reloadGlow!, rg);
       if (tm !== b.tm) b.metal.tint = b.tm = tm;
-      if (b.lit) { const tl = b.debris ? 0x333333 : mix(hurt(0xffffff, bf), 0xffd9a0, hot); if (tl !== b.tl) b.lit.tint = b.tl = tl; }
+      if (b.lit) { let tl = b.debris ? 0x333333 : mix(hurt(0xffffff, bf), 0xffd9a0, hot); if (rg > 0) tl = mix(tl, b.anim!.reloadGlow!, rg); if (tl !== b.tl) b.lit.tint = b.tl = tl; }
       showCracks(b, b.g, bf);
       if (b.kick <= 0 && b.heat <= 0) continue;
       // Fixed guns slide back into the hull, and glow hot

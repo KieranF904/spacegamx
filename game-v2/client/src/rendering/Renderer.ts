@@ -1670,6 +1670,16 @@ export class Renderer {
     this.weaponFx.onMuzzle = fn;
   }
 
+  /** A gun's spin where a shot left it (WeaponFx.spinAt) */
+  set spinAtOf(fn: WeaponFx['spinAt']) {
+    this.weaponFx.spinAt = fn;
+  }
+
+  /** Smoke or sparks off a gun that is reloading (WeaponFx.vent) */
+  ventPuff(x: number, y: number, angle: number, kind: 'smoke' | 'spark', color: number): void {
+    this.weaponFx.vent(x, y, angle, kind, color);
+  }
+
   /** The server reported where a projectile hit: stop its tracer there and throw sparks. */
   showProjectileHit(projectileId: number | undefined, x: number, y: number): void {
     this.weaponFx.onHit(projectileId, x, y);

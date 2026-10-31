@@ -292,7 +292,9 @@ export class DamageFx {
       return;
     }
     if (kind === 'railgun') {
+      // A slug passing through a hull (a Spear's, at full damage): a shock ring where it went through, a cyan-white flash
       this.glow(x, y, 0, 0, 40, 8, 0xdbeafe, 0.9);
+      this.ring(x, y, 0, 0, 8, 70, 16, 0x9fe8ff, 0.8);
       this.burstSparks(x, y, 0, 0, 14, 4, 10, 0xbfe3ff);
       return;
     }
@@ -306,10 +308,14 @@ export class DamageFx {
       return;
     }
     if (kind === 'flak') {
-      // A puff of black smoke shot through with shrapnel
-      this.glow(x, y, 0, 0, radius * 0.45, 8, 0xffd9a0, 0.9);
-      this.burstSparks(x, y, 0, 0, 26, 3, 9, 0xffb050);
-      for (let i = 0; i < 6; i++) this.dustPuff(x, y, (Math.random() - 0.5) * 1.4, (Math.random() - 0.5) * 1.4, radius * (0.2 + Math.random() * 0.15), 70 + Math.random() * 40, 0x2e2a28, 0.55, radius * 0.004);
+      // A burst: an orange flash, shrapnel streaks and a cloud that lingers (the Burst's 1.2 s dark grey; the Cloudmaker's
+      // bigger one, brown-grey round a gold core, 2.5 s: a wall that stays)
+      const wall = radius >= 220;
+      this.glow(x, y, 0, 0, radius * 0.45, 8, wall ? 0xffd070 : 0xffa050, 0.9);
+      this.burstSparks(x, y, 0, 0, wall ? 20 : 26, 3, 9, 0xffb050);
+      if (wall) this.glow(x, y, 0, 0, radius * 0.5, 60, 0xd9a040, 0.35, radius * 0.002);
+      const stay = wall ? 150 : 72;
+      for (let i = 0; i < 6; i++) this.dustPuff(x, y, (Math.random() - 0.5) * 1.4, (Math.random() - 0.5) * 1.4, radius * (0.2 + Math.random() * 0.15), stay * (0.85 + Math.random() * 0.3), wall ? 0x5a4a3c : 0x3a3836, 0.55, radius * 0.004);
       this.sound('explosion_small', { x, y }, 0.55);
       return;
     }
