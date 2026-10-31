@@ -358,7 +358,7 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   MOUNT.point_defence_turret = 'turret';
   MOUNTING.point_defence_turret = { arc: 300 };
   const SUPPORT = [
-    ['utility_repair_beam', 'Repair Beam', 'repair', ['rect2'], 17, 'steel', { weapon: 'repair', demand: 28, priority: 2, hpScale: 0.7, weaponMods: {} },
+    ['utility_repair_beam', 'Repair Beam', 'repair', ['rect2'], 17, 'steel', { weapon: 'repair', demand: 14, priority: 2, hpScale: 0.7, weaponMods: {} },
       "Mends 42 HP a second into the friendly part its beam lands on (range 520, 28 power a second): hold fire with it on a party member or an ally. It can't mend your own ship, a destroyed part or a shield, and does nothing to an enemy.", 'utility'],
     ['point_defence_turret', 'Point Defence Turret', 'point_defence', ['sq'], 10, 'steel', { weapon: 'point_defence', demand: 10, priority: 2, fireInterval: 12, hpScale: 0.6, weaponMods: {} },
       'Shoots down incoming missiles, torpedoes, mortar shells and seekers on its own: 5 shots a second out to 560, 2 power a shot. One hit kills a missile, mortar shell or seeker; a Hammerhead takes 2, an Eel 3, a Leviathan 5. It never fires at ships, and a boss\'s rings of shots are yours to dodge.', 'weapons'],

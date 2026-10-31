@@ -8,12 +8,12 @@ Mends42 hp/s into an ally's damaged parts where it lands · reach 520 · not you
 Beamheld while you fire · no heat · draws its power while it's on
 MountTurret, 240°
 FittingBolts on any side
-Power draw56/s
+Power draw28/s
 
 == partStats (stats rows) ==
 GradeMk II · Medium
 Hits withKinetic · penetration 2
-Power draw56
+Power draw28
 Hull · mass132 hp · 2.8
 Armour · build2 · 3.2 pts
 TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
@@ -32,7 +32,7 @@ Medium · Panel
 mends allies' parts; nothing for you, big draw
 
 == keyStats ==
-mends 42 hp/s · reach 520 · draws 56
+mends 42 hp/s · reach 520 · draws 28
 
 == mountBadge ==
 TURRET 240°
@@ -48,4 +48,4 @@ Bolts on any side
 {"open":true,"badge":"Lv 17","why":""}
 
 == partStats (raw) ==
-{"grade":2,"mark":"Mk II","size":"Medium","area":2,"hp":131.6,"mass":2.8,"firepower":0,"toughness":131.6,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":0,"heal":42,"range":520,"damageType":"kinetic","pen":2,"draw":56}
+{"grade":2,"mark":"Mk II","size":"Medium","area":2,"hp":131.6,"mass":2.8,"firepower":0,"toughness":131.6,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":0,"heal":42,"range":520,"damageType":"kinetic","pen":2,"draw":28}
