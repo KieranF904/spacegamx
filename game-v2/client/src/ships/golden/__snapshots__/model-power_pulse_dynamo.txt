@@ -4,7 +4,7 @@ Mk II · Square · 1 cell
 Hull · mass67 hp · 1.0
 Armour · build2 · 1.6 pts
 TakesKinetic −5% · Thermal −15% · Cryo −10%
-Surge out+8/s into the bank it touches: no wires; it powers only what its bank touches
+Charges10/s into each Capacitor or Drive Cell bank it touches (no wires; it powers nothing itself)
 
 == partStats (stats rows) ==
 GradeMk II
@@ -14,7 +14,7 @@ TakesKinetic −5% · Thermal −15% · Cryo −10%
 Rating scoretoughness 67
 
 == familyLabel ==
-Surge generators
+Bank chargers
 
 == sizeWord ==
 Small
@@ -23,10 +23,10 @@ Small
 Small · Square
 
 == tradeOff ==
-Surge with no wires, only to its bank
+charges the banks it touches, no wires
 
 == keyStats ==
-+8 surge, by touch
++10/s into each bank it touches
 
 == mountBadge ==
 

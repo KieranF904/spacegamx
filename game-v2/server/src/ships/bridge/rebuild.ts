@@ -33,7 +33,7 @@ export function spawnOn(b: BridgeCtx, eid: number, bp: Blueprint, kind: 'ship' |
   const was = b.bodies.get(eid), had = b.charge.get(eid);
   if (was && had && ship.derived.power) {
     const p = chargeTotal(was.derived, had);
-    b.charge.set(eid, { core: p, s: ship.derived.power.stores.map(() => p) });
+    b.charge.set(eid, { g: p, b: ship.derived.power.banks.map(() => p) });
   }
   b.bodies.set(eid, ship);
   b.ungridded.add(eid);
@@ -333,7 +333,7 @@ export function noteRebuild(b: BridgeCtx, t0: number): void {
 
 export function rebuildNow(b: BridgeCtx, eid: number, ship: ShipState): void {
   const oldCom: Vec2 = ship.derived.com;
-  // (Its circuits may split or join: each store keeps what it held, energy.ts remapCharge)
+  // (Its banks may split or join, its pool grow or shrink: each store keeps what it held, energy.ts remapCharge)
   const before = ship.derived;
   const pose = b.pose(eid);
   const t0 = b.now();

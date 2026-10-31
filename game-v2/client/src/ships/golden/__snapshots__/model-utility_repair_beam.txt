@@ -9,7 +9,6 @@ Beamheld while you fire · no heat · draws its power while it's on
 MountTurret, 240°
 FittingBolts on any side
 Power draw56/s
-On Surgecharged shot: after a 0.5 s pause, a shot hits ×1.5, a packet from the bank
 
 == partStats (stats rows) ==
 GradeMk II · Medium

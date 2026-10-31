@@ -19,7 +19,7 @@ const tuning = cfg.tuning as ShipTuning;
 
 const CARRIES: Record<string, string[]> = {
   'test-tow-hauler': ['utility_tow_beam', 'cargo'],
-  'test-strafer': ['engine_burst_strafer'],
+  'test-strafer': ['engine_burst_strafer', 'power_drive_cell'],
   'test-surge-striker': ['power_pulse_dynamo', 'railgun_rail_driver', 'shield_flash_screen', 'power_capacitor'],
   'test-support': ['utility_repair_beam', 'point_defence_turret'],
   'test-brownout': ['power_capacitor'],
@@ -41,25 +41,25 @@ describe('dev test ships (F9)', () => {
       it(id === 'test-brownout' ? 'browns out when firing and boosting, and refills when you ease off' : 'has positive spare power at idle and does not brown out thrusting and firing', () => {
         const d = createShipState(catalog, tuning, 1, dev[id], 0).derived;
         const t = loadTest(d, tuning, { fire: true, thrust: true, boost: id === 'test-brownout', seconds: id === 'test-brownout' ? 30 : 10 });
-        const browned = t.circuits.some((c) => c.brownAt >= 0);
+        const browned = t.brownAt >= 0;
         if (id === 'test-brownout') {
           expect(browned).toBe(true);
-          expect(t.circuits.some((c) => c.refill < Infinity)).toBe(true); // and it recovers when you ease off
+          expect(t.refill).toBeLessThan(Infinity); // and it recovers when you ease off
         } else {
           expect(d.energy!.spare, 'spare').toBeGreaterThan(0);
-          expect(browned, JSON.stringify(t.circuits)).toBe(false);
+          expect(browned, JSON.stringify(t)).toBe(false);
         }
       });
     });
   }
-  it('the strafer dodges every way, banks touch its flank strafers, and a run of dodges is backed before the circuit browns out', () => {
+  it('the strafer dodges every way, Drive Cell banks touch its flank strafers, and a run of dodges is backed before the ship browns out', () => {
     const d = createShipState(catalog, tuning, 1, dev['test-strafer'], 0).derived;
     const s = d.fx!.strafe!;
     for (const way of [DODGE_FORWARD, DODGE_BACK, DODGE_LEFT, DODGE_RIGHT]) expect(strafeForce(s, way), String(way)).toBeGreaterThan(0);
     const L = d.power!;
-    expect(s.parts.filter((p) => L.feeds[L.feedOf[p.part]].bank >= 0).length).toBeGreaterThanOrEqual(4);
+    expect(s.parts.filter((p) => L.feeds[L.feedOf[p.part]].banks.length > 0).length).toBeGreaterThanOrEqual(4);
     expect(burstEnergy(d, DODGE_LEFT)).toBeGreaterThan(100);
-    // Dodging left as often as it allows: the first several get their full push, then the circuit can't keep up
+    // Dodging left as often as it allows: the first several get their full push, then the ship can't keep up
     let charge: Charge = FULL_CHARGE;
     const kicks: number[] = [];
     for (let n = 0; n < 30; n++) {
@@ -74,8 +74,12 @@ describe('dev test ships (F9)', () => {
     expect(kicks[kicks.length - 1]).toBeLessThan(kicks[0] * 0.8);
     expect(chargeTotal(d, charge)).toBeLessThan(50);
   });
-  it('the Surge striker has a bank with a dynamo, and the Rail Driver and Flash Screen sit on it', () => {
-    const L = createShipState(catalog, tuning, 1, dev['test-surge-striker'], 0).derived.power!;
-    expect(L.stores.some((s) => s.kind === 'k')).toBe(true);
+  it('the striker has a Capacitor bank with its Pulse Dynamos against it, feeding the Rail Driver', () => {
+    const d = createShipState(catalog, tuning, 1, dev['test-surge-striker'], 0).derived, L = d.power!;
+    const rail = dev['test-surge-striker'].parts.findIndex((p) => p.fn === 'railgun_rail_driver');
+    const bank = L.banks.find((b) => b.kind === 'cap')!;
+    expect(bank.dynamos.length).toBe(2);
+    expect(bank.dynamo).toBeCloseTo(20, 6);
+    expect(bank.feeds).toContain(rail);
   });
 });

@@ -179,7 +179,7 @@ export interface PartFeature {
   /** Plan order: derive and load run lower first (ties by id) */
   order: number;
   /** It draws power by the tick while it works (as engines and guns do), not as a steady load at the rebuild. 'engine':
-   * and its circuit counts that draw as an engine's (circuits.ts engineDraw: a Burst Strafer's) */
+   * and Drive Cell banks touching it feed it as they do engines (circuits.ts: a Burst Strafer's) */
   burst?: boolean | 'engine';
   /**
    * Weapon-kind roles (see WeaponRole). A feature that is only this has `applies: () => false`: no function of its

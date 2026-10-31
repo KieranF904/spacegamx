@@ -48,7 +48,7 @@ export interface FeaturePlan {
   readonly globalMask: number;
   /** Features that draw by the tick (rebuild.ts burst) */
   readonly burstMask: number;
-  /** Of those, the ones whose draw their circuit counts as an engine's (burst: 'engine'; circuits.ts engineDraw) */
+  /** Of those, the ones Drive Cell banks feed as they do engines (burst: 'engine'; circuits.ts) */
   readonly engineMask: number;
   /** Features with flight hooks (replica.ts flightSignature folds these in) */
   readonly flightMask: number;

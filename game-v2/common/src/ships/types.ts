@@ -210,16 +210,14 @@ export interface FunctionDef {
   shield?: number;
   /** battery capacity per unit of area (batteries; × the material's output): energy.ts */
   store?: number;
-  /** Which pool a battery fills: general (default: everything draws on it), drive (engines only), weapon (guns and mining lasers only) */
+  /** A bank member's kind: 'drive' a Drive Cell (feeds engines and strafers it touches); else a Capacitor. A store that isn't a bank member is a pool battery, whatever this says (legacy drive and weapon batteries) */
   pool?: 'drive' | 'weapon';
-  /** The most a store gives a second, per unit of area (× its output): its circuit browns out past it (circuits.ts; absent: tuning energy.discharge by pool) */
+  /** The most a store gives a second, per unit of area (× its output): past it the ship browns out (circuits.ts; absent: tuning energy.discharge by kind) */
   discharge?: number;
-  /** A capacitor: touching ones make one bank, which gives only to the consumers it touches (circuits.ts) */
+  /** A bank member (with `pool: 'drive'` a Drive Cell, else a Capacitor): touching ones of a kind make one bank, which feeds the consumers of its kind it touches first (circuits.ts) */
   bank?: boolean;
-  /** A Surge generator (the Pulse Dynamo): Surge power per unit of area a second, into the bank it's part of by touch, never along wires (surge.ts) */
-  surge?: number;
-  /** Dual-fed (Steady + Surge, surge.ts): 'rail' the Rail Driver (its bank sets each shot's power), 'flash' the Flash Screen (a full restore when it breaks) */
-  dual?: 'rail' | 'flash';
+  /** A bank charger (the Pulse Dynamo): energy a second it puts into each bank it touches (× its health), never along wires (circuits.ts) */
+  dynamo?: number;
   /** Must point a facing edge out (engines and weapons do anyway: this is for the rest, e.g. mining lasers) */
   facing?: boolean;
   /** A mining laser (a beam that cuts rock while the pilot mines): `miner` itself, and the models of its family */

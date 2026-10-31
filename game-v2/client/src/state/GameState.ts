@@ -897,7 +897,7 @@ export class GameState {
     // This ensures reconciliation uses fresh fuel data, not 1-second-stale data.
     if (serverState.data && serverState.data.length >= 2) {
       this.serverBoostFuel = serverState.data[1];
-      // (Local circuits: the core's store and each store group's, energy.ts unpackCharge)
+      // (The ship's pool and each bank's, energy.ts unpackCharge)
       this.serverCharge = unpackCharge(serverState.data);
     }
     this.charge = { ...this.serverCharge };

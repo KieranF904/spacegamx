@@ -43,7 +43,7 @@ import { ShipClient } from './ships/ShipClient';
 import type { AdminPanel } from './ui/AdminPanel';
 import type { ContributorPanel } from './ui/ContributorPanel';
 
-import { CircuitBars } from './ui/CircuitBars';
+import { BankBars } from './ui/BankBars';
 import { ObjectiveBanner } from './ui/ObjectiveBanner';
 import { SiegePanel } from './ui/SiegePanel';
 import { moonOffset, planetPosition, pocketAt, inSafeSpace, type StarSystemData } from '@space-game/common';
@@ -189,8 +189,8 @@ private xpFillEl: HTMLElement | null;
   /** The XP bar as last shown (to glow when it grows) */
   private xpSeen: { level: number; into: number } | null = null;
   private boostFillEl: HTMLElement | null;
-  /** Each circuit's charge beside the ENERGY gauge (local circuits) */
-  private circuitBars: CircuitBars | null = null;
+  /** Each bank's charge beside the ENERGY gauge (circuits.ts banks) */
+  private bankBars: BankBars | null = null;
   private levelEl: HTMLElement | null;
   private xpEl: HTMLElement | null;
   private xpToNextEl: HTMLElement | null;
@@ -280,7 +280,7 @@ this.boostHudEl = document.getElementById('boostHud');
 this.xpFillEl = document.getElementById('xpFill');
     this.xpBarEl = document.getElementById('xpBar');
     this.boostFillEl = document.getElementById('boostFill');
-    this.circuitBars = new CircuitBars();
+    this.bankBars = new BankBars();
     this.levelEl = document.getElementById('level');
     this.xpEl = document.getElementById('xp');
     this.xpToNextEl = document.getElementById('xpToNext');
@@ -1518,8 +1518,8 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'none';
       const boostPercent = (this.state.boostFuel / this.state.maxBoostFuel) * 100;
       setStyle(this.boostFillEl, 'height', `${boostPercent.toFixed(1)}%`);
     }
-    // (and each circuit's, flashing while one browns out: ui/CircuitBars.ts)
-    this.circuitBars?.update(this.shipClient?.myShip()?.derived, this.state.charge);
+    // (and each bank's, flashing while what it feeds browns out: ui/BankBars.ts)
+    this.bankBars?.update(this.shipClient?.myShip()?.derived, this.state.charge);
     
     // XP bar: progress through the current level (from the pilot's profile)
     const prof = this.pilot.profile;

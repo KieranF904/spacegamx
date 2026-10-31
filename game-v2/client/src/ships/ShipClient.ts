@@ -952,7 +952,7 @@ export class ShipClient {
       aiming: this.jumpAiming(), aimDist: this.jumpAimInfo.dist, aimLabel: this.jumpAimInfo.label,
       reach: this.jumpReach(), field: me ? this.gaugeField() : undefined, danger: this.jumpAiming() ? this.jumpDanger() : null,
     });
-    // (Part features' chips: the Burst Strafer's, ready or cooling and whether the circuit can pay; the Tow Beam's while it tows)
+    // (Part features' chips: the Burst Strafer's, ready or cooling and whether the ship can pay; the Tow Beam's while it tows)
     this.features.updateIndicators();
     this.damageFx?.update(dt);
     this.beamFx?.update(dt);

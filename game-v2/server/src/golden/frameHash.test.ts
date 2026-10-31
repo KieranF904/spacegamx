@@ -4,7 +4,7 @@
  * A full 'sectors' GameServer runs in-process with four scripted pilots for 900 ticks:
  *   strafer  - the F9 dev ship with Burst Strafers (test-strafer): thrust, turns, dodges every way, fires
  *   tug      - the F9 Tow Beam hauler (test-tow-hauler) with ore in its hold, towing a Corsair wreck
- *   striker  - the F9 Surge striker (test-surge-striker: Pulse Dynamo, Rail Driver, Flash Screen), firing
+ *   striker  - the F9 striker (test-surge-striker: Pulse Dynamos charging a Capacitor bank, Rail Driver, Flash Screen), firing
  *   sparrow  - a stock Sparrow (sparrow-t) flying and firing alongside
  * Every 100 ticks it records, per pilot, a running SHA-256 of every raw frame the server sent that pilot (the
  * bytes on the wire, in order) plus the frame count, and a SHA-256 of a canonical dump of the server's world:

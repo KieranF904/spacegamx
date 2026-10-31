@@ -46,7 +46,7 @@ import { settings } from '../settings/Settings';
 import { boundKeyName } from '../input/keybindings';
 import { costHtml } from '../ui/windowKit';
 import { CONNECTOR_COLOR, functionColor, numToCss } from './shipColors';
-import { cellAt, circuitColor, SURGE_COLOR, eraseRun, layRun, powerReport, pruneWires, stepCells, wireBill, DEAD_NET, type Cell, type PowerReport } from './wireEdit';
+import { cellAt, eraseRun, layRun, powerReport, pruneWires, stepCells, wireBill, DEAD_NET, type Cell, type PowerReport } from './wireEdit';
 
 /** The hangar's load test: this many seconds of the ship's power, from full (energy.ts loadTest) */
 const LOAD_TEST_SECONDS = 4;
@@ -1452,74 +1452,51 @@ export class HangarUI {
   }
 
   /**
-   * Power: each circuit (local circuits: its letter, in its overlay colour)
-   * with its generators and stores, what it spares and what it can give a
-   * second, the load test's verdict on it, whether the design is auto-wired
-   * or wired by hand, and what's wrong (no generator for its stores, a
-   * capacitor touching nothing, a weak link)
+   * Power: each network (in its overlay colour) with its generators and
+   * batteries and what it makes against what's drawn on it, whether the design
+   * is auto-wired or wired by hand, and what's left without power; then the
+   * ship's pool and Output, its banks, and the load test
    */
   private powerHtml(): string {
     const rep = this.power, d = this.derived;
     if (!rep || !d) return '';
     const hand = !!this.bp.wires;
-    const n0 = (v: number) => (Number.isFinite(v) ? Math.round(v).toLocaleString() : '—');
     let html = `<div style="display:flex; align-items:baseline; margin-bottom:4px"><b style="color:#ffb547; letter-spacing:1px">POWER</b>`
       + `<span style="margin-left:auto; font-size:11px; color:${hand ? '#fbbf24' : '#7dd3fc'}" title="${hand ? 'Wired by hand: new segments cost wire spools as you save' : 'Auto-wired: the wires follow your parts, free, until you edit them (the Wires tool, W)'}">${hand ? 'wired by hand' : 'auto-wired'}</span></div>`;
-    const nets = rep.nets.map((n, k) => ({ n, k })).filter(({ n }) => n.letter).sort((a, b) => a.n.letter.localeCompare(b.n.letter));
+    const nets = rep.nets.map((n, k) => ({ n, k })).filter(({ n }) => n.generators.length || n.batteries.length || n.demand > 0);
     if (!nets.length) html += '<div style="color:#6b7a93; font-size:11px; margin-bottom:4px">No generator on this ship.</div>';
-    const lt = this.loadRun && this.loadRun.sig === designSig(this.bp) ? this.loadRun : null;
     for (const { n, k } of nets) {
-      const gens = n.generators.length, stores = n.batteries.length;
-      const what = [gens ? `${gens} gen` : 'no generator', stores ? `${stores} store${stores > 1 ? 's' : ''}` : '', n.main ? 'core' : ''].filter(Boolean).join(' · ');
+      const gens = n.generators.length, bats = n.batteries.length;
+      const what = [gens ? `${gens} generator${gens > 1 ? 's' : ''}` : 'no generator', bats ? `${bats} batter${bats > 1 ? 'ies' : 'y'}` : ''].filter(Boolean).join(' · ');
       const ok = n.supply >= n.demand - 1e-6;
-      html += `<div style="display:flex; align-items:center; gap:6px; padding:2px 0; border-bottom:1px solid #18223a; font-size:11px" title="Circuit ${n.letter}: ${n.parts.length} parts. Its generators make +${n0(n.supply)}/s (steady loads take ${n0(n.demand)}), so ${n0(n.spare)}/s spare for its engines, guns and stores; its stores hold ${n0(n.store)} and give up to ${n0(n.rate)}/s; flat out its engines and guns ask ${n0(n.burst)}/s (boosting asks far more)">`
-        + `<span style="width:15px; height:15px; border-radius:3px; flex-shrink:0; background:${n.color}; color:#0b1220; font-weight:800; text-align:center; line-height:15px">${n.letter}</span>`
-        + `<span style="color:#8ea0bd; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${what}</span>`
-        + `<span style="margin-left:auto; white-space:nowrap"><b style="color:${!n.powered ? '#8ea0bd' : ok ? '#4ade80' : '#fbbf24'}">+${n0(n.spare)}</b><span style="color:#6b7a93">/s · ${n0(n.store)} held · gives ${n0(n.rate)}/s</span></span></div>`;
-      const r = lt?.result.circuits[k];
-      if (r && (r.engines < 1.01 || r.guns < 1.01)) {
-        const pc = (v: number) => `${Math.round(v * 100)}%`;
-        const what2 = r.brownAt < 0 ? '<span style="color:#4ade80">holds up: full power throughout</span>'
-          : `<span style="color:${Math.min(r.engines, r.guns) < 0.5 ? '#f87171' : '#fbbf24'}">browns out ${r.brownAt < 0.05 ? 'at once' : `after ${r.brownAt.toFixed(1)} s`}: engines ${pc(r.engines)}, guns ${pc(r.guns)}</span>`;
-        const refill = !Number.isFinite(r.refill) ? (n.powered ? ' · refills slowly' : ' · <span style="color:#f87171">never refills</span>') : r.refill > 0.05 ? ` · refills in ${r.refill.toFixed(0)} s` : '';
-        html += `<div style="font-size:11px; padding:1px 0 3px 21px; color:#8ea0bd">${what2}${refill}</div>`;
-      }
+      html += `<div style="display:flex; align-items:center; gap:6px; padding:2px 0; border-bottom:1px solid #18223a; font-size:11px" title="${n.parts.length} parts on it">`
+        + `<span style="width:10px; height:10px; border-radius:2px; flex-shrink:0; background:${n.color}"></span><span style="color:#cfd8e6; white-space:nowrap">Network ${k + 1}</span><span style="color:#8ea0bd; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${what}</span>`
+        + `<span style="margin-left:auto; white-space:nowrap" title="Made / drawn steadily (engines and guns draw on the batteries)"><b style="color:${!n.powered ? '#8ea0bd' : ok ? '#4ade80' : '#fbbf24'}">+${Math.round(n.supply)}</b><span style="color:#6b7a93"> / ${Math.round(n.demand)}</span></span></div>`;
     }
-    // Surge banks (energy Phase 2: surge.ts): capacitors and Pulse Dynamos touching, giving only by touch
-    const partName = (i: number) => { const p = this.bp.parts[i], fn = this.deps.catalog.functions.get(p.fn); return fn?.name ?? p.fn; };
-    const names = (list: number[]) => {
-      const c = new Map<string, number>();
-      for (const i of list) c.set(partName(i), (c.get(partName(i)) ?? 0) + 1);
-      return [...c].map(([nm, k]) => (k > 1 ? `${k} ${nm}s` : nm)).join(', ');
-    };
-    for (const b of rep.banks) {
-      const what = [b.capacitors ? `${b.capacitors} capacitor${b.capacitors > 1 ? 's' : ''}` : '', b.dynamos ? `${b.dynamos} dynamo${b.dynamos > 1 ? 's' : ''}` : ''].filter(Boolean).join(' + ');
-      const feeds = [b.feeds.length ? names(b.feeds) : '', b.shields.length ? names(b.shields) : ''].filter(Boolean).join(', ');
-      html += `<div style="display:flex; align-items:center; gap:6px; padding:2px 0; border-bottom:1px solid #18223a; font-size:11px" title="Surge bank ${b.label}: ${what}. Charged by ${b.circuit ? `circuit ${b.circuit}` : 'no circuit'}${b.surge ? ` and its dynamos (+${n0(b.surge)}/s)` : ''}; gives only by touch, to ${feeds || 'nothing'}">`
-        + `<span style="min-width:15px; height:15px; padding:0 2px; border-radius:3px; flex-shrink:0; background:${SURGE_COLOR}; color:#0b1220; font-weight:800; text-align:center; line-height:15px; font-size:10px">${b.label}</span>`
-        + `<span style="color:#c4b5fd; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">Surge · ${feeds ? `feeds ${esc(feeds)}` : '<span style="color:#fbbf24">touches nothing</span>'}</span>`
-        + `<span style="margin-left:auto; white-space:nowrap; color:#6b7a93">${b.surge ? `<b style="color:#c4b5fd">+${n0(b.surge)}</b>/s · ` : ''}${n0(b.cap)} held</span></div>`;
-    }
-    // The core's store, and the load test
-    const core = d.power?.core;
-    if (core) {
-      const main = d.power!.circuits[core.circuit];
-      html += `<div style="font-size:11px; color:#6b7a93; padding:2px 0" title="The core's built-in store: a battery on the main circuit (the one making most power), and a slow trickle into every other circuit and into parts on none, so a cut-off part limps instead of dying">Core store ${n0(core.cap)}: gives ${main ? main.letter : 'the main circuit'} up to ${n0(core.rate)}/s, the others ${n0(core.trickle)}/s</div>`;
-    }
-    if (nets.length) {
+    // The ship's pool and the banks (energy.ts, circuits.ts), and the load test's verdict (energy.ts loadTest)
+    const L = d.power, n0 = (v: number) => (Number.isFinite(v) ? Math.round(v).toLocaleString() : '—');
+    if (L) {
+      html += `<div style="font-size:11px; color:#8ea0bd; padding:2px 0" title="The core's store and the batteries on powered networks: one pool. Output is the most the ship gives a second: spare generation plus what the pool gives">Pool ${n0(L.pool.cap)} · Output ${n0(L.spare + L.pool.rate)}/s</div>`;
+      const partName = (i: number) => { const p = this.bp.parts[i], fn = this.deps.catalog.functions.get(p.fn); return fn?.name ?? p.fn; };
+      L.banks.forEach((B, k) => {
+        const fed = [...new Set(B.feeds.map(partName))].join(', ');
+        const never = !B.refills && B.dynamo <= 0;
+        html += `<div style="font-size:11px; padding:1px 0; color:${never ? '#94a3b8' : B.kind === 'drive' ? '#7dd3fc' : '#fbbf24'}">Bank ${k + 1} (${B.parts.length} ${B.kind === 'drive' ? 'Drive Cell' : 'Capacitor'}${B.parts.length > 1 ? 's' : ''}) ${n0(B.cap)} · ${n0(B.rate)}/s → ${fed ? esc(fed) : 'feeds nothing'}${never ? ' · never refills' : ''}</div>`;
+      });
+      const lt = this.loadRun && this.loadRun.sig === designSig(this.bp) ? this.loadRun : null;
       const chip = (kind: string, label: string, tip: string) => `<button data-load="${kind}" title="${tip}" style="background:${lt?.kind === kind ? '#24406b' : '#0f1626'}; color:#e5ecf7; border:1px solid ${lt?.kind === kind ? '#5fd4c4' : '#2a3a5a'}; border-radius:5px; padding:1px 7px; cursor:pointer; font:11px 'Segoe UI', sans-serif">${label}</button>`;
-      html += `<div style="display:flex; align-items:center; gap:4px; margin:4px 0 2px; font-size:11px"><span style="color:#8ea0bd" title="Plays ${LOAD_TEST_SECONDS} seconds of the ship's own power from full: which circuits brown out, and how long they take to refill">Load test</span>`
+      html += `<div style="display:flex; align-items:center; gap:4px; margin:4px 0 2px; font-size:11px"><span style="color:#8ea0bd" title="Plays ${LOAD_TEST_SECONDS} seconds of the ship's own power from full">Load test</span>`
         + chip('fire', 'Fire', 'Every gun firing flat out') + chip('boost', 'Boost', 'Boosting forward') + chip('both', 'Both', 'Every gun firing while boosting forward')
         + (lt ? `<button data-load="off" title="Clear the load test" style="margin-left:auto; background:none; border:none; color:#6b7a93; cursor:pointer; font-size:11px">clear</button>` : '') + '</div>';
-    }
-    // Weak links: cells a wire runs through whose loss cuts consumers off from every generator (✂ on the overlay)
-    if (rep.weak.length) {
-      const w = rep.weak[0];
-      html += `<div style="font-size:11px; color:#fca5a5; margin-top:3px" title="${esc(rep.weak.slice(0, 8).map((x) => x.text).join('\n'))}">✂ ${rep.weak.length} weak link${rep.weak.length > 1 ? 's' : ''}: ${esc(w.text.charAt(0).toLowerCase() + w.text.slice(1))}${rep.weak.length > 1 ? ' (the Wires tool marks them; a loop of wire has none)' : ''}</div>`;
+      const r = lt?.result;
+      if (r) {
+        const pc = (v: number) => `${Math.round(v * 100)}%`;
+        html += `<div style="font-size:11px; padding:1px 0 3px; color:${r.brownAt < 0 ? '#4ade80' : Math.min(r.engines, r.guns) < 0.5 ? '#f87171' : '#fbbf24'}">${r.brownAt < 0 ? 'Holds up: full power throughout' : `Browns out ${r.brownAt < 0.05 ? 'at once' : `after ${r.brownAt.toFixed(1)} s`}: engines ${pc(r.engines)}, guns ${pc(r.guns)}`}</div>`;
+      }
     }
     if (rep.warnings.length) {
-      html += `<div style="margin:5px 0 2px; font-size:11px; line-height:1.45">${rep.warnings.slice(0, 7).map((w) => `<div style="color:${/no power|never/.test(w) ? '#f87171' : '#fbbf24'}">• ${esc(w.charAt(0).toUpperCase() + w.slice(1))}</div>`).join('')}`
-        + `${rep.warnings.length > 7 ? `<div style="color:#6b7a93">and ${rep.warnings.length - 7} more</div>` : ''}</div>`;
+      html += `<div style="margin:5px 0 2px; font-size:11px; line-height:1.45">${rep.warnings.slice(0, 6).map((w) => `<div style="color:${/no power/.test(w) ? '#f87171' : '#fbbf24'}">• ${esc(w.charAt(0).toUpperCase() + w.slice(1))}</div>`).join('')}`
+        + `${rep.warnings.length > 6 ? `<div style="color:#6b7a93">and ${rep.warnings.length - 6} more</div>` : ''}</div>`;
       if (this.tool !== 'wires') html += '<div style="color:#6b7a93; font-size:11px">The Wires tool (W) lays what\'s missing.</div>';
     } else if (nets.length) html += '<div style="color:#4ade80; font-size:11px; margin-top:4px">Everything that uses power has it.</div>';
     return html + '<div style="margin-bottom:12px"></div>';
@@ -1954,21 +1931,19 @@ if (d && this.overlays.com && d.mass > 0) {
       const net = rep.nets[d.network[i]], col = net?.color ?? DEAD_NET;
       const cx = sx(g.centroid[0]), cy = sy(g.centroid[1]);
       const st = rep.part[i];
-      if (st === 'unpowered' || st === 'stranded' || st === 'short' || st === 'trickle' || st === 'idle') {
-        // (amber: short of power, or on the core's trickle alone; grey: a capacitor touching nothing; red: none)
-        const soft = st === 'short' || st === 'trickle';
+      if (st === 'unpowered' || st === 'stranded' || st === 'short') {
         ctx.beginPath();
         g.polygon.forEach(([x, y], k) => (k ? ctx.lineTo(sx(x), sy(y)) : ctx.moveTo(sx(x), sy(y))));
         ctx.closePath();
-        ctx.fillStyle = st === 'idle' ? 'rgba(148, 163, 184, 0.14)' : soft ? 'rgba(251, 191, 36, 0.12)' : 'rgba(239, 68, 68, 0.18)';
+        ctx.fillStyle = st === 'short' ? 'rgba(251, 191, 36, 0.12)' : 'rgba(239, 68, 68, 0.18)';
         ctx.fill();
         ctx.setLineDash([4, 3]);
-        ctx.strokeStyle = st === 'idle' ? '#94a3b8' : soft ? '#fbbf24' : '#ef4444';
+        ctx.strokeStyle = st === 'short' ? '#fbbf24' : '#ef4444';
         ctx.lineWidth = 2;
         ctx.stroke();
         ctx.setLineDash([]);
         // (a struck-through bolt: no power)
-        if (st === 'unpowered' || st === 'stranded') {
+        if (st !== 'short') {
           ctx.fillStyle = '#fca5a5';
           ctx.font = `700 ${Math.max(10, Math.round(px * 0.42))}px 'Segoe UI', sans-serif`;
           ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -1996,17 +1971,17 @@ if (d && this.overlays.com && d.mass > 0) {
         ctx.fillRect(cx - bw / 2 + 3, cy - bh / 2 + 3, (bw - 6) * (net?.powered ? 0.7 : 0.15), bh - 6);
       }
     });
-    this.drawCircuits(d, sx, sy, ring);
+    this.drawBanks(d, sx, sy, ring);
   }
 
   /**
-   * Local circuits on the overlay: each circuit's letter on a badge by its
-   * first generator (else store, else part), weak links outlined red with a
-   * cut mark, and after a load test each part that browned out with its share
+   * The banks on the overlay (circuits.ts): each bank's members outlined (amber Capacitors, blue Drive Cells; grey one that
+   * never refills), a short strap to each part it feeds, and its number; after a load test, each part that browned out with
+   * its share
    */
-  private drawCircuits(d: ShipDerived, sx: (x: number) => number, sy: (y: number) => number, ring: number): void {
-    const ctx = this.ctx, rep = this.power, L = d.power;
-    if (!rep || !L) return;
+  private drawBanks(d: ShipDerived, sx: (x: number) => number, sy: (y: number) => number, ring: number): void {
+    const ctx = this.ctx, L = d.power;
+    if (!L) return;
     const outline = (i: number, color: string, dash: number[]) => {
       const g = this.geoms[i];
       if (!g) return;
@@ -2020,12 +1995,27 @@ if (d && this.overlays.com && d.mass > 0) {
     };
     const font = Math.max(10, Math.round(ring * 1.2));
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    // Weak links: the wire's single path (shoot it and what's beyond goes dark)
-    for (const w of this.tool === 'wires' ? rep.weak.slice(0, 12) : []) {
-      outline(w.part, '#f87171', [2, 3]);
-      const g = this.geoms[w.part];
-      if (g) { ctx.font = `700 ${font}px 'Segoe UI', sans-serif`; ctx.fillStyle = '#fca5a5'; ctx.fillText('✂', sx(g.centroid[0]), sy(g.centroid[1])); }
-    }
+    L.banks.forEach((B, k) => {
+      const col = !B.refills && B.dynamo <= 0 ? '#94a3b8' : B.kind === 'drive' ? '#60a5fa' : '#fbbf24';
+      for (const i of B.parts) outline(i, col, []);
+      ctx.strokeStyle = col; ctx.lineWidth = 3;
+      for (const j of B.feeds) {
+        const q = this.geoms[j];
+        if (!q) continue;
+        let from = this.geoms[B.parts[0]], best = Infinity;
+        for (const i of B.parts) { const g = this.geoms[i]; if (!g) continue; const dd = Math.hypot(g.centroid[0] - q.centroid[0], g.centroid[1] - q.centroid[1]); if (dd < best) { best = dd; from = g; } }
+        if (!from) continue;
+        ctx.beginPath(); ctx.moveTo(sx(from.centroid[0]), sy(from.centroid[1])); ctx.lineTo(sx(q.centroid[0]), sy(q.centroid[1])); ctx.stroke();
+      }
+      const at = this.geoms[B.parts[0]];
+      if (at) {
+        const bx = sx(at.centroid[0]) + ring * 1.15, by = sy(at.centroid[1]) - ring * 1.15, r = Math.max(7, font * 0.62);
+        ctx.fillStyle = 'rgba(3, 5, 10, 0.85)'; ctx.beginPath(); ctx.arc(bx, by, r + 2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = col; ctx.beginPath(); ctx.arc(bx, by, r, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#0b1220'; ctx.font = `800 ${Math.round(r * 1.2)}px 'Segoe UI', sans-serif`;
+        ctx.fillText(String(k + 1), bx, by + 0.5);
+      }
+    });
     // The load test: what browned out, by how much
     const lt = this.loadRun && this.loadRun.sig === designSig(this.bp) ? this.loadRun.result : null;
     if (lt) {
@@ -2040,57 +2030,6 @@ if (d && this.overlays.com && d.mass > 0) {
         ctx.fillStyle = v < 0.5 ? '#fca5a5' : '#fdba74';
         ctx.fillText(`${Math.round(v * 100)}%`, tx, ty);
       });
-    }
-    // Surge banks: their parts ringed violet, a short arc to each part they feed by touch, and their label
-    for (const g of L.stores) {
-      if (g.kind !== 'k') continue;
-      ctx.strokeStyle = SURGE_COLOR; ctx.lineWidth = 2;
-      for (const i of g.parts) {
-        const q = this.geoms[i];
-        if (!q) continue;
-        ctx.beginPath();
-        q.polygon.forEach(([x, y], k) => (k ? ctx.lineTo(sx(x), sy(y)) : ctx.moveTo(sx(x), sy(y))));
-        ctx.closePath(); ctx.stroke();
-      }
-      const touchAll = [...(g.feeds ?? []), ...(g.shields ?? [])];
-      ctx.lineWidth = 2.5;
-      for (const j of touchAll) {
-        const q = this.geoms[j];
-        const from = g.parts.map((i) => this.geoms[i]).filter(Boolean).sort((a, b) => Math.hypot(a.centroid[0] - (q?.centroid[0] ?? 0), a.centroid[1] - (q?.centroid[1] ?? 0)) - Math.hypot(b.centroid[0] - (q?.centroid[0] ?? 0), b.centroid[1] - (q?.centroid[1] ?? 0)))[0];
-        if (!q || !from) continue;
-        // (a zigzag: Surge jumps by touch)
-        const x0 = sx(from.centroid[0]), y0 = sy(from.centroid[1]), x1 = sx(q.centroid[0]), y1 = sy(q.centroid[1]);
-        const nx = -(y1 - y0), ny = x1 - x0, len = Math.hypot(nx, ny) || 1, amp = ring * 0.35;
-        ctx.beginPath(); ctx.moveTo(x0, y0);
-        for (let s = 1; s <= 4; s++) { const t = s / 5, sgn = s % 2 ? 1 : -1; ctx.lineTo(x0 + (x1 - x0) * t + (nx / len) * amp * sgn, y0 + (y1 - y0) * t + (ny / len) * amp * sgn); }
-        ctx.lineTo(x1, y1); ctx.stroke();
-        ctx.fillStyle = SURGE_COLOR;
-        ctx.beginPath(); ctx.arc(x1, y1, Math.max(2.5, ring * 0.22), 0, Math.PI * 2); ctx.fill();
-      }
-      const at = this.geoms[g.parts[0]];
-      if (at) {
-        const bx = sx(at.centroid[0]) + ring * 1.15, by = sy(at.centroid[1]) - ring * 1.15, r = Math.max(8, font * 0.7);
-        ctx.fillStyle = 'rgba(3, 5, 10, 0.85)'; ctx.beginPath(); ctx.arc(bx, by, r + 2, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = SURGE_COLOR; ctx.beginPath(); ctx.arc(bx, by, r, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#0b1220'; ctx.font = `800 ${Math.round(r * 1.05)}px 'Segoe UI', sans-serif`;
-        ctx.fillText(g.label ?? 'S', bx, by + 0.5);
-      }
-    }
-    // Letters
-    for (const ci of L.circuits) {
-      if (!ci.letter) continue;
-      const at = ci.generators[0] ?? ci.storeParts[0] ?? ci.consumers[0] ?? ci.parts[0];
-      const g = at !== undefined ? this.geoms[at] : undefined;
-      if (!g) continue;
-      const net = rep.nets[ci.net], col = net?.color ?? circuitColor(ci.letter);
-      const bx = sx(g.centroid[0]) + ring * 1.15, by = sy(g.centroid[1]) - ring * 1.15, r = Math.max(7, font * 0.62);
-      ctx.fillStyle = 'rgba(3, 5, 10, 0.85)';
-      ctx.beginPath(); ctx.arc(bx, by, r + 2, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = col;
-      ctx.beginPath(); ctx.arc(bx, by, r, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#0b1220';
-      ctx.font = `800 ${Math.round(r * 1.35)}px 'Segoe UI', sans-serif`;
-      ctx.fillText(ci.letter, bx, by + 0.5);
     }
     ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
   }

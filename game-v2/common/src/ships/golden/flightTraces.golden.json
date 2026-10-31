@@ -1,4 +1,22 @@
 {
+  "drive-bank-boost": {
+    "ticks": 590,
+    "trace": "35bf4aece222f735",
+    "charge": "0cc46e709465dac8",
+    "final": {
+      "x": 1967.29,
+      "y": -26805.45,
+      "vx": 14.5389,
+      "vy": -7.05,
+      "angle": 0.39964,
+      "angVel": 0.000002,
+      "jump": 0,
+      "jumpScale": 1,
+      "cargo": 0,
+      "dodge": 0,
+      "dodgeDir": 0
+    }
+  },
   "heavy-cargo": {
     "ticks": 360,
     "trace": "faa8ae24b1fe9f35",
@@ -73,13 +91,13 @@
   },
   "strafer-every-way": {
     "ticks": 409,
-    "trace": "8c65b77702ab6fa8",
-    "charge": "ae3f534ff3322436",
+    "trace": "63c6fc7a345b09ac",
+    "charge": "2504c2198bfe1bab",
     "final": {
-      "x": 557.55,
-      "y": 44.5,
-      "vx": -0.77,
-      "vy": -3.6432,
+      "x": 198.17,
+      "y": -250.3,
+      "vx": -6.473,
+      "vy": -6.6819,
       "angle": 1.09999,
       "angVel": 0.000002,
       "jump": 0,
@@ -125,28 +143,10 @@
       "dodgeDir": 27
     }
   },
-  "surge-kick": {
-    "ticks": 230,
-    "trace": "e59d417235f8de8b",
-    "charge": "dbe5871ece777d38",
-    "final": {
-      "x": 2535.32,
-      "y": -5092.41,
-      "vx": 18.8503,
-      "vy": -5.9743,
-      "angle": 0.39964,
-      "angVel": 0.000002,
-      "jump": 0,
-      "jumpScale": 1,
-      "cargo": 0,
-      "dodge": 0,
-      "dodgeDir": 0
-    }
-  },
   "tow": {
     "ticks": 239,
     "trace": "1c7b5611fe153c6c",
-    "charge": "d49ad8c7d736d933",
+    "charge": "594a27290d87e4f6",
     "final": {
       "x": 594.01,
       "y": -203.49,

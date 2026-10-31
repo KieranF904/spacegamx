@@ -4,8 +4,8 @@ Mk I · Square · 1 cell
 Hull · mass30 hp · 0.7
 Armour · build1 · 1 pts
 TakesKinetic +20% · Explosive +10% · Thermal +10% · Energy −20%
-Holds (what it touches)160 energy
-Givesup to 2,000/s only into parts it touches; touching capacitors are one bank
+Holds (guns it touches)160 energy
+Givesup to 2,000/s first to the guns, beams and mining lasers its bank touches; touching Capacitors are one bank
 
 == partStats (stats rows) ==
 GradeMk I
@@ -24,7 +24,7 @@ Small
 Small · Square
 
 == tradeOff ==
-tiny and very fast, only into what it touches
+a gun bank: very fast, first into the guns it touches
 
 == keyStats ==
 holds 160 (guns) · gives 2,000/s by touch

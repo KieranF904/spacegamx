@@ -485,7 +485,7 @@ const SHIP_SHAPES: Record<string, Spec> = {
       'unlock?': strict({ level: 'number' }), 'weaponMods?': 'any', 'rated?': 'number', 'blast?': obj({ radius: 'number', damage: 'number', delayTicks: 'number[]' }),
       'produce?': 'number', 'demand?': 'number', 'priority?': oneOf(1, 2, 3), 'thrust?': 'number', 'boost?': 'number', 'boostDrain?': 'number',
       'fireInterval?': 'number', 'capacity?': 'number', 'jumpCapacity?': 'number', 'range?': 'number', 'weapon?': 'string', 'shield?': 'number',
-      'store?': 'number', 'pool?': oneOf('drive', 'weapon'), 'discharge?': 'number', 'bank?': 'boolean', 'surge?': 'number', 'dual?': oneOf('rail', 'flash'), 'armour?': 'number', 'massScale?': 'number', 'mount?': oneOf('fixed', 'turret'),
+      'store?': 'number', 'pool?': oneOf('drive', 'weapon'), 'discharge?': 'number', 'bank?': 'boolean', 'dynamo?': 'number', 'armour?': 'number', 'massScale?': 'number', 'mount?': oneOf('fixed', 'turret'),
       'mounting?': strict({ 'attach?': oneOf('back', 'any'), 'angle?': oneOf('straight', 'right'), 'arc?': 'number', 'clear?': 'any' }),
     })),
   }),

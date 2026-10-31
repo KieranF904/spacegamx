@@ -9,7 +9,6 @@ Fire rate0.7/s · shells · Mortar Shells
 MountTurret, 360°
 FittingBolts on any side
 Power draw10/s
-On Surgecharged shot: after a 0.5 s pause, a shot hits ×1.5, a packet from the bank
 
 == partStats (stats rows) ==
 GradeMk I · Small

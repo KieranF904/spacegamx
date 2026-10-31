@@ -147,7 +147,7 @@ export class Towing implements FeatureInstance {
         this.release(pilot);
         continue;
       }
-      // Its power this tick (it draws on its circuit like a gun: energy.ts gunLoad)
+      // Its power this tick (it draws on the ship like a gun: energy.ts gunLoad)
       let share = 1;
       const c = this.ships.chargeOf(pilot);
       for (const i of ship.derived.fx?.tow?.parts ?? []) share = Math.min(share, feedShare(ship.derived, c, i, 'gun'));

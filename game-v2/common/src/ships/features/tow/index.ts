@@ -13,7 +13,7 @@ export const feature: PartFeature = {
   id: 'tow',
   applies: (fn) => !!fn.tow,
   order: 20,
-  // It draws by the tick, only while it tows (the beam's feed group on its circuit, as a gun's)
+  // It draws by the tick, only while it tows (its feed group, as a gun's)
   burst: true,
   derive(c) {
     for (const i of c.parts) {

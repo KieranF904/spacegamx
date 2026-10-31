@@ -1,11 +1,11 @@
 /**
  * Golden flight traces (refactor safety net, Stage 0). Each scripted scenario (golden/testData.ts) is flown through the
  * shared deterministic pilot step: stepShipPhysics inside pilotJumpStep, with the real energy (drainRate 1, the guns'
- * and Tow Beam's load, the tick for Surge kicks), exactly as the server and the pilot's prediction call it. The
+ * and Tow Beam's load, the tick), exactly as the server and the pilot's prediction call it. The
  * quantised body and charge after every tick are hashed and pinned in flightTraces.golden.json, with the final state
  * written out so a failing pin says where it ended up.
  *
- * Any change to how a ship flies (flight.ts, physics.ts, strafer.ts, tow.ts, load.ts, energy.ts, surge.ts, the
+ * Any change to how a ship flies (flight.ts, physics.ts, strafer.ts, tow.ts, load.ts, energy.ts, circuits.ts, the
  * catalog or tuning data) moves a hash. If it was meant to, regenerate: `UPDATE_GOLDEN=1 npx vitest run <this file>`.
  */
 

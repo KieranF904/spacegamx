@@ -97,7 +97,7 @@ export const clientFeature: ClientFeature = {
   drawShip(ctx) {
     drawJets(ctx, ctx.entity.dodge, ctx.entity.dodgeDir);
   },
-  // The chip: ready or cooling, and whether the circuit can pay
+  // The chip: ready or cooling, and whether the ship can pay
   indicator: {
     update(host) {
       chip.update(host.hangarOpen() ? null : localDodge(host), host.keyName('dodge'));

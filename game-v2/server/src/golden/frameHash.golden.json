@@ -3,199 +3,199 @@
   "checkpoints": [
     {
       "tick": 100,
-      "world": "19e80b465b8c87c180248f5db5e6f61e17ea40b65e95f9d48cd8379431129acf",
+      "world": "62384170af49162918f92a326df90d0229f809db1e0b5577f7eda85d5f136390",
       "pilots": {
         "strafer": {
           "frames": 45,
-          "stream": "d3f954410804dad9de4f0bff4873ec0836077df170aa6e706e4b58ab18f803ba"
+          "stream": "df1568457db0a9b86729e284598142dbf42492f098587075d105e15dacb70e0d"
         },
         "tug": {
           "frames": 45,
-          "stream": "9f1cc362d7d7d76db5433f1a3eca12e378199e17d9bc031f4e2416ce7a4cbdbc"
+          "stream": "25e422cbaec8e99b228228cf2505d4b46572bf6d31deb38935fd829fb799a6f0"
         },
         "striker": {
           "frames": 45,
-          "stream": "daf86f07f2c63f0508365da07395ff9875166411224bbca663b360a691e1daec"
+          "stream": "ccd46e8b93be49f63dfb108c0b53c0ffdf9c6f9395264b857bdd254d207819e9"
         },
         "sparrow": {
           "frames": 45,
-          "stream": "82cee4b5a1dbc879d609c46307b8804be6653ff9307214c01d2c765bad330a12"
+          "stream": "11c7ca6af77be69b743b4be2150fc9ea4d5dd16e3340c93cf706fd48fd60adf4"
         }
       }
     },
     {
       "tick": 200,
-      "world": "509c37a76756671cf3ac188399f728ff79dcfa32fd5394ece6590e48b837351b",
+      "world": "f5211274365c5fdd8ee1263db951d6965f76dd44e99fdcc078b4d457760de317",
       "pilots": {
         "strafer": {
           "frames": 78,
-          "stream": "6325ed96338542342f92a920c8fb66b4dc46e6229fa1a46c2b169a587ce803fe"
+          "stream": "6a52a060b00d5a5ab5ff8c1c01ab99560a04e6c5c9217195df82e71ebf9479d0"
         },
         "tug": {
           "frames": 79,
-          "stream": "d745d63777dc693e8473be22e5ea0403c4ea65c0454f7606e6ad38735a4358d8"
+          "stream": "aefed7f2422493a2951ed219db309dfe11999725358c1c35c429586ba4e5f9f3"
         },
         "striker": {
           "frames": 79,
-          "stream": "1d8945aa2ee277f60183c915828b0f70e0f4d82372d1728fe9c9ff7de70fd425"
+          "stream": "3c28d7146fd61a8e0e4c38ce0c3875186b9d07e0a50027ef31efb23db45f2f61"
         },
         "sparrow": {
           "frames": 78,
-          "stream": "eaaa0d3de9b9c674372683ee823755f42bd5cc04bc3bcac46b9e5533b10c6ecb"
+          "stream": "6f9f231a3514505f0f8862d6d62d731a6660f18ab1d29f4ab95a5db2611a91fb"
         }
       }
     },
     {
       "tick": 300,
-      "world": "e800d24afed9f584c9964a8483427bf41feb5cfc0abda708c45cfd7d40d9fee7",
+      "world": "6525b95b0d9c9ea6171abbc41d841a002ec48c7fd5cdbb46170ef2a46cfeb7fd",
       "pilots": {
         "strafer": {
-          "frames": 112,
-          "stream": "a0d69091b7afdc4d18a1eddcb04ad35f94223cccd6b51eea5b2bbc5263745719"
+          "frames": 113,
+          "stream": "e47e75cdb61fe4d01afbe63a0e2fb0b9e2e4c3aa1ce0151a1bde093ac9603f00"
         },
         "tug": {
-          "frames": 113,
-          "stream": "f23c0c931946d423c230d60c49e88e427c6a22d1f12334835adfda9629b5e7b1"
+          "frames": 114,
+          "stream": "25d4dd2c9b7ff5e53aafada0f4b55c844286da8893903cfe077afbe26df09390"
         },
         "striker": {
-          "frames": 113,
-          "stream": "213354f95109bb7e9429650475a29d70e38a31d4704a695919e4537fdfb381c5"
+          "frames": 114,
+          "stream": "91aa732c6366dab681067b8d03f90fd1c1872567fa8242292c21ce4277682306"
         },
         "sparrow": {
-          "frames": 112,
-          "stream": "319033dde2c0298ed9e281219548cc54c6e105b26e339f092a77367f1b7b3e40"
+          "frames": 113,
+          "stream": "5767d431bb0f01c95dcf7a1f98f4a3a53f07b7734f2a42676ac1c0bb66e9888f"
         }
       }
     },
     {
       "tick": 400,
-      "world": "21825bd16ecd93c0bade8d0870ccff6cee2fed0aca690e93513e5b3b384b098e",
+      "world": "3ac54b1ba92b3b204359d6ddbc2a86c46dea378e22013e1ddb2c6d5e2520b857",
       "pilots": {
         "strafer": {
-          "frames": 147,
-          "stream": "0a13ef9c3e12db1ffb264ae4c23902ca57fd393d4942eb906c27e4949d2c6c7f"
+          "frames": 146,
+          "stream": "2e16579040df433b6f8cd665f266859a4d2a0382ba4c986f2634c6ff78fb6403"
         },
         "tug": {
-          "frames": 148,
-          "stream": "7c51706b96e2d832779515cbb6707e46c7d973e3e4feb6451c30afb4a8f95145"
+          "frames": 147,
+          "stream": "8045cd74486030ed97370ef535642352ff1d31046b90ab014ee8a3f2865b7980"
         },
         "striker": {
-          "frames": 148,
-          "stream": "a5fc7f4779e9228fda2ffbe93545308f7a109dd9aa2bf2787272abfbabddc039"
+          "frames": 147,
+          "stream": "4af4ab31b03c0c1c4a5794e3c6934fc3a2da3e1fae5d08accfc2ff7b4085783e"
         },
         "sparrow": {
-          "frames": 147,
-          "stream": "f110f9e3a89f94d67c077609d6f6f01c29a6b873b5b360c24daa88728a3e3d6e"
+          "frames": 146,
+          "stream": "1e1187b69456b5dfbab066591620f66e945e15daa08444b3e668b5c1e30b3288"
         }
       }
     },
     {
       "tick": 500,
-      "world": "afc41c1bda7ab4cfef987c25352a42a978372933dacc1498de1cc5440716e4f3",
+      "world": "a4f0fcf69e83afa4c8dba375774ca84b74543c0065a5de3e57e25a71bcd95afd",
       "pilots": {
         "strafer": {
           "frames": 181,
-          "stream": "53ab10a4a702beead117e475f91c75a77e34bd483ff9619e87b863b0126e5d37"
+          "stream": "37f299cff124e2aecca2b0e200d517ac7aca6e67599a68d5e8a92c7a5e63a8f2"
         },
         "tug": {
           "frames": 182,
-          "stream": "a4d3ce17762224aba59ba191d1aff8f6540ec688e7a67a8736c61b77c1bda502"
+          "stream": "5359d5d763311758b7ef54925aeb7f94f0481cf0d7c2aa3812056c3df17cec19"
         },
         "striker": {
           "frames": 182,
-          "stream": "78eece245bca78413dec1553646560467df072f3dfef80a90f9ac7ce875996af"
+          "stream": "2dc008246d6177429473507dfe43e3cb978b44229d6de257c4c1a70c71d1754b"
         },
         "sparrow": {
           "frames": 181,
-          "stream": "0c66ca506691b1da3807dc16a1e2097511099d888397649f78fd28fb2e233e89"
+          "stream": "e59a5831acdc01136243bf715c6e2eb678530fac8fb486482c80006a2051888c"
         }
       }
     },
     {
       "tick": 600,
-      "world": "f4ce153e5011fe8664910bfc340d90ae5f68e244c6b104776d7a093ea28e9dbf",
+      "world": "1e9b1001850d01a29902d926a3076de8ce450f1343c964a378e3c07842b9a7f7",
       "pilots": {
         "strafer": {
-          "frames": 216,
-          "stream": "f4e5ccaf39087226a7da42f97b894e7963667a490fdfaef45bc4b9d98d60d373"
+          "frames": 215,
+          "stream": "8bd403dd2f026d39cc9c6205ad43f4b24ebb2c94e3eae786b8b425e70017a102"
         },
         "tug": {
-          "frames": 217,
-          "stream": "9fb286e5d9a079187ef36ffa3236761b78b6ec1819170e520c72cb08e055982f"
+          "frames": 216,
+          "stream": "ed185607e6db21fbbbc4d87f5d8f756f04122996039a2f8f4ef9ab86908d7b20"
         },
         "striker": {
-          "frames": 217,
-          "stream": "f6756eb365260431606a79b78ebfd726e75155915560cdaa5aa220eb5621916a"
+          "frames": 216,
+          "stream": "880634569ceb0996ad65710cf9837978fbd4e366aab96e2d70ae1c191924b80b"
         },
         "sparrow": {
-          "frames": 216,
-          "stream": "7635c2280c3f43af5535e72b1d0b1f260a4a9bc1611943a6227035f8134b27e6"
+          "frames": 215,
+          "stream": "3f68c4c8947ed6f75189ae291e092e66f61acbe3d026fa880ac2c04457512117"
         }
       }
     },
     {
       "tick": 700,
-      "world": "0048529f8d83b3b520708eecd82161161c4d5691eb5d15c44f22f01645fe76e8",
+      "world": "92b808bb1edd34650d37c3792b7ccd92b881be68c9bd12026d458539fb947485",
       "pilots": {
         "strafer": {
-          "frames": 251,
-          "stream": "9da68a7c4111092429257d37fb7b6f8df98903fab56d32180aa961fcf26af0e4"
+          "frames": 250,
+          "stream": "1872b6a51e70772e2a60e0c9ff3faa305be5013626ed604520fd020662824cff"
         },
         "tug": {
-          "frames": 252,
-          "stream": "ec3786590b54b72bff0117ffbd6d29a1901f9ab54d93d9754917dbbaf184e750"
+          "frames": 251,
+          "stream": "d916baf915a2d9bc59ef3879437ae0c83fa943304ef5a0a7ca1871fc987d3589"
         },
         "striker": {
-          "frames": 252,
-          "stream": "7cc628e72223bcda7bd75d4141c7e102f5f8be995f61c6b83b37e9cd20a0a3ad"
+          "frames": 251,
+          "stream": "832d5f8976fb73d292c57a80f6908bdaaf5b01a58264335c3ddca8aede179c6d"
         },
         "sparrow": {
-          "frames": 251,
-          "stream": "652cda83b5a7a23e7a733af2cb5ee20fe43454f2a09c296140b4d81e6f3e5d78"
+          "frames": 250,
+          "stream": "990ec70ea7e23ef16e03e6e441d7caa64c8fb5f096ed94c42042e096bce883ad"
         }
       }
     },
     {
       "tick": 800,
-      "world": "05329af31e2fd2f307b3d4cd046f185ce165780dc18f590cca6d9e145595c695",
+      "world": "861f02f0c932dc6d7505ba0daacebb64350bceb487110ccd52f254061868544b",
       "pilots": {
         "strafer": {
-          "frames": 286,
-          "stream": "3fac576d54d90c6bb92079d8bef926bd467afd5e0d84d4a6aa5b997c045f800f"
+          "frames": 283,
+          "stream": "fac880d978c41f038b30fcda58369a2ce487b4acb3dfea1e431e639c364a2d86"
         },
         "tug": {
-          "frames": 288,
-          "stream": "1261e3f7e9f0d9692774e33309e180faa1afec051a5918ac5254ffff5bf81430"
+          "frames": 285,
+          "stream": "4658d13dee8e9d0b2040712fbcc6cb9378ab34735c741acdad2ac120d8e86a91"
         },
         "striker": {
-          "frames": 287,
-          "stream": "b4d24ecbea939b510e73c4bdc026aebdfd93a453e8a22c138d3f10198495c95a"
+          "frames": 284,
+          "stream": "1a66c8c32772c08ab5973bb3107bbf6faa858277f68d2812f624dce6429a8054"
         },
         "sparrow": {
-          "frames": 286,
-          "stream": "6a246c5651bfa8519a02c9c6be575df5281478aed62580b75fa7238bb2ab9251"
+          "frames": 283,
+          "stream": "4b6a3f8211e7f5d0d1e76acaefa13f28473edc4552b492220ff1a5d17fb7abcd"
         }
       }
     },
     {
       "tick": 900,
-      "world": "06b30f5affec0915f1cb1f7082a281b4867c757a8a77bf4eb00f61c19045fded",
+      "world": "9401d432286265f7903807eccf14ef9459cbb59e3dc8e32d84b1f58aa0c5d21f",
       "pilots": {
         "strafer": {
-          "frames": 320,
-          "stream": "5f320338f210557b26687b90424105bbfb152f40e5b64ed7c111a9fd39cc83df"
+          "frames": 317,
+          "stream": "407b891489abfc87ba22d801ba56f5e05e2d7bc1681d83d96e1b76af2a6f2672"
         },
         "tug": {
-          "frames": 322,
-          "stream": "55fe4a7dad7f9dc659bed5ec4eb521a92713e22ec998db56f72ed321621733e4"
+          "frames": 319,
+          "stream": "15c04118647af91ccdf51a33d2ca86a413a7645ea008c95194872f2d8393b0ad"
         },
         "striker": {
-          "frames": 321,
-          "stream": "e3f1ef85869f4d1c1ba6cae09c741aaf014b89052bf075ef18bf02323962ae2c"
+          "frames": 318,
+          "stream": "9c70cf789ac3f6214be71206fc2948bf6289df95363b5120e76da6c352daf16d"
         },
         "sparrow": {
-          "frames": 320,
-          "stream": "5b131140a452bd73c1a14dd9d17f22e18c2df60848bc60114706735c30a82c71"
+          "frames": 317,
+          "stream": "5d453e325ab911c88b631a890ae75d8e2e81b0ff7976d20ddf7160d1f36bdbc9"
         }
       }
     }
@@ -206,18 +206,18 @@
       "authResult": 1,
       "codex": 1,
       "contact": 6,
-      "damage": 13,
-      "detonation": 3,
-      "effect": 15,
+      "damage": 12,
+      "detonation": 2,
+      "effect": 10,
       "hangar": 1,
       "items": 1,
       "news": 1,
       "people": 2,
       "playerState": 11,
       "profile": 1,
-      "projectileHit": 18,
+      "projectileHit": 12,
       "quests": 1,
-      "shipHps": 5,
+      "shipHps": 4,
       "shipSync": 26,
       "snapshot": 300,
       "systemInfo": 1,
@@ -229,18 +229,18 @@
       "authResult": 1,
       "codex": 1,
       "contact": 6,
-      "damage": 13,
-      "detonation": 3,
-      "effect": 15,
+      "damage": 12,
+      "detonation": 2,
+      "effect": 10,
       "hangar": 1,
       "items": 1,
       "news": 1,
       "people": 2,
       "playerState": 6,
       "profile": 1,
-      "projectileHit": 18,
+      "projectileHit": 12,
       "quests": 1,
-      "shipHps": 5,
+      "shipHps": 4,
       "shipSync": 26,
       "snapshot": 300,
       "systemInfo": 1,
@@ -253,18 +253,18 @@
       "authResult": 1,
       "codex": 1,
       "contact": 6,
-      "damage": 13,
-      "detonation": 3,
-      "effect": 15,
+      "damage": 12,
+      "detonation": 2,
+      "effect": 10,
       "hangar": 1,
       "items": 1,
       "news": 1,
       "people": 2,
-      "playerState": 7,
+      "playerState": 4,
       "profile": 2,
-      "projectileHit": 18,
+      "projectileHit": 12,
       "quests": 1,
-      "shipHps": 5,
+      "shipHps": 4,
       "shipSync": 25,
       "snapshot": 300,
       "systemInfo": 1,
@@ -276,18 +276,18 @@
       "authResult": 1,
       "codex": 1,
       "contact": 6,
-      "damage": 13,
-      "detonation": 3,
-      "effect": 15,
+      "damage": 12,
+      "detonation": 2,
+      "effect": 10,
       "hangar": 1,
       "items": 1,
       "news": 1,
       "people": 2,
       "playerState": 4,
       "profile": 1,
-      "projectileHit": 18,
+      "projectileHit": 12,
       "quests": 1,
-      "shipHps": 5,
+      "shipHps": 4,
       "shipSync": 26,
       "snapshot": 300,
       "systemInfo": 1,

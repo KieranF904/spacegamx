@@ -6,7 +6,6 @@ Armour · build1 · 2 pts
 Thrust8.0 · boost ×1.6
 Power draw68/s
 Rated speed4,200 m/s (its push fades out near it)
-On Surgekick: boosting, a dash every 0.33 s, paid from the bank
 
 == partStats (stats rows) ==
 GradeMk I · Medium

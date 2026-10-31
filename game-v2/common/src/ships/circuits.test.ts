@@ -1,8 +1,8 @@
 /**
- * Local circuits (docs/design/energy-system.md, Phase 1): circuits, discharge
- * rates, brownout, touch-fed capacitor banks, the core's store, splits, and the
- * migration promise: the library ships, the dev guests' and the starter never
- * brown out in a scripted fight, while deliberately bad layouts do.
+ * The ship's pool and the banks (docs/design/rework-2026-11.md §2.1-2.3; circuits.ts, energy.ts): the pre-5896116
+ * "powered" rule, one pool with an Output limit, Capacitor and Drive Cell banks that feed only what they touch and
+ * refill only when wired to power (or a Pulse Dynamo touches them), splits, the snapshot, and the migration promise:
+ * the library ships, the dev guests' and the starter never hit a discharge rate in a scripted fight.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -14,9 +14,13 @@ import { rebuild, type ShipDerived } from './rebuild.js';
 import { createShipState, type ShipState } from './state.js';
 import type { ShipTuning } from './tuning.js';
 import { stepGuns } from './guns.js';
-import { BROWNOUT, CHARGE_GROUPS_AT, FULL_CHARGE, chargeTotal, circuitCharges, gunLoad, loadTest, packCharge, powerTick, remapCharge, unpackCharge, type Charge } from './energy.js';
+import { stepShipPhysics } from './physics.js';
+import type { FlightBody, FlightControls } from './flight.js';
+import {
+  BROWNOUT, CHARGE_GROUPS_AT, FULL_CHARGE, bankCharges, chargeTotal, gunLoad, loadTest, packCharge, powerTick, remapCharge, unpackCharge, type Charge,
+} from './energy.js';
+import { burstEnergy, DODGE_LEFT } from './features/strafer/strafer.js';
 import { readShipJson, testCatalog, SHIP_DATA_DIR } from './testData.js';
-import { autoWire } from './wires.js';
 
 const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
@@ -34,10 +38,10 @@ const LIBRARY = [
   ...readdirSync(join(SHIP_DATA_DIR, 'blueprints/dev')).filter((f) => f.endsWith('.json') && f !== 'test-brownout.json').map((f) => `dev/${f}`),
 ];
 
-/** The same ship with stores that give without limit (the core's too): what it would do before discharge rates */
+/** The same ship with stores that give without limit (the pool's and the banks'): what it would do without discharge rates */
 function unlimited(d: ShipDerived): ShipDerived {
   const L = d.power!;
-  return { ...d, power: { ...L, stores: L.stores.map((s) => ({ ...s, rate: 1e12 })), core: L.core && { ...L.core, rate: 1e12, trickle: 1e12 } } };
+  return { ...d, power: { ...L, pool: { ...L.pool, rate: 1e12 }, banks: L.banks.map((b) => ({ ...b, rate: 1e12 })) } };
 }
 
 interface FightLog { brownTicks: number; rateLimited: number; minShare: number; shots: number; boosted: number }
@@ -82,7 +86,7 @@ function fight(b: Blueprint, seconds = 40): FightLog {
   return { brownTicks, rateLimited, minShare: Math.min(...real.shares), shots: real.shots, boosted: real.boosted };
 }
 
-describe('local circuits: migration', () => {
+describe('energy: migration', () => {
   it('every library ship, dev guest ship and the starter fights a scripted fight without a discharge rate ever biting', () => {
     const rows: string[] = [];
     for (const f of LIBRARY) {
@@ -90,10 +94,10 @@ describe('local circuits: migration', () => {
       const log = fight(b);
       const d = createShipState(catalog, tuning, 1, b, 0).derived;
       const L = d.power!;
-      rows.push(`${f.padEnd(28)} circuits ${L.circuits.filter((c) => c.letter).length} · brownout ticks ${log.brownTicks}/2400 (rate-limited ${log.rateLimited}) · lowest share ${log.minShare.toFixed(2)} · `
-        + `shots ${log.shots} · boosting ${log.boosted} · spare ${L.circuits.map((c) => c.spare.toFixed(0)).join('/')} engines ${d.energy.engineDraw.toFixed(0)} guns ${d.energy.weaponDraw.toFixed(0)} · `
-        + `stores ${L.stores.map((x) => `${x.kind} ${x.cap.toFixed(0)}@${x.rate.toFixed(0)}/s`).join(', ') || 'none'} + core ${L.core?.cap}@${L.core?.rate}/s`);
-      // (No discharge rate ever cuts what the old ship-wide batteries would have given)
+      rows.push(`${f.padEnd(28)} brownout ticks ${log.brownTicks}/2400 (rate-limited ${log.rateLimited}) · lowest share ${log.minShare.toFixed(2)} · `
+        + `shots ${log.shots} · boosting ${log.boosted} · spare ${L.spare.toFixed(0)} engines ${d.energy.engineDraw.toFixed(0)} guns ${d.energy.weaponDraw.toFixed(0)} · `
+        + `pool ${L.pool.cap.toFixed(0)}@${L.pool.rate.toFixed(0)}/s · banks ${L.banks.map((x) => `${x.kind} ${x.cap.toFixed(0)}@${x.rate.toFixed(0)}/s`).join(', ') || 'none'}`);
+      // (No discharge rate ever cuts what stores without limits would have given)
       expect(log.rateLimited, `${f}: ${rows[rows.length - 1]}`).toBe(0);
     }
     console.log(rows.join('\n'));
@@ -105,20 +109,10 @@ describe('local circuits: migration', () => {
       expect(log.brownTicks, f).toBe(0);
     }
   });
-
-  it('auto-wired designs are one circuit, so they behave as before but for the rates', () => {
-    for (const f of LIBRARY) {
-      const d = createShipState(catalog, tuning, 1, design(f), 0).derived;
-      const lettered = d.power!.circuits.filter((c) => c.letter);
-      expect(lettered.length, f).toBeLessThanOrEqual(1);
-      if (lettered.length) expect(lettered[0].main).toBe(true);
-    }
-  });
 });
 
 // The test ship: a core between two Pips, a Cell Reactor at the left (the left Pip touches it, so it's plugged in), a
-// strip of hull, and two Ion Drives under the middle (nothing touching the reactor). Auto-wired, it's one circuit; the
-// tests wire it by hand to split it, with room round it for what each adds.
+// strip of hull, and two Ion Drives under the middle. Auto-wired, it's one network with the reactor on it.
 //
 //   y=0:  Pip(-1)  CORE(0,1)  Pip(2)
 //   y=1:  R(-1)    h(0) h(1)  h(2)
@@ -142,192 +136,236 @@ const base = (extra: PlacedPart[] = [], wires?: Blueprint['wires']): Blueprint =
 /** The reactor to the engines */
 const ENGINES: [number, number, number, number][] = [[-1, 1, 0, 2], [0, 2, 1, 2]];
 const pose = { x: 0, y: 0, angle: -Math.PI / 2 };
-/** Shots each gun fires in `ticks` with the trigger held, from charge `c0`, idle engines */
-function shoot(b: Blueprint, ticks: number, c0: (d: ShipDerived) => Charge): Record<number, number> {
+/** Shots each gun fires in `ticks` with the trigger held, from charge `c0` (engines thrusting and boosting if asked) */
+function shoot(b: Blueprint, ticks: number, c0: (d: ShipDerived) => Charge, move: { thrusting: boolean; boosting: boolean } = { thrusting: false, boosting: false }): { shots: Record<number, number>; charge: Charge } {
   const ship = createShipState(catalog, tuning, 1, b, 0);
   const d = ship.derived;
   const n: Record<number, number> = {};
   let c = c0(d);
   for (let t = 1; t <= ticks; t++) {
-    c = powerTick(d, c, { thrusting: false, boosting: false, load: gunLoad(ship, t) }, tuning).charge;
+    c = powerTick(d, c, { ...move, load: gunLoad(ship, t) }, tuning).charge;
     for (const s of stepGuns(ship, pose, { firing: true, aimWorld: -Math.PI / 2, aimDist: 0, energy: { charge: c } }, t, tuning).shots) n[s.w.part] = (n[s.w.part] ?? 0) + 1;
   }
-  return n;
+  return { shots: n, charge: c };
 }
+const derived = (b: Blueprint) => createShipState(catalog, tuning, 1, b, 0).derived;
 
-describe('local circuits: the rules', () => {
-  it('auto-wired, the test ship is one circuit with the core\'s store on it', () => {
+describe('energy: the pool and the powered rule', () => {
+  it('the pool is the core\'s store plus the batteries on a powered network; Output is spare generation plus its rate', () => {
+    // A Battery against the reactor (plugged in) and one wired to nothing
+    const b = base([p(9, 'sq', 'power_battery', -2, 1), p(10, 'sq', 'power_battery', 3, 1)], [...ENGINES, [-1, 1, -2, 1]]);
+    expect(codes(b)).toEqual([]);
+    const L = derived(b).power!;
+    expect(L.pool.parts).toEqual([9]);
+    expect(L.pool.cap).toBeCloseTo(240 + 200, 6);
+    expect(L.pool.rate).toBeCloseTo(720 + 600, 6);
+    expect(L.banks.length).toBe(0);
+    expect(L.spare).toBeGreaterThan(0);
+  });
+
+  it('as before 5896116: an engine or gun runs if its network has a generator or a battery, and one on no network is dark', () => {
+    // No generator (hull for the reactor); the right Pip wired to nothing; the engines wired to a Battery only
+    const b = base([p(9, 'sq', 'power_battery', 2, 2)], [[0, 2, 1, 2], [1, 2, 2, 2]]);
+    b.parts[3] = { ...b.parts[3], fn: 'hull', material: 'alloy' };
+    expect(codes(b)).toEqual([]);
+    const d = derived(b);
+    expect(d.network[2]).toBe(-1);
+    expect(d.satisfaction[2]).toBe(0);
+    // (on a network with a battery but no generator: they run, on the ship's pool, though the battery isn't in it)
+    expect(d.network[7]).toBeGreaterThanOrEqual(0);
+    expect(d.satisfaction[7]).toBe(1);
+    expect(d.power!.pool.parts).toEqual([]);
+  });
+
+  it('short of Output, every gun gets the same share and reloads that much slower', () => {
+    // No reactor (hull instead) and the pool nearly dry: both Pips share what the pool gives
     const b = base();
-    expect(codes(b)).toEqual([]);
-    const L = createShipState(catalog, tuning, 1, b, 0).derived.power!;
-    expect(L.circuits.filter((c) => c.letter).map((c) => c.letter)).toEqual(['A']);
-    expect(L.core!.circuit).toBe(L.circuitOf[3]);
+    b.parts[3] = { ...b.parts[3], fn: 'hull', material: 'alloy' };
+    const d = derived(b);
+    expect(d.power!.spare).toBe(0);
+    const r = shoot(b, 600, () => ({ g: 100, b: [] }));
+    const flatOut = 600 / d.weapons.find((x) => x.part === 2)!.interval;
+    // (240 in the pool against 16/s: plenty for 10 s)
+    expect(r.shots[1]).toBeGreaterThan(flatOut * 0.95);
+    const dry = shoot(b, 600, () => ({ g: 0, b: [] }));
+    // (Loaded, each fires its first shot; then nothing comes in)
+    expect(dry.shots[1]).toBe(1);
+    expect(dry.shots[2]).toBe(1);
   });
 
-  it('each circuit keeps its own charge: a reactor on one circuit never charges another circuit\'s battery', () => {
-    // The engines and a Battery wired together with no generator; the guns, the reactor and a Battery beside it on the other
-    const b = base([p(9, 'sq', 'power_battery', 2, 2), p(10, 'sq', 'power_battery', -2, 1)],
-      [[0, 2, 1, 2], [1, 2, 2, 2], [-1, 1, 0, 1], [0, 1, 1, 1], [1, 1, 2, 1], [2, 1, 2, 0]]);
-    expect(codes(b)).toEqual([]);
-    const d = createShipState(catalog, tuning, 1, b, 0).derived;
-    const L = d.power!;
-    expect(L.circuits.filter((c) => c.letter).length).toBe(2);
-    const eng = L.circuits[L.circuitOf[7]], gun = L.circuits[L.circuitOf[2]];
-    expect(eng).not.toBe(gun);
-    expect(eng.generators.length).toBe(0);
-    expect(gun.main).toBe(true);
-    expect(eng.letter).toBe('B');
-    // Both batteries half empty; idle a few seconds: only the reactor's own circuit's battery fills
-    let c: Charge = { core: 100, s: L.stores.map(() => 50) };
-    for (let t = 0; t < 300; t++) c = powerTick(d, c, { thrusting: false, boosting: false }, tuning).charge;
-    expect(c.s[eng.pools.g]).toBeCloseTo(50, 6);
-    expect(c.s[gun.pools.g]).toBeGreaterThan(90);
-    // Thrusting drains only the engines' circuit's battery
-    c = { core: 100, s: L.stores.map(() => 100) };
-    for (let t = 0; t < 120; t++) c = powerTick(d, c, { thrusting: true, boosting: true, dir: [0, -1] }, tuning).charge;
-    expect(c.s[eng.pools.g]).toBeLessThan(100);
-    expect(c.s[gun.pools.g]).toBe(100);
-    // (Asked only for engines pushing a way, those pushing elsewhere draw nothing: flight doesn't ask it that way, as before)
-    const back = powerTick(d, FULL_CHARGE, { thrusting: true, boosting: false, dir: [0, 1] }, tuning);
-    expect(back.charge.s[eng.pools.g]).toBe(100);
-  });
-
-  it('a store gives no more than its discharge rate: past it, the circuit browns out with charge still stored', () => {
-    // The Galleon's engines and guns with its Fusion Plants taken out: a Heavy Bank (and the core) alone. The bank is full,
-    // but it gives slowly
-    // (wired as Auto-wire wired the real one)
+  it('a store gives no more than its rate: past its Output a boosting, firing ship browns out with charge still stored', () => {
+    // The Galleon with Isotope Piles for its Fusion Plants: little spare, so its Output is mostly the core's and Heavy Banks' rates
     const g = design('galleon.json');
-    g.wires = autoWire(design('galleon.json'), catalog).map((w) => [...w] as typeof w);
-    g.parts.filter((q) => q.fn === 'power_fusion_plant').forEach((q) => Object.assign(q, { fn: 'hull', material: 'alloy' }));
-    const d = createShipState(catalog, tuning, 1, g, 0).derived;
-    // Boosting with every gun reloading
-    const load = d.power!.feeds.map(() => 0);
-    for (const w of d.weapons) load[d.power!.feedOf[w.part]] += d.power!.draw[w.part];
-    const r = powerTick(d, FULL_CHARGE, { thrusting: true, boosting: true, dir: [0, -1], load }, tuning);
+    const pile = catalog.functions.get('power_isotope_pile')!;
+    g.parts.filter((q) => q.fn === 'power_fusion_plant').forEach((q) => Object.assign(q, { fn: pile.id, piece: 'round', material: pile.material }));
+    const d = derived(g), L = d.power!;
+    expect(L.pool.parts.length).toBeGreaterThan(0);
+    const load = L.feeds.map(() => 0);
+    for (const w of d.weapons) load[L.feedOf[w.part]] += L.draw[w.part];
+    const r = powerTick(d, FULL_CHARGE, { thrusting: true, boosting: true, load }, tuning);
     expect(r.boost).toBe(true);
-    // (Engines first: they get theirs, the guns what's left)
-    expect(r.power).toBe(1);
-    expect(Math.min(...r.charge.gun!)).toBeLessThan(BROWNOUT);
-    expect(Math.min(...r.charge.gun!)).toBeGreaterThan(0);
+    // (Engines first: the guns get no more of a share than they do)
+    expect(r.power).toBeLessThan(BROWNOUT);
+    expect(Math.max(...r.charge.gun!)).toBeLessThanOrEqual(r.power + 1e-9);
     expect(chargeTotal(d, r.charge)).toBeGreaterThan(95);
-    // Without the rates (the old batteries) it wouldn't have
-    const free = powerTick(unlimited(d), FULL_CHARGE, { thrusting: true, boosting: true, dir: [0, -1], load }, tuning);
+    // Without the rates it wouldn't have
+    const free = powerTick(unlimited(d), FULL_CHARGE, { thrusting: true, boosting: true, load }, tuning);
     expect(free.power).toBe(1);
     expect(Math.min(...free.charge.gun!)).toBe(1);
-    // The load test shows it from the first moment
+    // The load test shows it from the first moment; the real Galleon is fine
     const lt = loadTest(d, tuning, { fire: true, thrust: true, boost: true, seconds: 3 });
-    const main = d.power!.circuits.findIndex((c) => c.main);
-    expect(lt.circuits[main].guns).toBeLessThan(BROWNOUT);
-    expect(lt.circuits[main].brownAt).toBe(0);
-    // ...and the real Galleon passes it
-    const ok = createShipState(catalog, tuning, 1, design('galleon.json'), 0).derived;
-    expect(powerTick(ok, FULL_CHARGE, { thrusting: true, boosting: true, dir: [0, -1] }, tuning).power).toBe(1);
+    expect(lt.guns).toBeLessThan(BROWNOUT);
+    expect(lt.brownAt).toBe(0);
+    expect(powerTick(derived(design('galleon.json')), FULL_CHARGE, { thrusting: true, boosting: true, dir: [0, -1] }, tuning).power).toBe(1);
   });
 
-  it('brownout: a gun on a circuit that can\'t keep up reloads slower', () => {
-    // Both Pips cut off from the reactor: the left one unwired (it no longer touches it: the reactor moved down a cell), the
-    // right one wired only to an empty Battery. They share the core's trickle, 12/s against the 16/s the two would draw
-    const b: Blueprint = { ...base([p(9, 'sq', 'power_battery', 2, 2), p(10, 'sq', 'hull', -1, 1)], [[-1, 2, 0, 2], [0, 2, 1, 2], [2, 0, 2, 1], [2, 1, 2, 2]]) };
-    b.parts[3] = { ...b.parts[3], y: 2 };
+  it('the Heavy Bank holds 300 and gives 150/s a cell; the Battery 200 and 600/s', () => {
+    const L = derived(base([p(9, 'block2', 'power_heavy_bank', -3, 1), p(10, 'sq', 'power_battery', -1, 2)])).power!;
+    const hb = catalog.functions.get('power_heavy_bank')!, bat = catalog.functions.get('power_battery')!;
+    expect(hb.store).toBe(300);
+    expect(hb.discharge).toBe(150);
+    expect(bat.store).toBe(200);
+    expect(bat.discharge).toBe(600);
+    expect(L.pool.parts.sort()).toEqual([10, 9].sort());
+    expect(L.partCap[9]).toBeGreaterThan(1000);
+  });
+
+  it('spare generation refills the pool and the banks, emptiest first', () => {
+    const b = base([p(9, 'sq', 'power_capacitor', 3, 0), p(10, 'sq', 'power_battery', -2, 1)]);
+    const d = derived(b);
+    expect(d.power!.banks.length).toBe(1);
+    expect(d.power!.banks[0].refills).toBe(true);
+    let c: Charge = { g: 20, b: [80] };
+    for (let t = 0; t < 30; t++) c = powerTick(d, c, { thrusting: false, boosting: false }, tuning).charge;
+    // (The pool, emptier, takes it all while the bank is fuller)
+    expect(c.g).toBeGreaterThan(20);
+    expect(c.b[0]).toBeCloseTo(80, 6);
+  });
+});
+
+describe('energy: banks', () => {
+  it('touching Capacitors make one bank that feeds the guns it touches; it never feeds an engine, and kinds never mix', () => {
+    const b = base([p(9, 'sq', 'power_capacitor', 3, 0), p(10, 'sq', 'power_capacitor', 3, 1), p(11, 'sq', 'power_drive_cell', 3, 2), p(12, 'sq', 'power_capacitor', 2, 2), p(13, 'sq', 'engine_ion_drive', 2, 3, { facing: 'S' })]);
     expect(codes(b)).toEqual([]);
-    const d = createShipState(catalog, tuning, 1, b, 0).derived, L = d.power!;
-    expect(L.circuits[L.circuitOf[2]].main).toBe(false);
-    expect(d.network[1]).toBe(-1);
-    const n = shoot(b, 1200, (dd) => ({ core: 100, s: dd.power!.stores.map((s) => (s.circuit === L.circuitOf[2] ? 0 : 100)) }));
-    const flatOut = 1200 / d.weapons.find((x) => x.part === 2)!.interval;
-    for (const g of [1, 2]) {
-      expect(n[g]).toBeGreaterThan(flatOut * 0.5);
-      expect(n[g]).toBeLessThan(flatOut * 0.9);
-    }
-    // One alone on it keeps up (8/s of 12)
-    const one = shoot(b, 1200, (dd) => ({ core: 100, s: dd.power!.stores.map(() => 100) }));
-    expect(one[2]).toBeGreaterThan(flatOut * 0.95);
+    const L = derived(b).power!;
+    // Banks number by their lowest part: Capacitors 9+10, the Drive Cell, the lone Capacitor 12
+    expect(L.banks.map((x) => [x.kind, x.parts])).toEqual([['cap', [9, 10]], ['drive', [11]], ['cap', [12]]]);
+    expect(L.banks[0].feeds).toEqual([2]);
+    // (The Capacitor at (2,2) touches the Ion Drive at (1,2) and the one below it: it feeds neither)
+    expect(L.banks[2].feeds).toEqual([]);
+    expect(L.banks[0].cap).toBeCloseTo(320, 6);
+    expect(L.banks[0].rate).toBeCloseTo(4000, 6);
+    expect(L.feeds[L.feedOf[2]].banks).toEqual([0]);
+    expect(L.feeds[L.feedOf[1]].banks).toEqual([]);
   });
 
-  it('brownout: engines on a starved circuit push less', () => {
-    // The engines wired to a Battery with no generator; drained, they live on the trickle (12/s against their 18/s)
-    const b = base([p(9, 'sq', 'power_battery', 2, 2)], [[0, 2, 1, 2], [1, 2, 2, 2]]);
-    expect(codes(b)).toEqual([]);
-    const d = createShipState(catalog, tuning, 1, b, 0).derived, L = d.power!;
-    const eng = L.circuitOf[7];
-    const dry: Charge = { core: 100, s: L.stores.map((s) => (s.circuit === eng ? 0 : 100)) };
-    const r = powerTick(d, dry, { thrusting: true, boosting: false, dir: [0, -1] }, tuning);
-    expect(r.power).toBeLessThan(BROWNOUT);
-    expect(r.power).toBeCloseTo(12 / 18, 2);
+  it('a pool drained by boosting leaves a gun bank full, and the gun it feeds still reloads at full speed', () => {
+    const b = base([p(9, 'sq', 'power_capacitor', 3, 0), p(10, 'sq', 'power_capacitor', 3, 1)]);
+    const d = derived(b);
+    let c: Charge = FULL_CHARGE;
+    for (let t = 0; t < 1800; t++) c = powerTick(d, c, { thrusting: true, boosting: true }, tuning).charge;
+    expect(c.g).toBeLessThan(2);
+    expect(c.b[0]).toBe(100);
+    // Firing while boosting on the empty pool: the banked Pip keeps its pace, the other barely reloads
+    const r = shoot(b, 600, () => c, { thrusting: true, boosting: true });
+    const flatOut = 600 / d.weapons.find((x) => x.part === 2)!.interval;
+    expect(r.shots[2]).toBeGreaterThan(flatOut * 0.95);
+    // (The other shares what's left of the Output with nothing behind it)
+    expect(r.shots[1] ?? 0).toBeLessThan(r.shots[2] * 0.75);
+    expect(r.charge.b[0]).toBeLessThan(100);
   });
 
-  it('capacitors give only to what they touch, and touching ones make one bank', () => {
-    // The right Pip on a circuit with no generator and two capacitors: touching it (one bank of two), or off to the side
-    const touching = base([p(9, 'sq', 'power_capacitor', 3, 0), p(10, 'sq', 'power_capacitor', 3, 1)], [...ENGINES, [2, 0, 3, 0], [3, 0, 3, 1]]);
-    const apart = base([p(9, 'sq', 'power_capacitor', 3, 1), p(10, 'sq', 'power_capacitor', 4, 1)], [...ENGINES, [2, 0, 2, 1], [2, 1, 3, 1], [3, 1, 4, 1]]);
-    expect(codes(touching)).toEqual([]);
-    expect(codes(apart)).toEqual([]);
-    const L = createShipState(catalog, tuning, 1, touching, 0).derived.power!;
-    const banks = L.stores.filter((s) => s.kind === 'k');
-    expect(banks.length).toBe(1);
-    expect([...banks[0].parts].sort((a, b) => a - b)).toEqual([9, 10]);
-    expect(banks[0].feeds).toEqual([2]);
-    const La = createShipState(catalog, tuning, 1, apart, 0).derived.power!;
-    expect(La.stores.filter((s) => s.kind === 'k').every((s) => !s.feeds!.length)).toBe(true);
-    // No generator and the core empty (so no trickle): the touching bank feeds the Pip, the one apart can't
-    const noReactor = (b: Blueprint): Blueprint => ({ ...b, parts: b.parts.map((q) => (q.fn === 'power_cell_reactor' ? { ...q, fn: 'hull', material: 'alloy' } : q)) });
-    const empty = (): Charge => ({ core: 0, s: [] });
-    const a = shoot(noReactor(touching), 300, empty)[2] ?? 0, b = shoot(noReactor(apart), 300, empty)[2] ?? 0;
-    expect(b).toBe(1);
-    expect(a).toBeGreaterThan(10);
-  });
-
-  it('the core\'s store is a battery on the main circuit and a trickle to the rest; an unwired gun limps on it', () => {
-    const d = createShipState(catalog, tuning, 1, design('sparrow-t.json'), 0).derived;
+  it('a Drive Cell gives a Burst Strafer 2 full bursts on an empty pool', () => {
+    const bp = design('sparrow-t.json');
+    bp.parts.push(
+      { uid: 60, piece: 'sq', fn: 'engine_burst_strafer', material: 'steel', x: 3, y: 0, rot: 0, flip: false, facing: 'E' } as PlacedPart,
+      { uid: 62, piece: 'sq', fn: 'power_drive_cell', material: 'steel', x: 3, y: -1, rot: 0, flip: false } as PlacedPart,
+    );
+    const d = derived(bp);
     const L = d.power!;
-    expect(L.core).not.toBeNull();
-    expect(L.circuits[L.core!.circuit].main).toBe(true);
-    expect(L.core!.rate).toBeGreaterThan(L.core!.trickle * 5);
-    const dd = createShipState(catalog, tuning, 1, base([], [...ENGINES]), 0).derived;
-    expect(dd.network[2]).toBe(-1);
-    expect(dd.satisfaction[2]).toBe(1);
-    expect(dd.power!.circuits[dd.power!.circuitOf[2]].net).toBe(-1);
+    expect(L.banks.length).toBe(1);
+    expect(L.banks[0].kind).toBe('drive');
+    expect(L.banks[0].feeds.length).toBe(1);
+    expect(burstEnergy(d, DODGE_LEFT)).toBeCloseTo(140, 0);
+    const NONE: FlightControls = { forward: false, backward: false, left: false, right: false, boost: false, targetAngle: -Math.PI / 2 };
+    const body: FlightBody = { x: 0, y: 0, vx: 0, vy: 0, angle: -Math.PI / 2, angVel: 0, jump: 0 };
+    let c: Charge = { g: 0, b: [100] };
+    const kicks: number[] = [];
+    const s = d.fx!.strafe!;
+    for (let n = 0; n < 3; n++) {
+      const before = body.vx;
+      for (let i = 0; i < s.cooldown; i++) c = stepShipPhysics(body, { ...NONE, dodge: i < 4 }, d, tuning, { charge: c, drainRate: 1 }).charge;
+      kicks.push(Math.abs(body.vx - before));
+      body.vx = body.vy = 0;
+    }
+    // Reference: the same burst with all the power it wants
+    const ref: FlightBody = { x: 0, y: 0, vx: 0, vy: 0, angle: -Math.PI / 2, angVel: 0, jump: 0 };
+    for (let i = 0; i < s.cooldown; i++) stepShipPhysics(ref, { ...NONE, dodge: i < 4 }, d, tuning, { charge: FULL_CHARGE, drainRate: 0 });
+    const full = Math.abs(ref.vx);
+    expect(full).toBeGreaterThan(0);
+    expect(kicks[0]).toBeCloseTo(full, 3);
+    expect(kicks[1]).toBeCloseTo(full, 3);
+    // (The third has only what's left in the cell and the ship's spare generation)
+    expect(kicks[2]).toBeLessThan(full * 0.9);
+    // Without the Drive Cell, the first burst on an empty pool is refused or weak
+    const plain = design('sparrow-t.json');
+    plain.parts.push({ uid: 60, piece: 'sq', fn: 'engine_burst_strafer', material: 'steel', x: 3, y: 0, rot: 0, flip: false, facing: 'E' } as PlacedPart);
+    const dp = derived(plain), b0: FlightBody = { x: 0, y: 0, vx: 0, vy: 0, angle: -Math.PI / 2, angVel: 0, jump: 0 };
+    let c0: Charge = { g: 0, b: [] };
+    for (let i = 0; i < s.cooldown; i++) c0 = stepShipPhysics(b0, { ...NONE, dodge: i < 4 }, dp, tuning, { charge: c0, drainRate: 1 }).charge;
+    expect(Math.abs(b0.vx)).toBeLessThan(full * 0.5);
+  });
+
+  it('a bank refills only wired to power or from a Pulse Dynamo touching it (10/s), and a bank that can do neither stays empty', () => {
+    // The right Pip's Capacitor bank wired to nothing (hand wires: just the engines)
+    const loose = base([p(9, 'sq', 'power_capacitor', 3, 0)], [...ENGINES]);
+    const Ll = derived(loose).power!;
+    expect(Ll.banks[0].refills).toBe(false);
+    let c: Charge = { g: 100, b: [0] };
+    for (let t = 0; t < 600; t++) c = powerTick(derived(loose), c, { thrusting: false, boosting: false }, tuning).charge;
+    expect(c.b[0]).toBe(0);
+    // A Pulse Dynamo against it: 10 a second
+    const dyn = base([p(9, 'sq', 'power_capacitor', 3, 0), p(10, 'sq', 'power_pulse_dynamo', 3, 1)], [...ENGINES]);
+    const dd = derived(dyn);
+    expect(dd.power!.banks[0].dynamo).toBeCloseTo(10, 6);
+    expect(dd.power!.banks[0].dynamos).toEqual([10]);
+    c = { g: 100, b: [0] };
+    for (let t = 0; t < 600; t++) c = powerTick(dd, c, { thrusting: false, boosting: false }, tuning).charge;
+    expect((c.b[0] / 100) * dd.power!.banks[0].cap).toBeCloseTo(100, 0);
+    // (auto-wired, it's on the reactor's network: it refills from spare)
+    expect(derived(base([p(9, 'sq', 'power_capacitor', 3, 0)])).power!.banks[0].refills).toBe(true);
   });
 
   it('a split keeps each store\'s charge; a mended store comes back empty', () => {
-    // Batteries on each side, all wired through the middle hull
-    const b = base([p(9, 'sq', 'power_battery', 2, 2), p(10, 'sq', 'power_battery', -2, 1)], [...ENGINES, [-1, 1, 0, 1], [0, 1, 1, 1], [1, 1, 2, 1], [2, 1, 2, 2], [2, 1, 2, 0]]);
-    expect(codes(b)).toEqual([]);
+    // Two Capacitors in a row against the right Pip, then a third: shoot the middle one and the bank splits
+    const b = base([p(9, 'sq', 'power_capacitor', 3, 0), p(10, 'sq', 'power_capacitor', 4, 0), p(11, 'sq', 'power_capacitor', 5, 0), p(12, 'sq', 'power_battery', -2, 1)]);
     const ship = createShipState(catalog, tuning, 1, b, 0);
     const before = ship.derived;
-    expect(before.power!.circuits.filter((c) => c.letter).length).toBe(1);
-    const c: Charge = { core: 60, s: before.power!.stores.map(() => 40) };
-    // Shoot away the middle hull: the wire through it is cut, and the right side is a circuit of its own
-    const after = rebuild({ catalog, tuning, blueprint: b, hp: ship.maxHp.map((m, i) => (i === 5 ? 0 : m)), maxHp: ship.maxHp, detached: ship.detached, rootMode: 'core' });
-    expect(after.power!.circuits.filter((x) => x.letter).length).toBe(2);
+    expect(before.power!.banks.length).toBe(1);
+    const c: Charge = { g: 60, b: [40] };
+    const after = rebuild({ catalog, tuning, blueprint: b, hp: ship.maxHp.map((m, i) => (i === 10 ? 0 : m)), maxHp: ship.maxHp, detached: ship.detached, rootMode: 'core' });
     const moved = remapCharge(before, after, c);
-    expect(moved.core).toBe(60);
-    after.power!.stores.forEach((_, s) => expect(moved.s[s]).toBeCloseTo(40, 6));
-    // Battery 9 shot off and mended: it comes back empty, the rest keep theirs
-    const lost = rebuild({ catalog, tuning, blueprint: b, hp: ship.maxHp.map((m, i) => (i === 9 ? 0 : m)), maxHp: ship.maxHp, detached: ship.detached, rootMode: 'core' });
+    expect(moved.g).toBeCloseTo(60, 6);
+    // (The cell past the cut is off the ship: what's left is one bank of one)
+    for (let k = 0; k < after.power!.banks.length; k++) expect(moved.b[k]).toBeCloseTo(40, 6);
+    // The Battery shot off and mended: it comes back empty, the core keeps its share
+    const lost = rebuild({ catalog, tuning, blueprint: b, hp: ship.maxHp.map((m, i) => (i === 12 ? 0 : m)), maxHp: ship.maxHp, detached: ship.detached, rootMode: 'core' });
     const back = remapCharge(lost, before, remapCharge(before, lost, c));
-    const P = before.power!;
-    const held = P.stores.reduce((t, g, s) => t + (g.cap * back.s[s]) / 100, 0);
-    const want = P.stores.flatMap((g) => g.parts).filter((i) => i !== 9).reduce((t, i) => t + P.partCap[i] * 0.4, 0);
-    expect(held).toBeCloseTo(want, 3);
+    expect((back.g / 100) * before.power!.pool.cap).toBeCloseTo(0.6 * 240, 1);
   });
 
-  it('the snapshot carries every store group and the core, and unpacks to the same', () => {
-    const d = createShipState(catalog, tuning, 1, design('galleon.json'), 0).derived;
-    const c: Charge = { core: 33.3333, s: d.power!.stores.map((_, i) => 10 + i) };
+  it('the snapshot carries the pool and each bank (1 + banks groups), and unpacks to the same', () => {
+    const d = derived(base([p(9, 'sq', 'power_capacitor', 3, 0), p(10, 'sq', 'power_drive_cell', 2, 2)]));
+    expect(d.power!.banks.length).toBe(2);
+    const c: Charge = { g: 33.3333, b: [10, 11] };
     const packed = packCharge(d, c);
+    expect(packed.groups.length).toBe(3);
     const data: number[] = new Array(CHARGE_GROUPS_AT).fill(0);
-    data[1] = packed.total; data[10] = packed.core; data[11] = packed.groups.length; data.push(...packed.groups);
+    data[1] = packed.total; data[10] = packed.g; data[11] = packed.groups.length; data.push(...packed.groups);
     const back = unpackCharge(data);
-    expect(back.core).toBeCloseTo(33.33, 2);
-    expect(back.s).toEqual(c.s);
-    expect(unpackCharge([1, 2, 3])).toEqual({ core: 100, s: [] });
-  });
-
-  it('circuitCharges lists each lettered circuit and the core', () => {
-    const d = createShipState(catalog, tuning, 1, design('galleon.json'), 0).derived;
-    const cc = circuitCharges(d, FULL_CHARGE);
-    expect(cc.some((x) => x.letter === 'A')).toBe(true);
-    expect(cc[cc.length - 1].letter).toBe('core');
+    expect(back.g).toBeCloseTo(33.33, 2);
+    expect(back.b).toEqual(c.b);
+    expect(unpackCharge([1, 2, 3])).toEqual({ g: 100, b: [] });
+    expect(bankCharges(d, c).map((x) => x.kind)).toEqual(['pool', 'cap', 'drive']);
   });
 });

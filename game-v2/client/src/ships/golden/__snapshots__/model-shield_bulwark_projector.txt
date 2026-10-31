@@ -5,7 +5,6 @@ Hull · mass314 hp · 4.0
 Armour · build3 · 10 pts
 TakesKinetic −5% · Thermal −15% · Cryo −10%
 Power draw77/s
-On Surgeflash restore: when the shield breaks, the bank puts 50% back at once
 Shield180
 
 == partStats (stats rows) ==

@@ -4,8 +4,8 @@ Mk I · Square · 1 cell
 Hull · mass56 hp · 1.4
 Armour · build1 · 1 pts
 TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
-Holds (engines)320 energy
-Givesup to 1,400/s
+Holds (engines it touches)320 energy
+Givesup to 1,400/s first to the engines and strafers its bank touches; touching Drive Cells are one bank
 
 == partStats (stats rows) ==
 GradeMk I
@@ -24,10 +24,10 @@ Small
 Small · Square
 
 == tradeOff ==
-deep and fast, engines only
+an engine bank: first into the engines and strafers it touches
 
 == keyStats ==
-holds 320 (engines) · gives 1,400/s
+holds 320 (engines) · gives 1,400/s by touch
 
 == mountBadge ==
 

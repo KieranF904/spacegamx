@@ -50,7 +50,7 @@ in its folder and the shared files (`rebuild.ts`, `energy.ts`, `flight.ts`, `rep
   feature, so ships without one are byte-for-byte what they were.
 - **load** (`energy.ts` `gunLoad`, per tick): each feature in `fxList` adds its draw to `out`. Must not allocate.
 - **describe** (`featureFacts(ctx)`): facts of the features a function gives. `describePart()` (common ships/describe.ts) wraps it with partStats; the client renders facts in `client/src/ships/describe/` (tipRows, chips, summaryFields, guideNumber). A feature adds facts; the Tow Beam's replaced its old tooltip, card and compact-tooltip rows (a `Fact` may carry `dim`, `short`, `chip`, `drawWhen` presentation variants).
-- **burst: 'engine'** (`circuits.ts`): the part's circuit counts its draw as an engine's (`engineDraw`): a Burst Strafer's.
+- **burst: 'engine'** (`circuits.ts`): Drive Cell banks touching the part feed it, as they do engines: a Burst Strafer's.
 - **flight** (`flight.ts` stepFlight, Cut 6): five phases (`types.ts` FlightPhase: preJump, steer, thrustGate, impulse,
   damp), each the plan's hooks in (order, feature) order, sharing one module-level `FlightCtx` (reset by field, no
   allocation, not re-entrant). Every hook runs for **every** ship stepped and checks for itself (a ship that lost its

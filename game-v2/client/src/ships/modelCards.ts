@@ -14,7 +14,7 @@ export const FAMILY_LABEL: Record<string, string> = {
   laser: 'Lasers', pulse: 'Pulse guns', lance: 'Lances', arc: 'Arc projectors',
   missile: 'Missiles', torpedo: 'Torpedoes', emp: 'EMP',
   ion: 'Ion drives', afterburner: 'Burn engines', plasma: 'Plasma drives', jumpcoil: 'Jump coils',
-  reactor: 'Generators', dynamo: 'Surge generators', battery: 'Batteries', capacitor: 'Capacitors', drive_cell: 'Drive cells',
+  reactor: 'Generators', dynamo: 'Bank chargers', battery: 'Batteries', capacitor: 'Capacitors', drive_cell: 'Drive cells',
   shield: 'Shields', plating: 'Plating',
   mining: 'Mining lasers', demolition: 'Demolition', siphon: 'Siphons', scanner: 'Scanners', constructor: 'Constructors',
   // (Support weapons: common/src/ships/features/support/support.ts)
@@ -89,11 +89,11 @@ const TRADE_OFF: Record<string, string> = {
   power_isotope_pile: 'weak but tough, never explodes',
   power_fusion_plant: 'plenty of power, heavy, big blast',
   power_overclock_reactor: 'most power, fragile, biggest blast',
-  power_battery: 'an all-rounder: holds and gives quickly',
-  power_capacitor: 'tiny and very fast, only into what it touches',
-  power_drive_cell: 'deep and fast, engines only',
-  power_heavy_bank: 'holds the most, gives it slowly',
-  power_pulse_dynamo: 'Surge with no wires, only to its bank',
+  power_battery: 'the ship\'s pool: holds and gives quickly',
+  power_capacitor: 'a gun bank: very fast, first into the guns it touches',
+  power_drive_cell: 'an engine bank: first into the engines and strafers it touches',
+  power_heavy_bank: 'deep but slow: endurance, not alpha strikes',
+  power_pulse_dynamo: 'charges the banks it touches, no wires',
   utility_mining_laser: 'cuts ore, a poor weapon',
   utility_bore: 'cuts harder rock',
   utility_demolition_launcher: 'cracks rock wide open',
@@ -175,10 +175,10 @@ export function keyStats(catalog: Catalog, tuning: ShipTuning | undefined, fn: F
   if (st.thrust) out.push(`thrust ${st.thrust.toFixed(1)}`);
   if (fn.rated) out.push(`top ${n0(fn.rated * 60)} m/s`);
   if (st.supply) out.push(`+${n0(st.supply)} power`);
-  if ((fn.surge ?? 0) > 0) out.push(`+${n0(fn.surge! * st.area)} surge, by touch`);
+  if ((fn.dynamo ?? 0) > 0) out.push(`+${n0(fn.dynamo!)}/s into each bank it touches`);
   if ((fn.store ?? 0) > 0) {
-    out.push(`holds ${n0(fn.store! * st.area)}${fn.pool === 'drive' ? ' (engines)' : fn.pool === 'weapon' ? ' (guns)' : ''}`);
-    // (local circuits: the most it gives a second; a capacitor only into what it touches)
+    out.push(`holds ${n0(fn.store! * st.area)}${fn.bank ? (fn.pool === 'drive' ? ' (engines)' : ' (guns)') : ''}`);
+    // (the most it gives a second; a bank member first into what its bank touches)
     out.push(`gives ${n0(partDischarge(fn, st.area, catalog.materials.get(fn.material ?? 'alloy'), circuitTuning(tuning ?? ({} as ShipTuning))))}/s${fn.bank ? ' by touch' : ''}`);
   }
   if (st.shield) out.push(`shield ${n0(st.shield)}`);

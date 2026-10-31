@@ -1,4 +1,9 @@
 {
+  "drive-bank-boost/replica": {
+    "keyframes": "388,390,392,394,396,398,400,402,404,406,408,410,412,414,416,418,420,422,424,426,428,430,432,434,436,438,440,442,444,446,448,486-497,499,501,503,505,507,509,511,513,515,517,519,521,523,525,527,529,531,533,535,537,539,541,543,545,547,549",
+    "server": "6a29e05950f6fa32"
+  },
+  "drive-bank-boost/unrounded-aim": null,
   "heavy-cargo/replica": {
     "keyframes": "",
     "server": "a8063821238b1a1a"
@@ -20,8 +25,8 @@
   },
   "strafer-energy-short/unrounded-aim": null,
   "strafer-every-way/replica": {
-    "keyframes": "317-322,338-348,364-374",
-    "server": "5bd097f5c075b88f"
+    "keyframes": "",
+    "server": "3a7b7f7e0db933b2"
   },
   "strafer-every-way/unrounded-aim": null,
   "strafer-heavy/replica": {
@@ -34,14 +39,9 @@
     "server": "9c58b08dd8522cd9"
   },
   "strafer-replay/unrounded-aim": "tick 79: angVel server 0.01004 vs 0.010041",
-  "surge-kick/replica": {
-    "keyframes": "19,39,59,79,139,159,179",
-    "server": "7e65e28b286f487e"
-  },
-  "surge-kick/unrounded-aim": null,
   "tow/replica": {
     "keyframes": "2",
-    "server": "e48a265155a129ac"
+    "server": "d9840037c591615f"
   },
   "tow/unrounded-aim": null
 }
