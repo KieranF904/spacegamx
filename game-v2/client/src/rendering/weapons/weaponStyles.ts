@@ -6,6 +6,7 @@
  */
 
 import { WeaponType } from '@space-game/common';
+import { KINETIC_MODEL_STYLES } from './kineticStyles';
 
 export interface WeaponStyle {
   /** How the head is placed: from spawn point + velocity (straight shots), or from the server's interpolated position (guided or slowing shots) */
@@ -25,7 +26,7 @@ export interface WeaponStyle {
   /** Soft halo around the head (0 = none) */
   haloRadius: number;
   /** tongue: the forward flame's length × this; girth: the flash's width × this (a heavy shell's flash is fat) */
-  muzzle: { life: number; size: number; sparks: number; color: number; smoke: number; tongue?: number; girth?: number };
+  muzzle: { life: number; size: number; sparks: number; color: number; smoke: number; tongue?: number; girth?: number; ring?: { color: number; count?: number; size?: number } };
   /** ring: a second, wider shock ring of this colour (the heavier marks) */
   impact: { sparks: number; speed: number; life: number; color: number; flash: number; ring?: number };
   /** Leaves a smoke trail (missiles) */
@@ -55,6 +56,10 @@ export interface WeaponStyle {
   arcScale?: number;
   /** Impact sparks spread over this many degrees of hue round their colour (a prism's rainbow) */
   shardHue?: number;
+  /** Only every `every`th shot is drawn at full brightness, the rest at `dim` of it (a stream's tracer rounds) */
+  accent?: { every: number; dim: number };
+  /** The shot's colours turn from `cold` to `hot` with the firing gun's spin (0..1) when it leaves the barrel (a minigun's) */
+  heat?: { cold: number; hot: number };
 }
 
 /**
@@ -62,6 +67,7 @@ export interface WeaponStyle {
  * rest stay the kind's. Filled in by the per-model units; empty here.
  */
 export const MODEL_STYLES: Record<string, Partial<WeaponStyle>> = {};
+
 
 /** A beam's look: PulseFx (pulse guns) and MiningBeamFx (cutting beams) read it; absent fields keep the grade's look */
 export interface BeamLook {
@@ -282,3 +288,5 @@ export const WEAPON_STYLES: Record<number, WeaponStyle> = {
   },
 };
 
+// Per-model looks, by family (each in its own file)
+Object.assign(MODEL_STYLES, KINETIC_MODEL_STYLES);

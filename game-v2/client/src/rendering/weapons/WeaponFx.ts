@@ -42,6 +42,10 @@ interface Shot {
   power: number;
   /** Its own phase for sway and pulsing (so two shots do not beat together) */
   phase: number;
+  /** x its brightness: a stream's dim rounds (style.accent) */
+  dim: number;
+  /** The firing gun's spin as it left the barrel (0..1): turns its colours from cold to hot (style.heat) */
+  hot: number;
   type: number;
   owner: number;
   glow: number;
@@ -167,6 +171,8 @@ export class WeaponFx {
   barrelTip: ((owner: number, x: number, y: number, angle: number) => { x: number; y: number } | null) | null = null;
   /** The firing ship's pose on a shell's fire tick, where it's known (shells built from fire events) */
   firePose: ((id: number) => FirePoseXY | undefined) | null = null;
+  /** How far a gun's spin has got (0..1) where a shot left (x, y): the ship renderer knows (minigun tracers heat up with it) */
+  spinAt: ((owner: number, x: number, y: number) => number) | null = null;
   /** The model and damage of the gun a fire-event shell came from (read once, as the shell is first seen) */
   shellLook: ((id: number) => { model?: string; damage?: number } | undefined) | null = null;
 
@@ -321,7 +327,7 @@ export class WeaponFx {
       style,
       size: e.data?.[7] || 1,
       power: shotScale(look?.damage),
-      phase: (e.id * 0.618) % 1,
+      phase: (e.id * 0.618) % 1, dim: this.dimOf(style, e.id), hot: 0,
       type,
       owner: e.data?.[6] ?? -1,
       glow: mixColor(style.glowColor, hueColor(hue), style.ownerTint),
@@ -342,12 +348,34 @@ export class WeaponFx {
 
   private nextPredicted = -1;
 
+  /** A stream's accent: every nth round bright, the rest dim */
+  private dimOf(style: WeaponStyle, n: number): number {
+    return style.accent && n % style.accent.every !== 0 ? style.accent.dim : 1;
+  }
+
+  /**
+   * A puff off a gun that is not shooting: smoke venting from a housing, or sparks (a spent clip's eject, a rail's
+   * vent). From the ship renderer, on reload.
+   */
+  vent(x: number, y: number, angle: number, kind: 'smoke' | 'spark', color: number): void {
+    if (this.particleKeep < 1 && Math.random() > this.particleKeep) return;
+    if (kind === 'smoke') {
+      const a = angle + (Math.random() - 0.5) * 1.4;
+      this.smoke.push({ x, y, vx: Math.cos(a) * 0.7, vy: Math.sin(a) * 0.7, life: 0, max: 40 + Math.random() * 20, size: 5 + Math.random() * 3, color, alpha: 0.2 });
+      return;
+    }
+    for (let i = 0; i < 2; i++) {
+      const a = angle + (Math.random() - 0.5) * 1.6, v = 1.5 + Math.random() * 2;
+      this.sparks.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0, max: 14 + Math.random() * 10, color });
+    }
+  }
+
   /** A shell your client just fired (guns.ts): it flies from your barrel now, the server's copy takes it over when it comes */
   predict(p: PredictedShell): void {
     const style = weaponStyle(p.type, p.grade, p.model);
     const id = this.nextPredicted--;
     this.shots.set(id, {
-      id, style, size: p.size, power: shotScale(p.damage), phase: (-id * 0.618) % 1, type: p.type, owner: p.owner,
+      id, style, size: p.size, power: shotScale(p.damage), phase: (-id * 0.618) % 1, dim: this.dimOf(style, -id), hot: 0, type: p.type, owner: p.owner,
       glow: mixColor(style.glowColor, hueColor((p.owner * 137) % 360), style.ownerTint),
       spawnX: p.spawnX, spawnY: p.spawnY, spawnTick: p.spawnTick, vx: p.vx, vy: p.vy,
       hit: null, flashed: false, predicted: true, pose: p.pose, fading: null, head: null, tail: null,
@@ -411,6 +439,7 @@ export class WeaponFx {
     if (tip) { shot.vox = tip.x - shot.spawnX; shot.voy = tip.y - shot.spawnY; }
     const x = tip?.x ?? shot.spawnX, y = tip?.y ?? shot.spawnY;
     const size = m.size * shot.size * shot.power;
+    if (shot.style.heat) shot.hot = Math.max(0, Math.min(1, this.spinAt?.(shot.owner, shot.spawnX, shot.spawnY) ?? 0));
     // The barrel in the ship's frame: from the ship's pose on the fire tick (exact), else as it's drawn now (it's drawn at that tick)
     const ref = shot.pose ?? (owner ? { x: owner.renderX, y: owner.renderY, angle: owner.renderAngle } : undefined);
     const oa = ref?.angle ?? 0, c = Math.cos(-oa), sn = Math.sin(-oa);
@@ -422,9 +451,20 @@ export class WeaponFx {
       owner: owner ? shot.owner : -1, ox: dx * c - dy * sn, oy: dx * sn + dy * c, rel: angle - oa,
     });
     // Spent casings flung out to the side, tumbling away
-    for (let i = 0; i < (shot.style.casings ?? 0); i++) {
+    // (a minigun throws more brass the faster it spins)
+    const brass = Math.round((shot.style.casings ?? 0) * (shot.style.heat ? 0.3 + 0.9 * shot.hot : 1));
+    for (let i = 0; i < brass; i++) {
       const side = angle + (Math.random() < 0.5 ? 1 : -1) * (1.2 + Math.random() * 0.5), v = 1.4 + Math.random() * 1.8;
       this.sparks.push({ x, y, vx: Math.cos(side) * v, vy: Math.sin(side) * v, life: 0, max: 26 + Math.random() * 14, color: 0xe0b860, width: 2.4 });
+    }
+    // Shock rings off the muzzle (a rail's coil rings come one after another, each wider)
+    const mr = m.ring;
+    if (mr) {
+      const n = mr.count ?? 1;
+      for (let i = 0; i < n; i++) {
+        const ahead = i * size * 0.25;
+        this.rings.push({ x: x + Math.cos(angle) * ahead, y: y + Math.sin(angle) * ahead, life: 0, max: 9 + i * 3, size: size * (mr.size ?? 1) * (0.5 + 0.3 * i), color: mr.color });
+      }
     }
     // Smoke puffs out ahead of the barrel, carried a little by the shot, and left behind as the ship flies on
     for (let i = 0; i < m.smoke; i++) {
@@ -462,7 +502,13 @@ export class WeaponFx {
       let hx = shot.head.x, hy = shot.head.y, bx = tx, by = ty;
       const dx = hx - bx, dy = hy - by, dl = Math.hypot(dx, dy);
       const ux = dl > 1e-6 ? dx / dl : 1, uy = dl > 1e-6 ? dy / dl : 0, nx = -uy, ny = ux;
-      let alpha = fade;
+      let alpha = fade * shot.dim;
+      let coreCol = st.coreColor, glowCol = shot.glow;
+      if (st.heat) {
+        // (tracers run from the cold colour to the hot one with the gun's spin)
+        coreCol = mixColor(st.heat.cold, st.heat.hot, shot.hot);
+        glowCol = mixColor(shot.glow, st.heat.cold, 0.5 + 0.3 * shot.hot);
+      }
       if (st.blink) alpha *= ((this.clock / st.blink + shot.phase * 2) % 1) < 0.5 ? 1 : 0.2;
       if (st.wobble) {
         // The head sways across its line, the tail trailing the sway
@@ -475,8 +521,8 @@ export class WeaponFx {
         // A pair runs as two thinner tracers either side of the line
         const off = lanes === 2 ? (lane === 0 ? -0.5 : 0.5) * st.pair!.gap * z : 0, wk = lanes === 2 ? 0.7 : 1;
         const ox = nx * off, oy = ny * off;
-        if (st.glowWidth > 0) this.line(bx + ox, by + oy, hx + ox, hy + oy, st.glowWidth * z * wk, shot.glow, st.glowAlpha * alpha);
-        if (st.coreWidth > 0) this.line(bx + ox, by + oy, hx + ox, hy + oy, st.coreWidth * z * wk, st.coreColor, 0.9 * alpha);
+        if (st.glowWidth > 0) this.line(bx + ox, by + oy, hx + ox, hy + oy, st.glowWidth * z * wk, glowCol, st.glowAlpha * alpha);
+        if (st.coreWidth > 0) this.line(bx + ox, by + oy, hx + ox, hy + oy, st.coreWidth * z * wk, coreCol, 0.9 * alpha);
         if (st.haloRadius > 0) {
           this.circle(g, TEX.disc, hx + ox, hy + oy, st.haloRadius * z * wk, shot.glow, 0.14 * alpha);
           this.circle(g, TEX.disc, hx + ox, hy + oy, st.haloRadius * z * wk * 0.55, shot.glow, 0.22 * alpha);

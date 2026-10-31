@@ -393,7 +393,12 @@ export class ShipClient {
       id === this.opts.state.playerId ? this.localThrustCommand() : null,
     // Docked ships are inside their station: yours while you're berthed, others as the server says
     (id) => (id === this.opts.state.playerId ? this.docked : this.replicas.isDocked(id)), this.features);
-    renderer.onMuzzle = (owner, x, y, power) => this.renderer?.kick(owner, x, y, power);
+    renderer.onMuzzle = (owner, x, y, power) => {
+      this.renderer?.kick(owner, x, y, power);
+      // A heavy shot shoves the shooter's view (a small nudge, only for your own gun)
+      if (owner === this.opts.state.playerId && power > 1.3) this.opts.state.triggerScreenShake(1.2 * (power - 1.2), 0.12);
+    };
+    renderer.spinAtOf = (owner, x, y) => this.renderer?.spinAt(owner, x, y) ?? 0;
     // Muzzle flashes (and the shells' first stretch) from the drawn barrel's tip, not the facing edge they spawn at
     renderer.barrelTip = (owner, x, y, angle) => this.renderer?.barrelTip(owner, x, y, angle) ?? null;
     renderer.lodestoneGlow = (id) => this.lodestoneGlow(id);
