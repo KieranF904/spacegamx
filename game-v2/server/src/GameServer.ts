@@ -2243,7 +2243,7 @@ this.devTeleport = opts.devTeleport ?? false;
         return ids;
       },
       shotVs: (proj) => this.weapons.vsOf(proj),
-      hazardScale: (eid, what) => (what === 'heat' ? this.hazards.heatScale(eid) : this.hazards.shieldScale(eid)),
+      hazardScale: (eid) => this.hazards.shieldScale(eid),
       partLost: (eid, uid) => { const pc = this.pilots.connOf(eid); if (pc) this.hangar.gemsLost(pc, uid); },
       spendAmmo: (eid, kind, free) => { const pc = this.pilots.connOf(eid); return pc ? this.ammo.spend(pc, kind, free) : { scale: 1, dry: false }; },
       beamAsteroid: (eid, x, y, angle, range, damage, kind) => this.beamAsteroid(eid, x, y, angle, range, damage, kind),

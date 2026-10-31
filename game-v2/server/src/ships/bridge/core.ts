@@ -27,7 +27,7 @@ export interface ShipHost {
   /** A shot's damage against shields and hull (pulse lasers), if it has its own */
   shotVs?(proj: number): { shield?: number; hull?: number; hit?: HitInfo; bane?: { faction: string; damage: number } } | undefined;
   /** Where a hazard bites: beam heat or shield regeneration × this (1 where nothing does) */
-  hazardScale?(eid: number, what: 'heat' | 'shield'): number;
+  hazardScale?(eid: number, what: 'shield'): number;
   /** A part with gems in it was destroyed (the gems go with it) */
   partLost?(eid: number, uid: number): void;
   /** A pilot's gun fires a volley: spend its ammunition (if it takes any). Its damage share, and whether it's a plain round */

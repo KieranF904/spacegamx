@@ -3,8 +3,8 @@
  * second, each pilot's ship is weighed against where it is: the system's
  * ratings (higher near its star or black hole) less what its build tolerates.
  * What it's short of costs it, per point: radiation wears every part,
- * corrosion wears armour and makes repairs dearer, heat makes beams run hot
- * and shields slow to come back, an electromagnetic storm seizes the ship up
+ * corrosion wears armour and makes repairs dearer, heat makes shields slow
+ * to come back, an electromagnetic storm seizes the ship up
  * now and then. Only what the server works out alone: nothing here moves a
  * ship or changes its battery, so clients' prediction is untouched. Cold is
  * game/Warmth.ts's: it builds up over time instead.
@@ -40,11 +40,6 @@ export class Hazards {
   /** What a ship is short of here (empty: nothing) */
   deficit(eid: number): HazardRatings {
     return this.short.get(eid) ?? {};
-  }
-
-  /** Beam heat × this */
-  heatScale(eid: number): number {
-    return 1 + (this.short.get(eid)?.thermal ?? 0) * this.effect('thermal', 'beamHeat');
   }
 
   /** Shield regeneration × this */

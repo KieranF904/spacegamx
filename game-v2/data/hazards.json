@@ -35,8 +35,7 @@
       "batteryCap": -0.08
     },
     "thermal": {
-      "summary": "Beam heat builds 20% faster and shield regen drops 15%, per point",
-      "beamHeat": 0.2,
+      "summary": "Shield regen drops 15%, per point",
       "shieldRegen": -0.15
     },
     "cryo": {
