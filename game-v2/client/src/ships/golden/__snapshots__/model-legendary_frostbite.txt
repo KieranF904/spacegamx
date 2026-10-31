@@ -7,6 +7,7 @@ TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
 Damage95/s · reach 760
 Hits withCryo · penetration 4.5
 Beamheld while you fire · no heat · draws its power while it's on
+Modelbeam: Burns energy every second you hold it.
 MountTurret, 150°
 FittingBolts on from behind only
 Power draw24/s

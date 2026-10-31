@@ -6,6 +6,7 @@ Armour · build1 · 1 pts
 Damage26/s · reach 1,700
 Hits withExplosive · penetration 0
 Fire rate1.8/s · shells · Flak Canisters (no energy)
+Modelammo: Fires rounds from your hold on a fixed beat; costs no energy; empty means weak plain rounds (40% damage).
 MountTurret, 200°
 FittingSide mount (flippable) · Bolts on at its side only
 Power draw10/s

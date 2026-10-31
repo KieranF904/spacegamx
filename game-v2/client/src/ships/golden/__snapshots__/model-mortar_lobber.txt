@@ -6,6 +6,7 @@ Armour · build1 · 1 pts
 Damage28/s · reach 2,640
 Hits withExplosive · penetration 0.5
 Fire rate0.7/s · shells · Mortar Shells (no energy)
+Modelammo: Fires rounds from your hold on a fixed beat; costs no energy; empty means weak plain rounds (40% damage).
 MountTurret, 360°
 FittingBolts on any side
 Power draw10/s

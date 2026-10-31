@@ -6,6 +6,7 @@ Armour · build1 · 1 pts
 Damage53/s · reach 3,400, fading out to 5,100
 Hits withThermal · penetration 1
 Pulse96 a pulse · charges in 1.8s · no heat
+Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
 MountTurret, 240°
 FittingBolts on any side
 Power draw15/s
@@ -31,7 +32,7 @@ Small · Square
 a long pulse you time, reaches far
 
 == keyStats ==
-96 a pulse · reach 5,100 · draws 15
+96 a pulse · reach 5,100 · cycle · draws 15
 
 == mountBadge ==
 TURRET 240°

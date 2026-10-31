@@ -44,12 +44,12 @@ describe('gun tooltips in shots', () => {
     if (ch) expect(tip(ch.id, true)).toMatch(/Bank covers [\d.]+ charges?/);
   });
 
-  it('every firing model has its chip, a plain cycling gun none', () => {
+  it('every firing model has its chip, cycle and auto included', () => {
     const chips = new Set<string>();
     for (const f of catalog.functions.values()) if (f.weapon && f.fire && !f.fire.model.startsWith('x')) chips.add(`${f.fire.model}:${fireChip(f) !== ''}`);
     expect(chips.has('clip:true')).toBe(true);
     expect(chips.has('charge:true')).toBe(true);
     expect(chips.has('beam:true')).toBe(true);
-    expect(chips.has('cycle:false')).toBe(true);
+    expect(chips.has('cycle:true')).toBe(true);
   });
 });

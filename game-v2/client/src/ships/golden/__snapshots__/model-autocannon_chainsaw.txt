@@ -7,6 +7,7 @@ TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
 Damage80/s · reach 5,400
 Hits withKinetic · penetration 1.5
 Fire rate4.0/s spinning up to 16/s · shells
+Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
 MountTurret, 240°
 FittingBolts on from behind only
 Power draw21/s
@@ -33,7 +34,7 @@ Medium · Panel
 a hose: hard to dodge, harder to power
 
 == keyStats ==
-80 dmg/s · reach 5,400 · spins up · draws 21
+80 dmg/s · reach 5,400 · cycle · spins up · draws 21
 
 == mountBadge ==
 TURRET 240°

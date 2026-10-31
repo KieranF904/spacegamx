@@ -6,6 +6,7 @@ Armour · build1 · 2 pts
 Damage69/s · reach 5,700
 Hits withKinetic · penetration 2
 Fire rate1.4/s · shells
+Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 1 clear cell ahead
 Power draw10/s
@@ -31,7 +32,7 @@ Medium · Panel
 slow heavy shell, punches plate
 
 == keyStats ==
-69 dmg/s · reach 5,700 · draws 10
+69 dmg/s · reach 5,700 · cycle · draws 10
 
 == mountBadge ==
 FIXED

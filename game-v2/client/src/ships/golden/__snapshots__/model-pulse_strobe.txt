@@ -7,6 +7,7 @@ TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
 Damage54/s · reach 5,040
 Hits withEnergy · penetration 0.5
 Fire rate2.0/s · shells
+Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
 MountTurret, 220°
 FittingBolts on any side
 Power draw12/s
@@ -33,7 +34,7 @@ Small · Square
 steady bursts that strip shields
 
 == keyStats ==
-54 dmg/s · reach 5,040 · draws 12
+54 dmg/s · reach 5,040 · cycle · draws 12
 
 == mountBadge ==
 TURRET 220°

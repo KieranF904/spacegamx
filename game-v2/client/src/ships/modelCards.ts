@@ -160,7 +160,17 @@ export function sizeText(catalog: Catalog, fn: FunctionDef): string {
 
 const n0 = (v: number) => (Number.isFinite(v) ? Math.round(v).toLocaleString() : '—');
 
-/** A gun's firing model as a chip ("clip 6 · 1.5s reload", "charge 2.0s", "held beam"); a plain cycling gun has none */
+/** Each firing model's one-sentence hangar description (design section 3) */
+export const FIRE_SENTENCE: Record<string, string> = {
+  cycle: "Fires on a fixed beat while held; each shot's energy is drawn as it reloads.",
+  clip: 'Fires n rounds fast, then reloads from energy when empty, or 1 s after you let go.',
+  charge: 'Hold to charge; it fires itself at full charge, then cools down. Let go early and nothing fires.',
+  ammo: 'Fires rounds from your hold on a fixed beat; costs no energy; empty means weak plain rounds (40% damage).',
+  beam: 'Burns energy every second you hold it.',
+  auto: 'Fires on its own at incoming ordnance.',
+};
+
+/** A gun's firing model as a chip ("cycle", "clip 6 · 1.5s reload", "charge 2.0s", "held beam", "auto") */
 export function fireChip(fn: FunctionDef): string {
   const f = fn.fire;
   if (!f) return '';
@@ -169,7 +179,8 @@ export function fireChip(fn: FunctionDef): string {
     case 'charge': return `charge ${((f.charge ?? 0) / 60).toFixed(1)}s`;
     case 'beam': return f.windup ? 'held beam · winds up' : (fn.weaponMods?.set as { ramp?: unknown } | undefined)?.ramp ? 'held beam · ramps up' : 'held beam';
     case 'ammo': return 'ammo';
-    default: return f.spin ? 'spins up' : '';
+    case 'auto': return 'auto';
+    default: return f.spin ? 'cycle · spins up' : 'cycle';
   }
 }
 
@@ -185,7 +196,7 @@ export function keyStats(catalog: Catalog, tuning: ShipTuning | undefined, fn: F
   else if (st.intercept) out.push(`${st.intercept.perSec.toFixed(1)} shots/s at missiles`);
   else if (st.dps !== undefined && fn.weapon) out.push(`${n0(st.dps)} dmg/s`);
   if (st.range && fn.weapon) out.push(`reach ${n0(st.range)}`);
-  const fm = fn.weapon && !st.heal && !st.intercept ? fireChip(fn) : '';
+  const fm = fn.weapon && !st.heal ? fireChip(fn) : '';
   if (fm) out.push(fm);
   if (st.thrust) out.push(`thrust ${st.thrust.toFixed(1)}`);
   if (fn.rated) out.push(`top ${n0(fn.rated * 60)} m/s`);

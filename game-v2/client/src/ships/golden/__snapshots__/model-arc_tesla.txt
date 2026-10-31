@@ -7,6 +7,7 @@ TakesKinetic −5% · Thermal −15% · Cryo −10%
 Damage70/s · reach 660
 Hits withEnergy · penetration 4
 Beamheld while you fire · no heat · draws its power while it's on
+Modelbeam: Burns energy every second you hold it.
 MountTurret, 300°
 FittingSide mount (flippable) · Bolts on at its side only
 Power draw30/s

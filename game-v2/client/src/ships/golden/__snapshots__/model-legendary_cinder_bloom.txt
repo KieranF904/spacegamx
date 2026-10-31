@@ -7,6 +7,7 @@ TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
 Damage13/s · reach 3,240
 Hits withThermal · penetration 3.5
 Fire rate0.8/s · shells
+Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
 MountTurret, 360°
 FittingBolts on any side
 Power draw12/s
@@ -33,7 +34,7 @@ Small · Square
 The arsonist
 
 == keyStats ==
-13 dmg/s · reach 3,240 · draws 12
+13 dmg/s · reach 3,240 · cycle · draws 12
 
 == mountBadge ==
 TURRET 360°

@@ -7,6 +7,7 @@ TakesKinetic −5% · Thermal −15% · Cryo −10%
 Damage36/s · reach 5,400
 Hits withKinetic · penetration 2.5
 Clip12 rounds at 8.0/s · reloads in 1.2s from energy (20 a clip), when empty or a second after you let go
+Modelclip: Fires n rounds fast, then reloads from energy when empty, or 1 s after you let go.
 MountTurret, 200°
 FittingBolts on any side
 Power draw14/s

@@ -7,6 +7,7 @@ TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
 Damage12/s · reach 2,052
 Hits withExotic · penetration 4.5
 Fire rate0.1/s · shells
+Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
 MountTurret, 180°
 FittingBolts on from behind only
 Power draw30/s
@@ -33,7 +34,7 @@ Small · Square
 The black hole
 
 == keyStats ==
-12 dmg/s · reach 2,052 · draws 30
+12 dmg/s · reach 2,052 · cycle · draws 30
 
 == mountBadge ==
 TURRET 180°

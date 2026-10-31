@@ -7,6 +7,7 @@ TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
 Damage45/s · reach 660
 Hits withEnergy · penetration 2
 Fire rate1.3/s · shells
+Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
 MountTurret, 270°
 FittingBolts on any side
 Power draw18/s
@@ -33,7 +34,7 @@ Small · Square
 instant zap, chains to 3 more ships
 
 == keyStats ==
-45 dmg/s · reach 660 · draws 18
+45 dmg/s · reach 660 · cycle · draws 18
 
 == mountBadge ==
 TURRET 270°

@@ -7,6 +7,7 @@ TakesKinetic −5% · Thermal −15% · Cryo −10%
 Damage27/s · reach 11,440
 Hits withExplosive · penetration 2.5
 Fire rate0.3/s · shells · Missiles (6 a shot, no energy)
+Modelammo: Fires rounds from your hold on a fixed beat; costs no energy; empty means weak plain rounds (40% damage).
 MountFixed: aims with the ship
 FittingSide mount (flippable) · Bolts on at its side only · Needs 1 clear cell ahead
 Power draw15/s

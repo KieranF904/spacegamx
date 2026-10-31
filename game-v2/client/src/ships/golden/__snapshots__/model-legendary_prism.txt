@@ -7,6 +7,7 @@ TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
 Damage14/s · reach 2,800
 Hits withEnergy · penetration 4
 Fire rate0.6/s · shells
+Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
 MountTurret, 270°
 FittingBolts on any side
 Power draw10/s
@@ -33,7 +34,7 @@ Small · Square
 The splitter
 
 == keyStats ==
-14 dmg/s · reach 2,800 · draws 10
+14 dmg/s · reach 2,800 · cycle · draws 10
 
 == mountBadge ==
 TURRET 270°

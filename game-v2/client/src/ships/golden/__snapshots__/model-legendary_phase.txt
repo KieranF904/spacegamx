@@ -7,6 +7,7 @@ TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
 Damage32/s · reach 3,300
 Hits withExotic · penetration 5
 Fire rate0.5/s · shells
+Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 3 clear cells ahead
 Power draw14/s
@@ -33,7 +34,7 @@ Medium · Panel
 The ghost round
 
 == keyStats ==
-32 dmg/s · reach 3,300 · draws 14
+32 dmg/s · reach 3,300 · cycle · draws 14
 
 == mountBadge ==
 FIXED

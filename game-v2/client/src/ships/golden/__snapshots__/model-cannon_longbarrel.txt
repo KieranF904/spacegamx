@@ -7,6 +7,7 @@ TakesKinetic −5% · Thermal −15% · Cryo −10%
 Damage49/s · reach 8,400
 Hits withKinetic · penetration 4
 Chargehold 2.0s: it fires itself, then 1.5s to cool · let go early and nothing fires · 36 energy a charge
+Modelcharge: Hold to charge; it fires itself at full charge, then cools down. Let go early and nothing fires.
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 3 clear cells ahead
 Power draw10/s

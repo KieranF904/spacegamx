@@ -6,6 +6,7 @@ Armour · build1 · 1 pts
 TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
 Intercepts5.0 shots/s at missiles, torpedoes, mortar shells and seekers · reach 560 · on its own, never at ships
 Firefires itself at what comes in · a little power a shot
+Modelauto: Fires on its own at incoming ordnance.
 MountTurret, 300°
 FittingBolts on any side
 Power draw10/s
@@ -32,7 +33,7 @@ Small · Square
 shoots down missiles on its own; never ships
 
 == keyStats ==
-5.0 shots/s at missiles · reach 560 · draws 10
+5.0 shots/s at missiles · reach 560 · auto · draws 10
 
 == mountBadge ==
 TURRET 300°

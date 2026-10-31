@@ -7,6 +7,7 @@ TakesKinetic −5% · Thermal −15% · Cryo −10%
 Damage89/s · reach 2,700
 Hits withKinetic · penetration 4.5
 Fire rate1.1/s · shells
+Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 2 clear cells ahead
 Power draw16/s
@@ -33,7 +34,7 @@ Medium · Panel
 five slugs in a cone, close range · no ammo
 
 == keyStats ==
-89 dmg/s · reach 2,700 · draws 16
+89 dmg/s · reach 2,700 · cycle · draws 16
 
 == mountBadge ==
 FIXED

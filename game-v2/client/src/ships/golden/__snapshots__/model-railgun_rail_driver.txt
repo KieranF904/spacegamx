@@ -7,6 +7,7 @@ TakesKinetic −5% · Thermal −15% · Cryo −10%
 Damage96/s · reach 9,000
 Hits withKinetic · penetration 5.5
 Clip6 rounds at 6.0/s · reloads in 1.5s from energy (48 a clip), when empty or a second after you let go
+Modelclip: Fires n rounds fast, then reloads from energy when empty, or 1 s after you let go.
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 3 clear cells ahead
 Power draw19/s

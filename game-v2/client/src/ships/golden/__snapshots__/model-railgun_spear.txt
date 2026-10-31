@@ -7,6 +7,7 @@ TakesKinetic −5% · Thermal −15% · Cryo −10%
 Damage84/s · reach 9,000
 Hits withKinetic · penetration 5.5
 Fire rate0.5/s · shells
+Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 3 clear cells ahead
 Power draw63/s
@@ -33,7 +34,7 @@ Large · Block
 three ships at full damage, 120 E a shot
 
 == keyStats ==
-84 dmg/s · reach 9,000 · draws 63
+84 dmg/s · reach 9,000 · cycle · draws 63
 
 == mountBadge ==
 FIXED

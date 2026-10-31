@@ -6,6 +6,7 @@ Armour · build1 · 1 pts
 Damage43/s · reach 5,400
 Hits withKinetic · penetration 0.5
 Fire rate8.6/s · shells
+Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
 MountTurret, 270°
 FittingBolts on any side
 Power draw12/s
@@ -31,7 +32,7 @@ Small · Square
 a stream of small shells
 
 == keyStats ==
-43 dmg/s · reach 5,400 · draws 12
+43 dmg/s · reach 5,400 · cycle · draws 12
 
 == mountBadge ==
 TURRET 270°

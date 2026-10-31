@@ -7,6 +7,7 @@ TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
 Damage23/s · reach 9,120
 Hits withExplosive · penetration 3
 Clipholds 8 · 4 a shot, every 0.5s · regrows one every 0.75s (6 energy each)
+Modelclip: Fires n rounds fast, then reloads from energy when empty, or 1 s after you let go.
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 1 clear cell ahead
 Power draw12/s
