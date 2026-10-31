@@ -584,6 +584,21 @@ export class ContributorPanel {
   // ---------------------------------------------------------------------------
   // Saving, editing
 
+  private quickText = '';
+
+  /** A pin where your ship is, with whatever you typed: for notes taken mid-flight (no placing, shapes or movement to choose) */
+  private quickNote(): void {
+    const text = this.quickText.trim();
+    if (!text) { this.message = { ok: false, text: 'Type the note first' }; this.render(); return; }
+    const me = this.deps.state.entities.get(this.deps.state.playerId);
+    if (!me) { this.message = { ok: false, text: 'No ship to pin it to' }; this.render(); return; }
+    const title = text.slice(0, NOTE_LIMITS.title).replace(/\s+/g, ' ').trim();
+    this.deps.send({ type: 'contrib', op: 'create', note: { system: this.deps.state.systemId, title, text: text.slice(0, NOTE_LIMITS.text), sizeHint: '', color: this.color, shape: { kind: 'point' }, anchor: { kind: 'fixed', x: Math.round(me.renderX), y: Math.round(me.renderY) } } });
+    this.quickText = '';
+    this.message = { ok: true, text: 'Noted' };
+    this.render();
+  }
+
   private save(): void {
     this.readForm();
     if (!this.form.title.trim()) { this.message = { ok: false, text: 'Give it a title' }; this.render(); return; }
@@ -694,6 +709,9 @@ export class ContributorPanel {
         <button class="ctb-btn${this.overlay ? ' on' : ''}" data-a="overlay" title="Shift+F6">${this.overlay ? '◉ Overlay on' : '○ Overlay off'}</button>
         <span class="ctb-hint">${esc(sys?.name ?? this.system)}</span>
       </div>
+      <div class="ctb-sec">Quick note</div>
+      <textarea class="ctb-in" data-k="quick" maxlength="${NOTE_LIMITS.text}" placeholder="Jot something while you play: pinned where your ship is now. Ctrl+Enter adds it.">${esc(this.quickText)}</textarea>
+      <div class="ctb-row"><button class="ctb-btn" data-a="quick">Add note here</button><span class="ctb-hint">title = first words; it can be read back later</span></div>
       <div class="ctb-sec">${this.editing ? `Editing “${esc(this.editing.title)}”` : 'New note'}
         ${this.editing ? `<button class="ctb-btn sm" data-a="cancel" title="Stop editing (right-click in space too)">Cancel</button><button class="ctb-btn sm bad" data-a="delete-edit">${this.armed === this.editing.id ? 'Sure? Delete' : 'Delete'}</button>`
           : this.draft || this.placing ? '<button class="ctb-btn sm" data-a="cancel" title="Throw this one away">Discard</button>' : ''}</div>
@@ -748,6 +766,9 @@ export class ContributorPanel {
     q('[data-a="delete-edit"]')?.addEventListener('click', () => { if (this.editing) this.deleteNote(this.editing); });
     q('[data-a="place"]')?.addEventListener('click', () => { if (this.placing) { this.endPlacing(); this.render(); } else this.startPlacing(); });
     q('[data-a="save"]')?.addEventListener('click', () => this.save());
+    q('[data-a="quick"]')?.addEventListener('click', () => this.quickNote());
+    q('[data-k="quick"]')?.addEventListener('input', (e) => { this.quickText = (e.target as HTMLTextAreaElement).value; });
+    q('[data-k="quick"]')?.addEventListener('keydown', (e) => { const k = e as KeyboardEvent; if (k.key === 'Enter' && (k.ctrlKey || k.metaKey)) { k.preventDefault(); this.quickNote(); } });
     q('[data-a="match"]')?.addEventListener('click', () => { this.period = this.matchPeriod(this.movement); this.render(); });
     this.body.querySelectorAll<HTMLElement>('[data-shape]').forEach((b) => b.addEventListener('click', () => {
       this.shape = b.dataset.shape as NoteShapeKind;

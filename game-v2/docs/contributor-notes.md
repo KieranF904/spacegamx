@@ -12,6 +12,7 @@ Contributors (and admins, who are contributors by right) pin notes and shapes to
 ## In game
 
 - **F6** opens the panel and turns the overlay on. **Shift+F6** turns the overlay on or off without the panel. The **✎ NOTES** button at the bottom left does the same.
+- **Quick note:** the box at the top of the panel pins whatever you type to where your ship is (Ctrl+Enter or the button). Meant for jotting while playtesting. On the dev server everyone, guests included, gets the panel.
 - **Placing a note:**
   1. Pick a shape: pin, circle, ring, rectangle, line, arrow or polygon.
   2. Click in space, or on the system map (M), to place it. Drag to size it. To make a polygon, click each corner, then right-click or press Enter to close it. Esc cancels.
