@@ -3488,6 +3488,64 @@ this.devTeleport = opts.devTeleport ?? false;
     return along <= 1 ? Math.max(0, along) : 1;
   }
 
+  /** Shots stuck in rock (mining charges): the rock and where on it, until they blow */
+  private stuckShots = new Map<number, { asteroid: number; ox: number; oy: number }>();
+
+  /** A shot's damage lands on an asteroid: it mines, the shot is spent, the rock may break */
+  private hurtAsteroid(proj: number, hitAsteroid: number, ownerId: number, damage: number, hitX: number, hitY: number): void {
+    const systemId = InSystem.systemId[proj];
+    const ax = Position.x[hitAsteroid];
+    const ay = Position.y[hitAsteroid];
+    Asteroid.hp[hitAsteroid] -= damage;
+    // Any weapon mines a little (mining tools far more)
+    if (Projectile.miningYield[proj] > 0) {
+      const nl = Math.hypot(hitX - ax, hitY - ay) || 1;
+      this.mining.extract(hitAsteroid, ownerId, damage, { yield: Projectile.miningYield[proj], hardness: Projectile.miningHardness[proj] },
+        hitX, hitY, (hitX - ax) / nl, (hitY - ay) / nl);
+    }
+    addComponent(this.world, Dead, proj);
+    this.pendingRemovedEntities.add(proj);
+    this.broadcastProjectileHit(proj, hitX, hitY);
+
+    // Broadcast hit effect at collision point
+    this.broadcastToSystem(systemId, {
+      type: 'effect',
+      effectType: EffectType.LaserHit,
+      x: hitX,
+      y: hitY,
+      entityId: hitAsteroid,
+      data: [damage, 30], // damage, hue (default orange)
+    });
+
+    // Check if asteroid destroyed
+    if (Asteroid.hp[hitAsteroid] <= 0) {
+      addComponent(this.world, Dead, hitAsteroid);
+      this.pendingRemovedEntities.add(hitAsteroid);
+
+      // Broadcast asteroid break
+      this.broadcastToSystem(systemId, {
+        type: 'effect',
+        effectType: EffectType.AsteroidBreak,
+        x: ax,
+        y: ay,
+        data: [Asteroid.size[hitAsteroid], 30], // size, hue
+      });
+
+      this.mining.onBroken(hitAsteroid, ax, ay);
+      this.forgetAsteroid(hitAsteroid);
+    }
+  }
+
+  /** A stuck charge's time is up: it blows, and the rock takes its damage */
+  private blowStuck(proj: number): void {
+    const st = this.stuckShots.get(proj);
+    if (!st) return;
+    this.stuckShots.delete(proj);
+    if (hasComponent(this.world, Dead, st.asteroid)) return;
+    this.placeAsteroid(st.asteroid);
+    this.hurtAsteroid(proj, st.asteroid, Projectile.ownerId[proj], Projectile.damage[proj], Position.x[st.asteroid] + st.ox, Position.y[st.asteroid] + st.oy);
+  }
+
   private collisionSystem(): void {
     const projectiles = projectileQuery(this.world);
     // (now and then, forget the shots that are gone)
@@ -3502,6 +3560,15 @@ this.devTeleport = opts.devTeleport ?? false;
       if (hasComponent(this.world, Dead, proj)) continue;
       // A lobbed shell passes over everything until it comes down
       if (this.weapons.lobbed(proj)) continue;
+      // A charge stuck in rock rides it (and hurts nothing else)
+      const stuck = this.stuckShots.get(proj);
+      if (stuck) {
+        if (hasComponent(this.world, Dead, stuck.asteroid)) { this.stuckShots.delete(proj); addComponent(this.world, Dead, proj); this.pendingRemovedEntities.add(proj); continue; }
+        this.placeAsteroid(stuck.asteroid);
+        Position.x[proj] = Position.x[stuck.asteroid] + stuck.ox;
+        Position.y[proj] = Position.y[stuck.asteroid] + stuck.oy;
+        continue;
+      }
       
       const px = Position.x[proj];
       const py = Position.y[proj];
@@ -3598,53 +3665,20 @@ this.devTeleport = opts.devTeleport ?? false;
         // Calculate hit position
         hitX = px + vx * bestT;
         hitY = py + vy * bestT;
-        
-        const ax = Position.x[hitAsteroid];
-        const ay = Position.y[hitAsteroid];
-        const damage = Projectile.damage[proj];
-        
-        Asteroid.hp[hitAsteroid] -= damage;
-        // Any weapon mines a little (mining tools far more)
-        if (Projectile.miningYield[proj] > 0) {
-          const nl = Math.hypot(hitX - ax, hitY - ay) || 1;
-          this.mining.extract(hitAsteroid, ownerId, damage, { yield: Projectile.miningYield[proj], hardness: Projectile.miningHardness[proj] },
-            hitX, hitY, (hitX - ax) / nl, (hitY - ay) / nl);
+        // A mining charge sticks to the rock and blows later (lifetimeSystem), where the rock then is
+        const stick = this.weapons.stickTicks(proj);
+        if (stick > 0) {
+          this.placeAsteroid(hitAsteroid);
+          this.stuckShots.set(proj, { asteroid: hitAsteroid, ox: hitX - Position.x[hitAsteroid], oy: hitY - Position.y[hitAsteroid] });
+          Position.x[proj] = hitX; Position.y[proj] = hitY;
+          Velocity.x[proj] = 0; Velocity.y[proj] = 0;
+          Lifetime.remaining[proj] = stick;
+          continue;
         }
-        addComponent(this.world, Dead, proj);
-        this.pendingRemovedEntities.add(proj);
-        this.broadcastProjectileHit(proj, hitX, hitY);
-        
-        // Broadcast hit effect at collision point
-        this.broadcastToSystem(systemId, {
-          type: 'effect',
-          effectType: EffectType.LaserHit,
-          x: hitX,
-          y: hitY,
-          entityId: hitAsteroid,
-          data: [damage, 30], // damage, hue (default orange)
-        });
-        
-        // Check if asteroid destroyed
-        if (Asteroid.hp[hitAsteroid] <= 0) {
-          addComponent(this.world, Dead, hitAsteroid);
-          this.pendingRemovedEntities.add(hitAsteroid);
-          
-          // Broadcast asteroid break
-          this.broadcastToSystem(systemId, {
-            type: 'effect',
-            effectType: EffectType.AsteroidBreak,
-            x: ax,
-            y: ay,
-            data: [Asteroid.size[hitAsteroid], 30], // size, hue
-          });
-          
-          this.mining.onBroken(hitAsteroid, ax, ay);
-          this.forgetAsteroid(hitAsteroid);
-
-        }
+        this.hurtAsteroid(proj, hitAsteroid, ownerId, Projectile.damage[proj], hitX, hitY);
       }
     }
-    
+
     // Check player deaths
     for (const player of players) {
       if (Health.current[player] <= 0 && !hasComponent(this.world, Dead, player)) {
@@ -3938,7 +3972,7 @@ this.devTeleport = opts.devTeleport ?? false;
       Lifetime.remaining[eid]--;
       
       if (Lifetime.remaining[eid] <= 0) {
-        if (hasComponent(this.world, Projectile, eid)) this.weapons.onExpire(eid);
+        if (hasComponent(this.world, Projectile, eid)) { this.blowStuck(eid); this.weapons.onExpire(eid); }
         addComponent(this.world, Dead, eid);
         // Track for removal notification to clients
         this.pendingRemovedEntities.add(eid);

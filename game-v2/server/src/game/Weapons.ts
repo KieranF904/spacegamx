@@ -138,6 +138,11 @@ export class Weapons {
     return weaponHit(x?.kind ?? 'cannon', x?.def ?? this.def('cannon'), Projectile.tier[proj] || 1);
   }
 
+  /** Mining charge: the ticks it stays stuck in rock before it blows (0: it doesn't stick) */
+  stickTicks(proj: number): number {
+    return this.extras.get(proj)?.def.stick?.ticks ?? 0;
+  }
+
   /** Bodies a piercing shot has already passed through (it doesn't hit them twice) */
   exclusions(proj: number): Set<number> | undefined {
     return this.extras.get(proj)?.hit;
