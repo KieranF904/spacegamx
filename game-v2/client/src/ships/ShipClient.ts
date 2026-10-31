@@ -804,7 +804,7 @@ export class ShipClient {
         if (msg.effectType === 12) this.damageFx?.shieldReform(msg.x, msg.y); // EffectType.ShieldFlash
         return false; // the game draws its own
       case 'projectileHit':
-        this.damageFx?.shieldHit(msg.x, msg.y);
+        this.damageFx?.shieldHit(msg.x, msg.y, this.shellLooks.get(msg.id)?.model);
         return false; // the game stops the tracer and throws the sparks
       case 'scanPulse':
         this.scannerFx?.pulse(msg.seconds);

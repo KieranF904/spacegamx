@@ -80,7 +80,7 @@ export class DamageFx {
   private smokeSprites = new ParticlePool('normal');
   /** Where shields were struck: a bright patch on the bubble's rim, facing the hit */
   /** Shield ripples: where the shot struck, about the ship's centre in its own frame (angle and distance), so it rides with it */
-  private ripples: { id: number; a: number; d: number; life: number }[] = [];
+  private ripples: { id: number; a: number; d: number; life: number; model: number }[] = [];
   private ps: P[] = [];
   private pending: Pending[] = [];
   private time = 0;
@@ -667,7 +667,8 @@ export class DamageFx {
   }
 
   /** A shot struck at (x, y): if that's on a shielded ship, its bubble lights up there */
-  shieldHit(x: number, y: number): void {
+  shieldHit(x: number, y: number, model?: string): void {
+    const m = model === 'pulse_strobe' ? 1 : model === 'pulse_overpulse' ? 2 : 0;
     this.platingHit(x, y);
     for (const [id, pct] of this.lastShield) {
       if (pct <= 0) continue;
@@ -676,7 +677,7 @@ export class DamageFx {
       const r = ship.derived.radius * 1.12 + 10;
       if (Math.hypot(x - e.renderX, y - e.renderY) > r * 1.25) continue;
       // (At the hull where the server's hit landed, not out on the bubble's rim: the shot met the parts, not a circle)
-      if (this.ripples.length < 40) this.ripples.push({ id, a: Math.atan2(y - e.renderY, x - e.renderX) - e.renderAngle, d: Math.min(r, Math.hypot(x - e.renderX, y - e.renderY)), life: 0 });
+      if (this.ripples.length < 40) this.ripples.push({ id, a: Math.atan2(y - e.renderY, x - e.renderX) - e.renderAngle, d: Math.min(r, Math.hypot(x - e.renderX, y - e.renderY)), life: 0, model: m });
     }
   }
 
@@ -745,7 +746,22 @@ export class DamageFx {
       // A patch of shield over the struck spot, spreading as it fades
       // (Sized to the strike, capped: a boss's bubble is huge, and its whole rim lighting up read as the shot meeting a circle)
       const rr = Math.min(r, 90);
-      this.addSprites.take(glowBall(), e.renderX + Math.cos(a) * rp.d, e.renderY + Math.sin(a) * rp.d, 0.5, 0.5, 0xe0faff, Math.pow(1 - k, 1.5), a, (rr * 0.3) / DOT_SIZE, (rr * (0.6 + 1.0 * k)) / DOT_SIZE);
+      const px = e.renderX + Math.cos(a) * rp.d, py = e.renderY + Math.sin(a) * rp.d, fade = Math.pow(1 - k, 1.5);
+      // Strobe flares the rim pink; Overpulse cracks the bubble; every other gun is the pale ripple
+      const tint = rp.model === 1 ? 0xff4fb0 : rp.model === 2 ? 0xff6ee8 : 0xe0faff;
+      this.addSprites.take(glowBall(), px, py, 0.5, 0.5, tint, fade, a, (rr * 0.3) / DOT_SIZE, (rr * (0.6 + 1.0 * k)) / DOT_SIZE);
+      if (rp.model === 1) {
+        // The rim itself: a bright arc across the struck spot, tangent to the bubble
+        this.addSprites.take(streak(), px, py, 0.5, 0.5, 0xff8fd0, fade, a + Math.PI / 2, streakScale(rr * 0.9, 5).x, streakScale(rr * 0.9, 5).y);
+      } else if (rp.model === 2) {
+        // Cracks: jagged radial lines from the strike, fixed per ripple, lengthening then fading
+        const len = rr * (0.45 + 0.4 * Math.min(1, k * 3));
+        for (let c = 0; c < 6; c++) {
+          const ca = a + c * (Math.PI / 3) + Math.sin(rp.a * 7 + c * 2.1) * 0.35;
+          const sc = streakScale(len * (0.6 + 0.4 * ((c * 5) % 3) / 2), 2.5);
+          this.addSprites.take(streak(), px, py, 0, 0.5, 0xfff0fb, fade, ca, sc.x, sc.y);
+        }
+      }
     }
   }
 
