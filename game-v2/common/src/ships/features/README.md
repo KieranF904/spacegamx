@@ -38,3 +38,18 @@ rebuilds, draws and flies exactly as before. Tow is CUT 4, Strafer CUT 6.
   flags are full, so a new input needs the longer binary input form first (a protocol change). `compilePlan` refuses.
 - A new replicated slot is a wire change: append to `features.wire.json`, then `npm run wire:bump`.
 - Hooks are plain functions on plain data; per-tick hooks (`load`, flight) must not allocate.
+
+## Server and client halves (Cut 2)
+
+A feature's world side and UI side live next to the shared part, as plain folders the same generator lists:
+
+- `server/src/ships/features/<id>/index.ts` exports `serverFeature` (`ServerFeature`: `create(host)` returns a
+  `FeatureInstance` with optional `tick`, `messages`, `cargoMass`, `wire`, `status`, `onShipRebuilt`, `onLeave`).
+  `ServerFeatures` (host.ts) flattens them once; GameServer ticks them inside the `towing` tick entry (same slot, so
+  Tow keeps its place), adds their messages to the dispatch table (a type the game handles, or two features claim,
+  throws), and ShipBridge asks `featureCargo`, `shipRebuilt`, `shipForgotten` through its host.
+- `client/src/ships/features/<id>/index.ts` exports `clientFeature` (`ClientFeature`: `actions` merged into
+  `keybindings.ts` ACTIONS, `onKey`, `parsePilot` into `entity.fx`, `drawShip`, `indicator`). `ClientFeatures`
+  (host.ts) is owned by ShipClient; ShipRenderer gets it for the draw loop.
+- `npm run features:gen` writes all three lists; `--check` (run by registry.test.ts) fails if any is stale.
+- Not yet used: `FeatureInstance.wire`/`status` (SnapshotBuilder still calls `towing.wireOf`; Cut 4 switches it).

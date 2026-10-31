@@ -25,6 +25,8 @@ import type { Renderer } from '../rendering/Renderer';
 import { functionColor, mix } from './shipColors';
 import { ThrusterFx, ThrustCommand } from './ThrusterFx';
 import { decorOf } from './partDecor';
+import type { ClientFeatures } from './features/host';
+import type { ShipDrawCtx } from './features/types';
 import { turretHead, type GunShape } from './gunDecor';
 import { cameraView } from '../rendering/cameraView';
 import factionsData from '../../../data/factions.json';
@@ -319,6 +321,8 @@ export class ShipRenderer {
     private thrustCommand: (id: number) => ThrustCommand | null,
     /** Ships not to draw (docked: inside their station) */
     private hidden: (id: number) => boolean = () => false,
+    /** Part features' ship drawing (features/host.ts) */
+    private features?: ClientFeatures,
   ) {
     this.layer = new Container();
     renderer.getShipLayer().addChild(this.layer);
@@ -335,6 +339,8 @@ export class ShipRenderer {
   }
 
   private wireLayer = new Container();
+  /** The one ctx every feature draw gets (fields reset per ship: no allocation per frame) */
+  private featureCtx = {} as ShipDrawCtx;
   private wireGlowLayer = new Container();
   private lights = (L: Lighting) => this.collectLights(L);
   private destroyed = false;
@@ -563,6 +569,11 @@ export class ShipRenderer {
       this.updateLamps(view, ship, entity, dt);
       this.drawDodge(view, ship, entity.dodge, entity.dodgeDir, cs, now);
       this.drawTether(eid, entity, ship, cs, now);
+      if (this.features?.hasDrawers) {
+        const fc = this.featureCtx;
+        fc.eid = eid; fc.ship = ship; fc.entity = entity; fc.container = view.container; fc.cs = cs; fc.now = now; fc.shared = this.overLayer;
+        this.features.drawShip(fc);
+      }
       // Quick: most of the flash gone in ~6 frames
       if (view.flashLevel > 0) view.flashLevel = Math.max(0, view.flashLevel * Math.pow(0.7, dt * 60) - 0.01 * dt * 60);
       view.container.x = entity.renderX;

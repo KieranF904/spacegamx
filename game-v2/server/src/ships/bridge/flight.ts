@@ -165,7 +165,7 @@ export function stepMovement(b: BridgeCtx, eid: number): boolean {
   const body = b.readBody(eid, ship);
   // The hold's cargo flies with it (ships/load.ts), as the pilot's prediction and every replica have it
   // (and what its Tow Beam tows, as load: ships/tow.ts)
-  body.cargo = quantizeCargo((b.host.cargoMass?.(eid) ?? 0) + (b.host.towLoad?.(eid) ?? 0));
+  body.cargo = quantizeCargo((b.host.cargoMass?.(eid) ?? 0) + (b.host.towLoad?.(eid) ?? 0) + (b.host.featureCargo?.(eid) ?? 0));
   // (Burst Strafer: the dodge held; its way comes from the movement keys: ships/strafer.ts)
   const q = quantizeReplicaAngle(Input.targetAngle[eid]);
   // An EMP cripples the drive (thrust and steering × EMP_CONTROL) and stops a jump starting; the pilot's prediction flies it the same

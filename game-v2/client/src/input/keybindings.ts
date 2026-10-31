@@ -5,6 +5,8 @@
  * to know about rebinding.
  */
 
+import { CLIENT_FEATURES } from '../ships/features/index';
+
 export interface ActionDef {
   id: string;
   label: string;
@@ -59,6 +61,11 @@ export const ACTIONS: ActionDef[] = [
   { id: 'zoom', label: 'Zoom', category: 'Interface', key: 'Wheel', rebindable: false },
   { id: 'resetZoom', label: 'Reset zoom', category: 'Interface', key: 'Home' },
 ];
+// Part features' key bindings (ships/features: none registered yet), after the core ones so the order is stable
+for (const f of CLIENT_FEATURES) for (const a of f.actions ?? []) {
+  if (ACTIONS.some((x) => x.id === a.id)) throw new Error(`client feature ${f.id}: action ${a.id} already exists`);
+  ACTIONS.push(a);
+}
 
 /** Keys that can't be bound to an action (they'd fight the browser or the menu). */
 export const RESERVED_KEYS = new Set(['Escape', 'Enter', 'NumpadEnter', 'F5', 'F11', 'F12', 'MetaLeft', 'MetaRight']);

@@ -84,6 +84,8 @@ export interface InterpolatedEntity {
   /** Burst Strafer: the dodge counter and the last dodge's way (local player: the server's, then predicted; others: their replica's): ships/strafer.ts */
   dodge?: number;
   dodgeDir?: number;
+  /** Part features' values read from the pilot's row (local player; ships/features: ClientFeature.parsePilot) */
+  fx?: { [name: string]: number };
   /** The hold's cargo mass (local player; server data[14]: common/src/ships/load.ts): prediction flies it */
   cargoMass?: number;
   /** Other pilots: their status row (shield, EMP, beam heat, beams, cursor distance); data is rebuilt from it and their replica */

@@ -58,6 +58,12 @@ export interface ShipHost {
   cargoMass?(eid: number): number;
   /** The load of what a pilot's Tow Beam tows (ships/tow.ts towLoad; Towing.ts): carried as cargo */
   towLoad?(eid: number): number;
+  /** Mass its part features add to a pilot's hold (ships/features/host.ts), carried as cargo like towLoad */
+  featureCargo?(eid: number): number;
+  /** A ship was rebuilt (ships/features: features re-check what depends on its parts) */
+  shipRebuilt?(eid: number): void;
+  /** Everything kept about an entity id was dropped (ships/features: features forget it) */
+  shipForgotten?(eid: number): void;
   /** The jump drive's charging fields in this ship's system (a star's ring, lodestones: common/src/ships/jumpFields.ts) */
   jumpFields?(eid: number): FieldEnv;
   /** What a part is worth in credits (repair kits charge their budget by it) */

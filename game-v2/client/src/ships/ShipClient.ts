@@ -10,7 +10,7 @@
  *   J  jump drive: spool up, then fly far and fast along the nose (J again aborts)
  */
 
-import { stepPointDefenceAim, pointDefenceOf } from '@space-game/common';
+import { stepPointDefenceAim, pointDefenceOf, CHARGE_GROUPS_AT, MAX_CHARGE_GROUPS } from '@space-game/common';
 import { buildFlightInputs, newFlightControls, payMining, gunLoad, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, warmthStage, withNumb, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules } from '@space-game/common';
 import hazardData from '../../../data/hazards.json';
 
@@ -45,6 +45,8 @@ import type { PilotState } from '../econ/clientEcon';
 import type { ThrustCommand } from './ThrusterFx';
 import { settings } from '../settings/Settings';
 import { boundKeyName } from '../input/keybindings';
+import { ClientFeatures } from './features/host';
+import { CLIENT_FEATURES } from './features/index';
 import type { QualityProfile } from '../settings/quality';
 
 /** A dodge pressed during the cooldown fires when it's over, if that's within this long (ms) */
@@ -149,6 +151,8 @@ export class ShipClient {
   private dodgeUi = new DodgeIndicator();
   /** Tow Beam (tow.ts): its chip */
   private towUi = new TowIndicator();
+  /** Part features' client side (ships/features/host.ts): keys, pilot-row values, drawing and chips, none registered yet */
+  private features: ClientFeatures;
   private lastFrame = 0;
   /** The local jump charge sound, so an abort can cut it */
   private chargeSound: (() => void) | null = null;
@@ -158,6 +162,16 @@ export class ShipClient {
 
   constructor(private opts: ShipClientOptions) {
     this.store = new ShipStore(opts.catalog, opts.tuning);
+    this.features = new ClientFeatures(CLIENT_FEATURES, {
+      catalog: opts.catalog,
+      playerId: () => opts.state.playerId,
+      entity: (eid) => opts.state.entities.get(eid),
+      ship: (eid) => this.store.get(eid),
+      send: (msg) => opts.send(msg),
+      showMessage: (text, color) => opts.showMessage(text, color),
+      keyName: (id) => boundKeyName(id, settings.data.bindings),
+      hangarOpen: () => this.hangarOpen,
+    });
     this.jump = jumpTuning(opts.tuning);
     this.dockHint = document.createElement('div');
     this.dockHint.style.cssText = `position: fixed; left: 50%; bottom: 152px; transform: translateX(-50%); display: none;
@@ -338,7 +352,7 @@ export class ShipClient {
     this.renderer = new ShipRenderer(this.store, renderer, this.opts.state, (id) =>
       id === this.opts.state.playerId ? this.localThrustCommand() : null,
     // Docked ships are inside their station: yours while you're berthed, others as the server says
-    (id) => (id === this.opts.state.playerId ? this.docked : this.replicas.isDocked(id)));
+    (id) => (id === this.opts.state.playerId ? this.docked : this.replicas.isDocked(id)), this.features);
     renderer.onMuzzle = (owner, x, y) => this.renderer?.kick(owner, x, y);
     // Muzzle flashes (and the shells' first stretch) from the drawn barrel's tip, not the facing edge they spawn at
     renderer.barrelTip = (owner, x, y, angle) => this.renderer?.barrelTip(owner, x, y, angle) ?? null;
@@ -875,6 +889,7 @@ export class ShipClient {
 
   onKey(code: string): boolean {
     if (this.hangarOpen) return this.hangar.value!.handleKey(code);
+    if (this.features.onKey(code)) return true;
     if (code === 'KeyV') {
       this.helm = !this.helm;
       return true;
@@ -1023,6 +1038,9 @@ export class ShipClient {
       what: state.entities.get(towed)?.type === EntityType.DroppedItem ? 'pod' : 'wreck',
       thrustLoss: 1 - cargoThrust(towShip.derived, me?.cargoMass ?? 0),
     }, boundKeyName('tow', settings.data.bindings));
+    // (Part features: the pilot row's values, then each one's chip)
+    if (me?.data && this.features.hasParsers) this.features.parsePilot(me.data, CHARGE_GROUPS_AT + Math.max(0, Math.min(MAX_CHARGE_GROUPS, me.data[11] | 0)), me.fx ??= {});
+    this.features.updateIndicators();
     this.damageFx?.update(dt);
     this.beamFx?.update(dt);
     this.bossFx?.update(dt);

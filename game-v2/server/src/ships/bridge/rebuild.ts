@@ -121,6 +121,7 @@ export function forget(b: BridgeCtx, eid: number): void {
   b.dormant.delete(eid);
   b.lastFired.delete(eid);
   b.ungridded.delete(eid);
+  b.host.shipForgotten?.(eid);
   for (const [k, v] of b.targets) if (v === eid) b.targets.delete(k);
 }
 
@@ -372,6 +373,7 @@ export function rebuildNow(b: BridgeCtx, eid: number, ship: ShipState): void {
     Position.y[eid] += wy;
   }
   Radius.value[eid] = Math.max(1, ship.derived.radius);
+  b.host.shipRebuilt?.(eid);
 }
 
 /**
