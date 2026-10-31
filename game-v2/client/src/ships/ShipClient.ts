@@ -16,7 +16,7 @@ import { GunFeel } from './gunFeel';
 import './energyLooks';
 import { ChargeFx } from './ChargeFx';
 import { RingModel, type RingGroup, type RingSources } from './gunHud';
-import { buildFlightInputs, newFlightControls, payMining, gunLoad, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, warmthStage, withNumb, withSlowed, type WeaponInfo, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules } from '@space-game/common';
+import { buildFlightInputs, newFlightControls, payMining, gunLoadTick, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, warmthStage, withNumb, withSlowed, type WeaponInfo, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules } from '@space-game/common';
 import hazardData from '../../../data/hazards.json';
 
 const HAZARD_RULES = hazardData as unknown as HazardRules;
@@ -1040,7 +1040,7 @@ export class ShipClient {
     player.jumpPrime = pilotJumpStep(body, player.jumpPrime ?? 0, { central: this.central, lodestones: this.lodestones }, tick,
       ship.derived.jumpCooldown || this.jump.cooldownTicks, this.jump, (rangeBoost) => {
         // (The controls built as the server builds them: flightInputs.ts. The aim goes in as the message has it)
-        res = stepShipPhysics(body, buildFlightInputs(input, emp, PREDICT_CTL), ship.derived, this.opts.tuning, { charge, drainRate: 1, load: gunLoad(ship, tick), tick }, this.gravity, rangeBoost, emp ? withEmp(hazard) : hazard, this.terrain);
+        res = stepShipPhysics(body, buildFlightInputs(input, emp, PREDICT_CTL), ship.derived, this.opts.tuning, { charge, drainRate: 1, load: gunLoadTick(ship, tick), tick }, this.gravity, rangeBoost, emp ? withEmp(hazard) : hazard, this.terrain);
       });
     player.jumpScale = body.jumpScale;
     player.x = body.x;

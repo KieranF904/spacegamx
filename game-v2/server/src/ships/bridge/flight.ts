@@ -12,7 +12,7 @@ import { hasComponent, entityExists } from 'bitecs';
 import {
   Position, Velocity, Rotation, Input, Boost, Player, Dead, InSystem, stepShipPhysics, quantizeShipBody, damagePart,
   stepDrift, withEmp, withNumb, withSlowed, jumpTuning, pilotJumpStep, NO_FIELDS, convexPenetration, ReplicaMode, CTL,
-  controlBits, quantizeReplicaAngle, partWeaponDef, partMaterial, powerTick, gunLoad, quantizeCargo,
+  controlBits, quantizeReplicaAngle, partWeaponDef, partMaterial, powerTick, gunLoadTick, quantizeCargo,
   buildFlightInputs, newFlightControls, chargeTotal, getPlan,
   type ShipState, type Vec2, type GravityWell, type FlightConstants, type FlightInputSource,
 } from '@space-game/common';
@@ -195,7 +195,7 @@ export function stepMovement(b: BridgeCtx, eid: number): boolean {
   const jt = jumpTuning(b.tuning);
   let res!: ReturnType<typeof stepShipPhysics>;
   ship.jumpPrime = pilotJumpStep(body, ship.jumpPrime ?? 0, b.host.jumpFields?.(eid) ?? NO_FIELDS, b.host.getTick(), ship.derived.jumpCooldown || jt.cooldownTicks, jt, (rangeBoost) => {
-    res = stepShipPhysics(body, controls, ship.derived, b.tuning, { charge: b.chargeOf(eid), drainRate: 1, load: gunLoad(ship, b.host.getTick()), tick: b.host.getTick() }, b.host.gravityAt(eid), rangeBoost, emp ? withEmp(hazard) : hazard, b.host.terrainAt?.(eid));
+    res = stepShipPhysics(body, controls, ship.derived, b.tuning, { charge: b.chargeOf(eid), drainRate: 1, load: gunLoadTick(ship, b.host.getTick()), tick: b.host.getTick() }, b.host.gravityAt(eid), rangeBoost, emp ? withEmp(hazard) : hazard, b.host.terrainAt?.(eid));
   });
   b.setCharge(eid, res.charge);
   b.writeBody(eid, ship, body);

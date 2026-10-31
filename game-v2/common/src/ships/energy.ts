@@ -245,7 +245,26 @@ export interface GunLoadShip extends GunStateShip { derived: ShipDerived; mineUn
 export function gunLoad(ship: GunLoadShip, tick: number): number[] | undefined {
   const L = ship.derived.power;
   if (!L || !L.feeds.length) return undefined;
-  const out = new Array<number>(L.feeds.length).fill(0);
+  return gunLoadInto(ship, tick, new Array<number>(L.feeds.length).fill(0));
+}
+
+const sLoad: number[] = [];
+/**
+ * gunLoad for the per-tick paths: the same vector in a shared scratch (no allocation). Only valid until the
+ * next call and must not be kept: hand it straight to powerTick / stepShipPhysics. (Tests and anything that
+ * holds the vector use gunLoad.)
+ */
+export function gunLoadTick(ship: GunLoadShip, tick: number): number[] | undefined {
+  const L = ship.derived.power;
+  if (!L || !L.feeds.length) return undefined;
+  const n = L.feeds.length;
+  sLoad.length = n;
+  for (let i = 0; i < n; i++) sLoad[i] = 0;
+  return gunLoadInto(ship, tick, sLoad);
+}
+
+function gunLoadInto(ship: GunLoadShip, tick: number, out: number[]): number[] {
+  const L = ship.derived.power!;
   for (const w of ship.derived.weapons) {
     const f = L.feedOf[w.part];
     if (f >= 0) out[f] += gunDraw(ship, w, L.draw[w.part]);

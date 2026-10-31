@@ -9,9 +9,12 @@
 import { collideTerrain, terrainRadius } from '@space-game/common';
 import {
   Position, Velocity, Rotation, FRICTION, stepFlight, withEmp, withSlowed, ReplicaMode, CTL, controlBits, replicaAngle,
-  quantizeReplicaAngle, powerTick, gunLoad, FULL_CHARGE, type ShipState, type FlightConstants,
+  quantizeReplicaAngle, powerTick, gunLoadTick, FULL_CHARGE, type ShipState, type FlightConstants,
 } from '@space-game/common';
 import type { PilotOrders, BridgeCtx } from './core.js';
+
+/** Reused each tick (powerTick reads it and keeps nothing) */
+const PILOTLESS_USE: { thrusting: boolean; boosting: boolean; load: ArrayLike<number> | undefined } = { thrusting: false, boosting: false, load: undefined };
 
 export function hasController(b: BridgeCtx, eid: number): boolean {
   return b.controllers.has(eid);
@@ -91,7 +94,9 @@ export function stepPilotless(b: BridgeCtx, eid: number, ship: ShipState, k: Fli
   if (pin) { Position.x[eid] = pin.x; Position.y[eid] = pin.y; Velocity.x[eid] = 0; Velocity.y[eid] = 0; }
   // Pilotless ships have a battery too: spare power charges it, shots spend it
   // (Its guns draw on the ship as they reload: energy.ts)
-  const energy = { charge: powerTick(ship.derived, b.chargeOf(eid), { thrusting: false, boosting: false, load: gunLoad(ship, tick) }, b.tuning).charge };
+  PILOTLESS_USE.load = gunLoadTick(ship, tick);
+  const energy = { charge: powerTick(ship.derived, b.chargeOf(eid), PILOTLESS_USE, b.tuning).charge };
+  PILOTLESS_USE.load = undefined;
   b.fireWeapons(eid, ship, !!orders?.firing && !emp && !b.isJumping(ship), orders?.aim, orders?.aimDist ?? 0, orders?.target ?? -1, energy);
   b.charge.set(eid, energy.charge);
 }
