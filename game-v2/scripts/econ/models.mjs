@@ -64,6 +64,7 @@ const W = [
   ['autocannon_stinger', 'Stinger', 'autocannon', 'sq', 24, { dmg: 1.5, int: 1.25 }, { mul: { damage: x(1.6), spread: x(0.4) } }, 'The marksman SMG: twelve accurate needles in a burst, then a pause to reload.'],
   ['flak_burst', 'Burst', 'flak', 'sq', 4, {}, {}, 'The sky-filler: a canister shell that bursts on its own near whatever it passes.'],
   ['flak_cloudmaker', 'Cloudmaker', 'flak', 'rect2', 16, { dmg: 1.7, int: 1.4 }, { mul: { splashRadius: x(250 / 170), splashDamage: x(26 / 16) } }, 'The wall you place: four shells that burst where you aim, or sooner near a target, in wide clouds.'],
+  // (Section 4's ordnance rows, rework-2026-11. Mortars: the Lobber lands at the cursor (out to 2,640), splash r220 / 70, a shell every 90 t, 40 a
   // crate; the Quake walks three shells at 0.7, 1.0 and 1.3 of the aim distance, 15 t apart, r260 / 60 each, a salvo every 180 t (3 rounds).
   // Missiles: the Dart 24 a crate, 108 t, homing 0.07 on the ship nearest the cursor, 30 + r120 / 34; the Swarm six rockets over 30 t, a salvo
   // every 180 t (6 rounds), 10 + r60 / 12, homing x1.3; the Hammerhead 198 t, 105 + r150 / 54, guided, 2 PD hits. Torpedoes: the Eel 240 t, 420 dmg,
@@ -71,11 +72,15 @@ const W = [
   // homing, armed after 60 t, 5 PD hits. `intercept` is a shell's point-defence hits; the kinds give 1.)
   ['mortar_lobber', 'Lobber', 'mortar', 'sq', 7, { blurb: 'Artillery that lands where you click' }, {}, 'Artillery that lands where you click: one shell every second and a half, lobbed over everything to burst at your cursor (out to 2,640) in a 220 blast. Forty shells a crate.'],
   ['mortar_quake', 'Quake', 'mortar', 'rect2', 24, { dmg: 2, int: 2, blurb: 'The walking barrage' }, { set: { splash: { radius: 260, damage: 60 } } }, 'The walking barrage: a salvo of three shells every three seconds that land at 70%, 100% and 130% of your aim distance, a quarter second apart, each a 260 blast. It covers a lane, not a point. Uses three rounds a salvo.'],
-  ['laser_glint', 'Glint', 'laser', 'sq', 9, {}, {}, 'The base pulse laser: charged pulses that reach far.'],
-  ['laser_cutter', 'Cutter', 'laser', 'rect2', 18, { dmg: 2.1 }, { mul: { damage: x(2.1), range: x(0.8) } }, 'Close and brutal: a short, searing beam.'],
-  ['laser_searchlight', 'Searchlight', 'laser', 'round', 26, { dmg: 0.8 }, { mul: { damage: x(0.8), range: x(1.5) } }, 'A beam that reaches out further than anything.'],
-  ['pulse_strobe', 'Strobe', 'pulse', 'sq', 10, {}, {}, 'The base pulse gun: bursts that strip shields.'],
-  ['pulse_overpulse', 'Overpulse', 'pulse', 'rect2', 25, { burst: 4 / 3 }, { mul: { vsShield: x(1.9), vsHull: x(0.5) }, add: { burst: 1 } }, 'Four-shot bursts that tear shields down and barely scratch a hull.'],
+  // (Section 4's lasers and pulse guns, rework-2026-11 (family-beams-pulse). Glint: the pulse you time, 27 E a pulse. Cutter: a short held beam, 60 dps
+  // rising to 150 over 1.5 s on one part, 32 E/s. Searchlight: a long thin beam, 25 dps, 15 E/s, that marks. Strobe: a burst of 3 every 0.5 s, 9 dmg,
+  // x1.6 vs shields, x0.6 vs hull, 6 E a burst. Overpulse: a clip of 12 single bolts at 10/s, x1.9 vs shields, x0.5 vs hull. A beam's `demand` is its
+  // E/s spread over its cells; a pulse gun's, its E a burst x 60 / interval.)
+  ['laser_glint', 'Glint', 'laser', 'sq', 9, {}, {}, 'The long pulse: it charges for 1.8 s, then a 1.4 s pulse peaking at 96 damage reaches 5,100 units. Time it; 27 E a pulse.'],
+  ['laser_cutter', 'Cutter', 'laser', 'rect2', 18, { demand: r2(32 / PIECE_AREA.rect2) }, { set: { dps: 60, range: 900, width: 14, pulse: null, falloff: null, ramp: { to: 150, ticks: 90 } } }, 'The welding torch: a short held beam that burns deeper the longer it stays on one part, 60 rising to 150 damage a second over 1.5 s (it starts over if it slips off). 32 E a second.'],
+  ['laser_searchlight', 'Searchlight', 'laser', 'round', 26, { demand: r2(15 / PIECE_AREA.round) }, { set: { dps: 25, range: 7650, width: 8, pulse: null, falloff: null } }, 'The spotter: a thin beam that reaches furthest and barely hurts, but what it lights takes 20% more damage from everyone for 2 s after. 15 E a second.'],
+  ['pulse_strobe', 'Strobe', 'pulse', 'sq', 10, { demand: r2((6 * 60) / 30) }, {}, 'Steady shield pressure: a burst of 3 bolts every half second, 9 damage each, 1.6 times against shields and 0.6 against hull. 6 E a burst.'],
+  ['pulse_overpulse', 'Overpulse', 'pulse', 'rect2', 25, { demand: r2((36 * 60) / (90 + 12 * 6) / PIECE_AREA.rect2) }, { set: { burst: 1, vsShield: 1.9, vsHull: 0.5 } }, 'The shield shredder: a clip of 12 bolts at 10 a second, then a 1.5 s reload drawing 36 E. 1.9 times against shields and half against hull.'],
   ['missile_dart', 'Dart', 'missile', 'sq', 11, { blurb: 'Lock and forget' }, {}, 'Lock and forget: a missile every couple of seconds that homes on the ship nearest your cursor, 30 damage and a 120 blast. Twenty-four missiles a crate. Point defence kills it in one hit.'],
   ['missile_swarm', 'Swarm', 'missile', 'rect2', 21, { dmg: 0.5, burst: 6, int: 1.64, blurb: 'The ripple that floods point defence' }, { mul: { homing: x(1.3) }, set: { damage: 10, splash: { radius: 60, damage: 12 } } }, 'The ripple that floods point defence: six small rockets in half a second, every three seconds, spreading and then converging on the ship nearest your cursor. Each is 10 damage and a 60 blast and dies to one point-defence hit. Uses six rounds a salvo.'],
   ['missile_hammerhead', 'Hammerhead', 'missile', 'block2', 33, { dmg: 3.5, int: 1.8, hp: 1.2, mass: 1.4, blurb: 'The steered warhead' }, { mul: { damage: xp(3.5), speed: x(0.7), maxSpeed: x(0.7), size: x(1.5) }, set: { splash: { radius: 150, damage: 54 }, intercept: 2 } }, 'The steered warhead: a slow, heavy missile, 105 damage and a 150 blast. While you hold fire it flies toward your cursor; let go and it flies straight. Point defence needs two hits.'],
@@ -91,7 +96,7 @@ const W = [
   ['arc_tesla', 'Tesla', 'arc', 'round', 29, { dmg: 1.4 }, { set: { chain: { count: 5, radius: 300, falloff: 0.5 } } }, 'Lightning that jumps two ships further.'],
   ['torpedo_eel', 'Eel', 'torpedo', 'rect2', 19, { blurb: 'The stalker' }, { set: { homing: 0.02 } }, 'The stalker: a slow, fat torpedo that creeps after its prey, 420 damage straight through shields and a 90 blast. Six torpedoes a crate, one every four seconds. Point defence needs three hits.'],
   ['torpedo_leviathan', 'Leviathan', 'torpedo', 'block2', 38, { dmg: 2.4, hp: 1.2, mass: 1.3, blurb: 'The fight-ender' }, { mul: { speed: x(0.8), maxSpeed: x(0.8), size: x(1.4) }, set: { damage: 1000, splash: { radius: 200, damage: 200 }, intercept: 5, arm: 60 } }, 'The fight-ender: a huge torpedo, 1,000 damage straight through shields and a 200 blast, one every six seconds. It flies straight and does not home, and arms a second after launch. Two rounds a shot (three shots a crate). Point defence needs five hits.'],
-  ['lance_lance', 'Lance', 'lance', 'rect2', 32, {}, {}, 'The held beam: a heavy lance that burns as long as the power lasts.'],
+  ['lance_lance', 'Lance', 'lance', 'rect2', 32, { demand: 45 }, {}, 'The heavy held beam: 210 damage a second at 500 units after a 0.3 s windup, piercing, 20% more against plating. 90 E a second and no heat; short of power it sputters.'],
 ];
 
 /**

@@ -242,7 +242,7 @@ export interface BridgeInternals {
   ungridded: ShipBridge['ungridded']; castOn: ShipBridge['castOn']; castOk: ShipBridge['castOk'];
   gravityK: ShipBridge['gravityK'];
   markedUntil: ShipBridge['markedUntil']; slowedUntil: ShipBridge['slowedUntil']; salvos: ShipBridge['salvos'];
-  guides: ShipBridge['guides']; beamStruck: ShipBridge['beamStruck'];
+  guides: ShipBridge['guides']; ramps: ShipBridge['ramps']; beamStruck: ShipBridge['beamStruck'];
   // Private methods modules call back through
   fieldAt: ShipBridge['fieldAt'];
   rebuildNow: ShipBridge['rebuildNow']; syncHealth: ShipBridge['syncHealth']; cover: ShipBridge['cover'];

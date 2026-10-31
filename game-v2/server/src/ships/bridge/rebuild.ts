@@ -110,6 +110,7 @@ export function forget(b: BridgeCtx, eid: number): void {
   b.slowedUntil.delete(eid);
   b.salvos.delete(eid);
   b.guides.delete(eid);
+  for (let p = 0; p < 64; p++) b.ramps.delete(eid * 1024 + p);
   b.weaponBeams.delete(eid);
   b.pulsing.delete(eid);
   b.pdOn.delete(eid);

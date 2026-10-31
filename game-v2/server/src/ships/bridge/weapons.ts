@@ -350,15 +350,39 @@ export function fireBeam(b: BridgeCtx, eid: number, ship: ShipState, w: WeaponIn
     // Frostbite slows what it lights instead)
     b.beamStruck = shipHit.eid;
     const armor = shipHit.ship.blueprint.parts[shipHit.part].fn === 'armor' ? def.armorBonus ?? 1 : 1;
+    // A ramping beam (the Cutter's) burns deeper the longer it stays on this one part
+    const deeper = def.ramp && !pulse ? rampScale(b, eid, w.part, shipHit.eid * 1024 + shipHit.part, def) : 1;
     // Past its effective range a fading beam (the laser's) burns ever weaker, out to where it gives out (pulse.ts beamFalloff)
     const fade = beamFalloff(def, shipHit.t * range);
     const at = b.worldToGrid(shipHit.eid, shipHit.ship, x + (x1 - x) * shipHit.t, y + (y1 - y) * shipHit.t);
-    const dealt = b.hurt(shipHit.eid, shipHit.ship, shipHit.part, dmg * armor * fade, eid, { hit: weaponHit(w.kind, def, shooterGrade(b.catalog, ship.blueprint.parts[w.part])), at });
+    const dealt = b.hurt(shipHit.eid, shipHit.ship, shipHit.part, dmg * armor * fade * deeper, eid, { hit: weaponHit(w.kind, def, shooterGrade(b.catalog, ship.blueprint.parts[w.part])), at });
     if (pulse) b.pulseHit = { eid: shipHit.eid, dealt };
     else if (dealt > 0 && b.host.getTick() % 10 === 0) b.host.notifyDamage(shipHit.eid, dealt * 10, eid);
     return shipHit.t;
   }
+  // (Off every part: a ramping beam starts over)
+  if (def.ramp) b.ramps.delete(eid * 1024 + w.part);
   return rockT * (shipHit ? shipHit.t : 1);
+}
+
+/** Ticks a ramping beam may skip (a brownout sputter, a flick off the part) before it starts over */
+const RAMP_GRACE = 4;
+
+/**
+ * How much more a ramping beam burns this tick than at its base dps (`dps` rising to `ramp.to` over `ramp.ticks` burned
+ * ticks on one part): the beam of `eid`'s gun `part` is on `target` (ship * 1024 + part). A new part, or a gap of more
+ * than RAMP_GRACE ticks, starts it over. Allocation-free once the gun has a run.
+ */
+function rampScale(b: BridgeCtx, eid: number, part: number, target: number, def: WeaponTuning): number {
+  const ramp = def.ramp!, key = eid * 1024 + part, tick = b.host.getTick();
+  let r = b.ramps.get(key);
+  if (!r) b.ramps.set(key, (r = { target, ticks: 0, last: tick }));
+  else if (r.target !== target || tick - r.last > RAMP_GRACE) { r.target = target; r.ticks = 0; }
+  r.last = tick;
+  const base = Math.max(1e-9, def.dps ?? 50);
+  const k = base + (ramp.to - base) * Math.min(1, r.ticks / Math.max(1, ramp.ticks));
+  r.ticks++;
+  return k / base;
 }
 
 /** A beam's muzzle (world) and angle, along its gun's aim */
