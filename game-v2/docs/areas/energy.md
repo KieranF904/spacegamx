@@ -1,65 +1,41 @@
-# Energy & circuits
-How a ship makes, stores and spends power. Power runs along player-drawn wires (`Blueprint.wires`) that join generators to consumers; each wire network is a *circuit* with its own charge, stores and brownout. Capacitors/Pulse Dynamos touching each other form *banks* that feed only what they touch (Surge). The core has its own store (battery on the main circuit, trickle elsewhere). Layout is computed once per `rebuild`; the tick (`powerTick`) runs a loop over circuits and is identical on the server and in client prediction. Design doc: docs/design/energy-system.md (read only "Implemented (Phase 1)" l.26 and "Implemented (Phase 2)" l.156-231; the rest is the original draft/proposals).
+# Energy & banks
+How a ship makes, stores and spends power. Power runs along wires (`Blueprint.wires`, hand-drawn or auto-wired) that join generators to consumers, exactly as before 5896116. The core's store and every battery on a powered network make **one ship pool**; Capacitors that touch form a **bank** that feeds the guns, beams and mining lasers it touches first, and touching Drive Cells a bank that feeds the engines and Burst Strafers they touch. Layout is computed once per `rebuild` (`circuits.ts`); the tick (`powerTick`) is identical on the server and in client prediction. Binding design: docs/design/rework-2026-11.md §2 (2.1 wiring, 2.2 pool and Output, 2.3 banks, 2.5 the wire). docs/design/energy-system.md is history (Phase 1 circuits, Phase 2 Surge: both cut).
 
 ## Files (what each owns)
-| path | lines | owns |
-|---|---|---|
-| common/src/ships/wires.ts | 245 | wire cells/keys, `cleanWires`, `autoWire` (designs without wires), `wireNetworks`, `isPowerPart`, spool cost (`SEGMENTS_PER_SPOOL`, `wireSpools`, `addedWires`) |
-| common/src/ships/circuits.ts | 292 | `powerLayout()` -> `PowerLayout` (circuits, `StoreGroup`s kinds g/d/w/k, banks, feeds, core store); `circuitTuning`, `partDischarge`, `partCapacity`, `CIRCUIT_DEFAULTS` |
-| common/src/ships/energy.ts | 530 | `Charge`, `powerTick` (l.224-), brownout, `gunLoad` (l.201; guns, miners, then each part feature's `load` hook),  `feedShare`, `thrustShare`, `remapCharge`, `packCharge`/`unpackCharge`, `circuitCharges`, `loadTest`, `payMining` |
-| common/src/ships/surge.ts | 177 | power types (`POWER_TYPES`), Surge reactions (`surgeReaction`, `surgeShot`, `surgeKick`, `flashRestore`), `bankFor`, `railUnheld`, `SURGE_DEFAULTS` |
-| common/src/ships/rebuild.ts | - | calls `powerLayout` in one delimited block (l.536-540, "Local circuits"), the `burst` predicate (l.324: engines, guns, miners and burst features' parts draw by the tick), and steady-load sharing (steps 3-4, l.312-363) -> `ShipDerived.power`, `.energy`, `.satisfaction` |
-| data/ships/tuning.json `energy` (l.426) | - | `coreCapacity`, `boostDraw`, `coreDischarge`, `coreTrickle`, `discharge{general,drive,weapon,bank}`, `surge{...}` |
-| scripts/econ/models.mjs | - | store/generator fields on models: `produce`, `store`, `pool`, `discharge`, `bank`, `surge`, `dual` (battery/capacitor rows in `OTHER`, Surge block l.300) |
-| client/src/ships/wireEdit.ts | 299 | hangar wire tool + `powerReport` (circuit colours, warnings); `hullWire.ts` draws wires on the hull |
-| client/src/ships/HangarUI.ts | - | POWER panel (`this.power`, l.1462-1510), `drawPower` (l.1925), load test (l.1436 `loadTest`) |
-| client/src/ui/CircuitBars.ts | 88 | per-circuit HUD bars (letters, S1.. banks, brownout flash) |
-| client/src/ships/partTip.ts | - | Circuit/Bank/"On Surge" tooltip rows (l.143-205) |
-| common/src/ships/circuits.test.ts, surge.test.ts | - | guards (below) |
+| path | owns |
+|---|---|
+| common/src/ships/wires.ts | wire cells/keys, `cleanWires`, `autoWire` (designs without wires), `wireNetworks`, `isPowerPart`, spool cost (`SEGMENTS_PER_SPOOL`, `wireSpools`, `addedWires`) |
+| common/src/ships/circuits.ts | `powerLayout()` -> `PowerLayout` (the pool, `Bank`s, feed groups, per-part `feedOf`/`bankOf`/`draw`/`partCap`/`pooled`); `bankKind`, `circuitTuning`, `partDischarge`, `partCapacity`, `CIRCUIT_DEFAULTS` |
+| common/src/ships/energy.ts | `Charge {g, b[]}`, `powerTick` (engines, then guns/miners/features sharing the Output, then refill emptiest first, then dynamos), `BROWNOUT`, `gunLoad`, `feedShare`, `thrustShare`, `remapCharge`, `packCharge`/`unpackCharge`, `bankCharges`, `loadTest`, `payMining` |
+| common/src/ships/rebuild.ts | the "powered" rule (steady loads share their network's generators by priority; engines, guns, miners and burst features run if their network has a generator or a battery, or a bank of their kind touches them) and the `powerLayout` call -> `ShipDerived.power`, `.energy`, `.satisfaction` |
+| data/ships/tuning.json `energy` | `coreCapacity` 240, `boostDraw` 2.2, `coreDischarge` 720, `discharge{general,drive,bank}` |
+| scripts/econ/models.mjs | store/generator fields: `produce`, `store`, `pool` (`'drive'` makes a bank member a Drive Cell), `discharge`, `bank`, `dynamo` (Pulse Dynamo: per second into each bank it touches) |
+| client/src/ships/wireEdit.ts | hangar wire tool + `powerReport` (network colours `NET_COLORS`, unpowered warnings), as at 5896116^ |
+| client/src/ships/HangarUI.ts | POWER panel (`powerHtml`: networks, pool and Output, banks, load test), `drawPower` + `drawBanks` (bank outlines and straps) |
+| client/src/ui/BankBars.ts | HUD: a thin bar per bank (at most 4) beside the ENERGY gauge |
+| client/src/ships/partTip.ts | Holds/Gives/Charges, Bank and "Fed by" rows |
 
 ## Public interface
-- `ShipDerived.power: PowerLayout` (circuits, stores, core, feeds, `feedOf`, `storeOf`, `circuitOf`, `draw`, `dual`), `ShipDerived.energy: EnergyInfo` (capacities and draws).
-- `Charge { core, s: number[] }` (percent per store group); `FULL_CHARGE`; `powerTick(d, charge, PowerUse, tuning) -> PowerResult`; `gunLoad(ship, tick)` = guns' draw per feed group, passed to `stepFlight` as `boost.load`; `remapCharge(before, after, c)` on every rebuild; `chargeTotal`, `circuitCharges`, `capCharge`.
-- Wire format: `packCharge`/`unpackCharge`; pilot-row slots start at `CHARGE_GROUPS_AT` (15), at most `MAX_CHARGE_GROUPS` (24) groups. Part features' values follow, in the order of `common/src/ships/features/features.wire.json` `pilotExtra` (dodge, dodgeDir, then tow; `pilotExtras` in `features/strafer/strafer.ts` reads them).
-- Surge: `surgeReaction(fn)`, `surgeTuning`, `POWER_TYPES` (colours used everywhere), `bankFor(d, part)`.
-- Names: `CHARGE_GROUPS_AT` / `MAX_CHARGE_GROUPS` (energy.ts) are the pilot-row layout; `isPowerPart(fn)` (wires.ts) says which parts take wires; the burst predicate (rebuild.ts l.324) says which draw by the tick.
+- `ShipDerived.power: PowerLayout` (`pool {cap, rate, coreCap, coreRate, parts}`, `banks: Bank[]` (`kind` cap/drive, `parts`, `cap`, `rate`, `feeds`, `refills`, `dynamo`, `dynamos`), `spare`, `feeds[].banks`, `feedOf`, `bankOf`, `draw`, `partCap`, `pooled`), `ShipDerived.energy: EnergyInfo`.
+- `Charge { g, b: number[] }` (pool %, then each bank's in bank order: banks number by their lowest part index); `FULL_CHARGE`; `powerTick(d, charge, PowerUse, tuning) -> PowerResult`; `gunLoad(ship, tick)` = guns' draw per feed group, passed to `stepFlight` as `boost.load`; `remapCharge(before, after, c)` on every rebuild; `chargeTotal`, `bankCharges`, `capCharge`, `poolHeld`, `bankHeld`.
+- Wire format: `packCharge`/`unpackCharge`; pilot row `data[10]` the pool's %, `data[11]` the group count (1 + banks), groups from `CHARGE_GROUPS_AT` (15): the pool's, then each bank's, at most `MAX_CHARGE_GROUPS` (24). `CHARGE_GROUPS_LAYOUT` is in the wire hash. Part features' values follow, in the order of `features.wire.json` `pilotExtra`.
 
 ## Invariants
-- Deterministic and identical on both sides: `powerTick` runs inside `stepFlight` (common/src/ships/flight.ts) for the server (`stepMovement` in server/src/ships/bridge/flight.ts, reached through `ShipBridge`), the pilot (`ShipClient.predict`) and replicas. No Date.now/Math.random, no client/server imports.
-- Layout only at rebuild; the tick is O(circuits + feed groups + stores), no per-part loops except guns/thrusters.
-- Surge never travels along wires, only by touch inside a bank. Steady loads (shields, scanners, coils) are shared at rebuild, bursty ones (engines, guns, miners, a Burst Strafer's dodge, a Tow Beam's draw while it tows) at the tick.
-- Charge rides the snapshot as percent per store group; changing group order/count changes the wire layout (protocol bump + `remapCharge` must keep working). Flash restores are server-only (shields aren't predicted).
-- A store gives at most its discharge rate; past it the circuit browns out proportionally (engines first). `BROWNOUT = 0.995`.
-- Hand-drawn wires carry cost (spools: server `Hangar.ts` l.165); destroyed cells cut wires.
+- Deterministic and identical on both sides: `powerTick` runs inside `stepFlight` for the server, the pilot (`ShipClient.predict`) and replicas. No Date.now/Math.random, no client/server imports. Per-tick scratch is module-level (`grow`); a tick allocates only its result.
+- Output = spare generation + the pool's rate while it holds charge. Engines are served first (their Drive Cell banks, then the Output); guns, beams, miners and `PowerUse.extra` then draw their Capacitor (or Drive Cell, for strafers) banks first and share what's left equally. A bank gives at most its rate a tick; nothing but what it feeds can drain it.
+- Banks refill from spare generation only with a member on a powered network, plus their Pulse Dynamos. Refill brings the emptiest stores up first (one level, by percentage).
+- Charge rides the snapshot as percent per group; changing group order/count changes the wire meaning (protocol bump + `remapCharge` must keep working).
+- Hand-drawn wires carry cost (spools: server `Hangar.ts`); destroyed cells cut wires.
 
 ## How to extend
-Add a store/generator type:
-1. models.mjs: add the model with `produce`/`store`/`pool`/`discharge`/`bank`/`surge` (see `OTHER` and the Surge block).
-2. circuits.ts `powerLayout`: membership (`kindOf` l.136, banks, labels); keep within `MAX_CHARGE_GROUPS`.
-3. energy.ts `powerTick`: only if a new rule is needed; read steps in the header comment (l.1-30), then the section you change.
-4. Surface it: wireEdit.ts `powerReport`, HangarUI POWER panel, partTip.ts, CircuitBars.ts, field guide Surge section.
-Add a Surge reaction: one row in `surgeReaction` (surge.ts), tune in `SURGE_DEFAULTS`/tuning.json, hook where the category acts (guns.ts shots, flight.ts kicks, ShipBridge shields).
-Add a new power draw: make it a part feature (features/README.md, "Add a part feature"). Set `burst: true` (or `'engine'`) on the feature: rebuild puts its parts on a feed group (the `burst` predicate, rebuild.ts l.324). A feature that draws while active gives a `load` hook (gunLoad adds it per tick, as the Tow Beam does, features/tow/index.ts); one that draws on a flight tick asks through its `thrustGate` hook (`ctx.load`, settled as `PowerUse.extra`, energy.ts l.287). No edit to energy.ts.
-New power type: `POWER_TYPES` + `Circuit.type` (circuits.ts, currently `'steady'` only) + colours; update the design doc "Implemented" section.
+Add a store/generator: models.mjs fields (`produce`/`store`/`discharge`/`bank`/`pool`/`dynamo`); `circuits.ts` only for a new kind of membership. A new power draw: make it a part feature (features/README.md). `burst: true` puts its parts on a feed group; `burst: 'engine'` lets Drive Cell banks feed it; a `load` hook adds to `gunLoad` (Tow Beam), a `thrustGate` hook asks through `PowerUse.extra` (Burst Strafer). No edit to energy.ts.
 
 ## Tests
-- `npx vitest run common/src/ships/circuits.test.ts` migration (library ships never brown out), circuit isolation, discharge rate, brownout, banks, split/remap, snapshot round-trip.
-- `npx vitest run common/src/ships/surge.test.ts` dynamo bank, reactions, Rail Driver, Flash Screen.
-- `npx vitest run common/src/ships/ships.test.ts` (energy basics in rebuild/powerTick), `common/src/ships/features/strafer/strafer.test.ts` and `.../features/tow/tow.test.ts` (burst draws; a feature's burst draw is `PowerUse.extra`, by feature number), `client/src/ships/wireEdit.test.ts` (wire tool, report).
+- `npx vitest run common/src/ships/circuits.test.ts`: library fight (0 rate-limited ticks), the powered rule, Output limit, banks (a pool drained by boosting leaves a gun bank full; a Drive Cell gives a strafer 2 bursts), refill and dynamos, splits, the snapshot.
+- `common/src/ships/ships.test.ts` (energy basics), `features/strafer/*.test.ts`, `features/tow/tow.test.ts`, `client/src/ships/wireEdit.test.ts`, `server/src/ships/devTestShips.test.ts`; goldens: `common/src/ships/golden` (scenario `drive-bank-boost`), `server/src/golden`.
 
 ## Gotchas
-- Any enemy/boss design without wires is auto-wired as ONE circuit; keep that so old fights behave.
-- Battery capacity of the main circuit and the core are one general pool: they give together (`takeGeneral`).
-- Adding a store changes group indices; stale `Charge.s` after rebuild must go through `remapCharge`.
-- Engines draw whichever way they push (no direction-aware draw); a loaded gun fires its first shot on an empty circuit (decisions in the design doc).
-- Beams, pulse lasers and mining lasers have no Surge reaction yet.
-- Energy.ts was the biggest single-commit churn file; read by header comment and the function you need, not whole.
-
-## Related areas
-- [ship-parts](ship-parts.md) (models/fields, rebuild; part features in features/README.md). [flight](flight.md) (`stepFlight` calls `powerTick`, kicks, cargo, dodge). [weapons](weapons.md) (`guns.ts` charged shots, `gunLoad`). [hangar-ui](hangar-ui.md) (wire tool, POWER panel, load test), [ui-hud-input](ui-hud-input.md) (CircuitBars), [networking](networking.md) (charge groups in the pilot row, PROTOCOL_VERSION).
-
-## Notes (moved from DEVELOPMENT.md and the old engine-map)
-- **Phase 1 summary**: each wire network keeps its own charge; every store gives at most its `discharge` a second (past it the circuit browns out: guns reload slower, engines push less, beams burn that share of the time); capacitors give only to what they touch; the core's store is a battery on the main circuit plus a trickle to the rest. Layout is worked out at the rebuild (`circuits.ts`), run each tick by `energy.ts` (server and pilot prediction alike). Numbers: `discharge` in models.json (from `scripts/econ/models.mjs`), `energy` in `data/ships/tuning.json`. `circuits.test.ts` flies every library ship through a scripted fight and fails if a discharge rate ever bites. Design and decisions: `docs/design/energy-system.md`, "Implemented (Phase 1)".
-- **Pools** (`FunctionDef.pool`; capacity `store` x area x grade output): general (core's `tuning.energy.coreCapacity` plus standard batteries) serves everything; drive batteries feed engines only; weapon batteries feed guns and mining lasers only. In the rebuild flow solve only steady loads (shields, scanners, jump coils) share the generators' supply; engines, guns and mining lasers get satisfaction 1 if power reaches them. `derived.energy` holds the capacities, the spare power after steady loads, and the draws.
-- **Per tick** (see the `energy.ts` header): engines first (spare stream, then drive pool, then general; boosting draws `1 + boostDraw x boostDrain` times as much and needs stored charge), then guns (`WeaponInfo.energy` per shot, beams per tick, from weapon pool then general; with the stores dry they are silent) and mining lasers (per 15-tick segment aligned to the tick count, `payMining`, `ShipState.minePaid`). Spare power charges the pools in proportion to how empty each is.
-- **Charge on the wire**: `Charge` is percentages per pool, kept per ship in `ShipBridge.charge` (absent: full), sent in the pilot's own snapshot (`data[1]` general, `data[10]` drive, `data[11]` weapon; `data[9]` charging-field flags, `data[12]` a stillstone's priming, negative for a scarred one's) and predicted on the client (`GameState.charge`). `Boost.fuel`/`GameState.boostFuel` are the combined percentage for the ENERGY gauge (`chargeTotal`). Pilotless ships' flight is not metered; their guns are. `rateShip` counts guns at the rate energy sustains.
+- Any design without wires is auto-wired as one network; keep that so old fights behave.
+- Pre-5896116 rule: a battery on a network with no generator isn't in the pool, but it makes that network's engines and guns "powered" (they draw on the pool).
+- Legacy `drive_battery`/`weapon_battery` are plain pool batteries now.
+- If the library fight fails on the Heavy Bank's rate, lower `energy.boostDraw`, not the rate (design rule).
