@@ -44,6 +44,7 @@ import type { AdminPanel } from './ui/AdminPanel';
 import type { ContributorPanel } from './ui/ContributorPanel';
 
 import { BankBars } from './ui/BankBars';
+import { WeaponRing } from './ui/WeaponRing';
 import { ObjectiveBanner } from './ui/ObjectiveBanner';
 import { SiegePanel } from './ui/SiegePanel';
 import { moonOffset, planetPosition, pocketAt, inSafeSpace, type StarSystemData } from '@space-game/common';
@@ -191,6 +192,8 @@ private xpFillEl: HTMLElement | null;
   private boostFillEl: HTMLElement | null;
   /** Each bank's charge beside the ENERGY gauge (circuits.ts banks) */
   private bankBars: BankBars | null = null;
+  /** The weapon ring round the cursor (ui/WeaponRing.ts) */
+  private weaponRing: WeaponRing | null = null;
   private levelEl: HTMLElement | null;
   private xpEl: HTMLElement | null;
   private xpToNextEl: HTMLElement | null;
@@ -282,6 +285,7 @@ this.xpFillEl = document.getElementById('xpFill');
     this.xpBarEl = document.getElementById('xpBar');
     this.boostFillEl = document.getElementById('boostFill');
     this.bankBars = new BankBars();
+    this.weaponRing = new WeaponRing();
     this.levelEl = document.getElementById('level');
     this.xpEl = document.getElementById('xp');
     this.xpToNextEl = document.getElementById('xpToNext');
@@ -743,20 +747,12 @@ this.xpFillEl = document.getElementById('xpFill');
       this.heatText = this.heatEl.querySelector('[data-k="t"]') as HTMLElement;
       this.heatFill = this.heatEl.querySelector('[data-k="f"]') as HTMLElement;
     }
-    const gun = this.shipClient.gunCharge();
-    const laser = gun ? null : this.shipClient.laserCharge();
+    // (A charge gun's charge is on the weapon ring round the cursor: ui/WeaponRing.ts)
+    const laser = this.shipClient.laserCharge();
     const charging = !!laser && laser.charge < 0.999;
-    const show = this.loggedIn && !this.shipClient.hangarOpen && (!!gun || charging);
+    const show = this.loggedIn && !this.shipClient.hangarOpen && charging;
     setStyle(this.heatEl, 'display', show ? 'block' : 'none');
     if (!show) return;
-    if (gun) {
-      // A charge gun held: it fires itself when the bar is full (let go early and nothing fires)
-      setText(this.heatText, gun.charge >= 0.999 ? 'CHARGED' : 'CHARGING · HOLD TO FIRE');
-      setStyle(this.heatText, 'color', '#fde68a');
-      setStyle(this.heatFill, 'width', `${Math.round(gun.charge * 100)}%`);
-      setStyle(this.heatFill, 'background', 'linear-gradient(90deg,#92400e,#fbbf24,#fffbeb)');
-      return;
-    }
     if (laser) {
       // Pulse lasers: the charge to their next pulse
       setText(this.heatText, laser.total > 1 ? `LASERS CHARGING · ${laser.ready}/${laser.total} READY` : 'LASER CHARGING');
@@ -1037,6 +1033,9 @@ this.xpFillEl = document.getElementById('xpFill');
       this.w.cargoPanel.update(blocked || this.stationOpen || !me, !!me && !inSafeSpace(this.currentSystem(), me.renderX, me.renderY));
     }
     this.updateHeatGauge();
+    // The weapon ring round the cursor: your gun groups' clips, charges, spin and ammo
+    this.weaponRing?.update(this.shipClient.ringGroups(), this.input.mouseX, this.input.mouseY,
+      this.loggedIn && !this.localDead && !this.shipClient.hangarOpen && !this.menu.isOpen && !this.stationOpen && !this.w.systemMapUI.isOpen);
 
     // Update screen shake
     this.state.updateScreenShake(delta);

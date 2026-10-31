@@ -138,7 +138,7 @@ function clientPredictor(sc: Scenario, env: ReplicaEnv) {
   const self = {
     store: { get: () => ship }, docked: false, berth: null,
     // (What predictGuns reaches for: the scene its shells go to, and the gun-state history)
-    scene: { predictShot: () => {} }, gunSync: { record: () => {} },
+    scene: { predictShot: () => {} }, gunSync: { record: () => {} }, gunFeel: { own: () => {} },
     opts: { state: { entities: new Map() }, tuning },
     hazardFor: (d: never, x: number, y: number) => env.hazard?.(d, x, y),
     central: env.central, lodestones: env.lodestones ?? [], gravity: env.gravity, terrain: env.terrain ?? null,

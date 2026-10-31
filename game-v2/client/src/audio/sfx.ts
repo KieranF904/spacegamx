@@ -430,6 +430,53 @@ const RECIPES: Record<string, Recipe> = {
     sub.start();
     grains(ctx, out, r, 0, 1.5, 70, 2000, 9000, 0.28, true);
   } },
+  // A charge gun gathering (about the Longbarrel's second): a thin whine rising and brightening, a swelling hum under it
+  gun_charge: { duration: 1.4, reverb: 0.15, build(ctx, out, r) {
+    const swell = (peak: number) => {
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, 0);
+      g.gain.exponentialRampToValueAtTime(peak, 1.25);
+      g.gain.linearRampToValueAtTime(0, 1.38);
+      return g;
+    };
+    for (const m of [1, 1.503]) {
+      const o = osc(ctx, 'sine', 300 * m, 2600 * m, 1.3);
+      chain(o, swell(0.09), filter(ctx, 'lowpass', 7000), out);
+      o.start();
+    }
+    const hum = osc(ctx, 'sawtooth', 60, 150, 1.3);
+    chain(hum, filter(ctx, 'lowpass', 300, 0.8, 900, 1.3), swell(0.12), out);
+    hum.start();
+    grains(ctx, out, r, 0.2, 1.1, 40, 3000, 9000, 0.14, true);
+  } },
+  // A clip gun's reload seating: a short metal clack
+  gun_clack: { duration: 0.35, variants: 2, reverb: 0.1, build(ctx, out, r) {
+    modal(ctx, out, 0, [[640, 0.2, 0.12], [1130, 0.14, 0.08], [2210, 0.07, 0.05]]);
+    burst(ctx, out, r, 0, 0.7, 0.0008, 0.03, [filter(ctx, 'highpass', 1800), drive(ctx, 2)]);
+    thump(ctx, out, 0.015, 130, 70, 0.4, 0.1);
+  } },
+  // The last round gone: the reload vent, a hiss of vented heat
+  gun_vent: { duration: 0.7, reverb: 0.25, build(ctx, out, r) {
+    burst(ctx, out, r, 0, 0.45, 0.01, 0.5, [filter(ctx, 'bandpass', 5200, 0.9, 2400, 0.5)]);
+    modal(ctx, out, 0.02, [[420, 0.12, 0.14], [880, 0.08, 0.1]]);
+  } },
+  // The Chainsaw's barrels spinning up: a motor winding from a growl to a whir
+  gun_spin: { duration: 1.2, reverb: 0.12, build(ctx, out, r) {
+    const swell = (peak: number) => {
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, 0);
+      g.gain.exponentialRampToValueAtTime(peak, 1.0);
+      g.gain.linearRampToValueAtTime(0, 1.15);
+      return g;
+    };
+    const m = osc(ctx, 'sawtooth', 45, 340, 1.0);
+    chain(m, drive(ctx, 3), filter(ctx, 'lowpass', 500, 1, 2600, 1.0), swell(0.2), out);
+    m.start();
+    const n = noise(ctx, 1.2, r, 'brown');
+    chain(n, filter(ctx, 'bandpass', 200, 1.2, 1800, 1.0), swell(0.5), out);
+    n.start();
+    grains(ctx, out, r, 0, 1.1, 60, 1500, 6000, 0.2, true);
+  } },
   // The jump itself: a deep boom and the air of the hull tearing away
   jump_launch: { duration: 2.6, reverb: 0.6, build(ctx, out, r) {
     burst(ctx, out, r, 0, 0.9, 0.0005, 0.07, [filter(ctx, 'highpass', 1000), drive(ctx, 4)]);

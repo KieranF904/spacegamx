@@ -12,6 +12,9 @@
 
 import { stepPointDefenceAim, pointDefenceOf, chargeGroupsEnd, TELL_CHARGE_START, TELL_CHARGE_CANCEL } from '@space-game/common';
 import { GunSync } from './gunSync';
+import { GunFeel } from './gunFeel';
+import { ChargeFx } from './ChargeFx';
+import { RingModel, type RingGroup, type RingSources } from './gunHud';
 import { buildFlightInputs, newFlightControls, payMining, gunLoad, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, warmthStage, withNumb, withSlowed, type WeaponInfo, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules } from '@space-game/common';
 import hazardData from '../../../data/hazards.json';
 
@@ -132,6 +135,13 @@ export class ShipClient {
   private bossFx: BossFx | null = null;
   private damageFx: DamageFx | null = null;
   private beamFx: MiningBeamFx | null = null;
+  /** Charge guns' tells (Longbarrel's sight line, Blackout's darkening) */
+  private chargeFx: ChargeFx | null = null;
+  /** Gun sounds that follow the firing models (charge whine, clip clack and vent, spin-up) */
+  private gunFeel = new GunFeel((id, at, volume, pitch) => this.opts.sound?.(id, at, volume, pitch) ?? null);
+  /** The weapon ring's data (own guns, predicted) */
+  private ringModel = new RingModel();
+  private readonly ringAmmo = { loose: 0, crates: 0 };
   private scannerFx: ScannerFx | null = null;
   private zoom: () => number = () => 1;
   private jump: JumpTuning;
@@ -252,12 +262,34 @@ export class ShipClient {
     for (const [owner, ago, partAmmo, aimQ, ...ids] of m.fire ?? []) {
       const tick = m.tick - ago, part = partAmmo % 256, ammo = Math.floor(partAmmo / 256);
       // A charge gun's tell (no shells): it started charging, or was let go (guns.ts TELL_CHARGE_*; drawn by the charge FX)
-      if (ammo === TELL_CHARGE_START) { this.chargeTells.set(owner * 256 + part, tick); continue; }
-      if (ammo === TELL_CHARGE_CANCEL) { this.chargeTells.delete(owner * 256 + part); continue; }
+      if (ammo === TELL_CHARGE_START) {
+        this.chargeTells.set(owner * 256 + part, tick);
+        // (The whine of another ship's gun: yours is heard off your own gun state, gunFeel.ts)
+        const src = owner !== this.opts.state.playerId ? this.store.get(owner) : null, ent = this.opts.state.entities.get(owner);
+        const gun = src?.derived.weapons.find((w) => w.part === part);
+        if (gun && ent) {
+          this.tellSounds.get(owner * 256 + part)?.();
+          this.tellSounds.set(owner * 256 + part, this.gunFeel.otherCharge({ x: ent.renderX, y: ent.renderY }, gun));
+          while (this.tellSounds.size > 64) this.tellSounds.delete(this.tellSounds.keys().next().value!);
+        }
+        continue;
+      }
+      if (ammo === TELL_CHARGE_CANCEL) {
+        this.chargeTells.delete(owner * 256 + part);
+        this.tellSounds.get(owner * 256 + part)?.();
+        this.tellSounds.delete(owner * 256 + part);
+        continue;
+      }
       const ship = this.store.get(owner);
       const st = this.replicas.at(owner, tick);
       if (!ship || !st) continue;
       this.chargeTells.delete(owner * 256 + part);
+      this.tellSounds.delete(owner * 256 + part);
+      // Another ship's clip gun: count its rounds, the vent on the last
+      if (owner !== this.opts.state.playerId) {
+        const gun = ship.derived.weapons.find((w) => w.part === part);
+        if (gun) this.gunFeel.otherRound(owner, gun, tick, { x: st.body.x, y: st.body.y });
+      }
       while (this.chargeTells.size > 256) this.chargeTells.delete(this.chargeTells.keys().next().value!);
       // A pulse laser's pulse (a fire event with no shells): drawn from the tick it started
       const gun = ship.derived.weapons.find((w) => w.part === part);
@@ -367,6 +399,8 @@ export class ShipClient {
     this.beamFx.onPulse = (x, y, grade, own) => { this.opts.sound?.('laser_pulse', own ? undefined : { x, y }, own ? 0.42 : 0.7, PULSE_GRADE_PITCH[Math.max(0, Math.min(4, grade - 1))]); };
     // A mining laser's pulse: a deep, soft throb, one a ship however many miners it has
     this.beamFx.onMiningPulse = (x, y, own) => { this.opts.sound?.('mining_pulse', own ? undefined : { x, y }, own ? 0.5 : 0.6); };
+    this.chargeFx = new ChargeFx(renderer.getEffectLayer(), this.store, this.opts.state, this.opts.tuning, this.chargeTells);
+    renderer.addBloomSource(this.chargeFx.glowLayer);
     this.scannerFx = new ScannerFx(renderer.getEffectLayer(), this.store, this.opts.state, this.opts.pilot.econ);
     this.zoom = () => renderer.getZoom();
     this.damageFx = new DamageFx(renderer.getEffectLayer(), this.store, this.opts.state,
@@ -461,6 +495,7 @@ export class ShipClient {
     const { shots, pulses } = stepGuns(ship, pose, { firing, aimWorld: input.targetAngle, aimDist: input.cursorDist ?? 0, energy }, tick, this.opts.tuning);
     // (What the guns hold now, for the server's gun-state correction: gunSync.ts)
     this.gunSync.record(ship, tick);
+    this.gunFeel.own(ship, tick);
     for (const { w } of pulses) this.beamFx?.startPulse(player.id, w.part, tick);
     if (burning) ship.mineUntil = 0;
     payMining(ship, !!input.fireRight && hasMiners && !burning, tick, energy);
@@ -786,6 +821,31 @@ export class ShipClient {
 
   /** Others' charge guns charging now (a charge-start fire event, until it fires or is let go): owner * 256 + part → the tick it started */
   readonly chargeTells = new Map<number, number>();
+  /** ...and the stop for the whine each started (cut by a cancel) */
+  private readonly tellSounds = new Map<number, (() => void) | null>();
+
+  /**
+   * The weapon ring's groups (ui/WeaponRing.ts): your guns by model, with clip, charge, spin, ammo and bank, off your
+   * own predicted gun state. Empty when you fly nothing with guns. The records are reused every call.
+   */
+  ringGroups(): RingGroup[] {
+    const ship = this.store.get(this.opts.state.playerId);
+    this.ringSrc.charge = this.opts.state.charge;
+    return this.ringModel.update(ship ?? null, this.ringSrc);
+  }
+
+  private readonly ringSrc: RingSources = {
+    charge: { g: 100, b: [] },
+    ammoOf: (kind) => {
+      const item = this.opts.tuning.weapons?.[kind]?.ammo?.item;
+      if (!item) return null;
+      const a = this.ringAmmo;
+      a.loose = this.opts.pilot.profile?.ammo?.[item] ?? 0;
+      a.crates = 0;
+      for (const s of this.opts.pilot.cargo) if (s.id === item) a.crates += s.n;
+      return a;
+    },
+  };
 
   /** The gun-state correction for your own guns (gunSync.ts) */
   private readonly gunSync = new GunSync();
@@ -991,6 +1051,7 @@ export class ShipClient {
     this.features.updateIndicators();
     this.damageFx?.update(dt);
     this.beamFx?.update(dt);
+    this.chargeFx?.update(dt, Math.round(state.getRawServerTick()));
     this.bossFx?.update(dt);
     this.scannerFx?.update(dt, this.zoom());
     this.updateRepairHint();
