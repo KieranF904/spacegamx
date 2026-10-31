@@ -7,7 +7,7 @@
  *   `snap` the tether breaks. The server moves the towed thing (server/src/ships/features/tow/Towing.ts); it's never predicted.
  * - The ship feels the load: what it tows counts as cargo (load.ts), `loadShare` of its mass, so it pushes, turns
  *   and stops slower. That rides the flight body's cargo mass, so the pilot's prediction and every replica fly it.
- * - It draws its `demand` while towing, on its circuit like a gun (energy.ts gunLoad); short of power the pull
+ * - It draws its `demand` while towing, on the ship like a gun (energy.ts gunLoad); short of power the pull
  *   weakens, and under `minShare` the beam lets go.
  * - It never takes hold of a working ship: no enemies, no bosses, no pilots (only wrecks, debris and pods).
  * - Towed into a station's reach, a wreck or debris is salvaged into the pilot's station storage (econ/salvage.ts

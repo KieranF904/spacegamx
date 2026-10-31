@@ -10,7 +10,6 @@ Pulse202 a pulse · charges in 1.8s · no heat
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 1 clear cell ahead
 Power draw32/s
-On Surgecharged shot: after a 0.5 s pause, a shot hits ×1.5, a packet from the bank
 
 == partStats (stats rows) ==
 GradeMk II · Medium

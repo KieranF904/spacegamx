@@ -10,7 +10,7 @@ import { hasComponent } from 'bitecs';
 import {
   Position, Velocity, Player, InSystem, ShipState, Vec2, damagePart, coreHp, healPart, restorePart, hitMultiplier,
   type HitInfo, warmthStage, warmthPercent, insulationOf, THAW, WARMTH_STAGES, type WarmthStage, fartherThan,
-  nearestParts, partDistance, standing, stageOf, currentStage, RUIN_HP, seededRng, hashInts, flashRestore,
+  nearestParts, partDistance, standing, stageOf, currentStage, RUIN_HP, seededRng, hashInts,
 } from '@space-game/common';
 import { GLANCING, STAGE_COVER, EMP_IMMUNE_TICKS, type PendingBlast, type BridgeCtx } from './core.js';
 
@@ -199,11 +199,6 @@ export function hurt(b: BridgeCtx, eid: number, ship: ShipState, part: number, a
     amount -= soak / k;
     dealt += soak;
     ship.shieldHitTick = tick;
-    // (Surge: broken, a capacitor bank touching a shield generator puts part of it back at once: surge.ts flashRestore)
-    if (ship.shield <= 0 && soak > 0) {
-      const flash = flashRestore(ship.derived, b.chargeOf(eid), b.tuning);
-      if (flash) { ship.shield = flash.restore; b.setCharge(eid, flash.charge); }
-    }
   }
   const through = vs?.hit && ship.blueprint.parts[part] ? hitMultiplier(b.catalog, b.tuning, ship.blueprint.parts[part], vs.hit) : 1;
   // (a braced boss shows the hit as glancing: wait for its opening)

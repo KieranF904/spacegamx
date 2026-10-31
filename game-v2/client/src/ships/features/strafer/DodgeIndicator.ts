@@ -1,6 +1,6 @@
 /**
  * The Burst Strafer's HUD chip, over the jump gauge (common/src/ships/features/strafer): READY (lit) or a ring filling
- * over the short cooldown, the dodge key, a flash while a burst runs, LOW POWER when the circuit can't pay for a full
+ * over the short cooldown, the dodge key, a flash while a burst runs, LOW POWER when the ship can't pay for a full
  * burst the way you'd dodge now, and which ways the strafers can't push (if any). Shown while a ship has strafers fitted.
  * Its element is made on first use, so importing the feature (keybindings does) touches no DOM.
  */

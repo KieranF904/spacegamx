@@ -320,7 +320,7 @@ export class SnapshotBuilder {
       const beam = this.ships.beamState(eid);
       const heat = this.ships.heatState(eid);
       const ship = this.ships.get(eid);
-      // (The charge, packed: the whole gauge, the core's store, and each store group's, energy.ts packCharge)
+      // (The charge, packed: the whole gauge, the pool's, and the charge groups (the pool's, then each bank's), energy.ts packCharge)
       const charge = packCharge(ship?.derived, this.ships.chargeOf(eid));
       const field = this.ships.jumpFieldState(eid);
       const row = add({
@@ -336,8 +336,8 @@ export class SnapshotBuilder {
         av: quantizeShipValue('angVel', ship?.angVel ?? 0),
         hp: Math.round(Health.current[eid]),
         maxHp: Math.round(Health.max[eid]),
-        // data[0]: cursor/weapon state (see CURSOR_STATE.md); data[1]: the whole charge (the gauge); [10] the core's store, [11] how many
-        // store groups, [15...] each group's charge (local circuits, reconciliation: energy.ts packCharge / unpackCharge)
+        // data[0]: cursor/weapon state (see CURSOR_STATE.md); data[1]: the whole charge (the gauge); [10] the pool's, [11] how many
+        // charge groups, [15...] each group's charge: the pool's, then each bank's (reconciliation: energy.ts packCharge / unpackCharge)
         data: [
           packCursorWeaponState(Input.targetAngle[eid], beam.hit, this.ships.weaponBeamState(eid).on, beam.on),
           charge.total,
@@ -349,12 +349,12 @@ export class SnapshotBuilder {
           heat.over ? 1 : 0,                     // a beam weapon overheated
           Math.round((ship?.jumpScale ?? 1) * 1000), // this jump's speed scale (prediction)
           field.flags,                           // in a charging field: 1 a star's ring, 2 a lodestone's (bits)
-          charge.core,                           // [10] the core's store %
-          charge.groups.length,                  // [11] store groups that follow from [15]
+          charge.g,                              // [10] the ship pool's charge %
+          charge.groups.length,                  // [11] charge groups that follow from [15] (1 + banks)
           field.prime,                           // a lodestone's priming left, ticks (prediction)
           warmthPercent(this.ships.warmthOf(eid)), // warmth % (common/src/ships/warmth.ts: the frost vignette, and the stage prediction flies and fires with)
           ship?.cargo ?? 0,                      // [14] the hold's cargo mass (common/src/ships/load.ts: prediction flies it)
-          ...charge.groups,                      // [15...] each store group's charge % (CHARGE_GROUPS_AT)
+          ...charge.groups,                      // [15...] the pool's charge %, then each bank's (CHARGE_GROUPS_AT)
           // After the groups, the part features' values in features.wire.json pilotExtra order (features/strafer/strafer.ts
           // pilotExtras reads them): the Burst Strafer's dodge counter and way (ships/features/strafer), what the Tow Beam tows (+1: ships/features/tow)
           ...this.fxWire(eid),

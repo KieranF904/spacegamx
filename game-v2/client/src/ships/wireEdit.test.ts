@@ -8,7 +8,7 @@ import { join } from 'path';
 import { autoWire, createShipState, isNeighbour, placeGeometry, wireCells, cellKey, type Blueprint, type WireSeg } from '@space-game/common';
 import { loadShipConfigFromDisk } from '../../../server/src/ships/loadShipConfig';
 import { createShipBridge } from '../../../server/src/proto/createProtoServer';
-import { DEAD_NET, STEADY_COLOR, eraseRun, layRun, powerReport, pruneWires, stepCells, whereOnShip, wireBill, type Cell } from './wireEdit';
+import { DEAD_NET, NET_COLORS, eraseRun, layRun, powerReport, pruneWires, stepCells, whereOnShip, wireBill, type Cell } from './wireEdit';
 
 const bridge = createShipBridge(loadShipConfigFromDisk(join(__dirname, '../../../data')));
 const { catalog, tuning } = bridge;
@@ -81,53 +81,33 @@ describe('laying wire', () => {
 });
 
 describe('the power overlay', () => {
-  it('an auto-wired design has every power part on a powered circuit, A, in the Steady colour', () => {
+  it('an auto-wired design has every power part on a powered network, in the first colour', () => {
     const bp = testShip();
     const r = report(bp);
     expect(r.warnings).toEqual([]);
-    expect(r.nets.filter((n) => n.powered).map((n) => n.color)).toEqual([STEADY_COLOR]);
-    expect(r.nets.filter((n) => n.powered).map((n) => n.letter)).toEqual(['A']);
+    expect(r.nets.filter((n) => n.powered).map((n) => n.color)).toEqual([NET_COLORS[0]]);
     expect(r.nets[0].generators.length).toBe(1);
-    expect(r.seg.every((c) => c === STEADY_COLOR)).toBe(true);
+    expect(r.seg.every((c) => c === NET_COLORS[0])).toBe(true);
     expect(autoWire(bp, catalog).length).toBe(r.seg.length);
   });
 
-  it("a gun out on a wing with its wire gone limps on the core's trickle, and says where", () => {
+  it('a gun out on a wing with its wire gone has no power, and says where', () => {
     const bp = testShip();
     bp.wires = autoWire(bp, catalog).filter(([x0, , x1]) => x0 > -2 && x1 > -2);
     const r = report(bp);
     const gun = bp.parts.findIndex((p) => p.fn === 'cannon_pip');
-    expect(r.part[gun]).toBe('trickle');
-    expect(r.warnings).toContain("Pip on the left wing isn't wired to a generator or store: only the core's trickle reaches it");
+    expect(r.part[gun]).toBe('unpowered');
+    expect(r.warnings).toContain('Pip on the left wing has no power');
   });
 
-  it('local circuits: stores with no generator, a capacitor touching nothing, and weak links are named', () => {
-    const bp = testShip();
-    const at = (uid: number, fn: string, x: number, y: number) => ({ uid, piece: 'sq', fn, material: catalog.functions.get(fn)?.material ?? 'alloy', x, y, rot: 0 as const, flip: false });
-    // A battery and a capacitor off the right of the core, wired to each other only (a circuit with stores, no generator)
-    bp.parts.push(at(7, 'power_battery', 1, 0), at(8, 'power_capacitor', 2, 0));
-    bp.wires = [...autoWire(testShip(), catalog), [1, 0, 2, 0]];
-    const r = report(bp);
-    const letters = r.nets.filter((n) => n.letter).map((n) => n.letter).sort();
-    expect(letters).toEqual(['A', 'B']);
-    expect(r.nets.find((n) => n.main)!.letter).toBe('A');
-    expect(r.warnings).toContain('Circuit B has stores but no generator: nothing charges them');
-    expect(r.warnings.some((w) => /Capacitor touches nothing that draws power/.test(w))).toBe(true);
-    // The auto-wired tree out to the gun: every hull plate along it is a weak link, the one nearest the gun cutting it off
-    expect(r.weak.length).toBeGreaterThan(0);
-    const gun = bp.parts.findIndex((p) => p.fn === 'cannon_pip');
-    expect(r.weak.some((w) => w.cuts.includes(gun) && /Pip/.test(w.text))).toBe(true);
-  });
-
-  it('two generators wired apart make two circuits, each its own letter in the Steady colour; one with no generator is grey', () => {
+  it('two generators wired apart make two networks, each its own colour; one with no generator is grey', () => {
     const bp = testShip();
     bp.parts.push({ uid: 7, piece: 'sq', fn: 'power_cell_reactor', material: 'alloy', x: -3, y: 1, rot: 0, flip: false });
     bp.wires = [[0, 1, 0, 2], [0, 2, 0, 3]];
     const r = report(bp);
     const powered = r.nets.filter((n) => n.powered);
     expect(powered.length).toBe(2);
-    expect(new Set(powered.map((n) => n.letter)).size).toBe(2);
-    expect(powered.every((n) => n.color === STEADY_COLOR)).toBe(true);
+    expect(new Set(powered.map((n) => n.color)).size).toBe(2);
     // (the second generator sits beside the gun: plugged straight in)
     const gun = bp.parts.findIndex((p) => p.fn === 'cannon_pip');
     expect(r.part[gun]).toBe('powered');

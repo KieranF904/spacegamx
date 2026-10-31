@@ -16,7 +16,7 @@ import { fnOutput, isEngine, partDemand, partGrade, partMaterial, partSupply, pa
 import { netJoins, wireNetworks } from './wires.js';
 import { gunRate } from './launch.js';
 import { type EnergyInfo } from './energy.js';
-import { type PowerLayout, powerLayout } from './circuits.js';
+import { type PowerLayout, bankKind, powerLayout } from './circuits.js';
 import type { FeatureDerived } from './features/types.js';
 import { getPlan, featureBits, featureList } from './features/plan.js';
 
@@ -124,7 +124,7 @@ export interface ShipDerived {
   satisfaction: number[];
   /** Battery, spare generator power, and what draws on it (energy.ts) */
   energy: EnergyInfo;
-  /** Local circuits: each circuit's stores, generation and consumers, the capacitor banks and the core's store (circuits.ts; energy.ts runs them) */
+  /** The power layout: the ship's pool (the core's store and the batteries), the Capacitor and Drive Cell banks and the feed groups (circuits.ts; energy.ts runs them) */
   power?: PowerLayout;
   mass: number;
   /** Centre of mass, grid units */
@@ -323,16 +323,19 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   const fxOf = P.features.length ? fns.map((fn) => featureBits(P, fn)) : undefined;
   const burst = (i: number) => isEngine(fns[i]) || !!fns[i].weapon || isMinerFn(fns[i])
     || (fxOf !== undefined && (fxOf[i] & P.burstMask) !== 0);
-  // (Of those, the ones their circuit counts as engines: burst 'engine', a Burst Strafer's)
-  const engineLike = (i: number) => fxOf !== undefined && (fxOf[i] & P.engineMask) !== 0;
-  // (Local circuits: a burst consumer runs wherever its circuit has a generator or a store, it touches a capacitor bank, or the
-  // core's store can reach it: on the main circuit, or by its trickle elsewhere. How much it actually gets is the tick's: energy.ts)
+  // (Of those, the ones Drive Cell banks feed: engines, and burst 'engine' features (a Burst Strafer's); and the ones Capacitor
+  // banks feed: guns, beams and mining lasers. circuits.ts)
+  const engineLike = (i: number) => isEngine(fns[i]) || (fxOf !== undefined && (fxOf[i] & P.engineMask) !== 0);
+  const gunLike = (i: number) => !!fns[i].weapon || isMinerFn(fns[i]);
   const coreAlive = input.rootMode === 'core' && root >= 0 && parts[root].fn === 'core';
+  // (A burst consumer a bank of its kind touches runs on that bank whatever its network: circuits.ts)
   const nearBank = new Array<boolean>(n).fill(false);
   for (const [a, b] of joins) {
-    // (a Pulse Dynamo is part of the bank it touches: surge.ts)
-    if (alive[a] && alive[b] && ((fns[a].bank && (fns[a].store ?? 0) > 0) || (fns[a].surge ?? 0) > 0)) nearBank[b] = true;
-    if (alive[a] && alive[b] && ((fns[b].bank && (fns[b].store ?? 0) > 0) || (fns[b].surge ?? 0) > 0)) nearBank[a] = true;
+    if (!alive[a] || !alive[b]) continue;
+    for (const [s, t] of [[a, b], [b, a]] as const) {
+      const k = bankKind(fns[s]);
+      if (k && (k === 'drive' ? engineLike(t) : gunLike(t))) nearBank[t] = true;
+    }
   }
   let spare = 0, totalSupply = 0;
   const networks: FlowNetwork[] = wn.nets.map((g) => {
@@ -350,15 +353,15 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
       satisfaction[i] = demands[k] > 0 ? Math.min(1, alloc[k] / demands[k]) : 0;
       delivered += satisfaction[i] * demands[k];
     });
-    // (They run while their network has a generator or a store on it, or the core or a bank can reach them: energy.ts)
-    for (const i of g) if (burst(i) && (fns[i].demand ?? 0) > 0) satisfaction[i] = powered || stored || coreAlive || nearBank[i] ? 1 : 0;
+    // (They run while their network has a generator or a battery on it (the ship's pool pays), or a bank of their kind touches them)
+    for (const i of g) if (burst(i) && (fns[i].demand ?? 0) > 0) satisfaction[i] = powered || stored || nearBank[i] ? 1 : 0;
     spare += Math.max(0, supply - delivered);
     totalSupply += supply;
     return { parts: g, supply, demand: demands.reduce((s, d) => s + d, 0), delivered, powered };
   });
-  // Consumers on no network get nothing (but engines, guns and mining lasers the core's trickle or a bank they touch)
+  // Consumers on no network get nothing (but engines, guns and mining lasers a bank of their kind touches)
   parts.forEach((_, i) => {
-    if (alive[i] && (fns[i].demand ?? 0) > 0 && network[i] < 0) satisfaction[i] = burst(i) && (coreAlive || nearBank[i]) ? 1 : 0;
+    if (alive[i] && (fns[i].demand ?? 0) > 0 && network[i] < 0) satisfaction[i] = burst(i) && nearBank[i] ? 1 : 0;
   });
 
   // 5. Derived physics
@@ -533,11 +536,12 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     }
   }
 
-  // ---- Local circuits (circuits.ts): worked out here once, run by energy.ts every tick
-  const power = powerLayout({ fns, area, mats, alive, joins, network, networks, burst, engine: engineLike, core: coreAlive, tuning, health: hp.map((h, i) => healthFactor(h / (maxHp[i] || 1), tuning)) });
-  let batteryMax = power.core?.cap ?? 0, driveMax = 0, weaponMax = 0;
-  for (const g of power.stores) if (g.kind === 'd') driveMax += g.cap; else if (g.kind === 'w' || g.kind === 'k') weaponMax += g.cap; else batteryMax += g.cap;
-  // ---- (end local circuits)
+  // ---- The power layout (circuits.ts): the ship's pool and the banks, worked out here once, run by energy.ts every tick
+  const power = powerLayout({ fns, area, mats, alive, joins, network, networks, burst, engine: engineLike, gun: gunLike, core: coreAlive, tuning, health: hp.map((h, i) => healthFactor(h / (maxHp[i] || 1), tuning)) });
+  const batteryMax = power.pool.cap;
+  let driveMax = 0, weaponMax = 0;
+  for (const B of power.banks) if (B.kind === 'drive') driveMax += B.cap; else weaponMax += B.cap;
+  // ---- (end power layout)
 
   const jump = jumpDriveStats(jumpCap, hullCells, jumpCap > 0 ? jumpGradeSum / jumpCap : 1, jt);
 

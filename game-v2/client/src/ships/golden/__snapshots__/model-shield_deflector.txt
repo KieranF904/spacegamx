@@ -5,7 +5,6 @@ Hull · mass56 hp · 1.4
 Armour · build1 · 1 pts
 TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
 Power draw16/s
-On Surgeflash restore: when the shield breaks, the bank puts 50% back at once
 Shield40
 
 == partStats (stats rows) ==

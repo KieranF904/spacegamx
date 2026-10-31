@@ -10,7 +10,6 @@ Fire rate0.5/s · shells · Railgun Slugs
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 3 clear cells ahead
 Power draw168/s
-On Surgedual-fed: its bank sets its punch, ×0.7 empty to ×1.5 full; a full bank adds a pierce and empties. Fires only on a wired circuit
 
 == partStats (stats rows) ==
 GradeMk IV · Large

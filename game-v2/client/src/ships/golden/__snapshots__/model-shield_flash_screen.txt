@@ -5,7 +5,6 @@ Hull · mass56 hp · 1.4
 Armour · build2 · 1.6 pts
 TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
 Power draw16/s
-On Surgedual-fed: when it breaks, the bank puts all of it back at once
 Shield36
 
 == partStats (stats rows) ==

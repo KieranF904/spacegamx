@@ -64,12 +64,15 @@ describe('the strafer feature (registered)', () => {
     expect(d.fx!.strafe!.parts.every((p) => bare.power!.feedOf[p.part] < 0)).toBe(true);
   });
 
-  it('its circuit counts its draw as an engine\'s (burst: engine)', () => {
-    const d = sparrow([RIGHT_FLANK]).derived, plain = sparrow().derived;
+  it('Drive Cell banks feed it as they do engines (burst: engine), and Capacitor banks never do', () => {
+    const cell = { uid: 62, piece: 'sq', fn: 'power_drive_cell', material: 'steel', x: 3, y: -1, rot: 0, flip: false };
+    const cap = { ...cell, fn: 'power_capacitor', material: 'composite' };
+    const d = sparrow([RIGHT_FLANK, cell]).derived, c = sparrow([RIGHT_FLANK, cap]).derived;
     const part = d.fx!.strafe!.parts[0].part;
-    const c = d.power!.circuits.find((x) => x.consumers.includes(part))!;
-    const before = plain.power!.circuits[0].engineDraw;
-    expect(c.engineDraw).toBeCloseTo(before + d.power!.draw[part], 9);
+    expect(d.power!.banks[0].kind).toBe('drive');
+    expect(d.power!.banks[0].feeds).toEqual([part]);
+    expect(c.power!.banks[0].kind).toBe('cap');
+    expect(c.power!.banks[0].feeds).toEqual([]);
   });
 
   it('the flight signature carries its pushes (its flight key) and its feature bit', () => {

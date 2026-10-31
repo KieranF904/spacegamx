@@ -259,10 +259,10 @@ const OTHER = [
   ['power_isotope_pile', 'Isotope Pile', 'reactor', ['round'], 9, 'steel', { produce: 18, hpScale: 1.6 }, 'A weak generator, but tough, and it never explodes.', 'power'],
   ['power_fusion_plant', 'Fusion Plant', 'reactor', ['block2'], 18, 'steel', { produce: 48, hpScale: 0.9, massScale: 2, blast: { radius: 3, damage: 70, delayTicks: [4, 16] } }, 'A heavy plant with plenty of power, and a big blast.', 'power'],
   ['power_overclock_reactor', 'Overclock Reactor', 'reactor', ['rect2'], 24, 'titanium', { produce: 62, hpScale: 0.4, blast: { radius: 3.6, damage: 95, delayTicks: [3, 12] } }, 'The most power for its size: fragile, and the biggest blast.', 'power'],
-  ['power_battery', 'Battery', 'battery', ['sq'], 0, 'alloy', { store: 200, discharge: 600, hpScale: 0.6 }, 'Stores energy for engines and guns. An all-rounder: gives its charge quickly.', 'power'],
-  ['power_capacitor', 'Capacitor', 'capacitor', ['sq'], 7, 'composite', { store: 160, pool: 'weapon', bank: true, discharge: 2000, hpScale: 0.6 }, 'A tiny, very fast store for guns and mining lasers it touches. Touching capacitors make one bank.', 'power'],
-  ['power_drive_cell', 'Drive Cell', 'drive_cell', ['sq'], 10, 'steel', { store: 320, pool: 'drive', discharge: 1400, hpScale: 0.6 }, 'A deep store for the engines alone, and fast: made for boosting.', 'power'],
-  ['power_heavy_bank', 'Heavy Bank', 'battery', ['block2'], 20, 'titanium', { store: 300, discharge: 450, hpScale: 0.7, massScale: 1.6 }, 'A dense, heavy bank of cells: holds a lot, but gives it slowly.', 'power'],
+  ['power_battery', 'Battery', 'battery', ['sq'], 0, 'alloy', { store: 200, discharge: 600, hpScale: 0.6 }, 'Adds to the ship\'s pool on a powered network: holds 200 and gives it quickly.', 'power'],
+  ['power_capacitor', 'Capacitor', 'capacitor', ['sq'], 7, 'composite', { store: 160, pool: 'weapon', bank: true, discharge: 2000, hpScale: 0.6 }, 'A gun bank: touching Capacitors make one bank that feeds the guns, beams and mining lasers it touches first, very fast.', 'power'],
+  ['power_drive_cell', 'Drive Cell', 'drive_cell', ['sq'], 10, 'steel', { store: 320, pool: 'drive', bank: true, discharge: 1400, hpScale: 0.6 }, 'An engine bank: touching Drive Cells make one bank that feeds the engines and Burst Strafers it touches first.', 'power'],
+  ['power_heavy_bank', 'Heavy Bank', 'battery', ['block2'], 20, 'titanium', { store: 300, discharge: 150, hpScale: 0.7, massScale: 1.6 }, 'A deep, heavy battery for the ship\'s pool: holds a lot, but gives it slowly.', 'power'],
   ['utility_mining_laser', 'Mining Laser', 'mining', ['sq'], 0, 'alloy', { demand: 12, priority: 2, facing: true, mining: true, hpScale: 0.7 }, 'Cuts ore from rock. A poor weapon.', 'utility'],
   ['utility_bore', 'Bore', 'mining', ['rect2'], 10, 'steel', { demand: 9, priority: 2, facing: true, mining: true, hpScale: 0.8 }, 'A heavier mining laser: its steel cuts harder rock.', 'utility'],
   ['utility_demolition_launcher', 'Demolition Launcher', 'demolition', ['sq'], 8, 'alloy', { weapon: 'charge', demand: 8, priority: 2, fireInterval: 120, hpScale: 0.8, weaponMods: {} }, 'Fires mining charges that crack rock wide open.', 'utility'],
@@ -294,17 +294,17 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
     guide: { name, blurb: description.split(/[.:]/)[0], ...(pieces[0] !== 'sq' ? { piece: pieces[0] } : {}), order: guideOrder++ },
   });
 }
-// ---- Energy Phase 2: Surge (common/src/ships/surge.ts; docs/design/energy-system.md "Implemented (Phase 2)") ----------
-// The Pulse Dynamo (a Surge generator: part of the capacitor bank it touches, never on wires), the Flash Screen (a
-// Deflector fed Surge too: a full restore when it breaks) and the Rail Driver (a Spear fed Surge too: its bank sets each
-// slug's punch). Appended last, so no other model's order moves.
+// ---- The Pulse Dynamo, the Flash Screen and the Rail Driver (docs/design/rework-2026-11.md §2.6) ----------
+// The Pulse Dynamo charges the banks it touches (circuits.ts `dynamo`: a second, into each), with no wires; the Flash Screen is
+// a plain shield for now and the Rail Driver a plain heavy rail (their own behaviour comes later in the rework). Appended
+// last, so no other model's order moves.
 {
-  const SURGE_LOOK = { color: '#6d3fb3', decor: 'battery', glow: '#b57cff' };
-  const SURGE_OTHER = [
-    ['power_pulse_dynamo', 'Pulse Dynamo', 'dynamo', ['sq'], 18, 'titanium', { surge: 8, hpScale: 0.6 }, 'A Surge generator: it charges the capacitor bank it touches, with no wires, and powers only what that bank touches.', 'power', SURGE_LOOK],
-    ['shield_flash_screen', 'Flash Screen', 'shield', ['sq'], 13, 'steel', { shield: 36, demand: 16, priority: 2, hpScale: 0.6, dual: 'flash' }, 'A shield fed Surge too: when it breaks, the capacitor bank against it puts all of it back at once.', 'shields', legacyLook('shield')],
+  const DYNAMO_LOOK = { color: '#6d3fb3', decor: 'battery', glow: '#b57cff' };
+  const LATE_OTHER = [
+    ['power_pulse_dynamo', 'Pulse Dynamo', 'dynamo', ['sq'], 18, 'titanium', { dynamo: 10, hpScale: 0.6 }, 'A bank charger: it puts 10 a second into each Capacitor or Drive Cell bank it touches, with no wires, and powers nothing itself.', 'power', DYNAMO_LOOK],
+    ['shield_flash_screen', 'Flash Screen', 'shield', ['sq'], 13, 'steel', { shield: 36, demand: 16, priority: 2, hpScale: 0.6 }, 'A compact shield generator.', 'shields', legacyLook('shield')],
   ];
-  for (const [id, name, family, pieces, level, material, fields, description, category, look] of SURGE_OTHER) {
+  for (const [id, name, family, pieces, level, material, fields, description, category, look] of LATE_OTHER) {
     models.push({
       ...base(id, name, family, pieces, level, material, { grade: fields.grade }), ...fields, description,
       rarity: level >= 20 ? 'rare' : level >= 5 ? 'uncommon' : 'common', category, fabOrder: next(category), ...look,
@@ -314,13 +314,13 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   MOUNT.railgun_rail_driver = 'fixed';
   MOUNTING.railgun_rail_driver = { attach: 'back', clear: ahead(3) };
   const spear = models.find((m) => m.id === 'railgun_spear');
-  const desc = "A heavy rail fed Surge too: the capacitor bank against it sets each slug's punch, and a full bank throws one through an extra ship.";
+  const desc = 'A heavy rail that throws its slug through a ship.';
   models.push({
-    ...spear, id: 'railgun_rail_driver', name: 'Rail Driver', unlock: { level: 29 }, dual: 'rail', ...mounted('railgun_rail_driver', desc),
+    ...spear, id: 'railgun_rail_driver', name: 'Rail Driver', unlock: { level: 29 }, ...mounted('railgun_rail_driver', desc),
     fabOrder: next('weapons'), guide: { name: 'Rail Driver', blurb: desc.split(':')[0].replace(/[.]$/, ''), piece: 'block2', order: guideOrder++ },
   });
 }
-// ---- (end Energy Phase 2)
+// ---- (end Pulse Dynamo, Flash Screen, Rail Driver)
 // ---- Support weapons: the Repair Beam and the Point Defence Turret (common/src/ships/features/support/support.ts; build-archetypes.md §5 #6, #7) ----
 // The Repair Beam (band L16-23, Steady: the Warden's) is a held turret beam that mends friendly ships' parts where it lands, at a
 // big steady draw while it's on; the Point Defence Turret (band L8-15: the Interceptor's, Bulwark's and Freighter's) is a quick
@@ -357,8 +357,8 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
 // The Burst Strafer (the Dancer's, Interceptor's, Blinker's): no cruising thrust at all, only a dodge. A fixed sharp burst
 // (`strafe.ticks`) of `strafe.kick` push per cell out of its facing's opposite side, the next `strafe.cooldown` ticks after
 // one starts (no charges: energy is the limit); while a burst runs it draws `demand` per cell a second (140 a burst for its
-// one cell: several times an engine's energy per push, so dodging as often as it allows browns a circuit out unless banks,
-// batteries and generation back it), from the capacitor bank it touches first. (Kieran 2026-10-31, after playtesting:
+// one cell: several times an engine's energy per push, so dodging as often as it allows browns the ship out unless Drive Cells,
+// batteries and generation back it), from the Drive Cell bank it touches first. (Kieran 2026-10-31, after playtesting:
 // any direction, stronger, short cooldown, energy-limited; was a quarter-second sideways burst with three slow charges.) The Tow Beam (the Salvage Tug's): latches onto
 // a wreck, debris or a pod and pulls it on a tether (tuning.json `tow`), drawing `demand` per cell a second while it tows.
 // Appended last, so no other model's order moves.
@@ -471,7 +471,7 @@ const RECIPES = {
   plating_reactive_armour: { steel_plate: 2, propellant: 1, scrap_electronics: 1 },
   plating_spaced_plating: { titanium_plate: 3, composite_sheet: 1 },
 };
-// (Energy Phase 2: Surge parts)
+// (The Pulse Dynamo, Flash Screen and Rail Driver)
 Object.assign(RECIPES, {
   power_pulse_dynamo: { titanium_plate: 1, coil_winding: 2, capacitor_cell: 1 },
   shield_flash_screen: { steel_plate: 1, copper_wire: 2, shield_emitter: 1, capacitor_cell: 2 },

@@ -180,11 +180,9 @@ export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: 
   b.stepPulses(eid, ship, tick);
   // Weapon roles' own ticks: point defence fires on its own, whatever the trigger (features/support)
   tickWeaponHooks(b, eid, ship, pose, def);
-  for (const { w, aimQ, shot, pierce } of shots) {
+  for (const { w, aimQ, shot } of shots) {
     const d = def(w);
-    // (Surge: a full bank's Rail Driver slug goes through one more ship: surge.ts)
-    const mods0 = ship.blueprint.parts[w.part].mods;
-    const gunMods = pierce ? { ...mods0, add: { ...mods0?.add, pierce: (mods0?.add?.pierce ?? 0) + pierce } } : mods0;
+    const gunMods = ship.blueprint.parts[w.part].mods;
     // Missiles lock on to the target given, or the one nearest the aim point
     let lock = -1;
     if (d.homing) {

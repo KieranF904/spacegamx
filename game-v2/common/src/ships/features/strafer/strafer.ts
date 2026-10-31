@@ -17,16 +17,16 @@
  *   dodgeDir    the way of the current (or last) dodge, ship-local: 1..DODGE_DIRS (0 / absent: never dodged)
  *
  * Energy: while a burst runs, each strafer pushing that way draws its `demand` × how much of its push goes that way,
- * from the capacitor bank it touches first, then its circuit like an engine (energy.ts PowerUse.extra, the flight hook in index.ts). Short of it,
+ * from the Drive Cell bank it touches first, then the ship's Output (energy.ts PowerUse.extra, the flight hook in index.ts). Short of it,
  * the burst pushes that much less; a burst that gets under DODGE_MIN_SHARE on its first tick is refused (the impulse hook, index.ts:
  * the counter goes straight to the end of its cooldown, so it's ready again as soon as the control's let go). Spamming
- * it browns the circuit out unless it has the banks, batteries and generation to back it.
+ * it browns the ship out unless it has the Drive Cells, batteries and generation to back it.
  * Mass matters: the push is a force, so a heavy ship barely moves (index.ts).
  */
 
 import type { ShipDerived } from '../../rebuild.js';
 import type { Vec2 } from '../../types.js';
-import { CHARGE_GROUPS_AT, MAX_CHARGE_GROUPS, coreHeld, storeHeld, type Charge } from '../../energy.js';
+import { CHARGE_GROUPS_AT, FULL_CHARGE, MAX_CHARGE_GROUPS, bankHeld, poolHeld, type Charge } from '../../energy.js';
 
 /** One strafer's push (ship-local force vector, x right, y back; as an engine's thrust: world units of acceleration × mass) */
 export interface StraferPart {
@@ -190,30 +190,22 @@ export function burstEnergy(d: ShipDerived, dir: number): number {
 }
 
 /**
- * Roughly how much of a burst along `dir` the ship could pay for now (0..1, for the HUD): what the banks its strafers
- * touch hold, their circuits' engine pools (and the core's store on the main circuit), and the circuits' spare
- * generation over the burst, against the burst's energy. (The burst itself is settled tick by tick in powerTick.)
+ * Roughly how much of a burst along `dir` the ship could pay for now (0..1, for the HUD): what the Drive Cell banks its
+ * strafers touch hold, the ship's pool, and its spare generation over the burst, against the burst's energy. (The burst
+ * itself is settled tick by tick in powerTick.)
  */
 export function dodgeAffordable(d: ShipDerived, c: Charge | undefined, dir: number): number {
   const L = d.power, s = d.fx?.strafe;
   const need = burstEnergy(d, dir);
   if (!L || !s || !d.energy || need <= EPS) return 1;
-  const ch = c ?? { core: 100, s: [] };
-  const banks = new Set<number>(), circuits = new Set<number>();
+  const ch = c ?? FULL_CHARGE;
+  const banks = new Set<number>();
   for (const p of s.parts) {
     const f = L.feedOf[p.part];
-    if (f < 0) continue;
-    if (L.feeds[f].bank >= 0) banks.add(L.feeds[f].bank);
-    circuits.add(L.feeds[f].circuit);
+    if (f >= 0) for (const b of L.feeds[f].banks) banks.add(b);
   }
-  let have = 0;
-  for (const b of banks) have += storeHeld(d, ch, b);
-  for (const k of circuits) {
-    const ci = L.circuits[k];
-    for (const pool of [ci.pools.g, ci.pools.d]) if (pool >= 0) have += storeHeld(d, ch, pool);
-    if (ci.main) have += coreHeld(d, ch);
-    have += (ci.spare * s.ticks) / 60;
-  }
+  let have = poolHeld(d, ch) + (L.spare * s.ticks) / 60;
+  for (const b of banks) have += bankHeld(d, ch, b);
   return Math.max(0, Math.min(1, have / need));
 }
 

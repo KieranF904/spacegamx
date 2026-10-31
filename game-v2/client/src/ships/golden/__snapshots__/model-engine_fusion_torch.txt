@@ -7,7 +7,6 @@ TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
 Thrust14.4 · boost ×1.7
 Power draw112/s
 Rated speed5,100 m/s (its push fades out near it)
-On Surgekick: boosting, a dash every 0.33 s, paid from the bank
 
 == partStats (stats rows) ==
 GradeMk IV · Large

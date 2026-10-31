@@ -64,7 +64,7 @@ export const feature: PartFeature = {
   applies: (fn) => !!fn.strafe,
   // (After the Tow Beam: feature numbers follow (order, id), and the Tow Beam keeps number 0)
   order: 30,
-  // It draws by the tick, only while a burst runs, and its circuit counts that as an engine's draw
+  // It draws by the tick, only while a burst runs, and Drive Cell banks touching it feed it as they do engines
   burst: 'engine',
   // Each powered strafer pushes away from its facing edge, whichever way that is
   derive(c) {

@@ -8,7 +8,6 @@ import type { Vec2 } from './types.js';
 import type { ShipDerived } from './rebuild.js';
 import type { ShipTuning } from './tuning.js';
 import { capCharge, powerTick, thrustShare, type Charge } from './energy.js';
-import { surgeKick, surgeTuning } from './surge.js';
 import { cargoThrust, cargoTurn } from './load.js';
 import type { FlightCtx } from './features/types.js';
 import type { FlightEntry } from './features/plan.js';
@@ -467,11 +466,11 @@ export function stepFlight(
   let accel = 0;
   let charge = boost.charge;
   let isBoosting = false;
-  // The ship's power, on its local circuits (energy.ts): thrusting, the engines draw on their own circuit first (all of them, as
-  // ever), then the guns and mining lasers (`boost.load`); what's left charges each circuit's stores. (drainRate 0: no accounting,
-  // as for pilotless ships)
+  // The ship's power (energy.ts): thrusting, the engines draw first (their Drive Cell banks, then the ship's Output), then the
+  // guns and mining lasers (`boost.load`) and part features; what's left refills the stores. (drainRate 0: no accounting, as for
+  // pilotless ships)
   const thrusting = mag > 0 && d.mass > 0;
-  let power = 1, canBoost = !!input.boost, kickDv = 0;
+  let power = 1, canBoost = !!input.boost;
   if (boost.drainRate > 0 && d.energy) {
     // A hazard that saps the batteries: they hold only so much
     const cap = k.hazard ? Math.round(100 * k.hazard.cap * 1000) / 1000 : 100;
@@ -480,15 +479,10 @@ export function stepFlight(
     charge = pt.charge;
     c.shares = pt.extra;
     canBoost = pt.boost;
-    // (Each engine pushes on its own circuit's share: a browned-out circuit's engines push that much less)
+    // (Each engine pushes on its own feed group's share: short of power, engines push that much less)
     if (dir) {
       const along = (body.vx * ix + body.vy * iy) / mag;
       power = thrustShare(d, charge, dir, (rated) => ratedFade(rated, along));
-    }
-    // Surge (surge.ts): engines touching a bank kick while boosting, a dash every kickEvery ticks paid from the bank
-    if (dir && canBoost && input.boost && boost.tick !== undefined && boost.tick % surgeTuning(tuning).kickEvery === 0) {
-      const kick = surgeKick(d, charge, dir, tuning);
-      if (kick) { charge = kick.charge; kickDv = kick.dv * cargoThrust(d, cargo) * (k.hazard?.control ?? 1); }
     }
   }
   if (thrusting) {
@@ -500,8 +494,8 @@ export function stepFlight(
       accel *= d.boostFactor ?? k.boostFactor;
       isBoosting = true;
     }
-    body.vx += ix * (accel + kickDv);
-    body.vy += iy * (accel + kickDv);
+    body.vx += ix * accel;
+    body.vy += iy * accel;
   }
 
   // (Part features' pushes, on what power they got: a Burst Strafer's dodge, features/strafer)

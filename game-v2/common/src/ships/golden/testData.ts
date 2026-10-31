@@ -43,7 +43,7 @@ export interface Scenario {
   replayAt?: number[];
   /**
    * Whether a replica (full charge, no tick, control bits only) is expected to need keyframes on this script (energy
-   * limits, Surge kicks, a tow's load arriving, a jump's distance). The exact ticks are pinned in parity.golden.json
+   * limits, a bank running dry, a tow's load arriving, a jump's distance). The exact ticks are pinned in parity.golden.json
    */
   replicaDiverges: boolean;
 }
@@ -59,17 +59,17 @@ export const RIGHT_FLANK = { uid: 60, piece: 'sq', fn: 'engine_burst_strafer', m
 export const LEFT_FLANK = { uid: 61, piece: 'sq', fn: 'engine_burst_strafer', material: 'steel', x: -2, y: 0, rot: 0, flip: false, facing: 'W' };
 export const TOW_BEAM = { uid: 62, piece: 'rect2', fn: 'utility_tow_beam', material: 'steel', x: -1, y: 3, rot: 0, flip: false, facing: 'S' };
 
-/** The surge test ship: two Ion Drives with a capacitor against each (they kick while boosting: surge.ts) */
-function surgeShip(): Blueprint {
+/** The bank test ship: two Afterburners, one with a Drive Cell against it (it boosts on its bank first, the other on the pool: circuits.ts) */
+function driveBankShip(): Blueprint {
   const p = (uid: number, piece: string, fn: string, x: number, y: number, material: string, extra: Partial<PlacedPart> = {}): PlacedPart =>
     ({ uid, piece, fn, material, x, y, rot: 0 as Rot, flip: false, ...extra });
   return {
-    name: 'golden-surge', catalogVersion: 1,
+    name: 'golden-drive-bank', catalogVersion: 1,
     parts: [
       p(0, 'rect2', 'core', 0, 0, 'alloy'), p(1, 'sq', 'cannon_pip', -1, 0, 'alloy', { facing: 'N' }), p(2, 'sq', 'cannon_pip', 2, 0, 'alloy', { facing: 'N' }),
       p(3, 'sq', 'power_cell_reactor', -1, 1, 'alloy'), p(4, 'sq', 'hull', 0, 1, 'alloy'), p(5, 'sq', 'hull', 1, 1, 'alloy'), p(6, 'sq', 'hull', 2, 1, 'alloy'),
-      p(7, 'sq', 'engine_ion_drive', 0, 2, 'alloy', { facing: 'S' }), p(8, 'sq', 'engine_ion_drive', 1, 2, 'alloy', { facing: 'S' }),
-      p(9, 'sq', 'power_capacitor', 2, 2, 'composite'), p(10, 'sq', 'power_capacitor', -1, 2, 'composite'),
+      p(7, 'sq', 'engine_afterburner', 0, 2, 'alloy', { facing: 'S' }), p(8, 'sq', 'engine_afterburner', 1, 2, 'alloy', { facing: 'S' }),
+      p(9, 'sq', 'power_drive_cell', 2, 2, 'steel'),
     ],
   };
 }
@@ -122,7 +122,7 @@ const dodgeEveryWay = (): ScriptTick[] => {
   );
 };
 
-/** One strafer and no bank, dodging as fast as it allows: the circuit browns out and bursts weaken, then get refused */
+/** One strafer and no bank, dodging as fast as it allows: the ship browns out and bursts weaken, then get refused */
 const dodgeTillDry = (): ScriptTick[] => {
   const out: ScriptTick[] = [];
   for (let n = 0; n < 34; n++) for (let i = 0; i < 24; i++) out.push({ keys: { dodge: i < 4, forward: n % 5 === 4 && i >= 12 }, aim: UP + (n % 3) * 0.05 });
@@ -150,9 +150,9 @@ const towScript = (): ScriptTick[] => script(
   [3, { left: true, dodge: true }, -0.4], [40, {}, -0.4],
 );
 
-/** Boosting with Surge-fed engines: a kick every kickEvery ticks */
-const surgeScript = (): ScriptTick[] => script(
-  [90, { forward: true, boost: true }, UP],
+/** Boosting long: the pool runs short (the unbanked engine browns out) while the banked one boosts on, then its bank runs dry */
+const driveBankScript = (): ScriptTick[] => script(
+  [450, { forward: true, boost: true }, UP],
   [30, { forward: true }, (i) => UP + i * 0.03],
   [70, { right: true, boost: true }, 0.4],
   [40, {}, 0.4],
@@ -168,14 +168,14 @@ const jumpScript = (): ScriptTick[] => script(
 export const SCENARIOS: Scenario[] = [
   { name: 'plain-thrust-turn', ship: sparrow, script: flyAbout(), replayAt: [77, 200], replicaDiverges: false },
   { name: 'heavy-cargo', ship: sparrow, script: flyAbout(), cargo: 6, cargoOre: 60, replayAt: [120], replicaDiverges: false },
-  // (The dev ship's circuit browns out by its tenth dodge (tick ~317): from there the server's thrust and pushes are
-  // energy-limited and a replica, on full charge, needs keyframes)
-  { name: 'strafer-every-way', ship: () => blueprint('dev/test-strafer.json'), script: dodgeEveryWay(), replayAt: [12, 40, 200, 330], replicaDiverges: true },
+  // (The dev ship's flank strafers dodge on their Drive Cell banks first: the script never runs it short, so a replica on
+  // full charge flies it as the server does)
+  { name: 'strafer-every-way', ship: () => blueprint('dev/test-strafer.json'), script: dodgeEveryWay(), replayAt: [12, 40, 200, 330], replicaDiverges: false },
   { name: 'strafer-replay', ship: () => withParts(sparrow(), [RIGHT_FLANK, LEFT_FLANK]), script: replayScript(), replayAt: [14, 47, 100], replicaDiverges: false },
   { name: 'strafer-heavy', ship: () => withParts(sparrow(), [RIGHT_FLANK, LEFT_FLANK]), script: replayScript(), cargo: 4, cargoOre: 40, replayAt: [47], replicaDiverges: false },
   { name: 'strafer-energy-short', ship: () => withParts(sparrow(), [RIGHT_FLANK]), script: dodgeTillDry(), replayAt: [501, 700], replicaDiverges: true },
   { name: 'tow', ship: () => withParts(sparrow(), [RIGHT_FLANK, LEFT_FLANK, TOW_BEAM]), script: towScript(), tow: { from: 2, wreckDist: 300 }, replayAt: [125, 200], replicaDiverges: true },
-  { name: 'surge-kick', ship: surgeShip, script: surgeScript(), replayAt: [41, 150], replicaDiverges: true },
+  { name: 'drive-bank-boost', ship: driveBankShip, script: driveBankScript(), replayAt: [41, 150], replicaDiverges: true },
   { name: 'jump-burn', ship: sparrow, script: jumpScript(), replayAt: [95, 150], replicaDiverges: true },
 ];
 
@@ -192,7 +192,7 @@ export function bodyRow(b: FlightBody): number[] {
 export const BODY_FIELDS = ['x', 'y', 'vx', 'vy', 'angle', 'angVel', 'jump', 'jumpScale', 'cargo', 'dodge', 'dodgeDir'] as const;
 
 export function chargeRow(c: Charge): number[] {
-  return [c.core, ...c.s];
+  return [c.g, ...c.b];
 }
 
 /** sha256 of the rows (numbers written exactly), first 16 hex digits */

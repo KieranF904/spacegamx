@@ -10,7 +10,6 @@ Fire rate3.5/s · shells
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 2 clear cells ahead
 Power draw21/s
-On Surgecharged shot: after a 0.5 s pause, a shot hits ×1.5, a packet from the bank
 
 == partStats (stats rows) ==
 GradeMk IV · Large

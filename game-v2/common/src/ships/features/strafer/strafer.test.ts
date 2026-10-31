@@ -30,8 +30,8 @@ const ship = (extra: object[] = []) => {
 const RIGHT_FLANK = { uid: 60, piece: 'sq', fn: 'engine_burst_strafer', material: 'steel', x: 3, y: 0, rot: 0, flip: false, facing: 'E' };
 /** And one on the left flank, nozzle out to the left: it dodges the ship right */
 const LEFT_FLANK = { uid: 61, piece: 'sq', fn: 'engine_burst_strafer', material: 'steel', x: -2, y: 0, rot: 0, flip: false, facing: 'W' };
-/** A capacitor touching the right-flank strafer */
-const CAP = { uid: 62, piece: 'sq', fn: 'power_capacitor', material: 'composite', x: 3, y: -1, rot: 0, flip: false };
+/** A Drive Cell touching the right-flank strafer */
+const CELL = { uid: 62, piece: 'sq', fn: 'power_drive_cell', material: 'steel', x: 3, y: -1, rot: 0, flip: false };
 
 const testStrafer = () => createShipState(catalog, tuning, 1, parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/dev/test-strafer.json'), 'utf-8')), 0).derived;
 
@@ -91,9 +91,9 @@ describe('Burst Strafer: the part', () => {
     expect(strafeForce(s, DODGE_BACK)).toBeCloseTo(strafeForce(s, DODGE_LEFT) * 2, 3);
     expect(strafeForce(s, DODGE_FORWARD)).toBeCloseTo(strafeForce(s, DODGE_LEFT) * 2, 3);
     expect(strafeForce(s, DODGE_RIGHT)).toBeGreaterThan(0);
-    // (Every flank strafer touches a capacitor bank)
+    // (Every flank strafer touches a Drive Cell bank)
     const L = d.power!;
-    expect(s.parts.filter((p) => L.feeds[L.feedOf[p.part]].bank >= 0).length).toBeGreaterThanOrEqual(4);
+    expect(s.parts.filter((p) => L.feeds[L.feedOf[p.part]].banks.length > 0).length).toBeGreaterThanOrEqual(4);
   });
 });
 
@@ -247,8 +247,8 @@ describe('Burst Strafer: flight', () => {
     expect(Math.hypot(fitted.vx, fitted.vy)).toBeLessThanOrEqual(Math.hypot(plain.vx, plain.vy));
   });
 
-  it('a burst costs a lot of energy, and a capacitor bank it touches pays first', () => {
-    const plain = ship([RIGHT_FLANK]).derived, banked = ship([RIGHT_FLANK, CAP]).derived;
+  it('a burst costs a lot of energy, and a Drive Cell bank it touches pays first', () => {
+    const plain = ship([RIGHT_FLANK]).derived, banked = ship([RIGHT_FLANK, CELL]).derived;
     expect(burstEnergy(plain, DODGE_LEFT)).toBeGreaterThan(100);
     expect(burstEnergy(plain, DODGE_RIGHT)).toBe(0);
     // (At an angle, a share of it)
@@ -260,12 +260,11 @@ describe('Burst Strafer: flight', () => {
       return ch.c;
     };
     const a = cost(plain), b = cost(banked);
-    // Without a bank the core's store pays; with one, the bank does and the core's touched less
-    expect(a.core).toBeLessThan(85);
-    expect(b.core).toBeGreaterThan(a.core + 5);
-    const bank = banked.power!.stores.findIndex((s) => s.kind === 'k');
-    expect(bank).toBeGreaterThanOrEqual(0);
-    expect(b.s[bank]).toBeLessThan(100);
+    // Without a bank the pool pays; with one, the bank does and the pool's touched less
+    expect(a.g).toBeLessThan(85);
+    expect(b.g).toBeGreaterThan(a.g + 5);
+    expect(banked.power!.banks[0].kind).toBe('drive');
+    expect(b.b[0]).toBeLessThan(100);
     expect(chargeTotal(plain, a)).toBeLessThan(100);
     expect(dodgeAffordable(plain, FULL_CHARGE, DODGE_LEFT)).toBe(1);
   });
@@ -284,7 +283,7 @@ describe('Burst Strafer: flight', () => {
       kicks.push(before - lateral(b));
       b.vx = b.vy = 0;
     }
-    // The first bursts get their full push; by the end the circuit can't keep up
+    // The first bursts get their full push; by the end the ship can't keep up
     expect(kicks[kicks.length - 1]).toBeLessThan(kicks[0] * 0.75);
     expect(chargeTotal(d, ch.c)).toBeLessThan(30);
     expect(dodgeAffordable(d, ch.c, DODGE_LEFT)).toBeLessThan(1);
@@ -292,7 +291,7 @@ describe('Burst Strafer: flight', () => {
 
   it('a burst that gets almost no energy on its first tick is refused: no push, ready again once let go', () => {
     const d = ship([RIGHT_FLANK]).derived;
-    const empty: Charge = { core: 0, s: d.power!.stores.map(() => 0) };
+    const empty: Charge = { g: 0, b: d.power!.banks.map(() => 0) };
     // (All it has is what the generators make this tick: under a quarter of a burst's draw)
     expect(d.energy!.spare / 60).toBeLessThan(0.25 * (burstEnergy(d, DODGE_LEFT) / d.fx!.strafe!.ticks));
     const b = body();

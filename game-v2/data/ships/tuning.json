@@ -426,11 +426,10 @@
   "energy": {
     "_comment": "Battery: the core holds coreCapacity (energy units: power x seconds); battery parts add store x area x grade output. Boosting multiplies what the engines draw by 1 + boostDraw x their boostDrain (common/src/ships/energy.ts).",
     "coreCapacity": 240,
-    "boostDraw": 2.8,
-    "_circuits": "Local circuits (common/src/ships/circuits.ts, energy.ts): each wire network keeps its own charge. A store gives at most its discharge per cell per second (models.json discharge; legacy batteries: discharge below, by pool), so a circuit asked for more than its spare generation plus that browns out. The core's store gives the main circuit (the one making most power) up to coreDischarge a second, and trickles coreTrickle a second (shared) to every other circuit and to unwired parts.",
+    "boostDraw": 2.2,
+    "_pool": "One ship pool and the banks (common/src/ships/circuits.ts, energy.ts; docs/design/rework-2026-11.md 2.2-2.3): the pool is the core's store plus the batteries on powered networks; it gives at most coreDischarge a second plus each battery's discharge per cell (models.json discharge; legacy batteries: discharge.general). Output = spare generation + that while the pool holds charge; past it the ship browns out. Capacitor and Drive Cell banks give at most their discharge (absent: discharge.bank, discharge.drive) to what they touch.",
     "coreDischarge": 720,
-    "coreTrickle": 12,
-    "discharge": { "general": 600, "drive": 1400, "weapon": 900, "bank": 2000 }
+    "discharge": { "general": 600, "drive": 1400, "bank": 2000 }
   },
   "miner": {
     "range": 700,

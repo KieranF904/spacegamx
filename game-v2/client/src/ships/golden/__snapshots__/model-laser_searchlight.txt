@@ -10,7 +10,6 @@ Pulse77 a pulse · charges in 1.8s · no heat
 MountTurret, 360°
 FittingSide mount (flippable) · Bolts on at its side only
 Power draw12/s
-On Surgecharged shot: after a 0.5 s pause, a shot hits ×1.5, a packet from the bank
 
 == partStats (stats rows) ==
 GradeMk III · Small

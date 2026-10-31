@@ -1,45 +1,43 @@
 /**
- * Ship energy, a tick at a time, on local circuits (circuits.ts works out
- * the layout once a rebuild; docs/design/energy-system.md, Phase 1).
+ * Ship energy, a tick at a time (docs/design/rework-2026-11.md §2.2-2.3;
+ * circuits.ts works out the layout once a rebuild).
  *
- * Each circuit keeps its own charge. Each tick, every circuit:
+ * One ship pool (the core's store plus the batteries on powered networks) and
+ * the banks (touching Capacitors, touching Drive Cells). The ship's Output is
+ * the most it can give a second: its spare generation plus the pool's rate
+ * while the pool holds charge. Each tick:
  *
- *   1. Engines first: the ones pushing the way the pilot asks draw (boosting
- *      draws far more, and needs stored charge). They take their circuit's
- *      spare generator stream, then its drive pool, then its general pool
- *      (the main circuit then the core's store), each store giving no more
- *      than its discharge rate.
- *   2. Then the guns and mining lasers: a gun draws while it reloads (a
- *      shot's energy, spread over its reload), a beam while it burns, a
- *      mining laser while it cuts. They take what's left of the stream, then
- *      the weapon pool, then the general pool (main circuit: then the core).
- *   3. A capacitor bank tops up the consumers it touches, then the core's
- *      trickle tops up what's still short on every other circuit and on parts
- *      on no circuit, shared by what each is short.
- *   4. What a circuit couldn't give, its consumers lack in proportion: a
- *      brownout. Engines push that much less, guns reload that much slower,
- *      beams burn that share of the time. What its stream had left charges
- *      its own stores (and the main circuit's, the core's), the emptiest most.
+ *   1. Engines take what they need first: from the Drive Cell banks they
+ *      touch (fuller bank first, each giving at most its rate), then from the
+ *      Output (the spare stream first, then the pool). Boosting draws far more,
+ *      and needs stored charge.
+ *   2. Guns, beams, mining lasers and part features (a Tow Beam's load, a Burst
+ *      Strafer's burst: PowerUse.extra) draw on the banks they touch first (a
+ *      gun Capacitor banks, a strafer Drive Cell banks), then share what is left
+ *      of the Output equally: short of it, every one gets the same share (a
+ *      brownout: guns reload slower, beams burn that share of the ticks).
+ *   3. What's left of the spare stream refills the stores, emptiest first: the
+ *      pool and every bank that can refill (one with a member on a powered
+ *      network). Then each bank gets what its Pulse Dynamos make.
  *
- * Steady loads (shields, scanners, jump coils) share their circuit's
- * generators at the rebuild, before any of this (rebuild.ts), as before.
+ * Steady loads (shields, scanners, jump coils) share their network's
+ * generators at the rebuild, before any of this (rebuild.ts).
  *
- * Charge travels (and is predicted) as a percentage per store group plus
- * the core's. The same steps run on the server and on the pilot's client.
+ * Charge travels (and is predicted) as the pool's percentage plus one per bank.
+ * The same steps run on the server and on the pilot's client.
  */
 
 import type { ShipDerived } from './rebuild.js';
 import type { ShipTuning } from './tuning.js';
 import type { Vec2 } from './types.js';
-import type { PowerLayout } from './circuits.js';
 import { getPlan } from './features/plan.js';
 
 export interface EnergyInfo {
-  /** Capacity of each kind of store (energy units: power × seconds): general (the core's and batteries), drive (engines only), weapon (guns and lasers only: weapon batteries and capacitor banks) */
+  /** What the pool holds full (the core's store and the batteries'), and what the Drive Cell and Capacitor banks hold */
   max: number;
   driveMax: number;
   weaponMax: number;
-  /** Generator power left after the steady loads (power units: per second), every circuit together */
+  /** Generator power left after the steady loads (power units: per second) */
   spare: number;
   /** Total generator power */
   supply: number;
@@ -51,47 +49,53 @@ export interface EnergyInfo {
 }
 
 /**
- * The charge: the core's store and each store group's (ShipDerived.power.stores
- * order), as percentages of what they hold; a group with no entry is full.
- * `eng` and `gun` are this tick's shares of their power each feed group got
- * (powerTick): never sent, worked out afresh every tick.
+ * The charge: the pool's (`g`) and each bank's (`b`, ShipDerived.power.banks order), as percentages of what they hold;
+ * a bank with no entry is full. `eng` and `gun` are this tick's shares of their power each feed group got (powerTick):
+ * never sent, worked out afresh every tick.
  */
 export interface Charge {
-  core: number;
-  s: number[];
+  g: number;
+  b: number[];
   eng?: number[];
   gun?: number[];
 }
 
-export const FULL_CHARGE: Charge = { core: 100, s: [] };
+export const FULL_CHARGE: Charge = { g: 100, b: [] };
 
 /**
- * The pilot's own snapshot row carries the charge (GameServer, GameState): data[1] the whole ship's (the gauge),
- * data[10] the core's store, data[11] how many store groups follow, and each group's from data[CHARGE_GROUPS_AT]
- * (at most MAX_CHARGE_GROUPS; any past that are taken as full). Hundredths of a percent.
+ * The pilot's own snapshot row carries the charge (SnapshotBuilder, GameState): data[1] the whole ship's (the gauge),
+ * data[10] the pool's, data[11] how many charge groups follow, and each group's from data[CHARGE_GROUPS_AT]: the pool's,
+ * then each bank's (at most MAX_CHARGE_GROUPS in all; banks past that are taken as full). Hundredths of a percent.
  */
 export const CHARGE_GROUPS_AT = 15;
 export const MAX_CHARGE_GROUPS = 24;
+/** What the charge groups mean (in the wire hash: a change of meaning is a protocol bump) */
+export const CHARGE_GROUPS_LAYOUT = 'pool+banks';
 const hundredths = (v: number) => Math.round(pctOf(v) * 100) / 100;
 
-/** The charge's fields for the snapshot row: [core, count, groups] */
-export function packCharge(d: ShipDerived | undefined, c: Charge): { total: number; core: number; groups: number[] } {
-  const n = Math.min(MAX_CHARGE_GROUPS, d?.power?.stores.length ?? 0);
-  return { total: d ? hundredths(chargeTotal(d, c)) : 100, core: hundredths(c.core), groups: Array.from({ length: n }, (_, i) => hundredths(c.s[i] ?? 100)) };
+/** The charge's fields for the snapshot row: the gauge, the pool's, and the groups (the pool's, then each bank's) */
+export function packCharge(d: ShipDerived | undefined, c: Charge): { total: number; g: number; groups: number[] } {
+  const n = Math.min(MAX_CHARGE_GROUPS - 1, d?.power?.banks.length ?? 0);
+  const groups = new Array<number>(n + 1);
+  groups[0] = hundredths(c.g);
+  for (let i = 0; i < n; i++) groups[i + 1] = hundredths(c.b[i] ?? 100);
+  return { total: d ? hundredths(chargeTotal(d, c)) : 100, g: groups[0], groups };
 }
 
 /** The charge a snapshot row says (data as packed above; an old row: full) */
 export function unpackCharge(data: number[] | undefined): Charge {
-  if (!data || data.length <= 11) return { core: 100, s: [] };
+  if (!data || data.length <= 11) return { g: 100, b: [] };
   const n = Math.max(0, Math.min(MAX_CHARGE_GROUPS, data[11] | 0));
-  return { core: data[10] ?? 100, s: data.slice(CHARGE_GROUPS_AT, CHARGE_GROUPS_AT + n).map((v) => (Number.isFinite(v) ? v : 100)) };
+  const fin = (v: number | undefined, dflt: number) => (v !== undefined && Number.isFinite(v) ? v : dflt);
+  if (n === 0) return { g: fin(data[10], 100), b: [] };
+  return { g: fin(data[CHARGE_GROUPS_AT], fin(data[10], 100)), b: data.slice(CHARGE_GROUPS_AT + 1, CHARGE_GROUPS_AT + n).map((v) => fin(v, 100)) };
 }
 /** Mining lasers' old payment segment (ticks): kept for the tick alignment of their pulse */
 export const MINE_SEGMENT = 15;
 /** A mining laser's pulse (ticks): once started it runs to its end, whether or not the button's still held; it just isn't followed by another */
 export const MINE_CYCLE = 54;
 
-export const ENERGY_DEFAULTS = { coreCapacity: 240, boostDraw: 2.8 };
+export const ENERGY_DEFAULTS = { coreCapacity: 240, boostDraw: 2.2 };
 
 /** Each tuning's energy settings, worked out once (this runs for every ship every tick) */
 const energyTunings = new WeakMap<ShipTuning, typeof ENERGY_DEFAULTS>();
@@ -108,60 +112,38 @@ export const BROWNOUT = 0.995;
 const pct = (v: number, max: number) => (max <= 0 ? 100 : Math.round(Math.max(0, Math.min(100, (v / max) * 100)) * 1000) / 1000);
 const pctOf = (v: number | undefined) => (v === undefined || !Number.isFinite(v) ? 100 : Math.max(0, Math.min(100, v)));
 
-/** Energy held in a store group, and in the core */
-export function storeHeld(d: ShipDerived, c: Charge, s: number): number {
-  const g = d.power?.stores[s];
-  return g ? (g.cap * pctOf(c.s[s])) / 100 : 0;
+/** Energy held in the pool, and in a bank */
+export function poolHeld(d: ShipDerived, c: Charge): number {
+  return d.power ? (d.power.pool.cap * pctOf(c.g)) / 100 : 0;
 }
-export function coreHeld(d: ShipDerived, c: Charge): number {
-  return d.power?.core ? (d.power.core.cap * pctOf(c.core)) / 100 : 0;
+export function bankHeld(d: ShipDerived, c: Charge, b: number): number {
+  const B = d.power?.banks[b];
+  return B ? (B.cap * pctOf(c.b[b])) / 100 : 0;
 }
 
 /** All the ship's stored energy as one percentage (the HUD's gauge) */
 export function chargeTotal(d: ShipDerived, c: Charge): number {
   const L = d.power;
   if (!L) return 100;
-  let held = coreHeld(d, c), max = L.core?.cap ?? 0;
-  L.stores.forEach((g, s) => { held += storeHeld(d, c, s); max += g.cap; });
+  let held = poolHeld(d, c), max = L.pool.cap;
+  for (let b = 0; b < L.banks.length; b++) { held += bankHeld(d, c, b); max += L.banks[b].cap; }
   return max <= 0 ? 0 : Math.round((held / max) * 1000) / 10;
 }
 
-/** Stored energy the engines (or the guns) can reach anywhere on the ship */
-export function storedFor(d: ShipDerived, c: Charge, use: 'drive' | 'weapon'): number {
-  const L = d.power;
-  if (!L) return 0;
-  let h = coreHeld(d, c);
-  L.stores.forEach((g, s) => { if (g.kind === 'g' || g.kind === 'k' || g.kind === (use === 'drive' ? 'd' : 'w')) h += storeHeld(d, c, s); });
-  return h;
-}
-
-/**
- * Each Steady circuit's charge (its pools together) as a percentage and what it holds full, then each Surge bank's
- * (`bank`: its store index, letter its label S1...), then the core's (letter 'core', circuit -1)
- */
-export function circuitCharges(d: ShipDerived, c: Charge): { circuit: number; letter: string; pct: number; cap: number; main: boolean; bank?: number }[] {
+/** The pool's charge and each bank's (Charge.b order), as percentages, with what each holds full: for the HUD and hangar */
+export function bankCharges(d: ShipDerived, c: Charge): { bank: number; kind: 'pool' | 'cap' | 'drive'; pct: number; cap: number }[] {
   const L = d.power;
   if (!L) return [];
-  const out: { circuit: number; letter: string; pct: number; cap: number; main: boolean; bank?: number }[] = [];
-  L.circuits.forEach((ci, k) => {
-    const groups = [ci.pools.g, ci.pools.d, ci.pools.w].filter((s) => s >= 0);
-    const cap = groups.reduce((t, s) => t + L.stores[s].cap, 0);
-    if (!ci.letter && !cap) return;
-    const held = groups.reduce((t, s) => t + storeHeld(d, c, s), 0);
-    out.push({ circuit: k, letter: ci.letter || '·', pct: cap > 0 ? (held / cap) * 100 : 0, cap, main: ci.main });
-  });
-  L.stores.forEach((g, s) => {
-    if (g.kind === 'k' && g.cap > 0) out.push({ circuit: g.circuit, letter: g.label ?? 'S', pct: pctOf(c.s[s]), cap: g.cap, main: false, bank: s });
-  });
-  if (L.core) out.push({ circuit: -1, letter: 'core', pct: pctOf(c.core), cap: L.core.cap, main: false });
+  const out: { bank: number; kind: 'pool' | 'cap' | 'drive'; pct: number; cap: number }[] = [{ bank: -1, kind: 'pool', pct: pctOf(c.g), cap: L.pool.cap }];
+  L.banks.forEach((B, b) => out.push({ bank: b, kind: B.kind, pct: pctOf(c.b[b]), cap: B.cap }));
   return out;
 }
 
 /** The charge with every store held to at most `cap` percent (a hazard that saps the batteries) */
 export function capCharge(d: ShipDerived, c: Charge, cap: number): Charge {
   if (cap >= 100) return c;
-  const n = d.power?.stores.length ?? 0;
-  return { core: Math.min(pctOf(c.core), cap), s: Array.from({ length: n }, (_, i) => Math.min(pctOf(c.s[i]), cap)) };
+  const n = d.power?.banks.length ?? 0;
+  return { g: Math.min(pctOf(c.g), cap), b: Array.from({ length: n }, (_, i) => Math.min(pctOf(c.b[i]), cap)) };
 }
 
 export interface PowerUse {
@@ -174,7 +156,7 @@ export interface PowerUse {
   load?: ArrayLike<number>;
   /**
    * Part features' burst draws this tick, by feature number (features/plan.ts), each per feed group (per second): each
-   * takes from the bank it touches first, then asks its circuit as an engine (a Burst Strafer's dodge: features/strafer).
+   * takes from the banks feeding it first, then shares the Output with the guns (a Burst Strafer's dodge: features/strafer).
    * In feature order; undefined entries ask nothing.
    */
   extra?: readonly (ArrayLike<number> | undefined)[];
@@ -216,8 +198,21 @@ export function gunLoad(ship: GunLoadShip, tick: number): number[] | undefined {
   return out;
 }
 
+// ---- Scratch for powerTick (one ship at a time, never re-entered): grown as needed, so a tick allocates only its result
+let sHeld = new Float64Array(8), sAllow = new Float64Array(8), sAsk = new Float64Array(8), sOrder = new Int32Array(8);
+let sEngW = new Float64Array(8), sEngG = new Float64Array(8), sGunW = new Float64Array(8), sGunG = new Float64Array(8);
+let sRem = new Float64Array(8), sPick = new Int32Array(8), sUsed = new Int32Array(8);
+function grow(nB: number, nF: number): void {
+  if (sHeld.length < nB + 1) { const m = Math.max(nB + 1, sHeld.length * 2); sHeld = new Float64Array(m); sAllow = new Float64Array(m); sAsk = new Float64Array(m); sOrder = new Int32Array(m); }
+  if (sEngW.length < nF) {
+    const m = Math.max(nF, sEngW.length * 2);
+    sEngW = new Float64Array(m); sEngG = new Float64Array(m); sGunW = new Float64Array(m); sGunG = new Float64Array(m);
+    sRem = new Float64Array(m); sPick = new Int32Array(m); sUsed = new Int32Array(m);
+  }
+}
+
 /**
- * One tick of the ship's power (steps 1 to 4 above). Returns the new charge
+ * One tick of the ship's power (steps 1 to 3 above). Returns the new charge
  * (with each feed group's share this tick: `eng`, `gun`), the engines' share
  * all together, and whether a boost was possible (it needs stored charge).
  */
@@ -225,174 +220,145 @@ export function powerTick(d: ShipDerived, c: Charge, use: PowerUse, tuning: Ship
   const L = d.power;
   if (!L || !d.energy) return { charge: c, power: 1, boost: use.boosting };
   const et = energyTuning(tuning);
-  const S = L.stores, F = L.feeds, C = L.circuits;
-  const nS = S.length, nF = F.length, nC = C.length;
-  const held = new Float64Array(nS), allow = new Float64Array(nS);
-  for (let s = 0; s < nS; s++) { held[s] = (S[s].cap * pctOf(c.s[s])) / 100; allow[s] = Math.min(held[s], S[s].rate / 60); }
-  const core = L.core;
-  let coreLeft = core ? (core.cap * pctOf(c.core)) / 100 : 0;
-  const coreFull = coreLeft;
-  let coreMain = core ? core.rate / 60 : 0, coreTrickle = core ? core.trickle / 60 : 0;
+  const B = L.banks, F = L.feeds;
+  const nB = B.length, nF = F.length;
+  grow(nB, nF);
+  const held = sHeld, allow = sAllow;
+  for (let b = 0; b < nB; b++) { held[b] = (B[b].cap * pctOf(c.b[b])) / 100; allow[b] = Math.min(held[b], B[b].rate / 60); }
+  const P = L.pool;
+  let pool = (P.cap * pctOf(c.g)) / 100;
+  const poolStart = pool;
+  let poolAllow = Math.min(pool, P.rate / 60);
+  let stream = L.spare / 60;
 
-  // Boosting needs charge stored somewhere
-  let stored = coreLeft;
-  for (let s = 0; s < nS; s++) if (S[s].kind !== 'w') stored += held[s];
+  // Boosting needs charge stored for the engines: the pool's, or a Drive Cell bank's
+  let stored = pool;
+  for (let b = 0; b < nB; b++) if (B[b].kind === 'drive') stored += held[b];
   const boost = use.boosting && use.thrusting && stored > 0;
   const mult = boost ? 1 + et.boostDraw * (d.boostDrain ?? 1) : 1;
 
-  // What each feed group asks for this tick
-  const engWant = new Float64Array(nF), gunWant = new Float64Array(nF);
+  // What each feed group asks for this tick: engines (step 1), and guns, mining lasers and part features (step 2)
+  const engW = sEngW, engG = sEngG, gunW = sGunW, gunG = sGunG;
+  for (let f = 0; f < nF; f++) { engW[f] = 0; engG[f] = 0; gunW[f] = 0; gunG[f] = 0; }
   if (use.thrusting) {
     for (const t of d.thrusters) {
       const f = L.feedOf[t.part];
       if (f < 0 || (!t.force[0] && !t.force[1])) continue;
       if (use.dir && t.force[0] * use.dir[0] + t.force[1] * use.dir[1] <= 1e-9) continue;
-      engWant[f] += (L.draw[t.part] * mult) / 60;
+      engW[f] += (L.draw[t.part] * mult) / 60;
     }
   }
-  if (use.load) for (let f = 0; f < nF; f++) gunWant[f] = Math.max(0, use.load[f] ?? 0) / 60;
-  const engGot = new Float64Array(nF), gunGot = new Float64Array(nF);
-  const cE = new Float64Array(nC), cG = new Float64Array(nC);
-  for (let f = 0; f < nF; f++) { cE[F[f].circuit] += engWant[f]; cG[F[f].circuit] += gunWant[f]; }
-
-  const take = (s: number, want: number): number => {
-    if (s < 0 || want <= 1e-15) return 0;
-    const t = Math.min(want, allow[s]);
-    allow[s] -= t; held[s] -= t;
-    return t;
-  };
-  // The main circuit's general pool and the core's store are one general store: they give together, each by what it holds
-  // (so they run dry together, as one pool did), each no more than its own rate
-  const takeGeneral = (s: number, want: number, main: boolean): number => {
-    if (!main || !core) return take(s, want);
-    if (want <= 1e-15) return 0;
-    const a = s >= 0 ? allow[s] : 0, b = Math.max(0, Math.min(coreLeft, coreMain));
-    const t = Math.min(want, a + b);
-    if (t <= 0) return 0;
-    const hg = s >= 0 ? held[s] : 0, hc = coreLeft;
-    let fromG = hg + hc > 0 ? Math.min(a, (t * hg) / (hg + hc)) : 0;
-    const fromC = Math.min(b, t - fromG);
-    fromG = Math.min(a, t - fromC);
-    return take(s, fromG) + takeCore(fromC, true);
-  };
-  const takeCore = (want: number, main: boolean): number => {
-    if (!core || want <= 1e-15) return 0;
-    const t = Math.min(want, coreLeft, main ? coreMain : coreTrickle);
-    if (t <= 0) return 0;
-    if (main) coreMain -= t; else coreTrickle -= t;
-    coreLeft -= t;
-    return t;
-  };
-
-  // ---- Part features' burst draws (use.extra: a Burst Strafer's dodge): each takes from the bank it touches first, then asks
-  // its circuit as an engine
+  if (use.load) for (let f = 0; f < nF; f++) gunW[f] = Math.max(0, use.load[f] ?? 0) / 60;
   const X = use.extra;
-  let xRest: (Float64Array | undefined)[] | undefined, xWant: number[] | undefined, xBank: number[] | undefined;
+  let anyExtra = false;
   if (X) for (let x = 0; x < X.length; x++) {
     const ask = X[x];
     if (!ask) continue;
-    if (!xRest) { xRest = []; xWant = []; xBank = []; }
-    const rest = (xRest[x] = new Float64Array(nF));
-    let want = 0, bank = 0;
-    for (let f = 0; f < nF; f++) {
-      const w = Math.max(0, ask[f] ?? 0) / 60;
-      if (w <= 1e-15) continue;
-      want += w;
-      const b = F[f].bank >= 0 ? take(F[f].bank, w) : 0;
-      bank += b;
-      rest[f] = w - b; engWant[f] += w - b; cE[F[f].circuit] += w - b;
-    }
-    xWant![x] = want; xBank![x] = bank;
+    for (let f = 0; f < nF; f++) { const w = Math.max(0, ask[f] ?? 0) / 60; if (w > 1e-15) { gunW[f] += w; anyExtra = true; } }
   }
-  // ---- (end part features' burst draws)
 
-  // 1-2. Each circuit: engines, then guns and mining lasers, from its stream, then its pools (and the core, on the main one)
-  const stream = new Float64Array(nC);
-  for (let k = 0; k < nC; k++) {
-    const ci = C[k];
-    stream[k] = ci.spare / 60;
-    let e = 0;
-    if (cE[k] > 0) {
-      const fs = Math.min(stream[k], cE[k]);
-      stream[k] -= fs; e += fs;
-      e += take(ci.pools.d, cE[k] - e);
-      e += takeGeneral(ci.pools.g, cE[k] - e, ci.main);
+  /** One step: each group's want from its banks first (fuller bank first, a bank short of what's asked shared by what each asks), then the Output, shared equally */
+  const serve = (want: Float64Array, got: Float64Array) => {
+    const rem = sRem, pick = sPick, used = sUsed, ask = sAsk;
+    let maxBanks = 0;
+    for (let f = 0; f < nF; f++) { rem[f] = want[f]; used[f] = 0; if (F[f].banks.length > maxBanks) maxBanks = F[f].banks.length; }
+    for (let r = 0; r < maxBanks; r++) {
+      for (let b = 0; b < nB; b++) ask[b] = 0;
+      let any = false;
+      for (let f = 0; f < nF; f++) {
+        pick[f] = -1;
+        if (rem[f] <= 1e-15) continue;
+        const fb = F[f].banks;
+        let best = -1, bestPct = -1;
+        for (let j = 0; j < fb.length; j++) {
+          if (used[f] & (1 << j)) continue;
+          const b = fb[j], p = B[b].cap > 0 ? held[b] / B[b].cap : 0;
+          if (p > bestPct) { bestPct = p; best = j; }
+        }
+        if (best < 0) continue;
+        used[f] |= 1 << best;
+        pick[f] = fb[best];
+        ask[fb[best]] += rem[f];
+        any = true;
+      }
+      if (!any) break;
+      for (let f = 0; f < nF; f++) {
+        const b = pick[f];
+        if (b < 0) continue;
+        const t = rem[f] * Math.min(1, ask[b] > 0 ? allow[b] / ask[b] : 0);
+        rem[f] -= t; got[f] += t;
+      }
+      for (let b = 0; b < nB; b++) if (ask[b] > 0) { const t = Math.min(allow[b], ask[b]); allow[b] -= t; held[b] -= t; }
     }
-    let g = 0;
-    if (cG[k] > 0) {
-      const fs = Math.min(stream[k], cG[k]);
-      stream[k] -= fs; g += fs;
-      g += take(ci.pools.w, cG[k] - g);
-      g += takeGeneral(ci.pools.g, cG[k] - g, ci.main);
-    }
-    cE[k] = cE[k] > 0 ? e / cE[k] : 1;
-    cG[k] = cG[k] > 0 ? g / cG[k] : 1;
-  }
-  for (let f = 0; f < nF; f++) { engGot[f] = engWant[f] * cE[F[f].circuit]; gunGot[f] = gunWant[f] * cG[F[f].circuit]; }
-
-  // 3. Banks top up what they touch (engines first), shared by what each is short; then the core's trickle, the same
-  const topUp = (want: Float64Array, got: Float64Array, eligible: (f: number) => boolean, give: (short: number) => number) => {
-    let short = 0;
-    for (let f = 0; f < nF; f++) if (eligible(f)) short += Math.max(0, want[f] - got[f]);
-    if (short <= 1e-15) return;
-    const k = give(short) / short;
-    if (k > 0) for (let f = 0; f < nF; f++) if (eligible(f)) got[f] += Math.max(0, want[f] - got[f]) * k;
+    let R = 0;
+    for (let f = 0; f < nF; f++) R += rem[f];
+    if (R <= 1e-15) return;
+    const give = Math.min(R, stream + poolAllow);
+    const fromStream = Math.min(stream, give);
+    stream -= fromStream;
+    const fromPool = give - fromStream;
+    poolAllow -= fromPool; pool -= fromPool;
+    const k = give / R;
+    for (let f = 0; f < nF; f++) got[f] += rem[f] * k;
   };
-  // (A bank's Pulse Dynamos stream Surge into what it touches first, then the bank gives: surge.ts)
-  const surge = new Float64Array(nS);
-  for (let s = 0; s < nS; s++) surge[s] = (S[s].surge ?? 0) / 60;
-  const fromBank = (s: number, short: number) => { const a = Math.min(surge[s], short); surge[s] -= a; return a + take(s, short - a); };
-  for (let s = 0; s < nS; s++) {
-    if (S[s].kind !== 'k') continue;
-    topUp(engWant, engGot, (f) => F[f].bank === s, (short) => fromBank(s, short));
-    topUp(gunWant, gunGot, (f) => F[f].bank === s, (short) => fromBank(s, short));
-  }
-  if (core) {
-    const off = (f: number) => !C[F[f].circuit].main;
-    topUp(engWant, engGot, off, (short) => takeCore(short, false));
-    topUp(gunWant, gunGot, off, (short) => takeCore(short, false));
-  }
+  serve(engW, engG);
+  serve(gunW, gunG);
 
-  // 4. Shares (nothing asked: whether anything could be given at all), then the stream left charges each circuit's stores
+  // 3. The stream left refills the pool and the banks that can refill, emptiest first (all brought up to one level)
+  if (stream > 1e-15) {
+    const order = sOrder;
+    let m = 0;
+    const pctAt = (s: number) => (s === nB ? (P.cap > 0 ? pool / P.cap : 1) : B[s].cap > 0 ? held[s] / B[s].cap : 1);
+    const capAt = (s: number) => (s === nB ? P.cap : B[s].cap);
+    for (let s = 0; s <= nB; s++) {
+      if (capAt(s) <= 0 || (s < nB && !B[s].refills)) continue;
+      // (insertion sort by charge, emptiest first)
+      const p = pctAt(s);
+      let j = m++;
+      while (j > 0 && pctAt(order[j - 1]) > p) { order[j] = order[j - 1]; j--; }
+      order[j] = s;
+    }
+    let left = stream, k = 0, capSum = 0, level = m ? pctAt(order[0]) : 1;
+    while (left > 1e-15 && m > 0) {
+      while (k < m && pctAt(order[k]) <= level + 1e-12) capSum += capAt(order[k++]);
+      const next = k < m ? Math.min(1, pctAt(order[k])) : 1;
+      const need = (next - level) * capSum;
+      if (need >= left) { level += left / capSum; left = 0; break; }
+      left -= need; level = next;
+      if (level >= 1 && k >= m) break;
+    }
+    for (let j = 0; j < k; j++) {
+      const s = order[j];
+      if (s === nB) pool = Math.max(pool, level * P.cap); else held[s] = Math.max(held[s], level * B[s].cap);
+    }
+  }
+  // (Then each bank's Pulse Dynamos)
+  for (let b = 0; b < nB; b++) if (B[b].dynamo > 0) held[b] = Math.min(B[b].cap, held[b] + B[b].dynamo / 60);
+
+  // Shares (nothing asked: whether anything could be given at all)
   const eng = new Array<number>(nF), gun = new Array<number>(nF);
   let wantAll = 0, gotAll = 0;
   for (let f = 0; f < nF; f++) {
-    const ci = C[F[f].circuit], b = F[f].bank;
-    const reach = (pool: number) => ci.spare > 0 || (pool >= 0 && S[pool].cap > 0 && pctOf(c.s[pool]) > 0) || (ci.pools.g >= 0 && pctOf(c.s[ci.pools.g]) > 0)
-      || (b >= 0 && (pctOf(c.s[b]) > 0 || (S[b].surge ?? 0) > 0)) || (!!core && coreFull > 0 && (ci.main || core.trickle > 0));
-    eng[f] = engWant[f] > 1e-15 ? Math.min(1, engGot[f] / engWant[f]) : reach(ci.pools.d) ? 1 : 0;
-    gun[f] = gunWant[f] > 1e-15 ? Math.min(1, gunGot[f] / gunWant[f]) : reach(ci.pools.w) ? 1 : 0;
-    wantAll += engWant[f]; gotAll += engGot[f];
+    let reach = L.spare > 0 || poolStart > 0;
+    if (!reach) for (const b of F[f].banks) if (pctOf(c.b[b]) > 0 || B[b].dynamo > 0) { reach = true; break; }
+    eng[f] = engW[f] > 1e-15 ? Math.min(1, engG[f] / engW[f]) : reach ? 1 : 0;
+    gun[f] = gunW[f] > 1e-15 ? Math.min(1, gunG[f] / gunW[f]) : reach ? 1 : 0;
+    wantAll += engW[f]; gotAll += engG[f];
   }
-  for (let k = 0; k < nC; k++) {
-    const left = stream[k];
-    if (left <= 1e-15) continue;
-    const ci = C[k];
-    const groups = [ci.pools.g, ci.pools.d, ci.pools.w, ...ci.banks].filter((s) => s >= 0);
-    let room = 0;
-    for (const s of groups) room += Math.max(0, S[s].cap - held[s]);
-    const coreRoom = ci.main && core ? Math.max(0, core.cap - coreLeft) : 0;
-    room += coreRoom;
-    if (room <= 0) continue;
-    const kk = Math.min(1, left / room);
-    for (const s of groups) held[s] += Math.max(0, S[s].cap - held[s]) * kk;
-    coreLeft += coreRoom * kk;
-  }
-  // (What the Pulse Dynamos had left charges their own bank)
-  for (let i = 0; i < nS; i++) if (surge[i] > 0) held[i] = Math.min(S[i].cap, held[i] + surge[i]);
-  const s = new Array<number>(nS);
-  for (let i = 0; i < nS; i++) s[i] = pct(held[i], S[i].cap);
-  // (A feature's burst share: what its bank gave, and the rest at its feed group's engine share)
+  const s = new Array<number>(nB);
+  for (let b = 0; b < nB; b++) s[b] = pct(held[b], B[b].cap);
+  // (A feature's burst share: what it asked of each feed group, at that group's share)
   let extra: (number | undefined)[] | undefined;
-  if (xRest) for (let x = 0; x < xRest.length; x++) {
-    const rest = xRest[x];
-    if (!rest || xWant![x] <= 1e-15) continue;
-    let got = xBank![x];
-    for (let f = 0; f < nF; f++) got += rest[f] * eng[f];
-    (extra ??= [])[x] = Math.min(1, got / xWant![x]);
+  if (X && anyExtra) for (let x = 0; x < X.length; x++) {
+    const ask = X[x];
+    if (!ask) continue;
+    let want = 0, got = 0;
+    for (let f = 0; f < nF; f++) { const w = Math.max(0, ask[f] ?? 0); if (w > 0) { want += w; got += w * gun[f]; } }
+    if (want <= 1e-12) continue;
+    (extra ??= [])[x] = Math.min(1, got / want);
   }
   return {
-    charge: { core: core ? pct(coreLeft, core.cap) : 100, s, eng, gun },
+    charge: { g: pct(pool, P.cap), b: s, eng, gun },
     power: wantAll > 1e-15 ? Math.min(1, gotAll / wantAll) : 1,
     boost,
     ...(extra ? { extra } : {}),
@@ -408,7 +374,7 @@ export function feedShare(d: ShipDerived, c: Charge | undefined, part: number, u
 
 /**
  * The share of their push the engines pushing along `dir` (ship-local) get,
- * each on its own circuit's share (the core's maneuvering is its own, never
+ * each on its own feed group's share (the core's maneuvering is its own, never
  * short): what flight scales the thrust by
  */
 export function thrustShare(d: ShipDerived, c: Charge, dir: Vec2, fade: (rated: number | undefined) => number): number {
@@ -428,30 +394,34 @@ export function thrustShare(d: ShipDerived, c: Charge, dir: Vec2, fade: (rated: 
 }
 
 /**
- * The same charge on a ship rebuilt (a part lost or mended, the circuits
- * split or joined): each store keeps what it held, so a split circuit's
- * halves each keep their share and joined ones pool theirs; a store that
- * wasn't on the ship before (mended) comes back empty
+ * The same charge on a ship rebuilt (a part lost or mended, a bank split or
+ * joined): each store keeps what it held, so a split bank's halves each keep
+ * their share and joined ones pool theirs; a store that wasn't on the ship
+ * before (mended, or newly on a powered network) comes back empty
  */
 export function remapCharge(before: ShipDerived, after: ShipDerived, c: Charge): Charge {
   const A = before.power, B = after.power;
   if (!B) return c;
-  if (!A) return { core: pctOf(c.core), s: B.stores.map(() => 100) };
+  if (!A) return { g: pctOf(c.g), b: B.banks.map(() => 100) };
+  const g = pctOf(c.g);
+  // The pool: the core's store and the batteries that were in it keep theirs
+  let cap = B.pool.coreCap, held = A.pool.coreCap > 0 ? (B.pool.coreCap * g) / 100 : 0;
+  for (const i of B.pool.parts) { cap += B.partCap[i]; if (A.pooled[i]) held += (B.partCap[i] * g) / 100; }
   const partPct = new Map<number, number>();
-  A.stores.forEach((g, s) => { for (const i of g.parts) partPct.set(i, pctOf(c.s[s])); });
-  const s = B.stores.map((g) => {
-    let cap = 0, held = 0;
-    for (const i of g.parts) { const k = B.partCap[i]; cap += k; held += (k * (partPct.get(i) ?? 0)) / 100; }
-    return cap > 0 ? Math.round((held / cap) * 100 * 1000) / 1000 : 100;
+  A.banks.forEach((bk, b) => { for (const i of bk.parts) partPct.set(i, pctOf(c.b[b])); });
+  const b = B.banks.map((bk) => {
+    let bc = 0, bh = 0;
+    for (const i of bk.parts) { const k = B.partCap[i]; bc += k; bh += (k * (partPct.get(i) ?? 0)) / 100; }
+    return bc > 0 ? Math.round((bh / bc) * 100 * 1000) / 1000 : 100;
   });
-  return { core: B.core ? (A.core ? pctOf(c.core) : 0) : 100, s };
+  return { g: cap > 0 ? Math.round((held / cap) * 100 * 1000) / 1000 : 100, b };
 }
 
 /**
  * Mining lasers, one tick: a pulse (MINE_CYCLE ticks) runs to its end once
- * started, drawing on its circuit as it goes (gunLoad); none starts, and one
- * running stops, while their circuit can give them nothing. Returns whether
- * the beams are on this tick; `ship.mineUntil` is updated.
+ * started, drawing on the ship as it goes (gunLoad); none starts, and one
+ * running stops, while the ship can give them nothing. Returns whether the
+ * beams are on this tick; `ship.mineUntil` is updated.
  */
 export function payMining(ship: { derived: ShipDerived; minePaid?: number; mineUntil?: number }, on: boolean, tick: number, c: { charge: Charge }): boolean {
   const miners = ship.derived.miners;
@@ -466,8 +436,14 @@ export function payMining(ship: { derived: ShipDerived; minePaid?: number; mineU
 }
 
 export interface LoadTestResult {
-  /** Per circuit (power.circuits order): the lowest share its engines and its guns got, when its first brownout came (s, -1 never), and its charge at the end (%) */
-  circuits: { letter: string; engines: number; guns: number; brownAt: number; end: number; refill: number }[];
+  /** The lowest share the engines and the guns got, when the first brownout came (s, -1 never), the pool's charge at the end (%) and how long it takes to refill idle (s, Infinity never) */
+  engines: number;
+  guns: number;
+  brownAt: number;
+  end: number;
+  refill: number;
+  /** Each bank's charge at the end (%) */
+  banks: number[];
   /** Per part: the lowest share it got (burst consumers only; 1 elsewhere) */
   part: number[];
   seconds: number;
@@ -476,55 +452,44 @@ export interface LoadTestResult {
 /**
  * The hangar's load test: `seconds` of every gun firing flat out (reloading
  * all the time) and the engines thrusting forward (boosting if asked), from
- * full, the ship's own power code tick by tick. Then how long each circuit
- * takes to fill again, idle (s, Infinity never).
+ * full, the ship's own power code tick by tick. Then how long the ship takes
+ * to fill again, idle (s, Infinity never).
  */
 export function loadTest(d: ShipDerived, tuning: ShipTuning, opts: { fire: boolean; thrust: boolean; boost: boolean; seconds: number; from?: Charge }): LoadTestResult {
   const L = d.power;
   const ticks = Math.round(opts.seconds * 60);
   const part = d.alive.map(() => 1);
-  if (!L) return { circuits: [], part, seconds: opts.seconds };
+  if (!L) return { engines: 1, guns: 1, brownAt: -1, end: 100, refill: 0, banks: [], part, seconds: opts.seconds };
   const load = opts.fire ? (() => {
     const out = new Array<number>(L.feeds.length).fill(0);
     for (const w of d.weapons) { const f = L.feedOf[w.part]; if (f >= 0) out[f] += L.draw[w.part]; }
     return out;
   })() : undefined;
-  const engines = L.circuits.map(() => 1), guns = L.circuits.map(() => 1), brownAt = L.circuits.map(() => -1);
+  let engines = 1, guns = 1, brownAt = -1;
+  const isEngine = d.alive.map((_, i) => d.thrusters.some((x) => x.part === i && (x.force[0] || x.force[1])));
   let c: Charge = opts.from ?? FULL_CHARGE;
   for (let t = 0; t < ticks; t++) {
-    const r = powerTick(d, c, { thrusting: opts.thrust, boosting: opts.boost, load }, tuning);
-    c = r.charge;
-    L.feeds.forEach((f, k) => {
-      const ci = f.circuit;
+    c = powerTick(d, c, { thrusting: opts.thrust, boosting: opts.boost, load }, tuning).charge;
+    for (let k = 0; k < L.feeds.length; k++) {
       const e = c.eng![k], g = c.gun![k];
-      if (e < engines[ci]) engines[ci] = e;
-      if (g < guns[ci]) guns[ci] = g;
-      if ((e < BROWNOUT || g < BROWNOUT) && brownAt[ci] < 0) brownAt[ci] = t / 60;
-    });
+      if (e < engines) engines = e;
+      if (g < guns) guns = g;
+      if ((e < BROWNOUT || g < BROWNOUT) && brownAt < 0) brownAt = t / 60;
+    }
     for (let i = 0; i < part.length; i++) {
       const f = L.feedOf[i];
       if (f < 0) continue;
-      const isEngine = d.thrusters.some((x) => x.part === i && (x.force[0] || x.force[1]));
-      const v = isEngine ? (opts.thrust ? c.eng![f] : 1) : opts.fire ? c.gun![f] : 1;
+      const v = isEngine[i] ? (opts.thrust ? c.eng![f] : 1) : opts.fire ? c.gun![f] : 1;
       if (v < part[i]) part[i] = v;
     }
   }
-  const after = c;
-  const end = circuitCharges(d, after);
-  // Refill: idle ticks until each circuit's stores are full again (up to two minutes)
-  // (a circuit counts as full once its own pools and the banks it charges are: one with no stores has nothing to refill)
-  const full = (cc: ReturnType<typeof circuitCharges>, k: number) => cc.filter((x) => x.circuit === k && x.cap > 0).every((x) => x.pct >= 99.5);
-  const refill = L.circuits.map(() => Infinity);
-  let idle = after;
+  const end = pctOf(c.g), banks = L.banks.map((_, b) => pctOf(c.b[b]));
+  // Refill: idle ticks until the pool and every bank that can refill are full again (up to two minutes)
+  const full = (x: Charge) => (L.pool.cap <= 0 || pctOf(x.g) >= 99.5) && L.banks.every((B, b) => !(B.refills || B.dynamo > 0) || B.cap <= 0 || pctOf(x.b[b]) >= 99.5);
+  let refill = Infinity, idle = c;
   for (let t = 0; t <= 7200; t++) {
-    const cc = circuitCharges(d, idle);
-    for (let k = 0; k < refill.length; k++) if (refill[k] === Infinity && full(cc, k)) refill[k] = t / 60;
-    if (refill.every((v) => v !== Infinity)) break;
+    if (full(idle)) { refill = t / 60; break; }
     idle = powerTick(d, idle, { thrusting: false, boosting: false }, tuning).charge;
   }
-  return {
-    circuits: L.circuits.map((ci, k) => ({ letter: ci.letter, engines: engines[k], guns: guns[k], brownAt: brownAt[k], end: end.find((x) => x.circuit === k && x.bank === undefined)?.pct ?? 100, refill: refill[k] })),
-    part,
-    seconds: opts.seconds,
-  };
+  return { engines, guns, brownAt, end, refill, banks, part, seconds: opts.seconds };
 }
