@@ -10,6 +10,7 @@
     "dev": "tsx watch src/index.ts"
   },
   "dependencies": {
+    "pg": "^8.23.1",
     "ws": "^8.16.0"
   },
   "devDependencies": {

@@ -10,11 +10,9 @@
  *
  * Uses node-postgres (pg) via a small connection pool. Enable by setting
  * DATABASE_URL and USER_STORE_BACKEND=postgres in createUserStore().
- * NOTE: 'pg' is intentionally NOT in package.json dependencies yet. On the VPS, in server-browser/ (the lobby)
- * and in server/ (the game server keeps profiles in the same database), run `npm install pg`, then:
- *
- *   psql $DATABASE_URL -f server-browser/schema.sql
- *   USER_STORE_BACKEND=postgres DATABASE_URL=postgres://... npm start
+ * 'pg' is a dependency of server-browser/ (the lobby) and server/ (the game server keeps profiles in the same
+ * database), loaded only when this backend is selected. Moving the live JSON over (schema, ids, verification) and
+ * switching: docs/ops/postgres-migration.md (scripts/db/migrateJsonToPostgres.ts).
  */
 
 import {

@@ -75,6 +75,9 @@ sessions: (token, user_id, expires_at)
 
 ### Switching to PostgreSQL later
 
+> Production: the live accounts, sessions, profiles and rankings are already copied into the VPS's `spacegame`
+> database (not switched yet). The tool, re-sync, switch-over and rollback steps: `docs/ops/postgres-migration.md`.
+
 When your VPS PostgreSQL server is ready:
 
 ```powershell
