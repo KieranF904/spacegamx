@@ -4,9 +4,9 @@ Mk II · Medium · Panel · 2 cells
 Hull · mass141 hp · 2.8
 Armour · build2 · 3.2 pts
 TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
-Damage75/s · reach 5,400
+Damage80/s · reach 5,400
 Hits withKinetic · penetration 1.5
-Fire rate15/s · shells
+Fire rate4.0/s spinning up to 16/s · shells
 MountTurret, 240°
 FittingBolts on from behind only
 Power draw44/s
@@ -33,7 +33,7 @@ Medium · Panel
 a hose: hard to dodge, harder to power
 
 == keyStats ==
-75 dmg/s · reach 5,400 · draws 44
+80 dmg/s · reach 5,400 · draws 44
 
 == mountBadge ==
 TURRET 240°
@@ -49,4 +49,4 @@ Bolts on from behind only
 {"open":true,"badge":"Lv 14","why":""}
 
 == partStats (raw) ==
-{"grade":2,"mark":"Mk II","size":"Medium","area":2,"hp":141,"mass":2.8,"firepower":75,"toughness":141,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":75,"range":5400,"damageType":"kinetic","pen":1.5,"draw":43.64}
+{"grade":2,"mark":"Mk II","size":"Medium","area":2,"hp":141,"mass":2.8,"firepower":80,"toughness":141,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":80,"range":5400,"damageType":"kinetic","pen":1.5,"draw":43.64}

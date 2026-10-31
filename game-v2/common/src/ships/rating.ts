@@ -19,6 +19,8 @@ import type { ShipState } from './state.js';
 import { partSupply, partGrade, partMaterial, fnOutput } from './grades.js';
 import { penetrationMul, partArmour, weaponHit } from './damage.js';
 import { partWeaponDef } from './launch.js';
+import { averageInterval } from './guns.js';
+import type { FireSpec } from './types.js';
 
 /** Shields soak this many hit points per point of capacity (they come back) */
 const SHIELD_WORTH = 2;
@@ -47,20 +49,21 @@ export interface ShipRating {
   parts: PartScore[];
 }
 
-type WeaponDef = { type?: string; damage?: number; dps?: number; burst?: number; splash?: { damage: number; radius: number }; heatPerSec?: number; coolPerSec?: number };
+type WeaponDef = { type?: string; damage?: number; dps?: number; burst?: number; splash?: { damage: number; radius: number } };
 
-/** A weapon's sustained damage per second at full power, before grade and size (`gun`: one gun's own tuning, launch.ts gunDef) */
-export function baseWeaponDps(tuning: ShipTuning, kind: string, interval: number, gun?: WeaponTuning): number {
+/**
+ * A weapon's sustained damage per second at full power, before grade and size (`gun`: one gun's own tuning, launch.ts
+ * gunDef; `fire`: its firing model, guns.ts: a clip's reload and a charge's charge and cooldown count, a held beam burns its dps)
+ */
+export function baseWeaponDps(tuning: ShipTuning, kind: string, interval: number, gun?: WeaponTuning, fire?: FireSpec): number {
   const def = (gun ?? tuning.weapons?.[kind]) as WeaponDef | undefined;
   if (!def) return 0;
+  if (fire?.model === 'beam') return def.dps ?? 0;
+  interval = averageInterval(fire, interval);
   // A pulse laser: a pulse's damage every charge
   if ((def as WeaponTuning).pulse) return ((def.damage ?? 0) * 60) / Math.max(1, interval);
-  if (def.type === 'beam') {
-    // Beams overheat: they fire heat-up time out of every heat-up + cool-down
-    const heat = def.heatPerSec ?? 0, cool = def.coolPerSec ?? 0;
-    const duty = heat > 0 && cool > 0 ? cool / (heat + cool) : 1;
-    return (def.dps ?? 0) * duty;
-  }
+  // A beam burns as long as the power lasts (no heat: rework 2026-11)
+  if (def.type === 'beam') return def.dps ?? 0;
   // A wider burst than its kind's own (a bigger flak gun's) lands on that many more parts
   const base = tuning.weapons?.[kind]?.splash?.radius;
   const wide = def.splash && base ? def.splash.radius / base : 1;
@@ -81,7 +84,7 @@ export function rateShip(catalog: Catalog, tuning: ShipTuning, ship: ShipState, 
     const p = ship.blueprint.parts[w.part];
     const def = partWeaponDef(tuning, w.kind, p, w);
     const pen = weaponHit(w.kind, def, partGrade(catalog, p)).pen;
-    const dps = baseWeaponDps(tuning, w.kind, w.interval, def) * w.strength * Math.max(w.satisfaction, tuning.flow.minWeaponSatisfaction) * sustain * penetrationMul(pen - REF_ARMOUR, tuning);
+    const dps = baseWeaponDps(tuning, w.kind, w.interval, def, w.fire) * w.strength * Math.max(w.satisfaction, tuning.flow.minWeaponSatisfaction) * sustain * penetrationMul(pen - REF_ARMOUR, tuning);
     parts[w.part].firepower += dps;
     firepower += dps;
   }

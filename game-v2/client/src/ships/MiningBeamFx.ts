@@ -163,7 +163,7 @@ export class MiningBeamFx {
     for (const [id, ship] of this.source.bodies) {
       if (ship.kind !== 'ship') continue;
       // (Pulse lasers are drawn from their pulses: drawPulses)
-      const beams = ship.derived.weapons.filter((w) => defs[w.kind]?.type === 'beam' && !defs[w.kind]?.pulse);
+      const beams = ship.derived.weapons.filter((w) => w.fire.model === 'beam');
       if (!beams.length) continue;
       const e = this.state.entities.get(id);
       if (!e || !e.data?.length) continue;

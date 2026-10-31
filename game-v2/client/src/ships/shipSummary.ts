@@ -69,7 +69,7 @@ export function shipSummary(catalog: Catalog, tuning: ShipTuning, econ: Economy,
   for (const w of d.weapons) {
     if (!tuning.weapons?.[w.kind]) continue;
     // Its own tuning (grade, size, gems), as the rating counts it: a pulse laser's pulses, a beam's heat-limited burn, a gun's shells
-    dps += baseWeaponDps(tuning, w.kind, w.interval, partWeaponDef(tuning, w.kind, bp.parts[w.part], w)) * Math.max(w.satisfaction, tuning.flow.minWeaponSatisfaction) * w.strength;
+    dps += baseWeaponDps(tuning, w.kind, w.interval, partWeaponDef(tuning, w.kind, bp.parts[w.part], w), w.fire) * Math.max(w.satisfaction, tuning.flow.minWeaponSatisfaction) * w.strength;
   }
   // Losing it costs the minerals salvage doesn't bring back
   const raw = salvageOf(econ, econ.designParts(bp), 1);

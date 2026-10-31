@@ -4,9 +4,9 @@ Mk IV · Small · Square · 1 cell
 Hull · mass118 hp · 1.2
 Armour · build4 · 3.8 pts
 TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
-Damage28/s · reach 9,120
+Damage23/s · reach 9,120
 Hits withExplosive · penetration 3
-Fire rate0.4/s · shells
+Clipholds 8 · 4 a shot, every 2.5s · regrows one every 0.75s (6 energy each)
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 1 clear cell ahead
 Power draw12/s
@@ -33,7 +33,7 @@ Small · Square
 Legendary
 
 == keyStats ==
-28 dmg/s · reach 9,120 · draws 12
+23 dmg/s · reach 9,120 · draws 12
 
 == mountBadge ==
 FIXED
@@ -50,4 +50,4 @@ Needs 1 clear cell ahead
 {"open":true,"badge":"Lv 12","why":""}
 
 == partStats (raw) ==
-{"grade":4,"mark":"Mk IV","size":"Small","area":1,"hp":117.9,"mass":1.2,"firepower":27.52,"toughness":117.9,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":27.52,"range":9120,"damageType":"explosive","pen":3,"draw":12}
+{"grade":4,"mark":"Mk IV","size":"Small","area":1,"hp":117.9,"mass":1.2,"firepower":22.933333333333334,"toughness":117.9,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":22.933333333333334,"range":9120,"damageType":"explosive","pen":3,"draw":12}

@@ -260,6 +260,7 @@ private xpFillEl: HTMLElement | null;
     });
     this.state.shipPhysics = (player, input, fuel, tick) => this.shipClient.predict(player, input, fuel, tick);
     this.state.shipGuns = (player, input, tick, charge) => this.shipClient.predictGuns(player, input, tick, charge);
+    this.state.shipGunSync = (data, tick) => this.shipClient.syncGuns(data, tick);
     this.state.chargeTotal = (charge) => this.shipClient.chargeTotal(charge);
     // Every other ship moves by replication (proto writes its state straight in instead)
     if (!this.proto) {
@@ -730,12 +731,9 @@ this.xpFillEl = document.getElementById('xpFill');
   private heatEl: HTMLDivElement | null = null;
   private heatText: HTMLElement | null = null;
   private heatFill: HTMLElement | null = null;
-  private wasOverheated = false;
 
-  /** Beam weapon heat (lances, frostbite): a thin bar over the jump gauge while anything's warm; pulse lasers' charge there while they charge */
+  /** Charge guns' charge (Longbarrel, Blackout) and pulse lasers' charge to their next pulse: a thin bar over the jump gauge while they charge (no heat: rework 2026-11) */
   private updateHeatGauge(): void {
-    const me = this.state.entities.get(this.state.playerId);
-    const heat = me?.data?.[6] ?? 0, over = me?.data?.[7] === 1;
     if (!this.heatEl) {
       this.heatEl = document.createElement('div');
       this.heatEl.style.cssText = `position: fixed; left: 50%; bottom: 150px; transform: translateX(-50%); width: 240px; z-index: 860; pointer-events: none;
@@ -745,26 +743,27 @@ this.xpFillEl = document.getElementById('xpFill');
       this.heatText = this.heatEl.querySelector('[data-k="t"]') as HTMLElement;
       this.heatFill = this.heatEl.querySelector('[data-k="f"]') as HTMLElement;
     }
-    const laser = this.shipClient.laserCharge();
-    const charging = !!laser && laser.charge < 0.999 && !(heat > 1 || over);
-    const show = this.loggedIn && !this.shipClient.hangarOpen && (heat > 1 || over || charging);
+    const gun = this.shipClient.gunCharge();
+    const laser = gun ? null : this.shipClient.laserCharge();
+    const charging = !!laser && laser.charge < 0.999;
+    const show = this.loggedIn && !this.shipClient.hangarOpen && (!!gun || charging);
     setStyle(this.heatEl, 'display', show ? 'block' : 'none');
-    if (!show) { this.wasOverheated = false; return; }
-    if (charging && laser) {
-      // Pulse lasers: no heat, just the charge to their next pulse
+    if (!show) return;
+    if (gun) {
+      // A charge gun held: it fires itself when the bar is full (let go early and nothing fires)
+      setText(this.heatText, gun.charge >= 0.999 ? 'CHARGED' : 'CHARGING · HOLD TO FIRE');
+      setStyle(this.heatText, 'color', '#fde68a');
+      setStyle(this.heatFill, 'width', `${Math.round(gun.charge * 100)}%`);
+      setStyle(this.heatFill, 'background', 'linear-gradient(90deg,#92400e,#fbbf24,#fffbeb)');
+      return;
+    }
+    if (laser) {
+      // Pulse lasers: the charge to their next pulse
       setText(this.heatText, laser.total > 1 ? `LASERS CHARGING · ${laser.ready}/${laser.total} READY` : 'LASER CHARGING');
       setStyle(this.heatText, 'color', '#fecaca');
       setStyle(this.heatFill, 'width', `${Math.round(laser.charge * 100)}%`);
       setStyle(this.heatFill, 'background', 'linear-gradient(90deg,#7f1d1d,#f87171,#ffe4e4)');
-      this.wasOverheated = false;
-      return;
     }
-    setText(this.heatText, over ? 'BEAMS OVERHEATED · COOLING' : 'BEAM HEAT');
-    setStyle(this.heatText, 'color', over ? '#fca5a5' : heat > 75 ? '#fdba74' : '#cbd5e1');
-    setStyle(this.heatFill, 'width', `${Math.min(100, Math.round(heat))}%`);
-    setStyle(this.heatFill, 'background', over ? '#ef4444' : heat > 75 ? 'linear-gradient(90deg,#f59e0b,#ef4444)' : 'linear-gradient(90deg,#38bdf8,#f59e0b)');
-    if (over && !this.wasOverheated) this.audio.playUI('warning', 0.5);
-    this.wasOverheated = over;
   }
 
   private applyVolume(s: SettingsData): void {

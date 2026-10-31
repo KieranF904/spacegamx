@@ -4,9 +4,9 @@ Mk II · Medium · Panel · 2 cells
 Hull · mass150 hp · 2.8
 Armour · build2 · 3.2 pts
 TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
-Damage36/s · reach 1,700
+Damage25/s · reach 1,700
 Hits withExplosive · penetration 1
-Fire rate1.3/s · shells · Flak Canisters
+Clip4 rounds at 2.0/s · reloads in 2.5s from energy (30 a clip), when empty or a second after you let go
 MountTurret, 240°
 FittingSide mount (flippable) · Bolts on at its side only
 Power draw12/s
@@ -33,7 +33,7 @@ Medium · Panel
 wide heavy bursts, slow · ammo
 
 == keyStats ==
-36 dmg/s · reach 1,700 · draws 12
+25 dmg/s · reach 1,700 · draws 12
 
 == mountBadge ==
 TURRET 240°SIDE
@@ -50,4 +50,4 @@ Bolts on at its side only
 {"open":true,"badge":"Lv 16","why":""}
 
 == partStats (raw) ==
-{"grade":2,"mark":"Mk II","size":"Medium","area":2,"hp":150.4,"mass":2.8,"firepower":35.83,"toughness":150.4,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":35.83,"range":1700,"damageType":"explosive","pen":1,"draw":12.14}
+{"grade":2,"mark":"Mk II","size":"Medium","area":2,"hp":150.4,"mass":2.8,"firepower":25.47911111111111,"toughness":150.4,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":25.47911111111111,"range":1700,"damageType":"explosive","pen":1,"draw":12.14}

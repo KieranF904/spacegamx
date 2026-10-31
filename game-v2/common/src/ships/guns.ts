@@ -6,17 +6,24 @@
  * fires its own shells on the very tick the server does, from the very same
  * barrel, instead of waiting a round trip to hear about them.
  *
- * The caller does the rest: the server spawns the shells and runs the beams;
- * the client draws the shells it predicts.
+ * Every gun fires by one of the shared firing models (types.ts FireSpec,
+ * docs/design/rework-2026-11.md §3): cycle, clip, charge, ammo, beam, or auto
+ * (Point Defence). Their state (ShipState rounds, reload, charge, spin) steps
+ * here and only here, forward only, on the server and the pilot's client alike.
+ *
+ * The caller does the rest: the server spawns the shells, runs the beams and
+ * sends the charge tells; the client draws the shells it predicts.
  */
 
 import type { ShipState } from './state.js';
 import type { ShipTuning } from './tuning.js';
 import type { WeaponInfo } from './rebuild.js';
+import type { FireSpec } from './types.js';
 import { buildShot, shipPointToWorld, type ProjectileSpec, type ShipPose } from './shot.js';
 import { stepFixedGunAim, stepTurretAim } from './turret.js';
 import { SHOT_AIM_STEPS, shotAimQ } from './launch.js';
-import { BROWNOUT, feedShare, type Charge } from './energy.js';
+import { BROWNOUT, chargeGroupsEnd, feedShare, type Charge } from './energy.js';
+import { PILOT_EXTRAS } from './features/plan.js';
 
 export interface GunOrders {
   firing: boolean;
@@ -26,13 +33,11 @@ export interface GunOrders {
   aimDist: number;
   /**
    * The charge after this tick's power step (energy.ts powerTick): each gun
-   * draws on the ship while it reloads (gunLoad: its banks first), and reloads at the
-   * share of that it got (a brownout: slower); a beam burns
-   * that share of the time. Absent: guns run free (no accounting).
+   * draws on the ship as its model says (gunLoad: its banks first), and reloads,
+   * regrows or charges at the share of that it got (a brownout: slower); a beam
+   * burns that share of the time. Absent: guns run free (no accounting).
    */
   energy?: { charge: Charge };
-  /** Intervals × this (a cold ship's guns recycle slower: warmth.ts); absent: 1 */
-  slow?: number;
 }
 
 export interface GunShot {
@@ -48,15 +53,132 @@ export interface GunPulse {
   aimQ: number;
 }
 
+/** A charge gun that starts charging (start) or is let go early (the charge drains away): everyone sees the tell (a shell-less fire event) */
+export interface GunTell {
+  w: WeaponInfo;
+  aimQ: number;
+  start: boolean;
+}
+
+export interface GunStep {
+  shots: GunShot[];
+  beams: WeaponInfo[];
+  pulses: GunPulse[];
+  /** Charge starts and early releases (empty on most ticks: a shared empty list) */
+  tells: readonly GunTell[];
+}
+
+/** Ticks a charge let go early takes to drain away (nothing fires) */
+export const CHARGE_DRAIN = 15;
+/** Ticks after its last shot that a partly spent clip starts reloading */
+export const CLIP_IDLE = 60;
+/** Fire-event ammo codes that mark a charge tell (no shells): a charge started, a charge let go */
+export const TELL_CHARGE_START = 255;
+export const TELL_CHARGE_CANCEL = 254;
+
+const NO_TELLS: readonly GunTell[] = Object.freeze([]);
+
+/** A spinning gun's interval now (its beat eases from spin.from to spin.to as it spins up); any other gun's own */
+export function gunInterval(ship: ShipState, w: WeaponInfo): number {
+  const s = w.fire.spin;
+  if (!s) return w.interval;
+  const k = ship.spin[w.part] ?? 0;
+  return (w.interval * (s.from + (s.to - s.from) * k)) / Math.max(1e-9, w.fire.interval);
+}
+
+/**
+ * Ticks a shot (a volley) takes on average, firing flat out, by its model: a clip's beat plus its share of the reload
+ * (a regrowing clip: no faster than it regrows), a charge's charge and cooldown; any other gun's interval (a spinning
+ * one at full spin). What firepower and ratings divide by (rating.ts, partStats.ts)
+ */
+export function averageInterval(fire: FireSpec | undefined, interval: number): number {
+  if (!fire) return interval;
+  const per = fire.rounds ?? 1;
+  switch (fire.model) {
+    case 'clip': {
+      const shots = Math.max(1, Math.floor((fire.clip ?? 1) / per));
+      return fire.regrow ? Math.max(interval, fire.regrow * per) : interval + (fire.reload ?? 0) / shots;
+    }
+    case 'charge': return (fire.charge ?? interval) + (fire.cooldown ?? 0);
+    default: return fire.spin ? (interval * fire.spin.to) / Math.max(1e-9, fire.interval) : interval;
+  }
+}
+
+/** A beam's damage scale from its windup (0 → 1 over `windup` ticks lit); 1 without one */
+export function windupScale(ship: ShipState, w: WeaponInfo): number {
+  const n = w.fire.windup;
+  return n ? Math.min(1, (ship.charge[w.part] ?? 0) / n) : 1;
+}
+
+/** Is a clip gun reloading (a whole-clip reload under way)? */
+export function clipReloading(ship: Pick<ShipState, 'reload'>, w: WeaponInfo): boolean {
+  return w.fire.model === 'clip' && !w.fire.regrow && (ship.reload[w.part] ?? 0) > 0;
+}
+
+// ---- The gun-state correction (docs/design/rework-2026-11.md §3.3): the pilot row's last slot, own ship only.
+// A count, then that many (part index, value) pairs for the ship's clip and charge guns (the first GUN_STATE_MAX in
+// weapon order): a clip gun's rounds (+ GUN_STATE_RELOADING while it reloads), a charge gun's charge in whole ticks.
+// The client adopts the server's value only after disagreeing for GUN_STATE_PATIENCE ticks running (client gunSync.ts).
+
+/** The most guns the gun-state slot carries */
+export const GUN_STATE_MAX = 8;
+/** Added to a clip gun's rounds while it reloads */
+export const GUN_STATE_RELOADING = 128;
+/** Ticks of disagreement the client waits before it takes the server's gun state */
+export const GUN_STATE_PATIENCE = 30;
+/** What the slot holds (in the wire hash: a change of meaning is a protocol bump) */
+export const GUN_STATE_LAYOUT = `count+(part,value)x${GUN_STATE_MAX}:clip=rounds+${GUN_STATE_RELOADING}reloading,charge=ticks`;
+
+/** Does the gun-state slot carry this gun (a clip or charge gun)? */
+export function carriesGunState(w: WeaponInfo): boolean {
+  return w.fire.model === 'clip' || w.fire.model === 'charge';
+}
+
+/** A gun's value in the gun-state slot */
+export function gunStateValue(ship: ShipState, w: WeaponInfo): number {
+  if (w.fire.model === 'clip') return Math.max(0, Math.min(GUN_STATE_RELOADING - 1, Math.round(ship.rounds[w.part]))) + (clipReloading(ship, w) ? GUN_STATE_RELOADING : 0);
+  return Math.max(0, Math.round(ship.charge[w.part]));
+}
+
+/** Where the gun-state slot starts in a pilot row: after the charge groups and the part features' values */
+export function gunStateAt(data: ArrayLike<number>): number {
+  return chargeGroupsEnd(data) + PILOT_EXTRAS;
+}
+
+/** Append the gun-state slot to a pilot row (the server's): the count, then the pairs */
+export function packGunState(ship: ShipState, out: number[]): void {
+  const at = out.length;
+  out.push(0);
+  let n = 0;
+  for (const w of ship.derived.weapons) {
+    if (n >= GUN_STATE_MAX || !carriesGunState(w)) continue;
+    out.push(w.part, gunStateValue(ship, w));
+    n++;
+  }
+  out[at] = n;
+}
+
+/** Take the server's value for one gun (the client, after GUN_STATE_PATIENCE ticks of disagreeing) */
+export function applyGunState(ship: ShipState, w: WeaponInfo, v: number): void {
+  const p = w.part, f = w.fire;
+  if (f.model === 'clip') {
+    ship.rounds[p] = v % GUN_STATE_RELOADING;
+    if (f.regrow) return;
+    if (v >= GUN_STATE_RELOADING) { if (!(ship.reload[p] > 0)) ship.reload[p] = f.reload ?? 60; }
+    else ship.reload[p] = 0;
+  } else if (f.model === 'charge') ship.charge[p] = v;
+}
+
 /** Guns of a group fire in turn (see stepGuns): the others of `w`'s group that are ready wait their turn, `interval / guns` apart, in part order */
 function stagger(ship: ShipState, w: WeaponInfo): void {
+  const same = (x: WeaponInfo) => x.kind === w.kind && x.fire.model === w.fire.model && Math.abs(x.interval - w.interval) < 1e-6;
   let n = 0;
-  for (const x of ship.derived.weapons) if (x.kind === w.kind && Math.abs(x.interval - w.interval) < 1e-6) n++;
+  for (const x of ship.derived.weapons) if (same(x)) n++;
   if (n < 2) return;
   const gap = w.interval / n;
   let turn = 1;
   for (const x of ship.derived.weapons) {
-    if (x === w || x.kind !== w.kind || Math.abs(x.interval - w.interval) >= 1e-6 || ship.cooldown[x.part] > 0) continue;
+    if (x === w || !same(x) || ship.cooldown[x.part] > 0) continue;
     ship.cooldown[x.part] = turn++ * gap;
   }
 }
@@ -64,49 +186,87 @@ function stagger(ship: ShipState, w: WeaponInfo): void {
 /** A loaded gun counts on below 0 while it waits (how long it has: see stepGuns), down to this */
 const MAX_WAIT = 600;
 
+/** A clip gun's reload (or regrowth) for one tick, at its share of the power it asked for */
+function stepClip(ship: ShipState, w: WeaponInfo, share: number): void {
+  const f = w.fire, p = w.part, clip = f.clip ?? 1;
+  if (f.regrow) {
+    if (ship.rounds[p] >= clip) { ship.reload[p] = 0; return; }
+    ship.reload[p] += share;
+    if (ship.reload[p] >= f.regrow) {
+      ship.reload[p] -= f.regrow;
+      if (++ship.rounds[p] >= clip) ship.reload[p] = 0;
+    }
+    return;
+  }
+  if (ship.reload[p] > 0) {
+    ship.reload[p] -= share;
+    if (ship.reload[p] <= 1e-9) { ship.reload[p] = 0; ship.rounds[p] = clip; }
+    return;
+  }
+  // Empty, or a partly spent clip left alone a second: it reloads (the cooldown counts the ticks since its last shot)
+  if (ship.rounds[p] < (f.rounds ?? 1) || (ship.rounds[p] < clip && ship.cooldown[p] <= w.interval - CLIP_IDLE)) ship.reload[p] = f.reload ?? 60;
+}
+
 /**
  * Step every gun one tick. Returns the projectile guns that fire now, the
- * pulse lasers that start a pulse, and the beams that are on (cooling and
- * heat are the beams' own business; a pulse runs its course on its own).
+ * pulse lasers that start a pulse, the beams that are on (a pulse runs its
+ * course on its own) and the charge tells.
  *
- * A loaded gun fires; its shot's energy is drawn as it reloads (energy.ts
- * gunLoad), from the banks it touches, then the ship. Short of power, every gun
- * gets the same share, so all reload that much slower and a big gun is never
- * starved by small ones (the ready ones still go longest-waiting first).
+ * By model (types.ts FireSpec):
+ * - cycle (and auto): a loaded gun fires; its shot's energy is drawn as it reloads
+ *   (energy.ts gunLoad), from the banks it touches, then the ship. Short of
+ *   power, every gun gets the same share, so all reload that much slower and a
+ *   big gun is never starved by small ones (the ready ones still go
+ *   longest-waiting first). A spinning gun's beat quickens as it's held.
+ * - clip: fires while it has rounds; empty (or idle a second with a partial
+ *   clip) it reloads at its share, then the clip is full; a regrowing clip gets a
+ *   round back at a time instead.
+ * - charge: held, aligned and cooled, it charges at its share; full, it fires
+ *   itself and cools down. Let go early, the charge drains away and nothing fires.
+ * - ammo: a cycle that needs no power (the server spends the rounds).
+ * - beam: on while held and aligned; short of power it burns that share of the
+ *   ticks, evenly spread (the sputter); a windup ramps its damage in.
  *
  * Kinds that stagger (tuning `stagger`: pulse lasers, railguns, missiles)
  * fire one after another instead of all together: a gun of such a kind that
- * fires sets the others of its group (same kind, same interval, so a laser
+ * fires sets the others of its group (same kind, model and interval, so a laser
  * never waits on a cannon or one of another charge time) that are ready to
  * wait their turn, `interval / guns` apart. So on a first pull the first fires
  * at once and the rest ripple after it, and from then on each keeps its own
  * interval: as many shots a minute as before, evenly spaced. A group mid-cycle
  * isn't touched.
  */
-export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tick: number, tuning: ShipTuning): { shots: GunShot[]; beams: WeaponInfo[]; pulses: GunPulse[] } {
+export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tick: number, tuning: ShipTuning): GunStep {
   const shots: GunShot[] = [];
   const beams: WeaponInfo[] = [];
   const pulses: GunPulse[] = [];
-  /** A beam that stays on while held (a pulse laser charges and fires like a gun) */
-  const held = (w: WeaponInfo) => weapons[w.kind]?.type === 'beam' && !weapons[w.kind]?.pulse;
+  let tells = NO_TELLS as GunTell[];
   const weapons = tuning.weapons ?? {};
   const { aimWorld, aimDist } = orders;
   // Each gun's share of the power it asked for this tick (1 unaccounted, or with plenty)
   const share = (w: WeaponInfo) => (orders.energy ? feedShare(ship.derived, orders.energy.charge, w.part, 'gun') : 1);
   // (A beam short of power burns that share of the ticks, evenly spread)
   const burns = (w: WeaponInfo) => { const r = share(w); return r >= BROWNOUT || (r > 0 && Math.floor(tick * r) !== Math.floor((tick - 1) * r)); };
+  const tell = (w: WeaponInfo, start: boolean) => {
+    if (tells === NO_TELLS) tells = [];
+    tells.push({ w, aimQ: shotAimQ(ship.aim[w.part]), start });
+  };
   const aimX = aimWorld === undefined ? 0 : pose.x + Math.cos(aimWorld) * aimDist;
   const aimY = aimWorld === undefined ? 0 : pose.y + Math.sin(aimWorld) * aimDist;
   const ready: WeaponInfo[] = [];
   for (const w of ship.derived.weapons) {
-    // (Reloading, it loads at its share: a browned-out gun reloads slower)
-    const cd0 = ship.cooldown[w.part];
-    ship.cooldown[w.part] = Math.max(-MAX_WAIT, cd0 > 0 && !held(w) ? cd0 - share(w) : cd0 - 1);
+    const f = w.fire, p = w.part;
+    // (Reloading, a cycle gun loads at its share: a browned-out gun reloads slower. Every other model's beat needs no power)
+    const cd0 = ship.cooldown[p];
+    ship.cooldown[p] = Math.max(-MAX_WAIT, cd0 > 0 && (f.model === 'cycle' || f.model === 'auto') ? cd0 - share(w) : cd0 - 1);
+    if (f.model === 'clip') stepClip(ship, w, share(w));
+    // (A charge let go early drains away)
+    else if (f.model === 'charge' && ship.charge[p] < 0) ship.charge[p] = Math.min(0, ship.charge[p] + (f.charge ?? 60) / CHARGE_DRAIN);
     // (Point defence reloads here, drawing its power as any gun does, but aims and fires on its own: support.ts)
-    if (weapons[w.kind]?.pointDefence) continue;
+    if (f.model === 'auto' || weapons[w.kind]?.pointDefence) continue;
     let canFire = true;
     if (w.window) {
-      let desired = w.window.center + ship.aim[w.part];
+      let desired = w.window.center + ship.aim[p];
       if (aimWorld !== undefined) {
         let worldAngle = aimWorld;
         if (aimDist > 0) {
@@ -116,8 +276,8 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
         // World angle → local grid frame (grid forward is -y)
         desired = worldAngle - (pose.angle + Math.PI / 2);
       }
-      const res = stepTurretAim(w.window, ship.aim[w.part], desired, tuning);
-      ship.aim[w.part] = res.offset;
+      const res = stepTurretAim(w.window, ship.aim[p], desired, tuning);
+      ship.aim[p] = res.offset;
       canFire = res.canFire;
     } else if (aimWorld !== undefined) {
       // Fixed gun: fires when the cursor point is (almost) straight down its barrel,
@@ -129,35 +289,58 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
       }
       const facing = Math.atan2(w.dir[1], w.dir[0]);
       const local = (a: number) => a - (pose.angle + Math.PI / 2) - facing;
-      const res = stepFixedGunAim(local(worldAngle), tuning, local(aimWorld), weapons[w.kind]?.type === 'beam');
-      ship.aim[w.part] = res.offset;
+      const res = stepFixedGunAim(local(worldAngle), tuning, local(aimWorld), f.model === 'beam' || weapons[w.kind]?.type === 'beam');
+      ship.aim[p] = res.offset;
       canFire = res.canFire;
     }
-    if (!orders.firing || !canFire) continue;
-    if (held(w) ? !ship.overheated[w.part] : ship.cooldown[w.part] <= 0) ready.push(w);
+    const want = orders.firing && canFire;
+    // A spinning gun spins up while it's fired, and down when it isn't
+    if (f.spin) ship.spin[p] = want ? Math.min(1, ship.spin[p] + 1 / Math.max(1, f.spin.up)) : Math.max(0, ship.spin[p] - 1 / Math.max(1, f.spin.down));
+    if (f.model === 'charge') {
+      // Let go: a charge under way drains away, and nothing fires (held but off target or cooling, it holds)
+      if (!orders.firing) { if (ship.charge[p] > 0) { tell(w, false); ship.charge[p] = -ship.charge[p]; } continue; }
+      if (canFire && ship.cooldown[p] <= 0) ready.push(w);
+      continue;
+    }
+    if (!want) {
+      // (A beam let go winds up again from nothing)
+      if (f.model === 'beam') ship.charge[p] = 0;
+      continue;
+    }
+    if (f.model === 'beam') ready.push(w);
+    else if (ship.cooldown[p] <= 0 && (f.model !== 'clip' || (ship.rounds[p] >= (f.rounds ?? 1) && (f.regrow || ship.reload[p] <= 0)))) ready.push(w);
   }
   if (orders.energy && ready.length > 1) ready.sort((a, b) => ship.cooldown[a.part] - ship.cooldown[b.part] || a.part - b.part);
   for (const w of ready) {
-    // (Waiting its turn in its group's ripple: see stagger below)
-    if (!held(w) && ship.cooldown[w.part] > 0) continue;
-    if (held(w) && !burns(w)) continue;
-    const cd = ship.cooldown[w.part];
-    if (held(w)) {
-      // (A beam pays a tick at a time: each one is a shot)
-      ship.cooldown[w.part] = 1;
+    const f = w.fire, p = w.part;
+    if (f.model === 'beam') {
+      if (!burns(w)) continue;
+      // (A beam pays a tick at a time: each one is a shot. Its windup counts the ticks it has burned)
+      ship.cooldown[p] = 1;
+      if (f.windup) ship.charge[p] = Math.min(f.windup, ship.charge[p] + 1);
       beams.push(w);
       continue;
     }
-    // The aim fires in fire-event steps, so clients build the same shells (see launch.ts)
-    const aimQ = shotAimQ(ship.aim[w.part]);
-    ship.aim[w.part] = aimQ / SHOT_AIM_STEPS;
-    if (weapons[w.kind]?.type === 'beam') pulses.push({ w, aimQ });
-    else {
-      shots.push({ w, aimQ, shot: buildShot(w, ship, pose, tick, tuning) });
+    // (Waiting its turn in its group's ripple: see stagger below)
+    if (ship.cooldown[p] > 0) continue;
+    if (f.model === 'charge') {
+      // A charge starts (over a draining one: afresh), and everyone is told; it fills at the gun's share, and full, it fires
+      if (ship.charge[p] <= 0) { ship.charge[p] = 0; tell(w, true); }
+      ship.charge[p] += share(w);
+      if (ship.charge[p] < (f.charge ?? 60) - 1e-9) continue;
+      ship.charge[p] = 0;
     }
+    const cd = ship.cooldown[p];
+    // The aim fires in fire-event steps, so clients build the same shells (see launch.ts)
+    const aimQ = shotAimQ(ship.aim[p]);
+    ship.aim[p] = aimQ / SHOT_AIM_STEPS;
+    if (weapons[w.kind]?.type === 'beam') pulses.push({ w, aimQ });
+    else shots.push({ w, aimQ, shot: buildShot(w, ship, pose, tick, tuning) });
+    if (f.model === 'charge') ship.cooldown[p] = f.cooldown ?? w.interval;
     // Fired on time, it keeps the fraction of a tick it was late by (so an interval of 14.3 averages 14.3); after a wait, it starts afresh
-    ship.cooldown[w.part] = (cd > -1 ? cd : 0) + w.interval * (orders.slow ?? 1);
-    if (weapons[w.kind]?.stagger) stagger(ship, w);
+    else ship.cooldown[p] = (cd > -1 ? cd : 0) + gunInterval(ship, w);
+    if (f.model === 'clip') ship.rounds[p] -= f.rounds ?? 1;
+    if ((f.model === 'cycle' || f.model === 'ammo') && weapons[w.kind]?.stagger) stagger(ship, w);
   }
-  return { shots, beams, pulses };
+  return { shots, beams, pulses, tells };
 }

@@ -16,6 +16,9 @@ import type { ShipDerived } from '../rebuild.js';
 import { FEATURES } from './registry.js';
 import WIRE from './features.wire.json' with { type: 'json' };
 
+/** How many part-feature values the pilot row carries after its charge groups (features.wire.json pilotExtra): the gun-state slot follows them (guns.ts gunStateAt) */
+export const PILOT_EXTRAS = WIRE.pilotExtra.length;
+
 /** fxMask is an int32 bitmask */
 export const MAX_FEATURES = 31;
 

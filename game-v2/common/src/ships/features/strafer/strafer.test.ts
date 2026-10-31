@@ -13,7 +13,7 @@ import {
   dodgePhase, stepDodge, strafeForce, dodgeLoad, burstEnergy, pilotExtras, chooseDodgeDir, dodgeDirOf, dodgeVec, oppositeDir, bestDodge,
   dodgeAffordable, DODGE_DIRS, DODGE_LEFT, DODGE_RIGHT, DODGE_FORWARD, DODGE_BACK, type StrafeInfo,
 } from './strafer.js';
-import { FULL_CHARGE, chargeTotal, CHARGE_GROUPS_AT, type Charge } from '../../energy.js';
+import { FULL_CHARGE, chargeTotal, CHARGE_GROUPS_AT, PILOT_ROW, type Charge } from '../../energy.js';
 import { packKeyframe, unpackKeyframe } from '../../../network/replication.js';
 import { encodeInputBinary, decodeInputBinary } from '../../../network/protocol.js';
 
@@ -356,7 +356,7 @@ describe('Burst Strafer: the wire', () => {
 
   it("the pilot's row carries the dodge, its way and the tow after the charge groups", () => {
     const data = new Array(CHARGE_GROUPS_AT).fill(0);
-    data[11] = 2;
+    data[PILOT_ROW.groups] = 2;
     data.push(50, 60, 3, 17, 43);
     expect(pilotExtras(data)).toEqual({ dodge: 3, dodgeDir: 17, tow: 43 });
     expect(pilotExtras(undefined)).toEqual({ dodge: 0, dodgeDir: 0, tow: 0 });

@@ -56,9 +56,15 @@ export interface ShipState {
   /** Shield charge (0..derived.shieldMax) and when it was last hit */
   shield: number;
   shieldHitTick: number;
-  /** Beam weapon heat by part index (0..100); overheated parts wait until they cool to 30 */
-  heat: number[];
-  overheated: boolean[];
+  /**
+   * Gun state by part index (guns.ts stepGuns, the firing models): rounds in a clip gun's clip; a clip gun's reload
+   * ticks left (a regrowing clip's: progress towards its next round); a charge gun's charge in ticks (below 0: draining
+   * away after an early release), a beam's ticks lit (its windup); a spinning gun's spin (0..1)
+   */
+  rounds: number[];
+  reload: number[];
+  charge: number[];
+  spin: number[];
 }
 
 export function rebuildShip(state: ShipState, catalog: Catalog, tuning: ShipTuning): void {
@@ -106,12 +112,26 @@ export function createShipState(
     despawnTick: opts.kind === 'debris' ? tick + tuning.debris.lifetimeTicks : -1,
     shield: 0,
     shieldHitTick: -1e9,
-    heat: blueprint.parts.map(() => 0),
-    overheated: blueprint.parts.map(() => false),
+    rounds: blueprint.parts.map(() => 0),
+    reload: blueprint.parts.map(() => 0),
+    charge: blueprint.parts.map(() => 0),
+    spin: blueprint.parts.map(() => 0),
   };
   rebuildShip(state, catalog, tuning);
+  // (Every clip starts full)
+  fillClips(state);
   state.shield = state.derived.shieldMax;
   return state;
+}
+
+/** Fill every clip gun's clip (a new ship, a respawn), and clear reloads, charges and spin */
+export function fillClips(state: ShipState): void {
+  for (const w of state.derived.weapons) {
+    state.rounds[w.part] = w.fire.model === 'clip' ? w.fire.clip ?? 0 : 0;
+    state.reload[w.part] = 0;
+    state.charge[w.part] = 0;
+    state.spin[w.part] = 0;
+  }
 }
 
 /** Full HP is band 4 (with 25% bands) until it drops below 75%; 0 HP is band 0. */

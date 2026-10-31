@@ -174,15 +174,14 @@ export function guideHtml(tab: GuideTab, d: GuideDeps): string {
 function coldGuide(): string {
   const w = (hazardData as unknown as HazardRules).warmth;
   if (!w) return 'Cold systems slowly freeze a ship that stays away from heat.';
-  const pct = (x: number) => `${Math.round((x - 1) * 100)}%`;
-  const chilled = warmthStage(49), numb = warmthStage(24);
+  const numb = warmthStage(24);
   // (The coldest system, by its rating)
   const systems = ((systemsData as unknown as { systems?: unknown[] }).systems ?? []) as { name: string; hazardRatings?: Record<string, number> }[];
   const coldest = systems.filter((s) => (s.hazardRatings?.cryo ?? 0) > 0).sort((a, b) => b.hazardRatings!.cryo - a.hazardRatings!.cryo)[0];
   const insulators = MATERIALS.filter((m) => (m.insulation ?? 0) > 0).sort((a, b) => (b.insulation ?? 0) - (a.insulation ?? 0));
   return `In a cold system, cold builds up on your ship while you're away from heat, and frost creeps in from the edges of your screen as your warmth runs down (the chip under the hazard warnings gives the number). `
     + (coldest ? `In ${esc(coldest.name)} it takes about ${Math.round(secondsToFreeze(w, coldest.hazardRatings!.cryo, 0) / 60)} minutes from warm to frozen through.` : '')
-    + `<br><br>Below half warmth your guns recycle ${pct(chilled.guns)} slower. Below a quarter they're ${pct(numb.guns)} slower and thrust and steering drop by ${Math.round((1 - numb.control) * 100)}%. `
+    + `<br><br>Below half warmth you're chilled: a warning. Below a quarter thrust and steering drop by ${Math.round((1 - numb.control) * 100)}%. `
     + `Frozen through, your ship seizes up for ${Math.round(w.seizeTicks / 60)} seconds and comes out of it with a little warmth back.`
     + `<br><br><b>Heat</b> brings it back: near a star, close by a station (docked is quickest), beside a ship that's on fire (yours counts), or near a lava world. Away from the cold it comes back by itself. Plan your routes from one warm spot to the next.`
     + (insulators.length ? `<br><br><b>Insulation</b>: hulls of ${insulators.map((m) => `${m.name ?? m.id} (${Math.round((m.insulation ?? 0) * 100)}%)`).join(', ')} keep out that share of the cold, by how much of the hull they make. It only buys time: heat still matters.` : '')
@@ -228,7 +227,7 @@ function basics({ k }: GuideDeps): string {
 
 function combat({ k }: GuideDeps): string {
   return `<div class="fg-cols">
-    ${sec('Combat', `Hold the mouse buttons to fire. Fixed guns swivel only 2° either way, so they fire once your nose is on target; turrets track the cursor on their own and only fire through gaps in your own hull. Collisions hurt both ships. A <b>beam laser</b> fires in charged pulses: it charges between them (the bar over your jump gauge), and each pulse fades in thin, flares for an instant at its widest and hardest, then trails off, so hold the beam on target through the flare. It reaches far, over 3,000, and never overheats. Several lasers (and railguns, and missile launchers) fire in turn, evenly over their charge, rather than all at once: as many shots a minute, a steady stream. Lances and frostbite projectors are steady beams that heat up as they fire.`,
+    ${sec('Combat', `Hold the mouse buttons to fire. Fixed guns swivel only 2° either way, so they fire once your nose is on target; turrets track the cursor on their own and only fire through gaps in your own hull. Collisions hurt both ships. A <b>beam laser</b> fires in charged pulses: it charges between them (the bar over your jump gauge), and each pulse fades in thin, flares for an instant at its widest and hardest, then trails off, so hold the beam on target through the flare. It reaches far, over 3,000, and never overheats. Several lasers (and railguns, and missile launchers) fire in turn, evenly over their charge, rather than all at once: as many shots a minute, a steady stream. Lances and frostbite projectors are steady beams that burn as long as the power lasts: short of power they sputter.`,
       `Parts fail in their own way. A destroyed core explodes and takes the ship with it; generators, thrusters and guns blow up a moment later and can set off their neighbours; armour and hull just break. Whatever is left without a core drifts off and slowly crumbles away.`)}
     ${sec('Armour & damage', `Damage isn't absolute. Every gun has a <b>penetration</b> (its grade, plus a bit for railguns, lances and torpedoes, less for flak and pulse lasers) and every block an <b>armour</b> (its grade, plus one for armour plate). Level, and a hit does full damage; a grade short, about half; two short, a quarter; three, a tenth. So a Mk I gun barely scratches Mk III plate: find a bigger gun, or the weak points.`,
       `Guns deal kinetic, explosive, thermal, energy, cryo or exotic damage, and each material takes more or less of each: ceramic shrugs off heat but cracks under shells, insulated polymer turns energy but melts, steel shrugs off shells but conducts. Tooltips show a gun's damage type and penetration, and a block's armour and what it takes. Armour plate is heavy: it slows a ship down.`)}

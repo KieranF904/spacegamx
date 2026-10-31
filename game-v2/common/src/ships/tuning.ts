@@ -127,8 +127,6 @@ export interface WeaponTuning {
   emp?: { radius: number; ticks: number };
   range?: number;
   dps?: number;
-  heatPerSec?: number;
-  coolPerSec?: number;
   armorBonus?: number;
   /** Beam: how wide it burns (world units): a hull this close to its line is hit */
   width?: number;

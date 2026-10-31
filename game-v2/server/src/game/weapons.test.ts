@@ -138,7 +138,7 @@ describe('weapons', () => {
     const w = ship.derived.weapons[0];
     const prof = pulseProfile(partWeaponDef(bridge.tuning, w.kind, ship.blueprint.parts[w.part], w).pulse!);
     const per: number[] = [];
-    let last = 0, overheated = false;
+    let last = 0;
     for (let i = 0; i < 60 * 4; i++) {
       Position.x[pid] = 0; Position.y[pid] = 0; Velocity.x[pid] = 0; Velocity.y[pid] = 0; Rotation.angle[pid] = -Math.PI / 2;
       Position.x[target] = 0; Position.y[target] = -500;
@@ -147,10 +147,9 @@ describe('weapons', () => {
       const d = damaged(target);
       per.push(d - last);
       last = d;
-      if (ship.overheated.some(Boolean) || ship.heat.some((h) => h > 0)) overheated = true;
     }
     expect(last).toBeGreaterThan(0);
-    expect(overheated).toBe(false);
+    expect(Object.keys(ship)).not.toContain('heat');
     // The first pulse: little at first, its peak tick the hardest, then less again
     const start = per.findIndex((d) => d > 0);
     const first = per.slice(start, start + prof.ticks);

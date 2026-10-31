@@ -11,7 +11,7 @@
  * CRITICAL: Uses BitBuffer precision for all physics to match server exactly.
  */
 
-import { FULL_CHARGE, unpackCharge, pilotExtras, type Charge } from '@space-game/common';
+import { FULL_CHARGE, unpackCharge, pilotExtras, PILOT_ROW, type Charge } from '@space-game/common';
 import { FarShips } from './FarShips';
 import {
   ServerSnapshotMessage,
@@ -73,22 +73,22 @@ export interface InterpolatedEntity {
   angVel?: number;
   /** Modular ships: jump drive counter, predicted for the local player (others: data[3]) */
   jump?: number;
-  /** This jump's speed scale (local player; server data[8] / 1000) */
+  /** This jump's speed scale (local player; server data[PILOT_ROW.jumpScale] / 1000) */
   jumpScale?: number;
-  /** A lodestone's priming left, ticks (local player; server data[12], then predicted) */
+  /** A lodestone's priming left, ticks (local player; server data[PILOT_ROW.prime], then predicted) */
   jumpPrime?: number;
   /** Knocked out by an EMP until this tick (local player; the snapshot's tick + server data[5]): prediction drifts till then */
   empUntil?: number;
-  /** Warmth, % (local player; server data[13]: common/src/ships/warmth.ts): the frost vignette, and how cold prediction flies and fires */
+  /** Warmth, % (local player; server data[PILOT_ROW.warmth]: common/src/ships/warmth.ts): the frost vignette, and how cold prediction flies and fires */
   warmth?: number;
   /** Burst Strafer: the dodge counter and the last dodge's way (local player: the server's, then predicted; others: their replica's): ships/strafer.ts */
   dodge?: number;
   dodgeDir?: number;
   /** Part features' values read from the pilot's row (local player; ships/features: ClientFeature.parsePilot) */
   fx?: { [name: string]: number };
-  /** The hold's cargo mass (local player; server data[14]: common/src/ships/load.ts): prediction flies it */
+  /** The hold's cargo mass (local player; server data[PILOT_ROW.cargo]: common/src/ships/load.ts): prediction flies it */
   cargoMass?: number;
-  /** Other pilots: their status row (shield, EMP, beam heat, beams, cursor distance); data is rebuilt from it and their replica */
+  /** Other pilots: their status row (shield, EMP, beams, cursor distance, tow); data is rebuilt from it and their replica */
   status?: number[];
   /**
    * The last few states the server sent (tick-stamped). Snapshots only carry what
@@ -233,6 +233,8 @@ export class GameState {
   public shipPhysics: ((player: InterpolatedEntity, input: ClientInputMessage, charge: Charge, tick: number) => Charge | null) | null = null;
   /** After each forward prediction step (never a replay): the local ship's guns fire on that tick (ShipClient.predictGuns) */
   public shipGuns: ((player: InterpolatedEntity, input: ClientInputMessage, tick: number, charge: Charge) => Charge | null) | null = null;
+  /** The pilot row's gun state on reconciling (ShipClient.syncGuns: the clip and charge correction) */
+  public shipGunSync: ((data: number[] | undefined, tick: number) => void) | null = null;
   /** The batteries' charge as one percentage, for the HUD (ShipClient: energy.ts chargeTotal) */
   public chargeTotal: ((charge: Charge) => number) | null = null;
   /** The batteries' charge, predicted (energy.ts), and the server's last word on it */
@@ -884,11 +886,13 @@ export class GameState {
     player.maxHp = serverState.maxHp || player.maxHp;
     player.data = serverState.data;
     player.jump = serverState.data?.[3] ?? 0;
-    if (serverState.data && serverState.data.length > 8) player.jumpScale = serverState.data[8] / 1000;
-    player.jumpPrime = serverState.data?.[12] ?? 0;
+    if (serverState.data && serverState.data.length > PILOT_ROW.jumpScale) player.jumpScale = serverState.data[PILOT_ROW.jumpScale] / 1000;
+    player.jumpPrime = serverState.data?.[PILOT_ROW.prime] ?? 0;
     player.empUntil = snapshot.tick + (serverState.data?.[5] ?? 0);
-    player.warmth = serverState.data?.[13] ?? 100;
-    player.cargoMass = serverState.data?.[14] ?? 0;
+    player.warmth = serverState.data?.[PILOT_ROW.warmth] ?? 100;
+    player.cargoMass = serverState.data?.[PILOT_ROW.cargo] ?? 0;
+    // (The gun state the server's guns hold, against our own: the clip and charge correction, ShipClient.syncGuns)
+    this.shipGunSync?.(serverState.data, snapshot.tick);
     // (After the charge groups: the Burst Strafer's dodge and way, strafer.ts pilotExtras)
     { const x = pilotExtras(serverState.data); player.dodge = x.dodge; player.dodgeDir = x.dodgeDir; }
 

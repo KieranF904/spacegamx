@@ -71,7 +71,6 @@ describe('part features: the registry', () => {
     const W = WIRE as WireManifest;
     // Pilot extras, in order after the charge groups (strafer.ts pilotExtras)
     const data = new Array(CHARGE_GROUPS_AT).fill(0);
-    data[11] = 0;
     data.push(101, 102, 103);
     const x = pilotExtras(data) as Record<string, number>;
     W.pilotExtra.forEach((e, k) => expect(x[e.name]).toBe(101 + k));
@@ -122,7 +121,7 @@ describe('part features: compiling a plan', () => {
     expect(() => compilePlan([feature({ id: 'tow', inputs: [{ ...inp, ctlBit: CTL.dodge }] })])).toThrow(/not pinned/);
     expect(() => compilePlan([feature({ id: 'a', replicate: [{ name: 'tow', where: 'status', who: 'all', default: 0 }] })])).toThrow(/no status slot/);
     const P = compilePlan([feature({ id: 'tow', replicate: [{ name: 'tow', where: 'status', who: 'all', default: 0 }, { name: 'tow', where: 'pilotExtra', who: 'self', default: 0 }] })]);
-    expect(P.replicate.map((r) => r.slot)).toEqual([8, 2]);
+    expect(P.replicate.map((r) => r.slot)).toEqual([6, 2]);
     const many = Array.from({ length: MAX_FEATURES + 1 }, (_, i) => feature({ id: `f${i}` }));
     expect(() => compilePlan(many)).toThrow(/at most/);
   });

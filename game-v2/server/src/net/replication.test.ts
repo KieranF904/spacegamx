@@ -4,7 +4,9 @@ import * as bitecs from 'bitecs';
 import {
   Position, Velocity, Rotation, Input, InSystem, ServerMessage, ShipReplicaSet, ReplicaMode, replicaAngle, quantizeReplicaAngle,
   rebuildVolley, Player, Projectile, createShipState, stepGuns, volleyShells, firesStraight, weaponDef, isWeaponFn,
+  parseBlueprint, TELL_CHARGE_START, TELL_CHARGE_CANCEL, type Blueprint,
 } from '@space-game/common';
+import { readFileSync } from 'fs';
 import { hasComponent } from 'bitecs';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
@@ -183,10 +185,23 @@ describe('fire events', () => {
     expect(worst).toBeLessThan(0.5);
   });
 
-  it("a pilot's client fires the same shells on the same ticks as the server, from the same barrels", () => {
-    const { server, a } = world();
+  /** A Sparrow armed with these two models where its Pips were */
+  const armed = (left: string, right: string): Blueprint => {
+    const b = parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/sparrow-t.json'), 'utf-8'));
+    const pips = b.parts.filter((q) => q.fn === 'cannon_pip');
+    pips[0].fn = left;
+    pips[1].fn = right;
+    return b;
+  };
+
+  for (const guns of [null, ['railgun_rail_driver', 'cannon_longbarrel'], ['autocannon_stinger', 'autocannon_chainsaw'], ['flak_cloudmaker', 'emp_blackout']] as const) it(`a pilot's client fires the same shells on the same ticks as the server, from the same barrels${guns ? ` (firing models: ${guns.join(', ')})` : ''}`, () => {
+    const { server, a, b } = world();
     const ships = server.getShips();
     const p = a.pid();
+    if (guns) ships.respawnInPlace(p, armed(guns[0], guns[1]));
+    // (Charge tells reach the watcher as shell-less fire events. Fixed guns fire along the nose: the aim sweeps a little)
+    Position.x[b.pid()] = 26000; Position.y[b.pid()] = 21000;
+    let starts = 0, cancels = 0;
     Position.x[p] = 25000; Position.y[p] = 20000;
     // The client's own copy of the ship: guns stepped by guns.ts with the inputs it sent and the pose it predicted
     const mine = createShipState(ships.catalog, ships.tuning, p, ships.get(p)!.blueprint, 0);
@@ -194,11 +209,18 @@ describe('fire events', () => {
     for (let i = 0; i < 60 * 6; i++) {
       Input.forward[p] = (i % 120) < 60 ? 1 : 0;
       Input.fireLeft[p] = (i % 90) < 70 ? 1 : 0;
-      Input.targetAngle[p] = replicaAngle(ReplicaMode.Player, quantizeReplicaAngle(Math.sin(i / 30) * 0.8 - Math.PI / 2));
+      Input.targetAngle[p] = replicaAngle(ReplicaMode.Player, quantizeReplicaAngle(Math.sin(i / 30) * (guns ? 0.03 : 0.8) - Math.PI / 2));
+      Position.x[b.pid()] = 26000; Position.y[b.pid()] = 21000; Velocity.x[b.pid()] = 0; Velocity.y[b.pid()] = 0;
       server.step();
       const tick = (server as any).currentTick as number;
       const pose = { x: Position.x[p], y: Position.y[p], angle: Rotation.angle[p] };
       const { shots } = stepGuns(mine, pose, { firing: Input.fireLeft[p] === 1, aimWorld: Input.targetAngle[p], aimDist: Input.cursorDist[p] }, tick, ships.tuning);
+      for (const m of b.got.splice(0)) for (const [owner, , partAmmo, , ...ids] of (m.type === 'snapshot' ? m.fire : undefined) ?? []) {
+        if (owner !== p) continue;
+        const code = Math.floor(partAmmo / 256);
+        if (code === TELL_CHARGE_START) { starts++; expect(ids).toEqual([]); }
+        if (code === TELL_CHARGE_CANCEL) { cancels++; expect(ids).toEqual([]); }
+      }
       // The server's shells fired this tick (they've moved once since)
       const theirs = [...Array(20000).keys()].filter((e) => hasComponent(server['world'], Projectile, e) && Projectile.ownerId[e] === p && Projectile.spawnTick[e] === tick);
       const ours = shots.filter((s) => firesStraight(weaponDef(ships.tuning, s.w.kind)))
@@ -212,8 +234,11 @@ describe('fire events', () => {
         worst = Math.max(worst, Math.abs(Velocity.x[e] - s.vx), Math.abs(Velocity.y[e] - s.vy));
       }
     }
-    expect(predicted).toBeGreaterThan(10);
+    // (Slow guns: a 4-shell clip with a long reload and a charged orb fire less in the six seconds)
+    expect(predicted).toBeGreaterThan(guns ? 5 : 10);
     expect(matched).toBe(predicted);
     expect(worst).toBeLessThan(1e-3);
+    // (A charge gun's every charge is told, and the ones let go too: fire is let go 20 ticks in every 90)
+    if (guns?.some((g) => g === 'cannon_longbarrel' || g === 'emp_blackout')) { expect(starts).toBeGreaterThan(2); expect(cancels).toBeGreaterThan(0); }
   });
 });

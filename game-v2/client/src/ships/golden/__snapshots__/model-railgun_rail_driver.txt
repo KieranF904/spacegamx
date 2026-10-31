@@ -4,9 +4,9 @@ Mk IV · Large · Block · 4 cells
 Hull · mass430 hp · 4.0
 Armour · build4 · 15.2 pts
 TakesKinetic −5% · Thermal −15% · Cryo −10%
-Damage86/s · reach 9,000
+Damage387/s · reach 9,000
 Hits withKinetic · penetration 5.5
-Fire rate0.5/s · shells · Railgun Slugs
+Clip6 rounds at 6.0/s · reloads in 1.5s from energy (48 a clip), when empty or a second after you let go
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 3 clear cells ahead
 Power draw168/s
@@ -33,7 +33,7 @@ Large · Block
 its bank sets its punch; a full one pierces once more
 
 == keyStats ==
-86 dmg/s · reach 9,000 · draws 168
+387 dmg/s · reach 9,000 · draws 168
 
 == mountBadge ==
 FIXED
@@ -50,4 +50,4 @@ Needs 3 clear cells ahead
 {"open":true,"badge":"Lv 29","why":""}
 
 == partStats (raw) ==
-{"grade":4,"mark":"Mk IV","size":"Large","area":4,"hp":430.08,"mass":4,"firepower":85.59292035398232,"toughness":430.08,"armour":4,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"dps":85.59292035398232,"range":9000,"damageType":"kinetic","pen":5.5,"draw":167.8}
+{"grade":4,"mark":"Mk IV","size":"Large","area":4,"hp":430.08,"mass":4,"firepower":386.88000000000005,"toughness":430.08,"armour":4,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"dps":386.88000000000005,"range":9000,"damageType":"kinetic","pen":5.5,"draw":167.8}

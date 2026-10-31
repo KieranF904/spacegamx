@@ -95,9 +95,9 @@ export function partStats(catalog: Catalog, tuning: ShipTuning | undefined, p: {
     const def = gun as { type?: string; range?: number; speed?: number; life?: number; maxSpeed?: number } | undefined;
     if (tuning) {
       const interval = (fn.fireInterval ?? 10) / (fn.model ? 1 : gunRate(tuning, fn.weapon, grade, size));
-      out.dps = baseWeaponDps(tuning, fn.weapon, interval, gun) * weaponStrength(catalog, fn, area, mat);
+      out.dps = baseWeaponDps(tuning, fn.weapon, interval, gun, fn.fire) * weaponStrength(catalog, fn, area, mat);
       out.firepower = out.dps;
-      if (gun?.pulse) out.pulse = { damage: (gun.damage ?? 0) * weaponStrength(catalog, fn, area, mat), seconds: interval / 60 };
+      if (gun?.pulse && fn.fire?.model !== 'beam') out.pulse = { damage: (gun.damage ?? 0) * weaponStrength(catalog, fn, area, mat), seconds: interval / 60 };
       // (Support weapons do no damage and count nothing towards firepower: support.ts)
       if (gun?.heal) { out.heal = gun.heal * weaponStrength(catalog, fn, area, mat); out.dps = 0; out.firepower = 0; }
       if (gun?.pointDefence) { out.intercept = { perSec: 60 / interval, range: pointDefenceOf(gun).range }; out.dps = 0; out.firepower = 0; }

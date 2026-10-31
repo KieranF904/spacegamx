@@ -179,6 +179,8 @@ export interface FunctionDef {
   boostDrain?: number;
   /** ticks (weapons) */
   fireInterval?: number;
+  /** Weapon models: its firing model and its numbers (guns.ts stepGuns; docs/design/rework-2026-11.md §3). Legacy guns: none (rebuild.ts fireOf) */
+  fire?: FireSpec;
   /** cargo space per unit of area (cargo holds) */
   capacity?: number;
   /** Jump coils: cells of hull each cell of coil serves (flight.ts jumpDriveStats; better grades a little more) */
@@ -364,9 +366,42 @@ export interface WeaponMods {
   add?: Partial<Record<'burst' | 'pierce' | 'pierceKeep' | 'pen', number>>;
   set?: Record<string, unknown>;
 }
+/**
+ * A gun's firing model (guns.ts stepGuns; docs/design/rework-2026-11.md §3): its one trigger verb.
+ * - cycle: fires on a fixed beat while held; each shot's energy is drawn as it reloads (`spin`: the beat eases from
+ *   `from` to `to` ticks over `up` ticks of fire, back over `down`)
+ * - clip: `clip` rounds at `interval`; empty, or 60 ticks after the last shot with a partial clip, it reloads for
+ *   `reload` ticks drawing `reloadE` × missing / clip (`regrow`: one round back every `regrow` ticks instead, each
+ *   drawing `reloadE / clip`)
+ * - charge: held, it charges over `charge` ticks drawing `chargeE`, fires itself at full and cools for `cooldown`;
+ *   let go early, the charge drains away over 15 ticks and nothing fires
+ * - ammo: a cycle paid for with `rounds` (default 1) from the hold (server Ammo.ts), no energy
+ * - beam: burns its draw every tick held (`windup`: its damage ramps up from 0 over that many ticks)
+ * - auto: fires on its own (Point Defence)
+ * `burst` and `salvo` are carried for the family units (the shells a volley still come from the kind's tuning).
+ */
+export type FireModel = 'cycle' | 'clip' | 'charge' | 'ammo' | 'beam' | 'auto';
+export interface FireSpec {
+  model: FireModel;
+  /** Ticks between shots (cycle, clip, ammo, auto) */
+  interval: number;
+  clip?: number;
+  reload?: number;
+  reloadE?: number;
+  regrow?: number;
+  charge?: number;
+  cooldown?: number;
+  chargeE?: number;
+  burst?: { n: number; gap: number };
+  salvo?: number;
+  spin?: { from: number; to: number; up: number; down: number };
+  windup?: number;
+  rounds?: number;
+}
+
 /** rate: fire rate (rebuild.ts interval); hp: the part's own HP (blueprint.ts partMaxHp); splashDamage, splashRadius: its burst's; the rest scale its tuning */
-export type WeaponModNumber = 'damage' | 'speed' | 'life' | 'size' | 'spread' | 'range' | 'dps' | 'heatPerSec' | 'coolPerSec' | 'armorBonus' | 'homing' | 'accel' | 'maxSpeed' | 'fuse' | 'rate' | 'hp' | 'width' | 'splashDamage' | 'splashRadius';
-export const WEAPON_MOD_NUMBERS: WeaponModNumber[] = ['damage', 'speed', 'life', 'size', 'spread', 'range', 'dps', 'heatPerSec', 'coolPerSec', 'armorBonus', 'homing', 'accel', 'maxSpeed', 'fuse', 'rate', 'hp', 'width', 'splashDamage', 'splashRadius'];
+export type WeaponModNumber = 'damage' | 'speed' | 'life' | 'size' | 'spread' | 'range' | 'dps' | 'armorBonus' | 'homing' | 'accel' | 'maxSpeed' | 'fuse' | 'rate' | 'hp' | 'width' | 'splashDamage' | 'splashRadius';
+export const WEAPON_MOD_NUMBERS: WeaponModNumber[] = ['damage', 'speed', 'life', 'size', 'spread', 'range', 'dps', 'armorBonus', 'homing', 'accel', 'maxSpeed', 'fuse', 'rate', 'hp', 'width', 'splashDamage', 'splashRadius'];
 /** What `set` may give a gun */
 export const WEAPON_MOD_SETS = ['ignite', 'split', 'pull', 'chill', 'frost', 'splash', 'emp', 'pierceKeep', 'homing', 'fuse', 'color', 'bane'];
 

@@ -4,10 +4,10 @@
  * (materials.json `insulation`, by share of the hull: rebuild.ts makeup) but never stop it. Frost hits (gemmed guns, the
  * Brood Mother's cold) take warmth off the same meter.
  *
- * Running low costs a ship in stages (WARMTH_STAGES): its guns recycle slower, then its drive goes numb, and frozen
+ * Running low costs a ship in stages (WARMTH_STAGES): chilled is a warning, then its drive goes numb, and frozen
  * through it seizes up (an EMP) and shakes a little warmth back (THAW). The server keeps the meter
- * (server/src/game/Warmth.ts, ShipBridge.warm); its pilot gets it as a whole percent (snapshot data[13]), and both
- * sides work the stage out from that percent, so prediction flies and fires the same. Others' replicas see a numb
+ * (server/src/game/Warmth.ts, ShipBridge.warm); its pilot gets it as a whole percent (snapshot data[PILOT_ROW.warmth], energy.ts), and both
+ * sides work the stage out from that percent, so prediction flies the same. Guns never read warmth (rework 2026-11). Others' replicas see a numb
  * drive by its control bit (replica.ts CTL.numb).
  *
  * How fast and where are data (hazards.json `warmth`); what the stages cost is here, beside EMP_CONTROL.
@@ -42,18 +42,16 @@ export interface WarmthStage {
   name: WarmthStageName;
   /** Below this percent */
   below: number;
-  /** Gun intervals × this */
-  guns: number;
   /** Thrust and steering × this */
   control: number;
 }
 
 /** What running low on warmth costs, coldest last (percent: what the pilot is told, so both sides agree) */
 export const WARMTH_STAGES: readonly WarmthStage[] = [
-  { name: 'warm', below: 101, guns: 1, control: 1 },
-  { name: 'chilled', below: 50, guns: 1.15, control: 1 },
-  { name: 'numb', below: 25, guns: 1.3, control: 0.8 },
-  { name: 'frozen', below: 1, guns: 1.3, control: 0.8 },
+  { name: 'warm', below: 101, control: 1 },
+  { name: 'chilled', below: 50, control: 1 },
+  { name: 'numb', below: 25, control: 0.8 },
+  { name: 'frozen', below: 1, control: 0.8 },
 ];
 
 /** Frozen through, a ship seizes up and comes out of it with this much warmth */

@@ -6,7 +6,7 @@ Armour · build3 · 5 pts
 TakesKinetic −5% · Thermal −15% · Cryo −10%
 Damage58/s · reach 9,000
 Hits withKinetic · penetration 4.5
-Fire rate1.3/s · shells · Railgun Slugs
+Fire rate1.3/s · shells
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 2 clear cells ahead
 Power draw92/s

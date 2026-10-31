@@ -6,7 +6,7 @@ Armour · build4 · 15.2 pts
 TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
 Damage1/s · reach 3,300
 Hits withEnergy · penetration 4
-Fire rate0.3/s · shells
+Chargehold 1.5s: it fires itself, then 4.0s to cool · let go early and nothing fires · 90 energy a charge
 MountTurret, 120°
 FittingBolts on from behind only
 Power draw15/s
@@ -49,4 +49,4 @@ Bolts on from behind only
 {"open":true,"badge":"Lv 35","why":""}
 
 == partStats (raw) ==
-{"grade":4,"mark":"Mk IV","size":"Large","area":4,"hp":366.79999999999995,"mass":4.8,"firepower":0.75,"toughness":366.79999999999995,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":0.75,"range":3300,"damageType":"energy","pen":4,"draw":14.92}
+{"grade":4,"mark":"Mk IV","size":"Large","area":4,"hp":366.79999999999995,"mass":4.8,"firepower":0.5454545454545454,"toughness":366.79999999999995,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":0.5454545454545454,"range":3300,"damageType":"energy","pen":4,"draw":14.92}

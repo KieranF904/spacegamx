@@ -108,7 +108,7 @@ export function sleep(b: BridgeCtx, eid: number, recentTicks = { damaged: 600, f
 
 /**
  * Back into the pipeline: what went on while it slept is caught up (guns'
- * cooldowns and heat, its shield, its battery), and it carries on from where
+ * cooldowns and clips, its shield, its battery), and it carries on from where
  * SimLod left it (position, velocity, heading), with every part as it was.
  */
 export function wake(b: BridgeCtx, eid: number): void {
@@ -121,12 +121,10 @@ export function wake(b: BridgeCtx, eid: number): void {
   if (!ship) return;
   const now = b.host.getTick(), dt = Math.max(0, now - since);
   for (let i = 0; i < ship.cooldown.length; i++) if (ship.cooldown[i] > 0) ship.cooldown[i] = Math.max(0, ship.cooldown[i] - dt);
-  for (let i = 0; i < ship.heat.length; i++) {
-    if (ship.heat[i] <= 0) continue;
-    const w = ship.derived.weapons.find((x) => x.part === i);
-    const cool = w ? partWeaponDef(b.tuning, w.kind, ship.blueprint.parts[w.part], w).coolPerSec ?? 30 : 30;
-    ship.heat[i] = Math.max(0, ship.heat[i] - (cool / 60) * dt);
-    if (ship.overheated[i] && ship.heat[i] < 30) ship.overheated[i] = false;
+  // (Clips reload and charges drain while it sleeps: it wakes with full clips and no charge)
+  for (const w of ship.derived.weapons) {
+    if (w.fire.model === 'clip' && dt > 0) { ship.rounds[w.part] = w.fire.clip ?? 0; ship.reload[w.part] = 0; }
+    if (dt > 0) { ship.charge[w.part] = 0; ship.spin[w.part] = 0; }
   }
   const sh = b.tuning.shield, max = ship.derived.shieldMax;
   if (sh && max > 0 && ship.shield < max) {

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
-import { Position, Velocity, InSystem, ServerMessage, THAW, CTL } from '@space-game/common';
+import { Position, Velocity, InSystem, ServerMessage, THAW, CTL, PILOT_ROW } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
@@ -130,7 +130,7 @@ describe('warmth', () => {
     hover('borealis', -18200, 900, 10);
     const rows = got.filter((m) => m.type === 'snapshot').flatMap((m: any) => m.entities.filter((e: any) => e.id === pid && e.data?.length > 13));
     expect(rows.length).toBeGreaterThan(0);
-    expect(rows.at(-1).data[13]).toBe(65);
+    expect(rows.at(-1).data[PILOT_ROW.warmth]).toBe(65);
     // Insulation keeps out some of a hit too
     ships.get(pid)!.derived.makeup.insulation = 0.2;
     ships.frostHit(pid, 0.25, 75);

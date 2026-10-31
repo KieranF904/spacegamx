@@ -4,7 +4,7 @@ import * as bitecs from 'bitecs';
 import {
   Position, Velocity, Rotation, Input, InSystem, ServerMessage, ReplicaMode, replicaAngle, quantizeReplicaAngle,
   jumpTuning, jumpRange, jumpScaleFor, jumpPhase, FRICTION, jumpFieldAt, lodestonePosition, pilotJumpStep, stepShipPhysics, solarRingRadius,
-  lodestoneFieldRadius, lodestoneSize, lodestoneLive, primeBoost, type LodestoneData, type Charge,
+  lodestoneFieldRadius, lodestoneSize, lodestoneLive, primeBoost, PILOT_ROW, type LodestoneData, type Charge,
 } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
@@ -177,10 +177,10 @@ describe('stillstones', () => {
     expect(mismatches.slice(0, 3)).toEqual([]);
     expect(inField).toBeGreaterThan(100);
     expect(primedJump).toBe(true);
-    // The pilot's snapshot rows: data[9] flags (2: a lodestone's field) and data[12] the priming left
+    // The pilot's snapshot rows: data[PILOT_ROW.field] flags (2: a lodestone's field) and data[PILOT_ROW.prime] the priming left
     const rows = got.filter((m) => m.type === 'snapshot').flatMap((m: any) => m.entities.filter((e: any) => e.id === pid && e.data?.length > 12));
-    expect(rows.some((e: any) => (e.data[9] & 2) === 2 && e.data[12] === jt.lodestonePrimeTicks)).toBe(true);
-    expect(rows.some((e: any) => (e.data[9] & 2) === 0 && e.data[12] > 0 && e.data[12] < jt.lodestonePrimeTicks)).toBe(true);
+    expect(rows.some((e: any) => (e.data[PILOT_ROW.field] & 2) === 2 && e.data[PILOT_ROW.prime] === jt.lodestonePrimeTicks)).toBe(true);
+    expect(rows.some((e: any) => (e.data[PILOT_ROW.field] & 2) === 0 && e.data[PILOT_ROW.prime] > 0 && e.data[PILOT_ROW.prime] < jt.lodestonePrimeTicks)).toBe(true);
   });
 
   it('a watching client replays a pilot charging in a field without needing keyframes', () => {
@@ -215,7 +215,7 @@ describe('stillstones', () => {
     expect(primeBoost(ship().jumpPrime!, jt)).toBeLessThan(jt.lodestoneRangeBoost);
     expect(primeBoost(ship().jumpPrime!, jt)).toBeGreaterThan(1);
     const rows = got.filter((m) => m.type === 'snapshot').flatMap((m: any) => m.entities.filter((e: any) => e.id === pid && e.data?.length > 12));
-    expect(rows.some((e: any) => (e.data[9] & 2) === 2 && e.data[12] === -jt.lodestonePrimeTicks)).toBe(true);
+    expect(rows.some((e: any) => (e.data[PILOT_ROW.field] & 2) === 2 && e.data[PILOT_ROW.prime] === -jt.lodestonePrimeTicks)).toBe(true);
   });
 
   it('across the cluster: fewer in dangerous systems, dead and shattered ones there with no field, none overlapping', () => {

@@ -104,7 +104,8 @@ export function partTipHtml(p: Pick<PlacedPart, 'fn' | 'material' | 'piece'> & P
   if (fn.weapon) {
     const def = tuning.weapons?.[fn.weapon];
     const w = d?.weapons.find((x) => x.part === i);
-    const rate = 60 / (fn.fireInterval ?? 10);
+    const rateOf = fn.fireInterval ?? 10, rate = 60 / rateOf;
+    const f = fn.fire;
     // (A fading beam: full strength to its effective range, then weaker out to its full one)
     // (Support weapons do no damage: what they do instead, support.ts)
     if (st.heal) html += row('Mends', `<span style="color:#5eead4">${n0(st.heal)} hp/s</span> into an ally's damaged parts where it lands · reach ${n0(st.range ?? 0)} · not your own ship, not destroyed parts`);
@@ -115,7 +116,13 @@ export function partTipHtml(p: Pick<PlacedPart, 'fn' | 'material' | 'piece'> & P
     if (st.pulse) html += row('Pulse', `${n0(st.pulse.damage)} a pulse · charges in ${st.pulse.seconds.toFixed(1)}s · no heat`);
     else if (st.heal) html += row('Beam', 'held while you fire · no heat · draws its power while it\'s on');
     else if (st.intercept) html += row('Fire', 'fires itself at what comes in · a little power a shot');
-    else html += row('Fire rate', `${rate >= 10 ? n0(rate) : rate.toFixed(1)}/s · ${esc(KIND[def?.type ?? ''] ?? def?.type ?? fn.weapon)}${def?.ammo ? ` · ${esc(econ.items.name(def.ammo.item))}` : ''}`);
+    // Its firing model (common/src/ships/guns.ts): how it fires and what it pays with
+    else if (f?.model === 'beam') html += row('Beam', `held while you fire · no heat · draws its power while it's on${f.windup ? ` · winds up over ${(f.windup / 60).toFixed(1)}s` : ''}`);
+    else if (f?.model === 'clip') html += row('Clip', f.regrow
+      ? `holds ${f.clip} · ${f.rounds ?? 1} a shot, every ${(rateOf / 60).toFixed(1)}s · regrows one every ${(f.regrow / 60).toFixed(2)}s (${n0((f.reloadE ?? 0) / (f.clip ?? 1))} energy each)`
+      : `${f.clip} rounds at ${rate >= 10 ? n0(rate) : rate.toFixed(1)}/s · reloads in ${((f.reload ?? 0) / 60).toFixed(1)}s from energy (${n0(f.reloadE ?? 0)} a clip), when empty or a second after you let go`);
+    else if (f?.model === 'charge') html += row('Charge', `hold ${((f.charge ?? 0) / 60).toFixed(1)}s: it fires itself, then ${((f.cooldown ?? 0) / 60).toFixed(1)}s to cool · let go early and nothing fires · ${n0(f.chargeE ?? 0)} energy a charge`);
+    else html += row('Fire rate', `${f?.spin ? `${(60 / f.spin.from).toFixed(1)}/s spinning up to ${n0(60 / f.spin.to)}/s` : rate >= 10 ? n0(rate) : rate.toFixed(1)}${f?.spin ? '' : '/s'} · ${esc(KIND[def?.type ?? ''] ?? def?.type ?? fn.weapon)}${def?.ammo && (!f || f.model === 'ammo') ? ` · ${esc(econ.items.name(def.ammo.item))}${(f?.rounds ?? 1) > 1 ? ` (${f!.rounds} a shot, no energy)` : f ? ' (no energy)' : ''}` : ''}`);
     if (w && w.satisfaction < 0.995) html += row('Under-powered', `<span style="color:#fbbf24">${Math.round(w.satisfaction * 100)}%: fires slower</span>`);
     // (Its model's mount: not a choice)
     const facing = p.facing ? FACING[p.facing] : '';

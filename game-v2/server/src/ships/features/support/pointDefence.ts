@@ -41,7 +41,7 @@ export function pointDefence(b: WeaponBridge, eid: number, ship: ShipState, pose
     const a = win.center + res.offset;
     const [mx, my] = shipPointToWorld(ship, pose, [win.pivot[0] + Math.cos(a) * win.barrel, win.pivot[1] + Math.sin(a) * win.barrel], b.tuning.cellSize);
     const cd = ship.cooldown[w.part];
-    ship.cooldown[w.part] = (cd > -1 ? cd : 0) + w.interval * (b.coldStage(eid).guns ?? 1);
+    ship.cooldown[w.part] = (cd > -1 ? cd : 0) + w.interval;
     const target = pick.id;
     if (b.host.intercept!(eid, w.part, target, mx, my)) {
       const i = b.pdList.findIndex((t) => t.id === target);

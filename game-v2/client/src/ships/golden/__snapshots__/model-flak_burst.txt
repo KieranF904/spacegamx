@@ -5,7 +5,7 @@ Hull · mass60 hp · 1.0
 Armour · build1 · 1 pts
 Damage26/s · reach 1,700
 Hits withExplosive · penetration 0
-Fire rate1.8/s · shells · Flak Canisters
+Fire rate1.8/s · shells · Flak Canisters (no energy)
 MountTurret, 200°
 FittingSide mount (flippable) · Bolts on at its side only
 Power draw10/s
