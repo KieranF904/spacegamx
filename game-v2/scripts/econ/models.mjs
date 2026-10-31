@@ -64,16 +64,22 @@ const W = [
   ['autocannon_stinger', 'Stinger', 'autocannon', 'sq', 24, { dmg: 1.5, int: 1.25 }, { mul: { damage: x(1.5), spread: x(0.4) } }, 'An accurate autocannon: every shell where you aim it.'],
   ['flak_burst', 'Burst', 'flak', 'sq', 4, {}, {}, 'The base flak gun: shells that burst near what they pass. Fires canisters.'],
   ['flak_cloudmaker', 'Cloudmaker', 'flak', 'rect2', 16, { dmg: 1.7, int: 1.4 }, { mul: { splashRadius: x(1.45), splashDamage: x(1.7) } }, 'Wide, heavy bursts that fill the sky.'],
-  ['mortar_lobber', 'Lobber', 'mortar', 'sq', 7, {}, {}, 'The base mortar: shells that land where you aim. Fires shells.'],
-  ['mortar_quake', 'Quake', 'mortar', 'rect2', 24, { dmg: 2, int: 1.6 }, { mul: { splashRadius: x(1.4), splashDamage: x(2) } }, 'A heavy mortar whose shells shake the ground they land on.'],
+  // (Section 4's ordnance rows, rework-2026-11. Mortars: the Lobber lands at the cursor (out to 2,640), splash r220 / 70, a shell every 90 t, 40 a
+  // crate; the Quake walks three shells at 0.7, 1.0 and 1.3 of the aim distance, 15 t apart, r260 / 60 each, a salvo every 180 t (3 rounds).
+  // Missiles: the Dart 24 a crate, 108 t, homing 0.07 on the ship nearest the cursor, 30 + r120 / 34; the Swarm six rockets over 30 t, a salvo
+  // every 180 t (6 rounds), 10 + r60 / 12, homing x1.3; the Hammerhead 198 t, 105 + r150 / 54, guided, 2 PD hits. Torpedoes: the Eel 240 t, 420 dmg,
+  // through shields, r90 / 80, gentle homing, 3 PD hits; the Leviathan 2 rounds a shot, 360 t, 1,000 dmg, through shields, r200 / 200, no
+  // homing, armed after 60 t, 5 PD hits. `intercept` is a shell's point-defence hits; the kinds give 1.)
+  ['mortar_lobber', 'Lobber', 'mortar', 'sq', 7, { blurb: 'Artillery that lands where you click' }, {}, 'Artillery that lands where you click: one shell every second and a half, lobbed over everything to burst at your cursor (out to 2,640) in a 220 blast. Forty shells a crate.'],
+  ['mortar_quake', 'Quake', 'mortar', 'rect2', 24, { dmg: 2, int: 2, blurb: 'The walking barrage' }, { set: { splash: { radius: 260, damage: 60 } } }, 'The walking barrage: a salvo of three shells every three seconds that land at 70%, 100% and 130% of your aim distance, a quarter second apart, each a 260 blast. It covers a lane, not a point. Uses three rounds a salvo.'],
   ['laser_glint', 'Glint', 'laser', 'sq', 9, {}, {}, 'The base pulse laser: charged pulses that reach far.'],
   ['laser_cutter', 'Cutter', 'laser', 'rect2', 18, { dmg: 2.1 }, { mul: { damage: x(2.1), range: x(0.8) } }, 'Close and brutal: a short, searing beam.'],
   ['laser_searchlight', 'Searchlight', 'laser', 'round', 26, { dmg: 0.8 }, { mul: { damage: x(0.8), range: x(1.5) } }, 'A beam that reaches out further than anything.'],
   ['pulse_strobe', 'Strobe', 'pulse', 'sq', 10, {}, {}, 'The base pulse gun: bursts that strip shields.'],
   ['pulse_overpulse', 'Overpulse', 'pulse', 'rect2', 25, { burst: 4 / 3 }, { mul: { vsShield: x(1.9), vsHull: x(0.5) }, add: { burst: 1 } }, 'Four-shot bursts that tear shields down and barely scratch a hull.'],
-  ['missile_dart', 'Dart', 'missile', 'sq', 11, {}, {}, 'The base launcher: missiles that lock on. Fires missile crates.'],
-  ['missile_swarm', 'Swarm', 'missile', 'rect2', 21, { dmg: 0.5, burst: 3 }, { mul: { damage: x(0.5), splashDamage: x(0.5), homing: x(1.3) }, add: { burst: 2 } }, 'Three small missiles a salvo, turning hard.'],
-  ['missile_hammerhead', 'Hammerhead', 'missile', 'block2', 33, { dmg: 3.5, int: 1.8, hp: 1.2, mass: 1.4 }, { mul: { damage: x(3.5), splashDamage: x(1.6), speed: x(0.7), maxSpeed: x(0.7), size: x(1.5) } }, 'A huge, slow warhead.'],
+  ['missile_dart', 'Dart', 'missile', 'sq', 11, { blurb: 'Lock and forget' }, {}, 'Lock and forget: a missile every couple of seconds that homes on the ship nearest your cursor, 30 damage and a 120 blast. Twenty-four missiles a crate. Point defence kills it in one hit.'],
+  ['missile_swarm', 'Swarm', 'missile', 'rect2', 21, { dmg: 0.5, burst: 6, int: 1.64, blurb: 'The ripple that floods point defence' }, { mul: { homing: x(1.3) }, set: { damage: 10, splash: { radius: 60, damage: 12 } } }, 'The ripple that floods point defence: six small rockets in half a second, every three seconds, spreading and then converging on the ship nearest your cursor. Each is 10 damage and a 60 blast and dies to one point-defence hit. Uses six rounds a salvo.'],
+  ['missile_hammerhead', 'Hammerhead', 'missile', 'block2', 33, { dmg: 3.5, int: 1.8, hp: 1.2, mass: 1.4, blurb: 'The steered warhead' }, { mul: { damage: xp(3.5), speed: x(0.7), maxSpeed: x(0.7), size: x(1.5) }, set: { splash: { radius: 150, damage: 54 }, intercept: 2 } }, 'The steered warhead: a slow, heavy missile, 105 damage and a 150 blast. While you hold fire it flies toward your cursor; let go and it flies straight. Point defence needs two hits.'],
   // (Railguns, rework section 4: the Needle's slug 62 dmg, pierce 2, speed 150, 75 ticks; the Coilgun five slugs of 16 in a 12 degree cone, pierce 1,
   // life 18 (2,700 reach), 54 ticks, 14 E a shot; the Spear 160 dmg through three hulls at full damage, 114 ticks, 120 E. The energy a cycle gun
   // draws is its draw x its interval, so RAIL_E sets each demand to give 14 E and 120 E a shot)
@@ -84,8 +90,8 @@ const W = [
   ['emp_blackout', 'Blackout', 'emp', 'block2', 35, { int: 1.5, dmg: 1.6 }, { set: { emp: { radius: 320, ticks: 168 } }, mul: { size: x(1.4) } }, 'A wide, long blackout.'],
   ['arc_spark', 'Spark', 'arc', 'sq', 17, {}, {}, 'The base arc projector: lightning that jumps between ships.'],
   ['arc_tesla', 'Tesla', 'arc', 'round', 29, { dmg: 1.4 }, { set: { chain: { count: 5, radius: 300, falloff: 0.5 } } }, 'Lightning that jumps two ships further.'],
-  ['torpedo_eel', 'Eel', 'torpedo', 'rect2', 19, {}, {}, 'The base torpedo: slow and huge, straight through shields. Fires torpedoes.'],
-  ['torpedo_leviathan', 'Leviathan', 'torpedo', 'block2', 38, { dmg: 2.4, hp: 1.2, mass: 1.3 }, { mul: { damage: x(2.4), splashDamage: x(2.4), speed: x(0.8), maxSpeed: x(0.8), size: x(1.4) } }, 'A torpedo to end a fight.'],
+  ['torpedo_eel', 'Eel', 'torpedo', 'rect2', 19, { blurb: 'The stalker' }, { set: { homing: 0.02 } }, 'The stalker: a slow, fat torpedo that creeps after its prey, 420 damage straight through shields and a 90 blast. Six torpedoes a crate, one every four seconds. Point defence needs three hits.'],
+  ['torpedo_leviathan', 'Leviathan', 'torpedo', 'block2', 38, { dmg: 2.4, hp: 1.2, mass: 1.3, blurb: 'The fight-ender' }, { mul: { speed: x(0.8), maxSpeed: x(0.8), size: x(1.4) }, set: { damage: 1000, splash: { radius: 200, damage: 200 }, intercept: 5, arm: 60 } }, 'The fight-ender: a huge torpedo, 1,000 damage straight through shields and a 200 blast, one every six seconds. It flies straight and does not home, and arms a second after launch. Two rounds a shot (three shots a crate). Point defence needs five hits.'],
   ['lance_lance', 'Lance', 'lance', 'rect2', 32, {}, {}, 'The held beam: a heavy lance that burns as long as the power lasts.'],
 ];
 
@@ -418,14 +424,14 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
     flak_burst: { model: 'ammo' },
     flak_cloudmaker: { model: 'clip', interval: 30, clip: 4, reload: 150, reloadE: 30 },
     mortar_lobber: { model: 'ammo' },
-    mortar_quake: { model: 'ammo', rounds: 3 },
+    mortar_quake: { model: 'ammo', rounds: 3, interval: 180 },
     laser_glint: { model: 'cycle' },
     laser_cutter: { model: 'beam' },
     laser_searchlight: { model: 'beam' },
     pulse_strobe: { model: 'cycle' },
     pulse_overpulse: { model: 'clip', interval: 6, clip: 12, reload: 90, reloadE: 36 },
-    missile_dart: { model: 'ammo' },
-    missile_swarm: { model: 'ammo', rounds: 6 },
+    missile_dart: { model: 'ammo', interval: 108 },
+    missile_swarm: { model: 'ammo', rounds: 6, interval: 180 },
     missile_hammerhead: { model: 'ammo' },
     railgun_needle: { model: 'ammo' },
     railgun_coilgun: { model: 'cycle', interval: 54 },
@@ -436,7 +442,7 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
     arc_spark: { model: 'cycle' },
     arc_tesla: { model: 'beam' },
     torpedo_eel: { model: 'ammo' },
-    torpedo_leviathan: { model: 'ammo', rounds: 2 },
+    torpedo_leviathan: { model: 'ammo', rounds: 2, interval: 360 },
     lance_lance: { model: 'beam', windup: 18 },
     legendary_hive: { model: 'clip', clip: 8, regrow: 45, reloadE: 48, rounds: 4 },
     legendary_frostbite: { model: 'beam' },
@@ -480,6 +486,7 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
     emp_blackout: { endAtAim: true },
     mortar_quake: { walk: { at: [0.7, 1, 1.3], gap: 15 } },
     missile_hammerhead: { guided: { turn: 0.05 } },
+    missile_swarm: { salvo: { count: 6, gap: 6 } },
     laser_searchlight: { mark: { ticks: 120 } },
   };
   for (const [id, set] of Object.entries(SHOT)) {

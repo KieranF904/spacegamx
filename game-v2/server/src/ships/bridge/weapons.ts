@@ -189,14 +189,14 @@ export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: 
   for (const { w, aimQ, shot } of shots) {
     const d = def(w);
     const gunMods = ship.blueprint.parts[w.part].mods;
-    // Missiles lock on to the target given, or the one nearest the aim point (a guided one is steered instead)
+    // Missiles lock on to the ship nearest the aim point (the cursor), else the target given (a guided one is steered instead)
     let lock = -1;
     if (d.homing && !d.guided) {
-      lock = target;
-      if (lock < 0 && aimWorld !== undefined) {
+      if (aimWorld !== undefined) {
         const ax = pose.x + Math.cos(aimWorld) * Math.max(aimDist, 400), ay = pose.y + Math.sin(aimWorld) * Math.max(aimDist, 400);
         lock = b.nearestTarget(eid, ax, ay, 1400, undefined, true);
       }
+      if (lock < 0) lock = target;
     }
     // (An ammunition gun's shot costs its `rounds` from the hold; Ammo.ts: an empty hold fires plain rounds, as it always has)
     let round = b.host.spendAmmo?.(eid, w.kind, !d.ammo);
@@ -207,6 +207,13 @@ export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: 
       { speedScale: shot.speedScale, sizeScale: shot.sizeScale, turret: shot.mount === 'turret', kind: w.kind, target: lock, seed: `${eid}:${ship.blueprint.parts[w.part].uid}`, mods: gunMods, dry: round?.dry, ammoMods: round?.mods,
         reach: endsAtAim(d) ? aimReach(aimDist, d, 0) : undefined, grade: w.grade, size: w.size, model: w.model });
     if (ids?.length && firesStraight(d)) b.fired.push({ owner: eid, tick, part: w.part, aimQ, ids, ...(round?.item ? { ammo: ammoCode(round.item) } : {}) });
+    // A rippling salvo: the rest of its shells, `gap` ticks apart, on the same lock
+    if (d.salvo && d.salvo.count > 1) {
+      let list = b.salvos.get(eid);
+      if (!list) b.salvos.set(eid, (list = []));
+      const uid = ship.blueprint.parts[w.part].uid;
+      for (let i = 1; i < d.salvo.count; i++) list.push({ uid, due: tick + d.salvo.gap * i, index: i, reach: 0, target: lock, damageScale, dry: round?.dry, ammoMods: round?.mods });
+    }
     // A walking salvo: the rest of its shells, `gap` ticks apart, each landing at its fraction of this aim distance
     if (d.walk && d.walk.at.length > 1) {
       let list = b.salvos.get(eid);
@@ -255,7 +262,7 @@ function stepSalvos(b: BridgeCtx, eid: number, ship: ShipState, pose: { x: numbe
     if (!w) continue;
     const shot = buildShot(w, ship, pose, tick, b.tuning);
     b.host.fireBaseShot(eid, shot.x, shot.y, shot.angle, p.damageScale,
-      { speedScale: shot.speedScale, sizeScale: shot.sizeScale, turret: shot.mount === 'turret', kind: w.kind, seed: `${eid}:${p.uid}:w${p.index}`, mods: ship.blueprint.parts[w.part]?.mods,
+      { speedScale: shot.speedScale, sizeScale: shot.sizeScale, turret: shot.mount === 'turret', kind: w.kind, target: p.target, seed: `${eid}:${p.uid}:w${p.index}`, mods: ship.blueprint.parts[w.part]?.mods,
         dry: p.dry, ammoMods: p.ammoMods, reach: p.reach, grade: w.grade, size: w.size, model: w.model });
     b.lastFired.set(eid, tick);
   }
