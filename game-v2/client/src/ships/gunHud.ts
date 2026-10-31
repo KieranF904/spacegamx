@@ -17,6 +17,8 @@ export interface RingGroup {
   kind: string;
   /** Part indices of the guns in the group */
   parts: number[];
+  /** The guns' weapon records, parallel to `parts` (resolved at regroup so a frame looks nothing up) */
+  ws: Weapon[];
   /** Clip size of one gun (0: not a clip gun) */
   clip: number;
   /** Rounds in the clip, averaged over the group's guns */
@@ -51,6 +53,8 @@ export interface RingSources {
   ammoOf(kind: string): { loose: number; crates: number } | null;
 }
 
+type Weapon = ShipState['derived']['weapons'][number];
+
 const FLASH_FRAME = 0.1;
 
 export class RingModel {
@@ -71,13 +75,14 @@ export class RingModel {
       let g = by.get(key);
       if (!g) {
         g = {
-          fn, model: w.fire.model, kind: w.kind, parts: [], clip: w.fire.model === 'clip' ? (w.fire.clip ?? 1) : 0,
+          fn, model: w.fire.model, kind: w.kind, parts: [], ws: [], clip: w.fire.model === 'clip' ? (w.fire.clip ?? 1) : 0,
           rounds: 0, reloading: false, starved: false, charge: 0, cooling: 0, flash: 0, spin: 0, ready: 1, ammo: -1, crates: 0, bank: -1, prevCharge: 0,
         };
         by.set(key, g);
         out.push(g);
       }
       g.parts.push(w.part);
+      g.ws.push(w);
     }
     this.groups = out;
   }
@@ -86,12 +91,11 @@ export class RingModel {
   update(ship: ShipState | null, src: RingSources): RingGroup[] {
     if (!ship || ship.kind !== 'ship') { this.ship = null; this.groups.length = 0; return this.groups; }
     if (ship !== this.ship || ship.rebuilds !== this.rebuilds) this.regroup(ship);
-    const d = ship.derived, weapons = d.weapons;
+    const d = ship.derived;
     for (const g of this.groups) {
       let rounds = 0, n = 0, reloading = false, starved = false, charge = 0, cooling = 0, spin = 0, ready = 1, bank = -1;
-      for (const part of g.parts) {
-        const w = weapons.find((x) => x.part === part);
-        if (!w) continue;
+      for (let gi = 0; gi < g.parts.length; gi++) {
+        const part = g.parts[gi], w = g.ws[gi];
         n++;
         const f = w.fire;
         if (f.model === 'clip') {

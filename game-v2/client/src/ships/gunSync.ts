@@ -55,7 +55,8 @@ export class GunSync {
       const from = this.since.get(part);
       if (from === undefined || from > tick) { this.since.set(part, tick); continue; }
       if (tick - from < GUN_STATE_PATIENCE) continue;
-      const w = ship.derived.weapons.find((x) => x.part === part);
+      let w: (typeof ship.derived.weapons)[number] | undefined;
+      for (const x of ship.derived.weapons) if (x.part === part) { w = x; break; }
       if (w) { applyGunState(ship, w, v); adopted++; }
       this.since.delete(part);
     }
