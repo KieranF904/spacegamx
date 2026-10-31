@@ -90,10 +90,10 @@ const W = [
   ['railgun_needle', 'Needle', 'railgun', 'rect2', 13, {}, {}, 'The cheap rail: a long thin slug that goes through two ships. It fires slugs from the hold and needs no power.'],
   ['railgun_coilgun', 'Coilgun', 'railgun', 'rect2', 22, { dmg: 0.7, int: 0.72, draw: 1.8 }, { set: { ammo: null, damage: 16, burst: 5, spread: 6, jitter: 0, life: 18, pierce: 1 } }, 'The rail shotgun: five slugs in a tight cone, a finisher for close range that is spent past 2,700. It throws its own slugs for 14 E a shot, so it needs no ammo.'],
   ['railgun_spear', 'Spear', 'railgun', 'block2', 28, { dmg: 2.6, int: 1.52, draw: 2.2, hp: 1.2 }, { set: { damage: 160, pierce: 3, pierceKeep: 1 } }, 'The capital rail: one slug every couple of seconds that goes through three ships at full damage, a ring of shock at each. It costs 120 E a shot and needs no ammo.'],
-  ['emp_hush', 'Hush', 'emp', 'sq', 15, {}, {}, 'The base EMP: shuts a ship down for a moment.'],
-  ['emp_blackout', 'Blackout', 'emp', 'block2', 35, { int: 1.5, dmg: 1.6 }, { set: { emp: { radius: 320, ticks: 168 } }, mul: { size: x(1.4) } }, 'A wide, long blackout.'],
-  ['arc_spark', 'Spark', 'arc', 'sq', 17, {}, {}, 'The base arc projector: lightning that jumps between ships.'],
-  ['arc_tesla', 'Tesla', 'arc', 'round', 29, { dmg: 1.4 }, { set: { chain: { count: 5, radius: 300, falloff: 0.5 } } }, 'Lightning that jumps two ships further.'],
+  ['emp_hush', 'Hush', 'emp', 'sq', 15, { blurb: 'Switch one ship off' }, {}, 'Switches one ship off: an orb that bursts on its fuse or beside a ship, and 2 s of dead engines and guns.'],
+  ['emp_blackout', 'Blackout', 'emp', 'block2', 35, { int: 1.5, dmg: 1.6, blurb: 'The charged area blackout' }, { set: { emp: { radius: 320, ticks: 168 } }, mul: { size: x(1.4) } }, 'Hold to charge, then it fires itself: an orb that bursts where you aimed, or beside a ship, for a wide 2.8 s blackout.'],
+  ['arc_spark', 'Spark', 'arc', 'sq', 17, { blurb: 'The chain zap' }, {}, 'A bolt that strikes at once, out to 660, and leaps to 3 more ships nearby, weaker each hop.'],
+  ['arc_tesla', 'Tesla', 'arc', 'round', 29, { dmg: 1.4, blurb: 'The held storm' }, { set: { chain: { count: 5, radius: 300, falloff: 0.5 } } }, 'Hold to keep zapping, five times a second: each zap leaps to 5 more ships nearby, weaker each hop.'],
   ['torpedo_eel', 'Eel', 'torpedo', 'rect2', 19, { blurb: 'The stalker' }, { set: { homing: 0.02 } }, 'The stalker: a slow, fat torpedo that creeps after its prey, 420 damage straight through shields and a 90 blast. Six torpedoes a crate, one every four seconds. Point defence needs three hits.'],
   ['torpedo_leviathan', 'Leviathan', 'torpedo', 'block2', 38, { dmg: 2.4, hp: 1.2, mass: 1.3, blurb: 'The fight-ender' }, { mul: { speed: x(0.8), maxSpeed: x(0.8), size: x(1.4) }, set: { damage: 1000, splash: { radius: 200, damage: 200 }, intercept: 5, arm: 60 } }, 'The fight-ender: a huge torpedo, 1,000 damage straight through shields and a 200 blast, one every six seconds. It flies straight and does not home, and arms a second after launch. Two rounds a shot (three shots a crate). Point defence needs five hits.'],
   ['lance_lance', 'Lance', 'lance', 'rect2', 32, { demand: 45 }, {}, 'The heavy held beam: 210 damage a second at 500 units after a 0.3 s windup, piercing, 20% more against plating. 90 E a second and no heat; short of power it sputters.'],
@@ -441,9 +441,9 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
     railgun_coilgun: { model: 'cycle', interval: 54 },
     railgun_spear: { model: 'cycle', interval: 114 },
     railgun_rail_driver: { model: 'clip', interval: 10, clip: 6, reload: 90, reloadE: 48 },
-    emp_hush: { model: 'cycle' },
+    emp_hush: { model: 'cycle', interval: 162 },
     emp_blackout: { model: 'charge', charge: 90, cooldown: 240, chargeE: 90 },
-    arc_spark: { model: 'cycle' },
+    arc_spark: { model: 'cycle', interval: 45 },
     arc_tesla: { model: 'beam' },
     torpedo_eel: { model: 'ammo' },
     torpedo_leviathan: { model: 'ammo', rounds: 2, interval: 360 },
@@ -459,8 +459,12 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
     utility_demolition_launcher: { model: 'ammo' },
   };
   // (Held beams of kinds that fire shells or pulses today: the section 4 dps and reach, until their family unit gives them their own)
-  const RAIL_E = { railgun_coilgun: 14, railgun_spear: 120 };
-  const BEAM_SET = { laser_cutter: { dps: 60 }, laser_searchlight: { dps: 25 }, arc_tesla: { dps: 70, range: 660, width: 10 } };
+  const RAIL_E = { railgun_coilgun: 14, railgun_spear: 120, emp_hush: 25, arc_spark: 13.5 };
+  // (Held beams' energy a second, section 4: demand x the piece's area. Tesla: a zap every 12 ticks of 14 damage, chaining)
+  const BEAM_E = { arc_tesla: 30 };
+  const BEAM_SET = { laser_cutter: { dps: 60 }, laser_searchlight: { dps: 25 }, arc_tesla: { dps: 70, range: 660, width: 10, zap: 12 } };
+  // (Hush bursts on its fuse: 90 ticks of flight, or on proximity)
+  BEAM_SET.emp_hush = { life: 90 };
   for (const m of models) {
     if (!m.weapon) continue;
     const f = FIRE[m.id];
@@ -469,6 +473,7 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
     // (A clip's interval is its own beat within the clip, from section 4: the fire rate everything else reads too)
     if (f.interval !== undefined) m.fireInterval = f.interval;
     // (A cycle railgun's energy a shot is its draw x its interval: the section 4 energies set the draw, per cell)
+    if (BEAM_E[m.id]) m.demand = r2(BEAM_E[m.id] / PIECE_AREA[m.pieces[0]]);
     if (RAIL_E[m.id]) m.demand = r2((RAIL_E[m.id] * 60) / (f.interval * PIECE_AREA[m.pieces[0]]));
     const kind = TUNING.weapons[m.weapon] ?? {};
     const set = { ...(m.weaponMods?.set ?? {}) };

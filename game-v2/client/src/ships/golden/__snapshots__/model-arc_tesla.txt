@@ -9,12 +9,12 @@ Hits withEnergy · penetration 4
 Beamheld while you fire · no heat · draws its power while it's on
 MountTurret, 300°
 FittingSide mount (flippable) · Bolts on at its side only
-Power draw25/s
+Power draw30/s
 
 == partStats (stats rows) ==
 GradeMk IV · Small
 Hits withEnergy · penetration 4
-Power draw25
+Power draw30
 Hull · mass62 hp · 0.8
 Armour · build4 · 3 pts
 TakesKinetic −5% · Thermal −15% · Cryo −10%
@@ -30,10 +30,10 @@ Small
 Small · Round
 
 == tradeOff ==
-jumps two ships further
+held storm: 5 zaps a second, chains to 5
 
 == keyStats ==
-70 dmg/s · reach 660 · held beam · draws 25
+70 dmg/s · reach 660 · held beam · draws 30
 
 == mountBadge ==
 TURRET 300°SIDE
@@ -50,4 +50,4 @@ Bolts on at its side only
 {"open":true,"badge":"Lv 29","why":""}
 
 == partStats (raw) ==
-{"grade":4,"mark":"Mk IV","size":"Small","area":0.7853981633974483,"hp":61.57521601035994,"mass":0.7853981633974483,"firepower":70,"toughness":61.57521601035994,"armour":4,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"dps":70,"range":660,"damageType":"energy","pen":4,"draw":25.20342706342412}
+{"grade":4,"mark":"Mk IV","size":"Small","area":0.7853981633974483,"hp":61.57521601035994,"mass":0.7853981633974483,"firepower":70,"toughness":61.57521601035994,"armour":4,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"dps":70,"range":660,"damageType":"energy","pen":4,"draw":30.002209841782527}

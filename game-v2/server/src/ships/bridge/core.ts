@@ -40,6 +40,8 @@ export interface ShipHost {
   splashMobs?(systemNum: number, x: number, y: number, radius: number, damage: number, source: number): void;
   /** A beam passing through mobs this tick */
   beamMobs?(systemNum: number, x0: number, y0: number, x1: number, y1: number, width: number, damage: number, source: number): void;
+  /** A zap leapt to (x, y) from (fromX, fromY) (a Tesla's chain): everyone in the system sees the arc */
+  arcHop?(systemNum: number, x: number, y: number, fromX: number, fromY: number): void;
   beamAsteroid?(eid: number, x: number, y: number, angle: number, range: number, damage: number, kind: string): number;
   /** `glancing`: the hit barely got through the armour it struck (a gun too weak for it) */
   notifyDamage(targetEid: number, amount: number, sourceEid: number, glancing?: boolean): void;

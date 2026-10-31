@@ -186,6 +186,8 @@ export interface WeaponTuning {
   vsHull?: number;
   /** Lightning: from what it hits it leaps to `count` more ships within `radius`, each time × `falloff` */
   chain?: { count: number; radius: number; falloff: number };
+  /** Beam: it burns in a zap every `zap` ticks (dps x zap / 60 each, the chain leaping from it) instead of continuously (the Tesla) */
+  zap?: number;
   /** Each hit takes `perHit` of the warmth of the ship it lands on (warmth.ts); frozen through (0), it seizes up for `ticks` */
   frost?: { perHit: number; ticks: number };
   /** Hits on one faction's ships (not its bosses) do `damage` times as much (an ammunition made for them: Quench Slugs on the Cinder Cult) */

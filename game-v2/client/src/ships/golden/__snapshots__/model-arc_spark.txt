@@ -30,7 +30,7 @@ Small
 Small · Square
 
 == tradeOff ==
-lightning that jumps between ships
+instant zap, chains to 3 more ships
 
 == keyStats ==
 45 dmg/s · reach 660 · draws 18
