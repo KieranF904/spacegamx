@@ -8,13 +8,12 @@
  * Sibling behaviour is reached through the bridge (b.hurt, b.fireWeapons, b.rebuildNow), never by import.
  */
 
-import { collideTerrain, terrainRadius } from '@space-game/common';
 import { hasComponent, entityExists } from 'bitecs';
 import {
   Position, Velocity, Rotation, Input, Boost, Player, Dead, InSystem, stepShipPhysics, quantizeShipBody, damagePart,
-  stepFlight, stepDrift, withEmp, withNumb, jumpTuning, pilotJumpStep, NO_FIELDS, convexPenetration, ReplicaMode, CTL,
-  controlBits, replicaAngle, quantizeReplicaAngle, partWeaponDef, partMaterial, powerTick, gunLoad, quantizeCargo,
-  buildFlightInputs, newFlightControls, chargeTotal, FULL_CHARGE,
+  stepDrift, withEmp, withNumb, jumpTuning, pilotJumpStep, NO_FIELDS, convexPenetration, ReplicaMode, CTL,
+  controlBits, quantizeReplicaAngle, partWeaponDef, partMaterial, powerTick, gunLoad, quantizeCargo,
+  buildFlightInputs, newFlightControls, chargeTotal,
   type ShipState, type Vec2, type GravityWell, type FlightConstants, type FlightInputSource,
 } from '@space-game/common';
 import { K, centroidOf, CONTACT_MARGIN, BIG_BODY, type ContactPiece, type BridgeCtx } from './core.js';
@@ -245,34 +244,7 @@ export function tick(ctx: BridgeCtx): void {
       body.angVel = spin;
       ctx.writeBody(eid, ship, body);
     } else if (!hasComponent(world, Player, eid)) {
-      // Dummy: holds its heading, coasts, and keeps its weapons cooling (or flies its autopilot course)
-      const body = ctx.readBody(eid, ship);
-      const ai = ctx.controllers.get(eid);
-      const orders = ai ? ai(eid, ship) : null;
-      const target = ctx.autopilot.get(eid);
-      const emp = ctx.isEmped(eid);
-      const hold = { forward: false, backward: false, left: false, right: false, boost: false, targetAngle: body.angle };
-      let controls = orders ? orders.controls : target ? ctx.autopilotControls(eid, target) : hold;
-      // Aim in the replicated quantization, so every client steps it exactly the same
-      let q = 0;
-      if (controls !== hold) {
-        q = quantizeReplicaAngle(controls.targetAngle);
-        controls = { ...controls, targetAngle: replicaAngle(ReplicaMode.Pilotless, q) };
-      }
-      // EMP'd: it keeps flying, crippled (as a pilot does)
-      ctx.replicaCtl.set(eid, { mode: ReplicaMode.Pilotless, bits: (controls === hold ? CTL.hold : controlBits(controls)) | (emp ? CTL.emp : 0), q, derived: ship.derived });
-      if (orders?.impulse && !emp) { body.vx += orders.impulse[0]; body.vy += orders.impulse[1]; }
-      stepFlight(body, controls, ship.derived, ctx.tuning, { charge: FULL_CHARGE, drainRate: 0 }, emp ? { ...k, hazard: withEmp(undefined) } : k);
-      // A surface's rock (as the replicas have it: replicaStep)
-      collideTerrain(body, terrainRadius(ship.derived.radius), ctx.host.terrainAt?.(eid));
-      ctx.writeBody(eid, ship, body);
-      const pin = ctx.pinned.get(eid);
-      if (pin) { Position.x[eid] = pin.x; Position.y[eid] = pin.y; Velocity.x[eid] = 0; Velocity.y[eid] = 0; }
-      // Pilotless ships have a battery too: spare power charges it, shots spend it
-      // (Its guns draw on their own circuits as they reload: energy.ts)
-      const energy = { charge: powerTick(ship.derived, ctx.chargeOf(eid), { thrusting: false, boosting: false, load: gunLoad(ship, tick) }, ctx.tuning).charge };
-      ctx.fireWeapons(eid, ship, !!orders?.firing && !emp && !ctx.isJumping(ship), orders?.aim, orders?.aimDist ?? 0, orders?.target ?? -1, energy);
-      ctx.charge.set(eid, energy.charge);
+      ctx.stepPilotless(eid, ship, k, tick);
     }
   }
 

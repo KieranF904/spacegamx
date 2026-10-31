@@ -236,6 +236,7 @@ export interface BridgeInternals {
   damageContact: ShipBridge['damageContact']; contactScale: ShipBridge['contactScale']; stepBurns: ShipBridge['stepBurns'];
   stepRepairKits: ShipBridge['stepRepairKits']; decay: ShipBridge['decay']; repairStep: ShipBridge['repairStep'];
   partDeaths: ShipBridge['partDeaths']; applyBlast: ShipBridge['applyBlast']; autopilotControls: ShipBridge['autopilotControls'];
+  stepPilotless: ShipBridge['stepPilotless'];
 }
 
 /** The bridge as its modules see it */

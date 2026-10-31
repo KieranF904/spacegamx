@@ -10,7 +10,7 @@
  */
 
 import {
-  Position, Velocity, Rotation, Projectile, InSystem, FRICTION, Blueprint, Catalog,
+  Velocity, Projectile, InSystem, Blueprint, Catalog,
   ShipState, ShipTuning, PlacedGeom, Vec2, InventoryStub, ValidationResult,
   GravityWell, FlightConstants, type HitInfo, type WarmthStage, type JumpField, blueprintGeometry, standing,
   WeaponInfo, WeaponTuning, ReplicaMode, FireRecord, type FlightBody, type Charge,
@@ -24,6 +24,7 @@ import * as rbd from './bridge/rebuild.js';
 import * as wpn from './bridge/weapons.js';
 import * as dmg from './bridge/damage.js';
 import * as flt from './bridge/flight.js';
+import * as plt from './bridge/pilotless.js';
 
 // (The engine interface, events and constants now live in bridge/core.ts; re-exported for everything that imports them from here)
 export { STAGE_COVER };
@@ -132,14 +133,10 @@ export class ShipBridge {
 
   isAnchored(eid: number): boolean { return flt.isAnchored(this.ctx, eid); }
 
-  hasController(eid: number): boolean {
-    return this.controllers.has(eid);
-  }
+  hasController(eid: number): boolean { return plt.hasController(this.ctx, eid); }
 
   /** Where its autopilot is taking it (null: none) */
-  autopilotOf(eid: number): { x: number; y: number; arriveRadius: number } | null {
-    return this.autopilot.get(eid) ?? null;
-  }
+  autopilotOf(eid: number): { x: number; y: number; arriveRadius: number } | null { return plt.autopilotOf(this.ctx, eid); }
 
   lastFiredTick(eid: number): number { return wpn.lastFiredTick(this.ctx, eid); }
 
@@ -287,10 +284,7 @@ export class ShipBridge {
   pin(eid: number, on = true): void { return flt.pin(this.ctx, eid, on); }
 
   /** Give a pilotless ship an AI pilot (null: none) */
-  setController(eid: number, fn: ((eid: number, ship: ShipState) => PilotOrders | null) | null): void {
-    if (fn) this.controllers.set(eid, fn);
-    else this.controllers.delete(eid);
-  }
+  setController(eid: number, fn: ((eid: number, ship: ShipState) => PilotOrders | null) | null): void { return plt.setController(this.ctx, eid, fn); }
 
   /** Make a ship tougher (elite enemies): every part's max HP × k, at full HP */
   scaleHp(eid: number, k: number): void { return dmg.scaleHp(this.ctx, eid, k); }
@@ -302,35 +296,16 @@ export class ShipBridge {
   coreFraction(eid: number): number { return dmg.coreFraction(this.ctx, eid); }
 
   /** Fly a pilotless ship towards a point (null: stop and hold). */
-  setAutopilot(eid: number, target: { x: number; y: number; arriveRadius?: number } | null): void {
-    if (target) this.autopilot.set(eid, { x: target.x, y: target.y, arriveRadius: target.arriveRadius ?? 500 });
-    else this.autopilot.delete(eid);
-  }
+  setAutopilot(eid: number, target: { x: number; y: number; arriveRadius?: number } | null): void { return plt.setAutopilot(this.ctx, eid, target); }
 
   /**
    * Autopilot controls: turn to face the target, thrust when roughly facing it,
    * and cut the engines in time to coast to a stop at the arrival radius.
    */
-  private autopilotControls(eid: number, target: { x: number; y: number; arriveRadius: number }) {
-    const dx = target.x - Position.x[eid], dy = target.y - Position.y[eid];
-    const dist = Math.hypot(dx, dy);
-    // Hold the heading until the course drifts a degree or so: fewer control changes to replicate
-    let want = Math.atan2(dy, dx);
-    const held = this.apHeading.get(eid);
-    if (held !== undefined && Math.abs(Math.atan2(Math.sin(want - held), Math.cos(want - held))) < 0.02 && dist > target.arriveRadius) want = held;
-    this.apHeading.set(eid, want);
-    let err = want - Rotation.angle[eid];
-    while (err > Math.PI) err -= 2 * Math.PI;
-    while (err < -Math.PI) err += 2 * Math.PI;
-    // Friction alone stops a ship moving at v within about v / (1 - FRICTION)
-    const speed = Math.hypot(Velocity.x[eid], Velocity.y[eid]);
-    const stopping = speed / (1 - FRICTION);
-    const go = Math.abs(err) < 0.5 && dist - target.arriveRadius > stopping;
-    // Mouse-steer controls are screen-relative (forward = up the screen): press the
-    // screen directions nearest the nose, and the PD turn keeps the nose on target
-    const a = Rotation.angle[eid], cx = Math.cos(a), cy = Math.sin(a);
-    return { forward: go && cy < -0.38, backward: go && cy > 0.38, left: go && cx < -0.38, right: go && cx > 0.38, boost: false, targetAngle: want };
-  }
+  private autopilotControls(eid: number, target: { x: number; y: number; arriveRadius: number }) { return plt.autopilotControls(this.ctx, eid, target); }
+
+  /** One end-of-tick step of a pilotless ship (tick) */
+  private stepPilotless(eid: number, ship: ShipState, k: FlightConstants, tick: number): void { return plt.stepPilotless(this.ctx, eid, ship, k, tick); }
 
   validate(bp: Blueprint, opts: { mounting?: boolean } = {}): ValidationResult { return rbd.validate(this.ctx, bp, opts); }
 
