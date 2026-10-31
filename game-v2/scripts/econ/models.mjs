@@ -448,20 +448,21 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
     torpedo_eel: { model: 'ammo' },
     torpedo_leviathan: { model: 'ammo', rounds: 2, interval: 360 },
     lance_lance: { model: 'beam', windup: 18 },
-    legendary_hive: { model: 'clip', clip: 8, regrow: 45, reloadE: 48, rounds: 4 },
+    // (The Hive's salvo of four seekers (tuning.json weapons.hive salvo) takes four of its eight rounds, 0.5 s apart at most; it regrows one a 0.75 s drawing 6 E)
+    legendary_hive: { model: 'clip', interval: 30, clip: 8, regrow: 45, reloadE: 48, rounds: 4 },
     legendary_frostbite: { model: 'beam' },
-    legendary_cinder_bloom: { model: 'cycle' },
-    legendary_prism: { model: 'cycle' },
-    legendary_phase: { model: 'cycle' },
-    legendary_singularity: { model: 'cycle' },
+    legendary_cinder_bloom: { model: 'cycle', interval: 72 },
+    legendary_prism: { model: 'cycle', interval: 96 },
+    legendary_phase: { model: 'cycle', interval: 132 },
+    legendary_singularity: { model: 'cycle', interval: 420 },
     point_defence_turret: { model: 'auto' },
     utility_repair_beam: { model: 'beam' },
     utility_demolition_launcher: { model: 'ammo' },
   };
   // (Held beams of kinds that fire shells or pulses today: the section 4 dps and reach, until their family unit gives them their own)
-  const RAIL_E = { railgun_coilgun: 14, railgun_spear: 120, emp_hush: 25, arc_spark: 13.5 };
+  const RAIL_E = { railgun_coilgun: 14, railgun_spear: 120, emp_hush: 25, arc_spark: 13.5, legendary_cinder_bloom: 14, legendary_prism: 16, legendary_phase: 30, legendary_singularity: 210 };
   // (Held beams' energy a second, section 4: demand x the piece's area. Tesla: a zap every 12 ticks of 14 damage, chaining)
-  const BEAM_E = { arc_tesla: 30 };
+  const BEAM_E = { arc_tesla: 30, legendary_frostbite: 24 };
   const BEAM_SET = { laser_cutter: { dps: 60 }, laser_searchlight: { dps: 25 }, arc_tesla: { dps: 70, range: 660, width: 10, zap: 12 } };
   // (Hush bursts on its fuse: 90 ticks of flight, or on proximity)
   BEAM_SET.emp_hush = { life: 90 };
@@ -480,6 +481,20 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
     if (kind.ammo && f.model !== 'ammo') set.ammo = null;
     Object.assign(set, BEAM_SET[m.id] ?? {});
     if (Object.keys(set).length) m.weaponMods = { ...m.weaponMods, set };
+  }
+  // ---- Legendaries' texts (rework 2026-11 section 4): what each does, in numbers; its mount line is added after
+  const LEGEND_TEXT = {
+    legendary_hive: 'A nest that regrows: it holds eight seekers and looses them four at a time, a tenth of a second apart, each homing on a different one of the four ships nearest your cursor. One grows back every three-quarters of a second, drawing a little power. Each is 10 damage and a 70 blast, and dies to one point-defence hit.',
+    legendary_frostbite: 'The freeze beam: a held beam out to 760 that burns 95 a second. The ship it touches is slowed, 40% less thrust and turning, while lit and 0.7 s after. No heat, no cold.',
+    legendary_cinder_bloom: 'The arsonist: a shell every 1.2 s for 16 damage, and the part it hits burns for 22 a second over 5 s, the fire spreading to its neighbours.',
+    legendary_prism: 'The splitter: a crystal bolt every 1.6 s that splits where your cursor is into five 11-damage shards in a 40 degree fan. You choose where the fan opens.',
+    legendary_phase: 'The ghost round: a slow 70-damage round every 2.2 s that flies through rock, wrecks and shields, hits the hull directly, and carries on through two ships.',
+    legendary_singularity: 'The black hole: 210 power a shot, one every 7 s. A slow orb flies out along your aim, pulls every ship within 900 toward it for 3.8 s, then collapses in a 300 blast for 140.',
+  };
+  for (const [id, text] of Object.entries(LEGEND_TEXT)) {
+    const m = models.find((x) => x.id === id);
+    if (!m) throw new Error(`text for ${id}, which isn't a model`);
+    m.description = mounted(id, text).description;
   }
   for (const id of Object.keys(FIRE)) if (!models.some((m) => m.id === id && m.weapon)) throw new Error(`fire block for ${id}, which isn't a weapon model`);
 

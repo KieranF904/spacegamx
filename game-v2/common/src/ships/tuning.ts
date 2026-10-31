@@ -157,6 +157,10 @@ export interface WeaponTuning {
   walk?: { at: number[]; gap: number };
   /** A rippling salvo: `count` shells a trigger pull, the first at once and the rest `gap` ticks apart (the Swarm's six rockets over half a second) */
   salvo?: { count: number; gap: number };
+  /** A volley's shells (a rippling salvo's) each pick a different one of the `volleyTargets` ships nearest the cursor to home on (the Hive's four seekers), cycling when there are fewer */
+  volleyTargets?: number;
+  /** Passes through rock (and asteroids) as well as wrecks: only ships stop it (the Phase Cannon's) */
+  ghost?: boolean;
   /** Unarmed for this many ticks after launch: it flies through ships and rock, and goes off only after (the Leviathan's) */
   arm?: number;
   /** Guided: while its gun's trigger is held the shell turns toward the cursor (at most `turn` rad a tick); let go, it flies straight */

@@ -9,12 +9,12 @@ Hits withExotic · penetration 5
 Fire rate0.5/s · shells
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 3 clear cells ahead
-Power draw44/s
+Power draw14/s
 
 == partStats (stats rows) ==
 GradeMk IV · Medium
 Hits withExotic · penetration 4
-Power draw44
+Power draw14
 Hull · mass236 hp · 2.4
 Armour · build4 · 7.6 pts
 TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
@@ -30,10 +30,10 @@ Medium
 Medium · Panel
 
 == tradeOff ==
-Legendary
+The ghost round
 
 == keyStats ==
-32 dmg/s · reach 3,300 · draws 44
+32 dmg/s · reach 3,300 · draws 14
 
 == mountBadge ==
 FIXED
@@ -50,4 +50,4 @@ Needs 3 clear cells ahead
 {"open":true,"badge":"Lv 26","why":""}
 
 == partStats (raw) ==
-{"grade":4,"mark":"Mk IV","size":"Medium","area":2,"hp":235.8,"mass":2.4,"firepower":32.30769230769231,"toughness":235.8,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":32.30769230769231,"range":3300,"damageType":"exotic","pen":5,"draw":44}
+{"grade":4,"mark":"Mk IV","size":"Medium","area":2,"hp":235.8,"mass":2.4,"firepower":31.818181818181817,"toughness":235.8,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":31.818181818181817,"range":3300,"damageType":"exotic","pen":5,"draw":13.64}

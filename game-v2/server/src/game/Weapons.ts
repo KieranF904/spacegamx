@@ -124,6 +124,11 @@ export class Weapons {
     return !!this.extras.get(proj)?.def.lob;
   }
 
+  /** A ghost round (the Phase Cannon's) flies through rock and asteroids: only ships stop it */
+  ghost(proj: number): boolean {
+    return !!this.extras.get(proj)?.def.ghost;
+  }
+
   /** An unarmed shell (its `arm` ticks not yet up) flies through ships and rock */
   unarmed(proj: number): boolean {
     const arm = this.extras.get(proj)?.def.arm;

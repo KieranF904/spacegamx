@@ -283,9 +283,10 @@
       "damage": 10,
       "life": 240,
       "size": 0.9,
-      "spread": 26,
+      "spread": 20,
       "homing": 0.11,
-      "burst": 4,
+      "salvo": { "count": 4, "gap": 6 },
+      "volleyTargets": 4,
       "splash": {
         "radius": 70,
         "damage": 12
@@ -354,15 +355,17 @@
       "life": 110,
       "size": 1.6,
       "spread": 0.4,
-      "pierce": 3,
+      "pierce": 2,
       "pierceKeep": 1,
+      "vsShield": 0,
+      "ghost": true,
       "pen": 1
     },
     "singularity": {
       "type": "projectile",
       "speed": 9,
       "damage": 0,
-      "life": 230,
+      "life": 228,
       "size": 2.4,
       "spread": 0,
       "pull": {

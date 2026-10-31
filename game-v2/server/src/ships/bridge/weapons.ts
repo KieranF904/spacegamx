@@ -74,6 +74,18 @@ export function nearestTarget(b: BridgeCtx, eid: number, x: number, y: number, r
   return best;
 }
 
+/** The `n` ships nearest (x, y) within `range` that `eid` may attack, nearest first (a spread volley's targets: the Hive) */
+export function nearestTargets(b: BridgeCtx, eid: number, x: number, y: number, range: number, n: number): number[] {
+  const out: number[] = [];
+  const fresh = (o: number) => !out.includes(o);
+  for (let i = 0; i < n; i++) {
+    const t = nearestTarget(b, eid, x, y, range, fresh, true);
+    if (t < 0) break;
+    out.push(t);
+  }
+  return out;
+}
+
 /**
  * Player weapons. Left mouse fires the guns; right mouse runs the mining
  * lasers (or fires the guns too, on a ship without any).
@@ -191,10 +203,15 @@ export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: 
     const gunMods = ship.blueprint.parts[w.part].mods;
     // Missiles lock on to the ship nearest the aim point (the cursor), else the target given (a guided one is steered instead)
     let lock = -1;
+    // (A volley that spreads over several targets, the Hive's: each of its seekers takes the next of the ships nearest the cursor)
+    let locks: number[] | undefined;
     if (d.homing && !d.guided) {
       if (aimWorld !== undefined) {
         const ax = pose.x + Math.cos(aimWorld) * Math.max(aimDist, 400), ay = pose.y + Math.sin(aimWorld) * Math.max(aimDist, 400);
-        lock = b.nearestTarget(eid, ax, ay, 1400, undefined, true);
+        if (d.volleyTargets && d.volleyTargets > 1) {
+          locks = nearestTargets(b, eid, ax, ay, 1400, d.volleyTargets);
+          lock = locks.length ? locks[0] : -1;
+        } else lock = b.nearestTarget(eid, ax, ay, 1400, undefined, true);
       }
       if (lock < 0) lock = target;
     }
@@ -212,7 +229,7 @@ export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: 
       let list = b.salvos.get(eid);
       if (!list) b.salvos.set(eid, (list = []));
       const uid = ship.blueprint.parts[w.part].uid;
-      for (let i = 1; i < d.salvo.count; i++) list.push({ uid, due: tick + d.salvo.gap * i, index: i, reach: 0, target: lock, damageScale, dry: round?.dry, ammoMods: round?.mods });
+      for (let i = 1; i < d.salvo.count; i++) list.push({ uid, due: tick + d.salvo.gap * i, index: i, reach: 0, target: locks && locks.length ? locks[i % locks.length] : lock, damageScale, dry: round?.dry, ammoMods: round?.mods });
     }
     // A walking salvo: the rest of its shells, `gap` ticks apart, each landing at its fraction of this aim distance
     if (d.walk && d.walk.at.length > 1) {

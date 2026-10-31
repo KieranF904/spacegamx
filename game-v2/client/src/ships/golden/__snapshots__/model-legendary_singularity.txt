@@ -4,7 +4,7 @@ Mk IV · Small · Square · 1 cell
 Hull · mass131 hp · 1.2
 Armour · build4 · 3.8 pts
 TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
-Damage12/s · reach 2,070
+Damage12/s · reach 2,052
 Hits withExotic · penetration 4.5
 Fire rate0.1/s · shells
 MountTurret, 180°
@@ -30,10 +30,10 @@ Small
 Small · Square
 
 == tradeOff ==
-Legendary
+The black hole
 
 == keyStats ==
-12 dmg/s · reach 2,070 · draws 30
+12 dmg/s · reach 2,052 · draws 30
 
 == mountBadge ==
 TURRET 180°
@@ -49,4 +49,4 @@ Bolts on from behind only
 {"open":true,"badge":"Lv 30","why":""}
 
 == partStats (raw) ==
-{"grade":4,"mark":"Mk IV","size":"Small","area":1,"hp":131,"mass":1.2,"firepower":12,"toughness":131,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":12,"range":2070,"damageType":"exotic","pen":4.5,"draw":30}
+{"grade":4,"mark":"Mk IV","size":"Small","area":1,"hp":131,"mass":1.2,"firepower":12,"toughness":131,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":12,"range":2052,"damageType":"exotic","pen":4.5,"draw":30}

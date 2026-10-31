@@ -509,6 +509,9 @@ const LINGER_TICKS = 60 * 20;
 const scheduleImmediate: (fn: () => void) => unknown =
   typeof setImmediate === 'function' ? setImmediate : (fn) => setTimeout(fn, 0);
 
+/** No asteroids: what a ghost round's rock query is (it flies through them) */
+const NO_ROCKS: number[] = [];
+
 export class GameServer implements ServerCtx {
   readonly world: IWorld;
   gameData: GameData;
@@ -3581,7 +3584,9 @@ this.devTeleport = opts.devTeleport ?? false;
       const vx = Velocity.x[proj];
       const vy = Velocity.y[proj];
       // A surface's rock: the shot's path this tick ends where it meets it
-      const wall = this.shotWall(proj, systemId, px, py, vx, vy);
+      // (A ghost round, the Phase Cannon's, flies through rock and asteroids: only ships stop it)
+      const ghost = this.weapons.ghost(proj);
+      const wall = ghost ? 1 : this.shotWall(proj, systemId, px, py, vx, vy);
       const endX = px + vx * wall;
       const endY = py + vy * wall;
       const speed = Math.sqrt(vx * vx + vy * vy);
@@ -3628,7 +3633,7 @@ this.devTeleport = opts.devTeleport ?? false;
       let hitY = endY;
       let bestT = Infinity;
       
-      for (const asteroid of this.asteroidOrbits.query(systemId, px, py, endX, endY, speed + 100, this.currentTick)) {
+      for (const asteroid of ghost ? NO_ROCKS : this.asteroidOrbits.query(systemId, px, py, endX, endY, speed + 100, this.currentTick)) {
         if (hasComponent(this.world, Dead, asteroid) || this.isGas(asteroid)) continue;
         if (InSystem.systemId[asteroid] !== systemId) continue;
 
