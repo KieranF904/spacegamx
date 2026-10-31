@@ -59,7 +59,18 @@ export class GunSync {
       if (tick - from < GUN_STATE_PATIENCE) continue;
       let w: (typeof ship.derived.weapons)[number] | undefined;
       for (const x of ship.derived.weapons) if (x.part === part) { w = x; break; }
-      if (w) { applyGunState(ship, w, v, mine, Math.max(0, this.latest - tick)); adopted++; }
+      if (w) {
+        applyGunState(ship, w, v, mine, Math.max(0, this.latest - tick));
+        adopted++;
+        // Patch the history after the adopted tick by the same delta, so rows still in flight for those ticks
+        // compare against the corrected values and do not report the same disagreement again.
+        const delta = v - mine;
+        for (let t = tick + 1; t <= this.latest; t++) {
+          const s = ((t % HISTORY) + HISTORY) % HISTORY;
+          if (this.ticks[s] !== t) continue;
+          for (let k = 0; k < GUN_STATE_MAX; k++) if (this.parts[s * GUN_STATE_MAX + k] === part) { this.vals[s * GUN_STATE_MAX + k] += delta; break; }
+        }
+      }
       this.since.delete(part);
     }
     return adopted;
