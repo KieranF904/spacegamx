@@ -15,5 +15,5 @@ tar -czf "$TGZ" --exclude=node_modules --exclude=dist \
   common server server-browser client data $([ "${WITH_SITE:-}" = 1 ] && echo site)
 $SSH "$HOST" 'mkdir -p /root/spacegame-deploy'
 scp -i "$KEY" -o BatchMode=yes "$TGZ" "$HOST:/root/spacegame.tgz"
-scp -i "$KEY" -o BatchMode=yes deploy/vps/*.service deploy/vps/nginx-spacegame.conf deploy/vps/nginx-spacegame-site.conf deploy/vps/remote-install.sh "$HOST:/root/spacegame-deploy/"
+scp -i "$KEY" -o BatchMode=yes deploy/vps/*.service deploy/vps/*.timer deploy/vps/nginx-spacegame.conf deploy/vps/nginx-spacegame-site.conf deploy/vps/remote-install.sh "$HOST:/root/spacegame-deploy/"
 $SSH "$HOST" "WITH_SITE=${WITH_SITE:-0} bash /root/spacegame-deploy/remote-install.sh"

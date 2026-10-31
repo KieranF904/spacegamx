@@ -1413,7 +1413,8 @@ this.devTeleport = opts.devTeleport ?? false;
     if (!other || !p) return;
     const ship = this.ships.get(eid);
     let best = { v: -1, name: '', rank: '' };
-    for (const [f, v] of Object.entries(p.reputation)) {
+    // (A tie goes to the faction whose id sorts first, so it doesn't hang on how the save stored the keys)
+    for (const [f, v] of Object.entries(p.reputation).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
       if (v > best.v) best = { v, name: this.quests.file.reputations[f]?.name ?? f, rank: repRank(v).name };
     }
     const size = this.party.size(other);

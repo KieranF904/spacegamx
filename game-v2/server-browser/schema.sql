@@ -54,15 +54,4 @@ CREATE TABLE IF NOT EXISTS game_docs (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Seed admin account (username: admin, password: admin)
--- Hash/salt generated with PBKDF2-SHA512 (100k iterations, 64-byte output)
--- Change the password after first login!
-INSERT INTO users (username, email, password_hash, salt, is_admin)
-VALUES (
-    'admin',
-    'admin@localhost',
-    '112e445afd8e99d4fbdb0349e5e190aa7895ca75c314832b393fc955c209e68f041009eeb0cabcfb239444dcd21a87dea4be38ec19e646eed7e938a15c9c3296',
-    '660c99361c324b744a4553a1963a53d76711e37b8f6b0bab64c0fa95264d1323',
-    TRUE
-)
-ON CONFLICT (username) DO NOTHING;
+-- No seeded accounts: never ship an account with a known password (make admins through the lobby or by hand).

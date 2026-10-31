@@ -1,0 +1,17 @@
+[Unit]
+Description=Space Game v2: nightly dump of its Postgres database (accounts and profiles)
+After=postgresql.service
+
+[Service]
+Type=oneshot
+User=spacegame
+Group=spacegame
+# DATABASE_URL (the spacegame database only)
+EnvironmentFile=/etc/spacegame/secrets.env
+# Keep the last 14 nights: data/backups/db/spacegame-YYYY-MM-DD.sql.gz
+ExecStart=/bin/bash -c 'set -euo pipefail; d=/opt/spacegame/data/backups/db; mkdir -p "$d"; f="$d/spacegame-$(date +%%F).sql.gz"; pg_dump --no-owner "$DATABASE_URL" | gzip > "$f.tmp"; mv "$f.tmp" "$f"; ls -1t "$d"/spacegame-*.sql.gz | tail -n +15 | xargs -r rm --'
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/spacegame/data/backups
+PrivateTmp=true

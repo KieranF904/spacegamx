@@ -57,6 +57,13 @@ UNITS="spacegame-browser spacegame-server"; [ $SITE = 1 ] && UNITS="$UNITS space
 for u in $UNITS; do install -m 644 "$SRC/$u.service" /etc/systemd/system/; done
 systemctl daemon-reload
 systemctl enable $UNITS
+# The nightly dump of the game's Postgres database (only once secrets.env has a DATABASE_URL)
+if grep -q '^DATABASE_URL=' "$SECRETS"; then
+  install -m 644 "$SRC/spacegame-dbdump.service" "$SRC/spacegame-dbdump.timer" /etc/systemd/system/
+  mkdir -p "$APP/data/backups"; chown spacegame:spacegame "$APP/data/backups"
+  systemctl daemon-reload
+  systemctl enable --now spacegame-dbdump.timer
+fi
 systemctl restart $UNITS
 
 # nginx site: install once; certbot edits it in place afterwards, so don't overwrite it

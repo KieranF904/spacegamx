@@ -41,7 +41,9 @@ describe('migration tool: offline parts', () => {
     expect(ddl.some((s) => /^CREATE TABLE IF NOT EXISTS users\b/.test(s))).toBe(true);
     expect(ddl.some((s) => /^CREATE TABLE IF NOT EXISTS profiles\b/.test(s))).toBe(true);
     expect(ddl.some((s) => /INSERT/i.test(s))).toBe(false);
-    expect(dropped).toEqual(['INSERT INTO users']);
+    // (The schema seeds no accounts; were one added, it would be dropped, never applied)
+    expect(dropped).toEqual([]);
+    expect(schemaStatements(SCHEMA + "\nINSERT INTO users (username) VALUES ('x');\n").dropped).toEqual(['INSERT INTO users']);
     // (CRLF checkouts too)
     expect(schemaStatements(SCHEMA.replace(/\r?\n/g, '\r\n')).ddl).toEqual(ddl);
   });
