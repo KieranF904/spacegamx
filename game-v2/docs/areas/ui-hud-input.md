@@ -1,10 +1,13 @@
 # UI, HUD & input
-The client's player-facing shell: `Game.ts` (the orchestrator: builds every window and HUD piece and sends the per-tick input; key routing is `client/src/app/keys.ts` and server-message handling is `client/src/app/serverMessages.ts`), the DOM windows and HUD under `client/src/ui/`, input translation and rebinding under `client/src/input/`, saved player settings, and lazy-loaded screens. Hangar editing UI is a separate area (`hangar-ui`); rendering is `render-world`/`render-ships`. Everything here is plain DOM + CSS strings injected at runtime (no framework).
+The client's player-facing shell: `Game.ts` (the orchestrator: owns the window set, the HUD and the per-tick input send; the window registry is `client/src/app/windows.ts` (`buildWindows`), key routing is `client/src/app/keys.ts`, server-message handling is `client/src/app/serverMessages.ts`, the F8/F9 dev panels are `client/src/app/devTools.ts`, and the lazy screens and their prefetch list are `client/src/app/lazyScreens.ts`), the DOM windows and HUD under `client/src/ui/`, input translation and rebinding under `client/src/input/`, saved player settings, and lazy-loaded screens. Hangar editing UI is a separate area (`hangar-ui`); rendering is `render-world`/`render-ships`. Everything here is plain DOM + CSS strings injected at runtime (no framework).
 
 ## Files (what each owns)
 | path | lines | owns |
 |---|---|---|
-| `client/src/Game.ts` | 1837 | Orchestrator. See "Game.ts map" below. Read slices only |
+| `client/src/Game.ts` | 1591 | Orchestrator. See "Game.ts map" below. Read slices only |
+| `app/windows.ts` | 318 | The windows registry: `WindowHost` (the getters Game supplies), `WindowSet` (every window and HUD piece, 28 of them), `buildWindows(host, uiOverlay)`. Built in the same order as before (later windows close over earlier ones). Imports Game only as a type |
+| `app/lazyScreens.ts` | 36 | `makeComponentGuide`, `makeStationWindow` (the two `Lazy` windows), `prefetchScreens(host, w)` (the prefetch list) |
+| `app/devTools.ts` | 18 | `installDevTools`: the F8 render tuning and F9 ship swap panels, dev builds only (`import.meta.env.DEV`) |
 | `app/inputSend.ts` | 295 | The input-send path: `tickInput(s)` samples keys and mouse once per input tick and sends the message (or predicts unsent), `sendNeutralInput`, the last-sent bookkeeping over `INPUT_BOOLS`/`INPUT_HELD` (common/src/network/inputFields.ts). Reads the game through `InputSendHost`; tests: `inputSend.test.ts` |
 | `app/keys.ts` | 228 | Key presses: `handleKey(host, code)`, the ordered `MODAL_CHAIN`, then `PRE_KEYS` and `POST_KEYS` (tests: `keys.test.ts`). Reads the game through `KeyHost` |
 | `app/serverMessages.ts` | 401 | Server messages Game handles itself: `handleServerMessage(host, msg)` and the `HANDLERS` table, one entry per type (tests: `serverMessages.test.ts`). Reads the game through `MessageHost` |
@@ -30,14 +33,14 @@ The client's player-facing shell: `Game.ts` (the orchestrator: builds every wind
 | `settings/Settings.ts`, `quality.ts` | | `settings` singleton (localStorage, `subscribe`, `update`, `reset`), `SettingsData`; quality tiers (tested) |
 | `docs/ux/` | | `polish-pass-2026-10-31.md` (+ screenshots in `polish-2026-10-31/`): usability findings and proposals |
 
-### Game.ts map (1837 lines; grep the method name, then read a short slice)
+### Game.ts map (1591 lines; grep the method name, then read a short slice)
 | symbol(s) | section |
 |---|---|
-| imports, `ProtoHooks`, `GameOptions`, fields | field declarations (windows are `Lazy<>` or direct); `keyHost`, `msgHost` and `inputCtx` are built by `makeKeyHost`, `makeMessageHost`, `makeInputCtx` |
-| `constructor`, `init()` | `init()` is window/HUD construction and the callbacks (`network.onMessage` calls `handleServerMessage`; `input.onKeyPressed` calls `handleKeyPress`) |
-| `handleLogin`, `handleRegister`, `resumeSession`, `handleGuestPlay`, `handleServerSelect`, `handleLogout`, `signedIn` | sign-in and session flow; `prefetchScreens` (`prefetchIdle` of the lazy chunks) |
+| imports, `ProtoHooks`, `GameOptions`, fields | field declarations; every window is a field of `private w: WindowSet` (use `this.w.<name>`), filled by `buildWindows` in app/windows.ts. `keyHost`, `msgHost`, `inputCtx` and the window host are built by `makeKeyHost`, `makeMessageHost`, `makeInputCtx`, `makeWindowHost` |
+| `constructor`, `init()` | `init()` starts the renderer and input, calls `buildWindows(makeWindowHost(), ...)` and `installDevTools` (app/devTools.ts), and sets the callbacks (`network.onMessage` calls `handleServerMessage`; `input.onKeyPressed` calls `handleKeyPress`) |
+| `handleLogin`, `handleRegister`, `resumeSession`, `handleGuestPlay`, `handleServerSelect`, `handleLogout`, `signedIn` | sign-in and session flow; `prefetchScreens` (one line: the `screensFetched` guard, then `prefetchScreens(host, w)` in app/lazyScreens.ts, which holds the list) |
 | `start`, `createMenu`, `updateSounds`, `pocketWayIn`, `currentSystem`, `planetBelow`, `updateZone`, `applySettings`, `updateHeatGauge`, `applyVolume` | menu, audio, zone and heat gauge, settings |
-| `handleKeyPress(code)`, `makeKeyHost()` | calls `handleKey` in app/keys.ts; `makeKeyHost` gives it the game's getters |
+| `handleKeyPress(code)`, `makeKeyHost()`, `makeWindowHost()` | calls `handleKey` in app/keys.ts; `makeKeyHost` gives it the game's getters; `makeWindowHost` gives `buildWindows` its getters |
 | `objective`, `updateGuide`, `flyTo`, `toggleAutopilotToObjective`, `netRates` | quest target, guide, autopilot entry points, network stats text |
 | `update()` | the per-frame loop; calls `tickInput` (app/inputSend.ts) for each fixed input tick, and `sendNeutralInput` on focus loss |
 | `makeInputCtx()` | the getters and last-sent state for app/inputSend.ts |
@@ -66,8 +69,8 @@ The client's player-facing shell: `Game.ts` (the orchestrator: builds every wind
 
 ## How to extend
 1. **Add a keybinding**: add an `ActionDef` to `ACTIONS` (`input/keybindings.ts`) with a default `key`; handle `code === '<default>'` in `app/keys.ts` (`PRE_KEYS` or `POST_KEYS`) or read the key in `tickInput` (app/inputSend.ts); show it via `boundKeyName`. The rebinding UI iterates `ACTIONS`, so it appears automatically.
-2. **Add a window**: extend/compose `GameWindow` in `ui/<Name>.ts`; construct in `Game.init` passing `send`/`sound`; if heavy, wrap in `new Lazy(() => import('./ui/<Name>')...)` and add to `prefetchScreens`; add its Esc/toggle case to `MODAL_CHAIN` in `app/keys.ts`.
-3. **Add a HUD chip**: new small class in `ui/` (model: `DodgeIndicator.ts`, `CircuitBars.ts`) with an `update()` using `setText`; construct in `init`, call from `updateUI` or `update`; if toggleable add a field to `SettingsData` + `defaultSettings()` and a row in GameMenuUI's tab.
+2. **Add a window**: extend/compose `GameWindow` in `ui/<Name>.ts`; construct it in `buildWindows` (app/windows.ts) passing `send`/`sound`, add its field to `WindowSet`, and reach it as `this.w.<name>` in Game; if heavy, wrap in `new Lazy(() => import('../ui/<Name>')...)` (model: `makeStationWindow` in app/lazyScreens.ts) and add it to `prefetchScreens` there; add its Esc/toggle case to `MODAL_CHAIN` in `app/keys.ts`.
+3. **Add a HUD chip**: new small class in `ui/` (model: `DodgeIndicator.ts`, `CircuitBars.ts`) with an `update()` using `setText`; construct it in `buildWindows` (app/windows.ts), call from `updateUI` or `update`; if toggleable add a field to `SettingsData` + `defaultSettings()` and a row in GameMenuUI's tab.
 4. **Handle a new server message**: add an entry to `HANDLERS` in `app/serverMessages.ts` calling a UI method (add a `MessageHost` getter if it needs new game state); the type must exist in common protocol (`networking`).
 5. **Add a setting**: `SettingsData` + `defaultSettings()` in `settings/Settings.ts` (the loader merges saved data over defaults, so old saves are fine), a row in `GameMenuUI`, apply in `Game.applySettings`.
 6. **Add a context-menu action**: pure options in `input/contextClick.ts` (`targetOptions`/`openSpaceOptions`, extend `ActionId`), execution in `ContextActions.pick`, tests in `contextClick.test.ts`.
@@ -86,7 +89,7 @@ The client's player-facing shell: `Game.ts` (the orchestrator: builds every wind
 - The `MODAL_CHAIN` order matters (app/keys.ts): a window early in the chain returns and swallows keys meant for later ones (C is ignored on the map; Esc priority).
 - `SystemMapUI` and `StationWindow` are big; grep for the tab/section name, don't open whole.
 - Guests: `handleGuestPlay` (Game.ts) makes `Guest_<0-9999>` client-side; the server decides rights (guests are admins on dev servers).
-- Proto mode (`?proto`, `ProtoHooks`) skips some windows (`if (!this.proto)`); keep both paths working.
+- Proto mode (`?proto`, `ProtoHooks`) skips some windows (`if (!host.proto)` in app/windows.ts); keep both paths working.
 
 ## Related areas
 `hangar-ui` (HangarUI, component guide shared), `economy-quests` (Station/Trade/Quest content), `networking` (messages), `energy` (CircuitBars), `render-world` (Renderer, quality), `web-accounts` (LoginUI/ServerBrowserUI talk to the lobby), `flight` (input bundle), `ops-tools` (screenshot tools). Links: `docs/areas/<slug>.md`.

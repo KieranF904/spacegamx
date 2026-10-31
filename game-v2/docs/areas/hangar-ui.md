@@ -16,7 +16,7 @@ The station hangar where a pilot designs and refits ships: a canvas grid editor 
 | client/src/ui/componentSprites.ts | 130 | part sprites for the guide: `partSprite`, `peekSprite`, `PART_SPRITES_VERSION` (asset cache) |
 | common/src/ships/{mounting,blueprint,energy,circuits,wires}.ts | | the rules: `checkMounting`, `partMountingProblems`, `mountingWords`, blueprint validation (`badMounting` etc.), `loadTest`/`BROWNOUT` |
 | server/src/net/handlers/shipEdit.ts | 145 | `registerShipEditHandlers`: dock, undock, shipEdit, slotSave/Fly/Clear, designSave, shareDesign, pilotInfo; `clientBlueprint` (the untrusted blueprint parse), `handleShipEdit`, `handleSlotSave`. Registered from GameServer's `buildMessageHandlers()` |
-| server/src/GameServer.ts | 5101 | `freeBuild(conn)` (dev free-build check), reached from shipEdit.ts through `ServerCtx` |
+| server/src/GameServer.ts | 4168 | `freeBuild(conn)` (dev free-build check), reached from shipEdit.ts through `ServerCtx` |
 | server/src/ships/ShipBridge.ts | 540 | `validate(bp, {mounting?})` (one-line delegator to bridge/rebuild.ts `validate`): shared by both handlers |
 | server/src/game/Hangar.ts | | `save(conn, slot, bp, {plan, grantAll})`: costs, ghosts vs built parts, gem handling, loaner rule, returns `string[]` errors |
 | server/src/game/AdminTools.ts | | admin free-build toggle (`freeBuild`, and its admin command) |

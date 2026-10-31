@@ -48,6 +48,7 @@ The Node process that runs the world: `index.ts` wires stores, data and transpor
 | DERELICTS | a seam only: `getTrafficShips`. Derelict respawn, salvage and tow delivery are game/Derelicts.ts (`derelictRespawnSystem`, `towDelivered`, `onPilotlessShipDestroyed`); GameServer keeps field aliases (`derelicts`, `personCraft`) |
 | docking | the `dockingSystem` tick entry and `handleDock` live in game/Docking.ts; GameServer keeps the `dockedShips` alias and `stationInRange`/`isDocked` one-liners |
 | NETWORKING | one-line delegates only: `send`, `flushOutbox`, `flushLazy`, `broadcastToSystem`, `broadcastProjectileHit`, `broadcastNear` (net/snapshot/Outbox.ts), `sendSnapshots`, `sendPlayerState` (net/SnapshotBuilder.ts); `terrainOf`, `replicaEnv` (the replication environments) |
+| QUEST HANDLERS, BANK HANDLERS | the quest and bank message handlers, still registered in `buildMessageHandlers()` |
 | ADMIN SERVER INTEGRATION | `setupAdminHandlers`, `adminKillAllEnemies`, `adminTeleportPlayer`, `handleHttpAuth` (delegates to net/auth.ts), `reportAdminStats`, `liveStatus` |
 
 ### Tick order (`buildTickSystems()` builds the table; `tick()` walks it)

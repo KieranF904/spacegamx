@@ -25,7 +25,7 @@ How a ship makes, stores and spends power. Power runs along player-drawn wires (
 - NOTE: the audit names `CHARGE_GROUPS` and `drawsEnergy(fn)`; the real names are `CHARGE_GROUPS_AT`/`MAX_CHARGE_GROUPS` and `isPowerPart` (wires.ts) / `burst` predicate in rebuild.
 
 ## Invariants
-- Deterministic and identical on both sides: `powerTick` runs inside `stepFlight` (flight.ts l.472) for the server (`ShipBridge.stepMovement`), the pilot (`ShipClient.predict`) and replicas. No Date.now/Math.random, no client/server imports.
+- Deterministic and identical on both sides: `powerTick` runs inside `stepFlight` (common/src/ships/flight.ts) for the server (`stepMovement` in server/src/ships/bridge/flight.ts, reached through `ShipBridge`), the pilot (`ShipClient.predict`) and replicas. No Date.now/Math.random, no client/server imports.
 - Layout only at rebuild; the tick is O(circuits + feed groups + stores), no per-part loops except guns/thrusters.
 - Surge never travels along wires, only by touch inside a bank. Steady loads (shields, scanners, coils) are shared at rebuild, bursty ones (engines, guns, miners, dodge, tow) at the tick.
 - Charge rides the snapshot as percent per store group; changing group order/count changes the wire layout (protocol bump + `remapCharge` must keep working). Flash restores are server-only (shields aren't predicted).

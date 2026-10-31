@@ -2,8 +2,8 @@
 
 The project runs fully locally: no Supabase, no Fly.io, no external services. Production is the user's shared VPS
 (`deploy/vps/deploy.sh`, see the ops-tools guide). Read this page, then only your area's guide in the table below.
-Never open the god-files whole (`GameServer.ts`, `ShipBridge.ts`, `Game.ts`, `Renderer.ts`, `HangarUI.ts`,
-`protocol.ts`, `sandbox.ts`): the guides give section maps to grep. The Stage 2-3 splits are where to start: `server/src/ships/bridge/*.ts`, `server/src/net/auth.ts`, `server/src/net/handlers/*.ts`, `server/src/net/SnapshotBuilder.ts`, `server/src/net/snapshot/*.ts`, `server/src/game/Docking.ts`, `server/src/game/Derelicts.ts`, `client/src/app/*.ts`, `common/src/network/inputFields.ts`, `common/src/ships/flightInputs.ts`.
+Never open the god-files whole (`GameServer.ts`, `Game.ts`, `Renderer.ts`, `HangarUI.ts`,
+`protocol.ts`, `sandbox.ts`): the guides give section maps to grep. The Stage 2-5 splits are where to start: `server/src/ships/bridge/*.ts`, `server/src/net/auth.ts`, `server/src/net/handlers/*.ts`, `server/src/net/SnapshotBuilder.ts`, `server/src/net/snapshot/*.ts`, `server/src/game/Docking.ts`, `server/src/game/Derelicts.ts`, `client/src/app/*.ts`, `common/src/network/inputFields.ts`, `common/src/ships/flightInputs.ts`.
 
 ## Quick start
 

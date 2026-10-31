@@ -3,7 +3,7 @@
 ## Orient
 - Read `DEVELOPMENT.md` (the router), then only your area's guide in `docs/areas/<slug>.md`. Each folder with a
   `CONTEXT.md` points at its guide. Do not read other areas "just in case".
-- Never open the god-files whole: `server/src/GameServer.ts`, `server/src/ships/ShipBridge.ts`,
+- Never open the god-files whole: `server/src/GameServer.ts`,
   `client/src/Game.ts`, `client/src/rendering/Renderer.ts`, `client/src/ships/HangarUI.ts`,
   `common/src/network/protocol.ts`, `client/src/sandbox.ts`. Grep the name, or read the line range the guide gives.
 - Line numbers in docs drift; grep the banner text or symbol.
