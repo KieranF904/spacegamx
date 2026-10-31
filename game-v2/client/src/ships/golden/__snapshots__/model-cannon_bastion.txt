@@ -4,17 +4,17 @@ Mk IV · Large · Block · 4 cells
 Hull · mass545 hp · 7.7
 Armour · build4 · 15.2 pts
 TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
-Damage34/s · reach 7,200
+Damage100/s · reach 4,800
 Hits withKinetic · penetration 5
 Clip2 rounds at 3.3/s · reloads in 3.0s from energy (60 a clip), when empty or a second after you let go
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 2 clear cells ahead
-Power draw21/s
+Power draw17/s
 
 == partStats (stats rows) ==
 GradeMk IV · Large
 Hits withKinetic · penetration 4
-Power draw21
+Power draw17
 Hull · mass545 hp · 7.7
 Armour · build4 · 15.2 pts
 TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
@@ -33,7 +33,7 @@ Large · Block
 ship-killer shells, turns slowly
 
 == keyStats ==
-34 dmg/s · reach 7,200 · draws 21
+100 dmg/s · reach 4,800 · draws 17
 
 == mountBadge ==
 FIXED
@@ -50,4 +50,4 @@ Needs 2 clear cells ahead
 {"open":true,"badge":"Lv 30","why":""}
 
 == partStats (raw) ==
-{"grade":4,"mark":"Mk IV","size":"Large","area":4,"hp":544.96,"mass":7.68,"firepower":34.22222222222223,"toughness":544.96,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":34.22222222222223,"range":7200,"damageType":"kinetic","pen":5,"draw":20.72}
+{"grade":4,"mark":"Mk IV","size":"Large","area":4,"hp":544.96,"mass":7.68,"firepower":99.99999999888888,"toughness":544.96,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":99.99999999888888,"range":4800.0000024,"damageType":"kinetic","pen":5,"draw":16.68}
