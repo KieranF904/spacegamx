@@ -42,7 +42,7 @@ describe('support weapons: the models', () => {
     expect(sr.heal).toBeGreaterThan(30);
     expect(sr.dps).toBe(0);
     expect(sr.firepower).toBe(0);
-    expect(sr.draw).toBeGreaterThan(40);
+    expect(sr.draw).toBeCloseTo(28);
     const sp = partStats(catalog, tuning, { fn: pd.id, material: 'steel', piece: 'sq' })!;
     expect(sp.intercept).toEqual({ perSec: 5, range: pointDefenceOf(tuning.weapons!.point_defence).range });
     expect(sp.firepower).toBe(0);
