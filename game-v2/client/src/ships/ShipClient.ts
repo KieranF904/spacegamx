@@ -23,13 +23,11 @@ import {
   JumpTuning, jumpPhase, jumpTuning, coreHp, FRICTION, worldToLocalDir, partItemId, inSolarRing, jumpRange,
   jumpFieldAt, fieldRangeBoost, fieldCharge, primeBoost, pilotJumpStep, withEmp, lodestonePosition, type JumpField, type LodestoneData,
   ShipReplicaSet, ServerSnapshotMessage, packCursorWeaponState, rebuildVolley, WEAPON_KIND_TYPE, EntityState, accelAlong, turnAccel, rateShip, stepGuns, volleyShells, firesStraight, partWeaponDef,
-  dodgePhase, strafeForce, chooseDodgeDir, dodgeAffordable, DODGE_LEFT, DODGE_RIGHT, DODGE_FORWARD, DODGE_BACK,
 } from '@space-game/common';
 import type { MenuShipInfo } from '../ui/GameMenuUI';
 import type { GameState, InterpolatedEntity } from '../state/GameState';
 import type { Renderer } from '../rendering/Renderer';
 import { ShipStore } from './ShipStore';
-import { DodgeIndicator, type DodgeHud } from '../ui/DodgeIndicator';
 import { ShipRenderer } from './ShipRenderer';
 import { ShipHud } from './ShipHud';
 import type { HangarUI } from './HangarUI';
@@ -47,9 +45,6 @@ import { boundKeyName } from '../input/keybindings';
 import { ClientFeatures } from './features/host';
 import { CLIENT_FEATURES } from './features/index';
 import type { QualityProfile } from '../settings/quality';
-
-/** A dodge pressed during the cooldown fires when it's over, if that's within this long (ms) */
-const DODGE_BUFFER_MS = 250;
 
 /** A pulse laser's sound by its grade, Mk I-V: subtle, and centred low (the wide Mk IV deepest, the x-ray Mk V a touch brighter) */
 const PULSE_GRADE_PITCH = [0.98, 0.94, 1.01, 0.9, 1.04];
@@ -141,15 +136,10 @@ export class ShipClient {
   private jump: JumpTuning;
   /** J was pressed: the jump control stays on until the burn starts (or J again cancels) */
   private jumpLatched = false;
-  /** Burst Strafer (strafer.ts): the dodge being sent this press and since when; the key last frame, when it was pressed, and whether that press is spent */
-  private dodgeLatch = false;
-  private dodgeAt = 0;
-  private dodgeDown = false;
-  private dodgePressAt = -Infinity;
-  private dodgeUsed = true;
-  private dodgeUi = new DodgeIndicator();
-  /** Part features' client side (ships/features/host.ts): keys, pilot-row values, drawing and chips (the Tow Beam's) */
+  /** Part features' client side (ships/features/host.ts): keys, controls, pilot-row values, drawing and chips (the Tow Beam's, the Burst Strafer's) */
   private features: ClientFeatures;
+  /** The Burst Strafer's dodge control (features/strafer: it latches and buffers a press) */
+  private dodgeCtl: () => boolean;
   private lastFrame = 0;
   /** The local jump charge sound, so an abort can cut it */
   private chargeSound: (() => void) | null = null;
@@ -168,7 +158,12 @@ export class ShipClient {
       showMessage: (text, color) => opts.showMessage(text, color),
       keyName: (id) => boundKeyName(id, settings.data.bindings),
       hangarOpen: () => this.hangarOpen,
+      isKeyDown: (code) => opts.isKeyDown(code),
+      inputEnabled: () => opts.inputEnabled?.() ?? true,
+      helm: () => this.helm,
+      charge: () => opts.state.charge,
     });
+    this.dodgeCtl = this.features.controlFor('dodge');
     this.jump = jumpTuning(opts.tuning);
     this.dockHint = document.createElement('div');
     this.dockHint.style.cssText = `position: fixed; left: 50%; bottom: 152px; transform: translateX(-50%); display: none;
@@ -546,67 +541,10 @@ export class ShipClient {
     return this.jumpLatched;
   }
 
-  // ---- Burst Strafer (common/src/ships/strafer.ts)
-  /**
-   * The dodge control this input tick. A press of the dodge key (Space, rebindable) asks for one burst; which way is the
-   * simulation's to work out from the movement keys sent with it (strafer.ts chooseDodgeDir), so prediction and the server
-   * agree. A press during the cooldown waits for it (up to DODGE_BUFFER_MS) rather than being lost. Once sent it's held
-   * for at least a few ticks so the server sees it, then until the key's let go (one burst a press: strafer.ts stepDodge).
-   */
+  /** The Burst Strafer's dodge control this input tick (features/strafer: a press asks for one burst, the way you steer) */
   dodgeControl(): boolean {
-    const down = !this.hangarOpen && (this.opts.inputEnabled?.() ?? true) && this.opts.isKeyDown('Space');
-    const now = performance.now();
-    if (down && !this.dodgeDown) { this.dodgePressAt = now; this.dodgeUsed = false; }
-    this.dodgeDown = down;
-    if (this.dodgeLatch) {
-      if (!down && now - this.dodgeAt > 120) this.dodgeLatch = false;
-      return this.dodgeLatch;
-    }
-    if (this.dodgeUsed || now - this.dodgePressAt > DODGE_BUFFER_MS) return false;
-    const ship = this.store.get(this.opts.state.playerId), me = this.opts.state.entities.get(this.opts.state.playerId);
-    if (!ship || ship.kind !== 'ship' || !me) return false;
-    const s = ship.derived.strafe;
-    if (!s || !s.parts.length) {
-      this.dodgeUsed = true;
-      this.opts.showMessage(ship.blueprint.parts.some((p) => this.opts.catalog.functions.get(p.fn)?.strafe) ? 'The Burst Strafers have no power' : 'No Burst Strafer fitted: build one in the hangar to dodge', '#f2d24b');
-      return false;
-    }
-    // (Still cooling down: the press waits for it)
-    if (dodgePhase(me.dodge, s).phase !== 'ready') return false;
-    this.dodgeLatch = true;
-    this.dodgeUsed = true;
-    this.dodgeAt = now;
-    return true;
+    return this.dodgeCtl();
   }
-
-  /** The way the movement keys ask, ship-local (as flight.ts works it out from the same keys), or null */
-  private dodgeWay(angle: number): [number, number] | null {
-    const k = (...codes: string[]) => (codes.some((c) => this.opts.isKeyDown(c)) ? 1 : 0);
-    const fwd = k('KeyW', 'ArrowUp'), back = k('KeyS', 'ArrowDown');
-    if (this.helm) { const lx = k('KeyE') - k('KeyQ'), ly = back - fwd; return lx || ly ? [lx, ly] : null; }
-    const sx = k('KeyD', 'ArrowRight') - k('KeyA', 'ArrowLeft'), sy = back - fwd;
-    return sx || sy ? worldToLocalDir([sx, sy], angle) : null;
-  }
-
-  /** Your strafers' state (predicted), for the HUD: null without any */
-  localDodge(): DodgeHud | null {
-    const ship = this.store.get(this.opts.state.playerId), me = this.opts.state.entities.get(this.opts.state.playerId);
-    if (!ship || ship.kind !== 'ship' || !me) return null;
-    const s = ship.derived.strafe;
-    if (!s || !s.parts.length) return null;
-    const ph = dodgePhase(me.dodge, s);
-    const way = chooseDodgeDir(s, this.dodgeWay(me.angle), me.dodgeDir);
-    const can = (dir: number) => strafeForce(s, dir) > 1e-6;
-    const ways = [[DODGE_FORWARD, '↑'], [DODGE_BACK, '↓'], [DODGE_LEFT, '←'], [DODGE_RIGHT, '→']] as const;
-    const able = ways.filter(([d]) => can(d));
-    return {
-      phase: ph.phase, cooling: ph.cooling,
-      afford: dodgeAffordable(ship.derived, this.opts.state.charge, way),
-      ways: able.length === ways.length ? '' : able.map(([, a]) => a).join(''),
-    };
-  }
-
-  // ---- (end Burst Strafer)
 
   /** What the local pilot's keys ask the engines for (ship grid frame), for the thruster effects */
   private localThrustCommand(): ThrustCommand {
@@ -1014,9 +952,7 @@ export class ShipClient {
       aiming: this.jumpAiming(), aimDist: this.jumpAimInfo.dist, aimLabel: this.jumpAimInfo.label,
       reach: this.jumpReach(), field: me ? this.gaugeField() : undefined, danger: this.jumpAiming() ? this.jumpDanger() : null,
     });
-    // The Burst Strafer's chip (ready or cooling, and whether the circuit can pay)
-    this.dodgeUi.update(this.hangarOpen ? null : this.localDodge(), boundKeyName('dodge', settings.data.bindings));
-    // (Part features' chips: the Tow Beam's while it tows)
+    // (Part features' chips: the Burst Strafer's, ready or cooling and whether the circuit can pay; the Tow Beam's while it tows)
     this.features.updateIndicators();
     this.damageFx?.update(dt);
     this.beamFx?.update(dt);

@@ -180,7 +180,7 @@ export function partTipHtml(p: Pick<PlacedPart, 'fn' | 'material' | 'piece'> & P
     html += row('Dodge', `<span style="color:#f9a8d4">${o.force.toFixed(1)} push for ${o.secs.toFixed(2)} s</span> away from its nozzle · again after ${o.cooldown.toFixed(2)} s · <span style="color:#8ea0bd; font-weight:400">no push for cruising</span>`);
     html += row('A burst costs', `${n0(o.energy)} energy straight out (less at an angle) <span style="color:#8ea0bd; font-weight:400">(from a capacitor bank it touches first, then its circuit: dodging often needs banks, batteries and generation behind it)</span>`);
     if (d && i >= 0) {
-      const p = d.strafe?.parts.find((x) => x.part === i);
+      const p = d.fx?.strafe?.parts.find((x) => x.part === i);
       // (Ship-local: x right, y back)
       const way = p ? (Math.abs(p.push[0]) >= Math.abs(p.push[1]) ? (p.push[0] > 0 ? 'right' : 'left') : p.push[1] > 0 ? 'back' : 'forward') : '';
       html += row('On this ship', way ? `pushes ${way}: it helps any dodge with some ${way} in it` : '<span style="color:#fbbf24">has no power: it does nothing</span>');

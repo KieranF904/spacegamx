@@ -48,7 +48,7 @@ export const CTL = {
   hold: 1024,
   /** Numb with cold: thrust and steering × the numb stage's (warmth.ts) */
   numb: 2048,
-  /** Burst Strafer: dodge held (its way comes from the movement bits): strafer.ts. (4096 and 16384 are free) */
+  /** Burst Strafer: dodge held (its way comes from the movement bits): features/strafer, whose input owns it (features.wire.json). (4096 and 16384 are free) */
   dodge: 8192,
 } as const;
 
@@ -58,30 +58,41 @@ export interface ReplicaControls {
 }
 
 export function controlBits(c: Partial<FlightControls>): number {
-  return (c.forward ? CTL.forward : 0) | (c.backward ? CTL.backward : 0) | (c.left ? CTL.left : 0) | (c.right ? CTL.right : 0)
+  let bits = (c.forward ? CTL.forward : 0) | (c.backward ? CTL.backward : 0) | (c.left ? CTL.left : 0) | (c.right ? CTL.right : 0)
     | (c.boost ? CTL.boost : 0) | (c.helm ? CTL.helm : 0) | (c.strafeLeft ? CTL.strafeLeft : 0) | (c.strafeRight ? CTL.strafeRight : 0)
-    | (c.jump ? CTL.jump : 0) | (c.dodge ? CTL.dodge : 0);
+    | (c.jump ? CTL.jump : 0);
+  // (Part features' held inputs with a control bit: the Burst Strafer's dodge, features/plan.ts controls)
+  const X = getPlan().controls, held = c as Record<string, unknown>;
+  for (let i = 0; i < X.length; i++) if (held[X[i].name]) bits |= X[i].bit;
+  return bits;
 }
 
 export function flightControls(c: ReplicaControls, body: FlightBody): FlightControls {
   const b = c.bits;
-  return {
+  const out: FlightControls = {
     forward: (b & CTL.forward) !== 0, backward: (b & CTL.backward) !== 0, left: (b & CTL.left) !== 0, right: (b & CTL.right) !== 0,
     boost: (b & CTL.boost) !== 0, helm: (b & CTL.helm) !== 0, strafeLeft: (b & CTL.strafeLeft) !== 0, strafeRight: (b & CTL.strafeRight) !== 0,
     jump: (b & CTL.jump) !== 0,
-    dodge: (b & CTL.dodge) !== 0,
     targetAngle: (b & CTL.hold) !== 0 ? body.angle : c.targetAngle,
     // Where a jump lands isn't replicated: the burn's start brings a keyframe
     jumpDist: 0,
   };
+  // (Part features' held inputs from their control bits: the Burst Strafer's dodge)
+  const X = getPlan().controls, held = out as unknown as Record<string, boolean>;
+  for (let i = 0; i < X.length; i++) held[X[i].name] = (b & X[i].bit) !== 0;
+  return out;
 }
 
 /** What a ship's flight depends on: two structures with the same signature fly identically */
 export function flightSignature(d: ShipDerived): string {
   const t = d.thrusters.map((x) => `${x.force[0]},${x.force[1]}`).join(';');
-  // (Part features with flight hooks it has: features/plan.ts flightMask; nothing added for a ship with none)
-  const fx = d.fxMask ? d.fxMask & getPlan().flightMask : 0;
-  return `${d.mass}|${d.inertia}|${d.fullMass}|${d.fullInertia}|${d.drive}|${d.maneuverForce}|${d.maxTorque.cw}|${d.maxTorque.ccw}|${d.jumpRange}|${d.jumpCooldown}|${t}|${d.strafe ? `${d.strafe.ticks},${d.strafe.cooldown},${d.strafe.parts.map((p) => `${p.push[0]},${p.push[1]}`).join('+')}` : ''}${fx ? `|fx${fx}` : ''}`;
+  // (Part features with flight hooks it has: features/plan.ts flightMask; nothing added for a ship with none. And what of
+  // the rebuild their hooks read, each its flight key: the Burst Strafer's pushes, burst and cooldown)
+  const P = getPlan();
+  const fx = d.fxMask ? d.fxMask & P.flightMask : 0;
+  let keys = '';
+  for (let i = 0; i < P.flightKeys.length; i++) keys += (i ? '|' : '') + P.flightKeys[i](d);
+  return `${d.mass}|${d.inertia}|${d.fullMass}|${d.fullInertia}|${d.drive}|${d.maneuverForce}|${d.maxTorque.cw}|${d.maxTorque.ccw}|${d.jumpRange}|${d.jumpCooldown}|${t}|${keys}${fx ? `|fx${fx}` : ''}`;
 }
 
 /** (The fields: the central body's charging ring and the stillstones) */

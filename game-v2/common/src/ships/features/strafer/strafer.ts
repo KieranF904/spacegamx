@@ -17,16 +17,16 @@
  *   dodgeDir    the way of the current (or last) dodge, ship-local: 1..DODGE_DIRS (0 / absent: never dodged)
  *
  * Energy: while a burst runs, each strafer pushing that way draws its `demand` × how much of its push goes that way,
- * from the capacitor bank it touches first, then its circuit like an engine (energy.ts PowerUse.dodge). Short of it,
- * the burst pushes that much less; a burst that gets under DODGE_MIN_SHARE on its first tick is refused (flight.ts:
+ * from the capacitor bank it touches first, then its circuit like an engine (energy.ts PowerUse.extra, the flight hook in index.ts). Short of it,
+ * the burst pushes that much less; a burst that gets under DODGE_MIN_SHARE on its first tick is refused (the impulse hook, index.ts:
  * the counter goes straight to the end of its cooldown, so it's ready again as soon as the control's let go). Spamming
  * it browns the circuit out unless it has the banks, batteries and generation to back it.
- * Mass matters: the push is a force, so a heavy ship barely moves (flight.ts).
+ * Mass matters: the push is a force, so a heavy ship barely moves (index.ts).
  */
 
-import type { ShipDerived } from './rebuild.js';
-import type { Vec2 } from './types.js';
-import { CHARGE_GROUPS_AT, MAX_CHARGE_GROUPS, coreHeld, storeHeld, type Charge } from './energy.js';
+import type { ShipDerived } from '../../rebuild.js';
+import type { Vec2 } from '../../types.js';
+import { CHARGE_GROUPS_AT, MAX_CHARGE_GROUPS, coreHeld, storeHeld, type Charge } from '../../energy.js';
 
 /** One strafer's push (ship-local force vector, x right, y back; as an engine's thrust: world units of acceleration × mass) */
 export interface StraferPart {
@@ -34,7 +34,7 @@ export interface StraferPart {
   push: Vec2;
 }
 
-/** What a ship's strafers give (ShipDerived.strafe) */
+/** What a ship's strafers give (`derived.fx.strafe`: the feature's derive, index.ts) */
 export interface StrafeInfo {
   parts: StraferPart[];
   /** A burst's length, and ticks from one burst's start to the next (the best fitted strafer's) */
@@ -44,6 +44,11 @@ export interface StrafeInfo {
 
 /** Dodge ways, ship-local: way i (1..DODGE_DIRS) points (i - 1) × 360°/DODGE_DIRS round from the ship's right (1 right, 9 back, 17 left, 25 forward) */
 export const DODGE_DIRS = 32;
+
+// (Declared here, not in index.ts, so everything that imports strafer.ts (the barrel) sees `derived.fx.strafe`)
+declare module '../types.js' {
+  interface FeatureDerived { strafe?: StrafeInfo }
+}
 /** A burst that gets less than this share of its energy on its first tick is refused */
 export const DODGE_MIN_SHARE = 0.25;
 const EPS = 1e-6;
@@ -133,7 +138,7 @@ export function dodgePhase(c: number | undefined, s: StrafeInfo | undefined): { 
 }
 
 /**
- * One tick of the dodge (flight.ts runs it): `want` the pilot's dodge control held, `way` the ship-local way the
+ * One tick of the dodge (the flight hook in index.ts runs it): `want` the pilot's dodge control held, `way` the ship-local way the
  * movement keys ask (null: none), `blocked` the drive busy (a jump spooling). Updates the body's counter and way, and
  * returns the way a burst pushes this tick (0: none).
  */
@@ -155,14 +160,14 @@ export function stepDodge(body: { dodge?: number; dodgeDir?: number }, want: boo
   return out;
 }
 
-/** A refused burst (too little energy on its first tick: flight.ts): no push, and it's over (ready once the control's let go) */
+/** A refused burst (too little energy on its first tick: index.ts): no push, and it's over (ready once the control's let go) */
 export function refuseDodge(body: { dodge?: number }, s: StrafeInfo): void {
   body.dodge = dodgeCooldown(s);
 }
 
-/** What a burst along `dir` asks of each feed group (per second: energy.ts PowerUse.dodge), or undefined */
+/** What a burst along `dir` asks of each feed group (per second: energy.ts PowerUse.extra), or undefined */
 export function dodgeLoad(d: ShipDerived, dir: number): number[] | undefined {
-  const L = d.power, s = d.strafe;
+  const L = d.power, s = d.fx?.strafe;
   if (!L || !s || !dir) return undefined;
   const u = dodgeVec(dir);
   const out = new Array<number>(L.feeds.length).fill(0);
@@ -176,7 +181,7 @@ export function dodgeLoad(d: ShipDerived, dir: number): number[] | undefined {
 
 /** Energy one burst along `dir` costs (every strafer pushing that way, by how much of it goes that way), for readouts */
 export function burstEnergy(d: ShipDerived, dir: number): number {
-  const L = d.power, s = d.strafe;
+  const L = d.power, s = d.fx?.strafe;
   if (!L || !s || !dir) return 0;
   const u = dodgeVec(dir);
   let e = 0;
@@ -190,7 +195,7 @@ export function burstEnergy(d: ShipDerived, dir: number): number {
  * generation over the burst, against the burst's energy. (The burst itself is settled tick by tick in powerTick.)
  */
 export function dodgeAffordable(d: ShipDerived, c: Charge | undefined, dir: number): number {
-  const L = d.power, s = d.strafe;
+  const L = d.power, s = d.fx?.strafe;
   const need = burstEnergy(d, dir);
   if (!L || !s || !d.energy || need <= EPS) return 1;
   const ch = c ?? { core: 100, s: [] };

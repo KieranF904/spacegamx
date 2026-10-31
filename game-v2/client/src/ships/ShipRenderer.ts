@@ -18,7 +18,7 @@ import { HullWorker } from './hullWorkerClient';
 import { fromWire, type HullJob } from './hullWire';
 import { buildHull, skeletonCovered, type HullBuild } from './hullBuild';
 import { beam } from '../rendering/fxTextures';
-import { EntityType, ShipState, SIDE_NORMAL, Side, facingEdges, isOpen, isWeaponFn, wireCells, cellKey, type Blueprint, dodgePhase, dodgeVec } from '@space-game/common';
+import { EntityType, ShipState, SIDE_NORMAL, Side, facingEdges, isOpen, isWeaponFn, wireCells, cellKey, type Blueprint } from '@space-game/common';
 import type { ShipSource } from './ShipStore';
 import type { GameState } from '../state/GameState';
 import type { Renderer } from '../rendering/Renderer';
@@ -65,8 +65,6 @@ interface BodyView {
   turretRebuilds: number;
   /** What the health bar shows now (it's redrawn only when that changes) */
   barKey?: string;
-  /** A Burst Strafer's burst: its jets and the streak (drawDodge) */
-  dodge?: Graphics;
   /** Named pilotless hulks (derelicts) get a label underneath */
   label?: Text;
   /** Its label is in the calm style (a passive hostile, unprovoked) */
@@ -567,7 +565,6 @@ export class ShipRenderer {
       this.drawTurrets(view, ship, cs, dt * 60);
       this.drawWires(view, ship, cs, now, entity.type === EntityType.ShipBody && (hostile || entity.data?.[0] === 2));
       this.updateLamps(view, ship, entity, dt);
-      this.drawDodge(view, ship, entity.dodge, entity.dodgeDir, cs, now);
       if (this.features?.hasDrawers) {
         const fc = this.featureCtx;
         fc.eid = eid; fc.ship = ship; fc.entity = entity; fc.container = view.container; fc.cs = cs; fc.now = now; fc.shared = this.layer; fc.geometry = this.geometryOf;
@@ -966,53 +963,6 @@ export class ShipRenderer {
    * hull is in the way. Each barrel is drawn once, in white, and only turned
    * and tinted per frame.
    */
-  // ---- Burst Strafer (common/src/ships/strafer.ts)
-  /**
-   * A Burst Strafer's burst: from each strafer firing (those pushing the dodge's way, each by how much of its push goes
-   * that way), a hot pink-white jet out of its nozzle (long at first, shrinking as the burst runs out) with a flash at
-   * the mouth, and speed streaks trailing off the hull away from the dodge. Redrawn every frame while it runs (a fifth
-   * of a second); nothing otherwise.
-   */
-  private drawDodge(view: BodyView, ship: ShipState, counter: number | undefined, dir: number | undefined, cs: number, now: number): void {
-    const s = ship.derived.strafe;
-    const ph = s ? dodgePhase(counter, s) : null;
-    if (!s || !ph || ph.phase !== 'burst' || !dir) {
-      if (view.dodge?.visible) view.dodge.visible = false;
-      return;
-    }
-    if (!view.dodge) { view.dodge = new Graphics(); view.container.addChild(view.dodge); }
-    const g = view.dodge;
-    g.visible = true;
-    g.clear();
-    const k = 1 - ph.progress, flicker = 0.85 + 0.15 * Math.sin(now / 23);
-    const [cx, cy] = ship.derived.com;
-    const geoms = this.bridge.geometry(ship);
-    const [ux, uy] = dodgeVec(dir);
-    for (const p of s.parts) {
-      const geom = geoms[p.part], f = Math.hypot(p.push[0], p.push[1]);
-      const share = f > 0 ? (p.push[0] * ux + p.push[1] * uy) / f : 0;
-      if (!geom || share <= 0.05) continue;
-      for (const nz of decorOf(geom).nozzles) {
-        const bx = (nz.at[0] - cx) * cs, by = (nz.at[1] - cy) * cs;
-        const hw = (nz.width / 2) * cs * (1.1 + 0.6 * k), len = cs * (1.4 + 4.2 * k) * flicker * (0.4 + 0.6 * share);
-        const tip = [bx + nz.n[0] * len, by + nz.n[1] * len];
-        const l = [bx + nz.t[0] * hw, by + nz.t[1] * hw], r = [bx - nz.t[0] * hw, by - nz.t[1] * hw];
-        g.poly([l[0], l[1], tip[0], tip[1], r[0], r[1]]).fill({ color: 0xf472b6, alpha: 0.75 * (0.4 + 0.6 * k) });
-        const core = [bx + nz.n[0] * len * 0.6, by + nz.n[1] * len * 0.6];
-        g.poly([bx + nz.t[0] * hw * 0.45, by + nz.t[1] * hw * 0.45, core[0], core[1], bx - nz.t[0] * hw * 0.45, by - nz.t[1] * hw * 0.45]).fill({ color: 0xffffff, alpha: 0.85 * k });
-        g.circle(bx, by, hw * (1.3 + 1.2 * k)).fill({ color: 0xfbcfe8, alpha: 0.65 * k });
-      }
-    }
-    // Speed streaks: off the hull's trailing side (opposite the push), fading with the burst
-    const R = ship.derived.radius, nx = -uy, ny = ux;
-    for (let i = -1; i <= 1; i++) {
-      const o = i * R * 0.45, a = R * 0.7, b = R * 0.9 + cs * (1.5 + 3 * k);
-      g.moveTo(nx * o - ux * a, ny * o - uy * a).lineTo(nx * o - ux * b, ny * o - uy * b).stroke({ width: cs * 0.14, color: 0xf9a8d4, alpha: 0.6 * k });
-    }
-  }
-
-  // ---- (end Burst Strafer)
-
   private drawTurrets(view: BodyView, ship: ShipState, cs: number, frames: number): void {
     // (too small on screen to see a gun: none drawn, nor turned)
     const near = cs * this.renderer.getZoom() >= GUN_MIN_PX;

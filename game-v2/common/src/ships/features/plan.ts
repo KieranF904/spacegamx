@@ -12,11 +12,15 @@
 import type { FunctionDef } from '../types.js';
 import type { DeriveCtx, DescribeCtx, Fact, FlightHook, FlightPhase, InputDef, LoadShip, PartFeature, ReplicaField, ReplicaWhere } from './types.js';
 import type { PowerLayout } from '../circuits.js';
+import type { ShipDerived } from '../rebuild.js';
 import { FEATURES } from './registry.js';
 import WIRE from './features.wire.json' with { type: 'json' };
 
 /** fxMask is an int32 bitmask */
 export const MAX_FEATURES = 31;
+
+/** The controls flight has of its own (flight.ts FlightControls): a feature's input may not take one of these names */
+const CORE_CONTROLS: readonly string[] = ['forward', 'backward', 'left', 'right', 'boost', 'targetAngle', 'helm', 'strafeLeft', 'strafeRight', 'jump', 'jumpDist'];
 
 export const FLIGHT_PHASES: readonly FlightPhase[] = ['preJump', 'steer', 'thrustGate', 'impulse', 'damp'];
 
@@ -32,6 +36,8 @@ export type LoadHook = (ship: LoadShip, L: PowerLayout, out: number[]) => void;
 export interface FlightEntry { feature: number; order: number; step: FlightHook['step'] }
 export interface PlanInput extends InputDef { feature: string }
 export interface PlanReplica extends ReplicaField { feature: string; slot: number }
+/** A held input with a replica control bit */
+export interface PlanControl { name: string; bit: number }
 
 export interface FeaturePlan {
   readonly features: readonly PartFeature[];
@@ -40,6 +46,8 @@ export interface FeaturePlan {
   readonly globalMask: number;
   /** Features that draw by the tick (rebuild.ts burst) */
   readonly burstMask: number;
+  /** Of those, the ones whose draw their circuit counts as an engine's (burst: 'engine'; circuits.ts engineDraw) */
+  readonly engineMask: number;
   /** Features with flight hooks (replica.ts flightSignature folds these in) */
   readonly flightMask: number;
   /** By feature number (undefined: none) */
@@ -50,6 +58,12 @@ export interface FeaturePlan {
   /** Per phase, sorted by (order, feature id) */
   readonly flight: Readonly<Record<FlightPhase, readonly FlightEntry[]>>;
   readonly inputs: readonly PlanInput[];
+  /** The 'held' inputs' names (flightInputs.ts copies each from the held keys into the controls; the server's Input field of that name) */
+  readonly held: readonly string[];
+  /** The held inputs with a control bit (replica.ts controlBits / flightControls) */
+  readonly controls: readonly PlanControl[];
+  /** Features' flight keys, in plan order (replica.ts flightSignature) */
+  readonly flightKeys: readonly ((d: ShipDerived) => string)[];
   readonly replicate: readonly PlanReplica[];
 }
 
@@ -67,14 +81,17 @@ export function compilePlan(list: readonly PartFeature[], wire: WireManifest = W
   }
   const features = Object.freeze([...list].sort((a, b) => a.order - b.order || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)));
   const byId = new Map(features.map((f, i) => [f.id, i] as const));
-  let globalMask = 0, burstMask = 0, flightMask = 0;
+  let globalMask = 0, burstMask = 0, engineMask = 0, flightMask = 0;
   const flight = Object.fromEntries(FLIGHT_PHASES.map((p) => [p, [] as FlightEntry[]])) as Record<FlightPhase, FlightEntry[]>;
-  const inputs: PlanInput[] = [], replicate: PlanReplica[] = [];
+  const inputs: PlanInput[] = [], replicate: PlanReplica[] = [], held: string[] = [], controls: PlanControl[] = [];
+  const flightKeys: ((d: ShipDerived) => string)[] = [];
   const keys = new Map<string, string>(), bits = new Map<number, string>(), slots = new Map<string, string>();
   features.forEach((f, i) => {
     const bit = 1 << i;
     if (f.global) globalMask |= bit;
     if (f.burst) burstMask |= bit;
+    if (f.burst === 'engine') engineMask |= bit;
+    if (f.flightKey) flightKeys.push(f.flightKey.bind(f));
     for (const h of f.flight ?? []) {
       if (!FLIGHT_PHASES.includes(h.phase)) fail(`${f.id}: unknown flight phase "${h.phase}"`);
       flightMask |= bit;
@@ -94,7 +111,11 @@ export function compilePlan(list: readonly PartFeature[], wire: WireManifest = W
             + 'a NEW feature input needs the longer binary input form first (a protocol change), not just a bit');
         }
       }
+      if (inp.kind !== 'held') fail(`${f.id}.${inp.name}: only 'held' inputs are wired (a '${inp.kind}' input needs its plumbing first)`);
       inputs.push({ ...inp, feature: f.id });
+      if (held.includes(inp.name) || CORE_CONTROLS.includes(inp.name)) fail(`${f.id}.${inp.name}: a control of that name already exists`);
+      held.push(inp.name);
+      if (inp.ctlBit !== undefined) controls.push({ name: inp.name, bit: inp.ctlBit });
     }
     for (const r of f.replicate ?? []) {
       const slot = slotOf(wire, r.where, f.id, r.name);
@@ -115,12 +136,16 @@ export function compilePlan(list: readonly PartFeature[], wire: WireManifest = W
     byId,
     globalMask,
     burstMask,
+    engineMask,
     flightMask,
     derive: Object.freeze(features.map((f) => f.derive?.bind(f))),
     load: Object.freeze(features.map((f) => f.load?.bind(f))),
     describe: Object.freeze(features.filter((f) => f.describe)),
     flight: Object.freeze(flight),
     inputs: Object.freeze(inputs),
+    held: Object.freeze(held),
+    controls: Object.freeze(controls),
+    flightKeys: Object.freeze(flightKeys),
     replicate: Object.freeze(replicate),
   });
 }

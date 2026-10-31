@@ -51,19 +51,46 @@ export interface DeriveCtx {
 /** The ship a load() hook draws for: what energy.ts gunLoad gets */
 export type LoadShip = GunLoadShip;
 
-/** Where a flight hook runs inside stepFlight (CUT 5 wires these; until then they are compiled, not called) */
+/**
+ * Where a flight hook runs inside stepFlight (flight.ts), in tick order:
+ *   preJump     before the jump drive steps (the body as last tick left it)
+ *   steer       after the ship turns
+ *   thrustGate  the movement keys read (`wantX/wantY`), before a spooling drive takes the engines and the power is settled:
+ *               a hook may ask power for this tick in `load[feature]` (a Burst Strafer's dodge starts here)
+ *   impulse     after the engines push, before gravity: `shares[feature]` is what it got (the dodge's push)
+ *   damp        after gravity, before friction and the move
+ * Every hook runs for every ship stepped, with the feature or not: a hook checks for itself (a ship that lost its
+ * strafers mid-burst still winds the counter down).
+ */
 export type FlightPhase = 'preJump' | 'steer' | 'thrustGate' | 'impulse' | 'damp';
 
 /**
- * One tick's flight, shared by every hook of a call (one object per call site,
- * reset by field: never allocated per tick). `scratch` carries the named
- * multipliers features write and stepFlight composes in a fixed order.
+ * One tick's flight, shared by every hook of a call (one module-level object in flight.ts, reset by field: never
+ * allocated per tick, and not re-entrant: a hook must not step a ship). `scratch` carries what a feature's hooks hand
+ * each other within the tick (a dodge's way, from thrustGate to impulse); a hook writes it every tick it runs.
  */
 export interface FlightCtx {
   body: FlightBody;
   input: FlightControls;
   d: ShipDerived;
+  tuning: ShipTuning;
   k: FlightConstants;
+  /** The running hook's feature number (its index in `load` and `shares`) */
+  feature: number;
+  /** The hold's mass (body.cargo, 0 when absent) */
+  cargo: number;
+  /** The way the movement keys ask this tick, world space, not normalised (0, 0: none); set from thrustGate on */
+  wantX: number;
+  wantY: number;
+  /** The jump drive is spooling (it takes the engines); set from thrustGate on */
+  charging: boolean;
+  /** The ship's power is accounted this tick (energy.ts powerTick runs: not for replicas and pilotless ships) */
+  accounted: boolean;
+  /** thrustGate: what a feature draws this tick, per feed group (per second), by feature number (energy.ts PowerUse.extra); count what you set in `loads` */
+  load: (ArrayLike<number> | undefined)[];
+  loads: number;
+  /** impulse on: the share of that draw each feature got (undefined: none asked, or not accounted: take it as 1) */
+  shares: readonly (number | undefined)[] | undefined;
   scratch: { [name: string]: number | boolean };
 }
 
@@ -74,7 +101,13 @@ export interface FlightHook {
   step(ctx: FlightCtx): void;
 }
 
-/** A pilot input a feature declares (the key binding, its control bit) */
+/**
+ * A pilot input a feature declares (the key binding, its control bit). A 'held' input travels as the boolean `name`:
+ * in the input message (its binary flag is hand-packed in protocol.ts, whose flags are full), the server's Input
+ * component (a ui8 field `name`, network/inputFields.ts INPUT_BOOLS), the controls a flight step reads (`input[name]`:
+ * flightInputs.ts, replica.ts fill it from this table) and, with `ctlBit`, a replica's control bits.
+ * Only 'held' is wired; the others are reserved.
+ */
 export interface InputDef {
   name: string;
   kind: 'held' | 'toggle' | 'signed';
@@ -133,14 +166,17 @@ export interface PartFeature {
   global?: boolean;
   /** Plan order: derive and load run lower first (ties by id) */
   order: number;
-  /** It draws power by the tick while it works (as engines and guns do), not as a steady load at the rebuild */
-  burst?: boolean;
+  /** It draws power by the tick while it works (as engines and guns do), not as a steady load at the rebuild. 'engine':
+   * and its circuit counts that draw as an engine's (circuits.ts engineDraw: a Burst Strafer's) */
+  burst?: boolean | 'engine';
   /** At the rebuild (rebuild.ts), after the cargo/scanner pass: write `c.out.<key>` */
   derive?(c: DeriveCtx): void;
   /** Each tick (energy.ts gunLoad): add what it draws this tick, per feed group, to `out` (allocation-free) */
   load?(ship: LoadShip, L: PowerLayout, out: number[]): void;
-  /** Flight hooks (compiled per phase; called from stepFlight from CUT 5 on) */
+  /** Flight hooks (compiled per phase, called from stepFlight: FlightPhase) */
   flight?: readonly FlightHook[];
+  /** What of a rebuild its flight hooks read, as text: replica.ts flightSignature folds it in, so a replica is re-keyed when it changes */
+  flightKey?(d: ShipDerived): string;
   inputs?: readonly InputDef[];
   replicate?: readonly ReplicaField[];
   /** What to say about a part it applies to (UI only, may allocate) */

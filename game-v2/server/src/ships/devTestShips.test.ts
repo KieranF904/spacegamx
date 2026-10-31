@@ -54,7 +54,7 @@ describe('dev test ships (F9)', () => {
   }
   it('the strafer dodges every way, banks touch its flank strafers, and a run of dodges is backed before the circuit browns out', () => {
     const d = createShipState(catalog, tuning, 1, dev['test-strafer'], 0).derived;
-    const s = d.strafe!;
+    const s = d.fx!.strafe!;
     for (const way of [DODGE_FORWARD, DODGE_BACK, DODGE_LEFT, DODGE_RIGHT]) expect(strafeForce(s, way), String(way)).toBeGreaterThan(0);
     const L = d.power!;
     expect(s.parts.filter((p) => L.feeds[L.feedOf[p.part]].bank >= 0).length).toBeGreaterThanOrEqual(4);

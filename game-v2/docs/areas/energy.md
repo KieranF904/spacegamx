@@ -20,7 +20,7 @@ How a ship makes, stores and spends power. Power runs along player-drawn wires (
 ## Public interface
 - `ShipDerived.power: PowerLayout` (circuits, stores, core, feeds, `feedOf`, `storeOf`, `circuitOf`, `draw`, `dual`), `ShipDerived.energy: EnergyInfo` (capacities and draws).
 - `Charge { core, s: number[] }` (percent per store group); `FULL_CHARGE`; `powerTick(d, charge, PowerUse, tuning) -> PowerResult`; `gunLoad(ship, tick)` = guns' draw per feed group, passed to `stepFlight` as `boost.load`; `remapCharge(before, after, c)` on every rebuild; `chargeTotal`, `circuitCharges`, `capCharge`.
-- Wire format: `packCharge`/`unpackCharge`; pilot-row slots start at `CHARGE_GROUPS_AT` (15), at most `MAX_CHARGE_GROUPS` (24) groups. Others index after (strafer.ts `pilotExtras` reads dodge/tow past the groups).
+- Wire format: `packCharge`/`unpackCharge`; pilot-row slots start at `CHARGE_GROUPS_AT` (15), at most `MAX_CHARGE_GROUPS` (24) groups. Part features' values follow (features.wire.json pilotExtra order; `pilotExtras` in ships/features/strafer/strafer.ts reads dodge/tow past the groups).
 - Surge: `surgeReaction(fn)`, `surgeTuning`, `POWER_TYPES` (colours used everywhere), `bankFor(d, part)`.
 - NOTE: the audit names `CHARGE_GROUPS` and `drawsEnergy(fn)`; the real names are `CHARGE_GROUPS_AT`/`MAX_CHARGE_GROUPS` and `isPowerPart` (wires.ts) / `burst` predicate in rebuild.
 
@@ -45,7 +45,7 @@ New power type: `POWER_TYPES` + `Circuit.type` (circuits.ts, currently `'steady'
 ## Tests
 - `npx vitest run common/src/ships/circuits.test.ts` migration (library ships never brown out), circuit isolation, discharge rate, brownout, banks, split/remap, snapshot round-trip.
 - `npx vitest run common/src/ships/surge.test.ts` dynamo bank, reactions, Rail Driver, Flash Screen.
-- `npx vitest run common/src/ships/ships.test.ts` (energy basics in rebuild/powerTick), `strafer.test.ts`/`tow.test.ts` (burst draws), `client/src/ships/wireEdit.test.ts` (wire tool, report).
+- `npx vitest run common/src/ships/ships.test.ts` (energy basics in rebuild/powerTick), `features/strafer/strafer.test.ts`/`features/tow/tow.test.ts` (burst draws; a feature's burst draw is `PowerUse.extra`, by feature number), `client/src/ships/wireEdit.test.ts` (wire tool, report).
 
 ## Gotchas
 - Any enemy/boss design without wires is auto-wired as ONE circuit; keep that so old fights behave.

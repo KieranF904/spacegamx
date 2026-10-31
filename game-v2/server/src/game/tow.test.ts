@@ -64,24 +64,24 @@ describe('Burst Strafer in the server', () => {
   it('a press dodges once (no way held: sideways, then back the other way), and the replicas follow it without a keyframe', () => {
     const { server, pid, input, run, ships } = world();
     const d = ships.get(pid)!.derived;
-    expect(strafeForce(d.strafe, DODGE_LEFT)).toBeGreaterThan(0);
-    expect(strafeForce(d.strafe, DODGE_RIGHT)).toBeGreaterThan(0);
+    expect(strafeForce(d.fx?.strafe, DODGE_LEFT)).toBeGreaterThan(0);
+    expect(strafeForce(d.fx?.strafe, DODGE_RIGHT)).toBeGreaterThan(0);
     const rep = (server as any).replication;
     run(3);
     const before = { ...rep.reasons };
     input({ dodge: true });
-    run(d.strafe!.ticks + 5);
+    run(d.fx!.strafe!.ticks + 5);
     const lat = worldToLocalDir([Velocity.x[pid], Velocity.y[pid]], Rotation.angle[pid])[0];
     expect(lat).toBeGreaterThan(2);
     expect(ships.get(pid)!.dodgeDir).toBe(DODGE_RIGHT);
     // Held: no second burst, however long. Let go and press again: a second one, the other way
-    run(d.strafe!.cooldown + 10);
-    expect(dodgePhase(ships.get(pid)!.dodge, d.strafe).phase).toBe('held');
+    run(d.fx!.strafe!.cooldown + 10);
+    expect(dodgePhase(ships.get(pid)!.dodge, d.fx?.strafe).phase).toBe('held');
     input({ dodge: false });
     run(2);
-    expect(dodgePhase(ships.get(pid)!.dodge, d.strafe).phase).toBe('ready');
+    expect(dodgePhase(ships.get(pid)!.dodge, d.fx?.strafe).phase).toBe('ready');
     input({ dodge: true });
-    run(d.strafe!.ticks + 2);
+    run(d.fx!.strafe!.ticks + 2);
     expect(ships.get(pid)!.dodgeDir).toBe(DODGE_LEFT);
     expect(worldToLocalDir([Velocity.x[pid], Velocity.y[pid]], Rotation.angle[pid])[0]).toBeLessThan(0);
     const moved = Object.entries(rep.reasons as Record<string, number>).filter(([k, v]) => k.startsWith('Player:') && v !== (before[k] ?? 0));

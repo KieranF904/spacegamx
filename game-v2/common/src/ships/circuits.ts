@@ -104,6 +104,8 @@ export interface CircuitInput {
   networks: { parts: number[]; supply: number; delivered: number }[];
   /** Engines, guns and mining lasers: they draw by the tick, not steadily */
   burst: (i: number) => boolean;
+  /** Of those, the ones that draw as an engine does though they don't thrust (a part feature's burst: 'engine', a Burst Strafer's) */
+  engine?: (i: number) => boolean;
   core: boolean;
   tuning: ShipTuning;
   /** Each part's output against its health (tuning healthFactor): a damaged Pulse Dynamo makes less. Absent: all whole */
@@ -250,8 +252,8 @@ export function powerLayout(a: CircuitInput): PowerLayout {
     if (circuitOf[i] < 0) circuitOf[i] = c;
     const cc = circuits[c];
     cc.consumers.push(i);
-    // (A Burst Strafer is an engine that draws only while a burst runs: strafer.ts)
-    if ((fns[i].thrust ?? 0) > 0 || fns[i].strafe) cc.engineDraw += draw[i];
+    // (A Burst Strafer is an engine that draws only while a burst runs: a.engine, features/strafer)
+    if ((fns[i].thrust ?? 0) > 0 || a.engine?.(i)) cc.engineDraw += draw[i];
     else if (fns[i].weapon) cc.gunDraw += draw[i];
     else cc.minerDraw += draw[i];
   }

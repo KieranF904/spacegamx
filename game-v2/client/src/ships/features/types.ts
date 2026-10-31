@@ -5,7 +5,7 @@
  *
  * TYPE-ONLY imports here: the feature folders may import anything, this file must not make a cycle.
  */
-import type { ClientMessage, ShipState, Catalog, PlacedGeom } from '@space-game/common';
+import type { ClientMessage, ShipState, Catalog, PlacedGeom, Charge } from '@space-game/common';
 import type { Container } from 'pixi.js';
 import type { ActionDef } from '../../input/keybindings';
 import type { InterpolatedEntity } from '../../state/GameState';
@@ -21,6 +21,14 @@ export interface ClientFeatureHost {
   /** The key an action is bound to, as shown to the player */
   readonly keyName: (actionId: string) => string;
   readonly hangarOpen: () => boolean;
+  /** A key held, by its default code (InputManager maps the player's binding onto it) */
+  readonly isKeyDown: (code: string) => boolean;
+  /** The flight keys reach the ship (not typing in chat, no menu over the game) */
+  readonly inputEnabled: () => boolean;
+  /** Flying at the helm (Q/E strafe, A/D turn) rather than mouse-steer */
+  readonly helm: () => boolean;
+  /** The pilot's charge as predicted (energy.ts) */
+  readonly charge: () => Charge;
 }
 
 /** Per-frame drawing of one ship (ShipRenderer calls every feature's drawShip for each body, in id order) */
@@ -49,6 +57,11 @@ export interface ClientFeature {
   id: string;
   /** Key bindings, merged into keybindings.ts ACTIONS at module load (ids must be new) */
   actions?: readonly ActionDef[];
+  /**
+   * Its held inputs' values for this input tick, by input name (the shared feature's `inputs`: a Burst Strafer's
+   * `dodge`), sent in the input message under that name. Called once per input tick, so it may latch and buffer.
+   */
+  controls?: Readonly<Record<string, (host: ClientFeatureHost) => boolean>>;
   /** A bound key was pressed (default key code, as ShipClient.onKey gets it); true: used */
   onKey?(code: string, host: ClientFeatureHost): boolean;
   /** Read this feature's values from the pilot's row (`data`, from `at` = its first pilotExtra index) into `fx` */

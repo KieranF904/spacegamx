@@ -2,8 +2,8 @@
 
 A **part feature** is one behaviour a part gives a ship (a Tow Beam's tow, a Burst Strafer's dodge), declared once as a
 `PartFeature` object instead of special cases spread over `rebuild.ts`, `energy.ts`, `flight.ts` and the UI.
-Status: the seam exists and is wired; **the Tow Beam is the first feature converted** (`tow/`, Cut 4), the Strafer is
-CUT 6. Ships without a feature rebuild, draw and fly exactly as before.
+Status: the seam exists and is wired; converted: **the Tow Beam** (`tow/`, Cut 4) and **the Burst Strafer** (`strafer/`,
+Cut 6: the first with flight hooks and an input). Ships without a feature rebuild, draw and fly exactly as before.
 
 | File | What |
 |---|---|
@@ -24,9 +24,23 @@ CUT 6. Ships without a feature rebuild, draw and fly exactly as before.
   feature, so ships without one are byte-for-byte what they were.
 - **load** (`energy.ts` `gunLoad`, per tick): each feature in `fxList` adds its draw to `out`. Must not allocate.
 - **describe** (`featureFacts(ctx)`): facts of the features a function gives. `describePart()` (common ships/describe.ts) wraps it with partStats; the client renders facts in `client/src/ships/describe/` (tipRows, chips, summaryFields, guideNumber). A feature adds facts; the Tow Beam's replaced its old tooltip, card and compact-tooltip rows (a `Fact` may carry `dim`, `short`, `chip`, `drawWhen` presentation variants).
-- **flight signature** (`replica.ts`): a ship's features that have flight hooks are folded in (`|fx<mask>`).
-- **flight / inputs / replicate**: typed and compiled and validated (per-phase sorted arrays, unique keys and control
-  bits, slots pinned in `features.wire.json`), **not called yet**: stepFlight's phases and the input tables are CUT 5.
+- **burst: 'engine'** (`circuits.ts`): the part's circuit counts its draw as an engine's (`engineDraw`): a Burst Strafer's.
+- **flight** (`flight.ts` stepFlight, Cut 6): five phases (`types.ts` FlightPhase: preJump, steer, thrustGate, impulse,
+  damp), each the plan's hooks in (order, feature) order, sharing one module-level `FlightCtx` (reset by field, no
+  allocation, not re-entrant). Every hook runs for **every** ship stepped and checks for itself (a ship that lost its
+  strafers mid-dodge still winds the counter down). A thrustGate hook may ask power for the tick (`ctx.load[feature]`,
+  `ctx.loads++`); `powerTick` settles it as `PowerUse.extra` (by feature number: from the bank the parts touch first,
+  then as an engine) and the impulse hooks read `ctx.shares[feature]`. Hand state between a feature's hooks in
+  `ctx.scratch`, written every tick the hook runs.
+- **flight signature** (`replica.ts`): each feature's `flightKey(d)` (what of the rebuild its hooks read), and the
+  ship's features that have flight hooks (`|fx<mask>`).
+- **inputs** (Cut 6): a `held` input travels by its name through the whole chain: `flightInputs.ts`
+  (`newFlightControls`, `buildFlightInputs`), `replica.ts` (`controlBits`, `flightControls`, from its `ctlBit`), the
+  server's `readInputsInto` (Input component field of that name, resolved once). The wire end stays hand-packed and
+  pinned (protocol.ts binary flags, `INPUT_BOOLS`, the Input component, `CTL`): a NEW input needs the longer binary
+  input form first. `strafer/feature.test.ts` checks every held input round-trips the whole chain.
+- **replicate**: validated against `features.wire.json`; the pilot row's extras are written by the server features'
+  `wire()` in id order, which must be the manifest's slot order (server `strafer/wire.test.ts` checks it).
 
 ## Rules
 
@@ -49,7 +63,8 @@ A feature's world side and UI side live next to the shared part, as plain folder
   Tow keeps its place), adds their messages to the dispatch table (a type the game handles, or two features claim,
   throws), and ShipBridge asks `featureCargo`, `shipRebuilt`, `shipForgotten` through its host.
 - `client/src/ships/features/<id>/index.ts` exports `clientFeature` (`ClientFeature`: `actions` merged into
-  `keybindings.ts` ACTIONS, `onKey`, `parsePilot` into `entity.fx`, `drawShip`, `indicator`). `ClientFeatures`
+  `keybindings.ts` ACTIONS, `controls` (a held input's value each input tick: `ClientFeatures.controlFor(name)`),
+  `onKey`, `parsePilot` into `entity.fx`, `drawShip`, `indicator`). `ClientFeatures`
   (host.ts) is owned by ShipClient; ShipRenderer gets it for the draw loop.
 - `npm run features:gen` writes all three lists; `--check` (run by registry.test.ts) fails if any is stale.
 - `FeatureInstance.wire`/`status` feed SnapshotBuilder's pilot row and status row (the Tow Beam's `[8]`).

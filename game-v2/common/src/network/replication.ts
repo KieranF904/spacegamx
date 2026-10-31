@@ -54,7 +54,7 @@ export function packKeyframe(k: Keyframe): KeyframeRow {
   if (k.dock || b.cargo || dodge) row.push(b.cargo ?? 0);
   if (k.dock) row.push(k.dock.station, Math.round(k.dock.ox * 100) / 100, Math.round(k.dock.oy * 100) / 100);
   else if (dodge) row.push(-1, 0, 0);
-  // (The Burst Strafer's counter and the way it last dodged: strafer.ts)
+  // (The Burst Strafer's counter and the way it last dodged: ships/features/strafer)
   if (dodge) row.push(b.dodge ?? 0, b.dodgeDir ?? 0);
   return row;
 }

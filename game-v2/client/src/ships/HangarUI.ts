@@ -1581,7 +1581,7 @@ export class HangarUI {
     if (now.miners || (was && was.miners)) html += row('Mining lasers', `${now.miners}`, 'miners');
     // Burst Strafer and Tow Beam (common/src/ships/strafer.ts, tow.ts)
     if (now.dodge > 0 || (was && was.dodge > 0)) {
-      const s = this.derived?.strafe;
+      const s = this.derived?.fx?.strafe;
       const ways = s ? ([[DODGE_FORWARD, 'forward'], [DODGE_BACK, 'back'], [DODGE_LEFT, 'left'], [DODGE_RIGHT, 'right']] as const).filter(([w]) => strafeForce(s, w) > 1e-6).map(([, n]) => n) : [];
       const best = s ? bestDodge(s).dir : 0;
       const cost = this.derived && best ? burstEnergy(this.derived, best) : 0;

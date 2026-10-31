@@ -8,7 +8,7 @@ import { readShipJson, testCatalog, SHIP_DATA_DIR } from '../testData.js';
 import type { ShipTuning } from '../tuning.js';
 import { gunLoad } from '../energy.js';
 import { flightSignature, CTL } from '../replica.js';
-import { pilotExtras } from '../strafer.js';
+import { pilotExtras } from './strafer/strafer.js';
 import { CHARGE_GROUPS_AT } from '../energy.js';
 import { packKeyframe } from '../../network/replication.js';
 import { FEATURES } from './registry.js';

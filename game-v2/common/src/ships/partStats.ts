@@ -50,7 +50,7 @@ export interface PartStats {
   boostDrain?: number;
   shield?: number;
   cargo?: number;
-  /** Burst Strafer (strafer.ts): its push away from its nozzle while a burst runs (force), the burst's seconds, the seconds from one burst to the next, and the energy a burst (pushing straight out) */
+  /** Burst Strafer (features/strafer/strafer.ts): its push away from its nozzle while a burst runs (force), the burst's seconds, the seconds from one burst to the next, and the energy a burst (pushing straight out) */
   dodge?: { force: number; secs: number; cooldown: number; energy: number };
   /** Tow Beam (features/tow/tow.ts): how far past the hull it takes hold, and how far it stretches before it snaps. No text reads it any more (the tow feature's describe says it: features/tow/index.ts); kept because the golden raw partStats snapshot pins it */
   tow?: { range: number; snap: number };
@@ -120,7 +120,7 @@ export function partStats(catalog: Catalog, tuning: ShipTuning | undefined, p: {
   }
   if ((fn.shield ?? 0) > 0) out.shield = fn.shield! * area * fnOutput(fn, mat);
   if ((fn.capacity ?? 0) > 0) out.cargo = fn.capacity! * area;
-  // (A Burst Strafer: a dodge, not thrust: strafer.ts)
+  // (A Burst Strafer: a dodge, not thrust: features/strafer/strafer.ts)
   if (fn.strafe) {
     const st = fn.strafe;
     out.size = sizeName(Math.max(1, area));

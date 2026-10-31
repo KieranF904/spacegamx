@@ -75,7 +75,7 @@ export const Input = defineComponent({
   helm: Types.ui8,
   /** Jump drive control held (or latched by the client) */
   jump: Types.ui8,
-  /** Burst Strafer: dodge held (its way comes from the movement keys: ships/strafer.ts) */
+  /** Burst Strafer: dodge held (its way comes from the movement keys: ships/features/strafer, whose held input reads this field by name) */
   dodge: Types.ui8,
   /** Ship-to-cursor distance (world units) */
   cursorDist: Types.f32,

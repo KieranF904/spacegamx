@@ -33,7 +33,7 @@ export interface ShipState {
   jumpScale?: number;
   /** Mass of the cargo in its hold (load.ts), absent = 0 */
   cargo?: number;
-  /** Burst Strafer (strafer.ts): the dodge counter and the way of the last dodge (1..DODGE_DIRS, ship-local), absent = 0 */
+  /** Burst Strafer (features/strafer/strafer.ts): the dodge counter and the way of the last dodge (1..DODGE_DIRS, ship-local), absent = 0 */
   dodge?: number;
   dodgeDir?: number;
   /** Tow Beam (tow.ts): what it's towing (an entity id), absent = nothing; the server sets it, gunLoad draws for it */

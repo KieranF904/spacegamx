@@ -58,7 +58,7 @@ export interface InputSendHost {
 
 /** What the input path remembers between ticks (owned by the context object, not by Game) */
 export interface InputSendState {
-  /** The on/off keys last sent (common inputFields.ts INPUT_BOOLS; dodge: the Burst Strafer's control, ships/strafer.ts) */
+  /** The on/off keys last sent (common inputFields.ts INPUT_BOOLS; dodge: the Burst Strafer's control, ships/features/strafer) */
   readonly lastSent: Record<InputBool, boolean | undefined>;
   lastSentAngle: number;          // quantized angle (int)
   lastSentCursorDist: number;

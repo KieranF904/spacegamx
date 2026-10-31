@@ -4,13 +4,14 @@
  * client's input message for prediction. Shared so the two sides normalise every field alike:
  *   - a jump only starts when the drive isn't EMPed (jump && !emp)
  *   - jumpDist is the cursor distance as given (undefined or 0: as far as the drive goes)
- *   - dodge is a held flag (false when absent)
+ *   - a part feature's held input (features/plan.ts `held`: the Burst Strafer's dodge) is a flag, false when absent
  *
  * Per-tick use: pass `out` (one scratch object, reused) so nothing is allocated; stepShipPhysics never keeps it.
  * The same built object also feeds controlBits (replica.ts), which reads only the flags.
  */
 
 import type { FlightControls } from './flight.js';
+import { getPlan } from './features/plan.js';
 
 /** The held keys, structurally (the server's Input fields read as booleans, or the client's input message) */
 export interface FlightInputSource {
@@ -23,15 +24,20 @@ export interface FlightInputSource {
   jump?: boolean;
   /** Ship-to-cursor distance (world units): how far a jump goes */
   cursorDist?: number;
+  /** Burst Strafer (features/strafer): its held input, as the plan lists it */
   dodge?: boolean;
 }
 
 /** A fresh FlightControls to reuse as `out` */
 export function newFlightControls(): FlightControls {
-  return {
+  const out: FlightControls = {
     forward: false, backward: false, left: false, right: false, boost: false, targetAngle: 0,
-    helm: false, strafeLeft: false, strafeRight: false, jump: false, jumpDist: 0, dodge: false,
+    helm: false, strafeLeft: false, strafeRight: false, jump: false, jumpDist: 0,
   };
+  // (Part features' held inputs, off)
+  const H = getPlan().held, held = out as unknown as Record<string, boolean>;
+  for (let i = 0; i < H.length; i++) held[H[i]] = false;
+  return out;
 }
 
 /** Fill `out` (or a new object) with the controls a flight step reads, from the held keys and whether the drive is EMPed */
@@ -47,6 +53,8 @@ export function buildFlightInputs(src: FlightInputSource, emp: boolean, out: Fli
   out.strafeRight = !!src.strafeRight;
   out.jump = !!src.jump && !emp;
   out.jumpDist = src.cursorDist;
-  out.dodge = !!src.dodge;
+  // (Part features' held inputs, by name: the Burst Strafer's dodge)
+  const H = getPlan().held, from = src as unknown as Record<string, unknown>, to = out as unknown as Record<string, boolean>;
+  for (let i = 0; i < H.length; i++) to[H[i]] = !!from[H[i]];
   return out;
 }

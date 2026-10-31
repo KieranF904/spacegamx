@@ -15,7 +15,7 @@ The client's player-facing shell: `Game.ts` (the orchestrator: owns the window s
 | `ui/windowKit.ts` | 429 | `GameWindow` (veil + head + tabs + body, `open/close/onClose`, swallows keys except Esc), `showTip/hideTip`, `openMenu/closeMenu`, `itemTipHtml`, `partStatsHtml`, `costHtml`, `ItemGrid`, filters/sort |
 | `ui/PilotHud.ts` | 182 | `PilotHud` (bars, level, credits) and `ToastUI` |
 | `ui/QuickBar.ts`, `CargoPanelUI.ts` | 271 (cargo) | Quick-bar slots 1-5; the cargo panel on the HUD |
-| `ui/CircuitBars.ts`, `DodgeIndicator.ts` (ready/cooldown ring, LOW POWER, ways it can't dodge), `TowIndicator.ts`, `FrostVignette.ts` | 100-255 each | Per-feature HUD chips driven by `ShipDerived`/snapshot extras |
+| `ui/CircuitBars.ts`, `ships/features/strafer/DodgeIndicator.ts` (ready/cooldown ring, LOW POWER, ways it can't dodge), `ships/features/tow/TowIndicator.ts`, `ui/FrostVignette.ts` | 100-255 each | Per-feature HUD chips driven by `ShipDerived`/snapshot extras |
 | `ui/StationWindow.ts` | 1444 | Station tabs (lazy chunk). Economy area owns content; god-file |
 | `ui/InventoryWindow.ts`, `TradeWindow.ts`, `QuestUI.ts` (835), `SocialUI.ts` (319) | 200-835 | Cargo/storage window (I), player trade, jobs+skills log (L/K) and tracker, party/friends (P) |
 | `ui/SystemMapUI.ts` | 1885 | Galaxy/system map (M), autopilot clicks. God-file |
@@ -70,7 +70,7 @@ The client's player-facing shell: `Game.ts` (the orchestrator: owns the window s
 ## How to extend
 1. **Add a keybinding**: add an `ActionDef` to `ACTIONS` (`input/keybindings.ts`) with a default `key`; handle `code === '<default>'` in `app/keys.ts` (`PRE_KEYS` or `POST_KEYS`) or read the key in `tickInput` (app/inputSend.ts); show it via `boundKeyName`. The rebinding UI iterates `ACTIONS`, so it appears automatically.
 2. **Add a window**: extend/compose `GameWindow` in `ui/<Name>.ts`; construct it in `buildWindows` (app/windows.ts) passing `send`/`sound`, add its field to `WindowSet`, and reach it as `this.w.<name>` in Game; if heavy, wrap in `new Lazy(() => import('../ui/<Name>')...)` (model: `makeStationWindow` in app/lazyScreens.ts) and add it to `prefetchScreens` there; add its Esc/toggle case to `MODAL_CHAIN` in `app/keys.ts`.
-3. **Add a HUD chip**: new small class in `ui/` (model: `DodgeIndicator.ts`, `CircuitBars.ts`) with an `update()` using `setText`; construct it in `buildWindows` (app/windows.ts), call from `updateUI` or `update`; if toggleable add a field to `SettingsData` + `defaultSettings()` and a row in GameMenuUI's tab.
+3. **Add a HUD chip**: new small class in `ui/` (model: `CircuitBars.ts`; a part feature's chip is its client feature's `indicator`, e.g. ships/features/strafer) with an `update()` using `setText`; construct it in `buildWindows` (app/windows.ts), call from `updateUI` or `update`; if toggleable add a field to `SettingsData` + `defaultSettings()` and a row in GameMenuUI's tab.
 4. **Handle a new server message**: add an entry to `HANDLERS` in `app/serverMessages.ts` calling a UI method (add a `MessageHost` getter if it needs new game state); the type must exist in common protocol (`networking`).
 5. **Add a setting**: `SettingsData` + `defaultSettings()` in `settings/Settings.ts` (the loader merges saved data over defaults, so old saves are fine), a row in `GameMenuUI`, apply in `Game.applySettings`.
 6. **Add a context-menu action**: pure options in `input/contextClick.ts` (`targetOptions`/`openSpaceOptions`, extend `ActionId`), execution in `ContextActions.pick`, tests in `contextClick.test.ts`.

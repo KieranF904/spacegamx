@@ -1,21 +1,21 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { parseBlueprint } from './blueprint.js';
-import { createShipState } from './state.js';
-import { readShipJson, testCatalog, SHIP_DATA_DIR } from './testData.js';
-import type { ShipTuning } from './tuning.js';
-import type { ShipDerived } from './rebuild.js';
-import { worldToLocalDir, type FlightBody, type FlightControls } from './flight.js';
-import { stepShipPhysics, quantizeShipBody } from './physics.js';
-import { replicaStep, ReplicaMode, controlBits, CTL, flightSignature } from './replica.js';
+import { parseBlueprint } from '../../blueprint.js';
+import { createShipState } from '../../state.js';
+import { readShipJson, testCatalog, SHIP_DATA_DIR } from '../../testData.js';
+import type { ShipTuning } from '../../tuning.js';
+import type { ShipDerived } from '../../rebuild.js';
+import { worldToLocalDir, type FlightBody, type FlightControls } from '../../flight.js';
+import { stepShipPhysics, quantizeShipBody } from '../../physics.js';
+import { replicaStep, ReplicaMode, controlBits, CTL, flightSignature } from '../../replica.js';
 import {
   dodgePhase, stepDodge, strafeForce, dodgeLoad, burstEnergy, pilotExtras, chooseDodgeDir, dodgeDirOf, dodgeVec, oppositeDir, bestDodge,
   dodgeAffordable, DODGE_DIRS, DODGE_LEFT, DODGE_RIGHT, DODGE_FORWARD, DODGE_BACK, type StrafeInfo,
 } from './strafer.js';
-import { FULL_CHARGE, chargeTotal, CHARGE_GROUPS_AT, type Charge } from './energy.js';
-import { packKeyframe, unpackKeyframe } from '../network/replication.js';
-import { encodeInputBinary, decodeInputBinary } from '../network/protocol.js';
+import { FULL_CHARGE, chargeTotal, CHARGE_GROUPS_AT, type Charge } from '../../energy.js';
+import { packKeyframe, unpackKeyframe } from '../../../network/replication.js';
+import { encodeInputBinary, decodeInputBinary } from '../../../network/protocol.js';
 
 const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
@@ -67,25 +67,25 @@ describe('Burst Strafer: the part', () => {
   });
 
   it('gives the ship a push away from its nozzle; none on a plain ship; it adds no thruster', () => {
-    expect(ship().derived.strafe).toBeUndefined();
+    expect(ship().derived.fx?.strafe).toBeUndefined();
     const d = ship([RIGHT_FLANK]).derived;
-    expect(d.strafe!.parts.length).toBe(1);
-    expect(strafeForce(d.strafe, DODGE_LEFT)).toBeGreaterThan(0);
-    expect(strafeForce(d.strafe, DODGE_RIGHT)).toBe(0);
-    expect(strafeForce(d.strafe, DODGE_FORWARD)).toBeCloseTo(0, 6);
+    expect(d.fx!.strafe!.parts.length).toBe(1);
+    expect(strafeForce(d.fx?.strafe, DODGE_LEFT)).toBeGreaterThan(0);
+    expect(strafeForce(d.fx?.strafe, DODGE_RIGHT)).toBe(0);
+    expect(strafeForce(d.fx?.strafe, DODGE_FORWARD)).toBeCloseTo(0, 6);
     // (A diagonal gets its component: cos 45°)
-    expect(strafeForce(d.strafe, (DODGE_LEFT + DODGE_FORWARD) / 2)).toBeCloseTo(strafeForce(d.strafe, DODGE_LEFT) * Math.SQRT1_2, 3);
-    expect(d.thrusters.some((t) => t.part === d.strafe!.parts[0].part)).toBe(false);
+    expect(strafeForce(d.fx?.strafe, (DODGE_LEFT + DODGE_FORWARD) / 2)).toBeCloseTo(strafeForce(d.fx?.strafe, DODGE_LEFT) * Math.SQRT1_2, 3);
+    expect(d.thrusters.some((t) => t.part === d.fx!.strafe!.parts[0].part)).toBe(false);
     const both = ship([RIGHT_FLANK, LEFT_FLANK]).derived;
-    expect(both.strafe!.parts.length).toBe(2);
+    expect(both.fx!.strafe!.parts.length).toBe(2);
     // (It's an engine on its circuit: a burst consumer with a feed group)
-    expect(both.power!.feedOf[both.strafe!.parts[0].part]).toBeGreaterThanOrEqual(0);
+    expect(both.power!.feedOf[both.fx!.strafe!.parts[0].part]).toBeGreaterThanOrEqual(0);
     expect(flightSignature(both)).not.toBe(flightSignature(ship().derived));
   });
 
   it('strafers facing forward and back dodge back and forward (the dev test ship has them every way)', () => {
     const d = testStrafer();
-    const s = d.strafe!;
+    const s = d.fx!.strafe!;
     // Two at the nose (facing N: push back), two at the tail (facing S: push forward), one each flank
     expect(s.parts.length).toBe(6);
     expect(strafeForce(s, DODGE_BACK)).toBeCloseTo(strafeForce(s, DODGE_LEFT) * 2, 3);
@@ -197,7 +197,7 @@ describe('Burst Strafer: flight', () => {
     const d = ship([RIGHT_FLANK]).derived;
     const b = fly(body(), d, { dodge: true }, 1);
     expect(lateral(b)).toBeLessThan(0);
-    fly(b, d, { dodge: true }, d.strafe!.ticks - 1);
+    fly(b, d, { dodge: true }, d.fx!.strafe!.ticks - 1);
     const v = lateral(b);
     expect(v).toBeLessThan(-3);
     // Held on: no second burst, just coasting down
@@ -207,7 +207,7 @@ describe('Burst Strafer: flight', () => {
 
   it('dodges any way with strafers on all sides: forward, back and diagonals, the way the keys ask (screen-relative)', () => {
     const d = testStrafer();
-    const s = d.strafe!;
+    const s = d.fx!.strafe!;
     // (Facing up: screen up is forward, screen right is the ship's right)
     const go = (c: Partial<FlightControls>) => {
       // Thrust and dodge both: compare against the same keys without the dodge
@@ -256,7 +256,7 @@ describe('Burst Strafer: flight', () => {
     expect(dodgeLoad(plain, DODGE_LEFT)!.some((v) => v > 0)).toBe(true);
     const cost = (d: ShipDerived) => {
       const ch = { c: FULL_CHARGE as Charge };
-      fly(body(), d, { dodge: true }, d.strafe!.ticks, ch);
+      fly(body(), d, { dodge: true }, d.fx!.strafe!.ticks, ch);
       return ch.c;
     };
     const a = cost(plain), b = cost(banked);
@@ -278,7 +278,7 @@ describe('Burst Strafer: flight', () => {
     for (let n = 0; n < 40; n++) {
       // Press: hold a few ticks, then let go till it's ready
       const before = lateral(b);
-      for (let i = 0; i < d.strafe!.cooldown; i++) {
+      for (let i = 0; i < d.fx!.strafe!.cooldown; i++) {
         fly(b, d, { dodge: i < 4 }, 1, ch);
       }
       kicks.push(before - lateral(b));
@@ -294,11 +294,11 @@ describe('Burst Strafer: flight', () => {
     const d = ship([RIGHT_FLANK]).derived;
     const empty: Charge = { core: 0, s: d.power!.stores.map(() => 0) };
     // (All it has is what the generators make this tick: under a quarter of a burst's draw)
-    expect(d.energy!.spare / 60).toBeLessThan(0.25 * (burstEnergy(d, DODGE_LEFT) / d.strafe!.ticks));
+    expect(d.energy!.spare / 60).toBeLessThan(0.25 * (burstEnergy(d, DODGE_LEFT) / d.fx!.strafe!.ticks));
     const b = body();
     const r = stepShipPhysics(b, { ...NONE, dodge: true }, d, tuning, { charge: empty, drainRate: 1 });
     expect(lateral(b)).toBe(0);
-    expect(b.dodge).toBe(Math.max(d.strafe!.ticks, d.strafe!.cooldown));
+    expect(b.dodge).toBe(Math.max(d.fx!.strafe!.ticks, d.fx!.strafe!.cooldown));
     expect(dodgeAffordable(d, empty, DODGE_LEFT)).toBeLessThan(0.25);
     stepShipPhysics(b, { ...NONE }, d, tuning, { charge: r.charge, drainRate: 1 });
     expect(b.dodge).toBeUndefined();

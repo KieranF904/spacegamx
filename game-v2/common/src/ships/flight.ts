@@ -10,7 +10,9 @@ import type { ShipTuning } from './tuning.js';
 import { capCharge, powerTick, thrustShare, type Charge } from './energy.js';
 import { surgeKick, surgeTuning } from './surge.js';
 import { cargoThrust, cargoTurn } from './load.js';
-import { DODGE_MIN_SHARE, dodgeLoad, dodgeVec, refuseDodge, stepDodge, strafeForce } from './strafer.js';
+import type { FlightCtx } from './features/types.js';
+import type { FlightEntry } from './features/plan.js';
+import { getPlan } from './features/plan.js';
 
 /** A boss's fastest turn (radians a tick; Blueprint `turn`): a hull the size of a station doesn't whip round */
 const BOSS_SPIN = 0.04;
@@ -26,7 +28,7 @@ export interface FlightBody {
   jumpScale?: number;
   /** Mass of the cargo in the hold (load.ts): carried, not stepped; absent = 0 */
   cargo?: number;
-  /** Burst Strafer (strafer.ts stepDodge): the dodge counter and the way of the last dodge (1..DODGE_DIRS, ship-local); absent = 0 */
+  /** Burst Strafer (features/strafer): the dodge counter and the way of the last dodge (1..DODGE_DIRS, ship-local); absent = 0 */
   dodge?: number;
   dodgeDir?: number;
 }
@@ -47,7 +49,7 @@ export interface FlightControls {
   jump?: boolean;
   /** How far to jump (world units; the cursor distance): where the ship comes to rest. 0 = as far as the drive goes */
   jumpDist?: number;
-  /** Burst Strafer: held to dodge, the way the movement keys ask; one burst a press (strafer.ts) */
+  /** Burst Strafer: held to dodge, the way the movement keys ask; one burst a press (features/strafer: its input, filled from the plan's held inputs) */
   dodge?: boolean;
 }
 
@@ -356,6 +358,18 @@ export function thrustAlong(d: ShipDerived, dir: Vec2, speed = 0): number {
   return Math.max(f, d.maneuverForce);
 }
 
+/** The one flight context every stepFlight call fills (features/types.ts FlightCtx: reset by field, never re-entered) */
+const CTX: FlightCtx = {
+  body: undefined as unknown as FlightBody, input: undefined as unknown as FlightControls, d: undefined as unknown as ShipDerived,
+  tuning: undefined as unknown as ShipTuning, k: undefined as unknown as FlightConstants,
+  feature: 0, cargo: 0, wantX: 0, wantY: 0, charging: false, accounted: false, load: [], loads: 0, shares: undefined, scratch: {},
+};
+
+/** Run one phase's part-feature hooks (features/plan.ts, in (order, feature) order) */
+function runHooks(list: readonly FlightEntry[], c: FlightCtx): void {
+  for (let i = 0; i < list.length; i++) { const e = list[i]; c.feature = e.feature; e.step(c); }
+}
+
 export function stepFlight(
   body: FlightBody,
   input: FlightControls,
@@ -366,6 +380,13 @@ export function stepFlight(
   k: FlightConstants,
 ): FlightResult {
   const ft = tuning.flight;
+  // (Part features' flight hooks: features/types.ts FlightPhase says where each phase runs)
+  const H = getPlan().flight;
+  const c = CTX;
+  c.body = body; c.input = input; c.d = d; c.tuning = tuning; c.k = k;
+  c.cargo = body.cargo ?? 0; c.wantX = 0; c.wantY = 0; c.charging = false; c.accounted = boost.drainRate > 0 && !!d.energy; c.shares = undefined;
+  if (c.loads) { c.load.fill(undefined); c.loads = 0; }
+  runHooks(H.preJump, c);
 
   // --- Jump drive: while burning, nothing else applies (no steering, thrust, friction or gravity)
   const jt0 = jumpTuning(tuning);
@@ -418,6 +439,7 @@ export function stepFlight(
     body.angVel = 0;
   }
   body.angle = wrapAngle(body.angle + body.angVel);
+  runHooks(H.steer, c);
 
   // --- Thrust: force from whatever points the requested way.
   // Mouse-steer asks in screen space; helm asks in ship space (forward = the nose).
@@ -435,12 +457,12 @@ export function stepFlight(
     if (input.left) ix -= 1;
     if (input.right) ix += 1;
   }
-  // --- Burst Strafer (strafer.ts): a sharp burst the way the movement keys ask (ship-local), one a press, then a short
-  // cooldown (not while the drive spools)
-  const dodgeDir = d.strafe || body.dodge ? stepDodge(body, !!input.dodge, ix || iy ? worldToLocalDir([ix, iy], body.angle) : null, d.strafe, charging) : 0;
+  // (Part features see the way asked before a spooling drive takes the engines, and may ask power for this tick: a Burst
+  // Strafer's dodge, features/strafer)
+  c.wantX = ix; c.wantY = iy; c.charging = charging;
+  runHooks(H.thrustGate, c);
   // Spooling the drive takes the engines: the ship can still aim, but brakes instead of thrusting
   if (charging) ix = iy = 0;
-  let dodgeShare = 1;
   const mag = Math.hypot(ix, iy);
   let accel = 0;
   let charge = boost.charge;
@@ -454,9 +476,9 @@ export function stepFlight(
     // A hazard that saps the batteries: they hold only so much
     const cap = k.hazard ? Math.round(100 * k.hazard.cap * 1000) / 1000 : 100;
     const dir = thrusting ? worldToLocalDir([ix / mag, iy / mag], body.angle) : undefined;
-    const pt = powerTick(d, capCharge(d, boost.charge, cap), { thrusting, boosting: !!input.boost, load: boost.load, dodge: dodgeDir ? dodgeLoad(d, dodgeDir) : undefined }, tuning);
+    const pt = powerTick(d, capCharge(d, boost.charge, cap), { thrusting, boosting: !!input.boost, load: boost.load, extra: c.loads ? c.load : undefined }, tuning);
     charge = pt.charge;
-    dodgeShare = pt.dodge ?? 1;
+    c.shares = pt.extra;
     canBoost = pt.boost;
     // (Each engine pushes on its own circuit's share: a browned-out circuit's engines push that much less)
     if (dir) {
@@ -482,16 +504,8 @@ export function stepFlight(
     body.vy += iy * (accel + kickDv);
   }
 
-  // (A dodge: its strafers' push along its way, on the ship's mass and load; short of power, that much less, and a burst
-  // that gets too little on its first tick is refused: strafer.ts)
-  if (dodgeDir && body.dodge === 1 && dodgeShare < DODGE_MIN_SHARE) refuseDodge(body, d.strafe!);
-  else if (dodgeDir) {
-    const m = Math.max(d.mass, d.fullMass ?? d.mass);
-    const a = m > 0 ? ((strafeForce(d.strafe, dodgeDir) * (d.drive ?? 1)) / m) * cargoThrust(d, cargo) * dodgeShare * (k.hazard?.control ?? 1) : 0;
-    const [wx, wy] = localToWorldDir(dodgeVec(dodgeDir), body.angle);
-    body.vx += wx * a;
-    body.vy += wy * a;
-  }
+  // (Part features' pushes, on what power they got: a Burst Strafer's dodge, features/strafer)
+  runHooks(H.impulse, c);
 
   applyGravity(body, k.gravity);
   // A gravity hazard: a light ship is drawn towards the well
@@ -499,6 +513,8 @@ export function stepFlight(
     const r = Math.hypot(body.x, body.y);
     if (r > 1) { body.vx -= (body.x / r) * k.hazard.driftAccel; body.vy -= (body.y / r) * k.hazard.driftAccel; }
   }
+
+  runHooks(H.damp, c);
 
   // --- Same integrator as the legacy ship
   const damp = charging ? k.friction * jt.chargeDamping : k.friction;

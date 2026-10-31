@@ -61,7 +61,7 @@ export interface ClientInputMessage {
   cursorDist?: number;
   /** Jump drive: true while spooling up (the client latches it from a J press) */
   jump?: boolean;
-  /** Burst Strafer: held to dodge, the way the movement keys ask (ships/strafer.ts) */
+  /** Burst Strafer: held to dodge, the way the movement keys ask (ships/features/strafer) */
   dodge?: boolean;
 }
 

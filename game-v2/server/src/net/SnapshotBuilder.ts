@@ -355,8 +355,9 @@ export class SnapshotBuilder {
           warmthPercent(this.ships.warmthOf(eid)), // warmth % (common/src/ships/warmth.ts: the frost vignette, and the stage prediction flies and fires with)
           ship?.cargo ?? 0,                      // [14] the hold's cargo mass (common/src/ships/load.ts: prediction flies it)
           ...charge.groups,                      // [15...] each store group's charge % (CHARGE_GROUPS_AT)
-          // After the groups (common/src/ships/strafer.ts pilotExtras): the Burst Strafer's dodge counter and way, what the Tow Beam tows (+1: ships/features/tow, in features.wire.json pilotExtra order)
-          ship?.dodge ?? 0, ship?.dodgeDir ?? 0, ...this.fxWire(eid),
+          // After the groups, the part features' values in features.wire.json pilotExtra order (features/strafer/strafer.ts
+          // pilotExtras reads them): the Burst Strafer's dodge counter and way (ships/features/strafer), what the Tow Beam tows (+1: ships/features/tow)
+          ...this.fxWire(eid),
         ],
       }, 'player', names.get(eid));
       // Everyone else: status only (motion is replicated). data: [shield %, EMP'd, beam heat (tenths), overheated,

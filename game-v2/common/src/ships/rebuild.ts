@@ -17,7 +17,6 @@ import { netJoins, wireNetworks } from './wires.js';
 import { gunRate } from './launch.js';
 import { type EnergyInfo } from './energy.js';
 import { type PowerLayout, powerLayout } from './circuits.js';
-import type { StrafeInfo } from './strafer.js';
 import type { FeatureDerived } from './features/types.js';
 import { getPlan, featureBits, featureList } from './features/plan.js';
 
@@ -167,8 +166,6 @@ export interface ShipDerived {
   scanRange: number;
   /** Shield capacity from powered shield generators (0 = no shield) */
   shieldMax: number;
-  /** Burst Strafers (strafer.ts): each one's push (ship-local), the burst's length and the cooldown; absent without a powered one */
-  strafe?: StrafeInfo;
   /**
    * Part features (features/): the ones this ship has (bit = feature number in the plan: a live part they apply to, or
    * global), the same as a list in plan order, and what each one derived. All three absent when it has none.
@@ -320,12 +317,14 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   // 4. Power, per network
   const area = geoms.map((g) => g.area);
   const satisfaction = new Array<number>(n).fill(1);
-  // (Burst Strafers draw by the tick too, only while they work: strafer.ts)
-  // (Part features: which ones each part's function gives (features/plan.ts); a `burst` feature's parts draw by the tick too, as a Tow Beam's)
+  // (Part features: which ones each part's function gives (features/plan.ts); a `burst` feature's parts draw by the tick too, as a
+  // Tow Beam's and a Burst Strafer's)
   const P = getPlan();
   const fxOf = P.features.length ? fns.map((fn) => featureBits(P, fn)) : undefined;
-  const burst = (i: number) => isEngine(fns[i]) || !!fns[i].weapon || isMinerFn(fns[i]) || !!fns[i].strafe
+  const burst = (i: number) => isEngine(fns[i]) || !!fns[i].weapon || isMinerFn(fns[i])
     || (fxOf !== undefined && (fxOf[i] & P.burstMask) !== 0);
+  // (Of those, the ones their circuit counts as engines: burst 'engine', a Burst Strafer's)
+  const engineLike = (i: number) => fxOf !== undefined && (fxOf[i] & P.engineMask) !== 0;
   // (Local circuits: a burst consumer runs wherever its circuit has a generator or a store, it touches a capacitor bank, or the
   // core's store can reach it: on the main circuit, or by its trickle elsewhere. How much it actually gets is the tick's: energy.ts)
   const coreAlive = input.rootMode === 'core' && root >= 0 && parts[root].fn === 'core';
@@ -473,8 +472,6 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   let cargoCapacity = hasCore ? CORE_CARGO : 0;
   let scanRange = 0;
   let shieldMax = 0;
-  // (Burst Strafers: strafer.ts)
-  let strafe: StrafeInfo | undefined;
   const jt = { ...DEFAULT_JUMP, ...(tuning.jump ?? {}) };
   // The jump drive: coil capacity (the core's own, and powered coils', a little more for better grades) against the hull's cells
   let jumpCap = 0, jumpGradeSum = 0, hullCells = 0;
@@ -494,16 +491,6 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     if ((fns[i].capacity ?? 0) > 0) cargoCapacity += fns[i].capacity! * area[i];
     if ((fns[i].range ?? 0) > 0) scanRange = Math.max(scanRange, fns[i].range! * satisfaction[i]);
     if ((fns[i].shield ?? 0) > 0) shieldMax += fns[i].shield! * area[i] * fnOutput(fns[i], mats[i]) * satisfaction[i];
-    // ---- Burst Strafer: it pushes away from its facing edge, whichever way that is (strafer.ts)
-    const sf = fns[i].strafe;
-    if (sf && alive[i] && mounts[i] && satisfaction[i] > 0) {
-      strafe ??= { parts: [], ticks: sf.ticks, cooldown: sf.cooldown };
-      const force = sf.kick * area[i] * fnOutput(fns[i], mats[i]) * satisfaction[i];
-      const r = (v: number) => Math.round(v * 1000) / 1000 || 0;
-      strafe.parts.push({ part: i, push: [r(-mounts[i]!.dir[0] * force), r(-mounts[i]!.dir[1] * force)] });
-      strafe.ticks = Math.max(strafe.ticks, sf.ticks);
-      strafe.cooldown = Math.min(strafe.cooldown, sf.cooldown);
-    }
     if (satisfaction[i] > 0 && (fns[i].demand ?? 0) > 0) {
       const draw = partDemand(fns[i], area[i], mats[i]);
       if (isEngine(fns[i])) engineDraw += draw;
@@ -547,7 +534,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   }
 
   // ---- Local circuits (circuits.ts): worked out here once, run by energy.ts every tick
-  const power = powerLayout({ fns, area, mats, alive, joins, network, networks, burst, core: coreAlive, tuning, health: hp.map((h, i) => healthFactor(h / (maxHp[i] || 1), tuning)) });
+  const power = powerLayout({ fns, area, mats, alive, joins, network, networks, burst, engine: engineLike, core: coreAlive, tuning, health: hp.map((h, i) => healthFactor(h / (maxHp[i] || 1), tuning)) });
   let batteryMax = power.core?.cap ?? 0, driveMax = 0, weaponMax = 0;
   for (const g of power.stores) if (g.kind === 'd') driveMax += g.cap; else if (g.kind === 'w' || g.kind === 'k') weaponMax += g.cap; else batteryMax += g.cap;
   // ---- (end local circuits)
@@ -588,7 +575,6 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     dash,
     scanRange: Math.round(scanRange),
     shieldMax: Math.round(shieldMax),
-    ...(strafe ? { strafe } : {}),
     ...(fxMask ? { fxMask, fxList, fx: fxOut } : {}),
     jumpRange: jump.range,
     jumpCooldown: jump.cooldown,

@@ -1,7 +1,8 @@
 /**
- * The Burst Strafer's HUD chip, over the jump gauge (common/src/ships/strafer.ts): READY (lit) or a ring filling over
- * the short cooldown, the dodge key, a flash while a burst runs, LOW POWER when the circuit can't pay for a full burst
- * the way you'd dodge now, and which ways the strafers can't push (if any). Shown while a ship has strafers fitted.
+ * The Burst Strafer's HUD chip, over the jump gauge (common/src/ships/features/strafer): READY (lit) or a ring filling
+ * over the short cooldown, the dodge key, a flash while a burst runs, LOW POWER when the circuit can't pay for a full
+ * burst the way you'd dodge now, and which ways the strafers can't push (if any). Shown while a ship has strafers fitted.
+ * Its element is made on first use, so importing the feature (keybindings does) touches no DOM.
  */
 
 export interface DodgeHud {
@@ -15,16 +16,17 @@ export interface DodgeHud {
 }
 
 export class DodgeIndicator {
-  private root: HTMLDivElement;
+  private root?: HTMLDivElement;
   private key = '';
 
-  constructor() {
-    this.root = document.createElement('div');
-    this.root.style.cssText = `position: fixed; left: 50%; bottom: 262px; transform: translateX(-50%); z-index: 860; display: none; pointer-events: none;
+  private make(): HTMLDivElement {
+    const root = document.createElement('div');
+    root.style.cssText = `position: fixed; left: 50%; bottom: 262px; transform: translateX(-50%); z-index: 860; display: none; pointer-events: none;
       padding: 3px 12px 4px; border-radius: 999px; background: rgba(8, 14, 26, 0.72); border: 1px solid rgba(244, 114, 182, 0.35);
       font: 600 11px 'Segoe UI', system-ui, sans-serif; letter-spacing: 1.2px; color: #f9a8d4; text-align: center; white-space: nowrap;`;
-    this.root.dataset.hudAvoid = '1';
-    document.body.appendChild(this.root);
+    root.dataset.hudAvoid = '1';
+    document.body.appendChild(root);
+    return (this.root = root);
   }
 
   /** Each frame: the dodge's state (null: hidden), and the dodge key */
@@ -33,7 +35,9 @@ export class DodgeIndicator {
     const key = s ? `${s.phase}|${Math.round(s.cooling * 12)}|${low ? Math.round(s.afford * 10) : 'ok'}|${keyName}|${s.ways}` : '';
     if (key === this.key) return;
     this.key = key;
-    this.root.style.display = s ? 'block' : 'none';
+    if (!s && !this.root) return;
+    const root = this.root ?? this.make();
+    root.style.display = s ? 'block' : 'none';
     if (!s) return;
     const bursting = s.phase === 'burst';
     const ready = s.phase === 'ready' || s.phase === 'held';
@@ -43,8 +47,8 @@ export class DodgeIndicator {
     const power = low
       ? ` <span style="color:${s.afford < 0.25 ? '#f87171' : '#fbbf24'}; font-weight:600">${s.afford < 0.25 ? 'NO POWER' : `LOW POWER ${Math.round(s.afford * 100)}%`}</span>`
       : '';
-    this.root.style.borderColor = bursting ? 'rgba(244, 114, 182, 0.9)' : low ? 'rgba(251, 191, 36, 0.45)' : 'rgba(244, 114, 182, 0.35)';
-    this.root.style.boxShadow = bursting ? '0 0 14px rgba(244, 114, 182, 0.45)' : 'none';
-    this.root.innerHTML = `DODGE ${dot}<kbd style="color:#e5ecf7; font-weight:600">${keyName}</kbd>${power}${s.ways ? ` <span style="color:#9aa7b8; font-weight:400">${s.ways} only</span>` : ''}`;
+    root.style.borderColor = bursting ? 'rgba(244, 114, 182, 0.9)' : low ? 'rgba(251, 191, 36, 0.45)' : 'rgba(244, 114, 182, 0.35)';
+    root.style.boxShadow = bursting ? '0 0 14px rgba(244, 114, 182, 0.45)' : 'none';
+    root.innerHTML = `DODGE ${dot}<kbd style="color:#e5ecf7; font-weight:600">${keyName}</kbd>${power}${s.ways ? ` <span style="color:#9aa7b8; font-weight:400">${s.ways} only</span>` : ''}`;
   }
 }

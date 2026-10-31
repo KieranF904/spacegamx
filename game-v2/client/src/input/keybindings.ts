@@ -32,7 +32,6 @@ export const ACTIONS: ActionDef[] = [
   { id: 'boost', label: 'Boost', category: 'Flight', key: 'ShiftLeft', alt: 'ShiftRight' },
   { id: 'jump', label: 'Jump drive', category: 'Flight', key: 'KeyJ', hint: 'Jumps to your cursor (or the station, gate or marker you point at), within range' },
   { id: 'helm', label: 'Switch mouse-steer / helm', category: 'Flight', key: 'KeyV' },
-  { id: 'dodge', label: 'Dodge (Burst Strafer)', category: 'Flight', key: 'Space', hint: 'One hard burst a press, the way you are steering (WASD, diagonals too; forward, back and Q/E at the helm), with whichever strafers push that way; with nothing held, back the other way from last time. Ready again in under half a second; every burst costs a lot of energy' },
   { id: 'aim', label: 'Aim / steer', category: 'Flight', key: 'Mouse', rebindable: false },
   { id: 'fire', label: 'Fire', category: 'Combat', key: 'Mouse0', alt: 'Mouse2', rebindable: false },
   { id: 'targetNext', label: 'Target the next hostile', category: 'Combat', key: 'Tab', hint: 'Nearest first. Missiles lock on to your target' },
@@ -62,7 +61,7 @@ export const ACTIONS: ActionDef[] = [
   { id: 'zoom', label: 'Zoom', category: 'Interface', key: 'Wheel', rebindable: false },
   { id: 'resetZoom', label: 'Reset zoom', category: 'Interface', key: 'Home' },
 ];
-// Part features' key bindings (ships/features: the Tow Beam's), after the core ones so the order is stable
+// Part features' key bindings (ships/features: the Burst Strafer's dodge after the helm switch, the Tow Beam's after that), after the core ones so the order is stable
 for (const f of CLIENT_FEATURES) for (const a of f.actions ?? []) {
   if (ACTIONS.some((x) => x.id === a.id)) throw new Error(`client feature ${f.id}: action ${a.id} already exists`);
   const at = a.after ? ACTIONS.findIndex((x) => x.id === a.after) : -1;

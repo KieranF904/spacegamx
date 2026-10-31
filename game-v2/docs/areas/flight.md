@@ -8,7 +8,7 @@ How a ship moves: `stepFlight` turns inputs plus `ShipDerived` (thrust, mass, in
 | common/src/ships/physics.ts | 61 | `stepShipPhysics` (stepFlight + `collideTerrain` + `quantizeShipBody`), `SHIP_PRECISION`, `SHIP_FLIGHT_CONSTANTS` |
 | common/src/ships/state.ts | 171 | `ShipState` (blueprint, per-part hp, derived, cooldowns; no position), `createShipState`, `damagePart`, `healPart`, `rebuildShip` |
 | common/src/ships/load.ts | 49 | cargo mass: `cargoThrust`, `cargoTurn`, `cargoEffect`, `quantizeCargo`, `CARGO_TURN_SHARE` |
-| common/src/ships/strafer.ts, tow.ts | 225/103 | dodge counter `stepDodge`, ways (`DODGE_DIRS`, `chooseDodgeDir`, `dodgeVec`), `strafeForce`, `dodgeLoad`, `dodgeAffordable`; tow tether physics `towPull`, `towLoad` |
+| common/src/ships/features/strafer/strafer.ts, features/tow/tow.ts (each feature's index.ts: its hooks) | 225/103 | dodge counter `stepDodge`, ways (`DODGE_DIRS`, `chooseDodgeDir`, `dodgeVec`), `strafeForce`, `dodgeLoad`, `dodgeAffordable`; tow tether physics `towPull`, `towLoad` |
 | common/src/ships/replica.ts | 136 | `replicaStep`, `controlBits`/`flightControls`, `CTL` bit flags, `ReplicaMode`: replay a ship from keyframe + control bits |
 | common/src/ships/jumpFields.ts, hazards.ts, warmth.ts | 170/107/110 | jump charging fields; hazard and cold effects on control (`hazardFlight`, `withEmp`, `withNumb`) |
 | common/src/ships/collide.ts | 158 | hit tests in grid space: `castParts`, `partDistance`, `nearestParts`; `stages.ts` which part is hittable on staged bosses. Hit tests are used by [weapons](weapons.md), not flight |
@@ -44,13 +44,13 @@ Add a flight-affecting ability (dodge-style):
 2. Feature file `common/src/ships/<x>.ts`: tuning + pure `stepX(counter, want, able, t)`; keep state as ONE integer on `FlightBody`.
 3. flight.ts: add the field to `FlightBody` and the control to `FlightControls`; hook into `stepFlight` at the matching banner (read only that slice).
 4. Controls plumbing, ALL copies: protocol.ts input type + binary flags (bump `PROTOCOL_VERSION`, `npm run wire:bump`), the input list in common/src/network/inputFields.ts (`INPUT_BOOLS`/`INPUT_NUMBERS`) and GameServer `applyInputToEntity`/`releaseControls`, `controlBits`/`flightControls`/`CTL` in replica.ts, ShipBridge.stepMovement (body read + input), ShipClient.predict (body + `player.x` write-back), client input collection (`ui-hud-input`), `GameState.ts` pilot-row parsing (`player.dodge` etc.). The audit flags these hand-copied lists as the top drift risk.
-5. Keyframes/snapshots: pilot row extras (`pilotExtras` in strafer.ts, used by SnapshotBuilder.systemRows, net/SnapshotBuilder.ts).
+5. Keyframes/snapshots: pilot row extras (written by the server features' `wire` in features.wire.json order, net/SnapshotBuilder.ts; read back by `pilotExtras` in features/strafer/strafer.ts).
 Tune: edit data/ships/tuning.json, never inline constants; respect the `xxxTuning` default pattern.
 Add a velocity source (gravity, hazard): through `FlightConstants`, not in the bridge.
 
 ## Tests
 - `npx vitest run common/src/ships/ships.test.ts` flight basics, jump drive (incl. determinism through the quantised step).
-- `npx vitest run common/src/ships/strafer.test.ts common/src/ships/load.test.ts server/src/game/cargo.test.ts server/src/game/tow.test.ts common/src/ships/jumpFields.test.ts common/src/ships/hazards.test.ts common/src/ships/warmth.test.ts` feature flight effects (strafer.test.ts: ways, counter, energy limit, prediction/keyframe/replica replay).
+- `npx vitest run common/src/ships/features/strafer common/src/ships/load.test.ts server/src/game/cargo.test.ts server/src/game/tow.test.ts common/src/ships/jumpFields.test.ts common/src/ships/hazards.test.ts common/src/ships/warmth.test.ts` feature flight effects (features/strafer: ways, counter, energy limit, prediction/keyframe/replica replay; feature.test.ts: the hooks, the input plumbing).
 - `npx vitest run common/src/ships/models.test.ts` (engine rated-speed fade, "same steps on both sides").
 - `npx vitest run server/src/net/replication.test.ts server/src/ships/ships.engine.test.ts server/src/ships/collisions.test.ts common/src/ships/collide.test.ts common/src/terrain.test.ts`
 - `client/src/ships/autopilotFlight.test.ts` (autopilot courses flown through the shared step).

@@ -13,7 +13,7 @@ import {
   Position, Velocity, Rotation, Input, Boost, Player, Dead, InSystem, stepShipPhysics, quantizeShipBody, damagePart,
   stepDrift, withEmp, withNumb, jumpTuning, pilotJumpStep, NO_FIELDS, convexPenetration, ReplicaMode, CTL,
   controlBits, quantizeReplicaAngle, partWeaponDef, partMaterial, powerTick, gunLoad, quantizeCargo,
-  buildFlightInputs, newFlightControls, chargeTotal,
+  buildFlightInputs, newFlightControls, chargeTotal, getPlan,
   type ShipState, type Vec2, type GravityWell, type FlightConstants, type FlightInputSource,
 } from '@space-game/common';
 import { K, centroidOf, CONTACT_MARGIN, BIG_BODY, type ContactPiece, type BridgeCtx } from './core.js';
@@ -21,8 +21,17 @@ import { K, centroidOf, CONTACT_MARGIN, BIG_BODY, type ContactPiece, type Bridge
 /** stepMovement's scratch: the held keys read from Input, and the controls built from them (reused every call; the step never keeps them) */
 const MOVE_SRC: FlightInputSource = {
   forward: false, backward: false, left: false, right: false, boost: false, targetAngle: 0,
-  helm: false, strafeLeft: false, strafeRight: false, jump: false, cursorDist: 0, dodge: false,
+  helm: false, strafeLeft: false, strafeRight: false, jump: false, cursorDist: 0,
 };
+/** Part features' held inputs and the Input fields that hold them (the Burst Strafer's dodge: features/plan.ts held), resolved on first use */
+let HELD: { name: string; field: ArrayLike<number> }[] | undefined;
+function heldInputs(): { name: string; field: ArrayLike<number> }[] {
+  return HELD ??= getPlan().held.map((name) => {
+    const field = (Input as unknown as Record<string, ArrayLike<number> | undefined>)[name];
+    if (!field) throw new Error(`part feature input ${name}: the Input component has no field of that name (ecs/components.ts, network/inputFields.ts)`);
+    return { name, field };
+  });
+}
 const MOVE_CTL = newFlightControls();
 
 /** Read a player's held keys from the Input component into `src` */
@@ -38,7 +47,9 @@ function readInputsInto(eid: number, src: FlightInputSource): FlightInputSource 
   src.strafeRight = Input.strafeRight[eid] === 1;
   src.jump = Input.jump[eid] === 1;
   src.cursorDist = Input.cursorDist[eid];
-  src.dodge = Input.dodge[eid] === 1;
+  // (Part features' held inputs, by name: the Burst Strafer's dodge)
+  const H = heldInputs(), held = src as unknown as Record<string, boolean>;
+  for (let i = 0; i < H.length; i++) held[H[i].name] = H[i].field[eid] === 1;
   return src;
 }
 
@@ -166,7 +177,7 @@ export function stepMovement(b: BridgeCtx, eid: number): boolean {
   // The hold's cargo flies with it (ships/load.ts), as the pilot's prediction and every replica have it
   // (and what its part features add as load: a Tow Beam's tow, ships/features/tow)
   body.cargo = quantizeCargo((b.host.cargoMass?.(eid) ?? 0) + (b.host.featureCargo?.(eid) ?? 0));
-  // (Burst Strafer: the dodge held; its way comes from the movement keys: ships/strafer.ts)
+  // (Part features' held inputs, a Burst Strafer's dodge, come with the keys: readInputsInto)
   const q = quantizeReplicaAngle(Input.targetAngle[eid]);
   // An EMP cripples the drive (thrust and steering × EMP_CONTROL) and stops a jump starting; the pilot's prediction flies it the same
   const emp = b.isEmped(eid);

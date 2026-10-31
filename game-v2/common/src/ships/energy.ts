@@ -172,8 +172,12 @@ export interface PowerUse {
   dir?: Vec2;
   /** What the guns and mining lasers draw this tick, per feed group (per second): gunLoad */
   load?: ArrayLike<number>;
-  /** A Burst Strafer's dodge this tick, per feed group (per second: strafer.ts dodgeLoad): from the bank it touches first, then as an engine */
-  dodge?: ArrayLike<number>;
+  /**
+   * Part features' burst draws this tick, by feature number (features/plan.ts), each per feed group (per second): each
+   * takes from the bank it touches first, then asks its circuit as an engine (a Burst Strafer's dodge: features/strafer).
+   * In feature order; undefined entries ask nothing.
+   */
+  extra?: readonly (ArrayLike<number> | undefined)[];
 }
 
 export interface PowerResult {
@@ -182,8 +186,8 @@ export interface PowerResult {
   power: number;
   /** Whether a boost was possible (it needs stored charge) */
   boost: boolean;
-  /** A Burst Strafer's dodge: the share of its draw it got (absent: none asked) */
-  dodge?: number;
+  /** By feature number, the share of its `extra` draw each got (absent, or an undefined entry: it asked nothing) */
+  extra?: (number | undefined)[];
 }
 
 /** The ship gunLoad (and a part feature's load()) reads */
@@ -280,18 +284,27 @@ export function powerTick(d: ShipDerived, c: Charge, use: PowerUse, tuning: Ship
     return t;
   };
 
-  // ---- Burst Strafer (strafer.ts): a burst takes from the bank its strafers touch first, then asks their circuit as an engine
-  let dodgeWant = 0, dodgeBank = 0;
-  const dodgeRest = use.dodge ? new Float64Array(nF) : undefined;
-  if (use.dodge) for (let f = 0; f < nF; f++) {
-    const w = Math.max(0, use.dodge[f] ?? 0) / 60;
-    if (w <= 1e-15) continue;
-    dodgeWant += w;
-    const b = F[f].bank >= 0 ? take(F[f].bank, w) : 0;
-    dodgeBank += b;
-    dodgeRest![f] = w - b; engWant[f] += w - b; cE[F[f].circuit] += w - b;
+  // ---- Part features' burst draws (use.extra: a Burst Strafer's dodge): each takes from the bank it touches first, then asks
+  // its circuit as an engine
+  const X = use.extra;
+  let xRest: (Float64Array | undefined)[] | undefined, xWant: number[] | undefined, xBank: number[] | undefined;
+  if (X) for (let x = 0; x < X.length; x++) {
+    const ask = X[x];
+    if (!ask) continue;
+    if (!xRest) { xRest = []; xWant = []; xBank = []; }
+    const rest = (xRest[x] = new Float64Array(nF));
+    let want = 0, bank = 0;
+    for (let f = 0; f < nF; f++) {
+      const w = Math.max(0, ask[f] ?? 0) / 60;
+      if (w <= 1e-15) continue;
+      want += w;
+      const b = F[f].bank >= 0 ? take(F[f].bank, w) : 0;
+      bank += b;
+      rest[f] = w - b; engWant[f] += w - b; cE[F[f].circuit] += w - b;
+    }
+    xWant![x] = want; xBank![x] = bank;
   }
-  // ---- (end Burst Strafer)
+  // ---- (end part features' burst draws)
 
   // 1-2. Each circuit: engines, then guns and mining lasers, from its stream, then its pools (and the core, on the main one)
   const stream = new Float64Array(nC);
@@ -369,14 +382,20 @@ export function powerTick(d: ShipDerived, c: Charge, use: PowerUse, tuning: Ship
   for (let i = 0; i < nS; i++) if (surge[i] > 0) held[i] = Math.min(S[i].cap, held[i] + surge[i]);
   const s = new Array<number>(nS);
   for (let i = 0; i < nS; i++) s[i] = pct(held[i], S[i].cap);
-  // (A dodge's share: what its bank gave, and the rest at its feed group's engine share)
-  let dodge: number | undefined;
-  if (dodgeRest && dodgeWant > 1e-15) { let got = dodgeBank; for (let f = 0; f < nF; f++) got += dodgeRest[f] * eng[f]; dodge = Math.min(1, got / dodgeWant); }
+  // (A feature's burst share: what its bank gave, and the rest at its feed group's engine share)
+  let extra: (number | undefined)[] | undefined;
+  if (xRest) for (let x = 0; x < xRest.length; x++) {
+    const rest = xRest[x];
+    if (!rest || xWant![x] <= 1e-15) continue;
+    let got = xBank![x];
+    for (let f = 0; f < nF; f++) got += rest[f] * eng[f];
+    (extra ??= [])[x] = Math.min(1, got / xWant![x]);
+  }
   return {
     charge: { core: core ? pct(coreLeft, core.cap) : 100, s, eng, gun },
     power: wantAll > 1e-15 ? Math.min(1, gotAll / wantAll) : 1,
     boost,
-    ...(dodge !== undefined ? { dodge } : {}),
+    ...(extra ? { extra } : {}),
   };
 }
 

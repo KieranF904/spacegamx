@@ -7,5 +7,5 @@ export type * from './types.js';
 export { FEATURES } from './registry.js';
 export {
   MAX_FEATURES, FLIGHT_PHASES, compilePlan, getPlan, setPlanForTests, featureBits, featureList, featureFacts,
-  type FeaturePlan, type WireManifest, type DeriveHook, type LoadHook, type FlightEntry, type PlanInput, type PlanReplica,
+  type FeaturePlan, type WireManifest, type DeriveHook, type LoadHook, type FlightEntry, type PlanInput, type PlanReplica, type PlanControl,
 } from './plan.js';

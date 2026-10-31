@@ -11,6 +11,7 @@ export class ClientFeatures {
   private readonly drawers: NonNullable<ClientFeature['drawShip']>[] = [];
   private readonly frames: NonNullable<ClientFeature['beginFrame']>[] = [];
   private readonly chips: IndicatorDef[] = [];
+  private readonly controls = new Map<string, () => boolean>();
 
   constructor(features: readonly ClientFeature[], private readonly host: ClientFeatureHost) {
     const seen = new Set<string>();
@@ -22,11 +23,20 @@ export class ClientFeatures {
       if (f.drawShip) this.drawers.push(f.drawShip.bind(f));
       if (f.beginFrame) this.frames.push(f.beginFrame.bind(f));
       if (f.indicator) this.chips.push(f.indicator);
+      for (const [name, fn] of Object.entries(f.controls ?? {})) {
+        if (this.controls.has(name)) throw new Error(`client feature ${f.id}: control ${name} has two features`);
+        this.controls.set(name, () => fn(host));
+      }
     }
   }
 
   get hasDrawers(): boolean { return this.drawers.length > 0; }
   get hasParsers(): boolean { return this.parsers.length > 0; }
+
+  /** A held input's value this input tick (false: no feature gives it). Resolve once and keep the function */
+  controlFor(name: string): () => boolean {
+    return this.controls.get(name) ?? (() => false);
+  }
 
   /** A key was pressed: true if a feature used it */
   onKey(code: string): boolean {

@@ -186,7 +186,7 @@ export interface FunctionDef {
   /** scan range in world units (scanners) */
   range?: number;
   /**
-   * Burst Strafer (ships/strafer.ts): a dodge, pushing away from its nozzle. `kick` its push per cell while a burst
+   * Burst Strafer (ships/features/strafer/strafer.ts): a dodge, pushing away from its nozzle. `kick` its push per cell while a burst
    * runs (force, as an engine's thrust), `ticks` how long a burst lasts, `cooldown` ticks from one burst's start to
    * the next. It draws its `demand` per cell a second while a burst runs, from the bank it touches first
    */

@@ -118,7 +118,7 @@ export class Replication {
         || (b.jump ?? 0) !== (ship.jump ?? 0) || (b.jumpScale ?? 1) !== (ship.jumpScale ?? 1)
         // (The hold's mass: a load taken on or off needs a keyframe carrying it)
         || (b.cargo ?? 0) !== (ship.cargo ?? 0)
-        // (A Burst Strafer's counter and way: strafer.ts)
+        // (A Burst Strafer's counter and way: ships/features/strafer)
         || (b.dodge ?? 0) !== (ship.dodge ?? 0) || (b.dodgeDir ?? 0) !== (ship.dodgeDir ?? 0)) {
         s.diverged = true;
         this.why(`${ReplicaMode[mode]}:${(b.cargo ?? 0) !== (ship.cargo ?? 0) ? 'cargo' : (b.dodge ?? 0) !== (ship.dodge ?? 0) || (b.dodgeDir ?? 0) !== (ship.dodgeDir ?? 0) ? 'dodge' : b.x !== rx || b.y !== ry ? 'pos' : b.vx !== rvx || b.vy !== rvy ? 'vel' : b.angle !== ra || b.angVel !== ship.angVel ? 'turn' : 'jump'}`);

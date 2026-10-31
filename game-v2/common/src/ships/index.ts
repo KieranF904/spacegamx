@@ -41,7 +41,7 @@ export * from './warmth.js';
 export * from './wires.js';
 export * from './migrate.js';
 export * from './mounting.js';
-export * from './strafer.js';
+export * from './features/strafer/strafer.js';
 export * from './features/tow/tow.js';
 export * from './load.js';
 export * from './flightInputs.js';
