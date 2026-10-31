@@ -11,7 +11,7 @@
  */
 
 import { stepPointDefenceAim, pointDefenceOf } from '@space-game/common';
-import { payMining, gunLoad, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, warmthStage, withNumb, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules } from '@space-game/common';
+import { buildFlightInputs, newFlightControls, payMining, gunLoad, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, warmthStage, withNumb, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules } from '@space-game/common';
 import hazardData from '../../../data/hazards.json';
 
 const HAZARD_RULES = hazardData as unknown as HazardRules;
@@ -86,6 +86,9 @@ export interface ShipClientOptions {
   onHangarOpen?(): void;
   onHangarClose?(): void;
 }
+
+/** predict's controls scratch (reused every call; the step never keeps it) */
+const PREDICT_CTL = newFlightControls();
 
 export class ShipClient {
   readonly store: ShipStore;
@@ -941,12 +944,8 @@ export class ShipClient {
     let res!: ReturnType<typeof stepShipPhysics>;
     player.jumpPrime = pilotJumpStep(body, player.jumpPrime ?? 0, { central: this.central, lodestones: this.lodestones }, tick,
       ship.derived.jumpCooldown || this.jump.cooldownTicks, this.jump, (rangeBoost) => {
-        res = stepShipPhysics(body, {
-          forward: input.forward, backward: input.backward, left: input.left, right: input.right,
-          boost: input.boost, targetAngle: input.targetAngle,
-          helm: input.helm, strafeLeft: input.strafeLeft, strafeRight: input.strafeRight, jump: input.jump && !emp,
-          jumpDist: input.cursorDist, dodge: !!input.dodge,
-        }, ship.derived, this.opts.tuning, { charge, drainRate: 1, load: gunLoad(ship, tick), tick }, this.gravity, rangeBoost, emp ? withEmp(hazard) : hazard, this.terrain);
+        // (The controls built as the server builds them: flightInputs.ts. The aim goes in as the message has it)
+        res = stepShipPhysics(body, buildFlightInputs(input, emp, PREDICT_CTL), ship.derived, this.opts.tuning, { charge, drainRate: 1, load: gunLoad(ship, tick), tick }, this.gravity, rangeBoost, emp ? withEmp(hazard) : hazard, this.terrain);
       });
     player.jumpScale = body.jumpScale;
     player.x = body.x;

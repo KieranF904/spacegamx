@@ -96,6 +96,7 @@ import {
   ShipTuning,
   InventoryStub,
   quantizeCursorDist,
+  INPUT_BOOLS, INPUT_HELD, type InputBool,
   CURSOR_DIST_STEP,
   QuestTarget, QuestsFile,
   DisconnectInfo,
@@ -284,20 +285,12 @@ private xpFillEl: HTMLElement | null;
 
   // Tick-based input system
   private inputTickAccum = 0;         // ms accumulator for fixed-rate input ticks
-  private lastSentForward = false;
-  private lastSentBackward = false;
-  private lastSentLeft = false;
-  private lastSentRight = false;
-  private lastSentBoost = false;
-  private lastSentFireLeft = false;
-  private lastSentFireRight = false;
+  /** The on/off keys last sent (common inputFields.ts INPUT_BOOLS; dodge: the Burst Strafer's control, ships/strafer.ts) */
+  private readonly lastSent: Record<InputBool, boolean | undefined> = {
+    forward: false, backward: false, left: false, right: false, boost: false, fireLeft: false, fireRight: false,
+    strafeLeft: false, strafeRight: false, helm: false, jump: false, dodge: false,
+  };
   private lastSentAngle = 0;          // quantized angle (int)
-  private lastSentStrafeLeft = false;
-  private lastSentStrafeRight = false;
-  private lastSentHelm = false;
-  private lastSentJump = false;
-  /** Burst Strafer: the dodge control last sent (ships/strafer.ts) */
-  private lastSentDodge = false;
   /** Extra camera zoom factor while jumping */
   private jumpZoom = 1;
   private lastSentCursorDist = 0;
@@ -1487,22 +1480,6 @@ this.xpFillEl = document.getElementById('xpFill');
     }
     const targetAngle = dequantizeCursorAngle(quantized);
     
-    // Check if anything changed from last sent state
-    const changed = forward !== this.lastSentForward
-      || backward !== this.lastSentBackward
-      || left !== this.lastSentLeft
-      || right !== this.lastSentRight
-      || boost !== this.lastSentBoost
-      || fireLeft !== this.lastSentFireLeft
-      || fireRight !== this.lastSentFireRight
-      || quantized !== this.lastSentAngle
-      || strafeLeft !== this.lastSentStrafeLeft
-      || strafeRight !== this.lastSentStrafeRight
-      || helm !== this.lastSentHelm
-      || jump !== this.lastSentJump
-      || dodge !== this.lastSentDodge
-      || cursorDistQ !== this.lastSentCursorDist;
-    
     // Stamp targetTick using local tick counter — each tick iteration
     // gets a unique targetTick, ensuring one physics step per drain.
     const targetTick = this.state.getInputTargetTick();
@@ -1528,26 +1505,16 @@ this.xpFillEl = document.getElementById('xpFill');
       dodge,
     };
     
+    // Check if anything changed from last sent state
+    const changed = this.inputChanged(msg, quantized, cursorDistQ);
+    
     // Proto: no targetTick (applied on the next tick) and no prediction queue.
     if (this.proto) {
       if (changed) {
         msg.seq = this.state.nextInputSeq();
         msg.targetTick = undefined;
         this.network.send(msg);
-        this.lastSentForward = forward;
-        this.lastSentBackward = backward;
-        this.lastSentLeft = left;
-        this.lastSentRight = right;
-        this.lastSentBoost = boost;
-        this.lastSentFireLeft = fireLeft;
-        this.lastSentFireRight = fireRight;
-        this.lastSentAngle = quantized;
-        this.lastSentStrafeLeft = strafeLeft;
-        this.lastSentStrafeRight = strafeRight;
-        this.lastSentHelm = helm;
-        this.lastSentJump = jump;
-        this.lastSentDodge = dodge;
-        this.lastSentCursorDist = cursorDistQ;
+        this.markSent(msg, quantized, cursorDistQ);
       }
       return;
     }
@@ -1558,24 +1525,24 @@ this.xpFillEl = document.getElementById('xpFill');
       this.network.send(msg);
       // Queue for delayed application (physics runs when targetTick is reached)
       this.state.applyInput(msg);
-      this.lastSentForward = forward;
-      this.lastSentBackward = backward;
-      this.lastSentLeft = left;
-      this.lastSentRight = right;
-      this.lastSentBoost = boost;
-      this.lastSentFireLeft = fireLeft;
-      this.lastSentFireRight = fireRight;
-      this.lastSentAngle = quantized;
-      this.lastSentStrafeLeft = strafeLeft;
-      this.lastSentStrafeRight = strafeRight;
-      this.lastSentHelm = helm;
-      this.lastSentJump = jump;
-      this.lastSentDodge = dodge;
-      this.lastSentCursorDist = cursorDistQ;
+      this.markSent(msg, quantized, cursorDistQ);
     } else {
       // Queue for delayed application (server also applies same input on same tick)
       this.state.predictTick(msg);
     }
+  }
+
+  /** Whether this input differs from the last one sent: any key (INPUT_BOOLS), the quantized aim or cursor distance */
+  private inputChanged(msg: ClientInputMessage, quantized: number, cursorDistQ: number): boolean {
+    for (let i = 0; i < INPUT_BOOLS.length; i++) { const k = INPUT_BOOLS[i]; if (msg[k] !== this.lastSent[k]) return true; }
+    return quantized !== this.lastSentAngle || cursorDistQ !== this.lastSentCursorDist;
+  }
+
+  /** Remember this input as the last one sent */
+  private markSent(msg: ClientInputMessage, quantized: number, cursorDistQ: number): void {
+    for (let i = 0; i < INPUT_BOOLS.length; i++) { const k = INPUT_BOOLS[i]; this.lastSent[k] = msg[k]; }
+    this.lastSentAngle = quantized;
+    this.lastSentCursorDist = cursorDistQ;
   }
 
   /**
@@ -1601,7 +1568,7 @@ this.xpFillEl = document.getElementById('xpFill');
       targetAngle: dequantizeCursorAngle(this.lastSentAngle),
       strafeLeft: false,
       strafeRight: false,
-      helm: this.lastSentHelm,
+      helm: this.lastSent.helm,
       cursorDist: this.lastSentCursorDist * CURSOR_DIST_STEP,
       jump: false,
       dodge: false,
@@ -1609,10 +1576,7 @@ this.xpFillEl = document.getElementById('xpFill');
     this.network.send(msg);
     // The prediction steps the same input (proto has none)
     if (!this.proto) this.state.applyInput(msg);
-    this.lastSentForward = this.lastSentBackward = this.lastSentLeft = this.lastSentRight = false;
-    this.lastSentBoost = this.lastSentFireLeft = this.lastSentFireRight = false;
-    this.lastSentStrafeLeft = this.lastSentStrafeRight = this.lastSentJump = false;
-    this.lastSentDodge = false;
+    for (let i = 0; i < INPUT_HELD.length; i++) this.lastSent[INPUT_HELD[i]] = false;
   }
 
   private handleServerMessage(msg: ServerMessage): void {

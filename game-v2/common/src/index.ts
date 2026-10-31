@@ -9,6 +9,7 @@ export * from './data/index.js';
 
 // Network Protocol
 export * from './network/protocol.js';
+export * from './network/inputFields.js';
 export * from './network/cursorState.js';
 export * from './network/Transport.js';
 

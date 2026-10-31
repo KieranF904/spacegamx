@@ -164,7 +164,7 @@ import { SimLod, type Plan, type Intent, type FarPose } from './ships/SimLod.js'
 import { SystemMemory, shipMemory, restoreHp, type WorldStore, type MemoryHost, type ShipMemory } from './game/SystemMemory.js';
 import { Achievements } from './game/Achievements.js';
 import { huntedBoss, RibbonsFile, mineFalloff, rayTerrain, type Terrain } from '@space-game/common';
-import { repRank, replicaAngle, quantizeReplicaAngle, ReplicaMode } from '@space-game/common';
+import { repRank, replicaAngle, quantizeReplicaAngle, ReplicaMode, INPUT_BOOLS, INPUT_HELD } from '@space-game/common';
 import { MemoryProfileStore, type ProfileStore } from './profile/ProfileStore.js';
 import { MessageLimiter } from './net/MessageLimits.js';
 import { checkTickOrder, type TickSystem } from './tickOrder.js';
@@ -2765,7 +2765,7 @@ this.devTeleport = opts.devTeleport ?? false;
         const alive = hasComponent(this.world, Player, eid) && !hasComponent(this.world, Dead, eid);
         // Leaving mid-fight doesn't save you: the ship stays put (hands off the controls) for a while
         if (alive && conn.userId !== null && this.currentTick - this.ships.lastDamagedTick(eid) < LINGER_COMBAT_TICKS) {
-          for (const k of ['forward', 'backward', 'left', 'right', 'boost', 'fireLeft', 'fireRight', 'strafeLeft', 'strafeRight', 'jump'] as const) Input[k][eid] = 0;
+          this.releaseControls(eid, true);
           this.lingering.set(eid, { conn, until: this.currentTick + LINGER_TICKS });
           return;
         }
@@ -3215,7 +3215,7 @@ this.devTeleport = opts.devTeleport ?? false;
     // Inside: at the station's centre, out of reach; back out where it came in
     conn.docked = { station: st, ox: 0, oy: 0, exit: { x: Position.x[eid] - Position.x[st], y: Position.y[eid] - Position.y[st] } };
     this.dockedShips.add(eid);
-    for (const k of ['forward', 'backward', 'left', 'right', 'boost', 'fireLeft', 'fireRight', 'strafeLeft', 'strafeRight', 'jump'] as const) Input[k][eid] = 0;
+    this.releaseControls(eid, true);
     const sd = this.gameData.getStationByNum(Station.stationId[st]);
     if (sd?.dockingFee) this.pilots.payDockFee(conn, sd.id, sd.dockingFee);
     // (Quiet when there was nothing to load: every dock shouldn't say so)
@@ -3375,18 +3375,8 @@ this.devTeleport = opts.devTeleport ?? false;
   /** Write input state to ECS components for a player entity. */
   private applyInputToEntity(conn: ClientConnection, msg: any): void {
     const eid = conn.playerId;
-    Input.forward[eid] = msg.forward ? 1 : 0;
-    Input.backward[eid] = msg.backward ? 1 : 0;
-    Input.left[eid] = msg.left ? 1 : 0;
-    Input.right[eid] = msg.right ? 1 : 0;
-    Input.boost[eid] = msg.boost ? 1 : 0;
-    Input.fireLeft[eid] = msg.fireLeft ? 1 : 0;
-    Input.fireRight[eid] = msg.fireRight ? 1 : 0;
-    Input.strafeLeft[eid] = msg.strafeLeft ? 1 : 0;
-    Input.strafeRight[eid] = msg.strafeRight ? 1 : 0;
-    Input.helm[eid] = msg.helm ? 1 : 0;
-    Input.jump[eid] = msg.jump ? 1 : 0;
-    Input.dodge[eid] = msg.dodge ? 1 : 0;
+    // The on/off keys (inputFields.ts); the numbers below each have their own coercion
+    for (let i = 0; i < INPUT_BOOLS.length; i++) { const k = INPUT_BOOLS[i]; Input[k][eid] = msg[k] ? 1 : 0; }
     // (The binary input carries it as a uint16; a JSON one could say NaN, Infinity or a string)
     const cursorDist = Number(msg.cursorDist);
     Input.cursorDist[eid] = Number.isFinite(cursorDist) ? Math.min(65535, Math.max(0, cursorDist)) : 0;
@@ -3836,11 +3826,16 @@ this.devTeleport = opts.devTeleport ?? false;
     void drainedCount;
   }
 
-  /** Let go of every key (aim and helm stay as they are) */
-  private releaseControls(eid: number): void {
-    Input.forward[eid] = 0; Input.backward[eid] = 0; Input.left[eid] = 0; Input.right[eid] = 0;
-    Input.boost[eid] = 0; Input.fireLeft[eid] = 0; Input.fireRight[eid] = 0;
-    Input.strafeLeft[eid] = 0; Input.strafeRight[eid] = 0; Input.jump[eid] = 0; Input.dodge[eid] = 0;
+  /**
+   * Let go of every key (aim and helm stay as they are: inputFields.ts INPUT_HELD). `keepDodge`: the dock and the
+   * quit-mid-fight linger paths, which have always left the dodge control as it was
+   */
+  private releaseControls(eid: number, keepDodge = false): void {
+    for (let i = 0; i < INPUT_HELD.length; i++) {
+      const k = INPUT_HELD[i];
+      if (keepDodge && k === 'dodge') continue;
+      Input[k][eid] = 0;
+    }
   }
 
   // ---- Crash isolation (server robustness audit, docs/audits/server-robustness.md) ----
