@@ -5,7 +5,7 @@
  * severed wire all fall out of this; there is no special-case code.
  */
 
-import type { Blueprint, FunctionDef, MaterialDef, Vec2, WeaponMods, WireSeg } from './types.js';
+import type { Blueprint, FireSpec, FunctionDef, MaterialDef, Vec2, WeaponMods, WireSeg } from './types.js';
 import type { Catalog } from './catalog.js';
 import { PlacedGeom, computeJoins, mountOf, placeGeometry } from './grid.js';
 import { floodFill, partMount } from './blueprint.js';
@@ -19,6 +19,22 @@ import { type EnergyInfo } from './energy.js';
 import { type PowerLayout, bankKind, powerLayout } from './circuits.js';
 import type { FeatureDerived } from './features/types.js';
 import { getPlan, featureBits, featureList } from './features/plan.js';
+
+const legacyFire = new WeakMap<FunctionDef, FireSpec>();
+/**
+ * A gun's firing model (guns.ts): a weapon model's own `fire` block (scripts/econ/models.mjs); a legacy gun's
+ * (enemies', bosses') from its kind as it always fired: a held beam burns, point defence fires on its own, the rest cycle
+ */
+export function fireOf(tuning: ShipTuning, fn: FunctionDef): FireSpec {
+  if (fn.fire) return fn.fire;
+  let f = legacyFire.get(fn);
+  if (!f) {
+    const def = tuning.weapons?.[fn.weapon ?? ''];
+    const model = def?.type === 'beam' && !def.pulse ? 'beam' : def?.pointDefence ? 'auto' : 'cycle';
+    legacyFire.set(fn, (f = Object.freeze({ model, interval: model === 'beam' ? 1 : fn.fireInterval ?? 10 })));
+  }
+  return f;
+}
 
 /** The most engine output a blueprint can ask for (a boss's; players' designs stop at 1) */
 export const MAX_DRIVE = 2.5;
@@ -53,6 +69,8 @@ export interface WeaponInfo {
   model?: WeaponMods;
   /** Ticks between shots */
   interval: number;
+  /** Its firing model and numbers (guns.ts stepGuns): a model's own, a legacy gun's from its kind (fireOf) */
+  fire: FireSpec;
   /** Energy per shot (beams: per tick they're on): see energy.ts */
   energy: number;
   /** Muzzle point on the facing edge, grid units */
@@ -451,7 +469,8 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     // Firing flat out it draws its demand: a shot is that much power for one interval (beams: per tick)
     const draw = partDemand(fns[i], area[i], mats[i]);
     // (A pulse laser pays for a pulse at a time, as a gun does a shot)
-    const beam = tuning.weapons?.[fns[i].weapon!]?.type === 'beam' && !tuning.weapons?.[fns[i].weapon!]?.pulse;
+    const fire = fireOf(tuning, fns[i]);
+    const beam = fire.model === 'beam';
     weaponDraw += draw;
     weapons.push({
       part: i,
@@ -463,6 +482,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
       grade,
       ...(model ? { model: fns[i].weaponMods ?? NO_MODS } : {}),
       interval,
+      fire,
       energy: beam ? draw / 60 : (draw * interval) / 60,
       muzzle,
       dir,

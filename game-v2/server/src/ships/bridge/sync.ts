@@ -32,19 +32,6 @@ export function weaponBeamState(b: BridgeCtx, eid: number): { on: boolean; hit: 
   return f === undefined ? { on: false, hit: 1 } : { on: true, hit: f };
 }
 
-/** Hottest beam weapon (0..1) and whether any has overheated, for the HUD */
-export function heatState(b: BridgeCtx, eid: number): { heat: number; over: boolean } {
-  const ship = b.bodies.get(eid);
-  if (!ship) return { heat: 0, over: false };
-  let heat = 0, over = false;
-  for (let i = 0; i < ship.heat.length; i++) {
-    if (!ship.derived.alive[i]) continue;
-    heat = Math.max(heat, ship.heat[i] / 100);
-    over ||= ship.overheated[i];
-  }
-  return { heat, over };
-}
-
 /** Shield charge 0..1 for the snapshot (0 also without a shield) */
 export function shieldFraction(b: BridgeCtx, eid: number): number {
   const ship = b.bodies.get(eid);

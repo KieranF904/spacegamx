@@ -78,7 +78,7 @@ const W = [
   ['arc_tesla', 'Tesla', 'arc', 'round', 29, { dmg: 1.4 }, { set: { chain: { count: 5, radius: 300, falloff: 0.5 } } }, 'Lightning that jumps two ships further.'],
   ['torpedo_eel', 'Eel', 'torpedo', 'rect2', 19, {}, {}, 'The base torpedo: slow and huge, straight through shields. Fires torpedoes.'],
   ['torpedo_leviathan', 'Leviathan', 'torpedo', 'block2', 38, { dmg: 2.4, hp: 1.2, mass: 1.3 }, { mul: { damage: x(2.4), splashDamage: x(2.4), speed: x(0.8), maxSpeed: x(0.8), size: x(1.4) } }, 'A torpedo to end a fight.'],
-  ['lance_lance', 'Lance', 'lance', 'rect2', 32, {}, {}, 'The held beam: a heavy charged lance, as long as you can keep it cool.'],
+  ['lance_lance', 'Lance', 'lance', 'rect2', 32, {}, {}, 'The held beam: a heavy lance that burns as long as the power lasts.'],
 ];
 
 /**
@@ -384,6 +384,76 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   }
 }
 // ---- (end Burst Strafer and Tow Beam)
+// ---- Firing models (docs/design/rework-2026-11.md §3, §4): every weapon model's `fire` block, read by
+// common/src/ships/guns.ts stepGuns through WeaponInfo.fire. model: 'cycle' fires on a beat while held, its energy drawn
+// as it reloads; 'clip' fires `clip` rounds, then reloads `reload` ticks drawing `reloadE` (or, with `regrow`, one round
+// back every `regrow` ticks); 'charge' fills over `charge` ticks drawing `chargeE`, fires itself, then `cooldown`;
+// 'ammo' fires `rounds` from the hold on a beat, no energy; 'beam' burns energy every tick held (`windup`: damage ramps
+// in over that many ticks); 'auto' fires on its own (Point Defence). `interval` is today's fireInterval (ticks between
+// shots; a clip's is section 4's beat within the clip); a family unit of the rework retunes the numbers. `spin` {from, to, up, down}: the interval eases from `from`
+// to `to` ticks over `up` ticks of fire, back over `down`. Weapons whose kind fires ammunition but whose model pays
+// with power stop taking it (set: { ammo: null }); a held-beam model of a kind that isn't a beam gets its dps and range.
+{
+  const FIRE = {
+    cannon_pip: { model: 'cycle' },
+    cannon_hammer: { model: 'cycle' },
+    cannon_twinlink: { model: 'clip', interval: 6, clip: 16, reload: 90, reloadE: 24 },
+    cannon_longbarrel: { model: 'charge', charge: 120, cooldown: 90, chargeE: 36 },
+    cannon_bastion: { model: 'clip', interval: 18, clip: 2, reload: 180, reloadE: 60 },
+    autocannon_rattler: { model: 'cycle' },
+    autocannon_chainsaw: { model: 'cycle', spin: { from: 15, to: 3.75, up: 60, down: 30 } },
+    autocannon_stinger: { model: 'clip', interval: 7.5, clip: 12, reload: 72, reloadE: 20 },
+    flak_burst: { model: 'ammo' },
+    flak_cloudmaker: { model: 'clip', interval: 30, clip: 4, reload: 150, reloadE: 30 },
+    mortar_lobber: { model: 'ammo' },
+    mortar_quake: { model: 'ammo', rounds: 3 },
+    laser_glint: { model: 'cycle' },
+    laser_cutter: { model: 'beam' },
+    laser_searchlight: { model: 'beam' },
+    pulse_strobe: { model: 'cycle' },
+    pulse_overpulse: { model: 'clip', interval: 6, clip: 12, reload: 90, reloadE: 36 },
+    missile_dart: { model: 'ammo' },
+    missile_swarm: { model: 'ammo', rounds: 6 },
+    missile_hammerhead: { model: 'ammo' },
+    railgun_needle: { model: 'ammo' },
+    railgun_coilgun: { model: 'cycle' },
+    railgun_spear: { model: 'cycle' },
+    railgun_rail_driver: { model: 'clip', interval: 10, clip: 6, reload: 90, reloadE: 48 },
+    emp_hush: { model: 'cycle' },
+    emp_blackout: { model: 'charge', charge: 90, cooldown: 240, chargeE: 90 },
+    arc_spark: { model: 'cycle' },
+    arc_tesla: { model: 'beam' },
+    torpedo_eel: { model: 'ammo' },
+    torpedo_leviathan: { model: 'ammo', rounds: 2 },
+    lance_lance: { model: 'beam', windup: 18 },
+    legendary_hive: { model: 'clip', clip: 8, regrow: 45, reloadE: 48, rounds: 4 },
+    legendary_frostbite: { model: 'beam' },
+    legendary_cinder_bloom: { model: 'cycle' },
+    legendary_prism: { model: 'cycle' },
+    legendary_phase: { model: 'cycle' },
+    legendary_singularity: { model: 'cycle' },
+    point_defence_turret: { model: 'auto' },
+    utility_repair_beam: { model: 'beam' },
+    utility_demolition_launcher: { model: 'ammo' },
+  };
+  // (Held beams of kinds that fire shells or pulses today: the section 4 dps and reach, until their family unit gives them their own)
+  const BEAM_SET = { laser_cutter: { dps: 60 }, laser_searchlight: { dps: 25 }, arc_tesla: { dps: 70, range: 660, width: 10 } };
+  for (const m of models) {
+    if (!m.weapon) continue;
+    const f = FIRE[m.id];
+    if (!f) throw new Error(`no fire block for weapon ${m.id}`);
+    m.fire = { ...f, interval: f.model === 'beam' ? 1 : f.interval ?? m.fireInterval ?? 10 };
+    // (A clip's interval is its own beat within the clip, from section 4: the fire rate everything else reads too)
+    if (f.interval !== undefined) m.fireInterval = f.interval;
+    const kind = TUNING.weapons[m.weapon] ?? {};
+    const set = { ...(m.weaponMods?.set ?? {}) };
+    if (kind.ammo && f.model !== 'ammo') set.ammo = null;
+    Object.assign(set, BEAM_SET[m.id] ?? {});
+    if (Object.keys(set).length) m.weaponMods = { ...m.weaponMods, set };
+  }
+  for (const id of Object.keys(FIRE)) if (!models.some((m) => m.id === id && m.weapon)) throw new Error(`fire block for ${id}, which isn't a weapon model`);
+}
+// ---- (end firing models)
 for (const id of Object.keys(MOUNT)) if (!models.some((m) => m.id === id && m.weapon)) throw new Error(`mount for ${id}, which isn't a weapon model`);
 for (const id of Object.keys(MOUNTING)) if (!MOUNT[id]) throw new Error(`mounting rules for ${id}, which isn't a weapon model`);
 // (Everything below the legacy functions' own keys: a model is a FunctionDef)

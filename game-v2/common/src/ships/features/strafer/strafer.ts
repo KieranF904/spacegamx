@@ -26,7 +26,7 @@
 
 import type { ShipDerived } from '../../rebuild.js';
 import type { Vec2 } from '../../types.js';
-import { CHARGE_GROUPS_AT, FULL_CHARGE, MAX_CHARGE_GROUPS, bankHeld, poolHeld, type Charge } from '../../energy.js';
+import { FULL_CHARGE, PILOT_ROW, bankHeld, chargeGroupsEnd, poolHeld, type Charge } from '../../energy.js';
 
 /** One strafer's push (ship-local force vector, x right, y back; as an engine's thrust: world units of acceleration × mass) */
 export interface StraferPart {
@@ -210,11 +210,11 @@ export function dodgeAffordable(d: ShipDerived, c: Charge | undefined, dir: numb
 }
 
 /**
- * The pilot's own snapshot row carries, after the charge groups (energy.ts CHARGE_GROUPS_AT + data[11]): the dodge
+ * The pilot's own snapshot row carries, after the charge groups (energy.ts chargeGroupsEnd): the dodge
  * counter, the last dodge's way, and what the Tow Beam tows (entity id + 1, 0 nothing). GameServer writes them in that order.
  */
 export function pilotExtras(data: number[] | undefined): { dodge: number; dodgeDir: number; tow: number } {
-  if (!data || data.length <= 11) return { dodge: 0, dodgeDir: 0, tow: 0 };
-  const at = CHARGE_GROUPS_AT + Math.max(0, Math.min(MAX_CHARGE_GROUPS, data[11] | 0));
+  if (!data || data.length <= PILOT_ROW.groups) return { dodge: 0, dodgeDir: 0, tow: 0 };
+  const at = chargeGroupsEnd(data);
   return { dodge: data[at] ?? 0, dodgeDir: data[at + 1] ?? 0, tow: data[at + 2] ?? 0 };
 }

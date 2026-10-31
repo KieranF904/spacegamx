@@ -4,9 +4,9 @@ Mk IV · Medium · Panel · 2 cells
 Hull · mass236 hp · 2.4
 Armour · build4 · 7.6 pts
 TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
-Damage48/s · reach 760
+Damage95/s · reach 760
 Hits withCryo · penetration 4.5
-Fire rate6.0/s · beam
+Beamheld while you fire · no heat · draws its power while it's on
 MountTurret, 150°
 FittingBolts on from behind only
 Power draw48/s
@@ -33,7 +33,7 @@ Medium · Panel
 Legendary
 
 == keyStats ==
-48 dmg/s · reach 760 · draws 48
+95 dmg/s · reach 760 · draws 48
 
 == mountBadge ==
 TURRET 150°
@@ -49,4 +49,4 @@ Bolts on from behind only
 {"open":true,"badge":"Lv 12","why":""}
 
 == partStats (raw) ==
-{"grade":4,"mark":"Mk IV","size":"Medium","area":2,"hp":235.8,"mass":2.4,"firepower":47.5,"toughness":235.8,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":47.5,"range":760,"damageType":"cryo","pen":4.5,"draw":48}
+{"grade":4,"mark":"Mk IV","size":"Medium","area":2,"hp":235.8,"mass":2.4,"firepower":95,"toughness":235.8,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":95,"range":760,"damageType":"cryo","pen":4.5,"draw":48}

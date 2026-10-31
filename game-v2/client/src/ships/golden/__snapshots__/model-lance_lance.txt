@@ -4,9 +4,9 @@ Mk IV · Medium · Panel · 2 cells
 Hull · mass210 hp · 2.4
 Armour · build4 · 7.6 pts
 TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
-Damage83/s · reach 500
+Damage210/s · reach 500
 Hits withThermal · penetration 5.5
-Fire rate6.0/s · beam
+Beamheld while you fire · no heat · draws its power while it's on · winds up over 0.3s
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 4 clear cells ahead
 Power draw52/s
@@ -33,7 +33,7 @@ Medium · Panel
 a held beam, while it stays cool
 
 == keyStats ==
-83 dmg/s · reach 500 · draws 52
+210 dmg/s · reach 500 · draws 52
 
 == mountBadge ==
 FIXED
@@ -50,4 +50,4 @@ Needs 4 clear cells ahead
 {"open":true,"badge":"Lv 32","why":""}
 
 == partStats (raw) ==
-{"grade":4,"mark":"Mk IV","size":"Medium","area":2,"hp":209.60000000000002,"mass":2.4,"firepower":82.72727272727272,"toughness":209.60000000000002,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":82.72727272727272,"range":500,"damageType":"thermal","pen":5.5,"draw":52}
+{"grade":4,"mark":"Mk IV","size":"Medium","area":2,"hp":209.60000000000002,"mass":2.4,"firepower":210,"toughness":209.60000000000002,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":210,"range":500,"damageType":"thermal","pen":5.5,"draw":52}

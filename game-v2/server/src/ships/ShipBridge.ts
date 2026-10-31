@@ -497,9 +497,6 @@ export class ShipBridge {
   /** Weapon beam state for the snapshot */
   weaponBeamState(eid: number): { on: boolean; hit: number } { return sync.weaponBeamState(this.ctx, eid); }
 
-  /** Hottest beam weapon (0..1) and whether any has overheated, for the HUD */
-  heatState(eid: number): { heat: number; over: boolean } { return sync.heatState(this.ctx, eid); }
-
   /** Shield charge 0..1 for the snapshot (0 also without a shield) */
   shieldFraction(eid: number): number { return sync.shieldFraction(this.ctx, eid); }
 

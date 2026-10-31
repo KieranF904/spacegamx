@@ -27,7 +27,7 @@
  * The same steps run on the server and on the pilot's client.
  */
 
-import type { ShipDerived } from './rebuild.js';
+import type { ShipDerived, WeaponInfo } from './rebuild.js';
 import type { ShipTuning } from './tuning.js';
 import type { Vec2 } from './types.js';
 import { getPlan } from './features/plan.js';
@@ -63,12 +63,25 @@ export interface Charge {
 export const FULL_CHARGE: Charge = { g: 100, b: [] };
 
 /**
- * The pilot's own snapshot row carries the charge (SnapshotBuilder, GameState): data[1] the whole ship's (the gauge),
- * data[10] the pool's, data[11] how many charge groups follow, and each group's from data[CHARGE_GROUPS_AT]: the pool's,
- * then each bank's (at most MAX_CHARGE_GROUPS in all; banks past that are taken as full). Hundredths of a percent.
+ * The pilot's own snapshot row (server SnapshotBuilder; client GameState reads it), by index: 0 cursor and weapon
+ * state, 1 the whole charge (the gauge), 2 cursor distance, 3 jump counter, 4 shield %, 5 EMP ticks left, then these.
+ * After the charge groups come the part features' values (features.wire.json pilotExtra), then the gun state
+ * (guns.ts packGunState: a count, then that many part and value pairs).
  */
-export const CHARGE_GROUPS_AT = 15;
+export const PILOT_ROW = { jumpScale: 6, field: 7, pool: 8, groups: 9, prime: 10, warmth: 11, cargo: 12 } as const;
+
+/**
+ * The pilot's own snapshot row carries the charge (SnapshotBuilder, GameState): data[1] the whole ship's (the gauge),
+ * data[PILOT_ROW.pool] the pool's, data[PILOT_ROW.groups] how many charge groups follow, and each group's from
+ * data[CHARGE_GROUPS_AT]: the pool's, then each bank's (at most MAX_CHARGE_GROUPS in all; banks past that are taken
+ * as full). Hundredths of a percent.
+ */
+export const CHARGE_GROUPS_AT = 13;
 export const MAX_CHARGE_GROUPS = 24;
+/** Where the charge groups end in a pilot row (the part features' values start there) */
+export function chargeGroupsEnd(data: ArrayLike<number>): number {
+  return CHARGE_GROUPS_AT + Math.max(0, Math.min(MAX_CHARGE_GROUPS, data[PILOT_ROW.groups] | 0));
+}
 /** What the charge groups mean (in the wire hash: a change of meaning is a protocol bump) */
 export const CHARGE_GROUPS_LAYOUT = 'pool+banks';
 const hundredths = (v: number) => Math.round(pctOf(v) * 100) / 100;
@@ -84,11 +97,11 @@ export function packCharge(d: ShipDerived | undefined, c: Charge): { total: numb
 
 /** The charge a snapshot row says (data as packed above; an old row: full) */
 export function unpackCharge(data: number[] | undefined): Charge {
-  if (!data || data.length <= 11) return { g: 100, b: [] };
-  const n = Math.max(0, Math.min(MAX_CHARGE_GROUPS, data[11] | 0));
+  if (!data || data.length <= PILOT_ROW.groups) return { g: 100, b: [] };
+  const n = Math.max(0, Math.min(MAX_CHARGE_GROUPS, data[PILOT_ROW.groups] | 0));
   const fin = (v: number | undefined, dflt: number) => (v !== undefined && Number.isFinite(v) ? v : dflt);
-  if (n === 0) return { g: fin(data[10], 100), b: [] };
-  return { g: fin(data[CHARGE_GROUPS_AT], fin(data[10], 100)), b: data.slice(CHARGE_GROUPS_AT + 1, CHARGE_GROUPS_AT + n).map((v) => fin(v, 100)) };
+  if (n === 0) return { g: fin(data[PILOT_ROW.pool], 100), b: [] };
+  return { g: fin(data[CHARGE_GROUPS_AT], fin(data[PILOT_ROW.pool], 100)), b: data.slice(CHARGE_GROUPS_AT + 1, CHARGE_GROUPS_AT + n).map((v) => fin(v, 100)) };
 }
 /** Mining lasers' old payment segment (ticks): kept for the tick alignment of their pulse */
 export const MINE_SEGMENT = 15;
@@ -172,13 +185,62 @@ export interface PowerResult {
   extra?: (number | undefined)[];
 }
 
+/** The gun state a ship's guns keep (ShipState's fields): what gunDraw reads */
+export interface GunStateShip { cooldown: number[]; rounds?: number[]; reload?: number[]; charge?: number[]; spin?: number[] }
+
+/**
+ * What a gun draws this tick (per second), by its model, from the state the
+ * last tick left: a cycle (or auto) gun its `draw` while it reloads (a spinning
+ * one as much faster as it fires), a beam that burned last tick its `draw`, a
+ * clip gun `reloadE` × missing / clip over its reload (regrowing: `reloadE / clip`
+ * a round), a charge gun `chargeE` over its charge; an ammunition gun nothing.
+ */
+export function gunDraw(ship: GunStateShip, w: WeaponInfo, draw: number): number {
+  const f = w.fire, p = w.part;
+  switch (f.model) {
+    case 'ammo': return 0;
+    case 'clip': {
+      const clip = f.clip ?? 1, e = f.reloadE ?? 0;
+      if (f.regrow) return (ship.rounds?.[p] ?? clip) < clip ? (e / clip) * (60 / f.regrow) : 0;
+      const r = ship.reload?.[p] ?? 0;
+      return r > 0 ? (e * Math.max(0, clip - (ship.rounds?.[p] ?? 0))) / clip * (60 / Math.max(1, f.reload ?? 60)) : 0;
+    }
+    case 'charge': return (ship.charge?.[p] ?? 0) > 0 ? ((f.chargeE ?? 0) * 60) / Math.max(1, f.charge ?? 60) : 0;
+    case 'beam': return ship.cooldown[p] > 0 ? draw : 0;
+    default: {
+      if (!(ship.cooldown[p] > 0)) return 0;
+      const s = f.spin;
+      if (!s) return draw;
+      const k = ship.spin?.[p] ?? 0;
+      return (draw * f.interval) / Math.max(1e-9, s.from + (s.to - s.from) * k);
+    }
+  }
+}
+
+/** What a gun draws a second firing flat out (the hangar's load test): its model's draw spread over its whole cycle */
+export function gunDrawFlatOut(w: WeaponInfo, draw: number): number {
+  const f = w.fire;
+  switch (f.model) {
+    case 'ammo': return 0;
+    case 'clip': {
+      const clip = f.clip ?? 1, e = f.reloadE ?? 0;
+      if (f.regrow) return (e / clip) * (60 / f.regrow);
+      return (e * 60) / Math.max(1, (f.reload ?? 60) + clip * w.interval);
+    }
+    case 'charge': return ((f.chargeE ?? 0) * 60) / Math.max(1, (f.charge ?? 60) + (f.cooldown ?? 0));
+    case 'beam': return draw;
+    default: return f.spin ? (draw * f.interval) / Math.max(1e-9, f.spin.to) : draw;
+  }
+}
+
 /** The ship gunLoad (and a part feature's load()) reads */
-export interface GunLoadShip { derived: ShipDerived; cooldown: number[]; mineUntil?: number; tow?: number }
+export interface GunLoadShip extends GunStateShip { derived: ShipDerived; mineUntil?: number; tow?: number }
 
 /**
  * What the guns and mining lasers will draw this tick, per feed group (per
- * second): a gun reloading draws its draw (so a shot's energy over its
- * reload), a beam that burned last tick its draw, a running mining laser its
+ * second): each gun what its firing model draws now (gunDraw: a cycle gun its
+ * shot's energy over its reload, a clip gun its reload's, a charge gun its
+ * charge's, a beam that burned last tick its draw), a running mining laser its
  */
 export function gunLoad(ship: GunLoadShip, tick: number): number[] | undefined {
   const L = ship.derived.power;
@@ -186,7 +248,7 @@ export function gunLoad(ship: GunLoadShip, tick: number): number[] | undefined {
   const out = new Array<number>(L.feeds.length).fill(0);
   for (const w of ship.derived.weapons) {
     const f = L.feedOf[w.part];
-    if (f >= 0 && ship.cooldown[w.part] > 0) out[f] += L.draw[w.part];
+    if (f >= 0) out[f] += gunDraw(ship, w, L.draw[w.part]);
   }
   if (tick < (ship.mineUntil ?? 0)) for (const m of ship.derived.miners) { const f = L.feedOf[m.part]; if (f >= 0) out[f] += L.draw[m.part]; }
   // (Part features that draw by the tick: features/, in plan order; none on a ship without them. A Tow Beam draws while it tows: features/tow)
@@ -462,7 +524,7 @@ export function loadTest(d: ShipDerived, tuning: ShipTuning, opts: { fire: boole
   if (!L) return { engines: 1, guns: 1, brownAt: -1, end: 100, refill: 0, banks: [], part, seconds: opts.seconds };
   const load = opts.fire ? (() => {
     const out = new Array<number>(L.feeds.length).fill(0);
-    for (const w of d.weapons) { const f = L.feedOf[w.part]; if (f >= 0) out[f] += L.draw[w.part]; }
+    for (const w of d.weapons) { const f = L.feedOf[w.part]; if (f >= 0) out[f] += gunDrawFlatOut(w, L.draw[w.part]); }
     return out;
   })() : undefined;
   let engines = 1, guns = 1, brownAt = -1;

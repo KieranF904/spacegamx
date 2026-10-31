@@ -5,7 +5,7 @@ How a gun turns into shells, beams and pulses, and what those do to ships. The f
 | path | lines | owns |
 |---|---|---|
 | common/src/ships/tuning.ts | 205 | `ShipTuning`, `WeaponTuning` (every per-kind field: damage, speed, splash, fuse, homing, pierce, chain, frost, heal, ammo...) loaded from data/ships/tuning.json `weapons.<kind>` |
-| common/src/ships/guns.ts | 172 | `stepGuns`: cooldowns, turret slew, fixed-gun gimbal, who fires; returns `{shots, beams, pulses}` |
+| common/src/ships/guns.ts | 330 | `stepGuns`: the firing models (cycle, clip, charge, ammo, beam, auto: `FireSpec` in types.ts, each model's `fire` block in models.mjs, `WeaponInfo.fire`), cooldowns, clips, charges, spin, beam windup, turret slew, fixed-gun gimbal, who fires; returns `{shots, beams, pulses, tells}`; the gun-state slot (`packGunState`, `applyGunState`) |
 | common/src/ships/launch.ts | 255 | `weaponDef`, `gunDef`/`partWeaponDef` (kind + grade + size + gem/ammo mods), ammo crate registry, `launchShot`, `volleyAngles`, `rebuildVolley`, `volleyShells`, `shellSeed`, `shotAimQ` |
 | common/src/ships/shot.ts, pulse.ts | 69 | `buildShot` (base shot, `ProjectileSpec`); pulse-laser run maths |
 | common/src/ships/damage.ts | 89 | damage types, `weaponHit`, `penetrationMul`, `hitMultiplier` (type x armour x material resist), `TYPE_BY_KIND` |
@@ -51,7 +51,7 @@ Bridge slices (grep the name, read a short slice): in bridge/damage.ts, `hurt` (
 6. **Support weapon**: pure logic in support.ts, loop in bridge/weapons.ts (`repairBeam`, `pointDefence`).
 
 ## Tests
-- Shared maths: `npx vitest run common/src/ships/collide.test.ts common/src/ships/features/support/support.test.ts common/src/ships/turret.test.ts`
+- Shared maths: `npx vitest run common/src/ships/collide.test.ts common/src/ships/features/support/support.test.ts common/src/ships/turret.test.ts common/src/ships/fireModels.test.ts` (fireModels: clip, reload on idle, regrow, charge, spin, beam windup and sputter, the gun-state slot)
 - Server: `npx vitest run server/src/game/weapons.test.ts server/src/game/weapons2.test.ts server/src/game/ammo.test.ts server/src/game/damageModel.test.ts server/src/game/support.test.ts server/src/game/tow.test.ts server/src/ships/collisions.test.ts server/src/ships/cripple.test.ts`
 - collisions.test guards outline hits; damageModel guards types/penetration; weapons2 guards client/server volley agreement and replica angles. Benches: `server/src/bench/bulletHellBench.ts`, `collisionBench.ts`.
 
@@ -60,7 +60,8 @@ Bridge slices (grep the name, read a short slice): in bridge/damage.ts, `hurt` (
 - Splash, EMP, flak fuses and arc chains once used centroids or circles; use hull distance (`nearestTarget`, `nearestParts`) or bosses are immune near their edges.
 - A plain cannon shell has no `extras` entry; any grade/gem change creates one (`def !== this.def(kind)`), so new `Extra` state must default sanely.
 - Shield ripple must use the hit point, not the bounding rim.
-- Frost and warmth effects go through warmth.ts; do not couple them to heat.
+- No gun has heat, and guns never read warmth (rework 2026-11): a beam burns as long as the power lasts and sputters when short (`BROWNOUT`). Frost and warmth effects go through warmth.ts.
+- Gun state (ShipState `rounds`, `reload`, `charge`, `spin`) steps only in `stepGuns`, forward only, on the server and the pilot's client; the pilot row's gun-state slot corrects the client's after 30 ticks of disagreeing. A gun's energy goes through `gunLoad` (energy.ts `gunDraw`, by model): a cycle gun its shot's over its reload, a clip gun `reloadE` × missing / clip over its reload, a charge gun `chargeE` over its charge, an ammunition gun nothing. New firing behaviour belongs in a model's options, not a new model; the prediction-parity firing scenarios (server/src/golden/parity.test.ts) and the volley agreement test (server/src/net/replication.test.ts) must pass.
 - The tree has uncommitted edits (models.test.ts, mounting.test.ts and others); never revert.
 
 ## Related areas

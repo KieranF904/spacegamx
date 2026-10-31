@@ -5,7 +5,7 @@
  * back by itself. Frozen through, the ship seizes up (ShipBridge.warm). Ships without a pilot (frost-gemmed foes) only
  * ever lose warmth to hits: they get it back here at the ambient rate.
  *
- * The pilot is told its warmth in its snapshot (data[13]) and gets a word when it slips a stage (a toast).
+ * The pilot is told its warmth in its snapshot (data[PILOT_ROW.warmth]) and gets a word when it slips a stage (a toast).
  */
 
 import { hazardsAt, insulationOf, stepWarmth, starHeat, warmthStage, warmthPercent, planetPosition, type HazardRules, type StarSystemData, type WarmthRules, type WarmthStageName } from '@space-game/common';
@@ -32,7 +32,7 @@ const STEP = 15;
 
 /** What a pilot is told when it slips into a stage */
 const TOLD: Partial<Record<WarmthStageName, { text: string; kind: 'warn' | 'bad' }>> = {
-  chilled: { text: 'Chilled: your guns recycle slower. Stars, stations and fires warm you back up', kind: 'warn' },
+  chilled: { text: 'Chilled: any colder and your drive goes numb. Stars, stations and fires warm you back up', kind: 'warn' },
   numb: { text: 'Numb with cold: thrust and steering are down too. Get near heat', kind: 'bad' },
   frozen: { text: 'Frozen through: your ship seizes up', kind: 'bad' },
 };

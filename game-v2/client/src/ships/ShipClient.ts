@@ -10,8 +10,9 @@
  *   J  jump drive: spool up, then fly far and fast along the nose (J again aborts)
  */
 
-import { stepPointDefenceAim, pointDefenceOf, CHARGE_GROUPS_AT, MAX_CHARGE_GROUPS } from '@space-game/common';
-import { buildFlightInputs, newFlightControls, payMining, gunLoad, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, warmthStage, withNumb, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules } from '@space-game/common';
+import { stepPointDefenceAim, pointDefenceOf, chargeGroupsEnd, TELL_CHARGE_START, TELL_CHARGE_CANCEL } from '@space-game/common';
+import { GunSync } from './gunSync';
+import { buildFlightInputs, newFlightControls, payMining, gunLoad, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, warmthStage, withNumb, type WeaponInfo, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules } from '@space-game/common';
 import hazardData from '../../../data/hazards.json';
 
 const HAZARD_RULES = hazardData as unknown as HazardRules;
@@ -250,9 +251,14 @@ export class ShipClient {
     const out: EntityState[] = [];
     for (const [owner, ago, partAmmo, aimQ, ...ids] of m.fire ?? []) {
       const tick = m.tick - ago, part = partAmmo % 256, ammo = Math.floor(partAmmo / 256);
+      // A charge gun's tell (no shells): it started charging, or was let go (guns.ts TELL_CHARGE_*; drawn by the charge FX)
+      if (ammo === TELL_CHARGE_START) { this.chargeTells.set(owner * 256 + part, tick); continue; }
+      if (ammo === TELL_CHARGE_CANCEL) { this.chargeTells.delete(owner * 256 + part); continue; }
       const ship = this.store.get(owner);
       const st = this.replicas.at(owner, tick);
       if (!ship || !st) continue;
+      this.chargeTells.delete(owner * 256 + part);
+      while (this.chargeTells.size > 256) this.chargeTells.delete(this.chargeTells.keys().next().value!);
       // A pulse laser's pulse (a fire event with no shells): drawn from the tick it started
       const gun = ship.derived.weapons.find((w) => w.part === part);
       if (gun && this.opts.tuning.weapons?.[gun.kind]?.pulse) { this.beamFx?.startPulse(owner, part, tick); continue; }
@@ -320,8 +326,8 @@ export class ShipClient {
       // Rebuild the per-pilot data the effects read (see the server's player snapshot row)
       const s = e.status ?? [];
       e.data = [
-        packCursorWeaponState(p.aim, (s[4] ?? 10) / 10, s[5] === 1, s[6] === 1),
-        0, (s[7] ?? 0) * 100, p.jump, s[0] ?? 0, s[1] ?? 0, s[2] ?? 0, s[3] ?? 0, Math.round(p.jumpScale * 1000), 0,
+        packCursorWeaponState(p.aim, (s[2] ?? 10) / 10, s[3] === 1, s[4] === 1),
+        0, (s[5] ?? 0) * 100, p.jump, s[0] ?? 0, s[1] ?? 0, Math.round(p.jumpScale * 1000), 0,
       ];
     }
     return true;
@@ -451,9 +457,10 @@ export class ShipClient {
     const pose = { x: player.x, y: player.y, angle: player.angle };
     // Each shot spends stored energy, then the mining lasers pay for their segment, as on the server (energy.ts)
     const energy = { charge };
-    // (Cold guns recycle slower, from the warmth the server tells: warmth.ts)
-    const slow = warmthStage(player.warmth ?? 100).guns;
-    const { shots, pulses } = stepGuns(ship, pose, { firing, aimWorld: input.targetAngle, aimDist: input.cursorDist ?? 0, energy, slow }, tick, this.opts.tuning);
+    // (Guns never read warmth: rework 2026-11)
+    const { shots, pulses } = stepGuns(ship, pose, { firing, aimWorld: input.targetAngle, aimDist: input.cursorDist ?? 0, energy }, tick, this.opts.tuning);
+    // (What the guns hold now, for the server's gun-state correction: gunSync.ts)
+    this.gunSync.record(ship, tick);
     for (const { w } of pulses) this.beamFx?.startPulse(player.id, w.part, tick);
     if (burning) ship.mineUntil = 0;
     payMining(ship, !!input.fireRight && hasMiners && !burning, tick, energy);
@@ -756,10 +763,37 @@ export class ShipClient {
     const e = this.opts.state.entities.get(this.opts.state.playerId);
     const ship = this.store.get(this.opts.state.playerId);
     if (!e?.data?.length || !ship || !unpackCursorWeaponState(e.data[0]).leftActive) return null;
-    const defs = this.opts.tuning.weapons ?? {};
-    // (Pulse lasers have their own sound, a pulse at a time)
-    const beam = ship.derived.weapons.find((w) => defs[w.kind]?.type === 'beam' && !defs[w.kind]?.pulse);
+    // (Pulse lasers have their own sound, a pulse at a time: only held beams count)
+    const beam = ship.derived.weapons.find((w) => w.fire.model === 'beam');
     return beam?.kind ?? null;
+  }
+
+  /**
+   * Your charge guns' charge, for the HUD (the fullest one being charged: 0..1, as your client steps it: guns.ts),
+   * null when none is charging
+   */
+  gunCharge(): { charge: number; gun: WeaponInfo } | null {
+    const ship = this.store.get(this.opts.state.playerId);
+    if (!ship || ship.kind !== 'ship') return null;
+    let best: { charge: number; gun: WeaponInfo } | null = null;
+    for (const w of ship.derived.weapons) {
+      if (w.fire.model !== 'charge' || !(ship.charge[w.part] > 0)) continue;
+      const c = Math.min(1, ship.charge[w.part] / Math.max(1, w.fire.charge ?? 60));
+      if (!best || c > best.charge) best = { charge: c, gun: w };
+    }
+    return best;
+  }
+
+  /** Others' charge guns charging now (a charge-start fire event, until it fires or is let go): owner * 256 + part → the tick it started */
+  readonly chargeTells = new Map<number, number>();
+
+  /** The gun-state correction for your own guns (gunSync.ts) */
+  private readonly gunSync = new GunSync();
+
+  /** A pilot row from the server for your ship at a tick: its gun state against your prediction (GameState, on reconciling) */
+  syncGuns(data: number[] | undefined, tick: number): void {
+    const ship = this.store.get(this.opts.state.playerId);
+    if (data && ship && ship.kind === 'ship') this.gunSync.onRow(ship, data, tick);
   }
 
   /**
@@ -939,7 +973,7 @@ export class ShipClient {
     // (Part features: the pilot row's values, read before anything draws or shows them)
     { const mine = state.entities.get(state.playerId);
       if (mine) {
-        if (mine.data && this.features.hasParsers) this.features.parsePilot(mine.data, CHARGE_GROUPS_AT + Math.max(0, Math.min(MAX_CHARGE_GROUPS, mine.data[11] | 0)), mine.fx ??= {});
+        if (mine.data && this.features.hasParsers) this.features.parsePilot(mine.data, chargeGroupsEnd(mine.data), mine.fx ??= {});
         else mine.fx = undefined;
       } }
     this.renderer?.update();

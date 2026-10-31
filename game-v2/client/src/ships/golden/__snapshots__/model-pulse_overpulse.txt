@@ -4,9 +4,9 @@ Mk III · Medium · Panel · 2 cells
 Hull · mass157 hp · 2.0
 Armour · build3 · 5 pts
 TakesKinetic −5% · Thermal −15% · Cryo −10%
-Damage72/s · reach 5,040
+Damage160/s · reach 5,040
 Hits withEnergy · penetration 2.5
-Fire rate2.0/s · shells
+Clip12 rounds at 10/s · reloads in 1.5s from energy (36 a clip), when empty or a second after you let go
 MountTurret, 120°
 FittingBolts on from behind only
 Power draw21/s
@@ -33,7 +33,7 @@ Medium · Panel
 tears shields, barely scratches hull
 
 == keyStats ==
-72 dmg/s · reach 5,040 · draws 21
+160 dmg/s · reach 5,040 · draws 21
 
 == mountBadge ==
 TURRET 120°
@@ -49,4 +49,4 @@ Bolts on from behind only
 {"open":true,"badge":"Lv 25","why":""}
 
 == partStats (raw) ==
-{"grade":3,"mark":"Mk III","size":"Medium","area":2,"hp":156.79999999999998,"mass":2,"firepower":72,"toughness":156.79999999999998,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"dps":72,"range":5040,"damageType":"energy","pen":2.5,"draw":21.34}
+{"grade":3,"mark":"Mk III","size":"Medium","area":2,"hp":156.79999999999998,"mass":2,"firepower":160,"toughness":156.79999999999998,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"dps":160,"range":5040,"damageType":"energy","pen":2.5,"draw":21.34}

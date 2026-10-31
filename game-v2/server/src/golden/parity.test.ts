@@ -27,6 +27,7 @@ import {
 import { replicaAngle, quantizeReplicaAngle } from '../../../common/src/network/replication.js';
 import { readShipJson, testCatalog } from '../../../common/src/ships/testData.js';
 import { SCENARIOS, corsair, type Scenario, type ScriptTick } from '../../../common/src/ships/golden/testData.js';
+import { parseBlueprint } from '../../../common/src/ships/blueprint.js';
 import { bodyRow, chargeRow, hashRows, goldenFile, ranges, BODY_FIELDS } from '../../../common/src/ships/golden/testData.js';
 import { ShipClient } from '../../../client/src/ships/ShipClient.js';
 import { GameServer } from '../GameServer.js';
@@ -50,10 +51,23 @@ const UP = -Math.PI / 2;
 interface Tick {
   body: FlightBody;
   charge: Charge;
+  /** The guns' state after the step (firing scenarios: gunRow) */
+  guns: number[];
   jumpPrime: number;
   tow: number | undefined;
   /** The server's tick number during the step */
   tick: number;
+}
+
+/** A firing scenario's tick: fire held or not */
+type FireTick = ScriptTick & { fire?: boolean };
+
+/** Every gun's state, quantised (cooldown, rounds, reload, charge, spin), in weapon order: what the server and the pilot's guns must agree on */
+function gunRow(ship: ShipState): number[] {
+  const q = (v: number) => Math.round(v * 1e6) / 1e6;
+  const out: number[] = [];
+  for (const w of ship.derived.weapons) out.push(q(ship.cooldown[w.part]), ship.rounds[w.part], q(ship.reload[w.part]), q(ship.charge[w.part]), q(ship.spin[w.part]));
+  return out;
 }
 
 const keysOf = (t: ScriptTick) => ({ forward: false, backward: false, left: false, right: false, boost: false, ...t.keys });
@@ -86,12 +100,12 @@ function runServer(sc: Scenario) {
       x: Position.x[pid], y: Position.y[pid], vx: Velocity.x[pid], vy: Velocity.y[pid], angle: Rotation.angle[pid], angVel: ship.angVel,
       jump: ship.jump, jumpScale: ship.jumpScale, cargo: ship.cargo, dodge: ship.dodge, dodgeDir: ship.dodgeDir,
     },
-    charge: ships.chargeOf(pid), jumpPrime: ship.jumpPrime ?? 0, tow: ship.tow,
+    charge: ships.chargeOf(pid), jumpPrime: ship.jumpPrime ?? 0, tow: ship.tow, guns: gunRow(ship),
   });
   const start = read();
   const ticks: Tick[] = [];
   sc.script.forEach((s, i) => {
-    t.send({ type: 'input', seq: i + 1, tick: 0, fireLeft: false, fireRight: false, ...keysOf(s), targetAngle: s.aim, cursorDist: s.dist ?? 0 } as any);
+    t.send({ type: 'input', seq: i + 1, tick: 0, fireLeft: !!(s as FireTick).fire, fireRight: false, ...keysOf(s), targetAngle: s.aim, cursorDist: s.dist ?? 0 } as any);
     if (sc.tow && i === sc.tow.from) t.send({ type: 'tow', on: true } as any);
     server.step();
     ticks.push({ ...read(), tick: server.getTick() });
@@ -105,12 +119,15 @@ function clientPredictor(sc: Scenario, env: ReplicaEnv) {
   const ship: ShipState = createShipState(catalog, tuning, 1, sc.ship(), 0);
   const self = {
     store: { get: () => ship }, docked: false, berth: null,
+    // (What predictGuns reaches for: the scene its shells go to, and the gun-state history)
+    scene: { predictShot: () => {} }, gunSync: { record: () => {} },
     opts: { state: { entities: new Map() }, tuning },
     hazardFor: (d: never, x: number, y: number) => env.hazard?.(d, x, y),
     central: env.central, lodestones: env.lodestones ?? [], gravity: env.gravity, terrain: env.terrain ?? null,
     jump: jumpTuning(tuning),
   };
   const predict = ShipClient.prototype.predict as (this: unknown, ...a: Parameters<ShipClient['predict']>) => Charge | null;
+  const predictGuns = ShipClient.prototype.predictGuns as (this: unknown, ...a: Parameters<ShipClient['predictGuns']>) => Charge | null;
   return {
     ship,
     /** A player entity as the pilot's snapshot gives it */
@@ -128,10 +145,12 @@ function clientPredictor(sc: Scenario, env: ReplicaEnv) {
       player.cargoMass = server.body.cargo ?? 0;
       ship.tow = server.tow;
       const input: ClientInputMessage = {
-        type: 'input', seq: i + 1, tick: 0, fireLeft: false, fireRight: false, ...keysOf(s),
+        type: 'input', seq: i + 1, tick: 0, fireLeft: !!(s as FireTick).fire, fireRight: false, ...keysOf(s),
         targetAngle: aim === 'wire' ? Math.fround(dequantizeCursorAngle(quantizeCursorAngle(s.aim))) : dequantizeCursorAngle(quantizeCursorAngle(s.aim)), cursorDist: quantizeCursorDist(s.dist ?? 0) * CURSOR_DIST_STEP,
       } as ClientInputMessage;
-      return predict.call(self, player, input, charge, tick)!;
+      const after = predict.call(self, player, input, charge, tick)!;
+      // (Then the guns, as Game.ts has GameState call them after the ship's step: forward only)
+      return (s as FireTick).fire !== undefined ? predictGuns.call(self, player, input, tick, after) ?? after : after;
     },
     body(player: any): FlightBody {
       return { x: player.x, y: player.y, vx: player.vx, vy: player.vy, angle: player.angle, angVel: player.angVel, jump: player.jump, jumpScale: player.jumpScale, cargo: player.cargoMass, dodge: player.dodge, dodgeDir: player.dodgeDir };
@@ -242,5 +261,82 @@ describe('prediction parity: server, client prediction and replicas fly the same
     const dodges = SCENARIOS.find((s) => s.name === 'strafer-every-way')!;
     const d = runServer(dodges);
     expect(new Set(d.ticks.map((x) => x.body.dodgeDir ?? 0)).size).toBeGreaterThan(6);
+  });
+});
+
+// ---- The firing models (docs/design/rework-2026-11.md §3): the pilot's own guns, stepped forward on its client, must
+// keep the server's clips, reloads, charges, spin and cooldowns, and draw the same energy, tick by tick.
+
+/** A Sparrow with its two Pips swapped for these models (their own cells and mounts: the shape is the Sparrow's) */
+const armedSparrow = (left: string, right: string) => () => {
+  const bp = readShipJson('blueprints/sparrow-t.json') as unknown;
+  const b = parseBlueprint(JSON.stringify(bp));
+  const pips = b.parts.filter((q) => q.fn === 'cannon_pip');
+  pips[0].fn = left;
+  pips[1].fn = right;
+  return b;
+};
+
+/** Segments of [ticks, keys, fire held, aim (a number, or a function of the tick within the segment)] */
+function fireScript(...segs: [number, ScriptTick['keys'], boolean, number | ((i: number) => number)][]): FireTick[] {
+  const out: FireTick[] = [];
+  for (const [n, keys, fire, aim] of segs) for (let i = 0; i < n; i++) out.push({ keys, fire, aim: typeof aim === 'number' ? aim : aim(i) });
+  return out;
+}
+
+const FIRE_SCENARIOS: Scenario[] = [
+  // A clip emptied and reloaded, a partial clip reloaded on idle; a charge fired by itself, cooled, then let go early
+  {
+    name: 'fire-clip-charge', ship: armedSparrow('railgun_rail_driver', 'cannon_longbarrel'), replicaDiverges: true, replayAt: [],
+    script: fireScript([200, { forward: true }, true, UP], [30, {}, false, UP], [50, { left: true }, true, (i) => UP - i * 0.004], [100, {}, false, UP - 0.2], [300, { forward: true }, true, (i) => UP - 0.2 + i * 0.002]),
+  },
+  // A minigun spinning up and down, and a held lance with a windup, flown hard enough to run the ship short (the sputter)
+  {
+    name: 'fire-spin-beam', ship: armedSparrow('autocannon_chainsaw', 'lance_lance'), replicaDiverges: true, replayAt: [],
+    script: fireScript([150, { forward: true, boost: true }, true, UP], [40, {}, false, UP], [400, { forward: true, boost: true }, true, (i) => UP + Math.sin(i / 40) * 0.3], [60, {}, false, UP]),
+  },
+  // A regrowing nest and a turret clip
+  {
+    name: 'fire-regrow', ship: armedSparrow('legendary_hive', 'autocannon_stinger'), replicaDiverges: true, replayAt: [],
+    script: fireScript([400, { forward: true }, true, (i) => UP + Math.sin(i / 50) * 0.2], [200, {}, false, UP], [200, { right: true }, true, UP]),
+  },
+];
+
+describe('prediction parity: the firing models (the pilot\'s guns keep the server\'s state)', () => {
+  for (const sc of FIRE_SCENARIOS) {
+    it(`${sc.name}: guns, body and charge match the server tick by tick`, () => {
+      const r = runServer(sc);
+      const c = clientPredictor(sc, r.env);
+      const player = c.player(r.start);
+      let charge = r.start.charge;
+      let shots = 0, diff: string | null = null;
+      for (let i = 0; i < sc.script.length && !diff; i++) {
+        charge = c.step(player, sc.script[i], i, charge, r.ticks[i].tick, r.ticks[i]);
+        const s = r.ticks[i];
+        if (!sameRow(bodyRow(s.body), bodyRow(c.body(player)))) diff = `tick ${i}: body`;
+        else if (!sameRow(chargeRow(s.charge), chargeRow(charge))) diff = `tick ${i}: charge server ${chargeRow(s.charge)} vs ${chargeRow(charge)}`;
+        else if (!sameRow(s.guns, gunRow(c.ship))) diff = `tick ${i}: guns server ${s.guns} vs ${gunRow(c.ship)}`;
+        if (i > 0 && !sameRow(r.ticks[i - 1].guns, s.guns)) shots++;
+      }
+      expect(diff).toBeNull();
+      // (They did fire, and their state moved)
+      expect(shots).toBeGreaterThan(20);
+    });
+  }
+
+  it('the scenarios exercise each model: a reload, a charge that fired and one let go, spin, a windup and a sputter, regrowth', () => {
+    const cc = runServer(FIRE_SCENARIOS[0]);
+    const [rd, lb] = cc.derived.weapons;
+    expect([rd.fire.model, lb.fire.model]).toEqual(['clip', 'charge']);
+    // (gunRow: cooldown, rounds, reload, charge, spin per gun)
+    const g = (t: Tick, w: number, k: number) => t.guns[w * 5 + k];
+    expect(cc.ticks.some((t) => g(t, 0, 2) > 0)).toBe(true);
+    expect(cc.ticks.some((t) => g(t, 1, 3) < 0)).toBe(true);
+    const sb = runServer(FIRE_SCENARIOS[1]);
+    expect(sb.ticks.some((t) => g(t, 0, 4) === 1)).toBe(true);
+    expect(sb.ticks.some((t) => (t.charge.gun ?? []).some((v) => v < 0.995))).toBe(true);
+    const rg = runServer(FIRE_SCENARIOS[2]);
+    const hive = rg.ticks.map((t) => g(t, 0, 1));
+    expect(hive.some((v, i) => i > 0 && v === hive[i - 1] + 1)).toBe(true);
   });
 });

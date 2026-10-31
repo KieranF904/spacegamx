@@ -25,7 +25,6 @@
   "has",
   "hasController",
   "healAll",
-  "heatState",
   "hitProjectile",
   "holdTowed",
   "hullDistance",

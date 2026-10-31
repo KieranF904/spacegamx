@@ -6,7 +6,7 @@ Armour · build3 · 5 pts
 TakesKinetic −5% · Thermal −15% · Cryo −10%
 Damage49/s · reach 2,640
 Hits withExplosive · penetration 2.5
-Fire rate0.4/s · shells · Mortar Shells
+Fire rate0.4/s · shells · Mortar Shells (3 a shot, no energy)
 MountTurret, 360°
 FittingBolts on from behind only
 Power draw13/s

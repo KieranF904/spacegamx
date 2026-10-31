@@ -4,9 +4,9 @@ Mk II · Medium · Panel · 2 cells
 Hull · mass150 hp · 2.8
 Armour · build2 · 3.2 pts
 TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
-Damage151/s · reach 7,200
+Damage130/s · reach 7,200
 Hits withKinetic · penetration 2
-Fire rate6.0/s · shells
+Clip16 rounds at 10/s · reloads in 1.5s from energy (24 a clip), when empty or a second after you let go
 MountTurret, 180°
 FittingBolts on any side
 Power draw23/s
@@ -33,7 +33,7 @@ Medium · Panel
 sustained fire, power-hungry
 
 == keyStats ==
-151 dmg/s · reach 7,200 · draws 23
+130 dmg/s · reach 7,200 · draws 23
 
 == mountBadge ==
 TURRET 180°
@@ -49,4 +49,4 @@ Bolts on any side
 {"open":true,"badge":"Lv 12","why":""}
 
 == partStats (raw) ==
-{"grade":2,"mark":"Mk II","size":"Medium","area":2,"hp":150.4,"mass":2.8,"firepower":151.2,"toughness":150.4,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":151.2,"range":7200,"damageType":"kinetic","pen":2,"draw":23.04}
+{"grade":2,"mark":"Mk II","size":"Medium","area":2,"hp":150.4,"mass":2.8,"firepower":130.06451612903226,"toughness":150.4,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":130.06451612903226,"range":7200,"damageType":"kinetic","pen":2,"draw":23.04}

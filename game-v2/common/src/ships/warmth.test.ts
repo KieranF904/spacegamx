@@ -60,30 +60,24 @@ describe('warmth', () => {
     expect(hazardFlight(rules, { hazardRatings: { cryo: 3 } }, plain, 50000, 0)?.cap ?? 1).toBe(1);
   });
 
-  it('stages: guns slower below half, then the drive numb too, then frozen through', () => {
+  it('stages: chilled below half, then the drive numb, then frozen through', () => {
     expect(warmthStage(100).name).toBe('warm');
     expect(warmthStage(50).name).toBe('warm');
     expect(warmthStage(49).name).toBe('chilled');
     expect(warmthStage(24).name).toBe('numb');
     expect(warmthStage(0).name).toBe('frozen');
     for (let i = 1; i < WARMTH_STAGES.length; i++) {
-      expect(WARMTH_STAGES[i].guns).toBeGreaterThanOrEqual(WARMTH_STAGES[i - 1].guns);
       expect(WARMTH_STAGES[i].control).toBeLessThanOrEqual(WARMTH_STAGES[i - 1].control);
     }
     expect(withNumb(undefined, warmthStage(40))).toBeUndefined();
     expect(withNumb(undefined, warmthStage(10))!.control).toBe(warmthStage(10).control);
   });
 
-  it('a cold ship\'s guns recycle slower', () => {
-    const shots = (slow: number) => {
-      const s = createShipState(catalog, tuning, 1, blueprint('sparrow-t'), 0);
-      let n = 0;
-      for (let t = 0; t < 600; t++) n += stepGuns(s, { x: 0, y: 0, angle: 0 }, { firing: true, aimDist: 0, slow }, t, tuning).shots.length;
-      return n;
-    };
-    const warm = shots(1), cold = shots(warmthStage(10).guns);
-    expect(warm).toBeGreaterThan(0);
-    expect(cold).toBeLessThan(warm);
-    expect(cold).toBeGreaterThanOrEqual(Math.floor(warm / warmthStage(10).guns) - 2);
+  it('guns never read warmth (rework 2026-11): no stage slows them', () => {
+    const s = createShipState(catalog, tuning, 1, blueprint('sparrow-t'), 0);
+    let n = 0;
+    for (let t = 0; t < 600; t++) n += stepGuns(s, { x: 0, y: 0, angle: 0 }, { firing: true, aimDist: 0 }, t, tuning).shots.length;
+    expect(n).toBeGreaterThan(0);
+    for (const st of WARMTH_STAGES) expect(Object.keys(st)).not.toContain('guns');
   });
 });

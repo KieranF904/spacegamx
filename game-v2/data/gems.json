@@ -175,22 +175,20 @@
       "material": "iridium_ingot",
       "levels": {
         "1": {
-          "summary": "+25% range. Beams run 50% hotter",
+          "summary": "+25% range",
           "mods": {
             "mul": {
               "life": 0.25,
-              "range": 0.25,
-              "heatPerSec": 0.5
+              "range": 0.25
             }
           }
         },
         "2": {
-          "summary": "+40% range, and shots pierce one more. Beams run 50% hotter",
+          "summary": "+40% range, and shots pierce one more",
           "mods": {
             "mul": {
               "life": 0.4,
-              "range": 0.4,
-              "heatPerSec": 0.5
+              "range": 0.4
             },
             "add": {
               "pierce": 1
@@ -319,20 +317,18 @@
       "material": "aurum_ingot",
       "levels": {
         "1": {
-          "summary": "+15% rate of fire. Beams run 40% hotter",
+          "summary": "+15% rate of fire",
           "mods": {
             "mul": {
-              "rate": 0.15,
-              "heatPerSec": 0.4
+              "rate": 0.15
             }
           }
         },
         "2": {
-          "summary": "+25% rate of fire. Beams run 40% hotter",
+          "summary": "+25% rate of fire",
           "mods": {
             "mul": {
-              "rate": 0.25,
-              "heatPerSec": 0.4
+              "rate": 0.25
             }
           }
         }

@@ -4,9 +4,9 @@ Mk II · Medium · Panel · 2 cells
 Hull · mass132 hp · 2.8
 Armour · build2 · 3.2 pts
 TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
-Damage112/s · reach 2,720, fading out to 4,080
+Damage60/s · reach 2,720, fading out to 4,080
 Hits withThermal · penetration 2
-Pulse202 a pulse · charges in 1.8s · no heat
+Beamheld while you fire · no heat · draws its power while it's on
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 1 clear cell ahead
 Power draw32/s
@@ -33,7 +33,7 @@ Medium · Panel
 close and brutal, short reach
 
 == keyStats ==
-202 a pulse · reach 4,080 · draws 32
+60 dmg/s · reach 4,080 · draws 32
 
 == mountBadge ==
 FIXED
@@ -50,4 +50,4 @@ Needs 1 clear cell ahead
 {"open":true,"badge":"Lv 18","why":""}
 
 == partStats (raw) ==
-{"grade":2,"mark":"Mk II","size":"Medium","area":2,"hp":131.6,"mass":2.8,"firepower":112.00000000000001,"toughness":131.6,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":112.00000000000001,"pulse":{"damage":201.60000000000002,"seconds":1.8},"range":4080,"effectiveRange":2720.136,"damageType":"thermal","pen":2,"draw":31.5}
+{"grade":2,"mark":"Mk II","size":"Medium","area":2,"hp":131.6,"mass":2.8,"firepower":60,"toughness":131.6,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":60,"range":4080,"effectiveRange":2720.136,"damageType":"thermal","pen":2,"draw":31.5}

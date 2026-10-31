@@ -5,7 +5,7 @@ Hull · mass60 hp · 1.0
 Armour · build1 · 1 pts
 Damage450/s · reach 2,400
 Hits withExplosive · penetration 1
-Fire rate0.5/s · shells · Mining Charges
+Fire rate0.5/s · shells · Mining Charges (no energy)
 MountFixed: aims with the ship
 FittingBolts on any side
 Power draw8/s

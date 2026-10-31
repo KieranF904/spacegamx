@@ -17,7 +17,7 @@ import { stepGuns } from './guns.js';
 import { stepShipPhysics } from './physics.js';
 import type { FlightBody, FlightControls } from './flight.js';
 import {
-  BROWNOUT, CHARGE_GROUPS_AT, FULL_CHARGE, bankCharges, chargeTotal, gunLoad, loadTest, packCharge, powerTick, remapCharge, unpackCharge, type Charge,
+  BROWNOUT, CHARGE_GROUPS_AT, PILOT_ROW, FULL_CHARGE, bankCharges, chargeTotal, gunLoad, loadTest, packCharge, powerTick, remapCharge, unpackCharge, type Charge,
 } from './energy.js';
 import { burstEnergy, DODGE_LEFT } from './features/strafer/strafer.js';
 import { readShipJson, testCatalog, SHIP_DATA_DIR } from './testData.js';
@@ -361,7 +361,7 @@ describe('energy: banks', () => {
     const packed = packCharge(d, c);
     expect(packed.groups.length).toBe(3);
     const data: number[] = new Array(CHARGE_GROUPS_AT).fill(0);
-    data[1] = packed.total; data[10] = packed.g; data[11] = packed.groups.length; data.push(...packed.groups);
+    data[1] = packed.total; data[PILOT_ROW.pool] = packed.g; data[PILOT_ROW.groups] = packed.groups.length; data.push(...packed.groups);
     const back = unpackCharge(data);
     expect(back.g).toBeCloseTo(33.33, 2);
     expect(back.b).toEqual(c.b);

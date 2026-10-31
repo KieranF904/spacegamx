@@ -4,9 +4,9 @@ Mk III · Small · Round · 0.8 cells
 Hull · mass62 hp · 0.8
 Armour · build3 · 2 pts
 TakesKinetic −5% · Thermal −15% · Cryo −10%
-Damage43/s · reach 5,100, fading out to 7,650
+Damage25/s · reach 5,100, fading out to 7,650
 Hits withThermal · penetration 3
-Pulse77 a pulse · charges in 1.8s · no heat
+Beamheld while you fire · no heat · draws its power while it's on
 MountTurret, 360°
 FittingSide mount (flippable) · Bolts on at its side only
 Power draw12/s
@@ -33,7 +33,7 @@ Small · Round
 reaches furthest, hits softer
 
 == keyStats ==
-77 a pulse · reach 7,650 · draws 12
+25 dmg/s · reach 7,650 · draws 12
 
 == mountBadge ==
 TURRET 360°SIDE
@@ -50,4 +50,4 @@ Bolts on at its side only
 {"open":true,"badge":"Lv 26","why":""}
 
 == partStats (raw) ==
-{"grade":3,"mark":"Mk III","size":"Small","area":0.7853981633974483,"hp":61.57521601035994,"mass":0.7853981633974483,"firepower":42.66666666666668,"toughness":61.57521601035994,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"dps":42.66666666666668,"pulse":{"damage":76.80000000000001,"seconds":1.8},"range":7650,"effectiveRange":5100.255,"damageType":"thermal","pen":3,"draw":12.00088393671301}
+{"grade":3,"mark":"Mk III","size":"Small","area":0.7853981633974483,"hp":61.57521601035994,"mass":0.7853981633974483,"firepower":25,"toughness":61.57521601035994,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"dps":25,"range":7650,"effectiveRange":5100.255,"damageType":"thermal","pen":3,"draw":12.00088393671301}

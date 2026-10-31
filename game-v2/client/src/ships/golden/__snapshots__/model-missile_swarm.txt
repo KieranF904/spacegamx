@@ -6,7 +6,7 @@ Armour · build3 · 5 pts
 TakesKinetic −5% · Thermal −15% · Cryo −10%
 Damage41/s · reach 11,440
 Hits withExplosive · penetration 2.5
-Fire rate0.5/s · shells · Missiles
+Fire rate0.5/s · shells · Missiles (6 a shot, no energy)
 MountFixed: aims with the ship
 FittingSide mount (flippable) · Bolts on at its side only · Needs 1 clear cell ahead
 Power draw12/s

@@ -22,7 +22,7 @@ describe('the tow feature (registered)', () => {
     const P = getPlan(), i = P.byId.get('tow')!;
     expect(i).toBeGreaterThanOrEqual(0);
     expect(P.burstMask & (1 << i)).not.toBe(0);
-    expect(P.replicate.filter((r) => r.feature === 'tow').map((r) => `${r.where}:${r.slot}`).sort()).toEqual(['pilotExtra:2', 'status:8']);
+    expect(P.replicate.filter((r) => r.feature === 'tow').map((r) => `${r.where}:${r.slot}`).sort()).toEqual(['pilotExtra:2', 'status:6']);
   });
 
   it('a ship with a Tow Beam has fx.tow and the feature bit; one without has no feature fields', () => {

@@ -833,7 +833,7 @@ describe('weapon balance: grades, sizes and the laser', () => {
     const cannon = gun('weapon', 'sq', 'alloy', false);
     expect(laser.def.range!).toBeGreaterThanOrEqual(3200);
     expect(laser.def.pulse).toBeDefined();
-    expect(laser.def.heatPerSec).toBeUndefined();
+    expect((laser.def as Record<string, unknown>).heatPerSec).toBeUndefined();
     // It charges between pulses (its interval), longer than a pulse lasts
     const prof = pulseProfile(laser.def.pulse!);
     expect(laser.w.interval).toBeGreaterThan(prof.ticks);
@@ -919,7 +919,7 @@ describe('weapon balance: grades, sizes and the laser', () => {
     let want = 0;
     for (let j = 0; j < n; j++) want += Math.floor((T - 1 - Math.ceil((j * w.interval) / n)) / w.interval) + 1;
     expect(pulses).toBe(want);
-    expect(ship.overheated.some(Boolean)).toBe(false);
+    expect(Object.keys(ship)).not.toContain('overheated');
     // Each pulse's energy is drawn as it recharges, as a shot's is: with nothing to draw on, only the pulses they were charged with
     const fresh = createShipState(catalog, tuning, 2, b, 0);
     fresh.derived = derive(b, (max, i) => (b.parts[i].fn.includes('reactor') ? 0 : max));

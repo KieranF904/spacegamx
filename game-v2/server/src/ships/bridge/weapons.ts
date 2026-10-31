@@ -13,7 +13,7 @@ import {
   Position, Input, Player, InSystem, Projectile, ShipState, Vec2, damagePart, weaponHit, shooterGrade, localToWorldDir,
   castParts, partDistance, pointInConvex, standing, deciding, stageOf, currentStage, stageParts, shipPointToWorld,
   WeaponInfo, WeaponTuning, firesStraight, partWeaponDef, stepGuns, ammoCode, outputOf, payMining, MINE_CYCLE,
-  MINING_PULSE, MINE_TAIL, mineFalloff, type Charge, pulseProfile, beamFalloff,
+  MINING_PULSE, MINE_TAIL, mineFalloff, type Charge, pulseProfile, beamFalloff, windupScale, TELL_CHARGE_START, TELL_CHARGE_CANCEL,
 } from '@space-game/common';
 import { K, BEAM_PAD, GLANCING, type BridgeCtx } from './core.js';
 import { fireBeamHook, tickWeaponHooks } from '../features/weapons.js';
@@ -160,11 +160,11 @@ export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: 
   const pose = b.pose(eid);
   const def = (w: WeaponInfo) => partWeaponDef(b.tuning, w.kind, ship.blueprint.parts[w.part], w);
   let beamHit = -1;
-  const beamed = new Set<number>();
   // The guns' tick (shared with the pilot's client, which fires its own shells on the same tick: guns.ts)
-  const { shots, beams, pulses } = stepGuns(ship, pose, { firing, aimWorld, aimDist, energy, slow: b.coldStage(eid).guns }, tick, b.tuning);
+  const { shots, beams, pulses, tells } = stepGuns(ship, pose, { firing, aimWorld, aimDist, energy }, tick, b.tuning);
+  // A charge gun starting to charge, or let go early: a fire event with no shells, so everyone sees its tell (ammo code: guns.ts TELL_CHARGE_*)
+  for (const t of tells) b.fired.push({ owner: eid, tick, part: t.w.part, aimQ: t.aimQ, ids: [], ammo: t.start ? TELL_CHARGE_START : TELL_CHARGE_CANCEL });
   for (const w of beams) {
-    beamed.add(w.part);
     // (A beam of a weapon role fires its own way: a Repair Beam mends a friendly hull instead, features/support)
     const hook = fireBeamHook(def(w));
     const t = hook ? hook(b, eid, ship, w, def(w)) : b.fireBeam(eid, ship, w, def(w));
@@ -192,7 +192,9 @@ export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: 
         lock = b.nearestTarget(eid, ax, ay, 1400, undefined, true);
       }
     }
-    const round = b.host.spendAmmo?.(eid, w.kind, !d.ammo);
+    // (An ammunition gun's shot costs its `rounds` from the hold; Ammo.ts: an empty hold fires plain rounds, as it always has)
+    let round = b.host.spendAmmo?.(eid, w.kind, !d.ammo);
+    for (let k = 1; k < (w.fire.model === 'ammo' ? w.fire.rounds ?? 1 : 1); k++) round = b.host.spendAmmo?.(eid, w.kind, !d.ammo) ?? round;
     const ids = b.host.fireBaseShot(eid, shot.x, shot.y, shot.angle, shot.damageScale * b.damageMul(eid) * (round?.scale ?? 1),
       { speedScale: shot.speedScale, sizeScale: shot.sizeScale, turret: shot.mount === 'turret', kind: w.kind, target: lock, seed: `${eid}:${ship.blueprint.parts[w.part].uid}`, mods: gunMods, dry: round?.dry, ammoMods: round?.mods,
         reach: d.lob ? Math.max(200, aimDist) : undefined, grade: w.grade, size: w.size, model: w.model });
@@ -200,14 +202,7 @@ export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: 
   }
   if (beamHit >= 0) b.weaponBeams.set(eid, beamHit);
   else b.weaponBeams.delete(eid);
-  if (shots.length || beams.length || pulses.length) b.lastFired.set(eid, tick);
-  // Beam weapons cool while they aren't firing
-  for (let i = 0; i < ship.heat.length; i++) {
-    if (ship.heat[i] <= 0 || beamed.has(i)) continue;
-    const w = ship.derived.weapons.find((x) => x.part === i);
-    ship.heat[i] = Math.max(0, ship.heat[i] - (w ? def(w).coolPerSec ?? 30 : 30) / 60);
-    if (ship.overheated[i] && ship.heat[i] < 30) ship.overheated[i] = false;
-  }
+  if (shots.length || beams.length || pulses.length || tells.length) b.lastFired.set(eid, tick);
 }
 
 /** Each pulse under way burns its tick's share along its gun's aim, as wide as its curve says; done, it's dropped */
@@ -238,9 +233,9 @@ export function stepPulses(b: BridgeCtx, eid: number, ship: ShipState, tick: num
 
 /**
  * One tick of a beam weapon: out of its muzzle along its aim, it burns the
- * first hull (more against armour for the lance) or asteroid it meets, and
- * heats up; at 100 it overheats and must cool. Returns how far along it hit.
- * A pulse laser's tick (`pulse`) burns its share of the pulse, that wide, and doesn't heat.
+ * first hull (more against armour for the lance) or asteroid it meets, for as
+ * long as the power lasts (no heat). Returns how far along it hit.
+ * A pulse laser's tick (`pulse`) burns its share of the pulse, that wide.
  */
 export function fireBeam(b: BridgeCtx, eid: number, ship: ShipState, w: WeaponInfo, def: WeaponTuning, pulse?: { damage: number; width: number }): number {
   const pose = b.pose(eid);
@@ -261,7 +256,8 @@ export function fireBeam(b: BridgeCtx, eid: number, ship: ShipState, w: WeaponIn
   const x1 = x + Math.cos(angle) * range, y1 = y + Math.sin(angle) * range;
   // (A hostile's beam burns at its kind's npcScale: the laser was made better for pilots, not for the scrap that fires it)
   const npc = hasComponent(b.host.world, Player, eid) ? 1 : def.npcScale ?? 1;
-  const dmg = (pulse ? pulse.damage : (def.dps ?? 50) / 60) * Math.max(w.satisfaction, b.tuning.flow.minWeaponSatisfaction) * w.strength * b.damageMul(eid) * npc;
+  // (A held beam with a windup burns up to full over its first ticks: guns.ts windupScale)
+  const dmg = (pulse ? pulse.damage : ((def.dps ?? 50) / 60) * windupScale(ship, w)) * Math.max(w.satisfaction, b.tuning.flow.minWeaponSatisfaction) * w.strength * b.damageMul(eid) * npc;
   let shipHit: { eid: number; ship: ShipState; part: number; t: number } | null = null;
   // It burns `width` wide: a hull that close to its line is hit (its edges are tried when the line itself misses)
   const half = (pulse ? pulse.width : def.width ?? 0) / 2;
@@ -282,10 +278,6 @@ export function fireBeam(b: BridgeCtx, eid: number, ship: ShipState, w: WeaponIn
   if (b.host.beamMobs) {
     const stop = rockT * (shipHit ? shipHit.t : 1);
     b.host.beamMobs(InSystem.systemId[eid], x, y, x + (x1 - x) * stop, y + (y1 - y) * stop, half * 2, dmg * beamFalloff(def, stop * range * 0.5), eid);
-  }
-  if (!pulse) {
-    ship.heat[w.part] = Math.min(100, ship.heat[w.part] + ((def.heatPerSec ?? 20) / 60) * (b.host.hazardScale?.(eid, 'heat') ?? 1));
-    if (ship.heat[w.part] >= 100) ship.overheated[w.part] = true;
   }
   if (shipHit && rockT >= 0.999) {
     if (def.chill) {

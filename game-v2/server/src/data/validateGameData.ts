@@ -487,6 +487,10 @@ const SHIP_SHAPES: Record<string, Spec> = {
       'fireInterval?': 'number', 'capacity?': 'number', 'jumpCapacity?': 'number', 'range?': 'number', 'weapon?': 'string', 'shield?': 'number',
       'store?': 'number', 'pool?': oneOf('drive', 'weapon'), 'discharge?': 'number', 'bank?': 'boolean', 'dynamo?': 'number', 'armour?': 'number', 'massScale?': 'number', 'mount?': oneOf('fixed', 'turret'),
       'mounting?': strict({ 'attach?': oneOf('back', 'any'), 'angle?': oneOf('straight', 'right'), 'arc?': 'number', 'clear?': 'any' }),
+      // (A weapon's firing model: common/src/ships/types.ts FireSpec, guns.ts)
+      'fire?': strict({ model: oneOf('cycle', 'clip', 'charge', 'ammo', 'beam', 'auto'), interval: 'number', 'clip?': 'number', 'reload?': 'number', 'reloadE?': 'number', 'regrow?': 'number',
+        'charge?': 'number', 'cooldown?': 'number', 'chargeE?': 'number', 'burst?': strict({ n: 'number', gap: 'number' }), 'salvo?': 'number',
+        'spin?': strict({ from: 'number', to: 'number', up: 'number', down: 'number' }), 'windup?': 'number', 'rounds?': 'number' }),
     })),
   }),
   'ships/materials.json': strict({
