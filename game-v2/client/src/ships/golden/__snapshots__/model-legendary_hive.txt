@@ -6,7 +6,7 @@ Armour · build4 · 3.8 pts
 TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
 Damage23/s · reach 9,120
 Hits withExplosive · penetration 3
-Clipholds 8 · 4 a shot, every 2.5s · regrows one every 0.75s (6 energy each)
+Clipholds 8 · 4 a shot, every 0.5s · regrows one every 0.75s (6 energy each)
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 1 clear cell ahead
 Power draw12/s
@@ -30,7 +30,7 @@ Small
 Small · Square
 
 == tradeOff ==
-Legendary
+A nest that regrows
 
 == keyStats ==
 23 dmg/s · reach 9,120 · clip 8 · regrows · draws 12

@@ -9,12 +9,12 @@ Hits withCryo · penetration 4.5
 Beamheld while you fire · no heat · draws its power while it's on
 MountTurret, 150°
 FittingBolts on from behind only
-Power draw48/s
+Power draw24/s
 
 == partStats (stats rows) ==
 GradeMk IV · Medium
 Hits withCryo · penetration 4
-Power draw48
+Power draw24
 Hull · mass236 hp · 2.4
 Armour · build4 · 7.6 pts
 TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
@@ -30,10 +30,10 @@ Medium
 Medium · Panel
 
 == tradeOff ==
-Legendary
+The freeze beam
 
 == keyStats ==
-95 dmg/s · reach 760 · held beam · draws 48
+95 dmg/s · reach 760 · held beam · draws 24
 
 == mountBadge ==
 TURRET 150°
@@ -49,4 +49,4 @@ Bolts on from behind only
 {"open":true,"badge":"Lv 12","why":""}
 
 == partStats (raw) ==
-{"grade":4,"mark":"Mk IV","size":"Medium","area":2,"hp":235.8,"mass":2.4,"firepower":95,"toughness":235.8,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":95,"range":760,"damageType":"cryo","pen":4.5,"draw":48}
+{"grade":4,"mark":"Mk IV","size":"Medium","area":2,"hp":235.8,"mass":2.4,"firepower":95,"toughness":235.8,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":95,"range":760,"damageType":"cryo","pen":4.5,"draw":24}
