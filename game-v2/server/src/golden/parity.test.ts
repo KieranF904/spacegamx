@@ -321,12 +321,19 @@ const FIRE_SCENARIOS: Scenario[] = [
     name: 'fire-regrow', ship: armedSparrow('legendary_hive', 'autocannon_stinger'), replicaDiverges: true, replayAt: [],
     script: fireScript([400, { forward: true }, true, (i) => UP + Math.sin(i / 50) * 0.2], [200, {}, false, UP], [200, { right: true }, true, UP]),
   },
+<<<<<<< HEAD
   // Shells that end at the aim (features/weaponry endAtAim): a clip of aim bursts and a charged orb. Their shells go
   // as rows (launch.ts firesStraight), but the guns' clip and charge are the pilot's to predict, at a cursor distance
   {
     name: 'fire-aim-burst', ship: armedSparrow('flak_cloudmaker', 'emp_blackout'), replicaDiverges: true, replayAt: [],
     script: fireScript([300, { forward: true }, true, (i) => UP + Math.sin(i / 60) * 0.3], [60, {}, false, UP], [300, { left: true }, true, UP])
       .map((t, i) => ({ ...t, dist: 600 + (i % 200) * 4 })),
+=======
+  // The cycle railguns: the Coilgun's five-slug cone and the Spear, power paid per shot, flown on the throttle
+  {
+    name: 'fire-rail-cycle', ship: armedSparrow('railgun_coilgun', 'railgun_spear'), replicaDiverges: true, replayAt: [],
+    script: fireScript([300, { forward: true }, true, (i) => UP + Math.sin(i / 60) * 0.15], [40, {}, false, UP], [300, { forward: true, boost: true }, true, UP]),
+>>>>>>> rework/family-railguns
   },
 ];
 

@@ -118,6 +118,8 @@ export interface WeaponTuning {
   life?: number;
   size?: number;
   spread?: number;
+  /** A burst (burst > 1): the random scatter of each shell, in degrees either side of its place in the fan (default 4). Given (with an odd burst), the fan is centred on the aim and spans +-`spread` (a cone); 0: no scatter */
+  jitter?: number;
   pierce?: number;
   homing?: number;
   accel?: number;

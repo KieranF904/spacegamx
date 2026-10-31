@@ -30,7 +30,7 @@ Medium
 Medium · Panel
 
 == tradeOff ==
-fast piercing slugs · ammo
+fast slugs through two ships · ammo
 
 == keyStats ==
 50 dmg/s · reach 9,000 · draws 44
