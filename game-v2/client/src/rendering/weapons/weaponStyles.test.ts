@@ -1,5 +1,6 @@
 import { describe, expect, it, afterEach } from 'vitest';
 import { WeaponType } from '@space-game/common';
+import tuning from '../../../../data/ships/tuning.json';
 import { MODEL_STYLES, BEAM_LOOKS, beamLook, clearStyleCache, shotScale, weaponStyle } from './weaponStyles';
 
 afterEach(() => {
@@ -41,5 +42,20 @@ describe('weapon styles', () => {
     BEAM_LOOKS.test_beam = { width: 1.5, cone: 12 };
     expect(beamLook('test_beam')?.cone).toBe(12);
     expect(beamLook(undefined)).toBeUndefined();
+  });
+});
+
+describe('legendary looks', () => {
+  it('the singularity ring is drawn at the radius it pulls ships from', () => {
+    const w = (tuning as unknown as { weapons: Record<string, { pull?: { radius: number } }> }).weapons.singularity;
+    expect(weaponStyle(WeaponType.Singularity).pull?.radius).toBe(w.pull?.radius);
+  });
+
+  it('each legendary names a look of its own', () => {
+    for (const id of ['legendary_hive', 'legendary_cinder_bloom', 'legendary_prism', 'legendary_phase', 'legendary_singularity']) expect(MODEL_STYLES[id], id).toBeDefined();
+    expect(MODEL_STYLES.legendary_hive.wobble).toBeDefined();
+    expect(MODEL_STYLES.legendary_phase.afterimages).toBe(3);
+    expect(MODEL_STYLES.legendary_prism.shardHue).toBeGreaterThan(0);
+    expect(beamLook('legendary_frostbite')?.frost).toBeGreaterThan(0);
   });
 });

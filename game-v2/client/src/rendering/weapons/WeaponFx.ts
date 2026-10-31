@@ -222,7 +222,9 @@ export class WeaponFx {
       // not when it arrives, which is usually a little early. Shots first seen well downrange don't flash.
       if (!shot.flashed && t >= shot.spawnTick) {
         shot.flashed = true;
-        if (t - shot.spawnTick < 12) this.muzzleFlash(shot, state.entities.get(shot.owner));
+        if (t - shot.spawnTick < 12) {
+          if (shot.type === WeaponType.PrismShard) this.splitFlash(shot); else this.muzzleFlash(shot, state.entities.get(shot.owner));
+        }
       }
       if (shot.fading === null) this.place(shot, e, t);
     }
@@ -324,7 +326,7 @@ export class WeaponFx {
       phase: (e.id * 0.618) % 1,
       type,
       owner: e.data?.[6] ?? -1,
-      glow: mixColor(style.glowColor, hueColor(hue), style.ownerTint),
+      glow: type === WeaponType.PrismShard ? hueColor((e.id * 67) % 360) : mixColor(style.glowColor, hueColor(hue), style.ownerTint),
       spawnX: e.spawnX ?? e.x,
       spawnY: e.spawnY ?? e.y,
       spawnTick: e.spawnTick ?? 0,
@@ -398,6 +400,17 @@ export class WeaponFx {
       const back = Math.min(Math.hypot(e.vx, e.vy) * trail, Math.hypot(e.renderX - shot.spawnX, e.renderY - shot.spawnY));
       const sp = Math.hypot(e.vx, e.vy) || 1;
       shot.tail = { x: e.renderX - (e.vx / sp) * back, y: e.renderY - (e.vy / sp) * back };
+    }
+  }
+
+  /** Where a prism splits: each shard throws a ring and a few sparks in its own hue, so the five make a rainbow pop */
+  private splitFlash(shot: Shot): void {
+    const angle = Math.atan2(shot.vy, shot.vx);
+    this.rings.push({ x: shot.spawnX, y: shot.spawnY, life: 0, max: 14, size: 38, color: shot.glow });
+    this.rings.push({ x: shot.spawnX, y: shot.spawnY, life: 0, max: 9, size: 16, color: 0xffffff });
+    for (let i = 0; i < 4; i++) {
+      const a = angle + (Math.random() - 0.5) * 0.5, v = 3 + Math.random() * 3;
+      this.sparks.push({ x: shot.spawnX, y: shot.spawnY, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0, max: 14 + Math.random() * 8, color: shot.glow });
     }
   }
 
@@ -498,7 +511,7 @@ export class WeaponFx {
         const gap = Math.max(3, speed * 0.9);
         for (let i = 1; i <= st.afterimages; i++) {
           const f = i / (st.afterimages + 1);
-          this.circle(g, TEX.disc, hx - ux * gap * i, hy - uy * gap * i, Math.max(1, st.headRadius * z) * (1 - 0.5 * f), shot.glow, 0.5 * (1 - f) * alpha);
+          this.circle(g, TEX.disc, hx - ux * gap * i, hy - uy * gap * i, Math.max(1, st.headRadius * z) * (1 - 0.5 * f), shot.glow, 0.5 * (1 - f) * alpha * (0.55 + 0.45 * Math.sin(this.clock * 0.9 + i * 2.1 + shot.phase * 11)));
         }
       }
       // A ring swelling off the head and fading, again and again
@@ -532,6 +545,20 @@ export class WeaponFx {
             c.lineTo(x, y);
           }
           c.stroke({ color: lt.color, width: 1.5, alpha: 0.8 * fade });
+        }
+      }
+      // A gravity well: a faint ring at the pull radius and motes streaming in to the head, quickening as they fall
+      const pl = st.pull;
+      if (pl && shot.fading === null) {
+        const c = this.crackle;
+        this.crackling = true;
+        c.circle(hx, hy, pl.radius).stroke({ color: pl.color, width: 2.5, alpha: 0.14 * alpha });
+        c.circle(hx, hy, pl.radius * 0.985).stroke({ color: pl.color, width: 9, alpha: 0.04 * alpha });
+        const N = 22;
+        for (let i = 0; i < N; i++) {
+          const f = (this.clock * 0.011 + i / N + shot.phase) % 1, a = i * 2.399 + shot.phase * 6.283 + f * 1.1;
+          const r1 = pl.radius * (1 - f * f), r0 = Math.min(pl.radius, r1 + 24 + 90 * f), ca = Math.cos(a), sa = Math.sin(a);
+          c.moveTo(hx + ca * r0, hy + sa * r0).lineTo(hx + ca * r1, hy + sa * r1).stroke({ color: pl.color, width: 2, alpha: 0.55 * Math.sin(f * Math.PI) * alpha });
         }
       }
       // Missiles leave smoke

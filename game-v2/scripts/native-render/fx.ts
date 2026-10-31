@@ -9,13 +9,13 @@
 import { mulberry32 } from '@space-game/common';
 import { PAL, hsl, hueOf } from '../../client/src/ships/ThrusterFx';
 import { PLUME_ANCHOR, plumeKey, plumeScale } from '../../client/src/rendering/fxTextures';
-import { engineLookOf, plumeSpec, puffFlicker, sailRing } from '../../client/src/ships/engineLooks';
+import { engineLookOf, plumeSpec, puffFlicker, sailRing, FROST_MOTES } from '../../client/src/ships/engineLooks';
 import type { Draw } from './scene';
 
 /** One engine: its part's model (its look), its thrust direction (grid frame) and where its flames start */
 export interface Engine { index: number; fn?: string; f: [number, number]; nozzles: { mx: number; my: number; n: [number, number]; t: [number, number]; edge: number }[] }
 
-export interface FxParams { flames: number; boost: boolean; exhaust: boolean }
+export interface FxParams { flames: number; boost: boolean; exhaust: boolean; frost?: boolean }
 
 const DOT = 64;
 /** A flame in one hue (ThrusterFx.flameFor): the textures' names, the inner colour (the idle glow), the engines' light */
@@ -98,7 +98,7 @@ export function flames(engines: Engine[], thrust: [number, number], cs: number, 
         const g = edge * 2.4;
         q('puff').sprite(mx + nx * cs * 0.8, my + ny * cs * 0.8, g, g, 0.5, 0.5, 0, 0x6aa8ff, 0.16 + 0.3 * thr);
       } else if (thr >= 0.03) {
-        const sp = plumeSpec(look, thr, boost, edge, cs, time, seed), rot = Math.atan2(ny, nx), sc = plumeScale(sp.L, sp.w);
+        const sp = plumeSpec(look, thr, boost, edge, cs, time, seed, p.frost ? 1 : 0), rot = Math.atan2(ny, nx), sc = plumeScale(sp.L, sp.w);
         const sw = 256 * sc.x, sh = 128 * sc.y;
         q(sp.pal ? plumeKey(sp.pal.outer, sp.pal.inner, sp.pal.glow, sp.pal.shape) : flame.body).sprite(mx, my, sw, sh, PLUME_ANCHOR.x, PLUME_ANCHOR.y, rot, 0xffffff, thr);
         q('plume:core').sprite(mx, my, sw * sp.coreLen, sh * sp.coreWidth, PLUME_ANCHOR.x, PLUME_ANCHOR.y, rot, 0xffffff, Math.min(1, thr * 1.4));
@@ -137,7 +137,7 @@ export function flames(engines: Engine[], thrust: [number, number], cs: number, 
           list.push({
             x: s.x + tx * off + nx * cs * 0.3, y: s.y + ty * off + ny * cs * 0.3,
             vx: nx * speed + (rnd() - 0.5) * 40, vy: ny * speed + (rnd() - 0.5) * 40,
-            life, max: life, size: (s.edge * 0.11 + 1.2) * (0.7 + rnd() * 0.6), hot: rnd() < 0.35, tint: s.look.moteTint,
+            life, max: life, size: (s.edge * 0.11 + 1.2) * (0.7 + rnd() * 0.6), hot: rnd() < 0.35, tint: p.frost ? FROST_MOTES : s.look.moteTint,
           });
         }
       }

@@ -40,6 +40,8 @@ export interface ViewerParams {
   boost: boolean;
   /** Exhaust particles behind the flames */
   exhaust: boolean;
+  /** Draw the engines as a Frostbite-slowed ship's: short, pale plumes (native render) */
+  frost: boolean;
   bloom: boolean;
   /** Turret aim, degrees clockwise from nose-up in the ship's frame (null: each at rest, along its facing) */
   aim: number | null;
@@ -66,7 +68,7 @@ export interface ViewerParams {
 export const DEFAULTS: Readonly<ViewerParams> = Object.freeze({
   asset: 'ship:sparrow-t', zoom: 'fit', x: 0, y: 0, angle: 0,
   light: 'sun', lightDir: null, lightPower: null, ambient: null, elevation: null, lightColor: null, ambientColor: null,
-  bg: 'starfield', sky: 'sol', damage: 0, seed: 1, flames: 0, boost: false, exhaust: true, bloom: true,
+  bg: 'starfield', sky: 'sol', damage: 0, seed: 1, flames: 0, boost: false, exhaust: true, frost: false, bloom: true,
   aim: null, grid: false, heat: 0, tint: null, facing: 'auto', stub: true, labels: true, cols: null,
   w: null, h: null, scale: 1, ui: true,
 });
@@ -115,7 +117,7 @@ export function parseParams(q: string | URLSearchParams): ViewerParams {
   const sky = get('sky');
   if (sky && /^[a-z0-9_-]{1,64}$/i.test(sky)) p.sky = sky;
   n('damage', 0, 1); n('seed', 0, 1e9); n('flames', 0, 1); n('heat', 0, 1);
-  b('boost'); b('exhaust'); b('bloom'); b('grid'); b('stub'); b('labels'); b('ui');
+  b('boost'); b('exhaust'); b('frost'); b('bloom'); b('grid'); b('stub'); b('labels'); b('ui');
   n('aim', -720, 720, true);
   const tint = get('tint');
   if (tint !== null) p.tint = /^#?[0-9a-f]{6}$/i.test(tint) ? `#${tint.replace('#', '').toLowerCase()}` : /^faction:[a-z_]+$/.test(tint) ? tint : null;

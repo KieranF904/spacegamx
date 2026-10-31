@@ -18,9 +18,9 @@ import { HullWorker } from './hullWorkerClient';
 import { fromWire, type HullJob } from './hullWire';
 import { buildHull, skeletonCovered, type HullBuild } from './hullBuild';
 import { beam } from '../rendering/fxTextures';
-import { EntityType, ShipState, SIDE_NORMAL, Side, facingEdges, isOpen, isWeaponFn, wireCells, cellKey, type Blueprint } from '@space-game/common';
+import { EntityType, ShipState, SIDE_NORMAL, Side, facingEdges, isOpen, isWeaponFn, STATUS_SLOWED, wireCells, cellKey, type Blueprint } from '@space-game/common';
 import type { ShipSource } from './ShipStore';
-import type { GameState } from '../state/GameState';
+import type { GameState, InterpolatedEntity } from '../state/GameState';
 import type { Renderer } from '../rendering/Renderer';
 import { functionColor, mix } from './shipColors';
 import { ThrusterFx, ThrustCommand } from './ThrusterFx';
@@ -227,6 +227,8 @@ let designs = 0;
 const designNo = (bp: Blueprint) => { let n = DESIGN_NO.get(bp); if (n === undefined) DESIGN_NO.set(bp, (n = ++designs)); return n; };
 /** The smallest a cell is on screen (px) for guns to be drawn */
 const GUN_MIN_PX = 3;
+/** Where another pilot's status row keeps its weapon statuses (features.wire.json status "statuses") */
+const STATUS_SLOT = 7;
 const HEADLIGHT = 0xfff0d6;
 /** Power wires: lit, live with nothing to run them, their channel; and the smallest a cell is on screen (px) for them to show */
 const WIRE_LIT = 0x8fe3ff, WIRE_DIM = 0x3c5566, WIRE_DARK = 0x10141c;
@@ -338,6 +340,12 @@ export class ShipRenderer {
     this.wireGlowLayer.blendMode = 'add';
     this.overLayer.addChild(this.wireLayer, this.wireGlowLayer);
     this.lighting.addSource(this.lights);
+  }
+
+  /** Is this ship slowed by a Frostbite's beam: you from your pilot row's ticks, other pilots from their status bits (weaponry.ts STATUS_SLOWED) */
+  private slowed(eid: number, e: InterpolatedEntity): boolean {
+    if (eid === this.state.playerId) return (e.slowUntil ?? 0) > this.state.serverTick;
+    return ((e.status?.[STATUS_SLOT] ?? 0) & STATUS_SLOWED) !== 0;
   }
 
   private wireLayer = new Container();
@@ -563,7 +571,7 @@ export class ShipRenderer {
         }
       }
       this.hulls.setDamage(eid, ship.hp, ship.maxHp, ship.detached, ship.derived.alive);
-      this.engines.draw(view.flames, ship, entity, this.thrustCommand(eid), dt, cs, tint);
+      this.engines.draw(view.flames, ship, entity, this.thrustCommand(eid), dt, cs, tint, this.slowed(eid, entity) ? 1 : 0);
       // Light on the ship (for its guns, which are tinted rather than lit per vertex)
       this.lighting.levelAt(entity.renderX, entity.renderY, this.lvl);
       this.drawTurrets(view, ship, cs, dt * 60);

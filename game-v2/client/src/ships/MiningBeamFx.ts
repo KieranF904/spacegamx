@@ -194,6 +194,7 @@ export class MiningBeamFx {
         g.moveTo(x, y).lineTo(hx, hy).stroke({ color: core, width: wid * 0.45, alpha: 0.95 * gain });
         if (look?.braid) drawStrands(g, x, y, bux, buy, bl, wid, look.braid.strands, look.braid.color, gain, this.t, id + w.part);
         g.circle(x, y, wid * 1.2).fill({ color: mid, alpha: 0.5 * gain });
+        if (look?.frost) this.frostFx(g, x, y, bux, buy, bl, wid, t < 0.999, hx, hy, id + w.part, look.frost, mid);
         if (t < 0.999) {
           g.circle(hx, hy, wid * 2.6).fill({ color: mid, alpha: 0.3 });
           g.circle(hx, hy, wid * 1.1).fill({ color: core, alpha: 0.85 });
@@ -202,6 +203,31 @@ export class MiningBeamFx {
       }
     }
     this.drawPulses(g);
+  }
+
+  /**
+   * A frost beam's extras: motes of ice drifting off the beam as it goes, and white crystals blooming round what it
+   * lights (`lit`), turning slowly. Drawn straight into the beam's Graphics; nothing is kept
+   */
+  private frostFx(g: Graphics, x: number, y: number, ux: number, uy: number, len: number, wid: number, lit: boolean, ex: number, ey: number, seed: number, amount: number, tint: number): void {
+    const n = Math.max(2, Math.round(8 * amount)), t = this.t;
+    for (let k = 0; k < n; k++) {
+      const f = (t * 0.45 + k / n + seed * 0.37) % 1, off = Math.sin(t * 2.3 + k * 1.9 + seed) * wid * (1.1 + 0.9 * f);
+      const px = x + ux * len * f - uy * off, py = y + uy * len * f + ux * off + f * wid * 0.8;
+      g.circle(px, py, wid * (0.16 + 0.1 * Math.sin(k * 2.7 + t * 3))).fill({ color: k % 3 ? 0xffffff : tint, alpha: 0.75 * Math.sin(f * Math.PI) });
+    }
+    if (!lit) return;
+    // Crystals: six spikes round the lit spot, each a thin kite, alternately long and short
+    const spin = t * 0.35 + seed;
+    for (let k = 0; k < 6; k++) {
+      const a = spin + (k * Math.PI) / 3, L = wid * (k % 2 ? 1.7 : 2.6) * (0.85 + 0.15 * Math.sin(t * 5 + k)), w2 = wid * 0.32;
+      const c = Math.cos(a), s2 = Math.sin(a);
+      g.moveTo(ex + c * wid * 0.5, ey + s2 * wid * 0.5)
+        .lineTo(ex + c * L * 0.45 - s2 * w2, ey + s2 * L * 0.45 + c * w2)
+        .lineTo(ex + c * L, ey + s2 * L)
+        .lineTo(ex + c * L * 0.45 + s2 * w2, ey + s2 * L * 0.45 - c * w2)
+        .closePath().fill({ color: 0xf0fbff, alpha: 0.7 }).stroke({ color: tint, width: 1, alpha: 0.6 });
+    }
   }
 
   /**

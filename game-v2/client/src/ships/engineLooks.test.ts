@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ENGINE_LOOKS, engineLookOf, plumeSpec, puffFlicker, sailRing } from './engineLooks';
+import { ENGINE_LOOKS, FROST_PAL, engineLookOf, plumeSpec, puffFlicker, sailRing } from './engineLooks';
 import { SHIELD_LOOKS } from './shieldLooks';
 
 const ids = (family: string): string[] => (family === 'ion' ? ['engine_ion_drive', 'engine_vernier', 'engine_afterburner', 'engine_torch', 'engine_plasma_drive', 'engine_drift_sail', 'engine_fusion_torch', 'engine_burst_strafer'] : ['shield_deflector', 'shield_flicker_screen', 'shield_bulwark_projector', 'shield_flash_screen']);
@@ -42,5 +42,12 @@ describe('engine looks (rework 2026-11 section 5)', () => {
   it('every shield model has a bubble look, and only the Flash Screen blooms', () => {
     for (const id of ids('shield')) expect(SHIELD_LOOKS[id], id).toBeDefined();
     expect(Object.entries(SHIELD_LOOKS).filter(([, l]) => l.reform).map(([k]) => k)).toEqual(['shield_flash_screen']);
+  });
+
+  it('a slowed ship (a Frostbite beam) has short, pale, icy plumes', () => {
+    const look = engineLookOf('engine_ion_drive'), warm = plumeSpec(look, 1, 0, 20, 20, 1, 0), cold = plumeSpec(look, 1, 0, 20, 20, 1, 0, 1);
+    expect(cold.L).toBeLessThan(warm.L * 0.6);
+    expect(cold.pal).toBe(FROST_PAL);
+    expect(plumeSpec(look, 1, 0, 20, 20, 1, 0, 0).L).toBe(warm.L);
   });
 });

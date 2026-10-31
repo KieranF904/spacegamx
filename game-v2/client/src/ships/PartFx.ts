@@ -11,6 +11,7 @@
  *   Capacitor         amber straps to the parts it feeds; an arc to them while it's discharging
  *   Drive Cell        the same in blue
  *   Pulse Dynamo      a violet ring spinning, with small arcs to the bank it charges
+ *   Rustjaw's Hive    a honeycomb of seven cells, one lit per clip round held; the next to regrow breathes
  *
  * Charge is only known for your own ship (the pilot row: state.charge); other ships show their parts full. The banks'
  * glow by charge on the parts themselves is ShipRenderer.drawBankGlow.
@@ -20,10 +21,10 @@ import { Graphics, type Container } from 'pixi.js';
 import type { Charge, PlacedGeom, ShipState } from '@space-game/common';
 import './utilityLooks';
 
-type Kind = 'coil' | 'heavycoil' | 'cell' | 'pile' | 'fusion' | 'overclock' | 'battery' | 'bank' | 'cap' | 'drive' | 'dynamo';
+type Kind = 'coil' | 'heavycoil' | 'cell' | 'pile' | 'fusion' | 'overclock' | 'battery' | 'bank' | 'cap' | 'drive' | 'dynamo' | 'hive';
 const KINDS: Record<string, Kind> = {
   utility_jump_coil: 'coil', utility_heavy_coil: 'heavycoil', power_cell_reactor: 'cell', power_isotope_pile: 'pile', power_fusion_plant: 'fusion', power_overclock_reactor: 'overclock',
-  power_battery: 'battery', power_heavy_bank: 'bank', power_capacitor: 'cap', power_drive_cell: 'drive', power_pulse_dynamo: 'dynamo',
+  power_battery: 'battery', power_heavy_bank: 'bank', power_capacitor: 'cap', power_drive_cell: 'drive', power_pulse_dynamo: 'dynamo', legendary_hive: 'hive',
 };
 
 interface Item { i: number; kind: Kind; x: number; y: number; r: number; seed: number; w: number; h: number }
@@ -132,6 +133,20 @@ export class PartFx {
           g.circle(x, y, r * 0.5).fill({ color: VIOLET, alpha: 0.3 });
           break;
         }
+        case 'hive': {
+          // Seven hex cells (one in the middle, six round it); each lit cell is a round held. A ship whose rounds we do
+          // not know (another pilot's) shows them full
+          const w = d.weapons.find((x) => x.part === it.i), clip = Math.max(1, w?.fire.clip ?? 8), held = w ? ship.rounds[it.i] ?? clip : clip;
+          const lit = Math.max(0, Math.min(1, held / clip)) * 7, cr = r * 0.62, step = cr * 1.78;
+          for (let k = 0; k < 7; k++) {
+            const cx = k ? x + Math.cos((k - 1) * 1.0472 + 0.5236) * step : x, cy = k ? y + Math.sin((k - 1) * 1.0472 + 0.5236) * step : y;
+            const on = lit >= k + 1, next = !on && lit > k;
+            const a = on ? 0.55 + 0.12 * Math.sin(t * 2 + k) : next ? 0.12 + 0.4 * (lit % 1) + 0.15 * Math.sin(t * 6) : 0.05;
+            g.poly(hexPoints(cx, cy, cr * 0.82)).fill({ color: on ? 0xffb42a : 0xff9a3c, alpha: a });
+            if (on) g.circle(cx, cy, cr * 0.28).fill({ color: 0xfff1c8, alpha: 0.6 });
+          }
+          break;
+        }
         default: break;
       }
     }
@@ -168,6 +183,13 @@ export class PartFx {
       }
     }
   }
+}
+
+const HEX = new Array<number>(12).fill(0);
+/** A hexagon's corners (a reused array: pass it straight on) */
+function hexPoints(x: number, y: number, r: number): number[] {
+  for (let i = 0; i < 6; i++) { HEX[i * 2] = x + Math.cos(i * 1.0472) * r; HEX[i * 2 + 1] = y + Math.sin(i * 1.0472) * r; }
+  return HEX;
 }
 
 /** A consumer's centroid in the ship's frame */

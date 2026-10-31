@@ -6,6 +6,7 @@
  */
 
 import { WeaponType } from '@space-game/common';
+import { LEGENDARY_STYLES, LEGENDARY_BEAMS } from './legendaryStyles';
 
 export interface WeaponStyle {
   /** How the head is placed: from spawn point + velocity (straight shots), or from the server's interpolated position (guided or slowing shots) */
@@ -55,6 +56,8 @@ export interface WeaponStyle {
   arcScale?: number;
   /** Impact sparks spread over this many degrees of hue round their colour (a prism's rainbow) */
   shardHue?: number;
+  /** A faint ring at this radius round the head (a gravity well's pull) and motes streaming in to it, seen by everyone */
+  pull?: { radius: number; color: number };
 }
 
 /**
@@ -79,6 +82,8 @@ export interface BeamLook {
   ramp?: 'orb' | 'ring' | 'none';
   /** The beam breaks up and flickers when starved of power: Ã— the usual (0: steady) */
   sputter?: number;
+  /** Frost motes drifting off the beam and white crystals on what it lights: × the amount (0 or absent: none) */
+  frost?: number;
 }
 
 /** Beam looks by model id (PlacedPart.fn); filled in by the per-model units */
@@ -88,6 +93,10 @@ export const BEAM_LOOKS: Record<string, BeamLook> = {};
 export function beamLook(modelId: string | undefined): BeamLook | undefined {
   return modelId ? BEAM_LOOKS[modelId] : undefined;
 }
+
+// The legendaries' looks (their own file, so the other visuals units' tables stay apart)
+Object.assign(MODEL_STYLES, LEGENDARY_STYLES);
+Object.assign(BEAM_LOOKS, LEGENDARY_BEAMS);
 
 /** Damage that reads as the base shot's size (a cannon's) */
 const REF_DAMAGE = 14;
@@ -239,7 +248,7 @@ export const WEAPON_STYLES: Record<number, WeaponStyle> = {
   [WeaponType.PrismShard]: {
     ...KINETIC, tracerTicks: 2.4, coreWidth: 1.6, glowWidth: 6, coreColor: 0xffffff, glowColor: 0x67e8f9, glowAlpha: 0.5, ownerTint: 0,
     headRadius: 2, haloRadius: 7, muzzle: { life: 1, size: 1, sparks: 0, color: 0xffffff, smoke: 0 },
-    impact: { sparks: 6, speed: 3, life: 10, color: 0xf0abfc, flash: 12 },
+    impact: { sparks: 6, speed: 3, life: 10, color: 0xf0abfc, flash: 12 }, shardHue: 360,
   },
   // Phase Cannon: a shimmering violet slug
   [WeaponType.Phase]: {
@@ -252,6 +261,8 @@ export const WEAPON_STYLES: Record<number, WeaponStyle> = {
     ...KINETIC, motion: 'tracked', tracerTicks: 1, coreWidth: 0, glowWidth: 26, coreColor: 0x1a0b2e, glowColor: 0x9b5de5, glowAlpha: 0.35, ownerTint: 0,
     headRadius: 12, haloRadius: 46, muzzle: { life: 12, size: 40, sparks: 10, color: 0xc084fc, smoke: 0 },
     impact: { sparks: 20, speed: 5, life: 20, color: 0xd8b4fe, flash: 40 }, orb: true,
+    // (the pull radius is the model's: data/ships/tuning.json singularity.pull.radius, pinned by weaponStyles.test.ts)
+    pull: { radius: 900, color: 0xb98cf0 },
   },
   // Autocannon: short, quick tracers
   [WeaponType.Autocannon]: {
