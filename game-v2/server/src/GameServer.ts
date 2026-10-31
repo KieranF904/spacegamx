@@ -121,7 +121,7 @@ import { GameData } from './data/GameData.js';
 import type { UserStore } from './auth/types.js';
 import type { ClientSocket, ClientLink } from '@space-game/common';
 import type { ShipBridge, ShipHost } from './ships/ShipBridge.js';
-import { Blueprint, ShipState, parseBlueprint, quantizeShipValue, skillValue, hasAll, removeAll, Economy, Bag, StarterKit, jumpTuning, jumpPhase, partItemId, rateShip, ratingOf, createShipState, gradeReward, gradeOf, accrueTraces, releaseTraces, unlocks, isStructural, stationPerks, hazardFlight, stationTable, blueprintGrade, lookFn, fixModelMaterials, warmthPercent, packCharge, nearerThan, fartherThan, stationReachMax, type ShipDerived } from '@space-game/common';
+import { Blueprint, ShipState, quantizeShipValue, skillValue, hasAll, removeAll, Economy, Bag, StarterKit, jumpTuning, jumpPhase, partItemId, rateShip, ratingOf, createShipState, gradeReward, gradeOf, accrueTraces, releaseTraces, unlocks, isStructural, stationPerks, hazardFlight, stationTable, blueprintGrade, lookFn, warmthPercent, packCharge, nearerThan, fartherThan, type ShipDerived } from '@space-game/common';
 
 /** A station site by id */
 const stationPerksSite = (id: string | undefined) => (id ? stationTable()?.sites.find((s) => s.id === id) : undefined);
@@ -162,7 +162,7 @@ import { SimLod, type Plan, type Intent, type FarPose } from './ships/SimLod.js'
 import { SystemMemory, shipMemory, restoreHp, type WorldStore, type MemoryHost, type ShipMemory } from './game/SystemMemory.js';
 import { Achievements } from './game/Achievements.js';
 import { huntedBoss, RibbonsFile, mineFalloff, rayTerrain, type Terrain } from '@space-game/common';
-import { repRank, replicaAngle, quantizeReplicaAngle, ReplicaMode, INPUT_BOOLS, INPUT_HELD } from '@space-game/common';
+import { replicaAngle, quantizeReplicaAngle, ReplicaMode, INPUT_BOOLS, INPUT_HELD } from '@space-game/common';
 import { MemoryProfileStore, type ProfileStore } from './profile/ProfileStore.js';
 import { MessageLimiter } from './net/MessageLimits.js';
 import { checkTickOrder, type TickSystem } from './tickOrder.js';
@@ -170,6 +170,8 @@ import type { ClientConnection } from './net/ClientConnection.js';
 import type { ServerCtx } from './net/ServerCtx.js';
 import { registerModuleHandlers } from './net/handlers/modules.js';
 import { registerAuthHandlers, rejectAuth, handleHttpAuth } from './net/auth.js';
+import { registerShipEditHandlers } from './net/handlers/shipEdit.js';
+import { Docking, stationQuery } from './game/Docking.js';
 import { HandlerRegistry, dispatch, registerHandlers, MAX_INPUTS_PER_TICK, type HandlerTable } from './net/dispatch.js';
 
 // ============================================
@@ -422,7 +424,6 @@ const MAX_SCHEDULED_INPUTS = 32;
 /** A client's game loop silent this long (3 s) lets go of its controls */
 const INPUT_TIMEOUT_TICKS = 180;
 const droppedItemQuery = defineQuery([DroppedItem, Position, Velocity, Lifetime]);
-const stationQuery = defineQuery([Station, Position]);
 const portalQuery = defineQuery([Portal, Position]);
 const lifetimeQuery = defineQuery([Lifetime]);
 const deadQuery = defineQuery([Dead]);
@@ -585,7 +586,7 @@ const scheduleImmediate: (fn: () => void) => unknown =
   typeof setImmediate === 'function' ? setImmediate : (fn) => setTimeout(fn, 0);
 
 export class GameServer implements ServerCtx {
-  private world: IWorld;
+  readonly world: IWorld;
   gameData: GameData;
   clients: Map<ClientSocket, ClientConnection> = new Map();
   scene: 'sectors' | 'empty';
@@ -597,7 +598,11 @@ export class GameServer implements ServerCtx {
   /** Tick until which each player ignores rifts (no instant bounce-back) */
   private riftCooldown = new Map<number, number>();
   ships: ShipBridge;
-  private shipEditAnywhere: boolean;
+  readonly shipEditAnywhere: boolean;
+  /** Berths and who is inside a station (game/Docking.ts) */
+  docking!: Docking;
+  /** Ships inside a station: the same Set as docking.dockedShips (read on the hot path) */
+  private dockedShips!: Set<number>;
 
   private devTeleport: boolean;
   private clientIdCounter = 1;
@@ -697,7 +702,7 @@ export class GameServer implements ServerCtx {
   private wards = new Map<number, string>();
   /** People's ships, parked where they live (people.json craft): untouchable, by name */
   private personCraft = new Map<number, string>();
-  private clock: () => number;
+  readonly clock: () => number;
   /** Disconnected mid-fight: the ship stays in space until this tick */
   private lingering = new Map<number, { conn: ClientConnection; until: number }>();
 
@@ -861,6 +866,19 @@ export class GameServer implements ServerCtx {
     });
     this.clock = opts.clock ?? (() => Date.now());
     this.quests = new Quests(this.createQuestHost(), this.pilots, this.gameData.questsFile);
+    this.docking = new Docking({
+      world: this.world,
+      gameData: this.gameData,
+      clients: this.clients,
+      shipEditAnywhere: this.shipEditAnywhere,
+      pilots: this.pilots,
+      ammo: this.ammo,
+      quests: this.quests,
+      send: (ws, msg) => this.send(ws, msg),
+      clock: this.clock,
+      releaseControls: (eid) => this.releaseControls(eid),
+    });
+    this.dockedShips = this.docking.dockedShips;
     this.bosses = new Bosses(this.createBossHost(), this.enemies, this.ships, this.gameData.bossesFile as BossesFile, this.ships.enemyDesigns);
     this.mobs = new Mobs(this.createMobHost(), this.gameData.mobsFile as MobsFile);
     this.bosses.mobs = this.mobs;
@@ -1235,7 +1253,7 @@ this.devTeleport = opts.devTeleport ?? false;
   }
 
   /** The connection flying this entity (not one that's lingering after quitting) */
-  private liveConn(eid: number): ClientConnection | undefined {
+  liveConn(eid: number): ClientConnection | undefined {
     for (const c of this.clients.values()) if (c.playerId === eid) return c;
     return undefined;
   }
@@ -1348,68 +1366,12 @@ this.devTeleport = opts.devTeleport ?? false;
     };
   }
 
-  /** Another pilot's info card */
-  private handlePilotInfo(conn: ClientConnection, eid: number): void {
-    const other = this.liveConn(eid);
-    const p = other && this.pilots.get(other);
-    if (!other || !p) return;
-    const ship = this.ships.get(eid);
-    let best = { v: -1, name: '', rank: '' };
-    // (A tie goes to the faction whose id sorts first, so it doesn't hang on how the save stored the keys)
-    for (const [f, v] of Object.entries(p.reputation).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
-      if (v > best.v) best = { v, name: this.quests.file.reputations[f]?.name ?? f, rank: repRank(v).name };
-    }
-    const size = this.party.size(other);
-    this.send(conn.ws, {
-      type: 'pilotInfo', id: eid, name: other.username, level: p.level, guest: other.userId === null,
-      ship: ship?.blueprint.name ?? 'No ship', parts: ship ? ship.derived.alive.filter(Boolean).length : 0,
-      hull: Math.round(this.ships.integrity(eid) * 100),
-      title: best.v >= 5 ? `${best.rank} · ${best.name}` : 'Independent pilot',
-      party: size > 1 ? { leader: this.party.leaderName(other) ?? '', size, mine: this.party.same(conn, other) } : undefined,
-      kills: p.stats.kills ?? 0,
-      ribbons: this.achievements.summary(other).count,
-      topRibbon: this.achievements.summary(other).top,
-    });
-  }
-
-  private lastShare = new WeakMap<ClientConnection, number>();
-
   /**
    * A design a client sent, parsed (throws if it isn't one). Sizes are checked
    * before any work's done on it: parts have unique uids 0..255, so a real design
    * never has more than 256; and the strings in it are kept to a sensible length
    * (they're saved and sent to everyone near).
    */
-  private clientBlueprint(raw: unknown): Blueprint {
-    const r = raw as { parts?: unknown } | null;
-    if (!r || typeof r !== 'object' || !Array.isArray(r.parts) || r.parts.length > 256) throw new Error('not a blueprint');
-    const bp = fixModelMaterials(this.ships.catalog, parseBlueprint(JSON.stringify(raw)));
-    bp.name = bp.name.slice(0, 64);
-    for (const p of bp.parts) {
-      if (p.facing !== undefined && (typeof p.facing !== 'string' || p.facing.length > 16)) delete p.facing;
-      if (p.gems) p.gems = p.gems.map((g) => g.slice(0, 40));
-    }
-    return bp;
-  }
-
-  /** Send a ship design to your party (they can load it into their hangar) */
-  private handleShareDesign(conn: ClientConnection, raw: unknown): void {
-    const now = this.clock();
-    if (now - (this.lastShare.get(conn) ?? 0) < 3000) return;
-    this.lastShare.set(conn, now);
-    let bp: Blueprint;
-    try {
-      bp = this.clientBlueprint(raw);
-    } catch {
-      return this.pilots.toast(conn, "That isn't a ship design", 'warn');
-    }
-    if (!this.ships.validate(bp).ok) return this.pilots.toast(conn, 'Fix the design first: it has problems', 'warn');
-    const others = this.party.members(conn).filter((m) => m !== conn) as ClientConnection[];
-    if (!others.length) return this.pilots.toast(conn, 'Share designs with your party: invite someone first (P)', 'warn');
-    for (const m of others) this.send(m.ws, { type: 'sharedDesign', from: conn.username, blueprint: bp });
-    this.pilots.toast(conn, `Sent the ${bp.name} to your party`, 'good');
-  }
-
   private createEventHost() {
     const alivePlayers = (num: number) => {
       const out: number[] = [];
@@ -2839,6 +2801,7 @@ this.devTeleport = opts.devTeleport ?? false;
     const t = new HandlerRegistry();
     registerHandlers(t, registerModuleHandlers);
     registerHandlers(t, registerAuthHandlers);
+    registerHandlers(t, registerShipEditHandlers);
     t.on('input', (_ctx, conn, msg) => {
       // Queue for next tick boundary — don't apply mid-frame.
       // Messages still arrive instantly via setImmediate event loop.
@@ -2868,12 +2831,6 @@ this.devTeleport = opts.devTeleport ?? false;
     t.on('target', (_ctx, conn, msg) => {
       this.ships.setTarget(conn.playerId, Number(msg.id) || 0);
     });
-    t.on('pilotInfo', (_ctx, conn, msg) => {
-      this.handlePilotInfo(conn, Number(msg.id));
-    });
-    t.on('shareDesign', (_ctx, conn, msg) => {
-      this.handleShareDesign(conn, msg.blueprint);
-    });
     t.on('devStation', (_ctx, conn, msg) => {
       // Dev (or an admin): a station at Sol's site with every track at a tier, and in you go
       if (!this.devTeleport && !conn.isAdmin) return;
@@ -2888,30 +2845,6 @@ this.devTeleport = opts.devTeleport ?? false;
     });
     t.on('stateHash', (_ctx, conn, msg) => {
       this.handleStateHash(conn, msg as any);
-    });
-    t.on('shipEdit', (_ctx, conn, msg) => {
-      this.handleShipEdit(conn, msg.blueprint);
-    });
-    t.on('slotSave', (_ctx, conn, msg) => {
-      this.handleSlotSave(conn, msg);
-    });
-    t.on('slotFly', (_ctx, conn, msg) => {
-      const was = this.pilots.get(conn)?.ship;
-      this.hangar.fly(conn, Math.floor(Number(msg.slot)));
-      // Another ship: its own loadout aboard
-      if (this.pilots.get(conn)?.ship !== was) { this.ammo.restock(conn, { report: true, quiet: true }); this.pilots.sendProfile(conn); }
-    });
-    t.on('slotClear', (_ctx, conn, msg) => {
-      this.hangar.scrap(conn, Math.floor(Number(msg.slot)));
-    });
-    t.on('designSave', (_ctx, conn, msg) => {
-      let bp: Blueprint;
-      try { bp = this.clientBlueprint(msg.blueprint); } catch { return; }
-      if (!this.ships.validate(bp).ok) { this.pilots.toast(conn, 'Fix the design first: it has problems', 'warn'); return; }
-      this.hangar.saveDesign(conn, Math.floor(Number(msg.slot)), bp);
-    });
-    t.on('dock', (_ctx, conn, msg) => {
-      this.handleDock(conn);
     });
     t.on('devTeleport', (_ctx, conn, msg) => {
       this.handleDevTeleport(conn, msg);
@@ -2953,9 +2886,6 @@ this.devTeleport = opts.devTeleport ?? false;
       }
       this.pilots.toast(conn, `Boss worn to ${Math.round(this.ships.integrity(boss) * 100)}%`, 'info');
     });
-    t.on('undock', (_ctx, conn, msg) => {
-      this.undock(conn);
-    });
     t.on('tow', (_ctx, conn, msg) => {
       // Tow Beam (game/Towing.ts): take hold of what's nearest the cursor, or let go
       const p = conn.playerId;
@@ -2981,6 +2911,16 @@ this.devTeleport = opts.devTeleport ?? false;
     dispatch(this.handlers, this, conn, msg);
   }
 
+  /** The station this player is close enough to dock at, or -1 (game/Docking.ts) */
+  private stationInRange(eid: number): number {
+    return this.docking.stationInRange(eid);
+  }
+
+  /** Is this player close enough to a station to use its shipyard? */
+  isDocked(eid: number): boolean {
+    return this.docking.isDocked(eid);
+  }
+
   /** A wrong password, a refused registration, a replaced or deleted session: say why, then hang up (net/auth.ts) */
   private rejectAuth(conn: ClientConnection, error: string | undefined): void {
     rejectAuth(this, conn, error);
@@ -2989,23 +2929,6 @@ this.devTeleport = opts.devTeleport ?? false;
   /** HTTP auth requests (register, login, validate), called by SocketTransport (net/auth.ts) */
   handleHttpAuth(req: IncomingMessage, res: ServerResponse, action: 'register' | 'login' | 'validate', address?: string): Promise<void> {
     return handleHttpAuth(this, req, res, action, address);
-  }
-
-  /** The station this player is close enough to dock at, or -1. */
-  private stationInRange(eid: number): number {
-    for (const st of stationQuery(this.world)) {
-      if (InSystem.systemId[st] !== InSystem.systemId[eid]) continue;
-      const dx = Position.x[st] - Position.x[eid], dy = Position.y[st] - Position.y[eid];
-      // (Further than any station of its size reaches: no need to look up its design. Enemies ask this of every pilot they might go for)
-      if (fartherThan(dx, dy, stationReachMax(Radius.value[st]))) continue;
-      if (Math.hypot(dx, dy) < stationInteractRadius(Radius.value[st], this.gameData.getStationByNum(Station.stationId[st])?.design)) return st;
-    }
-    return -1;
-  }
-
-  /** Is this player close enough to a station to use its shipyard? */
-  isDocked(eid: number): boolean {
-    return this.stationInRange(eid) >= 0;
   }
 
   /**
@@ -3047,65 +2970,6 @@ this.devTeleport = opts.devTeleport ?? false;
     this.enemies.spawnPack(num, { faction: g.faction, ships: g.ships }, msg.x, msg.y);
   }
 
-  /** Berth at the nearest station (hangar opening): the ship then rides along with it. */
-  private handleDock(conn: ClientConnection): void {
-    const eid = conn.playerId;
-    const reply = (ok: boolean, station?: string, error?: string) => this.send(conn.ws, { type: 'dockResult', ok, station, error });
-    if (!hasComponent(this.world, Player, eid) || hasComponent(this.world, Dead, eid)) return reply(false, undefined, 'no ship');
-    if (this.shipEditAnywhere) return reply(true, 'Hangar');
-    const st = this.stationInRange(eid);
-    if (st < 0) return reply(false, undefined, 'too far from a station');
-    // Inside: at the station's centre, out of reach; back out where it came in
-    conn.docked = { station: st, ox: 0, oy: 0, exit: { x: Position.x[eid] - Position.x[st], y: Position.y[eid] - Position.y[st] } };
-    this.dockedShips.add(eid);
-    this.releaseControls(eid);
-    const sd = this.gameData.getStationByNum(Station.stationId[st]);
-    if (sd?.dockingFee) this.pilots.payDockFee(conn, sd.id, sd.dockingFee);
-    // (Quiet when there was nothing to load: every dock shouldn't say so)
-    this.ammo.restock(conn, { report: true, quiet: true });
-    if (sd) this.pilots.bumpStat(conn, `dock:${sd.id}`);
-    if (sd) this.quests.rumourAt(conn, sd.id, sd.system, Math.floor(this.clock() / 86_400_000));
-    reply(true, sd?.name ?? 'Station');
-  }
-
-  /** Leave the berth: back out where the ship came in, at rest */
-  private undock(conn: ClientConnection): void {
-    const d = conn.docked;
-    // Launching: the loadout tops up one last time (still in the berth), and says what's short
-    if (d) this.ammo.restock(conn, { report: true, quiet: true });
-    conn.docked = null;
-    this.dockedShips.delete(conn.playerId);
-    const eid = conn.playerId;
-    if (!d?.exit || !entityExists(this.world, d.station) || !hasComponent(this.world, Player, eid)) return;
-    Position.x[eid] = Position.x[d.station] + d.exit.x;
-    Position.y[eid] = Position.y[d.station] + d.exit.y;
-    Velocity.x[eid] = 0;
-    Velocity.y[eid] = 0;
-  }
-
-  /** Docked ships (inside a station): invulnerable, untouchable, unseen by hostiles */
-  private dockedShips = new Set<number>();
-
-  /** Berthed ships ride along inside their station, holding still. */
-  private dockingSystem(): void {
-    this.dockedShips.clear();
-    for (const conn of this.clients.values()) {
-      const d = conn.docked;
-      if (!d) continue;
-      const eid = conn.playerId;
-      if (!hasComponent(this.world, Player, eid) || hasComponent(this.world, Dead, eid) || !entityExists(this.world, d.station)) {
-        conn.docked = null;
-        continue;
-      }
-      this.dockedShips.add(eid);
-      const x = Position.x[d.station] + d.ox, y = Position.y[d.station] + d.oy;
-      Velocity.x[eid] = x - Position.x[eid];
-      Velocity.y[eid] = y - Position.y[eid];
-      Position.x[eid] = x;
-      Position.y[eid] = y;
-    }
-  }
-
   /**
    * Refits that take no parts and need no licence: proto mode (everyone's an
    * admin, editing anywhere), or an admin who switched on free build where the
@@ -3113,48 +2977,6 @@ this.devTeleport = opts.devTeleport ?? false;
    */
   freeBuild(conn: ClientConnection): boolean {
     return (this.everyoneAdmin && this.shipEditAnywhere) || (this.freeBuildAllowed && this.admin.freeBuild(conn));
-  }
-
-  /** Hangar: validate the new blueprint and respawn the player's ship in place. */
-  private handleShipEdit(conn: ClientConnection, raw: unknown): void {
-    const reply = (ok: boolean, errors: string[]) => this.send(conn.ws, { type: 'shipEditResult', ok, errors });
-    const eid = conn.playerId;
-    if (!hasComponent(this.world, Player, eid) || hasComponent(this.world, Dead, eid)) return reply(false, ['no ship to refit']);
-    // Berthed (hangar opened in range) counts even if the station has moved since; otherwise be in range now
-    if (!this.shipEditAnywhere && !conn.docked && !this.isDocked(eid)) return reply(false, ['dock at a station to refit your ship']);
-    let bp: Blueprint;
-    try {
-      bp = this.clientBlueprint(raw);
-    } catch {
-      return reply(false, ['not a blueprint']);
-    }
-    const result = this.ships.validate(bp);
-    if (!result.ok) return reply(false, result.errors.map((e) => e.message));
-    // Parts the pilot has are built in; the rest become ghosts (proto mode hands out everything)
-    const profile = this.pilots.get(conn);
-    const errors = this.hangar.save(conn, profile?.activeSlot ?? 0, bp, { grantAll: this.freeBuild(conn) });
-    if (errors.length) return reply(false, errors);
-    conn.blueprint = bp;
-    reply(true, []);
-  }
-
-  /** Save a design to a hangar slot */
-  private handleSlotSave(conn: ClientConnection, msg: { slot: number; blueprint: unknown; plan?: string }): void {
-    const reply = (ok: boolean, errors: string[]) => this.send(conn.ws, { type: 'shipEditResult', ok, errors });
-    const eid = conn.playerId;
-    if (!hasComponent(this.world, Player, eid) || hasComponent(this.world, Dead, eid)) return reply(false, ['no ship']);
-    if (!this.shipEditAnywhere && !conn.docked && !this.isDocked(eid)) return reply(false, ['dock at a station to use the hangar']);
-    let bp: Blueprint;
-    try {
-      bp = this.clientBlueprint(msg.blueprint);
-    } catch {
-      return reply(false, ['not a blueprint']);
-    }
-    const result = this.ships.validate(bp);
-    if (!result.ok) return reply(false, result.errors.map((e) => e.message));
-    const plan = typeof msg.plan === 'string' && this.ships.library.has(msg.plan) && this.pilots.knowsPlan(conn, msg.plan) ? msg.plan : undefined;
-    const errors = this.hangar.save(conn, Math.floor(Number(msg.slot)), bp, { plan, grantAll: this.freeBuild(conn) });
-    reply(errors.length === 0, errors);
   }
 
   /** The client's prediction of its ship at a tick, checked against what the ship really did then */
@@ -3610,7 +3432,7 @@ this.devTeleport = opts.devTeleport ?? false;
       { name: 'playerMovementSystem', phase: 'pilots-move', run: () => this.playerMovementSystem() },
       // (Tow Beams pull what they tow, after the pilots fly and before wrecks and pods move: game/Towing.ts)
       { name: 'towing', phase: 'pilots-move', run: () => this.towing.tick() },
-      { name: 'dockingSystem', phase: 'pilots-move', run: () => this.dockingSystem() },
+      { name: 'dockingSystem', phase: 'pilots-move', run: () => this.docking.dockingSystem() },
       { name: 'riftSystem', phase: 'pilots-move', run: () => this.riftSystem() },
       // ---- combat ----
       // (Boost fuel is the ship's battery now: it charges in the flight step, energy.ts)
