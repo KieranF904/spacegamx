@@ -1,0 +1,43 @@
+== partTip (tooltip) ==
+Mining Laser
+Mk I · Square · 1 cell
+Hull · mass53 hp · 1.0
+Armour · build1 · 1 pts
+Power draw12/s
+
+== partStats (stats rows) ==
+GradeMk I
+Power draw12
+Hull · mass53 hp · 1.0
+Armour · build1 · 1 pts
+Rating scoretoughness 53
+
+== familyLabel ==
+Mining lasers
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+cuts ore, a poor weapon
+
+== keyStats ==
+draws 12
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 0","why":"Learned at level 0 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 0","why":""}
+
+== partStats (raw) ==
+{"grade":1,"mark":"Mk I","size":"","area":1,"hp":52.5,"mass":1,"firepower":0,"toughness":52.5,"armour":1,"draw":12}

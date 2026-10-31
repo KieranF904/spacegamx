@@ -1,0 +1,164 @@
+{
+  "heavy-cargo": {
+    "ticks": 360,
+    "trace": "faa8ae24b1fe9f35",
+    "charge": "fc910b3414b809a0",
+    "final": {
+      "x": 720.82,
+      "y": -1440.58,
+      "vx": 0.271,
+      "vy": 0.2162,
+      "angle": -2.90036,
+      "angVel": 0.000003,
+      "jump": 0,
+      "jumpScale": 1,
+      "cargo": 6,
+      "dodge": 0,
+      "dodgeDir": 0
+    }
+  },
+  "jump-burn": {
+    "ticks": 220,
+    "trace": "51e2728d0354adf8",
+    "charge": "cde88f61bc36848b",
+    "final": {
+      "x": 5481.5,
+      "y": -17947.07,
+      "vx": 6.449,
+      "vy": -25.2048,
+      "angle": -1.27107,
+      "angVel": 0.000001,
+      "jump": 200,
+      "jumpScale": 0.622,
+      "cargo": 0,
+      "dodge": 0,
+      "dodgeDir": 0
+    }
+  },
+  "plain-thrust-turn": {
+    "ticks": 360,
+    "trace": "e44b2b7b87b962b7",
+    "charge": "fc910b3414b809a0",
+    "final": {
+      "x": 1025.38,
+      "y": -2079.4,
+      "vx": 0.3662,
+      "vy": 0.3009,
+      "angle": -2.90036,
+      "angVel": 0.000003,
+      "jump": 0,
+      "jumpScale": 1,
+      "cargo": 0,
+      "dodge": 0,
+      "dodgeDir": 0
+    }
+  },
+  "strafer-energy-short": {
+    "ticks": 816,
+    "trace": "5267090329fa594c",
+    "charge": "0f3030ab619871d8",
+    "final": {
+      "x": -5731.04,
+      "y": -1602.65,
+      "vx": -5.2758,
+      "vy": -1.2045,
+      "angle": -1.57076,
+      "angVel": -0.00008,
+      "jump": 0,
+      "jumpScale": 1,
+      "cargo": 0,
+      "dodge": 0,
+      "dodgeDir": 17
+    }
+  },
+  "strafer-every-way": {
+    "ticks": 409,
+    "trace": "8c65b77702ab6fa8",
+    "charge": "ae3f534ff3322436",
+    "final": {
+      "x": 557.55,
+      "y": 44.5,
+      "vx": -0.77,
+      "vy": -3.6432,
+      "angle": 1.09999,
+      "angVel": 0.000002,
+      "jump": 0,
+      "jumpScale": 1,
+      "cargo": 0,
+      "dodge": 0,
+      "dodgeDir": 5
+    }
+  },
+  "strafer-heavy": {
+    "ticks": 160,
+    "trace": "5301c6dacc232708",
+    "charge": "78f8bab70b6bad4f",
+    "final": {
+      "x": -80.64,
+      "y": -625.7,
+      "vx": 0.2504,
+      "vy": -0.7093,
+      "angle": 0.34098,
+      "angVel": 0.009975,
+      "jump": 0,
+      "jumpScale": 1,
+      "cargo": 4,
+      "dodge": 0,
+      "dodgeDir": 27
+    }
+  },
+  "strafer-replay": {
+    "ticks": 160,
+    "trace": "d379a7da71ae84e8",
+    "charge": "78f8bab70b6bad4f",
+    "final": {
+      "x": -100.15,
+      "y": -778.23,
+      "vx": 0.3123,
+      "vy": -0.8816,
+      "angle": 0.34098,
+      "angVel": 0.009975,
+      "jump": 0,
+      "jumpScale": 1,
+      "cargo": 0,
+      "dodge": 0,
+      "dodgeDir": 27
+    }
+  },
+  "surge-kick": {
+    "ticks": 230,
+    "trace": "e59d417235f8de8b",
+    "charge": "dbe5871ece777d38",
+    "final": {
+      "x": 2535.32,
+      "y": -5092.41,
+      "vx": 18.8503,
+      "vy": -5.9743,
+      "angle": 0.39964,
+      "angVel": 0.000002,
+      "jump": 0,
+      "jumpScale": 1,
+      "cargo": 0,
+      "dodge": 0,
+      "dodgeDir": 0
+    }
+  },
+  "tow": {
+    "ticks": 239,
+    "trace": "1c7b5611fe153c6c",
+    "charge": "d49ad8c7d736d933",
+    "final": {
+      "x": 594.01,
+      "y": -203.49,
+      "vx": 0.7236,
+      "vy": -1.8814,
+      "angle": -0.39964,
+      "angVel": -0.000002,
+      "jump": 0,
+      "jumpScale": 1,
+      "cargo": 36.94,
+      "dodge": 0,
+      "dodgeDir": 11
+    }
+  }
+}

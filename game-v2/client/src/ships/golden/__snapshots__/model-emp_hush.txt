@@ -1,0 +1,53 @@
+== partTip (tooltip) ==
+Hush
+Mk II · Small · Square · 1 cell
+Hull · mass66 hp · 1.4
+Armour · build2 · 1.6 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Damage1/s · reach 3,300
+Hits withEnergy · penetration 2
+Fire rate0.4/s · shells
+MountTurret, 360°
+FittingBolts on any side
+Power draw14/s
+On Surgecharged shot: after a 0.5 s pause, a shot hits ×1.5, a packet from the bank
+
+== partStats (stats rows) ==
+GradeMk II · Small
+Hits withEnergy · penetration 2
+Power draw14
+Hull · mass66 hp · 1.4
+Armour · build2 · 1.6 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 66
+
+== familyLabel ==
+EMP
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+shuts a ship down a moment
+
+== keyStats ==
+1 dmg/s · reach 3,300 · draws 14
+
+== mountBadge ==
+TURRET 360°
+
+== mountingText ==
+Turret, 360°
+Bolts on any side
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 15","why":"Learned at level 15 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 15","why":""}
+
+== partStats (raw) ==
+{"grade":2,"mark":"Mk II","size":"Small","area":1,"hp":65.8,"mass":1.4,"firepower":1.125,"toughness":65.8,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":1.125,"range":3300,"damageType":"energy","pen":2,"draw":14}

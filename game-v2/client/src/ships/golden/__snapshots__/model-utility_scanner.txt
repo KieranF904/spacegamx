@@ -1,0 +1,44 @@
+== partTip (tooltip) ==
+Scanner
+Mk I · Square · 1 cell
+Hull · mass45 hp · 1.0
+Armour · build1 · 1 pts
+Power draw4/s
+Scan range2,400 m
+
+== partStats (stats rows) ==
+GradeMk I
+Power draw4
+Hull · mass45 hp · 1.0
+Armour · build1 · 1 pts
+Rating scoretoughness 45
+
+== familyLabel ==
+Scanners
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+reads rocks, finds seams
+
+== keyStats ==
+scan 2,400 m · draws 4
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 5","why":"Learned at level 5 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 5","why":""}
+
+== partStats (raw) ==
+{"grade":1,"mark":"Mk I","size":"","area":1,"hp":45,"mass":1,"firepower":0,"toughness":45,"armour":1,"draw":4}

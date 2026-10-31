@@ -1,0 +1,52 @@
+== partTip (tooltip) ==
+Point Defence Turret
+Mk I · Small · Square · 1 cell
+Hull · mass56 hp · 1.4
+Armour · build1 · 1 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Intercepts5.0 shots/s at missiles, torpedoes, mortar shells and seekers · reach 560 · on its own, never at ships
+Firefires itself at what comes in · a little power a shot
+MountTurret, 300°
+FittingBolts on any side
+Power draw10/s
+On Surgecharged shot: after a 0.5 s pause, a shot hits ×1.5, a packet from the bank
+
+== partStats (stats rows) ==
+GradeMk I · Small
+Hits withKinetic · penetration 1
+Power draw10
+Hull · mass56 hp · 1.4
+Armour · build1 · 1 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 56
+
+== familyLabel ==
+Point defence
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+shoots down missiles on its own; never ships
+
+== keyStats ==
+5.0 shots/s at missiles · reach 560 · draws 10
+
+== mountBadge ==
+TURRET 300°
+
+== mountingText ==
+Turret, 300°
+Bolts on any side
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 10","why":"Learned at level 10 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 10","why":""}
+
+== partStats (raw) ==
+{"grade":1,"mark":"Mk I","size":"Small","area":1,"hp":56.4,"mass":1.4,"firepower":0,"toughness":56.4,"armour":1,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":0,"intercept":{"perSec":5,"range":560},"range":560,"damageType":"kinetic","pen":1,"draw":10}

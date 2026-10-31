@@ -1,0 +1,47 @@
+== partTip (tooltip) ==
+Ion Drive
+Mk I · Small · Square · 1 cell
+Hull · mass53 hp · 1.0
+Armour · build1 · 1 pts
+Thrust2.3 · boost ×2
+Power draw9/s
+Rated speed2,040 m/s (its push fades out near it)
+On Surgekick: boosting, a dash every 0.33 s, paid from the bank
+
+== partStats (stats rows) ==
+GradeMk I · Small
+Power draw9
+Thrust2.3 · boost ×2, drain ×1
+Hull · mass53 hp · 1.0
+Armour · build1 · 1 pts
+Rating scoretoughness 53
+
+== familyLabel ==
+Ion drives
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+efficient, low top speed
+
+== keyStats ==
+thrust 2.3 · top 2,040 m/s · draws 9
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 0","why":"Learned at level 0 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 0","why":""}
+
+== partStats (raw) ==
+{"grade":1,"mark":"Mk I","size":"Small","area":1,"hp":52.5,"mass":1,"firepower":0,"toughness":52.5,"armour":1,"draw":9,"thrust":2.26,"boost":2,"boostDrain":1}

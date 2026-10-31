@@ -1,0 +1,45 @@
+== partTip (tooltip) ==
+Heavy Bank
+Mk III · Block · 4 cells
+Hull · mass314 hp · 6.4
+Armour · build3 · 10 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Holds1,200 energy
+Givesup to 1,800/s
+
+== partStats (stats rows) ==
+GradeMk III
+Hull · mass314 hp · 6.4
+Armour · build3 · 10 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Rating scoretoughness 314
+
+== familyLabel ==
+Batteries
+
+== sizeWord ==
+Large
+
+== sizeText ==
+Large · Block
+
+== tradeOff ==
+holds the most, gives it slowly
+
+== keyStats ==
+holds 1,200 · gives 1,800/s
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 20","why":"Learned at level 20 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 20","why":""}
+
+== partStats (raw) ==
+{"grade":3,"mark":"Mk III","size":"","area":4,"hp":313.59999999999997,"mass":6.4,"firepower":0,"toughness":313.59999999999997,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9}}

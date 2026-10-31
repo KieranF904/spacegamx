@@ -1,0 +1,48 @@
+== partTip (tooltip) ==
+Bulwark Projector
+Mk III · Block · 4 cells
+Hull · mass314 hp · 4.0
+Armour · build3 · 10 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Power draw77/s
+On Surgeflash restore: when the shield breaks, the bank puts 50% back at once
+Shield180
+
+== partStats (stats rows) ==
+GradeMk III
+Power draw77
+Shield180
+Hull · mass314 hp · 4.0
+Armour · build3 · 10 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Rating scoretoughness 314
+
+== familyLabel ==
+Shields
+
+== sizeWord ==
+Large
+
+== sizeText ==
+Large · Block
+
+== tradeOff ==
+deep, hungry for power
+
+== keyStats ==
+shield 180 · draws 77
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 27","why":"Learned at level 27 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 27","why":""}
+
+== partStats (raw) ==
+{"grade":3,"mark":"Mk III","size":"","area":4,"hp":313.59999999999997,"mass":4,"firepower":0,"toughness":313.59999999999997,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"draw":76.8,"shield":180}

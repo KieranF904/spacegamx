@@ -1,0 +1,54 @@
+== partTip (tooltip) ==
+Coilgun
+Mk III · Medium · Panel · 2 cells
+Hull · mass179 hp · 2.0
+Armour · build3 · 5 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Damage58/s · reach 9,000
+Hits withKinetic · penetration 4.5
+Fire rate1.3/s · shells · Railgun Slugs
+MountFixed: aims with the ship
+FittingBolts on from behind only · Needs 2 clear cells ahead
+Power draw92/s
+On Surgecharged shot: after a 0.5 s pause, a shot hits ×1.5, a packet from the bank
+
+== partStats (stats rows) ==
+GradeMk III · Medium
+Hits withKinetic · penetration 3
+Power draw92
+Hull · mass179 hp · 2.0
+Armour · build3 · 5 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Rating scoretoughness 179
+
+== familyLabel ==
+Railguns
+
+== sizeWord ==
+Medium
+
+== sizeText ==
+Medium · Panel
+
+== tradeOff ==
+no ammo, drinks power
+
+== keyStats ==
+58 dmg/s · reach 9,000 · draws 92
+
+== mountBadge ==
+FIXED
+
+== mountingText ==
+Fixed: aims with the ship
+Bolts on from behind only
+Needs 2 clear cells ahead
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 22","why":"Learned at level 22 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 22","why":""}
+
+== partStats (raw) ==
+{"grade":3,"mark":"Mk III","size":"Medium","area":2,"hp":179.20000000000002,"mass":2,"firepower":57.86666666666667,"toughness":179.20000000000002,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"dps":57.86666666666667,"range":9000,"damageType":"kinetic","pen":4.5,"draw":92.4}

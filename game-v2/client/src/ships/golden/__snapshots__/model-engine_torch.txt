@@ -1,0 +1,47 @@
+== partTip (tooltip) ==
+Torch
+Mk I · Medium · Panel · 2 cells
+Hull · mass105 hp · 2.0
+Armour · build1 · 2 pts
+Thrust8.0 · boost ×1.6
+Power draw68/s
+Rated speed4,200 m/s (its push fades out near it)
+On Surgekick: boosting, a dash every 0.33 s, paid from the bank
+
+== partStats (stats rows) ==
+GradeMk I · Medium
+Power draw68
+Thrust8.0 · boost ×1.6, drain ×1.2
+Hull · mass105 hp · 2.0
+Armour · build1 · 2 pts
+Rating scoretoughness 105
+
+== familyLabel ==
+Burn engines
+
+== sizeWord ==
+Medium
+
+== sizeText ==
+Medium · Panel
+
+== tradeOff ==
+brutal thrust, burns energy
+
+== keyStats ==
+thrust 8.0 · top 4,200 m/s · draws 68
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 8","why":"Learned at level 8 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 8","why":""}
+
+== partStats (raw) ==
+{"grade":1,"mark":"Mk I","size":"Medium","area":2,"hp":105,"mass":2,"firepower":0,"toughness":105,"armour":1,"draw":68,"thrust":8,"boost":1.6,"boostDrain":1.2}

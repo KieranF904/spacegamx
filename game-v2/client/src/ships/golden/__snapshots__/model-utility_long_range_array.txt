@@ -1,0 +1,46 @@
+== partTip (tooltip) ==
+Long-Range Array
+Mk III · Dome · 3.1 cells
+Hull · mass211 hp · 3.1
+Armour · build3 · 7.9 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Power draw8/s
+Scan range4,800 m
+
+== partStats (stats rows) ==
+GradeMk III
+Power draw8
+Hull · mass211 hp · 3.1
+Armour · build3 · 7.9 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Rating scoretoughness 211
+
+== familyLabel ==
+Scanners
+
+== sizeWord ==
+Large
+
+== sizeText ==
+Large · Dome
+
+== tradeOff ==
+twice the reach, twice the power
+
+== keyStats ==
+scan 4,800 m · draws 8
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 20","why":"Learned at level 20 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 20","why":""}
+
+== partStats (raw) ==
+{"grade":3,"mark":"Mk III","size":"","area":3.141592653589793,"hp":211.1150263212341,"mass":3.141592653589793,"firepower":0,"toughness":211.1150263212341,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"draw":8.011061266653972}

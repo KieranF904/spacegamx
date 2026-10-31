@@ -1,0 +1,48 @@
+== partTip (tooltip) ==
+Flicker Screen
+Mk II · Round · 0.8 cells
+Hull · mass44 hp · 1.1
+Armour · build2 · 1.3 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Power draw5/s
+On Surgeflash restore: when the shield breaks, the bank puts 50% back at once
+Shield16
+
+== partStats (stats rows) ==
+GradeMk II
+Power draw5
+Shield16
+Hull · mass44 hp · 1.1
+Armour · build2 · 1.3 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 44
+
+== familyLabel ==
+Shields
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Round
+
+== tradeOff ==
+thin, almost free to run
+
+== keyStats ==
+shield 16 · draws 5
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 19","why":"Learned at level 19 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 19","why":""}
+
+== partStats (raw) ==
+{"grade":2,"mark":"Mk II","size":"","area":0.7853981633974483,"hp":44.296456415616085,"mass":1.0995574287564276,"firepower":0,"toughness":44.296456415616085,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"draw":5.026548245743669,"shield":15.707963267948966}

@@ -1,0 +1,52 @@
+== partTip (tooltip) ==
+Burst
+Mk I · Small · Square · 1 cell
+Hull · mass60 hp · 1.0
+Armour · build1 · 1 pts
+Damage26/s · reach 1,700
+Hits withExplosive · penetration 0
+Fire rate1.8/s · shells · Flak Canisters
+MountTurret, 200°
+FittingSide mount (flippable) · Bolts on at its side only
+Power draw10/s
+On Surgecharged shot: after a 0.5 s pause, a shot hits ×1.5, a packet from the bank
+
+== partStats (stats rows) ==
+GradeMk I · Small
+Hits withExplosive · penetration 1
+Power draw10
+Hull · mass60 hp · 1.0
+Armour · build1 · 1 pts
+Rating scoretoughness 60
+
+== familyLabel ==
+Flak
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+bursts near what it passes · ammo
+
+== keyStats ==
+26 dmg/s · reach 1,700 · draws 10
+
+== mountBadge ==
+TURRET 200°SIDE
+
+== mountingText ==
+Turret, 200°
+Side mount (flippable)
+Bolts on at its side only
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 4","why":"Learned at level 4 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 4","why":""}
+
+== partStats (raw) ==
+{"grade":1,"mark":"Mk I","size":"Small","area":1,"hp":60,"mass":1,"firepower":25.764705882352942,"toughness":60,"armour":1,"dps":25.764705882352942,"range":1700,"damageType":"explosive","pen":0,"draw":10}

@@ -1,0 +1,53 @@
+== partTip (tooltip) ==
+Singularity Launcher
+Mk IV · Small · Square · 1 cell
+Hull · mass131 hp · 1.2
+Armour · build4 · 3.8 pts
+TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
+Damage12/s · reach 2,070
+Hits withExotic · penetration 4.5
+Fire rate0.1/s · shells
+MountTurret, 180°
+FittingBolts on from behind only
+Power draw30/s
+On Surgecharged shot: after a 0.5 s pause, a shot hits ×1.5, a packet from the bank
+
+== partStats (stats rows) ==
+GradeMk IV · Small
+Hits withExotic · penetration 4
+Power draw30
+Hull · mass131 hp · 1.2
+Armour · build4 · 3.8 pts
+TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
+Rating scoretoughness 131
+
+== familyLabel ==
+Legendary
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+Legendary
+
+== keyStats ==
+12 dmg/s · reach 2,070 · draws 30
+
+== mountBadge ==
+TURRET 180°
+
+== mountingText ==
+Turret, 180°
+Bolts on from behind only
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 30","why":"Learned at level 30 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 30","why":""}
+
+== partStats (raw) ==
+{"grade":4,"mark":"Mk IV","size":"Small","area":1,"hp":131,"mass":1.2,"firepower":12,"toughness":131,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":12,"range":2070,"damageType":"exotic","pen":4.5,"draw":30}

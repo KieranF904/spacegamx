@@ -1,0 +1,54 @@
+== partTip (tooltip) ==
+Dart
+Mk I · Small · Square · 1 cell
+Hull · mass75 hp · 1.4
+Armour · build1 · 1 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Damage27/s · reach 11,440
+Hits withExplosive · penetration 0.5
+Fire rate0.5/s · shells · Missiles
+MountFixed: aims with the ship
+FittingBolts on from behind only · Needs 1 clear cell ahead
+Power draw8/s
+On Surgecharged shot: after a 0.5 s pause, a shot hits ×1.5, a packet from the bank
+
+== partStats (stats rows) ==
+GradeMk I · Small
+Hits withExplosive · penetration 1
+Power draw8
+Hull · mass75 hp · 1.4
+Armour · build1 · 1 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 75
+
+== familyLabel ==
+Missiles
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+locks on · ammo
+
+== keyStats ==
+27 dmg/s · reach 11,440 · draws 8
+
+== mountBadge ==
+FIXED
+
+== mountingText ==
+Fixed: aims with the ship
+Bolts on from behind only
+Needs 1 clear cell ahead
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 11","why":"Learned at level 11 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 11","why":""}
+
+== partStats (raw) ==
+{"grade":1,"mark":"Mk I","size":"Small","area":1,"hp":75.2,"mass":1.4,"firepower":27.490909090909092,"toughness":75.2,"armour":1,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":27.490909090909092,"range":11440,"damageType":"explosive","pen":0.5,"draw":8}

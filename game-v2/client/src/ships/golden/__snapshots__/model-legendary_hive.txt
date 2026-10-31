@@ -1,0 +1,54 @@
+== partTip (tooltip) ==
+Rustjaw's Hive
+Mk IV · Small · Square · 1 cell
+Hull · mass118 hp · 1.2
+Armour · build4 · 3.8 pts
+TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
+Damage28/s · reach 9,120
+Hits withExplosive · penetration 3
+Fire rate0.4/s · shells
+MountFixed: aims with the ship
+FittingBolts on from behind only · Needs 1 clear cell ahead
+Power draw12/s
+On Surgecharged shot: after a 0.5 s pause, a shot hits ×1.5, a packet from the bank
+
+== partStats (stats rows) ==
+GradeMk IV · Small
+Hits withExplosive · penetration 4
+Power draw12
+Hull · mass118 hp · 1.2
+Armour · build4 · 3.8 pts
+TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
+Rating scoretoughness 118
+
+== familyLabel ==
+Legendary
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+Legendary
+
+== keyStats ==
+28 dmg/s · reach 9,120 · draws 12
+
+== mountBadge ==
+FIXED
+
+== mountingText ==
+Fixed: aims with the ship
+Bolts on from behind only
+Needs 1 clear cell ahead
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 12","why":"Learned at level 12 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 12","why":""}
+
+== partStats (raw) ==
+{"grade":4,"mark":"Mk IV","size":"Small","area":1,"hp":117.9,"mass":1.2,"firepower":27.52,"toughness":117.9,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":27.52,"range":9120,"damageType":"explosive","pen":3,"draw":12}

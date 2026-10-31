@@ -1,0 +1,51 @@
+== partTip (tooltip) ==
+Rattler
+Mk I · Small · Square · 1 cell
+Hull · mass56 hp · 1.0
+Armour · build1 · 1 pts
+Damage43/s · reach 5,400
+Hits withKinetic · penetration 0.5
+Fire rate8.6/s · shells
+MountTurret, 270°
+FittingBolts on any side
+Power draw12/s
+On Surgecharged shot: after a 0.5 s pause, a shot hits ×1.5, a packet from the bank
+
+== partStats (stats rows) ==
+GradeMk I · Small
+Hits withKinetic · penetration 1
+Power draw12
+Hull · mass56 hp · 1.0
+Armour · build1 · 1 pts
+Rating scoretoughness 56
+
+== familyLabel ==
+Autocannons
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+a stream of small shells
+
+== keyStats ==
+43 dmg/s · reach 5,400 · draws 12
+
+== mountBadge ==
+TURRET 270°
+
+== mountingText ==
+Turret, 270°
+Bolts on any side
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 3","why":"Learned at level 3 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 3","why":""}
+
+== partStats (raw) ==
+{"grade":1,"mark":"Mk I","size":"Small","area":1,"hp":56.25,"mass":1,"firepower":42.857142857142854,"toughness":56.25,"armour":1,"dps":42.857142857142854,"range":5400,"damageType":"kinetic","pen":0.5,"draw":12}

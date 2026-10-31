@@ -1,0 +1,45 @@
+== partTip (tooltip) ==
+Isotope Pile
+Mk I · Small · Round · 0.8 cells
+Hull · mass118 hp · 1.1
+Armour · build1 · 0.8 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Power out+14/s
+
+== partStats (stats rows) ==
+GradeMk I · Small
+Power out+14
+Hull · mass118 hp · 1.1
+Armour · build1 · 0.8 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 118
+
+== familyLabel ==
+Generators
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Round
+
+== tradeOff ==
+weak but tough, never explodes
+
+== keyStats ==
++14 power
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 9","why":"Learned at level 9 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 9","why":""}
+
+== partStats (raw) ==
+{"grade":1,"mark":"Mk I","size":"Small","area":0.7853981633974483,"hp":118.12388377497624,"mass":1.0995574287564276,"firepower":0,"toughness":118.12388377497624,"armour":1,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"supply":14.137166941154069}

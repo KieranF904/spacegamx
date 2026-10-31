@@ -1,0 +1,45 @@
+== partTip (tooltip) ==
+Bore
+Mk I · Panel · 2 cells
+Hull · mass150 hp · 2.8
+Armour · build1 · 2 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Power draw18/s
+
+== partStats (stats rows) ==
+GradeMk I
+Power draw18
+Hull · mass150 hp · 2.8
+Armour · build1 · 2 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 150
+
+== familyLabel ==
+Mining lasers
+
+== sizeWord ==
+Medium
+
+== sizeText ==
+Medium · Panel
+
+== tradeOff ==
+cuts harder rock
+
+== keyStats ==
+draws 18
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 10","why":"Learned at level 10 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 10","why":""}
+
+== partStats (raw) ==
+{"grade":1,"mark":"Mk I","size":"","area":2,"hp":150.4,"mass":2.8,"firepower":0,"toughness":150.4,"armour":1,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"draw":18}

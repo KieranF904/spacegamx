@@ -1,0 +1,54 @@
+== partTip (tooltip) ==
+Tesla
+Mk IV · Small · Round · 0.8 cells
+Hull · mass62 hp · 0.8
+Armour · build4 · 3 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Damage45/s · reach 660
+Hits withEnergy · penetration 4
+Fire rate1.3/s · shells
+MountTurret, 300°
+FittingSide mount (flippable) · Bolts on at its side only
+Power draw25/s
+On Surgecharged shot: after a 0.5 s pause, a shot hits ×1.5, a packet from the bank
+
+== partStats (stats rows) ==
+GradeMk IV · Small
+Hits withEnergy · penetration 4
+Power draw25
+Hull · mass62 hp · 0.8
+Armour · build4 · 3 pts
+TakesKinetic −5% · Thermal −15% · Cryo −10%
+Rating scoretoughness 62
+
+== familyLabel ==
+Arc projectors
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Round
+
+== tradeOff ==
+jumps two ships further
+
+== keyStats ==
+45 dmg/s · reach 660 · draws 25
+
+== mountBadge ==
+TURRET 300°SIDE
+
+== mountingText ==
+Turret, 300°
+Side mount (flippable)
+Bolts on at its side only
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 29","why":"Learned at level 29 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 29","why":""}
+
+== partStats (raw) ==
+{"grade":4,"mark":"Mk IV","size":"Small","area":0.7853981633974483,"hp":61.57521601035994,"mass":0.7853981633974483,"firepower":45.333333333333336,"toughness":61.57521601035994,"armour":4,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"dps":45.333333333333336,"range":660,"damageType":"energy","pen":4,"draw":25.20342706342412}

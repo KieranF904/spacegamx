@@ -1,0 +1,45 @@
+== partTip (tooltip) ==
+Siphon
+Mk II · Square · 1 cell
+Hull · mass66 hp · 1.4
+Armour · build2 · 1.6 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Power draw10/s
+
+== partStats (stats rows) ==
+GradeMk II
+Power draw10
+Hull · mass66 hp · 1.4
+Armour · build2 · 1.6 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 66
+
+== familyLabel ==
+Siphons
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+draws gas from pockets
+
+== keyStats ==
+draws 10
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 12","why":"Learned at level 12 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 12","why":""}
+
+== partStats (raw) ==
+{"grade":2,"mark":"Mk II","size":"","area":1,"hp":65.8,"mass":1.4,"firepower":0,"toughness":65.8,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"draw":10}

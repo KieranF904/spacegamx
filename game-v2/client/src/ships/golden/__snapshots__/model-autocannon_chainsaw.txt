@@ -1,0 +1,53 @@
+== partTip (tooltip) ==
+Chainsaw
+Mk II · Medium · Panel · 2 cells
+Hull · mass141 hp · 2.8
+Armour · build2 · 3.2 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Damage75/s · reach 5,400
+Hits withKinetic · penetration 1.5
+Fire rate15/s · shells
+MountTurret, 240°
+FittingBolts on from behind only
+Power draw44/s
+On Surgecharged shot: after a 0.5 s pause, a shot hits ×1.5, a packet from the bank
+
+== partStats (stats rows) ==
+GradeMk II · Medium
+Hits withKinetic · penetration 2
+Power draw44
+Hull · mass141 hp · 2.8
+Armour · build2 · 3.2 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 141
+
+== familyLabel ==
+Autocannons
+
+== sizeWord ==
+Medium
+
+== sizeText ==
+Medium · Panel
+
+== tradeOff ==
+a hose: hard to dodge, harder to power
+
+== keyStats ==
+75 dmg/s · reach 5,400 · draws 44
+
+== mountBadge ==
+TURRET 240°
+
+== mountingText ==
+Turret, 240°
+Bolts on from behind only
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 14","why":"Learned at level 14 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 14","why":""}
+
+== partStats (raw) ==
+{"grade":2,"mark":"Mk II","size":"Medium","area":2,"hp":141,"mass":2.8,"firepower":75,"toughness":141,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":75,"range":5400,"damageType":"kinetic","pen":1.5,"draw":43.64}

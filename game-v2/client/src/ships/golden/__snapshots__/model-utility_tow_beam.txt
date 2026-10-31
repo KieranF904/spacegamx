@@ -1,0 +1,47 @@
+== partTip (tooltip) ==
+Tow Beam
+Mk II · Panel · 2 cells
+Hull · mass169 hp · 3.4
+Armour · build2 · 3.2 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Power draw24/s
+Towswrecks, debris and pods within 420 m of your hull · snaps past 900 m · into a station to salvage · draws only while towing; never a working ship
+
+== partStats (stats rows) ==
+GradeMk II
+Power draw24
+Towswrecks, debris and pods within 420 m
+Hull · mass169 hp · 3.4
+Armour · build2 · 3.2 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 169
+
+== familyLabel ==
+Tow beams
+
+== sizeWord ==
+Medium
+
+== sizeText ==
+Medium · Panel
+
+== tradeOff ==
+tows wrecks and pods to salvage; slows you by their mass
+
+== keyStats ==
+tows within 420 m · draws 24 towing
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 12","why":"Learned at level 12 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 12","why":""}
+
+== partStats (raw) ==
+{"grade":2,"mark":"Mk II","size":"","area":2,"hp":169.20000000000002,"mass":3.36,"firepower":0,"toughness":169.20000000000002,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"draw":24,"tow":{"range":420,"snap":900}}

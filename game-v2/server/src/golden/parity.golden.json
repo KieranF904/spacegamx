@@ -1,0 +1,47 @@
+{
+  "heavy-cargo/replica": {
+    "keyframes": "",
+    "server": "a8063821238b1a1a"
+  },
+  "heavy-cargo/unrounded-aim": "tick 78: angVel server 0.020985 vs 0.020986",
+  "jump-burn/replica": {
+    "keyframes": "109",
+    "server": "0681ac52d06f4688"
+  },
+  "jump-burn/unrounded-aim": null,
+  "plain-thrust-turn/replica": {
+    "keyframes": "",
+    "server": "fc4409425cf177d1"
+  },
+  "plain-thrust-turn/unrounded-aim": "tick 78: angVel server 0.020985 vs 0.020986",
+  "strafer-energy-short/replica": {
+    "keyframes": "49-59,73-83,97-107,120-131,145-155,169-179,193-203,217-227,240-251,265-275,289-299,313-323,337-347,360-371,385-395,409-419,433-443,457-467,480-491,505-515,529-539,553-563,577-587,600-611,625-635,649-659,673-683,697-707,720-731,745-755,769-779,793-803",
+    "server": "4b77223cbcabf2e0"
+  },
+  "strafer-energy-short/unrounded-aim": null,
+  "strafer-every-way/replica": {
+    "keyframes": "317-322,338-348,364-374",
+    "server": "5bd097f5c075b88f"
+  },
+  "strafer-every-way/unrounded-aim": null,
+  "strafer-heavy/replica": {
+    "keyframes": "",
+    "server": "175ce2678ba7fa86"
+  },
+  "strafer-heavy/unrounded-aim": "tick 5: angVel server 0.044257 vs 0.044256",
+  "strafer-replay/replica": {
+    "keyframes": "",
+    "server": "9c58b08dd8522cd9"
+  },
+  "strafer-replay/unrounded-aim": "tick 79: angVel server 0.01004 vs 0.010041",
+  "surge-kick/replica": {
+    "keyframes": "19,39,59,79,139,159,179",
+    "server": "7e65e28b286f487e"
+  },
+  "surge-kick/unrounded-aim": null,
+  "tow/replica": {
+    "keyframes": "2",
+    "server": "e48a265155a129ac"
+  },
+  "tow/unrounded-aim": null
+}

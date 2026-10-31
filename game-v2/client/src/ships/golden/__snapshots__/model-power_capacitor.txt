@@ -1,0 +1,45 @@
+== partTip (tooltip) ==
+Capacitor
+Mk I · Square · 1 cell
+Hull · mass30 hp · 0.7
+Armour · build1 · 1 pts
+TakesKinetic +20% · Explosive +10% · Thermal +10% · Energy −20%
+Holds (what it touches)160 energy
+Givesup to 2,000/s only into parts it touches; touching capacitors are one bank
+
+== partStats (stats rows) ==
+GradeMk I
+Hull · mass30 hp · 0.7
+Armour · build1 · 1 pts
+TakesKinetic +20% · Explosive +10% · Thermal +10% · Energy −20%
+Rating scoretoughness 30
+
+== familyLabel ==
+Capacitors
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+tiny and very fast, only into what it touches
+
+== keyStats ==
+holds 160 (guns) · gives 2,000/s by touch
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 7","why":"Learned at level 7 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 7","why":""}
+
+== partStats (raw) ==
+{"grade":1,"mark":"Mk I","size":"","area":1,"hp":30,"mass":0.7,"firepower":0,"toughness":30,"armour":1,"resist":{"kinetic":1.2,"explosive":1.1,"thermal":1.1,"energy":0.8}}
