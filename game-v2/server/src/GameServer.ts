@@ -167,6 +167,7 @@ import { huntedBoss, RibbonsFile, mineFalloff, rayTerrain, type Terrain } from '
 import { repRank, replicaAngle, quantizeReplicaAngle, ReplicaMode } from '@space-game/common';
 import { MemoryProfileStore, type ProfileStore } from './profile/ProfileStore.js';
 import { MessageLimiter } from './net/MessageLimits.js';
+import { checkTickOrder, type TickSystem } from './tickOrder.js';
 
 // ============================================
 // SPATIAL PARTITIONING
@@ -3918,6 +3919,8 @@ case 'join':
   // ---- Crash isolation (server robustness audit, docs/audits/server-robustness.md) ----
   /** Errors by where they happened: how many, and when it was last logged */
   private faults = new Map<string, { count: number; unlogged: number; loggedAt: number }>();
+  /** The tick's guarded systems, in order (built once; see buildTickSystems and tickOrder.ts) */
+  private readonly tickSystems: readonly TickSystem[] = this.buildTickSystems();
 
   /**
    * Run one part of the tick (or one message, or one client's share of it): if it
@@ -3951,62 +3954,97 @@ case 'join':
   }
   // ---- end crash isolation ----
 
+  /**
+   * The tick's guarded systems as an ordered table (tickOrder.ts), built once. tick() walks it; the order is the
+   * simulation order (golden/tickOrder.json pins it).
+   */
+  private buildTickSystems(): readonly TickSystem[] {
+    const systems: TickSystem[] = [
+      // ---- pilots-move ----
+      // (Asteroids aren't moved: their positions are worked out when something needs them, see placeAsteroid)
+      { name: 'stationOrbitSystem', phase: 'pilots-move', run: () => this.stationOrbitSystem() },
+      // Systems pilots are in or coming to are in the world; ones left a while are put away (before anything's spawned)
+      { name: 'memory', phase: 'pilots-move', scene: 'sectors', run: () => this.memory.tick() },
+      // Reset spatial grid and rebuild
+      { name: 'spatialGrid', phase: 'pilots-move', run: () => { this.spatialGrid.clear(); this.buildSpatialGrid(); } },
+      { name: 'playerMovementSystem', phase: 'pilots-move', run: () => this.playerMovementSystem() },
+      // (Tow Beams pull what they tow, after the pilots fly and before wrecks and pods move: game/Towing.ts)
+      { name: 'towing', phase: 'pilots-move', run: () => this.towing.tick() },
+      { name: 'dockingSystem', phase: 'pilots-move', run: () => this.dockingSystem() },
+      { name: 'riftSystem', phase: 'pilots-move', run: () => this.riftSystem() },
+      // ---- combat ----
+      // (Boost fuel is the ship's battery now: it charges in the flight step, energy.ts)
+      { name: 'weaponSystem', phase: 'combat', run: () => this.weaponSystem() },
+      { name: 'projectileSystem', phase: 'combat', run: () => this.projectileSystem() },
+      { name: 'enemies', phase: 'combat', scene: 'sectors', run: () => this.enemies.tick() },
+      { name: 'bosses', phase: 'combat', scene: 'sectors', run: () => this.bosses.tick() },
+      { name: 'mobs', phase: 'combat', scene: 'sectors', run: () => this.mobs.tick() },
+      { name: 'events', phase: 'combat', scene: 'sectors', run: () => this.events.tick() },
+      { name: 'surfaces', phase: 'combat', scene: 'sectors', run: () => this.surfaces.tick() },
+      { name: 'sieges', phase: 'combat', scene: 'sectors', run: () => this.sieges.tick() },
+      { name: 'arenas', phase: 'combat', scene: 'sectors', run: () => this.arenas.tick() },
+      { name: 'collisionSystem', phase: 'combat', run: () => this.collisionSystem() },
+      // Check for destroyed asteroids
+      { name: 'asteroidDeathSystem', phase: 'combat', run: () => this.asteroidDeathSystem() },
+      { name: 'lod', phase: 'combat', run: () => this.lod.tick() },
+      { name: 'ships', phase: 'combat', run: () => this.ships.tick() },
+      { name: 'replication.endTick', phase: 'combat', run: () => this.replication.endTick() },
+      { name: 'recordSelfHashes', phase: 'combat', run: () => this.recordSelfHashes() },
+      // ---- world ----
+      { name: 'pods', phase: 'world', run: () => this.pods.tick() },
+      { name: 'mining', phase: 'world', run: () => this.mining.tick() },
+      { name: 'hazards', phase: 'world', run: () => this.hazards.tick() },
+      { name: 'warmth', phase: 'world', run: () => this.warmth.tick() },
+      { name: 'homes', phase: 'world', run: () => this.homes.tick() },
+      { name: 'watchComet', phase: 'world', run: () => this.watchComet() },
+      // (per-client entries guard each client themselves)
+      { name: 'outpost', phase: 'world', every: 60, when: () => !!this.outpost, perClient: true, run: () => {
+        for (const c of this.clients.values()) this.guard('outpost', () => this.outpost!.finish(c));
+      } },
+      { name: 'pilots', phase: 'world', run: () => this.pilots.tick() },
+      { name: 'quests', phase: 'world', run: () => this.quests.tick() },
+      { name: 'codex', phase: 'world', run: () => this.codex.tick() },
+      { name: 'party', phase: 'world', run: () => this.party.tick() },
+      { name: 'trade', phase: 'world', run: () => this.trade.tick(this.currentTick) },
+      { name: 'achievements', phase: 'world', every: 60, perClient: true, run: () => {
+        for (const c of this.clients.values()) {
+          if (this.flying(c.playerId)) this.guard('achievements', () => this.achievements.visit(c, this.gameData.getSystemByNum(InSystem.systemId[c.playerId])?.id ?? ''));
+        }
+        this.achievements.save().catch((e) => console.error('[Achievements] save failed:', e));
+      } },
+      { name: 'ops', phase: 'world', scene: 'sectors', run: () => this.ops.tick() },
+      { name: 'services', phase: 'world', every: 60, perClient: true, run: () => {
+        for (const c of this.clients.values()) this.guard('services', () => { this.services.tick(c); this.hangar.tick(c); this.hangar.fill(c); });
+      } },
+      // ---- persist ----
+      { name: 'lingerSystem', phase: 'persist', run: () => this.lingerSystem() },
+      { name: 'derelictRespawnSystem', phase: 'persist', run: () => this.derelictRespawnSystem() },
+      { name: 'trafficSystem', phase: 'persist', run: () => this.trafficSystem() },
+      { name: 'lifetimeSystem', phase: 'persist', run: () => this.lifetimeSystem() },
+      { name: 'cleanupSystem', phase: 'persist', run: () => this.cleanupSystem() },
+    ];
+    checkTickOrder(systems);
+    return systems;
+  }
+
+  /** Test hook: the tick table's entries, in order (tickOrder.test.ts) */
+  tickSystemList(): { name: string; phase: string; every?: number; scene?: string; perClient?: boolean }[] {
+    return this.tickSystems.map((s) => ({ name: s.name, phase: s.phase, every: s.every, scene: s.scene, perClient: s.perClient }));
+  }
+
   private tick(): void {
     const tickStart = performance.now();
     this.currentTick++;
     
-    // (Asteroids aren't moved: their positions are worked out when something needs them, see placeAsteroid)
-    this.guard('stationOrbitSystem', () => this.stationOrbitSystem());
-    // Systems pilots are in or coming to are in the world; ones left a while are put away (before anything's spawned)
-    if (this.scene === 'sectors') this.guard('memory', () => this.memory.tick());
-
-    // Reset spatial grid and rebuild
-    this.guard('spatialGrid', () => { this.spatialGrid.clear(); this.buildSpatialGrid(); });
-    
-    // Run systems
-    this.guard('playerMovementSystem', () => this.playerMovementSystem());
-    // (Tow Beams pull what they tow, after the pilots fly and before wrecks and pods move: game/Towing.ts)
-    this.guard('towing', () => this.towing.tick());
-    this.guard('dockingSystem', () => this.dockingSystem());
-    this.guard('riftSystem', () => this.riftSystem());
-    // (Boost fuel is the ship's battery now: it charges in the flight step, energy.ts)
-    this.guard('weaponSystem', () => this.weaponSystem());
-    this.guard('projectileSystem', () => this.projectileSystem());
-    if (this.scene === 'sectors') {
-      this.guard('enemies', () => this.enemies.tick()); this.guard('bosses', () => this.bosses.tick()); this.guard('mobs', () => this.mobs.tick());
-      this.guard('events', () => this.events.tick()); this.guard('surfaces', () => this.surfaces.tick()); this.guard('sieges', () => this.sieges.tick()); this.guard('arenas', () => this.arenas.tick());
+    // The guarded systems, in order: tickOrder.ts (the table is built once, in buildTickSystems)
+    const tick = this.currentTick, scene = this.scene;
+    for (const s of this.tickSystems) {
+      if (s.scene !== undefined && s.scene !== scene) continue;
+      if (s.every !== undefined && tick % s.every !== 0) continue;
+      if (s.when !== undefined && !s.when()) continue;
+      if (s.perClient) s.run();
+      else this.guard(s.name, s.run);
     }
-    this.guard('collisionSystem', () => this.collisionSystem());
-    this.guard('asteroidDeathSystem', () => this.asteroidDeathSystem());  // Check for destroyed asteroids
-    this.guard('lod', () => this.lod.tick());
-    this.guard('ships', () => this.ships.tick());
-    this.guard('replication.endTick', () => this.replication.endTick());
-    this.guard('recordSelfHashes', () => this.recordSelfHashes());
-    this.guard('pods', () => this.pods.tick());
-    this.guard('mining', () => this.mining.tick());
-    this.guard('hazards', () => this.hazards.tick());
-    this.guard('warmth', () => this.warmth.tick());
-    this.guard('homes', () => this.homes.tick());
-    this.guard('watchComet', () => this.watchComet());
-    if (this.outpost && this.currentTick % 60 === 0) for (const c of this.clients.values()) this.guard('outpost', () => this.outpost!.finish(c));
-    this.guard('pilots', () => this.pilots.tick());
-    this.guard('quests', () => this.quests.tick());
-    this.guard('codex', () => this.codex.tick());
-    this.guard('party', () => this.party.tick());
-    this.guard('trade', () => this.trade.tick(this.currentTick));
-    if (this.currentTick % 60 === 0) {
-      for (const c of this.clients.values()) {
-        if (this.flying(c.playerId)) this.guard('achievements', () => this.achievements.visit(c, this.gameData.getSystemByNum(InSystem.systemId[c.playerId])?.id ?? ''));
-      }
-      this.achievements.save().catch((e) => console.error('[Achievements] save failed:', e));
-    }
-    if (this.scene === 'sectors') this.guard('ops', () => this.ops.tick());
-    if (this.currentTick % 60 === 0) for (const c of this.clients.values()) this.guard('services', () => { this.services.tick(c); this.hangar.tick(c); this.hangar.fill(c); });
-    this.guard('lingerSystem', () => this.lingerSystem());
-    this.guard('derelictRespawnSystem', () => this.derelictRespawnSystem());
-    this.guard('trafficSystem', () => this.trafficSystem());
-    this.guard('lifetimeSystem', () => this.lifetimeSystem());
-    this.guard('cleanupSystem', () => this.cleanupSystem());
     
     // Report to admin server and update performance metrics
     const tickTime = performance.now() - tickStart;
