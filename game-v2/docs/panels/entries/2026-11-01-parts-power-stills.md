@@ -1,0 +1,25 @@
+---
+date: "2026-11-01"
+category: "parts"
+topic: "power-stills"
+files:
+- "parts/power_battery-before.png"
+- "parts/power_battery-after.png"
+- "parts/power_capacitor-before.png"
+- "parts/power_capacitor-after.png"
+- "parts/power_cell_reactor-before.png"
+- "parts/power_cell_reactor-after.png"
+- "parts/power_drive_cell-before.png"
+- "parts/power_drive_cell-after.png"
+- "parts/power_fusion_plant-before.png"
+- "parts/power_fusion_plant-after.png"
+- "parts/power_heavy_bank-before.png"
+- "parts/power_heavy_bank-after.png"
+- "parts/power_isotope_pile-before.png"
+- "parts/power_isotope_pile-after.png"
+- "parts/power_overclock_reactor-before.png"
+- "parts/power_overclock_reactor-after.png"
+- "parts/power_pulse_dynamo-before.png"
+- "parts/power_pulse_dynamo-after.png"
+---
+Power parts (batteries, reactors, plants): native stills before and after the rework. Glows, bank arcs and shield bubbles are drawn only by the live client (see the live-effects entry).

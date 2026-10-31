@@ -3,8 +3,7 @@ date: "2026-11-01"
 category: "parts"
 topic: "engine-plasma-drive"
 files:
-- "parts/engine-plasma-drive.png"
-- "parts/engine-plasma-drive-before.png"
-- "parts/engine-plasma-drive-after.png"
+- "parts/engine_plasma_drive-before.png"
+- "parts/engine_plasma_drive-after.png"
 ---
 Plasma Drive: violet plume with shock diamonds.
