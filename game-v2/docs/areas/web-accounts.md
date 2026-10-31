@@ -21,7 +21,7 @@ Three cooperating services. The **lobby** (`server-browser/`) owns accounts and 
 | `site/src/{markdown,frontmatter,posts,uploads,rss,pilots,play,shoutbox}.ts` | | Sanitised Markdown, post front matter, image uploads (by bytes, no SVG), RSS, read-only `PilotSource` (profiles + `data/status/live.json`), `/play` handoff, shout SSE hub |
 | `site/scripts/post-update.ts`, `site/seed/` | 248 | `npm run post-update` CLI; example posts and images |
 | `site/REVIEW.md`, `docs/ops/postgres-migration.md`, `scripts/db/*` | | Local review guide; Postgres migration/re-sync/switch-over/rollback; `migrateJsonToPostgres.ts`, `vps-sync.sh` |
-| `client/src/ui/LoginUI.ts`, `ServerBrowserUI.ts`; `Game.ts` 711-806 | | Client side of sign-in: `handleLogin/Register/GuestPlay/resumeSession`, token in `localStorage.authToken` |
+| `client/src/ui/LoginUI.ts`, `ServerBrowserUI.ts`; `Game.ts` (`handleLogin` to `handleLogout`) | | Client side of sign-in: `handleLogin/Register/GuestPlay/resumeSession`, token in `localStorage.authToken` |
 
 ## Public interface
 - Lobby HTTP: `/auth/*` JSON POSTs (cookie-less; token in body/`Authorization`), `POST /register` heartbeat, `GET /list`; `/admin/*` guarded by `LOBBY_ADMIN_SECRET` (constant-time compared; wrong or empty is 403).
@@ -37,7 +37,7 @@ Three cooperating services. The **lobby** (`server-browser/`) owns accounts and 
 - Production has no dev defaults: no seeded `admin/admin`, `SITE_SECRET` (32+ chars), `LOBBY_ADMIN_SECRET` and an https `SITE_ORIGIN` required or the site refuses to start.
 - All user text escaped; Markdown sanitised to an allowlist every render; CSRF token on every POST; strict CSP on every page except `/play`.
 - Secrets (password hashes, salts, tokens, emails) never appear in logs or reports.
-- Guest names are generated client-side (`Guest_<0-9999>`, Game.ts 765) and sent as a guest display name (`pendingAuth` type `guest`); the server must not trust them for rights.
+- Guest names are generated client-side (`Guest_<0-9999>`, `handleGuestPlay` in Game.ts) and sent as a guest display name (`pendingAuth` type `guest`); the server must not trust them for rights.
 - Rate limiters are bounded (`maxKeys`); keep new limiters on `RateLimiter`.
 
 ## How to extend

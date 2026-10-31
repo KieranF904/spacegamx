@@ -18,7 +18,7 @@ The map and everything that keeps it alive cheaply: system/station/planet/astero
 | server/src/game/SystemMemory.ts | 317 | `SystemMemory` (evict/restore), `MemoryRules`, `MEMORY_VERSION`, `worldFileStore(file)`, `shipMemory`, `restoreHp`, snapshot types |
 | server/src/game/{Hazards,Warmth}.ts | 106, 115 | once-a-second hazard effects per pilot; warmth stepping (cold builds, heat sources bring it back) |
 | server/src/game/{Surfaces,Arenas,Sieges,Events,Roaming,AsteroidOrbits,Mining,HomeStations,LootPods}.ts | 439, 119, 1001, 418, 133, 301, 248, 141, 231 | planet surfaces, job arenas, moon sieges, raids/dynamic events, nest wandering, asteroid timetable, ore from damage, homesteads, loot containers |
-| server/src/GameServer.ts | god-file | `travelTo` (~L3660), `createPortal` (~L2573), rift constants (~L430), memory gate mouth (~L559), `trafficSystem`/`trafficIntent` (~L4456), `derelictRespawnSystem` (~L4672), system creation loop (~L2459); read slices only |
+| server/src/GameServer.ts | god-file | `travelTo` (~L3585), `createPortal` (~L2498), rift constants `RIFT_*` (~L431), `MEMORY_GATE_MOUTH` (~L486), `trafficSystem`/`trafficIntent` (~L4418/4455), `derelictRespawnSystem` (~L4634), system creation in `initializeWorld` (~L2371); read slices only |
 | client/src/state/FarShips.ts, ui/SystemMapUI.ts | | map dots for ships past the snapshot's view, carried on by the same legs as the server |
 
 ## Public interface

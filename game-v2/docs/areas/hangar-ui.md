@@ -15,8 +15,8 @@ The station hangar where a pilot designs and refits ships: a canvas grid editor 
 | client/src/ui/componentGuide.ts | 199 | pure data for it: tabs (`COMP_TABS`, `tabOf`), `guideRows`, `rowsOf`, `rowGates`/`requirementLine` (unlock gates), `questTeaches`, `bossDrops`, `rareParts` |
 | client/src/ui/componentSprites.ts | 130 | part sprites for the guide: `partSprite`, `peekSprite`, `PART_SPRITES_VERSION` (asset cache) |
 | common/src/ships/{mounting,blueprint,energy,circuits,wires}.ts | | the rules: `checkMounting`, `partMountingProblems`, `mountingWords`, blueprint validation (`badMounting` etc.), `loadTest`/`BROWNOUT` |
-| server/src/GameServer.ts | | `handleShipEdit` (~3350), `handleSlotSave` (~3373), `freeBuild(conn)` (~3345); message cases ~3101-3103 |
-| server/src/ships/ShipBridge.ts | | `validate(bp, {mounting?})` (~882): shared by both handlers |
+| server/src/GameServer.ts | | `handleShipEdit` (~3276), `handleSlotSave` (~3299), `freeBuild(conn)` (~3271); message handlers registered in `buildMessageHandlers()` |
+| server/src/ships/ShipBridge.ts | | `validate(bp, {mounting?})` (~727): shared by both handlers |
 | server/src/game/Hangar.ts | | `save(conn, slot, bp, {plan, grantAll})` (109): costs, ghosts vs built parts, gem handling, loaner rule, returns `string[]` errors |
 | server/src/game/AdminTools.ts | | admin free-build toggle (`freeBuild`, ~135, command ~291) |
 

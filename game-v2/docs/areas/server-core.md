@@ -1,11 +1,16 @@
 # Server core
-The Node process that runs the world: `index.ts` wires stores, data and transports; `GameServer.ts` (5,762 lines, one class) owns the ECS world, the 60 Hz tick, message routing, join/auth, docking, snapshots and the hosts that feed every `server/src/game/*` module. Most gameplay lives in those modules; GameServer is the glue. Do not read it whole: use the line map below.
+The Node process that runs the world: `index.ts` wires stores, data and transports; `GameServer.ts` (5,723 lines, one class) owns the ECS world, the 60 Hz tick (its system table is `buildTickSystems()`, phases in `tickOrder.ts`), message handlers (table in `buildMessageHandlers()`, dispatch in `net/dispatch.ts`), join/auth, docking, snapshots and the hosts that feed every `server/src/game/*` module. Most gameplay lives in those modules; GameServer is the glue. Do not read it whole: use the line map below.
 
 ## Files (what each owns)
 | path | lines | owns |
 |---|---|---|
 | server/src/index.ts | 192 | entry: env (`PORT`, `ADMIN_PORT`, `BROWSER_URL`, `LOBBY_ADMIN_SECRET`, `NODE_ENV`), `createUserStore`, `createProfileStore`, `checkGameData`, builds `GameServer`, `SocketTransport`, writes `data/status/live.json` every 2 s, graceful `shutdown` (20 s save budget), process-level handlers, registers with the lobby every 10 s (also receives `deletedAccounts`) |
-| server/src/GameServer.ts | 5762 | see section map below |
+| server/src/GameServer.ts | 5723 | see section map below |
+| server/src/net/dispatch.ts | 55 | `dispatch(table, ctx, conn, msg)` and `HandlerRegistry` (`t.on(type, fn)`); the pre-join gate (`PRE_JOIN`), the per-type rate limit and the handler call. `MAX_INPUTS_PER_TICK` lives here too |
+| server/src/net/ServerCtx.ts | 81 | `ServerCtx`: the narrow view of the server a client message handler may use (GameServer implements it) |
+| server/src/net/ClientConnection.ts | 81 | `ClientConnection`: the per-socket state (was the CLIENT CONNECTION block of GameServer) |
+| server/src/tickOrder.ts | 48 | `TickSystem`, `TICK_PHASES` (pilots-move, combat, world, persist), `checkTickOrder` |
+| server/src/ships/bridge/core.ts, sync.ts | 227 / 144 | ShipBridge split (see flight.md): shared types and constants, and the body, health, jump-field and tow readers and writers |
 | server/src/AdminServer.ts | 511 | dev/ops HTTP+WS admin API (`/auth /config /stats /command /reload`), sessions, `adminPassword()` (no default in production: off without a password) |
 | server/src/net/* | | transports, limits, shadows: see networking.md |
 | server/src/profile/ProfileStore.ts, JsonProfileStore.ts, PostgresProfileStore.ts, durableWrite.ts, index.ts | 49/145/85/55/22 | `ProfileStore` interface (`load/save/delete/loadDoc/saveDoc/close`), `MemoryProfileStore`, JSON files with daily backups, Postgres jsonb, atomic fsync+rename writes, `createProfileStore(dataPath)` switch |
@@ -14,28 +19,31 @@ The Node process that runs the world: `index.ts` wires stores, data and transpor
 | server/src/proto/createProtoServer.ts | | `createShipBridge(cfg)`, `createProtoServer` (in-process server for tests and `?proto`) |
 | server/src/game/*.ts | | the modules GameServer hosts (Pilots, Quests, Enemies, Bosses, Hangar, ...): each takes a `*Host` interface built by `create*Host()` in GameServer |
 
-## GameServer.ts section map (line numbers drift; grep the banner text)
+## GameServer.ts section map (line numbers drift; grep the banner text or the method name)
 | lines | section |
 |---|---|
-| 1-170 | imports, constants (`PRE_JOIN` ~416, `MAX_INPUTS_PER_TICK` ~418, `LAZY_TYPES`/`LAZY_TICKS` ~561) |
-| 171-373 | SPATIAL PARTITIONING (`SpatialGrid`) |
-| 374-447 | PERFORMANCE METRICS, QUERIES (bitecs queries) |
-| 448-610 | CLIENT CONNECTION (`ClientConnection` fields) |
-| 611-795 | `GameServerOptions`, class fields |
-| 796-1065 | constructor: builds every module in dependency order, wires hosts |
-| 1066-1110 | EXTERNAL CONTROL: `step()`, `setPaused`, `getTick`, `getShips` (tests/proto drive `step()`) |
-| 1115-2440 | `starterKit`, then the `create*Host()` factories (Pilot, Quest, Party, Ops, Event, Mob, Boss, Mining, Enemy, Admin, Surface, People, Arena, Siege, Pod, Ship), `loginPilot` (2230), `lingerSystem`, `canDamage`/`inPvpZone`, `forgetAccounts` (2296), `saveAll` (2311) |
-| 2442-2735 | INITIALIZATION: world, stations, rifts, portals, asteroids |
-| 2736-2900 | CONNECTION HANDLING: `connect(ws)` (2744, builds `ClientConnection`, sends `welcome`; returns the `ClientLink` with receive/close), `createPlayer` |
-| 2902-3797 | MESSAGE HANDLING: `handleMessage` switch (2909-3225), then `handleDock/undock/dockingSystem` (3282-3345), `handleShipEdit`, `handleStateHash`, `handleInput`, `handleJoin` (3526), `handleAuthLogin/Register`, `travelTo`, `riftSystem`, `handleInteract`, `handleRespawn` |
-| 3798-3920 | `gameLoop` (3823): fixed timestep accumulator, max 4 catch-up ticks, snapshots at 20 Hz, then `flushOutbox` |
-| 3921-3955 | crash isolation: `guard(where, fn)`, `fault`, `faultCounts` |
-| 3957-4020 | `tick()`: the system order (below) |
-| 4066-4800 | SYSTEMS: weapon, projectile, collision, asteroid death, DERELICTS, traffic, memory host, `towDelivered` (4688), `onPilotlessShipDestroyed`, lifetime, cleanup |
-| 4799-5560 | NETWORKING: `send/queue/flushOutbox`, `sendShipUpdates`, `systemRows` (4987), `sendSnapshots` (5146), `sendMapDots` (5330), `enterSystem` (5421), `sendPlayerState`, `sendSystemInfo` |
-| 5556-5762 | ADMIN SERVER INTEGRATION: `setupAdminHandlers`, `handleHttpAuth` (5631), `reportAdminStats`, `liveStatus` (5750) |
+| 1-174 | imports, constants (`LAZY_TYPES`/`LAZY_TICKS` ~l.488, `RIFT_*` ~l.431, `MEMORY_GATE_MOUTH` ~l.486). `PRE_JOIN` and `MAX_INPUTS_PER_TICK` are in net/dispatch.ts |
+| 175-377 | SPATIAL PARTITIONING (`SpatialGrid`) |
+| 378-448 | PERFORMANCE METRICS, QUERIES (bitecs queries) |
+| 449-537 | CLIENT CONNECTION banner (the `ClientConnection` interface itself is in net/ClientConnection.ts) |
+| 538-722 | GAME SERVER: `GameServerOptions`, class fields (`handlers`, `tickSystems`, `inputQueue`) |
+| 723-990 | constructor (723): builds every module in dependency order, wires hosts |
+| 991-1039 | `step()` (996), `setPaused`, `getTick`, `getShips` (tests and proto drive `step()`) |
+| 1040-2366 | `starterKit` (1040), then the `create*Host()` factories (Pilot, Quest, Party, Ops, Event, Mob, Boss, Mining, Enemy, Admin, Surface, People, Arena, Siege, Pod, Ship), `loginPilot` (2155), `lingerSystem` (2175), `canDamage` (2190), `forgetAccounts` (2221), `saveAll` (2236) |
+| 2367-2660 | INITIALIZATION: `initializeWorld` (2371): world, stations, rifts, portals, asteroids |
+| 2661-2826 | CONNECTION HANDLING: `connect(ws)` (2669, builds `ClientConnection`, sends `welcome`; returns the `ClientLink`), `createPlayer` (2778) |
+| 2827-3722 | MESSAGE HANDLING: `buildMessageHandlers()` (2840) registers one handler per client message type (`t.on`); `handleMessage` (3147) is one line calling `dispatch`. Then `handleDock` (3208), `dockingSystem` (3247), `handleShipEdit` (3276), `handleStateHash` (3318), `handleInput` (3354), `applyInputToEntity` (3376), `handleJoin` (3451), `handleAuthLogin` (3504), `handleAuthRegister` (3558), `travelTo` (3585), `handleInteract` (3641), `handleRespawn` (3688) |
+| 3731-3857 | GAME LOOP: `gameLoop` (3748: fixed timestep accumulator, max 4 catch-up ticks, snapshots at 20 Hz, then `flushOutbox`), `drainInputQueue` (3810), `releaseControls` (3840) |
+| 3858-3887 | crash isolation: `guard(where, fn)` (3858), `fault` (3866), `faultCounts` (3879) |
+| 3888-3957 | `buildTickSystems()` (3888): the tick table, built once |
+| 3958-4027 | `tickSystemList()` (test hook), `tick()` (3962): walks the table, then perf and admin stats |
+| 4028-4387 | SYSTEMS: the per-tick systems (weapon, projectile, collision, asteroid death, and the rest) |
+| 4388-4760 | DERELICTS (`derelictRespawnSystem` 4634), traffic (`trafficSystem` 4418, `trafficIntent` 4455), Tow Beam salvage `towDelivered` (4650), `onPilotlessShipDestroyed` (4692) |
+| 4761-5516 | NETWORKING: `send` (4789), `queue`, `flushOutbox` (4813), `sendShipUpdates` (4884), `systemRows` (4949), `sendSnapshots` (5107), `sendMapDots` (5291), `enterSystem` (5382), `sendPlayerState` (5433), `sendSystemInfo` (5490) |
+| 5517-5722 | ADMIN SERVER INTEGRATION: `setupAdminHandlers` (5521), `handleHttpAuth` (5592), `reportAdminStats` (5647), `liveStatus` (5711) |
 
-### Tick order (`tick()`, ~l.3957, every system inside `this.guard(name, fn)`)
+### Tick order (`buildTickSystems()` ~l.3888 builds the table; `tick()` ~l.3962 walks it)
+Each entry is `{ name, phase, run }` plus optional `every`, `scene` or `when`. The walker guards every entry with `guard(name, run)`; a `perClient` entry runs its own loop and guards each client. `server/src/golden/tickOrder.json` pins the order, and `tickOrder.test.ts` checks the table. The summary below is for orientation; the table is authoritative.
 stationOrbit, memory (load/unload systems), spatialGrid rebuild, playerMovement, towing, docking, rift, weapon, projectile, then (sectors scene only) enemies, bosses, mobs, events, surfaces, sieges, arenas, then collision, asteroidDeath, lod, ships (flight/damage), replication.endTick, recordSelfHashes, pods, mining, hazards, warmth, homes, comet watch, outpost finish (every 60), pilots, quests, codex, party, trade, achievements (every 60), ops, services+hangar (every 60), linger, derelictRespawn, traffic, lifetime, cleanup, perf/admin stats. Inputs are drained before each tick (`drainInputQueue`); snapshots are sent after the tick loop in `gameLoop`, not inside `tick()`.
 
 ## Public interface
@@ -45,8 +53,8 @@ stationOrbit, memory (load/unload systems), spatialGrid rebuild, playerMovement,
 - `ProfileStore`, `UserStore` (above); `PilotConn` is the narrow view of `ClientConnection` the modules see.
 
 ## Invariants
-- Every tick system, every message handler, every close step and every per-client send runs under `guard`/`try`: one failure must not stop the tick (docs/audits/server-robustness.md). A new tick system MUST be wrapped in `this.guard('name', ...)`.
-- `handleMessage` drops non-objects, unknown types and pre-join messages; rate limits (`limiter`) first. Handlers validate every field of `msg` (clients are hostile) and delegate; no game logic in the switch.
+- Every tick system, every message handler, every close step and every per-client send runs under `guard`/`try`: one failure must not stop the tick (docs/audits/server-robustness.md). A new tick system MUST be an entry in `buildTickSystems()`; the walker in `tick()` guards it.
+- `dispatch` (net/dispatch.ts, called by `handleMessage`) drops non-objects, unknown types and pre-join messages, then rate limits (`limiter`). Handlers validate every field of `msg` (clients are hostile) and delegate; no game logic in the handler table.
 - Never save a profile while it is loading or failed to load/migrate (`Session.loading`): a save we could not read is never replaced by a fresh one.
 - Durable writes only through `writeFileDurable(Sync)` (temp + fsync + rename). Profile saves for one account are serialised, newest wins.
 - Production refuses `guestAdmin`, `freeBuild` and a default admin password. Dev-only features check `NODE_ENV`.
@@ -55,10 +63,10 @@ stationOrbit, memory (load/unload systems), spatialGrid rebuild, playerMovement,
 - Systems not occupied are "put away" (`memory`); never assume a system's entities exist.
 
 ## How to extend
-1. **Add a tick system**: write it as a module or a private method; call it from `tick()` under `this.guard('myThing', () => ...)` at the right place in the order (after movement and before `replication.endTick` if it moves ships). If it only matters in sectors play, put it in the `scene === 'sectors'` block. Give it a test that drives `server.step()`.
+1. **Add a tick system**: write it as a module or a private method; add an entry `{ name, phase, run }` to `buildTickSystems()` at the right place in the order (after movement and before `replication.endTick` if it moves ships). If it only matters in sectors play, use the `scene` field rather than an `if`. Changing the order means updating `server/src/golden/tickOrder.json` on purpose. Give it a test that drives `server.step()`.
 2. **Add a module**: `game/Foo.ts` with `FooHost`; add `createFooHost()` and construct it in the constructor (keep dependency order: Pilots before Quests, etc.); call `foo.tick()` in the tick list; clean up in `connect()`'s `close` (guarded) if it holds per-connection state.
-3. **Add a client message handler**: see networking.md step 1; add the `case` in `handleMessage`, one line calling the module.
-4. **Add a field to ClientConnection**: interface (~l.450-610) AND the literal in `connect()` (~l.2750-2800); TypeScript will force the second.
+3. **Add a client message handler**: see networking.md step 1; register it in `buildMessageHandlers()` with `t.on('type', ...)`, one line calling the module.
+4. **Add a field to ClientConnection**: interface in `server/src/net/ClientConnection.ts` AND the literal in `connect()` (~l.2669); TypeScript will force the second.
 5. **Add a profile field**: econ/profile.ts (interface, `newProfile`, `migrateProfile`; see economy-quests.md); stores need no change.
 6. **Add an admin command**: game/AdminTools.ts (`AdminTools`), not AdminServer.
 7. **Add an env var**: read it in index.ts, pass via `GameServerOptions`; document in deploy/vps unit or secrets and DEVELOPMENT.md.
@@ -79,7 +87,7 @@ stationOrbit, memory (load/unload systems), spatialGrid rebuild, playerMovement,
 ## Gotchas
 - Line numbers in GameServer drift with every commit: grep the banner or method name, then read a 60-line slice.
 - A guard hides errors in the log (one line per 10 s per place): check `faultCounts()` when something silently does nothing.
-- `Input.*` fields are set from three/four hand-written lists (drainInputQueue, applyInputToEntity, releaseControls, the linger close path ~l.2830); a new control must be added to all of them.
+- `Input.*` fields are set from three/four hand-written lists (`drainInputQueue` ~l.3810, `applyInputToEntity` ~l.3376, `releaseControls` ~l.3840, the linger close path); a new control must be added to all of them.
 - Tests construct a server with `autoStart: false` and drive `step()`; if you forget to `flushLazy()`, effect messages seem missing.
 - `index.ts` still has a Fly.io comment/port branch (`publicPort = 443` in production); the project no longer deploys to Fly.io, nginx fronts the VPS.
 - Production runs on Postgres (switched 2026-10-31; see docs/ops/postgres-migration.md for the rollback). The JSON profile store is the local-dev default.

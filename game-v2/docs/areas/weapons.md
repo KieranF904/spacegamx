@@ -16,7 +16,7 @@ How a gun turns into shells, beams and pulses, and what those do to ships. The f
 | server/src/game/Weapons.ts | 300 | `Weapons`: `spawn` (one shot + burst), per-tick homing/pull/fuse, `onShipHit/onMobHit/onWallHit/onExpire`, `chain`, `shatter`, `detonate`, `threats`, `intercept` |
 | server/src/game/Ammo.ts | 207 | `Ammo`: crates, rounds, dry-fire at `dry` share |
 | server/src/game/Support.ts, Towing.ts | 59, 158 | support credit window (`SUPPORT_WINDOW_TICKS`); Tow Beam latch (maths in common tow.ts, flight/ship-parts) |
-| server/src/ships/ShipBridge.ts | 2453 | god-file; combat slices below |
+| server/src/ships/ShipBridge.ts | 2182 | god-file; combat slices below |
 | client/src/rendering/weapons/{WeaponFx,weaponStyles}.ts | 496, 242 | all projectile visuals; `WEAPON_STYLES[weaponType]`, `weaponStyle(type, grade)`; predicted own shells (`PredictedShell`) |
 | client/src/ships/{DamageFx,MiningBeamFx,PulseFx,gunDecor}.ts | 886, 372, 310, 623 | part damage/fire/break visuals; mining + lance beams (`castShips` uses collide.ts); pulse beams (`pulseLook`); per-gun barrel art |
 | docs/audits/collisions.md, boss-bullet-hell.md | | which tests hit what (outline vs circle); cost of boss shot storms |

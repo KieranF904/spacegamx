@@ -4,7 +4,7 @@ How a ship moves: `stepFlight` turns inputs plus `ShipDerived` (thrust, mass, in
 ## Files (what each owns)
 | path | lines | owns |
 |---|---|---|
-| common/src/ships/flight.ts | 536 | `FlightBody`, `FlightControls`, `FlightConstants`, `stepFlight` (jump, rotation, thrust, the strafer's dodge just before the energy tick, integrator: find them by their `// ---` banners), `stepDrift`, gravity, jump drive state machine (`stepJump`, `jumpPhase`, `jumpRange`, `JumpTuning`, l.116-300), `accelAlong`, `turnAccel`, `ratedFade` |
+| common/src/ships/flight.ts | 522 | `FlightBody`, `FlightControls`, `FlightConstants`, `stepFlight` (jump, rotation, thrust, the strafer's dodge just before the energy tick, integrator: find them by their `// ---` banners), `stepDrift`, gravity, jump drive state machine (`stepJump`, `jumpPhase`, `jumpRange`, `JumpTuning`), `accelAlong`, `turnAccel`, `ratedFade` |
 | common/src/ships/physics.ts | 61 | `stepShipPhysics` (stepFlight + `collideTerrain` + `quantizeShipBody`), `SHIP_PRECISION`, `SHIP_FLIGHT_CONSTANTS` |
 | common/src/ships/state.ts | 171 | `ShipState` (blueprint, per-part hp, derived, cooldowns; no position), `createShipState`, `damagePart`, `healPart`, `rebuildShip` |
 | common/src/ships/load.ts | 49 | cargo mass: `cargoThrust`, `cargoTurn`, `cargoEffect`, `quantizeCargo`, `CARGO_TURN_SHARE` |
@@ -13,16 +13,18 @@ How a ship moves: `stepFlight` turns inputs plus `ShipDerived` (thrust, mass, in
 | common/src/ships/jumpFields.ts, hazards.ts, warmth.ts | 170/107/110 | jump charging fields; hazard and cold effects on control (`hazardFlight`, `withEmp`, `withNumb`) |
 | common/src/ships/collide.ts | 158 | hit tests in grid space: `castParts`, `partDistance`, `nearestParts`; `stages.ts` which part is hittable on staged bosses. Hit tests are used by [weapons](weapons.md), not flight |
 | common/src/terrain.ts | - | `collideTerrain`, `terrainRadius` (planet-surface rock) |
-| server/src/ships/ShipBridge.ts | 2453 | server flight step `stepMovement` (l.1230-1280), `readBody`/`writeBody` (l.2360), debris/anchored drift (l.1790-1830) |
-| client/src/ships/ShipClient.ts | 1154 | `predict()` (l.944-985) pilot prediction, `predictGuns` (l.436) |
-| server/src/net/Replication.ts | - | the shadow `replicaStep` (l.113) that decides when a keyframe is needed |
+| common/src/ships/flightInputs.ts | 52 | `buildFlightInputs(src, emp, out)` and `newFlightControls()`: the one place a `FlightControls` is built from an input source. The server's `ShipBridge.stepMovement` uses it; `ShipClient` does not yet |
+| server/src/ships/ShipBridge.ts | 2182 | server flight step `stepMovement` (~l.1058), `tick()` (~l.1580); `readBody`/`writeBody` are thin wrappers over bridge/sync.ts |
+| server/src/ships/bridge/core.ts, sync.ts | 227 / 144 | shared bridge types (`ShipHost`, `ShipBridgeConfig`, `BridgeCtx`) and constants (core.ts); body, health, jump-field and tow readers and writers (`readBody` l.69, `writeBody` l.126, `syncHealth`, `jumpFieldState`, `towable`) (sync.ts) |
+| client/src/ships/ShipClient.ts | 1127 | `predict()` pilot prediction, `predictGuns` |
+| server/src/net/Replication.ts | - | the `replicaStep` shadow in `Replication` that decides when a keyframe is needed |
 | data/ships/tuning.json `flight`, `jump`, `tow` | - | gains and constants; read via `jumpTuning`, `towTuning` (the strafer's numbers are per model: `strafe` in models.mjs) |
 
 ## Public interface
 - `stepFlight(body, input, derived, tuning, boost{charge,drainRate,load?,tick?}, k) -> FlightResult`; call `stepShipPhysics(body, input, derived, tuning, boost, gravity, jumpBoost, hazard, terrain)` instead; never quantize by hand (`quantizeShipBody`).
 - `FlightBody` {x,y,vx,vy,angle,angVel, jump?, jumpScale?, cargo?, dodge?, dodgeDir?}; `FlightControls` {forward, backward, left, right, boost, targetAngle, helm?, strafeLeft?, strafeRight?, jump?, jumpDist?, dodge? (boolean)}.
 - Counters on the body (jump, dodge, dodgeDir) are the whole feature state and ride keyframes/snapshots.
-- Wire side of the input bundle: protocol.ts input message + binary flags2 (`encodeInputBinary`: strafeLeft/Right, helm, jump, targetTick, dodge; 0x20 and 0x80 free); `CTL` bits in replica.ts; server `Input.*` ECS arrays (GameServer.ts input handler ~l.3459-3464 and reset ~l.3918).
+- Wire side of the input bundle: protocol.ts input message + binary flags2 (`encodeInputBinary`: strafeLeft/Right, helm, jump, targetTick, dodge; 0x20 and 0x80 free); `CTL` bits in replica.ts; server `Input.*` ECS arrays (GameServer `applyInputToEntity` and `releaseControls`).
 - Jump: `jumpDriveStats`, `pilotJumpStep` (jumpFields.ts) wrap a step with field boosts; both ShipBridge and ShipClient use it.
 
 ## Invariants
@@ -40,7 +42,7 @@ Add a flight-affecting ability (dodge-style):
 2. Feature file `common/src/ships/<x>.ts`: tuning + pure `stepX(counter, want, able, t)`; keep state as ONE integer on `FlightBody`.
 3. flight.ts: add the field to `FlightBody` and the control to `FlightControls`; hook into `stepFlight` at the matching banner (read only that slice).
 4. Controls plumbing, ALL copies: protocol.ts input type + binary flags (bump `PROTOCOL_VERSION`, `npm run wire:bump`), GameServer input handler + reset (`Input.x`), `controlBits`/`flightControls`/`CTL` in replica.ts, ShipBridge.stepMovement (body read + input), ShipClient.predict (body + `player.x` write-back), client input collection (`ui-hud-input`), `GameState.ts` pilot-row parsing (`player.dodge` etc.). The audit flags these hand-copied lists as the top drift risk.
-5. Keyframes/snapshots: pilot row extras (`pilotExtras` in strafer.ts, GameServer ~l.5040).
+5. Keyframes/snapshots: pilot row extras (`pilotExtras` in strafer.ts, used by GameServer.systemRows).
 Tune: edit data/ships/tuning.json, never inline constants; respect the `xxxTuning` default pattern.
 Add a velocity source (gravity, hazard): through `FlightConstants`, not in the bridge.
 
@@ -52,7 +54,7 @@ Add a velocity source (gravity, hazard): through `FlightConstants`, not in the b
 - `client/src/ships/autopilotFlight.test.ts` (autopilot courses flown through the shared step).
 
 ## Gotchas
-- ShipBridge.stepMovement and ShipClient.predict each build a `FlightControls` and body by hand; cargo and dodge were each added in both places. A new field missing on one side is a silent desync. (Audit P10: extract a shared `buildFlightInputs`.)
+- The server builds its `FlightControls` with `buildFlightInputs` (common/src/ships/flightInputs.ts), but `ShipClient.predict` still builds its controls and body by hand; cargo and dodge were each added in both places. A new field missing on the client side is a silent desync: add it to `FlightInputSource`/`buildFlightInputs` and to the client copy together.
 - `replicaStep` (shadow on the server, Replication.ts) uses `FULL_CHARGE`, `drainRate 0`, and the control bits only: anything not in `CTL`/keyframe (jump distance, cargo, cursor) is not replicated, and a mismatch forces a keyframe. `replica.ts` header says clients replay too; at this time no client code calls `replicaStep`.
 - Jump landing distance isn't replicated: the burn start triggers a keyframe.
 - Berthed pilots skip prediction (`ShipClient.predict` early return).

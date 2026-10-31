@@ -1,10 +1,10 @@
 # Networking and protocol
-How client and server talk: message types (objects over a WebSocket), the compact/binary wire encoding, the snapshot and ship-replication format, the version/hash handshake, and the transports (WebSocket, in-process). Gameplay never touches sockets; it builds `ServerMessage`s and the codec turns them into frames. Read this instead of protocol.ts (1,593 lines) when adding a message or a snapshot field.
+How client and server talk: message types (objects over a WebSocket), the compact/binary wire encoding, the snapshot and ship-replication format, the version/hash handshake, and the transports (WebSocket, in-process). Gameplay never touches sockets; it builds `ServerMessage`s and the codec turns them into frames. Read this instead of protocol.ts (1,585 lines) when adding a message or a snapshot field.
 
 ## Files (what each owns)
 | path | lines | owns |
 |---|---|---|
-| common/src/network/protocol.ts | 1593 | `PROTOCOL_VERSION`/`PROTOCOL_WIRE_HASH` (l.34-37), core `Client*`/`Server*` interfaces and the `ClientMessage` (l.193) / `ServerMessage` (l.709) unions, `EntityState`/`EntityType` (336-366), map-dot packing (789-855), binary input codec (1169-1252), `COMPACT` table (~1307), `SNAP_FIELDS`, `wireTables()`, `packSnapshot`/`unpackSnapshot`, `encodeServerMessage`/`serverFrame`/`decodeServerFrame` (1474-1593) |
+| common/src/network/protocol.ts | 1585 | `PROTOCOL_VERSION`/`PROTOCOL_WIRE_HASH` (l.31-33), core `Client*`/`Server*` interfaces and the `ClientMessage` (l.187) / `ServerMessage` (l.703) unions, `EntityState`/`EntityType` (330-360), map-dot packing, binary input codec (`encodeInputBinary` l.1163, `decodeInputBinary` l.1189), `COMPACT` table (just above `COMPACT_TYPES`, l.1299), `SNAP_FIELDS`, `wireTables()`, `packSnapshot`/`unpackSnapshot`, `encodeServerMessage`/`serverFrame`/`decodeServerFrame` (1469-1585) |
 | common/src/network/econProtocol.ts, socialProtocol.ts, contributorProtocol.ts | 381 / 226 / 33 | message families (economy+profile+quests, party/trade/chat, contributor notes); re-exported from protocol.ts and unioned into `ClientMessage`/`ServerMessage` |
 | common/src/network/binaryCodec.ts | 287 | tagged binary value format, `DICTIONARY` (fixed head here + `ids` from wire-dictionary.json), `encodeBinary`, `BinaryReader/Writer` |
 | common/src/network/wire-dictionary.json | | append-only manifest of ids (models/materials/pieces) sent by index; edited by `npm run wire:sync` |
@@ -20,7 +20,8 @@ How client and server talk: message types (objects over a WebSocket), the compac
 | server/src/net/MessageLimits.ts | 76 | `MESSAGE_LIMITS` token buckets per message type, `MessageLimiter` |
 | client/src/network/NetworkManager.ts | 158 | browser WebSocket: reconnect back-off, `decodeServerFrame`, per-message error isolation, traffic counters |
 | scripts/wire/sync.mjs, bump.mjs | | the two wire tools (below) |
-| server/src/GameServer.ts | | the sending side: `send/queue/flushOutbox` (~4827-4870), `systemRows` (~4987), `sendSnapshots` (~5146), `sendMapDots` (~5330); see server-core.md |
+| server/src/net/dispatch.ts | 55 | the client message registry (`HandlerRegistry`, `dispatch`): pre-join gate, per-type rate limit, handler call. Handlers are registered in `GameServer.buildMessageHandlers()` |
+| server/src/GameServer.ts | | the sending side: `send` (4789), `queue`, `flushOutbox` (4813), `systemRows` (4949), `sendSnapshots` (5107), `sendMapDots` (5291); see server-core.md |
 
 ## Public interface
 - Types: `ClientMessage`, `ServerMessage`, `EntityState`, `EntityType`, `ServerSnapshotMessage`, `ClientInputMessage`.
@@ -29,7 +30,7 @@ How client and server talk: message types (objects over a WebSocket), the compac
 - Replication: `ShipReplicaSet`, `packKeyframe/unpackKeyframe`, `packControlRow/unpackControlRow`, `CTL` (common/src/ships/replica.ts).
 - Close codes: 4001 sign-in failed (no reconnect), 4002 version mismatch (no reconnect), 1013 too many connections.
 
-### Own pilot row (`EntityType.Player`) `data[N]` (built in GameServer.systemRows, ~l.5005-5035)
+### Own pilot row (`EntityType.Player`) `data[N]` (built in GameServer.systemRows)
 0 packed cursor/weapon state (aim 13b, laser hit dist 8b, left/right beam on) | 1 whole charge % | 2 cursor distance | 3 jump drive counter | 4 shield % | 5 EMP ticks left | 6 beam heat % | 7 overheated 0/1 | 8 jump scale x1000 | 9 field flags (1 star ring, 2 lodestone) | 10 core store % | 11 number of store groups | 12 lodestone prime ticks | 13 warmth % | 14 cargo mass | 15.. each store group's charge % (`CHARGE_GROUPS_AT`=15, max 24; `packCharge`/`unpackCharge` in ships/energy.ts) | then, after the groups (ships/strafer.ts `pilotExtras`): dodge counter, last dodge's way (1..32), tow target id+1 (`towing.wireOf`). Fields after the groups shift with the group count: never read them by a fixed index.
 ### Other pilots' status row (`row.other`) `data`
 0 shield % (steps of 5) | 1 EMP'd | 2 heat (tenths) | 3 overheated | 4 mining beam hit (tenths) | 5 weapon beam on | 6 mining beam on | 7 cursor dist/100 | 8 tow target id+1. Their motion is not here (replicated, below).
@@ -46,15 +47,15 @@ forward 1, backward 2, left 4, right 8, boost 16, helm 32, strafeLeft 64, strafe
 - Any change to the wire tables needs `PROTOCOL_VERSION` + `PROTOCOL_WIRE_HASH` updated (protocol.test.ts fails otherwise, on purpose). JSON-only messages not in `COMPACT` do not change the hash.
 - The dictionary is append-only (indices are the wire format).
 - `COMPACT` field order is the wire format; a message with an unlisted field falls back to a plain object (nothing lost).
-- The server never trusts a client message: validate shape, clamp, ignore junk. Before join only `join, ping, authLogin, authRegister` are accepted (`PRE_JOIN`, GameServer.ts ~l.416).
+- The server never trusts a client message: validate shape, clamp, ignore junk. Before join only `join, ping, authLogin, authRegister` are accepted (`PRE_JOIN` in net/dispatch.ts).
 - Inputs are queued (cap `MAX_INPUTS_PER_TICK`=16 a tick) and applied at the tick boundary.
 - Row values are quantised the same on both sides (`quantizeShipValue`) so prediction replays match.
 - Tick 60 Hz, snapshots 20 Hz (`SNAPSHOT_RATE`, common/src/constants.ts). `LAZY_TYPES` effects may wait `LAZY_TICKS` (2) to ride the next frame.
 - common never imports client or server code.
 
 ## How to extend
-1. **Add a client message**: interface in the right family file (core: protocol.ts), add it to that family's client union; add a `case` in `GameServer.handleMessage` (~l.2909-3225) that delegates to a module (no logic in the switch); validate fields; if costly or broadcast, add a `MESSAGE_LIMITS` entry. The client sends with `network.send`. No bump (JSON, not in COMPACT).
-2. **Add a server message**: interface + union entry; handle it in client `Game.handleServerMessage` (client/src/Game.ts ~l.1722, one big switch) or a UI's `onMessage`. If it fires several times a second add it to `COMPACT` (bump). Eye-and-ear-only effects: add to `LAZY_TYPES` (GameServer.ts ~l.561).
+1. **Add a client message**: interface in the right family file (core: protocol.ts), add it to that family's client union; register a handler in `GameServer.buildMessageHandlers()` (`t.on('type', ...)`, see net/dispatch.ts) that delegates to a module (no logic in the handler); validate fields; if costly or broadcast, add a `MESSAGE_LIMITS` entry. The client sends with `network.send`. No bump (JSON, not in COMPACT).
+2. **Add a server message**: interface + union entry; handle it in the `HANDLERS` table of client/src/app/serverMessages.ts (one entry per type; `serverMessages.test.ts` checks it against server/src/golden/serverMessages.json), or in `ShipClient.handleMessage` for ship messages, or a UI's `onMessage`. If it fires several times a second add it to `COMPACT` (bump). Eye-and-ear-only effects: add to `LAZY_TYPES` (GameServer.ts ~l.561).
 3. **Add a pilot-row field**: append at the END of the right `data` array in `systemRows` (never insert; the group tail already shifts), read it client side (ship state / ShipClient), update the lists above and the comment in GameServer, then bump (old clients mis-read it). The row key (`rowKey`/`internKey`) decides when a row is resent.
 4. **Add a control bit / input flag**: next power of two in `CTL` + `controlBits`/`flightControls` (replica.ts); for input add a bit in `encodeInputBinary`/`decodeInputBinary` (flags2 is full: needs a longer input form). Bump.
 5. **Add a part/material/piece id**: `npm run wire:sync` (appends ids from data/ships to wire-dictionary.json; `--skip` keeps them off the wire), then `npm run wire:bump "reason"`.
@@ -77,7 +78,7 @@ forward 1, backward 2, left 4, right 8, boost 16, helm 32, strafeLeft 64, strafe
 - Tests that read a tick's effects must call `flushLazy()` (lazy effects wait).
 
 ## Related areas
-server-core (handleMessage, send/flush, snapshots), flight (`FlightBody`, prediction, `replicaStep`), energy (`packCharge` in the pilot row), weapons (projectile rows, fire events), ui-hud-input (client handlers), web-accounts (lobby handshake, close codes), economy-quests (econProtocol bodies), ops-tools (netBench, monitor). Docs: docs/areas/<slug>.md.
+server-core (message dispatch, send/flush, snapshots), flight (`FlightBody`, prediction, `replicaStep`), energy (`packCharge` in the pilot row), weapons (projectile rows, fire events), ui-hud-input (client handlers), web-accounts (lobby handshake, close codes), economy-quests (econProtocol bodies), ops-tools (netBench, monitor). Docs: docs/areas/<slug>.md.
 
 ## Notes (moved from DEVELOPMENT.md and the old engine-map)
 - **Protocol changes (the rule)**: the wire format is pinned: `protocol.test.ts` hashes the wire tables (`COMPACT`, `SNAP_FIELDS`, the dictionary, the binary input layout) and fails until the pin is updated. Adding a model, material or piece to `data/ships` makes `wireDictionary.test.ts` fail until you run `npm run wire:sync` (appends the new ids to the append-only `common/src/network/wire-dictionary.json`; never reorder or edit it by hand). After any wire change run `npm run wire:bump "what changed"`: it rebuilds common, increments `PROTOCOL_VERSION`, writes `PROTOCOL_WIRE_HASH` and appends a line to `common/src/network/PROTOCOL_CHANGELOG.md`; it does nothing if the hash already matches, so a second run is harmless. Part ids you do not want on the wire go in the manifest's `"skip"` list (`wire:sync --skip`).
