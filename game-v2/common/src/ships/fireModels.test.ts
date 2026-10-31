@@ -162,6 +162,19 @@ describe('firing models', () => {
     expect(s.spin[w.part]).toBeCloseTo(0, 9);
   });
 
+  it('autocannon and flak numbers: Chainsaw 4/s to 16/s, Stinger clip of 12, Cloudmaker splash r250 / 26', () => {
+    const cs = armed('autocannon_chainsaw'), w = cs.derived.weapons[0];
+    expect(60 / gunInterval(cs, w)).toBeCloseTo(4, 6);
+    run(cs, 60, () => true);
+    expect(60 / gunInterval(cs, w)).toBeCloseTo(16, 6);
+    const st = armed('autocannon_stinger').derived.weapons[0];
+    expect(st.fire).toMatchObject({ model: 'clip', clip: 12, reload: 72, reloadE: 20 });
+    expect(st.interval).toBeCloseTo(7.5, 6);
+    const cm = armed('flak_cloudmaker').derived.weapons[0];
+    expect(cm.fire).toMatchObject({ model: 'clip', clip: 4, reload: 150, reloadE: 30 });
+    expect(cm.ammo).toBeFalsy();
+  });
+
   it('beam: no heat (lit as long as it is held), a windup ramps its damage in, and short of power it sputters evenly', () => {
     const s = armed('lance_lance');
     const w = s.derived.weapons[0];

@@ -50,4 +50,4 @@ Bolts on at its side only
 {"open":true,"badge":"Lv 16","why":""}
 
 == partStats (raw) ==
-{"grade":2,"mark":"Mk II","size":"Medium","area":2,"hp":150.4,"mass":2.8,"firepower":25.47911111111111,"toughness":150.4,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":25.47911111111111,"range":1700,"damageType":"explosive","pen":1,"draw":12.14}
+{"grade":2,"mark":"Mk II","size":"Medium","area":2,"hp":150.4,"mass":2.8,"firepower":24.842311111111112,"toughness":150.4,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":24.842311111111112,"range":1700,"damageType":"explosive","pen":1,"draw":12.14}
