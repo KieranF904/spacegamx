@@ -60,6 +60,8 @@ export class MiningBeamFx {
   get glowLayer(): Container { return this.root; }
   private sparks: Spark[] = [];
   private t = 0;
+  /** Your held beams on, by part, as your client predicts them (ShipClient.predictGuns): your own beam doesn't wait for the snapshot */
+  ownBeams: (() => ReadonlySet<number>) | null = null;
   /** Is your own beam on (for the loop sound) */
   localActive = false;
 
@@ -189,11 +191,14 @@ export class MiningBeamFx {
       const beams = ship.derived.weapons.filter((w) => w.fire.model === 'beam');
       if (!beams.length) continue;
       const e = this.state.entities.get(id);
-      if (!e || !e.data?.length) continue;
-      // Players: the cursor state's weapon flag; hostiles: snapshot data[6]
-      if (e.type === EntityType.Player ? !unpackCursorWeaponState(e.data[0]).leftActive : e.type !== EntityType.ShipBody || e.data[6] !== 1) continue;
+      if (!e) continue;
+      // Your own: as predicted; other players: the cursor state's weapon flag; hostiles: snapshot data[6]
+      const own = id === this.state.playerId && this.state.predictionEnabled && this.ownBeams ? this.ownBeams() : null;
+      if (own) { if (!own.size) continue; }
+      else if (!e.data?.length || (e.type === EntityType.Player ? !unpackCursorWeaponState(e.data[0]).leftActive : e.type !== EntityType.ShipBody || e.data[6] !== 1)) continue;
       const pose = { x: e.renderX, y: e.renderY, angle: e.renderAngle };
       for (const w of beams) {
+        if (own && !own.has(w.part)) continue;
         // Its own tuning: its grade's reach and width too (launch.ts gunDef)
         const def = partWeaponDef(this.tuning, w.kind, ship.blueprint.parts[w.part], w);
         // A Repair Beam: a soft teal beam to the friendly hull it mends, sparkling where it lands (support.ts)

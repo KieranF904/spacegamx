@@ -460,6 +460,7 @@ export class ShipClient {
       const ship = this.store.get(this.opts.state.playerId);
       return { firing: !!this.opts.miningHeld?.() && !!ship?.derived.miners.length && !this.hangarOpen, aim: aim.angle, dist: aim.dist };
     });
+    this.beamFx.ownBeams = () => this.ownBeams;
     // A pulse laser's pulse: its charge whine, the crack at its peak and its fading tail (pitched by its grade)
     this.beamFx.onPulse = (x, y, grade, own) => { this.opts.sound?.('laser_pulse', own ? undefined : { x, y }, own ? 0.42 : 0.7, PULSE_GRADE_PITCH[Math.max(0, Math.min(4, grade - 1))]); };
     // A mining laser's pulse: a deep, soft throb, one a ship however many miners it has
@@ -546,8 +547,12 @@ export class ShipClient {
    * shells leave your barrels on the tick the server fires them, with the same
    * spread. They're drawn at once; the server's copies take them over.
    */
+  /** Your held beams on this predicted tick (by part), so your own beam shows the moment it fires, as your shells do */
+  private ownBeams = new Set<number>();
+
   predictGuns(player: InterpolatedEntity, input: ClientInputMessage, tick: number, charge: Charge): Charge | null {
     const ship = this.store.get(player.id);
+    this.ownBeams.clear();
     if (!ship || ship.kind !== 'ship' || this.docked || !this.scene) return null;
     // (No firing mid-jump, nor knocked out by an EMP: ShipBridge.stepWeapons)
     const burning = jumpPhase(player.jump ?? 0, this.jump).phase === 'burn' || tick < (player.empUntil ?? 0);
@@ -558,7 +563,8 @@ export class ShipClient {
     // Each shot spends stored energy, then the mining lasers pay for their segment, as on the server (energy.ts)
     const energy = { charge };
     // (Guns never read warmth: rework 2026-11)
-    const { shots, pulses } = stepGuns(ship, pose, { firing, aimWorld: input.targetAngle, aimDist: input.cursorDist ?? 0, energy }, tick, this.opts.tuning);
+    const { shots, beams, pulses } = stepGuns(ship, pose, { firing, aimWorld: input.targetAngle, aimDist: input.cursorDist ?? 0, energy }, tick, this.opts.tuning);
+    for (const w of beams) this.ownBeams.add(w.part);
     // (What the guns hold now, for the server's gun-state correction: gunSync.ts)
     this.gunSync.record(ship, tick);
     this.gunFeel.own(ship, tick);
@@ -863,13 +869,15 @@ export class ShipClient {
     return this.beamFx?.localActive ?? false;
   }
 
-  /** Your own beam weapon firing now (from the server's flag): 'laser', 'lance' or null */
+  /** Your own beam weapon firing now (predicted, or the server's flag without prediction): 'laser', 'lance' or null */
   weaponBeamKind(): string | null {
     const e = this.opts.state.entities.get(this.opts.state.playerId);
     const ship = this.store.get(this.opts.state.playerId);
-    if (!e?.data?.length || !ship || !unpackCursorWeaponState(e.data[0]).leftActive) return null;
+    if (!ship) return null;
+    const predicted = this.opts.state.predictionEnabled;
+    if (predicted ? !this.ownBeams.size : !e?.data?.length || !unpackCursorWeaponState(e.data[0]).leftActive) return null;
     // (Pulse lasers have their own sound, a pulse at a time: only held beams count)
-    const beam = ship.derived.weapons.find((w) => w.fire.model === 'beam');
+    const beam = ship.derived.weapons.find((w) => w.fire.model === 'beam' && (!predicted || this.ownBeams.has(w.part)));
     return beam?.kind ?? null;
   }
 
