@@ -69,9 +69,12 @@ const W = [
   ['missile_dart', 'Dart', 'missile', 'sq', 11, {}, {}, 'The base launcher: missiles that lock on. Fires missile crates.'],
   ['missile_swarm', 'Swarm', 'missile', 'rect2', 21, { dmg: 0.5, burst: 3 }, { mul: { damage: x(0.5), splashDamage: x(0.5), homing: x(1.3) }, add: { burst: 2 } }, 'Three small missiles a salvo, turning hard.'],
   ['missile_hammerhead', 'Hammerhead', 'missile', 'block2', 33, { dmg: 3.5, int: 1.8, hp: 1.2, mass: 1.4 }, { mul: { damage: x(3.5), splashDamage: x(1.6), speed: x(0.7), maxSpeed: x(0.7), size: x(1.5) } }, 'A huge, slow warhead.'],
-  ['railgun_needle', 'Needle', 'railgun', 'rect2', 13, {}, {}, 'The base railgun: fast slugs that pierce. Fires slugs.'],
-  ['railgun_coilgun', 'Coilgun', 'railgun', 'rect2', 22, { dmg: 0.7, int: 0.6, draw: 1.8 }, { mul: { damage: x(0.7) }, set: { ammo: null } }, 'A railgun that needs no slugs: it throws its own, and drinks power for it.'],
-  ['railgun_spear', 'Spear', 'railgun', 'block2', 28, { dmg: 2.6, int: 1.5, draw: 2.2, hp: 1.2 }, { mul: { damage: x(2.6) }, add: { pierce: 1 } }, 'A heavy rail: slugs through ship after ship.'],
+  // (Railguns, rework section 4: the Needle's slug 62 dmg, pierce 2, speed 150, 75 ticks; the Coilgun five slugs of 16 in a 12 degree cone, pierce 1,
+  // life 18 (2,700 reach), 54 ticks, 14 E a shot; the Spear 160 dmg through three hulls at full damage, 114 ticks, 120 E. The energy a cycle gun
+  // draws is its draw x its interval, so RAIL_E sets each demand to give 14 E and 120 E a shot)
+  ['railgun_needle', 'Needle', 'railgun', 'rect2', 13, {}, {}, 'The cheap rail: a long thin slug that goes through two ships. It fires slugs from the hold and needs no power.'],
+  ['railgun_coilgun', 'Coilgun', 'railgun', 'rect2', 22, { dmg: 0.7, int: 0.72, draw: 1.8 }, { set: { ammo: null, damage: 16, burst: 5, spread: 6, jitter: 0, life: 18, pierce: 1 } }, 'The rail shotgun: five slugs in a tight cone, a finisher for close range that is spent past 2,700. It throws its own slugs for 14 E a shot, so it needs no ammo.'],
+  ['railgun_spear', 'Spear', 'railgun', 'block2', 28, { dmg: 2.6, int: 1.52, draw: 2.2, hp: 1.2 }, { set: { damage: 160, pierce: 3, pierceKeep: 1 } }, 'The capital rail: one slug every couple of seconds that goes through three ships at full damage, a ring of shock at each. It costs 120 E a shot and needs no ammo.'],
   ['emp_hush', 'Hush', 'emp', 'sq', 15, {}, {}, 'The base EMP: shuts a ship down for a moment.'],
   ['emp_blackout', 'Blackout', 'emp', 'block2', 35, { int: 1.5, dmg: 1.6 }, { set: { emp: { radius: 320, ticks: 168 } }, mul: { size: x(1.4) } }, 'A wide, long blackout.'],
   ['arc_spark', 'Spark', 'arc', 'sq', 17, {}, {}, 'The base arc projector: lightning that jumps between ships.'],
@@ -313,11 +316,15 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   }
   MOUNT.railgun_rail_driver = 'fixed';
   MOUNTING.railgun_rail_driver = { attach: 'back', clear: ahead(3) };
-  const spear = models.find((m) => m.id === 'railgun_spear');
-  const desc = 'A heavy rail that throws its slug through a ship.';
+  // (The semi-automatic rifle, its own numbers: a clip of 6 at 10 ticks, 40 dmg, pierce 1, speed 150; reloading itself for 90 ticks draws 48 E,
+  // the bank first. Its demand is that reload's draw spread over a clip's whole cycle; the fire block below gives the rest.)
+  const desc = 'The semi-automatic rifle: a clip of six sharp shots at six a second, then it reloads itself in a second and a half for 48 E, from its bank first. It needs no ammo.';
   models.push({
-    ...spear, id: 'railgun_rail_driver', name: 'Rail Driver', unlock: { level: 29 }, ...mounted('railgun_rail_driver', desc),
-    fabOrder: next('weapons'), guide: { name: 'Rail Driver', blurb: desc.split(':')[0].replace(/[.]$/, ''), piece: 'block2', order: guideOrder++ },
+    ...base('railgun_rail_driver', 'Rail Driver', 'railgun', ['block2'], 29, 'titanium', { grade: 4 }),
+    weapon: 'railgun', ...mounted('railgun_rail_driver', desc), hpScale: 0.96, demand: r2((48 * 60) / (90 + 6 * 10) / PIECE_AREA.block2), priority: 2, fireInterval: 10,
+    weaponMods: { set: { ammo: null, damage: 40, pierce: 1, speed: 150, life: 60 } },
+    rarity: 'rare', category: 'weapons', fabOrder: next('weapons'), ...legacyLook('railgun'),
+    guide: { name: 'Rail Driver', blurb: 'The semi-automatic rifle', piece: 'block2', order: guideOrder++ },
   });
 }
 // ---- (end Pulse Dynamo, Flash Screen, Rail Driver)
@@ -416,8 +423,8 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
     missile_swarm: { model: 'ammo', rounds: 6 },
     missile_hammerhead: { model: 'ammo' },
     railgun_needle: { model: 'ammo' },
-    railgun_coilgun: { model: 'cycle' },
-    railgun_spear: { model: 'cycle' },
+    railgun_coilgun: { model: 'cycle', interval: 54 },
+    railgun_spear: { model: 'cycle', interval: 114 },
     railgun_rail_driver: { model: 'clip', interval: 10, clip: 6, reload: 90, reloadE: 48 },
     emp_hush: { model: 'cycle' },
     emp_blackout: { model: 'charge', charge: 90, cooldown: 240, chargeE: 90 },
@@ -437,6 +444,7 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
     utility_demolition_launcher: { model: 'ammo' },
   };
   // (Held beams of kinds that fire shells or pulses today: the section 4 dps and reach, until their family unit gives them their own)
+  const RAIL_E = { railgun_coilgun: 14, railgun_spear: 120 };
   const BEAM_SET = { laser_cutter: { dps: 60 }, laser_searchlight: { dps: 25 }, arc_tesla: { dps: 70, range: 660, width: 10 } };
   for (const m of models) {
     if (!m.weapon) continue;
@@ -445,6 +453,8 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
     m.fire = { ...f, interval: f.model === 'beam' ? 1 : f.interval ?? m.fireInterval ?? 10 };
     // (A clip's interval is its own beat within the clip, from section 4: the fire rate everything else reads too)
     if (f.interval !== undefined) m.fireInterval = f.interval;
+    // (A cycle railgun's energy a shot is its draw x its interval: the section 4 energies set the draw, per cell)
+    if (RAIL_E[m.id]) m.demand = r2((RAIL_E[m.id] * 60) / (f.interval * PIECE_AREA[m.pieces[0]]));
     const kind = TUNING.weapons[m.weapon] ?? {};
     const set = { ...(m.weaponMods?.set ?? {}) };
     if (kind.ammo && f.model !== 'ammo') set.ammo = null;

@@ -4,17 +4,17 @@ Mk IV · Large · Block · 4 cells
 Hull · mass430 hp · 4.0
 Armour · build4 · 15.2 pts
 TakesKinetic −5% · Thermal −15% · Cryo −10%
-Damage86/s · reach 9,000
+Damage84/s · reach 9,000
 Hits withKinetic · penetration 5.5
 Fire rate0.5/s · shells
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 3 clear cells ahead
-Power draw168/s
+Power draw63/s
 
 == partStats (stats rows) ==
 GradeMk IV · Large
 Hits withKinetic · penetration 4
-Power draw168
+Power draw63
 Hull · mass430 hp · 4.0
 Armour · build4 · 15.2 pts
 TakesKinetic −5% · Thermal −15% · Cryo −10%
@@ -30,10 +30,10 @@ Large
 Large · Block
 
 == tradeOff ==
-through ship after ship, power-hungry
+three ships at full damage, 120 E a shot
 
 == keyStats ==
-86 dmg/s · reach 9,000 · draws 168
+84 dmg/s · reach 9,000 · draws 63
 
 == mountBadge ==
 FIXED
@@ -50,4 +50,4 @@ Needs 3 clear cells ahead
 {"open":true,"badge":"Lv 28","why":""}
 
 == partStats (raw) ==
-{"grade":4,"mark":"Mk IV","size":"Large","area":4,"hp":430.08,"mass":4,"firepower":85.59292035398232,"toughness":430.08,"armour":4,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"dps":85.59292035398232,"range":9000,"damageType":"kinetic","pen":5.5,"draw":167.8}
+{"grade":4,"mark":"Mk IV","size":"Large","area":4,"hp":430.08,"mass":4,"firepower":84.21052631578948,"toughness":430.08,"armour":4,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"dps":84.21052631578948,"range":9000,"damageType":"kinetic","pen":5.5,"draw":63.16}

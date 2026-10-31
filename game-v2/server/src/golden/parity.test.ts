@@ -300,6 +300,11 @@ const FIRE_SCENARIOS: Scenario[] = [
     name: 'fire-regrow', ship: armedSparrow('legendary_hive', 'autocannon_stinger'), replicaDiverges: true, replayAt: [],
     script: fireScript([400, { forward: true }, true, (i) => UP + Math.sin(i / 50) * 0.2], [200, {}, false, UP], [200, { right: true }, true, UP]),
   },
+  // The cycle railguns: the Coilgun's five-slug cone and the Spear, power paid per shot, flown on the throttle
+  {
+    name: 'fire-rail-cycle', ship: armedSparrow('railgun_coilgun', 'railgun_spear'), replicaDiverges: true, replayAt: [],
+    script: fireScript([300, { forward: true }, true, (i) => UP + Math.sin(i / 60) * 0.15], [40, {}, false, UP], [300, { forward: true, boost: true }, true, UP]),
+  },
 ];
 
 describe('prediction parity: the firing models (the pilot\'s guns keep the server\'s state)', () => {

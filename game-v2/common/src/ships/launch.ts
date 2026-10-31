@@ -177,7 +177,7 @@ export function shellSeed(owner: number, partUid: number, index: number): string
 export function launchShot(def: WeaponTuning, kind: string, shape: LaunchShape, angle: number, ownerVx: number, ownerVy: number,
   tick: number, seed: string): Omit<Launched, 'x' | 'y' | 'id'> & { speed: number } {
   const rng = mulberry32(hashString(`shot:${tick}:${seed}`));
-  const spread = ((def.burst ?? 1) > 1 ? 4 : def.spread ?? 1.8) * Math.PI / 180;
+  const spread = ((def.burst ?? 1) > 1 ? def.jitter ?? 4 : def.spread ?? 1.8) * Math.PI / 180;
   const a = angle + (rng() - 0.5) * 2 * spread;
   const cannon = kind === 'cannon';
   const speed = (def.speed ?? 48) * (cannon ? shape.speedScale : 1) * (0.99 + rng() * 0.02);
@@ -198,6 +198,13 @@ export function volleyAngles(def: WeaponTuning, angle: number): number[] {
   if (n <= 1) return [angle];
   const fan = ((def.spread ?? 10) * Math.PI) / 180;
   const out: number[] = [];
+  // An exact fan (`jitter` given, an odd burst: the Coilgun): evenly across +-spread, centred on the aim, its middle slug the volley's last
+  if (def.jitter !== undefined && n % 2 === 1) {
+    const mid = (n - 1) / 2;
+    for (let i = 0; i < n; i++) if (i !== mid) out.push(angle + fan * ((i / (n - 1)) - 0.5) * 2);
+    out.push(angle);
+    return out;
+  }
   for (let i = 1; i < n; i++) out.push(angle + fan * ((i / (n - 1)) - 0.5) * 2);
   out.push(angle);
   return out;
