@@ -33,7 +33,7 @@ Medium · Panel
 wide heavy bursts, slow · ammo
 
 == keyStats ==
-25 dmg/s · reach 1,700 · draws 12
+25 dmg/s · reach 1,700 · clip 4 · 2.5s reload · draws 12
 
 == mountBadge ==
 TURRET 240°SIDE

@@ -33,7 +33,7 @@ Large · Block
 ends a fight, slow · ammo
 
 == keyStats ==
-281 dmg/s · reach 6,240 · draws 58
+281 dmg/s · reach 6,240 · ammo · draws 58
 
 == mountBadge ==
 FIXED

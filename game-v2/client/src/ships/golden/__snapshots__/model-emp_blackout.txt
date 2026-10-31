@@ -33,7 +33,7 @@ Large · Block
 a wide, long blackout, slow
 
 == keyStats ==
-1 dmg/s · reach 3,300 · draws 15
+1 dmg/s · reach 3,300 · charge 1.5s · draws 15
 
 == mountBadge ==
 TURRET 120°

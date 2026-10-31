@@ -160,6 +160,19 @@ export function sizeText(catalog: Catalog, fn: FunctionDef): string {
 
 const n0 = (v: number) => (Number.isFinite(v) ? Math.round(v).toLocaleString() : '—');
 
+/** A gun's firing model as a chip ("clip 6 · 1.5s reload", "charge 2.0s", "held beam"); a plain cycling gun has none */
+export function fireChip(fn: FunctionDef): string {
+  const f = fn.fire;
+  if (!f) return '';
+  switch (f.model) {
+    case 'clip': return f.regrow ? `clip ${f.clip} · regrows` : `clip ${f.clip} · ${((f.reload ?? 0) / 60).toFixed(1)}s reload`;
+    case 'charge': return `charge ${((f.charge ?? 0) / 60).toFixed(1)}s`;
+    case 'beam': return f.windup ? 'held beam · winds up' : 'held beam';
+    case 'ammo': return 'ammo';
+    default: return f.spin ? 'spins up' : '';
+  }
+}
+
 /** Its key numbers at its own size, short: "62 dmg/s · reach 1,400", "thrust 4.0 · top 4,200 m/s · draws 68" (a boost is in its trade-off); structure in its material */
 export function keyStats(catalog: Catalog, tuning: ShipTuning | undefined, fn: FunctionDef, piece?: string, material?: string): string {
   const pc = piece ?? (fn.pieces === '*' ? 'sq' : fn.pieces[0]);
@@ -172,6 +185,8 @@ export function keyStats(catalog: Catalog, tuning: ShipTuning | undefined, fn: F
   else if (st.intercept) out.push(`${st.intercept.perSec.toFixed(1)} shots/s at missiles`);
   else if (st.dps !== undefined && fn.weapon) out.push(`${n0(st.dps)} dmg/s`);
   if (st.range && fn.weapon) out.push(`reach ${n0(st.range)}`);
+  const fm = fn.weapon && !st.heal && !st.intercept ? fireChip(fn) : '';
+  if (fm) out.push(fm);
   if (st.thrust) out.push(`thrust ${st.thrust.toFixed(1)}`);
   if (fn.rated) out.push(`top ${n0(fn.rated * 60)} m/s`);
   if (st.supply) out.push(`+${n0(st.supply)} power`);

@@ -33,7 +33,7 @@ Medium · Panel
 a hose: hard to dodge, harder to power
 
 == keyStats ==
-80 dmg/s · reach 5,400 · draws 44
+80 dmg/s · reach 5,400 · spins up · draws 44
 
 == mountBadge ==
 TURRET 240°

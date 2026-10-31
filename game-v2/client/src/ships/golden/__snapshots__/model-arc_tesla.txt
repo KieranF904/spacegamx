@@ -33,7 +33,7 @@ Small · Round
 jumps two ships further
 
 == keyStats ==
-70 dmg/s · reach 660 · draws 25
+70 dmg/s · reach 660 · held beam · draws 25
 
 == mountBadge ==
 TURRET 300°SIDE

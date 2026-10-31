@@ -71,6 +71,8 @@ interface BodyView {
   calmLabel?: boolean;
   /** Hostiles: a health bar under the label */
   bar?: Graphics;
+  /** The pilot's own bank members glowing by their bank's charge (drawBankGlow), and what it last showed */
+  bankGlow?: { g: Graphics; sig: number; ship: ShipState | null; rebuilds: number };
   /** How brightly the hull flashes white from a hit (the hull shader adds it), fading fast */
   flashLevel: number;
   /** Fading in on arrival, out on leaving (0..1) */
@@ -563,6 +565,7 @@ export class ShipRenderer {
       // Light on the ship (for its guns, which are tinted rather than lit per vertex)
       this.lighting.levelAt(entity.renderX, entity.renderY, this.lvl);
       this.drawTurrets(view, ship, cs, dt * 60);
+      this.drawBankGlow(view, ship, cs, eid === this.state.playerId);
       this.drawWires(view, ship, cs, now, entity.type === EntityType.ShipBody && (hostile || entity.data?.[0] === 2));
       this.updateLamps(view, ship, entity, dt);
       if (this.features?.hasDrawers) {
@@ -917,6 +920,38 @@ export class ShipRenderer {
     // (faded in and out with the ship, as its container is)
     w.g.alpha = view.fade;
     w.glow.alpha = w.breath * view.fade;
+  }
+
+  /**
+   * The pilot's own Capacitor and Drive Cell members glow with their bank's charge (rework 2026-11 section 2.4): amber and
+   * blue, brightest full, dark drained. Redrawn only when a bank's charge moves a step
+   */
+  private drawBankGlow(view: BodyView, ship: ShipState, cs: number, own: boolean): void {
+    const L = own && ship.kind === 'ship' ? ship.derived.power : undefined;
+    let b = view.bankGlow;
+    if (!L || !L.banks.length) { if (b) b.g.visible = false; return; }
+    if (!b) {
+      const g = new Graphics();
+      g.blendMode = 'add';
+      b = view.bankGlow = { g, sig: -1, ship: null, rebuilds: -1 };
+      view.container.addChildAt(g, Math.max(0, view.container.getChildIndex(view.guns)));
+    }
+    b.g.visible = true;
+    const charge = this.state.charge.b;
+    let sig = 1;
+    for (let k = 0; k < L.banks.length; k++) sig = (Math.imul(sig, 31) + Math.round((charge[k] ?? 100) / 5)) | 0;
+    if (sig === b.sig && ship === b.ship && ship.rebuilds === b.rebuilds) return;
+    b.sig = sig; b.ship = ship; b.rebuilds = ship.rebuilds;
+    const geoms = this.bridge.geometry(ship), [cx, cy] = ship.derived.com, g = b.g.clear();
+    for (let k = 0; k < L.banks.length; k++) {
+      const B = L.banks[k], pct = Math.max(0, Math.min(100, charge[k] ?? 100)) / 100, color = B.kind === 'drive' ? 0x3b82f6 : 0xf59e0b;
+      for (const i of B.parts) {
+        const poly = geoms[i]?.polygon;
+        if (!poly || !ship.derived.alive[i]) continue;
+        poly.forEach(([x, y], j) => (j ? g.lineTo((x - cx) * cs, (y - cy) * cs) : g.moveTo((x - cx) * cs, (y - cy) * cs)));
+        g.closePath().fill({ color, alpha: 0.05 + 0.5 * pct });
+      }
+    }
   }
 
   private layWires(w: NonNullable<BodyView['wires']>, ship: ShipState, cs: number): void {

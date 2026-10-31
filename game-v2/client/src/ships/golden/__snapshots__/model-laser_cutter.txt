@@ -33,7 +33,7 @@ Medium · Panel
 close and brutal, short reach
 
 == keyStats ==
-60 dmg/s · reach 4,080 · draws 32
+60 dmg/s · reach 4,080 · held beam · draws 32
 
 == mountBadge ==
 FIXED

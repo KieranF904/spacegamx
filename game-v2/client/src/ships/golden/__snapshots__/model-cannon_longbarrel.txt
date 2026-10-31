@@ -33,7 +33,7 @@ Medium · Panel
 a sniper's cannon: far, slow to fire
 
 == keyStats ==
-49 dmg/s · reach 8,400 · draws 10
+49 dmg/s · reach 8,400 · charge 2.0s · draws 10
 
 == mountBadge ==
 FIXED

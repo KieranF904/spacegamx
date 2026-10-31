@@ -33,7 +33,7 @@ Small · Square
 Legendary
 
 == keyStats ==
-23 dmg/s · reach 9,120 · draws 12
+23 dmg/s · reach 9,120 · clip 8 · regrows · draws 12
 
 == mountBadge ==
 FIXED

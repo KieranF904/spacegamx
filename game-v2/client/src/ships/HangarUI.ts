@@ -41,7 +41,7 @@ import {
   loadoutKinds, cratesFor, crateOrder, MAX_LOADOUT_CRATES, autoWire, wireCells, cellKey, cellOf, WIRE_ITEM, SEGMENTS_PER_SPOOL,
   type FunctionDef, type WireSeg, mountingOf, weaponSides, clearCells, partMountingProblems, type MountingProblem } from '@space-game/common';
 import { cargoEffect, CATEGORY_MASS, strafeForce, bestDodge, burstEnergy, DODGE_FORWARD, DODGE_BACK, DODGE_LEFT, DODGE_RIGHT } from '@space-game/common';
-import { loadTest, BROWNOUT, type LoadTestResult } from '@space-game/common';
+import { bankKind, gunDrawFlatOut, energyTuning, loadTest, BROWNOUT, type LoadTestResult } from '@space-game/common';
 import { settings } from '../settings/Settings';
 import { boundKeyName } from '../input/keybindings';
 import { costHtml } from '../ui/windowKit';
@@ -134,7 +134,14 @@ export class HangarUI {
   /** The power overlay's networks and warnings (from the design's derived state) */
   private power: PowerReport | null = null;
   /** The last load test (local circuits): which, on which design (it's dropped once the design changes), and what it found */
-  private loadRun: { kind: string; sig: string; result: LoadTestResult } | null = null;
+  /** The boost-and-fire load test of the derived design (the POWER panel's warning, the overlay's browned-out parts) */
+  private loadRun: { for: ShipDerived; result: LoadTestResult } | null = null;
+  private bothTest(): LoadTestResult | null {
+    const d = this.derived;
+    if (!d) return null;
+    if (this.loadRun?.for !== d) this.loadRun = { for: d, result: loadTest(d, this.deps.tuning, { fire: true, thrust: true, boost: true, seconds: LOAD_TEST_SECONDS }) };
+    return this.loadRun.result;
+  }
   private grantAll = false;
   private owned: Bag = {};
   /** The slot being edited, the plan it was loaded from, and what was last saved (to spot unsaved edits) */
@@ -1433,16 +1440,6 @@ export class HangarUI {
       const [item, n] = b.dataset.make!.split(':');
       this.deps.send({ type: 'fabOrder', item, n: Number(n) });
     });
-    // The load test (energy.ts loadTest): a few seconds of full fire, boost or both, run here on the design
-    this.stats.querySelectorAll<HTMLButtonElement>('[data-load]').forEach((b) => b.onclick = () => {
-      const kind = b.dataset.load!;
-      this.loadRun = kind === 'off' || !this.derived ? null : {
-        kind, sig: designSig(this.bp),
-        result: loadTest(this.derived, this.deps.tuning, { fire: kind !== 'boost', thrust: kind !== 'fire', boost: kind !== 'fire', seconds: LOAD_TEST_SECONDS }),
-      };
-      this.renderStats();
-      this.draw();
-    });
     act('all', () => this.deps.send({ type: 'slotBuild', slot: this.slot }));
     act('fly', () => { this.deps.send({ type: 'slotFly', slot: this.slot }); this.close(null); });
     act('clear', () => {
@@ -1473,26 +1470,33 @@ export class HangarUI {
         + `<span style="width:10px; height:10px; border-radius:2px; flex-shrink:0; background:${n.color}"></span><span style="color:#cfd8e6; white-space:nowrap">Network ${k + 1}</span><span style="color:#8ea0bd; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${what}</span>`
         + `<span style="margin-left:auto; white-space:nowrap" title="Made / drawn steadily (engines and guns draw on the batteries)"><b style="color:${!n.powered ? '#8ea0bd' : ok ? '#4ade80' : '#fbbf24'}">+${Math.round(n.supply)}</b><span style="color:#6b7a93"> / ${Math.round(n.demand)}</span></span></div>`;
     }
-    // The ship's pool and the banks (energy.ts, circuits.ts), and the load test's verdict (energy.ts loadTest)
+    // The ship's numbers in four lines, its banks, and the one load-test warning (rework 2026-11 section 2.4)
     const L = d.power, n0 = (v: number) => (Number.isFinite(v) ? Math.round(v).toLocaleString() : '—');
     if (L) {
-      html += `<div style="font-size:11px; color:#8ea0bd; padding:2px 0" title="The core's store and the batteries on powered networks: one pool. Output is the most the ship gives a second: spare generation plus what the pool gives">Pool ${n0(L.pool.cap)} · Output ${n0(L.spare + L.pool.rate)}/s</div>`;
+      const line = (t: string, tip = '') => `<div style="font-size:11px; color:#8ea0bd; padding:2px 0" ${tip ? `title="${tip}"` : ''}>${t}</div>`;
+      const gen = rep.nets.reduce((s, n) => s + (n.powered ? n.supply : 0), 0), steady = Math.max(0, gen - L.spare);
+      html += line(`Generation ${n0(gen)}/s · steady loads ${n0(steady)}/s · spare ${n0(L.spare)}/s`, 'What the generators make, what shields, scanners and coils take first, and what is left for the stores and the guns');
+      const nb = L.pool.parts.length;
+      html += line(`Store ${n0(L.pool.cap)} (core ${n0(L.pool.coreCap)}${nb ? ` + ${nb} ${nb === 1 ? 'battery' : 'batteries'}` : ''}) · Output ${n0(L.spare + L.pool.rate)}/s`, 'Your ship can give out at most its Output each second; engines are served first, and when guns want more, they all reload slower');
+      const boost = energyTuning(this.deps.tuning).boostDraw;
+      let eng = 0, engBoost = 0, guns = 0;
+      for (const t of new Set(d.thrusters.filter((x) => x.force[0] || x.force[1]).map((x) => x.part))) { eng += L.draw[t]; engBoost += L.draw[t] * (1 + boost * L.boostDrain[t]); }
+      for (const w of d.weapons) if (L.feedOf[w.part] >= 0) guns += gunDrawFlatOut(w, L.draw[w.part]);
+      html += line(`Flat out: engines ${n0(eng)}/s (boosting ${n0(engBoost)}/s) · guns ${n0(guns)}/s`);
       const partName = (i: number) => { const p = this.bp.parts[i], fn = this.deps.catalog.functions.get(p.fn); return fn?.name ?? p.fn; };
+      const r = this.bothTest();
+      if (r && guns > 0) {
+        const unbanked = d.weapons.filter((w) => L.feedOf[w.part] >= 0 && !L.feeds[L.feedOf[w.part]].banks.length && gunDrawFlatOut(w, L.draw[w.part]) > 0);
+        const share = unbanked.length ? Math.min(...unbanked.map((w) => r.part[w.part])) : 1;
+        if (r.brownAt >= 0 && share < BROWNOUT) html += `<div style="font-size:11px; padding:1px 0 3px; color:${share < 0.5 ? '#f87171' : '#fbbf24'}">⚠ Boosting while firing: unbanked guns get ${Math.round(share * 100)}%</div>`;
+        else if (r.brownAt >= 0) html += `<div style="font-size:11px; padding:1px 0 3px; color:#fbbf24">⚠ Boosting while firing: engines get ${Math.round(r.engines * 100)}%</div>`;
+        else html += '<div style="font-size:11px; padding:1px 0 3px; color:#4ade80">Holds up: full power while boosting and firing</div>';
+      }
       L.banks.forEach((B, k) => {
         const fed = [...new Set(B.feeds.map(partName))].join(', ');
         const never = !B.refills && B.dynamo <= 0;
         html += `<div style="font-size:11px; padding:1px 0; color:${never ? '#94a3b8' : B.kind === 'drive' ? '#7dd3fc' : '#fbbf24'}">Bank ${k + 1} (${B.parts.length} ${B.kind === 'drive' ? 'Drive Cell' : 'Capacitor'}${B.parts.length > 1 ? 's' : ''}) ${n0(B.cap)} · ${n0(B.rate)}/s → ${fed ? esc(fed) : 'feeds nothing'}${never ? ' · never refills' : ''}</div>`;
       });
-      const lt = this.loadRun && this.loadRun.sig === designSig(this.bp) ? this.loadRun : null;
-      const chip = (kind: string, label: string, tip: string) => `<button data-load="${kind}" title="${tip}" style="background:${lt?.kind === kind ? '#24406b' : '#0f1626'}; color:#e5ecf7; border:1px solid ${lt?.kind === kind ? '#5fd4c4' : '#2a3a5a'}; border-radius:5px; padding:1px 7px; cursor:pointer; font:11px 'Segoe UI', sans-serif">${label}</button>`;
-      html += `<div style="display:flex; align-items:center; gap:4px; margin:4px 0 2px; font-size:11px"><span style="color:#8ea0bd" title="Plays ${LOAD_TEST_SECONDS} seconds of the ship's own power from full">Load test</span>`
-        + chip('fire', 'Fire', 'Every gun firing flat out') + chip('boost', 'Boost', 'Boosting forward') + chip('both', 'Both', 'Every gun firing while boosting forward')
-        + (lt ? `<button data-load="off" title="Clear the load test" style="margin-left:auto; background:none; border:none; color:#6b7a93; cursor:pointer; font-size:11px">clear</button>` : '') + '</div>';
-      const r = lt?.result;
-      if (r) {
-        const pc = (v: number) => `${Math.round(v * 100)}%`;
-        html += `<div style="font-size:11px; padding:1px 0 3px; color:${r.brownAt < 0 ? '#4ade80' : Math.min(r.engines, r.guns) < 0.5 ? '#f87171' : '#fbbf24'}">${r.brownAt < 0 ? 'Holds up: full power throughout' : `Browns out ${r.brownAt < 0.05 ? 'at once' : `after ${r.brownAt.toFixed(1)} s`}: engines ${pc(r.engines)}, guns ${pc(r.guns)}`}</div>`;
-      }
     }
     if (rep.warnings.length) {
       html += `<div style="margin:5px 0 2px; font-size:11px; line-height:1.45">${rep.warnings.slice(0, 6).map((w) => `<div style="color:${/no power/.test(w) ? '#f87171' : '#fbbf24'}">• ${esc(w.charAt(0).toUpperCase() + w.slice(1))}</div>`).join('')}`
@@ -1856,8 +1860,65 @@ if (d && this.overlays.com && d.mass > 0) {
           ctx.fillStyle = '#fca5a5';
           ctx.font = '12px sans-serif';
           ctx.fillText(problem, sx(g.bbox.maxX) + 6, sy(g.bbox.minY) + 12);
-        }
+        } else this.drawFeedPreview(cand, g, sx, sy);
       }
+    }
+  }
+
+  private feedPreviewKey = '';
+  private feedPreviewFor: ShipDerived | null = null;
+  private feedPreviewVal: { feeds: number[]; hint: string } | null = null;
+
+  /**
+   * What a bank part in hand would feed (rework 2026-11 §2.4): the design with it added, run through the same power
+   * layout. A Capacitor's bank (with the ones it joins) feeds guns, a Drive Cell's engines and strafers, a Pulse Dynamo
+   * charges the banks it touches. Cached per candidate
+   */
+  private feedPreview(cand: PlacedPart): { feeds: number[]; hint: string } | null {
+    const { catalog, tuning } = this.deps, fn = catalog.functions.get(cand.fn);
+    if (!fn) return null;
+    const kind = bankKind(fn), dynamo = (fn.dynamo ?? 0) > 0;
+    if (!kind && !dynamo) return null;
+    const key = JSON.stringify(cand);
+    if (key === this.feedPreviewKey && this.derived === this.feedPreviewFor) return this.feedPreviewVal;
+    this.feedPreviewKey = key;
+    this.feedPreviewFor = this.derived;
+    this.feedPreviewVal = null;
+    try {
+      const L = createShipState(catalog, tuning, 0, { ...this.bp, parts: [...this.bp.parts, cand] }, 0).derived.power;
+      const at = this.bp.parts.length;
+      if (!L) return null;
+      const feeds = new Set<number>();
+      if (kind) { const B = L.banks[L.bankOf[at]]; if (B) for (const j of B.feeds) feeds.add(j); }
+      else for (const B of L.banks) if (B.dynamos.includes(at)) for (const i of B.parts) feeds.add(i);
+      this.feedPreviewVal = {
+        feeds: [...feeds].filter((j) => j < at),
+        hint: kind === 'drive' ? 'feeds nothing: it must touch an engine or strafer' : kind === 'cap' ? 'feeds nothing: it must touch a gun, beam or miner' : 'feeds nothing: it must touch a Capacitor or Drive Cell',
+      };
+    } catch { /* (a candidate the rebuild refuses: no preview) */ }
+    return this.feedPreviewVal;
+  }
+
+  /** Cyan glow on the parts the part in hand would feed, or a grey "feeds nothing" tag */
+  private drawFeedPreview(cand: PlacedPart, g: PlacedGeom, sx: (x: number) => number, sy: (y: number) => number): void {
+    const pv = this.feedPreview(cand), ctx = this.ctx;
+    if (!pv) return;
+    if (!pv.feeds.length) {
+      const fs = 11;
+      ctx.font = `600 ${fs}px 'Segoe UI', sans-serif`;
+      const tw = ctx.measureText(pv.hint).width + 10, bx = sx(g.bbox.minX), by = sy(g.bbox.maxY) + 18;
+      ctx.fillStyle = 'rgba(30, 36, 48, 0.9)'; ctx.fillRect(bx, by - 12, tw, 17);
+      ctx.fillStyle = '#9aa7bb'; ctx.fillText(pv.hint, bx + 5, by);
+      return;
+    }
+    for (const j of pv.feeds) {
+      const q = this.geoms[j];
+      if (!q) continue;
+      ctx.beginPath();
+      q.polygon.forEach(([x, y], k) => (k ? ctx.lineTo(sx(x), sy(y)) : ctx.moveTo(sx(x), sy(y))));
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(34, 211, 238, 0.28)'; ctx.fill();
+      ctx.strokeStyle = '#22d3ee'; ctx.lineWidth = 2.5; ctx.stroke();
     }
   }
 
@@ -1998,26 +2059,36 @@ if (d && this.overlays.com && d.mass > 0) {
     L.banks.forEach((B, k) => {
       const col = !B.refills && B.dynamo <= 0 ? '#94a3b8' : B.kind === 'drive' ? '#60a5fa' : '#fbbf24';
       for (const i of B.parts) outline(i, col, []);
-      ctx.strokeStyle = col; ctx.lineWidth = 3;
+      // (A glowing strap to every part it feeds, and a bolt on that part)
       for (const j of B.feeds) {
         const q = this.geoms[j];
         if (!q) continue;
         let from = this.geoms[B.parts[0]], best = Infinity;
         for (const i of B.parts) { const g = this.geoms[i]; if (!g) continue; const dd = Math.hypot(g.centroid[0] - q.centroid[0], g.centroid[1] - q.centroid[1]); if (dd < best) { best = dd; from = g; } }
         if (!from) continue;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = col; ctx.globalAlpha = 0.28; ctx.lineWidth = 8;
         ctx.beginPath(); ctx.moveTo(sx(from.centroid[0]), sy(from.centroid[1])); ctx.lineTo(sx(q.centroid[0]), sy(q.centroid[1])); ctx.stroke();
+        ctx.globalAlpha = 1; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(sx(from.centroid[0]), sy(from.centroid[1])); ctx.lineTo(sx(q.centroid[0]), sy(q.centroid[1])); ctx.stroke();
+        ctx.lineCap = 'butt';
+        this.boltGlyph(sx(q.centroid[0]) + ring * 0.85, sy(q.centroid[1]) - ring * 0.85, ring * 0.55, col);
       }
+      // (Its label: "Bank 1 · holds 320 · gives 4,000/s", at its first member)
       const at = this.geoms[B.parts[0]];
       if (at) {
-        const bx = sx(at.centroid[0]) + ring * 1.15, by = sy(at.centroid[1]) - ring * 1.15, r = Math.max(7, font * 0.62);
-        ctx.fillStyle = 'rgba(3, 5, 10, 0.85)'; ctx.beginPath(); ctx.arc(bx, by, r + 2, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = col; ctx.beginPath(); ctx.arc(bx, by, r, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#0b1220'; ctx.font = `800 ${Math.round(r * 1.2)}px 'Segoe UI', sans-serif`;
-        ctx.fillText(String(k + 1), bx, by + 0.5);
+        const n0 = (v: number) => Math.round(v).toLocaleString();
+        const text = `Bank ${k + 1} · holds ${n0(B.cap)} · gives ${n0(B.rate)}/s${!B.refills && B.dynamo <= 0 ? ' · never refills' : ''}`;
+        const fs = Math.max(10, Math.round(font * 0.8));
+        ctx.font = `700 ${fs}px 'Segoe UI', sans-serif`;
+        const tw = ctx.measureText(text).width + 10, bx = sx(at.centroid[0]), by = sy(at.centroid[1]) - ring * 1.7 - k * 0;
+        ctx.fillStyle = 'rgba(3, 5, 10, 0.85)'; ctx.fillRect(bx - tw / 2, by - fs * 0.7, tw, fs * 1.4);
+        ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.strokeRect(bx - tw / 2, by - fs * 0.7, tw, fs * 1.4);
+        ctx.fillStyle = col; ctx.fillText(text, bx, by + 0.5);
       }
     });
     // The load test: what browned out, by how much
-    const lt = this.loadRun && this.loadRun.sig === designSig(this.bp) ? this.loadRun.result : null;
+    const lt = this.overlays.power ? this.bothTest() : null;
     if (lt) {
       lt.part.forEach((v, i) => {
         if (v >= BROWNOUT || !this.geoms[i]) return;
@@ -2032,6 +2103,17 @@ if (d && this.overlays.com && d.mass > 0) {
       });
     }
     ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+  }
+
+  /** A small lightning bolt (fed parts, the power view) */
+  private boltGlyph(cx: number, cy: number, r: number, color: string): void {
+    const ctx = this.ctx;
+    ctx.beginPath();
+    ctx.moveTo(cx + r * 0.25, cy - r); ctx.lineTo(cx - r * 0.55, cy + r * 0.1); ctx.lineTo(cx - r * 0.05, cy + r * 0.1);
+    ctx.lineTo(cx - r * 0.25, cy + r); ctx.lineTo(cx + r * 0.55, cy - r * 0.2); ctx.lineTo(cx + r * 0.05, cy - r * 0.2);
+    ctx.closePath();
+    ctx.fillStyle = color; ctx.strokeStyle = 'rgba(3, 5, 10, 0.9)'; ctx.lineWidth = 1;
+    ctx.fill(); ctx.stroke();
   }
 
   /** The wires tool's cursor: the cell under the mouse (amber to lay, red to erase, grey off the hull) */

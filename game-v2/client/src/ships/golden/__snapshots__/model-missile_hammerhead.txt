@@ -33,7 +33,7 @@ Large · Block
 a huge slow warhead · ammo
 
 == keyStats ==
-42 dmg/s · reach 8,008 · draws 16
+42 dmg/s · reach 8,008 · ammo · draws 16
 
 == mountBadge ==
 FIXED

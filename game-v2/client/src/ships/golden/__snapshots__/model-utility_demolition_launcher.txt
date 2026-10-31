@@ -31,7 +31,7 @@ Small · Square
 cracks rock wide open
 
 == keyStats ==
-450 dmg/s · reach 2,400 · draws 8
+450 dmg/s · reach 2,400 · ammo · draws 8
 
 == mountBadge ==
 FIXED

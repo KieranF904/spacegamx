@@ -33,7 +33,7 @@ Medium · Panel
 slow, huge, through shields · ammo
 
 == keyStats ==
-117 dmg/s · reach 7,800 · draws 24
+117 dmg/s · reach 7,800 · ammo · draws 24
 
 == mountBadge ==
 FIXED
