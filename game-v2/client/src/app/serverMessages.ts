@@ -10,6 +10,7 @@
  * every type in server/src/golden/serverMessages.json is in HANDLERS and the table has nothing else.
  */
 import type { ServerMessage, DisconnectInfo } from '@space-game/common';
+import { showHitTick } from '../ui/HitTick';
 import { PROTOCOL_VERSION, PROTOCOL_MISMATCH_CLOSE } from '@space-game/common';
 import type { RibbonsFile } from '@space-game/common';
 import ribbonData from '../../../data/achievements.json';
@@ -229,6 +230,7 @@ function damage(h: MessageHost, msg: Msg<'damage'>): void {
     // Track damage dealt
     h.playerStatsUI.addDamageDealt(msg.amount);
     h.playerStatsUI.addShotHit();
+    showHitTick(msg.amount, msg.critical);
   }
   // Your own hull taking it: a thump (impacts on others sound from projectileHit)
   if (msg.targetId === h.state.playerId) {

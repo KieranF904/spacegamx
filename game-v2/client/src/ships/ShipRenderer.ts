@@ -389,7 +389,7 @@ export class ShipRenderer {
    * A shot left a gun at (x, y): the turret it came from (the one whose muzzle
    * is nearest) recoils and warms up.
    */
-  kick(owner: number, x: number, y: number): void {
+  kick(owner: number, x: number, y: number, power = 1): void {
     const view = this.views.get(owner);
     if (!view || (!view.turrets.length && !view.fixed.length)) return;
     const c = view.container, cos = Math.cos(c.rotation), sin = Math.sin(c.rotation);
@@ -402,7 +402,7 @@ export class ShipRenderer {
     for (const b of view.fixed) near(b, b.x0 + b.nx * b.len, b.y0 + b.ny * b.len);
     const hit = best as { kick: number; heat: number; len: number } | null;
     if (!hit || bestD > hit.len + 40) return;
-    hit.kick = 1;
+    hit.kick = Math.min(1.4, power);
     hit.heat = Math.min(1, hit.heat + HEAT_PER_SHOT);
   }
 

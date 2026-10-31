@@ -23,6 +23,8 @@
  */
 
 import type { Graphics } from 'pixi.js';
+import { beamLook } from '../rendering/weapons/weaponStyles';
+import { drawCone, drawStrands, sputterGain } from './beamLookFx';
 import { pulseIntensity, beamFalloff, effectiveRange, type PulseProfile, type WeaponTuning } from '@space-game/common';
 
 /** The flare's bulge races from the muzzle to where the beam lands at about this speed (world units a tick), in 5 to 12 ticks (~0.1-0.2 s) */
@@ -39,6 +41,12 @@ export interface PulseLook {
   halo?: number;
   /** Two strands spiralling round the beam while it's lit (Mk II's), this colour */
   helix?: number;
+  /** From a model's BEAM_LOOKS: strands wound round it (more than two, or another colour), motes (x), cone (degrees), ramp, sputter */
+  strands?: number;
+  motes?: number;
+  cone?: number;
+  ramp?: 'orb' | 'ring' | 'none';
+  sputter?: number;
 }
 
 const LOOKS: PulseLook[] = [
@@ -49,8 +57,25 @@ const LOOKS: PulseLook[] = [
   { outer: 0xf43f5e, mid: 0xffc2d0, core: 0xffffff, embers: 1.3, width: 1.1, rings: 2, halo: 0xa78bfa },
 ];
 
-export function pulseLook(grade: number): PulseLook {
-  return LOOKS[Math.max(0, Math.min(4, Math.round(grade) - 1))];
+const merged = new Map<string, PulseLook>();
+
+/** A pulse's look: its grade's, with the model's BEAM_LOOKS entry (if it has one) laid over it; each pair built once */
+export function pulseLook(grade: number, model?: string): PulseLook {
+  const base = LOOKS[Math.max(0, Math.min(4, Math.round(grade) - 1))];
+  const over = beamLook(model);
+  if (!over) return base;
+  const key = `${model}|${grade}`;
+  let m = merged.get(key);
+  if (m) return m;
+  m = { ...base };
+  if (over.outer !== undefined) m.outer = over.outer;
+  if (over.mid !== undefined) m.mid = over.mid;
+  if (over.core !== undefined) m.core = over.core;
+  if (over.width !== undefined) m.width = base.width * over.width;
+  if (over.braid) { m.helix = over.braid.color; m.strands = over.braid.strands; }
+  m.motes = over.motes; m.cone = over.cone; m.ramp = over.ramp; m.sputter = over.sputter;
+  merged.set(key, m);
+  return m;
 }
 
 
@@ -108,10 +133,10 @@ export class PulseFx {
    * full range, and what it hits out there flares weaker.
    */
   draw(g: Graphics, run: PulseRun, prof: PulseProfile, age: number, x: number, y: number, hx: number, hy: number, hit: boolean,
-    def: WeaponTuning, grade: number, frames: number): void {
+    def: WeaponTuning, grade: number, frames: number, model?: string): void {
     const k = pulseIntensity(prof, age);
     run.mx = x; run.my = y;
-    const L = pulseLook(grade);
+    const L = pulseLook(grade, model);
     const peakWidth = def.width ?? 16;
     const len = Math.hypot(hx - x, hy - y) || 1, ux = (hx - x) / len, uy = (hy - y) / len, nx = -uy, ny = ux;
     // Where it starts to fade, and how strong it is where it lands (dim past its effective range)
@@ -127,21 +152,27 @@ export class PulseFx {
     // Ramp: motes drawn in to the muzzle, and a charge orb swelling there
     if (ramp) {
       const q = Math.max(0, age / prof.peak);
-      if (Math.random() < 0.9 * frames) for (let i = 0; i < 2; i++) {
+      if (L.ramp !== 'none' && Math.random() < 0.9 * frames * (L.motes ?? 1)) for (let i = 0; i < 2; i++) {
         const a = Math.random() * Math.PI * 2, d = (26 + Math.random() * 40) * (1.2 - 0.5 * q);
         this.spawn({ kind: 2, x: Math.cos(a) * d, y: Math.sin(a) * d, vx: 0, vy: 0, life: 0, max: 10 + Math.random() * 8, color: Math.random() < 0.4 ? L.core : L.mid, size: 1.2 + Math.random() * 1.2, run });
       }
       const flick = 0.75 + 0.25 * Math.sin(this.t * 70 + run.part * 3);
       const orb = (3 + 11 * q * q) * L.width;
-      g.circle(x, y, orb * 2.2).fill({ color: L.outer, alpha: 0.18 * (0.3 + q) * flick });
-      g.circle(x, y, orb).fill({ color: L.mid, alpha: 0.45 * (0.3 + q) * flick });
-      g.circle(x, y, orb * 0.45).fill({ color: L.core, alpha: 0.85 * (0.3 + 0.7 * q) });
+      if (L.ramp === 'ring') {
+        // A ring closing in on the muzzle instead of an orb swelling there
+        g.circle(x, y, orb * 3 * (1.3 - 0.6 * q)).stroke({ color: L.mid, width: 1.5 + q * 2, alpha: 0.6 * (0.3 + q) * flick });
+        g.circle(x, y, orb * 0.4).fill({ color: L.core, alpha: 0.85 * (0.3 + 0.7 * q) });
+      } else if (L.ramp !== 'none') {
+        g.circle(x, y, orb * 2.2).fill({ color: L.outer, alpha: 0.18 * (0.3 + q) * flick });
+        g.circle(x, y, orb).fill({ color: L.mid, alpha: 0.45 * (0.3 + q) * flick });
+        g.circle(x, y, orb * 0.45).fill({ color: L.core, alpha: 0.85 * (0.3 + 0.7 * q) });
+      }
     }
 
     if (k > 0.004) {
       // Thin and flickering on the way in, steady at the flare, wavering as it dies
       const flicker = ramp ? 0.55 + 0.45 * Math.random() : 1;
-      const a = glow * flicker;
+      const a = glow * flicker * sputterGain(L.sputter, this.t, run.part);
       const waver = tail ? wid * 0.9 * (1 - k) : 0;
       const ex = x + ux * eff, ey = y + uy * eff;
       const line = (width: number, color: number, alpha: number, wv: number) => {
@@ -173,7 +204,11 @@ export class PulseFx {
       line(wid * 3.6, L.outer, 0.28 * a, waver * 1.4);
       line(wid * 1.6, L.mid, 0.6 * a, waver);
       line(Math.max(1, wid * 0.45), L.core, a, waver * 0.5);
-      if (L.helix !== undefined && !ramp) this.helix(g, x, y, ux, uy, nx, ny, eff, wid, L.helix, a, run.part);
+      if (L.cone) drawCone(g, x, y, ux, uy, eff, L.cone, L.mid, 0.2 * a);
+      if (L.helix !== undefined && !ramp) {
+        if (L.strands && L.strands !== 2) drawStrands(g, x, y, ux, uy, eff, wid, L.strands, L.helix, a, this.t, run.part);
+        else this.helix(g, x, y, ux, uy, nx, ny, eff, wid, L.helix, a, run.part);
+      }
       // Its muzzle: the glow it fires from (and an afterglow as it dies)
       g.circle(x, y, wid * (1.2 + 2.2 * k)).fill({ color: L.mid, alpha: 0.42 * a });
       if (hit && land > 0.01) {

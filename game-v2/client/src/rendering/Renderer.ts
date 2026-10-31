@@ -1650,6 +1650,11 @@ export class Renderer {
     this.weaponFx.firePose = fn;
   }
 
+  /** The model and damage of the gun a fire-event shell came from (WeaponFx.shellLook) */
+  set shellLookOf(fn: WeaponFx['shellLook']) {
+    this.weaponFx.shellLook = fn;
+  }
+
   /** A shell your client fired ahead of the server (WeaponFx.predict) */
   predictShot(p: PredictedShell): void {
     this.weaponFx.predict(p);
@@ -1661,7 +1666,7 @@ export class Renderer {
     this.weaponFx.barrelTip = fn;
   }
 
-  set onMuzzle(fn: ((owner: number, x: number, y: number) => void) | null) {
+  set onMuzzle(fn: ((owner: number, x: number, y: number, power: number) => void) | null) {
     this.weaponFx.onMuzzle = fn;
   }
 

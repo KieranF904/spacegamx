@@ -26,11 +26,11 @@
  */
 
 import { Container, Graphics, Texture } from 'pixi.js';
-import { disc, softDot, streak, streakScale, petal, petalScale, DOT_SIZE } from '../fxTextures';
+import { disc, softDot, streak, streakScale, petal, petalScale, ring, puff, DOT_SIZE } from '../fxTextures';
 import { ParticlePool } from '../particlePool';
 import { EntityType, WeaponType } from '@space-game/common';
 import type { GameState, InterpolatedEntity } from '../../state/GameState';
-import { WeaponStyle, weaponStyle } from './weaponStyles';
+import { WeaponStyle, weaponStyle, shotScale } from './weaponStyles';
 import type { Lighting } from '../lighting/Lighting';
 
 interface Shot {
@@ -38,6 +38,10 @@ interface Shot {
   style: WeaponStyle;
   /** Shell size relative to the base shot (fixed cannons fire bigger shells) */
   size: number;
+  /** x its flash, recoil and impact, from its damage (weaponStyles.shotScale) */
+  power: number;
+  /** Its own phase for sway and pulsing (so two shots do not beat together) */
+  phase: number;
   type: number;
   owner: number;
   glow: number;
@@ -69,8 +73,8 @@ interface Flash {
   girth: number;
   owner: number; ox: number; oy: number; rel: number;
 }
-interface Smoke { x: number; y: number; vx: number; vy: number; life: number; max: number; size: number }
-interface Spark { x: number; y: number; vx: number; vy: number; life: number; max: number; color: number }
+interface Smoke { x: number; y: number; vx: number; vy: number; life: number; max: number; size: number; color?: number; alpha?: number }
+interface Spark { x: number; y: number; vx: number; vy: number; life: number; max: number; color: number; width?: number }
 interface Ring { x: number; y: number; life: number; max: number; size: number; color: number }
 
 const FADE_FRAMES = 9;
@@ -87,8 +91,12 @@ export interface PredictedShell {
   pose: FirePoseXY;
   owner: number;
   type: number;
-  /** Its gun's grade (Mk I-V): each mark's shells look their own way */
+  /** Its gun's grade (Mk I-V): the mark only scales its size and brightness */
   grade?: number;
+  /** Its gun's model (PlacedPart.fn): its look (weaponStyles MODEL_STYLES) */
+  model?: string;
+  /** Damage a shot does: its recoil, flash and impact scale with it */
+  damage?: number;
   spawnX: number;
   spawnY: number;
   spawnTick: number;
@@ -113,6 +121,25 @@ function hueColor(h: number): number {
 }
 
 const TEX = { get disc() { return disc(); }, get dot() { return softDot(0.5, 0.1); }, get streak() { return streak(); }, get petal() { return petal(); } };
+/** The extra pool's textures (the glow pool holds its four already) */
+const TEX2 = { get ring() { return ring(); }, get puff() { return puff(); } };
+
+/** A colour with its hue turned by `deg` degrees (impact shards of a prism's rainbow) */
+export function turnHue(c: number, deg: number): number {
+  const r = ((c >> 16) & 255) / 255, g = ((c >> 8) & 255) / 255, b = (c & 255) / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  const l = (mx + mn) / 2;
+  if (d < 1e-6) return c;
+  const sat = d / (1 - Math.abs(2 * l - 1));
+  let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  h = ((h * 60 + deg) % 360 + 360) % 360;
+  const ch = (1 - Math.abs(2 * l - 1)) * sat, x = ch * (1 - Math.abs(((h / 60) % 2) - 1)), m = l - ch / 2;
+  const [r1, g1, b1] = h < 60 ? [ch, x, 0] : h < 120 ? [x, ch, 0] : h < 180 ? [0, ch, x] : h < 240 ? [0, x, ch] : h < 300 ? [x, 0, ch] : [ch, 0, x];
+  return (Math.round((r1 + m) * 255) << 16) | (Math.round((g1 + m) * 255) << 8) | Math.round((b1 + m) * 255);
+}
+
+/** Crackle defaults (an EMP orb's) when a style asks for lightning with no numbers of its own */
+const ORB_LIGHTNING = { color: 0xbfeaff, forks: 3, length: 7 };
 
 export class WeaponFx {
   /** Light (additive) and smoke (normal blending) */
@@ -122,6 +149,9 @@ export class WeaponFx {
    */
   private glow = new ParticlePool('normal');
   private smokeG = new ParticlePool('normal');
+  /** Rings, puffs and cloud (a fifth texture would not fit the glow pool) */
+  private extraG = new ParticlePool('normal');
+  private clock = 0;
   private crackle = new Graphics();
   /** Redrawn every frame it's crackling, so a render group of its own (Pixi rebuilds its draw list, not the scene's) */
   private crackleGroup = new Container({ isRenderGroup: true });
@@ -132,11 +162,13 @@ export class WeaponFx {
   private sparks: Spark[] = [];
   private rings: Ring[] = [];
   /** A shot seen leaving its gun (the ship renderer kicks the turret back) */
-  onMuzzle: ((owner: number, x: number, y: number) => void) | null = null;
+  onMuzzle: ((owner: number, x: number, y: number, power: number) => void) | null = null;
   /** Where a shot leaving (x, y) along `angle` comes out of its drawn barrel (the ship renderer knows), if it can tell */
   barrelTip: ((owner: number, x: number, y: number, angle: number) => { x: number; y: number } | null) | null = null;
   /** The firing ship's pose on a shell's fire tick, where it's known (shells built from fire events) */
   firePose: ((id: number) => FirePoseXY | undefined) | null = null;
+  /** The model and damage of the gun a fire-event shell came from (read once, as the shell is first seen) */
+  shellLook: ((id: number) => { model?: string; damage?: number } | undefined) | null = null;
 
   /** Everything here that glows (for the bloom) */
   get glowLayer(): Container {
@@ -149,7 +181,7 @@ export class WeaponFx {
   constructor(layer: Container) {
     this.crackle.blendMode = 'add';
     this.crackleGroup.addChild(this.crackle);
-    layer.addChild(this.smokeG.container, this.glow.container, this.crackleGroup);
+    layer.addChild(this.smokeG.container, this.glow.container, this.extraG.container, this.crackleGroup);
   }
 
   /** A line from (x0, y0) to (x1, y1), `width` thick with soft round ends */
@@ -240,7 +272,8 @@ export class WeaponFx {
   onHit(projectileId: number | undefined, x: number, y: number): void {
     const shot = projectileId !== undefined ? this.shots.get(projectileId) : undefined;
     const style = shot?.style ?? weaponStyle(WeaponType.Cannon);
-    const size = shot?.size ?? 1;
+    // (The impact scales with the shot's damage as well as its shell's size)
+    const size = (shot?.size ?? 1) * (shot?.power ?? 1);
     let normal = Math.random() * Math.PI * 2;
     if (shot) {
       shot.hit = { x, y };
@@ -252,7 +285,17 @@ export class WeaponFx {
     for (let i = 0; i < imp.sparks * size * this.particleKeep; i++) {
       const a = normal + (Math.random() - 0.5) * 2.2;
       const s = imp.speed * (0.4 + Math.random());
-      this.sparks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0, max: imp.life * (0.6 + Math.random() * 0.6), color: Math.random() < 0.25 ? 0xffffff : imp.color });
+      const col = Math.random() < 0.25 ? 0xffffff : style.shardHue ? turnHue(imp.color, (Math.random() - 0.5) * style.shardHue) : imp.color;
+      this.sparks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0, max: imp.life * (0.6 + Math.random() * 0.6), color: col });
+    }
+    // A cloud left where it landed (gas, dust, vapour)
+    const cloud = style.smokeCloud;
+    if (cloud) {
+      for (let i = 0; i < 5; i++) {
+        if (this.particleKeep < 1 && Math.random() > this.particleKeep) continue;
+        const a = Math.random() * Math.PI * 2, v = 0.3 + Math.random() * 0.8;
+        this.smoke.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0, max: cloud.life * (0.7 + Math.random() * 0.6), size: cloud.size * size * (0.6 + Math.random() * 0.6), color: cloud.color, alpha: 0.3 });
+      }
     }
     this.rings.push({ x, y, life: 0, max: 10, size: imp.flash * size, color: imp.color });
     // The heavier marks ring out wider and slower
@@ -270,12 +313,15 @@ export class WeaponFx {
   private createShot(e: InterpolatedEntity): Shot {
     const type = e.data?.[0] ?? WeaponType.Cannon;
     // data[1]: the gun's grade
-    const style = weaponStyle(type, e.data?.[1] ?? 1);
+    const look = this.shellLook?.(e.id);
+    const style = weaponStyle(type, e.data?.[1] ?? 1, look?.model);
     const hue = e.data?.[2] ?? 30;
     return {
       id: e.id,
       style,
       size: e.data?.[7] || 1,
+      power: shotScale(look?.damage),
+      phase: (e.id * 0.618) % 1,
       type,
       owner: e.data?.[6] ?? -1,
       glow: mixColor(style.glowColor, hueColor(hue), style.ownerTint),
@@ -298,10 +344,10 @@ export class WeaponFx {
 
   /** A shell your client just fired (guns.ts): it flies from your barrel now, the server's copy takes it over when it comes */
   predict(p: PredictedShell): void {
-    const style = weaponStyle(p.type, p.grade);
+    const style = weaponStyle(p.type, p.grade, p.model);
     const id = this.nextPredicted--;
     this.shots.set(id, {
-      id, style, size: p.size, type: p.type, owner: p.owner,
+      id, style, size: p.size, power: shotScale(p.damage), phase: (-id * 0.618) % 1, type: p.type, owner: p.owner,
       glow: mixColor(style.glowColor, hueColor((p.owner * 137) % 360), style.ownerTint),
       spawnX: p.spawnX, spawnY: p.spawnY, spawnTick: p.spawnTick, vx: p.vx, vy: p.vy,
       hit: null, flashed: false, predicted: true, pose: p.pose, fading: null, head: null, tail: null,
@@ -359,12 +405,12 @@ export class WeaponFx {
   private muzzleFlash(shot: Shot, owner?: { renderX: number; renderY: number; renderAngle: number }): void {
     const m = shot.style.muzzle;
     const angle = Math.atan2(shot.vy, shot.vx);
-    this.onMuzzle?.(shot.owner, shot.spawnX, shot.spawnY);
+    this.onMuzzle?.(shot.owner, shot.spawnX, shot.spawnY, shot.power);
     // At the drawn barrel's tip (shells spawn on the facing edge, the barrel pokes out past it), and the shell drawn from there too
     const tip = this.barrelTip?.(shot.owner, shot.spawnX, shot.spawnY, angle);
     if (tip) { shot.vox = tip.x - shot.spawnX; shot.voy = tip.y - shot.spawnY; }
     const x = tip?.x ?? shot.spawnX, y = tip?.y ?? shot.spawnY;
-    const size = m.size * shot.size;
+    const size = m.size * shot.size * shot.power;
     // The barrel in the ship's frame: from the ship's pose on the fire tick (exact), else as it's drawn now (it's drawn at that tick)
     const ref = shot.pose ?? (owner ? { x: owner.renderX, y: owner.renderY, angle: owner.renderAngle } : undefined);
     const oa = ref?.angle ?? 0, c = Math.cos(-oa), sn = Math.sin(-oa);
@@ -375,6 +421,11 @@ export class WeaponFx {
       petals: [(1.6 + Math.random() * 0.8) * (m.tongue ?? 1), 0.6 + Math.random() * 0.3, 0.6 + Math.random() * 0.3], girth: m.girth ?? 1,
       owner: owner ? shot.owner : -1, ox: dx * c - dy * sn, oy: dx * sn + dy * c, rel: angle - oa,
     });
+    // Spent casings flung out to the side, tumbling away
+    for (let i = 0; i < (shot.style.casings ?? 0); i++) {
+      const side = angle + (Math.random() < 0.5 ? 1 : -1) * (1.2 + Math.random() * 0.5), v = 1.4 + Math.random() * 1.8;
+      this.sparks.push({ x, y, vx: Math.cos(side) * v, vy: Math.sin(side) * v, life: 0, max: 26 + Math.random() * 14, color: 0xe0b860, width: 2.4 });
+    }
     // Smoke puffs out ahead of the barrel, carried a little by the shot, and left behind as the ship flies on
     for (let i = 0; i < m.smoke; i++) {
       if (this.particleKeep < 1 && Math.random() > this.particleKeep) continue;
@@ -389,6 +440,8 @@ export class WeaponFx {
     const g = this.glow;
     g.begin();
     this.smokeG.begin();
+    this.extraG.begin();
+    this.clock += frames;
     if (this.crackling) { this.crackle.clear(); this.crackling = false; }
 
     // (Deleting the current entry while iterating a Map is safe)
@@ -406,27 +459,79 @@ export class WeaponFx {
       const ty = shot.tail.y + (shot.head.y - shot.tail.y) * k;
 
       const z = shot.size;
-      if (st.glowWidth > 0) this.line(tx, ty, shot.head.x, shot.head.y, st.glowWidth * z, shot.glow, st.glowAlpha * fade);
-      if (st.coreWidth > 0) this.line(tx, ty, shot.head.x, shot.head.y, st.coreWidth * z, st.coreColor, 0.9 * fade);
-      if (st.haloRadius > 0) {
-        this.circle(g, TEX.disc, shot.head.x, shot.head.y, st.haloRadius * z, shot.glow, 0.14 * fade);
-        this.circle(g, TEX.disc, shot.head.x, shot.head.y, st.haloRadius * z * 0.55, shot.glow, 0.22 * fade);
+      let hx = shot.head.x, hy = shot.head.y, bx = tx, by = ty;
+      const dx = hx - bx, dy = hy - by, dl = Math.hypot(dx, dy);
+      const ux = dl > 1e-6 ? dx / dl : 1, uy = dl > 1e-6 ? dy / dl : 0, nx = -uy, ny = ux;
+      let alpha = fade;
+      if (st.blink) alpha *= ((this.clock / st.blink + shot.phase * 2) % 1) < 0.5 ? 1 : 0.2;
+      if (st.wobble) {
+        // The head sways across its line, the tail trailing the sway
+        const w = st.wobble, sw = Math.sin(((this.clock + shot.phase * w.period) / w.period) * Math.PI * 2) * w.amp * z;
+        hx += nx * sw; hy += ny * sw;
+        bx += nx * sw * 0.4; by += ny * sw * 0.4;
       }
-      if (st.headRadius > 0) this.circle(g, TEX.disc, shot.head.x, shot.head.y, st.headRadius * z, 0xffffff, fade);
-      // EMP orbs crackle
-      if (st.orb && shot.fading === null) {
-        const c = this.crackle;
+      const lanes = st.pair ? 2 : 1;
+      for (let lane = 0; lane < lanes; lane++) {
+        // A pair runs as two thinner tracers either side of the line
+        const off = lanes === 2 ? (lane === 0 ? -0.5 : 0.5) * st.pair!.gap * z : 0, wk = lanes === 2 ? 0.7 : 1;
+        const ox = nx * off, oy = ny * off;
+        if (st.glowWidth > 0) this.line(bx + ox, by + oy, hx + ox, hy + oy, st.glowWidth * z * wk, shot.glow, st.glowAlpha * alpha);
+        if (st.coreWidth > 0) this.line(bx + ox, by + oy, hx + ox, hy + oy, st.coreWidth * z * wk, st.coreColor, 0.9 * alpha);
+        if (st.haloRadius > 0) {
+          this.circle(g, TEX.disc, hx + ox, hy + oy, st.haloRadius * z * wk, shot.glow, 0.14 * alpha);
+          this.circle(g, TEX.disc, hx + ox, hy + oy, st.haloRadius * z * wk * 0.55, shot.glow, 0.22 * alpha);
+        }
+        if (st.headRadius > 0) this.circle(g, TEX.disc, hx + ox, hy + oy, st.headRadius * z * wk, 0xffffff, alpha);
+      }
+      const speed = Math.hypot(shot.vx, shot.vy);
+      // A glowing wake: dots left along the path behind it, each fainter (positions follow from the line, nothing is kept)
+      const ct = st.contrail;
+      if (ct && shot.fading === null) {
+        const step = ct.step ?? ct.size * 1.6, reach = Math.min(speed * ct.life * 0.5, 260), n = Math.min(14, Math.max(2, Math.ceil(reach / step)));
+        for (let i = 1; i <= n; i++) {
+          const f = i / n;
+          this.circle(g, TEX.dot, hx - ux * reach * f, hy - uy * reach * f, ct.size * z * (1 - 0.6 * f), ct.color, 0.5 * (1 - f) * alpha);
+        }
+      }
+      // Ghost copies of the head, each further back and fainter
+      if (st.afterimages && shot.fading === null) {
+        const gap = Math.max(3, speed * 0.9);
+        for (let i = 1; i <= st.afterimages; i++) {
+          const f = i / (st.afterimages + 1);
+          this.circle(g, TEX.disc, hx - ux * gap * i, hy - uy * gap * i, Math.max(1, st.headRadius * z) * (1 - 0.5 * f), shot.glow, 0.5 * (1 - f) * alpha);
+        }
+      }
+      // A ring swelling off the head and fading, again and again
+      const rp = st.ringPulse;
+      if (rp && shot.fading === null) {
+        const q = ((this.clock + shot.phase * rp.period) % rp.period) / rp.period, r = rp.size * z * (0.3 + 0.7 * q);
+        const k2 = (r * 2 * 32) / (28 * DOT_SIZE);
+        this.extraG.take(TEX2.ring, hx, hy, 0.5, 0.5, rp.color, 0.7 * (1 - q) * alpha, 0, k2, k2);
+      }
+      // A thin cloud as it flies: soft puffs along its path
+      const sc = st.smokeCloud;
+      if (sc?.fly && shot.fading === null) {
+        const reach = Math.min(speed * 6, 180);
+        for (let i = 0; i < 5; i++) {
+          const f = (i + 1) / 5, r = sc.size * z * (0.7 + 0.8 * f), kk = (r * 2) / DOT_SIZE;
+          this.extraG.take(TEX2.puff, hx - ux * reach * f, hy - uy * reach * f, 0.5, 0.5, sc.color, 0.22 * (1 - f) * alpha, 0, kk, kk);
+        }
+      }
+      // Crackle (EMP orbs, arcs, lightning-wrapped shots)
+      const lt = st.lightning ?? (st.orb ? ORB_LIGHTNING : undefined);
+      if (lt && shot.fading === null) {
+        const c = this.crackle, as = st.arcScale ?? 1;
         this.crackling = true;
-        for (let k = 0; k < 3; k++) {
+        for (let k = 0; k < lt.forks; k++) {
           const a0 = Math.random() * Math.PI * 2;
-          let x = shot.head.x, y = shot.head.y;
+          let x = hx, y = hy;
           c.moveTo(x, y);
           for (let j = 0; j < 4; j++) {
-            x += Math.cos(a0 + (Math.random() - 0.5) * 1.6) * 7 * z;
-            y += Math.sin(a0 + (Math.random() - 0.5) * 1.6) * 7 * z;
+            x += Math.cos(a0 + (Math.random() - 0.5) * 1.6) * lt.length * as * z;
+            y += Math.sin(a0 + (Math.random() - 0.5) * 1.6) * lt.length * as * z;
             c.lineTo(x, y);
           }
-          c.stroke({ color: 0xbfeaff, width: 1.5, alpha: 0.8 * fade });
+          c.stroke({ color: lt.color, width: 1.5, alpha: 0.8 * fade });
         }
       }
       // Missiles leave smoke
@@ -467,7 +572,7 @@ export class WeaponFx {
       p.vx *= drag; p.vy *= drag;
       p.x += p.vx * frames; p.y += p.vy * frames;
       const fade = 1 - p.life / p.max;
-      this.line(p.x - p.vx * 2.5, p.y - p.vy * 2.5, p.x, p.y, 1.5, p.color, fade);
+      this.line(p.x - p.vx * 2.5, p.y - p.vy * 2.5, p.x, p.y, p.width ?? 1.5, p.color, fade);
     }
 
     // Gun smoke and impact vapour (normal blending, so it reads as smoke, not light)
@@ -479,7 +584,7 @@ export class WeaponFx {
       s.vx *= drag; s.vy *= drag;
       s.x += s.vx * frames; s.y += s.vy * frames;
       const k = s.life / s.max;
-      this.circle(this.smokeG, TEX.dot, s.x, s.y, s.size * (1 + 1.8 * k) * 1.3, 0xb4aea6, 0.16 * (1 - k) * Math.min(1, k * 8));
+      this.circle(this.smokeG, TEX.dot, s.x, s.y, s.size * (1 + 1.8 * k) * 1.3, s.color ?? 0xb4aea6, (s.alpha ?? 0.16) * (1 - k) * Math.min(1, k * 8));
     }
 
     for (let i = this.rings.length - 1; i >= 0; i--) {
@@ -492,5 +597,6 @@ export class WeaponFx {
     }
     g.end();
     this.smokeG.end();
+    this.extraG.end();
   }
 }

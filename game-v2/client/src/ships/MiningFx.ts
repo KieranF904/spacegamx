@@ -19,6 +19,8 @@
 
 import type { Graphics } from 'pixi.js';
 import { pulseIntensity, mineFalloff, type PulseProfile } from '@space-game/common';
+import type { BeamLook } from '../rendering/weapons/weaponStyles';
+import { drawCone, drawStrands, sputterGain } from './beamLookFx';
 
 const OUTER = 0x0284c7, MID = 0x4fc3f7, CORE = 0xe6f8ff;
 /** Rings are this far apart along the beam (world units) and travel this fast (units a tick) */
@@ -70,18 +72,19 @@ export class MiningFx {
    * One beam this frame: `age` ticks into its pulse (`ending`: let go, so no pulse follows it: it fades to nothing), from the muzzle (x, y) to
    * (hx, hy), `hit` if it meets rock there (`rock`: its material's name); full strength out to `full`, then trailing off
    */
-  draw(g: Graphics, key: number, prof: PulseProfile, age: number, ending: boolean, x: number, y: number, hx: number, hy: number, hit: boolean, rock: string | null, now: number, frames: number, full: number): void {
+  draw(g: Graphics, key: number, prof: PulseProfile, age: number, ending: boolean, x: number, y: number, hx: number, hy: number, hit: boolean, rock: string | null, now: number, frames: number, full: number, look?: BeamLook): void {
     const k = pulseIntensity(prof, age);
+    const OUT = look?.outer ?? OUTER, MIDC = look?.mid ?? MID, COREC = look?.core ?? CORE;
     // Never quite out: a dim glow between pulses, the flare at each one's peak
     const env = ending ? Math.max(0, Math.min(1, (prof.ticks - age) / (prof.ticks - prof.peak))) : 1;
-    const lvl = (0.2 + 0.8 * k) * env;
+    const lvl = (0.2 + 0.8 * k) * env * sputterGain(look?.sputter, now / 60, key);
     // (Where it cuts, past its range, it cuts less: the glow and the particles follow)
     const reachStr = hit ? mineFalloff(Math.hypot(hx - x, hy - y), full) : 1;
     const len = Math.hypot(hx - x, hy - y) || 1, ux = (hx - x) / len, uy = (hy - y) / len, nx = -uy, ny = ux;
     const kind = ROCK[rock ?? ''] ?? FALLBACK, pal = kind.bits;
     this.lines.set(key, { x, y, hx, hy, hit });
     const flick = 0.93 + 0.07 * Math.sin(now * 0.7 + key);
-    const w = 7 * (0.62 + 0.38 * lvl) * flick;
+    const w = 7 * (0.62 + 0.38 * lvl) * flick * (look?.width ?? 1);
 
     // The beam: wide and soft, a bright core that swells with the flare
     // (Past `full` it thins away, in steps, as mineFalloff)
@@ -95,13 +98,15 @@ export class MiningFx {
         if (s > 0.01) g.moveTo(x + (hx - x) * a0, y + (hy - y) * a0).lineTo(x + (hx - x) * a1, y + (hy - y) * a1).stroke({ color, width, alpha: alpha * s });
       }
     };
-    line(w * 5.2, OUTER, 0.09 * lvl);
-    line(w * 2.4, MID, 0.26 * lvl);
-    line(w * 1.1, MID, 0.4 * lvl);
-    line(Math.max(1.4, w * (0.35 + 0.35 * k)), CORE, (0.45 + 0.5 * k) * env);
+    if (look?.cone) drawCone(g, x, y, ux, uy, Math.min(len, full), look.cone, MIDC, 0.2 * lvl);
+    line(w * 5.2, OUT, 0.09 * lvl);
+    line(w * 2.4, MIDC, 0.26 * lvl);
+    line(w * 1.1, MIDC, 0.4 * lvl);
+    line(Math.max(1.4, w * (0.35 + 0.35 * k)), COREC, (0.45 + 0.5 * k) * env);
+    if (look?.braid) drawStrands(g, x, y, ux, uy, Math.min(len, full), w, look.braid.strands, look.braid.color, lvl, now / 60, key);
     // Its muzzle: a steady glow
-    g.circle(x, y, w * (1.3 + 1.1 * k)).fill({ color: MID, alpha: 0.38 * lvl });
-    g.circle(x, y, w * (0.55 + 0.4 * k)).fill({ color: CORE, alpha: (0.5 + 0.4 * k) * env });
+    g.circle(x, y, w * (1.3 + 1.1 * k)).fill({ color: MIDC, alpha: 0.38 * lvl });
+    g.circle(x, y, w * (0.55 + 0.4 * k)).fill({ color: COREC, alpha: (0.5 + 0.4 * k) * env });
 
     // Rings drawing in along it, fading in while it cuts and out when it doesn't
     let rs = this.ringStates.get(key);
@@ -127,7 +132,7 @@ export class MiningFx {
       const a = back + (Math.random() - 0.5) * 2.8, s = 0.3 + Math.random() * 0.8;
       this.puffs.push({ x: hx, y: hy, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0, max: 34 + Math.random() * 26, r0: 4, r1: 16 + Math.random() * 12, color: pal[1] });
     }
-    if (Math.random() < (0.08 + 2.2 * k * k) * env * reachStr * frames && this.motes.length < MAX_MOTES) {
+    if (Math.random() < (0.08 + 2.2 * k * k) * env * reachStr * frames * (look?.motes ?? 1) && this.motes.length < MAX_MOTES) {
       this.motes.push({ key, f: 0.02, speed: MOTE_SPEED * (0.8 + Math.random() * 0.5), side: (Math.random() - 0.5) * 2, phase: Math.random() * 6.28, color: pal[Math.floor(Math.random() * 3)], size: 2.2 + Math.random() * 1.8 });
     }
   }

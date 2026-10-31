@@ -32,7 +32,108 @@ export interface WeaponStyle {
   trail?: { color: number; size: number; life: number };
   /** Drawn as a crackling orb rather than a tracer (EMP) */
   orb?: boolean;
+  // ---- Per-model extras (rework-2026-11 section 7). Each is optional; the kind styles set none of them. ----
+  /** Two parallel tracers `gap` world units apart (twin barrels), each a little thinner */
+  pair?: { gap: number };
+  /** Spent casings thrown out sideways at the muzzle, this many a shot */
+  casings?: number;
+  /** A glowing wake behind the head: a line of fading dots every `step` units for `life` ticks */
+  contrail?: { color: number; size: number; life: number; step?: number };
+  /** Ghost copies of the head trailing behind it, this many */
+  afterimages?: number;
+  /** A ring round the head that swells and fades every `period` ticks */
+  ringPulse?: { color: number; size: number; period: number };
+  /** A cloud of smoke or gas left where it lands (and a thin one as it flies, when `fly`) */
+  smokeCloud?: { color: number; size: number; life: number; fly?: boolean };
+  /** Arcs of lightning round the head, `forks` of them, `length` long (world units); `orb` styles use the same crackle */
+  lightning?: { color: number; forks: number; length: number };
+  /** The head sways sideways across its line: amplitude (world units) and period (ticks) */
+  wobble?: { amp: number; period: number };
+  /** The whole shot blinks on and off every `period` ticks */
+  blink?: number;
+  /** × the crackle's size (EMP, Arc and lightning): default 1 */
+  arcScale?: number;
+  /** Impact sparks spread over this many degrees of hue round their colour (a prism's rainbow) */
+  shardHue?: number;
 }
+
+/**
+ * A weapon model's look, by its function id (PlacedPart.fn): any field of its kind's style it names is replaced, the
+ * rest stay the kind's. Filled in by the per-model units; empty here.
+ */
+export const MODEL_STYLES: Record<string, Partial<WeaponStyle>> = {};
+
+/** A beam's look: PulseFx (pulse guns) and MiningBeamFx (cutting beams) read it; absent fields keep the grade's look */
+export interface BeamLook {
+  /** × the beam's drawn width */
+  width?: number;
+  /** Outer glow, body and core colours */
+  outer?: number; mid?: number; core?: number;
+  /** Two strands wound round the beam, this colour (see PulseLook.helix); with `braid` strands more than two */
+  braid?: { color: number; strands: number };
+  /** × the motes drawn in to the muzzle on the ramp (0: none) */
+  motes?: number;
+  /** A cone spread at the muzzle, half-angle in degrees (a searchlight's, a flamer's); 0: a line */
+  cone?: number;
+  /** Which pool the ramp-up charge draws from */
+  ramp?: 'orb' | 'ring' | 'none';
+  /** The beam breaks up and flickers when starved of power: × the usual (0: steady) */
+  sputter?: number;
+}
+
+/** Beam looks by model id (PlacedPart.fn); filled in by the per-model units */
+export const BEAM_LOOKS: Record<string, BeamLook> = {};
+
+/** The look of a beam model, if it has one */
+export function beamLook(modelId: string | undefined): BeamLook | undefined {
+  return modelId ? BEAM_LOOKS[modelId] : undefined;
+}
+
+/** Damage that reads as the base shot's size (a cannon's) */
+const REF_DAMAGE = 14;
+
+/**
+ * How big a shot's recoil, flash and impact are against the base shot's, from its damage: a fifth-root-ish curve, so a
+ * torpedo is big and a flak shard small but neither takes over the screen. Unknown or no damage: 1.
+ */
+export function shotScale(damage: number | undefined): number {
+  if (!damage || damage <= 0) return 1;
+  return Math.max(0.75, Math.min(1.7, Math.pow(damage / REF_DAMAGE, 0.3)));
+}
+
+const styled = new Map<string, WeaponStyle>();
+
+/**
+ * A shot's look: its model's if it has one (MODEL_STYLES over its kind's), else its weapon type's. The grade only scales
+ * size and brightness (a little bigger, brighter mark by mark), never the look itself. Each combination is built once.
+ */
+export function weaponStyle(weaponType: number, grade = 1, modelId?: string): WeaponStyle {
+  const kind = WEAPON_STYLES[weaponType] ?? KINETIC;
+  const over = modelId ? MODEL_STYLES[modelId] : undefined;
+  const g = Math.max(1, Math.min(5, Math.round(grade) || 1));
+  if (g === 1 && !over) return kind;
+  const key = `${modelId ?? ''}|${weaponType}|${g}`;
+  let s = styled.get(key);
+  if (s) return s;
+  const base: WeaponStyle = over ? { ...kind, ...over } : kind;
+  if (g === 1) s = base;
+  else {
+    const k = 1 + 0.07 * (g - 1);
+    s = {
+      ...base, glowWidth: base.glowWidth * k, haloRadius: base.haloRadius * k, glowAlpha: Math.min(0.8, base.glowAlpha * (1 + 0.06 * (g - 1))),
+      muzzle: { ...base.muzzle, size: base.muzzle.size * k },
+      impact: { ...base.impact, flash: base.impact.flash * (1 + 0.12 * (g - 1)), sparks: Math.round(base.impact.sparks * k) },
+    };
+  }
+  styled.set(key, s);
+  return s;
+}
+
+/** Forget the built styles (tests that change MODEL_STYLES) */
+export function clearStyleCache(): void {
+  styled.clear();
+}
+
 
 // Sized for ships with 24-unit cells; each shot is further scaled by its shell size
 const KINETIC: WeaponStyle = {
@@ -181,62 +282,3 @@ export const WEAPON_STYLES: Record<number, WeaponStyle> = {
   },
 };
 
-/**
- * Cannon shells by grade (tuning.json weaponGrades gives each mark its own
- * character; these match it). Mk I is the plain kinetic round; each mark up
- * reads stronger, and differently:
- *   Mk II   heavy shell: fatter, slower-looking, deep amber; a big fat muzzle flash and a thump of smoke
- *   Mk III  high-velocity slug: a long white-gold streak, thin and sharp
- *   Mk IV   autoloader: quick teal-white darts, crisp double impact ring
- *   Mk V    siege slug: a violet-white plasma-jacketed bolt with a heavy halo and a shock ring
- */
-const CANNON_GRADES: Partial<WeaponStyle>[] = [
-  {},
-  {
-    tracerTicks: 1.9, coreWidth: 3.1, glowWidth: 9.5, coreColor: 0xfff0d6, glowColor: 0xff8a2a, glowAlpha: 0.42,
-    headRadius: 3.8, haloRadius: 14, muzzle: { life: 12, size: 31, sparks: 12, color: 0xffa850, smoke: 10, tongue: 1, girth: 1.5 },
-    impact: { sparks: 16, speed: 3.4, life: 22, color: 0xffa050, flash: 28 },
-  },
-  {
-    tracerTicks: 3.6, coreWidth: 2, glowWidth: 7.5, coreColor: 0xffffff, glowColor: 0xffe08a, glowAlpha: 0.48, ownerTint: 0.1,
-    headRadius: 3.2, haloRadius: 11, muzzle: { life: 8, size: 30, sparks: 12, color: 0xfff0b8, smoke: 3, tongue: 1.7, girth: 0.8 },
-    impact: { sparks: 18, speed: 5.6, life: 16, color: 0xfff0b0, flash: 26 },
-  },
-  {
-    tracerTicks: 2.4, coreWidth: 2.4, glowWidth: 9, coreColor: 0xf0fffb, glowColor: 0x3fe0c8, glowAlpha: 0.5, ownerTint: 0.08,
-    headRadius: 3.4, haloRadius: 13, muzzle: { life: 6, size: 27, sparks: 9, color: 0x9ff5e6, smoke: 2, tongue: 1.2, girth: 1 },
-    impact: { sparks: 18, speed: 4.4, life: 18, color: 0x8ff0e0, flash: 30, ring: 0x3fe0c8 },
-  },
-  {
-    tracerTicks: 3, coreWidth: 3.6, glowWidth: 13, coreColor: 0xfdf6ff, glowColor: 0xb36bff, glowAlpha: 0.55, ownerTint: 0,
-    headRadius: 4.6, haloRadius: 21, muzzle: { life: 14, size: 44, sparks: 16, color: 0xd9b3ff, smoke: 5, tongue: 1.35, girth: 1.4 },
-    impact: { sparks: 26, speed: 5, life: 24, color: 0xd6a8ff, flash: 44, ring: 0xb36bff },
-  },
-];
-
-const graded = new Map<number, WeaponStyle>();
-
-/**
- * A shot's look: its weapon type's, and its gun's grade (Mk I-V). Cannons have
- * a look per mark (CANNON_GRADES); other weapons just burn a little bigger and
- * brighter each mark up. Each pair is built once.
- */
-export function weaponStyle(weaponType: number, grade = 1): WeaponStyle {
-  const base = WEAPON_STYLES[weaponType] ?? KINETIC;
-  const g = Math.max(1, Math.min(5, Math.round(grade) || 1));
-  if (g === 1) return base;
-  const key = weaponType * 8 + g;
-  let s = graded.get(key);
-  if (s) return s;
-  if (base === KINETIC) s = { ...KINETIC, ...CANNON_GRADES[g - 1] };
-  else {
-    const k = 1 + 0.07 * (g - 1);
-    s = {
-      ...base, glowWidth: base.glowWidth * k, haloRadius: base.haloRadius * k, glowAlpha: Math.min(0.8, base.glowAlpha * (1 + 0.06 * (g - 1))),
-      muzzle: { ...base.muzzle, size: base.muzzle.size * k },
-      impact: { ...base.impact, flash: base.impact.flash * (1 + 0.12 * (g - 1)), sparks: Math.round(base.impact.sparks * k) },
-    };
-  }
-  graded.set(key, s);
-  return s;
-}
