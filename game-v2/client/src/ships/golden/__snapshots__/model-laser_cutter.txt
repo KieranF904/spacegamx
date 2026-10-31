@@ -6,7 +6,7 @@ Armour · build2 · 3.2 pts
 TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
 Damage60 rising to 150/s · reach 900
 Hits withThermal · penetration 2
-Beamheld while you fire · no heat · draws its power while it's on · burns deeper over 1.5s on one part, starting over if it slips off
+Beamheld while you fire · draws its power while it's on · burns deeper over 1.5s on one part, starting over if it slips off
 Modelbeam: Burns energy every second you hold it.
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 1 clear cell ahead

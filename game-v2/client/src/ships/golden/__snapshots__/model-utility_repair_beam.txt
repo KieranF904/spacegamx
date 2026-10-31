@@ -5,7 +5,7 @@ Hull · mass132 hp · 2.8
 Armour · build2 · 3.2 pts
 TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
 Mends42 hp/s into an ally's damaged parts where it lands · reach 520 · not your own ship, not destroyed parts
-Beamheld while you fire · no heat · draws its power while it's on
+Beamheld while you fire · draws its power while it's on
 Modelbeam: Burns energy every second you hold it.
 MountTurret, 240°
 FittingBolts on any side

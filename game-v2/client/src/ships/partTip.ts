@@ -144,11 +144,11 @@ export function partTipHtml(p: Pick<PlacedPart, 'fn' | 'material' | 'piece'> & P
     else html += row('Damage', `${ramp ? `${n0(rampSet?.dps ?? 0)} rising to ` : ''}${n0(st.dps ?? 0)}/s${st.range ? ` · reach ${st.effectiveRange ? `${n0(st.effectiveRange)}, fading out to ${n0(st.range)}` : n0(st.range)}` : ''}`);
     if (st.damageType && !st.heal && !st.intercept) html += row('Hits with', `${DAMAGE_NAMES[st.damageType]} · penetration ${Math.round((st.pen ?? 1) * 10) / 10}`);
     // A pulse laser: a pulse's damage, and how long it takes to charge the next
-    if (st.pulse) html += row('Pulse', `${n0(st.pulse.damage)} a pulse · charges in ${st.pulse.seconds.toFixed(1)}s · no heat`);
-    else if (st.heal) html += row('Beam', 'held while you fire · no heat · draws its power while it\'s on');
+    if (st.pulse) html += row('Pulse', `${n0(st.pulse.damage)} a pulse · charges in ${st.pulse.seconds.toFixed(1)}s`);
+    else if (st.heal) html += row('Beam', 'held while you fire · draws its power while it\'s on');
     else if (st.intercept) html += row('Fire', 'fires itself at what comes in · a little power a shot');
     // Its firing model (common/src/ships/guns.ts): how it fires and what it pays with
-    else if (f?.model === 'beam') html += row('Beam', `held while you fire · no heat · draws its power while it's on${f.windup ? ` · winds up over ${(f.windup / 60).toFixed(1)}s` : ''}${ramp ? ` · burns deeper over ${(ramp.ticks / 60).toFixed(1)}s on one part, starting over if it slips off` : ''}`);
+    else if (f?.model === 'beam') html += row('Beam', `held while you fire · draws its power while it's on${f.windup ? ` · winds up over ${(f.windup / 60).toFixed(1)}s` : ''}${ramp ? ` · burns deeper over ${(ramp.ticks / 60).toFixed(1)}s on one part, starting over if it slips off` : ''}`);
     else if (f?.model === 'clip') html += row('Clip', f.regrow
       ? `holds ${f.clip} · ${f.rounds ?? 1} a shot, every ${(rateOf / 60).toFixed(1)}s · regrows one every ${(f.regrow / 60).toFixed(2)}s (${n0((f.reloadE ?? 0) / (f.clip ?? 1))} energy each)`
       : `${f.clip} rounds at ${rate >= 10 ? n0(rate) : rate.toFixed(1)}/s · reloads in ${((f.reload ?? 0) / 60).toFixed(1)}s from energy (${n0(f.reloadE ?? 0)} a clip), when empty or a second after you let go`);

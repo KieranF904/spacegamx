@@ -6,7 +6,7 @@ Armour · build4 · 7.6 pts
 TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
 Damage210/s · reach 500
 Hits withThermal · penetration 5.5
-Beamheld while you fire · no heat · draws its power while it's on · winds up over 0.3s
+Beamheld while you fire · draws its power while it's on · winds up over 0.3s
 Modelbeam: Burns energy every second you hold it.
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 4 clear cells ahead
