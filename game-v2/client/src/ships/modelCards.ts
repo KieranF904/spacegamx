@@ -5,7 +5,7 @@
  * locked, why: the level it's learned at (nothing opens one earlier).
  */
 
-import { circuitTuning, partDischarge, isWeaponFn, mountingOf, mountingWords, partMount, partStats, describeFn, PIECE_NAMES, type Catalog, type FunctionDef, type ItemDef, type Mount, type ShipTuning } from '@space-game/common';
+import { circuitTuning, coilCapacity, jumpTuning, partDischarge, partGrade, isWeaponFn, mountingOf, mountingWords, partMount, partStats, describeFn, PIECE_NAMES, type Catalog, type FunctionDef, type ItemDef, type Mount, type ShipTuning } from '@space-game/common';
 import { chips } from './describe';
 
 /** Families by name, in the palette's order within their category (legendaries share one group) */
@@ -216,7 +216,7 @@ export function keyStats(catalog: Catalog, tuning: ShipTuning | undefined, fn: F
   if (fn.splashTaken !== undefined && fn.splashTaken < 1) out.push(`${Math.round((1 - fn.splashTaken) * 100)}% less from blasts`);
   if (fn.jumpCooldown !== undefined && fn.jumpCooldown < 1) out.push(`jump cooldown −${Math.round((1 - fn.jumpCooldown) * 100)}%`);
   if ((fn.range ?? 0) > 0 && !fn.weapon) out.push(`scan ${n0(fn.range!)} m`);
-  if ((fn.jumpCapacity ?? 0) > 0) out.push(`jump ${n0(fn.jumpCapacity! * st.area)} cells`);
+  if ((fn.jumpCapacity ?? 0) > 0) out.push(`jump ${n0(coilCapacity(fn.jumpCapacity! * st.area, partGrade(catalog, { fn: fn.id, material: fn.model ? fn.material ?? 'alloy' : material ?? fn.material ?? 'alloy' }), jumpTuning(tuning ?? ({} as ShipTuning))))} cells`);
   if (st.dodge) out.push(`dodge ${st.dodge.force.toFixed(1)} push · every ${st.dodge.cooldown.toFixed(1)} s · ${n0(st.dodge.energy)} energy a burst`);
   // (What the part features it gives say: chips, and what its power draw applies to: a Tow Beam's "towing")
   const facts = describeFn(catalog, tuning, fn.id, pc, material);

@@ -28,7 +28,7 @@ Small · Square
 more jump for a bigger hull
 
 == keyStats ==
-jump 12 cells · draws 8
+jump 13 cells · draws 8
 
 == mountBadge ==
 

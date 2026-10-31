@@ -29,7 +29,7 @@ Large · Block
 more jump per cell, and 20% faster to cool
 
 == keyStats ==
-jump cooldown −20% · jump 64 cells · draws 32
+jump cooldown −20% · jump 83 cells · draws 32
 
 == mountBadge ==
 
