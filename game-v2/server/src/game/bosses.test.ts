@@ -276,10 +276,10 @@ describe('legendary weapons', () => {
   }
   const total = (bridge: any, eid: number) => bridge.get(eid).hp.reduce((a: number, b: number) => a + Math.max(0, b), 0);
 
-  it("Rustjaw's Hive looses a volley of four seekers", () => {
+  it("Rustjaw's Hive spawns one seeker per shot (the salvo of four is covered in legendaries.test.ts)", () => {
     const { fire, shots } = range();
     fire('hive');
-    expect(shots(12)).toBe(4);
+    expect(shots(12)).toBe(1);
   });
 
   it('the Prism Splitter shatters into shards when it hits', () => {
