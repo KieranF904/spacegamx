@@ -22,8 +22,11 @@ import * as bitecs from 'bitecs';
 import {
   Position, Velocity, Rotation, InSystem, createShipState, flightSignature, controlBits, replicaStep, ReplicaMode, CTL,
   quantizeCursorAngle, dequantizeCursorAngle, quantizeCursorDist, CURSOR_DIST_STEP, jumpTuning, packKeyframe, unpackKeyframe,
+  packGunState, gunStateAt, gunStateValue, GUN_STATE_RELOADING, GUN_STATE_PATIENCE, CHARGE_GROUPS_AT, PILOT_ROW, SNAPSHOT_RATE, TICK_RATE,
   type FlightBody, type Charge, type ShipState, type ShipTuning, type ReplicaEnv, type ClientInputMessage,
 } from '@space-game/common';
+import { PILOT_EXTRAS } from '../../../common/src/ships/features/plan.js';
+import { GunSync } from '../../../client/src/ships/gunSync.js';
 import { replicaAngle, quantizeReplicaAngle } from '../../../common/src/network/replication.js';
 import { readShipJson, testCatalog } from '../../../common/src/ships/testData.js';
 import { SCENARIOS, corsair, type Scenario, type ScriptTick } from '../../../common/src/ships/golden/testData.js';
@@ -53,6 +56,8 @@ interface Tick {
   charge: Charge;
   /** The guns' state after the step (firing scenarios: gunRow) */
   guns: number[];
+  /** The pilot row's gun-state slot as the server would send it this tick (packGunState behind an empty row) */
+  wire: number[];
   jumpPrime: number;
   tow: number | undefined;
   /** The server's tick number during the step */
@@ -74,6 +79,16 @@ function gunRow(ship: ShipState): number[] {
   const out: number[] = [];
   for (const w of ship.derived.weapons) out.push(q(ship.cooldown[w.part]), ship.rounds[w.part], q(ship.reload[w.part]), q(ship.charge[w.part]), q(ship.spin[w.part]));
   return out;
+}
+
+/** A pilot row carrying `ship`'s gun state, as the snapshot builder lays it out */
+function wireRow(ship: ShipState): number[] {
+  const d = new Array(CHARGE_GROUPS_AT).fill(0);
+  d[PILOT_ROW.groups] = 1;
+  d.push(100);
+  for (let i = 0; i < PILOT_EXTRAS; i++) d.push(0);
+  packGunState(ship, d);
+  return d;
 }
 
 const keysOf = (t: ScriptTick) => ({ forward: false, backward: false, left: false, right: false, boost: false, ...t.keys });
@@ -106,7 +121,7 @@ function runServer(sc: Scenario) {
       x: Position.x[pid], y: Position.y[pid], vx: Velocity.x[pid], vy: Velocity.y[pid], angle: Rotation.angle[pid], angVel: ship.angVel,
       jump: ship.jump, jumpScale: ship.jumpScale, cargo: ship.cargo, dodge: ship.dodge, dodgeDir: ship.dodgeDir,
     },
-    charge: ships.chargeOf(pid), jumpPrime: ship.jumpPrime ?? 0, tow: ship.tow, guns: gunRow(ship),
+    charge: ships.chargeOf(pid), jumpPrime: ship.jumpPrime ?? 0, tow: ship.tow, guns: gunRow(ship), wire: wireRow(ship),
   });
   const start = read();
   const ticks: Tick[] = [];
@@ -133,12 +148,12 @@ function runServer(sc: Scenario) {
 }
 
 /** The pilot's prediction: ShipClient.predict with just the state it reads (the rest of the client is the renderer's) */
-function clientPredictor(sc: Scenario, env: ReplicaEnv) {
+function clientPredictor(sc: Scenario, env: ReplicaEnv, sync?: GunSync) {
   const ship: ShipState = createShipState(catalog, tuning, 1, sc.ship(), 0);
   const self = {
     store: { get: () => ship }, docked: false, berth: null,
     // (What predictGuns reaches for: the scene its shells go to, and the gun-state history)
-    scene: { predictShot: () => {} }, gunSync: { record: () => {} }, gunFeel: { own: () => {} },
+    scene: { predictShot: () => {} }, gunSync: sync ?? { record: () => {} }, gunFeel: { own: () => {} },
     opts: { state: { entities: new Map() }, tuning },
     hazardFor: (d: never, x: number, y: number) => env.hazard?.(d, x, y),
     central: env.central, lodestones: env.lodestones ?? [], gravity: env.gravity, terrain: env.terrain ?? null,
@@ -356,6 +371,63 @@ describe('prediction parity: the firing models (the pilot\'s guns keep the serve
       expect(shots).toBeGreaterThan(20);
     });
   }
+
+  it('under latency and a missed shot: the real GunSync pulls the pilot clip and charge back to the server within 30 ticks plus the snapshot gap', () => {
+    const sc = FIRE_SCENARIOS[0];
+    const r = runServer(sc);
+    const gap = Math.round(TICK_RATE / SNAPSHOT_RATE);
+    // The pilot's guns agree with the server's: a clip by rounds and reloading, a charge to within a few ticks
+    const agree = (mine: ShipState, theirs: number[]) => {
+      const at = gunStateAt(theirs);
+      const reloading = (v: number) => v >= GUN_STATE_RELOADING;
+      for (let k = 0; k < theirs[at]; k++) {
+        const part = theirs[at + 1 + 2 * k], v = theirs[at + 2 + 2 * k];
+        const w = mine.derived.weapons.find((x) => x.part === part)!;
+        const m = gunStateValue(mine, w);
+        if (w.fire.model === 'clip' ? m % GUN_STATE_RELOADING !== v % GUN_STATE_RELOADING || reloading(m) !== reloading(v) : Math.abs(m - v) > 3) return false;
+      }
+      return true;
+    };
+    // Held fire for the first 200 ticks; the pilot's client loses ticks 100-111 of it (a lost input: the Rail Driver's shot
+    // and the Longbarrel's charge are missed there)
+    const EIGHTH = Math.ceil((r.derived.weapons[0].fire.reload ?? 60) / 8);
+    const DROP_FROM = 20, DROP_TO = 32;
+    const flown = (delay: number, drop: boolean) => {
+      const sync = new GunSync();
+      const c = clientPredictor(sc, r.env, sync);
+      const player = c.player(r.start);
+      let charge = r.start.charge;
+      const disagree: boolean[] = [];
+      let adopted = 0;
+      for (let i = 0; i < sc.script.length; i++) {
+        const s = drop && i >= DROP_FROM && i < DROP_TO ? { ...sc.script[i], fire: false } : sc.script[i];
+        charge = c.step(player, s, i, charge, r.ticks[i].tick, r.ticks[i]);
+        // The server's row of step j reaches the client `delay` ticks later, on the snapshot ticks
+        const j = i - delay;
+        if (j >= 0 && j % gap === 0) adopted += sync.onRow(c.ship, r.ticks[j].wire, r.ticks[j].tick);
+        // (Compared with the server's row of the same tick: the latest the server has, which is what the HUD would settle to)
+        // (A reload is carried in eighths and adopted mid-eighth, so a reload may be an eighth early or late: the pilot
+        // agrees when its guns hold the value the server held at some tick within that of this one)
+        let ok = false;
+        for (let k = Math.max(0, i - EIGHTH); k <= Math.min(r.ticks.length - 1, i + EIGHTH) && !ok; k++) ok = agree(c.ship, r.ticks[k].wire);
+        disagree.push(!ok);
+      }
+      return { disagree, adopted };
+    };
+    for (const delay of [3, 5, 8]) {
+      const clean = flown(delay, false);
+      // Without a missed shot and with the server's rows late, the pilot's guns never leave the server's
+      expect([delay, clean.disagree.indexOf(true), clean.adopted]).toEqual([delay, -1, 0]);
+      const lost = flown(delay, true);
+      // With it they leave (a shot was missed) ...
+      const first = lost.disagree.indexOf(true);
+      expect(first).toBeGreaterThanOrEqual(DROP_FROM);
+      expect(lost.adopted).toBeGreaterThan(0);
+      // ... and are back in step within GUN_STATE_PATIENCE ticks plus the gap and the delay of when they left, to the end of the held fire
+      const by = DROP_FROM + GUN_STATE_PATIENCE + gap + delay + 12;
+      expect([delay, lost.disagree.slice(by, 200).indexOf(true)]).toEqual([delay, -1]);
+    }
+  });
 
   it('the scenarios exercise each model: a reload, a charge that fired and one let go, spin, a windup and a sputter, regrowth', () => {
     const cc = runServer(FIRE_SCENARIOS[0]);
