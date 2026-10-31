@@ -227,6 +227,9 @@ export interface BridgeInternals {
   coldStage: ShipBridge['coldStage']; repairBeam: ShipBridge['repairBeam']; fireBeam: ShipBridge['fireBeam'];
   stepPulses: ShipBridge['stepPulses']; pointDefence: ShipBridge['pointDefence']; damageMul: ShipBridge['damageMul'];
   beamFrom: ShipBridge['beamFrom'];
+  noteRebuild: ShipBridge['noteRebuild']; spawnOn: ShipBridge['spawnOn']; removeBody: ShipBridge['removeBody'];
+  forget: ShipBridge['forget']; nextMissing: ShipBridge['nextMissing']; joinsOf: ShipBridge['joinsOf'];
+  spawnDebris: ShipBridge['spawnDebris'];
   closestPart: ShipBridge['closestPart']; partWorld: ShipBridge['partWorld']; nearestPart: ShipBridge['nearestPart'];
 }
 

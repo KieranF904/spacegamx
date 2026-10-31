@@ -12,15 +12,13 @@
 import { collideTerrain, terrainRadius } from '@space-game/common';
 import { hasComponent, entityExists } from 'bitecs';
 import {
-  Position, Velocity, Rotation, Radius, Health, Input, Boost, Player, Dead, Projectile, InSystem, FRICTION,
-  Blueprint, Catalog, ShipState, ShipTuning, PlacedGeom, Vec2, InventoryStub, stepShipPhysics, quantizeShipBody,
-  validateBlueprint, ValidationResult, GravityWell, FlightConstants, createShipState, rebuildShip, damagePart,
-  repairShip, healPart, restorePart, computeJoins, hitMultiplier, type HitInfo, stepFlight, stepDrift,
-  localToWorldDir, withEmp, withNumb, type WarmthStage, jumpTuning, pilotJumpStep, NO_FIELDS, type JumpField,
-  blueprintGeometry, standing, convexPenetration, seededRng, hashInts, shipPointToWorld, WeaponInfo, WeaponTuning,
-  ReplicaMode, CTL, controlBits, replicaAngle, quantizeReplicaAngle, partWeaponDef, FireRecord, partMaterial,
-  powerTick, gunLoad, remapCharge, quantizeCargo, type FlightBody, buildFlightInputs, newFlightControls,
-  type FlightInputSource, chargeTotal, FULL_CHARGE, type Charge,
+  Position, Velocity, Rotation, Input, Boost, Player, Dead, Projectile, InSystem, FRICTION, Blueprint, Catalog,
+  ShipState, ShipTuning, PlacedGeom, Vec2, InventoryStub, stepShipPhysics, quantizeShipBody, ValidationResult,
+  GravityWell, FlightConstants, damagePart, hitMultiplier, type HitInfo, stepFlight, stepDrift, withEmp, withNumb,
+  type WarmthStage, jumpTuning, pilotJumpStep, NO_FIELDS, type JumpField, blueprintGeometry, standing,
+  convexPenetration, WeaponInfo, WeaponTuning, ReplicaMode, CTL, controlBits, replicaAngle, quantizeReplicaAngle,
+  partWeaponDef, FireRecord, partMaterial, powerTick, gunLoad, quantizeCargo, type FlightBody, buildFlightInputs,
+  newFlightControls, type FlightInputSource, chargeTotal, FULL_CHARGE, type Charge,
 } from '@space-game/common';
 import {
   GLANCING, STAGE_COVER, K, centroidOf, CONTACT_MARGIN, BIG_BODY, type ShipHost, type PartDestroyedEvent,
@@ -28,6 +26,7 @@ import {
   type BridgeCtx,
 } from './bridge/core.js';
 import * as sync from './bridge/sync.js';
+import * as rbd from './bridge/rebuild.js';
 import * as wpn from './bridge/weapons.js';
 import * as dmg from './bridge/damage.js';
 
@@ -302,66 +301,18 @@ export class ShipBridge {
   // Spawning
   // -------------------------------------------------------------------------
 
-  private spawnOn(eid: number, bp: Blueprint, kind: 'ship' | 'debris', hp?: number[], angVel = 0): ShipState {
-    const t0 = this.now();
-    const ship = createShipState(this.catalog, this.tuning, eid, bp, this.host.getTick(), { kind, hp, angVel });
-    this.noteRebuild(t0);
-    // A new ship on a body that had one (a refit, a swap): its stores start as full, all told, as the old one's were
-    const was = this.bodies.get(eid), had = this.charge.get(eid);
-    if (was && had && ship.derived.power) {
-      const p = chargeTotal(was.derived, had);
-      this.charge.set(eid, { core: p, s: ship.derived.power.stores.map(() => p) });
-    }
-    this.bodies.set(eid, ship);
-    this.ungridded.add(eid);
-    Radius.value[eid] = Math.max(1, ship.derived.radius);
-    return ship;
-  }
+  private spawnOn(eid: number, bp: Blueprint, kind: 'ship' | 'debris', hp?: number[], angVel = 0): ShipState { return rbd.spawnOn(this.ctx, eid, bp, kind, hp, angVel); }
 
-  onPlayerCreated(eid: number): void {
-    const ship = this.spawnOn(eid, this.playerBlueprint, 'ship');
-    this.syncHealth(eid, ship);
-  }
+  onPlayerCreated(eid: number): void { return rbd.onPlayerCreated(this.ctx, eid); }
 
   /** A pilotless ship (debug key B). Returns its entity id. */
-  spawnDummy(bp: Blueprint, x: number, y: number, angle: number, systemId = 0): number {
-    const eid = this.host.createBody();
-    InSystem.systemId[eid] = systemId;
-    Position.x[eid] = x;
-    Position.y[eid] = y;
-    Velocity.x[eid] = 0;
-    Velocity.y[eid] = 0;
-    Rotation.angle[eid] = angle;
-    this.spawnOn(eid, bp, 'ship');
-    return eid;
-  }
+  spawnDummy(bp: Blueprint, x: number, y: number, angle: number, systemId = 0): number { return rbd.spawnDummy(this.ctx, bp, x, y, angle, systemId); }
 
-  /**
-   * A derelict hulk: a pilotless ship with seeded battle damage (a few parts
-   * shot away, many scorched) that drifts in place. Returns its entity id.
-   */
-  spawnWreck(bp: Blueprint, x: number, y: number, angle: number, systemId: number, seed: number): number {
-    const eid = this.spawnDummy(bp, x, y, angle, systemId);
-    const ship = this.bodies.get(eid)!;
-    const rng = seededRng(seed);
-    ship.blueprint.parts.forEach((p, i) => {
-      if (p.fn === 'core') return;
-      const r = rng();
-      if (r < 0.07) ship.hp[i] = 0; // holes in the hull (orphaned bits drift off as debris)
-      else if (r < 0.55) ship.hp[i] = ship.maxHp[i] * (0.2 + 0.55 * rng());
-    });
-    ship.dirty = true;
-    this.rebuildNow(eid, ship);
-    ship.angVel = (rng() - 0.5) * 0.0006;
-    this.anchored.add(eid);
-    return eid;
-  }
+  spawnWreck(bp: Blueprint, x: number, y: number, angle: number, systemId: number, seed: number): number { return rbd.spawnWreck(this.ctx, bp, x, y, angle, systemId, seed); }
 
   /** Damage multipliers: boss rage, factions' weak guns (pilots' skills no longer add damage) */
   private damageMuls = new Map<number, number>();
-  setSkills(eid: number, _skills: Record<string, number>): void {
-    this.setDamageScale(eid, 1);
-  }
+  setSkills(eid: number, _skills: Record<string, number>): void { return rbd.setSkills(this.ctx, eid, _skills); }
 
   setDamageScale(eid: number, k: number): void { return wpn.setDamageScale(this.ctx, eid, k); }
 
@@ -397,45 +348,9 @@ export class ShipBridge {
   /** Set it (a player's total is mirrored to Boost.fuel, which the HUD's gauge reads) */
   setCharge(eid: number, c: Charge): void { return sync.setCharge(this.ctx, eid, c); }
 
-  removeShip(eid: number): void {
-    if (this.bodies.has(eid)) this.removeBody(eid);
-    else this.forget(eid);
-  }
+  removeShip(eid: number): void { return rbd.removeShip(this.ctx, eid); }
 
-  /**
-   * Drop everything kept about an entity id. Ids are reused once enough are
-   * freed, so a new ship must never inherit a dead one's battery, heading,
-   * a boss's damage scale.
-   */
-  private forget(eid: number): void {
-    this.lastHitBy.delete(eid);
-    this.intangible.delete(eid);
-    this.anchored.delete(eid);
-    this.pinned.delete(eid);
-    this.charge.delete(eid);
-    this.autopilot.delete(eid);
-    this.decayAt.delete(eid);
-    this.lastDamaged.delete(eid);
-    this.restoreProgress.delete(eid);
-    this.empUntil.delete(eid);
-    this.warmth.delete(eid);
-    this.weaponBeams.delete(eid);
-    this.pulsing.delete(eid);
-    this.pdOn.delete(eid);
-    this.replicaCtl.delete(eid);
-    this.apHeading.delete(eid);
-    this.controllers.delete(eid);
-    this.damageMuls.delete(eid);
-    this.wing.delete(eid);
-    this.targets.delete(eid);
-    this.kits.delete(eid);
-    this.ghosts.delete(eid);
-    this.beams.delete(eid);
-    this.dormant.delete(eid);
-    this.lastFired.delete(eid);
-    this.ungridded.delete(eid);
-    for (const [k, v] of this.targets) if (v === eid) this.targets.delete(k);
-  }
+  private forget(eid: number): void { return rbd.forget(this.ctx, eid); }
 
   // -------------------------------------------------------------------------
   // Repair kits: a budget of credits spent slowly on the ship, damaged parts first, then missing ones
@@ -452,101 +367,17 @@ export class ShipBridge {
   }
 
   /** Is there anything a repair kit could do for this ship? */
-  needsRepair(eid: number): boolean {
-    const ship = this.bodies.get(eid);
-    if (!ship || ship.kind !== 'ship') return false;
-    return ship.hp.some((h, i) => (ship.derived.alive[i] && h < ship.maxHp[i] - 1e-6) || (!ship.derived.alive[i] && !this.isGhost(eid, i)));
-  }
+  needsRepair(eid: number): boolean { return rbd.needsRepair(this.ctx, eid); }
 
   /** Start a kit (another one adds to the budget and keeps the faster rate) */
-  startRepairKit(eid: number, kit: { budget: number; hpPerSec: number; restoreSec: number }): void {
-    const cur = this.kits.get(eid);
-    const restoreTicks = Math.max(30, Math.round(kit.restoreSec * 60));
-    if (cur) {
-      cur.left += kit.budget;
-      cur.total += kit.budget;
-      cur.hpPerSec = Math.max(cur.hpPerSec, kit.hpPerSec);
-      cur.restoreTicks = Math.min(cur.restoreTicks, restoreTicks);
-    } else {
-      this.kits.set(eid, { left: kit.budget, total: kit.budget, hpPerSec: kit.hpPerSec, restoreTicks, progress: 0, since: this.host.getTick() });
-    }
-    const k = this.kits.get(eid)!;
-    this.host.onRepairKit?.(eid, k.left, k.total);
-  }
+  startRepairKit(eid: number, kit: { budget: number; hpPerSec: number; restoreSec: number }): void { return rbd.startRepairKit(this.ctx, eid, kit); }
 
-  repairKitLeft(eid: number): number {
-    return this.kits.get(eid)?.left ?? 0;
-  }
+  repairKitLeft(eid: number): number { return rbd.repairKitLeft(this.ctx, eid); }
 
-  private stepRepairKits(tick: number): void {
-    const step = 15;
-    for (const [eid, kit] of this.kits) {
-      const ship = this.bodies.get(eid);
-      if (!ship || ship.kind !== 'ship' || ship.derived.root < 0) { this.kits.delete(eid); continue; }
-      // A hit or moving off breaks the repair: whatever was left of the kit is wasted
-      const broken = (this.lastDamaged.get(eid) ?? -1e9) > kit.since ? 'hit' : !this.isStill(eid) ? 'moved' : null;
-      if (broken) {
-        this.kits.delete(eid);
-        this.host.onRepairKit?.(eid, 0, kit.total, broken);
-        continue;
-      }
-      const value = (i: number) => Math.max(1, this.host.partValue?.(ship.blueprint.parts[i]) ?? 20);
-      const alive = ship.derived.alive;
-      let healed = false;
-      // 1. Damaged parts: heal each a little, paying for the HP restored
-      for (let i = 0; i < ship.hp.length && kit.left > 0; i++) {
-        if (!alive[i] || ship.hp[i] >= ship.maxHp[i] - 1e-6) continue;
-        const want = Math.min(ship.maxHp[i] - ship.hp[i], ship.maxHp[i] * kit.hpPerSec * step / 60);
-        const cost = (value(i) * want) / ship.maxHp[i];
-        const frac = Math.min(1, kit.left / Math.max(1e-6, cost));
-        const got = healPart(ship, i, want * frac, this.tuning);
-        kit.left -= (value(i) * got) / ship.maxHp[i];
-        healed = true;
-      }
-      // 2. All sound: rebuild missing parts (not ghosts) one at a time, nearest the core first
-      if (!healed && kit.left > 0) {
-        const pick = this.nextMissing(eid, ship);
-        if (pick < 0) { kit.left = 0; }
-        else if (value(pick) > kit.left) { kit.left = 0; }
-        else {
-          kit.progress += step;
-          if (kit.progress >= kit.restoreTicks) {
-            kit.progress = 0;
-            kit.left -= value(pick);
-            restorePart(ship, pick, 1);
-            ship.rebuildHp[pick] = 0;
-          }
-        }
-      }
-      if (kit.left <= 0.5) {
-        this.kits.delete(eid);
-        this.host.onRepairKit?.(eid, 0, kit.total);
-      } else if (tick % 60 === 0) {
-        this.host.onRepairKit?.(eid, kit.left, kit.total);
-      }
-    }
-  }
+  private stepRepairKits(tick: number): void { return rbd.stepRepairKits(this.ctx, tick); }
 
   /** The missing part (not a ghost) that joins the structure, nearest the core */
-  private nextMissing(eid: number, ship: ShipState): number {
-    const n = ship.hp.length;
-    const alive = ship.derived.alive;
-    const adj: number[][] = Array.from({ length: n }, () => []);
-    for (const [a, c] of this.joinsOf(ship)) { adj[a].push(c); adj[c].push(a); }
-    const depth = new Array<number>(n).fill(Infinity);
-    depth[ship.derived.root] = 0;
-    const queue = [ship.derived.root];
-    while (queue.length) {
-      const u = queue.shift()!;
-      for (const v of adj[u]) if (depth[v] === Infinity) { depth[v] = depth[u] + 1; queue.push(v); }
-    }
-    let pick = -1;
-    for (let i = 0; i < n; i++) {
-      if (alive[i] || this.isGhost(eid, i) || !adj[i].some((j) => alive[j])) continue;
-      if (pick < 0 || depth[i] < depth[pick]) pick = i;
-    }
-    return pick;
-  }
+  private nextMissing(eid: number, ship: ShipState): number { return rbd.nextMissing(this.ctx, eid, ship); }
 
   /** Parts designed but not built yet, by ship (part indices): absent, and never regrown by station repair */
   private ghosts = new Map<number, Set<number>>();
@@ -611,22 +442,10 @@ export class ShipBridge {
     return { forward: go && cy < -0.38, backward: go && cy > 0.38, left: go && cx < -0.38, right: go && cx > 0.38, boost: false, targetAngle: want };
   }
 
-  /**
-   * Validate a blueprint against the catalog, the rules and the inventory stub. `mounting: false` for a saved ship
-   * being loaded: one fitted before a weapon's mounting rules changed still flies (a refit must keep them).
-   */
-  validate(bp: Blueprint, opts: { mounting?: boolean } = {}): ValidationResult {
-    return validateBlueprint(this.catalog, bp, this.tuning, this.inventory, opts);
-  }
+  validate(bp: Blueprint, opts: { mounting?: boolean } = {}): ValidationResult { return rbd.validate(this.ctx, bp, opts); }
 
   /** Hangar save: swap the ship's blueprint and respawn in place at full HP. */
-  respawnInPlace(eid: number, bp: Blueprint): void {
-    this.ghosts.delete(eid);
-    const ship = this.spawnOn(eid, bp, 'ship');
-    Velocity.x[eid] = 0;
-    Velocity.y[eid] = 0;
-    this.syncHealth(eid, ship);
-  }
+  respawnInPlace(eid: number, bp: Blueprint): void { return rbd.respawnInPlace(this.ctx, eid, bp); }
 
   setPartHp(eid: number, fraction: (uid: number) => number): void { return dmg.setPartHp(this.ctx, eid, fraction); }
 
@@ -691,13 +510,7 @@ export class ShipBridge {
   shieldFraction(eid: number): number { return sync.shieldFraction(this.ctx, eid); }
 
   /** Proto debug key U. */
-  repair(eid: number): void {
-    const ship = this.bodies.get(eid);
-    if (!ship || ship.kind !== 'ship') return;
-    repairShip(ship);
-    this.rebuildNow(eid, ship);
-    this.syncHealth(eid, ship);
-  }
+  repair(eid: number): void { return rbd.repair(this.ctx, eid); }
 
   // -------------------------------------------------------------------------
   // Per-tick hooks from GameServer
@@ -1168,196 +981,33 @@ export class ShipBridge {
   // -------------------------------------------------------------------------
 
   /** Joins between every part of a blueprint, intact or not (where missing parts would reattach) */
-  private joinsOf(ship: ShipState): [number, number][] {
-    let j = this.joinCache.get(ship.blueprint);
-    if (!j) { j = computeJoins(this.geometry(ship)); this.joinCache.set(ship.blueprint, j); }
-    return j;
-  }
+  private joinsOf(ship: ShipState): [number, number][] { return rbd.joinsOf(this.ctx, ship); }
 
-  private partWorld(eid: number, ship: ShipState, part: number): Vec2 {
-    return shipPointToWorld(ship, this.pose(eid), this.geometry(ship)[part].centroid, this.tuning.cellSize);
-  }
+  private partWorld(eid: number, ship: ShipState, part: number): Vec2 { return rbd.partWorld(this.ctx, eid, ship, part); }
 
   private partDeaths(eid: number, ship: ShipState, tick: number): boolean { return dmg.partDeaths(this.ctx, eid, ship, tick); }
 
   /** Damage every intact part within the blast radius (any body), falling off with distance. */
   private applyBlast(b: PendingBlast): void { return dmg.applyBlast(this.ctx, b); }
 
-  /**
-   * Debris has no core holding it together: each part crumbles away at its own
-   * time (spread around decayTicks), and what is left splits as it goes.
-   */
-  private decay(eid: number, ship: ShipState, tick: number): void {
-    let at = this.decayAt.get(eid);
-    if (!at) {
-      const life = this.tuning.debris.decayTicks ?? 1200;
-      const rng = seededRng(hashInts(eid, ship.spawnTick, 77));
-      at = ship.hp.map(() => tick + Math.round(life * (0.25 + rng())));
-      this.decayAt.set(eid, at);
-    }
-    at.forEach((t, i) => {
-      if (tick < t || ship.hp[i] <= 0 || ship.detached[i]) return;
-      damagePart(ship, i, Infinity, this.tuning);
-      this.crumbled.add(`${eid}:${i}`);
-    });
-  }
+  private decay(eid: number, ship: ShipState, tick: number): void { return rbd.decay(this.ctx, eid, ship, tick); }
 
-  /**
-   * Near a station (and not hit recently): heal every damaged part a little, and
-   * regrow missing parts one at a time, nearest the core first. A part can only
-   * come back where it joins something still attached, so ships rebuild from
-   * the core outwards.
-   */
-  private repairStep(eid: number, ship: ShipState, tick: number): void {
-    const rp = this.tuning.repair!;
-    if (ship.kind !== 'ship' || ship.derived.root < 0) return;
-    if (tick - (this.lastDamaged.get(eid) ?? -1e9) < rp.combatPauseTicks) return;
-    if (!this.host.nearRepairSite?.(eid)) { this.restoreProgress.delete(eid); return; }
-    const alive = ship.derived.alive;
-    let heal = rp.healPerSecond * rp.intervalTicks / 60;
-    // The owner pays for what the crews mend
-    if (this.host.payRepair) {
-      let want = 0;
-      ship.hp.forEach((hp, i) => { if (alive[i] && hp > 0 && !ship.detached[i]) want += Math.min(ship.maxHp[i] * heal, ship.maxHp[i] - hp); });
-      if (want > 0) heal *= this.host.payRepair(eid, want);
-    }
-    if (heal > 0) ship.hp.forEach((_, i) => { if (alive[i]) healPart(ship, i, ship.maxHp[i] * heal, this.tuning); });
-
-    // Missing parts that join the attached structure, by distance (in joins) from the core
-    const n = ship.hp.length;
-    const adj: number[][] = Array.from({ length: n }, () => []);
-    for (const [a, c] of this.joinsOf(ship)) { adj[a].push(c); adj[c].push(a); }
-    const depth = new Array<number>(n).fill(Infinity);
-    depth[ship.derived.root] = 0;
-    const queue = [ship.derived.root];
-    while (queue.length) {
-      const u = queue.shift()!;
-      for (const v of adj[u]) if (depth[v] === Infinity) { depth[v] = depth[u] + 1; queue.push(v); }
-    }
-    let pick = -1;
-    for (let i = 0; i < n; i++) {
-      if (alive[i] || !adj[i].some((j) => alive[j]) || this.isGhost(eid, i)) continue;
-      if (pick < 0 || depth[i] < depth[pick]) pick = i;
-    }
-    if (pick < 0) { this.restoreProgress.delete(eid); return; }
-    const progress = (this.restoreProgress.get(eid) ?? 0) + rp.intervalTicks;
-    if (progress < rp.restoreTicks) { this.restoreProgress.set(eid, progress); return; }
-    // Ready: the owner pays the rebuild bill (or it waits, ready, until they can)
-    if (this.host.payRebuild && !this.host.payRebuild(eid, pick)) { this.restoreProgress.set(eid, progress); return; }
-    this.restoreProgress.set(eid, 0);
-    restorePart(ship, pick, rp.restoreHp);
-    // Not "freshly destroyed" if it is lost again before the rebuild
-    ship.rebuildHp[pick] = 0;
-  }
+  private repairStep(eid: number, ship: ShipState, tick: number): void { return rbd.repairStep(this.ctx, eid, ship, tick); }
 
   // -------------------------------------------------------------------------
   // Rebuild, detachment and debris
   // -------------------------------------------------------------------------
 
-  private noteRebuild(t0: number): void {
-    this.stats.lastRebuildMs = this.now() - t0;
-    this.stats.rebuildCount++;
-  }
+  private noteRebuild(t0: number): void { return rbd.noteRebuild(this.ctx, t0); }
 
-  private rebuildNow(eid: number, ship: ShipState): void {
-    const oldCom: Vec2 = ship.derived.com;
-    // (Its circuits may split or join: each store keeps what it held, energy.ts remapCharge)
-    const before = ship.derived;
-    const pose = this.pose(eid);
-    const t0 = this.now();
-    rebuildShip(ship, this.catalog, this.tuning);
-    this.noteRebuild(t0);
+  private rebuildNow(eid: number, ship: ShipState): void { return rbd.rebuildNow(this.ctx, eid, ship); }
 
-    // Orphaned groups leave as debris (for a ship with no core, that's everything)
-    const groups = ship.derived.orphanGroups;
-    if (groups.length) {
-      // (what breaks off debris only to be seen is only to be seen too)
-      groups.forEach((g, k) => { const d = this.spawnDebris(eid, ship, g, oldCom, pose, k); if (this.intangible.has(eid)) this.intangible.add(d); });
-      for (const g of groups) for (const i of g) ship.detached[i] = true;
-      rebuildShip(ship, this.catalog, this.tuning);
-    }
-    const held = this.charge.get(eid);
-    if (held) this.setCharge(eid, remapCharge(before, ship.derived, held));
-
-    // Core loss (or debris shot to nothing): every part has already left as debris
-    if (ship.derived.root < 0) {
-      if (hasComponent(this.host.world, Player, eid)) {
-        // The existing death/respawn flow takes over: health 0 → Dead → respawn.
-        // The empty body stays until then so nothing else draws in its place.
-        Health.current[eid] = 0;
-      } else {
-        this.host.onShipDestroyed?.(eid, this.lastHitBy.get(eid), ship);
-        this.removeBody(eid);
-      }
-      return;
-    }
-
-    // Keep the remaining parts where they were: the centre of mass moved in grid space
-    const newCom = ship.derived.com;
-    if (newCom[0] !== oldCom[0] || newCom[1] !== oldCom[1]) {
-      const cs = this.tuning.cellSize;
-      const [wx, wy] = localToWorldDir([(newCom[0] - oldCom[0]) * cs, (newCom[1] - oldCom[1]) * cs], pose.angle);
-      Position.x[eid] += wx;
-      Position.y[eid] += wy;
-    }
-    Radius.value[eid] = Math.max(1, ship.derived.radius);
-  }
-
-  /**
-   * Groups of parts leave a ship whole, each group a debris body of its own (a boss shedding its carapace, a wing
-   * breaking away); whatever then hangs off nothing goes too. `fling`: each thrown out from its middle this fast (a
-   * boss blowing apart); `crumble`: each crumbles away within this many ticks (not left lying about); `intangible`:
-   * only to be seen (nothing hits it, it hits nothing)
-   */
-  shed(eid: number, groups: number[][], fling = 0, crumble = 0, intangible = false): void {
-    const ship = this.bodies.get(eid);
-    if (!ship) return;
-    const live = groups.map((g) => g.filter((i) => ship.derived.alive[i])).filter((g) => g.length);
-    if (!live.length) return;
-    const pose = this.pose(eid), com = ship.derived.com;
-    live.forEach((g, k) => { const d = this.spawnDebris(eid, ship, g, com, pose, k, fling, crumble); if (intangible) this.intangible.add(d); });
-    for (const g of live) for (const i of g) ship.detached[i] = true;
-    this.rebuildNow(eid, ship);
-  }
+  shed(eid: number, groups: number[][], fling = 0, crumble = 0, intangible = false): void { return rbd.shed(this.ctx, eid, groups, fling, crumble, intangible); }
 
   /** A connected group of parts leaves `ship` as a new debris body built from the same parts and HP. */
-  private spawnDebris(parentEid: number, ship: ShipState, group: number[], parentCom: Vec2, pose: { x: number; y: number; angle: number }, k: number, fling = 0, crumble = 0): number {
-    const parts = group.map((i) => ship.blueprint.parts[i]);
-    const hp = group.map((i) => ship.hp[i]);
-    const bp: Blueprint = { name: `${ship.blueprint.name} debris`, catalogVersion: ship.blueprint.catalogVersion, parts };
-    const eid = this.host.createBody();
-    InSystem.systemId[eid] = InSystem.systemId[parentEid]; // debris stays in its ship's system
-    const rng = seededRng(hashInts(parentEid, this.host.getTick(), k));
-    const debris = this.spawnOn(eid, bp, 'debris', hp, ship.angVel + (rng() - 0.5) * 2 * this.tuning.debris.pushSpin);
-    // Debris breaking up further keeps its parts' crumble times
-    const parentDecay = this.decayAt.get(parentEid);
-    if (parentDecay) this.decayAt.set(eid, group.map((i) => parentDecay[i]));
-    if (crumble > 0) { const now = this.host.getTick(); this.decayAt.set(eid, group.map(() => now + Math.round(crumble * (0.5 + 0.5 * rng())))); }
+  private spawnDebris(parentEid: number, ship: ShipState, group: number[], parentCom: Vec2, pose: { x: number; y: number; angle: number }, k: number, fling = 0, crumble = 0): number { return rbd.spawnDebris(this.ctx, parentEid, ship, group, parentCom, pose, k, fling, crumble); }
 
-    const cs = this.tuning.cellSize;
-    const [rx, ry] = localToWorldDir([(debris.derived.com[0] - parentCom[0]) * cs, (debris.derived.com[1] - parentCom[1]) * cs], pose.angle);
-    Position.x[eid] = pose.x + rx;
-    Position.y[eid] = pose.y + ry;
-    Rotation.angle[eid] = pose.angle;
-    // Parent's velocity at the group's centre of mass, plus a small seeded push
-    const push = this.tuning.debris.pushSpeed * (0.5 + rng());
-    const dir = rng() * Math.PI * 2;
-    Velocity.x[eid] = Velocity.x[parentEid] - ship.angVel * ry + Math.cos(dir) * push;
-    Velocity.y[eid] = Velocity.y[parentEid] + ship.angVel * rx + Math.sin(dir) * push;
-    if (fling > 0) {
-      const l = Math.hypot(rx, ry) || 1, f = fling * (0.6 + 0.8 * rng());
-      Velocity.x[eid] += (rx / l) * f;
-      Velocity.y[eid] += (ry / l) * f;
-    }
-    return eid;
-  }
-
-  private removeBody(eid: number): void {
-    this.bodies.delete(eid);
-    this.forget(eid);
-    for (const k of this.contactFx.keys()) if (k.startsWith(`${eid}:`) || k.endsWith(`:${eid}`)) this.contactFx.delete(k);
-    this.host.removeBody(eid);
-  }
+  private removeBody(eid: number): void { return rbd.removeBody(this.ctx, eid); }
 
   // -------------------------------------------------------------------------
   // Helpers
