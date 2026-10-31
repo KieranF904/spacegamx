@@ -127,8 +127,10 @@ describe('structure pins', () => {
   });
 
   it('server messages client Game.ts handles', () => {
-    const src = readFileSync(join(srcRoot, 'client/src/Game.ts'), 'utf8');
-    const types = caseLabels(src, /^\s*private handleServerMessage\(msg: ServerMessage\)/, 6);
+    // (the handler table moved to client/src/app/serverMessages.ts: one entry per line at two-space indent)
+    const src = readFileSync(join(srcRoot, 'client/src/app/serverMessages.ts'), 'utf8').replace(/\r\n/g, '\n');
+    const body = src.slice(src.indexOf('const TABLE: Handlers = {'));
+    const types = [...new Set([...body.slice(0, body.indexOf('\n};')).matchAll(/^ {2}([A-Za-z]+)[:,]/gm)].map((m) => m[1]))].sort();
     expect(types.length).toBeGreaterThan(20);
     pin('serverMessages.json', types);
   });
