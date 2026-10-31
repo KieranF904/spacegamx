@@ -322,7 +322,7 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
 {
   const DYNAMO_LOOK = { color: '#6d3fb3', decor: 'battery', glow: '#b57cff' };
   const LATE_OTHER = [
-    ['power_pulse_dynamo', 'Pulse Dynamo', 'dynamo', ['sq'], 18, 'titanium', { dynamo: 10, hpScale: 0.6 }, 'Puts 10 a second into each Capacitor or Drive Cell bank it touches, split evenly. It needs no wires and powers nothing itself.', 'power', DYNAMO_LOOK],
+    ['power_pulse_dynamo', 'Pulse Dynamo', 'dynamo', ['sq'], 18, 'titanium', { dynamo: 10, hpScale: 0.6 }, 'Puts 10 a second into each Capacitor or Drive Cell bank it touches. It needs no wires and powers nothing itself.', 'power', DYNAMO_LOOK],
     ['shield_flash_screen', 'Flash Screen', 'shield', ['sq'], 13, 'steel', { shield: 36, shieldRegen: 0, shieldDelay: 0, flash: true, demand: 16, priority: 2, hpScale: 0.6 }, 'A shield with no slow refill that returns whole 4 seconds after it breaks, or at once for 4 E a point from a Capacitor bank touching it.', 'shields', legacyLook('shield')],
   ];
   for (const [id, name, family, pieces, level, material, fields, description, category, look] of LATE_OTHER) {
