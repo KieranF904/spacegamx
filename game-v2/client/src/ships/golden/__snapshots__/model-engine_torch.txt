@@ -3,14 +3,14 @@ Torch
 Mk I · Medium · Panel · 2 cells
 Hull · mass105 hp · 2.0
 Armour · build1 · 2 pts
-Thrust8.0 · boost ×1.6
+Thrust8.0 · boost ×1
 Power draw68/s
 Rated speed4,200 m/s (its push fades out near it)
 
 == partStats (stats rows) ==
 GradeMk I · Medium
 Power draw68
-Thrust8.0 · boost ×1.6, drain ×1.2
+Thrust8.0 · boost ×1, drain ×0
 Hull · mass105 hp · 2.0
 Armour · build1 · 2 pts
 Rating scoretoughness 105
@@ -25,7 +25,7 @@ Medium
 Medium · Panel
 
 == tradeOff ==
-brutal thrust, burns energy
+full thrust all the time, no boost, burns energy
 
 == keyStats ==
 thrust 8.0 · top 4,200 m/s · draws 68
@@ -43,4 +43,4 @@ thrust 8.0 · top 4,200 m/s · draws 68
 {"open":true,"badge":"Lv 8","why":""}
 
 == partStats (raw) ==
-{"grade":1,"mark":"Mk I","size":"Medium","area":2,"hp":105,"mass":2,"firepower":0,"toughness":105,"armour":1,"draw":68,"thrust":8,"boost":1.6,"boostDrain":1.2}
+{"grade":1,"mark":"Mk I","size":"Medium","area":2,"hp":105,"mass":2,"firepower":0,"toughness":105,"armour":1,"draw":68,"thrust":8,"boost":1,"boostDrain":0}

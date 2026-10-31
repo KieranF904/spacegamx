@@ -25,7 +25,7 @@ Small
 Small · Square
 
 == tradeOff ==
-weak cruise, huge boost
+weak cruise, huge boost; wants a Drive Cell touching it
 
 == keyStats ==
 thrust 1.6 · top 3,000 m/s · draws 8

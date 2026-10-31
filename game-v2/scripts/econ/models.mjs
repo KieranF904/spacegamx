@@ -188,9 +188,9 @@ const LEGENDARY = [
 // (The spec's table, but the Ion Drive pushes 2.26, as the thruster it replaces did: the starter flies as it always has)
 const E = [
   ['engine_ion_drive', 'Ion Drive', 'ion', 'sq', 0, 2.26, 9, 34, 2.0, 1.0, 'alloy', 'Efficient and steady, with a low top speed.'],
-  ['engine_vernier', 'Vernier', 'ion', 'tri', 2, 1.2, 4, 40, 1.6, 0.8, 'alloy', 'A cheap little thruster for side push.'],
-  ['engine_afterburner', 'Afterburner', 'afterburner', 'sq', 5, 1.6, 8, 50, 3.6, 3.0, 'alloy', 'Weak at cruise, a huge burst when boosting.'],
-  ['engine_torch', 'Torch', 'afterburner', 'rect2', 8, 4.0, 34, 70, 1.6, 1.2, 'alloy', 'Brutal thrust that burns through energy.'],
+  ['engine_vernier', 'Vernier', 'ion', 'tri', 2, 1.2, 4, 40, 1, 0, 'alloy', 'A cheap little thruster for corner push. It has no boost: boosting gives it no extra thrust and no extra drain.'],
+  ['engine_afterburner', 'Afterburner', 'afterburner', 'sq', 5, 1.6, 8, 50, 3.6, 3.0, 'alloy', 'Weak at cruise, a huge burst when boosting. Best with a Drive Cell touching it.'],
+  ['engine_torch', 'Torch', 'afterburner', 'rect2', 8, 4.0, 34, 70, 1, 0, 'alloy', 'Brutal thrust at full power all the time, and a brutal drain. It has no boost: nothing is held back to give.'],
   ['engine_plasma_drive', 'Plasma Drive', 'plasma', 'rect2', 16, 3.1, 20, 55, 1.8, 0.8, 'steel', 'The balanced main engine.'],
   ['engine_drift_sail', 'Drift Sail', 'ion', 'round', 22, 0.9, 3, 26, 1.3, 0.5, 'titanium', 'Near-free cruising, never in a hurry.'],
   ['engine_fusion_torch', 'Fusion Torch', 'plasma', 'block2', 30, 3.6, 28, 85, 1.7, 1.0, 'cobalt', 'The long-haul racer: fast, and faster still.'],
@@ -260,8 +260,8 @@ const OTHER = [
   ['power_fusion_plant', 'Fusion Plant', 'reactor', ['block2'], 18, 'steel', { produce: 48, hpScale: 0.9, massScale: 2, blast: { radius: 3, damage: 70, delayTicks: [4, 16] } }, 'A heavy plant with plenty of power, and a big blast.', 'power'],
   ['power_overclock_reactor', 'Overclock Reactor', 'reactor', ['rect2'], 24, 'titanium', { produce: 62, hpScale: 0.4, blast: { radius: 3.6, damage: 95, delayTicks: [3, 12] } }, 'The most power for its size: fragile, and the biggest blast.', 'power'],
   ['power_battery', 'Battery', 'battery', ['sq'], 0, 'alloy', { store: 200, discharge: 600, hpScale: 0.6 }, 'Adds to the ship\'s pool on a powered network: holds 200 and gives it quickly.', 'power'],
-  ['power_capacitor', 'Capacitor', 'capacitor', ['sq'], 7, 'composite', { store: 160, pool: 'weapon', bank: true, discharge: 2000, hpScale: 0.6 }, 'A gun bank: touching Capacitors make one bank that feeds the guns, beams and mining lasers it touches first, very fast.', 'power'],
-  ['power_drive_cell', 'Drive Cell', 'drive_cell', ['sq'], 10, 'steel', { store: 320, pool: 'drive', bank: true, discharge: 1400, hpScale: 0.6 }, 'An engine bank: touching Drive Cells make one bank that feeds the engines and Burst Strafers it touches first.', 'power'],
+  ['power_capacitor', 'Capacitor', 'capacitor', ['sq'], 7, 'composite', { store: 160, pool: 'weapon', bank: true, discharge: 2000, hpScale: 0.6 }, 'Touching Capacitors form a bank that feeds the guns, beams, miners and Flash Screen it touches before the ship does; it does not feed engines.', 'power'],
+  ['power_drive_cell', 'Drive Cell', 'drive_cell', ['sq'], 10, 'steel', { store: 320, pool: 'drive', bank: true, discharge: 1400, hpScale: 0.6 }, 'Touching Drive Cells form a bank that feeds the engines and Burst Strafers it touches before the ship does; it does not feed guns.', 'power'],
   ['power_heavy_bank', 'Heavy Bank', 'battery', ['block2'], 20, 'titanium', { store: 300, discharge: 150, hpScale: 0.7, massScale: 1.6 }, 'A deep, heavy battery for the ship\'s pool: holds a lot, but gives it slowly.', 'power'],
   ['utility_mining_laser', 'Mining Laser', 'mining', ['sq'], 0, 'alloy', { demand: 12, priority: 2, facing: true, mining: true, hpScale: 0.7 }, 'Cuts ore from rock. A poor weapon.', 'utility'],
   ['utility_bore', 'Bore', 'mining', ['rect2'], 10, 'steel', { demand: 9, priority: 2, facing: true, mining: true, hpScale: 0.8 }, 'A heavier mining laser: its steel cuts harder rock.', 'utility'],
@@ -301,7 +301,7 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
 {
   const DYNAMO_LOOK = { color: '#6d3fb3', decor: 'battery', glow: '#b57cff' };
   const LATE_OTHER = [
-    ['power_pulse_dynamo', 'Pulse Dynamo', 'dynamo', ['sq'], 18, 'titanium', { dynamo: 10, hpScale: 0.6 }, 'A bank charger: it puts 10 a second into each Capacitor or Drive Cell bank it touches, with no wires, and powers nothing itself.', 'power', DYNAMO_LOOK],
+    ['power_pulse_dynamo', 'Pulse Dynamo', 'dynamo', ['sq'], 18, 'titanium', { dynamo: 10, hpScale: 0.6 }, 'Puts 10 a second into each Capacitor or Drive Cell bank it touches, split evenly. It needs no wires and powers nothing itself.', 'power', DYNAMO_LOOK],
     ['shield_flash_screen', 'Flash Screen', 'shield', ['sq'], 13, 'steel', { shield: 36, demand: 16, priority: 2, hpScale: 0.6 }, 'A compact shield generator.', 'shields', legacyLook('shield')],
   ];
   for (const [id, name, family, pieces, level, material, fields, description, category, look] of LATE_OTHER) {
@@ -370,7 +370,7 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   const TUG = [
     ['engine_burst_strafer', 'Burst Strafer', 'strafer', ['sq'], 10, 'steel',
       { strafe: { kick: 14, ticks: 12, cooldown: 24 }, demand: 700, priority: 1, facing: true, hpScale: 0.6 },
-      'A dodge thruster: a hard fifth-of-a-second burst away from its nozzle, ready again in under half a second, and a lot of energy every time. Fit them facing different ways to dodge any way. No push at all for cruising.', 'engines'],
+      'A dodge thruster: a hard fifth-of-a-second burst away from its nozzle, ready again in under half a second, and a lot of energy every time. Fit them facing different ways to dodge any way. It draws from a Drive Cell bank touching it first. No push at all for cruising.', 'engines'],
     ['utility_tow_beam', 'Tow Beam', 'tow', ['rect2'], 12, 'steel',
       { tow: true, demand: 12, priority: 2, facing: true, hpScale: 0.9, massScale: 1.2 },
       'Latches onto a wreck, debris or a loot pod and pulls it along on a tether; the heavier it is, the slower you go. Tow a wreck into a station to salvage it. Never takes hold of a working ship.', 'utility'],

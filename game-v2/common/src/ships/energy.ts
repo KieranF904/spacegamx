@@ -235,7 +235,7 @@ export function powerTick(d: ShipDerived, c: Charge, use: PowerUse, tuning: Ship
   let stored = pool;
   for (let b = 0; b < nB; b++) if (B[b].kind === 'drive') stored += held[b];
   const boost = use.boosting && use.thrusting && stored > 0;
-  const mult = boost ? 1 + et.boostDraw * (d.boostDrain ?? 1) : 1;
+  const boostDraw = boost ? et.boostDraw : 0;
 
   // What each feed group asks for this tick: engines (step 1), and guns, mining lasers and part features (step 2)
   const engW = sEngW, engG = sEngG, gunW = sGunW, gunG = sGunG;
@@ -245,7 +245,7 @@ export function powerTick(d: ShipDerived, c: Charge, use: PowerUse, tuning: Ship
       const f = L.feedOf[t.part];
       if (f < 0 || (!t.force[0] && !t.force[1])) continue;
       if (use.dir && t.force[0] * use.dir[0] + t.force[1] * use.dir[1] <= 1e-9) continue;
-      engW[f] += (L.draw[t.part] * mult) / 60;
+      engW[f] += (L.draw[t.part] * (1 + boostDraw * L.boostDrain[t.part])) / 60;
     }
   }
   if (use.load) for (let f = 0; f < nF; f++) gunW[f] = Math.max(0, use.load[f] ?? 0) / 60;
