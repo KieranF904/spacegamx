@@ -170,7 +170,8 @@ import { MessageLimiter } from './net/MessageLimits.js';
 import { checkTickOrder, type TickSystem } from './tickOrder.js';
 import type { ClientConnection } from './net/ClientConnection.js';
 import type { ServerCtx } from './net/ServerCtx.js';
-import { HandlerRegistry, dispatch, MAX_INPUTS_PER_TICK, type HandlerTable } from './net/dispatch.js';
+import { registerModuleHandlers } from './net/handlers/modules.js';
+import { HandlerRegistry, dispatch, registerHandlers, MAX_INPUTS_PER_TICK, type HandlerTable } from './net/dispatch.js';
 
 // ============================================
 // SPATIAL PARTITIONING
@@ -576,8 +577,6 @@ export interface GameServerOptions {
 }
 
 /** A player who quits within this long of taking damage leaves their ship in space... */
-/** What a job or a hangar order can be told to do */
-const ORDER_ACTIONS = new Set(['pause', 'resume', 'cancel', 'top'] as const);
 const LINGER_COMBAT_TICKS = 60 * 15;
 /** ...for this long */
 const LINGER_TICKS = 60 * 20;
@@ -2839,6 +2838,7 @@ this.devTeleport = opts.devTeleport ?? false;
    */
   private buildMessageHandlers(): HandlerTable {
     const t = new HandlerRegistry();
+    registerHandlers(t, registerModuleHandlers);
     t.on('input', (_ctx, conn, msg) => {
       // Queue for next tick boundary — don't apply mid-frame.
       // Messages still arrive instantly via setImmediate event loop.
@@ -2871,81 +2871,8 @@ this.devTeleport = opts.devTeleport ?? false;
     t.on('pilotInfo', (_ctx, conn, msg) => {
       this.handlePilotInfo(conn, Number(msg.id));
     });
-    t.on('partyInvite', (_ctx, conn, msg) => {
-      this.party.invite(conn, { name: msg.name, id: msg.id });
-    });
-    t.on('ribbons', (_ctx, conn, msg) => {
-      this.achievements.progress(conn);
-    });
-    t.on('rankings', (_ctx, conn, msg) => {
-      this.achievements.rankings(conn);
-    });
     t.on('shareDesign', (_ctx, conn, msg) => {
       this.handleShareDesign(conn, msg.blueprint);
-    });
-    t.on('mapPing', (_ctx, conn, msg) => {
-      if (this.flying(conn.playerId)) this.party.ping(conn, msg, this.gameData.getSystemByNum(InSystem.systemId[conn.playerId])?.id ?? '');
-    });
-    t.on('partyRespond', (_ctx, conn, msg) => {
-      this.party.respond(conn, !!msg.accept);
-    });
-    t.on('partyLeave', (_ctx, conn, msg) => {
-      this.party.leave(conn);
-    });
-    t.on('partyKick', (_ctx, conn, msg) => {
-      this.party.kick(conn, String(msg.name));
-    });
-    t.on('partyPromote', (_ctx, conn, msg) => {
-      this.party.promote(conn, String(msg.name));
-    });
-    t.on('tradeRequest', (_ctx, conn, msg) => {
-      this.trade.request(conn, msg);
-    });
-    t.on('tradeRespond', (_ctx, conn, msg) => {
-      this.trade.respond(conn, msg);
-    });
-    t.on('tradeOffer', (_ctx, conn, msg) => {
-      this.trade.offer(conn, msg);
-    });
-    t.on('tradeAccept', (_ctx, conn, msg) => {
-      this.trade.accept(conn);
-    });
-    t.on('tradeCancel', (_ctx, conn, msg) => {
-      this.trade.cancel(conn);
-    });
-    t.on('vendorOpen', (_ctx, conn, msg) => {
-      this.market.vendors(conn);
-    });
-    t.on('vendorBuy', (_ctx, conn, msg) => {
-      this.market.buy(conn, msg);
-    });
-    t.on('marketScan', (_ctx, conn, msg) => {
-      this.market.scan(conn, Array.isArray(msg.items) ? msg.items.slice(0, 80).map(String) : []);
-    });
-    t.on('itemMove', (_ctx, conn, msg) => {
-      this.pilots.handleMove(conn, msg);
-    });
-    t.on('itemJettison', (_ctx, conn, msg) => {
-      this.pilots.handleJettison(conn, msg);
-    });
-    t.on('itemUse', (_ctx, conn, msg) => {
-      this.pilots.handleUse(conn, msg);
-    });
-    t.on('stationOpen', (_ctx, conn, msg) => {
-      this.services.open(conn);
-      this.quests.board(conn);
-    });
-    t.on('refine', (_ctx, conn, msg) => {
-      this.services.refine(conn, msg);
-    });
-    t.on('craft', (_ctx, conn, msg) => {
-      this.services.craft(conn, msg);
-    });
-    t.on('outpostCharter', (_ctx, conn, msg) => {
-      this.outpost?.charter(conn, String(msg.site));
-    });
-    t.on('outpostUpgrade', (_ctx, conn, msg) => {
-      this.outpost?.upgrade(conn, String(msg.track));
     });
     t.on('devStation', (_ctx, conn, msg) => {
       // Dev (or an admin): a station at Sol's site with every track at a tier, and in you go
@@ -2958,54 +2885,6 @@ this.devTeleport = opts.devTeleport ?? false;
       const sol = this.gameData.getSystemNum('sol');
       const jp = [...portalQuery(this.world)].find((g) => InSystem.systemId[g] === sol && this.gameData.getSystemByNum(Portal.targetSystem[g])?.private);
       if (jp !== undefined) this.homes.jump(conn, 'sol', Position.x[jp], Position.y[jp]);
-    });
-    t.on('ammoPrefer', (_ctx, conn, msg) => {
-      this.ammo.prefer(conn, String(msg.item));
-    });
-    t.on('slotLoadout', (_ctx, conn, msg) => {
-      this.ammo.setLoadout(conn, Math.floor(Number(msg.slot)), msg.load, msg.first);
-    });
-    t.on('restockLoadout', (_ctx, conn, msg) => {
-      this.ammo.restock(conn, { report: true });
-    });
-    t.on('itemStore', (_ctx, conn, msg) => {
-      this.pilots.handleStore(conn, msg.what);
-    });
-    t.on('gemCut', (_ctx, conn, msg) => {
-      this.services.cutGem(conn, msg);
-    });
-    t.on('gemSocket', (_ctx, conn, msg) => {
-      this.hangar.socketGem(conn, Math.floor(Number(msg.slot)), Math.floor(Number(msg.uid)), String(msg.gem));
-    });
-    t.on('gemUnsocket', (_ctx, conn, msg) => {
-      this.hangar.unsocketGem(conn, Math.floor(Number(msg.slot)), Math.floor(Number(msg.uid)), Math.floor(Number(msg.index)));
-    });
-    t.on('marketSell', (_ctx, conn, msg) => {
-      this.services.sell(conn, msg);
-    });
-    t.on('marketBuy', (_ctx, conn, msg) => {
-      this.services.buy(conn, msg);
-    });
-    t.on('questBoard', (_ctx, conn, msg) => {
-      this.quests.board(conn);
-    });
-    t.on('questAccept', (_ctx, conn, msg) => {
-      this.quests.accept(conn, msg);
-    });
-    t.on('talk', (_ctx, conn, msg) => {
-      this.people.handle(conn, msg);
-    });
-    t.on('questAbandon', (_ctx, conn, msg) => {
-      this.quests.abandon(conn, msg);
-    });
-    t.on('questSeen', (_ctx, conn, msg) => {
-      this.quests.seen(conn);
-    });
-    t.on('codexRead', (_ctx, conn, msg) => {
-      this.codex.read(conn, msg);
-    });
-    t.on('skillUp', (_ctx, conn, msg) => {
-      this.quests.skillUp(conn, msg);
     });
     t.on('join', (_ctx, conn, msg) => {
       // (Async: a throw inside is a rejected promise the receive() try/catch can't see)
@@ -3040,33 +2919,6 @@ this.devTeleport = opts.devTeleport ?? false;
       try { bp = this.clientBlueprint(msg.blueprint); } catch { return; }
       if (!this.ships.validate(bp).ok) { this.pilots.toast(conn, 'Fix the design first: it has problems', 'warn'); return; }
       this.hangar.saveDesign(conn, Math.floor(Number(msg.slot)), bp);
-    });
-    t.on('fabOrder', (_ctx, conn, msg) => {
-      this.hangar.orderItem(conn, String(msg.item), Math.floor(Number(msg.n)));
-    });
-    t.on('fabOrderCancel', (_ctx, conn, msg) => {
-      this.hangar.cancelOrder(conn, Math.floor(Number(msg.id)));
-    });
-    t.on('designDelete', (_ctx, conn, msg) => {
-      this.hangar.deleteDesign(conn, Math.floor(Number(msg.slot)));
-    });
-    t.on('slotBuild', (_ctx, conn, msg) => {
-      this.hangar.build(conn, Math.floor(Number(msg.slot)));
-    });
-    t.on('slotOrder', (_ctx, conn, msg) => {
-      if (ORDER_ACTIONS.has(msg.action)) this.hangar.order(conn, Math.floor(Number(msg.slot)), msg.action);
-    });
-    t.on('job', (_ctx, conn, msg) => {
-      if (ORDER_ACTIONS.has(msg.action)) this.services.jobAction(conn, Math.floor(Number(msg.id)), msg.action);
-    });
-    t.on('scrapItem', (_ctx, conn, msg) => {
-      this.pilots.scrapItem(conn, String(msg.id), Math.floor(Number(msg.n)));
-    });
-    t.on('marketSellAll', (_ctx, conn, msg) => {
-      this.services.sellAll(conn);
-    });
-    t.on('quickbarSet', (_ctx, conn, msg) => {
-      this.pilots.setQuickbar(conn, msg);
     });
     t.on('dock', (_ctx, conn, msg) => {
       this.handleDock(conn);
@@ -3110,15 +2962,6 @@ this.devTeleport = opts.devTeleport ?? false;
         }
       }
       this.pilots.toast(conn, `Boss worn to ${Math.round(this.ships.integrity(boss) * 100)}%`, 'info');
-    });
-    t.on('contrib', (_ctx, conn, msg) => {
-      this.contrib.handle(conn, msg as unknown as Record<string, unknown>);
-    });
-    t.on('admin', (_ctx, conn, msg) => {
-      this.admin.run(conn, String(msg.cmd ?? ''), msg.args && typeof msg.args === 'object' ? msg.args : {});
-    });
-    t.on('siege', (_ctx, conn, msg) => {
-      this.sieges.handle(conn, msg, conn.playerId);
     });
     t.on('undock', (_ctx, conn, msg) => {
       this.undock(conn);
