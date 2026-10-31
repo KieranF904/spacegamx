@@ -1,7 +1,8 @@
 /**
  * ShipBridge weapons: what a ship's guns do each tick. Firing (stepWeapons, fireWeapons, pulses, miners), beams
  * (fireBeam, repairBeam, beamFrom), point defence, the casts that find what a beam or shot meets (alongBeam,
- * segmentHit, castShip, cover, partAt), targets, and damage scaling. ShipBridge keeps one-line delegators with the same names.
+ * segmentHit, castShip, cover, partAt), a projectile's hit on a ship (hitProjectile), targets, and damage scaling.
+ * ShipBridge keeps one-line delegators with the same names.
  *
  * Damage goes through the bridge (b.hurt), never an import of the damage module, so the modules can't form a cycle.
  */
@@ -10,12 +11,12 @@ import { rayTerrain } from '@space-game/common';
 import { repairAt, pointDefenceOf, stepPointDefenceAim, wrapPi, isOpen } from '@space-game/common';
 import { hasComponent } from 'bitecs';
 import {
-  Position, Input, Player, InSystem, ShipState, Vec2, damagePart, weaponHit, shooterGrade, localToWorldDir,
+  Position, Input, Player, InSystem, Projectile, ShipState, Vec2, damagePart, weaponHit, shooterGrade, localToWorldDir,
   castParts, partDistance, pointInConvex, standing, deciding, stageOf, currentStage, stageParts, shipPointToWorld,
   WeaponInfo, WeaponTuning, firesStraight, partWeaponDef, stepGuns, ammoCode, outputOf, payMining, MINE_CYCLE,
   MINING_PULSE, MINE_TAIL, mineFalloff, type Charge, pulseProfile, beamFalloff,
 } from '@space-game/common';
-import { K, BEAM_PAD, type BridgeCtx } from './core.js';
+import { K, BEAM_PAD, GLANCING, type BridgeCtx } from './core.js';
 
 export function lastFiredTick(b: BridgeCtx, eid: number): number {
   return b.lastFired.get(eid) ?? -Infinity;
@@ -412,6 +413,35 @@ export function alongBeam(b: BridgeCtx, systemNum: number, x0: number, y0: numbe
   const out = [...near];
   for (const e of b.ungridded) out.push(e);
   return out;
+}
+
+/**
+ * Projectile vs ship parts. The engine's broadphase gives `nearby`; each
+ * candidate ship is tested part by part in its local grid space, and the
+ * first part the segment touches takes the damage.
+ */
+export function hitProjectile(
+  b: BridgeCtx, proj: number, ownerId: number, x0: number, y0: number, x1: number, y1: number,
+  nearby: { id: number }[], exclude?: Set<number>, radius = 0,
+): { eid: number; x: number; y: number; part: number } | null {
+  let best: { eid: number; ship: ShipState; part: number; t: number } | null = null;
+  const systemNum = InSystem.systemId[proj];
+  for (const { id: eid } of nearby) {
+    // (Instanced copies share coordinates: only ships in the shot's own copy)
+    if (eid === ownerId || exclude?.has(eid) || InSystem.systemId[eid] !== systemNum || b.intangible.has(eid)) continue;
+    const ship = b.bodies.get(eid);
+    if (!ship) continue;
+    // Shots pass straight through ships they may not hurt
+    if (b.host.canDamage && !b.host.canDamage(ownerId, eid)) continue;
+    const hit = b.segmentHit(eid, ship, x0, y0, x1, y1, radius);
+    if (hit && (!best || hit.t < best.t)) best = { eid, ship, ...hit };
+  }
+  if (!best) return null;
+  const hx = x0 + (x1 - x0) * best.t, hy = y0 + (y1 - y0) * best.t;
+  const dealt = b.hurt(best.eid, best.ship, best.part, Projectile.damage[proj], ownerId, { ...b.host.shotVs?.(proj), at: b.worldToGrid(best.eid, best.ship, hx, hy) });
+  b.host.notifyDamage(best.eid, dealt, ownerId, b.lastThrough < GLANCING);
+  b.host.notifyProjectileHit(proj, hx, hy);
+  return { eid: best.eid, x: hx, y: hy, part: best.part };
 }
 
 /** Does a world-space segment come within a ship's bounding circle (segmentHit's first test) */

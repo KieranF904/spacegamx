@@ -10,13 +10,13 @@
  */
 
 import {
-  Velocity, Projectile, InSystem, Blueprint, Catalog,
+  Velocity, Blueprint, Catalog,
   ShipState, ShipTuning, PlacedGeom, Vec2, InventoryStub, ValidationResult,
-  GravityWell, FlightConstants, type HitInfo, type WarmthStage, type JumpField, blueprintGeometry, standing,
+  GravityWell, FlightConstants, type HitInfo, type WarmthStage, type JumpField, standing,
   WeaponInfo, WeaponTuning, ReplicaMode, FireRecord, type FlightBody, type Charge,
 } from '@space-game/common';
 import {
-  GLANCING, STAGE_COVER, type ShipHost, type PartDestroyedEvent, type PilotOrders, type PendingBlast,
+  STAGE_COVER, type ShipHost, type PartDestroyedEvent, type PilotOrders, type PendingBlast,
   type ShipBridgeConfig, type ShipBridgeStats, type ContactPiece, type BridgeCtx,
 } from './bridge/core.js';
 import * as sync from './bridge/sync.js';
@@ -41,6 +41,15 @@ export class ShipBridge {
   readonly enemyDesigns: Record<string, Blueprint>;
   readonly devDesigns: Record<string, Blueprint>;
   readonly stats: ShipBridgeStats = { lastRebuildMs: 0, rebuildCount: 0, debrisCount: 0 };
+  /**
+   * What each body flew with this tick (replication: the server's shadow of each
+   * ship replays exactly this, with the structure the step used)
+   */
+  readonly replicaCtl = new Map<number, { mode: ReplicaMode; bits: number; q: number; derived: ShipState['derived'] }>();
+  /** Repair kits only work on a ship holding still (world units per tick) */
+  static readonly KIT_STILL_SPEED = 0.8;
+  /** Shots fired since the last snapshot (sent as fire events: see launch.ts); the server clears it */
+  readonly fired: FireRecord[] = [];
 
   /** This bridge as its modules (bridge/*.ts) see it, private state included (bridge/core.ts BridgeCtx) */
   private readonly ctx: BridgeCtx = this as unknown as BridgeCtx;
@@ -79,23 +88,6 @@ export class ShipBridge {
    * frost hits take it off, and frozen through a ship seizes up (common/src/ships/warmth.ts)
    */
   private warmth = new Map<number, number>();
-
-  /** Seize a ship up (as an EMP) for `ticks`: hazards' storms */
-  emp(eid: number, ticks: number): void { return dmg.emp(this.ctx, eid, ticks); }
-
-  /** A frost hit landed (a gemmed gun, the Brood Mother's cold): it takes `amount` of warmth, less what the hull keeps out; frozen through, the ship seizes up for `ticks` */
-  frostHit(eid: number, amount: number, ticks: number): void { return dmg.frostHit(this.ctx, eid, amount, ticks); }
-
-  /** A ship's warmth (0 frozen through .. 1 warm) */
-  warmthOf(eid: number): number { return dmg.warmthOf(this.ctx, eid); }
-
-  /** Ships that aren't fully warm */
-  chilled(): IterableIterator<number> { return dmg.chilled(this.ctx); }
-
-  warm(eid: number, delta: number, seizeTicks: number): void { return dmg.warm(this.ctx, eid, delta, seizeTicks); }
-
-  /** What the cold costs a pilot's ship now (others aren't slowed: the meter only seizes them up) */
-  private coldStage(eid: number): WarmthStage { return dmg.coldStage(this.ctx, eid); }
   /** Burning parts (incendiary hits): damage over time, spreading to neighbours as parts go */
   private burns: { eid: number; part: number; until: number; dps: number; radius: number; source: number; hit?: HitInfo }[] = [];
   /** Weapon beams on this tick, per ship: how far along the nearest one hit (0..1) */
@@ -104,17 +96,10 @@ export class ShipBridge {
   private pulsing = new Map<number, { part: number; start: number; hit?: { eid: number; dealt: number } }[]>();
   /** What the last pulse tick burned (fireBeam), so a pulse's damage is told as one number */
   private pulseHit: { eid: number; dealt: number } | null = null;
-  /**
-   * What each body flew with this tick (replication: the server's shadow of each
-   * ship replays exactly this, with the structure the step used)
-   */
-  readonly replicaCtl = new Map<number, { mode: ReplicaMode; bits: number; q: number; derived: ShipState['derived'] }>();
   /** Autopilot headings, held steady until they drift a little (fewer control changes to send) */
   private apHeading = new Map<number, number>();
-
   /** AI pilots: pilotless ships flown by a controller */
   private controllers = new Map<number, (eid: number, ship: ShipState) => PilotOrders | null>();
-
   /**
    * Distant ships (SimLod.ts): far from every pilot, they're out of the whole
    * pipeline (no controller, flight, guns, shields, contacts, hits); SimLod
@@ -123,42 +108,32 @@ export class ShipBridge {
   private dormant = new Map<number, number>();
   /** Last tick each ship fired anything (a ship still shooting isn't put to sleep) */
   private lastFired = new Map<number, number>();
-
-  isDormant(eid: number): boolean { return flt.isDormant(this.ctx, eid); }
-
-  /** Distant ships, and when each went to sleep */
-  dormantShips(): ReadonlyMap<number, number> { return flt.dormantShips(this.ctx); }
-
-  isPinned(eid: number): boolean { return flt.isPinned(this.ctx, eid); }
-
-  isAnchored(eid: number): boolean { return flt.isAnchored(this.ctx, eid); }
-
-  hasController(eid: number): boolean { return plt.hasController(this.ctx, eid); }
-
-  /** Where its autopilot is taking it (null: none) */
-  autopilotOf(eid: number): { x: number; y: number; arriveRadius: number } | null { return plt.autopilotOf(this.ctx, eid); }
-
-  lastFiredTick(eid: number): number { return wpn.lastFiredTick(this.ctx, eid); }
-
-  /**
-   * Why this ship can't go distant now (null: it can): a pilot's, debris, in
-   * the middle of something (hurt or shooting lately, EMP'd, burning, under
-   * repair, a blast of its own pending, mid-jump, docked)
-   */
-  sleepBlocker(eid: number, recentTicks: { damaged: number; fired: number }): string | null { return flt.sleepBlocker(this.ctx, eid, recentTicks); }
-
-  /** Take a pilotless ship out of the pipeline (SimLod moves it from now on). False if it can't go now. */
-  sleep(eid: number, recentTicks = { damaged: 600, fired: 300 }): boolean { return flt.sleep(this.ctx, eid, recentTicks); }
-
-  /**
-   * Back into the pipeline: what went on while it slept is caught up (guns'
-   * cooldowns and heat, its shield, its battery), and it carries on from where
-   * SimLod left it (position, velocity, heading), with every part as it was.
-   */
-  wake(eid: number): void { return flt.wake(this.ctx, eid); }
-
-  /** Where SimLod has a distant ship now (rounded as every body is: what clients would be sent) */
-  moveDistant(eid: number, b: { x: number; y: number; vx: number; vy: number; angle: number; angVel: number }): void { return flt.moveDistant(this.ctx, eid, b); }
+  /** Damage multipliers: boss rage, factions' weak guns (pilots' skills no longer add damage) */
+  private damageMuls = new Map<number, number>();
+  /** Flying in a wing (party members close by): a damage multiplier on top */
+  private wing = new Map<number, number>();
+  /** The target each player has selected (missiles lock on to it) */
+  private targets = new Map<number, number>();
+  /** Repair kits: a budget of credits spent slowly on the ship, damaged parts first, then missing ones */
+  private kits = new Map<number, { left: number; total: number; hpPerSec: number; restoreTicks: number; progress: number; since: number }>();
+  /** Parts designed but not built yet, by ship (part indices): absent, and never regrown by station repair */
+  private ghosts = new Map<number, Set<number>>();
+  /** How much of the last hit got through the armour it struck (hitMultiplier): under GLANCING it shows as glancing */
+  private lastThrough = 1;
+  /** While a splash hurts one body's parts (all from the point `at`): the part cover last sent a hit to, and in what stage */
+  private coverMemo: { ship: ShipState; at: Vec2; first: number; best: number } | null = null;
+  /** Mining beam state per ship, for the snapshot: on, and how far along the beam it hit */
+  private beams = new Map<number, number>();
+  /** Point defence's shots in reach this tick (reused), and what each turret is on (ship -> part -> shot) */
+  private pdList: { id: number; x: number; y: number; d: number }[] = [];
+  private pdOn = new Map<number, Map<number, number>>();
+  /** Bodies spawned or moved instantly since the broadphase was last filed (addToSpatialGrid) */
+  private ungridded = new Set<number>();
+  /** The ship being cast against (castShip's standing test, without a closure per call) */
+  private castOn: ShipState | null = null;
+  private readonly castOk = (i: number): boolean => standing(this.catalog, this.castOn!, i);
+  /** Flight constants with a system's gravity, built once per gravity (it's data: it never changes) */
+  private gravityK = new WeakMap<GravityWell, FlightConstants>();
 
   constructor(cfg: ShipBridgeConfig) {
     this.catalog = cfg.catalog;
@@ -183,117 +158,100 @@ export class ShipBridge {
     return this.bodies.get(eid);
   }
 
-  geometry(ship: ShipState): PlacedGeom[] {
-    let g = this.geomCache.get(ship.blueprint);
-    if (!g) {
-      g = blueprintGeometry(this.catalog, ship.blueprint);
-      this.geomCache.set(ship.blueprint, g);
-    }
-    return g;
-  }
-
-  // -------------------------------------------------------------------------
-  // Spawning
-  // -------------------------------------------------------------------------
-
-  private spawnOn(eid: number, bp: Blueprint, kind: 'ship' | 'debris', hp?: number[], angVel = 0): ShipState { return rbd.spawnOn(this.ctx, eid, bp, kind, hp, angVel); }
-
-  onPlayerCreated(eid: number): void { return rbd.onPlayerCreated(this.ctx, eid); }
-
-  /** A pilotless ship (debug key B). Returns its entity id. */
-  spawnDummy(bp: Blueprint, x: number, y: number, angle: number, systemId = 0): number { return rbd.spawnDummy(this.ctx, bp, x, y, angle, systemId); }
-
-  spawnWreck(bp: Blueprint, x: number, y: number, angle: number, systemId: number, seed: number): number { return rbd.spawnWreck(this.ctx, bp, x, y, angle, systemId, seed); }
-
-  /** Damage multipliers: boss rage, factions' weak guns (pilots' skills no longer add damage) */
-  private damageMuls = new Map<number, number>();
-  setSkills(eid: number, _skills: Record<string, number>): void { return rbd.setSkills(this.ctx, eid, _skills); }
-
-  setDamageScale(eid: number, k: number): void { return wpn.setDamageScale(this.ctx, eid, k); }
-
-  /** Flying in a wing (party members close by): a damage multiplier on top */
-  private wing = new Map<number, number>();
-  setWingBonus(eid: number, k: number): void { return wpn.setWingBonus(this.ctx, eid, k); }
-
-  wingBonus(eid: number): number { return wpn.wingBonus(this.ctx, eid); }
-
-  private damageMul(eid: number): number { return wpn.damageMul(this.ctx, eid); }
-
-  /** The target each player has selected (missiles lock on to it) */
-  private targets = new Map<number, number>();
-  setTarget(eid: number, target: number): void { return wpn.setTarget(this.ctx, eid, target); }
-
-  /** A player's selected target, if it's still there and in the same system */
-  targetOf(eid: number): number { return wpn.targetOf(this.ctx, eid); }
-
-  /** Hull left, as a fraction of the ship's full HP (every part counted) */
-  integrity(eid: number): number { return dmg.integrity(this.ctx, eid); }
-
-  /** Move a ship instantly (boss blinks) */
-  teleport(eid: number, x: number, y: number): void { return flt.teleport(this.ctx, eid, x, y); }
-
-  /** A ship's battery charge (energy.ts) */
-  chargeOf(eid: number): Charge { return sync.chargeOf(this.ctx, eid); }
-
-  /** Set it (a player's total is mirrored to Boost.fuel, which the HUD's gauge reads) */
-  setCharge(eid: number, c: Charge): void { return sync.setCharge(this.ctx, eid, c); }
-
-  removeShip(eid: number): void { return rbd.removeShip(this.ctx, eid); }
-
-  private forget(eid: number): void { return rbd.forget(this.ctx, eid); }
-
-  // -------------------------------------------------------------------------
-  // Repair kits: a budget of credits spent slowly on the ship, damaged parts first, then missing ones
-  // -------------------------------------------------------------------------
-
-  private kits = new Map<number, { left: number; total: number; hpPerSec: number; restoreTicks: number; progress: number; since: number }>();
-
-  /** Repair kits only work on a ship holding still (world units per tick) */
-  static readonly KIT_STILL_SPEED = 0.8;
-
   /** Is this ship holding still enough to use a repair kit? */
   isStill(eid: number): boolean {
     return Math.hypot(Velocity.x[eid], Velocity.y[eid]) <= ShipBridge.KIT_STILL_SPEED;
   }
 
-  /** Is there anything a repair kit could do for this ship? */
-  needsRepair(eid: number): boolean { return rbd.needsRepair(this.ctx, eid); }
+  // -------------------------------------------------------------------------
+  // Flight (bridge/flight.ts): movement, the end-of-tick step, contacts, the broadphase, sleep and wake
+  // -------------------------------------------------------------------------
 
-  /** Start a kit (another one adds to the budget and keeps the faster rate) */
-  startRepairKit(eid: number, kit: { budget: number; hpPerSec: number; restoreSec: number }): void { return rbd.startRepairKit(this.ctx, eid, kit); }
+  isDormant(eid: number): boolean { return flt.isDormant(this.ctx, eid); }
 
-  repairKitLeft(eid: number): number { return rbd.repairKitLeft(this.ctx, eid); }
+  /** Distant ships, and when each went to sleep */
+  dormantShips(): ReadonlyMap<number, number> { return flt.dormantShips(this.ctx); }
 
-  private stepRepairKits(tick: number): void { return rbd.stepRepairKits(this.ctx, tick); }
+  isPinned(eid: number): boolean { return flt.isPinned(this.ctx, eid); }
 
-  /** The missing part (not a ghost) that joins the structure, nearest the core */
-  private nextMissing(eid: number, ship: ShipState): number { return rbd.nextMissing(this.ctx, eid, ship); }
+  isAnchored(eid: number): boolean { return flt.isAnchored(this.ctx, eid); }
 
-  /** Parts designed but not built yet, by ship (part indices): absent, and never regrown by station repair */
-  private ghosts = new Map<number, Set<number>>();
+  /**
+   * Why this ship can't go distant now (null: it can): a pilot's, debris, in
+   * the middle of something (hurt or shooting lately, EMP'd, burning, under
+   * repair, a blast of its own pending, mid-jump, docked)
+   */
+  sleepBlocker(eid: number, recentTicks: { damaged: number; fired: number }): string | null { return flt.sleepBlocker(this.ctx, eid, recentTicks); }
 
-  /** Mark these parts (uids) as not built yet */
-  setGhosts(eid: number, uids: number[]): void { return dmg.setGhosts(this.ctx, eid, uids); }
+  /** Take a pilotless ship out of the pipeline (SimLod moves it from now on). False if it can't go now. */
+  sleep(eid: number, recentTicks = { damaged: 600, fired: 300 }): boolean { return flt.sleep(this.ctx, eid, recentTicks); }
 
-  isGhost(eid: number, part: number): boolean { return dmg.isGhost(this.ctx, eid, part); }
+  /**
+   * Back into the pipeline: what went on while it slept is caught up (guns'
+   * cooldowns and heat, its shield, its battery), and it carries on from where
+   * SimLod left it (position, velocity, heading), with every part as it was.
+   */
+  wake(eid: number): void { return flt.wake(this.ctx, eid); }
 
-  /** A ghost part arrived: build it in at full HP */
-  installGhost(eid: number, uid: number): boolean { return dmg.installGhost(this.ctx, eid, uid); }
+  /** Where SimLod has a distant ship now (rounded as every body is: what clients would be sent) */
+  moveDistant(eid: number, b: { x: number; y: number; vx: number; vy: number; angle: number; angVel: number }): void { return flt.moveDistant(this.ctx, eid, b); }
+
+  /** Move a ship instantly (boss blinks) */
+  teleport(eid: number, x: number, y: number): void { return flt.teleport(this.ctx, eid, x, y); }
 
   /** Fix a pilotless ship where it stands (or free it): rams and blasts no longer move it */
   pin(eid: number, on = true): void { return flt.pin(this.ctx, eid, on); }
 
+  /** Player movement. Returns false for non-ship entities so the legacy path runs. */
+  stepMovement(eid: number): boolean { return flt.stepMovement(this.ctx, eid); }
+
+  addToSpatialGrid(add: (eid: number, x: number, y: number, r: number) => void): void { return flt.addToSpatialGrid(this.ctx, add); }
+
+  /**
+   * The bodies as they are now, for a loop that may add or remove some: their ids and states as two lists (and 0, to
+   * count from), rather than a pair for each (that was most of what such a loop cost)
+   */
+  private bodiesNow(): [number[], ShipState[], number] { return flt.bodiesNow(this.ctx); }
+
+  /** End of tick: pilotless motion, contacts, rebuilds, detachment, debris lifetime, health sync. */
+  tick(): void { return flt.tick(this.ctx); }
+
+  private withGravity(gravity: GravityWell): FlightConstants { return flt.withGravity(this.ctx, gravity); }
+
+  /**
+   * World-space convex pieces of every alive part (shrunk, so parts that merely
+   * touch don't collide), each with its bounding box
+   */
+  private worldPieces(eid: number, ship: ShipState, near?: { x: number; y: number; r: number }): ContactPiece[] { return flt.worldPieces(this.ctx, eid, ship, near); }
+
+  /**
+   * Push overlapping bodies apart, exchange an impulse along the contact
+   * normal, and damage the touching parts on both sides when the closing speed
+   * is high enough (scaled by the other body's share of the mass).
+   *
+   * Pairs are found by system, swept along x (bounding circles, padded by
+   * CONTACT_MARGIN for the pushes earlier pairs make this pass), then taken in
+   * the same order as testing every pair would. Pieces are only tested against
+   * pieces whose bounding boxes they meet: the rest can't overlap.
+   */
+  private resolveContacts(): void { return flt.resolveContacts(this.ctx); }
+
+  private damageContact(eid: number, ship: ShipState, parts: Set<number>, amount: number, source: number): void { return flt.damageContact(this.ctx, eid, ship, parts, amount, source); }
+
+  /** How hard a collision lands on a part: its piece's `contact` share, doubled for brittle material */
+  private contactScale(ship: ShipState, part: number): number { return flt.contactScale(this.ctx, ship, part); }
+
+  // -------------------------------------------------------------------------
+  // Pilotless (bridge/pilotless.ts): AI pilots, the autopilot, the pilotless step
+  // -------------------------------------------------------------------------
+
+  hasController(eid: number): boolean { return plt.hasController(this.ctx, eid); }
+
+  /** Where its autopilot is taking it (null: none) */
+  autopilotOf(eid: number): { x: number; y: number; arriveRadius: number } | null { return plt.autopilotOf(this.ctx, eid); }
+
   /** Give a pilotless ship an AI pilot (null: none) */
   setController(eid: number, fn: ((eid: number, ship: ShipState) => PilotOrders | null) | null): void { return plt.setController(this.ctx, eid, fn); }
-
-  /** Make a ship tougher (elite enemies): every part's max HP × k, at full HP */
-  scaleHp(eid: number, k: number): void { return dmg.scaleHp(this.ctx, eid, k); }
-
-  /** Toughen one function's parts (a boss's core) by `k` */
-  hardenParts(eid: number, fn: string, k: number): void { return dmg.hardenParts(this.ctx, eid, fn, k); }
-
-  /** Core HP as a fraction of its max (0 when lost) */
-  coreFraction(eid: number): number { return dmg.coreFraction(this.ctx, eid); }
 
   /** Fly a pilotless ship towards a point (null: stop and hold). */
   setAutopilot(eid: number, target: { x: number; y: number; arriveRadius?: number } | null): void { return plt.setAutopilot(this.ctx, eid, target); }
@@ -307,10 +265,114 @@ export class ShipBridge {
   /** One end-of-tick step of a pilotless ship (tick) */
   private stepPilotless(eid: number, ship: ShipState, k: FlightConstants, tick: number): void { return plt.stepPilotless(this.ctx, eid, ship, k, tick); }
 
-  validate(bp: Blueprint, opts: { mounting?: boolean } = {}): ValidationResult { return rbd.validate(this.ctx, bp, opts); }
+  // -------------------------------------------------------------------------
+  // Weapons (bridge/weapons.ts): firing, beams, point defence, casts, projectile hits, targets, damage scaling
+  // -------------------------------------------------------------------------
 
-  /** Hangar save: swap the ship's blueprint and respawn in place at full HP. */
-  respawnInPlace(eid: number, bp: Blueprint): void { return rbd.respawnInPlace(this.ctx, eid, bp); }
+  lastFiredTick(eid: number): number { return wpn.lastFiredTick(this.ctx, eid); }
+
+  setDamageScale(eid: number, k: number): void { return wpn.setDamageScale(this.ctx, eid, k); }
+
+  setWingBonus(eid: number, k: number): void { return wpn.setWingBonus(this.ctx, eid, k); }
+
+  wingBonus(eid: number): number { return wpn.wingBonus(this.ctx, eid); }
+
+  private damageMul(eid: number): number { return wpn.damageMul(this.ctx, eid); }
+
+  setTarget(eid: number, target: number): void { return wpn.setTarget(this.ctx, eid, target); }
+
+  /** A player's selected target, if it's still there and in the same system */
+  targetOf(eid: number): number { return wpn.targetOf(this.ctx, eid); }
+
+  nearestTarget(eid: number, x: number, y: number, range: number, filter?: (other: number) => boolean, hull = false): number { return wpn.nearestTarget(this.ctx, eid, x, y, range, filter, hull); }
+
+  stepWeapons(eid: number): boolean { return wpn.stepWeapons(this.ctx, eid); }
+
+  private stepMiners(eid: number, ship: ShipState, on: boolean, aimWorld: number, aimDist: number): void { return wpn.stepMiners(this.ctx, eid, ship, on, aimWorld, aimDist); }
+
+  private fireWeapons(eid: number, ship: ShipState, firing: boolean, aimWorld?: number, aimDist = 0, target = -1, energy?: { charge: Charge }): void { return wpn.fireWeapons(this.ctx, eid, ship, firing, aimWorld, aimDist, target, energy); }
+
+  /** Each pulse under way burns its tick's share along its gun's aim, as wide as its curve says; done, it's dropped */
+  private stepPulses(eid: number, ship: ShipState, tick: number): void { return wpn.stepPulses(this.ctx, eid, ship, tick); }
+
+  private fireBeam(eid: number, ship: ShipState, w: WeaponInfo, def: WeaponTuning, pulse?: { damage: number; width: number }): number { return wpn.fireBeam(this.ctx, eid, ship, w, def, pulse); }
+
+  /** A beam's muzzle (world) and angle, along its gun's aim */
+  private beamFrom(eid: number, ship: ShipState, w: WeaponInfo): { x: number; y: number; angle: number } { return wpn.beamFrom(this.ctx, eid, ship, w); }
+
+  private repairBeam(eid: number, ship: ShipState, w: WeaponInfo, def: WeaponTuning): number { return wpn.repairBeam(this.ctx, eid, ship, w, def); }
+
+  private pointDefence(eid: number, ship: ShipState, pose: { x: number; y: number; angle: number }, def: (w: WeaponInfo) => WeaponTuning): void { return wpn.pointDefence(this.ctx, eid, ship, pose, def); }
+
+  private alongBeam(systemNum: number, x0: number, y0: number, x1: number, y1: number, half: number): Iterable<number> { return wpn.alongBeam(this.ctx, systemNum, x0, y0, x1, y1, half); }
+
+  /**
+   * Projectile vs ship parts. The engine's broadphase gives `nearby`; each
+   * candidate ship is tested part by part in its local grid space, and the
+   * first part the segment touches takes the damage.
+   */
+  hitProjectile(
+    proj: number, ownerId: number, x0: number, y0: number, x1: number, y1: number,
+    nearby: { id: number }[], exclude?: Set<number>, radius = 0,
+  ): { eid: number; x: number; y: number; part: number } | null {
+    return wpn.hitProjectile(this.ctx, proj, ownerId, x0, y0, x1, y1, nearby, exclude, radius);
+  }
+
+  /** Does a world-space segment come within a ship's bounding circle (segmentHit's first test) */
+  private nearSegment(eid: number, ship: ShipState, x0: number, y0: number, x1: number, y1: number, margin = 0): boolean { return wpn.nearSegment(this.ctx, eid, ship, x0, y0, x1, y1, margin); }
+
+  segmentHit(eid: number, ship: ShipState, x0: number, y0: number, x1: number, y1: number, margin = 0): { part: number; t: number } | null { return wpn.segmentHit(this.ctx, eid, ship, x0, y0, x1, y1, margin); }
+
+  /** segmentHit without its bounding-circle test (for callers that have just made it) */
+  private castShip(eid: number, ship: ShipState, x0: number, y0: number, x1: number, y1: number, margin = 0): { part: number; t: number } | null { return wpn.castShip(this.ctx, eid, ship, x0, y0, x1, y1, margin); }
+
+  private cover(ship: ShipState, part: number, at?: Vec2): number { return wpn.cover(this.ctx, ship, part, at); }
+
+  /** The ship part under a world point (debug key K). */
+  partAt(x: number, y: number): { eid: number; part: number } | null { return wpn.partAt(this.ctx, x, y); }
+
+  damagePartFraction(eid: number, part: number, fraction: number): void { return wpn.damagePartFraction(this.ctx, eid, part, fraction); }
+
+  // -------------------------------------------------------------------------
+  // Damage (bridge/damage.ts): hits, EMP and cold, fire, nearest-part queries, hp edits, ghosts, part deaths, blasts
+  // -------------------------------------------------------------------------
+
+  /** Seize a ship up (as an EMP) for `ticks`: hazards' storms */
+  emp(eid: number, ticks: number): void { return dmg.emp(this.ctx, eid, ticks); }
+
+  /** A frost hit landed (a gemmed gun, the Brood Mother's cold): it takes `amount` of warmth, less what the hull keeps out; frozen through, the ship seizes up for `ticks` */
+  frostHit(eid: number, amount: number, ticks: number): void { return dmg.frostHit(this.ctx, eid, amount, ticks); }
+
+  /** A ship's warmth (0 frozen through .. 1 warm) */
+  warmthOf(eid: number): number { return dmg.warmthOf(this.ctx, eid); }
+
+  /** Ships that aren't fully warm */
+  chilled(): IterableIterator<number> { return dmg.chilled(this.ctx); }
+
+  warm(eid: number, delta: number, seizeTicks: number): void { return dmg.warm(this.ctx, eid, delta, seizeTicks); }
+
+  /** What the cold costs a pilot's ship now (others aren't slowed: the meter only seizes them up) */
+  private coldStage(eid: number): WarmthStage { return dmg.coldStage(this.ctx, eid); }
+
+  /** Hull left, as a fraction of the ship's full HP (every part counted) */
+  integrity(eid: number): number { return dmg.integrity(this.ctx, eid); }
+
+  /** Mark these parts (uids) as not built yet */
+  setGhosts(eid: number, uids: number[]): void { return dmg.setGhosts(this.ctx, eid, uids); }
+
+  isGhost(eid: number, part: number): boolean { return dmg.isGhost(this.ctx, eid, part); }
+
+  /** A ghost part arrived: build it in at full HP */
+  installGhost(eid: number, uid: number): boolean { return dmg.installGhost(this.ctx, eid, uid); }
+
+  /** Make a ship tougher (elite enemies): every part's max HP × k, at full HP */
+  scaleHp(eid: number, k: number): void { return dmg.scaleHp(this.ctx, eid, k); }
+
+  /** Toughen one function's parts (a boss's core) by `k` */
+  hardenParts(eid: number, fn: string, k: number): void { return dmg.hardenParts(this.ctx, eid, fn, k); }
+
+  /** Core HP as a fraction of its max (0 when lost) */
+  coreFraction(eid: number): number { return dmg.coreFraction(this.ctx, eid); }
 
   setPartHp(eid: number, fraction: (uid: number) => number): void { return dmg.setPartHp(this.ctx, eid, fraction); }
 
@@ -325,12 +387,6 @@ export class ShipBridge {
 
   /** Damage one part from outside the usual weapons (a boss's beam): hurt, and reported as any hit is */
   damagePartBy(eid: number, part: number, amount: number, source: number, hit?: HitInfo): number { return dmg.damagePartBy(this.ctx, eid, part, amount, source, hit); }
-
-  /** How much of the last hit got through the armour it struck (hitMultiplier): under GLANCING it shows as glancing */
-  private lastThrough = 1;
-
-  /** While a splash hurts one body's parts (all from the point `at`): the part cover last sent a hit to, and in what stage */
-  private coverMemo: { ship: ShipState; at: Vec2; first: number; best: number } | null = null;
 
   /** Is this ship's electronics knocked out by an EMP? */
   isEmped(eid: number): boolean { return dmg.isEmped(this.ctx, eid); }
@@ -363,173 +419,61 @@ export class ShipBridge {
 
   private stepBurns(tick: number): void { return dmg.stepBurns(this.ctx, tick); }
 
-  nearestTarget(eid: number, x: number, y: number, range: number, filter?: (other: number) => boolean, hull = false): number { return wpn.nearestTarget(this.ctx, eid, x, y, range, filter, hull); }
+  private partDeaths(eid: number, ship: ShipState, tick: number): boolean { return dmg.partDeaths(this.ctx, eid, ship, tick); }
 
-  /** Weapon beam state for the snapshot */
-  weaponBeamState(eid: number): { on: boolean; hit: number } { return sync.weaponBeamState(this.ctx, eid); }
+  /** Damage every intact part within the blast radius (any body), falling off with distance. */
+  private applyBlast(b: PendingBlast): void { return dmg.applyBlast(this.ctx, b); }
 
-  /** Hottest beam weapon (0..1) and whether any has overheated, for the HUD */
-  heatState(eid: number): { heat: number; over: boolean } { return sync.heatState(this.ctx, eid); }
+  // -------------------------------------------------------------------------
+  // Rebuild (bridge/rebuild.ts): geometry, spawning, removal, rebuilds, debris, repair kits and station repair
+  // -------------------------------------------------------------------------
 
-  /** Shield charge 0..1 for the snapshot (0 also without a shield) */
-  shieldFraction(eid: number): number { return sync.shieldFraction(this.ctx, eid); }
+  geometry(ship: ShipState): PlacedGeom[] { return rbd.geometry(this.ctx, ship); }
+
+  private spawnOn(eid: number, bp: Blueprint, kind: 'ship' | 'debris', hp?: number[], angVel = 0): ShipState { return rbd.spawnOn(this.ctx, eid, bp, kind, hp, angVel); }
+
+  onPlayerCreated(eid: number): void { return rbd.onPlayerCreated(this.ctx, eid); }
+
+  /** A pilotless ship (debug key B). Returns its entity id. */
+  spawnDummy(bp: Blueprint, x: number, y: number, angle: number, systemId = 0): number { return rbd.spawnDummy(this.ctx, bp, x, y, angle, systemId); }
+
+  spawnWreck(bp: Blueprint, x: number, y: number, angle: number, systemId: number, seed: number): number { return rbd.spawnWreck(this.ctx, bp, x, y, angle, systemId, seed); }
+
+  setSkills(eid: number, _skills: Record<string, number>): void { return rbd.setSkills(this.ctx, eid, _skills); }
+
+  removeShip(eid: number): void { return rbd.removeShip(this.ctx, eid); }
+
+  private forget(eid: number): void { return rbd.forget(this.ctx, eid); }
+
+  /** Is there anything a repair kit could do for this ship? */
+  needsRepair(eid: number): boolean { return rbd.needsRepair(this.ctx, eid); }
+
+  /** Start a kit (another one adds to the budget and keeps the faster rate) */
+  startRepairKit(eid: number, kit: { budget: number; hpPerSec: number; restoreSec: number }): void { return rbd.startRepairKit(this.ctx, eid, kit); }
+
+  repairKitLeft(eid: number): number { return rbd.repairKitLeft(this.ctx, eid); }
+
+  private stepRepairKits(tick: number): void { return rbd.stepRepairKits(this.ctx, tick); }
+
+  /** The missing part (not a ghost) that joins the structure, nearest the core */
+  private nextMissing(eid: number, ship: ShipState): number { return rbd.nextMissing(this.ctx, eid, ship); }
+
+  validate(bp: Blueprint, opts: { mounting?: boolean } = {}): ValidationResult { return rbd.validate(this.ctx, bp, opts); }
+
+  /** Hangar save: swap the ship's blueprint and respawn in place at full HP. */
+  respawnInPlace(eid: number, bp: Blueprint): void { return rbd.respawnInPlace(this.ctx, eid, bp); }
 
   /** Proto debug key U. */
   repair(eid: number): void { return rbd.repair(this.ctx, eid); }
-
-  // -------------------------------------------------------------------------
-  // Per-tick hooks from GameServer
-  // -------------------------------------------------------------------------
-
-  /** Player movement. Returns false for non-ship entities so the legacy path runs. */
-  stepMovement(eid: number): boolean { return flt.stepMovement(this.ctx, eid); }
-
-  stepWeapons(eid: number): boolean { return wpn.stepWeapons(this.ctx, eid); }
-
-  /** Shots fired since the last snapshot (sent as fire events: see launch.ts); the server clears it */
-  readonly fired: FireRecord[] = [];
-
-  /** Mining beam state per ship, for the snapshot: on, and how far along the beam it hit */
-  private beams = new Map<number, number>();
-
-  beamState(eid: number): { on: boolean; hit: number } { return sync.beamState(this.ctx, eid); }
-
-  private stepMiners(eid: number, ship: ShipState, on: boolean, aimWorld: number, aimDist: number): void { return wpn.stepMiners(this.ctx, eid, ship, on, aimWorld, aimDist); }
-
-  private fireWeapons(eid: number, ship: ShipState, firing: boolean, aimWorld?: number, aimDist = 0, target = -1, energy?: { charge: Charge }): void { return wpn.fireWeapons(this.ctx, eid, ship, firing, aimWorld, aimDist, target, energy); }
-
-  /** Each pulse under way burns its tick's share along its gun's aim, as wide as its curve says; done, it's dropped */
-  private stepPulses(eid: number, ship: ShipState, tick: number): void { return wpn.stepPulses(this.ctx, eid, ship, tick); }
-
-  private fireBeam(eid: number, ship: ShipState, w: WeaponInfo, def: WeaponTuning, pulse?: { damage: number; width: number }): number { return wpn.fireBeam(this.ctx, eid, ship, w, def, pulse); }
-
-  // -------------------------------------------------------------------------
-  // Support weapons: the Repair Beam and point defence (common/src/ships/support.ts)
-  // -------------------------------------------------------------------------
-
-  /** A beam's muzzle (world) and angle, along its gun's aim */
-  private beamFrom(eid: number, ship: ShipState, w: WeaponInfo): { x: number; y: number; angle: number } { return wpn.beamFrom(this.ctx, eid, ship, w); }
-
-  private repairBeam(eid: number, ship: ShipState, w: WeaponInfo, def: WeaponTuning): number { return wpn.repairBeam(this.ctx, eid, ship, w, def); }
-
-  /** Point defence's shots in reach this tick (reused), and what each turret is on (ship -> part -> shot) */
-  private pdList: { id: number; x: number; y: number; d: number }[] = [];
-  private pdOn = new Map<number, Map<number, number>>();
-
-  private pointDefence(eid: number, ship: ShipState, pose: { x: number; y: number; angle: number }, def: (w: WeaponInfo) => WeaponTuning): void { return wpn.pointDefence(this.ctx, eid, ship, pose, def); }
-
-  private alongBeam(systemNum: number, x0: number, y0: number, x1: number, y1: number, half: number): Iterable<number> { return wpn.alongBeam(this.ctx, systemNum, x0, y0, x1, y1, half); }
-
-  /** Bodies spawned or moved instantly since the broadphase was last filed (addToSpatialGrid) */
-  private ungridded = new Set<number>();
-
-  addToSpatialGrid(add: (eid: number, x: number, y: number, r: number) => void): void { return flt.addToSpatialGrid(this.ctx, add); }
-
-  /**
-   * Projectile vs ship parts. The engine's broadphase gives `nearby`; each
-   * candidate ship is tested part by part in its local grid space, and the
-   * first part the segment touches takes the damage.
-   */
-  hitProjectile(
-    proj: number, ownerId: number, x0: number, y0: number, x1: number, y1: number,
-    nearby: { id: number }[], exclude?: Set<number>, radius = 0,
-  ): { eid: number; x: number; y: number; part: number } | null {
-    let best: { eid: number; ship: ShipState; part: number; t: number } | null = null;
-    const systemNum = InSystem.systemId[proj];
-    for (const { id: eid } of nearby) {
-      // (Instanced copies share coordinates: only ships in the shot's own copy)
-      if (eid === ownerId || exclude?.has(eid) || InSystem.systemId[eid] !== systemNum || this.intangible.has(eid)) continue;
-      const ship = this.bodies.get(eid);
-      if (!ship) continue;
-      // Shots pass straight through ships they may not hurt
-      if (this.host.canDamage && !this.host.canDamage(ownerId, eid)) continue;
-      const hit = this.segmentHit(eid, ship, x0, y0, x1, y1, radius);
-      if (hit && (!best || hit.t < best.t)) best = { eid, ship, ...hit };
-    }
-    if (!best) return null;
-    const hx = x0 + (x1 - x0) * best.t, hy = y0 + (y1 - y0) * best.t;
-    const dealt = this.hurt(best.eid, best.ship, best.part, Projectile.damage[proj], ownerId, { ...this.host.shotVs?.(proj), at: this.worldToGrid(best.eid, best.ship, hx, hy) });
-    this.host.notifyDamage(best.eid, dealt, ownerId, this.lastThrough < GLANCING);
-    this.host.notifyProjectileHit(proj, hx, hy);
-    return { eid: best.eid, x: hx, y: hy, part: best.part };
-  }
-
-  /** Does a world-space segment come within a ship's bounding circle (segmentHit's first test) */
-  private nearSegment(eid: number, ship: ShipState, x0: number, y0: number, x1: number, y1: number, margin = 0): boolean { return wpn.nearSegment(this.ctx, eid, ship, x0, y0, x1, y1, margin); }
-
-  segmentHit(eid: number, ship: ShipState, x0: number, y0: number, x1: number, y1: number, margin = 0): { part: number; t: number } | null { return wpn.segmentHit(this.ctx, eid, ship, x0, y0, x1, y1, margin); }
-
-  /** The ship being cast against (castShip's standing test, without a closure per call) */
-  private castOn: ShipState | null = null;
-  private readonly castOk = (i: number): boolean => standing(this.catalog, this.castOn!, i);
-
-  /** segmentHit without its bounding-circle test (for callers that have just made it) */
-  private castShip(eid: number, ship: ShipState, x0: number, y0: number, x1: number, y1: number, margin = 0): { part: number; t: number } | null { return wpn.castShip(this.ctx, eid, ship, x0, y0, x1, y1, margin); }
-
-  private cover(ship: ShipState, part: number, at?: Vec2): number { return wpn.cover(this.ctx, ship, part, at); }
-
-  /** The ship part under a world point (debug key K). */
-  partAt(x: number, y: number): { eid: number; part: number } | null { return wpn.partAt(this.ctx, x, y); }
-
-  damagePartFraction(eid: number, part: number, fraction: number): void { return wpn.damagePartFraction(this.ctx, eid, part, fraction); }
-
-  /**
-   * The bodies as they are now, for a loop that may add or remove some: their ids and states as two lists (and 0, to
-   * count from), rather than a pair for each (that was most of what such a loop cost)
-   */
-  private bodiesNow(): [number[], ShipState[], number] { return flt.bodiesNow(this.ctx); }
-
-  /** End of tick: pilotless motion, contacts, rebuilds, detachment, debris lifetime, health sync. */
-  tick(): void { return flt.tick(this.ctx); }
-
-  /** Flight constants with a system's gravity, built once per gravity (it's data: it never changes) */
-  private gravityK = new WeakMap<GravityWell, FlightConstants>();
-  private withGravity(gravity: GravityWell): FlightConstants { return flt.withGravity(this.ctx, gravity); }
-
-  /**
-   * World-space convex pieces of every alive part (shrunk, so parts that merely
-   * touch don't collide), each with its bounding box
-   */
-  private worldPieces(eid: number, ship: ShipState, near?: { x: number; y: number; r: number }): ContactPiece[] { return flt.worldPieces(this.ctx, eid, ship, near); }
-
-  /**
-   * Push overlapping bodies apart, exchange an impulse along the contact
-   * normal, and damage the touching parts on both sides when the closing speed
-   * is high enough (scaled by the other body's share of the mass).
-   *
-   * Pairs are found by system, swept along x (bounding circles, padded by
-   * CONTACT_MARGIN for the pushes earlier pairs make this pass), then taken in
-   * the same order as testing every pair would. Pieces are only tested against
-   * pieces whose bounding boxes they meet: the rest can't overlap.
-   */
-  private resolveContacts(): void { return flt.resolveContacts(this.ctx); }
-
-  private damageContact(eid: number, ship: ShipState, parts: Set<number>, amount: number, source: number): void { return flt.damageContact(this.ctx, eid, ship, parts, amount, source); }
-
-  /** How hard a collision lands on a part: its piece's `contact` share, doubled for brittle material */
-  private contactScale(ship: ShipState, part: number): number { return flt.contactScale(this.ctx, ship, part); }
-
-  // -------------------------------------------------------------------------
-  // Destroyed parts, blasts, decay and station repair
-  // -------------------------------------------------------------------------
 
   /** Joins between every part of a blueprint, intact or not (where missing parts would reattach) */
   private joinsOf(ship: ShipState): [number, number][] { return rbd.joinsOf(this.ctx, ship); }
 
   private partWorld(eid: number, ship: ShipState, part: number): Vec2 { return rbd.partWorld(this.ctx, eid, ship, part); }
 
-  private partDeaths(eid: number, ship: ShipState, tick: number): boolean { return dmg.partDeaths(this.ctx, eid, ship, tick); }
-
-  /** Damage every intact part within the blast radius (any body), falling off with distance. */
-  private applyBlast(b: PendingBlast): void { return dmg.applyBlast(this.ctx, b); }
-
   private decay(eid: number, ship: ShipState, tick: number): void { return rbd.decay(this.ctx, eid, ship, tick); }
 
   private repairStep(eid: number, ship: ShipState, tick: number): void { return rbd.repairStep(this.ctx, eid, ship, tick); }
-
-  // -------------------------------------------------------------------------
-  // Rebuild, detachment and debris
-  // -------------------------------------------------------------------------
 
   private noteRebuild(t0: number): void { return rbd.noteRebuild(this.ctx, t0); }
 
@@ -543,8 +487,25 @@ export class ShipBridge {
   private removeBody(eid: number): void { return rbd.removeBody(this.ctx, eid); }
 
   // -------------------------------------------------------------------------
-  // Helpers
+  // Sync (bridge/sync.ts): body and health sync, jump fields, Tow Beam glue, snapshot readers
   // -------------------------------------------------------------------------
+
+  /** A ship's battery charge (energy.ts) */
+  chargeOf(eid: number): Charge { return sync.chargeOf(this.ctx, eid); }
+
+  /** Set it (a player's total is mirrored to Boost.fuel, which the HUD's gauge reads) */
+  setCharge(eid: number, c: Charge): void { return sync.setCharge(this.ctx, eid, c); }
+
+  /** Weapon beam state for the snapshot */
+  weaponBeamState(eid: number): { on: boolean; hit: number } { return sync.weaponBeamState(this.ctx, eid); }
+
+  /** Hottest beam weapon (0..1) and whether any has overheated, for the HUD */
+  heatState(eid: number): { heat: number; over: boolean } { return sync.heatState(this.ctx, eid); }
+
+  /** Shield charge 0..1 for the snapshot (0 also without a shield) */
+  shieldFraction(eid: number): number { return sync.shieldFraction(this.ctx, eid); }
+
+  beamState(eid: number): { on: boolean; hit: number } { return sync.beamState(this.ctx, eid); }
 
   private syncHealth(eid: number, ship: ShipState): void { return sync.syncHealth(eid, ship); }
 

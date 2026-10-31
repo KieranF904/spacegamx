@@ -16,13 +16,13 @@ How a gun turns into shells, beams and pulses, and what those do to ships. The f
 | server/src/game/Weapons.ts | 300 | `Weapons`: `spawn` (one shot + burst), per-tick homing/pull/fuse, `onShipHit/onMobHit/onWallHit/onExpire`, `chain`, `shatter`, `detonate`, `threats`, `intercept` |
 | server/src/game/Ammo.ts | 207 | `Ammo`: crates, rounds, dry-fire at `dry` share |
 | server/src/game/Support.ts, Towing.ts | 59, 158 | support credit window (`SUPPORT_WINDOW_TICKS`); Tow Beam latch (maths in common tow.ts, flight/ship-parts) |
-| server/src/ships/ShipBridge.ts | 1046 | the bridge: per-tick loop and contacts; its combat methods are one-line delegators to bridge/damage.ts and bridge/weapons.ts |
-| server/src/ships/bridge/damage.ts, weapons.ts | 461 / 492 | the combat slices below (ShipBridge delegates to them) |
+| server/src/ships/ShipBridge.ts | 540 | the bridge facade: fields and one-line delegators (the per-tick loop and contacts are in bridge/flight.ts) |
+| server/src/ships/bridge/damage.ts, weapons.ts | 461 / 522 | the combat slices below (ShipBridge delegates to them) |
 | client/src/rendering/weapons/{WeaponFx,weaponStyles}.ts | 496, 242 | all projectile visuals; `WEAPON_STYLES[weaponType]`, `weaponStyle(type, grade)`; predicted own shells (`PredictedShell`) |
 | client/src/ships/{DamageFx,MiningBeamFx,PulseFx,gunDecor}.ts | 886, 372, 310, 623 | part damage/fire/break visuals; mining + lance beams (`castShips` uses collide.ts); pulse beams (`pulseLook`); per-gun barrel art |
 | docs/audits/collisions.md, boss-bullet-hell.md | | which tests hit what (outline vs circle); cost of boss shot storms |
 
-Bridge slices (grep the name, read a short slice): in bridge/damage.ts, `hurt` (ALL damage funnels here: shield first, then `cover` stage rule, bane, hull), `damagePartBy`, `splashAt`, `empAt`, `ignite`/`stepBurns`, `partDeaths`, `applyBlast`; in bridge/weapons.ts, `stepWeapons`, `fireWeapons`, `stepPulses`, `fireBeam`, `repairBeam`, `pointDefence`, `alongBeam`, `castShip`; in bridge/rebuild.ts, `decay`, `repairStep`, `rebuildNow`. `ShipBridge.ts` keeps a one-line delegator with the same name for each. The "Support weapons" and "Tow Beam" banners are still in ShipBridge.ts.
+Bridge slices (grep the name, read a short slice): in bridge/damage.ts, `hurt` (ALL damage funnels here: shield first, then `cover` stage rule, bane, hull), `damagePartBy`, `splashAt`, `empAt`, `ignite`/`stepBurns`, `partDeaths`, `applyBlast`; in bridge/weapons.ts, `stepWeapons`, `fireWeapons`, `stepPulses`, `fireBeam`, `repairBeam`, `pointDefence`, `alongBeam`, `castShip`, `hitProjectile`; in bridge/rebuild.ts, `decay`, `repairStep`, `rebuildNow`. `ShipBridge.ts` keeps a one-line delegator with the same name for each. ShipBridge.ts groups its delegators under one banner per module; the "Tow Beam" markers are around the sync group's tow delegators.
 
 ## Public interface
 - `WeaponTuning` / `ShipTuning` (tuning.ts). Kinds in tuning.json `weapons`: cannon railgun flak missile emp laser autocannon pulse arc torpedo mortar magma charge lance hive frostbite repair point_defence, plus boss kinds rivet scrap_chunk seam_seeker heart_spark heart_seeker cinder_bloom prism prism_shard phase singularity.
@@ -45,10 +45,10 @@ Bridge slices (grep the name, read a short slice): in bridge/damage.ts, `hurt` (
 ## How to extend
 1. **Tweak a kind's numbers**: data/ships/tuning.json `weapons.<kind>`. A new field goes in `WeaponTuning` (tuning.ts) and is read in `Weapons.ts`/`launch.ts`; gems/ammo can only touch `WeaponModNumber` fields.
 2. **Add a projectile kind**: (a) tuning.json `weapons.<kind>`; (b) `TYPE_BY_KIND` in damage.ts if not kinetic; (c) `WEAPON_KIND_TYPE` + `WeaponType` enum in common/src/ecs/components.ts (new number); (d) `WEAPON_STYLES` in weaponStyles.ts; (e) a weapon model in scripts/econ/models.mjs (read only its weapon rows, ~L34-80; see `ship-parts`), then `npm run wire:sync` and `wire:bump "reason"`; (f) barrel art in gunDecor.ts (`BY_DECOR`, a `<kind>_<model>` entry); (g) sfx in client/src/audio/sfx.ts. Only special behaviour needs Weapons.ts (`tick` for homing/pull/fuse, `onShipHit`, `detonate`).
-3. **Add a beam**: copy `fireBeam` in ShipBridge (hit via `castParts` capsule, damage via `hurt`); draw it client-side like MiningBeamFx/WeaponFx. No `WEAPON_KIND_TYPE` needed.
+3. **Add a beam**: copy `fireBeam` in bridge/weapons.ts (hit via `castParts` capsule, damage via `hurt`); draw it client-side like MiningBeamFx/WeaponFx. No `WEAPON_KIND_TYPE` needed.
 4. **Add a damage type**: `DamageType`, `DAMAGE_TYPES`, `DAMAGE_NAMES` in damage.ts, material `resist` in materials.json, `TYPE_BY_KIND`.
 5. **Add an on-hit effect**: field in `WeaponTuning`, applied in `Weapons.onShipHit` (`chain`, `shatter`, `detonate` are templates); cold effects go via `ShipBridge.warm`/`frostHit`.
-6. **Support weapon**: pure logic in support.ts, loop in ShipBridge's "Support weapons" slice.
+6. **Support weapon**: pure logic in support.ts, loop in bridge/weapons.ts (`repairBeam`, `pointDefence`).
 
 ## Tests
 - Shared maths: `npx vitest run common/src/ships/collide.test.ts common/src/ships/support.test.ts common/src/ships/turret.test.ts`

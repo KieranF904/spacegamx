@@ -1,7 +1,7 @@
 /**
- * ShipBridge rebuild: a ship's body coming and going. Spawning (spawnOn, dummies, wrecks, players), removal (removeShip,
- * forget, removeBody), the rebuild after parts are lost (rebuildNow, shed, spawnDebris, decay), and repair (kits,
- * station repair, respawnInPlace). ShipBridge keeps one-line delegators with the same names.
+ * ShipBridge rebuild: a ship's body coming and going. Its geometry (cached per blueprint), spawning (spawnOn,
+ * dummies, wrecks, players), removal (removeShip, forget, removeBody), the rebuild after parts are lost (rebuildNow,
+ * shed, spawnDebris, decay), and repair (kits, station repair, respawnInPlace). ShipBridge keeps one-line delegators with the same names.
  *
  * Modules reach each other through the bridge (b.hurt, b.rebuildNow), never by import, so they can't form a cycle.
  */
@@ -10,9 +10,20 @@ import { hasComponent } from 'bitecs';
 import {
   Position, Velocity, Rotation, Radius, Health, Player, Dead, InSystem, Blueprint, ShipState, Vec2,
   validateBlueprint, ValidationResult, createShipState, rebuildShip, damagePart, repairShip, healPart, restorePart,
-  computeJoins, localToWorldDir, seededRng, hashInts, shipPointToWorld, remapCharge, chargeTotal,
+  computeJoins, localToWorldDir, seededRng, hashInts, shipPointToWorld, remapCharge, chargeTotal, blueprintGeometry,
+  type PlacedGeom,
 } from '@space-game/common';
 import { type BridgeCtx } from './core.js';
+
+/** A blueprint's placed geometry, built once per blueprint (geomCache) */
+export function geometry(b: BridgeCtx, ship: ShipState): PlacedGeom[] {
+  let g = b.geomCache.get(ship.blueprint);
+  if (!g) {
+    g = blueprintGeometry(b.catalog, ship.blueprint);
+    b.geomCache.set(ship.blueprint, g);
+  }
+  return g;
+}
 
 export function spawnOn(b: BridgeCtx, eid: number, bp: Blueprint, kind: 'ship' | 'debris', hp?: number[], angVel = 0): ShipState {
   const t0 = b.now();
