@@ -4,7 +4,7 @@ Mk IV · Large · Block · 4 cells
 Hull · mass445 hp · 4.8
 Armour · build4 · 15.2 pts
 TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
-Thrust14.4 · boost ×1.7
+Thrust14.4 · boost ×1.7, drain ×1
 Power draw112/s
 Rated speed5,100 m/s (its push fades out near it)
 

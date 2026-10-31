@@ -166,7 +166,7 @@ export function partTipHtml(p: Pick<PlacedPart, 'fn' | 'material' | 'piece'> & P
     if (words.length > 1) html += row('Fitting', esc(words.slice(1).join(' · ')));
     for (const m of c.mounting ?? []) html += `<div style="color:#f87171; font-size:11px; margin-top:3px">✕ ${esc(m)}</div>`;
   } else if (p.facing) html += row('Facing', FACING[p.facing]);
-  if (st.thrust) html += row('Thrust', `${st.thrust.toFixed(1)}${st.boost ? ` · boost ×${st.boost}` : ''}`);
+  if (st.thrust) html += row('Thrust', `${st.thrust.toFixed(1)}${(st.boost ?? 1) > 1 ? ` · boost ×${st.boost}, drain ×${st.boostDrain ?? 1}` : ' · no boost'}`);
   if (st.supply) html += row('Power out', `<span style="color:#86efac">+${n0(st.supply)}/s</span>`);
   if (st.draw) {
     const sat = d && i >= 0 ? d.satisfaction[i] : 1;

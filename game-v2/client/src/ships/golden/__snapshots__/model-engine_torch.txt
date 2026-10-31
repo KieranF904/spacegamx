@@ -3,7 +3,7 @@ Torch
 Mk I · Medium · Panel · 2 cells
 Hull · mass105 hp · 2.0
 Armour · build1 · 2 pts
-Thrust8.0 · boost ×1
+Thrust8.0 · no boost
 Power draw68/s
 Rated speed4,200 m/s (its push fades out near it)
 

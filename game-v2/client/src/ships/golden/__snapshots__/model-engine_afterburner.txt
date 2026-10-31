@@ -3,7 +3,7 @@ Afterburner
 Mk I · Small · Square · 1 cell
 Hull · mass53 hp · 1.0
 Armour · build1 · 1 pts
-Thrust1.6 · boost ×3.6
+Thrust1.6 · boost ×3.6, drain ×3
 Power draw8/s
 Rated speed3,000 m/s (its push fades out near it)
 

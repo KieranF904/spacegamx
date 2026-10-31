@@ -4,7 +4,7 @@ Mk II · Medium · Panel · 2 cells
 Hull · mass160 hp · 2.8
 Armour · build2 · 3.2 pts
 TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
-Thrust6.2 · boost ×1.8
+Thrust6.2 · boost ×1.8, drain ×0.8
 Power draw40/s
 Rated speed3,300 m/s (its push fades out near it)
 
