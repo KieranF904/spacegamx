@@ -7,195 +7,195 @@
       "pilots": {
         "strafer": {
           "frames": 45,
-          "stream": "a616a7bd421df5818804e81d5ad8bb38121ed97739985a2a71f7a040f0d2a856"
+          "stream": "44cba7eea5f5b6d076667ae5b896f002a62884a48614688cdbd060bd6a49b36e"
         },
         "tug": {
           "frames": 45,
-          "stream": "65993ca237fd4cd75ab22cffd7b3d1bc93cc80500552eeffbc4199156479d824"
+          "stream": "caee0ac4961fff542f8646ad39dfc9b55fb2579dc0f00577de3fae41aef76065"
         },
         "striker": {
           "frames": 45,
-          "stream": "e64d50f8925ed64f31a361effa333471073b7c85bbe0ca8b8dbfaec379fde890"
+          "stream": "712f945dc0ee10fd83b51295506d1e0853247f1b87fc4637df2e5a09fc99b88d"
         },
         "sparrow": {
           "frames": 45,
-          "stream": "6af0a859daef10d5b2e5dc3070c1c264216c16cb3aa25eddac2783b5f4967b8a"
+          "stream": "59d74f6730b02e384eb1d0f796e9c6d1fc17ca6eb507963fa112294b8488671a"
         }
       }
     },
     {
       "tick": 200,
-      "world": "27110924bf21460e12db0eb05249fcdf6815a27c433bc2cece89936071a2e136",
+      "world": "544c7250d3c889df1ec82f24170a31309839cd9aa2e3b99fbd5877548ddabd49",
       "pilots": {
         "strafer": {
           "frames": 78,
-          "stream": "c167401fc70cdf4963499c0993cbbd13c3dd2d7a36776a6998c9647f2d321768"
+          "stream": "211ce6df28b359fb18ac3be7613ce8b52a4a435d6f7fe172f642eb7ebfc8901c"
         },
         "tug": {
           "frames": 79,
-          "stream": "eeb30faa84d465714acfdead2fe23c20c4c5a852edcc513e4088bbd209d9802f"
+          "stream": "a9d8320ea7ecebd66d5a574215575cc5341bc67548d0b1146015133d6ea52405"
         },
         "striker": {
           "frames": 78,
-          "stream": "1dbc82c2618693a4aad31e770b42c76b2d5b2210906b3c6f4b59994c832fe505"
+          "stream": "6174c55d8bb496181df33cbf08cf3784209b67b4df251282d3f83516a08c29f1"
         },
         "sparrow": {
           "frames": 78,
-          "stream": "95234ed68fe4ec7e70cda0b5c4e3b6c2728ee2fad53c7f445776b168dc56b4b4"
+          "stream": "819285f499b02e6cc32f7d6df2b81a19caf8b8d26f4429c03167d1b69efc14b8"
         }
       }
     },
     {
       "tick": 300,
-      "world": "474233096c1fde8c8cd1fd223dcb1d2e318d2e6d51b214d402ac7fb0534ec6f1",
+      "world": "d133c43c339255e7dcdfea945953e7944be1421abd1966dce984538d70256f8a",
       "pilots": {
         "strafer": {
           "frames": 113,
-          "stream": "02e939d8582e63e6a40e85fcd0cd28863b613e5a0683a0576d8251a391411b59"
+          "stream": "4673373591be76ee0b9c570cdecfb192fa4f086453f810043e6028a1b184ed1c"
         },
         "tug": {
           "frames": 114,
-          "stream": "0ad9c4795bac3cb61c0d0df023fd58e80ed120d7c9123ae03dabed397ed686d4"
+          "stream": "80bea073ec93b27a8992e3a7a4858f7860b115da0b2217f3933bb746a039657b"
         },
         "striker": {
           "frames": 113,
-          "stream": "2cde1acad4a1da725aa5be0f0411299d33982e51ac25793e8317bbe32f13f7f3"
+          "stream": "afc1f251358bafe33d3c602fa86f6171e388c06dcbcead66490dc8e288f82c89"
         },
         "sparrow": {
           "frames": 113,
-          "stream": "4dc48afe01f860300ba74f6249406d530b3872a3603231e7de4a87148d715922"
+          "stream": "fb9a91ab6c51600edf4c386505ee9645089cfa208a36374a71db9b4ca39fde3d"
         }
       }
     },
     {
       "tick": 400,
-      "world": "1988f416a1c67161aa213fa27e026ceff622420adc7513e31b0cdd3c1becdb8b",
+      "world": "d9b21a477fa103cfac0b44843b78eb1ecf821b76f67c3a99b28d6cd38fe5ef15",
       "pilots": {
         "strafer": {
           "frames": 146,
-          "stream": "32fef97001a1a604f0b1b15b4137091d9d100e65ff74c431231dc57cc5f4044a"
+          "stream": "b280ebcbc5bd64dcb5e2166ec447592e2d70939113036787f2606484db800841"
         },
         "tug": {
           "frames": 147,
-          "stream": "82d90a960a701f79a5ba8e0256530010fd92fd51c642013bce94e90b11cfdf66"
+          "stream": "0f54743b1b89a3cde02f81b5a72bae81bbe9b2160daae5f4d2907615a89bed06"
         },
         "striker": {
           "frames": 146,
-          "stream": "d9ee552147d39159cc3fef8551caa91688ead36a4d5a5cc66d29ab88f0e29d90"
+          "stream": "6535b07a4616597484d38c4fe6d2e426bb5002be581caa385759f46099b463c1"
         },
         "sparrow": {
           "frames": 146,
-          "stream": "f32a7d5c52822baf4854ee524c877067ed33f921f93f5a35ecdbab7e1b932fe7"
+          "stream": "3bfa044234c96f3df1ab6e985cbeed15831f776fb46750508abe6e485f700026"
         }
       }
     },
     {
       "tick": 500,
-      "world": "47164adb97412c62e9dcae622ab049abbd73bbb4e2fa33030af32e4ee189c286",
+      "world": "70973708ca8dfb1b87ae5cda1dc30e6ef3b7b5527510b451633b5d947c9ded90",
       "pilots": {
         "strafer": {
           "frames": 181,
-          "stream": "f3bf2557dab717bee015502c9d6a03e73d1e760f7f70e6242515d8fe9db264ae"
+          "stream": "8d302633d92c8dc46435c503f8e0cb7a4ffa46552b8e6c1947b679fae3c061e4"
         },
         "tug": {
           "frames": 182,
-          "stream": "f71e00997519fc228eab53b081c78d0a8e7e0c76f56143ba5a1d18c728c5ec3a"
+          "stream": "56cc17d4a7694e1c1f96bbbb55df6f52edbed43da5d71769ba825ea0b3b1a37c"
         },
         "striker": {
           "frames": 181,
-          "stream": "c5fe65256184179c1b99f115916438462dd733a674cbcd94843e1b829faddcea"
+          "stream": "8f9fa3fe014db3699c3e22d84aeb39941cc5cbf32ed7dd9555a50c9205edb246"
         },
         "sparrow": {
           "frames": 181,
-          "stream": "e458488024c13e02d76e7666175079044f38edf002081cea3893f4104021f71f"
+          "stream": "99aa4bfcea0416228cd339d476fc88ec812af0d68bc07f5ac5bbfb631667e8f5"
         }
       }
     },
     {
       "tick": 600,
-      "world": "ad349556cfefc5833e4022eb61d13064bd993b7e4955037fec268b311276ed57",
+      "world": "4f5c0718433c38469c77308c3abbb8788f5b9f716732700727bcc872af480024",
       "pilots": {
         "strafer": {
           "frames": 215,
-          "stream": "8b186582f0b8c19f515792dc6283698d64eb91c06553223d0ed1aeeebc9124e8"
+          "stream": "bb44fb7a40e206c140e5adb6ec35fd489a3185ed325f72f256ba89fab9cdab28"
         },
         "tug": {
           "frames": 216,
-          "stream": "00cb52f90353e9b77d9d2bcb90374a1443a6eb6b403f846d6aef4f0faded0a0f"
+          "stream": "2aaff80962283f21f1ea331dc18e357115d7dd16c7265c6b307b24e5a981dccc"
         },
         "striker": {
           "frames": 215,
-          "stream": "1ec4dc2fc957bf124cb187a1eef2057dc3fb5bec6b33edce616784b0a7358189"
+          "stream": "44d3dfaea1e489403395663ab7fc5ac9b985de11207c4045e0157f516bce7161"
         },
         "sparrow": {
           "frames": 215,
-          "stream": "e884c4815667a523d3c3283e28248bc4daaae82425a6cf04213d378e371bc7af"
+          "stream": "f9b1038bf1d1acf97bf7ddfc8f2ed0321bc00ec138d3664383eb96a764af0b33"
         }
       }
     },
     {
       "tick": 700,
-      "world": "e2686c22da5ea14b3cf981a0d6cefe65fc59ee59e753b94ec6fd1950f46b39a2",
+      "world": "bd728c830f0786a282373a125a335b057235587c53db70a161a8c87c0a54d6bd",
       "pilots": {
         "strafer": {
           "frames": 250,
-          "stream": "3e8112d78841ad3df9bbc204541c95c51a14f8687e7ebefe21703426070f19ce"
+          "stream": "a7cb2faa65f87c330f8cfdfe5c29cf1c5bc8a406f035310d8951f07294f22323"
         },
         "tug": {
           "frames": 251,
-          "stream": "0990429675e9c04915471b68ea52cc7dfd33744662cd404251018f71936b657e"
+          "stream": "b619c4036b4e79d0e3559ac985e7a7592164d8e3b8d70f9c41f056d760acd0a8"
         },
         "striker": {
           "frames": 250,
-          "stream": "c757ae48612129f49471c82c0fa8744a590c8024b7ce45d7d4989eba5bd43528"
+          "stream": "a33e5d0d7380a8e81925fcb75f1879abd0ec29430c5f0d998a0c6b442bef3c83"
         },
         "sparrow": {
           "frames": 250,
-          "stream": "3030d351ce6f9fe60467c5060c4937a49b8ea8ecf94b28c3bd757c8e885b084d"
+          "stream": "e87863c2a8b4c00469d21404a621bd8e2dcc55759b4abecba3fc35bd0f8c80da"
         }
       }
     },
     {
       "tick": 800,
-      "world": "a34cf718c3e03bb7755e2304b0fec052924dea5f07a492bd893883bc988cba29",
+      "world": "ea8d18ff7d648fd9416e8ef0c93612602a8bd4fc70ffad2fd49cb5af82242f44",
       "pilots": {
         "strafer": {
           "frames": 283,
-          "stream": "03e490b878f3f4ce2da171960712e46f15d74779ad0b4f77eeb025261fad5f95"
+          "stream": "0cd5cb6c751a21dd65e73b882cda60b62ca780f8ca1cea61a990957970fde596"
         },
         "tug": {
           "frames": 285,
-          "stream": "ce1abc7e8c69de2573be89283b1b5c03f466a4149ba59425497689c7b579fba0"
+          "stream": "4d101e94e744c76b772c66689be2b276ebefb01ca64931262758160800823960"
         },
         "striker": {
           "frames": 283,
-          "stream": "e99b74ce6a043251078b21248cc6ed75d12db02891b1f2a2a39ca08716dd00db"
+          "stream": "9db0bdbeb7f7bccd77c3ae7605df5ff8cf7679ccfa4d1548db49af4250e6184a"
         },
         "sparrow": {
           "frames": 283,
-          "stream": "8819e16031bad9d04c00abb9a8ad321c9d60d7695d2dab52a8d25c71dff7ab63"
+          "stream": "98b1467226ebcbdc342bb22a60010b33c93d3e30e7314aaa948d858fb35b35e1"
         }
       }
     },
     {
       "tick": 900,
-      "world": "81284e5c2b63624cdf2265cc48c7aea452d49b2dac420442507b2596085c7a81",
+      "world": "21a8a1928d0bdb471936263c7e6a2bc2872a62b3b523e14f3b8f77c7a6ea7846",
       "pilots": {
         "strafer": {
           "frames": 317,
-          "stream": "1ba11535bb27cd4c75af68d5c0cd0423b6065d541d8f2a3cd98316388a1fc04f"
+          "stream": "fa5c3105db2b5298268dabbba59a08f4c49d91628a1e67ec5a35ebded1e4e6e7"
         },
         "tug": {
           "frames": 319,
-          "stream": "49259bed5e6b6f57251429ca6f862baf9feb20e858ed7fb24437e5f2788776d7"
+          "stream": "986cb5ea5bf3319d63175d31950bd78194179c0ba932b101b8f7403f65806721"
         },
         "striker": {
           "frames": 317,
-          "stream": "5a62311ec5c5315b78483e025b93bea47d08ef76da0e004b02c3794652df7000"
+          "stream": "41f7af913747386e7345781d03077a3e7dae2cf5b29e3f49ac53ea606520a8f5"
         },
         "sparrow": {
           "frames": 317,
-          "stream": "9809dd1cc76db10bf554b33ea876bad9bc5d8368e0d24f2880b01395b4f71d27"
+          "stream": "50b22e5656aeeb77bbcb52e0ce37964e23767d6c0eac7c84bbfe911d683c7ad7"
         }
       }
     }

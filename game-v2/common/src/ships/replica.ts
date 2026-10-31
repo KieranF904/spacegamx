@@ -13,7 +13,7 @@
 import type { Terrain } from '../terrain.js';
 import { FULL_CHARGE } from './energy.js';
 import type { FlightBody, FlightControls, GravityWell } from './flight.js';
-import { stepDrift, jumpTuning, inSolarRing, type FlightConstants } from './flight.js';
+import { stepDrift, jumpTuning, inSolarRing, withSlowed, type FlightConstants } from './flight.js';
 import { jumpFieldAt, fieldCooldown, fieldRangeBoost, type FieldEnv } from './jumpFields.js';
 import { stepShipPhysics, quantizeShipBody, SHIP_FLIGHT_CONSTANTS } from './physics.js';
 import { withEmp } from './hazards.js';
@@ -48,7 +48,9 @@ export const CTL = {
   hold: 1024,
   /** Numb with cold: thrust and steering × the numb stage's (warmth.ts) */
   numb: 2048,
-  /** Burst Strafer: dodge held (its way comes from the movement bits): features/strafer, whose input owns it (features.wire.json). (4096 and 16384 are free) */
+  /** Slowed (a Frostbite beam, features/weaponry: thrust and turning × SLOW_CONTROL, flight.ts withSlowed); pinned in features.wire.json */
+  slowed: 4096,
+  /** Burst Strafer: dodge held (its way comes from the movement bits): features/strafer, whose input owns it (features.wire.json). (16384 is free) */
   dodge: 8192,
 } as const;
 
@@ -119,15 +121,18 @@ export function replicaStep(mode: ReplicaMode, body: FlightBody, c: ReplicaContr
       // (A stillstone's priming isn't replicated: a burn's start brings a keyframe anyway)
       const boost = fieldRangeBoost(inSolarRing(body.x, body.y, env.central, jt), 0, jt);
       const hazard = env.hazard?.(derived, body.x, body.y);
-      const flown = c.bits & CTL.numb ? withNumb(hazard, NUMB) : hazard;
+      // (numb with cold, then slowed, then EMP'd: the order the server and the pilot's prediction apply them in)
+      const flown = withSlowed(c.bits & CTL.numb ? withNumb(hazard, NUMB) : hazard, (c.bits & CTL.slowed) !== 0);
       stepShipPhysics(body, flightControls(c, body), derived, tuning, { charge: FULL_CHARGE, drainRate: 0 }, env.gravity, boost, c.bits & CTL.emp ? withEmp(flown) : flown, env.terrain);
       // A charging field (a star's ring, a stillstone's): the drive cools down faster
       body.jump = fieldCooldown(body.jump ?? 0, derived.jumpCooldown || jt.cooldownTicks, jumpFieldAt(body.x, body.y, env, tick, jt), jt, tick);
       return;
     }
-    case ReplicaMode.Pilotless:
-      stepShipPhysics(body, flightControls(c, body), derived, tuning, { charge: FULL_CHARGE, drainRate: 0 }, env.gravity, 1, c.bits & CTL.emp ? withEmp(undefined) : undefined, env.terrain);
+    case ReplicaMode.Pilotless: {
+      const slowed = withSlowed(undefined, (c.bits & CTL.slowed) !== 0);
+      stepShipPhysics(body, flightControls(c, body), derived, tuning, { charge: FULL_CHARGE, drainRate: 0 }, env.gravity, 1, c.bits & CTL.emp ? withEmp(slowed) : slowed, env.terrain);
       return;
+    }
     case ReplicaMode.Drift:
       stepDrift(body, k);
       quantizeShipBody(body);

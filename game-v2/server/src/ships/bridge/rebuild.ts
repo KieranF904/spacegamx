@@ -106,6 +106,10 @@ export function forget(b: BridgeCtx, eid: number): void {
   b.restoreProgress.delete(eid);
   b.empUntil.delete(eid);
   b.warmth.delete(eid);
+  b.markedUntil.delete(eid);
+  b.slowedUntil.delete(eid);
+  b.salvos.delete(eid);
+  b.guides.delete(eid);
   b.weaponBeams.delete(eid);
   b.pulsing.delete(eid);
   b.pdOn.delete(eid);

@@ -211,10 +211,11 @@ export function dodgeAffordable(d: ShipDerived, c: Charge | undefined, dir: numb
 
 /**
  * The pilot's own snapshot row carries, after the charge groups (energy.ts chargeGroupsEnd): the dodge
- * counter, the last dodge's way, and what the Tow Beam tows (entity id + 1, 0 nothing). GameServer writes them in that order.
+ * counter, the last dodge's way, what the Tow Beam tows (entity id + 1, 0 nothing), and the ticks left marked and slowed
+ * (features/weaponry). GameServer writes them in that order (features.wire.json pilotExtra).
  */
-export function pilotExtras(data: number[] | undefined): { dodge: number; dodgeDir: number; tow: number } {
-  if (!data || data.length <= PILOT_ROW.groups) return { dodge: 0, dodgeDir: 0, tow: 0 };
+export function pilotExtras(data: number[] | undefined): { dodge: number; dodgeDir: number; tow: number; marked: number; slowed: number } {
+  if (!data || data.length <= PILOT_ROW.groups) return { dodge: 0, dodgeDir: 0, tow: 0, marked: 0, slowed: 0 };
   const at = chargeGroupsEnd(data);
-  return { dodge: data[at] ?? 0, dodgeDir: data[at + 1] ?? 0, tow: data[at + 2] ?? 0 };
+  return { dodge: data[at] ?? 0, dodgeDir: data[at + 1] ?? 0, tow: data[at + 2] ?? 0, marked: data[at + 3] ?? 0, slowed: data[at + 4] ?? 0 };
 }

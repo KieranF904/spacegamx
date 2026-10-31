@@ -81,6 +81,10 @@ export interface InterpolatedEntity {
   empUntil?: number;
   /** Warmth, % (local player; server data[PILOT_ROW.warmth]: common/src/ships/warmth.ts): the frost vignette, and how cold prediction flies and fires */
   warmth?: number;
+  /** Slowed by a Frostbite's beam until this tick (local player; the snapshot's tick + the pilot row's slowed ticks: features/weaponry): prediction flies it slowed till then */
+  slowUntil?: number;
+  /** Marked by a Searchlight until this tick (local player; the snapshot's tick + the pilot row's marked ticks) */
+  markUntil?: number;
   /** Burst Strafer: the dodge counter and the last dodge's way (local player: the server's, then predicted; others: their replica's): ships/strafer.ts */
   dodge?: number;
   dodgeDir?: number;
@@ -894,7 +898,9 @@ export class GameState {
     // (The gun state the server's guns hold, against our own: the clip and charge correction, ShipClient.syncGuns)
     this.shipGunSync?.(serverState.data, snapshot.tick);
     // (After the charge groups: the Burst Strafer's dodge and way, strafer.ts pilotExtras)
-    { const x = pilotExtras(serverState.data); player.dodge = x.dodge; player.dodgeDir = x.dodgeDir; }
+    // (and the ticks left slowed and marked: features/weaponry, the prediction flies a slowed ship as the server does)
+    { const x = pilotExtras(serverState.data); player.dodge = x.dodge; player.dodgeDir = x.dodgeDir;
+      player.slowUntil = snapshot.tick + x.slowed; player.markUntil = snapshot.tick + x.marked; }
 
     // Reset boost fuel to server-reported value before replaying inputs.
     // Boost fuel is now in entity data[1] for every snapshot (not just playerState).

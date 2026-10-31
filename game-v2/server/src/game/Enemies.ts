@@ -31,7 +31,7 @@ import { hasComponent, IWorld } from 'bitecs';
 import {
   Position, Velocity, Rotation, InSystem, Player, Dead, Radius,
   Blueprint, Bag, ShipState, partItemId, mulberry32,
-  MAX_GRADE, markName, regrade, blueprintGrade, gradeReward, rateShip, ratingOf, createShipState, placeCost, type Economy, plated, partWeaponDef, migratePartItem,
+  MAX_GRADE, markName, regrade, blueprintGrade, gradeReward, rateShip, ratingOf, createShipState, placeCost, type Economy, plated, partWeaponDef, endsAtAim, migratePartItem,
   nestPosition, NEST_RADIUS, type NestData, type PlanetData, type StarSystemData } from '@space-game/common';
 import { nestBand, clampBand, stepRound, placesOfInterest, looseWaypoint, nomadDestination, LOOSE_REACH, type RoamStyle, type Band, type XY } from './Roaming.js';
 import type { ShipBridge, PilotOrders } from '../ships/ShipBridge.js';
@@ -1190,7 +1190,7 @@ export class Enemies {
       const def = partWeaponDef(this.ships.tuning, w.kind, ship.blueprint.parts[w.part], { model: w.model });
       // Beams: pilots' pulse lasers reach far, but hostiles only open up from nearer in (no sniping from past the edge of the screen)
       const r = def.type === 'beam' ? Math.min(def.range ?? 800, NPC_BEAM_REACH) : (def.maxSpeed ?? def.speed ?? 30) * (def.life ?? 60);
-      if (def.lob) lobs = true;
+      if (endsAtAim(def)) lobs = true;
       reach = Math.max(reach, r);
     }
     e.reach = reach > 0 ? reach : undefined;

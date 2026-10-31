@@ -415,7 +415,7 @@ export interface FireSpec {
 export type WeaponModNumber = 'damage' | 'speed' | 'life' | 'size' | 'spread' | 'range' | 'dps' | 'armorBonus' | 'homing' | 'accel' | 'maxSpeed' | 'fuse' | 'rate' | 'hp' | 'width' | 'splashDamage' | 'splashRadius';
 export const WEAPON_MOD_NUMBERS: WeaponModNumber[] = ['damage', 'speed', 'life', 'size', 'spread', 'range', 'dps', 'armorBonus', 'homing', 'accel', 'maxSpeed', 'fuse', 'rate', 'hp', 'width', 'splashDamage', 'splashRadius'];
 /** What `set` may give a gun */
-export const WEAPON_MOD_SETS = ['ignite', 'split', 'pull', 'chill', 'frost', 'splash', 'emp', 'pierceKeep', 'homing', 'fuse', 'color', 'bane'];
+export const WEAPON_MOD_SETS = ['ignite', 'split', 'pull', 'frost', 'splash', 'emp', 'pierceKeep', 'homing', 'fuse', 'color', 'bane'];
 
 export type Mount = 'fixed' | 'turret';
 

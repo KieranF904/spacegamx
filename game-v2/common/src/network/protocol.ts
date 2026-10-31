@@ -28,9 +28,9 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
  * has updated PROTOCOL_VERSION and PROTOCOL_WIRE_HASH.
  */
 // History: PROTOCOL_CHANGELOG.md. Re-pin with `npm run wire:bump "reason"` (game-v2/), never by hand.
-export const PROTOCOL_VERSION = 18;
+export const PROTOCOL_VERSION = 19;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
-export const PROTOCOL_WIRE_HASH = '6c1c0c52';
+export const PROTOCOL_WIRE_HASH = 'c15f6c77';
 /** WebSocket close code (and reason) for a client on another protocol version */
 export const PROTOCOL_MISMATCH_CLOSE = 4002;
 export const PROTOCOL_MISMATCH_REASON = 'version';
@@ -1350,16 +1350,18 @@ interface PackedSnapshot { type: 'snapshot'; t: number; lp: number; e?: unknown[
 
 /**
  * Projectiles have rows of their own (they're most of a fight's rows):
- *   [id, vx, vy, weaponType, ticks since fired, spawnX, spawnY, ownerId, tier?, sizeScale?, turret?, x?, y?]
- * tier 1, size 1 and no turret go as null (trailing ones dropped); x and y only
- * when it's off the straight line from the muzzle (missiles). The hue is the
- * owner's, worked out again on arrival.
+ *   [id, vx, vy, weaponType, ticks since fired, spawnX, spawnY, ownerId, tier?, sizeScale?, turret?, ticks to its end?, x?, y?]
+ * tier 1, size 1, no turret and no end go as null (trailing ones dropped); the
+ * end (data[9], the tick a shell that ends at a chosen point lands or bursts:
+ * mortars, aim bursts) goes as ticks after the snapshot's; x and y only when
+ * it's off the straight line from the muzzle (missiles). The hue is the owner's,
+ * worked out again on arrival.
  */
 function packProjectile(s: EntityState, tick: number): (number | null)[] | null {
   const d = s.data;
-  if (!d || d.length !== 9 || s.angle !== undefined || s.hp !== undefined || s.name !== undefined) return null;
+  if (!d || d.length !== 10 || s.angle !== undefined || s.hp !== undefined || s.name !== undefined) return null;
   const row: (number | null)[] = [s.id, s.vx ?? 0, s.vy ?? 0, d[0], tick - d[3], d[4], d[5], d[6],
-    d[1] === 1 ? null : d[1], d[7] === 1 ? null : d[7], d[8] === 0 ? null : d[8], s.x ?? null, s.y ?? null];
+    d[1] === 1 ? null : d[1], d[7] === 1 ? null : d[7], d[8] === 0 ? null : d[8], d[9] ? d[9] - tick : null, s.x ?? null, s.y ?? null];
   while (row[row.length - 1] === null) row.pop();
   return row;
 }
@@ -1368,9 +1370,10 @@ function unpackProjectile(r: (number | null)[], tick: number): EntityState {
   const owner = r[7] as number;
   const s: EntityState = {
     id: r[0] as number, type: EntityType.Projectile, vx: r[1] as number, vy: r[2] as number,
-    data: [r[3] as number, r[8] ?? 1, (owner * 137) % 360, tick - (r[4] as number), r[5] as number, r[6] as number, owner, r[9] ?? 1, r[10] ?? 0],
+    data: [r[3] as number, r[8] ?? 1, (owner * 137) % 360, tick - (r[4] as number), r[5] as number, r[6] as number, owner, r[9] ?? 1, r[10] ?? 0,
+      r[11] != null ? tick + r[11] : 0],
   } as EntityState;
-  if (r[11] != null) { s.x = r[11]; s.y = r[12] as number; }
+  if (r[12] != null) { s.x = r[12]; s.y = r[13] as number; }
   return s;
 }
 

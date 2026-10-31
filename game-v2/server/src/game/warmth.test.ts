@@ -149,10 +149,11 @@ describe('warmth', () => {
     expect(rules.seizeTicks).toBeGreaterThan(0);
   });
 
-  it('a frostbite beam held on a ship takes its warmth tick by tick', () => {
+  it("a trickle of frost hits takes a ship's warmth tick by tick", () => {
     const { ships, pid, hover } = world(1);
     hover(...WARM, 2);
-    const hold = (ships as any).tuning.weapons.frostbite.chill.holdTicks as number;
+    // (The Frostbite beam no longer chills (it slows: features/weaponry); a beam-like trickle of frost hits still freezes through)
+    const hold = 45;
     for (let i = 0; i < 10; i++) ships.frostHit(pid, 1 / hold, 40);
     expect(ships.warmthOf(pid)).toBeCloseTo(1 - 10 / hold, 6);
   });

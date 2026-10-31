@@ -43,12 +43,26 @@ describe('snapshot frames', () => {
 
   it('projectiles get rows of their own (position only off the straight line), and come back the same', async () => {
     const { encodeMessage, decodeServerFrame } = await import('./protocol.js');
-    const shell = { id: 40, type: 7, vx: 8.38, vy: -31.3, data: [1, 1, (2247 * 137) % 360, 1230, 27286.2, 21513.6, 2247, 1, 0] };
-    const missile = { id: 41, type: 7, x: 500.5, y: 600.25, vx: 2, vy: 3, data: [4, 2, (12 * 137) % 360, 1200, 100, 200, 12, 1.5, 1] };
+    const shell = { id: 40, type: 7, vx: 8.38, vy: -31.3, data: [1, 1, (2247 * 137) % 360, 1230, 27286.2, 21513.6, 2247, 1, 0, 0] };
+    const missile = { id: 41, type: 7, x: 500.5, y: 600.25, vx: 2, vy: 3, data: [4, 2, (12 * 137) % 360, 1200, 100, 200, 12, 1.5, 1, 0] };
     const snap = { type: 'snapshot' as const, tick: 1234, lastProcessedInput: 0, removed: [], entities: [shell, missile] };
     const wire = encodeMessage(snap as any) as string;
-    expect(JSON.parse(wire).p).toEqual([[40, 8.38, -31.3, 1, 4, 27286.2, 21513.6, 2247], [41, 2, 3, 4, 34, 100, 200, 12, 2, 1.5, 1, 500.5, 600.25]]);
+    expect(JSON.parse(wire).p).toEqual([[40, 8.38, -31.3, 1, 4, 27286.2, 21513.6, 2247], [41, 2, 3, 4, 34, 100, 200, 12, 2, 1.5, 1, null, 500.5, 600.25]]);
     expect(decodeServerFrame(wire)).toEqual([snap]);
+  });
+
+  it('a shell that ends at a chosen point carries its end tick (data[9]) as ticks after the snapshot, and back', async () => {
+    const { encodeMessage, decodeServerFrame, encodeServerMessage, serverFrame } = await import('./protocol.js');
+    // A mortar shell landing on tick 1290 (on its straight line), and an aim burst off its line (x, y sent)
+    const mortar = { id: 42, type: 7, vx: 12, vy: -5, data: [9, 1, (31 * 137) % 360, 1220, 50, 60, 31, 1.6, 1, 1290] };
+    const off = { id: 43, type: 7, x: 70.5, y: 80.25, vx: 1, vy: 2, data: [3, 1, (31 * 137) % 360, 1230, 10, 20, 31, 1, 0, 1236] };
+    const snap = { type: 'snapshot' as const, tick: 1234, lastProcessedInput: 0, removed: [], entities: [mortar, off] };
+    const wire = encodeMessage(snap as any) as string;
+    expect(JSON.parse(wire).p).toEqual([[42, 12, -5, 9, 14, 50, 60, 31, null, 1.6, 1, 56], [43, 1, 2, 3, 4, 10, 20, 31, null, null, null, 2, 70.5, 80.25]]);
+    expect(decodeServerFrame(wire)).toEqual([snap]);
+    // (and as a binary frame, as the server sends it)
+    const back = decodeServerFrame(serverFrame([encodeServerMessage(snap as any)])) as any[];
+    expect(back[0].entities.map((e: any) => e.data[9])).toEqual([1290, 1236]);
   });
 
   it('a snapshot encodes to exactly the bytes of its compact row, with its keyframes and control rows shared between clients', async () => {
@@ -72,7 +86,7 @@ describe('snapshot frames', () => {
       const snap: any = {
         type: 'snapshot', tick: 1000 + n, lastProcessedInput: n % 4 ? n : 0, removed: n % 3 ? [] : [5, 6],
         entities: n % 2 ? [{ id: 1, type: 1, x: 10.5, y: -3, angle: 0.25, hp: 100, data: [1, 2, 3], name: 'Ash' },
-          { id: 40, type: 7, vx: 8.38, vy: -31.3, data: [1, 1, 0, 990 + n, 27286.2, 21513.6, 2247, 1, 0] }] : [],
+          { id: 40, type: 7, vx: 8.38, vy: -31.3, data: [1, 1, 0, 990 + n, 27286.2, 21513.6, 2247, 1, 0, 0] }] : [],
         ships: n % 5 ? pick(keyframes) : undefined, ctl: n % 7 ? pick(ctls) : undefined, out: n % 4 ? undefined : [9, 10],
         fire: n % 6 ? undefined : [[3001, 2, 3, 4100, 5000, 5001]],
       };
@@ -157,7 +171,7 @@ describe('binary frames', () => {
     const snap = {
       type: 'snapshot' as const, tick: 1234, lastProcessedInput: 7, removed: [5],
       entities: [{ id: 1, type: 1, x: 10.5, y: -3, angle: 0.25, vx: 1, vy: 0, av: 0.01, hp: 100, maxHp: 120, data: [1, 2, 3], name: 'Ash' },
-        { id: 40, type: 7, vx: 8.38, vy: -31.3, data: [1, 1, (2247 * 137) % 360, 1230, 27286.2, 21513.6, 2247, 1, 0] }],
+        { id: 40, type: 7, vx: 8.38, vy: -31.3, data: [1, 1, (2247 * 137) % 360, 1230, 27286.2, 21513.6, 2247, 1, 0, 0] }],
       ships: [[2, 1, 4, 5, 0, 0, 0.5, 0, 0, 1, 16, 4000]],
       ctl: [[9, 1, 17, 4100], [-2251, 2, 9, 5249, -88, -28], [3, 0, 2, 6158]],
     };

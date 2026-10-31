@@ -143,6 +143,7 @@ export const Projectile = defineComponent({
   turret: Types.ui8,          // Fired by a turret (1) or a fixed gun / anything else (0)
   miningYield: Types.f32,     // Ore per damage on asteroids (relative to the mining table's damagePerUnit)
   miningHardness: Types.ui8,  // Hardest rock it can crack
+  endTick: Types.ui32,        // A shell that ends at a chosen point (a mortar's, an aim burst's): the tick it ends, in spawn + velocity × (tick - spawnTick) terms (0: none). Projectile row data[9]
 });
 
 /** Bullet-specific data (cannon, scatter) */

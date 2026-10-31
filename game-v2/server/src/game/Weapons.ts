@@ -12,6 +12,9 @@
  *   prism         shatters on impact into a fan of shards
  *   phase         pierces ships without losing damage
  *   singularity   a slow collapsing star: drags ships in, then implodes
+ * Shot behaviours any kind may switch on (common/src/ships/features/weaponry): endAtAim (bursts or splits at the aim
+ * distance, the mortar's maths), walk (a salvo landing along the aim: the bridge spaces its shells), guided (steers to
+ * the cursor while the trigger is held).
  * Beam weapons (laser, lance, frostbite) are continuous and live in the ship bridge.
  */
 
@@ -19,6 +22,7 @@ import { addEntity, addComponent, hasComponent, entityExists, IWorld } from 'bit
 import {
   Position, Velocity, Radius, Projectile, Bullet, Lifetime, InSystem, NetworkSync, OwnedBy, Dead,
   ShipTuning, WeaponTuning, WEAPON_KIND_TYPE, ServerMessage, interceptHits, mulberry32, hashString, weaponDef, gunDef, launchShot, volleyAngles, weaponHit, type WeaponMods, type HitInfo,
+  endsAtAim, lifeToReach, steerToward,
 } from '@space-game/common';
 import type { ShipBridge } from '../ships/ShipBridge.js';
 
@@ -99,8 +103,11 @@ export class Weapons {
     Projectile.miningYield[eid] = tool.yield;
     Projectile.miningHardness[eid] = tool.hardness;
     Bullet.speed[eid] = shot.speed;
-    // A lobbed shell comes down where it was aimed
-    Lifetime.remaining[eid] = def.lob && shape.reach ? Math.max(10, Math.min(shot.life, Math.round(shape.reach / Math.max(1, shot.speed)))) : shot.life;
+    // A shell that ends at the aim (a lobbed one, an aim burst, a walking salvo's) comes down or bursts where it was aimed
+    const ends = endsAtAim(def) && !!shape.reach;
+    Lifetime.remaining[eid] = ends ? lifeToReach(shot.life, shot.speed, shape.reach!) : shot.life;
+    // (and everyone is told when: projectile row data[9], in spawn + velocity × age terms)
+    Projectile.endTick[eid] = ends ? this.host.tick() + Lifetime.remaining[eid] : 0;
     InSystem.systemId[eid] = InSystem.systemId[owner];
     OwnedBy.ownerId[eid] = owner;
     // (A plain cannon shell has nothing to track: one with a grade's or a gem's changes does)
@@ -170,7 +177,8 @@ export class Weapons {
     const w = this.host.world;
     for (const [eid, x] of this.extras) {
       if (!entityExists(w, eid) || hasComponent(w, Dead, eid)) { this.extras.delete(eid); continue; }
-      if (x.def.homing) {
+      if (x.def.guided) this.guide(eid, x);
+      else if (x.def.homing) {
         const t = x.target;
         const alive = t >= 0 && this.ships.has(t) && InSystem.systemId[t] === InSystem.systemId[eid];
         let vx = Velocity.x[eid], vy = Velocity.y[eid];
@@ -206,6 +214,8 @@ export class Weapons {
         // Burst when the hull of anything we may hit comes within fuse range (its real outline: a boss's centre is far inside it)
         const near = this.ships.nearestTarget(x.owner, Position.x[eid], Position.y[eid], x.def.fuse, undefined, true);
         if (near >= 0 && this.host.tick() - Projectile.spawnTick[eid] > 4) {
+          // (a splitting shell splits on its fuse too)
+          if (x.def.split) this.shatter(eid, x, null);
           this.detonate(eid, Position.x[eid], Position.y[eid]);
           this.host.remove(eid);
         }
@@ -250,10 +260,30 @@ export class Weapons {
     if (this.extras.has(proj)) this.detonate(proj, x, y);
   }
 
-  /** The shot ran out of life: flak and EMP burst anyway, missiles fizzle with a bang */
+  /** The shot ran out of life: flak and EMP burst anyway, missiles fizzle with a bang; one that ends at the aim splits there (a Prism's) */
   onExpire(proj: number): void {
     const x = this.extras.get(proj);
-    if (x && (x.def.splash || x.def.emp)) this.detonate(proj, Position.x[proj], Position.y[proj]);
+    if (!x) return;
+    const split = !!x.def.split && endsAtAim(x.def) && Projectile.endTick[proj] > 0;
+    if (split) this.shatter(proj, x, null);
+    if (split || x.def.splash || x.def.emp) this.detonate(proj, Position.x[proj], Position.y[proj]);
+  }
+
+  private readonly steer = { x: 0, y: 0 };
+
+  /**
+   * A guided shell (weaponry guided): it speeds up as a missile does, and while its gun's trigger is held it turns
+   * toward the cursor (the owner's aim this tick, ShipBridge.guideOf); let go (or its ship gone), it flies straight
+   */
+  private guide(eid: number, x: Extra): void {
+    const vx = Velocity.x[eid], vy = Velocity.y[eid];
+    const sp = Math.hypot(vx, vy) || 1;
+    const nsp = Math.min(x.def.maxSpeed ?? x.def.speed ?? 40, sp + (x.def.accel ?? 0));
+    const g = this.ships.guideOf(x.owner, this.host.tick());
+    if (g && g.held) steerToward(Position.x[eid], Position.y[eid], vx, vy, g.x, g.y, x.def.guided!.turn, this.steer);
+    else { this.steer.x = vx / sp; this.steer.y = vy / sp; }
+    Velocity.x[eid] = this.steer.x * nsp;
+    Velocity.y[eid] = this.steer.y * nsp;
   }
 
   /** Lightning leaps from what it hit to the nearest ships it may hurt, weaker each time */
@@ -276,14 +306,16 @@ export class Weapons {
   }
 
   /** A prism bolt breaks into a fan of shards carrying on past what it hit */
-  private shatter(proj: number, x: Extra, hit: { eid: number; x: number; y: number }): void {
+  private shatter(proj: number, x: Extra, hit: { eid: number; x: number; y: number } | null): void {
     const sp = x.def.split!;
     const heading = Math.atan2(Velocity.y[proj], Velocity.x[proj]);
     const arc = (sp.arc * Math.PI) / 180;
     for (let i = 0; i < sp.count; i++) {
       const a = heading + arc * ((sp.count > 1 ? i / (sp.count - 1) : 0.5) - 0.5);
-      const shard = this.spawn(x.owner, sp.kind, hit.x + Math.cos(a) * 8, hit.y + Math.sin(a) * 8, a, x.damageScale, { speedScale: 1, sizeScale: 1, turret: false, noBurst: true });
-      this.extras.get(shard)?.hit.add(hit.eid);
+      // (where it broke: what it hit, or where it burst at the aim)
+      const px = hit ? hit.x : Position.x[proj], py = hit ? hit.y : Position.y[proj];
+      const shard = this.spawn(x.owner, sp.kind, px + Math.cos(a) * 8, py + Math.sin(a) * 8, a, x.damageScale, { speedScale: 1, sizeScale: 1, turret: false, noBurst: true });
+      if (hit) this.extras.get(shard)?.hit.add(hit.eid);
     }
   }
 

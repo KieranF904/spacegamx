@@ -296,9 +296,8 @@
       "range": 760,
       "dps": 95,
       "width": 14,
-      "chill": {
-        "holdTicks": 45,
-        "ticks": 40
+      "slow": {
+        "ticks": 42
       },
       "color": "ice",
       "pen": 0.5

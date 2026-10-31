@@ -108,6 +108,12 @@ Hooks receive `WeaponBridge` (an alias of the bridge's ctx, `bridge/core.ts`). N
 Intercepts tooltip rows replace the Damage and Fire-rate rows, which an append-only facts seam cannot express) and the
 client's repair beam / point-defence visuals (`MiningBeamFx`, `ShipClient.stepPointDefenceVisuals`, `gunDecor`).
 
+**`weaponry/`** (rework 2026-11, shot behaviours) is the second weapon-kind feature (order 50): roles `endAtAim`, `walk`,
+`guided` (shot options the projectile code reads: `game/Weapons.ts`, `bridge/weapons.ts`; no hooks), `mark` and `slow`
+(beam `onFire` hooks: burn with `fireBeam`, then mark or slow `b.beamStruck`). A role may be picked by a kind's tuning
+or by a weapon model's (`weaponMods.set`, models.mjs `SHOT`); the contract checks both. Its wire: pilot-row extras
+`marked`, `slowed` (ticks left), status `[7]` `statuses` (bits), control bit `slowed` (4096, replica.ts `CTL.slowed`).
+
 ## The contract
 
 `contract.ts` exports `runPartContract('<id>', { parts })`, a vitest suite every feature must pass (plan and wire

@@ -6,5 +6,6 @@ import { serverFeature as f_flash } from './flash/index.js';
 import { serverFeature as f_strafer } from './strafer/index.js';
 import { serverFeature as f_support } from './support/index.js';
 import { serverFeature as f_tow } from './tow/index.js';
+import { serverFeature as f_weaponry } from './weaponry/index.js';
 
-export const SERVER_FEATURES: readonly ServerFeature[] = [f_flash, f_strafer, f_support, f_tow];
+export const SERVER_FEATURES: readonly ServerFeature[] = [f_flash, f_strafer, f_support, f_tow, f_weaponry];

@@ -6,5 +6,6 @@ import { feature as f_flash } from './flash/index.js';
 import { feature as f_strafer } from './strafer/index.js';
 import { feature as f_support } from './support/index.js';
 import { feature as f_tow } from './tow/index.js';
+import { feature as f_weaponry } from './weaponry/index.js';
 
-export const FEATURES: readonly PartFeature[] = [f_flash, f_strafer, f_support, f_tow];
+export const FEATURES: readonly PartFeature[] = [f_flash, f_strafer, f_support, f_tow, f_weaponry];

@@ -1,18 +1,22 @@
 {
-  "_doc": "Wire slots part features own, pinned at today's positions (protocol 16; the status row's tow moved from 8 to 6 when the heat fields left it, rework 2026-11 firing models). APPEND-ONLY: never move or remove an entry; a new slot is a wire change (npm run wire:bump). Not part of the wire hash. pilotExtra: in order, after the pilot row's charge groups (strafer.ts pilotExtras). status: index in the status row other pilots get (net/SnapshotBuilder.ts). keyframe: index in a keyframe row (network/replication.ts packKeyframe). ctl: the replica control bit (replica.ts CTL). Checked by features/registry.test.ts.",
+  "_doc": "Wire slots part features own, pinned at today's positions (protocol 16; the status row's tow moved from 8 to 6 when the heat fields left it, rework 2026-11 firing models; the weaponry statuses appended in protocol 19, shot behaviours). APPEND-ONLY: never move or remove an entry; a new slot is a wire change (npm run wire:bump). Not part of the wire hash. pilotExtra: in order, after the pilot row's charge groups (strafer.ts pilotExtras). status: index in the status row other pilots get (net/SnapshotBuilder.ts). keyframe: index in a keyframe row (network/replication.ts packKeyframe). ctl: the replica control bit (replica.ts CTL). Checked by features/registry.test.ts.",
   "pilotExtra": [
     { "name": "dodge", "feature": "strafer" },
     { "name": "dodgeDir", "feature": "strafer" },
-    { "name": "tow", "feature": "tow" }
+    { "name": "tow", "feature": "tow" },
+    { "name": "marked", "feature": "weaponry" },
+    { "name": "slowed", "feature": "weaponry" }
   ],
   "status": [
-    { "name": "tow", "feature": "tow", "index": 6 }
+    { "name": "tow", "feature": "tow", "index": 6 },
+    { "name": "statuses", "feature": "weaponry", "index": 7 }
   ],
   "keyframe": [
     { "name": "dodge", "feature": "strafer", "index": 16 },
     { "name": "dodgeDir", "feature": "strafer", "index": 17 }
   ],
   "ctl": [
-    { "name": "dodge", "feature": "strafer", "bit": 8192 }
+    { "name": "dodge", "feature": "strafer", "bit": 8192 },
+    { "name": "slowed", "feature": "weaponry", "bit": 4096 }
   ]
 }

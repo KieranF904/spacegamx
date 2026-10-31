@@ -203,10 +203,34 @@ export function volleyAngles(def: WeaponTuning, angle: number): number[] {
   return out;
 }
 
+/** A shell that ends at a chosen point: a lobbed mortar's, one that bursts or splits at the aim (endAtAim), a walking salvo's */
+export function endsAtAim(def: WeaponTuning): boolean {
+  return !!(def.lob || def.endAtAim || def.walk);
+}
+
+/** The nearest an aimed shell is sent (world units): a cursor on the ship still lobs it clear */
+export const MIN_AIM_REACH = 200;
+
+/**
+ * How far a shell that ends at the aim flies: the aim distance (the server's cursorDist, from the ship), × its walk
+ * fraction for a walking salvo's `index`th shell, never under MIN_AIM_REACH
+ */
+export function aimReach(aimDist: number, def: WeaponTuning, index = 0): number {
+  const at = def.walk?.at;
+  const k = at && at.length ? at[Math.min(index, at.length - 1)] : 1;
+  return Math.max(MIN_AIM_REACH, aimDist) * k;
+}
+
+/** The ticks a shell flies to cover `reach` at `speed` (the mortar's land-at-cursor maths), within its own life */
+export function lifeToReach(life: number, speed: number, reach: number): number {
+  return Math.max(10, Math.min(life, Math.round(reach / Math.max(1, speed))));
+}
+
 /** Fire events go only for straight flyers */
 export function firesStraight(def: WeaponTuning): boolean {
-  // Lobbed shells fly as far as the aim (which only the server knows): sent as they fly, like missiles
-  return !def.homing && !def.lob;
+  // Shells that end at the aim fly as far as the aim (which only the server knows), and guided ones turn as the
+  // cursor moves: sent as they fly, like missiles (their projectile row carries the end tick: data[9])
+  return !def.homing && !endsAtAim(def) && !def.guided;
 }
 
 export interface FireRecord {

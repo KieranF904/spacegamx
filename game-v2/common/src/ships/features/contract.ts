@@ -28,6 +28,7 @@ import type { ShipTuning } from '../tuning.js';
 import type { FlightBody, FlightControls } from '../flight.js';
 import { stepShipPhysics } from '../physics.js';
 import { FULL_CHARGE, gunLoad, CHARGE_GROUPS_AT } from '../energy.js';
+import { gunDef } from '../launch.js';
 import { CTL, ReplicaMode, controlBits, flightControls, replicaStep } from '../replica.js';
 import { newFlightControls } from '../flightInputs.js';
 import { NO_FIELDS } from '../jumpFields.js';
@@ -69,7 +70,11 @@ export function runPartContract(id: string, opts: PartContractOptions = {}): voi
     const feature = P.features[index];
     const parts = opts.parts ?? [];
     const applying = [...catalog.functions.values()].filter((f) => feature?.applies(f));
-    const weaponKinds = (role: { applies(d: never): boolean }) => Object.entries(tuning.weapons ?? {}).filter(([, def]) => role.applies(def as never));
+    // (A role may be picked by a kind's own tuning, or by a weapon model's: its kind's with its model's changes, launch.ts gunDef)
+    const weaponKinds = (role: { applies(d: never): boolean }) => [
+      ...Object.entries(tuning.weapons ?? {}),
+      ...[...catalog.functions.values()].filter((f) => f.weapon && f.model).map((f) => [f.id, gunDef(tuning, f.weapon!, { model: f.weaponMods })] as const),
+    ].filter(([, def]) => role.applies(def as never));
 
     it('plan: registered under its folder name, with its wire slots as pinned', () => {
       expect(index, `${id} is not in the registry (npm run features:gen)`).toBeGreaterThanOrEqual(0);
@@ -186,7 +191,7 @@ export function runPartContract(id: string, opts: PartContractOptions = {}): voi
         expect((unpackKeyframe(row).body as Record<string, number>)[e.name]).toBe(7);
       }
       const data = new Array(CHARGE_GROUPS_AT).fill(0);
-      data.push(101, 102, 103);
+      W.pilotExtra.forEach((_, k) => data.push(101 + k));
       const x = pilotExtras(data) as Record<string, number>;
       W.pilotExtra.forEach((e, k) => { if (e.feature === id) expect(x[e.name], `pilot row ${e.name}`).toBe(101 + k); });
       for (const e of W.status.filter((s) => s.feature === id)) expect(P.replicate.some((r) => r.feature === id && r.where === 'status' && r.slot === e.index)).toBe(true);
