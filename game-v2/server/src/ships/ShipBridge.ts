@@ -18,8 +18,8 @@ import {
   Blueprint, Catalog, ShipState, ShipTuning, PlacedGeom, Vec2, InventoryStub,
   stepShipPhysics, quantizeShipBody, validateBlueprint, ValidationResult, GravityWell, FlightConstants,
   createShipState, rebuildShip, damagePart, repairShip, coreHp, healPart, restorePart, computeJoins, hitMultiplier, weaponHit, shooterGrade, type HitInfo,
-  stepFlight, stepDrift, buildShot, localToWorldDir, worldToLocalDir,
-  withEmp, withNumb, warmthStage, warmthPercent, insulationOf, THAW, WARMTH_STAGES, type WarmthStage, jumpPhase, jumpTuning, jumpFieldAt, fieldRangeBoost, pilotJumpStep, stepPrime, NO_FIELD, NO_FIELDS, type JumpField,
+  stepFlight, stepDrift, buildShot, localToWorldDir,
+  withEmp, withNumb, warmthStage, warmthPercent, insulationOf, THAW, WARMTH_STAGES, type WarmthStage, jumpTuning, pilotJumpStep, stepPrime, NO_FIELDS, type JumpField,
   stepFixedGunAim, fartherThan,
   blueprintGeometry, castParts, nearestParts, partDistance, pointInConvex, standing, deciding, stageOf, currentStage, stageParts, RUIN_HP, convexPenetration, seededRng, hashInts, stepTurretAim, shipPointToWorld,
   WeaponInfo, WeaponTuning,
@@ -34,6 +34,7 @@ import {
   GLANCING, STAGE_COVER, K, centroidOf, EMP_IMMUNE_TICKS, CONTACT_MARGIN, BEAM_PAD, BIG_BODY,
   type ShipHost, type PartDestroyedEvent, type PilotOrders, type PendingBlast, type ShipBridgeConfig, type ShipBridgeStats, type ContactPiece, type BridgeCtx,
 } from './bridge/core.js';
+import * as sync from './bridge/sync.js';
 
 // (The engine interface, events and constants now live in bridge/core.ts; re-exported for everything that imports them from here)
 export { STAGE_COVER };
@@ -448,16 +449,10 @@ export class ShipBridge {
   }
 
   /** A ship's battery charge (energy.ts) */
-  chargeOf(eid: number): Charge {
-    return this.charge.get(eid) ?? FULL_CHARGE;
-  }
+  chargeOf(eid: number): Charge { return sync.chargeOf(this.ctx, eid); }
 
   /** Set it (a player's total is mirrored to Boost.fuel, which the HUD's gauge reads) */
-  setCharge(eid: number, c: Charge): void {
-    this.charge.set(eid, c);
-    const ship = this.bodies.get(eid);
-    if (ship && hasComponent(this.host.world, Player, eid)) Boost.fuel[eid] = chargeTotal(ship.derived, c);
-  }
+  setCharge(eid: number, c: Charge): void { return sync.setCharge(this.ctx, eid, c); }
 
   removeShip(eid: number): void {
     if (this.bodies.has(eid)) this.removeBody(eid);
@@ -1038,29 +1033,13 @@ export class ShipBridge {
   }
 
   /** Weapon beam state for the snapshot */
-  weaponBeamState(eid: number): { on: boolean; hit: number } {
-    const f = this.weaponBeams.get(eid);
-    return f === undefined ? { on: false, hit: 1 } : { on: true, hit: f };
-  }
+  weaponBeamState(eid: number): { on: boolean; hit: number } { return sync.weaponBeamState(this.ctx, eid); }
 
   /** Hottest beam weapon (0..1) and whether any has overheated, for the HUD */
-  heatState(eid: number): { heat: number; over: boolean } {
-    const ship = this.bodies.get(eid);
-    if (!ship) return { heat: 0, over: false };
-    let heat = 0, over = false;
-    for (let i = 0; i < ship.heat.length; i++) {
-      if (!ship.derived.alive[i]) continue;
-      heat = Math.max(heat, ship.heat[i] / 100);
-      over ||= ship.overheated[i];
-    }
-    return { heat, over };
-  }
+  heatState(eid: number): { heat: number; over: boolean } { return sync.heatState(this.ctx, eid); }
 
   /** Shield charge 0..1 for the snapshot (0 also without a shield) */
-  shieldFraction(eid: number): number {
-    const ship = this.bodies.get(eid);
-    return ship && ship.derived.shieldMax > 0 ? ship.shield / ship.derived.shieldMax : 0;
-  }
+  shieldFraction(eid: number): number { return sync.shieldFraction(this.ctx, eid); }
 
   /** Proto debug key U. */
   repair(eid: number): void {
@@ -1136,10 +1115,7 @@ export class ShipBridge {
   /** Mining beam state per ship, for the snapshot: on, and how far along the beam it hit */
   private beams = new Map<number, number>();
 
-  beamState(eid: number): { on: boolean; hit: number } {
-    const f = this.beams.get(eid);
-    return f === undefined ? { on: false, hit: 1 } : { on: true, hit: f };
-  }
+  beamState(eid: number): { on: boolean; hit: number } { return sync.beamState(this.ctx, eid); }
 
   /**
    * Mining lasers: each one projects a beam out of its facing edge, swivelled a
@@ -2173,90 +2149,34 @@ export class ShipBridge {
   // Helpers
   // -------------------------------------------------------------------------
 
-  private syncHealth(eid: number, ship: ShipState): void {
-    const c = coreHp(ship);
-    Health.max[eid] = c.max;
-    Health.current[eid] = c.hp;
-  }
+  private syncHealth(eid: number, ship: ShipState): void { return sync.syncHealth(eid, ship); }
 
-  private pose(eid: number) {
-    return { x: Position.x[eid], y: Position.y[eid], angle: Rotation.angle[eid] };
-  }
+  private pose(eid: number) { return sync.pose(eid); }
 
-  private readBody(eid: number, ship: ShipState): FlightBody {
-    return { x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid], angle: Rotation.angle[eid], angVel: ship.angVel, jump: ship.jump, jumpScale: ship.jumpScale, cargo: ship.cargo, dodge: ship.dodge, dodgeDir: ship.dodgeDir };
-  }
+  private readBody(eid: number, ship: ShipState): FlightBody { return sync.readBody(eid, ship); }
 
   /** Jump range multiplier where this ship is (a star's ring, or a lodestone's priming) */
-  jumpBoost(eid: number): number {
-    return fieldRangeBoost(this.fieldAt(eid).ring, this.bodies.get(eid)?.jumpPrime ?? 0, jumpTuning(this.tuning));
-  }
+  jumpBoost(eid: number): number { return sync.jumpBoost(this.ctx, eid); }
 
   /** The charging fields where this ship is now */
-  private fieldAt(eid: number): JumpField {
-    const env = this.host.jumpFields?.(eid);
-    return env ? jumpFieldAt(Position.x[eid], Position.y[eid], env, this.host.getTick(), jumpTuning(this.tuning)) : NO_FIELD;
-  }
+  private fieldAt(eid: number): JumpField { return sync.fieldAt(this.ctx, eid); }
 
   /** For the pilot's snapshot: 1 = in a star's charging ring, 2 = in a lodestone's field (bits), and the priming left */
-  jumpFieldState(eid: number): { flags: number; prime: number } {
-    const f = this.fieldAt(eid);
-    return { flags: (f.ring ? 1 : 0) | (f.lodestone ? 2 : 0), prime: this.bodies.get(eid)?.jumpPrime ?? 0 };
-  }
+  jumpFieldState(eid: number): { flags: number; prime: number } { return sync.jumpFieldState(this.ctx, eid); }
 
   // ---- Tow Beam (Towing.ts; common/src/ships/tow.ts)
   /** What a Tow Beam can take hold of: debris you can touch, or a derelict wreck (never a working ship); null otherwise */
-  towable(eid: number): { kind: 'wreck' | 'debris'; mass: number; radius: number } | null {
-    const ship = this.bodies.get(eid);
-    if (!ship || this.intangible.has(eid) || this.dormant.has(eid) || hasComponent(this.host.world, Player, eid)) return null;
-    if (ship.kind === 'debris') return { kind: 'debris', mass: ship.derived.mass, radius: ship.derived.radius };
-    if (this.anchored.has(eid)) return { kind: 'wreck', mass: ship.derived.mass, radius: ship.derived.radius };
-    return null;
-  }
-
+  towable(eid: number): { kind: 'wreck' | 'debris'; mass: number; radius: number } | null { return sync.towable(this.ctx, eid); }
   /** Towable bodies in a system within `r` of (x, y) */
-  towablesNear(systemNum: number, x: number, y: number, r: number): number[] {
-    const out: number[] = [];
-    for (const eid of this.bodies.keys()) {
-      if (InSystem.systemId[eid] !== systemNum || !this.towable(eid)) continue;
-      if (Math.hypot(Position.x[eid] - x, Position.y[eid] - y) <= r + this.bodies.get(eid)!.derived.radius) out.push(eid);
-    }
-    return out;
-  }
-
+  towablesNear(systemNum: number, x: number, y: number, r: number): number[] { return sync.towablesNear(this.ctx, systemNum, x, y, r); }
   /** Being towed: debris neither crumbles nor goes while a beam holds it */
-  holdTowed(eid: number): void {
-    const ship = this.bodies.get(eid);
-    if (!ship || ship.kind !== 'debris') return;
-    const tick = this.host.getTick();
-    ship.despawnTick = Math.max(ship.despawnTick, tick + 120);
-    const at = this.decayAt.get(eid);
-    if (at) for (let i = 0; i < at.length; i++) if (ship.hp[i] > 0) at[i] = Math.max(at[i], tick + 120);
-  }
+  holdTowed(eid: number): void { return sync.holdTowed(this.ctx, eid); }
   // ---- (end Tow Beam)
 
   /** Mid-jump (the burn itself): no guns, and the ship passes through other hulls */
-  isJumping(ship: ShipState): boolean {
-    return jumpPhase(ship.jump, jumpTuning(this.tuning)).phase === 'burn';
-  }
+  isJumping(ship: ShipState): boolean { return sync.isJumping(this.ctx, ship); }
 
-  private writeBody(eid: number, ship: ShipState, b: { x: number; y: number; vx: number; vy: number; angle: number; angVel: number; jump?: number; jumpScale?: number; cargo?: number; dodge?: number; dodgeDir?: number }): void {
-    if (b.jump !== undefined) ship.jump = b.jump;
-    // (The Burst Strafer's: stepFlight leaves them absent at 0, so they're taken as they come)
-    if ('dodge' in b) { ship.dodge = b.dodge || undefined; ship.dodgeDir = b.dodgeDir || undefined; }
-    if (b.jumpScale !== undefined) ship.jumpScale = b.jumpScale;
-    if (b.cargo !== undefined) ship.cargo = b.cargo || undefined;
-    Position.x[eid] = b.x;
-    Position.y[eid] = b.y;
-    Velocity.x[eid] = b.vx;
-    Velocity.y[eid] = b.vy;
-    Rotation.angle[eid] = b.angle;
-    ship.angVel = b.angVel;
-  }
+  private writeBody(eid: number, ship: ShipState, b: { x: number; y: number; vx: number; vy: number; angle: number; angVel: number; jump?: number; jumpScale?: number; cargo?: number; dodge?: number; dodgeDir?: number }): void { return sync.writeBody(eid, ship, b); }
 
-  worldToGrid(eid: number, ship: ShipState, x: number, y: number): Vec2 {
-    const cs = this.tuning.cellSize;
-    const [lx, ly] = worldToLocalDir([x - Position.x[eid], y - Position.y[eid]], Rotation.angle[eid]);
-    return [lx / cs + ship.derived.com[0], ly / cs + ship.derived.com[1]];
-  }
+  worldToGrid(eid: number, ship: ShipState, x: number, y: number): Vec2 { return sync.worldToGrid(this.ctx, eid, ship, x, y); }
 }

@@ -219,6 +219,8 @@ export interface BridgeInternals {
   beams: ShipBridge['beams']; pdList: ShipBridge['pdList']; pdOn: ShipBridge['pdOn'];
   ungridded: ShipBridge['ungridded']; castOn: ShipBridge['castOn']; castOk: ShipBridge['castOk'];
   gravityK: ShipBridge['gravityK'];
+  // Private methods modules call back through
+  fieldAt: ShipBridge['fieldAt'];
 }
 
 /** The bridge as its modules see it */
