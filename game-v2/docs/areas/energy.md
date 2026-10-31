@@ -18,7 +18,7 @@ How a ship makes, stores and spends power. Power runs along wires (`Blueprint.wi
 ## Public interface
 - `ShipDerived.power: PowerLayout` (`pool {cap, rate, coreCap, coreRate, parts}`, `banks: Bank[]` (`kind` cap/drive, `parts`, `cap`, `rate`, `feeds`, `refills`, `dynamo`, `dynamos`), `spare`, `feeds[].banks`, `feedOf`, `bankOf`, `draw`, `partCap`, `pooled`), `ShipDerived.energy: EnergyInfo`.
 - `Charge { g, b: number[] }` (pool %, then each bank's in bank order: banks number by their lowest part index); `FULL_CHARGE`; `powerTick(d, charge, PowerUse, tuning) -> PowerResult`; `gunLoad(ship, tick)` = guns' draw per feed group, passed to `stepFlight` as `boost.load`; `remapCharge(before, after, c)` on every rebuild; `chargeTotal`, `bankCharges`, `capCharge`, `poolHeld`, `bankHeld`.
-- Wire format: `packCharge`/`unpackCharge`; pilot row `data[10]` the pool's %, `data[11]` the group count (1 + banks), groups from `CHARGE_GROUPS_AT` (15): the pool's, then each bank's, at most `MAX_CHARGE_GROUPS` (24). `CHARGE_GROUPS_LAYOUT` is in the wire hash. Part features' values follow, in the order of `features.wire.json` `pilotExtra`.
+- Wire format: `packCharge`/`unpackCharge`; pilot row `data[8]` the pool percent, `data[9]` the group count (1 + banks), groups from `CHARGE_GROUPS_AT` (13): the pool's, then each bank's, at most `MAX_CHARGE_GROUPS` (24). `CHARGE_GROUPS_LAYOUT` is in the wire hash. Part features' values follow, in the order of `features.wire.json` `pilotExtra`.
 
 ## Invariants
 - Deterministic and identical on both sides: `powerTick` runs inside `stepFlight` for the server, the pilot (`ShipClient.predict`) and replicas. No Date.now/Math.random, no client/server imports. Per-tick scratch is module-level (`grow`); a tick allocates only its result.

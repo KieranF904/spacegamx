@@ -96,7 +96,7 @@ const W = [
   ['arc_tesla', 'Tesla', 'arc', 'round', 29, { dmg: 1.4, blurb: 'The held storm' }, { set: { chain: { count: 5, radius: 300, falloff: 0.5 } } }, 'Hold to keep zapping, five times a second: each zap leaps to 5 more ships nearby, weaker each hop.'],
   ['torpedo_eel', 'Eel', 'torpedo', 'rect2', 19, { blurb: 'The stalker' }, { set: { homing: 0.02 } }, 'The stalker: a slow, fat torpedo that creeps after its prey, 420 damage straight through shields and a 90 blast. Six torpedoes a crate, one every four seconds. Point defence needs three hits.'],
   ['torpedo_leviathan', 'Leviathan', 'torpedo', 'block2', 38, { dmg: 2.4, hp: 1.2, mass: 1.3, blurb: 'The fight-ender' }, { mul: { speed: x(0.8), maxSpeed: x(0.8), size: x(1.4) }, set: { damage: 1000, splash: { radius: 200, damage: 200 }, intercept: 5, arm: 60 } }, 'The fight-ender: a huge torpedo, 1,000 damage straight through shields and a 200 blast, one every six seconds. It flies straight and does not home, and arms a second after launch. Two rounds a shot (three shots a crate). Point defence needs five hits.'],
-  ['lance_lance', 'Lance', 'lance', 'rect2', 32, { demand: 45 }, {}, 'The heavy held beam: 210 damage a second at 500 units after a 0.3 s windup, piercing, 20% more against plating. 90 E a second and no heat; short of power it sputters.'],
+  ['lance_lance', 'Lance', 'lance', 'rect2', 32, { demand: 45 }, {}, 'The heavy held beam: 210 damage a second at 500 units after a 0.3 s windup, piercing, 20% more against plating. 90 E a second; short of power it sputters.'],
 ];
 
 /**
@@ -359,7 +359,7 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   MOUNTING.point_defence_turret = { arc: 300 };
   const SUPPORT = [
     ['utility_repair_beam', 'Repair Beam', 'repair', ['rect2'], 17, 'steel', { weapon: 'repair', demand: 28, priority: 2, hpScale: 0.7, weaponMods: {} },
-      "Mends 42 HP a second into the friendly part its beam lands on (range 520, 28 power a second, no heat): hold fire with it on a party member or an ally. It can't mend your own ship, a destroyed part or a shield, and does nothing to an enemy.", 'utility'],
+      "Mends 42 HP a second into the friendly part its beam lands on (range 520, 28 power a second): hold fire with it on a party member or an ally. It can't mend your own ship, a destroyed part or a shield, and does nothing to an enemy.", 'utility'],
     ['point_defence_turret', 'Point Defence Turret', 'point_defence', ['sq'], 10, 'steel', { weapon: 'point_defence', demand: 10, priority: 2, fireInterval: 12, hpScale: 0.6, weaponMods: {} },
       'Shoots down incoming missiles, torpedoes, mortar shells and seekers on its own: 5 shots a second out to 560, 2 power a shot. One hit kills a missile, mortar shell or seeker; a Hammerhead takes 2, an Eel 3, a Leviathan 5. It never fires at ships, and a boss\'s rings of shots are yours to dodge.', 'weapons'],
   ];
@@ -485,7 +485,7 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   // ---- Legendaries' texts (rework 2026-11 section 4): what each does, in numbers; its mount line is added after
   const LEGEND_TEXT = {
     legendary_hive: 'A nest that regrows: it holds eight seekers and looses them four at a time, a tenth of a second apart, each homing on a different one of the four ships nearest your cursor. One grows back every three-quarters of a second, drawing a little power. Each is 10 damage and a 70 blast, and dies to one point-defence hit.',
-    legendary_frostbite: 'The freeze beam: a held beam out to 760 that burns 95 a second. The ship it touches is slowed, 40% less thrust and turning, while lit and 0.7 s after. No heat, no cold.',
+    legendary_frostbite: 'The freeze beam: a held beam out to 760 that burns 95 a second. The ship it touches is slowed, 40% less thrust and turning, while lit and 0.7 s after.',
     legendary_cinder_bloom: 'The arsonist: a shell every 1.2 s for 16 damage, and the part it hits burns for 22 a second over 5 s, the fire spreading to its neighbours.',
     legendary_prism: 'The splitter: a crystal bolt every 1.6 s that splits where your cursor is into five 11-damage shards in a 40 degree fan. You choose where the fan opens.',
     legendary_phase: 'The ghost round: a slow 70-damage round every 2.2 s that flies through rock, wrecks and shields, hits the hull directly, and carries on through two ships.',
