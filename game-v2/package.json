@@ -22,7 +22,8 @@
     "render": "node scripts/render/render.mjs",
     "wire:sync": "node scripts/wire/sync.mjs",
     "wire:bump": "node scripts/wire/bump.mjs",
-    "features:gen": "node scripts/features/gen.mjs"
+    "features:gen": "node scripts/features/gen.mjs",
+    "features:check": "node scripts/features/gen.mjs --check"
   },
   "devDependencies": {
     "typescript": "^5.3.3",

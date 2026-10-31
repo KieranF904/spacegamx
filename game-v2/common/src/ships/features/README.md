@@ -2,8 +2,34 @@
 
 A **part feature** is one behaviour a part gives a ship (a Tow Beam's tow, a Burst Strafer's dodge), declared once as a
 `PartFeature` object instead of special cases spread over `rebuild.ts`, `energy.ts`, `flight.ts` and the UI.
-Status: the seam exists and is wired; converted: **the Tow Beam** (`tow/`, Cut 4) and **the Burst Strafer** (`strafer/`,
-Cut 6: the first with flight hooks and an input). Ships without a feature rebuild, draw and fly exactly as before.
+Status: the seam exists and is wired; converted: **the Tow Beam** (`tow/`, Cut 4), **the Burst Strafer** (`strafer/`,
+Cut 6: the first with flight hooks and an input) and **the Repair Beam and Point Defence** (`support/`, Cut 8: weapon-kind
+roles). Ships without a feature rebuild, draw and fly exactly as before. Surge and Warmth are not features (left as they are).
+
+## Add a part feature (one folder)
+
+A feature is one folder per half, and the generator lists them. Nothing else is registered by hand.
+
+1. **The model.** Add the part to `scripts/econ/models.mjs` (its row or appended block, and its `RECIPES` entry), then
+   `node scripts/econ/models.mjs`. The function flag the feature reads (e.g. `tow: {...}`) is set here. Full steps:
+   [docs/areas/ship-parts.md](../../../../docs/areas/ship-parts.md), "How to extend".
+2. **The shared half**: `common/src/ships/features/<id>/index.ts` exports `feature: PartFeature` (`types.ts`). Put its
+   numbers and arithmetic in `<id>/<id>.ts` (pure, like `tow/tow.ts`; the barrel re-exports it). Fill only what the
+   feature needs: `applies` (which functions it is on), `order` (unique; a new feature goes after the existing ones so
+   their feature numbers do not move), `burst` (draws by the tick), `derive` (writes `derived.fx.<id>`), `load`, `flight`,
+   `inputs`, `replicate`, `describe` (facts for tooltips and cards), `weapon` (a weapon-kind role).
+3. **The world half** (only if it has server or client behaviour): `server/src/ships/features/<id>/index.ts` exports
+   `serverFeature` (`create(host)` returning a `FeatureInstance`: `tick`, `messages`, `cargoMass`, `wire`, `status`);
+   `client/src/ships/features/<id>/index.ts` exports `clientFeature` (`actions`, `controls`, `onKey`, `parsePilot`,
+   `drawShip`, `indicator`). Follow `tow/` or `strafer/` for the shape.
+4. **Generate**: `npm run features:gen` writes the three registries (`registry.ts`, the server and client `index.ts`).
+   `npm run features:check` (`--check`) fails if one is stale; `registry.test.ts` runs the same check.
+5. **Contract test**: `<id>/contract.test.ts` calls `runPartContract('<id>', { parts })` with fixture parts (see
+   "The contract" below). If it has a wire slot, a control bit or an input: append the slot to `features.wire.json`
+   (a wire change: `npm run wire:bump`), and a new input needs its bit pinned there (see "Rules").
+
+The touch list in `docs/areas/ship-parts.md` is for a part with no feature folder. With a feature, the behaviour lives
+in its folder and the shared files (`rebuild.ts`, `energy.ts`, `flight.ts`, `replica.ts`, the UI) do not change.
 
 | File | What |
 |---|---|
