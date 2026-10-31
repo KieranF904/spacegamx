@@ -31,7 +31,7 @@ Medium
 Medium · Panel
 
 == tradeOff ==
-sustained fire, power-hungry
+the only cannon turret: 16 rounds, then a short reload
 
 == keyStats ==
 62 dmg/s · reach 7,200 · clip 16 · 1.5s reload · draws 8
