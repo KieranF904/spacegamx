@@ -552,7 +552,7 @@ export class ShipClient {
 
   predictGuns(player: InterpolatedEntity, input: ClientInputMessage, tick: number, charge: Charge): Charge | null {
     const ship = this.store.get(player.id);
-    this.ownBeams.clear();
+    this.ownBeams?.clear();
     if (!ship || ship.kind !== 'ship' || this.docked || !this.scene) return null;
     // (No firing mid-jump, nor knocked out by an EMP: ShipBridge.stepWeapons)
     const burning = jumpPhase(player.jump ?? 0, this.jump).phase === 'burn' || tick < (player.empUntil ?? 0);
@@ -564,7 +564,7 @@ export class ShipClient {
     const energy = { charge };
     // (Guns never read warmth: rework 2026-11)
     const { shots, beams, pulses } = stepGuns(ship, pose, { firing, aimWorld: input.targetAngle, aimDist: input.cursorDist ?? 0, energy }, tick, this.opts.tuning);
-    for (const w of beams) this.ownBeams.add(w.part);
+    if (this.ownBeams) for (const w of beams) this.ownBeams.add(w.part);
     // (What the guns hold now, for the server's gun-state correction: gunSync.ts)
     this.gunSync.record(ship, tick);
     this.gunFeel.own(ship, tick);
