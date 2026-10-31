@@ -9,28 +9,26 @@
  * ship's centre of mass).
  */
 
-import { collideTerrain, rayTerrain, terrainRadius } from '@space-game/common';
-import { repairAt, pointDefenceOf, stepPointDefenceAim, wrapPi, isOpen } from '@space-game/common';
+import { collideTerrain, terrainRadius } from '@space-game/common';
 import { hasComponent, entityExists } from 'bitecs';
 import {
   Position, Velocity, Rotation, Radius, Health, Input, Boost, Player, Dead, Projectile, InSystem, FRICTION,
   Blueprint, Catalog, ShipState, ShipTuning, PlacedGeom, Vec2, InventoryStub, stepShipPhysics, quantizeShipBody,
   validateBlueprint, ValidationResult, GravityWell, FlightConstants, createShipState, rebuildShip, damagePart,
-  repairShip, healPart, restorePart, computeJoins, hitMultiplier, weaponHit, shooterGrade, type HitInfo, stepFlight,
-  stepDrift, localToWorldDir, withEmp, withNumb, type WarmthStage, jumpTuning, pilotJumpStep, NO_FIELDS,
-  type JumpField, blueprintGeometry, castParts, partDistance, pointInConvex, standing, deciding, stageOf,
-  currentStage, stageParts, convexPenetration, seededRng, hashInts, shipPointToWorld, WeaponInfo, WeaponTuning,
-  ReplicaMode, CTL, controlBits, replicaAngle, quantizeReplicaAngle, firesStraight, partWeaponDef, FireRecord,
-  stepGuns, ammoCode, partMaterial, outputOf, powerTick, gunLoad, remapCharge, quantizeCargo, type FlightBody,
-  buildFlightInputs, newFlightControls, type FlightInputSource, payMining, MINE_CYCLE, MINING_PULSE, MINE_TAIL,
-  mineFalloff, chargeTotal, FULL_CHARGE, type Charge, pulseProfile, beamFalloff,
+  repairShip, healPart, restorePart, computeJoins, hitMultiplier, type HitInfo, stepFlight, stepDrift,
+  localToWorldDir, withEmp, withNumb, type WarmthStage, jumpTuning, pilotJumpStep, NO_FIELDS, type JumpField,
+  blueprintGeometry, standing, convexPenetration, seededRng, hashInts, shipPointToWorld, WeaponInfo, WeaponTuning,
+  ReplicaMode, CTL, controlBits, replicaAngle, quantizeReplicaAngle, partWeaponDef, FireRecord, partMaterial,
+  powerTick, gunLoad, remapCharge, quantizeCargo, type FlightBody, buildFlightInputs, newFlightControls,
+  type FlightInputSource, chargeTotal, FULL_CHARGE, type Charge,
 } from '@space-game/common';
 import {
-  GLANCING, STAGE_COVER, K, centroidOf, CONTACT_MARGIN, BEAM_PAD, BIG_BODY, type ShipHost, type PartDestroyedEvent,
+  GLANCING, STAGE_COVER, K, centroidOf, CONTACT_MARGIN, BIG_BODY, type ShipHost, type PartDestroyedEvent,
   type PilotOrders, type PendingBlast, type ShipBridgeConfig, type ShipBridgeStats, type ContactPiece,
   type BridgeCtx,
 } from './bridge/core.js';
 import * as sync from './bridge/sync.js';
+import * as wpn from './bridge/weapons.js';
 import * as dmg from './bridge/damage.js';
 
 // (The engine interface, events and constants now live in bridge/core.ts; re-exported for everything that imports them from here)
@@ -181,9 +179,7 @@ export class ShipBridge {
     return this.autopilot.get(eid) ?? null;
   }
 
-  lastFiredTick(eid: number): number {
-    return this.lastFired.get(eid) ?? -Infinity;
-  }
+  lastFiredTick(eid: number): number { return wpn.lastFiredTick(this.ctx, eid); }
 
   /**
    * Why this ship can't go distant now (null: it can): a pilot's, debris, in
@@ -367,40 +363,22 @@ export class ShipBridge {
     this.setDamageScale(eid, 1);
   }
 
-  setDamageScale(eid: number, k: number): void {
-    if (k !== 1) this.damageMuls.set(eid, k);
-    else this.damageMuls.delete(eid);
-  }
+  setDamageScale(eid: number, k: number): void { return wpn.setDamageScale(this.ctx, eid, k); }
 
   /** Flying in a wing (party members close by): a damage multiplier on top */
   private wing = new Map<number, number>();
-  setWingBonus(eid: number, k: number): void {
-    if (k !== 1) this.wing.set(eid, k);
-    else this.wing.delete(eid);
-  }
+  setWingBonus(eid: number, k: number): void { return wpn.setWingBonus(this.ctx, eid, k); }
 
-  wingBonus(eid: number): number {
-    return this.wing.get(eid) ?? 1;
-  }
+  wingBonus(eid: number): number { return wpn.wingBonus(this.ctx, eid); }
 
-  private damageMul(eid: number): number {
-    return (this.damageMuls.get(eid) ?? 1) * (this.wing.get(eid) ?? 1);
-  }
+  private damageMul(eid: number): number { return wpn.damageMul(this.ctx, eid); }
 
   /** The target each player has selected (missiles lock on to it) */
   private targets = new Map<number, number>();
-  setTarget(eid: number, target: number): void {
-    if (target > 0 && target !== eid) this.targets.set(eid, target);
-    else this.targets.delete(eid);
-  }
+  setTarget(eid: number, target: number): void { return wpn.setTarget(this.ctx, eid, target); }
 
   /** A player's selected target, if it's still there and in the same system */
-  targetOf(eid: number): number {
-    const t = this.targets.get(eid);
-    if (t === undefined) return -1;
-    if (!this.bodies.has(t) || InSystem.systemId[t] !== InSystem.systemId[eid]) { this.targets.delete(eid); return -1; }
-    return t;
-  }
+  targetOf(eid: number): number { return wpn.targetOf(this.ctx, eid); }
 
   /** Hull left, as a fraction of the ship's full HP (every part counted) */
   integrity(eid: number): number { return dmg.integrity(this.ctx, eid); }
@@ -701,25 +679,7 @@ export class ShipBridge {
 
   private stepBurns(tick: number): void { return dmg.stepBurns(this.ctx, tick); }
 
-  /** Nearest ship `eid` may attack within `range` of (x, y) (missile targets) */
-  /** `hull`: by the distance to its hull (hullDistance), not to its centre (a boss's centre is far inside it) */
-  nearestTarget(eid: number, x: number, y: number, range: number, filter?: (other: number) => boolean, hull = false): number {
-    let best = -1, bd = range;
-    for (const [other, ship] of this.bodies) {
-      if (other === eid || ship.kind !== 'ship' || InSystem.systemId[other] !== InSystem.systemId[eid] || this.dormant.has(other)) continue;
-      // Distance first: it rules out nearly everything, and the checks after it are lookups
-      let d = Math.hypot(Position.x[other] - x, Position.y[other] - y);
-      if (hull) {
-        if (d - ship.derived.radius - this.tuning.cellSize >= bd) continue;
-        d = this.hullDistance(other, x, y, bd);
-      }
-      if (d >= bd || this.isJumping(ship)) continue;
-      if (this.host.canDamage && !this.host.canDamage(eid, other)) continue;
-      if (filter && !filter(other)) continue;
-      bd = d; best = other;
-    }
-    return best;
-  }
+  nearestTarget(eid: number, x: number, y: number, range: number, filter?: (other: number) => boolean, hull = false): number { return wpn.nearestTarget(this.ctx, eid, x, y, range, filter, hull); }
 
   /** Weapon beam state for the snapshot */
   weaponBeamState(eid: number): { on: boolean; hit: number } { return sync.weaponBeamState(this.ctx, eid); }
@@ -777,26 +737,7 @@ export class ShipBridge {
     return true;
   }
 
-  /**
-   * Player weapons. Left mouse fires the guns; right mouse runs the mining
-   * lasers (or fires the guns too, on a ship without any).
-   */
-  stepWeapons(eid: number): boolean {
-    const ship = this.bodies.get(eid);
-    if (!ship || ship.kind !== 'ship') return false;
-    // No firing mid-jump (the guns would be left behind by their own shots), nor from inside a station
-    const jumping = this.isJumping(ship) || this.isEmped(eid) || !!this.host.sheltered?.(eid);
-    const hasMiners = ship.derived.miners.length > 0;
-    const firing = (Input.fireLeft[eid] === 1 || (Input.fireRight[eid] === 1 && !hasMiners)) && !jumping;
-    // Shots spend stored energy (energy.ts); then the mining lasers pay for their segment from what's left
-    const energy = { charge: this.chargeOf(eid) };
-    this.fireWeapons(eid, ship, firing, Input.targetAngle[eid], Input.cursorDist[eid], this.targetOf(eid), energy);
-    if (jumping) ship.mineUntil = 0;
-    const mining = payMining(ship, Input.fireRight[eid] === 1 && hasMiners && !jumping, this.host.getTick(), energy);
-    this.setCharge(eid, energy.charge);
-    this.stepMiners(eid, ship, mining, Input.targetAngle[eid], Input.cursorDist[eid]);
-    return true;
-  }
+  stepWeapons(eid: number): boolean { return wpn.stepWeapons(this.ctx, eid); }
 
   /** Shots fired since the last snapshot (sent as fire events: see launch.ts); the server clears it */
   readonly fired: FireRecord[] = [];
@@ -806,334 +747,31 @@ export class ShipBridge {
 
   beamState(eid: number): { on: boolean; hit: number } { return sync.beamState(this.ctx, eid); }
 
-  /**
-   * Mining lasers: each one projects a beam out of its facing edge, swivelled a
-   * little towards the cursor point. The beam stops at the first asteroid or
-   * hull; asteroids are mined, ship parts take a little damage.
-   */
-  private stepMiners(eid: number, ship: ShipState, on: boolean, aimWorld: number, aimDist: number): void {
-    const mt = this.tuning.miner;
-    if (!on || !mt) { this.beams.delete(eid); return; }
-    const pose = this.pose(eid);
-    const cs = this.tuning.cellSize;
-    const gimbal = mt.gimbalDeg * Math.PI / 180;
-    const aimX = pose.x + Math.cos(aimWorld) * Math.max(aimDist, mt.range);
-    const aimY = pose.y + Math.sin(aimWorld) * Math.max(aimDist, mt.range);
-    let nearest = 1;
-    // The cutting is focused at the pulse's flare (the same curve as its look; a whole pulse still cuts what it did)
-    const prof = pulseProfile(MINING_PULSE);
-    const age = Math.max(0, Math.min(prof.ticks - 1, this.host.getTick() - ((ship.mineUntil ?? 0) - MINE_CYCLE)));
-    const focus = prof.share[age] * prof.ticks;
-    for (const m of ship.derived.miners) {
-      if (m.satisfaction <= 0.01) continue;
-      const [x, y] = shipPointToWorld(ship, pose, m.muzzle, cs);
-      const facing = pose.angle + Math.PI / 2 + Math.atan2(m.dir[1], m.dir[0]);
-      let off = Math.atan2(aimY - y, aimX - x) - facing;
-      while (off > Math.PI) off -= 2 * Math.PI;
-      while (off < -Math.PI) off += 2 * Math.PI;
-      const angle = facing + Math.max(-gimbal, Math.min(gimbal, off));
-      // (It reaches past its range, fading: mineFalloff)
-      const range = mt.range * (1 + MINE_TAIL);
-      const x1 = x + Math.cos(angle) * range, y1 = y + Math.sin(angle) * range;
-      // Nearest hull along the beam (not our own)
-      let shipHit: { eid: number; ship: ShipState; part: number; t: number } | null = null;
-      for (const other of this.alongBeam(InSystem.systemId[eid], x, y, x1, y1, 0)) {
-        const os = this.bodies.get(other);
-        if (!os || other === eid || InSystem.systemId[other] !== InSystem.systemId[eid] || this.dormant.has(other) || this.intangible.has(other) || !this.nearSegment(other, os, x, y, x1, y1) || this.isJumping(os)) continue;
-        if (this.host.canDamage && !this.host.canDamage(eid, other)) continue;
-        const h = this.castShip(other, os, x, y, x1, y1);
-        if (h && (!shipHit || h.t < shipHit.t)) shipHit = { eid: other, ship: os, ...h };
-      }
-      const sat = m.satisfaction;
-      const rockT = this.host.mineBeam?.(eid, x, y, angle, shipHit ? shipHit.t * range : range, (mt.dps / 60) * sat * focus, m.material, m.gas, mt.range) ?? 1;
-      const rockFrac = rockT * (shipHit ? shipHit.t : 1);
-      if (shipHit && rockT >= 0.999) {
-        // A mining laser is a poor weapon: a tenth or so of a same-grade laser
-        this.hurt(shipHit.eid, shipHit.ship, shipHit.part, (mt.shipDps / 60) * outputOf(this.catalog.materials.get(m.material)) * sat * mineFalloff(shipHit.t * range, mt.range), eid,
-          { hit: { type: 'thermal', pen: shooterGrade(this.catalog, { material: m.material } as never) }, at: this.worldToGrid(shipHit.eid, shipHit.ship, x + (x1 - x) * shipHit.t, y + (y1 - y) * shipHit.t) });
-        nearest = Math.min(nearest, shipHit.t);
-      } else {
-        nearest = Math.min(nearest, rockFrac);
-      }
-    }
-    this.beams.set(eid, nearest);
-  }
+  private stepMiners(eid: number, ship: ShipState, on: boolean, aimWorld: number, aimDist: number): void { return wpn.stepMiners(this.ctx, eid, ship, on, aimWorld, aimDist); }
 
-  /**
-   * Cool down every weapon, slew turrets towards the cursor, and fire what's
-   * ready. The cursor is `aimWorld` (angle from the ship) at `aimDist`; each
-   * turret aims at that point from its own pivot so the battery converges
-   * (parallel fire when the distance is unknown). Fixed weapons fire straight
-   * out; turrets only fire when on target and pointing through an open part
-   * of their window.
-   */
-  private fireWeapons(eid: number, ship: ShipState, firing: boolean, aimWorld?: number, aimDist = 0, target = -1, energy?: { charge: Charge }): void {
-    const tick = this.host.getTick();
-    const pose = this.pose(eid);
-    const def = (w: WeaponInfo) => partWeaponDef(this.tuning, w.kind, ship.blueprint.parts[w.part], w);
-    let beamHit = -1;
-    const beamed = new Set<number>();
-    // The guns' tick (shared with the pilot's client, which fires its own shells on the same tick: guns.ts)
-    const { shots, beams, pulses } = stepGuns(ship, pose, { firing, aimWorld, aimDist, energy, slow: this.coldStage(eid).guns }, tick, this.tuning);
-    for (const w of beams) {
-      beamed.add(w.part);
-      // (A Repair Beam mends a friendly hull instead: support.ts)
-      const t = def(w).heal ? this.repairBeam(eid, ship, w, def(w)) : this.fireBeam(eid, ship, w, def(w));
-      beamHit = beamHit < 0 ? t : Math.min(beamHit, t);
-    }
-    // A pulse laser starts a pulse: it runs its course along its aim from now (a fire event with no shells tells clients when)
-    for (const { w, aimQ } of pulses) {
-      let list = this.pulsing.get(eid);
-      if (!list) this.pulsing.set(eid, (list = []));
-      list.push({ part: w.part, start: tick });
-      this.fired.push({ owner: eid, tick, part: w.part, aimQ, ids: [] });
-    }
-    this.stepPulses(eid, ship, tick);
-    // Point defence fires on its own, whatever the trigger (support.ts)
-    this.pointDefence(eid, ship, pose, def);
-    for (const { w, aimQ, shot, pierce } of shots) {
-      const d = def(w);
-      // (Surge: a full bank's Rail Driver slug goes through one more ship: surge.ts)
-      const mods0 = ship.blueprint.parts[w.part].mods;
-      const gunMods = pierce ? { ...mods0, add: { ...mods0?.add, pierce: (mods0?.add?.pierce ?? 0) + pierce } } : mods0;
-      // Missiles lock on to the target given, or the one nearest the aim point
-      let lock = -1;
-      if (d.homing) {
-        lock = target;
-        if (lock < 0 && aimWorld !== undefined) {
-          const ax = pose.x + Math.cos(aimWorld) * Math.max(aimDist, 400), ay = pose.y + Math.sin(aimWorld) * Math.max(aimDist, 400);
-          lock = this.nearestTarget(eid, ax, ay, 1400, undefined, true);
-        }
-      }
-      const round = this.host.spendAmmo?.(eid, w.kind, !d.ammo);
-      const ids = this.host.fireBaseShot(eid, shot.x, shot.y, shot.angle, shot.damageScale * this.damageMul(eid) * (round?.scale ?? 1),
-        { speedScale: shot.speedScale, sizeScale: shot.sizeScale, turret: shot.mount === 'turret', kind: w.kind, target: lock, seed: `${eid}:${ship.blueprint.parts[w.part].uid}`, mods: gunMods, dry: round?.dry, ammoMods: round?.mods,
-          reach: d.lob ? Math.max(200, aimDist) : undefined, grade: w.grade, size: w.size, model: w.model });
-      if (ids?.length && firesStraight(d)) this.fired.push({ owner: eid, tick, part: w.part, aimQ, ids, ...(round?.item ? { ammo: ammoCode(round.item) } : {}) });
-    }
-    if (beamHit >= 0) this.weaponBeams.set(eid, beamHit);
-    else this.weaponBeams.delete(eid);
-    if (shots.length || beams.length || pulses.length) this.lastFired.set(eid, tick);
-    // Beam weapons cool while they aren't firing
-    for (let i = 0; i < ship.heat.length; i++) {
-      if (ship.heat[i] <= 0 || beamed.has(i)) continue;
-      const w = ship.derived.weapons.find((x) => x.part === i);
-      ship.heat[i] = Math.max(0, ship.heat[i] - (w ? def(w).coolPerSec ?? 30 : 30) / 60);
-      if (ship.overheated[i] && ship.heat[i] < 30) ship.overheated[i] = false;
-    }
-  }
+  private fireWeapons(eid: number, ship: ShipState, firing: boolean, aimWorld?: number, aimDist = 0, target = -1, energy?: { charge: Charge }): void { return wpn.fireWeapons(this.ctx, eid, ship, firing, aimWorld, aimDist, target, energy); }
 
   /** Each pulse under way burns its tick's share along its gun's aim, as wide as its curve says; done, it's dropped */
-  private stepPulses(eid: number, ship: ShipState, tick: number): void {
-    const list = this.pulsing.get(eid);
-    if (!list) return;
-    for (let i = list.length - 1; i >= 0; i--) {
-      const p = list[i];
-      const w = ship.derived.weapons.find((x) => x.part === p.part);
-      const def = w && partWeaponDef(this.tuning, w.kind, ship.blueprint.parts[w.part], w);
-      const prof = def?.pulse && pulseProfile(def.pulse);
-      const age = tick - p.start;
-      const tell = () => { if (p.hit && p.hit.dealt > 0) this.host.notifyDamage(p.hit.eid, p.hit.dealt, eid); p.hit = undefined; };
-      // (Its gun shot away, or its pulse over)
-      if (!w || !def || !prof || age >= prof.ticks) { tell(); list.splice(i, 1); continue; }
-      this.pulseHit = null;
-      this.fireBeam(eid, ship, w, def, { damage: (def.damage ?? 0) * prof.share[age], width: (def.width ?? 0) * prof.width[age] });
-      // The damage it does is told once a pulse (or when it swings on to another ship)
-      const h = this.pulseHit as { eid: number; dealt: number } | null;
-      if (h) {
-        if (p.hit && p.hit.eid !== h.eid) tell();
-        p.hit = { eid: h.eid, dealt: (p.hit?.dealt ?? 0) + h.dealt };
-      }
-      if (age === prof.ticks - 1) tell();
-    }
-    if (!list.length) this.pulsing.delete(eid);
-  }
+  private stepPulses(eid: number, ship: ShipState, tick: number): void { return wpn.stepPulses(this.ctx, eid, ship, tick); }
 
-  /**
-   * One tick of a beam weapon: out of its muzzle along its aim, it burns the
-   * first hull (more against armour for the lance) or asteroid it meets, and
-   * heats up; at 100 it overheats and must cool. Returns how far along it hit.
-   * A pulse laser's tick (`pulse`) burns its share of the pulse, that wide, and doesn't heat.
-   */
-  private fireBeam(eid: number, ship: ShipState, w: WeaponInfo, def: WeaponTuning, pulse?: { damage: number; width: number }): number {
-    const pose = this.pose(eid);
-    const cs = this.tuning.cellSize;
-    let muzzle = w.muzzle, dir = w.dir;
-    if (w.mount === 'turret' && w.window) {
-      const a = w.window.center + ship.aim[w.part];
-      dir = [Math.cos(a), Math.sin(a)];
-      muzzle = [w.window.pivot[0] + dir[0] * w.window.barrel, w.window.pivot[1] + dir[1] * w.window.barrel];
-    } else if (ship.aim[w.part]) {
-      const a = Math.atan2(dir[1], dir[0]) + ship.aim[w.part];
-      dir = [Math.cos(a), Math.sin(a)];
-    }
-    const [x, y] = shipPointToWorld(ship, pose, muzzle, cs);
-    const [dx, dy] = localToWorldDir(dir, pose.angle);
-    const angle = Math.atan2(dy, dx);
-    const range = def.range ?? 800;
-    const x1 = x + Math.cos(angle) * range, y1 = y + Math.sin(angle) * range;
-    // (A hostile's beam burns at its kind's npcScale: the laser was made better for pilots, not for the scrap that fires it)
-    const npc = hasComponent(this.host.world, Player, eid) ? 1 : def.npcScale ?? 1;
-    const dmg = (pulse ? pulse.damage : (def.dps ?? 50) / 60) * Math.max(w.satisfaction, this.tuning.flow.minWeaponSatisfaction) * w.strength * this.damageMul(eid) * npc;
-    let shipHit: { eid: number; ship: ShipState; part: number; t: number } | null = null;
-    // It burns `width` wide: a hull that close to its line is hit (its edges are tried when the line itself misses)
-    const half = (pulse ? pulse.width : def.width ?? 0) / 2;
-    for (const other of this.alongBeam(InSystem.systemId[eid], x, y, x1, y1, half)) {
-      const os = this.bodies.get(other);
-      if (!os || other === eid || InSystem.systemId[other] !== InSystem.systemId[eid] || this.isJumping(os) || this.intangible.has(other) || this.dormant.has(other)) continue;
-      if (!this.nearSegment(other, os, x, y, x1, y1, half)) continue;
-      if (this.host.canDamage && !this.host.canDamage(eid, other)) continue;
-      // (Its whole width against the parts' real shapes: a capsule, collide.ts)
-      const h = this.castShip(other, os, x, y, x1, y1, half);
-      if (h && (!shipHit || h.t < shipHit.t)) shipHit = { eid: other, ship: os, ...h };
-    }
-    // A surface's rock stops it before anything behind
-    const wall = rayTerrain(this.host.terrainAt?.(eid), x, y, x1, y1);
-    if (shipHit && shipHit.t > wall) shipHit = null;
-    const rockT = Math.min(wall, this.host.beamAsteroid?.(eid, x, y, angle, shipHit ? shipHit.t * range : range * wall, dmg, w.kind) ?? 1);
-    // (Mobs along its line burn too, up to whatever stops it: they don't stop it themselves)
-    if (this.host.beamMobs) {
-      const stop = rockT * (shipHit ? shipHit.t : 1);
-      this.host.beamMobs(InSystem.systemId[eid], x, y, x + (x1 - x) * stop, y + (y1 - y) * stop, half * 2, dmg * beamFalloff(def, stop * range * 0.5), eid);
-    }
-    if (!pulse) {
-      ship.heat[w.part] = Math.min(100, ship.heat[w.part] + ((def.heatPerSec ?? 20) / 60) * (this.host.hazardScale?.(eid, 'heat') ?? 1));
-      if (ship.heat[w.part] >= 100) ship.overheated[w.part] = true;
-    }
-    if (shipHit && rockT >= 0.999) {
-      if (def.chill) {
-        // Each tick on a ship takes its warmth (frozen through from warm in holdTicks), and frozen through it seizes up
-        this.frostHit(shipHit.eid, 1 / def.chill.holdTicks, def.chill.ticks);
-      }
-      const armor = shipHit.ship.blueprint.parts[shipHit.part].fn === 'armor' ? def.armorBonus ?? 1 : 1;
-      // Past its effective range a fading beam (the laser's) burns ever weaker, out to where it gives out (pulse.ts beamFalloff)
-      const fade = beamFalloff(def, shipHit.t * range);
-      const at = this.worldToGrid(shipHit.eid, shipHit.ship, x + (x1 - x) * shipHit.t, y + (y1 - y) * shipHit.t);
-      const dealt = this.hurt(shipHit.eid, shipHit.ship, shipHit.part, dmg * armor * fade, eid, { hit: weaponHit(w.kind, def, shooterGrade(this.catalog, ship.blueprint.parts[w.part])), at });
-      if (pulse) this.pulseHit = { eid: shipHit.eid, dealt };
-      else if (dealt > 0 && this.host.getTick() % 10 === 0) this.host.notifyDamage(shipHit.eid, dealt * 10, eid);
-      return shipHit.t;
-    }
-    return rockT * (shipHit ? shipHit.t : 1);
-  }
+  private fireBeam(eid: number, ship: ShipState, w: WeaponInfo, def: WeaponTuning, pulse?: { damage: number; width: number }): number { return wpn.fireBeam(this.ctx, eid, ship, w, def, pulse); }
 
   // -------------------------------------------------------------------------
   // Support weapons: the Repair Beam and point defence (common/src/ships/support.ts)
   // -------------------------------------------------------------------------
 
   /** A beam's muzzle (world) and angle, along its gun's aim */
-  private beamFrom(eid: number, ship: ShipState, w: WeaponInfo): { x: number; y: number; angle: number } {
-    const pose = this.pose(eid);
-    let muzzle = w.muzzle, dir = w.dir;
-    if (w.mount === 'turret' && w.window) {
-      const a = w.window.center + ship.aim[w.part];
-      dir = [Math.cos(a), Math.sin(a)];
-      muzzle = [w.window.pivot[0] + dir[0] * w.window.barrel, w.window.pivot[1] + dir[1] * w.window.barrel];
-    } else if (ship.aim[w.part]) {
-      const a = Math.atan2(dir[1], dir[0]) + ship.aim[w.part];
-      dir = [Math.cos(a), Math.sin(a)];
-    }
-    const [x, y] = shipPointToWorld(ship, pose, muzzle, this.tuning.cellSize);
-    const [dx, dy] = localToWorldDir(dir, pose.angle);
-    return { x, y, angle: Math.atan2(dy, dx) };
-  }
+  private beamFrom(eid: number, ship: ShipState, w: WeaponInfo): { x: number; y: number; angle: number } { return wpn.beamFrom(this.ctx, eid, ship, w); }
 
-  /**
-   * One tick of a Repair Beam: along its aim it passes through every ship it may not mend and stops on the first
-   * friendly hull (or rock), mending `heal` a second into the damaged parts nearest where it lands. Never its own ship,
-   * never a destroyed part. Returns how far along it stopped (0..1).
-   */
-  private repairBeam(eid: number, ship: ShipState, w: WeaponInfo, def: WeaponTuning): number {
-    const { x, y, angle } = this.beamFrom(eid, ship, w);
-    const range = def.range ?? 500;
-    const x1 = x + Math.cos(angle) * range, y1 = y + Math.sin(angle) * range;
-    const half = (def.width ?? 0) / 2, sys = InSystem.systemId[eid];
-    let hit: { eid: number; ship: ShipState; part: number; t: number } | null = null;
-    for (const other of this.alongBeam(sys, x, y, x1, y1, half)) {
-      const os = this.bodies.get(other);
-      if (!os || other === eid || os.kind !== 'ship' || InSystem.systemId[other] !== sys || this.isJumping(os) || this.intangible.has(other) || this.dormant.has(other)) continue;
-      if (!this.host.canHeal?.(eid, other) || !this.nearSegment(other, os, x, y, x1, y1, half)) continue;
-      const h = this.castShip(other, os, x, y, x1, y1, half);
-      if (h && (!hit || h.t < hit.t)) hit = { eid: other, ship: os, ...h };
-    }
-    const wall = rayTerrain(this.host.terrainAt?.(eid), x, y, x1, y1);
-    if (!hit || hit.t > wall) return wall;
-    const amount = ((def.heal ?? 0) / 60) * Math.max(w.satisfaction, this.tuning.flow.minWeaponSatisfaction) * w.strength;
-    const at = this.worldToGrid(hit.eid, hit.ship, x + (x1 - x) * hit.t, y + (y1 - y) * hit.t);
-    const healed = repairAt(hit.ship, this.geometry(hit.ship), at[0], at[1], amount, this.tuning);
-    if (healed > 0) this.host.onHeal?.(eid, hit.eid, healed);
-    return hit.t;
-  }
+  private repairBeam(eid: number, ship: ShipState, w: WeaponInfo, def: WeaponTuning): number { return wpn.repairBeam(this.ctx, eid, ship, w, def); }
 
   /** Point defence's shots in reach this tick (reused), and what each turret is on (ship -> part -> shot) */
   private pdList: { id: number; x: number; y: number; d: number }[] = [];
   private pdOn = new Map<number, Map<number, number>>();
 
-  /**
-   * Point-defence turrets: each turns to the nearest shot in reach it can bring to bear on (staying on the one it's on
-   * while it can), and fires when it's on it and loaded, each hit instant. Quiet mid-jump, EMP'd or inside a station,
-   * when they turn back to rest.
-   */
-  private pointDefence(eid: number, ship: ShipState, pose: { x: number; y: number; angle: number }, def: (w: WeaponInfo) => WeaponTuning): void {
-    let listed = false, on = this.pdOn.get(eid);
-    const quiet = this.isJumping(ship) || this.isEmped(eid) || !!this.host.sheltered?.(eid) || !this.host.pdThreats || !this.host.intercept;
-    for (const w of ship.derived.weapons) {
-      const d = def(w);
-      if (!d.pointDefence || !w.window) continue;
-      const pd = pointDefenceOf(d);
-      if (!listed && !quiet) {
-        this.host.pdThreats!(eid, pose.x, pose.y, pd.range + ship.derived.radius, this.pdList);
-        listed = true;
-      }
-      const win = w.window;
-      const [px, py] = shipPointToWorld(ship, pose, win.pivot, this.tuning.cellSize);
-      const reach = pd.range;
-      // (Local angle to a point, and whether it can fire that way: in its arc, and not through its own hull)
-      const local = (tx: number, ty: number) => Math.atan2(ty - py, tx - px) - (pose.angle + Math.PI / 2);
-      const bears = (a: number) => { const off = wrapPi(a - win.center); return (win.half >= Math.PI - 1e-9 || Math.abs(off) <= win.half) && isOpen(win, off); };
-      let pick: { id: number; x: number; y: number } | null = null;
-      if (!quiet && this.pdList.length) {
-        const was = on?.get(w.part);
-        for (const t of this.pdList) {
-          if (Math.hypot(t.x - px, t.y - py) > reach || !bears(local(t.x, t.y))) continue;
-          if (t.id === was) { pick = t; break; }
-          if (!pick) pick = t;
-        }
-      }
-      if (pick) { if (!on) this.pdOn.set(eid, (on = new Map())); on.set(w.part, pick.id); } else on?.delete(w.part);
-      const res = stepPointDefenceAim(win, ship.aim[w.part], pick ? local(pick.x, pick.y) : undefined, this.tuning, pd.slew);
-      ship.aim[w.part] = res.offset;
-      if (!pick || !res.canFire || ship.cooldown[w.part] > 0) continue;
-      // From its barrel's tip, instantly: one of the shot's hits
-      const a = win.center + res.offset;
-      const [mx, my] = shipPointToWorld(ship, pose, [win.pivot[0] + Math.cos(a) * win.barrel, win.pivot[1] + Math.sin(a) * win.barrel], this.tuning.cellSize);
-      const cd = ship.cooldown[w.part];
-      ship.cooldown[w.part] = (cd > -1 ? cd : 0) + w.interval * (this.coldStage(eid).guns ?? 1);
-      const target = pick.id;
-      if (this.host.intercept!(eid, w.part, target, mx, my)) {
-        const i = this.pdList.findIndex((t) => t.id === target);
-        if (i >= 0) this.pdList.splice(i, 1);
-        on?.delete(w.part);
-      }
-      this.lastFired.set(eid, this.host.getTick());
-    }
-    if (on && !on.size) this.pdOn.delete(eid);
-  }
+  private pointDefence(eid: number, ship: ShipState, pose: { x: number; y: number; angle: number }, def: (w: WeaponInfo) => WeaponTuning): void { return wpn.pointDefence(this.ctx, eid, ship, pose, def); }
 
-  /**
-   * The bodies a beam might meet: the host's broadphase (ships filed by their
-   * bounding circles when the tick began, so padded by how far one can have
-   * moved since), or every body
-   */
-  private alongBeam(systemNum: number, x0: number, y0: number, x1: number, y1: number, half: number): Iterable<number> {
-    const near = this.host.shipsAlong?.(systemNum, x0, y0, x1, y1, half + BEAM_PAD);
-    if (!near) return this.bodies.keys();
-    // (and what's come or been moved since it was filed: spawned this tick, a boss's blink)
-    if (!this.ungridded.size) return near;
-    const out = [...near];
-    for (const e of this.ungridded) out.push(e);
-    return out;
-  }
+  private alongBeam(systemNum: number, x0: number, y0: number, x1: number, y1: number, half: number): Iterable<number> { return wpn.alongBeam(this.ctx, systemNum, x0, y0, x1, y1, half); }
 
   /** Bodies spawned or moved instantly since the broadphase was last filed (addToSpatialGrid) */
   private ungridded = new Set<number>();
@@ -1177,85 +815,23 @@ export class ShipBridge {
   }
 
   /** Does a world-space segment come within a ship's bounding circle (segmentHit's first test) */
-  private nearSegment(eid: number, ship: ShipState, x0: number, y0: number, x1: number, y1: number, margin = 0): boolean {
-    const px = Position.x[eid], py = Position.y[eid];
-    const dx = x1 - x0, dy = y1 - y0;
-    const len2 = dx * dx + dy * dy || 1;
-    const u = Math.max(0, Math.min(1, ((px - x0) * dx + (py - y0) * dy) / len2));
-    return Math.hypot(x0 + dx * u - px, y0 + dy * u - py) <= ship.derived.radius + 1 + margin;
-  }
+  private nearSegment(eid: number, ship: ShipState, x0: number, y0: number, x1: number, y1: number, margin = 0): boolean { return wpn.nearSegment(this.ctx, eid, ship, x0, y0, x1, y1, margin); }
 
-  /**
-   * First part touched by a world-space segment, `margin` thick either side
-   * (a beam's half-width, a great orb's radius: 0 for a line), against the
-   * parts' real shapes in the ship's local grid space (collide.ts castParts).
-   */
-  segmentHit(eid: number, ship: ShipState, x0: number, y0: number, x1: number, y1: number, margin = 0): { part: number; t: number } | null {
-    if (!this.nearSegment(eid, ship, x0, y0, x1, y1, margin)) return null;
-    return this.castShip(eid, ship, x0, y0, x1, y1, margin);
-  }
+  segmentHit(eid: number, ship: ShipState, x0: number, y0: number, x1: number, y1: number, margin = 0): { part: number; t: number } | null { return wpn.segmentHit(this.ctx, eid, ship, x0, y0, x1, y1, margin); }
 
   /** The ship being cast against (castShip's standing test, without a closure per call) */
   private castOn: ShipState | null = null;
   private readonly castOk = (i: number): boolean => standing(this.catalog, this.castOn!, i);
 
   /** segmentHit without its bounding-circle test (for callers that have just made it) */
-  private castShip(eid: number, ship: ShipState, x0: number, y0: number, x1: number, y1: number, margin = 0): { part: number; t: number } | null {
-    const a = this.worldToGrid(eid, ship, x0, y0);
-    const b = this.worldToGrid(eid, ship, x1, y1);
-    this.castOn = ship;
-    // (shots pass through bones and wrecks: stages.ts standing)
-    const h = castParts(this.geometry(ship), this.castOk, a[0], a[1], b[0], b[1], margin / this.tuning.cellSize);
-    this.castOn = null;
-    return h;
-  }
+  private castShip(eid: number, ship: ShipState, x0: number, y0: number, x1: number, y1: number, margin = 0): { part: number; t: number } | null { return wpn.castShip(this.ctx, eid, ship, x0, y0, x1, y1, margin); }
 
-  /**
-   * What takes a hit meant for `part` (a boss's stages: stages.ts): itself if it's standing in the stage being fought;
-   * otherwise (a later stage's, or a wreck) the nearest part standing in that stage, one that decides it if any does;
-   * -1 if nothing stands (between stages). Nearest to where it struck (`at`, grid space) by each part's own outline,
-   * when that's known: so a shot at a boss's back goes to the plate nearest that spot (not one by its middle, the
-   * first of two equally near: the left one, always); else to the struck part's middle.
-   */
-  private cover(ship: ShipState, part: number, at?: Vec2): number {
-    if (!stageOf(this.catalog, ship, part)) return part;
-    const first = currentStage(this.catalog, ship);
-    if (!first) return -1;
-    if (stageOf(this.catalog, ship, part) === first && standing(this.catalog, ship, part)) return part;
-    // One blast's parts, all from the same point (coverMemo): while the part the last went to still stands, it's the
-    // nearest still (in the blast nothing heals or moves, so the parts standing only ever get fewer)
-    const memo = this.coverMemo?.ship === ship && this.coverMemo.at === at ? this.coverMemo : null;
-    if (memo && memo.first === first && memo.best >= 0 && standing(this.catalog, ship, memo.best)) return memo.best;
-    const geoms = this.geometry(ship), [cx, cy] = at ?? geoms[part].centroid;
-    let best = -1, bd = Infinity;
-    // (That stage's parts, in part order: the first of two equally near wins)
-    for (const i of stageParts(this.catalog, ship, first)) {
-      const g = geoms[i];
-      if (!g || !standing(this.catalog, ship, i)) continue;
-      const d = (at ? partDistance(g, cx, cy) : Math.hypot(g.centroid[0] - cx, g.centroid[1] - cy)) + (deciding(this.catalog, ship, i) ? 0 : 1e6);
-      if (d < bd) { bd = d; best = i; }
-    }
-    if (memo) { memo.first = first; memo.best = best; }
-    return best;
-  }
+  private cover(ship: ShipState, part: number, at?: Vec2): number { return wpn.cover(this.ctx, ship, part, at); }
 
   /** The ship part under a world point (debug key K). */
-  partAt(x: number, y: number): { eid: number; part: number } | null {
-    for (const [eid, ship] of this.bodies) {
-      const g = this.worldToGrid(eid, ship, x, y);
-      const geoms = this.geometry(ship);
-      for (let i = 0; i < geoms.length; i++) {
-        if (ship.derived.alive[i] && geoms[i].convex.some((c) => pointInConvex(c, g[0], g[1]))) return { eid, part: i };
-      }
-    }
-    return null;
-  }
+  partAt(x: number, y: number): { eid: number; part: number } | null { return wpn.partAt(this.ctx, x, y); }
 
-  damagePartFraction(eid: number, part: number, fraction: number): void {
-    const ship = this.bodies.get(eid);
-    if (!ship) return;
-    damagePart(ship, part, ship.maxHp[part] * fraction, this.tuning);
-  }
+  damagePartFraction(eid: number, part: number, fraction: number): void { return wpn.damagePartFraction(this.ctx, eid, part, fraction); }
 
   /**
    * The bodies as they are now, for a loop that may add or remove some: their ids and states as two lists (and 0, to

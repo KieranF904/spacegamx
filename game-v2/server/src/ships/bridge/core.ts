@@ -222,6 +222,11 @@ export interface BridgeInternals {
   // Private methods modules call back through
   fieldAt: ShipBridge['fieldAt'];
   rebuildNow: ShipBridge['rebuildNow']; syncHealth: ShipBridge['syncHealth']; cover: ShipBridge['cover'];
+  fireWeapons: ShipBridge['fireWeapons']; stepMiners: ShipBridge['stepMiners']; pose: ShipBridge['pose'];
+  alongBeam: ShipBridge['alongBeam']; nearSegment: ShipBridge['nearSegment']; castShip: ShipBridge['castShip'];
+  coldStage: ShipBridge['coldStage']; repairBeam: ShipBridge['repairBeam']; fireBeam: ShipBridge['fireBeam'];
+  stepPulses: ShipBridge['stepPulses']; pointDefence: ShipBridge['pointDefence']; damageMul: ShipBridge['damageMul'];
+  beamFrom: ShipBridge['beamFrom'];
   closestPart: ShipBridge['closestPart']; partWorld: ShipBridge['partWorld']; nearestPart: ShipBridge['nearestPart'];
 }
 
