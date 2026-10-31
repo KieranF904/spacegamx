@@ -113,29 +113,38 @@ vec4 trees(vec2 w, float S, float k, float dens) {
   return vec4(crown, lit, shadow, fract(hh.y * 13.7));
 }
 
-/** Farmland: fields in a grid turned its own way in each block (roads between blocks) */
-vec3 farmland(vec2 w, out float edge, out float road) {
-  vec2 B = vec2(3800.0);
-  vec2 bc = floor((w - uCity) / B);
-  float ang = (hash1(bc + 3.1) - 0.5) * 1.2;
-  vec2 bf = fract((w - uCity) / B);
-  vec2 be = min(bf, 1.0 - bf) * B;
-  road = (1.0 - smoothstep(9.0, 9.0 + uPx * 1.1, min(be.x, be.y))) * resolves(40.0);
-  vec2 lp = rot(ang) * (w - uCity);
-  vec2 size = vec2(720.0, 470.0) * (0.8 + 0.4 * hash1(bc));
-  vec2 fc = floor(lp / size), ff = fract(lp / size);
-  vec2 fe = min(ff, 1.0 - ff) * size;
-  edge = (1.0 - smoothstep(4.0, 4.0 + uPx * 1.1, min(fe.x, fe.y))) * resolves(60.0);
-  float pick = hash1(fc + bc * 13.7);
-  // Crops in rows (one way or the other, field by field)
-  float along = hash1(fc + 4.4) < 0.5 ? lp.x : lp.y;
-  float rows = 0.5 + 0.5 * sin(along / 34.0 * 6.2832);
-  rows = mix(0.5, rows, resolves(34.0));
+/**
+ * Farmland: irregular parcels (jittered cells, one continuous layout with no blocks or tiles to seam), stretched and
+ * turned with the land by a slow warp; each its own crop, row direction and spacing; hedgerows that wobble.
+ * \`keep\`: 0..1 how much of the parcel is worked (the odd one is left as meadow)
+ */
+vec3 farmland(vec2 w, out float edge, out float track, out float keep) {
+  // The warp: the grid follows the land (slow, big) and the hedges wander (fast, small)
+  vec2 sw = vec2(texture(uNoise, w / 4300.0 + uSeed * 1.7).g, texture(uNoise, w / 4300.0 + 0.41 + uSeed * 1.7).g) - 0.5;
+  vec2 fw = vec2(texture(uNoise, w / 520.0 + 0.2).b, texture(uNoise, w / 520.0 + 0.7).b) - 0.5;
+  vec2 lp = w + sw * 520.0 + fw * 55.0;
+  float turn = (texture(uNoise, w / 9000.0 + uSeed * 0.9).r - 0.5) * 1.2 + 0.5;
+  lp = rot(turn) * lp;
+  vec2 cs = cells(lp / vec2(1000.0, 680.0), 5.0);
+  float d = cs.x * 680.0;
+  float id = cs.y;
+  edge = (1.0 - smoothstep(4.0 + 3.0 * fract(id * 9.1), 8.0 + uPx * 1.1, d)) * resolves(60.0);
+  track = step(0.88, fract(id * 31.7)) * (1.0 - smoothstep(6.0, 12.0 + uPx, d)) * resolves(60.0);
+  keep = 1.0 - step(0.86, fract(id * 5.3));
+  // Crops in rows, each parcel its own way and spacing; some stippled (orchard, pasture)
+  float ang = id * 37.0;
+  float per = 22.0 + 26.0 * fract(id * 3.7);
+  float along = dot(w, vec2(cos(ang), sin(ang)));
+  float rows = 0.5 + 0.5 * sin(along / per * 6.2832);
+  rows = mix(0.5, rows, resolves(per));
   vec3 green = uLow * vec3(1.02, 1.06, 0.9), ripe = mix(uDry, uLow, 0.15), plough = mix(uSoil, uDry, 0.25), pasture = mix(uLow, uDry, 0.3) * 0.95;
-  vec3 col = pick < 0.3 ? green : pick < 0.52 ? ripe : pick < 0.72 ? plough : pasture;
-  float rowAmt = pick < 0.72 ? 0.16 : 0.04;
+  vec3 gold = mix(uDry, vec3(0.9, 0.78, 0.35), 0.5), dark = uLow * vec3(0.7, 0.85, 0.65), bloom = mix(uLow, vec3(0.85, 0.8, 0.3), 0.5);
+  float pick = fract(id * 7.31);
+  vec3 col = pick < 0.16 ? green : pick < 0.3 ? ripe : pick < 0.44 ? plough : pick < 0.58 ? pasture : pick < 0.7 ? gold : pick < 0.82 ? dark : pick < 0.9 ? bloom : green * 1.08;
+  float rowAmt = (pick < 0.44 || pick > 0.58) ? 0.2 : 0.05;
   col *= 1.0 - rowAmt + rowAmt * 2.0 * rows;
-  col *= 0.94 + 0.12 * hash1(fc + 9.9);
+  // (a slow shade across each parcel)
+  col *= 0.9 + 0.16 * fract(id * 13.9) + 0.1 * (texture(uNoise, w / 300.0 + id).a - 0.5);
   return col;
 }
 
@@ -336,18 +345,26 @@ void main() {
       float bank = (1.0 - smoothstep(rw, rw * 4.0 + fw * 2.0, abs(rv - 0.5))) * step(0.0001, rw);
       col = mix(col, uLow * vec3(0.8, 1.0, 0.8), bank * 0.45);
       // Farmland round the city: on flat low ground, giving way to the wild further out
-      float farm = uFeat.z * smoothstep(uLand.z * 1.02, uLand.z * 1.2, dc)
-        * (1.0 - smoothstep(uLand.z * 2.2, uLand.z * 3.4, dc + (big - 0.5) * 5000.0))
-        * (1.0 - smoothstep(0.35, 0.8, slope)) * (1.0 - smoothstep(0.18, 0.3, a)) * (1.0 - bank);
+      // (a margin of meadow and scrub left before the shore, rivers and steep ground, ragged)
+      float rag = (patchN - 0.5) * 0.5;
+      float nearCity = uFeat.z * smoothstep(uLand.z * 1.02, uLand.z * 1.2, dc)
+        * (1.0 - smoothstep(uLand.z * 2.2, uLand.z * 3.4, dc + (big - 0.5) * 5000.0));
+      float clear = (1.0 - smoothstep(0.35, 0.8, slope)) * (1.0 - smoothstep(0.18, 0.3, a))
+        * smoothstep(0.035, 0.09, a + rag * 0.06)
+        * (1.0 - (1.0 - smoothstep(rw, rw * 5.0 + fw * 2.0, abs(rv - 0.5))) * step(0.0001, rw + 0.0004));
+      float farm = nearCity * clear;
+      float fringe = nearCity * (1.0 - clear);
       if (farm > 0.01) {
-        float edge, road;
-        vec3 fcol = farmland(w, edge, road);
-        fcol = mix(fcol, uHigh * 0.8, edge * 0.6);
-        fcol = mix(fcol, mix(uUrban, uShore, 0.5) * 0.9, road * 0.8);
-        col = mix(col, mix(fcol, col, 0.2), farm);
+        float edge, track, keep;
+        vec3 fcol = farmland(w, edge, track, keep);
+        fcol = mix(fcol, uHigh * 0.8, edge * 0.8);
+        fcol = mix(fcol, mix(uUrban, uShore, 0.5) * 0.95, track * 0.6);
+        farm *= smoothstep(0.0, 0.5, farm) * keep;
+        col = mix(col, mix(fcol, col, 0.15), farm);
       }
       // Forest: on the wetter ground, the hills, along rivers; thinning out ragged at its edges
       float wood = smoothstep(0.47, 0.6, moist + a * 0.35 + (grit - 0.5) * 0.12 + bank * 0.3) * (1.0 - smoothstep(0.4, 0.52, a));
+      wood = max(wood, fringe * 0.3 * smoothstep(0.4, 0.75, moist + grit * 0.4));
       wood *= uFeat.x * (1.0 - city) * (1.0 - farm * 0.92) * smoothstep(0.0, 0.04, a);
       if (wood > 0.01) {
         vec3 leaf = mix(uHigh, uHigh * vec3(0.8, 1.05, 1.15), smoothstep(0.4, 0.7, detail));
