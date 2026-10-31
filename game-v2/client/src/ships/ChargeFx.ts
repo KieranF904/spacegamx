@@ -145,7 +145,10 @@ export class ChargeFx {
       const n = 5;
       for (let i = 0; i < n; i++) {
         const a = this.t * 6 + (i * Math.PI * 2) / n, j = 1 + 0.35 * Math.sin(this.t * 31 + i * 2.1);
-        this.glow.moveTo(x + Math.cos(a) * r, y + Math.sin(a) * r).lineTo(x + Math.cos(a) * r * (1 + 0.5 * j * k), y + Math.sin(a) * r * (1 + 0.5 * j * k))
+        // Sparks pulled inward: each streak starts well outside the disc (the start radius
+        // tightens as the charge fills) and ends at the rim, travelling in
+        const outer = r * (2.2 - 0.6 * k) * (0.9 + 0.1 * j), inner = r * 1.05;
+        this.glow.moveTo(x + Math.cos(a) * outer, y + Math.sin(a) * outer).lineTo(x + Math.cos(a) * inner, y + Math.sin(a) * inner)
           .stroke({ color: 0x93c5fd, width: 1, alpha: 0.6 * k });
       }
     } else {
