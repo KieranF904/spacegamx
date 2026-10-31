@@ -87,11 +87,23 @@ describe('structure pins', () => {
   }, 120_000);
 
   it('client messages the server handles', () => {
-    const src = readFileSync(join(srcRoot, 'server/src/GameServer.ts'), 'utf8');
-    const types = caseLabels(src, /^\s*private handleMessage\(conn: ClientConnection, msg: ClientMessage\)/, 6);
+    // Stage 1 Cut 1 turned handleMessage's switch into a handler table (net/dispatch.ts), so the types come from the
+    // table now. The Stage 0 extraction read case labels at a 6-space indent, which missed 'join' and 'respawn'
+    // (their labels sat at column 0): the pin never listed them, so they're left out here and checked in
+    // net/dispatch.test.ts, which pins the whole set.
+    resetGlobals();
+    const server = new GameServer({
+      gameData: new GameData(readGameDataFiles(dataDir)),
+      userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
+      scene: 'sectors',
+      autoStart: false,
+      ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
+      clock: () => 1_000_000,
+    });
+    const types = server.handledMessageTypes().filter((t) => t !== 'join' && t !== 'respawn').sort();
     expect(types.length).toBeGreaterThan(20);
     pin('clientMessages.json', types);
-  });
+  }, 120_000);
 
   it('ShipBridge public API', () => {
     const src = readFileSync(join(srcRoot, 'server/src/ships/ShipBridge.ts'), 'utf8');
