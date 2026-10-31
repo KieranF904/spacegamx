@@ -32,6 +32,7 @@ import { EntityType, WeaponType } from '@space-game/common';
 import type { GameState, InterpolatedEntity } from '../../state/GameState';
 import { WeaponStyle, weaponStyle, shotScale } from './weaponStyles';
 import type { Lighting } from '../lighting/Lighting';
+import { arcFraction, incomingTicks, landingPoint, sonarPeriod } from './ordnanceTells';
 
 interface Shot {
   id: number;
@@ -60,6 +61,19 @@ interface Shot {
   /** Drawn from the barrel's tip, not the spawn point: this offset at first, easing to none over BARREL_EASE ticks (muzzleFlash) */
   vox?: number;
   voy?: number;
+  /** The tick its flight ends (a mortar's landing: projectile row data[9]), 0 for none */
+  endTick: number;
+  /** Where it lands, when it has an end */
+  landX: number;
+  landY: number;
+  /** Its blast radius (world units), when its gun is known: the landing ring's */
+  splash: number;
+  /** 0..1 through its flight to its end (swells a lobbed shell) */
+  arc: number;
+  /** The timeline tick it was last placed at */
+  t: number;
+  /** Rings swelled so far (a sonar's, accumulated so a changing period never jumps the phase) */
+  pulse: number;
   /** Frames since the shot stopped (hit or removed); null while flying */
   fading: number | null;
   head: { x: number; y: number } | null;
@@ -82,6 +96,9 @@ const FADE_FRAMES = 9;
 const BARREL_EASE = 8;
 /** A predicted shell the server hasn't confirmed by then was never fired: it fades */
 const CONFIRM_TICKS = 60;
+
+/** What a shell's gun is: its model's look (MODEL_STYLES), its damage and its blast radius */
+export interface ShellLook { model?: string; damage?: number; splash?: number }
 
 export interface FirePoseXY { x: number; y: number; angle: number }
 
@@ -122,6 +139,7 @@ function hueColor(h: number): number {
 
 const TEX = { get disc() { return disc(); }, get dot() { return softDot(0.5, 0.1); }, get streak() { return streak(); }, get petal() { return petal(); } };
 /** The extra pool's textures (the glow pool holds its four already) */
+const SHIP_TYPES = [EntityType.Player, EntityType.Enemy, EntityType.NPC, EntityType.ShipBody];
 const TEX2 = { get ring() { return ring(); }, get puff() { return puff(); } };
 
 /** A colour with its hue turned by `deg` degrees (impact shards of a prism's rainbow) */
@@ -168,7 +186,16 @@ export class WeaponFx {
   /** The firing ship's pose on a shell's fire tick, where it's known (shells built from fire events) */
   firePose: ((id: number) => FirePoseXY | undefined) | null = null;
   /** The model and damage of the gun a fire-event shell came from (read once, as the shell is first seen) */
-  shellLook: ((id: number) => { model?: string; damage?: number } | undefined) | null = null;
+  shellLook: ((id: number, e: InterpolatedEntity) => ShellLook | undefined) | null = null;
+  /** Where your cursor is in the world while you hold fire (a guided shell's guide line), else null; the object may be reused */
+  guideTo: (() => { x: number; y: number } | null) | null = null;
+  /**
+   * Shells heading at the local pilot that warn of it (`incoming` styles), refilled every update: where each is and the
+   * ticks to its closest approach. `threatCount` of the slots are live.
+   */
+  readonly threats: { x: number; y: number; t: number }[] = [{ x: 0, y: 0, t: 0 }, { x: 0, y: 0, t: 0 }, { x: 0, y: 0, t: 0 }, { x: 0, y: 0, t: 0 }];
+  threatCount = 0;
+  private state: GameState | null = null;
 
   /** Everything here that glows (for the bloom) */
   get glowLayer(): Container {
@@ -208,6 +235,9 @@ export class WeaponFx {
     const frames = Math.min(4, delta * 60);
     const seen = this.seenShots;
     seen.clear();
+    this.state = state;
+    this.threatCount = 0;
+    const me = state.entities.get(state.playerId);
 
     for (const e of state.entities.ofType(EntityType.Projectile)) {
       seen.add(e.id);
@@ -218,13 +248,25 @@ export class WeaponFx {
         this.shots.set(e.id, shot);
       }
       const t = this.timeline(shot, state, presentTick, renderTick);
+      shot.t = t;
       // The flash goes off when the shot leaves the gun on its timeline (the ship is drawn at that tick too):
       // not when it arrives, which is usually a little early. Shots first seen well downrange don't flash.
       if (!shot.flashed && t >= shot.spawnTick) {
         shot.flashed = true;
         if (t - shot.spawnTick < 12) this.muzzleFlash(shot, state.entities.get(shot.owner));
       }
-      if (shot.fading === null) this.place(shot, e, t);
+      if (shot.fading === null) {
+        this.place(shot, e, t);
+        // A shell heading at you that the style warns of (a Leviathan): where it is and how long it has
+        const inc = shot.style.incoming;
+        if (inc && me && shot.head && shot.owner !== state.playerId && this.threatCount < this.threats.length) {
+          const tt = incomingTicks(me.renderX, me.renderY, shot.head.x, shot.head.y, e.vx, e.vy, inc.radius, 600);
+          if (tt >= 0) {
+            const th = this.threats[this.threatCount++];
+            th.x = shot.head.x; th.y = shot.head.y; th.t = tt;
+          }
+        }
+      }
     }
 
     // Flashes ride along with their guns: the ship keeps moving and turning under them
@@ -250,7 +292,11 @@ export class WeaponFx {
         this.place(shot, undefined, presentTick);
         continue;
       }
-      if (!seen.has(shot.id) && shot.fading === null) shot.fading = 0;
+      if (!seen.has(shot.id) && shot.fading === null) {
+        // A shell that was lobbed to a point and is gone has landed there: its burst (the server's damage messages only come for what it hit)
+        if (shot.style.landBurst && shot.endTick > 0 && !shot.hit && shot.t >= shot.endTick - 20) this.landed(shot, state);
+        else shot.fading = 0;
+      }
     }
 
     this.draw(frames);
@@ -266,6 +312,17 @@ export class WeaponFx {
     }
     for (const f of this.flashes) L.point(f.x, f.y, f.color, 70 + f.size * 7, 1.4 * (1 - f.life / f.max));
     for (const r of this.rings) L.point(r.x, r.y, r.color, 80 + r.size * 6, 1.1 * (1 - r.life / r.max));
+  }
+
+  /** A lobbed shell reached its end: burst there, and shake a screen near enough (a Quake's) */
+  private landed(shot: Shot, state: GameState): void {
+    const lb = shot.style.landBurst!;
+    this.onHit(shot.id, shot.landX, shot.landY);
+    const me = state.entities.get(state.playerId);
+    if (lb.shake && me) {
+      const d = Math.hypot(me.renderX - shot.landX, me.renderY - shot.landY);
+      if (d < lb.shake) state.triggerScreenShake(7 * (1 - d / lb.shake), 0.3);
+    }
   }
 
   /** A damage message with a hit point: stop that tracer there and throw sparks. */
@@ -313,10 +370,10 @@ export class WeaponFx {
   private createShot(e: InterpolatedEntity): Shot {
     const type = e.data?.[0] ?? WeaponType.Cannon;
     // data[1]: the gun's grade
-    const look = this.shellLook?.(e.id);
+    const look = this.shellLook?.(e.id, e);
     const style = weaponStyle(type, e.data?.[1] ?? 1, look?.model);
     const hue = e.data?.[2] ?? 30;
-    return {
+    const shot: Shot = {
       id: e.id,
       style,
       size: e.data?.[7] || 1,
@@ -334,10 +391,17 @@ export class WeaponFx {
       flashed: false,
       predicted: false,
       pose: this.firePose?.(e.id),
+      endTick: e.data?.[9] ?? 0, landX: 0, landY: 0, splash: look?.splash ?? 0, arc: 0, t: 0, pulse: 0,
       fading: null,
       head: null,
       tail: null,
     };
+    if (shot.endTick > 0) {
+      const o = { x: 0, y: 0 };
+      landingPoint(shot.spawnX, shot.spawnY, shot.vx, shot.vy, shot.spawnTick, shot.endTick, o);
+      shot.landX = o.x; shot.landY = o.y;
+    }
+    return shot;
   }
 
   private nextPredicted = -1;
@@ -350,7 +414,7 @@ export class WeaponFx {
       id, style, size: p.size, power: shotScale(p.damage), phase: (-id * 0.618) % 1, type: p.type, owner: p.owner,
       glow: mixColor(style.glowColor, hueColor((p.owner * 137) % 360), style.ownerTint),
       spawnX: p.spawnX, spawnY: p.spawnY, spawnTick: p.spawnTick, vx: p.vx, vy: p.vy,
-      hit: null, flashed: false, predicted: true, pose: p.pose, fading: null, head: null, tail: null,
+      hit: null, flashed: false, predicted: true, pose: p.pose, endTick: 0, landX: 0, landY: 0, splash: 0, arc: 0, t: 0, pulse: 0, fading: null, head: null, tail: null,
     });
   }
 
@@ -384,6 +448,7 @@ export class WeaponFx {
   private place(shot: Shot, e: InterpolatedEntity | undefined, t: number): void {
     const age = t - shot.spawnTick;
     if (age < 0) { shot.head = null; return; } // not fired yet on this timeline
+    shot.arc = arcFraction(t, shot.spawnTick, shot.endTick);
     const trail = shot.style.tracerTicks;
     if (shot.style.motion === 'linear') {
       // (From its barrel's tip at first, easing onto its true path)
@@ -436,6 +501,57 @@ export class WeaponFx {
     }
   }
 
+  /** A ring of `r` radius (the ring texture's) */
+  private ringAt(x: number, y: number, r: number, color: number, alpha: number): void {
+    const k = (r * 2 * 32) / (28 * DOT_SIZE);
+    this.extraG.take(TEX2.ring, x, y, 0.5, 0.5, color, alpha, 0, k, k);
+  }
+
+  /**
+   * Where every lobbed shell will land, for everyone (its endTick, worked out where it comes down): the blast's ring and a
+   * second ring tightening onto it as the shell falls. Yours in the shell's own colour, others' in a warning red.
+   */
+  private drawLandings(): void {
+    for (const shot of this.shots.values()) {
+      if (shot.fading !== null || !shot.endTick || !shot.style.landBurst || !shot.head) continue;
+      const f = shot.arc, r = shot.splash || 200;
+      const own = shot.owner === this.state?.playerId;
+      const col = own ? shot.style.impact.color : 0xff6a4a;
+      this.ringAt(shot.landX, shot.landY, r, col, 0.16 + 0.34 * f);
+      this.ringAt(shot.landX, shot.landY, r * (1 + 1.3 * (1 - f)), col, 0.25 + 0.45 * f);
+      this.circle(this.extraG, TEX.dot, shot.landX, shot.landY, 10 + 20 * f, col, 0.2 + 0.4 * f);
+    }
+  }
+
+  /** The distance to the nearest ship that is not the shell's owner (a sonar's quickening) */
+  private nearestShip(shot: Shot): number {
+    const st = this.state;
+    if (!st || !shot.head) return Infinity;
+    let best = Infinity;
+    for (const type of SHIP_TYPES) {
+      for (const e of st.entities.ofType(type)) {
+        if (e.id === shot.owner) continue;
+        const d = Math.hypot(e.renderX - shot.head.x, e.renderY - shot.head.y);
+        if (d < best) best = d;
+      }
+    }
+    return best;
+  }
+
+  /** A dashed line from (x, y) toward your cursor, while you hold fire */
+  private guideLine(x: number, y: number): void {
+    const to = this.guideTo?.();
+    if (!to) return;
+    const dx = to.x - x, dy = to.y - y, full = Math.hypot(dx, dy), len = Math.min(full, 1400);
+    if (len < 40) return;
+    const ux = dx / full, uy = dy / full;
+    for (let d = 30; d < len; d += 38) {
+      const e = Math.min(len, d + 20);
+      this.line(x + ux * d, y + uy * d, x + ux * e, y + uy * e, 1.5, 0xcfe6ff, 0.34 * (1 - d / 1700));
+    }
+    if (full <= 1400) this.ringAt(to.x, to.y, 14, 0xcfe6ff, 0.4);
+  }
+
   private draw(frames: number): void {
     const g = this.glow;
     g.begin();
@@ -458,7 +574,7 @@ export class WeaponFx {
       const tx = shot.tail.x + (shot.head.x - shot.tail.x) * k;
       const ty = shot.tail.y + (shot.head.y - shot.tail.y) * k;
 
-      const z = shot.size;
+      const z = shot.size * (st.lob ? 1 + st.lob * Math.sin(Math.PI * shot.arc) : 1);
       let hx = shot.head.x, hy = shot.head.y, bx = tx, by = ty;
       const dx = hx - bx, dy = hy - by, dl = Math.hypot(dx, dy);
       const ux = dl > 1e-6 ? dx / dl : 1, uy = dl > 1e-6 ? dy / dl : 0, nx = -uy, ny = ux;
@@ -504,10 +620,25 @@ export class WeaponFx {
       // A ring swelling off the head and fading, again and again
       const rp = st.ringPulse;
       if (rp && shot.fading === null) {
-        const q = ((this.clock + shot.phase * rp.period) % rp.period) / rp.period, r = rp.size * z * (0.3 + 0.7 * q);
+        // (A sonar quickens as it closes on a ship: the phase builds up, so the period can change without a jump)
+        if (shot.pulse === 0) shot.pulse = shot.phase || 0.001;
+        shot.pulse += frames / (rp.closing ? sonarPeriod(rp.period, this.nearestShip(shot), rp.closing) : rp.period);
+        const q = shot.pulse % 1, r = rp.size * z * (0.3 + 0.7 * q);
         const k2 = (r * 2 * 32) / (28 * DOT_SIZE);
         this.extraG.take(TEX2.ring, hx, hy, 0.5, 0.5, rp.color, 0.7 * (1 - q) * alpha, 0, k2, k2);
       }
+      // A light at the nose: a hard blink, or a slow pulse
+      const ns = st.nose;
+      if (ns && shot.fading === null) {
+        const ph = ((this.clock + shot.phase * ns.period) % ns.period) / ns.period;
+        const on = ns.blink ? (ph < 0.22 ? 1 : 0) : 0.5 + 0.5 * Math.sin(ph * Math.PI * 2);
+        if (on > 0.02) {
+          this.circle(g, TEX.dot, hx, hy, ns.size * z * (0.8 + 0.5 * on), ns.color, 0.6 * on * alpha);
+          this.circle(g, TEX.disc, hx, hy, ns.size * z * 0.28, mixColor(ns.color, 0xffffff, 0.5), on * alpha);
+        }
+      }
+      // Your own guided shell: a dashed guide to your cursor while you hold fire (it flies where you point)
+      if (st.guide && shot.fading === null && shot.owner === this.state?.playerId) this.guideLine(hx, hy);
       // A thin cloud as it flies: soft puffs along its path
       const sc = st.smokeCloud;
       if (sc?.fly && shot.fading === null) {
@@ -536,10 +667,12 @@ export class WeaponFx {
       }
       // Missiles leave smoke
       if (st.trail && shot.fading === null && Math.random() < 0.8) {
-        this.smoke.push({ x: shot.head.x - shot.vx * 0.5, y: shot.head.y - shot.vy * 0.5, vx: (Math.random() - 0.5) * 0.4, vy: (Math.random() - 0.5) * 0.4,
+        this.smoke.push({ x: (st.wobble ? hx : shot.head.x) - shot.vx * 0.5, y: (st.wobble ? hy : shot.head.y) - shot.vy * 0.5, vx: (Math.random() - 0.5) * 0.4, vy: (Math.random() - 0.5) * 0.4,
           life: 0, max: st.trail.life * (0.7 + Math.random() * 0.6), size: st.trail.size * (0.6 + Math.random() * 0.5) });
       }
     }
+
+    this.drawLandings();
 
     for (let i = this.flashes.length - 1; i >= 0; i--) {
       const f = this.flashes[i];
