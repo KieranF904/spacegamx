@@ -571,6 +571,13 @@ export class Pilots {
     return profile.cargo.reduce((t, s) => t + s.n * this.econ.items.volume(s.id), 0);
   }
 
+  /** Mass of what's in a pilot's hold (common/src/ships/load.ts: a full hold flies heavy); storage weighs nothing */
+  cargoMass(eid: number): number {
+    const conn = this.connOf(eid);
+    const s = conn && this.sessions.get(conn);
+    return s ? this.econ.items.massOf(s.profile.cargo) : 0;
+  }
+
   /** Room left in cargo, in volume units */
   cargoFree(conn: PilotConn): number {
     const s = this.sessions.get(conn);

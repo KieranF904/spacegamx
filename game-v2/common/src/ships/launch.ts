@@ -19,6 +19,7 @@ import type { ShipTuning, WeaponTuning } from './tuning.js';
 import type { PlacedPart, WeaponMods } from './types.js';
 import { buildShot, type ProjectileSpec } from './shot.js';
 import type { WeaponInfo } from './rebuild.js';
+import { bracedWeaponMods, anchorTuning as anchorTuningOf, isBraced } from './anchor.js';
 
 export interface LaunchShape {
   speedScale: number;
@@ -150,15 +151,17 @@ export function gunRate(tuning: ShipTuning, kind: string, grade: number | undefi
  * its kind's with its model's changes, then its gems and ammunition. Each step
  * is cached, so the same gun gets the same object every time.
  */
-export function gunDef(tuning: ShipTuning, kind: string, gun: { grade?: number; size?: number; mods?: WeaponMods; ammo?: WeaponMods; model?: WeaponMods }): WeaponTuning {
+export function gunDef(tuning: ShipTuning, kind: string, gun: { grade?: number; size?: number; mods?: WeaponMods; ammo?: WeaponMods; model?: WeaponMods; braced?: boolean }): WeaponTuning {
   const base = weaponDef(tuning, kind);
-  if (gun.model) return moddedDef(moddedDef(moddedDef(base, gun.model), gun.mods), gun.ammo);
-  return moddedDef(moddedDef(moddedDef(moddedDef(base, gun.mods), gun.ammo), gradeMods(tuning, kind, gun.grade)), sizeMods(base, gun.size));
+  // (Braced by a Stabiliser Anchor: further and steadier, anchor.ts)
+  const brace = gun.braced ? bracedWeaponMods(anchorTuningOf(tuning)) : undefined;
+  if (gun.model) return moddedDef(moddedDef(moddedDef(moddedDef(base, gun.model), gun.mods), gun.ammo), brace);
+  return moddedDef(moddedDef(moddedDef(moddedDef(moddedDef(base, gun.mods), gun.ammo), gradeMods(tuning, kind, gun.grade)), sizeMods(base, gun.size)), brace);
 }
 
 /** The tuning one gun fires with: its kind's, with the part's mods, and its model's or its grade's and size's (from its WeaponInfo) when given */
-export function partWeaponDef(tuning: ShipTuning, kind: string, part: PlacedPart | undefined, gun?: { grade?: number; size?: number; model?: WeaponMods }): WeaponTuning {
-  return gunDef(tuning, kind, { mods: part?.mods, grade: gun?.grade, size: gun?.size, model: gun?.model });
+export function partWeaponDef(tuning: ShipTuning, kind: string, part: PlacedPart | undefined, gun?: { grade?: number; size?: number; model?: WeaponMods }, braced = false): WeaponTuning {
+  return gunDef(tuning, kind, { mods: part?.mods, grade: gun?.grade, size: gun?.size, model: gun?.model, braced });
 }
 
 /** Turret and gimbal aims at the moment of firing go in steps of 1/SHOT_AIM_STEPS rad (both sides fire from the stepped aim) */
@@ -177,7 +180,8 @@ export function shellSeed(owner: number, partUid: number, index: number): string
 export function launchShot(def: WeaponTuning, kind: string, shape: LaunchShape, angle: number, ownerVx: number, ownerVy: number,
   tick: number, seed: string): Omit<Launched, 'x' | 'y' | 'id'> & { speed: number } {
   const rng = mulberry32(hashString(`shot:${tick}:${seed}`));
-  const spread = ((def.burst ?? 1) > 1 ? 4 : def.spread ?? 1.8) * Math.PI / 180;
+  // (A braced gun scatters less and its shells fly further: def.steady, def.reach)
+  const spread = ((def.burst ?? 1) > 1 ? 4 : def.spread ?? 1.8) * (def.steady ?? 1) * Math.PI / 180;
   const a = angle + (rng() - 0.5) * 2 * spread;
   const cannon = kind === 'cannon';
   const speed = (def.speed ?? 48) * (cannon ? shape.speedScale : 1) * (0.99 + rng() * 0.02);
@@ -188,7 +192,7 @@ export function launchShot(def: WeaponTuning, kind: string, shape: LaunchShape, 
     vy: Math.sin(a) * speed + ownerVy * 0.3,
     size: (def.size ?? 1) * (cannon ? shape.sizeScale : 1),
     // Slower shells live longer so the cannon keeps its range
-    life: Math.round((def.life ?? 150) / (cannon ? shape.speedScale : 1)),
+    life: Math.round(((def.life ?? 150) * (def.reach ?? 1)) / (cannon ? shape.speedScale : 1)),
   };
 }
 
@@ -222,7 +226,7 @@ export interface FireRecord {
   ids: number[];
 }
 
-export interface FirePose { x: number; y: number; angle: number; vx: number; vy: number }
+export interface FirePose { x: number; y: number; angle: number; vx: number; vy: number; /** Its anchor's counter (anchor.ts): braced guns reach further */ brace?: number }
 
 /**
  * A fire event's shells, from the firing ship (its structure) and its pose
@@ -241,7 +245,7 @@ export function rebuildVolley(rec: FireRecord, ship: ShipState, pose: FirePose, 
 
 /** A volley's shells (without entity ids), in spawn order: a burst's fanned extras, then the main shell */
 export function volleyShells(owner: number, ship: ShipState, w: WeaponInfo, shot: ProjectileSpec, pose: FirePose, tick: number, tuning: ShipTuning, ammo?: WeaponMods): Omit<Launched, 'id'>[] {
-  const def = gunDef(tuning, w.kind, { mods: ship.blueprint.parts[w.part]?.mods, ammo, grade: w.grade, size: w.size, model: w.model });
+  const def = gunDef(tuning, w.kind, { mods: ship.blueprint.parts[w.part]?.mods, ammo, grade: w.grade, size: w.size, model: w.model, braced: isBraced(pose.brace, anchorTuningOf(tuning)) });
   const shape = { speedScale: shot.speedScale, sizeScale: shot.sizeScale, turret: shot.mount === 'turret' };
   const uid = ship.blueprint.parts[w.part]?.uid ?? w.part;
   return volleyAngles(def, shot.angle).map((a, i) => {

@@ -7,7 +7,7 @@ describe('binary input messages', () => {
     const msg: ClientInputMessage = {
       type: 'input', seq: 77, tick: 123456, targetTick: 123460,
       forward: true, backward: false, left: true, right: false, boost: true, fireLeft: false, fireRight: true,
-      targetAngle: 1.25, strafeLeft: true, strafeRight: false, helm: true, cursorDist: 480, jump: true,
+      targetAngle: 1.25, strafeLeft: true, strafeRight: false, helm: true, cursorDist: 480, jump: true, brace: true,
     };
     const out = decodeInputBinary(encodeInputBinary(msg));
     // 11 bytes: the aim goes in the 13-bit cursor quantization, the target tick as its low 16 bits, no tick
@@ -16,6 +16,7 @@ describe('binary input messages', () => {
     expect(unwrapTick16(out.targetTick!, 123456)).toBe(123460);
     expect(unwrapTick16(65535, 65536 * 3 + 2)).toBe(65536 * 3 - 1);
     expect(decodeInputBinary(encodeInputBinary({ ...msg, jump: false })).jump).toBe(false);
+    expect(decodeInputBinary(encodeInputBinary({ ...msg, brace: false })).brace).toBe(false);
     expect(decodeInputBinary(encodeInputBinary({ ...msg, targetTick: undefined })).targetTick).toBeUndefined();
   });
 });

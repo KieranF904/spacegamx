@@ -59,10 +59,10 @@ export class Weapons {
    * which clients use to build the same volley from a fire event.
    */
   spawn(owner: number, kind: string, x: number, y: number, angle: number, damageScale: number,
-    shape: { speedScale: number; sizeScale: number; turret: boolean; target?: number; noBurst?: boolean; seed?: string; index?: number; mods?: WeaponMods; dry?: boolean; ammoMods?: WeaponMods; reach?: number; grade?: number; size?: number; model?: WeaponMods }, out?: number[]): number {
+    shape: { speedScale: number; sizeScale: number; turret: boolean; target?: number; noBurst?: boolean; seed?: string; index?: number; mods?: WeaponMods; dry?: boolean; ammoMods?: WeaponMods; reach?: number; grade?: number; size?: number; model?: WeaponMods; braced?: boolean }, out?: number[]): number {
     const w = this.host.world;
     // The gun's own mods (gems), then its ammunition's, its grade's and its size's: the same as the pilot's client builds the shells from (launch.ts gunDef)
-    const full = gunDef(this.tuning, kind, { mods: shape.mods, ammo: shape.ammoMods, grade: shape.grade, size: shape.size, model: shape.model });
+    const full = gunDef(this.tuning, kind, { mods: shape.mods, ammo: shape.ammoMods, grade: shape.grade, size: shape.size, model: shape.model, braced: shape.braced });
     // A plain round (out of ammunition): the same shell, none of its effects (and no fuse: with nothing to burst, it has to hit)
     const def = shape.dry ? { ...full, splash: undefined, emp: undefined, ignite: undefined, split: undefined, pull: undefined, pierce: 0, fuse: undefined, bane: undefined } : full;
     // A burst: the rest of the volley, fanned out (the main shell is the volley's last)

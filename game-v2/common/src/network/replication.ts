@@ -3,7 +3,9 @@
  *
  *   ships  keyframes, only for ships a client is new to or that left the
  *          path their controls predicted:
- *          [id, mode, x, y, vx, vy, angle, angVel, jump, jumpScale, bits, q, station?, ox?, oy?]
+ *          [id, mode, x, y, vx, vy, angle, angVel, jump, jumpScale, bits, q, brace?, cargo?, station?, ox?, oy?]
+ *          (brace and cargo, the anchor's counter and the hold's mass, go when
+ *          either is set or the ship is docked)
  *   ctl    control changes since the last snapshot, per ship:
  *          [id, tb, dq, tb, dq, ...]  where tb = bits × 8 + ticksAgo
  *          (ticksAgo counts back from the snapshot's tick: the step at that tick
@@ -47,6 +49,7 @@ export interface Keyframe {
 export function packKeyframe(k: Keyframe): KeyframeRow {
   const b = k.body;
   const row = [k.id, k.mode, b.x, b.y, b.vx, b.vy, b.angle, b.angVel, b.jump ?? 0, b.jumpScale ?? 1, k.ctl.bits, k.q];
+  if (k.dock || b.brace || b.cargo) row.push(b.brace ?? 0, b.cargo ?? 0);
   if (k.dock) row.push(k.dock.station, Math.round(k.dock.ox * 100) / 100, Math.round(k.dock.oy * 100) / 100);
   return row;
 }
@@ -55,10 +58,10 @@ export function unpackKeyframe(r: KeyframeRow): Keyframe {
   const mode = r[1] as ReplicaMode;
   return {
     id: r[0], mode,
-    body: { x: r[2], y: r[3], vx: r[4], vy: r[5], angle: r[6], angVel: r[7], jump: r[8], jumpScale: r[9] },
+    body: { x: r[2], y: r[3], vx: r[4], vy: r[5], angle: r[6], angVel: r[7], jump: r[8], jumpScale: r[9], ...(r[12] ? { brace: r[12] } : {}), ...(r[13] ? { cargo: r[13] } : {}) },
     ctl: { bits: r[10], targetAngle: replicaAngle(mode, r[11]) },
     q: r[11],
-    dock: r.length > 12 ? { station: r[12], ox: r[13], oy: r[14] } : undefined,
+    dock: r.length > 14 ? { station: r[14], ox: r[15], oy: r[16] } : undefined,
   };
 }
 
@@ -127,7 +130,7 @@ interface Rep {
 
 const HISTORY = 240;
 
-const cloneBody = (b: FlightBody): FlightBody => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, angle: b.angle, angVel: b.angVel, jump: b.jump, jumpScale: b.jumpScale });
+const cloneBody = (b: FlightBody): FlightBody => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, angle: b.angle, angVel: b.angVel, jump: b.jump, jumpScale: b.jumpScale, brace: b.brace, cargo: b.cargo });
 
 /**
  * Every replicated ship a client knows: keyframes and control changes from
@@ -244,7 +247,7 @@ export class ShipReplicaSet {
   }
 
   /** Where a ship is at a fractional tick (between two stepped states) */
-  pose(id: number, t: number): { x: number; y: number; angle: number; vx: number; vy: number; jump: number; jumpScale: number; aim: number; bits: number } | null {
+  pose(id: number, t: number): { x: number; y: number; angle: number; vx: number; vy: number; jump: number; jumpScale: number; brace: number; aim: number; bits: number } | null {
     const f = Math.floor(t);
     const a = this.at(id, f);
     if (!a) return null;
@@ -256,7 +259,7 @@ export class ShipReplicaSet {
     const mode = this.reps.get(id)!.mode;
     return {
       x: a.body.x + (b.body.x - a.body.x) * k, y: a.body.y + (b.body.y - a.body.y) * k, angle: a.body.angle + da * k,
-      vx: b.body.vx, vy: b.body.vy, jump: b.body.jump ?? 0, jumpScale: b.body.jumpScale ?? 1, aim: replicaAngle(mode, b.q), bits: b.bits,
+      vx: b.body.vx, vy: b.body.vy, jump: b.body.jump ?? 0, jumpScale: b.body.jumpScale ?? 1, brace: b.body.brace ?? 0, aim: replicaAngle(mode, b.q), bits: b.bits,
     };
   }
 }

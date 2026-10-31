@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import type { Blueprint, InventoryStub, PlacedPart, Rot, Side } from './types.js';
 import { parseBlueprint, serializeBlueprint, validateBlueprint } from './blueprint.js';
-import { allocateFlow, rebuild } from './rebuild.js';
+import { allocateFlow, rebuild, type ShipDerived } from './rebuild.js';
 import { createShipState, damagePart } from './state.js';
 import { healthFactor, ShipTuning } from './tuning.js';
 import { stepFlight, FlightBody, jumpTuning, jumpPhase, jumpDistance, jumpCoast, jumpScaleFor, jumpDriveStats } from './flight.js';
 import { pilotJumpStep, NO_FIELDS } from './jumpFields.js';
 import { stepShipPhysics } from './physics.js';
-import { powerTick, spend, payMining, MINE_SEGMENT, MINE_CYCLE, FULL_CHARGE, type Charge } from './energy.js';
+import { powerTick, payMining, gunLoad, coreHeld, MINE_CYCLE, FULL_CHARGE, type Charge } from './energy.js';
 import { stepGuns } from './guns.js';
 import { stepFixedGunAim } from './turret.js';
 import { partWeaponDef } from './launch.js';
@@ -270,7 +270,7 @@ describe('flow network and solver (M4)', () => {
     expect(d.energy.weaponDraw).toBeCloseTo(LEGACY_WEAPON, 9);
   });
 
-  it('an undersized generator: full power while the battery lasts, then only what the generators spare', () => {
+  it('an undersized generator: full power while the stores last, then only what the generators spare', () => {
     const full = derive(sparrow());
     const b = oneReactor();
     expect(codes(b)).toEqual([]);
@@ -282,46 +282,45 @@ describe('flow network and solver (M4)', () => {
     expect(supply).toBeLessThan(thrustDraw + weaponDraw);
 
     const weak = derive(b, (max, i) => (i === gi ? max * 0.5 : max));
-    // Built the same: full thrust and fire rate (the battery covers the shortfall)
+    // Built the same: full thrust and fire rate (the stores cover the shortfall, tick by tick: energy.ts)
     expect(weak.maxThrust.forward).toBeCloseTo(full.maxThrust.forward, 9);
     expect(weak.weapons[0].interval).toBeCloseTo(full.weapons[0].interval, 9);
     expect(weak.energy.spare).toBeCloseTo(supply, 9);
     expect(weak.energy.engineDraw).toBeCloseTo(thrustDraw, 9);
     expect(weak.energy.weaponDraw).toBeCloseTo(weaponDraw, 9);
-    const thrust = { thrusting: true, boosting: false };
-    // General-pool energy held, for a charge
-    const g = (d: typeof weak, c: Charge) => (d.energy.max * c.g) / 100;
-    const half: Charge = { g: 50, d: 0, w: 0 };
-    // Cruising: one generator keeps two thrusters going, and the rest charges the battery
+    // (The starter has no batteries: the core's own store is its main circuit's)
+    const thrust = { thrusting: true, boosting: false, dir: [0, -1] as [number, number] };
+    const half: Charge = { core: 50, s: [] };
+    // Cruising: one generator keeps two thrusters going, and the rest charges the core's store
     const c1 = powerTick(weak, half, thrust, tuning);
     expect(c1.power).toBe(1);
-    expect(g(weak, c1.charge)).toBeCloseTo(g(weak, half) + (supply - thrustDraw) / 60, 2);
-    // Boosting draws far more: full power on a charged battery, which drains by the shortfall
+    expect(coreHeld(weak, c1.charge)).toBeCloseTo(coreHeld(weak, half) + (supply - thrustDraw) / 60, 2);
+    // Boosting draws far more: full power on a charged store, which drains by the shortfall
     const boost = { ...thrust, boosting: true };
     const need = thrustDraw * (1 + 2.8 * weak.boostDrain);
     const b1 = powerTick(weak, half, boost, tuning);
     expect(b1.boost).toBe(true);
     expect(b1.power).toBe(1);
-    expect(g(weak, b1.charge)).toBeCloseTo(g(weak, half) - (need - supply) / 60, 2);
+    expect(coreHeld(weak, b1.charge)).toBeCloseTo(coreHeld(weak, half) - (need - supply) / 60, 2);
     // ...and needs stored charge
-    expect(powerTick(weak, { g: 0, d: 0, w: 0 }, boost, tuning).boost).toBe(false);
+    expect(powerTick(weak, { core: 0, s: [] }, boost, tuning).boost).toBe(false);
 
     // Damage that generator to a fifth of its HP: output drops on the health curve, and so does the spare power
     const damaged = derive(b, (max, i) => (i === gi ? max * 0.2 : max));
     const dSupply = PRODUCE * healthFactor(0.2, tuning);
     expect(damaged.energy.spare).toBeCloseTo(dSupply, 9);
     expect(dSupply).toBeLessThan(thrustDraw);
-    // Dry: the engines get what streams in, and nothing is left to charge the batteries
-    const empty: Charge = { g: 0, d: 0, w: 0 };
+    // Dry: the engines get what streams in (a brownout), and nothing is left to charge the store
+    const empty: Charge = { core: 0, s: [] };
     const dry = powerTick(damaged, empty, thrust, tuning);
     expect(dry.power).toBeCloseTo(dSupply / thrustDraw, 9);
-    expect(dry.charge.g).toBe(0);
-    // Idle: the battery charges with the spare power
+    expect(dry.charge.core).toBe(0);
+    // Idle: the store charges with the spare power
     const idle = powerTick(damaged, empty, { thrusting: false, boosting: false }, tuning);
-    expect(g(damaged, idle.charge)).toBeCloseTo(dSupply / 60, 2);
+    expect(coreHeld(damaged, idle.charge)).toBeCloseTo(dSupply / 60, 2);
   });
 
-  it('thrusting on empty batteries, the engines take every bit of power and the guns stay silent', () => {
+  it('thrusting on empty stores, the engines take every bit of power and the guns fire only what they were loaded with', () => {
     const b = oneReactor();
     const ship = createShipState(catalog, tuning, 1, b, 0);
     // Damage the generator so the engines need more than it makes
@@ -329,91 +328,100 @@ describe('flow network and solver (M4)', () => {
     ship.derived = derive(b, (max, i) => (i === gi ? max * 0.2 : max));
     expect(ship.derived.energy.spare).toBeLessThan(ship.derived.energy.engineDraw);
     const pose = { x: 0, y: 0, angle: -Math.PI / 2 };
-    let charge: Charge = { g: 0, d: 0, w: 0 };
+    let charge: Charge = { core: 0, s: [] };
     let fired = 0;
     for (let t = 1; t < 240; t++) {
-      charge = powerTick(ship.derived, charge, { thrusting: true, boosting: false }, tuning).charge;
-      const energy = { charge };
-      fired += stepGuns(ship, pose, { firing: true, aimWorld: -Math.PI / 2, aimDist: 0, energy }, t, tuning).shots.length;
-      charge = energy.charge;
+      charge = powerTick(ship.derived, charge, { thrusting: true, boosting: false, dir: [0, -1], load: gunLoad(ship, t) }, tuning).charge;
+      fired += stepGuns(ship, pose, { firing: true, aimWorld: -Math.PI / 2, aimDist: 0, energy: { charge } }, t, tuning).shots.length;
     }
-    expect(fired).toBe(0);
-    expect(charge.g).toBe(0);
+    // (A gun spawns loaded; its next shot's energy is drawn as it reloads, and the engines leave none)
+    expect(fired).toBe(ship.derived.weapons.length);
+    expect(charge.core).toBe(0);
   });
 
-  it('drive batteries feed only the engines, weapon batteries only the guns; the general battery both', () => {
+  it('drive stores feed only the engines, weapon stores only the guns; the general store both', () => {
     // (One reactor: a boost draws more than it makes)
     const b = oneReactor();
-    // Two of the hull squares become a Drive Cell and a Capacitor (each in its own material)
+    // Two of the hull squares become a Drive Cell and a weapon battery (a legacy one: a model Capacitor is a touch-fed bank)
     const hulls = b.parts.filter((q) => q.fn === 'hull' && q.piece === 'sq');
     let made = 0;
     for (const h of hulls) {
       if (made >= 2) break;
       const was = { fn: h.fn, material: h.material };
-      const m = FN(made === 0 ? 'power_drive_cell' : 'power_capacitor');
-      Object.assign(h, { fn: m.id, material: m.material });
+      Object.assign(h, made === 0 ? { fn: 'power_drive_cell', material: FN('power_drive_cell').material } : { fn: 'weapon_battery', material: 'alloy' });
       const d = derive(b);
       if ((made === 0 ? d.energy.driveMax : d.energy.weaponMax) > 0 && codes(b).length === 0) made++;
       else Object.assign(h, was);
     }
     expect(made).toBe(2);
-    const d = derive(b);
-    expect(d.energy.driveMax).toBeGreaterThan(0);
-    expect(d.energy.weaponMax).toBeGreaterThan(0);
-    // Guns spend the weapon battery first, and never the drive battery
-    const full: Charge = { g: 100, d: 100, w: 100 };
-    const a = spend(d, full, d.energy.weaponMax * 0.5)!;
-    expect(a.w).toBeCloseTo(50, 2);
-    expect(a.g).toBe(100);
-    expect(a.d).toBe(100);
-    // More than the weapon and general batteries hold: refused, though the drive battery is full
-    expect(spend(d, { g: 0, d: 100, w: 0 }, 1)).toBeNull();
-    // Boosting drains the drive battery first, and never the weapon battery
-    const boosted = powerTick(d, full, { thrusting: true, boosting: true }, tuning);
-    expect(boosted.charge.d).toBeLessThan(100);
-    expect(boosted.charge.w).toBe(100);
-    // Engines on an empty drive and general battery run on what streams in, even with a full weapon battery
-    const t = powerTick(d, { g: 0, d: 0, w: 100 }, { thrusting: true, boosting: true }, tuning);
+    const gi = reactorIndex(b);
+    const d = derive(b, (max, i) => (i === gi ? max * 0.2 : max));
+    const L = d.power!;
+    const main = L.circuits.find((c) => c.main)!;
+    expect(main.pools.d).toBeGreaterThanOrEqual(0);
+    expect(main.pools.w).toBeGreaterThanOrEqual(0);
+    const full: Charge = FULL_CHARGE;
+    // Guns draw on the weapon store first (past what streams in), and never the drive store
+    const load = L.feeds.map(() => 0);
+    for (const w of d.weapons) load[L.feedOf[w.part]] += L.draw[w.part] * 20;
+    const a = powerTick(d, full, { thrusting: false, boosting: false, load }, tuning).charge;
+    expect(a.s[main.pools.w]).toBeLessThan(100);
+    expect(a.s[main.pools.d]).toBe(100);
+    expect(a.core).toBe(100);
+    // Boosting drains the drive store first, and never the weapon store
+    const boosted = powerTick(d, full, { thrusting: true, boosting: true, dir: [0, -1] }, tuning).charge;
+    expect(boosted.s[main.pools.d]).toBeLessThan(100);
+    expect(boosted.s[main.pools.w]).toBe(100);
+    // Engines on an empty drive store and an empty core run on what streams in, even with a full weapon store
+    const s = L.stores.map((g) => (g.kind === 'w' ? 100 : 0));
+    const t = powerTick(d, { core: 0, s }, { thrusting: true, boosting: true, dir: [0, -1] }, tuning);
     expect(t.boost).toBe(false);
-    expect(t.charge.w).toBe(100);
+    expect(t.charge.s[main.pools.w]).toBe(100);
   });
 
-  it('mining lasers pay for a quarter-second segment at a time: no charge, no beam', () => {
+  it('mining lasers draw on their circuit while they run: nothing to run on, no beam', () => {
     const b = prospectorBp();
     const ship = createShipState(catalog, tuning, 1, b, 0);
     expect(ship.derived.miners.length).toBeGreaterThan(0);
-    const cost = (ship.derived.energy.minerDraw * MINE_SEGMENT) / 60;
-    // A segment's start: paid in full, then free until the next
-    const c = { charge: { g: 100, d: 100, w: 100 } as Charge };
-    expect(payMining(ship, true, MINE_SEGMENT * 10, c)).toBe(true);
-    const after = c.charge.g;
-    expect((ship.derived.energy.max * (100 - after)) / 100).toBeCloseTo(cost, 2);
-    expect(payMining(ship, true, MINE_SEGMENT * 10 + 5, c)).toBe(true);
-    expect(c.charge.g).toBe(after);
-    // The next segment, with nothing stored: the beam stops
-    const dry = { charge: { g: 0, d: 0, w: 0 } as Charge };
-    expect(payMining(ship, true, MINE_SEGMENT * 11, dry)).toBe(false);
-    // Starting mid-segment pays only for what's left of it
-    const fresh = createShipState(catalog, tuning, 2, b, 0);
-    const m = { charge: { g: 100, d: 100, w: 100 } as Charge };
-    payMining(fresh, true, MINE_SEGMENT * 20 + 10, m);
-    expect((fresh.derived.energy.max * (100 - m.charge.g)) / 100).toBeCloseTo((cost * (MINE_SEGMENT - 10)) / MINE_SEGMENT, 2);
+    // Started, a pulse runs MINE_CYCLE ticks, and while it runs its draw is part of the circuit's load
+    const c = { charge: powerTick(ship.derived, FULL_CHARGE, { thrusting: false, boosting: false, load: gunLoad(ship, 100) }, tuning).charge };
+    expect(payMining(ship, true, 100, c)).toBe(true);
+    expect(ship.mineUntil).toBe(100 + MINE_CYCLE);
+    const minerDraw = ship.derived.miners.reduce((t, m) => t + ship.derived.power!.draw[m.part], 0);
+    expect(gunLoad(ship, 101)!.reduce((t, v) => t + v, 0)).toBeCloseTo(minerDraw, 9);
+    expect(payMining(ship, false, 120, c)).toBe(true);
+    expect(payMining(ship, false, 100 + MINE_CYCLE, c)).toBe(false);
+    // Its reactors shot out and the core's store empty: no beam
+    const dead = createShipState(catalog, tuning, 2, b, 0);
+    dead.derived = derive(b, (max, i) => (b.parts[i].fn.includes('reactor') ? 0 : max));
+    const none = { charge: powerTick(dead.derived, { core: 0, s: [] }, { thrusting: false, boosting: false, load: gunLoad(dead, 5) }, tuning).charge };
+    expect(payMining(dead, true, 5, none)).toBe(false);
+    expect(dead.mineUntil ?? 0).toBe(0);
   });
 
-  it('every shot spends the battery: a gun it can\'t pay for waits', () => {
-    const ship = createShipState(catalog, tuning, 1, sparrow(), 0);
+  it('a gun draws its shot\'s energy as it reloads: with nothing to draw on it fires what it was loaded with, then waits', () => {
+    const b = sparrow();
     const pose = { x: 0, y: 0, angle: -Math.PI / 2 };
-    const w = ship.derived.weapons[0];
-    expect(w.energy).toBeGreaterThan(0);
-    // Empty: nothing fires
-    const dry = { charge: { g: 0, d: 0, w: 0 } as Charge };
-    expect(stepGuns(ship, pose, { firing: true, aimWorld: -Math.PI / 2, aimDist: 0, energy: dry }, 1, tuning).shots).toHaveLength(0);
-    // Charged: they fire, and each shot's energy comes off
-    const charged = { charge: { g: 100, d: 100, w: 100 } as Charge };
-    const { shots } = stepGuns(ship, pose, { firing: true, aimWorld: -Math.PI / 2, aimDist: 0, energy: charged }, 2, tuning);
-    expect(shots.length).toBeGreaterThan(0);
-    const spent = shots.reduce((t, s) => t + s.w.energy, 0);
-    expect((ship.derived.energy.max * (100 - charged.charge.g)) / 100).toBeCloseTo(spent, 2);
+    // Its reactors shot out: only the core's store to run on
+    const run = (core: number) => {
+      const ship = createShipState(catalog, tuning, 1, b, 0);
+      ship.derived = derive(b, (max, i) => (b.parts[i].fn.includes('reactor') ? 0 : max));
+      let charge: Charge = { core, s: [] };
+      let shots = 0;
+      for (let t = 1; t <= 120; t++) {
+        charge = powerTick(ship.derived, charge, { thrusting: false, boosting: false, load: gunLoad(ship, t) }, tuning).charge;
+        shots += stepGuns(ship, pose, { firing: true, aimWorld: -Math.PI / 2, aimDist: 0, energy: { charge } }, t, tuning).shots.length;
+      }
+      return { shots, spent: coreHeld(ship.derived, { core, s: [] }) - coreHeld(ship.derived, charge), w: ship.derived.weapons };
+    };
+    const dry = run(0);
+    expect(dry.shots).toBe(dry.w.length);
+    // Charged: they fire flat out, and the store pays each shot's energy as the guns reload
+    const charged = run(100);
+    expect(charged.shots).toBeGreaterThan(dry.shots * 4);
+    const perShot = charged.w[0].energy;
+    expect(charged.spent).toBeGreaterThan((charged.shots - charged.w.length) * perShot - 1e-6);
+    expect(charged.spent).toBeLessThan(charged.shots * perShot + 1e-6);
   });
 
   // A core, a generator under it, a strip of hull to its right and a gun at the end, wired along the strip; another strip
@@ -432,26 +440,33 @@ describe('flow network and solver (M4)', () => {
     ...(wires ? { wires } : {}),
   });
   const RUN: [number, number, number, number][] = [[0, 1, 1, 0], [1, 0, 2, 0], [2, 0, 3, 0], [3, 0, 4, 0]];
+  /** A part's circuit, on its local-circuits layout */
+  const circuitOf = (d: ShipDerived, i: number) => d.power!.circuits[d.power!.circuitOf[i]];
 
-  it('a wire carries power from a generator to what it reaches; cut the block under it and what lies beyond loses its power', () => {
+  it('a wire carries power from a generator to what it reaches; cut the block under it and what lies beyond is cut off', () => {
     const whole = derive(strip(RUN));
     expect(whole.satisfaction[5]).toBe(1);
     expect(whole.network[5]).toBe(whole.network[1]);
     expect(whole.wireLive.every(Boolean)).toBe(true);
     expect(whole.wireNet.every((n) => n === whole.network[1])).toBe(true);
     expect(whole.networks[whole.network[1]].powered).toBe(true);
+    expect(circuitOf(whole, 5).main).toBe(true);
     // (Hull it runs over is on the network too: a part joins every network with a wire node in it)
     expect(whole.network[3]).toBe(whole.network[1]);
-    // The middle plate shot off: the segments either side of it go dark, and the gun is cut off
+    // The middle plate shot off: the segments either side of it go dark, and the gun is cut off from the generator: it
+    // limps on the core's trickle (local circuits: energy.ts)
     const cut = derive(strip(RUN), (max, i) => (i === 3 ? 0 : max));
     expect(cut.alive[3]).toBe(false);
     expect(cut.alive[5]).toBe(true);
     expect(cut.wireLive).toEqual([true, false, false, true]);
     expect(cut.wireNet[1]).toBe(-1);
-    expect(cut.satisfaction[5]).toBe(0);
     expect(cut.network[5]).not.toBe(cut.network[1]);
-    // No wires at all: the gun touches nothing that makes power
-    expect(derive(strip([])).satisfaction[5]).toBe(0);
+    expect(circuitOf(cut, 5).main).toBe(false);
+    expect(circuitOf(cut, 5).generators).toHaveLength(0);
+    // No wires at all: the gun touches nothing that makes power, and is on no circuit
+    const bare = derive(strip([]));
+    expect(bare.network[5]).toBe(-1);
+    expect(circuitOf(bare, 5).net).toBe(-1);
   });
 
   it('a part touching a generator is plugged straight into it; modules touching modules share nothing else', () => {
@@ -462,28 +477,33 @@ describe('flow network and solver (M4)', () => {
       p(3, 'sq', 'cannon_pip', 3, 0, { facing: 'N' }),
     ]);
     const d = derive({ ...b, wires: [] });
-    expect(d.satisfaction[2]).toBe(1);
-    // (The second gun touches only the first)
-    expect(d.satisfaction[3]).toBe(0);
+    expect(d.network[2]).toBe(d.network[1]);
+    expect(circuitOf(d, 2).main).toBe(true);
+    // (The second gun touches only the first: on no circuit, the core's trickle is all it has)
     expect(d.network[3]).toBe(-1);
+    expect(circuitOf(d, 3).net).toBe(-1);
     // A wire into it from the first gun's cell: the first gun bridges it to the generator
-    expect(derive({ ...b, wires: [[2, 0, 3, 0]] }).satisfaction[3]).toBe(1);
+    expect(derive({ ...b, wires: [[2, 0, 3, 0]] }).network[3]).toBe(d.network[1]);
   });
 
-  it('batteries count only on a network with a generator; guns run off any battery on their network', () => {
+  it('a battery cut off from its generator keeps what it holds, but nothing charges it', () => {
     const battery = p(6, 'sq', 'power_battery', 5, 1);
     const store = FN('power_battery').store!;
     const core = tuning.energy?.coreCapacity ?? 240;
     const wired = derive(strip([...RUN, [4, 0, 5, 1]], [battery]));
     expect(wired.energy.max).toBe(Math.round(core + store));
-    // Cut off from the generator: the battery's capacity doesn't count, though the gun wired to it still runs off the ship's battery
+    // Cut off from the generator: the battery still counts, on the gun's own circuit, which has nothing to charge it
     const i6 = 10;
     const cut = derive(strip([...RUN, [4, 0, 5, 1]], [battery]), (max, i) => (i === 3 ? 0 : max));
     expect(cut.alive[i6]).toBe(true);
     expect(cut.network[i6]).toBe(cut.network[5]);
     expect(cut.networks[cut.network[i6]].powered).toBe(false);
-    expect(cut.energy.max).toBe(core);
+    expect(cut.energy.max).toBe(Math.round(core + store));
     expect(cut.satisfaction[5]).toBe(1);
+    const own = circuitOf(cut, i6);
+    let c: Charge = { core: 100, s: cut.power!.stores.map(() => 50) };
+    for (let t = 0; t < 120; t++) c = powerTick(cut, c, { thrusting: false, boosting: false }, tuning).charge;
+    expect(c.s[own.pools.g]).toBe(50);
   });
 
   it('a steady load shares out the supply on its own network, not the whole ship', () => {
@@ -924,10 +944,17 @@ describe('weapon balance: grades, sizes and the laser', () => {
     for (let j = 0; j < n; j++) want += Math.floor((T - 1 - Math.ceil((j * w.interval) / n)) / w.interval) + 1;
     expect(pulses).toBe(want);
     expect(ship.overheated.some(Boolean)).toBe(false);
-    // Each pulse is paid for at its start, as a shot is
-    const dry = { charge: { g: 0, d: 0, w: 0 } as Charge };
+    // Each pulse's energy is drawn as it recharges, as a shot's is: with nothing to draw on, only the pulses they were charged with
     const fresh = createShipState(catalog, tuning, 2, b, 0);
-    expect(stepGuns(fresh, pose, { firing: true, aimWorld: -Math.PI / 2, aimDist: 0, energy: dry }, 1, tuning).pulses).toHaveLength(0);
+    fresh.derived = derive(b, (max, i) => (b.parts[i].fn.includes('reactor') ? 0 : max));
+    let dry: Charge = { core: 0, s: [] }, charged = 0;
+    for (let t = 1; t <= 240; t++) {
+      dry = powerTick(fresh.derived, dry, { thrusting: false, boosting: false, load: gunLoad(fresh, t) }, tuning).charge;
+      charged += stepGuns(fresh, pose, { firing: true, aimWorld: -Math.PI / 2, aimDist: 0, energy: { charge: dry } }, t, tuning).pulses.length;
+    }
+    // (the second waits its turn in the ripple, and that wait is a recharge it can't draw for)
+    expect(charged).toBeGreaterThanOrEqual(1);
+    expect(charged).toBeLessThanOrEqual(fresh.derived.weapons.length);
   });
 
   /** A core, a generator, four guns across the front (`fns` by slot), fired for `T` ticks: each gun's fire ticks */

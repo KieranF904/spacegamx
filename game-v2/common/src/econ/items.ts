@@ -37,6 +37,8 @@ export interface ItemDef {
   description: string;
   /** Cargo space per unit (default 1) */
   volume?: number;
+  /** Mass per unit in the hold (ships/load.ts); default: its category's (CATEGORY_MASS) × its volume */
+  mass?: number;
   /** Parts: what to build */
   part?: { material: string; fn: string; piece: string };
   /** Plans: the blueprint file it unlocks */
@@ -59,6 +61,17 @@ export interface ItemDef {
   /** A record (data/codex.json id) found when this first comes into the hold or storage, however it was got */
   codex?: string;
 }
+
+/**
+ * Mass per unit of cargo space, by category (ships/load.ts: a full hold
+ * flies heavy). Ore and metal heavy, gems and plans light, ammunition between.
+ * An item's own `mass` (items.json) overrides it. A ship's own mass is about
+ * its cell count, so a starter's 30-space hold of ore is about a fifth of it.
+ */
+export const CATEGORY_MASS: Record<ItemCategory, number> = {
+  mineral: 0.1, refined: 0.09, part: 0.08, ammo: 0.06, artefact: 0.05, component: 0.04, quest: 0.04,
+  consumable: 0.03, volatile: 0.03, gem: 0.01, jewel: 0.01, plan: 0,
+};
 
 /** The five families of minerals (what kind of rock carries them) */
 export const MINERAL_FAMILIES = ['ferrous', 'noble', 'crystalline', 'volatile', 'exotic'] as const;
@@ -177,6 +190,24 @@ export class ItemCatalog {
 
   volume(id: string): number {
     return this.defs.get(id)?.volume ?? 1;
+  }
+
+  /** Mass of one unit in the hold (ships/load.ts) */
+  mass(id: string): number {
+    const d = this.defs.get(id);
+    if (!d) return CATEGORY_MASS.component;
+    return d.mass ?? CATEGORY_MASS[d.category] * (d.volume ?? 1);
+  }
+
+  /**
+   * What a list of stacks weighs: the hold's cargo mass (ships/load.ts), and
+   * the hook for jobs that pay by weight delivered (a hauling contract would
+   * weigh what it takes with this). Rounded as flight carries it.
+   */
+  massOf(stacks: readonly { id: string; n: number }[]): number {
+    let m = 0;
+    for (const s of stacks) m += s.n * this.mass(s.id);
+    return Math.round(m * 100) / 100;
   }
 
   name(id: string): string {

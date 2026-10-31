@@ -291,7 +291,8 @@ export abstract class StagedBrain implements BossBrain {
     for (const q of this.host.players(this.view.systemNum)) {
       const dx = x - Position.x[q], dy = y - Position.y[q], d = Math.hypot(dx, dy);
       if (d > r || d < 1) continue;
-      const f = k * (1 - d / r);
+      // (A braced Stabiliser Anchor holds against it: common/src/ships/anchor.ts)
+      const f = k * (1 - d / r) * this.host.ships.pullShare(q);
       Velocity.x[q] += (dx / d) * f;
       Velocity.y[q] += (dy / d) * f;
     }

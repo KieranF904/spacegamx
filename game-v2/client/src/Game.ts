@@ -60,6 +60,7 @@ import type { AdminPanel } from './ui/AdminPanel';
 import type { ContributorPanel } from './ui/ContributorPanel';
 import { RenderTuningPanel } from './ui/RenderTuningPanel';
 import { DevShipPanel } from './ui/DevShipPanel';
+import { CircuitBars } from './ui/CircuitBars';
 import { ObjectiveBanner } from './ui/ObjectiveBanner';
 import { SiegePanel } from './ui/SiegePanel';
 import { moonOffset, planetPosition, pocketAt, inSafeSpace, jumpRange, jumpTuning, type StarSystemData } from '@space-game/common';
@@ -117,7 +118,7 @@ registerRockTypes(miningTable as unknown as MiningTable);
 /** A cannon shot's pitch by its gun's grade, Mk I-V (heavy shells lower, high-velocity slugs higher) */
 const CANNON_GRADE_PITCH = [1, 0.86, 1.14, 1.06, 0.8];
 
-const FLIGHT_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'KeyJ', 'KeyV', 'KeyX', 'KeyH', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight', 'Space']);
+const FLIGHT_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'KeyJ', 'KeyY', 'KeyV', 'KeyX', 'KeyH', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight', 'Space']);
 
 /** Proto mode (npm run proto): in-process server, no login, no prediction. */
 export interface ProtoHooks {
@@ -259,6 +260,8 @@ private xpFillEl: HTMLElement | null;
   /** The XP bar as last shown (to glow when it grows) */
   private xpSeen: { level: number; into: number } | null = null;
   private boostFillEl: HTMLElement | null;
+  /** Each circuit's charge beside the ENERGY gauge (local circuits) */
+  private circuitBars: CircuitBars | null = null;
   private levelEl: HTMLElement | null;
   private xpEl: HTMLElement | null;
   private xpToNextEl: HTMLElement | null;
@@ -290,6 +293,7 @@ private xpFillEl: HTMLElement | null;
   private lastSentStrafeRight = false;
   private lastSentHelm = false;
   private lastSentJump = false;
+  private lastSentBrace = false;
   /** Extra camera zoom factor while jumping */
   private jumpZoom = 1;
   private lastSentCursorDist = 0;
@@ -364,6 +368,7 @@ this.boostHudEl = document.getElementById('boostHud');
 this.xpFillEl = document.getElementById('xpFill');
     this.xpBarEl = document.getElementById('xpBar');
     this.boostFillEl = document.getElementById('boostFill');
+    this.circuitBars = new CircuitBars();
     this.levelEl = document.getElementById('level');
     this.xpEl = document.getElementById('xp');
     this.xpToNextEl = document.getElementById('xpToNext');
@@ -449,6 +454,8 @@ this.xpFillEl = document.getElementById('xpFill');
     this.pilotHud = new PilotHud(this.pilot);
     this.cargoPanel = new CargoPanelUI(this.pilot, (m) => this.network.send(m), (id) => this.audio.playUI(id, 0.4));
     this.cargoPanel.ceiling = () => this.pilotHud.bottom();
+    // (The load is weighed against the ship you fly: common/src/ships/load.ts)
+    this.cargoPanel.ship = () => this.shipClient.myShip()?.derived ?? null;
     this.shipClient.ownAmmo = (kind) => {
       const prof = this.pilot.profile;
       const pick = chooseCrate(crateOrder(cratesFor(shipTuning as ShipTuning, kind), prof?.loadout), prof?.ammoPrefer?.[kind], prof?.ammo ?? {}, (id) => this.pilot.cargo.some((s) => s.id === id && s.n > 0));
@@ -1554,17 +1561,19 @@ this.xpFillEl = document.getElementById('xpFill');
     let strafeRight = helm && inputEnabled && this.input.isKeyDown('KeyE');
     // Jump drive: J latches it on, and it stays on until the jump fires (or J again cancels)
     let jump = inputEnabled && this.shipClient.jumpHeld();
+    // Stabiliser Anchor: toggled (Y), it stays braced while the toggle is on, chat or menus open or not
+    let brace = this.shipClient.braceHeld();
     // (The angle is quantized to 13 bits, so client and server use the same value for hitscan: see CURSOR_STATE.md)
     let quantized = quantizeCursorAngle(rawAngle);
     let cursorDistQ = quantizeCursorDist(aimDist);
     // A menu jump has the controls as the autopilot does: no thrust, mouse-steer, the drive as it says
     if (order) {
-      forward = backward = left = right = boost = helm = strafeLeft = strafeRight = false;
+      forward = backward = left = right = boost = helm = strafeLeft = strafeRight = brace = false;
       jump = order.jump;
     }
     if (auto) {
       ({ forward, backward, left, right, boost, jump } = auto);
-      helm = strafeLeft = strafeRight = false;
+      helm = strafeLeft = strafeRight = brace = false;
       quantized = quantizeCursorAngle(auto.targetAngle);
       cursorDistQ = quantizeCursorDist(auto.jump ? auto.cursorDist : aimDist);
     }
@@ -1583,6 +1592,7 @@ this.xpFillEl = document.getElementById('xpFill');
       || strafeRight !== this.lastSentStrafeRight
       || helm !== this.lastSentHelm
       || jump !== this.lastSentJump
+      || brace !== this.lastSentBrace
       || cursorDistQ !== this.lastSentCursorDist;
     
     // Stamp targetTick using local tick counter — each tick iteration
@@ -1607,6 +1617,7 @@ this.xpFillEl = document.getElementById('xpFill');
       helm,
       cursorDist: cursorDistQ * CURSOR_DIST_STEP,
       jump,
+      brace,
     };
     
     // Proto: no targetTick (applied on the next tick) and no prediction queue.
@@ -1627,6 +1638,7 @@ this.xpFillEl = document.getElementById('xpFill');
         this.lastSentStrafeRight = strafeRight;
         this.lastSentHelm = helm;
         this.lastSentJump = jump;
+        this.lastSentBrace = brace;
         this.lastSentCursorDist = cursorDistQ;
       }
       return;
@@ -1650,6 +1662,7 @@ this.xpFillEl = document.getElementById('xpFill');
       this.lastSentStrafeRight = strafeRight;
       this.lastSentHelm = helm;
       this.lastSentJump = jump;
+      this.lastSentBrace = brace;
       this.lastSentCursorDist = cursorDistQ;
     } else {
       // Queue for delayed application (server also applies same input on same tick)
@@ -1683,6 +1696,8 @@ this.xpFillEl = document.getElementById('xpFill');
       helm: this.lastSentHelm,
       cursorDist: this.lastSentCursorDist * CURSOR_DIST_STEP,
       jump: false,
+      // (The anchor is a toggle, not a held key: it stays as it was)
+      brace: this.lastSentBrace,
     };
     this.network.send(msg);
     // The prediction steps the same input (proto has none)
@@ -2405,6 +2420,8 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'none';
       const boostPercent = (this.state.boostFuel / this.state.maxBoostFuel) * 100;
       setStyle(this.boostFillEl, 'height', `${boostPercent.toFixed(1)}%`);
     }
+    // (and each circuit's, flashing while one browns out: ui/CircuitBars.ts)
+    this.circuitBars?.update(this.shipClient?.myShip()?.derived, this.state.charge);
     
     // XP bar: progress through the current level (from the pilot's profile)
     const prof = this.pilot.profile;

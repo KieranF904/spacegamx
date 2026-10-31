@@ -16,7 +16,7 @@ import type { WeaponInfo } from './rebuild.js';
 import { buildShot, shipPointToWorld, type ProjectileSpec, type ShipPose } from './shot.js';
 import { stepFixedGunAim, stepTurretAim } from './turret.js';
 import { SHOT_AIM_STEPS, shotAimQ } from './launch.js';
-import { spend, type Charge } from './energy.js';
+import { BROWNOUT, feedShare, type Charge } from './energy.js';
 
 export interface GunOrders {
   firing: boolean;
@@ -25,9 +25,10 @@ export interface GunOrders {
   /** How far away the aim point is (0: aim along aimWorld from anywhere) */
   aimDist: number;
   /**
-   * The batteries' charge (energy.ts): each shot spends its energy from the
-   * weapon batteries, then the general one, and a gun they can't pay for
-   * waits. Updated in place. Absent: guns fire for free (no accounting).
+   * The charge after this tick's power step (energy.ts powerTick): each gun
+   * draws on its own circuit while it reloads (gunLoad), and reloads at the
+   * share of that its circuit could give (a brownout: slower); a beam burns
+   * that share of the time. Absent: guns run free (no accounting).
    */
   energy?: { charge: Charge };
   /** Intervals × this (a cold ship's guns recycle slower: warmth.ts); absent: 1 */
@@ -68,10 +69,10 @@ const MAX_WAIT = 600;
  * pulse lasers that start a pulse, and the beams that are on (cooling and
  * heat are the beams' own business; a pulse runs its course on its own).
  *
- * The guns ready to fire pay in turn, the one that has waited longest first,
- * and one the batteries can't pay for holds back the rest: so on a ship short
- * of power the charge goes round, and a big gun (a big shot's worth at a time)
- * isn't starved by small ones nibbling at it as it trickles in.
+ * A loaded gun fires; its shot's energy is drawn as it reloads (energy.ts
+ * gunLoad), from its own circuit. On a circuit short of power every gun on it
+ * gets the same share, so all reload that much slower and a big gun is never
+ * starved by small ones (the ready ones still go longest-waiting first).
  *
  * Kinds that stagger (tuning `stagger`: pulse lasers, railguns, missiles)
  * fire one after another instead of all together: a gun of such a kind that
@@ -90,18 +91,17 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
   const held = (w: WeaponInfo) => weapons[w.kind]?.type === 'beam' && !weapons[w.kind]?.pulse;
   const weapons = tuning.weapons ?? {};
   const { aimWorld, aimDist } = orders;
-  const pay = (w: WeaponInfo) => {
-    if (!orders.energy) return true;
-    const left = spend(ship.derived, orders.energy.charge, w.energy);
-    if (left === null) return false;
-    orders.energy.charge = left;
-    return true;
-  };
+  // Each gun's share of the power it asked its circuit for this tick (1 unaccounted, or with plenty)
+  const share = (w: WeaponInfo) => (orders.energy ? feedShare(ship.derived, orders.energy.charge, w.part, 'gun') : 1);
+  // (A beam short of power burns that share of the ticks, evenly spread)
+  const burns = (w: WeaponInfo) => { const r = share(w); return r >= BROWNOUT || (r > 0 && Math.floor(tick * r) !== Math.floor((tick - 1) * r)); };
   const aimX = aimWorld === undefined ? 0 : pose.x + Math.cos(aimWorld) * aimDist;
   const aimY = aimWorld === undefined ? 0 : pose.y + Math.sin(aimWorld) * aimDist;
   const ready: WeaponInfo[] = [];
   for (const w of ship.derived.weapons) {
-    ship.cooldown[w.part] = Math.max(-MAX_WAIT, ship.cooldown[w.part] - 1);
+    // (Reloading, it loads at its circuit's share: a browned-out gun reloads slower)
+    const cd0 = ship.cooldown[w.part];
+    ship.cooldown[w.part] = Math.max(-MAX_WAIT, cd0 > 0 && !held(w) ? cd0 - share(w) : cd0 - 1);
     let canFire = true;
     if (w.window) {
       let desired = w.window.center + ship.aim[w.part];
@@ -138,7 +138,7 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
   for (const w of ready) {
     // (Waiting its turn in its group's ripple: see stagger below)
     if (!held(w) && ship.cooldown[w.part] > 0) continue;
-    if (!pay(w)) break;
+    if (held(w) && !burns(w)) continue;
     const cd = ship.cooldown[w.part];
     if (held(w)) {
       // (A beam pays a tick at a time: each one is a shot)

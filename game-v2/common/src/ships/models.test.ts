@@ -36,7 +36,7 @@ describe('models', () => {
   it('are in the catalogue: every one its own piece(s), material, tier and recipe', () => {
     const models = [...catalog.functions.values()].filter((f) => f.model);
     expect(models).toHaveLength(MODELS.models.length);
-    expect(models.length).toBe(65);
+    expect(models.length).toBe(66);
     const recipes = JSON.parse(readFileSync(join(SHIP_DATA_DIR, '../recipes.json'), 'utf-8')).models;
     for (const m of models) {
       expect(Array.isArray(m.pieces) && m.pieces.length > 0, m.id).toBe(true);

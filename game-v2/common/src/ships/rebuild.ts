@@ -15,7 +15,8 @@ import { DEFAULT_JUMP, coilCapacity, jumpDriveStats } from './flight.js';
 import { fnOutput, isEngine, partDemand, partGrade, partMaterial, partSupply, partThrust, weaponBaseArea, weaponStrength } from './grades.js';
 import { netJoins, wireNetworks } from './wires.js';
 import { gunRate } from './launch.js';
-import { type EnergyInfo, energyTuning } from './energy.js';
+import { type EnergyInfo } from './energy.js';
+import { type PowerLayout, powerLayout } from './circuits.js';
 
 /** The most engine output a blueprint can ask for (a boss's; players' designs stop at 1) */
 export const MAX_DRIVE = 2.5;
@@ -121,6 +122,8 @@ export interface ShipDerived {
   satisfaction: number[];
   /** Battery, spare generator power, and what draws on it (energy.ts) */
   energy: EnergyInfo;
+  /** Local circuits: each circuit's stores, generation and consumers, the capacitor banks and the core's store (circuits.ts; energy.ts runs them) */
+  power?: PowerLayout;
   mass: number;
   /** Centre of mass, grid units */
   com: Vec2;
@@ -161,6 +164,8 @@ export interface ShipDerived {
   scanRange: number;
   /** Shield capacity from powered shield generators (0 = no shield) */
   shieldMax: number;
+  /** Stabiliser Anchor: its best one's satisfaction (0 = none; it braces from anchor.ts MIN_ANCHOR_POWER) */
+  anchor?: number;
   /** Jump drive reach (world units) and cooldown (ticks): the core's own coil and powered jump coils against the hull (flight.ts jumpDriveStats) */
   jumpRange: number;
   jumpCooldown: number;
@@ -306,6 +311,14 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   const area = geoms.map((g) => g.area);
   const satisfaction = new Array<number>(n).fill(1);
   const burst = (i: number) => isEngine(fns[i]) || !!fns[i].weapon || isMinerFn(fns[i]);
+  // (Local circuits: a burst consumer runs wherever its circuit has a generator or a store, it touches a capacitor bank, or the
+  // core's store can reach it: on the main circuit, or by its trickle elsewhere. How much it actually gets is the tick's: energy.ts)
+  const coreAlive = input.rootMode === 'core' && root >= 0 && parts[root].fn === 'core';
+  const nearBank = new Array<boolean>(n).fill(false);
+  for (const [a, b] of joins) {
+    if (alive[a] && alive[b] && fns[a].bank && (fns[a].store ?? 0) > 0) nearBank[b] = true;
+    if (alive[a] && alive[b] && fns[b].bank && (fns[b].store ?? 0) > 0) nearBank[a] = true;
+  }
   let spare = 0, totalSupply = 0;
   const networks: FlowNetwork[] = wn.nets.map((g) => {
     let supply = 0, powered = false, stored = false;
@@ -322,15 +335,15 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
       satisfaction[i] = demands[k] > 0 ? Math.min(1, alloc[k] / demands[k]) : 0;
       delivered += satisfaction[i] * demands[k];
     });
-    // (They run while their network has a generator or a battery on it: the ship's batteries pay)
-    for (const i of g) if (burst(i) && (fns[i].demand ?? 0) > 0) satisfaction[i] = powered || stored ? 1 : 0;
+    // (They run while their network has a generator or a store on it, or the core or a bank can reach them: energy.ts)
+    for (const i of g) if (burst(i) && (fns[i].demand ?? 0) > 0) satisfaction[i] = powered || stored || coreAlive || nearBank[i] ? 1 : 0;
     spare += Math.max(0, supply - delivered);
     totalSupply += supply;
     return { parts: g, supply, demand: demands.reduce((s, d) => s + d, 0), delivered, powered };
   });
-  // Consumers on no network get nothing
+  // Consumers on no network get nothing (but engines, guns and mining lasers the core's trickle or a bank they touch)
   parts.forEach((_, i) => {
-    if (alive[i] && (fns[i].demand ?? 0) > 0 && network[i] < 0) satisfaction[i] = 0;
+    if (alive[i] && (fns[i].demand ?? 0) > 0 && network[i] < 0) satisfaction[i] = burst(i) && (coreAlive || nearBank[i]) ? 1 : 0;
   });
 
   // 5. Derived physics
@@ -444,13 +457,14 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   let cargoCapacity = hasCore ? CORE_CARGO : 0;
   let scanRange = 0;
   let shieldMax = 0;
+  // (Stabiliser Anchor: anchor.ts)
+  let anchor = 0;
   const jt = { ...DEFAULT_JUMP, ...(tuning.jump ?? {}) };
   // The jump drive: coil capacity (the core's own, and powered coils', a little more for better grades) against the hull's cells
   let jumpCap = 0, jumpGradeSum = 0, hullCells = 0;
   const miners: MinerInfo[] = [];
   const launchers: LauncherInfo[] = [];
   const dash = { speed: 0, cooldown: 0, coils: 0 };
-  let batteryMax = hasCore ? energyTuning(tuning).coreCapacity : 0, driveMax = 0, weaponMax = 0;
   let engineDraw = 0, minerDraw = 0;
   for (let i = 0; i < n; i++) {
     if (!alive[i]) continue;
@@ -464,11 +478,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     if ((fns[i].capacity ?? 0) > 0) cargoCapacity += fns[i].capacity! * area[i];
     if ((fns[i].range ?? 0) > 0) scanRange = Math.max(scanRange, fns[i].range! * satisfaction[i]);
     if ((fns[i].shield ?? 0) > 0) shieldMax += fns[i].shield! * area[i] * fnOutput(fns[i], mats[i]) * satisfaction[i];
-    // (A battery counts only on a network with a generator)
-    if ((fns[i].store ?? 0) > 0 && network[i] >= 0 && networks[network[i]].powered) {
-      const cap = fns[i].store! * area[i] * fnOutput(fns[i], mats[i]);
-      if (fns[i].pool === 'drive') driveMax += cap; else if (fns[i].pool === 'weapon') weaponMax += cap; else batteryMax += cap;
-    }
+    if (fns[i].anchor) anchor = Math.max(anchor, satisfaction[i]);
     if (satisfaction[i] > 0 && (fns[i].demand ?? 0) > 0) {
       const draw = partDemand(fns[i], area[i], mats[i]);
       if (isEngine(fns[i])) engineDraw += draw;
@@ -493,6 +503,12 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     }
   }
 
+  // ---- Local circuits (circuits.ts): worked out here once, run by energy.ts every tick
+  const power = powerLayout({ fns, area, mats, alive, joins, network, networks, burst, core: coreAlive, tuning });
+  let batteryMax = power.core?.cap ?? 0, driveMax = 0, weaponMax = 0;
+  for (const g of power.stores) if (g.kind === 'd') driveMax += g.cap; else if (g.kind === 'w' || g.kind === 'k') weaponMax += g.cap; else batteryMax += g.cap;
+  // ---- (end local circuits)
+
   const jump = jumpDriveStats(jumpCap, hullCells, jumpCap > 0 ? jumpGradeSum / jumpCap : 1, jt);
 
   return {
@@ -508,6 +524,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     wireNet: wn.segNet,
     satisfaction,
     energy: { max: Math.round(batteryMax), driveMax: Math.round(driveMax), weaponMax: Math.round(weaponMax), spare, supply: totalSupply, engineDraw, minerDraw, weaponDraw },
+    power,
     mass,
     com,
     inertia: inertiaGrid * cs * cs,
@@ -528,6 +545,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     dash,
     scanRange: Math.round(scanRange),
     shieldMax: Math.round(shieldMax),
+    ...(anchor > 0 ? { anchor: Math.round(anchor * 1000) / 1000 } : {}),
     jumpRange: jump.range,
     jumpCooldown: jump.cooldown,
     jumpRatio: jump.ratio,

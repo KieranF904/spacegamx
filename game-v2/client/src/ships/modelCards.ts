@@ -5,7 +5,7 @@
  * locked, why: the level it's learned at (nothing opens one earlier).
  */
 
-import { isWeaponFn, mountingOf, mountingWords, partMount, partStats, PIECE_NAMES, type Catalog, type FunctionDef, type ItemDef, type Mount, type ShipTuning } from '@space-game/common';
+import { circuitTuning, partDischarge, isWeaponFn, mountingOf, mountingWords, partMount, partStats, PIECE_NAMES, type Catalog, type FunctionDef, type ItemDef, type Mount, type ShipTuning } from '@space-game/common';
 
 /** Families by name, in the palette's order within their category (legendaries share one group) */
 export const FAMILY_LABEL: Record<string, string> = {
@@ -15,7 +15,7 @@ export const FAMILY_LABEL: Record<string, string> = {
   ion: 'Ion drives', afterburner: 'Burn engines', plasma: 'Plasma drives', jumpcoil: 'Jump coils',
   reactor: 'Generators', battery: 'Batteries', capacitor: 'Capacitors', drive_cell: 'Drive cells',
   shield: 'Shields', plating: 'Plating',
-  mining: 'Mining lasers', demolition: 'Demolition', siphon: 'Siphons', scanner: 'Scanners', constructor: 'Constructors',
+  mining: 'Mining lasers', demolition: 'Demolition', siphon: 'Siphons', scanner: 'Scanners', constructor: 'Constructors', anchor: 'Anchors',
 };
 export const LEGENDARY = 'Legendary';
 const FAMILY_ORDER = Object.keys(FAMILY_LABEL);
@@ -39,6 +39,7 @@ export function familyRank(label: string): number {
  */
 const TRADE_OFF: Record<string, string> = {
   cannon_pip: 'light and quick',
+  utility_stabiliser_anchor: 'hold still for range, aim and shields; no thrust braced',
   cannon_hammer: 'slow heavy shell, punches plate',
   cannon_twinlink: 'sustained fire, power-hungry',
   cannon_longbarrel: "a sniper's cannon: far, slow to fire",
@@ -79,10 +80,10 @@ const TRADE_OFF: Record<string, string> = {
   power_isotope_pile: 'weak but tough, never explodes',
   power_fusion_plant: 'plenty of power, heavy, big blast',
   power_overclock_reactor: 'most power, fragile, biggest blast',
-  power_battery: 'stores for engines and guns',
-  power_capacitor: 'light, feeds guns only',
-  power_drive_cell: 'deep store, engines only',
-  power_heavy_bank: 'dense and heavy',
+  power_battery: 'an all-rounder: holds and gives quickly',
+  power_capacitor: 'tiny and very fast, only into what it touches',
+  power_drive_cell: 'deep and fast, engines only',
+  power_heavy_bank: 'holds the most, gives it slowly',
   utility_mining_laser: 'cuts ore, a poor weapon',
   utility_bore: 'cuts harder rock',
   utility_demolition_launcher: 'cracks rock wide open',
@@ -160,10 +161,15 @@ export function keyStats(catalog: Catalog, tuning: ShipTuning | undefined, fn: F
   if (st.thrust) out.push(`thrust ${st.thrust.toFixed(1)}`);
   if (fn.rated) out.push(`top ${n0(fn.rated * 60)} m/s`);
   if (st.supply) out.push(`+${n0(st.supply)} power`);
-  if ((fn.store ?? 0) > 0) out.push(`holds ${n0(fn.store! * st.area)}${fn.pool === 'drive' ? ' (engines)' : fn.pool === 'weapon' ? ' (guns)' : ''}`);
+  if ((fn.store ?? 0) > 0) {
+    out.push(`holds ${n0(fn.store! * st.area)}${fn.pool === 'drive' ? ' (engines)' : fn.pool === 'weapon' ? ' (guns)' : ''}`);
+    // (local circuits: the most it gives a second; a capacitor only into what it touches)
+    out.push(`gives ${n0(partDischarge(fn, st.area, catalog.materials.get(fn.material ?? 'alloy'), circuitTuning(tuning ?? ({} as ShipTuning))))}/s${fn.bank ? ' by touch' : ''}`);
+  }
   if (st.shield) out.push(`shield ${n0(st.shield)}`);
   if ((fn.range ?? 0) > 0 && !fn.weapon) out.push(`scan ${n0(fn.range!)} m`);
   if ((fn.jumpCapacity ?? 0) > 0) out.push(`jump ${n0(fn.jumpCapacity! * st.area)} cells`);
+  if (st.brace) out.push(`braced: reach +${Math.round((st.brace.reach - 1) * 100)}%`);
   if (st.draw && !st.supply) out.push(`draws ${n0(st.draw)}`);
   if (!out.length || (fn.category === 'shields' && !st.shield)) out.push(`${n0(st.hp)} hp · armour ${st.armour}`);
   return out.join(' · ');

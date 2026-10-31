@@ -101,6 +101,8 @@ In dev, `localStorage['sg.surfaceLook'] = 'classic'` shows the old ground live, 
 | graphics | planet-edges-jovan | A gas giant's edge (Jovan) for comparison: already soft from its haze, unchanged. | | graphics/planet-edges-jovan-before.png, -after.png, planet-edges-jovan.png |
 | graphics | planet-edges-jovan-zoom1 | The same at normal game zoom. | | graphics/planet-edges-jovan-zoom1-before.png, -after.png, planet-edges-jovan-zoom1.png |
 | ui | login-random-body | The sign-in screen now shows a different Sol body each visit (here Jovan with its rings) in the sun's old place. Behind it is Sol's real sky, and the new sun sits in a corner as the light source. The sun itself still comes up about one visit in six. | sign-in screen ready in about the same time: 245–273 ms on a first visit (was 267), 179–197 ms on a reload (was 224) | ui/login-random-body-before.png, -after.png, login-random-body.png |
+| gameplay | cargo-mass | Cargo has mass now: the cargo panel says what your load weighs and what it costs you (a starter Sparrow T with a full 30-unit hold of ore). Station storage weighs nothing. | full starter hold of ore: 3.0 mass on a 14-mass ship, −18% thrust, −10% turning | gameplay/cargo-mass-before.png, -after.png, cargo-mass.png |
+| gameplay | hangar-cargo-mass | The hangar's ship readout shows what the hold costs now and what a full hold of ore would. | as above; a Hauler full of ore loses about 20% | gameplay/hangar-cargo-mass-before.png, -after.png, hangar-cargo-mass.png |
 
 ### Performance (numbers only, nothing visual to show)
 
@@ -115,6 +117,9 @@ New this update, after only (no matching before):
 | category | topic | what it is | files |
 |---|---|---|---|
 | ui | login-random-body-* | More sign-in screen examples: Terra Nova, Nereid, Ares, Selene (with Terra Nova behind it), Vesta, and the sun. | ui/login-random-body-terra-nova-after.png, -nereid-after.png, -ares-after.png, -terra-nova-moon-after.png, -vesta-after.png, -sun-after.png |
+| gameplay | stabiliser-anchor-hangar | The Stabiliser Anchor (new utility part, level 18) fitted to a Sparrow T in the hangar, with its tooltip: what bracing does, and how long it takes. The readout's Anchor row says the same. | gameplay/stabiliser-anchor-hangar-after.png |
+| gameplay | stabiliser-anchor-bracing | Pressing Y: the anchor's clamps start to swing out and the HUD chip says BRACING · NO THRUST while its bar fills (the vulnerable moment). | gameplay/stabiliser-anchor-bracing-after.png |
+| gameplay | stabiliser-anchor-braced | Braced (zoomed in): clamps out on their struts, a faint ring round the hull, and the chip says what it gives and the key to let go. | gameplay/stabiliser-anchor-braced-after.png |
 
 ## Skipped, and why
 
@@ -137,3 +142,13 @@ New this update, after only (no matching before):
 | graphics | surface-terra-nova-fields | Awaiting review, not deployed: Terra Nova farmland. The seam where the field grid jumped sideways is gone, and the fields are irregular parcels with wandering hedges, varied crops and row directions, with meadow and scrub left before coasts and rivers. | ground cost about the same (+0.002 ms native) | graphics/surface-terra-nova-fields-before.png, -after.png, surface-terra-nova-fields.png |
 | graphics | surface-terra-nova-fields-close | Awaiting review, not deployed: the same fields, low down. | ground cost about the same | graphics/surface-terra-nova-fields-close-before.png, -after.png, surface-terra-nova-fields-close.png |
 | ui | perf-monitor | Awaiting review, not deployed: the performance monitor (Settings > Performance monitor) is one readable panel at the top, left of the minimap and quest list: FPS and frame time with worst and 95th percentile, a frame-time graph with 16.7 and 33 ms lines, ping and jitter graph, entities, quality, network rates. Click the header to fold, drag to move. | | ui/perf-monitor-before.png, -after.png, perf-monitor.png |
+
+### 2026-10-31: local circuits (energy Phase 1)
+
+Awaiting review, not deployed. The same hand-wired test design both sides (a Split Sparrow: guns, reactor and two Capacitors on one circuit; the engines with a Drive Cell and a Battery on another; a third Capacitor wired to nothing), shot on a local test server.
+
+| category | topic | what changed | numbers | files |
+|---|---|---|---|---|
+| ui | hangar-power | The hangar's power view shows circuits: lettered A, B on the wires and in the POWER panel (A is the main circuit, which holds the core's store), each with what it spares, holds and can give a second. A load test (Fire / Boost / Both) plays 4 s of the ship's power and says which circuits brown out and how fast they refill (B: never). New warnings: stores with no generator, a capacitor touching nothing that draws power, and weak links (cells a single wire runs through; marked ✂ with the Wires tool). | Battery gives 600/s per cell, Heavy Bank 450, Drive Cell 1,400, Capacitor 2,000 (only into what it touches); core store 720/s to circuit A, 12/s trickle to the rest | ui/hangar-power-before.png, -after.png, hangar-power.png |
+| gameplay | hud-energy | Beside the ENERGY gauge, a thin bar for each circuit with stores (lettered and coloured as in the hangar; grey with no generator) and one for the core's store (◆). A circuit that browns out flashes red. Hidden on ships with only one store to show (the gauge says it all). | | gameplay/hud-energy-before.png, -after.png, hud-energy.png |
+| gameplay | hud-energy-closeup | The same, cropped round the gauge and enlarged 3×. | | gameplay/hud-energy-closeup-before.png, -after.png, hud-energy-closeup.png |

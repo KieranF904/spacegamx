@@ -32,6 +32,8 @@ export interface ShipSummary {
   guns: number;
   turrets: number;
   miners: number;
+  /** Stabiliser Anchor: its best one's power (0: none; ships/anchor.ts) */
+  anchor: number;
   /** Credits it costs to lose it: the minerals salvage doesn't bring back, at station prices */
   rebuild: number;
 }
@@ -39,7 +41,7 @@ export interface ShipSummary {
 /** Is a bigger number better for this stat (mass, turn time and rebuild cost are better small) */
 export const BIGGER_IS_BETTER: Record<keyof Omit<ShipSummary, 'power' | 'energy'>, boolean> = {
   rating: true, parts: true, mass: false, topSpeed: true, accel: true, turn180: false, dps: true, hull: true, shield: true, cargo: true,
-  jump: true, jumpCooldown: false, jumpRatio: true, guns: true, turrets: true, miners: true, rebuild: false,
+  jump: true, jumpCooldown: false, jumpRatio: true, guns: true, turrets: true, miners: true, anchor: true, rebuild: false,
 };
 
 export function shipSummary(catalog: Catalog, tuning: ShipTuning, econ: Economy, bp: Blueprint): ShipSummary | null {
@@ -93,6 +95,7 @@ export function shipSummary(catalog: Catalog, tuning: ShipTuning, econ: Economy,
     guns: d.weapons.length,
     turrets: d.weapons.filter((w) => w.mount === 'turret').length,
     miners: d.miners.length,
+    anchor: d.anchor ?? 0,
     rebuild,
   };
 }

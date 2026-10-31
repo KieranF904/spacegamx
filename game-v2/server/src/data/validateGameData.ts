@@ -474,7 +474,7 @@ const SHIP_SHAPES: Record<string, Spec> = {
       id: 'string', pieces: { or: ['string[]', oneOf('*')] }, hpScale: 'number', 'carriesFlow?': 'boolean',
       'produce?': 'number', 'demand?': 'number', 'priority?': oneOf(1, 2, 3), 'loss?': 'number', 'thrust?': 'number', 'boost?': 'number',
       'boostDrain?': 'number', 'fireInterval?': 'number', 'capacity?': 'number', 'jumpCapacity?': 'number',
-      'range?': 'number', 'weapon?': 'string', 'shield?': 'number', 'store?': 'number', 'pool?': oneOf('drive', 'weapon'), 'legacy?': 'boolean',
+      'range?': 'number', 'weapon?': 'string', 'shield?': 'number', 'store?': 'number', 'pool?': oneOf('drive', 'weapon'), 'discharge?': 'number', 'bank?': 'boolean', 'legacy?': 'boolean',
     })),
   }),
   // Player models (written by scripts/econ/models.mjs): functions with their own pieces, material, tier and unlock level
@@ -485,7 +485,7 @@ const SHIP_SHAPES: Record<string, Spec> = {
       'unlock?': strict({ level: 'number' }), 'weaponMods?': 'any', 'rated?': 'number', 'blast?': obj({ radius: 'number', damage: 'number', delayTicks: 'number[]' }),
       'produce?': 'number', 'demand?': 'number', 'priority?': oneOf(1, 2, 3), 'thrust?': 'number', 'boost?': 'number', 'boostDrain?': 'number',
       'fireInterval?': 'number', 'capacity?': 'number', 'jumpCapacity?': 'number', 'range?': 'number', 'weapon?': 'string', 'shield?': 'number',
-      'store?': 'number', 'pool?': oneOf('drive', 'weapon'), 'armour?': 'number', 'massScale?': 'number', 'mount?': oneOf('fixed', 'turret'),
+      'store?': 'number', 'pool?': oneOf('drive', 'weapon'), 'discharge?': 'number', 'bank?': 'boolean', 'armour?': 'number', 'massScale?': 'number', 'mount?': oneOf('fixed', 'turret'),
       'mounting?': strict({ 'attach?': oneOf('back', 'any'), 'angle?': oneOf('straight', 'right'), 'arc?': 'number', 'clear?': 'any' }),
     })),
   }),

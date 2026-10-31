@@ -30,6 +30,19 @@ ships on fire, lava worlds), slower through insulating materials (`materials.jso
 (gemmed guns, the Frostbite Lance, the Brood Mother) take warmth too. The pilot gets it as snapshot `data[13]`
 (percent) and sees it as the frost vignette (`client/src/ui/FrostVignette.ts`; a tint only on Low quality).
 
+Cargo mass and the Stabiliser Anchor: what's in a pilot's hold has mass (`ItemCatalog.mass`: an item's `mass` in
+`data/items.json`, else `CATEGORY_MASS` by category × its volume; station storage weighs nothing). It rides on the flight
+body (`FlightBody.cargo`, from `Pilots.cargoMass` each tick) and divides thrust and turning in `flight.ts` against the
+ship's own mass (`common/src/ships/load.ts`), so the server, the pilot's prediction (snapshot `data[15]`) and replicas
+(keyframes carry it) fly the same load. `ItemCatalog.massOf(stacks)` is the hook for jobs that pay by weight delivered.
+The Anchor (`functions.anchor`, model `utility_stabiliser_anchor`) braces on a toggled control (input flag `brace`,
+replica bit `CTL.brace`, key Y): its counter `FlightBody.brace` (`common/src/ships/anchor.ts`; snapshot `data[14]`)
+spools in and out, and while braced flight holds the ship, guns get `bracedWeaponMods` (`gunDef braced`), shields
+recharge faster (`ShipBridge`), and pulls and knockback go through `ShipBridge.pullShare`. Numbers: `tuning.json`
+`anchor` over `DEFAULT_ANCHOR`.
+
+Energy runs on local circuits: each wire network keeps its own charge, every store gives at most its discharge rate a second (past it the circuit browns out: guns reload slower, engines push less), capacitors give only to what they touch, and the core's store is a battery on the main circuit and a trickle to the rest. The layout is worked out at the rebuild in `common/src/ships/circuits.ts` and run each tick by `common/src/ships/energy.ts` (server and pilot prediction alike); the numbers are `discharge` in `data/ships/models.json` (from `scripts/econ/models.mjs`) and `energy` in `data/ships/tuning.json`. `common/src/ships/circuits.test.ts` flies every library ship through a scripted fight and fails if a discharge rate ever bites. Design and decisions: `docs/design/energy-system.md`, "Implemented (Phase 1)".
+
 Watching the VPS live: `npm run monitor` opens a dashboard of the box's CPU, memory, network, disk, each service and the game's tick times. It streams over SSH as a read-only `vpsmon` account (key `~/.ssh/vpsmon_ed25519`; set up by `deploy/vps/monitor/setup.sh`, which only lets that key run the stats script).
 
 ## Default Admin Account

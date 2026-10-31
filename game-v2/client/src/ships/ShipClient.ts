@@ -10,7 +10,7 @@
  *   J  jump drive: spool up, then fly far and fast along the nose (J again aborts)
  */
 
-import { payMining, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, warmthStage, withNumb, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules } from '@space-game/common';
+import { payMining, gunLoad, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, warmthStage, withNumb, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules } from '@space-game/common';
 import hazardData from '../../../data/hazards.json';
 
 const HAZARD_RULES = hazardData as unknown as HazardRules;
@@ -22,11 +22,13 @@ import {
   JumpTuning, jumpPhase, jumpTuning, coreHp, FRICTION, worldToLocalDir, partItemId, inSolarRing, jumpRange,
   jumpFieldAt, fieldRangeBoost, fieldCharge, primeBoost, pilotJumpStep, withEmp, lodestonePosition, type JumpField, type LodestoneData,
   ShipReplicaSet, ServerSnapshotMessage, packCursorWeaponState, rebuildVolley, WEAPON_KIND_TYPE, EntityState, accelAlong, turnAccel, rateShip, stepGuns, volleyShells, firesStraight, partWeaponDef,
+  anchorTuning, bracePhase, canBrace, type BracePhase,
 } from '@space-game/common';
 import type { MenuShipInfo } from '../ui/GameMenuUI';
 import type { GameState, InterpolatedEntity } from '../state/GameState';
 import type { Renderer } from '../rendering/Renderer';
 import { ShipStore } from './ShipStore';
+import { BraceIndicator } from '../ui/BraceIndicator';
 import { ShipRenderer } from './ShipRenderer';
 import { ShipHud } from './ShipHud';
 import type { HangarUI } from './HangarUI';
@@ -130,6 +132,9 @@ export class ShipClient {
   private jump: JumpTuning;
   /** J was pressed: the jump control stays on until the burn starts (or J again cancels) */
   private jumpLatched = false;
+  /** Stabiliser Anchor: the brace toggle (anchor.ts); the server and prediction step the counter from it */
+  private braceLatched = false;
+  private braceUi = new BraceIndicator();
   private lastFrame = 0;
   /** The local jump charge sound, so an abort can cut it */
   private chargeSound: (() => void) | null = null;
@@ -175,6 +180,7 @@ export class ShipClient {
       canMake: (id) => opts.pilot.canMake(id),
       level: () => opts.pilot.profile?.level ?? 1,
       have: (id) => opts.pilot.count(id),
+      cargoMass: () => opts.pilot.econ.items.massOf(opts.pilot.cargo),
       stored: (id) => opts.pilot.storage.reduce((t, x) => t + (x.id === id ? x.n : 0), 0),
       coming: () => opts.pilot.coming(),
       send: (m) => opts.send(m),
@@ -287,6 +293,8 @@ export class ShipClient {
     e.renderY += (p.y - e.renderY) * ease;
     e.renderAngle = p.angle;
     e.angVel = 0;
+    // (Its anchor: the brace effect, ShipRenderer)
+    e.brace = p.brace;
     if (e.type === EntityType.Player) {
       // Rebuild the per-pilot data the effects read (see the server's player snapshot row)
       const s = e.status ?? [];
@@ -432,7 +440,7 @@ export class ShipClient {
       // (Homing missiles change course: those the server sends as they fly)
       if (!firesStraight(partWeaponDef(this.opts.tuning, w.kind, ship.blueprint.parts[w.part], w))) continue;
       // A pilot's shells move on the tick they're fired (as in preSnapshot)
-      for (const s of volleyShells(player.id, ship, w, shot, { ...pose, vx: player.vx, vy: player.vy }, tick, this.opts.tuning, this.ownAmmo?.(w.kind))) {
+      for (const s of volleyShells(player.id, ship, w, shot, { ...pose, vx: player.vx, vy: player.vy, brace: player.brace }, tick, this.opts.tuning, this.ownAmmo?.(w.kind))) {
         this.scene.predictShot({ owner: player.id, type: WEAPON_KIND_TYPE[w.kind] ?? 1, grade: w.grade, spawnX: s.x, spawnY: s.y, spawnTick: tick - 1, vx: s.vx, vy: s.vy, size: s.size, pose });
       }
     }
@@ -512,12 +520,33 @@ export class ShipClient {
     return this.jumpLatched;
   }
 
+  /** Is the brace control on this tick? (Y toggles it; docking, or losing the anchor, lets go) */
+  braceHeld(): boolean {
+    if (this.braceLatched && (this.hangarOpen || !this.localCanBrace())) this.braceLatched = false;
+    return this.braceLatched;
+  }
+
+  /** Your ship has a working Stabiliser Anchor */
+  localCanBrace(): boolean {
+    const ship = this.store.get(this.opts.state.playerId);
+    return !!ship && ship.kind === 'ship' && canBrace(ship.derived);
+  }
+
+  /** Your anchor's phase (predicted), and whether the brace toggle is on: for the HUD */
+  localBrace(): { phase: BracePhase; progress: number; latched: boolean; fitted: boolean } {
+    const me = this.opts.state.entities.get(this.opts.state.playerId);
+    const ship = this.store.get(this.opts.state.playerId);
+    const fitted = !!ship && ship.kind === 'ship' && (ship.derived.anchor ?? 0) > 0;
+    return { ...bracePhase(me?.brace, anchorTuning(this.opts.tuning)), latched: this.braceLatched, fitted };
+  }
+
   /** What the local pilot's keys ask the engines for (ship grid frame), for the thruster effects */
   private localThrustCommand(): ThrustCommand {
     const me = this.opts.state.entities.get(this.opts.state.playerId);
     const idle: ThrustCommand = { dir: [0, 0], turn: 0, boost: false };
     if (!me || this.hangarOpen || !(this.opts.inputEnabled?.() ?? true)) return idle;
     if (this.localJump().phase !== 'ready' && this.localJump().phase !== 'cooldown') return idle; // the drive has the engines
+    if ((me.brace ?? 0) > 0) return idle; // (so does the anchor, out or spooling)
     const k = (...codes: string[]) => (codes.some((c) => this.opts.isKeyDown(c)) ? 1 : 0);
     const fwd = k('KeyW', 'ArrowUp'), back = k('KeyS', 'ArrowDown'), left = k('KeyA', 'ArrowLeft'), right = k('KeyD', 'ArrowRight');
     const boost = k('ShiftLeft', 'ShiftRight') === 1;
@@ -773,6 +802,14 @@ export class ShipClient {
       this.helm = !this.helm;
       return true;
     }
+    if (code === 'KeyY') {
+      const ship = this.store.get(this.opts.state.playerId);
+      if (this.braceLatched) this.braceLatched = false;
+      else if (!ship || ship.kind !== 'ship' || !(ship.derived.anchor ?? 0)) this.opts.showMessage('No Stabiliser Anchor fitted: build one in the hangar to brace', '#f2d24b');
+      else if (!this.localCanBrace()) this.opts.showMessage('The Stabiliser Anchor has no power', '#f2d24b');
+      else this.braceLatched = true;
+      return true;
+    }
     if (code === 'KeyJ') {
       const ph = this.localJump();
       const hold = settings.data.gameplay.jumpMode === 'hold';
@@ -823,7 +860,8 @@ export class ShipClient {
       player.x = st.x; player.y = st.y; player.vx = 0; player.vy = 0; player.angVel = 0;
       return charge;
     }
-    const body = { x: player.x, y: player.y, vx: player.vx, vy: player.vy, angle: player.angle, angVel: player.angVel ?? 0, jump: player.jump ?? 0, jumpScale: player.jumpScale };
+    // (The anchor's counter and the hold's mass, as the server flies them: anchor.ts, load.ts)
+    const body = { x: player.x, y: player.y, vx: player.vx, vy: player.vy, angle: player.angle, angVel: player.angVel ?? 0, jump: player.jump ?? 0, jumpScale: player.jumpScale, brace: player.brace ?? 0, cargo: player.cargoMass ?? 0 };
     // Hit by an EMP (or frozen through): the drive crippled and no jump starting, exactly as the server has it (ShipBridge.stepMovement)
     const emp = tick < (player.empUntil ?? 0);
     // (and numb with cold, a sluggish drive: warmth.ts, from the warmth the server tells)
@@ -837,8 +875,8 @@ export class ShipClient {
           forward: input.forward, backward: input.backward, left: input.left, right: input.right,
           boost: input.boost, targetAngle: input.targetAngle,
           helm: input.helm, strafeLeft: input.strafeLeft, strafeRight: input.strafeRight, jump: input.jump && !emp,
-          jumpDist: input.cursorDist,
-        }, ship.derived, this.opts.tuning, { charge, drainRate: 1 }, this.gravity, rangeBoost, emp ? withEmp(hazard) : hazard, this.terrain);
+          jumpDist: input.cursorDist, brace: input.brace,
+        }, ship.derived, this.opts.tuning, { charge, drainRate: 1, load: gunLoad(ship, tick) }, this.gravity, rangeBoost, emp ? withEmp(hazard) : hazard, this.terrain);
       });
     player.jumpScale = body.jumpScale;
     player.x = body.x;
@@ -848,13 +886,14 @@ export class ShipClient {
     player.angle = body.angle;
     player.angVel = body.angVel;
     player.jump = body.jump;
+    player.brace = body.brace;
     return res.charge;
   }
 
   /** All your ship's stored energy as one percentage (the HUD's gauge) */
   chargeTotal(charge: Charge): number {
     const ship = this.store.get(this.opts.state.playerId);
-    return ship && ship.kind === 'ship' ? chargeTotal(ship.derived, charge) : charge.g;
+    return ship && ship.kind === 'ship' ? chargeTotal(ship.derived, charge) : 100;
   }
 
   /**
@@ -906,6 +945,10 @@ export class ShipClient {
       aiming: this.jumpAiming(), aimDist: this.jumpAimInfo.dist, aimLabel: this.jumpAimInfo.label,
       reach: this.jumpReach(), field: me ? this.gaugeField() : undefined, danger: this.jumpAiming() ? this.jumpDanger() : null,
     });
+    // The anchor's chip (only while it's out)
+    const brace = this.localBrace();
+    const at = anchorTuning(this.opts.tuning);
+    this.braceUi.update(this.hangarOpen || !brace.fitted ? null : brace, boundKeyName('brace', settings.data.bindings), `guns +${Math.round(at.range * 100)}% reach`);
     this.damageFx?.update(dt);
     this.beamFx?.update(dt);
     this.bossFx?.update(dt);

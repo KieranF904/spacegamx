@@ -11,7 +11,7 @@
  * opens the full window.
  */
 
-import { RARITY_COLOR, secureHold, type ClientMessage, type Stack } from '@space-game/common';
+import { RARITY_COLOR, secureHold, cargoEffect, type ClientMessage, type Stack } from '@space-game/common';
 import type { PilotState } from '../econ/clientEcon';
 import { injectWindowStyles, itemTipHtml, showTip, hideTip, openMenu, closeMenu, sortStacks } from './windowKit';
 import { itemIcon } from './itemIcons';
@@ -22,6 +22,10 @@ const HEIGHT_KEY = 'sg.cargoPanel.height';
 /** The list's height until the pilot drags it (about nine rows of two), and the least it shrinks to */
 const DEFAULT_H = 200;
 const MIN_H = 44;
+/** What the load line means, in plain words */
+const LOAD_TIP = '<div class="t-n">Cargo has mass</div><div class="t-d">What is in your hold is carried with you: a heavy load accelerates, turns and stops slower. '
+  + 'It is weighed against your ship, so a big hauler minds the same load far less, and strong engines keep a laden ship lively. '
+  + 'Ore and metal are heavy, gems light, ammunition between. Station storage weighs nothing.</div>';
 const LOCK = '<svg viewBox="0 0 10 12" width="9" height="11"><rect x="1" y="5" width="8" height="6.5" rx="1.2" fill="#fcd34d"/><path d="M2.9 5V3.6a2.1 2.1 0 0 1 4.2 0V5" fill="none" stroke="#fcd34d" stroke-width="1.4"/></svg>';
 
 let styled = false;
@@ -62,6 +66,10 @@ function injectStyles(): void {
 @keyframes sgcNew { 0%, 25% { background: rgba(134, 239, 172, 0.32); box-shadow: inset 0 0 0 1px rgba(134, 239, 172, 0.6); } }
 @media (prefers-reduced-motion: reduce) { .sgc-it.new { animation: none; background: rgba(134, 239, 172, 0.15); } }
 .sgc-empty { grid-column: 1 / -1; color: #56657c; padding: 2px 4px; }
+.sgc-load { display: flex; gap: 6px; margin-top: 4px; font-size: 11px; color: #8394ad; cursor: help; }
+.sgc-load b { color: #c9d4e5; font-weight: 600; }
+.sgc-load .hit { color: #fbbf24; }
+.sgc-load .hit.heavy { color: #fb923c; }
 `;
   document.head.appendChild(css);
 }
@@ -84,6 +92,10 @@ export class CargoPanelUI {
   private placedAt = 0;
   /** The bottom of whatever sits above it in the left column (the pilot readout), so it never grows into it */
   ceiling?: () => number;
+  /** The ship you fly (its mass: what the load is weighed against, common/src/ships/load.ts) */
+  ship?: () => { mass: number; fullMass?: number } | null;
+  private load: HTMLDivElement;
+  private loadKey = '';
 
   constructor(private pilot: PilotState, private send: (m: ClientMessage) => void, private sound: (id: string) => void) {
     injectWindowStyles();
@@ -97,12 +109,15 @@ export class CargoPanelUI {
     this.root.className = 'sgc';
     this.root.dataset.hudAvoid = '1';
     this.root.innerHTML = `<div class="sgc-grip" title="Drag to resize"></div><div class="sgc-head" title="Click to fold · I: full inventory"><span class="tg"></span><b>CARGO</b><span class="f"></span></div>
-      <div class="sgw-bar"><i></i></div><div class="sgc-grid"></div>`;
+      <div class="sgw-bar"><i></i></div><div class="sgc-load" hidden></div><div class="sgc-grid"></div>`;
     const head = this.root.querySelector('.sgc-head') as HTMLElement;
     this.toggle = head.querySelector('.tg') as HTMLSpanElement;
     this.fill = head.querySelector('.f') as HTMLSpanElement;
     this.bar = this.root.querySelector('.sgw-bar') as HTMLElement;
     this.grid = this.root.querySelector('.sgc-grid') as HTMLDivElement;
+    this.load = this.root.querySelector('.sgc-load') as HTMLDivElement;
+    this.load.addEventListener('mousemove', (e) => showTip(LOAD_TIP, e.clientX, e.clientY));
+    this.load.addEventListener('mouseleave', hideTip);
     head.onclick = () => this.setCollapsed(!this.collapsed);
     this.grip(this.root.querySelector('.sgc-grip') as HTMLElement);
     this.root.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -176,7 +191,22 @@ export class CargoPanelUI {
     }
     if (exposed !== this.exposed) { this.exposed = exposed; this.render(); }
     // The readout above grows and shrinks (a rebuild note, ammunition): keep clear of it, now and then
-    if (!hidden && performance.now() - this.placedAt > 500) this.place();
+    if (!hidden && performance.now() - this.placedAt > 500) { this.place(); this.renderLoad(); }
+  }
+
+  /** The hold's mass, and what it costs the ship in thrust and turning (ships/load.ts) */
+  private renderLoad(): void {
+    const ship = this.ship?.();
+    const mass = this.pilot.econ.items.massOf(this.pilot.cargo);
+    const key = `${mass}|${ship?.mass}|${ship?.fullMass}`;
+    if (key === this.loadKey) return;
+    this.loadKey = key;
+    const e = ship && mass > 0 ? cargoEffect(ship, mass) : null;
+    this.load.hidden = !e;
+    if (!e) return;
+    const pct = (v: number) => `−${Math.round(v * 100)}%`;
+    const heavy = e.thrustLoss >= 0.25 ? ' heavy' : '';
+    this.load.innerHTML = `<span>Load <b>${mass.toFixed(1)}</b></span><span class="hit${heavy}">${pct(e.thrustLoss)} thrust</span><span class="hit${heavy}">${pct(e.turnLoss)} turn</span>`;
   }
 
   private render(): void {

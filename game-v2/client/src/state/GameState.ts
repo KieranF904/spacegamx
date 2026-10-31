@@ -11,7 +11,7 @@
  * CRITICAL: Uses BitBuffer precision for all physics to match server exactly.
  */
 
-import { FULL_CHARGE, type Charge } from '@space-game/common';
+import { FULL_CHARGE, unpackCharge, type Charge } from '@space-game/common';
 import { FarShips } from './FarShips';
 import {
   ServerSnapshotMessage,
@@ -81,6 +81,10 @@ export interface InterpolatedEntity {
   empUntil?: number;
   /** Warmth, % (local player; server data[13]: common/src/ships/warmth.ts): the frost vignette, and how cold prediction flies and fires */
   warmth?: number;
+  /** Stabiliser Anchor counter (local player: server data[14], then predicted; others: their replica): common/src/ships/anchor.ts */
+  brace?: number;
+  /** The hold's cargo mass (local player; server data[15]: common/src/ships/load.ts): prediction flies it */
+  cargoMass?: number;
   /** Other pilots: their status row (shield, EMP, beam heat, beams, cursor distance); data is rebuilt from it and their replica */
   status?: number[];
   /**
@@ -560,7 +564,7 @@ export class GameState {
     if (c != null) this.charge = c;
     const after = this.shipGuns?.(player, input, tick, this.charge);
     if (after != null) this.charge = after;
-    this.boostFuel = this.chargeTotal?.(this.charge) ?? this.charge.g;
+    this.boostFuel = this.chargeTotal?.(this.charge) ?? this.serverBoostFuel;
   }
 
   // ============================================
@@ -881,13 +885,16 @@ export class GameState {
     player.jumpPrime = serverState.data?.[12] ?? 0;
     player.empUntil = snapshot.tick + (serverState.data?.[5] ?? 0);
     player.warmth = serverState.data?.[13] ?? 100;
+    player.brace = serverState.data?.[14] ?? 0;
+    player.cargoMass = serverState.data?.[15] ?? 0;
 
     // Reset boost fuel to server-reported value before replaying inputs.
     // Boost fuel is now in entity data[1] for every snapshot (not just playerState).
     // This ensures reconciliation uses fresh fuel data, not 1-second-stale data.
     if (serverState.data && serverState.data.length >= 2) {
       this.serverBoostFuel = serverState.data[1];
-      this.serverCharge = { g: serverState.data[1], d: serverState.data[10] ?? 100, w: serverState.data[11] ?? 100 };
+      // (Local circuits: the core's store and each store group's, energy.ts unpackCharge)
+      this.serverCharge = unpackCharge(serverState.data);
     }
     this.charge = { ...this.serverCharge };
     
@@ -971,7 +978,7 @@ export class GameState {
   private reapplyInput(player: InterpolatedEntity, input: ClientInputMessage, tick: number): void {
     const c = this.shipPhysics?.(player, input, this.charge, tick);
     if (c != null) this.charge = c;
-    this.boostFuel = this.chargeTotal?.(this.charge) ?? this.charge.g;
+    this.boostFuel = this.chargeTotal?.(this.charge) ?? this.serverBoostFuel;
   }
 
   // ============================================

@@ -259,10 +259,10 @@ const OTHER = [
   ['power_isotope_pile', 'Isotope Pile', 'reactor', ['round'], 9, 'steel', { produce: 18, hpScale: 1.6 }, 'A weak generator, but tough, and it never explodes.', 'power'],
   ['power_fusion_plant', 'Fusion Plant', 'reactor', ['block2'], 18, 'steel', { produce: 48, hpScale: 0.9, massScale: 2, blast: { radius: 3, damage: 70, delayTicks: [4, 16] } }, 'A heavy plant with plenty of power, and a big blast.', 'power'],
   ['power_overclock_reactor', 'Overclock Reactor', 'reactor', ['rect2'], 24, 'titanium', { produce: 62, hpScale: 0.4, blast: { radius: 3.6, damage: 95, delayTicks: [3, 12] } }, 'The most power for its size: fragile, and the biggest blast.', 'power'],
-  ['power_battery', 'Battery', 'battery', ['sq'], 0, 'alloy', { store: 200, hpScale: 0.6 }, 'Stores energy for engines and guns.', 'power'],
-  ['power_capacitor', 'Capacitor', 'capacitor', ['sq'], 7, 'composite', { store: 160, pool: 'weapon', hpScale: 0.6 }, 'A light store that feeds only guns and mining lasers.', 'power'],
-  ['power_drive_cell', 'Drive Cell', 'drive_cell', ['sq'], 10, 'steel', { store: 320, pool: 'drive', hpScale: 0.6 }, 'A deep store for the engines alone.', 'power'],
-  ['power_heavy_bank', 'Heavy Bank', 'battery', ['block2'], 20, 'titanium', { store: 300, hpScale: 0.7, massScale: 1.6 }, 'A dense, heavy bank of cells.', 'power'],
+  ['power_battery', 'Battery', 'battery', ['sq'], 0, 'alloy', { store: 200, discharge: 600, hpScale: 0.6 }, 'Stores energy for engines and guns. An all-rounder: gives its charge quickly.', 'power'],
+  ['power_capacitor', 'Capacitor', 'capacitor', ['sq'], 7, 'composite', { store: 160, pool: 'weapon', bank: true, discharge: 2000, hpScale: 0.6 }, 'A tiny, very fast store for guns and mining lasers it touches. Touching capacitors make one bank.', 'power'],
+  ['power_drive_cell', 'Drive Cell', 'drive_cell', ['sq'], 10, 'steel', { store: 320, pool: 'drive', discharge: 1400, hpScale: 0.6 }, 'A deep store for the engines alone, and fast: made for boosting.', 'power'],
+  ['power_heavy_bank', 'Heavy Bank', 'battery', ['block2'], 20, 'titanium', { store: 300, discharge: 450, hpScale: 0.7, massScale: 1.6 }, 'A dense, heavy bank of cells: holds a lot, but gives it slowly.', 'power'],
   ['utility_mining_laser', 'Mining Laser', 'mining', ['sq'], 0, 'alloy', { demand: 12, priority: 2, facing: true, mining: true, hpScale: 0.7 }, 'Cuts ore from rock. A poor weapon.', 'utility'],
   ['utility_bore', 'Bore', 'mining', ['rect2'], 10, 'steel', { demand: 9, priority: 2, facing: true, mining: true, hpScale: 0.8 }, 'A heavier mining laser: its steel cuts harder rock.', 'utility'],
   ['utility_demolition_launcher', 'Demolition Launcher', 'demolition', ['sq'], 8, 'alloy', { weapon: 'charge', demand: 8, priority: 2, fireInterval: 120, hpScale: 0.8, weaponMods: {} }, 'Fires mining charges that crack rock wide open.', 'utility'],
@@ -278,13 +278,18 @@ const OTHER = [
   ['utility_heavy_coil', 'Heavy Coil', 'jumpcoil', ['block2'], 30, 'cobalt', { jumpCapacity: 16, demand: 8, priority: 3, hpScale: 0.8 }, 'A dense coil: the most jump drive for its cells.', 'engines'],
   ['plating_reactive_armour', 'Reactive Armour', 'plating', ['sq', 'rect2'], 12, 'steel', { armour: 2, hpScale: 2, massScale: 1.6 }, 'Plate that turns shells aside: lighter protection than armour.', 'shields'],
   ['plating_spaced_plating', 'Spaced Plating', 'plating', ['sq', 'rect2'], 22, 'titanium', { armour: 1, hpScale: 3.2, massScale: 1.3 }, 'Layers of plate with room between: a lot to chew through.', 'shields'],
+  // Stabiliser Anchor (docs/design/build-archetypes.md §5 #4; band L16-23, Steady): brace with a key to hold still for range, accuracy,
+  // shields and no pulls, at the cost of moving (common/src/ships/anchor.ts). A steady consumer like a shield (demand per cell: 12 in all)
+  ['utility_stabiliser_anchor', 'Stabiliser Anchor', 'anchor', ['block2'], 18, 'steel', { anchor: true, demand: 3, priority: 2, hpScale: 1.2, massScale: 1.5 }, 'Brace to hold still: guns reach further and shoot straighter, shields recharge faster, and nothing can pull you. No thrust while braced.', 'utility'],
 ];
 const LOOK = {
   reactor: 'generator', battery: 'battery', capacitor: 'weapon_battery', drive_cell: 'drive_battery', mining: 'miner', demolition: 'charge_launcher',
   siphon: 'siphon', scanner: 'scanner', constructor: 'constructor', shield: 'shield', jumpcoil: 'jumpcoil', plating: 'armor',
 };
+/** Families with no legacy function: their own look (client/src/ships/partDecor.ts DECOR_SHAPES) */
+const OWN_LOOK = { anchor: { color: '#8fb3d9', decor: 'anchor', glow: '#7dd3fc' } };
 for (const [id, name, family, pieces, level, material, fields, description, category] of OTHER) {
-  const look = legacyLook(LOOK[family]);
+  const look = OWN_LOOK[family] ?? legacyLook(LOOK[family]);
   models.push({
     ...base(id, name, family, pieces, level, material, { grade: fields.grade }), ...fields, ...(fields.weapon ? mounted(id, description) : { description }),
     rarity: level >= 20 ? 'rare' : level >= 5 ? 'uncommon' : 'common', category, fabOrder: next(category), ...look,
@@ -376,6 +381,7 @@ const RECIPES = {
   shield_bulwark_projector: { titanium_plate: 4, copper_wire: 4, shield_emitter: 3, power_coupling: 1 },
   utility_jump_coil: { steel_plate: 1, coil_winding: 1, power_coupling: 1, crystal: 1 },
   utility_heavy_coil: { cobalt_alloy: 4, coil_winding: 4, power_coupling: 2, nav_computer: 1 },
+  utility_stabiliser_anchor: { steel_plate: 4, servo_motor: 2, power_coupling: 1, copper_wire: 2 },
   plating_reactive_armour: { steel_plate: 2, propellant: 1, scrap_electronics: 1 },
   plating_spaced_plating: { titanium_plate: 3, composite_sheet: 1 },
 };

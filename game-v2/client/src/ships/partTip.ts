@@ -8,10 +8,11 @@
 
 import {
   Catalog, Economy, PlacedPart, ShipTuning, ShipDerived, Side, WeaponMods, Bag,
-  partStats, partItemId, placeCost, isStructural, outputOf, gradeOf, fnOutput, partGrade, partMaterial, energyTuning, jumpTuning, coilCapacity, CORE_CARGO, PIECE_NAMES, partBuildPoints, DAMAGE_NAMES, isPowerPart, mountingWords, type DamageType } from '@space-game/common';
+  partStats, partItemId, placeCost, isStructural, outputOf, gradeOf, fnOutput, partGrade, partMaterial, energyTuning, circuitTuning, partDischarge, jumpTuning, coilCapacity, CORE_CARGO, PIECE_NAMES, partBuildPoints, DAMAGE_NAMES, isPowerPart, mountingWords, type DamageType } from '@space-game/common';
 import { costHtml } from '../ui/windowKit';
 import { jumpRatioNote } from './shipSummary';
 import { functionColor, numToCss } from './shipColors';
+import { circuitColor } from './wireEdit';
 import { MOUNT_TEXT, tradeOff, weaponMount } from './modelCards';
 
 export interface PartTipCtx {
@@ -125,15 +126,29 @@ export function partTipHtml(p: Pick<PlacedPart, 'fn' | 'material' | 'piece'> & P
     const sat = d && i >= 0 ? d.satisfaction[i] : 1;
     html += row('Power draw', `${n0(st.draw)}/s${sat < 0.995 ? ` <span style="color:#fbbf24">(${Math.round(sat * 100)}% met)</span>` : ''}`);
   }
-  if ((fn.store ?? 0) > 0) html += row(fn.pool === 'drive' ? 'Holds (engines)' : fn.pool === 'weapon' ? 'Holds (guns)' : 'Holds', `${n0(fn.store! * st.area * fnOutput(fn, mat))} energy`);
+  if ((fn.store ?? 0) > 0) {
+    html += row(fn.bank ? 'Holds (what it touches)' : fn.pool === 'drive' ? 'Holds (engines)' : fn.pool === 'weapon' ? 'Holds (guns)' : 'Holds', `${n0(fn.store! * st.area * fnOutput(fn, mat))} energy`);
+    // Local circuits: the most it gives a second (past it, its circuit browns out); a capacitor gives only to what it touches
+    const rate = partDischarge(fn, st.area, mat, circuitTuning(tuning));
+    html += row('Gives', `up to ${n0(rate)}/s${fn.bank ? ' <span style="color:#c4b5fd; font-weight:400">only into parts it touches; touching capacitors are one bank</span>' : ''}`);
+  }
   if (fn.rated) html += row('Rated speed', `${n0(fn.rated * 60)} m/s <span style="color:#8ea0bd; font-weight:400">(its push fades out near it)</span>`);
-  // On the design: the power network it's wired into (wires.ts)
+  // On the design: the circuit it's on (wires.ts networks; circuits.ts), and what a capacitor feeds
   if (d && i >= 0 && isPowerPart(fn)) {
-    const k = d.network[i], net = d.networks[k];
-    html += row('Wired', k < 0 ? '<span style="color:#f87171">to nothing: no power</span>' : net?.powered ? `network ${k + 1}` : `<span style="color:#fbbf24">network ${k + 1}: no generator</span>`);
+    const L = d.power, ci = L && L.circuitOf[i] >= 0 ? L.circuits[L.circuitOf[i]] : undefined;
+    const bank = L && fn.bank && L.storeOf[i] >= 0 ? L.stores[L.storeOf[i]] : undefined;
+    const amber = (t: string) => `<span style="color:#fbbf24">${t}</span>`;
+    html += row('Circuit', !ci || ci.net < 0 ? amber(bank ? "none: it can't recharge" : "none: only the core's trickle reaches it")
+      : `<b style="color:${circuitColor(ci.letter)}">${ci.letter}</b>${ci.main ? ` <span style="color:#8ea0bd; font-weight:400">(main: the core's store is on it)</span>` : ci.generators.length ? '' : ` ${amber('· no generator to charge it')}`}`);
+    if (bank) html += row('Bank', bank.feeds!.length ? `${bank.parts.length} capacitor${bank.parts.length > 1 ? 's' : ''} · feeds ${bank.feeds!.length} part${bank.feeds!.length > 1 ? 's' : ''} it touches` : '<span style="color:#fbbf24">touches nothing that draws power: it helps nothing</span>');
   }
   if (st.shield) html += row('Shield', n0(st.shield));
-  if (st.cargo) html += row('Cargo', n0(st.cargo));
+  if (st.cargo) html += row('Cargo', `${n0(st.cargo)} <span style="color:#8ea0bd; font-weight:400">(what you carry weighs the ship down)</span>`);
+  if (st.brace) {
+    const b = st.brace, pct = (v: number) => `${Math.round(Math.abs(v - 1) * 100)}%`;
+    html += row('Braced', `guns reach +${pct(b.reach)}, scatter −${pct(b.scatter)} · shields recharge +${pct(b.shieldRegen)} · no pulls`);
+    html += row('Brace / let go', `${b.braceSecs.toFixed(2)} s / ${b.releaseSecs.toFixed(1)} s <span style="color:#fbbf24; font-weight:400">(no thrust while out)</span>`);
+  }
   if ((fn.range ?? 0) > 0 && !fn.weapon) html += row('Scan range', `${n0(fn.range!)} m`);
   // Jump coils (and the core's own): cells of hull served, and how the ship's coils stand against its hull
   const coilCells = p.fn === 'core' ? jumpTuning(tuning).coreCapacity : (fn.jumpCapacity ?? 0) * st.area;
@@ -146,7 +161,8 @@ export function partTipHtml(p: Pick<PlacedPart, 'fn' | 'material' | 'piece'> & P
   }
   if (p.fn === 'core') {
     const jt = jumpTuning(tuning);
-    html += row('Battery', n0(energyTuning(tuning).coreCapacity));
+    const ct = circuitTuning(tuning), main = d?.power?.circuits.find((x) => x.main);
+    html += row('Battery', `${n0(energyTuning(tuning).coreCapacity)} · gives ${main ? `circuit ${main.letter}` : 'the main circuit'} up to ${n0(ct.coreDischarge)}/s, every other ${n0(ct.coreTrickle)}/s`);
     html += row('Steering', `gyro ${n0(tuning.flight.gyroTorque)} · strafe ${tuning.flight.coreManeuverForce.toFixed(1)}`);
     html += row('Jump drive', d ? `${(d.jumpRange / 1000).toFixed(1)} km · ${Math.round(d.jumpCooldown / 60)} s` : `${(jt.baseRange / 1000).toFixed(0)} km · ${Math.round(jt.cooldownTicks / 60)} s when its coils suit the hull`);
     html += row('Cargo', n0(CORE_CARGO));

@@ -47,6 +47,8 @@ export const CTL = {
   hold: 1024,
   /** Numb with cold: thrust and steering × the numb stage's (warmth.ts) */
   numb: 2048,
+  /** Stabiliser Anchor: brace held (anchor.ts) */
+  brace: 4096,
 } as const;
 
 export interface ReplicaControls {
@@ -57,7 +59,7 @@ export interface ReplicaControls {
 export function controlBits(c: Partial<FlightControls>): number {
   return (c.forward ? CTL.forward : 0) | (c.backward ? CTL.backward : 0) | (c.left ? CTL.left : 0) | (c.right ? CTL.right : 0)
     | (c.boost ? CTL.boost : 0) | (c.helm ? CTL.helm : 0) | (c.strafeLeft ? CTL.strafeLeft : 0) | (c.strafeRight ? CTL.strafeRight : 0)
-    | (c.jump ? CTL.jump : 0);
+    | (c.jump ? CTL.jump : 0) | (c.brace ? CTL.brace : 0);
 }
 
 export function flightControls(c: ReplicaControls, body: FlightBody): FlightControls {
@@ -66,6 +68,7 @@ export function flightControls(c: ReplicaControls, body: FlightBody): FlightCont
     forward: (b & CTL.forward) !== 0, backward: (b & CTL.backward) !== 0, left: (b & CTL.left) !== 0, right: (b & CTL.right) !== 0,
     boost: (b & CTL.boost) !== 0, helm: (b & CTL.helm) !== 0, strafeLeft: (b & CTL.strafeLeft) !== 0, strafeRight: (b & CTL.strafeRight) !== 0,
     jump: (b & CTL.jump) !== 0,
+    brace: (b & CTL.brace) !== 0,
     targetAngle: (b & CTL.hold) !== 0 ? body.angle : c.targetAngle,
     // Where a jump lands isn't replicated: the burn's start brings a keyframe
     jumpDist: 0,
@@ -75,7 +78,7 @@ export function flightControls(c: ReplicaControls, body: FlightBody): FlightCont
 /** What a ship's flight depends on: two structures with the same signature fly identically */
 export function flightSignature(d: ShipDerived): string {
   const t = d.thrusters.map((x) => `${x.force[0]},${x.force[1]}`).join(';');
-  return `${d.mass}|${d.inertia}|${d.fullMass}|${d.fullInertia}|${d.drive}|${d.maneuverForce}|${d.maxTorque.cw}|${d.maxTorque.ccw}|${d.jumpRange}|${d.jumpCooldown}|${t}`;
+  return `${d.mass}|${d.inertia}|${d.fullMass}|${d.fullInertia}|${d.drive}|${d.maneuverForce}|${d.maxTorque.cw}|${d.maxTorque.ccw}|${d.jumpRange}|${d.jumpCooldown}|${d.anchor ?? 0}|${t}`;
 }
 
 /** (The fields: the central body's charging ring and the stillstones) */

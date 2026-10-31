@@ -185,6 +185,8 @@ export interface FunctionDef {
   jumpCapacity?: number;
   /** scan range in world units (scanners) */
   range?: number;
+  /** Stabiliser Anchor: the ship can brace (ships/anchor.ts) */
+  anchor?: boolean;
   /** weapons: which weapon this is (data/ships/tuning.json weapons.<kind>) */
   weapon?: string;
   /**
@@ -204,6 +206,10 @@ export interface FunctionDef {
   store?: number;
   /** Which pool a battery fills: general (default: everything draws on it), drive (engines only), weapon (guns and mining lasers only) */
   pool?: 'drive' | 'weapon';
+  /** The most a store gives a second, per unit of area (× its output): its circuit browns out past it (circuits.ts; absent: tuning energy.discharge by pool) */
+  discharge?: number;
+  /** A capacitor: touching ones make one bank, which gives only to the consumers it touches (circuits.ts) */
+  bank?: boolean;
   /** Must point a facing edge out (engines and weapons do anyway: this is for the rest, e.g. mining lasers) */
   facing?: boolean;
   /** A mining laser (a beam that cuts rock while the pilot mines): `miner` itself, and the models of its family */

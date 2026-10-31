@@ -35,7 +35,8 @@
       "description": "Rocky silica. Pressed into composites and lenses.",
       "family": "crystalline",
       "tier": 1,
-      "short": "Silicate"
+      "short": "Silicate",
+      "mass": 0.08
     },
     {
       "id": "ice",
@@ -47,7 +48,8 @@
       "description": "Frozen volatiles. Used in composites, coolant and boost cells.",
       "family": "volatile",
       "tier": 1,
-      "short": "Ice"
+      "short": "Ice",
+      "mass": 0.06
     },
     {
       "id": "copper_ore",
@@ -95,7 +97,8 @@
       "description": "Impossibly dense ore from the deepest, deadliest belts (the Void, the Maw). Refined into Mk V plating.",
       "family": "exotic",
       "tier": 5,
-      "short": "Neutronium"
+      "short": "Neutronium",
+      "mass": 0.2
     },
     {
       "id": "crystal",
@@ -107,7 +110,8 @@
       "description": "Glasswater's crystal: the clearest greyseam anyone has found. Hums under a scanner. Focuses beams and stores charge.",
       "family": "crystalline",
       "tier": 2,
-      "short": "Crystal"
+      "short": "Crystal",
+      "mass": 0.05
     },
     {
       "id": "ruby",
@@ -195,7 +199,8 @@
       "family": "noble",
       "tier": 2,
       "short": "Aurum",
-      "trace": true
+      "trace": true,
+      "mass": 0.13
     },
     {
       "id": "pale_iridium",
@@ -208,7 +213,8 @@
       "family": "noble",
       "tier": 3,
       "short": "Iridium",
-      "trace": true
+      "trace": true,
+      "mass": 0.14
     },
     {
       "id": "platinoid_ore",
@@ -233,7 +239,8 @@
       "family": "crystalline",
       "tier": 3,
       "short": "Voidglass",
-      "trace": true
+      "trace": true,
+      "mass": 0.06
     },
     {
       "id": "hydrazine_slush",
@@ -245,7 +252,8 @@
       "description": "Frozen fuel from ice bodies, thickest in Borealis. Refined into propellant.",
       "family": "volatile",
       "tier": 2,
-      "short": "Hydrazine"
+      "short": "Hydrazine",
+      "mass": 0.05
     },
     {
       "id": "aurora_rime",
@@ -257,7 +265,8 @@
       "description": "Ice grown inside the aurora, threaded with greyseam, from the floes of the Rime Shoal. Under a scanner it barely hums at all. Refined into hush panes.",
       "family": "volatile",
       "tier": 2,
-      "short": "Rime"
+      "short": "Rime",
+      "mass": 0.05
     },
     {
       "id": "polymer_precursor",
@@ -269,7 +278,8 @@
       "description": "Tarry hydrocarbons from the nebula bands. Cured into insulated polymer.",
       "family": "volatile",
       "tier": 3,
-      "short": "Polymer"
+      "short": "Polymer",
+      "mass": 0.05
     },
     {
       "id": "cryo_gas",
@@ -294,7 +304,8 @@
       "family": "exotic",
       "tier": 5,
       "short": "Singularity",
-      "trace": true
+      "trace": true,
+      "mass": 0.15
     },
     {
       "id": "gem_frost_1",
@@ -555,7 +566,8 @@
       "rarity": "common",
       "value": 8,
       "color": "#b9c7a5",
-      "description": "Light pressed silicate and resin."
+      "description": "Light pressed silicate and resin.",
+      "mass": 0.05
     },
     {
       "id": "titanium_plate",
@@ -600,7 +612,8 @@
       "rarity": "epic",
       "value": 95,
       "color": "#b48cf2",
-      "description": "Mk V plating stock: the toughest there is."
+      "description": "Mk V plating stock: the toughest there is.",
+      "mass": 0.18
     },
     {
       "id": "coolant",
@@ -609,7 +622,8 @@
       "rarity": "common",
       "value": 5,
       "color": "#81d4fa",
-      "description": "Chilled ice. Used in flak canisters, ceramic laminate and gem cutting."
+      "description": "Chilled ice. Used in flak canisters, ceramic laminate and gem cutting.",
+      "mass": 0.04
     },
     {
       "id": "ferrite_plate",
@@ -636,7 +650,8 @@
       "rarity": "rare",
       "value": 75,
       "color": "#ffca28",
-      "description": "Refined aurum. Used in conductive steel and aurum-tipped slugs, and to cut Ember, Grapple, Scatter and Overdrive gems."
+      "description": "Refined aurum. Used in conductive steel and aurum-tipped slugs, and to cut Ember, Grapple, Scatter and Overdrive gems.",
+      "mass": 0.12
     },
     {
       "id": "iridium_ingot",
@@ -645,7 +660,8 @@
       "rarity": "rare",
       "value": 110,
       "color": "#eceff1",
-      "description": "Refined pale iridium. Used in leaded iridium plating and to cut Lance Core gems."
+      "description": "Refined pale iridium. Used in leaded iridium plating and to cut Lance Core gems.",
+      "mass": 0.15
     },
     {
       "id": "catalyst",
@@ -681,7 +697,8 @@
       "rarity": "common",
       "value": 9,
       "color": "#dce775",
-      "description": "Fuel for missiles, torpedoes, mortar shells, mining charges and incendiary flak."
+      "description": "Fuel for missiles, torpedoes, mortar shells, mining charges and incendiary flak.",
+      "mass": 0.04
     },
     {
       "id": "insulated_polymer",
@@ -690,7 +707,8 @@
       "rarity": "uncommon",
       "value": 35,
       "color": "#a1887f",
-      "description": "Insulating hull plating: a hull of it builds up cold slower. Turns energy fire, but heat goes through it."
+      "description": "Insulating hull plating: a hull of it builds up cold slower. Turns energy fire, but heat goes through it.",
+      "mass": 0.05
     },
     {
       "id": "cryogen",
@@ -699,7 +717,8 @@
       "rarity": "uncommon",
       "value": 16,
       "color": "#e0f7fa",
-      "description": "Refined cryo gas. Used in chaff canisters and cryo missiles."
+      "description": "Refined cryo gas. Used in chaff canisters and cryo missiles.",
+      "mass": 0.04
     },
     {
       "id": "singularity_grain",
@@ -708,7 +727,8 @@
       "rarity": "epic",
       "value": 450,
       "color": "#7e57c2",
-      "description": "Refined singularity dust: specks of collapsed matter, pressed into grains. Rare, and valuable to traders."
+      "description": "Refined singularity dust: specks of collapsed matter, pressed into grains. Rare, and valuable to traders.",
+      "mass": 0.15
     },
     {
       "id": "conductive_steel_plate",
@@ -726,7 +746,8 @@
       "rarity": "rare",
       "value": 140,
       "color": "#dfe6ec",
-      "description": "Radiation plating: slow, heavy, and nearly proof against the Void."
+      "description": "Radiation plating: slow, heavy, and nearly proof against the Void.",
+      "mass": 0.15
     },
     {
       "id": "ceramic_plate",
@@ -1517,7 +1538,8 @@
       "description": "A dense, dark stone, found in traces in rock across the cluster and thickest in the Maw's shard ring. Its grain looks worked; Horizon Watch's assayers put that down to the Maw's pressures. The Ark buys it. Nobody else much wants it.",
       "family": "exotic",
       "tier": 4,
-      "short": "Leestone"
+      "short": "Leestone",
+      "mass": 0.12
     },
     {
       "id": "leestone",
@@ -1526,7 +1548,8 @@
       "rarity": "rare",
       "value": 70,
       "color": "#4a4d55",
-      "description": "Dressed leestone: dark, dense and dear. Only the Ark builds with it, so everyone calls it Ark stone. Nobody else sees the point."
+      "description": "Dressed leestone: dark, dense and dear. Only the Ark builds with it, so everyone calls it Ark stone. Nobody else sees the point.",
+      "mass": 0.12
     },
     {
       "id": "leestone_plate",
@@ -1535,7 +1558,8 @@
       "rarity": "rare",
       "value": 130,
       "color": "#565a63",
-      "description": "Leestone faced on a steel backing: Ark plating. Heavier than steel, no tougher than titanium, and dear to patch. The Ark says it's tradition and durability; pilots call the ships that carry it Ark-heavy."
+      "description": "Leestone faced on a steel backing: Ark plating. Heavier than steel, no tougher than titanium, and dear to patch. The Ark says it's tradition and durability; pilots call the ships that carry it Ark-heavy.",
+      "mass": 0.12
     },
     {
       "id": "ark_old_stock",

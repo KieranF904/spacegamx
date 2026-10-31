@@ -2,7 +2,7 @@ import { defineConfig, type Plugin } from 'vite';
 import { resolve } from 'path';
 import { shipsDevApi } from './shipsDevApi';
 
-/** Built for the browser, Node's built-ins (imported by the server code the sandbox and replays bundle) are stubs */
+/** In the browser, Node's built-ins (imported by the server code the sandbox and replays bundle) are stubs */
 const nodeStubs = (on: boolean) => (on ? [{ find: /^(fs|fs\/promises|path|os|url|zlib)$/, replacement: resolve(__dirname, 'src/nodeStubs.ts') }] : []);
 
 /**
@@ -34,7 +34,8 @@ export default defineConfig(({ command, mode }) => ({
   resolve: {
     alias: [
       { find: '@space-game/common', replacement: resolve(__dirname, '../common/src') },
-      ...nodeStubs(command === 'build'),
+      // (in dev too: the sandbox and replays bundle server code that imports Node's built-ins by name)
+      ...nodeStubs(true),
     ],
   },
   server: {

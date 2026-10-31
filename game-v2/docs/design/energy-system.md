@@ -1,6 +1,6 @@
 # Energy system: a discussion draft
 
-*Status: for discussion with Kieran, 2026-10-31. Nothing here is built. Part names, power-type names and numbers are
+*Status: for discussion with Kieran, 2026-10-31. Phase 1 (local circuits) is built: see "Implemented (Phase 1)" below; the rest is the draft. Part names, power-type names and numbers are
 placeholders. Sibling doc: docs/design/build-archetypes.md (this one builds on its §3.1 "Energy with shape").*
 
 Kieran's brief, in short: batteries and generators are "just placed somewhere and they'll probably connect". He wants
@@ -20,6 +20,137 @@ different **types** of power, power type changing what a weapon or thruster does
   warmth meter) and the first dual-fed parts. Then breakers, shock damage and a pilot "divert" switch. Exotic power
   and simple relays come last, if at all. **Avoid:** losses over distance, bonuses for lining generators up, free-form
   logic programming, and per-cell heat simulated every tick.
+
+---
+
+## Implemented (Phase 1): local circuits
+
+*Built 2026-10-31, awaiting review, not deployed: proposal A plus the touch-only capacitor rule (§4 Phase 1), with its
+hangar UX (§6.1 letters, §6.2 load test, §6.3 warnings and weak links) and per-circuit HUD bars. No heat, no Thermal,
+no power types: nothing here touches the warmth system. The rest of this doc is the original draft.*
+
+**Where it lives.** `common/src/ships/circuits.ts` works out the layout once per rebuild (circuits, store groups,
+banks, feed groups, the core's store); `common/src/ships/energy.ts` runs the tick over it (O(circuits + feed groups +
+stores), no part loops but the guns' and thrusters' own); `rebuild.ts` calls it in one delimited block
+(`ShipDerived.power`). Server: `ShipBridge` passes the guns' load into the flight step and remaps the charge on every
+rebuild. Client: the pilot predicts the same steps (`ShipClient.predict`, `predictGuns`).
+
+### The rules as built
+
+- **A circuit is a wire network** (wires.ts, unchanged). Its generators' spare (after its steady loads) streams to its
+  own consumers first, then charges its own stores. Spare never crosses circuits.
+- **Stores are grouped per circuit by label**, as before: general (Battery, Heavy Bank), drive (Drive Cell, engines
+  only), weapon (legacy weapon battery, guns and mining lasers only). Each group gives at most the sum of its parts'
+  discharge rates. A store on a circuit with no generator now counts (it starts full and never refills); before, it
+  didn't count at all.
+- **Per tick, per circuit:** engines first (stream, then drive pool, then general pool), then guns and mining lasers
+  (what's left of the stream, then weapon pool, then general pool). Then each capacitor bank tops up the consumers it
+  touches, then the core's trickle tops up what's still short elsewhere. What a circuit can't give, everything on it
+  lacks in the same proportion: a **brownout** (`BROWNOUT` = below 99.5%).
+- **Guns draw while they reload** (a decision, not in the draft). A shot's energy is spread over its reload: a gun
+  reloading on a browned-out circuit reloads at the circuit's share, so it cycles slower; a loaded gun always fires its
+  shot. Energy per shot is exactly what it was (draw × interval). Per-shot packets couldn't work with discharge caps (a
+  big gun's packet would never fit in one tick's allowance). Held beams burn that share of the ticks; pulse lasers
+  recharge like guns; mining lasers draw while their pulse runs and don't start (or stop) when their circuit can give
+  nothing. The guns' load reaches the flight step from the ship's cooldowns (`gunLoad`), one tick behind, which is
+  invisible.
+- **Engines:** every engine draws while you thrust, as before, and each pushes at its own circuit's share
+  (`thrustShare`; the core's maneuvering push is its own and never short). Drawing only for engines pushing the way
+  you're going is supported (`PowerUse.dir`) but **not used**: it changed big ships' energy enough to change the
+  autopilot's braking (a Galleon turned round three times), so flight keeps the old rule.
+- **Capacitors** (models.json `bank: true`): capacitors touching each other are one bank. It charges from the circuit
+  its first wired capacitor is on and gives only to the engines, guns and mining lasers it shares an edge with, as a top
+  up after their circuit (so a bank stays full until the circuit can't keep up). A consumer touching two banks uses the
+  first. An unwired bank still gives what it holds but never recharges. Legacy weapon batteries stay wired stores.
+- **The core's store** (240) sits on the **main circuit** (the one making the most power; then holding the most; then
+  the first), letter A. There it is part of the general pool: the pool's batteries and the core give together, each in
+  proportion to what it holds (so they run dry together, as the one ship-wide pool did) and each within its own rate.
+  It recharges only from the main circuit. To every other circuit, and to engines, guns and mining lasers wired to
+  nothing at all, it trickles 12/s in total, shared by what each is short. So an unwired or cut-off part limps.
+- **Steady loads** (shields, scanners, jump coils, the Stabiliser Anchor) are unchanged: shared out of their own
+  circuit's generators at the rebuild, before any of this.
+- **Damage:** a lost part splits circuits at the rebuild as before; `remapCharge` gives each new store group the
+  capacity-weighted charge its parts held, so each half keeps its share and joined circuits pool theirs. A mended
+  store comes back empty. A ship body that gets a new design (refit, swap) starts every store at the old ship's overall
+  percentage.
+- **Wave 2 hook:** `Circuit.type` (always `'steady'` now) is where a per-circuit power type goes; the layout already
+  treats a circuit as the unit (letters, stores, feeds), so Steady/Surge can be added without reshaping it.
+
+### Numbers
+
+| Store | Holds /cell | Gives /cell /s | Empties at full rate in | Draft placeholder |
+|---|---|---|---|---|
+| Battery | 200 | 600 | 0.33 s | 30 |
+| Heavy Bank | 300 | 450 | 0.67 s | 15 |
+| Drive Cell (engines only) | 320 | 1,400 | 0.23 s | 60 |
+| Capacitor (only what it touches) | 160 | 2,000 | 0.08 s | 200 |
+| Core store (main circuit) | 240 total | 720 total | 0.33 s | 12 |
+| Core trickle (every other circuit, shared) | | 12 total | | (same) |
+| Legacy batteries (no `discharge`) | | general 600, drive 1,400, weapon 900, bank 2,000 | | |
+
+Data: `discharge` per model in `scripts/econ/models.mjs` → `data/ships/models.json`; `coreDischarge`, `coreTrickle`
+and the legacy defaults in `data/ships/tuning.json` `energy`.
+
+**Why the rates are far above the draft's.** Boosting drains a big ship's stores at 0.5 to 1.8 times their capacity
+a second (engine draw × 3.7 when boosting): the Galleon asks 1,751/s more than its five Fusion Plants make, the Hauler
+1,161/s, the Bulwark 128/s from the core alone. With the draft's numbers every library ship's boost (and the Bulwark's,
+Corsair's and Drum's, whose only store is the core's) would have browned out at once. So the rates are set to the
+largest library need with margin, and the shapes are kept relative to size: a Heavy Bank gives 1.5× its capacity a
+second, a Battery 3×, a Drive Cell 4.4×, a Capacitor 12.5×. What still browns out: big engines or many guns on a
+circuit fed by stores alone, or by a Heavy Bank against a weak generator (the Galleon without its Fusion Plants:
+engines and guns together ask 2,713/s of a bank and core giving 2,520/s), circuits with no generator once dry, and
+anything on the trickle.
+
+### Migration and the library
+
+Auto-wired designs (every library ship, every enemy, old designs) are one circuit with the core's store on it, so
+they behave as before except for the rates. `common/src/ships/circuits.test.ts` flies every library ship, the dev guest
+ships and the starter through a scripted 40 s fight (thrusting throughout, a 1.5 s boost every 6 s, every gun firing
+as the aim sweeps round) twice, once with these rates and once with stores that give without limit, and asserts the
+rates never cut what the old pools would have given while the ship still had over 5% of its charge. Result: **0
+rate-limited ticks on every ship**. The starter (Sparrow T) and the dev guests never brown out at all. Ships that run
+flat by boosting 1.5 s at a time (Galleon, Hauler, Ark Tender, Lancer, Hammerhead, Bastion, Bulwark: 94 to 263 of
+2,400 ticks) do so identically with unlimited stores: that's boosting until empty, as before. Hand-wired designs that
+already split their power may now starve a circuit; the hangar says so, and the trickle keeps it limping.
+
+### Protocol (14)
+
+The pilot's own snapshot row: `data[1]` the whole charge (the ENERGY gauge), `data[10]` the core's store,
+`data[11]` how many store groups follow, `data[16…]` each group's charge (hundredths of a percent; at most 24).
+`packCharge` / `unpackCharge` in energy.ts. Nobody else's row carries charge. (The Stabiliser Anchor's `data[14]`
+and `[15]` sit between.) `PROTOCOL_VERSION` 13 → 14, one bump for both changes; the wire-table hash didn't change.
+
+### Hangar and HUD
+
+- Power panel: each circuit by letter and colour (grey: no generator) with generators, stores, spare per second,
+  what it holds and can give; the core's store line; **Load test** buttons (Fire, Boost, Both: 4 s from full, the
+  ship's own code) with a verdict per circuit ("browns out after 1.2 s: engines 62%, guns 0%", "refills in 6 s",
+  "never refills") and each browned-out part's share on the overlay; warnings for stores with no generator, capacitors
+  touching nothing that draws power, unwired parts on the trickle; and **weak links** (every non-generator part a live
+  wire runs through whose loss cuts consumers off from every generator; listed apart from the warnings, since every
+  auto-wired tree has them, and marked ✂ with the Wires tool).
+- Overlay: a letter badge on each circuit; trickle-fed parts amber, idle capacitors grey.
+- Part tooltips: its circuit (and "main"), what a store gives a second, a capacitor's bank and what it feeds; the
+  core's store and its two rates. Model cards: "gives N/s" (and "by touch").
+- HUD: a thin bar per circuit with stores, plus the core's (◆), beside the ENERGY gauge; a circuit browning out
+  flashes red. Hidden when there's only one store to show.
+- Field guide: Energy rewritten, and a new **Circuits** section (circuits, discharge, brownout, the capacitor rule,
+  the core's store, splits, the load test and weak links).
+
+### For Kieran to decide
+
+1. **Guns draw while reloading** instead of paying per shot. Same energy per shot; the difference is that a loaded gun
+   always fires its first shot, even on an empty circuit. OK?
+2. **Rates are high** (above). The library rule forces it while boosts drain big ships this fast. If you want Heavy
+   Banks to feel truly slow, the lever is the boost draw (`energy.boostDraw` 2.8), not the rates.
+3. **Direction-aware engine draw** (only engines pushing your way draw) is built but off. Turning it on makes
+   strafer circuits matter more but needs the autopilot's braking retuned.
+4. **The main circuit** is the one making the most power, not the one the core is wired into (the core usually isn't
+   wired into anything: auto-wire doesn't route through it). Fine?
+5. **Stores on a circuit with no generator** now count and start full (they never refill). Before, they counted for
+   nothing.
+6. A gun's stagger wait (railguns, missiles, pulse lasers rippling) counts as reloading, so it draws a little extra
+   before a group's first ripple. Small; worth knowing.
 
 ---
 

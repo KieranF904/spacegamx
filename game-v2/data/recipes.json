@@ -1442,6 +1442,15 @@
       },
       "time": 50,
       "perCell": true
+    },
+    "utility_stabiliser_anchor": {
+      "inputs": {
+        "steel_plate": 4,
+        "servo_motor": 2,
+        "power_coupling": 1,
+        "copper_wire": 2
+      },
+      "time": 120
     }
   }
 }

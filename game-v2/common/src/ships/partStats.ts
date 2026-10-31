@@ -16,6 +16,7 @@ import { gunDef, gunRate } from './launch.js';
 import { effectiveRange } from './pulse.js';
 import type { WeaponMods } from './types.js';
 import { baseWeaponDps } from './rating.js';
+import { anchorTuning, DEFAULT_ANCHOR } from './anchor.js';
 import { partArmour, weaponHit, DAMAGE_TYPES, type DamageType } from './damage.js';
 
 export interface PartStats {
@@ -44,6 +45,8 @@ export interface PartStats {
   boostDrain?: number;
   shield?: number;
   cargo?: number;
+  /** Stabiliser Anchor (anchor.ts): braced, guns' reach and scatter (× each), shields' recharge (×), and seconds to brace and to let go */
+  brace?: { reach: number; scatter: number; shieldRegen: number; braceSecs: number; releaseSecs: number };
   /** Towards the ship's rating */
   firepower: number;
   toughness: number;
@@ -106,5 +109,9 @@ export function partStats(catalog: Catalog, tuning: ShipTuning | undefined, p: {
   }
   if ((fn.shield ?? 0) > 0) out.shield = fn.shield! * area * fnOutput(fn, mat);
   if ((fn.capacity ?? 0) > 0) out.cargo = fn.capacity! * area;
+  if (fn.anchor) {
+    const a = tuning ? anchorTuning(tuning) : DEFAULT_ANCHOR;
+    out.brace = { reach: 1 + a.range, scatter: 1 - a.spread, shieldRegen: 1 + a.shieldRegen, braceSecs: a.braceTicks / 60, releaseSecs: a.releaseTicks / 60 };
+  }
   return out;
 }

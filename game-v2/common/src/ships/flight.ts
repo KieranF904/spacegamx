@@ -7,7 +7,9 @@
 import type { Vec2 } from './types.js';
 import type { ShipDerived } from './rebuild.js';
 import type { ShipTuning } from './tuning.js';
-import { powerTick, type Charge } from './energy.js';
+import { capCharge, powerTick, thrustShare, type Charge } from './energy.js';
+import { anchorTuning, canBrace, isBraced, stepBrace } from './anchor.js';
+import { cargoThrust, cargoTurn } from './load.js';
 
 /** A boss's fastest turn (radians a tick; Blueprint `turn`): a hull the size of a station doesn't whip round */
 const BOSS_SPIN = 0.04;
@@ -21,6 +23,10 @@ export interface FlightBody {
   jump?: number;
   /** This jump's burn as a fraction of a full-power one (set when the burn starts: jumpBurnSpeed) */
   jumpScale?: number;
+  /** Stabiliser Anchor counter (anchor.ts stepBrace); absent = 0 (free) */
+  brace?: number;
+  /** Mass of the cargo in the hold (load.ts): carried, not stepped; absent = 0 */
+  cargo?: number;
 }
 
 export interface FlightControls {
@@ -39,6 +45,8 @@ export interface FlightControls {
   jump?: boolean;
   /** How far to jump (world units; the cursor distance): where the ship comes to rest. 0 = as far as the drive goes */
   jumpDist?: number;
+  /** Stabiliser Anchor: braced while held (the client latches it from a toggle key) */
+  brace?: boolean;
 }
 
 export interface FlightConstants {
@@ -312,9 +320,10 @@ export function worldToLocalDir(v: Vec2, angle: number): Vec2 {
  * `speed`: how fast the ship is already going that way (engines fade near
  * their rated speed: thrustAlong).
  */
-export function accelAlong(d: ShipDerived, dir: Vec2, speed = 0): number {
+export function accelAlong(d: ShipDerived, dir: Vec2, speed = 0, cargo = 0): number {
   const m = Math.max(d.mass, d.fullMass ?? d.mass);
-  return m > 0 ? (thrustAlong(d, dir, speed) * (d.drive ?? 1)) / m : 0;
+  // (The hold's cargo is carried too: load.ts)
+  return m > 0 ? ((thrustAlong(d, dir, speed) * (d.drive ?? 1)) / m) * cargoThrust(d, cargo) : 0;
 }
 
 /** Steepness of an engine's fade towards its rated speed: near full until close to it, none past it */
@@ -327,9 +336,9 @@ export function ratedFade(rated: number | undefined, speed: number): number {
 }
 
 /** Turning acceleration caps (cw, ccw), on the same terms as accelAlong */
-export function turnAccel(d: ShipDerived): { cw: number; ccw: number } {
+export function turnAccel(d: ShipDerived, cargo = 0): { cw: number; ccw: number } {
   const I = Math.max(d.inertia, d.fullInertia ?? d.inertia);
-  const k = ((d.drive ?? 1) * (d.turn ?? 1)) / (I || 1);
+  const k = (((d.drive ?? 1) * (d.turn ?? 1)) / (I || 1)) * cargoTurn(d, cargo);
   return { cw: d.maxTorque.cw * k, ccw: d.maxTorque.ccw * k };
 }
 
@@ -350,7 +359,8 @@ export function stepFlight(
   input: FlightControls,
   d: ShipDerived,
   tuning: ShipTuning,
-  boost: { charge: Charge; drainRate: number },
+  /** The charge, whether it's accounted (drainRate 0: not), and what the guns and mining lasers draw this tick per feed group (energy.ts gunLoad) */
+  boost: { charge: Charge; drainRate: number; load?: ArrayLike<number> },
   k: FlightConstants,
 ): FlightResult {
   const ft = tuning.flight;
@@ -359,7 +369,18 @@ export function stepFlight(
   const jt0 = jumpTuning(tuning);
   const jt = d.jumpCooldown ? { ...jt0, cooldownTicks: d.jumpCooldown } : jt0;
   const prev = body.jump ?? 0;
-  const j = stepJump(prev, !!input.jump && d.mass > 0, jt);
+  // --- Stabiliser Anchor (anchor.ts): braces only from a standstill drive (not mid-jump); while it's out, no jump starts
+  const at = anchorTuning(tuning);
+  const brace0 = body.brace ?? 0;
+  if (brace0 > 0 || input.brace) {
+    const jp0 = jumpPhase(prev, jt).phase;
+    const able = canBrace(d);
+    body.brace = stepBrace(brace0, !!input.brace && able && (brace0 > 0 || jp0 === 'ready' || jp0 === 'cooldown'), able, at);
+  }
+  const anchored = (body.brace ?? 0) > 0;
+  const braced = anchored && isBraced(body.brace, at);
+  const cargo = body.cargo ?? 0;
+  const j = stepJump(prev, !!input.jump && d.mass > 0 && !anchored, jt);
   body.jump = j;
   // The burn starts: fix how far this jump goes (where you aimed, within the drive's reach)
   if (j === jt.chargeTicks && prev === jt.chargeTicks - 1) {
@@ -390,15 +411,16 @@ export function stepFlight(
       // A boss (Blueprint `turn`): it turns no faster than it can stop from by the time it's round, so a big hull swings
       // onto its heading and settles there instead of overshooting and hunting back and forth (the last little way
       // eased in, a share of what's left each tick: no twitching about it)
-      const err = wrapAngle(input.targetAngle - body.angle), a = Math.min(turnAccel(d).cw, turnAccel(d).ccw);
+      const err = wrapAngle(input.targetAngle - body.angle), a = Math.min(turnAccel(d, cargo).cw, turnAccel(d, cargo).ccw);
       const want = Math.sign(err) * Math.min(BOSS_SPIN, Math.sqrt(2 * a * Math.abs(err)) * 0.9, Math.abs(err) * 0.15);
       alpha = want - body.angVel;
     } else {
       const err = wrapAngle(input.targetAngle - body.angle);
       alpha = ft.turnKp * err - ft.turnKd * body.angVel;
     }
-    const { cw: maxCw, ccw: maxCcw } = turnAccel(d);
-    const ctl = k.hazard?.control ?? 1;
+    const { cw: maxCw, ccw: maxCcw } = turnAccel(d, cargo);
+    // (The anchor out: it turns, slowly)
+    const ctl = (k.hazard?.control ?? 1) * (anchored ? at.turn : 1);
     alpha = Math.max(-maxCcw * ctl, Math.min(maxCw * ctl, alpha));
     body.angVel = Math.max(-ft.maxAngularSpeed, Math.min(ft.maxAngularSpeed, body.angVel + alpha));
   } else {
@@ -422,29 +444,34 @@ export function stepFlight(
     if (input.left) ix -= 1;
     if (input.right) ix += 1;
   }
-  // Spooling the drive takes the engines: the ship can still aim, but brakes instead of thrusting
-  if (charging) ix = iy = 0;
+  // Spooling the drive takes the engines: the ship can still aim, but brakes instead of thrusting (so does the anchor, out or spooling)
+  if (charging || anchored) ix = iy = 0;
   const mag = Math.hypot(ix, iy);
   let accel = 0;
   let charge = boost.charge;
   let isBoosting = false;
-  // The batteries (energy.ts): engines take the spare power first, then the drive and general batteries; what's left charges them.
-  // (drainRate 0: no accounting, as for pilotless ships)
+  // The ship's power, on its local circuits (energy.ts): thrusting, the engines draw on their own circuit first (all of them, as
+  // ever), then the guns and mining lasers (`boost.load`); what's left charges each circuit's stores. (drainRate 0: no accounting,
+  // as for pilotless ships)
   const thrusting = mag > 0 && d.mass > 0;
   let power = 1, canBoost = !!input.boost;
   if (boost.drainRate > 0 && d.energy) {
     // A hazard that saps the batteries: they hold only so much
     const cap = k.hazard ? Math.round(100 * k.hazard.cap * 1000) / 1000 : 100;
-    const held = cap < 100 ? { g: Math.min(boost.charge.g, cap), d: Math.min(boost.charge.d, cap), w: Math.min(boost.charge.w, cap) } : boost.charge;
-    const pt = powerTick(d, held, { thrusting, boosting: !!input.boost }, tuning);
+    const dir = thrusting ? worldToLocalDir([ix / mag, iy / mag], body.angle) : undefined;
+    const pt = powerTick(d, capCharge(d, boost.charge, cap), { thrusting, boosting: !!input.boost, load: boost.load }, tuning);
     charge = pt.charge;
-    power = pt.power;
     canBoost = pt.boost;
+    // (Each engine pushes on its own circuit's share: a browned-out circuit's engines push that much less)
+    if (dir) {
+      const along = (body.vx * ix + body.vy * iy) / mag;
+      power = thrustShare(d, charge, dir, (rated) => ratedFade(rated, along));
+    }
   }
   if (thrusting) {
     ix /= mag; iy /= mag;
     // (Engines fade as the ship nears their rated speed the way it's pushing)
-    accel = accelAlong(d, worldToLocalDir([ix, iy], body.angle), body.vx * ix + body.vy * iy) * power * (k.hazard?.control ?? 1);
+    accel = accelAlong(d, worldToLocalDir([ix, iy], body.angle), body.vx * ix + body.vy * iy, cargo) * power * (k.hazard?.control ?? 1);
     if (input.boost && canBoost) {
       // The engines decide: afterburners kick hard and drink the battery, plasma drives barely boost
       accel *= d.boostFactor ?? k.boostFactor;
@@ -462,7 +489,8 @@ export function stepFlight(
   }
 
   // --- Same integrator as the legacy ship
-  const damp = charging ? k.friction * jt.chargeDamping : k.friction;
+  // (Braced, the anchor holds it where it is; spooling, its clamps drag)
+  const damp = charging ? k.friction * jt.chargeDamping : anchored ? k.friction * (braced ? at.hold : at.spoolHold) : k.friction;
   body.vx *= damp;
   body.vy *= damp;
   body.x = Math.max(-k.worldSize, Math.min(k.worldSize, body.x + body.vx));

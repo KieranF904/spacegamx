@@ -31,6 +31,10 @@ export interface ShipState {
   jump: number;
   /** This jump's speed scale (set when its burn starts) */
   jumpScale?: number;
+  /** Stabiliser Anchor counter (anchor.ts stepBrace), absent = 0 (free) */
+  brace?: number;
+  /** Mass of the cargo in its hold (load.ts), absent = 0 */
+  cargo?: number;
   /** Ticks left of a stillstone's priming (jumpFields.ts stepPrime; negative: a scarred one's): the next jump reaches further */
   jumpPrime?: number;
   /** Ticks until each part (weapons) can fire again, by part index */

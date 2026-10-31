@@ -67,6 +67,8 @@ export const DICTIONARY: readonly string[] = [
   'utility_scanner', 'utility_long_range_array', 'utility_constructor', 'shield_deflector', 'shield_flicker_screen',
   'shield_bulwark_projector', 'utility_jump_coil', 'utility_heavy_coil', 'plating_reactive_armour',
   'plating_spaced_plating',
+  // (appended: the Stabiliser Anchor)
+  'utility_stabiliser_anchor',
 ];
 const DICT_INDEX = new Map(DICTIONARY.map((s, i) => [s, i]));
 const utf8 = new TextEncoder();

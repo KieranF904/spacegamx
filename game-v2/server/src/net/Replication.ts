@@ -66,7 +66,7 @@ export class Replication {
 
   private real(eid: number): FlightBody {
     const s = this.ships.get(eid)!;
-    return { x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid], angle: Rotation.angle[eid], angVel: s.angVel, jump: s.jump, jumpScale: s.jumpScale };
+    return { x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid], angle: Rotation.angle[eid], angVel: s.angVel, jump: s.jump, jumpScale: s.jumpScale, brace: s.brace, cargo: s.cargo };
   }
 
   /**
@@ -115,9 +115,11 @@ export class Replication {
       const rx = Position.x[eid], ry = Position.y[eid], rvx = Velocity.x[eid], rvy = Velocity.y[eid], ra = Rotation.angle[eid];
       const b = s.body;
       if (b.x !== rx || b.y !== ry || b.vx !== rvx || b.vy !== rvy || b.angle !== ra || b.angVel !== ship.angVel
-        || (b.jump ?? 0) !== (ship.jump ?? 0) || (b.jumpScale ?? 1) !== (ship.jumpScale ?? 1)) {
+        || (b.jump ?? 0) !== (ship.jump ?? 0) || (b.jumpScale ?? 1) !== (ship.jumpScale ?? 1)
+        // (The anchor's counter, and the hold's mass: a load taken on or off needs a keyframe carrying it)
+        || (b.brace ?? 0) !== (ship.brace ?? 0) || (b.cargo ?? 0) !== (ship.cargo ?? 0)) {
         s.diverged = true;
-        this.why(`${ReplicaMode[mode]}:${b.x !== rx || b.y !== ry ? 'pos' : b.vx !== rvx || b.vy !== rvy ? 'vel' : b.angle !== ra || b.angVel !== ship.angVel ? 'turn' : 'jump'}`);
+        this.why(`${ReplicaMode[mode]}:${(b.cargo ?? 0) !== (ship.cargo ?? 0) ? 'cargo' : (b.brace ?? 0) !== (ship.brace ?? 0) ? 'brace' : b.x !== rx || b.y !== ry ? 'pos' : b.vx !== rvx || b.vy !== rvy ? 'vel' : b.angle !== ra || b.angVel !== ship.angVel ? 'turn' : 'jump'}`);
       }
     }
     this.ships.replicaCtl.clear();

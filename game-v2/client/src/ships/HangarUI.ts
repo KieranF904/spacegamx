@@ -40,9 +40,16 @@ import {
   isStructural, ghostBill, SALVAGE, ShipState, buildPoints, DAMAGE_NAMES, type DamageType,
   loadoutKinds, cratesFor, crateOrder, MAX_LOADOUT_CRATES, autoWire, wireCells, cellKey, cellOf, WIRE_ITEM, SEGMENTS_PER_SPOOL,
   type FunctionDef, type WireSeg, mountingOf, weaponSides, clearCells, partMountingProblems, type MountingProblem } from '@space-game/common';
+import { cargoEffect, CATEGORY_MASS, anchorTuning, MIN_ANCHOR_POWER } from '@space-game/common';
+import { loadTest, BROWNOUT, type LoadTestResult } from '@space-game/common';
+import { settings } from '../settings/Settings';
+import { boundKeyName } from '../input/keybindings';
 import { costHtml } from '../ui/windowKit';
 import { CONNECTOR_COLOR, functionColor, numToCss } from './shipColors';
-import { cellAt, eraseRun, layRun, powerReport, pruneWires, stepCells, wireBill, DEAD_NET, type Cell, type PowerReport } from './wireEdit';
+import { cellAt, circuitColor, eraseRun, layRun, powerReport, pruneWires, stepCells, wireBill, DEAD_NET, type Cell, type PowerReport } from './wireEdit';
+
+/** The hangar's load test: this many seconds of the ship's power, from full (energy.ts loadTest) */
+const LOAD_TEST_SECONDS = 4;
 import { familyLabel, familyRank, keyStats, modelLock, mountBadge, mountingText, MOUNT_TEXT, sizeText, sizeWord, weaponMount, type ModelLock } from './modelCards';
 import { gradeGlow, partColors } from './hullPreview2d';
 import { HangarLitView } from './HangarLitView';
@@ -67,6 +74,8 @@ export interface HangarDeps {
   level?(): number;
   /** Cargo + storage count of an item */
   have(id: string): number;
+  /** Mass of what's in the hold now (common/src/ships/load.ts) */
+  cargoMass?(): number;
   /** Station storage's count of an item (what a save pays from: wire spools) */
   stored?(id: string): number;
   /** Parts on their way from the fabricator */
@@ -124,6 +133,8 @@ export class HangarUI {
   private wireDrag: { erase: boolean; last: Cell } | null = null;
   /** The power overlay's networks and warnings (from the design's derived state) */
   private power: PowerReport | null = null;
+  /** The last load test (local circuits): which, on which design (it's dropped once the design changes), and what it found */
+  private loadRun: { kind: string; sig: string; result: LoadTestResult } | null = null;
   private grantAll = false;
   private owned: Bag = {};
   /** The slot being edited, the plan it was loaded from, and what was last saved (to spot unsaved edits) */
@@ -1422,6 +1433,16 @@ export class HangarUI {
       const [item, n] = b.dataset.make!.split(':');
       this.deps.send({ type: 'fabOrder', item, n: Number(n) });
     });
+    // The load test (energy.ts loadTest): a few seconds of full fire, boost or both, run here on the design
+    this.stats.querySelectorAll<HTMLButtonElement>('[data-load]').forEach((b) => b.onclick = () => {
+      const kind = b.dataset.load!;
+      this.loadRun = kind === 'off' || !this.derived ? null : {
+        kind, sig: designSig(this.bp),
+        result: loadTest(this.derived, this.deps.tuning, { fire: kind !== 'boost', thrust: kind !== 'fire', boost: kind !== 'fire', seconds: LOAD_TEST_SECONDS }),
+      };
+      this.renderStats();
+      this.draw();
+    });
     act('all', () => this.deps.send({ type: 'slotBuild', slot: this.slot }));
     act('fly', () => { this.deps.send({ type: 'slotFly', slot: this.slot }); this.close(null); });
     act('clear', () => {
@@ -1431,29 +1452,59 @@ export class HangarUI {
   }
 
   /**
-   * Power: each network (in its overlay colour) with its generators and
-   * batteries and what it makes against what's drawn on it, whether the design
-   * is auto-wired or wired by hand, and what's left without power
+   * Power: each circuit (local circuits: its letter, in its overlay colour)
+   * with its generators and stores, what it spares and what it can give a
+   * second, the load test's verdict on it, whether the design is auto-wired
+   * or wired by hand, and what's wrong (no generator for its stores, a
+   * capacitor touching nothing, a weak link)
    */
   private powerHtml(): string {
-    const rep = this.power;
-    if (!rep || !this.derived) return '';
+    const rep = this.power, d = this.derived;
+    if (!rep || !d) return '';
     const hand = !!this.bp.wires;
+    const n0 = (v: number) => (Number.isFinite(v) ? Math.round(v).toLocaleString() : '—');
     let html = `<div style="display:flex; align-items:baseline; margin-bottom:4px"><b style="color:#ffb547; letter-spacing:1px">POWER</b>`
       + `<span style="margin-left:auto; font-size:11px; color:${hand ? '#fbbf24' : '#7dd3fc'}" title="${hand ? 'Wired by hand: new segments cost wire spools as you save' : 'Auto-wired: the wires follow your parts, free, until you edit them (the Wires tool, W)'}">${hand ? 'wired by hand' : 'auto-wired'}</span></div>`;
-    const nets = rep.nets.map((n, k) => ({ n, k })).filter(({ n }) => n.generators.length || n.batteries.length || n.demand > 0);
+    const nets = rep.nets.map((n, k) => ({ n, k })).filter(({ n }) => n.letter).sort((a, b) => a.n.letter.localeCompare(b.n.letter));
     if (!nets.length) html += '<div style="color:#6b7a93; font-size:11px; margin-bottom:4px">No generator on this ship.</div>';
+    const lt = this.loadRun && this.loadRun.sig === designSig(this.bp) ? this.loadRun : null;
     for (const { n, k } of nets) {
-      const gens = n.generators.length, bats = n.batteries.length;
-      const what = [gens ? `${gens} generator${gens > 1 ? 's' : ''}` : 'no generator', bats ? `${bats} batter${bats > 1 ? 'ies' : 'y'}` : ''].filter(Boolean).join(' · ');
+      const gens = n.generators.length, stores = n.batteries.length;
+      const what = [gens ? `${gens} gen` : 'no generator', stores ? `${stores} store${stores > 1 ? 's' : ''}` : '', n.main ? 'core' : ''].filter(Boolean).join(' · ');
       const ok = n.supply >= n.demand - 1e-6;
-      html += `<div style="display:flex; align-items:center; gap:6px; padding:2px 0; border-bottom:1px solid #18223a; font-size:11px" title="${n.parts.length} parts on it">`
-        + `<span style="width:10px; height:10px; border-radius:2px; flex-shrink:0; background:${n.color}"></span><span style="color:#cfd8e6; white-space:nowrap">Network ${k + 1}</span><span style="color:#8ea0bd; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${what}</span>`
-        + `<span style="margin-left:auto; white-space:nowrap" title="Made / drawn steadily (engines and guns draw on the batteries)"><b style="color:${!n.powered ? '#8ea0bd' : ok ? '#4ade80' : '#fbbf24'}">+${Math.round(n.supply)}</b><span style="color:#6b7a93"> / ${Math.round(n.demand)}</span></span></div>`;
+      html += `<div style="display:flex; align-items:center; gap:6px; padding:2px 0; border-bottom:1px solid #18223a; font-size:11px" title="Circuit ${n.letter}: ${n.parts.length} parts. Its generators make +${n0(n.supply)}/s (steady loads take ${n0(n.demand)}), so ${n0(n.spare)}/s spare for its engines, guns and stores; its stores hold ${n0(n.store)} and give up to ${n0(n.rate)}/s; flat out its engines and guns ask ${n0(n.burst)}/s (boosting asks far more)">`
+        + `<span style="width:15px; height:15px; border-radius:3px; flex-shrink:0; background:${n.color}; color:#0b1220; font-weight:800; text-align:center; line-height:15px">${n.letter}</span>`
+        + `<span style="color:#8ea0bd; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${what}</span>`
+        + `<span style="margin-left:auto; white-space:nowrap"><b style="color:${!n.powered ? '#8ea0bd' : ok ? '#4ade80' : '#fbbf24'}">+${n0(n.spare)}</b><span style="color:#6b7a93">/s · ${n0(n.store)} held · gives ${n0(n.rate)}/s</span></span></div>`;
+      const r = lt?.result.circuits[k];
+      if (r && (r.engines < 1.01 || r.guns < 1.01)) {
+        const pc = (v: number) => `${Math.round(v * 100)}%`;
+        const what2 = r.brownAt < 0 ? '<span style="color:#4ade80">holds up: full power throughout</span>'
+          : `<span style="color:${Math.min(r.engines, r.guns) < 0.5 ? '#f87171' : '#fbbf24'}">browns out ${r.brownAt < 0.05 ? 'at once' : `after ${r.brownAt.toFixed(1)} s`}: engines ${pc(r.engines)}, guns ${pc(r.guns)}</span>`;
+        const refill = !Number.isFinite(r.refill) ? (n.powered ? ' · refills slowly' : ' · <span style="color:#f87171">never refills</span>') : r.refill > 0.05 ? ` · refills in ${r.refill.toFixed(0)} s` : '';
+        html += `<div style="font-size:11px; padding:1px 0 3px 21px; color:#8ea0bd">${what2}${refill}</div>`;
+      }
+    }
+    // The core's store, and the load test
+    const core = d.power?.core;
+    if (core) {
+      const main = d.power!.circuits[core.circuit];
+      html += `<div style="font-size:11px; color:#6b7a93; padding:2px 0" title="The core's built-in store: a battery on the main circuit (the one making most power), and a slow trickle into every other circuit and into parts on none, so a cut-off part limps instead of dying">Core store ${n0(core.cap)}: gives ${main ? main.letter : 'the main circuit'} up to ${n0(core.rate)}/s, the others ${n0(core.trickle)}/s</div>`;
+    }
+    if (nets.length) {
+      const chip = (kind: string, label: string, tip: string) => `<button data-load="${kind}" title="${tip}" style="background:${lt?.kind === kind ? '#24406b' : '#0f1626'}; color:#e5ecf7; border:1px solid ${lt?.kind === kind ? '#5fd4c4' : '#2a3a5a'}; border-radius:5px; padding:1px 7px; cursor:pointer; font:11px 'Segoe UI', sans-serif">${label}</button>`;
+      html += `<div style="display:flex; align-items:center; gap:4px; margin:4px 0 2px; font-size:11px"><span style="color:#8ea0bd" title="Plays ${LOAD_TEST_SECONDS} seconds of the ship's own power from full: which circuits brown out, and how long they take to refill">Load test</span>`
+        + chip('fire', 'Fire', 'Every gun firing flat out') + chip('boost', 'Boost', 'Boosting forward') + chip('both', 'Both', 'Every gun firing while boosting forward')
+        + (lt ? `<button data-load="off" title="Clear the load test" style="margin-left:auto; background:none; border:none; color:#6b7a93; cursor:pointer; font-size:11px">clear</button>` : '') + '</div>';
+    }
+    // Weak links: cells a wire runs through whose loss cuts consumers off from every generator (✂ on the overlay)
+    if (rep.weak.length) {
+      const w = rep.weak[0];
+      html += `<div style="font-size:11px; color:#fca5a5; margin-top:3px" title="${esc(rep.weak.slice(0, 8).map((x) => x.text).join('\n'))}">✂ ${rep.weak.length} weak link${rep.weak.length > 1 ? 's' : ''}: ${esc(w.text.charAt(0).toLowerCase() + w.text.slice(1))}${rep.weak.length > 1 ? ' (the Wires tool marks them; a loop of wire has none)' : ''}</div>`;
     }
     if (rep.warnings.length) {
-      html += `<div style="margin:5px 0 2px; font-size:11px; line-height:1.45">${rep.warnings.slice(0, 6).map((w) => `<div style="color:${/no power/.test(w) ? '#f87171' : '#fbbf24'}">• ${esc(w.charAt(0).toUpperCase() + w.slice(1))}</div>`).join('')}`
-        + `${rep.warnings.length > 6 ? `<div style="color:#6b7a93">and ${rep.warnings.length - 6} more</div>` : ''}</div>`;
+      html += `<div style="margin:5px 0 2px; font-size:11px; line-height:1.45">${rep.warnings.slice(0, 7).map((w) => `<div style="color:${/no power|never/.test(w) ? '#f87171' : '#fbbf24'}">• ${esc(w.charAt(0).toUpperCase() + w.slice(1))}</div>`).join('')}`
+        + `${rep.warnings.length > 7 ? `<div style="color:#6b7a93">and ${rep.warnings.length - 7} more</div>` : ''}</div>`;
       if (this.tool !== 'wires') html += '<div style="color:#6b7a93; font-size:11px">The Wires tool (W) lays what\'s missing.</div>';
     } else if (nets.length) html += '<div style="color:#4ade80; font-size:11px; margin-top:4px">Everything that uses power has it.</div>';
     return html + '<div style="margin-bottom:12px"></div>';
@@ -1495,12 +1546,34 @@ export class HangarUI {
     html += row('Hull', `${n0(now.hull)} hp`, 'hull', 'Every part\'s hit points together');
     if (now.shield > 0 || (was && was.shield > 0)) html += row('Shield', `${n0(now.shield)}`, 'shield');
     html += row('Cargo', `${n0(now.cargo)}`, 'cargo');
+    // Cargo has mass (common/src/ships/load.ts): what the hold costs in thrust and turning, now and full of ore
+    {
+      const pct = (v: number) => `−${Math.round(v * 100)}%`;
+      const load = this.deps.cargoMass?.() ?? 0;
+      const full = cargoEffect(now, now.cargo * CATEGORY_MASS.mineral);
+      const tip = 'Cargo has mass: a laden ship accelerates, turns and stops slower. It is weighed against the ship, so a bigger hull (or a hauler) minds the same load less; station storage weighs nothing';
+      if (load > 0) {
+        const e = cargoEffect(now, load);
+        html += row('Hold now', `${load.toFixed(1)} mass · <span style="color:#fbbf24">${pct(e.thrustLoss)} thrust, ${pct(e.turnLoss)} turn</span>`, undefined, tip);
+      }
+      if (now.cargo > 0) html += row('Full of ore', `<span style="color:#fbbf24">${pct(full.thrustLoss)} thrust, ${pct(full.turnLoss)} turn</span>`, undefined, tip);
+    }
     html += row('Jump drive', `${now.jump.toFixed(1)} km · ${Math.round(now.jumpCooldown)} s`, 'jump', 'Reach, and recharge time: from the jump coils (the core has one) against the size of the hull');
     {
       const note = jumpRatioNote(now.jumpRatio);
       html += row('Jump coils', `${now.jumpRatio.toFixed(2)}× the hull's need · <span style="color:${note.color}">${note.word}</span>`, 'jumpRatio', note.hint);
     }
     if (now.miners || (was && was.miners)) html += row('Mining lasers', `${now.miners}`, 'miners');
+    // The Stabiliser Anchor (common/src/ships/anchor.ts): what bracing does
+    if (now.anchor > 0) {
+      const a = anchorTuning(tuning);
+      const ok = now.anchor >= MIN_ANCHOR_POWER;
+      html += row('Anchor', ok
+        ? `brace: guns +${Math.round(a.range * 100)}% reach · shields +${Math.round(a.shieldRegen * 100)}%`
+        : '<span style="color:#f87171">no power</span>', undefined,
+        `Stabiliser Anchor: press ${boundKeyName('brace', settings.data.bindings)} to brace. Braced, the ship holds still (no thrust, slow turning), its guns reach ${Math.round(a.range * 100)}% further and scatter ${Math.round(a.spread * 100)}% less, `
+        + `its shields recharge ${Math.round(a.shieldRegen * 100)}% faster and hits take less of them, and pulls and knockback can't move it. It takes ${(a.braceTicks / 60).toFixed(2)} s to brace and ${(a.releaseTicks / 60).toFixed(1)} s to let go: no thrust and no benefits while it spools`);
+    }
     html += row('Mass', `${n0(now.mass)}`, 'mass');
     html += row('Loss cost', `${n0(now.rebuild)} cr`, 'rebuild', `If it's destroyed: the ${Math.round((1 - SALVAGE) * 100)}% of its minerals salvage doesn't bring back, at station prices (an insurance bond covers it)`);
     html += energyHtml(now.energy);
@@ -1860,19 +1933,21 @@ if (d && this.overlays.com && d.mass > 0) {
       const net = rep.nets[d.network[i]], col = net?.color ?? DEAD_NET;
       const cx = sx(g.centroid[0]), cy = sy(g.centroid[1]);
       const st = rep.part[i];
-      if (st === 'unpowered' || st === 'stranded' || st === 'short') {
+      if (st === 'unpowered' || st === 'stranded' || st === 'short' || st === 'trickle' || st === 'idle') {
+        // (amber: short of power, or on the core's trickle alone; grey: a capacitor touching nothing; red: none)
+        const soft = st === 'short' || st === 'trickle';
         ctx.beginPath();
         g.polygon.forEach(([x, y], k) => (k ? ctx.lineTo(sx(x), sy(y)) : ctx.moveTo(sx(x), sy(y))));
         ctx.closePath();
-        ctx.fillStyle = st === 'short' ? 'rgba(251, 191, 36, 0.12)' : 'rgba(239, 68, 68, 0.18)';
+        ctx.fillStyle = st === 'idle' ? 'rgba(148, 163, 184, 0.14)' : soft ? 'rgba(251, 191, 36, 0.12)' : 'rgba(239, 68, 68, 0.18)';
         ctx.fill();
         ctx.setLineDash([4, 3]);
-        ctx.strokeStyle = st === 'short' ? '#fbbf24' : '#ef4444';
+        ctx.strokeStyle = st === 'idle' ? '#94a3b8' : soft ? '#fbbf24' : '#ef4444';
         ctx.lineWidth = 2;
         ctx.stroke();
         ctx.setLineDash([]);
         // (a struck-through bolt: no power)
-        if (st !== 'short') {
+        if (st === 'unpowered' || st === 'stranded') {
           ctx.fillStyle = '#fca5a5';
           ctx.font = `700 ${Math.max(10, Math.round(px * 0.42))}px 'Segoe UI', sans-serif`;
           ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -1900,6 +1975,68 @@ if (d && this.overlays.com && d.mass > 0) {
         ctx.fillRect(cx - bw / 2 + 3, cy - bh / 2 + 3, (bw - 6) * (net?.powered ? 0.7 : 0.15), bh - 6);
       }
     });
+    this.drawCircuits(d, sx, sy, ring);
+  }
+
+  /**
+   * Local circuits on the overlay: each circuit's letter on a badge by its
+   * first generator (else store, else part), weak links outlined red with a
+   * cut mark, and after a load test each part that browned out with its share
+   */
+  private drawCircuits(d: ShipDerived, sx: (x: number) => number, sy: (y: number) => number, ring: number): void {
+    const ctx = this.ctx, rep = this.power, L = d.power;
+    if (!rep || !L) return;
+    const outline = (i: number, color: string, dash: number[]) => {
+      const g = this.geoms[i];
+      if (!g) return;
+      ctx.beginPath();
+      g.polygon.forEach(([x, y], k) => (k ? ctx.lineTo(sx(x), sy(y)) : ctx.moveTo(sx(x), sy(y))));
+      ctx.closePath();
+      ctx.setLineDash(dash);
+      ctx.strokeStyle = color; ctx.lineWidth = 2.5;
+      ctx.stroke();
+      ctx.setLineDash([]);
+    };
+    const font = Math.max(10, Math.round(ring * 1.2));
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    // Weak links: the wire's single path (shoot it and what's beyond goes dark)
+    for (const w of this.tool === 'wires' ? rep.weak.slice(0, 12) : []) {
+      outline(w.part, '#f87171', [2, 3]);
+      const g = this.geoms[w.part];
+      if (g) { ctx.font = `700 ${font}px 'Segoe UI', sans-serif`; ctx.fillStyle = '#fca5a5'; ctx.fillText('✂', sx(g.centroid[0]), sy(g.centroid[1])); }
+    }
+    // The load test: what browned out, by how much
+    const lt = this.loadRun && this.loadRun.sig === designSig(this.bp) ? this.loadRun.result : null;
+    if (lt) {
+      lt.part.forEach((v, i) => {
+        if (v >= BROWNOUT || !this.geoms[i]) return;
+        outline(i, v < 0.5 ? '#ef4444' : '#fb923c', []);
+        const g = this.geoms[i];
+        ctx.font = `700 ${Math.max(9, Math.round(font * 0.75))}px 'Segoe UI', sans-serif`;
+        ctx.fillStyle = 'rgba(3, 5, 10, 0.75)';
+        const tx = sx(g.centroid[0]), ty = sy(g.centroid[1]) + ring * 1.1;
+        ctx.fillRect(tx - font * 1.1, ty - font * 0.45, font * 2.2, font * 0.9);
+        ctx.fillStyle = v < 0.5 ? '#fca5a5' : '#fdba74';
+        ctx.fillText(`${Math.round(v * 100)}%`, tx, ty);
+      });
+    }
+    // Letters
+    for (const ci of L.circuits) {
+      if (!ci.letter) continue;
+      const at = ci.generators[0] ?? ci.storeParts[0] ?? ci.consumers[0] ?? ci.parts[0];
+      const g = at !== undefined ? this.geoms[at] : undefined;
+      if (!g) continue;
+      const net = rep.nets[ci.net], col = net?.color ?? circuitColor(ci.letter);
+      const bx = sx(g.centroid[0]) + ring * 1.15, by = sy(g.centroid[1]) - ring * 1.15, r = Math.max(7, font * 0.62);
+      ctx.fillStyle = 'rgba(3, 5, 10, 0.85)';
+      ctx.beginPath(); ctx.arc(bx, by, r + 2, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.arc(bx, by, r, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#0b1220';
+      ctx.font = `800 ${Math.round(r * 1.35)}px 'Segoe UI', sans-serif`;
+      ctx.fillText(ci.letter, bx, by + 0.5);
+    }
+    ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
   }
 
   /** The wires tool's cursor: the cell under the mouse (amber to lay, red to erase, grey off the hull) */

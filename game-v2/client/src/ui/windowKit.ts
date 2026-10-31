@@ -267,6 +267,9 @@ export function itemTipHtml(econ: Economy, id: string, opts: { count?: number; h
   if (opts.count !== undefined) html += `<div class="t-r"><span>Have</span><b>${opts.count}</b></div>`;
   html += `<div class="t-r"><span>Value</span><b class="sgw-credits">${d.value.toLocaleString()} cr</b></div>`;
   html += `<div class="t-r"><span>Cargo space</span><b>${econ.items.volume(id)}</b></div>`;
+  // (Carried in the hold it weighs the ship down: ships/load.ts)
+  const mass = econ.items.mass(id);
+  if (mass > 0) html += `<div class="t-r"><span>Mass in the hold</span><b>${mass < 0.1 ? mass.toFixed(2) : mass.toFixed(1)}${opts.count && opts.count > 1 ? ` · ${(mass * opts.count).toFixed(1)} all` : ''}</b></div>`;
   if (opts.extra) html += opts.extra;
   if (opts.hint) html += `<div class="t-h">${esc(opts.hint)}</div>`;
   return html;
@@ -288,6 +291,7 @@ export function partStatsHtml(econ: Economy, part: { material: string; fn: strin
   if (st.thrust) html += row('Thrust', `${st.thrust.toFixed(1)}${st.boost ? ` · boost ×${st.boost}, drain ×${st.boostDrain}` : ''}`);
   if (st.shield) html += row('Shield', `${n0(st.shield)}`);
   if (st.cargo) html += row('Cargo', `${n0(st.cargo)}`);
+  if (st.brace) html += row('Braced', `guns +${Math.round((st.brace.reach - 1) * 100)}% reach · shields +${Math.round((st.brace.shieldRegen - 1) * 100)}% recharge · no thrust`);
   html += row('Hull · mass', `${n0(st.hp)} hp · ${st.mass.toFixed(1)}`);
   html += row('Armour · build', `${st.armour} · ${Math.round(partBuildPoints(econ.ships, part) * 10) / 10} pts`);
   const res = resistText(st.resist);
