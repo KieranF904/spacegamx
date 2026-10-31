@@ -656,7 +656,7 @@ export class WeaponFx {
           this.circle(g, TEX.disc, hx + ox, hy + oy, st.haloRadius * z * wk, shot.glow, 0.14 * alpha);
           this.circle(g, TEX.disc, hx + ox, hy + oy, st.haloRadius * z * wk * 0.55, shot.glow, 0.22 * alpha);
         }
-        if (st.headRadius > 0) this.circle(g, TEX.disc, hx + ox, hy + oy, st.headRadius * z * wk, 0xffffff, alpha);
+        if (st.headRadius > 0) this.circle(g, TEX.disc, hx + ox, hy + oy, st.headRadius * z * wk, st.headColor ?? 0xffffff, alpha);
       }
       const speed = Math.hypot(shot.vx, shot.vy);
       // A glowing wake: dots left along the path behind it, each fainter (positions follow from the line, nothing is kept)

@@ -25,6 +25,8 @@ export interface WeaponStyle {
   ownerTint: number;
   /** Bright head dot radius (0 = none) */
   headRadius: number;
+  /** Colour of the head dot (default white; a dark one makes a black core, drawn in normal blend) */
+  headColor?: number;
   /** Soft halo around the head (0 = none) */
   haloRadius: number;
   /** tongue: the forward flame's length × this; girth: the flash's width × this (a heavy shell's flash is fat) */
@@ -288,7 +290,7 @@ export const WEAPON_STYLES: Record<number, WeaponStyle> = {
   // Singularity: a dark orb ringed with light
   [WeaponType.Singularity]: {
     ...KINETIC, motion: 'tracked', tracerTicks: 1, coreWidth: 0, glowWidth: 26, coreColor: 0x1a0b2e, glowColor: 0x9b5de5, glowAlpha: 0.35, ownerTint: 0,
-    headRadius: 12, haloRadius: 46, muzzle: { life: 12, size: 40, sparks: 10, color: 0xc084fc, smoke: 0 },
+    headRadius: 12, headColor: 0x0b0414, haloRadius: 46, muzzle: { life: 12, size: 40, sparks: 10, color: 0xc084fc, smoke: 0 },
     impact: { sparks: 20, speed: 5, life: 20, color: 0xd8b4fe, flash: 40 }, orb: true,
     // (the pull radius is the model's: data/ships/tuning.json singularity.pull.radius, pinned by weaponStyles.test.ts)
     pull: { radius: 900, color: 0xb98cf0 },

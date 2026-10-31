@@ -57,7 +57,7 @@ export const ORDNANCE_STYLES: Record<string, Partial<WeaponStyle>> = {
     trail: { color: 0x7a6a50, size: 5, life: 40 },
   },
   torpedo_leviathan: {
-    coreWidth: 12, glowWidth: 28, coreColor: 0x2d2219, glowColor: 0xff5a1a, glowAlpha: 0.42, headRadius: 6, haloRadius: 24, tracerTicks: 1.3,
+    coreWidth: 12, glowWidth: 28, coreColor: 0x2d2219, glowColor: 0xff5a1a, glowAlpha: 0.42, headRadius: 6, headColor: 0x120a06, haloRadius: 24, tracerTicks: 1.3,
     nose: { color: 0xff1a1a, size: 11, period: 40 },
     incoming: { radius: 340 },
     trail: { color: 0x3a2f28, size: 15, life: 80 },
