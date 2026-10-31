@@ -26,7 +26,7 @@ export const KINETIC_MODEL_STYLES = {
   cannon_longbarrel: {
     tracerTicks: 10, coreWidth: 1.7, glowWidth: 5.5, coreColor: 0xfffbe8, glowColor: 0xffd070, glowAlpha: 0.5, headRadius: 3, haloRadius: 9,
     muzzle: { life: 11, size: 30, sparks: 8, color: 0xffe9b0, smoke: 3, tongue: 3.5, girth: 0.55, ring: { color: 0xffe6a0, size: 1.1 } },
-    contrail: { color: 0xffe6a0, size: 3, life: 48, step: 14 },
+    contrail: { color: 0xffe6a0, size: 3, life: 48 },
     impact: { sparks: 20, speed: 7, life: 14, color: 0xffe6a0, flash: 26, ring: 0xffd070 },
   },
   // The ship-killer: a red-hot ball round a dark core with a heat haze pulsing off it, a smoke ring and heavy kick at the muzzle, a big double-ringed impact
@@ -64,7 +64,7 @@ export const KINETIC_MODEL_STYLES = {
   },
   // The cheap rail: today's long thin streak in cyan, an ionised contrail, three coil rings at the muzzle
   railgun_needle: {
-    coreColor: CYAN.core, glowColor: CYAN.glow, contrail: { color: 0x8fe4ff, size: 2.6, life: 24, step: 12 },
+    coreColor: CYAN.core, glowColor: CYAN.glow, contrail: { color: 0x8fe4ff, size: 2.6, life: 24 },
     muzzle: { life: 10, size: 28, sparks: 8, color: CYAN.flash, smoke: 2, ring: { color: 0x7fdcff, count: 3, size: 0.7 } },
     impact: { sparks: 20, speed: 6, life: 18, color: CYAN.flash, flash: 30 },
   },
@@ -77,7 +77,7 @@ export const KINETIC_MODEL_STYLES = {
   // The capital rail: a thick violet-white line that lingers, a big muzzle blast (a shock ring at each hull it passes is DamageFx's)
   railgun_spear: {
     tracerTicks: 3, coreWidth: 5, glowWidth: 17, coreColor: 0xf6f0ff, glowColor: 0xa070ff, glowAlpha: 0.55, ownerTint: 0, headRadius: 5, haloRadius: 18,
-    contrail: { color: 0xb89cff, size: 6, life: 60, step: 10 },
+    contrail: { color: 0xb89cff, size: 6, life: 60 },
     muzzle: { life: 13, size: 40, sparks: 10, color: 0xd8c4ff, smoke: 4, tongue: 2.2, girth: 1.4, ring: { color: 0xc4a8ff, size: 1.3 } },
     impact: { sparks: 26, speed: 6, life: 22, color: 0xd8c4ff, flash: 40, ring: 0x9a70ff },
   },

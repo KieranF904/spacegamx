@@ -13,7 +13,7 @@ export const LEGENDARY_STYLES: Record<string, Partial<WeaponStyle>> = {
   },
   // Cinder Bloom: an ember-dripping slug, a hot wake behind it; it lands in a spray of cinders
   legendary_cinder_bloom: {
-    contrail: { color: 0xff7a1a, size: 3.2, life: 26, step: 7 },
+    contrail: { color: 0xff7a1a, size: 3.2, life: 26 },
     impact: { sparks: 26, speed: 3.2, life: 30, color: 0xff6a1a, flash: 30, ring: 0xff9a3a },
   },
   // Prism Splitter: a faceted white crystal in a magenta halo, a ring swelling off it; its impact sparks span the rainbow

@@ -42,8 +42,8 @@ export interface WeaponStyle {
   pair?: { gap: number };
   /** Spent casings thrown out sideways at the muzzle, this many a shot */
   casings?: number;
-  /** A glowing wake behind the head: a line of fading dots every `step` units for `life` ticks */
-  contrail?: { color: number; size: number; life: number; step?: number };
+  /** A glowing wake behind the head: a segment laid each frame, fading over `life` frames */
+  contrail?: { color: number; size: number; life: number };
   /** Ghost copies of the head trailing behind it, this many */
   afterimages?: number;
   /** A ring round the head that swells and fades every `period` ticks */

@@ -53,7 +53,7 @@ export const ORDNANCE_STYLES: Record<string, Partial<WeaponStyle>> = {
   torpedo_eel: {
     coreColor: 0xfff0cc, glowColor: 0xffb040, glowAlpha: 0.5,
     ringPulse: { color: 0xffd48a, size: 36, period: 30, closing: 800 },
-    contrail: { color: 0xffc46b, size: 3, life: 44, step: 9 },
+    contrail: { color: 0xffc46b, size: 3, life: 44 },
     trail: { color: 0x7a6a50, size: 5, life: 40 },
   },
   torpedo_leviathan: {

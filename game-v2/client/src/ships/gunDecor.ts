@@ -364,6 +364,17 @@ const DESIGNS: Record<string, Design> = {
   // ---- railgun: twin rails
   railgun_needle: (g) => rails(g, 0.09, 0.042, [], 0.22),
   railgun_coilgun: (g) => rails(g, 0.095, 0.042, [0.3, 0.48, 0.66, 0.84], 0.24),
+  // Rail Driver: a short shrouded rifle, one housing over the rails, side vents behind a lit slot
+  railgun_rail_driver: (g) => {
+    rails(g, 0.075, 0.038, [], 0.26);
+    const k = g.k, { b0, m } = g;
+    g.box(b0, b0 + (m - b0) * 0.62, -0.13 * k, 0.13 * k, DK, true);
+    g.box(b0 + 0.02 * k, b0 + (m - b0) * 0.6, -0.1 * k, 0.1 * k, LT);
+    for (const s of [-1, 1]) for (let i = 0; i < 3; i++) {
+      const x = b0 + (m - b0) * (0.12 + i * 0.15);
+      g.box(x, x + 0.045 * k, s * 0.1 * k, s * 0.135 * k, DK);
+    }
+  },
   railgun_spear: (g) => {
     rails(g, 0.13, 0.06, [0.5], 0.3);
     // Capacitor banks on the house's flanks
@@ -565,7 +576,7 @@ const REACH: Record<string, number> = {
   autocannon_rattler: 0.5, autocannon_chainsaw: 0.6, autocannon_stinger: 0.66, flak_burst: 0.42, flak_cloudmaker: 0.52,
   mortar_lobber: 0.32, mortar_quake: 0.38, laser_glint: 0.45, laser_cutter: 0.38, laser_searchlight: 0.5,
   pulse_strobe: 0.5, pulse_overpulse: 0.6, missile_dart: 0.18, missile_swarm: 0.18, missile_hammerhead: 0.2,
-  railgun_needle: 0.95, railgun_coilgun: 0.85, railgun_spear: 1, emp_hush: 0.42, emp_blackout: 0.5,
+  railgun_needle: 0.95, railgun_rail_driver: 0.8, railgun_coilgun: 0.85, railgun_spear: 1, emp_hush: 0.42, emp_blackout: 0.5,
   arc_spark: 0.38, arc_tesla: 0.42, torpedo_eel: 0.55, torpedo_leviathan: 0.6, lance_lance: 0.75,
   hive: 0.16, frostbite: 0.5, cinder_bloom: 0.45, prism: 0.5, phase: 0.55, singularity: 0.45, exotic: 0.42, demolition: 0.3,
 };
