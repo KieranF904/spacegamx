@@ -171,6 +171,9 @@ export const FIRE_SENTENCE: Record<string, string> = {
   auto: 'Fires on its own at incoming ordnance.',
 };
 
+/** A clip with regrow never reloads: it spends its stock and one round grows back at a time */
+export const REGROW_SENTENCE = 'Fires a salvo from its stock; one round grows back at a time, each drawing a little energy.';
+
 /** A gun's firing model as a chip ("cycle", "clip 6 · 1.5s reload", "charge 2.0s", "held beam", "auto") */
 export function fireChip(fn: FunctionDef): string {
   const f = fn.fire;

@@ -13,7 +13,7 @@ import { costHtml } from '../ui/windowKit';
 import { jumpRatioNote } from './shipSummary';
 import { functionColor, numToCss } from './shipColors';
 import { tipRows } from './describe';
-import { FIRE_SENTENCE, MOUNT_TEXT, tradeOff, weaponMount } from './modelCards';
+import { FIRE_SENTENCE, REGROW_SENTENCE, MOUNT_TEXT, tradeOff, weaponMount } from './modelCards';
 
 /** A ship's boost-and-fire load test, kept per derived state: a tooltip reads it for every gun (4 s of power ticks) */
 const boostFire = new WeakMap<ShipDerived, ReturnType<typeof loadTest>>();
@@ -154,7 +154,7 @@ export function partTipHtml(p: Pick<PlacedPart, 'fn' | 'material' | 'piece'> & P
       : `${f.clip} rounds at ${rate >= 10 ? n0(rate) : rate.toFixed(1)}/s · reloads in ${((f.reload ?? 0) / 60).toFixed(1)}s from energy (${n0(f.reloadE ?? 0)} a clip), when empty or a second after you let go`);
     else if (f?.model === 'charge') html += row('Charge', `hold ${((f.charge ?? 0) / 60).toFixed(1)}s: it fires itself, then ${((f.cooldown ?? 0) / 60).toFixed(1)}s to cool · let go early and nothing fires · ${n0(f.chargeE ?? 0)} energy a charge`);
     else html += row('Fire rate', `${f?.spin ? `${(60 / f.spin.from).toFixed(1)}/s spinning up to ${n0(60 / f.spin.to)}/s` : rate >= 10 ? n0(rate) : rate.toFixed(1)}${f?.spin ? '' : '/s'} · ${esc(KIND[def?.type ?? ''] ?? def?.type ?? fn.weapon)}${def?.ammo && (!f || f.model === 'ammo') ? ` · ${esc(econ.items.name(def.ammo.item))}${(f?.rounds ?? 1) > 1 ? ` (${f!.rounds} a shot, no energy)` : f ? ' (no energy)' : ''}` : ''}`);
-    if (f && FIRE_SENTENCE[f.model]) html += row('Model', `${esc(f.model)}: ${esc(FIRE_SENTENCE[f.model])}`);
+    if (f && FIRE_SENTENCE[f.model]) html += row('Model', `${esc(f.model)}: ${esc(f.model === 'clip' && f.regrow ? REGROW_SENTENCE : FIRE_SENTENCE[f.model])}`);
     if (w && w.satisfaction < 0.995) html += row('Under-powered', `<span style="color:#fbbf24">${Math.round(w.satisfaction * 100)}%: fires slower</span>`);
     if (d && i >= 0 && f) for (const [a, b] of powerShots(d, tuning, i, f)) html += row(a, b);
     // (Its model's mount: not a choice)
