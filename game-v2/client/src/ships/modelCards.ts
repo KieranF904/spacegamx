@@ -102,13 +102,13 @@ const TRADE_OFF: Record<string, string> = {
   utility_long_range_array: 'twice the reach, twice the power',
   utility_constructor: 'builds structures',
   shield_deflector: 'soaks hits before the hull',
-  shield_flash_screen: 'its bank puts it all back when it breaks',
-  shield_flicker_screen: 'thin, almost free to run',
-  shield_bulwark_projector: 'deep, hungry for power',
+  shield_flash_screen: 'no slow refill, back whole after a break',
+  shield_flicker_screen: 'thin and cheap, back in a second',
+  shield_bulwark_projector: 'deep, slow to refill',
   utility_jump_coil: 'more jump for a bigger hull',
-  utility_heavy_coil: 'the most jump for its cells',
-  plating_reactive_armour: 'lighter protection than armour',
-  plating_spaced_plating: 'a lot to chew through, light',
+  utility_heavy_coil: 'more jump per cell, and 20% faster to cool',
+  plating_reactive_armour: 'blunts small fast hits',
+  plating_spaced_plating: 'half damage from blasts',
 };
 
 /** How a weapon is mounted: its model's own (common partMount: not the pilot's choice); a legacy part's as placed */
@@ -182,6 +182,9 @@ export function keyStats(catalog: Catalog, tuning: ShipTuning | undefined, fn: F
     out.push(`gives ${n0(partDischarge(fn, st.area, catalog.materials.get(fn.material ?? 'alloy'), circuitTuning(tuning ?? ({} as ShipTuning))))}/s${fn.bank ? ' by touch' : ''}`);
   }
   if (st.shield) out.push(`shield ${n0(st.shield)}`);
+  if (st.shield && fn.shieldRegen) out.push(`refills ${n0(fn.shieldRegen * st.area)}/s after ${(fn.shieldDelay ?? 0) / 60} s`);
+  if (fn.splashTaken !== undefined && fn.splashTaken < 1) out.push(`${Math.round((1 - fn.splashTaken) * 100)}% less from blasts`);
+  if (fn.jumpCooldown !== undefined && fn.jumpCooldown < 1) out.push(`jump cooldown −${Math.round((1 - fn.jumpCooldown) * 100)}%`);
   if ((fn.range ?? 0) > 0 && !fn.weapon) out.push(`scan ${n0(fn.range!)} m`);
   if ((fn.jumpCapacity ?? 0) > 0) out.push(`jump ${n0(fn.jumpCapacity! * st.area)} cells`);
   if (st.dodge) out.push(`dodge ${st.dodge.force.toFixed(1)} push · every ${st.dodge.cooldown.toFixed(1)} s · ${n0(st.dodge.energy)} energy a burst`);

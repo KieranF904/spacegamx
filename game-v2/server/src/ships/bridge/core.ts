@@ -60,6 +60,8 @@ export interface ShipHost {
   featureCargo?(eid: number): number;
   /** A ship was rebuilt (ships/features: features re-check what depends on its parts) */
   shipRebuilt?(eid: number): void;
+  /** A ship's shield broke (ships/features: a Flash Screen starts its return) */
+  shieldBroken?(eid: number): void;
   /** Everything kept about an entity id was dropped (ships/features: features forget it) */
   shipForgotten?(eid: number): void;
   /** The jump drive's charging fields in this ship's system (a star's ring, lodestones: common/src/ships/jumpFields.ts) */

@@ -178,7 +178,7 @@ export function lastDamagedTick(b: BridgeCtx, eid: number): number {
  * penetration against the part's armour and material: damage.ts).
  * Returns the damage dealt (shield + hull).
  */
-export function hurt(b: BridgeCtx, eid: number, ship: ShipState, part: number, amount: number, source = -1, vs?: { shield?: number; hull?: number; hit?: HitInfo; at?: Vec2; bane?: { faction: string; damage: number } }): number {
+export function hurt(b: BridgeCtx, eid: number, ship: ShipState, part: number, amount: number, source = -1, vs?: { splash?: boolean; shield?: number; hull?: number; hit?: HitInfo; at?: Vec2; bane?: { faction: string; damage: number } }): number {
   if (amount <= 0 || b.host.invulnerable?.(eid)) return 0;
   const struck = part;
   part = b.cover(ship, part, vs?.at);
@@ -186,6 +186,8 @@ export function hurt(b: BridgeCtx, eid: number, ship: ShipState, part: number, a
   // (a later stage's part: the plate covering it takes only a share, so the stage being fought is what to aim at)
   if (part !== struck && stageOf(b.catalog, ship, struck) > currentStage(b.catalog, ship)) amount *= b.host.stageCover?.(eid) ?? STAGE_COVER;
   // (ammunition made for one faction's ships: Quench Slugs on the Cinder Cult)
+  // (spaced plating: a blast does a share of its damage to the plate it lands on)
+  if (vs?.splash) amount *= b.catalog.functions.get(ship.blueprint.parts[part]?.fn)?.splashTaken ?? 1;
   if (vs?.bane && b.host.baneFaction?.(eid) === vs.bane.faction) amount *= vs.bane.damage;
   const taken = b.host.takenScale?.(eid) ?? 1;
   amount *= taken;
@@ -196,6 +198,7 @@ export function hurt(b: BridgeCtx, eid: number, ship: ShipState, part: number, a
     const k = vs?.shield ?? 1;
     const soak = Math.min(ship.shield, amount * k);
     ship.shield -= soak;
+    if (ship.shield <= 0) b.host.shieldBroken?.(eid);
     amount -= soak / k;
     dealt += soak;
     ship.shieldHitTick = tick;
@@ -252,7 +255,7 @@ export function splashAt(b: BridgeCtx, systemNum: number, x: number, y: number, 
     try {
       for (let k = 0; k < near.length && k < reach; k++) {
         const { i, d } = near[k];
-        dealt += b.hurt(eid, ship, i, damage * (1 - 0.7 * ((d * cs) / radius)), source, { hit, at });
+        dealt += b.hurt(eid, ship, i, damage * (1 - 0.7 * ((d * cs) / radius)), source, { hit, at, splash: true });
         through = Math.max(through, b.lastThrough);
       }
     } finally {
@@ -278,8 +281,10 @@ export function empAt(b: BridgeCtx, systemNum: number, x: number, y: number, rad
     // No stun-lock: a ship that just came out of an EMP shrugs off the next for a moment
     if (!b.isEmped(eid) && now < (b.empUntil.get(eid) ?? -Infinity) + EMP_IMMUNE_TICKS) continue;
     b.empUntil.set(eid, Math.max(b.empUntil.get(eid) ?? 0, now + t));
+    const held = ship.shield > 0;
     ship.shield = Math.max(0, ship.shield - ship.derived.shieldMax * 0.5);
     ship.shieldHitTick = now;
+    if (held && ship.shield <= 0) b.host.shieldBroken?.(eid);
     hit.push(eid);
   }
   return hit;
@@ -444,7 +449,7 @@ export function applyBlast(bridge: BridgeCtx, b: PendingBlast): void {
     // (By each part's own outline, as splash goes)
     const cs = bridge.tuning.cellSize, [gx, gy] = bridge.worldToGrid(eid, ship, b.x, b.y);
     for (const { i, d } of nearestParts(bridge.geometry(ship), (i) => ship.hp[i] > 0 && !ship.detached[i], gx, gy, b.radius / cs)) {
-      dealt += bridge.hurt(eid, ship, i, b.damage * (1 - (d * cs) / b.radius), bridge.lastHitBy.get(b.source) ?? -1, { at: [gx, gy] });
+      dealt += bridge.hurt(eid, ship, i, b.damage * (1 - (d * cs) / b.radius), bridge.lastHitBy.get(b.source) ?? -1, { at: [gx, gy], splash: true });
     }
     if (dealt <= 0) continue;
     bridge.lastDamaged.set(eid, tick);

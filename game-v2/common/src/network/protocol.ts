@@ -554,6 +554,8 @@ export enum EffectType {
   MineArm = 9,
   AsteroidBreak = 10,
   MuzzleFlash = 11,
+  /** A Flash Screen came back (entityId: the ship): a white bloom round it */
+  ShieldFlash = 12,
 }
 
 export interface ServerAuthResultMessage {

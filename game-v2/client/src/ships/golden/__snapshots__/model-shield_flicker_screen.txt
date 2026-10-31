@@ -6,6 +6,7 @@ Armour · build2 · 1.3 pts
 TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
 Power draw5/s
 Shield16
+Refills16/s after 1 s unhit
 
 == partStats (stats rows) ==
 GradeMk II
@@ -26,10 +27,10 @@ Small
 Small · Round
 
 == tradeOff ==
-thin, almost free to run
+thin and cheap, back in a second
 
 == keyStats ==
-shield 16 · draws 5
+shield 16 · refills 16/s after 1 s · draws 5
 
 == mountBadge ==
 

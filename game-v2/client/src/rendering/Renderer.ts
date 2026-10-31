@@ -1367,6 +1367,11 @@ export class Renderer {
         if (data?.[0] === 2) this.createArrivalWarning(x, y);
         else this.createWarpEffect(x, y, type === EffectType.WarpOut);
         break;
+      case EffectType.ShieldFlash:
+        // (a Flash Screen came back: a white bloom and a ring where the ship is)
+        this.flash(x, y, 90, 0xffffff, 0.8, 0.35, 1.4);
+        this.flash(x, y, 80, 0xbfe6ff, 0.7, 0.6, 3, ring());
+        break;
       // Add more effect types as needed
     }
   }

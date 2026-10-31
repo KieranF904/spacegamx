@@ -5,6 +5,7 @@ Hull · mass419 hp · 4.8
 Armour · build4 · 15.2 pts
 TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
 Power draw32/s
+Jump cooldown−20%
 Jump coilserves 83 cells of hull
 
 == partStats (stats rows) ==
@@ -25,10 +26,10 @@ Large
 Large · Block
 
 == tradeOff ==
-the most jump for its cells
+more jump per cell, and 20% faster to cool
 
 == keyStats ==
-jump 64 cells · draws 32
+jump cooldown −20% · jump 64 cells · draws 32
 
 == mountBadge ==
 

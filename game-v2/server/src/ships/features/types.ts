@@ -30,6 +30,8 @@ export interface FeatureHost {
   isDocked(pilot: number): boolean;
   /** Towed into a station's reach: salvage it for the pilot (and take it away): the Tow Beam's */
   deliver(pilot: number, target: number, kind: TowKind): void;
+  /** An effect everyone in the entity's system sees, at the entity (a Flash Screen's bloom) */
+  effect(eid: number, type: number): void;
 }
 
 /** One message handler: the pilot's entity and the message (already past the drops and limits of net/dispatch.ts) */
@@ -49,6 +51,8 @@ export interface FeatureInstance {
   status?(eid: number): number;
   /** A ship was rebuilt (parts lost, refit): re-check what depends on its parts */
   onShipRebuilt?(eid: number): void;
+  /** A ship's shield broke: it held something and now holds nothing (a hit, a blast or an EMP took the last of it) */
+  onShieldBreak?(eid: number): void;
   /** An entity left the world (every per-entity table of the feature should forget it) */
   onLeave?(eid: number): void;
 }

@@ -160,6 +160,9 @@ export function partTipHtml(p: Pick<PlacedPart, 'fn' | 'material' | 'piece'> & P
     if (f >= 0 && L.feeds[f].banks.length) html += row('Fed by', `Bank ${L.feeds[f].banks.map((x) => x + 1).join(', ')} first, then the ship`);
   }
   if (st.shield) html += row('Shield', n0(st.shield));
+  if (st.shield && fn.shieldRegen) html += row('Refills', `${n0(fn.shieldRegen * st.area)}/s after ${(fn.shieldDelay ?? 0) / 60} s unhit`);
+  if (fn.splashTaken !== undefined && fn.splashTaken < 1) html += row('Blasts', `${Math.round((1 - fn.splashTaken) * 100)}% less damage`);
+  if (fn.jumpCooldown !== undefined && fn.jumpCooldown < 1) html += row('Jump cooldown', `−${Math.round((1 - fn.jumpCooldown) * 100)}%`);
   if (st.cargo) html += row('Cargo', `${n0(st.cargo)} <span style="color:#8ea0bd; font-weight:400">(what you carry weighs the ship down)</span>`);
   // Burst Strafer (strafer.ts): a dodge, not thrust; on a design, which way it dodges
   if (st.dodge) {

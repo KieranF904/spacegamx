@@ -184,6 +184,9 @@ export interface ShipDerived {
   scanRange: number;
   /** Shield capacity from powered shield generators (0 = no shield) */
   shieldMax: number;
+  /** What the shield puts back a second (points, all generators together) and the ticks a hit holds that back (weighted by capacity); a Flash Screen adds none of either */
+  shieldRegen: number;
+  shieldDelay: number;
   /**
    * Part features (features/): the ones this ship has (bit = feature number in the plan: a live part they apply to, or
    * global), the same as a list in plan order, and what each one derived. All three absent when it has none.
@@ -497,7 +500,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   // 7. Cargo, mining lasers, scanners
   let cargoCapacity = hasCore ? CORE_CARGO : 0;
   let scanRange = 0;
-  let shieldMax = 0;
+  let shieldMax = 0, shieldRegen = 0, shieldDelayW = 0, coilCool = 1;
   const jt = { ...DEFAULT_JUMP, ...(tuning.jump ?? {}) };
   // The jump drive: coil capacity (the core's own, and powered coils', a little more for better grades) against the hull's cells
   let jumpCap = 0, jumpGradeSum = 0, hullCells = 0;
@@ -516,7 +519,16 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     }
     if ((fns[i].capacity ?? 0) > 0) cargoCapacity += fns[i].capacity! * area[i];
     if ((fns[i].range ?? 0) > 0) scanRange = Math.max(scanRange, fns[i].range! * satisfaction[i]);
-    if ((fns[i].shield ?? 0) > 0) shieldMax += fns[i].shield! * area[i] * fnOutput(fns[i], mats[i]) * satisfaction[i];
+    if ((fns[i].shield ?? 0) > 0) {
+      const cap = fns[i].shield! * area[i] * fnOutput(fns[i], mats[i]) * satisfaction[i];
+      shieldMax += cap;
+      // (its own refill, per cell; else the ship-wide tuning's share of what it holds)
+      const sr = fns[i].shieldRegen, sd = fns[i].shieldDelay ?? tuning.shield?.regenDelayTicks ?? 0;
+      const rate = sr !== undefined ? sr * area[i] * fnOutput(fns[i], mats[i]) * satisfaction[i] : cap * (tuning.shield?.regenPerSecond ?? 0);
+      shieldRegen += rate;
+      shieldDelayW += rate * sd;
+    }
+    if ((fns[i].jumpCooldown ?? 1) < coilCool && satisfaction[i] > 0) coilCool = fns[i].jumpCooldown!;
     if (satisfaction[i] > 0 && (fns[i].demand ?? 0) > 0) {
       const draw = partDemand(fns[i], area[i], mats[i]);
       if (isEngine(fns[i])) engineDraw += draw;
@@ -602,9 +614,11 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     dash,
     scanRange: Math.round(scanRange),
     shieldMax: Math.round(shieldMax),
+    shieldRegen: Math.round(shieldRegen * 100) / 100,
+    shieldDelay: shieldRegen > 0 ? Math.round(shieldDelayW / shieldRegen) : 0,
     ...(fxMask ? { fxMask, fxList, fx: fxOut } : {}),
     jumpRange: jump.range,
-    jumpCooldown: jump.cooldown,
+    jumpCooldown: coilCool < 1 ? Math.round(jump.cooldown * coilCool) : jump.cooldown,
     jumpRatio: jump.ratio,
     radius: radius * cs,
     makeup: makeupOf(alive, area, mats, fns),

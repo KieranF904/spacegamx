@@ -6,6 +6,7 @@ Armour · build3 · 10 pts
 TakesKinetic −5% · Thermal −15% · Cryo −10%
 Power draw77/s
 Shield180
+Refills20/s after 4 s unhit
 
 == partStats (stats rows) ==
 GradeMk III
@@ -26,10 +27,10 @@ Large
 Large · Block
 
 == tradeOff ==
-deep, hungry for power
+deep, slow to refill
 
 == keyStats ==
-shield 180 · draws 77
+shield 180 · refills 20/s after 4 s · draws 77
 
 == mountBadge ==
 

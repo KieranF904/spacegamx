@@ -210,6 +210,18 @@ export interface FunctionDef {
   mounting?: MountingRules;
   /** shield capacity per unit of area (shield generators) */
   shield?: number;
+  /**
+   * Shield generators: points a second each cell of it puts back, and the ticks a hit holds that back. Absent: the
+   * ship-wide tuning.json `shield` (a share of the part's own capacity a second, after its delay). 0: none (a Flash Screen)
+   */
+  shieldRegen?: number;
+  shieldDelay?: number;
+  /** Flash Screen (ships/features/flash): no slow regen; when the shield breaks it comes back whole after a wait, or at once for 4 E a point from a Capacitor bank touching it */
+  flash?: boolean;
+  /** Plating: × the damage a blast does to it (0.5: half of the splash). Hits and beams are unchanged */
+  splashTaken?: number;
+  /** Jump coils: × the jump drive's cooldown (0.8: 20% faster). The best one a ship has counts; they do not stack */
+  jumpCooldown?: number;
   /** battery capacity per unit of area (batteries; × the material's output): energy.ts */
   store?: number;
   /** A bank member's kind: 'drive' a Drive Cell (feeds engines and strafers it touches); else a Capacitor. A store that isn't a bank member is a pool battery, whatever this says (legacy drive and weapon batteries) */

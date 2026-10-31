@@ -381,7 +381,7 @@ export class ShipBridge {
 
   lastDamagedTick(eid: number): number { return dmg.lastDamagedTick(this.ctx, eid); }
 
-  hurt(eid: number, ship: ShipState, part: number, amount: number, source = -1, vs?: { shield?: number; hull?: number; hit?: HitInfo; at?: Vec2; bane?: { faction: string; damage: number } }): number { return dmg.hurt(this.ctx, eid, ship, part, amount, source, vs); }
+  hurt(eid: number, ship: ShipState, part: number, amount: number, source = -1, vs?: { splash?: boolean; shield?: number; hull?: number; hit?: HitInfo; at?: Vec2; bane?: { faction: string; damage: number } }): number { return dmg.hurt(this.ctx, eid, ship, part, amount, source, vs); }
 
   /** Damage one part from outside the usual weapons (a boss's beam): hurt, and reported as any hit is */
   damagePartBy(eid: number, part: number, amount: number, source: number, hit?: HitInfo): number { return dmg.damagePartBy(this.ctx, eid, part, amount, source, hit); }
