@@ -34,6 +34,8 @@ export class LoginUI {
   private sunRenderer: SunRenderer | null = null;
   /** Sol's sky behind it all */
   private sky: SkyRenderer | null = null;
+  private skyW = 0;
+  private skyH = 0;
   /** Or this visit's planet or moon of Sol (loginBody.ts), in the sun's place */
   private body: LoginBody | null = null;
   private starsGraphics: Graphics | null = null;
@@ -141,6 +143,8 @@ export class LoginUI {
     const delta = this.app.ticker.deltaMS / 1000;
     const w = this.app.screen.width;
     const h = this.app.screen.height;
+    // (the sky's haze texture is screen-sized: follow the window when it's resized under the sign-in screen)
+    if (this.sky && (w !== this.skyW || h !== this.skyH)) { this.skyW = w; this.skyH = h; this.sky.resize(); }
     
     // The sun: its visible top quarter's arc spans exactly the view's width (touching both bottom corners): for a cap of
     // height f·2R, the chord is 4R·sqrt(f(1 − f))
