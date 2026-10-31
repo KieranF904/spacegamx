@@ -104,8 +104,6 @@ import {
   MAP_DOT_SLACK,
   type Leg,
   ReplicaEnv,
-  PROTOCOL_MISMATCH_CLOSE,
-  PROTOCOL_MISMATCH_REASON,
   segmentNearCircle,
   segmentIntersectT,
   pointInPolygon,
@@ -171,6 +169,7 @@ import { checkTickOrder, type TickSystem } from './tickOrder.js';
 import type { ClientConnection } from './net/ClientConnection.js';
 import type { ServerCtx } from './net/ServerCtx.js';
 import { registerModuleHandlers } from './net/handlers/modules.js';
+import { registerAuthHandlers, rejectAuth, handleHttpAuth } from './net/auth.js';
 import { HandlerRegistry, dispatch, registerHandlers, MAX_INPUTS_PER_TICK, type HandlerTable } from './net/dispatch.js';
 
 // ============================================
@@ -2839,6 +2838,7 @@ this.devTeleport = opts.devTeleport ?? false;
   private buildMessageHandlers(): HandlerTable {
     const t = new HandlerRegistry();
     registerHandlers(t, registerModuleHandlers);
+    registerHandlers(t, registerAuthHandlers);
     t.on('input', (_ctx, conn, msg) => {
       // Queue for next tick boundary — don't apply mid-frame.
       // Messages still arrive instantly via setImmediate event loop.
@@ -2885,16 +2885,6 @@ this.devTeleport = opts.devTeleport ?? false;
       const sol = this.gameData.getSystemNum('sol');
       const jp = [...portalQuery(this.world)].find((g) => InSystem.systemId[g] === sol && this.gameData.getSystemByNum(Portal.targetSystem[g])?.private);
       if (jp !== undefined) this.homes.jump(conn, 'sol', Position.x[jp], Position.y[jp]);
-    });
-    t.on('join', (_ctx, conn, msg) => {
-      // (Async: a throw inside is a rejected promise the receive() try/catch can't see)
-      this.handleJoin(conn, msg).catch((e) => this.fault('join', e));
-    });
-    t.on('authLogin', (_ctx, conn, msg) => {
-      this.handleAuthLogin(conn, msg).catch((e) => this.fault('authLogin', e));
-    });
-    t.on('authRegister', (_ctx, conn, msg) => {
-      this.handleAuthRegister(conn, msg).catch((e) => this.fault('authRegister', e));
     });
     t.on('stateHash', (_ctx, conn, msg) => {
       this.handleStateHash(conn, msg as any);
@@ -2989,6 +2979,16 @@ this.devTeleport = opts.devTeleport ?? false;
 
   private handleMessage(conn: ClientConnection, msg: ClientMessage): void {
     dispatch(this.handlers, this, conn, msg);
+  }
+
+  /** A wrong password, a refused registration, a replaced or deleted session: say why, then hang up (net/auth.ts) */
+  private rejectAuth(conn: ClientConnection, error: string | undefined): void {
+    rejectAuth(this, conn, error);
+  }
+
+  /** HTTP auth requests (register, login, validate), called by SocketTransport (net/auth.ts) */
+  handleHttpAuth(req: IncomingMessage, res: ServerResponse, action: 'register' | 'login' | 'validate', address?: string): Promise<void> {
+    return handleHttpAuth(this, req, res, action, address);
   }
 
   /** The station this player is close enough to dock at, or -1. */
@@ -3281,136 +3281,15 @@ this.devTeleport = opts.devTeleport ?? false;
     }
   }
 
-  private async handleJoin(conn: ClientConnection, msg: any): Promise<void> {
-    // A client built for another wire format can't talk to us: it shows "new version, reload"
-    // (one that doesn't say predates the handshake, and the format it knows hasn't changed since)
-    if (msg.protocol !== undefined && msg.protocol !== PROTOCOL_VERSION) {
-      conn.ws.close?.(PROTOCOL_MISMATCH_CLOSE, PROTOCOL_MISMATCH_REASON);
-      return;
-    }
-    conn.joined = true;
-    if (msg.token) {
-      // Authenticated join - validate token
-      const { user, error } = this.userDB.checkSession
-        ? await this.userDB.checkSession(msg.token)
-        : { user: await this.userDB.validateSession(msg.token), error: '' };
-      if (user) {
-        conn.username = user.username;
-        conn.userId = user.id;
-        conn.isAdmin = user.is_admin;
-        conn.isContributor = this.contrib.hasRank(user.id, user.username);
-        conn.authToken = msg.token;
-        this.loginPilot(conn, user.id).catch((e) => this.fault('login', e));
-        console.log(`Player ${conn.playerId} authenticated as ${user.username}${user.is_admin ? ' (admin)' : ''}`);
-      } else {
-        // Expired, signed out or banned (or the lobby's unreachable): back to the sign-in screen, not in as a guest
-        this.rejectAuth(conn, error || 'Your session has ended. Sign in again.');
-        return;
-      }
-    } else {
-      // Guest join
-      // (A name only: a string, no control characters, a sensible length; it goes to everyone near)
-      const name = typeof msg.username === 'string' ? msg.username.replace(/[\u0000-\u001f\u007f-\u009f]/g, '').trim().slice(0, 24) : '';
-      // (Nor anyone's account: a guest can't pose as a known pilot or an admin)
-      // (Only asking the lobby waits: with no lobby to ask, a guest's join goes through at once, as it always has)
-      const owner = name ? this.signedInOwner(name) ?? (this.userDB.admin ? await this.accountOwner(name) : null) : null;
-      if (owner) {
-        this.rejectAuth(conn, `"${name}" is ${owner === 'admin' ? "an admin's" : "a registered pilot's"} name. Sign in to fly as them, or pick another name.`);
-        return;
-      }
-      conn.username = name || `Guest_${Math.floor(Math.random() * 10000)}`;
-      conn.userId = null;
-      conn.isAdmin = this.everyoneAdmin || this.guestAdmin;
-      conn.isContributor = false;
-    }
-    
-    // Send auth result back
-    this.send(conn.ws, {
-      type: 'authResult',
-      success: true,
-      username: conn.username,
-      isAdmin: conn.isAdmin,
-      isContributor: this.contrib.allowed(conn),
-    });
-  }
-
-  private async handleAuthLogin(conn: ClientConnection, msg: any): Promise<void> {
-    const result = await this.userDB.login(msg.username, msg.password, conn.address);
-    if (result.success) {
-      conn.username = result.user.username;
-      conn.userId = result.user.id;
-      this.loginPilot(conn, result.user.id).catch((e) => this.fault('login', e));
-      conn.isAdmin = result.user.is_admin;
-      conn.isContributor = this.contrib.hasRank(result.user.id, result.user.username);
-      conn.authToken = result.token;
-      
-      this.send(conn.ws, {
-        type: 'authResult',
-        success: true,
-        username: result.user.username,
-        token: result.token,
-        isAdmin: result.user.is_admin,
-        isContributor: this.contrib.allowed(conn),
-      });
-    } else {
-      this.rejectAuth(conn, result.error);
-    }
-  }
-
   /**
    * Whose account a guest's name is (whatever its case): an admin's or a registered pilot's, or nobody's (null).
    * signedInOwner knows those signed in here; accountOwner asks the lobby (when this server may: its admin secret,
    * `userDB.admin`), and a lobby that can't be reached doesn't keep guests out.
    */
-  private signedInOwner(name: string): 'admin' | 'pilot' | null {
-    const lower = name.toLowerCase();
-    for (const c of this.clients.values()) {
-      if (c.userId !== null && c.username.toLowerCase() === lower) return c.isAdmin ? 'admin' : 'pilot';
-    }
-    return null;
-  }
-  private async accountOwner(name: string): Promise<'admin' | 'pilot' | null> {
-    try {
-      const account = await this.userDB.admin?.get(name);
-      return account ? (account.isAdmin ? 'admin' : 'pilot') : null;
-    } catch {
-      return null;
-    }
-  }
-
   /**
    * A wrong password or a refused registration: say why, then hang up, so the
    * connection doesn't stay in the world as a nameless pilot.
    */
-  private rejectAuth(conn: ClientConnection, error: string | undefined): void {
-    this.send(conn.ws, { type: 'authResult', success: false, error });
-    // A moment for the answer to get out before the socket closes
-    setTimeout(() => conn.ws.close?.(), 250);
-  }
-
-  private async handleAuthRegister(conn: ClientConnection, msg: any): Promise<void> {
-    const result = await this.userDB.register(msg.username, msg.email, msg.password, conn.address);
-    if (result.success) {
-      conn.username = result.user.username;
-      conn.userId = result.user.id;
-      this.loginPilot(conn, result.user.id).catch((e) => this.fault('login', e));
-      conn.isAdmin = result.user.is_admin;
-      conn.isContributor = this.contrib.hasRank(result.user.id, result.user.username);
-      conn.authToken = result.token;
-      
-      this.send(conn.ws, {
-        type: 'authResult',
-        success: true,
-        username: result.user.username,
-        token: result.token,
-        isAdmin: result.user.is_admin,
-        isContributor: this.contrib.allowed(conn),
-      });
-    } else {
-      this.rejectAuth(conn, result.error);
-    }
-  }
-
   /**
    * Move a player to (x, y) in another (or the same) system: jump gates and rifts.
    * Rifts keep the ship's momentum; gates bring it to a stop.
@@ -5423,58 +5302,6 @@ this.devTeleport = opts.devTeleport ?? false;
   /**
    * Handle HTTP auth requests (register, login, validate)
    */
-  async handleHttpAuth(req: IncomingMessage, res: ServerResponse, action: 'register' | 'login' | 'validate', address?: string): Promise<void> {
-    // (A sign-in is a few hundred bytes: anything past 16 KB is refused, not held in memory)
-    let body = '', tooBig = false;
-    req.on('data', (chunk: { toString(): string }) => {
-      if (tooBig) return;
-      body += chunk.toString();
-      if (body.length > 16 * 1024) { tooBig = true; body = ''; }
-    });
-    req.on('error', () => {});
-    req.on('end', async () => {
-      try {
-        if (tooBig) throw new Error('request too large');
-        const data = JSON.parse(body);
-        if (!data || typeof data !== 'object') throw new Error('not an object');
-        res.setHeader('Content-Type', 'application/json');
-
-        if (action === 'register') {
-          const result = await this.userDB.register(data.username, data.email, data.password, address);
-          if (result.success) {
-            res.writeHead(200);
-            res.end(JSON.stringify({ success: true, username: result.user.username, token: result.token, isAdmin: result.user.is_admin }));
-          } else {
-            res.writeHead(400);
-            res.end(JSON.stringify({ success: false, error: result.error }));
-          }
-        } else if (action === 'login') {
-          const result = await this.userDB.login(data.username, data.password, address);
-          if (result.success) {
-            res.writeHead(200);
-            res.end(JSON.stringify({ success: true, username: result.user.username, token: result.token, isAdmin: result.user.is_admin }));
-          } else {
-            res.writeHead(400);
-            res.end(JSON.stringify({ success: false, error: result.error }));
-          }
-        } else if (action === 'validate') {
-          const user = await this.userDB.validateSession(data.token);
-          if (user) {
-            res.writeHead(200);
-            res.end(JSON.stringify({ success: true, username: user.username, isAdmin: user.is_admin }));
-          } else {
-            res.writeHead(401);
-            res.end(JSON.stringify({ success: false, error: 'Invalid or expired session' }));
-          }
-        }
-      } catch (e) {
-        if (res.headersSent) { res.end(); return; }
-        res.writeHead(400);
-        res.end(JSON.stringify({ success: false, error: 'Invalid request' }));
-      }
-    });
-  }
-
   /**
    * Report stats to admin server (call from game loop)
    */
