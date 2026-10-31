@@ -208,7 +208,7 @@ export class ThrusterFx {
    * Draw one ship's engines into `g` (the ship's rotating container, grid units
    * scaled by `cs`, origin at the centre of mass).
    */
-  draw(c: Container, ship: ShipState, e: InterpolatedEntity, command: ThrustCommand | null, dt: number, cs: number, tint?: number, frost = 0): void {
+  draw(c: Container, ship: ShipState, e: InterpolatedEntity, command: ThrustCommand | null, dt: number, cs: number, tint?: number, frost = 0, emp = false): void {
     let used = 0;
     const hideRest = () => { for (const n of (this.nozzles.get(c) ?? []).slice(used)) n.idle.visible = n.body.visible = n.core.visible = n.diamonds.visible = n.puffA.visible = n.puffB.visible = n.ringA.visible = n.ringB.visible = false; };
     if (ship.kind !== 'ship' || !ship.derived.thrusters.length) { hideRest(); return; }
@@ -218,7 +218,8 @@ export class ThrusterFx {
       this.engines.set(e.id, st);
     }
     const cmd = command ?? this.infer(st, ship, e);
-    st.boost += ((cmd.boost ? 1 : 0) - st.boost) * Math.min(1, dt * 8);
+    // (An EMP'd drive goes dark: the throttle falls to nothing whatever the keys say)
+    st.boost += ((cmd.boost && !emp ? 1 : 0) - st.boost) * Math.min(1, dt * 8);
     const mag = Math.hypot(cmd.dir[0], cmd.dir[1]);
     const ux = mag > 1e-6 ? cmd.dir[0] / mag : 0, uy = mag > 1e-6 ? cmd.dir[1] / mag : 0;
 
@@ -237,7 +238,7 @@ export class ThrusterFx {
       // How much this engine helps: along the requested direction, or with the turn
       let want = Math.max(0, (t.force[0] / f) * ux + (t.force[1] / f) * uy) * Math.min(1, mag);
       if (Math.abs(cmd.turn) > 0.15 && Math.sign(t.torque) === Math.sign(cmd.turn)) want = Math.max(want, 0.55 * Math.min(1, Math.abs(cmd.turn)));
-      want = want > 0.12 ? want : 0;
+      want = want > 0.12 && !emp ? want : 0;
       const prev = st!.throttle[i] ?? 0;
       const thr = prev + (want - prev) * Math.min(1, dt * (want > prev ? 14 : 6));
       st!.throttle[i] = thr;

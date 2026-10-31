@@ -651,8 +651,18 @@ export class DamageFx {
         if (rf > 0) this.addSprites.take(glowBall(), e.renderX, e.renderY, 0.5, 0.5, 0xffffff, 0.7 * rf, 0, (r * (1.1 + 0.5 * (1 - rf))) / DOT_SIZE, (r * (1.1 + 0.5 * (1 - rf))) / DOT_SIZE);
       }
       if (emp && Math.random() < 0.5 * frames) {
-        const a = Math.random() * Math.PI * 2;
-        this.arc(e.renderX + Math.cos(a) * r * 0.4, e.renderY + Math.sin(a) * r * 0.4, e.vx, e.vy, Math.random() * Math.PI * 2, r * 0.5, 6);
+        // (Sparks on a live part, not a random spot in the hull's disc)
+        const parts = ship.derived.alive;
+        let pi = (Math.random() * parts.length) | 0;
+        for (let k = 0; k < parts.length && !parts[pi]; k++) pi = (pi + 1) % parts.length;
+        const c = parts[pi] ? this.source.geometry(ship)[pi]?.centroid : undefined;
+        let px = e.renderX, py = e.renderY;
+        if (c) {
+          const cs = this.source.tuning.cellSize, ang = e.renderAngle + Math.PI / 2, ca = Math.cos(ang), sa = Math.sin(ang);
+          const lx = (c[0] - ship.derived.com[0]) * cs, ly = (c[1] - ship.derived.com[1]) * cs;
+          px += lx * ca - ly * sa; py += lx * sa + ly * ca;
+        }
+        this.arc(px, py, e.vx, e.vy, Math.random() * Math.PI * 2, Math.min(r * 0.5, 30), 6);
       }
     }
   }

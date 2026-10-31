@@ -363,6 +363,11 @@ export class ShipRenderer {
     return ((e.status?.[STATUS_SLOT] ?? 0) & STATUS_SLOWED) !== 0;
   }
 
+  /** Is this ship EMP'd (Hush): your row carries the ticks left in data[5], everyone else's a flag in data[2] */
+  private empd(e: InterpolatedEntity): boolean {
+    return ((e.type === EntityType.Player ? e.data?.[5] : e.data?.[2]) ?? 0) > 0;
+  }
+
   private wireLayer = new Container();
   /** The one ctx every feature draw gets (fields reset per ship: no allocation per frame) */
   private featureCtx = {} as ShipDrawCtx;
@@ -609,7 +614,7 @@ export class ShipRenderer {
         }
       }
       this.hulls.setDamage(eid, ship.hp, ship.maxHp, ship.detached, ship.derived.alive);
-      this.engines.draw(view.flames, ship, entity, this.thrustCommand(eid), dt, cs, tint, this.slowed(eid, entity) ? 1 : 0);
+      this.engines.draw(view.flames, ship, entity, this.thrustCommand(eid), dt, cs, tint, this.slowed(eid, entity) ? 1 : 0, this.empd(entity));
       // Light on the ship (for its guns, which are tinted rather than lit per vertex)
       this.lighting.levelAt(entity.renderX, entity.renderY, this.lvl);
       this.drawTurrets(view, ship, cs, dt * 60);
