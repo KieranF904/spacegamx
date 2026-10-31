@@ -1485,12 +1485,13 @@ export class HangarUI {
       html += line(`Flat out: engines ${n0(eng)}/s (boosting ${n0(engBoost)}/s) · guns ${n0(guns)}/s`);
       const partName = (i: number) => { const p = this.bp.parts[i], fn = this.deps.catalog.functions.get(p.fn); return fn?.name ?? p.fn; };
       const r = this.bothTest();
-      if (r && guns > 0) {
+      if (r && (guns > 0 || eng > 0)) {
         const unbanked = d.weapons.filter((w) => L.feedOf[w.part] >= 0 && !L.feeds[L.feedOf[w.part]].banks.length && gunDrawFlatOut(w, L.draw[w.part]) > 0);
         const share = unbanked.length ? Math.min(...unbanked.map((w) => r.part[w.part])) : 1;
+        const act = guns > 0 ? 'Boosting while firing' : 'Boosting';
         if (r.brownAt >= 0 && share < BROWNOUT) html += `<div style="font-size:11px; padding:1px 0 3px; color:${share < 0.5 ? '#f87171' : '#fbbf24'}">⚠ Boosting while firing: unbanked guns get ${Math.round(share * 100)}%</div>`;
-        else if (r.brownAt >= 0) html += `<div style="font-size:11px; padding:1px 0 3px; color:#fbbf24">⚠ Boosting while firing: engines get ${Math.round(r.engines * 100)}%</div>`;
-        else html += '<div style="font-size:11px; padding:1px 0 3px; color:#4ade80">Holds up: full power while boosting and firing</div>';
+        else if (r.brownAt >= 0) html += `<div style="font-size:11px; padding:1px 0 3px; color:#fbbf24">⚠ ${act}: engines get ${Math.round(r.engines * 100)}%</div>`;
+        else html += `<div style="font-size:11px; padding:1px 0 3px; color:#4ade80">Holds up: full power while ${guns > 0 ? 'boosting and firing' : 'boosting'}</div>`;
       }
       L.banks.forEach((B, k) => {
         const fed = [...new Set([...B.feeds, ...B.shields].map(partName))].join(', ');
