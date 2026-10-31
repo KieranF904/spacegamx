@@ -4,17 +4,17 @@ Mk III · Medium · Panel · 2 cells
 Hull · mass179 hp · 2.0
 Armour · build3 · 5 pts
 TakesKinetic −5% · Thermal −15% · Cryo −10%
-Damage6/s · reach 10,086
-Hits withKinetic · penetration 3
+Damage49/s · reach 8,400
+Hits withKinetic · penetration 4
 Chargehold 2.0s: it fires itself, then 1.5s to cool · let go early and nothing fires · 36 energy a charge
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 3 clear cells ahead
-Power draw8/s
+Power draw10/s
 
 == partStats (stats rows) ==
 GradeMk III · Medium
 Hits withKinetic · penetration 3
-Power draw8
+Power draw10
 Hull · mass179 hp · 2.0
 Armour · build3 · 5 pts
 TakesKinetic −5% · Thermal −15% · Cryo −10%
@@ -33,7 +33,7 @@ Medium · Panel
 a sniper's cannon: far, slow to fire
 
 == keyStats ==
-6 dmg/s · reach 10,086 · draws 8
+49 dmg/s · reach 8,400 · draws 10
 
 == mountBadge ==
 FIXED
@@ -50,4 +50,4 @@ Needs 3 clear cells ahead
 {"open":true,"badge":"Lv 20","why":""}
 
 == partStats (raw) ==
-{"grade":3,"mark":"Mk III","size":"Medium","area":2,"hp":179.20000000000002,"mass":2,"firepower":6.400000000000001,"toughness":179.20000000000002,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"dps":6.400000000000001,"range":10085.76,"damageType":"kinetic","pen":3,"draw":7.52}
+{"grade":3,"mark":"Mk III","size":"Medium","area":2,"hp":179.20000000000002,"mass":2,"firepower":48.571428572,"toughness":179.20000000000002,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"dps":48.571428572,"range":8400.00000096,"damageType":"kinetic","pen":4,"draw":10.28}

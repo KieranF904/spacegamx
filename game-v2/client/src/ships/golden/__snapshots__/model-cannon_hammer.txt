@@ -3,17 +3,17 @@ Hammer
 Mk I · Medium · Panel · 2 cells
 Hull · mass120 hp · 2.0
 Armour · build1 · 2 pts
-Damage112/s · reach 5,760
+Damage69/s · reach 5,700
 Hits withKinetic · penetration 2
-Fire rate2.5/s · shells
+Fire rate1.4/s · shells
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 1 clear cell ahead
-Power draw11/s
+Power draw10/s
 
 == partStats (stats rows) ==
 GradeMk I · Medium
 Hits withKinetic · penetration 1
-Power draw11
+Power draw10
 Hull · mass120 hp · 2.0
 Armour · build1 · 2 pts
 Rating scoretoughness 120
@@ -31,7 +31,7 @@ Medium · Panel
 slow heavy shell, punches plate
 
 == keyStats ==
-112 dmg/s · reach 5,760 · draws 11
+69 dmg/s · reach 5,700 · draws 10
 
 == mountBadge ==
 FIXED
@@ -48,4 +48,4 @@ Needs 1 clear cell ahead
 {"open":true,"badge":"Lv 6","why":""}
 
 == partStats (raw) ==
-{"grade":1,"mark":"Mk I","size":"Medium","area":2,"hp":120,"mass":2,"firepower":112.00000000000001,"toughness":120,"armour":1,"dps":112.00000000000001,"range":5760.000000000001,"damageType":"kinetic","pen":2,"draw":10.66}
+{"grade":1,"mark":"Mk I","size":"Medium","area":2,"hp":120,"mass":2,"firepower":68.57142858,"toughness":120,"armour":1,"dps":68.57142858,"range":5700.0000024,"damageType":"kinetic","pen":2,"draw":10}

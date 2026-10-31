@@ -27,6 +27,8 @@ const materialAt = (level) => (level < 10 ? 'alloy' : level < 20 ? 'steel' : lev
 const PLATE = { alloy: 'alloy_plate', composite: 'composite_sheet', steel: 'steel_plate', titanium: 'titanium_plate', cobalt: 'cobalt_alloy', neutronium: 'neutronium_plate' };
 /** × k as a WeaponMods mul */
 const x = (k) => Math.round((k - 1) * 1000) / 1000;
+/** × k as a WeaponMods mul, to the digit (a cannon's exact 48, not 48.006) */
+const xp = (k) => Math.round((k - 1) * 1e9) / 1e9;
 const r2 = (v) => Math.round(v * 100) / 100;
 
 /** The legacy function each family grew from (its base numbers and look), and which legacy functions migrate to it */
@@ -49,11 +51,14 @@ const LEGACY = Object.fromEntries(Object.entries(KIND_BASE).filter(([fam]) => fa
 
 const W = [
   // (A fixed gun at the rate and draw the starter's legacy fixed cannons had, a shell every 15 ticks: the starter rates as it did)
-  ['cannon_pip', 'Pip', 'cannon', 'sq', 0, { int: 1.5, draw: 1.5 }, {}, 'The starter gun: light and quick, a shell every quarter second.'],
-  ['cannon_hammer', 'Hammer', 'cannon', 'rect2', 6, { dmg: 3.2, int: 2.4 }, { mul: { damage: x(3.2), speed: x(0.8), size: x(1.6) }, add: { pen: 1 } }, 'A slow, heavy shell that punches through plate.'],
-  ['cannon_twinlink', 'Twinlink', 'cannon', 'rect2', 12, { dmg: 0.9, burst: 2, draw: 1.6 }, { mul: { damage: x(0.9), spread: x(3.3 / 1.8) }, add: { burst: 1 } }, 'Two barrels firing together: sustained fire, hungry for power.'],
-  ['cannon_longbarrel', 'Longbarrel', 'cannon', 'rect2', 20, { dmg: 1.6, int: 1.7 }, { mul: { damage: x(1.6), speed: x(1.7), life: x(1.4 / 1.7) } }, "A sniper's cannon: fast shells that carry far."],
-  ['cannon_bastion', 'Bastion', 'cannon', 'block2', 30, { dmg: 4.4, int: 1.7, hp: 1.3, mass: 1.6 }, { mul: { damage: x(4.4), size: x(2) }, add: { pen: 1 } }, 'A ship-killer: huge shells, and heavy enough to slow your turning.'],
+  // (Section 4's cannon rows, rework-2026-11: Pip 14 dmg every 15 t for 2 E; Hammer 48 dmg every 42 t for 7 E; Twinlink a clip of 16
+  // at 6 t, 12 dmg; Longbarrel a 120 t charge, 170 dmg, speed 140, life 60, no spread; Bastion a clip of 2, 18 t apart, 180 dmg.
+  // `demand` is the draw a cell gives while its beat runs (a clip or charge gun draws by its fire block instead: reloadE, chargeE).)
+  ['cannon_pip', 'Pip', 'cannon', 'sq', 0, { int: 1.5, draw: 1.5, blurb: 'The reliable starter' }, {}, 'The starter gun: four reliable amber shells a second, and no tricks.'],
+  ['cannon_hammer', 'Hammer', 'cannon', 'rect2', 6, { int: 4.2, demand: 5, blurb: 'The breacher' }, { mul: { damage: xp(48 / 14), speed: xp(38 / 48), size: xp(1.6) }, add: { pen: 1 } }, 'The breacher: one slow, armour-piercing slug at a steady rhythm.'],
+  ['cannon_twinlink', 'Twinlink', 'cannon', 'rect2', 12, { demand: 3.87, blurb: 'Paired autoloader turret' }, { mul: { damage: xp(12 / 14), spread: x(3.3 / 1.8) } }, 'A paired autoloader turret: a rattling stream of sixteen rounds, then a pause to reload.'],
+  ['cannon_longbarrel', 'Longbarrel', 'cannon', 'rect2', 20, { demand: 5.14, blurb: 'The sniper' }, { mul: { damage: xp(170 / 14), speed: xp(140 / 48), life: xp(60 / 150) }, add: { pen: 1 }, set: { spread: 0 } }, 'The sniper: it charges while you hold and fires itself at full, one telegraphed shot that picks a part off.'],
+  ['cannon_bastion', 'Bastion', 'cannon', 'block2', 30, { hp: 1.3, mass: 1.6, demand: 4.17, blurb: 'The ship-killer double tap' }, { mul: { damage: xp(180 / 14), speed: xp(32 / 48), size: xp(2.2) }, add: { pen: 1 } }, 'The ship-killer double tap: two huge, slow cannonballs you can dodge, then a long wait.'],
   ['autocannon_rattler', 'Rattler', 'autocannon', 'sq', 3, {}, {}, 'The base autocannon: a stream of small shells.'],
   ['autocannon_chainsaw', 'Chainsaw', 'autocannon', 'rect2', 14, { int: 0.55, draw: 2 }, { mul: { spread: x(1.6) } }, 'A hose of shells: hard to dodge, harder to power.'],
   ['autocannon_stinger', 'Stinger', 'autocannon', 'sq', 24, { dmg: 1.5, int: 1.25 }, { mul: { damage: x(1.5), spread: x(0.4) } }, 'An accurate autocannon: every shell where you aim it.'],
@@ -223,7 +228,7 @@ for (const [id, name, family, piece, level, k, mods, description] of W) {
   const area = PIECE_AREA[piece], baseArea = Math.min(...lf.pieces.filter((p) => PIECE_AREA[p] >= 1).map((p) => PIECE_AREA[p]));
   const dps = (k.dmg ?? 1) * (k.burst ?? 1) / (k.int ?? 1);
   // Its draw: its kind's at its base size, × how much harder it hits a second, × its own appetite; spread over its cells
-  const demand = r2(lf.demand * baseArea * dps * (k.draw ?? 1) / area);
+  const demand = k.demand ?? r2(lf.demand * baseArea * dps * (k.draw ?? 1) / area);
   models.push({
     ...base(id, name, family, [piece], level, k.material ?? materialAt(level), k),
     weapon: lf.weapon, ...mounted(id, description), hpScale: r2(lf.hpScale * (k.hp ?? 1)), ...(k.mass ? { massScale: k.mass } : {}),
@@ -231,7 +236,7 @@ for (const [id, name, family, piece, level, k, mods, description] of W) {
     weaponMods: mods, ...(family === 'cannon' ? { blast: BLAST.weapon } : {}),
     rarity: level >= 30 ? 'epic' : level >= 12 ? 'rare' : level >= 3 ? 'uncommon' : 'common',
     category: 'weapons', fabOrder: next('weapons'), ...legacyLook(KIND_BASE[family]),
-    guide: { name, blurb: description.split(':')[0].replace(/\.$/, ''), ...(piece !== 'sq' ? { piece } : {}), order: guideOrder++ },
+    guide: { name, blurb: k.blurb ?? description.split(':')[0].replace(/\.$/, ''), ...(piece !== 'sq' ? { piece } : {}), order: guideOrder++ },
   });
 }
 for (const [id, name, family, piece, level] of LEGENDARY) {
