@@ -80,6 +80,8 @@ interface Shot {
   pulse: number;
   /** Frames since the shot stopped (hit or removed); null while flying */
   fading: number | null;
+  /** Hulls it can still pass through (its gun's pierce; the server's count): a hit on one throws the impact and flies on */
+  pierceLeft: number;
   head: { x: number; y: number } | null;
   tail: { x: number; y: number } | null;
   /** Where its contrail was last laid down (NaN until the first frame) */
@@ -109,7 +111,7 @@ const BARREL_EASE = 8;
 const CONFIRM_TICKS = 60;
 
 /** What a shell's gun is: its model's look (MODEL_STYLES), its damage and its blast radius */
-export interface ShellLook { model?: string; damage?: number; splash?: number }
+export interface ShellLook { model?: string; damage?: number; splash?: number; pierce?: number }
 
 export interface FirePoseXY { x: number; y: number; angle: number }
 
@@ -125,6 +127,8 @@ export interface PredictedShell {
   model?: string;
   /** Damage a shot does: its recoil, flash and impact scale with it */
   damage?: number;
+  /** Hulls it passes through (its gun's pierce) */
+  pierce?: number;
   spawnX: number;
   spawnY: number;
   spawnTick: number;
@@ -336,6 +340,7 @@ export class WeaponFx {
   /** A lobbed shell reached its end: burst there, and shake a screen near enough (a Quake's) */
   private landed(shot: Shot, state: GameState): void {
     const lb = shot.style.landBurst!;
+    shot.pierceLeft = 0;
     this.onHit(shot.id, shot.landX, shot.landY);
     const me = state.entities.get(state.playerId);
     if (lb.shake && me) {
@@ -352,10 +357,14 @@ export class WeaponFx {
     const size = (shot?.size ?? 1) * (shot?.power ?? 1);
     let normal = Math.random() * Math.PI * 2;
     if (shot) {
-      shot.hit = { x, y };
-      shot.head = { x, y };
-      if (shot.fading === null) shot.fading = 0;
       normal = Math.atan2(-shot.vy, -shot.vx);
+      // A piercing round that still has hulls to pass keeps flying (tracer, contrail and line carry on); only its last hit ends it
+      if (shot.pierceLeft > 0) shot.pierceLeft--;
+      else {
+        shot.hit = { x, y };
+        shot.head = { x, y };
+        if (shot.fading === null) shot.fading = 0;
+      }
     }
     const imp = style.impact;
     for (let i = 0; i < imp.sparks * size * this.particleKeep; i++) {
@@ -411,7 +420,7 @@ export class WeaponFx {
       predicted: false,
       pose: this.firePose?.(e.id),
       endTick: e.data?.[9] ?? 0, landX: 0, landY: 0, splash: look?.splash ?? 0, arc: 0, t: 0, pulse: 0,
-      fading: null,
+      fading: null, pierceLeft: look?.pierce ?? 0,
       head: null,
       tail: null, ctX: NaN, ctY: NaN,
     };
@@ -455,7 +464,7 @@ export class WeaponFx {
       id, style, size: p.size, power: shotScale(p.damage), phase: (-id * 0.618) % 1, dim: this.dimOf(style, -id), hot: 0, type: p.type, owner: p.owner,
       glow: mixColor(style.glowColor, hueColor((p.owner * 137) % 360), style.ownerTint),
       spawnX: p.spawnX, spawnY: p.spawnY, spawnTick: p.spawnTick, vx: p.vx, vy: p.vy,
-      hit: null, flashed: false, predicted: true, pose: p.pose, endTick: 0, landX: 0, landY: 0, splash: 0, arc: 0, t: 0, pulse: 0, fading: null, head: null, tail: null, ctX: NaN, ctY: NaN,
+      hit: null, flashed: false, predicted: true, pose: p.pose, endTick: 0, landX: 0, landY: 0, splash: 0, arc: 0, t: 0, pulse: 0, fading: null, pierceLeft: p.pierce ?? 0, head: null, tail: null, ctX: NaN, ctY: NaN,
     });
   }
 

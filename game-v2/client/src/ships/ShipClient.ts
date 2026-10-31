@@ -288,7 +288,7 @@ export class ShipClient {
     if (!best) return undefined;
     const part = ship.blueprint.parts[best.part];
     const def = partWeaponDef(this.opts.tuning, best.kind, part, best);
-    l = { model: part?.fn, damage: def.damage, splash: def.splash?.radius };
+    l = { model: part?.fn, damage: def.damage, splash: def.splash?.radius, pierce: def.pierce };
     this.shellLooks.set(e.id, l);
     while (this.shellLooks.size > 512) this.shellLooks.delete(this.shellLooks.keys().next().value!);
     return l;
@@ -344,7 +344,7 @@ export class ShipClient {
       while (this.firePoses.size > 512) this.firePoses.delete(this.firePoses.keys().next().value!);
       // The gun's model and what a shot of it does (a model's look; the flash, recoil and impact scale with the damage)
       const wdef = partWeaponDef(this.opts.tuning, v.kind, ship.blueprint.parts[part], gun);
-      const look = { model: ship.blueprint.parts[part]?.fn, damage: wdef.damage, splash: wdef.splash?.radius };
+      const look = { model: ship.blueprint.parts[part]?.fn, damage: wdef.damage, splash: wdef.splash?.radius, pierce: wdef.pierce };
       for (const id of ids) this.shellLooks.set(id, look);
       while (this.shellLooks.size > 512) this.shellLooks.delete(this.shellLooks.keys().next().value!);
       // A pilot's shots move on the tick they're fired (they're fired before shells move; pilotless ships' after)
@@ -567,10 +567,11 @@ export class ShipClient {
     payMining(ship, !!input.fireRight && hasMiners && !burning, tick, energy);
     for (const { w, shot } of shots) {
       // (Homing missiles change course: those the server sends as they fly)
-      if (!firesStraight(partWeaponDef(this.opts.tuning, w.kind, ship.blueprint.parts[w.part], w))) continue;
+      const pdef = partWeaponDef(this.opts.tuning, w.kind, ship.blueprint.parts[w.part], w);
+      if (!firesStraight(pdef)) continue;
       // A pilot's shells move on the tick they're fired (as in preSnapshot)
       for (const s of volleyShells(player.id, ship, w, shot, { ...pose, vx: player.vx, vy: player.vy }, tick, this.opts.tuning, this.ownAmmo?.(w.kind))) {
-        this.scene.predictShot({ owner: player.id, type: WEAPON_KIND_TYPE[w.kind] ?? 1, grade: w.grade, model: ship.blueprint.parts[w.part]?.fn, damage: partWeaponDef(this.opts.tuning, w.kind, ship.blueprint.parts[w.part], w).damage, spawnX: s.x, spawnY: s.y, spawnTick: tick - 1, vx: s.vx, vy: s.vy, size: s.size, pose });
+        this.scene.predictShot({ owner: player.id, type: WEAPON_KIND_TYPE[w.kind] ?? 1, grade: w.grade, model: ship.blueprint.parts[w.part]?.fn, damage: pdef.damage, pierce: pdef.pierce, spawnX: s.x, spawnY: s.y, spawnTick: tick - 1, vx: s.vx, vy: s.vy, size: s.size, pose });
       }
     }
     return energy.charge;
