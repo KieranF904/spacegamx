@@ -44,7 +44,8 @@ export interface BossPhase {
   enrage?: number;
   heal?: number;
   blink?: number;
-  nova?: { every: number; kind: string; count: number; warnTicks: number };
+  /** `intercept`: point defence may shoot its shots down where their kind can be (absent: never: a ring is yours to dodge) */
+  nova?: { every: number; kind: string; count: number; warnTicks: number; intercept?: boolean };
 }
 
 export interface BossDef {
@@ -112,7 +113,7 @@ export interface BossHost {
   /** A notice to every player in a system */
   announce(systemNum: number, text: string, kind: 'info' | 'warn' | 'good' | 'bad'): void;
   /** Fire a shot from a ship (novas) */
-  fire(owner: number, kind: string, x: number, y: number, angle: number, damageScale: number, opts?: { target?: number; speed?: number }): void;
+  fire(owner: number, kind: string, x: number, y: number, angle: number, damageScale: number, opts?: { target?: number; speed?: number; intercept?: boolean }): void;
   /** Warp flash at a point (blinks) */
   warpFx(systemNum: number, x: number, y: number, out: boolean): void;
   /** Pay a player for the kill: XP, credits, loot into storage, quest credit */
@@ -127,6 +128,8 @@ export interface BossHost {
   terrain?(systemNum: number): import('@space-game/common').Terrain | undefined;
   /** It's dead, and these players had a hand in it */
   defeated?(boss: string, def: BossDef, players: number[]): void;
+  /** Pilots who've been mending this one (Repair Beams: game/Support.ts): a boss counts them among its winners */
+  supportersOf?(player: number): number[];
 }
 
 interface Live {
@@ -350,7 +353,7 @@ export class Bosses {
       const a0 = this.rng() * Math.PI * 2;
       for (let i = 0; i < b.nova.count; i++) {
         const a = a0 + (i / b.nova.count) * Math.PI * 2;
-        this.host.fire(b.eid, b.nova.kind, x + Math.cos(a) * r, y + Math.sin(a) * r, a, b.def.damage * b.rage);
+        this.host.fire(b.eid, b.nova.kind, x + Math.cos(a) * r, y + Math.sin(a) * r, a, b.def.damage * b.rage, { intercept: b.nova.intercept ?? false });
       }
       b.novaAt = -1;
       b.nextNova = now + b.nova.every;
@@ -408,6 +411,8 @@ export class Bosses {
     for (const [p, d] of b.dealt) if (now - d.last < r.creditWindowTicks && this.host.players(b.systemNum).includes(p)) winners.add(p);
     for (const p of this.host.players(b.systemNum)) if (Math.hypot(Position.x[p] - x, Position.y[p] - y) < r.creditRange) winners.add(p);
     if (killer !== undefined && this.host.players(b.systemNum).includes(killer)) winners.add(killer);
+    // (Support credit: whoever kept a winner flying, here, wins too)
+    for (const p of [...winners]) for (const s of this.host.supportersOf?.(p) ?? []) if (this.host.players(b.systemNum).includes(s)) winners.add(s);
     for (const p of winners) {
       // Full pay the first time; a farmed boss pays a share, and no second artefact
       const again = this.host.killedBefore?.(p, b.id) ?? false;

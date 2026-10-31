@@ -17,6 +17,7 @@ import { netJoins, wireNetworks } from './wires.js';
 import { gunRate } from './launch.js';
 import { type EnergyInfo } from './energy.js';
 import { type PowerLayout, powerLayout } from './circuits.js';
+import { STRAFE_SIDEWAYS, type StrafeInfo } from './strafer.js';
 
 /** The most engine output a blueprint can ask for (a boss's; players' designs stop at 1) */
 export const MAX_DRIVE = 2.5;
@@ -166,6 +167,10 @@ export interface ShipDerived {
   shieldMax: number;
   /** Stabiliser Anchor: its best one's satisfaction (0 = none; it braces from anchor.ts MIN_ANCHOR_POWER) */
   anchor?: number;
+  /** Burst Strafers (strafer.ts): each side's push and the charges; absent without a powered one pointing sideways */
+  strafe?: StrafeInfo;
+  /** Tow Beam (tow.ts): the best one's satisfaction (it takes hold from MIN_TOW_POWER), and every powered one (they draw while towing) */
+  tow?: { power: number; parts: number[] };
   /** Jump drive reach (world units) and cooldown (ticks): the core's own coil and powered jump coils against the hull (flight.ts jumpDriveStats) */
   jumpRange: number;
   jumpCooldown: number;
@@ -310,14 +315,16 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   // 4. Power, per network
   const area = geoms.map((g) => g.area);
   const satisfaction = new Array<number>(n).fill(1);
-  const burst = (i: number) => isEngine(fns[i]) || !!fns[i].weapon || isMinerFn(fns[i]);
+  // (Burst Strafers and Tow Beams draw by the tick too, only while they work: strafer.ts, tow.ts)
+  const burst = (i: number) => isEngine(fns[i]) || !!fns[i].weapon || isMinerFn(fns[i]) || !!fns[i].strafe || !!fns[i].tow;
   // (Local circuits: a burst consumer runs wherever its circuit has a generator or a store, it touches a capacitor bank, or the
   // core's store can reach it: on the main circuit, or by its trickle elsewhere. How much it actually gets is the tick's: energy.ts)
   const coreAlive = input.rootMode === 'core' && root >= 0 && parts[root].fn === 'core';
   const nearBank = new Array<boolean>(n).fill(false);
   for (const [a, b] of joins) {
-    if (alive[a] && alive[b] && fns[a].bank && (fns[a].store ?? 0) > 0) nearBank[b] = true;
-    if (alive[a] && alive[b] && fns[b].bank && (fns[b].store ?? 0) > 0) nearBank[a] = true;
+    // (a Pulse Dynamo is part of the bank it touches: surge.ts)
+    if (alive[a] && alive[b] && ((fns[a].bank && (fns[a].store ?? 0) > 0) || (fns[a].surge ?? 0) > 0)) nearBank[b] = true;
+    if (alive[a] && alive[b] && ((fns[b].bank && (fns[b].store ?? 0) > 0) || (fns[b].surge ?? 0) > 0)) nearBank[a] = true;
   }
   let spare = 0, totalSupply = 0;
   const networks: FlowNetwork[] = wn.nets.map((g) => {
@@ -459,6 +466,9 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   let shieldMax = 0;
   // (Stabiliser Anchor: anchor.ts)
   let anchor = 0;
+  // (Burst Strafers and Tow Beams: strafer.ts, tow.ts)
+  let strafe: StrafeInfo | undefined;
+  let tow: { power: number; parts: number[] } | undefined;
   const jt = { ...DEFAULT_JUMP, ...(tuning.jump ?? {}) };
   // The jump drive: coil capacity (the core's own, and powered coils', a little more for better grades) against the hull's cells
   let jumpCap = 0, jumpGradeSum = 0, hullCells = 0;
@@ -479,6 +489,25 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     if ((fns[i].range ?? 0) > 0) scanRange = Math.max(scanRange, fns[i].range! * satisfaction[i]);
     if ((fns[i].shield ?? 0) > 0) shieldMax += fns[i].shield! * area[i] * fnOutput(fns[i], mats[i]) * satisfaction[i];
     if (fns[i].anchor) anchor = Math.max(anchor, satisfaction[i]);
+    // ---- Burst Strafer: it pushes away from its facing edge; only one pointing sideways dodges (strafer.ts)
+    const sf = fns[i].strafe;
+    if (sf && alive[i] && mounts[i] && satisfaction[i] > 0) {
+      const lateral = -mounts[i]!.dir[0];
+      if (Math.abs(lateral) >= STRAFE_SIDEWAYS) {
+        strafe ??= { left: [], right: [], ticks: sf.ticks, charges: sf.charges, recharge: sf.recharge };
+        const force = sf.kick * area[i] * fnOutput(fns[i], mats[i]) * satisfaction[i] * Math.abs(lateral);
+        (lateral < 0 ? strafe.left : strafe.right).push({ part: i, force: Math.round(force * 1000) / 1000 });
+        strafe.ticks = Math.max(strafe.ticks, sf.ticks);
+        strafe.charges = Math.max(strafe.charges, sf.charges);
+        strafe.recharge = Math.min(strafe.recharge, sf.recharge);
+      }
+    }
+    // ---- Tow Beam (tow.ts)
+    if (fns[i].tow && alive[i] && satisfaction[i] > 0) {
+      tow ??= { power: 0, parts: [] };
+      tow.power = Math.max(tow.power, satisfaction[i]);
+      tow.parts.push(i);
+    }
     if (satisfaction[i] > 0 && (fns[i].demand ?? 0) > 0) {
       const draw = partDemand(fns[i], area[i], mats[i]);
       if (isEngine(fns[i])) engineDraw += draw;
@@ -504,7 +533,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   }
 
   // ---- Local circuits (circuits.ts): worked out here once, run by energy.ts every tick
-  const power = powerLayout({ fns, area, mats, alive, joins, network, networks, burst, core: coreAlive, tuning });
+  const power = powerLayout({ fns, area, mats, alive, joins, network, networks, burst, core: coreAlive, tuning, health: hp.map((h, i) => healthFactor(h / (maxHp[i] || 1), tuning)) });
   let batteryMax = power.core?.cap ?? 0, driveMax = 0, weaponMax = 0;
   for (const g of power.stores) if (g.kind === 'd') driveMax += g.cap; else if (g.kind === 'w' || g.kind === 'k') weaponMax += g.cap; else batteryMax += g.cap;
   // ---- (end local circuits)
@@ -546,6 +575,8 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     scanRange: Math.round(scanRange),
     shieldMax: Math.round(shieldMax),
     ...(anchor > 0 ? { anchor: Math.round(anchor * 1000) / 1000 } : {}),
+    ...(strafe ? { strafe } : {}),
+    ...(tow ? { tow: { power: Math.round(tow.power * 1000) / 1000, parts: tow.parts } } : {}),
     jumpRange: jump.range,
     jumpCooldown: jump.cooldown,
     jumpRatio: jump.ratio,

@@ -1451,6 +1451,69 @@
         "copper_wire": 2
       },
       "time": 120
+    },
+    "power_pulse_dynamo": {
+      "inputs": {
+        "titanium_plate": 1,
+        "coil_winding": 2,
+        "capacitor_cell": 1
+      },
+      "time": 0
+    },
+    "shield_flash_screen": {
+      "inputs": {
+        "steel_plate": 1,
+        "copper_wire": 2,
+        "shield_emitter": 1,
+        "capacitor_cell": 2
+      },
+      "time": 0
+    },
+    "railgun_rail_driver": {
+      "inputs": {
+        "titanium_plate": 4,
+        "hardened_steel": 2,
+        "coil_winding": 3,
+        "capacitor_cell": 2,
+        "power_coupling": 2
+      },
+      "time": 320
+    },
+    "utility_repair_beam": {
+      "inputs": {
+        "steel_plate": 2,
+        "copper_wire": 3,
+        "crystal_lens": 2,
+        "servo_motor": 1,
+        "power_coupling": 1
+      },
+      "time": 60
+    },
+    "point_defence_turret": {
+      "inputs": {
+        "steel_plate": 1,
+        "copper_wire": 2,
+        "servo_motor": 1,
+        "targeting_chip": 1
+      },
+      "time": 0
+    },
+    "engine_burst_strafer": {
+      "inputs": {
+        "steel_plate": 1,
+        "fuel_injector": 1,
+        "capacitor_cell": 1
+      },
+      "time": 0
+    },
+    "utility_tow_beam": {
+      "inputs": {
+        "steel_plate": 2,
+        "coil_winding": 2,
+        "servo_motor": 1,
+        "power_coupling": 1
+      },
+      "time": 60
     }
   }
 }

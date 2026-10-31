@@ -69,6 +69,8 @@ export const DICTIONARY: readonly string[] = [
   'plating_spaced_plating',
   // (appended: the Stabiliser Anchor)
   'utility_stabiliser_anchor',
+  // (appended: the Burst Strafer and the Tow Beam)
+  'engine_burst_strafer', 'utility_tow_beam',
 ];
 const DICT_INDEX = new Map(DICTIONARY.map((s, i) => [s, i]));
 const utf8 = new TextEncoder();

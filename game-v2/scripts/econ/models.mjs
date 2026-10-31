@@ -287,7 +287,7 @@ const LOOK = {
   siphon: 'siphon', scanner: 'scanner', constructor: 'constructor', shield: 'shield', jumpcoil: 'jumpcoil', plating: 'armor',
 };
 /** Families with no legacy function: their own look (client/src/ships/partDecor.ts DECOR_SHAPES) */
-const OWN_LOOK = { anchor: { color: '#8fb3d9', decor: 'anchor', glow: '#7dd3fc' } };
+const OWN_LOOK = { anchor: { color: '#8fb3d9', decor: 'anchor', glow: '#7dd3fc' }, constructor: { color: '#f5b942', decor: 'none' } };
 for (const [id, name, family, pieces, level, material, fields, description, category] of OTHER) {
   const look = OWN_LOOK[family] ?? legacyLook(LOOK[family]);
   models.push({
@@ -297,6 +297,94 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
     guide: { name, blurb: description.split(/[.:]/)[0], ...(pieces[0] !== 'sq' ? { piece: pieces[0] } : {}), order: guideOrder++ },
   });
 }
+// ---- Energy Phase 2: Surge (common/src/ships/surge.ts; docs/design/energy-system.md "Implemented (Phase 2)") ----------
+// The Pulse Dynamo (a Surge generator: part of the capacitor bank it touches, never on wires), the Flash Screen (a
+// Deflector fed Surge too: a full restore when it breaks) and the Rail Driver (a Spear fed Surge too: its bank sets each
+// slug's punch). Appended last, so no other model's order moves.
+{
+  const SURGE_LOOK = { color: '#6d3fb3', decor: 'battery', glow: '#b57cff' };
+  const SURGE_OTHER = [
+    ['power_pulse_dynamo', 'Pulse Dynamo', 'dynamo', ['sq'], 18, 'titanium', { surge: 8, hpScale: 0.6 }, 'A Surge generator: it charges the capacitor bank it touches, with no wires, and powers only what that bank touches.', 'power', SURGE_LOOK],
+    ['shield_flash_screen', 'Flash Screen', 'shield', ['sq'], 13, 'steel', { shield: 36, demand: 16, priority: 2, hpScale: 0.6, dual: 'flash' }, 'A shield fed Surge too: when it breaks, the capacitor bank against it puts all of it back at once.', 'shields', legacyLook('shield')],
+  ];
+  for (const [id, name, family, pieces, level, material, fields, description, category, look] of SURGE_OTHER) {
+    models.push({
+      ...base(id, name, family, pieces, level, material, { grade: fields.grade }), ...fields, description,
+      rarity: level >= 20 ? 'rare' : level >= 5 ? 'uncommon' : 'common', category, fabOrder: next(category), ...look,
+      guide: { name, blurb: description.split(/[.:]/)[0], ...(pieces[0] !== 'sq' ? { piece: pieces[0] } : {}), order: guideOrder++ },
+    });
+  }
+  MOUNT.railgun_rail_driver = 'fixed';
+  MOUNTING.railgun_rail_driver = { attach: 'back', clear: ahead(3) };
+  const spear = models.find((m) => m.id === 'railgun_spear');
+  const desc = "A heavy rail fed Surge too: the capacitor bank against it sets each slug's punch, and a full bank throws one through an extra ship.";
+  models.push({
+    ...spear, id: 'railgun_rail_driver', name: 'Rail Driver', unlock: { level: 29 }, dual: 'rail', ...mounted('railgun_rail_driver', desc),
+    fabOrder: next('weapons'), guide: { name: 'Rail Driver', blurb: desc.split(':')[0].replace(/[.]$/, ''), piece: 'block2', order: guideOrder++ },
+  });
+}
+// ---- (end Energy Phase 2)
+// ---- Support weapons: the Repair Beam and the Point Defence Turret (common/src/ships/support.ts; build-archetypes.md §5 #6, #7) ----
+// The Repair Beam (band L16-23, Steady: the Warden's) is a held turret beam that mends friendly ships' parts where it lands, at a
+// big steady draw while it's on; the Point Defence Turret (band L8-15: the Interceptor's, Bulwark's and Freighter's) is a quick
+// turret that fires on its own at incoming missiles, torpedoes, mortar shells and seekers, a little power a shot. Appended last,
+// so no other model's order moves.
+{
+  const SUPPORT_LOOK = {
+    repair: { color: '#2f9e7a', decor: 'laser', glow: '#5eead4', sfxLoop: 'laser_loop' },
+    point_defence: { color: '#c86a2a', decor: 'cannon', sfx: 'shot', sfxTurret: 'turret_shot' },
+  };
+  MOUNT.utility_repair_beam = 'turret';
+  MOUNTING.utility_repair_beam = { arc: 240 };
+  MOUNT.point_defence_turret = 'turret';
+  MOUNTING.point_defence_turret = { arc: 300 };
+  const SUPPORT = [
+    ['utility_repair_beam', 'Repair Beam', 'repair', ['rect2'], 17, 'steel', { weapon: 'repair', demand: 28, priority: 2, hpScale: 0.7, weaponMods: {} },
+      "Mends a friendly ship's damaged parts where its beam lands: hold fire with it on a party member or an ally. It can't mend your own ship, a destroyed part or a shield, and does nothing to an enemy.", 'utility'],
+    ['point_defence_turret', 'Point Defence Turret', 'point_defence', ['sq'], 10, 'steel', { weapon: 'point_defence', demand: 10, priority: 2, fireInterval: 12, hpScale: 0.6, weaponMods: {} },
+      'Shoots down incoming missiles, torpedoes, mortar shells and seekers on its own, a little power a shot. It never fires at ships, and a boss\'s rings of shots are yours to dodge.', 'weapons'],
+  ];
+  for (const [id, name, family, pieces, level, material, fields, description, category] of SUPPORT) {
+    const m = mounted(id, description);
+    models.push({
+      ...base(id, name, family, pieces, level, material, { grade: fields.grade }), ...fields, ...m,
+      // (It turns on its own, not to your aim)
+      ...(family === 'point_defence' ? { description: `${description} Turret: aims itself.` } : {}),
+      rarity: level >= 20 ? 'rare' : level >= 5 ? 'uncommon' : 'common', category, fabOrder: next(category), ...SUPPORT_LOOK[family],
+      guide: { name, blurb: description.split(/[.:]/)[0], ...(pieces[0] !== 'sq' ? { piece: pieces[0] } : {}), order: guideOrder++ },
+    });
+  }
+}
+// ---- (end support weapons)
+// ---- Burst Strafer and Tow Beam (common/src/ships/strafer.ts, tow.ts; build-archetypes.md §5 #1, #8; both band L8-15) ----
+// The Burst Strafer (the Dancer's, Interceptor's, Blinker's): no cruising thrust at all, only a dodge. A fixed sharp burst
+// (`strafe.ticks`) of `strafe.kick` push per cell out of its facing's opposite side, `strafe.charges` charges refilling one
+// every `strafe.recharge` ticks; while a burst runs it draws `demand` per cell a second (70 a burst for its one cell: several
+// times an engine's energy per push), from the capacitor bank it touches first. The Tow Beam (the Salvage Tug's): latches onto
+// a wreck, debris or a pod and pulls it on a tether (tuning.json `tow`), drawing `demand` per cell a second while it tows.
+// Appended last, so no other model's order moves.
+{
+  const TUG_LOOK = {
+    strafer: { color: '#8a94a6', decor: 'afterburner', glow: '#f472b6' },
+    tow: { color: '#8a8f6a', decor: 'miner', glow: '#facc15' },
+  };
+  const TUG = [
+    ['engine_burst_strafer', 'Burst Strafer', 'strafer', ['sq'], 10, 'steel',
+      { strafe: { kick: 5.5, ticks: 15, charges: 3, recharge: 150 }, demand: 280, priority: 1, facing: true, hpScale: 0.6 },
+      'A side thruster that only dodges: a sharp quarter-second burst away from its nozzle, three charges that refill slowly, and a lot of energy a burst. No push at all for cruising.', 'engines'],
+    ['utility_tow_beam', 'Tow Beam', 'tow', ['rect2'], 12, 'steel',
+      { tow: true, demand: 12, priority: 2, facing: true, hpScale: 0.9, massScale: 1.2 },
+      'Latches onto a wreck, debris or a loot pod and pulls it along on a tether; the heavier it is, the slower you go. Tow a wreck into a station to salvage it. Never takes hold of a working ship.', 'utility'],
+  ];
+  for (const [id, name, family, pieces, level, material, fields, description, category] of TUG) {
+    models.push({
+      ...base(id, name, family, pieces, level, material, { grade: fields.grade }), ...fields, description,
+      rarity: level >= 20 ? 'rare' : level >= 5 ? 'uncommon' : 'common', category, fabOrder: next(category), ...TUG_LOOK[family],
+      guide: { name, blurb: description.split(/[.:]/)[0], ...(pieces[0] !== 'sq' ? { piece: pieces[0] } : {}), order: guideOrder++ },
+    });
+  }
+}
+// ---- (end Burst Strafer and Tow Beam)
 for (const id of Object.keys(MOUNT)) if (!models.some((m) => m.id === id && m.weapon)) throw new Error(`mount for ${id}, which isn't a weapon model`);
 for (const id of Object.keys(MOUNTING)) if (!MOUNT[id]) throw new Error(`mounting rules for ${id}, which isn't a weapon model`);
 // (Everything below the legacy functions' own keys: a model is a FunctionDef)
@@ -385,6 +473,22 @@ const RECIPES = {
   plating_reactive_armour: { steel_plate: 2, propellant: 1, scrap_electronics: 1 },
   plating_spaced_plating: { titanium_plate: 3, composite_sheet: 1 },
 };
+// (Energy Phase 2: Surge parts)
+Object.assign(RECIPES, {
+  power_pulse_dynamo: { titanium_plate: 1, coil_winding: 2, capacitor_cell: 1 },
+  shield_flash_screen: { steel_plate: 1, copper_wire: 2, shield_emitter: 1, capacitor_cell: 2 },
+  railgun_rail_driver: { titanium_plate: 4, hardened_steel: 2, coil_winding: 3, capacitor_cell: 2, power_coupling: 2 },
+});
+// (Support weapons: the Repair Beam and the Point Defence Turret)
+Object.assign(RECIPES, {
+  utility_repair_beam: { steel_plate: 2, copper_wire: 3, crystal_lens: 2, servo_motor: 1, power_coupling: 1 },
+  point_defence_turret: { steel_plate: 1, copper_wire: 2, servo_motor: 1, targeting_chip: 1 },
+});
+// (Burst Strafer and Tow Beam)
+Object.assign(RECIPES, {
+  engine_burst_strafer: { steel_plate: 1, fuel_injector: 1, capacitor_cell: 1 },
+  utility_tow_beam: { steel_plate: 2, coil_winding: 2, servo_motor: 1, power_coupling: 1 },
+});
 /** Plating comes in two sizes: its recipe is per cell */
 const PER_CELL = new Set(['plating_reactive_armour', 'plating_spaced_plating']);
 const KNOWN = new Set([...read('items.json').items.map((d) => d.id), ...read('recipes.json').refining.map((r) => r.id), ...COMPONENTS.map((c) => c[0])]);

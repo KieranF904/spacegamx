@@ -43,6 +43,31 @@ recharge faster (`ShipBridge`), and pulls and knockback go through `ShipBridge.p
 
 Energy runs on local circuits: each wire network keeps its own charge, every store gives at most its discharge rate a second (past it the circuit browns out: guns reload slower, engines push less), capacitors give only to what they touch, and the core's store is a battery on the main circuit and a trickle to the rest. The layout is worked out at the rebuild in `common/src/ships/circuits.ts` and run each tick by `common/src/ships/energy.ts` (server and pilot prediction alike); the numbers are `discharge` in `data/ships/models.json` (from `scripts/econ/models.mjs`) and `energy` in `data/ships/tuning.json`. `common/src/ships/circuits.test.ts` flies every library ship through a scripted fight and fails if a discharge rate ever bites. Design and decisions: `docs/design/energy-system.md`, "Implemented (Phase 1)".
 
+Support weapons (`common/src/ships/support.ts`; models `utility_repair_beam` and `point_defence_turret`, kinds `repair` and
+`point_defence` in `data/ships/tuning.json`): the Repair Beam is a held turret beam (`heal` HP/s) that passes through
+ships it may not mend and mends the damaged parts nearest where it lands on the first friendly hull (`GameServer.canHeal`;
+`ShipBridge.repairBeam`, `repairAt`); never its own ship, a destroyed part or a shield. What it mends is noted in
+`server/src/game/Support.ts`, the support-credit hook: a mended pilot's kills pay its supporters as its party, and a boss
+counts them among its winners. Point defence (`pointDefence {range, slew}`) never fires on the trigger (`stepGuns` only
+reloads it): `ShipBridge.pointDefence` turns it to the nearest shot it can fire on (`Weapons.threats`: kinds with
+`intercept` hits, owners that may hurt it; a boss nova's never unless its phase says `intercept: true`) and each shot
+takes one hit (`Weapons.intercept`). Clients see an `intercept` message (a plain one: not in the wire tables) as a tracer
+and a pop (`DamageFx.onIntercept`), and the turret turning to it (`ShipClient.stepPointDefenceVisuals`).
+
+The Burst Strafer and the Tow Beam (`common/src/ships/strafer.ts`, `tow.ts`; models `engine_burst_strafer` and
+`utility_tow_beam`). A strafer gives no thrust, only a dodge: the held `dodge` control (input flags2 0x40/0x80, replica
+bits `CTL.dodge`/`dodgeRight`, key Space; `ShipClient.dodgeControl` picks the side you're steering) starts one burst of
+`strafe.ticks` from every powered strafer pushing that way, and spends one of `strafe.charges`. Its state is two
+integers on the flight body, `dodge` and `dodgeSpent`, stepped in `flight.ts` (`stepDodge`) and carried in keyframes and
+the pilot's row after the charge groups (`pilotExtras`), so prediction and replicas fly it exactly. A burst draws
+`demand` through `PowerUse.dodge`: from the capacitor bank the strafer touches first, then its circuit as an engine.
+The Tow Beam is server-side (`server/src/game/Towing.ts`): `{ type: 'tow', on }` (key U) takes hold of the wreck,
+debris or pod nearest the cursor (never a working ship: `ShipBridge.towable`), and a spring tether (`towPull`) pulls it
+each tick. Its mass rides as cargo (`ShipBridge` host `towLoad`), so the pilot's prediction flies the load, and the
+beam draws while it tows (`ShipState.tow`, `gunLoad`). In a station's reach, `GameServer.towDelivered` salvages it:
+a wreck's or debris's structure as plate (`tow.salvage` of it) into storage, plus a derelict's credits, or a pod's
+contents into storage. Numbers: `strafe` per model in `scripts/econ/models.mjs`; `tuning.json` `tow` over `DEFAULT_TOW`.
+
 Watching the VPS live: `npm run monitor` opens a dashboard of the box's CPU, memory, network, disk, each service and the game's tick times. It streams over SSH as a read-only `vpsmon` account (key `~/.ssh/vpsmon_ed25519`; set up by `deploy/vps/monitor/setup.sh`, which only lets that key run the stats script).
 
 ## Default Admin Account

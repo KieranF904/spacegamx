@@ -105,6 +105,27 @@ export class LootPods {
     return this.contents.get(eid);
   }
 
+  // ---- Tow Beam (Towing.ts)
+  /** Pods in a system within `r` of (x, y) */
+  near(systemNum: number, x: number, y: number, r: number): number[] {
+    const out: number[] = [];
+    for (const eid of podQuery(this.host.world)) {
+      if (InSystem.systemId[eid] !== systemNum || hasComponent(this.host.world, Dead, eid) || !this.contents.has(eid)) continue;
+      if (Math.hypot(Position.x[eid] - x, Position.y[eid] - y) <= r) out.push(eid);
+    }
+    return out;
+  }
+
+  /** Take a pod away whole (towed into a station): its contents, or undefined if it's gone */
+  take(eid: number): Bag | undefined {
+    const bag = this.contents.get(eid);
+    if (!bag) return undefined;
+    this.contents.delete(eid);
+    this.host.remove(eid);
+    return bag;
+  }
+  // ---- (end Tow Beam)
+
   /** Snapshot data for a pod entity */
   snapshotData(eid: number): number[] {
     const bag = this.contents.get(eid) ?? {};

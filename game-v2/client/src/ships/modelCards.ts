@@ -13,9 +13,13 @@ export const FAMILY_LABEL: Record<string, string> = {
   laser: 'Lasers', pulse: 'Pulse guns', lance: 'Lances', arc: 'Arc projectors',
   missile: 'Missiles', torpedo: 'Torpedoes', emp: 'EMP',
   ion: 'Ion drives', afterburner: 'Burn engines', plasma: 'Plasma drives', jumpcoil: 'Jump coils',
-  reactor: 'Generators', battery: 'Batteries', capacitor: 'Capacitors', drive_cell: 'Drive cells',
+  reactor: 'Generators', dynamo: 'Surge generators', battery: 'Batteries', capacitor: 'Capacitors', drive_cell: 'Drive cells',
   shield: 'Shields', plating: 'Plating',
   mining: 'Mining lasers', demolition: 'Demolition', siphon: 'Siphons', scanner: 'Scanners', constructor: 'Constructors', anchor: 'Anchors',
+  // (Support weapons: common/src/ships/support.ts)
+  repair: 'Repair beams', point_defence: 'Point defence',
+  // (Burst Strafer and Tow Beam: ships/strafer.ts, tow.ts)
+  strafer: 'Strafers', tow: 'Tow beams',
 };
 export const LEGENDARY = 'Legendary';
 const FAMILY_ORDER = Object.keys(FAMILY_LABEL);
@@ -40,6 +44,10 @@ export function familyRank(label: string): number {
 const TRADE_OFF: Record<string, string> = {
   cannon_pip: 'light and quick',
   utility_stabiliser_anchor: 'hold still for range, aim and shields; no thrust braced',
+  utility_repair_beam: "mends allies' parts; nothing for you, big draw",
+  point_defence_turret: 'shoots down missiles on its own; never ships',
+  engine_burst_strafer: 'a sharp dodge sideways, 3 charges; no cruising push, big draw',
+  utility_tow_beam: 'tows wrecks and pods to salvage; slows you by their mass',
   cannon_hammer: 'slow heavy shell, punches plate',
   cannon_twinlink: 'sustained fire, power-hungry',
   cannon_longbarrel: "a sniper's cannon: far, slow to fire",
@@ -62,6 +70,7 @@ const TRADE_OFF: Record<string, string> = {
   railgun_needle: 'fast piercing slugs · ammo',
   railgun_coilgun: 'no ammo, drinks power',
   railgun_spear: 'through ship after ship, power-hungry',
+  railgun_rail_driver: 'its bank sets its punch; a full one pierces once more',
   emp_hush: 'shuts a ship down a moment',
   emp_blackout: 'a wide, long blackout, slow',
   arc_spark: 'lightning that jumps between ships',
@@ -84,6 +93,7 @@ const TRADE_OFF: Record<string, string> = {
   power_capacitor: 'tiny and very fast, only into what it touches',
   power_drive_cell: 'deep and fast, engines only',
   power_heavy_bank: 'holds the most, gives it slowly',
+  power_pulse_dynamo: 'Surge with no wires, only to its bank',
   utility_mining_laser: 'cuts ore, a poor weapon',
   utility_bore: 'cuts harder rock',
   utility_demolition_launcher: 'cracks rock wide open',
@@ -92,6 +102,7 @@ const TRADE_OFF: Record<string, string> = {
   utility_long_range_array: 'twice the reach, twice the power',
   utility_constructor: 'builds structures',
   shield_deflector: 'soaks hits before the hull',
+  shield_flash_screen: 'its bank puts it all back when it breaks',
   shield_flicker_screen: 'thin, almost free to run',
   shield_bulwark_projector: 'deep, hungry for power',
   utility_jump_coil: 'more jump for a bigger hull',
@@ -156,11 +167,15 @@ export function keyStats(catalog: Catalog, tuning: ShipTuning | undefined, fn: F
   if (!st) return '';
   const out: string[] = [];
   if (st.pulse) out.push(`${n0(st.pulse.damage)} a pulse`);
+  // (Support weapons: support.ts)
+  else if (st.heal) out.push(`mends ${n0(st.heal)} hp/s`);
+  else if (st.intercept) out.push(`${st.intercept.perSec.toFixed(1)} shots/s at missiles`);
   else if (st.dps !== undefined && fn.weapon) out.push(`${n0(st.dps)} dmg/s`);
   if (st.range && fn.weapon) out.push(`reach ${n0(st.range)}`);
   if (st.thrust) out.push(`thrust ${st.thrust.toFixed(1)}`);
   if (fn.rated) out.push(`top ${n0(fn.rated * 60)} m/s`);
   if (st.supply) out.push(`+${n0(st.supply)} power`);
+  if ((fn.surge ?? 0) > 0) out.push(`+${n0(fn.surge! * st.area)} surge, by touch`);
   if ((fn.store ?? 0) > 0) {
     out.push(`holds ${n0(fn.store! * st.area)}${fn.pool === 'drive' ? ' (engines)' : fn.pool === 'weapon' ? ' (guns)' : ''}`);
     // (local circuits: the most it gives a second; a capacitor only into what it touches)
@@ -170,7 +185,9 @@ export function keyStats(catalog: Catalog, tuning: ShipTuning | undefined, fn: F
   if ((fn.range ?? 0) > 0 && !fn.weapon) out.push(`scan ${n0(fn.range!)} m`);
   if ((fn.jumpCapacity ?? 0) > 0) out.push(`jump ${n0(fn.jumpCapacity! * st.area)} cells`);
   if (st.brace) out.push(`braced: reach +${Math.round((st.brace.reach - 1) * 100)}%`);
-  if (st.draw && !st.supply) out.push(`draws ${n0(st.draw)}`);
+  if (st.dodge) out.push(`dodge ${st.dodge.force.toFixed(1)} push · ${st.dodge.charges} charges · ${n0(st.dodge.energy)} energy a burst`);
+  if (st.tow) out.push(`tows within ${n0(st.tow.range)} m`);
+  if (st.draw && !st.supply) out.push(st.dodge ? `draws ${n0(st.draw)} bursting` : st.tow ? `draws ${n0(st.draw)} towing` : `draws ${n0(st.draw)}`);
   if (!out.length || (fn.category === 'shields' && !st.shield)) out.push(`${n0(st.hp)} hp · armour ${st.armour}`);
   return out.join(' · ');
 }

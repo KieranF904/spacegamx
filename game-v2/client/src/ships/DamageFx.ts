@@ -329,6 +329,25 @@ export class DamageFx {
    * A station's defence turret fired on a hostile, from `from`: a laser's red
    * bolt, flak's tracers bursting on the target, or the lance's heavy beam.
    */
+  /**
+   * Point defence fired (common/src/ships/support.ts): a hot tracer from its muzzle to the shot, a flash where it
+   * struck, and brought down, the shot pops (a puff and a ring, small: its warhead never went off)
+   */
+  onIntercept(m: { x: number; y: number; fx: number; fy: number; down: boolean }): void {
+    const dx = m.x - m.fx, dy = m.y - m.fy;
+    this.push({ kind: 'beam', x: m.fx, y: m.fy, vx: 0, vy: 0, life: 0, max: 8, size: 3, grow: 0, color: 0xffc070, alpha: 1, drag: 1, rot: 0, vr: 0, pts: [dx, dy] });
+    this.glow(m.fx, m.fy, 0, 0, 16, 5, 0xffe2b0, 0.9);
+    this.glow(m.x, m.y, 0, 0, 22, 6, 0xfff1d0, 1);
+    if (m.down) {
+      this.glow(m.x, m.y, 0, 0, 46, 12, 0xffb24a, 0.9, 0.8);
+      this.ring(m.x, m.y, 0, 0, 8, 60, 12, 0xffd08a, 0.8);
+      this.burstSparks(m.x, m.y, 0, 0, 10, 1.5, 6, 0xffa040);
+      for (let i = 0; i < 2; i++) this.dustPuff(m.x, m.y, (Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 0.8, 18 + Math.random() * 10, 40, 0x3a3634, 0.45, 0.3);
+      this.sound('explosion_small', { x: m.x, y: m.y }, 0.35);
+    } else this.burstSparks(m.x, m.y, 0, 0, 4, 1, 4, 0xffd080);
+    this.sound('turret_shot', { x: m.fx, y: m.fy }, 0.35);
+  }
+
   onStationFire(from: { x: number; y: number; weapon: string; color: number }, target: number): void {
     const t = this.state.entities.get(target);
     if (!t) return;

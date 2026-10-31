@@ -18,7 +18,7 @@
 import { addEntity, addComponent, hasComponent, entityExists, IWorld } from 'bitecs';
 import {
   Position, Velocity, Radius, Projectile, Bullet, Lifetime, InSystem, NetworkSync, OwnedBy, Dead,
-  ShipTuning, WeaponTuning, WEAPON_KIND_TYPE, ServerMessage, mulberry32, hashString, weaponDef, gunDef, launchShot, volleyAngles, weaponHit, type WeaponMods, type HitInfo,
+  ShipTuning, WeaponTuning, WEAPON_KIND_TYPE, ServerMessage, interceptHits, mulberry32, hashString, weaponDef, gunDef, launchShot, volleyAngles, weaponHit, type WeaponMods, type HitInfo,
 } from '@space-game/common';
 import type { ShipBridge } from '../ships/ShipBridge.js';
 
@@ -42,6 +42,8 @@ interface Extra {
   hit: Set<number>;
   damageScale: number;
   sizeScale: number;
+  /** Point defence: hits left to shoot it down (0: it can't be; common/src/ships/support.ts) */
+  intercept: number;
 }
 
 export class Weapons {
@@ -59,7 +61,7 @@ export class Weapons {
    * which clients use to build the same volley from a fire event.
    */
   spawn(owner: number, kind: string, x: number, y: number, angle: number, damageScale: number,
-    shape: { speedScale: number; sizeScale: number; turret: boolean; target?: number; noBurst?: boolean; seed?: string; index?: number; mods?: WeaponMods; dry?: boolean; ammoMods?: WeaponMods; reach?: number; grade?: number; size?: number; model?: WeaponMods; braced?: boolean }, out?: number[]): number {
+    shape: { speedScale: number; sizeScale: number; turret: boolean; target?: number; noBurst?: boolean; seed?: string; index?: number; mods?: WeaponMods; dry?: boolean; ammoMods?: WeaponMods; reach?: number; grade?: number; size?: number; model?: WeaponMods; braced?: boolean; intercept?: boolean }, out?: number[]): number {
     const w = this.host.world;
     // The gun's own mods (gems), then its ammunition's, its grade's and its size's: the same as the pilot's client builds the shells from (launch.ts gunDef)
     const full = gunDef(this.tuning, kind, { mods: shape.mods, ammo: shape.ammoMods, grade: shape.grade, size: shape.size, model: shape.model, braced: shape.braced });
@@ -103,7 +105,8 @@ export class Weapons {
     OwnedBy.ownerId[eid] = owner;
     // (A plain cannon shell has nothing to track: one with a grade's or a gem's changes does)
     if (kind !== 'cannon' || def !== this.def(kind)) {
-      this.extras.set(eid, { kind, def, owner, target: shape.target ?? -1, pierceLeft: def.pierce ?? 0, hit: new Set(), damageScale, sizeScale: shot.size });
+      // (Point defence may shoot it down if its kind can be, unless it's told not (a boss's nova): support.ts)
+      this.extras.set(eid, { kind, def, owner, target: shape.target ?? -1, pierceLeft: def.pierce ?? 0, hit: new Set(), damageScale, sizeScale: shot.size, intercept: shape.intercept === false ? 0 : interceptHits(def) });
     }
     out?.push(eid);
     return eid;
@@ -132,6 +135,35 @@ export class Weapons {
   exclusions(proj: number): Set<number> | undefined {
     return this.extras.get(proj)?.hit;
   }
+
+  // --- Point defence (common/src/ships/support.ts; ShipBridge.pointDefence) ---
+
+  /**
+   * Shots point defence at (x, y) could fire on: ones that can be shot down, in this system, within `range`, fired by
+   * a ship `hostile` says may hurt it. Nearest first, into `out` (cleared).
+   */
+  threats(systemNum: number, x: number, y: number, range: number, hostile: (owner: number) => boolean, out: { id: number; x: number; y: number; d: number }[]): void {
+    out.length = 0;
+    const w = this.host.world, r2 = range * range;
+    for (const [eid, e] of this.extras) {
+      if (e.intercept <= 0 || InSystem.systemId[eid] !== systemNum || !entityExists(w, eid) || hasComponent(w, Dead, eid)) continue;
+      const dx = Position.x[eid] - x, dy = Position.y[eid] - y, d2 = dx * dx + dy * dy;
+      if (d2 > r2 || !hostile(e.owner)) continue;
+      out.push({ id: eid, x: Position.x[eid], y: Position.y[eid], d: Math.sqrt(d2) });
+    }
+    out.sort((a, b) => a.d - b.d || a.id - b.id);
+  }
+
+  /** A point-defence hit: one of its hits gone, and brought down it's removed (its warhead never goes off). True when it's down */
+  intercept(proj: number): boolean {
+    const e = this.extras.get(proj);
+    if (!e || e.intercept <= 0) return false;
+    if (--e.intercept > 0) return false;
+    this.extras.delete(proj);
+    this.host.remove(proj);
+    return true;
+  }
+  // --- end point defence ---
 
   /** Missiles steer, fuses check for targets in range */
   tick(): void {

@@ -45,7 +45,7 @@ export function stepShipPhysics(
   derived: ShipDerived,
   tuning: ShipTuning,
   /** The charge, whether it's accounted (drainRate 0: not), and what the guns and mining lasers draw this tick per feed group (energy.ts gunLoad) */
-  boost: { charge: Charge; drainRate: number; load?: ArrayLike<number> },
+  boost: { charge: Charge; drainRate: number; load?: ArrayLike<number>; tick?: number },
   gravity: GravityWell | null = null,
   jumpBoost = 1,
   hazard?: FlightConstants['hazard'],

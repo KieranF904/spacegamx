@@ -66,7 +66,7 @@ export class Replication {
 
   private real(eid: number): FlightBody {
     const s = this.ships.get(eid)!;
-    return { x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid], angle: Rotation.angle[eid], angVel: s.angVel, jump: s.jump, jumpScale: s.jumpScale, brace: s.brace, cargo: s.cargo };
+    return { x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid], angle: Rotation.angle[eid], angVel: s.angVel, jump: s.jump, jumpScale: s.jumpScale, brace: s.brace, cargo: s.cargo, dodge: s.dodge, dodgeSpent: s.dodgeSpent };
   }
 
   /**
@@ -117,7 +117,9 @@ export class Replication {
       if (b.x !== rx || b.y !== ry || b.vx !== rvx || b.vy !== rvy || b.angle !== ra || b.angVel !== ship.angVel
         || (b.jump ?? 0) !== (ship.jump ?? 0) || (b.jumpScale ?? 1) !== (ship.jumpScale ?? 1)
         // (The anchor's counter, and the hold's mass: a load taken on or off needs a keyframe carrying it)
-        || (b.brace ?? 0) !== (ship.brace ?? 0) || (b.cargo ?? 0) !== (ship.cargo ?? 0)) {
+        || (b.brace ?? 0) !== (ship.brace ?? 0) || (b.cargo ?? 0) !== (ship.cargo ?? 0)
+        // (A Burst Strafer's dodge and charge: strafer.ts)
+        || (b.dodge ?? 0) !== (ship.dodge ?? 0) || (b.dodgeSpent ?? 0) !== (ship.dodgeSpent ?? 0)) {
         s.diverged = true;
         this.why(`${ReplicaMode[mode]}:${(b.cargo ?? 0) !== (ship.cargo ?? 0) ? 'cargo' : (b.brace ?? 0) !== (ship.brace ?? 0) ? 'brace' : b.x !== rx || b.y !== ry ? 'pos' : b.vx !== rvx || b.vy !== rvy ? 'vel' : b.angle !== ra || b.angVel !== ship.angVel ? 'turn' : 'jump'}`);
       }

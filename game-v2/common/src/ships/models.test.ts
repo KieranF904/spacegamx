@@ -36,7 +36,9 @@ describe('models', () => {
   it('are in the catalogue: every one its own piece(s), material, tier and recipe', () => {
     const models = [...catalog.functions.values()].filter((f) => f.model);
     expect(models).toHaveLength(MODELS.models.length);
-    expect(models.length).toBe(66);
+    // (66, then the Pulse Dynamo, Flash Screen and Rail Driver (energy Phase 2), the Repair Beam, the Point Defence turret,
+    // the Burst Strafer and the Tow Beam: the parts agents added 2026-10-31)
+    expect(models.length).toBe(73);
     const recipes = JSON.parse(readFileSync(join(SHIP_DATA_DIR, '../recipes.json'), 'utf-8')).models;
     for (const m of models) {
       expect(Array.isArray(m.pieces) && m.pieces.length > 0, m.id).toBe(true);
@@ -133,10 +135,11 @@ describe('weapon mounts: each model its own', () => {
   };
 
   it('every weapon model has one, and its description says so', () => {
-    expect(weapons.length).toBe(37);
+    expect(weapons.length).toBe(40);
     for (const m of weapons) {
       expect(['fixed', 'turret'], m.id).toContain(m.mount);
-      expect(m.description, m.id).toContain(m.mount === 'fixed' ? 'Fixed: aim with the ship.' : 'Turret: turns to your aim.');
+      // (Point defence turns on its own, not to your aim: support.ts)
+      expect(m.description, m.id).toContain(m.mount === 'fixed' ? 'Fixed: aim with the ship.' : m.family === 'point_defence' ? 'Turret: aims itself.' : 'Turret: turns to your aim.');
       const want = MOUNTS[m.id] ?? BY_FAMILY[m.family!];
       if (want) expect(m.mount, m.id).toBe(want);
     }

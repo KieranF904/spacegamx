@@ -1,6 +1,6 @@
 # Energy system: a discussion draft
 
-*Status: for discussion with Kieran, 2026-10-31. Phase 1 (local circuits) is built: see "Implemented (Phase 1)" below; the rest is the draft. Part names, power-type names and numbers are
+*Status: for discussion with Kieran, 2026-10-31. Phases 1 (local circuits) and 2 (Steady and Surge) are built: see the "Implemented" sections below; the rest is the draft. Part names, power-type names and numbers are
 placeholders. Sibling doc: docs/design/build-archetypes.md (this one builds on its §3.1 "Energy with shape").*
 
 Kieran's brief, in short: batteries and generators are "just placed somewhere and they'll probably connect". He wants
@@ -151,6 +151,81 @@ and `[15]` sit between.) `PROTOCOL_VERSION` 13 → 14, one bump for both changes
    nothing.
 6. A gun's stagger wait (railguns, missiles, pulse lasers rippling) counts as reloading, so it draws a little extra
    before a group's first ripple. Small; worth knowing.
+
+
+## Implemented (Phase 2): power types, Steady and Surge
+
+*Built 2026-10-31, awaiting review, not deployed: B1 (two types only), B3 (the reaction table's Surge column for guns,
+engines and shields), B5 (two dual-fed parts) and the Pulse Dynamo. No Thermal (it's tied to heat), no Exotic, no
+heat or warmth coupling. Phase 1's open questions were answered: a loaded gun fires its first shot on an empty
+circuit; the rates stay; engines draw whichever way they push (direction-aware draw stays off); the main circuit is
+the strongest; stores on a generator-less circuit count and never refill.*
+
+**Where it lives.** `common/src/ships/surge.ts` (new: the reaction rules, `POWER_TYPES`, `surgeTuning`),
+`circuits.ts` (banks: Pulse Dynamos, Surge output, shields touched, labels), `energy.ts` (a bank's dynamo output in
+the tick). Hooks: `guns.ts` (charged shots, the Rail Driver), `flight.ts` (kicks), `ShipBridge` (the Rail Driver's
+pierce on the shell, the flash restore on a broken shield).
+
+### The rules as built
+
+- **Two types.** A wired circuit carries **Steady** (`Circuit.type`). **Surge** never travels along wires: it belongs
+  to a **bank** (`StoreGroup.type 'surge'`, labelled S1, S2...). Capacitors and Pulse Dynamos touching each other are
+  one bank, and it gives only to what touches it, as in Phase 1.
+- **Pulse Dynamo** (`models.json surge: 8`, per cell per second). **Decision: it is part of the bank it touches**
+  (the simpler rule to read: "Surge parts that touch are one bank"). It's on no wire network (it isn't a `produce`
+  generator, so touching it plugs nothing in, and Auto-wire ignores it). Its output first feeds what its bank touches,
+  then charges the bank. Alone, it powers what it touches directly. A damaged one makes less (the health curve).
+  Unlock **L18** (band L16–23), titanium, 1 cell, uses the battery look in violet.
+- **The reaction table** (one line per category, never per model; `surgeReaction`). A part fed Surge also still runs
+  on its Steady circuit; Surge only adds:
+
+  | Category | Fed Surge by touch | Numbers (`tuning energy.surge`, defaults in surge.ts) |
+  |---|---|---|
+  | Projectile guns | **Charged shot**: after a pause, the shot takes a packet from the bank and hits harder | loaded and idle ≥ 30 ticks; ×1.5 damage; packet 3 × the shot's energy |
+  | Engines | **Kick**: while boosting, a dash, a packet each | every 20 ticks; 12 ticks of the kicking engines' full thrust at once; packet 2 × their draw over those 12 ticks |
+  | Shields | **Flash restore**: when the shield breaks, the fullest bank touching a shield generator puts some back at once | 50% of the shield; 4 energy per shield point |
+  | Beams, pulse lasers, mining lasers, utility | nothing yet | |
+
+- **Dual-fed parts** (`FunctionDef.dual`):
+  - **Rail Driver** (`dual: 'rail'`, L29, the Spear's frame and numbers). Steady holds its rails: off a wired circuit it
+    doesn't fire. Its bank sets every slug's power: ×0.7 with an empty bank (or none) up to ×1.5 full. A full bank
+    (≥ 98%) also adds +1 pierce and is emptied; otherwise a shot takes 30% of the bank's capacity.
+  - **Flash Screen** (`dual: 'flash'`, L13, a Deflector with shield 36 per cell): its bank puts **all** of the shield
+    back when it breaks (any shield touching a bank with a Flash Screen on it).
+- **Charge and prediction.** Packets come out of the bank's share of the charge (`Charge.s`). Charged shots, Rail
+  Driver shots and kicks are worked out the same in the pilot's prediction (the kick needs the tick: the flight step's
+  `boost.tick`). Flash restores are the server's alone, like shields; the next snapshot corrects the pilot's bank.
+- **Not done (and why).** The Rail Driver's "much faster" slug and a charged shot's look: both would need a field in
+  fire events (other clients build every shell from those), so only damage and pierce changed, server-side. Kicks from
+  other pilots' ships show when the server's keyframe corrects their replica, as boosts on an empty battery already do.
+
+### Hangar, HUD and guides
+
+- Colour is the type: Steady circuits cyan `#18b4d0` (grey with no generator), Surge banks violet `#b57cff` with their
+  label and a zigzag "arc" to every part they feed by touch. The POWER panel lists each bank (what it feeds, holds and
+  makes). A Pulse Dynamo whose bank touches nothing gets a warning; a capacitor's status follows its bank.
+- Tooltips: an **On Surge** line for every gun, engine and shield (its reaction, with numbers, and "fed by S1" or "no
+  bank touches it"); the dynamo's output and bank. The load test runs as before (it doesn't fire reactions).
+- HUD: each Surge bank its own violet bar (S1...), beside the Steady circuits' and the core's.
+- Field guide: a new **Surge** section. Model cards: the three new parts' trade-offs, "+8 surge, by touch".
+
+### Protocol
+
+Unchanged (still 14): a bank's charge already travels in the store groups, and everything else is worked out from it
+or on the server. No wire change, no bump.
+
+### Tests
+
+`common/src/ships/surge.test.ts`: dynamo bank membership and wireless charging, a lone dynamo powering a gun, the
+reaction table, charged shots in bursts, flash restore (50%, Flash Screen 100%, none without a bank), kicks (and none
+without a bank), the Rail Driver (full bank ×1.5 + pierce and emptied, no bank ×0.7, no fire off a wired circuit).
+The Phase 1 library fight is unaffected (no library or enemy design has a capacitor).
+
+### For Kieran to decide
+
+1. The numbers above (×1.5 charged shot, kick every ⅓ s, 50% flash) are first guesses for playtesting.
+2. Beams, pulse lasers and mining lasers have no Surge reaction yet (the doc's "pulse" for beams).
+3. A charged shot and the Rail Driver's full-bank slug look like any other shot (a visual would need a protocol bump).
 
 ---
 

@@ -294,6 +294,8 @@ private xpFillEl: HTMLElement | null;
   private lastSentHelm = false;
   private lastSentJump = false;
   private lastSentBrace = false;
+  /** Burst Strafer: the dodge control last sent (-1, 0, +1: ships/strafer.ts) */
+  private lastSentDodge = 0;
   /** Extra camera zoom factor while jumping */
   private jumpZoom = 1;
   private lastSentCursorDist = 0;
@@ -1563,17 +1565,21 @@ this.xpFillEl = document.getElementById('xpFill');
     let jump = inputEnabled && this.shipClient.jumpHeld();
     // Stabiliser Anchor: toggled (Y), it stays braced while the toggle is on, chat or menus open or not
     let brace = this.shipClient.braceHeld();
+    // Burst Strafer: a press of the dodge key (Space) asks for one burst, to the side you're steering (ShipClient.dodgeControl)
+    let dodge = inputEnabled ? this.shipClient.dodgeControl() : 0;
     // (The angle is quantized to 13 bits, so client and server use the same value for hitscan: see CURSOR_STATE.md)
     let quantized = quantizeCursorAngle(rawAngle);
     let cursorDistQ = quantizeCursorDist(aimDist);
     // A menu jump has the controls as the autopilot does: no thrust, mouse-steer, the drive as it says
     if (order) {
       forward = backward = left = right = boost = helm = strafeLeft = strafeRight = brace = false;
+      dodge = 0;
       jump = order.jump;
     }
     if (auto) {
       ({ forward, backward, left, right, boost, jump } = auto);
       helm = strafeLeft = strafeRight = brace = false;
+      dodge = 0;
       quantized = quantizeCursorAngle(auto.targetAngle);
       cursorDistQ = quantizeCursorDist(auto.jump ? auto.cursorDist : aimDist);
     }
@@ -1593,6 +1599,7 @@ this.xpFillEl = document.getElementById('xpFill');
       || helm !== this.lastSentHelm
       || jump !== this.lastSentJump
       || brace !== this.lastSentBrace
+      || dodge !== this.lastSentDodge
       || cursorDistQ !== this.lastSentCursorDist;
     
     // Stamp targetTick using local tick counter — each tick iteration
@@ -1618,6 +1625,7 @@ this.xpFillEl = document.getElementById('xpFill');
       cursorDist: cursorDistQ * CURSOR_DIST_STEP,
       jump,
       brace,
+      dodge,
     };
     
     // Proto: no targetTick (applied on the next tick) and no prediction queue.
@@ -1639,6 +1647,7 @@ this.xpFillEl = document.getElementById('xpFill');
         this.lastSentHelm = helm;
         this.lastSentJump = jump;
         this.lastSentBrace = brace;
+        this.lastSentDodge = dodge;
         this.lastSentCursorDist = cursorDistQ;
       }
       return;
@@ -1663,6 +1672,7 @@ this.xpFillEl = document.getElementById('xpFill');
       this.lastSentHelm = helm;
       this.lastSentJump = jump;
       this.lastSentBrace = brace;
+      this.lastSentDodge = dodge;
       this.lastSentCursorDist = cursorDistQ;
     } else {
       // Queue for delayed application (server also applies same input on same tick)
@@ -1698,6 +1708,7 @@ this.xpFillEl = document.getElementById('xpFill');
       jump: false,
       // (The anchor is a toggle, not a held key: it stays as it was)
       brace: this.lastSentBrace,
+      dodge: 0,
     };
     this.network.send(msg);
     // The prediction steps the same input (proto has none)
@@ -1705,6 +1716,7 @@ this.xpFillEl = document.getElementById('xpFill');
     this.lastSentForward = this.lastSentBackward = this.lastSentLeft = this.lastSentRight = false;
     this.lastSentBoost = this.lastSentFireLeft = this.lastSentFireRight = false;
     this.lastSentStrafeLeft = this.lastSentStrafeRight = this.lastSentJump = false;
+    this.lastSentDodge = 0;
   }
 
   private handleServerMessage(msg: ServerMessage): void {

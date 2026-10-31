@@ -1,12 +1,13 @@
 /**
  * The pilot's per-circuit charge (local circuits: common/src/ships/circuits.ts, energy.ts), beside the ENERGY gauge:
- * a thin bar for each circuit that has stores, lettered and coloured as in the hangar's power view, and one for the
+ * a thin bar for each circuit that has stores, lettered and coloured as in the hangar's power view (Steady cyan; each
+ * Surge bank violet, S1, S2...), and one for the
  * core's own store. A circuit that browns out this tick (it can't give all that's asked of it) flashes red, bar or not.
  * Shown only when there's more than the one store to tell apart (the gauge says it all for a ship with one).
  */
 
 import { BROWNOUT, circuitCharges, type Charge, type ShipDerived } from '@space-game/common';
-import { circuitColor, DEAD_NET } from '../ships/wireEdit';
+import { circuitColor, DEAD_NET, SURGE_COLOR } from '../ships/wireEdit';
 import { setStyle, setText } from './domWrite';
 
 const CSS = `
@@ -25,7 +26,7 @@ const CSS = `
 export class CircuitBars {
   private wrap: HTMLElement | null = null;
   private sig = '';
-  private bars: { el: HTMLElement; fill: HTMLElement; circuit: number }[] = [];
+  private bars: { el: HTMLElement; fill: HTMLElement; circuit: number; key: string }[] = [];
 
   constructor() {
     const hud = document.getElementById('boostHud'), bar = document.getElementById('boostBar');
@@ -45,11 +46,14 @@ export class CircuitBars {
   update(d: ShipDerived | null | undefined, c: Charge): void {
     if (!this.wrap) return;
     const all = d?.power ? circuitCharges(d, c) : [];
-    // (stores on no circuit at all aren't shown: the hangar warns of them)
-    const shown = all.filter((x) => x.cap > 0 && (x.circuit < 0 || d!.power!.circuits[x.circuit].net >= 0));
+    // (a Surge bank by its own key: it shares its circuit's number)
+    const key = (x: (typeof all)[number]) => (x.bank !== undefined ? `k${x.bank}` : `c${x.circuit}`);
+    // (stores on no circuit at all aren't shown, but for Surge banks: the hangar warns of them)
+    const shown = all.filter((x) => x.cap > 0 && (x.bank !== undefined || x.circuit < 0 || d!.power!.circuits[x.circuit].net >= 0));
     const lettered = d?.power?.circuits.filter((x) => x.letter).length ?? 0;
     const visible = shown.length >= 2 || lettered >= 2;
-    const sig = visible ? shown.map((x) => `${x.letter}:${x.circuit}:${x.circuit >= 0 && d!.power!.circuits[x.circuit].generators.length ? 1 : 0}`).join('|') : '';
+    const powered = (x: (typeof all)[number]) => x.circuit >= 0 && d!.power!.circuits[x.circuit].generators.length > 0;
+    const sig = visible ? shown.map((x) => `${key(x)}:${x.letter}:${powered(x) ? 1 : 0}`).join('|') : '';
     if (sig !== this.sig) {
       this.sig = sig;
       this.wrap.innerHTML = '';
@@ -57,11 +61,11 @@ export class CircuitBars {
       for (const x of visible ? shown : []) {
         const el = document.createElement('div');
         el.className = 'cb';
-        // (as the hangar has it: a circuit with no generator grey, the core's store pale)
-        const col = x.circuit < 0 ? '#cbd5e1' : d!.power!.circuits[x.circuit].generators.length ? circuitColor(x.letter) : DEAD_NET;
-        el.innerHTML = `<div class="cb-bar"><div class="cb-fill" style="background:${col}"></div></div><span class="cb-l" style="color:${col}">${x.circuit < 0 ? '◆' : x.letter}</span>`;
+        // (as the hangar has it: Steady cyan, a Surge bank violet, a circuit with no generator grey, the core's store pale)
+        const col = x.bank !== undefined ? SURGE_COLOR : x.circuit < 0 ? '#cbd5e1' : powered(x) ? circuitColor(x.letter) : DEAD_NET;
+        el.innerHTML = `<div class="cb-bar"><div class="cb-fill" style="background:${col}"></div></div><span class="cb-l" style="color:${col}">${x.circuit < 0 && x.bank === undefined ? '◆' : x.letter}</span>`;
         this.wrap.appendChild(el);
-        this.bars.push({ el, fill: el.querySelector('.cb-fill') as HTMLElement, circuit: x.circuit });
+        this.bars.push({ el, fill: el.querySelector('.cb-fill') as HTMLElement, circuit: x.circuit, key: key(x) });
       }
     }
     if (!visible || !d?.power) return;
@@ -72,13 +76,13 @@ export class CircuitBars {
       share.set(f.circuit, Math.min(share.get(f.circuit) ?? 1, v));
     });
     for (const b of this.bars) {
-      const x = all.find((y) => y.circuit === b.circuit);
+      const x = all.find((y) => key(y) === b.key);
       if (!x) continue;
       setStyle(b.fill, 'height', `${x.pct.toFixed(1)}%`);
-      const brown = b.circuit >= 0 && (share.get(b.circuit) ?? 1) < BROWNOUT;
+      const bank = x.bank !== undefined;
+      const brown = !bank && b.circuit >= 0 && (share.get(b.circuit) ?? 1) < BROWNOUT;
       b.el.classList.toggle('brown', brown);
-      setText(b.el.querySelector('.cb-l'), b.circuit < 0 ? '◆' : x.letter);
-      b.el.title = b.circuit < 0 ? `The core's store: ${Math.round(x.pct)}% of ${Math.round(x.cap)}` : `Circuit ${x.letter}: ${Math.round(x.pct)}% of ${Math.round(x.cap)}${brown ? ' · browning out' : ''}`;
+      b.el.title = bank ? `Surge bank ${x.letter}: ${Math.round(x.pct)}% of ${Math.round(x.cap)}` : b.circuit < 0 ? `The core's store: ${Math.round(x.pct)}% of ${Math.round(x.cap)}` : `Circuit ${x.letter}: ${Math.round(x.pct)}% of ${Math.round(x.cap)}${brown ? ' · browning out' : ''}`;
     }
   }
 }

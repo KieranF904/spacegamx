@@ -10,6 +10,7 @@
  *   J  jump drive: spool up, then fly far and fast along the nose (J again aborts)
  */
 
+import { stepPointDefenceAim, pointDefenceOf } from '@space-game/common';
 import { payMining, gunLoad, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, warmthStage, withNumb, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules } from '@space-game/common';
 import hazardData from '../../../data/hazards.json';
 
@@ -23,12 +24,15 @@ import {
   jumpFieldAt, fieldRangeBoost, fieldCharge, primeBoost, pilotJumpStep, withEmp, lodestonePosition, type JumpField, type LodestoneData,
   ShipReplicaSet, ServerSnapshotMessage, packCursorWeaponState, rebuildVolley, WEAPON_KIND_TYPE, EntityState, accelAlong, turnAccel, rateShip, stepGuns, volleyShells, firesStraight, partWeaponDef,
   anchorTuning, bracePhase, canBrace, type BracePhase,
+  dodgeCharges, dodgePhase, strafeForce, pilotExtras, canTow, cargoThrust,
 } from '@space-game/common';
 import type { MenuShipInfo } from '../ui/GameMenuUI';
 import type { GameState, InterpolatedEntity } from '../state/GameState';
 import type { Renderer } from '../rendering/Renderer';
 import { ShipStore } from './ShipStore';
 import { BraceIndicator } from '../ui/BraceIndicator';
+import { DodgeIndicator } from '../ui/DodgeIndicator';
+import { TowIndicator } from '../ui/TowIndicator';
 import { ShipRenderer } from './ShipRenderer';
 import { ShipHud } from './ShipHud';
 import type { HangarUI } from './HangarUI';
@@ -135,6 +139,13 @@ export class ShipClient {
   /** Stabiliser Anchor: the brace toggle (anchor.ts); the server and prediction step the counter from it */
   private braceLatched = false;
   private braceUi = new BraceIndicator();
+  /** Burst Strafer (strafer.ts): the dodge held this press (-1 left, +1 right, 0 none), since when, and the last side dodged */
+  private dodgeLatch = 0;
+  private dodgeAt = 0;
+  private lastDodge = 1;
+  private dodgeUi = new DodgeIndicator();
+  /** Tow Beam (tow.ts): its chip */
+  private towUi = new TowIndicator();
   private lastFrame = 0;
   /** The local jump charge sound, so an abort can cut it */
   private chargeSound: (() => void) | null = null;
@@ -295,6 +306,8 @@ export class ShipClient {
     e.angVel = 0;
     // (Its anchor: the brace effect, ShipRenderer)
     e.brace = p.brace;
+    // (Its Burst Strafer's dodge: the jet, ShipRenderer)
+    e.dodge = p.dodge;
     if (e.type === EntityType.Player) {
       // Rebuild the per-pilot data the effects read (see the server's player snapshot row)
       const s = e.status ?? [];
@@ -526,6 +539,75 @@ export class ShipClient {
     return this.braceLatched;
   }
 
+  // ---- Burst Strafer (common/src/ships/strafer.ts) and Tow Beam (tow.ts)
+  /**
+   * The dodge control this input tick: -1 left, +1 right, 0 none. A press of the dodge key (Space, rebindable) asks for one
+   * burst, to the side you're steering (WASD on screen, or Q/E at the helm, turned into the ship's frame); with no side
+   * held, the other way from your last dodge (so tapping it weaves), or the only side your strafers push. It's held for at
+   * least a few ticks so the server sees it, then until the key's let go (one burst a press: strafer.ts stepDodge).
+   */
+  dodgeControl(): number {
+    const held = !this.hangarOpen && (this.opts.inputEnabled?.() ?? true) && this.opts.isKeyDown('Space');
+    const now = performance.now();
+    if (!held) {
+      if (this.dodgeLatch && now - this.dodgeAt > 120) this.dodgeLatch = 0;
+      return this.dodgeLatch;
+    }
+    if (this.dodgeLatch) return this.dodgeLatch;
+    const ship = this.store.get(this.opts.state.playerId), me = this.opts.state.entities.get(this.opts.state.playerId);
+    if (!ship || ship.kind !== 'ship' || !me) return 0;
+    const s = ship.derived.strafe;
+    if (!s) {
+      if (now - this.dodgeAt > 1500) { this.dodgeAt = now; this.opts.showMessage(ship.derived.power?.feedOf && ship.blueprint.parts.some((p) => this.opts.catalog.functions.get(p.fn)?.strafe) ? 'The Burst Strafers have no power, or none points sideways' : 'No Burst Strafer fitted: build one in the hangar to dodge', '#f2d24b'); }
+      return 0;
+    }
+    const k = (...codes: string[]) => (codes.some((c) => this.opts.isKeyDown(c)) ? 1 : 0);
+    let lx: number;
+    if (this.helm) lx = k('KeyE') - k('KeyQ');
+    else {
+      const sx = k('KeyD', 'ArrowRight') - k('KeyA', 'ArrowLeft'), sy = k('KeyS', 'ArrowDown') - k('KeyW', 'ArrowUp');
+      const m = Math.hypot(sx, sy);
+      lx = m > 0 ? worldToLocalDir([sx / m, sy / m], me.angle)[0] : 0;
+    }
+    let side = Math.abs(lx) > 0.25 ? Math.sign(lx) : -this.lastDodge;
+    const can = (v: number) => strafeForce(s, v) > 0;
+    if (!can(side)) side = can(-side) ? -side : 0;
+    if (!side) return 0;
+    const c = dodgeCharges(s, me.dodgeSpent);
+    if (c.ready <= 0) return 0;
+    this.dodgeLatch = side;
+    this.dodgeAt = now;
+    this.lastDodge = side;
+    return side;
+  }
+
+  /** Your strafers' charges (predicted), for the HUD: null without any */
+  localDodge(): { ready: number; max: number; refill: number; bursting: boolean; sides: string } | null {
+    const ship = this.store.get(this.opts.state.playerId), me = this.opts.state.entities.get(this.opts.state.playerId);
+    const s = ship && ship.kind === 'ship' ? ship.derived.strafe : undefined;
+    if (!s || !me) return null;
+    const c = dodgeCharges(s, me.dodgeSpent);
+    const l = s.left.length > 0, r = s.right.length > 0;
+    return { ...c, bursting: dodgePhase(me.dodge, s.ticks).phase === 'burst', sides: l && r ? '' : l ? '← only' : '→ only' };
+  }
+
+  /** What your Tow Beam tows (an entity id), if anything (the server says: strafer.ts pilotExtras) */
+  localTow(): number | undefined {
+    const me = this.opts.state.entities.get(this.opts.state.playerId);
+    const t = pilotExtras(me?.data).tow;
+    return t > 0 ? t - 1 : undefined;
+  }
+
+  /** The tow key (U): take hold of what's nearest the cursor, or let go */
+  private toggleTow(): void {
+    const ship = this.store.get(this.opts.state.playerId);
+    if (this.localTow() !== undefined) { this.opts.send({ type: 'tow', on: false }); return; }
+    if (!ship || ship.kind !== 'ship' || !ship.derived.tow) { this.opts.showMessage('No Tow Beam fitted: build one in the hangar to tow', '#f2d24b'); return; }
+    if (!canTow(ship.derived)) { this.opts.showMessage('The Tow Beam has no power', '#f2d24b'); return; }
+    this.opts.send({ type: 'tow', on: true });
+  }
+  // ---- (end Burst Strafer and Tow Beam)
+
   /** Your ship has a working Stabiliser Anchor */
   localCanBrace(): boolean {
     const ship = this.store.get(this.opts.state.playerId);
@@ -649,6 +731,12 @@ export class ShipClient {
         return true;
       case 'detonation':
         this.damageFx?.onDetonation(msg.kind, msg.x, msg.y, msg.radius, msg.from);
+        return true;
+      case 'intercept':
+        // Point defence fired (support.ts): its tracer and the shot popping; the shell's own tracer stops there; the turret turns to it
+        this.damageFx?.onIntercept(msg);
+        if (msg.down) this.scene?.showProjectileHit(msg.proj, msg.x, msg.y);
+        this.pdAim.set(msg.bodyId * 1024 + msg.part, { x: msg.x, y: msg.y, at: performance.now() });
         return true;
       case 'stationFire':
         const shot = this.scene?.stationFire(msg.station, msg.turret ?? 0, msg.target);
@@ -802,6 +890,10 @@ export class ShipClient {
       this.helm = !this.helm;
       return true;
     }
+    if (code === 'KeyU') {
+      this.toggleTow();
+      return true;
+    }
     if (code === 'KeyY') {
       const ship = this.store.get(this.opts.state.playerId);
       if (this.braceLatched) this.braceLatched = false;
@@ -861,7 +953,7 @@ export class ShipClient {
       return charge;
     }
     // (The anchor's counter and the hold's mass, as the server flies them: anchor.ts, load.ts)
-    const body = { x: player.x, y: player.y, vx: player.vx, vy: player.vy, angle: player.angle, angVel: player.angVel ?? 0, jump: player.jump ?? 0, jumpScale: player.jumpScale, brace: player.brace ?? 0, cargo: player.cargoMass ?? 0 };
+    const body = { x: player.x, y: player.y, vx: player.vx, vy: player.vy, angle: player.angle, angVel: player.angVel ?? 0, jump: player.jump ?? 0, jumpScale: player.jumpScale, brace: player.brace ?? 0, cargo: player.cargoMass ?? 0, dodge: player.dodge ?? 0, dodgeSpent: player.dodgeSpent ?? 0 };
     // Hit by an EMP (or frozen through): the drive crippled and no jump starting, exactly as the server has it (ShipBridge.stepMovement)
     const emp = tick < (player.empUntil ?? 0);
     // (and numb with cold, a sluggish drive: warmth.ts, from the warmth the server tells)
@@ -875,8 +967,8 @@ export class ShipClient {
           forward: input.forward, backward: input.backward, left: input.left, right: input.right,
           boost: input.boost, targetAngle: input.targetAngle,
           helm: input.helm, strafeLeft: input.strafeLeft, strafeRight: input.strafeRight, jump: input.jump && !emp,
-          jumpDist: input.cursorDist, brace: input.brace,
-        }, ship.derived, this.opts.tuning, { charge, drainRate: 1, load: gunLoad(ship, tick) }, this.gravity, rangeBoost, emp ? withEmp(hazard) : hazard, this.terrain);
+          jumpDist: input.cursorDist, brace: input.brace, dodge: input.dodge ?? 0,
+        }, ship.derived, this.opts.tuning, { charge, drainRate: 1, load: gunLoad(ship, tick), tick }, this.gravity, rangeBoost, emp ? withEmp(hazard) : hazard, this.terrain);
       });
     player.jumpScale = body.jumpScale;
     player.x = body.x;
@@ -887,6 +979,8 @@ export class ShipClient {
     player.angVel = body.angVel;
     player.jump = body.jump;
     player.brace = body.brace;
+    player.dodge = body.dodge ?? 0;
+    player.dodgeSpent = body.dodgeSpent ?? 0;
     return res.charge;
   }
 
@@ -932,7 +1026,7 @@ export class ShipClient {
     const ticks = Math.min(4, Math.floor((now - this.lastTurretFrame) / (1000 / 60)));
     if (ticks > 0) {
       this.lastTurretFrame = now;
-      for (let t = 0; t < ticks; t++) this.stepTurretVisuals();
+      for (let t = 0; t < ticks; t++) { this.stepTurretVisuals(); this.stepPointDefenceVisuals(now); }
     }
 
     this.renderer?.update();
@@ -949,6 +1043,14 @@ export class ShipClient {
     const brace = this.localBrace();
     const at = anchorTuning(this.opts.tuning);
     this.braceUi.update(this.hangarOpen || !brace.fitted ? null : brace, boundKeyName('brace', settings.data.bindings), `guns +${Math.round(at.range * 100)}% reach`);
+    // The Burst Strafer's charges, and the Tow Beam's chip while it tows
+    this.dodgeUi.update(this.hangarOpen ? null : this.localDodge(), boundKeyName('dodge', settings.data.bindings));
+    const towed = this.hangarOpen ? undefined : this.localTow();
+    const towShip = this.store.get(state.playerId);
+    this.towUi.update(towed === undefined || !towShip ? null : {
+      what: state.entities.get(towed)?.type === EntityType.DroppedItem ? 'pod' : 'wreck',
+      thrustLoss: 1 - cargoThrust(towShip.derived, me?.cargoMass ?? 0),
+    }, boundKeyName('tow', settings.data.bindings));
     this.damageFx?.update(dt);
     this.beamFx?.update(dt);
     this.bossFx?.update(dt);
@@ -991,6 +1093,35 @@ export class ShipClient {
     if (text) setHtml(this.repairHint, text);
   }
 
+  /** Point-defence turrets' last shots, by ship × 1024 + part: where to point (they aim themselves: support.ts) */
+  private pdAim = new Map<number, { x: number; y: number; at: number }>();
+
+  /**
+   * Point-defence turrets don't follow the cursor: each turns to where it last fired (an `intercept`), and back to rest
+   * a moment after (the server aims them; this is only how they look)
+   */
+  private stepPointDefenceVisuals(now: number): void {
+    const { state, tuning } = this.opts;
+    for (const [key, a] of this.pdAim) if (now - a.at > 900) this.pdAim.delete(key);
+    for (const [id, ship] of this.store.bodies) {
+      if (ship.kind !== 'ship') continue;
+      for (const w of ship.derived.weapons) {
+        const def = tuning.weapons?.[w.kind];
+        if (!def?.pointDefence || !w.window) continue;
+        const e = state.entities.get(id);
+        if (!e) continue;
+        const pose = { x: e.renderX, y: e.renderY, angle: e.renderAngle };
+        const a = this.pdAim.get(id * 1024 + w.part);
+        let local: number | undefined;
+        if (a) {
+          const [px, py] = shipPointToWorld(ship, pose, w.window.pivot, tuning.cellSize);
+          local = Math.atan2(a.y - py, a.x - px) - (pose.angle + Math.PI / 2);
+        }
+        ship.aim[w.part] = stepPointDefenceAim(w.window, ship.aim[w.part], local, tuning, pointDefenceOf(def).slew).offset;
+      }
+    }
+  }
+
   private stepTurretVisuals(): void {
     const { state } = this.opts;
     for (const [id, ship] of this.store.bodies) {
@@ -1009,7 +1140,8 @@ export class ShipClient {
       const pose = { x: e.renderX, y: e.renderY, angle: e.renderAngle };
       const ax = pose.x + Math.cos(angle) * dist, ay = pose.y + Math.sin(angle) * dist;
       for (const w of ship.derived.weapons) {
-        if (!w.window) continue;
+        // (Point defence aims itself: stepPointDefenceVisuals)
+        if (!w.window || this.opts.tuning.weapons?.[w.kind]?.pointDefence) continue;
         let worldAngle = angle;
         if (dist > 0) {
           const [px, py] = shipPointToWorld(ship, pose, w.window.pivot, this.opts.tuning.cellSize);

@@ -554,6 +554,8 @@ const FAMILY: Record<string, string> = {
   cannon: 'cannon_pip', autocannon: 'autocannon_rattler', flak: 'flak_burst', mortar: 'mortar_lobber', laser: 'laser_glint',
   pulse: 'pulse_strobe', missile: 'missile_dart', railgun: 'railgun_needle', emp: 'emp_hush', arc: 'arc_spark',
   torpedo: 'torpedo_eel', lance: 'lance_lance',
+  // (Support weapons, common/src/ships/support.ts: the Repair Beam an emitter in its own green, point defence a quick little autocannon)
+  repair: 'laser_glint', point_defence: 'autocannon_rattler',
 };
 const designOf = (id: GunId): Design => DESIGNS[id.model] ?? DESIGNS[id.family] ?? DESIGNS[FAMILY[id.family] ?? 'cannon_pip'];
 
@@ -605,6 +607,7 @@ const HOUSING: Record<string, Housing> = {
   cannon: 'casemate', autocannon: 'casemate', flak: 'casemate', mortar: 'well', torpedo: 'bay',
   laser: 'emitter', pulse: 'emitter', frostbite: 'emitter', prism: 'emitter', phase: 'emitter', cinder_bloom: 'emitter', singularity: 'emitter', exotic: 'emitter',
   railgun: 'spinal', lance: 'spinal', missile: 'bay', hive: 'bay', demolition: 'bay', emp: 'socket', arc: 'socket',
+  repair: 'emitter', point_defence: 'casemate',
 };
 export const housingOf = (fn: string): Housing => HOUSING[gunId(fn).family] ?? 'casemate';
 
@@ -615,5 +618,6 @@ const TURRET_BASE: Record<string, TurretBase> = {
   autocannon: 'round', flak: 'lugged', hive: 'lugged', mortar: 'tub',
   laser: 'stalk', pulse: 'stalk', frostbite: 'stalk', cinder_bloom: 'stalk', prism: 'stalk', phase: 'stalk', singularity: 'stalk', exotic: 'stalk',
   emp: 'braced', arc: 'braced',
+  repair: 'stalk', point_defence: 'round',
 };
 export const turretBaseOf = (fn: string): TurretBase => TURRET_BASE[gunId(fn).family] ?? 'ring';

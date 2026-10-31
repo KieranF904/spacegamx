@@ -225,6 +225,8 @@ export interface EnemyHost {
   stationBeam(num: number, station: number, target: number, turret: number): void;
   /** The other members of a player's party (entities), for shared kills */
   partyOf?(player: number): number[];
+  /** Pilots who've been mending this one (Repair Beams: game/Support.ts): they share its kills as its party does */
+  supportersOf?(player: number): number[];
   /** Docked, or in a station's docking ring: hostiles leave them be */
   sheltered?(player: number): boolean;
   /** An arrival's effect: a gate spooling up (`warning`), or a ship coming through (`warpIn`) / launching (`launch`) */
@@ -1269,12 +1271,18 @@ export class Enemies {
     // The killer's party nearby shares the kill (XP, some credits, and it counts for their jobs);
     // other helpers nearby get a share of the XP
     const party = new Set(killer !== undefined && this.alive(killer) ? this.host.partyOf?.(killer) ?? [] : []);
+    const support = new Set(killer !== undefined && this.alive(killer) ? this.host.supportersOf?.(killer) ?? [] : []);
     for (const p of this.host.players(num)) {
       if (p === killer) continue;
       const d = Math.hypot(Position.x[p] - x, Position.y[p] - y);
       if (party.has(p) && d < PARTY_SHARE_RANGE) {
         this.host.reward(p, Math.round(pay.xp * k * 0.75), Math.round(pay.credits * k * 0.4), true, label);
         this.host.questKill(p, e.type, e.faction);
+        continue;
+      }
+      // (Support credit: whoever kept the killer flying shares the kill's pay as its party does, not its job steps)
+      if (support.has(p) && d < PARTY_SHARE_RANGE) {
+        this.host.reward(p, Math.round(pay.xp * k * 0.75), Math.round(pay.credits * k * 0.4), true, label);
         continue;
       }
       if (d > 3000) continue;

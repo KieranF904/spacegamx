@@ -8,7 +8,7 @@ import { join } from 'path';
 import { autoWire, createShipState, isNeighbour, placeGeometry, wireCells, cellKey, type Blueprint, type WireSeg } from '@space-game/common';
 import { loadShipConfigFromDisk } from '../../../server/src/ships/loadShipConfig';
 import { createShipBridge } from '../../../server/src/proto/createProtoServer';
-import { DEAD_NET, NET_COLORS, eraseRun, layRun, powerReport, pruneWires, stepCells, whereOnShip, wireBill, type Cell } from './wireEdit';
+import { DEAD_NET, STEADY_COLOR, eraseRun, layRun, powerReport, pruneWires, stepCells, whereOnShip, wireBill, type Cell } from './wireEdit';
 
 const bridge = createShipBridge(loadShipConfigFromDisk(join(__dirname, '../../../data')));
 const { catalog, tuning } = bridge;
@@ -81,13 +81,14 @@ describe('laying wire', () => {
 });
 
 describe('the power overlay', () => {
-  it('an auto-wired design has every power part on a powered network, in the first colour', () => {
+  it('an auto-wired design has every power part on a powered circuit, A, in the Steady colour', () => {
     const bp = testShip();
     const r = report(bp);
     expect(r.warnings).toEqual([]);
-    expect(r.nets.filter((n) => n.powered).map((n) => n.color)).toEqual([NET_COLORS[0]]);
+    expect(r.nets.filter((n) => n.powered).map((n) => n.color)).toEqual([STEADY_COLOR]);
+    expect(r.nets.filter((n) => n.powered).map((n) => n.letter)).toEqual(['A']);
     expect(r.nets[0].generators.length).toBe(1);
-    expect(r.seg.every((c) => c === NET_COLORS[0])).toBe(true);
+    expect(r.seg.every((c) => c === STEADY_COLOR)).toBe(true);
     expect(autoWire(bp, catalog).length).toBe(r.seg.length);
   });
 
@@ -118,14 +119,15 @@ describe('the power overlay', () => {
     expect(r.weak.some((w) => w.cuts.includes(gun) && /Pip/.test(w.text))).toBe(true);
   });
 
-  it('two generators wired apart make two networks, each its own colour; one with no generator is grey', () => {
+  it('two generators wired apart make two circuits, each its own letter in the Steady colour; one with no generator is grey', () => {
     const bp = testShip();
     bp.parts.push({ uid: 7, piece: 'sq', fn: 'power_cell_reactor', material: 'alloy', x: -3, y: 1, rot: 0, flip: false });
     bp.wires = [[0, 1, 0, 2], [0, 2, 0, 3]];
     const r = report(bp);
     const powered = r.nets.filter((n) => n.powered);
     expect(powered.length).toBe(2);
-    expect(new Set(powered.map((n) => n.color)).size).toBe(2);
+    expect(new Set(powered.map((n) => n.letter)).size).toBe(2);
+    expect(powered.every((n) => n.color === STEADY_COLOR)).toBe(true);
     // (the second generator sits beside the gun: plugged straight in)
     const gun = bp.parts.findIndex((p) => p.fn === 'cannon_pip');
     expect(r.part[gun]).toBe('powered');

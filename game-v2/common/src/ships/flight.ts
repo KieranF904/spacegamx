@@ -8,8 +8,10 @@ import type { Vec2 } from './types.js';
 import type { ShipDerived } from './rebuild.js';
 import type { ShipTuning } from './tuning.js';
 import { capCharge, powerTick, thrustShare, type Charge } from './energy.js';
+import { surgeKick, surgeTuning } from './surge.js';
 import { anchorTuning, canBrace, isBraced, stepBrace } from './anchor.js';
 import { cargoThrust, cargoTurn } from './load.js';
+import { dodgeLoad, stepDodge, strafeForce } from './strafer.js';
 
 /** A boss's fastest turn (radians a tick; Blueprint `turn`): a hull the size of a station doesn't whip round */
 const BOSS_SPIN = 0.04;
@@ -27,6 +29,9 @@ export interface FlightBody {
   brace?: number;
   /** Mass of the cargo in the hold (load.ts): carried, not stepped; absent = 0 */
   cargo?: number;
+  /** Burst Strafer (strafer.ts stepDodge): the dodge counter (signed: its side) and the charge spent (ticks); absent = 0 */
+  dodge?: number;
+  dodgeSpent?: number;
 }
 
 export interface FlightControls {
@@ -47,6 +52,8 @@ export interface FlightControls {
   jumpDist?: number;
   /** Stabiliser Anchor: braced while held (the client latches it from a toggle key) */
   brace?: boolean;
+  /** Burst Strafer: held to dodge, -1 left or +1 right of the ship (0 / absent: none); one burst a press (strafer.ts) */
+  dodge?: number;
 }
 
 export interface FlightConstants {
@@ -360,7 +367,7 @@ export function stepFlight(
   d: ShipDerived,
   tuning: ShipTuning,
   /** The charge, whether it's accounted (drainRate 0: not), and what the guns and mining lasers draw this tick per feed group (energy.ts gunLoad) */
-  boost: { charge: Charge; drainRate: number; load?: ArrayLike<number> },
+  boost: { charge: Charge; drainRate: number; load?: ArrayLike<number>; tick?: number },
   k: FlightConstants,
 ): FlightResult {
   const ft = tuning.flight;
@@ -446,6 +453,9 @@ export function stepFlight(
   }
   // Spooling the drive takes the engines: the ship can still aim, but brakes instead of thrusting (so does the anchor, out or spooling)
   if (charging || anchored) ix = iy = 0;
+  // --- Burst Strafer (strafer.ts): a sharp sideways burst, a charge a press (not while the drive spools or the anchor's out)
+  const dodgeSide = d.strafe || body.dodge || body.dodgeSpent ? stepDodge(body, input.dodge ?? 0, d.strafe, charging || anchored) : 0;
+  let dodgeShare = 1;
   const mag = Math.hypot(ix, iy);
   let accel = 0;
   let charge = boost.charge;
@@ -454,18 +464,24 @@ export function stepFlight(
   // ever), then the guns and mining lasers (`boost.load`); what's left charges each circuit's stores. (drainRate 0: no accounting,
   // as for pilotless ships)
   const thrusting = mag > 0 && d.mass > 0;
-  let power = 1, canBoost = !!input.boost;
+  let power = 1, canBoost = !!input.boost, kickDv = 0;
   if (boost.drainRate > 0 && d.energy) {
     // A hazard that saps the batteries: they hold only so much
     const cap = k.hazard ? Math.round(100 * k.hazard.cap * 1000) / 1000 : 100;
     const dir = thrusting ? worldToLocalDir([ix / mag, iy / mag], body.angle) : undefined;
-    const pt = powerTick(d, capCharge(d, boost.charge, cap), { thrusting, boosting: !!input.boost, load: boost.load }, tuning);
+    const pt = powerTick(d, capCharge(d, boost.charge, cap), { thrusting, boosting: !!input.boost, load: boost.load, dodge: dodgeSide ? dodgeLoad(d, dodgeSide) : undefined }, tuning);
     charge = pt.charge;
+    dodgeShare = pt.dodge ?? 1;
     canBoost = pt.boost;
     // (Each engine pushes on its own circuit's share: a browned-out circuit's engines push that much less)
     if (dir) {
       const along = (body.vx * ix + body.vy * iy) / mag;
       power = thrustShare(d, charge, dir, (rated) => ratedFade(rated, along));
+    }
+    // Surge (surge.ts): engines touching a bank kick while boosting, a dash every kickEvery ticks paid from the bank
+    if (dir && canBoost && input.boost && boost.tick !== undefined && boost.tick % surgeTuning(tuning).kickEvery === 0) {
+      const kick = surgeKick(d, charge, dir, tuning);
+      if (kick) { charge = kick.charge; kickDv = kick.dv * cargoThrust(d, cargo) * (k.hazard?.control ?? 1); }
     }
   }
   if (thrusting) {
@@ -477,8 +493,17 @@ export function stepFlight(
       accel *= d.boostFactor ?? k.boostFactor;
       isBoosting = true;
     }
-    body.vx += ix * accel;
-    body.vy += iy * accel;
+    body.vx += ix * (accel + kickDv);
+    body.vy += iy * (accel + kickDv);
+  }
+
+  // (A dodge: its strafers' push, sideways, on the ship's mass and load; short of power, that much less)
+  if (dodgeSide) {
+    const m = Math.max(d.mass, d.fullMass ?? d.mass);
+    const a = m > 0 ? ((strafeForce(d.strafe, dodgeSide) * (d.drive ?? 1)) / m) * cargoThrust(d, cargo) * dodgeShare * (k.hazard?.control ?? 1) : 0;
+    const [wx, wy] = localToWorldDir([dodgeSide, 0], body.angle);
+    body.vx += wx * a;
+    body.vy += wy * a;
   }
 
   applyGravity(body, k.gravity);

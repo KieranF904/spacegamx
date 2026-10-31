@@ -13,10 +13,12 @@ import type { Catalog } from './catalog.js';
 import type { ShipTuning } from './tuning.js';
 import { fnOutput, isEngine, markName, partDemand, partGrade, partMaterial, partSupply, partThrust, weaponBaseArea, weaponSizeFactor, weaponStrength } from './grades.js';
 import { gunDef, gunRate } from './launch.js';
+import { pointDefenceOf } from './support.js';
 import { effectiveRange } from './pulse.js';
 import type { WeaponMods } from './types.js';
 import { baseWeaponDps } from './rating.js';
 import { anchorTuning, DEFAULT_ANCHOR } from './anchor.js';
+import { towTuning, DEFAULT_TOW } from './tow.js';
 import { partArmour, weaponHit, DAMAGE_TYPES, type DamageType } from './damage.js';
 
 export interface PartStats {
@@ -36,6 +38,10 @@ export interface PartStats {
   effectiveRange?: number;
   /** Pulse lasers: a pulse's damage, and the seconds it takes to charge one */
   pulse?: { damage: number; seconds: number };
+  /** A Repair Beam: HP a second it mends into a friendly ship (support.ts; no damage, no firepower) */
+  heal?: number;
+  /** Point defence: shots a second it fires at incoming shots, and its reach (support.ts; no damage, no firepower) */
+  intercept?: { perSec: number; range: number };
   /** Power made (generators) or drawn (everything that runs on it) */
   supply?: number;
   draw?: number;
@@ -47,6 +53,10 @@ export interface PartStats {
   cargo?: number;
   /** Stabiliser Anchor (anchor.ts): braced, guns' reach and scatter (× each), shields' recharge (×), and seconds to brace and to let go */
   brace?: { reach: number; scatter: number; shieldRegen: number; braceSecs: number; releaseSecs: number };
+  /** Burst Strafer (strafer.ts): its sideways push while a burst runs (force), the burst's seconds, its charges and seconds to refill one, and the energy a burst */
+  dodge?: { force: number; secs: number; charges: number; recharge: number; energy: number };
+  /** Tow Beam (tow.ts): how far past the hull it takes hold, and how far it stretches before it snaps */
+  tow?: { range: number; snap: number };
   /** Towards the ship's rating */
   firepower: number;
   toughness: number;
@@ -91,9 +101,13 @@ export function partStats(catalog: Catalog, tuning: ShipTuning | undefined, p: {
       out.dps = baseWeaponDps(tuning, fn.weapon, interval, gun) * weaponStrength(catalog, fn, area, mat);
       out.firepower = out.dps;
       if (gun?.pulse) out.pulse = { damage: (gun.damage ?? 0) * weaponStrength(catalog, fn, area, mat), seconds: interval / 60 };
+      // (Support weapons do no damage and count nothing towards firepower: support.ts)
+      if (gun?.heal) { out.heal = gun.heal * weaponStrength(catalog, fn, area, mat); out.dps = 0; out.firepower = 0; }
+      if (gun?.pointDefence) { out.intercept = { perSec: 60 / interval, range: pointDefenceOf(gun).range }; out.dps = 0; out.firepower = 0; }
     }
     // (A bigger cannon's shells fly faster for less long: the same reach)
     if (def) out.range = def.type === 'beam' ? def.range : (def.maxSpeed ?? def.speed ?? 0) * (def.life ?? 0);
+    if (gun?.pointDefence) out.range = pointDefenceOf(gun).range;
     if (gun?.falloff) out.effectiveRange = effectiveRange(gun);
     const hit = weaponHit(fn.weapon, gun, grade);
     out.damageType = hit.type;
@@ -112,6 +126,16 @@ export function partStats(catalog: Catalog, tuning: ShipTuning | undefined, p: {
   if (fn.anchor) {
     const a = tuning ? anchorTuning(tuning) : DEFAULT_ANCHOR;
     out.brace = { reach: 1 + a.range, scatter: 1 - a.spread, shieldRegen: 1 + a.shieldRegen, braceSecs: a.braceTicks / 60, releaseSecs: a.releaseTicks / 60 };
+  }
+  // (A Burst Strafer: a dodge, not thrust: strafer.ts)
+  if (fn.strafe) {
+    const st = fn.strafe;
+    out.size = sizeName(Math.max(1, area));
+    out.dodge = { force: st.kick * area * fnOutput(fn, mat), secs: st.ticks / 60, charges: st.charges, recharge: st.recharge / 60, energy: (partDemand(fn, area, mat) * st.ticks) / 60 };
+  }
+  if (fn.tow) {
+    const t = tuning ? towTuning(tuning) : DEFAULT_TOW;
+    out.tow = { range: t.range, snap: t.snap };
   }
   return out;
 }

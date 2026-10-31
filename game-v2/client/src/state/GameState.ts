@@ -11,7 +11,7 @@
  * CRITICAL: Uses BitBuffer precision for all physics to match server exactly.
  */
 
-import { FULL_CHARGE, unpackCharge, type Charge } from '@space-game/common';
+import { FULL_CHARGE, unpackCharge, pilotExtras, type Charge } from '@space-game/common';
 import { FarShips } from './FarShips';
 import {
   ServerSnapshotMessage,
@@ -83,6 +83,9 @@ export interface InterpolatedEntity {
   warmth?: number;
   /** Stabiliser Anchor counter (local player: server data[14], then predicted; others: their replica): common/src/ships/anchor.ts */
   brace?: number;
+  /** Burst Strafer: the dodge counter and charge spent (local player: the server's, then predicted; others: their replica's dodge): ships/strafer.ts */
+  dodge?: number;
+  dodgeSpent?: number;
   /** The hold's cargo mass (local player; server data[15]: common/src/ships/load.ts): prediction flies it */
   cargoMass?: number;
   /** Other pilots: their status row (shield, EMP, beam heat, beams, cursor distance); data is rebuilt from it and their replica */
@@ -887,6 +890,8 @@ export class GameState {
     player.warmth = serverState.data?.[13] ?? 100;
     player.brace = serverState.data?.[14] ?? 0;
     player.cargoMass = serverState.data?.[15] ?? 0;
+    // (After the charge groups: the Burst Strafer's dodge and charge, strafer.ts pilotExtras)
+    { const x = pilotExtras(serverState.data); player.dodge = x.dodge; player.dodgeSpent = x.dodgeSpent; }
 
     // Reset boost fuel to server-reported value before replaying inputs.
     // Boost fuel is now in entity data[1] for every snapshot (not just playerState).

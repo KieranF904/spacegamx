@@ -175,6 +175,14 @@ export interface WeaponTuning {
   frost?: { perHit: number; ticks: number };
   /** Hits on one faction's ships (not its bosses) do `damage` times as much (an ammunition made for them: Quench Slugs on the Cinder Cult) */
   bane?: { faction: string; damage: number };
+  // --- Support weapons (support.ts: the Repair Beam and the Point Defence Turret) ---
+  /** Beam: it mends instead of hurting: HP a second into a friendly ship's damaged parts near where it lands */
+  heal?: number;
+  /** A shot of this kind can be shot down by point defence: the hits it takes (absent or 0: it can't) */
+  intercept?: number;
+  /** Point defence: fires on its own at interceptable shots within `range`, turning `slew` × a turret's rate; never on the trigger, never at ships */
+  pointDefence?: { range?: number; slew?: number };
+  // --- end support weapons ---
   /**
    * Fires ammunition: crates of `item` in the hold, `rounds` volleys a crate.
    * Out of it, the gun fires plain rounds: the same shells at `dry` (default

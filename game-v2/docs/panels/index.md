@@ -152,3 +152,50 @@ Awaiting review, not deployed. The same hand-wired test design both sides (a Spl
 | ui | hangar-power | The hangar's power view shows circuits: lettered A, B on the wires and in the POWER panel (A is the main circuit, which holds the core's store), each with what it spares, holds and can give a second. A load test (Fire / Boost / Both) plays 4 s of the ship's power and says which circuits brown out and how fast they refill (B: never). New warnings: stores with no generator, a capacitor touching nothing that draws power, and weak links (cells a single wire runs through; marked ✂ with the Wires tool). | Battery gives 600/s per cell, Heavy Bank 450, Drive Cell 1,400, Capacitor 2,000 (only into what it touches); core store 720/s to circuit A, 12/s trickle to the rest | ui/hangar-power-before.png, -after.png, hangar-power.png |
 | gameplay | hud-energy | Beside the ENERGY gauge, a thin bar for each circuit with stores (lettered and coloured as in the hangar; grey with no generator) and one for the core's store (◆). A circuit that browns out flashes red. Hidden on ships with only one store to show (the gauge says it all). | | gameplay/hud-energy-before.png, -after.png, hud-energy.png |
 | gameplay | hud-energy-closeup | The same, cropped round the gauge and enlarged 3×. | | gameplay/hud-energy-closeup-before.png, -after.png, hud-energy-closeup.png |
+
+### 2026-10-31: power types, Steady and Surge (energy Phase 2)
+
+Awaiting review, not deployed. Before is Phase 1 as committed (5896116), the same Split Sparrow test design and framing; shot on a local test server.
+
+| category | topic | what changed | numbers | files |
+|---|---|---|---|---|
+| ui | hangar-surge | Circuits are coloured by their power type: Steady cyan (A), grey with no generator (B). Capacitor banks are Surge: violet, labelled S1, S2, S3, with a zigzag to each part they feed by touch, and their own rows in the POWER panel (what they feed, what they hold, what their Pulse Dynamos make). | | ui/hangar-surge-before.png, -after.png, hangar-surge.png |
+| gameplay | hud-surge | The HUD's circuit bars: Steady circuits cyan or grey, each Surge bank its own violet bar (S1, S2, S3), the core's store pale. | | gameplay/hud-surge-before.png, -after.png, hud-surge.png |
+| gameplay | hud-surge-closeup | The same, round the gauge, enlarged 3×. | | gameplay/hud-surge-closeup-before.png, -after.png, hud-surge-closeup.png |
+
+New, after only:
+
+| category | topic | what it is | files |
+|---|---|---|---|
+| ui | hangar-surge-lancer | A test design with the three new parts: a Rail Driver fed by bank S1 (two capacitors and a Pulse Dynamo, +8/s), a Flash Screen fed by S2, an Ion Drive fed by S3 (it kicks when boosting). | ui/hangar-surge-lancer-after.png |
+| ui | tooltip-rail-driver | The Rail Driver's tooltip: its circuit, and its Surge reaction (×0.7 empty to ×1.5 full; a full bank adds a pierce and empties; fires only on a wired circuit), fed by S1. | ui/tooltip-rail-driver-after.png |
+| ui | tooltip-flash-screen | The Flash Screen's: when it breaks, its bank puts all of it back at once; fed by S2. | ui/tooltip-flash-screen-after.png |
+| ui | tooltip-pulse-dynamo | The Pulse Dynamo's: +8/s Surge into the bank it touches, no wires; its bank. | ui/tooltip-pulse-dynamo-after.png |
+
+### 2026-10-31: support weapons, the Repair Beam and the Point Defence Turret
+
+Awaiting review, not deployed. New parts, so after only. Live shots on a local in-page test server (`?proto`): a test
+design (a Sparrow T with a Point Defence Turret for its left gun and a Repair Beam above its right), a damaged second
+pilot ahead of it, and a dummy hostile's missiles launched at it from close by (so the intercept lands on screen).
+
+| category | topic | what it is | files |
+|---|---|---|---|
+| gameplay | repair-beam | Holding fire with the cursor on a damaged wingmate: a calm teal beam with motes running along it, stopping on the wingmate's hull, and green sparkles where it mends (its card: hull back up to 58%). It passes through ships it can't mend. | gameplay/repair-beam-after.png |
+| gameplay | point-defence | The Point Defence Turret (left gun) firing on its own, nothing held: a hot tracer to an incoming missile, which pops in a small flash (its warhead never goes off). The next missile is on its way at the right. | gameplay/point-defence-after.png |
+| gameplay | support-parts | The two parts as the hangar draws them (native renderer): the Repair Beam, a green emitter on a stalk (1×2, level 17), and the Point Defence Turret, a little orange rotary gun (1×1, level 10). | gameplay/support-parts-after.png |
+
+### 2026-10-31: the Burst Strafer and the Tow Beam
+
+Awaiting review, not deployed. New parts, so after only. Live shots on a throwaway local server (port 3080, memory-only
+profiles) with the client's own build: a Sparrow T fitted with a Burst Strafer on each flank (a capacitor against the
+right one) and a Tow Beam at its tail, and a Corsair wreck beside it. The native renderer doesn't draw part decor on a
+model still, so the parts' look is shown in the live close-ups instead.
+
+| category | topic | what it is | files |
+|---|---|---|---|
+| gameplay | burst-strafer-ready | The test ship at rest next to a station, zoomed in: a strafer nozzle on each flank (pink tips), the Tow Beam's emitter at the tail, and the new DODGE chip over the jump gauge with its three charge pips and the key (Space). | gameplay/burst-strafer-ready-after.png |
+| gameplay | burst-strafer-dodge | A tenth of a second into a dodge (Space, no side held, so left): the right-flank strafer fires a hot pink jet with a flash at its nozzle, speed streaks trail off the hull, the chip's border lights and one pip is spent. | gameplay/burst-strafer-dodge-after.png |
+| gameplay | burst-strafer-dodge-closeup | The same, round the ship and chip, enlarged 2×. | gameplay/burst-strafer-dodge-closeup-after.png |
+| gameplay | strafer-tug-ship | The test ship's parts close up, enlarged 2× (rough looks, reusing the engine nozzle and mining-emitter decor). | gameplay/strafer-tug-ship-after.png |
+| gameplay | tow-beam-tether | U with the cursor on the wreck, then flying right: an amber tether from the beam's mouth to the Corsair wreck, pulses running in along it, the wreck dragged behind. The TOWING chip says what it costs (−62% thrust: a Corsair weighs three times a Sparrow) and how to salvage it or let go. | gameplay/tow-beam-tether-after.png |
+| gameplay | tow-beam-chips-closeup | The two chips, enlarged 2×: TOWING WRECK and DODGE with its pips. | gameplay/tow-beam-chips-closeup-after.png |

@@ -28,10 +28,13 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
  */
 // 14 (2026-10-31): local circuits (the pilot's row carries the core's store and each store group's charge: energy.ts
 // packCharge), the Stabiliser Anchor's brace flag and dictionary entry, and the hold's cargo mass
-export const PROTOCOL_VERSION = 14;
+// 15 (2026-10-31): the Burst Strafer's dodge (input flags2 0x40/0x80, CTL.dodge bits, keyframes' dodge and charge after a
+// station slot that's -1 undocked, the pilot's row's dodge, charge and tow after the charge groups) and the Tow Beam (the
+// `tow` message, other pilots' status data[8]); both models in the dictionary
+export const PROTOCOL_VERSION = 15;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
-// (Stabiliser Anchor 2026-10-31: the input's brace flag and the anchor's dictionary entry)
-export const PROTOCOL_WIRE_HASH = '9d1a257b';
+// (Burst Strafer and Tow Beam 2026-10-31: the input's dodge bits and both models' dictionary entries)
+export const PROTOCOL_WIRE_HASH = 'a9bbc10b';
 /** WebSocket close code (and reason) for a client on another protocol version */
 export const PROTOCOL_MISMATCH_CLOSE = 4002;
 export const PROTOCOL_MISMATCH_REASON = 'version';
@@ -64,6 +67,8 @@ export interface ClientInputMessage {
   jump?: boolean;
   /** Stabiliser Anchor: true while braced (the client toggles it: ships/anchor.ts) */
   brace?: boolean;
+  /** Burst Strafer: held to dodge, -1 left or +1 right of the ship (0 / absent none: ships/strafer.ts) */
+  dodge?: number;
 }
 
 /** Cursor distance is sent in steps of this many world units, up to CURSOR_DIST_MAX */
@@ -210,6 +215,7 @@ export type ClientMessage =
   | ClientShipEditMessage
   | ClientDockMessage
   | ClientUndockMessage
+  | ClientTowMessage
   | ClientDevTeleportMessage
   | ClientDevSpawnMessage
   | ClientDevShipMessage
@@ -284,6 +290,15 @@ export interface ClientDockMessage {
 
 export interface ClientUndockMessage {
   type: 'undock';
+}
+
+/**
+ * Tow Beam (common/src/ships/tow.ts): `on` takes hold of the wreck, debris or pod nearest the cursor within reach
+ * (the input's aim and cursor distance say where), off lets go. The server answers with a toast and the snapshot
+ */
+export interface ClientTowMessage {
+  type: 'tow';
+  on: boolean;
 }
 
 /** Hangar: replace my ship with this blueprint (validated by the server; must be docked) */
@@ -727,6 +742,7 @@ export type ServerMessage =
   | ServerPartDestroyedMessage
   | ServerContactMessage
   | ServerDetonationMessage
+  | ServerInterceptMessage
   | ServerStationFireMessage
   | ServerMapDotsMessage
   | ServerIgniteMessage
@@ -996,6 +1012,23 @@ export interface ServerIgniteMessage {
   ticks: number;
 }
 
+/**
+ * Point defence (common/src/ships/support.ts) fired: part `part` of ship `bodyId` (its muzzle at fx, fy) hit shot
+ * `proj` at (x, y); `down`: that brought it down (it's gone, its warhead never went off). Sent as a plain message (no
+ * compact row: the wire tables are unchanged).
+ */
+export interface ServerInterceptMessage {
+  type: 'intercept';
+  bodyId: number;
+  part: number;
+  proj: number;
+  x: number;
+  y: number;
+  fx: number;
+  fy: number;
+  down: boolean;
+}
+
 /** A warhead went off (flak burst, missile, EMP): for effects */
 export interface ServerDetonationMessage {
   type: 'detonation';
@@ -1123,7 +1156,7 @@ const BINARY_MSG_INPUT = 0x03;
 // [5]    : flags (forward, backward, left, right, boost, fireLeft, fireRight)
 // [6-7]  : aim angle in the 13-bit cursor quantization (the client only ever sends those)
 // [8-9]  : cursorDist / CURSOR_DIST_STEP (16 bits)
-// [10]   : flags2 (strafeLeft, strafeRight, helm, jump, has targetTick, brace)
+// [10]   : flags2 (strafeLeft, strafeRight, helm, jump, has targetTick, brace, dodge, dodge to the right)
 // The tick the client was at isn't sent: nothing reads it.
 // (The old 17-byte form, type 0x01, still decodes.)
 
@@ -1155,7 +1188,8 @@ export function encodeInputBinary(msg: ClientInputMessage): ArrayBuffer {
     (msg.helm ? 0x04 : 0) |
     (msg.jump ? 0x08 : 0) |
     (msg.targetTick !== undefined ? 0x10 : 0) |
-    (msg.brace ? 0x20 : 0));
+    (msg.brace ? 0x20 : 0) |
+    (msg.dodge ? 0x40 | (msg.dodge > 0 ? 0x80 : 0) : 0));
   return buffer;
 }
 
@@ -1184,6 +1218,7 @@ export function decodeInputBinary(data: ArrayBuffer | Uint8Array): ClientInputMe
     helm: (flags2 & 0x04) !== 0,
     jump: (flags2 & 0x08) !== 0,
     brace: (flags2 & 0x20) !== 0,
+    dodge: flags2 & 0x40 ? (flags2 & 0x80 ? 1 : -1) : 0,
     cursorDist: view.getUint16(8, true) * CURSOR_DIST_STEP,
   };
 }

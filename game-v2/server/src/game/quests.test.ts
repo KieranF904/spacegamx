@@ -752,10 +752,10 @@ describe('licences and skills', () => {
     const toast = [...got].reverse().find((m) => m.type === 'toast' && /^Level 12!/.test((m as any).text)) as any;
     expect(toast.text).toMatch(/\+11 skill points/);
     for (const name of ['Twinlink', 'Reactive Armour', 'Titanium structure', 'Steel structure', 'Hammer', 'Build points']) expect(toast.text).toContain(name);
-    expect(toast.text).toMatch(/Next: Needle at Lv 13$/);
+    expect(toast.text).toMatch(/Next: Needle and Flash Screen at Lv 13$/);
     const line = [...got].reverse().find((m) => m.type === 'systemMessage' && /^Level 12/.test((m as any).text)) as any;
     expect(line.text).toContain('Unlocked: ');
-    expect(line.text).toContain('Next: Needle at Lv 13.');
+    expect(line.text).toContain('Next: Needle and Flash Screen at Lv 13.');
   });
 
   it('levels give skill points only until every skill could be full (60)', () => {

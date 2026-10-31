@@ -35,6 +35,11 @@ export interface ShipState {
   brace?: number;
   /** Mass of the cargo in its hold (load.ts), absent = 0 */
   cargo?: number;
+  /** Burst Strafer (strafer.ts): the dodge counter (signed: its side) and the charge spent (ticks), absent = 0 */
+  dodge?: number;
+  dodgeSpent?: number;
+  /** Tow Beam (tow.ts): what it's towing (an entity id), absent = nothing; the server sets it, gunLoad draws for it */
+  tow?: number;
   /** Ticks left of a stillstone's priming (jumpFields.ts stepPrime; negative: a scarred one's): the next jump reaches further */
   jumpPrime?: number;
   /** Ticks until each part (weapons) can fire again, by part index */

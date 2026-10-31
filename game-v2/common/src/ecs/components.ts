@@ -77,6 +77,8 @@ export const Input = defineComponent({
   jump: Types.ui8,
   /** Stabiliser Anchor: brace held (toggled by the client) */
   brace: Types.ui8,
+  /** Burst Strafer: dodge held, -1 left or +1 right (ships/strafer.ts) */
+  dodge: Types.i8,
   /** Ship-to-cursor distance (world units) */
   cursorDist: Types.f32,
   // Target angle for aiming

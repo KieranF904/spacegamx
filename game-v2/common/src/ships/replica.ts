@@ -49,6 +49,9 @@ export const CTL = {
   numb: 2048,
   /** Stabiliser Anchor: brace held (anchor.ts) */
   brace: 4096,
+  /** Burst Strafer: dodge held, and to the right (else left): strafer.ts */
+  dodge: 8192,
+  dodgeRight: 16384,
 } as const;
 
 export interface ReplicaControls {
@@ -59,7 +62,8 @@ export interface ReplicaControls {
 export function controlBits(c: Partial<FlightControls>): number {
   return (c.forward ? CTL.forward : 0) | (c.backward ? CTL.backward : 0) | (c.left ? CTL.left : 0) | (c.right ? CTL.right : 0)
     | (c.boost ? CTL.boost : 0) | (c.helm ? CTL.helm : 0) | (c.strafeLeft ? CTL.strafeLeft : 0) | (c.strafeRight ? CTL.strafeRight : 0)
-    | (c.jump ? CTL.jump : 0) | (c.brace ? CTL.brace : 0);
+    | (c.jump ? CTL.jump : 0) | (c.brace ? CTL.brace : 0)
+    | (c.dodge ? CTL.dodge | (c.dodge > 0 ? CTL.dodgeRight : 0) : 0);
 }
 
 export function flightControls(c: ReplicaControls, body: FlightBody): FlightControls {
@@ -69,6 +73,7 @@ export function flightControls(c: ReplicaControls, body: FlightBody): FlightCont
     boost: (b & CTL.boost) !== 0, helm: (b & CTL.helm) !== 0, strafeLeft: (b & CTL.strafeLeft) !== 0, strafeRight: (b & CTL.strafeRight) !== 0,
     jump: (b & CTL.jump) !== 0,
     brace: (b & CTL.brace) !== 0,
+    dodge: (b & CTL.dodge) !== 0 ? ((b & CTL.dodgeRight) !== 0 ? 1 : -1) : 0,
     targetAngle: (b & CTL.hold) !== 0 ? body.angle : c.targetAngle,
     // Where a jump lands isn't replicated: the burn's start brings a keyframe
     jumpDist: 0,
@@ -78,7 +83,7 @@ export function flightControls(c: ReplicaControls, body: FlightBody): FlightCont
 /** What a ship's flight depends on: two structures with the same signature fly identically */
 export function flightSignature(d: ShipDerived): string {
   const t = d.thrusters.map((x) => `${x.force[0]},${x.force[1]}`).join(';');
-  return `${d.mass}|${d.inertia}|${d.fullMass}|${d.fullInertia}|${d.drive}|${d.maneuverForce}|${d.maxTorque.cw}|${d.maxTorque.ccw}|${d.jumpRange}|${d.jumpCooldown}|${d.anchor ?? 0}|${t}`;
+  return `${d.mass}|${d.inertia}|${d.fullMass}|${d.fullInertia}|${d.drive}|${d.maneuverForce}|${d.maxTorque.cw}|${d.maxTorque.ccw}|${d.jumpRange}|${d.jumpCooldown}|${d.anchor ?? 0}|${t}|${d.strafe ? `${d.strafe.ticks},${d.strafe.charges},${d.strafe.recharge},${d.strafe.left.map((p) => p.force).join('+')},${d.strafe.right.map((p) => p.force).join('+')}` : ''}`;
 }
 
 /** (The fields: the central body's charging ring and the stillstones) */

@@ -40,6 +40,12 @@ export interface StoreGroup {
   rate: number;
   /** A bank: the consumer parts it touches */
   feeds?: number[];
+  /** A bank (energy Phase 2: surge.ts): it carries Surge; the Surge its Pulse Dynamos make a second; the shield generators it
+   *  touches (flash restore); its label (S1, S2...) */
+  type?: 'surge';
+  surge?: number;
+  shields?: number[];
+  label?: string;
 }
 
 export interface Circuit {
@@ -47,7 +53,7 @@ export interface Circuit {
   net: number;
   /** A, B, C... (the main circuit first); '' for one with nothing on it that makes, stores or draws power */
   letter: string;
-  /** The power type it carries (wave 2: steady, surge...); every circuit is steady for now */
+  /** The power type it carries: a wired circuit is Steady (Surge never travels along wires: it's a bank's, by touch) */
   type: 'steady';
   /** Its parts (the network's) */
   parts: number[];
@@ -83,6 +89,8 @@ export interface PowerLayout {
   partCap: number[];
   /** Per part: its circuit (index into circuits), -1 none */
   circuitOf: number[];
+  /** Dual-fed parts (surge.ts): part index → 'rail' (Rail Driver) or 'flash' (Flash Screen) */
+  dual: Partial<Record<number, 'rail' | 'flash'>>;
 }
 
 export interface CircuitInput {
@@ -98,6 +106,8 @@ export interface CircuitInput {
   burst: (i: number) => boolean;
   core: boolean;
   tuning: ShipTuning;
+  /** Each part's output against its health (tuning healthFactor): a damaged Pulse Dynamo makes less. Absent: all whole */
+  health?: number[];
 }
 
 /** The energy defaults (tuning.json `energy` overrides them) */
@@ -146,12 +156,15 @@ export function powerLayout(a: CircuitInput): PowerLayout {
   const joins = a.joins.filter(([x, y]) => alive[x] && alive[y]);
   const isStore = (i: number) => alive[i] && (fns[i].store ?? 0) > 0;
   const isBank = (i: number) => isStore(i) && !!fns[i].bank;
+  // (A Pulse Dynamo is part of the bank it touches: capacitors and dynamos touching each other are one Surge bank)
+  const isDynamo = (i: number) => alive[i] && (fns[i].surge ?? 0) > 0;
+  const inBank = (i: number) => isBank(i) || isDynamo(i);
   const isConsumer = (i: number) => alive[i] && (fns[i].demand ?? 0) > 0 && a.burst(i);
 
   // Banks: capacitors touching each other (union-find over the joins between them)
   const parent = Array.from({ length: n }, (_, i) => i);
   const find = (x: number): number => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
-  for (const [x, y] of joins) if (isBank(x) && isBank(y)) { const rx = find(x), ry = find(y); if (rx !== ry) parent[Math.max(rx, ry)] = Math.min(rx, ry); }
+  for (const [x, y] of joins) if (inBank(x) && inBank(y)) { const rx = find(x), ry = find(y); if (rx !== ry) parent[Math.max(rx, ry)] = Math.min(rx, ry); }
   const touching: number[][] = Array.from({ length: n }, () => []);
   for (const [x, y] of joins) { touching[x].push(y); touching[y].push(x); }
 
@@ -187,23 +200,33 @@ export function powerLayout(a: CircuitInput): PowerLayout {
     c.storeParts.push(i);
   }
   const bankRoots = new Map<number, number>();
+  const isShield = (i: number) => alive[i] && (fns[i].shield ?? 0) > 0;
   for (let i = 0; i < n; i++) {
-    if (!isBank(i)) continue;
+    if (!inBank(i)) continue;
     const r = find(i);
     let b = bankRoots.get(r);
-    if (b === undefined) { b = stores.length; bankRoots.set(r, b); stores.push({ kind: 'k', circuit: -1, parts: [], cap: 0, rate: 0, feeds: [] }); }
+    if (b === undefined) {
+      b = stores.length; bankRoots.set(r, b);
+      stores.push({ kind: 'k', type: 'surge', circuit: -1, parts: [], cap: 0, rate: 0, feeds: [], surge: 0, shields: [], label: `S${bankRoots.size}` });
+    }
     const s = stores[b];
-    s.parts.push(i); s.cap += partCap[i]; s.rate += partDischarge(fns[i], area[i], mats[i], ct);
+    s.parts.push(i);
+    if (isBank(i)) { s.cap += partCap[i]; s.rate += partDischarge(fns[i], area[i], mats[i], ct); }
+    else s.surge! += fns[i].surge! * area[i] * (a.health?.[i] ?? 1);
     storeOf[i] = b;
     // (It charges from the circuit its first wired capacitor is on)
-    if (s.circuit < 0 && circuitOf[i] >= 0) s.circuit = circuitOf[i];
-    for (const j of touching[i]) if (isConsumer(j) && !s.feeds!.includes(j)) s.feeds!.push(j);
+    if (s.circuit < 0 && isBank(i) && circuitOf[i] >= 0) s.circuit = circuitOf[i];
+    for (const j of touching[i]) {
+      if (isConsumer(j) && !s.feeds!.includes(j)) s.feeds!.push(j);
+      if (isShield(j) && !s.shields!.includes(j)) s.shields!.push(j);
+    }
   }
   for (const [, b] of bankRoots) {
     const s = stores[b];
     if (s.circuit < 0) s.circuit = looseIndex();
     for (const i of s.parts) if (circuitOf[i] < 0) circuitOf[i] = s.circuit;
     s.feeds!.sort((x, y) => x - y);
+    s.shields!.sort((x, y) => x - y);
     circuits[s.circuit].banks.push(b);
     circuits[s.circuit].storeParts.push(...s.parts);
   }
@@ -227,7 +250,8 @@ export function powerLayout(a: CircuitInput): PowerLayout {
     if (circuitOf[i] < 0) circuitOf[i] = c;
     const cc = circuits[c];
     cc.consumers.push(i);
-    if ((fns[i].thrust ?? 0) > 0) cc.engineDraw += draw[i];
+    // (A Burst Strafer is an engine that draws only while a burst runs: strafer.ts)
+    if ((fns[i].thrust ?? 0) > 0 || fns[i].strafe) cc.engineDraw += draw[i];
     else if (fns[i].weapon) cc.gunDraw += draw[i];
     else cc.minerDraw += draw[i];
   }
@@ -250,6 +274,8 @@ export function powerLayout(a: CircuitInput): PowerLayout {
     c.letter = CIRCUIT_LETTERS[next++ % CIRCUIT_LETTERS.length];
   }
 
+  const dual: PowerLayout['dual'] = {};
+  for (let i = 0; i < n; i++) if (alive[i] && fns[i].dual) dual[i] = fns[i].dual;
   const coreCap = a.core ? ((tuning as { energy?: { coreCapacity?: number } }).energy?.coreCapacity ?? 240) : 0;
   return {
     circuits,
@@ -261,5 +287,6 @@ export function powerLayout(a: CircuitInput): PowerLayout {
     draw,
     partCap,
     circuitOf,
+    dual,
   };
 }

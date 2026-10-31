@@ -134,6 +134,8 @@ import { Warmth } from './game/Warmth.js';
 import { Outpost } from './game/Outpost.js';
 import { HomeStations } from './game/HomeStations.js';
 import { LootPods, PodHost } from './game/LootPods.js';
+import { Towing, type TowKind } from './game/Towing.js';
+import { towTuning } from '@space-game/common';
 import { Mining, MiningHost } from './game/Mining.js';
 import { AsteroidOrbits } from './game/AsteroidOrbits.js';
 import { StationServices } from './game/StationServices.js';
@@ -153,6 +155,7 @@ import { Surfaces, type SurfaceHost } from './game/Surfaces.js';
 import { Sieges, type SiegeHost } from './game/Sieges.js';
 import { Hangar } from './game/Hangar.js';
 import { Party } from './game/Party.js';
+import { Support } from './game/Support.js';
 import { Trade } from './game/Trade.js';
 import { Operations } from './game/Operations.js';
 import { Market } from './game/Market.js';
@@ -724,6 +727,8 @@ export class GameServer {
   /** Each player's progress: profile, cargo, storage, saving */
   readonly pilots: Pilots;
   private pods: LootPods;
+  /** Tow Beams (game/Towing.ts) */
+  private towing!: Towing;
   private mining: Mining;
   private services: StationServices;
   private ammo!: Ammo;
@@ -752,6 +757,8 @@ export class GameServer {
   readonly sieges: Sieges;
   readonly hangar: Hangar;
   readonly party: Party;
+  /** Who's been mending whom (Repair Beams): support counts towards kills' and bosses' rewards (game/Support.ts) */
+  readonly support = new Support();
   readonly trade: Trade;
   readonly ops: Operations;
   readonly market: Market;
@@ -801,6 +808,16 @@ export class GameServer {
     this.shipEditAnywhere = opts.shipEditAnywhere ?? false;
     this.econ = new Economy(this.gameData.itemsFile, this.gameData.recipesFile, this.ships.catalog, Object.fromEntries(this.ships.library));
     this.pods = new LootPods(this.createPodHost(), this.econ.items);
+    // ---- Tow Beam (game/Towing.ts)
+    this.towing = new Towing({
+      world: this.world,
+      getTick: () => this.currentTick,
+      tell: (pilot, text, color) => { for (const c of this.clients.values()) if (c.playerId === pilot) this.send(c.ws, { type: 'systemMessage', text, color }); },
+      stationInRange: (pilot) => this.stationInRange(pilot),
+      isDocked: (pilot) => this.dockedShips.has(pilot),
+      deliver: (pilot, target, kind) => this.towDelivered(pilot, target, kind),
+    }, this.ships, this.pods, this.ships.tuning);
+    // ---- (end Tow Beam)
     this.mining = new Mining(this.createMiningHost(), this.gameData.miningTable);
     this.weapons = new Weapons({
       world: this.world,
@@ -1576,10 +1593,12 @@ this.devTeleport = opts.devTeleport ?? false;
       announce: (num: number, text: string, kind: 'info' | 'warn' | 'good' | 'bad') => {
         for (const c of this.clients.values()) if (InSystem.systemId[c.playerId] === num) this.pilots.toast(c, text, kind);
       },
-      fire: (owner: number, kind: string, x: number, y: number, angle: number, scale: number, opts?: { target?: number; speed?: number }) => {
-        // (A boss's nova punches through as its own grade does)
+      // (Support credit: game/Support.ts)
+      supportersOf: (player: number) => this.support.supporters(player, this.currentTick),
+      fire: (owner: number, kind: string, x: number, y: number, angle: number, scale: number, opts?: { target?: number; speed?: number; intercept?: boolean }) => {
+        // (A boss's nova punches through as its own grade does; `intercept: false`, point defence can't touch it: support.ts)
         const ship = this.ships.get(owner);
-        this.weapons.spawn(owner, kind, x, y, angle, scale, { speedScale: opts?.speed ?? 1, sizeScale: 1, turret: false, noBurst: true, target: opts?.target, grade: ship ? blueprintGrade(this.ships.catalog, ship.blueprint) : 1 });
+        this.weapons.spawn(owner, kind, x, y, angle, scale, { speedScale: opts?.speed ?? 1, sizeScale: 1, turret: false, noBurst: true, target: opts?.target, grade: ship ? blueprintGrade(this.ships.catalog, ship.blueprint) : 1, intercept: opts?.intercept });
       },
       warpFx: (num: number, x: number, y: number, out: boolean) => {
         this.broadcastToSystem(num, { type: 'effect', effectType: out ? EffectType.WarpOut : EffectType.WarpIn, x, y });
@@ -1834,7 +1853,27 @@ this.devTeleport = opts.devTeleport ?? false;
         const pc = this.pilots.connOf(player);
         return pc ? this.party.members(pc).filter((m) => m !== pc).map((m) => m.playerId) : [];
       },
+      // (Support credit: game/Support.ts)
+      supportersOf: (player: number) => this.support.supporters(player, this.currentTick),
     };
+  }
+
+  /**
+   * May `healer`'s Repair Beam mend `target` (common/src/ships/support.ts)? Friendly ships only: pilots and what they
+   * defend (wards), never itself, nobody docked or a person's craft; two pilots both in a PvP zone only when they're in
+   * one party. Hostiles mend nothing (no enemy carries one yet).
+   */
+  canHeal(healer: number, target: number): boolean {
+    if (healer === target) return false;
+    if (this.dockedShips.has(healer) || this.dockedShips.has(target) || this.personCraft.has(healer) || this.personCraft.has(target)) return false;
+    const aPlayer = hasComponent(this.world, Player, healer), tPlayer = hasComponent(this.world, Player, target);
+    if (!(aPlayer || this.wards.has(healer)) || !(tPlayer || this.wards.has(target))) return false;
+    if (aPlayer && tPlayer && this.inPvpZone(healer) && this.inPvpZone(target)) {
+      const a = this.pilots.connOf(healer), b = this.pilots.connOf(target);
+      const pa = a ? this.party.partyId(a) : 0;
+      return pa !== 0 && b !== undefined && this.party.partyId(b) === pa;
+    }
+    return true;
   }
 
   /** What the admin tools reach into (AdminTools.ts) */
@@ -2354,6 +2393,17 @@ this.devTeleport = opts.devTeleport ?? false;
       payRebuild: (eid, part) => this.pilots.payRebuild(eid, part),
       payRepair: (eid, hp) => this.pilots.payRepair(eid, hp, this.repairRate(eid)),
       canDamage: (a, b) => this.canDamage(a, b),
+      // --- Support weapons (common/src/ships/support.ts) ---
+      canHeal: (a, b) => this.canHeal(a, b),
+      onHeal: (healer, target, hp) => this.support.note(healer, target, hp, this.currentTick),
+      pdThreats: (eid, x, y, range, out) => this.weapons.threats(InSystem.systemId[eid], x, y, range, (owner) => owner !== eid && this.canDamage(owner, eid), out),
+      intercept: (eid, part, proj, fx, fy) => {
+        const x = Position.x[proj], y = Position.y[proj], sys = InSystem.systemId[proj];
+        const down = this.weapons.intercept(proj);
+        this.broadcastNear(sys, x, y, { type: 'intercept', bodyId: eid, part, proj, x: Math.round(x), y: Math.round(y), fx: Math.round(fx), fy: Math.round(fy), down });
+        return down;
+      },
+      // --- end support weapons ---
       invulnerable: (eid) => (this.admin?.isGod(eid) ?? false) || this.dockedShips.has(eid) || this.personCraft.has(eid) || !!this.bosses?.brainOf(eid)?.invulnerable?.(),
       takenScale: (eid) => this.bosses?.brainOf(eid)?.taken?.() ?? 1,
       stageCover: (eid) => this.bosses?.stageCover(eid),
@@ -2376,6 +2426,7 @@ this.devTeleport = opts.devTeleport ?? false;
       },
       partValue: (part) => this.econ.items.get(partItemId(part))?.value ?? 20,
       cargoMass: (eid) => this.pilots.cargoMass(eid),
+      towLoad: (eid) => this.towing?.load(eid) ?? 0,
       onRepairKit: (eid, left, total, broken) => {
         const pc = this.pilots.connOf(eid) as ClientConnection | undefined;
         if (!pc) return;
@@ -3153,6 +3204,14 @@ case 'join':
       case 'undock':
         this.undock(conn);
         break;
+      case 'tow': {
+        // Tow Beam (game/Towing.ts): take hold of what's nearest the cursor, or let go
+        const p = conn.playerId;
+        if (!hasComponent(this.world, Player, p)) break;
+        const a = Input.targetAngle[p], dist = Input.cursorDist[p];
+        this.towing.request(p, !!msg.on, { x: Position.x[p] + Math.cos(a) * dist, y: Position.y[p] + Math.sin(a) * dist });
+        break;
+      }
       case 'shipNeed': {
         // The client lost a ship's blueprint: the next snapshot sends it in full
         conn.shipSynced.delete(Number(msg.id));
@@ -3402,6 +3461,7 @@ case 'join':
     Input.helm[eid] = msg.helm ? 1 : 0;
     Input.jump[eid] = msg.jump ? 1 : 0;
     Input.brace[eid] = msg.brace ? 1 : 0;
+    Input.dodge[eid] = Math.sign(Number(msg.dodge) || 0);
     // (The binary input carries it as a uint16; a JSON one could say NaN, Infinity or a string)
     const cursorDist = Number(msg.cursorDist);
     Input.cursorDist[eid] = Number.isFinite(cursorDist) ? Math.min(65535, Math.max(0, cursorDist)) : 0;
@@ -3855,7 +3915,7 @@ case 'join':
   private releaseControls(eid: number): void {
     Input.forward[eid] = 0; Input.backward[eid] = 0; Input.left[eid] = 0; Input.right[eid] = 0;
     Input.boost[eid] = 0; Input.fireLeft[eid] = 0; Input.fireRight[eid] = 0;
-    Input.strafeLeft[eid] = 0; Input.strafeRight[eid] = 0; Input.jump[eid] = 0; Input.brace[eid] = 0;
+    Input.strafeLeft[eid] = 0; Input.strafeRight[eid] = 0; Input.jump[eid] = 0; Input.brace[eid] = 0; Input.dodge[eid] = 0;
   }
 
   // ---- Crash isolation (server robustness audit, docs/audits/server-robustness.md) ----
@@ -3908,6 +3968,8 @@ case 'join':
     
     // Run systems
     this.guard('playerMovementSystem', () => this.playerMovementSystem());
+    // (Tow Beams pull what they tow, after the pilots fly and before wrecks and pods move: game/Towing.ts)
+    this.guard('towing', () => this.towing.tick());
     this.guard('dockingSystem', () => this.dockingSystem());
     this.guard('riftSystem', () => this.riftSystem());
     // (Boost fuel is the ship's battery now: it charges in the flight step, energy.ts)
@@ -4622,6 +4684,48 @@ case 'join':
     }
   }
 
+  // ---- Tow Beam (game/Towing.ts): towed into a station's reach, a wreck, debris or a pod is salvaged into the pilot's storage
+  private towDelivered(pilot: number, target: number, kind: TowKind): void {
+    const pc = this.pilots.connOf(pilot);
+    if (!pc) return;
+    const tell = (text: string) => { for (const c of this.clients.values()) if (c.playerId === pilot) this.send(c.ws, { type: 'systemMessage', text, color: '#ffd166' }); };
+    if (kind === 'pod') {
+      const bag = this.pods.take(target);
+      if (!bag) return;
+      this.pilots.give(pc, bag, { toStorage: true, source: 'salvaged' });
+      tell('Towed in a pod: its contents are in station storage');
+      return;
+    }
+    const ship = this.ships.get(target);
+    if (!ship) return;
+    // Its structure cut up for plate (towTuning salvage of what it's made of), as a derelict's chunks are; modules aren't salvaged
+    const share = towTuning(this.ships.tuning).salvage;
+    const made: Bag = {};
+    ship.blueprint.parts.forEach((q, i) => {
+      if (!(ship.hp[i] > 0) || ship.detached[i] || !isStructural(q.fn)) return;
+      for (const [id, n] of Object.entries(this.econ.recipes.partInputs(q))) made[id] = (made[id] ?? 0) + n * share;
+    });
+    const bag: Bag = {};
+    for (const [id, n] of Object.entries(made)) if (Math.floor(n) > 0) bag[id] = Math.floor(n);
+    const slot = this.derelicts.find((d) => d.eid === target);
+    let credits = 0, name = kind === 'wreck' ? 'a wreck' : 'debris';
+    if (slot) {
+      slot.eid = -1;
+      slot.respawnTick = this.currentTick + DERELICT_RESPAWN_TICKS;
+      credits = slot.data.salvage ?? 250;
+      name = slot.data.name;
+      this.pilots.addCredits(pc, credits);
+      this.pilots.addXp(pc, Math.round(credits / 4));
+      if (slot.data.log) this.codex.unlock(pc, [slot.data.log.codex]);
+    }
+    this.ships.removeShip(target);
+    if (Object.keys(bag).length) this.pilots.give(pc, bag, { toStorage: true, source: 'salvaged' });
+    this.pilots.bumpStat(pc, 'salvaged');
+    const n = Object.values(bag).reduce((t, k) => t + k, 0);
+    tell(`Salvaged ${name}: ${n} plate to station storage${credits ? `, +${credits} credits` : ''}`);
+  }
+  // ---- (end Tow Beam)
+
   /** Whoever breaks a derelict's core gets its salvage: credits, and plate of its material */
   private onPilotlessShipDestroyed(eid: number, lastHitBy: number | undefined): void {
     const slot = this.derelicts.find((d) => d.eid === eid);
@@ -4933,6 +5037,8 @@ case 'join':
           ship?.brace ?? 0,                      // [14] Stabiliser Anchor counter (common/src/ships/anchor.ts: prediction, the HUD)
           ship?.cargo ?? 0,                      // [15] the hold's cargo mass (common/src/ships/load.ts: prediction flies it)
           ...charge.groups,                      // [16...] each store group's charge % (CHARGE_GROUPS_AT)
+          // After the groups (common/src/ships/strafer.ts pilotExtras): the Burst Strafer's dodge and charge spent, what the Tow Beam tows (+1)
+          ship?.dodge ?? 0, ship?.dodgeSpent ?? 0, this.towing.wireOf(eid),
         ],
       }, 'player', names.get(eid));
       // Everyone else: status only (motion is replicated). data: [shield %, EMP'd, beam heat (tenths), overheated,
@@ -4940,7 +5046,9 @@ case 'join':
       const status: EntityState = {
         id: eid, type: EntityType.Player, x: row.state.x, y: row.state.y, hp: row.state.hp, maxHp: row.state.maxHp,
         data: [Math.round(this.ships.shieldFraction(eid) * 20) * 5, this.ships.isEmped(eid) ? 1 : 0, Math.round(heat.heat * 10), heat.over ? 1 : 0,
-          Math.round(beam.hit * 10), this.ships.weaponBeamState(eid).on ? 1 : 0, beam.on ? 1 : 0, Math.round(Input.cursorDist[eid] / 100)],
+          Math.round(beam.hit * 10), this.ships.weaponBeamState(eid).on ? 1 : 0, beam.on ? 1 : 0, Math.round(Input.cursorDist[eid] / 100),
+          // [8] what its Tow Beam tows (entity id + 1, 0 none: game/Towing.ts)
+          this.towing.wireOf(eid)],
       };
       row.other = { state: status, key: this.internKey(-1 - eid, `${status.hp},${status.maxHp},${status.data!.join(',')}`) };
     }

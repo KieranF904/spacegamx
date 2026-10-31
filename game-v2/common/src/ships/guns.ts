@@ -17,6 +17,7 @@ import { buildShot, shipPointToWorld, type ProjectileSpec, type ShipPose } from 
 import { stepFixedGunAim, stepTurretAim } from './turret.js';
 import { SHOT_AIM_STEPS, shotAimQ } from './launch.js';
 import { BROWNOUT, feedShare, type Charge } from './energy.js';
+import { railUnheld, surgeShot } from './surge.js';
 
 export interface GunOrders {
   firing: boolean;
@@ -40,6 +41,8 @@ export interface GunShot {
   /** The aim it fired with, in SHOT_AIM_STEPS (fire events carry it) */
   aimQ: number;
   shot: ProjectileSpec;
+  /** Surge (surge.ts): pierces a full bank added (a Rail Driver's), on top of the gun's own; its damage × is in the shot's */
+  pierce?: number;
 }
 
 /** A pulse laser that starts a pulse this tick (pulse.ts): charged like a gun's reload, paid for as one shot */
@@ -102,6 +105,8 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
     // (Reloading, it loads at its circuit's share: a browned-out gun reloads slower)
     const cd0 = ship.cooldown[w.part];
     ship.cooldown[w.part] = Math.max(-MAX_WAIT, cd0 > 0 && !held(w) ? cd0 - share(w) : cd0 - 1);
+    // (Point defence reloads here, drawing its power as any gun does, but aims and fires on its own: support.ts)
+    if (weapons[w.kind]?.pointDefence) continue;
     let canFire = true;
     if (w.window) {
       let desired = w.window.center + ship.aim[w.part];
@@ -139,6 +144,8 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
     // (Waiting its turn in its group's ripple: see stagger below)
     if (!held(w) && ship.cooldown[w.part] > 0) continue;
     if (held(w) && !burns(w)) continue;
+    // (A Rail Driver fires only on a wired circuit: Steady holds its rails, surge.ts)
+    if (orders.energy && railUnheld(ship.derived, w.part)) continue;
     const cd = ship.cooldown[w.part];
     if (held(w)) {
       // (A beam pays a tick at a time: each one is a shot)
@@ -150,7 +157,13 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
     const aimQ = shotAimQ(ship.aim[w.part]);
     ship.aim[w.part] = aimQ / SHOT_AIM_STEPS;
     if (weapons[w.kind]?.type === 'beam') pulses.push({ w, aimQ });
-    else shots.push({ w, aimQ, shot: buildShot(w, ship, pose, tick, tuning) });
+    else {
+      const shot = buildShot(w, ship, pose, tick, tuning);
+      // Fed Surge by touch, it may fire a charged shot (surge.ts): harder, a packet from its bank
+      const sg = orders.energy ? surgeShot(ship.derived, orders.energy.charge, w, cd, tuning) : null;
+      if (sg) { orders.energy!.charge = sg.charge; shot.damageScale *= sg.damage; }
+      shots.push({ w, aimQ, shot, ...(sg?.pierce ? { pierce: sg.pierce } : {}) });
+    }
     // Fired on time, it keeps the fraction of a tick it was late by (so an interval of 14.3 averages 14.3); after a wait, it starts afresh
     ship.cooldown[w.part] = (cd > -1 ? cd : 0) + w.interval * (orders.slow ?? 1);
     if (weapons[w.kind]?.stagger) stagger(ship, w);

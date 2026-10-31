@@ -187,6 +187,14 @@ export interface FunctionDef {
   range?: number;
   /** Stabiliser Anchor: the ship can brace (ships/anchor.ts) */
   anchor?: boolean;
+  /**
+   * Burst Strafer (ships/strafer.ts): a dodge out of its facing's opposite side. `kick` its push per cell while a
+   * burst runs (force, as an engine's thrust), `ticks` how long a burst lasts, `charges` how many it holds, `recharge`
+   * ticks to refill one. It draws its `demand` per cell a second while a burst runs, from the bank it touches first
+   */
+  strafe?: { kick: number; ticks: number; charges: number; recharge: number };
+  /** Tow Beam (ships/tow.ts): latches onto a wreck, debris or a pod and pulls it on a tether; draws its `demand` while towing */
+  tow?: boolean;
   /** weapons: which weapon this is (data/ships/tuning.json weapons.<kind>) */
   weapon?: string;
   /**
@@ -210,6 +218,10 @@ export interface FunctionDef {
   discharge?: number;
   /** A capacitor: touching ones make one bank, which gives only to the consumers it touches (circuits.ts) */
   bank?: boolean;
+  /** A Surge generator (the Pulse Dynamo): Surge power per unit of area a second, into the bank it's part of by touch, never along wires (surge.ts) */
+  surge?: number;
+  /** Dual-fed (Steady + Surge, surge.ts): 'rail' the Rail Driver (its bank sets each shot's power), 'flash' the Flash Screen (a full restore when it breaks) */
+  dual?: 'rail' | 'flash';
   /** Must point a facing edge out (engines and weapons do anyway: this is for the rest, e.g. mining lasers) */
   facing?: boolean;
   /** A mining laser (a beam that cuts rock while the pilot mines): `miner` itself, and the models of its family */

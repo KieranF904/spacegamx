@@ -8,7 +8,7 @@
 
 import {
   Catalog, Economy, PlacedPart, ShipTuning, ShipDerived, Side, WeaponMods, Bag,
-  partStats, partItemId, placeCost, isStructural, outputOf, gradeOf, fnOutput, partGrade, partMaterial, energyTuning, circuitTuning, partDischarge, jumpTuning, coilCapacity, CORE_CARGO, PIECE_NAMES, partBuildPoints, DAMAGE_NAMES, isPowerPart, mountingWords, type DamageType } from '@space-game/common';
+  partStats, partItemId, placeCost, isStructural, outputOf, gradeOf, fnOutput, partGrade, partMaterial, energyTuning, circuitTuning, partDischarge, surgeReaction, surgeTuning, bankFor, POWER_TYPES, jumpTuning, coilCapacity, CORE_CARGO, PIECE_NAMES, partBuildPoints, DAMAGE_NAMES, isPowerPart, mountingWords, type DamageType } from '@space-game/common';
 import { costHtml } from '../ui/windowKit';
 import { jumpRatioNote } from './shipSummary';
 import { functionColor, numToCss } from './shipColors';
@@ -105,10 +105,15 @@ export function partTipHtml(p: Pick<PlacedPart, 'fn' | 'material' | 'piece'> & P
     const w = d?.weapons.find((x) => x.part === i);
     const rate = 60 / (fn.fireInterval ?? 10);
     // (A fading beam: full strength to its effective range, then weaker out to its full one)
-    html += row('Damage', `${n0(st.dps ?? 0)}/s${st.range ? ` · reach ${st.effectiveRange ? `${n0(st.effectiveRange)}, fading out to ${n0(st.range)}` : n0(st.range)}` : ''}`);
-    if (st.damageType) html += row('Hits with', `${DAMAGE_NAMES[st.damageType]} · penetration ${Math.round((st.pen ?? 1) * 10) / 10}`);
+    // (Support weapons do no damage: what they do instead, support.ts)
+    if (st.heal) html += row('Mends', `<span style="color:#5eead4">${n0(st.heal)} hp/s</span> into an ally's damaged parts where it lands · reach ${n0(st.range ?? 0)} · not your own ship, not destroyed parts`);
+    else if (st.intercept) html += row('Intercepts', `<span style="color:#fdba74">${st.intercept.perSec.toFixed(1)} shots/s</span> at missiles, torpedoes, mortar shells and seekers · reach ${n0(st.intercept.range)} · on its own, never at ships`);
+    else html += row('Damage', `${n0(st.dps ?? 0)}/s${st.range ? ` · reach ${st.effectiveRange ? `${n0(st.effectiveRange)}, fading out to ${n0(st.range)}` : n0(st.range)}` : ''}`);
+    if (st.damageType && !st.heal && !st.intercept) html += row('Hits with', `${DAMAGE_NAMES[st.damageType]} · penetration ${Math.round((st.pen ?? 1) * 10) / 10}`);
     // A pulse laser: a pulse's damage, and how long it takes to charge the next
     if (st.pulse) html += row('Pulse', `${n0(st.pulse.damage)} a pulse · charges in ${st.pulse.seconds.toFixed(1)}s · no heat`);
+    else if (st.heal) html += row('Beam', 'held while you fire · no heat · draws its power while it\'s on');
+    else if (st.intercept) html += row('Fire', 'fires itself at what comes in · a little power a shot');
     else html += row('Fire rate', `${rate >= 10 ? n0(rate) : rate.toFixed(1)}/s · ${esc(KIND[def?.type ?? ''] ?? def?.type ?? fn.weapon)}${def?.ammo ? ` · ${esc(econ.items.name(def.ammo.item))}` : ''}`);
     if (w && w.satisfaction < 0.995) html += row('Under-powered', `<span style="color:#fbbf24">${Math.round(w.satisfaction * 100)}%: fires slower</span>`);
     // (Its model's mount: not a choice)
@@ -140,7 +145,30 @@ export function partTipHtml(p: Pick<PlacedPart, 'fn' | 'material' | 'piece'> & P
     const amber = (t: string) => `<span style="color:#fbbf24">${t}</span>`;
     html += row('Circuit', !ci || ci.net < 0 ? amber(bank ? "none: it can't recharge" : "none: only the core's trickle reaches it")
       : `<b style="color:${circuitColor(ci.letter)}">${ci.letter}</b>${ci.main ? ` <span style="color:#8ea0bd; font-weight:400">(main: the core's store is on it)</span>` : ci.generators.length ? '' : ` ${amber('· no generator to charge it')}`}`);
-    if (bank) html += row('Bank', bank.feeds!.length ? `${bank.parts.length} capacitor${bank.parts.length > 1 ? 's' : ''} · feeds ${bank.feeds!.length} part${bank.feeds!.length > 1 ? 's' : ''} it touches` : '<span style="color:#fbbf24">touches nothing that draws power: it helps nothing</span>');
+    if (bank) {
+      const reach = bank.feeds!.length + (bank.shields?.length ?? 0);
+      html += row('Bank', `<b style="color:${POWER_TYPES.surge.color}">${bank.label ?? 'S'}</b> (Surge) · ${bank.parts.length} part${bank.parts.length > 1 ? 's' : ''}${reach ? ` · feeds ${reach} it touches` : ' · <span style="color:#fbbf24">touches nothing that draws power: it helps nothing</span>'}`);
+    }
+  }
+  // Surge (energy Phase 2: surge.ts): a Pulse Dynamo's output, and what any part does fed Surge by touch, and whether it is
+  if ((fn.surge ?? 0) > 0) {
+    html += row('Surge out', `<span style="color:#c4b5fd">+${n0(fn.surge! * st.area)}/s</span> into the bank it touches: no wires; it powers only what its bank touches`);
+    const L = d?.power, b = L && i >= 0 && L.storeOf[i] >= 0 ? L.stores[L.storeOf[i]] : undefined;
+    if (d && i >= 0) html += row('Bank', b ? `<b style="color:${POWER_TYPES.surge.color}">${b.label}</b> · feeds ${(b.feeds?.length ?? 0) + (b.shields?.length ?? 0)} part(s) it touches` : '—');
+  }
+  const re = surgeReaction(fn);
+  if (re) {
+    const sg = surgeTuning(tuning), pc = (v: number) => `${Math.round(v * 100)}%`;
+    const what = {
+      charged: `charged shot: after a ${(sg.pauseTicks / 60).toFixed(1)} s pause, a shot hits ×${sg.chargedDamage}, a packet from the bank`,
+      rail: `dual-fed: its bank sets its punch, ×${sg.rail.min} empty to ×${sg.rail.max} full; a full bank adds a pierce and empties. Fires only on a wired circuit`,
+      kick: `kick: boosting, a dash every ${(sg.kickEvery / 60).toFixed(2)} s, paid from the bank`,
+      flash: `flash restore: when the shield breaks, the bank puts ${pc(sg.flash.share)} back at once`,
+      screen: 'dual-fed: when it breaks, the bank puts all of it back at once',
+    }[re];
+    const b = d && i >= 0 ? bankFor(d, i) : -1;
+    const fed = d && i >= 0 ? (b >= 0 ? ` · <b style="color:${POWER_TYPES.surge.color}">fed by ${d.power!.stores[b].label}</b>` : ' · <span style="color:#8ea0bd; font-weight:400">no bank touches it</span>') : '';
+    html += row('On Surge', `<span style="color:#c4b5fd">${what}</span>${fed}`);
   }
   if (st.shield) html += row('Shield', n0(st.shield));
   if (st.cargo) html += row('Cargo', `${n0(st.cargo)} <span style="color:#8ea0bd; font-weight:400">(what you carry weighs the ship down)</span>`);
@@ -149,6 +177,18 @@ export function partTipHtml(p: Pick<PlacedPart, 'fn' | 'material' | 'piece'> & P
     html += row('Braced', `guns reach +${pct(b.reach)}, scatter −${pct(b.scatter)} · shields recharge +${pct(b.shieldRegen)} · no pulls`);
     html += row('Brace / let go', `${b.braceSecs.toFixed(2)} s / ${b.releaseSecs.toFixed(1)} s <span style="color:#fbbf24; font-weight:400">(no thrust while out)</span>`);
   }
+  // Burst Strafer (strafer.ts): a dodge, not thrust; on a design, which way it dodges
+  if (st.dodge) {
+    const o = st.dodge;
+    html += row('Dodge', `<span style="color:#f9a8d4">${o.force.toFixed(1)} push for ${o.secs.toFixed(2)} s</span> away from its nozzle · ${o.charges} charges, one back every ${o.recharge.toFixed(1)} s · <span style="color:#8ea0bd; font-weight:400">no push for cruising</span>`);
+    html += row('A burst costs', `${n0(o.energy)} energy <span style="color:#8ea0bd; font-weight:400">(from a capacitor bank it touches first)</span>`);
+    if (d && i >= 0) {
+      const s = d.strafe, side = s?.left.some((x) => x.part === i) ? 'left' : s?.right.some((x) => x.part === i) ? 'right' : '';
+      html += row('On this ship', side ? `dodges ${side}` : '<span style="color:#fbbf24">points no way sideways (or has no power): it does nothing</span>');
+    }
+  }
+  // Tow Beam (tow.ts)
+  if (st.tow) html += row('Tows', `wrecks, debris and pods within ${n0(st.tow.range)} m of your hull · snaps past ${n0(st.tow.snap)} m · into a station to salvage · <span style="color:#8ea0bd; font-weight:400">draws only while towing; never a working ship</span>`);
   if ((fn.range ?? 0) > 0 && !fn.weapon) html += row('Scan range', `${n0(fn.range!)} m`);
   // Jump coils (and the core's own): cells of hull served, and how the ship's coils stand against its hull
   const coilCells = p.fn === 'core' ? jumpTuning(tuning).coreCapacity : (fn.jumpCapacity ?? 0) * st.area;

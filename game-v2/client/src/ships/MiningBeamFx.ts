@@ -33,12 +33,13 @@ const LASER_COLORS: [number, number, number][] = [
 ];
 import type { ShipSource } from './ShipStore';
 import { JumpFx } from './JumpFx';
-import { canHurt } from './sides';
+import { canHurt, canHeal } from './sides';
 import { PulseFx, type PulseRun } from './PulseFx';
 import { MiningFx } from './MiningFx';
 import { rockMaterial } from '../rendering/rocks/RockMaterials';
 
-interface Spark { x: number; y: number; vx: number; vy: number; life: number; max: number }
+/** (`heal`: a Repair Beam's sparkle, soft green, drifting: support.ts) */
+interface Spark { x: number; y: number; vx: number; vy: number; life: number; max: number; heal?: boolean }
 
 /** A mining laser's pulse (ticks): fades in, flares, trails off to nothing; the next one starts the moment it's gone (no cooldown) */
 const MINING_EVERY = 54;
@@ -146,7 +147,11 @@ export class MiningBeamFx {
       s.vx *= Math.pow(0.9, frames); s.vy *= Math.pow(0.9, frames);
       s.x += s.vx * frames; s.y += s.vy * frames;
       const f = 1 - s.life / s.max;
-      g.moveTo(s.x - s.vx * 2, s.y - s.vy * 2).lineTo(s.x, s.y).stroke({ color: f > 0.5 ? 0xfff2c8 : 0xffa04a, width: 1.4, alpha: f });
+      if (s.heal) {
+        // (A Repair Beam's sparkle: a little green cross, fading)
+        const r = 2.4 * (0.6 + f);
+        g.moveTo(s.x - r, s.y).lineTo(s.x + r, s.y).moveTo(s.x, s.y - r).lineTo(s.x, s.y + r).stroke({ color: f > 0.5 ? 0xd1fae5 : 0x34d399, width: 1.3, alpha: f });
+      } else g.moveTo(s.x - s.vx * 2, s.y - s.vy * 2).lineTo(s.x, s.y).stroke({ color: f > 0.5 ? 0xfff2c8 : 0xffa04a, width: 1.4, alpha: f });
       this.sparks[w++] = s;
     }
     this.sparks.length = Math.min(w, 400);
@@ -168,6 +173,8 @@ export class MiningBeamFx {
       for (const w of beams) {
         // Its own tuning: its grade's reach and width too (launch.ts gunDef)
         const def = partWeaponDef(this.tuning, w.kind, ship.blueprint.parts[w.part], w);
+        // A Repair Beam: a soft teal beam to the friendly hull it mends, sparkling where it lands (support.ts)
+        if (def.heal) { this.repairBeam(g, id, ship, w, pose, def); continue; }
         const { x, y, hx, hy, t } = this.beamLine(id, ship, w, pose, def.range ?? 800, (def.width ?? 0) / 2);
         const lance = w.kind === 'lance';
         const [outer, mid, core] = lance ? [0x7c3aed, 0xc084fc, 0xf5e8ff] : w.kind === 'frostbite' ? [0x0284c7, 0x7dd3fc, 0xf0fbff] : LASER_COLORS[Math.max(0, Math.min(4, (w.grade ?? 1) - 1))];
@@ -188,9 +195,37 @@ export class MiningBeamFx {
     this.drawPulses(g);
   }
 
+  /**
+   * A Repair Beam (support.ts): it passes through every ship it can't mend, as the server's does, and stops on the
+   * first friendly hull; a calm teal beam, gently breathing, and green sparkles drifting off where it lands.
+   */
+  private repairBeam(g: Graphics, id: number, ship: ShipState, w: WeaponInfo, pose: { x: number; y: number; angle: number }, def: WeaponTuning): void {
+    const { x, y, hx, hy, t } = this.beamLine(id, ship, w, pose, def.range ?? 500, (def.width ?? 0) / 2, true);
+    const breathe = 0.8 + 0.2 * Math.sin(this.t * 5 + id);
+    const wid = 7 * breathe;
+    g.moveTo(x, y).lineTo(hx, hy).stroke({ color: 0x0f766e, width: wid * 3.4, alpha: 0.12 });
+    g.moveTo(x, y).lineTo(hx, hy).stroke({ color: 0x2dd4bf, width: wid * 1.3, alpha: 0.4 });
+    g.moveTo(x, y).lineTo(hx, hy).stroke({ color: 0xecfdf5, width: wid * 0.35, alpha: 0.9 });
+    // (Motes running along it towards what it mends)
+    const len = Math.hypot(hx - x, hy - y);
+    for (let k = 0; k < 4; k++) {
+      const u = ((this.t * 0.9 + k / 4 + id * 0.13) % 1);
+      g.circle(x + (hx - x) * u, y + (hy - y) * u, 2.2 + 1.2 * Math.sin(u * Math.PI)).fill({ color: 0xa7f3d0, alpha: 0.75 * Math.sin(u * Math.PI) });
+    }
+    g.circle(x, y, wid * 1.1).fill({ color: 0x5eead4, alpha: 0.45 });
+    if (t < 0.999 && len > 1) {
+      g.circle(hx, hy, wid * 2.8).fill({ color: 0x2dd4bf, alpha: 0.22 });
+      g.circle(hx, hy, wid * 1.0).fill({ color: 0xecfdf5, alpha: 0.8 });
+      if (Math.random() < 0.7) {
+        const a = Math.random() * Math.PI * 2, s = 0.4 + Math.random() * 1.2;
+        this.sparks.push({ x: hx + Math.cos(a) * 10, y: hy + Math.sin(a) * 10, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 0.3, life: 0, max: 24 + Math.random() * 20, heal: true });
+      }
+    }
+  }
+
   /** Where a beam weapon points now and what it meets: muzzle, hit point, and how far along (1: nothing) */
-  /** (`half`: the beam's half-width, as the server burns it: a hull its edge touches stops it) */
-  private beamLine(id: number, ship: ShipState, w: WeaponInfo, pose: { x: number; y: number; angle: number }, range: number, half = 0): { x: number; y: number; hx: number; hy: number; t: number } {
+  /** (`half`: the beam's half-width, as the server burns it: a hull its edge touches stops it; `heal`: a Repair Beam's, stopped by friends only) */
+  private beamLine(id: number, ship: ShipState, w: WeaponInfo, pose: { x: number; y: number; angle: number }, range: number, half = 0, heal = false): { x: number; y: number; hx: number; hy: number; t: number } {
     let muzzle = w.muzzle, dir = w.dir;
     if (w.mount === 'turret' && w.window) {
       const a = w.window.center + (ship.aim[w.part] ?? 0);
@@ -204,7 +239,8 @@ export class MiningBeamFx {
     const [x, y] = shipPointToWorld(ship, pose, muzzle, this.tuning.cellSize);
     const a = pose.angle + Math.PI / 2 + Math.atan2(dir[1], dir[0]);
     const x1 = x + Math.cos(a) * range, y1 = y + Math.sin(a) * range;
-    const t = Math.min(this.cast(x, y, x1, y1), this.castShips(id, x, y, x1, y1, half));
+    // (A Repair Beam passes over rock as the server's does: only terrain and friends stop it)
+    const t = heal ? this.castShips(id, x, y, x1, y1, half, true) : Math.min(this.cast(x, y, x1, y1), this.castShips(id, x, y, x1, y1, half));
     return { x, y, hx: x + (x1 - x) * t, hy: y + (y1 - y) * t, t };
   }
 
@@ -290,7 +326,7 @@ export class MiningBeamFx {
    * server burns it (ShipBridge.segmentHit: a skeleton or a wreck is passed through), once the line comes near it
    */
   /** (As the server's beams: ShipBridge.fireBeam and stepMiners pass through ships mid-jump and ships the shooter can't hurt) */
-  private castShips(self: number, x0: number, y0: number, x1: number, y1: number, half = 0): number {
+  private castShips(self: number, x0: number, y0: number, x1: number, y1: number, half = 0, heal = false): number {
     let best = 1;
     const dx = x1 - x0, dy = y1 - y0, len2 = dx * dx + dy * dy || 1, cs = this.tuning.cellSize;
     const jt = jumpTuning(this.tuning);
@@ -298,7 +334,7 @@ export class MiningBeamFx {
       if (id === self) continue;
       const e = this.state.entities.get(id);
       if (!e) continue;
-      if (jumpPhase(JumpFx.counter(e, id === this.state.playerId), jt).phase === 'burn' || !canHurt(this.state, self, id)) continue;
+      if (jumpPhase(JumpFx.counter(e, id === this.state.playerId), jt).phase === 'burn' || !(heal ? canHeal(this.state, self, id) : canHurt(this.state, self, id))) continue;
       // Not near it at all: on to the next
       const u = Math.max(0, Math.min(1, ((e.renderX - x0) * dx + (e.renderY - y0) * dy) / len2));
       if (Math.hypot(x0 + dx * u - e.renderX, y0 + dy * u - e.renderY) > ship.derived.radius + cs + half) continue;

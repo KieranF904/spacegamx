@@ -7,7 +7,7 @@
  * ("Pip on the left wing has no power").
  */
 
-import { CIRCUIT_LETTERS, cellKey, cleanWires, isNeighbour, isPowerPart, normWire, wireCells, wireId, wireNetworks, wireSpools, type Blueprint, type Catalog, type PlacedGeom, type ShipDerived, type WireNetworks, type WireSeg } from '@space-game/common';
+import { POWER_TYPES, cellKey, cleanWires, isNeighbour, isPowerPart, normWire, wireCells, wireId, wireNetworks, wireSpools, type Blueprint, type Catalog, type PlacedGeom, type ShipDerived, type WireNetworks, type WireSeg } from '@space-game/common';
 
 export type Cell = [number, number];
 
@@ -80,14 +80,16 @@ export function wireBill(saved: WireSeg[] | undefined, now: WireSeg[] | undefine
   return { segments, savedSegments, spools: wireSpools(segments) - wireSpools(savedSegments) };
 }
 
-/** Circuits' colours in the overlay, by letter (A the first); a circuit with no generator on it is grey */
+/** (Phase 1's colours by letter: kept for anything still keyed by them) */
 export const NET_COLORS = ['#fbbf24', '#38bdf8', '#4ade80', '#f472b6', '#a78bfa', '#fb923c', '#2dd4bf', '#e879f9'];
 export const DEAD_NET = '#64748b';
+/** The power types' colours (surge.ts POWER_TYPES): the colour is the type, the letter tells same-type circuits apart */
+export const STEADY_COLOR: string = POWER_TYPES.steady.color;
+export const SURGE_COLOR: string = POWER_TYPES.surge.color;
 
-/** A circuit's colour, by its letter (circuits.ts CIRCUIT_LETTERS) */
+/** A circuit's colour: every wired circuit is Steady (a Surge bank's is SURGE_COLOR); grey for none */
 export function circuitColor(letter: string): string {
-  const k = CIRCUIT_LETTERS.indexOf(letter);
-  return k < 0 ? DEAD_NET : NET_COLORS[k % NET_COLORS.length];
+  return letter ? STEADY_COLOR : DEAD_NET;
 }
 
 export interface PowerNet {
@@ -117,6 +119,22 @@ export type PartPower = 'none' | 'powered' | 'short' | 'unpowered' | 'stranded' 
 /** A weak link: a part a wire runs through whose loss cuts consumers off from every generator */
 export interface WeakLink { part: number; cuts: number[]; text: string }
 
+/** A Surge bank (capacitors and Pulse Dynamos touching): what it holds, gives, makes and reaches by touch */
+export interface PowerBank {
+  store: number;
+  label: string;
+  parts: number[];
+  capacitors: number;
+  dynamos: number;
+  /** The circuit that charges it (its letter, '' none) */
+  circuit: string;
+  cap: number;
+  rate: number;
+  surge: number;
+  feeds: number[];
+  shields: number[];
+}
+
 export interface PowerReport {
   /** By network (ShipDerived.networks order) */
   nets: PowerNet[];
@@ -134,6 +152,8 @@ export interface PowerReport {
   warnings: string[];
   /** Weak links, most cut first */
   weak: WeakLink[];
+  /** Surge banks, S1 first */
+  banks: PowerBank[];
 }
 
 /** Where a part sits on the ship, in a pilot's words (forward is -y) */
@@ -201,7 +221,8 @@ export function powerReport(catalog: Catalog, bp: Blueprint, d: ShipDerived, geo
     const ci = L?.circuits[k];
     const generators = n.parts.filter((i) => (fns[i]?.produce ?? 0) > 0);
     const batteries = n.parts.filter((i) => (fns[i]?.store ?? 0) > 0);
-    const groups = ci ? [ci.pools.g, ci.pools.d, ci.pools.w, ...ci.banks].filter((s) => s >= 0) : [];
+    // (its own stores: its banks are Surge, listed apart)
+    const groups = ci ? [ci.pools.g, ci.pools.d, ci.pools.w].filter((s) => s >= 0) : [];
     const store = groups.reduce((t, s) => t + L!.stores[s].cap, 0) + (ci?.main && L?.core ? L.core.cap : 0);
     const rate = groups.reduce((t, s) => t + L!.stores[s].rate, 0) + (ci?.main && L?.core ? L.core.rate : 0);
     const letter = ci?.letter ?? '';
@@ -217,7 +238,9 @@ export function powerReport(catalog: Catalog, bp: Blueprint, d: ShipDerived, geo
     const net = nets[d.network[i]];
     if ((fn!.demand ?? 0) <= 0) {
       const bank = bankOf(i);
-      if (bank && !bank.feeds!.length) return 'idle';
+      if (bank && !bank.feeds!.length && !bank.shields?.length) return 'idle';
+      // (a capacitor goes by its bank: charged by the bank's circuit or its dynamos, wired itself or not)
+      if (bank) return L!.circuits[bank.circuit]?.generators.length || (bank.surge ?? 0) > 0 ? 'powered' : 'stranded';
       return net?.powered ? 'powered' : 'stranded';
     }
     const sat = d.satisfaction[i];
@@ -261,7 +284,16 @@ export function powerReport(catalog: Catalog, bp: Blueprint, d: ShipDerived, geo
     if (!n.powered || n.parts.some((i) => isPowerPart(fns[i]) && (fns[i]!.produce ?? 0) <= 0)) return;
     for (const i of n.generators) say(`g:${name(i)}:${where(i)}`, 5, (c) => `${plural(name(i), c)} ${where(i)} ${c > 1 ? 'power' : 'powers'} nothing: wire ${c > 1 ? 'them' : 'it'} to what draws power`);
   });
+  // Surge banks, and a Pulse Dynamo whose bank touches nothing that draws power
+  const banks: PowerBank[] = (L?.stores ?? []).flatMap((g, s) => g.kind !== 'k' ? [] : [{
+    store: s, label: g.label ?? 'S', parts: g.parts, capacitors: g.parts.filter((i) => fns[i]?.bank).length, dynamos: g.parts.filter((i) => (fns[i]?.surge ?? 0) > 0).length,
+    circuit: L!.circuits[g.circuit]?.letter ?? '', cap: g.cap, rate: g.rate, surge: g.surge ?? 0, feeds: g.feeds ?? [], shields: g.shields ?? [],
+  }]);
+  for (const b of banks) {
+    if (b.feeds.length || b.shields.length) continue;
+    for (const i of b.parts) if ((fns[i]?.surge ?? 0) > 0) say(`k:${name(i)}`, 3, (n) => `${plural(name(i), n)} ${n > 1 ? 'touch' : 'touches'} nothing that draws power, nor its bank: Surge goes only by touch`);
+  }
   const weak = opts.weak === false ? [] : weakLinks(catalog, bp, d, geoms, name, where);
   const warnings = [...said.values()].sort((a, b) => a.order - b.order).map((w) => w.text(w.n));
-  return { nets, part, seg, warnings, weak };
+  return { nets, part, seg, warnings, weak, banks };
 }

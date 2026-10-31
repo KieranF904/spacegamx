@@ -46,7 +46,7 @@ import { settings } from '../settings/Settings';
 import { boundKeyName } from '../input/keybindings';
 import { costHtml } from '../ui/windowKit';
 import { CONNECTOR_COLOR, functionColor, numToCss } from './shipColors';
-import { cellAt, circuitColor, eraseRun, layRun, powerReport, pruneWires, stepCells, wireBill, DEAD_NET, type Cell, type PowerReport } from './wireEdit';
+import { cellAt, circuitColor, SURGE_COLOR, eraseRun, layRun, powerReport, pruneWires, stepCells, wireBill, DEAD_NET, type Cell, type PowerReport } from './wireEdit';
 
 /** The hangar's load test: this many seconds of the ship's power, from full (energy.ts loadTest) */
 const LOAD_TEST_SECONDS = 4;
@@ -1485,6 +1485,21 @@ export class HangarUI {
         html += `<div style="font-size:11px; padding:1px 0 3px 21px; color:#8ea0bd">${what2}${refill}</div>`;
       }
     }
+    // Surge banks (energy Phase 2: surge.ts): capacitors and Pulse Dynamos touching, giving only by touch
+    const partName = (i: number) => { const p = this.bp.parts[i], fn = this.deps.catalog.functions.get(p.fn); return fn?.name ?? p.fn; };
+    const names = (list: number[]) => {
+      const c = new Map<string, number>();
+      for (const i of list) c.set(partName(i), (c.get(partName(i)) ?? 0) + 1);
+      return [...c].map(([nm, k]) => (k > 1 ? `${k} ${nm}s` : nm)).join(', ');
+    };
+    for (const b of rep.banks) {
+      const what = [b.capacitors ? `${b.capacitors} capacitor${b.capacitors > 1 ? 's' : ''}` : '', b.dynamos ? `${b.dynamos} dynamo${b.dynamos > 1 ? 's' : ''}` : ''].filter(Boolean).join(' + ');
+      const feeds = [b.feeds.length ? names(b.feeds) : '', b.shields.length ? names(b.shields) : ''].filter(Boolean).join(', ');
+      html += `<div style="display:flex; align-items:center; gap:6px; padding:2px 0; border-bottom:1px solid #18223a; font-size:11px" title="Surge bank ${b.label}: ${what}. Charged by ${b.circuit ? `circuit ${b.circuit}` : 'no circuit'}${b.surge ? ` and its dynamos (+${n0(b.surge)}/s)` : ''}; gives only by touch, to ${feeds || 'nothing'}">`
+        + `<span style="min-width:15px; height:15px; padding:0 2px; border-radius:3px; flex-shrink:0; background:${SURGE_COLOR}; color:#0b1220; font-weight:800; text-align:center; line-height:15px; font-size:10px">${b.label}</span>`
+        + `<span style="color:#c4b5fd; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">Surge · ${feeds ? `feeds ${esc(feeds)}` : '<span style="color:#fbbf24">touches nothing</span>'}</span>`
+        + `<span style="margin-left:auto; white-space:nowrap; color:#6b7a93">${b.surge ? `<b style="color:#c4b5fd">+${n0(b.surge)}</b>/s · ` : ''}${n0(b.cap)} held</span></div>`;
+    }
     // The core's store, and the load test
     const core = d.power?.core;
     if (core) {
@@ -1574,6 +1589,18 @@ export class HangarUI {
         `Stabiliser Anchor: press ${boundKeyName('brace', settings.data.bindings)} to brace. Braced, the ship holds still (no thrust, slow turning), its guns reach ${Math.round(a.range * 100)}% further and scatter ${Math.round(a.spread * 100)}% less, `
         + `its shields recharge ${Math.round(a.shieldRegen * 100)}% faster and hits take less of them, and pulls and knockback can't move it. It takes ${(a.braceTicks / 60).toFixed(2)} s to brace and ${(a.releaseTicks / 60).toFixed(1)} s to let go: no thrust and no benefits while it spools`);
     }
+    // Burst Strafer and Tow Beam (common/src/ships/strafer.ts, tow.ts)
+    if (now.dodge > 0 || (was && was.dodge > 0)) {
+      const s = this.derived?.strafe;
+      const sides = s ? (s.left.length && s.right.length ? 'either side' : s.left.length ? 'left only' : 'right only') : '';
+      html += row('Dodge', now.dodge > 0 ? `+${n0(now.dodge)} m/s a burst · ${s?.charges ?? 0} charges · ${sides}` : '<span style="color:#f87171">none</span>', 'dodge',
+        `Burst Strafers: press ${boundKeyName('dodge', settings.data.bindings)} for one sharp sideways burst (${((s?.ticks ?? 15) / 60).toFixed(2)} s) the way you're steering. `
+        + `Each burst spends a charge, which refills in ${((s?.recharge ?? 150) / 60).toFixed(1)} s, and draws a lot of energy: from a capacitor bank the strafers touch first, then their circuit. `
+        + 'A strafer pushes away from its nozzle, so point it out of the side you want to dodge away from. The heavier the ship, the less a burst moves it');
+    }
+    if (now.tow > 0) html += row('Tow Beam', now.tow >= 0.5 ? 'ready' : '<span style="color:#f87171">no power</span>', 'tow',
+      `Press ${boundKeyName('tow', settings.data.bindings)} to take hold of the wreck, debris or pod nearest your cursor; again to let go. What you tow slows you by its mass. `
+      + "Tow it into a station's reach to salvage it into your storage. It draws power only while towing");
     html += row('Mass', `${n0(now.mass)}`, 'mass');
     html += row('Loss cost', `${n0(now.rebuild)} cr`, 'rebuild', `If it's destroyed: the ${Math.round((1 - SALVAGE) * 100)}% of its minerals salvage doesn't bring back, at station prices (an insurance bond covers it)`);
     html += energyHtml(now.energy);
@@ -2019,6 +2046,41 @@ if (d && this.overlays.com && d.mass > 0) {
         ctx.fillStyle = v < 0.5 ? '#fca5a5' : '#fdba74';
         ctx.fillText(`${Math.round(v * 100)}%`, tx, ty);
       });
+    }
+    // Surge banks: their parts ringed violet, a short arc to each part they feed by touch, and their label
+    for (const g of L.stores) {
+      if (g.kind !== 'k') continue;
+      ctx.strokeStyle = SURGE_COLOR; ctx.lineWidth = 2;
+      for (const i of g.parts) {
+        const q = this.geoms[i];
+        if (!q) continue;
+        ctx.beginPath();
+        q.polygon.forEach(([x, y], k) => (k ? ctx.lineTo(sx(x), sy(y)) : ctx.moveTo(sx(x), sy(y))));
+        ctx.closePath(); ctx.stroke();
+      }
+      const touchAll = [...(g.feeds ?? []), ...(g.shields ?? [])];
+      ctx.lineWidth = 2.5;
+      for (const j of touchAll) {
+        const q = this.geoms[j];
+        const from = g.parts.map((i) => this.geoms[i]).filter(Boolean).sort((a, b) => Math.hypot(a.centroid[0] - (q?.centroid[0] ?? 0), a.centroid[1] - (q?.centroid[1] ?? 0)) - Math.hypot(b.centroid[0] - (q?.centroid[0] ?? 0), b.centroid[1] - (q?.centroid[1] ?? 0)))[0];
+        if (!q || !from) continue;
+        // (a zigzag: Surge jumps by touch)
+        const x0 = sx(from.centroid[0]), y0 = sy(from.centroid[1]), x1 = sx(q.centroid[0]), y1 = sy(q.centroid[1]);
+        const nx = -(y1 - y0), ny = x1 - x0, len = Math.hypot(nx, ny) || 1, amp = ring * 0.35;
+        ctx.beginPath(); ctx.moveTo(x0, y0);
+        for (let s = 1; s <= 4; s++) { const t = s / 5, sgn = s % 2 ? 1 : -1; ctx.lineTo(x0 + (x1 - x0) * t + (nx / len) * amp * sgn, y0 + (y1 - y0) * t + (ny / len) * amp * sgn); }
+        ctx.lineTo(x1, y1); ctx.stroke();
+        ctx.fillStyle = SURGE_COLOR;
+        ctx.beginPath(); ctx.arc(x1, y1, Math.max(2.5, ring * 0.22), 0, Math.PI * 2); ctx.fill();
+      }
+      const at = this.geoms[g.parts[0]];
+      if (at) {
+        const bx = sx(at.centroid[0]) + ring * 1.15, by = sy(at.centroid[1]) - ring * 1.15, r = Math.max(8, font * 0.7);
+        ctx.fillStyle = 'rgba(3, 5, 10, 0.85)'; ctx.beginPath(); ctx.arc(bx, by, r + 2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = SURGE_COLOR; ctx.beginPath(); ctx.arc(bx, by, r, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#0b1220'; ctx.font = `800 ${Math.round(r * 1.05)}px 'Segoe UI', sans-serif`;
+        ctx.fillText(g.label ?? 'S', bx, by + 0.5);
+      }
     }
     // Letters
     for (const ci of L.circuits) {

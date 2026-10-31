@@ -29,6 +29,8 @@ export const ACTIONS: ActionDef[] = [
   { id: 'jump', label: 'Jump drive', category: 'Flight', key: 'KeyJ', hint: 'Jumps to your cursor (or the station, gate or marker you point at), within range' },
   { id: 'helm', label: 'Switch mouse-steer / helm', category: 'Flight', key: 'KeyV' },
   { id: 'brace', label: 'Brace (Stabiliser Anchor)', category: 'Flight', key: 'KeyY', hint: 'Toggle: hold still for more gun range, steadier aim, faster shields and no pulls; no thrust while braced' },
+  { id: 'dodge', label: 'Dodge (Burst Strafer)', category: 'Flight', key: 'Space', hint: 'One sharp sideways burst a press, the way you are steering (WASD, or Q/E at the helm); with no side held, the other way from last time. Uses a charge' },
+  { id: 'tow', label: 'Tow / let go (Tow Beam)', category: 'Ship & world', key: 'KeyU', hint: 'Takes hold of the wreck, debris or pod nearest your cursor within reach; tow it into a station to salvage it' },
   { id: 'aim', label: 'Aim / steer', category: 'Flight', key: 'Mouse', rebindable: false },
   { id: 'fire', label: 'Fire', category: 'Combat', key: 'Mouse0', alt: 'Mouse2', rebindable: false },
   { id: 'targetNext', label: 'Target the next hostile', category: 'Combat', key: 'Tab', hint: 'Nearest first. Missiles lock on to your target' },

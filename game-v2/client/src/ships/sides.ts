@@ -44,6 +44,16 @@ function inPvp(state: GameState, id: number): boolean {
   return true;
 }
 
+/**
+ * May a Repair Beam on `healer` mend `target` (GameServer.canHeal; support.ts)? Friendly ships only: pilots and wards,
+ * never itself. (Two pilots in PvP space: the server mends only party members; drawn here as friends either way.)
+ */
+export function canHeal(state: GameState, healer: number, target: number): boolean {
+  if (healer === target) return false;
+  const a = sideOf(state, healer), t = sideOf(state, target);
+  return (a === 'pilot' || a === 'ward') && (t === 'pilot' || t === 'ward');
+}
+
 export function canHurt(state: GameState, attacker: number, target: number): boolean {
   const a = sideOf(state, attacker), t = sideOf(state, target);
   if (a === 'out' || t === 'out') return false;

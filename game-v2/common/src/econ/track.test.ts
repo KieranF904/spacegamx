@@ -48,9 +48,9 @@ describe('the unlock track', () => {
 
   it('hints at the next thing to build', () => {
     expect(nextBuildUnlock(fns(), 11)).toMatchObject({ level: 12 });
-    expect(nextUnlockHint(fns(), 12)).toBe('Needle at Lv 13');
+    expect(nextUnlockHint(fns(), 12)).toBe('Needle and Flash Screen at Lv 13');
     expect(nextUnlockHint(fns(), 1)).toBe('Constructor and Vernier at Lv 2');
-    expect(nextUnlockHint(fns(), 11)).toBe('Twinlink, Frostbite Lance and 5 more at Lv 12');
+    expect(nextUnlockHint(fns(), 11)).toBe('Twinlink, Frostbite Lance and 6 more at Lv 12');
     expect(nextUnlockHint(fns(), 30)).toBe('Lance and Neutronium structure at Lv 32');
     // Past the last model: nothing to hint (room still comes, but nothing new to build)
     expect(nextUnlockHint(fns(), 99)).toBeNull();

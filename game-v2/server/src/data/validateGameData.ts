@@ -366,7 +366,7 @@ const SHAPES: Record<string, Spec> = {
       xp: 'number', credits: 'number', respawnSeconds: 'number', behaviour: behaviourSpec, intro: 'string',
       phases: arr(strict({
         at: 'number', 'say?': 'string', 'escorts?': 'string[]', 'enrage?': 'number', 'heal?': 'number', 'blink?': 'number',
-        'nova?': obj({ every: 'number', kind: 'string', count: 'number', warnTicks: 'number' }),
+        'nova?': obj({ every: 'number', kind: 'string', count: 'number', warnTicks: 'number', 'intercept?': 'boolean' }),
       })),
       loot: lootSpec, 'design?': 'string', 'arena?': 'boolean', 'fixed?': 'boolean', 'grade?': 'number', 'plating?': 'number', 'asDesigned?': 'boolean', 'speed?': 'number', 'turn?': 'number', 'stageCover?': 'number',
       'roam?': obj({ radius: 'number', everySeconds: 'number' }), 'brain?': oneOf(...BRAIN_IDS),
@@ -485,7 +485,7 @@ const SHIP_SHAPES: Record<string, Spec> = {
       'unlock?': strict({ level: 'number' }), 'weaponMods?': 'any', 'rated?': 'number', 'blast?': obj({ radius: 'number', damage: 'number', delayTicks: 'number[]' }),
       'produce?': 'number', 'demand?': 'number', 'priority?': oneOf(1, 2, 3), 'thrust?': 'number', 'boost?': 'number', 'boostDrain?': 'number',
       'fireInterval?': 'number', 'capacity?': 'number', 'jumpCapacity?': 'number', 'range?': 'number', 'weapon?': 'string', 'shield?': 'number',
-      'store?': 'number', 'pool?': oneOf('drive', 'weapon'), 'discharge?': 'number', 'bank?': 'boolean', 'armour?': 'number', 'massScale?': 'number', 'mount?': oneOf('fixed', 'turret'),
+      'store?': 'number', 'pool?': oneOf('drive', 'weapon'), 'discharge?': 'number', 'bank?': 'boolean', 'surge?': 'number', 'dual?': oneOf('rail', 'flash'), 'armour?': 'number', 'massScale?': 'number', 'mount?': oneOf('fixed', 'turret'),
       'mounting?': strict({ 'attach?': oneOf('back', 'any'), 'angle?': oneOf('straight', 'right'), 'arc?': 'number', 'clear?': 'any' }),
     })),
   }),
@@ -1116,7 +1116,7 @@ export function validateGameData(files: GameDataFiles, opts: ValidateOptions = {
     for (const [id, p] of pieces) if (!dict.has(id) && !(p as { polygon?: unknown })?.polygon) c.warn(`pieces (${id})`, `piece "${id}" is not in the wire DICTIONARY (common/src/network/binaryCodec.ts)`, 'ships/pieces.json');
     for (const [kind, w] of entries(ships.tuning?.weapons)) {
       const F = 'ships/tuning.json';
-      if (w?.type === 'projectile' && !(kind in WEAPON_KIND_TYPE)) c.err(`weapons.${kind}`, `projectile kind "${kind}" is missing from WEAPON_KIND_TYPE (common/src/ecs/components.ts): clients draw it as a cannon shell`, F);
+      if (w?.type === 'projectile' && !w?.pointDefence && !(kind in WEAPON_KIND_TYPE)) c.err(`weapons.${kind}`, `projectile kind "${kind}" is missing from WEAPON_KIND_TYPE (common/src/ecs/components.ts): clients draw it as a cannon shell`, F);
       if (isObj(w?.split)) weaponKind(F, `weapons.${kind}.split.kind`, w.split.kind);
     }
     for (const [k] of entries(ships.tuning?.weaponGrades)) weaponKind('ships/tuning.json', `weaponGrades.${k}`, k);

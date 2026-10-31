@@ -18,7 +18,7 @@ import { HullWorker } from './hullWorkerClient';
 import { fromWire, type HullJob } from './hullWire';
 import { buildHull, skeletonCovered, type HullBuild } from './hullBuild';
 import { beam } from '../rendering/fxTextures';
-import { EntityType, ShipState, SIDE_NORMAL, Side, facingEdges, isOpen, isWeaponFn, wireCells, cellKey, type Blueprint, anchorTuning, braceAmount, bracePhase } from '@space-game/common';
+import { EntityType, ShipState, SIDE_NORMAL, Side, facingEdges, isOpen, isWeaponFn, wireCells, cellKey, type Blueprint, anchorTuning, braceAmount, bracePhase, dodgePhase, pilotExtras } from '@space-game/common';
 import type { ShipSource } from './ShipStore';
 import type { GameState } from '../state/GameState';
 import type { Renderer } from '../rendering/Renderer';
@@ -66,6 +66,8 @@ interface BodyView {
   /** A Stabiliser Anchor out: its clamps and the hull's ring (drawBrace), and what they were drawn for */
   brace?: Graphics;
   braceKey?: string;
+  /** A Burst Strafer's burst: its jets and the streak (drawDodge) */
+  dodge?: Graphics;
   /** Named pilotless hulks (derelicts) get a label underneath */
   label?: Text;
   /** Its label is in the calm style (a passive hostile, unprovoked) */
@@ -491,6 +493,9 @@ export class ShipRenderer {
     this.lastFrame = now;
     this.engines.beginFrame(dt);
     this.hulls.begin();
+    // (Tow Beams' tethers: all of them in one graphics, drawn afresh each frame: drawTether)
+    if (!this.tethers) { this.tethers = new Graphics(); this.layer.addChild(this.tethers); }
+    this.tethers.clear();
 
     for (const [eid, ship] of this.bridge.bodies) {
       const entity = this.state.entities.get(eid);
@@ -560,6 +565,8 @@ export class ShipRenderer {
       this.drawWires(view, ship, cs, now, entity.type === EntityType.ShipBody && (hostile || entity.data?.[0] === 2));
       this.updateLamps(view, ship, entity, dt);
       this.drawBrace(view, ship, entity.brace, cs, now);
+      this.drawDodge(view, ship, entity.dodge, cs, now);
+      this.drawTether(eid, entity, ship, cs, now);
       // Quick: most of the flash gone in ~6 frames
       if (view.flashLevel > 0) view.flashLevel = Math.max(0, view.flashLevel * Math.pow(0.7, dt * 60) - 0.01 * dt * 60);
       view.container.x = entity.renderX;
@@ -998,6 +1005,87 @@ export class ShipRenderer {
     }
     if (braced) g.circle(0, 0, ship.derived.radius * 1.06).stroke({ width: cs * 0.12, color: col, alpha: 0.12 + 0.12 * breath });
   }
+
+  // ---- Burst Strafer and Tow Beam (common/src/ships/strafer.ts, tow.ts)
+  private tethers?: Graphics;
+
+  /**
+   * A Burst Strafer's burst: from each strafer firing, a hot pink-white jet out of its nozzle (long at first, shrinking
+   * as the burst runs out) with a flash at the mouth, and speed streaks trailing off the hull's far side. Redrawn every
+   * frame while it runs (a quarter second); nothing otherwise.
+   */
+  private drawDodge(view: BodyView, ship: ShipState, counter: number | undefined, cs: number, now: number): void {
+    const s = ship.derived.strafe;
+    const ph = s ? dodgePhase(counter, s.ticks) : null;
+    if (!s || !ph || ph.phase !== 'burst') {
+      if (view.dodge?.visible) view.dodge.visible = false;
+      return;
+    }
+    if (!view.dodge) { view.dodge = new Graphics(); view.container.addChild(view.dodge); }
+    const g = view.dodge;
+    g.visible = true;
+    g.clear();
+    const k = 1 - ph.progress, flicker = 0.85 + 0.15 * Math.sin(now / 23);
+    const [cx, cy] = ship.derived.com;
+    const geoms = this.bridge.geometry(ship);
+    for (const p of ph.side < 0 ? s.left : s.right) {
+      const geom = geoms[p.part];
+      if (!geom) continue;
+      for (const nz of decorOf(geom).nozzles) {
+        const bx = (nz.at[0] - cx) * cs, by = (nz.at[1] - cy) * cs;
+        const hw = (nz.width / 2) * cs * (1.1 + 0.6 * k), len = cs * (1.4 + 4.2 * k) * flicker;
+        const tip = [bx + nz.n[0] * len, by + nz.n[1] * len];
+        const l = [bx + nz.t[0] * hw, by + nz.t[1] * hw], r = [bx - nz.t[0] * hw, by - nz.t[1] * hw];
+        g.poly([l[0], l[1], tip[0], tip[1], r[0], r[1]]).fill({ color: 0xf472b6, alpha: 0.75 * (0.4 + 0.6 * k) });
+        const core = [bx + nz.n[0] * len * 0.6, by + nz.n[1] * len * 0.6];
+        g.poly([bx + nz.t[0] * hw * 0.45, by + nz.t[1] * hw * 0.45, core[0], core[1], bx - nz.t[0] * hw * 0.45, by - nz.t[1] * hw * 0.45]).fill({ color: 0xffffff, alpha: 0.85 * k });
+        g.circle(bx, by, hw * (1.3 + 1.2 * k)).fill({ color: 0xfbcfe8, alpha: 0.65 * k });
+      }
+    }
+    // Speed streaks: off the hull's trailing side (opposite the push), fading with the burst
+    const R = ship.derived.radius, side = ph.side;
+    for (let i = -1; i <= 1; i++) {
+      const y = i * R * 0.45, x0 = -side * R * 0.7, x1 = -side * (R * 0.9 + cs * (1.5 + 3 * k));
+      g.moveTo(x0, y).lineTo(x1, y).stroke({ width: cs * 0.14, color: 0xf9a8d4, alpha: 0.6 * k });
+    }
+  }
+
+  /**
+   * A Tow Beam's tether (game/Towing.ts): an amber line from the beam's mouth to what it tows, a little slack in it,
+   * with pulses running along it towards the ship. The pilot's own comes from its snapshot row (strafer.ts
+   * pilotExtras), everyone else's from their status row (data[8]).
+   */
+  private drawTether(eid: number, entity: { renderX: number; renderY: number; renderAngle: number; data?: number[]; status?: number[] }, ship: ShipState, cs: number, now: number): void {
+    const w = eid === this.state.playerId ? pilotExtras(entity.data).tow : (entity.status?.[8] ?? 0);
+    if (!(w > 0) || !ship.derived.tow || !this.tethers) return;
+    const t = this.state.entities.get(w - 1);
+    if (!t) return;
+    // From the beam's mouth (its first emitter), in the world
+    const geoms = this.bridge.geometry(ship);
+    const part = ship.derived.tow.parts[0];
+    const nz = part !== undefined && geoms[part] ? decorOf(geoms[part]).nozzles[0] : undefined;
+    const [cx, cy] = ship.derived.com;
+    const geomAt = part !== undefined && geoms[part] ? geoms[part]!.centroid : ship.derived.com;
+    const lx = ((nz?.at[0] ?? geomAt[0]) - cx) * cs, ly = ((nz?.at[1] ?? geomAt[1]) - cy) * cs;
+    const a = entity.renderAngle + Math.PI / 2, c = Math.cos(a), s = Math.sin(a);
+    const x0 = entity.renderX + lx * c - ly * s, y0 = entity.renderY + lx * s + ly * c;
+    const x1 = t.renderX, y1 = t.renderY;
+    const dx = x1 - x0, dy = y1 - y0, d = Math.hypot(dx, dy);
+    if (d < 1) return;
+    // A little sag (perpendicular), less the more it's stretched
+    const sag = Math.max(0, 40 - d * 0.04), mx = (x0 + x1) / 2 - (dy / d) * sag, my = (y0 + y1) / 2 + (dx / d) * sag;
+    const g = this.tethers;
+    g.moveTo(x0, y0).quadraticCurveTo(mx, my, x1, y1).stroke({ width: cs * 0.22, color: 0xfacc15, alpha: 0.18 });
+    g.moveTo(x0, y0).quadraticCurveTo(mx, my, x1, y1).stroke({ width: cs * 0.07, color: 0xfde68a, alpha: 0.85 });
+    // Pulses running in towards the ship
+    for (let i = 0; i < 3; i++) {
+      const u = 1 - (((now / 700) + i / 3) % 1);
+      const px = (1 - u) * (1 - u) * x0 + 2 * (1 - u) * u * mx + u * u * x1, py = (1 - u) * (1 - u) * y0 + 2 * (1 - u) * u * my + u * u * y1;
+      g.circle(px, py, cs * 0.14).fill({ color: 0xfff7cc, alpha: 0.8 });
+    }
+    g.circle(x1, y1, cs * 0.3).stroke({ width: cs * 0.06, color: 0xfacc15, alpha: 0.6 });
+  }
+  // ---- (end Burst Strafer and Tow Beam)
 
   private drawTurrets(view: BodyView, ship: ShipState, cs: number, frames: number): void {
     // (too small on screen to see a gun: none drawn, nor turned)

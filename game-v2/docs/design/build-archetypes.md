@@ -336,3 +336,68 @@ Close behind: **Spool-up Bore / Spool-up Chainsaw** (stronger the longer it runs
 8. **PvP**: how much should PvP zones shape archetypes? Dancer/Blinker/Ghost/Disruptor get much stronger with PvP in mind; if PvP stays small, they should be balanced for bosses and packs first.
 9. **Drones**: worth the cost (AI, network, rendering, the bullet-hell budget in docs/audits/boss-bullet-hell.md)? Or keep the Carrier fantasy to Hive-style homing swarms?
 10. **Which 5–6 to foster first?** Suggested starter set, because the first four parts in section 5 open them: **Dancer, Alpha Striker, Freighter, Bombard, Bulwark, Interceptor**, then **Warden** once repair exists.
+
+---
+
+## Implemented: Repair Beam and Point Defence Turret (§5 #6, #7)
+
+*Built 2026-10-31, awaiting review, not deployed. Code: `common/src/ships/support.ts`; DEVELOPMENT.md has the map.*
+
+- **Repair Beam** (`utility_repair_beam`, utility, level 17, Mk II steel, 1×2, turret 240°): held on the fire key and
+  aimed at the cursor like any turret (so a Warden points at who needs it; its other guns' shots pass through friends
+  anyway). It passes through every ship it may not mend and stops on the first friendly hull: a party member, any pilot
+  outside a PvP zone (inside one, only your party), a ward. It mends 42 HP/s at full power (a library ship's parts hold
+  about 80 to 160 HP; an autocannon deals about 43/s), spread over the damaged parts nearest where it lands, at most three, nearest first. Draws 56/s
+  while on (about two Cell Reactors); no heat. **Decisions:** it never mends a destroyed part (stations and repair kits
+  rebuild), its own ship or a shield; no auto-targeting (the cursor is how every turret aims, and a client can't know a
+  friend's exact damage to predict an auto-pick).
+- **Support credit** (open question 7, answered "yes" as the default): `server/src/game/Support.ts` notes who mended
+  whom. A pilot who mended another at least 15 HP within the last 20 s is their supporter: an enemy the supported pilot
+  kills pays its supporters nearby as it pays the killer's party (75% XP, 40% credits; not its job steps), and a boss
+  counts the supporters of everyone it credits among its winners. The same hook (`supporters(target, now)`) is where
+  shielding, towing or painting would add support later.
+- **Point Defence Turret** (`point_defence_turret`, weapon, level 10, Mk I steel, 1×1, turret 300°): fires on its own,
+  never on the trigger and never at ships, at shots coming from anything that may hurt its ship, within 560 of it: the
+  nearest it has a clear line to, turning three times a gun's rate. 5 shots a second, 2 energy a shot (10/s firing flat
+  out), each hit instant. Quiet while EMPed, jumping or docked. **Interceptable** (`intercept`: hits to bring down):
+  missile 1 (and the Swarm's), hive 1, mortar shell 1, torpedo 3, the Scrap Mother's seam seekers 2, the Pyreclast's
+  heart seekers 2. Not: shells of any kind, beams, flak, EMP, arcs, prism shards, the singularity, the Scrap Mother's
+  chunk rings and the Pyreclast's heart sparks (those are dodging patterns). **A boss nova is never interceptable**
+  whatever its kind (the Maw Heart's missile ring included) unless its phase sets `nova.intercept: true`. There are no
+  mines in the game yet; a mine kind would just set `intercept`.
+
+---
+
+## Implemented: Burst Strafer and Tow Beam (§5 #1, #8)
+
+*Built 2026-10-31, awaiting review, not deployed. Code: `common/src/ships/strafer.ts`, `tow.ts`,
+`server/src/game/Towing.ts`; DEVELOPMENT.md has the map.*
+
+- **Burst Strafer** (`engine_burst_strafer`, engine, level 10, Mk I steel, 1×1, must point a facing edge out): no
+  cruising thrust at all. A press of **Space** (rebindable "Dodge") fires one burst of 15 ticks (0.25 s) from every
+  strafer pushing that way: 5.5 push per cell, as a force, so mass and cargo matter. On a Sparrow T one strafer gives
+  about +290 m/s sideways and moves the ship about 105 units in half a second; a heavy ship hardly moves. Three
+  charges, one back every 2.5 s. **Side:** the way you're steering (WASD on screen, turned into the ship's frame, or
+  Q/E at the helm); with no side held, the other way from your last dodge (so tapping it weaves), or the only side
+  your strafers push. A strafer pushes away from its nozzle, so one on each flank dodges both ways. **Energy:** a burst
+  draws 280/s per cell while it runs (70 a burst: over 10× a Vernier's energy per unit of push), from the capacitor
+  bank the strafer touches first (`PowerUse.dodge`), then its circuit as an engine, then the core's trickle. On a
+  plain Sparrow, three dodges in a row take most of the core's store and starve the guns for a moment; a bank against
+  the strafers pays instead. Short of power, a burst pushes that much less. **Not** while the jump drive spools or the
+  anchor's out. HUD: a DODGE chip with a pip per charge. Look: a hot pink jet out of the nozzle and speed streaks.
+- **Tow Beam** (`utility_tow_beam`, utility, level 12, Mk I steel, 1×2, facing edge out): **U** takes hold of the
+  wreck, debris or loot pod nearest the cursor within 420 of your hull; U again lets go. A spring tether (slack 70 past
+  both hulls, snaps 900 past that) pulls it towards you, damped; anything over 25 mass answers less. You carry 80% of
+  its mass as cargo (at most three times your own), so a Corsair wreck costs a Sparrow about 60% of its thrust. Draws
+  12/s per cell, only while towing (on its circuit like a gun); under 25% power it lets go. It also lets go if you jump,
+  change system or it snaps. **Never** a working ship: no enemies, bosses, wards, traffic or pilots (decision below).
+  **Salvage hook:** towed into a station's reach (docking ring), a wreck or debris is cut up for plate (half of its
+  intact structure's materials) into your station storage, and a derelict also pays its salvage credits and XP and
+  respawns later, as if broken; a pod's contents go into storage. The pilot's `salvaged` stat counts each delivery.
+  Modules aren't salvaged (salvageOf gives components in full, which would make every kill's debris a component farm).
+- **Decisions for Kieran:** (1) Dodge on a dedicated key (Space) rather than double-tap strafe: mouse-steer has no
+  ship-relative strafe keys, and double-tap misfires on fine adjustments. (2) No towing friendly pilots: their own
+  prediction would fight the tether (rubber-banding on their screen); it needs a "towed" flight mode first. (3) The
+  load is constant (mass × 0.8) rather than by tension, so prediction stays exact. (4) Pods with room in your hold
+  are still pulled in by the usual pickup, so towing pods matters when the hold is full. (5) Debris doesn't crumble
+  while towed. (6) No heat (as asked).
