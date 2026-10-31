@@ -222,10 +222,13 @@ describe('firing models', () => {
     expect(gunStateAt(data)).toBe(data.length);
     packGunState(s, data);
     const at = gunStateAt(data);
-    expect(data.slice(at)).toEqual([1, w.part, GUN_STATE_RELOADING]);
+    expect(data.slice(at, at + 2)).toEqual([1, w.part]);
+    // 0 rounds + the reloading flag + one flag step per eighth of the reload done
+    expect(data[at + 2] % GUN_STATE_RELOADING).toBe(0);
+    expect(data[at + 2]).toBeGreaterThanOrEqual(GUN_STATE_RELOADING);
     const fresh = armed('railgun_rail_driver');
     applyGunState(fresh, fresh.derived.weapons[0], data[at + 2]);
-    expect(gunStateValue(fresh, fresh.derived.weapons[0])).toBe(GUN_STATE_RELOADING);
+    expect(gunStateValue(fresh, fresh.derived.weapons[0])).toBe(data[at + 2]);
     expect(fresh.rounds[w.part]).toBe(0);
   });
 });

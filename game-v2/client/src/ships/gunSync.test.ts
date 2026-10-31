@@ -47,4 +47,17 @@ describe('gun-state correction (client)', () => {
     // A tick it never predicted (too old, or not yet): nothing to compare
     expect(sync.onRow(mine, row(server), 5000)).toBe(0);
   });
+
+  it('adopts a reload mid-way at the server progress, not from the start', () => {
+    const mine = railDriver(), server = railDriver();
+    const sync = new GunSync();
+    const w = mine.derived.weapons[0], p = w.part, len = w.fire.reload ?? 60;
+    server.rounds[p] = 0;
+    server.reload[p] = len * 0.3; // 70% done on the server; the client never saw the reload start
+    for (let t = 100; t <= 200; t++) sync.record(mine, t);
+    expect(sync.onRow(mine, row(server), 120)).toBe(0);
+    expect(sync.onRow(mine, row(server), 120 + GUN_STATE_PATIENCE)).toBe(1);
+    expect(mine.reload[p]).toBeGreaterThan(0);
+    expect(Math.abs(mine.reload[p] - len * 0.3)).toBeLessThanOrEqual(len / 8);
+  });
 });

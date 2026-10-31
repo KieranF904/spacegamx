@@ -9,3 +9,4 @@ except to fix a typo. A bump makes old clients reload (see PROTOCOL_VERSION in p
 - 17 (2026-10-31): one ship pool and banks: the pilot row's charge groups are the pool's then each bank's (1 + banks; energy.ts packCharge), data[10] the pool's; Surge, circuits and the core trickle gone
 - 18 (2026-10-31): Firing models: gun-state correction slot at the end of the pilot row; charge start/cancel as shell-less fire events (partAmmo 255/254); heat fields gone from the pilot row (indices 6..) and status row (tow now at 6)
 - 19 (2026-10-31): Shot behaviours: projectile row data[9] endTick (ticks to its end, before x/y); replica control bit CTL.slowed (4096); pilot row's weaponry extras (marked, slowed ticks left) after the tow; status row data[7] statuses (marked 1, slowed 2); the Frostbite's beam slows instead of chilling
+- 20 (2026-10-31): gun-state slot carries reload progress in eighths

@@ -122,12 +122,14 @@ export function clipReloading(ship: Pick<ShipState, 'reload'>, w: WeaponInfo): b
 
 /** The most guns the gun-state slot carries */
 export const GUN_STATE_MAX = 8;
-/** Added to a clip gun's rounds while it reloads */
+/** Added to a clip gun's rounds while it reloads; a further GUN_STATE_RELOADING per eighth of the reload already done */
 export const GUN_STATE_RELOADING = 128;
+/** Steps the reload's progress is carried in */
+const RELOAD_STEPS = 8;
 /** Ticks of disagreement the client waits before it takes the server's gun state */
 export const GUN_STATE_PATIENCE = 30;
 /** What the slot holds (in the wire hash: a change of meaning is a protocol bump) */
-export const GUN_STATE_LAYOUT = `count+(part,value)x${GUN_STATE_MAX}:clip=rounds+${GUN_STATE_RELOADING}reloading,charge=ticks`;
+export const GUN_STATE_LAYOUT = `count+(part,value)x${GUN_STATE_MAX}:clip=rounds+${GUN_STATE_RELOADING}x(1+eighths of the reload done)reloading,charge=ticks`;
 
 /** Does the gun-state slot carry this gun (a clip or charge gun)? */
 export function carriesGunState(w: WeaponInfo): boolean {
@@ -136,7 +138,12 @@ export function carriesGunState(w: WeaponInfo): boolean {
 
 /** A gun's value in the gun-state slot */
 export function gunStateValue(ship: ShipState, w: WeaponInfo): number {
-  if (w.fire.model === 'clip') return Math.max(0, Math.min(GUN_STATE_RELOADING - 1, Math.round(ship.rounds[w.part]))) + (clipReloading(ship, w) ? GUN_STATE_RELOADING : 0);
+  if (w.fire.model === 'clip') {
+    const rounds = Math.max(0, Math.min(GUN_STATE_RELOADING - 1, Math.round(ship.rounds[w.part])));
+    if (!clipReloading(ship, w)) return rounds;
+    const len = w.fire.reload ?? 60, done = Math.max(0, Math.min(RELOAD_STEPS - 1, Math.floor((1 - ship.reload[w.part] / len) * RELOAD_STEPS)));
+    return rounds + GUN_STATE_RELOADING * (1 + done);
+  }
   return Math.max(0, Math.round(ship.charge[w.part]));
 }
 
@@ -164,7 +171,8 @@ export function applyGunState(ship: ShipState, w: WeaponInfo, v: number): void {
   if (f.model === 'clip') {
     ship.rounds[p] = v % GUN_STATE_RELOADING;
     if (f.regrow) return;
-    if (v >= GUN_STATE_RELOADING) { if (!(ship.reload[p] > 0)) ship.reload[p] = f.reload ?? 60; }
+    // Reloading: resume at the server's progress (the middle of its eighth), not from the start
+    if (v >= GUN_STATE_RELOADING) ship.reload[p] = (f.reload ?? 60) * (1 - (Math.floor(v / GUN_STATE_RELOADING) - 1 + 0.5) / RELOAD_STEPS);
     else ship.reload[p] = 0;
   } else if (f.model === 'charge') ship.charge[p] = v;
 }
