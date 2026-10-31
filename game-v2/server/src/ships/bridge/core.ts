@@ -221,6 +221,8 @@ export interface BridgeInternals {
   gravityK: ShipBridge['gravityK'];
   // Private methods modules call back through
   fieldAt: ShipBridge['fieldAt'];
+  rebuildNow: ShipBridge['rebuildNow']; syncHealth: ShipBridge['syncHealth']; cover: ShipBridge['cover'];
+  closestPart: ShipBridge['closestPart']; partWorld: ShipBridge['partWorld']; nearestPart: ShipBridge['nearestPart'];
 }
 
 /** The bridge as its modules see it */

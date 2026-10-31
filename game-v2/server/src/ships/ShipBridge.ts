@@ -13,28 +13,25 @@ import { collideTerrain, rayTerrain, terrainRadius } from '@space-game/common';
 import { repairAt, pointDefenceOf, stepPointDefenceAim, wrapPi, isOpen } from '@space-game/common';
 import { hasComponent, entityExists } from 'bitecs';
 import {
-  Position, Velocity, Rotation, Radius, Health, Input, Boost, Player, Dead, Projectile, InSystem,
-  FRICTION,
-  Blueprint, Catalog, ShipState, ShipTuning, PlacedGeom, Vec2, InventoryStub,
-  stepShipPhysics, quantizeShipBody, validateBlueprint, ValidationResult, GravityWell, FlightConstants,
-  createShipState, rebuildShip, damagePart, repairShip, coreHp, healPart, restorePart, computeJoins, hitMultiplier, weaponHit, shooterGrade, type HitInfo,
-  stepFlight, stepDrift, buildShot, localToWorldDir,
-  withEmp, withNumb, warmthStage, warmthPercent, insulationOf, THAW, WARMTH_STAGES, type WarmthStage, jumpTuning, pilotJumpStep, stepPrime, NO_FIELDS, type JumpField,
-  stepFixedGunAim, fartherThan,
-  blueprintGeometry, castParts, nearestParts, partDistance, pointInConvex, standing, deciding, stageOf, currentStage, stageParts, RUIN_HP, convexPenetration, seededRng, hashInts, stepTurretAim, shipPointToWorld,
-  WeaponInfo, WeaponTuning,
-  ReplicaMode, CTL, controlBits, replicaAngle, quantizeReplicaAngle,
-  shotAimQ, SHOT_AIM_STEPS, firesStraight, partWeaponDef, FireRecord, stepGuns, ammoCode, partMaterial,
-  outputOf,
-  powerTick, gunLoad, remapCharge, flashRestore,
-  quantizeCargo, type FlightBody, buildFlightInputs, newFlightControls, type FlightInputSource,
-  payMining, MINE_CYCLE, MINING_PULSE, MINE_TAIL, mineFalloff, chargeTotal, FULL_CHARGE, type Charge, pulseProfile, beamFalloff,
+  Position, Velocity, Rotation, Radius, Health, Input, Boost, Player, Dead, Projectile, InSystem, FRICTION,
+  Blueprint, Catalog, ShipState, ShipTuning, PlacedGeom, Vec2, InventoryStub, stepShipPhysics, quantizeShipBody,
+  validateBlueprint, ValidationResult, GravityWell, FlightConstants, createShipState, rebuildShip, damagePart,
+  repairShip, healPart, restorePart, computeJoins, hitMultiplier, weaponHit, shooterGrade, type HitInfo, stepFlight,
+  stepDrift, localToWorldDir, withEmp, withNumb, type WarmthStage, jumpTuning, pilotJumpStep, NO_FIELDS,
+  type JumpField, blueprintGeometry, castParts, partDistance, pointInConvex, standing, deciding, stageOf,
+  currentStage, stageParts, convexPenetration, seededRng, hashInts, shipPointToWorld, WeaponInfo, WeaponTuning,
+  ReplicaMode, CTL, controlBits, replicaAngle, quantizeReplicaAngle, firesStraight, partWeaponDef, FireRecord,
+  stepGuns, ammoCode, partMaterial, outputOf, powerTick, gunLoad, remapCharge, quantizeCargo, type FlightBody,
+  buildFlightInputs, newFlightControls, type FlightInputSource, payMining, MINE_CYCLE, MINING_PULSE, MINE_TAIL,
+  mineFalloff, chargeTotal, FULL_CHARGE, type Charge, pulseProfile, beamFalloff,
 } from '@space-game/common';
 import {
-  GLANCING, STAGE_COVER, K, centroidOf, EMP_IMMUNE_TICKS, CONTACT_MARGIN, BEAM_PAD, BIG_BODY,
-  type ShipHost, type PartDestroyedEvent, type PilotOrders, type PendingBlast, type ShipBridgeConfig, type ShipBridgeStats, type ContactPiece, type BridgeCtx,
+  GLANCING, STAGE_COVER, K, centroidOf, CONTACT_MARGIN, BEAM_PAD, BIG_BODY, type ShipHost, type PartDestroyedEvent,
+  type PilotOrders, type PendingBlast, type ShipBridgeConfig, type ShipBridgeStats, type ContactPiece,
+  type BridgeCtx,
 } from './bridge/core.js';
 import * as sync from './bridge/sync.js';
+import * as dmg from './bridge/damage.js';
 
 // (The engine interface, events and constants now live in bridge/core.ts; re-exported for everything that imports them from here)
 export { STAGE_COVER };
@@ -115,47 +112,21 @@ export class ShipBridge {
   private warmth = new Map<number, number>();
 
   /** Seize a ship up (as an EMP) for `ticks`: hazards' storms */
-  emp(eid: number, ticks: number): void {
-    this.empUntil.set(eid, Math.max(this.empUntil.get(eid) ?? 0, this.host.getTick() + ticks));
-  }
+  emp(eid: number, ticks: number): void { return dmg.emp(this.ctx, eid, ticks); }
 
   /** A frost hit landed (a gemmed gun, the Brood Mother's cold): it takes `amount` of warmth, less what the hull keeps out; frozen through, the ship seizes up for `ticks` */
-  frostHit(eid: number, amount: number, ticks: number): void {
-    const ship = this.bodies.get(eid);
-    if (!ship || ship.kind !== 'ship') return;
-    this.warm(eid, -amount * (1 - insulationOf(ship.derived)), ticks);
-  }
+  frostHit(eid: number, amount: number, ticks: number): void { return dmg.frostHit(this.ctx, eid, amount, ticks); }
 
   /** A ship's warmth (0 frozen through .. 1 warm) */
-  warmthOf(eid: number): number {
-    return this.warmth.get(eid) ?? 1;
-  }
+  warmthOf(eid: number): number { return dmg.warmthOf(this.ctx, eid); }
 
   /** Ships that aren't fully warm */
-  chilled(): IterableIterator<number> {
-    return this.warmth.keys();
-  }
+  chilled(): IterableIterator<number> { return dmg.chilled(this.ctx); }
 
-  /**
-   * Change a ship's warmth by `delta`. Reaching 0, it seizes up (as an EMP) for `seizeTicks` and comes out of it
-   * with THAW back; not while it's already seized up, nor just after (EMP_IMMUNE_TICKS): it stays at 0 till then.
-   */
-  warm(eid: number, delta: number, seizeTicks: number): void {
-    const w = Math.max(0, Math.min(1, this.warmthOf(eid) + delta));
-    if (w >= 1) { this.warmth.delete(eid); return; }
-    if (w > 0) { this.warmth.set(eid, w); return; }
-    const now = this.host.getTick();
-    const until = this.empUntil.get(eid) ?? -Infinity;
-    if (now < until + EMP_IMMUNE_TICKS) { this.warmth.set(eid, 0); return; }
-    this.empUntil.set(eid, now + seizeTicks);
-    this.warmth.set(eid, THAW);
-  }
+  warm(eid: number, delta: number, seizeTicks: number): void { return dmg.warm(this.ctx, eid, delta, seizeTicks); }
 
   /** What the cold costs a pilot's ship now (others aren't slowed: the meter only seizes them up) */
-  private coldStage(eid: number): WarmthStage {
-    if (!this.warmth.has(eid) || !hasComponent(this.host.world, Player, eid)) return WARMTH_STAGES[0];
-    return warmthStage(warmthPercent(this.warmthOf(eid)));
-  }
+  private coldStage(eid: number): WarmthStage { return dmg.coldStage(this.ctx, eid); }
   /** Burning parts (incendiary hits): damage over time, spreading to neighbours as parts go */
   private burns: { eid: number; part: number; until: number; dps: number; radius: number; source: number; hit?: HitInfo }[] = [];
   /** Weapon beams on this tick, per ship: how far along the nearest one hit (0..1) */
@@ -432,13 +403,7 @@ export class ShipBridge {
   }
 
   /** Hull left, as a fraction of the ship's full HP (every part counted) */
-  integrity(eid: number): number {
-    const ship = this.bodies.get(eid);
-    if (!ship) return 0;
-    let hp = 0, max = 0;
-    ship.maxHp.forEach((m, i) => { max += m; if (!ship.detached[i]) hp += Math.max(0, ship.hp[i]); });
-    return max > 0 ? hp / max : 0;
-  }
+  integrity(eid: number): number { return dmg.integrity(this.ctx, eid); }
 
   /** Move a ship instantly (boss blinks) */
   teleport(eid: number, x: number, y: number): void {
@@ -609,42 +574,12 @@ export class ShipBridge {
   private ghosts = new Map<number, Set<number>>();
 
   /** Mark these parts (uids) as not built yet */
-  setGhosts(eid: number, uids: number[]): void {
-    const ship = this.bodies.get(eid);
-    if (!ship) return;
-    const want = new Set(uids);
-    const set = new Set<number>();
-    ship.blueprint.parts.forEach((p, i) => {
-      ship.ghost[i] = false;
-      if (!want.has(p.uid) || p.fn === 'core') return;
-      set.add(i);
-      ship.ghost[i] = true;
-      ship.hp[i] = 0;
-      ship.rebuildHp[i] = 0;
-      ship.detached[i] = false;
-    });
-    if (set.size) this.ghosts.set(eid, set); else this.ghosts.delete(eid);
-    this.rebuildNow(eid, ship);
-    if (hasComponent(this.host.world, Player, eid)) this.syncHealth(eid, ship);
-  }
+  setGhosts(eid: number, uids: number[]): void { return dmg.setGhosts(this.ctx, eid, uids); }
 
-  isGhost(eid: number, part: number): boolean {
-    return !!this.ghosts.get(eid)?.has(part);
-  }
+  isGhost(eid: number, part: number): boolean { return dmg.isGhost(this.ctx, eid, part); }
 
   /** A ghost part arrived: build it in at full HP */
-  installGhost(eid: number, uid: number): boolean {
-    const ship = this.bodies.get(eid);
-    const set = this.ghosts.get(eid);
-    if (!ship || !set) return false;
-    const i = ship.blueprint.parts.findIndex((p) => p.uid === uid);
-    if (i < 0 || !set.has(i)) return false;
-    set.delete(i);
-    ship.ghost[i] = false;
-    restorePart(ship, i, 1);
-    ship.rebuildHp[i] = 0;
-    return true;
-  }
+  installGhost(eid: number, uid: number): boolean { return dmg.installGhost(this.ctx, eid, uid); }
 
   /** Fix a pilotless ship where it stands (or free it): rams and blasts no longer move it */
   pin(eid: number, on = true): void {
@@ -659,35 +594,13 @@ export class ShipBridge {
   }
 
   /** Make a ship tougher (elite enemies): every part's max HP × k, at full HP */
-  scaleHp(eid: number, k: number): void {
-    const ship = this.bodies.get(eid);
-    if (!ship) return;
-    ship.maxHp = ship.maxHp.map((h) => h * k);
-    ship.hp = [...ship.maxHp];
-    ship.rebuildHp = [...ship.hp];
-    if (k !== 1) ship.scaledHp = true;
-  }
+  scaleHp(eid: number, k: number): void { return dmg.scaleHp(this.ctx, eid, k); }
 
   /** Toughen one function's parts (a boss's core) by `k` */
-  hardenParts(eid: number, fn: string, k: number): void {
-    const ship = this.bodies.get(eid);
-    if (!ship) return;
-    ship.blueprint.parts.forEach((p, i) => {
-      if (p.fn !== fn) return;
-      ship.scaledHp = true;
-      ship.maxHp[i] *= k;
-      ship.hp[i] = ship.maxHp[i];
-      ship.rebuildHp[i] = ship.hp[i];
-    });
-  }
+  hardenParts(eid: number, fn: string, k: number): void { return dmg.hardenParts(this.ctx, eid, fn, k); }
 
   /** Core HP as a fraction of its max (0 when lost) */
-  coreFraction(eid: number): number {
-    const ship = this.bodies.get(eid);
-    if (!ship) return 0;
-    const c = coreHp(ship);
-    return c.max > 0 ? c.hp / c.max : 0;
-  }
+  coreFraction(eid: number): number { return dmg.coreFraction(this.ctx, eid); }
 
   /** Fly a pilotless ship towards a point (null: stop and hold). */
   setAutopilot(eid: number, target: { x: number; y: number; arriveRadius?: number } | null): void {
@@ -737,97 +650,19 @@ export class ShipBridge {
     this.syncHealth(eid, ship);
   }
 
-  /**
-   * Set every part's HP as a fraction of its max (a saved ship coming back).
-   * 0 = destroyed. No destruction effects: these parts were lost before.
-   */
-  setPartHp(eid: number, fraction: (uid: number) => number): void {
-    const ship = this.bodies.get(eid);
-    if (!ship) return;
-    ship.blueprint.parts.forEach((p, i) => {
-      const f = Math.max(0, Math.min(1, fraction(p.uid)));
-      ship.hp[i] = p.fn === 'core' ? Math.max(ship.maxHp[i] * f, ship.maxHp[i] * 0.25) : ship.maxHp[i] * f;
-      ship.detached[i] = false;
-      ship.rebuildHp[i] = ship.hp[i];
-    });
-    this.rebuildNow(eid, ship);
-    if (hasComponent(this.host.world, Player, eid)) this.syncHealth(eid, ship);
-  }
+  setPartHp(eid: number, fraction: (uid: number) => number): void { return dmg.setPartHp(this.ctx, eid, fraction); }
 
   /** Heal every intact part by a fraction of its max HP (repair kits) */
-  healAll(eid: number, fraction: number): void {
-    const ship = this.bodies.get(eid);
-    if (!ship) return;
-    ship.hp.forEach((_, i) => { if (ship.derived.alive[i]) healPart(ship, i, ship.maxHp[i] * fraction, this.tuning); });
-    if (ship.dirty) this.rebuildNow(eid, ship);
-    if (hasComponent(this.host.world, Player, eid)) this.syncHealth(eid, ship);
-  }
+  healAll(eid: number, fraction: number): void { return dmg.healAll(this.ctx, eid, fraction); }
 
-  /** Last tick this body took damage (-Infinity if never) */
-  /** Who last hit this body (-1: nobody yet) */
-  lastHitter(eid: number): number {
-    return this.lastHitBy.get(eid) ?? -1;
-  }
+  lastHitter(eid: number): number { return dmg.lastHitter(this.ctx, eid); }
 
-  lastDamagedTick(eid: number): number {
-    return this.lastDamaged.get(eid) ?? -Infinity;
-  }
+  lastDamagedTick(eid: number): number { return dmg.lastDamagedTick(this.ctx, eid); }
 
-  /**
-   * All weapon and impact damage to a ship part goes through here: the shield
-   * soaks it first (and stops recharging for a while), the part takes the rest,
-   * as much of it as gets through (`vs.hit`: the weapon's damage type and
-   * penetration against the part's armour and material: damage.ts).
-   * Returns the damage dealt (shield + hull).
-   */
-  hurt(eid: number, ship: ShipState, part: number, amount: number, source = -1, vs?: { shield?: number; hull?: number; hit?: HitInfo; at?: Vec2; bane?: { faction: string; damage: number } }): number {
-    if (amount <= 0 || this.host.invulnerable?.(eid)) return 0;
-    const struck = part;
-    part = this.cover(ship, part, vs?.at);
-    if (part < 0) return 0;
-    // (a later stage's part: the plate covering it takes only a share, so the stage being fought is what to aim at)
-    if (part !== struck && stageOf(this.catalog, ship, struck) > currentStage(this.catalog, ship)) amount *= this.host.stageCover?.(eid) ?? STAGE_COVER;
-    // (ammunition made for one faction's ships: Quench Slugs on the Cinder Cult)
-    if (vs?.bane && this.host.baneFaction?.(eid) === vs.bane.faction) amount *= vs.bane.damage;
-    const taken = this.host.takenScale?.(eid) ?? 1;
-    amount *= taken;
-    const tick = this.host.getTick();
-    let dealt = 0;
-    if (ship.shield > 0 && ship.kind === 'ship' && (vs?.shield ?? 1) > 0) {
-      // What it does to shields (× vs.shield), and the rest of the shot goes on to the hull (a torpedo: shields don't stop it)
-      const k = vs?.shield ?? 1;
-      const soak = Math.min(ship.shield, amount * k);
-      ship.shield -= soak;
-      amount -= soak / k;
-      dealt += soak;
-      ship.shieldHitTick = tick;
-      // (Surge: broken, a capacitor bank touching a shield generator puts part of it back at once: surge.ts flashRestore)
-      if (ship.shield <= 0 && soak > 0) {
-        const flash = flashRestore(ship.derived, this.chargeOf(eid), this.tuning);
-        if (flash) { ship.shield = flash.restore; this.setCharge(eid, flash.charge); }
-      }
-    }
-    const through = vs?.hit && ship.blueprint.parts[part] ? hitMultiplier(this.catalog, this.tuning, ship.blueprint.parts[part], vs.hit) : 1;
-    // (a braced boss shows the hit as glancing: wait for its opening)
-    this.lastThrough = through * Math.min(1, taken);
-    // (a piece that ruins never breaks: it's left wrecked, RUIN_HP to it)
-    const floor = this.catalog.pieces.get(ship.blueprint.parts[part]?.piece)?.ruin ? RUIN_HP : 0;
-    if (amount > 0) dealt += damagePart(ship, part, Math.min(amount * (vs?.hull ?? 1) * through, Math.max(0, ship.hp[part] - floor)), this.tuning);
-    if (dealt > 0) {
-      this.lastDamaged.set(eid, tick);
-      if (source >= 0 && source !== eid) this.lastHitBy.set(eid, source);
-    }
-    return dealt;
-  }
+  hurt(eid: number, ship: ShipState, part: number, amount: number, source = -1, vs?: { shield?: number; hull?: number; hit?: HitInfo; at?: Vec2; bane?: { faction: string; damage: number } }): number { return dmg.hurt(this.ctx, eid, ship, part, amount, source, vs); }
 
   /** Damage one part from outside the usual weapons (a boss's beam): hurt, and reported as any hit is */
-  damagePartBy(eid: number, part: number, amount: number, source: number, hit?: HitInfo): number {
-    const ship = this.bodies.get(eid);
-    if (!ship) return 0;
-    const dealt = this.hurt(eid, ship, part, amount, source, hit ? { hit } : undefined);
-    if (dealt > 0) this.host.notifyDamage(eid, dealt, source, !!hit && this.lastThrough < GLANCING);
-    return dealt;
-  }
+  damagePartBy(eid: number, part: number, amount: number, source: number, hit?: HitInfo): number { return dmg.damagePartBy(this.ctx, eid, part, amount, source, hit); }
 
   /** How much of the last hit got through the armour it struck (hitMultiplier): under GLANCING it shows as glancing */
   private lastThrough = 1;
@@ -836,181 +671,35 @@ export class ShipBridge {
   private coverMemo: { ship: ShipState; at: Vec2; first: number; best: number } | null = null;
 
   /** Is this ship's electronics knocked out by an EMP? */
-  isEmped(eid: number): boolean {
-    return (this.empUntil.get(eid) ?? -1) > this.host.getTick();
-  }
+  isEmped(eid: number): boolean { return dmg.isEmped(this.ctx, eid); }
 
   /** How many more ticks it stays knocked out (0: it isn't), so the pilot's prediction drifts exactly as long as the server does */
-  empTicksLeft(eid: number): number {
-    return Math.max(0, (this.empUntil.get(eid) ?? 0) - this.host.getTick());
-  }
+  empTicksLeft(eid: number): number { return dmg.empTicksLeft(this.ctx, eid); }
 
-  /**
-   * Splash damage around a point (missiles, flak), falling off with distance.
-   * The outer layer shields what's behind it: only the few parts nearest the
-   * blast take it, so a buried core survives a burst against the hull.
-   */
-  splashAt(systemNum: number, x: number, y: number, radius: number, damage: number, source: number, hit?: HitInfo): void {
-    const reach = Math.max(3, Math.round(radius / this.tuning.cellSize));
-    for (const [eid, ship] of this.bodies) {
-      // (Out of reach first: the cheapest test, and it rules out most; the rest have no side effects)
-      if (eid === source || InSystem.systemId[eid] !== systemNum || fartherThan(Position.x[eid] - x, Position.y[eid] - y, radius + ship.derived.radius)) continue;
-      if (this.isJumping(ship) || this.intangible.has(eid) || this.dormant.has(eid)) continue;
-      if (source >= 0 && this.host.canDamage && !this.host.canDamage(source, eid)) continue;
-      // Each part by how far the blast is from its own outline (not its middle: a boss's great plate is hit where it's struck)
-      const cs = this.tuning.cellSize, [gx, gy] = this.worldToGrid(eid, ship, x, y), at: Vec2 = [gx, gy];
-      const near = nearestParts(this.geometry(ship), (i) => ship.hp[i] > 0 && !ship.detached[i] && standing(this.catalog, ship, i), gx, gy, radius / cs);
-      let dealt = 0, through = 0;
-      this.coverMemo = { ship, at, first: 0, best: -1 };
-      try {
-        for (let k = 0; k < near.length && k < reach; k++) {
-          const { i, d } = near[k];
-          dealt += this.hurt(eid, ship, i, damage * (1 - 0.7 * ((d * cs) / radius)), source, { hit, at });
-          through = Math.max(through, this.lastThrough);
-        }
-      } finally {
-        this.coverMemo = null;
-      }
-      if (dealt > 0) this.host.notifyDamage(eid, dealt, source, !!hit && through < GLANCING);
-    }
-    // Single-body enemies (mobs) in reach too
-    this.host.splashMobs?.(systemNum, x, y, radius, damage, source);
-  }
+  splashAt(systemNum: number, x: number, y: number, radius: number, damage: number, source: number, hit?: HitInfo): void { return dmg.splashAt(this.ctx, systemNum, x, y, radius, damage, source, hit); }
 
   /** An EMP burst: ships in range lose engines and guns for `ticks` (shields halve it) */
-  empAt(systemNum: number, x: number, y: number, radius: number, ticks: number, source: number): number[] {
-    const hit: number[] = [];
-    const now = this.host.getTick();
-    for (const [eid, ship] of this.bodies) {
-      if (InSystem.systemId[eid] !== systemNum || ship.kind !== 'ship' || eid === source || this.dormant.has(eid)) continue;
-      if (source >= 0 && this.host.canDamage && !this.host.canDamage(source, eid)) continue;
-      if (fartherThan(Position.x[eid] - x, Position.y[eid] - y, radius + ship.derived.radius)) continue;
-      // (Its hull in reach, not just its bounding circle)
-      if (this.hullDistance(eid, x, y, radius) > radius) continue;
-      const t = ship.shield > ship.derived.shieldMax * 0.25 ? Math.round(ticks / 2) : ticks;
-      // No stun-lock: a ship that just came out of an EMP shrugs off the next for a moment
-      if (!this.isEmped(eid) && now < (this.empUntil.get(eid) ?? -Infinity) + EMP_IMMUNE_TICKS) continue;
-      this.empUntil.set(eid, Math.max(this.empUntil.get(eid) ?? 0, now + t));
-      ship.shield = Math.max(0, ship.shield - ship.derived.shieldMax * 0.5);
-      ship.shieldHitTick = now;
-      hit.push(eid);
-    }
-    return hit;
-  }
+  empAt(systemNum: number, x: number, y: number, radius: number, ticks: number, source: number): number[] { return dmg.empAt(this.ctx, systemNum, x, y, radius, ticks, source); }
 
-  /**
-   * Set the part nearest (x, y) burning for `ticks`. Returns the part (or -1).
-   * Burning parts take `dps`; when one is gone the fire jumps to a neighbour
-   * within `radius` cells.
-   */
-  ignite(eid: number, x: number, y: number, dps: number, ticks: number, radius: number, source: number, hit?: HitInfo, struck = -1): number {
-    const ship = this.bodies.get(eid);
-    if (!ship || ship.kind !== 'ship') return -1;
-    // The part the shot struck, or the one whose outline is nearest the point
-    const part = struck >= 0 && ship.hp[struck] > 0 && !ship.detached[struck] ? struck : this.closestPart(eid, ship, x, y);
-    if (part < 0) return -1;
-    const until = this.host.getTick() + ticks;
-    const cur = this.burns.find((b) => b.eid === eid && b.part === part);
-    if (cur) { cur.until = Math.max(cur.until, until); cur.dps = Math.max(cur.dps, dps); }
-    else this.burns.push({ eid, part, until, dps, radius, source, hit });
-    return part;
-  }
+  ignite(eid: number, x: number, y: number, dps: number, ticks: number, radius: number, source: number, hit?: HitInfo, struck = -1): number { return dmg.ignite(this.ctx, eid, x, y, dps, ticks, radius, source, hit, struck); }
 
   /** Parts on fire now (for the snapshot effects): [body, part] pairs */
-  burning(): { eid: number; part: number }[] {
-    return this.burns.map((b) => ({ eid: b.eid, part: b.part }));
-  }
+  burning(): { eid: number; part: number }[] { return dmg.burning(this.ctx); }
 
   /** The intact part whose real outline is nearest a world point (-1: none) */
-  private closestPart(eid: number, ship: ShipState, x: number, y: number): number {
-    const [gx, gy] = this.worldToGrid(eid, ship, x, y), geoms = this.geometry(ship);
-    let best = -1, bd = Infinity;
-    for (let i = 0; i < geoms.length; i++) {
-      if (ship.hp[i] <= 0 || ship.detached[i]) continue;
-      const d = partDistance(geoms[i], gx, gy, bd);
-      if (d < bd) { bd = d; best = i; }
-      if (bd === 0) break;
-    }
-    return best;
-  }
+  private closestPart(eid: number, ship: ShipState, x: number, y: number): number { return dmg.closestPart(this.ctx, eid, ship, x, y); }
 
-  /**
-   * How far a world point is from a ship's hull: its nearest standing part's
-   * real outline (0 inside one). Infinity when that's further than `within`
-   * (or it has nothing standing). Fuses, EMPs and arcs go by this.
-   */
-  hullDistance(eid: number, x: number, y: number, within = Infinity): number {
-    const ship = this.bodies.get(eid);
-    if (!ship) return Infinity;
-    const cs = this.tuning.cellSize;
-    if (Math.hypot(Position.x[eid] - x, Position.y[eid] - y) - ship.derived.radius - cs > within) return Infinity;
-    const [gx, gy] = this.worldToGrid(eid, ship, x, y), geoms = this.geometry(ship);
-    let bd = within / cs, found = false;
-    for (let i = 0; i < geoms.length; i++) {
-      // (Its box, then its outline, before the lookups standing makes)
-      const d = partDistance(geoms[i], gx, gy, bd);
-      if (d > bd || !standing(this.catalog, ship, i)) continue;
-      bd = d; found = true;
-      if (bd === 0) break;
-    }
-    return found ? bd * cs : Infinity;
-  }
+  hullDistance(eid: number, x: number, y: number, within = Infinity): number { return dmg.hullDistance(this.ctx, eid, x, y, within); }
 
   /** The middle of the standing part nearest a world point by its outline (where an arc strikes), or null */
-  nearestPartPoint(eid: number, x: number, y: number): Vec2 | null {
-    const ship = this.bodies.get(eid);
-    if (!ship) return null;
-    const [gx, gy] = this.worldToGrid(eid, ship, x, y), geoms = this.geometry(ship);
-    let best = -1, bd = Infinity;
-    for (let i = 0; i < geoms.length; i++) {
-      const d = partDistance(geoms[i], gx, gy, bd);
-      if (d >= bd || !standing(this.catalog, ship, i)) continue;
-      bd = d; best = i;
-      if (bd === 0) break;
-    }
-    return best < 0 ? null : this.partWorld(eid, ship, best);
-  }
+  nearestPartPoint(eid: number, x: number, y: number): Vec2 | null { return dmg.nearestPartPoint(this.ctx, eid, x, y); }
 
   /** The part a straight shot from (x0, y0) at a ship's centre strikes first (a station's turret), else the one nearest (x0, y0); -1 if none */
-  partFacing(eid: number, x0: number, y0: number): number {
-    const ship = this.bodies.get(eid);
-    if (!ship) return -1;
-    const h = this.segmentHit(eid, ship, x0, y0, Position.x[eid], Position.y[eid]);
-    return h ? h.part : this.closestPart(eid, ship, x0, y0);
-  }
+  partFacing(eid: number, x0: number, y0: number): number { return dmg.partFacing(this.ctx, eid, x0, y0); }
 
-  private nearestPart(eid: number, ship: ShipState, x: number, y: number, exclude = -1): number {
-    let best = -1, bd = Infinity;
-    ship.hp.forEach((hp, i) => {
-      if (hp <= 0 || ship.detached[i] || i === exclude) return;
-      const [px, py] = this.partWorld(eid, ship, i);
-      const d = Math.hypot(px - x, py - y);
-      if (d < bd) { bd = d; best = i; }
-    });
-    return best;
-  }
+  private nearestPart(eid: number, ship: ShipState, x: number, y: number, exclude = -1): number { return dmg.nearestPart(this.ctx, eid, ship, x, y, exclude); }
 
-  private stepBurns(tick: number): void {
-    const keep: typeof this.burns = [];
-    for (const b of this.burns) {
-      const ship = this.bodies.get(b.eid);
-      if (!ship || tick >= b.until || ship.kind !== 'ship') continue;
-      if (ship.hp[b.part] <= 0 || ship.detached[b.part]) {
-        // Spread to the nearest part still standing, if it's close enough
-        const [px, py] = this.partWorld(b.eid, ship, b.part);
-        const next = this.nearestPart(b.eid, ship, px, py, b.part);
-        if (next < 0) continue;
-        const [nx, ny] = this.partWorld(b.eid, ship, next);
-        if (Math.hypot(nx - px, ny - py) > b.radius * this.tuning.cellSize * 1.5) continue;
-        if (this.burns.some((o) => o !== b && o.eid === b.eid && o.part === next)) continue;
-        b.part = next;
-      }
-      const dealt = this.hurt(b.eid, ship, b.part, (b.dps * 10) / 60, b.source, b.hit ? { hit: b.hit } : undefined);
-      if (dealt > 0 && tick % 30 === 0) this.host.notifyDamage(b.eid, dealt * 3, b.source);
-      keep.push(b);
-    }
-    this.burns = keep;
-  }
+  private stepBurns(tick: number): void { return dmg.stepBurns(this.ctx, tick); }
 
   /** Nearest ship `eid` may attack within `range` of (x, y) (missile targets) */
   /** `hull`: by the distance to its hull (hullDistance), not to its centre (a boss's centre is far inside it) */
@@ -1913,61 +1602,10 @@ export class ShipBridge {
     return shipPointToWorld(ship, this.pose(eid), this.geometry(ship)[part].centroid, this.tuning.cellSize);
   }
 
-  /**
-   * Parts destroyed since the last rebuild: send their effect, and schedule the
-   * ones that blow up. Returns whether any were found. Each is marked handled by
-   * zeroing its rebuild HP (the rebuild later this tick does that anyway).
-   */
-  private partDeaths(eid: number, ship: ShipState, tick: number): boolean {
-    let found = false;
-    const cs = this.tuning.cellSize;
-    const hps = ship.hp;
-    for (let i = 0; i < hps.length; i++) {
-      if (hps[i] > 0 || !(ship.rebuildHp[i] > 0) || ship.detached[i]) continue;
-      found = true;
-      ship.rebuildHp[i] = 0;
-      const fn = ship.blueprint.parts[i].fn;
-      const crumbled = this.crumbled.has(`${eid}:${i}`);
-      // (A model's own blast, or none; a legacy part's its function's)
-      const fd = this.catalog.functions.get(fn);
-      const blast = crumbled ? undefined : fd?.model ? fd.blast : this.tuning.partBlast?.[fn];
-      const [x, y] = this.partWorld(eid, ship, i);
-      const geom = this.geometry(ship)[i];
-      if (ship.blueprint.parts[i].gems?.length) this.host.partLost?.(eid, ship.blueprint.parts[i].uid);
-      this.host.notifyPartDestroyed?.({
-        systemId: InSystem.systemId[eid], bodyId: eid, part: i, fn,
-        how: crumbled ? 'crumble' : blast ? 'blast' : 'break',
-        x, y, vx: Velocity.x[eid], vy: Velocity.y[eid],
-        size: blast ? blast.radius * cs : Math.sqrt(geom.area) * cs,
-      });
-      if (!blast) continue;
-      const [lo, hi] = blast.delayTicks;
-      const delay = lo + Math.floor(seededRng(hashInts(eid, i, tick))() * (hi - lo + 1));
-      this.blasts.push({ due: tick + delay, systemId: InSystem.systemId[eid], x, y, radius: blast.radius * cs, damage: blast.damage, source: eid });
-    }
-    return found;
-  }
+  private partDeaths(eid: number, ship: ShipState, tick: number): boolean { return dmg.partDeaths(this.ctx, eid, ship, tick); }
 
   /** Damage every intact part within the blast radius (any body), falling off with distance. */
-  private applyBlast(b: PendingBlast): void {
-    const tick = this.host.getTick();
-    for (const [eid, ship] of this.bodies) {
-      if (InSystem.systemId[eid] !== b.systemId || this.intangible.has(eid)) continue;
-      if (Math.hypot(Position.x[eid] - b.x, Position.y[eid] - b.y) > b.radius + ship.derived.radius) continue;
-      let dealt = 0;
-      // (By each part's own outline, as splash goes)
-      const cs = this.tuning.cellSize, [gx, gy] = this.worldToGrid(eid, ship, b.x, b.y);
-      for (const { i, d } of nearestParts(this.geometry(ship), (i) => ship.hp[i] > 0 && !ship.detached[i], gx, gy, b.radius / cs)) {
-        dealt += this.hurt(eid, ship, i, b.damage * (1 - (d * cs) / b.radius), this.lastHitBy.get(b.source) ?? -1, { at: [gx, gy] });
-      }
-      if (dealt <= 0) continue;
-      this.lastDamaged.set(eid, tick);
-      // Whoever set off the chain gets the credit
-      const by = this.lastHitBy.get(b.source);
-      if (by !== undefined && eid !== by) this.lastHitBy.set(eid, by);
-      this.host.notifyDamage(eid, dealt, b.source);
-    }
-  }
+  private applyBlast(b: PendingBlast): void { return dmg.applyBlast(this.ctx, b); }
 
   /**
    * Debris has no core holding it together: each part crumbles away at its own
