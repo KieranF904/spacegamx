@@ -323,7 +323,7 @@ describe('legendary weapons', () => {
     void d0;
   });
 
-  it('the Frostbite Lance seizes up a ship it holds', () => {
+  it('the Frostbite Lance slows a ship it holds', () => {
     const { server, pid, bridge, enemies, step } = range();
     // A cultist with its lance swapped for a frostbite lance
     const bp = JSON.parse(JSON.stringify(bridge.enemyDesigns.cinder_zealot));
@@ -332,7 +332,7 @@ describe('legendary weapons', () => {
     expect(bridge.validate(bp).ok).toBe(true);
     enemies.spawnPack(InSystem.systemId[pid], { faction: 'cinder', ships: ['frost_test'] }, 90000, 89600);
     let frozen = false;
-    for (let i = 0; i < 60 * 15 && !frozen; i++) { hold(pid, 90000, 90000); step(); frozen = bridge.isEmped(pid); }
+    for (let i = 0; i < 60 * 15 && !frozen; i++) { hold(pid, 90000, 90000); step(); frozen = bridge.slowedTicksLeft(pid) > 0; }
     expect(frozen).toBe(true);
     void server;
   });
