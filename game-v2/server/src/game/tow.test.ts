@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import { readFileSync } from 'fs';
 import * as bitecs from 'bitecs';
-import { Position, Velocity, Rotation, InSystem, ServerMessage, parseBlueprint, worldToLocalDir, dodgeCharges, pilotExtras, type Blueprint } from '@space-game/common';
+import { Position, Velocity, Rotation, InSystem, ServerMessage, parseBlueprint, worldToLocalDir, strafeForce, dodgePhase, DODGE_LEFT, DODGE_RIGHT, pilotExtras, type Blueprint } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
@@ -61,38 +61,42 @@ function world() {
 }
 
 describe('Burst Strafer in the server', () => {
-  it('a press dodges once to the side asked, spends a charge, and the replicas follow it without a keyframe', () => {
+  it('a press dodges once (no way held: sideways, then back the other way), and the replicas follow it without a keyframe', () => {
     const { server, pid, input, run, ships } = world();
     const d = ships.get(pid)!.derived;
-    expect(d.strafe!.left.length).toBe(1);
-    expect(d.strafe!.right.length).toBe(1);
+    expect(strafeForce(d.strafe, DODGE_LEFT)).toBeGreaterThan(0);
+    expect(strafeForce(d.strafe, DODGE_RIGHT)).toBeGreaterThan(0);
     const rep = (server as any).replication;
     run(3);
     const before = { ...rep.reasons };
-    input({ dodge: 1 });
+    input({ dodge: true });
     run(d.strafe!.ticks + 5);
     const lat = worldToLocalDir([Velocity.x[pid], Velocity.y[pid]], Rotation.angle[pid])[0];
     expect(lat).toBeGreaterThan(2);
-    expect(dodgeCharges(d.strafe, ships.get(pid)!.dodgeSpent).ready).toBe(d.strafe!.charges - 1);
-    // Held: no second burst. Let go and press again: a second one, the other way
-    input({ dodge: 0 });
+    expect(ships.get(pid)!.dodgeDir).toBe(DODGE_RIGHT);
+    // Held: no second burst, however long. Let go and press again: a second one, the other way
+    run(d.strafe!.cooldown + 10);
+    expect(dodgePhase(ships.get(pid)!.dodge, d.strafe).phase).toBe('held');
+    input({ dodge: false });
     run(2);
-    input({ dodge: -1 });
+    expect(dodgePhase(ships.get(pid)!.dodge, d.strafe).phase).toBe('ready');
+    input({ dodge: true });
     run(d.strafe!.ticks + 2);
-    expect(dodgeCharges(d.strafe, ships.get(pid)!.dodgeSpent).ready).toBe(d.strafe!.charges - 2);
+    expect(ships.get(pid)!.dodgeDir).toBe(DODGE_LEFT);
+    expect(worldToLocalDir([Velocity.x[pid], Velocity.y[pid]], Rotation.angle[pid])[0]).toBeLessThan(0);
     const moved = Object.entries(rep.reasons as Record<string, number>).filter(([k, v]) => k.startsWith('Player:') && v !== (before[k] ?? 0));
     expect(moved).toEqual([]);
   });
 
-  it("the pilot's snapshot row carries the dodge and its charge (the prediction replays from them)", () => {
+  it("the pilot's snapshot row carries the dodge counter and its way (the prediction replays from them)", () => {
     const { got, input, run } = world();
-    input({ dodge: -1 });
+    input({ dodge: true, left: true });
     run(5);
     const snaps = got.filter((m) => m.type === 'snapshot') as any[];
     expect(snaps.length).toBeGreaterThan(0);
     // (Whatever the snapshot encoding, the pilot's own row has its data: find a row carrying a dodge under way)
     const rows = snaps.flatMap((s) => (s.e ?? s.entities ?? []) as any[]).map((r) => (Array.isArray(r) ? r[9] : r.data)).filter((x) => Array.isArray(x) && x.length > 16);
-    expect(rows.some((data: number[]) => pilotExtras(data).dodge < 0 && pilotExtras(data).dodgeSpent > 0)).toBe(true);
+    expect(rows.some((data: number[]) => pilotExtras(data).dodge > 0 && pilotExtras(data).dodgeDir === DODGE_LEFT)).toBe(true);
   });
 });
 

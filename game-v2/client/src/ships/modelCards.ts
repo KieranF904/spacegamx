@@ -15,7 +15,7 @@ export const FAMILY_LABEL: Record<string, string> = {
   ion: 'Ion drives', afterburner: 'Burn engines', plasma: 'Plasma drives', jumpcoil: 'Jump coils',
   reactor: 'Generators', dynamo: 'Surge generators', battery: 'Batteries', capacitor: 'Capacitors', drive_cell: 'Drive cells',
   shield: 'Shields', plating: 'Plating',
-  mining: 'Mining lasers', demolition: 'Demolition', siphon: 'Siphons', scanner: 'Scanners', constructor: 'Constructors', anchor: 'Anchors',
+  mining: 'Mining lasers', demolition: 'Demolition', siphon: 'Siphons', scanner: 'Scanners', constructor: 'Constructors',
   // (Support weapons: common/src/ships/support.ts)
   repair: 'Repair beams', point_defence: 'Point defence',
   // (Burst Strafer and Tow Beam: ships/strafer.ts, tow.ts)
@@ -43,10 +43,9 @@ export function familyRank(label: string): number {
  */
 const TRADE_OFF: Record<string, string> = {
   cannon_pip: 'light and quick',
-  utility_stabiliser_anchor: 'hold still for range, aim and shields; no thrust braced',
   utility_repair_beam: "mends allies' parts; nothing for you, big draw",
   point_defence_turret: 'shoots down missiles on its own; never ships',
-  engine_burst_strafer: 'a sharp dodge sideways, 3 charges; no cruising push, big draw',
+  engine_burst_strafer: 'a hard dodge away from its nozzle, short cooldown; no cruising push, big draw',
   utility_tow_beam: 'tows wrecks and pods to salvage; slows you by their mass',
   cannon_hammer: 'slow heavy shell, punches plate',
   cannon_twinlink: 'sustained fire, power-hungry',
@@ -184,8 +183,7 @@ export function keyStats(catalog: Catalog, tuning: ShipTuning | undefined, fn: F
   if (st.shield) out.push(`shield ${n0(st.shield)}`);
   if ((fn.range ?? 0) > 0 && !fn.weapon) out.push(`scan ${n0(fn.range!)} m`);
   if ((fn.jumpCapacity ?? 0) > 0) out.push(`jump ${n0(fn.jumpCapacity! * st.area)} cells`);
-  if (st.brace) out.push(`braced: reach +${Math.round((st.brace.reach - 1) * 100)}%`);
-  if (st.dodge) out.push(`dodge ${st.dodge.force.toFixed(1)} push · ${st.dodge.charges} charges · ${n0(st.dodge.energy)} energy a burst`);
+  if (st.dodge) out.push(`dodge ${st.dodge.force.toFixed(1)} push · every ${st.dodge.cooldown.toFixed(1)} s · ${n0(st.dodge.energy)} energy a burst`);
   if (st.tow) out.push(`tows within ${n0(st.tow.range)} m`);
   if (st.draw && !st.supply) out.push(st.dodge ? `draws ${n0(st.draw)} bursting` : st.tow ? `draws ${n0(st.draw)} towing` : `draws ${n0(st.draw)}`);
   if (!out.length || (fn.category === 'shields' && !st.shield)) out.push(`${n0(st.hp)} hp · armour ${st.armour}`);

@@ -67,7 +67,7 @@ rebuild. Client: the pilot predicts the same steps (`ShipClient.predict`, `predi
   proportion to what it holds (so they run dry together, as the one ship-wide pool did) and each within its own rate.
   It recharges only from the main circuit. To every other circuit, and to engines, guns and mining lasers wired to
   nothing at all, it trickles 12/s in total, shared by what each is short. So an unwired or cut-off part limps.
-- **Steady loads** (shields, scanners, jump coils, the Stabiliser Anchor) are unchanged: shared out of their own
+- **Steady loads** (shields, scanners, jump coils; the Stabiliser Anchor too, until it was removed after playtesting the same day) are unchanged: shared out of their own
   circuit's generators at the rebuild, before any of this.
 - **Damage:** a lost part splits circuits at the rebuild as before; `remapCharge` gives each new store group the
   capacity-weighted charge its parts held, so each half keeps its share and joined circuits pool theirs. A mended
@@ -119,6 +119,9 @@ The pilot's own snapshot row: `data[1]` the whole charge (the ENERGY gauge), `da
 `data[11]` how many store groups follow, `data[16…]` each group's charge (hundredths of a percent; at most 24).
 `packCharge` / `unpackCharge` in energy.ts. Nobody else's row carries charge. (The Stabiliser Anchor's `data[14]`
 and `[15]` sit between.) `PROTOCOL_VERSION` 13 → 14, one bump for both changes; the wire-table hash didn't change.
+*Since protocol 16 the anchor is gone (removed after playtesting): cargo mass is `data[14]` and the groups start at
+`data[15]` (`CHARGE_GROUPS_AT`). The Burst Strafer's dodge, reworked the same day, now draws 700/s a cell (140 a burst,
+no charges, a 0.4 s cooldown): spamming it is what banks and generation are for (build-archetypes.md, "Burst Strafer rework").*
 
 ### Hangar and HUD
 

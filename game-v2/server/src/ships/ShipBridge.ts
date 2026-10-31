@@ -27,7 +27,7 @@ import {
   shotAimQ, SHOT_AIM_STEPS, firesStraight, partWeaponDef, FireRecord, stepGuns, ammoCode, partMaterial, type WeaponMods, type ShipDerived,
   outputOf,
   powerTick, gunLoad, remapCharge, flashRestore,
-  anchorTuning, isBraced, quantizeCargo, type FlightBody,
+  quantizeCargo, type FlightBody,
   payMining, MINE_CYCLE, MINING_PULSE, MINE_TAIL, mineFalloff, chargeTotal, FULL_CHARGE, type Charge, pulseProfile, beamFalloff,
 } from '@space-game/common';
 
@@ -40,7 +40,7 @@ export interface ShipHost {
   removeBody(eid: number): void;
   /** A projectile weapon's shot (kind = tuning.weapons key), spawned exactly at (x, y). `target` is a homing target (or -1). */
   /** Returns the shells' entity ids, in spawn order */
-  fireBaseShot(ownerEid: number, x: number, y: number, angle: number, damageScale: number, shape?: { speedScale: number; sizeScale: number; turret: boolean; kind?: string; target?: number; seed?: string; mods?: WeaponMods; dry?: boolean; ammoMods?: WeaponMods; reach?: number; grade?: number; size?: number; model?: WeaponMods; braced?: boolean }): number[] | void;
+  fireBaseShot(ownerEid: number, x: number, y: number, angle: number, damageScale: number, shape?: { speedScale: number; sizeScale: number; turret: boolean; kind?: string; target?: number; seed?: string; mods?: WeaponMods; dry?: boolean; ammoMods?: WeaponMods; reach?: number; grade?: number; size?: number; model?: WeaponMods }): number[] | void;
   /** A shot's damage against shields and hull (pulse lasers), if it has its own */
   shotVs?(proj: number): { shield?: number; hull?: number; hit?: HitInfo; bane?: { faction: string; damage: number } } | undefined;
   /** Where a hazard bites: beam heat or shield regeneration × this (1 where nothing does) */
@@ -950,8 +950,7 @@ export class ShipBridge {
     let dealt = 0;
     if (ship.shield > 0 && ship.kind === 'ship' && (vs?.shield ?? 1) > 0) {
       // What it does to shields (× vs.shield), and the rest of the shot goes on to the hull (a torpedo: shields don't stop it)
-      // (Braced by an anchor, a hit takes less of the shield: anchor.ts)
-      const k = (vs?.shield ?? 1) / (ship.brace && isBraced(ship.brace, anchorTuning(this.tuning)) ? 1 + anchorTuning(this.tuning).shieldSoak : 1);
+      const k = vs?.shield ?? 1;
       const soak = Math.min(ship.shield, amount * k);
       ship.shield -= soak;
       amount -= soak / k;
@@ -1234,9 +1233,8 @@ export class ShipBridge {
     // The hold's cargo flies with it (ships/load.ts), as the pilot's prediction and every replica have it
     // (and what its Tow Beam tows, as load: ships/tow.ts)
     body.cargo = quantizeCargo((this.host.cargoMass?.(eid) ?? 0) + (this.host.towLoad?.(eid) ?? 0));
-    const brace = Input.brace[eid] === 1;
-    // (Burst Strafer: the held dodge, -1 left or +1 right: ships/strafer.ts)
-    const dodge = Math.sign(Input.dodge[eid]);
+    // (Burst Strafer: the dodge held; its way comes from the movement keys: ships/strafer.ts)
+    const dodge = Input.dodge[eid] === 1;
     const q = quantizeReplicaAngle(Input.targetAngle[eid]);
     // An EMP cripples the drive (thrust and steering × EMP_CONTROL) and stops a jump starting; the pilot's prediction flies it the same
     const emp = this.isEmped(eid);
@@ -1249,7 +1247,7 @@ export class ShipBridge {
       bits: controlBits({
         forward: Input.forward[eid] === 1, backward: Input.backward[eid] === 1, left: Input.left[eid] === 1, right: Input.right[eid] === 1,
         boost: Input.boost[eid] === 1, helm: Input.helm[eid] === 1, strafeLeft: Input.strafeLeft[eid] === 1, strafeRight: Input.strafeRight[eid] === 1,
-        jump, brace, dodge,
+        jump, dodge,
       }) | (emp ? CTL.emp : 0) | (cold.control < 1 ? CTL.numb : 0),
     });
     // Charging fields round the step (a star's ring, a lodestone's): the range boost from where it starts, then a faster
@@ -1269,7 +1267,6 @@ export class ShipBridge {
         strafeRight: Input.strafeRight[eid] === 1,
         jump,
         jumpDist: Input.cursorDist[eid],
-        brace,
         dodge,
       }, ship.derived, this.tuning, { charge: this.chargeOf(eid), drainRate: 1, load: gunLoad(ship, this.host.getTick()), tick: this.host.getTick() }, this.host.gravityAt(eid), rangeBoost, emp ? withEmp(hazard) : hazard, this.host.terrainAt?.(eid));
     });
@@ -1375,9 +1372,7 @@ export class ShipBridge {
   private fireWeapons(eid: number, ship: ShipState, firing: boolean, aimWorld?: number, aimDist = 0, target = -1, energy?: { charge: Charge }): void {
     const tick = this.host.getTick();
     const pose = this.pose(eid);
-    // (Braced by an anchor: further and steadier, anchor.ts)
-    const braced = !!ship.brace && isBraced(ship.brace, anchorTuning(this.tuning));
-    const def = (w: WeaponInfo) => partWeaponDef(this.tuning, w.kind, ship.blueprint.parts[w.part], w, braced);
+    const def = (w: WeaponInfo) => partWeaponDef(this.tuning, w.kind, ship.blueprint.parts[w.part], w);
     let beamHit = -1;
     const beamed = new Set<number>();
     // The guns' tick (shared with the pilot's client, which fires its own shells on the same tick: guns.ts)
@@ -1415,7 +1410,7 @@ export class ShipBridge {
       const round = this.host.spendAmmo?.(eid, w.kind, !d.ammo);
       const ids = this.host.fireBaseShot(eid, shot.x, shot.y, shot.angle, shot.damageScale * this.damageMul(eid) * (round?.scale ?? 1),
         { speedScale: shot.speedScale, sizeScale: shot.sizeScale, turret: shot.mount === 'turret', kind: w.kind, target: lock, seed: `${eid}:${ship.blueprint.parts[w.part].uid}`, mods: gunMods, dry: round?.dry, ammoMods: round?.mods,
-          reach: d.lob ? Math.max(200, aimDist) : undefined, grade: w.grade, size: w.size, model: w.model, braced });
+          reach: d.lob ? Math.max(200, aimDist) : undefined, grade: w.grade, size: w.size, model: w.model });
       if (ids?.length && firesStraight(d)) this.fired.push({ owner: eid, tick, part: w.part, aimQ, ids, ...(round?.item ? { ammo: ammoCode(round.item) } : {}) });
     }
     if (beamHit >= 0) this.weaponBeams.set(eid, beamHit);
@@ -1477,7 +1472,7 @@ export class ShipBridge {
     const [x, y] = shipPointToWorld(ship, pose, muzzle, cs);
     const [dx, dy] = localToWorldDir(dir, pose.angle);
     const angle = Math.atan2(dy, dx);
-    const range = (def.range ?? 800) * (def.reach ?? 1);
+    const range = def.range ?? 800;
     const x1 = x + Math.cos(angle) * range, y1 = y + Math.sin(angle) * range;
     // (A hostile's beam burns at its kind's npcScale: the laser was made better for pilots, not for the scrap that fires it)
     const npc = hasComponent(this.host.world, Player, eid) ? 1 : def.npcScale ?? 1;
@@ -1552,7 +1547,7 @@ export class ShipBridge {
    */
   private repairBeam(eid: number, ship: ShipState, w: WeaponInfo, def: WeaponTuning): number {
     const { x, y, angle } = this.beamFrom(eid, ship, w);
-    const range = (def.range ?? 500) * (def.reach ?? 1);
+    const range = def.range ?? 500;
     const x1 = x + Math.cos(angle) * range, y1 = y + Math.sin(angle) * range;
     const half = (def.width ?? 0) / 2, sys = InSystem.systemId[eid];
     let hit: { eid: number; ship: ShipState; part: number; t: number } | null = null;
@@ -1589,12 +1584,12 @@ export class ShipBridge {
       if (!d.pointDefence || !w.window) continue;
       const pd = pointDefenceOf(d);
       if (!listed && !quiet) {
-        this.host.pdThreats!(eid, pose.x, pose.y, (pd.range + ship.derived.radius) * (d.reach ?? 1), this.pdList);
+        this.host.pdThreats!(eid, pose.x, pose.y, pd.range + ship.derived.radius, this.pdList);
         listed = true;
       }
       const win = w.window;
       const [px, py] = shipPointToWorld(ship, pose, win.pivot, this.tuning.cellSize);
-      const reach = pd.range * (d.reach ?? 1);
+      const reach = pd.range;
       // (Local angle to a point, and whether it can fire that way: in its arc, and not through its own hull)
       const local = (tx: number, ty: number) => Math.atan2(ty - py, tx - px) - (pose.angle + Math.PI / 2);
       const bears = (a: number) => { const off = wrapPi(a - win.center); return (win.half >= Math.PI - 1e-9 || Math.abs(off) <= win.half) && isOpen(win, off); };
@@ -1846,8 +1841,7 @@ export class ShipBridge {
         const max = ship.derived.shieldMax;
         if (max <= 0) { ship.shield = 0; continue; }
         if (ship.shield > max) ship.shield = max;
-        // (Braced by an anchor, faster: anchor.ts)
-        if (ship.shield < max && tick - ship.shieldHitTick > sh.regenDelayTicks) ship.shield = Math.min(max, ship.shield + ((max * sh.regenPerSecond) / 60) * (this.host.hazardScale?.(ship.id, 'shield') ?? 1) * (ship.brace && isBraced(ship.brace, anchorTuning(this.tuning)) ? 1 + anchorTuning(this.tuning).shieldRegen : 1));
+        if (ship.shield < max && tick - ship.shieldHitTick > sh.regenDelayTicks) ship.shield = Math.min(max, ship.shield + ((max * sh.regenPerSecond) / 60) * (this.host.hazardScale?.(ship.id, 'shield') ?? 1));
       }
     }
 
@@ -2044,8 +2038,7 @@ export class ShipBridge {
       if (!deepest) continue;
 
       // Pinned structures don't give: whatever hits them takes all the push
-      // (A braced anchor gives only a little: anchor.ts contact)
-      const invA = this.pinned.has(ea) ? 0 : (1 / A.derived.mass) * this.contactShare(A), invB = this.pinned.has(eb) ? 0 : (1 / B.derived.mass) * this.contactShare(B);
+      const invA = this.pinned.has(ea) ? 0 : 1 / A.derived.mass, invB = this.pinned.has(eb) ? 0 : 1 / B.derived.mass;
       if (invA + invB === 0) continue;
       const { nx, ny, depth } = deepest;
       const corr = depth / (invA + invB);
@@ -2358,7 +2351,7 @@ export class ShipBridge {
   }
 
   private readBody(eid: number, ship: ShipState): FlightBody {
-    return { x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid], angle: Rotation.angle[eid], angVel: ship.angVel, jump: ship.jump, jumpScale: ship.jumpScale, brace: ship.brace, cargo: ship.cargo, dodge: ship.dodge, dodgeSpent: ship.dodgeSpent };
+    return { x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid], angle: Rotation.angle[eid], angVel: ship.angVel, jump: ship.jump, jumpScale: ship.jumpScale, cargo: ship.cargo, dodge: ship.dodge, dodgeDir: ship.dodgeDir };
   }
 
   /** Jump range multiplier where this ship is (a star's ring, or a lodestone's priming) */
@@ -2409,33 +2402,16 @@ export class ShipBridge {
   }
   // ---- (end Tow Beam)
 
-  /** Braced by a Stabiliser Anchor (common/src/ships/anchor.ts): its benefits apply */
-  isBraced(eid: number): boolean {
-    const ship = this.bodies.get(eid);
-    return !!ship?.brace && isBraced(ship.brace, anchorTuning(this.tuning));
-  }
-
-  /** Share of a collision's push a body takes (a braced anchor: anchor.ts contact) */
-  private contactShare(ship: ShipState): number {
-    return ship.brace && isBraced(ship.brace, anchorTuning(this.tuning)) ? anchorTuning(this.tuning).contact : 1;
-  }
-
-  /** Share of a pull or knockback this ship feels (a braced anchor holds it: none) */
-  pullShare(eid: number): number {
-    return this.isBraced(eid) ? anchorTuning(this.tuning).pull : 1;
-  }
-
   /** Mid-jump (the burn itself): no guns, and the ship passes through other hulls */
   isJumping(ship: ShipState): boolean {
     return jumpPhase(ship.jump, jumpTuning(this.tuning)).phase === 'burn';
   }
 
-  private writeBody(eid: number, ship: ShipState, b: { x: number; y: number; vx: number; vy: number; angle: number; angVel: number; jump?: number; jumpScale?: number; brace?: number; cargo?: number; dodge?: number; dodgeSpent?: number }): void {
+  private writeBody(eid: number, ship: ShipState, b: { x: number; y: number; vx: number; vy: number; angle: number; angVel: number; jump?: number; jumpScale?: number; cargo?: number; dodge?: number; dodgeDir?: number }): void {
     if (b.jump !== undefined) ship.jump = b.jump;
     // (The Burst Strafer's: stepFlight leaves them absent at 0, so they're taken as they come)
-    if ('dodge' in b) { ship.dodge = b.dodge || undefined; ship.dodgeSpent = b.dodgeSpent || undefined; }
+    if ('dodge' in b) { ship.dodge = b.dodge || undefined; ship.dodgeDir = b.dodgeDir || undefined; }
     if (b.jumpScale !== undefined) ship.jumpScale = b.jumpScale;
-    if (b.brace !== undefined) ship.brace = b.brace || undefined;
     if (b.cargo !== undefined) ship.cargo = b.cargo || undefined;
     Position.x[eid] = b.x;
     Position.y[eid] = b.y;

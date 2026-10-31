@@ -69,7 +69,7 @@ export const FULL_CHARGE: Charge = { core: 100, s: [] };
  * data[10] the core's store, data[11] how many store groups follow, and each group's from data[CHARGE_GROUPS_AT]
  * (at most MAX_CHARGE_GROUPS; any past that are taken as full). Hundredths of a percent.
  */
-export const CHARGE_GROUPS_AT = 16;
+export const CHARGE_GROUPS_AT = 15;
 export const MAX_CHARGE_GROUPS = 24;
 const hundredths = (v: number) => Math.round(pctOf(v) * 100) / 100;
 

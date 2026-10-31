@@ -28,9 +28,9 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
  * has updated PROTOCOL_VERSION and PROTOCOL_WIRE_HASH.
  */
 // History: PROTOCOL_CHANGELOG.md. Re-pin with `npm run wire:bump "reason"` (game-v2/), never by hand.
-export const PROTOCOL_VERSION = 15;
+export const PROTOCOL_VERSION = 16;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
-export const PROTOCOL_WIRE_HASH = 'a9bbc10b';
+export const PROTOCOL_WIRE_HASH = '4a951b59';
 /** WebSocket close code (and reason) for a client on another protocol version */
 export const PROTOCOL_MISMATCH_CLOSE = 4002;
 export const PROTOCOL_MISMATCH_REASON = 'version';
@@ -61,10 +61,8 @@ export interface ClientInputMessage {
   cursorDist?: number;
   /** Jump drive: true while spooling up (the client latches it from a J press) */
   jump?: boolean;
-  /** Stabiliser Anchor: true while braced (the client toggles it: ships/anchor.ts) */
-  brace?: boolean;
-  /** Burst Strafer: held to dodge, -1 left or +1 right of the ship (0 / absent none: ships/strafer.ts) */
-  dodge?: number;
+  /** Burst Strafer: held to dodge, the way the movement keys ask (ships/strafer.ts) */
+  dodge?: boolean;
 }
 
 /** Cursor distance is sent in steps of this many world units, up to CURSOR_DIST_MAX */
@@ -1152,7 +1150,7 @@ const BINARY_MSG_INPUT = 0x03;
 // [5]    : flags (forward, backward, left, right, boost, fireLeft, fireRight)
 // [6-7]  : aim angle in the 13-bit cursor quantization (the client only ever sends those)
 // [8-9]  : cursorDist / CURSOR_DIST_STEP (16 bits)
-// [10]   : flags2 (strafeLeft, strafeRight, helm, jump, has targetTick, brace, dodge, dodge to the right)
+// [10]   : flags2 (strafeLeft, strafeRight, helm, jump, has targetTick, -, dodge, -)  (0x20 and 0x80 free)
 // The tick the client was at isn't sent: nothing reads it.
 // (The old 17-byte form, type 0x01, still decodes.)
 
@@ -1184,8 +1182,7 @@ export function encodeInputBinary(msg: ClientInputMessage): ArrayBuffer {
     (msg.helm ? 0x04 : 0) |
     (msg.jump ? 0x08 : 0) |
     (msg.targetTick !== undefined ? 0x10 : 0) |
-    (msg.brace ? 0x20 : 0) |
-    (msg.dodge ? 0x40 | (msg.dodge > 0 ? 0x80 : 0) : 0));
+    (msg.dodge ? 0x40 : 0));
   return buffer;
 }
 
@@ -1213,8 +1210,7 @@ export function decodeInputBinary(data: ArrayBuffer | Uint8Array): ClientInputMe
     strafeRight: (flags2 & 0x02) !== 0,
     helm: (flags2 & 0x04) !== 0,
     jump: (flags2 & 0x08) !== 0,
-    brace: (flags2 & 0x20) !== 0,
-    dodge: flags2 & 0x40 ? (flags2 & 0x80 ? 1 : -1) : 0,
+    dodge: (flags2 & 0x40) !== 0,
     cursorDist: view.getUint16(8, true) * CURSOR_DIST_STEP,
   };
 }

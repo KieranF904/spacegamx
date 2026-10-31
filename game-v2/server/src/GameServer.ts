@@ -826,10 +826,8 @@ export class GameServer {
       remove: (eid) => { addComponent(this.world, Dead, eid); this.pendingRemovedEntities.add(eid); },
       nudge: (eid, ax, ay) => {
         if (hasComponent(this.world, Dead, eid) || this.ships.get(eid)?.kind === 'debris') return;
-        // (A braced Stabiliser Anchor holds against it: common/src/ships/anchor.ts)
-        const k = this.ships.pullShare(eid);
-        Velocity.x[eid] += ax * k;
-        Velocity.y[eid] += ay * k;
+        Velocity.x[eid] += ax;
+        Velocity.y[eid] += ay;
       },
       miningTool: (kind, turret) => {
         const t = this.gameData.miningTable.tools as unknown as Record<string, { yield: number; hardness: number }>;
@@ -2360,7 +2358,7 @@ this.devTeleport = opts.devTeleport ?? false;
       fireBaseShot: (ownerEid, x, y, angle, damageScale, shape) => {
         const ids: number[] = [];
         this.weapons.spawn(ownerEid, shape?.kind ?? 'cannon', x, y, angle, damageScale,
-          { speedScale: shape?.speedScale ?? 1, sizeScale: shape?.sizeScale ?? 1, turret: shape?.turret ?? false, target: shape?.target, seed: shape?.seed, mods: shape?.mods, dry: shape?.dry, ammoMods: shape?.ammoMods, reach: shape?.reach, grade: shape?.grade, size: shape?.size, model: shape?.model, braced: shape?.braced }, ids);
+          { speedScale: shape?.speedScale ?? 1, sizeScale: shape?.sizeScale ?? 1, turret: shape?.turret ?? false, target: shape?.target, seed: shape?.seed, mods: shape?.mods, dry: shape?.dry, ammoMods: shape?.ammoMods, reach: shape?.reach, grade: shape?.grade, size: shape?.size, model: shape?.model }, ids);
         return ids;
       },
       shotVs: (proj) => this.weapons.vsOf(proj),
@@ -3460,8 +3458,7 @@ case 'join':
     Input.strafeRight[eid] = msg.strafeRight ? 1 : 0;
     Input.helm[eid] = msg.helm ? 1 : 0;
     Input.jump[eid] = msg.jump ? 1 : 0;
-    Input.brace[eid] = msg.brace ? 1 : 0;
-    Input.dodge[eid] = Math.sign(Number(msg.dodge) || 0);
+    Input.dodge[eid] = msg.dodge ? 1 : 0;
     // (The binary input carries it as a uint16; a JSON one could say NaN, Infinity or a string)
     const cursorDist = Number(msg.cursorDist);
     Input.cursorDist[eid] = Number.isFinite(cursorDist) ? Math.min(65535, Math.max(0, cursorDist)) : 0;
@@ -3915,7 +3912,7 @@ case 'join':
   private releaseControls(eid: number): void {
     Input.forward[eid] = 0; Input.backward[eid] = 0; Input.left[eid] = 0; Input.right[eid] = 0;
     Input.boost[eid] = 0; Input.fireLeft[eid] = 0; Input.fireRight[eid] = 0;
-    Input.strafeLeft[eid] = 0; Input.strafeRight[eid] = 0; Input.jump[eid] = 0; Input.brace[eid] = 0; Input.dodge[eid] = 0;
+    Input.strafeLeft[eid] = 0; Input.strafeRight[eid] = 0; Input.jump[eid] = 0; Input.dodge[eid] = 0;
   }
 
   // ---- Crash isolation (server robustness audit, docs/audits/server-robustness.md) ----
@@ -5018,7 +5015,7 @@ case 'join':
         hp: Math.round(Health.current[eid]),
         maxHp: Math.round(Health.max[eid]),
         // data[0]: cursor/weapon state (see CURSOR_STATE.md); data[1]: the whole charge (the gauge); [10] the core's store, [11] how many
-        // store groups, [16...] each group's charge (local circuits, reconciliation: energy.ts packCharge / unpackCharge)
+        // store groups, [15...] each group's charge (local circuits, reconciliation: energy.ts packCharge / unpackCharge)
         data: [
           packCursorWeaponState(Input.targetAngle[eid], beam.hit, this.ships.weaponBeamState(eid).on, beam.on),
           charge.total,
@@ -5031,14 +5028,13 @@ case 'join':
           Math.round((ship?.jumpScale ?? 1) * 1000), // this jump's speed scale (prediction)
           field.flags,                           // in a charging field: 1 a star's ring, 2 a lodestone's (bits)
           charge.core,                           // [10] the core's store %
-          charge.groups.length,                  // [11] store groups that follow from [16]
+          charge.groups.length,                  // [11] store groups that follow from [15]
           field.prime,                           // a lodestone's priming left, ticks (prediction)
           warmthPercent(this.ships.warmthOf(eid)), // warmth % (common/src/ships/warmth.ts: the frost vignette, and the stage prediction flies and fires with)
-          ship?.brace ?? 0,                      // [14] Stabiliser Anchor counter (common/src/ships/anchor.ts: prediction, the HUD)
-          ship?.cargo ?? 0,                      // [15] the hold's cargo mass (common/src/ships/load.ts: prediction flies it)
-          ...charge.groups,                      // [16...] each store group's charge % (CHARGE_GROUPS_AT)
-          // After the groups (common/src/ships/strafer.ts pilotExtras): the Burst Strafer's dodge and charge spent, what the Tow Beam tows (+1)
-          ship?.dodge ?? 0, ship?.dodgeSpent ?? 0, this.towing.wireOf(eid),
+          ship?.cargo ?? 0,                      // [14] the hold's cargo mass (common/src/ships/load.ts: prediction flies it)
+          ...charge.groups,                      // [15...] each store group's charge % (CHARGE_GROUPS_AT)
+          // After the groups (common/src/ships/strafer.ts pilotExtras): the Burst Strafer's dodge counter and way, what the Tow Beam tows (+1)
+          ship?.dodge ?? 0, ship?.dodgeDir ?? 0, this.towing.wireOf(eid),
         ],
       }, 'player', names.get(eid));
       // Everyone else: status only (motion is replicated). data: [shield %, EMP'd, beam heat (tenths), overheated,

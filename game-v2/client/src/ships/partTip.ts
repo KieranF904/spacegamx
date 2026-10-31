@@ -172,19 +172,16 @@ export function partTipHtml(p: Pick<PlacedPart, 'fn' | 'material' | 'piece'> & P
   }
   if (st.shield) html += row('Shield', n0(st.shield));
   if (st.cargo) html += row('Cargo', `${n0(st.cargo)} <span style="color:#8ea0bd; font-weight:400">(what you carry weighs the ship down)</span>`);
-  if (st.brace) {
-    const b = st.brace, pct = (v: number) => `${Math.round(Math.abs(v - 1) * 100)}%`;
-    html += row('Braced', `guns reach +${pct(b.reach)}, scatter −${pct(b.scatter)} · shields recharge +${pct(b.shieldRegen)} · no pulls`);
-    html += row('Brace / let go', `${b.braceSecs.toFixed(2)} s / ${b.releaseSecs.toFixed(1)} s <span style="color:#fbbf24; font-weight:400">(no thrust while out)</span>`);
-  }
   // Burst Strafer (strafer.ts): a dodge, not thrust; on a design, which way it dodges
   if (st.dodge) {
     const o = st.dodge;
-    html += row('Dodge', `<span style="color:#f9a8d4">${o.force.toFixed(1)} push for ${o.secs.toFixed(2)} s</span> away from its nozzle · ${o.charges} charges, one back every ${o.recharge.toFixed(1)} s · <span style="color:#8ea0bd; font-weight:400">no push for cruising</span>`);
-    html += row('A burst costs', `${n0(o.energy)} energy <span style="color:#8ea0bd; font-weight:400">(from a capacitor bank it touches first)</span>`);
+    html += row('Dodge', `<span style="color:#f9a8d4">${o.force.toFixed(1)} push for ${o.secs.toFixed(2)} s</span> away from its nozzle · again after ${o.cooldown.toFixed(2)} s · <span style="color:#8ea0bd; font-weight:400">no push for cruising</span>`);
+    html += row('A burst costs', `${n0(o.energy)} energy straight out (less at an angle) <span style="color:#8ea0bd; font-weight:400">(from a capacitor bank it touches first, then its circuit: dodging often needs banks, batteries and generation behind it)</span>`);
     if (d && i >= 0) {
-      const s = d.strafe, side = s?.left.some((x) => x.part === i) ? 'left' : s?.right.some((x) => x.part === i) ? 'right' : '';
-      html += row('On this ship', side ? `dodges ${side}` : '<span style="color:#fbbf24">points no way sideways (or has no power): it does nothing</span>');
+      const p = d.strafe?.parts.find((x) => x.part === i);
+      // (Ship-local: x right, y back)
+      const way = p ? (Math.abs(p.push[0]) >= Math.abs(p.push[1]) ? (p.push[0] > 0 ? 'right' : 'left') : p.push[1] > 0 ? 'back' : 'forward') : '';
+      html += row('On this ship', way ? `pushes ${way}: it helps any dodge with some ${way} in it` : '<span style="color:#fbbf24">has no power: it does nothing</span>');
     }
   }
   // Tow Beam (tow.ts)

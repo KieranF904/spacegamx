@@ -14,7 +14,7 @@ import { rebuild, type ShipDerived } from './rebuild.js';
 import { createShipState, type ShipState } from './state.js';
 import type { ShipTuning } from './tuning.js';
 import { stepGuns } from './guns.js';
-import { BROWNOUT, FULL_CHARGE, chargeTotal, circuitCharges, gunLoad, loadTest, packCharge, powerTick, remapCharge, unpackCharge, type Charge } from './energy.js';
+import { BROWNOUT, CHARGE_GROUPS_AT, FULL_CHARGE, chargeTotal, circuitCharges, gunLoad, loadTest, packCharge, powerTick, remapCharge, unpackCharge, type Charge } from './energy.js';
 import { readShipJson, testCatalog, SHIP_DATA_DIR } from './testData.js';
 import { autoWire } from './wires.js';
 
@@ -28,9 +28,10 @@ const design = (path: string): Blueprint => parseBlueprint(readFileSync(join(SHI
 const codes = (b: Blueprint) => validateBlueprint(catalog, b, tuning, null).errors.map((e) => e.code);
 
 /** Every library design, the dev guests' and the starter (Sparrow T is the starter: it's in the library) */
+// (test-brownout.json is short of power on purpose; devTestShips.test.ts in the server covers the test-* ships)
 const LIBRARY = [
   ...readdirSync(join(SHIP_DATA_DIR, 'blueprints')).filter((f) => f.endsWith('.json')),
-  ...readdirSync(join(SHIP_DATA_DIR, 'blueprints/dev')).filter((f) => f.endsWith('.json')).map((f) => `dev/${f}`),
+  ...readdirSync(join(SHIP_DATA_DIR, 'blueprints/dev')).filter((f) => f.endsWith('.json') && f !== 'test-brownout.json').map((f) => `dev/${f}`),
 ];
 
 /** The same ship with stores that give without limit (the core's too): what it would do before discharge rates */
@@ -99,7 +100,7 @@ describe('local circuits: migration', () => {
   });
 
   it('the starter (Sparrow T) and the dev guests never brown out at all in that fight', () => {
-    for (const f of ['sparrow-t.json', ...LIBRARY.filter((x) => x.startsWith('dev/'))]) {
+    for (const f of ['sparrow-t.json', ...LIBRARY.filter((x) => x.startsWith('dev/guest-'))]) {
       const log = fight(design(f));
       expect(log.brownTicks, f).toBe(0);
     }
@@ -315,7 +316,7 @@ describe('local circuits: the rules', () => {
     const d = createShipState(catalog, tuning, 1, design('galleon.json'), 0).derived;
     const c: Charge = { core: 33.3333, s: d.power!.stores.map((_, i) => 10 + i) };
     const packed = packCharge(d, c);
-    const data: number[] = new Array(16).fill(0);
+    const data: number[] = new Array(CHARGE_GROUPS_AT).fill(0);
     data[1] = packed.total; data[10] = packed.core; data[11] = packed.groups.length; data.push(...packed.groups);
     const back = unpackCharge(data);
     expect(back.core).toBeCloseTo(33.33, 2);

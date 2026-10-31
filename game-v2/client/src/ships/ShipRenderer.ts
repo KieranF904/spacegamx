@@ -18,7 +18,7 @@ import { HullWorker } from './hullWorkerClient';
 import { fromWire, type HullJob } from './hullWire';
 import { buildHull, skeletonCovered, type HullBuild } from './hullBuild';
 import { beam } from '../rendering/fxTextures';
-import { EntityType, ShipState, SIDE_NORMAL, Side, facingEdges, isOpen, isWeaponFn, wireCells, cellKey, type Blueprint, anchorTuning, braceAmount, bracePhase, dodgePhase, pilotExtras } from '@space-game/common';
+import { EntityType, ShipState, SIDE_NORMAL, Side, facingEdges, isOpen, isWeaponFn, wireCells, cellKey, type Blueprint, dodgePhase, dodgeVec, pilotExtras } from '@space-game/common';
 import type { ShipSource } from './ShipStore';
 import type { GameState } from '../state/GameState';
 import type { Renderer } from '../rendering/Renderer';
@@ -63,9 +63,6 @@ interface BodyView {
   turretRebuilds: number;
   /** What the health bar shows now (it's redrawn only when that changes) */
   barKey?: string;
-  /** A Stabiliser Anchor out: its clamps and the hull's ring (drawBrace), and what they were drawn for */
-  brace?: Graphics;
-  braceKey?: string;
   /** A Burst Strafer's burst: its jets and the streak (drawDodge) */
   dodge?: Graphics;
   /** Named pilotless hulks (derelicts) get a label underneath */
@@ -564,8 +561,7 @@ export class ShipRenderer {
       this.drawTurrets(view, ship, cs, dt * 60);
       this.drawWires(view, ship, cs, now, entity.type === EntityType.ShipBody && (hostile || entity.data?.[0] === 2));
       this.updateLamps(view, ship, entity, dt);
-      this.drawBrace(view, ship, entity.brace, cs, now);
-      this.drawDodge(view, ship, entity.dodge, cs, now);
+      this.drawDodge(view, ship, entity.dodge, entity.dodgeDir, cs, now);
       this.drawTether(eid, entity, ship, cs, now);
       // Quick: most of the flash gone in ~6 frames
       if (view.flashLevel > 0) view.flashLevel = Math.max(0, view.flashLevel * Math.pow(0.7, dt * 60) - 0.01 * dt * 60);
@@ -960,64 +956,19 @@ export class ShipRenderer {
    * hull is in the way. Each barrel is drawn once, in white, and only turned
    * and tinted per frame.
    */
-  /**
-   * A Stabiliser Anchor out (common/src/ships/anchor.ts): each anchor's four
-   * clamp feet slide out of its corners on struts as it braces (and back as it
-   * lets go), lit amber while spooling and cyan braced, when a faint ring
-   * round the hull breathes too. Nothing drawn while it's stowed.
-   */
-  private drawBrace(view: BodyView, ship: ShipState, counter: number | undefined, cs: number, now: number): void {
-    const t = anchorTuning(this.bridge.tuning);
-    const out = ship.derived.anchor ? braceAmount(counter, t) : 0;
-    if (out <= 0) {
-      if (view.brace?.visible) { view.brace.visible = false; view.braceKey = ''; }
-      return;
-    }
-    if (!view.brace) { view.brace = new Graphics(); view.container.addChildAt(view.brace, 0); }
-    view.brace.visible = true;
-    const braced = bracePhase(counter, t).phase === 'braced';
-    // (Braced, it breathes: redrawn a few times a second, not every frame)
-    const breath = braced ? 0.5 + 0.5 * Math.sin(now / 420) : 0;
-    const key = `${ship.rebuilds}|${Math.round(out * 30)}|${braced ? Math.round(breath * 8) : -1}`;
-    if (key === view.braceKey) return;
-    view.braceKey = key;
-    const g = view.brace;
-    g.clear();
-    const col = braced ? 0x7dd3fc : 0xfbbf24;
-    const [cx, cy] = ship.derived.com;
-    const geoms = this.bridge.geometry(ship);
-    for (let i = 0; i < ship.blueprint.parts.length; i++) {
-      if (!ship.derived.alive[i] || !this.bridge.catalog.functions.get(ship.blueprint.parts[i].fn)?.anchor) continue;
-      const geom = geoms[i];
-      if (!geom) continue;
-      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-      for (const p of geom.polygon) { x0 = Math.min(x0, p[0]); y0 = Math.min(y0, p[1]); x1 = Math.max(x1, p[0]); y1 = Math.max(y1, p[1]); }
-      const mx = (geom.centroid[0] - cx) * cs, my = (geom.centroid[1] - cy) * cs;
-      const reach = 0.55 * out, pad = 0.32;
-      for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
-        const px = ((sx < 0 ? x0 : x1) - cx + sx * reach) * cs, py = ((sy < 0 ? y0 : y1) - cy + sy * reach) * cs;
-        // The strut, then the foot: an L hugging the corner, its knuckle lit
-        g.moveTo(mx, my).lineTo(px, py).stroke({ width: cs * 0.09, color: 0x3a3f48, alpha: 0.95 });
-        const fx = px - sx * pad * cs, fy = py - sy * pad * cs;
-        g.moveTo(fx, py).lineTo(px, py).lineTo(px, fy).stroke({ width: cs * 0.13, color: 0x8b95a5, alpha: 0.95, cap: 'round', join: 'round' });
-        g.circle(px, py, cs * 0.08).fill({ color: col, alpha: 0.55 + 0.4 * out });
-      }
-    }
-    if (braced) g.circle(0, 0, ship.derived.radius * 1.06).stroke({ width: cs * 0.12, color: col, alpha: 0.12 + 0.12 * breath });
-  }
-
   // ---- Burst Strafer and Tow Beam (common/src/ships/strafer.ts, tow.ts)
   private tethers?: Graphics;
 
   /**
-   * A Burst Strafer's burst: from each strafer firing, a hot pink-white jet out of its nozzle (long at first, shrinking
-   * as the burst runs out) with a flash at the mouth, and speed streaks trailing off the hull's far side. Redrawn every
-   * frame while it runs (a quarter second); nothing otherwise.
+   * A Burst Strafer's burst: from each strafer firing (those pushing the dodge's way, each by how much of its push goes
+   * that way), a hot pink-white jet out of its nozzle (long at first, shrinking as the burst runs out) with a flash at
+   * the mouth, and speed streaks trailing off the hull away from the dodge. Redrawn every frame while it runs (a fifth
+   * of a second); nothing otherwise.
    */
-  private drawDodge(view: BodyView, ship: ShipState, counter: number | undefined, cs: number, now: number): void {
+  private drawDodge(view: BodyView, ship: ShipState, counter: number | undefined, dir: number | undefined, cs: number, now: number): void {
     const s = ship.derived.strafe;
-    const ph = s ? dodgePhase(counter, s.ticks) : null;
-    if (!s || !ph || ph.phase !== 'burst') {
+    const ph = s ? dodgePhase(counter, s) : null;
+    if (!s || !ph || ph.phase !== 'burst' || !dir) {
       if (view.dodge?.visible) view.dodge.visible = false;
       return;
     }
@@ -1028,12 +979,14 @@ export class ShipRenderer {
     const k = 1 - ph.progress, flicker = 0.85 + 0.15 * Math.sin(now / 23);
     const [cx, cy] = ship.derived.com;
     const geoms = this.bridge.geometry(ship);
-    for (const p of ph.side < 0 ? s.left : s.right) {
-      const geom = geoms[p.part];
-      if (!geom) continue;
+    const [ux, uy] = dodgeVec(dir);
+    for (const p of s.parts) {
+      const geom = geoms[p.part], f = Math.hypot(p.push[0], p.push[1]);
+      const share = f > 0 ? (p.push[0] * ux + p.push[1] * uy) / f : 0;
+      if (!geom || share <= 0.05) continue;
       for (const nz of decorOf(geom).nozzles) {
         const bx = (nz.at[0] - cx) * cs, by = (nz.at[1] - cy) * cs;
-        const hw = (nz.width / 2) * cs * (1.1 + 0.6 * k), len = cs * (1.4 + 4.2 * k) * flicker;
+        const hw = (nz.width / 2) * cs * (1.1 + 0.6 * k), len = cs * (1.4 + 4.2 * k) * flicker * (0.4 + 0.6 * share);
         const tip = [bx + nz.n[0] * len, by + nz.n[1] * len];
         const l = [bx + nz.t[0] * hw, by + nz.t[1] * hw], r = [bx - nz.t[0] * hw, by - nz.t[1] * hw];
         g.poly([l[0], l[1], tip[0], tip[1], r[0], r[1]]).fill({ color: 0xf472b6, alpha: 0.75 * (0.4 + 0.6 * k) });
@@ -1043,10 +996,10 @@ export class ShipRenderer {
       }
     }
     // Speed streaks: off the hull's trailing side (opposite the push), fading with the burst
-    const R = ship.derived.radius, side = ph.side;
+    const R = ship.derived.radius, nx = -uy, ny = ux;
     for (let i = -1; i <= 1; i++) {
-      const y = i * R * 0.45, x0 = -side * R * 0.7, x1 = -side * (R * 0.9 + cs * (1.5 + 3 * k));
-      g.moveTo(x0, y).lineTo(x1, y).stroke({ width: cs * 0.14, color: 0xf9a8d4, alpha: 0.6 * k });
+      const o = i * R * 0.45, a = R * 0.7, b = R * 0.9 + cs * (1.5 + 3 * k);
+      g.moveTo(nx * o - ux * a, ny * o - uy * a).lineTo(nx * o - ux * b, ny * o - uy * b).stroke({ width: cs * 0.14, color: 0xf9a8d4, alpha: 0.6 * k });
     }
   }
 

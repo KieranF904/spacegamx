@@ -81,12 +81,10 @@ export interface InterpolatedEntity {
   empUntil?: number;
   /** Warmth, % (local player; server data[13]: common/src/ships/warmth.ts): the frost vignette, and how cold prediction flies and fires */
   warmth?: number;
-  /** Stabiliser Anchor counter (local player: server data[14], then predicted; others: their replica): common/src/ships/anchor.ts */
-  brace?: number;
-  /** Burst Strafer: the dodge counter and charge spent (local player: the server's, then predicted; others: their replica's dodge): ships/strafer.ts */
+  /** Burst Strafer: the dodge counter and the last dodge's way (local player: the server's, then predicted; others: their replica's): ships/strafer.ts */
   dodge?: number;
-  dodgeSpent?: number;
-  /** The hold's cargo mass (local player; server data[15]: common/src/ships/load.ts): prediction flies it */
+  dodgeDir?: number;
+  /** The hold's cargo mass (local player; server data[14]: common/src/ships/load.ts): prediction flies it */
   cargoMass?: number;
   /** Other pilots: their status row (shield, EMP, beam heat, beams, cursor distance); data is rebuilt from it and their replica */
   status?: number[];
@@ -888,10 +886,9 @@ export class GameState {
     player.jumpPrime = serverState.data?.[12] ?? 0;
     player.empUntil = snapshot.tick + (serverState.data?.[5] ?? 0);
     player.warmth = serverState.data?.[13] ?? 100;
-    player.brace = serverState.data?.[14] ?? 0;
-    player.cargoMass = serverState.data?.[15] ?? 0;
-    // (After the charge groups: the Burst Strafer's dodge and charge, strafer.ts pilotExtras)
-    { const x = pilotExtras(serverState.data); player.dodge = x.dodge; player.dodgeSpent = x.dodgeSpent; }
+    player.cargoMass = serverState.data?.[14] ?? 0;
+    // (After the charge groups: the Burst Strafer's dodge and way, strafer.ts pilotExtras)
+    { const x = pilotExtras(serverState.data); player.dodge = x.dodge; player.dodgeDir = x.dodgeDir; }
 
     // Reset boost fuel to server-reported value before replaying inputs.
     // Boost fuel is now in entity data[1] for every snapshot (not just playerState).

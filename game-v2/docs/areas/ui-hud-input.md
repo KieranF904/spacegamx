@@ -9,7 +9,7 @@ The client's player-facing shell: `Game.ts` (the orchestrator: builds every wind
 | `ui/windowKit.ts` | 429 | `GameWindow` (veil + head + tabs + body, `open/close/onClose`, swallows keys except Esc), `showTip/hideTip`, `openMenu/closeMenu`, `itemTipHtml`, `partStatsHtml`, `costHtml`, `ItemGrid`, filters/sort |
 | `ui/PilotHud.ts` | 182 | `PilotHud` (bars, level, credits) and `ToastUI` |
 | `ui/QuickBar.ts`, `CargoPanelUI.ts` | 271 (cargo) | Quick-bar slots 1-5; the cargo panel on the HUD |
-| `ui/CircuitBars.ts`, `BraceIndicator.ts`, `DodgeIndicator.ts`, `TowIndicator.ts`, `FrostVignette.ts` | 100-255 each | Per-feature HUD chips driven by `ShipDerived`/snapshot extras |
+| `ui/CircuitBars.ts`, `DodgeIndicator.ts` (ready/cooldown ring, LOW POWER, ways it can't dodge), `TowIndicator.ts`, `FrostVignette.ts` | 100-255 each | Per-feature HUD chips driven by `ShipDerived`/snapshot extras |
 | `ui/StationWindow.ts` | 1444 | Station tabs (lazy chunk). Economy area owns content; god-file |
 | `ui/InventoryWindow.ts`, `TradeWindow.ts`, `QuestUI.ts` (835), `SocialUI.ts` (319) | 200-835 | Cargo/storage window (I), player trade, jobs+skills log (L/K) and tracker, party/friends (P) |
 | `ui/SystemMapUI.ts` | 1885 | Galaxy/system map (M), autopilot clicks. God-file |
@@ -61,7 +61,7 @@ The client's player-facing shell: `Game.ts` (the orchestrator: builds every wind
 ## How to extend
 1. **Add a keybinding**: add an `ActionDef` to `ACTIONS` (`input/keybindings.ts`) with a default `key`; handle `code === '<default>'` in `Game.handleKeyPress` (1075-1214) or read the key in `tickInput` (1478); show it via `boundKeyName`. The rebinding UI iterates `ACTIONS`, so it appears automatically.
 2. **Add a window**: extend/compose `GameWindow` in `ui/<Name>.ts`; construct in `Game.init` (436-665) passing `send`/`sound`; if heavy, wrap in `new Lazy(() => import('./ui/<Name>')...)` and add to `prefetchScreens` (727); add its Esc/toggle case to `handleKeyPress`.
-3. **Add a HUD chip**: new small class in `ui/` (model: `BraceIndicator.ts`, `CircuitBars.ts`) with an `update()` using `setText`; construct in `init`, call from `updateUI` (2426) or `update`; if toggleable add a field to `SettingsData` + `defaultSettings()` and a row in GameMenuUI's tab.
+3. **Add a HUD chip**: new small class in `ui/` (model: `DodgeIndicator.ts`, `CircuitBars.ts`) with an `update()` using `setText`; construct in `init`, call from `updateUI` (2426) or `update`; if toggleable add a field to `SettingsData` + `defaultSettings()` and a row in GameMenuUI's tab.
 4. **Handle a new server message**: add a `case` in `handleServerMessage` (1722-2121) calling a UI method; the type must exist in common protocol (`networking`).
 5. **Add a setting**: `SettingsData` + `defaultSettings()` in `settings/Settings.ts` (the loader merges saved data over defaults, so old saves are fine), a row in `GameMenuUI`, apply in `Game.applySettings` (995).
 6. **Add a context-menu action**: pure options in `input/contextClick.ts` (`targetOptions`/`openSpaceOptions`, extend `ActionId`), execution in `ContextActions.pick`, tests in `contextClick.test.ts`.

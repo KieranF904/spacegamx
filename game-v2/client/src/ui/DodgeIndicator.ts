@@ -1,7 +1,18 @@
 /**
- * The Burst Strafer's HUD chip, over the jump gauge (common/src/ships/strafer.ts): a pip per charge (lit: ready;
- * the next one filling), the dodge key, and a flash while a burst runs. Shown while a ship has strafers fitted.
+ * The Burst Strafer's HUD chip, over the jump gauge (common/src/ships/strafer.ts): READY (lit) or a ring filling over
+ * the short cooldown, the dodge key, a flash while a burst runs, LOW POWER when the circuit can't pay for a full burst
+ * the way you'd dodge now, and which ways the strafers can't push (if any). Shown while a ship has strafers fitted.
  */
+
+export interface DodgeHud {
+  phase: 'ready' | 'burst' | 'cooling' | 'held';
+  /** Cooldown left (0..1) */
+  cooling: number;
+  /** How much of a burst the way you'd dodge now the ship could pay for (0..1: strafer.ts dodgeAffordable) */
+  afford: number;
+  /** The ways it can dodge, as arrows (ship-relative), when it can't dodge every way; '' when it can */
+  ways: string;
+}
 
 export class DodgeIndicator {
   private root: HTMLDivElement;
@@ -16,21 +27,24 @@ export class DodgeIndicator {
     document.body.appendChild(this.root);
   }
 
-  /** Each frame: the charges (null: hidden), whether a burst is running, and the dodge key */
-  update(s: { ready: number; max: number; refill: number; bursting: boolean; sides: string } | null, keyName: string): void {
-    const show = !!s && s.max > 0;
-    const key = show ? `${s!.ready}|${s!.max}|${Math.round(s!.refill * 10)}|${s!.bursting}|${keyName}|${s!.sides}` : '';
+  /** Each frame: the dodge's state (null: hidden), and the dodge key */
+  update(s: DodgeHud | null, keyName: string): void {
+    const low = !!s && s.afford < 0.999;
+    const key = s ? `${s.phase}|${Math.round(s.cooling * 12)}|${low ? Math.round(s.afford * 10) : 'ok'}|${keyName}|${s.ways}` : '';
     if (key === this.key) return;
     this.key = key;
-    this.root.style.display = show ? 'block' : 'none';
-    if (!show) return;
-    const pip = (i: number) => {
-      if (i < s!.ready) return '<b style="display:inline-block; width:9px; height:9px; margin:0 2px; border-radius:50%; background:#f472b6; box-shadow:0 0 6px #f472b6"></b>';
-      if (i === s!.ready) return `<b style="display:inline-block; width:9px; height:9px; margin:0 2px; border-radius:50%; background:conic-gradient(#f472b6 ${Math.round(s!.refill * 360)}deg, rgba(244,114,182,0.15) 0)"></b>`;
-      return '<b style="display:inline-block; width:9px; height:9px; margin:0 2px; border-radius:50%; background:rgba(244,114,182,0.15)"></b>';
-    };
-    this.root.style.borderColor = s!.bursting ? 'rgba(244, 114, 182, 0.9)' : 'rgba(244, 114, 182, 0.35)';
-    this.root.style.boxShadow = s!.bursting ? '0 0 14px rgba(244, 114, 182, 0.45)' : 'none';
-    this.root.innerHTML = `DODGE ${Array.from({ length: s!.max }, (_, i) => pip(i)).join('')} <kbd style="color:#e5ecf7; font-weight:600">${keyName}</kbd>${s!.sides ? ` <span style="color:#9aa7b8; font-weight:400">${s!.sides}</span>` : ''}`;
+    this.root.style.display = s ? 'block' : 'none';
+    if (!s) return;
+    const bursting = s.phase === 'burst';
+    const ready = s.phase === 'ready' || s.phase === 'held';
+    const dot = ready
+      ? `<b style="display:inline-block; width:9px; height:9px; margin:0 3px; border-radius:50%; background:${low ? '#fbbf24' : '#f472b6'}; box-shadow:0 0 6px ${low ? '#fbbf24' : '#f472b6'}"></b>`
+      : `<b style="display:inline-block; width:9px; height:9px; margin:0 3px; border-radius:50%; background:conic-gradient(#f472b6 ${Math.round((1 - s.cooling) * 360)}deg, rgba(244,114,182,0.15) 0)"></b>`;
+    const power = low
+      ? ` <span style="color:${s.afford < 0.25 ? '#f87171' : '#fbbf24'}; font-weight:600">${s.afford < 0.25 ? 'NO POWER' : `LOW POWER ${Math.round(s.afford * 100)}%`}</span>`
+      : '';
+    this.root.style.borderColor = bursting ? 'rgba(244, 114, 182, 0.9)' : low ? 'rgba(251, 191, 36, 0.45)' : 'rgba(244, 114, 182, 0.35)';
+    this.root.style.boxShadow = bursting ? '0 0 14px rgba(244, 114, 182, 0.45)' : 'none';
+    this.root.innerHTML = `DODGE ${dot}<kbd style="color:#e5ecf7; font-weight:600">${keyName}</kbd>${power}${s.ways ? ` <span style="color:#9aa7b8; font-weight:400">${s.ways} only</span>` : ''}`;
   }
 }

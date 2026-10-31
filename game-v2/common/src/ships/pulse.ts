@@ -96,8 +96,7 @@ export function pulseProfile(pulse: PulseTuning): PulseProfile {
  * then tails off steeply, to `floor` at its full range; beyond, nothing.
  */
 export function beamFalloff(def: WeaponTuning | undefined, dist: number): number {
-  // (Braced by an anchor it reaches further, its falloff stretched with it: anchor.ts)
-  const range = (def?.range ?? 800) * (def?.reach ?? 1);
+  const range = def?.range ?? 800;
   if (dist > range + 1e-6) return 0;
   const f = def?.falloff;
   if (!f) return 1;

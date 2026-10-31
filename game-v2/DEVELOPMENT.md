@@ -59,7 +59,7 @@ render-ships guides.
 |---|---|---|
 | Ship parts & models | [docs/areas/ship-parts.md](docs/areas/ship-parts.md) | `models.mjs`, `rebuild`, grades, ratings, engines, mounting rules |
 | Energy & circuits | [docs/areas/energy.md](docs/areas/energy.md) | wires, circuits, batteries, surge, discharge, brownouts |
-| Flight & physics | [docs/areas/flight.md](docs/areas/flight.md) | `stepFlight`, jump drive, cargo mass, anchor, strafer, tow, docking |
+| Flight & physics | [docs/areas/flight.md](docs/areas/flight.md) | `stepFlight`, jump drive, cargo mass, strafer, tow, docking |
 | Weapons & combat | [docs/areas/weapons.md](docs/areas/weapons.md) | guns, shells, beams, support weapons, part deaths, repair |
 | Bosses, enemies & AI | [docs/areas/bosses-ai.md](docs/areas/bosses-ai.md) | bosses (see also `docs/boss-design.md`), packs, zones, events |
 | World, systems & sim LOD | [docs/areas/world-sim.md](docs/areas/world-sim.md) | systems, travel, surfaces, sieges, hazards, cold, world memory |

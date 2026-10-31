@@ -20,7 +20,7 @@ How a ship makes, stores and spends power. Power runs along player-drawn wires (
 ## Public interface
 - `ShipDerived.power: PowerLayout` (circuits, stores, core, feeds, `feedOf`, `storeOf`, `circuitOf`, `draw`, `dual`), `ShipDerived.energy: EnergyInfo` (capacities and draws).
 - `Charge { core, s: number[] }` (percent per store group); `FULL_CHARGE`; `powerTick(d, charge, PowerUse, tuning) -> PowerResult`; `gunLoad(ship, tick)` = guns' draw per feed group, passed to `stepFlight` as `boost.load`; `remapCharge(before, after, c)` on every rebuild; `chargeTotal`, `circuitCharges`, `capCharge`.
-- Wire format: `packCharge`/`unpackCharge`; pilot-row slots start at `CHARGE_GROUPS_AT` (16), at most `MAX_CHARGE_GROUPS` (24) groups. Others index after (strafer.ts `pilotExtras` reads dodge/tow past the groups).
+- Wire format: `packCharge`/`unpackCharge`; pilot-row slots start at `CHARGE_GROUPS_AT` (15), at most `MAX_CHARGE_GROUPS` (24) groups. Others index after (strafer.ts `pilotExtras` reads dodge/tow past the groups).
 - Surge: `surgeReaction(fn)`, `surgeTuning`, `POWER_TYPES` (colours used everywhere), `bankFor(d, part)`.
 - NOTE: the audit names `CHARGE_GROUPS` and `drawsEnergy(fn)`; the real names are `CHARGE_GROUPS_AT`/`MAX_CHARGE_GROUPS` and `isPowerPart` (wires.ts) / `burst` predicate in rebuild.
 

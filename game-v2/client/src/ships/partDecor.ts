@@ -66,8 +66,6 @@ const METAL = 0x4b5563, DARK = 0x1c2230, GUNMETAL = 0x3a3f48, BELL = 0x7b8494, M
 export const DECOR_SHAPES = {
   none: 'none',
   battery: 'battery',
-  /** The Stabiliser Anchor: a bolted hub, and a clamp pad at each corner (they swing out when braced: ShipRenderer) */
-  anchor: 'anchor',
   miner: 'miner',
   // Engines: ion thrusters (steady blue), afterburners (long narrow jets), plasma drives (one great bell)
   ion: 'engine', afterburner: 'engine', plasma: 'engine',
@@ -125,7 +123,6 @@ export function partDecor(geom: PlacedGeom, part: PlacedPart = geom.part): PartD
   const kind = DECOR_SHAPES[decor];
   /** Batteries' charge cells: green for general, blue for drive, red for weapon */
   if (kind === 'battery') { battery(out, geom, glow ?? 0x4ade80); return out; }
-  if (kind === 'anchor') { anchor(out, geom, glow ?? 0x7dd3fc); return out; }
   const f = frameOf(part === geom.part ? geom : { ...geom, part });
   if (!f) return out;
   const W = f.hi - f.lo, D = f.depth, mid = (f.lo + f.hi) / 2;
@@ -566,27 +563,6 @@ function battery(out: PartDecor, geom: PlacedGeom, glow: number): void {
   }
   // The terminal
   out.polys.push({ pts: rect(w / 2 + 0.05, -h * 0.22, w / 2 + 0.05 + 0.07 * k, h * 0.22), color: METAL });
-}
-
-/** The Stabiliser Anchor: a clamp pad in each corner of its outline, struts in to a bolted hub with a lit core */
-function anchor(out: PartDecor, geom: PlacedGeom, glow: number): void {
-  const k = Math.sqrt(Math.max(1, geom.area));
-  const c = geom.centroid;
-  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-  for (const p of geom.polygon) { x0 = Math.min(x0, p[0]); y0 = Math.min(y0, p[1]); x1 = Math.max(x1, p[0]); y1 = Math.max(y1, p[1]); }
-  const inset = 0.12, pad = 0.22 * k;
-  for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]] as const) {
-    const px = sx < 0 ? x0 + inset : x1 - inset, py = sy < 0 ? y0 + inset : y1 - inset;
-    // The strut, from the hub out to the pad
-    const ux = px - c[0], uy = py - c[1], l = Math.hypot(ux, uy) || 1, w = 0.05 * k;
-    out.polys.push({ pts: [c[0] - (uy / l) * w, c[1] + (ux / l) * w, px - (uy / l) * w, py + (ux / l) * w, px + (uy / l) * w, py - (ux / l) * w, c[0] + (uy / l) * w, c[1] - (ux / l) * w], color: GUNMETAL });
-    // The pad: an L-shaped clamp hugging the corner
-    const ex = px - sx * pad, ey = py - sy * pad, t = 0.08 * k;
-    out.polys.push({ pts: [px, py, ex, py, ex, py - sy * t, px - sx * t, py - sy * t, px - sx * t, ey, px, ey], color: METAL, bevel: 0.03 });
-  }
-  out.discs.push({ x: c[0], y: c[1], r: 0.27 * k, color: DARK, bevel: 0.04, sides: 8 });
-  out.discs.push({ x: c[0], y: c[1], r: 0.2 * k, color: BELL, sides: 8 });
-  out.discs.push({ x: c[0], y: c[1], r: 0.09 * k, color: glow, glow: 0.6 });
 }
 
 /** A turret's silhouette (its head's outline: hit shapes, simple previews), in its own frame (x out along the barrel) */

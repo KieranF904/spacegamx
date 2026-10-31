@@ -17,7 +17,7 @@ import { netJoins, wireNetworks } from './wires.js';
 import { gunRate } from './launch.js';
 import { type EnergyInfo } from './energy.js';
 import { type PowerLayout, powerLayout } from './circuits.js';
-import { STRAFE_SIDEWAYS, type StrafeInfo } from './strafer.js';
+import type { StrafeInfo } from './strafer.js';
 
 /** The most engine output a blueprint can ask for (a boss's; players' designs stop at 1) */
 export const MAX_DRIVE = 2.5;
@@ -165,9 +165,7 @@ export interface ShipDerived {
   scanRange: number;
   /** Shield capacity from powered shield generators (0 = no shield) */
   shieldMax: number;
-  /** Stabiliser Anchor: its best one's satisfaction (0 = none; it braces from anchor.ts MIN_ANCHOR_POWER) */
-  anchor?: number;
-  /** Burst Strafers (strafer.ts): each side's push and the charges; absent without a powered one pointing sideways */
+  /** Burst Strafers (strafer.ts): each one's push (ship-local), the burst's length and the cooldown; absent without a powered one */
   strafe?: StrafeInfo;
   /** Tow Beam (tow.ts): the best one's satisfaction (it takes hold from MIN_TOW_POWER), and every powered one (they draw while towing) */
   tow?: { power: number; parts: number[] };
@@ -464,8 +462,6 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   let cargoCapacity = hasCore ? CORE_CARGO : 0;
   let scanRange = 0;
   let shieldMax = 0;
-  // (Stabiliser Anchor: anchor.ts)
-  let anchor = 0;
   // (Burst Strafers and Tow Beams: strafer.ts, tow.ts)
   let strafe: StrafeInfo | undefined;
   let tow: { power: number; parts: number[] } | undefined;
@@ -488,19 +484,15 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     if ((fns[i].capacity ?? 0) > 0) cargoCapacity += fns[i].capacity! * area[i];
     if ((fns[i].range ?? 0) > 0) scanRange = Math.max(scanRange, fns[i].range! * satisfaction[i]);
     if ((fns[i].shield ?? 0) > 0) shieldMax += fns[i].shield! * area[i] * fnOutput(fns[i], mats[i]) * satisfaction[i];
-    if (fns[i].anchor) anchor = Math.max(anchor, satisfaction[i]);
-    // ---- Burst Strafer: it pushes away from its facing edge; only one pointing sideways dodges (strafer.ts)
+    // ---- Burst Strafer: it pushes away from its facing edge, whichever way that is (strafer.ts)
     const sf = fns[i].strafe;
     if (sf && alive[i] && mounts[i] && satisfaction[i] > 0) {
-      const lateral = -mounts[i]!.dir[0];
-      if (Math.abs(lateral) >= STRAFE_SIDEWAYS) {
-        strafe ??= { left: [], right: [], ticks: sf.ticks, charges: sf.charges, recharge: sf.recharge };
-        const force = sf.kick * area[i] * fnOutput(fns[i], mats[i]) * satisfaction[i] * Math.abs(lateral);
-        (lateral < 0 ? strafe.left : strafe.right).push({ part: i, force: Math.round(force * 1000) / 1000 });
-        strafe.ticks = Math.max(strafe.ticks, sf.ticks);
-        strafe.charges = Math.max(strafe.charges, sf.charges);
-        strafe.recharge = Math.min(strafe.recharge, sf.recharge);
-      }
+      strafe ??= { parts: [], ticks: sf.ticks, cooldown: sf.cooldown };
+      const force = sf.kick * area[i] * fnOutput(fns[i], mats[i]) * satisfaction[i];
+      const r = (v: number) => Math.round(v * 1000) / 1000 || 0;
+      strafe.parts.push({ part: i, push: [r(-mounts[i]!.dir[0] * force), r(-mounts[i]!.dir[1] * force)] });
+      strafe.ticks = Math.max(strafe.ticks, sf.ticks);
+      strafe.cooldown = Math.min(strafe.cooldown, sf.cooldown);
     }
     // ---- Tow Beam (tow.ts)
     if (fns[i].tow && alive[i] && satisfaction[i] > 0) {
@@ -574,7 +566,6 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     dash,
     scanRange: Math.round(scanRange),
     shieldMax: Math.round(shieldMax),
-    ...(anchor > 0 ? { anchor: Math.round(anchor * 1000) / 1000 } : {}),
     ...(strafe ? { strafe } : {}),
     ...(tow ? { tow: { power: Math.round(tow.power * 1000) / 1000, parts: tow.parts } } : {}),
     jumpRange: jump.range,

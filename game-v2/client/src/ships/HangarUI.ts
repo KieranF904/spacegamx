@@ -40,7 +40,7 @@ import {
   isStructural, ghostBill, SALVAGE, ShipState, buildPoints, DAMAGE_NAMES, type DamageType,
   loadoutKinds, cratesFor, crateOrder, MAX_LOADOUT_CRATES, autoWire, wireCells, cellKey, cellOf, WIRE_ITEM, SEGMENTS_PER_SPOOL,
   type FunctionDef, type WireSeg, mountingOf, weaponSides, clearCells, partMountingProblems, type MountingProblem } from '@space-game/common';
-import { cargoEffect, CATEGORY_MASS, anchorTuning, MIN_ANCHOR_POWER } from '@space-game/common';
+import { cargoEffect, CATEGORY_MASS, strafeForce, bestDodge, burstEnergy, DODGE_FORWARD, DODGE_BACK, DODGE_LEFT, DODGE_RIGHT } from '@space-game/common';
 import { loadTest, BROWNOUT, type LoadTestResult } from '@space-game/common';
 import { settings } from '../settings/Settings';
 import { boundKeyName } from '../input/keybindings';
@@ -1579,24 +1579,17 @@ export class HangarUI {
       html += row('Jump coils', `${now.jumpRatio.toFixed(2)}× the hull's need · <span style="color:${note.color}">${note.word}</span>`, 'jumpRatio', note.hint);
     }
     if (now.miners || (was && was.miners)) html += row('Mining lasers', `${now.miners}`, 'miners');
-    // The Stabiliser Anchor (common/src/ships/anchor.ts): what bracing does
-    if (now.anchor > 0) {
-      const a = anchorTuning(tuning);
-      const ok = now.anchor >= MIN_ANCHOR_POWER;
-      html += row('Anchor', ok
-        ? `brace: guns +${Math.round(a.range * 100)}% reach · shields +${Math.round(a.shieldRegen * 100)}%`
-        : '<span style="color:#f87171">no power</span>', undefined,
-        `Stabiliser Anchor: press ${boundKeyName('brace', settings.data.bindings)} to brace. Braced, the ship holds still (no thrust, slow turning), its guns reach ${Math.round(a.range * 100)}% further and scatter ${Math.round(a.spread * 100)}% less, `
-        + `its shields recharge ${Math.round(a.shieldRegen * 100)}% faster and hits take less of them, and pulls and knockback can't move it. It takes ${(a.braceTicks / 60).toFixed(2)} s to brace and ${(a.releaseTicks / 60).toFixed(1)} s to let go: no thrust and no benefits while it spools`);
-    }
     // Burst Strafer and Tow Beam (common/src/ships/strafer.ts, tow.ts)
     if (now.dodge > 0 || (was && was.dodge > 0)) {
       const s = this.derived?.strafe;
-      const sides = s ? (s.left.length && s.right.length ? 'either side' : s.left.length ? 'left only' : 'right only') : '';
-      html += row('Dodge', now.dodge > 0 ? `+${n0(now.dodge)} m/s a burst · ${s?.charges ?? 0} charges · ${sides}` : '<span style="color:#f87171">none</span>', 'dodge',
-        `Burst Strafers: press ${boundKeyName('dodge', settings.data.bindings)} for one sharp sideways burst (${((s?.ticks ?? 15) / 60).toFixed(2)} s) the way you're steering. `
-        + `Each burst spends a charge, which refills in ${((s?.recharge ?? 150) / 60).toFixed(1)} s, and draws a lot of energy: from a capacitor bank the strafers touch first, then their circuit. `
-        + 'A strafer pushes away from its nozzle, so point it out of the side you want to dodge away from. The heavier the ship, the less a burst moves it');
+      const ways = s ? ([[DODGE_FORWARD, 'forward'], [DODGE_BACK, 'back'], [DODGE_LEFT, 'left'], [DODGE_RIGHT, 'right']] as const).filter(([w]) => strafeForce(s, w) > 1e-6).map(([, n]) => n) : [];
+      const best = s ? bestDodge(s).dir : 0;
+      const cost = this.derived && best ? burstEnergy(this.derived, best) : 0;
+      html += row('Dodge', now.dodge > 0 ? `+${n0(now.dodge)} m/s a burst · ${ways.length === 4 ? 'any way' : ways.join(', ') || 'no way'} · ${n0(cost)} energy` : '<span style="color:#f87171">none</span>', 'dodge',
+        `Burst Strafers: press ${boundKeyName('dodge', settings.data.bindings)} for one hard burst (${((s?.ticks ?? 12) / 60).toFixed(2)} s) the way you're steering, diagonals too, with whichever strafers push that way; `
+        + `with nothing held, back the other way from your last dodge. Ready again ${((s ? Math.max(s.ticks, s.cooldown) : 24) / 60).toFixed(2)} s after the last one started. `
+        + 'There are no charges: every burst draws a lot of energy, from a capacitor bank the strafers touch first, then their circuit, so dodging often browns the circuit out unless banks, batteries and generation back it. '
+        + 'A strafer pushes away from its nozzle: fit them facing different ways to dodge any way. The heavier the ship, the less a burst moves it');
     }
     if (now.tow > 0) html += row('Tow Beam', now.tow >= 0.5 ? 'ready' : '<span style="color:#f87171">no power</span>', 'tow',
       `Press ${boundKeyName('tow', settings.data.bindings)} to take hold of the wreck, debris or pod nearest your cursor; again to let go. What you tow slows you by its mass. `

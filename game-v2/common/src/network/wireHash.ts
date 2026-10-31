@@ -6,6 +6,9 @@
  */
 
 import { wireTables, encodeServerMessage, serverFrame, encodeInputBinary, type ClientInputMessage } from './protocol.js';
+import { packKeyframe } from './replication.js';
+import { CTL, ReplicaMode } from '../ships/replica.js';
+import { CHARGE_GROUPS_AT, MAX_CHARGE_GROUPS } from '../ships/energy.js';
 
 /** FNV-1a, 32 bits, as hex */
 export function fnv1a(s: string): string {
@@ -21,7 +24,12 @@ export function computeWireHash(): string {
   // The tables, and a frame of the formats built on them (so a change to how they're packed counts too)
   const input: ClientInputMessage = {
     type: 'input', seq: 77, tick: 0, targetTick: 123460, forward: true, backward: false, left: true, right: false,
-    boost: true, fireLeft: false, fireRight: true, targetAngle: 1.25, strafeLeft: true, strafeRight: false, helm: true, cursorDist: 480, jump: true,
+    boost: true, fireLeft: false, fireRight: true, targetAngle: 1.25, strafeLeft: true, strafeRight: false, helm: true, cursorDist: 480, jump: true, dodge: true,
+  };
+  // (Layouts that are positions, not tables: the control bits, a keyframe's optional tail, where the pilot row's charge groups start)
+  const layouts = {
+    ctl: CTL, chargeGroups: [CHARGE_GROUPS_AT, MAX_CHARGE_GROUPS],
+    keyframe: packKeyframe({ id: 2, mode: ReplicaMode.Player, body: { x: 1, y: 2, vx: 3, vy: 4, angle: 0.5, angVel: 0, jump: 0, cargo: 6, dodge: 7, dodgeDir: 8 }, ctl: { bits: 16, targetAngle: 0 }, q: 4000 }),
   };
   const msgs = [
     {
@@ -36,5 +44,5 @@ export function computeWireHash(): string {
   ];
   const frame = serverFrame(msgs.map((m) => encodeServerMessage(m as any)));
   const bytes = [...new Uint8Array(encodeInputBinary(input)), ...frame].map((b) => b.toString(16).padStart(2, '0')).join('');
-  return fnv1a(JSON.stringify(wireTables()) + '|' + bytes);
+  return fnv1a(JSON.stringify(wireTables()) + '|' + bytes + '|' + JSON.stringify(layouts));
 }

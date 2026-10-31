@@ -185,14 +185,12 @@ export interface FunctionDef {
   jumpCapacity?: number;
   /** scan range in world units (scanners) */
   range?: number;
-  /** Stabiliser Anchor: the ship can brace (ships/anchor.ts) */
-  anchor?: boolean;
   /**
-   * Burst Strafer (ships/strafer.ts): a dodge out of its facing's opposite side. `kick` its push per cell while a
-   * burst runs (force, as an engine's thrust), `ticks` how long a burst lasts, `charges` how many it holds, `recharge`
-   * ticks to refill one. It draws its `demand` per cell a second while a burst runs, from the bank it touches first
+   * Burst Strafer (ships/strafer.ts): a dodge, pushing away from its nozzle. `kick` its push per cell while a burst
+   * runs (force, as an engine's thrust), `ticks` how long a burst lasts, `cooldown` ticks from one burst's start to
+   * the next. It draws its `demand` per cell a second while a burst runs, from the bank it touches first
    */
-  strafe?: { kick: number; ticks: number; charges: number; recharge: number };
+  strafe?: { kick: number; ticks: number; cooldown: number };
   /** Tow Beam (ships/tow.ts): latches onto a wreck, debris or a pod and pulls it on a tether; draws its `demand` while towing */
   tow?: boolean;
   /** weapons: which weapon this is (data/ships/tuning.json weapons.<kind>) */

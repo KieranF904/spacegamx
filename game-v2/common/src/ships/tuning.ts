@@ -3,7 +3,6 @@
  */
 
 import type { JumpTuning } from './flight.js';
-import type { AnchorTuning } from './anchor.js';
 import type { WeaponModNumber, WeaponMods } from './types.js';
 import type { PulseTuning } from './pulse.js';
 
@@ -40,9 +39,6 @@ export interface ShipTuning {
 
   /** Jump drive (defaults in flight.ts DEFAULT_JUMP) */
   jump?: Partial<JumpTuning>;
-
-  /** The Stabiliser Anchor's brace (defaults in anchor.ts DEFAULT_ANCHOR) */
-  anchor?: Partial<AnchorTuning>;
 
   /**
    * Fixed (non-turret) guns swivel only this far either side of straight ahead, and fire only when the target is inside that (plus the tolerance).
@@ -117,9 +113,6 @@ export interface ShipTuning {
 
 export interface WeaponTuning {
   type: 'projectile' | 'beam';
-  /** Braced by a Stabiliser Anchor (anchor.ts bracedWeaponMods): its shells live (beams reach) × reach, and scatter × steady */
-  reach?: number;
-  steady?: number;
   speed?: number;
   damage?: number;
   life?: number;

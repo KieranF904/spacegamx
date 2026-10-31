@@ -5,7 +5,7 @@
  * against the one you saved).
  */
 
-import { Blueprint, Catalog, ShipTuning, Economy, createShipState, FRICTION, jumpTuning, buyPrice, rateShip, salvageOf, SALVAGE, energyTuning, baseWeaponDps, partWeaponDef, strafeForce } from '@space-game/common';
+import { Blueprint, Catalog, ShipTuning, Economy, createShipState, FRICTION, jumpTuning, buyPrice, rateShip, salvageOf, SALVAGE, energyTuning, baseWeaponDps, partWeaponDef, bestDodge } from '@space-game/common';
 
 export interface ShipSummary {
   /** Firepower and toughness together (ships/rating.ts) */
@@ -32,9 +32,7 @@ export interface ShipSummary {
   guns: number;
   turrets: number;
   miners: number;
-  /** Stabiliser Anchor: its best one's power (0: none; ships/anchor.ts) */
-  anchor: number;
-  /** Burst Strafer: the speed a burst gives (m/s, its stronger side; 0: none; ships/strafer.ts) */
+  /** Burst Strafer: the speed a burst gives (m/s, the way it pushes hardest; 0: none; ships/strafer.ts) */
   dodge: number;
   /** Tow Beam: its best one's power (0: none; ships/tow.ts) */
   tow: number;
@@ -45,7 +43,7 @@ export interface ShipSummary {
 /** Is a bigger number better for this stat (mass, turn time and rebuild cost are better small) */
 export const BIGGER_IS_BETTER: Record<keyof Omit<ShipSummary, 'power' | 'energy'>, boolean> = {
   rating: true, parts: true, mass: false, topSpeed: true, accel: true, turn180: false, dps: true, hull: true, shield: true, cargo: true,
-  jump: true, jumpCooldown: false, jumpRatio: true, guns: true, turrets: true, miners: true, anchor: true, dodge: true, tow: true, rebuild: false,
+  jump: true, jumpCooldown: false, jumpRatio: true, guns: true, turrets: true, miners: true, dodge: true, tow: true, rebuild: false,
 };
 
 export function shipSummary(catalog: Catalog, tuning: ShipTuning, econ: Economy, bp: Blueprint): ShipSummary | null {
@@ -99,8 +97,7 @@ export function shipSummary(catalog: Catalog, tuning: ShipTuning, econ: Economy,
     guns: d.weapons.length,
     turrets: d.weapons.filter((w) => w.mount === 'turret').length,
     miners: d.miners.length,
-    anchor: d.anchor ?? 0,
-    dodge: d.strafe ? Math.round((Math.max(strafeForce(d.strafe, -1), strafeForce(d.strafe, 1)) * d.strafe.ticks / Math.max(1, d.fullMass ?? d.mass)) * 60) : 0,
+    dodge: d.strafe ? Math.round((bestDodge(d.strafe).force * d.strafe.ticks / Math.max(1, d.fullMass ?? d.mass)) * 60) : 0,
     tow: d.tow?.power ?? 0,
     rebuild,
   };

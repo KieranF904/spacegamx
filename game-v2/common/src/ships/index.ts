@@ -40,7 +40,6 @@ export * from './warmth.js';
 export * from './wires.js';
 export * from './migrate.js';
 export * from './mounting.js';
-export * from './anchor.js';
 export * from './strafer.js';
 export * from './tow.js';
 export * from './load.js';

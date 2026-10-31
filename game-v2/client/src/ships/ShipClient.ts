@@ -23,15 +23,13 @@ import {
   JumpTuning, jumpPhase, jumpTuning, coreHp, FRICTION, worldToLocalDir, partItemId, inSolarRing, jumpRange,
   jumpFieldAt, fieldRangeBoost, fieldCharge, primeBoost, pilotJumpStep, withEmp, lodestonePosition, type JumpField, type LodestoneData,
   ShipReplicaSet, ServerSnapshotMessage, packCursorWeaponState, rebuildVolley, WEAPON_KIND_TYPE, EntityState, accelAlong, turnAccel, rateShip, stepGuns, volleyShells, firesStraight, partWeaponDef,
-  anchorTuning, bracePhase, canBrace, type BracePhase,
-  dodgeCharges, dodgePhase, strafeForce, pilotExtras, canTow, cargoThrust,
+  dodgePhase, strafeForce, chooseDodgeDir, dodgeAffordable, DODGE_LEFT, DODGE_RIGHT, DODGE_FORWARD, DODGE_BACK, pilotExtras, canTow, cargoThrust,
 } from '@space-game/common';
 import type { MenuShipInfo } from '../ui/GameMenuUI';
 import type { GameState, InterpolatedEntity } from '../state/GameState';
 import type { Renderer } from '../rendering/Renderer';
 import { ShipStore } from './ShipStore';
-import { BraceIndicator } from '../ui/BraceIndicator';
-import { DodgeIndicator } from '../ui/DodgeIndicator';
+import { DodgeIndicator, type DodgeHud } from '../ui/DodgeIndicator';
 import { TowIndicator } from '../ui/TowIndicator';
 import { ShipRenderer } from './ShipRenderer';
 import { ShipHud } from './ShipHud';
@@ -48,6 +46,9 @@ import type { ThrustCommand } from './ThrusterFx';
 import { settings } from '../settings/Settings';
 import { boundKeyName } from '../input/keybindings';
 import type { QualityProfile } from '../settings/quality';
+
+/** A dodge pressed during the cooldown fires when it's over, if that's within this long (ms) */
+const DODGE_BUFFER_MS = 250;
 
 /** A pulse laser's sound by its grade, Mk I-V: subtle, and centred low (the wide Mk IV deepest, the x-ray Mk V a touch brighter) */
 const PULSE_GRADE_PITCH = [0.98, 0.94, 1.01, 0.9, 1.04];
@@ -136,13 +137,12 @@ export class ShipClient {
   private jump: JumpTuning;
   /** J was pressed: the jump control stays on until the burn starts (or J again cancels) */
   private jumpLatched = false;
-  /** Stabiliser Anchor: the brace toggle (anchor.ts); the server and prediction step the counter from it */
-  private braceLatched = false;
-  private braceUi = new BraceIndicator();
-  /** Burst Strafer (strafer.ts): the dodge held this press (-1 left, +1 right, 0 none), since when, and the last side dodged */
-  private dodgeLatch = 0;
+  /** Burst Strafer (strafer.ts): the dodge being sent this press and since when; the key last frame, when it was pressed, and whether that press is spent */
+  private dodgeLatch = false;
   private dodgeAt = 0;
-  private lastDodge = 1;
+  private dodgeDown = false;
+  private dodgePressAt = -Infinity;
+  private dodgeUsed = true;
   private dodgeUi = new DodgeIndicator();
   /** Tow Beam (tow.ts): its chip */
   private towUi = new TowIndicator();
@@ -304,10 +304,9 @@ export class ShipClient {
     e.renderY += (p.y - e.renderY) * ease;
     e.renderAngle = p.angle;
     e.angVel = 0;
-    // (Its anchor: the brace effect, ShipRenderer)
-    e.brace = p.brace;
-    // (Its Burst Strafer's dodge: the jet, ShipRenderer)
+    // (Its Burst Strafer's dodge: the jets, ShipRenderer)
     e.dodge = p.dodge;
+    e.dodgeDir = p.dodgeDir;
     if (e.type === EntityType.Player) {
       // Rebuild the per-pilot data the effects read (see the server's player snapshot row)
       const s = e.status ?? [];
@@ -453,7 +452,7 @@ export class ShipClient {
       // (Homing missiles change course: those the server sends as they fly)
       if (!firesStraight(partWeaponDef(this.opts.tuning, w.kind, ship.blueprint.parts[w.part], w))) continue;
       // A pilot's shells move on the tick they're fired (as in preSnapshot)
-      for (const s of volleyShells(player.id, ship, w, shot, { ...pose, vx: player.vx, vy: player.vy, brace: player.brace }, tick, this.opts.tuning, this.ownAmmo?.(w.kind))) {
+      for (const s of volleyShells(player.id, ship, w, shot, { ...pose, vx: player.vx, vy: player.vy }, tick, this.opts.tuning, this.ownAmmo?.(w.kind))) {
         this.scene.predictShot({ owner: player.id, type: WEAPON_KIND_TYPE[w.kind] ?? 1, grade: w.grade, spawnX: s.x, spawnY: s.y, spawnTick: tick - 1, vx: s.vx, vy: s.vy, size: s.size, pose });
       }
     }
@@ -533,62 +532,64 @@ export class ShipClient {
     return this.jumpLatched;
   }
 
-  /** Is the brace control on this tick? (Y toggles it; docking, or losing the anchor, lets go) */
-  braceHeld(): boolean {
-    if (this.braceLatched && (this.hangarOpen || !this.localCanBrace())) this.braceLatched = false;
-    return this.braceLatched;
-  }
-
   // ---- Burst Strafer (common/src/ships/strafer.ts) and Tow Beam (tow.ts)
   /**
-   * The dodge control this input tick: -1 left, +1 right, 0 none. A press of the dodge key (Space, rebindable) asks for one
-   * burst, to the side you're steering (WASD on screen, or Q/E at the helm, turned into the ship's frame); with no side
-   * held, the other way from your last dodge (so tapping it weaves), or the only side your strafers push. It's held for at
-   * least a few ticks so the server sees it, then until the key's let go (one burst a press: strafer.ts stepDodge).
+   * The dodge control this input tick. A press of the dodge key (Space, rebindable) asks for one burst; which way is the
+   * simulation's to work out from the movement keys sent with it (strafer.ts chooseDodgeDir), so prediction and the server
+   * agree. A press during the cooldown waits for it (up to DODGE_BUFFER_MS) rather than being lost. Once sent it's held
+   * for at least a few ticks so the server sees it, then until the key's let go (one burst a press: strafer.ts stepDodge).
    */
-  dodgeControl(): number {
-    const held = !this.hangarOpen && (this.opts.inputEnabled?.() ?? true) && this.opts.isKeyDown('Space');
+  dodgeControl(): boolean {
+    const down = !this.hangarOpen && (this.opts.inputEnabled?.() ?? true) && this.opts.isKeyDown('Space');
     const now = performance.now();
-    if (!held) {
-      if (this.dodgeLatch && now - this.dodgeAt > 120) this.dodgeLatch = 0;
+    if (down && !this.dodgeDown) { this.dodgePressAt = now; this.dodgeUsed = false; }
+    this.dodgeDown = down;
+    if (this.dodgeLatch) {
+      if (!down && now - this.dodgeAt > 120) this.dodgeLatch = false;
       return this.dodgeLatch;
     }
-    if (this.dodgeLatch) return this.dodgeLatch;
+    if (this.dodgeUsed || now - this.dodgePressAt > DODGE_BUFFER_MS) return false;
     const ship = this.store.get(this.opts.state.playerId), me = this.opts.state.entities.get(this.opts.state.playerId);
-    if (!ship || ship.kind !== 'ship' || !me) return 0;
+    if (!ship || ship.kind !== 'ship' || !me) return false;
     const s = ship.derived.strafe;
-    if (!s) {
-      if (now - this.dodgeAt > 1500) { this.dodgeAt = now; this.opts.showMessage(ship.derived.power?.feedOf && ship.blueprint.parts.some((p) => this.opts.catalog.functions.get(p.fn)?.strafe) ? 'The Burst Strafers have no power, or none points sideways' : 'No Burst Strafer fitted: build one in the hangar to dodge', '#f2d24b'); }
-      return 0;
+    if (!s || !s.parts.length) {
+      this.dodgeUsed = true;
+      this.opts.showMessage(ship.blueprint.parts.some((p) => this.opts.catalog.functions.get(p.fn)?.strafe) ? 'The Burst Strafers have no power' : 'No Burst Strafer fitted: build one in the hangar to dodge', '#f2d24b');
+      return false;
     }
-    const k = (...codes: string[]) => (codes.some((c) => this.opts.isKeyDown(c)) ? 1 : 0);
-    let lx: number;
-    if (this.helm) lx = k('KeyE') - k('KeyQ');
-    else {
-      const sx = k('KeyD', 'ArrowRight') - k('KeyA', 'ArrowLeft'), sy = k('KeyS', 'ArrowDown') - k('KeyW', 'ArrowUp');
-      const m = Math.hypot(sx, sy);
-      lx = m > 0 ? worldToLocalDir([sx / m, sy / m], me.angle)[0] : 0;
-    }
-    let side = Math.abs(lx) > 0.25 ? Math.sign(lx) : -this.lastDodge;
-    const can = (v: number) => strafeForce(s, v) > 0;
-    if (!can(side)) side = can(-side) ? -side : 0;
-    if (!side) return 0;
-    const c = dodgeCharges(s, me.dodgeSpent);
-    if (c.ready <= 0) return 0;
-    this.dodgeLatch = side;
+    // (Still cooling down: the press waits for it)
+    if (dodgePhase(me.dodge, s).phase !== 'ready') return false;
+    this.dodgeLatch = true;
+    this.dodgeUsed = true;
     this.dodgeAt = now;
-    this.lastDodge = side;
-    return side;
+    return true;
   }
 
-  /** Your strafers' charges (predicted), for the HUD: null without any */
-  localDodge(): { ready: number; max: number; refill: number; bursting: boolean; sides: string } | null {
+  /** The way the movement keys ask, ship-local (as flight.ts works it out from the same keys), or null */
+  private dodgeWay(angle: number): [number, number] | null {
+    const k = (...codes: string[]) => (codes.some((c) => this.opts.isKeyDown(c)) ? 1 : 0);
+    const fwd = k('KeyW', 'ArrowUp'), back = k('KeyS', 'ArrowDown');
+    if (this.helm) { const lx = k('KeyE') - k('KeyQ'), ly = back - fwd; return lx || ly ? [lx, ly] : null; }
+    const sx = k('KeyD', 'ArrowRight') - k('KeyA', 'ArrowLeft'), sy = back - fwd;
+    return sx || sy ? worldToLocalDir([sx, sy], angle) : null;
+  }
+
+  /** Your strafers' state (predicted), for the HUD: null without any */
+  localDodge(): DodgeHud | null {
     const ship = this.store.get(this.opts.state.playerId), me = this.opts.state.entities.get(this.opts.state.playerId);
-    const s = ship && ship.kind === 'ship' ? ship.derived.strafe : undefined;
-    if (!s || !me) return null;
-    const c = dodgeCharges(s, me.dodgeSpent);
-    const l = s.left.length > 0, r = s.right.length > 0;
-    return { ...c, bursting: dodgePhase(me.dodge, s.ticks).phase === 'burst', sides: l && r ? '' : l ? '← only' : '→ only' };
+    if (!ship || ship.kind !== 'ship' || !me) return null;
+    const s = ship.derived.strafe;
+    if (!s || !s.parts.length) return null;
+    const ph = dodgePhase(me.dodge, s);
+    const way = chooseDodgeDir(s, this.dodgeWay(me.angle), me.dodgeDir);
+    const can = (dir: number) => strafeForce(s, dir) > 1e-6;
+    const ways = [[DODGE_FORWARD, '↑'], [DODGE_BACK, '↓'], [DODGE_LEFT, '←'], [DODGE_RIGHT, '→']] as const;
+    const able = ways.filter(([d]) => can(d));
+    return {
+      phase: ph.phase, cooling: ph.cooling,
+      afford: dodgeAffordable(ship.derived, this.opts.state.charge, way),
+      ways: able.length === ways.length ? '' : able.map(([, a]) => a).join(''),
+    };
   }
 
   /** What your Tow Beam tows (an entity id), if anything (the server says: strafer.ts pilotExtras) */
@@ -608,27 +609,12 @@ export class ShipClient {
   }
   // ---- (end Burst Strafer and Tow Beam)
 
-  /** Your ship has a working Stabiliser Anchor */
-  localCanBrace(): boolean {
-    const ship = this.store.get(this.opts.state.playerId);
-    return !!ship && ship.kind === 'ship' && canBrace(ship.derived);
-  }
-
-  /** Your anchor's phase (predicted), and whether the brace toggle is on: for the HUD */
-  localBrace(): { phase: BracePhase; progress: number; latched: boolean; fitted: boolean } {
-    const me = this.opts.state.entities.get(this.opts.state.playerId);
-    const ship = this.store.get(this.opts.state.playerId);
-    const fitted = !!ship && ship.kind === 'ship' && (ship.derived.anchor ?? 0) > 0;
-    return { ...bracePhase(me?.brace, anchorTuning(this.opts.tuning)), latched: this.braceLatched, fitted };
-  }
-
   /** What the local pilot's keys ask the engines for (ship grid frame), for the thruster effects */
   private localThrustCommand(): ThrustCommand {
     const me = this.opts.state.entities.get(this.opts.state.playerId);
     const idle: ThrustCommand = { dir: [0, 0], turn: 0, boost: false };
     if (!me || this.hangarOpen || !(this.opts.inputEnabled?.() ?? true)) return idle;
     if (this.localJump().phase !== 'ready' && this.localJump().phase !== 'cooldown') return idle; // the drive has the engines
-    if ((me.brace ?? 0) > 0) return idle; // (so does the anchor, out or spooling)
     const k = (...codes: string[]) => (codes.some((c) => this.opts.isKeyDown(c)) ? 1 : 0);
     const fwd = k('KeyW', 'ArrowUp'), back = k('KeyS', 'ArrowDown'), left = k('KeyA', 'ArrowLeft'), right = k('KeyD', 'ArrowRight');
     const boost = k('ShiftLeft', 'ShiftRight') === 1;
@@ -894,14 +880,6 @@ export class ShipClient {
       this.toggleTow();
       return true;
     }
-    if (code === 'KeyY') {
-      const ship = this.store.get(this.opts.state.playerId);
-      if (this.braceLatched) this.braceLatched = false;
-      else if (!ship || ship.kind !== 'ship' || !(ship.derived.anchor ?? 0)) this.opts.showMessage('No Stabiliser Anchor fitted: build one in the hangar to brace', '#f2d24b');
-      else if (!this.localCanBrace()) this.opts.showMessage('The Stabiliser Anchor has no power', '#f2d24b');
-      else this.braceLatched = true;
-      return true;
-    }
     if (code === 'KeyJ') {
       const ph = this.localJump();
       const hold = settings.data.gameplay.jumpMode === 'hold';
@@ -952,8 +930,8 @@ export class ShipClient {
       player.x = st.x; player.y = st.y; player.vx = 0; player.vy = 0; player.angVel = 0;
       return charge;
     }
-    // (The anchor's counter and the hold's mass, as the server flies them: anchor.ts, load.ts)
-    const body = { x: player.x, y: player.y, vx: player.vx, vy: player.vy, angle: player.angle, angVel: player.angVel ?? 0, jump: player.jump ?? 0, jumpScale: player.jumpScale, brace: player.brace ?? 0, cargo: player.cargoMass ?? 0, dodge: player.dodge ?? 0, dodgeSpent: player.dodgeSpent ?? 0 };
+    // (The hold's mass and the Burst Strafer's counter and way, as the server flies them: load.ts, strafer.ts)
+    const body = { x: player.x, y: player.y, vx: player.vx, vy: player.vy, angle: player.angle, angVel: player.angVel ?? 0, jump: player.jump ?? 0, jumpScale: player.jumpScale, cargo: player.cargoMass ?? 0, dodge: player.dodge ?? 0, dodgeDir: player.dodgeDir ?? 0 };
     // Hit by an EMP (or frozen through): the drive crippled and no jump starting, exactly as the server has it (ShipBridge.stepMovement)
     const emp = tick < (player.empUntil ?? 0);
     // (and numb with cold, a sluggish drive: warmth.ts, from the warmth the server tells)
@@ -967,7 +945,7 @@ export class ShipClient {
           forward: input.forward, backward: input.backward, left: input.left, right: input.right,
           boost: input.boost, targetAngle: input.targetAngle,
           helm: input.helm, strafeLeft: input.strafeLeft, strafeRight: input.strafeRight, jump: input.jump && !emp,
-          jumpDist: input.cursorDist, brace: input.brace, dodge: input.dodge ?? 0,
+          jumpDist: input.cursorDist, dodge: !!input.dodge,
         }, ship.derived, this.opts.tuning, { charge, drainRate: 1, load: gunLoad(ship, tick), tick }, this.gravity, rangeBoost, emp ? withEmp(hazard) : hazard, this.terrain);
       });
     player.jumpScale = body.jumpScale;
@@ -978,9 +956,8 @@ export class ShipClient {
     player.angle = body.angle;
     player.angVel = body.angVel;
     player.jump = body.jump;
-    player.brace = body.brace;
     player.dodge = body.dodge ?? 0;
-    player.dodgeSpent = body.dodgeSpent ?? 0;
+    player.dodgeDir = body.dodgeDir ?? 0;
     return res.charge;
   }
 
@@ -1039,11 +1016,7 @@ export class ShipClient {
       aiming: this.jumpAiming(), aimDist: this.jumpAimInfo.dist, aimLabel: this.jumpAimInfo.label,
       reach: this.jumpReach(), field: me ? this.gaugeField() : undefined, danger: this.jumpAiming() ? this.jumpDanger() : null,
     });
-    // The anchor's chip (only while it's out)
-    const brace = this.localBrace();
-    const at = anchorTuning(this.opts.tuning);
-    this.braceUi.update(this.hangarOpen || !brace.fitted ? null : brace, boundKeyName('brace', settings.data.bindings), `guns +${Math.round(at.range * 100)}% reach`);
-    // The Burst Strafer's charges, and the Tow Beam's chip while it tows
+    // The Burst Strafer's chip (ready or cooling, and whether the circuit can pay), and the Tow Beam's chip while it tows
     this.dodgeUi.update(this.hangarOpen ? null : this.localDodge(), boundKeyName('dodge', settings.data.bindings));
     const towed = this.hangarOpen ? undefined : this.localTow();
     const towShip = this.store.get(state.playerId);

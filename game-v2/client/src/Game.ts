@@ -293,9 +293,8 @@ private xpFillEl: HTMLElement | null;
   private lastSentStrafeRight = false;
   private lastSentHelm = false;
   private lastSentJump = false;
-  private lastSentBrace = false;
-  /** Burst Strafer: the dodge control last sent (-1, 0, +1: ships/strafer.ts) */
-  private lastSentDodge = 0;
+  /** Burst Strafer: the dodge control last sent (ships/strafer.ts) */
+  private lastSentDodge = false;
   /** Extra camera zoom factor while jumping */
   private jumpZoom = 1;
   private lastSentCursorDist = 0;
@@ -1563,23 +1562,19 @@ this.xpFillEl = document.getElementById('xpFill');
     let strafeRight = helm && inputEnabled && this.input.isKeyDown('KeyE');
     // Jump drive: J latches it on, and it stays on until the jump fires (or J again cancels)
     let jump = inputEnabled && this.shipClient.jumpHeld();
-    // Stabiliser Anchor: toggled (Y), it stays braced while the toggle is on, chat or menus open or not
-    let brace = this.shipClient.braceHeld();
-    // Burst Strafer: a press of the dodge key (Space) asks for one burst, to the side you're steering (ShipClient.dodgeControl)
-    let dodge = inputEnabled ? this.shipClient.dodgeControl() : 0;
+    // Burst Strafer: a press of the dodge key (Space) asks for one burst, the way you're steering (ShipClient.dodgeControl)
+    let dodge = inputEnabled && this.shipClient.dodgeControl();
     // (The angle is quantized to 13 bits, so client and server use the same value for hitscan: see CURSOR_STATE.md)
     let quantized = quantizeCursorAngle(rawAngle);
     let cursorDistQ = quantizeCursorDist(aimDist);
     // A menu jump has the controls as the autopilot does: no thrust, mouse-steer, the drive as it says
     if (order) {
-      forward = backward = left = right = boost = helm = strafeLeft = strafeRight = brace = false;
-      dodge = 0;
+      forward = backward = left = right = boost = helm = strafeLeft = strafeRight = dodge = false;
       jump = order.jump;
     }
     if (auto) {
       ({ forward, backward, left, right, boost, jump } = auto);
-      helm = strafeLeft = strafeRight = brace = false;
-      dodge = 0;
+      helm = strafeLeft = strafeRight = dodge = false;
       quantized = quantizeCursorAngle(auto.targetAngle);
       cursorDistQ = quantizeCursorDist(auto.jump ? auto.cursorDist : aimDist);
     }
@@ -1598,7 +1593,6 @@ this.xpFillEl = document.getElementById('xpFill');
       || strafeRight !== this.lastSentStrafeRight
       || helm !== this.lastSentHelm
       || jump !== this.lastSentJump
-      || brace !== this.lastSentBrace
       || dodge !== this.lastSentDodge
       || cursorDistQ !== this.lastSentCursorDist;
     
@@ -1624,7 +1618,6 @@ this.xpFillEl = document.getElementById('xpFill');
       helm,
       cursorDist: cursorDistQ * CURSOR_DIST_STEP,
       jump,
-      brace,
       dodge,
     };
     
@@ -1646,7 +1639,6 @@ this.xpFillEl = document.getElementById('xpFill');
         this.lastSentStrafeRight = strafeRight;
         this.lastSentHelm = helm;
         this.lastSentJump = jump;
-        this.lastSentBrace = brace;
         this.lastSentDodge = dodge;
         this.lastSentCursorDist = cursorDistQ;
       }
@@ -1671,7 +1663,6 @@ this.xpFillEl = document.getElementById('xpFill');
       this.lastSentStrafeRight = strafeRight;
       this.lastSentHelm = helm;
       this.lastSentJump = jump;
-      this.lastSentBrace = brace;
       this.lastSentDodge = dodge;
       this.lastSentCursorDist = cursorDistQ;
     } else {
@@ -1706,9 +1697,7 @@ this.xpFillEl = document.getElementById('xpFill');
       helm: this.lastSentHelm,
       cursorDist: this.lastSentCursorDist * CURSOR_DIST_STEP,
       jump: false,
-      // (The anchor is a toggle, not a held key: it stays as it was)
-      brace: this.lastSentBrace,
-      dodge: 0,
+      dodge: false,
     };
     this.network.send(msg);
     // The prediction steps the same input (proto has none)
@@ -1716,7 +1705,7 @@ this.xpFillEl = document.getElementById('xpFill');
     this.lastSentForward = this.lastSentBackward = this.lastSentLeft = this.lastSentRight = false;
     this.lastSentBoost = this.lastSentFireLeft = this.lastSentFireRight = false;
     this.lastSentStrafeLeft = this.lastSentStrafeRight = this.lastSentJump = false;
-    this.lastSentDodge = 0;
+    this.lastSentDodge = false;
   }
 
   private handleServerMessage(msg: ServerMessage): void {

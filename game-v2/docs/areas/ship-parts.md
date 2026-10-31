@@ -6,21 +6,21 @@ Every buildable ship part is a *model*: a `FunctionDef` (common/src/ships/types.
 |---|---|---|
 | scripts/econ/models.mjs | 543 | THE source of every model. Banners: `W` weapon rows (l.50), `MOUNT`/`MOUNTING` rules (l.90-166), `LEGENDARY` (l.178), `E` engines (l.189), `OTHER` power/utility/shield/plating (l.257), then one appended block per feature: Surge (l.300), Support weapons (l.327), Strafer+Tow (l.359); `COMPONENTS` (l.397), `RECIPES` (l.408), write step (l.509+) |
 | data/ships/models.json | 79 | GENERATED, one model per line (merge-friendly) + `legacy` family map |
-| data/ships/{functions,materials,pieces,tuning}.json | 1075/420/192/558 | legacy functions (enemies/bosses/migration; still read for model base numbers), materials (HP, mass, grade), piece shapes, tuning (weapons, `anchor`, `tow`, `energy`, ...). Hand-edited |
+| data/ships/{functions,materials,pieces,tuning}.json | 1075/420/192/558 | legacy functions (enemies/bosses/migration; still read for model base numbers), materials (HP, mass, grade), piece shapes, tuning (weapons, `tow`, `energy`, ...). Hand-edited |
 | common/src/ships/types.ts | 402 | `FunctionDef` (l.148-275, every model field, one doc comment each), `MaterialDef`, `Blueprint`, `PlacedPart`, `WeaponMods`, `MountingRules` |
 | common/src/ships/catalog.ts | 421 | `loadCatalog(files)` -> `Catalog` (`functions`, `families`, `materials`, `variants`); piece variants/transforms |
 | common/src/ships/rebuild.ts | 609 | `rebuild()` FunctionDef -> `ShipDerived`. Numbered steps: 1 joins (l.292), 2 structure, 3 networks (l.310), 4 power (l.315), 5 physics (l.356), 6 weapons (l.423), 7 cargo/miners/scanners + feature blocks (l.463-535), local circuits (l.535) |
 | common/src/ships/grades.ts | 200 | grade/material -> output: `partThrust`, `partSupply`, `partDemand`, `weaponStrength`, `partBuildPoints`, `isEngine` |
 | common/src/ships/partStats.ts | 141 | `partStats()` plain numbers per part (fabricator, hangar, tooltips, rating) |
 | common/src/ships/mounting.ts | 185 | weapon mounting rules: `mountingOf`, `checkMounting`, `partMountingProblems`, `mountingWords`, `clearCells` |
-| common/src/ships/{anchor,strafer,tow,support,surge}.ts | 124/128/103/93/177 | per-feature tuning + pure arithmetic (see Energy/Flight guides for surge, anchor, strafer, tow; support = Repair Beam, Point Defence) |
+| common/src/ships/{strafer,tow,support,surge}.ts | 225/103/93/177 | per-feature tuning + pure arithmetic (see Energy/Flight guides for surge, strafer, tow; support = Repair Beam, Point Defence) |
 | common/src/ships/models.test.ts, mounting.test.ts | - | catalogue/licence/migration invariants; mounting rules |
 | common/src/econ/market.ts | - | `modelLicensed(fn,_,level)`, `partLicensed()`; `common/src/econ/items.ts` `partItemId()` |
 | client/src/ui/componentGuide.ts, ComponentGuideUI.ts | - | Component Guide data (no DOM): `guideRows`, `rowGates`, tabs by `category` |
 | client/src/ships/modelCards.ts, partTip.ts | - | palette cards and tooltips for a model |
 
 ## Public interface
-- `Catalog` / `FunctionDef` (types.ts); `rebuild(RebuildInput): ShipDerived`; `ShipDerived` keys are the contract for flight, weapons, HUD, hangar (`anchor?`, `strafe?`, `tow?`, `power?`, `weapons[]`, `thrusters[]`...).
+- `Catalog` / `FunctionDef` (types.ts); `rebuild(RebuildInput): ShipDerived`; `ShipDerived` keys are the contract for flight, weapons, HUD, hangar (`strafe?`, `tow?`, `power?`, `weapons[]`, `thrusters[]`...).
 - `partStats(catalog, tuning, {material,fn,piece}): PartStats | null`; `partMount`, `partBuildPoints`, `fnOutput`, `partGrade`, `partMaterial`.
 - Mounting: `mountingOf`, `weaponSides`, `checkMounting`, `partMountingProblems`.
 - Data files: models.json (generated), recipes.json `models` + `craft`, items.json components. `validateGameData.ts` (server/src/data) checks models.json (l.480), recipe-per-model (l.877).
@@ -40,7 +40,7 @@ Add a part model:
 2. models.mjs `RECIPES` (l.408): add the recipe (script errors if missing or an input is unknown). New component: `COMPONENTS`.
 3. Run `node scripts/econ/models.mjs`; diff data/ only for your model.
 4. New FunctionDef field: add it to `FunctionDef` in types.ts (doc comment), read it in `rebuild.ts` in the matching numbered step (read only that slice), expose on `ShipDerived`, add the key to `validateGameData.ts` models schema (l.480-500).
-5. New mechanic: own file `common/src/ships/<feature>.ts`, `export *` in index.ts, tuning under data/ships/tuning.json (read through a `xxxTuning(t)` with defaults, see anchor.ts).
+5. New mechanic: own file `common/src/ships/<feature>.ts`, `export *` in index.ts, tuning under data/ships/tuning.json (read through a `xxxTuning(t)` with defaults, see tow.ts).
 6. Weapon mount rules: `MOUNT` + `MOUNTING` entries in models.mjs (`attach`, `angle`, `arc`, `clear: ahead(n)`).
 7. Surfaces: partTip.ts (tooltip rows), modelCards.ts, field guide section (client/src/ui/fieldGuide.ts), Component Guide picks it up from `category`/`unlock`/`guide`.
 8. Protocol: a new model id must be appended to `common/src/network/wire-dictionary.json` (append-only; `npm run wire:sync` / `wire:bump`, see networking guide); `protocol.test.ts` pins a hash of the wire format, so a new model usually means re-pinning it and bumping `PROTOCOL_VERSION` (protocol.ts l.31, now 15).
@@ -48,7 +48,7 @@ Add a part model:
 ## Tests
 - `npx vitest run common/src/ships/models.test.ts` catalogue, licences, migration, fixed mounts, engine fade.
 - `npx vitest run common/src/ships/mounting.test.ts` mount rules and checker.
-- `npx vitest run common/src/ships/anchor.test.ts strafer.test.ts tow.test.ts support.test.ts surge.test.ts catalog.test.ts ships.test.ts`
+- `npx vitest run common/src/ships/strafer.test.ts common/src/ships/support.test.ts common/src/ships/surge.test.ts common/src/ships/catalog.test.ts common/src/ships/ships.test.ts server/src/game/tow.test.ts`
 - `npx vitest run server/src/data/validateGameData.test.ts` data schema; `client/src/ui/componentGuide.test.ts`, `client/src/ui/fieldGuide.test.ts`, `client/src/ships/modelCards.test.ts`, `partPresentation.test.ts` UI facts.
 
 ## Gotchas
@@ -59,7 +59,7 @@ Add a part model:
 - Mount rules are not retroactive: saved ships that break them still fly, flagged in the hangar (`mounting: false` on load).
 
 ## Related areas
-- [energy](energy.md): `demand`/`produce`/`surge`/`store`/`bank` fields feed circuits. [flight](flight.md): `thrust`, `strafe`, `anchor`, `tow` effects. [weapons](weapons.md): `weapon`, `weaponMods`, `gunDef`. [hangar-ui](hangar-ui.md), [render-ships](render-ships.md) (`decor`), [economy-quests](economy-quests.md) (recipes, items, unlocks), [networking](networking.md) (wire dictionary).
+- [energy](energy.md): `demand`/`produce`/`surge`/`store`/`bank` fields feed circuits. [flight](flight.md): `thrust`, `strafe`, `tow` effects. [weapons](weapons.md): `weapon`, `weaponMods`, `gunDef`. [hangar-ui](hangar-ui.md), [render-ships](render-ships.md) (`decor`), [economy-quests](economy-quests.md) (recipes, items, unlocks), [networking](networking.md) (wire dictionary).
 
 ## Notes (moved from DEVELOPMENT.md and the old engine-map)
 - **Grades** (`data/ships/materials.json`, `grades.ts`): Mk I alloy (or lighter, frailer composite), II steel, III titanium, IV cobalt, V neutronium (refined from neutronium ore, danger 4+ belts). Each has `toughness` (HP per cell), `density`, `output`; output multiplies weapon damage (`WeaponInfo.strength`), generator power (`partSupply`) and shield capacity, and weapons/shields draw `output` times the power (`partDemand`).

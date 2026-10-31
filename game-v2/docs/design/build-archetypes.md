@@ -310,7 +310,7 @@ Ranked by how many archetypes each one opens up against how much code it needs. 
 | 1 | **Burst Strafer** (thruster) | S–M | Dancer, Blinker, Interceptor | A fixed short burn (say 0.25 s) of very high side thrust, with 2–3 charges that recharge slowly; costs several times the energy per unit of push of a normal engine and does nothing for cruising. |
 | 2 | **Discharge Capacitor** (power) | S | Alpha Striker, Blinker, Disruptor | Empties its whole charge in a moment for a big volley, then recharges slowly; useless for sustained fire. (Needs discharge rates, 3.1.1.) |
 | 3 | **Cargo with mass** (rule, not a part) | S | Freighter, Tug, Prospector | A full hold hauls more but handles like a barge; empty, you're quick. |
-| 4 | **Stabiliser Anchor** (utility) | S–M | Bombard, Longshot, Bulwark, Prospector | While braced: more range, accuracy, shield and mining steadiness, immune to pulls; zero thrust and a slow un-brace. |
+| 4 | ~~**Stabiliser Anchor** (utility)~~ | S–M | Bombard, Longshot, Bulwark, Prospector | While braced: more range, accuracy, shield and mining steadiness, immune to pulls; zero thrust and a slow un-brace. **Built (2026-10-31, L18) and removed the same day after playtesting** (Kieran: "take it out, it's lame"); see "Removed: Stabiliser Anchor" below. The archetypes it served need another answer. |
 | 5 | **Radiator** (utility) + heat (3.2) | M | every burst build; Pathfinder vs heat | Sheds heat fast, but must sit on an open edge, is fragile, and makes you colder in cold space. |
 | 6 | **Repair Beam** (utility) | M | Warden, Tug, party play | Heals another ship's parts at a big energy cost; does nothing for yourself. |
 | 7 | **Point Defence Turret** (weapon) | M | Interceptor, Bulwark, Freighter, escort | Shoots incoming missiles, torpedoes and slow orbs automatically; can't hurt ships. |
@@ -373,6 +373,7 @@ Close behind: **Spool-up Bore / Spool-up Chainsaw** (stronger the longer it runs
 *Built 2026-10-31, awaiting review, not deployed. Code: `common/src/ships/strafer.ts`, `tow.ts`,
 `server/src/game/Towing.ts`; docs/areas/ship-parts.md has the map.*
 
+- *Superseded the same day by the rework below ("Burst Strafer rework"); kept as it was first built.*
 - **Burst Strafer** (`engine_burst_strafer`, engine, level 10, Mk I steel, 1×1, must point a facing edge out): no
   cruising thrust at all. A press of **Space** (rebindable "Dodge") fires one burst of 15 ticks (0.25 s) from every
   strafer pushing that way: 5.5 push per cell, as a force, so mass and cargo matter. On a Sparrow T one strafer gives
@@ -401,3 +402,41 @@ Close behind: **Spool-up Bore / Spool-up Chainsaw** (stronger the longer it runs
   load is constant (mass × 0.8) rather than by tension, so prediction stays exact. (4) Pods with room in your hold
   are still pulled in by the usual pickup, so towing pods matters when the hold is full. (5) Debris doesn't crumble
   while towed. (6) No heat (as asked).
+
+---
+
+## Burst Strafer rework (2026-10-31, after playtesting)
+
+*Kieran: "lackluster and very restricted"; "the user should be able to use it as they like with a short cooldown, it
+should be stronger and use more energy; rather than forcing this recharge thing, they need to compensate with their
+energy system". Code: `common/src/ships/strafer.ts`, `flight.ts`; protocol 16.*
+
+- **Any way.** A press dodges the way the movement keys ask (WASD on screen, diagonals too; forward/back/Q/E at the
+  helm), worked out inside the shared step from the inputs of that tick and quantised to one of 32 ship-local ways, so
+  prediction, the server and replicas agree without a direction on the wire. Each strafer pushes away from its nozzle
+  and a way gets the sum of their components along it: strafers facing all four ways dodge anywhere, a pair on the
+  flanks mostly sideways (a diagonal gets cos 45° of them). **Nothing held** (or a way no strafer pushes at all): back
+  the other way from the last dodge (tapping weaves), else sideways (the stronger side, right on a tie), else whichever
+  way the strafers push hardest. Strafers no longer need to point sideways to count.
+- **No charges; a short cooldown.** One burst a press, 12 ticks (0.2 s); the next can start 24 ticks (0.4 s) after the
+  last one started. A press made during the cooldown waits for it (client-side, up to 250 ms) rather than being lost.
+- **Stronger.** 14 push per cell (was 5.5) over 12 ticks (was 15): about twice the impulse. On a Sparrow T one strafer
+  now moves the ship about 600 units (was ~300 by the same measure), well clear of its own width.
+- **Energy is the limit.** Demand 700/s per cell while bursting (was 280): 140 energy a strafer firing straight out (was
+  70), less at an angle (each strafer draws by how much of its push goes the dodge's way). Dodging as fast as it allows
+  is 350/s a strafer: the test strafer (four Cell Reactors, four batteries, two capacitor banks of two) gets about
+  thirteen full dodges in a row, then about half-strength ones it can sustain. Still from the bank the strafer touches
+  first, then its circuit as an engine. Short of power a burst pushes that much less; one that gets under a quarter of
+  its draw on its first tick is **refused** (no push; ready again once the key's let go), deterministically on every side.
+- **HUD:** the DODGE chip shows READY or a ring filling over the cooldown, LOW POWER n% / NO POWER when the circuit
+  can't pay for a full burst the way you'd dodge now, and the ways it can dodge if not all four.
+
+## Removed: Stabiliser Anchor (§5 #4)
+
+*Built 2026-10-31 (commit 5896116) and removed the same day after playtesting: "take it out, it's lame".* It was a
+2×2 steel utility part at level 18 drawing 3/s per cell: Y toggled a brace that spooled in over a moment, then held the
+ship still (no thrust, slow turning) for +range and −scatter on its guns, faster shield recharge, less shield taken a hit
+and immunity to pulls, knockback and most collision push, with a committed spool out. Everything is gone: the model,
+its recipe and decor, the `brace` input flag and CTL bit, the body counter, the pilot-row and keyframe slots (protocol
+16), `WeaponTuning.reach/steady` and the HUD chip. Its id stays in the append-only wire dictionary. If a "hold still for
+an edge" verb comes back, it needs more than numbers: the playtest found standing still simply wasn't fun.

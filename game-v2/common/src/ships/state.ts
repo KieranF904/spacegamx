@@ -31,13 +31,11 @@ export interface ShipState {
   jump: number;
   /** This jump's speed scale (set when its burn starts) */
   jumpScale?: number;
-  /** Stabiliser Anchor counter (anchor.ts stepBrace), absent = 0 (free) */
-  brace?: number;
   /** Mass of the cargo in its hold (load.ts), absent = 0 */
   cargo?: number;
-  /** Burst Strafer (strafer.ts): the dodge counter (signed: its side) and the charge spent (ticks), absent = 0 */
+  /** Burst Strafer (strafer.ts): the dodge counter and the way of the last dodge (1..DODGE_DIRS, ship-local), absent = 0 */
   dodge?: number;
-  dodgeSpent?: number;
+  dodgeDir?: number;
   /** Tow Beam (tow.ts): what it's towing (an entity id), absent = nothing; the server sets it, gunLoad draws for it */
   tow?: number;
   /** Ticks left of a stillstone's priming (jumpFields.ts stepPrime; negative: a scarred one's): the next jump reaches further */

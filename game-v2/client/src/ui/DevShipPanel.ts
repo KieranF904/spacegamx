@@ -12,6 +12,9 @@ interface Plan { name: string; parts: { fn: string }[] }
 const KIT_NAMES: Record<string, string> = {
   miner: 'mining laser', weapon: 'cannon', laser: 'beam laser', lance: 'lance', flak: 'flak', missile: 'missile', railgun: 'railgun',
   autocannon: 'autocannon', mortar: 'mortar', torpedo: 'torpedo', emp: 'EMP', hive: 'hive', frostbite: 'frostbite', jumpcoil: 'jump coil', shield: 'shield',
+  utility_tow_beam: 'tow beam', engine_burst_strafer: 'strafer', power_pulse_dynamo: 'dynamo',
+  railgun_rail_driver: 'rail driver', shield_flash_screen: 'flash screen', utility_repair_beam: 'repair beam',
+  point_defence_turret: 'point defence', power_capacitor: 'capacitor',
 };
 
 function kit(bp: Plan): { text: string; mines: boolean } {

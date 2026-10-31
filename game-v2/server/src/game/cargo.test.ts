@@ -1,0 +1,75 @@
+/**
+ * Cargo mass in the full server: a laden pilot flies heavy, and the replicas
+ * (the server's own shadows of what clients predict) stay on the real path,
+ * one keyframe carrying the load when it changes. (These lived in
+ * anchor.test.ts until the Stabiliser Anchor was removed.)
+ */
+import { describe, it, expect } from 'vitest';
+import { join } from 'path';
+import * as bitecs from 'bitecs';
+import { Position, Velocity, Rotation, ServerMessage } from '@space-game/common';
+import { GameServer } from '../GameServer.js';
+import { GameData } from '../data/GameData.js';
+import { LocalTransport } from '../net/LocalTransport.js';
+import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
+import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
+import { createShipBridge } from '../proto/createProtoServer.js';
+
+const dataDir = join(__dirname, '../../../data');
+const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
+const files = readGameDataFiles(dataDir);
+function world() {
+  resetGlobals();
+  const server = new GameServer({
+    gameData: new GameData(files),
+    userDB: { validateSession: async () => null, cleanupExpiredSessions: async () => {} } as any,
+    scene: 'sectors',
+    autoStart: false,
+    ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
+    clock: () => 1_000_000,
+  });
+  const t = new LocalTransport(server);
+  const got: ServerMessage[] = [];
+  t.onMessage = (m) => got.push(m);
+  t.connect();
+  t.send({ type: 'join', username: 'hauler' } as any);
+  const pid = t.getPlayerId();
+  const conn = server.pilots.connOf(pid)!;
+  // Out in open space, away from anything
+  Position.x[pid] = 40000; Position.y[pid] = 40000; Velocity.x[pid] = 0; Velocity.y[pid] = 0; Rotation.angle[pid] = -Math.PI / 2;
+  let seq = 1;
+  const input = (i: Record<string, unknown>) => t.send({ type: 'input', seq: seq++, tick: 0, forward: false, backward: false, left: false, right: false, boost: false, fireLeft: false, fireRight: false, targetAngle: -Math.PI / 2, ...i } as any);
+  const run = (n: number) => { for (let k = 0; k < n; k++) server.step(); };
+  return { server, pid, conn, input, run, ships: server.getShips()! };
+}
+
+describe('cargo mass in the server', () => {
+  const thrust = (load: number) => {
+    const { server, pid, conn, input, run, ships } = world();
+    if (load) server.pilots.get(conn)!.cargo.push({ id: 'iron_ore', n: load });
+    input({ forward: true });
+    run(40);
+    return { speed: Math.hypot(Velocity.x[pid], Velocity.y[pid]), cargo: ships.get(pid)!.cargo ?? 0, server };
+  };
+
+  it('a full hold of ore accelerates slower; the mass rides on the ship', () => {
+    const empty = thrust(0), full = thrust(30);
+    expect(empty.cargo).toBe(0);
+    expect(full.cargo).toBeCloseTo(3, 6);
+    expect(full.speed).toBeGreaterThan(0);
+    expect(full.speed).toBeLessThan(empty.speed * 0.9);
+  });
+
+  it('taking cargo on sends one keyframe carrying it; otherwise replicas stay on the real path', () => {
+    const { server, conn, input, run } = world();
+    const rep = (server as any).replication;
+    input({ forward: true, targetAngle: 0.4 });
+    run(30);
+    const before = { ...rep.reasons };
+    server.pilots.get(conn)!.cargo.push({ id: 'iron_ore', n: 20 });
+    run(30);
+    const after = Object.fromEntries(Object.entries(rep.reasons as Record<string, number>).map(([k, v]) => [k, v - (before[k] ?? 0)]).filter(([k, v]) => k.startsWith('Player:') && (v as number) > 0));
+    expect(after).toEqual({ 'Player:cargo': 1 });
+  });
+});
+

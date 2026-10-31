@@ -278,16 +278,13 @@ const OTHER = [
   ['utility_heavy_coil', 'Heavy Coil', 'jumpcoil', ['block2'], 30, 'cobalt', { jumpCapacity: 16, demand: 8, priority: 3, hpScale: 0.8 }, 'A dense coil: the most jump drive for its cells.', 'engines'],
   ['plating_reactive_armour', 'Reactive Armour', 'plating', ['sq', 'rect2'], 12, 'steel', { armour: 2, hpScale: 2, massScale: 1.6 }, 'Plate that turns shells aside: lighter protection than armour.', 'shields'],
   ['plating_spaced_plating', 'Spaced Plating', 'plating', ['sq', 'rect2'], 22, 'titanium', { armour: 1, hpScale: 3.2, massScale: 1.3 }, 'Layers of plate with room between: a lot to chew through.', 'shields'],
-  // Stabiliser Anchor (docs/design/build-archetypes.md §5 #4; band L16-23, Steady): brace with a key to hold still for range, accuracy,
-  // shields and no pulls, at the cost of moving (common/src/ships/anchor.ts). A steady consumer like a shield (demand per cell: 12 in all)
-  ['utility_stabiliser_anchor', 'Stabiliser Anchor', 'anchor', ['block2'], 18, 'steel', { anchor: true, demand: 3, priority: 2, hpScale: 1.2, massScale: 1.5 }, 'Brace to hold still: guns reach further and shoot straighter, shields recharge faster, and nothing can pull you. No thrust while braced.', 'utility'],
 ];
 const LOOK = {
   reactor: 'generator', battery: 'battery', capacitor: 'weapon_battery', drive_cell: 'drive_battery', mining: 'miner', demolition: 'charge_launcher',
   siphon: 'siphon', scanner: 'scanner', constructor: 'constructor', shield: 'shield', jumpcoil: 'jumpcoil', plating: 'armor',
 };
 /** Families with no legacy function: their own look (client/src/ships/partDecor.ts DECOR_SHAPES) */
-const OWN_LOOK = { anchor: { color: '#8fb3d9', decor: 'anchor', glow: '#7dd3fc' }, constructor: { color: '#f5b942', decor: 'none' } };
+const OWN_LOOK = { constructor: { color: '#f5b942', decor: 'none' } };
 for (const [id, name, family, pieces, level, material, fields, description, category] of OTHER) {
   const look = OWN_LOOK[family] ?? legacyLook(LOOK[family]);
   models.push({
@@ -358,9 +355,11 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
 // ---- (end support weapons)
 // ---- Burst Strafer and Tow Beam (common/src/ships/strafer.ts, tow.ts; build-archetypes.md §5 #1, #8; both band L8-15) ----
 // The Burst Strafer (the Dancer's, Interceptor's, Blinker's): no cruising thrust at all, only a dodge. A fixed sharp burst
-// (`strafe.ticks`) of `strafe.kick` push per cell out of its facing's opposite side, `strafe.charges` charges refilling one
-// every `strafe.recharge` ticks; while a burst runs it draws `demand` per cell a second (70 a burst for its one cell: several
-// times an engine's energy per push), from the capacitor bank it touches first. The Tow Beam (the Salvage Tug's): latches onto
+// (`strafe.ticks`) of `strafe.kick` push per cell out of its facing's opposite side, the next `strafe.cooldown` ticks after
+// one starts (no charges: energy is the limit); while a burst runs it draws `demand` per cell a second (140 a burst for its
+// one cell: several times an engine's energy per push, so dodging as often as it allows browns a circuit out unless banks,
+// batteries and generation back it), from the capacitor bank it touches first. (Kieran 2026-10-31, after playtesting:
+// any direction, stronger, short cooldown, energy-limited; was a quarter-second sideways burst with three slow charges.) The Tow Beam (the Salvage Tug's): latches onto
 // a wreck, debris or a pod and pulls it on a tether (tuning.json `tow`), drawing `demand` per cell a second while it tows.
 // Appended last, so no other model's order moves.
 {
@@ -370,8 +369,8 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   };
   const TUG = [
     ['engine_burst_strafer', 'Burst Strafer', 'strafer', ['sq'], 10, 'steel',
-      { strafe: { kick: 5.5, ticks: 15, charges: 3, recharge: 150 }, demand: 280, priority: 1, facing: true, hpScale: 0.6 },
-      'A side thruster that only dodges: a sharp quarter-second burst away from its nozzle, three charges that refill slowly, and a lot of energy a burst. No push at all for cruising.', 'engines'],
+      { strafe: { kick: 14, ticks: 12, cooldown: 24 }, demand: 700, priority: 1, facing: true, hpScale: 0.6 },
+      'A dodge thruster: a hard fifth-of-a-second burst away from its nozzle, ready again in under half a second, and a lot of energy every time. Fit them facing different ways to dodge any way. No push at all for cruising.', 'engines'],
     ['utility_tow_beam', 'Tow Beam', 'tow', ['rect2'], 12, 'steel',
       { tow: true, demand: 12, priority: 2, facing: true, hpScale: 0.9, massScale: 1.2 },
       'Latches onto a wreck, debris or a loot pod and pulls it along on a tether; the heavier it is, the slower you go. Tow a wreck into a station to salvage it. Never takes hold of a working ship.', 'utility'],
@@ -469,7 +468,6 @@ const RECIPES = {
   shield_bulwark_projector: { titanium_plate: 4, copper_wire: 4, shield_emitter: 3, power_coupling: 1 },
   utility_jump_coil: { steel_plate: 1, coil_winding: 1, power_coupling: 1, crystal: 1 },
   utility_heavy_coil: { cobalt_alloy: 4, coil_winding: 4, power_coupling: 2, nav_computer: 1 },
-  utility_stabiliser_anchor: { steel_plate: 4, servo_motor: 2, power_coupling: 1, copper_wire: 2 },
   plating_reactive_armour: { steel_plate: 2, propellant: 1, scrap_electronics: 1 },
   plating_spaced_plating: { titanium_plate: 3, composite_sheet: 1 },
 };

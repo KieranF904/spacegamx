@@ -17,7 +17,6 @@ import { pointDefenceOf } from './support.js';
 import { effectiveRange } from './pulse.js';
 import type { WeaponMods } from './types.js';
 import { baseWeaponDps } from './rating.js';
-import { anchorTuning, DEFAULT_ANCHOR } from './anchor.js';
 import { towTuning, DEFAULT_TOW } from './tow.js';
 import { partArmour, weaponHit, DAMAGE_TYPES, type DamageType } from './damage.js';
 
@@ -51,10 +50,8 @@ export interface PartStats {
   boostDrain?: number;
   shield?: number;
   cargo?: number;
-  /** Stabiliser Anchor (anchor.ts): braced, guns' reach and scatter (× each), shields' recharge (×), and seconds to brace and to let go */
-  brace?: { reach: number; scatter: number; shieldRegen: number; braceSecs: number; releaseSecs: number };
-  /** Burst Strafer (strafer.ts): its sideways push while a burst runs (force), the burst's seconds, its charges and seconds to refill one, and the energy a burst */
-  dodge?: { force: number; secs: number; charges: number; recharge: number; energy: number };
+  /** Burst Strafer (strafer.ts): its push away from its nozzle while a burst runs (force), the burst's seconds, the seconds from one burst to the next, and the energy a burst (pushing straight out) */
+  dodge?: { force: number; secs: number; cooldown: number; energy: number };
   /** Tow Beam (tow.ts): how far past the hull it takes hold, and how far it stretches before it snaps */
   tow?: { range: number; snap: number };
   /** Towards the ship's rating */
@@ -123,15 +120,11 @@ export function partStats(catalog: Catalog, tuning: ShipTuning | undefined, p: {
   }
   if ((fn.shield ?? 0) > 0) out.shield = fn.shield! * area * fnOutput(fn, mat);
   if ((fn.capacity ?? 0) > 0) out.cargo = fn.capacity! * area;
-  if (fn.anchor) {
-    const a = tuning ? anchorTuning(tuning) : DEFAULT_ANCHOR;
-    out.brace = { reach: 1 + a.range, scatter: 1 - a.spread, shieldRegen: 1 + a.shieldRegen, braceSecs: a.braceTicks / 60, releaseSecs: a.releaseTicks / 60 };
-  }
   // (A Burst Strafer: a dodge, not thrust: strafer.ts)
   if (fn.strafe) {
     const st = fn.strafe;
     out.size = sizeName(Math.max(1, area));
-    out.dodge = { force: st.kick * area * fnOutput(fn, mat), secs: st.ticks / 60, charges: st.charges, recharge: st.recharge / 60, energy: (partDemand(fn, area, mat) * st.ticks) / 60 };
+    out.dodge = { force: st.kick * area * fnOutput(fn, mat), secs: st.ticks / 60, cooldown: st.cooldown / 60, energy: (partDemand(fn, area, mat) * st.ticks) / 60 };
   }
   if (fn.tow) {
     const t = tuning ? towTuning(tuning) : DEFAULT_TOW;

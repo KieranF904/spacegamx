@@ -25,22 +25,22 @@ How client and server talk: message types (objects over a WebSocket), the compac
 ## Public interface
 - Types: `ClientMessage`, `ServerMessage`, `EntityState`, `EntityType`, `ServerSnapshotMessage`, `ClientInputMessage`.
 - Encoding: `encodeMessage` (client -> server; input goes binary, the rest JSON), `decodeMessage`, `encodeServerMessage`, `serverFrame(parts)`, `decodeServerFrame`, `splitServerFrame`, `packSnapshot`/`unpackSnapshot`, `wireTables()`, `COMPACT_TYPES`, `DICTIONARY`.
-- Version: `PROTOCOL_VERSION` (15 at time of writing), `PROTOCOL_WIRE_HASH`, `PROTOCOL_MISMATCH_CLOSE` (4002), `PROTOCOL_MISMATCH_REASON`. The client sends `protocol` in `join`; the server echoes its own in `welcome`; a mismatch closes the socket (4002) and the client asks for a reload.
+- Version: `PROTOCOL_VERSION` (16 at time of writing), `PROTOCOL_WIRE_HASH`, `PROTOCOL_MISMATCH_CLOSE` (4002), `PROTOCOL_MISMATCH_REASON`. The client sends `protocol` in `join`; the server echoes its own in `welcome`; a mismatch closes the socket (4002) and the client asks for a reload.
 - Replication: `ShipReplicaSet`, `packKeyframe/unpackKeyframe`, `packControlRow/unpackControlRow`, `CTL` (common/src/ships/replica.ts).
 - Close codes: 4001 sign-in failed (no reconnect), 4002 version mismatch (no reconnect), 1013 too many connections.
 
 ### Own pilot row (`EntityType.Player`) `data[N]` (built in GameServer.systemRows, ~l.5005-5035)
-0 packed cursor/weapon state (aim 13b, laser hit dist 8b, left/right beam on) | 1 whole charge % | 2 cursor distance | 3 jump drive counter | 4 shield % | 5 EMP ticks left | 6 beam heat % | 7 overheated 0/1 | 8 jump scale x1000 | 9 field flags (1 star ring, 2 lodestone) | 10 core store % | 11 number of store groups | 12 lodestone prime ticks | 13 warmth % | 14 brace counter (Stabiliser Anchor) | 15 cargo mass | 16.. each store group's charge % (`CHARGE_GROUPS_AT`=16, max 24; `packCharge`/`unpackCharge` in ships/energy.ts) | then, after the groups (ships/strafer.ts `pilotExtras`): dodge counter, dodge charge spent, tow target id+1 (`towing.wireOf`). Fields after the groups shift with the group count: never read them by a fixed index.
+0 packed cursor/weapon state (aim 13b, laser hit dist 8b, left/right beam on) | 1 whole charge % | 2 cursor distance | 3 jump drive counter | 4 shield % | 5 EMP ticks left | 6 beam heat % | 7 overheated 0/1 | 8 jump scale x1000 | 9 field flags (1 star ring, 2 lodestone) | 10 core store % | 11 number of store groups | 12 lodestone prime ticks | 13 warmth % | 14 cargo mass | 15.. each store group's charge % (`CHARGE_GROUPS_AT`=15, max 24; `packCharge`/`unpackCharge` in ships/energy.ts) | then, after the groups (ships/strafer.ts `pilotExtras`): dodge counter, last dodge's way (1..32), tow target id+1 (`towing.wireOf`). Fields after the groups shift with the group count: never read them by a fixed index.
 ### Other pilots' status row (`row.other`) `data`
 0 shield % (steps of 5) | 1 EMP'd | 2 heat (tenths) | 3 overheated | 4 mining beam hit (tenths) | 5 weapon beam on | 6 mining beam on | 7 cursor dist/100 | 8 tow target id+1. Their motion is not here (replicated, below).
 ### Other entities
 Ship body (`ShipBody`): 0 kind (1 derelict, 2 traffic, 3 hostile) | 1 shield % | 2 EMP | 3 faction idx | 4 elite 1 / boss 2 | 5 core % (0: client works it out) | 6 weapon beam on | 7 hull % (0) | 8 rating | 9 calm | 10 side (1 ward, 2 person's craft). Mob (`Enemy`): `[index in data/mobs.json]`. Projectile (own `p` rows in the snapshot): `[weaponType, tier, hue, spawnTick, spawnX, spawnY, ownerId, sizeScale, turret]`. Loot pod: `[best rarity idx, kinds, count, (drift anchor tick)]`.
 ### Ship motion (snapshot `k`, `c`, `f`, `o`)
-Keyframe row: `[id, mode, x, y, vx, vy, angle, angVel, jump, jumpScale, ctlBits, q, brace?, cargo?, station?, ox?, oy?, dodge?, dodgeSpent?]` (station -1 = undocked but dodging). Control row `[id, tb, dq, ...]` or run row `[-1-id, tb, dq, dq...]` (ids sent as deltas). Fire `[owner, ticksAgo, part, aimQ, ...shellIds]`. `o`: ships that left view.
+Keyframe row: `[id, mode, x, y, vx, vy, angle, angVel, jump, jumpScale, ctlBits, q, cargo?, station?, ox?, oy?, dodge?, dodgeDir?]` (station -1 = undocked but has dodged). Control row `[id, tb, dq, ...]` or run row `[-1-id, tb, dq, dq...]` (ids sent as deltas). Fire `[owner, ticksAgo, part, aimQ, ...shellIds]`. `o`: ships that left view.
 ### CTL bits (`CTL`, common/src/ships/replica.ts)
-forward 1, backward 2, left 4, right 8, boost 16, helm 32, strafeLeft 64, strafeRight 128, jump 256, emp 512, hold 1024, numb 2048, brace 4096, dodge 8192, dodgeRight 16384.
+forward 1, backward 2, left 4, right 8, boost 16, helm 32, strafeLeft 64, strafeRight 128, jump 256, emp 512, hold 1024, numb 2048, dodge 8192 (4096 and 16384 free since protocol 16).
 ### Binary input (11 bytes)
-[0] type, [1-2] seq, [3-4] targetTick low16, [5] flags (fwd 1, back 2, left 4, right 8, boost 0x10, fireL 0x20, fireR 0x40), [6-7] aim q13, [8-9] cursorDist/4, [10] flags2 (strafeL 1, strafeR 2, helm 4, jump 8, hasTargetTick 0x10, brace 0x20, dodge 0x40, dodgeRight 0x80; full). The old 17-byte V1 still decodes.
+[0] type, [1-2] seq, [3-4] targetTick low16, [5] flags (fwd 1, back 2, left 4, right 8, boost 0x10, fireL 0x20, fireR 0x40), [6-7] aim q13, [8-9] cursorDist/4, [10] flags2 (strafeL 1, strafeR 2, helm 4, jump 8, hasTargetTick 0x10, dodge 0x40; 0x20 and 0x80 free since protocol 16). The old 17-byte V1 still decodes.
 
 ## Invariants
 - Any change to the wire tables needs `PROTOCOL_VERSION` + `PROTOCOL_WIRE_HASH` updated (protocol.test.ts fails otherwise, on purpose). JSON-only messages not in `COMPACT` do not change the hash.
@@ -62,7 +62,7 @@ forward 1, backward 2, left 4, right 8, boost 16, helm 32, strafeLeft 64, strafe
 7. **The bump**: `npm run wire:bump "what changed"` from game-v2/. It rebuilds common, recomputes the hash, and if it differs from the pin increments `PROTOCOL_VERSION`, writes the new `PROTOCOL_WIRE_HASH` and appends a line to PROTOCOL_CHANGELOG.md. It does nothing if the hash already matches, and needs a reason otherwise. The failing test prints the same instruction. (These files had just landed when this was written; if `scripts/wire/` is missing, edit the two constants in protocol.ts by hand and add a changelog line.)
 
 ## Tests
-- `npx vitest run common/src/network` : codec round trips, snapshot frames, control rows, wire-hash pin.
+- `npx vitest run common/src/network` : codec round trips, snapshot frames, control rows, wire-hash pin (`computeWireHash` covers the tables, a sample frame and input, and since protocol 16 the `CTL` bits, a keyframe's optional tail and `CHARGE_GROUPS_AT`).
 - `npx vitest run server/src/net` : replication/keyframes (`replication.test.ts`), lodestones, ship view, socket limits (`socketTransport.test.ts`).
 - `npx vitest run server/src/proto server/src/game/robustness.test.ts` : transport and hostile input.
 - Bandwidth bench: `cd server && npm run bench:net` (server/src/bench/netBench.ts).
