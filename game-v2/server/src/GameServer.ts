@@ -112,7 +112,6 @@ import {
   // Shared physics for exact client/server parity
 // Data types
   StarSystemData,
-  DerelictData,
   TrafficData,
   RiftData,
 } from '@space-game/common';
@@ -121,7 +120,7 @@ import { GameData } from './data/GameData.js';
 import type { UserStore } from './auth/types.js';
 import type { ClientSocket, ClientLink } from '@space-game/common';
 import type { ShipBridge, ShipHost } from './ships/ShipBridge.js';
-import { Blueprint, ShipState, quantizeShipValue, skillValue, hasAll, removeAll, Economy, Bag, StarterKit, jumpTuning, jumpPhase, partItemId, rateShip, ratingOf, createShipState, gradeReward, gradeOf, accrueTraces, releaseTraces, unlocks, isStructural, stationPerks, hazardFlight, stationTable, blueprintGrade, lookFn, warmthPercent, packCharge, nearerThan, fartherThan, type ShipDerived } from '@space-game/common';
+import { Blueprint, ShipState, quantizeShipValue, skillValue, hasAll, removeAll, Economy, Bag, StarterKit, jumpTuning, jumpPhase, partItemId, rateShip, ratingOf, createShipState, gradeReward, gradeOf, accrueTraces, releaseTraces, unlocks, stationPerks, hazardFlight, stationTable, blueprintGrade, lookFn, warmthPercent, packCharge, nearerThan, fartherThan, type ShipDerived } from '@space-game/common';
 
 /** A station site by id */
 const stationPerksSite = (id: string | undefined) => (id ? stationTable()?.sites.find((s) => s.id === id) : undefined);
@@ -132,8 +131,7 @@ import { Warmth } from './game/Warmth.js';
 import { Outpost } from './game/Outpost.js';
 import { HomeStations } from './game/HomeStations.js';
 import { LootPods, PodHost } from './game/LootPods.js';
-import { Towing, type TowKind } from './game/Towing.js';
-import { towTuning } from '@space-game/common';
+import { Towing } from './game/Towing.js';
 import { Mining, MiningHost } from './game/Mining.js';
 import { AsteroidOrbits } from './game/AsteroidOrbits.js';
 import { StationServices } from './game/StationServices.js';
@@ -172,6 +170,7 @@ import { registerModuleHandlers } from './net/handlers/modules.js';
 import { registerAuthHandlers, rejectAuth, handleHttpAuth } from './net/auth.js';
 import { registerShipEditHandlers } from './net/handlers/shipEdit.js';
 import { Docking, stationQuery } from './game/Docking.js';
+import { Derelicts, type DerelictSlot } from './game/Derelicts.js';
 import { HandlerRegistry, dispatch, registerHandlers, MAX_INPUTS_PER_TICK, type HandlerTable } from './net/dispatch.js';
 
 // ============================================
@@ -435,10 +434,6 @@ const RIFT_COOLDOWN_TICKS = 180;
 const TRAFFIC_RESPAWN_TICKS = 60 * 120;
 const TRAFFIC_ARRIVE_RADIUS = 700;
 const TRAFFIC_DWELL_TICKS = 60 * 6;
-/** A destroyed derelict is replaced after this long */
-const DERELICT_RESPAWN_TICKS = 60 * 60 * 5;
-/** A broken derelict gives this share of the plate and wire its structure was built from */
-const DERELICT_PLATE_SHARE = 0.15;
 /** A derelict's log (systems.json `log`) is read by flying this close (a scan step's 700 is inside it) */
 const DERELICT_LOG_RANGE = 900;
 
@@ -645,7 +640,10 @@ export class GameServer implements ServerCtx {
   
   // System-specific state
   /** Derelict hulks by slot: the current body (-1 while destroyed) and when it comes back */
-  private derelicts: { data: DerelictData; systemNum: number; eid: number; respawnTick: number; spawns: number }[] = [];
+  /** Derelict slots: the same array as derelictsMod.derelicts (game/Derelicts.ts) */
+  private derelicts!: DerelictSlot[];
+  /** Derelicts and people's craft (game/Derelicts.ts) */
+  private derelictsMod!: Derelicts;
   /** Freighters: which station they're bound for, and how long they've been docked there */
   private traffic: { data: TrafficData; systemNum: number; eid: number; leg: number; dwell: number; respawnTick: number }[] = [];
   
@@ -700,8 +698,8 @@ export class GameServer implements ServerCtx {
   readonly achievements: Achievements;
   /** Pilotless ships players protect (escorted freighters, outposts): their names */
   private wards = new Map<number, string>();
-  /** People's ships, parked where they live (people.json craft): untouchable, by name */
-  private personCraft = new Map<number, string>();
+  /** People's ships, parked where they live (people.json craft): untouchable, by name. The same Map as derelictsMod.personCraft */
+  private personCraft!: Map<number, string>;
   readonly clock: () => number;
   /** Disconnected mid-fight: the ship stays in space until this tick */
   private lingering = new Map<number, { conn: ClientConnection; until: number }>();
@@ -745,7 +743,7 @@ export class GameServer implements ServerCtx {
       tell: (pilot, text, color) => { for (const c of this.clients.values()) if (c.playerId === pilot) this.send(c.ws, { type: 'systemMessage', text, color }); },
       stationInRange: (pilot) => this.stationInRange(pilot),
       isDocked: (pilot) => this.dockedShips.has(pilot),
-      deliver: (pilot, target, kind) => this.towDelivered(pilot, target, kind),
+      deliver: (pilot, target, kind) => this.derelictsMod.towDelivered(pilot, target, kind),
     }, this.ships, this.pods, this.ships.tuning);
     // ---- (end Tow Beam)
     this.mining = new Mining(this.createMiningHost(), this.gameData.miningTable);
@@ -957,6 +955,22 @@ export class GameServer implements ServerCtx {
     // (A distant pack sent somewhere new is flown there from where its route has it)
     this.enemies.onOrders = (eid) => this.lod.replan(eid);
     this.memory = new SystemMemory(this.createMemoryHost(), this.gameData.rulesFile.memory, opts.worldStore);
+    this.derelictsMod = new Derelicts({
+      world: this.world,
+      gameData: this.gameData,
+      clients: this.clients,
+      ships: this.ships,
+      pilots: this.pilots,
+      pods: this.pods,
+      codex: this.codex,
+      people: this.people,
+      memory: this.memory,
+      econ: this.econ,
+      send: (ws, msg) => this.send(ws, msg),
+      tick: () => this.currentTick,
+    });
+    this.derelicts = this.derelictsMod.derelicts;
+    this.personCraft = this.derelictsMod.personCraft;
     if (this.scene === 'sectors') this.memory.load();
     this.trade = new Trade({
       send: (conn, msg) => this.send((conn as ClientConnection).ws, msg),
@@ -2262,7 +2276,7 @@ this.devTeleport = opts.devTeleport ?? false;
         this.enemies.onDestroyed(eid, lastHitBy, ship);
         // A ward (freighter, pylon, bastion, turret) shot down: forget it before its entity number is reused
         if (this.wards.delete(eid)) { this.enemies.removeWard(eid); this.ships.setDamageScale(eid, 1); }
-        this.onPilotlessShipDestroyed(eid, lastHitBy);
+        this.derelictsMod.onPilotlessShipDestroyed(eid, lastHitBy);
       },
       notifyPartDestroyed: (e) => {
         const r = (v: number) => Math.round(v * 10) / 10;
@@ -2354,7 +2368,7 @@ this.devTeleport = opts.devTeleport ?? false;
         const slot = { data: d, systemNum, eid: -1, respawnTick: 0, spawns: 0 };
         this.derelicts.push(slot);
         // (A system remembered has its own back as they were: SystemMemory)
-        if (!this.memory.remembers(system.id)) this.spawnDerelict(slot);
+        if (!this.memory.remembers(system.id)) this.derelictsMod.spawnDerelict(slot);
       }
       for (const t of system.traffic ?? []) {
         const slot = { data: t, systemNum, eid: -1, leg: 0, dwell: 0, respawnTick: 0 };
@@ -2367,21 +2381,8 @@ this.devTeleport = opts.devTeleport ?? false;
     
     // Every belt filed: the orbit timetable trimmed to what's in it
     this.asteroidOrbits.settle();
-    this.spawnPersonCraft();
+    this.derelictsMod.spawnPersonCraft();
     console.log('World initialized');
-  }
-
-  /** People out in space and on planets live aboard something (people.json craft): parked there, out of every fight */
-  private spawnPersonCraft(): void {
-    for (const d of this.people.file.people) {
-      const bp = d.craft && this.ships.library.get(d.craft.ship);
-      if (!bp || !d.craft || 'station' in d.at) continue;
-      const num = this.gameData.getSystem(d.at.system) ? this.gameData.getSystemNum(d.at.system) : -1;
-      if (num < 0) continue;
-      const eid = this.ships.spawnDummy(bp, d.at.x, d.at.y, d.craft.angle ?? 0, num);
-      this.ships.pin(eid);
-      this.personCraft.set(eid, d.craft.name ?? d.name);
-    }
   }
 
   private createStation(data: any, systemNum: number): number {
@@ -3480,7 +3481,7 @@ this.devTeleport = opts.devTeleport ?? false;
       } },
       // ---- persist ----
       { name: 'lingerSystem', phase: 'persist', run: () => this.lingerSystem() },
-      { name: 'derelictRespawnSystem', phase: 'persist', run: () => this.derelictRespawnSystem() },
+      { name: 'derelictRespawnSystem', phase: 'persist', run: () => this.derelictsMod.derelictRespawnSystem() },
       { name: 'trafficSystem', phase: 'persist', run: () => this.trafficSystem() },
       { name: 'lifetimeSystem', phase: 'persist', run: () => this.lifetimeSystem() },
       { name: 'cleanupSystem', phase: 'persist', run: () => this.cleanupSystem() },
@@ -3924,13 +3925,6 @@ this.devTeleport = opts.devTeleport ?? false;
   // DERELICTS
   // ============================================
 
-  private spawnDerelict(slot: { data: DerelictData; systemNum: number; eid: number; spawns: number }): void {
-    const bp = this.ships.library.get(slot.data.blueprint);
-    if (!bp) return;
-    const seed = hashString(`derelict:${slot.data.id}:${slot.spawns++}`);
-    slot.eid = this.ships.spawnWreck(bp, slot.data.position.x, slot.data.position.y, slot.data.angle ?? 0, slot.systemNum, seed);
-  }
-
   /** Entity ids of the civilian freighters flying now */
   getTrafficShips(): { eid: number; route: string[]; leg: number }[] {
     return this.traffic.filter((t) => t.eid >= 0).map((t) => ({ eid: t.eid, route: t.data.route, leg: t.leg }));
@@ -4073,7 +4067,7 @@ this.devTeleport = opts.devTeleport ?? false;
           if (!m.ship) { slot.spawns = m.spawns; slot.respawnTick = local(m.respawnAt); continue; }
           // The same hulk (its seeded look), where it had drifted, as broken as it was (wrecks don't mend)
           slot.spawns = Math.max(0, m.spawns - 1);
-          this.spawnDerelict(slot);
+          this.derelictsMod.spawnDerelict(slot);
           if (slot.eid < 0) continue;
           this.ships.teleport(slot.eid, m.ship.x, m.ship.y);
           Rotation.angle[slot.eid] = m.ship.a;
@@ -4163,105 +4157,6 @@ this.devTeleport = opts.devTeleport ?? false;
     const t = this.traffic.find((x) => x.eid === eid);
     if (t) return { name: t.data.name, kind: 2 };
     return undefined;
-  }
-
-  /** A broken-up derelict comes back a while later (somebody always tows in another). */
-  private derelictRespawnSystem(): void {
-    if (this.currentTick % 60 !== 0) return;
-    for (const slot of this.derelicts) {
-      if (!this.memory.isResident(slot.systemNum)) continue;
-      if (slot.eid >= 0 && !this.ships.has(slot.eid)) {
-        slot.eid = -1;
-        slot.respawnTick = this.currentTick + DERELICT_RESPAWN_TICKS;
-      }
-      if (slot.eid < 0 && slot.respawnTick && this.currentTick >= slot.respawnTick) {
-        slot.respawnTick = 0;
-        this.spawnDerelict(slot);
-      }
-    }
-  }
-
-  // ---- Tow Beam (game/Towing.ts): towed into a station's reach, a wreck, debris or a pod is salvaged into the pilot's storage
-  private towDelivered(pilot: number, target: number, kind: TowKind): void {
-    const pc = this.pilots.connOf(pilot);
-    if (!pc) return;
-    const tell = (text: string) => { for (const c of this.clients.values()) if (c.playerId === pilot) this.send(c.ws, { type: 'systemMessage', text, color: '#ffd166' }); };
-    if (kind === 'pod') {
-      const bag = this.pods.take(target);
-      if (!bag) return;
-      this.pilots.give(pc, bag, { toStorage: true, source: 'salvaged' });
-      tell('Towed in a pod: its contents are in station storage');
-      return;
-    }
-    const ship = this.ships.get(target);
-    if (!ship) return;
-    // Its structure cut up for plate (towTuning salvage of what it's made of), as a derelict's chunks are; modules aren't salvaged
-    const share = towTuning(this.ships.tuning).salvage;
-    const made: Bag = {};
-    ship.blueprint.parts.forEach((q, i) => {
-      if (!(ship.hp[i] > 0) || ship.detached[i] || !isStructural(q.fn)) return;
-      for (const [id, n] of Object.entries(this.econ.recipes.partInputs(q))) made[id] = (made[id] ?? 0) + n * share;
-    });
-    const bag: Bag = {};
-    for (const [id, n] of Object.entries(made)) if (Math.floor(n) > 0) bag[id] = Math.floor(n);
-    const slot = this.derelicts.find((d) => d.eid === target);
-    let credits = 0, name = kind === 'wreck' ? 'a wreck' : 'debris';
-    if (slot) {
-      slot.eid = -1;
-      slot.respawnTick = this.currentTick + DERELICT_RESPAWN_TICKS;
-      credits = slot.data.salvage ?? 250;
-      name = slot.data.name;
-      this.pilots.addCredits(pc, credits);
-      this.pilots.addXp(pc, Math.round(credits / 4));
-      if (slot.data.log) this.codex.unlock(pc, [slot.data.log.codex]);
-    }
-    this.ships.removeShip(target);
-    if (Object.keys(bag).length) this.pilots.give(pc, bag, { toStorage: true, source: 'salvaged' });
-    this.pilots.bumpStat(pc, 'salvaged');
-    const n = Object.values(bag).reduce((t, k) => t + k, 0);
-    tell(`Salvaged ${name}: ${n} plate to station storage${credits ? `, +${credits} credits` : ''}`);
-  }
-  // ---- (end Tow Beam)
-
-  /** Whoever breaks a derelict's core gets its salvage: credits, and plate of its material */
-  private onPilotlessShipDestroyed(eid: number, lastHitBy: number | undefined): void {
-    const slot = this.derelicts.find((d) => d.eid === eid);
-    if (!slot) return;
-    slot.eid = -1;
-    slot.respawnTick = this.currentTick + DERELICT_RESPAWN_TICKS;
-    if (lastHitBy === undefined || !hasComponent(this.world, Player, lastHitBy)) return;
-    const credits = slot.data.salvage ?? 250;
-    const xp = Math.round(credits / 4);
-    const pc = this.pilots.connOf(lastHitBy);
-    // Cut up, it gives plate of what it was built from (and the wire in it), thrown out as chunks to pull in
-    const bp = this.ships.library.get(slot.data.blueprint);
-    if (bp) {
-      const made: Bag = {};
-      for (const q of bp.parts) {
-        if (!isStructural(q.fn)) continue;
-        for (const [id, n] of Object.entries(this.econ.recipes.partInputs(q))) made[id] = (made[id] ?? 0) + n * DERELICT_PLATE_SHARE;
-      }
-      const x = slot.data.position.x, y = slot.data.position.y;
-      let i = 0;
-      for (const [id, n] of Object.entries(made)) {
-        let left = Math.floor(n);
-        while (left > 0) {
-          const k = Math.min(left, 6), a = i++ * 2.39996;
-          this.pods.spawnChunk(slot.systemNum, x, y, Math.cos(a) * 2, Math.sin(a) * 2, { [id]: k }, lastHitBy);
-          left -= k;
-        }
-      }
-    }
-    if (pc) {
-      this.pilots.addCredits(pc, credits);
-      this.pilots.addXp(pc, xp);
-      this.pilots.bumpStat(pc, 'salvaged');
-      if (slot.data.log) this.codex.unlock(pc, [slot.data.log.codex]);
-    }
-    for (const c of this.clients.values()) {
-      if (c.playerId !== lastHitBy) continue;
-      this.send(c.ws, { type: 'systemMessage', text: `Salvaged ${slot.data.name}: +${credits} credits, +${xp} XP`, color: '#ffd166' });
-    }
   }
 
   private lifetimeSystem(): void {
