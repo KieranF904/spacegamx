@@ -88,9 +88,7 @@ describe('structure pins', () => {
 
   it('client messages the server handles', () => {
     // Stage 1 Cut 1 turned handleMessage's switch into a handler table (net/dispatch.ts), so the types come from the
-    // table now. The Stage 0 extraction read case labels at a 6-space indent, which missed 'join' and 'respawn'
-    // (their labels sat at column 0): the pin never listed them, so they're left out here and checked in
-    // net/dispatch.test.ts, which pins the whole set.
+    // table. (The Stage 0 pin, read from case labels at one indent, missed 'join' and 'respawn'; Stage 2 added them.)
     resetGlobals();
     const server = new GameServer({
       gameData: new GameData(readGameDataFiles(dataDir)),
@@ -100,8 +98,8 @@ describe('structure pins', () => {
       ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
       clock: () => 1_000_000,
     });
-    const types = server.handledMessageTypes().filter((t) => t !== 'join' && t !== 'respawn').sort();
-    expect(types.length).toBeGreaterThan(20);
+    const types = server.handledMessageTypes().sort();
+    expect(types.length).toBe(80);
     pin('clientMessages.json', types);
   }, 120_000);
 

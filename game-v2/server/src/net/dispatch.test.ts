@@ -18,7 +18,7 @@ const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
 
 describe('message dispatch', () => {
-  it('the handler table is the old switch: the pinned types plus join and respawn (the Stage 0 pin missed those two)', () => {
+  it('the handler table is the old switch: exactly the pinned types (golden/clientMessages.json)', () => {
     resetGlobals();
     const server = new GameServer({
       gameData: new GameData(readGameDataFiles(dataDir)),
@@ -29,7 +29,7 @@ describe('message dispatch', () => {
       clock: () => 1_000_000,
     });
     const pinned: string[] = JSON.parse(readFileSync(join(__dirname, '../golden/clientMessages.json'), 'utf8'));
-    expect(server.handledMessageTypes().sort()).toEqual([...pinned, 'join', 'respawn'].sort());
+    expect(server.handledMessageTypes().sort()).toEqual(pinned);
     expect(server.handledMessageTypes().length).toBe(80);
   }, 120_000);
 
