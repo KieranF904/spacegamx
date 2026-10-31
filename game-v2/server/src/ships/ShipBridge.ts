@@ -27,7 +27,7 @@ import {
   shotAimQ, SHOT_AIM_STEPS, firesStraight, partWeaponDef, FireRecord, stepGuns, ammoCode, partMaterial, type WeaponMods, type ShipDerived,
   outputOf,
   powerTick, gunLoad, remapCharge, flashRestore,
-  quantizeCargo, type FlightBody,
+  quantizeCargo, type FlightBody, buildFlightInputs, newFlightControls, type FlightInputSource,
   payMining, MINE_CYCLE, MINING_PULSE, MINE_TAIL, mineFalloff, chargeTotal, FULL_CHARGE, type Charge, pulseProfile, beamFalloff,
 } from '@space-game/common';
 
@@ -214,6 +214,30 @@ const BEAM_PAD = 120;
 
 /** Bodies with more parts than this only have the pieces near what they touch put in world space (contacts) */
 const BIG_BODY = 40;
+
+/** stepMovement's scratch: the held keys read from Input, and the controls built from them (reused every call; the step never keeps them) */
+const MOVE_SRC: FlightInputSource = {
+  forward: false, backward: false, left: false, right: false, boost: false, targetAngle: 0,
+  helm: false, strafeLeft: false, strafeRight: false, jump: false, cursorDist: 0, dodge: false,
+};
+const MOVE_CTL = newFlightControls();
+
+/** Read a player's held keys from the Input component into `src` */
+function readInputsInto(eid: number, src: FlightInputSource): FlightInputSource {
+  src.forward = Input.forward[eid] === 1;
+  src.backward = Input.backward[eid] === 1;
+  src.left = Input.left[eid] === 1;
+  src.right = Input.right[eid] === 1;
+  src.boost = Input.boost[eid] === 1;
+  src.targetAngle = Input.targetAngle[eid];
+  src.helm = Input.helm[eid] === 1;
+  src.strafeLeft = Input.strafeLeft[eid] === 1;
+  src.strafeRight = Input.strafeRight[eid] === 1;
+  src.jump = Input.jump[eid] === 1;
+  src.cursorDist = Input.cursorDist[eid];
+  src.dodge = Input.dodge[eid] === 1;
+  return src;
+}
 
 export class ShipBridge {
   readonly catalog: Catalog;
@@ -1234,41 +1258,24 @@ export class ShipBridge {
     // (and what its Tow Beam tows, as load: ships/tow.ts)
     body.cargo = quantizeCargo((this.host.cargoMass?.(eid) ?? 0) + (this.host.towLoad?.(eid) ?? 0));
     // (Burst Strafer: the dodge held; its way comes from the movement keys: ships/strafer.ts)
-    const dodge = Input.dodge[eid] === 1;
     const q = quantizeReplicaAngle(Input.targetAngle[eid]);
     // An EMP cripples the drive (thrust and steering × EMP_CONTROL) and stops a jump starting; the pilot's prediction flies it the same
     const emp = this.isEmped(eid);
-    const jump = Input.jump[eid] === 1 && !emp;
+    // The controls the step reads (flightInputs.ts: jump && !emp, jumpDist = cursorDist); the replica's bits read the same
+    const controls = buildFlightInputs(readInputsInto(eid, MOVE_SRC), emp, MOVE_CTL);
     // Numb with cold, the drive is sluggish (warmth.ts): its pilot's prediction works it out from the warmth it's told, replicas from CTL.numb
     const cold = this.coldStage(eid);
     const hazard = withNumb(this.host.hazardFlight?.(eid, ship.derived, body.x, body.y), cold);
     this.replicaCtl.set(eid, {
       mode: ReplicaMode.Player, q, derived: ship.derived,
-      bits: controlBits({
-        forward: Input.forward[eid] === 1, backward: Input.backward[eid] === 1, left: Input.left[eid] === 1, right: Input.right[eid] === 1,
-        boost: Input.boost[eid] === 1, helm: Input.helm[eid] === 1, strafeLeft: Input.strafeLeft[eid] === 1, strafeRight: Input.strafeRight[eid] === 1,
-        jump, dodge,
-      }) | (emp ? CTL.emp : 0) | (cold.control < 1 ? CTL.numb : 0),
+      bits: controlBits(controls) | (emp ? CTL.emp : 0) | (cold.control < 1 ? CTL.numb : 0),
     });
     // Charging fields round the step (a star's ring, a lodestone's): the range boost from where it starts, then a faster
     // cooldown and a lodestone's priming from where it ends (the pilot's prediction runs the same: ShipClient.predict)
     const jt = jumpTuning(this.tuning);
     let res!: ReturnType<typeof stepShipPhysics>;
     ship.jumpPrime = pilotJumpStep(body, ship.jumpPrime ?? 0, this.host.jumpFields?.(eid) ?? NO_FIELDS, this.host.getTick(), ship.derived.jumpCooldown || jt.cooldownTicks, jt, (rangeBoost) => {
-      res = stepShipPhysics(body, {
-        forward: Input.forward[eid] === 1,
-        backward: Input.backward[eid] === 1,
-        left: Input.left[eid] === 1,
-        right: Input.right[eid] === 1,
-        boost: Input.boost[eid] === 1,
-        targetAngle: Input.targetAngle[eid],
-        helm: Input.helm[eid] === 1,
-        strafeLeft: Input.strafeLeft[eid] === 1,
-        strafeRight: Input.strafeRight[eid] === 1,
-        jump,
-        jumpDist: Input.cursorDist[eid],
-        dodge,
-      }, ship.derived, this.tuning, { charge: this.chargeOf(eid), drainRate: 1, load: gunLoad(ship, this.host.getTick()), tick: this.host.getTick() }, this.host.gravityAt(eid), rangeBoost, emp ? withEmp(hazard) : hazard, this.host.terrainAt?.(eid));
+      res = stepShipPhysics(body, controls, ship.derived, this.tuning, { charge: this.chargeOf(eid), drainRate: 1, load: gunLoad(ship, this.host.getTick()), tick: this.host.getTick() }, this.host.gravityAt(eid), rangeBoost, emp ? withEmp(hazard) : hazard, this.host.terrainAt?.(eid));
     });
     this.setCharge(eid, res.charge);
     this.writeBody(eid, ship, body);

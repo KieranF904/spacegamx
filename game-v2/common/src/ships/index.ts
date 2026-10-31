@@ -43,3 +43,4 @@ export * from './mounting.js';
 export * from './strafer.js';
 export * from './tow.js';
 export * from './load.js';
+export * from './flightInputs.js';
