@@ -40,7 +40,7 @@ export async function handleJoin(ctx: ServerCtx, conn: ClientConnection, msg: an
     if (user) {
       conn.username = user.username;
       conn.userId = user.id;
-      conn.isAdmin = user.is_admin;
+      conn.isAdmin = user.is_admin || ctx.guestAdmin;
       conn.isContributor = ctx.contrib.hasRank(user.id, user.username);
       conn.authToken = msg.token;
       ctx.loginPilot(conn, user.id).catch((e) => ctx.fault('login', e));
@@ -83,7 +83,7 @@ export async function handleAuthLogin(ctx: ServerCtx, conn: ClientConnection, ms
     conn.username = result.user.username;
     conn.userId = result.user.id;
     ctx.loginPilot(conn, result.user.id).catch((e) => ctx.fault('login', e));
-    conn.isAdmin = result.user.is_admin;
+    conn.isAdmin = result.user.is_admin || ctx.guestAdmin;
     conn.isContributor = ctx.contrib.hasRank(result.user.id, result.user.username);
     conn.authToken = result.token;
     
@@ -92,7 +92,7 @@ export async function handleAuthLogin(ctx: ServerCtx, conn: ClientConnection, ms
       success: true,
       username: result.user.username,
       token: result.token,
-      isAdmin: result.user.is_admin,
+      isAdmin: conn.isAdmin,
       isContributor: ctx.contrib.allowed(conn),
     });
   } else {
@@ -129,7 +129,7 @@ export async function handleAuthRegister(ctx: ServerCtx, conn: ClientConnection,
     conn.username = result.user.username;
     conn.userId = result.user.id;
     ctx.loginPilot(conn, result.user.id).catch((e) => ctx.fault('login', e));
-    conn.isAdmin = result.user.is_admin;
+    conn.isAdmin = result.user.is_admin || ctx.guestAdmin;
     conn.isContributor = ctx.contrib.hasRank(result.user.id, result.user.username);
     conn.authToken = result.token;
     
@@ -138,7 +138,7 @@ export async function handleAuthRegister(ctx: ServerCtx, conn: ClientConnection,
       success: true,
       username: result.user.username,
       token: result.token,
-      isAdmin: result.user.is_admin,
+      isAdmin: conn.isAdmin,
       isContributor: ctx.contrib.allowed(conn),
     });
   } else {

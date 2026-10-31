@@ -75,7 +75,7 @@ const gameServer = new GameServer({
   ships: createShipBridge(shipConfig),
   profileStore,
   devTeleport: DEV_MODE,
-  // Guests are admins on the dev server (never in production: GameServer refuses it there too)
+  // Everyone (guests and signed-in pilots) is an admin on the dev server (never in production: GameServer refuses it there too)
   guestAdmin: DEV_MODE,
   // Admins may build anything in the hangar for free (the admin panel's switch; never in production: GameServer refuses it there too)
   freeBuild: DEV_MODE,
