@@ -221,6 +221,16 @@ export interface BridgeInternals {
   gravityK: ShipBridge['gravityK'];
   // Private methods modules call back through
   fieldAt: ShipBridge['fieldAt'];
+  rebuildNow: ShipBridge['rebuildNow']; syncHealth: ShipBridge['syncHealth']; cover: ShipBridge['cover'];
+  fireWeapons: ShipBridge['fireWeapons']; stepMiners: ShipBridge['stepMiners']; pose: ShipBridge['pose'];
+  alongBeam: ShipBridge['alongBeam']; nearSegment: ShipBridge['nearSegment']; castShip: ShipBridge['castShip'];
+  coldStage: ShipBridge['coldStage']; repairBeam: ShipBridge['repairBeam']; fireBeam: ShipBridge['fireBeam'];
+  stepPulses: ShipBridge['stepPulses']; pointDefence: ShipBridge['pointDefence']; damageMul: ShipBridge['damageMul'];
+  beamFrom: ShipBridge['beamFrom'];
+  noteRebuild: ShipBridge['noteRebuild']; spawnOn: ShipBridge['spawnOn']; removeBody: ShipBridge['removeBody'];
+  forget: ShipBridge['forget']; nextMissing: ShipBridge['nextMissing']; joinsOf: ShipBridge['joinsOf'];
+  spawnDebris: ShipBridge['spawnDebris'];
+  closestPart: ShipBridge['closestPart']; partWorld: ShipBridge['partWorld']; nearestPart: ShipBridge['nearestPart'];
 }
 
 /** The bridge as its modules see it */
