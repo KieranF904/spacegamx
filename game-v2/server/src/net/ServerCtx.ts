@@ -31,6 +31,9 @@ import type { Trade } from '../game/Trade.js';
 import type { Market } from '../game/Market.js';
 import type { Achievements } from '../game/Achievements.js';
 import type { Docking } from '../game/Docking.js';
+import type { Enemies } from '../game/Enemies.js';
+import type { Surfaces } from '../game/Surfaces.js';
+import type { HomeStations } from '../game/HomeStations.js';
 
 export interface ServerCtx {
   // ---- state (read only to handlers) ----
@@ -89,4 +92,19 @@ export interface ServerCtx {
   readonly trade: Trade;
   readonly market: Market;
   readonly achievements: Achievements;
+
+  // ---- flight messages (net/handlers/flight.ts) ----
+  /** Inputs received since the last tick boundary (GameServer.drainInputQueue applies them right before the tick) */
+  readonly inputQueue: Array<{ conn: ClientConnection; msg: any }>;
+  /** Pilots with a training drone out: pilot entity -> drone */
+  readonly trainers: Map<number, number>;
+  readonly enemies: Enemies;
+  readonly surfaces: Surfaces;
+  readonly homes: HomeStations;
+  /** A fresh player ship entity (respawn) */
+  createPlayer(): number;
+  /** Put a pilot's ship in a system at a point (respawn's rally) */
+  placePlayer(conn: ClientConnection, systemNum: number, x: number, y: number): void;
+  /** Move a pilot to another system (jump gates) */
+  travelTo(conn: ClientConnection, systemNum: number, x: number, y: number, keepMomentum: boolean): void;
 }

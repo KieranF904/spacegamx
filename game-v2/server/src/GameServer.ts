@@ -86,10 +86,8 @@ import {
   EntityType,
   encodeServerMessage,
   serverFrame,
-  unwrapTick16,
   ServerAsteroidSeedMessage,
   EffectType,
-  computeStateHash,
   packCursorWeaponState,
   // Shared polygon & collision helpers (used by both fireLaser and projectile collision)
   getAsteroidPolygon,
@@ -160,7 +158,6 @@ import { SimLod, type Plan, type Intent, type FarPose } from './ships/SimLod.js'
 import { SystemMemory, shipMemory, restoreHp, type WorldStore, type MemoryHost, type ShipMemory } from './game/SystemMemory.js';
 import { Achievements } from './game/Achievements.js';
 import { huntedBoss, RibbonsFile, mineFalloff, rayTerrain, type Terrain } from '@space-game/common';
-import { replicaAngle, quantizeReplicaAngle, ReplicaMode, INPUT_BOOLS, INPUT_HELD } from '@space-game/common';
 import { MemoryProfileStore, type ProfileStore } from './profile/ProfileStore.js';
 import { MessageLimiter } from './net/MessageLimits.js';
 import { checkTickOrder, type TickSystem } from './tickOrder.js';
@@ -171,7 +168,9 @@ import { registerAuthHandlers, rejectAuth, handleHttpAuth } from './net/auth.js'
 import { registerShipEditHandlers } from './net/handlers/shipEdit.js';
 import { Docking, stationQuery } from './game/Docking.js';
 import { Derelicts, type DerelictSlot } from './game/Derelicts.js';
-import { HandlerRegistry, dispatch, registerHandlers, MAX_INPUTS_PER_TICK, type HandlerTable } from './net/dispatch.js';
+import { HandlerRegistry, dispatch, registerHandlers, type HandlerTable } from './net/dispatch.js';
+import * as flight from './net/handlers/flight.js';
+import { registerFlightHandlers, portalQuery } from './net/handlers/flight.js';
 
 // ============================================
 // SPATIAL PARTITIONING
@@ -417,13 +416,9 @@ const bulletQuery = defineQuery([Bullet, Position, Velocity]);
 const miningProjectileQuery = defineQuery([MiningShot, Position, Velocity, Projectile]);
 const asteroidQuery = defineQuery([Asteroid, Position]);
 
-/** Input flood guards (the per-tick one, MAX_INPUTS_PER_TICK, is in net/dispatch.ts): how far ahead one may be scheduled, and how many may wait */
-const MAX_INPUT_LEAD = 64;
-const MAX_SCHEDULED_INPUTS = 32;
 /** A client's game loop silent this long (3 s) lets go of its controls */
 const INPUT_TIMEOUT_TICKS = 180;
 const droppedItemQuery = defineQuery([DroppedItem, Position, Velocity, Lifetime]);
-const portalQuery = defineQuery([Portal, Position]);
 const lifetimeQuery = defineQuery([Lifetime]);
 const deadQuery = defineQuery([Dead]);
 
@@ -609,7 +604,7 @@ export class GameServer implements ServerCtx {
   private lastSnapshotTick = 0;
   
   // Input queue — messages arrive instantly between ticks, get applied at tick boundaries
-  private inputQueue: Array<{ conn: ClientConnection; msg: any }> = [];
+  readonly inputQueue: Array<{ conn: ClientConnection; msg: any }> = [];
   
   // Tracks entities that died this tick (for snapshot removal notifications), with the system they were in
   private pendingRemovedEntities = new RemovalSet();
@@ -663,7 +658,7 @@ export class GameServer implements ServerCtx {
   private hazards!: Hazards;
   private warmth!: Warmth;
   outpost?: Outpost;
-  private homes!: HomeStations;
+  homes!: HomeStations;
   private weapons: Weapons;
   readonly enemies: Enemies;
   /** Story, chains and bounties */
@@ -2102,7 +2097,7 @@ this.devTeleport = opts.devTeleport ?? false;
   }
 
   /** Put a player somewhere without travel effects (logging in, respawning) */
-  private placePlayer(conn: ClientConnection, systemNum: number, x: number, y: number): void {
+  placePlayer(conn: ClientConnection, systemNum: number, x: number, y: number): void {
     const eid = conn.playerId;
     if (!this.gameData.getSystemByNum(systemNum)) return;
     const from = InSystem.systemId[eid];
@@ -2736,7 +2731,7 @@ this.devTeleport = opts.devTeleport ?? false;
     };
   }
 
-  private createPlayer(): number {
+  createPlayer(): number {
     const eid = addEntity(this.world);
     
     addComponent(this.world, Position, eid);
@@ -2803,34 +2798,9 @@ this.devTeleport = opts.devTeleport ?? false;
     registerHandlers(t, registerModuleHandlers);
     registerHandlers(t, registerAuthHandlers);
     registerHandlers(t, registerShipEditHandlers);
-    t.on('input', (_ctx, conn, msg) => {
-      // Queue for next tick boundary — don't apply mid-frame.
-      // Messages still arrive instantly via setImmediate event loop.
-      if (++conn.inputsThisTick > MAX_INPUTS_PER_TICK) return;
-      this.inputQueue.push({ conn, msg });
-    });
-    t.on('ping', (_ctx, conn, msg) => {
-      this.handlePing(conn, msg);
-    });
-    t.on('mapView', (_ctx, conn, msg) => {
-      // (Opened: the far ships at once, then once a second while it's open)
-      conn.mapOpen = msg.open === true;
-      if (conn.mapOpen) { conn.mapDotsDue = true; conn.mapFresh = true; conn.mapSent?.clear(); }
-    });
+    registerHandlers(t, registerFlightHandlers);
     t.on('chat', (_ctx, conn, msg) => {
       this.handleChat(conn, msg);
-    });
-    t.on('interact', (_ctx, conn, msg) => {
-      this.handleInteract(conn, msg);
-    });
-    t.on('respawn', (_ctx, conn, msg) => {
-      this.handleRespawn(conn, typeof msg.rally === 'string' ? msg.rally : undefined);
-    });
-    t.on('trainingDrone', (_ctx, conn, msg) => {
-      this.trainingDrone(conn);
-    });
-    t.on('target', (_ctx, conn, msg) => {
-      this.ships.setTarget(conn.playerId, Number(msg.id) || 0);
     });
     t.on('devStation', (_ctx, conn, msg) => {
       // Dev (or an admin): a station at Sol's site with every track at a tier, and in you go
@@ -2843,9 +2813,6 @@ this.devTeleport = opts.devTeleport ?? false;
       const sol = this.gameData.getSystemNum('sol');
       const jp = [...portalQuery(this.world)].find((g) => InSystem.systemId[g] === sol && this.gameData.getSystemByNum(Portal.targetSystem[g])?.private);
       if (jp !== undefined) this.homes.jump(conn, 'sol', Position.x[jp], Position.y[jp]);
-    });
-    t.on('stateHash', (_ctx, conn, msg) => {
-      this.handleStateHash(conn, msg as any);
     });
     t.on('devTeleport', (_ctx, conn, msg) => {
       this.handleDevTeleport(conn, msg);
@@ -2886,13 +2853,6 @@ this.devTeleport = opts.devTeleport ?? false;
         }
       }
       this.pilots.toast(conn, `Boss worn to ${Math.round(this.ships.integrity(boss) * 100)}%`, 'info');
-    });
-    t.on('tow', (_ctx, conn, msg) => {
-      // Tow Beam (game/Towing.ts): take hold of what's nearest the cursor, or let go
-      const p = conn.playerId;
-      if (!hasComponent(this.world, Player, p)) return;
-      const a = Input.targetAngle[p], dist = Input.cursorDist[p];
-      this.towing.request(p, !!msg.on, { x: Position.x[p] + Math.cos(a) * dist, y: Position.y[p] + Math.sin(a) * dist });
     });
     t.on('shipNeed', (_ctx, conn, msg) => {
       // The client lost a ship's blueprint: the next snapshot sends it in full
@@ -2980,95 +2940,19 @@ this.devTeleport = opts.devTeleport ?? false;
     return (this.everyoneAdmin && this.shipEditAnywhere) || (this.freeBuildAllowed && this.admin.freeBuild(conn));
   }
 
-  /** The client's prediction of its ship at a tick, checked against what the ship really did then */
-  private handleStateHash(conn: ClientConnection, msg: { tick: number; hash: number }): void {
-    conn.liveTick = this.currentTick;
-    conn.hashSeen = true;
-    if (!hasComponent(this.world, Player, conn.playerId)) return;
-    const tick = Number(msg.tick);
-    // The client predicts ahead of us: a hash for a tick we haven't reached is checked when we get there
-    if (tick > this.currentTick) {
-      if (tick - this.currentTick < 120 && conn.aheadHashes.size < 8) conn.aheadHashes.set(tick, msg.hash);
-      return;
-    }
-    const h = conn.selfHashes.get(tick);
-    if (h !== undefined && h !== msg.hash) conn.forceSnapshot = true;
-  }
-
-  /** End of tick: remember each pilot's ship state hash for the last couple of seconds */
-  private recordSelfHashes(): void {
-    for (const conn of this.clients.values()) {
-      const eid = conn.playerId;
-      if (!hasComponent(this.world, Player, eid) || hasComponent(this.world, Dead, eid)) continue;
-      const h = computeStateHash(Position.x[eid], Position.y[eid], Rotation.angle[eid], Velocity.x[eid], Velocity.y[eid],
-        Health.current[eid], Boost.fuel[eid], this.gameData.getSystemByNum(InSystem.systemId[eid])?.id || 'sol');
-      conn.selfHashes.set(this.currentTick, h);
-      conn.selfHashes.delete(this.currentTick - 180);
-      const ahead = conn.aheadHashes.get(this.currentTick);
-      if (ahead !== undefined) {
-        if (ahead !== h) conn.forceSnapshot = true;
-        conn.aheadHashes.delete(this.currentTick);
-      }
-      for (const t of conn.aheadHashes.keys()) if (t < this.currentTick) conn.aheadHashes.delete(t);
-    }
-  }
-
-  /**
-   * Schedule an input for future application at its targetTick.
-   * If no targetTick or it's in the past, apply immediately (backward compat).
-   */
+  /** Apply or schedule one queued input (net/handlers/flight.ts; drainInputQueue calls it) */
   private handleInput(conn: ClientConnection, msg: any): void {
-    const eid = conn.playerId;
-    if (!hasComponent(this.world, Player, eid)) return;
-    
-    // Inputs carry the low 16 bits of their target tick: the one nearest ours
-    if (msg.targetTick !== undefined) msg.targetTick = unwrapTick16(msg.targetTick & 0xFFFF, this.currentTick);
-    const targetTick = msg.targetTick;
-    conn.liveTick = this.currentTick;
-    if (targetTick !== undefined && targetTick > this.currentTick) {
-      // Schedule for future tick (no further ahead than a client could predict, and only so many)
-      if (targetTick > this.currentTick + MAX_INPUT_LEAD) return;
-      conn.scheduledInputs.push({ targetTick, msg });
-      if (conn.scheduledInputs.length > MAX_SCHEDULED_INPUTS) conn.scheduledInputs.shift();
-    } else {
-      // No targetTick (old client) or late arrival — apply immediately. The client
-      // predicted it on an earlier tick, so its ship needs correcting
-      this.applyInputToEntity(conn, msg);
-      conn.selfLate = true;
-    }
+    flight.handleInput(this, conn, msg);
   }
 
-  /** Write input state to ECS components for a player entity. */
+  /** Write input state to ECS components for a player entity (net/handlers/flight.ts) */
   private applyInputToEntity(conn: ClientConnection, msg: any): void {
-    const eid = conn.playerId;
-    // The on/off keys (inputFields.ts); the numbers below each have their own coercion
-    for (let i = 0; i < INPUT_BOOLS.length; i++) { const k = INPUT_BOOLS[i]; Input[k][eid] = msg[k] ? 1 : 0; }
-    // (The binary input carries it as a uint16; a JSON one could say NaN, Infinity or a string)
-    const cursorDist = Number(msg.cursorDist);
-    Input.cursorDist[eid] = Number.isFinite(cursorDist) ? Math.min(65535, Math.max(0, cursorDist)) : 0;
-    // The client sends dequantized(quantized(rawAngle)) as a float32, which is already on the
-    // replicated grid (replicaAngle gives back exactly that value). Anything else (a JSON input,
-    // a bot) is put on the grid too, so every client replays this ship's turning exactly.
-    Input.targetAngle[eid] = replicaAngle(ReplicaMode.Player, quantizeReplicaAngle(Number(msg.targetAngle) || 0));
-    const seq = Number.isFinite(msg.seq) ? msg.seq : 0;
-    Input.sequence[eid] = seq;
-    
-    conn.lastInputSeq = seq;
+    flight.applyInputToEntity(this, conn, msg);
   }
 
-  private handlePing(conn: ClientConnection, msg: any): void {
-    const receiveTime = performance.now();
-    const serverNow = Date.now();
-    // Rough estimate for admin display (includes clock skew, but close enough)
-    const clientTime = Number.isFinite(msg.clientTime) ? msg.clientTime : 0;
-    conn.ping = Math.max(0, serverNow - clientTime);
-    this.send(conn.ws, {
-      type: 'pong',
-      clientTime,
-      serverTime: serverNow,
-      tick: this.currentTick,
-      serverProcessing: Math.round((performance.now() - receiveTime) * 100) / 100,
-    });
+  /** End of tick: remember each pilot's ship state hash (net/handlers/flight.ts; run from the tick list) */
+  private recordSelfHashes(): void {
+    flight.recordSelfHashes(this);
   }
 
   private handleChat(conn: ClientConnection, msg: any): void {
@@ -3117,7 +3001,7 @@ this.devTeleport = opts.devTeleport ?? false;
    * Move a player to (x, y) in another (or the same) system: jump gates and rifts.
    * Rifts keep the ship's momentum; gates bring it to a stop.
    */
-  private travelTo(conn: ClientConnection, systemNum: number, x: number, y: number, keepMomentum: boolean): void {
+  travelTo(conn: ClientConnection, systemNum: number, x: number, y: number, keepMomentum: boolean): void {
     const eid = conn.playerId;
     const target = this.gameData.getSystemByNum(systemNum);
     if (!target) return;
@@ -3170,88 +3054,6 @@ this.devTeleport = opts.devTeleport ?? false;
         this.travelTo(conn, Portal.targetSystem[rift], Portal.targetX[rift], Portal.targetY[rift], true);
         break;
       }
-    }
-  }
-
-  private handleInteract(conn: ClientConnection, msg: any): void {
-    const playerEid = conn.playerId;
-    if (!hasComponent(this.world, Player, playerEid)) return;
-    // Someone out here to talk to (People.ts)
-    const person = hasComponent(this.world, Dead, playerEid) ? null : this.people.nearby(conn);
-    if (person) return this.people.talkTo(conn, person.id);
-    
-    const playerX = Position.x[playerEid];
-    const playerY = Position.y[playerEid];
-    const playerSystemId = InSystem.systemId[playerEid];
-    
-    // In orbit over a planet with a surface: down you go
-    const here = this.gameData.getSystemByNum(playerSystemId);
-    if (here && !hasComponent(this.world, Dead, playerEid) && this.surfaces.descend(conn, here, playerX, playerY)) return;
-
-    // Check for nearby jump gates (rifts trigger on their own when flown into)
-    for (const portalEid of portalQuery(this.world)) {
-      if (InSystem.systemId[portalEid] !== playerSystemId || Portal.kind[portalEid] !== 0) continue;
-
-      const dx = Position.x[portalEid] - playerX;
-      const dy = Position.y[portalEid] - playerY;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-
-      // Portal interaction radius
-      if (dist < 300) {
-        const targetSystemNum = Portal.targetSystem[portalEid];
-        const targetData = this.gameData.getSystemByNum(targetSystemNum);
-        if (!targetData) return;
-        // Pilots' own stations: in by a site's jump point, out by their station's gate
-        if (here?.private && this.homes.leave(conn, playerSystemId)) return;
-        if (targetData.private) return this.homes.jump(conn, here?.id ?? '', Position.x[portalEid], Position.y[portalEid]);
-        const barred = this.quests.canEnter(conn, targetData.id);
-        if (barred) return this.pilots.toast(conn, barred, 'warn');
-        // Arrive beside the gate that leads back here (or any gate if there's no return gate)
-        let arrival: number | null = null;
-        for (const g of portalQuery(this.world)) {
-          if (InSystem.systemId[g] !== targetSystemNum || Portal.kind[g] !== 0) continue;
-          if (arrival === null || Portal.targetSystem[g] === playerSystemId) arrival = g;
-        }
-        const ax = arrival !== null ? Position.x[arrival] + 500 : 0;
-        const ay = arrival !== null ? Position.y[arrival] : 0;
-        this.travelTo(conn, targetSystemNum, ax, ay, false);
-        return;
-      }
-    }
-  }
-
-  private handleRespawn(conn: ClientConnection, rally?: string): void {
-    const eid = conn.playerId;
-    // cleanupSystem removes dead entities the same tick they die, so by the time
-    // a respawn request arrives the entity is usually gone rather than Dead.
-    if (hasComponent(this.world, Dead, eid) || !entityExists(this.world, eid)) {
-      // Remove dead component and reset health
-      // For now, just recreate the player
-      const newPlayerId = this.createPlayer();
-      conn.playerId = newPlayerId;
-      Player.clientId[newPlayerId] = Player.clientId[eid];
-      if (hasComponent(this.world, Dead, eid)) removeEntity(this.world, eid);
-      this.pilots.onRespawn(conn);
-      // Rally: come back beside a party member (if they aren't in the thick of a fight)
-      if (rally) {
-        const m = this.party.members(conn).find((x) => x !== conn && x.username === rally) as ClientConnection | undefined;
-        const me = m?.playerId ?? -1;
-        if (!m || !this.flying(me)) this.pilots.toast(conn, `${rally} isn't flying right now: you're back at your home station`, 'warn');
-        else if (this.currentTick - this.ships.lastDamagedTick(me) < 60 * 8) this.pilots.toast(conn, `${rally} is under fire: you're back at your home station`, 'warn');
-        else {
-          const a = Math.random() * Math.PI * 2;
-          this.placePlayer(conn, InSystem.systemId[me], Position.x[me] + Math.cos(a) * 450, Position.y[me] + Math.sin(a) * 450);
-          this.pilots.toast(conn, `Rallied with ${rally}`, 'good');
-        }
-      }
-
-      this.send(conn.ws, {
-        type: 'welcome',
-        playerId: newPlayerId,
-        protocol: PROTOCOL_VERSION,
-        tickRate: TICK_RATE,
-        serverTime: Date.now(),
-      });
     }
   }
 
@@ -3371,12 +3173,9 @@ this.devTeleport = opts.devTeleport ?? false;
     void drainedCount;
   }
 
-  /**
-   * Let go of every key (aim and helm stay as they are: inputFields.ts INPUT_HELD). Docking and quitting mid-fight
-   * (the linger) let go the same way, the dodge control included: a dodge held then would fire later with nobody flying
-   */
+  /** Let go of every key (net/handlers/flight.ts) */
   private releaseControls(eid: number): void {
-    for (let i = 0; i < INPUT_HELD.length; i++) Input[INPUT_HELD[i]][eid] = 0;
+    flight.releaseControls(eid);
   }
 
   // ---- Crash isolation (server robustness audit, docs/audits/server-robustness.md) ----
@@ -4116,19 +3915,7 @@ this.devTeleport = opts.devTeleport ?? false;
   }
 
   /** Pilots with a training drone out (the tutorial's combat lesson): pilot entity -> drone */
-  private trainers = new Map<number, number>();
-
-  /** A Helios drone 1400 ahead of a pilot in safe space, to practise on: it only fights back once shot */
-  private trainingDrone(conn: ClientConnection): void {
-    const eid = conn.playerId;
-    const num = InSystem.systemId[eid];
-    const prev = this.trainers.get(eid);
-    if (prev !== undefined && this.enemies.isAlive(prev)) return;
-    if (!inSafeSpace(this.gameData.getSystemByNum(num), Position.x[eid], Position.y[eid]) || !(this.gameData.factionsFile as FactionsFile).factions?.helios) return;
-    const a = Rotation.angle[eid];
-    const [d] = this.enemies.spawnPack(num, { faction: 'helios', ships: ['helios_drone'], passive: true }, Position.x[eid] + Math.cos(a) * 1400, Position.y[eid] + Math.sin(a) * 1400);
-    if (d !== undefined) this.trainers.set(eid, d);
-  }
+  readonly trainers = new Map<number, number>();
 
   /** What killed a pilot, for telemetry: the last ship to hit them (an enemy's type and faction, or a pilot), the region, their rating */
   private deathCause(player: number): Record<string, unknown> {
