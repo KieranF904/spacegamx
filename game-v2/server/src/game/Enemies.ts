@@ -225,7 +225,7 @@ export interface EnemyHost {
   stationBeam(num: number, station: number, target: number, turret: number): void;
   /** The other members of a player's party (entities), for shared kills */
   partyOf?(player: number): number[];
-  /** Pilots who've been mending this one (Repair Beams: game/Support.ts): they share its kills as its party does */
+  /** Pilots who've been mending this one (Repair Beams: ships/features/support/Support.ts): they share its kills as its party does */
   supportersOf?(player: number): number[];
   /** Docked, or in a station's docking ring: hostiles leave them be */
   sheltered?(player: number): boolean;

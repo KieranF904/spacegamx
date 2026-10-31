@@ -6,7 +6,8 @@
  * TYPE-ONLY imports: GameServer builds the host, features only name types.
  */
 import type { IWorld } from 'bitecs';
-import type { ShipTuning, TowKind } from '@space-game/common';
+import type { ShipTuning, ShipState, TowKind, WeaponInfo, WeaponTuning } from '@space-game/common';
+import type { WeaponBridge } from '../bridge/core.js';
 import type { ShipBridge } from '../ShipBridge.js';
 import type { LootPods } from '../../game/LootPods.js';
 
@@ -52,8 +53,21 @@ export interface FeatureInstance {
   onLeave?(eid: number): void;
 }
 
+/**
+ * What a weapon-kind role does inside the bridge's gun step (PartFeature.weapon, common features/types.ts WeaponRole;
+ * flattened once by weapons.ts). Both hooks run for every ship that fires, every tick: allocation-free.
+ */
+export interface ServerWeaponHooks {
+  /** onFire: a held beam whose kind plays the role fires this way instead of the damaging beam. Returns how far along it stopped (0..1) */
+  onFire?(b: WeaponBridge, eid: number, ship: ShipState, w: WeaponInfo, def: WeaponTuning): number;
+  /** onTick: once a tick after the guns' tick, whatever the trigger, for the whole ship (it picks its own guns out) */
+  onTick?(b: WeaponBridge, eid: number, ship: ShipState, pose: { x: number; y: number; angle: number }, def: (w: WeaponInfo) => WeaponTuning): void;
+}
+
 export interface ServerFeature {
   /** Same id as the PartFeature it serves */
   id: string;
   create(host: FeatureHost): FeatureInstance;
+  /** Hooks for the weapon roles of the PartFeature with this id, by role id */
+  weapon?: Readonly<Record<string, ServerWeaponHooks>>;
 }

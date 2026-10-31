@@ -12,15 +12,19 @@
  * for projectiles within its range that it can shoot down (their kind's `intercept`: hits to bring one down; a boss's
  * nova never, whatever its kind) fired by ships that may hurt its own, turns to the nearest at `slew` × a turret's
  * rate, and fires when on it: each shot takes one of its hits, instantly. It never hurts a ship. Its shots draw their
- * power over the reload, as any gun's. The server runs it (ShipBridge.pointDefence); clients see an `intercept` event.
+ * power over the reload, as any gun's. The server runs it (features/support pointDefence); clients see an `intercept` event.
  */
 
-import type { ShipState } from './state.js';
-import { healPart } from './state.js';
-import type { ShipTuning, WeaponTuning } from './tuning.js';
-import type { PlacedGeom } from './grid.js';
-import { partDistance } from './collide.js';
-import { stepTurretAim, type TurretWindow } from './turret.js';
+import type { ShipState } from '../../state.js';
+import { healPart } from '../../state.js';
+import type { ShipTuning, WeaponTuning } from '../../tuning.js';
+import type { PlacedGeom } from '../../grid.js';
+import { partDistance } from '../../collide.js';
+import { stepTurretAim, type TurretWindow } from '../../turret.js';
+
+/** Weapon role ids of the support feature (features/support/index.ts); the server's hooks hang on these */
+export const REPAIR_BEAM = 'repairBeam';
+export const POINT_DEFENCE = 'pointDefence';
 
 /** A point-defence gun's own settings (WeaponTuning.pointDefence), every default filled in */
 export interface PointDefenceTuning {
@@ -35,6 +39,16 @@ export const DEFAULT_POINT_DEFENCE: PointDefenceTuning = { range: 560, slew: 3 }
 /** A kind that fires itself at incoming projectiles (and never on the trigger) */
 export function isPointDefence(tuning: ShipTuning, kind: string): boolean {
   return !!tuning.weapons?.[kind]?.pointDefence;
+}
+
+/** A weapon's tuning that fires itself at incoming projectiles (the Point Defence feature's role) */
+export function pointDefenceDef(def: WeaponTuning | undefined): boolean {
+  return !!def?.pointDefence;
+}
+
+/** A weapon's tuning whose beam mends instead of hurting (the Repair Beam feature's role; any heal at all, as the beam dispatch has always read it) */
+export function repairBeamDef(def: WeaponTuning | undefined): boolean {
+  return !!def?.heal;
 }
 
 /** A kind whose beam mends instead of hurting */

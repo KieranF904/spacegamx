@@ -554,7 +554,7 @@ const FAMILY: Record<string, string> = {
   cannon: 'cannon_pip', autocannon: 'autocannon_rattler', flak: 'flak_burst', mortar: 'mortar_lobber', laser: 'laser_glint',
   pulse: 'pulse_strobe', missile: 'missile_dart', railgun: 'railgun_needle', emp: 'emp_hush', arc: 'arc_spark',
   torpedo: 'torpedo_eel', lance: 'lance_lance',
-  // (Support weapons, common/src/ships/support.ts: the Repair Beam an emitter in its own green, point defence a quick little autocannon)
+  // (Support weapons, common/src/ships/features/support/support.ts: the Repair Beam an emitter in its own green, point defence a quick little autocannon)
   repair: 'laser_glint', point_defence: 'autocannon_rattler',
 };
 const designOf = (id: GunId): Design => DESIGNS[id.model] ?? DESIGNS[id.family] ?? DESIGNS[FAMILY[id.family] ?? 'cannon_pip'];

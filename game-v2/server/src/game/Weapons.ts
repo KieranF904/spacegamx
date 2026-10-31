@@ -42,7 +42,7 @@ interface Extra {
   hit: Set<number>;
   damageScale: number;
   sizeScale: number;
-  /** Point defence: hits left to shoot it down (0: it can't be; common/src/ships/support.ts) */
+  /** Point defence: hits left to shoot it down (0: it can't be; common/src/ships/features/support/support.ts) */
   intercept: number;
 }
 
@@ -136,7 +136,7 @@ export class Weapons {
     return this.extras.get(proj)?.hit;
   }
 
-  // --- Point defence (common/src/ships/support.ts; ShipBridge.pointDefence) ---
+  // --- Point defence (common/src/ships/features/support/support.ts; features/support pointDefence) ---
 
   /**
    * Shots point defence at (x, y) could fire on: ones that can be shot down, in this system, within `range`, fired by

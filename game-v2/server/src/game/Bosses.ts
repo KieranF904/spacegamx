@@ -128,7 +128,7 @@ export interface BossHost {
   terrain?(systemNum: number): import('@space-game/common').Terrain | undefined;
   /** It's dead, and these players had a hand in it */
   defeated?(boss: string, def: BossDef, players: number[]): void;
-  /** Pilots who've been mending this one (Repair Beams: game/Support.ts): a boss counts them among its winners */
+  /** Pilots who've been mending this one (Repair Beams: ships/features/support/Support.ts): a boss counts them among its winners */
   supportersOf?(player: number): number[];
 }
 

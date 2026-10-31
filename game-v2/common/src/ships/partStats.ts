@@ -13,7 +13,7 @@ import type { Catalog } from './catalog.js';
 import type { ShipTuning } from './tuning.js';
 import { fnOutput, isEngine, markName, partDemand, partGrade, partMaterial, partSupply, partThrust, weaponBaseArea, weaponSizeFactor, weaponStrength } from './grades.js';
 import { gunDef, gunRate } from './launch.js';
-import { pointDefenceOf } from './support.js';
+import { pointDefenceOf } from './features/support/support.js';
 import { effectiveRange } from './pulse.js';
 import type { WeaponMods } from './types.js';
 import { baseWeaponDps } from './rating.js';

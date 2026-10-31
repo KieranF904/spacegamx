@@ -34,7 +34,7 @@ export * from './guns.js';
 export * from './energy.js';
 export * from './circuits.js';
 export * from './surge.js';
-export * from './support.js';
+export * from './features/support/support.js';
 export * from './pulse.js';
 export * from './hazards.js';
 export * from './warmth.js';

@@ -68,3 +68,16 @@ A feature's world side and UI side live next to the shared part, as plain folder
   (host.ts) is owned by ShipClient; ShipRenderer gets it for the draw loop.
 - `npm run features:gen` writes all three lists; `--check` (run by registry.test.ts) fails if any is stale.
 - `FeatureInstance.wire`/`status` feed SnapshotBuilder's pilot row and status row (the Tow Beam's `[8]`).
+
+## Weapon-kind features (Cut 8: `support/`)
+
+A behaviour that belongs to a weapon KIND (tuning.json `weapons.<kind>`: the Repair Beam's `heal`, the Point Defence
+Turret's `pointDefence`) rather than to a function flag declares `weapon: WeaponRole[]` (id + `applies(def)`) and gives
+`applies: () => false` (so it never enters `derived.fxMask`; order 40, after the others, so their feature numbers are
+unchanged). The server half hangs hooks on the role ids (`ServerFeature.weapon`, `server/src/ships/features/types.ts`):
+`onFire` (a held beam of that kind fires this way instead of the damaging beam; returns how far it stopped) and `onTick`
+(once a tick after the guns' tick, whatever the trigger). `server/src/ships/features/weapons.ts` flattens them once, in
+plan order, and the bridge's gun step (`bridge/weapons.ts`) walks the arrays: no per-kind special case, no allocation.
+Hooks receive `WeaponBridge` (an alias of the bridge's ctx, `bridge/core.ts`). Not done here: describe text (the Mends /
+Intercepts tooltip rows replace the Damage and Fire-rate rows, which an append-only facts seam cannot express) and the
+client's repair beam / point-defence visuals (`MiningBeamFx`, `ShipClient.stepPointDefenceVisuals`, `gunDecor`).

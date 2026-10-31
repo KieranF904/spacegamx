@@ -3,6 +3,7 @@
 
 import type { PartFeature } from './types.js';
 import { feature as f_strafer } from './strafer/index.js';
+import { feature as f_support } from './support/index.js';
 import { feature as f_tow } from './tow/index.js';
 
-export const FEATURES: readonly PartFeature[] = [f_strafer, f_tow];
+export const FEATURES: readonly PartFeature[] = [f_strafer, f_support, f_tow];

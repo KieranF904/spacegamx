@@ -330,7 +330,7 @@ export class DamageFx {
    * bolt, flak's tracers bursting on the target, or the lance's heavy beam.
    */
   /**
-   * Point defence fired (common/src/ships/support.ts): a hot tracer from its muzzle to the shot, a flash where it
+   * Point defence fired (common/src/ships/features/support/support.ts): a hot tracer from its muzzle to the shot, a flash where it
    * struck, and brought down, the shot pops (a puff and a ring, small: its warhead never went off)
    */
   onIntercept(m: { x: number; y: number; fx: number; fy: number; down: boolean }): void {

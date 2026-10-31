@@ -10,7 +10,7 @@
 
 import type { Blueprint, FunctionDef, MaterialDef } from '../types.js';
 import type { Catalog } from '../catalog.js';
-import type { ShipTuning } from '../tuning.js';
+import type { ShipTuning, WeaponTuning } from '../tuning.js';
 import type { PlacedGeom, PartMount } from '../grid.js';
 import type { ShipDerived } from '../rebuild.js';
 import type { PowerLayout } from '../circuits.js';
@@ -157,6 +157,18 @@ export interface DescribeCtx {
   area?: number;
 }
 
+/**
+ * A weapon kind a feature is the behaviour of (a Repair Beam's mending, a Point Defence turret's aim): picked by the
+ * kind's tuning (`weapons.<kind>`), not by a function flag. The world half (server/src/ships/features/weapons.ts) hangs
+ * its onFire / onTick hooks on the role's id.
+ */
+export interface WeaponRole {
+  /** Unique within its feature */
+  id: string;
+  /** Does a gun with this (resolved) weapon tuning play the role? Pure, allocation-free: it runs for every gun every tick */
+  applies(def: WeaponTuning | undefined): boolean;
+}
+
 export interface PartFeature {
   /** Unique, also its folder name under features/ */
   id: string;
@@ -169,6 +181,11 @@ export interface PartFeature {
   /** It draws power by the tick while it works (as engines and guns do), not as a steady load at the rebuild. 'engine':
    * and its circuit counts that draw as an engine's (circuits.ts engineDraw: a Burst Strafer's) */
   burst?: boolean | 'engine';
+  /**
+   * Weapon-kind roles (see WeaponRole). A feature that is only this has `applies: () => false`: no function of its
+   * own to give a ship, so it never enters `derived.fxMask`.
+   */
+  weapon?: readonly WeaponRole[];
   /** At the rebuild (rebuild.ts), after the cargo/scanner pass: write `c.out.<key>` */
   derive?(c: DeriveCtx): void;
   /** Each tick (energy.ts gunLoad): add what it draws this tick, per feed group, to `out` (allocation-free) */

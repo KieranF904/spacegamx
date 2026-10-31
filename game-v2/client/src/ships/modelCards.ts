@@ -17,7 +17,7 @@ export const FAMILY_LABEL: Record<string, string> = {
   reactor: 'Generators', dynamo: 'Surge generators', battery: 'Batteries', capacitor: 'Capacitors', drive_cell: 'Drive cells',
   shield: 'Shields', plating: 'Plating',
   mining: 'Mining lasers', demolition: 'Demolition', siphon: 'Siphons', scanner: 'Scanners', constructor: 'Constructors',
-  // (Support weapons: common/src/ships/support.ts)
+  // (Support weapons: common/src/ships/features/support/support.ts)
   repair: 'Repair beams', point_defence: 'Point defence',
   // (Burst Strafer and Tow Beam: ships/strafer.ts, tow.ts)
   strafer: 'Strafers', tow: 'Tow beams',

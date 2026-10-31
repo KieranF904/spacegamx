@@ -82,7 +82,7 @@ export interface ShipHost {
   payRepair?(eid: number, hp: number): number;
   /** May `attacker` hurt `target`? (Players can't hurt each other outside PvP zones.) Default: yes. */
   canDamage?(attacker: number, target: number): boolean;
-  // --- Support weapons (common/src/ships/support.ts) ---
+  // --- Support weapons (common/src/ships/features/support/support.ts) ---
   /** May `healer`'s Repair Beam mend `target`? (A friendly ship: absent, nobody) */
   canHeal?(healer: number, target: number): boolean;
   /** A Repair Beam mended `hp` of `target` this tick (support credit: GameServer's Support ledger) */
@@ -228,8 +228,8 @@ export interface BridgeInternals {
   rebuildNow: ShipBridge['rebuildNow']; syncHealth: ShipBridge['syncHealth']; cover: ShipBridge['cover'];
   fireWeapons: ShipBridge['fireWeapons']; stepMiners: ShipBridge['stepMiners']; pose: ShipBridge['pose'];
   alongBeam: ShipBridge['alongBeam']; nearSegment: ShipBridge['nearSegment']; castShip: ShipBridge['castShip'];
-  coldStage: ShipBridge['coldStage']; repairBeam: ShipBridge['repairBeam']; fireBeam: ShipBridge['fireBeam'];
-  stepPulses: ShipBridge['stepPulses']; pointDefence: ShipBridge['pointDefence']; damageMul: ShipBridge['damageMul'];
+  coldStage: ShipBridge['coldStage']; fireBeam: ShipBridge['fireBeam'];
+  stepPulses: ShipBridge['stepPulses']; damageMul: ShipBridge['damageMul'];
   beamFrom: ShipBridge['beamFrom'];
   noteRebuild: ShipBridge['noteRebuild']; spawnOn: ShipBridge['spawnOn']; removeBody: ShipBridge['removeBody'];
   forget: ShipBridge['forget']; nextMissing: ShipBridge['nextMissing']; joinsOf: ShipBridge['joinsOf'];
@@ -245,3 +245,10 @@ export interface BridgeInternals {
 
 /** The bridge as its modules see it */
 export type BridgeCtx = Pick<ShipBridge, keyof ShipBridge> & BridgeInternals;
+
+/**
+ * What a part feature's weapon hooks (features/types.ts ServerWeaponHooks) are given: the bridge itself, the same
+ * object the bridge modules call back through. Named apart so the rule "only ShipBridge.ts and bridge/*.ts use the
+ * bridge internals" (imports.test.ts) stays about the bridge's own files; a feature's hooks are run by the bridge's gun step.
+ */
+export type WeaponBridge = BridgeCtx;

@@ -321,7 +321,7 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   });
 }
 // ---- (end Energy Phase 2)
-// ---- Support weapons: the Repair Beam and the Point Defence Turret (common/src/ships/support.ts; build-archetypes.md §5 #6, #7) ----
+// ---- Support weapons: the Repair Beam and the Point Defence Turret (common/src/ships/features/support/support.ts; build-archetypes.md §5 #6, #7) ----
 // The Repair Beam (band L16-23, Steady: the Warden's) is a held turret beam that mends friendly ships' parts where it lands, at a
 // big steady draw while it's on; the Point Defence Turret (band L8-15: the Interceptor's, Bulwark's and Freighter's) is a quick
 // turret that fires on its own at incoming missiles, torpedoes, mortar shells and seekers, a little power a shot. Appended last,

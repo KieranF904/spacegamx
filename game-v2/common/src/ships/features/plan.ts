@@ -10,7 +10,7 @@
  */
 
 import type { FunctionDef } from '../types.js';
-import type { DeriveCtx, DescribeCtx, Fact, FlightHook, FlightPhase, InputDef, LoadShip, PartFeature, ReplicaField, ReplicaWhere } from './types.js';
+import type { DeriveCtx, DescribeCtx, Fact, FlightHook, FlightPhase, InputDef, LoadShip, PartFeature, ReplicaField, ReplicaWhere, WeaponRole } from './types.js';
 import type { PowerLayout } from '../circuits.js';
 import type { ShipDerived } from '../rebuild.js';
 import { FEATURES } from './registry.js';
@@ -36,6 +36,8 @@ export type LoadHook = (ship: LoadShip, L: PowerLayout, out: number[]) => void;
 export interface FlightEntry { feature: number; order: number; step: FlightHook['step'] }
 export interface PlanInput extends InputDef { feature: string }
 export interface PlanReplica extends ReplicaField { feature: string; slot: number }
+/** A weapon-kind role, with the feature that owns it */
+export interface PlanWeaponRole extends WeaponRole { feature: string }
 /** A held input with a replica control bit */
 export interface PlanControl { name: string; bit: number }
 
@@ -55,6 +57,8 @@ export interface FeaturePlan {
   readonly load: readonly (LoadHook | undefined)[];
   /** Features with describe(), in plan order */
   readonly describe: readonly PartFeature[];
+  /** Every weapon-kind role of every feature, in plan order (WeaponRole) */
+  readonly weapons: readonly PlanWeaponRole[];
   /** Per phase, sorted by (order, feature id) */
   readonly flight: Readonly<Record<FlightPhase, readonly FlightEntry[]>>;
   readonly inputs: readonly PlanInput[];
@@ -85,6 +89,7 @@ export function compilePlan(list: readonly PartFeature[], wire: WireManifest = W
   const flight = Object.fromEntries(FLIGHT_PHASES.map((p) => [p, [] as FlightEntry[]])) as Record<FlightPhase, FlightEntry[]>;
   const inputs: PlanInput[] = [], replicate: PlanReplica[] = [], held: string[] = [], controls: PlanControl[] = [];
   const flightKeys: ((d: ShipDerived) => string)[] = [];
+  const weapons: PlanWeaponRole[] = [];
   const keys = new Map<string, string>(), bits = new Map<number, string>(), slots = new Map<string, string>();
   features.forEach((f, i) => {
     const bit = 1 << i;
@@ -92,6 +97,12 @@ export function compilePlan(list: readonly PartFeature[], wire: WireManifest = W
     if (f.burst) burstMask |= bit;
     if (f.burst === 'engine') engineMask |= bit;
     if (f.flightKey) flightKeys.push(f.flightKey.bind(f));
+    const roles = new Set<string>();
+    for (const r of f.weapon ?? []) {
+      if (roles.has(r.id)) fail(`${f.id}: weapon role "${r.id}" is listed twice`);
+      roles.add(r.id);
+      weapons.push({ ...r, feature: f.id });
+    }
     for (const h of f.flight ?? []) {
       if (!FLIGHT_PHASES.includes(h.phase)) fail(`${f.id}: unknown flight phase "${h.phase}"`);
       flightMask |= bit;
@@ -141,6 +152,7 @@ export function compilePlan(list: readonly PartFeature[], wire: WireManifest = W
     derive: Object.freeze(features.map((f) => f.derive?.bind(f))),
     load: Object.freeze(features.map((f) => f.load?.bind(f))),
     describe: Object.freeze(features.filter((f) => f.describe)),
+    weapons: Object.freeze(weapons),
     flight: Object.freeze(flight),
     inputs: Object.freeze(inputs),
     held: Object.freeze(held),
@@ -193,4 +205,11 @@ export function featureFacts(c: DescribeCtx): Fact[] {
   const out: Fact[] = [];
   for (const f of P.describe) if (f.applies(c.fn)) for (const fact of f.describe!(c)) out.push(fact);
   return out;
+}
+
+/** A feature's weapon role (the server's hooks hang on it): throws if there is none, a typo is a bug */
+export function weaponRole(P: FeaturePlan, feature: string, id: string): PlanWeaponRole {
+  const r = P.weapons.find((w) => w.feature === feature && w.id === id);
+  if (!r) throw new Error(`features: no weapon role ${feature}.${id}`);
+  return r;
 }

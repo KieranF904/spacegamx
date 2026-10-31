@@ -126,7 +126,7 @@ const JUMP = jumpTuning(shipTuning as unknown as ShipTuning);
 const STRAFER = (shipModels as unknown as { models: FunctionDef[] }).models.find((m) => m.strafe);
 const TOW_MODEL = (shipModels as unknown as { models: FunctionDef[] }).models.find((m) => m.tow);
 const TOW = towTuning(shipTuning as unknown as ShipTuning);
-/** The Repair Beam and the Point Defence Turret (common/src/ships/support.ts): their levels and numbers */
+/** The Repair Beam and the Point Defence Turret (common/src/ships/features/support/support.ts): their levels and numbers */
 const MODEL_LEVEL = (id: string, or: number) => (shipModels as unknown as { models: FunctionDef[] }).models.find((m) => m.id === id)?.unlock?.level ?? or;
 const REPAIR_LEVEL = MODEL_LEVEL('utility_repair_beam', 17), PD_LEVEL = MODEL_LEVEL('point_defence_turret', 10);
 const SUPPORT_W = (shipTuning as unknown as ShipTuning).weapons ?? {};

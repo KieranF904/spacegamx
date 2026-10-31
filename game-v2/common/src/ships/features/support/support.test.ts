@@ -1,16 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { parseBlueprint } from './blueprint.js';
-import { createShipState } from './state.js';
-import { readShipJson, testCatalog, SHIP_DATA_DIR } from './testData.js';
-import type { ShipTuning } from './tuning.js';
-import { stepGuns } from './guns.js';
-import { blueprintGeometry } from './blueprint.js';
-import { partStats } from './partStats.js';
-import { mountingOf } from './mounting.js';
+import { parseBlueprint } from '../../blueprint.js';
+import { createShipState } from '../../state.js';
+import { readShipJson, testCatalog, SHIP_DATA_DIR } from '../../testData.js';
+import type { ShipTuning } from '../../tuning.js';
+import { stepGuns } from '../../guns.js';
+import { blueprintGeometry } from '../../blueprint.js';
+import { partStats } from '../../partStats.js';
+import { mountingOf } from '../../mounting.js';
 import { repairAt, interceptHits, isPointDefence, isRepairBeam, stepPointDefenceAim, pointDefenceOf } from './support.js';
-import { damagePart } from './state.js';
+import { damagePart } from '../../state.js';
 
 const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
@@ -120,7 +120,7 @@ describe('repairAt', () => {
 
 describe('support weapons: on the wire', () => {
   it("an intercept goes as a plain message (no compact row: the wire tables don't change) and comes back whole", async () => {
-    const { encodeServerMessage, serverFrame, decodeServerFrame, COMPACT_TYPES } = await import('../network/protocol.js');
+    const { encodeServerMessage, serverFrame, decodeServerFrame, COMPACT_TYPES } = await import('../../../network/protocol.js');
     expect(COMPACT_TYPES).not.toContain('intercept');
     const msg = { type: 'intercept' as const, bodyId: 12, part: 3, proj: 4071, x: -1520, y: 880, fx: -1490, fy: 1300, down: true };
     expect(decodeServerFrame(serverFrame([encodeServerMessage(msg)]))).toEqual([msg]);

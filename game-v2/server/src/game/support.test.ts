@@ -1,5 +1,5 @@
 /**
- * The Repair Beam and the Point Defence Turret in the full server (common/src/ships/support.ts): a beam held on a
+ * The Repair Beam and the Point Defence Turret in the full server (common/src/ships/features/support/support.ts): a beam held on a
  * damaged wingmate mends it (not an enemy, not its own ship, not a destroyed part) and counts as support for rewards;
  * point defence shoots down hostile missiles and torpedoes on its own, but not a boss's nova or a friend's shots.
  */
@@ -14,7 +14,7 @@ import { LocalTransport } from '../net/LocalTransport.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
 import { loadShipConfigFromDisk } from '../ships/loadShipConfig.js';
 import { createShipBridge } from '../proto/createProtoServer.js';
-import { Support, SUPPORT_WINDOW_TICKS } from './Support.js';
+import { Support, SUPPORT_WINDOW_TICKS } from '../ships/features/support/Support.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;

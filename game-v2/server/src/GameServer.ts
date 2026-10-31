@@ -150,7 +150,7 @@ import { Surfaces, type SurfaceHost } from './game/Surfaces.js';
 import { Sieges, type SiegeHost } from './game/Sieges.js';
 import { Hangar } from './game/Hangar.js';
 import { Party } from './game/Party.js';
-import { Support } from './game/Support.js';
+import type { Support } from './ships/features/support/Support.js';
 import { Trade } from './game/Trade.js';
 import { Operations } from './game/Operations.js';
 import { Market } from './game/Market.js';
@@ -614,8 +614,8 @@ export class GameServer implements ServerCtx {
   readonly sieges: Sieges;
   readonly hangar: Hangar;
   readonly party: Party;
-  /** Who's been mending whom (Repair Beams): support counts towards kills' and bosses' rewards (game/Support.ts) */
-  readonly support = new Support();
+  /** Who's been mending whom (Repair Beams): support counts towards kills' and bosses' rewards (the support feature's ledger: ships/features/support/Support.ts) */
+  support!: Support;
   readonly trade: Trade;
   readonly ops: Operations;
   readonly market: Market;
@@ -688,6 +688,7 @@ export class GameServer implements ServerCtx {
         fn(conn.playerId, msg);
       });
     }
+    this.support = this.features.get('support') as unknown as Support;
     // ---- (end part features)
     this.mining = new Mining(this.createMiningHost(), this.gameData.miningTable);
     this.weapons = new Weapons({
@@ -1466,7 +1467,7 @@ this.devTeleport = opts.devTeleport ?? false;
       announce: (num: number, text: string, kind: 'info' | 'warn' | 'good' | 'bad') => {
         for (const c of this.clients.values()) if (InSystem.systemId[c.playerId] === num) this.pilots.toast(c, text, kind);
       },
-      // (Support credit: game/Support.ts)
+      // (Support credit: ships/features/support/Support.ts)
       supportersOf: (player: number) => this.support.supporters(player, this.currentTick),
       fire: (owner: number, kind: string, x: number, y: number, angle: number, scale: number, opts?: { target?: number; speed?: number; intercept?: boolean }) => {
         // (A boss's nova punches through as its own grade does; `intercept: false`, point defence can't touch it: support.ts)
@@ -1726,13 +1727,13 @@ this.devTeleport = opts.devTeleport ?? false;
         const pc = this.pilots.connOf(player);
         return pc ? this.party.members(pc).filter((m) => m !== pc).map((m) => m.playerId) : [];
       },
-      // (Support credit: game/Support.ts)
+      // (Support credit: ships/features/support/Support.ts)
       supportersOf: (player: number) => this.support.supporters(player, this.currentTick),
     };
   }
 
   /**
-   * May `healer`'s Repair Beam mend `target` (common/src/ships/support.ts)? Friendly ships only: pilots and what they
+   * May `healer`'s Repair Beam mend `target` (common/src/ships/features/support/support.ts)? Friendly ships only: pilots and what they
    * defend (wards), never itself, nobody docked or a person's craft; two pilots both in a PvP zone only when they're in
    * one party. Hostiles mend nothing (no enemy carries one yet).
    */
@@ -2266,7 +2267,7 @@ this.devTeleport = opts.devTeleport ?? false;
       payRebuild: (eid, part) => this.pilots.payRebuild(eid, part),
       payRepair: (eid, hp) => this.pilots.payRepair(eid, hp, this.repairRate(eid)),
       canDamage: (a, b) => this.canDamage(a, b),
-      // --- Support weapons (common/src/ships/support.ts) ---
+      // --- Support weapons (common/src/ships/features/support/support.ts) ---
       canHeal: (a, b) => this.canHeal(a, b),
       onHeal: (healer, target, hp) => this.support.note(healer, target, hp, this.currentTick),
       pdThreats: (eid, x, y, range, out) => this.weapons.threats(InSystem.systemId[eid], x, y, range, (owner) => owner !== eid && this.canDamage(owner, eid), out),

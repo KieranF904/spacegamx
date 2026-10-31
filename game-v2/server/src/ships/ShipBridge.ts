@@ -300,9 +300,7 @@ export class ShipBridge {
   /** A beam's muzzle (world) and angle, along its gun's aim */
   private beamFrom(eid: number, ship: ShipState, w: WeaponInfo): { x: number; y: number; angle: number } { return wpn.beamFrom(this.ctx, eid, ship, w); }
 
-  private repairBeam(eid: number, ship: ShipState, w: WeaponInfo, def: WeaponTuning): number { return wpn.repairBeam(this.ctx, eid, ship, w, def); }
 
-  private pointDefence(eid: number, ship: ShipState, pose: { x: number; y: number; angle: number }, def: (w: WeaponInfo) => WeaponTuning): void { return wpn.pointDefence(this.ctx, eid, ship, pose, def); }
 
   private alongBeam(systemNum: number, x0: number, y0: number, x1: number, y1: number, half: number): Iterable<number> { return wpn.alongBeam(this.ctx, systemNum, x0, y0, x1, y1, half); }
 

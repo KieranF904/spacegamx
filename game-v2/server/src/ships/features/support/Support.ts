@@ -1,6 +1,6 @@
 /**
  * Support credit (docs/design/build-archetypes.md §3, "Party rewards": support counts towards the reward share, else
- * Wardens won't exist). Who has been mending whom: a Repair Beam's mending is noted here (ShipBridge.repairBeam ->
+ * Wardens won't exist). Who has been mending whom: a Repair Beam's mending is noted here (features/support repairBeam ->
  * GameServer onHeal), and a pilot who mended another within the window is that pilot's supporter:
  *   - an enemy the supported pilot kills pays its supporters nearby as it pays the killer's party (Enemies.onDestroyed)
  *   - a boss counts the supporters of everyone it credits among its winners (Bosses.onDestroyed)

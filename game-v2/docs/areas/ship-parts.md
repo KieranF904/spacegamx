@@ -48,7 +48,7 @@ Add a part model:
 ## Tests
 - `npx vitest run common/src/ships/models.test.ts` catalogue, licences, migration, fixed mounts, engine fade.
 - `npx vitest run common/src/ships/mounting.test.ts` mount rules and checker.
-- `npx vitest run common/src/ships/features common/src/ships/support.test.ts common/src/ships/surge.test.ts common/src/ships/catalog.test.ts common/src/ships/ships.test.ts server/src/game/tow.test.ts`
+- `npx vitest run common/src/ships/features common/src/ships/features/support/support.test.ts common/src/ships/surge.test.ts common/src/ships/catalog.test.ts common/src/ships/ships.test.ts server/src/game/tow.test.ts`
 - `npx vitest run server/src/data/validateGameData.test.ts` data schema; `client/src/ui/componentGuide.test.ts`, `client/src/ui/fieldGuide.test.ts`, `client/src/ships/modelCards.test.ts`, `partPresentation.test.ts` UI facts.
 
 ## Gotchas
