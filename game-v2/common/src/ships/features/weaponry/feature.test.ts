@@ -50,7 +50,7 @@ describe('weaponry: a weapon-kind feature', () => {
 
 describe('weaponry role: endAtAim (bursts or splits at the aim distance)', () => {
   it('picks the aim bursts and the walking salvo, and no beam', () => {
-    expect(playing(ROLE_END_AT_AIM)).toEqual(['emp_blackout', 'flak_cloudmaker', 'legendary_prism', 'mortar_quake']);
+    expect(playing(ROLE_END_AT_AIM)).toEqual(['emp_blackout', 'flak_cloudmaker', 'legendary_prism', 'legendary_singularity', 'mortar_quake']);
   });
   it('its shells are sent as they fly (the aim is the server\'s), and fly the mortar\'s land-at-cursor maths', () => {
     for (const id of ['emp_blackout', 'flak_cloudmaker', 'legendary_prism']) {

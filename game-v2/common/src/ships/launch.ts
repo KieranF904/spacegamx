@@ -212,7 +212,7 @@ export function volleyAngles(def: WeaponTuning, angle: number): number[] {
 
 /** A shell that ends at a chosen point: a lobbed mortar's, one that bursts or splits at the aim (endAtAim), a walking salvo's */
 export function endsAtAim(def: WeaponTuning): boolean {
-  return !!(def.lob || def.endAtAim || def.walk);
+  return !!(def.lob || def.endAtAim || def.walk || def.hold);
 }
 
 /** The nearest an aimed shell is sent (world units): a cursor on the ship still lobs it clear */

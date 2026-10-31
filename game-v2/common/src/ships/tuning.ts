@@ -153,6 +153,11 @@ export interface WeaponTuning {
    * lifeToReach), where it bursts (splash, emp) or splits (split); earlier on its fuse (proximity) or on impact
    */
   endAtAim?: boolean;
+  /**
+   * Hold at the aim (the Singularity's orb): it flies to the aim distance (at most `life` ticks of flight), then sits
+   * there `hold` ticks, doing whatever it does (its pull), before it ends (its splash). Implies endAtAim's reach
+   */
+  hold?: number;
   /** A walking salvo: shell i lands at `at[i]` × the aim distance, each `gap` ticks after the one before (implies endAtAim) */
   walk?: { at: number[]; gap: number };
   /** A rippling salvo: `count` shells a trigger pull, the first at once and the rest `gap` ticks apart (the Swarm's six rockets over half a second) */

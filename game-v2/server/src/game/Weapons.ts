@@ -106,8 +106,11 @@ export class Weapons {
     // A shell that ends at the aim (a lobbed one, an aim burst, a walking salvo's) comes down or bursts where it was aimed
     const ends = endsAtAim(def) && !!shape.reach;
     Lifetime.remaining[eid] = ends ? lifeToReach(shot.life, shot.speed, shape.reach!) : shot.life;
+    // (a held orb stops there, endTick the tick it does, and lives `hold` ticks more)
+    if (ends && def.hold) Lifetime.remaining[eid] += def.hold;
+    const stopAt = ends && def.hold ? this.host.tick() + Lifetime.remaining[eid] - def.hold : 0;
     // (and everyone is told when: projectile row data[9], in spawn + velocity × age terms)
-    Projectile.endTick[eid] = ends ? this.host.tick() + Lifetime.remaining[eid] : 0;
+    Projectile.endTick[eid] = stopAt || (ends ? this.host.tick() + Lifetime.remaining[eid] : 0);
     InSystem.systemId[eid] = InSystem.systemId[owner];
     OwnedBy.ownerId[eid] = owner;
     // (A plain cannon shell has nothing to track: one with a grade's or a gem's changes does)
@@ -214,7 +217,10 @@ export class Weapons {
         vx = Math.cos(ang) * nsp; vy = Math.sin(ang) * nsp;
         Velocity.x[eid] = vx; Velocity.y[eid] = vy;
       }
-      if (x.def.pull) {
+      // A held orb parks where it was aimed (its endTick) and pulls from there
+      const parked = !!x.def.hold && this.host.tick() >= Projectile.endTick[eid];
+      if (parked) { Velocity.x[eid] = 0; Velocity.y[eid] = 0; }
+      if (x.def.pull && (!x.def.hold || parked)) {
         // A collapsing star: everything nearby is dragged in, harder the closer it is
         const px = Position.x[eid], py = Position.y[eid], r = x.def.pull.radius;
         for (const [other, s] of this.ships.bodies) {

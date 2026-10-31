@@ -489,7 +489,7 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
     legendary_cinder_bloom: 'The arsonist: a shell every 1.2 s for 16 damage, and the part it hits burns for 22 a second over 5 s, the fire spreading to its neighbours.',
     legendary_prism: 'The splitter: a crystal bolt every 1.6 s that splits where your cursor is into five 11-damage shards in a 40 degree fan. You choose where the fan opens.',
     legendary_phase: 'The ghost round: a slow 70-damage round every 2.2 s that flies through rock, wrecks and shields, hits the hull directly, and carries on through two ships.',
-    legendary_singularity: 'The black hole: 210 power a shot, one every 7 s. A slow orb flies out along your aim, pulls every ship within 900 toward it for 3.8 s, then collapses in a 300 blast for 140.',
+    legendary_singularity: 'The black hole: 210 power a shot, one every 7 s. A slow orb flies to your cursor and stops there, pulls every ship within 900 toward it for 3.8 s, then collapses in a 300 blast for 140.',
   };
   for (const [id, text] of Object.entries(LEGEND_TEXT)) {
     const m = models.find((x) => x.id === id);

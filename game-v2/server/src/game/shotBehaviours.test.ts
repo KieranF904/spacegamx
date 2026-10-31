@@ -309,3 +309,25 @@ describe('ordnance: the Swarm ripples, the Leviathan arms late', () => {
     expect(booms[0].tick - born).toBeGreaterThanOrEqual(58);
   });
 });
+
+describe('weaponry hold: the Singularity orb parks at the cursor', () => {
+  it('flies to the aim distance, stops there, and collapses there after its pull', () => {
+    const w = pilotWith('legendary_singularity', undefined, 1);
+    const q = bitecs.defineQuery([Projectile]);
+    const orb = () => q(w.server.world).find((e) => OwnedBy.ownerId[e] === w.pid && Projectile.weaponType[e] === WEAPON_KIND_TYPE.singularity);
+    let parkedAt = -1, px = 0;
+    for (let i = 0; i < 60 * 12 && !w.detonations('singularity').length; i++) {
+      w.hold();
+      Input.fireLeft[w.pid] = i < 5 ? 1 : 0; Input.cursorDist[w.pid] = 700; Input.targetAngle[w.pid] = aimEast();
+      w.server.step();
+      const e = orb();
+      if (e !== undefined && Velocity.x[e] === 0 && Velocity.y[e] === 0 && parkedAt < 0) { parkedAt = i; px = Position.x[e]; }
+      if (e !== undefined && parkedAt >= 0) expect(Position.x[e]).toBe(px);
+    }
+    expect(parkedAt).toBeGreaterThan(0);
+    expect(Math.abs(px - (X + 700))).toBeLessThan(80);
+    const boom = w.detonations('singularity')[0];
+    expect(boom).toBeTruthy();
+    expect(Math.abs(boom.x - px)).toBeLessThan(5);
+  });
+});

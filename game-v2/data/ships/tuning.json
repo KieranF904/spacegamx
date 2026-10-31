@@ -366,6 +366,7 @@
       "speed": 9,
       "damage": 0,
       "life": 228,
+      "hold": 228,
       "size": 2.4,
       "spread": 0,
       "pull": {

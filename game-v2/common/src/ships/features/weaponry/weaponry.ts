@@ -34,7 +34,7 @@ export const MARK_TAKEN = 1.2;
 export const STATUS_MARKED = 1;
 export const STATUS_SLOWED = 2;
 
-export const endsAtAimRole = (d: WeaponTuning | undefined): boolean => !!d && d.type !== 'beam' && !!(d.endAtAim || d.walk);
+export const endsAtAimRole = (d: WeaponTuning | undefined): boolean => !!d && d.type !== 'beam' && !!(d.endAtAim || d.walk || d.hold);
 export const walksRole = (d: WeaponTuning | undefined): boolean => !!d && d.type !== 'beam' && !!d.walk && d.walk.at.length > 0;
 export const guidedRole = (d: WeaponTuning | undefined): boolean => !!d && d.type !== 'beam' && !!d.guided;
 export const marksRole = (d: WeaponTuning | undefined): boolean => !!d && d.type === 'beam' && !!d.mark;

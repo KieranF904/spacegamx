@@ -318,7 +318,7 @@ describe('legendary weapons', () => {
     fire('singularity', -Math.PI / 2, { x: 40000, y: 39400 });
     const d0 = Math.hypot(Position.x[target] - 40000, Position.y[target] - 39000);
     const vy0 = Velocity.y[target];
-    for (let i = 0; i < 20; i++) { hold(pid, 40000, 40000); step(); }
+    for (let i = 0; i < 120; i++) { hold(pid, 40000, 40000); step(); }
     expect(Math.abs(Velocity.y[target] - vy0) + Math.abs(Velocity.x[target])).toBeGreaterThan(0.5);
     void d0;
   });
