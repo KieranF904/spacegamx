@@ -316,8 +316,8 @@ describe('long runs', () => {
     const sizes = () => ({
       clients: s(server).clients.size,
       sessions: s(server.pilots).sessions.size,
-      outbox: s(server).outbox.size,
-      lazy: s(server).lazy.size,
+      outbox: s(server).net.outbox.size,
+      lazy: s(server).net.lazy.size,
       states: s(server).lastEntityStates.size,
       lingering: s(server).lingering.size,
     });

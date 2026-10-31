@@ -171,6 +171,8 @@ import { Derelicts, type DerelictSlot } from './game/Derelicts.js';
 import { HandlerRegistry, dispatch, registerHandlers, type HandlerTable } from './net/dispatch.js';
 import * as flight from './net/handlers/flight.js';
 import { registerFlightHandlers, portalQuery } from './net/handlers/flight.js';
+import { Outbox } from './net/snapshot/Outbox.js';
+import { SELF_SAFETY_TICKS, SNAP_PROJECTILE_RANGE, SNAP_POD_RANGE, SHIP_VIEW_IN, SHIP_VIEW_OUT, MAP_DOTS_TICKS } from './net/snapshot/constants.js';
 
 // ============================================
 // SPATIAL PARTITIONING
@@ -458,29 +460,10 @@ interface SnapRow {
   other?: { state: EntityState; key: string };
 }
 
-/** A pilot's own ship is resent at least this often, even when its prediction is spot on */
-const SELF_SAFETY_TICKS = 120;
-/** Projectiles and loot further than this aren't sent at all */
-const SNAP_PROJECTILE_RANGE = 12000;
-const SNAP_POD_RANGE = 3000;
-/**
- * A client's view of the ships: those within SHIP_VIEW_IN come into it, and leave
- * past SHIP_VIEW_OUT (the gap stops one at the edge flickering in and out). Both
- * are well past the furthest flight zoom (about 24 km across half a 1080p screen).
- * Party members and your target are always in view.
- */
-const SHIP_VIEW_IN = 40000;
-const SHIP_VIEW_OUT = 48000;
-/** Ships past the view go to the system map this often (ticks) */
-const MAP_DOTS_TICKS = 60;
+// (SELF_SAFETY_TICKS, SNAP_PROJECTILE_RANGE, SNAP_POD_RANGE, SHIP_VIEW_IN/OUT, MAP_DOTS_TICKS: net/snapshot/constants.ts)
 /** A pilot this close past a gate's or rift's edge has where it goes brought back (SystemMemory), before they're through */
 const MEMORY_GATE_MOUTH = 3000;
-/** Messages that can wait for the next frame (see GameServer.lazy), and for how many ticks at most */
-const LAZY_TYPES = new Set(['damage', 'projectileHit', 'partDestroyed', 'contact', 'detonation', 'ignite', 'stationFire']);
-const LAZY_TICKS = 2;
-
-/** Combat effects (hits, damage numbers, parts blown off) only go to clients this near them */
-const FX_RANGE = SHIP_VIEW_OUT;
+// (LAZY_TYPES, LAZY_TICKS, FX_RANGE: net/snapshot/constants.ts)
 
 /** A blueprint's hash (designs are sent once per client; see ServerShipSyncMessage.design) */
 function designHash(bp: unknown): string {
@@ -699,6 +682,9 @@ export class GameServer implements ServerCtx {
   /** Disconnected mid-fight: the ship stays in space until this tick */
   private lingering = new Map<number, { conn: ClientConnection; until: number }>();
 
+  /** Outgoing messages: outboxes, lazy effects, broadcasts, byte counters (net/snapshot/Outbox.ts) */
+  readonly net: Outbox;
+
   // Admin server for dev tools
   private adminServer: AdminServer | null = null;
   
@@ -709,8 +695,6 @@ export class GameServer implements ServerCtx {
   private recentErrors: string[] = [];
   private static readonly MAX_ERRORS = 50;
   private tickTimeHistory: number[] = [];
-  private snapshotBytesSent = 0;
-  private bytesByType: Record<string, number> = {};
   private totalConnectionsEver = 0;
   
   // Scheduled game loop callback (setTimeout or setImmediate handle)
@@ -718,6 +702,7 @@ export class GameServer implements ServerCtx {
 
   constructor(opts: GameServerOptions) {
     this.world = createWorld();
+    this.net = new Outbox(this);
     this.gameData = opts.gameData;
     this.adminServer = opts.adminServer || null;
     this.userDB = opts.userDB;
@@ -1019,7 +1004,7 @@ this.devTeleport = opts.devTeleport ?? false;
 
   /** Run exactly one simulation tick (inputs drained first), as the real-time loop does. */
   step(): void {
-    this.batching++;
+    this.net.batching++;
     try {
       this.guard('inputs', () => this.drainInputQueue());
       this.tick();
@@ -1028,7 +1013,7 @@ this.devTeleport = opts.devTeleport ?? false;
         this.guard('snapshots', () => this.sendSnapshots());
       }
     } finally {
-      this.batching--;
+      this.net.batching--;
       this.flushOutbox();
     }
   }
@@ -2690,16 +2675,16 @@ this.devTeleport = opts.devTeleport ?? false;
 
     return {
       receive: (msg: ClientMessage) => {
-        this.batching++;
+        this.net.batching++;
         try {
           this.handleMessage(conn, msg);
         } catch (e) {
           // (Logged a line every 10 s at most per type: a hostile client could send thousands)
           this.fault(`message:${typeof msg?.type === 'string' ? msg.type.slice(0, 32) : '?'}`, e);
         } finally {
-          this.batching--;
+          this.net.batching--;
           // Answers to requests go now, together (inputs only queue, so usually nothing)
-          if (!this.batching) this.flushOutbox();
+          if (!this.net.batching) this.flushOutbox();
         }
       },
       close: () => {
@@ -2710,8 +2695,8 @@ this.devTeleport = opts.devTeleport ?? false;
         this.guard('close', () => this.people.leave(conn));
         this.guard('close', () => this.arenas.leave(conn));
         this.clients.delete(ws);
-        this.outbox.delete(ws);
-        this.lazy.delete(ws);
+        this.net.outbox.delete(ws);
+        this.net.lazy.delete(ws);
         this.guard('close', () => this.party.remove(conn));
         this.guard('close', () => this.trade.remove(conn));
         this.guard('close', () => this.admin.forget(conn));
@@ -3093,7 +3078,7 @@ this.devTeleport = opts.devTeleport ?? false;
     // Fixed timestep updates— cap catch-up to avoid spiral of death
     let ticksThisFrame = 0;
     const maxTicksPerFrame = 4;
-    this.batching++;
+    this.net.batching++;
     try {
       while (this.tickAccumulator >= TICK_MS && ticksThisFrame < maxTicksPerFrame) {
         // Drain queued inputs right before each tick so they take effect
@@ -3120,7 +3105,7 @@ this.devTeleport = opts.devTeleport ?? false;
       this.tickAccumulator = 0;
       this.fault('gameLoop', e);
     } finally {
-      this.batching--;
+      this.net.batching--;
       this.guard('flushOutbox', () => this.flushOutbox());
     }
     
@@ -3979,92 +3964,30 @@ this.devTeleport = opts.devTeleport ?? false;
   // NETWORKING
   // ============================================
 
-  /** Get byte length of encoded message (string or ArrayBuffer) */
-  private getMessageByteLength(data: string | ArrayBuffer | Uint8Array): number {
-    if (typeof data === 'string') {
-      return data.length; // Approximation for ASCII/UTF-8 JSON
-    }
-    return data.byteLength;
-  }
-
   /**
-   * Messages for a client wait in its outbox and go out together, one frame per
-   * tick (or straight after handling one of its requests), instead of a frame each.
+   * Outgoing messages (net/snapshot/Outbox.ts): each client's outbox, the effects that can wait (lazy), the byte
+   * counters and the broadcasts. These forward to it, so modules' hosts and tests call them as before.
    */
-  private outbox = new Map<ClientSocket, Uint8Array[]>();
-  /** Inside a tick or a request: messages wait for the flush (outside, e.g. timers, they go at once) */
-  private batching = 0;
-
-  /**
-   * Effects only for the eye and ear (hit sparks, damage numbers, parts blowing
-   * off, bumps) needn't have a frame of their own: they wait (up to LAZY_TICKS)
-   * to go with the next frame a client gets anyway, usually a snapshot. Saves
-   * a packet's headers each time, for a delay of a tick or two.
-   */
-  private lazy = new Map<ClientSocket, { since: number; parts: Uint8Array[] }>();
-
   send(ws: ClientSocket, msg: ServerMessage): void {
-    if (ws.isOpen()) {
-      const data = encodeServerMessage(msg);
-      const byteLen = data.length;
-      this.snapshotBytesSent += byteLen;
-      this.bytesByType[msg.type] = (this.bytesByType[msg.type] || 0) + byteLen;
-      // Pongs go at once: they measure the round trip
-      if (msg.type === 'pong') { ws.send(serverFrame([data])); return; }
-      this.queue(ws, data, LAZY_TYPES.has(msg.type));
-    }
+    this.net.send(ws, msg);
   }
 
-  private queue(ws: ClientSocket, data: Uint8Array, lazy = false): void {
-    if (!this.batching) { ws.send(serverFrame([data])); return; }
-    if (lazy) {
-      const l = this.lazy.get(ws);
-      if (l) l.parts.push(data); else this.lazy.set(ws, { since: this.currentTick, parts: [data] });
-      return;
-    }
-    const box = this.outbox.get(ws);
-    if (box) box.push(data); else this.outbox.set(ws, [data]);
-  }
-
-  /** Send everything waiting: one frame per client (effects that can wait, wait: see lazy) */
+  /** Send everything waiting: one frame per client (net/snapshot/Outbox.ts) */
   flushOutbox(): void {
-    for (const [ws, box] of this.outbox) {
-      const l = this.lazy.get(ws);
-      if (l) this.lazy.delete(ws);
-      if (ws.isOpen() && box.length) ws.send(serverFrame(l ? [...l.parts, ...box] : box));
-    }
-    this.outbox.clear();
-    for (const [ws, l] of this.lazy) {
-      if (!ws.isOpen()) { this.lazy.delete(ws); continue; }
-      if (this.currentTick - l.since >= LAZY_TICKS) { ws.send(serverFrame(l.parts)); this.lazy.delete(ws); }
-    }
+    this.net.flushOutbox();
   }
 
   /** Send the effects still waiting now (tests that look at a tick's messages straight after it) */
   flushLazy(): void {
-    for (const [ws, l] of this.lazy) if (ws.isOpen()) ws.send(serverFrame(l.parts));
-    this.lazy.clear();
+    this.net.flushLazy();
   }
 
   broadcastToSystem(systemId: number, msg: ServerMessage): void {
-    const data = encodeServerMessage(msg);
-    const byteLen = this.getMessageByteLength(data);
-    let sent = 0;
-    for (const client of this.clients.values()) {
-      // (System first: the cheapest check, and it rules out most)
-      if (InSystem.systemId[client.playerId] !== systemId) continue;
-      if (!client.ws.isOpen() || !hasComponent(this.world, Player, client.playerId)) continue;
-      
-      this.queue(client.ws, data, LAZY_TYPES.has(msg.type));
-      sent++;
-    }
-    const total = byteLen * sent;
-    this.snapshotBytesSent += total;
-    this.bytesByType[msg.type] = (this.bytesByType[msg.type] || 0) + total;
+    this.net.broadcastToSystem(systemId, msg);
   }
 
   private broadcastProjectileHit(proj: number, x: number, y: number): void {
-    this.broadcastNear(InSystem.systemId[proj], x, y, { type: 'projectileHit', id: proj, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 });
+    this.net.broadcastProjectileHit(proj, x, y);
   }
 
   /**
@@ -4582,17 +4505,9 @@ this.devTeleport = opts.devTeleport ?? false;
     return left;
   }
 
-  /** Clients in a system near a point (combat effects: nobody further out has the ships involved) */
-  private broadcastNear(systemId: number, x: number, y: number, msg: ServerMessage, also: number[] = []): void {
-    const data = encodeServerMessage(msg);
-    for (const client of this.clients.values()) {
-      if (InSystem.systemId[client.playerId] !== systemId) continue;
-      if (!client.ws.isOpen() || !hasComponent(this.world, Player, client.playerId)) continue;
-      const pid = client.playerId;
-      if (Math.hypot(Position.x[pid] - x, Position.y[pid] - y) > FX_RANGE && !also.includes(pid)) continue;
-      this.queue(client.ws, data, LAZY_TYPES.has(msg.type));
-      this.snapshotBytesSent += this.getMessageByteLength(data);
-    }
+  /** Clients in a system near a point (net/snapshot/Outbox.ts) */
+  private broadcastNear(systemId: number, x: number, y: number, msg: ServerMessage, also?: number[]): void {
+    this.net.broadcastNear(systemId, x, y, msg, also);
   }
 
   /** A client's first snapshot in a system: world events, the asteroid seed, and a clean slate */
@@ -4850,8 +4765,8 @@ this.devTeleport = opts.devTeleport ?? false;
         maxTickTimeMs: Math.round(maxTickTime * 100) / 100,
         memoryMb: Math.round(mem.heapUsed / 1024 / 1024 * 10) / 10,
         uptime: proc?.uptime() ?? 0,
-        snapshotBytes: this.snapshotBytesSent,
-        bytesByType: { ...this.bytesByType },
+        snapshotBytes: this.net.snapshotBytesSent,
+        bytesByType: { ...this.net.bytesByType },
         connectionsTotal: this.totalConnectionsEver,
         errors: this.recentErrors.slice(-10),
         playerList: this.admin.players(),
@@ -4861,8 +4776,8 @@ this.devTeleport = opts.devTeleport ?? false;
       if (adminStatsMsg) for (const c of admins) this.send(c.ws, adminStatsMsg as any);
       
       // Reset byte counters
-      this.snapshotBytesSent = 0;
-      this.bytesByType = {};
+      this.net.snapshotBytesSent = 0;
+      this.net.bytesByType = {};
     }
   }
   
