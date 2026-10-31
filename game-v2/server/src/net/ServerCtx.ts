@@ -6,6 +6,7 @@
  * nothing under net/ needs to import GameServer.ts. Keep it narrow: a handler that needs more than this should call
  * a module method, not widen the context (the snapshot path gets its own, wider host).
  */
+import type { IWorld } from 'bitecs';
 import type { ClientSocket, ServerMessage } from '@space-game/common';
 import type { ClientConnection } from './ClientConnection.js';
 import type { MessageLimiter } from './MessageLimits.js';
@@ -29,6 +30,7 @@ import type { Party } from '../game/Party.js';
 import type { Trade } from '../game/Trade.js';
 import type { Market } from '../game/Market.js';
 import type { Achievements } from '../game/Achievements.js';
+import type { Docking } from '../game/Docking.js';
 
 export interface ServerCtx {
   // ---- state (read only to handlers) ----
@@ -42,6 +44,12 @@ export interface ServerCtx {
   /** Every connection is an admin (proto) / guests are admins (dev server) */
   readonly everyoneAdmin: boolean;
   readonly guestAdmin: boolean;
+  /** The ECS world (handlers only read components from it) */
+  readonly world: IWorld;
+  /** The hangar opens anywhere (proto) */
+  readonly shipEditAnywhere: boolean;
+  /** Wall clock (ms); tests pass a fake one */
+  readonly clock: () => number;
 
   // ---- verbs ----
   send(ws: ClientSocket, msg: ServerMessage): void;
@@ -55,6 +63,8 @@ export interface ServerCtx {
   /** Is this entity a live player ship */
   flying(eid: number): boolean;
   isDocked(eid: number): boolean;
+  /** The connection flying this entity, if any */
+  liveConn(eid: number): ClientConnection | undefined;
   loginPilot(conn: ClientConnection, userId: number): Promise<void>;
   /** Hangar edits cost nothing for this connection (proto, or an admin with free build on a dev server) */
   freeBuild(conn: ClientConnection): boolean;
@@ -65,6 +75,7 @@ export interface ServerCtx {
   readonly ammo: Ammo;
   readonly outpost?: Outpost;
   readonly towing: Towing;
+  readonly docking: Docking;
   readonly services: StationServices;
   readonly quests: Quests;
   readonly people: People;

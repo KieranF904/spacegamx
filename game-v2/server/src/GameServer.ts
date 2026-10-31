@@ -104,8 +104,6 @@ import {
   MAP_DOT_SLACK,
   type Leg,
   ReplicaEnv,
-  PROTOCOL_MISMATCH_CLOSE,
-  PROTOCOL_MISMATCH_REASON,
   segmentNearCircle,
   segmentIntersectT,
   pointInPolygon,
@@ -114,7 +112,6 @@ import {
   // Shared physics for exact client/server parity
 // Data types
   StarSystemData,
-  DerelictData,
   TrafficData,
   RiftData,
 } from '@space-game/common';
@@ -123,7 +120,7 @@ import { GameData } from './data/GameData.js';
 import type { UserStore } from './auth/types.js';
 import type { ClientSocket, ClientLink } from '@space-game/common';
 import type { ShipBridge, ShipHost } from './ships/ShipBridge.js';
-import { Blueprint, ShipState, parseBlueprint, quantizeShipValue, skillValue, hasAll, removeAll, Economy, Bag, StarterKit, jumpTuning, jumpPhase, partItemId, rateShip, ratingOf, createShipState, gradeReward, gradeOf, accrueTraces, releaseTraces, unlocks, isStructural, stationPerks, hazardFlight, stationTable, blueprintGrade, lookFn, fixModelMaterials, warmthPercent, packCharge, nearerThan, fartherThan, stationReachMax, type ShipDerived } from '@space-game/common';
+import { Blueprint, ShipState, quantizeShipValue, skillValue, hasAll, removeAll, Economy, Bag, StarterKit, jumpTuning, jumpPhase, partItemId, rateShip, ratingOf, createShipState, gradeReward, gradeOf, accrueTraces, releaseTraces, unlocks, stationPerks, hazardFlight, stationTable, blueprintGrade, lookFn, warmthPercent, packCharge, nearerThan, fartherThan, type ShipDerived } from '@space-game/common';
 
 /** A station site by id */
 const stationPerksSite = (id: string | undefined) => (id ? stationTable()?.sites.find((s) => s.id === id) : undefined);
@@ -134,8 +131,7 @@ import { Warmth } from './game/Warmth.js';
 import { Outpost } from './game/Outpost.js';
 import { HomeStations } from './game/HomeStations.js';
 import { LootPods, PodHost } from './game/LootPods.js';
-import { Towing, type TowKind } from './game/Towing.js';
-import { towTuning } from '@space-game/common';
+import { Towing } from './game/Towing.js';
 import { Mining, MiningHost } from './game/Mining.js';
 import { AsteroidOrbits } from './game/AsteroidOrbits.js';
 import { StationServices } from './game/StationServices.js';
@@ -164,13 +160,18 @@ import { SimLod, type Plan, type Intent, type FarPose } from './ships/SimLod.js'
 import { SystemMemory, shipMemory, restoreHp, type WorldStore, type MemoryHost, type ShipMemory } from './game/SystemMemory.js';
 import { Achievements } from './game/Achievements.js';
 import { huntedBoss, RibbonsFile, mineFalloff, rayTerrain, type Terrain } from '@space-game/common';
-import { repRank, replicaAngle, quantizeReplicaAngle, ReplicaMode, INPUT_BOOLS, INPUT_HELD } from '@space-game/common';
+import { replicaAngle, quantizeReplicaAngle, ReplicaMode, INPUT_BOOLS, INPUT_HELD } from '@space-game/common';
 import { MemoryProfileStore, type ProfileStore } from './profile/ProfileStore.js';
 import { MessageLimiter } from './net/MessageLimits.js';
 import { checkTickOrder, type TickSystem } from './tickOrder.js';
 import type { ClientConnection } from './net/ClientConnection.js';
 import type { ServerCtx } from './net/ServerCtx.js';
-import { HandlerRegistry, dispatch, MAX_INPUTS_PER_TICK, type HandlerTable } from './net/dispatch.js';
+import { registerModuleHandlers } from './net/handlers/modules.js';
+import { registerAuthHandlers, rejectAuth, handleHttpAuth } from './net/auth.js';
+import { registerShipEditHandlers } from './net/handlers/shipEdit.js';
+import { Docking, stationQuery } from './game/Docking.js';
+import { Derelicts, type DerelictSlot } from './game/Derelicts.js';
+import { HandlerRegistry, dispatch, registerHandlers, MAX_INPUTS_PER_TICK, type HandlerTable } from './net/dispatch.js';
 
 // ============================================
 // SPATIAL PARTITIONING
@@ -422,7 +423,6 @@ const MAX_SCHEDULED_INPUTS = 32;
 /** A client's game loop silent this long (3 s) lets go of its controls */
 const INPUT_TIMEOUT_TICKS = 180;
 const droppedItemQuery = defineQuery([DroppedItem, Position, Velocity, Lifetime]);
-const stationQuery = defineQuery([Station, Position]);
 const portalQuery = defineQuery([Portal, Position]);
 const lifetimeQuery = defineQuery([Lifetime]);
 const deadQuery = defineQuery([Dead]);
@@ -434,10 +434,6 @@ const RIFT_COOLDOWN_TICKS = 180;
 const TRAFFIC_RESPAWN_TICKS = 60 * 120;
 const TRAFFIC_ARRIVE_RADIUS = 700;
 const TRAFFIC_DWELL_TICKS = 60 * 6;
-/** A destroyed derelict is replaced after this long */
-const DERELICT_RESPAWN_TICKS = 60 * 60 * 5;
-/** A broken derelict gives this share of the plate and wire its structure was built from */
-const DERELICT_PLATE_SHARE = 0.15;
 /** A derelict's log (systems.json `log`) is read by flying this close (a scan step's 700 is inside it) */
 const DERELICT_LOG_RANGE = 900;
 
@@ -576,8 +572,6 @@ export interface GameServerOptions {
 }
 
 /** A player who quits within this long of taking damage leaves their ship in space... */
-/** What a job or a hangar order can be told to do */
-const ORDER_ACTIONS = new Set(['pause', 'resume', 'cancel', 'top'] as const);
 const LINGER_COMBAT_TICKS = 60 * 15;
 /** ...for this long */
 const LINGER_TICKS = 60 * 20;
@@ -587,7 +581,7 @@ const scheduleImmediate: (fn: () => void) => unknown =
   typeof setImmediate === 'function' ? setImmediate : (fn) => setTimeout(fn, 0);
 
 export class GameServer implements ServerCtx {
-  private world: IWorld;
+  readonly world: IWorld;
   gameData: GameData;
   clients: Map<ClientSocket, ClientConnection> = new Map();
   scene: 'sectors' | 'empty';
@@ -599,7 +593,11 @@ export class GameServer implements ServerCtx {
   /** Tick until which each player ignores rifts (no instant bounce-back) */
   private riftCooldown = new Map<number, number>();
   ships: ShipBridge;
-  private shipEditAnywhere: boolean;
+  readonly shipEditAnywhere: boolean;
+  /** Berths and who is inside a station (game/Docking.ts) */
+  docking!: Docking;
+  /** Ships inside a station: the same Set as docking.dockedShips (read on the hot path) */
+  private dockedShips!: Set<number>;
 
   private devTeleport: boolean;
   private clientIdCounter = 1;
@@ -642,7 +640,10 @@ export class GameServer implements ServerCtx {
   
   // System-specific state
   /** Derelict hulks by slot: the current body (-1 while destroyed) and when it comes back */
-  private derelicts: { data: DerelictData; systemNum: number; eid: number; respawnTick: number; spawns: number }[] = [];
+  /** Derelict slots: the same array as derelictsMod.derelicts (game/Derelicts.ts) */
+  private derelicts!: DerelictSlot[];
+  /** Derelicts and people's craft (game/Derelicts.ts) */
+  private derelictsMod!: Derelicts;
   /** Freighters: which station they're bound for, and how long they've been docked there */
   private traffic: { data: TrafficData; systemNum: number; eid: number; leg: number; dwell: number; respawnTick: number }[] = [];
   
@@ -697,9 +698,9 @@ export class GameServer implements ServerCtx {
   readonly achievements: Achievements;
   /** Pilotless ships players protect (escorted freighters, outposts): their names */
   private wards = new Map<number, string>();
-  /** People's ships, parked where they live (people.json craft): untouchable, by name */
-  private personCraft = new Map<number, string>();
-  private clock: () => number;
+  /** People's ships, parked where they live (people.json craft): untouchable, by name. The same Map as derelictsMod.personCraft */
+  private personCraft!: Map<number, string>;
+  readonly clock: () => number;
   /** Disconnected mid-fight: the ship stays in space until this tick */
   private lingering = new Map<number, { conn: ClientConnection; until: number }>();
 
@@ -742,7 +743,7 @@ export class GameServer implements ServerCtx {
       tell: (pilot, text, color) => { for (const c of this.clients.values()) if (c.playerId === pilot) this.send(c.ws, { type: 'systemMessage', text, color }); },
       stationInRange: (pilot) => this.stationInRange(pilot),
       isDocked: (pilot) => this.dockedShips.has(pilot),
-      deliver: (pilot, target, kind) => this.towDelivered(pilot, target, kind),
+      deliver: (pilot, target, kind) => this.derelictsMod.towDelivered(pilot, target, kind),
     }, this.ships, this.pods, this.ships.tuning);
     // ---- (end Tow Beam)
     this.mining = new Mining(this.createMiningHost(), this.gameData.miningTable);
@@ -863,6 +864,19 @@ export class GameServer implements ServerCtx {
     });
     this.clock = opts.clock ?? (() => Date.now());
     this.quests = new Quests(this.createQuestHost(), this.pilots, this.gameData.questsFile);
+    this.docking = new Docking({
+      world: this.world,
+      gameData: this.gameData,
+      clients: this.clients,
+      shipEditAnywhere: this.shipEditAnywhere,
+      pilots: this.pilots,
+      ammo: this.ammo,
+      quests: this.quests,
+      send: (ws, msg) => this.send(ws, msg),
+      clock: this.clock,
+      releaseControls: (eid) => this.releaseControls(eid),
+    });
+    this.dockedShips = this.docking.dockedShips;
     this.bosses = new Bosses(this.createBossHost(), this.enemies, this.ships, this.gameData.bossesFile as BossesFile, this.ships.enemyDesigns);
     this.mobs = new Mobs(this.createMobHost(), this.gameData.mobsFile as MobsFile);
     this.bosses.mobs = this.mobs;
@@ -941,6 +955,22 @@ export class GameServer implements ServerCtx {
     // (A distant pack sent somewhere new is flown there from where its route has it)
     this.enemies.onOrders = (eid) => this.lod.replan(eid);
     this.memory = new SystemMemory(this.createMemoryHost(), this.gameData.rulesFile.memory, opts.worldStore);
+    this.derelictsMod = new Derelicts({
+      world: this.world,
+      gameData: this.gameData,
+      clients: this.clients,
+      ships: this.ships,
+      pilots: this.pilots,
+      pods: this.pods,
+      codex: this.codex,
+      people: this.people,
+      memory: this.memory,
+      econ: this.econ,
+      send: (ws, msg) => this.send(ws, msg),
+      tick: () => this.currentTick,
+    });
+    this.derelicts = this.derelictsMod.derelicts;
+    this.personCraft = this.derelictsMod.personCraft;
     if (this.scene === 'sectors') this.memory.load();
     this.trade = new Trade({
       send: (conn, msg) => this.send((conn as ClientConnection).ws, msg),
@@ -1237,7 +1267,7 @@ this.devTeleport = opts.devTeleport ?? false;
   }
 
   /** The connection flying this entity (not one that's lingering after quitting) */
-  private liveConn(eid: number): ClientConnection | undefined {
+  liveConn(eid: number): ClientConnection | undefined {
     for (const c of this.clients.values()) if (c.playerId === eid) return c;
     return undefined;
   }
@@ -1350,68 +1380,12 @@ this.devTeleport = opts.devTeleport ?? false;
     };
   }
 
-  /** Another pilot's info card */
-  private handlePilotInfo(conn: ClientConnection, eid: number): void {
-    const other = this.liveConn(eid);
-    const p = other && this.pilots.get(other);
-    if (!other || !p) return;
-    const ship = this.ships.get(eid);
-    let best = { v: -1, name: '', rank: '' };
-    // (A tie goes to the faction whose id sorts first, so it doesn't hang on how the save stored the keys)
-    for (const [f, v] of Object.entries(p.reputation).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
-      if (v > best.v) best = { v, name: this.quests.file.reputations[f]?.name ?? f, rank: repRank(v).name };
-    }
-    const size = this.party.size(other);
-    this.send(conn.ws, {
-      type: 'pilotInfo', id: eid, name: other.username, level: p.level, guest: other.userId === null,
-      ship: ship?.blueprint.name ?? 'No ship', parts: ship ? ship.derived.alive.filter(Boolean).length : 0,
-      hull: Math.round(this.ships.integrity(eid) * 100),
-      title: best.v >= 5 ? `${best.rank} · ${best.name}` : 'Independent pilot',
-      party: size > 1 ? { leader: this.party.leaderName(other) ?? '', size, mine: this.party.same(conn, other) } : undefined,
-      kills: p.stats.kills ?? 0,
-      ribbons: this.achievements.summary(other).count,
-      topRibbon: this.achievements.summary(other).top,
-    });
-  }
-
-  private lastShare = new WeakMap<ClientConnection, number>();
-
   /**
    * A design a client sent, parsed (throws if it isn't one). Sizes are checked
    * before any work's done on it: parts have unique uids 0..255, so a real design
    * never has more than 256; and the strings in it are kept to a sensible length
    * (they're saved and sent to everyone near).
    */
-  private clientBlueprint(raw: unknown): Blueprint {
-    const r = raw as { parts?: unknown } | null;
-    if (!r || typeof r !== 'object' || !Array.isArray(r.parts) || r.parts.length > 256) throw new Error('not a blueprint');
-    const bp = fixModelMaterials(this.ships.catalog, parseBlueprint(JSON.stringify(raw)));
-    bp.name = bp.name.slice(0, 64);
-    for (const p of bp.parts) {
-      if (p.facing !== undefined && (typeof p.facing !== 'string' || p.facing.length > 16)) delete p.facing;
-      if (p.gems) p.gems = p.gems.map((g) => g.slice(0, 40));
-    }
-    return bp;
-  }
-
-  /** Send a ship design to your party (they can load it into their hangar) */
-  private handleShareDesign(conn: ClientConnection, raw: unknown): void {
-    const now = this.clock();
-    if (now - (this.lastShare.get(conn) ?? 0) < 3000) return;
-    this.lastShare.set(conn, now);
-    let bp: Blueprint;
-    try {
-      bp = this.clientBlueprint(raw);
-    } catch {
-      return this.pilots.toast(conn, "That isn't a ship design", 'warn');
-    }
-    if (!this.ships.validate(bp).ok) return this.pilots.toast(conn, 'Fix the design first: it has problems', 'warn');
-    const others = this.party.members(conn).filter((m) => m !== conn) as ClientConnection[];
-    if (!others.length) return this.pilots.toast(conn, 'Share designs with your party: invite someone first (P)', 'warn');
-    for (const m of others) this.send(m.ws, { type: 'sharedDesign', from: conn.username, blueprint: bp });
-    this.pilots.toast(conn, `Sent the ${bp.name} to your party`, 'good');
-  }
-
   private createEventHost() {
     const alivePlayers = (num: number) => {
       const out: number[] = [];
@@ -2302,7 +2276,7 @@ this.devTeleport = opts.devTeleport ?? false;
         this.enemies.onDestroyed(eid, lastHitBy, ship);
         // A ward (freighter, pylon, bastion, turret) shot down: forget it before its entity number is reused
         if (this.wards.delete(eid)) { this.enemies.removeWard(eid); this.ships.setDamageScale(eid, 1); }
-        this.onPilotlessShipDestroyed(eid, lastHitBy);
+        this.derelictsMod.onPilotlessShipDestroyed(eid, lastHitBy);
       },
       notifyPartDestroyed: (e) => {
         const r = (v: number) => Math.round(v * 10) / 10;
@@ -2394,7 +2368,7 @@ this.devTeleport = opts.devTeleport ?? false;
         const slot = { data: d, systemNum, eid: -1, respawnTick: 0, spawns: 0 };
         this.derelicts.push(slot);
         // (A system remembered has its own back as they were: SystemMemory)
-        if (!this.memory.remembers(system.id)) this.spawnDerelict(slot);
+        if (!this.memory.remembers(system.id)) this.derelictsMod.spawnDerelict(slot);
       }
       for (const t of system.traffic ?? []) {
         const slot = { data: t, systemNum, eid: -1, leg: 0, dwell: 0, respawnTick: 0 };
@@ -2407,21 +2381,8 @@ this.devTeleport = opts.devTeleport ?? false;
     
     // Every belt filed: the orbit timetable trimmed to what's in it
     this.asteroidOrbits.settle();
-    this.spawnPersonCraft();
+    this.derelictsMod.spawnPersonCraft();
     console.log('World initialized');
-  }
-
-  /** People out in space and on planets live aboard something (people.json craft): parked there, out of every fight */
-  private spawnPersonCraft(): void {
-    for (const d of this.people.file.people) {
-      const bp = d.craft && this.ships.library.get(d.craft.ship);
-      if (!bp || !d.craft || 'station' in d.at) continue;
-      const num = this.gameData.getSystem(d.at.system) ? this.gameData.getSystemNum(d.at.system) : -1;
-      if (num < 0) continue;
-      const eid = this.ships.spawnDummy(bp, d.at.x, d.at.y, d.craft.angle ?? 0, num);
-      this.ships.pin(eid);
-      this.personCraft.set(eid, d.craft.name ?? d.name);
-    }
   }
 
   private createStation(data: any, systemNum: number): number {
@@ -2839,6 +2800,9 @@ this.devTeleport = opts.devTeleport ?? false;
    */
   private buildMessageHandlers(): HandlerTable {
     const t = new HandlerRegistry();
+    registerHandlers(t, registerModuleHandlers);
+    registerHandlers(t, registerAuthHandlers);
+    registerHandlers(t, registerShipEditHandlers);
     t.on('input', (_ctx, conn, msg) => {
       // Queue for next tick boundary — don't apply mid-frame.
       // Messages still arrive instantly via setImmediate event loop.
@@ -2868,85 +2832,6 @@ this.devTeleport = opts.devTeleport ?? false;
     t.on('target', (_ctx, conn, msg) => {
       this.ships.setTarget(conn.playerId, Number(msg.id) || 0);
     });
-    t.on('pilotInfo', (_ctx, conn, msg) => {
-      this.handlePilotInfo(conn, Number(msg.id));
-    });
-    t.on('partyInvite', (_ctx, conn, msg) => {
-      this.party.invite(conn, { name: msg.name, id: msg.id });
-    });
-    t.on('ribbons', (_ctx, conn, msg) => {
-      this.achievements.progress(conn);
-    });
-    t.on('rankings', (_ctx, conn, msg) => {
-      this.achievements.rankings(conn);
-    });
-    t.on('shareDesign', (_ctx, conn, msg) => {
-      this.handleShareDesign(conn, msg.blueprint);
-    });
-    t.on('mapPing', (_ctx, conn, msg) => {
-      if (this.flying(conn.playerId)) this.party.ping(conn, msg, this.gameData.getSystemByNum(InSystem.systemId[conn.playerId])?.id ?? '');
-    });
-    t.on('partyRespond', (_ctx, conn, msg) => {
-      this.party.respond(conn, !!msg.accept);
-    });
-    t.on('partyLeave', (_ctx, conn, msg) => {
-      this.party.leave(conn);
-    });
-    t.on('partyKick', (_ctx, conn, msg) => {
-      this.party.kick(conn, String(msg.name));
-    });
-    t.on('partyPromote', (_ctx, conn, msg) => {
-      this.party.promote(conn, String(msg.name));
-    });
-    t.on('tradeRequest', (_ctx, conn, msg) => {
-      this.trade.request(conn, msg);
-    });
-    t.on('tradeRespond', (_ctx, conn, msg) => {
-      this.trade.respond(conn, msg);
-    });
-    t.on('tradeOffer', (_ctx, conn, msg) => {
-      this.trade.offer(conn, msg);
-    });
-    t.on('tradeAccept', (_ctx, conn, msg) => {
-      this.trade.accept(conn);
-    });
-    t.on('tradeCancel', (_ctx, conn, msg) => {
-      this.trade.cancel(conn);
-    });
-    t.on('vendorOpen', (_ctx, conn, msg) => {
-      this.market.vendors(conn);
-    });
-    t.on('vendorBuy', (_ctx, conn, msg) => {
-      this.market.buy(conn, msg);
-    });
-    t.on('marketScan', (_ctx, conn, msg) => {
-      this.market.scan(conn, Array.isArray(msg.items) ? msg.items.slice(0, 80).map(String) : []);
-    });
-    t.on('itemMove', (_ctx, conn, msg) => {
-      this.pilots.handleMove(conn, msg);
-    });
-    t.on('itemJettison', (_ctx, conn, msg) => {
-      this.pilots.handleJettison(conn, msg);
-    });
-    t.on('itemUse', (_ctx, conn, msg) => {
-      this.pilots.handleUse(conn, msg);
-    });
-    t.on('stationOpen', (_ctx, conn, msg) => {
-      this.services.open(conn);
-      this.quests.board(conn);
-    });
-    t.on('refine', (_ctx, conn, msg) => {
-      this.services.refine(conn, msg);
-    });
-    t.on('craft', (_ctx, conn, msg) => {
-      this.services.craft(conn, msg);
-    });
-    t.on('outpostCharter', (_ctx, conn, msg) => {
-      this.outpost?.charter(conn, String(msg.site));
-    });
-    t.on('outpostUpgrade', (_ctx, conn, msg) => {
-      this.outpost?.upgrade(conn, String(msg.track));
-    });
     t.on('devStation', (_ctx, conn, msg) => {
       // Dev (or an admin): a station at Sol's site with every track at a tier, and in you go
       if (!this.devTeleport && !conn.isAdmin) return;
@@ -2959,117 +2844,8 @@ this.devTeleport = opts.devTeleport ?? false;
       const jp = [...portalQuery(this.world)].find((g) => InSystem.systemId[g] === sol && this.gameData.getSystemByNum(Portal.targetSystem[g])?.private);
       if (jp !== undefined) this.homes.jump(conn, 'sol', Position.x[jp], Position.y[jp]);
     });
-    t.on('ammoPrefer', (_ctx, conn, msg) => {
-      this.ammo.prefer(conn, String(msg.item));
-    });
-    t.on('slotLoadout', (_ctx, conn, msg) => {
-      this.ammo.setLoadout(conn, Math.floor(Number(msg.slot)), msg.load, msg.first);
-    });
-    t.on('restockLoadout', (_ctx, conn, msg) => {
-      this.ammo.restock(conn, { report: true });
-    });
-    t.on('itemStore', (_ctx, conn, msg) => {
-      this.pilots.handleStore(conn, msg.what);
-    });
-    t.on('gemCut', (_ctx, conn, msg) => {
-      this.services.cutGem(conn, msg);
-    });
-    t.on('gemSocket', (_ctx, conn, msg) => {
-      this.hangar.socketGem(conn, Math.floor(Number(msg.slot)), Math.floor(Number(msg.uid)), String(msg.gem));
-    });
-    t.on('gemUnsocket', (_ctx, conn, msg) => {
-      this.hangar.unsocketGem(conn, Math.floor(Number(msg.slot)), Math.floor(Number(msg.uid)), Math.floor(Number(msg.index)));
-    });
-    t.on('marketSell', (_ctx, conn, msg) => {
-      this.services.sell(conn, msg);
-    });
-    t.on('marketBuy', (_ctx, conn, msg) => {
-      this.services.buy(conn, msg);
-    });
-    t.on('questBoard', (_ctx, conn, msg) => {
-      this.quests.board(conn);
-    });
-    t.on('questAccept', (_ctx, conn, msg) => {
-      this.quests.accept(conn, msg);
-    });
-    t.on('talk', (_ctx, conn, msg) => {
-      this.people.handle(conn, msg);
-    });
-    t.on('questAbandon', (_ctx, conn, msg) => {
-      this.quests.abandon(conn, msg);
-    });
-    t.on('questSeen', (_ctx, conn, msg) => {
-      this.quests.seen(conn);
-    });
-    t.on('codexRead', (_ctx, conn, msg) => {
-      this.codex.read(conn, msg);
-    });
-    t.on('skillUp', (_ctx, conn, msg) => {
-      this.quests.skillUp(conn, msg);
-    });
-    t.on('join', (_ctx, conn, msg) => {
-      // (Async: a throw inside is a rejected promise the receive() try/catch can't see)
-      this.handleJoin(conn, msg).catch((e) => this.fault('join', e));
-    });
-    t.on('authLogin', (_ctx, conn, msg) => {
-      this.handleAuthLogin(conn, msg).catch((e) => this.fault('authLogin', e));
-    });
-    t.on('authRegister', (_ctx, conn, msg) => {
-      this.handleAuthRegister(conn, msg).catch((e) => this.fault('authRegister', e));
-    });
     t.on('stateHash', (_ctx, conn, msg) => {
       this.handleStateHash(conn, msg as any);
-    });
-    t.on('shipEdit', (_ctx, conn, msg) => {
-      this.handleShipEdit(conn, msg.blueprint);
-    });
-    t.on('slotSave', (_ctx, conn, msg) => {
-      this.handleSlotSave(conn, msg);
-    });
-    t.on('slotFly', (_ctx, conn, msg) => {
-      const was = this.pilots.get(conn)?.ship;
-      this.hangar.fly(conn, Math.floor(Number(msg.slot)));
-      // Another ship: its own loadout aboard
-      if (this.pilots.get(conn)?.ship !== was) { this.ammo.restock(conn, { report: true, quiet: true }); this.pilots.sendProfile(conn); }
-    });
-    t.on('slotClear', (_ctx, conn, msg) => {
-      this.hangar.scrap(conn, Math.floor(Number(msg.slot)));
-    });
-    t.on('designSave', (_ctx, conn, msg) => {
-      let bp: Blueprint;
-      try { bp = this.clientBlueprint(msg.blueprint); } catch { return; }
-      if (!this.ships.validate(bp).ok) { this.pilots.toast(conn, 'Fix the design first: it has problems', 'warn'); return; }
-      this.hangar.saveDesign(conn, Math.floor(Number(msg.slot)), bp);
-    });
-    t.on('fabOrder', (_ctx, conn, msg) => {
-      this.hangar.orderItem(conn, String(msg.item), Math.floor(Number(msg.n)));
-    });
-    t.on('fabOrderCancel', (_ctx, conn, msg) => {
-      this.hangar.cancelOrder(conn, Math.floor(Number(msg.id)));
-    });
-    t.on('designDelete', (_ctx, conn, msg) => {
-      this.hangar.deleteDesign(conn, Math.floor(Number(msg.slot)));
-    });
-    t.on('slotBuild', (_ctx, conn, msg) => {
-      this.hangar.build(conn, Math.floor(Number(msg.slot)));
-    });
-    t.on('slotOrder', (_ctx, conn, msg) => {
-      if (ORDER_ACTIONS.has(msg.action)) this.hangar.order(conn, Math.floor(Number(msg.slot)), msg.action);
-    });
-    t.on('job', (_ctx, conn, msg) => {
-      if (ORDER_ACTIONS.has(msg.action)) this.services.jobAction(conn, Math.floor(Number(msg.id)), msg.action);
-    });
-    t.on('scrapItem', (_ctx, conn, msg) => {
-      this.pilots.scrapItem(conn, String(msg.id), Math.floor(Number(msg.n)));
-    });
-    t.on('marketSellAll', (_ctx, conn, msg) => {
-      this.services.sellAll(conn);
-    });
-    t.on('quickbarSet', (_ctx, conn, msg) => {
-      this.pilots.setQuickbar(conn, msg);
-    });
-    t.on('dock', (_ctx, conn, msg) => {
-      this.handleDock(conn);
     });
     t.on('devTeleport', (_ctx, conn, msg) => {
       this.handleDevTeleport(conn, msg);
@@ -3111,18 +2887,6 @@ this.devTeleport = opts.devTeleport ?? false;
       }
       this.pilots.toast(conn, `Boss worn to ${Math.round(this.ships.integrity(boss) * 100)}%`, 'info');
     });
-    t.on('contrib', (_ctx, conn, msg) => {
-      this.contrib.handle(conn, msg as unknown as Record<string, unknown>);
-    });
-    t.on('admin', (_ctx, conn, msg) => {
-      this.admin.run(conn, String(msg.cmd ?? ''), msg.args && typeof msg.args === 'object' ? msg.args : {});
-    });
-    t.on('siege', (_ctx, conn, msg) => {
-      this.sieges.handle(conn, msg, conn.playerId);
-    });
-    t.on('undock', (_ctx, conn, msg) => {
-      this.undock(conn);
-    });
     t.on('tow', (_ctx, conn, msg) => {
       // Tow Beam (game/Towing.ts): take hold of what's nearest the cursor, or let go
       const p = conn.playerId;
@@ -3148,21 +2912,24 @@ this.devTeleport = opts.devTeleport ?? false;
     dispatch(this.handlers, this, conn, msg);
   }
 
-  /** The station this player is close enough to dock at, or -1. */
+  /** The station this player is close enough to dock at, or -1 (game/Docking.ts) */
   private stationInRange(eid: number): number {
-    for (const st of stationQuery(this.world)) {
-      if (InSystem.systemId[st] !== InSystem.systemId[eid]) continue;
-      const dx = Position.x[st] - Position.x[eid], dy = Position.y[st] - Position.y[eid];
-      // (Further than any station of its size reaches: no need to look up its design. Enemies ask this of every pilot they might go for)
-      if (fartherThan(dx, dy, stationReachMax(Radius.value[st]))) continue;
-      if (Math.hypot(dx, dy) < stationInteractRadius(Radius.value[st], this.gameData.getStationByNum(Station.stationId[st])?.design)) return st;
-    }
-    return -1;
+    return this.docking.stationInRange(eid);
   }
 
   /** Is this player close enough to a station to use its shipyard? */
   isDocked(eid: number): boolean {
-    return this.stationInRange(eid) >= 0;
+    return this.docking.isDocked(eid);
+  }
+
+  /** A wrong password, a refused registration, a replaced or deleted session: say why, then hang up (net/auth.ts) */
+  private rejectAuth(conn: ClientConnection, error: string | undefined): void {
+    rejectAuth(this, conn, error);
+  }
+
+  /** HTTP auth requests (register, login, validate), called by SocketTransport (net/auth.ts) */
+  handleHttpAuth(req: IncomingMessage, res: ServerResponse, action: 'register' | 'login' | 'validate', address?: string): Promise<void> {
+    return handleHttpAuth(this, req, res, action, address);
   }
 
   /**
@@ -3204,65 +2971,6 @@ this.devTeleport = opts.devTeleport ?? false;
     this.enemies.spawnPack(num, { faction: g.faction, ships: g.ships }, msg.x, msg.y);
   }
 
-  /** Berth at the nearest station (hangar opening): the ship then rides along with it. */
-  private handleDock(conn: ClientConnection): void {
-    const eid = conn.playerId;
-    const reply = (ok: boolean, station?: string, error?: string) => this.send(conn.ws, { type: 'dockResult', ok, station, error });
-    if (!hasComponent(this.world, Player, eid) || hasComponent(this.world, Dead, eid)) return reply(false, undefined, 'no ship');
-    if (this.shipEditAnywhere) return reply(true, 'Hangar');
-    const st = this.stationInRange(eid);
-    if (st < 0) return reply(false, undefined, 'too far from a station');
-    // Inside: at the station's centre, out of reach; back out where it came in
-    conn.docked = { station: st, ox: 0, oy: 0, exit: { x: Position.x[eid] - Position.x[st], y: Position.y[eid] - Position.y[st] } };
-    this.dockedShips.add(eid);
-    this.releaseControls(eid);
-    const sd = this.gameData.getStationByNum(Station.stationId[st]);
-    if (sd?.dockingFee) this.pilots.payDockFee(conn, sd.id, sd.dockingFee);
-    // (Quiet when there was nothing to load: every dock shouldn't say so)
-    this.ammo.restock(conn, { report: true, quiet: true });
-    if (sd) this.pilots.bumpStat(conn, `dock:${sd.id}`);
-    if (sd) this.quests.rumourAt(conn, sd.id, sd.system, Math.floor(this.clock() / 86_400_000));
-    reply(true, sd?.name ?? 'Station');
-  }
-
-  /** Leave the berth: back out where the ship came in, at rest */
-  private undock(conn: ClientConnection): void {
-    const d = conn.docked;
-    // Launching: the loadout tops up one last time (still in the berth), and says what's short
-    if (d) this.ammo.restock(conn, { report: true, quiet: true });
-    conn.docked = null;
-    this.dockedShips.delete(conn.playerId);
-    const eid = conn.playerId;
-    if (!d?.exit || !entityExists(this.world, d.station) || !hasComponent(this.world, Player, eid)) return;
-    Position.x[eid] = Position.x[d.station] + d.exit.x;
-    Position.y[eid] = Position.y[d.station] + d.exit.y;
-    Velocity.x[eid] = 0;
-    Velocity.y[eid] = 0;
-  }
-
-  /** Docked ships (inside a station): invulnerable, untouchable, unseen by hostiles */
-  private dockedShips = new Set<number>();
-
-  /** Berthed ships ride along inside their station, holding still. */
-  private dockingSystem(): void {
-    this.dockedShips.clear();
-    for (const conn of this.clients.values()) {
-      const d = conn.docked;
-      if (!d) continue;
-      const eid = conn.playerId;
-      if (!hasComponent(this.world, Player, eid) || hasComponent(this.world, Dead, eid) || !entityExists(this.world, d.station)) {
-        conn.docked = null;
-        continue;
-      }
-      this.dockedShips.add(eid);
-      const x = Position.x[d.station] + d.ox, y = Position.y[d.station] + d.oy;
-      Velocity.x[eid] = x - Position.x[eid];
-      Velocity.y[eid] = y - Position.y[eid];
-      Position.x[eid] = x;
-      Position.y[eid] = y;
-    }
-  }
-
   /**
    * Refits that take no parts and need no licence: proto mode (everyone's an
    * admin, editing anywhere), or an admin who switched on free build where the
@@ -3270,48 +2978,6 @@ this.devTeleport = opts.devTeleport ?? false;
    */
   freeBuild(conn: ClientConnection): boolean {
     return (this.everyoneAdmin && this.shipEditAnywhere) || (this.freeBuildAllowed && this.admin.freeBuild(conn));
-  }
-
-  /** Hangar: validate the new blueprint and respawn the player's ship in place. */
-  private handleShipEdit(conn: ClientConnection, raw: unknown): void {
-    const reply = (ok: boolean, errors: string[]) => this.send(conn.ws, { type: 'shipEditResult', ok, errors });
-    const eid = conn.playerId;
-    if (!hasComponent(this.world, Player, eid) || hasComponent(this.world, Dead, eid)) return reply(false, ['no ship to refit']);
-    // Berthed (hangar opened in range) counts even if the station has moved since; otherwise be in range now
-    if (!this.shipEditAnywhere && !conn.docked && !this.isDocked(eid)) return reply(false, ['dock at a station to refit your ship']);
-    let bp: Blueprint;
-    try {
-      bp = this.clientBlueprint(raw);
-    } catch {
-      return reply(false, ['not a blueprint']);
-    }
-    const result = this.ships.validate(bp);
-    if (!result.ok) return reply(false, result.errors.map((e) => e.message));
-    // Parts the pilot has are built in; the rest become ghosts (proto mode hands out everything)
-    const profile = this.pilots.get(conn);
-    const errors = this.hangar.save(conn, profile?.activeSlot ?? 0, bp, { grantAll: this.freeBuild(conn) });
-    if (errors.length) return reply(false, errors);
-    conn.blueprint = bp;
-    reply(true, []);
-  }
-
-  /** Save a design to a hangar slot */
-  private handleSlotSave(conn: ClientConnection, msg: { slot: number; blueprint: unknown; plan?: string }): void {
-    const reply = (ok: boolean, errors: string[]) => this.send(conn.ws, { type: 'shipEditResult', ok, errors });
-    const eid = conn.playerId;
-    if (!hasComponent(this.world, Player, eid) || hasComponent(this.world, Dead, eid)) return reply(false, ['no ship']);
-    if (!this.shipEditAnywhere && !conn.docked && !this.isDocked(eid)) return reply(false, ['dock at a station to use the hangar']);
-    let bp: Blueprint;
-    try {
-      bp = this.clientBlueprint(msg.blueprint);
-    } catch {
-      return reply(false, ['not a blueprint']);
-    }
-    const result = this.ships.validate(bp);
-    if (!result.ok) return reply(false, result.errors.map((e) => e.message));
-    const plan = typeof msg.plan === 'string' && this.ships.library.has(msg.plan) && this.pilots.knowsPlan(conn, msg.plan) ? msg.plan : undefined;
-    const errors = this.hangar.save(conn, Math.floor(Number(msg.slot)), bp, { plan, grantAll: this.freeBuild(conn) });
-    reply(errors.length === 0, errors);
   }
 
   /** The client's prediction of its ship at a tick, checked against what the ship really did then */
@@ -3438,136 +3104,15 @@ this.devTeleport = opts.devTeleport ?? false;
     }
   }
 
-  private async handleJoin(conn: ClientConnection, msg: any): Promise<void> {
-    // A client built for another wire format can't talk to us: it shows "new version, reload"
-    // (one that doesn't say predates the handshake, and the format it knows hasn't changed since)
-    if (msg.protocol !== undefined && msg.protocol !== PROTOCOL_VERSION) {
-      conn.ws.close?.(PROTOCOL_MISMATCH_CLOSE, PROTOCOL_MISMATCH_REASON);
-      return;
-    }
-    conn.joined = true;
-    if (msg.token) {
-      // Authenticated join - validate token
-      const { user, error } = this.userDB.checkSession
-        ? await this.userDB.checkSession(msg.token)
-        : { user: await this.userDB.validateSession(msg.token), error: '' };
-      if (user) {
-        conn.username = user.username;
-        conn.userId = user.id;
-        conn.isAdmin = user.is_admin;
-        conn.isContributor = this.contrib.hasRank(user.id, user.username);
-        conn.authToken = msg.token;
-        this.loginPilot(conn, user.id).catch((e) => this.fault('login', e));
-        console.log(`Player ${conn.playerId} authenticated as ${user.username}${user.is_admin ? ' (admin)' : ''}`);
-      } else {
-        // Expired, signed out or banned (or the lobby's unreachable): back to the sign-in screen, not in as a guest
-        this.rejectAuth(conn, error || 'Your session has ended. Sign in again.');
-        return;
-      }
-    } else {
-      // Guest join
-      // (A name only: a string, no control characters, a sensible length; it goes to everyone near)
-      const name = typeof msg.username === 'string' ? msg.username.replace(/[\u0000-\u001f\u007f-\u009f]/g, '').trim().slice(0, 24) : '';
-      // (Nor anyone's account: a guest can't pose as a known pilot or an admin)
-      // (Only asking the lobby waits: with no lobby to ask, a guest's join goes through at once, as it always has)
-      const owner = name ? this.signedInOwner(name) ?? (this.userDB.admin ? await this.accountOwner(name) : null) : null;
-      if (owner) {
-        this.rejectAuth(conn, `"${name}" is ${owner === 'admin' ? "an admin's" : "a registered pilot's"} name. Sign in to fly as them, or pick another name.`);
-        return;
-      }
-      conn.username = name || `Guest_${Math.floor(Math.random() * 10000)}`;
-      conn.userId = null;
-      conn.isAdmin = this.everyoneAdmin || this.guestAdmin;
-      conn.isContributor = false;
-    }
-    
-    // Send auth result back
-    this.send(conn.ws, {
-      type: 'authResult',
-      success: true,
-      username: conn.username,
-      isAdmin: conn.isAdmin,
-      isContributor: this.contrib.allowed(conn),
-    });
-  }
-
-  private async handleAuthLogin(conn: ClientConnection, msg: any): Promise<void> {
-    const result = await this.userDB.login(msg.username, msg.password, conn.address);
-    if (result.success) {
-      conn.username = result.user.username;
-      conn.userId = result.user.id;
-      this.loginPilot(conn, result.user.id).catch((e) => this.fault('login', e));
-      conn.isAdmin = result.user.is_admin;
-      conn.isContributor = this.contrib.hasRank(result.user.id, result.user.username);
-      conn.authToken = result.token;
-      
-      this.send(conn.ws, {
-        type: 'authResult',
-        success: true,
-        username: result.user.username,
-        token: result.token,
-        isAdmin: result.user.is_admin,
-        isContributor: this.contrib.allowed(conn),
-      });
-    } else {
-      this.rejectAuth(conn, result.error);
-    }
-  }
-
   /**
    * Whose account a guest's name is (whatever its case): an admin's or a registered pilot's, or nobody's (null).
    * signedInOwner knows those signed in here; accountOwner asks the lobby (when this server may: its admin secret,
    * `userDB.admin`), and a lobby that can't be reached doesn't keep guests out.
    */
-  private signedInOwner(name: string): 'admin' | 'pilot' | null {
-    const lower = name.toLowerCase();
-    for (const c of this.clients.values()) {
-      if (c.userId !== null && c.username.toLowerCase() === lower) return c.isAdmin ? 'admin' : 'pilot';
-    }
-    return null;
-  }
-  private async accountOwner(name: string): Promise<'admin' | 'pilot' | null> {
-    try {
-      const account = await this.userDB.admin?.get(name);
-      return account ? (account.isAdmin ? 'admin' : 'pilot') : null;
-    } catch {
-      return null;
-    }
-  }
-
   /**
    * A wrong password or a refused registration: say why, then hang up, so the
    * connection doesn't stay in the world as a nameless pilot.
    */
-  private rejectAuth(conn: ClientConnection, error: string | undefined): void {
-    this.send(conn.ws, { type: 'authResult', success: false, error });
-    // A moment for the answer to get out before the socket closes
-    setTimeout(() => conn.ws.close?.(), 250);
-  }
-
-  private async handleAuthRegister(conn: ClientConnection, msg: any): Promise<void> {
-    const result = await this.userDB.register(msg.username, msg.email, msg.password, conn.address);
-    if (result.success) {
-      conn.username = result.user.username;
-      conn.userId = result.user.id;
-      this.loginPilot(conn, result.user.id).catch((e) => this.fault('login', e));
-      conn.isAdmin = result.user.is_admin;
-      conn.isContributor = this.contrib.hasRank(result.user.id, result.user.username);
-      conn.authToken = result.token;
-      
-      this.send(conn.ws, {
-        type: 'authResult',
-        success: true,
-        username: result.user.username,
-        token: result.token,
-        isAdmin: result.user.is_admin,
-        isContributor: this.contrib.allowed(conn),
-      });
-    } else {
-      this.rejectAuth(conn, result.error);
-    }
-  }
-
   /**
    * Move a player to (x, y) in another (or the same) system: jump gates and rifts.
    * Rifts keep the ship's momentum; gates bring it to a stop.
@@ -3888,7 +3433,7 @@ this.devTeleport = opts.devTeleport ?? false;
       { name: 'playerMovementSystem', phase: 'pilots-move', run: () => this.playerMovementSystem() },
       // (Tow Beams pull what they tow, after the pilots fly and before wrecks and pods move: game/Towing.ts)
       { name: 'towing', phase: 'pilots-move', run: () => this.towing.tick() },
-      { name: 'dockingSystem', phase: 'pilots-move', run: () => this.dockingSystem() },
+      { name: 'dockingSystem', phase: 'pilots-move', run: () => this.docking.dockingSystem() },
       { name: 'riftSystem', phase: 'pilots-move', run: () => this.riftSystem() },
       // ---- combat ----
       // (Boost fuel is the ship's battery now: it charges in the flight step, energy.ts)
@@ -3936,7 +3481,7 @@ this.devTeleport = opts.devTeleport ?? false;
       } },
       // ---- persist ----
       { name: 'lingerSystem', phase: 'persist', run: () => this.lingerSystem() },
-      { name: 'derelictRespawnSystem', phase: 'persist', run: () => this.derelictRespawnSystem() },
+      { name: 'derelictRespawnSystem', phase: 'persist', run: () => this.derelictsMod.derelictRespawnSystem() },
       { name: 'trafficSystem', phase: 'persist', run: () => this.trafficSystem() },
       { name: 'lifetimeSystem', phase: 'persist', run: () => this.lifetimeSystem() },
       { name: 'cleanupSystem', phase: 'persist', run: () => this.cleanupSystem() },
@@ -4380,13 +3925,6 @@ this.devTeleport = opts.devTeleport ?? false;
   // DERELICTS
   // ============================================
 
-  private spawnDerelict(slot: { data: DerelictData; systemNum: number; eid: number; spawns: number }): void {
-    const bp = this.ships.library.get(slot.data.blueprint);
-    if (!bp) return;
-    const seed = hashString(`derelict:${slot.data.id}:${slot.spawns++}`);
-    slot.eid = this.ships.spawnWreck(bp, slot.data.position.x, slot.data.position.y, slot.data.angle ?? 0, slot.systemNum, seed);
-  }
-
   /** Entity ids of the civilian freighters flying now */
   getTrafficShips(): { eid: number; route: string[]; leg: number }[] {
     return this.traffic.filter((t) => t.eid >= 0).map((t) => ({ eid: t.eid, route: t.data.route, leg: t.leg }));
@@ -4529,7 +4067,7 @@ this.devTeleport = opts.devTeleport ?? false;
           if (!m.ship) { slot.spawns = m.spawns; slot.respawnTick = local(m.respawnAt); continue; }
           // The same hulk (its seeded look), where it had drifted, as broken as it was (wrecks don't mend)
           slot.spawns = Math.max(0, m.spawns - 1);
-          this.spawnDerelict(slot);
+          this.derelictsMod.spawnDerelict(slot);
           if (slot.eid < 0) continue;
           this.ships.teleport(slot.eid, m.ship.x, m.ship.y);
           Rotation.angle[slot.eid] = m.ship.a;
@@ -4619,105 +4157,6 @@ this.devTeleport = opts.devTeleport ?? false;
     const t = this.traffic.find((x) => x.eid === eid);
     if (t) return { name: t.data.name, kind: 2 };
     return undefined;
-  }
-
-  /** A broken-up derelict comes back a while later (somebody always tows in another). */
-  private derelictRespawnSystem(): void {
-    if (this.currentTick % 60 !== 0) return;
-    for (const slot of this.derelicts) {
-      if (!this.memory.isResident(slot.systemNum)) continue;
-      if (slot.eid >= 0 && !this.ships.has(slot.eid)) {
-        slot.eid = -1;
-        slot.respawnTick = this.currentTick + DERELICT_RESPAWN_TICKS;
-      }
-      if (slot.eid < 0 && slot.respawnTick && this.currentTick >= slot.respawnTick) {
-        slot.respawnTick = 0;
-        this.spawnDerelict(slot);
-      }
-    }
-  }
-
-  // ---- Tow Beam (game/Towing.ts): towed into a station's reach, a wreck, debris or a pod is salvaged into the pilot's storage
-  private towDelivered(pilot: number, target: number, kind: TowKind): void {
-    const pc = this.pilots.connOf(pilot);
-    if (!pc) return;
-    const tell = (text: string) => { for (const c of this.clients.values()) if (c.playerId === pilot) this.send(c.ws, { type: 'systemMessage', text, color: '#ffd166' }); };
-    if (kind === 'pod') {
-      const bag = this.pods.take(target);
-      if (!bag) return;
-      this.pilots.give(pc, bag, { toStorage: true, source: 'salvaged' });
-      tell('Towed in a pod: its contents are in station storage');
-      return;
-    }
-    const ship = this.ships.get(target);
-    if (!ship) return;
-    // Its structure cut up for plate (towTuning salvage of what it's made of), as a derelict's chunks are; modules aren't salvaged
-    const share = towTuning(this.ships.tuning).salvage;
-    const made: Bag = {};
-    ship.blueprint.parts.forEach((q, i) => {
-      if (!(ship.hp[i] > 0) || ship.detached[i] || !isStructural(q.fn)) return;
-      for (const [id, n] of Object.entries(this.econ.recipes.partInputs(q))) made[id] = (made[id] ?? 0) + n * share;
-    });
-    const bag: Bag = {};
-    for (const [id, n] of Object.entries(made)) if (Math.floor(n) > 0) bag[id] = Math.floor(n);
-    const slot = this.derelicts.find((d) => d.eid === target);
-    let credits = 0, name = kind === 'wreck' ? 'a wreck' : 'debris';
-    if (slot) {
-      slot.eid = -1;
-      slot.respawnTick = this.currentTick + DERELICT_RESPAWN_TICKS;
-      credits = slot.data.salvage ?? 250;
-      name = slot.data.name;
-      this.pilots.addCredits(pc, credits);
-      this.pilots.addXp(pc, Math.round(credits / 4));
-      if (slot.data.log) this.codex.unlock(pc, [slot.data.log.codex]);
-    }
-    this.ships.removeShip(target);
-    if (Object.keys(bag).length) this.pilots.give(pc, bag, { toStorage: true, source: 'salvaged' });
-    this.pilots.bumpStat(pc, 'salvaged');
-    const n = Object.values(bag).reduce((t, k) => t + k, 0);
-    tell(`Salvaged ${name}: ${n} plate to station storage${credits ? `, +${credits} credits` : ''}`);
-  }
-  // ---- (end Tow Beam)
-
-  /** Whoever breaks a derelict's core gets its salvage: credits, and plate of its material */
-  private onPilotlessShipDestroyed(eid: number, lastHitBy: number | undefined): void {
-    const slot = this.derelicts.find((d) => d.eid === eid);
-    if (!slot) return;
-    slot.eid = -1;
-    slot.respawnTick = this.currentTick + DERELICT_RESPAWN_TICKS;
-    if (lastHitBy === undefined || !hasComponent(this.world, Player, lastHitBy)) return;
-    const credits = slot.data.salvage ?? 250;
-    const xp = Math.round(credits / 4);
-    const pc = this.pilots.connOf(lastHitBy);
-    // Cut up, it gives plate of what it was built from (and the wire in it), thrown out as chunks to pull in
-    const bp = this.ships.library.get(slot.data.blueprint);
-    if (bp) {
-      const made: Bag = {};
-      for (const q of bp.parts) {
-        if (!isStructural(q.fn)) continue;
-        for (const [id, n] of Object.entries(this.econ.recipes.partInputs(q))) made[id] = (made[id] ?? 0) + n * DERELICT_PLATE_SHARE;
-      }
-      const x = slot.data.position.x, y = slot.data.position.y;
-      let i = 0;
-      for (const [id, n] of Object.entries(made)) {
-        let left = Math.floor(n);
-        while (left > 0) {
-          const k = Math.min(left, 6), a = i++ * 2.39996;
-          this.pods.spawnChunk(slot.systemNum, x, y, Math.cos(a) * 2, Math.sin(a) * 2, { [id]: k }, lastHitBy);
-          left -= k;
-        }
-      }
-    }
-    if (pc) {
-      this.pilots.addCredits(pc, credits);
-      this.pilots.addXp(pc, xp);
-      this.pilots.bumpStat(pc, 'salvaged');
-      if (slot.data.log) this.codex.unlock(pc, [slot.data.log.codex]);
-    }
-    for (const c of this.clients.values()) {
-      if (c.playerId !== lastHitBy) continue;
-      this.send(c.ws, { type: 'systemMessage', text: `Salvaged ${slot.data.name}: +${credits} credits, +${xp} XP`, color: '#ffd166' });
-    }
   }
 
   private lifetimeSystem(): void {
@@ -5580,58 +5019,6 @@ this.devTeleport = opts.devTeleport ?? false;
   /**
    * Handle HTTP auth requests (register, login, validate)
    */
-  async handleHttpAuth(req: IncomingMessage, res: ServerResponse, action: 'register' | 'login' | 'validate', address?: string): Promise<void> {
-    // (A sign-in is a few hundred bytes: anything past 16 KB is refused, not held in memory)
-    let body = '', tooBig = false;
-    req.on('data', (chunk: { toString(): string }) => {
-      if (tooBig) return;
-      body += chunk.toString();
-      if (body.length > 16 * 1024) { tooBig = true; body = ''; }
-    });
-    req.on('error', () => {});
-    req.on('end', async () => {
-      try {
-        if (tooBig) throw new Error('request too large');
-        const data = JSON.parse(body);
-        if (!data || typeof data !== 'object') throw new Error('not an object');
-        res.setHeader('Content-Type', 'application/json');
-
-        if (action === 'register') {
-          const result = await this.userDB.register(data.username, data.email, data.password, address);
-          if (result.success) {
-            res.writeHead(200);
-            res.end(JSON.stringify({ success: true, username: result.user.username, token: result.token, isAdmin: result.user.is_admin }));
-          } else {
-            res.writeHead(400);
-            res.end(JSON.stringify({ success: false, error: result.error }));
-          }
-        } else if (action === 'login') {
-          const result = await this.userDB.login(data.username, data.password, address);
-          if (result.success) {
-            res.writeHead(200);
-            res.end(JSON.stringify({ success: true, username: result.user.username, token: result.token, isAdmin: result.user.is_admin }));
-          } else {
-            res.writeHead(400);
-            res.end(JSON.stringify({ success: false, error: result.error }));
-          }
-        } else if (action === 'validate') {
-          const user = await this.userDB.validateSession(data.token);
-          if (user) {
-            res.writeHead(200);
-            res.end(JSON.stringify({ success: true, username: user.username, isAdmin: user.is_admin }));
-          } else {
-            res.writeHead(401);
-            res.end(JSON.stringify({ success: false, error: 'Invalid or expired session' }));
-          }
-        }
-      } catch (e) {
-        if (res.headersSent) { res.end(); return; }
-        res.writeHead(400);
-        res.end(JSON.stringify({ success: false, error: 'Invalid request' }));
-      }
-    });
-  }
-
   /**
    * Report stats to admin server (call from game loop)
    */
