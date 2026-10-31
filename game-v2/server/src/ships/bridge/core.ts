@@ -231,6 +231,11 @@ export interface BridgeInternals {
   forget: ShipBridge['forget']; nextMissing: ShipBridge['nextMissing']; joinsOf: ShipBridge['joinsOf'];
   spawnDebris: ShipBridge['spawnDebris'];
   closestPart: ShipBridge['closestPart']; partWorld: ShipBridge['partWorld']; nearestPart: ShipBridge['nearestPart'];
+  readBody: ShipBridge['readBody']; writeBody: ShipBridge['writeBody']; bodiesNow: ShipBridge['bodiesNow'];
+  withGravity: ShipBridge['withGravity']; worldPieces: ShipBridge['worldPieces']; resolveContacts: ShipBridge['resolveContacts'];
+  damageContact: ShipBridge['damageContact']; contactScale: ShipBridge['contactScale']; stepBurns: ShipBridge['stepBurns'];
+  stepRepairKits: ShipBridge['stepRepairKits']; decay: ShipBridge['decay']; repairStep: ShipBridge['repairStep'];
+  partDeaths: ShipBridge['partDeaths']; applyBlast: ShipBridge['applyBlast']; autopilotControls: ShipBridge['autopilotControls'];
 }
 
 /** The bridge as its modules see it */

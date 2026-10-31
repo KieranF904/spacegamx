@@ -9,54 +9,25 @@
  * ship's centre of mass).
  */
 
-import { collideTerrain, terrainRadius } from '@space-game/common';
-import { hasComponent, entityExists } from 'bitecs';
 import {
-  Position, Velocity, Rotation, Input, Boost, Player, Dead, Projectile, InSystem, FRICTION, Blueprint, Catalog,
-  ShipState, ShipTuning, PlacedGeom, Vec2, InventoryStub, stepShipPhysics, quantizeShipBody, ValidationResult,
-  GravityWell, FlightConstants, damagePart, hitMultiplier, type HitInfo, stepFlight, stepDrift, withEmp, withNumb,
-  type WarmthStage, jumpTuning, pilotJumpStep, NO_FIELDS, type JumpField, blueprintGeometry, standing,
-  convexPenetration, WeaponInfo, WeaponTuning, ReplicaMode, CTL, controlBits, replicaAngle, quantizeReplicaAngle,
-  partWeaponDef, FireRecord, partMaterial, powerTick, gunLoad, quantizeCargo, type FlightBody, buildFlightInputs,
-  newFlightControls, type FlightInputSource, chargeTotal, FULL_CHARGE, type Charge,
+  Position, Velocity, Rotation, Projectile, InSystem, FRICTION, Blueprint, Catalog,
+  ShipState, ShipTuning, PlacedGeom, Vec2, InventoryStub, ValidationResult,
+  GravityWell, FlightConstants, type HitInfo, type WarmthStage, type JumpField, blueprintGeometry, standing,
+  WeaponInfo, WeaponTuning, ReplicaMode, FireRecord, type FlightBody, type Charge,
 } from '@space-game/common';
 import {
-  GLANCING, STAGE_COVER, K, centroidOf, CONTACT_MARGIN, BIG_BODY, type ShipHost, type PartDestroyedEvent,
-  type PilotOrders, type PendingBlast, type ShipBridgeConfig, type ShipBridgeStats, type ContactPiece,
-  type BridgeCtx,
+  GLANCING, STAGE_COVER, type ShipHost, type PartDestroyedEvent, type PilotOrders, type PendingBlast,
+  type ShipBridgeConfig, type ShipBridgeStats, type ContactPiece, type BridgeCtx,
 } from './bridge/core.js';
 import * as sync from './bridge/sync.js';
 import * as rbd from './bridge/rebuild.js';
 import * as wpn from './bridge/weapons.js';
 import * as dmg from './bridge/damage.js';
+import * as flt from './bridge/flight.js';
 
 // (The engine interface, events and constants now live in bridge/core.ts; re-exported for everything that imports them from here)
 export { STAGE_COVER };
 export type { ShipHost, PartDestroyedEvent, PilotOrders, ShipBridgeConfig, ShipBridgeStats };
-
-/** stepMovement's scratch: the held keys read from Input, and the controls built from them (reused every call; the step never keeps them) */
-const MOVE_SRC: FlightInputSource = {
-  forward: false, backward: false, left: false, right: false, boost: false, targetAngle: 0,
-  helm: false, strafeLeft: false, strafeRight: false, jump: false, cursorDist: 0, dodge: false,
-};
-const MOVE_CTL = newFlightControls();
-
-/** Read a player's held keys from the Input component into `src` */
-function readInputsInto(eid: number, src: FlightInputSource): FlightInputSource {
-  src.forward = Input.forward[eid] === 1;
-  src.backward = Input.backward[eid] === 1;
-  src.left = Input.left[eid] === 1;
-  src.right = Input.right[eid] === 1;
-  src.boost = Input.boost[eid] === 1;
-  src.targetAngle = Input.targetAngle[eid];
-  src.helm = Input.helm[eid] === 1;
-  src.strafeLeft = Input.strafeLeft[eid] === 1;
-  src.strafeRight = Input.strafeRight[eid] === 1;
-  src.jump = Input.jump[eid] === 1;
-  src.cursorDist = Input.cursorDist[eid];
-  src.dodge = Input.dodge[eid] === 1;
-  return src;
-}
 
 export class ShipBridge {
   readonly catalog: Catalog;
@@ -152,22 +123,14 @@ export class ShipBridge {
   /** Last tick each ship fired anything (a ship still shooting isn't put to sleep) */
   private lastFired = new Map<number, number>();
 
-  isDormant(eid: number): boolean {
-    return this.dormant.has(eid);
-  }
+  isDormant(eid: number): boolean { return flt.isDormant(this.ctx, eid); }
 
   /** Distant ships, and when each went to sleep */
-  dormantShips(): ReadonlyMap<number, number> {
-    return this.dormant;
-  }
+  dormantShips(): ReadonlyMap<number, number> { return flt.dormantShips(this.ctx); }
 
-  isPinned(eid: number): boolean {
-    return this.pinned.has(eid);
-  }
+  isPinned(eid: number): boolean { return flt.isPinned(this.ctx, eid); }
 
-  isAnchored(eid: number): boolean {
-    return this.anchored.has(eid);
-  }
+  isAnchored(eid: number): boolean { return flt.isAnchored(this.ctx, eid); }
 
   hasController(eid: number): boolean {
     return this.controllers.has(eid);
@@ -185,85 +148,20 @@ export class ShipBridge {
    * the middle of something (hurt or shooting lately, EMP'd, burning, under
    * repair, a blast of its own pending, mid-jump, docked)
    */
-  sleepBlocker(eid: number, recentTicks: { damaged: number; fired: number }): string | null {
-    const ship = this.bodies.get(eid);
-    if (!ship) return 'gone';
-    if (ship.kind !== 'ship') return 'debris';
-    if (hasComponent(this.host.world, Player, eid)) return 'pilot';
-    if (this.intangible.has(eid)) return 'intangible';
-    const now = this.host.getTick();
-    if (now - (this.lastDamaged.get(eid) ?? -Infinity) < recentTicks.damaged) return 'damaged';
-    if (now - (this.lastFired.get(eid) ?? -Infinity) < recentTicks.fired) return 'firing';
-    if (this.pulsing.has(eid) || this.weaponBeams.has(eid) || this.beams.has(eid)) return 'firing';
-    if (this.isEmped(eid) || this.warmth.has(eid)) return 'emp';
-    if (this.isJumping(ship)) return 'jumping';
-    if (this.kits.has(eid)) return 'repairing';
-    if (this.host.sheltered?.(eid)) return 'docked';
-    for (const b of this.burns) if (b.eid === eid) return 'burning';
-    for (const b of this.blasts) if (b.source === eid) return 'blast';
-    return null;
-  }
+  sleepBlocker(eid: number, recentTicks: { damaged: number; fired: number }): string | null { return flt.sleepBlocker(this.ctx, eid, recentTicks); }
 
   /** Take a pilotless ship out of the pipeline (SimLod moves it from now on). False if it can't go now. */
-  sleep(eid: number, recentTicks = { damaged: 600, fired: 300 }): boolean {
-    if (this.dormant.has(eid) || this.sleepBlocker(eid, recentTicks)) return false;
-    this.dormant.set(eid, this.host.getTick());
-    const ship = this.bodies.get(eid)!;
-    // (It flies on smoothly: no spin carried into a kinematic heading, wrecks excepted)
-    if (!this.anchored.has(eid)) ship.angVel = 0;
-    this.replicaCtl.delete(eid);
-    this.apHeading.delete(eid);
-    return true;
-  }
+  sleep(eid: number, recentTicks = { damaged: 600, fired: 300 }): boolean { return flt.sleep(this.ctx, eid, recentTicks); }
 
   /**
    * Back into the pipeline: what went on while it slept is caught up (guns'
    * cooldowns and heat, its shield, its battery), and it carries on from where
    * SimLod left it (position, velocity, heading), with every part as it was.
    */
-  wake(eid: number): void {
-    const since = this.dormant.get(eid);
-    if (since === undefined) return;
-    this.dormant.delete(eid);
-    // (Not in this tick's broadphase: beams look for it anyway)
-    this.ungridded.add(eid);
-    const ship = this.bodies.get(eid);
-    if (!ship) return;
-    const now = this.host.getTick(), dt = Math.max(0, now - since);
-    for (let i = 0; i < ship.cooldown.length; i++) if (ship.cooldown[i] > 0) ship.cooldown[i] = Math.max(0, ship.cooldown[i] - dt);
-    for (let i = 0; i < ship.heat.length; i++) {
-      if (ship.heat[i] <= 0) continue;
-      const w = ship.derived.weapons.find((x) => x.part === i);
-      const cool = w ? partWeaponDef(this.tuning, w.kind, ship.blueprint.parts[w.part], w).coolPerSec ?? 30 : 30;
-      ship.heat[i] = Math.max(0, ship.heat[i] - (cool / 60) * dt);
-      if (ship.overheated[i] && ship.heat[i] < 30) ship.overheated[i] = false;
-    }
-    const sh = this.tuning.shield, max = ship.derived.shieldMax;
-    if (sh && max > 0 && ship.shield < max) {
-      const regen = Math.max(0, now - Math.max(since, ship.shieldHitTick + sh.regenDelayTicks));
-      ship.shield = Math.min(max, ship.shield + ((max * sh.regenPerSecond) / 60) * regen);
-    }
-    // Its battery: spare power tops it up as it would have, a tick at a time (it's never long)
-    let c = this.charge.get(eid);
-    if (c) {
-      for (let i = 0; i < Math.min(dt, 3600) && chargeTotal(ship.derived, c) < 100; i++) {
-        c = powerTick(ship.derived, c, { thrusting: false, boosting: false }, this.tuning).charge;
-      }
-      this.charge.set(eid, c);
-    }
-    const body = this.readBody(eid, ship);
-    quantizeShipBody(body);
-    this.writeBody(eid, ship, body);
-  }
+  wake(eid: number): void { return flt.wake(this.ctx, eid); }
 
   /** Where SimLod has a distant ship now (rounded as every body is: what clients would be sent) */
-  moveDistant(eid: number, b: { x: number; y: number; vx: number; vy: number; angle: number; angVel: number }): void {
-    const ship = this.bodies.get(eid);
-    if (!ship || !this.dormant.has(eid)) return;
-    const body = { ...b, jump: ship.jump, jumpScale: ship.jumpScale };
-    quantizeShipBody(body);
-    this.writeBody(eid, ship, body);
-  }
+  moveDistant(eid: number, b: { x: number; y: number; vx: number; vy: number; angle: number; angVel: number }): void { return flt.moveDistant(this.ctx, eid, b); }
 
   constructor(cfg: ShipBridgeConfig) {
     this.catalog = cfg.catalog;
@@ -335,12 +233,7 @@ export class ShipBridge {
   integrity(eid: number): number { return dmg.integrity(this.ctx, eid); }
 
   /** Move a ship instantly (boss blinks) */
-  teleport(eid: number, x: number, y: number): void {
-    if (!this.bodies.has(eid)) return;
-    Position.x[eid] = x;
-    Position.y[eid] = y;
-    this.ungridded.add(eid);
-  }
+  teleport(eid: number, x: number, y: number): void { return flt.teleport(this.ctx, eid, x, y); }
 
   /** A ship's battery charge (energy.ts) */
   chargeOf(eid: number): Charge { return sync.chargeOf(this.ctx, eid); }
@@ -391,10 +284,7 @@ export class ShipBridge {
   installGhost(eid: number, uid: number): boolean { return dmg.installGhost(this.ctx, eid, uid); }
 
   /** Fix a pilotless ship where it stands (or free it): rams and blasts no longer move it */
-  pin(eid: number, on = true): void {
-    if (on && this.bodies.has(eid)) this.pinned.set(eid, { x: Position.x[eid], y: Position.y[eid] });
-    else this.pinned.delete(eid);
-  }
+  pin(eid: number, on = true): void { return flt.pin(this.ctx, eid, on); }
 
   /** Give a pilotless ship an AI pilot (null: none) */
   setController(eid: number, fn: ((eid: number, ship: ShipState) => PilotOrders | null) | null): void {
@@ -517,38 +407,7 @@ export class ShipBridge {
   // -------------------------------------------------------------------------
 
   /** Player movement. Returns false for non-ship entities so the legacy path runs. */
-  stepMovement(eid: number): boolean {
-    const ship = this.bodies.get(eid);
-    if (!ship || ship.kind !== 'ship') return false;
-    const body = this.readBody(eid, ship);
-    // The hold's cargo flies with it (ships/load.ts), as the pilot's prediction and every replica have it
-    // (and what its Tow Beam tows, as load: ships/tow.ts)
-    body.cargo = quantizeCargo((this.host.cargoMass?.(eid) ?? 0) + (this.host.towLoad?.(eid) ?? 0));
-    // (Burst Strafer: the dodge held; its way comes from the movement keys: ships/strafer.ts)
-    const q = quantizeReplicaAngle(Input.targetAngle[eid]);
-    // An EMP cripples the drive (thrust and steering × EMP_CONTROL) and stops a jump starting; the pilot's prediction flies it the same
-    const emp = this.isEmped(eid);
-    // The controls the step reads (flightInputs.ts: jump && !emp, jumpDist = cursorDist); the replica's bits read the same
-    const controls = buildFlightInputs(readInputsInto(eid, MOVE_SRC), emp, MOVE_CTL);
-    // Numb with cold, the drive is sluggish (warmth.ts): its pilot's prediction works it out from the warmth it's told, replicas from CTL.numb
-    const cold = this.coldStage(eid);
-    const hazard = withNumb(this.host.hazardFlight?.(eid, ship.derived, body.x, body.y), cold);
-    this.replicaCtl.set(eid, {
-      mode: ReplicaMode.Player, q, derived: ship.derived,
-      bits: controlBits(controls) | (emp ? CTL.emp : 0) | (cold.control < 1 ? CTL.numb : 0),
-    });
-    // Charging fields round the step (a star's ring, a lodestone's): the range boost from where it starts, then a faster
-    // cooldown and a lodestone's priming from where it ends (the pilot's prediction runs the same: ShipClient.predict)
-    const jt = jumpTuning(this.tuning);
-    let res!: ReturnType<typeof stepShipPhysics>;
-    ship.jumpPrime = pilotJumpStep(body, ship.jumpPrime ?? 0, this.host.jumpFields?.(eid) ?? NO_FIELDS, this.host.getTick(), ship.derived.jumpCooldown || jt.cooldownTicks, jt, (rangeBoost) => {
-      res = stepShipPhysics(body, controls, ship.derived, this.tuning, { charge: this.chargeOf(eid), drainRate: 1, load: gunLoad(ship, this.host.getTick()), tick: this.host.getTick() }, this.host.gravityAt(eid), rangeBoost, emp ? withEmp(hazard) : hazard, this.host.terrainAt?.(eid));
-    });
-    this.setCharge(eid, res.charge);
-    this.writeBody(eid, ship, body);
-    if (res.isBoosting) Boost.lastUseTick[eid] = this.host.getTick();
-    return true;
-  }
+  stepMovement(eid: number): boolean { return flt.stepMovement(this.ctx, eid); }
 
   stepWeapons(eid: number): boolean { return wpn.stepWeapons(this.ctx, eid); }
 
@@ -589,14 +448,7 @@ export class ShipBridge {
   /** Bodies spawned or moved instantly since the broadphase was last filed (addToSpatialGrid) */
   private ungridded = new Set<number>();
 
-  addToSpatialGrid(add: (eid: number, x: number, y: number, r: number) => void): void {
-    this.ungridded.clear();
-    for (const [eid, ship] of this.bodies) {
-      // (already in the grid as a player; only to be seen; or distant, out of every fight)
-      if (hasComponent(this.host.world, Player, eid) || this.intangible.has(eid) || this.dormant.has(eid)) continue;
-      add(eid, Position.x[eid], Position.y[eid], Math.max(1, ship.derived.radius));
-    }
-  }
+  addToSpatialGrid(add: (eid: number, x: number, y: number, r: number) => void): void { return flt.addToSpatialGrid(this.ctx, add); }
 
   /**
    * Projectile vs ship parts. The engine's broadphase gives `nearby`; each
@@ -650,187 +502,20 @@ export class ShipBridge {
    * The bodies as they are now, for a loop that may add or remove some: their ids and states as two lists (and 0, to
    * count from), rather than a pair for each (that was most of what such a loop cost)
    */
-  private bodiesNow(): [number[], ShipState[], number] {
-    return [[...this.bodies.keys()], [...this.bodies.values()], 0];
-  }
+  private bodiesNow(): [number[], ShipState[], number] { return flt.bodiesNow(this.ctx); }
 
   /** End of tick: pilotless motion, contacts, rebuilds, detachment, debris lifetime, health sync. */
-  tick(): void {
-    const world = this.host.world;
-    const tick = this.host.getTick();
-    if (tick % 10 === 0 && this.burns.length) this.stepBurns(tick);
-    if (tick % 15 === 0 && this.kits.size) this.stepRepairKits(tick);
-
-    // 1. Prune and move everything nobody pilots
-    for (let [ids, ships, bi] = this.bodiesNow(); bi < ids.length; bi++) {
-      const eid = ids[bi], ship = ships[bi];
-      if (!entityExists(world, eid) || hasComponent(world, Dead, eid)) {
-        this.bodies.delete(eid);
-        this.forget(eid);
-        continue;
-      }
-      // Distant (SimLod moves it): nothing else happens to it
-      if (this.dormant.has(eid)) continue;
-      const gravity = this.host.gravityAt(eid);
-      const k = gravity ? this.withGravity(gravity) : K;
-      if (ship.kind === 'debris') {
-        if (tick >= ship.despawnTick) { this.removeBody(eid); continue; }
-        this.decay(eid, ship, tick);
-        this.replicaCtl.set(eid, { mode: ReplicaMode.Drift, bits: 0, q: 0, derived: ship.derived });
-        const body = this.readBody(eid, ship);
-        stepDrift(body, k);
-        this.writeBody(eid, ship, body);
-      } else if (this.anchored.has(eid)) {
-        // Wrecks turn slowly and coast when shoved, but no well pulls them in
-        this.replicaCtl.set(eid, { mode: ReplicaMode.Anchored, bits: 0, q: 0, derived: ship.derived });
-        const body = this.readBody(eid, ship);
-        const spin = body.angVel;
-        stepDrift(body, K);
-        body.angVel = spin;
-        this.writeBody(eid, ship, body);
-      } else if (!hasComponent(world, Player, eid)) {
-        // Dummy: holds its heading, coasts, and keeps its weapons cooling (or flies its autopilot course)
-        const body = this.readBody(eid, ship);
-        const ai = this.controllers.get(eid);
-        const orders = ai ? ai(eid, ship) : null;
-        const target = this.autopilot.get(eid);
-        const emp = this.isEmped(eid);
-        const hold = { forward: false, backward: false, left: false, right: false, boost: false, targetAngle: body.angle };
-        let controls = orders ? orders.controls : target ? this.autopilotControls(eid, target) : hold;
-        // Aim in the replicated quantization, so every client steps it exactly the same
-        let q = 0;
-        if (controls !== hold) {
-          q = quantizeReplicaAngle(controls.targetAngle);
-          controls = { ...controls, targetAngle: replicaAngle(ReplicaMode.Pilotless, q) };
-        }
-        // EMP'd: it keeps flying, crippled (as a pilot does)
-        this.replicaCtl.set(eid, { mode: ReplicaMode.Pilotless, bits: (controls === hold ? CTL.hold : controlBits(controls)) | (emp ? CTL.emp : 0), q, derived: ship.derived });
-        if (orders?.impulse && !emp) { body.vx += orders.impulse[0]; body.vy += orders.impulse[1]; }
-        stepFlight(body, controls, ship.derived, this.tuning, { charge: FULL_CHARGE, drainRate: 0 }, emp ? { ...k, hazard: withEmp(undefined) } : k);
-        // A surface's rock (as the replicas have it: replicaStep)
-        collideTerrain(body, terrainRadius(ship.derived.radius), this.host.terrainAt?.(eid));
-        this.writeBody(eid, ship, body);
-        const pin = this.pinned.get(eid);
-        if (pin) { Position.x[eid] = pin.x; Position.y[eid] = pin.y; Velocity.x[eid] = 0; Velocity.y[eid] = 0; }
-        // Pilotless ships have a battery too: spare power charges it, shots spend it
-        // (Its guns draw on their own circuits as they reload: energy.ts)
-        const energy = { charge: powerTick(ship.derived, this.chargeOf(eid), { thrusting: false, boosting: false, load: gunLoad(ship, tick) }, this.tuning).charge };
-        this.fireWeapons(eid, ship, !!orders?.firing && !emp && !this.isJumping(ship), orders?.aim, orders?.aimDist ?? 0, orders?.target ?? -1, energy);
-        this.charge.set(eid, energy.charge);
-      }
-    }
-
-    // Shields recharge once they've gone a while without a hit
-    const sh = this.tuning.shield;
-    if (sh) {
-      for (const ship of this.bodies.values()) {
-        if (this.dormant.has(ship.id)) continue; // (caught up when it wakes)
-        const max = ship.derived.shieldMax;
-        if (max <= 0) { ship.shield = 0; continue; }
-        if (ship.shield > max) ship.shield = max;
-        if (ship.shield < max && tick - ship.shieldHitTick > sh.regenDelayTicks) ship.shield = Math.min(max, ship.shield + ((max * sh.regenPerSecond) / 60) * (this.host.hazardScale?.(ship.id, 'shield') ?? 1));
-      }
-    }
-
-    // 2. Ship-to-ship and ship-to-debris contacts
-    this.resolveContacts();
-
-    // Past an event horizon nothing survives: every part is crushed (ships then
-    // go through the normal core-loss path; debris simply vanishes)
-    for (let [ids, ships, bi] = this.bodiesNow(); bi < ids.length; bi++) {
-      const eid = ids[bi], ship = ships[bi];
-      const horizon = this.host.gravityAt(eid)?.horizon;
-      if (!horizon || Math.hypot(Position.x[eid], Position.y[eid]) > horizon || this.host.invulnerable?.(eid)) continue;
-      if (ship.kind === 'debris') { this.removeBody(eid); continue; }
-      // (A distant ship drifted in: it dies as a live one does)
-      this.wake(eid);
-      ship.hp.forEach((_, i) => { if (damagePart(ship, i, Infinity, this.tuning) > 0) this.crumbled.add(`${eid}:${i}`); });
-    }
-
-    // Destroyed parts: effects, and the ones that blow up (cores at once, so the
-    // parts they leave behind carry the damage; the rest a few ticks later)
-    // A blast can kill more parts, so repeat until nothing new dies this tick
-    for (let pass = 0; pass < 8; pass++) {
-      let more = false;
-      for (let [ids, ships, bi] = this.bodiesNow(); bi < ids.length; bi++) if (!this.dormant.has(ids[bi])) more = this.partDeaths(ids[bi], ships[bi], tick) || more;
-      for (let i = this.blasts.length - 1; i >= 0; i--) {
-        if (this.blasts[i].due > tick) continue;
-        const b = this.blasts[i];
-        this.blasts.splice(i, 1);
-        this.applyBlast(b);
-        more = true;
-      }
-      if (!more) break;
-    }
-    this.crumbled.clear();
-
-    // Station repair
-    const rp = this.tuning.repair;
-    if (rp && tick % rp.intervalTicks === 0) {
-      for (const [eid, ship] of this.bodies) if (!this.dormant.has(eid)) this.repairStep(eid, ship, tick);
-    }
-
-    // 3. Rebuild what changed, then mirror core HP into the engine's health
-    for (let [ids, ships, bi] = this.bodiesNow(); bi < ids.length; bi++) {
-      const eid = ids[bi], ship = ships[bi];
-      if (ship.dirty) this.rebuildNow(eid, ship);
-      if (this.bodies.has(eid) && hasComponent(world, Player, eid)) this.syncHealth(eid, ship);
-    }
-
-    // 4. Round every body to snapshot precision, so what the server holds is
-    //    exactly what clients receive (client prediction replays from it)
-    for (const [eid, ship] of this.bodies) {
-      if (this.dormant.has(eid)) continue; // (SimLod rounds what it writes)
-      const body = this.readBody(eid, ship);
-      quantizeShipBody(body);
-      this.writeBody(eid, ship, body);
-    }
-    let debris = 0;
-    for (const s of this.bodies.values()) if (s.kind === 'debris') debris++;
-    this.stats.debrisCount = debris;
-  }
+  tick(): void { return flt.tick(this.ctx); }
 
   /** Flight constants with a system's gravity, built once per gravity (it's data: it never changes) */
   private gravityK = new WeakMap<GravityWell, FlightConstants>();
-  private withGravity(gravity: GravityWell): FlightConstants {
-    let k = this.gravityK.get(gravity);
-    if (!k) this.gravityK.set(gravity, (k = { ...K, gravity }));
-    return k;
-  }
+  private withGravity(gravity: GravityWell): FlightConstants { return flt.withGravity(this.ctx, gravity); }
 
   /**
    * World-space convex pieces of every alive part (shrunk, so parts that merely
    * touch don't collide), each with its bounding box
    */
-  private worldPieces(eid: number, ship: ShipState, near?: { x: number; y: number; r: number }): ContactPiece[] {
-    const cs = this.tuning.cellSize;
-    const [cx, cy] = ship.derived.com;
-    const px = Position.x[eid], py = Position.y[eid];
-    const phi = Rotation.angle[eid] + Math.PI / 2;
-    const c = Math.cos(phi), s = Math.sin(phi);
-    const out: ContactPiece[] = [];
-    // Only the parts that could reach a circle (the other body's bounds): a boss's far side isn't transformed for a ship grinding its flank
-    let nx = 0, ny = 0, nr = Infinity;
-    if (near) { [nx, ny] = this.worldToGrid(eid, ship, near.x, near.y); nr = near.r / cs + 1; }
-    this.geometry(ship).forEach((g, i) => {
-      if (!ship.derived.alive[i]) return;
-      if (near && (g.bbox.maxX < nx - nr || g.bbox.minX > nx + nr || g.bbox.maxY < ny - nr || g.bbox.minY > ny + nr)) return;
-      for (const piece of g.convexShrunk) {
-        let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-        const poly = piece.map(([x, y]) => {
-          const lx = (x - cx) * cs, ly = (y - cy) * cs;
-          const wx = px + lx * c - ly * s, wy = py + lx * s + ly * c;
-          if (wx < x0) x0 = wx;
-          if (wx > x1) x1 = wx;
-          if (wy < y0) y0 = wy;
-          if (wy > y1) y1 = wy;
-          return [wx, wy] as Vec2;
-        });
-        out.push({ part: i, poly, x0, x1, y0, y1 });
-      }
-    });
-    return out;
-  }
+  private worldPieces(eid: number, ship: ShipState, near?: { x: number; y: number; r: number }): ContactPiece[] { return flt.worldPieces(this.ctx, eid, ship, near); }
 
   /**
    * Push overlapping bodies apart, exchange an impulse along the contact
@@ -842,139 +527,12 @@ export class ShipBridge {
    * the same order as testing every pair would. Pieces are only tested against
    * pieces whose bounding boxes they meet: the rest can't overlap.
    */
-  private resolveContacts(): void {
-    const ct = this.tuning.collision;
-    // Who can touch anything at all (none of it changes while this runs)
-    const list: [number, ShipState][] = [];
-    for (const e of this.bodies) {
-      if (e[1].derived.mass > 0 && !this.dormant.has(e[0]) && !this.isJumping(e[1]) && !this.host.sheltered?.(e[0]) && !this.intangible.has(e[0])) list.push(e);
-    }
-    const n = list.length;
-    const pairs: number[] = [];
-    const bySys = new Map<number, number[]>();
-    for (let i = 0; i < n; i++) {
-      const sys = InSystem.systemId[list[i][0]];
-      let ids = bySys.get(sys);
-      if (!ids) bySys.set(sys, (ids = []));
-      ids.push(i);
-    }
-    // (Each one's left edge worked out once, not on every comparison of the sort)
-    const lefts = list.map(([eid, ship]) => Position.x[eid] - ship.derived.radius);
-    const left = (i: number) => lefts[i];
-    for (const ids of bySys.values()) {
-      if (ids.length < 2) continue;
-      ids.sort((p, q) => left(p) - left(q));
-      for (let a = 0; a < ids.length; a++) {
-        const i = ids[a], ei = list[i][0];
-        const ri = list[i][1].derived.radius + CONTACT_MARGIN;
-        const right = Position.x[ei] + ri, yi = Position.y[ei];
-        for (let b = a + 1; b < ids.length; b++) {
-          const j = ids[b];
-          // Sorted by left edge: everything after this starts further right still
-          if (left(j) > right) break;
-          if (Math.abs(Position.y[list[j][0]] - yi) > ri + list[j][1].derived.radius) continue;
-          pairs.push(i < j ? i * n + j : j * n + i);
-        }
-      }
-    }
-    pairs.sort((p, q) => p - q);
+  private resolveContacts(): void { return flt.resolveContacts(this.ctx); }
 
-    const pieces = new Map<number, ContactPiece[]>();
-    // A small body's pieces are kept for the pass (until it's pushed); a big one's (a boss's) are only those near the other body
-    const piecesOf = (eid: number, ship: ShipState, other: number, os: ShipState) => {
-      if (ship.blueprint.parts.length > BIG_BODY) return this.worldPieces(eid, ship, { x: Position.x[other], y: Position.y[other], r: os.derived.radius });
-      let p = pieces.get(eid);
-      if (!p) { p = this.worldPieces(eid, ship); pieces.set(eid, p); }
-      return p;
-    };
-    for (const key of pairs) {
-      const i = Math.floor(key / n), j = key - i * n;
-      const [ea, A] = list[i];
-      const [eb, B] = list[j];
-      const dx = Position.x[eb] - Position.x[ea], dy = Position.y[eb] - Position.y[ea];
-      if (Math.hypot(dx, dy) > A.derived.radius + B.derived.radius) continue;
-
-      let deepest: { depth: number; nx: number; ny: number } | null = null;
-      let at: Vec2 = [0, 0];
-      const partsA = new Set<number>(), partsB = new Set<number>();
-      const pa = piecesOf(ea, A, eb, B), pb = piecesOf(eb, B, ea, A);
-      // All of B's pieces lie in this box: A's pieces outside it touch nothing
-      let bx0 = Infinity, bx1 = -Infinity, by0 = Infinity, by1 = -Infinity;
-      for (const q of pb) {
-        if (q.x0 < bx0) bx0 = q.x0;
-        if (q.x1 > bx1) bx1 = q.x1;
-        if (q.y0 < by0) by0 = q.y0;
-        if (q.y1 > by1) by1 = q.y1;
-      }
-      for (const p of pa) {
-        if (p.x1 < bx0 || p.x0 > bx1 || p.y1 < by0 || p.y0 > by1) continue;
-        for (const q of pb) {
-          if (p.x1 < q.x0 || q.x1 < p.x0 || p.y1 < q.y0 || q.y1 < p.y0) continue;
-          const pen = convexPenetration(p.poly, q.poly);
-          if (!pen) continue;
-          partsA.add(p.part);
-          partsB.add(q.part);
-          if (!deepest || pen.depth > deepest.depth) {
-            deepest = pen;
-            // Contact point: between the two overlapping pieces
-            const ca = centroidOf(p.poly), cb = centroidOf(q.poly);
-            at = [(ca[0] + cb[0]) / 2, (ca[1] + cb[1]) / 2];
-          }
-        }
-      }
-      if (!deepest) continue;
-
-      // Pinned structures don't give: whatever hits them takes all the push
-      const invA = this.pinned.has(ea) ? 0 : 1 / A.derived.mass, invB = this.pinned.has(eb) ? 0 : 1 / B.derived.mass;
-      if (invA + invB === 0) continue;
-      const { nx, ny, depth } = deepest;
-      const corr = depth / (invA + invB);
-      Position.x[ea] -= nx * corr * invA; Position.y[ea] -= ny * corr * invA;
-      Position.x[eb] += nx * corr * invB; Position.y[eb] += ny * corr * invB;
-      pieces.delete(ea);
-      pieces.delete(eb);
-
-      const vrel = (Velocity.x[eb] - Velocity.x[ea]) * nx + (Velocity.y[eb] - Velocity.y[ea]) * ny;
-      if (vrel >= 0) continue; // already separating
-      const jImp = -(1 + ct.restitution) * vrel / (invA + invB);
-      Velocity.x[ea] -= jImp * invA * nx; Velocity.y[ea] -= jImp * invA * ny;
-      Velocity.x[eb] += jImp * invB * nx; Velocity.y[eb] += jImp * invB * ny;
-
-      const closing = -vrel;
-      // Sparks and a thud, at most once per pair per cooldown
-      if (closing > (ct.fxMinSpeed ?? 0.6)) {
-        const fk = ea < eb ? `${ea}:${eb}` : `${eb}:${ea}`;
-        const tick = this.host.getTick();
-        if (tick - (this.contactFx.get(fk) ?? -1e9) >= (ct.fxCooldownTicks ?? 8)) {
-          this.contactFx.set(fk, tick);
-          this.host.notifyContact?.({ systemId: InSystem.systemId[ea], x: at[0], y: at[1], nx, ny, speed: closing });
-        }
-      }
-      if (closing <= ct.minDamageSpeed) continue;
-      if (this.host.canDamage && !(this.host.canDamage(ea, eb) && this.host.canDamage(eb, ea))) continue;
-      const base = (closing - ct.minDamageSpeed) * ct.damagePerSpeed;
-      const total = A.derived.mass + B.derived.mass;
-      this.damageContact(ea, A, partsA, base * (2 * B.derived.mass / total), eb);
-      this.damageContact(eb, B, partsB, base * (2 * A.derived.mass / total), ea);
-    }
-  }
-
-  private damageContact(eid: number, ship: ShipState, parts: Set<number>, amount: number, source: number): void {
-    let dealt = 0;
-    // A wedge nose turns a blow aside; brittle material shatters
-    for (const p of parts) dealt += this.hurt(eid, ship, p, (amount / parts.size) * this.contactScale(ship, p), source);
-    if (dealt > 0) {
-      this.lastDamaged.set(eid, this.host.getTick());
-      this.host.notifyDamage(eid, dealt, source);
-    }
-  }
+  private damageContact(eid: number, ship: ShipState, parts: Set<number>, amount: number, source: number): void { return flt.damageContact(this.ctx, eid, ship, parts, amount, source); }
 
   /** How hard a collision lands on a part: its piece's `contact` share, doubled for brittle material */
-  private contactScale(ship: ShipState, part: number): number {
-    const q = ship.blueprint.parts[part];
-    const piece = this.catalog.pieces.get(q.piece);
-    return (piece?.contact ?? 1) * (partMaterial(this.catalog, q)?.traits?.includes('brittle') ? 2 : 1);
-  }
+  private contactScale(ship: ShipState, part: number): number { return flt.contactScale(this.ctx, ship, part); }
 
   // -------------------------------------------------------------------------
   // Destroyed parts, blasts, decay and station repair
