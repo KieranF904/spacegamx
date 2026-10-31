@@ -19,7 +19,7 @@ Object.assign(BEAM_LOOKS, {
   laser_searchlight: { width: 0.45, outer: 0xb8860b, mid: 0xfde68a, core: 0xfffbeb, cone: 5, coneLen: 1100 },
   lance_lance: { outer: 0x7c3aed, mid: 0xc084fc, core: 0xffffff, braid: { color: 0xf5e8ff, strands: 3 }, sputter: 1 },
   arc_tesla: { width: 0.9, outer: 0x7c3aed, mid: 0xb8a4ff, core: 0xf5f3ff, zap: 9 },
-  utility_repair_beam: { braid: { color: 0x99f6e4, strands: 2 }, plus: true },
+  utility_repair_beam: { braid: { color: 0x99f6e4, strands: 2 } },
 });
 
 Object.assign(MODEL_STYLES, {

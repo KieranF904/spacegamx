@@ -111,8 +111,6 @@ export interface BeamLook {
   pool?: number;
   /** The beam is a lightning polyline of this amplitude (world units), re-jittered every frame (the Tesla's) */
   zap?: number;
-  /** Crosses ('+') drift along the beam instead of dots (the Repair Beam's) */
-  plus?: boolean;
   /** Frost motes drifting off the beam and white crystals on what it lights: × the amount (0 or absent: none) */
   frost?: number;
 }

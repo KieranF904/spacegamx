@@ -14,7 +14,6 @@ describe('energy weapon looks', () => {
     expect(beamLook('lance_lance')?.braid?.strands).toBe(3);
     expect(beamLook('lance_lance')?.sputter).toBeGreaterThan(0);
     expect(beamLook('arc_tesla')?.zap).toBeGreaterThan(0);
-    expect(beamLook('utility_repair_beam')?.plus).toBe(true);
   });
   it('gives the shots theirs over their kind', () => {
     expect(weaponStyle(WeaponType.Emp, 1, 'emp_blackout').radiusRing?.radius).toBe(320);
