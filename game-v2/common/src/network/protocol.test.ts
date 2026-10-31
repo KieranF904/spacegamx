@@ -177,38 +177,13 @@ describe('binary frames', () => {
 });
 
 describe('protocol version', () => {
-  /** FNV-1a, 32 bits, as hex */
-  function fnv1a(s: string): string {
-    let h = 0x811c9dc5;
-    for (let i = 0; i < s.length; i++) {
-      h ^= s.charCodeAt(i);
-      h = Math.imul(h, 0x01000193) >>> 0;
-    }
-    return h.toString(16).padStart(8, '0');
-  }
-
   it('the wire format matches the one PROTOCOL_VERSION was recorded for', async () => {
-    const { wireTables, encodeServerMessage, serverFrame, PROTOCOL_VERSION, PROTOCOL_WIRE_HASH } = await import('./protocol.js');
-    // The tables, and a frame of the formats built on them (so a change to how they're packed counts too)
-    const input: ClientInputMessage = {
-      type: 'input', seq: 77, tick: 0, targetTick: 123460, forward: true, backward: false, left: true, right: false,
-      boost: true, fireLeft: false, fireRight: true, targetAngle: 1.25, strafeLeft: true, strafeRight: false, helm: true, cursorDist: 480, jump: true,
-    };
-    const msgs = [
-      {
-        type: 'snapshot', tick: 1234, lastProcessedInput: 7, removed: [5],
-        entities: [{ id: 1, type: 1, x: 10.5, y: -3, angle: 0.25, vx: 1, vy: 0, av: 0.01, hp: 100, maxHp: 120, data: [1, 2, 3], name: 'Ash' },
-          { id: 40, type: 7, vx: 8.38, vy: -31.3, data: [1, 1, (2247 * 137) % 360, 1230, 27286.2, 21513.6, 2247, 1, 0] }],
-        ships: [[2, 1, 4, 5, 0, 0, 0.5, 0, 0, 1, 16, 4000]], ctl: [[9, 1, 17, 4100], [-2251, 2, 9, 5249, -88, -28]], out: [3], fire: [[2, 1, 0, 100, 50, 51]],
-      },
-      { type: 'damage', targetId: 2242, amount: 14, sourceId: 2248, critical: true },
-      { type: 'shipSync', id: 3, kind: 'ship', hp: [1, 0.5], detached: [], rebuilds: 2, design: 'abc', blueprint: { name: 'X', parts: [] } },
-      { type: 'welcome', playerId: 1, tickRate: 60, serverTime: 5, protocol: 1 },
-    ];
-    const frame = serverFrame(msgs.map((m) => encodeServerMessage(m as any)));
-    const bytes = [...new Uint8Array(encodeInputBinary(input)), ...frame].map((b) => b.toString(16).padStart(2, '0')).join('');
-    const hash = fnv1a(JSON.stringify(wireTables()) + '|' + bytes);
-    expect(hash, `The wire format changed (protocol.ts / binaryCodec.ts). Bump PROTOCOL_VERSION (now ${PROTOCOL_VERSION}) `
-      + `in common/src/network/protocol.ts so old clients are told to reload, and set PROTOCOL_WIRE_HASH to '${hash}'.`).toBe(PROTOCOL_WIRE_HASH);
+    const { PROTOCOL_VERSION, PROTOCOL_WIRE_HASH } = await import('./protocol.js');
+    const { computeWireHash } = await import('./wireHash.js');
+    const hash = computeWireHash();
+    expect(hash, `The wire format changed (protocol.ts / binaryCodec.ts / wire-dictionary.json), so the pinned hash is stale. `
+      + `Run:  npm run wire:bump "what changed"  (at game-v2/). It rebuilds common, bumps PROTOCOL_VERSION (now ${PROTOCOL_VERSION}), `
+      + `sets PROTOCOL_WIRE_HASH to '${hash}' and logs the reason in common/src/network/PROTOCOL_CHANGELOG.md. `
+      + `If you added a part/material/piece, run  npm run wire:sync  first.`).toBe(PROTOCOL_WIRE_HASH);
   });
 });

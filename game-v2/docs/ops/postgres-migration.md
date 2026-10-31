@@ -1,12 +1,20 @@
 # Postgres migration (accounts and profiles)
 
-Status, 2026-10-31: the live accounts, sessions, profiles and rankings are **copied** into the `spacegame` database
-on the VPS and verified. **The game still runs on JSON.** Nothing reads the Postgres copy until the switch-over below
-is done, and the game keeps writing JSON meanwhile, so the copy is a snapshot: re-sync it right before switching.
+Status, 2026-10-31: **production runs on Postgres.** The switch-over was done at about 14:33 server time. The live
+accounts, sessions, profiles and rankings were re-synced from the frozen JSON into the `spacegame` database and verified
+(14/14 checks passed), then both services were restarted on it. The pre-switch JSON and a dump are in
+`/opt/spacegame/data/backups-pre-pgswitch-20261031-143323` (earlier, pre-copy backups: `backups-pre-pg-20261031-004940`).
+The backend is chosen by systemd drop-ins `/etc/systemd/system/spacegame-{browser,server}.service.d/postgres.conf`
+(`Environment=USER_STORE_BACKEND=postgres`; the deploy rewrites the unit files but leaves drop-ins alone). A nightly
+`pg_dump` runs from the `spacegame-dbdump` timer, installed by the deploy. Local dev still defaults to JSON.
+The JSON files are now a frozen snapshot taken at the switch (nothing writes them); the sections below keep the tool,
+the re-sync and the rollback steps. Rolling back to JSON loses everything done since the switch.
 
 ## What moves, what stays
 
-| Data | JSON (today) | Postgres | Migrated |
+(The state before the switch; after it the Postgres column is live and the JSON column is the frozen snapshot.)
+
+| Data | JSON (before the switch) | Postgres | Migrated |
 |---|---|---|---|
 | Accounts | `data/lobby/users.json` `users` | `users` (same columns, **same ids**) | yes: 2 |
 | Sessions | `users.json` `sessions` | `sessions` | yes, unexpired only: 6 (players stay signed in) |
@@ -25,7 +33,7 @@ Not copied on purpose: `profiles/1.json.bak-clearance-124155` (a hand-made backu
 and orphans (a profile or session of an account that no longer exists; there are none today).
 
 `pg` (8.23.1) is now a dependency of `server/` and `server-browser/` (package.json + lockfiles). Which store is used
-is unchanged: JSON unless `USER_STORE_BACKEND=postgres`. The site wasn't touched (its data isn't on the VPS).
+is JSON unless `USER_STORE_BACKEND=postgres` (set on the VPS by the drop-ins above). The site wasn't touched (its data isn't on the VPS).
 
 ## The tool
 
@@ -115,7 +123,7 @@ exactly as the lobby does it. (No account has been deleted, so nothing was lost 
 - Live files after the run: same sha256 as the backup; services untouched (both active since 06:38 AEDT,
   no `USER_STORE_BACKEND` in their environment, lobby log: `[UserStore] JSON store at /opt/spacegame/data/lobby/users.json`).
 
-## Re-sync (any time before the switch)
+## Re-sync (it was used before the switch; after it, a re-sync would overwrite live play with the frozen JSON)
 
 From `game-v2/` on this machine:
 
@@ -130,7 +138,7 @@ from `/etc/spacegame/secrets.env` inside the remote shell (never printed, never 
 JSON only and touches no service, unit or secret. A re-sync while the game runs is fine for testing, but it's a
 snapshot: for the real switch, re-sync with the services stopped (below).
 
-## Switch-over (for later, after review)
+## Switch-over (done 2026-10-31 ~14:33; kept for rollback or a redo)
 
 Prerequisites:
 
@@ -185,10 +193,10 @@ keep progress). The Postgres data stays where it is for a later retry.
 
 After the switch:
 
-- **Backups**: the JSON store's daily per-profile copies (`data/profiles/backups/`) stop: Postgres needs its own
-  (e.g. a nightly `pg_dump` of the spacegame database, kept for a week).
+- **Backups**: the JSON store's daily per-profile copies (`data/profiles/backups/`) stop; the nightly `pg_dump` timer
+  `spacegame-dbdump` (installed by the deploy) replaces them.
 - **The website's pilot pages** read `data/profiles/*.json` and `_rankings.json` directly (`site/src/pilots.ts`), so they
-  would go stale. The site isn't deployed today; give `PilotSource` a Postgres reader before it is.
+  would go stale. `PilotSource` (`site/src/pilots.ts`) reads files only: give it a Postgres reader before the site is meant to show live pilot data from production.
 - The deleted-accounts list stays a file (`data/lobby/deleted-accounts.json`); on Postgres, deleting an account also
   removes its sessions and profile by `ON DELETE CASCADE`.
 - Still on JSON: world memory, contributor notes, telemetry, status (no Postgres version exists).

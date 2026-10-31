@@ -1,0 +1,78 @@
+# Weapons & combat
+How a gun turns into shells, beams and pulses, and what those do to ships. The firing step (`stepGuns`) and the shell launch (`launchShot`) are deterministic and shared, so a pilot's client builds the same volley the server does from a bare fire event. Damage, shields, splash, EMP, burns, point defence and the Repair Beam live in the server's `ShipBridge` and `Weapons`. Hit tests against part outlines are shared with client beam visuals. Weapon *parts* (models, grades, mounts) belong to `ship-parts`; this area is what they do once they fire.
+
+## Files (what each owns)
+| path | lines | owns |
+|---|---|---|
+| common/src/ships/tuning.ts | 205 | `ShipTuning`, `WeaponTuning` (every per-kind field: damage, speed, splash, fuse, homing, pierce, chain, frost, heal, ammo...) loaded from data/ships/tuning.json `weapons.<kind>` |
+| common/src/ships/guns.ts | 172 | `stepGuns`: cooldowns, turret slew, fixed-gun gimbal, who fires; returns `{shots, beams, pulses}` |
+| common/src/ships/launch.ts | 255 | `weaponDef`, `gunDef`/`partWeaponDef` (kind + grade + size + gem/ammo mods), ammo crate registry, `launchShot`, `volleyAngles`, `rebuildVolley`, `volleyShells`, `shellSeed`, `shotAimQ` |
+| common/src/ships/shot.ts, pulse.ts | 69 | `buildShot` (base shot, `ProjectileSpec`); pulse-laser run maths |
+| common/src/ships/damage.ts | 89 | damage types, `weaponHit`, `penetrationMul`, `hitMultiplier` (type x armour x material resist), `TYPE_BY_KIND` |
+| common/src/ships/collide.ts | 158 | `castParts` (segment/capsule vs standing parts), `nearestParts`, `partDistance`, `capsuleConvexEntry` |
+| common/src/ships/support.ts | 93 | Repair Beam + Point Defence: `isRepairBeam`, `isPointDefence`, `pointDefenceOf`, `interceptHits`, `repairAt`, `stepPointDefenceAim` |
+| common/src/ships/hazards.ts | 107 | `EMP_CONTROL`, `withEmp` (EMP is a hazard-flight modifier); the rest is world-sim |
+| common/src/ecs/components.ts | ~L359 | `WEAPON_KIND_TYPE` kind -> snapshot `WeaponType` number (client style lookup) |
+| server/src/game/Weapons.ts | 300 | `Weapons`: `spawn` (one shot + burst), per-tick homing/pull/fuse, `onShipHit/onMobHit/onWallHit/onExpire`, `chain`, `shatter`, `detonate`, `threats`, `intercept` |
+| server/src/game/Ammo.ts | 207 | `Ammo`: crates, rounds, dry-fire at `dry` share |
+| server/src/game/Support.ts, Towing.ts | 59, 158 | support credit window (`SUPPORT_WINDOW_TICKS`); Tow Beam latch (maths in common tow.ts, flight/ship-parts) |
+| server/src/ships/ShipBridge.ts | 2453 | god-file; combat slices below |
+| client/src/rendering/weapons/{WeaponFx,weaponStyles}.ts | 496, 242 | all projectile visuals; `WEAPON_STYLES[weaponType]`, `weaponStyle(type, grade)`; predicted own shells (`PredictedShell`) |
+| client/src/ships/{DamageFx,MiningBeamFx,PulseFx,gunDecor}.ts | 886, 372, 310, 623 | part damage/fire/break visuals; mining + lance beams (`castShips` uses collide.ts); pulse beams (`pulseLook`); per-gun barrel art |
+| docs/audits/collisions.md, boss-bullet-hell.md | | which tests hit what (outline vs circle); cost of boss shot storms |
+
+ShipBridge slices (grep the name, read ~60 lines): `hurt` (~L938, ALL damage funnels here: shield first, then `cover` stage rule, bane, hull), `damagePartBy`, `splashAt`, `empAt`, `ignite`/`stepBurns`, `stepWeapons` (~L1286), `fireWeapons` (~L1375), `stepPulses`, `fireBeam` (~L1465), `repairBeam` (~L1553), `pointDefence` (~L1584), `alongBeam`, `partDeaths`, `applyBlast`, `damageContact`, `decay`, `repairStep`. Banners: "Support weapons" (~L98), "Tow Beam" (~L2381).
+
+## Public interface
+- `WeaponTuning` / `ShipTuning` (tuning.ts). Kinds in tuning.json `weapons`: cannon railgun flak missile emp laser autocannon pulse arc torpedo mortar magma charge lance hive frostbite repair point_defence, plus boss kinds rivet scrap_chunk seam_seeker heart_spark heart_seeker cinder_bloom prism prism_shard phase singularity.
+- `stepGuns(ship, pose, orders: GunOrders, tick, tuning)`, `launchShot(...)`, `gunDef` / `partWeaponDef`, `weaponDef(tuning, kind)`, `rebuildVolley(FireRecord, ...)` (client rebuild from a fire event).
+- `weaponHit(kind, def, grade): HitInfo`, `hitMultiplier(catalog, tuning, part, hit)`.
+- `ShipBridge.hurt(eid, ship, part, amount, source, vs?)`, `splashAt`, `empAt(...)` (returns hit eids), `ignite`, `emp`, `frostHit`, `shieldFraction`, `lastHitter`.
+- `Weapons.spawn(owner, kind, x, y, angle, damageScale, shape, out?)` used by ShipBridge (pilots, mobs) and brains (bosses). `WeaponsHost` is what GameServer supplies.
+- `castParts(geoms, ok, x0, y0, x1, y1, r?)` for any new hit test.
+
+## Invariants
+- Shell spawn is deterministic from `(owner, partUid, index, tick, aim quantised to SHOT_AIM_STEPS)`; never use `Math.random`/`Date.now` in guns.ts, launch.ts, shot.ts. Server and client must derive the same `gunDef` (grade, size, mods, ammo, model, braced).
+- All damage goes through `ShipBridge.hurt` (shields, stage cover, bane, invulnerable). Do not decrement part HP directly.
+- Hit tests use real part outlines in grid space (`ShipBridge.worldToGrid`), box first, convex pieces second; not bounding circles (collisions.md). Mobs are circles by design.
+- A kind with no `WEAPON_KIND_TYPE` entry goes out as type 1 (cannon).
+- Beams (laser, lance, frostbite, repair) are continuous, live in ShipBridge and send no shells.
+- Point defence never fires on the trigger and never at ships; only kinds with `intercept > 0` can be shot down (boss novas opt out via `shape.intercept`).
+- Dry ammo: same shells, no effects (splash/emp/ignite/split/pull/pierce/fuse stripped) at the `dry` share of damage, so tracers stay in sync.
+- Stage rule: a hit on a later-stage part passes to the nearest current-stage part measured from the impact point, at `stageCover` (default 0.4).
+
+## How to extend
+1. **Tweak a kind's numbers**: data/ships/tuning.json `weapons.<kind>`. A new field goes in `WeaponTuning` (tuning.ts) and is read in `Weapons.ts`/`launch.ts`; gems/ammo can only touch `WeaponModNumber` fields.
+2. **Add a projectile kind**: (a) tuning.json `weapons.<kind>`; (b) `TYPE_BY_KIND` in damage.ts if not kinetic; (c) `WEAPON_KIND_TYPE` + `WeaponType` enum in common/src/ecs/components.ts (new number); (d) `WEAPON_STYLES` in weaponStyles.ts; (e) a weapon model in scripts/econ/models.mjs (read only its weapon rows, ~L34-80; see `ship-parts`), then `npm run wire:sync` and `wire:bump "reason"`; (f) barrel art in gunDecor.ts (`BY_DECOR`, a `<kind>_<model>` entry); (g) sfx in client/src/audio/sfx.ts. Only special behaviour needs Weapons.ts (`tick` for homing/pull/fuse, `onShipHit`, `detonate`).
+3. **Add a beam**: copy `fireBeam` in ShipBridge (hit via `castParts` capsule, damage via `hurt`); draw it client-side like MiningBeamFx/WeaponFx. No `WEAPON_KIND_TYPE` needed.
+4. **Add a damage type**: `DamageType`, `DAMAGE_TYPES`, `DAMAGE_NAMES` in damage.ts, material `resist` in materials.json, `TYPE_BY_KIND`.
+5. **Add an on-hit effect**: field in `WeaponTuning`, applied in `Weapons.onShipHit` (`chain`, `shatter`, `detonate` are templates); cold effects go via `ShipBridge.warm`/`frostHit`.
+6. **Support weapon**: pure logic in support.ts, loop in ShipBridge's "Support weapons" slice.
+
+## Tests
+- Shared maths: `npx vitest run common/src/ships/collide.test.ts common/src/ships/support.test.ts common/src/ships/turret.test.ts`
+- Server: `npx vitest run server/src/game/weapons.test.ts server/src/game/weapons2.test.ts server/src/game/ammo.test.ts server/src/game/damageModel.test.ts server/src/game/support.test.ts server/src/game/tow.test.ts server/src/ships/collisions.test.ts server/src/ships/cripple.test.ts`
+- collisions.test guards outline hits; damageModel guards types/penetration; weapons2 guards client/server volley agreement and replica angles. Benches: `server/src/bench/bulletHellBench.ts`, `collisionBench.ts`.
+
+## Gotchas
+- Weapon model ids are in the append-only wire dictionary (`common/src/network/wire-dictionary.json`); a new gun fails wireDictionary.test until `npm run wire:sync` then `wire:bump "reason"`.
+- Splash, EMP, flak fuses and arc chains once used centroids or circles; use hull distance (`nearestTarget`, `nearestParts`) or bosses are immune near their edges.
+- A plain cannon shell has no `extras` entry; any grade/gem change creates one (`def !== this.def(kind)`), so new `Extra` state must default sanely.
+- Shield ripple must use the hit point, not the bounding rim.
+- Frost and warmth effects go through warmth.ts; do not couple them to heat.
+- The tree has uncommitted edits (models.test.ts, mounting.test.ts and others); never revert.
+
+## Related areas
+`ship-parts` (weapon models, `WeaponInfo`, grades; contract `partWeaponDef`), `energy` (guns spend `WeaponInfo.energy` via `orders.energy`), `flight` (pose, EMP via hazard flight), `bosses-ai` (brains call `Weapons.spawn`; stage `cover`), `render-ships` (gunDecor, DamageFx), `networking` (fire events, wire dictionary), `world-sim` (hazards, warmth).
+
+## Notes (moved from DEVELOPMENT.md and the old engine-map)
+- **Repair Beam** (model `utility_repair_beam`, kind `repair` in tuning.json): a held turret beam (`heal` HP/s) that passes through ships it may not mend and mends the damaged parts nearest where it lands on the first friendly hull (`GameServer.canHeal`; `ShipBridge.repairBeam`, `repairAt`); never its own ship, a destroyed part or a shield. What it mends is noted in `server/src/game/Support.ts`, the support-credit hook: a mended pilot's kills pay its supporters as its party, and a boss counts them among its winners.
+- **Point Defence** (model `point_defence_turret`, `pointDefence {range, slew}`): `stepGuns` only reloads it; `ShipBridge.pointDefence` turns it to the nearest shot it can fire on (`Weapons.threats`: kinds with `intercept` hits, owners that may hurt it; a boss nova's never unless its phase says `intercept: true`) and each shot takes one hit (`Weapons.intercept`). Clients get an `intercept` message (a plain one, not in the wire tables) as a tracer and pop (`DamageFx.onIntercept`), and the turret turns to it (`ShipClient.stepPointDefenceVisuals`).
+- **Fixed guns aim**: non-turret guns have a +-2 degree gimbal (`tuning.fixedGun.gimbalDeg`), each aiming at the cursor point from its own muzzle (`stepFixedGunAim` in `turret.ts`; the offset is stored in `ship.aim`, `buildShot` turns the shot by it). It fires only while the target is within the gimbal plus `fireToleranceDeg` (0.5), or within that range of the angle from the ship's centre; a close target off a wing fires at the closest angle. Legacy fixed cannons (enemies', bosses') also get `fixedGun` shell scaling: `intervalScale` 1.5 (applied in `rebuild`), `speedScale` 0.7, `sizeScale` 1.5 (on `ProjectileSpec`; lifetime divided by the speed scale so range is unchanged); a model weapon's mount and numbers are its own (`partMount`). Projectile snapshot rows carry `data[7]` (shell size) and `data[8]` (1 = turret).
+- **Turrets** (`mount: 'turret'`): base window +-`turret.halfArcDeg` around the facing; rays from the turret's centroid that cross another live part of the same ship are closed, and `rebuild` recomputes windows so they widen as cover is shot away. A turret slews (`turret.slewRate`) anywhere in its window but fires only when aligned with the cursor and pointing through an open sector; all turrets aim parallel along the ship-to-cursor angle. `computeTurretWindow` checks each part's bounding circle before clipping.
+- **Shot scaling**: `buildShot` scales the base shot's damage by satisfaction (min 0.1); fire interval is scaled separately by `rebuild`. Either mouse button fires every weapon.
+- **Part deaths, decay, repair** (ShipBridge): `partDeaths` (each tick before the rebuild) sends `partDestroyed` (`how`: blast, break, crumble) for every part that hit 0 HP; functions in `tuning.partBlast` blow up (core at once, others after a seeded delay), damaging intact parts on any body in radius with falloff, so generators can chain; whoever started a chain gets the kill credit. `decay`: a core-less body gives each part a crumble tick spread around `debris.decayTicks` (crumbling parts never blow up). `repairStep` (every `repair.intervalTicks`): a ship with a core within `repair.range` of a station's edge heals `healPerSecond` of every intact part's max HP and regrows one missing part per `restoreTicks` (nearest the core that touches the attached structure); paused for `combatPauseTicks` after damage; billed by `Pilots.payRepair` at the cheapest station's `repairCostPerHp` (a pilot who cannot pay is patched at a quarter rate free). `contact` messages (point, normal, closing speed) go above `collision.fxMinSpeed`, once per pair per `fxCooldownTicks`.
+- **Legendary weapons**: functions `hive`, `frostbite`, `cinder_bloom`, `prism`, `phase`, `singularity` (tuning `weapons`: `burst`, `chill`, `ignite`, `split`, `pierceKeep`, `pull`); they open by level and each recipe needs its boss's artefact (a very rare drop, docs/parts-redesign.md section 6).
+- **Combat rules**: splash only hits the few parts nearest the blast; EMPs leave 4 s of immunity; PvP only where `systems.json` says (`GameServer.canDamage`); wards (bastions, turrets, pylons, freighters) and docked ships cannot hurt or be hurt. Frost hits (gemmed guns, Frostbite Lance, Brood Mother) also take the target's warmth (`ShipBridge.warm`, see world-sim).
+- **Client weapon visuals** (`rendering/weapons/`): shots are placed from their exact spawn point and tick (snapshot `data[3..5]`, owner `data[6]`); your own run on the present timeline, others' on the interpolated one; `projectileHit` (id + exact point) ends a tracer. Look: thin additive tracers, brief muzzle flashes, spark bursts, pooled `SpritePool` sprites; guns recoil and heat (`onMuzzle` -> `ShipRenderer.kick`). `BULLET_SPEED` is 48, `BLASTER_LIFE_TICKS` 150.
+- **Retired weapon code**: the old Equipment weapons (laser, scatter, missile, pulse, mine, mining fire paths), the `Equipment`/`EquipmentStats`/`WeaponState`/`Shield`/`Missile`/`Mine` ECS components and the weapon cooldown bars are gone; any old doc naming them is stale. Player shields now come from shield parts.

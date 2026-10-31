@@ -17,8 +17,11 @@
     "test": "vitest run",
     "install:all": "cd common && npm install && cd ../server && npm install && cd ../client && npm install",
     "gen:sfx": "node --env-file=.env scripts/gen-sfx.mjs",
+    "panels:index": "node scripts/panels-index.mjs",
     "render-daemon": "node scripts/render/daemon.mjs",
-    "render": "node scripts/render/render.mjs"
+    "render": "node scripts/render/render.mjs",
+    "wire:sync": "node scripts/wire/sync.mjs",
+    "wire:bump": "node scripts/wire/bump.mjs"
   },
   "devDependencies": {
     "typescript": "^5.3.3",

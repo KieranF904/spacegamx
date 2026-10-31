@@ -22,18 +22,14 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
  * PROTOCOL_MISMATCH_CLOSE and the client asks the player to reload (a cached
  * old client would otherwise mis-decode every compact row, silently).
  *
- * Bump it whenever COMPACT, SNAP_FIELDS, DICTIONARY, the binary input layout or
- * the snapshot packing changes; protocol.test.ts hashes those and fails until
- * PROTOCOL_WIRE_HASH is updated too.
+ * Bump it whenever COMPACT, SNAP_FIELDS, DICTIONARY (binaryCodec.ts' head and
+ * wire-dictionary.json), the binary input layout or the snapshot packing
+ * changes; protocol.test.ts hashes those and fails until `npm run wire:bump`
+ * has updated PROTOCOL_VERSION and PROTOCOL_WIRE_HASH.
  */
-// 14 (2026-10-31): local circuits (the pilot's row carries the core's store and each store group's charge: energy.ts
-// packCharge), the Stabiliser Anchor's brace flag and dictionary entry, and the hold's cargo mass
-// 15 (2026-10-31): the Burst Strafer's dodge (input flags2 0x40/0x80, CTL.dodge bits, keyframes' dodge and charge after a
-// station slot that's -1 undocked, the pilot's row's dodge, charge and tow after the charge groups) and the Tow Beam (the
-// `tow` message, other pilots' status data[8]); both models in the dictionary
+// History: PROTOCOL_CHANGELOG.md. Re-pin with `npm run wire:bump "reason"` (game-v2/), never by hand.
 export const PROTOCOL_VERSION = 15;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
-// (Burst Strafer and Tow Beam 2026-10-31: the input's dodge bits and both models' dictionary entries)
 export const PROTOCOL_WIRE_HASH = 'a9bbc10b';
 /** WebSocket close code (and reason) for a client on another protocol version */
 export const PROTOCOL_MISMATCH_CLOSE = 4002;

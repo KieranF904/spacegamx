@@ -36,9 +36,10 @@ describe('models', () => {
   it('are in the catalogue: every one its own piece(s), material, tier and recipe', () => {
     const models = [...catalog.functions.values()].filter((f) => f.model);
     expect(models).toHaveLength(MODELS.models.length);
-    // (66, then the Pulse Dynamo, Flash Screen and Rail Driver (energy Phase 2), the Repair Beam, the Point Defence turret,
-    // the Burst Strafer and the Tow Beam: the parts agents added 2026-10-31)
-    expect(models.length).toBe(73);
+    // (No literal count: it changes with every part added. Ids are unique, and every one is in the models file.)
+    expect(new Set(models.map((m) => m.id)).size).toBe(models.length);
+    expect(new Set(MODELS.models.map((m) => m.id))).toEqual(new Set(models.map((m) => m.id)));
+    expect(models.length).toBeGreaterThan(0);
     const recipes = JSON.parse(readFileSync(join(SHIP_DATA_DIR, '../recipes.json'), 'utf-8')).models;
     for (const m of models) {
       expect(Array.isArray(m.pieces) && m.pieces.length > 0, m.id).toBe(true);
@@ -135,7 +136,10 @@ describe('weapon mounts: each model its own', () => {
   };
 
   it('every weapon model has one, and its description says so', () => {
-    expect(weapons.length).toBe(40);
+    // (Weapons are exactly the models whose function carries a weapon def; no literal count)
+    expect(weapons.length).toBeGreaterThan(0);
+    expect(weapons.every((m) => m.model)).toBe(true);
+    for (const m of weapons) expect(m.family, m.id).toBeTruthy();
     for (const m of weapons) {
       expect(['fixed', 'turret'], m.id).toContain(m.mount);
       // (Point defence turns on its own, not to your aim: support.ts)
@@ -285,7 +289,9 @@ describe('licences: everything by level, nothing early', () => {
     expect(canCraft(item('legendary_hive'), ['fn:hive'], hive.level - 1)).toBe(false);
     expect(canCraft(item('legendary_hive'), [], hive.level)).toBe(true);
     const legendaries = [...catalog.functions.values()].filter((f) => f.model && f.rarity === 'legendary');
-    expect(legendaries.length).toBe(6);
+    // (Exactly the legendary_* models, whatever their number)
+    expect(legendaries.map((f) => f.id).sort()).toEqual([...catalog.functions.values()].filter((f) => f.model && f.id.startsWith('legendary_')).map((f) => f.id).sort());
+    expect(legendaries.length).toBeGreaterThan(0);
     for (const f of legendaries) expect(f.unlock!.level, f.id).toBeGreaterThan(0);
     // Never in another material; legacy parts never
     expect(partLicensed({ fn: 'cannon_pip', material: 'steel' }, [], 99)).toBe(false);

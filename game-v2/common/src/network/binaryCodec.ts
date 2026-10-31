@@ -24,10 +24,12 @@
 declare const TextEncoder: { new (): { encode(s: string): Uint8Array } };
 declare const TextDecoder: { new (): { decode(b: Uint8Array): string } };
 
+import wireManifest from './wire-dictionary.json' with { type: 'json' };
+
 const POW10 = [1, 10, 100, 1000, 10000, 100000, 1000000];
 
 /** Strings sent by number (append only: both ends must agree) */
-export const DICTIONARY: readonly string[] = [
+const DICTIONARY_HEAD: readonly string[] = [
   // ship part functions, materials, pieces and facings
   'core', 'hull', 'armor', 'generator', 'conduit', 'thruster', 'miner', 'scanner', 'cargo', 'weapon', 'railgun', 'laser',
   'flak', 'missile', 'lance', 'emp', 'shield', 'hive', 'frostbite', 'cinder_bloom', 'prism', 'phase', 'singularity', 'jumpcoil',
@@ -53,25 +55,10 @@ export const DICTIONARY: readonly string[] = [
   'bone_frame', 'pyre_chrome', 'pyre_steel', 'scrap_iron', 'scrap_rust', 'scrap_paint', 'scrap_steel', 'scrap_seam', 'dev_singularity',
   // (appended: the Brood Mother's materials)
   'brood_shell', 'brood_rime', 'brood_membrane', 'brood_ice', 'brood_gland',
-  // (appended: blueprints' wires, and the player models: data/ships/models.json)
-  'wires', 'cannon_pip', 'cannon_hammer', 'cannon_twinlink', 'cannon_longbarrel', 'cannon_bastion',
-  'autocannon_rattler', 'autocannon_chainsaw', 'autocannon_stinger', 'flak_burst', 'flak_cloudmaker', 'mortar_lobber',
-  'mortar_quake', 'laser_glint', 'laser_cutter', 'laser_searchlight', 'pulse_strobe', 'pulse_overpulse',
-  'missile_dart', 'missile_swarm', 'missile_hammerhead', 'railgun_needle', 'railgun_coilgun', 'railgun_spear',
-  'emp_hush', 'emp_blackout', 'arc_spark', 'arc_tesla', 'torpedo_eel', 'torpedo_leviathan', 'lance_lance',
-  'legendary_hive', 'legendary_frostbite', 'legendary_cinder_bloom', 'legendary_prism', 'legendary_phase',
-  'legendary_singularity', 'engine_ion_drive', 'engine_vernier', 'engine_afterburner', 'engine_torch',
-  'engine_plasma_drive', 'engine_drift_sail', 'engine_fusion_torch', 'power_cell_reactor', 'power_isotope_pile',
-  'power_fusion_plant', 'power_overclock_reactor', 'power_battery', 'power_capacitor', 'power_drive_cell',
-  'power_heavy_bank', 'utility_mining_laser', 'utility_bore', 'utility_demolition_launcher', 'utility_siphon',
-  'utility_scanner', 'utility_long_range_array', 'utility_constructor', 'shield_deflector', 'shield_flicker_screen',
-  'shield_bulwark_projector', 'utility_jump_coil', 'utility_heavy_coil', 'plating_reactive_armour',
-  'plating_spaced_plating',
-  // (appended: the Stabiliser Anchor)
-  'utility_stabiliser_anchor',
-  // (appended: the Burst Strafer and the Tow Beam)
-  'engine_burst_strafer', 'utility_tow_beam',
+  // (everything appended after this is in wire-dictionary.json: the blueprint wires key and the player models)
 ];
+/** The head above, then the append-only manifest (data/ships ids; `npm run wire:sync` adds new ones). Never reorder either. */
+export const DICTIONARY: readonly string[] = [...DICTIONARY_HEAD, ...wireManifest.ids];
 const DICT_INDEX = new Map(DICTIONARY.map((s, i) => [s, i]));
 const utf8 = new TextEncoder();
 const fromUtf8 = new TextDecoder();

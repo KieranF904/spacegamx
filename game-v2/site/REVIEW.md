@@ -115,5 +115,5 @@ thing that is manual:
   were. Old bookmarks to the root show the website, with a Play button.
 - **Admin**: the lobby seeds an admin only with `ADMIN_PASSWORD` set; on the VPS the existing admin account is the
   site's admin.
-- **PostgreSQL** (optional, off by default): see `DEVELOPMENT.md`; `pg` must be installed in `site/`, `server-browser/`
+- **PostgreSQL** (optional, off by default): see `docs/areas/web-accounts.md` and `docs/ops/postgres-migration.md`; `pg` must be installed in `site/`, `server-browser/`
   and `server/`.

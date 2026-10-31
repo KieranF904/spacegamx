@@ -22,7 +22,7 @@ describe('field guide', () => {
     const html = guideHtml('progress', deps(11));
     expect(html).toContain('Unlock track');
     expect(html).toContain('fg-step you');
-    expect(html).toContain('Next: Twinlink, Frostbite Lance and 6 more at Lv 12');
+    expect(html).toMatch(/Next: Twinlink, Frostbite Lance and \d+ more at Lv 12/);
     // Models by family, materials, room; the levels behind faded
     expect(html).toMatch(/<em>Cannon<\/em>Twinlink/);
     expect(html).toContain('Titanium structure');

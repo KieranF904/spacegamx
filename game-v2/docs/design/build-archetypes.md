@@ -341,7 +341,7 @@ Close behind: **Spool-up Bore / Spool-up Chainsaw** (stronger the longer it runs
 
 ## Implemented: Repair Beam and Point Defence Turret (§5 #6, #7)
 
-*Built 2026-10-31, awaiting review, not deployed. Code: `common/src/ships/support.ts`; DEVELOPMENT.md has the map.*
+*Built 2026-10-31, awaiting review, not deployed. Code: `common/src/ships/support.ts`; docs/areas/ship-parts.md has the map.*
 
 - **Repair Beam** (`utility_repair_beam`, utility, level 17, Mk II steel, 1×2, turret 240°): held on the fire key and
   aimed at the cursor like any turret (so a Warden points at who needs it; its other guns' shots pass through friends
@@ -371,7 +371,7 @@ Close behind: **Spool-up Bore / Spool-up Chainsaw** (stronger the longer it runs
 ## Implemented: Burst Strafer and Tow Beam (§5 #1, #8)
 
 *Built 2026-10-31, awaiting review, not deployed. Code: `common/src/ships/strafer.ts`, `tow.ts`,
-`server/src/game/Towing.ts`; DEVELOPMENT.md has the map.*
+`server/src/game/Towing.ts`; docs/areas/ship-parts.md has the map.*
 
 - **Burst Strafer** (`engine_burst_strafer`, engine, level 10, Mk I steel, 1×1, must point a facing edge out): no
   cruising thrust at all. A press of **Space** (rebindable "Dodge") fires one burst of 15 ticks (0.25 s) from every

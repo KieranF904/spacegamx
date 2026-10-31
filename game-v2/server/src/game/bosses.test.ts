@@ -65,7 +65,9 @@ describe('bosses: data', () => {
     const artefacts = new Set(items.filter((i) => i.category === 'artefact').map((i) => i.id));
     const models = (files.recipes as any).models as Record<string, { inputs: Record<string, number> }>;
     const legendaries = [...bridge.catalog.functions.values()].filter((f) => f.model && f.rarity === 'legendary');
-    expect(legendaries.length).toBe(6);
+    // (Exactly the legendary_* models, whatever their number)
+    expect(legendaries.map((f) => f.id).sort()).toEqual([...bridge.catalog.functions.values()].filter((f) => f.model && f.id.startsWith('legendary_')).map((f) => f.id).sort());
+    expect(legendaries.length).toBeGreaterThan(0);
     for (const f of legendaries) {
       const parts = Object.keys(models[f.id].inputs).filter((id) => artefacts.has(id));
       expect(parts, f.id).toHaveLength(1);

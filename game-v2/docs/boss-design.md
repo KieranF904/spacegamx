@@ -169,7 +169,7 @@ pilots colliding with lingering debris. Only measuring showed it.
 3. **Wire up**: `data/bosses.json` (`design`, `asDesigned: true`, `brain`, `rigid` comes from the design), register the
    brain in `server/src/game/Bosses.ts` `BRAINS` and `server/src/game/brains/ids.ts`.
 4. **Render the design**: stills of the design itself (no fight, no server) go through the **native renderer**
-   (DEVELOPMENT.md "Asset viewer and renders"): a warm service, no browser, 15 to 30 ms a render. Run
+   (docs/areas/render-ships.md, "Native renderer"): a warm service, no browser, 15 to 30 ms a render. Run
    `npm run render -- boss:<name> --light dark --heat 0.8 --damage 0.4 --out shot.png` (a sheet of every stage, light
    preset, flames and transparent export work the same), or browse it at `http://127.0.0.1:5311/` once the service is up
    (`npm run render -- --list <name>`). It draws with the game's own hull shader, lighting, flames, bloom and sky. The

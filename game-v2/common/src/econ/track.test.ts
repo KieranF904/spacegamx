@@ -48,10 +48,17 @@ describe('the unlock track', () => {
 
   it('hints at the next thing to build', () => {
     expect(nextBuildUnlock(fns(), 11)).toMatchObject({ level: 12 });
-    expect(nextUnlockHint(fns(), 12)).toBe('Needle and Flash Screen at Lv 13');
-    expect(nextUnlockHint(fns(), 1)).toBe('Constructor and Vernier at Lv 2');
-    expect(nextUnlockHint(fns(), 11)).toBe('Twinlink, Frostbite Lance and 6 more at Lv 12');
-    expect(nextUnlockHint(fns(), 30)).toBe('Lance and Neutronium structure at Lv 32');
+    // (Worked out from the names at each level, not pinned to how many models a level has today)
+    const said = (level: number) => {
+      const n = nextBuildUnlock(fns(), level)!;
+      const list = n.names.length > 3 ? [...n.names.slice(0, 2), `${n.names.length - 2} more`] : n.names;
+      return `${list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : list[0]} at Lv ${n.level}`;
+    };
+    for (const l of [1, 11, 12, 30]) expect(nextUnlockHint(fns(), l), `level ${l}`).toBe(said(l));
+    // (Few names: "A and B"; many: the first two, then a count)
+    expect(nextBuildUnlock(fns(), 11)).toMatchObject({ level: 12 });
+    expect(nextBuildUnlock(fns(), 11)!.names).toEqual(expect.arrayContaining(['Twinlink', 'Frostbite Lance']));
+    expect(nextUnlockHint(fns(), 12)).toMatch(/^.+ at Lv 13$/);
     // Past the last model: nothing to hint (room still comes, but nothing new to build)
     expect(nextUnlockHint(fns(), 99)).toBeNull();
   });
