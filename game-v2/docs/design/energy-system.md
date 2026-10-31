@@ -1,6 +1,6 @@
 # Energy system: a discussion draft
 
-*Status: for discussion with Kieran, 2026-10-31. Phases 1 (local circuits) and 2 (Steady and Surge) are built: see the "Implemented" sections below; the rest is the draft. Part names, power-type names and numbers are
+*Status: HISTORY. Phases 1 (local circuits) and 2 (Steady and Surge) were built on 2026-10-31 and are **superseded by docs/design/rework-2026-11.md section 2** (wires restored, one ship pool with an Output limit, Capacitor and Drive Cell banks; Surge, circuits and the core trickle are cut). Read the "Implemented" sections below as a record of what was tried, not of what runs; the energy guide is docs/areas/energy.md. The rest is the original draft for discussion with Kieran. Part names, power-type names and numbers are
 placeholders. Sibling doc: docs/design/build-archetypes.md (this one builds on its §3.1 "Energy with shape").*
 
 Kieran's brief, in short: batteries and generators are "just placed somewhere and they'll probably connect". He wants
@@ -23,7 +23,7 @@ different **types** of power, power type changing what a weapon or thruster does
 
 ---
 
-## Implemented (Phase 1): local circuits
+## Implemented (Phase 1): local circuits (SUPERSEDED by rework-2026-11.md)
 
 *Built 2026-10-31, awaiting review, not deployed: proposal A plus the touch-only capacitor rule (§4 Phase 1), with its
 hangar UX (§6.1 letters, §6.2 load test, §6.3 warnings and weak links) and per-circuit HUD bars. No heat, no Thermal,
@@ -156,7 +156,7 @@ no charges, a 0.4 s cooldown): spamming it is what banks and generation are for 
    before a group's first ripple. Small; worth knowing.
 
 
-## Implemented (Phase 2): power types, Steady and Surge
+## Implemented (Phase 2): power types, Steady and Surge (SUPERSEDED by rework-2026-11.md)
 
 *Built 2026-10-31, awaiting review, not deployed: B1 (two types only), B3 (the reaction table's Surge column for guns,
 engines and shields), B5 (two dual-fed parts) and the Pulse Dynamo. No Thermal (it's tied to heat), no Exotic, no
