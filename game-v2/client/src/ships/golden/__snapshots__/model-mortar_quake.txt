@@ -33,7 +33,7 @@ Medium · Panel
 huge splash, slow · ammo
 
 == keyStats ==
-49 dmg/s · reach 2,640 · draws 13
+49 dmg/s · reach 2,640 · ammo · draws 13
 
 == mountBadge ==
 TURRET 360°

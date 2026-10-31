@@ -33,7 +33,7 @@ Medium · Panel
 sustained fire, power-hungry
 
 == keyStats ==
-62 dmg/s · reach 7,200 · draws 8
+62 dmg/s · reach 7,200 · clip 16 · 1.5s reload · draws 8
 
 == mountBadge ==
 TURRET 180°

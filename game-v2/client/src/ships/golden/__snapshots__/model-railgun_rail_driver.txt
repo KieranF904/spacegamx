@@ -33,7 +33,7 @@ Large · Block
 semi-auto rifle: six shots, then a 1.5 s reload
 
 == keyStats ==
-96 dmg/s · reach 9,000 · draws 19
+96 dmg/s · reach 9,000 · clip 6 · 1.5s reload · draws 19
 
 == mountBadge ==
 FIXED

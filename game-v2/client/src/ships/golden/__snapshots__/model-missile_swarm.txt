@@ -33,7 +33,7 @@ Medium · Panel
 three small seekers a salvo · ammo
 
 == keyStats ==
-41 dmg/s · reach 11,440 · draws 12
+41 dmg/s · reach 11,440 · ammo · draws 12
 
 == mountBadge ==
 FIXEDSIDE

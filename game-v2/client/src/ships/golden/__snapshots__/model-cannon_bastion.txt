@@ -33,7 +33,7 @@ Large · Block
 ship-killer shells, turns slowly
 
 == keyStats ==
-100 dmg/s · reach 4,800 · draws 17
+100 dmg/s · reach 4,800 · clip 2 · 3.0s reload · draws 17
 
 == mountBadge ==
 FIXED

@@ -33,7 +33,7 @@ Medium · Panel
 Legendary
 
 == keyStats ==
-95 dmg/s · reach 760 · draws 48
+95 dmg/s · reach 760 · held beam · draws 48
 
 == mountBadge ==
 TURRET 150°

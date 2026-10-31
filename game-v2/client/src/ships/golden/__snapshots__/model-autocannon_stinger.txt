@@ -33,7 +33,7 @@ Small · Square
 accurate, a little slower
 
 == keyStats ==
-33 dmg/s · reach 5,400 · draws 14
+33 dmg/s · reach 5,400 · clip 12 · 1.2s reload · draws 14
 
 == mountBadge ==
 TURRET 200°

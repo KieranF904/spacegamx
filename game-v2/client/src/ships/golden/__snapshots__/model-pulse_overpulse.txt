@@ -33,7 +33,7 @@ Medium · Panel
 tears shields, barely scratches hull
 
 == keyStats ==
-160 dmg/s · reach 5,040 · draws 21
+160 dmg/s · reach 5,040 · clip 12 · 1.5s reload · draws 21
 
 == mountBadge ==
 TURRET 120°

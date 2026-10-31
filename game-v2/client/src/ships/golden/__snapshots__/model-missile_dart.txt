@@ -33,7 +33,7 @@ Small · Square
 locks on · ammo
 
 == keyStats ==
-27 dmg/s · reach 11,440 · draws 8
+27 dmg/s · reach 11,440 · ammo · draws 8
 
 == mountBadge ==
 FIXED

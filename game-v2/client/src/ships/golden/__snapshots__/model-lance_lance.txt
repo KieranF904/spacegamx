@@ -33,7 +33,7 @@ Medium · Panel
 a held beam, while it stays cool
 
 == keyStats ==
-210 dmg/s · reach 500 · draws 52
+210 dmg/s · reach 500 · held beam · winds up · draws 52
 
 == mountBadge ==
 FIXED

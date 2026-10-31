@@ -7,13 +7,42 @@
  */
 
 import {
-  Catalog, Economy, PlacedPart, ShipTuning, ShipDerived, Side, WeaponMods, Bag,
-  partStats, describePart, partItemId, placeCost, isStructural, outputOf, gradeOf, fnOutput, partGrade, partMaterial, energyTuning, circuitTuning, partDischarge, bankKind, jumpTuning, coilCapacity, CORE_CARGO, PIECE_NAMES, partBuildPoints, DAMAGE_NAMES, mountingWords, type DamageType } from '@space-game/common';
+  Catalog, Economy, FunctionDef, PlacedPart, ShipTuning, ShipDerived, Side, WeaponMods, Bag,
+  partStats, describePart, partItemId, placeCost, isStructural, outputOf, gradeOf, fnOutput, partGrade, partMaterial, energyTuning, loadTest, gunDrawFlatOut, circuitTuning, partDischarge, bankKind, jumpTuning, coilCapacity, CORE_CARGO, PIECE_NAMES, partBuildPoints, DAMAGE_NAMES, mountingWords, type DamageType } from '@space-game/common';
 import { costHtml } from '../ui/windowKit';
 import { jumpRatioNote } from './shipSummary';
 import { functionColor, numToCss } from './shipColors';
 import { tipRows } from './describe';
 import { MOUNT_TEXT, tradeOff, weaponMount } from './modelCards';
+
+/** A ship's boost-and-fire load test, kept per derived state: a tooltip reads it for every gun (4 s of power ticks) */
+const boostFire = new WeakMap<ShipDerived, ReturnType<typeof loadTest>>();
+
+/**
+ * What a gun's power means in shots (rework 2026-11 §2.4): how many reloads, charges or shots its banks cover, and a
+ * charge gun's real charge time while the ship boosts with no bank behind it
+ */
+function powerShots(d: ShipDerived, tuning: ShipTuning, i: number, f: NonNullable<FunctionDef['fire']>): [string, string][] {
+  const L = d.power, w = d.weapons.find((x) => x.part === i);
+  if (!L || !w) return [];
+  const out: [string, string][] = [];
+  const fd = L.feedOf[i], banks = fd >= 0 ? L.feeds[fd].banks : [];
+  if (banks.length && f.model !== 'ammo') {
+    const held = banks.reduce((s, b) => s + L.banks[b].cap, 0);
+    const per = f.model === 'clip' ? (f.reloadE ?? 0) : f.model === 'charge' ? (f.chargeE ?? 0) : f.model === 'beam' ? L.draw[i] : (L.draw[i] * w.interval) / 60;
+    if (per > 0) {
+      const n = held / per;
+      const text = f.model === 'beam' ? `${n < 10 ? n.toFixed(1) : n0(n)} s of beam` : `${n < 10 ? n.toFixed(1).replace(/\.0$/, '') : n0(n)} ${f.model === 'clip' ? 'reload' : f.model === 'charge' ? 'charge' : 'shot'}${Math.abs(n - 1) < 0.05 ? '' : 's'}`;
+      out.push(['Bank covers', `${text} <span style="color:#8ea0bd; font-weight:400">(Bank ${banks.map((b) => b + 1).join(', ')} pays first, then the ship)</span>`]);
+    }
+  } else if (f.model === 'charge' && (f.chargeE ?? 0) > 0 && gunDrawFlatOut(w, L.draw[i]) > 0) {
+    let r = boostFire.get(d);
+    if (!r) boostFire.set(d, r = loadTest(d, tuning, { fire: true, thrust: true, boost: true, seconds: 3 }));
+    const share = r.part[i];
+    if (share < 0.995 && share > 0.02) out.push(['Boosting', `charge ${((f.charge ?? 0) / 60).toFixed(1)} s becomes <span style="color:#fbbf24">${((f.charge ?? 0) / 60 / share).toFixed(1)} s</span> while you boost and fire with no bank behind it`]);
+  }
+  return out;
+}
 
 export interface PartTipCtx {
   catalog: Catalog;
@@ -124,6 +153,7 @@ export function partTipHtml(p: Pick<PlacedPart, 'fn' | 'material' | 'piece'> & P
     else if (f?.model === 'charge') html += row('Charge', `hold ${((f.charge ?? 0) / 60).toFixed(1)}s: it fires itself, then ${((f.cooldown ?? 0) / 60).toFixed(1)}s to cool · let go early and nothing fires · ${n0(f.chargeE ?? 0)} energy a charge`);
     else html += row('Fire rate', `${f?.spin ? `${(60 / f.spin.from).toFixed(1)}/s spinning up to ${n0(60 / f.spin.to)}/s` : rate >= 10 ? n0(rate) : rate.toFixed(1)}${f?.spin ? '' : '/s'} · ${esc(KIND[def?.type ?? ''] ?? def?.type ?? fn.weapon)}${def?.ammo && (!f || f.model === 'ammo') ? ` · ${esc(econ.items.name(def.ammo.item))}${(f?.rounds ?? 1) > 1 ? ` (${f!.rounds} a shot, no energy)` : f ? ' (no energy)' : ''}` : ''}`);
     if (w && w.satisfaction < 0.995) html += row('Under-powered', `<span style="color:#fbbf24">${Math.round(w.satisfaction * 100)}%: fires slower</span>`);
+    if (d && i >= 0 && f) for (const [a, b] of powerShots(d, tuning, i, f)) html += row(a, b);
     // (Its model's mount: not a choice)
     const facing = p.facing ? FACING[p.facing] : '';
     const arc = w?.window ? ` · ${Math.round((w.window.open.reduce((s, [lo, hi]) => s + hi - lo, 0) * 180) / Math.PI)}° clear` : '';
