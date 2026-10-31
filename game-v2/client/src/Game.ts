@@ -2,12 +2,15 @@
  * Game - Main client orchestrator
  */
 
+import { buildWindows, type WindowHost, type WindowSet } from './app/windows';
+import { prefetchScreens } from './app/lazyScreens';
+import { installDevTools } from './app/devTools';
 import { handleKey, type KeyHost } from './app/keys';
 import { handleServerMessage as handleServerMessageTable, type MessageHost } from './app/serverMessages';
 import { tickInput, sendNeutralInput, newInputSendState, type InputSendCtx } from './app/inputSend';
 import { lobbyAuth, LobbyAuthResult } from './network/lobby';
 import { setText, setStyle } from './ui/domWrite';
-import { Application, Text} from 'pixi.js';
+import { Application, Text } from 'pixi.js';
 import { NetworkManager } from './network/NetworkManager';
 import { InputManager } from './input/InputManager';
 import { Renderer } from './rendering/Renderer';
@@ -15,59 +18,36 @@ import { noseUpAngle } from './rendering/cameraView';
 import { attachShaderWarmup, warmShaders } from './rendering/shaderWarmup';
 import { gameShaders } from './rendering/gameShaders';
 import { GameState } from './state/GameState';
-import { InventoryWindow } from './ui/InventoryWindow';
-import type { ComponentGuideUI } from './ui/ComponentGuideUI';
-import { Lazy, prefetchIdle } from './lazy';
-import type { StationWindow } from './ui/StationWindow';
-import { PilotHud, ToastUI } from './ui/PilotHud';
-import { CargoPanelUI } from './ui/CargoPanelUI';
+
+
+
 import { RegionUI } from './ui/RegionUI';
-import { BuildSites } from './rendering/BuildSites';
+
 import { PilotState, createClientEconomy } from './econ/clientEcon';
 import { LoginUI } from './ui/LoginUI';
 import { ServerBrowserUI, ServerInfo } from './ui/ServerBrowserUI';
 import { AudioManager } from './audio/AudioManager';
-import { KillFeedUI } from './ui/KillFeedUI';
-import { PlayerStatsUI } from './ui/PlayerStatsUI';
-import { NavMarkersUI } from './ui/NavMarkersUI';
-import { FarZoomMarkers } from './ui/FarZoomMarkers';
-import { SocialUI } from './ui/SocialUI';
-import { InfoPanel } from './ui/InfoPanel';
-import { TradeWindow } from './ui/TradeWindow';
-import { TargetUI } from './ui/TargetUI';
-import { OpsUI } from './ui/OpsUI';
-import { Tutorial } from './ui/Tutorial';
-import { PingUI } from './ui/PingUI';
+
 import { PerfMonitor } from './ui/PerfMonitor';
-import { RibbonPopup } from './ui/RibbonPopup';
-import ribbonData from '../../data/achievements.json';
-import type { RibbonsFile } from '@space-game/common';
-import { QuestClient } from './ui/QuestUI';
-import questsData from '../../data/quests.json';
-import { DialogueUI } from './ui/DialogueUI';
-import { PeopleUI, TALK_RANGE } from './ui/PeopleUI';
-import { ContextActions } from './input/ContextActions';
-import { GuideUI } from './ui/GuideUI';
-import { BossUI } from './ui/BossUI';
-import { QuickBar } from './ui/QuickBar';
-import { GameMenuUI, fieldGuide } from './ui/GameMenuUI';
+
+
+import { GameMenuUI } from './ui/GameMenuUI';
 import { settings, SettingsData } from './settings/Settings';
 import { AutoQuality, PROFILES, type QualityTier } from './settings/quality';
 import { ACTIONS, boundKeyName } from './input/keybindings';
 import systemsDataForMenu from '../../data/systems.json';
-import { SystemMapUI } from './ui/SystemMapUI';
+
 import { DamageIndicatorUI } from './ui/DamageIndicatorUI';
 import { FloatingRewardsUI } from './ui/FloatingRewardsUI';
 import { ShipClient } from './ships/ShipClient';
 import type { AdminPanel } from './ui/AdminPanel';
 import type { ContributorPanel } from './ui/ContributorPanel';
-import { RenderTuningPanel } from './ui/RenderTuningPanel';
-import { DevShipPanel } from './ui/DevShipPanel';
+
 import { CircuitBars } from './ui/CircuitBars';
 import { ObjectiveBanner } from './ui/ObjectiveBanner';
 import { SiegePanel } from './ui/SiegePanel';
-import { moonOffset, planetPosition, pocketAt, inSafeSpace, jumpRange, jumpTuning, type StarSystemData } from '@space-game/common';
-import { Autopilot, AutoDest } from './ships/Autopilot';
+import { moonOffset, planetPosition, pocketAt, inSafeSpace, type StarSystemData } from '@space-game/common';
+import { AutoDest } from './ships/Autopilot';
 import { HazardOverlay } from './ui/HazardOverlay';
 import { FrostVignette } from './ui/FrostVignette';
 import shipPieces from '../../data/ships/pieces.json';
@@ -76,27 +56,9 @@ import shipMaterials from '../../data/ships/materials.json';
 import shipModels from '../../data/ships/models.json';
 import shipTuning from '../../data/ships/tuning.json';
 import miningTable from '../../data/mining.json';
-import {
-  TICK_RATE,
-  TICK_MS,
-  xpToReach,
-} from '@space-game/common';
+import { TICK_RATE, TICK_MS, xpToReach } from '@space-game/common';
 import { itemIcon } from './ui/itemIcons';
-import {
-  ServerMessage,
-  asteroidComposition,
-  MiningTable, registerRockTypes, chooseCrate, crateOrder, cratesFor, ammoByCode, ammoCode,
-  EntityType,
-  computeStateHash,
-  ClientTransport,
-  loadCatalog,
-  ShipTuning,
-  InventoryStub,
-  QuestTarget, QuestsFile,
-  DisconnectInfo,
-  PROTOCOL_VERSION,
-  PROTOCOL_MISMATCH_CLOSE,
-} from '@space-game/common';
+import { ServerMessage, asteroidComposition, MiningTable, registerRockTypes, EntityType, computeStateHash, ClientTransport, loadCatalog, ShipTuning, InventoryStub, QuestTarget, DisconnectInfo, PROTOCOL_VERSION, PROTOCOL_MISMATCH_CLOSE } from '@space-game/common';
 
 /** Keys that take the controls back from the autopilot */
 // This build's rock types and belts (both sides generate the same rocks from them); a dev build adds the
@@ -143,6 +105,9 @@ export class Game {
   private readonly keyHost: KeyHost = this.makeKeyHost();
   private readonly msgHost: MessageHost = this.makeMessageHost();
   private readonly inputCtx: InputSendCtx = this.makeInputCtx();
+  private readonly windowHost: WindowHost = this.makeWindowHost();
+  /** Every window and HUD component (built in init; see app/windows.ts) */
+  private w = {} as WindowSet;
   private shipClient: ShipClient;
   private hazards = new HazardOverlay();
   /** The cold on screen: frost in from the edges as the ship's warmth runs down */
@@ -157,32 +122,13 @@ export class Game {
   // UI components
   private loginUI!: LoginUI;
   private serverBrowserUI!: ServerBrowserUI;
-  private inventoryWindow!: InventoryWindow;
-  /** Split out of the main chunk (see prefetchScreens) */
-  private componentGuide!: Lazy<ComponentGuideUI>;
-  /** Split out of the main chunk (see prefetchScreens; calls made before it arrives run when it does, in order) */
-  private stationWindow!: Lazy<StationWindow>;
   private get stationOpen(): boolean {
-    return this.stationWindow?.value?.isOpen ?? false;
+    return this.w.stationWindow?.value?.isOpen ?? false;
   }
   /** The pilot's progress, cargo and storage as the server reports them */
   readonly pilot: PilotState;
-  private pilotHud!: PilotHud;
-  private cargoPanel!: CargoPanelUI;
   /** The danger band you're in (a banner as you cross), and the card for a gate you're near */
   private regionUI = new RegionUI();
-  private quests!: QuestClient;
-  /** Conversations with people (and their calls) */
-  private dialogue!: DialogueUI;
-  /** People out in space and on planets */
-  private peopleUI: PeopleUI | null = null;
-  /** The objective guide's chevrons */
-  private guide!: GuideUI;
-  private bossUI!: BossUI;
-  private quickBar!: QuickBar;
-  private autopilot!: Autopilot;
-  /** The right-click menu: dock, travel, land, talk, target, fly or jump there (ContextActions.ts) */
-  private context!: ContextActions;
   /** Raids and wrecks in this system (marked on screen) */
   private worldEvents = new Map<number, { name: string; x: number; y: number; system: string }>();
   /** Kills (and assists) this session, for the tutorial */
@@ -193,22 +139,6 @@ export class Game {
   private objectives = new ObjectiveBanner();
   /** A moon siege's day panel */
   private siegePanel = new SiegePanel((m) => this.network.send(m));
-  private toasts!: ToastUI;
-  private killFeedUI!: KillFeedUI;
-  private playerStatsUI!: PlayerStatsUI;
-  private systemMapUI!: SystemMapUI;
-  private navMarkers: NavMarkersUI | null = null;
-  private farMarkers!: FarZoomMarkers;
-  private social!: SocialUI;
-  private infoPanel!: InfoPanel;
-  private tradeWindow!: TradeWindow;
-  private targetUI!: TargetUI;
-  private opsUI!: OpsUI;
-  /** Structures you've built or are building (drawn for you alone) */
-  private buildSites: BuildSites | null = null;
-  private tutorial!: Tutorial;
-  private pingUI!: PingUI;
-  private ribbonPopup!: RibbonPopup;
   private lastTraffic = { t: 0, bytesIn: 0, bytesOut: 0, framesIn: 0 };
   private trafficText = '';
   private localDead = false;
@@ -311,15 +241,15 @@ private xpFillEl: HTMLElement | null;
       catalog: shipCatalog,
       pilot: this.pilot,
       grantAllParts: !!options.proto,
-      onDocked: () => this.stationWindow.use((w) => w.open()),
+      onDocked: () => this.w.stationWindow.use((w) => w.open()),
       stationOpen: () => this.stationOpen,
-      onHangarBackToStation: () => this.stationWindow.use((w) => w.showAgain()),
+      onHangarBackToStation: () => this.w.stationWindow.use((w) => w.showAgain()),
       miningHeld: () => this.rightHeld() && !this.menu?.isOpen,
       tuning: shipTuningData,
       state: this.state,
       send: (msg) => this.network.send(msg),
       showMessage: (text, color) => this.showSystemMessage(text, color),
-      toast: (text, kind) => this.toasts?.show(text, kind),
+      toast: (text, kind) => this.w.toasts?.show(text, kind),
       localAim: () => this.localAim(),
       isKeyDown: (code) => this.input.isKeyDown(code),
       inputEnabled: () => !this.menu?.isOpen,
@@ -411,14 +341,8 @@ this.xpFillEl = document.getElementById('xpFill');
     // Initialize renderer
     this.renderer = new Renderer(this.app, this.state);
     this.shipClient.init(this.app, this.renderer);
-    // Render tuning (F8): on a dev server only, never in the deployed build
-    if (import.meta.env.DEV) {
-      new RenderTuningPanel({ zoom: () => this.renderer.getZoom(), warp: (systemId, x, y) => this.network.send({ type: 'devTeleport', systemId, x, y }) });
-      // Ship swap (F9): the plan library's ships and the dev test ships, flown at once
-      const library = import.meta.glob(['../../data/ships/blueprints/*.json', '../../data/ships/blueprints/dev/*.json'], { eager: true, import: 'default' }) as Record<string, { name: string; parts: { fn: string }[] }>;
-      new DevShipPanel(Object.fromEntries(Object.entries(library).map(([path, bp]) => [path.replace(/^.*\//, '').replace(/\.json$/, ''), bp])), (ship) => this.network.send({ type: 'devShip', ship }),
-        (wear, reset) => this.network.send({ type: 'devBoss', wear, reset }));
-    }
+    // Render tuning (F8) and ship swap (F9): dev server only (app/devTools.ts)
+    installDevTools(this.windowHost);
     
     // Initialize UI components
     const uiOverlay = document.getElementById('ui-overlay')!;
@@ -430,209 +354,7 @@ this.xpFillEl = document.getElementById('xpFill');
     attachShaderWarmup(this.app.renderer);
     warmShaders(gameShaders(this.app.renderer, this.loginUI.backdrop(), this.app.stage, (systemsDataForMenu as unknown as { systems: StarSystemData[] }).systems));
     this.serverBrowserUI = new ServerBrowserUI(uiOverlay);
-    this.inventoryWindow = new InventoryWindow(this.pilot, (m) => this.network.send(m), (id) => this.audio.playUI(id, id === 'ui_click' ? 0.4 : 0.6));
-    this.componentGuide = new Lazy(() => import('./ui/ComponentGuideUI').then(({ ComponentGuideUI }) =>
-      new ComponentGuideUI({ catalog: this.pilot.econ.ships, tuning: shipTuning as ShipTuning, pilot: this.pilot, sound: (id, v) => this.audio.playUI(id, v ?? 0.6) })));
-    this.pilotHud = new PilotHud(this.pilot);
-    this.cargoPanel = new CargoPanelUI(this.pilot, (m) => this.network.send(m), (id) => this.audio.playUI(id, 0.4));
-    this.cargoPanel.ceiling = () => this.pilotHud.bottom();
-    // (The load is weighed against the ship you fly: common/src/ships/load.ts)
-    this.cargoPanel.ship = () => this.shipClient.myShip()?.derived ?? null;
-    this.shipClient.ownAmmo = (kind) => {
-      const prof = this.pilot.profile;
-      const pick = chooseCrate(crateOrder(cratesFor(shipTuning as ShipTuning, kind), prof?.loadout), prof?.ammoPrefer?.[kind], prof?.ammo ?? {}, (id) => this.pilot.cargo.some((s) => s.id === id && s.n > 0));
-      return pick ? ammoByCode(ammoCode(pick.item))?.mods : undefined;
-    };
-    this.pilotHud.ammoKinds = () => {
-      const ship = this.shipClient?.myShip();
-      if (!ship) return [];
-      const out = new Set<string>();
-      for (const w of ship.derived.weapons) { const a = (shipTuning as ShipTuning).weapons?.[w.kind]?.ammo; if (a) out.add(a.item); }
-      // Special crates aboard for these guns too
-      const kinds = new Set(ship.derived.weapons.map((w) => w.kind));
-      for (const st of this.pilot.cargo) if (kinds.has(this.pilot.econ.items.get(st.id)?.ammoFor?.weapon ?? '')) out.add(st.id);
-      return [...out];
-    };
-    this.quests = new QuestClient({ pilot: this.pilot, send: (m) => this.network.send(m), sound: (id, v) => this.audio.playUI(id, v ?? 0.6) });
-    this.stationWindow = new Lazy(() => import('./ui/StationWindow').then(({ StationWindow }) => new StationWindow({
-      quests: this.quests,
-      pilot: this.pilot,
-      send: (m) => this.network.send(m),
-      sound: (id, v) => this.audio.playUI(id, v ?? 0.6),
-      openHangar: (slot) => { this.stationWindow.value?.hideForHangar(); this.shipClient.openHangar(slot); },
-      openInventory: () => this.inventoryWindow.open(),
-      onClose: () => { if (!this.shipClient.hangarOpen) this.shipClient.undock(); },
-    })));
-    this.toasts = new ToastUI();
-    this.dialogue = new DialogueUI({
-      pilot: this.pilot, send: (m) => this.network.send(m), sound: (id, v) => this.audio.playUI(id, v ?? 0.6),
-      track: (id) => this.quests.track(id), toast: (t, k) => this.toasts.show(t, k),
-    });
-    this.guide = new GuideUI();
-    this.bossUI = new BossUI(this.state, (id, v) => this.audio.playUI(id, v ?? 0.7));
-    this.quickBar = new QuickBar(this.pilot, (m) => this.network.send(m), (id, v) => this.audio.playUI(id, v ?? 0.5));
-    this.autopilot = new Autopilot({
-      state: this.state,
-      tuning: shipTuning as ShipTuning,
-      accel: () => this.shipClient.localAccel(),
-      boostFactor: () => this.shipClient.localBoostFactor(),
-      energy: () => this.state.boostFuel,
-      jumpPhase: () => this.shipClient.localJump().phase,
-      jumpReach: () => this.shipClient.jumpReach(),
-      objective: () => this.objective(),
-      memberSystem: (id) => this.social?.party.members.find((m) => m.eid === id)?.system,
-      interact: () => this.network.send({ type: 'interact' }),
-      arrived: (_d, station) => {
-        this.context?.arrived();
-        this.audio.playUI('ui_open', 0.5);
-        if (station) {
-          this.showSystemMessage(`Autopilot: arrived at ${station}`, '#86efac');
-          if (!this.stationOpen) this.shipClient.onKey('KeyH');
-        }
-      },
-      message: (text, color) => this.showSystemMessage(text, color),
-      lead: () => this.state.inputDelayTicks,
-      drive: () => {
-        const ship = this.shipClient.myShip(), me = this.state.entities.get(this.state.playerId);
-        if (!ship || !me) return null;
-        const jt = jumpTuning(shipTuning as ShipTuning), cooldown = ship.derived.jumpCooldown || jt.cooldownTicks;
-        const j = this.shipClient.localJump();
-        const cool = j.phase === 'ready' ? 0 : j.phase === 'cooldown' ? (1 - j.progress) * cooldown : cooldown;
-        return { range: jumpRange(ship.derived, jt), cooldown, cool, primed: me.jumpPrime ?? 0 };
-      },
-    });
-    this.quests.onAutopilot = () => this.toggleAutopilotToObjective();
-    this.context = new ContextActions({
-      state: this.state,
-      systems: (systemsDataForMenu as unknown as { systems: StarSystemData[] }).systems,
-      system: () => this.currentSystem(),
-      cursor: () => ({ x: this.input.mouseX, y: this.input.mouseY }),
-      screenToWorld: (x, y) => this.renderer.screenToWorld(x, y),
-      worldToScreen: (x, y) => this.renderer.worldToScreen(x, y),
-      zoom: () => this.renderer.getZoom(),
-      shipRadius: (id) => this.shipClient.store.get(id)?.derived.radius ?? 60,
-      people: () => this.peopleUI?.here() ?? [],
-      talkRange: TALK_RANGE,
-      enabled: () => this.loggedIn && !this.localDead && !this.shipClient.hangarOpen && !this.menu.isOpen && !this.systemMapUI.isOpen
-        && !this.stationOpen && !this.inventoryWindow.isOpen && !this.tradeWindow.isOpen && !this.social.window.isOpen && !this.quests.log.isOpen && !this.componentGuide.value?.isOpen
-        && !this.adminPanel?.capturesFlight,
-      menuModifier: () => this.input.isKeyDown('KeyZ'),
-      autopilot: this.autopilot,
-      flyTo: (d, note) => this.flyTo(d, note),
-      dock: () => { this.shipClient.onKey('KeyH'); },
-      stationInRange: () => this.shipClient.stationInRange()?.name ?? null,
-      // (As the X key: the gate card asks first for a system that outclasses you)
-      interact: () => { if (this.regionUI.allowInteract()) this.network.send({ type: 'interact' }); },
-      planetBelow: () => this.planetBelow(),
-      locked: (id) => this.systemMapUI.locked?.(id) ?? null,
-      jumpPhase: () => this.shipClient.localJump().phase,
-      jumpReach: () => this.shipClient.jumpReach(),
-      jumpMinRange: jumpTuning(shipTuning as ShipTuning).minRange,
-      jumpCool: () => {
-        const ship = this.shipClient.myShip(), j = this.shipClient.localJump();
-        if (j.phase !== 'cooldown') return 0;
-        return ((1 - j.progress) * (ship?.derived.jumpCooldown || jumpTuning(shipTuning as ShipTuning).cooldownTicks)) / 60;
-      },
-      jumpDanger: () => this.shipClient.jumpDanger(),
-      targetId: () => this.targetUI.target,
-      setTarget: (id) => this.targetUI.set(id),
-      inspect: (id) => this.infoPanel.inspect(id),
-      partyMate: (id) => this.social.isMember(id),
-      invite: (id) => this.social.invite(id),
-      trade: (id) => this.network.send({ type: 'tradeRequest', id }),
-      ping: (x, y, kind, target) => this.network.send({ type: 'mapPing', x, y, kind, target }),
-      wreck: () => { const w = this.wreck; return w && w.system === this.state.systemId && w.until > Date.now() ? { x: w.x, y: w.y } : null; },
-      message: (t, c) => this.showSystemMessage(t, c),
-      sound: (id) => this.audio.playUI(id, 0.5),
-    });
-    this.social = new SocialUI({
-      state: this.state,
-      send: (m) => this.network.send(m),
-      sound: (id, v) => this.audio.playUI(id, v ?? 0.6),
-      flyTo: (d) => this.flyTo(d),
-      message: (t, c) => this.showSystemMessage(t, c),
-    });
-    // (With the system map open, the cursor is the map's)
-    const cursorWorld = () => this.systemMapUI?.aimWorld() ?? this.renderer.screenToWorld(this.input.mouseX, this.input.mouseY);
-    const shipRadius = (id: number) => this.shipClient.store.get(id)?.derived.radius ?? 60;
-    this.infoPanel = new InfoPanel({
-      state: this.state, send: (m) => this.network.send(m), cursorWorld,
-      worldToScreen: (x, y) => this.renderer.worldToScreen(x, y), zoom: () => this.renderer.getZoom(),
-      radius: shipRadius, inParty: (id) => this.social.isMember(id), itemName: (id) => this.pilot.econ.items.name(id),
-      myRating: () => this.shipClient.myRating(), target: () => this.targetUI.target, belowHeight: () => this.targetUI.panelHeight,
-    });
-    this.tradeWindow = new TradeWindow(this.pilot, (m) => this.network.send(m), (id) => this.audio.playUI(id, 0.5));
-    this.targetUI = new TargetUI(this.state, (m) => this.network.send(m), (x, y) => this.renderer.worldToScreen(x, y), () => this.renderer.getZoom(),
-      shipRadius, cursorWorld, (id) => this.audio.playUI(id, 0.4), () => this.shipClient.myRating());
-    this.buildSites = new BuildSites(this.renderer.getEffectLayer(), this.state);
-    this.opsUI = new OpsUI(this.state, (x, y) => this.renderer.worldToScreen(x, y), () => this.renderer.getZoom(), {
-      abandon: (id) => this.quests.abandon(id),
-      leader: () => (this.social?.inParty() ? this.social.party.members.some((m) => m.leader && m.eid === this.state.playerId) : null),
-    });
-    this.ribbonPopup = new RibbonPopup((id) => this.audio.playUI(id, 0.6));
-    this.pingUI = new PingUI(this.state, (m) => this.network.send(m), (x, y) => this.renderer.worldToScreen(x, y), cursorWorld,
-      () => this.renderer.getZoom(), (id) => this.audio.playUI(id, 0.5));
-    this.tutorial = new Tutorial({
-      state: this.state,
-      isKeyDown: (c) => this.input.isKeyDown(c),
-      worldToScreen: (x, y) => this.renderer.worldToScreen(x, y),
-      oreInHold: () => this.pilot.cargo.filter((s) => ['mineral', 'gem', 'volatile'].includes(this.pilot.econ.items.get(s.id)?.category ?? '')).reduce((t, s) => t + s.n, 0),
-      inventoryOpen: () => this.inventoryWindow.isOpen,
-      stationOpen: () => this.stationOpen,
-      stationTab: () => (this.stationOpen ? this.stationWindow.value!.currentTab : ''),
-      inDockRing: () => this.shipClient.isDocked(),
-      autopilotOn: () => this.autopilot.active,
-      sound: (id, v) => this.audio.playUI(id, v ?? 0.5),
-      trainingDrone: () => this.network.send({ type: 'trainingDrone' }),
-      kills: () => this.sessionKills,
-      jumpPhase: () => this.shipClient.localJump().phase,
-    });
-    this.killFeedUI = new KillFeedUI(uiOverlay);
-    this.playerStatsUI = new PlayerStatsUI(uiOverlay);
-    this.systemMapUI = new SystemMapUI(uiOverlay, this.state);
-    this.systemMapUI.onFlyTo = (dest) => this.flyTo(dest);
-    this.systemMapUI.wreck = () => (this.wreck && this.wreck.until > Date.now() ? this.wreck : null);
-    this.systemMapUI.jump = () => ({ aiming: this.shipClient.jumpAiming(), phase: this.shipClient.localJump().phase, reach: this.shipClient.jumpReach() });
-    this.systemMapUI.autoTarget = () => this.autopilot.heading();
-    this.systemMapUI.autoRoute = () => this.autopilot.routeView();
-    this.systemMapUI.onVisibleChange = (open) => this.network.send({ type: 'mapView', open });
-    // Zoom is one continuous range: flight, then the system map, then the galaxy
-    this.systemMapUI.flightMinScale = this.input.minZoom;
-    this.input.onZoomPastMin = () => {
-      if (!this.loggedIn || this.systemMapUI.isOpen || this.shipClient.hangarOpen || this.menu.isOpen) return;
-      this.systemMapUI.showFromFlight(this.input.zoom * this.jumpZoom);
-      this.audio.playUI('ui_open', 0.4);
-    };
-    this.systemMapUI.onZoomIntoFlight = (scale) => {
-      this.input.zoom = this.input.targetZoom = Math.max(this.input.minZoom, scale);
-      this.audio.playUI('ui_close', 0.4);
-    };
-    // Proto's empty scene has nothing to navigate to
-    if (!this.proto) this.peopleUI = new PeopleUI(this.state, (x, y) => this.renderer.worldToScreen(x, y), () => this.quests.people);
-    if (!this.proto) this.navMarkers = new NavMarkersUI(this.state, (x, y) => this.renderer.worldToScreen(x, y), () => this.objective(),
-      () => [...this.worldEvents.values()].filter((e) => e.system === this.state.systemId).concat(this.objectives.markers(this.state.systemId), this.wreckMarker()),
-      () => this.social.others().filter((m) => m.alive && m.system === this.state.systemId).map((m) => {
-        const e = this.state.entities.get(m.eid);
-        return { name: m.name, x: e?.renderX ?? m.x, y: e?.renderY ?? m.y };
-      }),
-      () => {
-        // (Not twice: the job's own marker already points at its site)
-        const o = this.objective();
-        // People out here who want you
-        const people = (this.peopleUI?.here() ?? []).filter((p) => p.mark).map((p) => ({ name: `${p.mark === 'offer' ? '! ' : '▸ '}${p.name}`, x: p.x!, y: p.y! }));
-        return [...this.opsUI.markers(), ...this.pingUI.markers(), ...people].filter((m) => !o || o.x === undefined || o.y === undefined || Math.hypot(m.x - o.x, m.y - o.y) > 300);
-      });
-    this.farMarkers = new FarZoomMarkers(this.state, (x, y) => this.renderer.worldToScreen(x, y), () => this.renderer.getZoom(), () => this.social.memberIds());
-    this.systemMapUI.party = () => this.social.others();
-    this.systemMapUI.myRating = () => this.shipClient.myRating();
-    this.systemMapUI.myShip = () => this.shipClient.myShip()?.derived ?? null;
-    this.systemMapUI.locked = (id) => {
-      const r = (questsData as unknown as QuestsFile).restricted[id];
-      if (!r || this.pilot.profile?.licences.includes(r.licence ?? id)) return null;
-      return { name: r.name, hint: r.hint };
-    };
-    this.systemMapUI.pings = () => this.pingUI.markers();
-    this.systemMapUI.onPing = (x, y) => this.pingUI.pingAt(x, y);
+    this.w = buildWindows(this.windowHost, uiOverlay);
     this.createMenu();
     settings.subscribe((s) => this.applySettings(s));
     window.addEventListener('blur', () => { this.windowFocused = false; this.applyVolume(settings.data); });
@@ -661,9 +383,9 @@ this.xpFillEl = document.getElementById('xpFill');
 
     // Set up input handlers
     this.input.init(this.app.canvas as HTMLCanvasElement);
-    this.input.onFocusLost = () => { this.context.resetPress(); sendNeutralInput(this.inputCtx); };
-    this.input.onMouseButton = (button, down, x, y) => this.context.mouse(button, down, x, y);
-    this.context.attach(this.app.canvas as HTMLCanvasElement);
+    this.input.onFocusLost = () => { this.w.context.resetPress(); sendNeutralInput(this.inputCtx); };
+    this.input.onMouseButton = (button, down, x, y) => this.w.context.mouse(button, down, x, y);
+    this.w.context.attach(this.app.canvas as HTMLCanvasElement);
     this.input.onZoomChange = (zoom) => {
       this.renderer.setZoom(zoom);
     };
@@ -707,7 +429,7 @@ this.xpFillEl = document.getElementById('xpFill');
   private prefetchScreens(): void {
     if (this.screensFetched) return;
     this.screensFetched = true;
-    void prefetchIdle([() => this.stationWindow.load(), () => this.shipClient.hangar.load(), () => this.componentGuide.load(), () => fieldGuide.load()]);
+    prefetchScreens(this.windowHost, this.w);
   }
 
   /** The lobby's answer to a sign-in: on to the server list with a token, or the reason it was refused */
@@ -794,7 +516,7 @@ this.xpFillEl = document.getElementById('xpFill');
   private createMenu(): void {
     this.menu= new GameMenuUI({
       proto: !!this.proto,
-      openMap: () => this.systemMapUI.toggle(),
+      openMap: () => this.w.systemMapUI.toggle(),
       pilot: () => {
         const sys = this.currentSystem();
         return {
@@ -830,13 +552,13 @@ this.xpFillEl = document.getElementById('xpFill');
         location.reload();
       },
       onOpenChange: () => {},
-      replayTutorial: () => this.tutorial.restart(),
+      replayTutorial: () => this.w.tutorial.restart(),
       threats: () => this.state.threats,
       myRating: () => this.shipClient.myRating(),
       level: () => this.pilot.profile?.level ?? this.state.level,
       xp: () => this.pilot.profile?.xp ?? this.state.xp,
       icon: (id) => itemIcon(this.pilot.econ, id),
-      openComponents: () => this.componentGuide.use((g) => g.open()),
+      openComponents: () => this.w.componentGuide.use((g) => g.open()),
     });
   }
 
@@ -962,13 +684,13 @@ this.xpFillEl = document.getElementById('xpFill');
     const ctx = {
       sys, x: me.renderX, y: me.renderY, rating, threats: this.state.threats, regionThreats: this.state.regionThreats,
       system: (id: string) => (systemsDataForMenu as unknown as { systems: StarSystemData[] }).systems.find((s) => s.id === id),
-      locked: (id: string) => this.systemMapUI.locked?.(id) ?? null, interactKey: boundKeyName('interact', settings.data.bindings),
+      locked: (id: string) => this.w.systemMapUI.locked?.(id) ?? null, interactKey: boundKeyName('interact', settings.data.bindings),
     };
     const region = this.regionUI.current(ctx);
     this.regionUI.update(ctx);
-    this.pilotHud.setZone(sys.name.replace(/ System$/, ''), sys.danger ?? 1, !!sys.pvp, safe, ring, region ?? undefined);
+    this.w.pilotHud.setZone(sys.name.replace(/ System$/, ''), sys.danger ?? 1, !!sys.pvp, safe, ring, region ?? undefined);
     // (Against the band you're in, where a system has them)
-    this.pilotHud.setRating(rating, (region && this.state.regionThreats[sys.id]?.[region.id]) || this.state.threats[sys.id]);
+    this.w.pilotHud.setRating(rating, (region && this.state.regionThreats[sys.id]?.[region.id]) || this.state.threats[sys.id]);
   }
 
   /** Apply every setting (runs on start and on each change). */
@@ -994,7 +716,7 @@ this.xpFillEl = document.getElementById('xpFill');
     this.shipClient.applyControlMode();
     this.hazards.setEffectsVisible(s.ui.hazardEffects);
     this.frost.setVisible(s.ui.hazardEffects);
-    if (this.navMarkers) this.navMarkers.enabled = s.ui.navMarkers;
+    if (this.w.navMarkers) this.w.navMarkers.enabled = s.ui.navMarkers;
     if (this.loggedIn) {
       this.perfMonitor?.setVisible(s.ui.netStats);
     }
@@ -1057,6 +779,38 @@ this.xpFillEl = document.getElementById('xpFill');
   }
 
   /** What keys.ts reads (getters, so windows built late resolve at use; made once) */
+  private makeWindowHost(): WindowHost {
+    const g = this;
+    return {
+      get state() { return g.state; },
+      get pilot() { return g.pilot; },
+      get network() { return g.network; },
+      get audio() { return g.audio; },
+      get shipClient() { return g.shipClient; },
+      get renderer() { return g.renderer; },
+      get input() { return g.input; },
+      get proto() { return g.proto; },
+      get regionUI() { return g.regionUI; },
+      get objectives() { return g.objectives; },
+      get worldEvents() { return g.worldEvents; },
+      get wreck() { return g.wreck; },
+      get sessionKills() { return g.sessionKills; },
+      get loggedIn() { return g.loggedIn; },
+      get localDead() { return g.localDead; },
+      get jumpZoom() { return g.jumpZoom; },
+      get stationOpen() { return g.stationOpen; },
+      get menu() { return g.menu; },
+      get adminPanel() { return g.adminPanel; },
+      objective: () => g.objective(),
+      flyTo: (d, note) => g.flyTo(d, note),
+      showSystemMessage: (text, color) => g.showSystemMessage(text, color),
+      currentSystem: () => g.currentSystem(),
+      planetBelow: () => g.planetBelow(),
+      wreckMarker: () => g.wreckMarker(),
+      toggleAutopilotToObjective: () => g.toggleAutopilotToObjective(),
+    };
+  }
+
   private makeKeyHost(): KeyHost {
     const g = this;
     return {
@@ -1064,23 +818,23 @@ this.xpFillEl = document.getElementById('xpFill');
       get stationOpen() { return g.stationOpen; },
       get proto() { return g.proto; },
       get menu() { return g.menu; },
-      get dialogue() { return g.dialogue; },
-      get componentGuide() { return g.componentGuide; },
-      get inventoryWindow() { return g.inventoryWindow; },
-      get tradeWindow() { return g.tradeWindow; },
-      get social() { return g.social; },
-      get quests() { return g.quests; },
-      get stationWindow() { return g.stationWindow; },
+      get dialogue() { return g.w.dialogue; },
+      get componentGuide() { return g.w.componentGuide; },
+      get inventoryWindow() { return g.w.inventoryWindow; },
+      get tradeWindow() { return g.w.tradeWindow; },
+      get social() { return g.w.social; },
+      get quests() { return g.w.quests; },
+      get stationWindow() { return g.w.stationWindow; },
       get shipClient() { return g.shipClient; },
-      get autopilot() { return g.autopilot; },
-      get context() { return g.context; },
-      get quickBar() { return g.quickBar; },
-      get infoPanel() { return g.infoPanel; },
-      get pingUI() { return g.pingUI; },
-      get targetUI() { return g.targetUI; },
-      get playerStatsUI() { return g.playerStatsUI; },
-      get systemMapUI() { return g.systemMapUI; },
-      get navMarkers() { return g.navMarkers; },
+      get autopilot() { return g.w.autopilot; },
+      get context() { return g.w.context; },
+      get quickBar() { return g.w.quickBar; },
+      get infoPanel() { return g.w.infoPanel; },
+      get pingUI() { return g.w.pingUI; },
+      get targetUI() { return g.w.targetUI; },
+      get playerStatsUI() { return g.w.playerStatsUI; },
+      get systemMapUI() { return g.w.systemMapUI; },
+      get navMarkers() { return g.w.navMarkers; },
       get regionUI() { return g.regionUI; },
       get audio() { return g.audio; },
       get network() { return g.network; },
@@ -1105,9 +859,9 @@ this.xpFillEl = document.getElementById('xpFill');
   }
 
   private objective(): QuestTarget | null {
-    const t = this.quests.objective();
-    const q = this.quests.current();
-    const op = q && this.opsUI?.ops.find((o) => o.quest === q.id);
+    const t = this.w.quests.objective();
+    const q = this.w.quests.current();
+    const op = q && this.w.opsUI?.ops.find((o) => o.quest === q.id);
     if (!op || op.system !== this.state.systemId) return t;
     const ward = op.ward && this.state.entities.get(op.ward.eid);
     if (ward) return { system: op.system, x: ward.renderX, y: ward.renderY, label: op.ward!.name };
@@ -1120,35 +874,35 @@ this.xpFillEl = document.getElementById('xpFill');
 
   /** The objective guide: the next waypoint under the tracker, and chevrons from the ship towards it */
   private updateGuide(): void {
-    const on = settings.data.ui.questGuide && this.loggedIn && !this.shipClient.hangarOpen && !this.systemMapUI.isOpen && !this.menu.isOpen;
-    const wp = on ? this.navMarkers?.objectiveTarget() ?? null : null;
+    const on = settings.data.ui.questGuide && this.loggedIn && !this.shipClient.hangarOpen && !this.w.systemMapUI.isOpen && !this.menu.isOpen;
+    const wp = on ? this.w.navMarkers?.objectiveTarget() ?? null : null;
     const me = this.state.entities.get(this.state.playerId);
-    if (!wp || !me) { this.quests.setGuide(''); this.guide.update(null, null, 0); return; }
+    if (!wp || !me) { this.w.quests.setGuide(''); this.w.guide.update(null, null, 0); return; }
     const dist = Math.hypot(wp.x - me.renderX, wp.y - me.renderY);
     const km = dist >= 1000 ? `${(dist / 1000).toFixed(1)} km` : `${Math.round(dist)} m`;
-    this.quests.setGuide(`➜ ${wp.name} · ${km}`);
-    this.guide.update(this.renderer.worldToScreen(me.renderX, me.renderY), this.renderer.worldToScreen(wp.x, wp.y), dist);
+    this.w.quests.setGuide(`➜ ${wp.name} · ${km}`);
+    this.w.guide.update(this.renderer.worldToScreen(me.renderX, me.renderY), this.renderer.worldToScreen(wp.x, wp.y), dist);
   }
 
   /** The right mouse button as the guns and mining laser see it: held, but not while the right-click menu is up (or the press that opened it) */
   private rightHeld(): boolean {
-    return this.input.isMouseDown(2) && !this.context?.withholdingFire();
+    return this.input.isMouseDown(2) && !this.w.context?.withholdingFire();
   }
 
   /** Engage the autopilot (map clicks, the job tracker, party members, right-clicks) */
   flyTo(dest: AutoDest, note?: string): void {
     if (!this.loggedIn || this.proto) return;
-    if (this.stationOpen) this.stationWindow.value!.close();
+    if (this.stationOpen) this.w.stationWindow.value!.close();
     // (Somewhere new: a menu jump lining up is off)
-    if (this.context.jumpMark()) this.context.cancel();
-    this.autopilot.engage(dest, note);
+    if (this.w.context.jumpMark()) this.w.context.cancel();
+    this.w.autopilot.engage(dest, note);
     this.audio.playUI('ui_click', 0.5);
   }
 
   private toggleAutopilotToObjective(): void {
-    if (this.autopilot.active) { this.autopilot.cancel('Autopilot off'); return; }
+    if (this.w.autopilot.active) { this.w.autopilot.cancel('Autopilot off'); return; }
     const t = this.objective();
-    const q = this.quests.current() ?? this.quests.trackedLead();
+    const q = this.w.quests.current() ?? this.w.quests.trackedLead();
     if (!t || !q) { this.showSystemMessage(`Follow a job or a lead with a destination first (${boundKeyName('log', settings.data.bindings)}), or click a place on the map (${boundKeyName('map', settings.data.bindings)})`, '#f2d24b'); return; }
     this.flyTo({ kind: 'objective', name: t.label || q.name });
   }
@@ -1170,7 +924,7 @@ this.xpFillEl = document.getElementById('xpFill');
 
   /** Local cursor relative to the player's ship, world units. */
   private localAim(): { angle: number; dist: number } {
-    const m = this.systemMapUI?.aimWorld() ?? this.renderer.screenToWorld(this.input.mouseX, this.input.mouseY);
+    const m = this.w.systemMapUI?.aimWorld() ?? this.renderer.screenToWorld(this.input.mouseX, this.input.mouseY);
     const p = this.state.getPlayerPosition();
     return { angle: Math.atan2(m.y - p.y, m.x - p.x), dist: Math.hypot(m.x - p.x, m.y - p.y) };
   }
@@ -1235,7 +989,7 @@ this.xpFillEl = document.getElementById('xpFill');
     // Interpolate entities (rocks out of sight placed less often: see GameState.orbitFocus)
     {
       const me = this.state.entities.get(this.state.playerId);
-      const shown = !this.systemMapUI.covers() && !(this.loggedIn && (this.shipClient.hangarOpen || this.menu.isOpen));
+      const shown = !this.w.systemMapUI.covers() && !(this.loggedIn && (this.shipClient.hangarOpen || this.menu.isOpen));
       if (me) this.renderer.orbitFocus(me.renderX, me.renderY, shown, this.state.orbitFocus ??= { cx: 0, cy: 0, px: 0, py: 0, hw: 0, hh: 0 });
       else this.state.orbitFocus = null;
     }
@@ -1245,43 +999,43 @@ this.xpFillEl = document.getElementById('xpFill');
     this.hazards.setHorizonDanger(this.shipClient.horizonDanger());
     this.frost.update(this.loggedIn ? this.state.entities.get(this.state.playerId)?.warmth ?? null : null, delta);
     this.updateSounds(now);
-    if (this.navMarkers) {
-      this.navMarkers.setHidden(!this.loggedIn || this.shipClient.hangarOpen || this.systemMapUI.isOpen || this.menu.isOpen);
+    if (this.w.navMarkers) {
+      this.w.navMarkers.setHidden(!this.loggedIn || this.shipClient.hangarOpen || this.w.systemMapUI.isOpen || this.menu.isOpen);
     this.regionUI.setHidden(!this.loggedIn || this.shipClient.hangarOpen || this.menu.isOpen || this.stationOpen);
       // (Every few frames on the lower tiers: see settings/quality.ts)
       if (++this.navFrames >= this.hudEvery) {
         this.navFrames = 0;
-        this.navMarkers.update();
+        this.w.navMarkers.update();
       }
     }
-    if (this.peopleUI) {
-      this.peopleUI.setHidden(!this.loggedIn || this.shipClient.hangarOpen || this.systemMapUI.isOpen || this.menu.isOpen);
-      this.peopleUI.update();
+    if (this.w.peopleUI) {
+      this.w.peopleUI.setHidden(!this.loggedIn || this.shipClient.hangarOpen || this.w.systemMapUI.isOpen || this.menu.isOpen);
+      this.w.peopleUI.update();
     }
     this.updateGuide();
-    this.context.update();
-    this.bossUI.hidden = !this.loggedIn || this.shipClient.hangarOpen || this.systemMapUI.isOpen;
-    if (!this.loggedIn || this.shipClient.hangarOpen || this.menu.isOpen || this.stationOpen) this.autopilot.setHidden(true);
-    this.bossUI.update();
-    this.farMarkers.setHidden(!this.loggedIn || this.shipClient.hangarOpen || this.systemMapUI.isOpen || this.menu.isOpen);
-    this.farMarkers.update();
-    const blocked = !this.loggedIn || this.shipClient.hangarOpen || this.systemMapUI.isOpen || this.menu.isOpen;
-    const windowOpen = this.stationOpen || this.inventoryWindow.isOpen || this.tradeWindow.isOpen || this.social.window.isOpen || this.quests.log.isOpen || !!this.componentGuide.value?.isOpen;
-    this.targetUI.setHidden(blocked);
-    this.targetUI.update();
-    this.infoPanel.update(!blocked && !windowOpen && !this.localDead);
-    this.opsUI.setHidden(blocked);
-    this.opsUI.update(this.bossUI.visible);
+    this.w.context.update();
+    this.w.bossUI.hidden = !this.loggedIn || this.shipClient.hangarOpen || this.w.systemMapUI.isOpen;
+    if (!this.loggedIn || this.shipClient.hangarOpen || this.menu.isOpen || this.stationOpen) this.w.autopilot.setHidden(true);
+    this.w.bossUI.update();
+    this.w.farMarkers.setHidden(!this.loggedIn || this.shipClient.hangarOpen || this.w.systemMapUI.isOpen || this.menu.isOpen);
+    this.w.farMarkers.update();
+    const blocked = !this.loggedIn || this.shipClient.hangarOpen || this.w.systemMapUI.isOpen || this.menu.isOpen;
+    const windowOpen = this.stationOpen || this.w.inventoryWindow.isOpen || this.w.tradeWindow.isOpen || this.w.social.window.isOpen || this.w.quests.log.isOpen || !!this.w.componentGuide.value?.isOpen;
+    this.w.targetUI.setHidden(blocked);
+    this.w.targetUI.update();
+    this.w.infoPanel.update(!blocked && !windowOpen && !this.localDead);
+    this.w.opsUI.setHidden(blocked);
+    this.w.opsUI.update(this.w.bossUI.visible);
     // A construct job's site, while a piece is going on: the constructor beam
-    const building = this.opsUI.ops.find((o) => o.kind === 'construct' && o.system === this.state.systemId && o.markers[0]?.state === 'active');
-    this.buildSites?.update(1 / 60, building ? building.markers[0] : null);
-    this.tutorial.update(blocked || this.localDead || this.playerStatsUI.isVisible());
-    this.pingUI.setHidden(blocked);
-    this.pingUI.update();
+    const building = this.w.opsUI.ops.find((o) => o.kind === 'construct' && o.system === this.state.systemId && o.markers[0]?.state === 'active');
+    this.w.buildSites?.update(1 / 60, building ? building.markers[0] : null);
+    this.w.tutorial.update(blocked || this.localDead || this.w.playerStatsUI.isVisible());
+    this.w.pingUI.setHidden(blocked);
+    this.w.pingUI.update();
     // The hold above the chat: not while docked (the station's storage has it) or behind a full-screen view
     {
       const me = this.state.entities.get(this.state.playerId);
-      this.cargoPanel.update(blocked || this.stationOpen || !me, !!me && !inSafeSpace(this.currentSystem(), me.renderX, me.renderY));
+      this.w.cargoPanel.update(blocked || this.stationOpen || !me, !!me && !inSafeSpace(this.currentSystem(), me.renderX, me.renderY));
     }
     this.updateHeatGauge();
 
@@ -1311,7 +1065,7 @@ this.xpFillEl = document.getElementById('xpFill');
     // it catches up the frame the window closes, and once for a resize or a changed setting
     const paused = this.loggedIn && (this.shipClient.hangarOpen || this.menu.isOpen);
     this.worldPaused = paused;
-    const covered = this.systemMapUI.covers();
+    const covered = this.w.systemMapUI.covers();
     // (Nor under the sign-in screen, whose backdrop is drawn instead: its shaders are still compiling ahead)
     // Under a map that covers the screen the world isn't drawn at all (the GPU gets a rest), and kept up ten times a
     // second, not every frame (its effects run their course and views come and go; it's whole again as the map lifts)
@@ -1365,11 +1119,11 @@ this.xpFillEl = document.getElementById('xpFill');
       get menu() { return g.menu; },
       get adminPanel() { return g.adminPanel; },
       get shipClient() { return g.shipClient; },
-      get autopilot() { return g.autopilot; },
-      get context() { return g.context; },
-      get playerStatsUI() { return g.playerStatsUI; },
-      get systemMapUI() { return g.systemMapUI; },
-      get navMarkers() { return g.navMarkers; },
+      get autopilot() { return g.w.autopilot; },
+      get context() { return g.w.context; },
+      get playerStatsUI() { return g.w.playerStatsUI; },
+      get systemMapUI() { return g.w.systemMapUI; },
+      get navMarkers() { return g.w.navMarkers; },
       get audio() { return g.audio; },
       get network() { return g.network; },
       get input() { return g.input; },
@@ -1399,30 +1153,30 @@ this.xpFillEl = document.getElementById('xpFill');
       get renderer() { return g.renderer; },
       get audio() { return g.audio; },
       get shipClient() { return g.shipClient; },
-      get autopilot() { return g.autopilot; },
+      get autopilot() { return g.w.autopilot; },
       get hazards() { return g.hazards; },
       get systemNames() { return g.systemNames; },
-      get systemMapUI() { return g.systemMapUI; },
-      get playerStatsUI() { return g.playerStatsUI; },
+      get systemMapUI() { return g.w.systemMapUI; },
+      get playerStatsUI() { return g.w.playerStatsUI; },
       get floatingRewardsUI() { return g.floatingRewardsUI; },
       get damageIndicatorUI() { return g.damageIndicatorUI; },
-      get killFeedUI() { return g.killFeedUI; },
-      get toasts() { return g.toasts; },
-      get tutorial() { return g.tutorial; },
-      get quests() { return g.quests; },
-      get buildSites() { return g.buildSites; },
-      get social() { return g.social; },
-      get tradeWindow() { return g.tradeWindow; },
-      get infoPanel() { return g.infoPanel; },
-      get opsUI() { return g.opsUI; },
-      get pingUI() { return g.pingUI; },
-      get ribbonPopup() { return g.ribbonPopup; },
-      get quickBar() { return g.quickBar; },
-      get dialogue() { return g.dialogue; },
+      get killFeedUI() { return g.w.killFeedUI; },
+      get toasts() { return g.w.toasts; },
+      get tutorial() { return g.w.tutorial; },
+      get quests() { return g.w.quests; },
+      get buildSites() { return g.w.buildSites; },
+      get social() { return g.w.social; },
+      get tradeWindow() { return g.w.tradeWindow; },
+      get infoPanel() { return g.w.infoPanel; },
+      get opsUI() { return g.w.opsUI; },
+      get pingUI() { return g.w.pingUI; },
+      get ribbonPopup() { return g.w.ribbonPopup; },
+      get quickBar() { return g.w.quickBar; },
+      get dialogue() { return g.w.dialogue; },
       get objectives() { return g.objectives; },
       get siegePanel() { return g.siegePanel; },
-      get bossUI() { return g.bossUI; },
-      get stationWindow() { return g.stationWindow; },
+      get bossUI() { return g.w.bossUI; },
+      get stationWindow() { return g.w.stationWindow; },
       get worldEvents() { return g.worldEvents; },
       get adminPanel() { return g.adminPanel; },
       get contribPanel() { return g.contribPanel; },
@@ -1540,11 +1294,11 @@ this.xpFillEl = document.getElementById('xpFill');
     if (this.topHudEl) this.topHudEl.style.display = 'flex';
 if (this.xpHudEl) this.xpHudEl.style.display = 'flex';
 if (this.boostHudEl) this.boostHudEl.style.display = 'flex';
-    this.pilotHud.show();
+    this.w.pilotHud.show();
     this.shipClient.setInGame(true);
-    this.quests.show();
-    this.quickBar.show();
-    this.social.show();
+    this.w.quests.show();
+    this.w.quickBar.show();
+    this.w.social.show();
     this.perfMonitor?.setVisible(settings.data.ui.netStats);
     
     // Send join/auth message based on pending auth state
@@ -1608,14 +1362,14 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'flex';
     if (this.topHudEl) this.topHudEl.style.display = 'none';
 if (this.xpHudEl) this.xpHudEl.style.display = 'none';
 if (this.boostHudEl) this.boostHudEl.style.display = 'none';
-    this.pilotHud.hide();
+    this.w.pilotHud.hide();
     this.shipClient.setInGame(false);
-    this.quests.hide();
-    this.dialogue.hide();
-    this.quickBar.hide();
-    this.social.hide();
-    this.quests.log.close();
-    this.inventoryWindow.close();
+    this.w.quests.hide();
+    this.w.dialogue.hide();
+    this.w.quickBar.hide();
+    this.w.social.hide();
+    this.w.quests.log.close();
+    this.w.inventoryWindow.close();
   }
 
   private handleAuthResult(msg: { success: boolean; username?: string; token?: string; isAdmin?: boolean; isContributor?: boolean; error?: string }): void {
@@ -1629,7 +1383,7 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'none';
       }
       this.isAdmin = !!msg.isAdmin;
       // Map warp (Ctrl-click) is an admin tool: the server refuses it for anyone else, so only admins see it offered
-      this.systemMapUI.onWarp = this.isAdmin ? (systemId, x, y) => this.network.send({ type: 'devTeleport', systemId, x, y }) : null;
+      this.w.systemMapUI.onWarp = this.isAdmin ? (systemId, x, y) => this.network.send({ type: 'devTeleport', systemId, x, y }) : null;
       
       if (this.isAdmin) this.startAdmin();
       else this.stopAdmin();
@@ -1738,7 +1492,7 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'none';
         screenToWorld: (x, y) => this.renderer.screenToWorld(x, y),
         worldToScreen: (x, y) => this.renderer.worldToScreen(x, y),
         zoom: () => this.renderer.getZoom(),
-        map: this.systemMapUI,
+        map: this.w.systemMapUI,
         flyTo: (d) => this.flyTo(d),
         setCamera: (t) => this.renderer.setCameraTarget(t),
         warp: (systemId, x, y) => this.network.send({ type: 'devTeleport', systemId, x, y }),
@@ -1823,7 +1577,7 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'none';
     this.renderer.setQuality(q);
     this.frost.setQuality(q);
     this.shipClient.setQuality(q);
-    this.systemMapUI?.setRedrawEvery(q.mapEvery);
+    this.w.systemMapUI?.setRedrawEvery(q.mapEvery);
     this.hudEvery = q.hudEvery;
     const res = this.renderResolution();
     if (Math.abs(this.app.renderer.resolution - res) > 1e-3) this.onResize();
