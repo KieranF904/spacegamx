@@ -302,6 +302,8 @@ const LOOK = {
   siphon: 'siphon', scanner: 'scanner', constructor: 'constructor', shield: 'shield', jumpcoil: 'jumpcoil', plating: 'armor',
 };
 /** Families with no legacy function: their own look (client/src/ships/partDecor.ts DECOR_SHAPES) */
+/** Reactors and the Capacitor each read differently in stills and icons (their animated looks live in PartFx) */
+const POWER_COLOR = { power_cell_reactor: '#38bdf8', power_isotope_pile: '#6fbf4a', power_fusion_plant: '#f5e3a0', power_overclock_reactor: '#e0452f', power_capacitor: '#f5a83a' };
 const OWN_LOOK = { constructor: { color: '#f5b942', decor: 'none' } };
 for (const [id, name, family, pieces, level, material, fields, description, category] of OTHER) {
   const look = OWN_LOOK[family] ?? legacyLook(LOOK[family]);
@@ -309,6 +311,7 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
     ...base(id, name, family, pieces, level, material, { grade: fields.grade }), ...fields, ...(fields.weapon ? mounted(id, description) : { description }),
     rarity: level >= 20 ? 'rare' : level >= 5 ? 'uncommon' : 'common', category, fabOrder: next(category), ...look,
     ...(family === 'plating' ? { color: level > 15 ? '#7d8796' : '#857462' } : {}),
+    ...(POWER_COLOR[id] ? { color: POWER_COLOR[id] } : {}),
     guide: { name, blurb: description.split(/[.:]/)[0], ...(pieces[0] !== 'sq' ? { piece: pieces[0] } : {}), order: guideOrder++ },
   });
 }
