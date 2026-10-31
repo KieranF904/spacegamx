@@ -15,7 +15,7 @@
 
 import { Container, Graphics } from 'pixi.js';
 import { getPlan, partWeaponDef, shipPointToWorld, type ShipState, type ShipTuning, type WeaponInfo } from '@space-game/common';
-import { STATUS_MARKED } from '@space-game/common';
+import { STATUS_MARKED, TICK_RATE } from '@space-game/common';
 import type { GameState } from '../state/GameState';
 import type { ShipSource } from './ShipStore';
 
@@ -130,9 +130,13 @@ export class ChargeFx {
       const def = partWeaponDef(this.tuning, w.kind, ship.blueprint.parts[w.part], w);
       const reach = Math.min(1800, def.range ?? (def.speed && def.life ? def.speed * def.life : 900));
       const x1 = x + Math.cos(ang) * reach, y1 = y + Math.sin(ang) * reach;
-      this.glow.moveTo(x, y).lineTo(x1, y1).stroke({ color: 0xef4444, width: 1 + 2.5 * k, alpha: (0.1 + 0.55 * k) * pulse });
-      this.glow.moveTo(x, y).lineTo(x1, y1).stroke({ color: 0xfecaca, width: 0.8, alpha: 0.15 + 0.5 * k });
-      this.softDot(x, y, 5 + 10 * k, 0xff5a4a, 0.3 + 0.6 * k);
+      // Last 0.3 s of the charge: a fast bright flicker on the line and the tip
+      const left = (1 - k) * Math.max(1, w.fire.charge ?? 60) / TICK_RATE;
+      const hot = left < 0.3 ? 1 - left / 0.3 : 0;
+      const flick = hot > 0 ? 1 + hot * (0.5 + 0.5 * Math.sin(this.t * 70)) : 1;
+      this.glow.moveTo(x, y).lineTo(x1, y1).stroke({ color: 0xef4444, width: 1 + 2.5 * k, alpha: Math.min(1, (0.15 + 0.45 * k) * pulse * flick) });
+      this.glow.moveTo(x, y).lineTo(x1, y1).stroke({ color: 0xfecaca, width: 0.8, alpha: Math.min(1, (0.15 + 0.5 * k) * flick) });
+      this.softDot(x, y, (5 + 10 * k) * (1 + 0.3 * hot), 0xffe6a0, Math.min(1, (0.3 + 0.6 * k) * (hot > 0 ? 0.8 + 0.4 * flick / 1.5 : 1)));
     } else if (look === 'blackout') {
       const r = (w.window ? cs * 0.9 : cs) * (0.4 + 1.1 * k);
       // The emitter goes dark: a black disc swelling over it, its rim crackling blue
