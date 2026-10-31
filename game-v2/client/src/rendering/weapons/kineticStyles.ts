@@ -59,7 +59,7 @@ export const KINETIC_MODEL_STYLES = {
   },
   // The wall you place: a brown-gold shell blinking like a timer
   flak_cloudmaker: {
-    coreColor: 0xf0d090, glowColor: 0xb8802c, glowAlpha: 0.42, haloRadius: 12, blink: 9,
+    coreColor: 0xf0d090, glowColor: 0xb8802c, glowAlpha: 0.42, haloRadius: 12, blink: 9, aimTick: true,
     muzzle: { life: 7, size: 20, sparks: 4, color: 0xd9a050, smoke: 5 },
   },
   // The cheap rail: today's long thin streak in cyan, an ionised contrail, three coil rings at the muzzle

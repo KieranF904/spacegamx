@@ -66,6 +66,8 @@ export interface WeaponStyle {
   landBurst?: { shake?: number };
   /** Draws a dashed guide from the shell to your cursor while you hold fire (your own guided shells) */
   guide?: boolean;
+  /** Your own shell marks the point it will burst (its endTick) with a faint tick across its line: the Cloudmaker's aim distance */
+  aimTick?: boolean;
   /** Warns a pilot it is heading at, from the shell's velocity: the miss distance (world units) that counts as heading at you */
   incoming?: { radius: number };
   /** Impact sparks spread over this many degrees of hue round their colour (a prism's rainbow) */

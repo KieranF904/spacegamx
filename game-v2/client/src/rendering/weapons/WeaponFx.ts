@@ -586,6 +586,12 @@ export class WeaponFx {
    */
   private drawLandings(): void {
     for (const shot of this.shots.values()) {
+      if (shot.fading === null && shot.endTick && shot.style.aimTick && shot.head && shot.owner === this.state?.playerId) {
+        // Your Cloudmaker shell: a faint tick across its line where it will burst
+        const sp = Math.hypot(shot.vx, shot.vy) || 1, nx = -shot.vy / sp, ny = shot.vx / sp;
+        this.line(shot.landX - nx * 26, shot.landY - ny * 26, shot.landX + nx * 26, shot.landY + ny * 26, 2, shot.style.coreColor, 0.45);
+        this.ringAt(shot.landX, shot.landY, 9, shot.style.coreColor, 0.35);
+      }
       if (shot.fading !== null || !shot.endTick || !shot.style.landBurst || !shot.head) continue;
       const f = shot.arc, r = shot.splash || 200;
       const own = shot.owner === this.state?.playerId;
