@@ -68,6 +68,7 @@ export interface ShipState {
 }
 
 export function rebuildShip(state: ShipState, catalog: Catalog, tuning: ShipTuning): void {
+  const before = state.derived ? state.derived.alive : null;
   state.derived = rebuild({
     catalog,
     tuning,
@@ -81,6 +82,16 @@ export function rebuildShip(state: ShipState, catalog: Catalog, tuning: ShipTuni
   state.rebuildHp = [...state.hp];
   state.dirty = false;
   state.rebuilds++;
+  // A gun that comes back (a part restored or rebuilt) returns with a full clip, no reload, no charge
+  if (before) {
+    for (const w of state.derived.weapons) {
+      if (before[w.part]) continue;
+      state.rounds[w.part] = w.fire.model === 'clip' ? w.fire.clip ?? 0 : 0;
+      state.reload[w.part] = 0;
+      state.charge[w.part] = 0;
+      state.spin[w.part] = 0;
+    }
+  }
 }
 
 export function createShipState(

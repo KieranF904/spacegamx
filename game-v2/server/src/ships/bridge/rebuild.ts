@@ -9,7 +9,7 @@
 import { hasComponent } from 'bitecs';
 import {
   Position, Velocity, Rotation, Radius, Health, Player, Dead, InSystem, Blueprint, ShipState, Vec2,
-  validateBlueprint, ValidationResult, createShipState, rebuildShip, damagePart, repairShip, healPart, restorePart,
+  validateBlueprint, ValidationResult, createShipState, rebuildShip, fillClips, damagePart, repairShip, healPart, restorePart,
   computeJoins, localToWorldDir, seededRng, hashInts, shipPointToWorld, remapCharge, chargeTotal, blueprintGeometry,
   type PlacedGeom,
 } from '@space-game/common';
@@ -250,6 +250,7 @@ export function repair(b: BridgeCtx, eid: number): void {
   if (!ship || ship.kind !== 'ship') return;
   repairShip(ship);
   b.rebuildNow(eid, ship);
+  fillClips(ship); // a full repair: every clip full
   b.syncHealth(eid, ship);
 }
 
