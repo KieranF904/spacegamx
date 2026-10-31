@@ -187,7 +187,7 @@ export function partTipHtml(p: Pick<PlacedPart, 'fn' | 'material' | 'piece'> & P
     const b = L.bankOf[i];
     if (b >= 0) {
       const B = L.banks[b];
-      html += row('Bank', `<b>${b + 1}</b> · ${B.parts.length} part${B.parts.length > 1 ? 's' : ''} · holds ${n0(B.cap)} · gives ${n0(B.rate)}/s${B.feeds.length ? ` · feeds ${B.feeds.length} it touches` : ` · ${amber('feeds nothing')}`}${!B.refills && B.dynamo <= 0 ? ` · ${amber('never refills')}` : ''}`);
+      html += row('Bank', `<b>${b + 1}</b> · ${B.parts.length} part${B.parts.length > 1 ? 's' : ''} · holds ${n0(B.cap)} · gives ${n0(B.rate)}/s${B.feeds.length + B.shields.length ? ` · feeds ${B.feeds.length + B.shields.length} it touches` : ` · ${amber('feeds nothing')}`}${!B.refills && B.dynamo <= 0 ? ` · ${amber('never refills')}` : ''}`);
     }
     const f = L.feedOf[i];
     if (f >= 0 && L.feeds[f].banks.length) html += row('Fed by', `Bank ${L.feeds[f].banks.map((x) => x + 1).join(', ')} first, then the ship`);

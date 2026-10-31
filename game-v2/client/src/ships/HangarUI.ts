@@ -1493,7 +1493,7 @@ export class HangarUI {
         else html += '<div style="font-size:11px; padding:1px 0 3px; color:#4ade80">Holds up: full power while boosting and firing</div>';
       }
       L.banks.forEach((B, k) => {
-        const fed = [...new Set(B.feeds.map(partName))].join(', ');
+        const fed = [...new Set([...B.feeds, ...B.shields].map(partName))].join(', ');
         const never = !B.refills && B.dynamo <= 0;
         html += `<div style="font-size:11px; padding:1px 0; color:${never ? '#94a3b8' : B.kind === 'drive' ? '#7dd3fc' : '#fbbf24'}">Bank ${k + 1} (${B.parts.length} ${B.kind === 'drive' ? 'Drive Cell' : 'Capacitor'}${B.parts.length > 1 ? 's' : ''}) ${n0(B.cap)} · ${n0(B.rate)}/s → ${fed ? esc(fed) : 'feeds nothing'}${never ? ' · never refills' : ''}</div>`;
       });
@@ -1889,7 +1889,7 @@ if (d && this.overlays.com && d.mass > 0) {
       const at = this.bp.parts.length;
       if (!L) return null;
       const feeds = new Set<number>();
-      if (kind) { const B = L.banks[L.bankOf[at]]; if (B) for (const j of B.feeds) feeds.add(j); }
+      if (kind) { const B = L.banks[L.bankOf[at]]; if (B) { for (const j of B.feeds) feeds.add(j); for (const j of B.shields) feeds.add(j); } }
       else for (const B of L.banks) if (B.dynamos.includes(at)) for (const i of B.parts) feeds.add(i);
       this.feedPreviewVal = {
         feeds: [...feeds].filter((j) => j < at),
@@ -2060,7 +2060,8 @@ if (d && this.overlays.com && d.mass > 0) {
       const col = !B.refills && B.dynamo <= 0 ? '#94a3b8' : B.kind === 'drive' ? '#60a5fa' : '#fbbf24';
       for (const i of B.parts) outline(i, col, []);
       // (A glowing strap to every part it feeds, and a bolt on that part)
-      for (const j of B.feeds) {
+      for (let n = 0, nn = B.feeds.length + B.shields.length; n < nn; n++) {
+        const j = n < B.feeds.length ? B.feeds[n] : B.shields[n - B.feeds.length];
         const q = this.geoms[j];
         if (!q) continue;
         let from = this.geoms[B.parts[0]], best = Infinity;

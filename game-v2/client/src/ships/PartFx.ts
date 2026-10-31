@@ -165,7 +165,8 @@ export class PartFx {
         const from = B.parts.length ? byPart(B.parts[0]) : undefined;
         if (from) {
           const arcing = (v.arcUntil[k] ?? 0) > now;
-          for (const fi of B.feeds) {
+          for (let n = 0, nn = B.feeds.length + B.shields.length; n < nn; n++) {
+            const fi = n < B.feeds.length ? B.feeds[n] : B.shields[n - B.feeds.length];
             const to = byPartOrCentroid(v.items, geoms, d.com, cs, fi);
             if (!to) continue;
             g.moveTo(from.x, from.y).lineTo(to[0], to[1]).stroke({ color: col, width: Math.max(1.2, cs * 0.06), alpha: 0.08 + 0.3 * pct });

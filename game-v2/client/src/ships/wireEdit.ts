@@ -139,6 +139,7 @@ export function powerReport(catalog: Catalog, bp: Blueprint, d: ShipDerived, geo
   for (const B of d.power?.banks ?? []) {
     for (const i of B.parts) if (!nets[d.network[i]]) offGrid.set(i, B);
     for (const i of B.feeds) feedOf.add(i);
+    for (const i of B.shields) feedOf.add(i);
   }
   const part: PartPower[] = bp.parts.map((_, i) => {
     const fn = fns[i];
