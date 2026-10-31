@@ -31,7 +31,7 @@ Medium
 Medium · Panel
 
 == tradeOff ==
-wide heavy bursts, slow · ammo
+placed clouds at your aim distance, slow reload
 
 == keyStats ==
 25 dmg/s · reach 1,700 · clip 4 · 2.5s reload · draws 12

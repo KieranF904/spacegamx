@@ -31,7 +31,7 @@ Medium
 Medium · Panel
 
 == tradeOff ==
-three small seekers a salvo · ammo
+six small rockets a salvo, floods point defence · ammo
 
 == keyStats ==
 27 dmg/s · reach 11,440 · ammo · draws 15
