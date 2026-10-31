@@ -3,6 +3,7 @@
  */
 
 import { handleKey, type KeyHost } from './app/keys';
+import { handleServerMessage as handleServerMessageTable, type MessageHost } from './app/serverMessages';
 import { lobbyAuth, LobbyAuthResult } from './network/lobby';
 import { setText, setStyle } from './ui/domWrite';
 import { Application, Text} from 'pixi.js';
@@ -145,6 +146,7 @@ export class Game {
   private network: ClientTransport;
   private proto: ProtoHooks | null;
   private readonly keyHost: KeyHost = this.makeKeyHost();
+  private readonly msgHost: MessageHost = this.makeMessageHost();
   private shipClient: ShipClient;
   private hazards = new HazardOverlay();
   /** The cold on screen: frost in from the edges as the ship's warmth runs down */
@@ -1614,404 +1616,71 @@ this.xpFillEl = document.getElementById('xpFill');
   }
 
   private handleServerMessage(msg: ServerMessage): void {
-    if (this.shipClient.handleMessage(msg)) return;
-    switch (msg.type) {
-      case 'welcome':
-        // A server on another protocol version (it echoes its own): our decoding can't be trusted
-        if (msg.protocol !== undefined && msg.protocol !== PROTOCOL_VERSION) {
-          console.warn(`Server protocol ${msg.protocol}, this client ${PROTOCOL_VERSION}`);
-          this.network.disconnect();
-          this.onDisconnected({ code: PROTOCOL_MISMATCH_CLOSE, reason: 'version', retrying: false });
-          return;
-        }
-        this.state.playerId = msg.playerId;
-        this.state.tickRate = msg.tickRate;
-        if (msg.threats) this.state.threats = msg.threats;
-        if (msg.regionThreats) this.state.regionThreats = msg.regionThreats;
-        this.loggedIn = true;
-        this.renderer.hideDeathScreen(); // welcome also follows a respawn
-        this.localDead = false;
-        this.social?.showRally(false);
-        console.log('Joined as player', msg.playerId);
-        break;
-        
-      case 'pong':
-        this.state.handlePong(msg.clientTime, msg.serverTime, msg.tick);
-        this.perfSrv = msg.serverProcessing;
-        this.perfNet = this.netRates().replace(/^ \| /, '');
-        break;
-        
-      case 'snapshot':
-        this.state.applySnapshot(msg);
-        break;
-        
-      case 'playerState':
-        // Track credit gains for stats
-        if (msg.credits > this.state.credits) {
-          const creditGain = msg.credits - this.state.credits;
-          this.playerStatsUI.addCreditsEarned(creditGain);
-          // Show floating credit text near player
-          const playerPos = this.state.getPlayerPosition();
-          this.floatingRewardsUI.addCredits(playerPos.x, playerPos.y, creditGain);
-        }
-        // Track XP gains for stats
-        if (msg.xp > this.state.xp || msg.level > this.state.level) {
-          const xpGain = msg.xp - this.state.xp;
-          if (xpGain > 0) {
-            const playerPos = this.state.getPlayerPosition();
-            this.floatingRewardsUI.addXP(playerPos.x, playerPos.y, xpGain, msg.level > this.state.level);
-          }
-        }
-        this.state.hp = msg.hp;
-        this.state.maxHp = msg.maxHp;
-        this.state.boostFuel = msg.boostFuel;
-        this.state.maxBoostFuel = msg.maxBoostFuel;
-        this.state.serverBoostFuel = msg.boostFuel; // anchor for reconciliation
-        // Sounds for gains and travel (not for the first update after joining)
-        if (this.statsPrimed) {
-          if (msg.level > this.state.level) this.audio.playUI('level_up');
-          else if (msg.credits > this.state.credits) this.audio.playUI('credits', 0.8);
-          if (msg.systemId !== this.state.systemId) this.audio.playUI('warp');
-        }
-        if (msg.systemId !== this.state.systemId) this.systemArrivedAt = performance.now();
-        this.statsPrimed = true;
-        this.state.xp = msg.xp;
-        this.state.level = msg.level;
-        this.state.credits = msg.credits;
-        // Clear deterministic asteroids on system change
-        if (msg.systemId !== this.state.systemId) {
-          this.state.clearDeterministicAsteroids();
-          this.state.clearForSystemChange();
-        }
-        this.state.systemId = msg.systemId;
-        break;
-        
-      case 'systemInfo':
-        // Data-driven system visuals from the server (central body + starfield)
-        this.renderer.setSystemInfo(msg);
-        this.systemNames.set(msg.systemId, msg.name);
-        this.hazards.setHazards(msg.hazards ?? []);
-        // Feed the system map
-        this.systemMapUI.setSystemInfo({
-          name: msg.name,
-          sector: msg.sector,
-          centralBody: msg.centralBody as any,
-        });
-        break;
-        
-      case 'profile':
-        if (this.pilot.profile && msg.level > this.pilot.profile.level) this.audio.playUI('level_up');
-        this.pilot.setProfile(msg);
-        break;
+    handleServerMessageTable(this.msgHost, msg);
+  }
 
-      case 'items':
-        this.pilot.setItems(msg);
-        break;
-
-      case 'gained': {
-        if (msg.source?.startsWith('kill:') || msg.source?.startsWith('assist:')) this.sessionKills++;
-        const at = msg.x !== undefined && msg.y !== undefined ? { x: msg.x, y: msg.y } : this.state.getPlayerPosition();
-        let k = 0;
-        for (const [id, n] of Object.entries(msg.items)) {
-          const d = this.pilot.econ.items.get(id);
-          this.floatingRewardsUI.addItem(at.x, at.y - k++ * 26, `+${n} ${d?.name ?? id}`, d?.rarity ?? 'common');
-        }
-        if (k) this.audio.playUI('credits', 0.35);
-        if (msg.xp) this.floatingRewardsUI.addXP(at.x + 40, at.y - k * 26, msg.xp);
-        if (msg.credits) this.floatingRewardsUI.addCredits(at.x - 40, at.y - k * 26, msg.credits);
-        if (msg.source?.startsWith('kill:')) {
-          this.killFeedUI.addEnemyDefeat(this.state.playerName, msg.source.slice(5), true);
-          this.playerStatsUI.addEnemyDefeated();
-          this.audio.playUI('credits', 0.6);
-        }
-        break;
-      }
-
-      case 'wreck':
-        this.wreck = msg.gone || msg.system === undefined ? null : { system: msg.system, x: msg.x ?? 0, y: msg.y ?? 0, until: Date.now() + (msg.seconds ?? 0) * 1000 };
-        break;
-
-      case 'toast':
-        this.toasts.show(msg.text, msg.kind);
-        if (msg.kind === 'bad') this.audio.playUI('error', 0.5);
-        else if (msg.text.startsWith('Fabrication complete')) this.audio.playUI('craft_done', 0.8);
-        break;
-
-      case 'rebuild':
-        this.pilot.setRebuild(msg);
-        break;
-
-      case 'station':
-        this.stationWindow.use((w) => w.setStation(msg));
-        break;
-
-      case 'vendors':
-        this.stationWindow.use((w) => w.setVendors(msg));
-        break;
-
-      case 'marketScan':
-        this.stationWindow.use((w) => w.setScan(msg));
-        break;
-
-      case 'quests':
-        // Brand-new pilots get the flight school
-        if (!this.proto) this.tutorial.maybeStart(msg.done === 0 && (this.pilot.profile?.level ?? 1) <= 1 && (this.pilot.profile?.xp ?? 0) < 20);
-        this.quests.setQuests(msg);
-        this.buildSites?.set(msg.builds);
-        break;
-
-      case 'codex':
-        this.quests.setCodex(msg);
-        break;
-
-      case 'hangar':
-        this.pilot.setHangar(msg);
-        break;
-
-      case 'party':
-        this.social.setParty(msg);
-        break;
-
-      case 'partyInvite':
-        this.social.onInvite(msg);
-        break;
-
-      case 'tradeRequest':
-        this.social.onTradeRequest(msg);
-        break;
-
-      case 'trade':
-        this.tradeWindow.onTrade(msg);
-        break;
-
-      case 'pilotInfo':
-        this.infoPanel.onInfo(msg);
-        break;
-
-      case 'ops':
-        this.opsUI.setOps(msg);
-        break;
-
-      case 'mapPing':
-        this.pingUI.onPing(msg);
-        break;
-
-      case 'ribbon': {
-        const def = (ribbonData as unknown as RibbonsFile).ribbons.find((r) => r.id === msg.id);
-        if (def) this.ribbonPopup.show(def, msg.credits, msg.xp);
-        break;
-      }
-
-      case 'ribbons':
-        this.quests.setRibbons(msg);
-        break;
-
-      case 'rankings':
-        this.quests.setRankings(msg);
-        break;
-
-      case 'news':
-        // The galaxy's news: in the chat log, and fresh stories in the event feed too
-        this.addChatMessage('Galaxy', msg.text, true);
-        if (!msg.old) {
-          this.killFeedUI.addSystemMessage(msg.text);
-          if (msg.kind === 'boss' || msg.kind === 'fleet') this.audio.playUI('scan_ping', 0.4);
-        }
-        break;
-
-      case 'sharedDesign':
-        this.shipClient.addSharedDesign(msg.from, msg.blueprint);
-        this.toasts?.show(`${msg.from} shared the ${msg.blueprint.name}. Open the hangar at a station and pick it under Load → Shared with you`, 'info');
-        this.audio.playUI('scan_ping', 0.5);
-        break;
-
-      case 'repairKit':
-        this.quickBar.setKit(msg.left, msg.total);
-        this.shipClient.setKitActive(msg.left > 0);
-        break;
-
-      case 'questBoard':
-        this.quests.setBoard(msg);
-        break;
-
-      case 'talk':
-        this.dialogue.set(msg.view);
-        break;
-
-      case 'people':
-        this.quests.setPeople(msg.people);
-        break;
-
-      case 'worldEvent':
-        this.worldEvents.set(msg.id, { name: msg.title, x: msg.x, y: msg.y, system: this.state.systemId });
-        setTimeout(() => this.worldEvents.delete(msg.id), msg.seconds * 1000 + 5000);
-        if (msg.kind === 'raid') this.audio.playUI('warning', 0.7);
-        break;
-
-      case 'worldEventEnd':
-        this.worldEvents.delete(msg.id);
-        break;
-
-      case 'objective':
-        this.objectives.show(msg, this.state.systemId);
-        if (msg.night !== undefined) this.renderer.setNight(msg.night);
-        break;
-
-      case 'objectiveEnd':
-        this.objectives.end(msg.id);
-        this.renderer.setNight(0);
-        break;
-
-      case 'siegeState':
-        this.siegePanel.update(msg);
-        if (!msg.active) this.renderer.setNight(0);
-        break;
-
-      case 'bossIntro':
-        this.bossUI.intro(msg.name, msg.title, msg.text);
-        break;
-
-      case 'mapDots':
-        this.state.farShips.apply(msg, this.state.systemId, this.state.getRawServerTick());
-        break;
-
-      case 'bossPhase':
-        // (no line: a reminder of the phase it's in, for someone arriving mid-fight)
-        if (msg.text) this.bossUI.onPhase(msg.text);
-        break;
-
-      case 'bossDefeated':
-        this.bossUI.defeated(msg.name);
-        break;
-
-      case 'questStep':
-        this.quests.stepDone(msg.text);
-        this.toasts.show(`Next: ${msg.text}`, 'info');
-        break;
-
-      case 'damage':
-        this.renderer.showDamageNumber(msg.targetId, msg.amount, msg.critical, msg.glancing);
-        this.renderer.hitEntity(msg.targetId, msg.amount);
-        // Update entity HP if included (deterministic asteroids)
-        if (msg.hp !== undefined) {
-          const dmgEntity = this.state.entities.get(msg.targetId);
-          if (dmgEntity) {
-            dmgEntity.hp = msg.hp;
-            if (msg.maxHp !== undefined) dmgEntity.maxHp = msg.maxHp;
-          }
-        }
-        // Show damage indicator if local player is the target
-        if (msg.targetId === this.state.playerId) {
-          // The indicator points at whoever fired (when we can see them); otherwise it's just a flash
-          const src = msg.sourceId !== undefined && msg.sourceId !== msg.targetId ? this.state.entities.get(msg.sourceId) : undefined;
-          const playerPos = this.state.getPlayerPosition();
-          this.damageIndicatorUI.addDamage(
-            src ? src.renderX : playerPos.x,
-            src ? src.renderY : playerPos.y,
-            Math.min(1, msg.amount / 50) // Normalize intensity
-          );
-          // Track damage taken
-          this.playerStatsUI.addDamageTaken(msg.amount);
-        } else if (msg.sourceId === this.state.playerId) {
-          // Track damage dealt
-          this.playerStatsUI.addDamageDealt(msg.amount);
-          this.playerStatsUI.addShotHit();
-        }
-        // Your own hull taking it: a thump (impacts on others sound from projectileHit)
-        if (msg.targetId === this.state.playerId) {
-          this.audio.playUI('hurt', Math.min(1, 0.4 + msg.amount / 40));
-          this.audio.bumpCombat(1);
-        }
-        break;
-        
-      case 'projectileHit':
-        this.renderer.showProjectileHit(msg.id, msg.x, msg.y);
-        this.audio.play('hit', msg.x, msg.y, { pitch: 0.85 + Math.random() * 0.3, volume: 0.7 });
-        break;
-        
-      case 'asteroidSpawn':
-        this.state.handleAsteroidSpawn(msg.tick, msg.asteroids);
-        break;
-
-      case 'asteroidSeed':
-        this.state.handleAsteroidSeed(msg.tick, msg.systemId, msg.seed, msg.belt, msg.ids, msg.indices, msg.asteroidField);
-        // Feed belt geometry to the system map
-        if (msg.belt) {
-          this.systemMapUI.setBelt(msg.belt.innerRadius, msg.belt.outerRadius);
-        }
-        break;
-
-      case 'asteroidDebug':
-        this.renderer.showAsteroidDebug(msg.points, msg.durationMs);
-        break;
-        
-      case 'death':
-        if (msg.entityId === this.state.playerId) {
-          // (The blast itself sounds from the core's partDestroyed message)
-          this.renderer.showDeathScreen(msg.killerId !== undefined ? this.state.entities.get(msg.killerId)?.name : undefined);
-          this.killFeedUI.addSystemMessage('You were destroyed');
-          this.autopilot.cancel();
-          this.localDead = true;
-          this.social.showRally(true);
-        } else {
-          this.renderer.showExplosion(msg.entityId);
-          // Get dead entity info
-          const deadEntity = this.state.entities.get(msg.entityId);
-          if (deadEntity) this.audio.play('explosion_large', deadEntity.x, deadEntity.y);
-        }
-        break;
-        
-      case 'effect':
-        this.renderer.showEffect(msg.effectType, msg.x, msg.y, msg.data, msg.targetX, msg.targetY, msg.entityId);
-        break;
-        
-      case 'systemMessage':
-        this.showSystemMessage(msg.text, msg.color);
-        break;
-        
-      case 'chat':
-        this.addChatMessage(msg.playerName, msg.text);
-        break;
-        
-      case 'authResult':
-        this.handleAuthResult(msg);
-        break;
-        
-      case 'adminStats':
-        this.adminPanel?.onStats(msg);
-        break;
-
-      case 'adminInfo':
-        this.adminPanel?.onInfo(msg);
-        break;
-      case 'adminAccounts':
-        this.adminPanel?.onAccounts(msg);
-        break;
-
-      case 'contribRank':
-        if (msg.on) this.startContrib(); else this.stopContrib();
-        this.addChatMessage('', msg.on ? 'You are a contributor: F6 opens the contributor notes.' : 'Your contributor rank was removed.', true, '#5eead4');
-        break;
-      case 'contribNotes':
-        this.contribPanel?.onNotes(msg.system, msg.notes);
-        break;
-      case 'contribNote':
-        this.contribPanel?.onNote(msg.note);
-        break;
-      case 'contribNoteGone':
-        this.contribPanel?.onGone(msg.id);
-        break;
-      case 'contribResult':
-        this.contribPanel?.onResult(msg.ok, msg.text);
-        if (!this.contribPanel?.isOpen) this.addChatMessage('', msg.text, true, msg.ok ? '#9fe0b5' : '#ff9a8a');
-        break;
-
-      case 'adminResult':
-        this.adminPanel?.onResult(msg.ok, msg.text);
-        // Chat commands answer in the chat (the panel may be shut)
-        if (!this.adminPanel?.isOpen) this.addChatMessage('', msg.text, true, msg.ok ? '#9fe0b5' : '#ff9a8a');
-        break;
-    }
+  /** What app/serverMessages.ts reads and writes (getters/setters, so late-built windows resolve at use; made once) */
+  private makeMessageHost(): MessageHost {
+    const g = this;
+    return {
+      get proto() { return g.proto; },
+      get network() { return g.network; },
+      get state() { return g.state; },
+      get pilot() { return g.pilot; },
+      get renderer() { return g.renderer; },
+      get audio() { return g.audio; },
+      get shipClient() { return g.shipClient; },
+      get autopilot() { return g.autopilot; },
+      get hazards() { return g.hazards; },
+      get systemNames() { return g.systemNames; },
+      get systemMapUI() { return g.systemMapUI; },
+      get playerStatsUI() { return g.playerStatsUI; },
+      get floatingRewardsUI() { return g.floatingRewardsUI; },
+      get damageIndicatorUI() { return g.damageIndicatorUI; },
+      get killFeedUI() { return g.killFeedUI; },
+      get toasts() { return g.toasts; },
+      get tutorial() { return g.tutorial; },
+      get quests() { return g.quests; },
+      get buildSites() { return g.buildSites; },
+      get social() { return g.social; },
+      get tradeWindow() { return g.tradeWindow; },
+      get infoPanel() { return g.infoPanel; },
+      get opsUI() { return g.opsUI; },
+      get pingUI() { return g.pingUI; },
+      get ribbonPopup() { return g.ribbonPopup; },
+      get quickBar() { return g.quickBar; },
+      get dialogue() { return g.dialogue; },
+      get objectives() { return g.objectives; },
+      get siegePanel() { return g.siegePanel; },
+      get bossUI() { return g.bossUI; },
+      get stationWindow() { return g.stationWindow; },
+      get worldEvents() { return g.worldEvents; },
+      get adminPanel() { return g.adminPanel; },
+      get contribPanel() { return g.contribPanel; },
+      get loggedIn() { return g.loggedIn; },
+      set loggedIn(v) { g.loggedIn = v; },
+      get localDead() { return g.localDead; },
+      set localDead(v) { g.localDead = v; },
+      get statsPrimed() { return g.statsPrimed; },
+      set statsPrimed(v) { g.statsPrimed = v; },
+      get sessionKills() { return g.sessionKills; },
+      set sessionKills(v) { g.sessionKills = v; },
+      get systemArrivedAt() { return g.systemArrivedAt; },
+      set systemArrivedAt(v) { g.systemArrivedAt = v; },
+      get perfSrv() { return g.perfSrv; },
+      set perfSrv(v) { g.perfSrv = v; },
+      get perfNet() { return g.perfNet; },
+      set perfNet(v) { g.perfNet = v; },
+      get wreck() { return g.wreck; },
+      set wreck(v) { g.wreck = v; },
+      onDisconnected: (info) => g.onDisconnected(info),
+      netRates: () => g.netRates(),
+      addChatMessage: (playerName, text, isSystem, color) => g.addChatMessage(playerName, text, isSystem, color),
+      showSystemMessage: (text, color) => g.showSystemMessage(text, color),
+      handleAuthResult: (msg) => g.handleAuthResult(msg),
+      startContrib: () => g.startContrib(),
+      stopContrib: () => g.stopContrib(),
+    };
   }
 
   private setupChat(): void {
