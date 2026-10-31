@@ -15,7 +15,7 @@ import { clearIfDrawn } from '../rendering/gfx';
 import { Container, Graphics } from 'pixi.js';
 import { GAS_TYPES } from '../rendering/AsteroidLook';
 import {
-  EntityType, ShipTuning, jumpTuning, jumpPhase, getAsteroidPolygon, segmentIntersectT, shipPointToWorld, worldToLocalDir, standing, castParts, unpackCursorWeaponState, partWeaponDef, pulseProfile, MINING_PULSE, MINE_TAIL,
+  EntityType, ShipTuning, jumpTuning, jumpPhase, getAsteroidPolygon, segmentIntersectT, shipPointToWorld, worldToLocalDir, standing, castParts, unpackCursorWeaponState, partWeaponDef, feedShare, BROWNOUT, pulseProfile, MINING_PULSE, MINE_TAIL,
   type ShipState, type WeaponInfo, type PulseTuning, type WeaponTuning, type Composition,
 } from '@space-game/common';
 import type { GameState } from '../state/GameState';
@@ -35,6 +35,7 @@ import type { ShipSource } from './ShipStore';
 import { JumpFx } from './JumpFx';
 import { canHurt, canHeal } from './sides';
 import { beamLook } from '../rendering/weapons/weaponStyles';
+import './energyLooks';
 import { drawCone, drawStrands, sputterGain } from './beamLookFx';
 import { PulseFx, type PulseRun } from './PulseFx';
 import { MiningFx } from './MiningFx';
@@ -159,8 +160,28 @@ export class MiningBeamFx {
     this.sparks.length = Math.min(w, 400);
   }
 
+  /** How long each held beam (by ship × 256 + part) has been on, and burning the same spot (`burn`: it starts over if the spot jumps or is lost for a moment) */
+  private holds = new Map<number, { on: number; burn: number; lx: number; ly: number; miss: number; seen: number }>();
+  private frameNo = 0;
+
+  private held(key: number, hx: number, hy: number, hit: boolean, dt: number): { on: number; burn: number } {
+    let h = this.holds.get(key);
+    if (!h) this.holds.set(key, (h = { on: 0, burn: 0, lx: hx, ly: hy, miss: 0, seen: 0 }));
+    h.seen = this.frameNo;
+    h.on += dt;
+    if (!hit) { h.miss += dt; if (h.miss > 4 / 60) h.burn = 0; }
+    else {
+      h.miss = 0;
+      if (Math.hypot(hx - h.lx, hy - h.ly) > 70) h.burn = 0;
+      h.burn += dt;
+    }
+    h.lx = hx; h.ly = hy;
+    return h;
+  }
+
   /** Pulse lasers and plasma lances: drawn while the ship's "left weapon active" flag is set (a laser's colour is its grade's: LASER_COLORS) */
   private weaponBeams(g: Graphics): void {
+    this.frameNo++;
     const defs = this.tuning.weapons ?? {};
     for (const [id, ship] of this.source.bodies) {
       if (ship.kind !== 'ship') continue;
@@ -186,21 +207,57 @@ export class MiningBeamFx {
         // (A model's own look, if it has one: BEAM_LOOKS)
         if (look) { outer = look.outer ?? outer; mid = look.mid ?? mid; core = look.core ?? core; }
         const wid = (lance ? 13 : w.kind === 'frostbite' ? 10 : 6) * flick * ((def.width ?? 1) / (defs[w.kind]!.width ?? 1)) * (1 + 0.08 * ((w.grade ?? 1) - 1)) * (look?.width ?? 1);
-        const gain = sputterGain(look?.sputter, this.t, id + w.part);
+        // (Short of power a model with a sputter breaks up: your own ship's feed is known; others' beams burn steady)
+        const starved = !!look?.sputter && id === this.state.playerId && feedShare(ship.derived, this.state.charge, w.part, 'gun') < BROWNOUT;
+        const gain = starved ? sputterGain(look!.sputter, this.t, id + w.part) : 1;
         const bl = Math.hypot(hx - x, hy - y) || 1, bux = (hx - x) / bl, buy = (hy - y) / bl;
-        if (look?.cone) drawCone(g, x, y, bux, buy, bl, look.cone, mid, 0.22 * gain);
-        g.moveTo(x, y).lineTo(hx, hy).stroke({ color: outer, width: wid * 3, alpha: 0.13 * gain });
-        g.moveTo(x, y).lineTo(hx, hy).stroke({ color: mid, width: wid * 1.4, alpha: 0.45 * gain });
-        g.moveTo(x, y).lineTo(hx, hy).stroke({ color: core, width: wid * 0.45, alpha: 0.95 * gain });
+        const hold = this.held(id * 256 + w.part, hx, hy, t < 0.999, this.dt);
+        // How far up its ramp a beam that gets hotter the longer it burns one spot has come (the Cutter's: 0 to 1)
+        const ramp = def.ramp ? Math.min(1, hold.burn * 60 / Math.max(1, def.ramp.ticks)) : 0;
+        if (look?.cone) drawCone(g, x, y, bux, buy, Math.min(bl, look.coneLen ?? bl), look.cone, mid, 0.22 * gain);
+        if (look?.zap) {
+          // Lightning: a jagged polyline, different every frame, with a fainter twin
+          for (let pass = 0; pass < 2; pass++) {
+            const n = Math.max(5, Math.min(26, Math.round(bl / 30)));
+            g.moveTo(x, y);
+            for (let i = 1; i <= n; i++) {
+              const f = i / n, o = i === n && t < 0.999 ? 0 : (Math.random() - 0.5) * 2 * look.zap * (pass ? 0.6 : 1) * Math.sin(Math.min(1, f * 6) * Math.PI / 2);
+              g.lineTo(x + (hx - x) * f - buy * o, y + (hy - y) * f + bux * o);
+            }
+            g.stroke(pass === 0 ? { color: mid, width: wid * 2.4, alpha: 0.28 * flick } : { color: core, width: Math.max(1.2, wid * 0.4), alpha: 0.95 * flick });
+          }
+        } else {
+          g.moveTo(x, y).lineTo(hx, hy).stroke({ color: outer, width: wid * 3, alpha: 0.13 * gain });
+          g.moveTo(x, y).lineTo(hx, hy).stroke({ color: mid, width: wid * 1.4, alpha: 0.45 * gain });
+          g.moveTo(x, y).lineTo(hx, hy).stroke({ color: core, width: wid * 0.45, alpha: 0.95 * gain });
+        }
         if (look?.braid) drawStrands(g, x, y, bux, buy, bl, wid, look.braid.strands, look.braid.color, gain, this.t, id + w.part);
-        g.circle(x, y, wid * 1.2).fill({ color: mid, alpha: 0.5 * gain });
+        // A lance's crystal brightens the longer it's held, its prongs crackling at the muzzle
+        const warm = lance ? Math.min(1, hold.on / 2.5) : 0;
+        g.circle(x, y, wid * (1.2 + 0.9 * warm)).fill({ color: mid, alpha: (0.5 + 0.3 * warm) * gain });
+        if (lance) {
+          g.circle(x, y, wid * 0.55 * (0.6 + warm)).fill({ color: 0xffffff, alpha: (0.5 + 0.5 * warm) * gain });
+          for (let i = 0; i < 2; i++) {
+            const a = Math.atan2(buy, bux) + (i ? 1 : -1) * (0.5 + 0.25 * Math.sin(this.t * 40 + i * 2)), l = wid * (2.2 + 1.6 * Math.random());
+            g.moveTo(x, y).lineTo(x + Math.cos(a) * l * 0.5 + (Math.random() - 0.5) * 3, y + Math.sin(a) * l * 0.5 + (Math.random() - 0.5) * 3).lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l)
+              .stroke({ color: core, width: 1.1, alpha: 0.8 * gain });
+          }
+        }
         if (t < 0.999) {
           g.circle(hx, hy, wid * 2.6).fill({ color: mid, alpha: 0.3 });
           g.circle(hx, hy, wid * 1.1).fill({ color: core, alpha: 0.85 });
-          if (Math.random() < 0.6) this.sparks.push({ x: hx, y: hy, vx: (Math.random() - 0.5) * 7, vy: (Math.random() - 0.5) * 7, life: 0, max: 8 + Math.random() * 10 });
+          // The Cutter's molten pool: it spreads and brightens as the ramp climbs, and the spray thickens
+          if (look?.pool !== undefined) {
+            const r = wid * (1.6 + 3.2 * ramp);
+            g.circle(hx, hy, r * 1.6).fill({ color: look.pool, alpha: 0.12 + 0.12 * ramp });
+            g.circle(hx, hy, r).fill({ color: look.pool, alpha: 0.28 + 0.3 * ramp });
+            g.circle(hx, hy, r * 0.5).fill({ color: 0xfff1c9, alpha: 0.4 + 0.5 * ramp });
+          }
+          if (Math.random() < 0.6 + (look?.pool !== undefined ? 1.6 * ramp : 0)) this.sparks.push({ x: hx, y: hy, vx: (Math.random() - 0.5) * (7 + 6 * ramp), vy: (Math.random() - 0.5) * (7 + 6 * ramp), life: 0, max: 8 + Math.random() * 10 });
         }
       }
     }
+    for (const [k, h] of this.holds) if (h.seen !== this.frameNo) this.holds.delete(k);
     this.drawPulses(g);
   }
 
@@ -215,11 +272,13 @@ export class MiningBeamFx {
     g.moveTo(x, y).lineTo(hx, hy).stroke({ color: 0x0f766e, width: wid * 3.4, alpha: 0.12 });
     g.moveTo(x, y).lineTo(hx, hy).stroke({ color: 0x2dd4bf, width: wid * 1.3, alpha: 0.4 });
     g.moveTo(x, y).lineTo(hx, hy).stroke({ color: 0xecfdf5, width: wid * 0.35, alpha: 0.9 });
-    // (Motes running along it towards what it mends)
-    const len = Math.hypot(hx - x, hy - y);
+    // Two teal strands braided by sine round it, and green '+' motes flowing towards what it mends
+    const len = Math.hypot(hx - x, hy - y), ux = len > 1 ? (hx - x) / len : 1, uy = len > 1 ? (hy - y) / len : 0;
+    const look = beamLook(ship.blueprint.parts[w.part]?.fn);
+    if (len > 8) drawStrands(g, x, y, ux, uy, len, wid, look?.braid?.strands ?? 2, look?.braid?.color ?? 0x99f6e4, 1, this.t, id + w.part);
     for (let k = 0; k < 4; k++) {
-      const u = ((this.t * 0.9 + k / 4 + id * 0.13) % 1);
-      g.circle(x + (hx - x) * u, y + (hy - y) * u, 2.2 + 1.2 * Math.sin(u * Math.PI)).fill({ color: 0xa7f3d0, alpha: 0.75 * Math.sin(u * Math.PI) });
+      const u = ((this.t * 0.9 + k / 4 + id * 0.13) % 1), s = Math.sin(u * Math.PI), r = 2.6 + 1.6 * s, mx = x + (hx - x) * u, my = y + (hy - y) * u;
+      g.moveTo(mx - r, my).lineTo(mx + r, my).moveTo(mx, my - r).lineTo(mx, my + r).stroke({ color: 0xa7f3d0, width: 1.6, alpha: 0.85 * s });
     }
     g.circle(x, y, wid * 1.1).fill({ color: 0x5eead4, alpha: 0.45 });
     if (t < 0.999 && len > 1) {

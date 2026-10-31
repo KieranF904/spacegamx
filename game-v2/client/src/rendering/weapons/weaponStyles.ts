@@ -55,6 +55,10 @@ export interface WeaponStyle {
   arcScale?: number;
   /** Impact sparks spread over this many degrees of hue round their colour (a prism's rainbow) */
   shardHue?: number;
+  /** A faint ring of this world radius round the head the whole flight (a blast radius you can see coming: the Blackout) */
+  radiusRing?: { color: number; radius: number };
+  /** A jagged polyline along the shot's whole tracer, re-jittered every frame (a lightning bolt: the Spark) */
+  jagged?: { color: number; amp: number };
 }
 
 /**
@@ -79,6 +83,14 @@ export interface BeamLook {
   ramp?: 'orb' | 'ring' | 'none';
   /** The beam breaks up and flickers when starved of power: × the usual (0: steady) */
   sputter?: number;
+  /** The cone only reaches this far from the muzzle (a searchlight's is a spill of light, not the whole beam); default the beam */
+  coneLen?: number;
+  /** A molten pool of this colour at the hit point, growing with how long the beam has burned the same spot (the Cutter's) */
+  pool?: number;
+  /** The beam is a lightning polyline of this amplitude (world units), re-jittered every frame (the Tesla's) */
+  zap?: number;
+  /** Crosses ('+') drift along the beam instead of dots (the Repair Beam's) */
+  plus?: boolean;
 }
 
 /** Beam looks by model id (PlacedPart.fn); filled in by the per-model units */

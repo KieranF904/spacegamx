@@ -44,6 +44,8 @@ interface P {
   rot: number; vr: number;
   /** Arcs: jagged points, regenerated as they flicker; beams: [dx, dy] to the far end */
   pts?: number[];
+  /** Arcs: a new jag every frame (a chain's lightning), not now and then */
+  jit?: boolean;
   /** Chunks: the hot edge while it glows (its outline, stroked once for the chunk's size) */
   hot?: Graphics;
 }
@@ -246,8 +248,9 @@ export class DamageFx {
     }
     if (kind === 'arc') {
       // A jagged bolt from where it leapt, and a crackle where it lands
-      if (from) this.bolt(from, x, y, 0xffffff, 0xbfe9ff, 2.2);
+      if (from) this.zapArc(from, x, y);
       this.glow(x, y, 0, 0, 50, 9, 0x9ad8ff, 0.9);
+      this.burstSparks(x, y, 0, 0, 5, 2.5, 8, 0xbfe9ff);
       this.sound('hit', { x, y }, 0.5);
       return;
     }
@@ -298,6 +301,11 @@ export class DamageFx {
     }
     if (kind === 'hive') radius *= 0.7;
     if (kind === 'emp') {
+      // A wide one (the Blackout's) first throws a dark-blue dome out to its blast radius
+      if (radius >= 260) {
+        this.glow(x, y, 0, 0, radius * 0.95, 30, 0x1d3ea8, 0.55, 0.3);
+        this.ring(x, y, 0, 0, radius * 0.9, radius, 26, 0x3b6cf0, 0.7);
+      }
       this.glow(x, y, 0, 0, radius * 0.5, 10, 0xd9f6ff, 0.9);
       this.ring(x, y, 0, 0, radius * 0.15, radius * 1.1, 22, 0x6ad1ff, 0.8);
       this.ring(x, y, 0, 0, radius * 0.1, radius * 0.8, 16, 0xffffff, 0.5);
@@ -336,8 +344,8 @@ export class DamageFx {
    */
   onIntercept(m: { x: number; y: number; fx: number; fy: number; down: boolean }): void {
     const dx = m.x - m.fx, dy = m.y - m.fy;
-    this.push({ kind: 'beam', x: m.fx, y: m.fy, vx: 0, vy: 0, life: 0, max: 8, size: 3, grow: 0, color: 0xffc070, alpha: 1, drag: 1, rot: 0, vr: 0, pts: [dx, dy] });
-    this.glow(m.fx, m.fy, 0, 0, 16, 5, 0xffe2b0, 0.9);
+    this.push({ kind: 'beam', x: m.fx, y: m.fy, vx: 0, vy: 0, life: 0, max: 8, size: 3, grow: 0, color: 0xff8a1a, alpha: 1, drag: 1, rot: 0, vr: 0, pts: [dx, dy] });
+    this.glow(m.fx, m.fy, 0, 0, 16, 5, 0xffb060, 0.9);
     this.glow(m.x, m.y, 0, 0, 22, 6, 0xfff1d0, 1);
     if (m.down) {
       this.glow(m.x, m.y, 0, 0, 46, 12, 0xffb24a, 0.9, 0.8);
@@ -548,6 +556,12 @@ export class DamageFx {
   /** A jagged electric arc reaching out from (x, y) */
   private arc(x: number, y: number, vx: number, vy: number, angle: number, length: number, life: number): void {
     this.push({ kind: 'arc', x, y, vx, vy, life: 0, max: life, size: length, grow: 0, color: 0xbfeaff, alpha: 1, drag: 1, rot: angle, vr: 0, pts: this.jag(length, angle) });
+  }
+
+  /** A lightning polyline from where a chain leapt to where it lands, re-jittered every frame for 6 frames */
+  private zapArc(from: [number, number], x: number, y: number): void {
+    const dx = x - from[0], dy = y - from[1], len = Math.hypot(dx, dy) || 1, angle = Math.atan2(dy, dx);
+    this.push({ kind: 'arc', x: from[0], y: from[1], vx: 0, vy: 0, life: 0, max: 6, size: len, grow: 0, color: 0xc7dcff, alpha: 1, drag: 1, rot: angle, vr: 0, pts: this.jag(len, angle), jit: true });
   }
 
   private jag(length: number, angle: number): number[] {
@@ -905,7 +919,7 @@ export class DamageFx {
           break;
         }
         case 'arc': {
-          if (p.pts && p.pts.length > 4 && Math.random() < 0.35) p.pts = this.jag(p.size, p.rot);
+          if (p.pts && p.pts.length > 4 && (p.jit || Math.random() < 0.35)) p.pts = this.jag(p.size, p.rot);
           const pts = p.pts!;
           ga.moveTo(p.x + pts[0], p.y + pts[1]);
           for (let i = 2; i < pts.length; i += 2) ga.lineTo(p.x + pts[i], p.y + pts[i + 1]);
