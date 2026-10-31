@@ -452,7 +452,7 @@ export function scene(data: Data, p: ViewerParams): { items: Item[]; view: View;
   items.forEach((it, i) => {
     const b = it.built;
     // Flames, exhaust, and the engines' light (where lighting is on)
-    const fx = flames(b.jets, b.thrust, cs, b.tint, { flames: p.flames, boost: p.boost, exhaust: p.exhaust }, i + 1);
+    const fx = flames(b.jets, b.thrust, cs, b.tint, { flames: p.flames, boost: p.boost, exhaust: p.exhaust, frost: p.frost }, i + 1);
     it.fx = fx.draws;
     if (on && fx.light) {
       const [lx, ly] = rot(it, fx.light.x, fx.light.y);

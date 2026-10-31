@@ -290,7 +290,9 @@ export class DamageFx {
       return;
     }
     if (kind === 'phase') {
+      // A violet ripple spreading over the hull it passed through, a second one following
       this.ring(x, y, 0, 0, 10, 90, 14, 0xa78bfa, 0.9);
+      this.later(0.07, () => this.ring(x, y, 0, 0, 6, 130, 22, 0xc4b5fd, 0.6));
       this.glow(x, y, 0, 0, 50, 10, 0xede9fe, 0.8);
       return;
     }
@@ -783,6 +785,9 @@ export class DamageFx {
       this.push({ kind: 'glow', x: p.x + Math.cos(a) * 6, y: p.y + Math.sin(a) * 6, vx: p.vx + (Math.random() - 0.5) * 0.5, vy: p.vy + (Math.random() - 0.5) * 0.5,
         life: 0, max: 16 + Math.random() * 14, size: 9 + Math.random() * 9, grow: 0.25, color: Math.random() < 0.5 ? 0xff7a1a : 0xffc04a, alpha: 0.8, drag: 0.97, rot: 0, vr: 0 });
       if (Math.random() < 0.25) this.dustPuff(p.x, p.y, p.vx, p.vy - 0.2, 7, 60, 0x302a26, 0.35, 0.15);
+      // Embers lifting off it
+      if (Math.random() < 0.3) this.push({ kind: 'spark', x: p.x + Math.cos(a) * 4, y: p.y + Math.sin(a) * 4, vx: p.vx + (Math.random() - 0.5) * 0.8, vy: p.vy - 0.5 - Math.random() * 0.7,
+        life: 0, max: 26 + Math.random() * 20, size: 1.3, grow: 0, color: 0xffa04a, alpha: 1, drag: 0.97, rot: 0, vr: 0 });
     }
   }
 

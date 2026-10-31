@@ -87,20 +87,25 @@ export interface PlumeSpec {
   diamonds: number;
 }
 
-export function plumeSpec(k: EngineLook, thr: number, boost: number, edge: number, cs: number, time: number, seed: number): PlumeSpec {
+export function plumeSpec(k: EngineLook, thr: number, boost: number, edge: number, cs: number, time: number, seed: number, frost = 0): PlumeSpec {
   const b = k.boostGain > 0 ? boost : 0;
   const boosted = b > 0.5;
   const s = k.shimmer;
   const flicker = 1 + s * (0.07 * Math.sin(time * 41 + seed) + 0.05 * Math.sin(time * 27.3 + seed * 2.1) + 0.03 * Math.sin(time * 73 + seed * 0.7));
   const size = Math.sqrt(edge / cs);
-  const L = cs * (1.1 + 3.2 * thr) * size * k.len * (1 + k.boostGain * b) * flicker;
+  const L = cs * (1.1 + 3.2 * thr) * size * k.len * (1 + k.boostGain * b) * flicker * (1 - FROST_SHORTEN * frost);
   // (heat shimmer also breathes the width)
   const w = edge * 0.42 * k.width * (s > 1 ? 1 + 0.08 * (s - 1) * Math.sin(time * 57 + seed * 3.3) : 1);
   let d = 0;
   if (k.diamonds === 'thrust') d = thr > 0.6 ? (thr - 0.6) / 0.4 : 0;
   else if (k.diamonds === 'boost') d = boosted ? Math.min(1, thr) : 0;
-  return { L, w, pal: boosted ? k.boostPal ?? BOOST_PAL : k.pal, boosted, coreLen: k.coreLen, coreWidth: k.coreWidth, diamonds: d * k.diamondMul };
+  return { L, w, pal: frost > 0 ? FROST_PAL : boosted ? k.boostPal ?? BOOST_PAL : k.pal, boosted, coreLen: k.coreLen, coreWidth: k.coreWidth, diamonds: d * k.diamondMul };
 }
+
+/** A slowed ship (a Frostbite's beam, seen by all): its plumes run this much shorter, pale and icy, with white-blue motes */
+export const FROST_SHORTEN = 0.45;
+export const FROST_PAL: Palette = { outer: 0xbfe6ff, inner: 0xffffff, glow: 0x7cc4ff, shape: 'plume' };
+export const FROST_MOTES: [number, number, number] = [0xffffff, 0xcdeeff, 0x8fd0ff];
 
 /** The default boost flame (ThrusterFx PAL) */
 export const BOOST_PAL: Palette = { outer: 0x8a6bff, inner: 0xe6dcff, glow: 0x2a63ff, shape: 'plume' };
