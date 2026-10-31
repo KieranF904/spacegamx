@@ -165,16 +165,27 @@ export function packGunState(ship: ShipState, out: number[]): void {
   out[at] = n;
 }
 
-/** Take the server's value for one gun (the client, after GUN_STATE_PATIENCE ticks of disagreeing) */
-export function applyGunState(ship: ShipState, w: WeaponInfo, v: number): void {
+/**
+ * Take the server's value for one gun (the client, after GUN_STATE_PATIENCE ticks of disagreeing). `v` is the server's
+ * value at its tick T. With `mine` (our own value at T) and `elapsed` (ticks from T to now), the adoption is the
+ * DELTA (server - mine@T) applied to the present state, and a reload resumes `elapsed` ticks further on, so our own
+ * shots and charge ticks since T are kept. Without them the raw value is written.
+ */
+export function applyGunState(ship: ShipState, w: WeaponInfo, v: number, mine?: number, elapsed = 0): void {
   const p = w.part, f = w.fire;
   if (f.model === 'clip') {
-    ship.rounds[p] = v % GUN_STATE_RELOADING;
+    const clip = f.clip ?? 1, sr = v % GUN_STATE_RELOADING;
+    ship.rounds[p] = mine === undefined ? sr : Math.max(0, Math.min(clip, ship.rounds[p] + (sr - (mine % GUN_STATE_RELOADING))));
     if (f.regrow) return;
     // Reloading: resume at the server's progress (the middle of its eighth), not from the start
-    if (v >= GUN_STATE_RELOADING) ship.reload[p] = (f.reload ?? 60) * (1 - (Math.floor(v / GUN_STATE_RELOADING) - 1 + 0.5) / RELOAD_STEPS);
-    else ship.reload[p] = 0;
-  } else if (f.model === 'charge') ship.charge[p] = v;
+    if (v >= GUN_STATE_RELOADING) {
+      const left = (f.reload ?? 60) * (1 - (Math.floor(v / GUN_STATE_RELOADING) - 1 + 0.5) / RELOAD_STEPS) - elapsed;
+      if (left > 0) ship.reload[p] = left;
+      else { ship.reload[p] = 0; ship.rounds[p] = clip; } // it has finished since
+    } else if (mine === undefined || mine >= GUN_STATE_RELOADING) ship.reload[p] = 0;
+  } else if (f.model === 'charge') {
+    ship.charge[p] = mine === undefined ? v : Math.max(0, Math.min(f.charge ?? Infinity, ship.charge[p] + (v - mine)));
+  }
 }
 
 /** Guns of a group fire in turn (see stepGuns): the others of `w`'s group that are ready wait their turn, `interval / guns` apart, in part order */

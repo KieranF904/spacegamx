@@ -54,10 +54,27 @@ describe('gun-state correction (client)', () => {
     const w = mine.derived.weapons[0], p = w.part, len = w.fire.reload ?? 60;
     server.rounds[p] = 0;
     server.reload[p] = len * 0.3; // 70% done on the server; the client never saw the reload start
-    for (let t = 100; t <= 200; t++) sync.record(mine, t);
+    for (let t = 100; t <= 120 + GUN_STATE_PATIENCE; t++) sync.record(mine, t); // (the newest tick is the row's: no latency)
     expect(sync.onRow(mine, row(server), 120)).toBe(0);
     expect(sync.onRow(mine, row(server), 120 + GUN_STATE_PATIENCE)).toBe(1);
     expect(mine.reload[p]).toBeGreaterThan(0);
     expect(Math.abs(mine.reload[p] - len * 0.3)).toBeLessThanOrEqual(len / 8);
+  });
+});
+
+describe('gun-state adoption keeps our own progress since the server tick', () => {
+  it('applies the delta (server - mine at T) to a clip that has fired since T', () => {
+    const mine = railDriver(), server = railDriver();
+    const sync = new GunSync();
+    const p = mine.derived.weapons[0].part;
+    server.rounds[p] = 5;
+    for (let t = 100; t <= 120; t++) sync.record(mine, t);
+    expect(sync.onRow(mine, row(server), 100)).toBe(0);
+    mine.rounds[p] = 4; // ours at the server's tick 130
+    for (let t = 121; t <= 130; t++) sync.record(mine, t);
+    mine.rounds[p] = 3; // fired again since (latency)
+    for (let t = 131; t <= 136; t++) sync.record(mine, t);
+    expect(sync.onRow(mine, row(server), 130)).toBe(1);
+    expect(mine.rounds[p]).toBe(4); // 3 + (5 - 4), not the raw 5
   });
 });

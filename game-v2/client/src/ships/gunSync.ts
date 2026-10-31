@@ -20,10 +20,11 @@ export class GunSync {
   /** By part index: the server tick it first disagreed at (absent: agreeing) */
   private readonly since = new Map<number, number>();
   private ship: ShipState | null = null;
+  private latest = -1;
 
   /** After a predicted tick of your guns: what they hold now */
   record(ship: ShipState, tick: number): void {
-    if (ship !== this.ship) { this.ship = ship; this.since.clear(); this.ticks.fill(-1); }
+    if (ship !== this.ship) { this.ship = ship; this.since.clear(); this.ticks.fill(-1); this.latest = -1; }
     const slot = ((tick % HISTORY) + HISTORY) % HISTORY, at = slot * GUN_STATE_MAX;
     let n = 0;
     for (const w of ship.derived.weapons) {
@@ -34,6 +35,7 @@ export class GunSync {
     }
     for (let k = n; k < GUN_STATE_MAX; k++) this.parts[at + k] = -1;
     this.ticks[slot] = tick;
+    if (tick > this.latest) this.latest = tick;
   }
 
   /**
@@ -57,7 +59,7 @@ export class GunSync {
       if (tick - from < GUN_STATE_PATIENCE) continue;
       let w: (typeof ship.derived.weapons)[number] | undefined;
       for (const x of ship.derived.weapons) if (x.part === part) { w = x; break; }
-      if (w) { applyGunState(ship, w, v); adopted++; }
+      if (w) { applyGunState(ship, w, v, mine, Math.max(0, this.latest - tick)); adopted++; }
       this.since.delete(part);
     }
     return adopted;
