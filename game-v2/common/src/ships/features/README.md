@@ -81,3 +81,11 @@ plan order, and the bridge's gun step (`bridge/weapons.ts`) walks the arrays: no
 Hooks receive `WeaponBridge` (an alias of the bridge's ctx, `bridge/core.ts`). Not done here: describe text (the Mends /
 Intercepts tooltip rows replace the Damage and Fire-rate rows, which an append-only facts seam cannot express) and the
 client's repair beam / point-defence visuals (`MiningBeamFx`, `ShipClient.stepPointDefenceVisuals`, `gunDecor`).
+
+## The contract
+
+`contract.ts` exports `runPartContract('<id>', { parts })`, a vitest suite every feature must pass (plan and wire
+slots, catalogue and recipes, describe facts, burst energy, stepShipPhysics vs replicaStep parity, keyframe and
+pilot-row round-trip, hot-path emptiness). Each feature folder has a `contract.test.ts` calling it; the client half
+(facts render in tooltip, chips and summary) is `client/src/ships/features/contract.test.ts`, which walks every
+registered feature. A new feature adds its `contract.test.ts` with fixture parts.
