@@ -7,6 +7,7 @@
 
 import { WeaponType } from '@space-game/common';
 import { KINETIC_MODEL_STYLES } from './kineticStyles';
+import { ORDNANCE_STYLES } from './ordnanceStyles';
 
 export interface WeaponStyle {
   /** How the head is placed: from spawn point + velocity (straight shots), or from the server's interpolated position (guided or slowing shots) */
@@ -43,7 +44,7 @@ export interface WeaponStyle {
   /** Ghost copies of the head trailing behind it, this many */
   afterimages?: number;
   /** A ring round the head that swells and fades every `period` ticks */
-  ringPulse?: { color: number; size: number; period: number };
+  ringPulse?: { color: number; size: number; period: number; closing?: number };
   /** A cloud of smoke or gas left where it lands (and a thin one as it flies, when `fly`) */
   smokeCloud?: { color: number; size: number; life: number; fly?: boolean };
   /** Arcs of lightning round the head, `forks` of them, `length` long (world units); `orb` styles use the same crackle */
@@ -54,6 +55,16 @@ export interface WeaponStyle {
   blink?: number;
   /** × the crackle's size (EMP, Arc and lightning): default 1 */
   arcScale?: number;
+  /** The shell swells to (1 + lob) × its size at the top of its flight and shrinks again as it lands (a mortar's arc; needs the shell's endTick) */
+  lob?: number;
+  /** A light at the nose: a hard blink (`blink`) or a soft pulse, every `period` ticks */
+  nose?: { color: number; size: number; period: number; blink?: boolean };
+  /** A shell that bursts where its endTick says when it is removed (a mortar's landing), shaking a screen within `shake` units at full strength */
+  landBurst?: { shake?: number };
+  /** Draws a dashed guide from the shell to your cursor while you hold fire (your own guided shells) */
+  guide?: boolean;
+  /** Warns a pilot it is heading at, from the shell's velocity: the miss distance (world units) that counts as heading at you */
+  incoming?: { radius: number };
   /** Impact sparks spread over this many degrees of hue round their colour (a prism's rainbow) */
   shardHue?: number;
   /** Only every `every`th shot is drawn at full brightness, the rest at `dim` of it (a stream's tracer rounds) */
@@ -66,7 +77,7 @@ export interface WeaponStyle {
  * A weapon model's look, by its function id (PlacedPart.fn): any field of its kind's style it names is replaced, the
  * rest stay the kind's. Filled in by the per-model units; empty here.
  */
-export const MODEL_STYLES: Record<string, Partial<WeaponStyle>> = {};
+export const MODEL_STYLES: Record<string, Partial<WeaponStyle>> = { ...ORDNANCE_STYLES };
 
 
 /** A beam's look: PulseFx (pulse guns) and MiningBeamFx (cutting beams) read it; absent fields keep the grade's look */

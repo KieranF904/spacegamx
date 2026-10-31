@@ -42,6 +42,8 @@ import { BossFx } from './BossFx';
 import { DamageFx } from './DamageFx';
 import { MiningBeamFx } from './MiningBeamFx';
 import { ScannerFx } from './ScannerFx';
+import { IncomingWarning } from '../ui/IncomingWarning';
+import type { ShellLook } from '../rendering/weapons/WeaponFx';
 import type { PilotState } from '../econ/clientEcon';
 import type { ThrustCommand } from './ThrusterFx';
 import { settings } from '../settings/Settings';
@@ -255,7 +257,41 @@ export class ShipClient {
    * server row taking the shell over (WeaponFx asks once, as it first sees the shell; shells first seen in a snapshot
    * have no entry and take their kind's look)
    */
-  private shellLooks = new Map<number, { model?: string; damage?: number }>();
+  private shellLooks = new Map<number, ShellLook>();
+  /** Your cursor in the world (a guided shell's guide), reused */
+  private readonly cursorPoint = { x: 0, y: 0 };
+  /** Was your trigger held on the last predicted tick (the guide line shows only while it is) */
+  private fireHeld = false;
+  private incomingUI: IncomingWarning | null = null;
+
+  /**
+   * The gun behind a shell: from its fire event if it came by one, else (shells sent as rows: homing, aimed, guided)
+   * worked out from its owner's guns, the one of its weapon type whose muzzle was nearest where it spawned. Kept per
+   * shell id (WeaponFx and the landing rings both ask).
+   */
+  shellInfo(e: InterpolatedEntity): ShellLook | undefined {
+    let l = this.shellLooks.get(e.id);
+    if (l) return l;
+    const owner = e.data?.[6] ?? -1, type = e.data?.[0] ?? -1;
+    const ship = this.store.get(owner), ent = this.opts.state.entities.get(owner);
+    if (!ship || ship.kind !== 'ship' || !ent) return undefined;
+    const sx = e.spawnX ?? e.x, sy = e.spawnY ?? e.y;
+    const pose = { x: ent.renderX, y: ent.renderY, angle: ent.renderAngle };
+    let best: WeaponInfo | null = null, bd = Infinity;
+    for (const w of ship.derived.weapons) {
+      if ((WEAPON_KIND_TYPE[w.kind] ?? 1) !== type) continue;
+      const [mx, my] = shipPointToWorld(ship, pose, w.window ? w.window.pivot : w.muzzle, this.opts.tuning.cellSize);
+      const d = Math.hypot(mx - sx, my - sy);
+      if (d < bd) { bd = d; best = w; }
+    }
+    if (!best) return undefined;
+    const part = ship.blueprint.parts[best.part];
+    const def = partWeaponDef(this.opts.tuning, best.kind, part, best);
+    l = { model: part?.fn, damage: def.damage, splash: def.splash?.radius };
+    this.shellLooks.set(e.id, l);
+    while (this.shellLooks.size > 512) this.shellLooks.delete(this.shellLooks.keys().next().value!);
+    return l;
+  }
 
   /**
    * A snapshot arriving, before anything else: its keyframes and control
@@ -306,7 +342,8 @@ export class ShipClient {
       for (const id of ids) this.firePoses.set(id, { x: st.body.x, y: st.body.y, angle: st.body.angle });
       while (this.firePoses.size > 512) this.firePoses.delete(this.firePoses.keys().next().value!);
       // The gun's model and what a shot of it does (a model's look; the flash, recoil and impact scale with the damage)
-      const look = { model: ship.blueprint.parts[part]?.fn, damage: partWeaponDef(this.opts.tuning, v.kind, ship.blueprint.parts[part], gun).damage };
+      const wdef = partWeaponDef(this.opts.tuning, v.kind, ship.blueprint.parts[part], gun);
+      const look = { model: ship.blueprint.parts[part]?.fn, damage: wdef.damage, splash: wdef.splash?.radius };
       for (const id of ids) this.shellLooks.set(id, look);
       while (this.shellLooks.size > 512) this.shellLooks.delete(this.shellLooks.keys().next().value!);
       // A pilot's shots move on the tick they're fired (they're fired before shells move; pilotless ships' after)
@@ -403,7 +440,18 @@ export class ShipClient {
     renderer.barrelTip = (owner, x, y, angle) => this.renderer?.barrelTip(owner, x, y, angle) ?? null;
     renderer.lodestoneGlow = (id) => this.lodestoneGlow(id);
     renderer.firePoseOf = (id) => { const p = this.firePoses.get(id); this.firePoses.delete(id); return p; };
-    renderer.shellLookOf = (id) => { const l = this.shellLooks.get(id); this.shellLooks.delete(id); return l; };
+    renderer.shellLookOf = (id, e) => this.shellInfo(e);
+    // A guided shell's guide line runs to your cursor while you hold fire
+    renderer.guideTo = () => {
+      if (!this.fireHeld) return null;
+      const me = this.opts.state.entities.get(this.opts.state.playerId);
+      if (!me) return null;
+      const a = this.opts.localAim();
+      this.cursorPoint.x = me.renderX + Math.cos(a.angle) * a.dist;
+      this.cursorPoint.y = me.renderY + Math.sin(a.angle) * a.dist;
+      return this.cursorPoint;
+    };
+    this.incomingUI = new IncomingWarning();
     renderer.lighting.addSource((L) => this.damageFx?.collectLights(L));
     this.jumpFx = new JumpFx(renderer.getShipLayer(), this.store, this.opts.state, this.jump);
     this.beamFx = new MiningBeamFx(renderer.getEffectLayer(), this.store, this.opts.state, this.opts.tuning, () => {
@@ -504,6 +552,7 @@ export class ShipClient {
     const burning = jumpPhase(player.jump ?? 0, this.jump).phase === 'burn' || tick < (player.empUntil ?? 0);
     const hasMiners = ship.derived.miners.length > 0;
     const firing = (input.fireLeft || (input.fireRight && !hasMiners)) && !burning;
+    this.fireHeld = firing;
     const pose = { x: player.x, y: player.y, angle: player.angle };
     // Each shot spends stored energy, then the mining lasers pay for their segment, as on the server (energy.ts)
     const energy = { charge };
@@ -1071,6 +1120,8 @@ export class ShipClient {
     this.damageFx?.update(dt);
     this.beamFx?.update(dt);
     this.chargeFx?.update(dt, Math.round(state.getRawServerTick()));
+    // A shell heading at you that warns of it (the Leviathan): an arrow on the screen edge toward it
+    if (this.scene && this.incomingUI) this.incomingUI.update(dt, this.scene.incomingShells, (x, y) => this.scene!.worldToScreen(x, y), this.scene.screenSize());
     this.bossFx?.update(dt);
     this.scannerFx?.update(dt, this.zoom());
     this.updateRepairHint();

@@ -1655,6 +1655,26 @@ export class Renderer {
     this.weaponFx.shellLook = fn;
   }
 
+  /** Shells heading at you that warn of it (WeaponFx.threats) */
+  get incomingShells(): { list: WeaponFx['threats']; count: number } {
+    this.incomingScratch.list = this.weaponFx.threats;
+    this.incomingScratch.count = this.weaponFx.threatCount;
+    return this.incomingScratch;
+  }
+  private incomingScratch: { list: WeaponFx['threats']; count: number } = { list: [], count: 0 };
+
+  screenSize(): { w: number; h: number } {
+    this.sizeScratch.w = this.app.screen.width;
+    this.sizeScratch.h = this.app.screen.height;
+    return this.sizeScratch;
+  }
+  private sizeScratch = { w: 0, h: 0 };
+
+  /** Where your cursor is in the world while you hold fire (WeaponFx.guideTo) */
+  set guideTo(fn: WeaponFx['guideTo']) {
+    this.weaponFx.guideTo = fn;
+  }
+
   /** A shell your client fired ahead of the server (WeaponFx.predict) */
   predictShot(p: PredictedShell): void {
     this.weaponFx.predict(p);
