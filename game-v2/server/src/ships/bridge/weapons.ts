@@ -315,7 +315,10 @@ export function fireBeam(b: BridgeCtx, eid: number, ship: ShipState, w: WeaponIn
   // (A hostile's beam burns at its kind's npcScale: the laser was made better for pilots, not for the scrap that fires it)
   const npc = hasComponent(b.host.world, Player, eid) ? 1 : def.npcScale ?? 1;
   // (A held beam with a windup burns up to full over its first ticks: guns.ts windupScale)
-  const dmg = (pulse ? pulse.damage : ((def.dps ?? 50) / 60) * windupScale(ship, w)) * Math.max(w.satisfaction, b.tuning.flow.minWeaponSatisfaction) * w.strength * b.damageMul(eid) * npc;
+  // (A zapping beam, the Tesla's, burns its dps x zap / 60 all at once every `zap` ticks, and nothing in between)
+  const zapping = !pulse && !!def.zap;
+  const zapK = zapping ? (b.host.getTick() % def.zap! === 0 ? def.zap! : 0) : 1;
+  const dmg = zapK * (pulse ? pulse.damage : ((def.dps ?? 50) / 60) * windupScale(ship, w)) * Math.max(w.satisfaction, b.tuning.flow.minWeaponSatisfaction) * w.strength * b.damageMul(eid) * npc;
   let shipHit: { eid: number; ship: ShipState; part: number; t: number } | null = null;
   // It burns `width` wide: a hull that close to its line is hit (its edges are tried when the line itself misses)
   const half = (pulse ? pulse.width : def.width ?? 0) / 2;
@@ -346,12 +349,45 @@ export function fireBeam(b: BridgeCtx, eid: number, ship: ShipState, w: WeaponIn
     // Past its effective range a fading beam (the laser's) burns ever weaker, out to where it gives out (pulse.ts beamFalloff)
     const fade = beamFalloff(def, shipHit.t * range);
     const at = b.worldToGrid(shipHit.eid, shipHit.ship, x + (x1 - x) * shipHit.t, y + (y1 - y) * shipHit.t);
+    if (zapping) {
+      // (Between zaps it only lights the line; on a zap it hurts the first hull, then leaps on from where it struck)
+      if (dmg > 0) zap(b, eid, w, def, shipHit.eid, shipHit.ship, shipHit.part, dmg * armor * fade, at, ship, x + (x1 - x) * shipHit.t, y + (y1 - y) * shipHit.t);
+      return shipHit.t;
+    }
     const dealt = b.hurt(shipHit.eid, shipHit.ship, shipHit.part, dmg * armor * fade, eid, { hit: weaponHit(w.kind, def, shooterGrade(b.catalog, ship.blueprint.parts[w.part])), at });
     if (pulse) b.pulseHit = { eid: shipHit.eid, dealt };
     else if (dealt > 0 && b.host.getTick() % 10 === 0) b.host.notifyDamage(shipHit.eid, dealt * 10, eid);
     return shipHit.t;
   }
   return rockT * (shipHit ? shipHit.t : 1);
+}
+
+/**
+ * One zap of a Tesla: `dmg` into the part it struck, then it leaps to up to `chain.count` more ships within
+ * `chain.radius` of where it last struck (the nearest not yet struck, by hull), each time `chain.falloff` of the
+ * last, on the part nearest where it leapt from. Each hop is shown to everyone (host.arcHop).
+ */
+function zap(b: BridgeCtx, eid: number, w: WeaponInfo, def: WeaponTuning, target: number, tship: ShipState, part: number, dmg: number, at: Vec2, ship: ShipState, hx: number, hy: number): void {
+  const hit = weaponHit(w.kind, def, shooterGrade(b.catalog, ship.blueprint.parts[w.part]));
+  const dealt = b.hurt(target, tship, part, dmg, eid, { hit, at });
+  if (dealt > 0) b.host.notifyDamage(target, dealt, eid);
+  const c = def.chain;
+  if (!c) return;
+  const sys = InSystem.systemId[eid];
+  // (A zap strikes a handful of ships, a few times a second: the small list costs nothing)
+  const struck = [eid, target];
+  let fx = hx, fy = hy, d = dmg;
+  for (let i = 0; i < c.count; i++) {
+    const next = nearestTarget(b, eid, fx, fy, c.radius, (o) => !struck.includes(o), true);
+    if (next < 0) break;
+    struck.push(next);
+    d *= c.falloff;
+    const p = b.nearestPartPoint(next, fx, fy);
+    const tx = p ? p[0] : Position.x[next], ty = p ? p[1] : Position.y[next];
+    b.splashAt(sys, tx, ty, 30, d, eid, hit);
+    b.host.arcHop?.(sys, tx, ty, fx, fy);
+    fx = tx; fy = ty;
+  }
 }
 
 /** A beam's muzzle (world) and angle, along its gun's aim */

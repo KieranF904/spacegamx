@@ -30,7 +30,7 @@ Large
 Large · Block
 
 == tradeOff ==
-a wide, long blackout, slow
+charged area blackout, 2.8 s
 
 == keyStats ==
 1 dmg/s · reach 3,300 · charge 1.5s · draws 15
