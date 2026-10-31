@@ -237,7 +237,7 @@ export function lifeToReach(life: number, speed: number, reach: number): number 
 export function firesStraight(def: WeaponTuning): boolean {
   // Shells that end at the aim fly as far as the aim (which only the server knows), and guided ones turn as the
   // cursor moves: sent as they fly, like missiles (their projectile row carries the end tick: data[9])
-  return !def.homing && !endsAtAim(def) && !def.guided;
+  return !def.homing && !endsAtAim(def) && !def.guided && !def.salvo;
 }
 
 export interface FireRecord {

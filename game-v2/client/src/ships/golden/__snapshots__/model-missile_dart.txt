@@ -4,9 +4,9 @@ Mk I · Small · Square · 1 cell
 Hull · mass75 hp · 1.4
 Armour · build1 · 1 pts
 TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
-Damage27/s · reach 11,440
+Damage28/s · reach 11,440
 Hits withExplosive · penetration 0.5
-Fire rate0.5/s · shells · Missiles (no energy)
+Fire rate0.6/s · shells · Missiles (no energy)
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 1 clear cell ahead
 Power draw8/s
@@ -33,7 +33,7 @@ Small · Square
 locks on · ammo
 
 == keyStats ==
-27 dmg/s · reach 11,440 · ammo · draws 8
+28 dmg/s · reach 11,440 · ammo · draws 8
 
 == mountBadge ==
 FIXED
@@ -50,4 +50,4 @@ Needs 1 clear cell ahead
 {"open":true,"badge":"Lv 11","why":""}
 
 == partStats (raw) ==
-{"grade":1,"mark":"Mk I","size":"Small","area":1,"hp":75.2,"mass":1.4,"firepower":27.490909090909092,"toughness":75.2,"armour":1,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":27.490909090909092,"range":11440,"damageType":"explosive","pen":0.5,"draw":8}
+{"grade":1,"mark":"Mk I","size":"Small","area":1,"hp":75.2,"mass":1.4,"firepower":28,"toughness":75.2,"armour":1,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":28,"range":11440,"damageType":"explosive","pen":0.5,"draw":8}

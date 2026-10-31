@@ -49,7 +49,7 @@ export interface ShipRating {
   parts: PartScore[];
 }
 
-type WeaponDef = { type?: string; damage?: number; dps?: number; burst?: number; splash?: { damage: number; radius: number } };
+type WeaponDef = { type?: string; damage?: number; dps?: number; burst?: number; walk?: { at: number[] }; salvo?: { count: number }; splash?: { damage: number; radius: number } };
 
 /**
  * A weapon's sustained damage per second at full power, before grade and size (`gun`: one gun's own tuning, launch.ts
@@ -67,7 +67,7 @@ export function baseWeaponDps(tuning: ShipTuning, kind: string, interval: number
   // A wider burst than its kind's own (a bigger flak gun's) lands on that many more parts
   const base = tuning.weapons?.[kind]?.splash?.radius;
   const wide = def.splash && base ? def.splash.radius / base : 1;
-  return (((def.damage ?? 0) + (def.splash?.damage ?? 0) * SPLASH_WORTH * wide) * (def.burst ?? 1) * 60) / Math.max(1, interval);
+  return (((def.damage ?? 0) + (def.splash?.damage ?? 0) * SPLASH_WORTH * wide) * (def.burst ?? 1) * (def.walk?.at.length ?? def.salvo?.count ?? 1) * 60) / Math.max(1, interval);
 }
 
 /** The rating of a ship as built (its parts' current state: lost parts count nothing). `hpScale`: an enemy faction's toughness */

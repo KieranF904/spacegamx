@@ -155,6 +155,10 @@ export interface WeaponTuning {
   endAtAim?: boolean;
   /** A walking salvo: shell i lands at `at[i]` × the aim distance, each `gap` ticks after the one before (implies endAtAim) */
   walk?: { at: number[]; gap: number };
+  /** A rippling salvo: `count` shells a trigger pull, the first at once and the rest `gap` ticks apart (the Swarm's six rockets over half a second) */
+  salvo?: { count: number; gap: number };
+  /** Unarmed for this many ticks after launch: it flies through ships and rock, and goes off only after (the Leviathan's) */
+  arm?: number;
   /** Guided: while its gun's trigger is held the shell turns toward the cursor (at most `turn` rad a tick); let go, it flies straight */
   guided?: { turn: number };
   /** Beam: what it lights is marked (takes MARK_TAKEN × damage from everyone) while lit and `ticks` after */

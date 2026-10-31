@@ -162,6 +162,8 @@ export interface PendingSalvoShell {
   due: number;
   index: number;
   reach: number;
+  /** A rippling salvo's missiles: the lock they steer to */
+  target?: number;
   damageScale: number;
   dry?: boolean;
   ammoMods?: WeaponMods;

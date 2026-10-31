@@ -124,6 +124,12 @@ export class Weapons {
     return !!this.extras.get(proj)?.def.lob;
   }
 
+  /** An unarmed shell (its `arm` ticks not yet up) flies through ships and rock */
+  unarmed(proj: number): boolean {
+    const arm = this.extras.get(proj)?.def.arm;
+    return !!arm && this.host.tick() - Projectile.spawnTick[proj] < arm;
+  }
+
   /** A shot's damage against shields and hull, if its weapon has its own, what it hits with (damage.ts), and the faction its ammunition is made for */
   vsOf(proj: number): { shield?: number; hull?: number; hit: HitInfo; bane?: { faction: string; damage: number } } {
     const x = this.extras.get(proj), d = x?.def;

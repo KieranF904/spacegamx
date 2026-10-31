@@ -3559,7 +3559,7 @@ this.devTeleport = opts.devTeleport ?? false;
     for (const proj of projectiles) {
       if (hasComponent(this.world, Dead, proj)) continue;
       // A lobbed shell passes over everything until it comes down
-      if (this.weapons.lobbed(proj)) continue;
+      if (this.weapons.lobbed(proj) || this.weapons.unarmed(proj)) continue;
       // A charge stuck in rock rides it (and hurts nothing else)
       const stuck = this.stuckShots.get(proj);
       if (stuck) {
