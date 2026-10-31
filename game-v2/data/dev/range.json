@@ -1,0 +1,38 @@
+{
+  "_comment": "DEV ONLY (temporary): the weapons range. A private empty system with a firing line at its centre and stationary target dummies (real enemy ships that never move, aim or fire, pay nothing and come back after respawnSeconds). Loaded by the server only in development (server/src/data/devData.ts); production never reads this file. Reach it with the F9/F10 panel's Go to Weapons Range, or devTeleport to `dev_range`. Each dummy: ship (data/ships/blueprints/enemy), faction, grade (Mk), plating, elite, hp/core (a boss's multipliers, bosses.json), distance from the firing line, bearing in degrees off north.",
+  "system": {
+    "id": "dev_range",
+    "name": "Weapons Range (dev)",
+    "description": "Dev only: an empty, quiet system with target dummies to shoot at.",
+    "danger": 1,
+    "starColor": "#cfe3f5",
+    "starRadius": 0,
+    "position": { "x": -200000, "y": -200000 },
+    "sector": "private",
+    "private": true,
+    "centralBody": { "type": "none" },
+    "visuals": { "ambient": 0.35 },
+    "hazards": [],
+    "asteroidDensity": 0,
+    "asteroidBelt": { "innerRadius": 0, "outerRadius": 0, "count": 0 },
+    "stations": [],
+    "portals": []
+  },
+  "range": {
+    "origin": { "x": 0, "y": 0 },
+    "respawnSeconds": 4,
+    "sweep": 350,
+    "dummies": [
+      { "id": "mite", "label": "Scrap Mite (start)", "ship": "scrap_mite", "faction": "scrapborn", "grade": 1, "distance": 400, "bearing": -30 },
+      { "id": "crawler", "label": "Scrap Crawler (start)", "ship": "scrap_crawler", "faction": "scrapborn", "grade": 1, "distance": 400, "bearing": 0 },
+      { "id": "skiff", "label": "Pirate Skiff (start)", "ship": "pirate_skiff", "faction": "pirates", "grade": 1, "distance": 400, "bearing": 30 },
+      { "id": "brawler", "label": "Redtooth Brawler (start)", "ship": "redtooth_brawler", "faction": "redtooth", "grade": 1, "distance": 800, "bearing": -35 },
+      { "id": "raider2", "label": "Pirate Raider Mk II (mid)", "ship": "pirate_raider", "faction": "pirates", "grade": 2, "distance": 800, "bearing": 0 },
+      { "id": "warden2", "label": "Frost Warden Mk II (shielded)", "ship": "frost_warden", "faction": "frost", "grade": 2, "distance": 800, "bearing": 35 },
+      { "id": "zealot3", "label": "Cinder Zealot Mk III (late)", "ship": "cinder_zealot", "faction": "cinder", "grade": 3, "distance": 1400, "bearing": -40 },
+      { "id": "elite_gunship2", "label": "Elite Pirate Gunship Mk II", "ship": "pirate_gunship", "faction": "pirates", "grade": 2, "elite": true, "distance": 1400, "bearing": -12 },
+      { "id": "tallyman", "label": "Tallyman-class boss hull", "ship": "pirate_gunship", "faction": "pirates", "grade": 1, "plating": 1, "hp": 4, "core": 2.5, "distance": 1400, "bearing": 12 },
+      { "id": "bulwark3", "label": "Frost Bulwark Mk III (heavy)", "ship": "frost_bulwark", "faction": "frost", "grade": 3, "distance": 1400, "bearing": 40 }
+    ]
+  }
+}

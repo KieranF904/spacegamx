@@ -27,6 +27,10 @@ export class Ammo {
   /** Every crate each weapon kind takes, the standard one first */
   private crates = new Map<string, string[]>();
 
+  /** Dev only (WeaponsRange): pilots whose ammunition guns fire the ideal crate without limit, spending nothing */
+  private ideal = new Set<PilotConn>();
+  private idealPicks = new Map<string, string | null>();
+
   /** Resend the hangar (a slot's loadout changed) */
   hangar?: (conn: PilotConn) => void;
 
@@ -55,6 +59,14 @@ export class Ammo {
     const crates = this.crates.get(kind);
     const p = crates && this.pilots.get(conn);
     if (!crates || !p) return { scale: 1, dry: false };
+    // Ideal ammunition (dev tool): the best crate for this gun, unlimited, nothing opened or spent, never dry
+    if (this.ideal.size && this.ideal.has(conn)) {
+      const item = this.idealCrate(kind);
+      if (item) {
+        if (this.dry.delete(conn)) this.pilots.sendProfile(conn);
+        return { scale: 1, dry: false, mods: this.crate(item, kind).mods, item };
+      }
+    }
     const ammo = p.ammo ?? { open: {}, load: {} };
     // The loadout's crates open before any others; its first pick before those
     const pick = chooseCrate(crateOrder(crates, this.loadoutOf(p.ship)), this.firstOf(p)[kind], ammo.open, (c) => countOf(p.cargo, c) > 0);
@@ -80,6 +92,35 @@ export class Ammo {
       this.pilots.toast(conn, `Out of ammunition for the ${kind}: firing plain rounds (${Math.round(dry * 100)}% damage)`, 'warn');
     }
     return { scale: dry, dry: true };
+  }
+
+  /**
+   * Dev tool: switch "ideal ammo" on or off for a pilot. While on, every gun that takes crates fires
+   * `idealCrate(kind)` without limit: no crate opened, nothing leaves the hold. The caller gates it on the dev flag.
+   */
+  setIdeal(conn: PilotConn, on: boolean): void {
+    if (on) this.ideal.add(conn); else this.ideal.delete(conn);
+  }
+
+  isIdeal(conn: PilotConn): boolean {
+    return this.ideal.has(conn);
+  }
+
+  /**
+   * The crate "ideal ammo" fires for a gun kind: the one that does the most damage per round (its direct damage
+   * multiplier, 1 + mods.mul.damage; the splash, burn or frost a crate adds does not count), the standard crate on a tie.
+   * Undefined when the kind takes no crates.
+   */
+  idealCrate(kind: string): string | undefined {
+    if (this.idealPicks.has(kind)) return this.idealPicks.get(kind) ?? undefined;
+    const list = this.crates.get(kind) ?? [];
+    let best: string | undefined, score = -Infinity;
+    for (const c of list) {
+      const k = 1 + (this.crate(c, kind).mods?.mul?.damage ?? 0);
+      if (k > score + 1e-9) { best = c; score = k; }
+    }
+    this.idealPicks.set(kind, best ?? null);
+    return best;
   }
 
   /** Open this kind of crate first (for the gun it's for), on the ship you fly */
@@ -203,5 +244,6 @@ export class Ammo {
 
   forget(conn: PilotConn): void {
     this.dry.delete(conn);
+    this.ideal.delete(conn);
   }
 }

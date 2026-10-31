@@ -7,7 +7,7 @@ The client's player-facing shell: `Game.ts` (the orchestrator: owns the window s
 | `client/src/Game.ts` | 1591 | Orchestrator. See "Game.ts map" below. Read slices only |
 | `app/windows.ts` | 318 | The windows registry: `WindowHost` (the getters Game supplies), `WindowSet` (every window and HUD piece, 28 of them), `buildWindows(host, uiOverlay)`. Built in the same order as before (later windows close over earlier ones). Imports Game only as a type |
 | `app/lazyScreens.ts` | 36 | `makeComponentGuide`, `makeStationWindow` (the two `Lazy` windows), `prefetchScreens(host, w)` (the prefetch list) |
-| `app/devTools.ts` | 18 | `installDevTools`: the F8 render tuning and F9 ship swap panels, dev builds only (`import.meta.env.DEV`) |
+| `app/devTools.ts` | 18 | `installDevTools`: the F8 render tuning, F9 ship swap and F10 weapons range panels, dev builds only (`import.meta.env.DEV`) |
 | `app/inputSend.ts` | 295 | The input-send path: `tickInput(s)` samples keys and mouse once per input tick and sends the message (or predicts unsent), `sendNeutralInput`, the last-sent bookkeeping over `INPUT_BOOLS`/`INPUT_HELD` (common/src/network/inputFields.ts). Reads the game through `InputSendHost`; tests: `inputSend.test.ts` |
 | `app/keys.ts` | 228 | Key presses: `handleKey(host, code)`, the ordered `MODAL_CHAIN`, then `PRE_KEYS` and `POST_KEYS` (tests: `keys.test.ts`). Reads the game through `KeyHost` |
 | `app/serverMessages.ts` | 401 | Server messages Game handles itself: `handleServerMessage(host, msg)` and the `HANDLERS` table, one entry per type (tests: `serverMessages.test.ts`). Reads the game through `MessageHost` |
@@ -25,7 +25,7 @@ The client's player-facing shell: `Game.ts` (the orchestrator: owns the window s
 | `ui/ContextMenuUI.ts`, `ContextActionUI.ts` | 241 | The Z + right-click action menu (rendering only) |
 | `ui/PerfMonitor.ts` | 355 | FPS/frame breakdown overlay |
 | `ui/LoginUI.ts`, `loginBody.ts`, `ServerBrowserUI.ts` | 706/164/613 | Sign-in screen, rotating Sol body picker (pure, tested), lobby server list |
-| `ui/AdminPanel.ts`, `ContributorPanel.ts`, `AdminGive.ts`, `DebugUI.ts`, `RenderTuningPanel.ts`, `DevShipPanel.ts` | | Admin/contributor/dev tools (by rank, or dev builds) |
+| `ui/AdminPanel.ts`, `ContributorPanel.ts`, `AdminGive.ts`, `DebugUI.ts`, `RenderTuningPanel.ts`, `DevShipPanel.ts`, `DevRangePanel.ts` (+ `devRangeFeed.ts`) | | Admin/contributor/dev tools (by rank, or dev builds) |
 | `ui/domWrite.ts` | | `setText/setHtml/...`: DOM writes that skip when unchanged. Use in per-frame code |
 | `input/keybindings.ts` | | Declarative `ACTIONS: ActionDef[]` (id, label, category, default `key`, `alt`, `hint`, `rebindable:false`), `RESERVED_KEYS`, `keyName()`, `boundKeyName(actionId, bindings)` |
 | `input/InputManager.ts` | 223 | Keyboard/mouse/wheel; translates a bound key to the action's default code; `raw` mode (hangar/menu); `onKeyPressed`, `onMouseButton`, `onCapture`, zoom |

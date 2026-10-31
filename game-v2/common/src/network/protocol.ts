@@ -214,6 +214,7 @@ export type ClientMessage =
   | ClientDevSpawnMessage
   | ClientDevShipMessage
   | ClientDevBossMessage
+  | ClientDevRangeMessage
   | ClientAdminMessage
   | ClientSiegeMessage
   | EconClientMessage
@@ -259,6 +260,17 @@ export interface ClientDevBossMessage {
   reset?: boolean;
   /** Its first this many shedding steps done at once (a boss that sheds: its stages, to look at) */
   shed?: number;
+}
+
+/**
+ * Dev tool, the weapons range (WeaponsRange.ts; dev servers only, refused anywhere else): `go` to the range, `arm` the
+ * test rig with one or two weapon models (`guns`), `ideal` ammo on or off, `moving` targets on or off, `reset` the dummies.
+ */
+export interface ClientDevRangeMessage {
+  type: 'devRange';
+  action: 'go' | 'arm' | 'ideal' | 'moving' | 'reset';
+  guns?: string[];
+  on?: boolean;
 }
 
 /** A moon siege's day: ready up (or not), refit, or buy from the shop */
@@ -417,6 +429,36 @@ export interface ServerChatMessage {
   playerName: string;
   text: string;
   timestamp: number;
+}
+
+/** One range dummy's readout (ServerRangeStateMessage) */
+export interface RangeDummyState {
+  id: string;
+  name: string;
+  /** Distance from the firing line, units */
+  dist: number;
+  dead: boolean;
+  /** Hull (core) and shield, 0..1 */
+  hull: number;
+  shield: number;
+  /** Damage taken in the last 5 s, and per second over them */
+  dmg5: number;
+  dps: number;
+  /** Seconds of the current fight (first hit until now or its death), and the last kill's: first hit to death */
+  fight: number;
+  ttk: number | null;
+  /** Everything taken since its first hit */
+  total: number;
+}
+
+/** Dev tool: the weapons range's readout, a few times a second to a pilot in it (WeaponsRange.ts) */
+export interface ServerRangeStateMessage {
+  type: 'rangeState';
+  moving: boolean;
+  ideal: boolean;
+  /** Each gun you carry: its model's name, its kind, and the crate "ideal ammo" gives it (or the one it is firing) */
+  guns: { name: string; kind: string; crate?: string }[];
+  dummies: RangeDummyState[];
 }
 
 export interface ServerSystemMessage {
@@ -712,6 +754,7 @@ export type ServerMessage =
   | ServerBankMessage
   | ServerChatMessage
   | ServerSystemMessage
+  | ServerRangeStateMessage
   | ServerDialogueMessage
   | ServerShopMessage
   | ServerDamageMessage

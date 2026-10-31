@@ -250,6 +250,8 @@ interface Enemy {
   faction: string;
   /** A boss (data/bosses.json id): its own behaviour, and Bosses handles its death */
   boss?: string;
+  /** A weapons-range target (dev only: WeaponsRange.ts): never moves, turns or fires, pays nothing, drops nothing, counts for nothing */
+  dummy?: boolean;
   behaviour?: Behaviour;
   pack: number;
   elite: boolean;
@@ -496,6 +498,7 @@ export class Enemies {
   intent(eid: number, at: Plan): Intent | null | undefined {
     const e = this.enemies.get(eid);
     if (!e) return undefined;
+    if (e.dummy) return null;
     if (e.state === 'engage' || e.state === 'flee' || e.target >= 0) return null;
     const now = at.tick;
     const b = e.behaviour ?? this.data.factions[e.faction].behaviour;
@@ -579,6 +582,36 @@ export class Enemies {
       out.push(eid);
     });
     return out;
+  }
+
+  /**
+   * A weapons-range target (dev only, WeaponsRange.ts): a real enemy ship that is held where it is, aims nowhere and fires
+   * nothing (pinned, no AI), takes damage as any ship does, and pays nothing when it dies (onDestroyed). Its own pack,
+   * never remembered with the system. `hp` scales its hull as a boss's (bosses.json) does, `core` hardens its core.
+   */
+  spawnTarget(systemNum: number, t: { ship: string; faction: string; grade?: number; plating?: number; elite?: boolean; hp?: number; core?: number }, x: number, y: number, angle: number): number {
+    const pack: Pack = { id: this.nextPack++, systemNum, home: { x, y }, members: new Set(), lastSeen: this.host.tick() };
+    const eid = this.spawnShip(pack, t.ship, t.faction, Math.max(1, Math.min(MAX_GRADE, Math.round(t.grade ?? 1))), t.plating ?? 0, !!t.elite, x, y, angle, 0);
+    if (eid < 0) return -1;
+    this.packs.set(pack.id, pack);
+    const e = this.enemies.get(eid)!;
+    e.dummy = true;
+    this.ships.setController(eid, () => null);
+    if (t.hp && t.hp !== 1) this.ships.scaleHp(eid, t.hp);
+    if (t.core && t.core !== 1) this.ships.hardenParts(eid, 'core', t.core);
+    this.ships.pin(eid);
+    return eid;
+  }
+
+  /** Let a range target fly (or hold again): a slow sweep across its spot, else pinned where it stands */
+  setTargetMoving(eid: number, to: { x: number; y: number } | null): void {
+    if (!this.enemies.get(eid)?.dummy) return;
+    if (to) { this.ships.pin(eid, false); this.ships.setAutopilot(eid, { x: to.x, y: to.y, arriveRadius: 60 }); }
+    else { this.ships.setAutopilot(eid, null); this.ships.pin(eid); }
+  }
+
+  isTarget(eid: number): boolean {
+    return !!this.enemies.get(eid)?.dummy;
   }
 
   /** One of a pack's ships: its design in its grade (an elite's plated a grade better, and tougher), its faction's hull and guns, and its AI (-1: no such design) */
@@ -1254,6 +1287,8 @@ export class Enemies {
     if (!e) return;
     this.enemies.delete(eid);
     this.packs.get(e.pack)?.members.delete(eid);
+    // A range target pays nothing, drops nothing, counts for nothing
+    if (e.dummy) return;
     if (e.boss) { this.bosses?.onDestroyed(eid, killer, ship); return; }
     const f = this.data.factions[e.faction];
     const base = f.ships[e.type] ?? { xp: 20, credits: 20 };

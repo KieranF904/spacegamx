@@ -77,6 +77,7 @@ asteroidParamsAt,
   calcOrbitStateRaw,
   OrbitType,
   asteroidRegistry,
+  buildRangeRig,
 } from '@space-game/common';
 
 import {
@@ -124,6 +125,7 @@ import { Blueprint, ShipState, quantizeShipValue, skillValue, hasAll, removeAll,
 const stationPerksSite = (id: string | undefined) => (id ? stationTable()?.sites.find((s) => s.id === id) : undefined);
 import { Pilots, PilotHost, type PilotConn } from './game/Pilots.js';
 import { Ammo } from './game/Ammo.js';
+import { WeaponsRange, type RangeConfig } from './game/WeaponsRange.js';
 import { Hazards } from './game/Hazards.js';
 import { Warmth } from './game/Warmth.js';
 import { Outpost } from './game/Outpost.js';
@@ -490,6 +492,8 @@ export interface GameServerOptions {
   clock?: () => number;
   /** Allow the map's click-to-warp for everyone (dev servers, proto). Admins can always use it. */
   devTeleport?: boolean;
+  /** The weapons range (data/dev/range.json): the dev server only (needs devTeleport), refused outright under NODE_ENV=production */
+  devRange?: RangeConfig;
   /** Admins may switch on free build (any part in the hangar, nothing taken): the dev server only. Refused outright under NODE_ENV=production. */
   freeBuild?: boolean;
   /** Where pilots' deaths and milestones are written (Telemetry.ts); none: not recorded */
@@ -592,6 +596,8 @@ export class GameServer implements ServerCtx {
   private mining: Mining;
   services: StationServices;
   ammo!: Ammo;
+  /** The dev weapons range (game/WeaponsRange.ts): null unless this is a dev server */
+  range: WeaponsRange | null = null;
   private hazards!: Hazards;
   private warmth!: Warmth;
   outpost?: Outpost;
@@ -933,6 +939,7 @@ export class GameServer implements ServerCtx {
     }, this.pilots);
     this.ops = new Operations(this.createOpsHost(), this.quests, () => [...this.clients.values()].filter((c) => this.flying(c.playerId) || hasComponent(this.world, Player, c.playerId)), this.gameData.rulesFile.operations, this.gameData.stringsFile);
 this.devTeleport = opts.devTeleport ?? false;
+    if (opts.devRange && this.devTeleport && process.env.NODE_ENV !== 'production') this.range = this.createRange(opts.devRange);
     
     // The snapshot path (net/SnapshotBuilder.ts): built once, after every module it reads
     this.snapshots = new SnapshotBuilder({
@@ -2249,6 +2256,7 @@ this.devTeleport = opts.devTeleport ?? false;
       beamAsteroid: (eid, x, y, angle, range, damage, kind) => this.beamAsteroid(eid, x, y, angle, range, damage, kind),
       notifyDamage: (targetEid, amount, sourceEid, glancing) => {
         this.bosses?.onDamage(targetEid, amount, sourceEid);
+        this.range?.onDamage(targetEid, amount);
         this.broadcastNear(InSystem.systemId[targetEid], Position.x[targetEid], Position.y[targetEid], { type: 'damage', targetId: targetEid, amount, sourceId: sourceEid, ...(glancing ? { glancing: true } : {}) }, [sourceEid]);
       },
       notifyProjectileHit: (proj, x, y) => this.broadcastProjectileHit(proj, x, y),
@@ -2842,6 +2850,9 @@ this.devTeleport = opts.devTeleport ?? false;
       }
       this.pilots.toast(conn, `Boss worn to ${Math.round(this.ships.integrity(boss) * 100)}%`, 'info');
     });
+    t.on('devRange', (_ctx, conn, msg) => {
+      this.handleDevRange(conn, msg);
+    });
     t.on('shipNeed', (_ctx, conn, msg) => {
       // The client lost a ship's blueprint: the next snapshot sends it in full
       conn.shipSynced.delete(Number(msg.id));
@@ -2906,6 +2917,64 @@ this.devTeleport = opts.devTeleport ?? false;
     }
     conn.docked = null;
     this.travelTo(conn, systemNum, x, y, false);
+  }
+
+  /** The weapons range, wired to this server (dev only: the caller has checked the dev flag) */
+  private createRange(cfg: RangeConfig): WeaponsRange {
+    const live = (c: ClientConnection) => hasComponent(this.world, Player, c.playerId) && !hasComponent(this.world, Dead, c.playerId);
+    return new WeaponsRange(cfg, this.enemies, this.ships, {
+      tick: () => this.currentTick,
+      systemNum: () => this.gameData.getSystem(cfg.system) ? this.gameData.getSystemNum(cfg.system) : -1,
+      players: (num) => [...this.clients.values()].filter((c) => live(c) && InSystem.systemId[c.playerId] === num).map((c) => c.playerId),
+      pilot: (player) => {
+        const pc = this.pilots.connOf(player), ship = this.ships.get(player);
+        const ideal = !!pc && this.ammo.isIdeal(pc);
+        const guns = (ship?.derived.weapons ?? []).map((w) => {
+          const fn = ship!.blueprint.parts[w.part]?.fn ?? '';
+          const crate = ideal ? this.ammo.idealCrate(w.kind) : undefined;
+          return { name: this.ships.catalog.functions.get(fn)?.name ?? fn, kind: w.kind, ...(crate ? { crate: this.pilots.econ.items.name(crate) } : {}) };
+        });
+        return { ideal, guns };
+      },
+      send: (player, msg) => { const c = this.pilots.connOf(player) as ClientConnection | undefined; if (c) this.send(c.ws, msg); },
+    });
+  }
+
+  /** Dev tool, the weapons range (client message devRange): refused unless this is a dev server with the range loaded */
+  private handleDevRange(conn: ClientConnection, msg: { action?: string; guns?: unknown; on?: unknown }): void {
+    const range = this.range;
+    if (!range || !this.devTeleport || process.env.NODE_ENV === 'production') {
+      this.send(conn.ws, { type: 'systemMessage', text: 'The weapons range is a dev tool (not enabled on this server)', color: '#f2d24b' });
+      return;
+    }
+    switch (msg.action) {
+      case 'go': {
+        const system = this.gameData.getSystem(range.cfg.system);
+        if (!system || !hasComponent(this.world, Player, conn.playerId) || hasComponent(this.world, Dead, conn.playerId)) return;
+        conn.docked = null;
+        // (Ideal ammunition starts on: a borrowed rig carries no crates. The panel's switch turns it off.)
+        this.ammo.setIdeal(conn, true);
+        this.travelTo(conn, this.gameData.getSystemNum(system.id), range.cfg.origin.x, range.cfg.origin.y, false);
+        return;
+      }
+      case 'arm': {
+        const guns = (Array.isArray(msg.guns) ? msg.guns : []).filter((g): g is string => typeof g === 'string').slice(0, 2);
+        const rig = guns.length ? buildRangeRig(this.ships.catalog, guns) : null;
+        if (!rig) { this.pilots.toast(conn, 'No such weapon for the test rig', 'warn'); return; }
+        if (this.pilots.devSwapShip(conn, rig)) this.pilots.toast(conn, `${rig.name} (dev: not saved)`, 'info');
+        return;
+      }
+      case 'ideal':
+        this.ammo.setIdeal(conn, !!msg.on);
+        this.pilots.toast(conn, msg.on ? 'Ideal ammo on: unlimited rounds of the best crate' : 'Ideal ammo off: your own crates', 'info');
+        return;
+      case 'moving':
+        range.setMoving(!!msg.on);
+        return;
+      case 'reset':
+        range.reset();
+        return;
+    }
   }
 
   /** Dev tool: a hostile pack here (the system's own kind unless given) */
@@ -3226,7 +3295,7 @@ this.devTeleport = opts.devTeleport ?? false;
       // (Boost fuel is the ship's battery now: it charges in the flight step, energy.ts)
       { name: 'weaponSystem', phase: 'combat', run: () => this.weaponSystem() },
       { name: 'projectileSystem', phase: 'combat', run: () => this.projectileSystem() },
-      { name: 'enemies', phase: 'combat', scene: 'sectors', run: () => this.enemies.tick() },
+      { name: 'enemies', phase: 'combat', scene: 'sectors', run: () => { this.enemies.tick(); this.range?.tick(); } },
       { name: 'bosses', phase: 'combat', scene: 'sectors', run: () => this.bosses.tick() },
       { name: 'mobs', phase: 'combat', scene: 'sectors', run: () => this.mobs.tick() },
       { name: 'events', phase: 'combat', scene: 'sectors', run: () => this.events.tick() },
