@@ -694,6 +694,26 @@ export class WeaponFx {
           this.extraG.take(TEX2.puff, hx - ux * reach * f, hy - uy * reach * f, 0.5, 0.5, sc.color, 0.22 * (1 - f) * alpha, 0, kk, kk);
         }
       }
+      // A blast radius you can see coming: a faint ring round the head, the whole flight
+      const rr = st.radiusRing;
+      if (rr && shot.fading === null) {
+        const k2 = (rr.radius * 2 * 32) / (28 * DOT_SIZE);
+        this.extraG.take(TEX2.ring, hx, hy, 0.5, 0.5, rr.color, 0.22 * alpha, 0, k2, k2);
+      }
+      // A bolt of lightning down the whole tracer, different every frame
+      const jg = st.jagged;
+      if (jg && shot.fading === null && dl > 1) {
+        const c = this.crackle, n = Math.max(4, Math.min(14, Math.round(dl / 40)));
+        this.crackling = true;
+        for (let pass = 0; pass < 2; pass++) {
+          c.moveTo(bx, by);
+          for (let i = 1; i <= n; i++) {
+            const f = i / n, o = i === n ? 0 : (Math.random() - 0.5) * 2 * jg.amp * z;
+            c.lineTo(bx + dx * f + nx * o, by + dy * f + ny * o);
+          }
+          c.stroke(pass === 0 ? { color: jg.color, width: 3, alpha: 0.35 * fade } : { color: 0xffffff, width: 1.2, alpha: 0.95 * fade });
+        }
+      }
       // Crackle (EMP orbs, arcs, lightning-wrapped shots)
       const lt = st.lightning ?? (st.orb ? ORB_LIGHTNING : undefined);
       if (lt && shot.fading === null) {

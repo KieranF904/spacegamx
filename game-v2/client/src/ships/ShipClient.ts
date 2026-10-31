@@ -13,6 +13,7 @@
 import { stepPointDefenceAim, pointDefenceOf, chargeGroupsEnd, TELL_CHARGE_START, TELL_CHARGE_CANCEL } from '@space-game/common';
 import { GunSync } from './gunSync';
 import { GunFeel } from './gunFeel';
+import './energyLooks';
 import { ChargeFx } from './ChargeFx';
 import { RingModel, type RingGroup, type RingSources } from './gunHud';
 import { buildFlightInputs, newFlightControls, payMining, gunLoad, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, warmthStage, withNumb, withSlowed, type WeaponInfo, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules } from '@space-game/common';

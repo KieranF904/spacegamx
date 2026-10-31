@@ -6,12 +6,16 @@
  *   Longbarrel  a thin red sight line along its aim that brightens as it fills, and a glow on the barrel's end
  *   Blackout    its emitter darkening: a dark disc swelling over the dish, a blue rim of crackle at the edge
  *   any other   a soft dot at the muzzle in a neutral light
+ * and two marks on the ships themselves: a ship a Searchlight has lit wears a gold rim and corner brackets, seen by all
+ * (the weaponry status bit; your own from the pilot row's ticks), and an Overpulse's clip shows as a 12-segment ring
+ * round its ship that empties as it fires and refills as it reloads.
  *
  * Plain Graphics, redrawn each frame (a dark one in normal blend, a glowing one added, so bloom picks it up).
  */
 
 import { Container, Graphics } from 'pixi.js';
-import { partWeaponDef, shipPointToWorld, type ShipState, type ShipTuning, type WeaponInfo } from '@space-game/common';
+import { getPlan, partWeaponDef, shipPointToWorld, type ShipState, type ShipTuning, type WeaponInfo } from '@space-game/common';
+import { STATUS_MARKED } from '@space-game/common';
 import type { GameState } from '../state/GameState';
 import type { ShipSource } from './ShipStore';
 
@@ -53,6 +57,7 @@ export class ChargeFx {
         if (c > 0) this.draw(me, mine, w, Math.min(1, c / Math.max(1, w.fire.charge ?? 60)));
       }
     }
+    this.marks(tick);
     for (const [key, start] of this.tells) {
       const owner = key >> 8, part = key & 255;
       if (owner === me) continue;
@@ -63,6 +68,42 @@ export class ChargeFx {
       const need = Math.max(1, w.fire.charge ?? 60), age = tick - start;
       if (age > need + STALE) continue;
       this.draw(owner, ship, w, Math.max(0, Math.min(1, age / need)));
+    }
+  }
+
+  /** Slot of the weaponry feature's statuses in a status row (features.wire.json) */
+  private statusSlot = -1;
+
+  /** Gold rim and brackets on every marked ship; the Overpulse's segment ring */
+  private marks(tick: number): void {
+    if (this.statusSlot < 0) this.statusSlot = getPlan().replicate.find((x) => x.feature === 'weaponry' && x.where === 'status')?.slot ?? -2;
+    const me = this.state.playerId, cs = this.tuning.cellSize;
+    for (const [id, ship] of this.source.bodies) {
+      if (ship.kind !== 'ship') continue;
+      const e = this.state.entities.get(id);
+      if (!e) continue;
+      const r = ship.derived.radius + cs * 0.6;
+      const marked = id === me ? tick < (e.markUntil ?? 0) : this.statusSlot >= 0 && ((e.status?.[this.statusSlot] ?? 0) & STATUS_MARKED) !== 0;
+      if (marked) {
+        const pulse = 0.7 + 0.3 * Math.sin(this.t * 6), spin = this.t * 0.8;
+        this.glow.circle(e.renderX, e.renderY, r).stroke({ color: 0xfbbf24, width: 2, alpha: 0.35 * pulse });
+        this.glow.circle(e.renderX, e.renderY, r).stroke({ color: 0xfde68a, width: 5, alpha: 0.1 * pulse });
+        // Four corner brackets, turning slowly
+        for (let i = 0; i < 4; i++) {
+          const a = spin + (i * Math.PI) / 2, sp = 0.2;
+          this.glow.arc(e.renderX, e.renderY, r * 1.12, a - sp, a + sp).stroke({ color: 0xfde68a, width: 2.5, alpha: 0.85 * pulse });
+        }
+      }
+      for (const w of ship.derived.weapons) {
+        if (w.fire.model !== 'clip' || ship.blueprint.parts[w.part]?.fn !== 'pulse_overpulse') continue;
+        const clip = Math.max(1, w.fire.clip ?? 12), left = ship.rounds[w.part] ?? clip, segs = 12, lit = Math.round((left / clip) * segs);
+        const rr = r + 7, gap = 0.06, step = (Math.PI * 2) / segs;
+        for (let i = 0; i < segs; i++) {
+          const a0 = -Math.PI / 2 + i * step + gap;
+          this.glow.arc(e.renderX, e.renderY, rr, a0, a0 + step - gap * 2).stroke(i < lit ? { color: 0xf0abfc, width: 2.4, alpha: 0.7 } : { color: 0x86198f, width: 1.4, alpha: 0.35 });
+        }
+        break;
+      }
     }
   }
 
