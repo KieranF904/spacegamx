@@ -16,12 +16,13 @@ How a gun turns into shells, beams and pulses, and what those do to ships. The f
 | server/src/game/Weapons.ts | 300 | `Weapons`: `spawn` (one shot + burst), per-tick homing/pull/fuse, `onShipHit/onMobHit/onWallHit/onExpire`, `chain`, `shatter`, `detonate`, `threats`, `intercept` |
 | server/src/game/Ammo.ts | 207 | `Ammo`: crates, rounds, dry-fire at `dry` share |
 | server/src/game/Support.ts, Towing.ts | 59, 158 | support credit window (`SUPPORT_WINDOW_TICKS`); Tow Beam latch (maths in common tow.ts, flight/ship-parts) |
-| server/src/ships/ShipBridge.ts | 2182 | god-file; combat slices below |
+| server/src/ships/ShipBridge.ts | 1046 | the bridge: per-tick loop and contacts; its combat methods are one-line delegators to bridge/damage.ts and bridge/weapons.ts |
+| server/src/ships/bridge/damage.ts, weapons.ts | 461 / 492 | the combat slices below (ShipBridge delegates to them) |
 | client/src/rendering/weapons/{WeaponFx,weaponStyles}.ts | 496, 242 | all projectile visuals; `WEAPON_STYLES[weaponType]`, `weaponStyle(type, grade)`; predicted own shells (`PredictedShell`) |
 | client/src/ships/{DamageFx,MiningBeamFx,PulseFx,gunDecor}.ts | 886, 372, 310, 623 | part damage/fire/break visuals; mining + lance beams (`castShips` uses collide.ts); pulse beams (`pulseLook`); per-gun barrel art |
 | docs/audits/collisions.md, boss-bullet-hell.md | | which tests hit what (outline vs circle); cost of boss shot storms |
 
-ShipBridge slices (grep the name, read ~60 lines): `hurt` (~L938, ALL damage funnels here: shield first, then `cover` stage rule, bane, hull), `damagePartBy`, `splashAt`, `empAt`, `ignite`/`stepBurns`, `stepWeapons` (~L1286), `fireWeapons` (~L1375), `stepPulses`, `fireBeam` (~L1465), `repairBeam` (~L1553), `pointDefence` (~L1584), `alongBeam`, `partDeaths`, `applyBlast`, `damageContact`, `decay`, `repairStep`. Banners: "Support weapons" (~L98), "Tow Beam" (~L2381).
+Bridge slices (grep the name, read a short slice): in bridge/damage.ts, `hurt` (ALL damage funnels here: shield first, then `cover` stage rule, bane, hull), `damagePartBy`, `splashAt`, `empAt`, `ignite`/`stepBurns`, `partDeaths`, `applyBlast`; in bridge/weapons.ts, `stepWeapons`, `fireWeapons`, `stepPulses`, `fireBeam`, `repairBeam`, `pointDefence`, `alongBeam`, `castShip`; in bridge/rebuild.ts, `decay`, `repairStep`, `rebuildNow`. `ShipBridge.ts` keeps a one-line delegator with the same name for each. The "Support weapons" and "Tow Beam" banners are still in ShipBridge.ts.
 
 ## Public interface
 - `WeaponTuning` / `ShipTuning` (tuning.ts). Kinds in tuning.json `weapons`: cannon railgun flak missile emp laser autocannon pulse arc torpedo mortar magma charge lance hive frostbite repair point_defence, plus boss kinds rivet scrap_chunk seam_seeker heart_spark heart_seeker cinder_bloom prism prism_shard phase singularity.

@@ -28,7 +28,7 @@ Everything a pilot owns and earns: the item catalogue and recipes, cargo/storage
 - Stacks: `Stack {id,n}`, `Bag = Record<string,number>`; always use the stacks helpers.
 - Pilots (server): `pilots.give(conn, bag, {toStorage?, source?, at?, quiet?})` (returns what did not fit), `take(conn, bag, 'cargo'|'storage'|'any')`, `addCredits`, `addXp`, `bumpStat`, `grant({plans,recipes,licences,reputation,skillPoints})`, `get(conn)` (the profile), `connOf(eid)`, `onEvent`, `markDirty`, `toast`.
 - Quests (server): `quests.onKill(conn, enemy, faction, system)`, `acceptFrom`, `opCount/opAdvance/fail`, `canEnter(conn, systemId)` (sector licences).
-- Pods: `pods.spawn/scatter/take/near`; Towing: `towDelivered(pilot, target, kind)` in GameServer (~l.4688); Support: `support.note(healer, target, hp, now)`, `supporters(target, now)`.
+- Pods: `pods.spawn/scatter/take/near`; Towing: `towDelivered(pilot, target, kind)` in game/Derelicts.ts (GameServer calls it); Support: `support.note(healer, target, hp, now)`, `supporters(target, now)`.
 - Kill pay: `Enemies.onDestroyed` (game/Enemies.ts ~l.1255): `faction.ships[type].xp/credits` x `gradeReward` (xp) and x `rules.gradeCredits[grade-1]` (credits), elite x `rules.eliteLoot`, party members 0.75 xp / 0.4 credits within `PARTY_SHARE_RANGE`, supporters (Support ledger) paid like party but without job credit. Bosses: Bosses.onDestroyed.
 - Profile persistence: `PlayerProfile`, `migrateProfile(raw, kit, catalog)`; stores in server-core.md.
 
@@ -50,7 +50,7 @@ Everything a pilot owns and earns: the item catalogue and recipes, cargo/storage
 4. **Add a reputation or vendor**: `reputations` in quests.json (+ `vendor.stock` with `rank`); prices via `vendorPrice` and `RANK_DISCOUNT`.
 5. **Add a ribbon**: entry in data/achievements.json (`stat` must be in `KNOWN_STATS`, validateGameData.ts ~l.147; bump the stat with `pilots.bumpStat`).
 6. **Add a profile field**: add to `PlayerProfile`, default in `newProfile`, tolerant copy in `migrateProfile` (a `cleanX` helper), set `markDirty` where it changes, send it in `sendProfile` and `ServerProfileMessage` if the client shows it (econProtocol.ts). Bump `PROFILE_VERSION` only if old saves need real conversion. Add a case in `econ.test.ts` or `players.test.ts`.
-7. **Add an economy message**: econProtocol.ts (client + server interfaces), `GameServer.handleMessage` case calling the module (e.g. `this.services.sell`), client send in the window; see networking.md.
+7. **Add an economy message**: econProtocol.ts (client + server interfaces), a forwarding entry in `registerModuleHandlers` (net/handlers/modules.ts) calling the module (e.g. `ctx.services.sell`), client send in the window; see networking.md.
 8. **Add a pay source**: credits via `pilots.addCredits`; XP via `addXp`; party share via `PilotHost`; support share via `Support.supporters` (see Enemies.onDestroyed).
 
 ## Tests

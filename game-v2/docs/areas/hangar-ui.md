@@ -15,10 +15,11 @@ The station hangar where a pilot designs and refits ships: a canvas grid editor 
 | client/src/ui/componentGuide.ts | 199 | pure data for it: tabs (`COMP_TABS`, `tabOf`), `guideRows`, `rowsOf`, `rowGates`/`requirementLine` (unlock gates), `questTeaches`, `bossDrops`, `rareParts` |
 | client/src/ui/componentSprites.ts | 130 | part sprites for the guide: `partSprite`, `peekSprite`, `PART_SPRITES_VERSION` (asset cache) |
 | common/src/ships/{mounting,blueprint,energy,circuits,wires}.ts | | the rules: `checkMounting`, `partMountingProblems`, `mountingWords`, blueprint validation (`badMounting` etc.), `loadTest`/`BROWNOUT` |
-| server/src/GameServer.ts | | `handleShipEdit` (~3276), `handleSlotSave` (~3299), `freeBuild(conn)` (~3271); message handlers registered in `buildMessageHandlers()` |
-| server/src/ships/ShipBridge.ts | | `validate(bp, {mounting?})` (~727): shared by both handlers |
-| server/src/game/Hangar.ts | | `save(conn, slot, bp, {plan, grantAll})` (109): costs, ghosts vs built parts, gem handling, loaner rule, returns `string[]` errors |
-| server/src/game/AdminTools.ts | | admin free-build toggle (`freeBuild`, ~135, command ~291) |
+| server/src/net/handlers/shipEdit.ts | 145 | `registerShipEditHandlers`: dock, undock, shipEdit, slotSave/Fly/Clear, designSave, shareDesign, pilotInfo; `clientBlueprint` (the untrusted blueprint parse), `handleShipEdit`, `handleSlotSave`. Registered from GameServer's `buildMessageHandlers()` |
+| server/src/GameServer.ts | 5101 | `freeBuild(conn)` (dev free-build check), reached from shipEdit.ts through `ServerCtx` |
+| server/src/ships/ShipBridge.ts | 1046 | `validate(bp, {mounting?})` (one-line delegator to bridge/rebuild.ts `validate`): shared by both handlers |
+| server/src/game/Hangar.ts | | `save(conn, slot, bp, {plan, grantAll})`: costs, ghosts vs built parts, gem handling, loaner rule, returns `string[]` errors |
+| server/src/game/AdminTools.ts | | admin free-build toggle (`freeBuild`, and its admin command) |
 
 ### HangarUI.ts sections (read only the slice)
 63-102 `HangarDeps` | 105-307 fields + constructor (DOM, canvas, lit view at 255) | 308-408 open/close/slots/keys | 409-535 editing: `candidate, pickFacing, placementProblem, candidateMounting, mountLine, place, pickUp, remove` | 536-602 wires (`setTool, wireStart/To, autoWireAll`) | 603-676 new/load blueprint | 677-764 saved designs | 765-817 `saveAndLaunch`, `remaining`, ghosts, status | 818-889 derive: `refresh, rederive, showLit` | 890-1303 panels: palette (`renderPalette` 908), `handCard` 1000, filters, `partListsHtml` 1115, `renderWirePanel` 1230, `renderSlots` | 1304-1460 `buildHtml`, `ammoHtml`, button binding | 1461-1528 `powerHtml` (load test UI) | 1529-1659 `summaryHtml`, `renderStats` | 1660-1719 tooltips | 1720-2188 canvas: `draw` 1729, `drawPower` 1925, `drawCircuits` 2013, `drawMounting` 2122, `drawFacing` 2162 | 2189-2342 module helpers (`ruleText, esc, button, chip, energyHtml`...).
@@ -30,7 +31,7 @@ The station hangar where a pilot designs and refits ships: a canvas grid editor 
 
 ## Invariants
 - No game rules in the UI: mounting/validity/power math come from `common` and are shown, never re-derived. Add a rule in common (with the server using it via `ships.validate`), then surface it.
-- The server is authoritative: `handleShipEdit`/`handleSlotSave` always re-run `ships.validate` and `Hangar.save`; a client check is feedback only. Both require being docked (or `shipEditAnywhere`).
+- The server is authoritative: `handleShipEdit`/`handleSlotSave` (net/handlers/shipEdit.ts) always re-run `ships.validate` and `Hangar.save`; a client check is feedback only. Both require being docked (or `shipEditAnywhere`).
 - Free build (no parts or licence needed) is dev only: proto mode (everyone admin + `shipEditAnywhere`) or an admin with `freeBuild` toggled where the server was started with `freeBuild` (index.ts: `DEV_MODE`) and `NODE_ENV !== 'production'`. `grantAll` must never be reachable in production.
 - Gun gems/mods are the server's to give: `Hangar.save` strips client-supplied `mods/gems`.
 - Generated art here (part sprites, item icons) uses the asset cache with `PART_SPRITES_VERSION`; bump on change.
@@ -61,7 +62,7 @@ The station hangar where a pilot designs and refits ships: a canvas grid editor 
 - Wires cost spools from storage (`wireBill`); `stored()` is optional in deps.
 
 ## Related areas
-[energy](energy.md) (circuits, load test, `PowerUse`), [ship-parts](ship-parts.md) (`describePart`, models, mounting data), [render-ships](render-ships.md) (HangarLitView, decor), [economy-quests](economy-quests.md) (fabrication, licences, Hangar slots), [networking](networking.md) (ShipEdit messages), [server-core](server-core.md) (GameServer handlers), [ui-hud-input](ui-hud-input.md) (window kit, Component Guide placement).
+[energy](energy.md) (circuits, load test, `PowerUse`), [ship-parts](ship-parts.md) (`describePart`, models, mounting data), [render-ships](render-ships.md) (HangarLitView, decor), [economy-quests](economy-quests.md) (fabrication, licences, Hangar slots), [networking](networking.md) (ShipEdit messages), [server-core](server-core.md) (GameServer handlers, net/handlers/shipEdit.ts), [ui-hud-input](ui-hud-input.md) (window kit, Component Guide placement).
 
 ## Notes (moved from DEVELOPMENT.md and the old engine-map)
 - **Refit flow**: the hangar sends `shipEdit`; the server checks docking (`STATION_INTERACT_RADIUS`) and validation, replies `shipEditResult`, and keeps the blueprint per connection across respawns (proto sets `shipEditAnywhere`). Saved ships (the active one and the hangar) live in the pilot's profile; guests' refits last the session.

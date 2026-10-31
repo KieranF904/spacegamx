@@ -13,7 +13,7 @@ Three cooperating services. The **lobby** (`server-browser/`) owns accounts and 
 | `accounts/DeletedAccounts.ts`, `RateLimiter.ts`, `utils.ts`, `request.ts` | 62/63/130/65 | 30-day deleted-id list (file `data/lobby/deleted-accounts.json`), sliding-window limiter (bounded keys), durable writes, body parsing (`BodyError` 413) |
 | `server-browser/schema.sql` | | Postgres schema (users, sessions, profiles, game_docs); safe to re-apply; its seed `INSERT` of admin/admin must never be run in production |
 | `server/src/auth/LobbyAccounts.ts` (+`types.ts`, `index.ts`) | | Game server's `UserStore` that asks the lobby; `admin` tools need the shared secret; `createUserStore(BROWSER_URL, LOBBY_ADMIN_SECRET)` |
-| `server/src/profile/{ProfileStore,JsonProfileStore,PostgresProfileStore}.ts` | | Pilot saves (JSON `data/profiles/<id>.json` or Postgres `profiles`); `GameServer.forgetAccounts` (GameServer.ts ~2296) deletes a profile when the lobby reports a deleted id |
+| `server/src/profile/{ProfileStore,JsonProfileStore,PostgresProfileStore}.ts` | | Pilot saves (JSON `data/profiles/<id>.json` or Postgres `profiles`); `GameServer.forgetAccounts` deletes a profile when the lobby reports a deleted id |
 | `site/src/server.ts`, `app.ts` | 43 / 898 | Entry; the router (`Router<Ctx>`): `/`, `/updates`, `/suggestions`, `/shoutbox`, `/signin`, `/register`, `/account`, `/pilots`, `/play`, `/admin/*`, `/api/v1/*` (route list at top of `app.ts`). God-file: grep `router.get('/x'` |
 | `site/src/config.ts`, `security.ts`, `http.ts`, `lobby.ts` | | Env config (`checkProductionEnv`), CSRF/rate limits/CSP, helpers, lobby client |
 | `site/src/views/{layout,pages,admin}.ts`, `public/site.css`, `site.js` | | HTML templates (escape by default via `html.ts`), static assets |
@@ -64,7 +64,7 @@ Three cooperating services. The **lobby** (`server-browser/`) owns accounts and 
 - Dev admin is `admin`/`admin`; guests are admins on dev servers only.
 
 ## Related areas
-`ops-tools` (deploy, secrets, nginx, backups, dbdump timer), `networking` (auth messages `authLogin`/`authRegister` (guests send only a display name, protocol.ts ~165)), `server-core` (`GameServer` auth and `forgetAccounts`), `ui-hud-input` (LoginUI/ServerBrowserUI), `economy-quests` (profile schema/`migrateProfile`).
+`ops-tools` (deploy, secrets, nginx, backups, dbdump timer), `networking` (auth messages `authLogin`/`authRegister` (guests send only a display name, protocol.ts ~165)), `server-core` (`net/auth.ts` join and sign-in, `GameServer.forgetAccounts`), `ui-hud-input` (LoginUI/ServerBrowserUI), `economy-quests` (profile schema/`migrateProfile`).
 
 ## Notes (moved from DEVELOPMENT.md)
 - **Run the site**: `cd game-v2/site; npm install; npm run dev` (http://localhost:5310; needs the lobby on 8787, Play needs Vite on 5273); `npm run typecheck`; tests run with the rest (`npx vitest run --pool=forks --no-file-parallelism`, site/src/*.test.ts). Server-rendered Node + TypeScript, no front-end framework. Features: live pilot count, update feed (Markdown posts, comments, RSS), suggestions board (votes, statuses, admin replies), shoutbox, accounts (sign in, register, pilot card, change password/email, sign out everywhere, delete), public pilot profiles and leaderboards, admin panel, authed API and CLI for posting updates.

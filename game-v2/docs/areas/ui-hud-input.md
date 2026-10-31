@@ -4,7 +4,8 @@ The client's player-facing shell: `Game.ts` (the orchestrator: builds every wind
 ## Files (what each owns)
 | path | lines | owns |
 |---|---|---|
-| `client/src/Game.ts` | 2068 | God-file. See "Game.ts map" below. Read slices only |
+| `client/src/Game.ts` | 1837 | Orchestrator. See "Game.ts map" below. Read slices only |
+| `app/inputSend.ts` | 295 | The input-send path: `tickInput(s)` samples keys and mouse once per input tick and sends the message (or predicts unsent), `sendNeutralInput`, the last-sent bookkeeping over `INPUT_BOOLS`/`INPUT_HELD` (common/src/network/inputFields.ts). Reads the game through `InputSendHost`; tests: `inputSend.test.ts` |
 | `app/keys.ts` | 228 | Key presses: `handleKey(host, code)`, the ordered `MODAL_CHAIN`, then `PRE_KEYS` and `POST_KEYS` (tests: `keys.test.ts`). Reads the game through `KeyHost` |
 | `app/serverMessages.ts` | 401 | Server messages Game handles itself: `handleServerMessage(host, msg)` and the `HANDLERS` table, one entry per type (tests: `serverMessages.test.ts`). Reads the game through `MessageHost` |
 | `client/src/lazy.ts` | 40 | `Lazy<T>` (dynamic-import wrapper: `.value`, `.load()`, `.use(fn)`), `prefetchIdle(loads)` |
@@ -29,20 +30,22 @@ The client's player-facing shell: `Game.ts` (the orchestrator: builds every wind
 | `settings/Settings.ts`, `quality.ts` | | `settings` singleton (localStorage, `subscribe`, `update`, `reset`), `SettingsData`; quality tiers (tested) |
 | `docs/ux/` | | `polish-pass-2026-10-31.md` (+ screenshots in `polish-2026-10-31/`): usability findings and proposals |
 
-### Game.ts map (2068 lines; open only the slice you need)
-| lines | section |
+### Game.ts map (1837 lines; grep the method name, then read a short slice)
+| symbol(s) | section |
 |---|---|
-| 1-314 | imports, `ProtoHooks`, `GameOptions`, field declarations (windows are `Lazy<>` or direct) |
-| 315-400 | `constructor` |
-| 401-712 | `init()`: window/HUD construction (`ComponentGuideUI` 456, `InventoryWindow` 455, lazy `StationWindow` 479, `QuickBar` 495, `SystemMapUI` 614), callbacks (`network.onMessage` 680, `input.onKeyPressed` 692 to `handleKeyPress`) |
-| 713-808 | login/register/guest/server-select/logout (`handleLogin` 713, `resumeSession` 753, `handleGuestPlay` 767, `handleLogout` 799); `prefetchScreens` (729, `prefetchIdle` of the lazy chunks) |
-| 809-1076 | `start`, `createMenu` (816), `updateSounds` (870), zone, `applySettings` (997), heat gauge |
-| 1077-1120 | `handleKeyPress(code)` calls `handleKey` in app/keys.ts; `makeKeyHost()` (1082) gives it the game's getters |
-| 1200-1383 | `update()`, the per-frame loop |
-| 1357-1386 | `makeInputCtx()`: the getters and last-sent state for app/inputSend.ts (`tickInput` builds and sends the input message, called from `update()`; `sendNeutralInput` on focus loss) |
-| 1618-1685 | `handleServerMessage` calls `handleServerMessageTable` in app/serverMessages.ts; `makeMessageHost()` (1623) gives it the game's getters and setters |
-| 1686-1988 | chat (`setupChat` 1686), connect/disconnect/auth result (`onConnected` 1761, `onDisconnected` 1806, `handleAuthResult` 1852), admin and contributor panel start/stop (`startAdmin` 1921 to `stopContrib` 1980) |
-| 1989-2068 | `updateUI`, quality, resize |
+| imports, `ProtoHooks`, `GameOptions`, fields | field declarations (windows are `Lazy<>` or direct); `keyHost`, `msgHost` and `inputCtx` are built by `makeKeyHost`, `makeMessageHost`, `makeInputCtx` |
+| `constructor`, `init()` | `init()` is window/HUD construction and the callbacks (`network.onMessage` calls `handleServerMessage`; `input.onKeyPressed` calls `handleKeyPress`) |
+| `handleLogin`, `handleRegister`, `resumeSession`, `handleGuestPlay`, `handleServerSelect`, `handleLogout`, `signedIn` | sign-in and session flow; `prefetchScreens` (`prefetchIdle` of the lazy chunks) |
+| `start`, `createMenu`, `updateSounds`, `pocketWayIn`, `currentSystem`, `planetBelow`, `updateZone`, `applySettings`, `updateHeatGauge`, `applyVolume` | menu, audio, zone and heat gauge, settings |
+| `handleKeyPress(code)`, `makeKeyHost()` | calls `handleKey` in app/keys.ts; `makeKeyHost` gives it the game's getters |
+| `objective`, `updateGuide`, `flyTo`, `toggleAutopilotToObjective`, `netRates` | quest target, guide, autopilot entry points, network stats text |
+| `update()` | the per-frame loop; calls `tickInput` (app/inputSend.ts) for each fixed input tick, and `sendNeutralInput` on focus loss |
+| `makeInputCtx()` | the getters and last-sent state for app/inputSend.ts |
+| `handleServerMessage(msg)`, `makeMessageHost()` | calls `handleServerMessageTable` in app/serverMessages.ts; `makeMessageHost` gives it the game's getters and setters |
+| `setupChat`, `sendChatMessage`, `addChatMessage`, `escapeHtml` | chat |
+| `onConnected`, `onDisconnected`, `handleAuthResult`, `clearLoadingClick`, `showVersionOverlay` | connect, disconnect, auth result |
+| `startAdmin`/`stopAdmin`, `startContrib`/`stopContrib` | admin and contributor panel start/stop |
+| `updateUI`, `replayClass`, `showSystemMessage`, `renderResolution`, `qualityTier`, `applyQuality`, `onResize` | HUD refresh, quality tiers, resize |
 
 ## Public interface
 - `GameWindow` (windowKit): subclass or compose; `open()/close()/isOpen/onClose`; fill `body`, `tabs`, `headExtra`.

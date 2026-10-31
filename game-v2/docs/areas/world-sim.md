@@ -18,7 +18,8 @@ The map and everything that keeps it alive cheaply: system/station/planet/astero
 | server/src/game/SystemMemory.ts | 317 | `SystemMemory` (evict/restore), `MemoryRules`, `MEMORY_VERSION`, `worldFileStore(file)`, `shipMemory`, `restoreHp`, snapshot types |
 | server/src/game/{Hazards,Warmth}.ts | 106, 115 | once-a-second hazard effects per pilot; warmth stepping (cold builds, heat sources bring it back) |
 | server/src/game/{Surfaces,Arenas,Sieges,Events,Roaming,AsteroidOrbits,Mining,HomeStations,LootPods}.ts | 439, 119, 1001, 418, 133, 301, 248, 141, 231 | planet surfaces, job arenas, moon sieges, raids/dynamic events, nest wandering, asteroid timetable, ore from damage, homesteads, loot containers |
-| server/src/GameServer.ts | god-file | `travelTo` (~L3585), `createPortal` (~L2498), rift constants `RIFT_*` (~L431), `MEMORY_GATE_MOUTH` (~L486), `trafficSystem`/`trafficIntent` (~L4418/4455), `derelictRespawnSystem` (~L4634), system creation in `initializeWorld` (~L2371); read slices only |
+| server/src/GameServer.ts | god-file | `travelTo`, `createPortal`, rift constants `RIFT_*`, `MEMORY_GATE_MOUTH`, `trafficSystem`/`trafficIntent`, system creation in `initializeWorld`; read slices only |
+| server/src/game/Derelicts.ts | 202 | derelict wrecks and people's craft: `derelictRespawnSystem`, salvage, `towDelivered`, `onPilotlessShipDestroyed` |
 | client/src/state/FarShips.ts, ui/SystemMapUI.ts | | map dots for ships past the snapshot's view, carried on by the same legs as the server |
 
 ## Public interface
@@ -42,7 +43,7 @@ The map and everything that keeps it alive cheaply: system/station/planet/astero
 1. **Add a system**: entry in data/systems.json (copy a neighbour; `portals` both ways, `stations`, `nests`, `hazards`, `traffic`, `derelicts`); ids referenced in factions.json `spawns` and quests. Run the data validator test (any game test) and `server/src/travel.test.ts`.
 2. **Add a hazard**: add to `HAZARDS` (hazards.ts), tolerance/rules in data/hazards.json, material ratings in materials.json, effect in server Hazards.ts, client toast text via strings. Cold is separate (Warmth).
 3. **Add a warmth source/stage**: heat `sources` in hazards.json `warmth`; stage tables in common/src/ships/warmth.ts (client and server read the same). Test warmth.test.ts (both common and server).
-4. **Add a traffic route / derelict**: `traffic` (blueprint, route of station ids) or `derelicts` on the system; logic in GameServer `trafficSystem`. Add a memory case only for new spawner kinds (SystemMemory.ts + `MemoryTimers`).
+4. **Add a traffic route / derelict**: `traffic` (blueprint, route of station ids) or `derelicts` on the system; logic in GameServer `trafficSystem`; derelict wrecks respawn in game/Derelicts.ts (`derelictRespawnSystem`). Add a memory case only for new spawner kinds (SystemMemory.ts + `MemoryTimers`).
 5. **Add a new spawner kind that persists**: give it a capture/restore pair, a clock in `MemoryTimers`, and bump `MEMORY_VERSION` if the file shape changes.
 6. **Add an `Intent`** for a distant ship: new variant in SimLod.ts `Intent`, its leg maths in farRoute.ts (shared with client FarShips, mirror there).
 7. **Add a surface/arena/pocket**: system entry with `surface` / `arena` / `pocket`; Surfaces.ts / Arenas.ts / pockets.ts for behaviour.
