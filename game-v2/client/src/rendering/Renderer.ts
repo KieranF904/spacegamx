@@ -10,6 +10,8 @@ import { stepOverlays, screenTint } from './overlayFrame';
 import { cameraView, helmFollow, MAX_VIEW_SPIN, NORTH_RETURN_RATE, screenToWorld, screenToWorldDir, smoothAngle, viewHalfExtents, worldToScreen, worldToScreenDir } from './cameraView';
 import { FACTION_COLORS } from '../ships/ShipRenderer';
 import { PlanetRenderer } from './PlanetRenderer';
+import { setPlanetDetail } from './planet-proto/planetQuad';
+import { installVolumeUpload } from './texture3d';
 import { SceneryRenderer } from './Scenery';
 import { NestRenderer, nestColor } from './NestViews';
 import systemsData from '../../../data/systems.json';
@@ -35,16 +37,13 @@ import { drawAsteroid, AsteroidSeams } from './AsteroidLook';
 import { RiftShader } from './RiftShader';
 import { StationShot, StationView } from './StationView';
 import { CentralBodyShaders, CentralType } from './CentralBodyShaders';
-import { SunRenderer } from './SunRenderer';
-import { GlowRenderer } from './GlowRenderer';
+import { SunRenderer, starOf } from './sun/SunRenderer';
+import type { StarBody } from './sun/plasmaSun';
 import {
   EntityType,
   EffectType,
   TICK_MS,
   getAsteroidPolygon,
-  mulberry32,
-  hashString,
-  sunShaderDefs,
   nestPosition,
   pocketsFrom,
   entranceNest,
@@ -55,7 +54,6 @@ import { CityView } from './surface/CityView';
 import { BastionView } from './surface/BastionView';
 import { Lighting } from './lighting/Lighting';
 import { AsteroidBatch } from './lighting/AsteroidBatch';
-import { CoronaRaysRenderer } from './CoronaRaysRenderer';
 import { skyBiome, SkyBiome } from './sky/skyBiome';
 import type { NestData, ServerSystemInfoMessage, StarSystemData } from '@space-game/common';
 import { boundKeyName } from '../input/keybindings';
@@ -170,20 +168,6 @@ const DEFAULT_SYSTEM_VISUALS: SystemVisuals = {
   coronaStyle: 'plasmaStreams',
 };
 
-function buildStyleParams(
-  styles: typeof sunShaderDefs.sunStyles,
-  styleId: string | undefined,
-  paramOverrides?: Record<string, number>
-) {
-  const index = Math.max(0, styles.findIndex((s) => s.id === styleId));
-  const style = styles[index] || styles[0];
-  const params = style.params.map((param) => {
-    const override = paramOverrides?.[param.key];
-    return override !== undefined ? override : param.default;
-  });
-  return { index, params };
-}
-
 /** A screen-aligned offset (ox, oy) in an entity's turned frame (c, sn: the cos and sin of `up`, the roll that keeps `o` upright) */
 function placeUpright(o: Container, c: number, sn: number, up: number, ox: number, oy: number): void {
   o.position.set(c * ox - sn * oy, sn * ox + c * oy);
@@ -260,9 +244,10 @@ export class Renderer {
   public showDamageNumbers = true;
   public showNames = true;
   
-  // GPU shader renderers for sun and glow
-  private sunRenderer: SunRenderer;
-  private glowRenderer: GlowRenderer;
+  /** The star (plasma, drawn at a share of the screen's resolution: sun/SunRenderer.ts) */
+  readonly sun: SunRenderer;
+  /** A system's star, for one not in systems.json (made from its visuals once) */
+  private starBodies = new WeakMap<SystemVisuals, StarBody>();
   
   // GPU procedural starfield (sandbox-style)
   private sky: SkyRenderer;
@@ -281,8 +266,6 @@ export class Renderer {
   private rocks: AsteroidBatch;
   private lightKey = '';
   private podLight: [number, number, number] = [1, 1, 1];
-  /** A sun's corona: streamers of plasma reaching out from its edge */
-  private corona: CoronaRaysRenderer;
   /** Each system's sky, made the first time it's seen */
   private biomes = new Map<string, SkyBiome>();
   
@@ -303,8 +286,6 @@ export class Renderer {
   private fadingOut: { id: number; container: Container }[] = [];
   /** This system's data (looked up once per system, not per frame) */
   private sys: { id: string; data: (StarSystemData & { visuals?: Record<string, any> }) | undefined } = { id: '', data: undefined };
-  /** The sun's style parameters and the corona's look, made once per system's visuals */
-  private sunLook: { visuals: SystemVisuals | null; id: string; sun: ReturnType<typeof buildStyleParams>; corona: ReturnType<typeof buildStyleParams>; rays: Parameters<CoronaRaysRenderer['update']>[3] | null } | null = null;
 
   // Effects
   private damageNumbers: DamageNumber[] = [];
@@ -352,6 +333,8 @@ export class Renderer {
   constructor(app: Application, state: GameState) {
     this.app = app;
     this.state = state;
+    // (the planets' noise is a 3D texture: planet-proto/planetTextures.ts)
+    installVolumeUpload(app.renderer);
     this.initPan();
 
     // Create layer containers
@@ -389,19 +372,9 @@ export class Renderer {
     // The vignette under the rest of the UI
     this.uiContainer.addChild(this.vignette);
     
-    // Initialize GPU shader renderers for sun and ambient glow
-    this.glowRenderer = new GlowRenderer();
-    this.glowRenderer.initialize();
-    this.backgroundContainer.addChild(this.glowRenderer.getContainer());
-    
-    // Solar rays between the glow and the disc
-    this.corona = new CoronaRaysRenderer();
-    this.corona.initialize();
-    this.backgroundContainer.addChild(this.corona.getContainer());
-
-    this.sunRenderer = new SunRenderer();
-    this.sunRenderer.initialize();
-    this.backgroundContainer.addChild(this.sunRenderer.getContainer());
+    // The star: its disc, chromosphere and corona in one (behind the central bodies, planets and everything else)
+    this.sun = new SunRenderer(this.app);
+    this.backgroundContainer.addChild(this.sun.container);
     this.backgroundContainer.addChild(this.centralShaders.container);
     this.backgroundContainer.addChild(this.scenery.container);
     this.backgroundContainer.addChild(this.nests.container);
@@ -823,179 +796,40 @@ export class Renderer {
     } else {
       this.shadows.begin();
       this.shadows.end();
-      this.sky.update(Math.min(0.1, delta) * 1000, this.cameraX, this.cameraY, zoom, this.cameraAngle);
     }
 
-    // Update and render GPU shader-based sun and glow (seconds: the same speed at any frame rate)
+    // The star (seconds: the same speed at any frame rate), at the world's origin: drawn into its own target with the
+    // camera's transform, and stretched back over the screen in the background layer's frame (the world's)
     const animDelta = Math.min(0.1, delta);
-    const screenSize = { width: this.app.screen.width, height: this.app.screen.height };
-    
-    // Position at world origin (0, 0)
-    this.glowRenderer.setPosition(0, 0);
-    this.sunRenderer.setPosition(0, 0);
     const plainSun = !systemVisuals.noCentralBody && !systemVisuals.centralType;
-    this.glowRenderer.getContainer().visible = plainSun;
-    this.sunRenderer.getContainer().visible = plainSun;
-    this.corona.getContainer().visible = plainSun;
-    this.centralShaders.set(systemVisuals.centralType ?? null, systemVisuals.centralRadius ?? 1000, systemVisuals.centralHue ?? 30);
+    this.centralShaders.set(systemVisuals.centralType ?? null, systemVisuals.centralRadius ?? 1000, systemVisuals.centralHue ?? 30, this.sys.data?.centralBody?.look);
     this.centralShaders.update(animDelta);
-    
-    // Calculate LOD based on zoom (closer = more detail)
-    // Zoom 0.1 = far (LOD 0), Zoom 2+ = close (LOD 1)
-    const lodZoom = Math.max(0, Math.min(1, (this.cameraZoom - 0.1) / 1.9));
-    this.glowRenderer.setLOD(lodZoom);
-    { const vb = this.viewBox(); this.glowRenderer.setViewHalf(vb.hw, vb.hh); }
-    this.sunRenderer.setLOD(lodZoom);
-
-    if (systemVisuals.detailStar) {
-      // Detail-star mode: full fBM/warp/plasma control (sandbox detail_sun look)
-      this.updateDetailStar(systemVisuals, animDelta, screenSize);
+    if (plainSun) {
+      this.sun.setStar(this.currentSystemId, this.starBody(systemVisuals));
+      this.worldContainer.updateLocalTransform();
+      const toScreen = this.worldContainer.localTransform;
+      this.sun.update(animDelta, toScreen, toScreen);
     } else {
-      // Standard style-based sun
-      const look = this.lookOf(systemVisuals);
-      this.sunRenderer.setSunStyle(look.sun.index, look.sun.params);
-      this.sunRenderer.setCoronaStyle(look.corona.index, look.corona.params);
-      
-      // Update shaders with current system visuals
-      // Pass camera position for parallax effect
-      const glowRadius = systemVisuals.starRadius * 1.8 + 8000;
-      this.glowRenderer.update(animDelta, systemVisuals.starHue, systemVisuals.starRadius, glowRadius, this.cameraX, this.cameraY);
-      // (The shader draws its disc at discScale × what it's given: give it what makes the disc the star's own radius)
-      this.sunRenderer.update(animDelta, systemVisuals.starHue, systemVisuals.starRadius / this.sunRenderer.discScale, screenSize);
+      // (none here: it draws nothing, and the sky has no hole)
+      this.sun.setStar(this.currentSystemId, null);
+      this.sun.update(animDelta, this.worldContainer.localTransform);
     }
-    if (plainSun) this.updateCorona(systemVisuals, animDelta);
+    // The sky after it: nothing drawn behind its disc, none at all when the disc fills the screen
+    if (!surface) this.sky.update(Math.min(0.1, delta) * 1000, this.cameraX, this.cameraY, zoom, this.cameraAngle, this.sun.opaqueRadius);
   }
 
-  /** The sun's style parameters for these visuals (made when the system or its visuals change, not each frame) */
-  private lookOf(v: SystemVisuals): NonNullable<Renderer['sunLook']> {
-    if (this.sunLook?.visuals !== v || this.sunLook.id !== this.currentSystemId) {
-      this.sunLook = {
-        visuals: v, id: this.currentSystemId, rays: null,
-        sun: buildStyleParams(sunShaderDefs.sunStyles, v.sunStyle, v.sunStyleParams),
-        corona: buildStyleParams(sunShaderDefs.coronaStyles, v.coronaStyle, v.coronaStyleParams),
-      };
-    }
-    return this.sunLook;
-  }
-
-  /**
-   * Configure the sun renderer for detail-star mode.
-   * Mirrors the sandbox's detail_sun element: brownian fBM style with
-   * domain warping, plasma, custom colors, and edge control.
-   */
-  private updateDetailStar(v: SystemVisuals, animDelta: number, screenSize: { width: number; height: number }): void {
-    const p = v.detailParams ?? {};
-    const sp = v.detailColors ?? {};
-    const radius = p.radius ?? v.starRadius;
-    const hue = p.hue ?? v.starHue;
-
-    // Resolve the brownian sun style (same shader used by sandbox detail_sun)
-    const brownianIndex = sunShaderDefs.sunStyles.findIndex(s => s.id === 'brownian');
-    const styleIndex = brownianIndex >= 0 ? brownianIndex : 2;
-    const sunParams = [
-      0.5,                              // coreRadius
-      p.octaves ?? 5.0,                 // octaves (1-8)
-      p.lacunarity ?? 2.0,              // lacunarity (freq multiplier)
-      p.gain ?? 0.5,                    // gain (amplitude multiplier)
-      0.9,                              // unused
-      p.warpAmount ?? 0.4,              // warpAmount for domain warping
-    ];
-    this.sunRenderer.setSunStyle(styleIndex, sunParams);
-
-    // Disable built-in corona — detail stars use the glow renderer for atmosphere
-    this.sunRenderer.setCoronaSize(0);
-    this.sunRenderer.setCoronaIntensity(0);
-
-    this.sunRenderer.setRadius(0.4);
-    this.sunRenderer.setWarpParams(p.warpScale ?? 0.5, 0.0, p.turbulenceMix ?? 0.3);
-    this.sunRenderer.setFbmParams(p.noiseScale ?? 4.0, p.animSpeed ?? 0.15, p.fbmContrast ?? 1.0);
-    this.sunRenderer.setPlasmaParams(p.plasmaIntensity ?? 0.3, p.plasmaScale ?? 3.0, p.plasmaSpeed ?? 1.0);
-    this.sunRenderer.setCenterLight(
-      p.centerDarken ?? 0.5,
-      p.centerHighlight ?? 0.5,
-      p.centerFalloff ?? 1.5,
-      p.centerMidpoint ?? 0.5
-    );
-    this.sunRenderer.setInsideAdjust(p.innerDarkening ?? 0.0, p.whiteBalance ?? 0.0, p.saturation ?? 1.0);
-    this.sunRenderer.setEdgeStyle(p.edgeBrightness ?? 1.0, p.edgeThickness ?? 0.03, p.edgeSharpness ?? 0.5);
-    this.sunRenderer.setEdgeGlow(p.limbDarkening ?? 0.5, 0.0, 0.0);
-    this.sunRenderer.setAtmosphereRadii(0.0, 0.0);
-    this.sunRenderer.setCoronaRadii(0.0, 0.0);
-    this.sunRenderer.setCustomColors(
-      this.hexToRgb(sp.darkColor ?? '#1a0500'),
-      this.hexToRgb(sp.midColor ?? '#661100'),
-      this.hexToRgb(sp.brightColor ?? '#ff6600'),
-      this.hexToRgb(sp.edgeColor ?? '#ffaa33')
-    );
-    this.sunRenderer.setPlasmaColor(this.hexToRgb(sp.plasmaColor ?? '#ff9933'));
-    this.sunRenderer.setCenterColor(this.hexToRgb(sp.centerColor ?? '#ffe6cc'));
-
-    // Atmosphere glow via the glow renderer (like sandbox detail_atmosphere)
-    const glowIntensity = p.glowIntensity ?? 0.6;
-    const glowSize = p.glowSize ?? 0.1;
-    const glowRadius = p.glowRadius ?? radius * 1.8 + 8000;
-    if (glowIntensity > 0) {
-      // Bright glow colors derived from the sun's bright/edge palette
-      const bright = this.hexToRgb(sp.brightColor ?? '#ffaa22');
-      const edge = this.hexToRgb(sp.edgeColor ?? '#ffdd66');
-      this.glowRenderer.update(
-        animDelta, hue, radius, glowRadius,
-        this.cameraX, this.cameraY,
-        glowIntensity, glowSize,
-        // inner color: bright sun tone
-        [Math.min(1, bright[0] * 1.1), Math.min(1, bright[1] * 1.1), Math.min(1, bright[2] * 1.1)],
-        // outer color: softer edge tone
-        [edge[0] * 0.9, edge[1] * 0.85, edge[2] * 0.8],
-      );
-    }
-
-    this.sunRenderer.update(animDelta, hue, radius / this.sunRenderer.discScale, screenSize);
-  }
-
-  /**
-   * The corona's look follows the system: its ray count, reach and motion from
-   * the system's id, its colours from the sun's own palette.
-   */
-  private updateCorona(v: SystemVisuals, dt: number): void {
-    // From the disc's edge (drawn at the star's own radius)
-    const radius = v.detailStar ? v.detailParams?.radius ?? v.starRadius : v.starRadius;
-    const look = this.lookOf(v);
-    if (!look.rays) {
-      // Made once per system: its ray count, reach and motion from its id, its colours from the sun's palette
-      const rnd = mulberry32(hashString(`corona:${this.currentSystemId}`));
-      const c = v.detailColors;
-      look.rays = {
-        intensity: 0.75 + rnd() * 0.3,
-        innerRadiusMul: 0.96,
-        outerRadiusMul: 2.2 + rnd() * 0.9,
-        rayCount: Math.round(7 + rnd() * 8),
-        rayWidth: 0.05 + rnd() * 0.05,
-        rayVariation: 0.3 + rnd() * 0.3,
-        raySpeed: 0.25 + rnd() * 0.3,
-        rayTurbulence: 0.1 + rnd() * 0.25,
-        baseColor: c?.brightColor ? this.hexToRgb(c.brightColor) : this.hslRgb(v.starHue, 0.9, 0.62),
-        tipColor: c?.edgeColor ? this.hexToRgb(c.edgeColor) : this.hslRgb(v.starHue + 12, 0.85, 0.82),
-      };
-    }
-    this.corona.setPosition(0, 0);
-    this.corona.update(dt * 1000, v.starHue, radius, look.rays);
+  /** A system's star: its systems.json entry (its look there), else one made from what the server sent */
+  private starBody(v: SystemVisuals): StarBody {
+    const known = starOf(this.currentSystemId);
+    if (known) return known;
+    let b = this.starBodies.get(v);
+    if (!b) this.starBodies.set(v, (b = { radius: v.starRadius, hue: v.starHue, sunStyle: v.sunStyle, detailStar: v.detailStar, detailParams: v.detailParams, detailColors: v.detailColors }));
+    return b;
   }
 
   private hslRgb(h: number, s: number, l: number): [number, number, number] {
     const hex = this.hslToHex(h, s * 100, l * 100);
     return [((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255];
-  }
-
-  /** Parse '#RRGGBB' to [r, g, b] 0-1 floats */
-  private hexToRgb(hex: string): [number, number, number] {
-    const val = hex.startsWith('#') ? hex.slice(1) : hex;
-    const rgb = parseInt(val, 16);
-    if (isNaN(rgb)) return [1, 0, 0];
-    return [
-      ((rgb >> 16) & 0xff) / 255,
-      ((rgb >> 8) & 0xff) / 255,
-      (rgb & 0xff) / 255,
-    ];
   }
 
   private renderEntities(dt: number): void {
@@ -1855,8 +1689,10 @@ export class Renderer {
 
   /** Apply a graphics quality tier (settings/quality.ts) */
   setQuality(q: QualityProfile): void {
+    setPlanetDetail(q.planetDetail);
     this.bloom.setQuality(q.bloomScale, q.bloomQuality);
     this.sky.setDetail(q.hazeScale, q.starLayers);
+    this.sun.setScale(q.sunScale);
     this.particleKeep = q.particles;
     this.weaponFx.particleKeep = q.particles;
     this.minimapMs = 1000 / q.minimapHz;

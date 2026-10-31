@@ -4,7 +4,10 @@
  */
 
 import { Container } from 'pixi.js';
+import type { PlanetLookData } from '@space-game/common';
 import { createShaderQuad, ShaderQuad } from './shaderQuad';
+import { planetQuad } from './planet-proto/planetQuad';
+import { planetTexturesReady } from './planet-proto/planetTextures';
 
 /** Top-down black hole: event horizon, photon ring, Keplerian accretion disk, faint haze. */
 const BLACK_HOLE = `
@@ -79,12 +82,15 @@ const PULSAR = `
 `;
 
 /**
+ * The brown dwarf's classic shader (until 2026-10-31; the game draws it with the planets' program now, below). Kept
+ * for the sun lab's harness (scripts/sun-sky-proto reads it from this file).
+ *
  * Brown dwarf: a star that never caught. A dim, banded ball turning slowly,
  * its bands dragged into eddies, a storm riding one of them, glowing dull red
  * through the cracks between the cloud decks, with a faint smoulder round it,
  * and one old scar of fractures running out from a hot point on the equator.
  */
-const BROWN_DWARF = `
+export const BROWN_DWARF = `
   void main() {
     vec2 p = (vUV - 0.5) * 2.0 * 1.6;      // quad spans ±1.6 radii
     float r = length(p);
@@ -131,8 +137,8 @@ export class CentralBodyShaders {
   private current: { type: CentralType; key: string; quad: ShaderQuad } | null = null;
   private time = 0;
 
-  /** Show (or hide with type null) the special central body for this system. */
-  set(type: CentralType | null, radius: number, hue: number): void {
+  /** Show (or hide with type null) the special central body for this system (`look`: a brown dwarf's own) */
+  set(type: CentralType | null, radius: number, hue: number, look?: PlanetLookData): void {
     const key = `${type}:${radius}:${hue}`;
     if (this.current?.key === key) return;
     if (this.current) {
@@ -144,7 +150,8 @@ export class CentralBodyShaders {
     const quad = type === 'black_hole'
       ? createShaderQuad(BLACK_HOLE, { uTime: { value: 0, type: 'f32' }, uDiskHue: { value: hue, type: 'f32' } }, radius * 6)
       : type === 'brown_dwarf'
-      ? createShaderQuad(BROWN_DWARF, { uTime: { value: 0, type: 'f32' }, uHue: { value: hue, type: 'f32' } }, radius * 1.6)
+      // (a planet that lights itself: planet-proto, kind 'dwarf', its banded deck, heat and old scar)
+      ? planetQuad({ id: 'dwarf', kind: 'dwarf', hue, look }, 0, radius, 1.6)
       : createShaderQuad(PULSAR, {
           uTime: { value: 0, type: 'f32' },
           uBeamHue: { value: hue, type: 'f32' },
@@ -158,6 +165,9 @@ export class CentralBodyShaders {
 
   update(delta: number): void {
     this.time += delta;
-    if (this.current) this.current.quad.u.uniforms.uTime = this.time;
+    if (!this.current) return;
+    this.current.quad.u.uniforms.uTime = this.time;
+    // (the brown dwarf waits for the planets' noise, as they do)
+    if (this.current.type === 'brown_dwarf') this.current.quad.mesh.visible = planetTexturesReady();
   }
 }

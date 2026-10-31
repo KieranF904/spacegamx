@@ -1,7 +1,7 @@
 # Sun and sky prototypes (2026-10-31)
 
-Prototype shaders for the star and the sky that are cheaper than today's and (for the star) look better. **Nothing in
-the game uses them yet**: they live in `client/src/rendering/proto/`, the live lab page `client/sunlab.html` (dev server
+Prototype shaders for the star and the sky that are cheaper than today's and (for the star) look better. **Round 5 at ½
+and the sprite sky are in the game now** ("Adopted" just below); the prototypes: they live in `client/src/rendering/proto/`, the live lab page `client/sunlab.html` (dev server
 only, not a build input) and the native harness `scripts/sun-sky-proto/`. Every number below was measured with that
 harness on the real GPU (RTX 5070 Ti, moderngl, GPU timer queries, best of two runs of 5×10 draws) unless it says
 otherwise, against the game's own shaders read from its TypeScript, set up the way `Renderer` sets them up for each
@@ -9,6 +9,96 @@ system.
 
 There are five rounds. **Round 5** (just below) answers Kieran's review of round 4; each round answers his review of
 the one before. The older rounds are kept below as they were.
+
+# Adopted (2026-10-31): round 5 at ½ resolution, and the sprite sky
+
+Kieran approved plasma R5 at ½ resolution and the sprite sky; both are in the game now. The prototypes below stay as
+they were (the lab and the harness still draw them, with the shipped star beside them as `ship`).
+
+**What shipped**
+
+- **The star.**
+  - `client/src/rendering/sun/plasmaSun.ts` is R5's shader (`PLASMA_R4` + `PLASMA_R5` only) and each star's look.
+  - `sun/SunRenderer.ts` draws it into a target at ½ of the screen's device pixels (⅓ on Low), cleared to nothing,
+    linear, premultiplied, then stretched back.
+  - Its noise volume (`sun/plasmaNoise.ts`, the same bytes as the prototype's) is built in the procedural worker and
+    kept by the asset cache (`plasmaNoise`, `PLASMA_NOISE_VERSION`). `rendering/texture3d.ts` uploads a 3D texture
+    through Pixi.
+  - The old sun, glow (it drew nothing) and corona renderers are gone from the game. They're kept in
+    `rendering/legacy/` for the sandbox and as the lab's "original".
+  - Black holes, the pulsar and the brown dwarf keep their own shaders.
+- **Per star data.** `centralBody.plasma` in `data/systems.json`. Rounds 4 and 5's tuning moved there.
+  - The fields and their ranges are `STAR_PLASMA_FIELDS` in `common/src/data/schemas.ts`, checked by `validateGameData.ts`.
+  - Anything not given comes from the star's palette.
+- **The sky.** All six star layers are sprites in one instanced draw, then the deep sky and motes in one more
+  (`sky/skySprites.ts`; `proto/skyProto.ts` re-exports it).
+  - Behind the star's opaque disc no sprite is drawn, and when the disc fills the screen the sky isn't drawn at all.
+  - Near a black hole the old star shader still draws, inside the Einstein ring only, on a quad round it (its program,
+    577 ms cold, is compiled last).
+- **The sign-in screen** draws Sol with the same renderer: `new SunRenderer(app)`, `setStar('sol')`, then
+  `drawAt(dt, x, y, radiusPx)` each frame.
+- **Shader warm-up** (`gameShaders.ts`) lists the star's program, the sky's three, and the ring last (only if a system
+  has a black hole). The old sun style programs are gone (each about 1.8 s cold).
+- **First visit** (`loadTime.mjs`, cold Chrome profile, `vite preview` of each build): 26 programs and 219 ms of
+  blocking link waits before, 24 programs and 231 ms after. Both are dominated by Pixi's batch program (194 ms); every
+  other compile runs in parallel behind the sign-in screen.
+
+**Low tier: R5 at ⅓** (`sunScale` 1/3), not "R5 low ½", for three reasons:
+
+- At Low's DPR 1 (the 1080p rows) it's as cheap or cheaper in 8 of 12 views.
+- It keeps the whole R5 look (bump, spicules, fine octaves).
+- It's the same program as High and Medium, so Auto stepping down mid-flight compiles nothing.
+
+**Sol, more detail** (Kieran: "Sol could use a little more work, more detail").
+
+- Sol's plasma has fine detail (`threads` 2.4, `threadFlow` 0.3, `granulation` 0.35, `fineContrast` 1.25), compiled as
+  its own variant (`PLASMA_FINE`), so the other stars pay nothing:
+  - each fine octave's ridges become thin bright threads, strongest in active regions, with darker lanes beside them;
+  - the fine octaves are pushed along by the plasma's second field, so the fine detail swirls with the flow instead of
+    lying over it as grain.
+- It costs no extra texture read. Two cheaper-looking designs were tried and dropped:
+  - a separate thread read: +30 to 80%, from occupancy;
+  - each octave pushed by the one before: a serial chain of dependent reads.
+- The edge and its character are unchanged. Stills: `C:\Users\Kieran\AppData\Local\Temp\claude\c--Users-Kieran-Desktop-Spacegame\b24c970b-6148-4883-b4f6-ab3b6971e1b5\scratchpad\ship\shipsol-sol-*.png`.
+
+**The edge, two fixes** (Kieran's reports from the dev client):
+
+1. **It flickered while zooming.** R5 sized its edge noise (the ragged fade, the spicules) from the star's size on screen
+   continuously, so every zoom step re-rolled the pattern, and it read at LOD 0 (aliasing in the ½ target).
+   - Now each ring's frequency moves in steps of two, and the two neighbouring steps are cross-faded with their contrast
+     kept (`edgeRing`). Each step has its own fixed place in the volume, and each read is mip-filtered for the pixel.
+     Features stay put on the star and only fade in or out.
+   - Zoom sweep 0.04 → 2 → 0.04 with time frozen and the limb at the centre (`zoomsweep` + `zoomflicker.py`): the mean
+     frame-to-frame residual at the limb went from 6.7 to 11.5 (R5; peaks to 20) to 2.2 to 2.8 (max 3.6, about the
+     resampling floor).
+   - Nothing else in R5 pops with zoom: the fine octaves and the px-capped widths change continuously, and the target's
+     size follows the screen, not the zoom.
+2. **Its base looked stretched.** The spicules' radial noise coordinate was `max(s, 0)`, so inside the limb one slice of
+   it was drawn out inward into radial streaks.
+   - The noise now runs on through the limb.
+   - The tongues are rooted at it, with a constant width along it, and taper outward (their up-the-radius frequency
+     ratio doubled, so up close they're tongues, not long smears).
+   - Inside the limb there's only a soft glow (about their average) over the fade.
+   - The ragged fade's own noise was nearly constant across the narrow fade, so it made rectangular bars (Cinder Reach
+     shows it worst). It's now close to isotropic, so the fade breaks up into mottling.
+
+Crops: `C:\Users\Kieran\AppData\Local\Temp\claude\c--Users-Kieran-Desktop-Spacegame\b24c970b-6148-4883-b4f6-ab3b6971e1b5\scratchpad\edge\edgefix-<sol|borealis|nebula_prime|cinder_reach>.png` (R4 | R5 | fixed, zoom 0.15, 0.3, 1, 2), and
+animations `C:\Users\Kieran\AppData\Local\Temp\claude\c--Users-Kieran-Desktop-Spacegame\b24c970b-6148-4883-b4f6-ab3b6971e1b5\scratchpad\edge\zoomsweep-<star>.gif`. Cost: +0.001 to 0.004 ms at the limb.
+
+**Cost of the shipped star, ms** (native harness, best of two; `benchship`; "R5 ½" is the approved prototype):
+
+| star | view | R5 ½ | shipped ½ | R5 ⅓ | shipped ⅓ (Low) |
+|---|---|---|---|---|---|
+| Sol | whole / limb / disc, 1080p | 0.062 / 0.039 / 0.057 | 0.068 / 0.048 / 0.066 | 0.035 / 0.023 / 0.032 | 0.037 / 0.027 / 0.037 |
+| Sol | whole / limb / disc, 4K | 0.208 / 0.144 / 0.220 | 0.246 / 0.177 / 0.255 | 0.116 / 0.084 / 0.121 | 0.129 / 0.099 / 0.141 |
+| Borealis | limb, 1080p / 4K | 0.035 / 0.126 | 0.036 / 0.130 | | |
+| Nebula Prime | limb, 1080p / 4K | 0.039 / 0.145 | 0.042 / 0.151 | | |
+| Cinder Reach | limb, 1080p / 4K | 0.039 / 0.145 | 0.043 / 0.152 | | |
+
+- The other stars are within 0.001 to 0.007 ms of R5 ½ in every view (the edge fix).
+- Sol is +0.006 to 0.009 ms at 1080p for its detail.
+- Against the original sun (round 5's table) it is still 3 to 4× cheaper at Sol's limb and over 10× at Borealis'.
+- Raw: `C:\Users\Kieran\AppData\Local\Temp\claude\c--Users-Kieran-Desktop-Spacegame\b24c970b-6148-4883-b4f6-ab3b6971e1b5\scratchpad\ship\benchship.final.json`.
 
 # Round 5 (after Kieran's review of round 4)
 

@@ -35,6 +35,7 @@ import { TargetUI } from './ui/TargetUI';
 import { OpsUI } from './ui/OpsUI';
 import { Tutorial } from './ui/Tutorial';
 import { PingUI } from './ui/PingUI';
+import { PerfMonitor } from './ui/PerfMonitor';
 import { RibbonPopup } from './ui/RibbonPopup';
 import ribbonData from '../../data/achievements.json';
 import type { RibbonsFile } from '@space-game/common';
@@ -248,7 +249,9 @@ export class Game {
 private xpHudEl: HTMLElement | null;
 private boostHudEl: HTMLElement | null;
   private inventoryPanelEl: HTMLElement | null;
-private debugEl: HTMLElement | null;
+private perfMonitor: PerfMonitor | null = null;
+  private perfSrv: number | undefined;
+  private perfNet = '';
   
   // Individual HUD components
 private xpFillEl: HTMLElement | null;
@@ -261,9 +264,6 @@ private xpFillEl: HTMLElement | null;
   private xpToNextEl: HTMLElement | null;
   private creditsEl: HTMLElement | null;
   private systemInfoEl: HTMLElement | null;
-  private fpsEl: HTMLElement | null;
-  private pingEl: HTMLElement | null;
-  private entityCountEl: HTMLElement | null;
 
   // Chat elements
   private chatMessagesEl: HTMLElement | null;
@@ -303,10 +303,6 @@ private xpFillEl: HTMLElement | null;
   private versionMismatch = false;
 
   // Ping graph
-  private pingDisplayEl: HTMLElement | null;
-  private pingTextEl: HTMLElement | null;
-  private pingGraphCanvas: HTMLCanvasElement | null;
-  private pingGraphCtx: CanvasRenderingContext2D | null = null;
 
   constructor(container: HTMLElement, options: GameOptions = {}) {
     this.container = container;
@@ -363,7 +359,6 @@ private xpFillEl: HTMLElement | null;
 this.xpHudEl = document.getElementById('xpHud');
 this.boostHudEl = document.getElementById('boostHud');
     this.inventoryPanelEl = document.getElementById('inventoryPanel');
-this.debugEl = document.getElementById('debug');
     
     // Individual components
 this.xpFillEl = document.getElementById('xpFill');
@@ -374,22 +369,24 @@ this.xpFillEl = document.getElementById('xpFill');
     this.xpToNextEl = document.getElementById('xpToNext');
     this.creditsEl = document.getElementById('credits');
     this.systemInfoEl = document.getElementById('systemInfo');
-    this.fpsEl = document.getElementById('fps');
-    this.pingEl = document.getElementById('ping');
-    this.entityCountEl = document.getElementById('entity-count');
 
     // Chat elements
     this.chatMessagesEl = document.getElementById('chatMessages');
     this.chatInputEl = document.getElementById('chatInput') as HTMLInputElement;
     this.chatSendBtn = document.getElementById('chatSendBtn');
 
-    // Ping display
-    this.pingDisplayEl = document.getElementById('pingDisplay');
-    this.pingTextEl = document.getElementById('pingText');
-    this.pingGraphCanvas = document.getElementById('pingGraphCanvas') as HTMLCanvasElement;
-    if (this.pingGraphCanvas) {
-      this.pingGraphCtx = this.pingGraphCanvas.getContext('2d');
-    }
+    // Performance monitor (Settings > Performance monitor): its own panel, fed every frame
+    this.perfMonitor = new PerfMonitor(document.getElementById('ui-overlay') ?? document.body, () => ({
+      ping: this.state.ping,
+      jitter: this.state.jitter,
+      pingHistory: this.state.pingGraphHistory,
+      jitterHistory: this.state.jitterGraphHistory,
+      pingEvery: 2,
+      entities: this.state.entities.size,
+      tier: `${this.qualityTier()}${settings.data.display.quality === 'auto' ? ' (auto)' : ''}`,
+      serverMs: this.perfSrv,
+      net: this.perfNet,
+    }));
   }
 
   async init(): Promise<void> {
@@ -439,6 +436,9 @@ this.xpFillEl = document.getElementById('xpFill');
     // Initialize UI components
     const uiOverlay = document.getElementById('ui-overlay')!;
     this.loginUI = new LoginUI(uiOverlay, this.app);
+    // (its own render resolution while it's up: renderResolution)
+    this.loginUI.onVisibility = () => { if (Math.abs(this.app.renderer.resolution - this.renderResolution()) > 1e-3) this.onResize(); };
+    this.loginUI.onVisibility();
     // Load time: the shaders compiled ahead, off the main thread, while the sign-in screen is up (see shaderWarmup)
     attachShaderWarmup(this.app.renderer);
     warmShaders(gameShaders(this.app.renderer, this.loginUI.backdrop(), this.app.stage, (systemsDataForMenu as unknown as { systems: StarSystemData[] }).systems));
@@ -1007,8 +1007,7 @@ this.xpFillEl = document.getElementById('xpFill');
     this.frost.setVisible(s.ui.hazardEffects);
     if (this.navMarkers) this.navMarkers.enabled = s.ui.navMarkers;
     if (this.loggedIn) {
-      if (this.debugEl) this.debugEl.style.display = s.ui.netStats ? 'block' : 'none';
-      if (this.pingDisplayEl) this.pingDisplayEl.style.display = s.ui.netStats ? 'flex' : 'none';
+      this.perfMonitor?.setVisible(s.ui.netStats);
     }
     const chat = document.getElementById('chatBox');
     if (chat) chat.style.visibility = s.ui.chat ? 'visible' : 'hidden';
@@ -1298,8 +1297,8 @@ this.xpFillEl = document.getElementById('xpFill');
 
     // Update FPS counter
     this.frameCount++;
+    this.perfMonitor?.frame(delta * 1000, now);
     if (now - this.fpsUpdateTime > 1000) {
-      if (this.fpsEl) this.fpsEl.textContent = this.frameCount.toString();
       this.frameCount = 0;
       this.fpsUpdateTime = now;
     }
@@ -1717,19 +1716,12 @@ this.xpFillEl = document.getElementById('xpFill');
         
       case 'pong':
         this.state.handlePong(msg.clientTime, msg.serverTime, msg.tick);
-        if (this.pingEl) this.pingEl.textContent = this.state.ping.toString();
-        if (this.pingTextEl) {
-          const procText = msg.serverProcessing !== undefined ? ` | SRV: ${msg.serverProcessing}ms` : '';
-          this.pingTextEl.textContent = `PING: ${this.state.ping}ms | JITTER: ${this.state.jitter}ms${procText}${this.netRates()}`;
-        }
-        this.drawPingGraph();
+        this.perfSrv = msg.serverProcessing;
+        this.perfNet = this.netRates().replace(/^ \| /, '');
         break;
         
       case 'snapshot':
         this.state.applySnapshot(msg);
-        if (this.entityCountEl) {
-          this.entityCountEl.textContent = this.state.entities.size.toString();
-        }
         break;
         
       case 'playerState':
@@ -2194,8 +2186,7 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'flex';
     this.quests.show();
     this.quickBar.show();
     this.social.show();
-    if (this.debugEl) this.debugEl.style.display = settings.data.ui.netStats ? 'block' : 'none';
-    if (this.pingDisplayEl) this.pingDisplayEl.style.display = settings.data.ui.netStats ? 'flex' : 'none';
+    this.perfMonitor?.setVisible(settings.data.ui.netStats);
     
     // Send join/auth message based on pending auth state
     // (Each carries our protocol version: a server on another one hangs up with PROTOCOL_MISMATCH_CLOSE)
@@ -2443,160 +2434,6 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'none';
     el.classList.add(cls);
   }
 
-  private drawPingGraph(): void {
-    const ctx = this.pingGraphCtx;
-    const canvas = this.pingGraphCanvas;
-    if (!ctx || !canvas) return;
-    
-    const w = canvas.width;   // 720 (2x retina)
-    const h = canvas.height;  // 240
-    
-    // Layout: left margin for axis labels, bottom margin for time axis
-    const marginLeft = 52;
-    const marginBottom = 28;
-    const marginTop = 24;
-    const marginRight = 16;
-    const plotW = w - marginLeft - marginRight;
-    const plotH = h - marginTop - marginBottom;
-    
-    ctx.clearRect(0, 0, w, h);
-    
-    const pingData = this.state.pingGraphHistory;
-    const jitterData = this.state.jitterGraphHistory;
-    if (pingData.length < 2) return;
-    
-    // Determine scale — snap to nice grid intervals
-    const rawMax = Math.max(20, ...pingData, ...jitterData);
-    const niceIntervals = [10, 20, 25, 50, 100, 150, 200, 250, 500, 1000];
-    let gridInterval = 10;
-    let maxVal = 20;
-    for (const interval of niceIntervals) {
-      if (rawMax <= interval * 4) {
-        gridInterval = interval;
-        maxVal = interval * 4;
-        break;
-      }
-    }
-    if (rawMax > maxVal) {
-      gridInterval = Math.ceil(rawMax / 4 / 50) * 50;
-      maxVal = gridInterval * 4;
-    }
-    
-    const scaleY = plotH / maxVal;
-    const step = plotW / Math.max(1, pingData.length - 1);
-    
-    const toX = (i: number) => marginLeft + i * step;
-    const toY = (v: number) => marginTop + plotH - v * scaleY;
-    
-    // ── Grid lines ──
-    ctx.setLineDash([4, 4]);
-    ctx.lineWidth = 1;
-    for (let g = 0; g <= 4; g++) {
-      const val = g * gridInterval;
-      const y = toY(val);
-      ctx.strokeStyle = g === 0 ? 'rgba(120,160,220,0.3)' : 'rgba(120,160,220,0.12)';
-      ctx.beginPath();
-      ctx.moveTo(marginLeft, y);
-      ctx.lineTo(w - marginRight, y);
-      ctx.stroke();
-      
-      // Axis label
-      ctx.fillStyle = 'rgba(180,200,230,0.7)';
-      ctx.font = '18px monospace';
-      ctx.textAlign = 'right';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(`${val}`, marginLeft - 8, y);
-    }
-    ctx.setLineDash([]);
-    
-    // ── "ms" label at top of Y axis ──
-    ctx.fillStyle = 'rgba(180,200,230,0.5)';
-    ctx.font = '16px monospace';
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText('ms', marginLeft - 8, marginTop - 2);
-    
-    // ── Time axis labels (seconds ago) ──
-    const totalSamples = this.state.pingGraphHistory.length;
-    const sampleIntervalSec = 2;  // ping every 2s
-    ctx.fillStyle = 'rgba(180,200,230,0.5)';
-    ctx.font = '16px monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    const timeLabels = 5;
-    for (let t = 0; t < timeLabels; t++) {
-      const frac = t / (timeLabels - 1);
-      const idx = Math.round(frac * (pingData.length - 1));
-      const secsAgo = (pingData.length - 1 - idx) * sampleIntervalSec;
-      const x = toX(idx);
-      const label = secsAgo === 0 ? 'now' : `-${secsAgo}s`;
-      ctx.fillText(label, x, marginTop + plotH + 6);
-    }
-    
-    // ── Jitter fill area ──
-    ctx.beginPath();
-    ctx.moveTo(toX(0), toY(0));
-    for (let i = 0; i < jitterData.length; i++) {
-      ctx.lineTo(toX(i), toY(jitterData[i]));
-    }
-    ctx.lineTo(toX(jitterData.length - 1), toY(0));
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(255, 160, 60, 0.12)';
-    ctx.fill();
-    
-    // ── Jitter line ──
-    ctx.beginPath();
-    for (let i = 0; i < jitterData.length; i++) {
-      i === 0 ? ctx.moveTo(toX(i), toY(jitterData[i])) : ctx.lineTo(toX(i), toY(jitterData[i]));
-    }
-    ctx.strokeStyle = 'rgba(255, 160, 60, 0.7)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    
-    // ── Ping line ──
-    ctx.beginPath();
-    for (let i = 0; i < pingData.length; i++) {
-      i === 0 ? ctx.moveTo(toX(i), toY(pingData[i])) : ctx.lineTo(toX(i), toY(pingData[i]));
-    }
-    ctx.strokeStyle = 'rgba(100, 200, 255, 0.9)';
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
-    
-    // ── Current value dots ──
-    const lastPing = pingData[pingData.length - 1];
-    const lastJitter = jitterData[jitterData.length - 1];
-    const lastX = toX(pingData.length - 1);
-    
-    // Ping dot
-    ctx.beginPath();
-    ctx.arc(lastX, toY(lastPing), 4, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(100, 200, 255, 1)';
-    ctx.fill();
-    
-    // Jitter dot
-    ctx.beginPath();
-    ctx.arc(lastX, toY(lastJitter), 3, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255, 160, 60, 1)';
-    ctx.fill();
-    
-    // ── Legend (top-left of plot area) ──
-    const legendX = marginLeft + 12;
-    const legendY = marginTop + 8;
-    ctx.font = 'bold 18px monospace';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    
-    // Ping legend
-    ctx.fillStyle = 'rgba(100, 200, 255, 0.9)';
-    ctx.fillRect(legendX, legendY + 2, 16, 3);
-    ctx.fillText(`Ping: ${lastPing}ms`, legendX + 22, legendY - 3);
-    
-    // Jitter legend
-    ctx.fillStyle = 'rgba(255, 160, 60, 0.8)';
-    ctx.fillRect(legendX, legendY + 22, 16, 3);
-    ctx.fillText(`Jitter: ${lastJitter}ms`, legendX + 22, legendY + 17);
-  }
-
   /** The server's notices (party, travel, announcements) go in the chat */
   private showSystemMessage(text: string, color?: string): void {
     this.addChatMessage('', text, true, color);
@@ -2608,6 +2445,8 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'none';
    * times the Render resolution setting.
    */
   private renderResolution(): number {
+    // (the sign-in screen: one body on an idle screen, at the screen's own density whatever the tier)
+    if (this.loginUI?.isVisible()) return Math.min(2, window.devicePixelRatio || 1);
     return Math.min(PROFILES[this.qualityTier()].maxDpr, window.devicePixelRatio || 1) * Math.max(0.5, Math.min(1, settings.data.display.renderScale));
   }
 

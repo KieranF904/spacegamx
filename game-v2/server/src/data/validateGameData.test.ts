@@ -135,6 +135,19 @@ describe('game data validation', () => {
       .some((p) => /safe space/.test(p.message))).toBe(false);
   });
 
+  it("checks a star's plasma look: known fields, numbers in range, colours", () => {
+    const e = broken((f) => {
+      const cb = f.systems.systems.find((s: any) => s.id === 'sol').centralBody;
+      cb.plasma = { ...cb.plasma, threds: 1, limbDarkening: 3, rimColor: 'orange', iridescence: { mode: 'stripes', colors: ['#fff'] } };
+    });
+    const at = (k: string) => e.find((p) => p.path === `systems[0].centralBody.plasma.${k}`);
+    expect(at('threds')?.message).toMatch(/not a plasma field/);
+    expect(at('limbDarkening')?.message).toMatch(/out of range \(0\.\.1\)/);
+    expect(at('rimColor')?.message).toMatch(/#rrggbb/);
+    expect(at('iridescence.mode')).toBeTruthy();
+    expect(at('iridescence.colors')).toBeTruthy();
+  });
+
   it('lodestone and jump tuning fields are known (a typo warns)', () => {
     const f = structuredClone(files) as any;
     const s = structuredClone(ships) as any;

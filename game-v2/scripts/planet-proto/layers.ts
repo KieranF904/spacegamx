@@ -6,7 +6,7 @@
  */
 
 import type { PlanetData, PlanetKind } from '@space-game/common';
-import { lookFor, planetProtoDecls, planetProtoUniforms, PLANET_PROTO_FRAG, type BodyIn } from '../../client/src/rendering/planet-proto/planetProto';
+import { lookFor, planetFragment, planetProtoDecls, planetProtoUniforms, PLANET_PROTO_FRAG, type BodyIn } from '../../client/src/rendering/planet-proto/planetProto';
 
 export interface View { w: number; h: number; dpr: number; cam: [number, number]; zoom: number; t: number }
 export interface Layer {
@@ -79,10 +79,10 @@ export interface Body extends BodyIn {
 export function bodiesOf(system: any): Body[] {
   const out: Body[] = [];
   const cb = system.centralBody;
-  if (cb?.type === 'brown_dwarf') out.push({ id: `${system.id}.dwarf`, name: `${system.name} (brown dwarf)`, kind: 'dwarf', hue: cb.hue ?? 14, radius: cb.radius, seed: 0, extent: 1.6, dwarf: true });
+  if (cb?.type === 'brown_dwarf') out.push({ id: `${system.id}.dwarf`, name: `${system.name} (brown dwarf)`, kind: 'dwarf', hue: cb.hue ?? 14, look: cb.look, radius: cb.radius, seed: 0, extent: 1.6, dwarf: true });
   for (const p of (system.planets ?? []) as PlanetData[]) {
     const seed = hashId(p.id);
-    out.push({ id: p.id, name: p.name, kind: p.kind, hue: p.hue ?? DEFAULT_HUE[p.kind], rings: p.rings, radius: p.radius, seed, extent: Math.max(1.3, p.rings?.outer ?? 0) });
+    out.push({ id: p.id, name: p.name, kind: p.kind, hue: p.hue ?? DEFAULT_HUE[p.kind], rings: p.rings, look: p.look, radius: p.radius, seed, extent: Math.max(1.3, p.rings?.outer ?? 0) });
     (p.moons ?? []).forEach((m, i) => out.push({
       id: `${p.id}.moon${i}`, name: `${m.name ?? `${p.name} moon ${i + 1}`}`, kind: i % 2 ? 'ice' : 'rocky', hue: 30 + i * 140,
       radius: m.radius, seed: seed + i * 13, extent: 1.3,
@@ -102,11 +102,12 @@ export function worldQuad(v: View, cx: number, cy: number, h: number): number[] 
 export const lightAmtOf = (centralType?: string) => (centralType === 'black_hole' ? 0.55 : centralType === 'pulsar' ? 0.75 : 1);
 
 /**
- * The variants: `cur` (the game's), `proto` (the prototype), `proto.lite` (its low tier: one flow phase, no relief,
+ * The variants: `cur` (the classic look, before the prototype was adopted), `proto` (the prototype: the game's Medium
+ * tier), `proto.fine` (High: exact cracks), `proto.lite` (Low: one flow phase, no relief,
  * no fine octave)
  */
-export type Variant = 'cur' | 'proto' | 'proto.lite';
-export const VARIANT_LABEL: Record<Variant, string> = { cur: 'current', proto: 'prototype', 'proto.lite': 'prototype lite' };
+export type Variant = 'cur' | 'proto' | 'proto.lite' | 'proto.fine';
+export const VARIANT_LABEL: Record<Variant, string> = { cur: 'classic', proto: 'standard (Medium)', 'proto.lite': 'lite (Low)', 'proto.fine': 'fine (High)' };
 
 /** Where a body sits and where its light comes from (a unit vector toward the star, world space, y down) */
 export interface Placement { x: number; y: number; light: [number, number]; lightAmt: number }
@@ -122,7 +123,7 @@ export function bodyLayer(b: Body, variant: Variant, v: View, at: Placement): La
   }
   const u = planetProtoUniforms(lookFor(b, b.seed), b.kind, b.seed, b.extent);
   return {
-    name: 'planet', program: variant === 'proto.lite' ? 'planet.lite' : 'planet.proto', blend: 'normal', verts, textures: { uNoise: 'planetNoise' },
+    name: 'planet', program: variant === 'proto.lite' ? 'planet.lite' : variant === 'proto.fine' ? 'planet.fine' : 'planet.proto', blend: 'normal', verts, textures: variant === 'proto.fine' ? { uNoise: 'planetNoise', uCrack: 'planetCrack' } : { uNoise: 'planetNoise' },
     uniforms: { ...u, uTime: v.t, uLight: at.light, uLightAmt: b.dwarf ? 1 : at.lightAmt },
   };
 }
@@ -159,7 +160,8 @@ export function planetPrograms(src: Sources, forDesktop: boolean): Programs {
     'planet.cur': { vert, frag: fix(quadFrag(src.planetFrag, curU, src.glslCommon)) },
     'dwarf.cur': { vert, frag: fix(quadFrag(src.dwarfFrag, { uTime: 0, uHue: 0 }, src.glslCommon)) },
     'planet.proto': { vert, frag: fix(quadFrag(PLANET_PROTO_FRAG, PROTO_U, src.glslCommon)) },
-    'planet.lite': { vert, frag: fix(quadFrag(PLANET_PROTO_FRAG, PROTO_U, src.glslCommon, '#define PLANET_LITE')) },
+    'planet.lite': { vert, frag: fix(quadFrag(planetFragment('lite'), PROTO_U, src.glslCommon)) },
+    'planet.fine': { vert, frag: fix(quadFrag(planetFragment('fine'), PROTO_U, src.glslCommon)) },
     backdrop: { vert, frag: fix(quadFrag(BACKDROP, { uRes: [0, 0], uCam: [0, 0] }, src.glslCommon)) },
   };
 }

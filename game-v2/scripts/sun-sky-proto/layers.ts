@@ -7,6 +7,7 @@
 
 import { hashString, mulberry32 } from '@space-game/common';
 import { sunShaderDefs } from '../../common/src/data/definitions/SunShaderDefs';
+import { plasmaFine, plasmaSunFrag, PLASMA_SUN_VERT, starLook, type PlasmaParams as ShipParams } from '../../client/src/rendering/sun/plasmaSun';
 import { B2_CELLS, plasmaLook, sunPhotoLook, withEdgeFix, withExactNoise, withTextureNoise, PLASMA_FRAG, SUN_PHOTO_FRAG, SUN_PHOTO_VERT, type PlasmaParams } from '../../client/src/rendering/proto/sunProto';
 
 export interface Sources {
@@ -255,12 +256,38 @@ export function plasmaSunLayers(id: string, cb: CentralBody, v: View, lite = fal
 }
 
 /**
+ * Trial settings for the shipped star (`ship.<name>`), on top of its systems.json `plasma`: `r5` is round 5 exactly
+ * (Sol without its fine detail), `noflow` and `nothreads` Sol's fine detail without one half of it (for its cost)
+ */
+export const SHIP_TRIALS: Record<string, ShipParams> = {
+  r5: { threads: 0, threadFlow: 0, granulation: 0, fineContrast: 1, fineOnset: 0 },
+  noflow: { threadFlow: 0 },
+  nothreads: { threads: 0, granulation: 0 },
+};
+
+/**
+ * The star as the game ships it (client/src/rendering/sun: plasmaSun.ts's shader and look): its look from systems.json
+ * (centralBody.plasma), with the round 4 and 5 tuning under it for a star without one, and a trial on top
+ */
+export function shipSunLayers(id: string, cb: CentralBody, v: View, trial?: string): Layer[] {
+  const R = cb.detailParams?.radius ?? cb.radius ?? 1000;
+  const plasma = { ...PLASMA4_TUNING[id], ...PLASMA5_TUNING[id], ...(cb as { plasma?: ShipParams }).plasma, ...(trial ? SHIP_TRIALS[trial] : {}) };
+  const look = starLook(id, { ...cb, plasma } as Parameters<typeof starLook>[1]);
+  const pxR = R * v.zoom;
+  const h = R * look.reach;
+  if (!onScreen(v, 0, 0, h, h)) return [];
+  const detail = Math.max(0, Math.min(3, Math.log2(pxR / 1500) / 2 + 0.5 + look.fineOnset));
+  return [{ name: 'sun', program: plasmaFine(look) ? 'ship.fine' : 'ship', blend: 'normal', textures: { uNoise3: 'noise3' }, verts: worldQuad(v, 0, 0, h, h), uniforms: { ...look.uniforms, uTime: v.t, uDetail: detail, uPxR: pxR } }];
+}
+
+/**
  * A sun option by name: a look, then optionally `@scale` to draw it into a render target that size and stretch it.
  * Looks: cur (the game's), port (A), exact (A-exact), photo and lite (B, round 1), plasma and plasma.lite (round 2).
  */
 export function sunVariantLayers(id: string, cb: CentralBody, v: View, variant: string): Layer[] {
   const [look, scale] = variant.split('@');
-  const layers = look === 'cur' || look === 'port' || look === 'exact' || look === 'fix' ? currentSunLayers(id, cb, v, look === 'cur' ? false : look)
+  const layers = look === 'ship' || look.startsWith('ship.') ? shipSunLayers(id, cb, v, look.split('.')[1])
+    : look === 'cur' || look === 'port' || look === 'exact' || look === 'fix' ? currentSunLayers(id, cb, v, look === 'cur' ? false : look)
     : look.startsWith('plasma') ? plasmaSunLayers(id, cb, v, look.includes('.lite'), PLASMA_EXAMPLES[look.split('.').find((k) => k in PLASMA_EXAMPLES) ?? ''], look.startsWith('plasma5') ? 5 : look.startsWith('plasma4') ? 4 : 3, look.includes('.low'))
     : photoSunLayers(id, cb, v, look === 'lite' || look === 'lite2', look === 'photo2' || look === 'lite2');
   return scale ? atScale(layers, Number(scale)) : layers;
@@ -314,6 +341,8 @@ export function sunPrograms(src: Sources, desktop = true): Programs {
     'plasma5.low': { vert: SUN_PHOTO_VERT, frag: PLASMA_FRAG.replace('#version 300 es', '#version 300 es\n  #define PLASMA_R4 1\n  #define PLASMA_R5 1\n  #define PLASMA_LOW 1') },
     plasma4: { vert: SUN_PHOTO_VERT, frag: PLASMA_FRAG.replace('#version 300 es', '#version 300 es\n  #define PLASMA_R4 1') },
     'plasma4.lite': { vert: SUN_PHOTO_VERT, frag: PLASMA_FRAG.replace('#version 300 es', '#version 300 es\n  #define PLASMA_R4 1\n  #define PLASMA_LITE 1') },
+    ship: { vert: PLASMA_SUN_VERT, frag: plasmaSunFrag(false) },
+    'ship.fine': { vert: PLASMA_SUN_VERT, frag: plasmaSunFrag(true) },
     'photo.lite': { vert: SUN_PHOTO_VERT, frag: SUN_PHOTO_FRAG.replace('#version 300 es', '#version 300 es\n  #define SUN_PHOTO_LITE 1') },
   };
   for (const n of ['BLACK_HOLE', 'PULSAR', 'BROWN_DWARF'] as const) {

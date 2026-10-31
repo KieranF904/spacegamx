@@ -51,8 +51,11 @@ class Harness:
             data = open(t['file'], 'rb').read()
             if t.get('d'):
                 tex = self.ctx.texture3d((t['w'], t['h'], t['d']), 4, data)
-                tex.build_mipmaps()
-                tex.filter = (moderngl.LINEAR_MIPMAP_LINEAR, moderngl.LINEAR)
+                if t.get('nearest'):
+                    tex.filter = (moderngl.NEAREST, moderngl.NEAREST)
+                else:
+                    tex.build_mipmaps()
+                    tex.filter = (moderngl.LINEAR_MIPMAP_LINEAR, moderngl.LINEAR)
                 tex.repeat_x = tex.repeat_y = tex.repeat_z = True
                 self.textures[name] = tex
                 continue

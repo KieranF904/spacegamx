@@ -302,11 +302,11 @@ try {
     const set = (fn) => ev(`(async () => { const u = performance.getEntriesByType('resource').map((r) => r.name).find((n) => n.includes('/src/settings/Settings.ts')) ?? '/src/settings/Settings.ts'; const m = await import(u); m.settings.update((s) => { ${fn} }); return 1; })()`);
     const size = async (w, h, dpr) => { await metrics(w, h, dpr); await sleep(300); await ev(`window.dispatchEvent(new Event('resize')), 1`); await sleep(1200); };
     const run = async (label, expr = '') => { await ensure(); await topUp(); if (expr) await ev(`(() => { const r = window.__game.renderer; ${expr}; return 1; })()`); await sleep(800); return measure(`gpu-${label}`, 4, { profile: false, gpu: process.env.GPU_METHOD === 'timer' ? 'timer' : true }); };
-    const ALL_ON = 'r.sky.container.renderable = true; r.sunRenderer.getContainer().renderable = true; r.glowRenderer.getContainer().renderable = true; r.corona.getContainer().renderable = true; r.bloom.sprite.renderable = true; r.bloom.enabled = true; r.shipLayer.renderable = true; r.effectContainer.renderable = true; r.worldContainer.renderable = true';
+    const ALL_ON = 'r.sky.container.renderable = true; r.sun.container.renderable = true; r.bloom.sprite.renderable = true; r.bloom.enabled = true; r.shipLayer.renderable = true; r.effectContainer.renderable = true; r.worldContainer.renderable = true';
     const layers = async (tag) => {
       await run(`${tag}-base`, ALL_ON);
       await run(`${tag}-no-sky`, ALL_ON + '; r.sky.container.renderable = false');
-      await run(`${tag}-no-sun-glow-corona`, ALL_ON + '; r.sunRenderer.getContainer().renderable = false; r.glowRenderer.getContainer().renderable = false; r.corona.getContainer().renderable = false');
+      await run(`${tag}-no-sun`, ALL_ON + '; r.sun.container.renderable = false');
       await run(`${tag}-no-bloom`, ALL_ON + '; r.bloom.enabled = false; r.bloom.sprite.renderable = false');
       await run(`${tag}-no-ships`, ALL_ON + '; r.shipLayer.renderable = false');
       await run(`${tag}-no-effects`, ALL_ON + '; r.effectContainer.renderable = false');

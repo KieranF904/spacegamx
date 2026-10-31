@@ -88,13 +88,13 @@ export function spriteSkyLayers(b: SkyBiome, v: View, lens = 0, opts: { better?:
   const shared = { ...skySpriteUniforms(b, v, lens), uSunHole: opts.hole ?? [0, 0, 0] };
   if (opts.oneDraw) {
     const g = oneDrawGrid(b, v, lens);
-    if (g) out.push({ name: 'stars (one draw)', program: better ? 'sprite1.better' : 'sprite1', uniforms: { ...shared, ...g.uniforms } as Layer['uniforms'], textures: { uNoise: 'skyNoise' }, verts: SCREEN, blend: 'add', instances: g.count });
+    if (g) out.push({ name: 'stars (one draw)', program: better ? 'sprite1.better' : 'sprite1', uniforms: { ...shared, ...g.uniforms } as Layer['uniforms'], textures: { uNoise: 'skyNoise' }, verts: SPRITE_QUAD, blend: 'add', instances: g.count });
   }
   else SKY_LAYERS.forEach((_, i) => {
     if (opts.only !== undefined && opts.only !== i) return;
     const g = spriteGrid(b, v, i, lens);
     if (!g) return;
-    out.push({ name: `stars${i}`, program: prog, uniforms: { ...shared, ...g.uniforms }, textures: { uNoise: 'skyNoise' }, verts: SCREEN, blend: 'add', instances: g.count });
+    out.push({ name: `stars${i}`, program: prog, uniforms: { ...shared, ...g.uniforms }, textures: { uNoise: 'skyNoise' }, verts: SPRITE_QUAD, blend: 'add', instances: g.count });
   });
   const deep = opts.only === undefined ? spriteGrid(b, v, 'deep', lens) : null;
   // Near a black hole: inside its ring, the old shader (only there)
@@ -105,9 +105,12 @@ export function spriteSkyLayers(b: SkyBiome, v: View, lens = 0, opts: { better?:
     const verts = [cx(x0), cy(y0), u(x0), w(y0), cx(x1), cy(y0), u(x1), w(y0), cx(x0), cy(y1), u(x0), w(y1), cx(x1), cy(y1), u(x1), w(y1)];
     out.push({ name: 'stars (ring)', program: opts.hole ? 'stars.ring.hole' : 'stars.ring', uniforms: { ...currentStarUniforms(b, v, lens), uSunHole: opts.hole ?? [0, 0, 0] }, textures: { uNoise: 'skyNoise' }, verts, blend: 'add' });
   }
-  if (deep) out.push({ name: 'deep+motes', program: 'deep', uniforms: { ...shared, ...deep.uniforms }, textures: { uNoise: 'skyNoise' }, verts: SCREEN, blend: 'add', instances: deep.count });
+  if (deep) out.push({ name: 'deep+motes', program: 'deep', uniforms: { ...shared, ...deep.uniforms }, textures: { uNoise: 'skyNoise' }, verts: SPRITE_QUAD, blend: 'add', instances: deep.count });
   return out;
 }
+
+/** The sprites' quad: each instance's corners, 0..1 in both attributes (skySprites reads (aPosition + aUV) / 2) */
+const SPRITE_QUAD = [0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 1, 1, 1];
 
 export function skyPrograms(desktop = true): Programs {
   const better = (s: string) => s.replace('#version 300 es', '#version 300 es\n#define SKY_BETTER 1');

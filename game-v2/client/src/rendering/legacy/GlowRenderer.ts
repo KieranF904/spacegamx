@@ -1,4 +1,9 @@
 /**
+ * LEGACY: the star as it was drawn before plasma round 5 (sun/SunRenderer.ts draws it now). Kept for the sandbox's
+ * star elements and as the "original" the sun lab and the native harness compare against
+ * (docs/rendering/sun-sky-prototypes.md). The game doesn't use it.
+ */
+/**
  * GlowRenderer - GPU-accelerated ambient glow rendering
  * 
  * Creates the large area lighting effect emanating from the sun
@@ -6,7 +11,7 @@
  */
 
 import { Container, Mesh, MeshGeometry, Shader, GlProgram, State } from 'pixi.js';
-import { debugConfig } from '../ui/DebugUI';
+import { debugConfig } from '../../ui/DebugUI';
 
 const VERTEX_SHADER = `#version 300 es
   in vec2 aPosition;

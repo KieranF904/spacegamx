@@ -1,3 +1,8 @@
+/**
+ * LEGACY: the star as it was drawn before plasma round 5 (sun/SunRenderer.ts draws it now). Kept for the sandbox's
+ * star elements and as the "original" the sun lab and the native harness compare against
+ * (docs/rendering/sun-sky-prototypes.md). The game doesn't use it.
+ */
 import { Container, Mesh, MeshGeometry, Shader, GlProgram, State } from 'pixi.js';
 
 const VERTEX_SHADER = `#version 300 es

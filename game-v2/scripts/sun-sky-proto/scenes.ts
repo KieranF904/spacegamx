@@ -22,7 +22,7 @@ const out = resolve(process.argv[3] ?? join(root, '.sun-sky-proto'));
 mkdirSync(out, { recursive: true });
 
 const read = (file: string) => readFileSync(join(root, 'client/src/rendering', file), 'utf8');
-const sources = sourcesFrom({ sun: read('SunRenderer.ts'), glow: read('GlowRenderer.ts'), rays: read('CoronaRaysRenderer.ts'), central: read('CentralBodyShaders.ts'), quad: read('shaderQuad.ts') }, GLSL_COMMON);
+const sources = sourcesFrom({ sun: read('legacy/SunRenderer.ts'), glow: read('legacy/GlowRenderer.ts'), rays: read('legacy/CoronaRaysRenderer.ts'), central: read('CentralBodyShaders.ts'), quad: read('shaderQuad.ts') }, GLSL_COMMON);
 
 const systemsJson = JSON.parse(readFileSync(join(root, 'data/systems.json'), 'utf8'));
 const systems: any[] = Array.isArray(systemsJson) ? systemsJson : systemsJson.systems;
@@ -422,6 +422,79 @@ if (set === 'panels5') {
     const topic = `${id.replace(/_/g, '-')}-sun-r5`;
     job(`panels5.${id}.before`, v, sunLayers(id, v, 'cur'), { out: `panels5/${topic}-before.png` });
     job(`panels5.${id}.after`, v, sunLayers(id, v, 'plasma5@0.5'), { out: `panels5/${topic}-after.png` });
+  }
+}
+
+/** The shipped star: R5 ½ (as approved) against the shipped ½ (and ⅓, Low), and Sol's fine detail without one half of it */
+const SHIP: SunVariant[] = ['plasma5@0.5', 'ship@0.5', 'ship.noflow@0.5', 'ship.nothreads@0.5', 'plasma5@0.33', 'ship@0.33'];
+if (set === 'ship' || set === 'shipsol') {
+  for (const id of set === 'ship' ? PLAIN : ['sol']) {
+    const s = sysOf(id), cb = s.centralBody as CentralBody, R = radiusOf(cb), b = systemBiome(s);
+    const views = { ...STAR_VIEWS(R, 120), near: { w: 960, h: 540, dpr: 1, cam: [-(R + 364), 300] as [number, number], zoom: 0.55, t: 120 }, mid: { w: 960, h: 540, dpr: 1, cam: [-(R - 1400), 0] as [number, number], zoom: 0.3, t: 120 } };
+    const variants = set === 'ship' ? ['plasma5@0.5', 'ship@0.5', 'ship@0.33'] : SHIP;
+    for (const [vn, v] of Object.entries(views)) {
+      const cells = variants.map((variant) => {
+        const file = `${set}/${id}.${vn}.${variant}.png`;
+        job(`${set}.${id}.${vn}.${variant}`, v, [...(vn === 'full' ? [] : currentSkyLayers(b, v, 0)), ...sunLayers(id, v, variant)], { out: file });
+        return { file, label: variant };
+      });
+      composites.push({ out: `${set}-${id}-${vn}.png`, cols: 3, cells, metric: false, scale: vn === 'full' ? 0.6 : 0.5, title: `${s.name}, ${vn}: R5 ½ as approved, then the shipped star` });
+    }
+  }
+}
+
+if (set === 'benchship') {
+  const reps = 10;
+  for (const dpr of [1, 2]) {
+    for (const id of PLAIN) {
+      const cb = sysOf(id).centralBody as CentralBody, R = radiusOf(cb);
+      for (const [name, v] of Object.entries(sunViews(R, 120, dpr))) {
+        if (name === 'corona') continue;
+        for (const variant of ['plasma5@0.5', 'plasma5@0.33', 'ship@0.5', 'ship@0.33', ...(id === 'sol' ? ['ship.r5@0.5', 'ship.noflow@0.5', 'ship.nothreads@0.5'] : [])]) job(`sun|${id}|${name}|${variant}|${dpr}`, v, sunLayers(id, v, variant), { bench: true, reps });
+      }
+    }
+  }
+}
+
+if (set === 'edgefix') {
+  // The limb up close, R4 and R5 (both ½, as approved) against the shipped star (its edge fixed: rooted spicules, the
+  // edge's noise in steps), at zoom 0.15, 0.3, 1 and 2; the limb a third of the way in from the left
+  for (const id of PLAIN) {
+    const s = sysOf(id), cb = s.centralBody as CentralBody, R = radiusOf(cb), b = systemBiome(s);
+    const cells: { file: string; label: string }[] = [];
+    for (const zoom of [0.15, 0.3, 1, 2]) {
+      const v: View = { w: 640, h: 400, dpr: 1, cam: [R + 0.15 * 640 / zoom, 0], zoom, t: 120 };
+      for (const variant of ['plasma4@0.5', 'plasma5@0.5', 'ship@0.5']) {
+        const file = `edgefix/${id}.z${zoom}.${variant}.png`;
+        job(`edgefix.${id}.${zoom}.${variant}`, v, [...currentSkyLayers(b, v, 0), ...sunLayers(id, v, variant)], { out: file });
+        cells.push({ file, label: `${variant === 'ship@0.5' ? 'FIXED (shipped)' : variant.startsWith('plasma4') ? 'R4' : 'R5'}, zoom ${zoom}` });
+      }
+    }
+    composites.push({ out: `edgefix-${id}.png`, cols: 3, cells, title: `${s.name}: the limb up close, R4 | R5 | fixed (shipped), at zoom 0.15, 0.3, 1 and 2` });
+  }
+}
+
+if (set === 'zoomsweep') {
+  // A smooth zoom from 0.04 to 2 and back with time frozen, the limb held at the screen's middle: each frame against
+  // the last (zoomflicker.py) shows flicker as change that isn't the zoom's own scaling
+  const N = 48;
+  for (const id of PLAIN) {
+    const s = sysOf(id), cb = s.centralBody as CentralBody, R = radiusOf(cb), b = systemBiome(s);
+    const frames: string[] = [];
+    for (let f = 0; f < 2 * N; f++) {
+      const k = f < N ? f / (N - 1) : (2 * N - 1 - f) / (N - 1);
+      const zoom = 0.04 * Math.pow(2 / 0.04, k);
+      const v: View = { w: 480, h: 300, dpr: 1, cam: [R, 0], zoom, t: 120 };
+      const cells = ['plasma5@0.5', 'ship@0.5'].map((variant) => {
+        const file = `zoomsweep/${id}.${variant}.${f}.png`;
+        job(`zoomsweep.${id}.${variant}.${f}`, v, [...currentSkyLayers(b, v, 0), ...sunLayers(id, v, variant)], { out: file });
+        return { file, label: `${variant === 'ship@0.5' ? 'fixed' : 'R5 ½'}  zoom ${zoom.toFixed(3)}` };
+      });
+      const sheet = `zoomsweep/${id}.sheet.${f}.png`;
+      composites.push({ out: sheet, cols: 2, cells });
+      frames.push(sheet);
+    }
+    gifs.push({ out: `zoomsweep-${id}.gif`, frames, ms: 60, scale: 0.8 });
   }
 }
 

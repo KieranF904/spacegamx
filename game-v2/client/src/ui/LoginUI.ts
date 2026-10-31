@@ -2,7 +2,8 @@
  * Login UI - Cinematic Login/Registration screen
  * 
  * Features:
- * - Huge animated sun using WebGL shader (same as in-game), drawn by the game's own renderer
+ * - A huge body of Sol under the form, a different one each visit (ui/loginBody.ts): the sun (rendering/sun/SunRenderer.ts)
+ *   or a planet or moon as the game draws them, by the game's own renderer
  * - Stylized glowing title
  * - Animated starfield background
  * - Particle effects
@@ -10,10 +11,14 @@
  */
 
 import { Application, Container, Graphics, type GlProgram } from 'pixi.js';
-import { SunRenderer } from '../rendering/SunRenderer';
-import { GlowRenderer } from '../rendering/GlowRenderer';
-import { batchProgram, programsUnder, shaderReady } from '../rendering/shaderWarmup';
-import { sunShaderDefs } from '@space-game/common';
+import { SunRenderer } from '../rendering/sun/SunRenderer';
+import { batchProgram, shaderReady } from '../rendering/shaderWarmup';
+import type { StarSystemData } from '@space-game/common';
+import systemsData from '../../../data/systems.json';
+import { LoginBody, loginBodyForVisit, sunSpot } from './loginBody';
+import { SkyRenderer, skyPrograms } from '../rendering/sky/SkyRenderer';
+import { skyBiome, type BiomeHints } from '../rendering/sky/skyBiome';
+import { attachVolumeUploads } from '../rendering/planet-proto/planetTextures';
 
 export class LoginUI {
   private container: HTMLElement;
@@ -25,8 +30,12 @@ export class LoginUI {
   // shaders compile once, and ahead: see shaderWarmup), on the game's canvas, borrowed into the panel
   private app: Application;
   private worldContainer: Container | null = null;
+  /** The star (it shows itself once its noise and program are ready) */
   private sunRenderer: SunRenderer | null = null;
-  private glowRenderer: GlowRenderer | null = null;
+  /** Sol's sky behind it all */
+  private sky: SkyRenderer | null = null;
+  /** Or this visit's planet or moon of Sol (loginBody.ts), in the sun's place */
+  private body: LoginBody | null = null;
   private starsGraphics: Graphics | null = null;
   /** The backdrop's parts and the programs each waits for: shown once they're compiled (a first visit's first frames aren't held up) */
   private parts: [Container, GlProgram[]][] = [];
@@ -36,58 +45,12 @@ export class LoginUI {
   // Star field
   private stars: Array<{ x: number; y: number; z: number; size: number; phase: number }> = [];
   
-  // Debug sliders values - fBM + Plasma shader params
-  private debugParams = {
-    // === fBM CORE ===
-    octaves: 5.0,           // Number of noise octaves (1-8)
-    lacunarity: 2.0,        // Frequency multiplier per octave
-    gain: 0.5,              // Amplitude multiplier per octave
-    noiseScale: 4.0,        // Overall noise scale
-    animSpeed: 0.15,        // Animation speed
-    contrast: 1.0,          // Output contrast
-    // === DOMAIN WARPING ===
-    warpAmount: 0.4,        // Warp strength
-    warpScale: 0.5,         // Warp noise scale
-    turbulenceMix: 0.3,     // Smooth vs turbulent fBM
-    // === PLASMA OVERLAY ===
-    plasmaIntensity: 0.3,   // Plasma effect strength
-    plasmaScale: 3.0,       // Plasma pattern scale
-    plasmaSpeed: 1.0,       // Plasma animation speed
-    // === CENTER CONTRAST ===
-    centerDarken: 0.5,      // Darken dark areas toward center
-    centerHighlight: 0.5,   // Highlight bright areas toward center
-    centerFalloff: 1.5,     // Center effect falloff curve
-    // === INSIDE ADJUST ===
-    innerDarkening: 0.0,    // Darken the center (opposite of limb)
-    whiteBalance: 0.0,      // Warm (+) / Cool (-) shift
-    saturation: 1.0,        // Color saturation
-    // === EDGE STYLING ===
-    edgeBrightness: 1.0,    // Edge brightness multiplier
-    edgeThickness: 0.03,    // Edge thickness
-    edgeSharpness: 0.5,     // Edge sharpness/falloff
-    limbDarkening: 0.5,     // Darken towards edges
-    glowIntensity: 0.4,     // Edge glow strength
-    glowSize: 0.1,          // How far glow extends
-    // === CORONA ===
-    coronaSize: 2.0,
-    coronaIntensity: 0.8,
-    atmosphereInnerRadius: 0.7,
-    atmosphereOuterRadius: 2.2,
-    coronaInnerRadius: 0.6,
-    coronaOuterRadius: 1.5,
-    // === COLORS (hex strings) ===
-    darkColor: '#1a0500',   // Darkest
-    midColor: '#661100',    // Mid-tone
-    brightColor: '#ff6600', // Brightest
-    edgeColor: '#ffaa33',   // Highlight/edge color
-    plasmaColor: '#ff9933', // Plasma overlay color
-    centerColor: '#ffe6cc', // Center light color
-  };
-  
   // Callbacks
   public onLogin: ((username: string, password: string) => void) | null = null;
   public onRegister: ((username: string, password: string, email: string) => void) | null = null;
   public onPlayAsGuest: (() => void) | null = null;
+  /** After it's shown or hidden (the game renders at the screen's density while it's up) */
+  public onVisibility: (() => void) | null = null;
   
   private mode: 'login' | 'register' = 'login';
   private errorMessage = '';
@@ -123,19 +86,31 @@ export class LoginUI {
     this.starsGraphics = new Graphics();
     this.worldContainer.addChild(this.starsGraphics);
     
-    // Initialize GPU renderers
-    this.glowRenderer = new GlowRenderer();
-    this.glowRenderer.initialize();
-    this.worldContainer.addChild(this.glowRenderer.getContainer());
     const batch = batchProgram(this.app.renderer);
-    this.parts = [[this.starsGraphics, batch ? [batch] : []], [this.glowRenderer.getContainer(), programsUnder(this.glowRenderer.getContainer())]];
-    
-    this.sunRenderer = new SunRenderer();
-    this.sunRenderer.initialize();
-    this.worldContainer.addChild(this.sunRenderer.getContainer());
-    
-    // Set up the brownian sun style
-    this.setupBrownianSunStyle();
+    this.parts = [[this.starsGraphics, batch ? [batch] : []]];
+
+    // Sol's sky as the game draws it (its nebula, haze and stars), once its programs are compiled; the dots above till then
+    const sol = (systemsData as { systems: StarSystemData[] }).systems.find((s) => s.id === 'sol');
+    const v = (sol?.visuals ?? {}) as BiomeHints;
+    this.sky = new SkyRenderer(this.app);
+    this.sky.setBiome(skyBiome('sol', {
+      biome: v.biome, sector: sol?.sector, position: sol?.position, central: sol?.centralBody?.type,
+      hasNebula: v.hasNebula, nebulaHue: v.nebulaHue, starHueShift: v.starHueShift, specialStarChance: v.specialStarChance, specialStarHue: v.specialStarHue,
+    }));
+    this.worldContainer.addChild(this.sky.container);
+    this.parts.push([this.sky.container, skyPrograms()]);
+
+    // One of Sol's bodies, a different one each visit (loginBody.ts): the sun as the game draws it, or a planet or moon
+    // lit by the sun drawn small at a top corner
+    const id = loginBodyForVisit(sol);
+    this.sunRenderer = new SunRenderer(this.app);
+    this.sunRenderer.setStar('sol');
+    if (id !== 'sun') {
+      attachVolumeUploads(this.app.renderer);
+      this.body = new LoginBody(id, sol);
+      this.worldContainer.addChild(this.body.container);
+    }
+    this.worldContainer.addChild(this.sunRenderer.container);
   }
 
   /** Show the backdrop: the game's canvas into the panel, under the form, and animated */
@@ -158,47 +133,8 @@ export class LoginUI {
     this.canvasHome = null;
   }
   
-  private setupBrownianSunStyle(): void {
-    if (!this.sunRenderer) return;
-    
-    // Find the brownian style index
-    const brownianIndex = sunShaderDefs.sunStyles.findIndex(s => s.id === 'brownian');
-    
-    // Set up corona style (plasma streams looks nice)
-    const coronaIndex = sunShaderDefs.coronaStyles.findIndex(s => s.id === 'plasmaStreams');
-    const coronaStyle = sunShaderDefs.coronaStyles[coronaIndex] || sunShaderDefs.coronaStyles[0];
-    const coronaParams = coronaStyle.params.map(p => p.default);
-    this.sunRenderer.setCoronaStyle(coronaIndex >= 0 ? coronaIndex : 0, coronaParams);
-    
-    // Set sun visual parameters
-    this.sunRenderer.setRadius(0.4);
-    this.sunRenderer.setLOD(1.0); // Full detail
-    
-    // Apply debug params (this sets the sun style and corona)
-    this.applyDebugParams();
-  }
-  
-  private updateSunPosition(): void {
-    if (!this.sunRenderer || !this.glowRenderer) return;
-    
-    const w = this.app.screen.width;
-    const h = this.app.screen.height;
-    
-    // Position sun so the visible top 25% arc spans exactly the view width
-    // (touching both bottom corners).
-    const sunX = w / 2;
-    const visibleFraction = 0.25;
-    const renderedRadius = w / (4 * Math.sqrt(visibleFraction * (1 - visibleFraction)));
-    const sunY = h + (1 - 2 * visibleFraction) * renderedRadius;
-    
-    this.sunRenderer.setPosition(sunX, sunY);
-    this.glowRenderer.setPosition(sunX, sunY);
-  }
-  
   private updateAnimation = (): void => {
-    if (!this.visible || !this.sunRenderer || !this.glowRenderer) return;
-    // (The game's renderer follows the window; the sun follows the screen)
-    this.updateSunPosition();
+    if (!this.visible || !this.sunRenderer) return;
     for (const [part, programs] of this.parts) part.visible = programs.every(shaderReady);
     
     const time = (Date.now() - this.startTime) / 1000;
@@ -206,24 +142,20 @@ export class LoginUI {
     const w = this.app.screen.width;
     const h = this.app.screen.height;
     
-    // Update sun + glow shaders.
-    // For top 25% visibility to span view width: chord = 4R*sqrt(f*(1-f)), f=0.25.
-    // SunRenderer effective pixel radius is 2 * worldRadius
-    // (quadSize=2, meshScale=worldRadius*2.5, uRadius=0.4).
+    // The sun: its visible top quarter's arc spans exactly the view's width (touching both bottom corners): for a cap of
+    // height f·2R, the chord is 4R·sqrt(f(1 − f))
     const visibleFraction = 0.25;
     const renderedRadius = w / (4 * Math.sqrt(visibleFraction * (1 - visibleFraction)));
-    const sunWorldRadius = renderedRadius / 2;
+    const cy = h + (1 - 2 * visibleFraction) * renderedRadius;
+    // (a slow drift through the sky: its near stars slide past the far ones; not drawn, its haze not even into its
+    // texture, till its programs are compiled ahead: a compile here would hold up the sign-in screen's first frames)
+    if (this.sky?.container.visible) this.sky.update(delta * 1000, time * 40, time * 12, 0.35);
+    if (this.body) {
+      const sun = sunSpot(this.body.side, w, h);
+      this.sunRenderer.drawAt(delta, sun.x, sun.y, sun.r);
+      this.body.update(delta, w / 2, cy, renderedRadius, w, h, sun.x, sun.y);
+    } else this.sunRenderer.drawAt(delta, w / 2, cy, renderedRadius);
 
-    // Keep ambient glow fade in sync with the atmosphere radius sliders.
-    const atmosphereInner = Math.max(0.0, this.debugParams.atmosphereInnerRadius);
-    const atmosphereOuter = Math.max(atmosphereInner + 0.001, this.debugParams.atmosphereOuterRadius);
-    const glowInnerRadius = renderedRadius * atmosphereInner;
-    const glowOuterRadius = renderedRadius * atmosphereOuter;
-    const hue = 30;
-    
-    this.sunRenderer.update(delta, hue, sunWorldRadius, { width: w, height: h });
-    this.glowRenderer.update(delta, hue, glowInnerRadius, glowOuterRadius, 0, 0);
-    
     // Draw stars
     this.drawStars(time);
   };
@@ -239,6 +171,8 @@ export class LoginUI {
     // The backdrop's own black (the game's renderer clears to its own)
     g.rect(0, 0, w, h);
     g.fill({ color: 0x000005 });
+    // (only till Sol's own sky shows)
+    if (this.sky?.container.visible) return;
     
     for (const star of this.stars) {
       const parallax = 0.5 + star.z * 0.5;
@@ -595,113 +529,6 @@ export class LoginUI {
   }
   
   // Helper to convert hex color to RGB array
-  private hexToRgb(hex: string): [number, number, number] {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    if (result) {
-      return [
-        parseInt(result[1], 16) / 255,
-        parseInt(result[2], 16) / 255,
-        parseInt(result[3], 16) / 255
-      ];
-    }
-    return [0, 0, 0];
-  }
-  
-  private applyDebugParams(): void {
-    if (!this.sunRenderer) return;
-    
-    // Apply corona settings
-    this.sunRenderer.setCoronaSize(this.debugParams.coronaSize);
-    this.sunRenderer.setCoronaIntensity(this.debugParams.coronaIntensity);
-    this.sunRenderer.setAtmosphereRadii(
-      this.debugParams.atmosphereInnerRadius,
-      this.debugParams.atmosphereOuterRadius
-    );
-    this.sunRenderer.setCoronaRadii(
-      this.debugParams.coronaInnerRadius,
-      this.debugParams.coronaOuterRadius
-    );
-    
-    // Apply custom colors (4 colors: dark, mid, bright, edge)
-    const darkRgb = this.hexToRgb(this.debugParams.darkColor);
-    const midRgb = this.hexToRgb(this.debugParams.midColor);
-    const brightRgb = this.hexToRgb(this.debugParams.brightColor);
-    const edgeRgb = this.hexToRgb(this.debugParams.edgeColor);
-    this.sunRenderer.setCustomColors(darkRgb, midRgb, brightRgb, edgeRgb);
-    
-    // Apply warp params: warpScale, unused, turbulenceMix
-    this.sunRenderer.setWarpParams(
-      this.debugParams.warpScale,
-      0.0, // unused
-      this.debugParams.turbulenceMix
-    );
-    
-    // Apply fBM params: noiseScale, animSpeed, contrast
-    this.sunRenderer.setFbmParams(
-      this.debugParams.noiseScale,
-      this.debugParams.animSpeed,
-      this.debugParams.contrast
-    );
-    
-    // Apply plasma params: intensity, scale, speed
-    this.sunRenderer.setPlasmaParams(
-      this.debugParams.plasmaIntensity,
-      this.debugParams.plasmaScale,
-      this.debugParams.plasmaSpeed
-    );
-    
-    // Apply plasma color
-    const plasmaRgb = this.hexToRgb(this.debugParams.plasmaColor);
-    this.sunRenderer.setPlasmaColor(plasmaRgb);
-    
-    // Apply center contrast: darken, highlight, falloff
-    this.sunRenderer.setCenterLight(
-      this.debugParams.centerDarken,
-      this.debugParams.centerHighlight,
-      this.debugParams.centerFalloff
-    );
-    
-    // Apply center color
-    const centerRgb = this.hexToRgb(this.debugParams.centerColor);
-    this.sunRenderer.setCenterColor(centerRgb);
-    
-    // Apply inside adjustments: innerDarkening, whiteBalance, saturation
-    this.sunRenderer.setInsideAdjust(
-      this.debugParams.innerDarkening,
-      this.debugParams.whiteBalance,
-      this.debugParams.saturation
-    );
-    
-    // Apply edge style: brightness, thickness, sharpness
-    this.sunRenderer.setEdgeStyle(
-      this.debugParams.edgeBrightness,
-      this.debugParams.edgeThickness,
-      this.debugParams.edgeSharpness
-    );
-    
-    // Apply edge glow: limbDarkening, glowIntensity, glowSize
-    this.sunRenderer.setEdgeGlow(
-      this.debugParams.limbDarkening,
-      this.debugParams.glowIntensity,
-      this.debugParams.glowSize
-    );
-    
-    // Get brownian style index (should be 2)
-    const brownianIndex = sunShaderDefs.sunStyles.findIndex(s => s.id === 'brownian');
-    const styleIndex = brownianIndex >= 0 ? brownianIndex : 2;
-    
-    // Apply sun style params (fBM core): [coreRadius, octaves, lacunarity, gain, unused, warpAmount]
-    const sunParams = [
-      0.5,                              // coreRadius
-      this.debugParams.octaves,         // octaves (1-8)
-      this.debugParams.lacunarity,      // lacunarity (freq multiplier)
-      this.debugParams.gain,            // gain (amplitude multiplier)
-      0.9,                              // unused
-      this.debugParams.warpAmount,      // warpAmount for domain warping
-    ];
-    this.sunRenderer.setSunStyle(styleIndex, sunParams);
-  }
-
   private render(): void {
     const isLogin = this.mode === 'login';
     
@@ -833,6 +660,7 @@ export class LoginUI {
     this.panel.style.display = 'flex';
     // The backdrop: running again, or rebuilt if it was released
     this.attachBackdrop();
+    this.onVisibility?.();
   }
 
   hide(): void {
@@ -840,6 +668,7 @@ export class LoginUI {
     this.panel.style.display = 'none';
     // The world is drawn again, on its canvas back in the game's container
     this.detachBackdrop();
+    this.onVisibility?.();
   }
 
   /** Free the backdrop (the game is up); show() builds it again */
@@ -863,10 +692,8 @@ export class LoginUI {
       this.sunRenderer.destroy();
       this.sunRenderer = null;
     }
-    if (this.glowRenderer) {
-      this.glowRenderer.destroy();
-      this.glowRenderer = null;
-    }
+    this.body = null;
+    this.sky = null;
     this.worldContainer?.destroy({ children: true });
     this.worldContainer = null;
     this.starsGraphics = null;

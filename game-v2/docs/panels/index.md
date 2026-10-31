@@ -74,6 +74,33 @@ Surface panels: live game shots at 1280×800, with ships, HUD and minimap hidden
 day fixed, so before and after match exactly. The ground's cost is its GPU time, new against old, from the native
 harness on an RTX 5070 Ti. At 1080p it's 17–23 µs before and 19–30 µs after; at 4K about 0.08 → 0.11 ms (`docs/rendering/surface-art-pass.md`).
 In dev, `localStorage['sg.surfaceLook'] = 'classic'` shows the old ground live, for comparison.
+| graphics | game-sol-sun-limb | In the game now (next deploy): Sol's edge from close by, the old sun against the new plasma star (drawn at half resolution, with Sol's finer detail), and the sky's stars now drawn as sprites. Live dev client, same spot and zoom. | sun 0.19 → 0.048 ms a frame at 1080p (native harness); sky 0.22 → 0.023 ms | graphics/game-sol-sun-limb-before.png, -after.png, game-sol-sun-limb.png |
+| graphics | game-sol-sun-close | In the game now: right at Sol's edge, zoomed in. | | graphics/game-sol-sun-close-before.png, -after.png, game-sol-sun-close.png |
+| graphics | game-sol-sun-far | In the game now: Sol from the widest flight zoom. | | graphics/game-sol-sun-far-before.png, -after.png, game-sol-sun-far.png |
+| graphics | game-borealis-sun-limb | In the game now: Borealis' blue star at its edge. | sun 0.49 → 0.036 ms a frame at 1080p | graphics/game-borealis-sun-limb-before.png, -after.png, game-borealis-sun-limb.png |
+| graphics | game-nebula-prime-sun-limb | In the game now: Nebula Prime's pink star at its edge. | sun 0.39 → 0.042 ms a frame at 1080p | graphics/game-nebula-prime-sun-limb-before.png, -after.png, game-nebula-prime-sun-limb.png |
+| graphics | game-cinder-reach-sun-limb | In the game now: Cinder Reach's red giant at its edge. | sun 0.20 → 0.043 ms a frame at 1080p | graphics/game-cinder-reach-sun-limb-before.png, -after.png, game-cinder-reach-sun-limb.png |
+| graphics | login-sun | The sign-in screen's sun, now the game's own Sol (the same plasma star). Another change (in progress) shows a random Sol body there instead. | | graphics/login-sun-before.png, -after.png, login-sun.png |
+| graphics | planets-ingame-jovan | The new planet look is in the game: Jovan as you fly by it, with its great red spot, flowing bands, see-through rings and a soft glowing edge (live game; the planet has moved along its orbit between the two shots). | planets about the same cost far out, up to 3× cheaper close up | graphics/planets-ingame-jovan-before.png, -after.png, planets-ingame-jovan.png |
+| graphics | planets-ingame-jovan-edge | Jovan's edge up close in the game: the hard band of haze is gone; the clouds thin into haze that fades into space. | | graphics/planets-ingame-jovan-edge-before.png, -after.png, planets-ingame-jovan-edge.png |
+| graphics | planets-ingame-ice-close | Nereid's ice up close in the game (High quality): ridged cracks in the ice, sharp at any zoom, instead of blurry blue loops. | | graphics/planets-ingame-ice-close-before.png, -after.png, planets-ingame-ice-close.png |
+| graphics | planets-ingame-ice-closest | The same at the closest zoom. | | graphics/planets-ingame-ice-closest-before.png, -after.png, planets-ingame-ice-closest.png |
+| graphics | planets-ingame-lava | Kindle, a lava world: a network of glowing rivers between dark crust plates. | | graphics/planets-ingame-lava-before.png, -after.png, planets-ingame-lava.png |
+| graphics | planets-ingame-lava-close | Kindle up close: glowing rivers with cooling cracks in the crust between them. | | graphics/planets-ingame-lava-close-before.png, -after.png, planets-ingame-lava-close.png |
+| graphics | planets-ingame-brown-dwarf | Ashfall's brown dwarf, now drawn like the planets: turbulent bands, glowing heat and its old scar. | | graphics/planets-ingame-brown-dwarf-before.png, -after.png, planets-ingame-brown-dwarf.png |
+| graphics | planets-ingame-terra-nova | Terra Nova: continents, coasts, ice caps and drifting clouds, lit from the star with a soft twilight edge. | | graphics/planets-ingame-terra-nova-before.png, -after.png, planets-ingame-terra-nova.png |
+| graphics | planets-ingame-vesta-close | Vesta up close: craters and ridges catch the light, and the edge is soft, with a faint glow. | | graphics/planets-ingame-vesta-close-before.png, -after.png, planets-ingame-vesta-close.png |
+| graphics | planet-cracks-ice-close | Ice cracks up close, Medium quality (left) against High (right). Medium reads cracks from a small texture, so close up they break into blotchy, pixelated dashes. High works each crack out exactly, so it stays sharp at any zoom. | High costs ~0.2 ms more a frame (1080p) only while an icy or lava world fills the screen | graphics/planet-cracks-ice-close-before.png, -after.png, planet-cracks-ice-close.png |
+| graphics | planet-cracks-ice-zoom1 | The same on Thule at normal zoom: Medium left, High right. | | graphics/planet-cracks-ice-zoom1-before.png, -after.png, planet-cracks-ice-zoom1.png |
+| graphics | planet-cracks-ice-whole | Thule from further out, Medium left, High right: about the same number of cracks, just cleaner. | | graphics/planet-cracks-ice-whole-before.png, -after.png, planet-cracks-ice-whole.png |
+| graphics | planet-cracks-lava-close | Lava rivers up close: Medium (left) against High (right). Sharp, smooth glow instead of blocky crack lines. | | graphics/planet-cracks-lava-close-before.png, -after.png, planet-cracks-lava-close.png |
+| graphics | planet-edges-selene | A moon's edge (Selene, at the sign-in screen's size): left, a hard cut-out disc; right, a soft edge with a thin rim of sunlight and a faint dust glow. | | graphics/planet-edges-selene-before.png, -after.png, planet-edges-selene.png |
+| graphics | planet-edges-selene-zoom1 | The same at normal game zoom. | | graphics/planet-edges-selene-zoom1-before.png, -after.png, planet-edges-selene-zoom1.png |
+| graphics | planet-edges-vesta | A rocky world's edge (Vesta), at the sign-in screen's size: hard cut-out (left) against soft (right). | | graphics/planet-edges-vesta-before.png, -after.png, planet-edges-vesta.png |
+| graphics | planet-edges-vesta-zoom1 | The same at normal game zoom. | | graphics/planet-edges-vesta-zoom1-before.png, -after.png, planet-edges-vesta-zoom1.png |
+| graphics | planet-edges-jovan | A gas giant's edge (Jovan) for comparison: already soft from its haze, unchanged. | | graphics/planet-edges-jovan-before.png, -after.png, planet-edges-jovan.png |
+| graphics | planet-edges-jovan-zoom1 | The same at normal game zoom. | | graphics/planet-edges-jovan-zoom1-before.png, -after.png, planet-edges-jovan-zoom1.png |
+| ui | login-random-body | The sign-in screen now shows a different Sol body each visit (here Jovan with its rings) in the sun's old place. Behind it is Sol's real sky, and the new sun sits in a corner as the light source. The sun itself still comes up about one visit in six. | sign-in screen ready in about the same time: 245–273 ms on a first visit (was 267), 179–197 ms on a reload (was 224) | ui/login-random-body-before.png, -after.png, login-random-body.png |
 
 ### Performance (numbers only, nothing visual to show)
 
@@ -82,6 +109,12 @@ In dev, `localStorage['sg.surfaceLook'] = 'classic'` shows the old ground live, 
 | performance | first-load | The sign-in screen is drawn by the game's own renderer and shaders compile in the background, so the game is ready almost at once on a first visit. | first visit to the guest button ~5.2 s → ~0.35 s |
 | performance | reload | Generated art (rocks, hulls, stations, icons, frost) is cached in the browser instead of rebuilt each visit. | reload worker CPU ~2.8 s → ~0.2 s |
 | tools | native-renderer | Ship, boss and part pictures render without a browser. | ~1.3 s to the first picture, then 15–30 ms each |
+
+New this update, after only (no matching before):
+
+| category | topic | what it is | files |
+|---|---|---|---|
+| ui | login-random-body-* | More sign-in screen examples: Terra Nova, Nereid, Ares, Selene (with Terra Nova behind it), Vesta, and the sun. | ui/login-random-body-terra-nova-after.png, -nereid-after.png, -ares-after.png, -terra-nova-moon-after.png, -vesta-after.png, -sun-after.png |
 
 ## Skipped, and why
 
@@ -103,3 +136,4 @@ In dev, `localStorage['sg.surfaceLook'] = 'classic'` shows the old ground live, 
 - **Sun lab cost graph, pre-cache audit.** Developer tools and documents, not player-facing.
 | graphics | surface-terra-nova-fields | Awaiting review, not deployed: Terra Nova farmland. The seam where the field grid jumped sideways is gone, and the fields are irregular parcels with wandering hedges, varied crops and row directions, with meadow and scrub left before coasts and rivers. | ground cost about the same (+0.002 ms native) | graphics/surface-terra-nova-fields-before.png, -after.png, surface-terra-nova-fields.png |
 | graphics | surface-terra-nova-fields-close | Awaiting review, not deployed: the same fields, low down. | ground cost about the same | graphics/surface-terra-nova-fields-close-before.png, -after.png, surface-terra-nova-fields-close.png |
+| ui | perf-monitor | Awaiting review, not deployed: the performance monitor (Settings > Performance monitor) is one readable panel at the top, left of the minimap and quest list: FPS and frame time with worst and 95th percentile, a frame-time graph with 16.7 and 33 ms lines, ping and jitter graph, entities, quality, network rates. Click the header to fold, drag to move. | | ui/perf-monitor-before.png, -after.png, perf-monitor.png |

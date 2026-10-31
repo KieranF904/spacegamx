@@ -1,4 +1,9 @@
 /**
+ * LEGACY: the star as it was drawn before plasma round 5 (sun/SunRenderer.ts draws it now). Kept for the sandbox's
+ * star elements and as the "original" the sun lab and the native harness compare against
+ * (docs/rendering/sun-sky-prototypes.md). The game doesn't use it.
+ */
+/**
  * SunRenderer - GPU-accelerated sun rendering with custom shaders
  * 
  * Uses PixiJS v8 mesh shaders for smooth, performant sun visuals
@@ -6,7 +11,7 @@
  */
 
 import { Container, Mesh, MeshGeometry, Shader, GlProgram, State } from 'pixi.js';
-import { shaderReady } from './shaderWarmup';
+import { shaderReady } from '../shaderWarmup';
 
 // Vertex shader - creates a quad and passes UV coordinates
 const VERTEX_SHADER = `#version 300 es

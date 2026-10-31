@@ -2,7 +2,8 @@
  * Procedural textures, built in a worker (proceduralWorker.ts) so the game
  * doesn't stall while they're made: the asteroids' relief atlas (once), each
  * stillstone's surface (once per stone), the stations' hull atlas (once) and
- * each station's baked look (stations/stationBake.ts). Without a worker
+ * each station's baked look (stations/stationBake.ts), and the star's noise
+ * volume (sun/plasmaNoise.ts, once). Without a worker
  * (tests, or one that fails) they're built here instead, a moment later.
  */
 
@@ -11,9 +12,12 @@ import { buildRockAtlas } from './rocks/rockTextures';
 import { buildStillstoneMap } from './stillstoneMap';
 import { buildStationAtlas } from './stations/stationTextures';
 import { bakeStation, type BakeInput, type BakeOutput } from './stations/stationBake';
+import { noise3Data } from './sun/plasmaNoise';
+import { planetCrackCells, planetNoiseData as bakePlanetNoise } from './planet-proto/planetNoise';
 
 export type ProceduralRequest = { id: number; kind: 'rockAtlas' } | { id: number; kind: 'stillstone'; data: LodestoneData }
-  | { id: number; kind: 'stationAtlas' } | { id: number; kind: 'stationBake'; data: BakeInput };
+  | { id: number; kind: 'stationAtlas' } | { id: number; kind: 'stationBake'; data: BakeInput } | { id: number; kind: 'plasmaNoise' }
+  | { id: number; kind: 'planetNoise' };
 type Job = { req: ProceduralRequest; done: (v: unknown) => void };
 /** A request before it has its id */
 type Ask = ProceduralRequest extends infer R ? (R extends ProceduralRequest ? Omit<R, 'id'> : never) : never;
@@ -28,6 +32,8 @@ function inline(req: ProceduralRequest): unknown {
     case 'stillstone': return buildStillstoneMap(req.data);
     case 'stationAtlas': return buildStationAtlas();
     case 'stationBake': try { return bakeStation(req.data); } catch (err) { console.warn('station bake failed', err); return null; }
+    case 'plasmaNoise': return noise3Data();
+    case 'planetNoise': return buildPlanetNoise();
   }
 }
 
@@ -89,4 +95,21 @@ export function stationAtlasData(): Promise<Uint8Array> {
 /** A station's baked look (stations/stationBake.ts; null if it failed); its input's arrays are copied over, not handed over */
 export function stationBakeData(data: BakeInput): Promise<BakeOutput | null> {
   return run<BakeOutput | null>({ kind: 'stationBake', data });
+}
+
+let plasmaNoise: Promise<Uint8Array> | null = null;
+/** The star's noise volume (sun/plasmaNoise.ts): 64³ RGBA */
+export function plasmaNoiseData(): Promise<Uint8Array> {
+  return (plasmaNoise ??= run<Uint8Array>({ kind: 'plasmaNoise' }));
+}
+
+/** The planets' noise volume and crack candidates (planet-proto/planetNoise.ts) */
+export interface PlanetNoise { noise: Uint8Array; cells: Uint8Array }
+export function buildPlanetNoise(): PlanetNoise {
+  return { noise: bakePlanetNoise(), cells: planetCrackCells() };
+}
+let planetNoise: Promise<PlanetNoise> | null = null;
+/** The planets' noise (once) */
+export function planetNoiseData(): Promise<PlanetNoise> {
+  return (planetNoise ??= run<PlanetNoise>({ kind: 'planetNoise' }));
 }

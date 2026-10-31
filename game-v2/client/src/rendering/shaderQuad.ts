@@ -74,7 +74,8 @@ export function shaderQuadProgram(fragmentBody: string, uniforms: Record<string,
   return glProgram;
 }
 
-export function createShaderQuad(fragmentBody: string, uniforms: Record<string, UniformDef>, halfSize: number): ShaderQuad {
+/** `extra`: more resources for the shader beside its uniforms (textures, by their sampler's name) */
+export function createShaderQuad(fragmentBody: string, uniforms: Record<string, UniformDef>, halfSize: number, extra: Record<string, unknown> = {}): ShaderQuad {
   const glProgram = shaderQuadProgram(fragmentBody, uniforms);
   const h = halfSize;
   const geometry = new MeshGeometry({
@@ -84,7 +85,7 @@ export function createShaderQuad(fragmentBody: string, uniforms: Record<string, 
   });
   const shader = new Shader({
     glProgram,
-    resources: { u: uniforms },
+    resources: { u: uniforms, ...extra },
   });
   const state = State.for2d();
   state.blend = true;

@@ -463,7 +463,7 @@ export class GameMenuUI {
         toggle('Navigation markers', s.ui.navMarkers, (v) => upd((d) => { d.ui.navMarkers = v; }), `Edge-of-screen pointers to stations, gates and more (${keyName(s.bindings.nav ?? 'KeyN')})`),
         toggle('Minimap', s.ui.minimap, (v) => upd((d) => { d.ui.minimap = v; })),
         toggle('Ship schematic', s.ui.shipHud, (v) => upd((d) => { d.ui.shipHud = v; })),
-        toggle('Network stats', s.ui.netStats, (v) => upd((d) => { d.ui.netStats = v; }), 'Ping graph and FPS counter'),
+        toggle('Performance monitor', s.ui.netStats, (v) => upd((d) => { d.ui.netStats = v; }), 'FPS, frame time, ping and jitter graphs, entities'),
         toggle('Chat box', s.ui.chat, (v) => upd((d) => { d.ui.chat = v; })),
         toggle('Hazard screen effects', s.ui.hazardEffects, (v) => upd((d) => { d.ui.hazardEffects = v; }), 'Haze, darkness and radiation tints (the warnings stay)'),
         toggle('Jobs tracker', s.ui.questTracker, (v) => upd((d) => { d.ui.questTracker = v; }), 'The list of your jobs at the right. Off: just its header (SHOW brings it back)'),

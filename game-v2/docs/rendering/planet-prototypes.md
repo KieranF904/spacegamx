@@ -1,8 +1,71 @@
 # Planet prototypes (2026-10-31)
 
-Prototype shaders for the planets, moons and the brown dwarf as seen from space (not the sun, and not the surface
-views). **Nothing in the game uses them yet**: they live in `client/src/rendering/planet-proto/`, the live lab
-`client/planetlab.html` (dev server only, not a build input) and the native harness `scripts/planet-proto/`.
+Shaders for the planets, moons and the brown dwarf as seen from space (not the sun, and not the surface views). **In the
+game since 2026-10-31** (see "In the game" below). They live in `client/src/rendering/planet-proto/`, the live labs
+(`client/sunlab.html`, `client/planetlab.html`: dev server only) and the native harness `scripts/planet-proto/`.
+
+## In the game
+
+- **Where:** `PlanetRenderer` (planets and moons), `CentralBodyShaders` (the brown dwarf), and the sign-in screen
+  (`ui/loginBody.ts`). Each body is a quad from `planet-proto/planetQuad.ts`.
+- **Textures:** two 3D textures, `planet-proto/planetTextures.ts`, uploaded by `rendering/texture3d.ts` (`volume3d`, shared
+  with the sun):
+  - the 64³ noise volume;
+  - the crack candidates (160×40×40, nearest).
+
+  Both are baked in the procedural worker through the asset cache (`planetNoise3`, `PLANET_NOISE_VERSION`). Planets stay
+  hidden until they're in: about 1.5 s of worker time on a first visit, milliseconds after.
+- **Looks are data:** a planet's `look` in `data/systems.json` (and `centralBody.look`) overrides its kind's defaults
+  field by field. The fields are `PLANET_LOOK_FIELDS` in `common/src/data/schemas.ts`, checked by `validateGameData`. The
+  old `PLANET_TUNING` entries (Jovan, Cinderjack, Boreas Major, Opaline, Ember Giant) moved there.
+- **Detail levels** (`settings/quality.ts` `planetDetail`, swapped live by `setPlanetDetail`):
+
+  | tier | level | what it is |
+  |---|---|---|
+  | Low | `lite` | as before |
+  | Medium | `standard` | the prototype as reviewed |
+  | High | `fine` | exact cracks, see "Cracks on High" |
+
+  All three are compiled ahead (`gameShaders.ts`). The sign-in screen always uses `fine`, and renders at the screen's
+  own pixel density while it's up.
+- **Edges (every level):** the `look` fields `edge` and `edge2`.
+  - `edge`: the disc edge's width in radii (never under 1.5 px), extra terminator width for rough ground, and a thin rim
+    of light on the lit limb.
+  - `edge2`: a faint dust or scattered-light halo just off the limb (strength, height), and limb darkening.
+  - Rocky worlds and every moon (moons are airless now, even icy ones) get the airless set: a soft limb, a wide rough
+    terminator, a lit rim and a dust halo. Worlds with air keep their haze edge.
+- **The classic look** (the shader before this) is `planet-proto/planetClassic.ts`, with `BROWN_DWARF` in
+  `CentralBodyShaders.ts`. They're kept only for the labs' "current"/"classic" comparison.
+
+### Cracks on High (the `fine` level)
+
+The crack channel (A) of the noise volume is Worley F2 - F1 at 5 cells a tile. Read from 64 texels a tile, any thin
+crack falls between texels when close: the lines break into blotchy, pixelated dashes.
+
+On `fine` the same field is worked out per pixel wherever the volume is magnified and a crack is near:
+
+- **The same network.** It uses the bake's own hash, bit for bit, in `uint`. The bake's search is 4x4x4, so F2 is right
+  even where the points are sparse.
+- **A soft F2.** F2 is a soft minimum (log-sum-exp, K = 0.025 cells), so the relief has no creases where the second and
+  third nearest swap.
+- **Relief from the gradient.** The relief's step toward the star comes from the gradient, as |v + g·dq|: the field is a
+  V at a crack.
+- **Lines at least a pixel wide.** Lines are antialiased to the pixel: never thinner than one, fading instead.
+- **Only the candidates.** It visits only the points listed for its sub-cell (`planetCrackCells`: 8 sub-cells a cell
+  each way, 4.5 points on average, up to 16), not a 64-cell search.
+- **The same density as Medium.** Ice's lineae and the finest cracks are masked into long patches. Worked out exactly,
+  the whole network would show, a honeycomb over the ice.
+
+Cost at 1080p on the RTX 5070 Ti, native, with a cracked world filling the screen:
+
+| level | ms a frame |
+|---|---|
+| standard (Medium) | 0.06 |
+| fine (High) | 0.12 to 0.4 |
+
+Whole planets cost about the same on both. The `cracks` and `crackbench` harness sets show and time it; the labs have
+the look as "fine".
+
 
 Kieran's brief: "the gas giants still have a hard edge, it needs to be softened with some kind of edge effect, and
 check if there's improvements that can be made to the effect itself."

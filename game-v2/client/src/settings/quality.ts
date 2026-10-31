@@ -5,6 +5,8 @@
  * particles, the HUD's overlays and the maps redrawn less often), so a slow processor gains from Auto stepping down.
  */
 
+import type { PlanetDetail } from '../rendering/planet-proto/planetProto';
+
 export type QualitySetting = 'auto' | 'low' | 'medium' | 'high';
 export type QualityTier = 'low' | 'medium' | 'high';
 /** Frame-rate cap choices (0: none) */
@@ -22,6 +24,14 @@ export interface QualityProfile {
   starLayers: readonly boolean[];
   /** The sky haze texture's size as a fraction of the screen's */
   hazeScale: number;
+  /**
+   * The star's render target, as a share of the screen's device pixels (sun/SunRenderer.ts). Low draws it at ⅓ rather
+   * than the stripped-down "R5 low" at ½: as cheap or cheaper at Low's DPR 1 in most views, the full look, and the
+   * same program as High and Medium, so Auto stepping down mid-flight compiles nothing (docs/rendering/sun-sky-prototypes.md)
+   */
+  sunScale: number;
+  /** How finely planets are drawn (planet-proto/planetProto.ts): fine (cracks worked out exactly), standard, lite */
+  planetDetail: PlanetDetail;
   /** Share of the small effect particles spawned (sparks, smoke and dust: the renderer's, weapons' and damage's) */
   particles: number;
   /** Most damage-effect particles alive at once (ships/DamageFx.ts) */
@@ -37,9 +47,9 @@ export interface QualityProfile {
 }
 
 export const PROFILES: Record<QualityTier, QualityProfile> = {
-  high: { msaa: true, maxDpr: 2, bloomScale: 0.25, bloomQuality: 2, starLayers: [true, true, true, true, true, true], hazeScale: 1 / 2, particles: 1, effectCap: 2500, hudEvery: 1, minimapHz: 20, mapEvery: 1, frostTexture: 1024 },
-  medium: { msaa: true, maxDpr: 1.5, bloomScale: 0.2, bloomQuality: 2, starLayers: [true, true, true, false, true, true], hazeScale: 0.4, particles: 0.7, effectCap: 1600, hudEvery: 2, minimapHz: 15, mapEvery: 2, frostTexture: 640 },
-  low: { msaa: false, maxDpr: 1, bloomScale: 0.125, bloomQuality: 1, starLayers: [true, false, true, false, true, true], hazeScale: 1 / 3, particles: 0.4, effectCap: 900, hudEvery: 2, minimapHz: 10, mapEvery: 2, frostTexture: 0 },
+  high: { msaa: true, maxDpr: 2, bloomScale: 0.25, bloomQuality: 2, starLayers: [true, true, true, true, true, true], hazeScale: 1 / 2, sunScale: 1 / 2, planetDetail: 'fine', particles: 1, effectCap: 2500, hudEvery: 1, minimapHz: 20, mapEvery: 1, frostTexture: 1024 },
+  medium: { msaa: true, maxDpr: 1.5, bloomScale: 0.2, bloomQuality: 2, starLayers: [true, true, true, false, true, true], hazeScale: 0.4, sunScale: 1 / 2, planetDetail: 'standard', particles: 0.7, effectCap: 1600, hudEvery: 2, minimapHz: 15, mapEvery: 2, frostTexture: 640 },
+  low: { msaa: false, maxDpr: 1, bloomScale: 0.125, bloomQuality: 1, starLayers: [true, false, true, false, true, true], hazeScale: 1 / 3, sunScale: 1 / 3, planetDetail: 'lite', particles: 0.4, effectCap: 900, hudEvery: 2, minimapHz: 10, mapEvery: 2, frostTexture: 0 },
 };
 
 const ORDER: QualityTier[] = ['high', 'medium', 'low'];

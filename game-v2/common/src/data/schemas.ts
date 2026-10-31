@@ -98,6 +98,18 @@ export interface RiftData {
 export type PlanetKind = 'rocky' | 'desert' | 'ice' | 'gas' | 'lava' | 'ocean' | 'toxic';
 
 /**
+ * How each field of a planet's `look` is shaped (client/src/rendering/planet-proto/planetProto.ts PlanetLook, which
+ * documents what each does): `rgb` a colour as three numbers 0..1, `vec3` three numbers, `pal` three colours.
+ */
+export const PLANET_LOOK_FIELDS = {
+  pal: 'pal', atmoColor: 'rgb', sunsetColor: 'rgb', atmo: 'vec3', atmo2: 'vec3', limb: 'vec3', edge: 'vec3', edge2: 'vec3', detail: 'vec3', bands: 'vec3',
+  storm: 'vec3', stormColor: 'vec3', storm2: 'vec3', emitColor: 'rgb', spin: 'number', ring: 'vec3', ringCol0: 'rgb', ringCol1: 'rgb',
+} as const;
+type LookFieldValue<S> = S extends 'number' ? number : S extends 'pal' ? [number[], number[], number[]] : S extends 'rgb' ? number[] : [number, number, number];
+/** A planet's (or a brown dwarf's) look over its kind's defaults: any of the fields, each replacing the default's */
+export type PlanetLookData = { -readonly [K in keyof typeof PLANET_LOOK_FIELDS]?: LookFieldValue<(typeof PLANET_LOOK_FIELDS)[K]> };
+
+/**
  * A planet: scenery on a slow circular orbit about the system centre (fly
  * over it freely). Position at a tick comes from planetPosition().
  */
@@ -122,6 +134,8 @@ export interface PlanetData {
   description?: string;
   /** Its surface (a system id with `surface`): X in orbit close by descends to it */
   surface?: string;
+  /** Its look from space over its kind's defaults (storms, bands, palette...; see PLANET_LOOK_FIELDS) */
+  look?: PlanetLookData;
 }
 
 /** A planet's surface: a small bounded system of its own, reached from orbit */
@@ -352,7 +366,27 @@ export interface CentralBodyData {
   detailParams?: Record<string, number>;
   /** Detail-star colors (darkColor, midColor, brightColor, edgeColor, plasmaColor, centerColor) */
   detailColors?: Record<string, string>;
+  /** A brown dwarf's look over its defaults (drawn as a planet: PlanetLookData) */
+  look?: PlanetLookData;
+  /** A star's look (type 'sun'; STAR_PLASMA_FIELDS): anything not given comes from its palette */
+  plasma?: StarPlasmaData;
 }
+
+/**
+ * A star's plasma look (`centralBody.plasma`; client/src/rendering/sun/plasmaSun.ts PlasmaParams documents each field):
+ * each number's allowed range, or `colour` ('#rrggbb'), or `iridescence` (multicolour: { mode: 'rainbow' | 'tints',
+ * colors?, strength?, drift?, spread? }).
+ */
+export const STAR_PLASMA_FIELDS = {
+  scale: [1, 40], warp: [0, 5], contrast: [0, 3], core: [0, 3], heat: [0.1, 2], softEdge: [0, 0.2],
+  limbDarkening: [0, 1], limbPower: [0.05, 4], limbContrast: [0, 1], limbTint: 'colour', limbTintStrength: [0, 1], bump: [0, 2],
+  rim: [0, 3], rimColor: 'colour', rimWidth: [0, 0.1], halo: [0, 3], spicules: [0, 0.5],
+  evolve: [0, 0.2], warpEvolve: [0, 0.2], warpWander: [0, 2],
+  threads: [0, 4], threadFlow: [0, 2], granulation: [0, 2], fineContrast: [0, 3], fineOnset: [-2, 2],
+  iridescence: 'iridescence',
+} as const;
+type PlasmaFieldValue<S> = S extends 'colour' ? string : S extends 'iridescence' ? { mode: 'rainbow' | 'tints'; colors?: string[]; strength?: number; drift?: number; spread?: number } : number;
+export type StarPlasmaData = { -readonly [K in keyof typeof STAR_PLASMA_FIELDS]?: PlasmaFieldValue<(typeof STAR_PLASMA_FIELDS)[K]> };
 
 /**
  * Data-driven visual configuration for a star system.

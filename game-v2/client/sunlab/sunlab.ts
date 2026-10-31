@@ -6,19 +6,19 @@
  * (perf.ts; measured as `measure` and `measurePlanets` say). It draws the same layers as the native harnesses
  * (scripts/sun-sky-proto/layers.ts and skyLayers.ts, scripts/planet-proto/layers.ts) with a small WebGL2 runner.
  *
- * URL params (all optional): ?system=<id>&body=star|<planet id>|<planet id>.moon<i>&look=proto|proto.lite|cur
+ * URL params (all optional): ?system=<id>&body=star|<planet id>|<planet id>.moon<i>&look=proto|proto.fine|proto.lite|cur
  * &view=<preset>&sun=<star option>&sky=<sky option>&zoom=<z>, e.g. sunlab.html?system=sol&body=jovan&view=limb. A body alone
  * finds its system (sunlab.html?body=terra_nova); the planet lab's `<system>.dwarf` means that system's star. ?compile
  * times every program's cold compile instead.
  */
 
-import sunText from '../src/rendering/SunRenderer.ts?raw';
-import glowText from '../src/rendering/GlowRenderer.ts?raw';
-import raysText from '../src/rendering/CoronaRaysRenderer.ts?raw';
+import sunText from '../src/rendering/legacy/SunRenderer.ts?raw';
+import glowText from '../src/rendering/legacy/GlowRenderer.ts?raw';
+import raysText from '../src/rendering/legacy/CoronaRaysRenderer.ts?raw';
 import centralText from '../src/rendering/CentralBodyShaders.ts?raw';
 import quadText from '../src/rendering/shaderQuad.ts?raw';
-import planetText from '../src/rendering/PlanetRenderer.ts?raw';
-import { planetNoiseData, PLANET_NOISE_SIZE } from '../src/rendering/planet-proto/planetNoise';
+import planetText from '../src/rendering/planet-proto/planetClassic.ts?raw';
+import { planetCrackCells, planetNoiseData, PLANET_NOISE_SIZE } from '../src/rendering/planet-proto/planetNoise';
 import { moonOffset, planetPosition, type PlanetData } from '@space-game/common';
 import { GLSL_COMMON } from '../src/rendering/shaderQuad';
 import { skyNoiseTexture } from '../src/rendering/sky/noiseTexture';
@@ -161,7 +161,18 @@ function volume(data: Uint8Array, size: number): WebGLTexture {
 const textures: Record<string, WebGLTexture> = { sunNoise: texture(sunNoiseData(), SUN_NOISE_SIZE), skyNoise: texture(skySrc.resource, skySrc.width) };
 // (made on first use: the simplex bake takes a few hundred ms)
 const lazyTextures: Record<string, () => WebGLTexture> = { simplex: () => floatTexture(bakeSimplex(EXACT_SIZE, EXACT_UNITS), EXACT_SIZE) };
-const volumes: Record<string, () => WebGLTexture> = { noise3: () => volume(noise3Data(), NOISE3_SIZE), planetNoise: () => volume(planetNoiseData(), PLANET_NOISE_SIZE) };
+
+/** The planets' crack candidates (the fine look's): 160 x 40 x 40, nearest, repeating */
+function crackVolume(): WebGLTexture {
+  const t = gl.createTexture()!;
+  gl.bindTexture(gl.TEXTURE_3D, t);
+  gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA8, 160, 40, 40, 0, gl.RGBA, gl.UNSIGNED_BYTE, planetCrackCells());
+  gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  for (const w of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T, gl.TEXTURE_WRAP_R]) gl.texParameteri(gl.TEXTURE_3D, w, gl.REPEAT);
+  return t;
+}
+const volumes: Record<string, () => WebGLTexture> = { noise3: () => volume(noise3Data(), NOISE3_SIZE), planetNoise: () => volume(planetNoiseData(), PLANET_NOISE_SIZE), planetCrack: crackVolume };
 const made3: Record<string, WebGLTexture> = {};
 
 /** Render targets by name (the haze's), remade at a new size */

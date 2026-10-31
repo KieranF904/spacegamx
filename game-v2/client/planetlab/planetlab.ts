@@ -7,11 +7,11 @@
  * URL params: ?body=<id>&view=<preset>&look=proto|proto.lite (e.g. planetlab.html?body=jovan&view=limb).
  */
 
-import planetText from '../src/rendering/PlanetRenderer.ts?raw';
+import planetText from '../src/rendering/planet-proto/planetClassic.ts?raw';
 import centralText from '../src/rendering/CentralBodyShaders.ts?raw';
 import quadText from '../src/rendering/shaderQuad.ts?raw';
 import { GLSL_COMMON } from '../src/rendering/shaderQuad';
-import { planetNoiseData, PLANET_NOISE_SIZE } from '../src/rendering/planet-proto/planetNoise';
+import { planetCrackCells, planetNoiseData, PLANET_NOISE_SIZE } from '../src/rendering/planet-proto/planetNoise';
 import systemsJson from '../../data/systems.json';
 import { PerfGraph } from './perf';
 import { backdropLayer, bodiesOf, bodyLayer, lightAmtOf, planetPrograms, sourcesFrom, type Body, type Layer, type Placement, type Variant, type View } from '../../scripts/planet-proto/layers';
@@ -77,6 +77,17 @@ const noise = (() => {
   return t;
 })();
 
+/** The crack candidates (the fine look's): nearest, repeating */
+const crack = (() => {
+  const t = gl.createTexture()!;
+  gl.bindTexture(gl.TEXTURE_3D, t);
+  gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA8, 160, 40, 40, 0, gl.RGBA, gl.UNSIGNED_BYTE, planetCrackCells());
+  gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  for (const w of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T, gl.TEXTURE_WRAP_R]) gl.texParameteri(gl.TEXTURE_3D, w, gl.REPEAT);
+  return t;
+})();
+
 let outFb: WebGLFramebuffer | null = null;
 const vbo = gl.createBuffer()!;
 const vao = gl.createVertexArray()!;
@@ -113,6 +124,11 @@ function draw(layer: Layer, w: number, h: number): void {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_3D, noise);
     gl.uniform1i(uloc(p, 'uNoise'), 0);
+  }
+  if (layer.textures?.uCrack) {
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_3D, crack);
+    gl.uniform1i(uloc(p, 'uCrack'), 1);
   }
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }

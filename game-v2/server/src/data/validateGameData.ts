@@ -21,7 +21,7 @@
 import { BRAIN_IDS } from '../game/brains/ids.js';
 import {
   FN_NAMES, WEAPON_KIND_TYPE, WEAPON_MOD_NUMBERS, DICTIONARY, DAMAGE_TYPES, DEFAULT_ASTEROID_FIELDS, DEFAULT_ASTEROIDS, parsePartItemId, MINERAL_FAMILIES, MATERIAL_TRAITS, HAZARDS, UNLOCK_KEYS,
-  nestReach, safeRadius, CODEX_TABS, MAX_DRIVE, type Blueprint, type CatalogFiles, type ShipTuning, type InventoryStub,
+  nestReach, safeRadius, CODEX_TABS, MAX_DRIVE, PLANET_LOOK_FIELDS, STAR_PLASMA_FIELDS, type Blueprint, type CatalogFiles, type ShipTuning, type InventoryStub,
 } from '@space-game/common';
 import type { GameDataFiles } from './GameData.js';
 
@@ -145,6 +145,43 @@ const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
 const STATION_SERVICES = ['repair', 'storage', 'refinery', 'fabricator', 'market', 'shipyard', 'refuel', 'shop', 'bank', 'quests'];
 /** Profile stats that something bumps (Pilots.bumpStat callers), plus the two computed ones */
 const KNOWN_STATS = ['kills', 'assists', 'bosses', 'mined', 'quests', 'fleetOps', 'escorts', 'defences', 'crafted', 'refined', 'earned', 'trades', 'salvaged', 'raidsDefended', 'events', 'level', 'systems'];
+
+/** A planet's `look` (PLANET_LOOK_FIELDS): known fields only, each the right shape */
+const lookSpec: Spec = (v, path, c) => {
+  if (!isObj(v)) { c.err(path, `expected an object, got ${typeName(v)}`); return; }
+  const nums = (x: unknown, n: number) => Array.isArray(x) && x.length === n && x.every((e) => typeof e === 'number' && Number.isFinite(e));
+  for (const [k, x] of Object.entries(v)) {
+    if (k.startsWith('_')) continue;
+    const shape = (PLANET_LOOK_FIELDS as Record<string, string>)[k], p = join(path, k);
+    if (!shape) c.err(p, `not a look field (${Object.keys(PLANET_LOOK_FIELDS).join(', ')})`);
+    else if (shape === 'number') { if (typeof x !== 'number' || !Number.isFinite(x)) c.err(p, `expected a number, got ${typeName(x)}`); }
+    else if (shape === 'pal') { if (!(Array.isArray(x) && x.length === 3 && x.every((col) => nums(col, 3)))) c.err(p, 'expected three colours, each [r, g, b]'); }
+    else if (!nums(x, 3)) c.err(p, `expected three numbers${shape === 'rgb' ? ' (a colour: r, g, b)' : ''}`);
+    else if (shape === 'rgb' && (x as number[]).some((e) => e < 0 || e > 2)) c.err(p, 'colour channels are 0..1 (up to 2 for a glow)');
+  }
+};
+
+/** A star's `plasma` (STAR_PLASMA_FIELDS): known fields only, numbers in range, colours '#rrggbb' */
+const plasmaSpec: Spec = (v, path, c) => {
+  if (!isObj(v)) { c.err(path, `expected an object, got ${typeName(v)}`); return; }
+  const colour = (x: unknown) => typeof x === 'string' && /^#[0-9a-fA-F]{6}$/.test(x);
+  for (const [k, x] of Object.entries(v)) {
+    if (k.startsWith('_')) continue;
+    const field = (STAR_PLASMA_FIELDS as Record<string, unknown>)[k], p = join(path, k);
+    if (!field) c.err(p, `not a plasma field (${Object.keys(STAR_PLASMA_FIELDS).join(', ')})`);
+    else if (field === 'colour') { if (!colour(x)) c.err(p, `expected a colour '#rrggbb', got ${JSON.stringify(x)}`); }
+    else if (field === 'iridescence') {
+      if (!isObj(x)) { c.err(p, `expected an object, got ${typeName(x)}`); continue; }
+      if (x.mode !== 'rainbow' && x.mode !== 'tints') c.err(join(p, 'mode'), `expected 'rainbow' or 'tints'`);
+      if (x.colors !== undefined && !(Array.isArray(x.colors) && x.colors.length >= 1 && x.colors.length <= 3 && x.colors.every(colour))) c.err(join(p, 'colors'), `expected one to three colours '#rrggbb'`);
+      for (const n of ['strength', 'drift', 'spread']) if (x[n] !== undefined && (typeof x[n] !== 'number' || !Number.isFinite(x[n]))) c.err(join(p, n), `expected a number, got ${typeName(x[n])}`);
+    } else {
+      const [lo, hi] = field as readonly [number, number];
+      if (typeof x !== 'number' || !Number.isFinite(x)) c.err(p, `expected a number, got ${typeName(x)}`);
+      else if (x < lo || x > hi) c.err(p, `${x} is out of range (${lo}..${hi})`);
+    }
+  }
+};
 
 const lootSpec = arr(obj({ item: 'string', chance: 'number', min: 'number', max: 'number' }));
 const behaviourSpec = obj({ aggro: 'number', range: 'number', flee: 'number', leash: 'number', 'accuracy?': 'number', 'strafe?': 'number' });
@@ -380,7 +417,7 @@ const SHAPES: Record<string, Spec> = {
     systems: arr(strict({
       id: 'string', name: 'string', 'danger?': 'number', 'pvp?': obj({ mode: oneOf('all', 'outer'), 'safeRadius?': 'number' }),
       description: 'string', starColor: 'string', starRadius: 'number', position: 'xy', 'sector?': 'string',
-      'centralBody?': obj({ type: oneOf('sun', 'binary', 'black_hole', 'pulsar', 'brown_dwarf', 'none') }),
+      'centralBody?': obj({ type: oneOf('sun', 'binary', 'black_hole', 'pulsar', 'brown_dwarf', 'none'), 'look?': lookSpec, 'plasma?': plasmaSpec }),
       'zones?': arr(obj({ id: 'string', name: 'string', inner: 'number', outer: 'number', 'x?': 'number', 'y?': 'number' })),
       'regions?': arr(obj({ id: 'string', name: 'string', outer: 'number', danger: oneOf('safe', 'contested', 'hostile'), 'description?': 'string' })),
       'surface?': obj({
@@ -411,7 +448,7 @@ const SHAPES: Record<string, Spec> = {
       'planets?': arr(obj({
         id: 'string', name: 'string', kind: 'string', radius: 'number', orbit: obj({ radius: 'number', phase: 'number', period: 'number' }),
         'moons?': arr(obj({ radius: 'number', distance: 'number', period: 'number', phase: 'number', 'name?': 'string', 'surface?': 'string' })),
-        'surface?': 'string',
+        'surface?': 'string', 'look?': lookSpec,
       })),
       'derelicts?': arr(obj({ id: 'string', name: 'string', blueprint: 'string', position: 'xy', 'log?': strict({ codex: 'string' }) })),
       'comets?': arr(obj({ id: 'string', name: 'string', nucleus: 'number' })),

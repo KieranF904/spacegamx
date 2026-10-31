@@ -1,7 +1,8 @@
 /**
- * Planet prototypes (not in the game yet; docs/rendering/planet-prototypes.md). One fragment body for every planet,
- * moon and the brown dwarf, drop-in for PlanetRenderer's FRAGMENT: it runs on the same shaderQuad (vUV across the
- * quad, premultiplied out, GLSL_COMMON prepended) and adds one texture, the baked noise volume (planetNoise.ts).
+ * The planets' look from space (docs/rendering/planet-prototypes.md; in the game since 2026-10-31: PlanetRenderer and
+ * the brown dwarf draw with it). One fragment body for every planet, moon and the brown dwarf, on shaderQuad (vUV
+ * across the quad, premultiplied out, GLSL_COMMON prepended) plus one texture, the baked noise volume (planetNoise.ts,
+ * uploaded by planetNoiseTexture.ts). Three detail levels (planetFragment): lite, standard, fine.
  *
  * What's new against the game's shader:
  * - The edge: an atmosphere with real thickness. The haze's optical depth follows the view ray through a shell
@@ -18,10 +19,13 @@
  *   coastal shallows, clouds with their shadows; lava that glows through its cracks and lights its own haze.
  * - Rings: a radial profile from the noise (mipmapped, so no moiré far out), transparency from optical depth, a
  *   soft-edged planet shadow with a penumbra, and faint clumping along the orbit.
- * - Every look is data (`PlanetLook`): defaults per kind from the planet's hue, overrides per planet id.
+ * - Every look is data (`PlanetLook`): defaults per kind from the planet's hue, overrides per planet in systems.json
+ *   (`look`).
+ * - Cracks (ice lineae, lava rivers, desert canyons): read from the volume (standard), or on the fine level worked out
+ *   exactly per pixel wherever the volume is magnified, antialiased to the pixel, so they're never pixelated.
  */
 
-import type { PlanetData, PlanetKind } from '@space-game/common';
+import type { PlanetData, PlanetKind, PlanetLookData } from '@space-game/common';
 
 export const PLANET_KIND_INDEX: Record<PlanetKind | 'dwarf', number> = { rocky: 0, desert: 1, ice: 2, gas: 3, lava: 4, ocean: 5, toxic: 6, dwarf: 7 };
 
@@ -42,6 +46,136 @@ export const PLANET_PROTO_FRAG = /* glsl */ `
   /** max(d, 0) with a soft knee of half-width k (the terminator) */
   float softLit(float d, float k) { float h = clamp(d + k, 0.0, 2.0 * k); return d > k ? d : h * h / (4.0 * k); }
   float wrapPi(float a) { return mod(a + PI, 2.0 * PI) - PI; }
+
+  // ---------------------------------------------------------------- cracks (ice lineae, lava rivers, canyons)
+#ifdef PLANET_FINE
+  precision highp int;
+  /** The jittered point of the bake's cell w (0..4 each way): planetNoise.ts hash3 at seeds 303, 304, 305, bit for bit */
+  vec3 bakePoint(vec3 w) {
+    uvec3 u = uvec3(w);
+    uint b = u.x * 374761393u + u.y * 668265263u + u.z * 2147483647u + 303u * 144665u;
+    uvec3 h = uvec3(b, b + 144665u, b + 2u * 144665u);
+    h = (h ^ (h >> 13u)) * 1274126177u;
+    h ^= h >> 16u;
+    return vec3(h) * (1.0 / 4294967296.0);
+  }
+  /**
+   * The volume's crack channel (A: Worley F2 - F1, 5 cells a tile, the bake's seed 303) worked out exactly at q (in
+   * tiles) instead of read from 64 texels a tile: the same network, smooth however close (planetNoise.ts worleyEdge's
+   * points). x: the value as baked (normalised) up to cap (as far as the look reads it; past it nothing changes, and it
+   * is cap); yzw: its gradient per tile.
+   *
+   * F1 (the nearest point) is exact; F2 is a soft minimum (log-sum-exp, K cells) over all the others, kept relative to
+   * F1 as it changes. The hard F2 has creases wherever the second and third nearest swap, which would light as hard
+   * lines in the relief (the texture's filtering always softened them); the soft one is smooth but at the cracks.
+   * Only the points that can count are visited: uCrack lists them for each eighth of a cell each way (planetNoise.ts
+   * planetCrackCells; nearest first, 4 or 5 of them on average), in place of a 4x4x4 search.
+   */
+  uniform highp sampler3D uCrack;
+  const float K = 0.025, KL = 1.442695 / K, CRACK_CAP = 0.2;
+  void crackVisit(vec3 c, vec3 x, inout float f1, inout vec3 n1, inout float S, inout vec3 G) {
+    // (the cell wrapped to the tile in floats: (c + 0.5) / 5 is never near a whole number, so floor can't slip)
+    vec3 dv = x - c - bakePoint(c - 5.0 * floor((c + 0.5) * 0.2));
+    float l = max(dot(dv, dv), 1e-10), inv = inversesqrt(l), f = l * inv;
+    vec3 n = dv * inv;                     // (its gradient)
+    if (f < f1) {
+      float r = exp2((f - f1) * KL);
+      S = S * r + r;
+      G = G * r + n1 * r;
+      f1 = f;
+      n1 = n;
+    } else {
+      float e = exp2((f1 - f) * KL);
+      S += e;
+      G += n * e;
+    }
+  }
+  vec4 crackAt(vec3 q, float cap) {
+    vec3 x = (q - 0.5 / 64.0) * 5.0;      // (the bake's texel i is the noise at i/64; GL samples it at (i + 0.5)/64)
+    vec3 cell = floor(x);
+    vec3 sub = floor(x * 8.0);
+    sub -= 40.0 * floor((sub + 0.5) / 40.0);
+    ivec3 t = ivec3(sub) * ivec3(4, 1, 1);
+    float f1 = 1e3, S = 0.0;
+    vec3 n1 = vec3(0.0), G = vec3(0.0);
+    for (int j = 0; j < 4; j++) {
+      vec4 slots = texelFetch(uCrack, t + ivec3(j, 0, 0), 0) * 255.0 + 0.5;
+      if (slots.x > 255.0) break;
+      for (int k = 0; k < 4; k++) {
+        float id = floor(slots[k]);
+        if (id > 254.5) break;
+        vec3 o = vec3(id - 5.0 * floor((id + 0.5) * 0.2), floor((id + 0.5) * 0.2) - 5.0 * floor((id + 0.5) * 0.04), floor((id + 0.5) * 0.04));
+        crackVisit(cell + o - 2.0, x, f1, n1, S, G);
+      }
+    }
+    float v = -0.6931472 * K * log2(max(S, 1e-30)) / 0.6;
+    return v < cap ? vec4(max(v, 0.0), (G / S - n1) * (5.0 / 0.6)) : vec4(cap, 0.0, 0.0, 0.0);
+  }
+#endif
+  /**
+   * A read's crack channel: x the value, y how much it changes across a pixel (0 when read), z its value a step dq
+   * (tiles) along (-1: read it there). Standard: the texel value. PLANET_FINE: worked out exactly wherever the volume is
+   * magnified (a texel past a pixel) and near a crack, so cracks never show texel steps; the step is then free (from
+   * the gradient). cap: the most the look reads (its widest line or glow; a line is also never under a pixel wide);
+   * need: whether it's wanted at all here (a line's mask). Where the texel says no crack is within the cap (its value can
+   * be off by a texel's worth of the field's slope) it isn't worked out.
+   */
+  vec3 ck(vec4 t, vec3 q, float s, vec3 dq, float cap, float need) {
+#ifdef PLANET_FINE
+    float w = smoothstep(1.0, 0.5, gFoot * s * 64.0);
+    // (a line's antialiasing reads past its width by up to a pixel's worth of the field: 2 cells a cell, 5 cells a tile)
+    float c = min(cap + (10.0 / 0.6) * gFoot * s * w, CRACK_CAP);
+    float ta = min(t.a, c);
+    if (w > 0.0 && need > 0.0 && t.a < c + 0.2) {
+      vec4 e = crackAt(q, c);
+      // (the field is a V at a crack, |sigma| with sigma smooth, its gradient flipping there: so the value a step along is
+      // |v + g.dq| on either side, not v + g.dq, which would jump as the step crosses the crack)
+      return vec3(mix(ta, e.x, w), length(e.yzw) * gFoot * s * w, dq == vec3(0.0) ? -1.0 : min(abs(e.x + dot(e.yzw, dq)), c));
+    }
+    return vec3(ta, 0.0, w > 0.0 ? c : -1.0);
+#else
+    return vec3(t.a, 0.0, -1.0);
+#endif
+  }
+  /**
+   * The finest cracks, in patches (PLANET_FINE). Read, only the few texels that fall near a crack show it, as scattered
+   * dashes; worked out exactly the whole network shows, too busy: so it shows where the ground's own noise says.
+   */
+  float fineMask(vec4 d) {
+#ifdef PLANET_FINE
+    return smoothstep(0.42, 0.6, d.g * 0.7 + d.r * 0.3);
+#else
+    return 1.0;
+#endif
+  }
+  /**
+   * Ice's lineae in long patches (PLANET_FINE): read, the thin lines show only in scattered stretches (where texels
+   * fall near them); worked out exactly the whole network would show, a honeycomb over the ice. These keep about the
+   * density the standard level shows, each stretch fading out along its line. mA: the broad lineae, mD: the finer.
+   */
+  float maskA(vec4 a) {
+#ifdef PLANET_FINE
+    return smoothstep(0.44, 0.6, a.g);
+#else
+    return 1.0;
+#endif
+  }
+  float maskD(vec4 a, vec4 d) {
+#ifdef PLANET_FINE
+    return smoothstep(0.42, 0.6, d.r * 0.6 + a.g * 0.4);
+#else
+    return 1.0;
+#endif
+  }
+  /** A crack line, smoothstep(w, 0, c): never narrower than a pixel, fading instead (PLANET_FINE; standard: as is) */
+  float line(vec3 c, float w) {
+#ifdef PLANET_FINE
+    float ww = max(w, c.y);
+    return smoothstep(ww, 0.0, c.x) * (w / ww);
+#else
+    return smoothstep(w, 0.0, c.x);
+#endif
+  }
 
   // ---------------------------------------------------------------- gas giants (and the brown dwarf, and toxic decks)
   /** Zonal jet speed at a latitude (alternating, strongest at the equator) */
@@ -153,11 +287,16 @@ export const PLANET_PROTO_FRAG = /* glsl */ `
   }
 
   // ---------------------------------------------------------------- solid worlds
-  /** The height field a kind's relief is lit from (0..1), and its surface reads */
-  float heightAt(vec3 b, out vec4 a, out vec4 d) {
+  /** The two reads a solid world's ground is built from (a: broad, d: finer, warped by a), in tiles */
+  vec3 qA(vec3 b) { return b * uDetail.x * 0.5 + vec3(uSeed * 0.011, 0.31); }
+  vec3 qD(vec3 b, vec4 a) { return b * uDetail.x * 1.3 + vec3(0.7, uSeed * 0.017) + (a.rgr - 0.5) * 0.35; }
+  /** Whether a kind's look uses the crack channel of the a read (ice), and of the d read (desert, ice, lava) */
+  bool cracksA() { return uKind > 1.5 && uKind < 2.5; }
+  bool cracksD() { return uKind > 0.5 && uKind < 4.5 && !(uKind > 2.5 && uKind < 3.5); }
+
+  /** The height field a kind's relief is lit from (0..1), from its reads (ca, cd: their crack channels, ck) */
+  float heightOf(vec3 b, vec4 a, vec4 d, vec3 ca, vec3 cd) {
     float s = uDetail.x;
-    a = tn(b * s * 0.5 + vec3(uSeed * 0.011, 0.31), s * 0.5);
-    d = tn(b * s * 1.3 + vec3(0.7, uSeed * 0.017) + (a.rgr - 0.5) * 0.35, s * 1.3);
     if (uKind < 0.5) {
       // rocky: rolling ground, craters (bowl and raised rim) at two sizes
       float c1 = smoothstep(0.45, 0.05, d.b) * -0.55 + smoothstep(0.32, 0.5, d.b) * smoothstep(0.7, 0.5, d.b) * 0.35;
@@ -165,22 +304,23 @@ export const PLANET_PROTO_FRAG = /* glsl */ `
       return a.r * 0.6 + c1 * 0.35 + c2 * 0.4;
     } else if (uKind < 1.5) {
       // desert: mesas and canyons along the cells' edges, dunes
-      float canyon = smoothstep(0.1, 0.0, d.a) * smoothstep(0.62, 0.4, a.r);
+      float canyon = line(cd, 0.1) * smoothstep(0.62, 0.4, a.r);
       return a.r * 0.75 + d.g * 0.2 - canyon * 0.3;
     } else if (uKind < 2.5) {
       // ice: low swells, ridged lineae (a double ridge each side of a crack)
-      float l1 = max(smoothstep(0.08, 0.0, a.a), smoothstep(0.06, 0.0, d.a) * smoothstep(0.3, 0.6, d.g));
-      float l0 = max(smoothstep(0.025, 0.0, a.a), smoothstep(0.02, 0.0, d.a) * smoothstep(0.3, 0.6, d.g));
+      float mA = maskA(a), mD = maskD(a, d);
+      float l1 = max(line(ca, 0.08) * mA, line(cd, 0.06) * smoothstep(0.3, 0.6, d.g) * mD);
+      float l0 = max(line(ca, 0.025) * mA, line(cd, 0.02) * smoothstep(0.3, 0.6, d.g) * mD);
       return a.r * 0.35 + l1 * 0.25 - l0 * 0.3;
     } else if (uKind < 4.5) {
       // lava: crust plates between glowing cracks
-      return a.r * 0.5 + smoothstep(0.0, 0.2, d.a) * 0.3;
+      return a.r * 0.5 + smoothstep(0.0, 0.2, cd.x) * 0.3;
     }
     // ocean: land above the sea
     return smoothstep(0.555, 0.68, tn(b * s * 0.22 + vec3(0.13, uSeed * 0.01), s * 0.22).r * 0.8 + a.r * 0.2 + 0.04);
   }
 
-  vec3 solidSurface(vec3 b, vec3 lb, float lat, float px, vec4 a, vec4 d, out float emit, out float spec, out float cloud, out float cloudShade) {
+  vec3 solidSurface(vec3 b, vec3 lb, float lat, float px, vec4 a, vec4 d, vec3 ca, vec3 cd, out float emit, out float spec, out float cloud, out float cloudShade) {
     emit = 0.0; spec = 0.0; cloud = 0.0; cloudShade = 0.0;
     float fineW = smoothstep(0.004, 0.0012, px);
     if (uKind < 0.5) {
@@ -195,24 +335,35 @@ export const PLANET_PROTO_FRAG = /* glsl */ `
       // desert: sand seas with dunes, dark rock in the canyons, frost caps
       float dune = sin(dot(b, vec3(13.0, 41.0, 7.0)) * uDetail.x * 0.35 + d.g * 9.0) * 0.5 + 0.5;
       vec3 c = mix(uPal1, uPal0, a.r * 0.7 + dune * 0.3 * fineW + 0.15);
-      c = mix(c, uPal2, smoothstep(0.1, 0.0, d.a) * smoothstep(0.62, 0.4, a.r) * 0.55 + smoothstep(0.58, 0.75, a.r) * 0.35);
+      c = mix(c, uPal2, line(cd, 0.1) * smoothstep(0.62, 0.4, a.r) * 0.55 + smoothstep(0.58, 0.75, a.r) * 0.35);
       float cap = smoothstep(0.86, 0.93, abs(b.y) + (a.g - 0.5) * 0.1);
       return mix(c, vec3(0.93, 0.9, 0.88), cap * 0.9);
     } else if (uKind < 2.5) {
       // ice: white-blue sheets, rust-tinted lineae, blue-grey old ice
       vec3 c = mix(uPal1, uPal0, smoothstep(0.3, 0.7, a.r) * 0.8 + a.g * 0.2);
-      float lines = max(smoothstep(0.06, 0.0, a.a), smoothstep(0.05, 0.0, d.a) * smoothstep(0.2, 0.5, d.g) * 0.7);
-      if (fineW > 0.0) lines = max(lines, smoothstep(0.035, 0.0, tn(b * uDetail.x * 4.0 + 1.7, uDetail.x * 4.0).a) * 0.6 * fineW);
+      float lines = max(line(ca, 0.06) * maskA(a), line(cd, 0.05) * smoothstep(0.2, 0.5, d.g) * 0.7 * maskD(a, d));
+      if (fineW > 0.0) {
+        vec3 qf = b * uDetail.x * 4.0 + 1.7;
+        float fm = fineMask(d);
+        lines = max(lines, line(ck(tn(qf, uDetail.x * 4.0), qf, uDetail.x * 4.0, vec3(0.0), 0.035, fm), 0.035) * 0.6 * fineW * fm);
+      }
       return mix(c, uPal2, lines * 0.8);
     } else if (uKind < 4.5) {
       // lava: black crust, glowing cracks and lakes, pulsing slowly
       // the rivers: a coarse crack network (its own read, warped), a glow round each, fine cracks between
-      float big = tn(b * 0.6 + (a.rgr - 0.5) * 0.05 + vec3(0.21, uSeed * 0.013), 0.6).a;
-      float river = smoothstep(0.12, 0.02, big) + smoothstep(0.35, 0.0, big) * 0.25;
-      float crack = max(river, smoothstep(0.05, 0.0, d.a) * 0.35) * (0.7 + 0.3 * smoothstep(0.3, 0.6, a.g));
+      vec3 qb = b * 0.6 + (a.rgr - 0.5) * 0.05 + vec3(0.21, uSeed * 0.013);
+      vec4 tb = tn(qb, 0.6);
+      // (the river's core from the crack channel, worked out on the fine level; its faint wide halo as read)
+      float big = ck(tb, qb, 0.6, vec3(0.0), 0.12, 1.0).x;
+      float river = smoothstep(0.12, 0.02, big) + smoothstep(0.35, 0.0, tb.a) * 0.25;
+      float crack = max(river, line(cd, 0.05) * 0.35) * (0.7 + 0.3 * smoothstep(0.3, 0.6, a.g));
       float pulse = 0.75 + 0.25 * sin(uTime * 0.35 + a.g * 12.0);
       emit = crack * (0.65 + 0.35 * pulse);
-      if (fineW > 0.0) emit = max(emit, smoothstep(0.1, 0.0, tn(b * uDetail.x * 4.5, uDetail.x * 4.5).a) * 0.5 * fineW);
+      if (fineW > 0.0) {
+        vec3 qf = b * uDetail.x * 4.5;
+        float fm = fineMask(d);
+        emit = max(emit, line(ck(tn(qf, uDetail.x * 4.5), qf, uDetail.x * 4.5, vec3(0.0), 0.1, fm), 0.1) * 0.5 * fineW * fm);
+      }
       vec3 crust = uPal1 * (0.6 + 0.8 * a.g);
       return mix(crust, uPal0, emit);
     }
@@ -288,12 +439,14 @@ export const PLANET_PROTO_FRAG = /* glsl */ `
 
     // The atmosphere: limb optical depth g, scale height H (radii), twilight wrap
     float g = uAtmo.x, H = max(uAtmo.y, 1e-4), wrapW = uAtmo.z;
-    float soft = max(1.5 * px, uLimb.z);  // the disc edge: never under 1.5 px
+    // the disc edge: the look's width (an airless ball's too: uEdge.x), never under 1.5 px
+    float soft = max(1.5 * px, max(uLimb.z, uEdge.x));
 
     if (r > 1.0 - soft) {
-      // Outside the limb: haze falling off with height, lit round past the terminator
+      // Outside the limb: haze falling off with height, lit round past the terminator; and on an airless ball a faint
+      // thin glow of dust and scattered light just off its edge (uEdge2: strength, height)
       float a = max(r - 1.0, 0.0);
-      float tau = g * exp(-a / H) * smoothstep(1.0 / uPR, 1.0 / uPR - 0.08, r);
+      float tau = (g * exp(-a / H) + uEdge2.x * exp(-a / max(uEdge2.y, 1e-4))) * smoothstep(1.0 / uPR, 1.0 / uPR - 0.08, r);
       if (tau > 0.002) {
         vec3 dir = vec3(p / max(r, 1e-4), 0.0);
         float cl = dot(dir, l3);
@@ -321,23 +474,35 @@ export const PLANET_PROTO_FRAG = /* glsl */ `
       if (uKind > 2.5 && uKind < 3.5 || uKind > 5.5) {
         base = gasGiant(lon, lat, b, px, (uKind > 5.5 && uKind < 6.5) ? 1.0 : lite, heat);
       } else {
-        vec4 a, d;
-        float h0 = heightAt(b, a, d);
-        if (lite < 0.5 && uLimb.y > 0.0) {
-          // relief: the height again a step toward the star (in the body's frame)
-          vec3 tl = lb - b * dot(lb, b);
-          float tlen = length(tl);
-          float eps = 0.012 / uDetail.x;
-          vec4 a1, d1;
-          float h1 = heightAt(b + tl / max(tlen, 1e-4) * eps, a1, d1);
+        float sc = uDetail.x;
+        vec3 qa = qA(b);
+        vec4 a = tn(qa, sc * 0.5);
+        vec3 qd = qD(b, a);
+        vec4 d = tn(qd, sc * 1.3);
+        // relief: the height again a step toward the star (in the body's frame)
+        bool relief = lite < 0.5 && uLimb.y > 0.0;
+        vec3 tl = lb - b * dot(lb, b);
+        float tlen = length(tl), eps = 0.012 / sc;
+        vec3 stp = relief ? tl / max(tlen, 1e-4) * eps : vec3(0.0);
+        // (ice's lineae only where their masks show them)
+        bool ice = uKind > 1.5 && uKind < 2.5;
+        vec3 ca = cracksA() ? ck(a, qa, sc * 0.5, stp * sc * 0.5, 0.08, maskA(a)) : vec3(a.a, 0.0, -1.0);
+        vec3 cd = cracksD() ? ck(d, qd, sc * 1.3, stp * sc * 1.3, uKind > 3.5 ? 0.2 : ice ? 0.06 : 0.1, ice ? maskD(a, d) : 1.0) : vec3(d.a, 0.0, -1.0);
+        float h0 = heightOf(b, a, d, ca, cd);
+        if (relief) {
+          vec3 b1 = b + stp;
+          vec4 a1 = tn(qA(b1), sc * 0.5);
+          vec4 d1 = tn(qD(b1, a1), sc * 1.3);
+          float h1 = heightOf(b1, a1, d1, vec3(ca.z < -0.5 ? a1.a : ca.z, ca.y, -1.0), vec3(cd.z < -0.5 ? d1.a : cd.z, cd.y, -1.0));
           slope = (h1 - h0) / eps * tlen;
         }
-        base = solidSurface(b, lb, lat, px, a, d, emit, spec, cloud, cloudShade);
+        base = solidSurface(b, lb, lat, px, a, d, ca, cd, emit, spec, cloud, cloudShade);
       }
 
       // Light: a soft knee at the terminator (wider under thicker air), relief tilting it, reddened in twilight
       float dl = d0 + slope * uLimb.y * 0.012;
-      float tw = uAtmo.z * 0.5 + 0.02;
+      // (rough ground widens it too: craters and ridges catch the light past the line, uEdge.y)
+      float tw = uAtmo.z * 0.5 + 0.02 + uEdge.y;
       float lit = softLit(dl, tw) * uLightAmt;
       vec3 sunTint = mix(vec3(1.0), uSunsetColor * 1.6, exp(-d0 * d0 / (tw * tw * 4.0 + 0.002)) * uAtmo2.x * 0.6);
       vec3 c;
@@ -364,6 +529,12 @@ export const PLANET_PROTO_FRAG = /* glsl */ `
       }
       // Limb darkening (gas giants): the deck seen through more of itself toward the edge
       c *= mix(1.0, pow(max(z, 0.02), uLimb.y), uLimb.x);
+      // Solid worlds: a little darkening to the limb (uEdge2.z), and a thin rim of light on the lit limb (uEdge.z)
+      if (self < 0.5) {
+        c *= mix(1.0, sqrt(max(z, 0.02)), uEdge2.z);
+        float rim = pow(1.0 - z, 4.0) * smoothstep(-0.1, 0.5, d0) * uEdge.z;
+        c += (base * 0.7 + 0.12) * rim * uLightAmt;
+      }
 
       // The haze over the face: thin face-on, thick at the limb (the same depth as just outside it)
       float k = sqrt(2.0 * H / PI);
@@ -395,6 +566,11 @@ export interface PlanetLook {
   atmo2: [number, number, number];
   /** Limb darkening, gas: its power / solid: relief strength, the disc edge's width in radii */
   limb: [number, number, number];
+  /** The edge (any body): the disc edge's width in radii (at least 1.5 px), the terminator's extra width (rough
+   *  ground), a thin rim of light on the lit limb */
+  edge: [number, number, number];
+  /** An airless ball's halo of dust and scattered light just off its limb: strength, height (radii); limb darkening */
+  edge2: [number, number, number];
   /** Solid: feature scale, contrast, cloud cover. Gas: (unused), vortex strength, (unused) */
   detail: [number, number, number];
   /** Gas: band frequency, turbulence, jet speed (rad/s) */
@@ -421,6 +597,9 @@ export function hsl(h: number, s: number, l: number): number[] {
 
 const DEFAULT_HUE: Record<PlanetKind, number> = { rocky: 28, desert: 36, ice: 200, gas: 30, lava: 14, ocean: 210, toxic: 85 };
 
+/** An airless ball's edge (rocky worlds, and every moon): a soft limb, a wide rough terminator, a lit rim, a dust halo */
+const AIRLESS_EDGE: Pick<PlanetLook, 'edge' | 'edge2'> = { edge: [0.012, 0.07, 0.8], edge2: [0.35, 0.02, 0.3] };
+
 /** The defaults for a kind, from its hue */
 export function kindLook(kind: PlanetKind | 'dwarf', hue: number, seed: number): PlanetLook {
   const rnd = (k: number) => ((Math.sin(seed * 12.9898 + k * 78.233) * 43758.5453) % 1 + 1) % 1;
@@ -428,7 +607,7 @@ export function kindLook(kind: PlanetKind | 'dwarf', hue: number, seed: number):
   const base: PlanetLook = {
     pal: [hsl(hue, 0.2, 0.6), hsl(hue, 0.15, 0.35), hsl(hue, 0.15, 0.2)],
     atmoColor: hsl(hue, 0.6, 0.65), sunsetColor: hsl(20, 0.85, 0.55),
-    atmo: [0.3, 0.012, 0.12], atmo2: [0.4, 1.0, 0.8], limb: [0, 1, 0], detail: [3, 1, 0],
+    atmo: [0.3, 0.012, 0.12], atmo2: [0.4, 1.0, 0.8], limb: [0, 1, 0], detail: [3, 1, 0], edge: [0.003, 0.03, 0.25], edge2: [0, 0.01, 0.2],
     bands: [7, 1, 0.004], storm: [0, 0, 0.1], stormColor: [-2, 0, 0], storm2: none, emitColor: [0, 0, 0], spin: 0.008,
     ring: none, ringCol0: [0, 0, 0], ringCol1: [0, 0, 0],
   };
@@ -439,7 +618,7 @@ export function kindLook(kind: PlanetKind | 'dwarf', hue: number, seed: number):
         pal: [hsl(hue + 22, 0.42, 0.76), hsl(hue, 0.62, 0.42), hsl(hue - 14, 0.7, 0.2)],
         atmoColor: hsl(hue + 10, 0.55, 0.66), sunsetColor: hsl(hue - 10, 0.85, 0.5),
         // thick: a deep haze, a wide twilight, limb-darkened under it
-        atmo: [1.25, 0.028, 0.3], atmo2: [0.7, 0.8, 0.7], limb: [0.45, 0.55, 0.012], detail: [3, 1, 0],
+        atmo: [1.25, 0.028, 0.3], atmo2: [0.7, 0.8, 0.7], limb: [0.45, 0.55, 0.012], detail: [3, 1, 0], edge: [0, 0, 0], edge2: [0, 0.01, 0],
         bands: [6 + Math.round(rnd(1) * 3), 1.0, 0.0035],
         storm: [rnd(2) * 6.28, -0.42 + (rnd(3) - 0.5) * 0.2, 0.12], stormColor: hsl(hue - 8, 0.72, 0.45),
         storm2: [0.55 + rnd(4) * 0.15, 5 + Math.round(rnd(5) * 3), 0.035],
@@ -449,7 +628,7 @@ export function kindLook(kind: PlanetKind | 'dwarf', hue: number, seed: number):
         ...base, spin: 0.035,
         pal: [hsl(hue + 14, 0.5, 0.42), hsl(hue, 0.62, 0.27), hsl(hue - 6, 0.55, 0.12)],
         atmoColor: hsl(hue, 0.85, 0.32), sunsetColor: hsl(hue + 10, 0.9, 0.45), emitColor: hsl(hue + 8, 0.95, 0.5),
-        atmo: [1.2, 0.035, 0.3], atmo2: [0, 1.0, 0.55], limb: [0.55, 0.6, 0.012],
+        atmo: [1.2, 0.035, 0.3], atmo2: [0, 1.0, 0.55], limb: [0.55, 0.6, 0.012], edge: [0, 0, 0], edge2: [0, 0.01, 0],
         bands: [9, 1.1, 0.003], storm: [0.7, -0.36, 0.13], stormColor: hsl(hue + 4, 0.75, 0.38), storm2: none,
       };
     case 'toxic':
@@ -457,7 +636,7 @@ export function kindLook(kind: PlanetKind | 'dwarf', hue: number, seed: number):
         ...base, spin: 0.01,
         pal: [hsl(hue - 25, 0.62, 0.6), hsl(hue, 0.55, 0.33), hsl(hue + 10, 0.5, 0.2)],
         atmoColor: hsl(hue - 10, 0.6, 0.6), sunsetColor: hsl(hue - 45, 0.8, 0.5),
-        atmo: [1.4, 0.035, 0.32], atmo2: [0.6, 0.9, 0.75], limb: [0.35, 0.6, 0.01],
+        atmo: [1.4, 0.035, 0.32], atmo2: [0.6, 0.9, 0.75], limb: [0.35, 0.6, 0.01], edge: [0, 0, 0], edge2: [0, 0.01, 0],
         bands: [4, 1.6, 0.003], detail: [3, 0.6, 0],
       };
     case 'rocky':
@@ -465,62 +644,52 @@ export function kindLook(kind: PlanetKind | 'dwarf', hue: number, seed: number):
         ...base,
         pal: [hsl(hue, 0.16, 0.6), hsl(hue, 0.12, 0.3), hsl(hue, 0.1, 0.2)],
         atmoColor: hsl(hue, 0.25, 0.7), atmo: [0.06, 0.006, 0.04], atmo2: [0, 0.7, 0.3], limb: [0, 1.0, 0], detail: [3.2, 1, 0],
+        // airless: a soft limb, a wide rough terminator, a rim of light and a faint dust halo
+        ...AIRLESS_EDGE,
       };
     case 'desert':
       return {
         ...base,
         pal: [hsl(hue + 8, 0.58, 0.64), hsl(hue, 0.55, 0.4), hsl(hue - 10, 0.4, 0.24)],
         atmoColor: hsl(hue + 4, 0.55, 0.68), sunsetColor: hsl(205, 0.55, 0.6),
-        atmo: [0.35, 0.01, 0.1], atmo2: [0.35, 0.9, 0.6], limb: [0, 0.9, 0], detail: [3, 1, 0],
+        atmo: [0.35, 0.01, 0.1], atmo2: [0.35, 0.9, 0.6], limb: [0, 0.9, 0], detail: [3, 1, 0], edge: [0.003, 0.035, 0.25], edge2: [0.03, 0.01, 0.2],
       };
     case 'ice':
       return {
         ...base,
         pal: [[0.94, 0.97, 1.0], hsl(hue, 0.35, 0.68), hsl(hue + 10, 0.7, 0.38)],
         atmoColor: hsl(hue, 0.55, 0.75), sunsetColor: hsl(hue + 30, 0.5, 0.6),
-        atmo: [0.25, 0.01, 0.08], atmo2: [0.2, 0.9, 0.5], limb: [0, 0.6, 0], detail: [2.6, 1, 0],
+        atmo: [0.25, 0.01, 0.08], atmo2: [0.2, 0.9, 0.5], limb: [0, 0.6, 0], detail: [2.6, 1, 0], edge: [0.004, 0.03, 0.35], edge2: [0.05, 0.01, 0.2],
       };
     case 'lava':
       return {
         ...base,
         pal: [hsl(hue + 18, 1.0, 0.6), hsl(hue, 0.2, 0.1), hsl(hue, 0.2, 0.05)],
         atmoColor: hsl(hue + 6, 0.7, 0.45), sunsetColor: hsl(hue + 15, 0.95, 0.5), emitColor: hsl(hue + 15, 1.0, 0.5),
-        atmo: [0.45, 0.012, 0.15], atmo2: [0.5, 0.9, 0.6], limb: [0, 0.8, 0], detail: [3, 1, 0],
+        atmo: [0.45, 0.012, 0.15], atmo2: [0.5, 0.9, 0.6], limb: [0, 0.8, 0], detail: [3, 1, 0], edge: [0.003, 0.03, 0.15], edge2: [0, 0.01, 0.15],
       };
     case 'ocean':
       return {
         ...base,
         pal: [hsl(hue - 15, 0.6, 0.4), hsl(hue, 0.75, 0.17), hsl(hue, 0.5, 0.3)],
         atmoColor: hsl(205, 0.75, 0.65), sunsetColor: hsl(22, 0.9, 0.55),
-        atmo: [0.55, 0.014, 0.14], atmo2: [0.6, 1.0, 0.6], limb: [0, 0.5, 0], detail: [2.4, 1, 0.8],
+        atmo: [0.55, 0.014, 0.14], atmo2: [0.6, 1.0, 0.6], limb: [0, 0.5, 0], detail: [2.4, 1, 0.8], edge: [0.002, 0, 0.2], edge2: [0, 0.01, 0.15],
       };
   }
   return base;
 }
 
 /**
- * Per-planet tuning over the kind's defaults (in the game: a `look` on the planet in systems.json). Kept small: each
- * entry is what makes that world itself.
+ * Everything that decides a body's look. `look` is the planet's (or the brown dwarf's) own, from systems.json: what
+ * makes that world itself over its kind's defaults (Jovan's red spot, Cinderjack's sooty bands...).
  */
-export const PLANET_TUNING: Record<string, Partial<PlanetLook>> = {
-  // Jovan: the classic, a great red spot in the south, white ovals in the north-ish band
-  jovan: { storm: [0.9, -0.36, 0.13], stormColor: hsl(10, 0.62, 0.46), storm2: [0.5, 6, 0.035] },
-  // Cinderjack (Ashfall's giant, round the brown dwarf): sooty, hotter, wilder bands, a dark storm
-  cinderjack: { bands: [9, 1.35, 0.004], stormColor: hsl(10, 0.6, 0.22), atmo: [1.8, 0.03, 0.32] },
-  // Boreas Major: an ice giant, soft bands, a dark spot, no ovals
-  boreas_major: { bands: [5, 0.7, 0.003], stormColor: hsl(222, 0.6, 0.25), storm2: [0, 0, 0], storm: [2.0, -0.25, 0.1] },
-  // Opaline: pearly magenta, high contrast, two storms' worth of ovals
-  opaline: { storm2: [-0.55, 8, 0.03] },
-  // Ember Giant: deep red, a pale storm
-  ember_giant: { stormColor: hsl(30, 0.6, 0.7), bands: [8, 1.2, 0.0035], pal: [hsl(24, 0.6, 0.55), hsl(12, 0.75, 0.32), hsl(4, 0.75, 0.15)], atmoColor: hsl(18, 0.6, 0.55) },
-};
-
-/** Everything that decides a body's look */
-export interface BodyIn { id: string; kind: PlanetKind | 'dwarf'; hue?: number; rings?: PlanetData['rings'] }
+export interface BodyIn { id: string; kind: PlanetKind | 'dwarf'; hue?: number; rings?: PlanetData['rings']; look?: PlanetLookData }
 
 export function lookFor(body: BodyIn, seed: number): PlanetLook {
   const hue = body.hue ?? (body.kind === 'dwarf' ? 14 : DEFAULT_HUE[body.kind]);
-  const look: PlanetLook = { ...kindLook(body.kind, hue, seed), ...(PLANET_TUNING[body.id] ?? {}) };
+  const look: PlanetLook = { ...kindLook(body.kind, hue, seed), ...(body.look as Partial<PlanetLook> | undefined) };
+  // Moons have no air: even an icy one only a trace of haze, and an airless ball's edge
+  if (body.id.includes('.moon') && !body.look) Object.assign(look, { atmo: [0.05, 0.006, 0.04], atmo2: [0, 0.7, 0.3] }, AIRLESS_EDGE);
   if (body.rings) {
     const rh = body.rings.hue ?? hue;
     look.ring = [body.rings.inner, body.rings.outer, 0.8];
@@ -530,6 +699,17 @@ export function lookFor(body: BodyIn, seed: number): PlanetLook {
   return look;
 }
 
+/**
+ * How finely a planet is drawn (the quality tier's planetDetail): lite (Low: one flow phase, no relief, no fine
+ * octaves), standard (Medium), fine (High: cracks worked out exactly, never pixelated close up).
+ */
+export type PlanetDetail = 'lite' | 'standard' | 'fine';
+export const PLANET_DETAILS: readonly PlanetDetail[] = ['lite', 'standard', 'fine'];
+/** The fragment body for a detail level */
+export function planetFragment(detail: PlanetDetail): string {
+  return (detail === 'lite' ? '#define PLANET_LITE\n' : detail === 'fine' ? '#define PLANET_FINE\n' : '') + PLANET_PROTO_FRAG;
+}
+
 /** The look as the prototype shader's uniforms (all floats and vec2/vec3: shaderQuad's UniformDef types) */
 export function planetProtoUniforms(look: PlanetLook, kind: PlanetKind | 'dwarf', seed: number, extent: number): Record<string, number | number[]> {
   return {
@@ -537,7 +717,7 @@ export function planetProtoUniforms(look: PlanetLook, kind: PlanetKind | 'dwarf'
     uSpin: look.spin,
     uPal0: look.pal[0], uPal1: look.pal[1], uPal2: look.pal[2],
     uAtmoColor: look.atmoColor, uSunsetColor: look.sunsetColor, uAtmo: look.atmo, uAtmo2: look.atmo2, uLimb: look.limb,
-    uDetail: look.detail, uBands: look.bands, uStorm: look.storm, uStormCol: look.stormColor, uStorm2: look.storm2,
+    uEdge: look.edge, uEdge2: look.edge2, uDetail: look.detail, uBands: look.bands, uStorm: look.storm, uStormCol: look.stormColor, uStorm2: look.storm2,
     uEmitColor: look.emitColor, uRing: look.ring, uRingCol0: look.ringCol0, uRingCol1: look.ringCol1,
   };
 }

@@ -13,6 +13,7 @@
       "sector": "core",
       "centralBody": {
         "type": "sun",
+        "plasma": {"limbDarkening": 0.55, "limbPower": 0.6, "limbContrast": 0.45, "limbTint": "#a82800", "limbTintStrength": 0.5, "bump": 0.6, "rim": 0.7, "rimColor": "#ffb37a", "rimWidth": 0.008, "halo": 0.35, "spicules": 0.035, "evolve": 0.012, "warpEvolve": 0.006, "warpWander": 0.15, "threads": 2.4, "threadFlow": 0.3, "granulation": 0.35, "fineContrast": 1.25},
         "radius": 21000,
         "hue": 40,
         "detailStar": true,
@@ -139,6 +140,7 @@
           "id": "jovan",
           "name": "Jovan",
           "kind": "gas",
+          "look": { "storm": [0.9, -0.36, 0.13], "stormColor": [0.745, 0.27, 0.175], "storm2": [0.5, 6, 0.035] },
           "hue": 32,
           "radius": 4300,
           "orbit": {
@@ -976,6 +978,7 @@
           "id": "cinderjack",
           "name": "Cinderjack",
           "kind": "gas",
+          "look": { "bands": [9, 1.35, 0.004], "stormColor": [0.352, 0.132, 0.088], "atmo": [1.8, 0.03, 0.32] },
           "hue": 28,
           "radius": 16000,
           "orbit": {
@@ -1146,6 +1149,7 @@
       "sector": "core",
       "centralBody": {
         "type": "sun",
+        "plasma": {"limbDarkening": 0.35, "limbPower": 0.5, "limbContrast": 0.55, "limbTint": "#2a5cff", "limbTintStrength": 0.4, "bump": 0.45, "rim": 0.65, "rimColor": "#c8f0ff", "rimWidth": 0.007, "halo": 0.5, "spicules": 0.03, "evolve": 0.018, "warpEvolve": 0.009, "warpWander": 0.18},
         "radius": 14000,
         "hue": 200,
         "sunStyle": "granular",
@@ -1236,6 +1240,7 @@
           "id": "boreas_major",
           "name": "Boreas Major",
           "kind": "gas",
+          "look": { "bands": [5, 0.7, 0.003], "stormColor": [0.1, 0.19, 0.4], "storm2": [0, 0, 0], "storm": [2, -0.25, 0.1] },
           "hue": 205,
           "radius": 3500,
           "orbit": {
@@ -1443,6 +1448,7 @@
       "sector": "outer_rim",
       "centralBody": {
         "type": "sun",
+        "plasma": {"limbDarkening": 0.45, "limbPower": 0.55, "limbContrast": 0.5, "limbTint": "#6e0a5e", "limbTintStrength": 0.5, "bump": 0.5, "rim": 0.7, "rimColor": "#ffc4ee", "rimWidth": 0.008, "halo": 0.45, "spicules": 0.035, "evolve": 0.014, "warpEvolve": 0.008, "warpWander": 0.22},
         "radius": 26000,
         "hue": 330,
         "sunStyle": "flow",
@@ -1503,6 +1509,7 @@
           "id": "opaline",
           "name": "Opaline",
           "kind": "gas",
+          "look": { "storm2": [-0.55, 8, 0.03] },
           "hue": 305,
           "radius": 3900,
           "orbit": {
@@ -1867,6 +1874,7 @@
       "sector": "ember_frontier",
       "centralBody": {
         "type": "sun",
+        "plasma": {"limbDarkening": 0.72, "limbPower": 0.8, "limbContrast": 0.35, "limbTint": "#3a0400", "limbTintStrength": 0.6, "bump": 0.75, "rim": 0.5, "rimColor": "#ff5a2a", "rimWidth": 0.014, "halo": 0.45, "spicules": 0.045, "evolve": 0.007, "warpEvolve": 0.004, "warpWander": 0.12},
         "radius": 40000,
         "hue": 10,
         "detailStar": true,
@@ -1978,6 +1986,7 @@
           "id": "ember_giant",
           "name": "Ember Giant",
           "kind": "gas",
+          "look": { "stormColor": [0.88, 0.7, 0.52], "bands": [8, 1.2, 0.0035], "pal": [[0.82, 0.496, 0.28], [0.56, 0.176, 0.08], [0.262, 0.052, 0.038]], "atmoColor": [0.82, 0.442, 0.28] },
           "hue": 16,
           "radius": 3700,
           "orbit": {

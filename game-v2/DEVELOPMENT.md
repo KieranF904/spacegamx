@@ -127,7 +127,7 @@ used past 256 MB dropped). Without IndexedDB it just builds. To add a generator:
   away by transfer. Pictures drawn one at a time use `assets/pictureSheet.ts`.
 
 Kept now: the rock, hull and station atlases, stillstone maps, station bakes, intact hull geometry (damaged hulls are
-built each time), the sky noise, item icons, Component Guide pictures and the frost texture. Clear it from DevTools
+built each time), the sky noise, the star's noise volume, item icons, Component Guide pictures and the frost texture. Clear it from DevTools
 (Application, IndexedDB, `space-assets`) to see a first visit.
 
 Shaders are compiled ahead too (`client/src/rendering/shaderWarmup.ts`): the game's programs are listed in
@@ -210,19 +210,29 @@ up, or its own frozen one on 5299; Chrome runs at Idle priority on the real GPU,
 (`RENDER_IDLE_MIN`)). `npm run render -- --browser --ui ship:corsair --out viewer.png` shoots the viewer page itself.
 `scripts/boss-shots/shoot.mjs` (live game shots) uses the same daemon. Don't use either for plain stills.
 
-**Sun and sky prototypes** (not in the game yet; `docs/rendering/sun-sky-prototypes.md`): the live lab is
-<http://localhost:5273/sunlab.html> (dev server only; the whole system, star, sky, planets and moons, prototypes
-against current, live cost graph; e.g. `sunlab.html?body=jovan&view=limb`), and `node scripts/sun-sky-proto/run.mjs verify|bench|stills|gif|parity|v2|stills2|bench2|gif2|v3|stills3|bench3|gif3|edge|v4|stills4|bench4|gif4|v5|stills5|bench5|gif5|panel5 <out dir>`
-draws and times the game's sun and sky against them natively (moderngl, no browser).
+**The star and the sky** (`docs/rendering/sun-sky-prototypes.md`, "Adopted" at the top). The star is plasma round 5:
+`client/src/rendering/sun/plasmaSun.ts` (the shader and each star's look) drawn by `sun/SunRenderer.ts` into a target at
+½ of the screen's device pixels (⅓ on Low: `sunScale` in `settings/quality.ts`) and stretched back. Everything that
+differs between stars is data, `centralBody.plasma` in `data/systems.json` (the fields and their ranges are
+`STAR_PLASMA_FIELDS` in common; checked by `validateGameData.ts`); anything not given comes from the star's palette. The
+sky's stars are sprites, all six layers in one instanced draw (`sky/skySprites.ts`), skipped behind the star's disc and
+not drawn at all when it fills the screen. To show a star anywhere the game's renderer draws (the sign-in screen does):
+`new SunRenderer(app)`, `setStar('sol')`, add its `container`, then each frame `drawAt(dt, x, y, radiusPx)`. The star
+before this (sun, glow and corona renderers) is in `rendering/legacy/`, kept for the sandbox and as the lab's "original".
+The lab is <http://localhost:5273/sunlab.html> (dev server only; the whole system, star, sky, planets and moons, the
+shipped star against the prototypes and the original, live cost graph; e.g. `sunlab.html?body=jovan&view=limb`), and
+`node scripts/sun-sky-proto/run.mjs ship|benchship|edgefix|zoomsweep|v5|stills5|bench5|gif5|... <out dir>` draws and
+times them natively (moderngl, no browser); after `zoomsweep`, `python scripts/sun-sky-proto/zoomflicker.py <out dir>`
+measures flicker while zooming.
 
 **Planet surfaces** (the ground seen from inside the atmosphere; `docs/rendering/surface-art-pass.md`): each surface's look is
 data in `client/src/rendering/surface/surfaceLooks.ts`, drawn by `groundShader.ts`. `node scripts/surface-art/run.mjs stills|bench <out dir>`
 draws and times it natively. In dev, `__game.renderer.surface.setClassic(true)` shows the ground as it was before the art pass.
 
-**Planet prototypes** (not in the game yet; `docs/rendering/planet-prototypes.md`): seen in place in the sun lab
+**Planets** (in the game: `docs/rendering/planet-prototypes.md`, "In the game"; looks are data, a planet's `look` in systems.json; three detail levels by quality tier, cracks exact on High): seen in place in the sun lab
 above (the default planet look there), or alone in <http://localhost:5273/planetlab.html> (dev server only; pick a
-planet, hold Space for the current shader, live cost graph), and `node scripts/planet-proto/run.mjs verify|stills|edges|bench|gif|panels <out dir>` draws and times the
-game's planets against them natively.
+planet, hold Space for the current shader, live cost graph), and `node scripts/planet-proto/run.mjs verify|stills|edges|bench|gif|panels|cracks|crackbench|edgecrops <out dir>` draws and times them
+natively against the classic look. The sign-in screen shows a random Sol body each visit (`client/src/ui/loginBody.ts`; dev: `?loginBody=<id>`).
 
 ## Website (site/)
 
