@@ -136,3 +136,27 @@ describe('the power overlay', () => {
     }
   });
 });
+
+describe('off-grid bank pods in the power overlay', () => {
+  const pod = (withDynamo: boolean): Blueprint => {
+    const at = (uid: number, fn: string, x: number, y: number, facing?: string) => ({ uid, piece: 'sq', fn, material: catalog.functions.get(fn)?.material ?? 'alloy', x, y, rot: 0 as const, flip: false, ...(facing ? { facing } : {}) });
+    const bp = {
+      name: 'Pod', catalogVersion: catalog.version,
+      parts: [at(0, 'core', 0, 0), at(1, 'power_cell_reactor', 0, 1), at(2, 'hull', -1, 0), at(3, 'power_capacitor', -2, 0), at(4, 'cannon_pip', -3, 0, 'N'), ...(withDynamo ? [at(5, 'power_pulse_dynamo', -2, 1)] : [])],
+    } as Blueprint;
+    bp.wires = [[0, 0, 0, 1]];
+    return bp;
+  };
+  it('a Capacitor with a Pulse Dynamo and the gun it feeds read as powered with no wire', () => {
+    const r = report(pod(true));
+    expect(r.part[3]).toBe('powered');
+    expect(r.part[4]).toBe('powered');
+    expect(r.warnings.join('|')).not.toMatch(/no power/);
+  });
+  it('one that can never refill is grey and says so, not "no power"', () => {
+    const r = report(pod(false));
+    expect(r.part[3]).toBe('stranded');
+    expect(r.warnings.join('|')).toMatch(/never refills/);
+    expect(r.warnings.join('|')).not.toMatch(/Capacitor.*no power/);
+  });
+});

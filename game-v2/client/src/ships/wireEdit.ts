@@ -135,11 +135,23 @@ export function powerReport(catalog: Catalog, bp: Blueprint, d: ShipDerived, geo
     const batteries = n.parts.filter((i) => (fns[i]?.store ?? 0) > 0);
     return { color: n.powered ? NET_COLORS[k++ % NET_COLORS.length] : DEAD_NET, parts: n.parts, generators, batteries, supply: n.supply, demand: n.demand, powered: n.powered };
   });
+  const offGrid = new Map<number, { dynamo: number }>(), feedOf = new Set<number>();
+  for (const B of d.power?.banks ?? []) {
+    for (const i of B.parts) if (!nets[d.network[i]]) offGrid.set(i, B);
+    for (const i of B.feeds) feedOf.add(i);
+  }
   const part: PartPower[] = bp.parts.map((_, i) => {
     const fn = fns[i];
     if (!d.alive[i] || !isPowerPart(fn) || (fn!.produce ?? 0) > 0) return 'none';
     const net = nets[d.network[i]];
-    if (!net) return 'unpowered';
+    if (!net) {
+      // Off the wire grid: a Capacitor or Drive Cell bank runs on its own (a Pulse Dynamo touching it charges it), and the guns or
+      // engines a bank feeds run on it (rebuild gives them satisfaction 1)
+      const own = offGrid.get(i);
+      if (own) return own.dynamo > 0 ? 'powered' : 'stranded';
+      if (feedOf.has(i) && d.satisfaction[i] >= 0.995) return 'powered';
+      return 'unpowered';
+    }
     if ((fn!.demand ?? 0) <= 0) return net.powered ? 'powered' : 'stranded';
     // (as rebuild has it: engines and guns run on a network with a generator or a battery, steady loads on its supply)
     const sat = d.satisfaction[i];
@@ -160,6 +172,7 @@ export function powerReport(catalog: Catalog, bp: Blueprint, d: ShipDerived, geo
     if (st === 'none' || st === 'powered' || !geoms[i]) return;
     const nm = name(i), where = whereOnShip(geoms[i].centroid, centre, half);
     if (st === 'unpowered') say(`u:${nm}:${where}`, 0, (n) => `${plural(nm, n)} ${where} ${n > 1 ? 'have' : 'has'} no power`);
+    else if (st === 'stranded' && offGrid.has(i)) say(`b:${nm}:${where}`, 1, (n) => `${plural(nm, n)} ${where} never ${n > 1 ? 'refill' : 'refills'}: wire ${n > 1 ? 'them' : 'it'} to a generator or touch a Pulse Dynamo`);
     else if (st === 'stranded') say(`s:${nm}:${where}`, 1, (n) => `${plural(nm, n)} ${where} ${n > 1 ? 'have' : 'has'} no generator to charge ${n > 1 ? 'them' : 'it'}`);
     else say(`h:${nm}:${where}`, 2, (n) => `${plural(nm, n)} ${where} ${n > 1 ? 'get' : 'gets'} only ${Math.round(d.satisfaction[i] * 100)}% of ${n > 1 ? 'their' : 'its'} power`);
   });
