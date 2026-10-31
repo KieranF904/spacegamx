@@ -82,7 +82,14 @@ interface Shot {
   fading: number | null;
   head: { x: number; y: number } | null;
   tail: { x: number; y: number } | null;
+  /** Where its contrail was last laid down (NaN until the first frame) */
+  ctX: number;
+  ctY: number;
 }
+
+/** A piece of contrail left in the world: it stays where it was laid and fades over `max` frames, long after the shot has gone */
+interface TrailSeg { x0: number; y0: number; x1: number; y1: number; age: number; max: number; width: number; color: number; alpha: number }
+const TRAIL_CAP = 2048;
 
 /** A muzzle flash: pinned to the ship that fired it (`owner`, at `ox, oy` and `rel` in its frame) */
 interface Flash {
@@ -181,6 +188,10 @@ export class WeaponFx {
   private smoke: Smoke[] = [];
   private shots = new Map<number, Shot>();
   private flashes: Flash[] = [];
+  /** Contrail segments, a ring buffer of reused records (oldest overwritten when full); `trailLen` are live, ending at `trailHead` */
+  private trail: TrailSeg[] = Array.from({ length: TRAIL_CAP }, () => ({ x0: 0, y0: 0, x1: 0, y1: 0, age: 0, max: 0, width: 0, color: 0, alpha: 0 }));
+  private trailHead = 0;
+  private trailLen = 0;
   private sparks: Spark[] = [];
   private rings: Ring[] = [];
   /** A shot seen leaving its gun (the ship renderer kicks the turret back) */
@@ -402,7 +413,7 @@ export class WeaponFx {
       endTick: e.data?.[9] ?? 0, landX: 0, landY: 0, splash: look?.splash ?? 0, arc: 0, t: 0, pulse: 0,
       fading: null,
       head: null,
-      tail: null,
+      tail: null, ctX: NaN, ctY: NaN,
     };
     if (shot.endTick > 0) {
       const o = { x: 0, y: 0 };
@@ -444,7 +455,7 @@ export class WeaponFx {
       id, style, size: p.size, power: shotScale(p.damage), phase: (-id * 0.618) % 1, dim: this.dimOf(style, -id), hot: 0, type: p.type, owner: p.owner,
       glow: mixColor(style.glowColor, hueColor((p.owner * 137) % 360), style.ownerTint),
       spawnX: p.spawnX, spawnY: p.spawnY, spawnTick: p.spawnTick, vx: p.vx, vy: p.vy,
-      hit: null, flashed: false, predicted: true, pose: p.pose, endTick: 0, landX: 0, landY: 0, splash: 0, arc: 0, t: 0, pulse: 0, fading: null, head: null, tail: null,
+      hit: null, flashed: false, predicted: true, pose: p.pose, endTick: 0, landX: 0, landY: 0, splash: 0, arc: 0, t: 0, pulse: 0, fading: null, head: null, tail: null, ctX: NaN, ctY: NaN,
     });
   }
 
@@ -605,6 +616,23 @@ export class WeaponFx {
     if (full <= 1400) this.ringAt(to.x, to.y, 14, 0xcfe6ff, 0.4);
   }
 
+  /** Ages the contrail segments and draws the live ones (the oldest are at the back of the ring and expire first) */
+  private drawTrails(frames: number): void {
+    for (let i = 0; i < this.trailLen; i++) {
+      const sg = this.trail[(this.trailHead - 1 - i + TRAIL_CAP) % TRAIL_CAP];
+      sg.age += frames;
+      if (sg.age >= sg.max) continue;
+      const f = 1 - sg.age / sg.max;
+      this.line(sg.x0, sg.y0, sg.x1, sg.y1, sg.width, sg.color, sg.alpha * f);
+    }
+    // (Lives differ per style, so only the oldest ones can be dropped from the count)
+    while (this.trailLen > 0) {
+      const old = this.trail[(this.trailHead - this.trailLen + TRAIL_CAP) % TRAIL_CAP];
+      if (old.age < old.max) break;
+      this.trailLen--;
+    }
+  }
+
   private draw(frames: number): void {
     const g = this.glow;
     g.begin();
@@ -659,14 +687,17 @@ export class WeaponFx {
         if (st.headRadius > 0) this.circle(g, TEX.disc, hx + ox, hy + oy, st.headRadius * z * wk, st.headColor ?? 0xffffff, alpha);
       }
       const speed = Math.hypot(shot.vx, shot.vy);
-      // A glowing wake: dots left along the path behind it, each fainter (positions follow from the line, nothing is kept)
+      // A contrail: a segment laid from where the head was last frame to where it is now, left in the world to fade over `life` frames
       const ct = st.contrail;
       if (ct && shot.fading === null) {
-        const step = ct.step ?? ct.size * 1.6, reach = Math.min(speed * ct.life * 0.5, 260), n = Math.min(14, Math.max(2, Math.ceil(reach / step)));
-        for (let i = 1; i <= n; i++) {
-          const f = i / n;
-          this.circle(g, TEX.dot, hx - ux * reach * f, hy - uy * reach * f, ct.size * z * (1 - 0.6 * f), ct.color, 0.5 * (1 - f) * alpha);
+        if (shot.ctX === shot.ctX && Math.hypot(hx - shot.ctX, hy - shot.ctY) > 0.5) {
+          const sg = this.trail[this.trailHead];
+          sg.x0 = shot.ctX; sg.y0 = shot.ctY; sg.x1 = hx; sg.y1 = hy; sg.age = 0; sg.max = ct.life;
+          sg.width = ct.size * z; sg.color = ct.color; sg.alpha = 0.5 * alpha;
+          this.trailHead = (this.trailHead + 1) % TRAIL_CAP;
+          if (this.trailLen < TRAIL_CAP) this.trailLen++;
         }
+        shot.ctX = hx; shot.ctY = hy;
       }
       // Ghost copies of the head, each further back and fainter
       if (st.afterimages && shot.fading === null) {
@@ -766,6 +797,7 @@ export class WeaponFx {
     }
 
     this.drawLandings();
+    this.drawTrails(frames);
 
     for (let i = this.flashes.length - 1; i >= 0; i--) {
       const f = this.flashes[i];
