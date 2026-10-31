@@ -2,6 +2,7 @@
  * Game - Main client orchestrator
  */
 
+import { handleKey, type KeyHost } from './app/keys';
 import { lobbyAuth, LobbyAuthResult } from './network/lobby';
 import { setText, setStyle } from './ui/domWrite';
 import { Application, Text} from 'pixi.js';
@@ -118,7 +119,6 @@ registerRockTypes(miningTable as unknown as MiningTable);
 /** A cannon shot's pitch by its gun's grade, Mk I-V (heavy shells lower, high-velocity slugs higher) */
 const CANNON_GRADE_PITCH = [1, 0.86, 1.14, 1.06, 0.8];
 
-const FLIGHT_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'KeyJ', 'KeyY', 'KeyV', 'KeyX', 'KeyH', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight', 'Space']);
 
 /** Proto mode (npm run proto): in-process server, no login, no prediction. */
 export interface ProtoHooks {
@@ -144,6 +144,7 @@ export class Game {
   private app!: Application;
   private network: ClientTransport;
   private proto: ProtoHooks | null;
+  private readonly keyHost: KeyHost = this.makeKeyHost();
   private shipClient: ShipClient;
   private hazards = new HazardOverlay();
   /** The cold on screen: frost in from the edges as the ship's warmth runs down */
@@ -1072,140 +1073,44 @@ this.xpFillEl = document.getElementById('xpFill');
   }
 
   private handleKeyPress(code: string): void {
-    // The menu owns the keyboard while open (Esc steps back / closes it)
-    if (this.menu.isOpen) {
-      if (code === 'Escape') this.menu.back();
-      return;
-    }
-    // A conversation: digits answer, Space skips ahead, Esc walks away
-    if (this.dialogue.onKey(code)) return;
-    // The component guide sits over everything else (the hangar, the station)
-    if (this.componentGuide.value?.isOpen) {
-      if (code === 'Escape' || code === 'KeyC') this.componentGuide.value.close();
-      return;
-    }
-    // C: the component guide (anywhere but the map, which centres on C)
-    if (code === 'KeyC' && this.loggedIn && !this.systemMapUI.isOpen) {
-      this.componentGuide.use((g) => g.open());
-      return;
-    }
-    if (this.inventoryWindow.isOpen) {
-      if (code === 'Escape' || code === 'KeyI') this.inventoryWindow.close();
-      return;
-    }
-    if (this.tradeWindow.isOpen) {
-      if (code === 'Escape') this.tradeWindow.close();
-      return;
-    }
-    if (this.social.window.isOpen) {
-      if (code === 'Escape' || code === 'KeyP') this.social.window.close();
-      return;
-    }
-    if (this.quests.log.isOpen) {
-      if (code === 'Escape') this.quests.log.close();
-      else if (code === 'KeyL') this.quests.log.toggle('jobs');
-      else if (code === 'KeyK') this.quests.log.toggle('skills');
-      return;
-    }
-    if (this.stationOpen && !this.shipClient.hangarOpen) {
-      if (code === 'Escape' || code === 'KeyH') this.stationWindow.value!.close();
-      else if (code === 'KeyI') this.inventoryWindow.open();
-      return;
-    }
-    if (this.proto?.onKeyPressed?.(code)) return;
-    // Any flight key hands control back from the autopilot
-    if (this.autopilot.active && FLIGHT_KEYS.has(code) && !this.shipClient.hangarOpen) this.autopilot.cancel('Autopilot off');
-    // ...and calls off a menu jump; Esc calls off a menu order (instead of opening the game menu)
-    if (this.context.jumpMark() && FLIGHT_KEYS.has(code) && !this.shipClient.hangarOpen) this.context.cancel('Jump cancelled');
-    if (code === 'Escape' && this.context.active && this.context.cancel(this.context.jumpMark() ? 'Jump cancelled' : 'Autopilot off')) return;
-    // G: autopilot to the job you're following (again: off)
-    if (code === 'KeyG' && this.loggedIn && !this.shipClient.hangarOpen) {
-      this.toggleAutopilotToObjective();
-      return;
-    }
-    if (this.loggedIn && this.shipClient.onKey(code)) return;
-
-    // I: cargo and storage
-    if (code === 'KeyI' && this.loggedIn && !this.shipClient.hangarOpen) {
-      this.inventoryWindow.open();
-      return;
-    }
-    // 1-5: the quick bar
-    const quick = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5'].indexOf(code);
-    if (quick >= 0 && this.loggedIn && !this.shipClient.hangarOpen) {
-      this.quickBar.use(quick);
-      return;
-    }
-    // P: invite the pilot under the cursor, or the party window
-    if (code === 'KeyP' && this.loggedIn && !this.shipClient.hangarOpen) {
-      const over = this.infoPanel.hovered;
-      if (over > 0 && !this.social.isMember(over)) this.social.invite(over);
-      else this.social.openWindow();
-      return;
-    }
-    // B: ping what's under the cursor for the party (Shift: danger)
-    if (code === 'KeyB' && this.loggedIn && !this.shipClient.hangarOpen) {
-      this.pingUI.pingAtCursor(this.input.isKeyDown('ShiftLeft') || this.input.isKeyDown('ShiftRight'));
-      return;
-    }
-    // Tab: next hostile; T: the ship under the cursor
-    if (code === 'Tab' && this.loggedIn && !this.shipClient.hangarOpen) {
-      this.targetUI.cycle();
-      return;
-    }
-    if (code === 'KeyT' && this.loggedIn && !this.shipClient.hangarOpen) {
-      this.targetUI.pickAtCursor();
-      return;
-    }
-    // L: the pilot log (jobs), K: skills
-    if ((code === 'KeyL' || code === 'KeyK') && this.loggedIn && !this.shipClient.hangarOpen) {
-      this.quests.log.open(code === 'KeyL' ? 'jobs' : 'skills');
-      return;
-    }
-
-    // Escape opens the menu (the map and the hangar close themselves first; the stats panel closes instead)
-    if (code === 'Escape' && this.loggedIn) {
-      if (this.playerStatsUI.isVisible()) this.playerStatsUI.hide();
-      else this.menu.open();
-      return;
-    }
-    
-    // O: session stats panel
-    if (code === 'KeyO' && this.loggedIn) {
-      this.playerStatsUI.toggle();
-    }
-
-    // M key - toggle system map
-    if (code === 'KeyM' && this.loggedIn) {
-      this.systemMapUI.toggle();
-      this.audio.playUI(this.systemMapUI.isOpen ? 'ui_open' : 'ui_close', 0.7);
-    }
-
-    // N key - toggle navigation markers
-    if (code === 'KeyN' && this.loggedIn && this.navMarkers) {
-      const on = !settings.data.ui.navMarkers;
-      settings.update((s) => { s.ui.navMarkers = on; });
-      this.showSystemMessage(on ? 'Nav markers on' : 'Nav markers off', '#7dd3fc');
-    }
-    
-    // Respawn with R after being destroyed
-    if (code === 'KeyR' && this.loggedIn) {
-      this.network.send({ type: 'respawn' });
-    }
-    
-    // Interact with X (E is strafe right in helm controls)
-    if (code === 'KeyX' && this.loggedIn && this.regionUI.allowInteract()) {
-      this.network.send({ type: 'interact' });
-    }
-    
-
-    // Reset zoom with Home
-    if (code === 'Home') {
-      this.input.resetZoom();
-      this.renderer.setZoom(1);
-    }
+    handleKey(this.keyHost, code);
   }
-  
+
+  /** What keys.ts reads (getters, so windows built late resolve at use; made once) */
+  private makeKeyHost(): KeyHost {
+    const g = this;
+    return {
+      get loggedIn() { return g.loggedIn; },
+      get stationOpen() { return g.stationOpen; },
+      get proto() { return g.proto; },
+      get menu() { return g.menu; },
+      get dialogue() { return g.dialogue; },
+      get componentGuide() { return g.componentGuide; },
+      get inventoryWindow() { return g.inventoryWindow; },
+      get tradeWindow() { return g.tradeWindow; },
+      get social() { return g.social; },
+      get quests() { return g.quests; },
+      get stationWindow() { return g.stationWindow; },
+      get shipClient() { return g.shipClient; },
+      get autopilot() { return g.autopilot; },
+      get context() { return g.context; },
+      get quickBar() { return g.quickBar; },
+      get infoPanel() { return g.infoPanel; },
+      get pingUI() { return g.pingUI; },
+      get targetUI() { return g.targetUI; },
+      get playerStatsUI() { return g.playerStatsUI; },
+      get systemMapUI() { return g.systemMapUI; },
+      get navMarkers() { return g.navMarkers; },
+      get regionUI() { return g.regionUI; },
+      get audio() { return g.audio; },
+      get network() { return g.network; },
+      get input() { return g.input; },
+      get renderer() { return g.renderer; },
+      toggleAutopilotToObjective: () => g.toggleAutopilotToObjective(),
+      showSystemMessage: (text, color) => g.showSystemMessage(text, color),
+    };
+  }
+
   /**
    * Where the followed job wants you. Jobs out in space follow what's live: the
    * freighter you're escorting as it flies, the outpost or beacons once they're up.
