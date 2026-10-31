@@ -90,7 +90,7 @@ const TRADE_OFF: Record<string, string> = {
   power_fusion_plant: 'plenty of power, heavy, big blast',
   power_overclock_reactor: 'most power, fragile, biggest blast',
   power_battery: 'the ship\'s pool: holds and gives quickly',
-  power_capacitor: 'touching Capacitors form a bank that feeds the guns, beams and miners it touches first',
+  power_capacitor: 'touching Capacitors form a bank that feeds the guns, beams, miners and Flash Screens it touches first; it does not feed engines',
   power_drive_cell: 'touching Drive Cells form a bank that feeds the engines and strafers it touches first',
   power_heavy_bank: 'deep but slow: endurance, not alpha strikes',
   power_pulse_dynamo: 'puts 10 a second into each bank it touches, no wires',

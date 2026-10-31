@@ -5,7 +5,7 @@ Hull · mass30 hp · 0.7
 Armour · build1 · 1 pts
 TakesKinetic +20% · Explosive +10% · Thermal +10% · Energy −20%
 Holds (guns it touches)160 energy
-Givesup to 2,000/s first to the guns, beams and mining lasers its bank touches; touching Capacitors are one bank
+Givesup to 2,000/s first to the guns, beams, mining lasers and Flash Screens its bank touches; touching Capacitors are one bank
 
 == partStats (stats rows) ==
 GradeMk I
@@ -24,7 +24,7 @@ Small
 Small · Square
 
 == tradeOff ==
-touching Capacitors form a bank that feeds the guns, beams and miners it touches first
+touching Capacitors form a bank that feeds the guns, beams, miners and Flash Screens it touches first; it does not feed engines
 
 == keyStats ==
 holds 160 (guns) · gives 2,000/s by touch

@@ -1893,7 +1893,7 @@ if (d && this.overlays.com && d.mass > 0) {
       else for (const B of L.banks) if (B.dynamos.includes(at)) for (const i of B.parts) feeds.add(i);
       this.feedPreviewVal = {
         feeds: [...feeds].filter((j) => j < at),
-        hint: kind === 'drive' ? 'feeds nothing: it must touch an engine or strafer' : kind === 'cap' ? 'feeds nothing: it must touch a gun, beam or miner' : 'feeds nothing: it must touch a Capacitor or Drive Cell',
+        hint: kind === 'drive' ? 'feeds nothing: it must touch an engine or strafer' : kind === 'cap' ? 'feeds nothing: it must touch a gun, beam, miner or Flash Screen' : 'feeds nothing: it must touch a Capacitor or Drive Cell',
       };
     } catch { /* (a candidate the rebuild refuses: no preview) */ }
     return this.feedPreviewVal;
