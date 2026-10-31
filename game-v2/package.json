@@ -21,7 +21,8 @@
     "render-daemon": "node scripts/render/daemon.mjs",
     "render": "node scripts/render/render.mjs",
     "wire:sync": "node scripts/wire/sync.mjs",
-    "wire:bump": "node scripts/wire/bump.mjs"
+    "wire:bump": "node scripts/wire/bump.mjs",
+    "features:gen": "node scripts/features/gen.mjs"
   },
   "devDependencies": {
     "typescript": "^5.3.3",

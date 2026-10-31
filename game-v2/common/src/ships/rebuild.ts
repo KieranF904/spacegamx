@@ -18,6 +18,8 @@ import { gunRate } from './launch.js';
 import { type EnergyInfo } from './energy.js';
 import { type PowerLayout, powerLayout } from './circuits.js';
 import type { StrafeInfo } from './strafer.js';
+import type { FeatureDerived } from './features/types.js';
+import { getPlan, featureBits, featureList } from './features/plan.js';
 
 /** The most engine output a blueprint can ask for (a boss's; players' designs stop at 1) */
 export const MAX_DRIVE = 2.5;
@@ -169,6 +171,13 @@ export interface ShipDerived {
   strafe?: StrafeInfo;
   /** Tow Beam (tow.ts): the best one's satisfaction (it takes hold from MIN_TOW_POWER), and every powered one (they draw while towing) */
   tow?: { power: number; parts: number[] };
+  /**
+   * Part features (features/): the ones this ship has (bit = feature number in the plan: a live part they apply to, or
+   * global), the same as a list in plan order, and what each one derived. All three absent when it has none.
+   */
+  fxMask?: number;
+  fxList?: Int8Array;
+  fx?: FeatureDerived;
   /** Jump drive reach (world units) and cooldown (ticks): the core's own coil and powered jump coils against the hull (flight.ts jumpDriveStats) */
   jumpRange: number;
   jumpCooldown: number;
@@ -314,7 +323,11 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   const area = geoms.map((g) => g.area);
   const satisfaction = new Array<number>(n).fill(1);
   // (Burst Strafers and Tow Beams draw by the tick too, only while they work: strafer.ts, tow.ts)
-  const burst = (i: number) => isEngine(fns[i]) || !!fns[i].weapon || isMinerFn(fns[i]) || !!fns[i].strafe || !!fns[i].tow;
+  // (Part features: which ones each part's function gives (features/plan.ts); a `burst` feature's parts draw by the tick too)
+  const P = getPlan();
+  const fxOf = P.features.length ? fns.map((fn) => featureBits(P, fn)) : undefined;
+  const burst = (i: number) => isEngine(fns[i]) || !!fns[i].weapon || isMinerFn(fns[i]) || !!fns[i].strafe || !!fns[i].tow
+    || (fxOf !== undefined && (fxOf[i] & P.burstMask) !== 0);
   // (Local circuits: a burst consumer runs wherever its circuit has a generator or a store, it touches a capacitor bank, or the
   // core's store can reach it: on the main circuit, or by its trickle elsewhere. How much it actually gets is the tick's: energy.ts)
   const coreAlive = input.rootMode === 'core' && root >= 0 && parts[root].fn === 'core';
@@ -524,6 +537,24 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     }
   }
 
+  // ---- Part features (features/): each one this ship has derives its own `fx.<key>`, in plan order
+  let fxMask = 0, fxList: Int8Array | undefined, fxOut: FeatureDerived | undefined;
+  if (fxOf) {
+    fxMask = P.globalMask;
+    for (let i = 0; i < n; i++) if (alive[i]) fxMask |= fxOf[i];
+    if (fxMask) {
+      fxList = featureList(fxMask);
+      fxOut = {};
+      for (const f of fxList) {
+        const derive = P.derive[f];
+        if (!derive) continue;
+        const bit = 1 << f, mine: number[] = [];
+        for (let i = 0; i < n; i++) if (alive[i] && (fxOf[i] & bit)) mine.push(i);
+        derive({ catalog, tuning, blueprint, fns, mats, area, geoms, mounts, alive, satisfaction, parts: mine, out: fxOut });
+      }
+    }
+  }
+
   // ---- Local circuits (circuits.ts): worked out here once, run by energy.ts every tick
   const power = powerLayout({ fns, area, mats, alive, joins, network, networks, burst, core: coreAlive, tuning, health: hp.map((h, i) => healthFactor(h / (maxHp[i] || 1), tuning)) });
   let batteryMax = power.core?.cap ?? 0, driveMax = 0, weaponMax = 0;
@@ -568,6 +599,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     shieldMax: Math.round(shieldMax),
     ...(strafe ? { strafe } : {}),
     ...(tow ? { tow: { power: Math.round(tow.power * 1000) / 1000, parts: tow.parts } } : {}),
+    ...(fxMask ? { fxMask, fxList, fx: fxOut } : {}),
     jumpRange: jump.range,
     jumpCooldown: jump.cooldown,
     jumpRatio: jump.ratio,

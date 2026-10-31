@@ -23,6 +23,7 @@ import { warmthStage, withNumb } from './warmth.js';
 const NUMB = warmthStage(1);
 import type { ShipDerived } from './rebuild.js';
 import type { ShipTuning } from './tuning.js';
+import { getPlan } from './features/plan.js';
 
 /** How a ship moves */
 export enum ReplicaMode {
@@ -78,7 +79,9 @@ export function flightControls(c: ReplicaControls, body: FlightBody): FlightCont
 /** What a ship's flight depends on: two structures with the same signature fly identically */
 export function flightSignature(d: ShipDerived): string {
   const t = d.thrusters.map((x) => `${x.force[0]},${x.force[1]}`).join(';');
-  return `${d.mass}|${d.inertia}|${d.fullMass}|${d.fullInertia}|${d.drive}|${d.maneuverForce}|${d.maxTorque.cw}|${d.maxTorque.ccw}|${d.jumpRange}|${d.jumpCooldown}|${t}|${d.strafe ? `${d.strafe.ticks},${d.strafe.cooldown},${d.strafe.parts.map((p) => `${p.push[0]},${p.push[1]}`).join('+')}` : ''}`;
+  // (Part features with flight hooks it has: features/plan.ts flightMask; nothing added for a ship with none)
+  const fx = d.fxMask ? d.fxMask & getPlan().flightMask : 0;
+  return `${d.mass}|${d.inertia}|${d.fullMass}|${d.fullInertia}|${d.drive}|${d.maneuverForce}|${d.maxTorque.cw}|${d.maxTorque.ccw}|${d.jumpRange}|${d.jumpCooldown}|${t}|${d.strafe ? `${d.strafe.ticks},${d.strafe.cooldown},${d.strafe.parts.map((p) => `${p.push[0]},${p.push[1]}`).join('+')}` : ''}${fx ? `|fx${fx}` : ''}`;
 }
 
 /** (The fields: the central body's charging ring and the stillstones) */

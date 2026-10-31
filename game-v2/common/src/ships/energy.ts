@@ -32,6 +32,7 @@ import type { ShipDerived } from './rebuild.js';
 import type { ShipTuning } from './tuning.js';
 import type { Vec2 } from './types.js';
 import type { PowerLayout } from './circuits.js';
+import { getPlan } from './features/plan.js';
 
 export interface EnergyInfo {
   /** Capacity of each kind of store (energy units: power × seconds): general (the core's and batteries), drive (engines only), weapon (guns and lasers only: weapon batteries and capacitor banks) */
@@ -185,12 +186,15 @@ export interface PowerResult {
   dodge?: number;
 }
 
+/** The ship gunLoad (and a part feature's load()) reads */
+export interface GunLoadShip { derived: ShipDerived; cooldown: number[]; mineUntil?: number; tow?: number }
+
 /**
  * What the guns and mining lasers will draw this tick, per feed group (per
  * second): a gun reloading draws its draw (so a shot's energy over its
  * reload), a beam that burned last tick its draw, a running mining laser its
  */
-export function gunLoad(ship: { derived: ShipDerived; cooldown: number[]; mineUntil?: number; tow?: number }, tick: number): number[] | undefined {
+export function gunLoad(ship: GunLoadShip, tick: number): number[] | undefined {
   const L = ship.derived.power;
   if (!L || !L.feeds.length) return undefined;
   const out = new Array<number>(L.feeds.length).fill(0);
@@ -201,6 +205,12 @@ export function gunLoad(ship: { derived: ShipDerived; cooldown: number[]; mineUn
   if (tick < (ship.mineUntil ?? 0)) for (const m of ship.derived.miners) { const f = L.feedOf[m.part]; if (f >= 0) out[f] += L.draw[m.part]; }
   // (A Tow Beam draws while it tows: tow.ts)
   if (ship.tow !== undefined && ship.derived.tow) for (const i of ship.derived.tow.parts) { const f = L.feedOf[i]; if (f >= 0) out[f] += L.draw[i]; }
+  // (Part features that draw by the tick: features/, in plan order; none on a ship without them)
+  const fl = ship.derived.fxList;
+  if (fl !== undefined) {
+    const load = getPlan().load;
+    for (let k = 0; k < fl.length; k++) { const h = load[fl[k]]; if (h !== undefined) h(ship, L, out); }
+  }
   return out;
 }
 
