@@ -1,0 +1,86 @@
+{
+  "target": "server/src/ships/ShipBridge.ts split into server/src/ships/bridge/{flight,weapons,damage,rebuild,pilotless,sync}.ts behind the ShipBridge facade, plus common buildFlightInputs()",
+  "currentLines": 2453,
+  "cuts": [
+    {
+      "newFile": "common/src/ships/flightInputs.ts (do FIRST, standalone)",
+      "moves": "New buildFlightInputs(src: {forward,backward,left,right,boost,targetAngle,helm,strafeLeft,strafeRight,jump,cursorDist,brace,dodge}, opts:{emp:boolean}): FlightInputs, returning the object passed to stepShipPhysics (jump && !emp, jumpDist=cursorDist, dodge=sign/0 normalised). Add companion controlBits input reuse so ShipBridge.stepMovement's replicaCtl bits (lines ~1244-1250) reads the same normalised struct. Server stepMovement (1230-1284) reads Input.* SoA arrays into a reusable scratch object (readInputsInto(eid, scratch)) then calls buildFlightInputs; client predict (946-990, the literal at 966-970) passes ClientInputMessage. Also export a buildFlightBody(src) for the player-state to FlightBody literal (ShipClient line ~960 vs server readBody/cargo/brace/dodge at 1233-1238) if cheap. Export from common index; add common/src/ships/flightInputs.test.ts (every input field changes output; emp suppresses jump; dodge defaults 0).",
+      "approxLines": 90,
+      "dependsOn": "none",
+      "risk": "Low-medium. Prediction drift if any field normalisation differs (dodge sign, jump&&!emp, cursorDist undefined vs 0). Perf: avoid allocating per tick on server; use one module-level scratch object mutated in place (stepShipPhysics must not retain it). Keep ClientInputMessage free of new coupling: accept a structural type, not the message type, to avoid common importing client/protocol."
+    },
+    {
+      "newFile": "server/src/ships/bridge/core.ts (do SECOND, prerequisite for all other bridge cuts)",
+      "moves": "Lines 1-266 (imports, ShipHost interface, PartDestroyedEvent, PilotOrders, ShipBridgeConfig, ShipBridgeStats, constants STAGE_COVER/EMP_IMMUNE_TICKS/CONTACT_MARGIN/BEAM_PAD/BIG_BODY, PendingBlast, ContactPiece, centroidOf, K) become bridge/types.ts (types+consts, no runtime import of ShipBridge). Then define in core.ts an exported interface BridgeCtx exposing what modules need (bodies, host, tuning, catalog, charge, lastHitBy, lastDamaged, autopilot, empUntil, warmth, blasts, decayAt, restoreProgress, crumbled, geomCache, etc.). Simplest: make the ~25 private fields `/** @internal */ readonly` (not private) and have modules take `b: ShipBridge` via `import type`. ShipBridge.ts keeps re-exporting STAGE_COVER, ShipHost, PartDestroyedEvent, PilotOrders so no external import changes.",
+      "approxLines": 300,
+      "dependsOn": "flightInputs optional but cheaper after; must precede the other bridge cuts",
+      "risk": "Medium. Dropping `private` on fields widens the surface; ban external use via a lint/grep test. Circular imports: modules must `import type { ShipBridge }` only (erased); runtime imports go one way (ShipBridge.ts -> bridge/*.ts -> types.ts/common). Never import ShipBridge value from a bridge module."
+    },
+    {
+      "newFile": "server/src/ships/bridge/sync.ts",
+      "moves": "Banner 2346 'Helpers' (2347-2453): syncHealth 2350, pose 2356, readBody 2360, writeBody 2433, fieldAt 2370, jumpBoost 2365, jumpFieldState 2376, worldToGrid 2448, isJumping 2429, plus Tow glue (2381-2410: towable, towablesNear, holdTowed) and pullShare/contactShare/isBraced (2413-2424). Also replica/keyframe-facing readers: weaponBeamState 1192, heatState 1198, shieldFraction 1211, beamState 1309, chargeOf/setCharge 601-610. Facade keeps thin one-line delegators.",
+      "approxLines": 260,
+      "dependsOn": "core.ts",
+      "risk": "Low. readBody/writeBody are per-tick hot: keep as plain functions (not closures per call); facade delegator adds one call hop, V8 inlines it. Called by flight, damage and rebuild, so land this cut first of the six."
+    },
+    {
+      "newFile": "server/src/ships/bridge/flight.ts",
+      "moves": "stepMovement 1230-1284 (using buildFlightInputs), tick() 1776-1912 (physics step of bodies), withGravity 1914, worldPieces 1924-1962, resolveContacts 1964-2080, damageContact 2082, contactScale 2093, bodiesNow 1771, addToSpatialGrid 1648-1685, moveDistant 443, teleport 593, sleep/wake/sleepBlocker/isDormant/dormantShips 336-441, setController/pin/isPinned/isAnchored 345-353 and 805-815.",
+      "approxLines": 600,
+      "dependsOn": "sync.ts, flightInputs.ts",
+      "risk": "Highest runtime risk: contact resolution and tick() are the per-tick hot path (Section 'Per-tick hooks' and no banner for tick). Keep CONTACT_MARGIN/BIG_BODY logic and scratch arrays module-level; do not convert loops to closures/array methods. Run tickBench and bulletHellBench before/after."
+    },
+    {
+      "newFile": "server/src/ships/bridge/weapons.ts",
+      "moves": "Banner 1527 'Support weapons' and the fire code from banner 1225: stepWeapons 1286, stepMiners 1319, fireWeapons 1375, stepPulses 1434, fireBeam 1465, beamFrom 1532, repairBeam 1553, pointDefence 1584, alongBeam 1635, nearSegment 1687, segmentHit 1700, castShip 1710, cover 1727, partAt 1750, damagePartFraction 1761, lastFiredTick 362, nearestTarget 1173, setTarget/targetOf 570-582, wingBonus/setWingBonus 555-562, setDamageScale 548.",
+      "approxLines": 520,
+      "dependsOn": "sync.ts, damage.ts (calls hurt) - import type only for facade, call b.hurt via facade",
+      "risk": "Medium. Weapon code calls hurt/damage and sync readers; route through the facade object (b.hurt) rather than importing damage.ts to avoid a weapons<->damage import cycle. Client predictGuns (ShipClient 436) must stay in step: do not change stepGuns signatures."
+    },
+    {
+      "newFile": "server/src/ships/bridge/damage.ts",
+      "moves": "Unbannered block 938-1217 plus banner 2099: hurt 938, damagePartBy 980, splashAt 1009, empAt 1037, emp 267, isEmped/empTicksLeft 995-1000, frostHit/warmthOf/chilled/warm/coldStage 272-334, ignite/burning/stepBurns 1062-1171, closestPart/hullDistance/nearestPartPoint/partFacing/nearestPart 1081-1146, setPartHp/healAll/scaleHp/hardenParts/coreFraction 817-846 and 899-921, lastHitter/lastDamagedTick 923-936, integrity 584, partDeaths 2119, applyBlast 2150, ghosts (setGhosts/isGhost/installGhost 767-803).",
+      "approxLines": 650,
+      "dependsOn": "sync.ts",
+      "risk": "Medium. Destroy flow ends by calling rebuildNow (rebuild.ts) and fires host.onPartDestroyed; call via facade (b.rebuildNow) to avoid a damage<->rebuild cycle. hurt() ordering (shield, stage cover, takenScale, lastHitBy) is covered by many server tests: run whole suite."
+    },
+    {
+      "newFile": "server/src/ships/bridge/rebuild.ts",
+      "moves": "Banner 2237: noteRebuild 2241, rebuildNow 2246-2294, shed 2296, spawnDebris 2308, removeBody 2339; banner 2099 tail: decay 2174, repairStep 2195, joinsOf 2104, partWorld 2110; banner 652 repair kits: KIT_STILL_SPEED 659, isStill, needsRepair, startRepairKit, repairKitLeft, stepRepairKits 693, nextMissing 743, repair 1217, validate 882, respawnInPlace 887; banner 483 spawning: spawnOn 487, onPlayerCreated 503, spawnDummy 509, spawnWreck 525, setSkills 544, removeShip/forget 612-650, attach/has/get/geometry 462-481.",
+      "approxLines": 560,
+      "dependsOn": "sync.ts",
+      "risk": "Medium. rebuildNow sets stats.lastRebuildMs and invalidates geomCache/joinCache; keep those fields on the facade. Spawning code touches Input/bitecs component setup: keep import list intact."
+    },
+    {
+      "newFile": "server/src/ships/bridge/pilotless.ts",
+      "moves": "setAutopilot 848, autopilotOf 358, autopilotControls 857-880, hasController 353, and the pilotless flight path: the orders-driven stepping that PilotOrders feeds (check tick() 1776-1912 for the branch handling ships with host.controller; extract into pilotlessStep(b, eid)). Also flyToward if present (audit names it; grep did not find it in ShipBridge, it may live in Pilots.ts, so confirm and leave it there).",
+      "approxLines": 120,
+      "dependsOn": "flight.ts (tick branch) and core.ts",
+      "risk": "Low size but the smallest, most uncertain cut: the audit's 'pilotless.ts (flyToward)' does not match the file (autopilot code is only ~35 lines). Fold into flight.ts if under 150 lines to avoid a trivial file."
+    },
+    {
+      "newFile": "server/src/ships/ShipBridge.ts (facade, after all cuts)",
+      "moves": "Keep class declaration, field declarations, constructor 451, attach, and one-line delegating methods preserving every public name/signature (about 150 delegators) so GameServer, Pilots, Weapons, Bosses, tests and benches are unchanged. Re-export STAGE_COVER and types. Target under 450 lines.",
+      "approxLines": 450,
+      "dependsOn": "all",
+      "risk": "Delegator boilerplate can drift from module signatures; use a tsc-checked pattern like `stepWeapons(eid: number) { return stepWeapons(this, eid); }` and add a test that Object.getOwnPropertyNames(ShipBridge.prototype) equals the pre-split list (snapshot it before cutting)."
+    }
+  ],
+  "parallelSafe": "Sequential, not parallel, for the bridge cuts. Order: (1) flightInputs.ts (independent, can run in a worktree in parallel with 2); (2) types.ts/core.ts field-visibility change (touches the whole class header, so everything else depends on it); (3) sync.ts; then (4) damage, weapons, rebuild, flight/pilotless can run in parallel worktrees ONLY after sync lands, because each deletes a different contiguous line range of the same file and the facade edit region differs; merge them one at a time, rebasing each (conflicts are mechanical: deleted ranges plus appended delegators). Safer default: run them serially, 2-4 hours each. Do not run any cut while another agent edits ShipBridge.ts or ShipClient.ts for a feature (these are the hot files: 183 and 142 changed lines in the working tree); freeze feature work or land cuts at a commit boundary.",
+  "verification": "Before starting: commit or snapshot, record baseline `npm test` result, snapshot ShipBridge.prototype method names and the public d.ts (server/dist/ships/ShipBridge.d.ts) for diffing. After each cut: `npm run typecheck`/tsc for common, server, client; full `npm test` (vitest) green with no test edits; diff of the public method list unchanged; npm run wire:sync reports no protocol hash change (no wire format touched). For flightInputs: new unit test plus the planned prediction-parity test (server ShipBridge vs client ShipClient reach same body state over a scripted input sequence incl. jump, brace, dodge, emp, cargo); run existing replay tests (server/src/ships/replay). Perf: run server/src/bench/tickBench.ts and bulletHellBench.ts before and after flight/weapons cuts and require within noise (about 3%) of baseline ms/tick. Grep guard: no bridge/*.ts has a non-type import of ../ShipBridge.",
+  "suggestedModel": "flightInputs.ts and the core.ts field-visibility/type split: opus or sonnet (cross-side semantic care; prediction drift is subtle). sync/damage/weapons/rebuild/flight mechanical moves: sonnet (large files, import wiring, needs judgement on cycles and the unbannered 938-1217 block). Facade delegator generation and the prototype-name snapshot test: haiku. Final review of the hot-path cuts (flight.ts tick/contacts): opus.",
+  "tokenEstimate": "About 900k-1.3M total. flightInputs: ~120k (read stepMovement, predict, tests, write helper and parity test). core/types split: ~150k. Each of the five bridge module cuts: ~120-200k (slice-read 500-650 lines at ~12k tokens, edit via script, fix tsc errors, run tests). Facade + snapshot test + bench comparison: ~100k. Effort: 1.5-2 days of agent time sequentially; flightInputs 2-3 hours, each bridge cut 2-4 hours.",
+  "hazards": [
+    "Prediction drift: server stepMovement and client predict build inputs separately today (jump && !emp, dodge sign vs ?? 0, cursorDist vs jumpDist, cargo quantised on server vs player.cargoMass on client). buildFlightInputs must preserve each exactly; dodge is Math.sign on server but raw on client (client dodge arrives already -1/0/1, confirm) and add the parity test BEFORE refactoring, then keep it green.",
+    "controlBits for the replica (stepMovement 1243-1251) and Input flag packing in GameServer (4 hand-copied input lists, input byte 2 full) are a third and fourth copy; buildFlightInputs fixes only two of the copies. Do not try to widen the input protocol in this change.",
+    "Private fields: ~25 private members and 84 this.bodies/world refs are shared across the six slices; making them non-private is required, so add a guard (grep/test) that only bridge/*.ts and ShipBridge.ts touch them.",
+    "Circular imports: weapons<->damage<->rebuild call each other (hurt -> partDeaths -> rebuildNow; fireBeam -> hurt). Rule: bridge modules import only `type` from ShipBridge and call sibling behaviour through the facade instance (b.hurt), never import sibling modules at runtime. Verify with madge or a tsc import-graph check.",
+    "Per-tick performance: tick(), resolveContacts, worldPieces, addToSpatialGrid, readBody/writeBody and fireWeapons run every tick for every ship. Facade delegation adds one call; do not introduce closures, spreads, per-call object allocation or Array methods in these paths; keep module-level scratch buffers (BIG_BODY, ContactPiece pools). The buildFlightInputs scratch object must be reused, not allocated per ship per tick.",
+    "Concurrent-edit collisions: ShipBridge.ts and ShipClient.ts are the hottest files (58 files modified in the tree, ShipBridge 183 lines changed). Line ranges above are from the current tree and go stale instantly; implementing agents must re-derive ranges from method names and banners, and the work must start from a clean commit (git status was clean at 3c936b7) with feature agents paused or on separate branches. Never use git checkout/restore/stash/reset to resolve conflicts (project rule).",
+    "Public API: GameServer, Pilots, Weapons, Bosses, Hazards, tests and benches call ShipBridge methods and import STAGE_COVER, ShipHost, PartDestroyedEvent, PilotOrders from ShipBridge.ts; keep re-exports. dist/ .d.ts files exist in server/dist, do not edit them.",
+    "Unbannered code: the biggest chunk (938-1217 damage, 1776-2097 tick/contacts) has no section banner, so the audit's 'cut along banners' underestimates; the banners only give 7 seams and 'pilotless' and 'sync' have no true banner. Expect judgement calls and keep file sizes under about 700 lines.",
+    "Section comment markers inside the class (// --- Support weapons ... end support weapons lines 98-107, Tow Beam 2381-2410 markers) are used by docs/areas guides and possibly tooling; update docs/areas/weapons.md, flight.md, ship-parts.md and the router (docs line refs, link check) after the split.",
+    "Audit claims 'flyToward' is in pilotless; it was not found in ShipBridge.ts, so pilotless.ts may be tiny; confirm by grep before creating the file.",
+    "Do not combine the split with the part-registry work (P1) in the same branch: parity and hook-order risk compound."
+  ]
+}
