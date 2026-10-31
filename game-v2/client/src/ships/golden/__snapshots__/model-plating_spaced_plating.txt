@@ -4,6 +4,7 @@ Mk III · 1 cell
 Hull · mass358 hp · 1.3
 Armour · build4 · 2.5 pts
 TakesKinetic −5% · Thermal −15% · Cryo −10%
+Blasts50% less damage
 
 == partStats (stats rows) ==
 GradeMk III
@@ -22,10 +23,10 @@ Small
 Small · Square / Medium · Panel
 
 == tradeOff ==
-a lot to chew through, light
+half damage from blasts
 
 == keyStats ==
-358 hp · armour 4
+50% less from blasts · 358 hp · armour 4
 
 == mountBadge ==
 

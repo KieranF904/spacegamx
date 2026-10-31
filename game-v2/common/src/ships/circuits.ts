@@ -32,6 +32,8 @@ export interface Bank {
   rate: number;
   /** The consumer parts it feeds (touching, of its kind), ascending */
   feeds: number[];
+  /** The Flash Screens it touches (a Capacitor bank only): it pays for their instant return (features/flash) */
+  shields: number[];
   /** Whether spare generation refills it (a member on a powered network) */
   refills: boolean;
   /** What touching Pulse Dynamos put in a second, and the dynamos */
@@ -159,7 +161,7 @@ export function powerLayout(a: CircuitInput): PowerLayout {
     if (!k) continue;
     const r = find(i);
     let b = rootBank.get(r);
-    if (b === undefined) { b = banks.length; rootBank.set(r, b); banks.push({ kind: k, parts: [], cap: 0, rate: 0, feeds: [], refills: false, dynamo: 0, dynamos: [] }); }
+    if (b === undefined) { b = banks.length; rootBank.set(r, b); banks.push({ kind: k, parts: [], cap: 0, rate: 0, feeds: [], shields: [], refills: false, dynamo: 0, dynamos: [] }); }
     const B = banks[b];
     B.parts.push(i);
     B.cap += partCap[i];
@@ -168,11 +170,13 @@ export function powerLayout(a: CircuitInput): PowerLayout {
     bankOf[i] = b;
     for (const j of touching[i]) {
       if (isConsumer(j) && !B.feeds.includes(j) && (k === 'drive' ? a.engine(j) : a.gun(j))) B.feeds.push(j);
+      if (k === 'cap' && alive[j] && fns[j].flash && !B.shields.includes(j)) B.shields.push(j);
       if (alive[j] && (fns[j].dynamo ?? 0) > 0 && !B.dynamos.includes(j)) B.dynamos.push(j);
     }
   }
   for (const B of banks) {
     B.feeds.sort((x, y) => x - y);
+    B.shields.sort((x, y) => x - y);
     B.dynamos.sort((x, y) => x - y);
     for (const j of B.dynamos) B.dynamo += fns[j].dynamo! * (a.health?.[j] ?? 1);
   }

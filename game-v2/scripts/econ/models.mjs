@@ -263,21 +263,21 @@ const OTHER = [
   ['power_capacitor', 'Capacitor', 'capacitor', ['sq'], 7, 'composite', { store: 160, pool: 'weapon', bank: true, discharge: 2000, hpScale: 0.6 }, 'A gun bank: touching Capacitors make one bank that feeds the guns, beams and mining lasers it touches first, very fast.', 'power'],
   ['power_drive_cell', 'Drive Cell', 'drive_cell', ['sq'], 10, 'steel', { store: 320, pool: 'drive', bank: true, discharge: 1400, hpScale: 0.6 }, 'An engine bank: touching Drive Cells make one bank that feeds the engines and Burst Strafers it touches first.', 'power'],
   ['power_heavy_bank', 'Heavy Bank', 'battery', ['block2'], 20, 'titanium', { store: 300, discharge: 150, hpScale: 0.7, massScale: 1.6 }, 'A deep, heavy battery for the ship\'s pool: holds a lot, but gives it slowly.', 'power'],
-  ['utility_mining_laser', 'Mining Laser', 'mining', ['sq'], 0, 'alloy', { demand: 12, priority: 2, facing: true, mining: true, hpScale: 0.7 }, 'Cuts ore from rock. A poor weapon.', 'utility'],
-  ['utility_bore', 'Bore', 'mining', ['rect2'], 10, 'steel', { demand: 9, priority: 2, facing: true, mining: true, hpScale: 0.8 }, 'A heavier mining laser: its steel cuts harder rock.', 'utility'],
+  ['utility_mining_laser', 'Mining Laser', 'mining', ['sq'], 0, 'alloy', { demand: 12, priority: 2, facing: true, mining: true, hpScale: 0.7 }, 'A pulsed cutter that takes ore from rock, and a poor weapon.', 'utility'],
+  ['utility_bore', 'Bore', 'mining', ['rect2'], 10, 'steel', { demand: 9, priority: 2, facing: true, mining: true, hpScale: 0.8 }, 'A heavy cutter that breaks harder rock than a mining laser.', 'utility'],
   ['utility_demolition_launcher', 'Demolition Launcher', 'demolition', ['sq'], 8, 'alloy', { weapon: 'charge', demand: 8, priority: 2, fireInterval: 120, hpScale: 0.8, weaponMods: {} }, 'Fires mining charges that crack rock wide open.', 'utility'],
-  ['utility_siphon', 'Siphon', 'siphon', ['sq'], 12, 'steel', { demand: 10, priority: 2, facing: true, siphon: true, hpScale: 0.7 }, 'Draws gas from gas pockets.', 'utility'],
-  ['utility_scanner', 'Scanner', 'scanner', ['sq'], 5, 'alloy', { demand: 4, priority: 3, range: 2400, hpScale: 0.6 }, 'Reads rocks and finds seams.', 'utility'],
-  ['utility_long_range_array', 'Long-Range Array', 'scanner', ['round2'], 20, 'titanium', { demand: r2(8 / PIECE_AREA.round2), priority: 3, range: 4800, hpScale: 0.6 }, 'Twice the reach of a scanner, for twice the power.', 'utility'],
+  ['utility_siphon', 'Siphon', 'siphon', ['sq'], 12, 'steel', { demand: 10, priority: 2, facing: true, siphon: true, hpScale: 0.7 }, 'Drinks gas from gas pockets and sends it back to the ship.', 'utility'],
+  ['utility_scanner', 'Scanner', 'scanner', ['sq'], 5, 'alloy', { demand: 4, priority: 3, range: 2400, hpScale: 0.6 }, 'A quick short sweep that reads rocks and finds seams.', 'utility'],
+  ['utility_long_range_array', 'Long-Range Array', 'scanner', ['round2'], 20, 'titanium', { demand: r2(8 / PIECE_AREA.round2), priority: 3, range: 4800, hpScale: 0.6 }, 'A slow sweep that reaches twice as far as a scanner.', 'utility'],
   // (Level 2, Kieran 2026-10-30: the lane-clearance job, offered at 2, has you build one, and nothing opens early now; still a Mk III titanium rig)
   ['utility_constructor', 'Constructor', 'constructor', ['sq'], 2, 'titanium', { demand: 4, priority: 3, hpScale: 0.6, grade: 3 }, 'Builds structures piece by piece.', 'utility'],
-  ['shield_deflector', 'Deflector', 'shield', ['sq'], 11, 'steel', { shield: 40, demand: 16, priority: 2, hpScale: 0.6 }, 'A shield that soaks damage before the hull.', 'shields'],
-  ['shield_flicker_screen', 'Flicker Screen', 'shield', ['round'], 19, 'steel', { shield: 20, demand: r2(16 * 0.4), priority: 2, hpScale: 0.6 }, 'A thin shield that costs almost nothing to run.', 'shields'],
-  ['shield_bulwark_projector', 'Bulwark Projector', 'shield', ['block2'], 27, 'titanium', { shield: 45, demand: r2(16 * 1.2), priority: 2, hpScale: 0.7 }, 'A deep shield, hungry for power.', 'shields'],
+  ['shield_deflector', 'Deflector', 'shield', ['sq'], 11, 'steel', { shield: 40, shieldRegen: 8, shieldDelay: 180, demand: 16, priority: 2, hpScale: 0.6 }, 'The standard shield, which soaks damage before the hull and refills 8 a second per cell after 3 seconds unhit.', 'shields'],
+  ['shield_flicker_screen', 'Flicker Screen', 'shield', ['round'], 19, 'steel', { shield: 20, shieldRegen: 20, shieldDelay: 60, demand: r2(16 * 0.4), priority: 2, hpScale: 0.6 }, 'A thin, cheap shield that refills 20 a second per cell after only 1 second unhit.', 'shields'],
+  ['shield_bulwark_projector', 'Bulwark Projector', 'shield', ['block2'], 27, 'titanium', { shield: 45, shieldRegen: 5, shieldDelay: 240, demand: r2(16 * 1.2), priority: 2, hpScale: 0.7 }, 'A deep shield that soaks an alpha strike but refills only 5 a second per cell after 4 seconds unhit.', 'shields'],
   ['utility_jump_coil', 'Jump Coil', 'jumpcoil', ['sq'], 14, 'steel', { jumpCapacity: 12, demand: 8, priority: 3, hpScale: 0.8 }, 'More jump drive for a bigger hull.', 'engines'],
-  ['utility_heavy_coil', 'Heavy Coil', 'jumpcoil', ['block2'], 30, 'cobalt', { jumpCapacity: 16, demand: 8, priority: 3, hpScale: 0.8 }, 'A dense coil: the most jump drive for its cells.', 'engines'],
-  ['plating_reactive_armour', 'Reactive Armour', 'plating', ['sq', 'rect2'], 12, 'steel', { armour: 2, hpScale: 2, massScale: 1.6 }, 'Plate that turns shells aside: lighter protection than armour.', 'shields'],
-  ['plating_spaced_plating', 'Spaced Plating', 'plating', ['sq', 'rect2'], 22, 'titanium', { armour: 1, hpScale: 3.2, massScale: 1.3 }, 'Layers of plate with room between: a lot to chew through.', 'shields'],
+  ['utility_heavy_coil', 'Heavy Coil', 'jumpcoil', ['block2'], 30, 'cobalt', { jumpCapacity: 16, jumpCooldown: 0.8, demand: 8, priority: 3, hpScale: 0.8 }, 'A dense coil with more jump drive per cell that also cuts the jump cooldown by a fifth.', 'engines'],
+  ['plating_reactive_armour', 'Reactive Armour', 'plating', ['sq', 'rect2'], 12, 'steel', { armour: 2, hpScale: 2, massScale: 1.6 }, 'Plate that blunts small fast hits, so it beats streams of fire.', 'shields'],
+  ['plating_spaced_plating', 'Spaced Plating', 'plating', ['sq', 'rect2'], 22, 'titanium', { armour: 1, splashTaken: 0.5, hpScale: 3.2, massScale: 1.3 }, 'Layered plate with room between that takes half damage from blasts.', 'shields'],
 ];
 const LOOK = {
   reactor: 'generator', battery: 'battery', capacitor: 'weapon_battery', drive_cell: 'drive_battery', mining: 'miner', demolition: 'charge_launcher',
@@ -295,14 +295,14 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   });
 }
 // ---- The Pulse Dynamo, the Flash Screen and the Rail Driver (docs/design/rework-2026-11.md §2.6) ----------
-// The Pulse Dynamo charges the banks it touches (circuits.ts `dynamo`: a second, into each), with no wires; the Flash Screen is
-// a plain shield for now and the Rail Driver a plain heavy rail (their own behaviour comes later in the rework). Appended
+// The Pulse Dynamo charges the banks it touches (circuits.ts `dynamo`: a second, into each), with no wires; the Flash Screen's
+// return is its own feature (features/flash) and the Rail Driver a plain heavy rail (their own behaviour comes later in the rework). Appended
 // last, so no other model's order moves.
 {
   const DYNAMO_LOOK = { color: '#6d3fb3', decor: 'battery', glow: '#b57cff' };
   const LATE_OTHER = [
     ['power_pulse_dynamo', 'Pulse Dynamo', 'dynamo', ['sq'], 18, 'titanium', { dynamo: 10, hpScale: 0.6 }, 'A bank charger: it puts 10 a second into each Capacitor or Drive Cell bank it touches, with no wires, and powers nothing itself.', 'power', DYNAMO_LOOK],
-    ['shield_flash_screen', 'Flash Screen', 'shield', ['sq'], 13, 'steel', { shield: 36, demand: 16, priority: 2, hpScale: 0.6 }, 'A compact shield generator.', 'shields', legacyLook('shield')],
+    ['shield_flash_screen', 'Flash Screen', 'shield', ['sq'], 13, 'steel', { shield: 36, shieldRegen: 0, shieldDelay: 0, flash: true, demand: 16, priority: 2, hpScale: 0.6 }, 'A shield with no slow refill that returns whole 4 seconds after it breaks, or at once for 4 E a point from a Capacitor bank touching it.', 'shields', legacyLook('shield')],
   ];
   for (const [id, name, family, pieces, level, material, fields, description, category, look] of LATE_OTHER) {
     models.push({
@@ -373,7 +373,7 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
       'A dodge thruster: a hard fifth-of-a-second burst away from its nozzle, ready again in under half a second, and a lot of energy every time. Fit them facing different ways to dodge any way. No push at all for cruising.', 'engines'],
     ['utility_tow_beam', 'Tow Beam', 'tow', ['rect2'], 12, 'steel',
       { tow: true, demand: 12, priority: 2, facing: true, hpScale: 0.9, massScale: 1.2 },
-      'Latches onto a wreck, debris or a loot pod and pulls it along on a tether; the heavier it is, the slower you go. Tow a wreck into a station to salvage it. Never takes hold of a working ship.', 'utility'],
+      'Latches onto a wreck, debris or a loot pod and drags it on a tether to a station to salvage, and never takes hold of a working ship.', 'utility'],
   ];
   for (const [id, name, family, pieces, level, material, fields, description, category] of TUG) {
     models.push({

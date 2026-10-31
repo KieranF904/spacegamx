@@ -2,8 +2,9 @@
 // One import per server/src/ships/features/<id>/index.ts (its `serverFeature` export), sorted by folder.
 
 import type { ServerFeature } from './types.js';
+import { serverFeature as f_flash } from './flash/index.js';
 import { serverFeature as f_strafer } from './strafer/index.js';
 import { serverFeature as f_support } from './support/index.js';
 import { serverFeature as f_tow } from './tow/index.js';
 
-export const SERVER_FEATURES: readonly ServerFeature[] = [f_strafer, f_support, f_tow];
+export const SERVER_FEATURES: readonly ServerFeature[] = [f_flash, f_strafer, f_support, f_tow];

@@ -128,10 +128,10 @@ export function wake(b: BridgeCtx, eid: number): void {
     ship.heat[i] = Math.max(0, ship.heat[i] - (cool / 60) * dt);
     if (ship.overheated[i] && ship.heat[i] < 30) ship.overheated[i] = false;
   }
-  const sh = b.tuning.shield, max = ship.derived.shieldMax;
-  if (sh && max > 0 && ship.shield < max) {
-    const regen = Math.max(0, now - Math.max(since, ship.shieldHitTick + sh.regenDelayTicks));
-    ship.shield = Math.min(max, ship.shield + ((max * sh.regenPerSecond) / 60) * regen);
+  const max = ship.derived.shieldMax, rate = ship.derived.shieldRegen;
+  if (rate > 0 && max > 0 && ship.shield < max) {
+    const regen = Math.max(0, now - Math.max(since, ship.shieldHitTick + ship.derived.shieldDelay));
+    ship.shield = Math.min(max, ship.shield + (rate / 60) * regen);
   }
   // Its battery: spare power tops it up as it would have, a tick at a time (it's never long)
   let c = b.charge.get(eid);
@@ -260,14 +260,14 @@ export function tick(ctx: BridgeCtx): void {
   }
 
   // Shields recharge once they've gone a while without a hit
-  const sh = ctx.tuning.shield;
-  if (sh) {
+  {
     for (const ship of ctx.bodies.values()) {
       if (ctx.dormant.has(ship.id)) continue; // (caught up when it wakes)
       const max = ship.derived.shieldMax;
       if (max <= 0) { ship.shield = 0; continue; }
       if (ship.shield > max) ship.shield = max;
-      if (ship.shield < max && tick - ship.shieldHitTick > sh.regenDelayTicks) ship.shield = Math.min(max, ship.shield + ((max * sh.regenPerSecond) / 60) * (ctx.host.hazardScale?.(ship.id, 'shield') ?? 1));
+      const rate = ship.derived.shieldRegen;
+      if (rate > 0 && ship.shield < max && tick - ship.shieldHitTick > ship.derived.shieldDelay) ship.shield = Math.min(max, ship.shield + (rate / 60) * (ctx.host.hazardScale?.(ship.id, 'shield') ?? 1));
     }
   }
 

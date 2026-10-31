@@ -6,6 +6,7 @@ Armour · build1 · 1 pts
 TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
 Power draw16/s
 Shield40
+Refills8/s after 3 s unhit
 
 == partStats (stats rows) ==
 GradeMk I
@@ -29,7 +30,7 @@ Small · Square
 soaks hits before the hull
 
 == keyStats ==
-shield 40 · draws 16
+shield 40 · refills 8/s after 3 s · draws 16
 
 == mountBadge ==
 

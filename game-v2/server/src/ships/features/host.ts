@@ -12,6 +12,7 @@ export class ServerFeatures {
   private readonly cargo: ((eid: number) => number)[] = [];
   private readonly wires: ((eid: number, out: number[]) => number)[] = [];
   private readonly rebuilt: ((eid: number) => void)[] = [];
+  private readonly breaks: ((eid: number) => void)[] = [];
   private readonly leaves: ((eid: number) => void)[] = [];
   private readonly byId = new Map<string, FeatureInstance>();
 
@@ -27,6 +28,7 @@ export class ServerFeatures {
       if (inst.cargoMass) this.cargo.push(inst.cargoMass.bind(inst));
       if (inst.wire) this.wires.push(inst.wire.bind(inst));
       if (inst.onShipRebuilt) this.rebuilt.push(inst.onShipRebuilt.bind(inst));
+      if (inst.onShieldBreak) this.breaks.push(inst.onShieldBreak.bind(inst));
       if (inst.onLeave) this.leaves.push(inst.onLeave.bind(inst));
       for (const [type, fn] of Object.entries(inst.messages ?? {})) {
         if (taken.has(type)) throw new Error(`server feature ${f.id}: message ${type} is already handled by the game`);
@@ -71,6 +73,10 @@ export class ServerFeatures {
 
   onShipRebuilt(eid: number): void {
     for (let i = 0; i < this.rebuilt.length; i++) this.rebuilt[i](eid);
+  }
+
+  onShieldBreak(eid: number): void {
+    for (let i = 0; i < this.breaks.length; i++) this.breaks[i](eid);
   }
 
   onLeave(eid: number): void {

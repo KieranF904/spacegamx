@@ -2,8 +2,9 @@
 // One import per features/<id>/index.ts (its `feature` export), sorted by folder. Only plan.ts and the barrel import this.
 
 import type { PartFeature } from './types.js';
+import { feature as f_flash } from './flash/index.js';
 import { feature as f_strafer } from './strafer/index.js';
 import { feature as f_support } from './support/index.js';
 import { feature as f_tow } from './tow/index.js';
 
-export const FEATURES: readonly PartFeature[] = [f_strafer, f_support, f_tow];
+export const FEATURES: readonly PartFeature[] = [f_flash, f_strafer, f_support, f_tow];

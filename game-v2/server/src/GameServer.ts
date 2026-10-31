@@ -680,6 +680,7 @@ export class GameServer implements ServerCtx {
       stationInRange: (pilot) => this.stationInRange(pilot),
       isDocked: (pilot) => this.dockedShips.has(pilot),
       deliver: (pilot, target, kind) => this.derelictsMod.towDelivered(pilot, target, kind),
+      effect: (eid, type) => this.broadcastToSystem(InSystem.systemId[eid], { type: 'effect', effectType: type, x: Math.round(Position.x[eid]), y: Math.round(Position.y[eid]), entityId: eid }),
     }, new Set(this.handlers.keys()));
     // A feature's messages join the table (the handlers field is built before the constructor body; the table is a Map)
     for (const [type, fn] of this.features.messages) {
@@ -2302,6 +2303,7 @@ this.devTeleport = opts.devTeleport ?? false;
       cargoMass: (eid) => this.pilots.cargoMass(eid),
       featureCargo: (eid) => this.features?.cargoMass(eid) ?? 0,
       shipRebuilt: (eid) => this.features?.onShipRebuilt(eid),
+      shieldBroken: (eid) => this.features?.onShieldBreak(eid),
       shipForgotten: (eid) => this.features?.onLeave(eid),
       onRepairKit: (eid, left, total, broken) => {
         const pc = this.pilots.connOf(eid) as ClientConnection | undefined;

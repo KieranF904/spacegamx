@@ -42,6 +42,7 @@ export * from './migrate.js';
 export * from './mounting.js';
 export * from './features/strafer/strafer.js';
 export * from './features/tow/tow.js';
+export * from './features/flash/flash.js';
 export * from './load.js';
 export * from './flightInputs.js';
 export * from './features/index.js';

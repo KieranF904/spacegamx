@@ -4,7 +4,7 @@ A **part feature** is one behaviour a part gives a ship (a Tow Beam's tow, a Bur
 `PartFeature` object instead of special cases spread over `rebuild.ts`, `energy.ts`, `flight.ts` and the UI.
 Status: the seam exists and is wired; converted: **the Tow Beam** (`tow/`, Cut 4), **the Burst Strafer** (`strafer/`,
 Cut 6: the first with flight hooks and an input) and **the Repair Beam and Point Defence** (`support/`, Cut 8: weapon-kind
-roles). Ships without a feature rebuild, draw and fly exactly as before. Surge and Warmth are not features (left as they are).
+roles) and **the Flash Screen** (`flash/`: derive-only on the shared side; its server half hangs on `onShieldBreak`, called by the bridge when a ship's shield goes from something to nothing). Ships without a feature rebuild, draw and fly exactly as before. Surge and Warmth are not features (left as they are).
 
 ## Add a part feature (one folder)
 

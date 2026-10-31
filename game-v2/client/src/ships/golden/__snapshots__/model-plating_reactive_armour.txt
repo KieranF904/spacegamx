@@ -22,7 +22,7 @@ Small
 Small · Square / Medium · Panel
 
 == tradeOff ==
-lighter protection than armour
+blunts small fast hits
 
 == keyStats ==
 188 hp · armour 4
