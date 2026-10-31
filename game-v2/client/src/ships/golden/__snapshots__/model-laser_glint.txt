@@ -28,7 +28,7 @@ Small
 Small · Square
 
 == tradeOff ==
-charged pulses that reach far
+a long pulse you time, reaches far
 
 == keyStats ==
 96 a pulse · reach 5,100 · draws 15

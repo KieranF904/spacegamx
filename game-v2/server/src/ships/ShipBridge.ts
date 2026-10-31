@@ -96,6 +96,8 @@ export class ShipBridge {
   private salvos = new Map<number, PendingSalvoShell[]>();
   /** Where each ship's guns aimed on the last tick they stepped, and whether the trigger was held (guided shells steer to it) */
   private guides = new Map<number, { tick: number; held: boolean; x: number; y: number }>();
+  /** A ramping beam's run on one part, per ship and gun (key = ship * 1024 + part): the part it is on, the ticks it has burned there, its last tick (fireBeam) */
+  private ramps = new Map<number, { target: number; ticks: number; last: number }>();
   /** The ship the last damaging beam tick burned (fireBeam; -1 none): a marking or slowing beam's role reads it */
   private beamStruck = -1;
   /** Burning parts (incendiary hits): damage over time, spreading to neighbours as parts go */

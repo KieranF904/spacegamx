@@ -66,11 +66,15 @@ const W = [
   ['flak_cloudmaker', 'Cloudmaker', 'flak', 'rect2', 16, { dmg: 1.7, int: 1.4 }, { mul: { splashRadius: x(1.45), splashDamage: x(1.7) } }, 'Wide, heavy bursts that fill the sky.'],
   ['mortar_lobber', 'Lobber', 'mortar', 'sq', 7, {}, {}, 'The base mortar: shells that land where you aim. Fires shells.'],
   ['mortar_quake', 'Quake', 'mortar', 'rect2', 24, { dmg: 2, int: 1.6 }, { mul: { splashRadius: x(1.4), splashDamage: x(2) } }, 'A heavy mortar whose shells shake the ground they land on.'],
-  ['laser_glint', 'Glint', 'laser', 'sq', 9, {}, {}, 'The base pulse laser: charged pulses that reach far.'],
-  ['laser_cutter', 'Cutter', 'laser', 'rect2', 18, { dmg: 2.1 }, { mul: { damage: x(2.1), range: x(0.8) } }, 'Close and brutal: a short, searing beam.'],
-  ['laser_searchlight', 'Searchlight', 'laser', 'round', 26, { dmg: 0.8 }, { mul: { damage: x(0.8), range: x(1.5) } }, 'A beam that reaches out further than anything.'],
-  ['pulse_strobe', 'Strobe', 'pulse', 'sq', 10, {}, {}, 'The base pulse gun: bursts that strip shields.'],
-  ['pulse_overpulse', 'Overpulse', 'pulse', 'rect2', 25, { burst: 4 / 3 }, { mul: { vsShield: x(1.9), vsHull: x(0.5) }, add: { burst: 1 } }, 'Four-shot bursts that tear shields down and barely scratch a hull.'],
+  // (Section 4's lasers and pulse guns, rework-2026-11 (family-beams-pulse). Glint: the pulse you time, 27 E a pulse. Cutter: a short held beam, 60 dps
+  // rising to 150 over 1.5 s on one part, 32 E/s. Searchlight: a long thin beam, 25 dps, 15 E/s, that marks. Strobe: a burst of 3 every 0.5 s, 9 dmg,
+  // x1.6 vs shields, x0.6 vs hull, 6 E a burst. Overpulse: a clip of 12 single bolts at 10/s, x1.9 vs shields, x0.5 vs hull. A beam's `demand` is its
+  // E/s spread over its cells; a pulse gun's, its E a burst x 60 / interval.)
+  ['laser_glint', 'Glint', 'laser', 'sq', 9, {}, {}, 'The long pulse: it charges for 1.8 s, then a 1.4 s pulse peaking at 96 damage reaches 5,100 units. Time it; 27 E a pulse.'],
+  ['laser_cutter', 'Cutter', 'laser', 'rect2', 18, { demand: r2(32 / PIECE_AREA.rect2) }, { set: { dps: 60, range: 900, width: 14, pulse: null, falloff: null, ramp: { to: 150, ticks: 90 } } }, 'The welding torch: a short held beam that burns deeper the longer it stays on one part, 60 rising to 150 damage a second over 1.5 s (it starts over if it slips off). 32 E a second.'],
+  ['laser_searchlight', 'Searchlight', 'laser', 'round', 26, { demand: r2(15 / PIECE_AREA.round) }, { set: { dps: 25, range: 7650, width: 8, pulse: null, falloff: null } }, 'The spotter: a thin beam that reaches furthest and barely hurts, but what it lights takes 20% more damage from everyone for 2 s after. 15 E a second.'],
+  ['pulse_strobe', 'Strobe', 'pulse', 'sq', 10, { demand: r2((6 * 60) / 30) }, {}, 'Steady shield pressure: a burst of 3 bolts every half second, 9 damage each, 1.6 times against shields and 0.6 against hull. 6 E a burst.'],
+  ['pulse_overpulse', 'Overpulse', 'pulse', 'rect2', 25, { demand: r2((36 * 60) / (90 + 12 * 6) / PIECE_AREA.rect2) }, { set: { burst: 1, vsShield: 1.9, vsHull: 0.5 } }, 'The shield shredder: a clip of 12 bolts at 10 a second, then a 1.5 s reload drawing 36 E. 1.9 times against shields and half against hull.'],
   ['missile_dart', 'Dart', 'missile', 'sq', 11, {}, {}, 'The base launcher: missiles that lock on. Fires missile crates.'],
   ['missile_swarm', 'Swarm', 'missile', 'rect2', 21, { dmg: 0.5, burst: 3 }, { mul: { damage: x(0.5), splashDamage: x(0.5), homing: x(1.3) }, add: { burst: 2 } }, 'Three small missiles a salvo, turning hard.'],
   ['missile_hammerhead', 'Hammerhead', 'missile', 'block2', 33, { dmg: 3.5, int: 1.8, hp: 1.2, mass: 1.4 }, { mul: { damage: x(3.5), splashDamage: x(1.6), speed: x(0.7), maxSpeed: x(0.7), size: x(1.5) } }, 'A huge, slow warhead.'],
@@ -86,7 +90,7 @@ const W = [
   ['arc_tesla', 'Tesla', 'arc', 'round', 29, { dmg: 1.4 }, { set: { chain: { count: 5, radius: 300, falloff: 0.5 } } }, 'Lightning that jumps two ships further.'],
   ['torpedo_eel', 'Eel', 'torpedo', 'rect2', 19, {}, {}, 'The base torpedo: slow and huge, straight through shields. Fires torpedoes.'],
   ['torpedo_leviathan', 'Leviathan', 'torpedo', 'block2', 38, { dmg: 2.4, hp: 1.2, mass: 1.3 }, { mul: { damage: x(2.4), splashDamage: x(2.4), speed: x(0.8), maxSpeed: x(0.8), size: x(1.4) } }, 'A torpedo to end a fight.'],
-  ['lance_lance', 'Lance', 'lance', 'rect2', 32, {}, {}, 'The held beam: a heavy lance that burns as long as the power lasts.'],
+  ['lance_lance', 'Lance', 'lance', 'rect2', 32, { demand: 45 }, {}, 'The heavy held beam: 210 damage a second at 500 units after a 0.3 s windup, piercing, 20% more against plating. 90 E a second and no heat; short of power it sputters.'],
 ];
 
 /**

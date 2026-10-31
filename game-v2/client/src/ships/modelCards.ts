@@ -59,11 +59,11 @@ const TRADE_OFF: Record<string, string> = {
   flak_cloudmaker: 'wide heavy bursts, slow · ammo',
   mortar_lobber: 'lands where you aim · ammo',
   mortar_quake: 'huge splash, slow · ammo',
-  laser_glint: 'charged pulses that reach far',
-  laser_cutter: 'close and brutal, short reach',
-  laser_searchlight: 'reaches furthest, hits softer',
-  pulse_strobe: 'strips shields',
-  pulse_overpulse: 'tears shields, barely scratches hull',
+  laser_glint: 'a long pulse you time, reaches far',
+  laser_cutter: 'burns deeper the longer it stays on one part, short reach',
+  laser_searchlight: 'reaches furthest, marks what it lights for 20% more damage',
+  pulse_strobe: 'steady bursts that strip shields',
+  pulse_overpulse: 'dumps a clip of bolts into shields, barely scratches hull',
   missile_dart: 'locks on · ammo',
   missile_swarm: 'three small seekers a salvo · ammo',
   missile_hammerhead: 'a huge slow warhead · ammo',
@@ -77,7 +77,7 @@ const TRADE_OFF: Record<string, string> = {
   arc_tesla: 'jumps two ships further',
   torpedo_eel: 'slow, huge, through shields · ammo',
   torpedo_leviathan: 'ends a fight, slow · ammo',
-  lance_lance: 'a held beam, while it stays cool',
+  lance_lance: 'the heaviest held beam at point blank; sputters short of power',
   engine_ion_drive: 'efficient, low top speed',
   engine_vernier: 'cheap corner push, no boost',
   engine_afterburner: 'weak cruise, huge boost; wants a Drive Cell touching it',
@@ -167,7 +167,7 @@ export function fireChip(fn: FunctionDef): string {
   switch (f.model) {
     case 'clip': return f.regrow ? `clip ${f.clip} · regrows` : `clip ${f.clip} · ${((f.reload ?? 0) / 60).toFixed(1)}s reload`;
     case 'charge': return `charge ${((f.charge ?? 0) / 60).toFixed(1)}s`;
-    case 'beam': return f.windup ? 'held beam · winds up' : 'held beam';
+    case 'beam': return f.windup ? 'held beam · winds up' : (fn.weaponMods?.set as { ramp?: unknown } | undefined)?.ramp ? 'held beam · ramps up' : 'held beam';
     case 'ammo': return 'ammo';
     default: return f.spin ? 'spins up' : '';
   }

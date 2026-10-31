@@ -161,6 +161,11 @@ export interface WeaponTuning {
   mark?: { ticks: number };
   /** Beam: what it lights is slowed (thrust and turning × SLOW_CONTROL, flight.ts) while lit and `ticks` after */
   slow?: { ticks: number };
+  /**
+   * Beam: burns deeper the longer it stays on one part: its `dps` rises to `to` over `ticks` burned ticks on that part,
+   * and starts over when the beam slips to another part (or off, for a few ticks; server bridge/weapons.ts fireBeam)
+   */
+  ramp?: { to: number; ticks: number };
   // --- end shot behaviours ---
   /** The part hit burns (damage over time), spreading to parts within `radius` cells */
   ignite?: { dps: number; ticks: number; radius: number };

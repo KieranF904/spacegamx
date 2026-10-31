@@ -58,12 +58,12 @@ type WeaponDef = { type?: string; damage?: number; dps?: number; burst?: number;
 export function baseWeaponDps(tuning: ShipTuning, kind: string, interval: number, gun?: WeaponTuning, fire?: FireSpec): number {
   const def = (gun ?? tuning.weapons?.[kind]) as WeaponDef | undefined;
   if (!def) return 0;
-  if (fire?.model === 'beam') return def.dps ?? 0;
+  if (fire?.model === 'beam') return (def as WeaponTuning).ramp?.to ?? def.dps ?? 0;
   interval = averageInterval(fire, interval);
   // A pulse laser: a pulse's damage every charge
   if ((def as WeaponTuning).pulse) return ((def.damage ?? 0) * 60) / Math.max(1, interval);
   // A beam burns as long as the power lasts (no heat: rework 2026-11)
-  if (def.type === 'beam') return def.dps ?? 0;
+  if (def.type === 'beam') return (def as WeaponTuning).ramp?.to ?? def.dps ?? 0;
   // A wider burst than its kind's own (a bigger flak gun's) lands on that many more parts
   const base = tuning.weapons?.[kind]?.splash?.radius;
   const wide = def.splash && base ? def.splash.radius / base : 1;
