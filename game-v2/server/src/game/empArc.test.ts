@@ -123,8 +123,8 @@ describe('Tesla: a held storm that zaps on a beat', () => {
     const da = a0 - hpOf(sa), db = b0 - hpOf(sb);
     expect(da).toBeGreaterThan(0);
     expect(db).toBeGreaterThan(0);
-    expect(w.detonations('arc').length).toBeGreaterThan(0);
-    expect(w.detonations('arc')[0].from).toBeTruthy();
+    expect(w.detonations('tesla_arc').length).toBeGreaterThan(0);
+    expect(w.detonations('tesla_arc')[0].from).toBeTruthy();
   });
 });
 

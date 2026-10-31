@@ -246,11 +246,12 @@ export class DamageFx {
       if (this.near(x, y, 900)) this.state.triggerScreenShake(4, 0.2);
       return;
     }
-    if (kind === 'arc') {
-      // A jagged bolt from where it leapt, and a crackle where it lands
-      if (from) this.zapArc(from, x, y);
-      this.glow(x, y, 0, 0, 50, 9, 0x9ad8ff, 0.9);
-      this.burstSparks(x, y, 0, 0, 5, 2.5, 8, 0xbfe9ff);
+    if (kind === 'arc' || kind === 'tesla_arc') {
+      // A jagged bolt from where it leapt, and a crackle where it lands (Tesla's hops are violet-white, Spark's pale blue)
+      const tesla = kind === 'tesla_arc';
+      if (from) this.zapArc(from, x, y, tesla ? 0xb8a4ff : 0xc7dcff);
+      this.glow(x, y, 0, 0, 50, 9, tesla ? 0xb8a4ff : 0x9ad8ff, 0.9);
+      this.burstSparks(x, y, 0, 0, 5, 2.5, 8, tesla ? 0xe4dcff : 0xbfe9ff);
       this.sound('hit', { x, y }, 0.5);
       return;
     }
@@ -567,9 +568,9 @@ export class DamageFx {
   }
 
   /** A lightning polyline from where a chain leapt to where it lands, re-jittered every frame for 6 frames */
-  private zapArc(from: [number, number], x: number, y: number): void {
+  private zapArc(from: [number, number], x: number, y: number, color: number): void {
     const dx = x - from[0], dy = y - from[1], len = Math.hypot(dx, dy) || 1, angle = Math.atan2(dy, dx);
-    this.push({ kind: 'arc', x: from[0], y: from[1], vx: 0, vy: 0, life: 0, max: 6, size: len, grow: 0, color: 0xc7dcff, alpha: 1, drag: 1, rot: angle, vr: 0, pts: this.jag(len, angle), jit: true });
+    this.push({ kind: 'arc', x: from[0], y: from[1], vx: 0, vy: 0, life: 0, max: 6, size: len, grow: 0, color, alpha: 1, drag: 1, rot: angle, vr: 0, pts: this.jag(len, angle), jit: true });
   }
 
   private jag(length: number, angle: number): number[] {

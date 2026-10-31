@@ -2235,7 +2235,7 @@ this.devTeleport = opts.devTeleport ?? false;
       // (Only pilots' splash and beams hurt mobs: a boss's own shells pass through its drones)
       splashMobs: (num, x, y, radius, damage, source) => { if (source >= 0 && hasComponent(this.world, Player, source)) this.mobs.splash(num, x, y, radius, damage); },
       beamMobs: (num, x0, y0, x1, y1, width, damage, source) => { if (source >= 0 && hasComponent(this.world, Player, source)) this.mobs.beam(num, x0, y0, x1, y1, width, damage); },
-      arcHop: (num, x, y, fx, fy) => this.broadcastToSystem(num, { type: 'detonation', kind: 'arc', x: Math.round(x), y: Math.round(y), radius: 30, from: [Math.round(fx), Math.round(fy)] }),
+      arcHop: (num, x, y, fx, fy) => this.broadcastToSystem(num, { type: 'detonation', kind: 'tesla_arc', x: Math.round(x), y: Math.round(y), radius: 30, from: [Math.round(fx), Math.round(fy)] }),
       fireBaseShot: (ownerEid, x, y, angle, damageScale, shape) => {
         const ids: number[] = [];
         this.weapons.spawn(ownerEid, shape?.kind ?? 'cannon', x, y, angle, damageScale,
