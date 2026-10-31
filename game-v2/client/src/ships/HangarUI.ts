@@ -1569,7 +1569,7 @@ export class HangarUI {
       html += row('Dodge', now.dodge > 0 ? `+${n0(now.dodge)} m/s a burst · ${ways.length === 4 ? 'any way' : ways.join(', ') || 'no way'} · ${n0(cost)} energy` : '<span style="color:#f87171">none</span>', 'dodge',
         `Burst Strafers: press ${boundKeyName('dodge', settings.data.bindings)} for one hard burst (${((s?.ticks ?? 12) / 60).toFixed(2)} s) the way you're steering, diagonals too, with whichever strafers push that way; `
         + `with nothing held, back the other way from your last dodge. Ready again ${((s ? Math.max(s.ticks, s.cooldown) : 24) / 60).toFixed(2)} s after the last one started. `
-        + 'There are no charges: every burst draws a lot of energy, from a capacitor bank the strafers touch first, then their circuit, so dodging often browns the circuit out unless banks, batteries and generation back it. '
+        + 'There are no charges: every burst draws a lot of energy, from a Drive Cell bank the strafer touches first, then the ship, so dodging often browns the ship out unless Drive Cells, batteries and generation back it. '
         + 'A strafer pushes away from its nozzle: fit them facing different ways to dodge any way. The heavier the ship, the less a burst moves it');
     }
     if (now.tow > 0) html += row('Tow Beam', now.tow >= 0.5 ? 'ready' : '<span style="color:#f87171">no power</span>', 'tow',
