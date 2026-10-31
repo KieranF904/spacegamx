@@ -24,7 +24,7 @@ Small
 Small · Square
 
 == tradeOff ==
-a gun bank: very fast, first into the guns it touches
+touching Capacitors form a bank that feeds the guns, beams and miners it touches first
 
 == keyStats ==
 holds 160 (guns) · gives 2,000/s by touch

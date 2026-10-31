@@ -23,7 +23,7 @@ Small
 Small · Square
 
 == tradeOff ==
-charges the banks it touches, no wires
+puts 10 a second into each bank it touches, no wires
 
 == keyStats ==
 +10/s into each bank it touches

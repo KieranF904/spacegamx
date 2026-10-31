@@ -24,7 +24,7 @@ Small
 Small · Square
 
 == tradeOff ==
-an engine bank: first into the engines and strafers it touches
+touching Drive Cells form a bank that feeds the engines and strafers it touches first
 
 == keyStats ==
 holds 320 (engines) · gives 1,400/s by touch

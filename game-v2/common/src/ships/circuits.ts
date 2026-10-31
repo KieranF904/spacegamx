@@ -51,6 +51,8 @@ export interface PowerLayout {
   feedOf: number[];
   bankOf: number[];
   draw: number[];
+  /** Per engine: how hard boosting drains it, × its draw (0 for an engine with no boost) */
+  boostDrain: number[];
   partCap: number[];
   pooled: boolean[];
 }
@@ -179,6 +181,7 @@ export function powerLayout(a: CircuitInput): PowerLayout {
 
   // Burst consumers: their feed group (the banks feeding them)
   const draw = new Array<number>(n).fill(0);
+  const boostDrain = new Array<number>(n).fill(0);
   const feedOf = new Array<number>(n).fill(-1);
   const feeds: PowerLayout['feeds'] = [];
   const feedKey = new Map<string, number>();
@@ -187,6 +190,7 @@ export function powerLayout(a: CircuitInput): PowerLayout {
   for (let i = 0; i < n; i++) {
     if (!isConsumer(i)) continue;
     draw[i] = partDemand(fns[i], area[i], mats[i]);
+    boostDrain[i] = fns[i].boostDrain ?? 1;
     const key = fedBy[i].join(',');
     let f = feedKey.get(key);
     if (f === undefined) { f = feeds.length; feedKey.set(key, f); feeds.push({ banks: fedBy[i] }); }
@@ -194,5 +198,5 @@ export function powerLayout(a: CircuitInput): PowerLayout {
   }
 
   const spare = networks.reduce((t, net) => t + Math.max(0, net.supply - net.delivered), 0);
-  return { pool, banks, spare, feeds, feedOf, bankOf, draw, partCap, pooled };
+  return { pool, banks, spare, feeds, feedOf, bankOf, draw, boostDrain, partCap, pooled };
 }

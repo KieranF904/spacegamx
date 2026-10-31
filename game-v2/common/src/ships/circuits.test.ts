@@ -369,3 +369,33 @@ describe('energy: banks', () => {
     expect(bankCharges(d, c).map((x) => x.kind)).toEqual(['pool', 'cap', 'drive']);
   });
 });
+
+describe('engines with no boost (Vernier, Torch)', () => {
+  /** A ship with the engine under the hull; the tri piece is turned and faced until it has a mount */
+  const withEngine = (fn: string, piece: string): ShipDerived => {
+    const bases = [p(20, 'sq', 'hull', 2, 1), p(21, 'sq', 'hull', 0, 1), p(22, 'sq', 'hull', 1, 1)];
+    for (const rot of [0, 1, 2, 3] as Rot[]) for (const facing of ['N', 'E', 'S', 'W'] as const) {
+      const b = base();
+      b.parts = b.parts.filter((q) => q.fn !== 'engine_ion_drive' && q.fn !== 'hull');
+      b.parts.push(...bases, piece === 'tri' ? p(23, piece, fn, 2, 2, { facing, rot }) : p(23, piece, fn, 0, 2, { facing: 'S' }));
+      const d = createShipState(catalog, tuning, 1, b, 0).derived;
+      if (d.thrusters.length === 1 && d.thrusters[0].part >= 0) return d;
+    }
+    throw new Error('no mount for ' + fn);
+  };
+  for (const [fn, piece] of [['engine_torch', 'rect2'], ['engine_vernier', 'tri']] as const) {
+    it(`${fn}: thrust and draw are the same with boost held`, () => {
+      const d = withEngine(fn, piece);
+      expect(d.boostFactor).toBe(1);
+      expect(d.boostDrain).toBe(0);
+      const f = d.thrusters[0].force, m = Math.hypot(f[0], f[1]);
+      expect(m).toBeGreaterThan(0);
+      const dir: [number, number] = [-f[0] / m, -f[1] / m];
+      const full: Charge = { g: 100, b: [] };
+      const plain = powerTick(d, full, { thrusting: true, boosting: false, dir }, tuning);
+      const held = powerTick(d, full, { thrusting: true, boosting: true, dir }, tuning);
+      expect(held.charge.g).toBeCloseTo(plain.charge.g, 12);
+      expect(held.power).toBe(plain.power);
+    });
+  }
+});

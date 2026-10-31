@@ -427,14 +427,17 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   const thrusters: ThrusterInfo[] = [];
   const maxThrust = { forward: 0, back: 0, left: 0, right: 0 };
   let torqueCw = 0, torqueCcw = 0;
-  let thrustSum = 0, boostSum = 0, drainSum = 0;
+  let thrustSum = 0, boostSum = 0, drainSum = 0, demandSum = 0;
   for (let i = 0; i < n; i++) {
     if (!alive[i] || !isEngine(fns[i]) || !mounts[i]) continue;
     const nrm = mounts[i]!.dir;
     const mag = partThrust(catalog, fns[i], area[i], mats[i]) * satisfaction[i];
     thrustSum += mag;
     boostSum += mag * (fns[i].boost ?? 2.2);
-    drainSum += mag * (fns[i].boostDrain ?? 1);
+    // (The drain is weighted by what each engine draws, as the power tick adds it up engine by engine)
+    const dem = partDemand(fns[i], area[i], mats[i]);
+    demandSum += dem;
+    drainSum += dem * (fns[i].boostDrain ?? 1);
     const force: Vec2 = [-nrm[0] * mag || 0, -nrm[1] * mag || 0];
     const pos = geoms[i].centroid;
     const torque = cross2([pos[0] - com[0], pos[1] - com[1]], force) * cs;
@@ -587,7 +590,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     drive: driveFactor(mass, fullMass) * Math.max(0.1, Math.min(MAX_DRIVE, blueprint.drive ?? 1)),
     ...(blueprint.turn ? { turn: Math.max(0.1, Math.min(MAX_TURN, blueprint.turn)) } : {}),
     boostFactor: thrustSum > 0 ? boostSum / thrustSum : 2.2,
-    boostDrain: thrustSum > 0 ? drainSum / thrustSum : 1,
+    boostDrain: demandSum > 0 ? drainSum / demandSum : 1,
     thrusters,
     maxThrust,
     maneuverForce: hasCore ? tuning.flight.coreManeuverForce : 0,
