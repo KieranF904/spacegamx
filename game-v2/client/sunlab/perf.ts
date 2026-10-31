@@ -1,14 +1,14 @@
 /**
- * The sun lab's live performance graph: the last 30 s of what the shown option costs (ms a frame), the sun's and the
- * sky's in two plots, each against the current shader's cost (dashed), with a marker wherever something was changed,
+ * The sun lab's live performance graph: the last 30 s of what the shown option costs (ms a frame), the sun's, the
+ * sky's and the planets' (every planet and moon on screen) in three plots, each against the current shader's cost (dashed), with a marker wherever something was changed,
  * and a plain readout of the last 2 s ("8.2x cheaper than current"). The numbers come from sunlab.ts's measure().
  */
 
-export type Series = 'sun' | 'sunRef' | 'sky' | 'skyRef';
+export type Series = 'sun' | 'sunRef' | 'sky' | 'skyRef' | 'planet' | 'planetRef';
 
 const WINDOW = 30;   // seconds shown
 const AVERAGE = 2;   // seconds averaged for the readout
-const COLORS = { sun: '#ffb347', sky: '#6fb6ff' };
+const COLORS = { sun: '#ffb347', sky: '#6fb6ff', planet: '#7fe0b0' };
 
 interface Sample { t: number; ms: number }
 
@@ -19,7 +19,7 @@ function niceStep(max: number): number {
 }
 
 export class PerfGraph {
-  private samples: Record<Series, Sample[]> = { sun: [], sunRef: [], sky: [], skyRef: [] };
+  private samples: Record<Series, Sample[]> = { sun: [], sunRef: [], sky: [], skyRef: [], planet: [], planetRef: [] };
   private marks: { t: number; label: string }[] = [];
   private ctx: CanvasRenderingContext2D;
 
@@ -48,7 +48,7 @@ export class PerfGraph {
     return recent.length ? recent[Math.floor(recent.length / 2)] : null;
   }
 
-  /** The plain line for one of the two: the option, its cost, and how it compares to the current shader */
+  /** The plain line for one of the three: the option, its cost, and how it compares to the current shader */
   private line(what: string, option: string, ms: number | null, ref: number | null, color: string): string {
     const cost = ms === null ? '…' : ms < 0.0005 ? 'not drawn' : `${ms.toFixed(3)} ms`;
     let vs = '';
@@ -64,11 +64,12 @@ export class PerfGraph {
     return `<div class="big"><span style="color:${color}">${what}</span> ${option}<br><span class="ms">${cost}</span> ${vs}</div>`;
   }
 
-  draw(sunOption: string, skyOption: string, paused: boolean): void {
+  draw(sunOption: string, skyOption: string, planetOption: string, paused: boolean): void {
     const now = performance.now() / 1000;
     this.readout.innerHTML = (paused ? '<div class="paused">Measuring paused</div>' : '')
       + this.line('SUN', sunOption, this.average('sun', now), this.average('sunRef', now), COLORS.sun)
-      + this.line('SKY', skyOption, this.average('sky', now), this.average('skyRef', now), COLORS.sky);
+      + this.line('SKY', skyOption, this.average('sky', now), this.average('skyRef', now), COLORS.sky)
+      + this.line('PLANETS', planetOption, this.average('planet', now), this.average('planetRef', now), COLORS.planet);
 
     const { canvas, ctx } = this;
     const dpr = devicePixelRatio || 1;
@@ -77,11 +78,12 @@ export class PerfGraph {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
     const left = 46, right = 8, gap = 30, top = 18;
-    const plotH = (H - top - gap - 18) / 2;
+    const plotH = (H - top - 2 * gap - 18) / 3;
     const x = (t: number) => left + ((t - (now - WINDOW)) / WINDOW) * (W - left - right);
     const plots: [string, Series, Series, string, number][] = [
       ['Sun, ms a frame', 'sun', 'sunRef', COLORS.sun, top],
       ['Sky, ms a frame', 'sky', 'skyRef', COLORS.sky, top + plotH + gap],
+      ['Planets and moons on screen, ms a frame', 'planet', 'planetRef', COLORS.planet, top + 2 * (plotH + gap)],
     ];
     ctx.font = '11px Segoe UI, system-ui, sans-serif';
     for (const [title, s, ref, color, y0] of plots) {
@@ -117,7 +119,7 @@ export class PerfGraph {
       }
       ctx.setLineDash([]);
     }
-    // Changes: a line through both plots, labelled
+    // Changes: a line through all three plots, labelled
     ctx.textAlign = 'left';
     for (const m of this.marks) {
       if (m.t < now - WINDOW) continue;

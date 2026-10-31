@@ -260,6 +260,13 @@ Caveats:
 
 ## The planet lab
 
+**The sun lab now shows the planets too** (<http://localhost:5273/sunlab.html>, `docs/rendering/sun-sky-prototypes.md`,
+"Running it"): the whole system as the game lays it out, the star and its sky with every planet and moon at its orbit
+position, lit from the star, the planet prototype the default look (prototype lite and current selectable; Space
+shows the current shaders), the same view presets about any body, and the planets' cost as a third plot in the live
+graph. For example `sunlab.html?body=jovan&view=limb`, `sunlab.html?system=ashfall&view=whole` (the brown dwarf).
+The planet lab below still works, for a body alone with the light's direction on a slider.
+
 <http://localhost:5273/planetlab.html> (dev server only; nothing to start beyond Vite).
 
 - **Pick a body:** any planet, moon or the Ashfall brown dwarf, grouped by system and labelled with kind and rings.

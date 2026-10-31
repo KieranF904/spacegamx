@@ -427,15 +427,17 @@ Kieran's review:
 - The star field should stay as good-looking as it is.
 
 Every option is selectable in the lab (<http://localhost:5273/sunlab.html>; hold Space for the current shaders in
-place). Every comparison sheet puts **current first** and labels each option **FAITHFUL** or **ALT**, with its mean
+place). The lab now draws the whole system: the planets and moons too (with the planet prototypes,
+`docs/rendering/planet-prototypes.md`); see "Running it" below. Every comparison sheet puts **current first** and labels each option **FAITHFUL** or **ALT**, with its mean
 difference from current (0 to 255 a channel).
 
 **Live cost in the lab** (bottom right, `client/sunlab/perf.ts`):
 
 - **What it shows:**
-  - A graph of the last 30 s, the sun's cost and the sky's in two plots, in ms a frame. Each has a dashed line for the
-    current shader, measured the same way.
-  - A labelled marker at every change: option, system, view, resolution, and holding or releasing Space.
+  - A graph of the last 30 s, in ms a frame, in three plots: the sun's cost, the sky's, and the planets' (every
+    planet and moon on screen, summed). Each has a dashed line for the current shader, measured the same way.
+  - A labelled marker at every change: star, sky or planet look, system, body, view, resolution, crossing the game's
+    zoom limits, and holding or releasing Space.
   - A plain readout: the option, its typical ms over the last 2 s (the median), and "N× cheaper than current".
 - **How it measures.** WebGL timer queries are unreliable on ANGLE, and frame time is capped by vsync, so the lab uses
   a forced sync:
@@ -443,6 +445,9 @@ difference from current (0 to 255 a channel).
   2. Time a second read with nothing queued: the cost of the sync itself.
   3. Draw the layers K times into an offscreen target the size of the canvas, read a pixel again, and divide the
      difference by K. K adapts so each measurement is about 5 ms.
+  4. The planets are timed as the planet lab times them: each body's uniforms set once and only its draw repeated
+     (re-sending the planet prototype's 26 uniforms every repeat mostly timed ANGLE's validation), summed over the
+     bodies on screen.
 - **Load.** Four measurements a second, alternating the option and the current shader: about 2% of the GPU's time.
   "Pause measuring" stops it, and it stops while the tab is hidden.
 - **Accuracy.** The browser adds a floor of about 0.04 ms a draw (the driver's submit cost, which the game pays too),
@@ -880,9 +885,30 @@ map or minimap), use B-lite with a high `uLevel`. Below about 8 px radius, use a
 
 ## Running it
 
-- **Live lab:** <http://localhost:5273/sunlab.html> with the Vite dev server up. Pick a system, sun variant, sky
-  variant and view; drag to pan, wheel to zoom; hold Space to see the current shaders in place. `?compile` measures
-  cold compile times (use a fresh browser profile).
+- **Live lab:** <http://localhost:5273/sunlab.html> with the Vite dev server up. It draws the whole system as the game
+  lays it out: the sky, the star, then every planet and moon at its orbit position (frozen at tick 0; the Time slider
+  runs only the shaders' clocks), each lit from the system centre as PlanetRenderer lights it (dimmed round black holes
+  and the pulsar, as in the game). Off-screen bodies are culled, as in the game.
+  - **System**, then **Body**: the star, or any planet or moon of that system (sorted outward, moons under their
+    planet). In the Ashfall Drift the star is the brown dwarf.
+  - **Star**: every sun option (R5 ½ the default). Black holes and the pulsar keep their own shaders.
+  - **Planets**: prototype (the new look, the default), prototype lite (Low tier) or current, for every planet and
+    moon, and for the brown dwarf (its prototype is the planet prototype's).
+  - **Sky**: as before.
+  - **View**: the star's presets (whole, limb, close, over the disc, corona, surface and limb up close, far out) or,
+    for a planet, moon or the brown dwarf, the planet lab's (whole, lit limb up close, limb at the terminator, widest
+    game zoom, limb at zoom 1, surface at zoom 2, surface and limb up close, far out), about that body and lit from
+    the star. Both have "the whole system" (every orbit).
+  - **Zoom**: 0.002 to 40 on a log scale, the game's 0.04 to 2 shaded; drag to pan, wheel to zoom.
+  - **Hold Space** to see the current shaders (star, sky and planets) in place.
+  - `?compile` measures cold compile times (use a fresh browser profile).
+- **URL params** (all optional): `?system=<id>&body=star|<planet>|<planet>.moon<i>&look=proto|proto.lite|cur&view=<preset>&sun=<star option>&sky=<sky option>&zoom=<z>`.
+  A body alone finds its system, and the planet lab's `<system>.dwarf` means that system's star. The URL follows the
+  controls as they change, so it can be copied to share a view. Examples:
+  - `sunlab.html?body=jovan&view=limb` (Jovan's lit limb, prototype);
+  - `sunlab.html?system=sol&body=terra_nova&view=whole&zoom=0.014` (Terra Nova with Sol in frame);
+  - `sunlab.html?system=ashfall&view=whole` (the Ashfall brown dwarf, planet prototype);
+  - `sunlab.html?system=sol&view=system` (every orbit).
 - **Native harness:** `node scripts/sun-sky-proto/run.mjs <set> <out dir>`, where the set is one of:
   - `verify`: quick looks and the glow check;
   - `bench`: timings;
