@@ -121,6 +121,7 @@ export function partDecor(geom: PlacedGeom, part: PlacedPart = geom.part): PartD
   const out: PartDecor = { polys: [], discs: [], barrels: [], nozzles: [] };
   const { decor, glow } = lookOf(part.fn);
   const kind = DECOR_SHAPES[decor];
+  if (part.fn === 'plating_reactive_armour' || part.fn === 'plating_spaced_plating') { plating(out, geom, part.fn === 'plating_reactive_armour'); return out; }
   /** Batteries' charge cells: green for general, blue for drive, red for weapon */
   if (kind === 'battery') { battery(out, geom, glow ?? 0x4ade80); return out; }
   const f = frameOf(part === geom.part ? geom : { ...geom, part });
@@ -546,6 +547,36 @@ function miner(out: PartDecor, f: Frame, W: number, D: number, mid: number, size
   out.discs.push({ ...pt(chamber), r: 0.25 * k, color: DARK });
   out.discs.push({ ...pt(chamber), r: 0.17 * k, color: MINER_GLOW, glow: 0.8 });
   out.discs.push({ ...pt(chamber), r: 0.07 * k, color: 0xe0fffb, glow: 1 });
+}
+
+/**
+ * Plating's surface (rework 2026-11 section 5): Reactive Armour is tiled bricks, offset row on row, so it reads as armour
+ * that can flick a shell away; Spaced Plating is ribbed, layered plates with dark gaps between. Cut to the part's outline.
+ */
+function plating(out: PartDecor, geom: PlacedGeom, reactive: boolean): void {
+  const poly = geom.polygon;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const [x, y] of poly) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+  const clip = poly as Vec2[];
+  const add = (pts: number[], color: number, bevel: number) => { const c = clipTo(pts, clip); if (c.length >= 6) out.polys.push({ pts: c, color, bevel }); };
+  const rect = (a: number, b: number, c: number, d: number) => [a, b, c, b, c, d, a, d];
+  if (reactive) {
+    const rows = Math.max(2, Math.round((y1 - y0) * 3)), bh = (y1 - y0) / rows, bw = 0.5;
+    for (let r = 0; r < rows; r++) {
+      const off = r & 1 ? bw / 2 : 0;
+      for (let x = x0 - off; x < x1; x += bw) {
+        const a = Math.max(x0, x) + 0.03, b = Math.min(x1, x + bw) - 0.03;
+        if (b - a > 0.05) add(rect(a, y0 + r * bh + 0.03, b, y0 + (r + 1) * bh - 0.03), (r + Math.round(x / bw)) & 1 ? 0x8d97a6 : 0x7c8696, 0.03);
+      }
+    }
+  } else {
+    const n = Math.max(3, Math.round((y1 - y0) * 4)), bh = (y1 - y0) / n;
+    for (let r = 0; r < n; r++) {
+      const inset = r & 1 ? 0.07 : 0.02;
+      add(rect(x0 + inset, y0 + r * bh + bh * 0.2, x1 - inset, y0 + (r + 1) * bh - bh * 0.05), r & 1 ? 0x939daa : 0x7e8896, 0.035);
+      add(rect(x0 + 0.02, y0 + r * bh, x1 - 0.02, y0 + r * bh + bh * 0.2), DARK, 0);
+    }
+  }
 }
 
 /** A battery: a dark casing with a row of glowing charge cells (coloured by which pool it fills) and a terminal */

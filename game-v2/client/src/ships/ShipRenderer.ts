@@ -24,6 +24,7 @@ import type { GameState } from '../state/GameState';
 import type { Renderer } from '../rendering/Renderer';
 import { functionColor, mix } from './shipColors';
 import { ThrusterFx, ThrustCommand } from './ThrusterFx';
+import { PartFx } from './PartFx';
 import { decorOf } from './partDecor';
 import type { ClientFeatures } from './features/host';
 import type { ShipDrawCtx } from './features/types';
@@ -304,6 +305,7 @@ export class ShipRenderer {
   private views = new Map<number, BodyView>();
   private layer: Container;
   private engines: ThrusterFx;
+  private partFx = new PartFx();
   private lastFrame = 0;
   private flamesLayer = new Container();
   /** Under the hulls (fixed barrels), the hulls in a few draws, then over them (flashes, turrets) */
@@ -566,6 +568,7 @@ export class ShipRenderer {
       this.lighting.levelAt(entity.renderX, entity.renderY, this.lvl);
       this.drawTurrets(view, ship, cs, dt * 60);
       this.drawBankGlow(view, ship, cs, eid === this.state.playerId);
+      this.partFx.draw(view.container, view.guns, ship, this.bridge.geometry(ship), cs, now, eid === this.state.playerId ? this.state.charge : null);
       this.drawWires(view, ship, cs, now, entity.type === EntityType.ShipBody && (hostile || entity.data?.[0] === 2));
       this.updateLamps(view, ship, entity, dt);
       if (this.features?.hasDrawers) {

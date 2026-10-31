@@ -745,6 +745,9 @@ export class ShipClient {
       case 'damage':
         this.renderer?.hit(msg.targetId, msg.amount);
         return false; // the game shows the number and the HUD's indicator
+      case 'effect':
+        if (msg.effectType === 12) this.damageFx?.shieldReform(msg.x, msg.y); // EffectType.ShieldFlash
+        return false; // the game draws its own
       case 'projectileHit':
         this.damageFx?.shieldHit(msg.x, msg.y);
         return false; // the game stops the tracer and throws the sparks

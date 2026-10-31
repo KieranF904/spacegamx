@@ -44,6 +44,21 @@ export function drawJets(ctx: ShipDrawCtx, counter: number | undefined, dir: num
       g.circle(bx, by, hw * (1.3 + 1.2 * k)).fill({ color: 0xfbcfe8, alpha: 0.65 * k });
     }
   }
+  // Afterimage: three fading pink copies of the hull strung out behind, so the dodge reads as a jump
+  const R0 = ship.derived.radius;
+  for (let i = 3; i >= 1; i--) {
+    const off = R0 * 0.32 * i * (0.5 + 0.5 * (1 - k * 0.6)), ox = -ux * off, oy = -uy * off, a = 0.2 * (1 - (i - 1) * 0.28) * (0.3 + 0.7 * k);
+    for (let j = 0; j < geoms.length; j++) {
+      const poly = geoms[j]?.polygon;
+      if (!poly || !ship.derived.alive[j]) continue;
+      for (let v = 0; v < poly.length; v++) {
+        const x = (poly[v][0] - cx) * cs + ox, y = (poly[v][1] - cy) * cs + oy;
+        if (v) g.lineTo(x, y); else g.moveTo(x, y);
+      }
+      g.closePath();
+    }
+    g.fill({ color: 0xf9a8d4, alpha: a });
+  }
   // Speed streaks: off the hull's trailing side (opposite the push), fading with the burst
   const R = ship.derived.radius, nx = -uy, ny = ux;
   for (let i = -1; i <= 1; i++) {
