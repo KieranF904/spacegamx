@@ -4,6 +4,7 @@
 
 import { handleKey, type KeyHost } from './app/keys';
 import { handleServerMessage as handleServerMessageTable, type MessageHost } from './app/serverMessages';
+import { tickInput, sendNeutralInput, newInputSendState, type InputSendCtx } from './app/inputSend';
 import { lobbyAuth, LobbyAuthResult } from './network/lobby';
 import { setText, setStyle } from './ui/domWrite';
 import { Application, Text} from 'pixi.js';
@@ -85,19 +86,12 @@ import {
   ServerMessage,
   asteroidComposition,
   MiningTable, registerRockTypes, chooseCrate, crateOrder, cratesFor, ammoByCode, ammoCode,
-  ClientInputMessage,
   EntityType,
-  quantizeCursorAngle,
-  dequantizeCursorAngle,
-  CURSOR_RADIUS,
   computeStateHash,
   ClientTransport,
   loadCatalog,
   ShipTuning,
   InventoryStub,
-  quantizeCursorDist,
-  INPUT_BOOLS, INPUT_HELD, type InputBool,
-  CURSOR_DIST_STEP,
   QuestTarget, QuestsFile,
   DisconnectInfo,
   PROTOCOL_VERSION,
@@ -148,6 +142,7 @@ export class Game {
   private proto: ProtoHooks | null;
   private readonly keyHost: KeyHost = this.makeKeyHost();
   private readonly msgHost: MessageHost = this.makeMessageHost();
+  private readonly inputCtx: InputSendCtx = this.makeInputCtx();
   private shipClient: ShipClient;
   private hazards = new HazardOverlay();
   /** The cold on screen: frost in from the edges as the ship's warmth runs down */
@@ -278,22 +273,12 @@ private xpFillEl: HTMLElement | null;
   private chatSendBtn: HTMLElement | null;
   private chatFocused = false;
   
-  // Weapon firing state (for sound triggering)
-  private lastFireLeft = false;
-  private lastFireRight = false;
   private lastStateHashTime = 0;
 
   // Tick-based input system
   private inputTickAccum = 0;         // ms accumulator for fixed-rate input ticks
-  /** The on/off keys last sent (common inputFields.ts INPUT_BOOLS; dodge: the Burst Strafer's control, ships/strafer.ts) */
-  private readonly lastSent: Record<InputBool, boolean | undefined> = {
-    forward: false, backward: false, left: false, right: false, boost: false, fireLeft: false, fireRight: false,
-    strafeLeft: false, strafeRight: false, helm: false, jump: false, dodge: false,
-  };
-  private lastSentAngle = 0;          // quantized angle (int)
   /** Extra camera zoom factor while jumping */
   private jumpZoom = 1;
-  private lastSentCursorDist = 0;
 
   // Auth state
   private authToken: string | null = null;
@@ -676,7 +661,7 @@ this.xpFillEl = document.getElementById('xpFill');
 
     // Set up input handlers
     this.input.init(this.app.canvas as HTMLCanvasElement);
-    this.input.onFocusLost = () => { this.context.resetPress(); this.sendNeutralInput(); };
+    this.input.onFocusLost = () => { this.context.resetPress(); sendNeutralInput(this.inputCtx); };
     this.input.onMouseButton = (button, down, x, y) => this.context.mouse(button, down, x, y);
     this.context.attach(this.app.canvas as HTMLCanvasElement);
     this.input.onZoomChange = (zoom) => {
@@ -1227,7 +1212,7 @@ this.xpFillEl = document.getElementById('xpFill');
         this.inputTickAccum += delta * 1000; // delta is in seconds
         let ticksRun = 0;
         while (this.inputTickAccum >= TICK_MS && ticksRun < 4) {
-          this.tickInput();
+          tickInput(this.inputCtx);
           this.inputTickAccum -= TICK_MS;
           ticksRun++;
         }
@@ -1239,7 +1224,7 @@ this.xpFillEl = document.getElementById('xpFill');
         const due = Math.min(4, this.state.ticksDue());
         for (let i = 0; i < due; i++) {
           this.state.cachedServerTick = this.state.predictedTick;
-          this.tickInput();               // sample input, queued for targetTick = tick + input delay
+          tickInput(this.inputCtx);       // sample input, queued for targetTick = tick + input delay
           this.state.drainDelayQueue();   // apply what's due and step to predictedTick + 1
           this.state.predictedTick++;
         }
@@ -1369,214 +1354,34 @@ this.xpFillEl = document.getElementById('xpFill');
     this.updateUI();
   }
 
-  /**
-   * Fixed-rate input tick (runs at TICK_RATE = 60Hz).
-   * Samples current input state, runs local prediction, and only sends
-   * a network message if the input actually changed from last send.
-   */
-  private tickInput(): void {
-    // The system map open: the ship faces the map cursor
-    const mouseWorld = this.systemMapUI.aimWorld() ?? this.renderer.screenToWorld(
-      this.input.mouseX,
-      this.input.mouseY
-    );
-    
-    const playerPos = this.state.getPlayerPosition();
-    
-    // Clamp cursor to circle of CURSOR_RADIUS and compute angle
-    let dx = mouseWorld.x - playerPos.x;
-    let dy = mouseWorld.y - playerPos.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist > CURSOR_RADIUS) {
-      dx = dx / dist * CURSOR_RADIUS;
-      dy = dy / dist * CURSOR_RADIUS;
-    }
-    
-    let rawAngle = Math.atan2(dy, dx);
-    // True distance (not the clamped one): turrets converge on the cursor point
-    let aimDist = Math.hypot(mouseWorld.x - playerPos.x, mouseWorld.y - playerPos.y);
-    // Lining up a jump: lock on to a station, gate or marker near the cursor, and stop just short of it (a stillstone: inside its field)
-    // A menu jump: its mark, wherever the cursor is
-    const inputEnabled = (this.proto?.inputEnabled?.() ?? true) && !this.shipClient.hangarOpen && !this.menu.isOpen && !this.adminPanel?.capturesFlight;
-    const order = inputEnabled ? this.context.flight() : null;
-    if (order) {
-      rawAngle = order.angle;
-      aimDist = order.dist;
-      this.shipClient.setJumpAim(aimDist, null);
-      this.systemMapUI.jumpAim = { angle: rawAngle, dist: aimDist, label: null };
-    } else if (this.loggedIn && this.shipClient.jumpAiming()) {
-      // Cursor right on a destination, or pointing straight at one (off-screen ones too: aim at its edge marker)
-      // (On the map, whatever's under its cursor wins)
-      let best: { name: string; x: number; y: number; stop?: number } | null = this.systemMapUI.jumpLock(), bd = best ? -Infinity : Infinity;
-      const aimA = Math.atan2(mouseWorld.y - playerPos.y, mouseWorld.x - playerPos.x);
-      for (const t of this.navMarkers?.snapTargets() ?? []) {
-        const far = Math.hypot(t.x - playerPos.x, t.y - playerPos.y);
-        if (far < 2500) continue;
-        const near = Math.hypot(t.x - mouseWorld.x, t.y - mouseWorld.y);
-        let da = Math.abs(Math.atan2(t.y - playerPos.y, t.x - playerPos.x) - aimA);
-        if (da > Math.PI) da = 2 * Math.PI - da;
-        const onPoint = near < Math.max(1500, far * 0.12);
-        const onLine = da < Math.max(0.05, Math.atan2(1200, far));
-        if (!onPoint && !onLine) continue;
-        const score = onPoint ? near / far : da;
-        if (score < bd) { bd = score; best = t; }
-      }
-      if (best) {
-        const far = Math.hypot(best.x - playerPos.x, best.y - playerPos.y);
-        rawAngle = Math.atan2(best.y - playerPos.y, best.x - playerPos.x);
-        aimDist = Math.max(0, far - (best.stop ?? 1500));
-      }
-      this.shipClient.setJumpAim(aimDist, best?.name ?? null);
-      this.systemMapUI.jumpAim = { angle: rawAngle, dist: aimDist, label: best?.name ?? null };
-    }
-    
-    let fireLeft = inputEnabled && ((this.input.isMouseDown(0) && !this.context.withholdingLeft()) || this.systemMapUI.firing());
-    let fireRight = inputEnabled && this.rightHeld();
-    // A click calls off a menu jump too
-    if (fireLeft && this.context.jumpMark()) this.context.cancel('Jump cancelled');
-    // The autopilot flies until a click (or a flight key) takes over
-    if (this.autopilot.active && (fireLeft || fireRight)) this.autopilot.cancel('Autopilot off');
-    const auto = this.loggedIn && inputEnabled && !this.stationOpen ? this.autopilot.tick() : null;
-    if (auto) { fireLeft = fireRight = false; }
-    
-    // Gun sounds come from the shots themselves (updateSounds); firing stirs the combat music
-    if (fireLeft && !this.lastFireLeft) this.playerStatsUI.addShotFired();
-    if (fireRight && !this.lastFireRight) this.playerStatsUI.addShotFired();
-    if (fireLeft || fireRight) this.audio.bumpCombat(1);
-    this.lastFireLeft = fireLeft;
-    this.lastFireRight = fireRight;
-    
-    // Fire state is now passed to renderer AFTER drainDelayQueue() in the
-    // update loop, using the drained (tick-accurate) angle rather than the
-    // live mouse angle. This ensures the laser visual matches what the server
-    // actually processes (N ticks delayed).
-    
-    let forward = inputEnabled && (this.input.isKeyDown('KeyW') || this.input.isKeyDown('ArrowUp'));
-    let backward = inputEnabled && (this.input.isKeyDown('KeyS') || this.input.isKeyDown('ArrowDown'));
-    let left = inputEnabled && (this.input.isKeyDown('KeyA') || this.input.isKeyDown('ArrowLeft'));
-    let right = inputEnabled && (this.input.isKeyDown('KeyD') || this.input.isKeyDown('ArrowRight'));
-    let boost = inputEnabled && (this.input.isKeyDown('ShiftLeft') || this.input.isKeyDown('ShiftRight'));
-    // Proto helm controls: left/right turn the ship, Q/E strafe
-    let helm = this.shipClient.helmMode();
-    let strafeLeft = helm && inputEnabled && this.input.isKeyDown('KeyQ');
-    let strafeRight = helm && inputEnabled && this.input.isKeyDown('KeyE');
-    // Jump drive: J latches it on, and it stays on until the jump fires (or J again cancels)
-    let jump = inputEnabled && this.shipClient.jumpHeld();
-    // Burst Strafer: a press of the dodge key (Space) asks for one burst, the way you're steering (ShipClient.dodgeControl)
-    let dodge = inputEnabled && this.shipClient.dodgeControl();
-    // (The angle is quantized to 13 bits, so client and server use the same value for hitscan: see CURSOR_STATE.md)
-    let quantized = quantizeCursorAngle(rawAngle);
-    let cursorDistQ = quantizeCursorDist(aimDist);
-    // A menu jump has the controls as the autopilot does: no thrust, mouse-steer, the drive as it says
-    if (order) {
-      forward = backward = left = right = boost = helm = strafeLeft = strafeRight = dodge = false;
-      jump = order.jump;
-    }
-    if (auto) {
-      ({ forward, backward, left, right, boost, jump } = auto);
-      helm = strafeLeft = strafeRight = dodge = false;
-      quantized = quantizeCursorAngle(auto.targetAngle);
-      cursorDistQ = quantizeCursorDist(auto.jump ? auto.cursorDist : aimDist);
-    }
-    const targetAngle = dequantizeCursorAngle(quantized);
-    
-    // Stamp targetTick using local tick counter — each tick iteration
-    // gets a unique targetTick, ensuring one physics step per drain.
-    const targetTick = this.state.getInputTargetTick();
-    
-    const msg: ClientInputMessage = {
-      type: 'input',
-      seq: 0, // set below only if we send
-      tick: this.state.serverTick,
-      targetTick,
-      forward,
-      backward,
-      left,
-      right,
-      boost,
-      fireLeft,
-      fireRight,
-      targetAngle,
-      strafeLeft,
-      strafeRight,
-      helm,
-      cursorDist: cursorDistQ * CURSOR_DIST_STEP,
-      jump,
-      dodge,
+  /** What app/inputSend.ts (tickInput, sendNeutralInput) reads (getters, so windows built late resolve at use) plus its last-sent state; made once */
+  private makeInputCtx(): InputSendCtx {
+    const g = this;
+    const st = newInputSendState();
+    return {
+      get loggedIn() { return g.loggedIn; },
+      get stationOpen() { return g.stationOpen; },
+      get proto() { return g.proto; },
+      get menu() { return g.menu; },
+      get adminPanel() { return g.adminPanel; },
+      get shipClient() { return g.shipClient; },
+      get autopilot() { return g.autopilot; },
+      get context() { return g.context; },
+      get playerStatsUI() { return g.playerStatsUI; },
+      get systemMapUI() { return g.systemMapUI; },
+      get navMarkers() { return g.navMarkers; },
+      get audio() { return g.audio; },
+      get network() { return g.network; },
+      get input() { return g.input; },
+      get renderer() { return g.renderer; },
+      get state() { return g.state; },
+      rightHeld: () => g.rightHeld(),
+      lastSent: st.lastSent,
+      lastSentAngle: st.lastSentAngle,
+      lastSentCursorDist: st.lastSentCursorDist,
+      lastFireLeft: st.lastFireLeft,
+      lastFireRight: st.lastFireRight,
     };
-    
-    // Check if anything changed from last sent state
-    const changed = this.inputChanged(msg, quantized, cursorDistQ);
-    
-    // Proto: no targetTick (applied on the next tick) and no prediction queue.
-    if (this.proto) {
-      if (changed) {
-        msg.seq = this.state.nextInputSeq();
-        msg.targetTick = undefined;
-        this.network.send(msg);
-        this.markSent(msg, quantized, cursorDistQ);
-      }
-      return;
-    }
-
-    // Only send over network if something changed
-    if (changed) {
-      msg.seq = this.state.nextInputSeq();
-      this.network.send(msg);
-      // Queue for delayed application (physics runs when targetTick is reached)
-      this.state.applyInput(msg);
-      this.markSent(msg, quantized, cursorDistQ);
-    } else {
-      // Queue for delayed application (server also applies same input on same tick)
-      this.state.predictTick(msg);
-    }
-  }
-
-  /** Whether this input differs from the last one sent: any key (INPUT_BOOLS), the quantized aim or cursor distance */
-  private inputChanged(msg: ClientInputMessage, quantized: number, cursorDistQ: number): boolean {
-    for (let i = 0; i < INPUT_BOOLS.length; i++) { const k = INPUT_BOOLS[i]; if (msg[k] !== this.lastSent[k]) return true; }
-    return quantized !== this.lastSentAngle || cursorDistQ !== this.lastSentCursorDist;
-  }
-
-  /** Remember this input as the last one sent */
-  private markSent(msg: ClientInputMessage, quantized: number, cursorDistQ: number): void {
-    for (let i = 0; i < INPUT_BOOLS.length; i++) { const k = INPUT_BOOLS[i]; this.lastSent[k] = msg[k]; }
-    this.lastSentAngle = quantized;
-    this.lastSentCursorDist = cursorDistQ;
-  }
-
-  /**
-   * The window lost focus or the tab was hidden: one neutral input (all keys
-   * up, no fire), straight to the network. A hidden tab's ticker stops, so
-   * tickInput wouldn't send it until the player came back, and the ship would
-   * fly on (the server also stops a ship that hasn't sent input for a while).
-   */
-  private sendNeutralInput(): void {
-    if (!this.loggedIn || !this.state.playerId || !this.network.isConnected()) return;
-    const msg: ClientInputMessage = {
-      type: 'input',
-      seq: this.state.nextInputSeq(),
-      tick: this.state.serverTick,
-      targetTick: this.proto ? undefined : this.state.getInputTargetTick(),
-      forward: false,
-      backward: false,
-      left: false,
-      right: false,
-      boost: false,
-      fireLeft: false,
-      fireRight: false,
-      targetAngle: dequantizeCursorAngle(this.lastSentAngle),
-      strafeLeft: false,
-      strafeRight: false,
-      helm: this.lastSent.helm,
-      cursorDist: this.lastSentCursorDist * CURSOR_DIST_STEP,
-      jump: false,
-      dodge: false,
-    };
-    this.network.send(msg);
-    // The prediction steps the same input (proto has none)
-    if (!this.proto) this.state.applyInput(msg);
-    for (let i = 0; i < INPUT_HELD.length; i++) this.lastSent[INPUT_HELD[i]] = false;
   }
 
   private handleServerMessage(msg: ServerMessage): void {

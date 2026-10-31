@@ -39,7 +39,7 @@ The client's player-facing shell: `Game.ts` (the orchestrator: builds every wind
 | 809-1076 | `start`, `createMenu` (816), `updateSounds` (870), zone, `applySettings` (997), heat gauge |
 | 1077-1120 | `handleKeyPress(code)` calls `handleKey` in app/keys.ts; `makeKeyHost()` (1082) gives it the game's getters |
 | 1200-1383 | `update()`, the per-frame loop |
-| 1384-1586 | `tickInput()` builds and sends the input message; `sendNeutralInput` (1587) |
+| 1357-1386 | `makeInputCtx()`: the getters and last-sent state for app/inputSend.ts (`tickInput` builds and sends the input message, called from `update()`; `sendNeutralInput` on focus loss) |
 | 1618-1685 | `handleServerMessage` calls `handleServerMessageTable` in app/serverMessages.ts; `makeMessageHost()` (1623) gives it the game's getters and setters |
 | 1686-1988 | chat (`setupChat` 1686), connect/disconnect/auth result (`onConnected` 1761, `onDisconnected` 1806, `handleAuthResult` 1852), admin and contributor panel start/stop (`startAdmin` 1921 to `stopContrib` 1980) |
 | 1989-2068 | `updateUI`, quality, resize |
@@ -62,7 +62,7 @@ The client's player-facing shell: `Game.ts` (the orchestrator: builds every wind
 - Keep pure logic (menu options, guide HTML, login body choice, quality) in testable pure modules; DOM classes stay thin.
 
 ## How to extend
-1. **Add a keybinding**: add an `ActionDef` to `ACTIONS` (`input/keybindings.ts`) with a default `key`; handle `code === '<default>'` in `app/keys.ts` (`PRE_KEYS` or `POST_KEYS`) or read the key in `Game.tickInput`; show it via `boundKeyName`. The rebinding UI iterates `ACTIONS`, so it appears automatically.
+1. **Add a keybinding**: add an `ActionDef` to `ACTIONS` (`input/keybindings.ts`) with a default `key`; handle `code === '<default>'` in `app/keys.ts` (`PRE_KEYS` or `POST_KEYS`) or read the key in `tickInput` (app/inputSend.ts); show it via `boundKeyName`. The rebinding UI iterates `ACTIONS`, so it appears automatically.
 2. **Add a window**: extend/compose `GameWindow` in `ui/<Name>.ts`; construct in `Game.init` passing `send`/`sound`; if heavy, wrap in `new Lazy(() => import('./ui/<Name>')...)` and add to `prefetchScreens`; add its Esc/toggle case to `MODAL_CHAIN` in `app/keys.ts`.
 3. **Add a HUD chip**: new small class in `ui/` (model: `DodgeIndicator.ts`, `CircuitBars.ts`) with an `update()` using `setText`; construct in `init`, call from `updateUI` or `update`; if toggleable add a field to `SettingsData` + `defaultSettings()` and a row in GameMenuUI's tab.
 4. **Handle a new server message**: add an entry to `HANDLERS` in `app/serverMessages.ts` calling a UI method (add a `MessageHost` getter if it needs new game state); the type must exist in common protocol (`networking`).
