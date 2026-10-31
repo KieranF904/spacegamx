@@ -97,6 +97,13 @@ void main() {
 
 # ---- effect textures (rendering/fxTextures.ts paints them on a canvas: here with PIL), premultiplied RGBA like a canvas's
 PLUME_W, PLUME_H, PAD, PLUME_LEN, PLUME_HALF = 256, 128, 6, 1.3, 1.7 * 1.25
+# fxTextures PLUME_SHAPES: glow / outer / inner as (length, half-width, bulge)
+PLUME_SHAPES = {
+    'plume': [(1.3, 1.7, 1.25), (1, 1.02, 1.1), (0.68, 0.66, 1.0)],
+    'needle': [(1.3, 0.8, 1.1), (1, 0.4, 1.0), (0.82, 0.2, 1.0)],
+    'sheath': [(1.3, 1.5, 1.2), (1, 1.1, 1.1), (0.8, 0.45, 1.0)],
+    'cone': [(1.3, 1.6, 1.3), (1, 1.3, 1.2), (0.62, 0.7, 1.1)],
+}
 
 
 def _mask(pts, size, sigma):
@@ -135,11 +142,26 @@ def make_texture_data(name):
     parts = name.split(':')
     if parts[0] == 'white':
         return 1, 1, bytes([255, 255, 255, 255])
-    if parts[0] == 'plume' and len(parts) == 4:
-        outer, inner, glow = (_rgb(int(x)) for x in parts[1:])
-        layers = [(_mask(_plume_pts(1.3, 1.7, 1.25), size, 2), glow, 0.1), (_mask(_plume_pts(1, 1.02, 1.1), size, 2), outer, 0.32),
-                  (_mask(_plume_pts(0.68, 0.66, 1.0), size, 1), inner, 0.5)]
+    if parts[0] == 'plume' and len(parts) in (4, 5):
+        outer, inner, glow = (_rgb(int(x)) for x in parts[1:4])
+        g, o, i = PLUME_SHAPES[parts[4] if len(parts) == 5 else 'plume']
+        layers = [(_mask(_plume_pts(*g), size, 2), glow, 0.1), (_mask(_plume_pts(*o), size, 2), outer, 0.32),
+                  (_mask(_plume_pts(*i), size, 1), inner, 0.5)]
         return PLUME_W, PLUME_H, _premult(layers, size).tobytes()
+    if name == 'puff':
+        # fxTextures.puff: a radial gradient, dense in the middle (64 px across)
+        y, x = np.mgrid[0:64, 0:64]
+        r = np.hypot(x + 0.5 - 32, y + 0.5 - 32) / 32
+        a = np.interp(r, [0, 0.5, 0.8, 1], [1, 0.8, 0.3, 0]).astype(np.float32)
+        px = np.repeat((np.clip(a, 0, 1) * 255 + .5).astype(np.uint8)[..., None], 4, axis=2)
+        return 64, 64, px.tobytes()
+    if name == 'ring':
+        # fxTextures.ring: a 4.8 px line at radius 28 of 32 (anti-aliased by distance)
+        y, x = np.mgrid[0:64, 0:64]
+        r = np.hypot(x + 0.5 - 32, y + 0.5 - 32)
+        a = np.clip(2.4 + 0.5 - np.abs(r - 28), 0, 1).astype(np.float32)
+        px = np.repeat((np.clip(a, 0, 1) * 255 + .5).astype(np.uint8)[..., None], 4, axis=2)
+        return 64, 64, px.tobytes()
     if name == 'plume:core':
         return PLUME_W, PLUME_H, _premult([(_mask(_plume_pts(0.34, 0.34, 0.95), size, 1), (1, 1, 1), 0.85)], size).tobytes()
     if name == 'plume:diamonds':

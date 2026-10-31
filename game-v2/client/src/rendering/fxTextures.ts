@@ -50,15 +50,32 @@ function flame(ctx: CanvasRenderingContext2D, len: number, half: number, bulge: 
   ctx.fill();
 }
 
+/**
+ * A plume's silhouettes, glow / outer / inner as [length, half-width, bulge] (units of PLUME_LEN and the nozzle half-width):
+ * the ordinary flame, a long thin needle (Torch), a wide sheath round a bright core (Fusion Torch) and a short wide cone
+ * (the Afterburner's boost). scripts/native-render/gl_worker.py keeps the same table.
+ */
+export type PlumeShape = 'plume' | 'needle' | 'sheath' | 'cone';
+export const PLUME_SHAPES: Record<PlumeShape, [number, number, number][]> = {
+  plume: [[1.3, 1.7, 1.25], [1, 1.02, 1.1], [0.68, 0.66, 1.0]],
+  needle: [[1.3, 0.8, 1.1], [1, 0.4, 1.0], [0.82, 0.2, 1.0]],
+  sheath: [[1.3, 1.5, 1.2], [1, 1.1, 1.1], [0.8, 0.45, 1.0]],
+  cone: [[1.3, 1.6, 1.3], [1, 1.3, 1.2], [0.62, 0.7, 1.1]],
+};
+/** The texture name of a plume in colours and shape (the native renderer asks the GL worker for it by this) */
+export const plumeKey = (outer: number, inner: number, glow: number, shape: PlumeShape = 'plume'): string =>
+  `plume:${outer}:${inner}:${glow}${shape === 'plume' ? '' : ':' + shape}`;
+
 /** The flame of a plume at full throttle without its white core (glow, outer and inner flames) */
-export function plumeBody(outer: number, inner: number, glow: number): Texture {
-  return paint(`plume:${outer}:${inner}:${glow}`, PLUME_W, PLUME_H, (ctx) => {
+export function plumeBody(outer: number, inner: number, glow: number, shape: PlumeShape = 'plume'): Texture {
+  const [g, o, i] = PLUME_SHAPES[shape];
+  return paint(plumeKey(outer, inner, glow, shape), PLUME_W, PLUME_H, (ctx) => {
     ctx.globalCompositeOperation = 'lighter';
     ctx.filter = 'blur(2px)';
-    flame(ctx, 1.3, 1.7, 1.25, glow, 0.1);
-    flame(ctx, 1, 1.02, 1.1, outer, 0.32);
+    flame(ctx, g[0], g[1], g[2], glow, 0.1);
+    flame(ctx, o[0], o[1], o[2], outer, 0.32);
     ctx.filter = 'blur(1px)';
-    flame(ctx, 0.68, 0.66, 1.0, inner, 0.5);
+    flame(ctx, i[0], i[1], i[2], inner, 0.5);
   });
 }
 
@@ -248,6 +265,33 @@ export function bubble(): Texture {
   });
 }
 export const BUBBLE_RIM = 0.94;
+
+/** A honeycomb of thin hex outlines faded out towards the bubble's rim (128 px across, same scale as `bubble`): the Bulwark's shield */
+export function hexShield(): Texture {
+  return paint('hexShield', 128, 128, (ctx) => {
+    const R = 11, h = Math.sqrt(3) * R;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.4;
+    for (let row = -1; row < 128 / h + 1; row++) {
+      for (let col = -1; col < 128 / (R * 1.5) + 1; col++) {
+        const cx = col * R * 1.5, cy = row * h + (col & 1 ? h / 2 : 0);
+        ctx.beginPath();
+        for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; const x = cx + R * Math.cos(a), y = cy + R * Math.sin(a); if (k) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
+        ctx.closePath();
+        ctx.stroke();
+      }
+    }
+    // keep it inside the bubble, strongest nearer the rim
+    ctx.globalCompositeOperation = 'destination-in';
+    const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    g.addColorStop(0, 'rgba(255,255,255,0.15)');
+    g.addColorStop(0.7, 'rgba(255,255,255,0.7)');
+    g.addColorStop(0.93, 'rgba(255,255,255,0.9)');
+    g.addColorStop(0.95, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 128, 128);
+  });
+}
 
 /**
  * A headlight's beam: a cone from its apex at the left middle, fading with

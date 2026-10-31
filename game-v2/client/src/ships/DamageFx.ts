@@ -25,7 +25,8 @@
 import { clearIfDrawn } from '../rendering/gfx';
 import { Container, Graphics, GraphicsContext, Texture } from 'pixi.js';
 import { ParticlePool } from '../rendering/particlePool';
-import { BUBBLE_RIM, DOT_SIZE, bubble, glowBall, puff, streak, streakScale } from '../rendering/fxTextures';
+import { BUBBLE_RIM, DOT_SIZE, bubble, glowBall, hexShield, puff, streak, streakScale } from '../rendering/fxTextures';
+import { shieldLookOf } from './shieldLooks';
 import { EntityType, isRuined, lookFn, ServerContactMessage, ServerPartDestroyedMessage } from '@space-game/common';
 import type { GameState } from '../state/GameState';
 import type { ShipSource } from './ShipStore';
@@ -588,6 +589,8 @@ export class DamageFx {
 
   private lastShield = new Map<number, number>();
   private shieldFlash = new Map<number, number>();
+  /** A Flash Screen's re-form bloom, 1 fading to 0 */
+  private reform = new Map<number, number>();
 
   /** Shield bubbles (brighter when hit) and EMP crackle over knocked-out ships */
   private drawShields(frames: number): void {
@@ -600,18 +603,30 @@ export class DamageFx {
       const emp = ((isPlayer ? e.data?.[5] : e.data?.[2]) ?? 0) > 0;
       const r = ship.derived.radius * 1.12 + 10;
       const prev = this.lastShield.get(id) ?? shieldPct;
+      const look = shieldLookOf(ship);
       if (shieldPct < prev - 0.5) {
         if ((this.shieldFlash.get(id) ?? 0) < 0.4) this.sound('shield_hit', { x: e.renderX, y: e.renderY }, 0.6);
         this.shieldFlash.set(id, 1);
       }
+      // A Flash Screen coming back: a white bloom swelling out of the bubble (the server's ShieldFlash effect adds the ring)
+      if (look.reform && prev <= 0.5 && shieldPct > 0.5) this.reform.set(id, 1);
       this.lastShield.set(id, shieldPct);
       const flash = Math.max(0, (this.shieldFlash.get(id) ?? 0) - frames * 0.06);
       this.shieldFlash.set(id, flash);
+      const rf = Math.max(0, (this.reform.get(id) ?? 0) - frames * 0.035);
+      this.reform.set(id, rf);
       if (shieldPct > 0 || flash > 0) {
         const k = shieldPct / 100;
         const wob = 1 + 0.015 * Math.sin(this.time * 3 + id);
-        const b = (r * wob * (1 + 0.04 * flash)) / (64 * BUBBLE_RIM);
-        this.addSprites.take(bubble(), e.renderX, e.renderY, 0.5, 0.5, flash > 0.3 ? 0xc8f4ff : 0x7fd6fa, 0.12 + 0.26 * k + 0.7 * flash, 0, b, b);
+        const grow = 1 + 0.04 * flash + 0.12 * rf * rf;
+        const b = (r * wob * grow) / (64 * BUBBLE_RIM);
+        // (Flicker: the thin screen shimmers; the rest breathe slowly)
+        const sh = look.shimmer ? 1 - look.shimmer * (0.5 + 0.5 * Math.sin(this.time * 47 + id) * Math.sin(this.time * 29 + id * 2)) : 1;
+        const a = (look.base + look.fill * k + 0.7 * flash) * sh + 0.8 * rf;
+        this.addSprites.take(bubble(), e.renderX, e.renderY, 0.5, 0.5, flash > 0.3 ? look.hit : rf > 0.3 ? 0xffffff : look.tint, a, 0, b, b);
+        if (look.inner) this.addSprites.take(bubble(), e.renderX, e.renderY, 0.5, 0.5, look.inner, a * 0.8, 0, b * 0.9, b * 0.9);
+        if (look.hex) this.addSprites.take(hexShield(), e.renderX, e.renderY, 0.5, 0.5, look.hex, (0.18 + 0.3 * k + 0.5 * flash) * sh, this.time * 0.05 + id, b, b);
+        if (rf > 0) this.addSprites.take(glowBall(), e.renderX, e.renderY, 0.5, 0.5, 0xffffff, 0.7 * rf, 0, (r * (1.1 + 0.5 * (1 - rf))) / DOT_SIZE, (r * (1.1 + 0.5 * (1 - rf))) / DOT_SIZE);
       }
       if (emp && Math.random() < 0.5 * frames) {
         const a = Math.random() * Math.PI * 2;
@@ -631,6 +646,7 @@ export class DamageFx {
 
   /** A shot struck at (x, y): if that's on a shielded ship, its bubble lights up there */
   shieldHit(x: number, y: number): void {
+    this.platingHit(x, y);
     for (const [id, pct] of this.lastShield) {
       if (pct <= 0) continue;
       const e = this.state.entities.get(id), ship = this.source.get(id);
@@ -640,6 +656,61 @@ export class DamageFx {
       // (At the hull where the server's hit landed, not out on the bubble's rim: the shot met the parts, not a circle)
       if (this.ripples.length < 40) this.ripples.push({ id, a: Math.atan2(y - e.renderY, x - e.renderX) - e.renderAngle, d: Math.min(r, Math.hypot(x - e.renderX, y - e.renderY)), life: 0 });
     }
+  }
+
+  /**
+   * A shot struck at (x, y): on a ship's plating (no shield up), Reactive Armour throws bright sparks off and flicks a
+   * ring where it deflects; Spaced Plating throws chips and a puff of dust, and the outer plate peels away a little more
+   * the harder it's hurt. The part is found from where the shot landed (the wire carries no part).
+   */
+  private platingHit(x: number, y: number): void {
+    for (const [id, ship] of this.source.bodies) {
+      const e = this.state.entities.get(id);
+      if (!e || ship.kind !== 'ship' || (this.lastShield.get(id) ?? 0) > 0) continue;
+      const R = ship.derived.radius + 12;
+      if (Math.abs(x - e.renderX) > R || Math.abs(y - e.renderY) > R) continue;
+      const parts = ship.blueprint.parts;
+      const cs = this.source.tuning.cellSize, a = e.renderAngle + Math.PI / 2, ca = Math.cos(a), sa = Math.sin(a);
+      const dx = x - e.renderX, dy = y - e.renderY;
+      const [cx, cy] = ship.derived.com;
+      const gx = cx + (dx * ca + dy * sa) / cs, gy = cy + (-dx * sa + dy * ca) / cs;
+      const geoms = this.source.geometry(ship);
+      let hit = -1, bd = 0.9;
+      for (let i = 0; i < parts.length; i++) {
+        if (!ship.derived.alive[i]) continue;
+        const f = parts[i].fn;
+        if (f !== 'plating_reactive_armour' && f !== 'plating_spaced_plating') continue;
+        const c = geoms[i]?.centroid;
+        if (!c) continue;
+        const d = Math.hypot(c[0] - gx, c[1] - gy);
+        if (d < bd) { bd = d; hit = i; }
+      }
+      if (hit < 0) continue;
+      const reactive = parts[hit].fn === 'plating_reactive_armour';
+      if (reactive) {
+        this.burstSparks(x, y, e.vx, e.vy, 7, 3, 9, 0xffe9a0);
+        this.glow(x, y, e.vx, e.vy, 7, 5, 0xfff2c8, 0.7);
+        this.ring(x, y, e.vx, e.vy, 3, 13, 8, 0xffd98a, 0.5);
+      } else {
+        const hurt = ship.maxHp[hit] > 0 ? 1 - ship.hp[hit] / ship.maxHp[hit] : 0;
+        this.chunks(x, y, e.vx, e.vy, 2 + Math.round(3 * hurt), 1.3, 3, 0x8a929e);
+        this.dustPuff(x, y, e.vx, e.vy, 6, 40, 0x8a857e, 0.3);
+        this.burstSparks(x, y, e.vx, e.vy, 3, 1.5, 4, 0xc9d0da);
+      }
+      return;
+    }
+  }
+
+  /** A Flash Screen came back at (x, y) (the server's ShieldFlash effect, seen even when the shield never showed as empty): bloom the nearest bubble */
+  shieldReform(x: number, y: number): void {
+    let best = -1, bd = Infinity;
+    for (const [id, ship] of this.source.bodies) {
+      const e = this.state.entities.get(id);
+      if (!e || ship.kind !== 'ship') continue;
+      const d = Math.hypot(e.renderX - x, e.renderY - y);
+      if (d < bd) { bd = d; best = id; }
+    }
+    if (best >= 0 && bd < 300) this.reform.set(best, 1);
   }
 
   private drawRipples(frames: number): void {

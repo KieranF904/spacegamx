@@ -16,6 +16,7 @@ import { buildHull, skeletonCovered } from '../../client/src/ships/hullBuild';
 import { buildSkeleton } from '../../client/src/ships/skeletonBuild';
 import { decorOf } from '../../client/src/ships/partDecor';
 import { flames, beam, type Engine } from './fx';
+import { engineLookOf } from '../../client/src/ships/engineLooks';
 import { skyUniforms, type SkyUniforms } from './sky';
 import { buildFrame } from '../../client/src/ships/frameBuild';
 import { turretHead } from '../../client/src/ships/gunDecor';
@@ -350,7 +351,7 @@ export function build(data: Data, ref: AssetRef, p: ViewerParams): Built {
   const jets: Engine[] = [];
   ship.derived.thrusters.forEach((t, index) => {
     if (Math.hypot(t.force[0], t.force[1]) <= 0 || !ship.derived.alive[t.part]) return;
-    jets.push({ index, f: [t.force[0], t.force[1]], nozzles: decorOf(geoms[t.part]).nozzles.map((nz) => ({ mx: (nz.at[0] - cx) * cs, my: (nz.at[1] - cy) * cs, n: nz.n as [number, number], t: nz.t as [number, number], edge: nz.width * cs * 1.05 })) });
+    jets.push({ index, fn: bp.parts[t.part]?.fn, f: [t.force[0], t.force[1]], nozzles: decorOf(geoms[t.part]).nozzles.map((nz) => ({ mx: (nz.at[0] - cx) * cs, my: (nz.at[1] - cy) * cs, n: nz.n as [number, number], t: nz.t as [number, number], edge: nz.width * cs * 1.05 })) });
   });
   const built: Built = {
     key, draws, box, cs, thrust, jets, tint, engines: ship.derived.thrusters.length > 0, parts: bp.parts.length, radius: ship.derived.radius, ship: ship.kind === 'ship',
@@ -417,7 +418,7 @@ export function scene(data: Data, p: ViewerParams): { items: Item[]; view: View;
     let { x0, y0, x1, y1 } = it.built.box;
     x0 -= cs * 0.6; y0 -= cs * 0.6; x1 += cs * 0.6; y1 += cs * 0.6;
     if (p.flames > 0 && it.built.engines) {
-      const plume = cs * (1.5 + 3.5 * p.flames) * (p.boost ? 1.7 : 1), [tx, ty] = it.built.thrust;
+      const plume = cs * (1.5 + 3.5 * p.flames) * (p.boost ? 1.7 : 1) * Math.max(1, ...it.built.jets.map((j) => engineLookOf(j.fn ?? "").len * (p.boost ? 1.4 : 1))), [tx, ty] = it.built.thrust;
       if (tx > 0.5) x0 -= plume; if (tx < -0.5) x1 += plume; if (ty > 0.5) y0 -= plume; if (ty < -0.5) y1 += plume;
     }
     for (const [x, y] of [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]) {
