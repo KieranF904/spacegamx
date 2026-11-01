@@ -13,6 +13,7 @@
   <span id="runInfo" class="muted"></span>
   <span class="grow"></span>
   <span id="live" class="muted mono"></span>
+  <label class="check follow" title="Watch the newest command-line run, and move to the next one when it ends (a batch's attempts one after another)"><input type="checkbox" id="followLatest"> follow the newest run</label>
   <button id="stop" class="danger" disabled>Stop</button>
 </header>
 <div id="conceptNote" class="muted" style="padding:2px 12px;font-size:12px"></div>
@@ -122,6 +123,12 @@
   <h2>Gallery <span class="muted small">best designs this session, valid first</span></h2>
   <div id="gallery" class="gallery"><p class="muted small">Nothing yet.</p></div>
 </footer>
+
+<details id="shipsBox" class="panel galleryPanel" open>
+  <summary><b>Saved ships</b> <span class="muted small">every batch run's saved ships (out/runs), newest first</span> <span id="shipsCount" class="muted small"></span></summary>
+  <select id="shipsRole"><option value="">all roles</option></select>
+  <div id="ships" class="gallery wrap"><p class="muted small">Looking...</p></div>
+</details>
 
 <script type="module" src="app.js"></script>
 </body>

@@ -2,11 +2,13 @@
 // that works best for the role, refining each valid on-brief design with a few evolve generations, and saving the ones that
 // pass under <out>/<role>/<NNN>-<slug>/ (blueprint, render, concept, metrics, check summary, the first valid draft). Rejected
 // attempts are logged, not saved. A running summary.json and a static gallery index.html are rewritten after every ship.
+// Every attempt writes its events as it goes to <out>/attempts/<NNN>-<role>/events.jsonl (the refinement's to refine/
+// under it), so the page's Watch can follow it live, with trace.jsonl beside them; the log lines go to <out>/batch.log too.
 // Built to run unattended: every error is caught and logged, a model server that is down is waited for with a growing
 // delay, a stuck ship is cut off after a time cap, the renderer is restarted when it dies and closed on exit, a full disk
 // stops the loop cleanly, and only small per-ship records are kept in memory. One model call at a time.
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { dirname, join } from 'path';
 import { spawn } from 'child_process';
 import { type Blueprint, serializeBlueprint } from '../../../common/src/ships/index';
 import { type Concept, briefCheck, check, conceptKey, conceptLine, findRole } from '../core/index';
@@ -46,6 +48,8 @@ export interface BatchOptions {
   shipMinutes?: number;
   /** The concept step (default on) */
   concept?: boolean;
+  /** A line of brief for every ship ("a long, narrow hull") */
+  brief?: string;
   /** Let reasoning models think, with a reply budget that fits the loaded context (default on) */
   think?: boolean;
   temperature?: number;
@@ -207,17 +211,20 @@ interface Capture {
   modelErrors: number;
   lastModelError?: string;
   errors: string[];
-  /** The design's steps, replies, grids and feedback, trimmed: written to trace/ for every attempt, to see why one failed */
+  /** The design's steps, replies, grids and feedback, trimmed: written to the attempt's trace.jsonl, to see why one failed */
   trace: Record<string, unknown>[];
 }
 
-const capture = (): { cap: Capture; emit: (e: ShipgenEvent) => void } => {
+/** `events`: a file every event but the tokens is appended to as it comes (what the page's Watch follows) */
+const capture = (events?: string): { cap: Capture; emit: (e: ShipgenEvent) => void } => {
   const cap: Capture = { modelErrors: 0, errors: [], trace: [] };
   const cut = (t: string, n: number) => (t.length > n ? `${t.slice(0, n / 2)}\n...\n${t.slice(-n / 2)}` : t);
+  if (events) try { mkdirSync(dirname(events), { recursive: true }); } catch { events = undefined; }
   return {
     cap,
     // (Only what the batch needs: tokens, previews and the rest are dropped as they come, so memory stays flat)
     emit: (e) => {
+      if (events && e.type !== 'token') try { appendFileSync(events, JSON.stringify(e) + '\n'); } catch { /* (the live record is a view only) */ }
       if (e.type === 'step') cap.trace.push({ type: e.type, step: e.step, status: e.status, round: e.round, note: e.note });
       else if (e.type === 'reply') cap.trace.push({ type: e.type, round: e.round, ms: e.ms, tokens: e.outputTokens, stop: e.stopReason, text: cut(e.text, 4000) });
       else if (e.type === 'grid' && !e.partial) cap.trace.push({ type: e.type, round: e.round, via: e.via, parts: e.parts, text: e.text, errors: e.errors.slice(0, 5) });
@@ -235,7 +242,11 @@ const capture = (): { cap: Capture; emit: (e: ShipgenEvent) => void } => {
 
 export async function runBatch(deps: BatchDeps, o: BatchOptions): Promise<BatchSummary> {
   const now = deps.now ?? Date.now;
-  const log = deps.log ?? ((l: string) => console.log(l));
+  const say = deps.log ?? ((l: string) => console.log(l));
+  const log = (l: string) => {
+    say(l);
+    try { appendFileSync(join(o.outDir, 'batch.log'), `${new Date(now()).toISOString()} ${l}\n`); } catch { /* (no folder yet) */ }
+  };
   const sleep = deps.sleep ?? sleepFor;
   const notify = deps.notify ?? notifyViaScript;
   const ctx = deps.ctx;
@@ -353,17 +364,19 @@ export async function runBatch(deps: BatchDeps, o: BatchOptions): Promise<BatchS
     const signal = AbortSignal.any([master.signal, cap.signal]);
     try {
       const common = {
-        model: o.model, brief: { role }, signal, temperature: o.temperature, timeoutMs: o.timeoutMs, contract: o.contract, mirror: o.mirror,
+        model: o.model, brief: { role, ...(o.brief ? { text: o.brief } : {}) }, signal, temperature: o.temperature, timeoutMs: o.timeoutMs, contract: o.contract, mirror: o.mirror,
         think: o.think !== false, generous: true, render: 'off' as const,
       };
       // ---- Design: concept step, then the build
-      const d = capture();
+      const attempts = join(o.outDir, 'attempts');
+      const adir = join(attempts, `${pad(nextNumber(attempts))}-${role}`);
+      const d = capture(join(adir, 'events.jsonl'));
       const dr = await run(deps, {
         mode: 'design', ...common, build, rounds: o.rounds ?? 5, concept: o.concept !== false, conceptSeed: no, usedConcepts: used, shapeIndex: perRole - 1,
       }, d.emit);
       if (dr.mode !== 'design') throw new Error('mode');
       const out = dr.outcome;
-      try { mkdirSync(join(o.outDir, 'trace'), { recursive: true }); writeFileSync(join(o.outDir, 'trace', `${pad(no)}-${role}.jsonl`), d.cap.trace.map((x) => JSON.stringify(x)).join('\n') + '\n'); } catch { /* (a trace is a diagnostic only) */ }
+      try { mkdirSync(adir, { recursive: true }); writeFileSync(join(adir, 'trace.jsonl'), d.cap.trace.map((x) => JSON.stringify(x)).join('\n') + '\n'); } catch { /* (a trace is a diagnostic only) */ }
       const concept = out.concept ?? d.cap.concept;
       if (concept) { used.push(conceptKey(concept)); if (used.length > 6) used.shift(); }
       if (!out.attempts.length && !stopped()) throw new ModelDownError(d.cap.lastModelError ?? 'the model gave no reply');
@@ -381,7 +394,7 @@ export async function runBatch(deps: BatchDeps, o: BatchOptions): Promise<BatchS
       let gens = 0, draftScore = draft.score, children = 0;
       const G = o.generations ?? 4;
       if (G > 0 && !signal.aborted) {
-        const e = capture();
+        const e = capture(join(adir, 'refine', 'events.jsonl'));
         try {
           const er = await run(deps, {
             mode: 'evolve', ...common, build: 'oneshot', seed: draft.bp, generations: G, population: o.population ?? 3, keep: o.keep ?? 2, patience: o.patience ?? 2,

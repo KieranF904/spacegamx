@@ -23,7 +23,8 @@ export interface WatchRun {
 /** A run that writes nothing for this long (a round takes minutes at most) is taken as stopped */
 export const STALE_MS = 15 * 60000;
 
-const SKIP = new Set(['stills', 'timelapse', 'renders', 'designs']);
+// (A batch's saved ships hold no events; its attempts do, at <batch>/attempts/<NNN>-<role>[/refine])
+const SKIP = new Set(['stills', 'timelapse', 'renders', 'designs', 'trace']);
 
 function readRange(file: string, from: number, to: number): Buffer {
   const fd = openSync(file, 'r');
@@ -35,7 +36,7 @@ function readRange(file: string, from: number, to: number): Buffer {
 }
 
 /** Every folder under `root` (a few levels deep) holding an events.jsonl, newest first */
-export function listWatchRuns(root: string, maxDepth = 4): WatchRun[] {
+export function listWatchRuns(root: string, maxDepth = 7): WatchRun[] {
   const found: WatchRun[] = [];
   const walk = (dir: string, depth: number) => {
     let names: string[];

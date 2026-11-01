@@ -15,7 +15,7 @@
 // Mirror mode is on by default: the model writes the left half and the centre line, the tool mirrors it.
 // LM Studio models are listed only: nothing is sent to LM Studio (it would load the model) unless LMSTUDIO_CHAT=1.
 // Models: "gemma4:12b" (Ollama), "ollama/<name>" or "lmstudio/<name>". Results (designs as blueprints, metrics.json and
-// events.jsonl) go to scripts/shipgen/out/<time>-<mode>-<role>/ (gitignored). Ctrl+C stops cleanly and still writes them.
+// events.jsonl) go to scripts/shipgen/out/runs/<time>-<mode>-<role>/ (gitignored; a batch: out/runs/<time>-batch-<model>/). Ctrl+C stops cleanly and still writes them.
 import { mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'fs';
 import { join, resolve } from 'path';
 import { parseBlueprint, serializeBlueprint, type Blueprint } from '../../common/src/ships/index';
@@ -61,7 +61,7 @@ async function main(): Promise<void> {
   // (A seed with no role named gets the role it fits best, not the starter by default)
   const role = flags.role ?? (seed ? loadRoles(ctx).roles.map((r) => ({ id: r.id, n: briefCheck(ctx, seed, { ...r, example: undefined }).unmet.length })).sort((a, b) => a.n - b.n)[0]?.id : undefined) ?? 'starter';
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  const out = resolve(flags.out ?? join(__dirname, 'out', `${stamp}-${mode}-${role}`));
+  const out = resolve(flags.out ?? join(__dirname, 'out', 'runs', `${stamp}-${mode}-${role}`));
 
   const ac = new AbortController();
   let renderer: Renderer | undefined;
@@ -152,8 +152,8 @@ async function main(): Promise<void> {
 
 /** --mode batch: see loop/batch.ts */
 async function batch(llm: Llm, ctx: ReturnType<typeof loadContext>, models: ModelInfo[], model: string): Promise<void> {
-  const day = new Date().toISOString().slice(0, 10);
-  const out = resolve(flags.out ?? join(__dirname, 'out', 'overnight', day));
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const out = resolve(flags.out ?? join(__dirname, 'out', 'runs', `${stamp}-batch-${model.split('/').pop()!.replace(/[^\w.-]+/g, '_')}`));
   const build = (flags.build ?? 'auto') as 'auto' | 'oneshot' | 'staged';
   if (!['auto', 'oneshot', 'staged'].includes(build)) throw new Error(`--build ${flags.build}: use auto, oneshot or staged`);
   const contract = parseContract(flags.contract ?? 'auto');
@@ -175,7 +175,7 @@ async function batch(llm: Llm, ctx: ReturnType<typeof loadContext>, models: Mode
     roles: flags.roles ? flags.roles.split(',') : undefined, stopFile: flags['stop-file'] ? resolve(flags['stop-file']) : undefined,
     maxShips: num('max-ships'), notifyEveryMins: num('notify-every-mins'), shipMinutes: num('ship-minutes'), generations: num('generations'),
     population: num('population'), patience: num('patience'), rounds: num('rounds'), temperature: num('temperature'),
-    concept: !flags['no-concept'], think: !flags['no-think'], timeoutMs: flags.timeout ? Number(flags.timeout) * 1000 : undefined,
+    concept: !flags['no-concept'], brief: flags.brief, think: !flags['no-think'], timeoutMs: flags.timeout ? Number(flags.timeout) * 1000 : undefined,
   });
   console.log(`batch done: ${JSON.stringify({ saved: s.saved, attempts: s.attempts, perRole: s.perRole, stopReason: s.stopReason })}`);
 }

@@ -105,6 +105,11 @@ body.m-design .only-evolve, body.m-design .only-compare, body.m-evolve .only-com
   .paneBody, .panes.cols2 { grid-template-columns: 1fr; }
 }
 
+.gallery.wrap { flex-wrap: wrap; overflow-x: visible; max-height: 520px; overflow-y: auto; margin-top: 6px; }
+#shipsBox summary { cursor: pointer; }
+#shipsRole { margin-top: 6px; font-size: 11px; width: auto; }
+.follow { font-size: 12px; white-space: nowrap; }
+
 .watchBox { margin: 8px 12px; }
 .watchBox summary { cursor: pointer; }
 .watchList { max-height: 220px; overflow-y: auto; margin-top: 6px; }

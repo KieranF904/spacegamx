@@ -7,7 +7,7 @@ import { anthropicKey, lmStudioToken } from './secrets';
 export type Provider = 'ollama' | 'lmstudio' | 'anthropic';
 
 /** Claude models offered through the Anthropic API ("anthropic/claude-haiku-5-5"). Cloud: never picked by default. */
-export const ANTHROPIC_MODELS = ['claude-haiku-5-5'];
+export const ANTHROPIC_MODELS = ['claude-haiku-5-5', 'claude-sonnet-5-5'];
 
 export interface ModelInfo {
   /** "ollama/gemma4:12b", "lmstudio/qwen3-8b" */

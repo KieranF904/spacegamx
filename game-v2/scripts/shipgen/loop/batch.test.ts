@@ -3,13 +3,15 @@
 import { describe, it, expect, afterAll, afterEach } from 'vitest';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
-import { join } from 'path';
+import { join, relative, sep } from 'path';
 import { parseBlueprint } from '../../../common/src/ships/index';
 import { blueprintToGrid, loadContext } from '../core/index';
 import { ship } from '../core/testShips';
 import { type BatchDeps, type BatchOptions, buildFor, galleryHtml, runBatch } from './batch';
 import { fakeLlm } from './fakeLlm';
 import type { Renderer } from './render';
+import { listSavedShips } from '../web/ships';
+import { listWatchRuns } from '../web/watch';
 
 const real = loadContext();
 const GOOD = blueprintToGrid(real, ship('dev/review-wren')).text;
@@ -101,6 +103,32 @@ describe('shipgen batch mode', () => {
     expect(html).not.toMatch(/https?:\/\//);
     expect(read(join(out, 'summary.json')).saved).toBe(4);
     expect(renderer.closed).toBe(true);
+  });
+
+  it('writes each attempt live for Watch (design, then refine), its trace, a batch.log, and the ships for the Saved list', async () => {
+    const root = tmp();
+    const { out } = await run({ roles: ['alpha'], maxShips: 2, outDir: join(root, 'runs', 'b1') });
+    expect(readdirSync(join(out, 'attempts'))).toEqual(['001-alpha', '002-alpha']);
+    const a = join(out, 'attempts', '001-alpha');
+    const lines = (f: string) => readFileSync(f, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+    const design = lines(join(a, 'events.jsonl'));
+    expect(design[0]).toMatchObject({ type: 'start', mode: 'design', role: 'alpha' });
+    expect(design.at(-1).type).toBe('done');
+    expect(design.some((e) => e.type === 'token')).toBe(false);
+    expect(lines(join(a, 'refine', 'events.jsonl'))[0]).toMatchObject({ type: 'start', mode: 'evolve' });
+    expect(existsSync(join(a, 'trace.jsonl'))).toBe(true);
+    expect(readFileSync(join(out, 'batch.log'), 'utf8')).toMatch(/saved alpha\/001-/);
+    // The page's lists: the attempts are runs to watch (finished), the saved ships one gallery
+    const rel = (p: string) => relative(root, p).split(sep).join('/');
+    expect(listWatchRuns(root).map((r) => r.id)).toEqual(expect.arrayContaining([rel(a), `${rel(a)}/refine`]));
+    expect(listWatchRuns(root).find((r) => r.id === rel(a))?.finished).toBe(true);
+    const ships = listSavedShips(root).filter((s) => s.run === rel(out));
+    expect(ships.length).toBe(2);
+    expect(ships[0]).toMatchObject({ role: 'alpha', model: 'fake' });
+    expect(ships[0].bp).toMatch(/^\/out\/.*\/blueprint\.json$/);
+    // A batch resumed in the same folder numbers its attempts on
+    await run({ roles: ['alpha'], maxShips: 1, outDir: out });
+    expect(readdirSync(join(out, 'attempts'))).toContain('003-alpha');
   });
 
   it('varies the concept across ships: the next ask lists the ones already used', async () => {

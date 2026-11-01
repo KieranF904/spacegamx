@@ -246,14 +246,38 @@ function watch(id) {
   state.watching = id;
   log.clear();
   state.selected = null;
+  watchEnded = false;
   const es = new EventSource(`/api/watch/events?run=${encodeURIComponent(id)}`);
   state.es = es;
   es.onmessage = (m) => { if (state.es === es) onEvent(JSON.parse(m.data)); };
-  es.addEventListener('end', () => { es.close(); if (state.watching === id) setStatus('done'); });
-  es.onerror = () => { if (es.readyState === EventSource.CLOSED && state.watching === id) setStatus('idle'); };
-  setStatus('running', `watching ${id}`);
+  es.addEventListener('end', () => {
+    es.close();
+    if (state.watching !== id) return;
+    setStatus('done'); watchEnded = true;
+    refreshShips();
+    follow();
+  });
+  es.onerror = () => { if (es.readyState === EventSource.CLOSED && state.watching === id) { setStatus('idle'); watchEnded = true; } };
+  setStatus('running', `watching ${short(id)}`);
   renderWatch();
 }
+const short = (id) => id.replace(/^runs\//, '');
+
+// (Follow: the newest live run; when the one watched ends, the next one that starts, e.g. a batch's next attempt)
+let watchEnded = false;
+async function follow() {
+  if (!$('followLatest').checked) return;
+  if (state.run && $('status').textContent === 'running') return;
+  try { watchRuns = (await api('/api/watch')).runs; } catch { return; }
+  if ($('watchBox').open) renderWatch();
+  const cur = state.watching && watchRuns.find((r) => r.id === state.watching);
+  const curLive = cur && !cur.finished && !cur.stale && !watchEnded;
+  const live = watchRuns.find((r) => !r.finished && !r.stale);
+  if (live && live.id !== state.watching && !curLive) watch(live.id);
+  else if (!state.watching && watchRuns[0]) watch(watchRuns[0].id);
+}
+setInterval(follow, 3000);
+$('followLatest').onchange = () => { store.set('follow', $('followLatest').checked); follow(); };
 
 let watchRuns = [];
 function renderWatch() {
@@ -265,8 +289,9 @@ function renderWatch() {
     const row = document.createElement('div');
     row.className = `watchRow${state.watching === r.id ? ' on' : ''}`;
     const when = new Date(r.modified).toLocaleString();
-    row.innerHTML = `<span class="pill ${r.finished ? 'done' : r.stale ? '' : 'running'}">${r.finished ? 'done' : r.stale ? 'stopped?' : 'live?'}</span> <b>${esc(r.id)}</b> <span class="muted small">${esc([r.mode, r.model, r.role].filter(Boolean).join(' · '))} · ${esc(when)}</span>`;
-    row.onclick = () => watch(r.id);
+    row.innerHTML = `<span class="pill ${r.finished ? 'done' : r.stale ? '' : 'running'}">${r.finished ? 'done' : r.stale ? 'stopped?' : 'live?'}</span> <b>${esc(short(r.id))}</b> <span class="muted small">${esc([r.mode, r.model, r.role].filter(Boolean).join(' · '))} · ${esc(when)}</span>`;
+    // (Picking a run by hand stops following the newest)
+    row.onclick = () => { $('followLatest').checked = false; store.set('follow', false); watch(r.id); };
     el.appendChild(row);
   }
 }
@@ -290,6 +315,33 @@ async function refreshGallery() {
     el.appendChild(card);
   }
 }
+
+// ---------------------------------------------------------------------------------------------------------- saved ships
+let savedShips = [];
+async function refreshShips() {
+  try { savedShips = (await api('/api/ships')).ships; } catch { return; }
+  const sel = $('shipsRole'), role = sel.value;
+  const roles = [...new Set(savedShips.map((s) => s.role))].sort();
+  sel.innerHTML = `<option value="">all roles</option>${roles.map((r) => `<option value="${esc(r)}">${esc(r)}</option>`).join('')}`;
+  sel.value = roles.includes(role) ? role : '';
+  const list = savedShips.filter((s) => !sel.value || s.role === sel.value);
+  $('shipsCount').textContent = `(${list.length})`;
+  const el = $('ships');
+  if (!list.length) { el.innerHTML = '<p class="muted small">No saved ships yet.</p>'; return; }
+  el.innerHTML = '';
+  for (const s of list) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.title = `${s.dir}${s.concept ? `\n${s.concept}` : ''}`;
+    card.innerHTML = `${s.png ? `<img src="${esc(s.png)}" alt="" loading="lazy">` : '<div class="noimg">no render</div>'}<b>${esc(s.name)}</b><span>${s.score}</span> <span class="muted">${esc(s.role)} · ${esc((s.model ?? '').replace(/^\w+\//, ''))}</span><div class="muted">${esc(s.savedAt.slice(0, 16).replace('T', ' '))}</div>`;
+    card.onclick = async () => {
+      try { await openDesign(await (await fetch(s.bp)).json(), { name: s.name, url: s.png, role: s.role, score: s.score }); } catch (e) { msg('actMsg', e.message, 'err'); }
+    };
+    el.appendChild(card);
+  }
+}
+$('shipsRole').onchange = refreshShips;
+setInterval(() => { if ($('shipsBox').open) refreshShips(); }, 30000);
 
 /** Shows a design (library or gallery) in the main pane, with its check, and selects it */
 async function openDesign(bp, { name, url, role, score, saved } = {}) {
@@ -394,8 +446,10 @@ $('start').onchange = async () => {
     await loadModels().catch((e) => msg('formMsg', `models: ${e.message}`, 'err'));
     refreshGallery();
     refreshWatch();
+    refreshShips();
+    $('followLatest').checked = store.get('follow') ?? true;
     const { runs } = await api('/api/runs');
-    const live = runs.find((r) => r.status === 'running') ?? runs.at(-1);
-    if (live) attach(live.id);
+    const live = runs.find((r) => r.status === 'running') ?? ($('followLatest').checked ? undefined : runs.at(-1));
+    if (live) attach(live.id); else follow();
   } catch (e) { msg('formMsg', e.message, 'err'); }
 })();

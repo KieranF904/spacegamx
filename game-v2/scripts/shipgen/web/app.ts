@@ -14,6 +14,7 @@ import { legendRows, partCells } from './parts';
 import type { Paths } from './paths';
 import { type PageEvent, type RunFn, Runs } from './runs';
 import { buildUp, renderTimelapse } from './timelapse';
+import { listSavedShips } from './ships';
 import { listWatchRuns, watchStream } from './watch';
 
 export interface AppDeps {
@@ -82,11 +83,10 @@ export function createApp(deps: AppDeps): App {
     const start = form.startBp ? blueprintFrom(form.startBp) : form.startId ? loadLibrary(paths.blueprints, form.startId) : undefined;
     const ac = new AbortController();
     const id = runs.nextId();
-    const outDir = join(paths.out, `${stamp()}-${form.mode ?? 'design'}-${slug(form.role ?? 'free')}-${id}-page`);
+    const outDir = join(paths.out, 'runs', `${stamp()}-${form.mode ?? 'design'}-${slug(form.role ?? 'free')}-${id}-page`);
     const list = await models(true);
     const o = runOptions(ctx, form, list, { outDir, signal: ac.signal, start });
-    mkdirSync(paths.out, { recursive: true });
-    mkdirSync(outDir);
+    mkdirSync(outDir, { recursive: true });
     const renderer = o.render === 'off' ? undefined : await deps.getRenderer();
     const r = runs.start({ ctx, llm, models: list, renderer }, o, { id, ac, outDir });
     // (A record on disk, like the CLI's: events without tokens, and the designs that came best)
@@ -171,6 +171,7 @@ export function createApp(deps: AppDeps): App {
     if (m === 'GET' && p === '/api/watch') return json(res, 200, { runs: listWatchRuns(paths.out) });
     if (m === 'GET' && p === '/api/watch/events') return watchStream(req, res, runs, paths.out, url);
     if (m === 'GET' && p === '/api/gallery') return json(res, 200, { gallery: runs.gallery });
+    if (m === 'GET' && p === '/api/ships') return json(res, 200, { ships: listSavedShips(paths.out) });
     if (m === 'POST' && p === '/api/save') {
       const b = await readJson(req);
       const s = saveGenerated(ctx, paths.dev, blueprintFrom(b.bp), String(b.role || 'free'));
