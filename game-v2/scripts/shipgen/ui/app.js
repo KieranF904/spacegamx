@@ -106,7 +106,7 @@ function formBody() {
   const body = {
     mode: v('mode'), model: v('model'), critic: v('critic'), temperature: n('temperature'), rounds: n('rounds'), role: v('role'),
     maxLevel: n('maxLevel'), note: v('note'), think: f.get('think') === 'on', trials: n('trials'), population: n('population'), generations: n('generations'),
-    build: v('build'), contract: v('contract'), mirror: f.get('mirror') === 'on',
+    build: v('build'), contract: v('contract'), mirror: f.get('mirror') === 'on', concept: f.get('concept') === 'on',
   };
   if (body.mode === 'compare') body.models = [v('model'), v('model2')];
   if (n('cellsMin') || n('cellsMax')) {
@@ -116,7 +116,7 @@ function formBody() {
   const start = v('start');
   if (start === 'sel' && state.start) body.startBp = state.start.bp;
   else if (start && start !== 'sel') body.startId = start;
-  store.set('form', { model: body.model, model2: v('model2'), critic: body.critic ?? '', role: body.role, mode: body.mode, temperature: body.temperature, rounds: body.rounds, build: body.build, contract: body.contract, mirror: body.mirror });
+  store.set('form', { model: body.model, model2: v('model2'), critic: body.critic ?? '', role: body.role, mode: body.mode, temperature: body.temperature, rounds: body.rounds, build: body.build, contract: body.contract, mirror: body.mirror, concept: body.concept });
   return body;
 }
 
@@ -186,10 +186,11 @@ function onEvent(e) {
   switch (e.type) {
     case 'start':
       if (state.watching && e.role && state.roles.some((r) => r.id === e.role)) { $('role').value = e.role; roleChanged(); }
-      state.mode = e.mode; state.checks.clear();
+      state.mode = e.mode; state.checks.clear(); $('conceptNote').textContent = '';
       setupPanes(e.mode, e.models ?? [e.model], e.model);
       setStatus('running', `${e.mode}${e.build === 'staged' ? ' (staged)' : ''} · ${e.models?.join(' vs ') ?? e.model} · ${e.role ?? 'no role'} · ${e.contract}${e.mirror === false ? ' · mirror off' : ' · mirrored'}${e.critic ? ` · critic ${e.critic}` : ''}`);
       break;
+    case 'concept': $('conceptNote').textContent = e.line; break;
     case 'prompt': pane?.newRound(e.round, state.mode === 'design' ? '' : e.lane); $('live').textContent = ''; break;
     case 'token':
       if (e.kind === 'content') pane?.token(e.text);
@@ -386,6 +387,7 @@ $('start').onchange = async () => {
     if (prefs.rounds) $('rounds').value = prefs.rounds;
     if (prefs.build) $('build').value = prefs.build;
     if (prefs.mirror === false) $('mirror').checked = false;
+    if (prefs.concept === false) $('concept').checked = false;
     $('temperature').oninput();
     modeChanged(); roleChanged();
     setupPanes('design', [], 'no run yet');

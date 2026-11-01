@@ -15,6 +15,7 @@
   <span id="live" class="muted mono"></span>
   <button id="stop" class="danger" disabled>Stop</button>
 </header>
+<div id="conceptNote" class="muted" style="padding:2px 12px;font-size:12px"></div>
 
 <details id="watchBox" class="panel watchBox">
   <summary><b>Watch</b> <span class="muted small">runs from the command line (out/**/events.jsonl), read-only</span> <span id="watchCount" class="muted small"></span></summary>
@@ -47,6 +48,7 @@
     <label>Reply format <span id="contractHint" class="muted small"></span>
       <select name="contract" id="contract"><option value="auto">auto (measured per model)</option></select>
     </label>
+    <label class="check"><input type="checkbox" name="concept" id="concept" checked> concept: the model writes a short plan first (silhouette, layout), kept in every later prompt</label>
     <label class="check"><input type="checkbox" name="mirror" id="mirror" checked> mirror: the model draws the left half, the tool mirrors it</label>
     <label>Critic <span class="muted">(optional; vision models rate looks; weight 0: recorded, not scored)</span>
       <select name="critic" id="critic"></select>

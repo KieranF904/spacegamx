@@ -3,7 +3,7 @@
 // each child gets a few repair rounds, and the top K of parents and children carry on. With build: 'staged' the fresh
 // seeds are built in steps (staged.ts); children are always changed whole.
 import type { Blueprint } from '../../../common/src/ships/index';
-import { briefLegend, feedbackMessage } from '../core/index';
+import { briefLegend, feedbackMessage, shapeSuggestion } from '../core/index';
 import { type Attempt, type DesignOptions, type LoopDeps, better, designLoop, gridOf, roleOf, scoreGiven } from './design';
 import type { Emit, EvolveMetrics } from './events';
 import { mutationsFor, pickMutation, rngOf } from './mutations';
@@ -19,6 +19,10 @@ export interface EvolveOptions extends Omit<DesignOptions, 'start' | 'rounds' | 
   /** Start from this design instead of fresh ones */
   seed?: Blueprint;
   rngSeed?: number;
+  /** Stop early when the best score has not improved for this many generations (default: never) */
+  patience?: number;
+  /** Offer "shape the outline" as a change, with the square corners named (on a valid parent that has some) */
+  shapeHints?: boolean;
 }
 
 export interface Individual { id: string; a: Attempt }
@@ -64,12 +68,18 @@ export async function evolveLoop(deps: LoopDeps, o: EvolveOptions, emit: Emit): 
   report(0);
 
   // ---- Generations
+  let stale = 0;
   for (let gen = 1; gen <= G && pop.length && !cancelled && !o.signal?.aborted; gen++) {
+    const bestBefore = pop[0]?.a.score ?? 0, wasValid = !!pop[0]?.a.valid;
     const kids: Individual[] = [];
     for (let c = 0; c < P && !o.signal?.aborted; c++) {
       // (Parents by rank: the best more often)
       const parent = pop[Math.min(pop.length - 1, Math.floor(rng() * rng() * pop.length))];
-      const m = pickMutation(mutationsFor(parent.a.result, parent.a.brief, legend), rng);
+      const menu = mutationsFor(parent.a.result, parent.a.brief, legend);
+      // (Square corners left on a valid parent: named, as the shape step does in a staged build)
+      const corners = o.shapeHints && parent.a.bp && parent.a.valid ? shapeSuggestion(ctx, parent.a.bp, o.mirror !== false) : null;
+      if (corners) menu.push({ instruction: `shape the outline: ${corners.replace(/^Outline: /, '')} Keep every gun, engine and power part exactly as it is`, weight: 3, why: 'square corners' });
+      const m = pickMutation(menu, rng);
       const lane = `g${gen}#${c + 1}`;
       emit({ type: 'mutation', gen, child: c + 1, parent: parent.id, instruction: m.instruction });
       const feedback = parent.a.result ? feedbackMessage({ result: parent.a.result, brief: parent.a.brief, maxItems: 5 }) : undefined;
@@ -81,6 +91,8 @@ export async function evolveLoop(deps: LoopDeps, o: EvolveOptions, emit: Emit): 
     pop = rank([...pop, ...kids]).slice(0, K);
     metrics.generations = gen;
     report(gen);
+    stale = (pop[0]?.a.score ?? 0) > bestBefore || (!wasValid && pop[0]?.a.valid) ? 0 : stale + 1;
+    if (o.patience && stale >= o.patience) break;
   }
   metrics.ms = now() - t0;
   return { survivors: pop, best: pop[0], metrics, cancelled: cancelled || !!o.signal?.aborted };

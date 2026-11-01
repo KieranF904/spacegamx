@@ -43,6 +43,7 @@ export class StepLog {
       case 'start':
         this.add(L, 0, `<b>${esc(e.mode)}</b> with ${esc(e.models?.join(' vs ') ?? e.model)}${e.critic ? `, critic ${esc(e.critic)}` : ''}; role ${esc(e.role ?? 'none')}; ${esc(e.contract)} replies; mirror ${e.mirror === false ? 'off' : 'on'}${e.build === 'staged' ? '; staged build' : ''}`);
         break;
+      case 'concept': this.add(L, 0, `<b>concept</b>${e.note ? ` <span class="muted">(${esc(e.note)})</span>` : ''}: ${esc(e.line)}`, 'good'); break;
       case 'brief':
         this.add(L, 0, fold(`brief (${e.legendCodes} codes, system prompt ${e.promptChars} chars)`, e.text));
         break;

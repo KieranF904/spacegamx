@@ -137,7 +137,7 @@ describe('shipgen page server', () => {
     const prev = currentLlm;
     currentLlm = fakeLlm(['name: S\nparts:\nCR -1,0\nBT -1,-1\nend', 'name: S\nparts:\nPI^ -2,0\nend', 'name: S\nparts:\nBT -1,1\nIDv -1,2\nend', 'name: S\nparts:\nAA -3,0\nend'], [fakeModel('fake')]);
     try {
-      const r = await post('/api/runs', { mode: 'design', model: 'ollama/fake', role: 'starter', build: 'staged', contract: 'parts', rounds: 1, mirror: true });
+      const r = await post('/api/runs', { mode: 'design', model: 'ollama/fake', role: 'starter', build: 'staged', contract: 'parts', rounds: 1, mirror: true, concept: false });
       expect(r.status).toBe(200);
       const ev = await stream(r.body.id);
       expect(ev[0]).toMatchObject({ type: 'start', build: 'staged', contract: 'parts', mirror: true });
@@ -216,7 +216,7 @@ describe('shipgen page server', () => {
   it('runs one at a time, and Stop ends a run', async () => {
     currentLlm = hangingLlm();
     try {
-      const r = await post('/api/runs', { mode: 'design', model: 'ollama/slow', role: 'starter', rounds: 3 });
+      const r = await post('/api/runs', { mode: 'design', model: 'ollama/slow', role: 'starter', rounds: 3, concept: false });
       expect(r.status).toBe(200);
       expect((await post('/api/runs', { mode: 'design', model: 'ollama/slow', role: 'starter' })).status).toBe(409);
       const events = stream(r.body.id);

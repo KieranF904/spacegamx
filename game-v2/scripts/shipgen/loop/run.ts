@@ -25,6 +25,7 @@ export async function run(deps: LoopDeps, o: RunOptions, emitRaw: (e: ShipgenEve
   const emit: Emit = (e) => emitRaw({ ...e, t: now() - t0 } as ShipgenEvent);
   const model = o.mode === 'compare' ? o.models[0] : o.model;
   const { signal: _s, seed: _seed, ...shown } = o as RunOptions & { signal?: unknown; seed?: unknown };
+  if (typeof shown.concept === 'object') shown.concept = true; // (the start event shows that a concept was on, not the concept)
   // (A model listed but not to be asked, such as LM Studio's while its chat is off: refuse before any request)
   deps.models ??= await deps.llm.list().catch(() => []);
   for (const id of [...(o.mode === 'compare' ? o.models : [o.model]), ...(o.critic ? [o.critic] : [])]) {
@@ -61,7 +62,7 @@ export function designMetrics(model: string, r: DesignOutcome, renderMs: number[
     kind: 'design', model, rounds: r.attempts.length, firstValidRound: r.firstValidRound,
     // (A staged build is valid only once a step after the power-only skeleton was accepted)
     valid: !!r.best?.valid && (!r.steps || r.steps.accepted.some((s) => s !== 'power')),
-    bestScore: r.best?.score ?? 0, unreadable: r.unreadable, truncated: r.truncated, ...(r.steps ? { steps: r.steps } : {}), ms: r.ms,
+    bestScore: r.best?.score ?? 0, unreadable: r.unreadable, truncated: r.truncated, ...(r.steps ? { steps: r.steps } : {}), ...(r.concept ? { concept: r.concept } : {}), ms: r.ms,
     outputTokens: r.attempts.reduce((a, x) => a + (x.outputTokens ?? 0), 0),
     tokensPerSec: tps.length ? Math.round((tps.reduce((a, b) => a + b, 0) / tps.length) * 10) / 10 : null,
     renderMs: [...renderMs],

@@ -1,7 +1,7 @@
 // What the design loop reports, in order, for the CLI and the page. Every event carries `t` (ms since the run began)
 // and, in compare and evolve runs, a `lane` (the model, or "gen 2 #3") saying which line of work it belongs to.
 import type { Blueprint } from '../../../common/src/ships/index';
-import type { BriefCheck, CheckResult, GridError } from '../core/index';
+import type { BriefCheck, CheckResult, Concept, ConceptHint, GridError } from '../core/index';
 import type { Contract } from './contracts';
 
 export type Mode = 'design' | 'evolve' | 'compare';
@@ -32,18 +32,20 @@ export interface CheckEvent extends Base { type: 'check'; round: number; valid: 
 export interface FeedbackEvent extends Base { type: 'feedback'; round: number; text: string }
 export interface RenderEvent extends Base { type: 'render'; round: number; path: string; ms: number }
 export interface CriticEvent extends Base { type: 'critic'; round: number; model: string; looks: number | null; reason: string; ms: number }
-export interface ScoreEvent extends Base { type: 'score'; round: number; score: number; parts: { check: number; briefPenalty: number; asymmetry?: number; looks?: number } }
+export interface ScoreEvent extends Base { type: 'score'; round: number; score: number; parts: { check: number; briefPenalty: number; asymmetry?: number; concept?: number; looks?: number } }
 export interface BestEvent extends Base { type: 'best'; round: number; score: number; valid: boolean; name: string; bp: Blueprint; renderPath?: string }
 /** Staged build: a step begins, is accepted, or runs out of tries (the ship stays as it was) */
 export interface StepEvent extends Base { type: 'step'; step: string; index: number; of: number; status: 'start' | 'accepted' | 'failed' | 'skipped'; round: number; note?: string }
 export interface MutationEvent extends Base { type: 'mutation'; gen: number; child: number; parent: string; instruction: string }
 export interface GenerationEvent extends Base { type: 'generation'; gen: number; population: { id: string; score: number; valid: boolean; name: string }[] }
+/** The concept written before the first design round (or the fallback made when none could be read) */
+export interface ConceptEvent extends Base { type: 'concept'; concept: Concept; line: string; ms: number; hint?: ConceptHint; note?: string }
 export interface ErrorEvent extends Base { type: 'error'; round?: number; message: string; fatal: boolean }
 export interface DoneEvent extends Base { type: 'done'; metrics: DesignMetrics | EvolveMetrics | CompareMetrics; cancelled: boolean }
 
 export type ShipgenEvent =
   | StartEvent | BriefEvent | PromptEvent | TokenEvent | ReplyEvent | GridEvent | CheckEvent | FeedbackEvent
-  | RenderEvent | CriticEvent | ScoreEvent | BestEvent | StepEvent | MutationEvent | GenerationEvent | ErrorEvent | DoneEvent;
+  | RenderEvent | CriticEvent | ScoreEvent | BestEvent | StepEvent | ConceptEvent | MutationEvent | GenerationEvent | ErrorEvent | DoneEvent;
 
 export type Emit = (e: DistributiveOmit<ShipgenEvent, 't'> & { t?: number }) => void;
 export type DistributiveOmit<T, K extends keyof any> = T extends unknown ? Omit<T, K> : never;
@@ -62,6 +64,8 @@ export interface DesignMetrics {
   truncated: number;
   /** Staged build: steps accepted and failed */
   steps?: { accepted: string[]; failed: string[] };
+  /** The concept the design followed */
+  concept?: Concept;
   ms: number;
   outputTokens: number;
   tokensPerSec: number | null;

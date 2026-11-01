@@ -4,7 +4,7 @@
 import { join } from 'path';
 import type { Blueprint } from '../../../common/src/ships/index';
 import {
-  type Brief, type BriefCheck, type CheckResult, type CodeDef, type DecodeResult, type GridError, type Role, type ShipgenContext,
+  type Brief, type BriefCheck, type CheckResult, type CodeDef, type Concept, conceptBlock, conceptLine, conceptPenalty, type DecodeResult, type GridError, type Role, type ShipgenContext,
   CodeBook, withShape, asymmetricCells, blueprintToGrid, briefCheck, briefLegend, briefText, check, designText, feedbackMessage, findRole, mirrorHalf, shapeSuggestion, systemPrompt,
 } from '../core/index';
 import type { Emit } from './events';
@@ -15,6 +15,7 @@ import { autoContract } from './modelPrefs';
 import type { Renderer } from './render';
 import { critique } from './critic';
 import { stagedLoop } from './staged';
+import { conceptStep } from './concept';
 
 export interface LoopDeps {
   ctx: ShipgenContext;
@@ -62,6 +63,16 @@ export interface DesignOptions {
   signal?: AbortSignal;
   /** Which of the role's shapes to ask for (compare: the trial; default: one at random); brief.shape set wins */
   shapeIndex?: number;
+  /**
+   * The concept step: true asks the model for a short concept before the first round (a design that begins from a given
+   * ship doesn't), a Concept is used as given. Off by default here; the CLI and the page turn it on.
+   */
+  concept?: boolean | Concept;
+  /** Variation: a number, and the one-line forms of concepts already used this session (conceptKey) */
+  conceptSeed?: number;
+  usedConcepts?: string[];
+  /** Size the reply budget to the model's loaded context (minus the prompt), and let reasoning models think */
+  generous?: boolean;
   /** Begin from a design (evolve): the design (bp, shown in the contract's form; or its grid text), the change to make, and its check */
   start?: { text?: string; bp?: Blueprint; instruction: string; feedback?: string };
 }
@@ -100,6 +111,8 @@ export interface DesignOutcome {
   truncated: number;
   /** Staged build: the steps that were accepted and those that ran out of tries */
   steps?: { accepted: string[]; failed: string[] };
+  /** The concept the design followed */
+  concept?: Concept;
   cancelled: boolean;
   ms: number;
 }
@@ -171,7 +184,12 @@ export class Session {
   readonly role?: Role;
   readonly mirror: boolean;
   readonly C: ContractDef;
-  readonly budget: number;
+  /** Reply budget in tokens (with `generous`, refitted to the context at every ask) */
+  budget: number;
+  /** The concept the design follows, when it has one */
+  readonly concept?: Concept;
+  /** Loaded context of the model, when known */
+  readonly loadedContext?: number;
   readonly maxRows: number;
   readonly maxCols: number;
   readonly weights: Record<string, number> | undefined;
@@ -190,7 +208,9 @@ export class Session {
     // (A thinking model may think even when told not to (qwen3-vl): room for the thinking as well as the grid)
     const thinks = !!deps.models?.find((m) => m.id === fullId(o.model))?.thinking || (!!o.think && fullId(o.model).startsWith('anthropic/'));
     // (8192: a mid-size ship's grid is about 4k tokens, and a capital's more; runaway replies are stopped by the line limit below)
-    this.budget = o.maxTokens ?? (thinks ? 12288 : 8192);
+    this.budget = o.maxTokens ?? (thinks ? (o.generous ? 16384 : 12288) : 8192);
+    this.loadedContext = deps.models?.find((m) => m.id === fullId(o.model))?.loadedContext;
+    if (typeof o.concept === 'object') this.concept = o.concept;
     // (Grid lines, the column-number line included, past which a reply is a runaway; a part list gets more lines)
     const lines = this.C.form === 'parts' ? (this.role?.size?.cells?.[1] ?? 100) + 4 : 2 * (this.role?.size?.maxHeight ?? 20);
     this.maxRows = lines + 6;
@@ -202,6 +222,19 @@ export class Session {
   }
 
   ask(mirrorNote = true): string { return this.C.ask(this.mirror && mirrorNote); }
+
+  /** The concept as a block for the design prompt ('' without one) */
+  conceptBlock(): string { return this.concept ? `${conceptBlock(this.concept)}\n` : ''; }
+
+  /** The concept as one line for a feedback message ('' without one) */
+  conceptLine(): string { return this.concept ? `${conceptLine(this.concept)} Keep to it.\n` : ''; }
+
+  /** With `generous`: the reply budget that fits the loaded context after this prompt (a thinking model needs room to think and write) */
+  private fitBudget(messages: ChatMessage[]): void {
+    if (!this.o.generous || this.o.maxTokens !== undefined || !this.loadedContext) return;
+    const prompt = Math.ceil(messages.reduce((a, m) => a + m.content.length, 0) / 3);
+    this.budget = Math.max(2048, Math.min(32768, this.loadedContext - prompt - 256));
+  }
 
   bounds(): { w: number; h: number } { return { w: this.role?.size?.maxWidth ?? 20, h: this.role?.size?.maxHeight ?? 20 }; }
 
@@ -223,6 +256,7 @@ export class Session {
   async chat(round: number, messages: ChatMessage[]): Promise<Asked | 'cancelled' | 'failed' | 'retry'> {
     const { o, ctx, emit, C } = this;
     const last = messages[messages.length - 1];
+    this.fitBudget(messages);
     emit({ type: 'prompt', round, ...(round === 1 ? { system: messages[0].content } : {}), user: last.content, messages: messages.length, chars: messages.reduce((a, m) => a + m.content.length, 0) });
     let sofar = '', shown = 0, wide = false, runaway = false, far = false, farAt = '';
     const stopper = new AbortController();
@@ -346,8 +380,10 @@ ${r.feedback}` : cut } : r);
 ${shape}`;
     await renderAndCritique(this.deps, this.o, a, this.stats, emit);
     const s = scoreOf(result, bc, a.looks, this.o.criticWeight ?? 0);
-    a.score = Math.max(0, Math.round((s.score - asymPoints) * 10) / 10);
-    emit({ type: 'score', round, score: a.score, parts: { check: result.score, briefPenalty: s.penalty, ...(asymPoints ? { asymmetry: asymPoints } : {}), ...(a.looks ? { looks: a.looks } : {}) } });
+    // (A small term for keeping to the concept: its size class and cell count against the ship's cells)
+    const cp = conceptPenalty(this.role, this.concept, result.stats.cells);
+    a.score = Math.max(0, Math.round((s.score - asymPoints - cp.points) * 10) / 10);
+    emit({ type: 'score', round, score: a.score, parts: { check: result.score, briefPenalty: s.penalty, ...(asymPoints ? { asymmetry: asymPoints } : {}), ...(cp.points ? { concept: cp.points } : {}), ...(a.looks ? { looks: a.looks } : {}) } });
     return finish({ attempt: a, drawn, feedback, readable: true, said: ex.text });
   }
 }
@@ -369,7 +405,16 @@ export function scoreGiven(ctx: ShipgenContext, bp: Blueprint, role: Role | unde
 
 export async function designLoop(deps: LoopDeps, o: DesignOptions, emit: Emit): Promise<DesignOutcome> {
   if (!o.start) o = { ...o, brief: withShape(deps.ctx, o.brief, o.shapeIndex ?? Math.floor(Math.random() * 1000)) };
-  if (o.build === 'staged') return stagedLoop(deps, o, emit);
+  // (The concept step: once, before the first round; a design begun from a given ship asks for none unless one is given)
+  let concept: Concept | undefined;
+  if (o.concept && !(o.concept === true && o.start)) {
+    concept = await conceptStep(deps, o, emit);
+    o = { ...o, concept: concept ?? false };
+  } else if (o.concept === true) o = { ...o, concept: false };
+  if (o.build === 'staged') {
+    const r = await stagedLoop(deps, o, emit);
+    return concept ? { ...r, concept } : r;
+  }
   const { ctx } = deps;
   const S = new Session(deps, o, await contractFor(deps, o.model, o.contract), emit);
   const t0 = S.now();
@@ -379,8 +424,8 @@ export async function designLoop(deps: LoopDeps, o: DesignOptions, emit: Emit): 
 
   const startText = o.start ? (o.start.bp ? S.show(o.start.bp) : o.start.text ?? '') : '';
   const first = o.start
-    ? `Here is a design${S.mirror && o.start.bp ? ' (its left half and centre line)' : ''}:\n${startText}\n\n${o.start.feedback ? `Its check:\n${o.start.feedback}\n\n` : ''}Change it: ${o.start.instruction}. Keep what already works.\n${S.ask()}`
-    : `Design the ship now.\n${S.ask()}`;
+    ? `Here is a design${S.mirror && o.start.bp ? ' (its left half and centre line)' : ''}:\n${startText}\n\n${o.start.feedback ? `Its check:\n${o.start.feedback}\n\n` : ''}Change it: ${o.start.instruction}. Keep what already works.\n${S.conceptBlock()}${S.ask()}`
+    : `Design the ship now.\n${S.conceptBlock()}${S.ask()}`;
   const head: ChatMessage[] = [{ role: 'system', content: system }, { role: 'user', content: first }];
   let tail: ChatMessage[] = [];
   const out: DesignOutcome = { attempts: [], firstValidRound: null, firstPassRound: null, unreadable: 0, truncated: 0, cancelled: false, ms: 0 };
@@ -411,7 +456,7 @@ export async function designLoop(deps: LoopDeps, o: DesignOptions, emit: Emit): 
       const again = !!key && seen.has(key);
       if (key) seen.add(key);
       if (again) S.heat();
-      const msg = `${again ? 'You sent this same design before, and it has the same problems: change the parts the errors name.\n' : ''}${r.feedback}\n${S.ask()}`;
+      const msg = `${again ? 'You sent this same design before, and it has the same problems: change the parts the errors name.\n' : ''}${r.feedback}\n${S.conceptLine()}${S.ask()}`;
       emit({ type: 'feedback', round, text: msg });
       // (What it said, kept short: the design as read, not the thinking aloud around it)
       const said = r.said ? (S.C.id === 'grid-json' && /^\s*\{/.test(a.reply.trim()) ? a.reply.trim() : r.said) : a.reply.slice(-1500);
@@ -419,6 +464,7 @@ export async function designLoop(deps: LoopDeps, o: DesignOptions, emit: Emit): 
     }
   }
   out.ms = S.now() - t0;
+  if (concept) out.concept = concept;
   return out;
 }
 

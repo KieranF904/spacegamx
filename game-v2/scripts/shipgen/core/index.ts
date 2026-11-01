@@ -18,3 +18,6 @@ export {
   type Brief, type FeedbackInput, type DesignForm, type PromptOptions, rulesText, rulesShort, shapeSuggestion, shownLegend, withShape, formatText, partsFormatText, mirrorText, designText, briefLegend, briefText,
   systemPrompt, feedbackMessage,
 } from './prompt';
+export {
+  type Concept, type ConceptHint, type SizeClass, CONCEPT_SCHEMA, CONCEPT_TOKENS, classRange, conceptBlock, conceptKey, conceptLine, conceptPenalty, conceptRequest, fallbackConcept, parseConcept,
+} from './concept';

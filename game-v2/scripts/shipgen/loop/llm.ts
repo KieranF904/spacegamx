@@ -24,6 +24,8 @@ export interface ModelInfo {
   /** Takes a JSON schema for its reply */
   structured: boolean;
   contextLength?: number;
+  /** The context the model is loaded with right now (LM Studio loaded_instances), when it is loaded */
+  loadedContext?: number;
   params?: string;
   sizeBytes?: number;
   /** Listed but not to be asked: why (LM Studio while its chat is off: asking would load the model there) */
@@ -163,6 +165,7 @@ export function createLlm(opts: LlmOptions = {}): Llm {
         id: `lmstudio/${m.key}`, provider: 'lmstudio' as const, name: m.key, cloud: false,
         vision: !!m.capabilities?.vision, chat: true, thinking: !!m.capabilities?.reasoning, structured: true,
         contextLength: m.max_context_length, params: m.params_string, sizeBytes: m.size_bytes, ...off,
+        ...(Number(m.loaded_instances?.[0]?.config?.context_length) > 0 ? { loadedContext: Number(m.loaded_instances[0].config.context_length) } : {}),
       }));
     }
     // (/api/v0/models says vlm/llm/embeddings; the OpenAI list doesn't)

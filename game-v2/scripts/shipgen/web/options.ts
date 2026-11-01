@@ -31,6 +31,8 @@ export interface RunForm {
   contract?: string;
   /** Mirror mode (default on) */
   mirror?: boolean;
+  /** The concept step (default on) */
+  concept?: boolean;
 }
 
 const num = (x: unknown, lo: number, hi: number, d?: number) => {
@@ -74,7 +76,7 @@ export function runOptions(ctx: ShipgenContext, f: RunForm, models: ModelInfo[],
   const common = {
     brief, rounds: num(f.rounds, 1, 20, build === 'staged' ? 3 : 4), temperature: num(f.temperature, 0, 2, 0.6), think: !!f.think,
     ...(f.critic ? { critic: known(models, f.critic, 'critic', true) } : {}),
-    render: f.render ?? 'auto', outDir: opts.outDir, signal: opts.signal, contract, mirror: f.mirror !== false, build,
+    render: f.render ?? 'auto', outDir: opts.outDir, signal: opts.signal, contract, mirror: f.mirror !== false, build, concept: f.concept !== false,
   };
   if (mode === 'compare') {
     const ms = (f.models ?? []).filter(Boolean).map((m) => known(models, m, 'designer'));

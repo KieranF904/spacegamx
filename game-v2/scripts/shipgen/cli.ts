@@ -7,6 +7,10 @@
 //   npx tsx scripts/shipgen/cli.ts --model gemma4:12b --role gunship --build staged --rounds 3   (skeleton, then power, guns, engines, armour)
 //   ... --contract auto|grid-text|grid-json|parts (auto: the model's measured best, loop/modelPrefs.ts)  --no-mirror (draw the whole ship)
 //   ... --critic qwen3-vl:8b (optional: a vision model rates valid designs' looks; --critic-weight 0.1 to count it, default 0)
+//   ... --no-concept (skip the concept step: a short plan the model writes first, kept in every later prompt)
+//   npx tsx scripts/shipgen/cli.ts --mode batch --model <id> [--roles starter,gunship,beam_frigate,missile_boat,hauler,capital] [--build auto|staged|oneshot]
+//       [--out <dir>] [--stop-file <path>] [--max-ships N] [--notify-every-mins 60] [--ship-minutes 45] [--generations 4] [--patience 2] [--rounds 5]
+//       (overnight: loops over the roles until Ctrl+C, the stop file, or N ships; saves valid on-brief ships under <out>/<role>/<NNN>-<slug>/ with a gallery index.html)
 //   ... --render auto|valid|all|off  --out <dir>  --brief "a needle-nosed interceptor"  --think  --temperature 0.6  --timeout 600 --verbose
 // Mirror mode is on by default: the model writes the left half and the centre line, the tool mirrors it.
 // LM Studio models are listed only: nothing is sent to LM Studio (it would load the model) unless LMSTUDIO_CHAT=1.
@@ -16,6 +20,7 @@ import { mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'fs';
 import { join, resolve } from 'path';
 import { parseBlueprint, serializeBlueprint, type Blueprint } from '../../common/src/ships/index';
 import { briefCheck, loadContext, loadRoles } from './core/index';
+import { type ModelInfo, type Llm, runBatch } from './loop/index';
 import {
   type Attempt, type LoopDeps, type Renderer, type RunOptions, type ShipgenEvent,
   autoContract, createLlm, defaultModel, nativeRenderer, parseContract, run,
@@ -41,7 +46,7 @@ async function main(): Promise<void> {
     if (!(await llm.list()).some((m) => m.provider === 'lmstudio')) console.log('(LM Studio: nothing listed: not running, or no LM_API_TOKEN in the environment or game-v2/.env)');
     return;
   }
-  const mode = (flags.mode ?? 'design') as RunOptions['mode'];
+  const mode = (flags.mode ?? 'design') as RunOptions['mode'] | 'batch';
   const ctx = loadContext();
   const models = await llm.list().catch(() => []);
   const pick = (id: string | undefined, vision = false) => {
@@ -50,6 +55,7 @@ async function main(): Promise<void> {
     if (!d) throw new Error(`no local ${vision ? 'vision ' : ''}model found: name one with --model`);
     return d.id;
   };
+  if (mode === 'batch') { await batch(llm, ctx, models, pick(flags.model)); return; }
   // (Everything that can throw is checked first; the renderer service is started last, and always stopped)
   const seed: Blueprint | undefined = flags.seed ? parseBlueprint(readFileSync(flags.seed, 'utf8')) : undefined;
   // (A seed with no role named gets the role it fits best, not the starter by default)
@@ -72,7 +78,7 @@ async function main(): Promise<void> {
   const common = {
     brief: { role, ...(flags.brief ? { text: flags.brief } : {}), ...(flags.name ? { name: flags.name } : {}) },
     rounds: num('rounds'), contract, mirror: !flags['no-mirror'], build, temperature: num('temperature'), think: flags.think === 'true',
-    critic: flags.critic, criticWeight: num('critic-weight'), render: renderMode, outDir: out, signal: ac.signal,
+    concept: !flags['no-concept'], critic: flags.critic, criticWeight: num('critic-weight'), render: renderMode, outDir: out, signal: ac.signal,
     timeoutMs: flags.timeout ? Number(flags.timeout) * 1000 : undefined,
   };
   const opts: RunOptions = mode === 'compare'
@@ -95,6 +101,7 @@ async function main(): Promise<void> {
     const s = (x: number) => `${(x / 1000).toFixed(1)}s`;
     switch (e.type) {
       case 'start': console.log(`shipgen ${e.mode}${e.build === 'staged' ? ' (staged build)' : ''}: ${e.models?.join(' vs ') ?? e.model}, role ${e.role}, ${e.contract} replies, mirror ${e.mirror === false ? 'off' : 'on'}${e.critic ? `, critic ${e.critic}` : ''} -> ${out}`); break;
+      case 'concept': console.log(`${L}concept${e.note ? ` (${e.note})` : ''}: ${e.line} (${s(e.ms)})`); break;
       case 'step': console.log(`${L}step ${e.index}/${e.of} ${e.step}: ${e.status}${e.note ? ` (${e.note})` : ''}`); break;
       case 'brief': console.log(`${L}brief: ${e.text.split('\n')[0]} (${e.legendCodes} codes, prompt ${e.promptChars} chars)`); break;
       case 'prompt': tokens = 0; process.stdout.write(`${L}round ${e.round}: asking (${e.messages} messages, ${e.chars} chars) `); break;
@@ -141,6 +148,36 @@ async function main(): Promise<void> {
   } finally {
     await renderer?.close();
   }
+}
+
+/** --mode batch: see loop/batch.ts */
+async function batch(llm: Llm, ctx: ReturnType<typeof loadContext>, models: ModelInfo[], model: string): Promise<void> {
+  const day = new Date().toISOString().slice(0, 10);
+  const out = resolve(flags.out ?? join(__dirname, 'out', 'overnight', day));
+  const build = (flags.build ?? 'auto') as 'auto' | 'oneshot' | 'staged';
+  if (!['auto', 'oneshot', 'staged'].includes(build)) throw new Error(`--build ${flags.build}: use auto, oneshot or staged`);
+  const contract = parseContract(flags.contract ?? 'auto');
+  if (!contract) throw new Error(`--contract ${flags.contract}: use auto, grid-text, grid-json or parts`);
+  const ac = new AbortController();
+  let renderer: Renderer | undefined;
+  const onSignal = () => {
+    if (ac.signal.aborted) { Promise.race([renderer?.close(), new Promise((r) => setTimeout(r, 3000))]).catch(() => {}).finally(() => process.exit(130)); return; }
+    console.error('\n[shipgen] stopping after this step (Ctrl+C again to quit now)');
+    ac.abort();
+  };
+  process.on('SIGINT', onSignal);
+  process.on('SIGTERM', onSignal);
+  const s = await runBatch({
+    ctx, llm, models,
+    makeRenderer: flags.render === 'off' ? undefined : async () => (renderer = await nativeRenderer({ keep: !!flags['keep-render'] })),
+  }, {
+    model, outDir: out, build, signal: ac.signal, contract, mirror: !flags['no-mirror'],
+    roles: flags.roles ? flags.roles.split(',') : undefined, stopFile: flags['stop-file'] ? resolve(flags['stop-file']) : undefined,
+    maxShips: num('max-ships'), notifyEveryMins: num('notify-every-mins'), shipMinutes: num('ship-minutes'), generations: num('generations'),
+    population: num('population'), patience: num('patience'), rounds: num('rounds'), temperature: num('temperature'),
+    concept: !flags['no-concept'], think: !flags['no-think'], timeoutMs: flags.timeout ? Number(flags.timeout) * 1000 : undefined,
+  });
+  console.log(`batch done: ${JSON.stringify({ saved: s.saved, attempts: s.attempts, perRole: s.perRole, stopReason: s.stopReason })}`);
 }
 
 const summary = (a: Attempt) => ({ round: a.round, valid: a.valid, score: a.score, looks: a.looks, reason: a.reason, errors: a.result?.errors.length, unmet: a.brief?.unmet, render: a.renderPath, ms: a.ms, tokensPerSec: a.tokensPerSec });

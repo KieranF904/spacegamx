@@ -12,3 +12,5 @@ export { type Attempt, type DesignOptions, type DesignOutcome, type LoopDeps, be
 export { type EvolveOptions, type EvolveOutcome, type Individual, evolveLoop } from './evolve';
 export { type CompareOptions, type CompareOutcome, compareLoop } from './compare';
 export { type RunOptions, type RunOutcome, designMetrics, run, runEvents } from './run';
+export { type BatchOptions, type BatchDeps, type BatchSummary, type ShipRecord, BUILD_BY_ROLE, DEFAULT_ROLES, buildFor, galleryHtml, nextNumber, runBatch, scanShips } from './batch';
+export { conceptStep, hintFor } from './concept';
