@@ -10,7 +10,7 @@ import { hasComponent } from 'bitecs';
 import {
   Position, Velocity, Player, InSystem, ShipState, Vec2, damagePart, coreHp, healPart, restorePart, hitMultiplier,
   type HitInfo, warmthStage, warmthPercent, insulationOf, THAW, WARMTH_STAGES, type WarmthStage, fartherThan,
-  nearestParts, partDistance, standing, stageOf, currentStage, RUIN_HP, seededRng, hashInts, MARK_TAKEN,
+  nearestParts, castParts, partDistance, standing, stageOf, currentStage, RUIN_HP, seededRng, hashInts, MARK_TAKEN,
 } from '@space-game/common';
 import { GLANCING, STAGE_COVER, EMP_IMMUNE_TICKS, type PendingBlast, type BridgeCtx } from './core.js';
 
@@ -271,7 +271,33 @@ export function empTicksLeft(b: BridgeCtx, eid: number): number {
  * The outer layer shields what's behind it: only the few parts nearest the
  * blast take it, so a buried core survives a burst against the hull.
  */
-export function splashAt(b: BridgeCtx, systemNum: number, x: number, y: number, radius: number, damage: number, source: number, hit?: HitInfo): void {
+/** What each standing part between an overhead blast and the part it hurts lets through (a shell lobbed to a point inside a hull) */
+export const OVERHEAD_LAYER = 0.6;
+const OVERHEAD_LAYERS = 4;
+
+/**
+ * How much of an overhead blast reaches `part`: it came down from `from` (world), so the parts between the two
+ * (up to four) take the brunt, each letting 0.6 of it through. A blast on the hull's outside is unchanged; one aimed
+ * at a buried core is mostly spent on what covers it.
+ */
+function overheadShare(b: BridgeCtx, eid: number, ship: ShipState, part: number, from: Vec2): number {
+  const geoms = b.geometry(ship), g = geoms[part];
+  if (!g) return 1;
+  const [ox, oy] = b.worldToGrid(eid, ship, from[0], from[1]);
+  const [cx, cy] = g.centroid;
+  const own = castParts(geoms, (j) => j === part && standing(b.catalog, ship, j), ox, oy, cx, cy);
+  if (!own) return 1;
+  const skip = new Set<number>([part]);
+  let layers = 0;
+  for (; layers < OVERHEAD_LAYERS; layers++) {
+    const h = castParts(geoms, (j) => !skip.has(j) && standing(b.catalog, ship, j), ox, oy, cx, cy);
+    if (!h || h.t >= own.t) break;
+    skip.add(h.part);
+  }
+  return Math.pow(OVERHEAD_LAYER, layers);
+}
+
+export function splashAt(b: BridgeCtx, systemNum: number, x: number, y: number, radius: number, damage: number, source: number, hit?: HitInfo, overhead?: Vec2): void {
   const reach = Math.max(3, Math.round(radius / b.tuning.cellSize));
   for (const [eid, ship] of b.bodies) {
     // (Out of reach first: the cheapest test, and it rules out most; the rest have no side effects)
@@ -286,7 +312,8 @@ export function splashAt(b: BridgeCtx, systemNum: number, x: number, y: number, 
     try {
       for (let k = 0; k < near.length && k < reach; k++) {
         const { i, d } = near[k];
-        dealt += b.hurt(eid, ship, i, damage * (1 - 0.7 * ((d * cs) / radius)), source, { hit, at, splash: true });
+        const share = overhead ? overheadShare(b, eid, ship, i, overhead) : 1;
+        dealt += b.hurt(eid, ship, i, damage * share * (1 - 0.7 * ((d * cs) / radius)), source, { hit, at, splash: true });
         through = Math.max(through, b.lastThrough);
       }
     } finally {

@@ -339,3 +339,25 @@ describe('beams and the broadphase', () => {
     expect(near).toBeGreaterThan(20);
   });
 });
+
+describe('overhead blasts (a shell lobbed to a point inside a hull)', () => {
+  it('a blast aimed at a buried part is mostly spent on what covers it; one on the outside is unchanged', () => {
+    const probe = setup('scrap_mother');
+    const geoms = probe.bridge.geometry(probe.ship());
+    const centre = (w: ReturnType<typeof setup>, i: number) => shipPointToWorld(w.ship(), { x: 0, y: 0, angle: w.angle }, w.bridge.geometry(w.ship())[i].centroid, w.bridge.tuning.cellSize);
+    const hurtBy = (i: number, overhead: boolean) => {
+      const w = setup('scrap_mother');
+      const [x, y] = centre(w, i);
+      const b = w.ship().hp.slice();
+      w.bridge.splashAt(w.sys, x, y, 60, 30, -1, undefined, overhead ? [x + 6000, y] : undefined);
+      return b.reduce((a, h, k) => a + (h - w.ship().hp[k]), 0);
+    };
+    let lessSomewhere = false;
+    for (let i = 0; i < geoms.length; i += Math.max(1, Math.floor(geoms.length / 25))) {
+      const flat = hurtBy(i, false), over = hurtBy(i, true);
+      expect(over).toBeLessThanOrEqual(flat + 1e-6);
+      if (over < flat - 1e-6) lessSomewhere = true;
+    }
+    expect(lessSomewhere).toBe(true);
+  });
+});

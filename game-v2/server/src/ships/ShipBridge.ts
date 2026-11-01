@@ -419,7 +419,7 @@ export class ShipBridge {
   /** How many more ticks it stays knocked out (0: it isn't), so the pilot's prediction drifts exactly as long as the server does */
   empTicksLeft(eid: number): number { return dmg.empTicksLeft(this.ctx, eid); }
 
-  splashAt(systemNum: number, x: number, y: number, radius: number, damage: number, source: number, hit?: HitInfo): void { return dmg.splashAt(this.ctx, systemNum, x, y, radius, damage, source, hit); }
+  splashAt(systemNum: number, x: number, y: number, radius: number, damage: number, source: number, hit?: HitInfo, overhead?: Vec2): void { return dmg.splashAt(this.ctx, systemNum, x, y, radius, damage, source, hit, overhead); }
 
   /** An EMP burst: ships in range lose engines and guns for `ticks` (shields halve it) */
   empAt(systemNum: number, x: number, y: number, radius: number, ticks: number, source: number): number[] { return dmg.empAt(this.ctx, systemNum, x, y, radius, ticks, source); }

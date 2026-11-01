@@ -288,7 +288,8 @@ export class Weapons {
     if (!x) return;
     const split = !!x.def.split && endsAtAim(x.def) && Projectile.endTick[proj] > 0;
     if (split) this.shatter(proj, x, null);
-    if (split || x.def.splash || x.def.emp) this.detonate(proj, Position.x[proj], Position.y[proj]);
+    // (A shell that came down at its aim is overhead: what covers a buried part takes the brunt, damage.ts overheadShare)
+    if (split || x.def.splash || x.def.emp) this.detonate(proj, Position.x[proj], Position.y[proj], endsAtAim(x.def) && Projectile.endTick[proj] > 0);
   }
 
   private readonly steer = { x: 0, y: 0 };
@@ -341,12 +342,12 @@ export class Weapons {
     }
   }
 
-  private detonate(proj: number, px: number, py: number): void {
+  private detonate(proj: number, px: number, py: number, overhead = false): void {
     const x = this.extras.get(proj);
     if (!x) return;
     this.extras.delete(proj);
     const num = InSystem.systemId[proj];
-    if (x.def.splash) this.ships.splashAt(num, px, py, x.def.splash.radius, x.def.splash.damage * x.damageScale, x.owner, weaponHit(x.kind, x.def, Projectile.tier[proj] || 1));
+    if (x.def.splash) this.ships.splashAt(num, px, py, x.def.splash.radius, x.def.splash.damage * x.damageScale, x.owner, weaponHit(x.kind, x.def, Projectile.tier[proj] || 1), overhead ? [Projectile.spawnX[proj], Projectile.spawnY[proj]] : undefined);
     if (x.def.emp) this.ships.empAt(num, px, py, x.def.emp.radius, x.def.emp.ticks, x.owner);
     const radius = x.def.splash?.radius ?? x.def.emp?.radius ?? 40;
     this.host.broadcast(num, { type: 'detonation', kind: x.kind, x: Math.round(px), y: Math.round(py), radius });
