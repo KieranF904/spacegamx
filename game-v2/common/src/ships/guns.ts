@@ -68,6 +68,9 @@ export interface GunStep {
   tells: readonly GunTell[];
 }
 
+/** Ticks a click waits for a semi-automatic gun to be ready (a click just before the gun is) */
+export const SEMI_BUFFER = 5;
+
 /** Ticks a charge let go early takes to drain away (nothing fires) */
 export const CHARGE_DRAIN = 15;
 /** Ticks after its last shot that a partly spent clip starts reloading */
@@ -273,6 +276,11 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
   const aimX = aimWorld === undefined ? 0 : pose.x + Math.cos(aimWorld) * aimDist;
   const aimY = aimWorld === undefined ? 0 : pose.y + Math.sin(aimWorld) * aimDist;
   const ready: WeaponInfo[] = [];
+  // A semi-automatic gun fires once per click: the click is kept a few ticks, for one pressed just before the gun is ready
+  if (orders.firing && !ship.triggerHeld) ship.clickAt = tick;
+  ship.triggerHeld = orders.firing;
+  const semiReady: WeaponInfo[] = [];
+  const clicked = tick - ship.clickAt <= SEMI_BUFFER;
   for (const w of ship.derived.weapons) {
     const f = w.fire, p = w.part;
     // (Reloading, a cycle gun loads at its share: a browned-out gun reloads slower. Every other model's beat needs no power)
@@ -313,6 +321,11 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
       canFire = res.canFire;
     }
     const want = orders.firing && canFire;
+    if (f.semi) {
+      // (Held or not, it needs a fresh click; a reloading or busy gun is skipped, so the next of its kind takes the shot)
+      if (clicked && canFire && ship.cooldown[p] <= 0 && ship.rounds[p] >= (f.rounds ?? 1) && (f.regrow || ship.reload[p] <= 0)) semiReady.push(w);
+      continue;
+    }
     // A spinning gun spins up while it's fired, and down when it isn't
     if (f.spin) ship.spin[p] = want ? Math.min(1, ship.spin[p] + 1 / Math.max(1, f.spin.up)) : Math.max(0, ship.spin[p] - 1 / Math.max(1, f.spin.down));
     if (f.model === 'charge') {
@@ -329,6 +342,13 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
     }
     if (f.model === 'beam') ready.push(w);
     else if (ship.cooldown[p] <= 0 && (f.model !== 'clip' || (ship.rounds[p] >= (f.rounds ?? 1) && (f.regrow || ship.reload[p] <= 0)))) ready.push(w);
+  }
+  if (semiReady.length) {
+    // One shot a click for each kind of semi-automatic gun: the one that has waited longest, so a pair takes turns
+    const taken = new Set<string>();
+    semiReady.sort((a, b) => ship.cooldown[a.part] - ship.cooldown[b.part] || a.part - b.part);
+    for (const w of semiReady) if (!taken.has(w.kind)) { taken.add(w.kind); ready.push(w); }
+    ship.clickAt = -1e9;
   }
   if (orders.energy && ready.length > 1) ready.sort((a, b) => ship.cooldown[a.part] - ship.cooldown[b.part] || a.part - b.part);
   for (const w of ready) {

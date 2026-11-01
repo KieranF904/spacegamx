@@ -208,7 +208,7 @@ describe('fire events', () => {
     let predicted = 0, matched = 0, worst = 0;
     for (let i = 0; i < 60 * 6; i++) {
       Input.forward[p] = (i % 120) < 60 ? 1 : 0;
-      Input.fireLeft[p] = (i % 90) < 70 ? 1 : 0;
+      Input.fireLeft[p] = (i % 90) < 70 && (guns?.[0] !== 'railgun_rail_driver' || i % 4 < 2) ? 1 : 0;
       Input.targetAngle[p] = replicaAngle(ReplicaMode.Player, quantizeReplicaAngle(Math.sin(i / 30) * (guns ? 0.03 : 0.8) - Math.PI / 2));
       Position.x[b.pid()] = 26000; Position.y[b.pid()] = 21000; Velocity.x[b.pid()] = 0; Velocity.y[b.pid()] = 0;
       server.step();

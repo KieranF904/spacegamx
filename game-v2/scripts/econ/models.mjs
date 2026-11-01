@@ -336,7 +336,7 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   MOUNTING.railgun_rail_driver = { attach: 'back', clear: ahead(3) };
   // (The semi-automatic rifle, its own numbers: a clip of 6 at 10 ticks, 40 dmg, pierce 1, speed 150; reloading itself for 90 ticks draws 48 E,
   // the bank first. Its demand is that reload's draw spread over a clip's whole cycle; the fire block below gives the rest.)
-  const desc = 'The semi-automatic rifle: a clip of six sharp shots at six a second, then it reloads itself in a second and a half for 48 E, from its bank first. It needs no ammo.';
+  const desc = 'The semi-automatic rifle: a clip of six sharp shots, one a click (as fast as you can click, up to six a second; a second Rail Driver takes alternate shots, skipping one that is reloading), then it reloads itself in a second and a half for 48 E, from its bank first. It needs no ammo.';
   models.push({
     ...base('railgun_rail_driver', 'Rail Driver', 'railgun', ['block2'], 29, 'titanium', { grade: 4 }),
     weapon: 'railgun', ...mounted('railgun_rail_driver', desc), hpScale: 0.96, demand: r2((48 * 60) / (90 + 6 * 10) / PIECE_AREA.block2), priority: 2, fireInterval: 10,
@@ -443,7 +443,7 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
     railgun_needle: { model: 'ammo' },
     railgun_coilgun: { model: 'cycle', interval: 54 },
     railgun_spear: { model: 'cycle', interval: 114 },
-    railgun_rail_driver: { model: 'clip', interval: 10, clip: 6, reload: 90, reloadE: 48 },
+    railgun_rail_driver: { model: 'clip', interval: 10, clip: 6, reload: 90, reloadE: 48, semi: true },
     emp_hush: { model: 'cycle', interval: 162 },
     emp_blackout: { model: 'charge', charge: 90, cooldown: 240, chargeE: 90 },
     arc_spark: { model: 'cycle', interval: 45 },

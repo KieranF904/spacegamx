@@ -57,7 +57,7 @@ describe('firing models', () => {
   it('clip: fires its rounds at its beat, then reloads for its reload and fires again', () => {
     const s = armed('railgun_rail_driver');
     const w = s.derived.weapons[0];
-    const { shots } = run(s, 300, () => true);
+    const { shots } = run(s, 300, (t) => t % 2 === 1);
     // Six shots ten ticks apart, the last one empties it; reloading 90 ticks from the next, then six more
     expect(shots.slice(0, 6)).toEqual([1, 11, 21, 31, 41, 51]);
     expect(shots[6]).toBe(51 + 1 + w.fire.reload!);
@@ -67,7 +67,7 @@ describe('firing models', () => {
   it('clip: a partly spent clip reloads a second after the last shot, drawing its missing share of reloadE', () => {
     const s = armed('railgun_rail_driver');
     const w = s.derived.weapons[0];
-    const { shots } = run(s, 15, (t) => t <= 15);
+    const { shots } = run(s, 15, (t) => t <= 15 && t % 2 === 1);
     expect(shots).toEqual([1, 11]);
     expect(s.rounds[w.part]).toBe(4);
     let drawn = 0, t = 16, startedAt = -1;
@@ -86,7 +86,7 @@ describe('firing models', () => {
     const s = armed('railgun_rail_driver');
     const w = s.derived.weapons[0];
     // (The sixth shot at 51 empties it; its reload starts on the next tick)
-    run(s, 51, () => true);
+    run(s, 51, (t) => t % 2 === 1);
     expect(s.rounds[w.part]).toBe(0);
     const L = s.derived.power!;
     const half: Charge = { g: 100, b: [], gun: L.feeds.map(() => 0.5), eng: L.feeds.map(() => 1) };
@@ -212,7 +212,7 @@ describe('firing models', () => {
   it('the gun-state slot carries clip and charge guns after the part features, and round-trips', () => {
     const s = armed('railgun_rail_driver');
     const w = s.derived.weapons[0];
-    run(s, 60, () => true);
+    run(s, 60, (t) => t % 2 === 1);
     run(s, 5, () => false, 61);
     expect(s.reload[w.part]).toBeGreaterThan(0);
     const data: number[] = new Array(CHARGE_GROUPS_AT).fill(0);

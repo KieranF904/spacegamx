@@ -39,7 +39,7 @@ describe('railguns', () => {
     expect(w.fire).toMatchObject({ model: 'clip', clip: 6, interval: 10, reload: 90, reloadE: 48 });
     const shots: number[] = [];
     for (let t = 1; t < 300; t++) {
-      const r = stepGuns(s, pose, { firing: true, aimWorld: UP, aimDist: 0 }, t, tuning);
+      const r = stepGuns(s, pose, { firing: t % 2 === 1, aimWorld: UP, aimDist: 0 }, t, tuning);
       for (const sh of r.shots) { shots.push(t); expect(sh.shot.ammo).toBeFalsy(); }
     }
     expect(shots.slice(0, 6)).toEqual([1, 11, 21, 31, 41, 51]);
@@ -84,5 +84,14 @@ describe('railguns', () => {
       const area = { rect2: 2, block2: 4 }[fn.pieces![0] as string]!;
       expect((fn.demand! * area * fn.fire!.interval) / 60).toBeCloseTo(e, 0);
     }
+  });
+});
+
+describe('semi-automatic: one click, one shot', () => {
+  it('holding the trigger fires once', () => {
+    const s = armed('railgun_rail_driver');
+    let held = 0;
+    for (let t = 1; t < 120; t++) held += stepGuns(s, pose, { firing: true, aimWorld: UP, aimDist: 0 }, t, tuning).shots.length;
+    expect(held).toBe(1);
   });
 });

@@ -65,6 +65,9 @@ export interface ShipState {
   reload: number[];
   charge: number[];
   spin: number[];
+  /** The trigger was held last tick, and the tick of the latest click not yet spent on a semi-automatic shot (guns.ts) */
+  triggerHeld: boolean;
+  clickAt: number;
 }
 
 export function rebuildShip(state: ShipState, catalog: Catalog, tuning: ShipTuning): void {
@@ -127,6 +130,8 @@ export function createShipState(
     reload: blueprint.parts.map(() => 0),
     charge: blueprint.parts.map(() => 0),
     spin: blueprint.parts.map(() => 0),
+    triggerHeld: false,
+    clickAt: -1e9,
   };
   rebuildShip(state, catalog, tuning);
   // (Every clip starts full)

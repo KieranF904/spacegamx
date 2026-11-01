@@ -409,6 +409,8 @@ export interface FireSpec {
   spin?: { from: number; to: number; up: number; down: number };
   windup?: number;
   rounds?: number;
+  /** Semi-automatic: one click is one shot (guns.ts stepGuns): the trigger has to be pressed again for each, and the guns of its kind take turns */
+  semi?: boolean;
 }
 
 /** rate: fire rate (rebuild.ts interval); hp: the part's own HP (blueprint.ts partMaxHp); splashDamage, splashRadius: its burst's; the rest scale its tuning */

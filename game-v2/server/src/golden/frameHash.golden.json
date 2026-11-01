@@ -113,89 +113,89 @@
     },
     {
       "tick": 600,
-      "world": "4f5c0718433c38469c77308c3abbb8788f5b9f716732700727bcc872af480024",
+      "world": "542cbc6cd7b00b510aac2e40319ec4e9e29b59afc53227085b0c99ce1a70ab2f",
       "pilots": {
         "strafer": {
           "frames": 215,
-          "stream": "23cf974d23f23c7e57402e92b2e9bc7afc8c7edb744d9692580b97105baef6cf"
+          "stream": "efe4b049043fef98992458e4c691064a49e94ccde13bbaf13cee709fed7bb3fa"
         },
         "tug": {
           "frames": 216,
-          "stream": "6ef213ba56cede29c0af9774bcb65c4fa946637d117c2c385b0a880d5a12637c"
+          "stream": "1f9909c41062186ae795489edd827e91fe56a7b75af719d4c1fecd9e484c0869"
         },
         "striker": {
           "frames": 215,
-          "stream": "e805b73ea1b482e2d8eec7e4556ed001cebc91b361ec15914920b5b250844fbe"
+          "stream": "99c665d5ea9f06d0b42adce68cb1d716557f9072f9b9a2a03ef06144c1a6a751"
         },
         "sparrow": {
           "frames": 215,
-          "stream": "1e356a716402f3043bf7cf8f61406e746414c763de08198ab3c88be579bd6f58"
+          "stream": "abc83cad6a51fecfba087afe2b1437f6c93477d9148df35499e88f73f2abe5d3"
         }
       }
     },
     {
       "tick": 700,
-      "world": "bd728c830f0786a282373a125a335b057235587c53db70a161a8c87c0a54d6bd",
+      "world": "90c26cf7e3437b707c5eaab54a1600204ec7f8027ec3f70a25fa0ae392415178",
       "pilots": {
         "strafer": {
-          "frames": 250,
-          "stream": "4d4e5b1924afeb8df46e4e2f51bf11295186be53454e0b03f31affc2b2fc8e7d"
+          "frames": 251,
+          "stream": "6eccd925dcdfc0b75fb816a19ccb30b70d1468465dc3bb256549a172df350b7e"
         },
         "tug": {
-          "frames": 251,
-          "stream": "725861e62bc3ca90deffb7f3017b76c9d8230e4ba3f0c5617d4c575d6f808f14"
+          "frames": 252,
+          "stream": "89ec9b8d20a9a5c6cd37725b2f83fcdc9ae12ea831b8cc8a230d6a7ea4b5a4f9"
         },
         "striker": {
-          "frames": 250,
-          "stream": "ad7638a157e4bb3aa39d3c69897bd8677b3f159d1d14ed50ecfb0f803bff4644"
+          "frames": 251,
+          "stream": "5311ca8ef387563226f8ba7737c643a7650794e213939bad9d12840139d1887b"
         },
         "sparrow": {
-          "frames": 250,
-          "stream": "adf1c88e3f3e2b517404d1a89dbe81088f1da12deb60ee20b94bedcb613e9ae7"
+          "frames": 251,
+          "stream": "098104ee40b6799c8142fb241da55320bf40a98d4fb6aa483a3eb8cc1a31d0b1"
         }
       }
     },
     {
       "tick": 800,
-      "world": "ea8d18ff7d648fd9416e8ef0c93612602a8bd4fc70ffad2fd49cb5af82242f44",
+      "world": "b5a26c733bd9a327c66ec8e29fdc6f8b1ab398013920bac1278abe04cfa9b828",
       "pilots": {
         "strafer": {
-          "frames": 283,
-          "stream": "d997b491b5ba9e462b5751b8f7952160509823a33100ff6bf2d27282dcb2a92f"
+          "frames": 284,
+          "stream": "abc02431c98e34552538617d3535436a5d6630bc550912fa7c03c8437e54d30b"
         },
         "tug": {
-          "frames": 285,
-          "stream": "082646e2160bb3455769d64ee4ef62b2b4cddc1e6772cca616552ff82412d1b4"
+          "frames": 286,
+          "stream": "40fd37b46e2ce4b2821bee0f3368e2bb3a864648142a6dcbced3697688ff17b4"
         },
         "striker": {
-          "frames": 283,
-          "stream": "89a4f3e1482dbf63a2ad26011e4df0ac6858b1132b3ce3c6a5a49b47b8e4a32d"
+          "frames": 284,
+          "stream": "0e4e616e6a0021d92b810503a126915ea3cdf03115ea0a3be7165402efd266ad"
         },
         "sparrow": {
-          "frames": 283,
-          "stream": "1b4bc1fde064db5886a9af0cca0e532da5d4e3e34ee4116ad5aaf43d6f14f52b"
+          "frames": 284,
+          "stream": "4544d7cb486a3465e741cd7b0fab7b4e1549f896727aed6e40fe8941dedb7093"
         }
       }
     },
     {
       "tick": 900,
-      "world": "21a8a1928d0bdb471936263c7e6a2bc2872a62b3b523e14f3b8f77c7a6ea7846",
+      "world": "ce5a173fac56fcdab6e3ca1741622e87044438fee961a8373c237167801f837a",
       "pilots": {
         "strafer": {
-          "frames": 317,
-          "stream": "3ab05436782558bd5ddc4cfd5b6f3df9ca09cffbc75ce8f96fb0a52e41a8ece0"
+          "frames": 318,
+          "stream": "a057dd7c3b4f1d6a12e7ab5729ad709e33b9342abb30b4e318a990ef3e4939aa"
         },
         "tug": {
-          "frames": 319,
-          "stream": "a92ccd05ad56945d56f0c112aa97fdd71a4535c2b0631ad30fd919895011de95"
+          "frames": 320,
+          "stream": "543a96ddf116b82f0b7a4ca25b129e2809947172e4f7d3ca6686c9e10e3d1b0c"
         },
         "striker": {
-          "frames": 317,
-          "stream": "8b7dbaf81c5ea32e561f932ac00fa291920def93b846ddaf3f8e3c2c5adb4031"
+          "frames": 318,
+          "stream": "4b74fd1da1017307d4bdf1e503406cc8a6cffeeaabbe5f9062fefe8476010477"
         },
         "sparrow": {
-          "frames": 317,
-          "stream": "f4bd3854388092a172c528134ca85605f33b2a0f9a1cd5ee0e8bbf8767ae4bd7"
+          "frames": 318,
+          "stream": "164551d2abe2328aa6071720c9bde525701d1fd5ffcef9620d063f1e832ba0ab"
         }
       }
     }
@@ -208,14 +208,14 @@
       "contact": 6,
       "damage": 12,
       "detonation": 2,
-      "effect": 9,
+      "effect": 11,
       "hangar": 1,
       "items": 1,
       "news": 1,
       "people": 2,
       "playerState": 11,
       "profile": 1,
-      "projectileHit": 11,
+      "projectileHit": 13,
       "quests": 1,
       "shipHps": 4,
       "shipSync": 26,
@@ -231,14 +231,14 @@
       "contact": 6,
       "damage": 12,
       "detonation": 2,
-      "effect": 9,
+      "effect": 11,
       "hangar": 1,
       "items": 1,
       "news": 1,
       "people": 2,
       "playerState": 6,
       "profile": 1,
-      "projectileHit": 11,
+      "projectileHit": 13,
       "quests": 1,
       "shipHps": 4,
       "shipSync": 26,
@@ -255,14 +255,14 @@
       "contact": 6,
       "damage": 12,
       "detonation": 2,
-      "effect": 9,
+      "effect": 11,
       "hangar": 1,
       "items": 1,
       "news": 1,
       "people": 2,
       "playerState": 2,
       "profile": 1,
-      "projectileHit": 11,
+      "projectileHit": 13,
       "quests": 1,
       "shipHps": 4,
       "shipSync": 25,
@@ -278,14 +278,14 @@
       "contact": 6,
       "damage": 12,
       "detonation": 2,
-      "effect": 9,
+      "effect": 11,
       "hangar": 1,
       "items": 1,
       "news": 1,
       "people": 2,
       "playerState": 4,
       "profile": 1,
-      "projectileHit": 11,
+      "projectileHit": 13,
       "quests": 1,
       "shipHps": 4,
       "shipSync": 26,
@@ -314,7 +314,7 @@
     "firedTicks": {
       "strafer": 63,
       "tug": 27,
-      "striker": 26,
+      "striker": 27,
       "sparrow": 39
     },
     "tugMessages": [
