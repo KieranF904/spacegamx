@@ -457,8 +457,10 @@ export async function stagedLoop(deps: LoopDeps, o: DesignOptions, emit: Emit): 
   steps:
   for (const [i, step] of STEPS.entries()) {
     if (o.signal?.aborted) { out.cancelled = true; break; }
-    const before = ship;
-    const r0 = check(ctx, before, { book });
+    // (`before` moves on when a try makes progress without finishing the step: its parts are kept for the next try)
+    let before = ship;
+    let r0 = check(ctx, before, { book });
+    let progress: Attempt | undefined;
     const replaces = step.replaces ?? isFrame;
     if (!step.lacks(sc, before, r0).length && step.id !== 'armour' && i > 0) {
       emit({ type: 'step', step: step.id, index: i + 1, of: STEPS.length, status: 'skipped', round, note: 'already done' });
@@ -470,8 +472,8 @@ export async function stagedLoop(deps: LoopDeps, o: DesignOptions, emit: Emit): 
       ...(step.id === 'weapons' ? codesFor(ctx, specialParts(ctx, S.role, true)) : step.id === 'fittings' ? codesFor(ctx, specialParts(ctx, S.role, false)) : []),
       ...(hint[step.id] ?? '').split(/[;,]\s*|\s+/).filter((c) => /^[A-Z]{2,3}$/.test(c)),
     ])].filter((c) => briefCodes.has(c));
-    const menu = step.menu ? placementMenu(ctx, before, menuCodes, step.menu, S.mirror, step.adds ?? (() => true)) : [];
-    const menuLine = `Placements the tool checked (each works on its own: copy several that don't overlap, as many as the step needs): ${menu.join('; ')}.`;
+    let menu = step.menu ? placementMenu(ctx, before, menuCodes, step.menu, S.mirror, step.adds ?? (() => true)) : [];
+    let menuLine = `Placements the tool checked (each works on its own: copy several that don't overlap, as many as the step needs): ${menu.join('; ')}.`;
     const ring = step.id === 'power' ? ringAround(ctx, before, where.map((w) => w.split(' ')[0]), S.mirror) : [];
     const parts = S.C.form === 'parts';
     const ask = [
@@ -531,8 +533,17 @@ export async function stagedLoop(deps: LoopDeps, o: DesignOptions, emit: Emit): 
           break;
         }
       }
+      // (Progress short of the step: valid, nothing lost, nothing dark, some of the step's parts added. Kept, and the next try adds to it)
+      let kept = false;
+      if (!accepted && step.menu && a.bp && a.result && a.valid && !lost(ctx, before, a.bp, replaces).length && !(a.result.power?.unpowered.length) && step.adds && addedParts(ctx, before, a.bp).some((p) => step.adds!(ctx, p))) {
+        before = a.bp; r0 = a.result; progress = a; kept = true;
+        menu = placementMenu(ctx, before, menuCodes, step.menu, S.mirror, step.adds);
+        menuLine = `Placements the tool checked (each works on its own: copy several that don't overlap, as many as the step needs): ${menu.join('; ')}.`;
+        problems = step.lacks(sc, before, r0);
+      }
       if (t < tries) {
         const lines = [
+          kept ? `Kept: the parts you just added are now placed (the ship below). Add MORE to finish the step: list only parts not placed yet.` : '',
           problems.length ? `Step ${i + 1} (${step.title}) is not done yet:\n${problems.map((x) => `- ${x}`).join('\n')}` : '',
           r.feedback,
           ...(step.extra ? step.extra(sc, before) : []),
@@ -547,6 +558,8 @@ export async function stagedLoop(deps: LoopDeps, o: DesignOptions, emit: Emit): 
         tail = [...tail, { role: 'assistant' as const, content: r.said ?? a.reply.slice(-1500) }, { role: 'user' as const, content: msg }].slice(-2 * Math.max(1, keep));
       }
     }
+    // (A step that made progress but didn't finish keeps it: the ship goes on with the parts added)
+    if (!accepted && progress?.bp) { ship = progress.bp; shipAttempt = progress; }
     if (!accepted) out.steps!.failed.push(step.id);
     if (!accepted) emit({ type: 'step', step: step.id, index: i + 1, of: STEPS.length, status: 'failed', round, note: `no try in ${tries} kept the ship valid with the ${step.title} in place; going on without it` });
   }

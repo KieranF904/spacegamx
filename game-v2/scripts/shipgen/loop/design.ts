@@ -326,7 +326,13 @@ export class Session {
     const cut = reply.truncated ? `Your reply was cut off at the ${this.budget}-token limit before it was finished${reply.thinking.trim() ? ' (part of it went on thinking)' : ''}, so the design in it is incomplete. This is not a format mistake: write a more compact design, and send the design only, with no thinking aloud or explanation.` : '';
     const finish = (r: Read): Read => (reply.truncated ? { ...r, truncated: true, feedback: r.readable ? `${cut}
 ${r.feedback}` : cut } : r);
-    const ex = C.extract(reply.text);
+    let ex = C.extract(reply.text);
+    // (Some reasoning models write the answer inside their thinking and send nothing after it: read its last block there)
+    if (!ex.text && !reply.text.trim() && reply.thinking.trim()) {
+      const t = reply.thinking, at = Math.max(t.lastIndexOf('name:'), t.lastIndexOf('parts:') - 200, t.lastIndexOf('grid:') - 200, 0);
+      const inThought = C.extract(t.slice(at));
+      if (inThought.text) ex = { ...inThought, notes: ['(read from the end of your thinking: write the design after it next time)', ...inThought.notes] };
+    }
     ex.notes.unshift(...reply.notes);
     if (!ex.text) {
       if (!reply.text.trim() && reply.thinking.trim()) ex.notes.unshift(`you spent the whole reply thinking (${reply.outputTokens ?? this.budget} tokens) and wrote no design: think briefly, then write it`);

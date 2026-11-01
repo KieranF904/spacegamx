@@ -280,7 +280,7 @@ export function feedbackMessage(f: FeedbackInput): string {
     out.push("I couldn't read your grid:");
     out.push(...cap(f.gridErrors, (e) => `- ${e.row !== undefined ? `row ${e.row} col ${e.col}: ` : ''}${e.message}`));
     if (f.gridWarnings?.length) out.push('Also:', ...cap(f.gridWarnings, (w) => `- ${w}`).slice(0, 4));
-    out.push('Send the whole design again, every row the same width.');
+    out.push('Fix these and send it again (a grid: every row the same width; a part list: one CODE col,row per line).');
     return out.join('\n');
   }
   if (f.buildErrors?.length) {
