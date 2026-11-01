@@ -413,6 +413,33 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   }
 }
 // ---- (end Burst Strafer and Tow Beam)
+// ---- Energy routing's relays: the Conduit and the Diode (docs/design/energy-routing-impl.md §1.1, §3.4, P4; §0 D1: no
+// wires, power moves only between parts sharing a full cell edge). Plain store data, read by the power core
+// (common/src/ships/power/layout.ts): a relay holds `store`, gives `discharge` and takes `intake` E a second per cell.
+// `relayOnly`: a pass-through (a Pulse Dynamo never tops it up). `oneWay`: a Diode, giving only out of its facing edge
+// (that edge must touch a part: blueprint.ts partFacingRule 'joined'), taking from every other. Until the switch-over
+// (P2) the live energy system (circuits.ts) leaves both out of the pool and the banks: they carry nothing yet.
+// Appended last, so no other model's order moves.
+{
+  const RELAY_LOOK = {
+    power_conduit: { color: '#b0711f', decor: 'none' },
+    power_diode: { color: '#d9a03a', decor: 'none' },
+  };
+  const RELAYS = [
+    ['power_conduit', 'Conduit', 'relay', ['sq'], 0, 'alloy', { store: 10, discharge: 200, intake: 200, relayOnly: true, hpScale: 0.5 },
+      'A power line: it passes power between the parts it touches, up to 200 a second, and holds only 10 itself.', 'power'],
+    ['power_diode', 'Diode', 'relay', ['sq'], 4, 'alloy', { store: 10, discharge: 200, intake: 200, oneWay: true, hpScale: 0.5 },
+      'A one-way power line: power only flows out of its front, into the part there, up to 200 a second; the other parts touching it can only feed it. Its front must touch a part.', 'power'],
+  ];
+  for (const [id, name, family, pieces, level, material, fields, description, category] of RELAYS) {
+    models.push({
+      ...base(id, name, family, pieces, level, material, { grade: fields.grade }), ...fields, description,
+      rarity: level >= 20 ? 'rare' : level >= 5 ? 'uncommon' : 'common', category, fabOrder: next(category), ...RELAY_LOOK[id],
+      guide: { name, blurb: description.split(/[.:]/)[0], ...(pieces[0] !== 'sq' ? { piece: pieces[0] } : {}), order: guideOrder++ },
+    });
+  }
+}
+// ---- (end Conduit and Diode)
 // ---- Firing models (docs/design/rework-2026-11.md §3, §4): every weapon model's `fire` block, read by
 // common/src/ships/guns.ts stepGuns through WeaponInfo.fire. model: 'cycle' fires on a beat while held, its energy drawn
 // as it reloads; 'clip' fires `clip` rounds, then reloads `reload` ticks drawing `reloadE` (or, with `regrow`, one round
@@ -673,6 +700,11 @@ Object.assign(RECIPES, {
 Object.assign(RECIPES, {
   engine_burst_strafer: { steel_plate: 1, fuel_injector: 1, capacitor_cell: 1 },
   utility_tow_beam: { steel_plate: 2, coil_winding: 2, servo_motor: 1, power_coupling: 1 },
+});
+// (The Conduit and the Diode: cheap, a power line and a one-way one)
+Object.assign(RECIPES, {
+  power_conduit: { alloy_plate: 1, copper_wire: 1 },
+  power_diode: { alloy_plate: 1, copper_wire: 2, insulated_polymer: 1 },
 });
 /** Plating comes in two sizes: its recipe is per cell */
 const PER_CELL = new Set(['plating_reactive_armour', 'plating_spaced_plating']);

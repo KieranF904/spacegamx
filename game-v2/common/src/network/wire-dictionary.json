@@ -69,7 +69,9 @@
   "plating_spaced_plating",
   "utility_stabiliser_anchor",
   "engine_burst_strafer",
-  "utility_tow_beam"
+  "utility_tow_beam",
+  "power_conduit",
+  "power_diode"
  ],
  "skip": [
   "power_pulse_dynamo",

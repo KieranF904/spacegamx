@@ -488,7 +488,7 @@ const SHIP_SHAPES: Record<string, Spec> = {
       'produce?': 'number', 'demand?': 'number', 'priority?': oneOf(1, 2, 3), 'thrust?': 'number', 'boost?': 'number', 'boostDrain?': 'number',
       'fireInterval?': 'number', 'capacity?': 'number', 'jumpCapacity?': 'number', 'range?': 'number', 'weapon?': 'string', 'shield?': 'number', 'shieldRegen?': 'number', 'shieldDelay?': 'number', 'flash?': 'boolean', 'splashTaken?': 'number', 'jumpCooldown?': 'number',
       'store?': 'number', 'pool?': oneOf('drive', 'weapon'), 'discharge?': 'number', 'bank?': 'boolean', 'dynamo?': 'number', 'armour?': 'number', 'massScale?': 'number', 'mount?': oneOf('fixed', 'turret'),
-      'intake?': 'number', 'buffer?': 'number',
+      'intake?': 'number', 'buffer?': 'number', 'oneWay?': 'boolean', 'relayOnly?': 'boolean',
       'mounting?': strict({ 'attach?': oneOf('back', 'any'), 'angle?': oneOf('straight', 'right'), 'arc?': 'number', 'clear?': 'any' }),
       // (A weapon's firing model: common/src/ships/types.ts FireSpec, guns.ts)
       'fire?': strict({ model: oneOf('cycle', 'clip', 'charge', 'ammo', 'beam', 'auto'), interval: 'number', 'clip?': 'number', 'reload?': 'number', 'reloadE?': 'number', 'regrow?': 'number',

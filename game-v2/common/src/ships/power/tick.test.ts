@@ -146,6 +146,48 @@ describe('energy tick: stores', () => {
     expect(e.held[2]).toBeLessThan(L.cap[2]);
   });
 
+  it('carries a Cell Reactor\'s power down four Conduits (the models) into a Battery; hull in the line carries none', () => {
+    const line = (gap: string) => setup([
+      ['sq', 'power_cell_reactor', 0, 0], ['sq', 'power_conduit', 1, 0], ['sq', 'power_conduit', 2, 0], ['sq', gap, 3, 0], ['sq', 'power_conduit', 4, 0],
+      ['sq', 'power_battery', 5, 0],
+    ]);
+    const { L, e } = line('power_conduit');
+    // A Conduit: a relay holding 10, giving and taking 200 E a second
+    for (const c of [1, 2, 3, 4]) expect([L.role[c], L.cap[c], L.give[c], L.take[c]]).toEqual([ROLE_RELAY, toEu(10), perTick(200), perTick(200)]);
+    for (let p = 1; p < L.n; p++) e.held[p] = 0;
+    for (let t = 0; t < 3 * 60; t++) energyTick(L, e, IDLE_CONTROLS);
+    // (No faster than the reactor makes it: 35 E a second)
+    expect(e.held[5]).toBeGreaterThan(0);
+    expect(e.held[5]).toBeLessThan(toEu(3 * 35));
+    for (let t = 0; t < 60 * 60; t++) energyTick(L, e, IDLE_CONTROLS);
+    expect(Array.from(e.held)).toEqual(Array.from(L.cap));
+    const cut = line('hull');
+    for (let p = 1; p < cut.L.n; p++) cut.e.held[p] = 0;
+    for (let t = 0; t < 60 * 60; t++) energyTick(cut.L, cut.e, IDLE_CONTROLS);
+    expect([cut.e.held[1], cut.e.held[2]]).toEqual([cut.L.cap[1], cut.L.cap[2]]);
+    expect([cut.e.held[4], cut.e.held[5]]).toEqual([0, 0]);
+  });
+
+  it('lets a Diode (the model) guard a Battery: guns firing on the near side never drain the far one; a Conduit there does', () => {
+    //   Pip  BAT  mid>  BAT  Ion
+    const build = (mid: string) => setup([
+      ['sq', 'cannon_pip', 0, 0, 'N'], ['sq', 'power_battery', 1, 0], ['sq', mid, 2, 0, 'E'], ['sq', 'power_battery', 3, 0], ['sq', 'engine_ion_drive', 4, 0, 'S'],
+    ]);
+    const firing = (mid: string) => {
+      const { L, e } = build(mid), g = new Gun(L, e, 0, 15);
+      for (let t = 0; t < 1200; t++) { energyTick(L, e, IDLE_CONTROLS); g.step(t); }
+      return { L, e, g };
+    };
+    const d = firing('power_diode'), c = firing('power_conduit');
+    // Its out side is its facing (E): the Battery at 3, both pairs one way towards it
+    expect(d.L.diodeOut[2]).toBe(3);
+    expect(Array.from(d.L.pairA, (a, x) => [a, d.L.pairB[x], d.L.pairDir[x]])).toEqual([[1, 2, 1], [2, 3, 1]]);
+    expect(d.g.shots.length).toBeGreaterThan(0);
+    expect(d.e.held[1]).toBeLessThan(d.L.cap[1]);
+    expect(d.e.held[3]).toBe(d.L.cap[3]);
+    expect(c.e.held[3]).toBeLessThan(c.L.cap[3]);
+  });
+
   it('tops up the stores a Pulse Dynamo touches, with no generator', () => {
     const { L, e } = setup([['sq', 'power_pulse_dynamo', 0, 0], ['sq', storeFn('t_bat', 300, 150, 50), 1, 0]]);
     e.held[1] = 0;

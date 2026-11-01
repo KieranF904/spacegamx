@@ -78,6 +78,8 @@ export interface PilotsOptions {
   starter: StarterKit;
   /** Designs a guest finds in their hangar's free bays (the dev server's) */
   guestShips?: Blueprint[];
+  /** Where every pilot appears, joining and respawning, whatever their profile says (the dev server's Rockery); none: where they left off, or home */
+  spawn?: (eid: number) => { system: number; x: number; y: number };
   /** Pilots below this level rebuild lost parts for free */
   freeRebuildBelowLevel: number;
   death?: Partial<DeathRules>;
@@ -382,7 +384,7 @@ export class Pilots {
     if (placeShip && hasComponent(this.host.world, Player, eid) && !hasComponent(this.host.world, Dead, eid)) {
       this.applyShip(s);
       const sys = this.host.systemNum(profile.position.system);
-      if (sys >= 0 && this.host.safeToAppear(sys, profile.position.x, profile.position.y)) {
+      if (!this.opts.spawn && sys >= 0 && this.host.safeToAppear(sys, profile.position.x, profile.position.y)) {
         this.host.place(conn, sys, profile.position.x, profile.position.y);
       } else {
         const at = this.homePoint(s);
@@ -1081,6 +1083,7 @@ export class Pilots {
   homePoint(s: Session | PilotConn): { system: number; x: number; y: number } | null {
     const sess = 'profile' in s ? s : this.sessions.get(s);
     if (!sess) return null;
+    if (this.opts.spawn) return this.opts.spawn(sess.conn.playerId);
     const st = this.host.stationEntity(sess.profile.home) >= 0 ? this.host.stationEntity(sess.profile.home) : this.host.stationEntity(this.opts.starter.home);
     if (st < 0) {
       const p = this.opts.starter.position;

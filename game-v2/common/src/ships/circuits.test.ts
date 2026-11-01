@@ -177,6 +177,23 @@ describe('energy: the pool and the powered rule', () => {
     expect(d.power!.pool.parts).toEqual([]);
   });
 
+  it('a Conduit or a Diode (energy routing\'s relays) is no battery here: never pooled, never a bank, and lights no network', () => {
+    // Wired to the reactor: the pool is the core's alone, with no bank
+    const b = base([p(9, 'sq', 'power_conduit', -2, 1), p(10, 'sq', 'power_diode', -3, 1, { facing: 'E' })], [...ENGINES, [-1, 1, -2, 1], [-2, 1, -3, 1]]);
+    expect(codes(b)).toEqual([]);
+    const L = derived(b).power!;
+    expect(L.pool.parts).toEqual([]);
+    expect([L.pool.cap, L.pool.rate]).toEqual([L.pool.coreCap, L.pool.coreRate]);
+    expect(L.banks.length).toBe(0);
+    // The engines on a network with a Conduit and a Diode but no generator stay dark (a Battery there would light them)
+    for (const fn of ['power_conduit', 'power_diode']) {
+      const c = base([p(9, 'sq', fn, 2, 2, fn === 'power_diode' ? { facing: 'W' } : {})], [[0, 2, 1, 2], [1, 2, 2, 2]]);
+      c.parts[3] = { ...c.parts[3], fn: 'hull', material: 'alloy' };
+      expect(codes(c)).toEqual([]);
+      expect(derived(c).satisfaction[7]).toBe(0);
+    }
+  });
+
   it('short of Output, every gun gets the same share and reloads that much slower', () => {
     // No reactor (hull instead) and the pool nearly dry: both Pips share what the pool gives
     const b = base();

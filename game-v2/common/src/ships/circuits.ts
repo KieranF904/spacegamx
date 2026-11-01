@@ -139,7 +139,8 @@ export function powerLayout(a: CircuitInput): PowerLayout {
   for (let i = 0; i < n; i++) {
     if (!alive[i] || !((fns[i].store ?? 0) > 0)) continue;
     partCap[i] = partCapacity(fns[i], area[i], mats[i]);
-    if (kind(i) || !onPowered(i)) continue;
+    // (A Conduit or a Diode, energy routing's relays: never a pool battery here; they carry nothing until the switch-over)
+    if (kind(i) || !onPowered(i) || fns[i].relayOnly || fns[i].oneWay) continue;
     pooled[i] = true;
     pool.parts.push(i);
     pool.cap += partCap[i];

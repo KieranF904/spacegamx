@@ -126,6 +126,7 @@ textarea { width: 100%; height: 90px; background: #0a0e11; color: var(--ink); bo
       <span><i style="background:var(--starve)"></i>Starved</span>
       <span><i style="background:var(--idle)"></i>Idle</span>
       <span><i style="border:2px dashed #c084fc;background:none"></i>Fuel tanks joined</span>
+      <span><i style="background:#d9a03a;clip-path:polygon(50% 0,100% 60%,65% 60%,65% 100%,35% 100%,35% 60%,0 60%)"></i>Diode: power leaves only the way its arrow points</span>
     </div>
   </main>
 
@@ -142,6 +143,7 @@ textarea { width: 100%; height: 90px; background: #0a0e11; color: var(--ink); bo
           <li><b>Power only moves between parts that touch</b> (a shared edge; corners don't count). There is no ship-wide pool.</li>
           <li><b>Generators</b> make power every second and push it into the parts touching them. What nothing takes is wasted.</li>
           <li><b>Stores and Conduits pass power on.</b> Each takes in no more than its Takes a second and gives out no more than its Gives, so the narrowest part in a chain sets the rate. Touching stores even out towards the same fill.</li>
+          <li><b>A Diode is a one-way Conduit.</b> Its arrow is its out side: power leaves only that way, into the part across it (a store, a Conduit or a part that uses power). Every other side only feeds it: generators may push into it, stores and Conduits may pass power into it, and nothing comes back. A part touching a Diode's other sides gets nothing from it. Use one to keep guns from draining the engines' stores, or to let power run one way down a spine. When placing one, R turns the arrow; select a placed one and press R to turn it.</li>
           <li><b>Weapons, engines, shields and tools are dead ends:</b> they draw only from the generators, stores and conduits touching them, and pass nothing on. Generators are used first, then the fullest store.</li>
           <li><b>Order each tick:</b> thrusters, then shields and tools, then weapons.</li>
           <li><b>Thrusters</b> burn from a buffer that refills no faster than their Intake. While it lasts they give full thrust; once it's empty, thrust drops to Intake ÷ Burn. Main engines run on Thrust (and Boost), Side Jets while Strafe is on, Burst Strafers for a moment on each Dodge.</li>
@@ -176,7 +178,7 @@ textarea { width: 100%; height: 90px; background: #0a0e11; color: var(--ink); bo
 // ================================================================ part types (the proposal's numbers, per whole part)
 const T = {}, ORDER = [];
 const CATS = ['Core and hull', 'Generators', 'Stores and conduits', 'Weapons', 'Engines', 'Shields and tools'];
-const COL = { core: '#e8e3d6', hull: '#4b5660', armor: '#6e7a84', cargo: '#7a6a52', gen: '#38bdf8', pool: '#4ade80', cap: '#f5a83a', drive: '#60a5fa', conduit: '#a7b4be',
+const COL = { core: '#e8e3d6', hull: '#4b5660', armor: '#6e7a84', cargo: '#7a6a52', gen: '#38bdf8', pool: '#4ade80', cap: '#f5a83a', drive: '#60a5fa', conduit: '#a7b4be', diode: '#d9a03a',
   fuel: '#c084fc', dynamo: '#facc15', E: '#ef5f55', H: '#e0a83c', A: '#a08cf2', engine: '#3fb0e0', fengine: '#c07ae0', strafer: '#8cc4ff', util: '#4fbfb2' };
 const ICON = { core: 'core', inert: '', gen: 'bolt', store: 'cell', fuel: 'drop', dynamo: 'spin', weapon: 'gun', engine: 'flame', util: 'ring' };
 function def(o) { o.w = o.w || 1; o.h = o.h || 1; if (o.mass === undefined) o.mass = o.w * o.h; T[o.id] = o; ORDER.push(o.id); }
@@ -193,6 +195,8 @@ def({ id: 'fusion', name: 'Fusion Plant', cat: 1, kind: 'gen', produce: 192, w: 
 def({ id: 'stellarator', name: 'Stellarator', cat: 1, kind: 'gen', produce: 300, w: 2, h: 2, mass: 10, col: COL.gen, lvl: 36, isNew: true });
 
 def({ id: 'conduit', name: 'Conduit', cat: 2, kind: 'store', hold: 10, give: 200, take: 200, mass: 0.3, col: COL.conduit, lvl: 0, isNew: true, conduit: true });
+// A Diode: a one-way Conduit. Its out side (the arrow; the game's `facing`) is the only edge power leaves by; every other edge only feeds it.
+def({ id: 'diode', name: 'Diode', cat: 2, kind: 'store', hold: 10, give: 200, take: 200, mass: 0.3, col: COL.diode, lvl: 4, isNew: true, conduit: true, diode: true });
 def({ id: 'battery', name: 'Battery', cat: 2, kind: 'store', hold: 300, give: 150, take: 50, col: COL.pool, lvl: 0 });
 def({ id: 'heavy_bank', name: 'Heavy Bank', cat: 2, kind: 'store', hold: 1200, give: 400, take: 600, w: 2, h: 2, mass: 6.4, col: COL.pool, lvl: 20 });
 def({ id: 'capacitor', name: 'Capacitor', cat: 2, kind: 'store', hold: 120, give: 2000, take: 40, col: COL.cap, lvl: 7 });
@@ -277,7 +281,13 @@ const SHIPS = window.SHIPS || [];
 // ================================================================ state
 let GW = 20, GH = 14;
 let parts = [], nextUid = 1;
-let tool = 'inspect', rot = false, selected = null, hover = null, hoverPart = null;
+let tool = 'inspect', rot = false, face = 'N', selected = null, hover = null, hoverPart = null;
+// Diode out sides, as the game's PlacedPart.facing: N is up the screen (-y), E right, S down, W left
+const SIDES = ['N', 'E', 'S', 'W'], SIDE_V = { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0] };
+const SIDE_WORD = { N: 'up', E: 'right', S: 'down', W: 'left' };
+const nextFace = (f) => SIDES[(SIDES.indexOf(f) + 1) % 4];
+// May power pass from part a to touching part b? A Diode gives only to the part across its out side, and takes from every other side.
+const mayPass = (a, b) => (!tdef(a).diode || a.diodeOut === b) && (!tdef(b).diode || b.diodeOut !== a);
 const ctrl = { fire: true, thrust: false, boost: false, strafe: false, util: true, paused: false, dodge: false };
 const settings = { beamMode: 'buffer', relight: 50, speed: 1, zoom: 0, hullConducts: false, hullRate: 60 };
 let hold = { slugs: 400, canisters: 240, shells: 80, missiles: 48, torpedoes: 12, propellant: 400 };
@@ -313,14 +323,23 @@ function rebuild() {
     if (p.relay && p.held === undefined) p.held = tdef(p).kind === 'store' ? p.relay.hold : 0;
     if (p.relay) p.held = Math.min(p.held, p.relay.hold);
   }
+  // A Diode's out side: the part across it (null: nothing there, so it gives nowhere)
+  for (const p of parts) {
+    p.diodeOut = null;
+    if (!tdef(p).diode) continue;
+    p.face ||= 'N';
+    const [x, y] = p.cells[0], [dx, dy] = SIDE_V[p.face], nx = x + dx, ny = y + dy;
+    const q = nx >= 0 && ny >= 0 && nx < GW && ny < GH ? occ[key(nx, ny)] : null;
+    if (q && q !== p) p.diodeOut = q;
+  }
   const kind = (p) => tdef(p).kind;
   const isSource = (p) => kind(p) === 'gen' || !!p.relay;
-  for (const p of parts) p.sources = [...p.touch.keys()].filter(isSource);
-  // Which relays can reach a generator through other relays (for "connected" warnings)
+  for (const p of parts) p.sources = [...p.touch.keys()].filter((s) => isSource(s) && mayPass(s, p));
+  // Which relays can reach a generator through other relays, following Diodes' one way (for "connected" warnings)
   const reach = new Set(), queue = [];
-  for (const g of parts) if (kind(g) === 'gen') for (const q of g.touch.keys()) if (q.relay && !reach.has(q)) { reach.add(q); queue.push(q); }
-  while (queue.length) { const r = queue.shift(); for (const q of r.touch.keys()) if (q.relay && !reach.has(q)) { reach.add(q); queue.push(q); } }
-  for (const p of parts) p.linked = kind(p) === 'gen' ? [...p.touch.keys()].some((q) => q.relay || isConsumer(kind(q))) : p.sources.some((s) => kind(s) === 'gen' || reach.has(s));
+  for (const g of parts) if (kind(g) === 'gen') for (const q of g.touch.keys()) if (q.relay && mayPass(g, q) && !reach.has(q)) { reach.add(q); queue.push(q); }
+  while (queue.length) { const r = queue.shift(); for (const q of r.touch.keys()) if (q.relay && mayPass(r, q) && !reach.has(q)) { reach.add(q); queue.push(q); } }
+  for (const p of parts) p.linked = kind(p) === 'gen' ? [...p.touch.keys()].some((q) => (q.relay || isConsumer(kind(q))) && mayPass(p, q)) : p.sources.some((s) => kind(s) === 'gen' || reach.has(s));
   // Fuel tanks that touch share propellant
   const fuelBanks = [], bankOf = new Map();
   for (const p of parts) {
@@ -332,10 +351,11 @@ function rebuild() {
   const by = (k) => parts.filter((p) => kind(p) === k);
   L = { occ, fuelBanks, bankOf, gens: by('gen'), relays: parts.filter((p) => p.relay), weapons: by('weapon'), engines: by('engine'),
     utils: by('util'), dynamos: by('dynamo'), fuels: by('fuel') };
-  L.rr = []; // relay pairs, each once
-  for (const a of L.relays) for (const b of a.touch.keys()) if (b.relay && a.uid < b.uid) L.rr.push([a, b]);
+  L.rr = []; // relay pairs, each once: [a, b, a may give to b, b may give to a] (a Diode makes a pair one-way, or closes it)
+  for (const a of L.relays) for (const b of a.touch.keys()) if (b.relay && a.uid < b.uid) { const ab = mayPass(a, b), ba = mayPass(b, a); if (ab || ba) L.rr.push([a, b, ab, ba]); }
   for (const p of L.engines) p.fuelBanks = [...new Set([...p.touch.keys()].map((q) => bankOf.get(q)).filter(Boolean))];
-  for (const p of L.dynamos) p.into = [...p.touch.keys()].filter((q) => kind(q) === 'store');
+  // A dynamo tops up stores, never a Conduit or Diode (they only pass power on)
+  for (const p of L.dynamos) p.into = [...p.touch.keys()].filter((q) => kind(q) === 'store' && !tdef(q).conduit);
   for (const p of parts) initState(p);
   flows.clear();
 }
@@ -352,7 +372,13 @@ function fitsCells(type, cells) {
   if (type === 'core' && parts.some((p) => p.type === 'core')) return false;
   return cells.every(([x, y]) => x >= 0 && y >= 0 && x < GW && y < GH && !L.occ[key(x, y)]);
 }
-function addPart(type, cells) { const p = { uid: nextUid++, type, cells }; parts.push(p); return p; }
+function addPart(type, cells, side) { const p = { uid: nextUid++, type, cells }; if (T[type]?.diode) p.face = SIDES.includes(side) ? side : 'N'; parts.push(p); return p; }
+// R: turns a Diode's arrow (the one being placed, or a selected one), else turns the part being placed
+function rotateKey() {
+  if (T[tool]?.diode) { face = nextFace(face); setTool(tool); }
+  else if (!T[tool] && selected && tdef(selected).diode) { selected.face = nextFace(selected.face); rebuild(); save(); renderCard(); }
+  else rot = !rot;
+}
 function removePart(p) { parts = parts.filter((q) => q !== p); if (selected === p) selected = null; rebuild(); save(); renderCard(); }
 
 // ================================================================ the tick (60 a second): power moves only between touching parts
@@ -468,15 +494,16 @@ function tick() {
   // 5. Generators push what's left into the stores touching them (no faster than each one's Takes)
   let charge = 0;
   for (const g of L.gens) {
-    const rs = [...g.touch.keys()].filter((q) => q.relay);
+    const rs = [...g.touch.keys()].filter((q) => q.relay && mayPass(g, q));
     const a = waterfill(rs.map((r) => Math.max(0, Math.min(r.tLeft, r.relay.hold - r.held))), g.left);
     rs.forEach((r, i) => { if (a[i] > 0) { r.held += a[i]; r.tLeft -= a[i]; r.in += a[i]; g.left -= a[i]; charge += a[i]; moved(g, r, a[i]); } });
     g.emaWaste = ema(g.emaWaste, g.left / DT);
   }
   // 6. Touching stores even out: power moves from the fuller (by %) to the emptier, within Gives and Takes
-  for (const [a0, b0] of L.rr) {
+  for (const [a0, b0, ab, ba] of L.rr) {
     let a = a0, b = b0;
     if (a.held / a.relay.hold < b.held / b.relay.hold) [a, b] = [b, a];
+    if (!(a === a0 ? ab : ba)) continue; // one-way through a Diode: never backwards
     const want = (a.held * b.relay.hold - b.held * a.relay.hold) / (a.relay.hold + b.relay.hold);
     const t = Math.min(want, a.gLeft, b.tLeft, a.held, b.relay.hold - b.held);
     if (t > 1e-9) { a.held -= t; a.gLeft -= t; a.out += t; b.held += t; b.tLeft -= t; b.in += t; moved(a, b, t); }
@@ -586,6 +613,7 @@ function draw() {
     const bw = (p.box.x1 - p.box.x0) * CS, bh = (p.box.y1 - p.box.y0) * CS;
     const X = p.cx * CS, Y = p.cy * CS, s = Math.min(bw, bh) * 0.3;
     const showName = bw >= 64 && bh >= 34 && CS >= 22, showNum = CS >= 26;
+    if (t.diode) { drawIcon('arrow', X, Y, Math.max(s, CS * 0.32), p.face); continue; }
     drawIcon(t.id === 'core' ? 'core' : t.conduit ? 'wire' : ic, X, showName ? Y - bh * 0.14 : Y, Math.min(s, 13));
     if (showName) { cx.fillStyle = '#e9eff3'; cx.font = `600 ${Math.min(12, CS / 3)}px "IBM Plex Sans", sans-serif`; cx.fillText(t.name, X, Y + bh * 0.18); }
     else if (showNum && t.kind === 'gen') { cx.fillStyle = '#bfe9ff'; cx.font = `600 ${Math.min(11, CS / 3)}px "IBM Plex Mono", monospace`; cx.fillText('+' + t.produce, X, Y + CS * 0.3); }
@@ -598,6 +626,7 @@ function draw() {
     const cells = rectCells(tool, hover.x, hover.y, rot), ok = fitsCells(tool, cells);
     cx.fillStyle = ok ? 'rgba(95,209,138,.3)' : 'rgba(239,106,90,.3)';
     for (const [x, y] of cells) if (x < GW && y < GH) cx.fillRect(x * CS, y * CS, CS, CS);
+    if (T[tool].diode) drawIcon('arrow', (hover.x + 0.5) * CS, (hover.y + 0.5) * CS, CS * 0.32, face);
   }
 }
 function outline(cells, p, inset) { outlineSet(cells, (x, y) => L.occ[key(x, y)] === p, inset); }
@@ -613,9 +642,9 @@ function outlineSet(cells, inside, inset) {
   }
   cx.stroke();
 }
-function drawIcon(ic, x, y, s) {
+function drawIcon(ic, x, y, s, side) {
   if (s < 3) return;
-  cx.save(); cx.translate(x, y); cx.fillStyle = '#eef4f7'; cx.strokeStyle = '#eef4f7'; cx.lineWidth = Math.max(1.2, s / 6); cx.lineJoin = 'round';
+  cx.save(); cx.translate(x, y); if (side) cx.rotate(SIDES.indexOf(side) * Math.PI / 2); cx.fillStyle = '#eef4f7'; cx.strokeStyle = '#eef4f7'; cx.lineWidth = Math.max(1.2, s / 6); cx.lineJoin = 'round';
   cx.beginPath();
   switch (ic) {
     case 'bolt': cx.moveTo(s * 0.15, -s); cx.lineTo(-s * 0.55, s * 0.1); cx.lineTo(0, s * 0.1); cx.lineTo(-s * 0.15, s); cx.lineTo(s * 0.55, -s * 0.1); cx.lineTo(0, -s * 0.1); cx.closePath(); cx.fill(); break;
@@ -627,6 +656,9 @@ function drawIcon(ic, x, y, s) {
     case 'flame': cx.moveTo(-s * 0.7, -s * 0.5); cx.lineTo(0, s * 0.1); cx.lineTo(s * 0.7, -s * 0.5); cx.moveTo(-s * 0.7, s * 0.1); cx.lineTo(0, s * 0.7); cx.lineTo(s * 0.7, s * 0.1); cx.stroke(); break;
     case 'dodge': cx.moveTo(-s, 0); cx.lineTo(s, 0); cx.moveTo(-s * 0.5, -s * 0.5); cx.lineTo(-s, 0); cx.lineTo(-s * 0.5, s * 0.5); cx.moveTo(s * 0.5, -s * 0.5); cx.lineTo(s, 0); cx.lineTo(s * 0.5, s * 0.5); cx.stroke(); break;
     case 'ring': cx.arc(0, 0, s * 0.75, 0, 7); cx.stroke(); cx.beginPath(); cx.arc(0, 0, s * 0.25, 0, 7); cx.fill(); break;
+    // Points up (N) before rotating: a shaft and a head that reaches the out edge
+    case 'arrow': cx.lineWidth = Math.max(1.6, s / 4); cx.moveTo(0, s * 0.9); cx.lineTo(0, -s * 0.2); cx.stroke();
+      cx.beginPath(); cx.moveTo(0, -s * 1.15); cx.lineTo(s * 0.7, -s * 0.15); cx.lineTo(-s * 0.7, -s * 0.15); cx.closePath(); cx.fill(); break;
     case 'core': cx.moveTo(0, -s); cx.lineTo(s * 0.8, 0); cx.lineTo(0, s); cx.lineTo(-s * 0.8, 0); cx.closePath(); cx.fillStyle = '#10161b'; cx.fill(); cx.stroke(); break;
   }
   cx.restore();
@@ -638,6 +670,7 @@ const pc = (v) => `${Math.round(v * 100)}%`;
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const nameList = (ps) => { const m = new Map(); for (const p of ps) m.set(tdef(p).name, (m.get(tdef(p).name) || 0) + 1); return [...m].map(([n, c]) => (c > 1 ? `${c} ${n}s` : `a ${n}`)).join(', '); };
 const flowFrom = (a, b) => flows.get(a.uid + '>' + b.uid) || 0;
+const kind0 = (p) => tdef(p).kind;
 function explain(p) {
   const t = tdef(p), out = [], nb = [...p.touch.keys()];
   if (t.kind === 'gen') {
@@ -647,7 +680,15 @@ function explain(p) {
     if (p.emaWaste > 1 && takers.length) out.push(`<span style="color:var(--starve)">Wasting ${n0(p.emaWaste)} E/s</span>: what touches it is full, or can't take it in fast enough.`);
   } else if (p.relay) {
     const r = p.relay;
-    out.push(t.kind === 'store'
+    if (t.diode) {
+      out.push(`One way: power leaves only by its out side (the arrow, pointing ${SIDE_WORD[p.face]}), up to ${r.give} E/s, into the part across it. The other parts touching it can only feed it, up to ${r.take} E/s. Holds almost nothing (${r.hold}).`);
+      out.push(p.diodeOut ? `Out side: ${nameList([p.diodeOut])}${p.diodeOut.relay || isConsumer(tdef(p.diodeOut).kind) ? '.' : ', <span style="color:var(--starve)">which carries no power, so nothing gets through</span>.'}`
+        : '<span style="color:var(--starve)">Nothing is across its out side, so it gives nowhere.</span> Rotate it (select it, press R) or put a part there.');
+      const feeders = nb.filter((q) => q !== p.diodeOut && (q.relay || kind0(q) === 'gen'));
+      if (feeders.length) out.push(`Can be fed by ${nameList(feeders)}.`);
+      const shut = nb.filter((q) => q !== p.diodeOut && isConsumer(kind0(q)));
+      if (shut.length) out.push(`<span style="color:var(--part)">Gets nothing from it:</span> ${nameList(shut)} (not across its out side).`);
+    } else out.push(t.kind === 'store'
       ? (t.conduit ? `Carries up to ${r.give} E/s from one neighbour to another and stores almost nothing (${r.hold}).` : `Holds ${r.hold}. Takes in at most ${r.take} E/s and gives out at most ${r.give} E/s.`)
       : `Hull that carries power (the setting is on): up to ${r.give} E/s.`);
     out.push(`Now: ${n0(p.held)} held, ${n0(p.emaIn)} E/s coming in, ${n0(p.emaOut)} E/s going out.`);
@@ -673,6 +714,8 @@ function explain(p) {
       if (t.mode === 'main' && t.bBurn !== t.burn) out.push(`Boosting: ${t.bThrust} thrust for ${t.bBurn} E/s${t.bFuel ? ` and ${t.bFuel} propellant` : ''}; with an empty buffer, ${pc(Math.min(1, t.intake / t.bBurn))} of that.`);
       if (p.active) out.push(`Now: ${pc(p.sat)} thrust, buffer ${n0(p.stored)} of ${t.buffer}.`);
     } else out.push(`Draws ${t.e} E/s while shields and tools are on.`);
+    const awayDiodes = nb.filter((q) => tdef(q).diode && q.diodeOut !== p);
+    if (awayDiodes.length) out.push(`<span style="color:var(--part)">${awayDiodes.length > 1 ? `${awayDiodes.length} Diodes touch it but point` : 'A Diode touches it but points'} away</span>, so ${awayDiodes.length > 1 ? 'they give' : 'it gives'} it nothing.`);
     if (!p.sources.length) out.push('<span style="color:var(--starve)">Touches nothing that carries power.</span> Put a generator, store or Conduit against it.');
     else {
       const feeders = p.sources.filter((s) => flowFrom(s, p) > 0.5);
@@ -816,7 +859,7 @@ function setTool(t) {
   tool = t;
   document.querySelectorAll('.pal button').forEach((b) => b.classList.toggle('on', b.dataset.type === t));
   document.getElementById('tInspect').classList.toggle('on', t === 'inspect'); document.getElementById('tErase').classList.toggle('on', t === 'erase');
-  document.getElementById('mode').textContent = T[t] ? `Placing ${T[t].name}. Click the grid; R rotates; right-click removes.` : t === 'erase' ? 'Erasing: click parts to remove them.' : 'Pick a part below to place it, or click a part on the grid to select it.';
+  document.getElementById('mode').textContent = T[t] ? (T[t].diode ? `Placing a Diode, arrow ${SIDE_WORD[face]}: power leaves only that way. Click the grid; R turns the arrow; right-click removes.` : `Placing ${T[t].name}. Click the grid; R rotates; right-click removes.`) : t === 'erase' ? 'Erasing: click parts to remove them.' : 'Pick a part below to place it, or click a part on the grid to select it.';
 }
 function cellAt(e) { const r = cv.getBoundingClientRect(); const x = Math.floor((e.clientX - r.left) / CS), y = Math.floor((e.clientY - r.top) / CS); return x >= 0 && y >= 0 && x < GW && y < GH ? { x, y } : null; }
 const tip = document.getElementById('tip');
@@ -844,10 +887,10 @@ function act(c) {
   const p = L.occ[key(c.x, c.y)];
   if (tool === 'erase') { if (p) removePart(p); }
   else if (tool === 'inspect') { selected = p || null; renderCard(); }
-  else if (T[tool]) { const cells = rectCells(tool, c.x, c.y, rot); if (fitsCells(tool, cells)) { const np = addPart(tool, cells); if (tdef(np).kind === 'store') np.held = 0; selected = np; rebuild(); save(); renderCard(); } }
+  else if (T[tool]) { const cells = rectCells(tool, c.x, c.y, rot); if (fitsCells(tool, cells)) { const np = addPart(tool, cells, T[tool].diode ? face : undefined); if (tdef(np).kind === 'store') np.held = 0; selected = np; rebuild(); save(); renderCard(); } }
 }
 const btn = (id, f) => document.getElementById(id).addEventListener('click', f);
-btn('tInspect', () => setTool('inspect')); btn('tErase', () => setTool('erase')); btn('tRot', () => { rot = !rot; });
+btn('tInspect', () => setTool('inspect')); btn('tErase', () => setTool('erase')); btn('tRot', rotateKey);
 const toggles = { cFire: 'fire', cThrust: 'thrust', cBoost: 'boost', cStrafe: 'strafe', cUtil: 'util', cPause: 'paused' };
 function syncCtrls() { for (const [id, k] of Object.entries(toggles)) document.getElementById(id).classList.toggle('on', ctrl[k]); }
 for (const [id, k] of Object.entries(toggles)) btn(id, () => { ctrl[k] = !ctrl[k]; syncCtrls(); });
@@ -865,7 +908,7 @@ window.addEventListener('keydown', (e) => {
   if (e.target.matches('input, textarea, select')) return;
   const k = e.key.toLowerCase();
   if (k === 'f') ctrl.fire = !ctrl.fire; else if (k === 'w') ctrl.thrust = !ctrl.thrust; else if (k === 'b') ctrl.boost = !ctrl.boost; else if (k === 's') ctrl.strafe = !ctrl.strafe;
-  else if (k === 'u') ctrl.util = !ctrl.util; else if (k === 'd') ctrl.dodge = true; else if (k === 'r') rot = !rot;
+  else if (k === 'u') ctrl.util = !ctrl.util; else if (k === 'd') ctrl.dodge = true; else if (k === 'r') rotateKey();
   else if (k === ' ') { ctrl.paused = !ctrl.paused; e.preventDefault(); } else if (k === 'escape') { setTool('inspect'); selected = null; renderCard(); }
   else if (k === 'x') setTool('erase'); else if ((k === 'delete' || k === 'backspace') && selected) removePart(selected);
   else return;
@@ -891,20 +934,21 @@ function renderShipPicker() {
   const sel = document.getElementById('ship');
   const opt = (v, label) => `<option value="${esc(v)}">${esc(label)}</option>`;
   const byGroup = {}; SHIPS.forEach((s, i) => { (byGroup[s.group] ||= []).push(opt('ship:' + i, `${s.name} (${s.parts.length} parts)`)); });
-  sel.innerHTML = '<option value="">Load a ship…</option>' + `<optgroup label="Test setups">${Object.keys(SETUPS).map((k) => opt('setup:' + k, k)).join('')}</optgroup>`
-    + Object.entries(byGroup).map(([g, o]) => `<optgroup label="${esc(g)}">${o.join('')}</optgroup>`).join('')
+  const group = ([g, o]) => `<optgroup label="${esc(g)}">${o.join('')}</optgroup>`, first = Object.entries(byGroup).filter(([g]) => g === 'Review ships');
+  sel.innerHTML = '<option value="">Load a ship…</option>' + first.map(group).join('') + `<optgroup label="Test setups">${Object.keys(SETUPS).map((k) => opt('setup:' + k, k)).join('')}</optgroup>`
+    + Object.entries(byGroup).filter(([g]) => g !== 'Review ships').map(group).join('')
     + '<optgroup label="Empty">' + opt('empty', 'Empty grid') + '</optgroup>';
   if (!SHIPS.length) sel.insertAdjacentHTML('beforeend', '<option disabled>(ships.js missing: run export-ships.ts)</option>');
   sel.addEventListener('change', () => { if (sel.value) loadChoice(sel.value); sel.value = ''; });
 }
 function setGrid(w, h) { GW = Math.max(16, w); GH = Math.max(12, h); }
 function loadChoice(v) {
-  parts = []; selected = null; fromGame = v.startsWith('ship:');
+  parts = []; selected = null; fromGame = false;
   if (v.startsWith('ship:')) {
-    const s = SHIPS[+v.slice(5)]; shipName = s.name;
+    const s = SHIPS[+v.slice(5)]; shipName = s.name; fromGame = s.group !== 'Review ships'; // review ships are built for touch routing, not wires
     const w = Math.max(...s.parts.flatMap((p) => p[1].map((c) => c[0]))) + 1, h = Math.max(...s.parts.flatMap((p) => p[1].map((c) => c[1]))) + 1;
     setGrid(w + 4, h + 4); const ox = Math.floor((GW - w) / 2), oy = Math.floor((GH - h) / 2);
-    for (const [type, cells] of s.parts) addPart(T[type] ? type : 'hull', cells.map(([x, y]) => [x + ox, y + oy]));
+    for (const [type, cells, side] of s.parts) addPart(T[type] ? type : 'hull', cells.map(([x, y]) => [x + ox, y + oy]), side);
   } else if (v.startsWith('setup:')) {
     const name = v.slice(6); shipName = name; setGrid(16, 12); rebuild();
     for (const [type, x, y] of SETUPS[name]) { const c = rectCells(type, x, y, false); if (fitsCells(type, c)) { addPart(type, c); rebuild(); } }
@@ -924,7 +968,7 @@ let saveTimer = 0;
 function snapshot() {
   const params = {};
   for (const id of ORDER) for (const k of Object.keys(T[id])) if (typeof T[id][k] === 'number' && T[id][k] !== DEFAULTS[id][k]) (params[id] ||= {})[k] = T[id][k];
-  return { v: 3, name: shipName, grid: [GW, GH], parts: parts.map((p) => [p.type, p.cells]), params, hold,
+  return { v: 3, name: shipName, grid: [GW, GH], parts: parts.map((p) => (p.face ? [p.type, p.cells, p.face] : [p.type, p.cells])), params, hold,
     settings: { beamMode: settings.beamMode, relight: settings.relight, hullConducts: settings.hullConducts, hullRate: settings.hullRate } };
 }
 function syncSettingsUi() {
@@ -939,7 +983,7 @@ function restore(s) {
   syncSettingsUi();
   shipName = s.name || 'Your design'; setGrid(...(s.grid || [20, 14]));
   parts = []; selected = null;
-  for (const [type, cells] of s.parts || []) if (T[type] && Array.isArray(cells)) addPart(type, cells);
+  for (const [type, cells, side] of s.parts || []) if (T[type] && Array.isArray(cells)) addPart(type, cells, side);
   ticks = 0; rebuild(); sizeCanvas(); renderPalette(); renderCard();
 }
 function save() { clearTimeout(saveTimer); saveTimer = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify(snapshot())); } catch (e) { /* storage unavailable */ } }, 300); }

@@ -1505,6 +1505,21 @@
         "power_coupling": 1
       },
       "time": 60
+    },
+    "power_conduit": {
+      "inputs": {
+        "alloy_plate": 1,
+        "copper_wire": 1
+      },
+      "time": 0
+    },
+    "power_diode": {
+      "inputs": {
+        "alloy_plate": 1,
+        "copper_wire": 2,
+        "insulated_polymer": 1
+      },
+      "time": 0
     }
   }
 }

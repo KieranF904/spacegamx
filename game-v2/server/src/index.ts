@@ -81,6 +81,8 @@ const gameServer = new GameServer({
   guestAdmin: DEV_MODE,
   // Admins may build anything in the hangar for free (the admin panel's switch; never in production: GameServer refuses it there too)
   freeBuild: DEV_MODE,
+  // Every pilot joins and respawns in the dev Rockery (data/dev/rockery.json), not Sol (never in production: GameServer refuses it there too)
+  devStart: DEV_MODE ? 'dev_rockery' : undefined,
   // ...and find these designs in their hangar (data/ships/blueprints/dev/guest-*.json)
   guestShips: DEV_MODE ? devGuestShips(dataPath) as never : undefined,
   // Where new pilots die and what they get done in their first hour (data/telemetry/, kept between deploys)

@@ -363,7 +363,8 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     let supply = 0, powered = false, stored = false;
     for (const i of g) {
       if ((fns[i].produce ?? 0) > 0) { powered = true; supply += partSupply(fns[i], area[i], mats[i]) * healthFactor(hp[i] / maxHp[i], tuning); }
-      if ((fns[i].store ?? 0) > 0) stored = true;
+      // (Energy routing's relays, the Conduit and Diode, store nothing for the old flow: circuits.ts leaves them out of the pool)
+      if ((fns[i].store ?? 0) > 0 && !fns[i].relayOnly && !fns[i].oneWay) stored = true;
     }
     // Engines, guns and mining lasers draw on the battery (energy.ts): only steady loads share out the supply here
     const consumers = g.filter((i) => (fns[i].demand ?? 0) > 0 && !burst(i));

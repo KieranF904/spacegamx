@@ -34,7 +34,7 @@
 
 import {
   Blueprint, Catalog, Economy, Bag, partItemId, isWeaponFn, PlacedPart, PlacedGeom, Rot, Side, ShipTuning, ShipDerived, Vec2,
-  SIDES, SIDE_NORMAL, placeGeometry, overlapsAny, computeJoins, facingEdges, isEdgeFree, geomContainsPoint,
+  SIDES, SIDE_NORMAL, placeGeometry, overlapsAny, computeJoins, facingEdges, facingProblem, geomContainsPoint,
   validateBlueprint, nextFreeUid, floodFill, partNeedsFacing, createShipState, connectorEndpoints, getVariant,
   BlueprintError, TurretWindow, computeTurretWindow, ClientMessage, ServerHangarMessage, partDemand, parsePartItemId,
   isStructural, ghostBill, SALVAGE, ShipState, buildPoints, DAMAGE_NAMES, type DamageType,
@@ -437,10 +437,8 @@ export class HangarUI {
     const all = [...this.geoms, g];
     const pref = DEFAULT_FACING[p.fn] ?? 'N';
     const order = [pref, ...SIDES.filter((s) => s !== pref)];
-    const free = (side: Side) => {
-      const edges = facingEdges(g, side);
-      return edges.length > 0 && edges.every((e) => isEdgeFree(all, all.length - 1, e, side));
-    };
+    // (Free, or for a Diode joined: partFacingRule)
+    const free = (side: Side) => !facingProblem(p.fn, all, all.length - 1, side);
     // A weapon with mounting rules: the first side it fires out of that keeps them all (bolted on where it must be,
     // its barrel clear), else the first free one, so the preview shows what's wrong
     if (mountingOf(this.deps.catalog, p.fn)?.rules) {
@@ -467,10 +465,12 @@ export class HangarUI {
     const g = placeGeometry(this.deps.catalog, p);
     if (overlapsAny(g, this.geoms)) return 'overlaps another part';
     // It must point out of a free straight edge (T or the Facing buttons pick another side)
+    // (A Diode's instead must touch a part: power leaves by it)
     if (p.facing) {
-      const all = [...this.geoms, g], edges = facingEdges(g, p.facing as Side);
-      if (!edges.length) return `no straight edge facing ${p.facing} on this piece: press T for another side`;
-      if (!edges.every((e) => isEdgeFree(all, all.length - 1, e, p.facing as Side))) return `its ${p.facing} edge is blocked: press T for another side`;
+      const why = facingProblem(p.fn, [...this.geoms, g], this.geoms.length, p.facing as Side);
+      if (why === 'noEdge') return `no straight edge facing ${p.facing} on this piece: press T for another side`;
+      if (why === 'blocked') return `its ${p.facing} edge is blocked: press T for another side`;
+      if (why === 'notJoined') return `its ${p.facing} edge (where power leaves) must touch a part: press T for another side`;
     }
     if (this.geoms.length && computeJoins([...this.geoms, g]).every(([a, b]) => b !== this.geoms.length && a !== this.geoms.length)) {
       return "doesn't join anything";

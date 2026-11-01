@@ -17,6 +17,7 @@ import { partBuildPoints, partGrade, partSupply, partThrust, weaponSizeFactor, w
 import { partArmour } from './damage.js';
 import { legacyCandidates, legacyModel, migrateBlueprint, migrateItemStack, migratePartItem } from './migrate.js';
 import { isPowerPart } from './wires.js';
+import { describePart } from './describe.js';
 import type { ShipTuning } from './tuning.js';
 import { readShipJson, testCatalog, SHIP_DATA_DIR } from './testData.js';
 import { canCraft, MATERIAL_LEVEL, modelLicensed, partLicensed } from '../econ/market.js';
@@ -121,6 +122,23 @@ describe('models', () => {
     expect(d.maxThrust.forward).toBeCloseTo(2 * FN('thruster').thrust!, 6);
     expect(d.weapons).toHaveLength(2);
     expect(d.weapons.every((w) => w.satisfaction === 1)).toBe(true);
+  });
+
+  it('the Conduit and the Diode: plain relay data (holds 10, gives and takes 200), cheap, from level 0 and 4, and say what they do', () => {
+    const recipes = JSON.parse(readFileSync(join(SHIP_DATA_DIR, '../recipes.json'), 'utf-8')).models;
+    const con = FN('power_conduit'), dio = FN('power_diode');
+    for (const f of [con, dio]) {
+      expect([f.pieces, f.material, f.store, f.discharge, f.intake, f.category, f.bank, f.pool, f.demand, f.produce])
+        .toEqual([['sq'], 'alloy', 10, 200, 200, 'power', undefined, undefined, undefined, undefined]);
+      expect(recipes[f.id].time).toBe(0);
+    }
+    expect([con.relayOnly, con.oneWay, con.unlock?.level]).toEqual([true, undefined, 0]);
+    expect([dio.oneWay, dio.relayOnly, dio.unlock?.level]).toEqual([true, undefined, 4]);
+    expect(recipes.power_conduit.inputs).toEqual({ alloy_plate: 1, copper_wire: 1 });
+    const said = (id: string) => (describePart(catalog, tuning, { fn: id, material: 'alloy', piece: 'sq' })?.facts ?? []).map((f) => f.sentence ?? '').join(' ');
+    expect(said('power_diode')).toContain('power only flows out of its front');
+    expect(said('power_conduit')).toContain('passes power between the parts it touches');
+    expect(said('power_battery')).toBe('');
   });
 });
 

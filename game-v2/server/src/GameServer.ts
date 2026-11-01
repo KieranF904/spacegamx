@@ -496,6 +496,8 @@ export interface GameServerOptions {
   devRange?: RangeConfig;
   /** Admins may switch on free build (any part in the hangar, nothing taken): the dev server only. Refused outright under NODE_ENV=production. */
   freeBuild?: boolean;
+  /** Every pilot joins and respawns in this system (the dev Rockery, `dev_rockery`), whatever their profile says: the dev server only. Refused outright under NODE_ENV=production. */
+  devStart?: string;
   /** Where pilots' deaths and milestones are written (Telemetry.ts); none: not recorded */
   telemetry?: TelemetryWriter;
   /** Where contributor notes and ranks are kept (contribFileStore: data/contributor); none: in memory */
@@ -525,6 +527,8 @@ export class GameServer implements ServerCtx {
   guestAdmin: boolean;
   /** Admins may build for free in the hangar (AdminTools `freebuild`) */
   private freeBuildAllowed: boolean;
+  /** The dev server's start system (opts.devStart), by number; -1: pilots start in Sol and come back where they left off */
+  private devStartNum = -1;
   private paused = false;
   /** Tick until which each player ignores rifts (no instant bounce-back) */
   private riftCooldown = new Map<number, number>();
@@ -673,6 +677,7 @@ export class GameServer implements ServerCtx {
     // (never on a production server, whatever it was started with)
     this.guestAdmin = !!opts.guestAdmin && process.env.NODE_ENV !== 'production';
     this.freeBuildAllowed = !!opts.freeBuild && process.env.NODE_ENV !== 'production';
+    if (opts.devStart && process.env.NODE_ENV !== 'production' && this.gameData.getSystem(opts.devStart)) this.devStartNum = this.gameData.getSystemNum(opts.devStart);
     this.ships = opts.ships;
     this.ships.attach(this.createShipHost());
     this.shipEditAnywhere = opts.shipEditAnywhere ?? false;
@@ -722,6 +727,7 @@ export class GameServer implements ServerCtx {
     this.pilots = new Pilots(this.createPilotHost(), this.econ, this.ships, profileStore, {
       starter: this.starterKit(),
       guestShips: process.env.NODE_ENV !== 'production' ? opts.guestShips : undefined,
+      spawn: this.devStartNum >= 0 ? (eid) => this.devStartSpot(eid) : undefined,
       freeRebuildBelowLevel: 3,
       autosaveMs: 30_000,
       now: opts.clock,
@@ -1085,6 +1091,19 @@ this.devTeleport = opts.devTeleport ?? false;
     return { x: Math.cos(a) * r, y: Math.sin(a) * r };
   }
 
+  /**
+   * Where a pilot appears in the dev start system: on a ring well clear of the star, just inside the asteroid belt's
+   * inner edge (rocks close by, none underneath), each pilot at their own angle
+   */
+  private devStartSpot(eid: number): { system: number; x: number; y: number } {
+    const sys = this.gameData.getSystemByNum(this.devStartNum);
+    const star = sys?.centralBody?.radius ?? sys?.starRadius ?? 0;
+    const belt = sys?.asteroidBelt?.innerRadius ?? 0;
+    const r = Math.max(star + 1500, belt - 600);
+    const a = (eid * 2.399) % (Math.PI * 2);
+    return { system: this.devStartNum, x: Math.cos(a) * r, y: Math.sin(a) * r };
+  }
+
   private createPilotHost(): PilotHost {
     return {
       world: this.world,
@@ -1112,7 +1131,7 @@ this.devTeleport = opts.devTeleport ?? false;
       },
       place: (conn, num, x, y) => {
         // Someone's station only exists while it's loaded: back out by its jump point
-        if (this.gameData.getSystemByNum(num)?.private) {
+        if (this.gameData.getSystemByNum(num)?.private && num !== this.devStartNum) {
           const out = this.homes.exitFor(num) ?? this.siteExit(conn as ClientConnection);
           if (out) return this.placePlayer(conn as ClientConnection, out.num, out.x + 500, out.y);
         }
@@ -2770,6 +2789,13 @@ this.devTeleport = opts.devTeleport ?? false;
     Boost.lastUseTick[eid] = 0;
     
     InSystem.systemId[eid] = 0;
+    // (The dev server's start system instead, the Rockery: guests are never placed again)
+    if (this.devStartNum >= 0) {
+      const dev = this.devStartSpot(eid);
+      Player.systemId[eid] = InSystem.systemId[eid] = dev.system;
+      Position.x[eid] = dev.x;
+      Position.y[eid] = dev.y;
+    }
 
     this.ships.onPlayerCreated(eid);
 

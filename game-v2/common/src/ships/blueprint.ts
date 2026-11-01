@@ -4,9 +4,9 @@
 
 import type { Blueprint, FunctionDef, InventoryStub, Mount, PlacedPart, Rot, Side, WeaponMods } from './types.js';
 import { WEAPON_MOD_NUMBERS, WEAPON_MOD_SETS } from './types.js';
-import type { Catalog } from './catalog.js';
+import { type Catalog, SIDE_NORMAL } from './catalog.js';
 import type { ShipTuning } from './tuning.js';
-import { PlacedGeom, computeJoins, facingEdges, findOverlaps, isEdgeFree, placeGeometry } from './grid.js';
+import { PlacedGeom, computeJoins, facingEdges, findOverlaps, geomContainsPoint, isEdgeFree, placeGeometry } from './grid.js';
 import { partMaterial } from './grades.js';
 import { cleanWires } from './wires.js';
 import { checkMounting } from './mounting.js';
@@ -14,7 +14,7 @@ import { checkMounting } from './mounting.js';
 export type BlueprintErrorCode =
   | 'catalogVersion' | 'unknownPiece' | 'unknownFunction' | 'unknownMaterial' | 'functionNotAllowed'
   | 'badUid' | 'duplicateUid' | 'tooManyParts' | 'coreCount' | 'overlap' | 'unreachable'
-  | 'facingMissing' | 'facingBlocked' | 'notOwned' | 'materialNotOwned' | 'badPlacement' | 'badMount' | 'exclusive'
+  | 'facingMissing' | 'facingBlocked' | 'facingNotJoined' | 'notOwned' | 'materialNotOwned' | 'badPlacement' | 'badMount' | 'exclusive'
   | 'badMounting';
 
 export interface BlueprintError {
@@ -40,6 +40,8 @@ export function isWeaponFn(fn: string): boolean {
 
 /** Parts that point a facing edge out: weapons, engines (thrust), and any marked `facing` (mining lasers) */
 const NEEDS_FACING = new Set<string>();
+/** Parts whose facing edge must touch a part instead: a Diode (`oneWay`: its out side, energy-routing-impl.md §3.4) */
+const JOINED_FACING = new Set<string>();
 
 /** Every function by id, and the legacy functions of each family (licences: econ/market.ts) */
 const FN_DEFS = new Map<string, FunctionDef>();
@@ -50,7 +52,8 @@ export function registerFunctionDefs(defs: Iterable<FunctionDef>, legacyFamily?:
   for (const f of defs) {
     FN_DEFS.set(f.id, f);
     if (f.weapon) WEAPON_FNS.add(f.id);
-    if (f.weapon || (f.thrust ?? 0) > 0 || f.facing) NEEDS_FACING.add(f.id);
+    if (f.oneWay) JOINED_FACING.add(f.id);
+    else if (f.weapon || (f.thrust ?? 0) > 0 || f.facing) NEEDS_FACING.add(f.id);
   }
   if (legacyFamily) {
     LEGACY_OF.clear();
@@ -82,8 +85,38 @@ export function legacyFunctionsOf(family: string): string[] {
   return LEGACY_OF.get(family) ?? [];
 }
 
+/** Does a part of this function carry a facing (whichever rule its edge keeps: partFacingRule) */
 export function partNeedsFacing(fn: string): boolean {
-  return NEEDS_FACING.has(fn);
+  return NEEDS_FACING.has(fn) || JOINED_FACING.has(fn);
+}
+
+/**
+ * What a part's facing edge must be: 'free' (nothing across it: guns, engines, mining lasers), 'joined' (a part
+ * across it: a Diode's out side, which power leaves by), or null (it has no facing). Validation, migration and the
+ * hangar's placement all ask this.
+ */
+export function partFacingRule(fn: string): 'free' | 'joined' | null {
+  return JOINED_FACING.has(fn) ? 'joined' : NEEDS_FACING.has(fn) ? 'free' : null;
+}
+
+/**
+ * What's wrong with part `self`'s facing `side` among `geoms` under its function's rule: 'noEdge' (no straight edge
+ * that way), 'blocked' (a 'free' edge with a part across it), 'notJoined' (a 'joined' edge with no part across some
+ * of it), or null when it keeps the rule (or the function has none).
+ */
+export function facingProblem(fn: string, geoms: PlacedGeom[], self: number, side: Side): 'noEdge' | 'blocked' | 'notJoined' | null {
+  const rule = partFacingRule(fn);
+  if (!rule) return null;
+  const edges = facingEdges(geoms[self], side);
+  if (!edges.length) return 'noEdge';
+  if (rule === 'free') return edges.every((e) => isEdgeFree(geoms, self, e, side)) ? null : 'blocked';
+  // (Joined: just past each unit edge's middle lies another part, as power/layout.ts finds a Diode's out part)
+  const n = SIDE_NORMAL[side];
+  const across = ([a, b]: (typeof edges)[number]) => {
+    const x = (a[0] + b[0]) / 2 + n[0] * 0.05, y = (a[1] + b[1]) / 2 + n[1] * 0.05;
+    return geoms.some((g, i) => i !== self && geomContainsPoint(g, x, y));
+  };
+  return edges.every(across) ? null : 'notJoined';
 }
 
 export function partMaxHp(catalog: Catalog, p: PlacedPart): number {
@@ -191,15 +224,13 @@ export function validateBlueprint(
     if (lost.length) err('unreachable', lost, `${lost.length} part(s) not connected to the core`);
   }
 
-  geoms.forEach((g, i) => {
-    const p = usable[i];
+  usable.forEach((p, i) => {
     if (!partNeedsFacing(p.fn)) return;
     if (!p.facing) { err('facingMissing', [p.uid], `${p.fn} ${p.uid} needs a facing`); return; }
-    const edges = facingEdges(g, p.facing);
-    if (!edges.length) { err('facingMissing', [p.uid], `${p.fn} ${p.uid} has no straight edge facing ${p.facing}`); return; }
-    if (!edges.every((e) => isEdgeFree(geoms, i, e, p.facing as Side))) {
-      err('facingBlocked', [p.uid], `${p.fn} ${p.uid}: its ${p.facing} edge must be free`);
-    }
+    const problem = facingProblem(p.fn, geoms, i, p.facing as Side);
+    if (problem === 'noEdge') err('facingMissing', [p.uid], `${p.fn} ${p.uid} has no straight edge facing ${p.facing}`);
+    else if (problem === 'blocked') err('facingBlocked', [p.uid], `${p.fn} ${p.uid}: its ${p.facing} edge must be free`);
+    else if (problem === 'notJoined') err('facingNotJoined', [p.uid], `${p.fn} ${p.uid}: its ${p.facing} edge must touch a part`);
   });
 
   // Weapons' mounting rules (attach edge, right-angle side, barrel clearance)

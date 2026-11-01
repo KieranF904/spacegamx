@@ -15,6 +15,8 @@ export const FAMILY_LABEL: Record<string, string> = {
   missile: 'Missiles', torpedo: 'Torpedoes', emp: 'EMP',
   ion: 'Ion drives', afterburner: 'Burn engines', plasma: 'Plasma drives', jumpcoil: 'Jump coils',
   reactor: 'Generators', dynamo: 'Bank chargers', battery: 'Batteries', capacitor: 'Capacitors', drive_cell: 'Drive cells',
+  // (Energy routing's Conduit and Diode: models.mjs)
+  relay: 'Relays',
   shield: 'Shields', plating: 'Plating',
   mining: 'Mining lasers', demolition: 'Demolition', siphon: 'Siphons', scanner: 'Scanners', constructor: 'Constructors',
   // (Support weapons: common/src/ships/features/support/support.ts)

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Blueprint, InventoryStub, PlacedPart, Rot, Side } from './types.js';
-import { parseBlueprint, serializeBlueprint, validateBlueprint } from './blueprint.js';
+import { parseBlueprint, partFacingRule, partNeedsFacing, serializeBlueprint, validateBlueprint } from './blueprint.js';
 import { allocateFlow, rebuild, type ShipDerived } from './rebuild.js';
 import { createShipState, damagePart } from './state.js';
 import { healthFactor, ShipTuning } from './tuning.js';
@@ -96,6 +96,15 @@ describe('blueprints (M2)', () => {
       const b = sparrow();
       b.parts.push(p(20, 'sq', 'hull', 0, 3)); // right behind thruster 5
       expect(codes(b)).toContain('facingBlocked');
+    });
+    it('a Diode\'s facing (its out side) must touch a part instead; a Conduit has none', () => {
+      expect([partFacingRule('power_diode'), partFacingRule('power_conduit'), partFacingRule('cannon_pip')]).toEqual(['joined', null, 'free']);
+      expect([partNeedsFacing('power_diode'), partNeedsFacing('power_conduit')]).toEqual([true, false]);
+      const d = (facing?: Side) => bp([p(0, 'sq', 'core', 0, 0), p(1, 'sq', 'power_diode', 1, 0, facing ? { facing } : {}), p(2, 'sq', 'power_conduit', 2, 0)]);
+      expect(codes(d('E'))).toEqual([]);
+      expect(codes(d('W'))).toEqual([]);
+      expect(codes(d('N'))).toEqual(['facingNotJoined']);
+      expect(codes(d())).toEqual(['facingMissing']);
     });
     it('thrusters and weapons need a facing with a straight edge', () => {
       const b = sparrow();

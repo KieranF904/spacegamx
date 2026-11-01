@@ -13,6 +13,7 @@ import { partStats, type PartStats } from './partStats.js';
 import { partMaterial } from './grades.js';
 import { featureFacts } from './features/plan.js';
 import type { Fact } from './features/types.js';
+import type { FunctionDef } from './types.js';
 
 export interface PartFacts {
   base: PartStats;
@@ -25,7 +26,28 @@ export function describePart(catalog: Catalog, tuning: ShipTuning | undefined, p
   if (!base || !fn) return null;
   // (No tuning: a feature reads its defaults from an empty one, as partStats does)
   const facts = featureFacts({ catalog, tuning: tuning ?? ({} as ShipTuning), fn, mat: partMaterial(catalog, part), area: base.area });
+  facts.push(...relayFacts(fn));
   return { base, facts };
+}
+
+/**
+ * Energy routing's relays (plain FunctionDef data, no feature: docs/design/energy-routing-impl.md §3.4): a Diode
+ * (`oneWay`) and a Conduit (`relayOnly`), in plain words (their Holds and Gives are any store's: partTip, modelCards).
+ */
+function relayFacts(fn: FunctionDef): Fact[] {
+  if (!((fn.store ?? 0) > 0) || !(fn.oneWay || fn.relayOnly)) return [];
+  if (fn.oneWay) {
+    return [{
+      feature: 'relay', key: 'oneWay', label: 'One way', value: 'out of its front', tier: 'stat',
+      sentence: 'power only flows out of its front, into the part there; the other parts touching it can only feed it, and its front must touch a part',
+      short: 'power only flows out of its front', chip: 'one way',
+    }];
+  }
+  return [{
+    feature: 'relay', key: 'carries', label: 'Carries', value: 'between touching parts', tier: 'stat',
+    sentence: 'a power line: it passes power between the parts it touches, both ways, and holds very little itself',
+    short: 'passes power between the parts it touches', chip: 'power line',
+  }];
 }
 
 /** Facts of a function on its own (a palette card, no material placed): the first material it names */

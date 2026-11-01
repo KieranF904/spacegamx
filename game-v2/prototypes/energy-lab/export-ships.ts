@@ -11,7 +11,7 @@ const raw = loadShipConfigFromDisk(join(root, 'data'));
 const catalog = loadCatalog(raw.catalog, { overlapShrink: raw.tuning.overlapShrink });
 
 const MAP: Record<string, string> = {
-  core: 'core', armor: 'armor', hull: 'hull', cargo: 'cargo', conduit: 'conduit',
+  core: 'core', armor: 'armor', hull: 'hull', cargo: 'cargo', conduit: 'conduit', power_conduit: 'conduit', power_diode: 'diode',
   power_cell_reactor: 'cell_reactor', power_isotope_pile: 'isotope', power_fusion_plant: 'fusion', power_overclock_reactor: 'overclock',
   power_battery: 'battery', power_heavy_bank: 'heavy_bank', power_capacitor: 'capacitor', power_drive_cell: 'drive_cell', power_pulse_dynamo: 'dynamo',
   engine_ion_drive: 'ion', engine_vernier: 'vernier', engine_afterburner: 'afterburner', engine_torch: 'torch', engine_plasma_drive: 'plasma',
@@ -43,18 +43,26 @@ function typeOf(fn: string): string {
 }
 
 const ships: unknown[] = [];
-for (const [group, dir] of [['Player ships', 'data/ships/blueprints'], ['Enemy ships', 'data/ships/blueprints/enemy']] as const) {
+// The hand-built review ships (dev/review-*.json) come first; the rest of the dev folder (test ships) goes last
+const GROUPS: [string, string, (f: string) => boolean][] = [
+  ['Review ships', 'data/ships/blueprints/dev', (f) => f.startsWith('review-')],
+  ['Player ships', 'data/ships/blueprints', (f) => f !== 'bastion.json'], // bastion.json: a copy of bastion-dreadnought
+  ['Enemy ships', 'data/ships/blueprints/enemy', () => true],
+  ['Dev test ships', 'data/ships/blueprints/dev', (f) => !f.startsWith('review-')],
+];
+for (const [group, dir, keep] of GROUPS) {
   const d = join(root, dir);
   if (!existsSync(d)) continue;
-  for (const f of readdirSync(d).filter((x) => x.endsWith('.json')).sort()) {
-    if (f === 'bastion.json') continue; // a copy of bastion-dreadnought
+  for (const f of readdirSync(d).filter((x) => x.endsWith('.json') && keep(x)).sort()) {
     let bp;
     try { bp = parseBlueprint(readFileSync(join(d, f), 'utf8')); } catch { continue; }
-    const parts: [string, number[][]][] = [];
+    // [type, cells] or, for a Diode, [type, cells, out side]: the game's PlacedPart.facing (N = -y, the lab's up)
+    const parts: [string, number[][], string?][] = [];
     for (const p of bp.parts) {
       let cells: number[][];
       try { cells = placeGeometry(catalog, p).cells.map((c) => [Math.round(c[0]), Math.round(c[1])]); } catch { continue; }
-      if (cells.length) parts.push([typeOf(p.fn), cells]);
+      const type = typeOf(p.fn);
+      if (cells.length) parts.push(type === 'diode' ? [type, cells, p.facing ?? 'N'] : [type, cells]);
     }
     const xs = parts.flatMap(([, c]) => c.map((v) => v[0])), ys = parts.flatMap(([, c]) => c.map((v) => v[1]));
     const x0 = Math.min(...xs), y0 = Math.min(...ys);
