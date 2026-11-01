@@ -41,7 +41,10 @@ describe('shipgen staged build: accepting a step, engines, skeleton size', () =>
 
   it('names the engine count, the legal cells aft, and what to do when there is no room', () => {
     const sc = { ctx, role: STARTER, mirror: true };
-    const noRoom = engineHelp(sc, skeleton(ctx, STARTER)).join('\n');
+    // (Frame hull gives way, so the skeleton has legal cells; a frame of armour boxes the core in)
+    expect(engineHelp(sc, skeleton(ctx, STARTER)).join('\n')).toMatch(/Legal engine cells[^\n]*frame hull/);
+    const boxed = skeleton(ctx, STARTER);
+    const noRoom = engineHelp(sc, { ...boxed, parts: boxed.parts.map((p) => (p.fn === 'hull' ? { ...p, fn: 'armor' } : p)) }).join('\n');
     expect(noRoom).toMatch(/Engines now: 0 facing v; the ship needs at least 2/);
     expect(noRoom).toMatch(/counts twice/);
     expect(noRoom).toMatch(/Extend the ship aft/);

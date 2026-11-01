@@ -4,7 +4,7 @@
 import { join } from 'path';
 import type { Blueprint } from '../../../common/src/ships/index';
 import {
-  type Brief, type BriefCheck, type CheckResult, type CodeDef, type Concept, conceptBlock, conceptLine, conceptPenalty, type DecodeResult, type GridError, type Role, type ShipgenContext,
+  type Brief, type BriefCheck, type CheckResult, type CodeDef, type Concept, conceptBlock, conceptLine, conceptPenalty, rowWidths, type DecodeResult, type GridError, type Role, type ShipgenContext,
   CodeBook, withShape, asymmetricCells, blueprintToGrid, briefCheck, briefLegend, briefText, check, designText, feedbackMessage, findRole, mirrorHalf, shapeSuggestion, systemPrompt,
 } from '../core/index';
 import type { Emit } from './events';
@@ -208,7 +208,7 @@ export class Session {
     // (A thinking model may think even when told not to (qwen3-vl): room for the thinking as well as the grid)
     const thinks = !!deps.models?.find((m) => m.id === fullId(o.model))?.thinking || (!!o.think && fullId(o.model).startsWith('anthropic/'));
     // (8192: a mid-size ship's grid is about 4k tokens, and a capital's more; runaway replies are stopped by the line limit below)
-    this.budget = o.maxTokens ?? (thinks ? (o.generous ? 16384 : 12288) : 8192);
+    this.budget = o.maxTokens ?? (thinks ? (o.generous ? 24576 : 12288) : 8192);
     this.loadedContext = deps.models?.find((m) => m.id === fullId(o.model))?.loadedContext;
     if (typeof o.concept === 'object') this.concept = o.concept;
     // (Grid lines, the column-number line included, past which a reply is a runaway; a part list gets more lines)
@@ -381,7 +381,9 @@ ${shape}`;
     await renderAndCritique(this.deps, this.o, a, this.stats, emit);
     const s = scoreOf(result, bc, a.looks, this.o.criticWeight ?? 0);
     // (A small term for keeping to the concept: its size class and cell count against the ship's cells)
-    const cp = conceptPenalty(this.role, this.concept, result.stats.cells);
+    const cp = conceptPenalty(this.role, this.concept, result.stats.cells, rowWidths(ctx, bp));
+    if (cp.notes.length) feedback += `
+The concept: ${cp.notes.join('; ')}.`;
     a.score = Math.max(0, Math.round((s.score - asymPoints - cp.points) * 10) / 10);
     emit({ type: 'score', round, score: a.score, parts: { check: result.score, briefPenalty: s.penalty, ...(asymPoints ? { asymmetry: asymPoints } : {}), ...(cp.points ? { concept: cp.points } : {}), ...(a.looks ? { looks: a.looks } : {}) } });
     return finish({ attempt: a, drawn, feedback, readable: true, said: ex.text });

@@ -207,15 +207,23 @@ interface Capture {
   modelErrors: number;
   lastModelError?: string;
   errors: string[];
+  /** The design's steps, replies, grids and feedback, trimmed: written to trace/ for every attempt, to see why one failed */
+  trace: Record<string, unknown>[];
 }
 
 const capture = (): { cap: Capture; emit: (e: ShipgenEvent) => void } => {
-  const cap: Capture = { modelErrors: 0, errors: [] };
+  const cap: Capture = { modelErrors: 0, errors: [], trace: [] };
+  const cut = (t: string, n: number) => (t.length > n ? `${t.slice(0, n / 2)}\n...\n${t.slice(-n / 2)}` : t);
   return {
     cap,
     // (Only what the batch needs: tokens, previews and the rest are dropped as they come, so memory stays flat)
     emit: (e) => {
-      if (e.type === 'concept') cap.concept = e.concept;
+      if (e.type === 'step') cap.trace.push({ type: e.type, step: e.step, status: e.status, round: e.round, note: e.note });
+      else if (e.type === 'reply') cap.trace.push({ type: e.type, round: e.round, ms: e.ms, tokens: e.outputTokens, stop: e.stopReason, text: cut(e.text, 4000) });
+      else if (e.type === 'grid' && !e.partial) cap.trace.push({ type: e.type, round: e.round, via: e.via, parts: e.parts, text: e.text, errors: e.errors.slice(0, 5) });
+      else if (e.type === 'check') cap.trace.push({ type: e.type, round: e.round, valid: e.valid, score: e.score, unmet: e.brief?.unmet });
+      else if (e.type === 'feedback') cap.trace.push({ type: e.type, round: e.round, text: cut(e.text, 3000) });
+      if (e.type === 'concept') { cap.concept = e.concept; cap.trace.push({ type: e.type, line: e.line, note: e.note }); }
       else if (e.type === 'done') cap.done = e.metrics as DesignMetrics | EvolveMetrics;
       else if (e.type === 'error') {
         if (/^model:/.test(e.message)) { cap.modelErrors++; cap.lastModelError = e.message; }
@@ -355,6 +363,7 @@ export async function runBatch(deps: BatchDeps, o: BatchOptions): Promise<BatchS
       }, d.emit);
       if (dr.mode !== 'design') throw new Error('mode');
       const out = dr.outcome;
+      try { mkdirSync(join(o.outDir, 'trace'), { recursive: true }); writeFileSync(join(o.outDir, 'trace', `${pad(no)}-${role}.jsonl`), d.cap.trace.map((x) => JSON.stringify(x)).join('\n') + '\n'); } catch { /* (a trace is a diagnostic only) */ }
       const concept = out.concept ?? d.cap.concept;
       if (concept) { used.push(conceptKey(concept)); if (used.length > 6) used.shift(); }
       if (!out.attempts.length && !stopped()) throw new ModelDownError(d.cap.lastModelError ?? 'the model gave no reply');

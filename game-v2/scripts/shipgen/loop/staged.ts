@@ -6,8 +6,8 @@
 import type { Blueprint, PlacedPart } from '../../../common/src/ships/index';
 import { isEngine, placeGeometry } from '../../../common/src/ships/index';
 import {
-  type CheckResult, type DecodeResult, type Role, type Selector, type ShipgenContext,
-  CodeBook, briefLegend, briefText, buildLegend, check, coreLeftEdge, exposedCorners, halfOf, matches, mergeParts, outlineShapes, partAt, partKey, partPower, silhouetteScore, squareCornerWords, systemPrompt,
+  type CheckResult, type Concept, type DecodeResult, type Role, type Selector, type ShipgenContext,
+  CodeBook, outlineFit, outlinePicture, shipRows, briefLegend, briefText, buildLegend, check, coreLeftEdge, exposedCorners, halfOf, matches, mergeParts, outlineShapes, partAt, partKey, partPower, silhouetteScore, squareCornerWords, systemPrompt,
 } from '../core/index';
 import { type Attempt, type DesignOptions, type DesignOutcome, type LoopDeps, Session, better, contractFor, passes } from './design';
 import type { Emit } from './events';
@@ -33,6 +33,8 @@ export interface StepContext {
   ctx: ShipgenContext;
   role?: Role;
   mirror: boolean;
+  /** The concept the build follows: its outline is what the armour step fills */
+  concept?: Concept;
 }
 
 export interface Step {
@@ -83,6 +85,41 @@ export function engineHelp(s: StepContext, bp: Blueprint): string[] {
     out.push(`There is not enough room for ${need - has} more engines behind the power parts. Extend the ship aft: put a store or a generator on a free cell touching power (${ext.length ? ext.join('; ') : 'any free cell beside the core'}), then engines in the cells beside or behind THAT part (each engine must touch a store, generator or the core). Hull you add aft needs power too: engines on bare hull get none.`);
   }
   return out;
+}
+
+/**
+ * The free cells inside the concept's outline, placed where the ship's rows fit it best, centred on the core's column: not
+ * in front of a gun or behind an engine (any part's facing lane), and joined to the ship. Left half and centre line in
+ * mirror mode. As "col,row", nose to tail
+ */
+export function outlineFill(ctx: ShipgenContext, bp: Blueprint, outline: number[], mirror: boolean): string[] {
+  const rows = shipRows(ctx, bp);
+  const core = bp.parts.find((p) => p.fn === 'core');
+  if (!rows.length || !core) return [];
+  const f = outlineFit(outline, rows.map((r) => r.x1 - r.x0 + 1));
+  const cxs = placeGeometry(ctx.catalog, core).cells.map((c) => c[0]);
+  const c = Math.round((Math.min(...cxs) + Math.max(...cxs)) / 2);
+  const owner = new Set<string>(), blocked = new Set<string>();
+  for (const p of bp.parts) for (const k of placeGeometry(ctx.catalog, p).cells) owner.add(`${k[0]},${k[1]}`);
+  const D: Record<string, [number, number]> = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] };
+  for (const p of bp.parts) {
+    const fn = ctx.catalog.functions.get(p.fn);
+    if (!p.facing || !(fn?.weapon || isEngine(fn))) continue;
+    const [dx, dy] = D[p.facing] ?? [0, 0];
+    for (const k of placeGeometry(ctx.catalog, p).cells) for (let n = 1; n <= 40; n++) blocked.add(`${k[0] + dx * n},${k[1] + dy * n}`);
+  }
+  const want: [number, number][] = [];
+  outline.forEach((w, i) => {
+    const y = rows[0].y + i + f.offset, half = (w - 1) / 2;
+    for (let x = c - half; x <= (mirror ? c : c + half); x++) if (!owner.has(`${x},${y}`) && !blocked.has(`${x},${y}`)) want.push([x, y]);
+  });
+  // (Only cells joined to the ship, through each other: a mirrored half also touches its mirror across the centre line)
+  const ok = new Set<string>(), has = (x: number, y: number) => owner.has(`${x},${y}`) || ok.has(`${x},${y}`) || (mirror && owner.has(`${2 * c - x},${y}`));
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const [x, y] of want) if (!ok.has(`${x},${y}`) && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => has(x + dx, y + dy))) { ok.add(`${x},${y}`); grew = true; }
+  }
+  return want.filter(([x, y]) => ok.has(`${x},${y}`)).map(([x, y]) => `${x},${y}`);
 }
 
 const twice = (s: StepContext) => (s.mirror ? ' (in the whole ship: a part left of the centre line is mirrored, so it counts twice)' : '');
@@ -139,9 +176,23 @@ export const STEPS: Step[] = [
       return `Add ARMOUR on the OUTSIDE${n ? `: at least ${n} armour parts${twice(s)}` : ' (optional)'}: across the nose and down the flanks, around the core, generators and stores. Never in front of a gun or behind an engine. Shaped pieces (wedges) at the corners look good.`;
     },
     adds: (_c, p) => p.fn === 'armor' || p.fn === 'hull',
-    lacks: (s, bp) => {
+    lacks: (s, bp, _r, prev) => {
       const n = wants(s.role, { fn: 'armor' }, true), has = bp.parts.filter((p) => p.fn === 'armor').length;
-      return has < n ? [`needs at least ${n} armour parts (has ${has})`] : [];
+      const out = has < n ? [`needs at least ${n} armour parts (has ${has})`] : [];
+      const o = s.concept?.outline;
+      if (o && prev) {
+        const target = outlineFill(s.ctx, prev.bp, o, s.mirror);
+        const left = new Set(outlineFill(s.ctx, bp, o, s.mirror));
+        const empty = target.filter((k) => left.has(k));
+        if (target.length >= 3 && empty.length > target.length / 2) out.push(`the concept's outline still has ${empty.length} of ${target.length} cells empty: fill ${empty.slice(0, 12).join('; ')}`);
+      }
+      return out;
+    },
+    extra: (s, bp) => {
+      const o = s.concept?.outline;
+      if (!o) return [];
+      const cells = outlineFill(s.ctx, bp, o, s.mirror);
+      return cells.length ? [`The concept's outline (row widths nose to tail ${o.join(',')}):\n${outlinePicture(o)}\nFill it: put armour (or hull) on these free cells (col,row)${s.mirror ? ', left half and centre line' : ''}: ${cells.slice(0, 30).join('; ')}.`] : [];
     },
   },
   {
@@ -164,8 +215,11 @@ export const STEPS: Step[] = [
   },
 ];
 
-/** A valid, symmetric start: the core on column 0, a hull spine down the centre line and a cross beam behind the core */
-export function skeleton(ctx: ShipgenContext, role: Role | undefined, name = 'Skeleton', target?: number): Blueprint {
+/**
+ * A valid, symmetric start: the core on column 0, a hull spine down the centre line and a cross beam behind the core.
+ * `fill` (default on): more frame up to the brief's minimum cells (or `target`); off when the armour step will fill an outline
+ */
+export function skeleton(ctx: ShipgenContext, role: Role | undefined, name = 'Skeleton', target?: number, fill = true): Blueprint {
   const legend = buildLegend(ctx);
   const core = legend.entries.find((e) => e.fn === 'core' && e.level === 0) ?? legend.entries.find((e) => e.fn === 'core')!;
   const hull = legend.entries.find((e) => e.kind === 'structure' && e.fn === 'hull' && e.level === 0) ?? legend.entries.find((e) => e.fn === 'hull')!;
@@ -180,7 +234,7 @@ export function skeleton(ctx: ShipgenContext, role: Role | undefined, name = 'Sk
   // (The brief wants at least its minimum cells: more hull frame, row by row outward from the core, until it has that many.
   // The hull is a placeholder the model builds over, so the ship doesn't stay small for want of a frame)
   const want = Math.min(role?.size.cells[1] ?? 0, Math.max(role?.size.cells[0] ?? 0, target ?? 0));
-  if (want > parts.length) {
+  if (fill && want > parts.length) {
     const have = new Set(parts.map((p) => `${p.x},${p.y}`));
     const H = role?.size.maxHeight ?? 8, up = Math.floor((H - 1) / 2), down = H - 1 - up;
     const half = Math.max(1, Math.floor(((role?.size.maxWidth ?? 10) - 1) / 2));
@@ -198,6 +252,40 @@ export function skeleton(ctx: ShipgenContext, role: Role | undefined, name = 'Sk
 
 /** Frame hull: the placeholder the model may build over */
 const isFrame = (p: PlacedPart) => p.fn === 'hull';
+
+/**
+ * Frame hull out of the way: hull in front of a gun or behind an engine (any part's facing lane: it would block the shot or
+ * the flame), then hull no longer joined to the core
+ */
+export function clearLanes(ctx: ShipgenContext, bp: Blueprint): { bp: Blueprint; removed: number } {
+  const D: Record<string, [number, number]> = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] };
+  const lane = new Set<string>();
+  for (const p of bp.parts) {
+    const fn = ctx.catalog.functions.get(p.fn);
+    if (!p.facing || !(fn?.weapon || isEngine(fn))) continue;
+    const [dx, dy] = D[p.facing] ?? [0, 0];
+    for (const c of placeGeometry(ctx.catalog, p).cells) for (let n = 1; n <= 40; n++) lane.add(`${c[0] + dx * n},${c[1] + dy * n}`);
+  }
+  const cellsOf = bp.parts.map((p) => placeGeometry(ctx.catalog, p).cells.map((c) => `${c[0]},${c[1]}`));
+  let keep = bp.parts.map((p, i) => !(isFrame(p) && cellsOf[i].some((k) => lane.has(k))));
+  // (Then what is still joined to the core, through the parts kept)
+  const core = bp.parts.findIndex((p) => p.fn === 'core');
+  if (core >= 0) {
+    const owner = new Map<string, number>();
+    cellsOf.forEach((ks, i) => { if (keep[i]) for (const k of ks) owner.set(k, i); });
+    const seen = new Set<number>([core]), todo = [core];
+    while (todo.length) {
+      const i = todo.pop()!;
+      for (const k of cellsOf[i]) {
+        const [x, y] = k.split(',').map(Number);
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const j = owner.get(`${x + dx},${y + dy}`); if (j !== undefined && !seen.has(j)) { seen.add(j); todo.push(j); } }
+      }
+    }
+    keep = keep.map((k, i) => k && (seen.has(i) || !isFrame(bp.parts[i])));
+  }
+  const removed = keep.filter((k) => !k).length;
+  return removed ? { bp: { ...bp, parts: bp.parts.filter((_, i) => keep[i]).map((p, uid) => ({ ...p, uid })) }, removed } : { bp, removed: 0 };
+}
 
 /** Free cells (empty, or frame hull) touching a part of these power roles; on the left half and centre line in mirror mode */
 export function suggestCells(ctx: ShipgenContext, bp: Blueprint, roles: string[], opts: { lane?: 'N' | 'S'; mirror?: boolean; max?: number } = {}): string[] {
@@ -218,7 +306,7 @@ export function suggestCells(ctx: ShipgenContext, bp: Blueprint, roles: string[]
         if (opts.lane) {
           const step = opts.lane === 'N' ? -1 : 1, stop = opts.lane === 'N' ? Math.min(...ys) : Math.max(...ys);
           let clear = true;
-          for (let yy = y + step; opts.lane === 'N' ? yy >= stop : yy <= stop; yy += step) if (owner.has(`${x},${yy}`)) { clear = false; break; }
+          for (let yy = y + step; opts.lane === 'N' ? yy >= stop : yy <= stop; yy += step) { const q = owner.get(`${x},${yy}`); if (q && !isFrame(q)) { clear = false; break; } }
           if (!clear) continue;
         }
         out.set(k, `${x},${y}${o ? ' (frame hull)' : ''}`);
@@ -264,11 +352,12 @@ export async function stagedLoop(deps: LoopDeps, o: DesignOptions, emit: Emit): 
   const S = new Session(deps, o, await contractFor(deps, o.model, o.contract, 'staged'), emit);
   const t0 = S.now();
   const tries = o.rounds ?? 3, keep = o.keepRounds ?? 2;
-  const sc: StepContext = { ctx, role: S.role, mirror: S.mirror };
+  const sc: StepContext = { ctx, role: S.role, mirror: S.mirror, ...(S.concept ? { concept: S.concept } : {}) };
   const system = systemPrompt(ctx, o.brief, { form: S.C.form, mirror: S.mirror, staged: true });
   emit({ type: 'brief', role: S.role?.id, text: briefText(ctx, o.brief), legendCodes: briefLegend(ctx, o.brief).length, promptChars: system.length });
   const out: DesignOutcome = { attempts: [], firstValidRound: null, firstPassRound: null, unreadable: 0, truncated: 0, cancelled: false, ms: 0, steps: { accepted: [], failed: [] } };
-  let ship = o.start?.bp ?? skeleton(ctx, S.role, o.brief.name ?? 'Untitled', S.concept?.cells);
+  // (With an outline the armour step fills it: the frame stays small so guns and engines have clear lanes)
+  let ship = o.start?.bp ?? skeleton(ctx, S.role, o.brief.name ?? 'Untitled', S.concept?.cells, !S.concept?.outline);
   let shipAttempt: Attempt | undefined;
   let round = 0;
   const book = new CodeBook(ctx);
@@ -306,7 +395,12 @@ export async function stagedLoop(deps: LoopDeps, o: DesignOptions, emit: Emit): 
     ].join('\n');
     const head: ChatMessage[] = [{ role: 'system', content: system }, { role: 'user', content: ask }];
     let tail: ChatMessage[] = [];
-    const build = parts ? (drawn: Blueprint, b: CodeBook): DecodeResult => mergeParts(ctx, S.mirror ? halfOf(ctx, before) : before, drawn.parts, replaces, b) : undefined;
+    const build = parts ? (drawn: Blueprint, b: CodeBook): DecodeResult => {
+      const m = mergeParts(ctx, S.mirror ? halfOf(ctx, before) : before, drawn.parts, replaces, b);
+      if (!m.bp) return m;
+      const c = clearLanes(ctx, m.bp);
+      return c.removed ? { ...m, bp: c.bp, warnings: [...m.warnings, `${c.removed} frame hull part(s) in front of a gun, behind an engine or cut off were removed`] } : m;
+    } : undefined;
     let accepted = false;
     const seen = new Set<string>();
     for (let t = 1; t <= tries; t++) {

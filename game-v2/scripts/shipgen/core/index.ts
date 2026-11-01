@@ -11,7 +11,7 @@ export { type HalfResult, sideOf, halfAxis2, halfOf, mirrorHalf, asymmetricCells
 export { partEntry, blueprintToParts, partsToBlueprint, mergeParts, boxSize } from './partlist';
 export { type ShipEnergy, type RunOptions, type RunResult, shipEnergy, runEnergy } from './sim';
 export { type DesignScores, designScores } from './scores';
-export { type Corner, exposedCorners, silhouetteScore, squareCornerWords, coreLeftEdge, outlineShapes } from './silhouette';
+export { type Corner, exposedCorners, silhouetteScore, squareCornerWords, coreLeftEdge, outlineShapes, rowWidths, shipRows } from './silhouette';
 export { type CheckResult, type CheckOptions, type CheckError, type ConsumerPower, type PowerReport, type CheckStats, type PartRef, DEFAULT_WEIGHTS, check } from './check';
 export { type Role, type RolesFile, type Selector, type SelectorRole, type BriefCheck, loadRoles, findRole, matches, selectorWords, briefCheck, outOfBand } from './roles';
 export {
@@ -19,5 +19,5 @@ export {
   systemPrompt, feedbackMessage,
 } from './prompt';
 export {
-  type Concept, type ConceptHint, type SizeClass, CONCEPT_SCHEMA, CONCEPT_TOKENS, classRange, conceptBlock, conceptKey, conceptLine, conceptPenalty, conceptRequest, fallbackConcept, parseConcept,
+  type Concept, type ConceptHint, type SizeClass, CONCEPT_SCHEMA, CONCEPT_TOKENS, classRange, cleanName, conceptBlock, conceptKey, conceptLine, conceptPenalty, conceptRequest, fallbackConcept, outlineFit, outlinePicture, parseConcept, parseOutline,
 } from './concept';

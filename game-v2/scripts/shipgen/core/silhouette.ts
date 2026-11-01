@@ -99,3 +99,21 @@ export function outlineShapes(ctx: ShipgenContext): { piece: string; letter: str
   add(nose, 'a pointed nose, 2x2');
   return out;
 }
+
+/** The ship's rows, nose to tail: each row's y and its leftmost and rightmost cell */
+export function shipRows(ctx: ShipgenContext, bp: Blueprint): { y: number; x0: number; x1: number }[] {
+  const rows = new Map<number, { y: number; x0: number; x1: number }>();
+  for (const p of bp.parts) for (const [x, y] of placeGeometry(ctx.catalog, p).cells) {
+    const r = rows.get(y);
+    if (!r) rows.set(y, { y, x0: x, x1: x }); else { r.x0 = Math.min(r.x0, x); r.x1 = Math.max(r.x1, x); }
+  }
+  const ys = [...rows.keys()];
+  if (!ys.length) return [];
+  const out: { y: number; x0: number; x1: number }[] = [];
+  // (A row with no cell between two that have some counts as width 0)
+  for (let y = Math.min(...ys); y <= Math.max(...ys); y++) out.push(rows.get(y) ?? { y, x0: 0, x1: -1 });
+  return out;
+}
+
+/** The ship's width on each row, nose to tail (what a concept outline is measured against) */
+export const rowWidths = (ctx: ShipgenContext, bp: Blueprint): number[] => shipRows(ctx, bp).map((r) => r.x1 - r.x0 + 1);
