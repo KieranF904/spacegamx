@@ -1,5 +1,5 @@
 {
-  "_comment": "Ship generator taste (scripts/shipgen): the only hand-written part. Everything else (parts, rules, power) comes from the game. size.cells: grid cells the ship covers. band: what a pilot of that level can build (maxLevel; rarities). require/encourage select parts by power role (generator, store, conduit, diode, dynamo, weapon, thruster, tool, core), family (models.json) or fn id; min/max counts. example: a bundled blueprint shown as a worked example. weights: check() score weights.",
+  "_comment": "Ship generator taste (scripts/shipgen): the only hand-written part. Everything else (parts, rules, power) comes from the game. size.cells: grid cells the ship covers. band: what a pilot of that level can build (maxLevel; rarities). require/encourage select parts by power role (generator, store, conduit, diode, dynamo, weapon, thruster, tool, core), family (models.json) or fn id; min/max counts. example: a bundled blueprint shown as a worked example. shapes: silhouettes a design is asked for, one per trial (so a model has a target that is not the example). weights: check() score weights.",
   "roles": [
     {
       "id": "starter",
@@ -18,7 +18,13 @@
         "Mirror it left to right.",
         "A wedge or two of hull (shaped pieces) at the wing tips looks good but is optional."
       ],
-      "example": "dev/review-wren"
+      "example": "dev/review-wren",
+      "shapes": [
+        "a dart: narrow (5 columns) and long (7 rows), with a pointed nose",
+        "a flying wing: wide (9 columns) and short (4 rows), the guns at the wing roots",
+        "an arrowhead: wings swept back from a short nose, 7 columns wide and 6 rows long",
+        "a stubby brick: compact, 6 columns wide and 5 rows long, the engines in a block at the back"
+      ]
     },
     {
       "id": "gunship",
@@ -42,6 +48,12 @@
         "Each group of guns gets its own store beside a generator."
       ],
       "example": "dev/review-kestrel",
+      "shapes": [
+        "a hammerhead: a wide armoured nose (12 columns) over a narrower body, 10 rows long",
+        "a long brawler: narrow (8 columns) and long (12 rows), the guns down the front half",
+        "a diamond: 11 columns wide at the middle, tapering to the nose and the tail, 10 rows long",
+        "a twin-boom: two gun pods on short arms either side of the core, 12 columns wide and 8 rows long"
+      ],
       "weights": { "gunsOut": 0.2, "armourOutside": 0.2 }
     },
     {

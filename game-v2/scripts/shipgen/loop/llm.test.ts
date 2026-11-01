@@ -90,7 +90,7 @@ describe('shipgen llm client', () => {
     const SECRET = 'sk-test-secret-123';
     const sse = ['data: {"choices":[{"delta":{"content":"{\\"name\\""}}]}\n\n', 'data: {"choices":[{"delta":{"content":":\\"B\\"}"}}]}\n\n', 'data: {"choices":[],"usage":{"prompt_tokens":9,"completion_tokens":4}}\n\n', 'data: [DONE]\n\n'];
     const llm = createLlm({
-      token: () => SECRET,
+      token: () => SECRET, lmStudioChat: () => true,
       fetch: fakeFetch((u) => (u.endsWith('/api/tags') ? json({}, 500) : u.endsWith('/api/v0/models') ? json({ data: [{ id: 'qwen3-vl', type: 'vlm' }, { id: 'nomic-embed', type: 'embeddings' }] }) : new Response(streamOf(sse)))),
     });
     const l = await llm.list();
@@ -109,8 +109,42 @@ describe('shipgen llm client', () => {
     expect(JSON.stringify(r)).not.toContain(SECRET);
   });
 
+  it('only LISTS LM Studio models by default: no chat request ever goes to it unless LMSTUDIO_CHAT=1 or the toggle is on', async () => {
+    const old = process.env.LMSTUDIO_CHAT;
+    delete process.env.LMSTUDIO_CHAT;
+    try {
+      const route = (u: string) => (u.endsWith('/api/tags') ? json(TAGS) : u.endsWith('/api/v0/models') ? json({ data: [{ id: 'qwen3-8b', type: 'llm' }] }) : new Response(streamOf(['data: [DONE]\n\n'])));
+      const llm = createLlm({ token: () => 'sk-x', fetch: fakeFetch(route) });
+      const l = await llm.list();
+      const lm = l.find((m) => m.provider === 'lmstudio')!;
+      expect(lm.off).toBe('LM Studio, not enabled');
+      expect(defaultModel(l.filter((m) => m.provider === 'lmstudio'))).toBeUndefined();
+      await expect(llm.chat({ model: 'lmstudio/qwen3-8b', messages: [{ role: 'user', content: 'hi' }] })).rejects.toThrow(/not enabled[\s\S]*LMSTUDIO_CHAT=1/);
+      expect(calls.filter((c) => /lmstudio|:1234/.test(c.url) && /chat|completions/.test(c.url))).toEqual([]);
+      expect(calls.some((c) => c.url.includes('/v1/chat/completions'))).toBe(false);
+      // (Ollama still chats)
+      expect(l.find((m) => m.provider === 'ollama')!.off).toBeUndefined();
+      // The environment switch turns it on
+      process.env.LMSTUDIO_CHAT = '1';
+      const on = createLlm({ token: () => 'sk-x', fetch: fakeFetch(route) });
+      expect((await on.list()).find((m) => m.provider === 'lmstudio')!.off).toBeUndefined();
+      await on.chat({ model: 'lmstudio/qwen3-8b', messages: [{ role: 'user', content: 'hi' }] });
+      expect(calls.some((c) => c.url.endsWith('/v1/chat/completions'))).toBe(true);
+    } finally {
+      if (old === undefined) delete process.env.LMSTUDIO_CHAT; else process.env.LMSTUDIO_CHAT = old;
+    }
+  });
+
+  it('lists every downloaded LM Studio model from /api/v1/models (loaded or not), without loading any', async () => {
+    const v1 = { models: [{ type: 'llm', key: 'qwen3.6-27b', params_string: '27B', capabilities: { vision: false, reasoning: { default: 'on' } } }, { type: 'embedding', key: 'nomic' }] };
+    const llm = createLlm({ token: () => 'sk-x', lmStudioChat: () => false, fetch: fakeFetch((u) => (u.endsWith('/api/tags') ? json({ models: [] }) : u.endsWith('/api/v1/models') ? json(v1) : json({ data: [] }))) });
+    const l = await llm.list();
+    expect(l.map((m) => [m.id, m.off, m.params])).toEqual([['lmstudio/qwen3.6-27b', 'LM Studio, not enabled', '27B']]);
+    expect(calls.every((c) => !c.init.method || c.init.method === 'GET')).toBe(true);
+  });
+
   it('refuses LM Studio without a token (and says where to put it)', async () => {
-    const llm = createLlm({ token: () => undefined, fetch: fakeFetch(() => json({}, 500)) });
+    const llm = createLlm({ token: () => undefined, lmStudioChat: () => true, fetch: fakeFetch(() => json({}, 500)) });
     await expect(llm.chat({ model: 'lmstudio/x', messages: [] })).rejects.toThrow(/LM_API_TOKEN/);
     await expect(llm.list()).rejects.toThrow(/LM_API_TOKEN/);
   });

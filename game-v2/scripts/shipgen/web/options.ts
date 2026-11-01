@@ -4,7 +4,7 @@ import type { Blueprint } from '../../../common/src/ships/index';
 import {
   type Brief, type Role, type ShipgenContext, blueprintToGrid, briefCheck, check, feedbackMessage, findRole,
 } from '../core/index';
-import type { ModelInfo, RunOptions } from '../loop/index';
+import { type ModelInfo, type RunOptions, parseContract } from '../loop/index';
 import { HttpError } from './http';
 
 export interface RunForm {
@@ -25,6 +25,12 @@ export interface RunForm {
   keep?: number;
   generations?: number;
   render?: 'off' | 'valid' | 'all' | 'auto';
+  /** oneshot (default) or staged (skeleton, then power, weapons, engines, armour) */
+  build?: 'oneshot' | 'staged';
+  /** auto (the model's measured best), grid-text, grid-json or parts */
+  contract?: string;
+  /** Mirror mode (default on) */
+  mirror?: boolean;
 }
 
 const num = (x: unknown, lo: number, hi: number, d?: number) => {
@@ -51,6 +57,7 @@ function known(models: ModelInfo[], id: string, what: string, vision = false): s
   const m = models.find((x) => x.id === full);
   if (!m) throw new HttpError(400, `no ${what} model ${id}`);
   if (vision && !m.vision) throw new HttpError(400, `the critic must take images: ${id} doesn't`);
+  if (m.off) throw new HttpError(400, `${id}: ${m.off} (asking it would load it in LM Studio: tick "let LM Studio chat" first)`);
   return full;
 }
 
@@ -60,10 +67,14 @@ export function runOptions(ctx: ShipgenContext, f: RunForm, models: ModelInfo[],
   const role = roleFor(ctx, f);
   const note = typeof f.note === 'string' ? f.note.trim().slice(0, 2000) : '';
   const brief: Brief = { ...(role ? { role } : {}), ...(note ? { text: note } : {}) };
+  const contract = parseContract(f.contract ?? 'auto');
+  if (!contract) throw new HttpError(400, `bad reply format ${f.contract}`);
+  const build = f.build ?? 'oneshot';
+  if (build !== 'oneshot' && build !== 'staged') throw new HttpError(400, `bad build ${build}`);
   const common = {
-    brief, rounds: num(f.rounds, 1, 20, 4), temperature: num(f.temperature, 0, 2, 0.6), think: !!f.think,
+    brief, rounds: num(f.rounds, 1, 20, build === 'staged' ? 3 : 4), temperature: num(f.temperature, 0, 2, 0.6), think: !!f.think,
     ...(f.critic ? { critic: known(models, f.critic, 'critic', true) } : {}),
-    render: f.render ?? 'auto', outDir: opts.outDir, signal: opts.signal, contract: 'auto' as const,
+    render: f.render ?? 'auto', outDir: opts.outDir, signal: opts.signal, contract, mirror: f.mirror !== false, build,
   };
   if (mode === 'compare') {
     const ms = (f.models ?? []).filter(Boolean).map((m) => known(models, m, 'designer'));
@@ -79,11 +90,12 @@ export function runOptions(ctx: ShipgenContext, f: RunForm, models: ModelInfo[],
     };
   }
   if (!opts.start) return { mode: 'design', ...common, model };
+  if (build === 'staged') return { mode: 'design', ...common, model, start: { bp: opts.start, instruction: note || 'finish it for the brief' } };
   const text = blueprintToGrid(ctx, opts.start).text;
   const result = check(ctx, opts.start);
   const bc = role ? briefCheck(ctx, opts.start, role) : undefined;
   return {
     mode: 'design', ...common, model,
-    start: { text, instruction: note || 'improve it for the brief', feedback: feedbackMessage({ result, brief: bc, maxItems: 6 }) },
+    start: { bp: opts.start, text, instruction: note || 'improve it for the brief', feedback: feedbackMessage({ result, brief: bc, maxItems: 6 }) },
   };
 }

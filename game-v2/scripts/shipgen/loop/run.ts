@@ -25,9 +25,15 @@ export async function run(deps: LoopDeps, o: RunOptions, emitRaw: (e: ShipgenEve
   const emit: Emit = (e) => emitRaw({ ...e, t: now() - t0 } as ShipgenEvent);
   const model = o.mode === 'compare' ? o.models[0] : o.model;
   const { signal: _s, seed: _seed, ...shown } = o as RunOptions & { signal?: unknown; seed?: unknown };
+  // (A model listed but not to be asked, such as LM Studio's while its chat is off: refuse before any request)
+  deps.models ??= await deps.llm.list().catch(() => []);
+  for (const id of [...(o.mode === 'compare' ? o.models : [o.model]), ...(o.critic ? [o.critic] : [])]) {
+    const m = deps.models.find((x) => x.id === (id.includes('/') ? id : `ollama/${id}`));
+    if (m?.off) throw new Error(`${id}: ${m.off} (asking it would load it there; set LMSTUDIO_CHAT=1 or tick "let LM Studio chat" on the page)`);
+  }
   emit({
     type: 'start', mode: o.mode, model, ...(o.mode === 'compare' ? { models: o.models } : {}), ...(o.critic ? { critic: o.critic } : {}),
-    role: roleName(o), contract: await contractFor(deps, model, o.contract), options: { ...shown, brief: { ...o.brief, role: roleName(o) } },
+    role: roleName(o), contract: await contractFor(deps, model, o.contract, o.build), mirror: o.mirror !== false, build: o.build ?? 'oneshot', options: { ...shown, brief: { ...o.brief, role: roleName(o) } },
   });
   try {
     if (o.mode === 'design') {

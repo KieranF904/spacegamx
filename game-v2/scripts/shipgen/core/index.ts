@@ -7,8 +7,13 @@ export {
   CodeBook, type DecodeResult, type EncodeResult, type GridError, FACING_MARK, blueprintToGrid, gridToBlueprint, gridLines, partKey, partAt,
   mirrorPart, mirrorLeft, mirrorGridLeft, coreAxis2,
 } from './grid';
+export { type HalfResult, sideOf, halfAxis2, halfOf, mirrorHalf, asymmetricCells } from './mirror';
+export { partEntry, blueprintToParts, partsToBlueprint, mergeParts, boxSize } from './partlist';
 export { type ShipEnergy, type RunOptions, type RunResult, shipEnergy, runEnergy } from './sim';
 export { type DesignScores, designScores } from './scores';
 export { type CheckResult, type CheckOptions, type CheckError, type ConsumerPower, type PowerReport, type CheckStats, type PartRef, DEFAULT_WEIGHTS, check } from './check';
 export { type Role, type RolesFile, type Selector, type BriefCheck, loadRoles, findRole, matches, selectorWords, briefCheck } from './roles';
-export { type Brief, type FeedbackInput, rulesText, formatText, briefLegend, briefText, systemPrompt, feedbackMessage } from './prompt';
+export {
+  type Brief, type FeedbackInput, type DesignForm, type PromptOptions, rulesText, withShape, formatText, partsFormatText, mirrorText, designText, briefLegend, briefText,
+  systemPrompt, feedbackMessage,
+} from './prompt';

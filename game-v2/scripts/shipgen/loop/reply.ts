@@ -13,12 +13,9 @@ export const DESIGN_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-export type Contract = 'json' | 'text';
+import type { Contract } from './contracts';
 
-export const CONTRACT_TEXT: Record<Contract, string> = {
-  json: 'Reply as JSON only: {"name": "<a name>", "grid": ["<line 1: the column numbers>", "<row line>", ...]}: each string in "grid" is one line of the grid, exactly as the format shows it (a row number, then one token per cell).',
-  text: 'Reply with the design only, between the markers: the name: line, grid:, the rows, and end. No other words.',
-};
+export type { Contract };
 
 export interface Extracted {
   /** Grid text for gridToBlueprint (name:, grid:, rows, end), or null when the reply holds no grid */
@@ -129,7 +126,7 @@ function lastRun(ls: string[]): string[] | null {
 export function partialGrid(sofar: string, contract: Contract): { text: string; lines: number } | null {
   const s = stripChatter(sofar);
   let rows: string[];
-  if (contract === 'json' && /"grid"\s*:\s*\[/.test(s)) {
+  if (contract === 'grid-json' && /"grid"\s*:\s*\[/.test(s)) {
     const tail = s.slice(s.search(/"grid"\s*:\s*\[/));
     rows = [...tail.matchAll(/"((?:[^"\\]|\\.)*)"\s*[,\]]/g)].map((m) => { try { return JSON.parse(`"${m[1]}"`) as string; } catch { return m[1]; } });
   } else {

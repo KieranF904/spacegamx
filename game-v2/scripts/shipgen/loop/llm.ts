@@ -23,6 +23,8 @@ export interface ModelInfo {
   contextLength?: number;
   params?: string;
   sizeBytes?: number;
+  /** Listed but not to be asked: why (LM Studio while its chat is off: asking would load the model there) */
+  off?: string;
 }
 
 export interface ChatMessage {
@@ -74,7 +76,17 @@ export interface LlmOptions {
   fetch?: typeof fetch;
   /** Overrides the LM Studio token lookup (tests) */
   token?: () => string | undefined;
+  /**
+   * May chat requests go to LM Studio? Asking an LM Studio model loads it there, so by default its models are only
+   * listed: on only with LMSTUDIO_CHAT=1 or when this says so (the page's toggle).
+   */
+  lmStudioChat?: () => boolean;
 }
+
+/** LM Studio chat is on only when asked for: LMSTUDIO_CHAT=1 */
+export const lmStudioChatFromEnv = () => process.env.LMSTUDIO_CHAT === '1';
+
+export const LMSTUDIO_OFF = 'LM Studio, not enabled';
 
 export class AbortedError extends Error {
   constructor(m = 'cancelled') { super(m); this.name = 'AbortError'; }
@@ -92,7 +104,7 @@ export const isCloudName = (name: string) => /[:-]cloud$/i.test(name);
 
 /** The model to use when none is named: local, chat-capable (vision too when asked) */
 export function defaultModel(list: ModelInfo[], opts: { vision?: boolean } = {}): ModelInfo | undefined {
-  return list.find((m) => !m.cloud && m.chat && (!opts.vision || m.vision));
+  return list.find((m) => !m.cloud && !m.off && m.chat && (!opts.vision || m.vision));
 }
 
 export function createLlm(opts: LlmOptions = {}): Llm {
@@ -100,6 +112,7 @@ export function createLlm(opts: LlmOptions = {}): Llm {
   const lms = (opts.lmStudioUrl ?? process.env.LMSTUDIO_URL ?? 'http://localhost:1234').replace(/\/$/, '');
   const f = opts.fetch ?? fetch;
   const token = opts.token ?? (() => lmStudioToken());
+  const lmsChat = opts.lmStudioChat ?? lmStudioChatFromEnv;
   const auth = (): Record<string, string> => { const t = token(); return t ? { Authorization: `Bearer ${t}` } : {}; };
   let cache: Promise<ModelInfo[]> | null = null;
 
@@ -121,6 +134,18 @@ export function createLlm(opts: LlmOptions = {}): Llm {
 
   async function listLmStudio(): Promise<ModelInfo[]> {
     if (!token()) throw new Error('LM Studio: no LM_API_TOKEN (environment or game-v2/.env)');
+    const off = lmsChat() ? {} : { off: LMSTUDIO_OFF };
+    // (/api/v1/models lists every downloaded model, loaded or not; the older lists show only what is loaded. Listing
+    // never loads anything)
+    const v1 = await f(`${lms}/api/v1/models`, { headers: auth(), signal: AbortSignal.timeout(5000) }).catch(() => null);
+    const all = v1?.ok ? ((await v1.json().catch(() => ({}))) as { models?: any[] }).models : undefined;
+    if (all?.length) {
+      return all.filter((m) => m.type !== 'embedding' && m.type !== 'embeddings' && m.key).map((m) => ({
+        id: `lmstudio/${m.key}`, provider: 'lmstudio' as const, name: m.key, cloud: false,
+        vision: !!m.capabilities?.vision, chat: true, thinking: !!m.capabilities?.reasoning, structured: true,
+        contextLength: m.max_context_length, params: m.params_string, sizeBytes: m.size_bytes, ...off,
+      }));
+    }
     // (/api/v0/models says vlm/llm/embeddings; the OpenAI list doesn't)
     let r = await f(`${lms}/api/v0/models`, { headers: auth(), signal: AbortSignal.timeout(5000) });
     let rich = true;
@@ -131,6 +156,7 @@ export function createLlm(opts: LlmOptions = {}): Llm {
       id: `lmstudio/${m.id}`, provider: 'lmstudio' as const, name: m.id, cloud: false,
       vision: rich ? m.type === 'vlm' : /vl|vision|llava/i.test(m.id), chat: !/embed/i.test(m.id), thinking: false, structured: true,
       contextLength: m.max_context_length ?? m.loaded_context_length,
+      ...(lmsChat() ? {} : { off: LMSTUDIO_OFF }),
     }));
   }
 
@@ -149,6 +175,8 @@ export function createLlm(opts: LlmOptions = {}): Llm {
 
   async function chat(req: ChatRequest): Promise<ChatResult> {
     const { provider, name } = splitId(req.model);
+    // (Before anything else: asking LM Studio would load the model there)
+    if (provider === 'lmstudio' && !lmsChat()) throw new Error(`${LMSTUDIO_OFF}: asking ${name} would load it in LM Studio. Set LMSTUDIO_CHAT=1 (or tick "let LM Studio chat" on the page) to allow it`);
     const mi = await info(req.model);
     const structured = !!req.schema && (mi ? mi.structured : true);
     const t0 = Date.now();

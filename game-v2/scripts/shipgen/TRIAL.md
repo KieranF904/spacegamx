@@ -104,3 +104,114 @@ All 167 shipgen tests pass, including new ones for the runaway stops, cut-off JS
 3. **Pick the reply format and settings per model by measuring them,** and replace the critic. Store each model's best
    format (the coder: text; gemma: JSON) and temperature. Raise the temperature on a repeated grid. Replace the
    always-8 critic with a calibrated prompt or pairwise "which is better" judging, or drop it.
+
+# Trial 2: mirror mode, part lists, staged build (2026-11-01, evening)
+
+Same machine, Ollama only (gemma4:12b, qwen2.5-coder:14b; no cloud models, nothing sent to LM Studio). Compare mode,
+2 trials per cell, mirror mode ON throughout. Raw runs: `scripts/shipgen/out/trial2/` (gitignored). Small samples:
+2 trials a cell is enough to see big effects, not to rank close ones.
+
+## What changed before it
+
+- **Mirror mode (default on).** The model writes the left half and the parts on the centre line (the line down the
+  middle of the core); `core/mirror.ts` adds the right half (`mirrorHalf`: E/W facings swap, handed shapes swap via
+  `mirrorShape`). A part across the line must be its own mirror image. Forgiving: a right-half part that is already
+  the mirror is ignored, one with free mirror cells is mirrored to the left too, one that clashes is dropped (the left
+  half wins); every case is a note in the feedback. `--no-mirror` / the page's checkbox turns it off; then the
+  feedback lists every cell without a twin (`asymmetricCells`: "row 2: col -4 is HA, but its mirror col 5 is empty"),
+  symmetry weighs 0.6 and each such cell costs 4 points (up to 40).
+- **Part-list contract** (`--contract parts`, `core/partlist.ts`): `CODE col,row [WxH]`, placed by the top-left
+  cell; overlaps are refused by name (`"BT -1,0" overlaps "CR -1,0": both cover col -1 row 0`); hull listed under a
+  part is dropped with a note. Contracts are a registry (`loop/contracts.ts`: grid-text, grid-json, parts; the old
+  names text/json still work). Feedback now always shows the ship as built, as a grid (whole, after mirroring).
+- **Staged build** (`--build staged`, `loop/staged.ts`): a valid symmetric skeleton (core on column 0, a hull spine
+  and a cross beam sized to the brief), then power, weapons, engines, armour, one step each. A step is accepted only
+  if the ship stays valid, keeps every earlier part, has what the step asks for and every gun and engine is powered;
+  otherwise the check goes back and the step is retried (`--rounds` = tries per step). Each ask names free cells that
+  touch power (with a clear lane for guns and engines). With `--contract auto` a staged build uses the part list:
+  each step's reply is only the new parts.
+- **Per-model contract table** (`loop/modelPrefs.ts`), used by `--contract auto` and shown on the page.
+- **Shapes.** Every one-shot design is now asked for a silhouette from `roles.json` (`shapes`, one per trial),
+  because with the example shown as a half grid qwen copied the Wren 10 times out of 10 in a first try.
+- A model resending the same design gets +0.3 temperature (up to 1.2). A part list running far outside the brief
+  ("HA -1,-1 ... HA -86,-1") is stopped. Critic weight 0 by default (recorded, not scored). LM Studio is list-only
+  unless `LMSTUDIO_CHAT=1` or the page toggle; a test checks no chat request goes to it by default.
+
+## Reply format per model (starter, one-shot, mirror on, 2 trials x 5 rounds)
+
+| Model | grid-text | grid-json | parts |
+|---|---|---|---|
+| qwen2.5-coder:14b | 0/2 valid (resends one broken grid) | **2/2 valid, 1 on brief** | 0/2 (hull listed under parts, guns blocked) |
+| gemma4:12b | **2/2 valid**, 0 on brief (a gun on the centre line counts once) | 0/2 | 1/2 valid |
+
+This is the opposite of trial 1 for both models (there: coder best with text, gemma with JSON). With 2-3 trials a
+cell the format effect is within the noise; the table now says qwen: grid-json, gemma: grid-text, and staged builds
+always use parts. The part list did not help one-shot designs (the models still stack parts and put guns behind
+hull); it did help staged steps (below).
+
+## Results (mirror on, 2 trials each, contract auto)
+
+"Valid" for staged runs counts only ships that got power and at least one more system in (the skeleton alone is
+always valid). On brief = valid, every requirement met, every gun and engine powered, not the worked example.
+One-shot: up to 5 rounds. Staged: 4 steps, up to 2 tries each.
+
+| Role | Model | Build | Contract | Valid | On brief | Replies | Gen s/reply | Minutes | On brief / min | Best score | Commonest failures |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| starter | qwen2.5-coder:14b | one-shot | grid-json | 1/2 | 0/2 | 5/5 | 2.8 | 0.47 | 0 | 95.2 (a copy of the Wren) | copied the example, cells nobody owns |
+| starter | gemma4:12b | one-shot | grid-text | 1/2 | 0/2 | 5/5 | 4.1 | 0.68 | 0 | 87.9 (one engine) | two cores, empty grid |
+| starter | qwen2.5-coder:14b | staged | parts | **2/2** | **2/2** | 5/5 | 1.0 | 0.18 | **11.2** | 88.7 | a part on a part placed before |
+| starter | gemma4:12b | staged | parts | 2/2 | 0/2 | 5/6 | 2.7 | 0.51 | 0 | 79.2 | guns facing into hull: the weapons step fails |
+| gunship | qwen2.5-coder:14b | one-shot | grid-json | 0/2 | 0/2 | 5/5 | 15.1 | 2.52 | 0 | - | every grid empty (10/10) |
+| gunship | gemma4:12b | one-shot | grid-text | 0/2 | 0/2 | 5/5 | 2.2 | 0.38 | 0 | - | cells nobody owns, two cores |
+| gunship | qwen2.5-coder:14b | staged | parts | 0/2 | 0/2 | 7/8 | 1.4 | 0.38 | 0 | 38 (power and armour only) | guns and engines facing into the frame |
+| gunship | gemma4:12b | staged | parts | 0/2 | 0/2 | 6/7 | 1.3 | 0.30 | 0 | 22.6 | turrets with no facing, or facing into parts |
+
+Overall: one-shot 2/8 valid, 0/8 on brief; staged 4/8 with real systems in, 2/8 on brief (both qwen starters).
+Valid per minute (any valid ship): about 2 a minute for one-shot starters, 0 for gunships.
+
+A first staged run used each model's one-shot contract (the whole half grid redrawn every step): 0/8 on brief; the
+models redrew the half with new rows below it, unattached, or added a second core. That is why staged builds now ask
+for new parts only. One more fix between the staged runs: the power step also lists the ring of cells one further
+out (the gunship needs 2 generators and 2 stores and the core has one free side cell on the left).
+
+## Stills (native renderer), judged
+
+- **Best staged starter** (qwen2.5-coder:14b):
+  `out/trial2/main/starter-staged_parts2-qwen2_5-coder_14b/renders/qwen2.5-coder_14b-t1-r3.png`. Valid, on brief,
+  score 88.7, exactly symmetric. A cross: four Pips in a stepped row at the front, batteries either side of the core,
+  a reactor under it and three Ion Drives at the back, with flat hull arms (the skeleton's cross beam) sticking out
+  at the sides. Functional and tidy but blocky; the arms look like left-over scaffolding and the armour step never
+  landed, so it has no nose or wing shape. The other qwen trial built the same kind of ship. Gemma's
+  (`.../starter-staged_parts2-gemma4_12b/renders/gemma4_12b-t1-r3.png`) is the same cross with one gun on the centre
+  line and two beside it.
+- **Best one-shot starter** (qwen2.5-coder:14b, grid-json):
+  `out/trial2/contract-starter-grid-json-qwen2_5-coder_14b/renders/qwen2.5-coder_14b-t2-r1.png`. On brief, score
+  94.8: a Wren with longer swept wings and wedge tips. Symmetric, and the best-looking ship of the trial, but clearly
+  Wren-derived.
+- **Gemma one-shot starter**: `out/trial2/main/starter-oneshot-gemma4_12b/renders/gemma4_12b-t2-r2.png`. Symmetric
+  but a squat U-shaped box with one engine: off brief and not good-looking.
+- **Best staged gunship** (qwen):
+  `out/trial2/main/gunship-staged_parts2-qwen2_5-coder_14b/renders/qwen2.5-coder_14b-t2-r8.png`. Not usable: power
+  round the core, then two big armour slabs (the armour step accepts any valid armour), no guns, no engines.
+
+Symmetry is solved: no ship made in mirror mode has a lopsided wing. Looks are now limited by the models' shapes
+(and, in staged ships, by the skeleton's cross beam showing through).
+
+## Pairwise critic (qwen3-vl:8b)
+
+`critic-check.ts` showed it 20 pairs of valid stills (scores 10+ points apart), each pair both ways round (5-18 s a
+pair). It agreed with the higher score 11 times, disagreed 2 times, and 7 times picked whichever image came first
+(or second) both ways round. It agrees when one ship plainly lacks guns or engines, which the score already knows; on
+closer pairs it answers by position, and its reasons repeat the prompt's words. Not informative enough: the critic
+stays optional at weight 0, and pairwise judging is an experiment script only.
+
+## Verdict and next
+
+- **Mirror mode**: on by default; it removes the lopsided-wing problem and costs nothing.
+- **Staged + part list** is the first setup that makes on-brief ships reliably, but only for the starter and only
+  with qwen2.5-coder (2/2, about 11 a minute). For the gunship both models fail the weapons and engines steps: they
+  place guns and engines facing into the frame or other parts. Next: offer exact legal cells for a gun or engine
+  (free, touching power, the faced cell free, mounting met) and have the model pick from that list; make the armour
+  step require the earlier steps to have landed; give the skeleton a nose and drop the cross beam once wings exist.
+- **One-shot** is still poor for anything but a starter, and the starter still copies the worked example in some
+  trials even when asked for another shape.

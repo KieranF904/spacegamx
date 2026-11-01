@@ -48,7 +48,7 @@ beforeAll(async () => {
   const paths = { ...defaultPaths(ctx.dataDir), out: join(tmp, 'out'), dev: join(tmp, 'dev'), lab: join(tmp, 'lab') };
   mkdirSync(paths.lab, { recursive: true });
   writeFileSync(join(paths.lab, 'index.html'), '<p>lab</p>');
-  llm = fakeLlm([GOOD], [fakeModel('fake'), fakeModel('other'), fakeModel('eyes', { vision: true }), fakeModel('big:cloud', { cloud: true })]);
+  llm = fakeLlm([GOOD], [fakeModel('fake'), fakeModel('other'), fakeModel('eyes', { vision: true }), fakeModel('big:cloud', { cloud: true }), { ...fakeModel('lm'), id: 'lmstudio/lm', provider: 'lmstudio', off: 'LM Studio, not enabled' }]);
   currentLlm = llm;
   // (The llm can be swapped per test through this proxy)
   const proxy: Llm = { list: () => currentLlm.list(), chat: (r) => currentLlm.chat(r) };
@@ -117,6 +117,34 @@ describe('shipgen page server', () => {
     expect(JSON.stringify(m.body)).not.toMatch(/token|bearer/i);
   });
 
+  it('marks LM Studio models not enabled, refuses to run them, and shows each model\'s auto reply format', async () => {
+    const m = await get('/api/models');
+    expect(m.body.lmstudioChat).toBe(false);
+    expect(m.body.models.find((x: any) => x.id === 'lmstudio/lm').off).toBe('LM Studio, not enabled');
+    expect(m.body.models.find((x: any) => x.name === 'fake').auto.contract).toBe('grid-text');
+    expect(m.body.contracts.map((c: any) => c.id)).toEqual(['grid-text', 'grid-json', 'parts']);
+    const bad = await post('/api/runs', { mode: 'design', model: 'lmstudio/lm', role: 'starter' });
+    expect(bad.status).toBe(400);
+    expect(bad.body.error).toMatch(/not enabled/);
+    expect((await post('/api/settings', { lmstudioChat: true })).body.lmstudioChat).toBe(true);
+    expect((await get('/api/models')).body.lmstudioChat).toBe(true);
+    expect((await post('/api/settings', { lmstudioChat: false })).body.lmstudioChat).toBe(false);
+    expect((await post('/api/runs', { mode: 'design', model: 'ollama/fake', role: 'starter', contract: 'xml' })).status).toBe(400);
+  });
+
+  it('runs a staged build with a part list from the form', async () => {
+    const prev = currentLlm;
+    currentLlm = fakeLlm(['name: S\nparts:\nCR -1,0\nBT -1,-1\nend', 'name: S\nparts:\nPI^ -2,0\nend', 'name: S\nparts:\nBT -1,1\nIDv -1,2\nend', 'name: S\nparts:\nAA -3,0\nend'], [fakeModel('fake')]);
+    try {
+      const r = await post('/api/runs', { mode: 'design', model: 'ollama/fake', role: 'starter', build: 'staged', contract: 'parts', rounds: 1, mirror: true });
+      expect(r.status).toBe(200);
+      const ev = await stream(r.body.id);
+      expect(ev[0]).toMatchObject({ type: 'start', build: 'staged', contract: 'parts', mirror: true });
+      expect(ev.filter((e) => e.type === 'step' && e.status === 'accepted').map((e) => e.step)).toEqual(['power', 'weapons', 'engines', 'armour']);
+      await waitIdle();
+    } finally { currentLlm = prev; }
+  });
+
   it('answers only requests addressed to localhost, and serves files only from inside its folders', async () => {
     const status = await new Promise<number>((ok, fail) => {
       const u = new URL(base);
@@ -155,7 +183,7 @@ describe('shipgen page server', () => {
     expect(rest).toMatch(new RegExp(`^id: ${ev.length - 1}$`, 'm'));
     // The gallery has it, and the run left a record
     const g = await get('/api/gallery');
-    expect(g.body.gallery[0]).toMatchObject({ valid: true, url: render.url, model: 'ollama/fake', role: 'starter' });
+    expect(g.body.gallery.find((x: any) => x.run === r.body.id)).toMatchObject({ valid: true, url: render.url, model: 'ollama/fake', role: 'starter' });
     const runs = await get('/api/runs');
     const out = runs.body.runs.find((x: any) => x.id === r.body.id);
     expect(out.status).toBe('done');
@@ -169,7 +197,7 @@ describe('shipgen page server', () => {
     expect(r.status).toBe(200);
     await stream(r.body.id);
     const req = (llm as any).requests.at(-1);
-    expect(req.messages[1].content).toMatch(/Here is a design:[\s\S]*Change it: make it faster/);
+    expect(req.messages[1].content).toMatch(/Here is a design \(its left half and centre line\):[\s\S]*Change it: make it faster/);
     expect(req.messages[0].content).toMatch(/20.{0,6}30/);
   });
 

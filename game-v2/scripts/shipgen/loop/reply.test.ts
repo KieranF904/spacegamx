@@ -79,13 +79,13 @@ describe('shipgen reply parser', () => {
   it('previews complete rows while streaming (text and JSON)', () => {
     const text = `name: X\ngrid:\n${rows.join('\n')}\nend`;
     const cut = text.slice(0, text.indexOf(rows[2]) + 3);
-    const pg = partialGrid(cut, 'text')!;
+    const pg = partialGrid(cut, 'grid-text')!;
     expect(pg.lines).toBe(2);
-    expect(partialGrid('name: X\ngrid:\n' + rows[0], 'text')).toBeNull();
+    expect(partialGrid('name: X\ngrid:\n' + rows[0], 'grid-text')).toBeNull();
     const j = JSON.stringify({ name: 'J', grid: rows });
     const jc = j.slice(0, j.indexOf(rows[3]) + 4);
-    expect(partialGrid(jc, 'json')!.lines).toBe(3);
-    expect(gridToBlueprint(ctx, partialGrid(j, 'json')!.text).bp!.parts.length).toBe(wren.parts.length);
+    expect(partialGrid(jc, 'grid-json')!.lines).toBe(3);
+    expect(gridToBlueprint(ctx, partialGrid(j, 'grid-json')!.text).bp!.parts.length).toBe(wren.parts.length);
   });
 
   it('salvages JSON cut off at the token limit, and says so', () => {

@@ -81,7 +81,7 @@ describe('shipgen design loop', () => {
     const rows = GOOD.split('\n').filter((l) => !/^(name|grid|end)\b/.test(l.trim()));
     const llm = fakeLlm([JSON.stringify({ name: 'Jay', grid: rows })], [fakeModel('fake', { structured: true })]);
     const { ev, r } = await collect({ mode: 'design', model: 'fake', brief: { role: STARTER }, rounds: 1 }, llm);
-    expect((ev[0] as Extract<ShipgenEvent, { type: 'start' }>).contract).toBe('json');
+    expect((ev[0] as Extract<ShipgenEvent, { type: 'start' }>).contract).toBe('grid-json');
     expect(llm.requests[0].schema).toBeTruthy();
     expect(llm.requests[0].messages[1].content).toMatch(/Reply as JSON/);
     expect(r.mode === 'design' && r.outcome.best?.valid).toBe(true);
@@ -129,7 +129,7 @@ describe('shipgen design loop', () => {
     const renders: string[] = [];
     const renderer: Renderer = { async render(_bp, path) { renders.push(path); return { path, ms: 20, png: Buffer.from('png') }; }, async close() {} };
     const llm = fakeLlm((req) => (req.messages[0].images ? '{"looks": 4, "reason": "boxy"}' : req.messages.length > 2 ? GOOD : NO_CORE), [fakeModel('fake'), fakeModel('eye', { vision: true })]);
-    const { ev, r } = await collect({ mode: 'design', model: 'fake', critic: 'eye', brief: { role: STARTER }, rounds: 2, outDir: 'mem' }, llm, { renderer });
+    const { ev, r } = await collect({ mode: 'design', model: 'fake', critic: 'eye', criticWeight: 0.1, brief: { role: STARTER }, rounds: 2, outDir: 'mem' }, llm, { renderer });
     expect(renders.length).toBe(2); // (fast renders: every readable design)
     const crit = ev.filter((e) => e.type === 'critic');
     expect(crit.length).toBe(1); // (the valid one only)
@@ -158,7 +158,7 @@ describe('shipgen design loop', () => {
     const { ev } = await collect({ mode: 'design', model: 'fake', brief: { role: STARTER }, rounds: 3 }, fakeLlm([NO_CORE, NO_CORE, NO_CORE]));
     const fb = ev.filter((e) => e.type === 'feedback').map((e) => (e.type === 'feedback' ? e.text : ''));
     expect(fb[0]).not.toMatch(/same grid/);
-    expect(fb[1]).toMatch(/same grid/);
+    expect(fb[1]).toMatch(/same design/);
   });
 
   it('stops a row that runs on far past the brief\'s width', async () => {
@@ -196,7 +196,7 @@ describe('shipgen evolve and compare', () => {
     expect(r.outcome.metrics).toMatchObject({ kind: 'evolve', generations: 2, children: 6, validChildren: 6 });
     // The child's first ask carries the parent's grid and the change
     const ask = llm.requests[0].messages[1].content;
-    expect(ask).toMatch(/Here is a design:[\s\S]*grid:[\s\S]*Its check:[\s\S]*Change it: /);
+    expect(ask).toMatch(/Here is a design \(its left half and centre line\):[\s\S]*grid:[\s\S]*Its check:[\s\S]*Change it: /);
     expect(ev.filter((e) => e.type === 'prompt').every((e) => typeof e.lane === 'string' && /^g\d#\d$/.test(e.lane))).toBe(true);
   });
 

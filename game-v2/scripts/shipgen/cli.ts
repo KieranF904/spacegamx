@@ -4,8 +4,12 @@
 //   npx tsx scripts/shipgen/cli.ts --mode evolve --model qwen3:4b --role gunship --generations 3 --population 4 --keep 2
 //   npx tsx scripts/shipgen/cli.ts --mode evolve --model qwen3:4b --seed data/ships/blueprints/dev/review-wren.json
 //   npx tsx scripts/shipgen/cli.ts --mode compare --models qwen3:4b,gemma4:12b --role starter --trials 3 --rounds 4
-//   ... --critic qwen3-vl:8b (a vision model scores each valid design's looks)  --render auto|valid|all|off  --out <dir>
-//   ... --brief "a needle-nosed interceptor"  --contract auto|json|text  --think  --temperature 0.6  --timeout 600 --verbose
+//   npx tsx scripts/shipgen/cli.ts --model gemma4:12b --role gunship --build staged --rounds 3   (skeleton, then power, guns, engines, armour)
+//   ... --contract auto|grid-text|grid-json|parts (auto: the model's measured best, loop/modelPrefs.ts)  --no-mirror (draw the whole ship)
+//   ... --critic qwen3-vl:8b (optional: a vision model rates valid designs' looks; --critic-weight 0.1 to count it, default 0)
+//   ... --render auto|valid|all|off  --out <dir>  --brief "a needle-nosed interceptor"  --think  --temperature 0.6  --timeout 600 --verbose
+// Mirror mode is on by default: the model writes the left half and the centre line, the tool mirrors it.
+// LM Studio models are listed only: nothing is sent to LM Studio (it would load the model) unless LMSTUDIO_CHAT=1.
 // Models: "gemma4:12b" (Ollama), "ollama/<name>" or "lmstudio/<name>". Results (designs as blueprints, metrics.json and
 // events.jsonl) go to scripts/shipgen/out/<time>-<mode>-<role>/ (gitignored). Ctrl+C stops cleanly and still writes them.
 import { mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'fs';
@@ -14,7 +18,7 @@ import { parseBlueprint, serializeBlueprint, type Blueprint } from '../../common
 import { loadContext } from './core/index';
 import {
   type Attempt, type LoopDeps, type Renderer, type RunOptions, type ShipgenEvent,
-  createLlm, defaultModel, nativeRenderer, run,
+  autoContract, createLlm, defaultModel, nativeRenderer, parseContract, run,
 } from './loop/index';
 
 const argv = process.argv.slice(2);
@@ -31,7 +35,7 @@ async function main(): Promise<void> {
   const llm = createLlm();
   if (flags.list) {
     for (const m of await llm.list()) {
-      const tags = [m.cloud ? 'cloud' : 'local', m.chat ? 'chat' : 'no-chat', m.vision && 'vision', m.thinking && 'thinking', m.structured && 'schema', m.params].filter(Boolean);
+      const tags = [m.cloud ? 'cloud' : 'local', m.chat ? 'chat' : 'no-chat', m.vision && 'vision', m.thinking && 'thinking', m.structured && 'schema', m.params, m.off, m.chat && !m.off && `auto: ${autoContract(m.id, m).contract}`].filter(Boolean);
       console.log(`${m.id.padEnd(44)} ${tags.join(', ')}`);
     }
     if (!(await llm.list()).some((m) => m.provider === 'lmstudio')) console.log('(LM Studio: nothing listed: not running, or no LM_API_TOKEN in the environment or game-v2/.env)');
@@ -60,9 +64,13 @@ async function main(): Promise<void> {
     try { renderer = await nativeRenderer({ keep: !!flags['keep-render'] }); } catch (e) { console.error(`[shipgen] no renders: ${(e as Error).message}`); }
   }
   const deps: LoopDeps = { ctx, llm, models, renderer };
+  const contract = parseContract(flags.contract ?? 'auto');
+  if (!contract) throw new Error(`--contract ${flags.contract}: use auto, grid-text, grid-json or parts`);
+  const build = (flags.build ?? (flags.staged ? 'staged' : 'oneshot')) as 'oneshot' | 'staged';
+  if (build !== 'oneshot' && build !== 'staged') throw new Error(`--build ${flags.build}: use oneshot or staged`);
   const common = {
     brief: { role, ...(flags.brief ? { text: flags.brief } : {}), ...(flags.name ? { name: flags.name } : {}) },
-    rounds: num('rounds'), contract: (flags.contract ?? 'auto') as 'auto', temperature: num('temperature'), think: flags.think === 'true',
+    rounds: num('rounds'), contract, mirror: !flags['no-mirror'], build, temperature: num('temperature'), think: flags.think === 'true',
     critic: flags.critic, criticWeight: num('critic-weight'), render: renderMode, outDir: out, signal: ac.signal,
     timeoutMs: flags.timeout ? Number(flags.timeout) * 1000 : undefined,
   };
@@ -84,7 +92,8 @@ async function main(): Promise<void> {
     const L = e.lane ? `[${e.lane}] ` : '';
     const s = (x: number) => `${(x / 1000).toFixed(1)}s`;
     switch (e.type) {
-      case 'start': console.log(`shipgen ${e.mode}: ${e.models?.join(' vs ') ?? e.model}, role ${e.role}, ${e.contract} replies${e.critic ? `, critic ${e.critic}` : ''} -> ${out}`); break;
+      case 'start': console.log(`shipgen ${e.mode}${e.build === 'staged' ? ' (staged build)' : ''}: ${e.models?.join(' vs ') ?? e.model}, role ${e.role}, ${e.contract} replies, mirror ${e.mirror === false ? 'off' : 'on'}${e.critic ? `, critic ${e.critic}` : ''} -> ${out}`); break;
+      case 'step': console.log(`${L}step ${e.index}/${e.of} ${e.step}: ${e.status}${e.note ? ` (${e.note})` : ''}`); break;
       case 'brief': console.log(`${L}brief: ${e.text.split('\n')[0]} (${e.legendCodes} codes, prompt ${e.promptChars} chars)`); break;
       case 'prompt': tokens = 0; process.stdout.write(`${L}round ${e.round}: asking (${e.messages} messages, ${e.chars} chars) `); break;
       case 'token': if (verbose) process.stdout.write(e.text); else if (++tokens % 40 === 0) process.stdout.write(e.kind === 'thinking' ? '~' : '.'); break;

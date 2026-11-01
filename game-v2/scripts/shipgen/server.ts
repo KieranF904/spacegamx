@@ -1,11 +1,11 @@
 // The ship generator's page. From game-v2:  npm run shipgen   (or: npx tsx scripts/shipgen/server.ts [--port 5320])
 // Serves http://127.0.0.1:5320/ (or the next free port), on localhost only. Models come live from Ollama
 // (localhost:11434) and LM Studio (localhost:1234, with LM_API_TOKEN from the environment or game-v2/.env; the token
-// never leaves this process). Stills come from the native renderer, started on first use and stopped on exit if this
+// never leaves this process). LM Studio's models are only listed until LMSTUDIO_CHAT=1 or the page's toggle allows chat. Stills come from the native renderer, started on first use and stopped on exit if this
 // started it. Ctrl+C stops any run and quits.
 import { createServer } from 'http';
 import { loadContext } from './core/index';
-import { type Renderer, createLlm, nativeRenderer } from './loop/index';
+import { type Renderer, createLlm, lmStudioChatFromEnv, nativeRenderer } from './loop/index';
 import { createApp } from './web/app';
 import { defaultPaths } from './web/paths';
 
@@ -22,7 +22,10 @@ async function main(): Promise<void> {
     return undefined;
   }));
   let quit = () => {};
-  const app = createApp({ ctx, llm: createLlm(), paths: defaultPaths(ctx.dataDir), getRenderer, onQuit: () => quit() });
+  // (LM Studio is listed only, unless LMSTUDIO_CHAT=1 or the page's toggle: asking it loads the model there)
+  const settings = { lmstudioChat: lmStudioChatFromEnv() };
+  const llm = createLlm({ lmStudioChat: () => settings.lmstudioChat });
+  const app = createApp({ ctx, llm, paths: defaultPaths(ctx.dataDir), getRenderer, onQuit: () => quit(), settings });
   const server = createServer(app.handle);
 
   const first = Number(flag('port') ?? process.env.SHIPGEN_PORT ?? 5320);

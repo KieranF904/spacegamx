@@ -26,7 +26,7 @@ const log = new StepLog($('log'), () => $('follow').checked);
 function msg(id, text, cls = '') { const el = $(id); el.textContent = text; el.className = `msg ${cls}`; }
 
 function modelLabel(m) {
-  return `${m.name}${m.params ? `  ${m.params}` : ''}${m.vision ? ' · vision' : ''}${m.cloud ? ' · CLOUD' : ''}`;
+  return `${m.name}${m.params ? `  ${m.params}` : ''}${m.vision ? ' · vision' : ''}${m.cloud ? ' · CLOUD' : ''}${m.off ? ` · ${m.off}` : ''}`;
 }
 
 function fillModels(select, list, { none, pick } = {}) {
@@ -36,22 +36,37 @@ function fillModels(select, list, { none, pick } = {}) {
     ['Cloud (runs on an outside service)', list.filter((m) => m.cloud)],
   ];
   select.innerHTML = (none ? `<option value="">${esc(none)}</option>` : '') + groups.filter(([, ms]) => ms.length)
-    .map(([g, ms]) => `<optgroup label="${esc(g)}">${ms.map((m) => `<option value="${esc(m.id)}">${esc(modelLabel(m))}</option>`).join('')}</optgroup>`).join('');
-  if (pick && list.some((m) => m.id === pick)) select.value = pick;
+    .map(([g, ms]) => `<optgroup label="${esc(g)}">${ms.map((m) => `<option value="${esc(m.id)}"${m.off ? ' disabled' : ''}>${esc(modelLabel(m))}</option>`).join('')}</optgroup>`).join('');
+  if (pick && list.some((m) => m.id === pick && !m.off)) select.value = pick;
 }
 
 async function loadModels() {
-  const { models, lmstudio } = await api('/api/models?fresh');
+  const { models, lmstudio, lmstudioChat, contracts } = await api('/api/models?fresh');
   state.models = models;
+  $('lmsChat').checked = !!lmstudioChat;
+  if (contracts && $('contract').options.length < 2) {
+    $('contract').innerHTML = '<option value="auto">auto (measured per model)</option>' + contracts.map((c) => `<option value="${esc(c.id)}">${esc(c.id)}: ${esc(c.label)}</option>`).join('');
+    const p = store.get('form') ?? {};
+    if (p.contract) $('contract').value = p.contract;
+  }
   const chat = models.filter((m) => m.chat);
-  const local = chat.filter((m) => !m.cloud);
+  const local = chat.filter((m) => !m.cloud && !m.off);
   const prefs = store.get('form') ?? {};
   // (Never a cloud model by default: only one the user picked before)
   fillModels($('model'), chat, { pick: prefs.model ?? local[0]?.id });
   if (!prefs.model && local[0]) $('model').value = local[0].id;
   fillModels($('model2'), chat, { pick: prefs.model2 ?? local[1]?.id ?? local[0]?.id });
   fillModels($('critic'), chat.filter((m) => m.vision), { none: '(no critic)', pick: prefs.critic ?? '' });
+  contractHint();
   if (!lmstudio) $('modelLabel').title = 'LM Studio lists nothing: not running, or no LM_API_TOKEN in the environment or game-v2/.env';
+}
+
+/** What "auto" picks for the chosen designer, and why (the measured table in loop/modelPrefs.ts) */
+function contractHint() {
+  const m = state.models.find((x) => x.id === $('model').value);
+  const a = m?.auto;
+  $('contractHint').textContent = a ? `auto = ${$('build').value === 'staged' ? 'parts (staged)' : a.contract}` : '';
+  $('contractHint').title = a ? a.why : '';
 }
 
 async function loadStatic() {
@@ -90,6 +105,7 @@ function formBody() {
   const body = {
     mode: v('mode'), model: v('model'), critic: v('critic'), temperature: n('temperature'), rounds: n('rounds'), role: v('role'),
     maxLevel: n('maxLevel'), note: v('note'), think: f.get('think') === 'on', trials: n('trials'), population: n('population'), generations: n('generations'),
+    build: v('build'), contract: v('contract'), mirror: f.get('mirror') === 'on',
   };
   if (body.mode === 'compare') body.models = [v('model'), v('model2')];
   if (n('cellsMin') || n('cellsMax')) {
@@ -99,7 +115,7 @@ function formBody() {
   const start = v('start');
   if (start === 'sel' && state.start) body.startBp = state.start.bp;
   else if (start && start !== 'sel') body.startId = start;
-  store.set('form', { model: body.model, model2: v('model2'), critic: body.critic ?? '', role: body.role, mode: body.mode, temperature: body.temperature, rounds: body.rounds });
+  store.set('form', { model: body.model, model2: v('model2'), critic: body.critic ?? '', role: body.role, mode: body.mode, temperature: body.temperature, rounds: body.rounds, build: body.build, contract: body.contract, mirror: body.mirror });
   return body;
 }
 
@@ -171,14 +187,14 @@ function onEvent(e) {
       if (state.watching && e.role && state.roles.some((r) => r.id === e.role)) { $('role').value = e.role; roleChanged(); }
       state.mode = e.mode; state.checks.clear();
       setupPanes(e.mode, e.models ?? [e.model], e.model);
-      setStatus('running', `${e.mode} · ${e.models?.join(' vs ') ?? e.model} · ${e.role ?? 'no role'}${e.critic ? ` · critic ${e.critic}` : ''}`);
+      setStatus('running', `${e.mode}${e.build === 'staged' ? ' (staged)' : ''} · ${e.models?.join(' vs ') ?? e.model} · ${e.role ?? 'no role'} · ${e.contract}${e.mirror === false ? ' · mirror off' : ' · mirrored'}${e.critic ? ` · critic ${e.critic}` : ''}`);
       break;
     case 'prompt': pane?.newRound(e.round, state.mode === 'design' ? '' : e.lane); $('live').textContent = ''; break;
     case 'token':
       if (e.kind === 'content') pane?.token(e.text);
       else $('live').textContent = 'thinking...';
       return;
-    case 'grid': if (!e.partial) pane?.gridFinal(e.text); else return; break;
+    case 'grid': if (!e.partial) pane?.gridFinal(e.text); else { if (e.text) pane?.preview(e.text); return; } break;
     case 'reply': $('live').textContent = e.tokensPerSec ? `${e.tokensPerSec} tok/s` : ''; pane?.foot(`reply in ${(e.ms / 1000).toFixed(1)} s`); break;
     case 'check':
       pane?.check(e.result, e.cells);
@@ -338,6 +354,15 @@ $('form').onsubmit = async (ev) => {
   } catch (e) { msg('formMsg', e.message, 'err'); }
 };
 $('mode').onchange = modeChanged;
+$('model').addEventListener('change', contractHint);
+$('build').addEventListener('change', contractHint);
+$('lmsChat').onchange = async () => {
+  try {
+    await api('/api/settings', { lmstudioChat: $('lmsChat').checked });
+    msg('formMsg', $('lmsChat').checked ? 'LM Studio may chat now: a run with an LM Studio model will LOAD it there.' : 'LM Studio models are listed only again.', '');
+    await loadModels();
+  } catch (e) { msg('formMsg', e.message, 'err'); }
+};
 $('role').onchange = roleChanged;
 $('temperature').oninput = () => { $('tempOut').textContent = Number($('temperature').value).toFixed(2); };
 $('start').onchange = async () => {
@@ -358,6 +383,8 @@ $('start').onchange = async () => {
     if (prefs.role !== undefined && state.roles.some((r) => r.id === prefs.role)) $('role').value = prefs.role; else $('role').value = 'starter';
     if (prefs.temperature !== undefined) $('temperature').value = prefs.temperature;
     if (prefs.rounds) $('rounds').value = prefs.rounds;
+    if (prefs.build) $('build').value = prefs.build;
+    if (prefs.mirror === false) $('mirror').checked = false;
     $('temperature').oninput();
     modeChanged(); roleChanged();
     setupPanes('design', [], 'no run yet');

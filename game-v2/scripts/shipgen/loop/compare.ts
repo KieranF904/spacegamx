@@ -24,7 +24,7 @@ export async function compareLoop(deps: LoopDeps, o: CompareOptions, emit: Emit)
     best.set(model, []);
     for (let t = 1; t <= trials && !cancelled; t++) {
       const lane = `${model} t${t}`;
-      const r = await designLoop(deps, { ...o, model, rounds, stopWhenValid: true, tag: `${model.replace(/[^\w.-]+/g, '_')}-t${t}` }, (e) => emit({ ...e, lane }));
+      const r = await designLoop(deps, { ...o, model, rounds, stopWhenValid: true, shapeIndex: t - 1, tag: `${model.replace(/[^\w.-]+/g, '_')}-t${t}` }, (e) => emit({ ...e, lane }));
       if (r.cancelled) { cancelled = true; break; }
       done++;
       if (r.firstPassRound !== null) { passes++; roundsToValid += r.firstPassRound; }

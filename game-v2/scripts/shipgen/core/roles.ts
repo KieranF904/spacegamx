@@ -28,6 +28,8 @@ export interface Role {
   style?: string[];
   /** A bundled blueprint (path under data/ships/blueprints, no .json) shown as a worked example */
   example?: string;
+  /** Silhouettes to ask for, one per trial: a target that isn't the example */
+  shapes?: string[];
   weights?: Record<string, number>;
 }
 

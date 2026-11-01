@@ -1,6 +1,7 @@
 // Evolve: a population seeded from a role (fresh designs) or a given blueprint; each generation the model makes children
 // by changing a parent ("make it faster", "guard the engines with a Diode": picked from what the parent's check lacks),
-// each child gets a few repair rounds, and the top K of parents and children carry on.
+// each child gets a few repair rounds, and the top K of parents and children carry on. With build: 'staged' the fresh
+// seeds are built in steps (staged.ts); children are always changed whole.
 import type { Blueprint } from '../../../common/src/ships/index';
 import { CodeBook, blueprintToGrid, briefCheck, briefLegend, check, feedbackMessage } from '../core/index';
 import { type Attempt, type DesignOptions, type LoopDeps, better, designLoop, roleOf } from './design';
@@ -71,7 +72,7 @@ export async function evolveLoop(deps: LoopDeps, o: EvolveOptions, emit: Emit): 
       const lane = `g${gen}#${c + 1}`;
       emit({ type: 'mutation', gen, child: c + 1, parent: parent.id, instruction: m.instruction });
       const feedback = parent.a.result ? feedbackMessage({ result: parent.a.result, brief: parent.a.brief, maxItems: 5 }) : undefined;
-      const r = await designLoop(deps, { ...o, rounds: o.childRounds ?? 2, tag: lane, start: { text: parent.a.gridText!, instruction: m.instruction, feedback } }, sub(emit, lane));
+      const r = await designLoop(deps, { ...o, build: 'oneshot', rounds: o.childRounds ?? 2, tag: lane, start: { bp: parent.a.bp, text: parent.a.gridText ?? undefined, instruction: m.instruction, feedback } }, sub(emit, lane));
       if (r.cancelled) { cancelled = true; break; }
       metrics.children++;
       if (r.best) { kids.push({ id: lane, a: r.best }); if (r.best.valid) metrics.validChildren++; }

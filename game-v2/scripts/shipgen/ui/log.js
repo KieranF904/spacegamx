@@ -41,7 +41,7 @@ export class StepLog {
     const L = e.lane, R = e.round;
     switch (e.type) {
       case 'start':
-        this.add(L, 0, `<b>${esc(e.mode)}</b> with ${esc(e.models?.join(' vs ') ?? e.model)}${e.critic ? `, critic ${esc(e.critic)}` : ''}; role ${esc(e.role ?? 'none')}; ${esc(e.contract)} replies`);
+        this.add(L, 0, `<b>${esc(e.mode)}</b> with ${esc(e.models?.join(' vs ') ?? e.model)}${e.critic ? `, critic ${esc(e.critic)}` : ''}; role ${esc(e.role ?? 'none')}; ${esc(e.contract)} replies; mirror ${e.mirror === false ? 'off' : 'on'}${e.build === 'staged' ? '; staged build' : ''}`);
         break;
       case 'brief':
         this.add(L, 0, fold(`brief (${e.legendCodes} codes, system prompt ${e.promptChars} chars)`, e.text));
@@ -73,10 +73,11 @@ export class StepLog {
       case 'render': this.add(L, R, `still rendered in ${e.ms} ms`, 'note'); break;
       case 'critic': this.add(L, R, `critic ${esc(e.model)}: looks ${e.looks ?? '?'}/10, ${esc(e.reason)} (${secs(e.ms)})`); break;
       case 'score':
-        this.add(L, R, `score <b>${e.score}</b> <span class="muted">(check ${e.parts.check}${e.parts.briefPenalty ? `, brief -${e.parts.briefPenalty}` : ''}${e.parts.looks ? `, looks ${e.parts.looks}/10` : ''})</span>`);
+        this.add(L, R, `score <b>${e.score}</b> <span class="muted">(check ${e.parts.check}${e.parts.briefPenalty ? `, brief -${e.parts.briefPenalty}` : ''}${e.parts.asymmetry ? `, asymmetry -${e.parts.asymmetry}` : ''}${e.parts.looks ? `, looks ${e.parts.looks}/10` : ''})</span>`);
         this.badge(L, R, String(e.score));
         break;
       case 'best': this.add(L, R, `best so far: "${esc(e.name)}" ${e.score}${e.valid ? ' (valid)' : ''}`, 'good'); break;
+      case 'step': this.add(L, R || 0, `<b>step ${e.index}/${e.of}: ${esc(e.step)}</b> ${esc(e.status)}${e.note ? ` <span class="muted">(${esc(e.note)})</span>` : ''}`, e.status === 'accepted' ? 'good' : e.status === 'failed' ? 'err' : ''); break;
       case 'mutation': this.add(L, 0, `gen ${e.gen} child ${e.child} from ${esc(e.parent)}: ${esc(e.instruction)}`); break;
       case 'generation': this.add(L, 0, `generation ${e.gen}: ${e.population.map((p) => `${esc(p.id)} ${p.score}${p.valid ? '' : ' (invalid)'}`).join(', ')}`); break;
       case 'error': this.add(L, R, `${e.fatal ? 'stopped: ' : ''}${esc(e.message)}`, 'err'); break;

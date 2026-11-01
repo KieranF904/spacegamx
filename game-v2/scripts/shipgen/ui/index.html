@@ -38,7 +38,17 @@
     <label class="only-compare">Second designer
       <select name="model2" id="model2"></select>
     </label>
-    <label>Critic <span class="muted">(vision models; scores looks)</span>
+    <label>Build
+      <select name="build" id="build">
+        <option value="oneshot">one-shot: the whole ship each round</option>
+        <option value="staged">staged: skeleton, then power, guns, engines, armour</option>
+      </select>
+    </label>
+    <label>Reply format <span id="contractHint" class="muted small"></span>
+      <select name="contract" id="contract"><option value="auto">auto (measured per model)</option></select>
+    </label>
+    <label class="check"><input type="checkbox" name="mirror" id="mirror" checked> mirror: the model draws the left half, the tool mirrors it</label>
+    <label>Critic <span class="muted">(optional; vision models rate looks; weight 0: recorded, not scored)</span>
       <select name="critic" id="critic"></select>
     </label>
     <div class="row2">
@@ -46,7 +56,7 @@
         <input type="range" name="temperature" id="temperature" min="0" max="1.5" step="0.05" value="0.6">
       </label>
       <label>Rounds
-        <input type="number" name="rounds" id="rounds" min="1" max="20" value="4">
+        <input type="number" name="rounds" id="rounds" min="1" max="20" value="4" title="Staged build: tries per step">
       </label>
     </div>
     <div class="row2 only-evolve">
@@ -72,6 +82,7 @@
       <select name="start" id="start"></select>
     </label>
     <label class="check"><input type="checkbox" name="think" id="think"> let thinking models think (slower)</label>
+    <label class="check" title="Off by default. LM Studio models are only listed; with this on, a run asks LM Studio, which LOADS the model there."><input type="checkbox" id="lmsChat"> let LM Studio chat (this will LOAD the model in LM Studio)</label>
     <button type="submit" id="go" class="primary">Start</button>
     <p id="formMsg" class="msg"></p>
     <details class="legendBox">

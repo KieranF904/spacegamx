@@ -5,7 +5,7 @@ import { appendFileSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { serializeBlueprint } from '../../../common/src/ships/index';
 import { type ShipgenContext, blueprintToGrid, check, loadRoles } from '../core/index';
-import { type Llm, type ModelInfo, type Renderer, run as loopRun } from '../loop/index';
+import { type Llm, type ModelInfo, type Renderer, CONTRACTS, CONTRACT_IDS, autoContract, run as loopRun } from '../loop/index';
 import { HttpError, json, readJson, sendFile } from './http';
 import { labUrl, runLabExporter } from './lab';
 import { blueprintFrom, listLibrary, loadLibrary, saveGenerated } from './library';
@@ -26,6 +26,8 @@ export interface AppDeps {
   exportLab?: (exporter: string, cwd: string) => Promise<string>;
   /** POST /api/quit (scripts stopping the server cleanly); absent: no such route */
   onQuit?: () => void;
+  /** Settings the page can change, shared with the llm (server.ts): may LM Studio be asked (it loads the model there) */
+  settings?: { lmstudioChat: boolean };
 }
 
 export interface App {
@@ -41,10 +43,12 @@ const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9_-]+/g, '_').replac
 
 const modelRow = (m: ModelInfo) => ({
   id: m.id, name: m.name, provider: m.provider, cloud: m.cloud, vision: m.vision, chat: m.chat, thinking: m.thinking, structured: m.structured, params: m.params,
+  ...(m.off ? { off: m.off } : {}), auto: autoContract(m.id, m),
 });
 
 export function createApp(deps: AppDeps): App {
   const { ctx, llm, paths } = deps;
+  const settings = deps.settings ?? { lmstudioChat: false };
   const runs = new Runs(ctx, paths.out, deps.runFn ?? loopRun);
   const exportLab = deps.exportLab ?? runLabExporter;
   let modelCache: { at: number; list: ModelInfo[] } | null = null;
@@ -113,7 +117,16 @@ export function createApp(deps: AppDeps): App {
 
     if (m === 'GET' && p === '/api/models') {
       const list = await models(url.searchParams.has('fresh'));
-      return json(res, 200, { models: list.map(modelRow), lmstudio: list.some((x) => x.provider === 'lmstudio') });
+      return json(res, 200, {
+        models: list.map(modelRow), lmstudio: list.some((x) => x.provider === 'lmstudio'), lmstudioChat: settings.lmstudioChat,
+        contracts: CONTRACT_IDS.map((id) => ({ id, label: CONTRACTS[id].label })),
+      });
+    }
+    if (m === 'POST' && p === '/api/settings') {
+      const b = await readJson(req);
+      if (typeof b.lmstudioChat === 'boolean') settings.lmstudioChat = b.lmstudioChat;
+      modelCache = null;
+      return json(res, 200, { lmstudioChat: settings.lmstudioChat });
     }
     if (m === 'GET' && p === '/api/roles') return json(res, 200, { roles: loadRoles(ctx).roles });
     if (m === 'GET' && p === '/api/legend') return json(res, 200, { legend: legendRows(ctx) });

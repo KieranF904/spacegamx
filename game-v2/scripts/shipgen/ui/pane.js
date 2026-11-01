@@ -24,7 +24,7 @@ export class Pane {
   }
 
   reset() {
-    this.tokens = ''; this.cells = new Map(); this.prev = null; this.final = null; this.overlay = null; this.round = 0; this.pending = false;
+    this.tokens = ''; this.cells = new Map(); this.prev = null; this.final = null; this.overlay = null; this.round = 0; this.pending = false; this.previewed = false;
     this.stopLapse?.();
   }
 
@@ -34,7 +34,7 @@ export class Pane {
   /** A new round: last round's final grid becomes what changes are measured against */
   newRound(round, lane) {
     if (this.final?.size) this.prev = this.final;
-    this.final = null; this.overlay = null; this.tokens = ''; this.round = round;
+    this.final = null; this.overlay = null; this.tokens = ''; this.round = round; this.previewed = false;
     this.set('.lane', `${lane ? `${lane} · ` : ''}round ${round}`);
     this.foot('asking the model...');
   }
@@ -45,10 +45,18 @@ export class Pane {
     this.pending = true;
     requestAnimationFrame(() => {
       this.pending = false;
-      const cells = parseGrid(gridLinesOf(this.tokens));
-      if (cells.size) { this.cells = cells; this.draw(); }
+      // (Once the loop sends previews (the whole ship as built: mirrored, or from a part list), those are drawn instead)
+      const cells = this.previewed ? this.cells : parseGrid(gridLinesOf(this.tokens));
+      if (cells.size && !this.previewed) { this.cells = cells; this.draw(); }
       this.foot(`streaming: ${this.tokens.length} chars, ${cells.size} cells so far`);
     });
+  }
+
+  /** The ship so far, as the loop built it from the reply so far */
+  preview(text) {
+    const cells = parseGrid(gridLinesOf(text));
+    if (!cells.size) return;
+    this.previewed = true; this.cells = cells; this.draw();
   }
 
   gridFinal(text) {
