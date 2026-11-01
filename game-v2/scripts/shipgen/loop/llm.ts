@@ -229,7 +229,7 @@ export function createLlm(opts: LlmOptions = {}): Llm {
         if (!key) throw new Error('Anthropic: no ANTHROPIC_API_KEY (environment or game-v2/.env)');
         const system = req.messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n\n');
         const body: Record<string, unknown> = {
-          model: name, stream: true, max_tokens: req.maxTokens ?? 4096,
+          model: name, stream: true, max_tokens: req.maxTokens ?? 16384,
           ...(system ? { system } : {}),
           // (No temperature: the current Claude models refuse the setting)
           messages: req.messages.filter((m) => m.role !== 'system').map((m) => ({

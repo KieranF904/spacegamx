@@ -178,7 +178,8 @@ export class Session {
     this.C = CONTRACTS[contract];
     // (A thinking model may think even when told not to (qwen3-vl): room for the thinking as well as the grid)
     const thinks = !!deps.models?.find((m) => m.id === fullId(o.model))?.thinking;
-    this.budget = o.maxTokens ?? (thinks ? 12288 : 4096);
+    // (8192: a mid-size ship's grid is about 4k tokens, and a capital's more; runaway replies are stopped by the line limit below)
+    this.budget = o.maxTokens ?? (thinks ? 12288 : 8192);
     // (Grid lines, the column-number line included, past which a reply is a runaway; a part list gets more lines)
     const lines = this.C.form === 'parts' ? (this.role?.size?.cells?.[1] ?? 100) + 4 : 2 * (this.role?.size?.maxHeight ?? 20);
     this.maxRows = lines + 6;
