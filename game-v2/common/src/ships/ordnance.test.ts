@@ -60,15 +60,14 @@ describe('ordnance: the section 4 rows', () => {
     expect(endsAtAim(q)).toBe(true);
   });
 
-  it("missiles: the Dart, the Swarm's six rockets over 30 ticks, the steered Hammerhead", () => {
+  it("missiles: the Dart, the Swarm's pair of rockets every 45 ticks, the steered Hammerhead", () => {
     const dart = def('missile_dart');
     expect(dart.w.fire).toMatchObject({ model: 'ammo', interval: 108 });
     expect(dart.d).toMatchObject({ homing: 0.07, damage: 30, splash: { radius: 120, damage: 34 } });
     expect(dart.d.ammo?.rounds).toBe(24);
     const sw = def('missile_swarm');
-    expect(sw.w.fire).toMatchObject({ model: 'ammo', rounds: 6, interval: 180 });
-    expect(sw.d.salvo).toEqual({ count: 6, gap: 6 });
-    expect((sw.d.salvo!.count - 1) * sw.d.salvo!.gap).toBe(30);
+    expect(sw.w.fire).toMatchObject({ model: 'ammo', rounds: 1, interval: 45 });
+    expect(sw.d.salvo).toEqual({ count: 2, gap: 5 });
     expect(sw.d).toMatchObject({ damage: 10, splash: { radius: 60, damage: 12 } });
     expect(sw.d.homing).toBeCloseTo(0.091, 5);
     expect(firesStraight(sw.d)).toBe(false);
@@ -77,15 +76,15 @@ describe('ordnance: the section 4 rows', () => {
     expect(hh.d).toMatchObject({ damage: 105, splash: { radius: 150, damage: 54 }, guided: { turn: 0.05 } });
   });
 
-  it('torpedoes: the Eel homes gently; the Leviathan is two rounds a shot, straight, armed after 60 ticks', () => {
+  it('torpedoes: the Eel homes gently; the Leviathan is a round a shot every 3 s, straight, armed after 30 ticks', () => {
     const eel = def('torpedo_eel');
     expect(eel.w.fire).toMatchObject({ model: 'ammo', interval: 240 });
     expect(eel.d).toMatchObject({ damage: 420, vsShield: 0, splash: { radius: 90, damage: 80 } });
     expect(eel.d.homing).toBeGreaterThan(0);
     expect(eel.d.ammo?.rounds).toBe(6);
     const lev = def('torpedo_leviathan');
-    expect(lev.w.fire).toMatchObject({ model: 'ammo', rounds: 2, interval: 360 });
-    expect(lev.d).toMatchObject({ damage: 1000, vsShield: 0, arm: 60, splash: { radius: 200, damage: 200 } });
+    expect(lev.w.fire).toMatchObject({ model: 'ammo', rounds: 1, interval: 180 });
+    expect(lev.d).toMatchObject({ damage: 560, vsShield: 0, arm: 30, splash: { radius: 160, damage: 120 } });
     expect(lev.d.homing).toBeUndefined();
     expect(firesStraight(lev.d)).toBe(true);
   });

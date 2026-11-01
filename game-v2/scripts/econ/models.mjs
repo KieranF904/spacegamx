@@ -82,7 +82,7 @@ const W = [
   ['pulse_strobe', 'Strobe', 'pulse', 'sq', 10, { demand: r2((6 * 60) / 30) }, {}, 'Steady shield pressure: a burst of 3 bolts every half second, 9 damage each, 1.6 times against shields and 0.6 against hull. 6 E a burst.'],
   ['pulse_overpulse', 'Overpulse', 'pulse', 'rect2', 25, { demand: r2((36 * 60) / (90 + 12 * 6) / PIECE_AREA.rect2) }, { set: { burst: 1, vsShield: 1.9, vsHull: 0.5 } }, 'The shield shredder: a clip of 12 bolts at 10 a second, then a 1.5 s reload drawing 36 E. 1.9 times against shields and half against hull.'],
   ['missile_dart', 'Dart', 'missile', 'sq', 11, { blurb: 'Lock and forget' }, {}, 'Lock and forget: a missile every couple of seconds that homes on the ship nearest your cursor, 30 damage and a 120 blast. Twenty-four missiles a crate. Point defence kills it in one hit.'],
-  ['missile_swarm', 'Swarm', 'missile', 'rect2', 21, { dmg: 0.5, burst: 6, int: 1.64, blurb: 'The ripple that floods point defence' }, { mul: { homing: x(1.3) }, set: { damage: 10, splash: { radius: 60, damage: 12 } } }, 'The ripple that floods point defence: six small rockets in half a second, every three seconds, spreading and then converging on the ship nearest your cursor. Each is 10 damage and a 60 blast and dies to one point-defence hit. Uses six rounds a salvo.'],
+  ['missile_swarm', 'Swarm', 'missile', 'rect2', 21, { dmg: 0.5, burst: 2, int: 0.41, blurb: 'The ripple that floods point defence' }, { mul: { homing: x(1.3) }, set: { damage: 10, splash: { radius: 60, damage: 12 } } }, 'The ripple that floods point defence: a pair of small rockets every three-quarters of a second, steady for as long as you hold, spreading and then converging on the ship nearest your cursor. Each is 10 damage and a 60 blast and dies to one point-defence hit. One round a pair.'],
   ['missile_hammerhead', 'Hammerhead', 'missile', 'block2', 33, { dmg: 3.5, int: 1.8, hp: 1.2, mass: 1.4, blurb: 'The steered warhead' }, { mul: { damage: xp(3.5), speed: x(0.7), maxSpeed: x(0.7), size: x(1.5) }, set: { splash: { radius: 150, damage: 54 }, intercept: 2 } }, 'The steered warhead: a slow, heavy missile, 105 damage and a 150 blast. While you hold fire it flies toward your cursor; let go and it flies straight. Point defence needs two hits.'],
   // (Railguns, rework section 4: the Needle's slug 62 dmg, pierce 2, speed 150, 75 ticks; the Coilgun five slugs of 16 in a 12 degree cone, pierce 1,
   // life 18 (2,700 reach), 54 ticks, 14 E a shot; the Spear 160 dmg through three hulls at full damage, 114 ticks, 120 E. The energy a cycle gun
@@ -95,7 +95,7 @@ const W = [
   ['arc_spark', 'Spark', 'arc', 'sq', 17, { blurb: 'The chain zap' }, {}, 'A bolt that strikes at once, out to 660, and leaps to 3 more ships nearby, weaker each hop.'],
   ['arc_tesla', 'Tesla', 'arc', 'round', 29, { dmg: 1.4, blurb: 'The held storm' }, { set: { chain: { count: 5, radius: 300, falloff: 0.5 } } }, 'Hold to keep zapping, five times a second: each zap leaps to 5 more ships nearby, weaker each hop.'],
   ['torpedo_eel', 'Eel', 'torpedo', 'rect2', 19, { blurb: 'The stalker' }, { set: { homing: 0.02 } }, 'The stalker: a slow, fat torpedo that creeps after its prey, 420 damage straight through shields and a 90 blast. Six torpedoes a crate, one every four seconds. Point defence needs three hits.'],
-  ['torpedo_leviathan', 'Leviathan', 'torpedo', 'block2', 38, { dmg: 2.4, hp: 1.2, mass: 1.3, blurb: 'The fight-ender' }, { mul: { speed: x(0.8), maxSpeed: x(0.8), size: x(1.4) }, set: { damage: 1000, splash: { radius: 200, damage: 200 }, intercept: 5, arm: 60 } }, 'The fight-ender: a huge torpedo, 1,000 damage straight through shields and a 200 blast, one every six seconds. It flies straight and does not home, and arms a second after launch. Two rounds a shot (three shots a crate). Point defence needs five hits.'],
+  ['torpedo_leviathan', 'Leviathan', 'torpedo', 'block2', 38, { dmg: 2.4, hp: 1.2, mass: 1.3, blurb: 'The fight-ender' }, { mul: { speed: x(1.1), maxSpeed: x(1.1), size: x(1.4) }, set: { damage: 560, splash: { radius: 160, damage: 120 }, intercept: 5, arm: 30 } }, 'The fight-ender: a huge torpedo, 560 damage straight through shields and a 120 blast, one every three seconds. It flies straight and fast and does not home, and arms half a second after launch. One round a shot. Point defence needs five hits.'],
   ['lance_lance', 'Lance', 'lance', 'rect2', 32, { demand: 45 }, {}, 'The heavy held beam: 210 damage a second at 500 units after a 0.3 s windup, piercing, 20% more against plating. 90 E a second; short of power it sputters.'],
 ];
 
@@ -438,7 +438,7 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
     pulse_strobe: { model: 'cycle' },
     pulse_overpulse: { model: 'clip', interval: 6, clip: 12, reload: 90, reloadE: 36 },
     missile_dart: { model: 'ammo', interval: 108 },
-    missile_swarm: { model: 'ammo', rounds: 6, interval: 180 },
+    missile_swarm: { model: 'ammo', rounds: 1, interval: 45 },
     missile_hammerhead: { model: 'ammo' },
     railgun_needle: { model: 'ammo' },
     railgun_coilgun: { model: 'cycle', interval: 54 },
@@ -449,7 +449,7 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
     arc_spark: { model: 'cycle', interval: 45 },
     arc_tesla: { model: 'beam' },
     torpedo_eel: { model: 'ammo' },
-    torpedo_leviathan: { model: 'ammo', rounds: 2, interval: 360 },
+    torpedo_leviathan: { model: 'ammo', rounds: 1, interval: 180 },
     lance_lance: { model: 'beam', windup: 18 },
     // (The Hive's salvo of four seekers (tuning.json weapons.hive salvo) takes four of its eight rounds, 0.5 s apart at most; it regrows one a 0.75 s drawing 6 E)
     legendary_hive: { model: 'clip', interval: 30, clip: 8, regrow: 45, reloadE: 48, rounds: 4 },
@@ -513,7 +513,7 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
     emp_blackout: { endAtAim: true },
     mortar_quake: { walk: { at: [0.7, 1, 1.3], gap: 15 } },
     missile_hammerhead: { guided: { turn: 0.05 } },
-    missile_swarm: { salvo: { count: 6, gap: 6 } },
+    missile_swarm: { salvo: { count: 2, gap: 5 } },
     laser_searchlight: { mark: { ticks: 120 } },
   };
   for (const [id, set] of Object.entries(SHOT)) {

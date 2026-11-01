@@ -267,23 +267,24 @@ describe('weaponry slow: what a Frostbite lights flies slowed', () => {
 });
 
 describe('ordnance: the Swarm ripples, the Leviathan arms late', () => {
-  it('Swarm: one trigger pull launches six rockets 6 ticks apart, the last at 30 ticks', () => {
+  it('Swarm: each salvo is two rockets 5 ticks apart, and held it keeps going every 45 ticks', () => {
     const w = pilotWith('missile_swarm', { id: 'missile_crate', n: 1 }, 1);
     const q = bitecs.defineQuery([Projectile]);
     const seen = new Map<number, number>();
     for (let i = 0; i < 50; i++) {
       w.hold();
-      Input.fireLeft[w.pid] = i < 2 ? 1 : 0; Input.cursorDist[w.pid] = 900; Input.targetAngle[w.pid] = aimEast();
+      Input.fireLeft[w.pid] = 1; Input.cursorDist[w.pid] = 900; Input.targetAngle[w.pid] = aimEast();
       w.server.step();
       for (const e of q(w.server.world)) if (OwnedBy.ownerId[e] === w.pid && Projectile.weaponType[e] === WEAPON_KIND_TYPE.missile && !seen.has(e)) seen.set(e, Projectile.spawnTick[e]);
     }
     const ticks = [...seen.values()].sort((a, b) => a - b);
-    expect(ticks.length).toBe(6);
-    for (let i = 1; i < 6; i++) expect(ticks[i] - ticks[i - 1]).toBe(6);
-    expect(ticks[5] - ticks[0]).toBe(30);
+    // (Held for 50 ticks: the first pair, then the next pair's first rocket 45 ticks on)
+    expect(ticks.length).toBe(3);
+    expect(ticks[1] - ticks[0]).toBe(5);
+    expect(ticks[2] - ticks[0]).toBe(45);
   });
 
-  it('Leviathan: unarmed for 60 ticks (it flies through a ship in its way), then it goes off on one', () => {
+  it('Leviathan: unarmed for 30 ticks (it flies through a ship in its way), then it goes off on one', () => {
     const w = pilotWith('torpedo_leviathan', { id: 'torpedo_crate', n: 1 }, 1);
     const q = bitecs.defineQuery([Projectile]);
     const [skiff] = w.server.enemies.spawnPack(InSystem.systemId[w.pid], { faction: 'pirates', ships: ['pirate_skiff'] }, X + 2000, Y);
@@ -300,13 +301,13 @@ describe('ordnance: the Swarm ripples, the Leviathan arms late', () => {
       if (torp >= 0 && bitecs.entityExists(w.server.world, torp)) onNose();
       w.server.step();
       if (torp < 0) for (const e of q(w.server.world)) if (OwnedBy.ownerId[e] === w.pid && Projectile.weaponType[e] === WEAPON_KIND_TYPE.torpedo) { torp = e; born = w.server.getTick(); }
-      if (torp >= 0 && w.server.getTick() - born < 55) early += w.detonations('torpedo').length;
+      if (torp >= 0 && w.server.getTick() - born < 25) early += w.detonations('torpedo').length;
     }
     expect(torp).toBeGreaterThanOrEqual(0);
     expect(early).toBe(0);
     const booms = w.detonations('torpedo');
     expect(booms.length).toBeGreaterThan(0);
-    expect(booms[0].tick - born).toBeGreaterThanOrEqual(58);
+    expect(booms[0].tick - born).toBeGreaterThanOrEqual(28);
   });
 });
 

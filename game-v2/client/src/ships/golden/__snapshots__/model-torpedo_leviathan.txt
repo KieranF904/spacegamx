@@ -4,9 +4,9 @@ Mk V · Large · Block · 4 cells
 Hull · mass503 hp · 6.2
 Armour · build5 · 22 pts
 TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
-Damage211/s · reach 6,240
+Damage229/s · reach 8,580
 Hits withExplosive · penetration 6
-Fire rate0.2/s · shells · Torpedoes (2 a shot, no energy)
+Fire rate0.3/s · shells · Torpedoes (no energy)
 Modelammo: Fires rounds from your hold on a fixed beat; costs no energy; empty means weak plain rounds (40% damage).
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 3 clear cells ahead
@@ -34,7 +34,7 @@ Large · Block
 ends a fight, slow · ammo
 
 == keyStats ==
-211 dmg/s · reach 6,240 · ammo · draws 58
+229 dmg/s · reach 8,580 · ammo · draws 58
 
 == mountBadge ==
 FIXED
@@ -51,4 +51,4 @@ Needs 3 clear cells ahead
 {"open":true,"badge":"Lv 38","why":""}
 
 == partStats (raw) ==
-{"grade":5,"mark":"Mk V","size":"Large","area":4,"hp":503.03999999999996,"mass":6.24,"firepower":211.11111111111111,"toughness":503.03999999999996,"armour":5,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":211.11111111111111,"range":6240,"damageType":"explosive","pen":6,"draw":57.6}
+{"grade":5,"mark":"Mk V","size":"Large","area":4,"hp":503.03999999999996,"mass":6.24,"firepower":229.33333333333334,"toughness":503.03999999999996,"armour":5,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":229.33333333333334,"range":8580,"damageType":"explosive","pen":6,"draw":57.6}
