@@ -1,7 +1,7 @@
 // Mirror mode, the part-list contract, the staged build, per-model contracts and the critic's default weight, on a
 // scripted model.
 import { describe, it, expect } from 'vitest';
-import { asymmetricCells, blueprintToGrid, blueprintToParts, check, findRole, halfOf } from '../core/index';
+import { asymmetricCells, blueprintToGrid, blueprintToParts, check, findRole, halfOf, roleCheckOptions } from '../core/index';
 import { loadContext } from '../core/context';
 import { ship } from '../core/testShips';
 import type { ShipgenEvent } from './events';
@@ -88,7 +88,8 @@ describe('shipgen mirror mode and part lists in the loop', () => {
     const r = await run({ ctx, llm, models: llm.models, renderer }, { mode: 'design', model: 'fake', critic: 'eye', brief: { role: STARTER }, rounds: 1, outDir: 'mem' }, (e) => ev.push(e));
     if (r.mode !== 'design') throw new Error();
     expect(r.outcome.best!.looks).toBe(2);
-    expect(r.outcome.best!.score).toBe(check(ctx, r.outcome.best!.bp!).score);
+    // (Scored as the loop scores: the role's targets, and no symmetry term in mirror mode)
+    expect(r.outcome.best!.score).toBe(check(ctx, r.outcome.best!.bp!, roleCheckOptions(STARTER, true) as never).score);
   });
 });
 

@@ -73,12 +73,24 @@ export interface CheckResult {
   errors: CheckError[];
   power: PowerReport | null;
   stats: CheckStats;
-  scores: DesignScores & { power: number };
+  scores: DesignScores & { power: number; fit: number | null };
+  /** The role's targets (CheckOptions.targets) against the ship: what each measured, and how far it got (1: met) */
+  fit: FitItem[];
   /** 0..100 */
   score: number;
 }
 
+export interface FitItem { key: string; value: number; target: number; share: number; words: string }
+
+/** What a role's targets may name: a measure of the ship (0..) that is good when it is at least the target */
+export const FIT_WORDS: Record<string, string> = {
+  weaponShare: 'share of the cells that are guns', cargoShare: 'share of the cells that are cargo', thrustToMass: 'thrust for its mass',
+  generationPerCell: 'E/s made per cell', armourShare: 'share of the cells that are armour',
+};
+
 export interface CheckOptions {
+  /** The role's targets (roles.json targets: weaponShare, cargoShare, thrustToMass, generationPerCell, armourShare): the fit score is how far each is met */
+  targets?: Record<string, number>;
   /** Seconds to run the power core (default 10), and the long run that shows what it sustains (default 60) */
   seconds?: number;
   longSeconds?: number;
@@ -91,9 +103,10 @@ export interface CheckOptions {
 }
 
 export const DEFAULT_WEIGHTS: Record<keyof CheckResult['scores'], number> = {
-  power: 0.3, symmetry: 0.15, armourOutside: 0.15, enginesAft: 0.15, gunsOut: 0.15, compactness: 0.1,
-  // (Modest: a shaped outline ranks above a blocky one of the same function)
-  silhouette: 0.06,
+  // (Power first; then what the role is for (fit) and whether the ship is mostly ship, not power plant (lean); the
+  // placement terms are near 1 on any finished design, so they weigh less; the outline terms are taste)
+  power: 0.3, fit: 0.2, lean: 0.1, symmetry: 0.15, armourOutside: 0.1, enginesAft: 0.1, gunsOut: 0.1, compactness: 0.05,
+  silhouette: 0.05,
 };
 
 const pct = (a: number, b: number) => (b > 0 ? Math.round(Math.min(1, a / b) * 1000) / 10 : 0);
@@ -141,10 +154,11 @@ export function check(ctx: ShipgenContext, bp: Blueprint, opts: CheckOptions = {
   };
 
   // ---- Scores
-  const taste = geoms ? designScores(ctx, bp, geoms) : { symmetry: 0, armourOutside: 0, enginesAft: 0, gunsOut: null, compactness: 0, silhouette: null };
+  const taste = geoms ? designScores(ctx, bp, geoms) : { symmetry: 0, armourOutside: 0, enginesAft: 0, gunsOut: null, compactness: 0, lean: 0, silhouette: null };
   const consumers = power?.consumers ?? [];
   const powerScore = consumers.length ? consumers.reduce((s, c) => s + (c.linked ? (c.pct + c.pctLong) / 200 : 0), 0) / consumers.length : 0;
-  const scores = { ...taste, power: Math.round(powerScore * 1000) / 1000 };
+  const fit = fitItems(ctx, bp, geoms ?? [], stats, opts.targets);
+  const scores = { ...taste, power: Math.round(powerScore * 1000) / 1000, fit: fit.length ? Math.round((fit.reduce((a, f) => a + f.share, 0) / fit.length) * 1000) / 1000 : null };
   const w = { ...DEFAULT_WEIGHTS, ...opts.weights };
   let sum = 0, wsum = 0;
   for (const k of Object.keys(w) as (keyof typeof w)[]) {
@@ -154,7 +168,29 @@ export function check(ctx: ShipgenContext, bp: Blueprint, opts: CheckOptions = {
   }
   const base = wsum > 0 ? sum / wsum : 0;
   const score = Math.round((v.ok ? base : base * 0.3) * 1000) / 10;
-  return { valid: v.ok, errors, power, stats, scores, score };
+  return { valid: v.ok, errors, power, stats, scores, fit, score };
+}
+
+/** Each target measured on the ship: value, target and the share met (capped at 1) */
+function fitItems(ctx: ShipgenContext, bp: Blueprint, geoms: { cells: [number, number][] }[], stats: CheckStats, targets?: Record<string, number>): FitItem[] {
+  if (!targets || !stats.cells) return [];
+  const cellsOf = (pick: (fn: NonNullable<ReturnType<typeof ctx.catalog.functions.get>>, fnId: string) => boolean) =>
+    bp.parts.reduce((a, p, i) => { const fn = ctx.catalog.functions.get(p.fn); return fn && pick(fn, p.fn) ? a + (geoms[i]?.cells.length ?? 0) : a; }, 0);
+  const measure: Record<string, () => number> = {
+    weaponShare: () => cellsOf((fn) => !!fn.weapon) / stats.cells,
+    cargoShare: () => cellsOf((_fn, id) => id === 'cargo') / stats.cells,
+    armourShare: () => cellsOf((_fn, id) => id === 'armor') / stats.cells,
+    thrustToMass: () => stats.thrustToMass,
+    generationPerCell: () => stats.generation / stats.cells,
+  };
+  const out: FitItem[] = [];
+  for (const [key, target] of Object.entries(targets)) {
+    const m = measure[key];
+    if (!m || !(target > 0)) continue;
+    const value = Math.round(m() * 1000) / 1000;
+    out.push({ key, value, target, share: Math.min(1, Math.round((value / target) * 1000) / 1000), words: FIT_WORDS[key] ?? key });
+  }
+  return out;
 }
 
 function powerReport(se: ShipEnergy, bp: Blueprint, ref: (p: PlacedPart) => PartRef, seconds: number, longSeconds: number): PowerReport {

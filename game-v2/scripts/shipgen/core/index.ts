@@ -13,7 +13,7 @@ export { type ShipEnergy, type RunOptions, type RunResult, shipEnergy, runEnergy
 export { type DesignScores, designScores } from './scores';
 export { type Corner, exposedCorners, silhouetteScore, squareCornerWords, coreLeftEdge, outlineShapes, rowWidths, shipRows } from './silhouette';
 export { type CheckResult, type CheckOptions, type CheckError, type ConsumerPower, type PowerReport, type CheckStats, type PartRef, DEFAULT_WEIGHTS, check } from './check';
-export { type Role, type RolesFile, type Selector, type SelectorRole, type BriefCheck, loadRoles, findRole, matches, selectorWords, briefCheck, outOfBand } from './roles';
+export { type Role, type RolesFile, type Selector, type SelectorRole, type BriefCheck, loadRoles, findRole, matches, selectorWords, briefCheck, outOfBand, roleCheckOptions } from './roles';
 export {
   type Brief, type FeedbackInput, type DesignForm, type PromptOptions, rulesText, rulesShort, shapeSuggestion, shownLegend, withShape, formatText, partsFormatText, mirrorText, designText, briefLegend, briefText,
   systemPrompt, feedbackMessage,

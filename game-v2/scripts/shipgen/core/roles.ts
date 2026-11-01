@@ -35,6 +35,14 @@ export interface Role {
   /** Silhouettes to ask for, one per trial: a target that isn't the example */
   shapes?: string[];
   weights?: Record<string, number>;
+  /** What the role is for, as measures of the ship a design should reach (check.ts FIT_WORDS: weaponShare, cargoShare, thrustToMass, generationPerCell, armourShare) */
+  targets?: Record<string, number>;
+}
+
+/** The check options a role asks for: its score weights (symmetry dropped in mirror mode, where it is always 1) and its targets */
+export function roleCheckOptions(role: Role | undefined, mirror: boolean): { weights?: Record<string, number>; targets?: Record<string, number> } {
+  const weights = { ...(role?.weights ?? {}), ...(mirror ? { symmetry: 0 } : {}) };
+  return { weights, ...(role?.targets ? { targets: role.targets } : {}) };
 }
 
 export interface RolesFile { roles: Role[] }

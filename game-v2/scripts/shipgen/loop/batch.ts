@@ -11,7 +11,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renam
 import { dirname, join } from 'path';
 import { spawn } from 'child_process';
 import { type Blueprint, serializeBlueprint } from '../../../common/src/ships/index';
-import { type Concept, briefCheck, check, conceptKey, conceptLine, findRole } from '../core/index';
+import { type Concept, briefCheck, check, conceptKey, conceptLine, findRole, roleCheckOptions } from '../core/index';
 import { type Attempt, type DesignOptions, type LoopDeps, passes } from './design';
 import type { DesignMetrics, EvolveMetrics, ShipgenEvent } from './events';
 import { run } from './run';
@@ -95,6 +95,9 @@ export interface BatchSummary {
   elapsedMinutes: number;
   lastError?: string;
   lastSaved?: string;
+  /** Tokens read and written by the model over the batch */
+  tokensIn: number;
+  tokensOut: number;
 }
 
 /** What the gallery shows of a saved ship */
@@ -213,11 +216,14 @@ interface Capture {
   errors: string[];
   /** The design's steps, replies, grids and feedback, trimmed: written to the attempt's trace.jsonl, to see why one failed */
   trace: Record<string, unknown>[];
+  /** Tokens the model read and wrote over the run */
+  tokensIn: number;
+  tokensOut: number;
 }
 
 /** `events`: a file every event but the tokens is appended to as it comes (what the page's Watch follows) */
 const capture = (events?: string): { cap: Capture; emit: (e: ShipgenEvent) => void } => {
-  const cap: Capture = { modelErrors: 0, errors: [], trace: [] };
+  const cap: Capture = { modelErrors: 0, errors: [], trace: [], tokensIn: 0, tokensOut: 0 };
   const cut = (t: string, n: number) => (t.length > n ? `${t.slice(0, n / 2)}\n...\n${t.slice(-n / 2)}` : t);
   if (events) try { mkdirSync(dirname(events), { recursive: true }); } catch { events = undefined; }
   return {
@@ -226,7 +232,7 @@ const capture = (events?: string): { cap: Capture; emit: (e: ShipgenEvent) => vo
     emit: (e) => {
       if (events && e.type !== 'token') try { appendFileSync(events, JSON.stringify(e) + '\n'); } catch { /* (the live record is a view only) */ }
       if (e.type === 'step') cap.trace.push({ type: e.type, step: e.step, status: e.status, round: e.round, note: e.note });
-      else if (e.type === 'reply') cap.trace.push({ type: e.type, round: e.round, ms: e.ms, tokens: e.outputTokens, stop: e.stopReason, text: cut(e.text, 4000) });
+      else if (e.type === 'reply') { cap.trace.push({ type: e.type, round: e.round, ms: e.ms, tokens: e.outputTokens, promptTokens: e.promptTokens, stop: e.stopReason, text: cut(e.text, 4000) }); cap.tokensIn += e.promptTokens ?? 0; cap.tokensOut += e.outputTokens ?? 0; }
       else if (e.type === 'grid' && !e.partial) cap.trace.push({ type: e.type, round: e.round, via: e.via, parts: e.parts, text: e.text, errors: e.errors.slice(0, 5) });
       else if (e.type === 'check') cap.trace.push({ type: e.type, round: e.round, valid: e.valid, score: e.score, unmet: e.brief?.unmet });
       else if (e.type === 'feedback') cap.trace.push({ type: e.type, round: e.round, text: cut(e.text, 3000) });
@@ -284,7 +290,7 @@ export async function runBatch(deps: BatchDeps, o: BatchOptions): Promise<BatchS
   const sum: BatchSummary = {
     started: new Date(startedAt).toISOString(), updated: new Date(startedAt).toISOString(), status: 'running', model: o.model, roles,
     attempts: 0, saved: 0, rejected: 0, errors: 0, perRole: Object.fromEntries(roles.map((r) => [r, { attempts: 0, saved: 0 }])),
-    validRate: 0, avgMinutesPerShip: null, avgMinutesPerAttempt: null, elapsedMinutes: 0,
+    validRate: 0, avgMinutesPerShip: null, avgMinutesPerAttempt: null, elapsedMinutes: 0, tokensIn: 0, tokensOut: 0,
   };
   let shipMs = 0, attemptMs = 0;
   const used: string[] = ships.slice(-6).map((s) => s.concept ?? '').filter(Boolean).map((c) => c.replace(/^Concept /, ''));
@@ -365,18 +371,20 @@ export async function runBatch(deps: BatchDeps, o: BatchOptions): Promise<BatchS
     try {
       const common = {
         model: o.model, brief: { role, ...(o.brief ? { text: o.brief } : {}) }, signal, temperature: o.temperature, timeoutMs: o.timeoutMs, contract: o.contract, mirror: o.mirror,
-        think: o.think !== false, generous: true, render: 'off' as const,
+        think: o.think !== false, generous: true, render: 'all' as const,
       };
       // ---- Design: concept step, then the build
       const attempts = join(o.outDir, 'attempts');
       const adir = join(attempts, `${pad(nextNumber(attempts))}-${role}`);
       const d = capture(join(adir, 'events.jsonl'));
-      const dr = await run(deps, {
-        mode: 'design', ...common, build, rounds: o.rounds ?? 5, concept: o.concept !== false, conceptSeed: no, usedConcepts: used, shapeIndex: perRole - 1,
+      // (Every try's ship is drawn as it comes, under the attempt's folder, for the page's live view; the renderer is the batch's own)
+      const dr = await run({ ...deps, renderer }, {
+        mode: 'design', ...common, outDir: adir, build, rounds: o.rounds ?? 5, concept: o.concept !== false, conceptSeed: no, usedConcepts: used, shapeIndex: perRole - 1,
       }, d.emit);
       if (dr.mode !== 'design') throw new Error('mode');
       const out = dr.outcome;
       try { mkdirSync(adir, { recursive: true }); writeFileSync(join(adir, 'trace.jsonl'), d.cap.trace.map((x) => JSON.stringify(x)).join('\n') + '\n'); } catch { /* (a trace is a diagnostic only) */ }
+      sum.tokensIn += d.cap.tokensIn; sum.tokensOut += d.cap.tokensOut;
       const concept = out.concept ?? d.cap.concept;
       if (concept) { used.push(conceptKey(concept)); if (used.length > 6) used.shift(); }
       if (!out.attempts.length && !stopped()) throw new ModelDownError(d.cap.lastModelError ?? 'the model gave no reply');
@@ -386,7 +394,7 @@ export async function runBatch(deps: BatchDeps, o: BatchOptions): Promise<BatchS
       if (!ok || !draft?.bp) {
         const why = draft ? [...(draft.brief?.unmet ?? []), ...(draft.valid ? [] : [`invalid (${draft.result?.errors[0]?.message ?? '?'})`])].slice(0, 4) : ['nothing readable'];
         log(`[batch] ${role}: rejected (${why.join('; ')})`);
-        logAttempt({ n: no, role, build, outcome: 'rejected', why, valid: !!draft?.valid, score: draft?.score ?? 0, minutes: r1((now() - t0) / 60000), concept: concept && conceptLine(concept) });
+        logAttempt({ n: no, role, build, outcome: 'rejected', why, valid: !!draft?.valid, score: draft?.score ?? 0, minutes: r1((now() - t0) / 60000), concept: concept && conceptLine(concept), tokensIn: d.cap.tokensIn, tokensOut: d.cap.tokensOut });
         return 'rejected';
       }
       // ---- Refinement: evolve from the draft, the concept kept, until the score stops improving
@@ -396,10 +404,11 @@ export async function runBatch(deps: BatchDeps, o: BatchOptions): Promise<BatchS
       if (G > 0 && !signal.aborted) {
         const e = capture(join(adir, 'refine', 'events.jsonl'));
         try {
-          const er = await run(deps, {
-            mode: 'evolve', ...common, build: 'oneshot', seed: draft.bp, generations: G, population: o.population ?? 3, keep: o.keep ?? 2, patience: o.patience ?? 2,
+          const er = await run({ ...deps, renderer }, {
+            mode: 'evolve', ...common, outDir: join(adir, 'refine'), build: 'oneshot', seed: draft.bp, generations: G, population: o.population ?? 3, keep: o.keep ?? 2, patience: o.patience ?? 2,
             shapeHints: true, childRounds: 3, concept: concept ?? false, rngSeed: no,
           }, e.emit);
+          sum.tokensIn += e.cap.tokensIn; sum.tokensOut += e.cap.tokensOut;
           if (er.mode === 'evolve') {
             const em = er.outcome.metrics;
             gens = em.generations; children = em.children;
@@ -417,7 +426,7 @@ export async function runBatch(deps: BatchDeps, o: BatchOptions): Promise<BatchS
       const minutes = r1((now() - t0) / 60000);
       const rec = await save(role, no, best, draft, { concept, build, minutes, gens, children, draftScore, rounds: metrics?.rounds ?? out.attempts.length, designMetrics: metrics, cappedByTime: cap.signal.aborted });
       log(`[batch] ${role}: saved ${rec.dir} "${rec.name}" score ${rec.score}${rec.generations ? ` (draft ${rec.draftScore})` : ''}, ${minutes} min`);
-      logAttempt({ n: no, role, build, outcome: 'saved', dir: rec.dir, score: rec.score, draftScore: rec.draftScore, minutes, concept: rec.concept });
+      logAttempt({ n: no, role, build, outcome: 'saved', dir: rec.dir, score: rec.score, draftScore: rec.draftScore, minutes, concept: rec.concept, tokensIn: d.cap.tokensIn, tokensOut: d.cap.tokensOut });
       sum.lastSaved = rec.dir;
       return 'saved';
     } finally {
@@ -448,7 +457,7 @@ export async function runBatch(deps: BatchDeps, o: BatchOptions): Promise<BatchS
     const bp = named(best.bp!);
     const dir = join(roleDir, `${pad(nextNumber(roleDir))}-${slugOf(bp.name)}`);
     mkdirSync(dir, { recursive: true });
-    const res = best.result ?? check(ctx, bp);
+    const res = best.result ?? check(ctx, bp, roleCheckOptions(findRole(ctx, role), o.mirror !== false) as never);
     const role_ = findRole(ctx, role);
     const bc = role_ ? briefCheck(ctx, bp, role_) : undefined;
     const cells = res.stats.cells;

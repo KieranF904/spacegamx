@@ -270,6 +270,7 @@ const SCORE_HINTS: Record<string, string> = {
   enginesAft: 'engines at the back, facing v',
   gunsOut: 'fixed guns facing ^; side guns on their own side facing out',
   compactness: 'fill the gaps: fewer holes and spikes',
+  lean: 'too much of the ship is power plant: fewer stores and generators, more hull, armour and the parts the role is for',
 };
 
 /** The message after a try: what to fix, most important first */
@@ -320,6 +321,9 @@ export function feedbackMessage(f: FeedbackInput): string {
   const weak = (Object.entries(r.scores) as [string, number | null][]).filter(([, v]) => v !== null && v < 0.75).sort((a, b) => a[1]! - b[1]!);
   out.push(`Scores (0-1): ${(Object.entries(r.scores) as [string, number | null][]).map(([k, v]) => `${k} ${v === null ? '-' : v.toFixed(2)}`).join(', ')}.`);
   for (const [k] of weak.slice(0, 3)) if (SCORE_HINTS[k]) out.push(`- ${k}: ${SCORE_HINTS[k]}`);
+  // (The role's targets it falls short of: what to add more of)
+  const short = (r.fit ?? []).filter((f) => f.share < 1);
+  if (short.length) out.push(`- fit: ${short.map((f) => `${f.words} is ${f.value} and the role wants ${f.target}`).join('; ')}`);
   out.push(r.valid && !f.brief?.unmet.length ? 'Improve it if you can.' : 'Fix these.');
   return out.join('\n');
 }

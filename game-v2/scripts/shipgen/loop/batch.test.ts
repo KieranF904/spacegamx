@@ -238,7 +238,7 @@ describe('shipgen batch mode', () => {
   });
 
   it('writes a gallery that escapes names and works without ships', () => {
-    const s = { started: '', updated: '', status: 'running' as const, model: 'm<x>', roles: [], attempts: 0, saved: 0, rejected: 0, errors: 0, perRole: {}, validRate: 0, avgMinutesPerShip: null, avgMinutesPerAttempt: null, elapsedMinutes: 0 };
+    const s = { started: '', updated: '', status: 'running' as const, model: 'm<x>', roles: [], attempts: 0, saved: 0, rejected: 0, errors: 0, perRole: {}, validRate: 0, avgMinutesPerShip: null, avgMinutesPerAttempt: null, elapsedMinutes: 0, tokensIn: 0, tokensOut: 0 };
     expect(galleryHtml([], s)).toMatch(/Nothing saved yet/);
     const html = galleryHtml([{ role: 'a', dir: 'a/001-x', name: '<b>Evil</b>', score: 90, draftScore: 80, parts: 20, cells: 30, minutes: 12, generations: 3, png: true, savedAt: 'x' }], s);
     expect(html).not.toMatch(/<b>Evil/);

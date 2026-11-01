@@ -1,5 +1,5 @@
 {
-  "_comment": "Ship generator taste (scripts/shipgen): the only hand-written part. Everything else (parts, rules, power) comes from the game. size.cells: grid cells the ship covers. band: what a pilot of that level can build (maxLevel; rarities). require/encourage select parts by power role (generator, store, conduit, diode, dynamo, weapon, thruster, tool, core; or engine: a part with thrust, which the gyros and the burst strafer are not), family (models.json) or fn id; min/max counts. example: a bundled blueprint shown as a worked example. shapes: silhouettes a design is asked for, one per trial (so a model has a target that is not the example). weights: check() score weights.",
+  "_comment": "Ship generator taste (scripts/shipgen): the only hand-written part. Everything else (parts, rules, power) comes from the game. size.cells: grid cells the ship covers. band: what a pilot of that level can build (maxLevel; rarities). require/encourage select parts by power role (generator, store, conduit, diode, dynamo, weapon, thruster, tool, core; or engine: a part with thrust, which the gyros and the burst strafer are not), family (models.json) or fn id; min/max counts. example: a bundled blueprint shown as a worked example. shapes: silhouettes a design is asked for, one per trial (so a model has a target that is not the example). weights: check() score weights. targets: measures of the ship the role should reach (weaponShare, cargoShare, armourShare: share of the cells; thrustToMass; generationPerCell), the fit score. The lean score (check.ts) keeps a design from padding itself with batteries: the review ships run about two fifths power plant, and a design past that scores lower.",
   "roles": [
     {
       "id": "starter",
@@ -19,6 +19,7 @@
         "A wedge or two of hull (shaped pieces) at the wing tips looks good but is optional."
       ],
       "example": "dev/review-wren",
+      "targets": { "weaponShare": 0.08, "thrustToMass": 0.2 },
       "shapes": [
         "a dart: narrow (5 columns) and long (7 rows), with a pointed nose",
         "a flying wing: wide (9 columns) and short (4 rows), the guns at the wing roots",
@@ -54,7 +55,8 @@
         "a diamond: 11 columns wide at the middle, tapering to the nose and the tail, 10 rows long",
         "a twin-boom: two gun pods on short arms either side of the core, 12 columns wide and 8 rows long"
       ],
-      "weights": { "gunsOut": 0.2, "armourOutside": 0.2 }
+      "weights": { "gunsOut": 0.2, "armourOutside": 0.2 },
+      "targets": { "weaponShare": 0.12, "armourShare": 0.15 }
     },
     {
       "id": "beam_frigate",
@@ -74,7 +76,8 @@
         "A long, narrow hull with the beams forward and the engines in a row at the back.",
         "Use Diodes to keep an engine or shield reserve that the beams can't drain."
       ],
-      "example": "dev/review-heron"
+      "example": "dev/review-heron",
+      "targets": { "weaponShare": 0.08, "generationPerCell": 2.5 }
     },
     {
       "id": "missile_boat",
@@ -94,7 +97,8 @@
         "Launchers along the flanks, mirrored."
       ],
       "example": "dev/review-mako",
-      "weights": { "enginesAft": 0.2 }
+      "weights": { "enginesAft": 0.2 },
+      "targets": { "weaponShare": 0.12, "thrustToMass": 0.12 }
     },
     {
       "id": "hauler",
@@ -116,7 +120,8 @@
         "Engines strong enough for the loaded mass.",
         "Guns are an afterthought: a turret or two at the corners."
       ],
-      "weights": { "gunsOut": 0.05, "compactness": 0.2 }
+      "weights": { "gunsOut": 0.05, "compactness": 0.2 },
+      "targets": { "cargoShare": 0.25, "thrustToMass": 0.06 }
     },
     {
       "id": "capital",
@@ -140,7 +145,8 @@
         "Armour all round the outside; nothing vital on the edge.",
         "Big guns forward facing ^, turrets out at the flanks, a wall of engines at the back facing v."
       ],
-      "example": "dev/review-monarch"
+      "example": "dev/review-monarch",
+      "targets": { "weaponShare": 0.08, "armourShare": 0.2, "thrustToMass": 0.06 }
     }
   ]
 }

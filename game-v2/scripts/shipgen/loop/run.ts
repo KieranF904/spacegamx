@@ -64,6 +64,7 @@ export function designMetrics(model: string, r: DesignOutcome, renderMs: number[
     valid: !!r.best?.valid && (!r.steps || r.steps.accepted.some((s) => s !== 'power')),
     bestScore: r.best?.score ?? 0, unreadable: r.unreadable, truncated: r.truncated, ...(r.steps ? { steps: r.steps } : {}), ...(r.concept ? { concept: r.concept } : {}), ms: r.ms,
     outputTokens: r.attempts.reduce((a, x) => a + (x.outputTokens ?? 0), 0),
+    inputTokens: r.attempts.reduce((a, x) => a + (x.promptTokens ?? 0), 0),
     tokensPerSec: tps.length ? Math.round((tps.reduce((a, b) => a + b, 0) / tps.length) * 10) / 10 : null,
     renderMs: [...renderMs],
   };

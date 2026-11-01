@@ -4,7 +4,7 @@ import type { IncomingMessage, ServerResponse } from 'http';
 import { appendFileSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { serializeBlueprint } from '../../../common/src/ships/index';
-import { type ShipgenContext, blueprintToGrid, check, loadRoles } from '../core/index';
+import { type ShipgenContext, blueprintToGrid, check, loadRoles, roleCheckOptions } from '../core/index';
 import { type Llm, type ModelInfo, type Renderer, CONTRACTS, CONTRACT_IDS, autoContract, run as loopRun } from '../loop/index';
 import { HttpError, json, readJson, sendFile } from './http';
 import { labUrl, runLabExporter } from './lab';
@@ -14,7 +14,7 @@ import { legendRows, partCells } from './parts';
 import type { Paths } from './paths';
 import { type PageEvent, type RunFn, Runs } from './runs';
 import { buildUp, renderTimelapse } from './timelapse';
-import { listSavedShips } from './ships';
+import { listSavedShips, rateShip } from './ships';
 import { listWatchRuns, watchStream } from './watch';
 
 export interface AppDeps {
@@ -65,7 +65,7 @@ export function createApp(deps: AppDeps): App {
   const designView = (bp: ReturnType<typeof blueprintFrom>, role?: string) => {
     const r = role ? roleFor(ctx, { role }) : undefined;
     const enc = blueprintToGrid(ctx, bp);
-    return { bp, grid: enc.text, check: check(ctx, bp, { book: enc.book, weights: r?.weights as never }), cells: partCells(ctx, bp) };
+    return { bp, grid: enc.text, check: check(ctx, bp, { book: enc.book, ...(roleCheckOptions(r, true) as object) }), cells: partCells(ctx, bp) };
   };
 
   // (The slot is taken before the first await: two POSTs at once can't both pass the check)
@@ -172,6 +172,10 @@ export function createApp(deps: AppDeps): App {
     if (m === 'GET' && p === '/api/watch/events') return watchStream(req, res, runs, paths.out, url);
     if (m === 'GET' && p === '/api/gallery') return json(res, 200, { gallery: runs.gallery });
     if (m === 'GET' && p === '/api/ships') return json(res, 200, { ships: listSavedShips(paths.out) });
+    if (m === 'POST' && p === '/api/ships/rate') {
+      const b = await readJson(req);
+      try { return json(res, 200, rateShip(paths.out, String(b.dir ?? ''), Number(b.rating))); } catch (e) { throw new HttpError(400, (e as Error).message); }
+    }
     if (m === 'POST' && p === '/api/save') {
       const b = await readJson(req);
       const s = saveGenerated(ctx, paths.dev, blueprintFrom(b.bp), String(b.role || 'free'));

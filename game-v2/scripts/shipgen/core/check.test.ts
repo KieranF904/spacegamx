@@ -41,6 +41,32 @@ describe('shipgen check', () => {
     });
   }
 
+  it('scores a ship that is mostly power plant down (lean), measures the role\'s targets (fit), and reads compactness by row fill', () => {
+    const kestrel = ship('dev/review-kestrel');
+    // Kestrel with a capacitor bank bolted on under it: the same guns and engines, three times the stores
+    const cap = kestrel.parts.find((p) => p.fn === 'power_capacitor')!;
+    const ys = kestrel.parts.map((p) => p.y), y0 = Math.max(...ys) + 1;
+    const extra = [];
+    for (let y = y0; y < y0 + 4; y++) for (let x = -3; x <= 3; x++) extra.push({ ...cap, uid: 1000 + extra.length, x, y, facing: undefined });
+    const padded = { ...kestrel, parts: [...kestrel.parts, ...extra] };
+    const a = check(ctx, kestrel, { weights: { symmetry: 0 } }), b = check(ctx, padded, { weights: { symmetry: 0 } });
+    expect(a.scores.lean).toBe(1);
+    expect(b.scores.lean).toBeLessThan(0.7);
+    expect(b.score).toBeLessThan(a.score);
+    // Fit: the targets measured, each capped at 1; none asked: null
+    expect(a.scores.fit).toBeNull();
+    const t = check(ctx, kestrel, { targets: { weaponShare: 0.05, thrustToMass: 0.5 } });
+    expect(t.fit.map((f) => f.key)).toEqual(['weaponShare', 'thrustToMass']);
+    expect(t.fit[0].share).toBe(1);
+    expect(t.fit[1].share).toBeLessThan(0.5);
+    expect(t.scores.fit).toBeCloseTo((1 + t.fit[1].share) / 2, 2);
+    // Compactness: a wing on a spine fills its rows; a hollow row doesn't
+    const spine = gridToBlueprint(ctx, 'name: s\ngrid:\n   -2 -1 0 1 2\n0  HA HA CA HA HA\n1  .. .. HA .. ..\n2  .. .. HA .. ..\nend').bp!;
+    const hollow = gridToBlueprint(ctx, 'name: h\ngrid:\n   -2 -1 0 1 2\n0  HA HA CA HA HA\n1  HA .. HA .. HA\n2  HA HA HA HA HA\nend').bp!;
+    expect(check(ctx, spine).scores.compactness).toBe(1);
+    expect(check(ctx, hollow).scores.compactness).toBeLessThan(1);
+  });
+
   it('points a rule broken at its cell, and scores the broken design down', () => {
     const good = [
       'name: Tiny', 'grid:',

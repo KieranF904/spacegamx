@@ -5,7 +5,7 @@ import { join } from 'path';
 import type { Blueprint } from '../../../common/src/ships/index';
 import {
   type Brief, type BriefCheck, type CheckResult, type CodeDef, type Concept, conceptBlock, conceptLine, conceptPenalty, rowWidths, type DecodeResult, type GridError, type Role, type ShipgenContext,
-  CodeBook, withShape, asymmetricCells, blueprintToGrid, briefCheck, briefLegend, briefText, check, designText, feedbackMessage, findRole, mirrorHalf, shapeSuggestion, systemPrompt,
+  CodeBook, withShape, asymmetricCells, blueprintToGrid, briefCheck, briefLegend, briefText, check, designText, feedbackMessage, findRole, mirrorHalf, roleCheckOptions, shapeSuggestion, systemPrompt,
 } from '../core/index';
 import type { Emit } from './events';
 import type { ChatMessage, Llm, ModelInfo } from './llm';
@@ -92,6 +92,7 @@ export interface Attempt {
   renderPath?: string;
   ms: number;
   outputTokens?: number;
+  promptTokens?: number;
   tokensPerSec?: number;
   /** The reply was cut off at the token limit */
   truncated?: boolean;
@@ -162,7 +163,7 @@ export function gridOf(ctx: ShipgenContext, bp: Blueprint, book?: CodeBook, max?
 
 const isAbort = (e: unknown) => e instanceof Error && (e.name === 'AbortError' || e instanceof AbortedError);
 
-export interface Asked { text: string; thinking: string; ms: number; outputTokens?: number; tokensPerSec?: number; notes: string[]; truncated?: boolean; stopReason?: string; tokensEstimated?: boolean }
+export interface Asked { text: string; thinking: string; ms: number; outputTokens?: number; promptTokens?: number; tokensPerSec?: number; notes: string[]; truncated?: boolean; stopReason?: string; tokensEstimated?: boolean }
 
 /** What read() made of a reply */
 export interface Read {
@@ -193,6 +194,7 @@ export class Session {
   readonly maxRows: number;
   readonly maxCols: number;
   readonly weights: Record<string, number> | undefined;
+  readonly targets: Record<string, number> | undefined;
   readonly stats: { ms: number[]; slow: boolean };
   readonly now: () => number;
   failures = 0;
@@ -216,8 +218,9 @@ export class Session {
     this.maxRows = lines + 6;
     this.temperature = o.temperature ?? 0.6;
     this.maxCols = 2 * (this.role?.size?.maxWidth ?? 20) + 6;
-    const rw = this.role?.weights as Record<string, number> | undefined;
-    this.weights = this.mirror ? rw : { ...rw, symmetry: NO_MIRROR_SYMMETRY_WEIGHT };
+    const rc = roleCheckOptions(this.role, this.mirror);
+    this.weights = this.mirror ? rc.weights : { ...rc.weights, symmetry: NO_MIRROR_SYMMETRY_WEIGHT };
+    this.targets = rc.targets;
     this.stats = (deps.renderStats ??= { ms: [], slow: false });
   }
 
@@ -233,13 +236,16 @@ export class Session {
   private fitBudget(messages: ChatMessage[]): void {
     if (!this.o.generous || this.o.maxTokens !== undefined || !this.loadedContext) return;
     const prompt = Math.ceil(messages.reduce((a, m) => a + m.content.length, 0) / 3);
-    this.budget = Math.max(2048, Math.min(32768, this.loadedContext - prompt - 256));
+    this.budget = Math.max(2048, Math.min(65536, this.loadedContext - prompt - 256));
   }
 
   bounds(): { w: number; h: number } { return { w: this.role?.size?.maxWidth ?? 20, h: this.role?.size?.maxHeight ?? 20 }; }
 
   /** A model stuck resending the same design gets a hotter next try (+0.3, up to 1.2) */
   heat(): void { this.temperature = Math.min(1.2, Math.round((this.temperature + 0.3) * 100) / 100); }
+
+  /** The next ask goes with thinking off: a reply that was all thinking and no design is asked again plainly */
+  thinkOffNext = false;
 
   /** Codes a shown design needed a key for (a part the legend has no code for): the model's reply may leave the key out, and still means them */
   private carried: CodeDef[] = [];
@@ -265,7 +271,7 @@ export class Session {
     try {
       const reply = await this.deps.llm.chat({
         model: o.model, messages, schema: C.schema,
-        temperature: this.temperature, think: o.think, numCtx: o.numCtx ?? numCtxFor(messages, this.budget), maxTokens: this.budget,
+        temperature: this.temperature, think: this.thinkOffNext ? false : o.think, numCtx: o.numCtx ?? numCtxFor(messages, this.budget), maxTokens: this.budget,
         timeoutMs: o.timeoutMs, idleMs: o.idleMs, signal: o.signal ? AbortSignal.any([o.signal, stopper.signal]) : stopper.signal,
         onToken: (d, kind) => {
           emit({ type: 'token', round, kind, text: d });
@@ -295,6 +301,7 @@ export class Session {
         },
       });
       this.failures = 0;
+      this.thinkOffNext = false;
       return { ...reply, notes };
     } catch (e) {
       if (runaway && !o.signal?.aborted) {
@@ -320,8 +327,8 @@ export class Session {
    */
   async read(round: number, reply: Asked, build?: (drawn: Blueprint, book: CodeBook) => DecodeResult): Promise<Read> {
     const { ctx, emit, C } = this;
-    emit({ type: 'reply', round, text: reply.text, ms: reply.ms, outputTokens: reply.outputTokens, tokensPerSec: reply.tokensPerSec, structured: !!C.schema, ...(reply.stopReason ? { stopReason: reply.stopReason } : {}), ...(reply.truncated ? { truncated: true } : {}), ...(reply.tokensEstimated ? { tokensEstimated: true } : {}) });
-    const a: Attempt = { round, reply: reply.text, gridText: null, valid: false, score: 0, ms: reply.ms, outputTokens: reply.outputTokens, tokensPerSec: reply.tokensPerSec, ...(reply.truncated ? { truncated: true } : {}), ...(reply.tokensEstimated ? { tokensEstimated: true } : {}) };
+    emit({ type: 'reply', round, text: reply.text, ms: reply.ms, outputTokens: reply.outputTokens, promptTokens: reply.promptTokens, tokensPerSec: reply.tokensPerSec, structured: !!C.schema, ...(reply.stopReason ? { stopReason: reply.stopReason } : {}), ...(reply.truncated ? { truncated: true } : {}), ...(reply.tokensEstimated ? { tokensEstimated: true } : {}) });
+    const a: Attempt = { round, reply: reply.text, gridText: null, valid: false, score: 0, ms: reply.ms, outputTokens: reply.outputTokens, promptTokens: reply.promptTokens, tokensPerSec: reply.tokensPerSec, ...(reply.truncated ? { truncated: true } : {}), ...(reply.tokensEstimated ? { tokensEstimated: true } : {}) };
     // (Cut off at the token limit: said plainly, not as a mistake of the model's format)
     const cut = reply.truncated ? `Your reply was cut off at the ${this.budget}-token limit before it was finished${reply.thinking.trim() ? ' (part of it went on thinking)' : ''}, so the design in it is incomplete. This is not a format mistake: write a more compact design, and send the design only, with no thinking aloud or explanation.` : '';
     const finish = (r: Read): Read => (reply.truncated ? { ...r, truncated: true, feedback: r.readable ? `${cut}
@@ -335,7 +342,7 @@ ${r.feedback}` : cut } : r);
     }
     ex.notes.unshift(...reply.notes);
     if (!ex.text) {
-      if (!reply.text.trim() && reply.thinking.trim()) ex.notes.unshift(`you spent the whole reply thinking (${reply.outputTokens ?? this.budget} tokens) and wrote no design: think briefly, then write it`);
+      if (!reply.text.trim() && reply.thinking.trim()) { ex.notes.unshift(`you spent the whole reply thinking (${reply.outputTokens ?? this.budget} tokens) and wrote no design: think briefly, then write it`); this.thinkOffNext = true; }
       emit({ type: 'grid', round, partial: false, text: null, via: 'none', parts: 0, errors: ex.notes.map((message) => ({ message })), warnings: [] });
       return finish({ attempt: a, feedback: `I couldn't find a design in your reply (${ex.notes.join('; ')}).`, readable: false, said: null });
     }
@@ -370,7 +377,7 @@ ${r.feedback}` : cut } : r);
     a.bp = bp;
     const shipGrid = gridOf(ctx, bp, book, this.bounds());
     emit({ type: 'grid', round, partial: false, text: shipGrid, drawn: ex.text ?? undefined, via: ex.via, parts: bp.parts.length, errors: [], warnings, bp });
-    const result = check(ctx, bp, { book, weights: this.weights as never });
+    const result = check(ctx, bp, { book, weights: this.weights as never, targets: this.targets });
     const bc = this.role ? briefCheck(ctx, bp, this.role) : undefined;
     // (The game accepts a ship whose guns or engines get no power; nobody could fly it, so it doesn't meet a brief)
     const dark = result.power?.unpowered.length ?? 0;
@@ -400,8 +407,8 @@ The concept: ${cp.notes.join('; ')}.`;
 export function scoreGiven(ctx: ShipgenContext, bp: Blueprint, role: Role | undefined, o: { mirror?: boolean } = {}): { result: CheckResult; brief?: BriefCheck; score: number; book: CodeBook } {
   const book = new CodeBook(ctx);
   const mirror = o.mirror !== false;
-  const rw = role?.weights as Record<string, number> | undefined;
-  const result = check(ctx, bp, { book, weights: (mirror ? rw : { ...rw, symmetry: NO_MIRROR_SYMMETRY_WEIGHT }) as never });
+  const rc = roleCheckOptions(role, mirror);
+  const result = check(ctx, bp, { book, weights: (mirror ? rc.weights : { ...rc.weights, symmetry: NO_MIRROR_SYMMETRY_WEIGHT }) as never, targets: rc.targets });
   const brief = role ? briefCheck(ctx, bp, role) : undefined;
   // (The seed is no copy of the example when it is the example)
   if (brief) brief.unmet = brief.unmet.filter((x) => !x.startsWith('your own design'));
@@ -486,7 +493,7 @@ export function better(a: Attempt, b: Attempt): boolean {
 /** Ollama's context: room for the prompt (~3 chars a token) and a reply */
 export function numCtxFor(messages: ChatMessage[], reply: number): number {
   const need = Math.ceil(messages.reduce((a, m) => a + m.content.length, 0) / 3) + reply;
-  return Math.min(40960, Math.max(8192, Math.ceil(need / 2048) * 2048));
+  return Math.min(131072, Math.max(8192, Math.ceil(need / 2048) * 2048));
 }
 
 async function renderAndCritique(deps: LoopDeps, o: DesignOptions, a: Attempt, stats: { ms: number[]; slow: boolean }, emit: Emit): Promise<void> {

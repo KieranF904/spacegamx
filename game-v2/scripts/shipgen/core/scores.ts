@@ -15,8 +15,10 @@ export interface DesignScores {
   enginesAft: number;
   /** Guns facing forward, or out at the flank they sit on; null with no guns */
   gunsOut: number | null;
-  /** Cells covered / the bounding box */
+  /** Cells covered / the sum of each row's span: holes and gaps inside the outline count, wings and a long spine don't */
   compactness: number;
+  /** Share of the ship that is not power plant: 1 up to two fifths of the cells in generators, stores and conduits (the review ships run about that), 0 at two thirds */
+  lean: number;
   /** Share of the exposed outer corners of hull and armour that are shaped pieces (wedges, rounds, a nose); null with no such corner */
   silhouette: number | null;
 }
@@ -38,7 +40,7 @@ export function designScores(ctx: ShipgenContext, bp: Blueprint, geoms?: PlacedG
   const owner = new Map<string, number>();
   gs.forEach((g, i) => { for (const c of g.cells) owner.set(`${c[0]},${c[1]}`, i); });
   const cells = [...owner.keys()].map((k) => k.split(',').map(Number));
-  if (!cells.length) return { symmetry: 0, armourOutside: 0, enginesAft: 0, gunsOut: null, compactness: 0, silhouette: null };
+  if (!cells.length) return { symmetry: 0, armourOutside: 0, enginesAft: 0, gunsOut: null, compactness: 0, lean: 0, silhouette: null };
   const x0 = Math.min(...cells.map((c) => c[0])), x1 = Math.max(...cells.map((c) => c[0])) + 1;
   const y0 = Math.min(...cells.map((c) => c[1])), y1 = Math.max(...cells.map((c) => c[1])) + 1;
   const cx = cells.reduce((s, c) => s + c[0] + 0.5, 0) / cells.length, cy = cells.reduce((s, c) => s + c[1] + 0.5, 0) / cells.length;
@@ -53,6 +55,20 @@ export function designScores(ctx: ShipgenContext, bp: Blueprint, geoms?: PlacedG
       if (isShell(catalog, bp.parts[i].fn)) shell++;
     }
   }
+
+  // Row fill: each row's cells over its span (a hollow or a gap in a row costs; the outline's shape doesn't)
+  const span = new Map<number, [number, number]>();
+  for (const [x, y] of cells) { const s = span.get(y); if (!s) span.set(y, [x, x]); else { s[0] = Math.min(s[0], x); s[1] = Math.max(s[1], x); } }
+  const spanned = [...span.values()].reduce((a, [x0_, x1_]) => a + x1_ - x0_ + 1, 0);
+
+  // Power plant bulk: cells of generators, stores and conduits (not the core, nor anything that fires or pushes)
+  let plant = 0;
+  gs.forEach((g, i) => {
+    const fn = catalog.functions.get(bp.parts[i].fn);
+    if (!fn || bp.parts[i].fn === 'core' || fn.weapon || isEngine(fn) || fn.strafe) return;
+    if ((fn.produce ?? 0) > 0 || (fn.store ?? 0) > 0 || (fn.dynamo ?? 0) > 0) plant += g.cells.length;
+  });
+  const plantShare = plant / cells.length;
 
   // Engines: facing S, in the rear half, by thrust
   let eW = 0, eS = 0;
@@ -100,7 +116,8 @@ export function designScores(ctx: ShipgenContext, bp: Blueprint, geoms?: PlacedG
     armourOutside: edges ? shell / edges : 0,
     enginesAft: eW ? eS / eW : 0,
     gunsOut: gN ? gS / gN : null,
-    compactness: cells.length / ((x1 - x0) * (y1 - y0)),
+    compactness: spanned ? cells.length / spanned : 0,
+    lean: Math.max(0, Math.min(1, 1 - (plantShare - 0.4) / 0.27)),
     silhouette: silhouetteScore(ctx, bp),
   };
 }

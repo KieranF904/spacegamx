@@ -12,7 +12,7 @@ export interface StartEvent extends Base { type: 'start'; mode: Mode; model: str
 export interface BriefEvent extends Base { type: 'brief'; role?: string; text: string; legendCodes: number; promptChars: number }
 export interface PromptEvent extends Base { type: 'prompt'; round: number; system?: string; user: string; messages: number; chars: number }
 export interface TokenEvent extends Base { type: 'token'; round: number; kind: 'content' | 'thinking'; text: string }
-export interface ReplyEvent extends Base { type: 'reply'; round: number; text: string; ms: number; outputTokens?: number; tokensPerSec?: number; structured: boolean; stopReason?: string; truncated?: boolean; tokensEstimated?: boolean }
+export interface ReplyEvent extends Base { type: 'reply'; round: number; text: string; ms: number; outputTokens?: number; promptTokens?: number; tokensPerSec?: number; structured: boolean; stopReason?: string; truncated?: boolean; tokensEstimated?: boolean }
 export interface GridEvent extends Base {
   type: 'grid'; round: number;
   /** Still streaming (complete rows so far) */
@@ -68,6 +68,8 @@ export interface DesignMetrics {
   concept?: Concept;
   ms: number;
   outputTokens: number;
+  /** Prompt tokens over every reply (what the model read), when the server reports them */
+  inputTokens: number;
   tokensPerSec: number | null;
   renderMs: number[];
 }
