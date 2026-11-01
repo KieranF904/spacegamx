@@ -25,8 +25,9 @@
 import { clearIfDrawn } from '../rendering/gfx';
 import { Container, Graphics, GraphicsContext, Texture } from 'pixi.js';
 import { ParticlePool } from '../rendering/particlePool';
-import { BUBBLE_RIM, DOT_SIZE, bubble, glowBall, hexShield, puff, streak, streakScale } from '../rendering/fxTextures';
+import { BUBBLE_RIM, DOT_SIZE, bubble, bubbleRim, glowBall, hexShield, puff, streak, streakScale } from '../rendering/fxTextures';
 import { shieldLookOf } from './shieldLooks';
+import { settings } from '../settings/Settings';
 import { EntityType, isRuined, lookFn, ServerContactMessage, ServerPartDestroyedMessage } from '@space-game/common';
 import type { GameState } from '../state/GameState';
 import type { ShipSource } from './ShipStore';
@@ -614,6 +615,8 @@ export class DamageFx {
   private shieldFlash = new Map<number, number>();
   /** A Flash Screen's re-form bloom, 1 fading to 0 */
   private reform = new Map<number, number>();
+  /** Recharge glow, 1 while the level climbs, fading to 0 */
+  private regen = new Map<number, number>();
 
   /** Shield bubbles (brighter when hit) and EMP crackle over knocked-out ships */
   private drawShields(frames: number): void {
@@ -638,6 +641,9 @@ export class DamageFx {
       this.shieldFlash.set(id, flash);
       const rf = Math.max(0, (this.reform.get(id) ?? 0) - frames * 0.035);
       this.reform.set(id, rf);
+      // Recharging: lit while the level keeps climbing, fading ~0.7 s after it stops
+      const rg = shieldPct > prev + 0.01 && shieldPct < 100 ? 1 : Math.max(0, (this.regen.get(id) ?? 0) - frames * 0.025);
+      this.regen.set(id, rg);
       if (shieldPct > 0 || flash > 0) {
         const k = shieldPct / 100;
         const wob = 1 + 0.015 * Math.sin(this.time * 3 + id);
@@ -645,10 +651,18 @@ export class DamageFx {
         const b = (r * wob * grow) / (64 * BUBBLE_RIM);
         // (Flicker: the thin screen shimmers; the rest breathe slowly)
         const sh = look.shimmer ? 1 - look.shimmer * (0.5 + 0.5 * Math.sin(this.time * 47 + id) * Math.sin(this.time * 29 + id * 2)) : 1;
-        const a = (look.base + look.fill * k + 0.7 * flash) * sh + 0.8 * rf;
-        this.addSprites.take(bubble(), e.renderX, e.renderY, 0.5, 0.5, flash > 0.3 ? look.hit : rf > 0.3 ? 0xffffff : look.tint, a, 0, b, b);
-        if (look.inner) this.addSprites.take(bubble(), e.renderX, e.renderY, 0.5, 0.5, look.inner, a * 0.8, 0, b * 0.9, b * 0.9);
-        if (look.hex) this.addSprites.take(hexShield(), e.renderX, e.renderY, 0.5, 0.5, look.hex, (0.18 + 0.3 * k + 0.5 * flash) * sh, this.time * 0.05 + id, b, b);
+        // At rest only the rim shows (your own fainter, by the setting; others' with a trace of fill so they read as
+        // shielded); the filled bubble over the hull comes up on a hit (short: flash²) and while it recharges
+        const own = id === this.state.playerId;
+        const rest = (look.base + look.fill * k) * sh * (own ? settings.data.display.ownShield : 1);
+        const f2 = flash * flash;
+        const tint = flash > 0.3 ? look.hit : rf > 0.3 ? 0xffffff : look.tint;
+        const rim = rest + 0.35 * flash + 0.15 * rg + 0.8 * rf;
+        const fill = (own ? 0 : 0.3 * rest) + 0.55 * f2 + 0.18 * rg + 0.3 * rf;
+        this.addSprites.take(bubbleRim(), e.renderX, e.renderY, 0.5, 0.5, tint, rim, 0, b, b);
+        if (fill > 0.01) this.addSprites.take(bubble(), e.renderX, e.renderY, 0.5, 0.5, tint, fill, 0, b, b);
+        if (look.inner) this.addSprites.take(bubbleRim(), e.renderX, e.renderY, 0.5, 0.5, look.inner, rim * 0.8, 0, b * 0.9, b * 0.9);
+        if (look.hex) this.addSprites.take(hexShield(), e.renderX, e.renderY, 0.5, 0.5, look.hex, (0.06 + 0.12 * k) * sh * (own ? settings.data.display.ownShield : 1) + 0.45 * f2 + 0.15 * rg, this.time * 0.05 + id, b, b);
         if (rf > 0) this.addSprites.take(glowBall(), e.renderX, e.renderY, 0.5, 0.5, 0xffffff, 0.7 * rf, 0, (r * (1.1 + 0.5 * (1 - rf))) / DOT_SIZE, (r * (1.1 + 0.5 * (1 - rf))) / DOT_SIZE);
       }
       if (emp && Math.random() < 0.5 * frames) {

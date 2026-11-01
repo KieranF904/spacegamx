@@ -4,6 +4,7 @@
  */
 import type { Container } from 'pixi.js';
 import type { ClientFeature, ClientFeatureHost, IndicatorDef, ShipDrawCtx } from './types';
+import type { FeatureStatusLine } from '../../ui/shipStatus/source';
 
 export class ClientFeatures {
   private readonly keyed: NonNullable<ClientFeature['onKey']>[] = [];
@@ -11,6 +12,7 @@ export class ClientFeatures {
   private readonly drawers: NonNullable<ClientFeature['drawShip']>[] = [];
   private readonly frames: NonNullable<ClientFeature['beginFrame']>[] = [];
   private readonly chips: IndicatorDef[] = [];
+  private readonly statuses: NonNullable<ClientFeature['status']>[] = [];
   private readonly controls = new Map<string, () => boolean>();
 
   constructor(features: readonly ClientFeature[], private readonly host: ClientFeatureHost) {
@@ -23,6 +25,7 @@ export class ClientFeatures {
       if (f.drawShip) this.drawers.push(f.drawShip.bind(f));
       if (f.beginFrame) this.frames.push(f.beginFrame.bind(f));
       if (f.indicator) this.chips.push(f.indicator);
+      if (f.status) this.statuses.push(f.status.bind(f));
       for (const [name, fn] of Object.entries(f.controls ?? {})) {
         if (this.controls.has(name)) throw new Error(`client feature ${f.id}: control ${name} has two features`);
         this.controls.set(name, () => fn(host));
@@ -60,5 +63,12 @@ export class ClientFeatures {
 
   updateIndicators(): void {
     for (let i = 0; i < this.chips.length; i++) this.chips[i].update(this.host);
+  }
+
+  /** The features' status panel lines now, into `out` (cleared first; ui/shipStatus) */
+  statusLines(out: FeatureStatusLine[]): FeatureStatusLine[] {
+    out.length = 0;
+    for (let i = 0; i < this.statuses.length; i++) { const l = this.statuses[i](this.host); if (l) out.push(l); }
+    return out;
   }
 }

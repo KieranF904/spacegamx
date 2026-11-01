@@ -266,6 +266,24 @@ export function bubble(): Texture {
 }
 export const BUBBLE_RIM = 0.94;
 
+/**
+ * Just the bubble's rim, same scale as `bubble` (rim at 0.94 of the half-size), clear inside: the resting look of a
+ * shield, so the hull under it stays readable. The full `bubble` is laid over it only on a hit or while it recharges.
+ */
+export function bubbleRim(): Texture {
+  return paint('bubbleRim', 128, 128, (ctx) => {
+    const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    g.addColorStop(0, 'rgba(255,255,255,0)');
+    g.addColorStop(0.8, 'rgba(255,255,255,0)');
+    g.addColorStop(0.89, 'rgba(255,255,255,0.18)');
+    g.addColorStop(0.93, 'rgba(255,255,255,0.9)');
+    g.addColorStop(0.95, 'rgba(255,255,255,0.9)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 128, 128);
+  });
+}
+
 /** A honeycomb of thin hex outlines faded out towards the bubble's rim (128 px across, same scale as `bubble`): the Bulwark's shield */
 export function hexShield(): Texture {
   return paint('hexShield', 128, 128, (ctx) => {

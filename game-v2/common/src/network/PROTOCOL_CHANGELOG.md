@@ -11,3 +11,4 @@ except to fix a typo. A bump makes old clients reload (see PROTOCOL_VERSION in p
 - 19 (2026-10-31): Shot behaviours: projectile row data[9] endTick (ticks to its end, before x/y); replica control bit CTL.slowed (4096); pilot row's weaponry extras (marked, slowed ticks left) after the tow; status row data[7] statuses (marked 1, slowed 2); the Frostbite's beam slows instead of chilling
 - 20 (2026-10-31): gun-state slot carries reload progress in eighths
 - 21 (2026-11-01): parts: the Conduit and the Diode (energy routing P4), two model ids appended to the wire dictionary
+- 22 (2026-11-01): parts: the Gyro and the Heavy Gyro (reaction wheels), two model ids appended to the wire dictionary

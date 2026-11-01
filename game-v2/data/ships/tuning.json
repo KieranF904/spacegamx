@@ -12,12 +12,15 @@
     "minWeaponSatisfaction": 0.1
   },
   "flight": {
+    "_comment": "Mouse-steer (common/src/ships/flight.ts steerSpin): the ship spins towards the aim no faster than maxAngularSpeed, than it can still stop from in time (its torque/inertia cap the braking way, under hazards and cargo, x turnBrakeMargin), or than turnGain x the angle left (the last little way eased in: at most 1, or it overshoots and twitches). Bosses (Blueprint turn) spin at most bossMaxAngularSpeed and ease in at bossTurnGain.",
     "coreManeuverForce": 3,
     "gyroTorque": 216,
     "thrusterTorqueGain": 9,
-    "turnKp": 0.085,
-    "turnKd": 0.5,
+    "turnGain": 0.5,
+    "turnBrakeMargin": 0.9,
     "maxAngularSpeed": 0.1,
+    "bossMaxAngularSpeed": 0.04,
+    "bossTurnGain": 0.15,
     "helmTurnGain": 0.25
   },
   "jump": {

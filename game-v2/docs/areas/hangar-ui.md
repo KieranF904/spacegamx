@@ -1,11 +1,11 @@
 # Hangar and ship-edit UI
-The station hangar where a pilot designs and refits ships: a canvas grid editor (place/pick up/rotate parts, wires), the part palette and model cards, mounting and power/circuit feedback, the load test, ship summary stats, part tooltips, saved designs and hangar slots, plus the Component Guide window. Server side: `shipEdit` / `slotSave` validation and `Hangar.save`. All rules live in `common` (mounting, blueprint validation, derive, energy); this area only presents them and sends `ShipEdit` messages.
+The station hangar where a pilot designs and refits ships: a canvas grid editor (place/pick up/rotate parts), the part palette and model cards, mounting and power/circuit feedback, the load test, ship summary stats, part tooltips, saved designs and hangar slots, plus the Component Guide window. Server side: `shipEdit` / `slotSave` validation and `Hangar.save`. All rules live in `common` (mounting, blueprint validation, derive, energy); this area only presents them and sends `ShipEdit` messages.
 
 ## Files (what each owns)
 | path | lines | owns |
 |---|---|---|
 | client/src/ships/HangarUI.ts | 2342 | `HangarUI` class + `HangarDeps`; sections below |
-| client/src/ships/wireEdit.ts | 299 | wire drawing helpers (`layRun`, `eraseRun`, `pruneWires`, `stepCells`, `wireBill`) and the power report (`powerReport`, `weakLinks`, `PowerReport`, `PartPower`, net colours) |
+| client/src/ships/wireEdit.ts | 299 | `pruneWires` (saved wire dropped as parts go) and the power report (`powerReport`, `weakLinks`, `PowerReport`, `PartPower`, net colours) |
 | client/src/ships/modelCards.ts | 210 | model card text: `familyLabel`, `mountBadge`, `mountingText`, `keyStats`, `sizeText`, `tradeOff`, `modelLock` (what a locked model waits on) |
 | client/src/ships/partTip.ts | 228 | `partTipHtml(part, PartTipCtx)`, `PART_TIP_CSS`, `resistText`, `modsText` |
 | client/src/ships/shipSummary.ts | 114 | `shipSummary(catalog, tuning, econ, bp)` -> `ShipSummary` (stats shown/compared), `BIGGER_IS_BETTER`, `jumpRatioNote` |
@@ -22,7 +22,7 @@ The station hangar where a pilot designs and refits ships: a canvas grid editor 
 | server/src/game/AdminTools.ts | | admin free-build toggle (`freeBuild`, and its admin command) |
 
 ### HangarUI.ts sections (read only the slice)
-63-102 `HangarDeps` | 105-307 fields + constructor (DOM, canvas, lit view at 255) | 308-408 open/close/slots/keys | 409-535 editing: `candidate, pickFacing, placementProblem, candidateMounting, mountLine, place, pickUp, remove` | 536-602 wires (`setTool, wireStart/To, autoWireAll`) | 603-676 new/load blueprint | 677-764 saved designs | 765-817 `saveAndLaunch`, `remaining`, ghosts, status | 818-889 derive: `refresh, rederive, showLit` | 890-1303 panels: palette (`renderPalette` 908), `handCard` 1000, filters, `partListsHtml` 1115, `renderWirePanel` 1230, `renderSlots` | 1304-1460 `buildHtml`, `ammoHtml`, button binding | 1461-1528 `powerHtml` (load test UI) | 1529-1659 `summaryHtml`, `renderStats` | 1660-1719 tooltips | 1720-2188 canvas: `draw` 1729, `drawPower` 1925, `drawCircuits` 2013, `drawMounting` 2122, `drawFacing` 2162 | 2189-2342 module helpers (`ruleText, esc, button, chip, energyHtml`...).
+63-102 `HangarDeps` | 105-307 fields + constructor (DOM, canvas, lit view at 255) | 308-408 open/close/slots/keys | 409-535 editing: `candidate, pickFacing, placementProblem, candidateMounting, mountLine, place, pickUp, remove` | `onHull` (saved-wire pruning) | 603-676 new/load blueprint | 677-764 saved designs | 765-817 `saveAndLaunch`, `remaining`, ghosts, status | 818-889 derive: `refresh, rederive, showLit` | 890-1303 panels: palette (`renderPalette` 908), `handCard` 1000, filters, `partListsHtml` 1115, `renderSlots` | 1304-1460 `buildHtml`, `ammoHtml`, button binding | 1461-1528 `powerHtml` (load test UI) | 1529-1659 `summaryHtml`, `renderStats` | 1660-1719 tooltips | 1720-2188 canvas: `draw` 1729, `drawPower` 1925, `drawCircuits` 2013, `drawMounting` 2122, `drawFacing` 2162 | 2189-2342 module helpers (`ruleText, esc, button, chip, energyHtml`...).
 
 ## Public interface
 - `new HangarUI(deps: HangarDeps)` (HangarUI.ts:63/105): `toggle()`, `open(slot?)`, `close(launch)`, `onHangarUpdate()`, `handleKey(code)`. Deps supply catalog, tuning, econ, `owned(slot)`, `hangarState()`, `canMake`, `have`, `coming`, `send(ClientMessage)`, `knownPlans`, `grantAll`, `getBlueprint`, `liveShip`, `onOpen/onClose`.
@@ -59,7 +59,7 @@ The station hangar where a pilot designs and refits ships: a canvas grid editor 
 - HTML panels are built as strings: escape names with `esc()`.
 - `owned(slot)` includes that slot's built parts; ghosts are what you could not pay for. A loaner slot refuses saves unless `grantAll`.
 - Z-order: tooltips use z-index 2100 (`PART_TIP_CSS`); new overlays must sit below or above deliberately.
-- Wires cost spools from storage (`wireBill`); `stored()` is optional in deps.
+- Wiring is retired (energy-routing-impl.md D1): no wire tool, no wire drawn on the grid, no spools billed (server `Hangar.save`); a saved `bp.wires` is kept and pruned as parts go, for the old energy system until the switch-over. The power panel/overlay show the old system's networks until P5's energy overlay replaces them. `stored()` in deps is now unused.
 
 ## Related areas
 [energy](energy.md) (circuits, load test, `PowerUse`), [ship-parts](ship-parts.md) (`describePart`, models, mounting data), [render-ships](render-ships.md) (HangarLitView, decor), [economy-quests](economy-quests.md) (fabrication, licences, Hangar slots), [networking](networking.md) (ShipEdit messages), [server-core](server-core.md) (GameServer handlers, net/handlers/shipEdit.ts), [ui-hud-input](ui-hud-input.md) (window kit, Component Guide placement).

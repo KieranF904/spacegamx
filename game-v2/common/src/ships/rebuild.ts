@@ -556,6 +556,8 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
 
   // ---- Part features (features/): each one this ship has derives its own `fx.<key>`, in plan order
   let fxMask = 0, fxList: Int8Array | undefined, fxOut: FeatureDerived | undefined;
+  // (Turning torque features add, both ways and wherever their parts sit: a Gyro's. DeriveCtx.turn)
+  const fxTurn = { torque: 0 };
   if (fxOf) {
     fxMask = P.globalMask;
     for (let i = 0; i < n; i++) if (alive[i]) fxMask |= fxOf[i];
@@ -567,7 +569,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
         if (!derive) continue;
         const bit = 1 << f, mine: number[] = [];
         for (let i = 0; i < n; i++) if (alive[i] && (fxOf[i] & bit)) mine.push(i);
-        derive({ catalog, tuning, blueprint, fns, mats, area, geoms, mounts, alive, satisfaction, parts: mine, out: fxOut });
+        derive({ catalog, tuning, blueprint, fns, mats, area, geoms, mounts, alive, satisfaction, parts: mine, out: fxOut, turn: fxTurn });
       }
     }
   }
@@ -607,7 +609,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     thrusters,
     maxThrust,
     maneuverForce: hasCore ? tuning.flight.coreManeuverForce : 0,
-    maxTorque: { cw: gyro + gain * torqueCw, ccw: gyro + gain * torqueCcw },
+    maxTorque: { cw: gyro + fxTurn.torque + gain * torqueCw, ccw: gyro + fxTurn.torque + gain * torqueCcw },
     weapons,
     cargoCapacity: Math.round(cargoCapacity),
     miners,

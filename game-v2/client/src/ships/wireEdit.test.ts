@@ -1,14 +1,13 @@
 /**
- * The hangar's wire tool: a drag lays an unbroken run of neighbouring segments (only over the hull), erasing takes
- * out what it passes, a part taken away takes its wire, the spool bill matches the server's, and the power overlay
- * gives each network its own colour and names what's left without power, and where.
+ * The hangar's power overlay (the wire tool is retired: energy-routing-impl.md D1): a part taken away takes the saved
+ * wire over it, and the overlay gives each network its own colour and names what's left without power, and where.
  */
 import { describe, expect, it } from 'vitest';
 import { join } from 'path';
-import { autoWire, createShipState, isNeighbour, placeGeometry, wireCells, cellKey, type Blueprint, type WireSeg } from '@space-game/common';
+import { autoWire, createShipState, placeGeometry, wireCells, cellKey, type Blueprint } from '@space-game/common';
 import { loadShipConfigFromDisk } from '../../../server/src/ships/loadShipConfig';
 import { createShipBridge } from '../../../server/src/proto/createProtoServer';
-import { DEAD_NET, NET_COLORS, eraseRun, layRun, powerReport, pruneWires, stepCells, whereOnShip, wireBill, type Cell } from './wireEdit';
+import { DEAD_NET, NET_COLORS, powerReport, pruneWires, whereOnShip } from './wireEdit';
 
 const bridge = createShipBridge(loadShipConfigFromDisk(join(__dirname, '../../../data')));
 const { catalog, tuning } = bridge;
@@ -36,47 +35,13 @@ function testShip(): Blueprint {
   } as Blueprint;
 }
 
-describe('laying wire', () => {
-  it('a drag steps cell by cell, every step a neighbour', () => {
-    for (const [a, b] of [[[0, 0], [5, 2]], [[3, -4], [-2, 1]], [[0, 0], [0, 0]], [[1, 1], [-6, 1]]] as [Cell, Cell][]) {
-      const run = stepCells(a, b);
-      expect(run[0]).toEqual(a);
-      expect(run[run.length - 1]).toEqual(b);
-      for (let i = 1; i < run.length; i++) expect(isNeighbour(run[i - 1][0], run[i - 1][1], run[i][0], run[i][1])).toBe(true);
-    }
-  });
-
-  it('lays segments only over the hull, each once, and erases what a drag passes', () => {
-    const bp = testShip(), onHull = onHullOf(bp);
-    const run: Cell[] = [[0, 1], ...stepCells([0, 0], [-3, 0])];
-    let w = layRun([], run, onHull);
-    expect(w.length).toBe(4);
-    expect(layRun(w, run, onHull)).toBe(w);
-    // (a run that strays off the hull lays only what's on it: (0,1) to (-1,1) is off)
-    expect(layRun([], stepCells([0, 1], [-3, 0]), onHull).length).toBe(1);
-    // (off the hull: nothing)
-    expect(layRun(w, [[5, 5], [6, 5]], onHull)).toBe(w);
-    w = layRun(w, [[0, 1], [0, 2], [0, 3]], onHull);
-    expect(w.length).toBe(6);
-    const cut = eraseRun(w, [[0, 2]]);
-    expect(cut.length).toBe(4);
-    expect(cut.some(([x0, y0, x1, y1]) => (x0 === 0 && y0 === 2) || (x1 === 0 && y1 === 2))).toBe(false);
-    expect(eraseRun(w, [[9, 9]])).toBe(w);
-  });
-
+describe('saved wire', () => {
   it('a part taken away takes the wire laid over it', () => {
     const bp = testShip();
-    bp.wires = layRun([], [[0, 1], [0, 2], [0, 3]], onHullOf(bp));
+    bp.wires = [[0, 1, 0, 2], [0, 2, 0, 3]];
+    expect(pruneWires(bp.wires, onHullOf(bp))).toBe(bp.wires);
     bp.parts = bp.parts.filter((p) => p.uid !== 6);
     expect(pruneWires(bp.wires, onHullOf(bp))).toEqual([[0, 1, 0, 2]]);
-  });
-
-  it('bills spools as the server does: explicit segments against the saved design', () => {
-    const w = (n: number) => Array.from({ length: n }, (_, i) => [i, 0, i + 1, 0] as WireSeg);
-    expect(wireBill(undefined, undefined).spools).toBe(0);
-    expect(wireBill(undefined, w(5)).spools).toBe(2);
-    expect(wireBill(w(4), w(8)).spools).toBe(1);
-    expect(wireBill(w(9), w(4)).spools).toBe(-2);
   });
 });
 
@@ -87,8 +52,6 @@ describe('the power overlay', () => {
     expect(r.warnings).toEqual([]);
     expect(r.nets.filter((n) => n.powered).map((n) => n.color)).toEqual([NET_COLORS[0]]);
     expect(r.nets[0].generators.length).toBe(1);
-    expect(r.seg.every((c) => c === NET_COLORS[0])).toBe(true);
-    expect(autoWire(bp, catalog).length).toBe(r.seg.length);
   });
 
   it('a gun out on a wing with its wire gone has no power, and says where', () => {

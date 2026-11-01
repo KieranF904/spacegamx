@@ -99,32 +99,17 @@ describe('hangar slots', () => {
     expect(last('hangar')!.slots[1]!.ghosts.length).toBe(bp.parts.length);
   });
 
-  it('wires are laid as a design is saved: a spool for every four segments, given back when they come out; unwired, it\'s auto-wired free', () => {
+  it('wires are retired: a design with saved wires costs no spools, and its wires are kept as sent', () => {
     const { server, t, pid, profile, last, ships } = world();
     dock(server, pid);
     const bp = prospector(server);
     emptyStorage(server, pid, bill(server, bp));
-    // (Unwired: nothing to pay, and it flies on its auto-wiring)
-    t.send({ type: 'slotSave', slot: 1, blueprint: bp, plan: 'prospector' } as any);
-    expect(last('shipEditResult')!.ok).toBe(true);
-    // Its auto-wiring drawn in by hand: six segments take two spools, and there are none
     const wires = autoWire(bp, ships.catalog).slice(0, 6);
     expect(wires).toHaveLength(6);
-    const wired = { ...bp, wires };
-    t.send({ type: 'slotSave', slot: 1, blueprint: wired, plan: 'prospector' } as any);
-    expect(last('shipEditResult')!.ok).toBe(false);
-    expect(last('shipEditResult')!.errors[0]).toMatch(/2 wire spools/);
-    addTo(profile().storage, 'wire_spool', 3);
-    t.send({ type: 'slotSave', slot: 1, blueprint: wired, plan: 'prospector' } as any);
+    t.send({ type: 'slotSave', slot: 1, blueprint: { ...bp, wires }, plan: 'prospector' } as any);
     expect(last('shipEditResult')!.ok).toBe(true);
-    expect(countOf(profile().storage, 'wire_spool')).toBe(1);
+    expect(countOf(profile().storage, 'wire_spool')).toBe(0);
     expect(profile().hangar[1]!.blueprint.wires).toEqual(cleanWires(wires));
-    // Saved again as it is: nothing more; half of them taken out: one spool back
-    t.send({ type: 'slotSave', slot: 1, blueprint: wired, plan: 'prospector' } as any);
-    expect(countOf(profile().storage, 'wire_spool')).toBe(1);
-    t.send({ type: 'slotSave', slot: 1, blueprint: { ...bp, wires: wires.slice(0, 3) }, plan: 'prospector' } as any);
-    expect(last('shipEditResult')!.ok).toBe(true);
-    expect(countOf(profile().storage, 'wire_spool')).toBe(2);
   });
 
   it('parts reaching storage fit themselves, from the core outwards, never leaving any loose', () => {

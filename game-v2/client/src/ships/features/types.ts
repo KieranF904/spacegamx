@@ -9,6 +9,7 @@ import type { ClientMessage, ShipState, Catalog, PlacedGeom, Charge } from '@spa
 import type { Container } from 'pixi.js';
 import type { ActionDef } from '../../input/keybindings';
 import type { InterpolatedEntity } from '../../state/GameState';
+import type { FeatureStatusLine } from '../../ui/shipStatus/source';
 
 /** What a client feature may ask of the game (ShipClient builds it once) */
 export interface ClientFeatureHost {
@@ -70,4 +71,6 @@ export interface ClientFeature {
   beginFrame?(shared: Container, host: ClientFeatureHost): void;
   drawShip?(ctx: ShipDrawCtx, host: ClientFeatureHost): void;
   indicator?: IndicatorDef;
+  /** Its line on the ship status panel (ui/shipStatus: a Burst Strafer's dodge, ready or cooling); null: none now */
+  status?(host: ClientFeatureHost): FeatureStatusLine | null;
 }

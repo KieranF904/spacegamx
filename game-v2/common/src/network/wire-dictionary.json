@@ -71,7 +71,9 @@
   "engine_burst_strafer",
   "utility_tow_beam",
   "power_conduit",
-  "power_diode"
+  "power_diode",
+  "utility_gyro",
+  "utility_heavy_gyro"
  ],
  "skip": [
   "power_pulse_dynamo",

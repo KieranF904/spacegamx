@@ -446,6 +446,7 @@ export class GameMenuUI {
         toggle('Jump drive screen effects', s.display.jumpEffects, (v) => upd((d) => { d.display.jumpEffects = v; }), 'Star streaks and the spooling vignette'),
         toggle('Pull the camera back during a jump', s.display.jumpCamera, (v) => upd((d) => { d.display.jumpCamera = v; })),
         toggle('Planets and moons', s.display.planets, (v) => upd((d) => { d.display.planets = v; }), 'Turn off on slow GPUs'),
+        slider('Your shield at rest', s.display.ownShield, 0, 1, 0.1, pctFmt, (v) => upd((d) => { d.display.ownShield = v; })),
         toggle('Damage numbers', s.display.damageNumbers, (v) => upd((d) => { d.display.damageNumbers = v; })),
         toggle('Pilot names', s.display.playerNames, (v) => upd((d) => { d.display.playerNames = v; })),
         toggle('Bloom', s.display.bloom, (v) => upd((d) => { d.display.bloom = v; }), 'Glow around engines, shots and sparks'),

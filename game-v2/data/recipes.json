@@ -1520,6 +1520,23 @@
         "insulated_polymer": 1
       },
       "time": 0
+    },
+    "utility_gyro": {
+      "inputs": {
+        "alloy_plate": 2,
+        "copper_wire": 1,
+        "servo_motor": 1
+      },
+      "time": 0
+    },
+    "utility_heavy_gyro": {
+      "inputs": {
+        "titanium_plate": 4,
+        "coil_winding": 2,
+        "servo_motor": 2,
+        "power_coupling": 1
+      },
+      "time": 200
     }
   }
 }

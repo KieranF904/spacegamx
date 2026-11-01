@@ -15,6 +15,7 @@ Every buildable ship part is a *model*: a `FunctionDef` (common/src/ships/types.
 | common/src/ships/describe.ts | - | `describePart()` (partStats plus the features' facts) and `describeFn()` (facts only, for palette cards) |
 | common/src/ships/mounting.ts | 185 | weapon mounting rules: `mountingOf`, `checkMounting`, `partMountingProblems`, `mountingWords`, `clearCells` |
 | common/src/ships/features/{tow,strafer,support}/ | - | each part feature: its `index.ts` (the `PartFeature`), its pure tuning and arithmetic (`tow.ts`, `strafer.ts`, `support.ts`), its tests and README. Server and client halves in `server/src/ships/features/` and `client/src/ships/features/` |
+| common/src/ships/features/gyro/ | - | the Gyro (sq, L6, alloy, 250 torque) and Heavy Gyro (block2, L20, titanium, 28,000): reaction wheels. `gyro` torque per cell goes into both turning caps wherever the part sits (`DeriveCtx.turn`, added to `maxTorque` in rebuild.ts), no thrust, `massScale` 1.5 / 2; power only while the spin changes, in proportion (flight hooks + `burst: 'engine'`), unpaid share of the turn taken back; a thruster role in the routing core (power/layout.ts) |
 | common/src/ships/models.test.ts, mounting.test.ts | - | catalogue/licence/migration invariants; mounting rules |
 | common/src/econ/market.ts | - | `modelLicensed(fn,_,level)`, `partLicensed()`; `common/src/econ/items.ts` `partItemId()` |
 | client/src/ui/componentGuide.ts, ComponentGuideUI.ts | - | Component Guide data (no DOM): `guideRows`, `rowGates`, tabs by `category` |

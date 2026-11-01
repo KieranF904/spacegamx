@@ -18,7 +18,7 @@ import { HullWorker } from './hullWorkerClient';
 import { fromWire, type HullJob } from './hullWire';
 import { buildHull, skeletonCovered, type HullBuild } from './hullBuild';
 import { beam } from '../rendering/fxTextures';
-import { EntityType, ShipState, SIDE_NORMAL, Side, facingEdges, isOpen, isWeaponFn, STATUS_SLOWED, wireCells, cellKey, type Blueprint, type WeaponInfo } from '@space-game/common';
+import { EntityType, ShipState, SIDE_NORMAL, Side, facingEdges, isOpen, isWeaponFn, STATUS_SLOWED, type Blueprint, type WeaponInfo } from '@space-game/common';
 import type { ShipSource } from './ShipStore';
 import type { GameState, InterpolatedEntity } from '../state/GameState';
 import type { Renderer } from '../rendering/Renderer';
@@ -88,14 +88,6 @@ interface BodyView {
    */
   hullFor: ShipState | null;
   hullCom?: readonly number[];
-  /**
-   * Its power wires over the hull (in its frame: they turn with it): the dark
-   * channel and the dim unpowered runs, and the lit ones (additive); what
-   * they were drawn from (the ship, its rebuild, a hash of which segments are
-   * lit) and when; how bright the lit ones are breathing. Every ship's are in
-   * two shared layers under the turrets (one blend switch for all, not two a ship)
-   */
-  wires?: { g: Graphics; glow: Graphics; ship: ShipState | null; rebuilds: number; sig: number; at: number; breath: number };
   labelAlpha: number;
 }
 
@@ -245,11 +237,6 @@ const GUN_MIN_PX = 3;
 /** Where another pilot's status row keeps its weapon statuses (features.wire.json status "statuses") */
 const STATUS_SLOT = 7;
 const HEADLIGHT = 0xfff0d6;
-/** Power wires: lit, live with nothing to run them, their channel; and the smallest a cell is on screen (px) for them to show */
-const WIRE_LIT = 0x8fe3ff, WIRE_DIM = 0x3c5566, WIRE_DARK = 0x10141c;
-const WIRE_MIN_PX = 5;
-/** On NPC ships (hostiles, traffic), only from this close in */
-const NPC_WIRE_MIN_PX = 9;
 /** Headlights come on below this much ambient and sunlight */
 const LAMPS_BELOW = 0.5;
 
@@ -351,9 +338,6 @@ export class ShipRenderer {
     this.lighting = renderer.lighting;
     this.hulls = new ShipBatch(this.lighting, bridge.tuning.cellSize);
     this.layer.addChild(this.underLayer, this.hulls.container, this.overLayer);
-    // Every ship's wires under every ship's turrets: the channels, then the lit runs (one additive run for them all)
-    this.wireGlowLayer.blendMode = 'add';
-    this.overLayer.addChild(this.wireLayer, this.wireGlowLayer);
     this.lighting.addSource(this.lights);
   }
 
@@ -368,16 +352,14 @@ export class ShipRenderer {
     return ((e.type === EntityType.Player ? e.data?.[5] : e.data?.[2]) ?? 0) > 0;
   }
 
-  private wireLayer = new Container();
   /** The one ctx every feature draw gets (fields reset per ship: no allocation per frame) */
   private featureCtx = {} as ShipDrawCtx;
   private geometryOf = (ship: ShipState) => this.bridge.geometry(ship);
-  private wireGlowLayer = new Container();
   private lights = (L: Lighting) => this.collectLights(L);
   private destroyed = false;
 
   /**
-   * Everything it made let go: every ship's view (hull slots, guns, wires, frames, labels), the hull worker, its batch's
+   * Everything it made let go: every ship's view (hull slots, guns, frames, labels), the hull worker, its batch's
    * GPU geometry and textures, its light source, its layers, and the gun looks no one else is using
    */
   destroy(): void {
@@ -581,7 +563,6 @@ export class ShipRenderer {
       if (away) {
         view.lamps = 0;
         if (view.beam) view.beam.visible = false;
-        if (view.wires) view.wires.g.visible = view.wires.glow.visible = false;
         continue;
       }
       const hostile = entity.type === EntityType.ShipBody && entity.data?.[0] === 3;
@@ -593,7 +574,6 @@ export class ShipRenderer {
       if (isRigid(ship)) this.ask(ship, cs, tint);
       if (!shown) {
         if (view.beam) view.beam.visible = false;
-        if (view.wires) view.wires.g.visible = view.wires.glow.visible = false;
         continue;
       }
       // (fading in only once its hull's there to show: built off the main thread, it may take a frame or two)
@@ -620,7 +600,6 @@ export class ShipRenderer {
       this.drawTurrets(view, ship, cs, dt * 60);
       this.drawBankGlow(view, ship, cs, eid === this.state.playerId);
       this.partFx.draw(view.container, view.guns, ship, this.bridge.geometry(ship), cs, now, eid === this.state.playerId ? this.state.charge : null);
-      this.drawWires(view, ship, cs, now, entity.type === EntityType.ShipBody && (hostile || entity.data?.[0] === 2));
       this.updateLamps(view, ship, entity, dt);
       if (this.features?.hasDrawers) {
         const fc = this.featureCtx;
@@ -695,7 +674,6 @@ export class ShipRenderer {
       view.fade -= dt / FADE;
       if (view.fade <= 0) { this.dispose(view); continue; }
       view.container.alpha = view.barrels.alpha = view.flames.alpha = view.fade;
-      if (view.wires) { view.wires.g.alpha = view.fade; view.wires.glow.alpha = view.wires.breath * view.fade; }
       this.placeHull(view);
       if (view.label) view.label.alpha = view.labelAlpha * view.fade;
       if (view.bar) view.bar.alpha = view.fade;
@@ -707,16 +685,12 @@ export class ShipRenderer {
   }
 
   /**
-   * The hull's slot follows the container (and the barrels, frame and wires with it). A hull built for parts since
+   * The hull's slot follows the container (and the barrels and frame with it). A hull built for parts since
    * lost (its new one still being built) is shifted onto the ship's centre of mass as it is now; one built for another
    * ship (a new design on its way) isn't drawn.
    */
   private placeHull(view: BodyView): void {
     const c = view.container, ship = view.ship;
-    if (view.wires) {
-      view.wires.g.position.copyFrom(c.position); view.wires.g.rotation = c.rotation;
-      view.wires.glow.position.copyFrom(c.position); view.wires.glow.rotation = c.rotation;
-    }
     let x = c.x, y = c.y;
     const com = ship?.derived.com, at = view.hullCom;
     if (com && at && (com[0] !== at[0] || com[1] !== at[1])) {
@@ -730,7 +704,6 @@ export class ShipRenderer {
     // (no hull of its own yet: nothing of it drawn, not its guns nor its flames floating without it)
     if (!mine) {
       view.barrels.visible = view.guns.visible = view.flames.visible = false;
-      if (view.wires) view.wires.g.visible = view.wires.glow.visible = false;
     }
     // (built whole: what shows is what's there)
     if (ship && mine && isRigid(ship)) {
@@ -761,7 +734,6 @@ export class ShipRenderer {
     this.clearBarrels(view);
     view.barrels.destroy();
     this.clearTurrets(view);
-    if (view.wires) { view.wires.g.destroy(); view.wires.glow.destroy(); view.wires = undefined; }
     this.disposeFrame(view);
     view.container.destroy({ children: true });
     view.hullFor = null;
@@ -934,49 +906,6 @@ export class ShipRenderer {
   }
 
   /**
-   * A ship's power wires over its hull (wires.ts), in its own frame: a dark
-   * channel along every segment still on it, lit in the power colour where it's
-   * live on a network with a generator, dim where it's live but unpowered; a cut
-   * one shows only its stub on what's left. Remade only when the structure
-   * changes and what's lit did too (a big ship's at most every BUILD_EVERY ms):
-   * a boss built whole keeps its geometry until a part breaks, and then only a
-   * hash over its segments is worked out. None on debris, nor while a cell is
-   * too small on screen for a wire to show (an NPC's, `npc`, from a little
-   * closer in). Drawn in the shared wire layers (one blend switch for every
-   * ship's), placed with the ship each frame (placeHull).
-   */
-  private drawWires(view: BodyView, ship: ShipState, cs: number, now: number, npc = false): void {
-    const d = ship.derived;
-    const show = ship.kind === 'ship' && d.wires.length > 0 && cs * this.renderer.getZoom() >= (npc ? NPC_WIRE_MIN_PX : WIRE_MIN_PX);
-    let w = view.wires;
-    if (!show) { if (w) w.g.visible = w.glow.visible = false; return; }
-    if (!w) {
-      w = view.wires = { g: new Graphics(), glow: new Graphics(), ship: null, rebuilds: -1, sig: 0, at: 0, breath: 1 };
-      w.glow.blendMode = 'add';
-      this.wireLayer.addChild(w.g);
-      this.wireGlowLayer.addChild(w.glow);
-    }
-    w.g.visible = w.glow.visible = true;
-    if (ship !== w.ship || ship.rebuilds !== w.rebuilds) {
-      const big = ship.blueprint.parts.length >= BIG_HULL;
-      if (!(big && ship === w.ship && now - w.at < BUILD_EVERY)) {
-        const networks = d.networks;
-        // Which segments are lit (0 cut, 1 live unpowered, 2 lit), hashed
-        let sig = d.wires.length;
-        for (let s = 0; s < d.wires.length; s++) sig = (Math.imul(sig, 31) + (!d.wireLive[s] ? 0 : networks[d.wireNet[s]]?.powered ? 2 : 1)) | 0;
-        if (ship !== w.ship || sig !== w.sig) this.layWires(w, ship, cs);
-        w.ship = ship; w.rebuilds = ship.rebuilds; w.sig = sig; w.at = now;
-      }
-    }
-    // The channel lit as the hull is; the lit runs breathe a little
-    w.g.tint = shade(0xffffff, this.lvl);
-    w.breath = 0.8 + 0.2 * Math.sin(now / 320 + view.id);
-    // (faded in and out with the ship, as its container is)
-    w.g.alpha = view.fade;
-    w.glow.alpha = w.breath * view.fade;
-  }
-
-  /**
    * The pilot's own Capacitor and Drive Cell members glow with their bank's charge (rework 2026-11 section 2.4): amber and
    * blue, brightest full, dark drained. Redrawn only when a bank's charge moves a step
    */
@@ -1005,45 +934,6 @@ export class ShipRenderer {
         poly.forEach(([x, y], j) => (j ? g.lineTo((x - cx) * cs, (y - cy) * cs) : g.moveTo((x - cx) * cs, (y - cy) * cs)));
         g.closePath().fill({ color, alpha: 0.05 + 0.5 * pct });
       }
-    }
-  }
-
-  private layWires(w: NonNullable<BodyView['wires']>, ship: ShipState, cs: number): void {
-    const d = ship.derived, [cx, cy] = d.com;
-    const cells = wireCells(this.bridge.catalog, ship.blueprint);
-    const live = (x: number, y: number) => cells.get(cellKey(x, y))?.some((i) => d.alive[i]) ?? false;
-    const X = (v: number) => (v + 0.5 - cx) * cs, Y = (v: number) => (v + 0.5 - cy) * cs;
-    const g = w.g.clear(), glow = w.glow.clear();
-    let dark = false, dim = false, lit = false;
-    // The channel: whole where both ends are on the ship, a stub to the break where one is
-    d.wires.forEach(([x0, y0, x1, y1], s) => {
-      const a = live(x0, y0), b = live(x1, y1);
-      if (!a && !b) return;
-      const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
-      if (a && b) g.moveTo(X(x0), Y(y0)).lineTo(X(x1), Y(y1));
-      else if (a) g.moveTo(X(x0), Y(y0)).lineTo(X(mx), Y(my));
-      else g.moveTo(X(x1), Y(y1)).lineTo(X(mx), Y(my));
-      dark = true;
-    });
-    if (dark) g.stroke({ color: WIRE_DARK, width: cs * 0.15, alpha: 0.9, cap: 'round' });
-    // Live but on a network with nothing to run it: a faint core
-    d.wires.forEach(([x0, y0, x1, y1], s) => {
-      if (!d.wireLive[s] || d.networks[d.wireNet[s]]?.powered) return;
-      g.moveTo(X(x0), Y(y0)).lineTo(X(x1), Y(y1));
-      dim = true;
-    });
-    if (dim) g.stroke({ color: WIRE_DIM, width: cs * 0.05, cap: 'round' });
-    // Lit: a soft halo and a bright core (a stroke takes the path it ends, so it's traced for each)
-    const trace = () => d.wires.forEach(([x0, y0, x1, y1], s) => {
-      if (!d.wireLive[s] || !d.networks[d.wireNet[s]]?.powered) return;
-      glow.moveTo(X(x0), Y(y0)).lineTo(X(x1), Y(y1));
-      lit = true;
-    });
-    trace();
-    if (lit) {
-      glow.stroke({ color: WIRE_LIT, width: cs * 0.2, alpha: 0.16, cap: 'round' });
-      trace();
-      glow.stroke({ color: WIRE_LIT, width: cs * 0.055, alpha: 0.95, cap: 'round' });
     }
   }
 

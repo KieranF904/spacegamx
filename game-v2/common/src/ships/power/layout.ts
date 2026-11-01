@@ -6,7 +6,7 @@
  *   normals, a shared triangle diagonal, and bespoke pieces' overlap joins). Corner contact never conducts. There are
  *   no wires: `bp.wires` plays no part in power.
  * - Roles: generator (`produce`), relay (the core, and anything with `store`: Battery, Capacitor, Drive Cell, Heavy
- *   Bank, Conduit, Diode), thruster (engines and Burst Strafers: their own buffer), tool (any other `demand`: shields,
+ *   Bank, Conduit, Diode), thruster (engines, Burst Strafers and Gyros: their own buffer), tool (any other `demand`: shields,
  *   scanners, coils, miners, Tow), weapon (every gun in `input.weapons`: its own buffer), dynamo (`dynamo`), inert.
  * - A consumer's sources are the generators and relays it touches. A relay touching a relay is an equalising pair. A
  *   generator pushes into the relays it touches. A dynamo tops up the relays it touches.
@@ -238,7 +238,8 @@ export function buildEnergyLayout(input: EnergyLayoutInput): EnergyLayout {
     } else if (fn.weapon) {
       const w = weaponOf.get(i);
       if (w) { role[i] = ROLE_WEAPON; weaponNumbers(i, fn, a, m, w, pt); }
-    } else if (isEngine(fn) || fn.strafe) {
+    } else if (isEngine(fn) || fn.strafe || (fn.gyro ?? 0) > 0) {
+      // (A Gyro is a thruster too: its torque is its thrust, active while the ship turns, features/gyro)
       role[i] = ROLE_THRUSTER;
       thrusterNumbers(i, fn, a, m, pt);
     } else if ((fn.store ?? 0) > 0) {
@@ -294,6 +295,10 @@ export function buildEnergyLayout(input: EnergyLayoutInput): EnergyLayout {
       const burstE = (burnE * fn.strafe.ticks) / 60;
       bufE = fn.buffer !== undefined ? fn.buffer * a * k : burstE;
       intakeE = fn.intake !== undefined ? fn.intake * a * k : burstE / 3.5;
+    } else if (!isEngine(fn)) {
+      // (A Gyro: no boost; a second of its burn buffered, refilled at its burn, unless it says otherwise)
+      bufE = fn.buffer !== undefined ? fn.buffer * a * k : burnE;
+      intakeE = fn.intake !== undefined ? fn.intake * a * k : burnE;
     } else {
       mul = fn.boost ?? 2.2;
       bBurnE = burnE * (1 + p.boostDraw * (fn.boostDrain ?? 1));

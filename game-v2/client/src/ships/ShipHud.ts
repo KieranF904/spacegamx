@@ -1,5 +1,7 @@
 /**
- * Ship HUD: core HP plus a small schematic of the ship, each part tinted by HP.
+ * Ship HUD: core HP plus a small schematic of the ship, each part tinted by HP, and the ship status readout
+ * (ui/shipStatus: a shield and energy summary under the CORE bar, and a foldable details column beside the schematic,
+ * refreshed at STATUS_HZ from the source ShipClient gives it).
  */
 
 import { setText, setStyle, setHtml } from '../ui/domWrite';
@@ -8,6 +10,11 @@ import type { ShipSource } from './ShipStore';
 import { hpColor, numToCss } from './shipColors';
 import { settings } from '../settings/Settings';
 import { boundKeyName } from '../input/keybindings';
+import { StatusPanel } from '../ui/shipStatus/StatusPanel';
+import { readStatus, newMemory, emptyStatus, type StatusInput } from '../ui/shipStatus/source';
+
+/** How often the status readout is refreshed (a second) */
+const STATUS_HZ = 10;
 
 export class ShipHud {
   private root: HTMLDivElement;
@@ -18,13 +25,21 @@ export class ShipHud {
   private lastSig = '';
 
   private mode: HTMLDivElement;
+  private status = new StatusPanel();
+  private statusMem = newMemory();
+  private statusRec = emptyStatus();
+  private statusAt = 0;
 
-  constructor(private bridge: ShipSource, private getPlayerId: () => number, private isHelm: () => boolean) {
+  constructor(private bridge: ShipSource, private getPlayerId: () => number, private isHelm: () => boolean,
+    private statusInput: () => StatusInput | null = () => null) {
     this.root = document.createElement('div');
+    // (The ship column; unfolded, the status details sit in their own box beside it: ui/shipStatus/StatusPanel.ts)
     this.root.style.cssText = `
       position: fixed; left: 16px; top: 64px; width: 180px; padding: 8px 10px 10px;
       background: rgba(8, 12, 22, 0.82); border: 1px solid rgba(120, 150, 200, 0.35); border-radius: 8px;
       font: 12px 'Courier New', monospace; color: #cfd8e6; z-index: 900; pointer-events: none;`;
+    this.root.dataset.hudAvoid = '1';
+    const col = document.createElement('div');
     this.label = document.createElement('div');
     const track = document.createElement('div');
     track.style.cssText = 'height: 6px; background: #1b2333; border-radius: 3px; margin: 4px 0 8px; overflow: hidden;';
@@ -32,13 +47,16 @@ export class ShipHud {
     this.bar.style.cssText = 'height: 100%; width: 100%; background: #4ade80; transition: width 0.1s;';
     track.appendChild(this.bar);
     this.canvas = document.createElement('canvas');
-    this.canvas.width = 160;
-    this.canvas.height = 120;
-    this.canvas.style.cssText = 'display: block; position: static; width: 160px; height: 120px;';
+    this.canvas.width = 180;
+    this.canvas.height = 88;
+    this.canvas.style.cssText = 'display: block; position: static; width: 180px; height: 88px;';
     this.ctx = this.canvas.getContext('2d')!;
     this.mode = document.createElement('div');
     this.mode.style.cssText = 'margin-top: 6px; color: #8ea0bd; font-size: 11px;';
-    this.root.append(this.label, track, this.canvas, this.mode);
+    const head = document.createElement('div');
+    head.append(this.status.fold, this.label);
+    col.append(head, track, this.status.summary, this.canvas, this.mode);
+    this.root.append(col, this.status.details);
     document.body.appendChild(this.root);
   }
 
@@ -74,6 +92,14 @@ const ship = this.bridge.get(this.getPlayerId());
     setText(this.label, `CORE ${Math.ceil(hp)} / ${Math.round(max)}`);
     setStyle(this.bar, 'width', `${Math.max(0, f * 100).toFixed(1)}%`);
     setStyle(this.bar, 'background', numToCss(hpColor(f)));
+
+    // The status readout, at STATUS_HZ (what it reads: ui/shipStatus/source.ts)
+    const now = performance.now();
+    if (now - this.statusAt >= 1000 / STATUS_HZ) {
+      this.statusAt = now;
+      const inp = this.statusInput();
+      if (inp) this.status.update(readStatus(inp, this.statusMem, this.statusRec));
+    }
 
     const sig = ship.hp.map((h, i) => (ship.detached[i] ? 'x' : Math.round((h / ship.maxHp[i]) * 20))).join(',') + ship.rebuilds;
     if (sig !== this.lastSig) {

@@ -209,19 +209,24 @@ describe('rebuild: structure and derived stats (M3)', () => {
     const d = derive(b);
     expect(d.maxTorque.cw).toBeLessThan(d.maxTorque.ccw);
 
-    // Fly it: equal-size turns left and right take different times
-    const ticksToTurn = (target: number) => {
+    // Fly it: it swings away quicker to the left (rest to rest the two even out: a turn speeds up on one side's thrust
+    // and brakes on the other's), and either way it settles on the heading without overshooting
+    const turn = (target: number) => {
       const body: FlightBody = { x: 0, y: 0, vx: 0, vy: 0, angle: -Math.PI / 2, angVel: 0 };
-      for (let t = 1; t < 600; t++) {
+      let early = 0, over = 0;
+      for (let t = 1; t <= 600; t++) {
         stepFlight(body, { forward: false, backward: false, left: false, right: false, boost: false, targetAngle: target },
           d, tuning, { fuel: 0, drainRate: 0 }, K);
-        if (Math.abs(body.angle - target) < 0.02 && Math.abs(body.angVel) < 0.005) return t;
+        if (t === 6) early = Math.abs(body.angle + Math.PI / 2);
+        over = Math.max(over, (body.angle - target) * Math.sign(target + Math.PI / 2));
       }
-      return 600;
+      expect(body.angle).toBeCloseTo(target, 3);
+      expect(over).toBeLessThan(0.005);
+      return early;
     };
-    const right = ticksToTurn(-Math.PI / 2 + 1.5);
-    const left = ticksToTurn(-Math.PI / 2 - 1.5);
-    expect(right).toBeGreaterThan(left);
+    const right = turn(-Math.PI / 2 + 1.5);
+    const left = turn(-Math.PI / 2 - 1.5);
+    expect(right).toBeLessThan(left);
   });
 });
 

@@ -46,6 +46,11 @@ export interface DeriveCtx {
   parts: readonly number[];
   /** Where the feature writes what it derived (`out.<its key>`) */
   out: FeatureDerived;
+  /**
+   * Turning torque a feature adds to the ship, both ways and wherever its parts sit (a Gyro's): rebuild.ts adds `torque`
+   * to `maxTorque.cw` and `.ccw` after the features derive. Shared by every feature of the rebuild: add to it, never set
+   */
+  turn: { torque: number };
 }
 
 /** The ship a load() hook draws for: what energy.ts gunLoad gets */

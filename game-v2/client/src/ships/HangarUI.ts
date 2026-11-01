@@ -11,12 +11,11 @@
  * many of each crate its guns carry, and which they open first. Docking,
  * launching and flying it top the hold up to that from storage.
  *
- * Power runs along wires (common/src/ships/wires.ts): the Wires tool (W)
- * lays them by dragging across cells, erases them with a right-drag (or its
- * Erase mode), and lays the lot afresh (Auto-wire). A design nobody's wired
- * by hand is auto-wired, free, until it's edited; one wired by hand pays its
- * new segments in wire spools as it's saved. The power overlay shows each
- * network in its own colour, and what's left without power.
+ * Wiring is retired (docs/design/energy-routing-impl.md D1): there is no
+ * wire tool and no wire is drawn. A saved design's wires stay in it (pruned
+ * as parts go) for the old energy system, which still auto-wires inside until
+ * the switch-over. The power overlay marks generators and batteries and what's
+ * left without power; P5 replaces it with the energy overlay.
  *
  * The palette leads with the parts you have (storage and hold, and what this
  * slot already carries), by category; then what you can fabricate here; then
@@ -29,7 +28,7 @@
  * (rules still apply), and saving takes nothing.
  *
  * Click: place · middle-click: pick a placed part up · middle-drag: pan · R: rotate · F: mirror (flips a side mount) · T: cycle facing · right-click: remove
- * W: wires tool · E: draw / erase wires · Wheel: zoom · arrow keys: pan · Esc / H: close
+ * Wheel: zoom · arrow keys: pan · Esc / H: close
  */
 
 import {
@@ -38,15 +37,15 @@ import {
   validateBlueprint, nextFreeUid, floodFill, partNeedsFacing, createShipState, connectorEndpoints, getVariant,
   BlueprintError, TurretWindow, computeTurretWindow, ClientMessage, ServerHangarMessage, partDemand, parsePartItemId,
   isStructural, ghostBill, SALVAGE, ShipState, buildPoints, DAMAGE_NAMES, type DamageType,
-  loadoutKinds, cratesFor, crateOrder, MAX_LOADOUT_CRATES, autoWire, wireCells, cellKey, cellOf, WIRE_ITEM, SEGMENTS_PER_SPOOL,
-  type FunctionDef, type WireSeg, mountingOf, weaponSides, clearCells, partMountingProblems, type MountingProblem } from '@space-game/common';
+  loadoutKinds, cratesFor, crateOrder, MAX_LOADOUT_CRATES, wireCells, cellKey,
+  type FunctionDef, mountingOf, weaponSides, clearCells, partMountingProblems, type MountingProblem } from '@space-game/common';
 import { cargoEffect, CATEGORY_MASS, strafeForce, bestDodge, burstEnergy, DODGE_FORWARD, DODGE_BACK, DODGE_LEFT, DODGE_RIGHT } from '@space-game/common';
 import { bankKind, gunDrawFlatOut, energyTuning, loadTest, BROWNOUT, type LoadTestResult } from '@space-game/common';
 import { settings } from '../settings/Settings';
 import { boundKeyName } from '../input/keybindings';
 import { costHtml } from '../ui/windowKit';
 import { CONNECTOR_COLOR, functionColor, numToCss } from './shipColors';
-import { cellAt, eraseRun, layRun, powerReport, pruneWires, stepCells, wireBill, DEAD_NET, type Cell, type PowerReport } from './wireEdit';
+import { powerReport, pruneWires, DEAD_NET, type PowerReport } from './wireEdit';
 
 /** The hangar's load test: this many seconds of the ship's power, from full (energy.ts loadTest) */
 const LOAD_TEST_SECONDS = 4;
@@ -76,7 +75,7 @@ export interface HangarDeps {
   have(id: string): number;
   /** Mass of what's in the hold now (common/src/ships/load.ts) */
   cargoMass?(): number;
-  /** Station storage's count of an item (what a save pays from: wire spools) */
+  /** Station storage's count of an item (unused since wire spools stopped being billed) */
   stored?(id: string): number;
   /** Parts on their way from the fabricator */
   coming(): Bag;
@@ -126,11 +125,6 @@ export class HangarUI {
   private pan: { x: number; y: number; cx: number; cy: number; at: Vec2; moved: boolean } | null = null;
   private mouse: Vec2 | null = null;
   private overlays: Record<Overlay, boolean> = { connectors: false, joins: false, power: true, com: true, thrust: true, arcs: true };
-  /** Placing parts, or laying wires (and whether a left-drag erases them) */
-  private tool: 'parts' | 'wires' = 'parts';
-  private wireErase = false;
-  /** A wire drag in progress: erasing or laying, and the cell it last reached */
-  private wireDrag: { erase: boolean; last: Cell } | null = null;
   /** The power overlay's networks and warnings (from the design's derived state) */
   private power: PowerReport | null = null;
   /** The last load test (local circuits): which, on which design (it's dropped once the design changes), and what it found */
@@ -279,13 +273,10 @@ export class HangarUI {
         if (pan.moved) { this.view.cx = pan.cx - dx / this.view.px; this.view.cy = pan.cy - dy / this.view.px; this.draw(); return; }
       }
       this.mouse = this.toGrid(e);
-      if (this.wireDrag) { this.wireTo(cellAt(this.mouse[0], this.mouse[1])); return; }
-      // (no part tooltips over the wires: they'd hide what's being wired)
       this.draw();
-      if (this.tool === 'parts') this.gridTip(e);
+      this.gridTip(e);
     });
     window.addEventListener('mouseup', (e) => {
-      if (this.wireDrag && e.button !== 1) { this.wireDrag = null; this.refresh(); return; }
       if (e.button !== 1 || !this.pan) return;
       const pan = this.pan;
       this.pan = null;
@@ -295,8 +286,6 @@ export class HangarUI {
     this.canvas.addEventListener('mouseleave', () => { this.mouse = null; this.draw(); this.hideTip(); });
     this.canvas.addEventListener('mousedown', (e) => {
       const g = this.toGrid(e);
-      // The wires tool: a left-drag lays (or, in Erase mode, erases), a right-drag erases
-      if (this.tool === 'wires' && (e.button === 0 || e.button === 2)) { this.wireStart(cellAt(g[0], g[1]), e.button === 2 || this.wireErase); return; }
       if (e.button === 0) this.place(g);
       if (e.button === 1) { e.preventDefault(); this.pan = { x: e.clientX, y: e.clientY, cx: this.view.cx, cy: this.view.cy, at: g, moved: false }; }
       if (e.button === 2) this.remove(g);
@@ -401,9 +390,7 @@ export class HangarUI {
     else if (code === 'KeyT') {
       const order: (Side | 'auto')[] = ['auto', ...SIDES];
       this.sel.facing = order[(order.indexOf(this.sel.facing) + 1) % order.length];
-    } else if (code === 'KeyW') this.setTool(this.tool === 'wires' ? 'parts' : 'wires');
-    else if (code === 'KeyE' && this.tool === 'wires') this.wireErase = !this.wireErase;
-    else if(code === 'Escape' || code === 'KeyH') { this.close(null); return true; }
+    } else if (code === 'Escape' || code === 'KeyH') { this.close(null); return true; }
     else if (code === 'ArrowLeft') this.view.cx -= 1;
     else if (code === 'ArrowRight') this.view.cx += 1;
     else if (code === 'ArrowUp') this.view.cy -= 1;
@@ -540,71 +527,10 @@ export class HangarUI {
     this.refresh();
   }
 
-  // -------------------------------------------------------------------------
-  // Wires
-  // -------------------------------------------------------------------------
-
-  private setTool(tool: 'parts' | 'wires'): void {
-    this.tool = tool;
-    this.wireDrag = null;
-    this.canvas.style.cursor = tool === 'wires' ? 'cell' : 'crosshair';
-    this.hideTip();
-    this.renderPalette();
-    this.draw();
-  }
-
-  /** Is a cell under one of the design's parts (where a wire can run) */
+  /** Is a cell under one of the design's parts (where saved wire stays) */
   private onHull(): (x: number, y: number) => boolean {
     const cells = wireCells(this.deps.catalog, this.bp, this.bp.parts.map((p) => placeGeometry(this.deps.catalog, p)));
     return (x, y) => cells.has(cellKey(x, y));
-  }
-
-  /** The design's wires to edit by hand: an auto-wired one starts from what Auto-wire lays */
-  private handWires(): WireSeg[] {
-    if (!this.bp.wires) this.bp.wires = autoWire(this.bp, this.deps.catalog).map((w) => [...w] as WireSeg);
-    return this.bp.wires;
-  }
-
-  private wireStart(cell: Cell, erase: boolean): void {
-    const wires = this.handWires();
-    if (erase) this.bp.wires = eraseRun(wires, [cell]);
-    this.wireDrag = { erase, last: cell };
-    this.wiresChanged();
-  }
-
-  /** The drag reached another cell: lay (or erase) the run there from the last */
-  private wireTo(cell: Cell): void {
-    const drag = this.wireDrag!;
-    if (cell[0] === drag.last[0] && cell[1] === drag.last[1]) return;
-    const run = stepCells(drag.last, cell), wires = this.handWires();
-    this.bp.wires = drag.erase ? eraseRun(wires, run) : layRun(wires, run, this.onHull());
-    drag.last = cell;
-    this.wiresChanged();
-  }
-
-  /** Mid-drag: the power overlay follows (the panels catch up on release) */
-  private wiresChanged(): void {
-    this.rederive();
-    this.draw();
-  }
-
-  private autoWireAll(): void {
-    this.bp.wires = autoWire(this.bp, this.deps.catalog).map((w) => [...w] as WireSeg);
-    this.status(`auto-wired: ${this.bp.wires.length} segments from the generators to everything that uses power`);
-    this.refresh();
-  }
-
-  private clearWires(): void {
-    this.bp.wires = [];
-    this.status('wires cleared: only what touches a generator has power');
-    this.refresh();
-  }
-
-  /** Back to auto-wiring (free: the wires follow the parts) */
-  private unwire(): void {
-    delete this.bp.wires;
-    this.status('auto-wired again: the wires follow your parts, free');
-    this.refresh();
   }
 
   private newBlueprint(): void {
@@ -905,7 +831,7 @@ export class HangarUI {
   }
 
   /**
-   * The palette: the tool (parts or wires), the part in hand, a category
+   * The palette: the part in hand, a category
    * filter, then the parts themselves, what you have first: your parts (with
    * how many), structure (built from materials), what you can fabricate here,
    * and what's locked and why, folded away. Built as one string (it's redrawn
@@ -916,25 +842,6 @@ export class HangarUI {
     const el = this.palette, scroll = el.scrollTop;
     el.innerHTML = '';
     if (this.tipKey.startsWith('p:')) this.hideTip();
-
-    // The tool: parts, or wires
-    const tools = document.createElement('div');
-    tools.style.cssText = 'display:grid; grid-template-columns: 1fr 1fr; gap:3px; margin-bottom:8px;';
-    for (const [t, text, tip] of [['parts', 'Parts', 'Place and remove parts'], ['wires', '⚡ Wires', 'Lay power wires across the hull (W)']] as const) {
-      const on = this.tool === t;
-      const b = document.createElement('button');
-      b.textContent = text;
-      b.title = tip;
-      b.style.cssText = `background:${on ? '#24406b' : '#0f1626'}; color:${on ? '#fff' : '#9fb0cc'}; border:1px solid ${on ? '#5fd4c4' : '#2a3a5a'}; border-radius:4px; padding:5px 2px; cursor:pointer; font-size:12px; font-weight:${on ? 600 : 400};`;
-      b.onclick = () => this.setTool(t);
-      tools.append(b);
-    }
-    el.append(tools);
-    if (this.tool === 'wires') {
-      this.renderWirePanel(el);
-      el.scrollTop = scroll;
-      return;
-    }
 
     el.append(this.handCard());
     el.append(this.filterRow());
@@ -949,7 +856,7 @@ export class HangarUI {
 
     const info = document.createElement('div');
     info.style.cssText = 'line-height:1.6; color:#6b7a93; margin:10px 0 8px; font-size:11px;';
-    info.innerHTML = `Click places · right-click removes · <b style="color:#9fb0cc">middle-click picks a part up</b><br>R turn · F mirror · T facing · W wires · wheel zooms · middle-drag or arrows pan`;
+    info.innerHTML = `Click places · right-click removes · <b style="color:#9fb0cc">middle-click picks a part up</b><br>R turn · F mirror · T facing · wheel zooms · middle-drag or arrows pan`;
     el.append(info);
 
     el.append(foldHeading('Overlays', this.folded.overlays, () => { this.folded.overlays = !this.folded.overlays; this.renderPalette(); }));
@@ -1229,64 +1136,6 @@ export class HangarUI {
     return html;
   }
 
-  /**
-   * The wires tool: draw or erase, Auto-wire, Clear, back to auto-wiring;
-   * whether the design is auto-wired (free, following its parts) or wired by
-   * hand, and what saving the wiring costs in spools
-   */
-  private renderWirePanel(el: HTMLElement): void {
-    const wires = this.bp.wires;
-    el.append(heading('Power wires'));
-    const intro = document.createElement('div');
-    intro.style.cssText = 'color:#8ea0bd; font-size:11px; line-height:1.5; margin-bottom:8px;';
-    intro.innerHTML = 'Power runs from the generators along wires to what uses it. A part touching a generator is plugged straight in; modules touching modules share nothing. Shoot away the block under a wire and it\'s cut there.';
-    el.append(intro);
-    const state = document.createElement('div');
-    state.style.cssText = 'background:#0d1524; border:1px solid #24324d; border-radius:8px; padding:7px 8px; margin-bottom:8px; font-size:11px; line-height:1.5;';
-    const n = this.derived?.wires.length ?? 0;
-    if (!wires) {
-      state.innerHTML = `<div style="color:#7dd3fc; font-weight:600">Auto-wired</div><div style="color:#a7b4c8">${n} segment${n === 1 ? '' : 's'} laid for you, free: they follow your parts as you change them, until you edit a wire.</div>`;
-    } else {
-      const saved = this.deps.hangarState()?.slots[this.slot]?.blueprint.wires;
-      const bill = wireBill(saved, wires), have = this.deps.stored?.(WIRE_ITEM) ?? this.deps.have(WIRE_ITEM);
-      const cost = this.free ? '<span style="color:#6b7a93">free here</span>'
-        : bill.spools > 0 ? `<span style="color:${have >= bill.spools ? '#fbbf24' : '#f87171'}">saving takes ${bill.spools} wire spool${bill.spools > 1 ? 's' : ''}</span> <span style="color:#6b7a93">(${have} in storage)</span>`
-        : bill.spools < 0 ? `<span style="color:#4ade80">saving returns ${-bill.spools} spool${bill.spools < -1 ? 's' : ''}</span>`
-        : '<span style="color:#6b7a93">no new spools to save</span>';
-      state.innerHTML = `<div style="color:#fbbf24; font-weight:600">Wired by hand</div>`
-        + `<div style="color:#a7b4c8">${wires.length} segment${wires.length === 1 ? '' : 's'} · ${Math.ceil(wires.length / SEGMENTS_PER_SPOOL)} spool${Math.ceil(wires.length / SEGMENTS_PER_SPOOL) === 1 ? '' : 's'}`
-        + `${saved ? ` <span style="color:#6b7a93">(saved: ${saved.length})</span>` : ' <span style="color:#6b7a93">(saved: auto-wired)</span>'}</div><div>${cost}</div>`
-        + `<div style="color:#6b7a93">A spool lays ${SEGMENTS_PER_SPOOL} segments; ones you take out come back.</div>`;
-    }
-    el.append(state);
-    // Draw / erase
-    const modes = document.createElement('div');
-    modes.style.cssText = 'display:flex; gap:3px; margin-bottom:6px;';
-    const draw = chip('Draw', !this.wireErase, '#fbbf24', () => { this.wireErase = false; this.renderPalette(); });
-    draw.title = 'Drag across cells to lay wire between them (E switches)';
-    const erase = chip('Erase', this.wireErase, '#f87171', () => { this.wireErase = true; this.renderPalette(); });
-    erase.title = 'Drag across cells to take their wire out (a right-drag always erases)';
-    modes.append(draw, erase);
-    el.append(modes);
-    const acts = document.createElement('div');
-    acts.style.cssText = 'display:flex; flex-wrap:wrap; gap:4px; margin-bottom:10px;';
-    const auto = button('Auto-wire', () => this.autoWireAll(), '#1d3d5c');
-    auto.title = 'Lay the shortest runs from the generators to everything that makes, stores or draws power (replaces your wiring)';
-    const clear = button('Clear wires', () => this.clearWires(), '#3a1f2a');
-    clear.title = 'Take every wire out: only what touches a generator keeps its power';
-    acts.append(auto, clear);
-    if (wires) {
-      const back = button('Back to auto', () => this.unwire());
-      back.title = 'Forget the hand wiring: auto-wired again, free, following the parts';
-      acts.append(back);
-    }
-    el.append(acts);
-    const info = document.createElement('div');
-    info.style.cssText = 'line-height:1.6; color:#6b7a93; margin-bottom: 8px; font-size:11px;';
-    info.innerHTML = 'Drag lays wire cell to cell (diagonals too) · <b style="color:#9fb0cc">right-drag erases</b><br>E draw / erase · W back to parts · wheel zooms · middle-drag pans';
-    el.append(info);
-  }
-
   /** Slot tabs: which ship you're designing */
   private renderSlots(): void {
     const hs = this.deps.hangarState();
@@ -1450,16 +1299,15 @@ export class HangarUI {
 
   /**
    * Power: each network (in its overlay colour) with its generators and
-   * batteries and what it makes against what's drawn on it, whether the design
-   * is auto-wired or wired by hand, and what's left without power; then the
-   * ship's pool and Output, its banks, and the load test
+   * batteries and what it makes against what's drawn on it, and what's left
+   * without power; then the ship's pool and Output, its banks, and the load
+   * test. (The networks are the old energy system's: P5 replaces this with the
+   * energy overlay's report.)
    */
   private powerHtml(): string {
     const rep = this.power, d = this.derived;
     if (!rep || !d) return '';
-    const hand = !!this.bp.wires;
-    let html = `<div style="display:flex; align-items:baseline; margin-bottom:4px"><b style="color:#ffb547; letter-spacing:1px">POWER</b>`
-      + `<span style="margin-left:auto; font-size:11px; color:${hand ? '#fbbf24' : '#7dd3fc'}" title="${hand ? 'Wired by hand: new segments cost wire spools as you save' : 'Auto-wired: the wires follow your parts, free, until you edit them (the Wires tool, W)'}">${hand ? 'wired by hand' : 'auto-wired'}</span></div>`;
+    let html = `<div style="display:flex; align-items:baseline; margin-bottom:4px"><b style="color:#ffb547; letter-spacing:1px">POWER</b></div>`;
     const nets = rep.nets.map((n, k) => ({ n, k })).filter(({ n }) => n.generators.length || n.batteries.length || n.demand > 0);
     if (!nets.length) html += '<div style="color:#6b7a93; font-size:11px; margin-bottom:4px">No generator on this ship.</div>';
     for (const { n, k } of nets) {
@@ -1502,7 +1350,6 @@ export class HangarUI {
     if (rep.warnings.length) {
       html += `<div style="margin:5px 0 2px; font-size:11px; line-height:1.45">${rep.warnings.slice(0, 6).map((w) => `<div style="color:${/no power/.test(w) ? '#f87171' : '#fbbf24'}">• ${esc(w.charAt(0).toUpperCase() + w.slice(1))}</div>`).join('')}`
         + `${rep.warnings.length > 6 ? `<div style="color:#6b7a93">and ${rep.warnings.length - 6} more</div>` : ''}</div>`;
-      if (this.tool !== 'wires') html += '<div style="color:#6b7a93; font-size:11px">The Wires tool (W) lays what\'s missing.</div>';
     } else if (nets.length) html += '<div style="color:#4ade80; font-size:11px; margin-top:4px">Everything that uses power has it.</div>';
     return html + '<div style="margin-bottom:12px"></div>';
   }
@@ -1813,8 +1660,8 @@ export class HangarUI {
         ctx.beginPath(); ctx.arc(sx((A[0] + B[0]) / 2), sy((A[1] + B[1]) / 2), 2.5, 0, Math.PI * 2); ctx.fill();
       }
     }
-    // Power: the wires over the hull, each network its own colour (always, with the wires tool)
-    if (d && (this.overlays.power || this.tool === 'wires')) this.drawPower(d, sx, sy);
+    // Power: generators, batteries and what lacks power, each network its own colour
+    if (d && this.overlays.power) this.drawPower(d, sx, sy);
     if (d && this.overlays.thrust) {
       ctx.strokeStyle = '#7dd3fc';
       ctx.fillStyle = '#7dd3fc';
@@ -1835,9 +1682,8 @@ if (d && this.overlays.com && d.mass > 0) {
       ctx.beginPath(); ctx.moveTo(X - 11, Y); ctx.lineTo(X + 11, Y); ctx.moveTo(X, Y - 11); ctx.lineTo(X, Y + 11); ctx.stroke();
     }
 
-    // Ghost (the wires tool: the cell under the mouse)
-    if (this.mouse && this.tool === 'wires') this.drawWireCursor(sx, sy);
-    else if (this.mouse) {
+    // Ghost
+    if (this.mouse) {
       const cand = this.candidate(this.mouse);
       if (cand) {
         const g = placeGeometry(this.deps.catalog, cand);
@@ -1949,42 +1795,13 @@ if (d && this.overlays.com && d.mass > 0) {
   }
 
   /**
-   * The power overlay: each wire segment, cell centre to cell centre, in its
-   * network's colour (a cut one dashed dark red); generators ringed and
-   * batteries barred in their network's colour; what's left without power
-   * outlined red (short of it, amber). With the wires tool, a dot on every
-   * cell a wire can run through.
+   * The power overlay: generators ringed and batteries barred in their
+   * network's colour; what's left without power outlined red (short of it,
+   * amber). No wires: they're retired, and not drawn.
    */
   private drawPower(d: ShipDerived, sx: (x: number) => number, sy: (y: number) => number): void {
     const ctx = this.ctx, px = this.view.px, rep = this.power;
     if (!rep) return;
-    const wiring = this.tool === 'wires';
-    const X = (v: number) => sx(v + 0.5), Y = (v: number) => sy(v + 0.5);
-    if (wiring) {
-      const r = Math.max(1, px * 0.045);
-      ctx.fillStyle = 'rgba(159, 179, 209, 0.45)';
-      for (const k of wireCells(this.deps.catalog, this.bp, this.geoms).keys()) {
-        const [x, y] = cellOf(k);
-        ctx.fillRect(X(x) - r, Y(y) - r, r * 2, r * 2);
-      }
-    }
-    const w = Math.max(2, px * (wiring ? 0.15 : 0.1));
-    ctx.lineCap = 'round';
-    // (a dark line under it, so a wire reads over any hull)
-    ctx.strokeStyle = 'rgba(3, 5, 10, 0.8)';
-    ctx.lineWidth = w + 3;
-    ctx.beginPath();
-    for (const [x0, y0, x1, y1] of d.wires) { ctx.moveTo(X(x0), Y(y0)); ctx.lineTo(X(x1), Y(y1)); }
-    ctx.stroke();
-    ctx.lineWidth = w;
-    d.wires.forEach(([x0, y0, x1, y1], s) => {
-      const col = rep.seg[s];
-      ctx.setLineDash(col ? [] : [w * 1.2, w * 1.4]);
-      ctx.strokeStyle = col ?? '#9f2a2a';
-      ctx.beginPath(); ctx.moveTo(X(x0), Y(y0)); ctx.lineTo(X(x1), Y(y1)); ctx.stroke();
-    });
-    ctx.setLineDash([]);
-    ctx.lineCap = 'butt';
     // Parts: what makes and stores power, in its network's colour; what lacks it
     const ring = Math.max(4, px * 0.26);
     this.geoms.forEach((g, i) => {
@@ -2116,19 +1933,6 @@ if (d && this.overlays.com && d.mass > 0) {
     ctx.closePath();
     ctx.fillStyle = color; ctx.strokeStyle = 'rgba(3, 5, 10, 0.9)'; ctx.lineWidth = 1;
     ctx.fill(); ctx.stroke();
-  }
-
-  /** The wires tool's cursor: the cell under the mouse (amber to lay, red to erase, grey off the hull) */
-  private drawWireCursor(sx: (x: number) => number, sy: (y: number) => number): void {
-    const ctx = this.ctx, [x, y] = cellAt(this.mouse![0], this.mouse![1]);
-    const on = this.onHull()(x, y), erase = this.wireDrag?.erase ?? this.wireErase;
-    ctx.strokeStyle = !on ? '#4b5870' : erase ? '#f87171' : '#fbbf24';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(sx(x) + 1, sy(y) + 1, this.view.px - 2, this.view.px - 2);
-    if (on) {
-      ctx.fillStyle = erase ? 'rgba(248, 113, 113, 0.18)' : 'rgba(251, 191, 36, 0.16)';
-      ctx.fillRect(sx(x) + 1, sy(y) + 1, this.view.px - 2, this.view.px - 2);
-    }
   }
 
   /**

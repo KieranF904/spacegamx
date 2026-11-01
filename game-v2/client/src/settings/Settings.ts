@@ -29,6 +29,8 @@ export interface SettingsData {
     quality: QualitySetting;
     /** Frame-rate cap (0: none) */
     fpsCap: number;
+    /** Your own shield's resting rim, 0..1 of the full look (hits and recharging always show) */
+    ownShield: number;
   };
   ui: {
     navMarkers: boolean; minimap: boolean; shipHud: boolean; netStats: boolean; chat: boolean; hazardEffects: boolean;
@@ -45,7 +47,7 @@ export interface SettingsData {
 export function defaultSettings(): SettingsData {
   return {
     audio: { master: 0.8, sfx: 1, music: 0.5, muteUnfocused: true },
-    display: { screenShake: 1, jumpEffects: true, jumpCamera: true, planets: true, damageNumbers: true, playerNames: true, bloom: true, lighting: true, renderScale: 1, quality: 'high', fpsCap: 0 },
+    display: { screenShake: 1, jumpEffects: true, jumpCamera: true, planets: true, damageNumbers: true, playerNames: true, bloom: true, lighting: true, renderScale: 1, quality: 'high', fpsCap: 0, ownShield: 0.6 },
     ui: { navMarkers: true, minimap: true, shipHud: true, netStats: false, chat: true, hazardEffects: true, questTracker: true, questGuide: true },
     gameplay: { controlMode: 'mouse', jumpMode: 'tap', invertZoom: false, zoomSpeed: 1 },
     bindings: Object.fromEntries(ACTIONS.filter((a) => a.rebindable !== false).map((a) => [a.id, a.key])),

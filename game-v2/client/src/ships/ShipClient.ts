@@ -35,6 +35,7 @@ import type { Renderer } from '../rendering/Renderer';
 import { ShipStore } from './ShipStore';
 import { ShipRenderer } from './ShipRenderer';
 import { ShipHud } from './ShipHud';
+import type { StatusInput, FeatureStatusLine } from '../ui/shipStatus/source';
 import type { HangarUI } from './HangarUI';
 import { Lazy } from '../lazy';
 import { JumpFx } from './JumpFx';
@@ -191,7 +192,7 @@ export class ShipClient {
     this.repairHint.style.color = '#9ffcff';
     this.repairHint.style.display = 'none';
     document.body.appendChild(this.repairHint);
-    this.hud = new ShipHud(this.store, () => opts.state.playerId, () => this.helm);
+    this.hud = new ShipHud(this.store, () => opts.state.playerId, () => this.helm, () => this.statusInput());
     this.hangar = new Lazy(() => import('./HangarUI').then(({ HangarUI }) => new HangarUI({
       catalog: opts.catalog,
       tuning: opts.tuning,
@@ -911,6 +912,36 @@ export class ShipClient {
     this.ringSrc.charge = this.opts.state.charge;
     return this.ringModel.update(ship ?? null, this.ringSrc);
   }
+
+  /**
+   * What the ship status panel reads (ui/shipStatus/source.ts), at its own rate: the ship, the predicted charge, the
+   * shield, the keys' thrust, the weapon ring's groups (as the ring last stepped them) and the part features' lines.
+   * The record is reused.
+   */
+  private statusInput(): StatusInput | null {
+    const st = this.opts.state, ship = this.store.get(st.playerId);
+    if (!ship || ship.kind !== 'ship') return null;
+    const inp = this.statusRec;
+    inp.ship = ship;
+    inp.charge = st.charge;
+    inp.shieldPct = st.entities.get(st.playerId)?.data?.[4] ?? 0;
+    const cmd = this.localThrustCommand();
+    inp.thrust.on = cmd.dir[0] !== 0 || cmd.dir[1] !== 0;
+    inp.thrust.boost = cmd.boost;
+    inp.tick = st.serverTick;
+    inp.tuning = this.opts.tuning;
+    // (The ring's groups as Game stepped them this frame; stepped here only when nothing has)
+    inp.groups = this.ringModel.groups.length || !ship.derived.weapons.length ? this.ringModel.groups : this.ringGroups();
+    inp.features = this.features.statusLines(this.statusLines);
+    inp.now = performance.now();
+    return inp;
+  }
+  private readonly statusLines: FeatureStatusLine[] = [];
+  private readonly statusRec: StatusInput = {
+    ship: null, charge: { g: 100, b: [] }, shieldPct: 0, thrust: { on: false, boost: false }, tick: 0, tuning: {} as StatusInput['tuning'],
+    groups: [], features: [], now: 0,
+    nameOf: (fn) => this.opts.catalog.functions.get(fn)?.name ?? fn,
+  };
 
   private readonly ringSrc: RingSources = {
     charge: { g: 100, b: [] },

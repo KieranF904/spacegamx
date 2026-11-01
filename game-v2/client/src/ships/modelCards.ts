@@ -23,6 +23,8 @@ export const FAMILY_LABEL: Record<string, string> = {
   repair: 'Repair beams', point_defence: 'Point defence',
   // (Burst Strafer and Tow Beam: ships/strafer.ts, tow.ts)
   strafer: 'Strafers', tow: 'Tow beams',
+  // (Gyro and Heavy Gyro: common/src/ships/features/gyro)
+  gyro: 'Gyros',
 };
 export const LEGENDARY = 'Legendary';
 const FAMILY_ORDER = Object.keys(FAMILY_LABEL);

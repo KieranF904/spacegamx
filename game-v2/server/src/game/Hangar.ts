@@ -5,8 +5,8 @@
  * ship, then storage, then modules in your hold) from the core outwards; the
  * rest are ghosts, which you can design with as long as you know how to make
  * them (an admin's free build on a dev server takes nothing and needs no licence). Structure (hull,
- * armour, holds) is paid for in refined materials as it goes in, and its
- * wires in wire spools (one lays four segments) as the design is saved;
+ * armour, holds) is paid for in refined materials as it goes in (wires are
+ * retired: a design's saved wires are kept but cost nothing, energy-routing-impl.md D1);
  * modules (weapons, generators, thrusters...) take their fabricated item
  * (econ/salvage.ts). Ghosts fill in by themselves as what they take reaches
  * storage, always from the core outwards so nothing ever hangs loose. The
@@ -29,7 +29,7 @@
 import {
   Blueprint, Bag, Economy, ShipRecord, PlayerProfile, Catalog, ServerMessage, unlocks,
   partItemId, canCraft, countOf, addTo, removeFrom, installableGhosts, setActiveShip, placeGeometry, computeJoins,
-  placeCost, ghostBill, salvageParts, orderRanking, CraftJob, partLicensed, wireSpools, WIRE_ITEM,
+  placeCost, ghostBill, salvageParts, orderRanking, CraftJob, partLicensed,
   socketsFor, setPartGems, parseGemItemId, type GemsFile, buildPoints, shipLoadout } from '@space-game/common';
 import type { Pilots, PilotConn } from './Pilots.js';
 import type { StationServices, JobTag } from './StationServices.js';
@@ -161,9 +161,6 @@ export class Hangar {
     }
     if (unlicensed.length) return [`you aren't licensed to fit ${[...new Set(unlicensed)].slice(0, 3).join(', ')}: each opens at its level`];
     if (missing.length) return [`you can't make ${[...new Set(missing)].slice(0, 3).join(', ')} yet: it opens at its level`];
-    // Wires: a spool lays four segments, paid as the design is saved (taken out, they come back; an unwired design is auto-wired, free)
-    const spools = opts.grantAll ? 0 : wireSpools(bp.wires?.length ?? 0) - wireSpools(old?.blueprint.wires?.length ?? 0);
-    if (spools > 0 && (pool[WIRE_ITEM] ?? 0) < spools) return [`you need ${spools} wire spool${spools > 1 ? 's' : ''} to lay those wires (you have ${pool[WIRE_ITEM] ?? 0}): the fabricator makes them`];
 
     // Build from the core outwards through intact parts
     const geoms = bp.parts.map((q) => placeGeometry(this.catalog, q));
@@ -178,8 +175,6 @@ export class Hangar {
       for (const [id, n] of Object.entries(placeCost(this.econ, q))) { pool[id] -= n; used[id] = (used[id] ?? 0) + n; }
       return true;
     };
-    if (spools > 0) { pool[WIRE_ITEM] -= spools; used[WIRE_ITEM] = spools; }
-    else if (spools < 0) freed[WIRE_ITEM] = (freed[WIRE_ITEM] ?? 0) - spools;
     const queue: number[] = [];
     const seen = new Set<number>();
     const visit = (i: number) => {

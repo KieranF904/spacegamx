@@ -203,6 +203,8 @@ export interface FunctionDef {
   strafe?: { kick: number; ticks: number; cooldown: number };
   /** Tow Beam (ships/features/tow/tow.ts): latches onto a wreck, debris or a pod and pulls it on a tether; draws its `demand` while towing */
   tow?: boolean;
+  /** Gyro (ships/features/gyro/gyro.ts): turning torque per unit of area, both ways, wherever it sits; draws its `demand` per cell a second turning flat out, less turning gently */
+  gyro?: number;
   /** weapons: which weapon this is (data/ships/tuning.json weapons.<kind>) */
   weapon?: string;
   /**

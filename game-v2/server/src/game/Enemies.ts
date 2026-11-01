@@ -1096,8 +1096,9 @@ export class Enemies {
       const fromHome = Math.hypot(x - home.x, y - home.y);
       // Hurt? run (if the faction does); and when most of the pack is gone, its nerve breaks
       const broken = b.flee > 0 && !e.boss && pack && (pack.size0 ?? 1) >= 3 && pack.members.size <= (pack.size0 ?? 1) * 0.4 && this.ships.coreFraction(eid) < 0.75;
-      // Passive packs (safe systems) only fight once one of them has been shot
-      if (pack?.passive && pack.members.size && [...pack.members].some((m) => now - this.ships.lastDamagedTick(m) < 30)) pack.angryUntil = now + 60 * (f.angrySeconds ?? 45);
+      // Passive packs (safe systems) only fight once one of them has been shot (a wingmate of their own faction bumping
+      // into them doesn't count)
+      if (pack?.passive && pack.members.size && [...pack.members].some((m) => now - this.ships.lastDamagedTick(m) < 30 && this.enemies.get(this.ships.lastHitter(m))?.faction !== e.faction)) pack.angryUntil = now + 60 * (f.angrySeconds ?? 45);
       const calm = !!pack?.passive && now >= (pack.angryUntil ?? 0);
       // Whoever's been hurting the pack, from however far off
       const hitter = calm ? -1 : this.packHitter(e, pack, now);

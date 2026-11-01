@@ -14,6 +14,7 @@ The client's player-facing shell: `Game.ts` (the orchestrator: owns the window s
 | `client/src/lazy.ts` | 40 | `Lazy<T>` (dynamic-import wrapper: `.value`, `.load()`, `.use(fn)`), `prefetchIdle(loads)` |
 | `ui/windowKit.ts` | 429 | `GameWindow` (veil + head + tabs + body, `open/close/onClose`, swallows keys except Esc), `showTip/hideTip`, `openMenu/closeMenu`, `itemTipHtml`, `partStatsHtml`, `costHtml`, `ItemGrid`, filters/sort |
 | `ui/PilotHud.ts` | 182 | `PilotHud` (bars, level, credits) and `ToastUI` |
+| `ui/shipStatus/source.ts` (+test), `ui/shipStatus/StatusPanel.ts` | | The ship status readout in the top-left ship panel (`ships/ShipHud.ts` hosts it, 10 Hz): SHLD/ENRG summary under the CORE bar, and a foldable details box beside the panel (energy gen vs draw, net and time to dry, BROWNOUT, each store; shield state and wait; hull; weapon groups; thrust and boost; part features' lines via `ClientFeature.status`). `source.ts` is the ONLY place it reads game data (`ShipClient.statusInput` feeds it): the energy switch-over (P2) swaps its `readEnergy` to the new EnergyState |
 | `ui/QuickBar.ts`, `CargoPanelUI.ts` | 271 (cargo) | Quick-bar slots 1-5; the cargo panel on the HUD |
 | `ui/CircuitBars.ts`, `ships/features/strafer/DodgeIndicator.ts` (ready/cooldown ring, LOW POWER, ways it can't dodge), `ships/features/tow/TowIndicator.ts`, `ui/FrostVignette.ts` | 100-255 each | Per-feature HUD chips driven by `ShipDerived`/snapshot extras |
 | `ui/StationWindow.ts` | 1444 | Station tabs (lazy chunk). Economy area owns content; god-file |

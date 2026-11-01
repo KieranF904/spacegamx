@@ -40,11 +40,13 @@ describe('the strafer feature (registered)', () => {
     expect(P.byId.get('tow')).toBe(0);
     expect(i).toBe(1);
     expect(P.burstMask & (1 << i)).not.toBe(0);
-    expect(P.engineMask).toBe(1 << i);
-    expect(P.flightMask).toBe(1 << i);
-    expect(P.flight.thrustGate.map((e) => e.feature)).toEqual([i]);
-    expect(P.flight.impulse.map((e) => e.feature)).toEqual([i]);
-    expect(P.flight.preJump.length + P.flight.steer.length + P.flight.damp.length).toBe(0);
+    // (Its own bits and hooks: a later feature, the Gyro's, has some of its own)
+    expect(P.engineMask & (1 << i)).toBe(1 << i);
+    expect(P.flightMask & (1 << i)).toBe(1 << i);
+    const mine = (l: readonly { feature: number }[]) => l.filter((e) => e.feature === i).map((e) => e.feature);
+    expect(mine(P.flight.thrustGate)).toEqual([i]);
+    expect(mine(P.flight.impulse)).toEqual([i]);
+    expect(mine(P.flight.preJump).length + mine(P.flight.steer).length + mine(P.flight.damp).length).toBe(0);
     expect(P.held).toEqual(['dodge']);
     expect(P.controls).toEqual([{ name: 'dodge', bit: CTL.dodge }]);
     expect(P.flightKeys.length).toBe(1);

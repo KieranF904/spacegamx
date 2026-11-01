@@ -17,7 +17,7 @@ import { type EnergyState, FLAG_LATCH, FLAG_LIT, energyGauge } from './state.js'
 
 /** What the ship does this tick, as far as energy cares */
 export interface EnergyControls {
-  /** By part: 1 for a thruster pushing this tick (a main engine thrusting along the asked direction; a Burst Strafer while its burst runs). null: none */
+  /** By part: 1 for a thruster pushing this tick (a main engine thrusting along the asked direction; a Burst Strafer while its burst runs; a Gyro while the ship turns). null: none */
   active: Uint8Array | null;
   /** Boost held: an active engine that can boost burns its boost when that gives more thrust than cruising */
   boosting: boolean;

@@ -38,10 +38,10 @@ const playing = (role: string) => {
 };
 
 describe('weaponry: a weapon-kind feature', () => {
-  it('gives no function a feature of its own, and comes after every other feature', () => {
+  it('gives no function a feature of its own, and comes after every feature before it (a later one, the Gyro, goes after it: numbers never move)', () => {
     expect(feature.applies({} as never)).toBe(false);
     const P = getPlan();
-    for (const f of P.features) if (f.id !== 'weaponry') expect(P.byId.get('weaponry')!).toBeGreaterThan(P.byId.get(f.id)!);
+    for (const f of P.features) if (f.id !== 'weaponry' && f.order <= feature.order) expect(P.byId.get('weaponry')!).toBeGreaterThan(P.byId.get(f.id)!);
   });
   it('no role picks a gun with no tuning', () => {
     for (const r of feature.weapon!) expect(r.applies(undefined)).toBe(false);

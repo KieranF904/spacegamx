@@ -28,11 +28,17 @@ export interface ShipTuning {
     gyroTorque: number;
     /** Multiplier on thruster torque about the centre of mass (differential throttling) */
     thrusterTorqueGain: number;
-    /** PD controller towards the aim angle: alpha = kp * error - kd * angularVelocity, per tick */
-    turnKp: number;
-    turnKd: number;
+    /**
+     * Mouse-steer towards the aim angle (flight.ts steerSpin): spin at most turnGain × the angle left (≤ 1: the last
+     * little way eased in), and no faster than the ship can still stop from, its braking cap × turnBrakeMargin
+     */
+    turnGain: number;
+    turnBrakeMargin: number;
     /** rad/tick */
     maxAngularSpeed: number;
+    /** Bosses (Blueprint `turn`): a hull the size of a station doesn't whip round (rad/tick), and eases in more gently */
+    bossMaxAngularSpeed: number;
+    bossTurnGain: number;
     /** Helm controls: angular acceleration towards ±maxAngularSpeed (or 0) per tick, before the torque cap */
     helmTurnGain: number;
   };

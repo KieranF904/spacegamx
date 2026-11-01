@@ -77,3 +77,17 @@ deterministic, integer eu (1/256 E), allocation-free per tick (module scratch: n
   `linkFrom`/`linkTo` per id.
 - Tests: `npx vitest run common/src/ships/power` (layout, tick scenarios from the prototype, 10k-tick determinism, wire
   round trip). Bench: `POWER_BENCH=1 NODE_OPTIONS=--expose-gc npx vitest run common/src/ships/power/tick.bench.test.ts`.
+
+## Design rules (for ship designers; scripts/shipgen reads the block below into its prompt: keep it true to the power core)
+<!-- shipgen:rules -->
+- Power moves only between parts that share a full cell edge (they touch). A corner touch carries nothing. There are no wires.
+- A GENERATOR pushes its power into the stores, conduits, diodes, the core and the consumers it touches. Nothing else makes power.
+- A STORE (and the CORE) holds power and passes it to every part it touches: consumers, and other stores (touching stores even out). It gives at most its Gives a second and takes in at most its Takes a second.
+- A CONDUIT is a power line: it passes power between the parts it touches, both ways, and holds very little. Use a row of them to reach parts far from the generators.
+- A DIODE passes power one way: out of its marked side (^ > v <), into the part there, which it must touch. The parts touching its other sides can only feed it. Use it to keep a reserve (for engines or shields) that the guns can't drain.
+- Hull, armour, cargo and every other part marked "carries no power" pass no power: a gun behind hull gets nothing.
+- Every CONSUMER (guns, engines, shields, tools) must touch a generator, store, conduit, diode or the core, and that chain must lead back to a generator. A consumer drawing on a chain gets no more than its weakest link gives.
+- Put generators beside the stores that feed the hungriest parts (big guns, boosting engines), and give each group of guns or engines its own store.
+- Parts that face out (guns, engines, mining tools) need the edge they face left free: nothing across it. Engines usually face back (v); fixed guns face forward (^); turrets may face out at the sides.
+- Every part must touch the ship by a full edge, part to part, back to the core. A ship has exactly one core.
+<!-- /shipgen:rules -->

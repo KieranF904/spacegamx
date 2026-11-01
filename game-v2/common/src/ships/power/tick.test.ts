@@ -285,6 +285,26 @@ describe('energy tick: thrusters', () => {
     expect(t / 60).toBeLessThan(3.6);
   });
 
+  it('runs a Heavy Gyro as a thruster active while turning: full off its buffer, then at intake / burn; idle it draws nothing', () => {
+    const { L, e } = setup([['sq', BIG, 0, 0], ['block2', 'utility_heavy_gyro', 1, 0]]);
+    expect(L.role[1]).toBe(ROLE_THRUSTER);
+    // (Per cell: burn 12, intake 10, buffer 24; four cells)
+    expect(L.burn[1]).toBe(perTick(48));
+    expect(L.rate[1]).toBe(perTick(40));
+    expect(L.cap[1]).toBe(toEu(96));
+    // Holding a heading: nothing drawn, full torque available
+    const held0 = e.held[1];
+    for (let t = 0; t < 120; t++) { energyTick(L, e, IDLE_CONTROLS); expect(thrustFrac()[1]).toBe(1); }
+    expect(e.held[1]).toBe(held0);
+    // Turning (boost held changes nothing: a gyro has no boost)
+    const on = ctl({ active: activeFor(L, [1]), boosting: true });
+    const fr: number[] = [];
+    for (let t = 0; t < 900; t++) { energyTick(L, e, on); fr.push(thrustFrac()[1]); expect(thrustMul()[1]).toBe(1); }
+    // 96 E at a net 8 E/s: twelve seconds flat out, then intake / burn
+    expect(Math.min(...fr.slice(0, 700))).toBe(1);
+    for (const f of fr.slice(780)) { expect(f).toBeGreaterThan(0.82); expect(f).toBeLessThan(0.85); }
+  });
+
   it('steps replicas\' thrusters alone, their intake assumed met', () => {
     const { L, e } = setup([['sq', 'engine_ion_drive', 0, 0, 'S']]);
     const c = ctl({ active: activeFor(L, [0]), boosting: true });

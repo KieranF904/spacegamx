@@ -513,7 +513,7 @@ const SHIP_SHAPES: Record<string, Spec> = {
   'ships/tuning.json': strict({
     cellSize: 'number', overlapShrink: 'number', arcSegmentsPerQuarter: 'number', maxParts: 'number', hpBandSize: 'number',
     health: obj({ floor: 'number', slope: 'number' }), flow: obj({ minWeaponSatisfaction: 'number' }),
-    flight: obj({ coreManeuverForce: 'number', gyroTorque: 'number', thrusterTorqueGain: 'number', turnKp: 'number', turnKd: 'number', maxAngularSpeed: 'number', helmTurnGain: 'number' }),
+    flight: obj({ coreManeuverForce: 'number', gyroTorque: 'number', thrusterTorqueGain: 'number', '_comment?': 'string', turnGain: 'number', turnBrakeMargin: 'number', maxAngularSpeed: 'number', bossMaxAngularSpeed: 'number', bossTurnGain: 'number', helmTurnGain: 'number' }),
     'jump?': strict({
       'chargeTicks?': 'number', 'burnTicks?': 'number', 'cooldownTicks?': 'number', 'speed?': 'number', 'exitSpeed?': 'number', 'rampTicks?': 'number',
       'slowTicks?': 'number', 'chargeDamping?': 'number', 'baseRange?': 'number', 'minRange?': 'number', 'solarRing?': 'number', 'solarRangeBoost?': 'number',

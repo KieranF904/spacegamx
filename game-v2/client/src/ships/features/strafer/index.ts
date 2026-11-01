@@ -103,4 +103,14 @@ export const clientFeature: ClientFeature = {
       chip.update(host.hangarOpen() ? null : localDodge(host), host.keyName('dodge'));
     },
   },
+  // The status panel's line: ready, bursting or cooling, and short of power
+  status(host) {
+    const s = localDodge(host);
+    if (!s) return null;
+    const low = s.afford < 0.999;
+    if (s.phase === 'burst') return { label: 'DODGE', text: 'BURST', tone: 'busy' };
+    if (s.phase === 'cooling') return { label: 'DODGE', text: 'COOLING', tone: 'busy', progress: 1 - s.cooling };
+    if (low) return { label: 'DODGE', text: s.afford < 0.25 ? 'NO POWER' : `LOW ${Math.round(s.afford * 100)}%`, tone: s.afford < 0.25 ? 'bad' : 'warn' };
+    return { label: 'DODGE', text: `READY ${host.keyName('dodge')}`, tone: 'ok' };
+  },
 };

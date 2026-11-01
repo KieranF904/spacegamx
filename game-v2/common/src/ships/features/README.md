@@ -48,6 +48,7 @@ in its folder and the shared files (`rebuild.ts`, `energy.ts`, `flight.ts`, `rep
   `derived.fx.<key>`; the key is typed by declaration merging on `FeatureDerived`. The ship also gets `derived.fxMask`
   (bit = feature number) and `derived.fxList` (`Int8Array`, plan order). All three are **absent** when a ship has no
   feature, so ships without one are byte-for-byte what they were.
+- **turn** (`DeriveCtx.turn`): a derive may add turning torque, both ways and wherever its parts sit; rebuild adds the sum to `maxTorque` (the Gyro's, `gyro/`).
 - **load** (`energy.ts` `gunLoad`, per tick): each feature in `fxList` adds its draw to `out`. Must not allocate.
 - **describe** (`featureFacts(ctx)`): facts of the features a function gives. `describePart()` (common ships/describe.ts) wraps it with partStats; the client renders facts in `client/src/ships/describe/` (tipRows, chips, summaryFields, guideNumber). A feature adds facts; the Tow Beam's replaced its old tooltip, card and compact-tooltip rows (a `Fact` may carry `dim`, `short`, `chip`, `drawWhen` presentation variants).
 - **burst: 'engine'** (`circuits.ts`): Drive Cell banks touching the part feed it, as they do engines: a Burst Strafer's.

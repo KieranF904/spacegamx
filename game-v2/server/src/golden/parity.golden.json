@@ -1,47 +1,47 @@
 {
   "drive-bank-boost/replica": {
-    "keyframes": "388,390,392,394,396,398,400,402,404,406,408,410,412,414,416,418,420,422,424,426,428,430,432,434,436,438,440,442,444,446,448,486-497,499,501,503,505,507,509,511,513,515,517,519,521,523,525,527,529,531,533,535,537,539,541,543,545,547,549",
-    "server": "6a29e05950f6fa32"
+    "keyframes": "388,390,392,394,396,398,400,402,404,406,408,410,412,414,416,418,420,422,424,426,428,430,432,434,436,438,440,442,444,446,448,486-491,493,495,497,499,501,503,505,507,509,511,513,515,517,519,521,523,525,527,529,531,533,535,537,539,541,543,545,547,549",
+    "server": "7729ac069274f4bc"
   },
   "drive-bank-boost/unrounded-aim": null,
   "heavy-cargo/replica": {
     "keyframes": "",
-    "server": "a8063821238b1a1a"
+    "server": "b6cea3ff1ef8a516"
   },
-  "heavy-cargo/unrounded-aim": "tick 78: angVel server 0.020985 vs 0.020986",
+  "heavy-cargo/unrounded-aim": "tick 53: angVel server 0.018217 vs 0.018216",
   "jump-burn/replica": {
     "keyframes": "109",
-    "server": "0681ac52d06f4688"
+    "server": "98f7b21984c19a81"
   },
   "jump-burn/unrounded-aim": null,
   "plain-thrust-turn/replica": {
     "keyframes": "",
-    "server": "fc4409425cf177d1"
+    "server": "aaa9e3766355431e"
   },
-  "plain-thrust-turn/unrounded-aim": "tick 78: angVel server 0.020985 vs 0.020986",
+  "plain-thrust-turn/unrounded-aim": "tick 53: angVel server 0.018217 vs 0.018216",
   "strafer-energy-short/replica": {
     "keyframes": "49-59,73-83,97-107,120-131,145-155,169-179,193-203,217-227,240-251,265-275,289-299,313-323,337-347,360-371,385-395,409-419,433-443,457-467,480-491,505-515,529-539,553-563,577-587,600-611,625-635,649-659,673-683,697-707,720-731,745-755,769-779,793-803",
-    "server": "4b77223cbcabf2e0"
+    "server": "3043e71f6bd578d3"
   },
   "strafer-energy-short/unrounded-aim": null,
   "strafer-every-way/replica": {
     "keyframes": "",
-    "server": "c115529a6b5c4f47"
+    "server": "629b0c1daafc9d55"
   },
   "strafer-every-way/unrounded-aim": null,
   "strafer-heavy/replica": {
     "keyframes": "",
-    "server": "175ce2678ba7fa86"
+    "server": "062f22b1abe9ae34"
   },
-  "strafer-heavy/unrounded-aim": "tick 5: angVel server 0.044257 vs 0.044256",
+  "strafer-heavy/unrounded-aim": "tick 14: angle server -1.07056 vs -1.07057",
   "strafer-replay/replica": {
     "keyframes": "",
-    "server": "9c58b08dd8522cd9"
+    "server": "855196dbcb68fef6"
   },
-  "strafer-replay/unrounded-aim": "tick 79: angVel server 0.01004 vs 0.010041",
+  "strafer-replay/unrounded-aim": "tick 66: angVel server 0.009972 vs 0.009971",
   "tow/replica": {
     "keyframes": "2",
-    "server": "d9840037c591615f"
+    "server": "2a64948517188236"
   },
   "tow/unrounded-aim": null
 }

@@ -1,7 +1,7 @@
 /**
  * The native renderer's Node side: an asset id in, what to draw out (typed arrays, in draw order), built by the game's
  * own pure code: the catalog, viewer builders (model stubs, material blocks), buildHull (hull geometry, exposure and
- * volume baked, a boss's built whole), skeletons and frames, turret heads (gunDecor) and fixed barrels, power wires.
+ * volume baked, a boss's built whole), skeletons and frames, turret heads (gunDecor) and fixed barrels (no wires: retired, energy-routing-impl.md D1).
  *
  * The hull and lit shaders are read out of the game's TypeScript (ShipBatch.ts, litShader.ts) at load, so they stay
  * the single source; so are the light presets (viewer/ViewerScene.ts) and the hull attribute table (ShipBatch ATTRS).
@@ -11,7 +11,7 @@
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { join, resolve } from 'path';
 import earcut from 'earcut';
-import { blueprintGeometry, cellKey, isOpen, loadCatalog, parseBlueprint, wireCells, type Blueprint, type Catalog, type ShipState, type ShipTuning } from '@space-game/common';
+import { blueprintGeometry, isOpen, loadCatalog, parseBlueprint, type Blueprint, type Catalog, type ShipState, type ShipTuning } from '@space-game/common';
 import { buildHull, skeletonCovered } from '../../client/src/ships/hullBuild';
 import { buildSkeleton } from '../../client/src/ships/skeletonBuild';
 import { decorOf } from '../../client/src/ships/partDecor';
@@ -128,7 +128,7 @@ export { searchAssets, parseParams };
 
 // ---- one asset, as draws
 
-/** A draw: `hull` (the hull shader), `lit` (the lit shader: skeletons, frames), `flat` (turrets, barrels, wires: plain
+/** A draw: `hull` (the hull shader), `lit` (the lit shader: skeletons, frames), `flat` (turrets, barrels: plain
  * fills, `metal` vertices tinted by the light level as the game tints them). All in the ship's own frame, pixels */
 export interface Draw {
   kind: 'hull' | 'lit' | 'flat' | 'sprite';
@@ -142,7 +142,7 @@ export interface Draw {
   blend?: 'normal' | 'add';
   /** Each pixel drawn once however its shapes overlap (a stroked path, as Pixi strokes one) */
   once?: boolean;
-  /** Drawn only while a cell is at least this big on screen (px), as the game hides guns and wires when small */
+  /** Drawn only while a cell is at least this big on screen (px), as the game hides guns when small */
   minPx?: number;
 }
 
@@ -191,16 +191,6 @@ class Flat {
     }
     for (const t of earcut(pts)) this.idx.push(base + t);
   }
-  /** A stroke along a segment with round ends (an octagon at each) */
-  seg(x0: number, y0: number, x1: number, y1: number, w: number, color: number, alpha: number, metal: boolean): void {
-    const len = Math.hypot(x1 - x0, y1 - y0) || 1, nx = (-(y1 - y0) / len) * w / 2, ny = ((x1 - x0) / len) * w / 2;
-    this.poly([x0 + nx, y0 + ny, x1 + nx, y1 + ny, x1 - nx, y1 - ny, x0 - nx, y0 - ny], color, { alpha, metal });
-    for (const [x, y] of [[x0, y0], [x1, y1]]) {
-      const ring: number[] = [];
-      for (let i = 0; i < 8; i++) ring.push(x + Math.cos((i / 8) * Math.PI * 2) * w / 2, y + Math.sin((i / 8) * Math.PI * 2) * w / 2);
-      this.poly(ring, color, { alpha, metal });
-    }
-  }
   draw(o: Partial<Draw> = {}): Draw | null {
     if (!this.idx.length) return null;
     return {
@@ -219,36 +209,8 @@ const litDraw = (g: LitGeometry): Draw => ({
   },
 });
 
-/** Power wires as ShipRenderer.layWires draws them: a dark channel, dim unpowered cores, lit runs (a halo and a core, added) */
 const LAMPS_BELOW = 0.5;
-const WIRE_LIT = 0x8fe3ff, WIRE_DIM = 0x3c5566, WIRE_DARK = 0x10141c, WIRE_MIN_PX = 5, GUN_MIN_PX = 3;
-function wires(data: Data, ship: ShipState, cs: number): Draw[] {
-  const d = ship.derived, [cx, cy] = d.com;
-  if (ship.kind !== 'ship' || !d.wires.length) return [];
-  const cells = wireCells(data.catalog, ship.blueprint);
-  const live = (x: number, y: number) => cells.get(cellKey(x, y))?.some((i) => d.alive[i]) ?? false;
-  const X = (v: number) => (v + 0.5 - cx) * cs, Y = (v: number) => (v + 0.5 - cy) * cs;
-  const dark = new Flat(), dim = new Flat(), halo = new Flat(), core = new Flat();
-  d.wires.forEach(([x0, y0, x1, y1], s) => {
-    const a = live(x0, y0), b = live(x1, y1);
-    if (a || b) {
-      const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
-      const [p, q] = a && b ? [[x0, y0], [x1, y1]] : a ? [[x0, y0], [mx, my]] : [[x1, y1], [mx, my]];
-      dark.seg(X(p[0]), Y(p[1]), X(q[0]), Y(q[1]), cs * 0.15, WIRE_DARK, 0.9, true);
-    }
-    if (!d.wireLive[s]) return;
-    if (!d.networks[d.wireNet[s]]?.powered) dim.seg(X(x0), Y(y0), X(x1), Y(y1), cs * 0.05, WIRE_DIM, 1, true);
-    else {
-      halo.seg(X(x0), Y(y0), X(x1), Y(y1), cs * 0.2, WIRE_LIT, 0.16, false);
-      core.seg(X(x0), Y(y0), X(x1), Y(y1), cs * 0.055, WIRE_LIT, 0.95, false);
-    }
-  });
-  // (the lit runs breathe: 0.8..1; taken at its middle)
-  const glow = 0.9;
-  for (const f of [halo, core]) for (let k = 0; k < f.col.length; k++) f.col[k] *= glow;
-  return [dark.draw({ once: true, minPx: WIRE_MIN_PX }), dim.draw({ once: true, minPx: WIRE_MIN_PX }),
-    halo.draw({ once: true, blend: 'add', minPx: WIRE_MIN_PX }), core.draw({ once: true, blend: 'add', minPx: WIRE_MIN_PX })].filter((x): x is Draw => !!x);
-}
+const GUN_MIN_PX = 3;
 
 /** What one asset builds as (a change here builds again; the rest is uniforms) */
 const refId = (r: AssetRef) => `${r.kind}:${r.key}${r.facing ? `@${r.facing}` : ''}`;
@@ -310,8 +272,7 @@ export function build(data: Data, ref: AssetRef, p: ViewerParams): Built {
   }
   draws.push({ kind: 'hull', attrs, idx: new Uint32Array(hull.full.idx) });
 
-  // Over it: wires, then turrets at rest (or aimed: as far round as each can turn)
-  draws.push(...wires(data, ship, cs));
+  // Over it: turrets at rest (or aimed: as far round as each can turn)
   const guns = new Flat();
   for (const w of ship.derived.weapons) {
     if (!w.window) continue;

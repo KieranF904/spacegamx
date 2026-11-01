@@ -1,7 +1,7 @@
 /**
  * Flight on derived stats. Keeps the legacy controls (screen-relative WASD,
  * ship turns to face the cursor, same friction and boost), but acceleration
- * comes from thrust / mass and turning from torque / inertia via a PD controller.
+ * comes from thrust / mass and turning from torque / inertia (towards the cursor, braking in time: steerSpin).
  */
 
 import type { Vec2 } from './types.js';
@@ -12,9 +12,6 @@ import { cargoThrust, cargoTurn } from './load.js';
 import type { FlightCtx } from './features/types.js';
 import type { FlightEntry } from './features/plan.js';
 import { getPlan } from './features/plan.js';
-
-/** A boss's fastest turn (radians a tick; Blueprint `turn`): a hull the size of a station doesn't whip round */
-const BOSS_SPIN = 0.04;
 
 export interface FlightBody {
   x: number; y: number;
@@ -361,9 +358,31 @@ export function ratedFade(rated: number | undefined, speed: number): number {
 
 /** Turning acceleration caps (cw, ccw), on the same terms as accelAlong */
 export function turnAccel(d: ShipDerived, cargo = 0): { cw: number; ccw: number } {
-  const I = Math.max(d.inertia, d.fullInertia ?? d.inertia);
-  const k = (((d.drive ?? 1) * (d.turn ?? 1)) / (I || 1)) * cargoTurn(d, cargo);
+  const k = turnScale(d, cargo);
   return { cw: d.maxTorque.cw * k, ccw: d.maxTorque.ccw * k };
+}
+
+/** Torque → turning acceleration (turnAccel's factor, allocation-free for the flight step and part features' flight hooks) */
+export function turnScale(d: ShipDerived, cargo: number): number {
+  const I = Math.max(d.inertia, d.fullInertia ?? d.inertia);
+  return (((d.drive ?? 1) * (d.turn ?? 1)) / (I || 1)) * cargoTurn(d, cargo);
+}
+
+/**
+ * The spin (rad/tick, signed) to turn at with `err` still to go: as fast as `maxSpin`, but no faster than the ship can
+ * stop from by the time it's round (`brake`: its turning cap the way that slows this turn, × `margin`), and the last
+ * little way eased in at `gain` of what's left a tick (≤ 1: no overshoot, no twitching). So a big, slow-turning hull
+ * swings onto its heading and settles there instead of overshooting and hunting back and forth, and a nimble one is
+ * round as fast as its torque allows.
+ *
+ * The stop is worked out on the step's own terms (the spin changes, then the angle moves by it): spinning at v and
+ * braking at a, the ship turns v + (v − a) + (v − 2a) + … ≈ v(v + a) / 2a before it stops, so the fastest spin that
+ * still stops within |err| is (√(a² + 8a|err|) − a) / 2.
+ */
+function steerSpin(err: number, brake: number, maxSpin: number, gain: number, margin: number): number {
+  const e = Math.abs(err);
+  const stop = (Math.sqrt(brake * brake + 8 * brake * e) - brake) * 0.5 * margin;
+  return Math.sign(err) * Math.min(maxSpin, stop, gain * e);
 }
 
 /**
@@ -434,26 +453,22 @@ export function stepFlight(
   const charging = jp === 'charging';
 
   // --- Rotation, angular acceleration capped by torque / inertia.
-  // Mouse-steer: PD towards the aim angle. Helm: chase ±maxAngularSpeed (or stop) from the turn keys.
+  // Mouse-steer: spin towards the aim angle, braking in time (steerSpin). Helm: chase ±maxAngularSpeed (or stop) from the turn keys.
   if (d.inertia > 0) {
+    // (The caps, cut by hazards: a positive alpha turns cw)
+    const tk = turnScale(d, cargo) * (k.hazard?.control ?? 1);
+    const maxCw = d.maxTorque.cw * tk, maxCcw = d.maxTorque.ccw * tk;
     let alpha: number;
     if (input.helm) {
       const turn = (input.right ? 1 : 0) - (input.left ? 1 : 0);
       alpha = ft.helmTurnGain * (turn * ft.maxAngularSpeed - body.angVel);
-    } else if (d.turn) {
-      // A boss (Blueprint `turn`): it turns no faster than it can stop from by the time it's round, so a big hull swings
-      // onto its heading and settles there instead of overshooting and hunting back and forth (the last little way
-      // eased in, a share of what's left each tick: no twitching about it)
-      const err = wrapAngle(input.targetAngle - body.angle), a = Math.min(turnAccel(d, cargo).cw, turnAccel(d, cargo).ccw);
-      const want = Math.sign(err) * Math.min(BOSS_SPIN, Math.sqrt(2 * a * Math.abs(err)) * 0.9, Math.abs(err) * 0.15);
-      alpha = want - body.angVel;
     } else {
+      // (Turning cw, it brakes with the ccw cap, and the other way round. A boss, Blueprint `turn`, swings slower and eases in gentler)
       const err = wrapAngle(input.targetAngle - body.angle);
-      alpha = ft.turnKp * err - ft.turnKd * body.angVel;
+      const boss = !!d.turn;
+      alpha = steerSpin(err, err > 0 ? maxCcw : maxCw, boss ? ft.bossMaxAngularSpeed : ft.maxAngularSpeed, boss ? ft.bossTurnGain : ft.turnGain, ft.turnBrakeMargin) - body.angVel;
     }
-    const { cw: maxCw, ccw: maxCcw } = turnAccel(d, cargo);
-    const ctl = k.hazard?.control ?? 1;
-    alpha = Math.max(-maxCcw * ctl, Math.min(maxCw * ctl, alpha));
+    alpha = Math.max(-maxCcw, Math.min(maxCw, alpha));
     body.angVel = Math.max(-ft.maxAngularSpeed, Math.min(ft.maxAngularSpeed, body.angVel + alpha));
   } else {
     body.angVel = 0;
