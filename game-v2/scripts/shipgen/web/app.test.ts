@@ -30,7 +30,8 @@ const fakeRenderer = (): Renderer & { calls: number } => {
 const hangingLlm = (): Llm => ({
   async list() { return [fakeModel('slow')]; },
   chat(req) {
-    req.onToken?.('name: X\ngrid:\n', 'content');
+    // (After a beat: the page's stream is connected by then, and tokens are live only)
+    setTimeout(() => req.onToken?.('name: X\ngrid:\n', 'content'), 30);
     return new Promise((_ok, fail) => {
       if (req.signal?.aborted) fail(new AbortedError());
       req.signal?.addEventListener('abort', () => fail(new AbortedError()));
@@ -177,10 +178,14 @@ describe('shipgen page server', () => {
     const best = ev.find((e) => e.type === 'best');
     expect(best.url).toBe(render.url);
     // (A replay from an event on gives the rest)
-    const after = await fetch(`${base}/api/runs/${r.body.id}/events`, { headers: { 'Last-Event-ID': String(ev.length - 2) } });
+    const kept = ev.filter((e) => e.type !== 'token');
+    const after = await fetch(`${base}/api/runs/${r.body.id}/events`, { headers: { 'Last-Event-ID': String(kept.length - 2) } });
     const rest = await after.text();
     expect(rest.match(/^id: /gm)?.length).toBe(1);
-    expect(rest).toMatch(new RegExp(`^id: ${ev.length - 1}$`, 'm'));
+    expect(rest).toMatch(new RegExp(`^id: ${kept.length - 1}$`, 'm'));
+    // (Token deltas are live only: kept events number 0..n, and a stream opened after the run has no tokens)
+    expect(kept.map((e) => e.seq)).toEqual(kept.map((_, i) => i));
+    expect((await stream(r.body.id)).some((e) => e.type === 'token')).toBe(false);
     // The gallery has it, and the run left a record
     const g = await get('/api/gallery');
     expect(g.body.gallery.find((x: any) => x.run === r.body.id)).toMatchObject({ valid: true, url: render.url, model: 'ollama/fake', role: 'starter' });

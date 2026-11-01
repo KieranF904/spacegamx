@@ -7,9 +7,8 @@ import type { Blueprint, FunctionDef, PlacedPart, Rot, Side } from '../types.js'
 import type { ShipTuning } from '../tuning.js';
 import { blueprintGeometry } from '../blueprint.js';
 import { computeJoins } from '../grid.js';
-import { partMaterial } from '../grades.js';
-import { createShipState } from '../state.js';
 import { readShipJson, testCatalog } from '../testData.js';
+import { blueprintEnergyInput } from './blueprint.js';
 import { type EnergyLayout, type EnergyLayoutInput, buildEnergyLayout } from './layout.js';
 
 export const catalog = testCatalog();
@@ -55,12 +54,5 @@ export function layoutOf(specs: PartSpec[], alive?: boolean[]): EnergyLayout {
 
 /** A bundled blueprint's layout, built from its rebuild as P2's rebuild will */
 export function blueprintInput(bp: Blueprint): EnergyLayoutInput {
-  const ship = createShipState(catalog, tuning, 1, bp, 0), d = ship.derived;
-  const geoms = blueprintGeometry(catalog, bp);
-  return {
-    fns: bp.parts.map((p) => catalog.functions.get(p.fn)!), area: geoms.map((g) => g.area), mats: bp.parts.map((p) => partMaterial(catalog, p)),
-    alive: d.alive, joins: d.joins, core: d.root >= 0 && bp.parts[d.root].fn === 'core' ? d.root : -1, tuning,
-    // (today's interval divides by the old flow's satisfaction: undone here, as P2.1 drops it: EnergyWeaponInput.interval)
-    weapons: d.weapons.map((w) => ({ part: w.part, fire: w.fire, interval: w.interval * Math.max(w.satisfaction, tuning.flow.minWeaponSatisfaction) })), geoms,
-  };
+  return blueprintEnergyInput(catalog, tuning, bp);
 }

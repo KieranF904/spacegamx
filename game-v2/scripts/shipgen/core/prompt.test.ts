@@ -5,7 +5,7 @@ import { loadContext } from './context';
 import { buildLegend } from './legend';
 import { check } from './check';
 import { gridToBlueprint } from './grid';
-import { briefLegend, feedbackMessage, rulesText, systemPrompt } from './prompt';
+import { feedbackMessage, rulesShort, rulesText, shownLegend, systemPrompt } from './prompt';
 import { briefCheck, loadRoles, type Selector } from './roles';
 import { BLUEPRINTS } from './testShips';
 
@@ -16,7 +16,7 @@ describe('shipgen roles and prompt', () => {
   it('has roles whose selectors name real functions, families and power roles, and real examples', () => {
     expect(roles.length).toBeGreaterThanOrEqual(5);
     const fns = ctx.catalog.functions, families = new Set([...fns.values()].map((f) => f.family).filter(Boolean));
-    const powerRoles = new Set(['generator', 'store', 'conduit', 'diode', 'dynamo', 'weapon', 'thruster', 'tool', 'core']);
+    const powerRoles = new Set(['generator', 'store', 'conduit', 'diode', 'dynamo', 'weapon', 'thruster', 'tool', 'core', 'engine']);
     const list = <T>(v: T | T[] | undefined) => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
     for (const r of roles) {
       expect(r.size.cells[0]).toBeLessThan(r.size.cells[1]);
@@ -40,11 +40,14 @@ describe('shipgen roles and prompt', () => {
   for (const r of roles) {
     it(`builds the ${r.id} prompt from the current catalog`, () => {
       const p = systemPrompt(ctx, { role: r.id, text: 'Something striking.' });
-      expect(p).toContain(rulesText(ctx));
+      expect(p).toContain(rulesShort(ctx));
+      expect(rulesShort(ctx).length).toBeLessThan(rulesText(ctx).length);
       expect(p).toContain('## Grid format');
       expect(p).toContain(r.summary);
       expect(p).toContain('Something striking.');
-      for (const e of briefLegend(ctx, { role: r.id })) expect(p).toContain(e.line);
+      for (const e of shownLegend(ctx, { role: r.id })) expect(p).toContain(e.kind === 'structure' ? `${e.code} ` : e.line);
+      // (Short: the prompt is not the old 10-26k characters)
+      expect(p.length).toBeLessThan(14000);
       // (nothing above the band's level unless the example uses it)
       if (r.example) expect(p).toContain('## Example');
       expect(p.length).toBeLessThan(40000);

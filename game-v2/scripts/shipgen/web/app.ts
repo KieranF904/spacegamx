@@ -37,7 +37,9 @@ export interface App {
   close(): Promise<void>;
 }
 
-const LOCAL_HOST = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/i;
+/** What /out/ serves: pictures and a run's records, never a dotfile (see http.ts) */
+const OUT_FILES = /\.(png|jpe?g|gif|webp|json|jsonl)$/i;
+const LOCAL_HOST =/^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/i;
 const stamp = () => new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'ship';
 
@@ -65,15 +67,26 @@ export function createApp(deps: AppDeps): App {
     return { bp, grid: enc.text, check: check(ctx, bp, { book: enc.book, weights: r?.weights as never }), cells: partCells(ctx, bp) };
   };
 
+  // (The slot is taken before the first await: two POSTs at once can't both pass the check)
+  let starting = false;
+  let timelapses = 0;
+  const busy = () => starting || !!runs.active() || timelapses > 0;
+
   async function startRun(form: RunForm & { startId?: string; startBp?: unknown }) {
-    if (runs.active()) throw new HttpError(409, 'a run is going: stop it first');
+    if (busy()) throw new HttpError(409, 'a run is going: stop it first');
+    starting = true;
+    try { return await startRunNow(form); } finally { starting = false; }
+  }
+
+  async function startRunNow(form: RunForm & { startId?: string; startBp?: unknown }) {
     const start = form.startBp ? blueprintFrom(form.startBp) : form.startId ? loadLibrary(paths.blueprints, form.startId) : undefined;
     const ac = new AbortController();
     const id = runs.nextId();
-    const outDir = join(paths.out, `${stamp()}-${form.mode ?? 'design'}-${slug(form.role ?? 'free')}-page`);
+    const outDir = join(paths.out, `${stamp()}-${form.mode ?? 'design'}-${slug(form.role ?? 'free')}-${id}-page`);
     const list = await models(true);
     const o = runOptions(ctx, form, list, { outDir, signal: ac.signal, start });
-    mkdirSync(outDir, { recursive: true });
+    mkdirSync(paths.out, { recursive: true });
+    mkdirSync(outDir);
     const renderer = o.render === 'off' ? undefined : await deps.getRenderer();
     const r = runs.start({ ctx, llm, models: list, renderer }, o, { id, ac, outDir });
     // (A record on disk, like the CLI's: events without tokens, and the designs that came best)
@@ -98,10 +111,11 @@ export function createApp(deps: AppDeps): App {
     if (!r) throw new HttpError(404, `no run ${id}`);
     res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
     const last = Number(req.headers['last-event-id'] ?? url.searchParams.get('after') ?? -1);
-    let i = Number.isFinite(last) ? last + 1 : 0;
-    const send = (e: PageEvent) => { res.write(`id: ${i++}\ndata: ${JSON.stringify(e)}\n\n`); };
+    const from = Number.isFinite(last) ? last + 1 : 0;
+    // (Stored events carry their place in the run as the SSE id; token deltas are live only and carry none)
+    const send = (e: PageEvent) => { res.write(`${e.seq !== undefined ? `id: ${e.seq}\n` : ''}data: ${JSON.stringify(e)}\n\n`); };
     const end = () => { res.write('event: end\ndata: {}\n\n'); res.end(); };
-    for (const e of r.events.slice(i)) send(e);
+    for (const e of r.events.slice(from)) send(e);
     if (r.status !== 'running') { end(); return; }
     const ping = setInterval(() => res.write(': ping\n\n'), 15000);
     const listener = (e: PageEvent | null) => { if (e) send(e); else { clearInterval(ping); end(); } };
@@ -113,7 +127,11 @@ export function createApp(deps: AppDeps): App {
     const url = new URL(req.url ?? '/', 'http://127.0.0.1');
     const p = url.pathname, m = req.method ?? 'GET';
     if (!LOCAL_HOST.test(req.headers.host ?? '')) throw new HttpError(403, 'localhost only');
-    if (m === 'POST' && req.headers.origin && !LOCAL_HOST.test(req.headers.origin.replace(/^https?:\/\//, ''))) throw new HttpError(403, 'cross-site request');
+    if (m === 'POST') {
+      // (Exactly this server's own origin, not any localhost page; and JSON only, which a cross-origin page can't send without a preflight)
+      if (req.headers.origin && req.headers.origin !== `http://${req.headers.host}`) throw new HttpError(403, 'cross-site request');
+      if (!/^application\/json\b/i.test(req.headers['content-type'] ?? '')) throw new HttpError(415, 'POST bodies are JSON: send Content-Type: application/json');
+    }
 
     if (m === 'GET' && p === '/api/models') {
       const list = await models(url.searchParams.has('fresh'));
@@ -166,6 +184,7 @@ export function createApp(deps: AppDeps): App {
       return json(res, 200, { url: labUrl(saved.name), saved, log: log.split('\n').slice(-3).join('\n') });
     }
     if (m === 'POST' && p === '/api/render') {
+      if (busy()) throw new HttpError(409, 'a run is going: stills wait for it');
       const bp = blueprintFrom((await readJson(req)).bp);
       const renderer = await deps.getRenderer();
       if (!renderer) throw new HttpError(503, 'the native renderer is not available');
@@ -180,15 +199,24 @@ export function createApp(deps: AppDeps): App {
     if (m === 'POST' && p === '/api/timelapse') {
       const b = await readJson(req);
       const bp = blueprintFrom(b.bp);
-      const renderer = await deps.getRenderer();
-      if (!renderer) throw new HttpError(503, 'the native renderer is not available');
-      const dir = join(paths.out, 'timelapse', `${slug(bp.name)}-${stamp()}`);
-      const t = await renderTimelapse(renderer, buildUp(ctx, bp, Number(b.maxFrames) || 80), dir);
+      // (Not alongside a model run or another timelapse: they share the GPU and the render queue; it stops when the page goes)
+      if (busy()) throw new HttpError(409, 'a run or a timelapse is going: wait for it');
+      timelapses++;
+      const ac = new AbortController();
+      const abort = () => ac.abort();
+      res.on('close', abort);
+      let t;
+      try {
+        const renderer = await deps.getRenderer();
+        if (!renderer) throw new HttpError(503, 'the native renderer is not available');
+        const dir = join(paths.out, 'timelapse', `${slug(bp.name)}-${stamp()}`);
+        t = await renderTimelapse(renderer, buildUp(ctx, bp, Number(b.maxFrames) || 80), dir, ac.signal);
+      } finally { timelapses--; res.off('close', abort); }
       return json(res, 200, { dir: t.dir, ms: t.ms, frames: t.frames.map((f) => ({ url: runs.urlOf(f.file), stage: f.stage, parts: f.parts })) });
     }
 
     if (m !== 'GET' && m !== 'HEAD') throw new HttpError(404, 'not found');
-    if (p.startsWith('/out/') && sendFile(res, paths.out, p.slice(5))) return;
+    if (p.startsWith('/out/') && sendFile(res, paths.out, p.slice(5), OUT_FILES)) return;
     if (p.startsWith('/lab/') && /\.(html|js)$/.test(p) && sendFile(res, paths.lab, p.slice(5))) return;
     if (!p.startsWith('/out/') && !p.startsWith('/lab/') && !p.startsWith('/api/') && sendFile(res, paths.ui, p === '/' ? 'index.html' : p.slice(1))) return;
     throw new HttpError(404, 'not found');

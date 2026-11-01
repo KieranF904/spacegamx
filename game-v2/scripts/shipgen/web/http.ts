@@ -1,7 +1,7 @@
 // Small HTTP helpers for the shipgen page: JSON replies, bounded request bodies, files served only from inside a root.
 import type { IncomingMessage, ServerResponse } from 'http';
 import { existsSync, readFileSync, statSync } from 'fs';
-import { extname, resolve, sep } from 'path';
+import { extname, relative, resolve, sep } from 'path';
 
 export class HttpError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -28,7 +28,7 @@ export async function readJson<T = any>(req: IncomingMessage, limit = 4 << 20): 
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml',
+  '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.json': 'application/json; charset=utf-8', '.jsonl': 'application/x-ndjson; charset=utf-8', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml',
 };
 
 /** The file at `rel` under `root`, or null when it is outside it or missing */
@@ -42,9 +42,11 @@ export function inside(root: string, rel: string): string | null {
   return existsSync(p) && statSync(p).isFile() ? p : null;
 }
 
-export function sendFile(res: ServerResponse, root: string, rel: string): boolean {
+/** `only`: serve just files whose name matches it. A path with a dot-file or dot-folder in it is never served. */
+export function sendFile(res: ServerResponse, root: string, rel: string, only?: RegExp): boolean {
   const p = inside(root, rel);
   if (!p) return false;
+  if (only && (!only.test(p) || relative(resolve(root), p).split(/[\\/]/).some((s) => s.startsWith('.')))) return false;
   res.writeHead(200, { 'Content-Type': MIME[extname(p).toLowerCase()] ?? 'application/octet-stream', 'Cache-Control': 'no-cache' });
   res.end(readFileSync(p));
   return true;

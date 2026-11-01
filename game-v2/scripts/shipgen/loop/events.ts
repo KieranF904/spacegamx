@@ -12,7 +12,7 @@ export interface StartEvent extends Base { type: 'start'; mode: Mode; model: str
 export interface BriefEvent extends Base { type: 'brief'; role?: string; text: string; legendCodes: number; promptChars: number }
 export interface PromptEvent extends Base { type: 'prompt'; round: number; system?: string; user: string; messages: number; chars: number }
 export interface TokenEvent extends Base { type: 'token'; round: number; kind: 'content' | 'thinking'; text: string }
-export interface ReplyEvent extends Base { type: 'reply'; round: number; text: string; ms: number; outputTokens?: number; tokensPerSec?: number; structured: boolean }
+export interface ReplyEvent extends Base { type: 'reply'; round: number; text: string; ms: number; outputTokens?: number; tokensPerSec?: number; structured: boolean; stopReason?: string; truncated?: boolean; tokensEstimated?: boolean }
 export interface GridEvent extends Base {
   type: 'grid'; round: number;
   /** Still streaming (complete rows so far) */
@@ -56,8 +56,12 @@ export interface DesignMetrics {
   firstValidRound: number | null;
   valid: boolean;
   bestScore: number;
-  /** Replies that held no readable grid */
+  /** Replies that held no readable grid (not counting those cut off at the token limit) */
   unreadable: number;
+  /** Replies cut off at the token limit */
+  truncated: number;
+  /** Staged build: steps accepted and failed */
+  steps?: { accepted: string[]; failed: string[] };
   ms: number;
   outputTokens: number;
   tokensPerSec: number | null;

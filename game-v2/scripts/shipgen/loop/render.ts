@@ -20,6 +20,9 @@ export interface NativeRenderOptions {
   keep?: boolean;
 }
 
+/** A still that takes longer than this is given up on (a non-fatal render error), whatever signal the caller passed */
+export const RENDER_TIMEOUT_MS = 60000;
+
 interface NativeClient { BASE: string; health(): Promise<unknown>; start(): Promise<unknown>; stop(): Promise<void> }
 
 export async function nativeRenderer(opts: NativeRenderOptions = {}): Promise<Renderer> {
@@ -30,8 +33,12 @@ export async function nativeRenderer(opts: NativeRenderOptions = {}): Promise<Re
   return {
     async render(bp, outPath, signal, params) {
       const t0 = Date.now();
+      const timeout = AbortSignal.timeout(RENDER_TIMEOUT_MS);
       const qs = params ? new URLSearchParams({ ...Object.fromEntries(q), ...params }) : q;
-      const r = await fetch(`${native.BASE}/render?${qs}`, { method: 'POST', body: JSON.stringify(bp), headers: { 'Content-Type': 'application/json' }, signal: signal ?? AbortSignal.timeout(60000) });
+      const r = await fetch(`${native.BASE}/render?${qs}`, { method: 'POST', body: JSON.stringify(bp), headers: { 'Content-Type': 'application/json' }, signal: signal ? AbortSignal.any([signal, timeout]) : timeout }).catch((e) => {
+        if (timeout.aborted && !signal?.aborted) throw new Error(`render: no picture in ${RENDER_TIMEOUT_MS / 1000} s`);
+        throw e;
+      });
       if (!r.ok) throw new Error(`render: HTTP ${r.status} ${(await r.text()).slice(0, 300)}`);
       const png = Buffer.from(await r.arrayBuffer());
       mkdirSync(dirname(outPath), { recursive: true });

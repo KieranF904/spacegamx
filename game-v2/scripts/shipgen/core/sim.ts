@@ -1,10 +1,10 @@
 // Runs a design on the touch-routed power core (common/src/ships/power), as the review ships were checked: every gun on
 // the trigger, engines pushing, tools at full, for N seconds. Each run is paired with an ideal one (the same graph with
 // unlimited generation and relays), so a percentage is "of what this part could do", whatever its firing model.
-import type { Blueprint, EnergyLayout, EnergyLayoutInput, ShipDerived, ShipTuning } from '../../../common/src/ships/index';
+import type { Blueprint, EnergyLayout, EnergyLayoutInput, ShipDerived } from '../../../common/src/ships/index';
 import {
-  GUN_BEAM, ROLE_GEN, ROLE_RELAY, ROLE_THRUSTER, ROLE_TOOL, ROLE_WEAPON, beamStep, blueprintGeometry, buildEnergyLayout,
-  createEnergyState, createShipState, energyTick, givesLeft, gunReady, isEngine, partMaterial, spendShot, thrustFrac, thrustMul,
+  GUN_BEAM, ROLE_GEN, ROLE_RELAY, ROLE_THRUSTER, ROLE_TOOL, ROLE_WEAPON, beamStep, blueprintEnergyInput, buildEnergyLayout,
+  createEnergyState, createShipState, energyTick, givesLeft, gunReady, isEngine, spendShot, thrustFrac, thrustMul,
 } from '../../../common/src/ships/index';
 import type { ShipgenContext } from './context';
 
@@ -16,18 +16,12 @@ export interface ShipEnergy {
   interval: Map<number, number>;
 }
 
-/** A design's energy layout, built from its rebuild as the power core's P2 rebuild will (power/testData.ts blueprintInput) */
+/** A design's energy layout, built from its rebuild by the power core's own builder (power/blueprint.ts) */
 export function shipEnergy(ctx: ShipgenContext, bp: Blueprint): ShipEnergy {
   const { catalog, tuning } = ctx;
   const d = createShipState(catalog, tuning, 1, bp, 0).derived;
-  const geoms = blueprintGeometry(catalog, bp);
-  const minSat = (tuning as ShipTuning).flow.minWeaponSatisfaction;
-  const weapons = d.weapons.map((w) => ({ part: w.part, fire: w.fire, interval: w.interval * Math.max(w.satisfaction, minSat) }));
-  const input: EnergyLayoutInput = {
-    fns: bp.parts.map((p) => catalog.functions.get(p.fn)!), area: geoms.map((g) => g.area), mats: bp.parts.map((p) => partMaterial(catalog, p)),
-    alive: d.alive, joins: d.joins, core: d.root >= 0 && bp.parts[d.root].fn === 'core' ? d.root : -1, tuning, weapons, geoms,
-  };
-  return { derived: d, input, L: buildEnergyLayout(input), interval: new Map(weapons.map((w) => [w.part, Math.max(1, Math.round(w.interval))])) };
+  const input = blueprintEnergyInput(catalog, tuning, bp);
+  return { derived: d, input, L: buildEnergyLayout(input), interval: new Map((input.weapons ?? []).map((w) => [w.part, Math.max(1, Math.round(w.interval))])) };
 }
 
 export interface RunOptions {

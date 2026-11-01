@@ -15,7 +15,7 @@
 import { mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'fs';
 import { join, resolve } from 'path';
 import { parseBlueprint, serializeBlueprint, type Blueprint } from '../../common/src/ships/index';
-import { loadContext } from './core/index';
+import { briefCheck, loadContext, loadRoles } from './core/index';
 import {
   type Attempt, type LoopDeps, type Renderer, type RunOptions, type ShipgenEvent,
   autoContract, createLlm, defaultModel, nativeRenderer, parseContract, run,
@@ -50,20 +50,21 @@ async function main(): Promise<void> {
     if (!d) throw new Error(`no local ${vision ? 'vision ' : ''}model found: name one with --model`);
     return d.id;
   };
-  const role = flags.role ?? 'starter';
+  // (Everything that can throw is checked first; the renderer service is started last, and always stopped)
+  const seed: Blueprint | undefined = flags.seed ? parseBlueprint(readFileSync(flags.seed, 'utf8')) : undefined;
+  // (A seed with no role named gets the role it fits best, not the starter by default)
+  const role = flags.role ?? (seed ? loadRoles(ctx).roles.map((r) => ({ id: r.id, n: briefCheck(ctx, seed, { ...r, example: undefined }).unmet.length })).sort((a, b) => a.n - b.n)[0]?.id : undefined) ?? 'starter';
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const out = resolve(flags.out ?? join(__dirname, 'out', `${stamp}-${mode}-${role}`));
-  mkdirSync(out, { recursive: true });
 
   const ac = new AbortController();
-  process.on('SIGINT', () => { if (ac.signal.aborted) process.exit(130); console.error('\n[shipgen] stopping (Ctrl+C again to quit now)'); ac.abort(); });
+  let renderer: Renderer | undefined;
+  const stopNow = () => { Promise.race([renderer?.close(), new Promise((r) => setTimeout(r, 3000))]).catch(() => {}).finally(() => process.exit(130)); };
+  const onSignal = () => { if (ac.signal.aborted) { stopNow(); return; } console.error('\n[shipgen] stopping (Ctrl+C again to quit now)'); ac.abort(); };
+  process.on('SIGINT', onSignal);
+  process.on('SIGTERM', onSignal);
 
   const renderMode = (flags.render ?? 'auto') as 'off' | 'valid' | 'all' | 'auto';
-  let renderer: Renderer | undefined;
-  if (renderMode !== 'off') {
-    try { renderer = await nativeRenderer({ keep: !!flags['keep-render'] }); } catch (e) { console.error(`[shipgen] no renders: ${(e as Error).message}`); }
-  }
-  const deps: LoopDeps = { ctx, llm, models, renderer };
   const contract = parseContract(flags.contract ?? 'auto');
   if (!contract) throw new Error(`--contract ${flags.contract}: use auto, grid-text, grid-json or parts`);
   const build = (flags.build ?? (flags.staged ? 'staged' : 'oneshot')) as 'oneshot' | 'staged';
@@ -77,13 +78,14 @@ async function main(): Promise<void> {
   const opts: RunOptions = mode === 'compare'
     ? { mode, ...common, models: (flags.models ?? '').split(',').filter(Boolean), trials: num('trials') }
     : mode === 'evolve'
-      ? { mode, ...common, model: pick(flags.model), population: num('population'), keep: num('keep'), generations: num('generations'), seedRounds: num('seed-rounds'), childRounds: num('child-rounds'), ...(flags.seed ? { seed: parseBlueprint(readFileSync(flags.seed, 'utf8')) } : {}) }
+      ? { mode, ...common, model: pick(flags.model), population: num('population'), keep: num('keep'), generations: num('generations'), seedRounds: num('seed-rounds'), childRounds: num('child-rounds'), ...(seed ? { seed } : {}) }
       : { mode: 'design', ...common, model: pick(flags.model) };
   if (opts.mode === 'compare' && !opts.models.length) throw new Error('compare needs --models a,b (or one model, for its trials alone)');
   for (const m of opts.mode === 'compare' ? opts.models : [opts.model]) {
     if (models.find((x) => x.id === (m.includes('/') ? m : `ollama/${m}`))?.cloud) console.error(`[shipgen] note: ${m} is a CLOUD model (runs on an outside service)`);
   }
 
+  mkdirSync(out, { recursive: true });
   const events = join(out, 'events.jsonl');
   const verbose = !!flags.verbose;
   let tokens = 0;
@@ -97,7 +99,7 @@ async function main(): Promise<void> {
       case 'brief': console.log(`${L}brief: ${e.text.split('\n')[0]} (${e.legendCodes} codes, prompt ${e.promptChars} chars)`); break;
       case 'prompt': tokens = 0; process.stdout.write(`${L}round ${e.round}: asking (${e.messages} messages, ${e.chars} chars) `); break;
       case 'token': if (verbose) process.stdout.write(e.text); else if (++tokens % 40 === 0) process.stdout.write(e.kind === 'thinking' ? '~' : '.'); break;
-      case 'reply': console.log(`\n${L}  reply in ${s(e.ms)}${e.outputTokens ? `, ${e.outputTokens} tokens` : ''}${e.tokensPerSec ? ` at ${e.tokensPerSec}/s` : ''}${e.structured ? ' (schema)' : ''}`); break;
+      case 'reply': console.log(`\n${L}  reply in ${s(e.ms)}${e.outputTokens ? `, ${e.tokensEstimated ? '~' : ''}${e.outputTokens} tokens` : ''}${e.truncated ? ` (CUT OFF at the token limit: ${e.stopReason})` : ''}${e.tokensPerSec ? ` at ${e.tokensPerSec}/s` : ''}${e.structured ? ' (schema)' : ''}`); break;
       case 'grid': if (!e.partial) console.log(`${L}  grid (${e.via}): ${e.parts} parts${e.errors.length ? `, ${e.errors.length} unreadable: ${e.errors[0].message}` : ''}${e.warnings.length ? `, ${e.warnings.length} guesses` : ''}`); break;
       case 'check': console.log(`${L}  check: ${e.valid ? 'VALID' : `invalid (${e.result.errors.length} errors: ${e.result.errors[0]?.message ?? ''})`}, score ${e.score}${e.brief?.unmet.length ? `, brief unmet: ${e.brief.unmet.join('; ')}` : ''}`); break;
       case 'render': console.log(`${L}  render ${e.ms} ms: ${e.path}`); break;
@@ -112,6 +114,10 @@ async function main(): Promise<void> {
     }
   };
 
+  if (renderMode !== 'off') {
+    try { renderer = await nativeRenderer({ keep: !!flags['keep-render'] }); } catch (e) { console.error(`[shipgen] no renders: ${(e as Error).message}`); }
+  }
+  const deps: LoopDeps = { ctx, llm, models, renderer };
   try {
     const r = await run(deps, opts, print);
     const designs = join(out, 'designs');

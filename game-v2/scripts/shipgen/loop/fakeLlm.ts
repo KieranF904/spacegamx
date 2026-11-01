@@ -3,7 +3,8 @@
 import type { ChatRequest, ChatResult, Llm, ModelInfo } from './llm';
 import { AbortedError } from './llm';
 
-export type Scripted = string | Error | ((req: ChatRequest) => string | Error);
+/** A reply: its text, or the text with how the model stopped (`truncated`: cut off at the token limit) */
+export type Scripted = string | Error | { text: string; truncated?: boolean } | ((req: ChatRequest) => string | Error | { text: string; truncated?: boolean });
 
 export interface FakeLlm extends Llm { requests: ChatRequest[]; models: ModelInfo[] }
 
@@ -23,6 +24,8 @@ export function fakeLlm(script: Scripted[] | ((req: ChatRequest, n: number) => S
       let r: Scripted = typeof script === 'function' ? script(req, i) : script[Math.min(i, script.length - 1)];
       if (typeof r === 'function') r = r(req);
       if (r instanceof Error) throw r;
+      const cut = typeof r === 'object' ? !!r.truncated : false;
+      if (typeof r === 'object') r = r.text;
       const mi = models.find((m) => m.id === req.model || m.name === req.model);
       for (let k = 0; k < r.length; k += chunk) {
         if (req.signal?.aborted) throw new AbortedError();
@@ -30,7 +33,7 @@ export function fakeLlm(script: Scripted[] | ((req: ChatRequest, n: number) => S
         req.onToken?.(r.slice(k, k + chunk), 'content');
       }
       if (req.signal?.aborted) throw new AbortedError();
-      return { text: r, thinking: '', ms: 5, outputTokens: Math.ceil(r.length / 4), tokensPerSec: 100, structured: !!req.schema && !!mi?.structured };
+      return { text: r, thinking: '', ms: 5, outputTokens: Math.ceil(r.length / 4), tokensPerSec: 100, structured: !!req.schema && !!mi?.structured, ...(cut ? { stopReason: 'max_tokens', truncated: true } : {}) };
     },
   };
 }

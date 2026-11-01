@@ -4,8 +4,8 @@
 import { join } from 'path';
 import type { Blueprint } from '../../../common/src/ships/index';
 import {
-  type Brief, type BriefCheck, type CheckResult, type DecodeResult, type GridError, type Role, type ShipgenContext,
-  CodeBook, withShape, asymmetricCells, blueprintToGrid, briefCheck, briefLegend, briefText, check, designText, feedbackMessage, findRole, mirrorHalf, systemPrompt,
+  type Brief, type BriefCheck, type CheckResult, type CodeDef, type DecodeResult, type GridError, type Role, type ShipgenContext,
+  CodeBook, withShape, asymmetricCells, blueprintToGrid, briefCheck, briefLegend, briefText, check, designText, feedbackMessage, findRole, mirrorHalf, shapeSuggestion, systemPrompt,
 } from '../core/index';
 import type { Emit } from './events';
 import type { ChatMessage, Llm, ModelInfo } from './llm';
@@ -82,6 +82,10 @@ export interface Attempt {
   ms: number;
   outputTokens?: number;
   tokensPerSec?: number;
+  /** The reply was cut off at the token limit */
+  truncated?: boolean;
+  /** outputTokens is an estimate (the reply was stopped as a runaway before the model reported its count) */
+  tokensEstimated?: boolean;
 }
 
 export interface DesignOutcome {
@@ -90,7 +94,12 @@ export interface DesignOutcome {
   firstValidRound: number | null;
   /** First round valid and meeting the brief (a copy of the worked example, or a ship the wrong size, doesn't) */
   firstPassRound: number | null;
+  /** Replies that held no readable design (replies cut off at the token limit are counted in `truncated`, not here) */
   unreadable: number;
+  /** Replies cut off at the token limit */
+  truncated: number;
+  /** Staged build: the steps that were accepted and those that ran out of tries */
+  steps?: { accepted: string[]; failed: string[] };
   cancelled: boolean;
   ms: number;
 }
@@ -140,7 +149,7 @@ export function gridOf(ctx: ShipgenContext, bp: Blueprint, book?: CodeBook, max?
 
 const isAbort = (e: unknown) => e instanceof Error && (e.name === 'AbortError' || e instanceof AbortedError);
 
-export interface Asked { text: string; thinking: string; ms: number; outputTokens?: number; tokensPerSec?: number; notes: string[] }
+export interface Asked { text: string; thinking: string; ms: number; outputTokens?: number; tokensPerSec?: number; notes: string[]; truncated?: boolean; stopReason?: string; tokensEstimated?: boolean }
 
 /** What read() made of a reply */
 export interface Read {
@@ -152,6 +161,8 @@ export interface Read {
   readable: boolean;
   /** The text the model sent, as extracted (for the conversation and the repeat check) */
   said: string | null;
+  /** The reply was cut off at the token limit */
+  truncated?: boolean;
 }
 
 /** One model, one brief: asking, reading and scoring replies, shared by the one-shot loop and the staged build */
@@ -177,7 +188,7 @@ export class Session {
     this.mirror = o.mirror !== false;
     this.C = CONTRACTS[contract];
     // (A thinking model may think even when told not to (qwen3-vl): room for the thinking as well as the grid)
-    const thinks = !!deps.models?.find((m) => m.id === fullId(o.model))?.thinking;
+    const thinks = !!deps.models?.find((m) => m.id === fullId(o.model))?.thinking || (!!o.think && fullId(o.model).startsWith('anthropic/'));
     // (8192: a mid-size ship's grid is about 4k tokens, and a capital's more; runaway replies are stopped by the line limit below)
     this.budget = o.maxTokens ?? (thinks ? 12288 : 8192);
     // (Grid lines, the column-number line included, past which a reply is a runaway; a part list gets more lines)
@@ -197,8 +208,16 @@ export class Session {
   /** A model stuck resending the same design gets a hotter next try (+0.3, up to 1.2) */
   heat(): void { this.temperature = Math.min(1.2, Math.round((this.temperature + 0.3) * 100) / 100); }
 
+  /** Codes a shown design needed a key for (a part the legend has no code for): the model's reply may leave the key out, and still means them */
+  private carried: CodeDef[] = [];
+
   /** The design shown to the model in its own form (half in mirror mode) */
-  show(bp: Blueprint): string { return designText(this.ctx, bp, { form: this.C.form, mirror: this.mirror }); }
+  show(bp: Blueprint): string {
+    const book = new CodeBook(this.ctx);
+    const text = designText(this.ctx, bp, { form: this.C.form, mirror: this.mirror, book });
+    this.carried = [...book.own];
+    return text;
+  }
 
   /** Asks the model, streaming (live previews as lines complete); null when cancelled or after two failures in a row */
   async chat(round: number, messages: ChatMessage[]): Promise<Asked | 'cancelled' | 'failed' | 'retry'> {
@@ -251,7 +270,8 @@ export class Session {
           : wide
           ? `a row ran on past ${this.maxCols} cells and you were stopped: the brief allows at most ${this.role?.size?.maxWidth ?? this.maxCols} columns; every row needs the same few tokens, one per cell`
           : C.form === 'parts' ? `you kept listing parts (more than ${max}) and were stopped: list each part once, then end` : `you kept writing rows (more than ${this.maxRows - 1}) and were stopped: the brief allows at most ${max}; draw each row once, then close the grid`);
-        return { text: sofar, thinking: '', ms: this.now() - tAsk, notes };
+        // (The stopped stream never reached the model's own count: about 4 characters a token, marked as an estimate)
+        return { text: sofar, thinking: '', ms: this.now() - tAsk, notes, outputTokens: Math.ceil(sofar.length / 4), tokensEstimated: true };
       }
       if (isAbort(e) || o.signal?.aborted) return 'cancelled';
       this.failures++;
@@ -266,17 +286,22 @@ export class Session {
    */
   async read(round: number, reply: Asked, build?: (drawn: Blueprint, book: CodeBook) => DecodeResult): Promise<Read> {
     const { ctx, emit, C } = this;
-    emit({ type: 'reply', round, text: reply.text, ms: reply.ms, outputTokens: reply.outputTokens, tokensPerSec: reply.tokensPerSec, structured: !!C.schema });
-    const a: Attempt = { round, reply: reply.text, gridText: null, valid: false, score: 0, ms: reply.ms, outputTokens: reply.outputTokens, tokensPerSec: reply.tokensPerSec };
+    emit({ type: 'reply', round, text: reply.text, ms: reply.ms, outputTokens: reply.outputTokens, tokensPerSec: reply.tokensPerSec, structured: !!C.schema, ...(reply.stopReason ? { stopReason: reply.stopReason } : {}), ...(reply.truncated ? { truncated: true } : {}), ...(reply.tokensEstimated ? { tokensEstimated: true } : {}) });
+    const a: Attempt = { round, reply: reply.text, gridText: null, valid: false, score: 0, ms: reply.ms, outputTokens: reply.outputTokens, tokensPerSec: reply.tokensPerSec, ...(reply.truncated ? { truncated: true } : {}), ...(reply.tokensEstimated ? { tokensEstimated: true } : {}) };
+    // (Cut off at the token limit: said plainly, not as a mistake of the model's format)
+    const cut = reply.truncated ? `Your reply was cut off at the ${this.budget}-token limit before it was finished${reply.thinking.trim() ? ' (part of it went on thinking)' : ''}, so the design in it is incomplete. This is not a format mistake: write a more compact design, and send the design only, with no thinking aloud or explanation.` : '';
+    const finish = (r: Read): Read => (reply.truncated ? { ...r, truncated: true, feedback: r.readable ? `${cut}
+${r.feedback}` : cut } : r);
     const ex = C.extract(reply.text);
     ex.notes.unshift(...reply.notes);
     if (!ex.text) {
       if (!reply.text.trim() && reply.thinking.trim()) ex.notes.unshift(`you spent the whole reply thinking (${reply.outputTokens ?? this.budget} tokens) and wrote no design: think briefly, then write it`);
       emit({ type: 'grid', round, partial: false, text: null, via: 'none', parts: 0, errors: ex.notes.map((message) => ({ message })), warnings: [] });
-      return { attempt: a, feedback: `I couldn't find a design in your reply (${ex.notes.join('; ')}).`, readable: false, said: null };
+      return finish({ attempt: a, feedback: `I couldn't find a design in your reply (${ex.notes.join('; ')}).`, readable: false, said: null });
     }
     a.gridText = ex.text;
     const book = new CodeBook(ctx);
+    for (const c of this.carried) book.add({ ...c });
     const dec = C.decode(ctx, ex.text, book);
     const warnings = [...ex.notes, ...dec.warnings];
     const fail = (errors: GridError[], shown?: Blueprint): Read => {
@@ -284,7 +309,7 @@ export class Session {
       const feedback = shown
         ? feedbackMessage({ buildErrors: errors, gridWarnings: warnings, ship: gridOf(ctx, shown, book, this.bounds()) })
         : feedbackMessage({ gridErrors: errors, gridWarnings: warnings });
-      return { attempt: a, feedback, readable: false, said: ex.text ?? null, ...(shown ? { drawn: shown } : {}) };
+      return finish({ attempt: a, feedback, readable: false, said: ex.text ?? null, ...(shown ? { drawn: shown } : {}) });
     };
     if (!dec.bp || dec.errors.length) return fail(dec.errors);
     if (!dec.bp.parts.length) return fail([{ message: C.form === 'parts' ? 'the list has no parts: list the ship\'s parts with the codes in the legend' : 'the grid has no parts: every cell is ".."; draw the ship with the codes in the legend' }]);
@@ -314,13 +339,32 @@ export class Session {
     emit({ type: 'check', round, valid: result.valid, score: result.score, result, ...(bc ? { brief: bc } : {}) });
     const asymmetry = this.mirror ? undefined : asymmetricCells(ctx, bp, { book }).map((x) => x.message);
     const asymPoints = asymmetry ? Math.min(ASYMMETRY_POINTS.max, ASYMMETRY_POINTS.perCell * asymmetry.length) : 0;
-    const feedback = feedbackMessage({ result, brief: bc, gridWarnings: warnings, ship: shipGrid, mirror: this.mirror, asymmetry, asymmetryPoints: ASYMMETRY_POINTS.perCell });
+    let feedback = feedbackMessage({ result, brief: bc, gridWarnings: warnings, ship: shipGrid, mirror: this.mirror, asymmetry, asymmetryPoints: ASYMMETRY_POINTS.perCell });
+    // (A valid ship with square exposed corners: a few named, as a suggestion)
+    const shape = result.valid ? shapeSuggestion(ctx, bp, this.mirror) : null;
+    if (shape) feedback += `
+${shape}`;
     await renderAndCritique(this.deps, this.o, a, this.stats, emit);
     const s = scoreOf(result, bc, a.looks, this.o.criticWeight ?? 0);
     a.score = Math.max(0, Math.round((s.score - asymPoints) * 10) / 10);
     emit({ type: 'score', round, score: a.score, parts: { check: result.score, briefPenalty: s.penalty, ...(asymPoints ? { asymmetry: asymPoints } : {}), ...(a.looks ? { looks: a.looks } : {}) } });
-    return { attempt: a, drawn, feedback, readable: true, said: ex.text };
+    return finish({ attempt: a, drawn, feedback, readable: true, said: ex.text });
   }
+}
+
+/** A given design (evolve's seed) scored as Session.read scores a reply: the brief penalty, the unpowered item, and the asymmetry rules with mirror mode off */
+export function scoreGiven(ctx: ShipgenContext, bp: Blueprint, role: Role | undefined, o: { mirror?: boolean } = {}): { result: CheckResult; brief?: BriefCheck; score: number; book: CodeBook } {
+  const book = new CodeBook(ctx);
+  const mirror = o.mirror !== false;
+  const rw = role?.weights as Record<string, number> | undefined;
+  const result = check(ctx, bp, { book, weights: (mirror ? rw : { ...rw, symmetry: NO_MIRROR_SYMMETRY_WEIGHT }) as never });
+  const brief = role ? briefCheck(ctx, bp, role) : undefined;
+  // (The seed is no copy of the example when it is the example)
+  if (brief) brief.unmet = brief.unmet.filter((x) => !x.startsWith('your own design'));
+  const dark = result.power?.unpowered.length ?? 0;
+  if (brief && dark) brief.unmet.push(`every gun, engine and tool powered (${dark} get none)`);
+  const asym = mirror ? 0 : Math.min(ASYMMETRY_POINTS.max, ASYMMETRY_POINTS.perCell * asymmetricCells(ctx, bp, { book }).length);
+  return { result, brief, book, score: Math.max(0, Math.round((scoreOf(result, brief, null, 0).score - asym) * 10) / 10) };
 }
 
 export async function designLoop(deps: LoopDeps, o: DesignOptions, emit: Emit): Promise<DesignOutcome> {
@@ -339,7 +383,7 @@ export async function designLoop(deps: LoopDeps, o: DesignOptions, emit: Emit): 
     : `Design the ship now.\n${S.ask()}`;
   const head: ChatMessage[] = [{ role: 'system', content: system }, { role: 'user', content: first }];
   let tail: ChatMessage[] = [];
-  const out: DesignOutcome = { attempts: [], firstValidRound: null, firstPassRound: null, unreadable: 0, cancelled: false, ms: 0 };
+  const out: DesignOutcome = { attempts: [], firstValidRound: null, firstPassRound: null, unreadable: 0, truncated: 0, cancelled: false, ms: 0 };
   const seen = new Set<string>();
 
   for (let round = 1; round <= rounds; round++) {
@@ -351,7 +395,8 @@ export async function designLoop(deps: LoopDeps, o: DesignOptions, emit: Emit): 
     const r = await S.read(round, reply);
     const a = r.attempt;
     out.attempts.push(a);
-    if (!r.readable) out.unreadable++;
+    if (r.truncated) out.truncated++;
+    else if (!r.readable) out.unreadable++;
     if (a.valid && out.firstValidRound === null) out.firstValidRound = round;
     if (a.bp && (!out.best || better(a, out.best))) {
       out.best = a;

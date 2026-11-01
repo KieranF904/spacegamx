@@ -16,7 +16,12 @@ export interface WatchRun {
   /** ms since the epoch: the event file's last write */
   modified: number;
   finished: boolean;
+  /** Not finished, and its file hasn't grown for STALE_MS: killed or crashed, most likely */
+  stale?: boolean;
 }
+
+/** A run that writes nothing for this long (a round takes minutes at most) is taken as stopped */
+export const STALE_MS = 15 * 60000;
 
 const SKIP = new Set(['stills', 'timelapse', 'renders', 'designs']);
 
@@ -69,6 +74,7 @@ function describe(root: string, dir: string, ev: string, hasMetrics: boolean): W
   if (!run.finished) {
     const tail = readRange(ev, Math.max(0, st.size - 8192), st.size).toString('utf8');
     run.finished = /"type":"done"/.test(tail);
+    if (!run.finished && Date.now() - st.mtimeMs > STALE_MS) run.stale = true;
   }
   return run;
 }
@@ -110,7 +116,7 @@ export function watchFile(root: string, id: string): string | null {
 }
 
 /** GET /api/watch/events?run=<id>[&after=<n>]: replay, then follow, until the run is done or the client leaves */
-export function watchStream(req: IncomingMessage, res: ServerResponse, runs: Runs, root: string, url: URL, intervalMs = 500): void {
+export function watchStream(req: IncomingMessage, res: ServerResponse, runs: Runs, root: string, url: URL, intervalMs = 500, staleMs = STALE_MS): void {
   const id = url.searchParams.get('run') ?? '';
   const file = id ? watchFile(root, id) : null;
   if (!file) throw new HttpError(404, `no run ${id}`);
@@ -126,7 +132,15 @@ export function watchStream(req: IncomingMessage, res: ServerResponse, runs: Run
     if (i++ >= skip) res.write(`id: ${i - 1}\ndata: ${JSON.stringify(pe)}\n\n`);
     if (e.type === 'done') end();
   }, intervalMs);
-  const stop = () => { clearInterval(ping); follower.stop(); };
+  // (A run that never wrote 'done' and has gone quiet: say so and end, instead of polling for ever)
+  const quiet = setInterval(() => {
+    let m = 0;
+    try { m = statSync(file).mtimeMs; } catch { /* (gone) */ }
+    if (ended || Date.now() - m < staleMs) return;
+    res.write(`data: ${JSON.stringify({ type: 'error', message: `this run wrote nothing for ${Math.round(staleMs / 60000)} min and never finished: it was probably stopped`, fatal: true, t: 0 })}\n\n`);
+    end();
+  }, Math.min(30000, Math.max(50, Math.floor(staleMs / 2))));
+  const stop = () => { clearInterval(ping); clearInterval(quiet); follower.stop(); };
   function end() { if (ended) return; ended = true; stop(); res.write('event: end\ndata: {}\n\n'); res.end(); }
   req.on('close', () => { ended = true; stop(); });
 }

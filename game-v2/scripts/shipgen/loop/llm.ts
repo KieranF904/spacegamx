@@ -65,6 +65,10 @@ export interface ChatResult {
   tokensPerSec?: number;
   /** The reply was held to the schema */
   structured: boolean;
+  /** Why the model stopped, as the provider says (Anthropic stop_reason, Ollama done_reason, OpenAI finish_reason) */
+  stopReason?: string;
+  /** The reply was cut off at the token limit (stop reason max_tokens / length), so the design in it is incomplete */
+  truncated?: boolean;
 }
 
 export interface Llm {
@@ -88,6 +92,9 @@ export interface LlmOptions {
    */
   lmStudioChat?: () => boolean;
 }
+
+/** The Anthropic request settings that keep hidden thinking from eating the reply budget, in the order tried */
+const THINKING_OFF: Record<string, unknown>[] = [{ thinking: { type: 'disabled' } }, { output_config: { effort: 'low' } }, {}];
 
 /** LM Studio chat is on only when asked for: LMSTUDIO_CHAT=1 */
 export const lmStudioChatFromEnv = () => process.env.LMSTUDIO_CHAT === '1';
@@ -122,7 +129,11 @@ export function createLlm(opts: LlmOptions = {}): Llm {
   const akey = opts.anthropicKey ?? (() => anthropicKey());
   const anthropic = (opts.anthropicUrl ?? 'https://api.anthropic.com').replace(/\/$/, '');
   const auth = (): Record<string, string> => { const t = token(); return t ? { Authorization: `Bearer ${t}` } : {}; };
-  let cache: Promise<ModelInfo[]> | null = null;
+  // (The model list, kept 30 s and never when it failed or came back empty: a model pulled mid-session is seen)
+  let cache: { at: number; list: ModelInfo[] } | null = null;
+  const INFO_TTL = 30000;
+  // (Which Anthropic thinking setting the API took: 0 thinking off, 1 effort low, 2 neither; it moves on when the API refuses one)
+  let thinkVariant = 0;
 
   async function listOllama(): Promise<ModelInfo[]> {
     const r = await f(`${ollama}/api/tags`, { signal: AbortSignal.timeout(5000) });
@@ -182,16 +193,23 @@ export function createLlm(opts: LlmOptions = {}): Llm {
   }
 
   async function info(id: string): Promise<ModelInfo | undefined> {
-    cache ??= list().catch(() => []);
-    const l = await cache;
     const { provider, name } = splitId(id);
-    return l.find((m) => m.provider === provider && m.name === name);
+    const find = (l: ModelInfo[]) => l.find((m) => m.provider === provider && m.name === name);
+    if (cache && Date.now() - cache.at < INFO_TTL) {
+      const hit = find(cache.list);
+      if (hit) return hit;
+    }
+    const l = await list().catch(() => [] as ModelInfo[]);
+    cache = l.length ? { at: Date.now(), list: l } : null;
+    return find(l);
   }
 
   async function chat(req: ChatRequest): Promise<ChatResult> {
     const { provider, name } = splitId(req.model);
     // (Before anything else: asking LM Studio would load the model there)
     if (provider === 'lmstudio' && !lmsChat()) throw new Error(`${LMSTUDIO_OFF}: asking ${name} would load it in LM Studio. Set LMSTUDIO_CHAT=1 (or tick "let LM Studio chat" on the page) to allow it`);
+    // (No key, no request: not even the model listing)
+    if (provider === 'anthropic' && !akey()) throw new Error('Anthropic: no ANTHROPIC_API_KEY (environment or game-v2/.env)');
     const mi = await info(req.model);
     const structured = !!req.schema && (mi ? mi.structured : true);
     const t0 = Date.now();
@@ -220,6 +238,7 @@ export function createLlm(opts: LlmOptions = {}): Llm {
           emit(j.message?.thinking, 'thinking');
           emit(j.message?.content, 'content');
           if (j.done) {
+            if (j.done_reason) out.stopReason = String(j.done_reason);
             out.promptTokens = j.prompt_eval_count; out.outputTokens = j.eval_count;
             if (j.eval_count && j.eval_duration) out.tokensPerSec = Math.round((j.eval_count / (j.eval_duration / 1e9)) * 10) / 10;
           }
@@ -231,7 +250,9 @@ export function createLlm(opts: LlmOptions = {}): Llm {
         const body: Record<string, unknown> = {
           model: name, stream: true, max_tokens: req.maxTokens ?? 16384,
           ...(system ? { system } : {}),
-          // (No temperature: the current Claude models refuse the setting)
+          // (No temperature: the current Claude models refuse the setting. Thinking is off unless asked for, or the hidden thinking
+          // eats the reply budget; a setting the API refuses is dropped for the next, see below)
+          ...(req.think ? {} : THINKING_OFF[Math.min(thinkVariant, THINKING_OFF.length - 1)]),
           messages: req.messages.filter((m) => m.role !== 'system').map((m) => ({
             role: m.role,
             content: m.images?.length
@@ -239,9 +260,19 @@ export function createLlm(opts: LlmOptions = {}): Llm {
               : m.content,
           })),
         };
-        const r = await f(`${anthropic}/v1/messages`, {
+        const send = () => f(`${anthropic}/v1/messages`, {
           method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' }, body: JSON.stringify(body), signal,
         });
+        let r = await send();
+        // (Graceful fallback: a 400 about the thinking or effort setting moves to the next variant, and is remembered)
+        while (!r.ok && r.status === 400 && !req.think && thinkVariant < THINKING_OFF.length - 1) {
+          const why = await r.clone().text().catch(() => '');
+          if (!/thinking|effort|output_config/i.test(why)) break;
+          thinkVariant++;
+          delete body.thinking; delete body.output_config;
+          Object.assign(body, THINKING_OFF[thinkVariant]);
+          r = await send();
+        }
         if (!r.ok || !r.body) throw new Error(`anthropic ${name}: HTTP ${r.status} ${(await r.text().catch(() => '')).slice(0, 300)}`);
         for await (const line of lines(r.body)) {
           const m = /^data:\s?(.*)$/.exec(line);
@@ -250,7 +281,10 @@ export function createLlm(opts: LlmOptions = {}): Llm {
           if (j.type === 'error') throw new Error(`anthropic ${name}: ${j.error?.message ?? 'error'}`);
           if (j.type === 'message_start') out.promptTokens = j.message?.usage?.input_tokens;
           else if (j.type === 'content_block_delta') { emit(j.delta?.text, 'content'); emit(j.delta?.thinking, 'thinking'); }
-          else if (j.type === 'message_delta' && j.usage?.output_tokens !== undefined) out.outputTokens = j.usage.output_tokens;
+          else if (j.type === 'message_delta') {
+            if (j.usage?.output_tokens !== undefined) out.outputTokens = j.usage.output_tokens;
+            if (j.delta?.stop_reason) out.stopReason = String(j.delta.stop_reason);
+          }
         }
         if (out.outputTokens) out.tokensPerSec = Math.round((out.outputTokens / ((Date.now() - t0) / 1000)) * 10) / 10;
       } else {
@@ -272,6 +306,7 @@ export function createLlm(opts: LlmOptions = {}): Llm {
           if (!m || m[1].trim() === '[DONE]') continue;
           const j = JSON.parse(m[1]);
           if (j.error) throw new Error(`LM Studio ${name}: ${j.error.message ?? j.error}`);
+          if (j.choices?.[0]?.finish_reason) out.stopReason = String(j.choices[0].finish_reason);
           const d = j.choices?.[0]?.delta ?? {};
           emit(d.reasoning_content ?? d.reasoning, 'thinking');
           emit(d.content, 'content');
@@ -280,6 +315,7 @@ export function createLlm(opts: LlmOptions = {}): Llm {
         if (out.outputTokens) out.tokensPerSec = Math.round((out.outputTokens / ((Date.now() - t0) / 1000)) * 10) / 10;
       }
       out.ms = Date.now() - t0;
+      out.truncated = out.stopReason === 'max_tokens' || out.stopReason === 'length';
       return out;
     });
   }

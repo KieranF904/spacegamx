@@ -58,8 +58,10 @@ export async function run(deps: LoopDeps, o: RunOptions, emitRaw: (e: ShipgenEve
 export function designMetrics(model: string, r: DesignOutcome, renderMs: number[]): DesignMetrics {
   const tps = r.attempts.map((a: Attempt) => a.tokensPerSec).filter((x): x is number => !!x);
   return {
-    kind: 'design', model, rounds: r.attempts.length, firstValidRound: r.firstValidRound, valid: !!r.best?.valid,
-    bestScore: r.best?.score ?? 0, unreadable: r.unreadable, ms: r.ms,
+    kind: 'design', model, rounds: r.attempts.length, firstValidRound: r.firstValidRound,
+    // (A staged build is valid only once a step after the power-only skeleton was accepted)
+    valid: !!r.best?.valid && (!r.steps || r.steps.accepted.some((s) => s !== 'power')),
+    bestScore: r.best?.score ?? 0, unreadable: r.unreadable, truncated: r.truncated, ...(r.steps ? { steps: r.steps } : {}), ms: r.ms,
     outputTokens: r.attempts.reduce((a, x) => a + (x.outputTokens ?? 0), 0),
     tokensPerSec: tps.length ? Math.round((tps.reduce((a, b) => a + b, 0) / tps.length) * 10) / 10 : null,
     renderMs: [...renderMs],

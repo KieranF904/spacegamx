@@ -5,11 +5,15 @@ import { join } from 'path';
 import type { Blueprint, PlacedGeom } from '../../../common/src/ships/index';
 import { parseBlueprint, placeGeometry } from '../../../common/src/ships/index';
 import type { ShipgenContext } from './context';
-import type { TierBand } from './legend';
+import { type TierBand, partInBand } from './legend';
 import { type PowerRole, partPower } from './partPower';
+import { isEngine } from '../../../common/src/ships/index';
+
+/** What a selector's `role` may name: a power role (from the power core), or 'engine' (the game's isEngine: it has thrust; the gyros and the burst strafer, though 'thruster' to the core, are not) */
+export type SelectorRole = PowerRole | 'engine';
 
 export interface Selector {
-  role?: PowerRole | PowerRole[];
+  role?: SelectorRole | SelectorRole[];
   family?: string | string[];
   fn?: string | string[];
   min?: number;
@@ -51,13 +55,16 @@ export function matches(ctx: ShipgenContext, sel: Selector, p: { fn: string; pie
   if (!fn) return false;
   if (sel.fn && !list(sel.fn).includes(p.fn)) return false;
   if (sel.family && !list(sel.family).includes(fn.family ?? '')) return false;
-  if (sel.role && !list(sel.role).includes(partPower(ctx, fn, p.piece, p.material).role)) return false;
+  if (sel.role) {
+    const rs = list(sel.role);
+    if (!(rs.includes('engine') && isEngine(fn)) && !rs.includes(partPower(ctx, fn, p.piece, p.material).role)) return false;
+  }
   return !!(sel.fn || sel.family || sel.role);
 }
 
 /** "2 weapons", "3 parts of family laser or pulse" */
 export function selectorWords(sel: Selector): string {
-  const what = sel.fn ? list(sel.fn).join(' or ') : sel.family ? `${list(sel.family).join(' or ')} part(s)` : `${list(sel.role).join(' or ')} part(s)`;
+  const what = sel.fn ? list(sel.fn).join(' or ') : sel.family ? `${list(sel.family).join(' or ')} part(s)` : list(sel.role).includes('engine') ? 'engine(s)' : `${list(sel.role).join(' or ')} part(s)`;
   const n = sel.max !== undefined && sel.min !== undefined ? `${sel.min}-${sel.max}` : sel.max !== undefined ? `at most ${sel.max}` : `at least ${sel.min ?? 1}`;
   return `${n} ${what}`;
 }
@@ -91,10 +98,22 @@ export function briefCheck(ctx: ShipgenContext, bp: Blueprint, role: Role): Brie
   const w = xs.length ? Math.max(...xs) - Math.min(...xs) + 1 : 0, h = ys.length ? Math.max(...ys) - Math.min(...ys) + 1 : 0;
   if (role.size.maxWidth && w > role.size.maxWidth) unmet.push(`width: at most ${role.size.maxWidth} columns (has ${w})`);
   if (role.size.maxHeight && h > role.size.maxHeight) unmet.push(`length: at most ${role.size.maxHeight} rows (has ${h})`);
+  const out = outOfBand(ctx, bp, role.band);
+  if (out.length) unmet.push(`parts above the pilot level band (level ${role.band.maxLevel} or a rarity not allowed): ${out.slice(0, 4).join(', ')}${out.length > 4 ? ` and ${out.length - 4} more` : ''}; use only the legend's codes`);
   const ex = exampleShip(ctx, role.example);
   const same = ex ? sameness(ctx, bp, ex) : 0;
   if (same >= 0.85) unmet.push(`your own design: ${Math.round(same * 100)}% of its parts are the worked example's, in the same places; make a different ship`);
   return { unmet, missing };
+}
+
+/** The parts of a design that a pilot of the band could not fit (the game's own licensing: econ partLicensed; rarities as the legend's band) */
+export function outOfBand(ctx: ShipgenContext, bp: Blueprint, band: TierBand): string[] {
+  const out = new Set<string>();
+  for (const p of bp.parts) {
+    const fn = ctx.catalog.functions.get(p.fn);
+    if (fn && !partInBand(p, band)) out.add(fn.model ? `${fn.name ?? fn.id} (level ${fn.unlock?.level ?? '?'}, ${fn.rarity ?? 'common'})` : `${fn.name ?? fn.id} in ${p.material}`);
+  }
+  return [...out];
 }
 
 const examples = new Map<string, Blueprint | null>();

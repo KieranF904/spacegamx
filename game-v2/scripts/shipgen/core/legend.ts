@@ -2,8 +2,8 @@
 // material), with a line of what it is built from the catalog, describePart, mounting rules and the power core.
 // Codes are derived (initials first, collisions resolved in catalog order), so they only move if the catalog reorders.
 import type { FunctionDef } from '../../../common/src/ships/index';
-import { describePart, getVariant, mountingWords, partFacingRule } from '../../../common/src/ships/index';
-import { JOB_MATERIALS, MATERIAL_LEVEL, STARTER_MATERIALS } from '../../../common/src/econ/index';
+import { describePart, getVariant, mountingWords, partFacingRule, registeredFunction } from '../../../common/src/ships/index';
+import { JOB_MATERIALS, MATERIAL_LEVEL, STARTER_MATERIALS, partLicensed } from '../../../common/src/econ/index';
 import type { ShipgenContext } from './context';
 import { type PartPower, partPower } from './partPower';
 import { pieceShapes } from './shapes';
@@ -138,75 +138,94 @@ export function pieceWords(ctx: ShipgenContext, piece: string): string {
 
 const num = (v: number) => (Math.abs(v) >= 100 ? Math.round(v) : Math.round(v * 10) / 10);
 
+/** What a part does with power, in few words ("E" is energy, "/s" per second: the legend's header says so) */
 function powerWords(p: PartPower, facing: LegendEntry['facing']): string {
   switch (p.role) {
-    case 'generator': return `GENERATOR makes ${num(p.makes!)} E/s into touching stores/consumers`;
-    case 'dynamo': return `DYNAMO tops up touching stores ${num(p.makes!)} E/s`;
-    case 'store': return `STORE holds ${num(p.holds!)} E, gives ${num(p.gives!)} E/s, takes ${num(p.takes!)} E/s`;
-    case 'conduit': return `CONDUIT power line: passes up to ${num(p.gives!)} E/s between the parts it touches, both ways`;
-    case 'diode': return `DIODE one way: power leaves only out of its facing side${facing === 'joined' ? ' (that side must touch a part)' : ''}, up to ${num(p.gives!)} E/s`;
-    case 'core': return `CORE store: holds ${num(p.holds!)} E, gives ${num(p.gives!)} E/s`;
-    case 'weapon': return `CONSUMER uses ${num(p.uses!)} E/s firing (${p.gun} gun)`;
-    case 'thruster': return `CONSUMER uses ${num(p.uses!)} E/s running${p.boostUses ? `, ${num(p.boostUses)} boosting` : ''}`;
-    case 'tool': return `CONSUMER uses ${num(p.uses!)} E/s working`;
-    default: return 'carries no power';
+    case 'generator': return `GEN makes ${num(p.makes!)}E/s`;
+    case 'dynamo': return `DYNAMO tops up stores ${num(p.makes!)}E/s`;
+    case 'store': return `STORE holds ${num(p.holds!)}E, gives ${num(p.gives!)}/s, takes ${num(p.takes!)}/s`;
+    case 'conduit': return `CONDUIT ${num(p.gives!)}/s between touching parts, both ways`;
+    case 'diode': return `DIODE one way, out of its mark${facing === 'joined' ? ' (that side must touch a part)' : ''}, ${num(p.gives!)}/s`;
+    case 'core': return `CORE store: holds ${num(p.holds!)}E, gives ${num(p.gives!)}/s`;
+    case 'weapon': return `uses ${num(p.uses!)}E/s (${p.gun})`;
+    case 'thruster': return `uses ${num(p.uses!)}E/s${p.boostUses ? ` (${num(p.boostUses)} boosting)` : ''}`;
+    case 'tool': return `uses ${num(p.uses!)}E/s`;
+    default: return '';
   }
 }
 
+/** One legend line: code, name, then size, facing, mounting, power and the numbers that matter. No prose. */
 function legendLine(ctx: ShipgenContext, e: LegendEntry, fn: FunctionDef): string {
   const parts: string[] = [];
   const isStructure = e.kind === 'structure';
-  parts.push(isStructure ? 'any shape' : e.pieces.map((p) => pieceWords(ctx, p)).join(' or '));
-  if (e.facing === 'free') parts.push('FACES OUT: mark ^ > v < ; that edge must be free');
-  else if (e.facing === 'joined') parts.push('mark ^ > v < = its out side');
-  const mw = mountingWords(ctx.catalog, fn, ctx.tuning).filter((w) => !/^Mounts anywhere$/.test(w));
+  if (!isStructure) parts.push(e.pieces.map((p) => pieceWords(ctx, p)).join(' or '));
+  if (e.facing === 'free') parts.push('face');
+  else if (e.facing === 'joined') parts.push('face (out side)');
+  const mw = mountingWords(ctx.catalog, fn, ctx.tuning)
+    .filter((w) => !/^Mounts anywhere$|^Bolts on any side$/.test(w))
+    .map((w) => w.replace(/^Fixed: aims with the ship$/, 'fixed').replace(/ clear cells? ahead/, ' clear ahead').replace(/^Bolts on /, 'bolts on '));
   if (mw.length) parts.push(mw.join(', '));
-  parts.push(powerWords(e.power, e.facing));
+  if (!isStructure) { const pw = powerWords(e.power, e.facing); if (pw) parts.push(pw); }
   const d = describePart(ctx.catalog, ctx.tuning, { fn: e.fn, material: e.material, piece: e.pieces[0] });
   if (d) {
     const b = d.base, stats: string[] = [];
-    if (b.dps) stats.push(`${num(b.dps)} dps`);
-    if (b.range) stats.push(`range ${num(b.range)}`);
-    if (b.thrust) stats.push(`thrust ${num(b.thrust)}${b.boost && b.boost > 1 ? ` (x${num(b.boost)} boost)` : ''}`);
+    if (b.dps) stats.push(`${num(b.dps)}dps`);
+    if (b.range) stats.push(`r${num(b.range)}`);
+    if (b.thrust) stats.push(`thrust ${num(b.thrust)}${b.boost && b.boost > 1 ? `x${num(b.boost)}` : ''}`);
     if (b.shield) stats.push(`shield ${num(b.shield)}`);
     if (b.cargo) stats.push(`cargo ${num(b.cargo)}`);
     if (b.heal) stats.push(`heals ${num(b.heal)}/s`);
-    stats.push(`hp ${num(b.hp)}`, `mass ${num(b.mass)}`);
-    if (b.armour > 1) stats.push(`armour ${num(b.armour)}`);
-    parts.push(stats.join(', '));
-    const facts = d.facts.filter((f) => f.tier === 'headline' || (f.tier === 'stat' && f.feature !== 'relay')).map((f) => f.short ?? f.sentence).filter(Boolean);
-    if (facts.length) parts.push(facts.slice(0, 2).join('; '));
+    stats.push(`hp${num(b.hp)}`, `m${num(b.mass)}`);
+    if (b.armour > 1) stats.push(`ar${num(b.armour)}`);
+    parts.push(stats.join(' '));
   }
-  const desc = (fn.description ?? '').split(/(?<=[.!?:])\s/)[0];
-  // (A relay's own text predates the power core: its numbers above say what it does now)
-  const relay = ['store', 'conduit', 'diode', 'core'].includes(e.power.role);
-  if (desc && !isStructure && !relay) parts.push(desc.replace(/[.:]$/, ''));
-  const tier = `Lv${e.level} ${e.rarity}`;
-  return `${e.code} = ${e.name} [${tier}]: ${parts.join(' | ')}`;
+  return `${e.code} ${e.name}: ${parts.join(', ')}`;
 }
 
-/** The entries a tier band allows (structure: materials open by maxLevel; models: unlocked by it, of an allowed rarity) */
+/** The entries a tier band allows (the game's own licensing: see partInBand) */
 export function legendFor(legend: Legend, band: TierBand): LegendEntry[] {
-  const rar = band.rarities ?? ['common', 'uncommon', 'rare', 'epic'];
-  return legend.entries.filter((e) => {
-    if (band.include?.includes(e.fn)) return true;
-    if (band.exclude?.includes(e.fn)) return false;
-    if (e.level > band.maxLevel) return false;
-    if (e.kind === 'structure') return !e.job || !!band.jobMaterials;
-    return rar.includes(e.rarity);
-  });
+  return legend.entries.filter((e) => partInBand(e, band));
 }
 
-/** The legend as the model reads it: structure, then by power role */
+const DEFAULT_RARITIES = ['common', 'uncommon', 'rare', 'epic'];
+
+/**
+ * May a design of this band carry this part: the game's own licensing (econ partLicensed: a model at its unlock level, a
+ * structure by its material's level, the core with its licence, a job's material with the job's) at the band's level, a
+ * model of an allowed rarity, and the band's include/exclude lists
+ */
+export function partInBand(p: { fn: string; material: string }, band: TierBand): boolean {
+  if (band.include?.includes(p.fn)) return true;
+  if (band.exclude?.includes(p.fn)) return false;
+  const fn = registeredFunction(p.fn);
+  if (!fn) return false;
+  const learned = ['fn:core', ...(band.jobMaterials ? JOB_MATERIALS.map((m) => `material:${m}`) : [])];
+  if (!partLicensed({ fn: p.fn, material: p.material }, learned, band.maxLevel)) return false;
+  return !fn.model || (band.rarities ?? DEFAULT_RARITIES).includes(fn.rarity ?? 'common');
+}
+
+/** The legend as the model reads it: structure (one line a function, a code a material), then by power role */
 export function legendText(entries: LegendEntry[]): string {
+  const out: string[] = ['(E = energy, /s = per second, hp = hit points, m = mass, ar = armour, r = range. "face" = needs a ^ > v < mark, and the cell it faces left free)'];
+  const structure = entries.filter((e) => e.kind === 'structure');
+  if (structure.length) {
+    out.push('# Structure: any shape. One line a part, a code a material');
+    const fns = [...new Set(structure.map((e) => e.fn))];
+    for (const f of fns) {
+      const es = structure.filter((e) => e.fn === f);
+      const core = es[0].power.role === 'core';
+      const mat = (e: LegendEntry) => /\((.*)\)$/.exec(e.name)?.[1] ?? e.material;
+      const base = es[0].name.replace(/ \(.*\)$/, '');
+      out.push(`${base}${core ? ` (${powerWords(es[0].power, null)})` : ' (no power)'}: ${es.map((e) => `${e.code} ${mat(e)} ${e.line.slice(e.line.indexOf(': ') + 2)}`).join('; ')}`);
+    }
+  }
   const groups: [string, (e: LegendEntry) => boolean][] = [
-    ['Structure (hull, armour and cargo carry NO power; the core is a small store)', (e) => e.kind === 'structure'],
     ['Power: generators, stores, conduits, diodes', (e) => ['generator', 'store', 'conduit', 'diode', 'dynamo'].includes(e.power.role)],
     ['Engines and thrusters', (e) => e.power.role === 'thruster'],
     ['Weapons', (e) => e.power.role === 'weapon'],
     ['Tools, shields and the rest', () => true],
   ];
-  const done = new Set<LegendEntry>(), out: string[] = [];
+  const done = new Set<LegendEntry>(structure);
   for (const [title, test] of groups) {
     const list = entries.filter((e) => !done.has(e) && test(e));
     if (!list.length) continue;

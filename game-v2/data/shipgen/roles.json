@@ -1,5 +1,5 @@
 {
-  "_comment": "Ship generator taste (scripts/shipgen): the only hand-written part. Everything else (parts, rules, power) comes from the game. size.cells: grid cells the ship covers. band: what a pilot of that level can build (maxLevel; rarities). require/encourage select parts by power role (generator, store, conduit, diode, dynamo, weapon, thruster, tool, core), family (models.json) or fn id; min/max counts. example: a bundled blueprint shown as a worked example. shapes: silhouettes a design is asked for, one per trial (so a model has a target that is not the example). weights: check() score weights.",
+  "_comment": "Ship generator taste (scripts/shipgen): the only hand-written part. Everything else (parts, rules, power) comes from the game. size.cells: grid cells the ship covers. band: what a pilot of that level can build (maxLevel; rarities). require/encourage select parts by power role (generator, store, conduit, diode, dynamo, weapon, thruster, tool, core; or engine: a part with thrust, which the gyros and the burst strafer are not), family (models.json) or fn id; min/max counts. example: a bundled blueprint shown as a worked example. shapes: silhouettes a design is asked for, one per trial (so a model has a target that is not the example). weights: check() score weights.",
   "roles": [
     {
       "id": "starter",
@@ -10,7 +10,7 @@
       "require": [
         { "role": "generator", "min": 1 },
         { "role": "weapon", "min": 2 },
-        { "role": "thruster", "min": 2 }
+        { "role": "engine", "min": 2 }
       ],
       "encourage": [{ "role": "store", "min": 1, "why": "a battery between the reactor and the guns keeps them firing" }],
       "style": [
@@ -31,16 +31,16 @@
       "name": "Gunship",
       "summary": "a brawler: as many guns as it can keep firing, armour at the front and sides",
       "size": { "cells": [35, 90], "maxWidth": 14, "maxHeight": 12 },
-      "band": { "maxLevel": 20 },
+      "band": { "maxLevel": 24 },
       "require": [
-        { "role": "generator", "min": 2 },
+        { "role": "generator", "min": 1 },
         { "role": "store", "min": 2 },
         { "role": "weapon", "min": 4 },
-        { "role": "thruster", "min": 3 }
+        { "role": "engine", "min": 3 }
       ],
       "encourage": [
         { "fn": "armor", "min": 4, "why": "armour on the nose and flanks" },
-        { "role": "tool", "min": 1, "why": "a shield keeps it in the fight" }
+        { "family": "shield", "min": 1, "why": "a shield keeps it in the fight" }
       ],
       "style": [
         "Guns in a forward battery facing ^, turrets out at the flanks.",
@@ -61,14 +61,14 @@
       "name": "Beam frigate",
       "summary": "a mid-size ship built around beams and pulse lasers, with the generation to keep them lit",
       "size": { "cells": [50, 120], "maxWidth": 14, "maxHeight": 14 },
-      "band": { "maxLevel": 26 },
+      "band": { "maxLevel": 32 },
       "require": [
         { "family": ["laser", "pulse"], "min": 2 },
-        { "role": "generator", "min": 3 },
+        { "role": "generator", "min": 2 },
         { "role": "store", "min": 2 },
-        { "role": "thruster", "min": 4 }
+        { "role": "engine", "min": 4 }
       ],
-      "encourage": [{ "role": "tool", "min": 2, "why": "shields" }],
+      "encourage": [{ "family": "shield", "min": 2, "why": "shields" }],
       "style": [
         "Lasers are hungry: put generators and stores right behind them.",
         "A long, narrow hull with the beams forward and the engines in a row at the back.",
@@ -85,7 +85,7 @@
       "require": [
         { "family": ["missile", "torpedo"], "min": 3 },
         { "role": "generator", "min": 2 },
-        { "role": "thruster", "min": 4 }
+        { "role": "engine", "min": 4 }
       ],
       "encourage": [{ "fn": "point_defence_turret", "min": 1, "why": "point defence against return fire" }],
       "style": [
@@ -105,7 +105,7 @@
       "require": [
         { "fn": "cargo", "min": 6 },
         { "role": "generator", "min": 1 },
-        { "role": "thruster", "min": 3 }
+        { "role": "engine", "min": 3 }
       ],
       "encourage": [
         { "family": ["tow", "mining"], "min": 1, "why": "something to fill the holds with" },
@@ -128,8 +128,8 @@
         { "role": "generator", "min": 4 },
         { "role": "store", "min": 6 },
         { "role": "weapon", "min": 6 },
-        { "role": "thruster", "min": 6 },
-        { "role": "tool", "min": 2 }
+        { "role": "engine", "min": 4 },
+        { "family": "shield", "min": 2 }
       ],
       "encourage": [
         { "role": "diode", "min": 2, "why": "Diodes between the grids keep the engines' reserve from the guns" },

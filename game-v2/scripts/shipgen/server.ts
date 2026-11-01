@@ -16,11 +16,18 @@ const HOST = '127.0.0.1';
 async function main(): Promise<void> {
   const ctx = loadContext();
   let renderer: Promise<Renderer | undefined> | null = null;
-  const getRenderer = () => (renderer ??= nativeRenderer().catch((e) => {
-    console.error(`[shipgen] no renders: ${(e as Error).message}`);
-    renderer = null;
-    return undefined;
-  }));
+  // (A start that failed is not tried again for a minute: each try waits up to 30 s and leaves a log handle open in the starter)
+  let failedAt = 0;
+  const getRenderer = (): Promise<Renderer | undefined> => {
+    if (renderer) return renderer;
+    if (Date.now() - failedAt < 60000) return Promise.resolve(undefined);
+    return (renderer = nativeRenderer().catch((e) => {
+      console.error(`[shipgen] no renders: ${(e as Error).message}`);
+      renderer = null;
+      failedAt = Date.now();
+      return undefined;
+    }));
+  };
   let quit = () => {};
   // (LM Studio is listed only, unless LMSTUDIO_CHAT=1 or the page's toggle: asking it loads the model there)
   const settings = { lmstudioChat: lmStudioChatFromEnv() };

@@ -440,6 +440,29 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   }
 }
 // ---- (end Conduit and Diode)
+// ---- The Gyro and the Heavy Gyro (common/src/ships/features/gyro): reaction wheels. `gyro` is turning torque per cell,
+// added to the ship's turning both ways wherever the part sits, with no push of its own. A gyro draws `demand` per cell a
+// second only while the ship turns flat out (less turning gently, none holding a heading), as an engine does (the Drive
+// Cell bank it touches first). `intake`/`buffer` are its numbers for the routing core (a thruster that is active while
+// turning). Heavy (`massScale`): the price is a little thrust. Sized so 2-4 Heavy Gyros swing a capital ship onto a new
+// heading 30-50% sooner, and a Gyro on a small ship helps a little. Appended last, so no other model's order moves.
+{
+  const GYRO_LOOK = { color: '#7f9cb8', decor: 'none', glow: '#7dd3fc' };
+  const GYROS = [
+    ['utility_gyro', 'Gyro', 'gyro', ['sq'], 6, 'alloy', { gyro: 250, demand: 6, intake: 6, buffer: 6, priority: 1, massScale: 1.5, hpScale: 0.8 },
+      'A reaction wheel: it adds turning force anywhere on the hull, with no push of its own, and draws power only while turning. Heavier than plain hull.', 'engines'],
+    ['utility_heavy_gyro', 'Heavy Gyro', 'gyro', ['block2'], 20, 'titanium', { gyro: 7000, demand: 12, intake: 10, buffer: 24, priority: 1, massScale: 2, hpScale: 0.9 },
+      'A big reaction wheel for big ships: it adds a lot of turning force anywhere on the hull, with no push of its own, and draws power only while turning. Heavy.', 'engines'],
+  ];
+  for (const [id, name, family, pieces, level, material, fields, description, category] of GYROS) {
+    models.push({
+      ...base(id, name, family, pieces, level, material, { grade: fields.grade }), ...fields, description,
+      rarity: level >= 20 ? 'rare' : level >= 5 ? 'uncommon' : 'common', category, fabOrder: next(category), ...GYRO_LOOK,
+      guide: { name, blurb: description.split(/[.:]/)[0], ...(pieces[0] !== 'sq' ? { piece: pieces[0] } : {}), order: guideOrder++ },
+    });
+  }
+}
+// ---- (end Gyro and Heavy Gyro)
 // ---- Firing models (docs/design/rework-2026-11.md §3, §4): every weapon model's `fire` block, read by
 // common/src/ships/guns.ts stepGuns through WeaponInfo.fire. model: 'cycle' fires on a beat while held, its energy drawn
 // as it reloads; 'clip' fires `clip` rounds, then reloads `reload` ticks drawing `reloadE` (or, with `regrow`, one round
@@ -705,6 +728,11 @@ Object.assign(RECIPES, {
 Object.assign(RECIPES, {
   power_conduit: { alloy_plate: 1, copper_wire: 1 },
   power_diode: { alloy_plate: 1, copper_wire: 2, insulated_polymer: 1 },
+});
+// (The Gyro and the Heavy Gyro: a spinning wheel on a motor)
+Object.assign(RECIPES, {
+  utility_gyro: { alloy_plate: 2, copper_wire: 1, servo_motor: 1 },
+  utility_heavy_gyro: { titanium_plate: 4, coil_winding: 2, servo_motor: 2, power_coupling: 1 },
 });
 /** Plating comes in two sizes: its recipe is per cell */
 const PER_CELL = new Set(['plating_reactive_armour', 'plating_spaced_plating']);

@@ -7,7 +7,8 @@ import type { ShipgenContext } from '../core/index';
 import type { LoopDeps, RunOptions, RunOutcome, ShipgenEvent } from '../loop/index';
 import { partCells } from './parts';
 
-export type PageEvent = ShipgenEvent & { url?: string; cells?: Record<number, [number, number][]> };
+/** `seq`: the event's place in the run's stored events (its SSE id); token deltas are live only and have none */
+export type PageEvent = ShipgenEvent & { url?: string; seq?: number; cells?: Record<number, [number, number][]> };
 
 export interface GalleryItem {
   key: string;
@@ -42,6 +43,8 @@ export class Runs {
   readonly all = new Map<string, Run>();
   readonly gallery: GalleryItem[] = [];
   private n = 0;
+  /** Finished runs kept in memory (older ones are on disk, in their events.jsonl, and reachable through Watch) */
+  static readonly KEEP_FINISHED = 10;
 
   constructor(private ctx: ShipgenContext, private outRoot: string, private runFn: RunFn) {}
 
@@ -84,7 +87,16 @@ export class Runs {
     const enrich = this.enricher((e, url) => this.addToGallery(run, e, url));
     const emit = (e: ShipgenEvent) => {
       const pe = enrich(e);
-      run.events.push(pe);
+      if (pe.type !== 'token') {
+        pe.seq = run.events.length;
+        // (A round's reply is in: its streaming previews are no use to a late page, and are the bulk of the memory)
+        if (pe.type === 'reply') for (let k = run.events.length - 1; k >= 0; k--) {
+          const o = run.events[k];
+          if (o.lane === pe.lane && o.type === 'prompt') break;
+          if (o.lane === pe.lane && o.type === 'grid' && o.partial) { o.text = null; o.errors = []; o.warnings = []; }
+        }
+        run.events.push(pe);
+      }
       for (const l of run.listeners) l(pe);
     };
     run.done = this.runFn(deps, o, emit).then(
@@ -94,8 +106,14 @@ export class Runs {
         if (!run.events.some((e) => e.type === 'error' && e.fatal)) emit({ type: 'error', message: (err as Error).message, fatal: true, t: 0 });
         return undefined;
       },
-    ).finally(() => { for (const l of run.listeners) l(null); run.listeners.clear(); });
+    ).finally(() => { for (const l of run.listeners) l(null); run.listeners.clear(); this.prune(); });
     return run;
+  }
+
+  /** Drops the oldest finished runs beyond KEEP_FINISHED */
+  private prune(): void {
+    const done = [...this.all.values()].filter((r) => r.status !== 'running');
+    for (const r of done.slice(0, Math.max(0, done.length - Runs.KEEP_FINISHED))) this.all.delete(r.id);
   }
 
   nextId(): string {

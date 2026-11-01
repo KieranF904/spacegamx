@@ -3,8 +3,8 @@
 // each child gets a few repair rounds, and the top K of parents and children carry on. With build: 'staged' the fresh
 // seeds are built in steps (staged.ts); children are always changed whole.
 import type { Blueprint } from '../../../common/src/ships/index';
-import { CodeBook, blueprintToGrid, briefCheck, briefLegend, check, feedbackMessage } from '../core/index';
-import { type Attempt, type DesignOptions, type LoopDeps, better, designLoop, roleOf } from './design';
+import { briefLegend, feedbackMessage } from '../core/index';
+import { type Attempt, type DesignOptions, type LoopDeps, better, designLoop, gridOf, roleOf, scoreGiven } from './design';
 import type { Emit, EvolveMetrics } from './events';
 import { mutationsFor, pickMutation, rngOf } from './mutations';
 
@@ -46,11 +46,12 @@ export async function evolveLoop(deps: LoopDeps, o: EvolveOptions, emit: Emit): 
 
   // ---- Generation 0: the given design, or fresh ones
   if (o.seed) {
-    const book = new CodeBook(ctx);
-    const text = blueprintToGrid(ctx, o.seed, { book }).text;
-    const result = check(ctx, o.seed, { book, weights: role?.weights as never });
-    const bc = role ? briefCheck(ctx, o.seed, role) : undefined;
-    pop = [{ id: 'seed', a: { round: 0, reply: '', gridText: text, bp: o.seed, result, brief: bc, valid: result.valid, score: result.score, ms: 0 } }];
+    // (Scored as a child is, brief penalty and all, so it doesn't beat an equal child; and said when it misses the role's size or band)
+    const g = scoreGiven(ctx, o.seed, role, o);
+    const text = gridOf(ctx, o.seed, g.book);
+    const off = (g.brief?.unmet ?? []).filter((x) => /^(size|width|length)|level|band/.test(x));
+    if (off.length) emit({ type: 'error', message: `the seed doesn't fit the role${role ? ` ${role.id}` : ''}: ${off.join('; ')}. Pick a role that suits it (--role), or expect the ranking to favour children that do`, fatal: false });
+    pop = [{ id: 'seed', a: { round: 0, reply: '', gridText: text, bp: o.seed, result: g.result, brief: g.brief, valid: g.result.valid, score: g.score, ms: 0 } }];
   } else {
     for (let i = 0; i < K && !o.signal?.aborted; i++) {
       const lane = `g0#${i + 1}`;

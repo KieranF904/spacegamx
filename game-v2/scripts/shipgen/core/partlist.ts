@@ -11,12 +11,12 @@
 import type { Blueprint, PlacedPart, Side, Vec2 } from '../../../common/src/ships/index';
 import { getVariant, placeGeometry } from '../../../common/src/ships/index';
 import type { ShipgenContext } from './context';
-import { CodeBook, FACING_MARK, type DecodeResult, type GridError } from './grid';
+import { CodeBook, FACING_MARK, partKey, type DecodeResult, type GridError } from './grid';
 import { type ShapeClass, pieceOfLetter, pieceShapes, placeShape, shapeOfPart } from './shapes';
 
 const MARK_FACING: Record<string, Side> = { '^': 'N', '>': 'E', v: 'S', '<': 'W' };
 /** CODE[mark][shape] col,row [WxH] */
-const ENTRY = /^\s*[-*•]?\s*([A-Za-z]{2})([\^>v<])?([a-z]?[1-8])?\s*(?:at\s*|@\s*)?[([]?\s*(-?\d+)\s*[,\s]\s*(-?\d+)\s*[)\]]?\s*(?:(\d)\s*[x×]\s*(\d))?\s*,?\s*$/;
+const ENTRY = /^\s*[-*•]?\s*([A-Za-z]{2})(?:\s?([\^>v<]))?([a-z]?[1-8])?\s*(?:at\s*|@\s*)?[([]?\s*(-?\d+)\s*[,\s]\s*(-?\d+)\s*[)\]]?\s*(?:(\d)\s*[x×]\s*(\d))?\s*,?\s*$/;
 
 const sizeOf = (cells: Vec2[]) => {
   const xs = cells.map((c) => c[0]), ys = cells.map((c) => c[1]);
@@ -34,16 +34,60 @@ export function partEntry(ctx: ShipgenContext, book: CodeBook, p: PlacedPart): s
   return `${def.code}${face}${shape} ${at[0]},${at[1]}${s.box && w * h > 1 ? ` ${w}x${h}` : ''}`;
 }
 
-/** A design as a part list (reading order: top row first) */
-export function blueprintToParts(ctx: ShipgenContext, bp: Blueprint, opts: { book?: CodeBook } = {}): { text: string; book: CodeBook } {
-  const book = opts.book ?? new CodeBook(ctx);
-  const rows = bp.parts.map((p) => { const { at } = shapeOfPart(ctx.catalog, p); return { p, at }; }).sort((a, b) => a.at[1] - b.at[1] || a.at[0] - b.at[0]);
-  const lines = [`name: ${bp.name}`, 'parts:', ...rows.map((r) => partEntry(ctx, book, r.p)), 'end'];
+/** A design as a part list (reading order: top row first). Parts the list can't carry (mods or gems, a piece sharing cells with another) ride in `raw:`; paint, drive and rigid are header lines. */
+export function blueprintToParts(ctx: ShipgenContext, bp: Blueprint, opts: { book?: CodeBook } = {}): { text: string; book: CodeBook; raw: { uid: number; reason: string }[] } {
+  const rawUids = new Map<number, string>();
+  for (const p of bp.parts) if (p.mods || p.gems?.length) rawUids.set(p.uid, 'has mods or gems');
+  for (let pass = 0; pass < 6; pass++) {
+    const book = opts.book ?? new CodeBook(ctx);
+    const text = encodeParts(ctx, bp, book, rawUids);
+    // (Reads back with a fresh code book, key section and all: whatever reads differently rides raw instead)
+    const back = partsToBlueprint(ctx, text);
+    if (!back.bp) { for (const p of bp.parts) rawUids.set(p.uid, 'list did not read back'); continue; }
+    const got = new Map<string, number>();
+    for (const p of back.bp.parts) { const k = partKey(ctx, p); got.set(k, (got.get(k) ?? 0) + 1); }
+    let ok = true;
+    for (const p of bp.parts) {
+      const k = partKey(ctx, p), n = got.get(k) ?? 0;
+      if (n > 0) { got.set(k, n - 1); continue; }
+      if (rawUids.has(p.uid)) continue;
+      ok = false;
+      rawUids.set(p.uid, 'reads back as a different part');
+    }
+    if (ok) return { text, book, raw: [...rawUids].map(([uid, reason]) => ({ uid, reason })) };
+  }
+  throw new Error(`could not encode ${bp.name}`);
+}
+
+function encodeParts(ctx: ShipgenContext, bp: Blueprint, book: CodeBook, rawUids: Map<number, string>): string {
+  const cells = new Set<string>();
+  const rows: { p: PlacedPart; at: Vec2 }[] = [];
+  for (const p of bp.parts) {
+    if (rawUids.has(p.uid)) continue;
+    let shape;
+    try { shape = shapeOfPart(ctx.catalog, p); } catch { rawUids.set(p.uid, 'unknown piece'); continue; }
+    const mine = shape.cls.cells.map((c) => `${c[0] + shape.at[0]},${c[1] + shape.at[1]}`);
+    const clash = mine.find((k) => cells.has(k));
+    if (clash) { rawUids.set(p.uid, `shares cell ${clash} with another part`); continue; }
+    for (const k of mine) cells.add(k);
+    rows.push({ p, at: shape.at });
+  }
+  rows.sort((a, b) => a.at[1] - b.at[1] || a.at[0] - b.at[0]);
+  const lines = [`name: ${bp.name}`];
+  if (bp.paint) lines.push(`paint: ${bp.paint}`);
+  if (bp.drive !== undefined) lines.push(`drive: ${bp.drive}`);
+  if (bp.rigid) lines.push('rigid: true');
+  lines.push('parts:', ...rows.map((r) => partEntry(ctx, book, r.p)), 'end');
   if (book.own.length) {
     lines.push('key:');
     for (const c of book.own) lines.push(`  ${c.code} = fn=${c.fn} material=${c.material}${c.piece ? ` piece=${c.piece}` : ''}${c.mount ? ` mount=${c.mount}` : ''}`);
   }
-  return { text: lines.join('\n') + '\n', book };
+  const raws = bp.parts.filter((p) => rawUids.has(p.uid));
+  if (raws.length) {
+    lines.push('raw:');
+    for (const p of raws) { const { uid: _u, ...rest } = p; lines.push(`  ${JSON.stringify(rest)}`); }
+  }
+  return lines.join('\n') + '\n';
 }
 
 /** The shape a code takes at an entry: its shape mark, else the box piece of the size given (else its smallest) */
@@ -78,13 +122,17 @@ function shapeFor(ctx: ShipgenContext, book: CodeBook, code: string, shape: stri
 export function partsToBlueprint(ctx: ShipgenContext, text: string, opts: { book?: CodeBook } = {}): DecodeResult {
   const book = opts.book ?? new CodeBook(ctx);
   const errors: GridError[] = [], warnings: string[] = [];
-  let name: string | undefined;
-  let mode: 'top' | 'parts' | 'key' = 'top';
+  let name: string | undefined, paint: string | undefined, drive: number | undefined, rigid = false;
+  let mode: 'top' | 'parts' | 'key' | 'raw' = 'top';
   const parts: PlacedPart[] = [];
+  const rawParts: PlacedPart[] = [];
   const owner = new Map<string, { entry: string; i: number }>();
   const dropped = new Set<number>();
   const raw = text.replace(/\r/g, '').split('\n');
   const hasHead = raw.some((l) => /^\s*parts\s*:/i.test(l));
+  // (Pass 1: the name, header lines, key and raw sections wherever they stand: the key is written after "end", but its codes
+  // are needed by the entries above it. The entries are kept for pass 2.)
+  const entries: { entry: string; inParts: boolean }[] = [];
   for (const line of raw) {
     const t = line.trim();
     const nm = /^name\s*:\s*(.*)$/i.exec(t);
@@ -92,6 +140,7 @@ export function partsToBlueprint(ctx: ShipgenContext, text: string, opts: { book
     if (/^parts\s*:?\s*$/i.test(t)) { mode = 'parts'; continue; }
     if (/^end\s*$/i.test(t)) { mode = 'top'; continue; }
     if (/^key\s*:\s*$/i.test(t)) { mode = 'key'; continue; }
+    if (/^raw\s*:\s*$/i.test(t)) { mode = 'raw'; continue; }
     if (!t) continue;
     if (mode === 'key') {
       const km = /^([A-Z]{2})\s*=\s*(.*)$/.exec(t);
@@ -100,43 +149,83 @@ export function partsToBlueprint(ctx: ShipgenContext, text: string, opts: { book
       if (kv.fn && kv.material && !book.get(km[1])) book.add({ code: km[1], fn: kv.fn, material: kv.material, kind: 'extra', ...(kv.piece ? { piece: kv.piece } : {}), ...(kv.mount === 'turret' ? { mount: 'turret' } : {}) });
       continue;
     }
-    if (hasHead && mode !== 'parts') continue;
-    for (const entry of t.split(';').map((s) => s.trim()).filter(Boolean)) {
-      const m = ENTRY.exec(entry);
-      if (!m) {
-        const bare = /^([a-z])(\d)\s/.exec(entry);
-        if (mode === 'parts') errors.push({ message: `can't read "${entry.slice(0, 60)}": write CODE col,row (like PI^ -1,-2, or HB -3,1 2x2)${bare ? `; a shape goes after a code: HA${bare[1]}${bare[2]}, not ${bare[1]}${bare[2]}` : ''}` });
-        continue;
-      }
-      const [, c, mark, shape, xs, ys, w, h] = m;
-      if (c !== c.toUpperCase()) { errors.push({ message: `"${entry}": write the code in CAPITALS` }); continue; }
-      const x = Number(xs), y = Number(ys);
-      const sh = shapeFor(ctx, book, c, shape, w ? [Number(w), Number(h)] : null);
-      if (!sh.cls) { errors.push({ row: y, col: x, message: `"${entry}": ${sh.why}` }); continue; }
-      const def = book.get(c)!;
-      const p: PlacedPart = { uid: parts.length, piece: sh.cls.piece, fn: def.fn, material: def.material, ...placeShape(sh.cls, [x, y]), ...(mark ? { facing: MARK_FACING[mark] } : {}), ...(def.mount ? { mount: def.mount } : {}) };
-      let cells: Vec2[];
-      try { cells = placeGeometry(ctx.catalog, p).cells; } catch (e) { errors.push({ row: y, col: x, message: `"${entry}": ${(e as Error).message}` }); continue; }
-      // (Hull "under" a part: models often list a hull cell and a part on it; the part wins, with a note)
-      const under = [...new Set(cells.map((k) => owner.get(`${k[0]},${k[1]}`)?.i).filter((i): i is number => i !== undefined))];
-      if (under.length && p.fn === 'hull') { warnings.push(`"${entry}" is under another part: dropped (a cell holds one part)`); continue; }
-      if (under.length && under.every((i) => parts[i].fn === 'hull' && !dropped.has(i))) {
-        for (const i of under) { dropped.add(i); warnings.push(`hull under "${entry}": dropped (a cell holds one part)`); }
-        for (const [k, o] of [...owner]) if (dropped.has(o.i)) owner.delete(k);
-      }
-      const clash = cells.find((k) => owner.has(`${k[0]},${k[1]}`));
-      if (clash) {
-        const o = owner.get(`${clash[0]},${clash[1]}`)!;
-        errors.push({ row: y, col: x, message: `"${entry}" overlaps "${o.entry}": both cover col ${clash[0]} row ${clash[1]}${cells.length > 1 ? ` (${entry.split(/\s+/)[0]} covers ${cells.map((k) => `${k[0]},${k[1]}`).join(' ')})` : ''}: move one` });
-        continue;
-      }
-      for (const k of cells) owner.set(`${k[0]},${k[1]}`, { entry, i: parts.length });
-      parts.push(p);
+    if (mode === 'raw') {
+      try { const p = JSON.parse(t); if (p && typeof p.fn === 'string') rawParts.push(p); } catch { errors.push({ message: `raw line isn't JSON: ${t.slice(0, 60)}` }); }
+      continue;
     }
+    if (mode === 'top') {
+      const h = /^(paint|drive|rigid)\s*:\s*(.*)$/i.exec(t);
+      if (h) {
+        const k = h[1].toLowerCase(), v = h[2].trim();
+        if (k === 'paint' && /^#[0-9a-f]{6}$/i.test(v)) paint = v.toLowerCase();
+        else if (k === 'drive') { const d = Number(v); if (d > 0 && d < 1) drive = d; }
+        else if (k === 'rigid') rigid = v === 'true';
+        continue;
+      }
+    }
+    if (hasHead && mode !== 'parts') continue;
+    for (const entry of t.split(';').map((x) => x.trim()).filter(Boolean)) entries.push({ entry, inParts: mode === 'parts' });
+  }
+  for (const { entry, inParts } of entries) {
+    const m = ENTRY.exec(entry);
+    if (!m) {
+      const bare = /^([a-z])(\d)\s/.exec(entry);
+      if (inParts) errors.push({ message: `can't read "${entry.slice(0, 60)}": write CODE col,row (like PI^ -1,-2, or HB -3,1 2x2)${bare ? `; a shape goes after a code: HA${bare[1]}${bare[2]}, not ${bare[1]}${bare[2]}` : ''}` });
+      continue;
+    }
+    const [, c, mark, shape, xs, ys, w, h] = m;
+    if (c !== c.toUpperCase()) { errors.push({ message: `"${entry}": write the code in CAPITALS` }); continue; }
+    const x = Number(xs), y = Number(ys);
+    const sh = shapeFor(ctx, book, c, shape, w ? [Number(w), Number(h)] : null);
+    if (!sh.cls) { errors.push({ row: y, col: x, message: `"${entry}": ${sh.why}` }); continue; }
+    const def = book.get(c)!;
+    const p: PlacedPart = { uid: parts.length, piece: sh.cls.piece, fn: def.fn, material: def.material, ...placeShape(sh.cls, [x, y]), ...(mark ? { facing: MARK_FACING[mark] } : {}), ...(def.mount ? { mount: def.mount } : {}) };
+    let cells: Vec2[];
+    try { cells = placeGeometry(ctx.catalog, p).cells; } catch (e) { errors.push({ row: y, col: x, message: `"${entry}": ${(e as Error).message}` }); continue; }
+    // (Hull "under" a part: models often list a hull cell and a part on it; the part wins, with a note. A hull block only
+    // partly covered keeps its other cells as 1x1 hull; a shaped hull piece only partly covered is an overlap)
+    const under = [...new Set(cells.map((k) => owner.get(`${k[0]},${k[1]}`)?.i).filter((i): i is number => i !== undefined))];
+    if (under.length && p.fn === 'hull') { warnings.push(`"${entry}" is under another part: dropped (a cell holds one part)`); continue; }
+    if (under.length && under.every((i) => parts[i].fn === 'hull' && !dropped.has(i))) {
+      const mine = new Set(cells.map((k) => `${k[0]},${k[1]}`));
+      const rest = new Map<number, Vec2[]>();
+      let ok = true;
+      for (const i of under) {
+        const left = placeGeometry(ctx.catalog, parts[i]).cells.filter((k) => !mine.has(`${k[0]},${k[1]}`));
+        if (left.length && !pieceShapes(ctx.catalog, parts[i].piece).box) ok = false;
+        rest.set(i, left);
+      }
+      if (ok) {
+        for (const i of under) {
+          dropped.add(i);
+          for (const [k, o] of [...owner]) if (o.i === i) owner.delete(k);
+          const left = rest.get(i)!;
+          warnings.push(left.length ? `hull under "${entry}": the ${left.length} cell(s) it didn't cover stay hull` : `hull under "${entry}": dropped (a cell holds one part)`);
+          for (const k of left) {
+            const hp: PlacedPart = { uid: parts.length, piece: 'sq', fn: parts[i].fn, material: parts[i].material, x: k[0], y: k[1], rot: 0, flip: false };
+            owner.set(`${k[0]},${k[1]}`, { entry: `hull ${k[0]},${k[1]}`, i: parts.length });
+            parts.push(hp);
+          }
+        }
+      }
+    }
+    const clash = cells.find((k) => owner.has(`${k[0]},${k[1]}`));
+    if (clash) {
+      const o = owner.get(`${clash[0]},${clash[1]}`)!;
+      errors.push({ row: y, col: x, message: `"${entry}" overlaps "${o.entry}": both cover col ${clash[0]} row ${clash[1]}${cells.length > 1 ? ` (${entry.split(/\s+/)[0]} covers ${cells.map((k) => `${k[0]},${k[1]}`).join(' ')})` : ''}: move one` });
+      continue;
+    }
+    for (const k of cells) owner.set(`${k[0]},${k[1]}`, { entry, i: parts.length });
+    parts.push(p);
   }
   if (errors.length) return { errors, warnings, book };
   if (!hasHead) warnings.push('no "parts:" line: read every line that looks like an entry');
-  const bp: Blueprint = { name: name ?? 'Untitled', catalogVersion: ctx.catalog.version, parts: parts.filter((_, i) => !dropped.has(i)).map((p, uid) => ({ ...p, uid })) };
+  const all = [...parts.filter((_, i) => !dropped.has(i)), ...rawParts];
+  const bp: Blueprint = {
+    name: name ?? 'Untitled', catalogVersion: ctx.catalog.version,
+    ...(paint ? { paint } : {}), ...(drive !== undefined ? { drive } : {}), ...(rigid ? { rigid: true } : {}),
+    parts: all.map((p, uid) => ({ ...p, uid })),
+  };
   return { bp, errors, warnings, book };
 }
 

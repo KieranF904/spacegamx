@@ -1,17 +1,19 @@
-// The words a model reads: the system prompt (rules from docs/areas/energy.md, the grid format, the legend for the
-// brief's tier, a worked example, the brief) and the feedback after each try (a check() result, made specific).
+/// The words a model reads: the system prompt (rules from docs/areas/energy.md, the format for the reply form chosen, the
+// legend for the brief's tier, a worked example, the brief) and the feedback after each try (a check() result, made specific).
+// Kept short: every section is the least that lets a model do the job, and everything in it is derived from the game's data.
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { getVariant, parseBlueprint } from '../../../common/src/ships/index';
+import { isEngine, parseBlueprint } from '../../../common/src/ships/index';
 import type { ShipgenContext } from './context';
-import { type LegendEntry, type TierBand, buildLegend, legendFor, legendText } from './legend';
-import { allShapes, pieceShapes, shapeWords } from './shapes';
+import { type LegendEntry, type TierBand, buildLegend, legendFor, legendText, partInBand } from './legend';
+import { allShapes, pieceShapes } from './shapes';
 import { CodeBook, type GridError, blueprintToGrid } from './grid';
 import type { Blueprint } from '../../../common/src/ships/index';
 import { halfOf } from './mirror';
 import { blueprintToParts, boxSize } from './partlist';
 import type { CheckResult } from './check';
 import { type BriefCheck, type Role, findRole, selectorWords } from './roles';
+import { coreLeftEdge, outlineShapes, squareCornerWords } from './silhouette';
 
 export interface Brief {
   /** A role id (data/shipgen/roles.json) or a role */
@@ -43,6 +45,16 @@ export function rulesText(ctx: ShipgenContext): string {
   return m[1].replace(/\r/g, '').trim();
 }
 
+/** The rules as the prompt gives them: each point cut to its first sentence (the doc's own words, not paraphrased) */
+export function rulesShort(ctx: ShipgenContext): string {
+  return rulesText(ctx).split('\n').map((l) => {
+    const m = /^(\s*[-*]\s+)(.*)$/.exec(l);
+    if (!m) return l;
+    const first = /^.*?[.!?](?=\s|$)/.exec(m[2]);
+    return m[1] + (first ? first[0] : m[2]);
+  }).join('\n');
+}
+
 function roleOf(ctx: ShipgenContext, brief: Brief): Role | undefined {
   if (!brief.role) return undefined;
   if (typeof brief.role !== 'string') return brief.role;
@@ -51,76 +63,79 @@ function roleOf(ctx: ShipgenContext, brief: Brief): Role | undefined {
   return r;
 }
 
-/** The grid format as the model reads it */
-export function formatText(ctx: ShipgenContext, entries: LegendEntry[]): string {
+/** "t1 S+W, t2 N+W": a shape's digits and the flat sides each has (the others are cut) */
+const shortShape = (s: ReturnType<typeof pieceShapes>) =>
+  s.classes.map((c) => {
+    const xs = c.cells.map((k) => k[0]), ys = c.cells.map((k) => k[1]);
+    const size = c.cells.length > 1 ? `${Math.max(...xs) - Math.min(...xs) + 1}x${Math.max(...ys) - Math.min(...ys) + 1} ` : '';
+    return `${s.letter}${c.index} ${size}${c.flat.length ? c.flat.join('+') : 'curved'}`;
+  }).join(', ');
+
+/** The shapes lines both formats share, and the nudge to use them */
+function shapeLines(ctx: ShipgenContext, entries: LegendEntry[]): string[] {
   const shaped = allShapes(ctx.catalog).filter((s) => !s.box && !s.bespoke && s.letter);
   const usable = shaped.filter((s) => entries.some((e) => e.kind === 'structure' || e.pieces.includes(s.piece)));
-  const boxes = allShapes(ctx.catalog).filter((s) => s.box && s.letter);
-  // (Examples from the legend itself: a structure code, a 2-cell part that faces out, a 2x2 part, a shaped one)
-  const cellsOf = (e: LegendEntry) => getVariant(ctx.catalog, e.pieces[0], 0, false).cells.length;
+  const lines: string[] = [];
+  if (usable.length) {
+    lines.push('Shapes (hull and armour may be any of these; the sides named are flat, the rest is cut). Rectangular pieces need no mark:');
+    for (const s of usable) lines.push(`  ${s.letter} = ${s.piece}: ${shortShape(s)}`);
+    const o = outlineShapes(ctx).filter((x) => usable.some((s) => s.piece === x.piece));
+    if (o.length) lines.push(`Shape the outline: put shaped hull or armour on the exposed outer corners instead of square blocks (same footprint, no extra cells): ${o.map((x) => `${x.marks} ${x.words}`).join('; ')}. A ship with square corners scores lower.`);
+  }
+  return lines;
+}
+
+/** The grid format as the model reads it */
+export function formatText(ctx: ShipgenContext, entries: LegendEntry[]): string {
+  // (Examples from the legend itself: a structure code, a 2-cell part that faces out, a shaped one)
+  const cellsOf = (e: LegendEntry) => pieceShapes(ctx.catalog, e.pieces[0]).classes[0].cells.length;
   const st = (entries.find((e) => e.kind === 'structure' && e.power.role === 'none') ?? entries.find((e) => e.kind === 'structure'))?.code ?? 'HA';
   const two = entries.find((e) => e.kind === 'model' && e.facing === 'free' && cellsOf(e) === 2);
   const lo = st.toLowerCase();
-  const tri = shaped[0];
+  const shaped = allShapes(ctx.catalog).filter((s) => !s.box && !s.bespoke && s.letter);
   const sf = entries.find((e) => e.facing === 'free' && !pieceShapes(ctx.catalog, e.pieces[0]).box);
   const lines = [
-    'The ship is drawn on a square grid, seen from above. The FRONT of the ship is UP (row numbers grow towards the back).',
-    'Line 1 is the column numbers; every other line is a row number, then one token per cell, separated by spaces:',
-    '  ..      an empty cell',
-    `  ${st.padEnd(8)}the FIRST cell of a part (its top-left cell: the topmost, then leftmost) = its legend code in CAPITALS`,
-    `  ${lo.padEnd(8)}every OTHER cell of that part = the same code in small letters: a 2x1 block of hull is "${st} ${lo}", a 2x2 block is "${st} ${lo}" over "${lo} ${lo}"` +
-      (two ? `; a ${two.name} (2x1) facing up is "${two.code}^ ${two.code.toLowerCase()}"` : ''),
-    `  ${(two?.code ?? 'PI') + '^'}     a part that faces out gets a mark after its code: ^ faces forward (up), v back (down), > right, < left`,
-    ...(tri ? [`  ${st}${tri.letter}2    a shaped piece gets its shape letter and number after its code` + (sf ? ` (after any facing mark: ${sf.code}v${pieceShapes(ctx.catalog, sf.pieces[0]).letter}2)` : '')] : []),
-    'Every row has the same number of tokens. Parts must not overlap. Two parts of the same code side by side are told apart by their CAPITAL first cells.',
-    'Draw only the ship: no empty rows above or below it and no empty columns beside it (there is no canvas to fill; numbers may start anywhere, such as -3). Never send a grid of only "..".',
+    'Top-down grid, the FRONT of the ship UP (rows grow towards the back). Line 1: the column numbers. Then one line per row: the row number, then one token per cell, space-separated:',
+    '  ..      empty',
+    `  ${st.padEnd(7)} the FIRST cell of a part (its top-left: topmost, then leftmost): its legend code in CAPITALS`,
+    `  ${lo.padEnd(7)} every OTHER cell of that part: the same code in small letters (2x1 hull "${st} ${lo}"; 2x2 "${st} ${lo}" over "${lo} ${lo}"${two ? `; a ${two.name} facing up "${two.code}^ ${two.code.toLowerCase()}"` : ''})`,
+    `  ${((two?.code ?? 'PI') + '^').padEnd(7)} facing mark after the code: ^ forward (up), v back, > right, < left`,
+    ...(shaped[0] ? [`  ${(st + shaped[0].letter + '2').padEnd(7)} a shaped piece: its shape letter and number after the code${sf ? ` (after any facing mark: ${sf.code}v${pieceShapes(ctx.catalog, sf.pieces[0]).letter}2)` : ''}`] : []),
+    'Every row has the same number of tokens; no blank lines; parts never overlap. Draw only the ship: no empty rows or columns around it (numbers may start anywhere, such as -3).',
+    ...shapeLines(ctx, entries),
+    'Write: name: <a name>, then grid:, the rows, end.',
   ];
-  if (usable.length) {
-    lines.push('Shapes (only pieces the legend says "shape" need one; any structure part may use them):');
-    for (const s of usable) lines.push(`  ${s.letter}1-${s.letter}${s.classes.length} = ${s.piece}: ${s.classes.map((c) => `${s.letter}${c.index} ${shapeWords(c)}`).join(', ')}`);
-  }
-  if (boxes.length) lines.push(`Square pieces need no shape mark (${boxes.map((s) => `${s.letter}=${s.piece}`).join(', ')} marks exist only to settle a rare ambiguity).`);
-  lines.push('Write the design as:', 'name: <a name>', 'grid:', '<the rows>', 'end');
   return lines.join('\n');
 }
 
 /** The part-list format as the model reads it (core/partlist.ts) */
 export function partsFormatText(ctx: ShipgenContext, entries: LegendEntry[]): string {
   const shaped = allShapes(ctx.catalog).filter((s) => !s.box && !s.bespoke && s.letter);
-  const usable = shaped.filter((s) => entries.some((e) => e.kind === 'structure' || e.pieces.includes(s.piece)));
   const st = (entries.find((e) => e.kind === 'structure' && e.power.role === 'none') ?? entries.find((e) => e.kind === 'structure'))?.code ?? 'HA';
   const gun = entries.find((e) => e.power.role === 'weapon' && e.facing === 'free')?.code ?? 'PI';
   const big = entries.find((e) => e.kind === 'model' && e.pieces.length === 1 && boxSize(ctx, e.pieces[0]) === '2x2');
   const two = entries.find((e) => e.kind === 'model' && e.facing === 'free' && e.pieces.length === 1 && boxSize(ctx, e.pieces[0]) === '2x1');
   const tri = shaped[0];
   const lines = [
-    'The ship sits on a square grid seen from above. The FRONT of the ship is UP: rows (y) grow towards the back, columns (x) grow to the right; numbers may be negative.',
-    'Write the design as a LIST OF PARTS, one per line: its legend code, then its position as col,row. You never draw the grid: the tool places each part.',
+    'A list of parts, one per line: the legend code, then col,row (columns grow to the right, rows towards the back; the FRONT is UP; numbers may be negative). The tool places each part; you draw no grid.',
     `  ${st} 0,2        a part at column 0, row 2`,
-    `  ${gun}^ -1,-2     a part that faces out gets a mark after its code: ^ faces forward (up), v back (down), > right, < left`,
-    `  ${(big?.code ?? 'HB')} -3,1 2x2   a part bigger than one cell: its position is its TOP-LEFT cell, and its size (columns x rows) follows; it covers the cells right of and below that cell`,
-    ...(two ? [`  ${two.code}v 1,3 1x2   a 2x1 part may stand upright: size 1x2 (across is 2x1, the default)`] : []),
+    `  ${gun}^ -1,-2     facing mark after the code: ^ forward (up), v back, > right, < left`,
+    `  ${(big?.code ?? 'HB')} -3,1 2x2   a part over one cell: its TOP-LEFT cell, then its size (columns x rows); it covers the cells right of and below that cell`,
+    ...(two ? [`  ${two.code}v 1,3 1x2   a 2x1 part standing upright is 1x2`] : []),
     `  ${st} 2,2 2x1     structure (hull, armour, cargo) may be 1x1 (the default), 2x1, 1x2 or 2x2`,
-    ...(tri ? [`  ${st}${tri.letter}2 -3,0     a shaped piece gets its shape letter and number after its code (after any facing mark)`] : []),
-    'Parts must not overlap: two parts may never cover the same cell (the tool names any that do). Each part must share a full edge with the rest of the ship.',
+    ...(tri ? [`  ${st}${tri.letter}2 -3,0     a shaped piece: its shape letter and number after the code (after any facing mark)`] : []),
+    'Parts never overlap, and each shares a full edge with the rest of the ship.',
+    ...shapeLines(ctx, entries),
+    'Write: name: <a name>, then parts:, one part per line, end.',
   ];
-  if (usable.length) {
-    lines.push('Shapes (only pieces the legend says "shape" need one; any structure part may use them):');
-    for (const s of usable) lines.push(`  ${s.letter}1-${s.letter}${s.classes.length} = ${s.piece}: ${s.classes.map((c) => `${s.letter}${c.index} ${shapeWords(c)}`).join(', ')}`);
-  }
-  lines.push('Write the design as:', 'name: <a name>', 'parts:', '<one part per line>', 'end');
   return lines.join('\n');
 }
 
 /** How mirror mode works, for the system prompt */
 export function mirrorText(form: DesignForm): string {
-  const what = form === 'parts' ? 'List' : 'Draw';
   return [
-    `MIRROR MODE: ${what} only the LEFT HALF of the ship and the parts ON its centre line. The tool adds the right half as the mirror image of your left half, so the ship is always symmetric.`,
-    'The centre line runs down the middle of the core. Give the core whole; give everything else only where it is left of that line' + (form === 'grid' ? ' (draw no columns right of the core).' : ' (no column right of the core).'),
-    'A part ON the centre line (across it) must look the same mirrored: facing ^ or v, never > or <. A part on the left facing < becomes one facing > on the right; left-handed shapes become right-handed.',
-    'Two parts side by side across the centre line (two guns, two engines) come from ONE part just left of it.',
-    'Counts in the brief are for the whole ship: a part left of the centre line counts twice (it and its mirror image), a part on the line once.',
+    `MIRROR MODE: ${form === 'parts' ? 'list' : 'draw'} only the LEFT HALF of the ship and the parts ON its centre line (down the middle of the core, which you give whole; ${form === 'grid' ? 'no columns' : 'no column'} right of it). The tool adds the mirror image, so the ship is symmetric.`,
+    'A part ON the centre line must look the same mirrored: facing ^ or v, never > or <. Two side-by-side parts across the line (two guns, two engines) come from ONE part just left of it. Brief counts are for the whole ship: a part left of the line counts twice, one on the line once.',
   ].join('\n');
 }
 
@@ -132,27 +147,43 @@ export function designText(ctx: ShipgenContext, bp: Blueprint, opts: { form?: De
   return (opts.form === 'parts' ? blueprintToParts(ctx, shown, { book: opts.book }) : blueprintToGrid(ctx, shown, { book: opts.book })).text.trim();
 }
 
-function exampleText(ctx: ShipgenContext, path: string | undefined, opts: { form?: DesignForm; mirror?: boolean } = {}): { text: string; codes: Set<string> } | null {
+/** The role's worked example as the model reads it, or null when it has none, or draws with a key, or a pilot of the band couldn't fit it */
+function exampleText(ctx: ShipgenContext, path: string | undefined, band: TierBand, opts: { form?: DesignForm; mirror?: boolean } = {}): { text: string; parts: Blueprint['parts'] } | null {
   if (!path) return null;
   const f = join(ctx.dataDir, 'ships/blueprints', `${path}.json`);
   if (!existsSync(f)) return null;
   const bp = parseBlueprint(readFileSync(f, 'utf8'));
+  // (An example with a part above the band would hand the model a code it may not use)
+  if (bp.parts.some((p) => !partInBand(p, band))) return null;
   const enc = blueprintToGrid(ctx, bp, { book: new CodeBook(ctx) });
   if (enc.raw.length || enc.book.own.length) return null;
-  const codes = new Set<string>();
-  for (const m of enc.text.matchAll(/\b([A-Z]{2})(?=[\^>v<a-z0-9]*\b)/g)) codes.add(m[1]);
-  if (!opts.form && !opts.mirror) return { text: enc.text.trim(), codes };
-  return { text: designText(ctx, bp, opts), codes };
+  if (!opts.form && !opts.mirror) return { text: enc.text.trim(), parts: bp.parts };
+  return { text: designText(ctx, bp, opts), parts: bp.parts };
 }
 
-/** The legend entries a brief shows: its band's, plus any its example uses */
+/** The legend entries a brief allows: its band's */
 export function briefLegend(ctx: ShipgenContext, brief: Brief): LegendEntry[] {
   const role = roleOf(ctx, brief), legend = buildLegend(ctx);
-  const band = brief.band ?? role?.band ?? { maxLevel: 99 };
-  const out = legendFor(legend, band);
-  const ex = exampleText(ctx, role?.example);
-  for (const e of legend.entries) if (ex?.codes.has(e.code) && !out.includes(e)) out.push(e);
-  return out;
+  return legendFor(legend, brief.band ?? role?.band ?? { maxLevel: 99 });
+}
+
+/**
+ * The entries the prompt lists: the band's, less what the role has no use for (tools the role doesn't name, thrusters that
+ * are not engines, cargo holds in a role that wants none). The parts stay usable: the checker reads every code of the band.
+ */
+export function shownLegend(ctx: ShipgenContext, brief: Brief): LegendEntry[] {
+  const role = roleOf(ctx, brief);
+  const sels = [...(role?.require ?? []), ...(role?.encourage ?? [])];
+  const list = <T>(v: T | T[] | undefined): T[] => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
+  const named = (e: LegendEntry) => sels.some((s) => list(s.fn).includes(e.fn) || list(s.family).includes(ctx.catalog.functions.get(e.fn)?.family ?? '\0'));
+  return briefLegend(ctx, brief).filter((e) => {
+    const fn = ctx.catalog.functions.get(e.fn);
+    if (e.kind === 'structure') return e.fn !== 'cargo' || named(e);
+    if (named(e)) return true;
+    if (e.power.role === 'tool') return fn?.family === 'shield';
+    if (e.power.role === 'thruster') return isEngine(fn);
+    return true;
+  });
 }
 
 export function briefText(ctx: ShipgenContext, brief: Brief): string {
@@ -184,23 +215,31 @@ export interface PromptOptions {
 
 export function systemPrompt(ctx: ShipgenContext, brief: Brief, opts: PromptOptions = {}): string {
   const role = roleOf(ctx, brief);
-  const entries = briefLegend(ctx, brief);
+  const entries = shownLegend(ctx, brief);
   const form = opts.form ?? 'grid';
-  const ex = exampleText(ctx, role?.example, opts.form || opts.mirror ? { form, mirror: opts.mirror } : {});
-  const how = form === 'parts' ? 'You write the design as a list of parts with positions' : 'You write the design as a text grid';
+  const band = brief.band ?? role?.band ?? { maxLevel: 99 };
+  const ex = exampleText(ctx, role?.example, band, opts.form || opts.mirror ? { form, mirror: opts.mirror } : {});
+  // (The example's own parts are listed too, so every code it shows is one the legend explains)
+  if (ex) for (const p of ex.parts) { const e = buildLegend(ctx).find(p.fn, p.material); if (e && !entries.includes(e)) entries.push(e); }
   const parts = [
-    `You design spaceships for a 2D space game. A ship is a grid of parts. ${how}; a checker builds it, runs its power and tells you what to fix.` +
+    `You design spaceships for a 2D space game: a grid of parts. You write the design as ${form === 'parts' ? 'a list of parts with positions' : 'a text grid'}; a checker builds it, runs its power and tells you what to fix.` +
       (opts.staged ? ' You build it in steps: each step adds one system to a ship that already works.' : ''),
-    '## Rules\n' + rulesText(ctx),
+    '## Rules\n' + rulesShort(ctx),
     (form === 'parts' ? '## Part list format\n' + partsFormatText(ctx, entries) : '## Grid format\n' + formatText(ctx, entries)),
   ];
   if (opts.mirror) parts.push('## Mirror mode\n' + mirrorText(form));
-  parts.push('## Legend: the only codes you may use (each line: what it is, its size, how it faces, what it does with power)\n' + legendText(entries));
-  if (ex) parts.push(`## Example: a good design${opts.mirror ? ', as its left half and centre line' : ''} (study how power flows from generators through stores to every gun and engine; do not copy it: your ship has its own shape)\n` + ex.text);
+  parts.push('## Legend: the only codes you may use\n' + legendText(entries));
+  if (ex) parts.push(`## Example${opts.mirror ? ' (left half and centre line)' : ''}: study how power flows from generators through stores to every gun and engine; do not copy it\n` + ex.text);
   parts.push('## Your brief\n' + briefText(ctx, brief));
-  const body = form === 'parts' ? 'the name: line, parts:, one part per line, and end' : 'the name: line, grid:, the rows, and end';
-  parts.push(`## Reply\nReply with the design only: ${body}${opts.mirror ? ' (the left half and the centre line only)' : ''}. No other words.`);
   return parts.join('\n\n') + '\n';
+}
+
+/** Square corners left on a valid ship, named as a suggestion */
+export function shapeSuggestion(ctx: ShipgenContext, bp: Blueprint, mirror = false): string | null {
+  const sq = squareCornerWords(ctx, bp, 5, mirror ? coreLeftEdge(ctx, bp) : undefined);
+  const o = outlineShapes(ctx);
+  if (!sq.length || !o.length) return null;
+  return `Outline: ${sq.length === 5 ? 'several' : sq.length} exposed corner(s) are still square, e.g. ${sq.join('; ')}. Swap them for shaped pieces (${o.map((x) => x.marks).join(', ')}) where it fits; the same footprint.`;
 }
 
 export interface FeedbackInput {
@@ -241,7 +280,7 @@ export function feedbackMessage(f: FeedbackInput): string {
     out.push("I couldn't read your grid:");
     out.push(...cap(f.gridErrors, (e) => `- ${e.row !== undefined ? `row ${e.row} col ${e.col}: ` : ''}${e.message}`));
     if (f.gridWarnings?.length) out.push('Also:', ...cap(f.gridWarnings, (w) => `- ${w}`).slice(0, 4));
-    out.push('Reply with the whole design again, every row the same width, in the format given.');
+    out.push('Send the whole design again, every row the same width.');
     return out.join('\n');
   }
   if (f.buildErrors?.length) {
@@ -249,7 +288,7 @@ export function feedbackMessage(f: FeedbackInput): string {
     out.push(...cap(f.buildErrors, (e) => `- ${e.message}`));
     if (f.gridWarnings?.length) out.push('Also:', ...cap(f.gridWarnings, (w) => `- ${w}`).slice(0, 4));
     if (f.ship) out.push('What you sent, as read:', f.ship);
-    out.push('Fix these and reply with the whole design again, in the format given.');
+    out.push('Fix these.');
     return out.join('\n');
   }
   const r = f.result;
@@ -281,6 +320,6 @@ export function feedbackMessage(f: FeedbackInput): string {
   const weak = (Object.entries(r.scores) as [string, number | null][]).filter(([, v]) => v !== null && v < 0.75).sort((a, b) => a[1]! - b[1]!);
   out.push(`Scores (0-1): ${(Object.entries(r.scores) as [string, number | null][]).map(([k, v]) => `${k} ${v === null ? '-' : v.toFixed(2)}`).join(', ')}.`);
   for (const [k] of weak.slice(0, 3)) if (SCORE_HINTS[k]) out.push(`- ${k}: ${SCORE_HINTS[k]}`);
-  out.push(r.valid && !f.brief?.unmet.length ? 'Improve it if you can, and reply with the whole design in the same format.' : 'Fix these and reply with the whole corrected design in the same format.');
+  out.push(r.valid && !f.brief?.unmet.length ? 'Improve it if you can.' : 'Fix these.');
   return out.join('\n');
 }

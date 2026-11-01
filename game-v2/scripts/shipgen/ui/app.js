@@ -35,9 +35,10 @@ function fillModels(select, list, { none, pick } = {}) {
     ['Local: LM Studio', list.filter((m) => !m.cloud && m.provider === 'lmstudio')],
     ['Cloud (runs on an outside service)', list.filter((m) => m.cloud)],
   ];
-  select.innerHTML = (none ? `<option value="">${esc(none)}</option>` : '') + groups.filter(([, ms]) => ms.length)
+  // (No model picked: a placeholder shows, never the first enabled option, which could be a paid cloud one)
+  select.innerHTML = (none ? `<option value="">${esc(none)}</option>` : '<option value="" disabled>(pick a model)</option>') + groups.filter(([, ms]) => ms.length)
     .map(([g, ms]) => `<optgroup label="${esc(g)}">${ms.map((m) => `<option value="${esc(m.id)}"${m.off ? ' disabled' : ''}>${esc(modelLabel(m))}</option>`).join('')}</optgroup>`).join('');
-  if (pick && list.some((m) => m.id === pick && !m.off)) select.value = pick;
+  select.value = pick && list.some((m) => m.id === pick && !m.off) ? pick : '';
 }
 
 async function loadModels() {
@@ -263,7 +264,7 @@ function renderWatch() {
     const row = document.createElement('div');
     row.className = `watchRow${state.watching === r.id ? ' on' : ''}`;
     const when = new Date(r.modified).toLocaleString();
-    row.innerHTML = `<span class="pill ${r.finished ? 'done' : 'running'}">${r.finished ? 'done' : 'live?'}</span> <b>${esc(r.id)}</b> <span class="muted small">${esc([r.mode, r.model, r.role].filter(Boolean).join(' · '))} · ${esc(when)}</span>`;
+    row.innerHTML = `<span class="pill ${r.finished ? 'done' : r.stale ? '' : 'running'}">${r.finished ? 'done' : r.stale ? 'stopped?' : 'live?'}</span> <b>${esc(r.id)}</b> <span class="muted small">${esc([r.mode, r.model, r.role].filter(Boolean).join(' · '))} · ${esc(when)}</span>`;
     row.onclick = () => watch(r.id);
     el.appendChild(row);
   }

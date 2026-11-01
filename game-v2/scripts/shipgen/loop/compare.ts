@@ -20,19 +20,21 @@ export async function compareLoop(deps: LoopDeps, o: CompareOptions, emit: Emit)
   let cancelled = false;
   for (const model of o.models) {
     const t0 = now();
-    let passes = 0, roundsToValid = 0, scoreSum = 0, tps: number[] = [], done = 0;
+    let passes = 0, roundsToValid = 0, scoreSum = 0, tps: number[] = [], done = 0, lastEnd = t0;
     best.set(model, []);
     for (let t = 1; t <= trials && !cancelled; t++) {
       const lane = `${model} t${t}`;
       const r = await designLoop(deps, { ...o, model, rounds, stopWhenValid: true, shapeIndex: t - 1, tag: `${model.replace(/[^\w.-]+/g, '_')}-t${t}` }, (e) => emit({ ...e, lane }));
       if (r.cancelled) { cancelled = true; break; }
       done++;
+      lastEnd = now();
       if (r.firstPassRound !== null) { passes++; roundsToValid += r.firstPassRound; }
       scoreSum += r.best?.score ?? 0;
       if (r.best) best.get(model)!.push(r.best);
       for (const a of r.attempts) if (a.tokensPerSec) tps.push(a.tokensPerSec);
     }
-    const ms = now() - t0;
+    // (To the end of the last finished trial: a trial cancelled midway doesn't count against the model's rate)
+    const ms = lastEnd - t0;
     models.push({
       model, trials: done, passes, passRate: done ? round2(passes / done) : 0,
       roundsPerValid: passes ? round2(roundsToValid / passes) : null,

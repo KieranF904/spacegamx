@@ -192,7 +192,7 @@ function parseText(text: string, book: CodeBook): Parsed {
   const lines = text.replace(/\r/g, '').split('\n').map((l) => l.replace(/```\w*/g, '').replace(/\|/g, ' ').replace(/\s+$/, ''));
   let mode: 'top' | 'grid' | 'key' | 'raw' = 'top';
   const hasGridHead = lines.some((l) => /^\s*grid\s*:/i.test(l));
-  let header: number[] | null = null, rowIdx = 0;
+  let header: number[] | null = null, rowIdx = 0, blank = false;
   const rows: { y: number; toks: string[] }[] = [];
   for (const line of lines) {
     const t = line.trim();
@@ -208,7 +208,17 @@ function parseText(text: string, book: CodeBook): Parsed {
       if (k === 'key' && /:/.test(t)) { mode = 'key'; continue; }
       if (k === 'raw' && /:/.test(t)) { mode = 'raw'; continue; }
     }
-    if (!t) { if (mode === 'grid' && rows.length) mode = 'top'; continue; }
+    if (!t) { if (mode === 'grid' && rows.length) blank = true; continue; }
+    if (blank) {
+      // (A blank line inside the grid: rows that follow it are still the grid's; anything else ends it)
+      blank = false;
+      if (mode === 'grid') {
+        const bt = t.split(/\s+/);
+        if (isInt(bt[0]) && bt.length > 1) bt.shift();
+        if (bt.every((x) => /^\.+$/.test(x) || x === '##' || TOKEN.test(x))) out.warnings.push('a blank line inside the grid: the rows after it were read too (leave no blank lines between rows)');
+        else mode = 'top';
+      }
+    }
     if (mode === 'key') {
       const km = /^([A-Z]{2})\s*=\s*(.*)$/.exec(t);
       if (!km) continue;
@@ -223,7 +233,7 @@ function parseText(text: string, book: CodeBook): Parsed {
     }
     if (mode !== 'grid' && hasGridHead) continue;
     const toks = t.split(/\s+/);
-    if (toks.every(isInt) && toks.length > 1 && !header && !rows.length) { header = toks.map(Number); continue; }
+    if (toks.every(isInt) && (toks.length > 1 || mode === 'grid') && !header && !rows.length) { header = toks.map(Number); continue; }
     let label: number | null = null;
     if (isInt(toks[0]) && toks.length > 1) label = Number(toks.shift());
     if (!toks.every((x) => /^\.+$/.test(x) || x === '##' || TOKEN.test(x))) {

@@ -4,6 +4,7 @@ import type { Blueprint, Catalog, PlacedGeom, Side } from '../../../common/src/s
 import { SIDE_NORMAL, isEngine, partMount, placeGeometry } from '../../../common/src/ships/index';
 import type { ShipgenContext } from './context';
 import { mirrorPart, partKey } from './grid';
+import { silhouetteScore } from './silhouette';
 
 export interface DesignScores {
   /** Share of the ship (by area) that has a mirror twin across the best left-right axis */
@@ -16,6 +17,8 @@ export interface DesignScores {
   gunsOut: number | null;
   /** Cells covered / the bounding box */
   compactness: number;
+  /** Share of the exposed outer corners of hull and armour that are shaped pieces (wedges, rounds, a nose); null with no such corner */
+  silhouette: number | null;
 }
 
 const SIDES4: [number, number][] = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -35,7 +38,7 @@ export function designScores(ctx: ShipgenContext, bp: Blueprint, geoms?: PlacedG
   const owner = new Map<string, number>();
   gs.forEach((g, i) => { for (const c of g.cells) owner.set(`${c[0]},${c[1]}`, i); });
   const cells = [...owner.keys()].map((k) => k.split(',').map(Number));
-  if (!cells.length) return { symmetry: 0, armourOutside: 0, enginesAft: 0, gunsOut: null, compactness: 0 };
+  if (!cells.length) return { symmetry: 0, armourOutside: 0, enginesAft: 0, gunsOut: null, compactness: 0, silhouette: null };
   const x0 = Math.min(...cells.map((c) => c[0])), x1 = Math.max(...cells.map((c) => c[0])) + 1;
   const y0 = Math.min(...cells.map((c) => c[1])), y1 = Math.max(...cells.map((c) => c[1])) + 1;
   const cx = cells.reduce((s, c) => s + c[0] + 0.5, 0) / cells.length, cy = cells.reduce((s, c) => s + c[1] + 0.5, 0) / cells.length;
@@ -98,5 +101,6 @@ export function designScores(ctx: ShipgenContext, bp: Blueprint, geoms?: PlacedG
     enginesAft: eW ? eS / eW : 0,
     gunsOut: gN ? gS / gN : null,
     compactness: cells.length / ((x1 - x0) * (y1 - y0)),
+    silhouette: silhouetteScore(ctx, bp),
   };
 }

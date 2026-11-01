@@ -1,5 +1,8 @@
 // The image critic: a vision model looks at a still of the design and scores its looks 1-10 with a one-line reason.
-import type { Llm } from './llm';
+import { type Llm, splitId } from './llm';
+
+/** Claude models answer in plain text and may think first: room for both */
+const budgetFor = (model: string, local: number) => (splitId(model).provider === 'anthropic' ? Math.max(local, 1024) : local);
 
 export const CRITIC_SCHEMA = {
   type: 'object',
@@ -34,10 +37,13 @@ export function parseVerdict(text: string): { looks: number | null; reason: stri
 
 export async function critique(llm: Llm, model: string, png: Buffer, opts: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<Verdict> {
   const r = await llm.chat({
-    model, schema: CRITIC_SCHEMA, temperature: 0.2, maxTokens: 300, signal: opts.signal, timeoutMs: opts.timeoutMs ?? 180000,
+    model, schema: CRITIC_SCHEMA, temperature: 0.2, maxTokens: budgetFor(model, 300), signal: opts.signal, timeoutMs: opts.timeoutMs ?? 180000,
     messages: [{ role: 'user', content: CRITIC_PROMPT, images: [png.toString('base64')] }],
   });
-  return { ...parseVerdict(r.text), ms: r.ms };
+  const v = parseVerdict(r.text);
+  // (An empty verdict is a broken critic, not a score: say so instead of recording "looks ?/10")
+  if (v.looks === null) throw new Error(`the critic ${model} sent no verdict${r.truncated ? ' (cut off at the token limit)' : r.text.trim() ? '' : ' (an empty reply)'}`);
+  return { ...v, ms: r.ms };
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -86,7 +92,7 @@ export async function comparePair(llm: Llm, model: string, a: Buffer, b: Buffer,
   let reason = '';
   for (const [x, y, first] of [[a, b, 'a'], [b, a, 'b']] as const) {
     const r = await llm.chat({
-      model, schema: PAIR_SCHEMA, temperature: 0.1, maxTokens: opts.maxTokens ?? 2000, signal: opts.signal, timeoutMs: opts.timeoutMs ?? 300000,
+      model, schema: PAIR_SCHEMA, temperature: 0.1, maxTokens: opts.maxTokens ?? budgetFor(model, 2000) * (splitId(model).provider === 'anthropic' ? 2 : 1), signal: opts.signal, timeoutMs: opts.timeoutMs ?? 300000,
       messages: [{ role: 'user', content: PAIR_PROMPT, images: [x.toString('base64'), y.toString('base64')] }],
     });
     const v = parsePair(r.text || r.thinking.slice(-400));

@@ -9,7 +9,8 @@
  *
  *   GET /render?asset=ship:sparrow-t&zoom=fit&light=sun&bg=transparent&w=1280&h=800&scale=1&angle=0&aim=...  → PNG
  *       (the viewer's params: client/src/viewer/params.ts; timings in X-Render-* headers)
- *   GET /assets?q=word word   → JSON: the browse list (ids as above), filtered
+ *   POST /render?zoom=...     → PNG of the blueprint JSON in the body (kept as ship:posted/<hash>)
+ *   GET /assets?q=word word  → JSON: the browse list (ids as above), filtered
  *   GET /health               → JSON: pids, uptime, renders, timings
  *   GET /                     → the viewer page (ui.html: displays /render's PNGs, draws nothing itself)
  *   POST /quit                → stops it (and its GL worker)
@@ -20,7 +21,9 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 import { createServer, type IncomingMessage, type ServerResponse } from 'http';
 import { readFileSync } from 'fs';
+import { createHash } from 'crypto';
 import { join } from 'path';
+import { parseBlueprint } from '@space-game/common';
 import { constants, setPriority } from 'os';
 import { SHADERS, TABLES, atlas, loadData, parseParams, scene, searchAssets, type Draw } from './scene';
 import { SKY_SHADERS, skyNoise } from './sky';
@@ -145,6 +148,26 @@ ${res.h.trace ?? ''}`);
 
 // ---- HTTP
 
+const POSTED_KEPT = 200, BODY_MAX = 4 << 20;
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((ok, fail) => {
+    const chunks: Buffer[] = [];
+    let n = 0;
+    req.on('data', (c: Buffer) => { n += c.length; if (n > BODY_MAX) { fail(new Error('body too big')); req.destroy(); } else chunks.push(c); });
+    req.on('end', () => ok(Buffer.concat(chunks).toString('utf8')));
+    req.on('error', fail);
+  });
+}
+/** A posted blueprint, kept (by content) among the ships under posted/: its key */
+function postShip(body: string): string {
+  const bp = parseBlueprint(body);
+  const key = `posted/${createHash('sha1').update(body).digest('hex').slice(0, 16)}`;
+  data.ships.delete(key);
+  data.ships.set(key, bp);
+  for (const k of [...data.ships.keys()].filter((k) => k.startsWith('posted/')).slice(0, -POSTED_KEPT)) data.ships.delete(k);
+  return key;
+}
+
 const UI = join(__dirname, 'ui.html');
 function send(res: ServerResponse, code: number, type: string, body: string | Buffer, extra: Record<string, string> = {}): void {
   res.writeHead(code, { 'Content-Type': type, 'Cache-Control': 'no-store', ...extra });
@@ -161,6 +184,8 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
   const url = new URL(req.url ?? '/', `http://127.0.0.1:${PORT}`);
   try {
     if (url.pathname === '/render') {
+      // (POST: a blueprint as the body, drawn as asset ship:posted/<hash>, so a design that isn't on disk renders too)
+      if (req.method === 'POST') url.searchParams.set('asset', `ship:${postShip(await readBody(req))}`);
       const r = await render(url.search);
       stats.renders++;
       stats.last = { asset: url.searchParams.get('asset'), ...r.times };

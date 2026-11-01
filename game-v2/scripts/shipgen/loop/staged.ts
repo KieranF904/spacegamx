@@ -4,16 +4,16 @@
 // and it tries that step again. A step that runs out of tries leaves the ship as it was and the build moves on.
 // The steps are a registry (STEPS): each says what it asks for and what a ship still lacks for it, from the role.
 import type { Blueprint, PlacedPart } from '../../../common/src/ships/index';
-import { placeGeometry } from '../../../common/src/ships/index';
+import { isEngine, placeGeometry } from '../../../common/src/ships/index';
 import {
   type CheckResult, type DecodeResult, type Role, type Selector, type ShipgenContext,
-  CodeBook, briefLegend, briefText, buildLegend, check, halfOf, matches, mergeParts, partAt, partKey, partPower, systemPrompt,
+  CodeBook, briefLegend, briefText, buildLegend, check, coreLeftEdge, exposedCorners, halfOf, matches, mergeParts, outlineShapes, partAt, partKey, partPower, silhouetteScore, squareCornerWords, systemPrompt,
 } from '../core/index';
 import { type Attempt, type DesignOptions, type DesignOutcome, type LoopDeps, Session, better, contractFor, passes } from './design';
 import type { Emit } from './events';
 import type { ChatMessage } from './llm';
 
-type PR = 'generator' | 'store' | 'weapon' | 'thruster';
+type PR = 'generator' | 'store' | 'weapon' | 'engine';
 
 /** The most a role requires (or encourages) of a power role (or function) */
 function wants(role: Role | undefined, sel: { role?: PR; fn?: string }, encourage = false): number {
@@ -40,8 +40,12 @@ export interface Step {
   title: string;
   /** What to add, in words */
   ask(s: StepContext): string;
-  /** What a built ship still lacks for this step (empty: done) */
-  lacks(s: StepContext, bp: Blueprint, r: CheckResult): string[];
+  /** What a built ship still lacks for this step (empty: done). `prev`: the ship as the step found it, for a step judged against it */
+  lacks(s: StepContext, bp: Blueprint, r: CheckResult, prev?: { bp: Blueprint; r: CheckResult }): string[];
+  /** Parts of the ship so far this step may replace (default: the frame's hull) */
+  replaces?: (p: PlacedPart) => boolean;
+  /** More lines for the step's ask, from the ship so far */
+  extra?(s: StepContext, bp: Blueprint): string[];
   /** Cells worth suggesting: free cells touching these power roles (and, for facing parts, with a clear lane that way) */
   near?: { roles: string[]; lane?: 'N' | 'S' };
 }
@@ -79,10 +83,10 @@ export const STEPS: Step[] = [
   },
   {
     id: 'engines', title: 'engines',
-    ask: (s) => `Add the ENGINES: at least ${Math.max(2, wants(s.role, { role: 'thruster' }))} engines${twice(s)} at the BACK, facing v (backwards), with NOTHING in the cell behind them. Each must TOUCH a store, a generator or the core.`,
+    ask: (s) => `Add the ENGINES: at least ${Math.max(2, wants(s.role, { role: 'engine' }))} engines${twice(s)} at the BACK, facing v (backwards), with NOTHING in the cell behind them. Each must TOUCH a store, a generator or the core.`,
     lacks: (s, bp, r) => {
-      const n = Math.max(2, wants(s.role, { role: 'thruster' }));
-      const back = bp.parts.filter((p) => matches(s.ctx, { role: 'thruster' }, p) && p.facing === 'S').length;
+      const n = Math.max(2, wants(s.role, { role: 'engine' }));
+      const back = bp.parts.filter((p) => matches(s.ctx, { role: 'engine' }, p) && p.facing === 'S').length;
       const out = back < n ? [`needs at least ${n} engines facing v (has ${back})`] : [];
       for (const u of unpoweredOf(r, 'thruster')) out.push(`the ${u.name} (${u.code} at row ${u.row} col ${u.col}) gets no power: put it against a store, generator or the core`);
       return out;
@@ -99,6 +103,24 @@ export const STEPS: Step[] = [
       const n = wants(s.role, { fn: 'armor' }, true), has = bp.parts.filter((p) => p.fn === 'armor').length;
       return has < n ? [`needs at least ${n} armour parts (has ${has})`] : [];
     },
+  },
+  {
+    id: 'shape', title: 'shape',
+    ask: (s) => {
+      const o = outlineShapes(s.ctx);
+      return `SHAPE the outline: swap the exposed outer corner cells of hull and armour for shaped pieces${o.length ? ` (${o.map((x) => `${x.marks} ${x.words}`).join('; ')})` : ''}, so the ship is not a block. Change only hull and armour; keep every gun, engine and power part, and the same footprint. The power must stay exactly as it is.${twice(s)}`;
+    },
+    lacks: (s, bp, r, prev) => {
+      if (!exposedCorners(s.ctx, bp).length) return [];
+      if (!prev) return squareCornerWords(s.ctx, bp, 1, s.mirror ? coreLeftEdge(s.ctx, bp) : undefined).length ? ['the exposed outer corners are still square'] : [];
+      const out: string[] = [];
+      if ((silhouetteScore(s.ctx, bp) ?? 0) <= (silhouetteScore(s.ctx, prev.bp) ?? 0)) out.push('the outline is no more shaped than before: put shaped pieces on the listed corners');
+      const sig = (x: CheckResult) => (x.power?.consumers ?? []).map((c) => `${c.name}:${c.pct}:${c.pctLong}`).sort().join('|');
+      if (sig(r) !== sig(prev.r)) out.push('the power changed (a gun or engine now fires or pushes differently): keep the power exactly as it was');
+      return out;
+    },
+    replaces: (p) => p.fn === 'hull' || p.fn === 'armor',
+    extra: (s, bp) => { const w = squareCornerWords(s.ctx, bp, 12, s.mirror ? coreLeftEdge(s.ctx, bp) : undefined); return w.length ? [`Exposed corners still square (col,row, open sides): ${w.join('; ')}.`] : []; },
   },
 ];
 
@@ -169,12 +191,12 @@ export function ringAround(ctx: ShipgenContext, bp: Blueprint, cells: string[], 
 }
 
 /** Parts placed before (not frame hull) that a step's ship no longer has */
-function lost(ctx: ShipgenContext, before: Blueprint, after: Blueprint): PlacedPart[] {
+function lost(ctx: ShipgenContext, before: Blueprint, after: Blueprint, replaces: (p: PlacedPart) => boolean = isFrame): PlacedPart[] {
   const left = new Map<string, number>();
   for (const p of after.parts) { const k = partKey(ctx, p); left.set(k, (left.get(k) ?? 0) + 1); }
   const out: PlacedPart[] = [];
   for (const p of before.parts) {
-    if (isFrame(p)) continue;
+    if (replaces(p)) continue;
     const k = partKey(ctx, p), n = left.get(k) ?? 0;
     if (n > 0) left.set(k, n - 1); else out.push(p);
   }
@@ -189,19 +211,20 @@ export async function stagedLoop(deps: LoopDeps, o: DesignOptions, emit: Emit): 
   const sc: StepContext = { ctx, role: S.role, mirror: S.mirror };
   const system = systemPrompt(ctx, o.brief, { form: S.C.form, mirror: S.mirror, staged: true });
   emit({ type: 'brief', role: S.role?.id, text: briefText(ctx, o.brief), legendCodes: briefLegend(ctx, o.brief).length, promptChars: system.length });
-  const out: DesignOutcome = { attempts: [], firstValidRound: null, firstPassRound: null, unreadable: 0, cancelled: false, ms: 0 };
+  const out: DesignOutcome = { attempts: [], firstValidRound: null, firstPassRound: null, unreadable: 0, truncated: 0, cancelled: false, ms: 0, steps: { accepted: [], failed: [] } };
   let ship = o.start?.bp ?? skeleton(ctx, S.role, o.brief.name ?? 'Untitled');
   let shipAttempt: Attempt | undefined;
   let round = 0;
   const book = new CodeBook(ctx);
-  const codesOf = (r: string) => briefLegend(ctx, o.brief).filter((e) => e.power.role === r).map((e) => e.code).slice(0, 8).join(', ');
-  const hint: Record<string, string> = { power: `generators ${codesOf('generator')}; stores ${codesOf('store')}`, weapons: codesOf('weapon'), engines: codesOf('thruster') };
+  const codesOf = (r: string) => briefLegend(ctx, o.brief).filter((e) => (r === 'engine' ? isEngine(ctx.catalog.functions.get(e.fn)) : e.power.role === r)).map((e) => e.code).slice(0, 8).join(', ');
+  const hint: Record<string, string> = { power: `generators ${codesOf('generator')}; stores ${codesOf('store')}`, weapons: codesOf('weapon'), engines: codesOf('engine') };
 
   steps:
   for (const [i, step] of STEPS.entries()) {
     if (o.signal?.aborted) { out.cancelled = true; break; }
     const before = ship;
     const r0 = check(ctx, before, { book });
+    const replaces = step.replaces ?? isFrame;
     if (!step.lacks(sc, before, r0).length && step.id !== 'armour' && i > 0) {
       emit({ type: 'step', step: step.id, index: i + 1, of: STEPS.length, status: 'skipped', round, note: 'already done' });
       continue;
@@ -217,15 +240,16 @@ export async function stagedLoop(deps: LoopDeps, o: DesignOptions, emit: Emit): 
       `Step ${i + 1} of ${STEPS.length}: ${step.ask(sc)}`,
       ...(hint[step.id] ? [`Codes for this step (see the legend): ${hint[step.id]}.`] : []),
       ...(ring.length ? [`Free cells one further out (touching those, for a second generator or store in a chain): ${ring.join('; ')}.`] : []),
-      ...(where.length ? [`Free cells that touch power${step.near?.lane === 'N' ? ' with nothing in front' : step.near?.lane === 'S' ? ' with nothing behind' : ''} (col,row): ${where.join('; ')}.`] : []),
-      `Keep every part already placed. The frame's hull cells are placeholders: you may build over them.`,
+      ...(where.length ? [`Free cells that touch power${step.near?.lane === 'N' ? ' with nothing in front' : step.near?.lane === 'S' ? ' with nothing behind' : ''} (col,row): ${where.join('; ')}. Put each new part ON one of them (frame hull there is replaced), not behind hull.`] : []),
+      ...(step.extra ? step.extra(sc, before) : []),
+      step.replaces ? `Keep every other part already placed: this step may replace hull and armour.` : `Keep every part already placed. The frame's hull cells are placeholders: you may build over them.`,
       parts
         ? `Reply with name:, parts:, ONLY THE NEW PARTS (one per line, CODE col,row), and end. A new part placed on a frame hull cell replaces it.${S.mirror ? ' Only on the left half and the centre line.' : ''}`
         : S.ask(),
     ].join('\n');
     const head: ChatMessage[] = [{ role: 'system', content: system }, { role: 'user', content: ask }];
     let tail: ChatMessage[] = [];
-    const build = parts ? (drawn: Blueprint, b: CodeBook): DecodeResult => mergeParts(ctx, S.mirror ? halfOf(ctx, before) : before, drawn.parts, isFrame, b) : undefined;
+    const build = parts ? (drawn: Blueprint, b: CodeBook): DecodeResult => mergeParts(ctx, S.mirror ? halfOf(ctx, before) : before, drawn.parts, replaces, b) : undefined;
     let accepted = false;
     const seen = new Set<string>();
     for (let t = 1; t <= tries; t++) {
@@ -238,16 +262,19 @@ export async function stagedLoop(deps: LoopDeps, o: DesignOptions, emit: Emit): 
       const r = await S.read(round, reply, build);
       const a = r.attempt;
       out.attempts.push(a);
-      if (!r.readable) out.unreadable++;
-      if (a.valid && out.firstValidRound === null) out.firstValidRound = round;
+      if (r.truncated) out.truncated++;
+      else if (!r.readable) out.unreadable++;
       let problems: string[] = [];
       if (a.bp && a.result) {
-        problems = [...step.lacks(sc, a.bp, a.result)];
-        for (const p of lost(ctx, before, a.bp)) { const at = partAt(ctx, p); problems.unshift(`you removed the ${ctx.catalog.functions.get(p.fn)?.name ?? p.fn} at row ${at.row} col ${at.col} (placed in an earlier step): keep every part already placed`); }
+        problems = [...step.lacks(sc, a.bp, a.result, { bp: before, r: r0 })];
+        for (const p of lost(ctx, before, a.bp, replaces)) { const at = partAt(ctx, p); problems.unshift(`you removed the ${ctx.catalog.functions.get(p.fn)?.name ?? p.fn} at row ${at.row} col ${at.col} (placed in an earlier step): keep every part already placed`); }
         if (i > 0) for (const u of a.result.power?.unpowered ?? []) { const m = `the ${u.name} (${u.code} at row ${u.row} col ${u.col}) gets no power`; if (!problems.some((x) => x.startsWith(m))) problems.push(`${m}: it must touch a store, generator or the core`); }
         if (a.valid && !problems.length) {
           accepted = true;
           ship = a.bp; shipAttempt = a;
+          out.steps!.accepted.push(step.id);
+          // (The power-only skeleton is valid almost every time: a staged build counts as valid from the first step after it)
+          if (i > 0 && out.firstValidRound === null) out.firstValidRound = round;
           emit({ type: 'step', step: step.id, index: i + 1, of: STEPS.length, status: 'accepted', round });
           emit({ type: 'best', round, score: a.score, valid: a.valid, name: a.bp.name, bp: a.bp, ...(a.renderPath ? { renderPath: a.renderPath } : {}) });
           if (passes(a) && out.firstPassRound === null && i === STEPS.length - 1) out.firstPassRound = round;
@@ -267,6 +294,7 @@ export async function stagedLoop(deps: LoopDeps, o: DesignOptions, emit: Emit): 
         tail = [...tail, { role: 'assistant' as const, content: r.said ?? a.reply.slice(-1500) }, { role: 'user' as const, content: msg }].slice(-2 * Math.max(1, keep));
       }
     }
+    if (!accepted) out.steps!.failed.push(step.id);
     if (!accepted) emit({ type: 'step', step: step.id, index: i + 1, of: STEPS.length, status: 'failed', round, note: `no try in ${tries} kept the ship valid with the ${step.title} in place; going on without it` });
   }
   // (The ship the steps built, scored against the whole brief; a run that never got past the skeleton keeps its best try)

@@ -43,8 +43,8 @@ describe('shipgen legend', () => {
       if (['generator', 'dynamo'].includes(e.power.role)) expect(e.power.makes, e.fn).toBeGreaterThan(0);
       if (['store', 'conduit', 'diode'].includes(e.power.role)) expect(e.power.gives, e.fn).toBeGreaterThan(0);
       if (e.power.role === 'weapon') expect(e.power.uses, e.fn).toBeGreaterThanOrEqual(0);
-      expect(e.line.startsWith(`${e.code} = `)).toBe(true);
-      if (e.facing === 'free') expect(e.line).toContain('FACES OUT');
+      expect(e.line.startsWith(`${e.code} ${e.name}: `)).toBe(true);
+      if (e.facing === 'free') expect(e.line).toContain(', face');
     }
   });
 
@@ -55,7 +55,8 @@ describe('shipgen legend', () => {
     expect(legendFor(legend, { maxLevel: 99 }).some((e) => e.rarity === 'legendary')).toBe(false);
     expect(legendFor(legend, { maxLevel: 99, rarities: ['legendary'] }).filter((e) => e.kind === 'model').every((e) => e.rarity === 'legendary')).toBe(true);
     const text = legendText(low);
-    for (const e of low) expect(text).toContain(e.line);
+    // (A model's line in full; a structure part as its function's line: its code and material)
+    for (const e of low) expect(text).toContain(e.kind === 'structure' ? `${e.code} ` : e.line);
   });
 
   it('gives every shaped player piece a letter and its distinct shapes', () => {

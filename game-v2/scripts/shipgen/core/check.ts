@@ -92,6 +92,8 @@ export interface CheckOptions {
 
 export const DEFAULT_WEIGHTS: Record<keyof CheckResult['scores'], number> = {
   power: 0.3, symmetry: 0.15, armourOutside: 0.15, enginesAft: 0.15, gunsOut: 0.15, compactness: 0.1,
+  // (Modest: a shaped outline ranks above a blocky one of the same function)
+  silhouette: 0.06,
 };
 
 const pct = (a: number, b: number) => (b > 0 ? Math.round(Math.min(1, a / b) * 1000) / 10 : 0);
@@ -139,7 +141,7 @@ export function check(ctx: ShipgenContext, bp: Blueprint, opts: CheckOptions = {
   };
 
   // ---- Scores
-  const taste = geoms ? designScores(ctx, bp, geoms) : { symmetry: 0, armourOutside: 0, enginesAft: 0, gunsOut: null, compactness: 0 };
+  const taste = geoms ? designScores(ctx, bp, geoms) : { symmetry: 0, armourOutside: 0, enginesAft: 0, gunsOut: null, compactness: 0, silhouette: null };
   const consumers = power?.consumers ?? [];
   const powerScore = consumers.length ? consumers.reduce((s, c) => s + (c.linked ? (c.pct + c.pctLong) / 200 : 0), 0) / consumers.length : 0;
   const scores = { ...taste, power: Math.round(powerScore * 1000) / 1000 };
