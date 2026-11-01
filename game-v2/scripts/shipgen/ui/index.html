@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shipgen</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <h1>Shipgen</h1>
+  <span id="status" class="pill idle">idle</span>
+  <span id="runInfo" class="muted"></span>
+  <span class="grow"></span>
+  <span id="live" class="muted mono"></span>
+  <button id="stop" class="danger" disabled>Stop</button>
+</header>
+
+<details id="watchBox" class="panel watchBox">
+  <summary><b>Watch</b> <span class="muted small">runs from the command line (out/**/events.jsonl), read-only</span> <span id="watchCount" class="muted small"></span></summary>
+  <div id="watchList" class="watchList"><p class="muted small">Looking...</p></div>
+</details>
+
+<main class="layout">
+  <!-- ---------------------------------------------------------------- controls -->
+  <form id="form" class="panel controls" autocomplete="off">
+    <h2>Run</h2>
+    <label>Mode
+      <select name="mode" id="mode">
+        <option value="design">design: one ship, rounds of feedback</option>
+        <option value="evolve">evolve: a population, kept by score</option>
+        <option value="compare">compare: two models, same brief</option>
+      </select>
+    </label>
+    <label><span id="modelLabel">Designer</span>
+      <select name="model" id="model"></select>
+    </label>
+    <label class="only-compare">Second designer
+      <select name="model2" id="model2"></select>
+    </label>
+    <label>Critic <span class="muted">(vision models; scores looks)</span>
+      <select name="critic" id="critic"></select>
+    </label>
+    <div class="row2">
+      <label>Temperature <output id="tempOut">0.60</output>
+        <input type="range" name="temperature" id="temperature" min="0" max="1.5" step="0.05" value="0.6">
+      </label>
+      <label>Rounds
+        <input type="number" name="rounds" id="rounds" min="1" max="20" value="4">
+      </label>
+    </div>
+    <div class="row2 only-evolve">
+      <label>Children / gen <input type="number" name="population" min="1" max="12" value="3"></label>
+      <label>Generations <input type="number" name="generations" min="1" max="10" value="2"></label>
+    </div>
+    <div class="row2 only-compare">
+      <label>Trials each <input type="number" name="trials" min="1" max="10" value="2"></label>
+      <span></span>
+    </div>
+    <label>Role
+      <select name="role" id="role"></select>
+    </label>
+    <p id="roleSummary" class="muted small"></p>
+    <div class="row2">
+      <label>Tier (max level) <input type="number" name="maxLevel" id="maxLevel" min="1" max="99"></label>
+      <label>Size (cells) <span class="pair"><input type="number" name="cellsMin" id="cellsMin" min="1"><input type="number" name="cellsMax" id="cellsMax" min="1"></span></label>
+    </div>
+    <label>Note <span class="muted">(added to the brief)</span>
+      <textarea name="note" id="note" rows="3" placeholder="e.g. a needle-nosed interceptor"></textarea>
+    </label>
+    <label class="not-compare">Start from <span class="muted">(change a ship instead of starting blank)</span>
+      <select name="start" id="start"></select>
+    </label>
+    <label class="check"><input type="checkbox" name="think" id="think"> let thinking models think (slower)</label>
+    <button type="submit" id="go" class="primary">Start</button>
+    <p id="formMsg" class="msg"></p>
+    <details class="legendBox">
+      <summary>Colours</summary>
+      <div id="key" class="key"></div>
+    </details>
+  </form>
+
+  <!-- ---------------------------------------------------------------- stage -->
+  <section class="stage">
+    <div id="panes" class="panes"></div>
+    <div class="panel actions">
+      <div class="sel">
+        <span class="muted">Selected:</span> <b id="selName">none yet</b> <span id="selScore" class="muted"></span>
+      </div>
+      <div class="btns">
+        <button id="actSave" disabled title="Validate, then write data/ships/blueprints/dev/gen-&lt;role&gt;-&lt;n&gt;.json (flyable from the F9 panel after a game-server restart)">Save to library</button>
+        <button id="actLab" disabled title="Saves it (if not yet saved), regenerates the Energy Lab's ship list and opens it there">Open in Energy Lab</button>
+        <button id="actStart" disabled title="The next run changes this design">Use as start point</button>
+        <button id="actLapse" disabled title="Render the build-up part by part: core, frame, power, weapons, engines, armour">Timelapse</button>
+      </div>
+      <p id="actMsg" class="msg"></p>
+    </div>
+    <div id="metrics" class="panel metrics"></div>
+  </section>
+
+  <!-- ---------------------------------------------------------------- log -->
+  <section class="panel logPanel">
+    <div class="logHead"><h2>Step log</h2><label class="check small"><input type="checkbox" id="follow" checked> follow</label></div>
+    <div id="log" class="log"></div>
+  </section>
+</main>
+
+<footer class="panel galleryPanel">
+  <h2>Gallery <span class="muted small">best designs this session, valid first</span></h2>
+  <div id="gallery" class="gallery"><p class="muted small">Nothing yet.</p></div>
+</footer>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

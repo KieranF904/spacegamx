@@ -1,0 +1,14 @@
+// Ship generator core: pure (no network). Everything is derived from the game's live code and data; data/shipgen/roles.json is the only taste.
+export { type ShipgenContext, DATA_DIR, loadContext, readCatalogFiles } from './context';
+export { type CodeDef, type Legend, type LegendEntry, type TierBand, buildLegend, legendFor, legendText, pieceWords, allocateCode } from './legend';
+export { type PartPower, type PowerRole, partPower } from './partPower';
+export { type PieceShapes, type ShapeClass, allShapes, pieceShapes, shapeOfPart, mirrorShape, shapeWords } from './shapes';
+export {
+  CodeBook, type DecodeResult, type EncodeResult, type GridError, FACING_MARK, blueprintToGrid, gridToBlueprint, gridLines, partKey, partAt,
+  mirrorPart, mirrorLeft, mirrorGridLeft, coreAxis2,
+} from './grid';
+export { type ShipEnergy, type RunOptions, type RunResult, shipEnergy, runEnergy } from './sim';
+export { type DesignScores, designScores } from './scores';
+export { type CheckResult, type CheckOptions, type CheckError, type ConsumerPower, type PowerReport, type CheckStats, type PartRef, DEFAULT_WEIGHTS, check } from './check';
+export { type Role, type RolesFile, type Selector, type BriefCheck, loadRoles, findRole, matches, selectorWords, briefCheck } from './roles';
+export { type Brief, type FeedbackInput, rulesText, formatText, briefLegend, briefText, systemPrompt, feedbackMessage } from './prompt';
