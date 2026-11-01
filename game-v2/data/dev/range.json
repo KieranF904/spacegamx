@@ -32,7 +32,11 @@
       { "id": "zealot3", "label": "Cinder Zealot Mk III (late)", "ship": "cinder_zealot", "faction": "cinder", "grade": 3, "distance": 1400, "bearing": -40 },
       { "id": "elite_gunship2", "label": "Elite Pirate Gunship Mk II", "ship": "pirate_gunship", "faction": "pirates", "grade": 2, "elite": true, "distance": 1400, "bearing": -12 },
       { "id": "tallyman", "label": "Tallyman-class boss hull", "ship": "pirate_gunship", "faction": "pirates", "grade": 1, "plating": 1, "hp": 4, "core": 2.5, "distance": 1400, "bearing": 12 },
-      { "id": "bulwark3", "label": "Frost Bulwark Mk III (heavy)", "ship": "frost_bulwark", "faction": "frost", "grade": 3, "distance": 1400, "bearing": 40 }
+      { "id": "bulwark3", "label": "Frost Bulwark Mk III (heavy)", "ship": "frost_bulwark", "faction": "frost", "grade": 3, "distance": 1400, "bearing": 40 },
+      { "id": "mammoth", "label": "Redtooth Mammoth (giant, 127 parts)", "ship": "giant_mammoth", "faction": "redtooth", "grade": 1, "distance": 2600, "bearing": -50 },
+      { "id": "ironmonger", "label": "The Ironmonger (giant, 138 parts)", "ship": "giant_ironmonger", "faction": "pirates", "grade": 1, "distance": 2600, "bearing": -17 },
+      { "id": "pilgrim", "label": "The Ash Pilgrim (giant, 129 parts)", "ship": "giant_pilgrim", "faction": "cinder", "grade": 1, "distance": 2600, "bearing": 17 },
+      { "id": "rimeback", "label": "Rimeback (giant, 110 parts)", "ship": "giant_rimeback", "faction": "frost", "grade": 1, "distance": 2600, "bearing": 50 }
     ]
   }
 }

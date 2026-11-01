@@ -48,10 +48,10 @@ const projectiles = (server: GameServer) => bitecs.defineQuery([Projectile])(ser
 const pose = (server: GameServer, eids: number[]) => eids.map((e) => [Position.x[e], Position.y[e], Velocity.x[e], Velocity.y[e], Rotation.angle[e]]);
 
 describe('weapons range: dummies', () => {
-  it('the data loads: a clear private system and ten dummies at 400/800/1400', () => {
+  it('the data loads: a clear private system and fourteen dummies at 400/800/1400/2600', () => {
     expect(config.system).toBe('dev_range');
     expect(config.dummies.length).toBeGreaterThanOrEqual(10);
-    expect([...new Set(config.dummies.map((d) => d.distance))].sort((a, b) => a - b)).toEqual([400, 800, 1400]);
+    expect([...new Set(config.dummies.map((d) => d.distance))].sort((a, b) => a - b)).toEqual([400, 800, 1400, 2600]);
     const sys = withDevData(readGameDataFiles(dataDir), dataDir).systems.systems.find((s) => s.id === 'dev_range')!;
     expect(sys.hazards).toEqual([]);
     expect(sys.asteroidBelt.count).toBe(0);
