@@ -102,7 +102,7 @@ describe('shipgen concept step', () => {
   it('carries the concept through a staged build: each step ask and each retry', async () => {
     const { llm } = await go({ build: 'staged', contract: 'parts', rounds: 2 }, (req, n) => (n === 0 ? CONCEPT : n === 1 ? 'name: S\nparts:\nCR -1,0\nBT -1,-1\nend' : 'nothing'));
     const power = llm.requests[1].messages[1].content;
-    expect(power).toMatch(/Follow this concept[\s\S]*Dart[\s\S]*Step 1 of 5/);
+    expect(power).toMatch(/Follow this concept[\s\S]*Dart[\s\S]*Step 1 of 6/);
     // (the skeleton is sized to the plan's cell target)
     expect(power).toMatch(/Step 1/);
   });

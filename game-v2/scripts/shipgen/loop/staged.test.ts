@@ -116,12 +116,12 @@ describe('shipgen staged build', () => {
     ];
     const { ev, out, llm } = await go({ build: 'staged', contract: 'parts', rounds: 3 }, replies);
     const steps = ev.filter((e) => e.type === 'step') as Extract<ShipgenEvent, { type: 'step' }>[];
-    expect(steps.map((s) => `${s.step}:${s.status}`)).toEqual(['power:start', 'power:accepted', 'weapons:start', 'weapons:accepted', 'engines:start', 'engines:accepted', 'armour:start', 'armour:accepted', 'shape:start', 'shape:failed']);
+    expect(steps.map((s) => `${s.step}:${s.status}`)).toEqual(['power:start', 'power:accepted', 'weapons:start', 'weapons:accepted', 'engines:start', 'engines:accepted', 'fittings:skipped', 'armour:start', 'armour:accepted', 'shape:start', 'shape:failed']);
     expect(llm.requests.length).toBe(8);
     expect(fb(ev)[0]).toMatch(/overlaps "CR -1,0"/);
     // Each step's ask shows the ship so far and names the step
-    expect(llm.requests[0].messages[1].content).toMatch(/Step 1 of 5: Add the POWER/);
-    expect(llm.requests[2].messages[1].content).toMatch(/Step 2 of 5: Add the WEAPONS[\s\S]*Free cells/);
+    expect(llm.requests[0].messages[1].content).toMatch(/Step 1 of 6: Add the POWER/);
+    expect(llm.requests[2].messages[1].content).toMatch(/Step 2 of 6: Add the WEAPONS[\s\S]*Free cells/);
     expect(llm.requests[0].messages[0].content).toMatch(/You build it in steps/);
     const best = out.best!;
     expect(best.valid).toBe(true);
@@ -130,7 +130,7 @@ describe('shipgen staged build', () => {
     expect(asymmetricCells(ctx, best.bp!)).toEqual([]);
     expect(best.bp!.parts.filter((p) => p.facing === 'S').length).toBe(2);
     expect(best.bp!.parts.filter((p) => p.facing === 'N').length).toBe(2);
-    expect(STEPS.map((s) => s.id)).toEqual(['power', 'weapons', 'engines', 'armour', 'shape']);
+    expect(STEPS.map((s) => s.id)).toEqual(['power', 'weapons', 'engines', 'fittings', 'armour', 'shape']);
   });
 
   it('moves on when a step runs out of tries, keeping the ship as it was', async () => {

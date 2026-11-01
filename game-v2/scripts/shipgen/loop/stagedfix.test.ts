@@ -57,7 +57,7 @@ describe('shipgen staged build: accepting a step, engines, skeleton size', () =>
 
   it('puts the engine lines in the engines step ask and its retry', async () => {
     const { llm } = await go({ build: 'staged', contract: 'parts', rounds: 2 }, [...REPLIES.slice(0, 3), 'nothing', 'nothing']);
-    const asks = llm.requests.filter((r) => /Step 3 of 5/.test(r.messages[1].content));
+    const asks = llm.requests.filter((r) => /Step 3 of 6/.test(r.messages[1].content));
     expect(asks.length).toBe(2);
     expect(asks[0].messages[1].content).toMatch(/Engines now: \d+ facing v/);
     expect(asks[1].messages.at(-1)!.content).toMatch(/Engines now/);

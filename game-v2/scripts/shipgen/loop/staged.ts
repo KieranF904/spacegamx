@@ -7,7 +7,7 @@ import type { Blueprint, PlacedPart } from '../../../common/src/ships/index';
 import { isEngine, placeGeometry } from '../../../common/src/ships/index';
 import {
   type CheckResult, type Concept, type DecodeResult, type Role, type Selector, type ShipgenContext,
-  CodeBook, mirrorHalf, outlineFit, outlinePicture, partsToBlueprint, shipRows, briefLegend, briefText, buildLegend, check, coreLeftEdge, exposedCorners, halfOf, matches, mergeParts, outlineShapes, partAt, partKey, partPower, silhouetteScore, squareCornerWords, systemPrompt,
+  CodeBook, mirrorHalf, selectorWords, outlineFit, outlinePicture, partsToBlueprint, shipRows, briefLegend, briefText, buildLegend, check, coreLeftEdge, exposedCorners, halfOf, matches, mergeParts, outlineShapes, partAt, partKey, partPower, silhouetteScore, squareCornerWords, systemPrompt,
 } from '../core/index';
 import { type Attempt, type DesignOptions, type DesignOutcome, type LoopDeps, Session, better, contractFor, passes } from './design';
 import type { Emit } from './events';
@@ -28,6 +28,26 @@ function wants(role: Role | undefined, sel: { role?: PR; fn?: string }, encourag
 }
 
 const count = (ctx: ShipgenContext, bp: Blueprint, sel: Selector) => bp.parts.filter((p) => matches(ctx, sel, p)).length;
+
+/**
+ * The role's required (and encouraged) parts named by function or family, not by power role alone: `weapon` those whose
+ * parts are guns (the weapons step asks for them), the rest fittings (cargo, shields: their own step)
+ */
+export function specialParts(ctx: ShipgenContext, role: Role | undefined, weapon: boolean, encourage = false): Selector[] {
+  const legend = buildLegend(ctx);
+  return [...(role?.require ?? []), ...(encourage ? role?.encourage ?? [] : [])].filter((s) => {
+    if (!s.fn && !s.family) return false;
+    const hits = legend.entries.filter((e) => matches(ctx, s, { fn: e.fn, piece: e.pieces[0] ?? 'sq', material: e.material }));
+    return hits.length > 0 && hits.every((e) => e.power.role === 'weapon') === weapon && (s.min ?? 1) > 0;
+  });
+}
+
+/** Legend codes for these selectors */
+export function codesFor(ctx: ShipgenContext, sels: Selector[]): string[] {
+  return buildLegend(ctx).entries.filter((e) => sels.some((s) => matches(ctx, s, { fn: e.fn, piece: e.pieces[0] ?? 'sq', material: e.material }))).map((e) => e.code);
+}
+
+const lacksOf = (s: StepContext, bp: Blueprint, sels: Selector[]) => sels.flatMap((x) => { const n = count(s.ctx, bp, x); return n < (x.min ?? 1) ? [`needs ${selectorWords(x)} (has ${n})`] : []; });
 
 export interface StepContext {
   ctx: ShipgenContext;
@@ -148,10 +168,11 @@ export const STEPS: Step[] = [
   },
   {
     id: 'weapons', title: 'weapons',
-    ask: (s) => `Add the WEAPONS: at least ${Math.max(2, wants(s.role, { role: 'weapon' }))} guns${twice(s)}. Each gun must TOUCH a store, a generator or the core (hull carries no power), face OUT (fixed guns face ^) with NOTHING in the cell it faces, and keep its legend mounting rule.`,
+    ask: (s) => `Add the WEAPONS: at least ${Math.max(2, wants(s.role, { role: 'weapon' }))} guns${specialParts(s.ctx, s.role, true).map((x) => `, including ${selectorWords(x)}`).join('')}${twice(s)}. Each gun must TOUCH a store, a generator or the core (hull carries no power), face OUT (fixed guns face ^) with NOTHING in the cell it faces, and keep its legend mounting rule.`,
     lacks: (s, bp, r) => {
       const n = Math.max(2, wants(s.role, { role: 'weapon' })), has = count(s.ctx, bp, { role: 'weapon' });
       const out = has < n ? [`needs at least ${n} guns (has ${has})`] : [];
+      out.push(...lacksOf(s, bp, specialParts(s.ctx, s.role, true)));
       for (const u of unpoweredOf(r, 'weapon')) out.push(`the ${u.name} (${u.code} at row ${u.row} col ${u.col}) gets no power: put it against a store, generator or the core`);
       return out;
     },
@@ -175,6 +196,14 @@ export const STEPS: Step[] = [
     extra: (s, bp) => engineHelp(s, bp),
   },
   {
+    id: 'fittings', title: 'fittings',
+    ask: (s) => `Add the role's FITTINGS: ${specialParts(s.ctx, s.role, false).map(selectorWords).join(', ')}${twice(s)}. Each powered one must TOUCH a store, a generator or the core.`,
+    lacks: (s, bp) => lacksOf(s, bp, specialParts(s.ctx, s.role, false)),
+    near: { roles: ['core', 'generator', 'store'] },
+    adds: () => true,
+    menu: [''],
+  },
+  {
     id: 'armour', title: 'armour',
     ask: (s) => {
       const n = wants(s.role, { fn: 'armor' }, true);
@@ -184,6 +213,8 @@ export const STEPS: Step[] = [
     lacks: (s, bp, _r, prev) => {
       const n = wants(s.role, { fn: 'armor' }, true), has = bp.parts.filter((p) => p.fn === 'armor').length;
       const out = has < n ? [`needs at least ${n} armour parts (has ${has})`] : [];
+      const min = s.role?.size.cells[0] ?? 0, cells = check(s.ctx, bp).stats.cells;
+      if (cells < min) out.push(`the ship has ${cells} cells and the role needs at least ${min}: add armour or hull around the outside${s.mirror ? ' (a part left of the centre line counts twice)' : ''}`);
       const o = s.concept?.outline;
       if (o && prev) {
         const target = outlineFill(s.ctx, prev.bp, o, s.mirror);
@@ -415,7 +446,13 @@ export async function stagedLoop(deps: LoopDeps, o: DesignOptions, emit: Emit): 
   let round = 0;
   const book = new CodeBook(ctx);
   const codesOf = (r: string) => briefLegend(ctx, o.brief).filter((e) => (r === 'engine' ? isEngine(ctx.catalog.functions.get(e.fn)) : e.power.role === r)).map((e) => e.code).slice(0, 8).join(', ');
-  const hint: Record<string, string> = { power: `generators ${codesOf('generator')}; stores ${codesOf('store')}`, weapons: codesOf('weapon'), engines: codesOf('engine') };
+  const briefCodes = new Set(briefLegend(ctx, o.brief).map((e) => e.code));
+  const inBrief = (cs: string[]) => cs.filter((c) => briefCodes.has(c)).slice(0, 8).join(', ');
+  const hint: Record<string, string> = {
+    power: `generators ${codesOf('generator')}; stores ${codesOf('store')}`, engines: codesOf('engine'),
+    weapons: [inBrief(codesFor(ctx, specialParts(ctx, S.role, true))), codesOf('weapon')].filter(Boolean).join(', '),
+    fittings: inBrief(codesFor(ctx, specialParts(ctx, S.role, false))),
+  };
 
   steps:
   for (const [i, step] of STEPS.entries()) {
@@ -429,7 +466,11 @@ export async function stagedLoop(deps: LoopDeps, o: DesignOptions, emit: Emit): 
     }
     emit({ type: 'step', step: step.id, index: i + 1, of: STEPS.length, status: 'start', round });
     const where = step.near ? suggestCells(ctx, before, step.near.roles, { lane: step.near.lane, mirror: S.mirror }) : [];
-    const menu = step.menu ? placementMenu(ctx, before, (hint[step.id] ?? '').split(/[;,]\s*|\s+/).filter((c) => /^[A-Z]{2,3}$/.test(c)), step.menu, S.mirror, step.adds ?? (() => true)) : [];
+    const menuCodes = [...new Set([
+      ...(step.id === 'weapons' ? codesFor(ctx, specialParts(ctx, S.role, true)) : step.id === 'fittings' ? codesFor(ctx, specialParts(ctx, S.role, false)) : []),
+      ...(hint[step.id] ?? '').split(/[;,]\s*|\s+/).filter((c) => /^[A-Z]{2,3}$/.test(c)),
+    ])].filter((c) => briefCodes.has(c));
+    const menu = step.menu ? placementMenu(ctx, before, menuCodes, step.menu, S.mirror, step.adds ?? (() => true)) : [];
     const menuLine = `Placements the tool checked (each works on its own: copy several that don't overlap, as many as the step needs): ${menu.join('; ')}.`;
     const ring = step.id === 'power' ? ringAround(ctx, before, where.map((w) => w.split(' ')[0]), S.mirror) : [];
     const parts = S.C.form === 'parts';
