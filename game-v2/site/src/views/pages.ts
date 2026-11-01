@@ -23,12 +23,12 @@ export function shoutbox(ctx: PageCtx, shouts: Shout[]): SafeHtml {
   <ol class="shouts" data-shouts aria-live="polite" aria-relevant="additions">
     ${shouts.length ? shouts.map((s) => shoutLine(publicShout(s))) : ''}
   </ol>
-  <p class="shouts-empty" data-shouts-empty${shouts.length ? raw(' hidden') : ''}>Quiet out here. Say hello.</p>
+  <p class="shouts-empty" data-shouts-empty${shouts.length ? raw(' hidden') : ''}>No messages yet.</p>
   ${ctx.user
     ? html`<form class="shout-form" method="post" action="/shoutbox" data-shout-form>
         ${csrfField(ctx)}
         <label class="sr-only" for="shout-text">Message</label>
-        <input id="shout-text" name="text" maxlength="${SHOUT_MAX}" autocomplete="off" placeholder="Say something to the other pilots" required>
+        <input id="shout-text" name="text" maxlength="${SHOUT_MAX}" autocomplete="off" placeholder="Message" required>
         <span class="count" data-count aria-hidden="true">${SHOUT_MAX}</span>
         <button class="btn btn-primary" type="submit">Send</button>
         <p class="form-error" data-shout-error role="alert" hidden></p>
@@ -50,7 +50,7 @@ function postRow(p: Post, comments: number, lead = false): SafeHtml {
     <p class="meta">${when(p.publishedAt ?? p.updatedAt, false)}${p.tags.length ? html` <span class="sep">/</span> ${p.tags.slice(0, 3).join(', ')}` : ''}</p>
     <h3><a href="${url}">${p.title}</a></h3>
     <p class="summary">${summaryOf(p, lead ? 300 : 200)}</p>
-    <p class="meta"><a class="more" href="${url}">Read the update</a>${comments ? html` <span class="sep">/</span> ${comments} ${comments === 1 ? 'comment' : 'comments'}` : ''}</p>
+    <p class="meta"><a class="more" href="${url}">Read more</a>${comments ? html` <span class="sep">/</span> ${comments} ${comments === 1 ? 'comment' : 'comments'}` : ''}</p>
   </div>
 </article>`;
 }
@@ -61,7 +61,7 @@ function miniBoard(r: Rankings | null): SafeHtml {
   <div class="panel-head"><h2 id="mb-h">Top pilots</h2><a class="link-quiet" href="/pilots">All boards</a></div>
   ${rows
     ? html`<p class="dim small">${rows.label}</p><ol class="rank-list">${rows.rows.slice(0, 5).map((x, i) => html`<li><span class="rk">${i + 1}</span><a href="/pilots/${encodeURIComponent(x.name)}">${x.name}</a><span class="val">${fmtNum(x.value)}</span></li>`)}</ol>`
-    : html`<p class="dim">No one on the boards yet. The first pilot to clear a few hostiles takes the top spot.</p>`}
+    : html`<p class="dim">No scores yet.</p>`}
 </section>`;
 }
 
@@ -73,70 +73,70 @@ export function homePage(ctx: PageCtx, d: { posts: Post[]; comments: Map<number,
 <section class="hero">
   <div class="hero-art" aria-hidden="true"><img src="/static/img/hero-corsair.webp" alt="" width="1600" height="900"></div>
   <div class="wrap hero-in">
-    <p class="eyebrow eyebrow-hero">Multiplayer space game <span class="sep">/</span> in development</p>
+    <p class="eyebrow eyebrow-hero">Space game <span class="sep">/</span> in development</p>
     <h1>Build it part by part.<br><span class="accent">Fly it into the dark.</span></h1>
-    <p class="lede">Mine, trade and take jobs at the stations. Design your ship one component at a time, wire up its power, and take it out against what nests in the Drift.</p>
+    <p class="lede">A space game about building ships. Mine, trade and take jobs at stations. Ships are built one part at a time, and power only reaches the parts it can travel through. Still in development.</p>
     <div class="hero-cta">
-      <a class="btn-play btn-play-lg" href="/play"><span>Play now</span><small>in your browser</small></a>
+      <a class="btn-play btn-play-lg" href="/play"><span>Play now</span><small>in the browser</small></a>
       ${lead ? html`<a class="btn btn-ghost" href="/updates/${encodeURIComponent(lead.slug)}">Latest update <span aria-hidden="true">&rarr;</span></a>` : ''}
     </div>
     <div class="hero-meta">
       ${livePill(ctx.live, true)}
-      <span class="dim">${ctx.user ? html`Signed in as <b>${ctx.user.username}</b>: Play takes you straight in.` : 'One account for the site and the game.'}</span>
+      <span class="dim">${ctx.user ? html`Signed in as <b>${ctx.user.username}</b>.` : 'One account for the site and the game.'}</span>
     </div>
   </div>
   <div class="hero-scroll" aria-hidden="true"></div>
 </section>
 
 <section class="wrap block">
-  ${sectionHead('Patch notes', 'Latest updates', html`<a class="link-quiet" href="/updates">All updates <span aria-hidden="true">&rarr;</span></a>`)}
+  ${sectionHead('Updates', 'Latest', html`<a class="link-quiet" href="/updates">All updates <span aria-hidden="true">&rarr;</span></a>`)}
   ${lead
     ? html`<div class="post-list home-posts">${postRow(lead, d.comments.get(lead.id) ?? 0, true)}${rest.slice(0, 2).map((p) => postRow(p, d.comments.get(p.id) ?? 0))}</div>`
-    : empty('No updates yet', 'The first patch notes will land here.')}
+    : empty('No updates yet', 'Nothing here yet.')}
 </section>
 
 <section class="features" aria-labelledby="feat-h">
   <div class="wrap">
-    ${sectionHead('The game', raw('<span id="feat-h">What you do out there</span>'))}
+    ${sectionHead('The game', raw('<span id="feat-h">Features</span>'))}
     <div class="feature">
       <figure class="feature-art art-parts"><img src="/static/img/parts.webp" alt="A sheet of the game's ship components: guns, engines, reactors, batteries and shields, each with its name" loading="lazy"></figure>
       <div class="feature-text">
         <p class="feature-n">01 <span>Build</span></p>
-        <h3>Every ship is a grid of parts you place</h3>
-        <p>Hull plates, reactors, batteries, engines, guns and shields, each a named component with its own size, numbers and trade-off. Power runs along wires you draw across the hull; shoot out the block under a wire and everything past the break goes dark.</p>
-        <p class="dim">Guns follow mounting rules: what they bolt onto, which way they face, the lane they need clear. The Component Guide (C) lists them all by the level they open at.</p>
+        <h3>Ships are built from parts</h3>
+        <p>Hull plates, reactors, batteries, engines, guns and shields. Power only flows between parts that touch.</p>
+        <p class="dim">Guns have mounting rules. The Component Guide (C) lists every part.</p>
       </div>
     </div>
     <div class="feature flip">
       <figure class="feature-art art-ship"><img src="/static/img/lancer.webp" alt="A player ship rendered in the game, engines lit" loading="lazy"></figure>
       <div class="feature-text">
         <p class="feature-n">02 <span>Fly</span></p>
-        <h3>Steer with the mouse, or take the helm</h3>
-        <p>Point and thrust with the mouse, or switch to helm controls (V): turn with A and D, strafe with Q and E, and the camera swings round so your nose always points up the screen.</p>
-        <p class="dim">Engines have a rated speed: an Ion Drive is efficient but slow at the top end, an Afterburner trades cruise for a huge boost.</p>
+        <h3>Mouse or helm controls</h3>
+        <p>Steer with the mouse, or switch to helm controls (V): A and D turn, Q and E strafe.</p>
+        <p class="dim">Engines have a rated speed.</p>
       </div>
     </div>
     <div class="feature">
       <figure class="feature-art art-boss"><img src="/static/img/scrap-mother.webp" alt="The Scrap Mother, a huge patched-together boss with crane claws and glowing green vents" loading="lazy"></figure>
       <div class="feature-text">
         <p class="feature-n">03 <span>Fight</span></p>
-        <h3>Bosses in three stages, each its own fight</h3>
-        <p>Every attack that hurts is telegraphed first, moves come in a fixed order you can learn, and shooting a part off stops the move it powers. The Scrap Mother waits in her nest out in the Drift.</p>
-        <blockquote class="ingame"><p>&ldquo;Something huge and patched together stirs in the hollow at the heart of the junk, grey veins glinting in the rock around it.&rdquo;</p><cite>The game, as you reach her</cite></blockquote>
+        <h3>Bosses</h3>
+        <p>Bosses fight in stages. Attacks are telegraphed, and shooting a part off stops the move it powers. The Scrap Mother is in the Drift.</p>
+        <blockquote class="ingame"><p>&ldquo;Something huge and patched together stirs in the hollow at the heart of the junk, grey veins glinting in the rock around it.&rdquo;</p><cite>In the game</cite></blockquote>
       </div>
     </div>
   </div>
 </section>
 
 <section class="wrap block community">
-  ${sectionHead('Community', 'Talk to the other pilots', html`<a class="link-quiet" href="/suggestions">Suggest something <span aria-hidden="true">&rarr;</span></a>`)}
+  ${sectionHead('Community', 'Community', html`<a class="link-quiet" href="/suggestions">Suggestions <span aria-hidden="true">&rarr;</span></a>`)}
   <div class="community-grid">
     ${shoutbox(ctx, d.shouts)}
     <div class="side-stack">
       ${miniBoard(d.rankings)}
       <section class="panel cta-panel">
-        <h2>Got an idea?</h2>
-        <p>The suggestions board is read. Post an idea, vote for the ones you want, and see what's planned.</p>
+        <h2>Suggestions</h2>
+        <p>Post ideas and vote on them.</p>
         <a class="btn" href="/suggestions">Open the board</a>
       </section>
     </div>
@@ -152,15 +152,15 @@ export function updatesPage(ctx: PageCtx, d: { posts: Post[]; total: number; pag
   const q = (page: number) => `/updates?${new URLSearchParams({ ...(d.tag ? { tag: d.tag } : {}), ...(page > 1 ? { page: String(page) } : {}) })}`;
   const body = html`
 <section class="page-head wrap">
-  <p class="eyebrow">Patch notes</p>
+  <p class="eyebrow">Updates</p>
   <h1>Updates</h1>
-  <p class="lede">What changed in the game, written up as it ships. <a href="/rss.xml" class="rss">RSS feed</a></p>
+  <p class="lede">Changes to the game. <a href="/rss.xml" class="rss">RSS feed</a></p>
   ${d.tags.length ? html`<div class="tags" aria-label="Filter by tag"><a class="tag${d.tag ? '' : ' on'}" href="/updates">all</a>${d.tags.map((t) => tagChip(t.tag, t.tag === d.tag))}</div>` : ''}
 </section>
 <section class="wrap block-tight">
   ${d.posts.length
     ? html`<div class="post-list">${d.posts.map((p, i) => postRow(p, d.comments.get(p.id) ?? 0, i === 0 && d.page === 1 && !d.tag))}</div>`
-    : empty(d.tag ? `Nothing tagged “${d.tag}”` : 'No updates yet', d.tag ? html`<a href="/updates">See every update</a>` : 'The first patch notes will land here.')}
+    : empty(d.tag ? `Nothing tagged “${d.tag}”` : 'No updates yet', d.tag ? html`<a href="/updates">All updates</a>` : 'Nothing here yet.')}
   ${pages > 1 ? html`<nav class="pager" aria-label="Pages">
     ${d.page > 1 ? html`<a class="btn" href="${q(d.page - 1)}" rel="prev">Newer</a>` : html`<span></span>`}
     <span class="dim">Page ${d.page} of ${pages}</span>
@@ -200,14 +200,14 @@ export function postPage(ctx: PageCtx, d: { post: Post; comments: Comment[]; pre
         ${ctx.user?.isAdmin ? html`<form method="post" action="/admin/comments/${c.id}/hide" class="inline-mod">${csrfField(ctx)}<input type="hidden" name="back" value="/updates/${p.slug}#comments"><button class="link-btn" type="submit">Hide</button></form>` : ''}</div>
         <div class="comment-body prose-sm">${raw(renderMarkdown(c.body, 'comment'))}</div>
       </li>`)}</ol>`
-    : html`<p class="dim">No comments yet.${ctx.user ? ' Start the conversation.' : ''}</p>`}
+    : html`<p class="dim">No comments yet.</p>`}
   ${p.status !== 'published' ? '' : ctx.user
     ? html`<form class="comment-form" method="post" action="/updates/${encodeURIComponent(p.slug)}/comments">
         ${csrfField(ctx)}
         <label for="comment-body">Add a comment <span class="dim">as ${ctx.user.username}</span></label>
-        <textarea id="comment-body" name="body" rows="4" maxlength="2000" required placeholder="Plain text, with **bold**, *italics*, \`code\` and links">${d.draft ?? ''}</textarea>
+        <textarea id="comment-body" name="body" rows="4" maxlength="2000" required placeholder="Markdown is supported">${d.draft ?? ''}</textarea>
         ${d.error ? html`<p class="form-error" role="alert">${d.error}</p>` : ''}
-        <div class="form-row"><span class="dim small">Be decent. Moderators can hide comments.</span><button class="btn btn-primary" type="submit">Post comment</button></div>
+        <div class="form-row"><span class="dim small">Moderators can hide comments.</span><button class="btn btn-primary" type="submit">Post comment</button></div>
       </form>`
     : signInPrompt(ctx, 'to comment.')}
 </section>`;
@@ -228,7 +228,7 @@ export function suggestionsPage(ctx: PageCtx, d: { list: Suggestion[]; sort: 'to
 <section class="page-head wrap">
   <p class="eyebrow">Community</p>
   <h1>Suggestions</h1>
-  <p class="lede">Ideas for the game, voted up by pilots. One vote per account; the team marks what's planned, under way, done or not happening, and says why.</p>
+  <p class="lede">Ideas for the game. One vote per account.</p>
 </section>
 <section class="wrap block-tight sugg-layout">
   <div class="sugg-main">
@@ -245,8 +245,8 @@ export function suggestionsPage(ctx: PageCtx, d: { list: Suggestion[]; sort: 'to
     ${d.list.length
       ? html`<ol class="sugg-list">${d.list.map((s) => suggestionRow(ctx, s, d.voted.has(s.id)))}</ol>`
       : total === 0
-        ? empty('The board is empty', 'No one has suggested anything yet. Yours could be the first idea on it.', ctx.user ? html`<a class="btn btn-primary" href="#suggest">Make the first suggestion</a>` : html`<a class="btn btn-primary" href="/register?next=/suggestions">Create an account to post</a>`)
-        : empty('Nothing here', html`No suggestions are ${d.status ? STATUS_LABEL[d.status].toLowerCase() : 'listed'} right now. <a href="/suggestions">See them all</a>.`)}
+        ? empty('No suggestions yet.', '', ctx.user ? html`<a class="btn btn-primary" href="#suggest">Suggest something</a>` : html`<a class="btn btn-primary" href="/register?next=/suggestions">Create an account</a>`)
+        : empty('Nothing here yet.', html`<a href="/suggestions">All suggestions</a>`)}
   </div>
   <aside class="sugg-side">
     <section class="panel" id="suggest" aria-labelledby="sg-h">
@@ -254,13 +254,13 @@ export function suggestionsPage(ctx: PageCtx, d: { list: Suggestion[]; sort: 'to
       ${ctx.user
         ? html`<form method="post" action="/suggestions" class="stack">
             ${csrfField(ctx)}
-            <label for="sg-title">Idea, in a line</label>
-            <input id="sg-title" name="title" maxlength="120" required value="${d.draft?.title ?? ''}" placeholder="e.g. Let me name my ships">
-            <label for="sg-body">Why, and how it might work <span class="dim">(optional)</span></label>
+            <label for="sg-title">Idea</label>
+            <input id="sg-title" name="title" maxlength="120" required value="${d.draft?.title ?? ''}" placeholder="e.g. Name your ships">
+            <label for="sg-body">Details <span class="dim">(optional)</span></label>
             <textarea id="sg-body" name="body" rows="5" maxlength="2000">${d.draft?.body ?? ''}</textarea>
             ${d.error ? html`<p class="form-error" role="alert">${d.error}</p>` : ''}
             <button class="btn btn-primary" type="submit">Post suggestion</button>
-            <p class="dim small">Check the list first: a vote on an existing idea counts for more than a duplicate.</p>
+            <p class="dim small">Check the list for duplicates first.</p>
           </form>`
         : signInPrompt(ctx, 'to post ideas and vote.')}
     </section>
@@ -294,7 +294,7 @@ export function pilotCard(card: PilotCard | null, name: string, opts: { own: boo
   if (!card) {
     return html`<section class="pilot-card panel no-data">
       <div class="pc-id"><span class="pc-badge">?</span><div><p class="eyebrow">Pilot</p><h2>${name}</h2></div></div>
-      ${empty('No flight record yet', opts.own ? 'Your pilot card fills in once you have flown. Your level, ship and tallies show up here.' : `${name} hasn't flown yet, or the record isn't on this server.`, opts.own ? html`<a class="btn-play" href="/play">Play now</a>` : undefined)}
+      ${empty('No record yet', opts.own ? 'The card fills in after you play.' : `No record for ${name}.`, opts.own ? html`<a class="btn-play" href="/play">Play now</a>` : undefined)}
     </section>`;
   }
   const s = card.stats;
@@ -317,7 +317,7 @@ export function pilotsPage(ctx: PageCtx, d: { rankings: Rankings | null; period:
 <section class="page-head wrap">
   <p class="eyebrow">Leaderboards</p>
   <h1>Pilots</h1>
-  <p class="lede">The game's own boards, refreshed as pilots fly. Weekly boards start again each week.</p>
+  <p class="lede">Leaderboards from the game. Weekly boards reset each week.</p>
   <div class="toolbar">
     <div class="seg" role="group" aria-label="Period">
       <a href="/pilots"${d.period === 'allTime' ? raw(' aria-current="true"') : ''}>All time</a>
@@ -338,10 +338,10 @@ export function pilotsPage(ctx: PageCtx, d: { rankings: Rankings | null; period:
           <div class="panel-head"><h2>${b.label}</h2></div>
           ${rows.length
             ? html`<ol class="rank-list">${rows.map((r, i) => html`<li class="${i < 3 ? `top top-${i + 1}` : ''}"><span class="rk">${i + 1}</span><a href="/pilots/${encodeURIComponent(r.name)}">${r.name}</a><span class="val">${fmtNum(r.value)}${b.unit ? html` <small>${b.unit}</small>` : ''}</span></li>`)}</ol>`
-            : html`<p class="dim small">No one yet.</p>`}
+            : html`<p class="dim small">No scores yet.</p>`}
         </section>`;
       })}</div>`
-    : empty('The boards are empty', d.period === 'weekly' ? 'No one has scored this week yet.' : 'No pilot has made the boards yet. Fly a little and yours could be the first name here.', html`<a class="btn-play" href="/play">Play now</a>`)}
+    : empty(d.period === 'weekly' ? 'No scores this week.' : 'No scores yet.', '', html`<a class="btn-play" href="/play">Play now</a>`)}
 </section>`;
   return layout(ctx, { title: 'Pilots', body });
 }
@@ -357,12 +357,12 @@ export function pilotPage(ctx: PageCtx, d: { name: string; card: PilotCard | nul
 }
 
 export function notFoundPage(ctx: PageCtx, what = 'page'): SafeHtml {
-  const body = html`<section class="wrap block narrow-col">${empty(`No such ${what}`, html`It may have moved, or never existed. <a href="/">Back to the start</a>.`)}</section>`;
+  const body = html`<section class="wrap block narrow-col">${empty(`No such ${what}`, html`<a href="/">Home</a>`)}</section>`;
   return layout(ctx, { title: 'Not found', body });
 }
 
 export function errorPage(ctx: PageCtx, title: string, text: string): SafeHtml {
-  return layout(ctx, { title, body: html`<section class="wrap block narrow-col">${empty(title, text, html`<a class="btn" href="/">Back to the start</a>`)}</section>` });
+  return layout(ctx, { title, body: html`<section class="wrap block narrow-col">${empty(title, text, html`<a class="btn" href="/">Home</a>`)}</section>` });
 }
 
 // ---------------------------------------------------------------- sign in, register
@@ -374,24 +374,24 @@ export function signInPage(ctx: PageCtx, d: { mode: 'signin' | 'register'; next:
 <section class="auth wrap">
   <div class="auth-art" aria-hidden="true"><img src="/static/img/sparrow.webp" alt=""></div>
   <div class="auth-panel panel">
-    <p class="eyebrow">${reg ? 'New pilot' : 'Welcome back'}</p>
+    <p class="eyebrow">${reg ? 'New account' : 'Account'}</p>
     <h1>${reg ? 'Create an account' : 'Sign in'}</h1>
-    <p class="dim">${reg ? 'One account for the site and the game. Your pilot, ship and progress are kept with it.' : 'The same account you use in the game.'}</p>
+    <p class="dim">${reg ? 'One account for the site and the game.' : 'The same account as the game.'}</p>
     <form method="post" action="/${reg ? 'register' : 'signin'}" class="stack">
       ${csrfField(ctx)}
       <input type="hidden" name="next" value="${d.next}">
       <label for="u">${reg ? 'Pilot name' : 'Pilot name or email'}</label>
       <input id="u" name="username" required autocomplete="username" maxlength="${reg ? 20 : 254}" value="${d.username ?? ''}" ${reg ? raw('pattern="[A-Za-z0-9_\\-]{2,20}" title="2 to 20 letters, numbers, _ or -"') : ''} autofocus>
-      ${reg ? html`<p class="hint">2 to 20 letters, numbers, _ or -. Other pilots see it.</p>
+      ${reg ? html`<p class="hint">2 to 20 letters, numbers, _ or -. Shown to other players.</p>
       <label for="e">Email</label>
       <input id="e" name="email" type="email" required autocomplete="email" maxlength="254" value="${d.email ?? ''}">
-      <p class="hint">Only for your account. Never shown to anyone.</p>` : ''}
+      <p class="hint">Not shown to anyone.</p>` : ''}
       <label for="p">Password</label>
       <input id="p" name="password" type="password" required autocomplete="${reg ? 'new-password' : 'current-password'}" maxlength="200">
       ${d.error ? html`<p class="form-error" role="alert">${d.error}</p>` : ''}
       <button class="btn btn-primary btn-wide" type="submit">${reg ? 'Create account' : 'Sign in'}</button>
     </form>
-    <p class="auth-switch">${reg ? html`Already flying? <a href="/signin${nextQ}">Sign in</a>` : html`New here? <a href="/register${nextQ}">Create an account</a>`}</p>
+    <p class="auth-switch">${reg ? html`Have an account? <a href="/signin${nextQ}">Sign in</a>` : html`No account? <a href="/register${nextQ}">Create an account</a>`}</p>
   </div>
 </section>`;
   return layout(ctx, { title: reg ? 'Create an account' : 'Sign in', body, bodyClass: 'auth-page' });
@@ -406,26 +406,26 @@ export function accountPage(ctx: PageCtx, d: { account: LobbyAccount; card: Pilo
   const err = (f: AccountForm) => (d.errors[f] ? html`<p class="form-error" role="alert">${d.errors[f]}</p>` : '');
   const body = html`
 <section class="page-head wrap">
-  <p class="eyebrow">Your account</p>
+  <p class="eyebrow">Account</p>
   <h1>${a.username}</h1>
-  <p class="lede">Pilot since ${fmtDate(a.createdAt)}${a.isAdmin ? html` · <span class="gold">admin</span>` : ''}. <a href="/pilots/${encodeURIComponent(a.username)}">Your public profile</a></p>
+  <p class="lede">Pilot since ${fmtDate(a.createdAt)}${a.isAdmin ? html` · <span class="gold">admin</span>` : ''}. <a href="/pilots/${encodeURIComponent(a.username)}">Public profile</a></p>
 </section>
 <section class="wrap block-tight account-grid">
   <div class="account-main">
     ${pilotCard(d.card, a.username, { own: true })}
     <div class="panel-row">
       <a class="btn-play" href="/play">Play now</a>
-      <span class="dim small">You're signed in here, so the game opens without asking again.</span>
+      <span class="dim small">The game uses this sign-in.</span>
     </div>
   </div>
   <div class="account-forms">
     <section class="panel" aria-labelledby="em-h">
       <div class="panel-head"><h2 id="em-h">Email</h2></div>
-      <p class="dim small">Currently <b class="mono">${a.email}</b></p>
+      <p class="dim small">Current: <b class="mono">${a.email}</b></p>
       <form method="post" action="/account/email" class="stack">
         ${csrfField(ctx)}
         <label for="em">New email</label><input id="em" name="email" type="email" required maxlength="254" autocomplete="email">
-        <label for="em-p">Your password</label><input id="em-p" name="password" type="password" required autocomplete="current-password">
+        <label for="em-p">Password</label><input id="em-p" name="password" type="password" required autocomplete="current-password">
         ${err('email')}
         <button class="btn" type="submit">Change email</button>
       </form>
@@ -439,14 +439,14 @@ export function accountPage(ctx: PageCtx, d: { account: LobbyAccount; card: Pilo
         <label for="pw-r">New password again</label><input id="pw-r" name="repeat" type="password" required maxlength="200" autocomplete="new-password">
         ${err('password')}
         <button class="btn" type="submit">Change password</button>
-        <p class="hint">Signs you out everywhere else (the game included); this browser stays signed in.</p>
+        <p class="hint">Signs out all other sessions, including the game.</p>
       </form>
     </section>
     <section class="panel" aria-labelledby="ev-h">
       <div class="panel-head"><h2 id="ev-h">Sessions</h2></div>
       <form method="post" action="/account/signout-all" class="stack">
         ${csrfField(ctx)}
-        <p class="dim small">Lost a device, or signed in somewhere shared? End every session on this account, in the game and on the site.</p>
+        <p class="dim small">Ends every session, on the site and in the game.</p>
         ${err('everywhere')}
         <button class="btn" type="submit">Sign out everywhere</button>
       </form>
@@ -455,13 +455,13 @@ export function accountPage(ctx: PageCtx, d: { account: LobbyAccount; card: Pilo
     <section class="panel danger" aria-labelledby="del-h">
       <div class="panel-head"><h2 id="del-h">Delete account</h2></div>
       <details${d.errors.delete ? raw(' open') : ''}>
-        <summary>Delete this account for good</summary>
+        <summary>Delete this account</summary>
         <form method="post" action="/account/delete" class="stack" data-confirm-delete="${a.username}">
           ${csrfField(ctx)}
-          <p class="small">This removes your account, your pilot and everything they own. It can't be undone. Your comments and suggestions stay, signed as "a former pilot"; your shouts and votes go.</p>
-          <label for="del-n">Type your pilot name, <b class="mono">${a.username}</b>, to confirm</label>
+          <p class="small">This deletes the account, the pilot and everything the pilot owns. It can't be undone. Comments and suggestions stay, shown as "a former pilot". Shouts and votes are deleted.</p>
+          <label for="del-n">Type <b class="mono">${a.username}</b> to confirm</label>
           <input id="del-n" name="confirm" required autocomplete="off" data-confirm-input>
-          <label for="del-p">Your password</label><input id="del-p" name="password" type="password" required autocomplete="current-password">
+          <label for="del-p">Password</label><input id="del-p" name="password" type="password" required autocomplete="current-password">
           ${err('delete')}
           <button class="btn btn-danger" type="submit" data-confirm-button>Delete my account</button>
         </form>

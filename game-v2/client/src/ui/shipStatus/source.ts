@@ -1,7 +1,8 @@
 /**
- * The ship status panel's data source (ui/shipStatus/StatusPanel.ts draws it): everything the panel shows, worked out
- * from what the client already has, in one record rewritten in place (no allocation at the panel's 10 Hz beyond
- * gunLoad's small vector).
+ * The ship status data source (ui/shipStatus/Schematic.ts draws it on the HUD's ship schematic): everything the HUD shows
+ * about energy, shield, weapons and thrust, worked out from what the client already has, in one record rewritten in
+ * place (no allocation at the HUD's 10 Hz beyond gunLoad's small vector). `parts` is the per-part readout the schematic
+ * paints (fills, glows, flashes, brownouts).
  *
  * THE ONE PLACE THE PANEL READS ENERGY. The live game still runs the old energy system (common/src/ships/energy.ts,
  * circuits.ts: a pool, Capacitor and Drive Cell banks, feed-group shares in Charge.eng/gun). The touch-only power core
@@ -106,6 +107,26 @@ export interface ShipStatus {
   weapons: WeaponLine[];
   thrust: { engines: number; boost: 'ready' | 'boosting' | 'empty' | 'none'; share: number };
   features: readonly FeatureStatusLine[];
+  parts: PartStatus[];
+}
+
+export type PartKind = 'none' | 'store' | 'weapon' | 'engine' | 'gen' | 'shield';
+
+/** One part's readout for the schematic (parallel to ship.blueprint.parts; rewritten in place) */
+export interface PartStatus {
+  kind: PartKind;
+  /** 0..1 liquid level (a store's charge, a weapon's reload, a shield's level); -1: no fill */
+  fill: number;
+  /** 0..1 steady glow (thrusting, a lit beam, a generator running) */
+  glow: number;
+  /** 0..1 flash (a shot just fired) */
+  flash: number;
+  /** Clip guns: the clip size (ticks drawn for a small clip); 0: none */
+  clip: number;
+  /** Short of power this tick */
+  brown: boolean;
+  /** Out of ammo, or a shield that is down: drawn dim */
+  dim: boolean;
 }
 
 /** What the source remembers between reads (the net rate, the shield's last hit) */
@@ -132,6 +153,7 @@ export function emptyStatus(): ShipStatus {
     weapons: [],
     thrust: { engines: 0, boost: 'none', share: 1 },
     features: [],
+    parts: [],
   };
 }
 
@@ -150,6 +172,7 @@ export function readStatus(inp: StatusInput, mem: StatusMemory, out: ShipStatus 
   readEnergy(ship, inp, mem, out.energy);
   readWeapons(ship, inp, out);
   readThrust(ship, inp, out);
+  readParts(ship, inp, out);
   out.features = inp.features;
   return out;
 }
@@ -338,4 +361,56 @@ function readThrust(ship: ShipState, inp: StatusInput, out: ShipStatus): void {
   let share = 1;
   if (L) for (let f = 0; f < L.feeds.length; f++) share = Math.min(share, inp.charge.eng?.[f] ?? 1);
   t.share = share;
+}
+
+const PART_STORE_FN = new Set(['core', 'battery', 'drive_battery', 'weapon_battery']);
+
+/**
+ * The per-part readout. Stores show the charge of the pool or bank they belong to (the old energy system keeps no
+ * per-part charge); at the P2 switch-over this reads each part's own EnergyState level instead.
+ */
+function readParts(ship: ShipState, inp: StatusInput, out: ShipStatus): void {
+  const parts = ship.blueprint.parts, d = ship.derived, L = d.power, c = inp.charge, ps = out.parts;
+  while (ps.length > parts.length) ps.pop();
+  while (ps.length < parts.length) ps.push({ kind: 'none', fill: -1, glow: 0, flash: 0, clip: 0, brown: false, dim: false });
+  for (let i = 0; i < parts.length; i++) {
+    const r = ps[i], fn = parts[i].fn;
+    r.kind = 'none'; r.fill = -1; r.glow = 0; r.flash = 0; r.clip = 0; r.brown = false; r.dim = false;
+    const bank = L ? L.bankOf[i] : -1;
+    if (bank >= 0) { r.kind = 'store'; r.fill = pctOf(c.b[bank]) / 100; r.brown = bankBrown(L!.feeds, bank, c); }
+    else if (PART_STORE_FN.has(fn) || L?.pooled[i]) { r.kind = 'store'; r.fill = pctOf(c.g) / 100; }
+    else if (fn === 'generator') { r.kind = 'gen'; r.glow = 1; }
+    else if (fn === 'shield') {
+      r.kind = 'shield'; r.fill = out.shield.pct / 100; r.dim = out.shield.state === 'down';
+    }
+  }
+  for (const t of d.thrusters) {
+    const r = ps[t.part];
+    if (!r || (!t.force[0] && !t.force[1])) continue;
+    r.kind = 'engine';
+    r.glow = inp.thrust.on ? (inp.thrust.boost ? 1 : 0.55) : 0;
+    r.brown = inp.thrust.on && feedShare(d, c, t.part, 'eng') < BROWNOUT;
+  }
+  for (const g of inp.groups) {
+    const dry = g.ammo === 0 && g.crates <= 0;
+    for (const p of g.parts) {
+      const r = ps[p];
+      if (!r) continue;
+      r.kind = 'weapon';
+      r.flash = g.flash;
+      r.brown = g.starved || feedShare(d, c, p, 'gun') < BROWNOUT;
+      r.dim = dry && g.model !== 'clip';
+      switch (g.model) {
+        case 'clip': r.fill = g.clip > 0 ? Math.min(1, g.rounds / g.clip) : 1; r.clip = g.clip; break;
+        case 'charge': r.fill = g.charge > 0 ? g.charge : g.cooling > 0 ? 1 - g.cooling : 1; break;
+        case 'beam': {
+          const lit = (ship.cooldown[p] ?? 0) > 0;
+          r.glow = lit ? 1 : 0;
+          r.fill = lit ? 1 : g.charge > 0 ? g.charge : 1;
+          break;
+        }
+        default: r.fill = Math.min(1, g.ready);
+      }
+    }
+  }
 }

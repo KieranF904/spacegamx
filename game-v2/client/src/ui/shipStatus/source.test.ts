@@ -135,6 +135,21 @@ describe('ship status source', () => {
     expect(empty.thrust.boost).toBe('empty');
   });
 
+  it('reads each part for the schematic: store levels, gun reload, engine glow, brownout', () => {
+    const s = clipShip();
+    const L = s.derived.power!;
+    for (const w of s.derived.weapons) { s.rounds[w.part] = 3; }
+    let st = readStatus(input(s, { g: 40, b: L.banks.map(() => 70) }, { thrust: { on: true, boost: true } }), newMemory());
+    expect(st.parts).toHaveLength(s.blueprint.parts.length);
+    const core = s.blueprint.parts.findIndex((p) => p.fn === 'core');
+    expect(st.parts[core]).toMatchObject({ kind: 'store', fill: 0.4 });
+    for (const w of s.derived.weapons) expect(st.parts[w.part]).toMatchObject({ kind: 'weapon', fill: 0.5, clip: 6 });
+    const eng = s.derived.thrusters.find((t) => t.force[0] || t.force[1])!;
+    expect(st.parts[eng.part]).toMatchObject({ kind: 'engine', glow: 1 });
+    st = readStatus(input(s, { g: 40, b: [], gun: L.feeds.map(() => 0.1) }), newMemory());
+    expect(st.parts[s.derived.weapons[0].part].brown).toBe(true);
+  });
+
   it('is empty without a ship', () => {
     const s = ship();
     expect(readStatus({ ...input(s, { g: 100, b: [] }), ship: null }, newMemory()).has).toBe(false);

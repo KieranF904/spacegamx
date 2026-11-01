@@ -81,9 +81,9 @@ export interface Ctx {
 
 /** Fixed notes shown after a redirect (?ok=key): never text from the request */
 const NOTICES: Record<string, string> = {
-  signedin: 'Signed in. Welcome back.', registered: 'Account created. Welcome aboard.', signedout: 'Signed out.',
+  signedin: 'Signed in.', registered: 'Account created.', signedout: 'Signed out.',
   email: 'Email changed.', password: 'Password changed. Your other sessions were signed out.', everywhere: 'Signed out everywhere.',
-  deleted: 'Your account was deleted. Safe travels.', suggested: 'Suggestion posted. Thanks!', commented: 'Comment posted.',
+  deleted: 'Account deleted.', suggested: 'Suggestion posted.', commented: 'Comment posted.',
   saved: 'Saved.', published: 'Published.', unpublished: 'Unpublished: it is a draft again.', postdeleted: 'Post deleted.',
   hidden: 'Hidden.', shown: 'Shown again.', removed: 'Deleted.', banned: 'Banned.', unbanned: 'Ban lifted.', revoked: 'Token revoked.',
 };
@@ -226,7 +226,7 @@ export function createApp(deps: AppDeps) {
     if (!body) return showPost(ctx, p.slug, 400, { error: 'Write something first.', draft: body });
     if (body.length > 2000) return showPost(ctx, p.slug, 400, { error: 'Comments can be 2000 characters at most.', draft: body.slice(0, 2000) });
     if (limited(ctx, `comment:${user.id}`, LIMITS.comment)) return showPost(ctx, p.slug, 429, { error: slow(ctx, `comment:${user.id}`, LIMITS.comment), draft: body });
-    if (limited(ctx, `commentDay:${user.id}`, LIMITS.commentDaily)) return showPost(ctx, p.slug, 429, { error: "That's a lot of comments for one day. Try again tomorrow.", draft: body });
+    if (limited(ctx, `commentDay:${user.id}`, LIMITS.commentDaily)) return showPost(ctx, p.slug, 429, { error: "Daily comment limit reached.", draft: body });
     const c = await store.addComment({ postId: post.id, authorId: user.id, authorName: user.username, body });
     redirect(ctx.res, `/updates/${encodeURIComponent(post.slug)}?ok=commented#c${c.id}`);
   });

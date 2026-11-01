@@ -56,7 +56,7 @@ export function layout(ctx: PageCtx, p: PageOpts): SafeHtml {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title}</title>
-<meta name="description" content="${p.description ?? `${ctx.siteName}: a multiplayer space game. Build a ship part by part, fly it, and fight what lives out there.`}">
+<meta name="description" content="${p.description ?? `${ctx.siteName}: a space game about building ships.`}">
 <meta name="csrf-token" content="${ctx.csrf}">
 <meta name="color-scheme" content="dark">
 <meta property="og:title" content="${p.title || ctx.siteName}">
@@ -95,7 +95,7 @@ ${p.body}
 </main>
 <footer class="foot">
   <div class="wrap foot-in">
-    <div class="foot-brand">${MARK}<span>${ctx.siteName}</span><span class="dim">working title · in development</span></div>
+    <div class="foot-brand">${MARK}<span>${ctx.siteName}</span><span class="dim">in development</span></div>
     <nav class="foot-nav" aria-label="Footer">
       <a href="/updates">Updates</a><a href="/suggestions">Suggestions</a><a href="/pilots">Pilots</a><a href="/rss.xml">RSS</a>
       ${ctx.user ? html`<a href="/account">Account</a>` : html`<a href="/register">Create an account</a>`}
