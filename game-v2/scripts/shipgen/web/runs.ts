@@ -34,7 +34,7 @@ export interface Run {
   status: 'running' | 'done' | 'failed' | 'stopped';
   ac: AbortController;
   listeners: Set<(e: PageEvent | null) => void>;
-  done: Promise<RunOutcome | undefined>;
+  done: Promise<RunOutcome | unknown>;
 }
 
 export type RunFn = (deps: LoopDeps, o: RunOptions, emit: (e: ShipgenEvent) => void) => Promise<RunOutcome>;
@@ -68,6 +68,7 @@ export class Runs {
       if (e.type === 'grid' && !e.partial) { if (e.bp) lastBp.set(lane, e.bp); else lastBp.delete(lane); }
       if (e.type === 'check') { const bp = lastBp.get(lane); if (bp) pe.cells = partCells(this.ctx, bp); }
       if (e.type === 'render') pe.url = this.urlOf(e.path);
+      if (e.type === 'batch' && e.ship?.renderPath) pe.url = this.urlOf(e.ship.renderPath);
       if (e.type === 'best') {
         if (e.renderPath) pe.url = this.urlOf(e.renderPath);
         onBest?.(e, pe.url);
@@ -79,8 +80,13 @@ export class Runs {
   start(deps: LoopDeps, o: RunOptions, meta: { id: string; ac: AbortController; outDir: string }): Run {
     const model = o.mode === 'compare' ? o.models.join(' vs ') : o.model;
     const role = typeof o.brief.role === 'string' ? o.brief.role : o.brief.role?.id;
+    return this.startJob({ ...meta, mode: o.mode, model, role }, (emit) => this.runFn(deps, o, emit));
+  }
+
+  /** Any job that emits events (a batch, say): the page streams and records it as a run */
+  startJob(meta: { id: string; ac: AbortController; outDir: string; mode: string; model: string; role?: string }, job: (emit: (e: ShipgenEvent) => void) => Promise<unknown>): Run {
     const run: Run = {
-      id: meta.id, mode: o.mode, model, role, outDir: meta.outDir, events: [], status: 'running', ac: meta.ac, listeners: new Set(),
+      id: meta.id, mode: meta.mode, model: meta.model, role: meta.role, outDir: meta.outDir, events: [], status: 'running', ac: meta.ac, listeners: new Set(),
       done: Promise.resolve(undefined),
     };
     this.all.set(run.id, run);
@@ -99,7 +105,7 @@ export class Runs {
       }
       for (const l of run.listeners) l(pe);
     };
-    run.done = this.runFn(deps, o, emit).then(
+    run.done = job(emit).then(
       (r) => { run.status = meta.ac.signal.aborted ? 'stopped' : 'done'; return r; },
       (err) => {
         run.status = meta.ac.signal.aborted ? 'stopped' : 'failed';

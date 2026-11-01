@@ -41,11 +41,31 @@ export interface GenerationEvent extends Base { type: 'generation'; gen: number;
 /** The concept written before the first design round (or the fallback made when none could be read) */
 export interface ConceptEvent extends Base { type: 'concept'; concept: Concept; line: string; ms: number; hint?: ConceptHint; note?: string }
 export interface ErrorEvent extends Base { type: 'error'; round?: number; message: string; fatal: boolean }
+/** Batch mode: where the batch is (sent through BatchDeps.tap, between the ships' own events) */
+export interface BatchEvent extends Base {
+  type: 'batch';
+  phase: 'design' | 'refine' | 'saved' | 'rejected' | 'error' | 'waiting' | 'stopped';
+  /** The attempt's number in the batch, and its role */
+  attempt: number;
+  role: string;
+  saved: number;
+  attempts: number;
+  perRole: Record<string, { attempts: number; saved: number }>;
+  /** saved: the ship's folder (relative to the batch), name, score and render */
+  ship?: { dir: string; name: string; score: number; renderPath?: string };
+  why?: string[];
+  message?: string;
+  minutes?: number;
+  /** waiting: seconds before the next try */
+  waitS?: number;
+  /** stopped: why */
+  reason?: string;
+}
 export interface DoneEvent extends Base { type: 'done'; metrics: DesignMetrics | EvolveMetrics | CompareMetrics; cancelled: boolean }
 
 export type ShipgenEvent =
   | StartEvent | BriefEvent | PromptEvent | TokenEvent | ReplyEvent | GridEvent | CheckEvent | FeedbackEvent
-  | RenderEvent | CriticEvent | ScoreEvent | BestEvent | StepEvent | ConceptEvent | MutationEvent | GenerationEvent | ErrorEvent | DoneEvent;
+  | RenderEvent | CriticEvent | ScoreEvent | BestEvent | StepEvent | ConceptEvent | MutationEvent | GenerationEvent | ErrorEvent | DoneEvent | BatchEvent;
 
 export type Emit = (e: DistributiveOmit<ShipgenEvent, 't'> & { t?: number }) => void;
 export type DistributiveOmit<T, K extends keyof any> = T extends unknown ? Omit<T, K> : never;

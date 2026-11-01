@@ -5,11 +5,11 @@ import { appendFileSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { serializeBlueprint } from '../../../common/src/ships/index';
 import { type ShipgenContext, blueprintToGrid, check, loadRoles, roleCheckOptions } from '../core/index';
-import { type Llm, type ModelInfo, type Renderer, CONTRACTS, CONTRACT_IDS, autoContract, run as loopRun } from '../loop/index';
+import { type Llm, type ModelInfo, type Renderer, CONTRACTS, CONTRACT_IDS, autoContract, run as loopRun, runBatch } from '../loop/index';
 import { HttpError, json, readJson, sendFile } from './http';
 import { labUrl, runLabExporter } from './lab';
 import { blueprintFrom, listLibrary, loadLibrary, saveGenerated } from './library';
-import { type RunForm, roleFor, runOptions } from './options';
+import { type RunForm, batchOptions, roleFor, runOptions } from './options';
 import { legendRows, partCells } from './parts';
 import type { Paths } from './paths';
 import { type PageEvent, type RunFn, Runs } from './runs';
@@ -79,7 +79,21 @@ export function createApp(deps: AppDeps): App {
     try { return await startRunNow(form); } finally { starting = false; }
   }
 
+  /** A batch from the page: the same loop as the CLI's --mode batch, streamed as one run (each ship's events in its own lane) */
+  async function startBatch(form: RunForm) {
+    const ac = new AbortController();
+    const id = runs.nextId();
+    const list = await models(true);
+    const outDir = join(paths.out, 'runs', `${stamp()}-batch-${slug((form.model ?? 'model').split('/').pop() ?? 'model')}-${id}-page`);
+    const o = batchOptions(ctx, form, list, { outDir, signal: ac.signal });
+    mkdirSync(outDir, { recursive: true });
+    const renderer = await deps.getRenderer();
+    runs.startJob({ id, ac, outDir, mode: 'batch', model: o.model, role: o.roles!.join('+') }, (emit) => runBatch({ ctx, llm, models: list, renderer, tap: emit, log: (l) => console.log(l), notify: async () => {} }, o));
+    return { id, outDir };
+  }
+
   async function startRunNow(form: RunForm & { startId?: string; startBp?: unknown }) {
+    if (form.mode === 'batch') return startBatch(form);
     const start = form.startBp ? blueprintFrom(form.startBp) : form.startId ? loadLibrary(paths.blueprints, form.startId) : undefined;
     const ac = new AbortController();
     const id = runs.nextId();

@@ -82,6 +82,12 @@ export class StepLog {
       case 'mutation': this.add(L, 0, `gen ${e.gen} child ${e.child} from ${esc(e.parent)}: ${esc(e.instruction)}`); break;
       case 'generation': this.add(L, 0, `generation ${e.gen}: ${e.population.map((p) => `${esc(p.id)} ${p.score}${p.valid ? '' : ' (invalid)'}`).join(', ')}`); break;
       case 'error': this.add(L, R, `${e.fatal ? 'stopped: ' : ''}${esc(e.message)}`, 'err'); break;
+      case 'batch': {
+        const what = e.phase === 'design' ? `ship #${e.attempt} (${esc(e.role)}): designing` : e.phase === 'refine' ? `ship #${e.attempt}: refining` : e.phase === 'saved' ? `ship #${e.attempt}: saved "${esc(e.ship?.name)}" score ${e.ship?.score} (${e.minutes} min)`
+          : e.phase === 'rejected' ? `ship #${e.attempt}: rejected (${esc((e.why ?? []).join('; '))})` : e.phase === 'error' ? `ship #${e.attempt}: error ${esc(e.message)}` : e.phase === 'waiting' ? `waiting ${e.waitS} s: ${esc(e.message)}` : `batch stopped: ${esc(e.reason)}`;
+        this.add(`#${e.attempt}`, 0, `<b>batch</b> ${what} <span class="muted">(${e.saved} saved of ${e.attempts})</span>`, e.phase === 'saved' ? 'good' : e.phase === 'rejected' || e.phase === 'error' ? 'err' : 'note');
+        break;
+      }
       case 'done': this.add(L, 0, `done${e.cancelled ? ' (stopped)' : ''}`, 'good'); break;
     }
   }

@@ -1,4 +1,5 @@
-// Shipgen page: the form, the run stream (server-sent events), panes, metrics, gallery and the design actions.
+// Shipgen page: the form (make ships in a batch, one ship, evolve, compare), the run stream (server-sent events), the
+// progress strip, panes, metrics, the saved ships with ratings, the session gallery, and watching command-line runs.
 import { CATEGORY_NAMES, COLOURS } from './grid.js';
 import { StepLog } from './log.js';
 import { Pane } from './pane.js';
@@ -15,25 +16,45 @@ const store = {
   get(k) { try { return JSON.parse(localStorage.getItem(`shipgen.${k}`) ?? 'null'); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(`shipgen.${k}`, JSON.stringify(v)); } catch { /* (no storage) */ } },
 };
+const STEP_NAMES = ['power', 'weapons', 'engines', 'fittings', 'armour', 'shape'];
 
 const state = {
-  legend: new Map(), roles: [], models: [], library: [], run: null, es: null, mode: 'design',
+  legend: new Map(), roles: [], models: [], library: [], run: null, runMode: null, es: null, mode: 'design',
   panes: new Map(), checks: new Map(), selected: null, start: null, watching: null,
+  /** Where the attached run is (the progress strip) */
+  progress: null,
 };
 const log = new StepLog($('log'), () => $('follow').checked);
 
 // ---------------------------------------------------------------------------------------------------------- form
 function msg(id, text, cls = '') { const el = $(id); el.textContent = text; el.className = `msg ${cls}`; }
 
+const formMode = () => document.body.className.replace(/^m-/, '');
+
+function setMode(mode) {
+  document.body.className = `m-${mode}`;
+  for (const b of $('tabs').querySelectorAll('button')) b.classList.toggle('on', b.dataset.mode === mode);
+  $('modelLabel').textContent = mode === 'compare' ? 'First model' : 'Model';
+  $('go').textContent = mode === 'batch' ? 'Start making ships' : mode === 'design' ? 'Design one ship' : mode === 'evolve' ? 'Start evolving' : 'Compare the models';
+  // (The build's "auto" is a batch choice: by role)
+  const auto = $('build').querySelector('option[value=auto]');
+  auto.hidden = mode !== 'batch';
+  if (mode !== 'batch' && $('build').value === 'auto') $('build').value = 'oneshot';
+  if (mode === 'batch' && !store.get('build')) $('build').value = 'auto';
+  contractHint();
+  store.set('mode', mode);
+}
+for (const b of $('tabs').querySelectorAll('button')) b.onclick = () => setMode(b.dataset.mode);
+
 function modelLabel(m) {
-  return `${m.name}${m.params ? `  ${m.params}` : ''}${m.vision ? ' · vision' : ''}${m.cloud ? ' · CLOUD' : ''}${m.off ? ` · ${m.off}` : ''}`;
+  return `${m.name}${m.params ? `  ${m.params}` : ''}${m.vision ? ' · vision' : ''}${m.cloud ? ' · CLOUD (paid)' : ''}${m.off ? ` · ${m.off}` : ''}`;
 }
 
 function fillModels(select, list, { none, pick } = {}) {
   const groups = [
     ['Local: Ollama', list.filter((m) => !m.cloud && m.provider === 'ollama')],
     ['Local: LM Studio', list.filter((m) => !m.cloud && m.provider === 'lmstudio')],
-    ['Cloud (runs on an outside service)', list.filter((m) => m.cloud)],
+    ['Cloud (runs on an outside service, costs money)', list.filter((m) => m.cloud)],
   ];
   // (No model picked: a placeholder shows, never the first enabled option, which could be a paid cloud one)
   select.innerHTML = (none ? `<option value="">${esc(none)}</option>` : '<option value="" disabled>(pick a model)</option>') + groups.filter(([, ms]) => ms.length)
@@ -59,14 +80,18 @@ async function loadModels() {
   fillModels($('model2'), chat, { pick: prefs.model2 ?? local[1]?.id ?? local[0]?.id });
   fillModels($('critic'), chat.filter((m) => m.vision), { none: '(no critic)', pick: prefs.critic ?? '' });
   contractHint();
-  if (!lmstudio) $('modelLabel').title = 'LM Studio lists nothing: not running, or no LM_API_TOKEN in the environment or game-v2/.env';
+  const notes = [];
+  if (!local.length) notes.push('No local model is ready: start Ollama, or load a model in LM Studio and tick "let LM Studio chat" under Advanced.');
+  else if (!lmstudio) notes.push('LM Studio lists nothing (not running, or no LM_API_TOKEN).');
+  if (models.some((m) => m.provider === 'lmstudio' && m.off)) notes.push('LM Studio models are listed only until "let LM Studio chat" is ticked (Advanced).');
+  $('modelNote').textContent = notes.join(' ');
 }
 
 /** What "auto" picks for the chosen designer, and why (the measured table in loop/modelPrefs.ts) */
 function contractHint() {
   const m = state.models.find((x) => x.id === $('model').value);
   const a = m?.auto;
-  $('contractHint').textContent = a ? `auto = ${$('build').value === 'staged' ? 'parts (staged)' : a.contract}` : '';
+  $('contractHint').textContent = a ? `auto = ${$('build').value === 'staged' ? 'parts (steps)' : $('build').value === 'auto' ? 'by build' : a.contract}` : '';
   $('contractHint').title = a ? a.why : '';
 }
 
@@ -75,7 +100,9 @@ async function loadStatic() {
   state.roles = roles;
   for (const r of legend) state.legend.set(r.code, r);
   state.library = ships;
-  $('role').innerHTML = `<option value="">(no role: the note only)</option>` + roles.map((r) => `<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('');
+  $('role').innerHTML = `<option value="">(no role: the description only)</option>` + roles.map((r) => `<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('');
+  const picked = store.get('roles') ?? roles.map((r) => r.id);
+  $('roleChecks').innerHTML = roles.map((r) => `<label title="${esc(`${r.summary}. ${r.size.cells[0]}-${r.size.cells[1]} cells`)}"><input type="checkbox" name="roles" value="${esc(r.id)}"${picked.includes(r.id) ? ' checked' : ''}> ${esc(r.name)}</label>`).join('');
   const groups = {};
   for (const s of ships) (groups[s.group] ??= []).push(s);
   $('start').innerHTML = '<option value="">(blank: a new design)</option><option value="sel" disabled>(the selected design)</option>' +
@@ -87,36 +114,39 @@ async function loadStatic() {
 
 function roleChanged() {
   const r = state.roles.find((x) => x.id === $('role').value);
-  $('roleSummary').textContent = r ? `${r.summary}. Size ${r.size.cells[0]}-${r.size.cells[1]} cells, level ${r.band.maxLevel} parts.` : 'No role: the model gets only the rules, the legend and your note.';
+  $('roleSummary').textContent = r ? `${r.summary}. Size ${r.size.cells[0]}-${r.size.cells[1]} cells, level ${r.band.maxLevel} parts.` : 'No role: the model gets only the rules, the legend and your description.';
   $('maxLevel').placeholder = r ? String(r.band.maxLevel) : '99';
   $('cellsMin').placeholder = r ? String(r.size.cells[0]) : 'min';
   $('cellsMax').placeholder = r ? String(r.size.cells[1]) : 'max';
 }
 
-function modeChanged() {
-  state.mode = $('mode').value;
-  document.body.className = `m-${state.mode}`;
-  $('modelLabel').textContent = state.mode === 'compare' ? 'First designer' : 'Designer';
-}
-
 function formBody() {
+  const mode = formMode();
   const f = new FormData($('form'));
   const v = (k) => { const x = f.get(k); return x === null || x === '' ? undefined : x; };
   const n = (k) => (v(k) === undefined ? undefined : Number(v(k)));
   const body = {
-    mode: v('mode'), model: v('model'), critic: v('critic'), temperature: n('temperature'), rounds: n('rounds'), role: v('role'),
-    maxLevel: n('maxLevel'), note: v('note'), think: f.get('think') === 'on', trials: n('trials'), population: n('population'), generations: n('generations'),
+    mode, model: v('model'), temperature: n('temperature'), rounds: n('rounds'), note: v('note'), think: f.get('think') === 'on',
     build: v('build'), contract: v('contract'), mirror: f.get('mirror') === 'on', concept: f.get('concept') === 'on',
   };
-  if (body.mode === 'compare') body.models = [v('model'), v('model2')];
-  if (n('cellsMin') || n('cellsMax')) {
-    const r = state.roles.find((x) => x.id === body.role);
-    body.cells = [n('cellsMin') ?? r?.size.cells[0] ?? 10, n('cellsMax') ?? r?.size.cells[1] ?? 200];
+  if (mode === 'batch') {
+    body.roles = f.getAll('roles');
+    body.maxShips = n('maxShips'); body.shipMinutes = n('shipMinutes'); body.generations = Number($('generationsBatch').value) || 0;
+    store.set('roles', body.roles);
+  } else {
+    body.role = v('role'); body.critic = v('critic'); body.maxLevel = n('maxLevel'); body.trials = n('trials'); body.population = n('population');
+    body.generations = Number($('generationsEvolve').value) || undefined;
+    if (body.build === 'auto') body.build = 'oneshot';
+    if (mode === 'compare') body.models = [v('model'), v('model2')];
+    if (n('cellsMin') || n('cellsMax')) {
+      const r = state.roles.find((x) => x.id === body.role);
+      body.cells = [n('cellsMin') ?? r?.size.cells[0] ?? 10, n('cellsMax') ?? r?.size.cells[1] ?? 200];
+    }
+    const start = v('start');
+    if (start === 'sel' && state.start) body.startBp = state.start.bp;
+    else if (start && start !== 'sel') body.startId = start;
   }
-  const start = v('start');
-  if (start === 'sel' && state.start) body.startBp = state.start.bp;
-  else if (start && start !== 'sel') body.startId = start;
-  store.set('form', { model: body.model, model2: v('model2'), critic: body.critic ?? '', role: body.role, mode: body.mode, temperature: body.temperature, rounds: body.rounds, build: body.build, contract: body.contract, mirror: body.mirror, concept: body.concept });
+  store.set('form', { model: body.model, model2: v('model2'), critic: v('critic') ?? '', role: v('role'), temperature: body.temperature, rounds: body.rounds, build: v('build'), contract: body.contract, mirror: body.mirror, concept: body.concept, think: body.think, shipMinutes: n('shipMinutes'), maxShips: n('maxShips'), generationsBatch: $('generationsBatch').value });
   return body;
 }
 
@@ -156,21 +186,62 @@ function bar(pct) {
   return `<span class="bar"><i style="width:${Math.max(0, Math.min(100, pct))}%;background:${c}"></i></span>${Math.round(pct)}%`;
 }
 
+const SCORE_WORDS = {
+  power: 'power: guns and engines fed', fit: 'fit: what the role is for', lean: 'lean: not mostly power plant', symmetry: 'symmetry', armourOutside: 'shell outside',
+  enginesAft: 'engines aft', gunsOut: 'guns out', compactness: 'compact rows', silhouette: 'shaped outline',
+};
+
 function metrics(r, extra = '') {
   const s = r.stats, p = r.power;
   const kv = [
     ['score', r.score], ['valid', r.valid ? 'yes' : `no (${r.errors.length} errors)`], ['parts', s.parts], ['size', `${s.width} x ${s.height} (${s.cells} cells)`],
     ['mass', s.mass], ['cost', s.cost ?? 'n/a'], ['thrust / mass', s.thrustToMass], ['makes', `${s.generation} E/s`],
     ...(p ? [['stores', `${p.storage} E`], ['cruise', `${p.thrust.cruisePct}%`], ['boost', `${p.thrust.boostPct}%`], ['unpowered', p.unpowered.length], ['bottlenecks', p.bottlenecks.length]] : []),
-    ...Object.entries(r.scores).map(([k, v]) => [k, v === null ? 'n/a' : Number(v).toFixed(2)]),
   ];
+  const sc = Object.entries(r.scores).filter(([, v]) => v !== null && v !== undefined).map(([k, v]) => `<div><span>${esc(SCORE_WORDS[k] ?? k)}</span> ${bar(Number(v) * 100)}</div>`).join('');
+  const fit = (r.fit ?? []).length ? `<div class="muted small">${r.fit.map((f) => `${esc(f.words)}: ${f.value} of ${f.target}`).join(' · ')}</div>` : '';
   const guns = p?.weapons.length ? `<table><tr><th>weapon</th><th>at</th><th>10 s</th><th>sustained</th></tr>${p.weapons.map((w) => `<tr><td>${esc(w.name)} (${esc(w.code)})</td><td>${w.row}, ${w.col}</td><td>${bar(w.pct)}</td><td>${bar(w.pctLong)}</td></tr>`).join('')}</table>` : '';
-  $('metrics').innerHTML = `<h2>Design metrics</h2><div class="kv">${kv.map(([k, v]) => `<div><span>${esc(k)}</span> ${esc(v)}</div>`).join('')}</div>${guns}${extra}`;
+  $('metrics').innerHTML = `<h2>Design metrics</h2><div class="kv">${kv.map(([k, v]) => `<div><span>${esc(k)}</span> ${esc(v)}</div>`).join('')}</div><div class="kv">${sc}</div>${fit}${guns}${extra}`;
 }
 
 function compareTable(m) {
   return `<h2>Compare</h2><table><tr><th>model</th><th>trials</th><th>valid</th><th>pass rate</th><th>rounds / valid</th><th>valid / min</th><th>mean score</th><th>tok/s</th><th>time</th></tr>` +
     m.models.map((x) => `<tr><td>${esc(x.model)}</td><td>${x.trials}</td><td>${x.passes}</td><td>${Math.round(x.passRate * 100)}%</td><td>${x.roundsPerValid ?? '-'}</td><td>${x.validPerMinute}</td><td>${x.meanScore}</td><td>${x.tokensPerSec ?? '-'}</td><td>${(x.ms / 1000).toFixed(0)} s</td></tr>`).join('') + '</table>';
+}
+
+// ---------------------------------------------------------------------------------------------------------- progress
+const clock = (ms) => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+
+function progressReset(title) {
+  state.progress = { title, where: '', since: Date.now(), steps: new Map(), tally: '', round: 0 };
+  $('progress').hidden = false;
+  progressDraw();
+}
+function progressDraw() {
+  const p = state.progress;
+  if (!p) { $('progress').hidden = true; return; }
+  $('progressTitle').textContent = p.title;
+  $('progressWhere').textContent = [p.where, p.round ? `try ${p.round}` : ''].filter(Boolean).join(' · ');
+  $('progressClock').textContent = clock(Date.now() - p.since);
+  $('progressBar').innerHTML = p.steps.size ? [...p.steps.entries()].map(([name, st]) => `<span class="${st}" data-name="${esc(name)}"></span>`).join('') : '';
+  $('progressTally').textContent = p.tally;
+}
+setInterval(() => { if (state.progress && $('status').textContent === 'running') $('progressClock').textContent = clock(Date.now() - state.progress.since); }, 1000);
+
+function onBatch(e) {
+  const p = state.progress ?? (progressReset('Making ships'), state.progress);
+  const per = Object.entries(e.perRole).map(([r, v]) => `${r} ${v.saved}/${v.attempts}`).join(' · ');
+  p.tally = `${e.saved} saved of ${e.attempts} attempts${per ? ` · ${per}` : ''}`;
+  switch (e.phase) {
+    case 'design': p.title = `Ship #${e.attempt}: ${e.role}`; p.where = 'writing the concept'; p.since = Date.now(); p.steps = new Map(); p.round = 0; break;
+    case 'refine': p.where = 'refining the design (evolve)'; p.steps = new Map(); p.round = 0; break;
+    case 'saved': p.where = `saved "${e.ship?.name}" (score ${e.ship?.score}) in ${e.minutes} min`; refreshShips(); break;
+    case 'rejected': p.where = `rejected after ${e.minutes} min: ${(e.why ?? []).join('; ')}`; break;
+    case 'error': p.where = `error: ${e.message}`; break;
+    case 'waiting': p.where = `waiting ${e.waitS} s (${e.message})`; break;
+    case 'stopped': p.title = 'Batch finished'; p.where = `stopped: ${e.reason}`; break;
+  }
+  progressDraw();
 }
 
 // ---------------------------------------------------------------------------------------------------------- the stream
@@ -182,22 +253,35 @@ function setStatus(s, info) {
 }
 
 function onEvent(e) {
+  if (e.type === 'batch') { onBatch(e); log.event(e); return; }
   const pane = e.type === 'start' ? null : paneFor(e);
+  const p = state.progress;
   switch (e.type) {
     case 'start':
       if (state.watching && e.role && state.roles.some((r) => r.id === e.role)) { $('role').value = e.role; roleChanged(); }
       state.mode = e.mode; state.checks.clear(); $('conceptNote').textContent = '';
-      setupPanes(e.mode, e.models ?? [e.model], e.model);
-      setStatus('running', `${e.mode}${e.build === 'staged' ? ' (staged)' : ''} · ${e.models?.join(' vs ') ?? e.model} · ${e.role ?? 'no role'} · ${e.contract}${e.mirror === false ? ' · mirror off' : ' · mirrored'}${e.critic ? ` · critic ${e.critic}` : ''}`);
+      setupPanes(e.mode, e.models ?? [e.model], e.lane ?? e.role ?? e.model);
+      if (state.runMode !== 'batch') progressReset(`${e.mode === 'design' ? 'Designing' : e.mode === 'evolve' ? 'Evolving' : 'Comparing'}${e.role ? `: ${e.role}` : ''}`);
+      else if (p) { p.where = e.mode === 'evolve' ? 'refining the design (evolve)' : `designing${e.build === 'staged' ? ' in steps' : ''}`; p.steps = new Map(); p.round = 0; }
+      if (e.build === 'staged' && p) { for (const s of STEP_NAMES) p.steps.set(s, ''); }
+      setStatus('running', `${state.runMode === 'batch' ? 'batch · ' : ''}${e.mode}${e.build === 'staged' ? ' (steps)' : ''} · ${e.models?.join(' vs ') ?? e.model} · ${e.role ?? 'no role'} · ${e.contract}${e.mirror === false ? ' · mirror off' : ''}${e.critic ? ` · critic ${e.critic}` : ''}`);
+      progressDraw();
       break;
-    case 'concept': $('conceptNote').textContent = e.line; break;
-    case 'prompt': pane?.newRound(e.round, state.mode === 'design' ? '' : e.lane); $('live').textContent = ''; break;
+    case 'concept': $('conceptNote').textContent = e.line; if (p) { p.where = 'designing from the concept'; progressDraw(); } break;
+    case 'step':
+      if (p) {
+        if (e.status === 'start') { for (const [k, v] of p.steps) if (v === 'on') p.steps.set(k, 'done'); p.steps.set(e.step, 'on'); p.where = `step ${e.index}/${e.of}: ${e.step}`; }
+        else p.steps.set(e.step, e.status === 'accepted' ? 'done' : e.status);
+        progressDraw();
+      }
+      break;
+    case 'prompt': pane?.newRound(e.round, state.mode === 'design' ? '' : e.lane); $('live').textContent = ''; if (p) { p.round = e.round; progressDraw(); } break;
     case 'token':
       if (e.kind === 'content') pane?.token(e.text);
       else $('live').textContent = 'thinking...';
       return;
     case 'grid': if (!e.partial) pane?.gridFinal(e.text); else { if (e.text) pane?.preview(e.text); return; } break;
-    case 'reply': $('live').textContent = e.tokensPerSec ? `${e.tokensPerSec} tok/s` : ''; pane?.foot(`reply in ${(e.ms / 1000).toFixed(1)} s`); break;
+    case 'reply': $('live').textContent = e.tokensPerSec ? `${e.tokensPerSec} tok/s` : ''; pane?.foot(`reply in ${(e.ms / 1000).toFixed(1)} s${e.outputTokens ? `, ${e.outputTokens} tokens` : ''}`); break;
     case 'check':
       pane?.check(e.result, e.cells);
       state.checks.set(`${e.lane ?? ''}|${e.round}`, { result: e.result, cells: e.cells });
@@ -217,16 +301,18 @@ function onEvent(e) {
     case 'done':
       if (e.metrics.kind === 'compare') { $('metrics').innerHTML = compareTable(e.metrics); }
       $('live').textContent = '';
+      if (p && state.runMode !== 'batch') { for (const [k, v] of p.steps) if (v === 'on') p.steps.set(k, 'done'); p.where = e.cancelled ? 'stopped' : 'done'; progressDraw(); }
       refreshGallery();
       break;
   }
   log.event(e);
 }
 
-function attach(id) {
+function attach(id, mode) {
   state.es?.close();
   state.watching = null;
-  state.run = id;
+  state.run = id; state.runMode = mode ?? null;
+  state.progress = null; progressDraw();
   const es = new EventSource(`/api/runs/${id}/events`);
   state.es = es;
   es.onmessage = (m) => onEvent(JSON.parse(m.data));
@@ -235,6 +321,7 @@ function attach(id) {
     const { runs } = await api('/api/runs');
     const r = runs.find((x) => x.id === id);
     setStatus(r?.status ?? 'done');
+    refreshShips();
   });
 }
 
@@ -242,10 +329,11 @@ function attach(id) {
 /** Follows a run started elsewhere (the CLI): the same view, read-only (no Stop) */
 function watch(id) {
   state.es?.close();
-  state.run = null;
+  state.run = null; state.runMode = null;
   state.watching = id;
   log.clear();
   state.selected = null;
+  state.progress = null; progressDraw();
   watchEnded = false;
   const es = new EventSource(`/api/watch/events?run=${encodeURIComponent(id)}`);
   state.es = es;
@@ -274,7 +362,7 @@ async function follow() {
   const curLive = cur && !cur.finished && !cur.stale && !watchEnded;
   const live = watchRuns.find((r) => !r.finished && !r.stale);
   if (live && live.id !== state.watching && !curLive) watch(live.id);
-  else if (!state.watching && watchRuns[0]) watch(watchRuns[0].id);
+  else if (!state.watching && !state.run && watchRuns[0]) watch(watchRuns[0].id);
 }
 setInterval(follow, 3000);
 $('followLatest').onchange = () => { store.set('follow', $('followLatest').checked); follow(); };
@@ -285,7 +373,7 @@ function renderWatch() {
   $('watchCount').textContent = watchRuns.length ? `(${watchRuns.length})` : '';
   if (!watchRuns.length) { el.innerHTML = '<p class="muted small">No runs in out/ yet.</p>'; return; }
   el.innerHTML = '';
-  for (const r of watchRuns) {
+  for (const r of watchRuns.slice(0, 60)) {
     const row = document.createElement('div');
     row.className = `watchRow${state.watching === r.id ? ' on' : ''}`;
     const when = new Date(r.modified).toLocaleString();
@@ -301,7 +389,7 @@ async function refreshWatch() {
 setInterval(() => { if ($('watchBox').open) refreshWatch(); }, 4000);
 $('watchBox').addEventListener('toggle', () => { if ($('watchBox').open) refreshWatch(); });
 
-// ---------------------------------------------------------------------------------------------------------- gallery
+// ---------------------------------------------------------------------------------------------------------- session gallery
 async function refreshGallery() {
   const { gallery } = await api('/api/gallery');
   const el = $('gallery');
@@ -318,29 +406,52 @@ async function refreshGallery() {
 
 // ---------------------------------------------------------------------------------------------------------- saved ships
 let savedShips = [];
-async function refreshShips() {
-  try { savedShips = (await api('/api/ships')).ships; } catch { return; }
+function stars(s) {
+  const el = document.createElement('div');
+  el.className = 'stars';
+  el.title = 'rate it (click a star again to clear)';
+  for (let i = 1; i <= 5; i++) {
+    const st = document.createElement('i');
+    st.textContent = '★'; st.className = i <= (s.rating ?? 0) ? 'on' : '';
+    st.onclick = async (ev) => {
+      ev.stopPropagation();
+      const rating = s.rating === i ? 0 : i;
+      try { await api('/api/ships/rate', { dir: s.dir, rating }); s.rating = rating || undefined; drawShips(); } catch (e) { msg('actMsg', e.message, 'err'); }
+    };
+    el.appendChild(st);
+  }
+  return el;
+}
+function drawShips() {
   const sel = $('shipsRole'), role = sel.value;
   const roles = [...new Set(savedShips.map((s) => s.role))].sort();
   sel.innerHTML = `<option value="">all roles</option>${roles.map((r) => `<option value="${esc(r)}">${esc(r)}</option>`).join('')}`;
   sel.value = roles.includes(role) ? role : '';
-  const list = savedShips.filter((s) => !sel.value || s.role === sel.value);
+  const sort = $('shipsSort').value;
+  const list = savedShips.filter((s) => !sel.value || s.role === sel.value).sort((a, b) =>
+    sort === 'score' ? b.score - a.score : sort === 'rating' ? (b.rating ?? 0) - (a.rating ?? 0) || b.score - a.score : b.savedAt.localeCompare(a.savedAt));
   $('shipsCount').textContent = `(${list.length})`;
   const el = $('ships');
-  if (!list.length) { el.innerHTML = '<p class="muted small">No saved ships yet.</p>'; return; }
+  if (!list.length) { el.innerHTML = '<p class="muted small">No saved ships yet. Start a batch and the ones that pass appear here.</p>'; return; }
   el.innerHTML = '';
   for (const s of list) {
     const card = document.createElement('div');
     card.className = 'card';
     card.title = `${s.dir}${s.concept ? `\n${s.concept}` : ''}`;
-    card.innerHTML = `${s.png ? `<img src="${esc(s.png)}" alt="" loading="lazy">` : '<div class="noimg">no render</div>'}<b>${esc(s.name)}</b><span>${s.score}</span> <span class="muted">${esc(s.role)} · ${esc((s.model ?? '').replace(/^\w+\//, ''))}</span><div class="muted">${esc(s.savedAt.slice(0, 16).replace('T', ' '))}</div>`;
+    card.innerHTML = `${s.png ? `<img src="${esc(s.png)}" alt="" loading="lazy">` : '<div class="noimg">no render</div>'}<b>${esc(s.name)}</b><span>score ${s.score}</span> <span class="muted">${esc(s.role)}</span><div class="muted">${esc((s.model ?? '').replace(/^\w+\//, ''))} · ${esc(s.savedAt.slice(0, 16).replace('T', ' '))}</div>`;
+    card.appendChild(stars(s));
     card.onclick = async () => {
       try { await openDesign(await (await fetch(s.bp)).json(), { name: s.name, url: s.png, role: s.role, score: s.score }); } catch (e) { msg('actMsg', e.message, 'err'); }
     };
     el.appendChild(card);
   }
 }
-$('shipsRole').onchange = refreshShips;
+async function refreshShips() {
+  try { savedShips = (await api('/api/ships')).ships; } catch { return; }
+  drawShips();
+}
+$('shipsRole').onchange = drawShips;
+$('shipsSort').onchange = drawShips;
 setInterval(() => { if ($('shipsBox').open) refreshShips(); }, 30000);
 
 /** Shows a design (library or gallery) in the main pane, with its check, and selects it */
@@ -381,6 +492,7 @@ $('actStart').onclick = () => {
   const o = $('start').querySelector('option[value=sel]');
   o.disabled = false; o.textContent = `(the selected design: ${state.start.name})`;
   $('start').value = 'sel';
+  if (formMode() === 'batch') setMode('design');
   msg('actMsg', `The next run starts from "${state.start.name}".`, 'ok');
 };
 $('actLapse').onclick = async () => {
@@ -394,22 +506,28 @@ $('actLapse').onclick = async () => {
   } catch (e) { msg('actMsg', e.message, 'err'); }
   $('actLapse').disabled = false;
 };
-$('stop').onclick = () => state.run && api(`/api/runs/${state.run}/stop`, {}).catch((e) => msg('formMsg', e.message, 'err'));
+$('stop').onclick = () => {
+  if (!state.run) return;
+  $('stop').disabled = true;
+  msg('formMsg', state.runMode === 'batch' ? 'Stopping after this step...' : 'Stopping...', '');
+  api(`/api/runs/${state.run}/stop`, {}).catch((e) => msg('formMsg', e.message, 'err'));
+};
 
 $('form').onsubmit = async (ev) => {
   ev.preventDefault();
   msg('formMsg', '');
   try {
     const body = formBody();
-    if (body.mode === 'compare' && body.models[0] === body.models[1]) throw new Error('pick two different designers');
+    if (body.mode === 'compare' && body.models[0] === body.models[1]) throw new Error('pick two different models');
+    if (body.mode === 'batch' && !body.roles.length) throw new Error('tick at least one role');
+    if (!body.model) throw new Error('pick a model');
     log.clear();
     const { id } = await api('/api/runs', body);
-    attach(id);
+    attach(id, body.mode);
   } catch (e) { msg('formMsg', e.message, 'err'); }
 };
-$('mode').onchange = modeChanged;
 $('model').addEventListener('change', contractHint);
-$('build').addEventListener('change', contractHint);
+$('build').addEventListener('change', () => { contractHint(); store.set('build', $('build').value); });
 $('lmsChat').onchange = async () => {
   try {
     await api('/api/settings', { lmstudioChat: $('lmsChat').checked });
@@ -433,23 +551,27 @@ $('start').onchange = async () => {
   try {
     await loadStatic();
     const prefs = store.get('form') ?? {};
-    if (prefs.mode) $('mode').value = prefs.mode;
     if (prefs.role !== undefined && state.roles.some((r) => r.id === prefs.role)) $('role').value = prefs.role; else $('role').value = 'starter';
     if (prefs.temperature !== undefined) $('temperature').value = prefs.temperature;
     if (prefs.rounds) $('rounds').value = prefs.rounds;
-    if (prefs.build) $('build').value = prefs.build;
     if (prefs.mirror === false) $('mirror').checked = false;
     if (prefs.concept === false) $('concept').checked = false;
+    if (prefs.think === false) $('think').checked = false;
+    if (prefs.shipMinutes) $('shipMinutes').value = prefs.shipMinutes;
+    if (prefs.maxShips) $('maxShips').value = prefs.maxShips;
+    if (prefs.generationsBatch !== undefined) $('generationsBatch').value = prefs.generationsBatch;
+    if (store.get('build')) $('build').value = store.get('build');
     $('temperature').oninput();
-    modeChanged(); roleChanged();
+    setMode(store.get('mode') ?? 'batch');
+    roleChanged();
     setupPanes('design', [], 'no run yet');
     await loadModels().catch((e) => msg('formMsg', `models: ${e.message}`, 'err'));
     refreshGallery();
     refreshWatch();
     refreshShips();
-    $('followLatest').checked = store.get('follow') ?? true;
+    $('followLatest').checked = store.get('follow') ?? false;
     const { runs } = await api('/api/runs');
-    const live = runs.find((r) => r.status === 'running') ?? ($('followLatest').checked ? undefined : runs.at(-1));
-    if (live) attach(live.id); else follow();
+    const live = runs.find((r) => r.status === 'running') ?? runs.at(-1);
+    if (live) attach(live.id, live.mode); else follow();
   } catch (e) { msg('formMsg', e.message, 'err'); }
 })();

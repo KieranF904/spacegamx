@@ -6,96 +6,118 @@
 <title>Shipgen</title>
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="m-batch">
 <header class="top">
   <h1>Shipgen</h1>
   <span id="status" class="pill idle">idle</span>
   <span id="runInfo" class="muted"></span>
   <span class="grow"></span>
   <span id="live" class="muted mono"></span>
-  <label class="check follow" title="Watch the newest command-line run, and move to the next one when it ends (a batch's attempts one after another)"><input type="checkbox" id="followLatest"> follow the newest run</label>
   <button id="stop" class="danger" disabled>Stop</button>
 </header>
-<div id="conceptNote" class="muted" style="padding:2px 12px;font-size:12px"></div>
-
-<details id="watchBox" class="panel watchBox">
-  <summary><b>Watch</b> <span class="muted small">runs from the command line (out/**/events.jsonl), read-only</span> <span id="watchCount" class="muted small"></span></summary>
-  <div id="watchList" class="watchList"><p class="muted small">Looking...</p></div>
-</details>
 
 <main class="layout">
   <!-- ---------------------------------------------------------------- controls -->
   <form id="form" class="panel controls" autocomplete="off">
-    <h2>Run</h2>
-    <label>Mode
-      <select name="mode" id="mode">
-        <option value="design">design: one ship, rounds of feedback</option>
-        <option value="evolve">evolve: a population, kept by score</option>
-        <option value="compare">compare: two models, same brief</option>
-      </select>
-    </label>
-    <label><span id="modelLabel">Designer</span>
+    <nav class="tabs" id="tabs">
+      <button type="button" data-mode="batch" class="on" title="Make ships one after another, each from a concept, saving the ones that pass">Make ships</button>
+      <button type="button" data-mode="design" title="One ship, rounds of feedback">One ship</button>
+      <button type="button" data-mode="evolve" title="A population changed by the model, kept by score">Evolve</button>
+      <button type="button" data-mode="compare" title="Two models, the same brief">Compare</button>
+    </nav>
+
+    <label><span id="modelLabel">Model</span>
       <select name="model" id="model"></select>
     </label>
-    <label class="only-compare">Second designer
+    <label class="only-compare">Second model
       <select name="model2" id="model2"></select>
     </label>
-    <label>Build
-      <select name="build" id="build">
-        <option value="oneshot">one-shot: the whole ship each round</option>
-        <option value="staged">staged: skeleton, then power, guns, engines, armour</option>
-      </select>
-    </label>
-    <label>Reply format <span id="contractHint" class="muted small"></span>
-      <select name="contract" id="contract"><option value="auto">auto (measured per model)</option></select>
-    </label>
-    <label class="check"><input type="checkbox" name="concept" id="concept" checked> concept: the model writes a short plan first (silhouette, layout), kept in every later prompt</label>
-    <label class="check"><input type="checkbox" name="mirror" id="mirror" checked> mirror: the model draws the left half, the tool mirrors it</label>
-    <label>Critic <span class="muted">(optional; vision models rate looks; weight 0: recorded, not scored)</span>
-      <select name="critic" id="critic"></select>
-    </label>
-    <div class="row2">
-      <label>Temperature <output id="tempOut">0.60</output>
-        <input type="range" name="temperature" id="temperature" min="0" max="1.5" step="0.05" value="0.6">
-      </label>
-      <label>Rounds
-        <input type="number" name="rounds" id="rounds" min="1" max="20" value="4" title="Staged build: tries per step">
-      </label>
+    <p id="modelNote" class="muted small"></p>
+
+    <div class="only-batch">
+      <div class="lbl">Roles <span class="muted">(in turn)</span></div>
+      <div id="roleChecks" class="checks"></div>
+      <div class="row2">
+        <label>Ships to make <input type="number" name="maxShips" id="maxShips" min="1" max="1000" placeholder="until stopped"></label>
+        <label>Minutes per ship <input type="number" name="shipMinutes" id="shipMinutes" min="5" max="1440" value="120"></label>
+      </div>
+      <label>Refinement rounds after a valid design <input type="number" name="generations" id="generationsBatch" min="0" max="10" value="3"></label>
     </div>
-    <div class="row2 only-evolve">
-      <label>Children / gen <input type="number" name="population" min="1" max="12" value="3"></label>
-      <label>Generations <input type="number" name="generations" min="1" max="10" value="2"></label>
-    </div>
-    <div class="row2 only-compare">
-      <label>Trials each <input type="number" name="trials" min="1" max="10" value="2"></label>
-      <span></span>
-    </div>
-    <label>Role
+
+    <label class="not-batch">Role
       <select name="role" id="role"></select>
     </label>
-    <p id="roleSummary" class="muted small"></p>
-    <div class="row2">
-      <label>Tier (max level) <input type="number" name="maxLevel" id="maxLevel" min="1" max="99"></label>
-      <label>Size (cells) <span class="pair"><input type="number" name="cellsMin" id="cellsMin" min="1"><input type="number" name="cellsMax" id="cellsMax" min="1"></span></label>
-    </div>
-    <label>Note <span class="muted">(added to the brief)</span>
-      <textarea name="note" id="note" rows="3" placeholder="e.g. a needle-nosed interceptor"></textarea>
-    </label>
-    <label class="not-compare">Start from <span class="muted">(change a ship instead of starting blank)</span>
+    <p id="roleSummary" class="muted small not-batch"></p>
+    <label class="not-batch not-compare">Start from <span class="muted">(change a ship instead of starting blank)</span>
       <select name="start" id="start"></select>
     </label>
-    <label class="check"><input type="checkbox" name="think" id="think"> let thinking models think (slower)</label>
-    <label class="check" title="Off by default. LM Studio models are only listed; with this on, a run asks LM Studio, which LOADS the model there."><input type="checkbox" id="lmsChat"> let LM Studio chat (this will LOAD the model in LM Studio)</label>
-    <button type="submit" id="go" class="primary">Start</button>
+
+    <label>Description <span class="muted">(what you want; added to the brief)</span>
+      <textarea name="note" id="note" rows="3" placeholder="e.g. long and narrow, a needle nose, engines in a row at the tail"></textarea>
+    </label>
+
+    <button type="submit" id="go" class="primary big">Start</button>
     <p id="formMsg" class="msg"></p>
-    <details class="legendBox">
-      <summary>Colours</summary>
-      <div id="key" class="key"></div>
+
+    <details class="advanced">
+      <summary>Advanced</summary>
+      <label>Build
+        <select name="build" id="build">
+          <option value="auto" class="only-batch-opt">auto: by role (small ships in one go, the rest in steps)</option>
+          <option value="oneshot">one go: the whole ship each round</option>
+          <option value="staged">in steps: outline, power, guns, engines, fittings, armour, shape</option>
+        </select>
+      </label>
+      <label>Reply format <span id="contractHint" class="muted small"></span>
+        <select name="contract" id="contract"><option value="auto">auto (measured per model)</option></select>
+      </label>
+      <label class="check"><input type="checkbox" name="concept" id="concept" checked> concept first: the model writes a short plan (silhouette, outline, layout) the rounds follow</label>
+      <label class="check"><input type="checkbox" name="mirror" id="mirror" checked> mirror: the model writes the left half, the tool mirrors it</label>
+      <label class="check"><input type="checkbox" name="think" id="think" checked> let thinking models think (better, slower)</label>
+      <div class="row2">
+        <label>Temperature <output id="tempOut">0.60</output>
+          <input type="range" name="temperature" id="temperature" min="0" max="1.5" step="0.05" value="0.6">
+        </label>
+        <label>Rounds <span class="muted">(tries per step)</span>
+          <input type="number" name="rounds" id="rounds" min="1" max="20" placeholder="5">
+        </label>
+      </div>
+      <div class="row2 only-evolve">
+        <label>Children / gen <input type="number" name="population" min="1" max="12" value="3"></label>
+        <label>Generations <input type="number" name="generations" id="generationsEvolve" min="1" max="10" value="2"></label>
+      </div>
+      <div class="row2 only-compare">
+        <label>Trials each <input type="number" name="trials" min="1" max="10" value="2"></label>
+        <span></span>
+      </div>
+      <div class="row2 not-batch">
+        <label>Tier (max level) <input type="number" name="maxLevel" id="maxLevel" min="1" max="99"></label>
+        <label>Size (cells) <span class="pair"><input type="number" name="cellsMin" id="cellsMin" min="1"><input type="number" name="cellsMax" id="cellsMax" min="1"></span></label>
+      </div>
+      <label class="not-batch">Critic <span class="muted">(a vision model rates looks; recorded, not scored)</span>
+        <select name="critic" id="critic"></select>
+      </label>
+      <label class="check" title="Off by default. LM Studio models are only listed; with this on, a run asks LM Studio, which LOADS the model there."><input type="checkbox" id="lmsChat"> let LM Studio chat (loads the model there)</label>
+      <details class="legendBox">
+        <summary>Colours</summary>
+        <div id="key" class="key"></div>
+      </details>
     </details>
   </form>
 
   <!-- ---------------------------------------------------------------- stage -->
   <section class="stage">
+    <div id="progress" class="panel progress" hidden>
+      <div class="progressTop">
+        <b id="progressTitle"></b>
+        <span id="progressWhere" class="muted"></span>
+        <span class="grow"></span>
+        <span id="progressClock" class="mono muted"></span>
+      </div>
+      <div id="progressBar" class="steps"></div>
+      <div id="progressTally" class="muted small"></div>
+    </div>
+    <div id="conceptNote" class="muted small concept"></div>
     <div id="panes" class="panes"></div>
     <div class="panel actions">
       <div class="sel">
@@ -104,7 +126,7 @@
       <div class="btns">
         <button id="actSave" disabled title="Validate, then write data/ships/blueprints/dev/gen-&lt;role&gt;-&lt;n&gt;.json (flyable from the F9 panel after a game-server restart)">Save to library</button>
         <button id="actLab" disabled title="Saves it (if not yet saved), regenerates the Energy Lab's ship list and opens it there">Open in Energy Lab</button>
-        <button id="actStart" disabled title="The next run changes this design">Use as start point</button>
+        <button id="actStart" disabled title="The next one-ship or evolve run changes this design">Use as start point</button>
         <button id="actLapse" disabled title="Render the build-up part by part: core, frame, power, weapons, engines, armour">Timelapse</button>
       </div>
       <p id="actMsg" class="msg"></p>
@@ -119,15 +141,24 @@
   </section>
 </main>
 
-<footer class="panel galleryPanel">
-  <h2>Gallery <span class="muted small">best designs this session, valid first</span></h2>
-  <div id="gallery" class="gallery"><p class="muted small">Nothing yet.</p></div>
-</footer>
-
 <details id="shipsBox" class="panel galleryPanel" open>
-  <summary><b>Saved ships</b> <span class="muted small">every batch run's saved ships (out/runs), newest first</span> <span id="shipsCount" class="muted small"></span></summary>
-  <select id="shipsRole"><option value="">all roles</option></select>
+  <summary><b>Saved ships</b> <span class="muted small">every ship a batch kept, newest first; click to open, rate with the stars</span> <span id="shipsCount" class="muted small"></span></summary>
+  <div class="row gap">
+    <select id="shipsRole"><option value="">all roles</option></select>
+    <select id="shipsSort"><option value="new">newest first</option><option value="score">best score first</option><option value="rating">best rated first</option></select>
+  </div>
   <div id="ships" class="gallery wrap"><p class="muted small">Looking...</p></div>
+</details>
+
+<details class="panel galleryPanel" id="galleryBox">
+  <summary><b>This session</b> <span class="muted small">best designs from runs on this page, valid first</span></summary>
+  <div id="gallery" class="gallery"><p class="muted small">Nothing yet.</p></div>
+</details>
+
+<details id="watchBox" class="panel galleryPanel">
+  <summary><b>Other runs</b> <span class="muted small">from the command line, read-only</span> <span id="watchCount" class="muted small"></span></summary>
+  <label class="check follow" title="Watch the newest command-line run, and move to the next one when it ends"><input type="checkbox" id="followLatest"> follow the newest run</label>
+  <div id="watchList" class="watchList"><p class="muted small">Looking...</p></div>
 </details>
 
 <script type="module" src="app.js"></script>

@@ -6,6 +6,7 @@ import { tmpdir } from 'os';
 import { dirname, join } from 'path';
 import { blueprintToGrid, loadContext } from '../core/index';
 import { ship } from '../core/testShips';
+import { pruneFrame } from '../loop/staged';
 import { AbortedError, type Llm, type Renderer } from '../loop/index';
 import { fakeLlm, fakeModel } from '../loop/fakeLlm';
 import { type App, createApp } from './app';
@@ -15,6 +16,8 @@ import { buildUp } from './timelapse';
 const ctx = loadContext();
 const wren = ship('dev/review-wren');
 const GOOD = blueprintToGrid(ctx, wren).text;
+// (The Wren less its wing tips: a batch keeps only a ship that isn't a copy of the role's worked example)
+const TRIM = blueprintToGrid(ctx, pruneFrame(ctx, wren).bp).text;
 const PNG = Buffer.from('89504e470d0a1a0a', 'hex');
 
 const fakeRenderer = (): Renderer & { calls: number } => {
@@ -211,6 +214,46 @@ describe('shipgen page server', () => {
     expect((await post('/api/runs', { mode: 'design', model: 'fake', critic: 'ollama/other', role: 'starter' })).body.error).toMatch(/images/);
     expect((await post('/api/runs', { mode: 'compare', models: ['ollama/fake'], role: 'starter' })).status).toBe(400);
     expect((await post('/api/runs', { mode: 'design', model: 'fake', role: 'nope' })).status).toBe(400);
+  });
+
+  it('makes ships in a batch from the form: each ship in its own lane, batch events between, the ship in the saved list, a rating kept beside it', async () => {
+    currentLlm = fakeLlm([TRIM], [fakeModel('fake')]);
+    const r = await post('/api/runs', { mode: 'batch', model: 'ollama/fake', roles: ['starter'], maxShips: 1, generations: 0, rounds: 2, note: 'tidy' });
+    expect(r.status).toBe(200);
+    const ev = await stream(r.body.id).finally(() => { currentLlm = llm; });
+    const batch = ev.filter((e) => e.type === 'batch');
+    expect(batch.map((e) => e.phase)).toEqual(['design', 'saved', 'stopped']);
+    expect(batch[1]).toMatchObject({ attempt: 1, role: 'starter', saved: 1, attempts: 1, ship: { name: expect.any(String) } });
+    expect(batch[1].url).toMatch(/^\/out\/.+\/starter\/001-.+\/render\.png$/);
+    expect(batch[2].reason).toBe('1 ships');
+    const start = ev.find((e) => e.type === 'start');
+    expect(start).toMatchObject({ mode: 'design', role: 'starter', lane: '#1 starter' });
+    expect(ev.filter((e) => e.type === 'done').length).toBe(1);
+    expect((await get('/api/runs')).body.runs.find((x: any) => x.id === r.body.id)).toMatchObject({ mode: 'batch', status: 'done' });
+    // The saved list has it, under the page's own batch folder, and a rating is written beside it
+    const ships = (await get('/api/ships')).body.ships;
+    const mine = ships.find((s: any) => s.run.includes(`-${r.body.id}-page`));
+    expect(mine).toMatchObject({ role: 'starter', model: 'ollama/fake' });
+    expect((await post('/api/ships/rate', { dir: mine.dir, rating: 4 })).body).toEqual({ dir: mine.dir, rating: 4 });
+    expect((await get('/api/ships')).body.ships.find((s: any) => s.dir === mine.dir).rating).toBe(4);
+    expect((await post('/api/ships/rate', { dir: mine.dir, rating: 0 })).body).toEqual({ dir: mine.dir });
+    expect((await post('/api/ships/rate', { dir: '../../etc', rating: 3 })).status).toBe(400);
+    expect((await post('/api/runs', { mode: 'batch', model: 'ollama/fake', roles: [] })).status).toBe(400);
+  });
+
+  it('Stop ends a batch too', async () => {
+    currentLlm = hangingLlm();
+    try {
+      const r = await post('/api/runs', { mode: 'batch', model: 'ollama/slow', roles: ['starter'], concept: false });
+      expect(r.status).toBe(200);
+      const events = stream(r.body.id);
+      await new Promise((ok) => setTimeout(ok, 50));
+      expect((await post(`/api/runs/${r.body.id}/stop`, {})).body.stopping).toBe(true);
+      const ev = await events;
+      expect(ev.at(-1)).toMatchObject({ type: 'batch', phase: 'stopped', reason: 'interrupted' });
+      await waitIdle();
+      expect(app.runs.all.get(r.body.id)!.status).toBe('stopped');
+    } finally { currentLlm = llm; }
   });
 
   it('runs one at a time, and Stop ends a run', async () => {

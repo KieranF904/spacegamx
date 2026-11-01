@@ -16,6 +16,7 @@ import { type Attempt, type DesignOptions, type LoopDeps, passes } from './desig
 import type { DesignMetrics, EvolveMetrics, ShipgenEvent } from './events';
 import { run } from './run';
 import type { Renderer } from './render';
+import type { BatchEvent } from './events';
 
 /**
  * Which build works best per role (measured: TRIAL.md, and the staged runs since): the one-shot grid is fine for a ship of
@@ -71,6 +72,8 @@ export interface BatchDeps extends LoopDeps {
   /** A progress ping (default: scripts/notify.mjs); failures are ignored */
   notify?: (title: string, message: string) => Promise<void>;
   log?: (line: string) => void;
+  /** Every event of every ship as it comes (lane "#3 gunship", "#3 gunship refine"), and the batch's own (type 'batch'): the page's live view */
+  tap?: (e: ShipgenEvent) => void;
 }
 
 export interface RoleStats { attempts: number; saved: number }
@@ -221,8 +224,11 @@ interface Capture {
   tokensOut: number;
 }
 
-/** `events`: a file every event but the tokens is appended to as it comes (what the page's Watch follows) */
-const capture = (events?: string): { cap: Capture; emit: (e: ShipgenEvent) => void } => {
+/**
+ * `events`: a file every event but the tokens is appended to as it comes (what the page's Watch follows); `tap`: a listener
+ * for every event, each given `lane` (the page's live view)
+ */
+const capture = (events?: string, tap?: (e: ShipgenEvent) => void, lane?: string): { cap: Capture; emit: (e: ShipgenEvent) => void } => {
   const cap: Capture = { modelErrors: 0, errors: [], trace: [], tokensIn: 0, tokensOut: 0 };
   const cut = (t: string, n: number) => (t.length > n ? `${t.slice(0, n / 2)}\n...\n${t.slice(-n / 2)}` : t);
   if (events) try { mkdirSync(dirname(events), { recursive: true }); } catch { events = undefined; }
@@ -230,6 +236,7 @@ const capture = (events?: string): { cap: Capture; emit: (e: ShipgenEvent) => vo
     cap,
     // (Only what the batch needs: tokens, previews and the rest are dropped as they come, so memory stays flat)
     emit: (e) => {
+      if (tap) tap(lane ? { ...e, lane: e.lane ? `${lane} ${e.lane}` : lane } : e);
       if (events && e.type !== 'token') try { appendFileSync(events, JSON.stringify(e) + '\n'); } catch { /* (the live record is a view only) */ }
       if (e.type === 'step') cap.trace.push({ type: e.type, step: e.step, status: e.status, round: e.round, note: e.note });
       else if (e.type === 'reply') { cap.trace.push({ type: e.type, round: e.round, ms: e.ms, tokens: e.outputTokens, promptTokens: e.promptTokens, stop: e.stopReason, text: cut(e.text, 4000) }); cap.tokensIn += e.promptTokens ?? 0; cap.tokensOut += e.outputTokens ?? 0; }
@@ -315,6 +322,8 @@ export async function runBatch(deps: BatchDeps, o: BatchOptions): Promise<BatchS
 
   let turn = 0, errorRun = 0, lastPing = now();
   const perRoleN: Record<string, number> = {};
+  // (Where the batch is, for a live view)
+  const tell = (e: Omit<BatchEvent, 't' | 'type' | 'saved' | 'attempts' | 'perRole'> & Partial<Pick<BatchEvent, 'saved' | 'perRole'>>) => deps.tap?.({ type: 'batch', t: now() - startedAt, saved: sum.saved, attempts: sum.attempts, perRole: sum.perRole, ...e });
   try {
     if (renderer === undefined) await startRenderer();
     log(`[batch] ${o.model}: roles ${roles.join(', ')} -> ${o.outDir}${o.stopFile ? ` (stop file ${o.stopFile})` : ''}`);
@@ -325,6 +334,7 @@ export async function runBatch(deps: BatchDeps, o: BatchOptions): Promise<BatchS
       sum.attempts++; sum.perRole[role].attempts++;
       const t0 = now();
       try {
+        tell({ phase: 'design', attempt: sum.attempts, role });
         const res = await oneShip(role, sum.attempts, n);
         attemptMs += now() - t0;
         if (res === 'saved') { sum.saved++; sum.perRole[role].saved++; shipMs += now() - t0; errorRun = 0; } else { sum.rejected++; errorRun = 0; }
@@ -334,12 +344,14 @@ export async function runBatch(deps: BatchDeps, o: BatchOptions): Promise<BatchS
         const msg = (e as Error).message ?? String(e);
         sum.lastError = `${role}: ${msg}`;
         log(`[batch] ${role}: error: ${msg}`);
+        tell({ phase: 'error', attempt: sum.attempts, role, message: msg });
         logAttempt({ n: sum.attempts, role, outcome: 'error', error: msg });
         if (isDiskFull(e)) { stopReason = 'disk full'; master.abort(); } else if (!stopped()) {
           errorRun++;
           const base = o.backoff?.baseMs ?? 5000, cap = o.backoff?.capMs ?? 300000;
           const wait = Math.min(cap, base * 2 ** Math.min(20, errorRun - 1));
           log(`[batch] waiting ${Math.round(wait / 1000)} s${e instanceof ModelDownError ? ' (model server not answering)' : ''} before the next try`);
+          tell({ phase: 'waiting', attempt: sum.attempts, role, waitS: Math.round(wait / 1000), message: e instanceof ModelDownError ? 'the model server is not answering' : msg });
           writeSummary();
           await sleep(wait, master.signal);
         }
@@ -357,6 +369,7 @@ export async function runBatch(deps: BatchDeps, o: BatchOptions): Promise<BatchS
     writeSummary();
     if (o.notifyEveryMins !== undefined) await ping(`Ship batch stopped (${sum.stopReason})`);
     log(`[batch] stopped (${sum.stopReason}): ${sum.saved} saved in ${sum.attempts} attempts`);
+    tell({ phase: 'stopped', attempt: sum.attempts, role: '', reason: sum.stopReason });
   }
   return sum;
 
@@ -376,7 +389,7 @@ export async function runBatch(deps: BatchDeps, o: BatchOptions): Promise<BatchS
       // ---- Design: concept step, then the build
       const attempts = join(o.outDir, 'attempts');
       const adir = join(attempts, `${pad(nextNumber(attempts))}-${role}`);
-      const d = capture(join(adir, 'events.jsonl'));
+      const d = capture(join(adir, 'events.jsonl'), deps.tap, `#${no} ${role}`);
       // (Every try's ship is drawn as it comes, under the attempt's folder, for the page's live view; the renderer is the batch's own)
       const dr = await run({ ...deps, renderer }, {
         mode: 'design', ...common, outDir: adir, build, rounds: o.rounds ?? 5, concept: o.concept !== false, conceptSeed: no, usedConcepts: used, shapeIndex: perRole - 1,
@@ -394,6 +407,7 @@ export async function runBatch(deps: BatchDeps, o: BatchOptions): Promise<BatchS
       if (!ok || !draft?.bp) {
         const why = draft ? [...(draft.brief?.unmet ?? []), ...(draft.valid ? [] : [`invalid (${draft.result?.errors[0]?.message ?? '?'})`])].slice(0, 4) : ['nothing readable'];
         log(`[batch] ${role}: rejected (${why.join('; ')})`);
+        tell({ phase: 'rejected', attempt: no, role, why, minutes: r1((now() - t0) / 60000) });
         logAttempt({ n: no, role, build, outcome: 'rejected', why, valid: !!draft?.valid, score: draft?.score ?? 0, minutes: r1((now() - t0) / 60000), concept: concept && conceptLine(concept), tokensIn: d.cap.tokensIn, tokensOut: d.cap.tokensOut });
         return 'rejected';
       }
@@ -402,7 +416,8 @@ export async function runBatch(deps: BatchDeps, o: BatchOptions): Promise<BatchS
       let gens = 0, draftScore = draft.score, children = 0;
       const G = o.generations ?? 4;
       if (G > 0 && !signal.aborted) {
-        const e = capture(join(adir, 'refine', 'events.jsonl'));
+        tell({ phase: 'refine', attempt: no, role });
+        const e = capture(join(adir, 'refine', 'events.jsonl'), deps.tap, `#${no} ${role} refine`);
         try {
           const er = await run({ ...deps, renderer }, {
             mode: 'evolve', ...common, outDir: join(adir, 'refine'), build: 'oneshot', seed: draft.bp, generations: G, population: o.population ?? 3, keep: o.keep ?? 2, patience: o.patience ?? 2,
@@ -426,6 +441,8 @@ export async function runBatch(deps: BatchDeps, o: BatchOptions): Promise<BatchS
       const minutes = r1((now() - t0) / 60000);
       const rec = await save(role, no, best, draft, { concept, build, minutes, gens, children, draftScore, rounds: metrics?.rounds ?? out.attempts.length, designMetrics: metrics, cappedByTime: cap.signal.aborted });
       log(`[batch] ${role}: saved ${rec.dir} "${rec.name}" score ${rec.score}${rec.generations ? ` (draft ${rec.draftScore})` : ''}, ${minutes} min`);
+      // (Counted as saved before the loop adds it up)
+      tell({ phase: 'saved', attempt: no, role, minutes, saved: sum.saved + 1, perRole: { ...sum.perRole, [role]: { ...sum.perRole[role], saved: sum.perRole[role].saved + 1 } }, ship: { dir: rec.dir, name: rec.name, score: rec.score, ...(rec.png ? { renderPath: join(o.outDir, ...rec.dir.split('/'), 'render.png') } : {}) } });
       logAttempt({ n: no, role, build, outcome: 'saved', dir: rec.dir, score: rec.score, draftScore: rec.draftScore, minutes, concept: rec.concept, tokensIn: d.cap.tokensIn, tokensOut: d.cap.tokensOut });
       sum.lastSaved = rec.dir;
       return 'saved';
