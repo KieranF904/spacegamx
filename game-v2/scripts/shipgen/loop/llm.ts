@@ -296,6 +296,8 @@ export function createLlm(opts: LlmOptions = {}): Llm {
           })),
           ...(req.temperature !== undefined ? { temperature: req.temperature } : {}), ...(req.maxTokens ? { max_tokens: req.maxTokens } : {}), ...(req.seed !== undefined ? { seed: req.seed } : {}),
           ...(structured ? { response_format: { type: 'json_schema', json_schema: { name: 'reply', strict: true, schema: req.schema } } } : {}),
+          // (A reasoning model (gpt-oss, which LM Studio doesn't flag as one) otherwise reasons until the context is full)
+          ...(!req.think && (mi?.thinking || /gpt-oss/i.test(name)) ? { reasoning_effort: 'low' } : {}),
           stream_options: { include_usage: true },
         };
         if (!token()) throw new Error('LM Studio: no LM_API_TOKEN (environment or game-v2/.env)');
