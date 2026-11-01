@@ -215,3 +215,14 @@ stays optional at weight 0, and pairwise judging is an experiment script only.
   step require the earlier steps to have landed; give the skeleton a nose and drop the cross beam once wings exist.
 - **One-shot** is still poor for anything but a starter, and the starter still copies the worked example in some
   trials even when asked for another shape.
+
+## Trial 3: Claude Haiku 5.5 (2026-11-01, via the Anthropic API; `--model anthropic/claude-haiku-5-5`)
+
+The key is `ANTHROPIC_API_KEY` in game-v2/.env. Claude models take no temperature setting and no JSON schema (plain text replies). Gunship role, mirror on, 1 attempt each:
+
+| Build | Rounds | Valid | Output tokens | Time | Score | Brief |
+|---|---|---|---|---|---|---|
+| Staged (parts) | 4 (one per step, no retries) | yes, from step 1 | 4,030 | 22 s | 86.8 | one cell short of the size range (34 of 35-90) |
+| One-shot (grid-text) | 3 (round 1 had no readable grid) | yes, round 3 | 9,669 | 47 s | 96.8 | met |
+
+The local models made no valid gunship in any trial. Haiku's staged ship is a symmetric cross with four Pips, two Rattlers on the flanks and four Ion Drives; its one-shot ship is a blocky "M" with four Pips and four engines. Renders: out/haiku/gunship-staged/renders/r4.png, out/haiku/gunship-oneshot/renders/r3.png.

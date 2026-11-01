@@ -2,9 +2,12 @@
 // (a JSON schema) where the model can take one, images for vision models, timeouts and cancellation.
 // Model ids: "ollama/<name>" or "lmstudio/<name>"; a bare name is Ollama's. Cloud models (Ollama names ending
 // ":cloud"/"-cloud", or with a remote host) are listed and labelled, never picked by default.
-import { lmStudioToken } from './secrets';
+import { anthropicKey, lmStudioToken } from './secrets';
 
-export type Provider = 'ollama' | 'lmstudio';
+export type Provider = 'ollama' | 'lmstudio' | 'anthropic';
+
+/** Claude models offered through the Anthropic API ("anthropic/claude-haiku-5-5"). Cloud: never picked by default. */
+export const ANTHROPIC_MODELS = ['claude-haiku-5-5'];
 
 export interface ModelInfo {
   /** "ollama/gemma4:12b", "lmstudio/qwen3-8b" */
@@ -76,6 +79,9 @@ export interface LlmOptions {
   fetch?: typeof fetch;
   /** Overrides the LM Studio token lookup (tests) */
   token?: () => string | undefined;
+  /** Overrides the Anthropic key lookup (tests) */
+  anthropicKey?: () => string | undefined;
+  anthropicUrl?: string;
   /**
    * May chat requests go to LM Studio? Asking an LM Studio model loads it there, so by default its models are only
    * listed: on only with LMSTUDIO_CHAT=1 or when this says so (the page's toggle).
@@ -96,7 +102,7 @@ export class TimeoutError extends Error {
 }
 
 export function splitId(id: string): { provider: Provider; name: string } {
-  const m = /^(ollama|lmstudio)\/(.+)$/.exec(id);
+  const m = /^(ollama|lmstudio|anthropic)\/(.+)$/.exec(id);
   return m ? { provider: m[1] as Provider, name: m[2] } : { provider: 'ollama', name: id };
 }
 
@@ -113,6 +119,8 @@ export function createLlm(opts: LlmOptions = {}): Llm {
   const f = opts.fetch ?? fetch;
   const token = opts.token ?? (() => lmStudioToken());
   const lmsChat = opts.lmStudioChat ?? lmStudioChatFromEnv;
+  const akey = opts.anthropicKey ?? (() => anthropicKey());
+  const anthropic = (opts.anthropicUrl ?? 'https://api.anthropic.com').replace(/\/$/, '');
   const auth = (): Record<string, string> => { const t = token(); return t ? { Authorization: `Bearer ${t}` } : {}; };
   let cache: Promise<ModelInfo[]> | null = null;
 
@@ -160,10 +168,17 @@ export function createLlm(opts: LlmOptions = {}): Llm {
     }));
   }
 
+  // (No network call to list: a fixed set, shown only when a key is set. It never takes a JSON schema: replies are plain text)
+  function listAnthropic(): ModelInfo[] {
+    if (!akey()) return [];
+    return ANTHROPIC_MODELS.map((m) => ({ id: `anthropic/${m}`, provider: 'anthropic' as const, name: m, cloud: true, vision: true, chat: true, thinking: false, structured: false }));
+  }
+
   async function list(): Promise<ModelInfo[]> {
     const [a, b] = await Promise.allSettled([listOllama(), listLmStudio()]);
-    if (a.status === 'rejected' && b.status === 'rejected') throw new Error(`no model server: ${a.reason?.message ?? a.reason}; ${b.reason?.message ?? b.reason}`);
-    return [...(a.status === 'fulfilled' ? a.value : []), ...(b.status === 'fulfilled' ? b.value : [])];
+    const c = listAnthropic();
+    if (a.status === 'rejected' && b.status === 'rejected' && !c.length) throw new Error(`no model server: ${a.reason?.message ?? a.reason}; ${b.reason?.message ?? b.reason}`);
+    return [...(a.status === 'fulfilled' ? a.value : []), ...(b.status === 'fulfilled' ? b.value : []), ...c];
   }
 
   async function info(id: string): Promise<ModelInfo | undefined> {
@@ -209,6 +224,35 @@ export function createLlm(opts: LlmOptions = {}): Llm {
             if (j.eval_count && j.eval_duration) out.tokensPerSec = Math.round((j.eval_count / (j.eval_duration / 1e9)) * 10) / 10;
           }
         }
+      } else if (provider === 'anthropic') {
+        const key = akey();
+        if (!key) throw new Error('Anthropic: no ANTHROPIC_API_KEY (environment or game-v2/.env)');
+        const system = req.messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n\n');
+        const body: Record<string, unknown> = {
+          model: name, stream: true, max_tokens: req.maxTokens ?? 4096,
+          ...(system ? { system } : {}),
+          // (No temperature: the current Claude models refuse the setting)
+          messages: req.messages.filter((m) => m.role !== 'system').map((m) => ({
+            role: m.role,
+            content: m.images?.length
+              ? [...m.images.map((b) => ({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: b } })), { type: 'text', text: m.content }]
+              : m.content,
+          })),
+        };
+        const r = await f(`${anthropic}/v1/messages`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' }, body: JSON.stringify(body), signal,
+        });
+        if (!r.ok || !r.body) throw new Error(`anthropic ${name}: HTTP ${r.status} ${(await r.text().catch(() => '')).slice(0, 300)}`);
+        for await (const line of lines(r.body)) {
+          const m = /^data:\s?(.*)$/.exec(line);
+          if (!m) continue;
+          const j = JSON.parse(m[1]);
+          if (j.type === 'error') throw new Error(`anthropic ${name}: ${j.error?.message ?? 'error'}`);
+          if (j.type === 'message_start') out.promptTokens = j.message?.usage?.input_tokens;
+          else if (j.type === 'content_block_delta') { emit(j.delta?.text, 'content'); emit(j.delta?.thinking, 'thinking'); }
+          else if (j.type === 'message_delta' && j.usage?.output_tokens !== undefined) out.outputTokens = j.usage.output_tokens;
+        }
+        if (out.outputTokens) out.tokensPerSec = Math.round((out.outputTokens / ((Date.now() - t0) / 1000)) * 10) / 10;
       } else {
         const body: Record<string, unknown> = {
           model: name, stream: true,

@@ -20,7 +20,7 @@ export const MODEL_PREFS: ModelPref[] = [
 ];
 
 export function prefFor(model: string): ModelPref | undefined {
-  const name = model.replace(/^(ollama|lmstudio)\//, '');
+  const name = model.replace(/^(ollama|lmstudio|anthropic)\//, '');
   return MODEL_PREFS.find((p) => p.match.test(name));
 }
 
