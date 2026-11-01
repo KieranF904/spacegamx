@@ -202,16 +202,18 @@ const LEGENDARY = [
   ['legendary_singularity', 'Singularity Launcher', 'singularity', 'sq', 30],
 ];
 
-// Engines: [id, name, family, piece, level, thrust, draw, rated, boost, boostDrain, material, description]
+// Engines: [id, name, family, piece, level, thrust, draw, rated, boost, boostDrain, intake, buffer, material, description]
+// (intake, buffer: energy routing, docs/design/energy-routing-impl.md §5.3: E a second each cell refills its own buffer at,
+// and the E each cell holds. Burn stays `draw`, and boosting burns draw x (1 + boostDraw x boostDrain))
 // (The spec's table, but the Ion Drive pushes 2.26, as the thruster it replaces did: the starter flies as it always has)
 const E = [
-  ['engine_ion_drive', 'Ion Drive', 'ion', 'sq', 0, 2.26, 9, 34, 2.0, 1.0, 'alloy', 'Efficient and steady, with a low top speed.'],
-  ['engine_vernier', 'Vernier', 'ion', 'tri', 2, 1.2, 4, 40, 1, 0, 'alloy', 'A cheap little thruster for corner push. It has no boost: boosting gives it no extra thrust and no extra drain.'],
-  ['engine_afterburner', 'Afterburner', 'afterburner', 'sq', 5, 1.6, 8, 50, 3.6, 3.0, 'alloy', 'Weak at cruise, a huge burst when boosting. Best with a Drive Cell touching it.'],
-  ['engine_torch', 'Torch', 'afterburner', 'rect2', 8, 4.0, 34, 70, 1, 0, 'alloy', 'Brutal thrust at full power all the time, and a brutal drain. It has no boost: nothing is held back to give.'],
-  ['engine_plasma_drive', 'Plasma Drive', 'plasma', 'rect2', 16, 3.1, 20, 55, 1.8, 0.8, 'steel', 'The balanced main engine.'],
-  ['engine_drift_sail', 'Drift Sail', 'ion', 'round', 22, 0.9, 3, 26, 1.3, 0.5, 'titanium', 'Near-free cruising, never in a hurry.'],
-  ['engine_fusion_torch', 'Fusion Torch', 'plasma', 'block2', 30, 3.6, 28, 85, 1.7, 1.0, 'cobalt', 'The long-haul racer: fast, and faster still.'],
+  ['engine_ion_drive', 'Ion Drive', 'ion', 'sq', 0, 2.26, 9, 34, 2.0, 1.0, 12, 30, 'alloy', 'Efficient and steady, with a low top speed.'],
+  ['engine_vernier', 'Vernier', 'ion', 'tri', 2, 1.2, 4, 40, 1, 0, 4, 8, 'alloy', 'A cheap little thruster for corner push. It has no boost: boosting gives it no extra thrust and no extra drain.'],
+  ['engine_afterburner', 'Afterburner', 'afterburner', 'sq', 5, 1.6, 8, 50, 3.6, 3.0, 10, 60, 'alloy', 'Weak at cruise, a huge burst when boosting. Best with a Drive Cell touching it.'],
+  ['engine_torch', 'Torch', 'afterburner', 'rect2', 8, 4.0, 34, 70, 1, 0, 30, 40, 'alloy', 'Brutal thrust at full power all the time, and a brutal drain. It has no boost: nothing is held back to give.'],
+  ['engine_plasma_drive', 'Plasma Drive', 'plasma', 'rect2', 16, 3.1, 20, 55, 1.8, 0.8, 25, 60, 'steel', 'The balanced main engine.'],
+  ['engine_drift_sail', 'Drift Sail', 'ion', 'round', 22, 0.9, 3, 26, 1.3, 0.5, 3, 6, 'titanium', 'Near-free cruising, never in a hurry.'],
+  ['engine_fusion_torch', 'Fusion Torch', 'plasma', 'block2', 30, 3.6, 28, 85, 1.7, 1.0, 32.5, 100, 'cobalt', 'The long-haul racer: fast, and faster still.'],
 ];
 
 const BLAST = TUNING.partBlast;
@@ -260,27 +262,29 @@ for (const [id, name, family, piece, level] of LEGENDARY) {
     weaponMods: {}, rarity: 'legendary', category: 'weapons', fabOrder: next('weapons'), ...legacyLook(family),
   });
 }
-for (const [id, name, family, piece, level, thrust, draw, rated, boost, boostDrain, material, description] of E) {
+for (const [id, name, family, piece, level, thrust, draw, rated, boost, boostDrain, intake, buffer, material, description] of E) {
   const lf = FNS.get(KIND_BASE[family]);
   const blast = BLAST[KIND_BASE[family]];
   models.push({
     ...base(id, name, family, [piece], level, material, {}),
-    hpScale: lf.hpScale, demand: draw, priority: 1, thrust, rated, boost, boostDrain, ...(blast ? { blast } : {}),
+    hpScale: lf.hpScale, demand: draw, priority: 1, thrust, rated, boost, boostDrain, intake, buffer, ...(blast ? { blast } : {}),
     rarity: level >= 20 ? 'rare' : level >= 5 ? 'uncommon' : 'common', description, category: 'engines', fabOrder: next('engines'),
     ...legacyLook(KIND_BASE[family]), guide: { name, blurb: description.replace(/\.$/, ''), ...(piece !== 'sq' ? { piece } : {}), order: guideOrder++ },
   });
 }
 
 // Power, utility, shields and plating: [id, name, family, piece(s), level, material, fields, description, category]
+// (A store's `intake`: energy routing's Takes, the most E a second each cell accepts (docs/design/energy-routing-impl.md §5.2);
+// `store` and `discharge` are its Holds and Gives. The new store and discharge numbers there land with the switch-over, P2)
 const OTHER = [
   ['power_cell_reactor', 'Cell Reactor', 'reactor', ['sq'], 0, 'alloy', { produce: 35, hpScale: 0.8, blast: BLAST.generator }, 'The starter generator. It explodes when destroyed.', 'power'],
   ['power_isotope_pile', 'Isotope Pile', 'reactor', ['round'], 9, 'steel', { produce: 18, hpScale: 1.6 }, 'A weak generator, but tough, and it never explodes.', 'power'],
   ['power_fusion_plant', 'Fusion Plant', 'reactor', ['block2'], 18, 'steel', { produce: 48, hpScale: 0.9, massScale: 2, blast: { radius: 3, damage: 70, delayTicks: [4, 16] } }, 'A heavy plant with plenty of power, and a big blast.', 'power'],
   ['power_overclock_reactor', 'Overclock Reactor', 'reactor', ['rect2'], 24, 'titanium', { produce: 62, hpScale: 0.4, blast: { radius: 3.6, damage: 95, delayTicks: [3, 12] } }, 'The most power for its size: fragile, and the biggest blast.', 'power'],
-  ['power_battery', 'Battery', 'battery', ['sq'], 0, 'alloy', { store: 200, discharge: 600, hpScale: 0.6 }, 'Adds to the ship\'s pool on a powered network: holds 200 and gives it quickly.', 'power'],
-  ['power_capacitor', 'Capacitor', 'capacitor', ['sq'], 7, 'composite', { store: 160, pool: 'weapon', bank: true, discharge: 2000, hpScale: 0.6 }, 'Touching Capacitors form a bank that feeds the guns, beams, miners and Flash Screen it touches before the ship does; it does not feed engines.', 'power'],
-  ['power_drive_cell', 'Drive Cell', 'drive_cell', ['sq'], 10, 'steel', { store: 320, pool: 'drive', bank: true, discharge: 1400, hpScale: 0.6 }, 'Touching Drive Cells form a bank that feeds the engines and Burst Strafers it touches before the ship does; it does not feed guns.', 'power'],
-  ['power_heavy_bank', 'Heavy Bank', 'battery', ['block2'], 20, 'titanium', { store: 300, discharge: 150, hpScale: 0.7, massScale: 1.6 }, 'A deep, heavy battery for the ship\'s pool: holds a lot, but gives it slowly.', 'power'],
+  ['power_battery', 'Battery', 'battery', ['sq'], 0, 'alloy', { store: 200, discharge: 600, intake: 50, hpScale: 0.6 }, 'Adds to the ship\'s pool on a powered network: holds 200 and gives it quickly.', 'power'],
+  ['power_capacitor', 'Capacitor', 'capacitor', ['sq'], 7, 'composite', { store: 160, pool: 'weapon', bank: true, discharge: 2000, intake: 40, hpScale: 0.6 }, 'Touching Capacitors form a bank that feeds the guns, beams, miners and Flash Screen it touches before the ship does; it does not feed engines.', 'power'],
+  ['power_drive_cell', 'Drive Cell', 'drive_cell', ['sq'], 10, 'steel', { store: 320, pool: 'drive', bank: true, discharge: 1400, intake: 80, hpScale: 0.6 }, 'Touching Drive Cells form a bank that feeds the engines and Burst Strafers it touches before the ship does; it does not feed guns.', 'power'],
+  ['power_heavy_bank', 'Heavy Bank', 'battery', ['block2'], 20, 'titanium', { store: 300, discharge: 150, intake: 150, hpScale: 0.7, massScale: 1.6 }, 'A deep, heavy battery for the ship\'s pool: holds a lot, but gives it slowly.', 'power'],
   ['utility_mining_laser', 'Mining Laser', 'mining', ['sq'], 0, 'alloy', { demand: 12, priority: 2, facing: true, mining: true, hpScale: 0.7 }, 'A pulsed cutter that takes ore from rock, and a poor weapon.', 'utility'],
   ['utility_bore', 'Bore', 'mining', ['rect2'], 10, 'steel', { demand: 9, priority: 2, facing: true, mining: true, hpScale: 0.8 }, 'A heavy cutter that breaks harder rock than a mining laser.', 'utility'],
   ['utility_demolition_launcher', 'Demolition Launcher', 'demolition', ['sq'], 8, 'alloy', { weapon: 'charge', demand: 8, priority: 2, fireInterval: 120, hpScale: 0.8, weaponMods: {} }, 'Fires mining charges (30 a crate, one every 2 seconds) that stick to rock, blink for a second, then blow it open. Harmless to ships.', 'utility'],
@@ -394,7 +398,7 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
   };
   const TUG = [
     ['engine_burst_strafer', 'Burst Strafer', 'strafer', ['sq'], 10, 'steel',
-      { strafe: { kick: 14, ticks: 12, cooldown: 24 }, demand: 700, priority: 1, facing: true, hpScale: 0.6 },
+      { strafe: { kick: 14, ticks: 12, cooldown: 24 }, demand: 700, intake: 40, buffer: 140, priority: 1, facing: true, hpScale: 0.6 },
       'A dodge thruster: a hard fifth-of-a-second burst away from its nozzle, ready again in under half a second, and a lot of energy every time. Fit them facing different ways to dodge any way. It draws from a Drive Cell bank touching it first. No push at all for cruising.', 'engines'],
     ['utility_tow_beam', 'Tow Beam', 'tow', ['rect2'], 12, 'steel',
       { tow: true, demand: 12, priority: 2, facing: true, hpScale: 0.9, massScale: 1.2 },
@@ -494,6 +498,50 @@ for (const [id, name, family, pieces, level, material, fields, description, cate
     legendary_phase: 'The ghost round: a slow 70-damage round every 2.2 s that flies through rock, wrecks and shields, hits the hull directly, and carries on through two ships.',
     legendary_singularity: 'The black hole: 210 power a shot, one every 7 s. A slow orb flies to your cursor and stops there, pulls every ship within 900 toward it for 3.8 s, then collapses in a 300 blast for 140.',
   };
+  // ---- Energy routing (docs/design/energy-routing-impl.md §1.4, §5.1, owner decision D3): each weapon's own buffer, filled at
+  // `intake` E a second. Its `shot` (E) is derived so that at full supply the beat and damage are today's: a cycle, ammo or
+  // auto gun's intake over its interval; a spin gun's over its fastest beat; a clip refills whole in today's `reload` (the
+  // Hive in its eight regrows); a charge gun's over charge + cooldown. `buffer` is in shots (a clip's: its clip). A beam
+  // burns `burn` E a second from a buffer of `bufferE`, refilled at `intake`, and relights at tuning energy.relight of it.
+  // Read by the power core from P1; `demand` stays what the pool reads until the switch-over.
+  const ENERGY = {
+    cannon_pip: { intake: 20 }, autocannon_rattler: { intake: 28 }, flak_burst: { intake: 10 }, cannon_hammer: { intake: 30 },
+    mortar_lobber: { intake: 6 }, laser_glint: { intake: 35 }, pulse_strobe: { intake: 50 }, legendary_prism: { intake: 60 },
+    point_defence_turret: { intake: 25 }, missile_dart: { intake: 8 }, cannon_twinlink: { intake: 55 }, legendary_hive: { intake: 60 },
+    legendary_frostbite: { beam: { burn: 90, intake: 90, bufferE: 270 } }, railgun_needle: { intake: 30 },
+    autocannon_chainsaw: { intake: 80, buffer: 10 }, emp_hush: { intake: 40 }, flak_cloudmaker: { intake: 35 }, arc_spark: { intake: 70 },
+    laser_cutter: { beam: { burn: 90, intake: 40, bufferE: 180 } }, torpedo_eel: { intake: 10 }, cannon_longbarrel: { intake: 110 },
+    missile_swarm: { intake: 12 }, railgun_coilgun: { intake: 70 }, legendary_cinder_bloom: { intake: 130 }, autocannon_stinger: { intake: 120 },
+    mortar_quake: { intake: 12 }, pulse_overpulse: { intake: 130 }, laser_searchlight: { beam: { burn: 140, intake: 140, bufferE: 280 } },
+    legendary_phase: { intake: 140 }, railgun_spear: { intake: 90, buffer: 2 }, arc_tesla: { beam: { burn: 170, intake: 170, bufferE: 300 } },
+    railgun_rail_driver: { intake: 80 }, cannon_bastion: { intake: 220 }, legendary_singularity: { intake: 240 },
+    lance_lance: { beam: { burn: 300, intake: 300, bufferE: 600 } }, missile_hammerhead: { intake: 12 }, emp_blackout: { intake: 120 },
+    torpedo_leviathan: { intake: 15 },
+  };
+  // (The utility guns keep today's draw: the Repair Beam burns and refills at its demand x area with 2 s of it held; the Demolition Launcher takes its demand x area)
+  for (const id of ['utility_repair_beam', 'utility_demolition_launcher']) {
+    const m = models.find((x) => x.id === id);
+    const e = m.demand * PIECE_AREA[m.pieces[0]];
+    ENERGY[id] = m.fire.model === 'beam' ? { beam: { burn: e, intake: e, bufferE: 2 * e } } : { intake: e };
+  }
+  const r5 = (v) => Math.round(v * 1e5) / 1e5;
+  for (const m of models) {
+    if (!m.weapon) continue;
+    const e = ENERGY[m.id], f = m.fire;
+    if (!e) throw new Error(`no energy for weapon ${m.id}`);
+    if (f.model === 'beam') {
+      if (!e.beam) throw new Error(`${m.id}: a beam's energy is { beam: { burn, intake, bufferE } }`);
+      Object.assign(f, e.beam);
+      continue;
+    }
+    if (e.beam) throw new Error(`${m.id}: only a beam burns`);
+    const ticks = f.model === 'clip' ? (f.regrow ? f.regrow * f.clip : f.reload) / f.clip
+      : f.model === 'charge' ? f.charge + f.cooldown
+      : f.spin ? f.spin.to : f.interval;
+    if (!(ticks > 0)) throw new Error(`${m.id}: no beat to derive its shot from`);
+    Object.assign(f, { shot: r5((e.intake * ticks) / 60), intake: e.intake, buffer: f.model === 'clip' ? f.clip : e.buffer ?? 1 });
+  }
+  for (const id of Object.keys(ENERGY)) if (!models.some((m) => m.id === id && m.weapon)) throw new Error(`energy for ${id}, which isn't a weapon model`);
   for (const [id, text] of Object.entries(LEGEND_TEXT)) {
     const m = models.find((x) => x.id === id);
     if (!m) throw new Error(`text for ${id}, which isn't a model`);

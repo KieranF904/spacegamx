@@ -33,6 +33,8 @@ export * from './describe.js';
 export * from './guns.js';
 export * from './energy.js';
 export * from './circuits.js';
+// The energy core (energy routing, P1: nothing in the game runs it yet)
+export * from './power/index.js';
 export * from './features/support/support.js';
 export * from './pulse.js';
 export * from './hazards.js';

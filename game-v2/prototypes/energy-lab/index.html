@@ -1,0 +1,980 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Energy Lab</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap">
+<style>
+/* Layout: header controls; parts bin | ship grid | what's happening. One dark console look. */
+:root {
+  --bg: #0e1317; --panel: #151c22; --raise: #1d262e; --line: #2a3742; --ink: #dde5ea; --mute: #8b9ba7; --faint: #5d6c77;
+  --accent: #f5a83a; --full: #5fd18a; --part: #f2c14e; --starve: #ef6a5a; --idle: #6b7680;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 13px/1.45 var(--sans); padding: 10px 16px 24px; }
+h1 { font: 600 17px var(--sans); margin: 0 12px 0 0; }
+h2 { font: 600 11px var(--sans); text-transform: uppercase; letter-spacing: .08em; color: var(--mute); margin: 0 0 8px; }
+.bar-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-bottom: 10px; }
+.sep { width: 1px; height: 22px; background: var(--line); margin: 0 4px; }
+button.b, select { background: var(--raise); color: var(--ink); border: 1px solid var(--line); border-radius: 5px; padding: 5px 10px; font: 13px var(--sans); cursor: pointer; }
+button.b:hover { border-color: var(--mute); }
+button.b.on { background: #3b2b10; border-color: var(--accent); color: #ffd99c; }
+button.b kbd { font: 11px var(--mono); color: var(--faint); margin-left: 4px; }
+button.b.on kbd { color: #c9a26a; }
+button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.wrap { display: grid; grid-template-columns: 210px minmax(0, 1fr) 400px; gap: 12px; align-items: start; }
+@media (max-width: 1250px) { .wrap { grid-template-columns: 190px minmax(0, 1fr); } .side { grid-column: 1 / -1; } }
+@media (max-width: 760px) { .wrap { grid-template-columns: 1fr; } }
+.pane { background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 10px 12px; }
+.left { max-height: calc(100vh - 80px); overflow: auto; position: sticky; top: 10px; }
+.cat summary { cursor: pointer; font: 600 11px var(--sans); text-transform: uppercase; letter-spacing: .08em; color: var(--mute); padding: 4px 0; }
+.pal { display: grid; gap: 2px; margin: 2px 0 8px; }
+.pal button { display: grid; grid-template-columns: 14px 1fr auto; gap: 7px; align-items: center; text-align: left; background: transparent; color: var(--ink);
+  border: 1px solid transparent; border-radius: 4px; padding: 3px 5px; font: 12.5px var(--sans); cursor: pointer; }
+.pal button:hover { background: var(--raise); }
+.pal button.on { border-color: var(--accent); background: #2a2214; }
+.pal .sw { width: 12px; height: 12px; border-radius: 3px; }
+.pal .meta { font: 11px var(--mono); color: var(--faint); }
+.mode { font-size: 12px; color: var(--mute); margin-bottom: 8px; }
+.canvas-wrap { overflow: auto; max-height: calc(100vh - 150px); border-radius: 5px; background: #0a0e11; }
+canvas { display: block; touch-action: none; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; font-size: 12px; color: var(--mute); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { display: inline-block; width: 14px; height: 10px; border-radius: 2px; }
+.tip { position: fixed; z-index: 10; pointer-events: none; max-width: 330px; background: #0b1013f2; border: 1px solid var(--line); border-radius: 6px;
+  padding: 8px 10px; font-size: 12.5px; box-shadow: 0 6px 20px #0008; }
+.tip b { display: block; margin-bottom: 2px; }
+.tip p { margin: 3px 0 0; color: var(--mute); }
+.side { display: grid; gap: 10px; }
+.flow-row { display: grid; grid-template-columns: 44px 1fr; gap: 8px; align-items: center; margin-bottom: 6px; font-size: 12px; color: var(--mute); }
+.stack { display: flex; height: 22px; border-radius: 4px; overflow: hidden; background: #0a0e11; }
+.stack div { height: 100%; min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; margin: 4px 0 2px; }
+.chips span { display: inline-flex; align-items: center; gap: 5px; color: var(--mute); }
+.chips b { color: var(--ink); font: 600 12px var(--mono); }
+.chips i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.verdict { margin: 8px 0 0; font-size: 13px; }
+.verdict p { margin: 3px 0; }
+.meter { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 7px 0; border-top: 1px solid #1e2830; }
+.meter:first-of-type { border-top: 0; }
+.meter .name { font-weight: 600; }
+.meter .val { font: 600 13px var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
+.meter .why { grid-column: 1 / -1; color: var(--mute); font-size: 12px; }
+.track { grid-column: 1 / -1; height: 8px; background: #0a0e11; border-radius: 4px; overflow: hidden; }
+.track i { display: block; height: 100%; border-radius: 4px; }
+.card p { margin: 4px 0; }
+.card .lead { font-size: 13.5px; }
+.sub { color: var(--mute); font-size: 12px; }
+.insp label { display: grid; grid-template-columns: 1fr 92px; gap: 8px; align-items: center; margin-bottom: 3px; font-size: 12px; color: var(--mute); }
+.insp input[type=number] { width: 92px; background: #0a0e11; color: var(--ink); border: 1px solid var(--line); border-radius: 3px; padding: 2px 5px; font: 12px var(--mono); }
+details.more summary { cursor: pointer; color: var(--mute); font-size: 12px; margin-top: 6px; }
+.note { color: var(--mute); font-size: 12px; margin: 6px 0 0; }
+table { border-collapse: collapse; width: 100%; font: 12px var(--mono); font-variant-numeric: tabular-nums; }
+td, th { padding: 3px 4px; border-bottom: 1px solid #1e2830; text-align: left; }
+th { font: 600 10px var(--sans); text-transform: uppercase; letter-spacing: .06em; color: var(--mute); }
+td.n { text-align: right; }
+textarea { width: 100%; height: 90px; background: #0a0e11; color: var(--ink); border: 1px solid var(--line); border-radius: 4px; font: 11px var(--mono); }
+.rules { font-size: 12px; color: var(--mute); margin: 0; padding-left: 18px; }
+.rules li { margin-bottom: 4px; }
+.row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+</style>
+</head>
+<body>
+
+<div class="bar-top">
+  <h1>Energy Lab</h1>
+  <select id="ship" aria-label="Load a ship"></select>
+  <button class="b" id="zoomOut" title="Zoom out">−</button><button class="b" id="zoomFit">Fit</button><button class="b" id="zoomIn" title="Zoom in">+</button>
+  <span class="sep"></span>
+  <button class="b" id="cFire">Fire<kbd>F</kbd></button>
+  <button class="b" id="cThrust">Thrust<kbd>W</kbd></button>
+  <button class="b" id="cBoost">Boost<kbd>B</kbd></button>
+  <button class="b" id="cStrafe">Strafe<kbd>S</kbd></button>
+  <button class="b" id="cDodge">Dodge<kbd>D</kbd></button>
+  <button class="b" id="cUtil">Shields and tools<kbd>U</kbd></button>
+  <span class="sep"></span>
+  <button class="b" id="cPause">Pause<kbd>Space</kbd></button>
+  <select id="speed" aria-label="Speed"><option value="1">1× speed</option><option value="3">3× speed</option><option value="0.25">¼× speed</option></select>
+  <button class="b" id="fill">Charge all</button>
+  <button class="b" id="drain">Empty all</button>
+</div>
+
+<div class="wrap">
+  <aside class="pane left">
+    <div class="mode" id="mode"></div>
+    <div class="row" style="margin-bottom:8px">
+      <button class="b" id="tInspect">Select<kbd>Esc</kbd></button>
+      <button class="b" id="tErase">Erase<kbd>X</kbd></button>
+      <button class="b" id="tRot">Rotate<kbd>R</kbd></button>
+    </div>
+    <div id="palette"></div>
+  </aside>
+
+  <main class="pane">
+    <div class="canvas-wrap" id="cwrap"><canvas id="cv"></canvas></div>
+    <div class="legend">
+      <span><i style="background:radial-gradient(circle,#ffe08a 30%,transparent 35%) 0 0/7px 10px"></i>Power moving between touching parts</span>
+      <span><i style="border:2px solid #f5a83a;background:none"></i>Bottleneck: passing all it can</span>
+      <span><i style="background:linear-gradient(0deg,#4ade80 55%,transparent 55%)"></i>Liquid level: charge held, or a weapon's buffer</span>
+      <span><i style="background:var(--full)"></i>Fully fed</span>
+      <span><i style="background:var(--part)"></i>Partly fed</span>
+      <span><i style="background:var(--starve)"></i>Starved</span>
+      <span><i style="background:var(--idle)"></i>Idle</span>
+      <span><i style="border:2px dashed #c084fc;background:none"></i>Fuel tanks joined</span>
+    </div>
+  </main>
+
+  <section class="side">
+    <div class="pane"><h2>Power this second</h2><div id="flow"></div></div>
+    <div class="pane card" id="card"></div>
+    <div class="pane"><h2>Weapons</h2><div id="weap"></div></div>
+    <div class="pane"><h2>Engines, shields and tools</h2><div id="eng"></div></div>
+    <div class="pane"><h2>Stores and conduits</h2><div id="stores"></div></div>
+    <div class="pane">
+      <details class="more"><summary>Ammo and fuel in the hold</summary><div id="hold" style="margin-top:6px"></div></details>
+      <details class="more" open><summary>Rules this lab follows</summary>
+        <ul class="rules" style="margin-top:6px">
+          <li><b>Power only moves between parts that touch</b> (a shared edge; corners don't count). There is no ship-wide pool.</li>
+          <li><b>Generators</b> make power every second and push it into the parts touching them. What nothing takes is wasted.</li>
+          <li><b>Stores and Conduits pass power on.</b> Each takes in no more than its Takes a second and gives out no more than its Gives, so the narrowest part in a chain sets the rate. Touching stores even out towards the same fill.</li>
+          <li><b>Weapons, engines, shields and tools are dead ends:</b> they draw only from the generators, stores and conduits touching them, and pass nothing on. Generators are used first, then the fullest store.</li>
+          <li><b>Order each tick:</b> thrusters, then shields and tools, then weapons.</li>
+          <li><b>Thrusters</b> burn from a buffer that refills no faster than their Intake. While it lasts they give full thrust; once it's empty, thrust drops to Intake ÷ Burn. Main engines run on Thrust (and Boost), Side Jets while Strafe is on, Burst Strafers for a moment on each Dodge.</li>
+          <li><b>Weapons</b> fire only when their buffer holds a full shot and their cycle is done. The buffer fills no faster than their Intake. <b>Beams</b> burn from it while on, and rest when it's empty until it reaches the relight level.</li>
+          <li><b>Fuel engines</b> need propellant from a touching Fuel Tank; touching tanks share. Tanks refill from the hold.</li>
+        </ul>
+        <div class="insp" style="margin-top:8px">
+          <label>Hull and cargo carry power <input type="checkbox" id="hullConducts" style="justify-self:start"></label>
+          <label>…up to (E/s a part) <input type="number" id="hullRate" min="0" step="10" value="60"></label>
+          <label>Beams
+            <select id="beamMode" style="width:auto"><option value="buffer">burst, then rest</option><option value="cont">continuous at supply</option></select></label>
+          <label>Beam relights at buffer % <input type="number" id="relight" min="5" max="100" step="5" value="50"></label>
+        </div>
+      </details>
+      <details class="more"><summary>Save, share, reset</summary>
+        <div class="row" style="margin:6px 0">
+          <button class="b" id="exp">Copy design into the box</button>
+          <button class="b" id="imp">Load design from the box</button>
+          <button class="b" id="resetParams">Reset all numbers</button>
+        </div>
+        <textarea id="io" aria-label="Design as JSON" spellcheck="false"></textarea>
+        <p class="note" id="ioMsg">Your layout and edited numbers are saved in this browser.</p>
+      </details>
+    </div>
+  </section>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script src="ships.js"></script>
+<script>
+'use strict';
+// ================================================================ part types (the proposal's numbers, per whole part)
+const T = {}, ORDER = [];
+const CATS = ['Core and hull', 'Generators', 'Stores and conduits', 'Weapons', 'Engines', 'Shields and tools'];
+const COL = { core: '#e8e3d6', hull: '#4b5660', armor: '#6e7a84', cargo: '#7a6a52', gen: '#38bdf8', pool: '#4ade80', cap: '#f5a83a', drive: '#60a5fa', conduit: '#a7b4be',
+  fuel: '#c084fc', dynamo: '#facc15', E: '#ef5f55', H: '#e0a83c', A: '#a08cf2', engine: '#3fb0e0', fengine: '#c07ae0', strafer: '#8cc4ff', util: '#4fbfb2' };
+const ICON = { core: 'core', inert: '', gen: 'bolt', store: 'cell', fuel: 'drop', dynamo: 'spin', weapon: 'gun', engine: 'flame', util: 'ring' };
+function def(o) { o.w = o.w || 1; o.h = o.h || 1; if (o.mass === undefined) o.mass = o.w * o.h; T[o.id] = o; ORDER.push(o.id); }
+
+def({ id: 'core', name: 'Core', cat: 0, kind: 'store', hold: 240, give: 720, take: 120, mass: 2, col: COL.core, lvl: 0 });
+def({ id: 'hull', name: 'Hull', cat: 0, kind: 'inert', mass: 1, col: COL.hull, lvl: 0 });
+def({ id: 'armor', name: 'Armour', cat: 0, kind: 'inert', mass: 3, col: COL.armor, lvl: 0 });
+def({ id: 'cargo', name: 'Cargo', cat: 0, kind: 'inert', mass: 1, col: COL.cargo, lvl: 0 });
+
+def({ id: 'cell_reactor', name: 'Cell Reactor', cat: 1, kind: 'gen', produce: 35, mass: 1.5, col: COL.gen, lvl: 0 });
+def({ id: 'isotope', name: 'Isotope Pile', cat: 1, kind: 'gen', produce: 18, mass: 2, col: COL.gen, lvl: 9 });
+def({ id: 'overclock', name: 'Overclock Reactor', cat: 1, kind: 'gen', produce: 124, w: 2, mass: 2.5, col: COL.gen, lvl: 24 });
+def({ id: 'fusion', name: 'Fusion Plant', cat: 1, kind: 'gen', produce: 192, w: 2, h: 2, mass: 8, col: COL.gen, lvl: 18 });
+def({ id: 'stellarator', name: 'Stellarator', cat: 1, kind: 'gen', produce: 300, w: 2, h: 2, mass: 10, col: COL.gen, lvl: 36, isNew: true });
+
+def({ id: 'conduit', name: 'Conduit', cat: 2, kind: 'store', hold: 10, give: 200, take: 200, mass: 0.3, col: COL.conduit, lvl: 0, isNew: true, conduit: true });
+def({ id: 'battery', name: 'Battery', cat: 2, kind: 'store', hold: 300, give: 150, take: 50, col: COL.pool, lvl: 0 });
+def({ id: 'heavy_bank', name: 'Heavy Bank', cat: 2, kind: 'store', hold: 1200, give: 400, take: 600, w: 2, h: 2, mass: 6.4, col: COL.pool, lvl: 20 });
+def({ id: 'capacitor', name: 'Capacitor', cat: 2, kind: 'store', hold: 120, give: 2000, take: 40, col: COL.cap, lvl: 7 });
+def({ id: 'flux_coil', name: 'Flux Coil', cat: 2, kind: 'store', hold: 160, give: 1200, take: 600, w: 2, col: COL.cap, lvl: 20, isNew: true });
+def({ id: 'drive_cell', name: 'Drive Cell', cat: 2, kind: 'store', hold: 320, give: 1400, take: 80, col: COL.drive, lvl: 10 });
+def({ id: 'fuel_tank', name: 'Fuel Tank', cat: 2, kind: 'fuel', hold: 100, refill: 20, mass: 1.5, col: COL.fuel, lvl: 3, isNew: true });
+def({ id: 'dynamo', name: 'Pulse Dynamo', cat: 2, kind: 'dynamo', rate: 10, col: COL.dynamo, lvl: 18 });
+
+// [id, name, lvl, w, h, profile, intake E/s, cycle s, buffer shots, full-rate DPS, ammo, rounds a shot, beam]
+// Shot = intake × cycle (× 1.5 for clip guns, buffer 4+, so they empty and then wait). Damage a shot = DPS × the full-rate interval.
+const W = [
+  ['pip', 'Pip', 0, 1, 1, 'E', 20, 0.5, 1, 56], ['rattler', 'Rattler', 3, 1, 1, 'E', 28, 0.15, 1, 43],
+  ['burst', 'Burst', 4, 1, 1, 'H', 10, 1.0, 1, 37, 'canisters'], ['hammer', 'Hammer', 6, 2, 1, 'E', 30, 1.0, 1, 69],
+  ['lobber', 'Lobber', 7, 1, 1, 'A', 6, 1.5, 1, 47, 'shells'], ['glint', 'Glint', 9, 1, 1, 'E', 35, 0.8, 1, 54],
+  ['strobe', 'Strobe', 10, 1, 1, 'E', 50, 0.5, 1, 54], ['prism', 'Prism Splitter', 10, 1, 1, 'E', 60, 1.0, 1, 21],
+  ['pd', 'Point Defence', 10, 1, 1, 'E', 25, 0.2, 1, 20], ['dart', 'Dart', 11, 1, 1, 'A', 8, 1.8, 1, 36, 'missiles'],
+  ['twinlink', 'Twinlink', 12, 2, 1, 'E', 55, 0.25, 16, 64], ['hive', "Rustjaw's Hive", 12, 1, 1, 'E', 60, 0.5, 8, 31],
+  ['frostbite', 'Frostbite Lance', 12, 2, 1, 'E', 90, 0, 0, 95, null, 1, { burn: 90, intake: 90, bufferE: 270 }],
+  ['needle', 'Needle', 13, 2, 1, 'H', 30, 1.2, 1, 50, 'slugs'], ['chainsaw', 'Chainsaw', 14, 2, 1, 'E', 80, 0.1, 10, 79],
+  ['hush', 'Hush', 15, 1, 1, 'E', 40, 2.0, 1, 1], ['cloudmaker', 'Cloudmaker', 16, 2, 1, 'H', 35, 0.6, 6, 31, 'canisters'],
+  ['spark', 'Spark', 17, 1, 1, 'E', 70, 0.6, 1, 45],
+  ['cutter', 'Cutter', 18, 2, 1, 'E', 90, 0, 0, 150, null, 1, { burn: 90, intake: 40, bufferE: 180 }],
+  ['eel', 'Eel', 19, 2, 1, 'A', 10, 4.0, 1, 125, 'torpedoes'], ['longbarrel', 'Longbarrel', 20, 2, 1, 'E', 110, 2.0, 1, 48],
+  ['swarm', 'Swarm', 21, 2, 1, 'A', 12, 0.75, 1, 59, 'missiles', 2], ['coilgun', 'Coilgun', 22, 2, 1, 'H', 70, 1.2, 1, 89, 'slugs'],
+  ['cinder', 'Cinder Bloom', 22, 1, 1, 'E', 130, 1.0, 1, 105], ['stinger', 'Stinger', 24, 1, 1, 'E', 120, 0.2, 12, 37],
+  ['quake', 'Quake', 24, 2, 1, 'A', 12, 3.0, 1, 60, 'shells', 3], ['overpulse', 'Overpulse', 25, 2, 1, 'E', 130, 0.3, 8, 41],
+  ['searchlight', 'Searchlight', 26, 1, 1, 'E', 140, 0, 0, 25, null, 1, { burn: 140, intake: 140, bufferE: 280 }],
+  ['phase', 'Phase Cannon', 26, 2, 1, 'E', 140, 1.5, 1, 33], ['spear', 'Spear', 28, 2, 2, 'H', 90, 2.0, 2, 85, 'slugs'],
+  ['tesla', 'Tesla', 29, 1, 1, 'E', 170, 0, 0, 70, null, 1, { burn: 170, intake: 170, bufferE: 300 }],
+  ['rail_driver', 'Rail Driver', 29, 2, 2, 'H', 80, 0.17, 6, 90, 'slugs'], ['bastion', 'Bastion', 30, 2, 2, 'E', 220, 0.25, 16, 111],
+  ['singularity', 'Singularity Launcher', 30, 1, 1, 'E', 240, 3.0, 1, 21],
+  ['lance', 'Lance', 32, 2, 1, 'E', 300, 0, 0, 210, null, 1, { burn: 300, intake: 300, bufferE: 600 }],
+  ['hammerhead', 'Hammerhead', 33, 2, 2, 'A', 12, 3.3, 1, 50, 'missiles'], ['blackout', 'Blackout', 35, 2, 2, 'E', 120, 4.0, 1, 1],
+  ['leviathan', 'Leviathan', 38, 2, 2, 'A', 15, 3.0, 1, 227, 'torpedoes'],
+];
+for (const [id, name, lvl, w, h, profile, intake, cycle, buffer, dps, ammo, ammoPer, beam] of W) {
+  const o = { id, name, cat: 3, kind: 'weapon', lvl, w, h, profile, col: COL[profile], ammo: ammo || null, ammoPer: ammoPer || 1, mass: w * h * 1.2 };
+  if (beam) Object.assign(o, { model: 'beam', burn: beam.burn, intake: beam.intake, bufferE: beam.bufferE, dps });
+  else {
+    const shot = Math.round(intake * cycle * (buffer >= 4 ? 1.5 : 1) * 10) / 10;
+    Object.assign(o, { model: 'shot', intake, cycle, buffer, shot, damage: Math.round(dps * Math.max(cycle, shot / intake) * 10) / 10 });
+  }
+  def(o);
+}
+// Thrusters have a buffer like weapons: full thrust burns `burn` E/s from it; it refills at up to `intake` E/s from what touches it.
+// When it runs dry the thruster keeps going at intake ÷ burn of its thrust. Burn well above intake = a sprinter (strafing, dodging).
+// [id, name, lvl, w, h, mode, thrust, burn, intake, buffer, fuel/s, boost thrust, boost burn, boost fuel/s, new]
+// mode: main (Thrust, boostable), strafe (held Strafe), dodge (a Dodge burst of burstT s). Boost burns follow today's draw × (1 + 2.2 × boostDrain).
+const EN = [
+  ['vernier', 'Vernier', 2, 1, 1, 'main', 1.2, 4, 4, 8, 0, 1.2, 4, 0], ['drift_sail', 'Drift Sail', 22, 1, 1, 'main', 0.9, 3, 3, 6, 0, 1.17, 6.3, 0],
+  ['ion', 'Ion Drive', 0, 1, 1, 'main', 2.26, 9, 12, 30, 0, 4.52, 28.8, 0], ['chem', 'Chem Rocket', 3, 1, 1, 'main', 3.0, 2, 2, 4, 2, 3.0, 2, 2, true],
+  ['afterburner', 'Afterburner', 5, 1, 1, 'main', 1.6, 8, 10, 60, 0, 5.76, 8, 3], ['plasma', 'Plasma Drive', 16, 2, 1, 'main', 6.2, 40, 50, 120, 0, 11.16, 110.4, 0],
+  ['torch', 'Torch', 8, 2, 1, 'main', 8.0, 20, 20, 40, 5, 8.0, 20, 5], ['fusion_torch', 'Fusion Torch', 30, 2, 2, 'main', 14.4, 112, 130, 400, 0, 24.48, 358.4, 0],
+  ['side_jet', 'Side Jet', 6, 1, 1, 'strafe', 5, 50, 6, 100, 0, 5, 50, 0, true],
+  ['strafer', 'Burst Strafer', 10, 1, 1, 'dodge', 14, 700, 40, 140, 0, 14, 700, 0],
+];
+for (const [id, name, lvl, w, h, mode, thrust, burn, intake, buffer, fuel, bThrust, bBurn, bFuel, isNew] of EN)
+  def({ id, name, cat: 4, kind: 'engine', mode, lvl, w, h, thrust, burn, intake, buffer, fuel, bThrust, bBurn, bFuel, isNew, ...(mode === 'dodge' ? { burstT: 0.2 } : {}),
+    col: mode !== 'main' ? COL.strafer : fuel || bFuel ? COL.fengine : COL.engine });
+const UT = [['deflector', 'Deflector', 11, 1, 1, 16], ['flicker', 'Flicker Screen', 19, 1, 1, 6.4], ['bulwark', 'Bulwark Projector', 27, 2, 2, 76.8],
+  ['mining', 'Mining Laser', 0, 1, 1, 12], ['bore', 'Bore', 10, 2, 1, 18], ['siphon', 'Siphon', 12, 1, 1, 10], ['scanner', 'Scanner', 5, 1, 1, 4],
+  ['tow', 'Tow Beam', 12, 2, 1, 24], ['jump_coil', 'Jump Coil', 14, 1, 1, 8]];
+for (const [id, name, lvl, w, h, e] of UT) def({ id, name, cat: 5, kind: 'util', lvl, w, h, e, col: COL.util });
+
+const AMMO = { slugs: { price: 30, rounds: 200 }, canisters: { price: 25, rounds: 120 }, shells: { price: 45, rounds: 40 },
+  missiles: { price: 50, rounds: 24 }, torpedoes: { price: 160, rounds: 6 }, propellant: { price: 20, rounds: 100 } };
+const FIELDS = {
+  store: [['hold', 'Holds (E)'], ['give', 'Gives out, at most (E/s)'], ['take', 'Takes in, at most (E/s)'], ['mass', 'Mass']],
+  gen: [['produce', 'Makes (E/s)'], ['mass', 'Mass']],
+  fuel: [['hold', 'Holds (propellant)'], ['refill', 'Refills from hold (/s)'], ['mass', 'Mass']],
+  dynamo: [['rate', 'Into each touching store (E/s)'], ['mass', 'Mass']],
+  shot: [['intake', 'Intake (E/s)'], ['shot', 'Energy a shot (E)'], ['buffer', 'Buffer (shots)'], ['cycle', 'Cycle (s)'], ['damage', 'Damage a shot'], ['ammoPer', 'Rounds a shot'], ['mass', 'Mass']],
+  beam: [['burn', 'Burns while on (E/s)'], ['intake', 'Intake (E/s)'], ['bufferE', 'Buffer (E)'], ['dps', 'DPS while on'], ['mass', 'Mass']],
+  engine: [['thrust', 'Thrust'], ['burn', 'Burns at full thrust (E/s)'], ['intake', 'Intake (E/s)'], ['buffer', 'Buffer (E)'], ['fuel', 'Fuel (/s)'],
+    ['bThrust', 'Boost thrust'], ['bBurn', 'Boost burn (E/s)'], ['bFuel', 'Boost fuel (/s)'], ['burstT', 'Dodge length (s)'], ['mass', 'Mass']],
+  util: [['e', 'Energy (E/s)'], ['mass', 'Mass']], inert: [['mass', 'Mass']],
+};
+const fieldsOf = (t) => FIELDS[t.kind === 'weapon' ? t.model : t.kind].filter(([k]) => t[k] !== undefined && !(t.mode && t.mode !== 'main' && k[0] === 'b' && k !== 'buffer' && k !== 'burn'));
+const DEFAULTS = JSON.parse(JSON.stringify(T));
+const SHIPS = window.SHIPS || [];
+
+// ================================================================ state
+let GW = 20, GH = 14;
+let parts = [], nextUid = 1;
+let tool = 'inspect', rot = false, selected = null, hover = null, hoverPart = null;
+const ctrl = { fire: true, thrust: false, boost: false, strafe: false, util: true, paused: false, dodge: false };
+const settings = { beamMode: 'buffer', relight: 50, speed: 1, zoom: 0, hullConducts: false, hullRate: 60 };
+let hold = { slugs: 400, canisters: 240, shells: 80, missiles: 48, torpedoes: 12, propellant: 400 };
+let L = null, shipName = '', fromGame = false;
+const tdef = (p) => T[p.type];
+const key = (x, y) => y * GW + x;
+const isConsumer = (k) => k === 'weapon' || k === 'engine' || k === 'util';
+// A relay passes power on: every store (Core, Battery, Capacitor, Conduit…), and hull/cargo when that setting is on
+function relayOf(p) {
+  const t = tdef(p);
+  if (t.kind === 'store') return { hold: t.hold, give: t.give, take: t.take };
+  if (settings.hullConducts && (p.type === 'hull' || p.type === 'cargo')) return { hold: 5, give: settings.hullRate, take: settings.hullRate };
+  return null;
+}
+
+// ================================================================ layout
+function rebuild() {
+  const occ = new Array(GW * GH).fill(null);
+  for (const p of parts) for (const [x, y] of p.cells) occ[key(x, y)] = p;
+  for (const p of parts) {
+    p.touch = new Map(); // neighbour -> one shared edge [x, y, nx, ny] (for drawing the flow)
+    let sx = 0, sy = 0, x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    for (const [x, y] of p.cells) {
+      sx += x + 0.5; sy += y + 0.5; x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x + 1); y1 = Math.max(y1, y + 1);
+      for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+        if (nx < 0 || ny < 0 || nx >= GW || ny >= GH) continue;
+        const q = occ[key(nx, ny)];
+        if (q && q !== p && !p.touch.has(q)) p.touch.set(q, [x, y, nx, ny]);
+      }
+    }
+    p.cx = sx / p.cells.length; p.cy = sy / p.cells.length; p.box = { x0, y0, x1, y1 };
+    p.relay = relayOf(p);
+    if (p.relay && p.held === undefined) p.held = tdef(p).kind === 'store' ? p.relay.hold : 0;
+    if (p.relay) p.held = Math.min(p.held, p.relay.hold);
+  }
+  const kind = (p) => tdef(p).kind;
+  const isSource = (p) => kind(p) === 'gen' || !!p.relay;
+  for (const p of parts) p.sources = [...p.touch.keys()].filter(isSource);
+  // Which relays can reach a generator through other relays (for "connected" warnings)
+  const reach = new Set(), queue = [];
+  for (const g of parts) if (kind(g) === 'gen') for (const q of g.touch.keys()) if (q.relay && !reach.has(q)) { reach.add(q); queue.push(q); }
+  while (queue.length) { const r = queue.shift(); for (const q of r.touch.keys()) if (q.relay && !reach.has(q)) { reach.add(q); queue.push(q); } }
+  for (const p of parts) p.linked = kind(p) === 'gen' ? [...p.touch.keys()].some((q) => q.relay || isConsumer(kind(q))) : p.sources.some((s) => kind(s) === 'gen' || reach.has(s));
+  // Fuel tanks that touch share propellant
+  const fuelBanks = [], bankOf = new Map();
+  for (const p of parts) {
+    if (kind(p) !== 'fuel' || bankOf.has(p)) continue;
+    const b = { members: [] }; const st = [p]; bankOf.set(p, b);
+    while (st.length) { const q = st.pop(); b.members.push(q); for (const r of q.touch.keys()) if (kind(r) === 'fuel' && !bankOf.has(r)) { bankOf.set(r, b); st.push(r); } }
+    fuelBanks.push(b);
+  }
+  const by = (k) => parts.filter((p) => kind(p) === k);
+  L = { occ, fuelBanks, bankOf, gens: by('gen'), relays: parts.filter((p) => p.relay), weapons: by('weapon'), engines: by('engine'),
+    utils: by('util'), dynamos: by('dynamo'), fuels: by('fuel') };
+  L.rr = []; // relay pairs, each once
+  for (const a of L.relays) for (const b of a.touch.keys()) if (b.relay && a.uid < b.uid) L.rr.push([a, b]);
+  for (const p of L.engines) p.fuelBanks = [...new Set([...p.touch.keys()].map((q) => bankOf.get(q)).filter(Boolean))];
+  for (const p of L.dynamos) p.into = [...p.touch.keys()].filter((q) => kind(q) === 'store');
+  for (const p of parts) initState(p);
+  flows.clear();
+}
+function initState(p) {
+  const t = tdef(p);
+  if (t.kind === 'fuel' && p.held === undefined) p.held = t.hold;
+  if (t.kind === 'weapon') { if (p.stored === undefined) p.stored = capOf(p); p.cd ??= 0; p.on ??= false; p.flash ??= 0; }
+  p.emaE ??= 0; p.emaD ??= 0; p.emaR ??= 0; p.emaF ??= 0; p.emaOut ??= 0; p.emaIn ??= 0; p.emaNeck ??= 0; p.sat ??= 1; p.thrustNow ??= 0; p.emaWaste ??= 0;
+  if (t.kind === 'engine') { if (p.stored === undefined) p.stored = t.buffer; p.burst ??= 0; }
+}
+function capOf(p) { const t = tdef(p); return t.model === 'beam' ? (settings.beamMode === 'cont' ? t.burn / 60 : t.bufferE) : t.shot * t.buffer; }
+function rectCells(type, x, y, r) { const t = T[type], w = r ? t.h : t.w, h = r ? t.w : t.h, c = []; for (let dx = 0; dx < w; dx++) for (let dy = 0; dy < h; dy++) c.push([x + dx, y + dy]); return c; }
+function fitsCells(type, cells) {
+  if (type === 'core' && parts.some((p) => p.type === 'core')) return false;
+  return cells.every(([x, y]) => x >= 0 && y >= 0 && x < GW && y < GH && !L.occ[key(x, y)]);
+}
+function addPart(type, cells) { const p = { uid: nextUid++, type, cells }; parts.push(p); return p; }
+function removePart(p) { parts = parts.filter((q) => q !== p); if (selected === p) selected = null; rebuild(); save(); renderCard(); }
+
+// ================================================================ the tick (60 a second): power moves only between touching parts
+const DT = 1 / 60, TAU = 1.5;
+let ticks = 0;
+const ema = (cur, v) => cur + (v - cur) * Math.max(DT / TAU, 1 / (ticks + 1));
+const emaSlow = (cur, v) => cur + (v - cur) * (DT / 5); // damage comes in bursts (a beam's on/rest cycle), so average it longer
+function waterfill(wants, supply) {
+  const out = new Array(wants.length).fill(0);
+  const idx = wants.map((_, i) => i).filter((i) => wants[i] > 1e-12).sort((a, b) => wants[a] - wants[b]);
+  let left = Math.max(0, supply), k = idx.length;
+  for (const i of idx) { const g = Math.min(wants[i], left / k); out[i] = g; left -= g; k--; }
+  return out;
+}
+const flows = new Map();     // 'a>b' -> E/s, smoothed (for the moving dots)
+let tickFlow = new Map();
+function moved(a, b, amt) { if (amt <= 0) return; const k = a.uid + '>' + b.uid; tickFlow.set(k, (tickFlow.get(k) || 0) + amt); }
+const fuelHeld = (b) => b.members.reduce((s, m) => s + m.held, 0);
+function fuelTake(b, amt) { const h = fuelHeld(b); if (h <= 0 || amt <= 0) return; const f = Math.min(1, amt / h); for (const m of b.members) m.held -= m.held * f; }
+const F = { gen: 0, store: 0, engines: 0, utils: 0, weapons: 0, charge: 0, wasted: 0, shortE: 0, shortU: 0, shortW: 0, thrust: 0 };
+
+function tick() {
+  tickFlow = new Map();
+  for (const g of L.gens) { g.left = tdef(g).produce * DT; }
+  for (const r of L.relays) { r.gLeft = r.relay.give * DT; r.tLeft = r.relay.take * DT; r.out = 0; r.in = 0; }
+  const avail = (s) => (tdef(s).kind === 'gen' ? s.left : Math.max(0, Math.min(s.held, s.gLeft)));
+  function takeFrom(s, c, a) {
+    if (tdef(s).kind === 'gen') s.left -= a; else { s.held -= a; s.gLeft -= a; s.out += a; storeOut += a; }
+    moved(s, c, a);
+  }
+  let storeOut = 0;
+  // Consumers draw from what touches them: generators first, then the fullest store
+  function serve(cons, wants) {
+    const got = new Array(cons.length).fill(0);
+    const srcs = [...new Set(cons.flatMap((c) => c.sources))].sort((a, b) => {
+      const ga = tdef(a).kind === 'gen' ? 0 : 1, gb = tdef(b).kind === 'gen' ? 0 : 1;
+      return ga - gb || (b.relay ? b.held / b.relay.hold : 0) - (a.relay ? a.held / a.relay.hold : 0) || a.uid - b.uid;
+    });
+    for (const s of srcs) {
+      const idx = []; cons.forEach((c, i) => { if (wants[i] - got[i] > 1e-12 && c.sources.includes(s)) idx.push(i); });
+      if (!idx.length) continue;
+      const a = waterfill(idx.map((i) => wants[i] - got[i]), avail(s));
+      idx.forEach((i, j) => { if (a[j] > 0) { got[i] += a[j]; takeFrom(s, cons[i], a[j]); } });
+    }
+    return got;
+  }
+  const sum = (a) => a.reduce((s, v) => s + v, 0);
+
+  // 1. Thrusters: refill their buffers (no faster than Intake), then burn from them. Short of buffer, thrust scales to what they had.
+  const wantE = L.engines.map((p) => { const t = tdef(p); return Math.max(0, Math.min(t.intake * DT, t.buffer - p.stored)); });
+  const gotE = serve(L.engines, wantE);
+  let thrust = 0;
+  L.engines.forEach((p, i) => {
+    const t = tdef(p);
+    p.stored += gotE[i]; p.emaE = ema(p.emaE, gotE[i] / DT);
+    if (t.mode === 'dodge' && ctrl.dodge && !(p.burst > 0)) p.burst = t.burstT;
+    p.active = t.mode === 'main' ? ctrl.thrust : t.mode === 'strafe' ? ctrl.strafe : p.burst > 0;
+    const boost = ctrl.boost && t.mode === 'main';
+    let frac = 1, gf = 0;
+    if (p.active) {
+      const need = (boost ? t.bBurn : t.burn) * DT, use = Math.min(p.stored, need);
+      p.stored -= use; frac = need > 0 ? use / need : 1;
+      const wf = (boost ? t.bFuel : t.fuel) * DT * frac;
+      if (wf > 0) { for (const b of p.fuelBanks) { const g = Math.min(wf - gf, fuelHeld(b)); fuelTake(b, g); gf += g; } frac *= gf / wf; }
+      if (p.burst > 0) p.burst -= DT;
+    }
+    p.emaF = ema(p.emaF, gf / DT);
+    p.sat = p.active ? frac : 1;
+    p.thrustNow = p.active ? (boost ? t.bThrust : t.thrust) * frac : 0;
+    thrust += p.thrustNow;
+  });
+  ctrl.dodge = false;
+
+  // 2. Shields and tools
+  const wantU = L.utils.map((p) => (ctrl.util ? tdef(p).e * DT : 0));
+  const gotU = serve(L.utils, wantU);
+  L.utils.forEach((p, i) => { p.active = ctrl.util; p.sat = wantU[i] > 0 ? gotU[i] / wantU[i] : 1; p.emaE = ema(p.emaE, gotU[i] / DT); });
+
+  // 3. Weapons fill their buffers
+  const cont = settings.beamMode === 'cont';
+  const wantW = L.weapons.map((p) => {
+    const t = tdef(p), cap = capOf(p);
+    if (t.model === 'beam' && cont) return ctrl.fire ? Math.max(0, cap - p.stored) : 0;
+    return Math.max(0, Math.min(t.intake * DT, cap - p.stored));
+  });
+  const gotW = serve(L.weapons, wantW);
+  L.weapons.forEach((p, i) => { p.stored += gotW[i]; p.emaE = ema(p.emaE, gotW[i] / DT); });
+
+  // 4. Weapons fire
+  for (const p of L.weapons) {
+    const t = tdef(p); let dmg = 0, rounds = 0;
+    p.cd = Math.max(0, p.cd - DT); p.flash = Math.max(0, p.flash - DT); p.active = ctrl.fire;
+    if (t.model === 'shot') {
+      const ammoOk = !t.ammo || hold[t.ammo] >= t.ammoPer;
+      if (ctrl.fire && p.cd <= 1e-9 && p.stored >= t.shot - 1e-9 && ammoOk) {
+        p.stored -= t.shot; p.cd = t.cycle; dmg = t.damage; p.flash = 0.1;
+        if (t.ammo) { hold[t.ammo] -= t.ammoPer; rounds = t.ammoPer; }
+      }
+      p.noAmmo = !ammoOk;
+    } else if (cont) {
+      const need = t.burn * DT, f = ctrl.fire ? Math.min(1, p.stored / need) : 0;
+      dmg = t.dps * DT * f; if (ctrl.fire) p.stored = 0; p.on = f > 0.01;
+    } else {
+      const need = t.burn * DT;
+      if (!ctrl.fire) p.on = false;
+      else if (!p.on && p.stored >= (settings.relight / 100) * t.bufferE - 1e-9) p.on = true;
+      if (p.on && p.stored >= need - 1e-9) { p.stored -= need; dmg = t.dps * DT; } else p.on = false;
+    }
+    p.emaD = emaSlow(p.emaD, dmg / DT); p.emaR = emaSlow(p.emaR, rounds / DT);
+    p.rate = full(t) ? p.emaD / full(t) : 0;
+  }
+
+  // 5. Generators push what's left into the stores touching them (no faster than each one's Takes)
+  let charge = 0;
+  for (const g of L.gens) {
+    const rs = [...g.touch.keys()].filter((q) => q.relay);
+    const a = waterfill(rs.map((r) => Math.max(0, Math.min(r.tLeft, r.relay.hold - r.held))), g.left);
+    rs.forEach((r, i) => { if (a[i] > 0) { r.held += a[i]; r.tLeft -= a[i]; r.in += a[i]; g.left -= a[i]; charge += a[i]; moved(g, r, a[i]); } });
+    g.emaWaste = ema(g.emaWaste, g.left / DT);
+  }
+  // 6. Touching stores even out: power moves from the fuller (by %) to the emptier, within Gives and Takes
+  for (const [a0, b0] of L.rr) {
+    let a = a0, b = b0;
+    if (a.held / a.relay.hold < b.held / b.relay.hold) [a, b] = [b, a];
+    const want = (a.held * b.relay.hold - b.held * a.relay.hold) / (a.relay.hold + b.relay.hold);
+    const t = Math.min(want, a.gLeft, b.tLeft, a.held, b.relay.hold - b.held);
+    if (t > 1e-9) { a.held -= t; a.gLeft -= t; a.out += t; b.held += t; b.tLeft -= t; b.in += t; moved(a, b, t); }
+  }
+  for (const d of L.dynamos) for (const r of d.into) { const g = Math.min(tdef(d).rate * DT, r.relay.hold - r.held); if (g > 0) { r.held += g; moved(d, r, g); } }
+  for (const p of L.fuels) { const t = tdef(p), g = Math.min(t.refill * DT, t.hold - p.held, hold.propellant); if (g > 0) { p.held += g; hold.propellant -= g; } }
+  for (const r of L.relays) {
+    r.emaOut = ema(r.emaOut, r.out / DT); r.emaIn = ema(r.emaIn, r.in / DT);
+    // At its limit: it gave out all it may this tick (Gives), or took in all it may (Takes)
+    r.emaNeck = ema(r.emaNeck, r.gLeft < 1e-9 && r.relay.give > 0 ? 1 : 0);
+    r.emaNeckIn = ema(r.emaNeckIn || 0, r.tLeft < 1e-9 && r.relay.take > 0 ? 1 : 0);
+  }
+  for (const [k, v] of tickFlow) flows.set(k, ema(flows.get(k) || 0, v / DT));
+  for (const [k, v] of flows) if (!tickFlow.has(k)) { const nv = ema(v, 0); if (nv < 0.05) flows.delete(k); else flows.set(k, nv); }
+
+  const per = (v) => v / DT, wasted = L.gens.reduce((s, g) => s + g.left, 0);
+  const now = { gen: per(L.gens.reduce((s, g) => s + tdef(g).produce * DT, 0)), store: per(storeOut), engines: per(sum(gotE)), utils: per(sum(gotU)), weapons: per(sum(gotW)),
+    charge: per(charge), wasted: per(wasted), shortE: per(sum(wantE) - sum(gotE)), shortU: per(sum(wantU) - sum(gotU)), shortW: per(sum(wantW) - sum(gotW)), thrust };
+  for (const k in F) F[k] = ema(F[k], now[k]);
+  ticks++;
+}
+const full = (t) => (t.model === 'beam' ? t.dps : t.damage / Math.max(t.cycle, t.shot / t.intake));
+
+// ================================================================ drawing
+const cv = document.getElementById('cv'), cx = cv.getContext('2d'), cwrap = document.getElementById('cwrap');
+let CS = 32;
+function fitCS() { const w = cwrap.clientWidth - 4, h = Math.max(320, window.innerHeight - 170); return Math.max(10, Math.min(56, Math.floor(Math.min(w / GW, h / GH)))); }
+function sizeCanvas() {
+  CS = Math.max(8, Math.min(90, Math.round(fitCS() * Math.pow(1.25, settings.zoom))));
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = GW * CS * dpr; cv.height = GH * CS * dpr; cv.style.width = GW * CS + 'px'; cv.style.height = GH * CS + 'px';
+  cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+function mix(hex, a, bg = [16, 22, 27]) { const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+  return `rgb(${Math.round(bg[0] + (r - bg[0]) * a)},${Math.round(bg[1] + (g - bg[1]) * a)},${Math.round(bg[2] + (b - bg[2]) * a)})`; }
+const STATUS = { full: '#5fd18a', part: '#f2c14e', starve: '#ef6a5a', idle: '#6b7680' };
+// A bottleneck worth showing: a store or conduit at its in or out limit while something on the ship is short of power
+const shortNow = () => F.shortE + F.shortU + F.shortW > 1;
+const atLimit = (r) => shortNow() && ((r.emaNeck > 0.6 && r.emaOut > 1) || ((r.emaNeckIn || 0) > 0.6 && r.emaIn > 1));
+function statusOf(p) {
+  const t = tdef(p);
+  if (t.kind === 'weapon') { if (!ctrl.fire) return 'idle'; if (p.noAmmo || !p.sources.length) return 'starve'; return p.rate >= 0.95 ? 'full' : p.rate >= 0.5 ? 'part' : 'starve'; }
+  if (t.kind === 'engine' || t.kind === 'util') { if (!p.active) return 'idle'; return p.sat >= 0.97 ? 'full' : p.sat >= 0.5 ? 'part' : 'starve'; }
+  return null;
+}
+function levelOf(p) { const t = tdef(p); if (p.relay && t.kind === 'store') return p.held / p.relay.hold; if (t.kind === 'fuel') return p.held / t.hold; if (t.kind === 'weapon') return Math.min(1, p.stored / capOf(p)); if (t.kind === 'engine') return t.buffer > 0 ? p.stored / t.buffer : null; return null; }
+let tnow = 0;
+const byUid = new Map();
+function draw() {
+  tnow = performance.now() / 1000;
+  byUid.clear(); for (const p of parts) byUid.set(p.uid, p);
+  const Wd = GW * CS, Ht = GH * CS;
+  cx.fillStyle = '#0a0e11'; cx.fillRect(0, 0, Wd, Ht);
+  cx.strokeStyle = '#141c22'; cx.lineWidth = 1; cx.beginPath();
+  for (let x = 0; x <= GW; x++) { cx.moveTo(x * CS + 0.5, 0); cx.lineTo(x * CS + 0.5, Ht); }
+  for (let y = 0; y <= GH; y++) { cx.moveTo(0, y * CS + 0.5); cx.lineTo(Wd, y * CS + 0.5); }
+  cx.stroke();
+  // 1. cells and liquid levels
+  for (const p of parts) {
+    const t = tdef(p), inert = t.kind === 'inert';
+    cx.fillStyle = p.relay && inert ? mix('#6f7f8c', 0.55) : mix(t.col, inert ? 0.45 : 0.24);
+    for (const [x, y] of p.cells) cx.fillRect(x * CS, y * CS, CS, CS);
+    const lv = levelOf(p);
+    if (lv !== null && !(inert)) {
+      const top = p.box.y1 - lv * (p.box.y1 - p.box.y0);
+      cx.fillStyle = mix(t.col, 0.62);
+      for (const [x, y] of p.cells) { const a = Math.max(y, top); if (a < y + 1) cx.fillRect(x * CS, a * CS, CS, (y + 1 - a) * CS); }
+    }
+    if (t.kind === 'gen') { const g = 0.12 + 0.08 * Math.sin(tnow * 4 + p.uid); cx.fillStyle = `rgba(56,189,248,${g})`; for (const [x, y] of p.cells) cx.fillRect(x * CS, y * CS, CS, CS); }
+    if (t.kind === 'weapon' && (p.flash > 0 || p.on)) { cx.fillStyle = p.on ? 'rgba(255,240,200,.28)' : `rgba(255,245,220,${p.flash * 6})`; for (const [x, y] of p.cells) cx.fillRect(x * CS, y * CS, CS, CS); }
+  }
+  // 2. outlines: consumers by how well fed; relays amber when they're the bottleneck
+  for (const p of parts) {
+    const t = tdef(p), st = statusOf(p);
+    let col = t.kind === 'inert' ? '#0a0e11' : mix(t.col, 0.8), w = 1.25;
+    if (st) { col = STATUS[st]; if (st !== 'idle') w = Math.max(2, CS / 12); }
+    else if (p.relay && atLimit(p)) { col = `rgba(245,168,58,${0.65 + 0.35 * Math.sin(tnow * 6)})`; w = Math.max(2, CS / 11); }
+    else if (t.kind === 'gen' && p.emaWaste > 1 && shortNow()) { col = '#ef6a5a'; w = Math.max(2, CS / 12); }
+    cx.strokeStyle = col; cx.lineWidth = w;
+    outline(p.cells, p, w > 1.5 ? w / 2 : 0.5);
+  }
+  // 3. fuel tanks that share
+  for (const b of L.fuelBanks) if (b.members.length > 1) {
+    cx.strokeStyle = '#c084fc'; cx.lineWidth = Math.max(2, CS / 10); cx.setLineDash([CS / 4, CS / 6]);
+    const mem = new Set(b.members); outlineSet(b.members.flatMap((m) => m.cells), (x, y) => mem.has(L.occ[key(x, y)]), -cx.lineWidth / 2);
+    cx.setLineDash([]);
+  }
+  // 4. power moving: dots across each shared edge, from giver to taker; more dots and faster for more power
+  for (const [k, v] of flows) {
+    if (v < 0.5) continue;
+    const [au, bu] = k.split('>').map(Number), a = byUid.get(au), b = byUid.get(bu);
+    if (!a || !b) continue;
+    const e = a.touch.get(b); if (!e) continue;
+    const [x, y, nx, ny] = e, ax = (x + 0.5) * CS, ay = (y + 0.5) * CS, bx = (nx + 0.5) * CS, by = (ny + 0.5) * CS;
+    const n = Math.min(4, 1 + Math.floor(Math.log10(v + 1) * 1.5)), speed = 0.6 + Math.min(1.6, v / 120);
+    const fromGen = tdef(a).kind === 'gen';
+    cx.fillStyle = fromGen ? '#9fe3ff' : '#ffe08a';
+    for (let i = 0; i < n; i++) {
+      const f = (tnow * speed + i / n) % 1, px = ax + (bx - ax) * f, py = ay + (by - ay) * f;
+      cx.beginPath(); cx.arc(px, py, Math.max(1.6, CS / 13), 0, 7); cx.fill();
+    }
+  }
+  // 5. icons and names
+  cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  for (const p of parts) {
+    const t = tdef(p); const ic = ICON[t.kind]; if (!ic && t.id !== 'core') continue;
+    const bw = (p.box.x1 - p.box.x0) * CS, bh = (p.box.y1 - p.box.y0) * CS;
+    const X = p.cx * CS, Y = p.cy * CS, s = Math.min(bw, bh) * 0.3;
+    const showName = bw >= 64 && bh >= 34 && CS >= 22, showNum = CS >= 26;
+    drawIcon(t.id === 'core' ? 'core' : t.conduit ? 'wire' : ic, X, showName ? Y - bh * 0.14 : Y, Math.min(s, 13));
+    if (showName) { cx.fillStyle = '#e9eff3'; cx.font = `600 ${Math.min(12, CS / 3)}px "IBM Plex Sans", sans-serif`; cx.fillText(t.name, X, Y + bh * 0.18); }
+    else if (showNum && t.kind === 'gen') { cx.fillStyle = '#bfe9ff'; cx.font = `600 ${Math.min(11, CS / 3)}px "IBM Plex Mono", monospace`; cx.fillText('+' + t.produce, X, Y + CS * 0.3); }
+    if (isConsumer(t.kind) && !p.sources.length && CS >= 16) { cx.fillStyle = '#ef6a5a'; cx.font = `700 ${Math.min(13, CS / 2.6)}px "IBM Plex Sans", sans-serif`; cx.fillText('no power', X, p.box.y0 * CS + Math.min(9, CS / 4)); }
+  }
+  if (selected) { cx.strokeStyle = '#ffffff'; cx.setLineDash([5, 4]); cx.lineWidth = 2; outline(selected.cells, selected, -2); cx.setLineDash([]); }
+  if (hoverPart && hoverPart !== selected) { cx.strokeStyle = 'rgba(255,255,255,.55)'; cx.lineWidth = 1.5; outline(hoverPart.cells, hoverPart, -1.5); }
+  // 6. ghost of the part being placed
+  if (hover && T[tool]) {
+    const cells = rectCells(tool, hover.x, hover.y, rot), ok = fitsCells(tool, cells);
+    cx.fillStyle = ok ? 'rgba(95,209,138,.3)' : 'rgba(239,106,90,.3)';
+    for (const [x, y] of cells) if (x < GW && y < GH) cx.fillRect(x * CS, y * CS, CS, CS);
+  }
+}
+function outline(cells, p, inset) { outlineSet(cells, (x, y) => L.occ[key(x, y)] === p, inset); }
+function outlineSet(cells, inside, inset) {
+  const ins = (x, y) => x >= 0 && y >= 0 && x < GW && y < GH && inside(x, y); const o = inset || 0;
+  cx.beginPath();
+  for (const [x, y] of cells) {
+    const X0 = x * CS, Y0 = y * CS, X1 = X0 + CS, Y1 = Y0 + CS;
+    if (!ins(x, y - 1)) { cx.moveTo(X0, Y0 + o); cx.lineTo(X1, Y0 + o); }
+    if (!ins(x, y + 1)) { cx.moveTo(X0, Y1 - o); cx.lineTo(X1, Y1 - o); }
+    if (!ins(x - 1, y)) { cx.moveTo(X0 + o, Y0); cx.lineTo(X0 + o, Y1); }
+    if (!ins(x + 1, y)) { cx.moveTo(X1 - o, Y0); cx.lineTo(X1 - o, Y1); }
+  }
+  cx.stroke();
+}
+function drawIcon(ic, x, y, s) {
+  if (s < 3) return;
+  cx.save(); cx.translate(x, y); cx.fillStyle = '#eef4f7'; cx.strokeStyle = '#eef4f7'; cx.lineWidth = Math.max(1.2, s / 6); cx.lineJoin = 'round';
+  cx.beginPath();
+  switch (ic) {
+    case 'bolt': cx.moveTo(s * 0.15, -s); cx.lineTo(-s * 0.55, s * 0.1); cx.lineTo(0, s * 0.1); cx.lineTo(-s * 0.15, s); cx.lineTo(s * 0.55, -s * 0.1); cx.lineTo(0, -s * 0.1); cx.closePath(); cx.fill(); break;
+    case 'cell': cx.strokeRect(-s * 0.55, -s * 0.8, s * 1.1, s * 1.6); cx.fillRect(-s * 0.25, -s * 1.0, s * 0.5, s * 0.2); break;
+    case 'wire': cx.moveTo(-s, 0); cx.lineTo(s, 0); cx.moveTo(0, -s); cx.lineTo(0, s); cx.stroke(); cx.beginPath(); cx.arc(0, 0, s * 0.25, 0, 7); cx.fill(); break;
+    case 'drop': cx.moveTo(0, -s); cx.quadraticCurveTo(s * 0.8, s * 0.1, 0, s * 0.8); cx.quadraticCurveTo(-s * 0.8, s * 0.1, 0, -s); cx.fill(); break;
+    case 'spin': cx.arc(0, 0, s * 0.7, tnow * 3, tnow * 3 + 4.5); cx.stroke(); break;
+    case 'gun': cx.arc(0, 0, s * 0.55, 0, 7); cx.moveTo(0, -s); cx.lineTo(0, s); cx.moveTo(-s, 0); cx.lineTo(s, 0); cx.stroke(); break;
+    case 'flame': cx.moveTo(-s * 0.7, -s * 0.5); cx.lineTo(0, s * 0.1); cx.lineTo(s * 0.7, -s * 0.5); cx.moveTo(-s * 0.7, s * 0.1); cx.lineTo(0, s * 0.7); cx.lineTo(s * 0.7, s * 0.1); cx.stroke(); break;
+    case 'dodge': cx.moveTo(-s, 0); cx.lineTo(s, 0); cx.moveTo(-s * 0.5, -s * 0.5); cx.lineTo(-s, 0); cx.lineTo(-s * 0.5, s * 0.5); cx.moveTo(s * 0.5, -s * 0.5); cx.lineTo(s, 0); cx.lineTo(s * 0.5, s * 0.5); cx.stroke(); break;
+    case 'ring': cx.arc(0, 0, s * 0.75, 0, 7); cx.stroke(); cx.beginPath(); cx.arc(0, 0, s * 0.25, 0, 7); cx.fill(); break;
+    case 'core': cx.moveTo(0, -s); cx.lineTo(s * 0.8, 0); cx.lineTo(0, s); cx.lineTo(-s * 0.8, 0); cx.closePath(); cx.fillStyle = '#10161b'; cx.fill(); cx.stroke(); break;
+  }
+  cx.restore();
+}
+
+// ================================================================ plain-language explanations
+const n0 = (v) => (Math.abs(v) >= 100 ? Math.round(v).toLocaleString() : Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2));
+const pc = (v) => `${Math.round(v * 100)}%`;
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const nameList = (ps) => { const m = new Map(); for (const p of ps) m.set(tdef(p).name, (m.get(tdef(p).name) || 0) + 1); return [...m].map(([n, c]) => (c > 1 ? `${c} ${n}s` : `a ${n}`)).join(', '); };
+const flowFrom = (a, b) => flows.get(a.uid + '>' + b.uid) || 0;
+function explain(p) {
+  const t = tdef(p), out = [], nb = [...p.touch.keys()];
+  if (t.kind === 'gen') {
+    out.push(`Makes ${t.produce} E/s and pushes it into the parts touching it.`);
+    const takers = nb.filter((q) => q.relay || isConsumer(tdef(q).kind));
+    out.push(takers.length ? `Touching: ${nameList(takers)}.` : '<span style="color:var(--starve)">Nothing that uses or carries power touches it, so all of it is wasted.</span>');
+    if (p.emaWaste > 1 && takers.length) out.push(`<span style="color:var(--starve)">Wasting ${n0(p.emaWaste)} E/s</span>: what touches it is full, or can't take it in fast enough.`);
+  } else if (p.relay) {
+    const r = p.relay;
+    out.push(t.kind === 'store'
+      ? (t.conduit ? `Carries up to ${r.give} E/s from one neighbour to another and stores almost nothing (${r.hold}).` : `Holds ${r.hold}. Takes in at most ${r.take} E/s and gives out at most ${r.give} E/s.`)
+      : `Hull that carries power (the setting is on): up to ${r.give} E/s.`);
+    out.push(`Now: ${n0(p.held)} held, ${n0(p.emaIn)} E/s coming in, ${n0(p.emaOut)} E/s going out.`);
+    const ins = nb.filter((q) => flowFrom(q, p) > 0.5), outs = nb.filter((q) => flowFrom(p, q) > 0.5);
+    if (ins.length) out.push(`Fed by ${nameList(ins)}.`);
+    if (outs.length) out.push(`Feeding ${nameList(outs)}.`);
+    if (p.emaNeck > 0.6 && p.emaOut > 1) out.push(`<span style="color:var(--accent)">Giving out all it can</span> (${r.give} E/s)${shortNow() ? ': it may be what holds the parts it feeds back' : ''}.`);
+    if ((p.emaNeckIn || 0) > 0.6 && p.emaIn > 1) out.push(`<span style="color:var(--accent)">Taking in all it can</span> (${r.take} E/s)${shortNow() ? ': over time it can pass on no more than that' : ''}.`);
+    if (!p.linked && p.held < 1) out.push('<span style="color:var(--starve)">No path to a generator.</span>');
+  } else if (t.kind === 'fuel') out.push(`Holds ${t.hold} propellant for the fuel engines touching it, refilled from the hold at ${t.refill} a second. Touching tanks share.`);
+  else if (t.kind === 'dynamo') out.push(`Adds ${t.rate} E/s to each store touching it${p.into.length ? '' : ' (it touches none)'}.`);
+  else if (isConsumer(t.kind)) {
+    if (t.kind === 'weapon') {
+      if (t.model === 'shot') out.push(`Fires when its buffer holds a full shot (${t.shot} E) and its ${t.cycle} s cycle is done. Full rate needs ${t.intake} E/s.`);
+      else out.push(`A beam: burns ${t.burn} E/s while on, from a ${t.bufferE} E buffer that refills at up to ${t.intake} E/s.`);
+      if (t.ammo) out.push(`Also uses ${t.ammoPer > 1 ? t.ammoPer + ' ' : 'one of the '}${t.ammo} a shot.`);
+    } else if (t.kind === 'engine') {
+      const when = { main: 'while Thrust is on', strafe: 'while Strafe is on', dodge: `for ${t.burstT} s each Dodge` }[t.mode];
+      out.push(`Full thrust (${t.thrust}) burns ${t.burn} E/s${t.fuel ? ` and ${t.fuel} propellant` : ''}, ${when}. It burns from a ${t.buffer} E buffer that refills at up to ${t.intake} E/s from what touches it.`);
+      out.push(t.burn > t.intake
+        ? `A full buffer lasts ${n0(t.buffer / (t.burn - t.intake))} s at full thrust. Once it's empty it keeps going at ${pc(Math.min(1, t.intake / t.burn))} thrust, all its intake can feed.`
+        : 'Its intake keeps up with its burn, so it can run at full thrust for as long as the power reaches it.');
+      if (t.mode === 'main' && t.bBurn !== t.burn) out.push(`Boosting: ${t.bThrust} thrust for ${t.bBurn} E/s${t.bFuel ? ` and ${t.bFuel} propellant` : ''}; with an empty buffer, ${pc(Math.min(1, t.intake / t.bBurn))} of that.`);
+      if (p.active) out.push(`Now: ${pc(p.sat)} thrust, buffer ${n0(p.stored)} of ${t.buffer}.`);
+    } else out.push(`Draws ${t.e} E/s while shields and tools are on.`);
+    if (!p.sources.length) out.push('<span style="color:var(--starve)">Touches nothing that carries power.</span> Put a generator, store or Conduit against it.');
+    else {
+      const feeders = p.sources.filter((s) => flowFrom(s, p) > 0.5);
+      out.push(`Draws from what touches it: ${nameList(p.sources)}.${feeders.length ? ` Power is coming from ${nameList(feeders)}.` : ''}`);
+      const necks = p.sources.filter((s) => s.relay && atLimit(s));
+      if (necks.length && (t.kind === 'weapon' ? p.rate < 0.95 : p.sat < 0.97)) out.push(`<span style="color:var(--accent)">Held back by</span> ${nameList(necks)}, at ${necks.length > 1 ? 'their' : 'its'} limit. Hover ${necks.length > 1 ? 'them' : 'it'} to see which.`);
+      else if ((t.kind === 'weapon' ? p.rate < 0.95 : p.sat < 0.97) && p.sources.every((s) => tdef(s).kind === 'gen' || s.held < 1)) out.push('<span style="color:var(--part)">Everything touching it is empty or a generator already giving all it makes:</span> there just isn’t enough power reaching it.');
+      if (!p.linked) out.push('<span style="color:var(--part)">None of those connect back to a generator:</span> it runs on stored power until that is gone.');
+    }
+    if (t.kind === 'weapon' && ctrl.fire) out.push(p.noAmmo ? `<span style="color:var(--starve)">Out of ${t.ammo}.</span>` : `Getting ${n0(p.emaE)} E/s: firing at ${pc(p.rate)} of full rate.`);
+    if (t.kind === 'engine' && (t.fuel || t.bFuel) && !p.fuelBanks.length) out.push('<span style="color:var(--starve)">No Fuel Tank touches it, so it gets no propellant.</span>');
+    if (t.kind === 'util' && p.active) out.push(`Getting ${pc(p.sat)} of what it needs.`);
+  } else out.push(`Carries no power${p.type === 'hull' || p.type === 'cargo' ? ' (turn on "Hull and cargo carry power" to change that)' : ''}. Mass ${t.mass}.`);
+  return out;
+}
+
+// ================================================================ side panel
+function stackBar(segs, total) {
+  return `<div class="stack">${segs.filter((s) => s.v > 0.05).map((s) => `<div title="${esc(s.label)}: ${n0(s.v)} E/s" style="width:${(s.v / total) * 100}%;background:${s.col}${s.hatch ? ';background-image:repeating-linear-gradient(45deg,transparent 0 4px,#0006 4px 8px)' : ''}"></div>`).join('')}</div>
+    <div class="chips">${segs.filter((s) => s.v > 0.05).map((s) => `<span><i style="background:${s.col}"></i>${esc(s.label)} <b>${n0(s.v)}</b></span>`).join('')}</div>`;
+}
+function renderFlow() {
+  const short = F.shortE + F.shortU + F.shortW;
+  const src = [{ label: 'Made by generators', v: F.gen, col: '#38bdf8' }, { label: 'Drawn from stores', v: F.store, col: '#4ade80' }];
+  const use = [{ label: 'Engines', v: F.engines, col: '#3fb0e0' }, { label: 'Shields and tools', v: F.utils, col: '#4fbfb2' }, { label: 'Weapons', v: F.weapons, col: '#ef5f55' },
+    { label: 'Into stores and conduits', v: F.charge, col: '#8bdca6' }, { label: 'Wasted at generators', v: F.wasted, col: '#55606a' }, { label: 'Wanted, not reached', v: short, col: '#ef6a5a', hatch: true }];
+  const total = Math.max(1, src.reduce((s, x) => s + x.v, 0), use.reduce((s, x) => s + x.v, 0));
+  const lines = [];
+  if (!parts.length) lines.push('Pick a ship above, or place parts from the left.');
+  const lonelyGens = L.gens.filter((g) => !g.linked).length, dead = [...L.weapons, ...L.engines, ...L.utils].filter((p) => !p.sources.length).length;
+  const unlinked = [...L.weapons, ...L.engines, ...L.utils].filter((p) => p.sources.length && !p.linked).length;
+  if (dead) lines.push(`<span style="color:var(--starve)">${dead} part${dead > 1 ? 's' : ''} touch nothing that carries power</span> (marked "no power").`);
+  if (fromGame && !settings.hullConducts && (dead || lonelyGens)) lines.push('This ship was designed for wires, so its power parts don’t touch. To see it with its hull acting as the wiring, tick "Hull and cargo carry power" under Rules.');
+  if (lonelyGens) lines.push(`<span style="color:var(--starve)">${lonelyGens} generator${lonelyGens > 1 ? 's' : ''} touch nothing to power.</span>`);
+  if (unlinked) lines.push(`<span style="color:var(--part)">${unlinked} part${unlinked > 1 ? 's run' : ' runs'} on stores with no path back to a generator.</span>`);
+  if (short > 1) {
+    const who = [[F.shortW, 'weapons'], [F.shortE, 'engines'], [F.shortU, 'shields and tools']].filter(([v]) => v > 1).map(([v, w]) => `${w} ${n0(v)}`).join(', ');
+    lines.push(`<span style="color:var(--starve)">${n0(short)} E/s wanted but not reaching them</span> (${who}).${F.wasted > 1 ? ` Meanwhile ${n0(F.wasted)} E/s is wasted at generators: the power is in the wrong place.` : ''}`);
+  } else if (parts.length) lines.push(`<span style="color:var(--full)">Everything that's on gets what it asks for.</span>${F.wasted > 1 ? ` ${n0(F.wasted)} E/s of generation is unused.` : ''}`);
+  document.getElementById('flow').innerHTML = `<div class="flow-row"><span>From</span><div>${stackBar(src, total)}</div></div>
+    <div class="flow-row"><span>To</span><div>${stackBar(use, total)}</div></div><div class="verdict">${lines.map((l) => `<p>${l}</p>`).join('')}</div>`;
+}
+function meter(name, count, frac, valText, why, col) {
+  return `<div class="meter"><span class="name">${esc(name)}${count > 1 ? ` <span style="color:var(--mute);font-weight:400">×${count}</span>` : ''}</span><span class="val" style="color:${col}">${valText}</span>
+    <div class="track"><i style="width:${Math.max(0, Math.min(100, frac * 100)).toFixed(1)}%;background:${col}"></i></div><span class="why">${why}</span></div>`;
+}
+const stCol = (f) => (f >= 0.95 ? STATUS.full : f >= 0.5 ? STATUS.part : STATUS.starve);
+function groups(list) { const m = new Map(); for (const p of list) { if (!m.has(p.type)) m.set(p.type, []); m.get(p.type).push(p); } return [...m.entries()]; }
+function renderLists() {
+  const avg = (a, f) => a.reduce((s, p) => s + f(p), 0) / a.length;
+  let dpsNow = 0, dpsFull = 0;
+  const wh = groups(L.weapons).map(([type, ps]) => {
+    const t = T[type], rate = avg(ps, (p) => p.rate), got = avg(ps, (p) => p.emaE), need = t.model === 'beam' ? t.burn : t.intake;
+    const dps = ps.reduce((s, p) => s + p.emaD, 0); dpsNow += dps; dpsFull += full(t) * ps.length;
+    const dead = ps.filter((p) => !p.sources.length).length;
+    let why;
+    if (!ctrl.fire) why = `Idle. Each needs ${need} E/s at full rate. Press Fire.`;
+    else if (ps.some((p) => p.noAmmo)) why = `<span style="color:var(--starve)">Out of ${t.ammo}.</span> Add a crate in the hold.`;
+    else if (rate >= 0.95) why = `Firing at full rate, ${n0(dps)} DPS.`;
+    else why = `Each gets ${n0(got)} of the ${need} E/s it needs. ${n0(dps)} of ${n0(full(t) * ps.length)} DPS.`;
+    if (dead) why += ` <span style="color:var(--starve)">${dead === ps.length ? 'None touch' : dead + ' touch no'} power.</span>`;
+    if (t.ammo && ctrl.fire) { const cost = ps.reduce((s, p) => s + (p.emaR * 60 * AMMO[t.ammo].price) / AMMO[t.ammo].rounds, 0); if (cost > 0.5) why += ` Ammo: $${n0(cost)} a minute.`; }
+    return meter(t.name, ps.length, ctrl.fire ? rate : 0, ctrl.fire ? pc(rate) + ' rate' : 'idle', why, ctrl.fire ? stCol(rate) : STATUS.idle);
+  });
+  document.getElementById('weap').innerHTML = L.weapons.length
+    ? `<p class="sub" style="margin:0 0 4px">Damage now ${n0(dpsNow)} of ${n0(dpsFull)} DPS at full rate (${pc(dpsNow / Math.max(1, dpsFull))}).</p>` + wh.join('')
+    : '<p class="note">No weapons on this ship.</p>';
+  const thrustMax = L.engines.reduce((s, p) => s + tdef(p).thrust, 0), bMax = L.engines.reduce((s, p) => s + tdef(p).bThrust, 0), mass = parts.reduce((s, p) => s + tdef(p).mass, 0);
+  const eh = groups([...L.engines, ...L.utils]).map(([type, ps]) => {
+    const t = T[type], sat = avg(ps, (p) => p.sat), on = ps.some((p) => p.active), dead = ps.filter((p) => !p.sources.length).length;
+    let why;
+    if (t.kind === 'util') why = `Each draws ${t.e} E/s.`;
+    else {
+      const boost = ctrl.boost && t.mode === 'main', burn = boost ? t.bBurn : t.burn, buf = avg(ps, (p) => p.stored);
+      why = `Each: ${boost ? t.bThrust : t.thrust} thrust for ${burn} E/s, refilled at ${t.intake} E/s. Buffer ${n0(buf)} of ${t.buffer}.`;
+      if (on && buf < 1 && sat < 0.97) why += ` <span style="color:var(--part)">Buffers empty: running on intake.</span>`;
+      if (!on) why += ` (${{ main: 'Thrust', strafe: 'Strafe', dodge: 'Dodge' }[t.mode]} runs it.)`;
+    }
+    if (dead) why += ` <span style="color:var(--starve)">${dead === ps.length ? 'None touch' : dead + ' touch no'} power.</span>`;
+    if (t.kind === 'engine' && (t.fuel || t.bFuel) && ps.some((p) => !p.fuelBanks.length)) why += ' <span style="color:var(--starve)">Some have no Fuel Tank touching.</span>';
+    return meter(t.name, ps.length, on ? sat : 0, on ? pc(sat) + ' fed' : 'idle', why, on ? stCol(sat) : STATUS.idle);
+  });
+  document.getElementById('eng').innerHTML = (eh.length ? `<p class="sub" style="margin:0 0 4px">Thrust now ${n0(F.thrust)} (cruise ${n0(thrustMax)}, boost ${n0(bMax)}). Mass ${n0(mass)}.</p>` + eh.join('') : '<p class="note">Nothing here.</p>');
+  const sh = groups(L.relays.filter((r) => tdef(r).kind === 'store')).map(([type, ps]) => {
+    const t = T[type], cap = ps.reduce((s, p) => s + p.relay.hold, 0), held = ps.reduce((s, p) => s + p.held, 0);
+    const out = ps.reduce((s, p) => s + p.emaOut, 0), inn = ps.reduce((s, p) => s + p.emaIn, 0), necks = ps.filter(atLimit).length;
+    let why = `Each takes in ${t.take}/s, gives out ${t.give}/s. Now ${n0(inn)} in, ${n0(out)} out.`;
+    if (necks) why += ` <span style="color:var(--accent)">${necks} at their limit.</span>`;
+    return meter(t.name, ps.length, held / cap, `${n0(held)} / ${n0(cap)}`, why, t.col);
+  });
+  if (settings.hullConducts) { const hr = L.relays.filter((r) => tdef(r).kind !== 'store'); if (hr.length) { const out = hr.reduce((s, p) => s + p.emaOut, 0), necks = hr.filter(atLimit).length;
+    sh.push(meter('Hull carrying power', hr.length, 0, '', `${n0(out)} E/s moving through hull. ${necks ? necks + ' at their limit.' : ''}`, '#6f7f8c')); } }
+  for (const b of L.fuelBanks) { const cap = b.members.reduce((s, m) => s + tdef(m).hold, 0); sh.push(meter('Fuel tanks', b.members.length, fuelHeld(b) / cap, `${n0(fuelHeld(b))} / ${n0(cap)}`, 'Propellant for touching fuel engines.', COL.fuel)); }
+  document.getElementById('stores').innerHTML = sh.join('') || '<p class="note">No stores.</p>';
+  document.getElementById('hold').innerHTML = `<table><tr><th>Item</th><th>In hold</th><th>A crate</th><th></th></tr>${Object.entries(AMMO).map(([k, a]) =>
+    `<tr><td>${k}</td><td class="n">${Math.floor(hold[k])}</td><td>$${a.price} for ${a.rounds}</td><td><button class="b" data-crate="${k}">+ crate</button></td></tr>`).join('')}</table>`;
+}
+function renderCard() {
+  const el = document.getElementById('card');
+  if (!selected) {
+    el.innerHTML = `<h2>${esc(shipName || 'Your design')}</h2><p class="lead">Hover any part to see what it's doing and where its power comes from. Click one to pin it here and edit its numbers.</p>
+      <p class="sub">Power only moves between touching parts. Yellow dots show it moving; blue dots are fresh from a generator.</p>`;
+    return;
+  }
+  const p = selected, t = tdef(p), d = DEFAULTS[t.id];
+  const same = parts.filter((q) => q.type === t.id).length;
+  const swaps = ORDER.filter((id) => id !== t.id && T[id].kind === t.kind && T[id].w * T[id].h === p.cells.length);
+  el.innerHTML = `<h2>Selected</h2><p class="lead"><b>${esc(t.name)}</b> <span class="sub">level ${t.lvl}${t.profile ? ' · ' + { E: 'energy weapon', H: 'energy and ammo', A: 'ammo weapon' }[t.profile] : ''}${t.isNew ? ' · new part' : ''}</span></p>
+    <div id="cardText">${explain(p).map((s) => `<p>${s}</p>`).join('')}</div>
+    ${swaps.length ? `<div class="row" style="margin-top:8px"><span class="sub">Swap ${same > 1 ? 'all ' + same : 'it'} for</span>
+      <select id="swapSel">${swaps.map((id) => `<option value="${id}">${esc(T[id].name)}</option>`).join('')}</select><button class="b" id="swapGo">Swap</button></div>` : ''}
+    <div class="row" style="margin-top:6px"><button class="b" id="delSel">Remove it</button><button class="b" id="deselect">Done</button></div>
+    <details class="more insp"><summary>Edit the numbers for every ${esc(t.name)}</summary><div style="margin-top:6px">${fieldsOf(t).map(([k, label]) => `<label>${label}${t[k] !== d[k] ? ` <span style="color:var(--part)">(was ${d[k]})</span>` : ''}
+      <input type="number" step="any" id="f_${k}" data-k="${k}" value="${t[k]}"></label>`).join('')}</div></details>`;
+  el.querySelectorAll('input[data-k]').forEach((inp) => inp.addEventListener('change', () => {
+    const v = parseFloat(inp.value); if (!Number.isFinite(v) || v < 0) return;
+    t[inp.dataset.k] = v;
+    for (const q of parts) if (q.type === t.id && t.kind === 'weapon') q.stored = Math.min(q.stored, capOf(q));
+    rebuild(); save(); renderCard(); renderPalette();
+  }));
+  document.getElementById('swapGo')?.addEventListener('click', () => {
+    const to = document.getElementById('swapSel').value;
+    for (const q of parts) if (q.type === t.id) { q.type = to; delete q.held; delete q.stored; }
+    rebuild(); save(); renderCard();
+  });
+  document.getElementById('delSel').addEventListener('click', () => removePart(p));
+  document.getElementById('deselect').addEventListener('click', () => { selected = null; renderCard(); });
+}
+
+// ================================================================ palette, input
+function renderPalette() {
+  const el = document.getElementById('palette');
+  el.innerHTML = CATS.map((c, ci) => `<details class="cat" ${ci >= 1 && ci <= 4 ? 'open' : ''}><summary>${c}</summary><div class="pal">${ORDER.filter((id) => T[id].cat === ci).map((id) => {
+    const t = T[id];
+    const stat = t.kind === 'gen' ? `+${t.produce}` : t.kind === 'weapon' ? (t.model === 'beam' ? t.burn : t.intake) : t.kind === 'engine' ? `${t.intake}→${t.burn}` : t.kind === 'util' ? t.e : t.kind === 'store' ? `${t.take}→${t.give}` : '';
+    return `<button data-type="${id}" class="${tool === id ? 'on' : ''}" title="${esc(t.name)}: level ${t.lvl}, ${t.w}×${t.h}"><span class="sw" style="background:${t.col}"></span><span>${esc(t.name)}${t.isNew ? ' <span style="color:var(--accent)">new</span>' : ''}</span><span class="meta">${stat}</span></button>`;
+  }).join('')}</div></details>`).join('') + '<p class="note">Beside each part: the E/s it makes (+) or needs. For stores and conduits: what it takes in → what it gives out, a second.</p>';
+  el.querySelectorAll('button[data-type]').forEach((b) => b.addEventListener('click', () => setTool(b.dataset.type)));
+}
+function setTool(t) {
+  tool = t;
+  document.querySelectorAll('.pal button').forEach((b) => b.classList.toggle('on', b.dataset.type === t));
+  document.getElementById('tInspect').classList.toggle('on', t === 'inspect'); document.getElementById('tErase').classList.toggle('on', t === 'erase');
+  document.getElementById('mode').textContent = T[t] ? `Placing ${T[t].name}. Click the grid; R rotates; right-click removes.` : t === 'erase' ? 'Erasing: click parts to remove them.' : 'Pick a part below to place it, or click a part on the grid to select it.';
+}
+function cellAt(e) { const r = cv.getBoundingClientRect(); const x = Math.floor((e.clientX - r.left) / CS), y = Math.floor((e.clientY - r.top) / CS); return x >= 0 && y >= 0 && x < GW && y < GH ? { x, y } : null; }
+const tip = document.getElementById('tip');
+let painting = false;
+cv.addEventListener('pointerdown', (e) => {
+  const c = cellAt(e); if (!c) return;
+  const p = L.occ[key(c.x, c.y)];
+  if (e.button === 2) { if (p) removePart(p); return; }
+  painting = true; act(c);
+});
+cv.addEventListener('pointermove', (e) => {
+  hover = cellAt(e); hoverPart = hover ? L.occ[key(hover.x, hover.y)] : null;
+  if (hoverPart && !T[tool]) {
+    tip.innerHTML = `<b>${esc(tdef(hoverPart).name)}</b>${explain(hoverPart).map((s) => `<p>${s}</p>`).join('')}`;
+    tip.hidden = false;
+    const x = Math.min(e.clientX + 16, window.innerWidth - 350), y = Math.min(e.clientY + 16, window.innerHeight - tip.offsetHeight - 10);
+    tip.style.left = x + 'px'; tip.style.top = y + 'px';
+  } else tip.hidden = true;
+  if (painting && hover && (tool === 'erase' || (T[tool] && T[tool].w * T[tool].h === 1))) act(hover);
+});
+window.addEventListener('pointerup', () => { painting = false; });
+cv.addEventListener('pointerleave', () => { hover = null; hoverPart = null; tip.hidden = true; });
+cv.addEventListener('contextmenu', (e) => e.preventDefault());
+function act(c) {
+  const p = L.occ[key(c.x, c.y)];
+  if (tool === 'erase') { if (p) removePart(p); }
+  else if (tool === 'inspect') { selected = p || null; renderCard(); }
+  else if (T[tool]) { const cells = rectCells(tool, c.x, c.y, rot); if (fitsCells(tool, cells)) { const np = addPart(tool, cells); if (tdef(np).kind === 'store') np.held = 0; selected = np; rebuild(); save(); renderCard(); } }
+}
+const btn = (id, f) => document.getElementById(id).addEventListener('click', f);
+btn('tInspect', () => setTool('inspect')); btn('tErase', () => setTool('erase')); btn('tRot', () => { rot = !rot; });
+const toggles = { cFire: 'fire', cThrust: 'thrust', cBoost: 'boost', cStrafe: 'strafe', cUtil: 'util', cPause: 'paused' };
+function syncCtrls() { for (const [id, k] of Object.entries(toggles)) document.getElementById(id).classList.toggle('on', ctrl[k]); }
+for (const [id, k] of Object.entries(toggles)) btn(id, () => { ctrl[k] = !ctrl[k]; syncCtrls(); });
+btn('cDodge', () => { ctrl.dodge = true; });
+btn('fill', () => { for (const p of parts) { const t = tdef(p); if (p.relay) p.held = p.relay.hold; if (t.kind === 'fuel') p.held = t.hold; if (t.kind === 'weapon') p.stored = capOf(p); if (t.kind === 'engine') p.stored = t.buffer; } });
+btn('drain', () => { for (const p of parts) { const t = tdef(p); if (p.relay || t.kind === 'fuel') p.held = 0; if (t.kind === 'weapon' || t.kind === 'engine') p.stored = 0; } });
+btn('zoomIn', () => { settings.zoom++; sizeCanvas(); }); btn('zoomOut', () => { settings.zoom--; sizeCanvas(); }); btn('zoomFit', () => { settings.zoom = 0; sizeCanvas(); });
+document.getElementById('speed').addEventListener('change', (e) => { settings.speed = parseFloat(e.target.value); });
+document.getElementById('beamMode').addEventListener('change', (e) => { settings.beamMode = e.target.value; for (const p of L.weapons) p.stored = Math.min(p.stored, capOf(p)); save(); });
+document.getElementById('relight').addEventListener('change', (e) => { const v = parseFloat(e.target.value); if (v > 0 && v <= 100) { settings.relight = v; save(); } });
+document.getElementById('hullConducts').addEventListener('change', (e) => { settings.hullConducts = e.target.checked; rebuild(); save(); });
+document.getElementById('hullRate').addEventListener('change', (e) => { const v = parseFloat(e.target.value); if (v >= 0) { settings.hullRate = v; rebuild(); save(); } });
+document.getElementById('hold').addEventListener('click', (e) => { const k = e.target.dataset?.crate; if (k) { hold[k] += AMMO[k].rounds; save(); } });
+window.addEventListener('keydown', (e) => {
+  if (e.target.matches('input, textarea, select')) return;
+  const k = e.key.toLowerCase();
+  if (k === 'f') ctrl.fire = !ctrl.fire; else if (k === 'w') ctrl.thrust = !ctrl.thrust; else if (k === 'b') ctrl.boost = !ctrl.boost; else if (k === 's') ctrl.strafe = !ctrl.strafe;
+  else if (k === 'u') ctrl.util = !ctrl.util; else if (k === 'd') ctrl.dodge = true; else if (k === 'r') rot = !rot;
+  else if (k === ' ') { ctrl.paused = !ctrl.paused; e.preventDefault(); } else if (k === 'escape') { setTool('inspect'); selected = null; renderCard(); }
+  else if (k === 'x') setTool('erase'); else if ((k === 'delete' || k === 'backspace') && selected) removePart(selected);
+  else return;
+  syncCtrls();
+});
+
+// ================================================================ ships: the game's own designs, plus test setups that show routing
+const SETUPS = {
+  'Generator straight into two Pips': [['cell_reactor', 8, 5], ['pip', 7, 5], ['pip', 9, 5], ['core', 8, 6], ['ion', 8, 7]],
+  'Generator > Battery > Glint': [['cell_reactor', 6, 5], ['battery', 7, 5], ['glint', 8, 5], ['core', 6, 6], ['ion', 6, 7]],
+  'Bottleneck: a Lance behind one Battery': [['fusion', 4, 4], ['battery', 6, 4], ['lance', 7, 4], ['core', 6, 5], ['ion', 6, 6]],
+  'Starved by Capacitors: plant > Heavy Bank > Capacitors > Lance': [['fusion', 3, 4], ['heavy_bank', 5, 4], ['capacitor', 7, 4], ['capacitor', 7, 5], ['lance', 8, 4],
+    ['capacitor', 10, 4], ['core', 5, 6], ['ion', 5, 7]],
+  'Lance fed well: plant touching it, Heavy Bank and Capacitors for bursts': [['lance', 5, 3], ['fusion', 5, 4], ['heavy_bank', 7, 3], ['capacitor', 4, 3], ['capacitor', 4, 4],
+    ['core', 5, 6], ['ion', 6, 6]],
+  'Strafing: Side Jets and Burst Strafers on a Battery': [['core', 7, 5], ['cell_reactor', 8, 5], ['battery', 7, 6], ['battery', 8, 6], ['side_jet', 6, 6], ['side_jet', 9, 6],
+    ['strafer', 6, 5], ['strafer', 9, 5], ['ion', 7, 7], ['ion', 8, 7], ['pip', 7, 4], ['pip', 8, 4]],
+  'The armour brick: a generator wrapped in armour': [['cell_reactor', 8, 5], ['pip', 8, 3], ['pip', 10, 5], ['ion', 8, 7]],
+  'Conduit run to far guns': [['cell_reactor', 4, 6], ['conduit', 5, 6], ['conduit', 6, 6], ['conduit', 7, 6], ['conduit', 8, 6], ['conduit', 9, 6], ['glint', 10, 6], ['conduit', 9, 5], ['glint', 9, 4], ['core', 4, 7], ['ion', 4, 8]],
+  'Fuel racer: Chem Rockets and tanks': [['glint', 8, 3], ['glint', 9, 3], ['core', 8, 4], ['cell_reactor', 9, 4], ['chem', 9, 5], ['chem', 10, 4], ['fuel_tank', 10, 5], ['fuel_tank', 11, 5]],
+};
+function renderShipPicker() {
+  const sel = document.getElementById('ship');
+  const opt = (v, label) => `<option value="${esc(v)}">${esc(label)}</option>`;
+  const byGroup = {}; SHIPS.forEach((s, i) => { (byGroup[s.group] ||= []).push(opt('ship:' + i, `${s.name} (${s.parts.length} parts)`)); });
+  sel.innerHTML = '<option value="">Load a ship…</option>' + `<optgroup label="Test setups">${Object.keys(SETUPS).map((k) => opt('setup:' + k, k)).join('')}</optgroup>`
+    + Object.entries(byGroup).map(([g, o]) => `<optgroup label="${esc(g)}">${o.join('')}</optgroup>`).join('')
+    + '<optgroup label="Empty">' + opt('empty', 'Empty grid') + '</optgroup>';
+  if (!SHIPS.length) sel.insertAdjacentHTML('beforeend', '<option disabled>(ships.js missing: run export-ships.ts)</option>');
+  sel.addEventListener('change', () => { if (sel.value) loadChoice(sel.value); sel.value = ''; });
+}
+function setGrid(w, h) { GW = Math.max(16, w); GH = Math.max(12, h); }
+function loadChoice(v) {
+  parts = []; selected = null; fromGame = v.startsWith('ship:');
+  if (v.startsWith('ship:')) {
+    const s = SHIPS[+v.slice(5)]; shipName = s.name;
+    const w = Math.max(...s.parts.flatMap((p) => p[1].map((c) => c[0]))) + 1, h = Math.max(...s.parts.flatMap((p) => p[1].map((c) => c[1]))) + 1;
+    setGrid(w + 4, h + 4); const ox = Math.floor((GW - w) / 2), oy = Math.floor((GH - h) / 2);
+    for (const [type, cells] of s.parts) addPart(T[type] ? type : 'hull', cells.map(([x, y]) => [x + ox, y + oy]));
+  } else if (v.startsWith('setup:')) {
+    const name = v.slice(6); shipName = name; setGrid(16, 12); rebuild();
+    for (const [type, x, y] of SETUPS[name]) { const c = rectCells(type, x, y, false); if (fitsCells(type, c)) { addPart(type, c); rebuild(); } }
+    armourRing();
+  } else { shipName = 'Empty grid'; setGrid(20, 14); }
+  ticks = 0; rebuild(); settings.zoom = 0; sizeCanvas(); save(); renderCard();
+}
+function armourRing() {
+  const xs = parts.flatMap((p) => p.cells.map((c) => c[0])), ys = parts.flatMap((p) => p.cells.map((c) => c[1]));
+  const x0 = Math.min(...xs) - 1, y0 = Math.min(...ys) - 1, x1 = Math.max(...xs) + 1, y1 = Math.max(...ys) + 1;
+  for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) if ((x === x0 || x === x1 || y === y0 || y === y1) && fitsCells('armor', [[x, y]])) { addPart('armor', [[x, y]]); rebuild(); }
+}
+
+// ================================================================ saving
+const KEY = 'energy-lab-v4';
+let saveTimer = 0;
+function snapshot() {
+  const params = {};
+  for (const id of ORDER) for (const k of Object.keys(T[id])) if (typeof T[id][k] === 'number' && T[id][k] !== DEFAULTS[id][k]) (params[id] ||= {})[k] = T[id][k];
+  return { v: 3, name: shipName, grid: [GW, GH], parts: parts.map((p) => [p.type, p.cells]), params, hold,
+    settings: { beamMode: settings.beamMode, relight: settings.relight, hullConducts: settings.hullConducts, hullRate: settings.hullRate } };
+}
+function syncSettingsUi() {
+  document.getElementById('beamMode').value = settings.beamMode; document.getElementById('relight').value = settings.relight;
+  document.getElementById('hullConducts').checked = settings.hullConducts; document.getElementById('hullRate').value = settings.hullRate;
+}
+function restore(s) {
+  for (const id of ORDER) Object.assign(T[id], JSON.parse(JSON.stringify(DEFAULTS[id])));
+  for (const [id, ps] of Object.entries(s.params || {})) if (T[id]) for (const [k, v] of Object.entries(ps)) if (typeof v === 'number') T[id][k] = v;
+  if (s.hold) hold = Object.assign({}, hold, s.hold);
+  if (s.settings) Object.assign(settings, s.settings);
+  syncSettingsUi();
+  shipName = s.name || 'Your design'; setGrid(...(s.grid || [20, 14]));
+  parts = []; selected = null;
+  for (const [type, cells] of s.parts || []) if (T[type] && Array.isArray(cells)) addPart(type, cells);
+  ticks = 0; rebuild(); sizeCanvas(); renderPalette(); renderCard();
+}
+function save() { clearTimeout(saveTimer); saveTimer = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify(snapshot())); } catch (e) { /* storage unavailable */ } }, 300); }
+btn('exp', () => { document.getElementById('io').value = JSON.stringify(snapshot()); document.getElementById('ioMsg').textContent = 'The design is in the box. Copy it to keep it or send it.'; });
+btn('imp', () => {
+  try { restore(JSON.parse(document.getElementById('io').value)); save(); document.getElementById('ioMsg').textContent = 'Loaded the design from the box.'; }
+  catch (e) { document.getElementById('ioMsg').textContent = 'That text isn’t a saved design. Paste all of it, starting with {.'; }
+});
+btn('resetParams', () => { for (const id of ORDER) Object.assign(T[id], JSON.parse(JSON.stringify(DEFAULTS[id]))); rebuild(); save(); renderPalette(); renderCard(); document.getElementById('ioMsg').textContent = 'Every number is back to the proposal.'; });
+
+// ================================================================ run
+let last = performance.now(), acc = 0, frame = 0;
+function loop(now) {
+  const dt = Math.min(0.25, (now - last) / 1000); last = now;
+  if (!ctrl.paused) { acc += dt * settings.speed * 60; let n = 0; while (acc >= 1 && n < 400) { tick(); acc -= 1; n++; } if (n >= 400) acc = 0; }
+  draw();
+  if (frame++ % 10 === 0) { renderFlow(); renderLists(); if (selected) { const el = document.getElementById('cardText'); if (el) el.innerHTML = explain(selected).map((s) => `<p>${s}</p>`).join(''); } }
+  requestAnimationFrame(loop);
+}
+rebuild(); renderPalette(); renderShipPicker(); setTool('inspect');
+let loaded = false;
+// index.html#ship=Bulwark opens that ship or test setup by name; &thrust, &boost, &cold (fire off), &hull (hull carries power) set the controls
+const hash = new URLSearchParams(location.hash.slice(1));
+if (hash.has('hull')) { settings.hullConducts = true; syncSettingsUi(); }
+if (hash.get('ship')) {
+  const want = hash.get('ship').toLowerCase();
+  const i = SHIPS.findIndex((s) => s.name.toLowerCase() === want), setup = Object.keys(SETUPS).find((k) => k.toLowerCase() === want);
+  if (i >= 0 || setup) { loadChoice(i >= 0 ? 'ship:' + i : 'setup:' + setup); loaded = true; }
+  if (hash.has('thrust')) ctrl.thrust = true; if (hash.has('boost')) ctrl.thrust = ctrl.boost = true; if (hash.has('strafe')) ctrl.strafe = true; if (hash.has('cold')) ctrl.fire = false;
+}
+if (!loaded) try { const s = localStorage.getItem(KEY); if (s) { restore(JSON.parse(s)); loaded = parts.length > 0; } } catch (e) { /* no storage */ }
+if (!loaded) loadChoice('setup:Generator > Battery > Glint');
+syncCtrls(); sizeCanvas(); renderCard();
+window.addEventListener('resize', sizeCanvas);
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

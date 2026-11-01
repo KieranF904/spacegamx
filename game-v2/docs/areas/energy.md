@@ -39,3 +39,41 @@ Add a store/generator: models.mjs fields (`produce`/`store`/`discharge`/`bank`/`
 - Pre-5896116 rule: a battery on a network with no generator isn't in the pool, but it makes that network's engines and guns "powered" (they draw on the pool).
 - Legacy `drive_battery`/`weapon_battery` are plain pool batteries now.
 - If the library fight fails on the Heavy Bank's rate, lower `energy.boostDraw`, not the rate (design rule).
+
+## Power core (P1 of docs/design/energy-routing-impl.md; nothing in the game runs it yet)
+`common/src/ships/power/` (exported from `@space-game/common`): the touch-routed replacement for circuits.ts/energy.ts, built
+to §0 of the spec: **no wires** (power moves only between parts that share a full edge: rebuild's `joins`, bespoke joins
+included, never a corner), clips are true magazines with a manual Reload, beats unchanged at full supply. Pure,
+deterministic, integer eu (1/256 E), allocation-free per tick (module scratch: not re-entrant). P2 switches the game to it.
+
+| file | exports |
+|---|---|
+| units.ts | `EU` (256), `toEu(E)`, `fromEu(eu)`, `perTick(E/s)` (rounded), `perTickUp(E/s)` (weapons' intake: rounded up so a gun keeps its beat) |
+| layout.ts | `buildEnergyLayout(input: EnergyLayoutInput): EnergyLayout`, `layoutSig(L)`, `partHolds`/`partGives`/`partTakes(fn, area, mat[, pt])`, `powerTuning(tuning)`, `POWER_DEFAULTS`; `ROLE_*`, `GUN_SHOT`/`GUN_CLIP`/`GUN_BEAM`, `PHASE_THRUST`/`PHASE_TOOL`/`PHASE_WEAPON`, `NO_FILL_BOUND`, `NO_DEPTH`. Layout extras: `rounds` (a clip's salvo), `depth` (a relay's hops from generation). The sig leaves out generators' and dynamos' rates (health-scaled) |
+| state.ts | `EnergyState {sig, held: Int32Array, flags: Uint8Array, sat: Uint8Array, shieldSat, gauge}`, `FLAG_LATCH` (1), `FLAG_LIT` (2), `createEnergyState(L)` (full), `fullEnergy(L, out?)`, `remapEnergy(e, after, sameDesign)`, `energyGauge(L, e)`, `energyGaugePct(L, e)` |
+| tick.ts | `energyTick(L, e, ctl: EnergyControls, trace?)`, `thrustFrac()`/`thrustMul()` (by part, scratch), `stepThrustersFree(L, e, ctl)` (replicas), `settleEnergy(L, e, ticks, ctl?)` (default: tools asleep, wanting nothing; never refills an unlatched clip), `IDLE_CONTROLS` (every tool at full rate), `SETTLE_TICKS`; `genLeft()`/`givesLeft()`/`takesLeft()` (by part, scratch: waste and the Gives/Takes left after the tick); `drawFromRelays(L, e, p, eu, whole?)` (a one-off draw from the relays feeding p, fullest first: Flash); the guns' gates: `gunReady(L, e, p, n = L.rounds[p])`, `spendShot(L, e, p, n = L.rounds[p])` (returns eu, latches a clip that can't pay another salvo), `clipRounds(L, e, p)`, `beamStep(L, e, p, trigger)` (returns eu burnt). Every scratch accessor is valid only straight after the tick, for that layout's parts of its role |
+| wire.ts | `ENERGY_SLOT_LAYOUT`, `ENERGY_ROW {sig: 8, count: 9, at: 13}`, `packEnergy(L, e, out)` (appends sparse `(part, held*4+flags)` pairs, returns n), `energySlotEnd(data)`, `unpackEnergyInto(L, e, data)` (false on a sig mismatch), `energyDigest(L, e)` (u16 over held/flags: §4.1b stateHash), `packThrusterTail`/`unpackThrusterTail` (P3) |
+
+- **Input** (`EnergyLayoutInput`, all from rebuild): `fns`, `area`, `mats`, `alive`, `joins`, `core` (index or -1),
+  `tuning`, `weapons` (`{part, fire, interval}` from WeaponInfo: a gun not listed is inert; `interval` with mods but
+  **without** today's `/ satisfaction` term), `geoms` (for a Diode's out edge: pass it, or no Diode gives), `health`
+  (generators and dynamos × it). A store with `relayOnly` (the Conduit, P4) or `oneWay` (Diode) is never topped up by a
+  dynamo.
+- **Roles**: generator `produce`; relay = the core or any `store` (Battery, Capacitor, Drive Cell, Heavy Bank, Conduit,
+  Diode `oneWay`); thruster = engine or `strafe`; tool = any other `demand`; weapon; dynamo. Legacy defaults: a store
+  with no `discharge` Gives `energy.discharge.general` (600)/cell and Takes a quarter; a legacy gun's shot is its draw
+  over its interval, buffer 1, intake its draw; a legacy beam burns and takes its draw, buffer 2 s; a legacy engine
+  takes its boost burn and buffers 1 s of it.
+- **Controls** (`EnergyControls`): `active` (by part: thrusters pushing this tick; flight and the strafer set it),
+  `boosting`, `toolWant` (by part, eu this tick; null = every tool its full rate), `reload` (D2: latches every clip not full).
+- **Tick order**: budgets; thrusters take in then burn (boost only when it beats cruising); tools (`sat`, `shieldSat`);
+  weapons take in (a clip only while LATCHED; latch clears at full; a beam's at relight); generators push into touching
+  relays; relay pairs even out (one pass, one-way pairs never backwards; a full relay closes the last rounding gap to a
+  deeper one, `L.depth`, so chains fill exactly and never bounce); dynamos; gauge. serve(): generators first, then
+  relays fullest first, each waterfilling across its consumers smallest want first.
+- **Guns (P2.3 calls these from stepGuns)**: ready = `gunReady` (+ the mechanical cooldown); a charge gun's timer runs
+  only while `gunReady`; fire = `spendShot`; beams call `beamStep` each tick they are held.
+- **Trace** (hangar): `Float64Array(L.links)`; link ids: feeds `[0, linkPush)`, pushes, pairs (signed), dynamos;
+  `linkFrom`/`linkTo` per id.
+- Tests: `npx vitest run common/src/ships/power` (layout, tick scenarios from the prototype, 10k-tick determinism, wire
+  round trip). Bench: `POWER_BENCH=1 NODE_OPTIONS=--expose-gc npx vitest run common/src/ships/power/tick.bench.test.ts`.

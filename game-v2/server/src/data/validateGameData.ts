@@ -475,6 +475,8 @@ const SHIP_SHAPES: Record<string, Spec> = {
       'produce?': 'number', 'demand?': 'number', 'priority?': oneOf(1, 2, 3), 'loss?': 'number', 'thrust?': 'number', 'boost?': 'number',
       'boostDrain?': 'number', 'fireInterval?': 'number', 'capacity?': 'number', 'jumpCapacity?': 'number',
       'range?': 'number', 'weapon?': 'string', 'shield?': 'number', 'shieldRegen?': 'number', 'shieldDelay?': 'number', 'flash?': 'boolean', 'splashTaken?': 'number', 'jumpCooldown?': 'number', 'store?': 'number', 'pool?': oneOf('drive', 'weapon'), 'discharge?': 'number', 'bank?': 'boolean', 'legacy?': 'boolean',
+      // (Energy routing, types.ts FunctionDef: a store's Takes, an engine's refill and buffer)
+      'intake?': 'number', 'buffer?': 'number',
     })),
   }),
   // Player models (written by scripts/econ/models.mjs): functions with their own pieces, material, tier and unlock level
@@ -486,11 +488,14 @@ const SHIP_SHAPES: Record<string, Spec> = {
       'produce?': 'number', 'demand?': 'number', 'priority?': oneOf(1, 2, 3), 'thrust?': 'number', 'boost?': 'number', 'boostDrain?': 'number',
       'fireInterval?': 'number', 'capacity?': 'number', 'jumpCapacity?': 'number', 'range?': 'number', 'weapon?': 'string', 'shield?': 'number', 'shieldRegen?': 'number', 'shieldDelay?': 'number', 'flash?': 'boolean', 'splashTaken?': 'number', 'jumpCooldown?': 'number',
       'store?': 'number', 'pool?': oneOf('drive', 'weapon'), 'discharge?': 'number', 'bank?': 'boolean', 'dynamo?': 'number', 'armour?': 'number', 'massScale?': 'number', 'mount?': oneOf('fixed', 'turret'),
+      'intake?': 'number', 'buffer?': 'number',
       'mounting?': strict({ 'attach?': oneOf('back', 'any'), 'angle?': oneOf('straight', 'right'), 'arc?': 'number', 'clear?': 'any' }),
       // (A weapon's firing model: common/src/ships/types.ts FireSpec, guns.ts)
       'fire?': strict({ model: oneOf('cycle', 'clip', 'charge', 'ammo', 'beam', 'auto'), interval: 'number', 'clip?': 'number', 'reload?': 'number', 'reloadE?': 'number', 'regrow?': 'number',
         'charge?': 'number', 'cooldown?': 'number', 'chargeE?': 'number', 'burst?': strict({ n: 'number', gap: 'number' }), 'salvo?': 'number',
-        'spin?': strict({ from: 'number', to: 'number', up: 'number', down: 'number' }), 'windup?': 'number', 'rounds?': 'number' }),
+        'spin?': strict({ from: 'number', to: 'number', up: 'number', down: 'number' }), 'windup?': 'number', 'rounds?': 'number', 'semi?': 'boolean',
+        // (Energy routing: a shot gun's shot, intake and buffer; a beam's burn, intake, bufferE and relight)
+        'shot?': 'number', 'intake?': 'number', 'buffer?': 'number', 'burn?': 'number', 'bufferE?': 'number', 'relight?': 'number' }),
     })),
   }),
   'ships/materials.json': strict({
@@ -537,7 +542,8 @@ const SHIP_SHAPES: Record<string, Spec> = {
       });
     }),
     'shield?': obj({ regenDelayTicks: 'number', regenPerSecond: 'number', maxPerArea: 'number' }),
-    'energy?': 'any',
+    // (The core and the pool, circuits.ts/energy.ts; coreIntake and relight: energy routing, docs/design/energy-routing-impl.md §5.2)
+    'energy?': obj({ 'coreCapacity?': 'number', 'boostDraw?': 'number', 'coreDischarge?': 'number', 'discharge?': rec('number'), 'coreIntake?': 'number', 'relight?': 'number' }),
     'miner?': obj({ range: 'number', dps: 'number', shipDps: 'number', gimbalDeg: 'number' }),
     turret: obj({ halfArcDeg: 'number', sampleDeg: 'number', slewRate: 'number', fireToleranceDeg: 'number', barrelMargin: 'number' }),
     debris: obj({ lifetimeTicks: 'number', pushSpeed: 'number', pushSpin: 'number' }),

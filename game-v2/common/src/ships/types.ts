@@ -177,6 +177,14 @@ export interface FunctionDef {
   /** Engines: how much harder they push while boosting (× thrust), and how fast that drains the boost battery (× the usual) */
   boost?: number;
   boostDrain?: number;
+  /**
+   * Energy routing (docs/design/energy-routing-impl.md §2.4; read from P1, power/layout.ts), per unit of area, scaled
+   * like `demand`. Engines and Burst Strafers: E a second their own buffer refills at. Stores: their Takes, the most E a
+   * second they accept (with `store` their Holds and `discharge` their Gives)
+   */
+  intake?: number;
+  /** Energy routing: an engine's or Burst Strafer's own buffer, E per unit of area (it burns `demand`, boosted as today) */
+  buffer?: number;
   /** ticks (weapons) */
   fireInterval?: number;
   /** Weapon models: its firing model and its numbers (guns.ts stepGuns; docs/design/rework-2026-11.md §3). Legacy guns: none (rebuild.ts fireOf) */
@@ -234,6 +242,16 @@ export interface FunctionDef {
   dynamo?: number;
   /** Must point a facing edge out (engines and weapons do anyway: this is for the rest, e.g. mining lasers) */
   facing?: boolean;
+  /**
+   * Energy routing (docs/design/energy-routing-impl.md §1.1; power/layout.ts): a Diode. A relay that passes power one
+   * way only, out of its `facing` edge into the part across it; every other part touching it may only feed it
+   */
+  oneWay?: boolean;
+  /**
+   * Energy routing (§1.3 step 6; power/layout.ts): a pass-through relay (the Conduit, and a Diode implicitly): a
+   * Pulse Dynamo never tops it up. Data sets it from P4
+   */
+  relayOnly?: boolean;
   /** A mining laser (a beam that cuts rock while the pilot mines): `miner` itself, and the models of its family */
   mining?: boolean;
 
@@ -404,6 +422,18 @@ export interface FireSpec {
   charge?: number;
   cooldown?: number;
   chargeE?: number;
+  /**
+   * Energy routing (docs/design/energy-routing-impl.md §1.4, §5.1; read from P1), per whole part. Shot models (not
+   * beams): `shot` E a shot (a clip spends it per round), from a buffer of `buffer` shots (a clip's is its clip) refilled
+   * at `intake` E a second; `shot` is derived in models.mjs so that at full supply the beat is unchanged
+   */
+  shot?: number;
+  intake?: number;
+  buffer?: number;
+  /** Beams: `burn` E a second while lit, from a buffer of `bufferE` E refilled at `intake`; it relights at `relight` of the buffer (absent: tuning energy.relight) */
+  burn?: number;
+  bufferE?: number;
+  relight?: number;
   burst?: { n: number; gap: number };
   salvo?: number;
   spin?: { from: number; to: number; up: number; down: number };

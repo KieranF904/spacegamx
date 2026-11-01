@@ -429,7 +429,10 @@
     "boostDraw": 2.2,
     "_pool": "One ship pool and the banks (common/src/ships/circuits.ts, energy.ts; docs/design/rework-2026-11.md 2.2-2.3): the pool is the core's store plus the batteries on powered networks; it gives at most coreDischarge a second plus each battery's discharge per cell (models.json discharge; legacy batteries: discharge.general). Output = spare generation + that while the pool holds charge; past it the ship browns out. Capacitor and Drive Cell banks give at most their discharge (absent: discharge.bank, discharge.drive) to what they touch.",
     "coreDischarge": 720,
-    "discharge": { "general": 600, "drive": 1400, "bank": 2000 }
+    "discharge": { "general": 600, "drive": 1400, "bank": 2000 },
+    "_routing": "Energy routing (docs/design/energy-routing-impl.md 5.2; read from P1, common/src/ships/power): the core Takes at most coreIntake E a second; a beam relights once its buffer is back to relight of full (a weapon fire.relight overrides).",
+    "coreIntake": 120,
+    "relight": 0.5
   },
   "miner": {
     "range": 700,
