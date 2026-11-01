@@ -7,7 +7,7 @@ import type { Blueprint, PlacedPart } from '../../../common/src/ships/index';
 import { isEngine, placeGeometry } from '../../../common/src/ships/index';
 import {
   type CheckResult, type Concept, type DecodeResult, type Role, type Selector, type ShipgenContext,
-  CodeBook, outlineFit, outlinePicture, shipRows, briefLegend, briefText, buildLegend, check, coreLeftEdge, exposedCorners, halfOf, matches, mergeParts, outlineShapes, partAt, partKey, partPower, silhouetteScore, squareCornerWords, systemPrompt,
+  CodeBook, mirrorHalf, outlineFit, outlinePicture, partsToBlueprint, shipRows, briefLegend, briefText, buildLegend, check, coreLeftEdge, exposedCorners, halfOf, matches, mergeParts, outlineShapes, partAt, partKey, partPower, silhouetteScore, squareCornerWords, systemPrompt,
 } from '../core/index';
 import { type Attempt, type DesignOptions, type DesignOutcome, type LoopDeps, Session, better, contractFor, passes } from './design';
 import type { Emit } from './events';
@@ -39,6 +39,8 @@ export interface StepContext {
 
 export interface Step {
   id: string;
+  /** Facings to try for the step's codes in its placement menu ('' for none); no menu without it */
+  menu?: string[];
   title: string;
   /** What to add, in words */
   ask(s: StepContext): string;
@@ -142,6 +144,7 @@ export const STEPS: Step[] = [
     },
     near: { roles: ['core', 'generator', 'store'] },
     adds: (c, p) => isPower(c, p, 'generator') || isPower(c, p, 'store'),
+    menu: [''],
   },
   {
     id: 'weapons', title: 'weapons',
@@ -154,6 +157,7 @@ export const STEPS: Step[] = [
     },
     near: { roles: ['core', 'generator', 'store'], lane: 'N' },
     adds: (c, p) => matches(c, { role: 'weapon' }, p),
+    menu: ['^', '<'],
   },
   {
     id: 'engines', title: 'engines',
@@ -167,6 +171,7 @@ export const STEPS: Step[] = [
     },
     near: { roles: ['core', 'generator', 'store'], lane: 'S' },
     adds: (c, p) => matches(c, { role: 'engine' }, p),
+    menu: ['v'],
     extra: (s, bp) => engineHelp(s, bp),
   },
   {
@@ -316,6 +321,54 @@ export function suggestCells(ctx: ShipgenContext, bp: Blueprint, roles: string[]
   return [...out.entries()].sort((a, b) => { const [ax, ay] = a[0].split(',').map(Number), [bx, by] = b[0].split(',').map(Number); return (opts.lane === 'S' ? by - ay : ay - by) || ax - bx; }).slice(0, opts.max ?? 10).map((e) => e[1]);
 }
 
+/**
+ * Placements the tool has checked: each code (with each facing) tried alone on free cells (or frame hull) within two cells of
+ * a power part, on the left half and centre line in mirror mode; kept when the ship stays valid with no part left unpowered
+ * and the step's kind of part was added. A few per code, as "CODE col,row" the model can copy
+ */
+export function placementMenu(ctx: ShipgenContext, before: Blueprint, codes: string[], facings: string[], mirror: boolean, adds: (c: ShipgenContext, p: PlacedPart) => boolean, opts: { perCode?: number; max?: number } = {}): string[] {
+  const owner = new Map<string, PlacedPart>();
+  for (const p of before.parts) for (const c of placeGeometry(ctx.catalog, p).cells) owner.set(`${c[0]},${c[1]}`, p);
+  const core = before.parts.find((p) => p.fn === 'core');
+  if (!core) return [];
+  const cx = Math.max(...placeGeometry(ctx.catalog, core).cells.map((c) => c[0]));
+  const power = before.parts.filter((p) => { const fn = ctx.catalog.functions.get(p.fn); return !!fn && ['core', 'generator', 'store'].includes(partPower(ctx, fn, p.piece, p.material).role); });
+  const cells = new Set<string>();
+  for (const q of power) for (const [x, y] of placeGeometry(ctx.catalog, q).cells) {
+    for (let dx = -2; dx <= 2; dx++) for (let dy = -2; dy <= 2; dy++) {
+      if (Math.abs(dx) + Math.abs(dy) > 2 || (mirror && x + dx > cx)) continue;
+      const o = owner.get(`${x + dx},${y + dy}`);
+      if (!o || isFrame(o)) cells.add(`${x + dx},${y + dy}`);
+    }
+  }
+  const base = mirror ? halfOf(ctx, before) : before;
+  const dark0 = check(ctx, before).power?.unpowered.length ?? 0;
+  const out: string[] = [];
+  // (Guns tried from the nose back, engines from the tail forward, the rest nearest the core first)
+  const yOf = (k: string) => Number(k.split(',')[1]), cy = placeGeometry(ctx.catalog, core).cells[0][1];
+  const order = (f: string) => [...cells].sort((a, b) => (f === 'v' ? yOf(b) - yOf(a) : f ? yOf(a) - yOf(b) : Math.abs(yOf(a) - cy) - Math.abs(yOf(b) - cy)));
+  for (const code of codes) {
+    let n = 0;
+    for (const f of facings) {
+      for (const k of order(f)) {
+        if (n >= (opts.perCode ?? 3) || out.length >= (opts.max ?? 14)) break;
+        const entry = `${code}${f} ${k}`;
+        const book = new CodeBook(ctx);
+        const d = partsToBlueprint(ctx, `name: x\nparts:\n${entry}\nend`, { book });
+        if (!d.bp || d.errors.length || d.bp.parts.length !== 1 || !adds(ctx, d.bp.parts[0])) continue;
+        const m = mergeParts(ctx, base, d.bp.parts, isFrame, book);
+        if (!m.bp) continue;
+        let bp = clearLanes(ctx, m.bp).bp;
+        if (mirror) { const h = mirrorHalf(ctx, bp, { book }); if (!h.bp) continue; bp = h.bp; }
+        const r = check(ctx, bp, { book });
+        if (!r.valid || (r.power?.unpowered.length ?? 0) > dark0) continue;
+        out.push(entry); n++;
+      }
+    }
+  }
+  return out;
+}
+
 /** Empty cells next to these cells (not among them), on the left half and centre line in mirror mode */
 export function ringAround(ctx: ShipgenContext, bp: Blueprint, cells: string[], mirror: boolean, max = 8): string[] {
   const owner = new Set<string>();
@@ -376,6 +429,8 @@ export async function stagedLoop(deps: LoopDeps, o: DesignOptions, emit: Emit): 
     }
     emit({ type: 'step', step: step.id, index: i + 1, of: STEPS.length, status: 'start', round });
     const where = step.near ? suggestCells(ctx, before, step.near.roles, { lane: step.near.lane, mirror: S.mirror }) : [];
+    const menu = step.menu ? placementMenu(ctx, before, (hint[step.id] ?? '').split(/[;,]\s*|\s+/).filter((c) => /^[A-Z]{2,3}$/.test(c)), step.menu, S.mirror, step.adds ?? (() => true)) : [];
+    const menuLine = `Placements the tool checked (each works on its own: copy several that don't overlap, as many as the step needs): ${menu.join('; ')}.`;
     const ring = step.id === 'power' ? ringAround(ctx, before, where.map((w) => w.split(' ')[0]), S.mirror) : [];
     const parts = S.C.form === 'parts';
     const ask = [
@@ -388,6 +443,7 @@ export async function stagedLoop(deps: LoopDeps, o: DesignOptions, emit: Emit): 
       ...(ring.length ? [`Free cells one further out (touching those, for a second generator or store in a chain): ${ring.join('; ')}.`] : []),
       ...(where.length ? [`Free cells that touch power${step.near?.lane === 'N' ? ' with nothing in front' : step.near?.lane === 'S' ? ' with nothing behind' : ''} (col,row): ${where.join('; ')}. Put each new part ON one of them (frame hull there is replaced), not behind hull.`] : []),
       ...(step.extra ? step.extra(sc, before) : []),
+      ...(menu.length ? [menuLine] : []),
       step.replaces ? `Keep every other part already placed: this step may replace hull and armour.` : `Keep every part already placed. The frame's hull cells are placeholders: you may build over them.`,
       parts
         ? `Reply with name:, parts:, ONLY THE NEW PARTS (one per line, CODE col,row), and end. A new part placed on a frame hull cell replaces it.${S.mirror ? ' Only on the left half and the centre line.' : ''}`
@@ -439,6 +495,7 @@ export async function stagedLoop(deps: LoopDeps, o: DesignOptions, emit: Emit): 
           problems.length ? `Step ${i + 1} (${step.title}) is not done yet:\n${problems.map((x) => `- ${x}`).join('\n')}` : '',
           r.feedback,
           ...(step.extra ? step.extra(sc, before) : []),
+          ...(menu.length ? [menuLine] : []),
           S.conceptLine().trimEnd(),
           parts ? `Reply again with name:, parts:, ONLY THE NEW PARTS for this step, and end.` : S.ask(),
         ].filter(Boolean);
