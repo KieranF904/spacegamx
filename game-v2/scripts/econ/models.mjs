@@ -642,7 +642,8 @@ for (const m of models) m.carriesFlow = true;
   // Fixed ports: the generators (a cell's worth each) and the stores (In at the back, Out at the front: Out over In, so a
   // charged store pours; a Heavy Bank joins two lines into one)
   const PORTS = {
-    power_cell_reactor: ports('out', 'N', [0], 35), power_isotope_pile: ports('out', 'N', [0], 18),
+    // (A round piece's straight edges are its W and S: the Isotope Pile gives out of its W)
+    power_cell_reactor: ports('out', 'N', [0], 35), power_isotope_pile: ports('out', 'W', [0], 18),
     power_fusion_plant: ports('out', 'N', [0, 1], 100), power_overclock_reactor: ports('out', 'N', [0, 1], 70),
     power_battery: io(40, 60), power_capacitor: io(40, 400), power_drive_cell: io(60, 250), power_heavy_bank: io(70, 150, [0, 1], [0]),
     power_conduit: io(200, 200), power_diode: io(200, 200),
@@ -650,17 +651,15 @@ for (const m of models) m.carriesFlow = true;
   // Profiles and feeds (section 9, 10): what shapes a gun's draw, and the materials a gun or engine takes (about a third of the
   // mid guns, half of the high ones; none of the starters)
   const PROFILE = {
-    // (A thresholded gun's own ports are rated for it: a line below that rating, a lone Cell Reactor's, never fires it)
-    cannon_hammer: { profile: { threshold: 40 }, ports: ports('in', 'S', [0, 1], 20) },
     cannon_longbarrel: { profile: { discharge: 1 }, takes: ['overcharge', 'coolant', 'flux'] },
-    cannon_bastion: { profile: { threshold: 90 }, takes: ['overcharge', 'accelerant'], ports: ports('in', 'S', [0, 1], 50) },
+    cannon_bastion: { takes: ['overcharge', 'accelerant'] },
     autocannon_chainsaw: { takes: ['coolant', 'flux'] },
     pulse_overpulse: { takes: ['coolant', 'accelerant'] },
-    laser_cutter: { profile: { burst: true, rest: 1 }, takes: ['lens', 'coolant'] },
+    laser_cutter: { profile: { burst: true, rest: 0.5 }, takes: ['lens', 'coolant'] },
     laser_searchlight: { takes: ['lens'] },
-    railgun_spear: { profile: { steady: 30, passive: 5 }, takes: ['damping', 'overcharge'], ports: ports('in', 'S', [0, 1], 30) },
+    railgun_spear: { profile: { steady: 30, passive: 5 }, takes: ['damping', 'overcharge'] },
     railgun_rail_driver: { takes: ['accelerant', 'coolant'] },
-    lance_lance: { profile: { burst: true, rest: 2, passive: 20 }, takes: ['lens', 'coolant'] },
+    lance_lance: { profile: { burst: true, rest: 1, passive: 20 }, takes: ['lens', 'coolant'] },
     legendary_singularity: { profile: { passive: 30, discharge: 1.5 }, takes: ['overcharge', 'coolant', 'damping'] },
     engine_plasma_drive: { takes: ['catalyst', 'reaction'] },
     engine_fusion_torch: { takes: ['catalyst', 'burstgel'] },
@@ -670,9 +669,10 @@ for (const m of models) m.carriesFlow = true;
     if (PORTS[m.id]) m.ports = PORTS[m.id];
     else if (m.weapon || m.thrust || m.shield || m.gyro || m.jumpCapacity || m.mining || m.siphon || m.range || m.strafe || m.tow) {
       // (Consumers: In at the back, a little over the draw, split over the back cells; an engine's its own intake)
-      const cells = backCells(m.pieces[0]), area = PIECE_AREA[m.pieces[0]];
+      const side = m.mounting?.angle === 'right', cells = side ? [0] : backCells(m.pieces[0]), area = PIECE_AREA[m.pieces[0]];
       const draw = m.thrust ? (m.intake ?? m.demand) * area : (m.demand ?? 0) * area * 1.5;
-      if (draw > 0) m.ports = ports('in', 'S', cells, Math.max(4, Math.ceil(draw / cells.length)));
+      // (A side mount (mounting angle 'right': it fires at right angles to the edge it bolts on, the W in its own frame) takes there)
+      if (draw > 0) m.ports = ports('in', side ? 'W' : 'S', cells, Math.max(4, Math.ceil(draw / cells.length)));
     }
     if (PROFILE[m.id]) Object.assign(m, PROFILE[m.id]);
   }
@@ -737,10 +737,43 @@ for (const m of models) m.carriesFlow = true;
     weapon: 'cannon', ...mounted('cannon_slurry', slurryDesc), hpScale: r2(FNS.get('weapon').hpScale * 1.1), demand: 18, priority: 2, fireInterval: 42,
     weaponMods: { mul: { damage: xp(48 / 14), speed: xp(38 / 48), size: xp(1.5) }, add: { pen: 1 } }, blast: BLAST.weapon,
     fire: { model: 'cycle', interval: 42, shot: 25, intake: 45, buffer: 1 },
-    ports: ports('in', 'S', [0], 60), feedPort: { side: 'S', cell: 1, required: true }, takes: ['overcharge', 'accelerant', 'flux'], profile: { threshold: 40 },
+    ports: ports('in', 'S', [0], 54), feedPort: { side: 'S', cell: 1, required: true }, takes: ['overcharge', 'accelerant', 'flux'],
     rarity: 'rare', category: 'weapons', fabOrder: next('weapons'), ...legacyLook('weapon'),
     guide: { name: 'Slurry Cannon', blurb: 'The two-input gun', piece: 'rect2', order: guideOrder++ },
   });
+  // Infrastructure tiers (docs/design/energy-ports-2026-11.md section 15): two ways to arm a ship. Simple guns run off a
+  // Cell Reactor at each port: many of them, cheap. Mid, heavy and super guns need lines rated `line` E/s at every port (a
+  // lone Cell Reactor's 35 never fires them: an Overclock's 70 or a Battery's 60 for mid, a Fusion Plant's 100 for heavy, a
+  // Surge Cell's for super), and pay that back in damage: `damage` x on a ports ship, set so that damage a second per cell
+  // of gun and its cheapest rig climbs with the tier (scratch measure: ports-tiers in the design doc). A material that
+  // raises the threshold (Accelerant) needs heavier lines still; one that lowers it (Damping Gel) lets a lighter rig through.
+  // Ammunition, support and legendary guns are tiered but keep their damage (they pay in rounds, roles and artefacts)
+  const LINE = { simple: 0, mid: 50, heavy: 85, super: 120 };
+  const INFRA = {
+    cannon_pip: ['simple', 1], autocannon_rattler: ['simple', 1], laser_glint: ['simple', 1], pulse_strobe: ['simple', 1], arc_spark: ['simple', 1],
+    autocannon_stinger: ['simple', 1], flak_burst: ['simple', 1], mortar_lobber: ['simple', 1], missile_dart: ['simple', 1],
+    // (Mid: 1.2x the simple guns' damage a cell (24) on an Overclock or a Battery line, at most 2x)
+    railgun_coilgun: ['mid', 1.3], autocannon_chainsaw: ['mid', 1.45], cannon_hammer: ['mid', 1.7], cannon_twinlink: ['mid', 1.85],
+    cannon_slurry: ['mid', 2], pulse_overpulse: ['mid', 2], flak_cloudmaker: ['mid', 2], laser_searchlight: ['mid', 2],
+    railgun_needle: ['mid', 1], torpedo_eel: ['mid', 1], missile_swarm: ['mid', 1], mortar_quake: ['mid', 1],
+    // (Heavy: 1.4x a cell on a Fusion Plant, at most 2.5x: the Longbarrel and Spear stay under it, paid in reach and pierce)
+    laser_cutter: ['heavy', 2.5], arc_tesla: ['heavy', 2.3], cannon_longbarrel: ['heavy', 2.5], railgun_spear: ['heavy', 2.5], railgun_rail_driver: ['heavy', 2.5],
+    cannon_bastion: ['heavy', 2.5], missile_hammerhead: ['heavy', 1], torpedo_leviathan: ['heavy', 1],
+    // (Super: 1.6x a cell on Surge Cells over a Fusion Plant, at most 3x. A burst beam's damage a second counts its rests:
+    // the Cutter is lit about half the time, the Lance about 45%; 3x makes its beam 630 a second while it burns)
+    lance_lance: ['super', 3],
+  };
+  for (const m of models) {
+    const t = INFRA[m.id];
+    if (!t) continue;
+    const [tier, damage] = t, line = LINE[tier];
+    m.infra = { tier, damage };
+    if (!line || m.fire?.model === 'ammo') continue;
+    const ins = (m.ports ?? []).filter((q) => q.dir === 'in');
+    const thr = Math.max(1, ...(m.takes ?? []).map((f) => TUNING.feeds?.[f]?.mod.threshold ?? 1));
+    m.profile = { ...(m.profile ?? {}), threshold: line * ins.length };
+    m.ports = m.ports.map((q) => (q.dir === 'in' ? { ...q, rate: Math.max(q.rate, Math.ceil(line * thr)) } : q));
+  }
 }
 // ---- (end ports energy core)
 

@@ -90,6 +90,8 @@ export interface PortsLayout {
   burst: Uint8Array;
   threshold: Int32Array;
   steady: Int32Array;
+  /** Weapons: the damage x its infrastructure tier gives it (FunctionDef.infra) */
+  tierDmg: Float64Array;
   /** Tools: 1 for a shield generator */
   shield: Uint8Array;
   /** Lines (conduit-like stores: they carry material too) */
@@ -221,6 +223,7 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
   const Z = () => new Int32Array(n);
   const role = new Uint8Array(n), cap = Z(), rate = Z(), burn = Z(), bBurn = Z(), boostMul = new Float64Array(n).fill(1);
   const gun = new Uint8Array(n), shot = Z(), rounds = Z(), relight = Z(), passive = Z(), discharge = Z(), rest = Z(), burst = new Uint8Array(n), threshold = Z(), steady = Z();
+  const tierDmg = new Float64Array(n).fill(1);
   const shield = new Uint8Array(n), carrier = new Uint8Array(n), matCap = Z(), matUse = Z(), takes = Z(), tankFeed = new Uint8Array(n), feedPort = new Uint8Array(n);
   const mul = () => new Float64Array(n * W).fill(1);
   const mShot = mul(), mDamage = mul(), mCycle = mul(), mDischarge = mul(), mRest = mul(), mBurn = mul(), mThreshold = mul(), mSteady = mul(), mThrust = mul(), mBoost = mul(), mBoostDrain = mul();
@@ -269,6 +272,7 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
       const pr = fn.profile ?? {};
       passive[i] = perTick(pr.passive ?? 0); discharge[i] = Math.round((pr.discharge ?? 0) * TPS); rest[i] = Math.round((pr.rest ?? 0) * TPS);
       // (A threshold rounds down, so a line rated exactly at it passes)
+      tierDmg[i] = fn.infra?.damage ?? 1;
       burst[i] = pr.burst ? 1 : 0; threshold[i] = Math.floor(((pr.threshold ?? 0) * EU) / TPS); steady[i] = perTick(pr.steady ?? 0);
     } else if (isEngine(fn)) {
       role[i] = P_THRUSTER;
@@ -393,7 +397,7 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
   for (let i = 0; i < n; i++) if (role[i] === P_THRUSTER || role[i] === P_TOOL || role[i] === P_WEAPON) consumers.push(i);
   let gaugeMax = 0; for (const r of relays) gaugeMax += cap[r];
   const L: PortsLayout = {
-    n, sig: 0, role, cap, rate, burn, bBurn, boostMul, gun, shot, rounds, relight, passive, discharge, rest, burst, threshold, steady, shield, carrier, matCap, matUse, takes, tankFeed, feedPort,
+    n, sig: 0, role, cap, rate, burn, bBurn, boostMul, tierDmg, gun, shot, rounds, relight, passive, discharge, rest, burst, threshold, steady, shield, carrier, matCap, matUse, takes, tankFeed, feedPort,
     mShot, mDamage, mCycle, mDischarge, mRest, mBurn, mThreshold, mSteady, mThrust, mBoost, mBoostDrain, feeds, feedDefs,
     links: linkFrom.length, linkFrom: Int32Array.from(linkFrom), linkTo: Int32Array.from(linkTo), linkCap: Int32Array.from(linkCap),
     outStart, outLink: Int32Array.from(outLink), inStart, inLink: Int32Array.from(inLink), openIn, openOut,
@@ -546,6 +550,8 @@ export function portsTick(L: PortsLayout, e: PortsState, ctl: Readonly<PortsCont
   for (let p = 0; p < L.n; p++) {
     const a = L.inStart[p], b = L.inStart[p + 1]; if (a === b) continue;
     let space = spaceOf(L, e, p);
+    // (A gun takes at most its own intake, however well rated its lines: the rating is the threshold's, the intake its rhythm's)
+    if (L.role[p] === P_WEAPON && space > L.rate[p]) space = L.rate[p];
     const th = L.role[p] === P_WEAPON ? effThreshold(L, e, p) : 0;
     if (th > 0) { let rated = 0; for (let x = a; x < b; x++) { const l = L.inLink[x]; if (offer[l] > 0) rated += L.linkCap[l]; } if (rated < th) space = 0; }
     if (b - a === 1) { const l = L.inLink[a]; send[l] = offer[l] < space ? offer[l] : space; continue; }
@@ -649,12 +655,17 @@ export function portsGunReady(L: PortsLayout, e: PortsState, p: number, n = L.ro
 /** Pay for a shot: eu off the buffer, material off the feed buffer, the ports shut for the discharge. Returns the damage multiplier its material gives */
 export function portsSpendShot(L: PortsLayout, e: PortsState, p: number, n = L.rounds[p] || 1): number {
   const f = matOf(L, e, p), s = effShot(L, e, p) * n, h = e.held[p], paid = h < s ? h : s;
-  const dmg = f ? L.mDamage[p * L.feeds.length + f] : 1;
+  const dmg = (f ? L.mDamage[p * L.feeds.length + f] : 1) * L.tierDmg[p];
   e.held[p] = h - paid;
   const d = effDischarge(L, e, p); if (d > 0) e.closed[p] = d > 32000 ? 32000 : d;
   if (f) { e.amt[p] -= L.matUse[p] * n; if (e.amt[p] <= 0) { e.amt[p] = 0; e.mat[p] = 0; } }
   if (L.gun[p] === 2 && e.held[p] < s) e.flags[p] |= PF_LATCH;
   return dmg;
+}
+/** What a gun's hits are worth on a ports ship: its tier's damage and its material's (beams and pulses: the server's fireBeam) */
+export function portsDamageMul(L: PortsLayout, e: PortsState, p: number): number {
+  const f = matOf(L, e, p);
+  return (f ? L.mDamage[p * L.feeds.length + f] : 1) * L.tierDmg[p];
 }
 /** A beam's tick while the trigger's held: lights when it may (a burst beam only when full), burns a tick's worth, goes out and rests when it can't. Returns eu burnt */
 export function portsBeamStep(L: PortsLayout, e: PortsState, p: number, trigger: boolean): number {

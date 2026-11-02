@@ -7,7 +7,7 @@
  * Damage goes through the bridge (b.hurt), never an import of the damage module, so the modules can't form a cycle.
  */
 
-import { rayTerrain } from '@space-game/common';
+import { rayTerrain, portsDamageMul } from '@space-game/common';
 import { hasComponent } from 'bitecs';
 import {
   Position, Input, Player, InSystem, Projectile, ShipState, Vec2, damagePart, weaponHit, shooterGrade, localToWorldDir,
@@ -342,7 +342,9 @@ export function fireBeam(b: BridgeCtx, eid: number, ship: ShipState, w: WeaponIn
   // (A zapping beam, the Tesla's, burns its dps x zap / 60 all at once every `zap` ticks, and nothing in between)
   const zapping = !pulse && !!def.zap;
   const zapK = zapping ? (b.host.getTick() % def.zap! === 0 ? def.zap! : 0) : 1;
-  const dmg = zapK * (pulse ? pulse.damage : ((def.dps ?? 50) / 60) * windupScale(ship, w)) * Math.max(w.satisfaction, b.tuning.flow.minWeaponSatisfaction) * w.strength * b.damageMul(eid) * npc;
+  // (A ports ship's gun: its infrastructure tier's damage and its material's, power/ports.ts)
+  const pz = ship.derived.ports, pc = pz ? b.chargeOf(eid).e : undefined;
+  const dmg = zapK * (pulse ? pulse.damage : ((def.dps ?? 50) / 60) * windupScale(ship, w)) * Math.max(w.satisfaction, b.tuning.flow.minWeaponSatisfaction) * w.strength * b.damageMul(eid) * npc * (pz && pc ? portsDamageMul(pz, pc, w.part) : 1);
   let shipHit: { eid: number; ship: ShipState; part: number; t: number } | null = null;
   // It burns `width` wide: a hull that close to its line is hit (its edges are tried when the line itself misses)
   const half = (pulse ? pulse.width : def.width ?? 0) / 2;

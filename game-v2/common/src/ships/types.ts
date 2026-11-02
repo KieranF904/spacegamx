@@ -274,6 +274,8 @@ export interface FunctionDef {
   feedUse?: number;
   feedBuf?: number;
   feedMods?: Record<string, Record<string, number>>;
+  /** Weapons, ports ships: its infrastructure tier (simple guns run off a reactor; mid, heavy and super ones need rated lines: profile.threshold) and the damage x that pays for it */
+  infra?: { tier: 'simple' | 'mid' | 'heavy' | 'super'; damage: number };
   /** Feed layer: its own feed input beside its power input (a pipe joins it there); `required`: it does nothing without material */
   feedPort?: { side: Side; cell?: number; required?: boolean };
   /** A mining laser (a beam that cuts rock while the pilot mines): `miner` itself, and the models of its family */

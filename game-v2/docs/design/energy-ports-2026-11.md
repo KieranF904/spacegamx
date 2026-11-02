@@ -523,3 +523,79 @@ Passthrough, two Reaction Thrusters on one Reaction Mass tank).
 Not in this cut: the hangar draws no port glyphs and its load test skips ports ships; tanks refill only on a rebuild
 (a respawn or swap); mining lasers and part features (Tow, Strafer, Flash) are unaccounted on a ports ship; shields
 draw their buffer but their `sat` isn't wired to the shield; a hazard's battery cap is ignored.
+
+## 15. Two ways to arm a ship: infrastructure tiers (2026-11-03)
+
+The owner's framing: a ship is armed one of two ways. **Simple guns** need almost nothing (a Cell Reactor at the port),
+so a ship carries many of them: a spammer, resilient, nothing worth sniping. **Infrastructure guns** need rated lines,
+stores and feeds that eat the parts quota, so a ship carries two or three, and each must be much better and look it:
+harder per shot or a frightening rate. The unit of balance is the gun **and the cheapest rig that runs it**.
+
+Every powered gun has a tier (`infra.tier` in models.mjs, the `INFRA` table) and the tier sets the line rating it needs
+at each port (`profile.threshold`, the gun's port ratings raised to match):
+
+| Tier | Line at each port | Cheapest rig that passes | Damage a cell, target |
+|---|---|---|---|
+| simple | none | a Cell Reactor (35) | the simple guns' mean, 24 |
+| mid | 50 | an Overclock Reactor (70), or a Battery (60) on a reactor | 1.2x |
+| heavy | 85 | a Fusion Plant (100) | 1.4x |
+| super | 120 | Surge Cells (300) on a Fusion Plant | 1.6x |
+
+A material that raises the threshold (Accelerant, x1.5) needs a heavier rig; Damping Gel (x0.5) lets a lighter one
+through: a feed choice that is also an infrastructure choice. The core gives 150 at its N and S ports, so a gun fed
+straight off the core passes any tier: one or two guns can sit there.
+
+`infra.damage` pays for the rig, on ports ships only (`portsSpendShot` for shells, `portsDamageMul` in the server's beam
+and pulse damage). It was set by measuring every gun on the four rigs through the game's own ports core (10 s to spend
+its starting charge, then 60 s of fire; a semi-automatic gun clicked; a beam counted by the time it is lit, so a burst
+beam's rests count), picking the rig with the most damage a cell, and solving for the tier's target, between 1 and a cap
+(mid 2, heavy 2.5, super 3). The burst beams' rests were shortened (Cutter 0.5 s, Lance 1 s) so their duty can reach it.
+Ammunition guns keep their damage (they pay in rounds), as do support guns and legendaries. A gun takes at most its own
+intake a tick, however well rated its lines (the rating gates it; the intake keeps its rhythm).
+
+| Gun | Tier | Fires on a simple, mid, heavy, super rig | Best rig | Cells | Dmg/s | Damage × | Dmg/s per cell |
+|---|---|---|---|---|---|---|---|
+| Pip | simple | ●●●● | simple | 2.0 | 56 | 1 | 28.0 |
+| Strobe | simple | ●●●● | simple | 2.0 | 54 | 1 | 27.0 |
+| Glint | simple | ●●●● | simple | 2.0 | 53 | 1 | 26.7 |
+| Spark | simple | ●●●● | simple | 2.0 | 45 | 1 | 22.7 |
+| Rattler | simple | ●●●● | simple | 2.0 | 43 | 1 | 21.4 |
+| Stinger | simple | ●●●● | simple | 2.0 | 36 | 1 | 17.8 |
+| Lobber (ammo) | simple | ●●●● | simple | 2.0 | 28 | 1 | 14.0 |
+| Dart (ammo) | simple | ●●●● | simple | 2.0 | 28 | 1 | 14.0 |
+| Burst (ammo) | simple | ●●●● | simple | 2.0 | 26 | 1 | 12.9 |
+| Eel (ammo) | mid | ●●●● | simple | 4.0 | 117 | 1 | 29.3 |
+| Hammer | mid | ·●●● | mid | 4.0 | 117 | 1.7 | 29.1 |
+| Chainsaw | mid | ·●●● | mid | 4.0 | 116 | 1.45 | 29.0 |
+| Coilgun | mid | ·●●● | mid | 4.0 | 116 | 1.3 | 28.9 |
+| Twinlink | mid | ·●●● | mid | 4.0 | 115 | 1.85 | 28.6 |
+| Slurry Cannon | mid | ·◐●● | mid | 5.0 | 108 | 2 | 21.6 |
+| Overpulse | mid | ·●●● | mid | 4.0 | 80 | 2 | 20.0 |
+| Searchlight | mid | ·●●● | mid | 2.8 | 50 | 2 | 18.0 |
+| Cloudmaker | mid | ·●●● | mid | 4.0 | 50 | 2 | 12.4 |
+| Needle (ammo) | mid | ●●●● | simple | 4.0 | 50 | 1 | 12.4 |
+| Swarm (ammo) | mid | ●●●● | simple | 3.0 | 36 | 1 | 12.1 |
+| Quake (ammo) | mid | ●●●● | simple | 4.0 | 43 | 1 | 10.6 |
+| Leviathan (ammo) | heavy | ●●●● | simple | 6.0 | 229 | 1 | 38.2 |
+| Tesla | heavy | ··●● | heavy | 4.8 | 161 | 2.3 | 33.6 |
+| Cutter | heavy | ··●● | heavy | 6.0 | 194 | 2.5 | 32.3 |
+| Bastion | heavy | ··●● | heavy | 8.0 | 250 | 2.5 | 31.2 |
+| Rail Driver | heavy | ··●● | heavy | 8.0 | 240 | 2.5 | 30.0 |
+| Spear | heavy | ··●● | heavy | 8.0 | 211 | 2.5 | 26.3 |
+| Longbarrel | heavy | ··●● | heavy | 6.0 | 121 | 2.5 | 20.2 |
+| Hammerhead (ammo) | heavy | ●●●● | simple | 6.0 | 44 | 1 | 7.3 |
+| Lance | super | ···● | super | 8.0 | 240 | 3 | 30.1 |
+
+Reading it: the lighter rigs never fire a mid, heavy or super gun once its starting charge is spent (the dots), so the
+tiers are forced, not advised. Mid guns land on 1.2x (29 a cell) where the cap allows; the Overpulse, Searchlight and
+Cloudmaker stay under it at the cap (their worth is the mark and the area). Heavy guns land on 1.4x (31-34) except the
+Longbarrel and Spear, paid instead in reach and pierce. The Lance is at 30 a cell even at 3x, because its rests are long;
+lit, it burns 630 a second.
+
+Build points still follow grade (a Bastion is cobalt, Mk IV), so a heavy build costs more points as well as more cells:
+the Monitor below is 82 points against the Hornet's 48. Whether that double price is right is for testing.
+
+Example ships (F9, Ports energy): **Hornet** (eight simple guns, each on its own reactor: 416 dmg/s, 48 cells),
+**Brawler** (a Hammer and two Twinlinks on Overclocks: 346, 42 cells), **Monitor** (two Bastions on Fusion Plants, 450 a
+ball: 500, 52 cells), **Pike** (one Lance on Surge Cells over a Fusion Plant with Lens Fluid: 630 while lit, 43 cells).
+The scratch tools that made the table and the ships (measure.mjs, design.mjs) are not in the repo.
