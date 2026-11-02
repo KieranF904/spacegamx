@@ -139,9 +139,10 @@ def groups(cells: set[tuple[int, int]]) -> list[set[tuple[int, int]]]:
     return sorted(out, key=len, reverse=True)
 
 
-def check(parts: list[list[str]], turrets: set[tuple[int, int]], names: dict[str, str] | None = None) -> list[str]:
+def check(parts: list[list[str]], turrets: set[tuple[int, int]], names: dict[str, str] | None = None, want_turrets: bool = True) -> list[str]:
     """A finished ship's rules: it reaches the centre column, it is one connected shape (so the mirrored ship is too),
-    there are 1 or 2 turrets a side, and each turret is the top filled cell of its column"""
+    there are 1 or 2 turrets a side (when want_turrets: a step that may not place them is not asked for them), and each
+    turret is the top filled cell of its column"""
     names = names or {}
     nm = lambda s: f'{names[s]} ({s})' if s in names else s
     cells = filled(parts, turrets)
@@ -155,7 +156,7 @@ def check(parts: list[list[str]], turrets: set[tuple[int, int]], names: dict[str
         xs = sorted({x for _y, x in g})
         syms = sorted({parts[y][x] if parts[y][x] != EMPTY else TURRET for y, x in g})
         out.append(f'{" and ".join(nm(s) for s in syms)} at {rows_cols(ys, xs)} do{"es" if len(g) == 1 else ""} not touch the rest of the ship.')
-    if not 1 <= len(turrets) <= 2:
+    if want_turrets and not 1 <= len(turrets) <= 2:
         out.append(f'{len(turrets)} turrets a side; the ship wants 1 or 2.')
     for y, x in sorted(turrets):
         if parts[y][x] in (EMPTY, '#'):
@@ -164,6 +165,63 @@ def check(parts: list[list[str]], turrets: set[tuple[int, int]], names: dict[str
         if above:
             out.append(f'Turret at row {y}, column {x} has filled cells above it in column {x} (rows {span(above)}). A turret must be the top filled cell of its column.')
     return out
+
+
+ACTIONS = ('add', 'remove', 'change', 'turrets')
+
+
+def enforce(before: list[list[str]], before_t: set, after: list[list[str]], after_t: set, key: set[str], editable: set[str],
+            actions: set[str], names: dict[str, str] | None = None) -> tuple[list[list[str]], set, list[str]]:
+    """A reply held to what the step allows. key: the letters the prompt showed or offered; editable: the ones it may draw,
+    remove or change; actions: some of add (fill '.' cells), remove (back to '.'), change (one letter to another),
+    turrets (add, move or remove T). Anything else goes back to how it was before, and is listed for the model.
+    Returns (parts, turrets, problems)"""
+    names = names or {}
+    nm = lambda s: f'{names[s]} ({s})' if s in names else s
+    out = [row[:] for row in before]
+    broke: dict[tuple[str, str], list[tuple[int, int]]] = {}
+    for y, row in enumerate(after):
+        for x, a in enumerate(row):
+            b = before[y][x]
+            # (A T hides the part under it: a turret cell counts as unchanged unless it was emptied)
+            if a != EMPTY and b != EMPTY and ((y, x) in after_t or (y, x) in before_t):
+                a = b
+            if a == b:
+                continue
+            if a != EMPTY and a not in key:
+                why = ('letter', a)
+            elif b == EMPTY:
+                why = ('add', '') if 'add' not in actions else ('add-part', a) if a not in editable else None
+            elif a == EMPTY:
+                why = ('remove', '') if 'remove' not in actions else ('remove-part', b) if b not in editable else None
+            else:
+                why = ('change', '') if 'change' not in actions else ('change-part', b if b not in editable else a) if b not in editable or a not in editable else None
+            if why:
+                broke.setdefault(why, []).append((y, x))
+            else:
+                out[y][x] = a
+    turrets = set(before_t)
+    if 'turrets' in actions:
+        turrets = {c for c in after_t if out[c[0]][c[1]] != EMPTY}
+    elif set(after_t) != set(before_t):
+        broke[('turrets', '')] = sorted(set(after_t) ^ set(before_t))
+    words = {
+        'letter': lambda s: f'{s} is not a letter in the key; you used it on',
+        'add': lambda s: 'adding cells is not allowed in this step; you filled',
+        'add-part': lambda s: f'you may not draw {nm(s)} in this step; you put it on',
+        'remove': lambda s: 'removing cells is not allowed in this step; you emptied',
+        'remove-part': lambda s: f'you may not remove {nm(s)} in this step; you emptied',
+        'change': lambda s: 'changing a cell from one part to another is not allowed in this step; you changed',
+        'change-part': lambda s: f'you may not change {nm(s)} in this step; you changed',
+        'turrets': lambda s: 'adding, moving or removing turrets (T) is not allowed in this step; T changed on',
+    }
+    problems = []
+    for (kind, s), cells in broke.items():
+        ys, xs = sorted({y for y, _x in cells}), sorted({x for _y, x in cells})
+        n = len(cells)
+        text = words[kind](s)
+        problems.append(f'{text[0].upper()}{text[1:]} {n} cell{"s" if n > 1 else ""} at {rows_cols(ys, xs)}. {"They were" if n > 1 else "It was"} put back.')
+    return out, turrets, problems
 
 
 def rectangles(parts: list[list[str]]) -> list[tuple[str, int, int, int, int]]:

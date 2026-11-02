@@ -73,6 +73,24 @@ def test_rectangles_cover_exactly():
         assert set(seen) == {(y, x) for y, row in enumerate(p) for x, c in enumerate(row) if c != '.'}
 
 
+def test_enforce():
+    before = [list('A..'), list('AB.'), list('...')]
+    after = [list('AA.'), list('.BC'), list('Z..')]
+    names = {'A': 'Hull', 'B': 'Wing'}
+    # everything allowed, A and B editable; C and Z not in the key
+    out, t, probs = ag.enforce(before, set(), after, set(), {'A', 'B'}, {'A', 'B'}, set(ag.ACTIONS), names)
+    assert out == [list('AA.'), list('.B.'), list('...')]
+    assert sorted(p.split(' ')[0] for p in probs) == ['C', 'Z']
+    # add only, and only A: the emptied A comes back
+    out, t, probs = ag.enforce(before, set(), after, set(), {'A', 'B', 'C', 'Z'}, {'A'}, {'add'}, names)
+    assert out == [list('AA.'), list('AB.'), list('...')]
+    assert any(p.startswith('Removing cells is not allowed') for p in probs)
+    assert any(p.startswith('You may not draw C') for p in probs)
+    # turrets locked
+    out, t, probs = ag.enforce(before, {(0, 0)}, before, {(1, 1)}, {'A', 'B'}, {'A', 'B'}, {'add'}, names)
+    assert t == {(0, 0)} and any('turrets' in p for p in probs)
+
+
 def test_l_shape():
     p = [list('A..'), list('A..'), list('AAA')]
     assert ag.rectangles(p) == [('A', 0, 0, 1, 3), ('A', 2, 1, 2, 1)]

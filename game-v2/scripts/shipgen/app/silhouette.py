@@ -12,10 +12,15 @@
 # Or a lettered ASCII grid of the right half (asciigrid.py): row numbers, then '.' empty, A B C ... parts, T turrets.
 # Each part gets its own colour and the panel lists the rules broken. Copy grid writes the drawing back out in that
 # format (a letter per colour), to start a prompt from; Copy pieces writes it as Block[y,x,w,h] / Turret[y,x].
-# Ask a model (Ollama or LM Studio, localllm.py): write what to change and Send. The prompt (prompts/ascii/edit.txt, read
-# fresh each time so it can be tuned while the window is open) carries the current grid and key; the reply, a lettered
-# grid, replaces the drawing (Ctrl+Z steps back). A reply that breaks the rules goes back with the problems, up to
-# Retries times. Every prompt and reply is kept in out/silhouettes/ai.
+# Ask a model (Ollama, LM Studio or Anthropic, localllm.py): write the task and Send. Each Send is one step: pick the
+# colours the model may draw with (a colour not on the grid yet is offered as a new part) and what it may do (add
+# cells, remove cells, change a cell's part, turrets). The prompt (prompts/ascii/step.txt, read fresh each time so it
+# can be tuned while the window is open) carries the current grid, the key and those permissions; whatever the reply
+# does beyond them is put back and told to the model. The reply replaces the drawing (Ctrl+Z steps back); one that
+# breaks a rule goes back with the problems, up to Retries times. Prompts and replies are kept in out/silhouettes/ai.
+# Parts: each colour is a part (a letter for the model). Rename, delete or merge parts; untick "Model sees" to leave a
+# part out of the prompt (it comes back unchanged after the reply). Reset design empties everything.
+# A crash is written to out/silhouettes/crash.log.
 #   pythonw scripts/shipgen/app/silhouette.py   or  npm run silhouette   (the Shipgen window's Silhouette button opens it
 #   as its own process too)
 import json
@@ -30,8 +35,8 @@ import localllm
 from PySide6.QtCore import QObject, QPointF, QRectF, QSettings, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QIcon, QKeySequence, QPainter, QPen, QPixmap, QPolygonF, QShortcut, QTextCursor
 from PySide6.QtWidgets import (
-    QApplication, QButtonGroup, QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QHBoxLayout, QLabel, QMainWindow, QPlainTextEdit, QPushButton,
-    QSpinBox, QTabWidget, QVBoxLayout, QWidget,
+    QAbstractItemView, QApplication, QButtonGroup, QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QHBoxLayout, QHeaderView, QLabel, QMainWindow,
+    QPlainTextEdit, QPushButton, QSpinBox, QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget,
 )
 
 PALETTE = [
@@ -57,7 +62,9 @@ MIRROR_SHAPE = {0: 0, 1: 4, 4: 1, 2: 3, 3: 2}
 SHAPE_NAMES = {0: 'whole cell', 1: 'triangle, flat on the bottom and left', 2: 'triangle, flat on the top and left',
                3: 'triangle, flat on the top and right', 4: 'triangle, flat on the bottom and right'}
 BG, GRID_LINE, CENTRE = QColor('#080a0d'), QColor('#161c23'), QColor('#2f5f8c')
-EDIT_PROMPT = Path(__file__).resolve().parents[1] / 'prompts' / 'ascii' / 'edit.txt'
+STEP_PROMPT = Path(__file__).resolve().parents[1] / 'prompts' / 'ascii' / 'step.txt'
+# (What a step may do, as the panel names it)
+ACTION_NAMES = {'add': 'Add cells', 'remove': 'Remove cells', 'change': 'Change parts', 'turrets': 'Turrets'}
 LETTERS = 'ABCDEFGHIJKLMNOPQRSUVWXYZ'
 
 
@@ -150,7 +157,7 @@ class Designer(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle('Silhouette designer')
-        self.w, self.h = 15, 24
+        self.w, self.h = 21, 32
         self.cells: dict[tuple[int, int], tuple[int, int]] = {}
         # (Components on cells: 'turret')
         self.comps: dict[tuple[int, int], str] = {}
@@ -161,6 +168,8 @@ class Designer(QMainWindow):
         self.undo: list[dict] = []
         # (Part letters, kept across model edits so a part keeps its colour: letter -> (palette index, name))
         self.legend: dict[str, tuple[int, str]] = {}
+        # (Part letters left out of the prompt; 'T' stands for the turrets)
+        self.hidden: set[str] = set()
         self.models: list[dict] = []
         self.busy = False
         self.stop_flag = False
@@ -242,7 +251,7 @@ class Designer(QMainWindow):
         self.sh.editingFinished.connect(self.resize_grid)
         size.addWidget(self.sh)
         side.addLayout(size)
-        for text, fn in [('Undo  (Ctrl+Z)', self.do_undo), ('Clear', self.clear), ('Flip top to bottom', self.flip_v), ('Save...', self.save), ('Open...', self.open),
+        for text, fn in [('Undo  (Ctrl+Z)', self.do_undo), ('Reset design', self.clear), ('Flip top to bottom', self.flip_v), ('Save...', self.save), ('Open...', self.open),
                          ('Export PNG...', self.export_png), ('Copy row widths', self.copy_widths), ('Copy grid', self.copy_grid), ('Copy pieces', self.copy_pieces)]:
             b = QPushButton(text)
             b.clicked.connect(fn)
@@ -272,6 +281,30 @@ class Designer(QMainWindow):
     # ---- asking a model
     def ai_panel(self) -> QVBoxLayout:
         col = QVBoxLayout()
+        col.addWidget(QLabel('Parts'))
+        self.parts = QTableWidget(0, 4)
+        self.parts.setHorizontalHeaderLabels(['', 'Name', 'Cells', 'Model sees'])
+        self.parts.verticalHeader().setVisible(False)
+        self.parts.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.parts.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        hh = self.parts.horizontalHeader()
+        hh.setSectionResizeMode(1, QHeaderView.Stretch)
+        for i in (0, 2, 3):
+            hh.setSectionResizeMode(i, QHeaderView.ResizeToContents)
+        self.parts.setMaximumHeight(190)
+        self.parts.setStyleSheet('QTableWidget{background:#0e1217;border:1px solid #232c36;gridline-color:#1a2129;} QHeaderView::section{background:#141a21;color:#7c8896;border:0;padding:3px;}')
+        self.parts.setToolTip('Double-click a name to rename. Model sees: in the prompt, or left out and kept as it is')
+        self.parts.itemChanged.connect(self.part_edited)
+        col.addWidget(self.parts)
+        pb = QHBoxLayout()
+        for text, fn, tip in [('Delete', self.delete_parts, 'Remove the selected parts (or the turrets)'),
+                              ('Merge', self.merge_parts, 'Make the selected parts one part: the first one\'s letter, colour and name'),
+                              ('Model sees all', self.show_all, 'Tick Model sees for every part')]:
+            b = QPushButton(text)
+            b.setToolTip(tip)
+            b.clicked.connect(fn)
+            pb.addWidget(b)
+        col.addLayout(pb)
         col.addWidget(QLabel('Ask a model'))
         row = QHBoxLayout()
         self.model_box = QComboBox()
@@ -284,10 +317,46 @@ class Designer(QMainWindow):
         row.addWidget(again)
         col.addLayout(row)
         self.instruction = QPlainTextEdit()
-        self.instruction.setPlaceholderText('What to change, e.g.\nMake the wings swept back and 2 rows thinner.\nAdd two tail fins at the back of the hull.\n\nOn an empty grid: describe a ship to draw.')
-        self.instruction.setMaximumHeight(130)
+        self.instruction.setPlaceholderText('The task for this step, e.g.\nDraw the silhouette of a long gunship with swept wings.\nMake the wings 2 rows thinner.\nAdd engines at the back of the hull.')
+        self.instruction.setMaximumHeight(110)
         self.instruction.setStyleSheet('background:#0e1217;border:1px solid #232c36;border-radius:4px;')
         col.addWidget(self.instruction)
+        col.addWidget(QLabel('Colours it may draw with', objectName='small'))
+        sw = QHBoxLayout()
+        sw.setSpacing(3)
+        allowed = self.prefs.value('allowed', None)
+        allowed = {int(x) for x in (allowed if isinstance(allowed, list) else str(allowed).split(',') if allowed else range(len(PALETTE))) if str(x).strip().isdigit()}
+        self.allow_btns = []
+        for i, (name, hexa) in enumerate(PALETTE):
+            b = QPushButton()
+            b.setCheckable(True)
+            b.setChecked(i in allowed)
+            b.setFixedSize(26, 22)
+            b.setToolTip(name)
+            b.setStyleSheet(f'QPushButton {{ background: {hexa}; border: 1px solid #232c36; }} QPushButton:!checked {{ background: #12171d; border: 1px dashed {hexa}; }} QPushButton:checked {{ border: 2px solid #ffffff; }}')
+            b.toggled.connect(self.save_step)
+            self.allow_btns.append(b)
+            sw.addWidget(b)
+        for text, on in (('All', True), ('None', False)):
+            b = QPushButton(text)
+            b.setFixedHeight(22)
+            b.clicked.connect(lambda _c=False, on=on: [x.setChecked(on) for x in self.allow_btns])
+            sw.addWidget(b)
+        sw.addStretch(1)
+        col.addLayout(sw)
+        acts = QHBoxLayout()
+        acts.addWidget(QLabel('It may', objectName='small'))
+        saved = self.prefs.value('actions', None)
+        saved = set(saved if isinstance(saved, list) else str(saved).split(',')) if saved else set(ACTION_NAMES)
+        self.action_boxes = {}
+        for key, text in ACTION_NAMES.items():
+            box = QCheckBox(text)
+            box.setChecked(key in saved)
+            box.toggled.connect(self.save_step)
+            self.action_boxes[key] = box
+            acts.addWidget(box)
+        acts.addStretch(1)
+        col.addLayout(acts)
         opts = QHBoxLayout()
         opts.addWidget(QLabel('Temperature'))
         self.temp = QDoubleSpinBox()
@@ -343,12 +412,61 @@ class Designer(QMainWindow):
         self.model_box.blockSignals(False)
         self.ai_status.setText(f'{len(models)} models.' + (' ' + ' '.join(notes) if notes else ''))
 
-    def build_prompt(self, instruction: str) -> str:
-        parts, turrets, names = self.half_grid()
-        key = '\n'.join(f'{sym} = {n}' for sym, n in names.items()) or '(no parts yet)'
-        fill = {'key': key, 'grid': asciigrid.render(parts, turrets), 'instruction': instruction.strip(),
-                'last_col': str(len(parts[0]) - 1), 'last_row': str(len(parts) - 1)}
-        text = EDIT_PROMPT.read_text(encoding='utf-8')
+    def save_step(self, *_a) -> None:
+        self.prefs.setValue('allowed', ','.join(str(i) for i, b in enumerate(self.allow_btns) if b.isChecked()))
+        self.prefs.setValue('actions', ','.join(k for k, b in self.action_boxes.items() if b.isChecked()))
+
+    def plan_step(self) -> dict:
+        """This step: the grid the model sees, the key (its parts, then a new letter per allowed colour not on the
+        grid yet), which letters it may work with, and what it may do"""
+        parts, turrets, names = self.half_grid(seen_only=True)
+        allowed = {i for i, b in enumerate(self.allow_btns) if b.isChecked()}
+        actions = {k for k, b in self.action_boxes.items() if b.isChecked()}
+        have = {col for col, _n in self.legend.values()}
+        taken = set(self.legend) | {'T'}
+        new = {}
+        for col in sorted(allowed - have, key=lambda c: (c not in PART_COLOURS, PART_COLOURS.index(c) if c in PART_COLOURS else c)):
+            sym = next((c for c in LETTERS if c not in taken), None)
+            if sym:
+                taken.add(sym)
+                new[sym] = col
+        editable = {sym for sym in names if self.legend[sym][0] in allowed} | set(new)
+        return {'before': parts, 'before_t': turrets, 'names': names, 'new': new, 'editable': editable, 'actions': actions,
+                'key': set(names) | set(new)}
+
+    def build_prompt(self, instruction: str, step: dict) -> str:
+        names, new, editable, actions = step['names'], step['new'], step['editable'], step['actions']
+        lines = [f'{sym} = {n}' for sym, n in names.items()] + [f'{sym} = {PALETTE[col][0]} (new: not drawn yet)' for sym, col in new.items()]
+        if step['before_t'] or 'turrets' in actions:
+            lines.append('T = turret')
+        letters = ', '.join(f'{s} ({names.get(s) or PALETTE[new[s]][0]})' for s in sorted(editable))
+        others = ', '.join(f'{s} ({n})' for s, n in names.items() if s not in editable)
+        may, may_not = [], []
+        draws = actions & {'add', 'remove', 'change'}
+        if editable and draws:
+            may.append(f'- Work only with these letters: {letters}.')
+            if 'add' in actions:
+                may.append('- Add cells: write one of those letters on empty (.) cells.')
+            if 'remove' in actions:
+                may.append("- Remove cells: turn cells of those letters back into '.'.")
+            if 'change' in actions:
+                may.append('- Change a cell from one of those letters to another.')
+        if 'turrets' in actions:
+            may.append("- Turrets: put T on a filled cell (1 or 2 in all), or move or remove a T. Each T must be the top filled cell of its column, with only '.' above it.")
+        if not may:
+            may.append('- Nothing: answer with the grid exactly as it is.')
+        for k, text in (('add', 'Do not add cells.'), ('remove', 'Do not remove cells.'), ('change', "Do not change any cell's letter.")):
+            if k not in actions:
+                may_not.append(f'- {text}')
+        if others:
+            may_not.append(f'- Do not touch {others}: keep every one of their cells exactly as it is.')
+        if 'turrets' not in actions:
+            may_not.append('- Do not add, move or remove T.' if step['before_t'] else '- Do not add turrets (T).')
+        may_not.append('- Do not use any letter that is not in the key.')
+        fill = {'key': '\n'.join(lines) or '(nothing yet)', 'grid': asciigrid.render(step['before'], step['before_t']), 'instruction': instruction.strip(),
+                'may': '\n'.join(may), 'may_not': '\n'.join(may_not),
+                'last_col': str(len(step['before'][0]) - 1), 'last_row': str(len(step['before']) - 1)}
+        text = STEP_PROMPT.read_text(encoding='utf-8')
         for k, v in fill.items():
             text = text.replace('{{' + k + '}}', v)
         return text
@@ -365,8 +483,9 @@ class Designer(QMainWindow):
             return
         self.prefs.setValue('temperature', self.temp.value())
         self.prefs.setValue('retries', self.retries.value())
-        prompt = self.build_prompt(self.instruction.toPlainText())
-        self.job = {'model': model, 'messages': [{'role': 'user', 'content': prompt}], 'attempt': 1,
+        step = self.plan_step()
+        prompt = self.build_prompt(self.instruction.toPlainText(), step)
+        self.job = {'model': model, 'messages': [{'role': 'user', 'content': prompt}], 'attempt': 1, 'step': step,
                     'size': (self.w - self.w // 2, self.h), 'stamp': time.strftime('%Y%m%d-%H%M%S')}
         self.prompt_view.setPlainText(prompt)
         self.run_job()
@@ -422,7 +541,7 @@ class Designer(QMainWindow):
         secs = time.time() - j['t0']
         speed = f', {out["output_tokens"] / secs:.1f} tokens/s' if out.get('output_tokens') and secs > 0 else ''
         cut = ' The reply was cut off (it hit the length limit).' if out.get('stop_reason') in ('length', 'max_tokens') else ''
-        problems = self.apply_ascii(text, size=j['size'])
+        problems = self.apply_ascii(text, size=j['size'], step=j['step'])
         head = f'Try {j["attempt"]}: {secs:.0f} s{speed}.{cut}'
         if problems and j['attempt'] <= self.retries.value():
             j['messages'] += [{'role': 'assistant', 'content': text}, {'role': 'user', 'content':
@@ -466,15 +585,17 @@ class Designer(QMainWindow):
     def update_info(self, extra: str = '') -> None:
         n = len(self.cells)
         self.info.setText(f'{n} cells, {self.w} x {self.h}.\n{extra}'.strip())
+        if hasattr(self, 'parts'):
+            self.refresh_parts()
 
     # ---- painting
     def push_undo(self) -> None:
-        self.undo.append((dict(self.cells), dict(self.comps)))
+        self.undo.append((dict(self.cells), dict(self.comps), dict(self.legend)))
         del self.undo[:-60]
 
     def do_undo(self) -> None:
         if self.undo:
-            self.cells, self.comps = self.undo.pop()
+            self.cells, self.comps, self.legend = self.undo.pop()
             self.canvas.update()
             self.update_info()
 
@@ -581,14 +702,16 @@ class Designer(QMainWindow):
         self.update_info('Applied.' if not problems else '\n'.join(problems))
         return problems
 
-    def apply_ascii(self, text: str, size: tuple[int, int] | None = None) -> list[str]:
+    def apply_ascii(self, text: str, size: tuple[int, int] | None = None, step: dict | None = None) -> list[str]:
         """A lettered grid of the right half, mirrored (21 wide for 11 columns), cleared first. Each part letter keeps
         its colour from the legend (a new letter takes an unused one); T is a turret on its cell. Given a size (half
-        width, rows) the reply must fit it. Returns what it could not read and the rules broken"""
+        width, rows) the reply must fit it. Given a step (a model's reply), it is held to what the step allowed and the
+        parts the model did not see come back as they were. Returns what it could not read and the rules broken"""
         g = asciigrid.parse(text, *(size or (0, 0)))
         if not g['parts']:
             self.update_info('\n'.join(g['problems']))
             return g['problems']
+        kept_note = self.hold_to_step(g, step) if step else ''
         self.push_undo()
         parts, turrets = g['parts'], g['turrets']
         self.w, self.h = 2 * len(parts[0]) - 1, len(parts)
@@ -612,31 +735,186 @@ class Designer(QMainWindow):
             for c in {mid + x, mid - x}:
                 self.cells[(y, c)] = (GUN, 0)
                 self.comps[(y, c)] = 'turret'
-        problems = g['problems'] + asciigrid.check(parts, turrets, g['names'])
+        names = {s: self.legend[s][1] for s in letters}
+        problems = g['problems'] + g.get('broke', []) + asciigrid.check(parts, turrets, names, want_turrets=not step or 'turrets' in step['actions'])
         key = ', '.join(f'{s} {self.legend[s][1]}' for s in letters)
         self.canvas.update()
-        self.update_info(f'Grid read: {len(letters)} parts ({key}), {len(turrets)} turrets a side.\n'
+        self.update_info(f'Grid read: {len(letters)} part{"s" if len(letters) != 1 else ""} ({key}), {len(turrets)} turrets a side.{kept_note}\n'
                          + ('\n'.join(problems) if problems else 'Every rule kept.'))
         return problems
 
-    def half_grid(self) -> tuple[list[list[str]], set[tuple[int, int]], dict[str, str]]:
-        """The drawing's right half as a lettered grid: a letter per colour (A first, in the order the colours appear
-        from the nose down), turrets as T. A colour already in the legend keeps its letter and name; a new one is named
-        after its palette colour and added"""
+    def hold_to_step(self, g: dict, step: dict) -> str:
+        """Into a parsed reply, in place: anything beyond what the step allowed put back (listed in g['broke'] for the
+        model), the new parts given their colours, and the parts the model did not see laid back on as they are now
+        (they win any cell the reply used). Returns a line for the panel"""
+        before = step['before']
+        if (len(before), len(before[0])) != (len(g['parts']), len(g['parts'][0])):
+            return ''
+        names = dict(step['names'], **{s: PALETTE[c][0] for s, c in step['new'].items()})
+        parts, turrets, broke = asciigrid.enforce(before, step['before_t'], g['parts'], g['turrets'], step['key'], step['editable'], step['actions'], names)
+        # (A new part takes its colour, and the name the model gave it if any; the existing parts keep theirs)
+        drawn = {c for row in parts for c in row}
+        for sym, col in step['new'].items():
+            if sym in drawn:
+                self.legend[sym] = (col, g['names'].get(sym) or PALETTE[col][0])
+        g['names'] = {}
+        note = ''
+        if self.hidden:
+            now, now_turrets, _n = self.half_grid()
+            keep = self.hidden - {'T'}
+            lost = 0
+            for y, row in enumerate(now):
+                for x, c in enumerate(row):
+                    if c in keep:
+                        lost += parts[y][x] not in (asciigrid.EMPTY, c)
+                        parts[y][x] = c
+            if 'T' in self.hidden:
+                turrets = set(now_turrets)
+            kept = ', '.join(self.legend[s][1] for s in sorted(keep) if s in self.legend) + (', turrets' if 'T' in self.hidden else '')
+            note = f'\nKept as they were (not shown to the model): {kept}.' + (f' The reply had drawn over {lost} of their cells.' if lost else '')
+        g['parts'], g['turrets'], g['broke'] = parts, turrets, broke
+        return note
+
+    # ---- parts
+    def sync_legend(self) -> None:
+        """A part per colour on the grid (turret cells aside): a new colour gets the next free letter, named after its
+        palette colour; a part with no cells left goes"""
+        present = []
+        for cell, (col, _sh) in sorted(self.cells.items()):
+            if self.comps.get(cell) != 'turret' and col not in present:
+                present.append(col)
+        by_col = {col: sym for sym, (col, _n) in self.legend.items()}
+        for col in present:
+            if col not in by_col:
+                sym = next((c for c in LETTERS if c not in self.legend), None)
+                if sym:
+                    self.legend[sym] = (col, PALETTE[col][0])
+                    by_col[col] = sym
+        for sym, (col, _n) in list(self.legend.items()):
+            if col not in present or by_col.get(col) != sym:
+                del self.legend[sym]
+        self.hidden &= set(self.legend) | {'T'}
+
+    def refresh_parts(self) -> None:
+        self.sync_legend()
+        mid = self.w // 2
+        count: dict[int, int] = {}
+        for (r, c), (col, _sh) in self.cells.items():
+            if c >= mid and self.comps.get((r, c)) != 'turret':
+                count[col] = count.get(col, 0) + 1
+        rows = [(sym, col, name, count.get(col, 0)) for sym, (col, name) in sorted(self.legend.items())]
+        turrets = sum(1 for (r, c), k in self.comps.items() if k == 'turret' and c >= mid)
+        if turrets:
+            rows.append(('T', GUN, 'Turrets', turrets))
+        picked = set(self.picked_parts())
+        self.parts.blockSignals(True)
+        self.parts.setRowCount(len(rows))
+        for i, (sym, col, name, n) in enumerate(rows):
+            tag = QTableWidgetItem(sym)
+            tag.setData(Qt.UserRole, sym)
+            tag.setBackground(QColor(PALETTE[col][1]))
+            tag.setForeground(QColor('#0b0e12'))
+            tag.setTextAlignment(Qt.AlignCenter)
+            tag.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+            self.parts.setItem(i, 0, tag)
+            nm = QTableWidgetItem(name)
+            nm.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable | (Qt.ItemIsEditable if sym != 'T' else Qt.NoItemFlags))
+            self.parts.setItem(i, 1, nm)
+            cnt = QTableWidgetItem(str(n))
+            cnt.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+            cnt.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            self.parts.setItem(i, 2, cnt)
+            box = QTableWidgetItem()
+            box.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsUserCheckable)
+            box.setCheckState(Qt.Unchecked if sym in self.hidden else Qt.Checked)
+            self.parts.setItem(i, 3, box)
+        self.parts.clearSelection()
+        for i, (sym, *_rest) in enumerate(rows):
+            if sym in picked:
+                for j in range(4):
+                    self.parts.item(i, j).setSelected(True)
+        self.parts.blockSignals(False)
+
+    def picked_parts(self) -> list[str]:
+        """The selected parts' letters, top first"""
+        rows = sorted({i.row() for i in self.parts.selectedItems()})
+        return [self.parts.item(r, 0).data(Qt.UserRole) for r in rows if self.parts.item(r, 0)]
+
+    def part_edited(self, item: QTableWidgetItem) -> None:
+        sym = self.parts.item(item.row(), 0).data(Qt.UserRole)
+        if item.column() == 1 and sym in self.legend and item.text().strip():
+            self.legend[sym] = (self.legend[sym][0], item.text().strip())
+        elif item.column() == 3:
+            if item.checkState() == Qt.Checked:
+                self.hidden.discard(sym)
+            else:
+                self.hidden.add(sym)
+
+    def turret_cells_off(self, cells) -> None:
+        """Take the turrets off these cells: each cell becomes the part beside it (below first), or empty"""
+        for r, c in cells:
+            self.comps.pop((r, c), None)
+            near = [(r + 1, c), (r, c - 1), (r, c + 1), (r - 1, c)]
+            col = next((self.cells[n][0] for n in near if n in self.cells and self.comps.get(n) != 'turret'), None)
+            if col is None:
+                self.cells.pop((r, c), None)
+            else:
+                self.cells[(r, c)] = (col, 0)
+
+    def delete_parts(self) -> None:
+        picked = self.picked_parts()
+        if not picked:
+            self.update_info('Select a part in the list first (Ctrl or Shift for more than one).')
+            return
+        self.push_undo()
+        cols = {self.legend[s][0] for s in picked if s in self.legend}
+        for cell, (col, _sh) in list(self.cells.items()):
+            if col in cols and self.comps.get(cell) != 'turret':
+                del self.cells[cell]
+        if 'T' in picked:
+            self.turret_cells_off([cell for cell, k in list(self.comps.items()) if k == 'turret'])
+        names = [self.legend[s][1] if s in self.legend else 'turrets' for s in picked]
+        self.canvas.update()
+        self.update_info(f'Deleted {", ".join(names)}.')
+
+    def merge_parts(self) -> None:
+        picked = [s for s in self.picked_parts() if s in self.legend]
+        if len(picked) < 2:
+            self.update_info('Select two or more parts to merge (Ctrl-click).')
+            return
+        self.push_undo()
+        into = self.legend[picked[0]][0]
+        cols = {self.legend[s][0] for s in picked[1:]}
+        for cell, (col, sh) in list(self.cells.items()):
+            if col in cols and self.comps.get(cell) != 'turret':
+                self.cells[cell] = (into, sh)
+        names = [self.legend[s][1] for s in picked]
+        self.canvas.update()
+        self.update_info(f'Merged {", ".join(names[1:])} into {names[0]} ({picked[0]}).')
+
+    def show_all(self) -> None:
+        self.hidden.clear()
+        self.refresh_parts()
+
+    def half_grid(self, seen_only: bool = False) -> tuple[list[list[str]], set[tuple[int, int]], dict[str, str]]:
+        """The drawing's right half as a lettered grid: a letter per part (colour), turrets as T, and the parts' names.
+        seen_only leaves out what the model is not to see"""
+        self.sync_legend()
         mid = self.w // 2
         letters: dict[int, str] = {col: s for s, (col, _n) in self.legend.items()}
+        skip = self.hidden if seen_only else set()
         parts = [[asciigrid.EMPTY] * (self.w - mid) for _ in range(self.h)]
         turrets = set()
         for (r, c), (col, _sh) in sorted(self.cells.items()):
             if c < mid:
                 continue
             if self.comps.get((r, c)) == 'turret':
-                turrets.add((r, c - mid))
+                if 'T' not in skip:
+                    turrets.add((r, c - mid))
                 continue
-            if col not in letters:
-                letters[col] = next((s for s in LETTERS if s not in self.legend), '#')
-                self.legend[letters[col]] = (col, PALETTE[col][0])
-            parts[r][c - mid] = letters[col]
+            sym = letters.get(col, '#')
+            if sym not in skip:
+                parts[r][c - mid] = sym
         asciigrid.under_turrets(parts, turrets)
         shown = {s for row in parts for s in row}
         return parts, turrets, {s: n for s, (_c, n) in sorted(self.legend.items()) if s in shown}
@@ -787,6 +1065,7 @@ class Designer(QMainWindow):
         self.cells.clear()
         self.comps.clear()
         self.legend.clear()
+        self.hidden.clear()
         self.canvas.update()
         self.update_info()
 
@@ -860,6 +1139,21 @@ class Designer(QMainWindow):
 
 
 def main() -> int:
+    # (pythonw has no console: an error goes to a file, and the window says so)
+    log = Path(__file__).resolve().parents[1] / 'out' / 'silhouettes' / 'crash.log'
+    log.parent.mkdir(parents=True, exist_ok=True)
+    import faulthandler
+    import traceback
+    fault = open(log.with_name('fault.log'), 'a', encoding='utf-8')
+    faulthandler.enable(fault)
+
+    def hook(kind, err, tb):
+        with open(log, 'a', encoding='utf-8') as f:
+            f.write(time.strftime('%Y-%m-%d %H:%M:%S ') + ''.join(traceback.format_exception(kind, err, tb)) + '\n')
+        for w in QApplication.topLevelWidgets():
+            if isinstance(w, Designer):
+                w.update_info(f'Error: {err} (details in {log})')
+    sys.excepthook = hook
     app = QApplication(sys.argv)
     w = Designer()
     w.show()
