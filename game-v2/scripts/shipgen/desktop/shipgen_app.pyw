@@ -4,6 +4,7 @@
 #   pythonw scripts/shipgen/desktop/shipgen_app.pyw        (needs: pip install pywebview)
 # The server's output goes to scripts/shipgen/out/server.log.
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -26,9 +27,24 @@ def up() -> bool:
         return False
 
 
+def real_pythonw() -> str | None:
+    """The first pythonw on PATH that is a real install: the Store's WindowsApps aliases can't be started from inside a
+    Store Python process (spawn EPERM), and the renderer starts one for its GL worker"""
+    for d in os.environ.get('PATH', '').split(os.pathsep):
+        if 'WindowsApps' in d:
+            continue
+        p = shutil.which('pythonw', path=d)
+        if p:
+            return p
+    return None
+
+
 def start_server() -> subprocess.Popen:
     LOG.parent.mkdir(parents=True, exist_ok=True)
     env = {**os.environ, 'LMSTUDIO_CHAT': '1'}
+    py = real_pythonw()
+    if py:
+        env['PYTHON'] = py
     log = open(LOG, 'a', encoding='utf-8')
     log.write(f'\n--- {time.strftime("%Y-%m-%d %H:%M:%S")} started by the desktop app ---\n')
     log.flush()

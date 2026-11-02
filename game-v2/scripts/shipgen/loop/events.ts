@@ -12,6 +12,8 @@ export interface StartEvent extends Base { type: 'start'; mode: Mode; model: str
 export interface BriefEvent extends Base { type: 'brief'; role?: string; text: string; legendCodes: number; promptChars: number }
 export interface PromptEvent extends Base { type: 'prompt'; round: number; system?: string; user: string; messages: number; chars: number }
 export interface TokenEvent extends Base { type: 'token'; round: number; kind: 'content' | 'thinking'; text: string }
+/** While a reply streams, every few seconds: how much it has thought and written so far (a record keeps these, not the tokens) */
+export interface ProgressEvent extends Base { type: 'progress'; round: number; thinking: number; content: number; tokensPerSec?: number }
 export interface ReplyEvent extends Base { type: 'reply'; round: number; text: string; ms: number; outputTokens?: number; promptTokens?: number; tokensPerSec?: number; structured: boolean; stopReason?: string; truncated?: boolean; tokensEstimated?: boolean }
 export interface GridEvent extends Base {
   type: 'grid'; round: number;
@@ -64,7 +66,7 @@ export interface BatchEvent extends Base {
 export interface DoneEvent extends Base { type: 'done'; metrics: DesignMetrics | EvolveMetrics | CompareMetrics; cancelled: boolean }
 
 export type ShipgenEvent =
-  | StartEvent | BriefEvent | PromptEvent | TokenEvent | ReplyEvent | GridEvent | CheckEvent | FeedbackEvent
+  | StartEvent | BriefEvent | PromptEvent | TokenEvent | ProgressEvent | ReplyEvent | GridEvent | CheckEvent | FeedbackEvent
   | RenderEvent | CriticEvent | ScoreEvent | BestEvent | StepEvent | ConceptEvent | MutationEvent | GenerationEvent | ErrorEvent | DoneEvent | BatchEvent;
 
 export type Emit = (e: DistributiveOmit<ShipgenEvent, 't'> & { t?: number }) => void;

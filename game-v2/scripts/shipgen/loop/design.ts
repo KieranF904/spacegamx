@@ -161,6 +161,9 @@ export function gridOf(ctx: ShipgenContext, bp: Blueprint, book?: CodeBook, max?
   } catch (e) { return `(can't draw it as a grid: ${(e as Error).message})`; }
 }
 
+/** How often a streaming reply reports its progress */
+export const PROGRESS_MS = 3000;
+
 const isAbort = (e: unknown) => e instanceof Error && (e.name === 'AbortError' || e instanceof AbortedError);
 
 export interface Asked { text: string; thinking: string; ms: number; outputTokens?: number; promptTokens?: number; tokensPerSec?: number; notes: string[]; truncated?: boolean; stopReason?: string; tokensEstimated?: boolean }
@@ -265,6 +268,15 @@ export class Session {
     this.fitBudget(messages);
     emit({ type: 'prompt', round, ...(round === 1 ? { system: messages[0].content } : {}), user: last.content, messages: messages.length, chars: messages.reduce((a, m) => a + m.content.length, 0) });
     let sofar = '', shown = 0, wide = false, runaway = false, far = false, farAt = '';
+    // (A heartbeat for watchers: thinking and written so far, every few seconds; tokens themselves are live only)
+    let thought = 0, lastBeat = this.now();
+    const beat = () => {
+      const t = this.now();
+      if (t - lastBeat < PROGRESS_MS) return;
+      lastBeat = t;
+      const secs = (t - tAsk) / 1000;
+      emit({ type: 'progress', round, thinking: thought, content: sofar.length, ...(secs > 1 ? { tokensPerSec: Math.round(((thought + sofar.length) / 4 / secs) * 10) / 10 } : {}) });
+    };
     const stopper = new AbortController();
     const tAsk = this.now();
     const notes: string[] = [];
@@ -275,8 +287,9 @@ export class Session {
         timeoutMs: o.timeoutMs, idleMs: o.idleMs, signal: o.signal ? AbortSignal.any([o.signal, stopper.signal]) : stopper.signal,
         onToken: (d, kind) => {
           emit({ type: 'token', round, kind, text: d });
-          if (kind !== 'content') return;
+          if (kind !== 'content') { thought += d.length; beat(); return; }
           sofar += d;
+          beat();
           // (One row far wider than the brief: the row so far is what follows the last line break or quote)
           const rowAt = Math.max(sofar.lastIndexOf('\n'), sofar.lastIndexOf('"')) + 1;
           if (!runaway && C.form === 'grid' && sofar.length - rowAt > 4 * this.maxCols && sofar.slice(rowAt).trim().split(/\s+/).length > this.maxCols + 1) { runaway = wide = true; stopper.abort(); return; }

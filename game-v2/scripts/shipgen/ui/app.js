@@ -278,8 +278,14 @@ function onEvent(e) {
     case 'prompt': pane?.newRound(e.round, state.mode === 'design' ? '' : e.lane); $('live').textContent = ''; if (p) { p.round = e.round; progressDraw(); } break;
     case 'token':
       if (e.kind === 'content') pane?.token(e.text);
-      else $('live').textContent = 'thinking...';
       return;
+    case 'progress': {
+      const k = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
+      const what = e.content ? `writing: ${k(e.content)} chars${e.thinking ? ` after ${k(e.thinking)} of thinking` : ''}` : `thinking: ${k(e.thinking)} chars`;
+      $('live').textContent = `${what}${e.tokensPerSec ? ` · ~${e.tokensPerSec} tok/s` : ''}`;
+      if (!e.content) pane?.foot(`the model is thinking (${k(e.thinking)} chars so far)`);
+      return;
+    }
     case 'grid': if (!e.partial) pane?.gridFinal(e.text); else { if (e.text) pane?.preview(e.text); return; } break;
     case 'reply': $('live').textContent = e.tokensPerSec ? `${e.tokensPerSec} tok/s` : ''; pane?.foot(`reply in ${(e.ms / 1000).toFixed(1)} s${e.outputTokens ? `, ${e.outputTokens} tokens` : ''}`); break;
     case 'check':

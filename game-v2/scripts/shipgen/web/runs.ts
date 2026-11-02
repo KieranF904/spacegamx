@@ -101,6 +101,8 @@ export class Runs {
           if (o.lane === pe.lane && o.type === 'prompt') break;
           if (o.lane === pe.lane && o.type === 'grid' && o.partial) { o.text = null; o.errors = []; o.warnings = []; }
         }
+        // (Only the latest progress of a lane is worth replaying)
+        if (pe.type === 'progress') { const last = run.events[run.events.length - 1]; if (last?.type === 'progress' && last.lane === pe.lane) { pe.seq = last.seq; run.events[run.events.length - 1] = pe; for (const l of run.listeners) l(pe); return; } }
         run.events.push(pe);
       }
       for (const l of run.listeners) l(pe);
