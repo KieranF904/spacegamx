@@ -1,0 +1,32 @@
+{
+ "_comment": "Each scenario: budget (credits it may spend beyond the starting ship), what may be added (categories of the catalogue), the hits it takes (incoming: damage a hit, its pen and type, damage per second, where from: front, rear, sides, left, right or all, and the spread in degrees), and how it is scored (weights: each measure against the starting ship's, so 1 = as good as the start; penalties: per part). Measures: damage_before_down, alive_s, half_s, sustained_dps, burst_dps, thrust_to_mass, cargo. Penalties: unpowered (guns, engines, shields under a quarter of their power), idle (relays and reactors nothing goes through), parts.",
+ "scenarios": [
+  {
+   "name": "Gunship: head-on fight",
+   "about": "Fights facing the enemy: most hits come at the nose. Scored on damage dealt before going down.",
+   "budget": 2500,
+   "allow": ["structure", "power", "shields"],
+   "incoming": {"damage": 40, "pen": 2, "type": "kinetic", "dps": 120, "from": "front", "spread": 50, "max_hits": 3000},
+   "weights": {"damage_before_down": 1.0, "burst_dps": 0.2, "thrust_to_mass": 0.1},
+   "penalties": {"unpowered": 0.3, "idle": 0.05}
+  },
+  {
+   "name": "Brawler: surrounded",
+   "about": "Hit from every side. Survival matters as much as damage.",
+   "budget": 2500,
+   "allow": ["structure", "power", "shields"],
+   "incoming": {"damage": 40, "pen": 2, "type": "explosive", "dps": 160, "from": "all", "spread": 180, "max_hits": 3000},
+   "weights": {"damage_before_down": 1.0, "alive_s": 0.5},
+   "penalties": {"unpowered": 0.3, "idle": 0.05}
+  },
+  {
+   "name": "Hauler: get the cargo home",
+   "about": "Carries as much as it can, fast, and survives being chased (hits from behind).",
+   "budget": 2000,
+   "allow": ["structure", "power", "shields"],
+   "incoming": {"damage": 30, "pen": 1, "type": "kinetic", "dps": 60, "from": "rear", "spread": 40, "max_hits": 3000},
+   "weights": {"cargo": 1.0, "thrust_to_mass": 0.6, "alive_s": 0.4},
+   "penalties": {"unpowered": 0.3, "idle": 0.05}
+  }
+ ]
+}

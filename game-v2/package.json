@@ -6,6 +6,7 @@
     "monitor": "node scripts/vpsmon/server.mjs",
     "shipgen": "pythonw scripts/shipgen/app/shipgen.pyw",
     "silhouette": "pythonw scripts/shipgen/app/silhouette.py",
+    "evolver": "pythonw scripts/shipgen/evolver/app.py",
     "build:common": "cd common && npm run build",
     "build:server": "cd server && npm run build",
     "build:client": "cd client && npm run build",
