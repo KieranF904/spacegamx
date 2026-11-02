@@ -19,7 +19,7 @@
    "incoming": {
     "damage": 40,
     "pen": 2,
-    "dps": 120,
+    "dps": 200,
     "from": "front",
     "spread": 50,
     "flank": 0.35,
@@ -101,7 +101,7 @@
    "incoming": {
     "damage": 60,
     "pen": 3,
-    "dps": 240,
+    "dps": 300,
     "from": "front",
     "spread": 60,
     "flank": 0.4,
@@ -175,7 +175,7 @@
    "incoming": {
     "damage": 40,
     "pen": 2,
-    "dps": 120,
+    "dps": 200,
     "from": "front",
     "spread": 50,
     "flank": 0.35,
@@ -233,23 +233,31 @@
   },
   {
    "name": "Siege: crack the armour",
-   "about": "Against heavy armour (5): penetration is everything. Tungsten feeds and big guns should earn their place.",
+   "about": "Against heavy armour (4): penetration is everything. It starts with a pair of Longbarrels (pen 3) at the nose to build round; tungsten feeds and joined lines should earn their place.",
    "silhouette": "gunship.json",
    "level": 28,
    "allow": [],
    "budget": 8000,
    "points": 320,
-   "start_parts": [],
+   "start_parts": [
+    [
+     "longbarrel",
+     11,
+     6,
+     0,
+     false
+    ]
+   ],
    "power_s": 30,
    "fire": {
     "on": 3,
     "off": 5
    },
-   "enemy_armour": 5,
+   "enemy_armour": 4,
    "incoming": {
     "damage": 40,
     "pen": 2,
-    "dps": 120,
+    "dps": 200,
     "from": "front",
     "spread": 50,
     "flank": 0.35,

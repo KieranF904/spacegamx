@@ -66,9 +66,9 @@
   def({ id: 'stellarator', name: 'Stellarator', cat: 1, kind: 'gen', w: 2, h: 2, hp: 400, blast: { r: 4.5, dmg: 400 }, mass: 10, col: COL.gen, lvl: 36, isNew: true,
     ports: [O('N', 60, 0), O('N', 60, 1), O('S', 60, 0), O('S', 60, 1)], say: 'Four lines of 60: the end-game plant.' });
 
-  def({ id: 'conduit', name: 'Conduit', cat: 2, kind: 'store', conduit: true, hold: 10, hp: 35, mass: 0.3, col: COL.conduit, lvl: 0, ports: [I('S', 200), O('N', 200)],
+  def({ id: 'conduit', name: 'Conduit', cat: 2, kind: 'store', conduit: true, hold: 10, hp: 35, mass: 0.8, col: COL.conduit, lvl: 0, ports: [I('S', 200), O('N', 200)],
     say: 'A one-way line: in at the back, out at the front.' });
-  def({ id: 'corner', name: 'Conduit, corner', cat: 2, kind: 'store', conduit: true, hold: 10, hp: 35, mass: 0.3, col: COL.conduit, lvl: 0, ports: [I('S', 200), O('E', 200)],
+  def({ id: 'corner', name: 'Conduit, corner', cat: 2, kind: 'store', conduit: true, hold: 10, hp: 35, mass: 0.8, col: COL.conduit, lvl: 0, ports: [I('S', 200), O('E', 200)],
     say: 'A one-way line that turns right. Flip it (T) to turn left.' });
   def({ id: 'cell_battery', name: 'Cell Battery', cat: 2, kind: 'store', hold: 200, hp: 45, col: COL.store, lvl: 0, ports: [I('S', 40), O('N', 60)],
     say: 'Smooths one line: takes 40, gives up to 60, holds 200.' });
@@ -139,7 +139,7 @@
   for (const [fid, f] of Object.entries(FLUIDS))
     def({ id: 'tank_' + fid, name: 'Tank: ' + f.short, cat: 5, kind: 'tank', fluid: fid, fill: 120, hp: 55, mass: f.tankMass || 1.5, col: f.col, lvl: 8, isNew: true, feed: ALL4,
       say: `Holds 120 ${f.name.toLowerCase()} for the feed lines touching it. ${f.say}` });
-  def({ id: 'pipe', name: 'Feed pipe', cat: 5, kind: 'pipe', hp: 30, mass: 0.3, col: COL.pipe, lvl: 8, isNew: true, feed: ALL4,
+  def({ id: 'pipe', name: 'Feed pipe', cat: 5, kind: 'pipe', hp: 30, mass: 0.8, col: COL.pipe, lvl: 8, isNew: true, feed: ALL4,
     say: 'Carries feed between whatever touches it, any side. It can\'t cross a power line: use a Passthrough there.' });
   def({ id: 'passthrough', name: 'Passthrough', cat: 5, kind: 'store', conduit: true, hold: 10, hp: 45, mass: 0.5, col: COL.pipe, lvl: 8, isNew: true,
     ports: [I('S', 200), O('N', 200)], feed: [['E', 0], ['W', 0]],

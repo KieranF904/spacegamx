@@ -93,7 +93,19 @@ function powerPhase(parts, req, sc, blocked) {
   let idle = 0;
   for (const s of L.stores) if (T[s.type].id !== 'core' && (flowAll.get(s) || 0) / secs < 0.5) idle++;
   for (const g of L.gens) if (g.emaWaste >= T[g.type].produce - 0.5) idle++;
-  for (const nn of L.feedNets) if (!nn.tanks.length || !nn.users.length) idle += nn.parts.filter((q) => T[q.type].kind === 'pipe' || T[q.type].kind === 'tank').length;
+  for (const nn of L.feedNets) {
+    if (!nn.tanks.length || !nn.users.length) { idle += nn.parts.filter((q) => T[q.type].kind === 'pipe' || T[q.type].kind === 'tank').length; continue; }
+    // (A pipe earns its place only on a shortest path, through the network, from a user to its nearest tank: the rest is filler)
+    const nb = (q) => q.feeds.map((f) => f.joined).filter((r) => r && r.feedNet === nn);
+    const distFrom = (starts) => { const d = new Map(); const qu = []; for (const s0 of starts) { d.set(s0, 0); qu.push(s0); } for (let i = 0; i < qu.length; i++) for (const r of nb(qu[i])) if (!d.has(r)) { d.set(r, d.get(qu[i]) + 1); qu.push(r); } return d; };
+    const dT = distFrom(nn.tanks), useful = new Set();
+    for (const u of nn.users) {
+      const dU = distFrom([u]), D = dT.get(u);
+      if (D === undefined) continue;
+      for (const q of nn.parts) if (dU.has(q) && dT.has(q) && dU.get(q) + dT.get(q) === D) useful.add(q);
+    }
+    idle += nn.parts.filter((q) => T[q.type].kind === 'pipe' && !useful.has(q)).length;
+  }
   return { L, dps: dealt / secs, thrust: thrust / secs, wasted: wasted / secs, live, reached, powered, got, fxShare: dealt ? fxDealt / dealt : 0, feedUsed: stock0 - stockOf(L), idle };
 }
 

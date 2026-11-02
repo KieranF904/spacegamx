@@ -338,7 +338,7 @@ function draw() {
     const bw = (Math.max(...xs) + 1 - Math.min(...xs)) * CS, bh = (Math.max(...ys) + 1 - Math.min(...ys)) * CS, X = p.cx * CS, Y = p.cy * CS;
     const showName = bw >= 64 && bh >= 30 && CS >= 22;
     if (showName) { cx.fillStyle = '#e9eff3'; cx.font = `600 ${Math.min(12, CS / 3)}px "IBM Plex Sans", sans-serif`; cx.fillText(t.name, X, Y); }
-    else if (CS >= 24) { cx.fillStyle = '#e9eff3'; cx.font = `600 ${Math.min(11, CS / 3.2)}px "IBM Plex Sans", sans-serif`; cx.fillText(t.name.split(/[ ,]/)[0].slice(0, 7), X, Y); }
+    else if (CS >= 24) { cx.fillStyle = '#e9eff3'; cx.font = `600 ${Math.min(11, CS / 3.2)}px "IBM Plex Sans", sans-serif`; cx.fillText((t.kind === 'tank' ? FLUIDS[t.fluid].short : t.name.split(/[ ,]/)[0]).slice(0, 7), X, Y); }
     if (isConsumer(t.kind) && !p.links.length && CS >= 16) { cx.fillStyle = '#ef6a5a'; cx.font = `700 ${Math.min(12, CS / 2.8)}px "IBM Plex Sans", sans-serif`; cx.fillText('no feed', X, Math.min(...ys) * CS + Math.min(9, CS / 4)); }
   }
   // 6. blast radius of what's under the pointer (a hazard worth seeing), selection, ghost

@@ -135,6 +135,8 @@ class PortsEvolver:
         # (Each measure is scored against the scenario's fixed scale (scales: what counts as 1), not against the start:
         # a weak start would make every gain look huge and every penalty negligible)
         self.ref = dict(scenario.get('scales') or {})
+        # (The scenario's start parts are fixed, like the core: the ship is built round them, never without them)
+        self.fixed = {(spec[0], spec[1], spec[2], spec[3] if len(spec) > 3 else 0, bool(spec[4]) if len(spec) > 4 else False) for spec in scenario.get('start_parts', [])}
         self.start = start or self.seed_ship()
         self.base = self.score(self.start)['m']
         self.gen = 0
@@ -182,6 +184,9 @@ class PortsEvolver:
             return [(0, False), (0, True)]
         return [(r, f) for r in range(4) for f in (False, True)]
 
+    def is_fixed(self, p: PPart) -> bool:
+        return p.type == 'core' or (p.type, p.x, p.y, p.rot, p.flip) in self.fixed
+
     def put(self, s: PShip, np: PPart, keep_core=True) -> bool:
         """Place np, taking away the parts wholly under it (never the core). False if it can't go there"""
         t = self.T[np.type]
@@ -192,7 +197,7 @@ class PortsEvolver:
         under = {own[c] for c in cells if c in own}
         for i in under:
             o = s.parts[i]
-            if (keep_core and o.type == 'core') or not all(c in cells for c in self.cells(o)):
+            if (keep_core and self.is_fixed(o)) or not all(c in cells for c in self.cells(o)):
                 return False
         s.parts = [p for i, p in enumerate(s.parts) if i not in under] + [np]
         return True
@@ -272,7 +277,7 @@ class PortsEvolver:
         return self.put(s, PPart(t['id'], x, y, r, f))
 
     def swap(self, s: PShip) -> bool:
-        idx = [i for i, p in enumerate(s.parts) if p.type != 'core']
+        idx = [i for i, p in enumerate(s.parts) if not self.is_fixed(p)]
         if not idx:
             return False
         i = self.rng.choice(idx)
@@ -285,7 +290,7 @@ class PortsEvolver:
         return True
 
     def clear(self, s: PShip) -> bool:
-        idx = [i for i, p in enumerate(s.parts) if p.type not in ('hull', 'core')]
+        idx = [i for i, p in enumerate(s.parts) if p.type != 'hull' and not self.is_fixed(p)]
         if not idx:
             return False
         p = s.parts.pop(self.rng.choice(idx))
@@ -293,7 +298,7 @@ class PortsEvolver:
         return True
 
     def turn(self, s: PShip) -> bool:
-        idx = [i for i, p in enumerate(s.parts) if self.T[p.type]['ports']]
+        idx = [i for i, p in enumerate(s.parts) if self.T[p.type]['ports'] and (p.type == 'core' or not self.is_fixed(p))]
         if not idx:
             return False
         i = self.rng.choice(idx)
@@ -393,7 +398,7 @@ class PortsEvolver:
 
     def move(self, s: PShip) -> bool:
         """A part shifted a cell (hull left where it was), so a layout can shuffle without being rebuilt"""
-        idx = [i for i, p in enumerate(s.parts) if self.T[p.type]['kind'] not in ('inert',) and p.type != 'core']
+        idx = [i for i, p in enumerate(s.parts) if self.T[p.type]['kind'] not in ('inert',) and not self.is_fixed(p)]
         if not idx:
             return False
         i = self.rng.choice(idx)
