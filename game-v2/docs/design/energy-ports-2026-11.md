@@ -326,49 +326,71 @@ The lab's example 12 (a Longbarrel) shows 4.7 s against 3.7 s from the same two 
 New store for discharge: the **Surge Cell** (takes 120, gives 300, holds 120): a buffer fast enough on both sides to
 catch a whole plant line while a gun is shut. The Capacitor (takes 40) does the same for a reactor's line.
 
-## 10. The feed layer (2026-11-02)
+## 10. The feed layer (revised 2026-11-03)
 
-Owner's direction: not fuel for power (that's only logistics), but a second network carrying consumables that change
-what guns do. Effects are trade-offs, not straight bonuses. Some guns need power and a feed through separate inputs;
-others take a feed mixed into their power line. It should be infrastructure with spatial consequences, mostly internal,
-and it must be able to cross the power network.
+Owner's direction, over 2026-11-02/03: not fuel for power (that's only logistics) but a second network carrying
+materials that reshape what guns and engines do, as sidegrades (something better, something worse), not as straight
+bonuses and not as elemental effects (ammo types will carry those). No hazards. Only some guns take feed (about a third
+of mid-level guns, half of high-level ones; none of the starters); some have a discrete feed input beside their power
+input. Thrusters take feeds that modulate their stats, on one or two existing engines, plus a new thruster built for the
+system. The pilot can switch which feed is hooked up, which needs two tanks and their lines.
 
-### 10.1 Rules
+### 10.1 Rules (as built in the lab)
 
-- **Tanks** hold one consumable (120). Touching tanks of the same kind join. A hit tank does its consumable's hazard,
-  scaled by how full it is.
-- **Pipes** join anything with a feed point (tanks, pipes, Passthroughs, Combiners, feed ports), on any side. Undirected,
-  unlimited in rate. Everything joined is one **feed network**; its users draw from every tank on it in proportion.
-  Two consumables on one network mix: every effect on it is weaker.
-- **Passthrough**: a power conduit (back to front) with a pipe crossing it (side to side), in one cell: the only place
-  the two networks cross. Breaking one cuts both.
-- **Combiner** (owner's idea: a 2-to-1 like a Joiner): power in at the back, feed on its side, one flavoured line out.
-  It holds no charge, so it is tough and doesn't explode. 1 feed for every 50 power through it.
-- **Flavour** travels with power: every store and conduit carries the mix of what it holds, and passes it on. A gun's
-  shots take the flavour of its buffer: a gun on a half-flavoured line fires at half strength. A **Scrubber** takes the
-  flavour off a line. A broken flavoured line leaks a share of its feed's hazard where it breaks, so injecting near the
-  reactor flavours many guns but spreads the hazard through the ship; injecting near one gun is local but puts the tank
-  near the front.
-- **Feed guns** have their own feed port (a second input, on a given edge) and need it: no feed, no shot. They carry
-  their feed's effect half again as strongly. The **Scorcher** (a projector beam) and **Slurry Cannon** (shells) are the
-  first two.
+- **Tanks** hold one material (120). Touching tanks of the same kind join. **Pipes** join anything with a feed point, on
+  any side; a pipe crosses a power line only through a **Passthrough** (a conduit with a pipe through it, side to side).
+- **A feed buffer** on every gun or engine that takes feed, beside its energy buffer. A shot (or a second lit or
+  thrusting) uses some. **One kind at a time:** anything holding a material refuses another until it is empty. That is
+  true of guns, engines, Combiners and lines alike.
+- **Two ways in.** (a) A **feed port**: the part's own feed input on a given edge, fed by a pipe or a tank touching it;
+  required on some guns (no feed, no shot). (b) A **combined line**: a **Combiner** (power in at its back, material on
+  its side, one line out; it holds no charge, so it is tough and never explodes) puts the material onto a power line,
+  and the conduits carry it on, one kind at a time, into a gun that takes it. **Batteries and capacitors carry power
+  only**, so the Combiner goes after them (store → Combiner → gun). A gun that doesn't take the material blocks it, and
+  the line backs up to the Combiner (the hangar warns).
+- **A Selector** has two feed inputs and one output and passes one at a time; the pilot switches it. The old material
+  runs out of the lines and buffers before the new one arrives, so the changeover takes as long as the buffers are
+  deep: a real trade-off between buffering and quick switching. **Purge** dumps the buffers for an instant switch,
+  wasting what was in them.
+- **Compatibility:** each gun or engine lists the materials it takes; most guns take none. A material it doesn't take
+  never enters it.
+- **Costs:** the parts, the space, the routing and the consumable. Nothing explodes or leaks.
 
-### 10.2 Consumables
+### 10.2 Materials (first numbers)
 
-| Consumable | Gives | Costs | Hazard when hit |
+Each multiplies some of a part's stats. A part may respond more strongly (the Reaction Thruster).
+
+| Material | For | Gives | Costs |
 |---|---|---|---|
-| Incendiary gel | burn: 60% of the hit again, over time | impact −20% | fire (90 over 2 cells) |
-| Cryo slurry | slows the target (25% off its fire, fading) | impact −10% | freezes guns and engines within 1.8 cells for 6 s |
-| Ion gas | disrupts its power (30% off its fire, fading) | impact −15%, cycle +20% | arcs 80 into power parts within 2.2 cells |
-| Tungsten dust | +2 penetration | cycle +15%, heavy tanks | none |
-| Shaped slurry | splash: half the hit again around it | −1 penetration | a bomb (160 over 2.5 cells) |
-| Tracer dust | marks: 30% more from everyone else | impact −10% | none |
+| Overcharge slurry | guns | damage ×1.3, discharge ×0.5 | energy a shot ×1.4 |
+| Coolant | guns | discharge ×0.5, rest ×0.5 (less buffering needed in front) | damage ×0.85 |
+| Damping gel | guns | threshold ×0.5, steady ×0.5 (a weak or shared line will do) | cycle ×1.25 |
+| Flux salts | guns | energy a shot ×0.7 (more shots per reactor) | damage ×0.85 |
+| Accelerant | guns | cycle ×0.7 | energy a shot ×1.25, threshold ×1.5 |
+| Lens fluid | beams | burn ×0.75 (longer bursts from the same buffer) | dps ×0.9, rest ×1.5 |
+| Catalyst | engines | burn ×0.6 (power freed for guns) | thrust ×0.85 |
+| Reaction mass | engines | thrust ×1.4 | used fast |
+| Burst gel | engines | boost ×1.5, boost drain ×0.5 | thrust ×0.9 |
 
-### 10.3 Later (not in the lab)
+### 10.3 Who takes what (the lab's set)
 
-Selector (several tanks in, the pilot picks), Mixer (two feeds into a combined effect), Purge valve (dump a leaking
-tank), armoured pipe passthrough (through the armour belt), pumps (a length limit). And other networks the owner
-floated: heat (radiators on the hull, coolant loops) and voltage tiers (transformers for end-game guns).
+| Part | Takes | How |
+|---|---|---|
+| Pip, Glint, Hammer, Bastion | nothing | — |
+| Cutter (beam, 18) | Lens fluid, Coolant | combined line |
+| Slurry Cannon (16) | Overcharge, Accelerant, Flux | its own feed port, required |
+| Longbarrel (20) | Overcharge, Coolant, Flux | combined line |
+| Spear (28) | Damping gel, Overcharge | combined line |
+| Lance (beam, 32) | Lens fluid, Coolant | combined line |
+| Sunbreaker (34) | Overcharge, Coolant, Damping gel | combined line (any of its six) |
+| Ion Drive | nothing | — |
+| Plasma Drive (16) | Catalyst, Reaction mass | combined line |
+| Reaction Thruster (new, 12) | Reaction mass, Catalyst, Burst gel | its own feed point; on power alone 1.0 thrust for 4 a second, on Reaction mass 5.0 for the same 4 |
+
+### 10.4 Later
+
+Mixers (two feeds into one combined effect), a Purge valve part (per line, not global), shields and mining tools
+taking feed (recharge against capacity, yield against power), engine feeds that touch rated speed and turning.
 
 ## 11. Staging (by level)
 
