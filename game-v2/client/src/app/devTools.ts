@@ -13,8 +13,10 @@ export function installDevTools(host: { readonly renderer: Renderer; readonly ne
   if (import.meta.env.DEV) {
       new RenderTuningPanel({ zoom: () => host.renderer.getZoom(), warp: (systemId, x, y) => host.network.send({ type: 'devTeleport', systemId, x, y }) });
       // Ship swap (F9): the plan library's ships and the dev test ships, flown at once
-      const library = import.meta.glob(['../../../data/ships/blueprints/*.json', '../../../data/ships/blueprints/dev/*.json'], { eager: true, import: 'default' }) as Record<string, { name: string; parts: { fn: string }[] }>;
-      new DevShipPanel(Object.fromEntries(Object.entries(library).map(([path, bp]) => [path.replace(/^.*\//, '').replace(/\.json$/, ''), bp])), (ship) => host.network.send({ type: 'devShip', ship }),
+      // (Grouped: a ports design (`power: 'ports'`) first, then the library, then the dev test ships; one marked `retired` isn't listed)
+      const library = import.meta.glob(['../../../data/ships/blueprints/*.json', '../../../data/ships/blueprints/dev/*.json'], { eager: true, import: 'default' }) as Record<string, { name: string; parts: { fn: string }[]; power?: string; retired?: unknown }>;
+      const groupOf = (path: string, bp: { power?: string }) => (bp.power === 'ports' ? 'Ports energy' : path.includes('/dev/') ? 'Dev test ships' : 'Library');
+      new DevShipPanel(Object.fromEntries(Object.entries(library).filter(([, bp]) => !bp.retired).map(([path, bp]) => [path.replace(/^.*\//, '').replace(/\.json$/, ''), { ...bp, group: groupOf(path, bp) }])), (ship) => host.network.send({ type: 'devShip', ship }),
         (wear, reset) => host.network.send({ type: 'devBoss', wear, reset }), () => host.network.send({ type: 'devRange', action: 'go' }));
       // Weapons range (F10): every weapon model to arm a test rig with, the readout, ideal ammo
       const NO_TARGET = new Set(['repair', 'point_defence']);

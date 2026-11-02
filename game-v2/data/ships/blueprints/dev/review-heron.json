@@ -1,6 +1,7 @@
 {
   "name": "Review: Heron",
   "catalogVersion": 1,
+  "retired": "Off the F9 list: a shipgen review design of 2026-11-01 (kept for the shipgen tests)",
   "parts": [
     {"uid":0,"piece":"rect2","fn":"core","material":"titanium","x":0,"y":-2,"rot":0,"flip":false},
     {"uid":1,"piece":"rect2","fn":"lance_lance","material":"cobalt","x":0,"y":-6,"rot":0,"flip":false,"facing":"N"},

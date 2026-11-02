@@ -1,6 +1,7 @@
 {
   "name": "Test Surge Striker",
   "catalogVersion": 1,
+  "retired": "Off the F9 list: the Surge cut (kept for the frame-hash golden)",
   "parts": [
     {"uid":0,"piece":"block2","fn":"railgun_rail_driver","material":"titanium","x":-1,"y":-4,"rot":0,"flip":false,"facing":"N"},
     {"uid":1,"piece":"sq","fn":"shield_flash_screen","material":"steel","x":-2,"y":-2,"rot":0,"flip":false},

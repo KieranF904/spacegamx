@@ -1,6 +1,7 @@
 {
   "name": "Review: Mako",
   "catalogVersion": 1,
+  "retired": "Off the F9 list: a shipgen review design of 2026-11-01 (kept for the shipgen tests)",
   "parts": [
     {"uid":0,"piece":"rect2","fn":"core","material":"steel","x":0,"y":-2,"rot":0,"flip":false},
     {"uid":1,"piece":"rect2","fn":"torpedo_eel","material":"steel","x":0,"y":-5,"rot":0,"flip":false,"facing":"N"},

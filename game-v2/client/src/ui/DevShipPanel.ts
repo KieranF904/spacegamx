@@ -6,7 +6,9 @@
  * what the ship carries, so the ones with a mining laser are easy to find.
  */
 
-interface Plan { name: string; parts: { fn: string }[] }
+interface Plan { name: string; parts: { fn: string }[]; group?: string }
+/** The order the groups are listed in (anything else after them) */
+const GROUPS = ['Ports energy', 'Library', 'Dev test ships'];
 
 /** What a ship carries that isn't just structure, for its row */
 const KIT_NAMES: Record<string, string> = {
@@ -54,9 +56,20 @@ export class DevShipPanel {
     }
 
     const rows = Object.entries(ships).map(([id, bp]) => ({ id, bp, ...kit(bp) }));
-    // Mining ships first, then the smaller ships first
-    rows.sort((a, b) => Number(b.mines) - Number(a.mines) || a.bp.parts.length - b.bp.parts.length);
-    for (const r of rows) this.button(r.bp.name, r.text, r.mines, () => this.swap(r.id));
+    // By group, each under its heading; in a group mining ships first, then the smaller ships first
+    const rank = (g: string | undefined) => { const i = GROUPS.indexOf(g ?? ''); return i < 0 ? GROUPS.length : i; };
+    rows.sort((a, b) => rank(a.bp.group) - rank(b.bp.group) || Number(b.mines) - Number(a.mines) || a.bp.parts.length - b.bp.parts.length);
+    let group: string | undefined;
+    for (const r of rows) {
+      if (r.bp.group && r.bp.group !== group) {
+        group = r.bp.group;
+        const head = document.createElement('div');
+        head.textContent = group.toUpperCase();
+        Object.assign(head.style, { letterSpacing: '2px', fontSize: '11px', color: '#7fb3d9', margin: '10px 0 6px' });
+        this.el.appendChild(head);
+      }
+      this.button(r.bp.name, r.text, r.mines, () => this.swap(r.id));
+    }
     const own = this.button('My own ship', 'Back to the ship you really have', false, () => this.swap());
     own.style.marginTop = '10px';
     own.style.borderColor = '#4a7a5a';

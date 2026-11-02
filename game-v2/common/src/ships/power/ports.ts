@@ -321,6 +321,8 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
     if (!alive[i] || role[i] === P_INERT || role[i] === P_TANK || role[i] === P_SELECTOR || role[i] === P_PIPE) continue;
     for (const q of fns[i].ports ?? []) {
       const e = placeEdge(parts[i], frames[i], q.side, q.cell ?? 0);
+      // (A port past the piece's side lands on its last cell: a second one there is the same port, once. A 1-cell core has one N port, a 2-cell one two)
+      if (byPart[i].some((o) => o.x === e.x && o.y === e.y && o.side === e.side && o.dir === (q.dir === 'out' ? 1 : 0))) continue;
       const port: Port = { part: i, dir: q.dir === 'out' ? 1 : 0, x: e.x, y: e.y, side: e.side, nx: e.nx, ny: e.ny, rate: q.rate * (role[i] === P_GEN ? health(i) : 1), link: -1 };
       ports.push(port); byPart[i].push(port);
     }

@@ -1,0 +1,41 @@
+== partTip (tooltip) ==
+Feed Pipe
+Mk I · Square · 1 cell
+Hull · mass38 hp · 1.0
+Armour · build1 · 1 pts
+
+== partStats (stats rows) ==
+GradeMk I
+Hull · mass38 hp · 1.0
+Armour · build1 · 1 pts
+Rating scoretoughness 38
+
+== familyLabel ==
+Feed
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+A pipe
+
+== keyStats ==
+38 hp · armour 1
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 10","why":"Learned at level 10 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 10","why":""}
+
+== partStats (raw) ==
+{"grade":1,"mark":"Mk I","size":"","area":1,"hp":37.5,"mass":1,"firepower":0,"toughness":37.5,"armour":1}

@@ -1,0 +1,43 @@
+== partTip (tooltip) ==
+Damping Gel Tank
+Mk III · Square · 1 cell
+Hull · mass66 hp · 1.4
+Armour · build3 · 2.5 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+
+== partStats (stats rows) ==
+GradeMk III
+Hull · mass66 hp · 1.4
+Armour · build3 · 2.5 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 66
+
+== familyLabel ==
+Feed
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+A tank of Damping Gel
+
+== keyStats ==
+66 hp · armour 3
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 22","why":"Learned at level 22 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 22","why":""}
+
+== partStats (raw) ==
+{"grade":3,"mark":"Mk III","size":"","area":1,"hp":65.8,"mass":1.4,"firepower":0,"toughness":65.8,"armour":3,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1}}

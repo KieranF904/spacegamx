@@ -1,6 +1,7 @@
 {
   "name": "Review: Kestrel",
   "catalogVersion": 1,
+  "retired": "Off the F9 list: a shipgen review design of 2026-11-01 (kept for the shipgen tests)",
   "parts": [
     {"uid":0,"piece":"rect2","fn":"core","material":"composite","x":0,"y":-2,"rot":0,"flip":false},
     {"uid":1,"piece":"rect2","fn":"power_overclock_reactor","material":"titanium","x":0,"y":-3,"rot":0,"flip":false},

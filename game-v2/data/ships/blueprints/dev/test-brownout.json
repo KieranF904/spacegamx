@@ -1,6 +1,7 @@
 {
   "name": "Test Brownout",
   "catalogVersion": 1,
+  "retired": "Off the F9 list: the pool-and-banks brownout test (kept for circuits.test.ts)",
   "parts": [
     {"uid":0,"piece":"sq","fn":"cannon_pip","material":"alloy","x":-3,"y":0,"rot":0,"flip":false,"facing":"N"},
     {"uid":1,"piece":"sq","fn":"autocannon_rattler","material":"alloy","x":-2,"y":0,"rot":0,"flip":false,"facing":"N"},

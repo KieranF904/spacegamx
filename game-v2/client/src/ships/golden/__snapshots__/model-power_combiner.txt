@@ -1,0 +1,47 @@
+== partTip (tooltip) ==
+Combiner
+Mk II · Square · 1 cell
+Hull · mass113 hp · 1.4
+Armour · build2 · 1.6 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Holds10 energy
+Givesup to 150/s on to the parts it touches
+Carriesa power line: it passes power between the parts it touches, both ways, and holds very little itself
+
+== partStats (stats rows) ==
+GradeMk II
+Carriespasses power between the parts it touches
+Hull · mass113 hp · 1.4
+Armour · build2 · 1.6 pts
+TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
+Rating scoretoughness 113
+
+== familyLabel ==
+Relays
+
+== sizeWord ==
+Small
+
+== sizeText ==
+Small · Square
+
+== tradeOff ==
+Joins a feed to a power line
+
+== keyStats ==
+holds 10 · gives 150/s · power line
+
+== mountBadge ==
+
+
+== mountingText ==
+
+
+== modelLock (locked, level 4) ==
+{"open":false,"badge":"Lv 12","why":"Learned at level 12 (you're 4)"}
+
+== modelLock (unlocked, level 99) ==
+{"open":true,"badge":"Lv 12","why":""}
+
+== partStats (raw) ==
+{"grade":2,"mark":"Mk II","size":"","area":1,"hp":112.8,"mass":1.4,"firepower":0,"toughness":112.8,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1}}

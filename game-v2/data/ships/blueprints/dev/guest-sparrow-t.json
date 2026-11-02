@@ -1,6 +1,7 @@
 {
   "name": "Sparrow T (brotherk3d)",
   "catalogVersion": 1,
+  "retired": "Off the F9 list: the guest hangar copy of the library Sparrow T",
   "parts": [
     {"uid":0,"piece":"rect2","fn":"core","material":"alloy","x":0,"y":0,"rot":0,"flip":false},
     {"uid":1,"piece":"block2","fn":"power_fusion_plant","material":"steel","x":1,"y":1,"rot":1,"flip":false},

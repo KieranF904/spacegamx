@@ -6,9 +6,9 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseBlueprint } from '../blueprint.js';
+import { parseBlueprint, validateBlueprint } from '../blueprint.js';
 import { createShipState } from '../state.js';
 import { stepGuns } from '../guns.js';
 import { powerTick, remapCharge, type Charge } from '../energy.js';
@@ -62,6 +62,18 @@ describe('ports layout on the dev ships', () => {
     expect(L.role[tank]).toBe(P_TANK);
     expect(L.role[t1]).toBe(P_THRUSTER);
   });
+});
+
+describe('every ports dev ship', () => {
+  for (const f of readdirSync(join(SHIP_DATA_DIR, 'blueprints/dev')).filter((x) => x.startsWith('ports-'))) {
+    it(`${f}: a valid design whose guns, engines and tools are all fed`, () => {
+      const bp = dev(f);
+      expect(validateBlueprint(catalog, bp, tuning).errors.map((e) => e.message)).toEqual([]);
+      const L = createShipState(catalog, tuning, 1, bp, 0).derived.ports!;
+      for (const i of [...L.weapons, ...L.thrusters, ...L.tools]) expect(L.inStart[i + 1] - L.inStart[i], bp.parts[i].fn).toBeGreaterThan(0);
+      for (let i = 0; i < L.n; i++) if (L.feedPort[i]) expect(L.netOf[i], bp.parts[i].fn).toBeGreaterThanOrEqual(0);
+    });
+  }
 });
 
 describe('ports tick', () => {
