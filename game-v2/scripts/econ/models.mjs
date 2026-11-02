@@ -681,9 +681,9 @@ for (const m of models) m.carriesFlow = true;
   const TANKS = [
     ['overcharge', 'Overcharge', 20, '#f97316', 'Harder hits and half the discharge, for 40% more power a shot'],
     ['coolant', 'Coolant', 18, '#38bdf8', 'Half the discharge and rest, 15% softer hits'],
-    ['damping', 'Damping Gel', 22, '#a78bfa', 'Heavy guns run on half the line rating, a quarter slower'],
+    ['damping', 'Damping Gel', 22, '#a78bfa', 'A heavy gun needs half the floor, a quarter slower'],
     ['flux', 'Flux Salts', 18, '#facc15', '30% less power a shot, 15% softer hits'],
-    ['accelerant', 'Accelerant', 24, '#f43f5e', '30% faster fire for a quarter more power a shot; it needs heavier lines'],
+    ['accelerant', 'Accelerant', 24, '#f43f5e', '30% faster fire for a quarter more power a shot, and a higher floor'],
     ['lens', 'Lens Fluid', 20, '#2dd4bf', 'A beam burns a quarter less and hits a tenth softer, resting longer'],
     ['catalyst', 'Catalyst', 16, '#84cc16', 'An engine burns 40% less for 15% less thrust'],
     ['reaction', 'Reaction Mass', 18, '#e879f9', '40% more thrust for the same burn; a Reaction Thruster runs on it'],
@@ -731,7 +731,7 @@ for (const m of models) m.carriesFlow = true;
   // The Slurry Cannon: two inputs, power at its back left and its own feed at its back right, and it fires only with feed
   MOUNT.cannon_slurry = 'fixed';
   MOUNTING.cannon_slurry = { attach: 'back', clear: ahead(2) };
-  const slurryDesc = 'The two-input gun: power at its back left (lines rated 40 or more; 60 on Accelerant) and its own feed input at its back right, and it fires only with a material in it: a heavy slug every 0.7 s that hits like a Hammer. Overcharge, Accelerant or Flux Salts.';
+  const slurryDesc = 'The two-input gun: power at its back left and its own feed input at its back right, and it fires only with a material in it: a heavy slug every 0.7 s that hits like a Hammer. Overcharge, Accelerant or Flux Salts.';
   models.push({
     ...base('cannon_slurry', 'Slurry Cannon', 'cannon', ['rect2'], 18, 'titanium', { grade: 3 }),
     weapon: 'cannon', ...mounted('cannon_slurry', slurryDesc), hpScale: r2(FNS.get('weapon').hpScale * 1.1), demand: 18, priority: 2, fireInterval: 42,
@@ -741,38 +741,72 @@ for (const m of models) m.carriesFlow = true;
     rarity: 'rare', category: 'weapons', fabOrder: next('weapons'), ...legacyLook('weapon'),
     guide: { name: 'Slurry Cannon', blurb: 'The two-input gun', piece: 'rect2', order: guideOrder++ },
   });
-  // Infrastructure tiers (docs/design/energy-ports-2026-11.md section 15): two ways to arm a ship. Simple guns run off a
-  // Cell Reactor at each port: many of them, cheap. Mid, heavy and super guns need lines rated `line` E/s at every port (a
-  // lone Cell Reactor's 35 never fires them: an Overclock's 70 or a Battery's 60 for mid, a Fusion Plant's 100 for heavy, a
-  // Surge Cell's for super), and pay that back in damage: `damage` x on a ports ship, set so that damage a second per cell
-  // of gun and its cheapest rig climbs with the tier (scratch measure: ports-tiers in the design doc). A material that
-  // raises the threshold (Accelerant) needs heavier lines still; one that lowers it (Damping Gel) lets a lighter rig through.
-  // Ammunition, support and legendary guns are tiered but keep their damage (they pay in rounds, roles and artefacts)
-  const LINE = { simple: 0, mid: 50, heavy: 85, super: 120 };
-  const INFRA = {
-    cannon_pip: ['simple', 1], autocannon_rattler: ['simple', 1], laser_glint: ['simple', 1], pulse_strobe: ['simple', 1], arc_spark: ['simple', 1],
-    autocannon_stinger: ['simple', 1], flak_burst: ['simple', 1], mortar_lobber: ['simple', 1], missile_dart: ['simple', 1],
-    // (Mid: 1.2x the simple guns' damage a cell (24) on an Overclock or a Battery line, at most 2x)
-    railgun_coilgun: ['mid', 1.3], autocannon_chainsaw: ['mid', 1.45], cannon_hammer: ['mid', 1.7], cannon_twinlink: ['mid', 1.85],
-    cannon_slurry: ['mid', 2], pulse_overpulse: ['mid', 2], flak_cloudmaker: ['mid', 2], laser_searchlight: ['mid', 2],
-    railgun_needle: ['mid', 1], torpedo_eel: ['mid', 1], missile_swarm: ['mid', 1], mortar_quake: ['mid', 1],
-    // (Heavy: 1.4x a cell on a Fusion Plant, at most 2.5x: the Longbarrel and Spear stay under it, paid in reach and pierce)
-    laser_cutter: ['heavy', 2.5], arc_tesla: ['heavy', 2.3], cannon_longbarrel: ['heavy', 2.5], railgun_spear: ['heavy', 2.5], railgun_rail_driver: ['heavy', 2.5],
-    cannon_bastion: ['heavy', 2.5], missile_hammerhead: ['heavy', 1], torpedo_leviathan: ['heavy', 1],
-    // (Super: 1.6x a cell on Surge Cells over a Fusion Plant, at most 3x. A burst beam's damage a second counts its rests:
-    // the Cutter is lit about half the time, the Lance about 45%; 3x makes its beam 630 a second while it burns)
-    lance_lance: ['super', 3],
+  // Ways to arm a ship (docs/design/energy-ports-2026-11.md section 17). Three kinds of gun, by what they ask of the ship:
+  // - simple: fires off any line (a Cell Reactor at its port). Cheap, many of them.
+  // - dual: the same, and a second input with its own buffer (`augment`): wire a rated line into it (`floor` E/s: a lone
+  //   Cell Reactor's 35 never fills it; an Overclock, a Battery or a Surge Cell does) and its shots become something else
+  //   (a breaching charge, a choked pattern, a storm of arcs...). A spam gun on one reactor, a specialist on two lines.
+  // - heavy / super: a floor on the gun itself (profile.steady: what it gathers collapses unless its lines deliver that
+  //   much while it fills), a big draw (`infra.draw` E/s: its energy a cycle is that draw over its cycle) and a big hit
+  //   (`infra.damage` x). Only heavy infrastructure runs one: a Fusion Plant, or a store that can pour that fast while it
+  //   lasts. Some have an augment of their own on top.
+  // Damage here is per role, not per cell: each gun is judged in the scenarios it is for (scripts/balance/weapon-scenarios.mjs).
+  // Ammunition guns pay in rounds and stay simple; support guns and legendaries keep their ways.
+  const ROLE = {
+    simple: ['cannon_pip', 'autocannon_rattler', 'laser_glint', 'pulse_strobe', 'autocannon_stinger', 'flak_burst', 'mortar_lobber', 'missile_dart',
+      'railgun_needle', 'torpedo_eel', 'missile_swarm', 'mortar_quake', 'missile_hammerhead', 'torpedo_leviathan'],
+    dual: ['cannon_hammer', 'cannon_twinlink', 'autocannon_chainsaw', 'railgun_coilgun', 'arc_spark', 'pulse_overpulse', 'flak_cloudmaker', 'laser_searchlight', 'cannon_slurry'],
+    heavy: ['cannon_longbarrel', 'cannon_bastion', 'railgun_spear', 'railgun_rail_driver', 'laser_cutter', 'arc_tesla'],
+    super: ['lance_lance'],
   };
-  for (const m of models) {
-    const t = INFRA[m.id];
-    if (!t) continue;
-    const [tier, damage] = t, line = LINE[tier];
-    m.infra = { tier, damage };
-    if (!line || m.fire?.model === 'ammo') continue;
-    const ins = (m.ports ?? []).filter((q) => q.dir === 'in');
-    const thr = Math.max(1, ...(m.takes ?? []).map((f) => TUNING.feeds?.[f]?.mod.threshold ?? 1));
-    m.profile = { ...(m.profile ?? {}), threshold: line * ins.length };
-    m.ports = m.ports.map((q) => (q.dir === 'in' ? { ...q, rate: Math.max(q.rate, Math.ceil(line * thr)) } : q));
+  // (Heavy and super: draw E/s on a ports ship, and damage x. The floor is 85% of the draw, spread over the gun's ports)
+  const HEAVY = {
+    cannon_longbarrel: { draw: 170, damage: 3 }, cannon_bastion: { draw: 170, damage: 1.8 }, railgun_spear: { draw: 170, damage: 1.6 },
+    railgun_rail_driver: { draw: 170, damage: 1.8 }, laser_cutter: { draw: 170, damage: 2.6 }, arc_tesla: { draw: 100, damage: 1.3 },
+    lance_lance: { draw: 260, damage: 2.5 },
+  };
+  // (Augments. side/cell: its input, in the gun's own frame (S cell 1: the back of a 2-wide gun's right cell, which its main
+  // input gives up); rate: E/s it takes; floor: E/s its line must deliver while it fills; cost: E a shot (a beam: E/s);
+  // buffer: shots it holds (a beam: seconds); mods: on top of the gun's own (a mul is a change: 0.3 is x1.3))
+  // (Damage x on a ports ship for the guns that had no place in any scenario: the Rattler and Strobe as cheap swarm turrets,
+  // the Twinlink's stream; the Coilgun's base is a short-range pattern that its Choke turns into a real gun; the Slurry
+  // Cannon's feed is its infrastructure)
+  const DUAL = { railgun_coilgun: 0.55, cannon_slurry: 1.35, cannon_twinlink: 1.25, autocannon_rattler: 1.4, pulse_strobe: 1.2 };
+  const AUG = (name, say, side, cell, rate, floor, cost, mods, buffer) => ({ name, say, side, ...(cell ? { cell } : {}), rate, floor, cost, ...(buffer ? { buffer } : {}), mods });
+  const AUGMENT = {
+    cannon_hammer: AUG('Breaching charge', 'its slug punches one grade deeper and bursts inside', 'S', 1, 60, 45, 30, { mul: { damage: 0.25 }, add: { pen: 1 }, set: { splash: { radius: 70, damage: 36 } } }),
+    cannon_twinlink: AUG('Tracer lock', 'a tight stream twice as fast, harder-hitting, that reaches much further', 'S', 1, 60, 45, 8, { mul: { spread: -0.7, speed: 1, damage: 0.4 }, add: { pen: 0.5 } }, 16),
+    autocannon_chainsaw: AUG('Incendiary belt', 'every round sets the part it hits burning', 'S', 1, 60, 45, 3, { set: { ignite: { dps: 6, ticks: 180, radius: 0.6 } } }, 20),
+    railgun_coilgun: AUG('Choke', 'a tight, heavy pattern that carries twice as far', 'S', 1, 60, 45, 36, { mul: { spread: -0.65, life: 1, damage: 0.8 } }),
+    arc_spark: AUG('Storm coil', 'its arc leaps to six targets, further apart', 'W', 0, 60, 45, 30, { set: { chain: { count: 6, radius: 420, falloff: 0.65 } } }),
+    pulse_overpulse: AUG('Overdrive', 'three bolts a shot, fanned', 'S', 1, 60, 45, 10, { add: { burst: 2 }, mul: { spread: 0.4 } }, 12),
+    flak_cloudmaker: AUG('Wide burst', 'bursts half again as wide and 60% harder', 'S', 0, 60, 45, 45, { mul: { splashRadius: 0.5, splashDamage: 0.6 } }),
+    laser_searchlight: AUG('Sear', 'its marking beam burns twice as hot', 'S', 0, 60, 45, 40, { mul: { dps: 1 } }),
+    cannon_longbarrel: AUG('Penetrator', 'its round goes on through two more ships', 'W', 0, 70, 50, 150, { add: { pierce: 2 }, set: { pierceKeep: 1 } }),
+    cannon_bastion: AUG('Shatter', 'each ball bursts in a 200 blast', 'W', 0, 70, 50, 80, { set: { splash: { radius: 200, damage: 110 } } }),
+    railgun_rail_driver: AUG('Coil boost', 'half again the damage, a third faster', 'W', 0, 70, 50, 20, { mul: { damage: 0.5, speed: 0.3 } }, 6),
+    laser_cutter: AUG('Focus', 'burns half again as hot', 'W', 0, 70, 50, 60, { mul: { dps: 0.5 } }),
+    arc_tesla: AUG('Storm', 'zaps half again as hard', 'S', 0, 70, 50, 50, { mul: { dps: 0.5 } }),
+    lance_lance: AUG('Focus', 'burns half again as hot', 'W', 0, 100, 55, 100, { mul: { dps: 0.5 } }),
+  };
+  for (const [tier, ids] of Object.entries(ROLE)) for (const id of ids) {
+    const m = models.find((x) => x.id === id);
+    if (!m) throw new Error(`role for unknown model ${id}`);
+    const h = HEAVY[id], ag = AUGMENT[id];
+    m.infra = { tier, damage: h?.damage ?? DUAL[id] ?? 1, ...(h ? { draw: h.draw } : {}) };
+    if (ag) {
+      m.augment = ag;
+      // (Its augment takes the back of its right cell: its main input keeps the left one, at the whole rate)
+      if (ag.side === 'S' && ag.cell === 1) {
+        const left = m.ports.filter((q) => q.dir === 'in' && !(q.side === 'S' && q.cell === 1));
+        m.ports = left.map((q) => ({ ...q, rate: q.rate * 2 }));
+      }
+    }
+    if (h) {
+      const ins = m.ports.filter((q) => q.dir === 'in');
+      m.profile = { ...(m.profile ?? {}), steady: Math.round(0.85 * h.draw) };
+      m.ports = m.ports.map((q) => (q.dir === 'in' ? { ...q, rate: Math.ceil((1.1 * h.draw) / ins.length) } : q));
+    }
   }
 }
 // ---- (end ports energy core)

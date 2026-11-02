@@ -1,6 +1,7 @@
 {
   "name": "Ports Lancer",
   "catalogVersion": 1,
+  "retired": "Off the F9 list: an early ports demo (kept for common/src/ships/power/ports.test.ts)",
   "power": "ports",
   "parts": [
     {"uid":0,"piece":"sq","fn":"core","material":"alloy","x":0,"y":0,"rot":0,"flip":false},

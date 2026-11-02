@@ -7,7 +7,7 @@
  * Damage goes through the bridge (b.hurt), never an import of the damage module, so the modules can't form a cycle.
  */
 
-import { rayTerrain, portsDamageMul } from '@space-game/common';
+import { rayTerrain, portsDamageMul, stackMods } from '@space-game/common';
 import { hasComponent } from 'bitecs';
 import {
   Position, Input, Player, InSystem, Projectile, ShipState, Vec2, damagePart, weaponHit, shooterGrade, localToWorldDir,
@@ -198,7 +198,7 @@ export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: 
   b.stepPulses(eid, ship, tick);
   // Weapon roles' own ticks: point defence fires on its own, whatever the trigger (features/support)
   tickWeaponHooks(b, eid, ship, pose, def);
-  for (const { w, aimQ, shot } of shots) {
+  for (const { w, aimQ, shot, aug } of shots) {
     const d = def(w);
     const gunMods = ship.blueprint.parts[w.part].mods;
     // Missiles lock on to the ship nearest the aim point (the cursor), else the target given (a guided one is steered instead)
@@ -218,12 +218,14 @@ export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: 
     // (An ammunition gun's shot costs its `rounds` from the hold; Ammo.ts: an empty hold fires plain rounds, as it always has)
     let round = b.host.spendAmmo?.(eid, w.kind, !d.ammo);
     for (let k = 1; k < (w.fire.model === 'ammo' ? w.fire.rounds ?? 1 : 1); k++) round = b.host.spendAmmo?.(eid, w.kind, !d.ammo) ?? round;
+    // (A ports ship's augmented shot: its augment's mods on the round's, power/ports.ts)
+    const mods = stackMods(round?.mods, aug);
     const damageScale = shot.damageScale * b.damageMul(eid) * (round?.scale ?? 1);
     // (A shell that ends at the aim flies the aim distance: a lobbed mortar's, an aim burst's, a walking salvo's first)
     const ids = b.host.fireBaseShot(eid, shot.x, shot.y, shot.angle, damageScale,
-      { speedScale: shot.speedScale, sizeScale: shot.sizeScale, turret: shot.mount === 'turret', kind: w.kind, target: lock, seed: `${eid}:${ship.blueprint.parts[w.part].uid}`, mods: gunMods, dry: round?.dry, ammoMods: round?.mods,
+      { speedScale: shot.speedScale, sizeScale: shot.sizeScale, turret: shot.mount === 'turret', kind: w.kind, target: lock, seed: `${eid}:${ship.blueprint.parts[w.part].uid}`, mods: gunMods, dry: round?.dry, ammoMods: mods,
         reach: endsAtAim(d) ? aimReach(aimDist, d, 0) : undefined, grade: w.grade, size: w.size, model: w.model });
-    if (ids?.length && firesStraight(d)) b.fired.push({ owner: eid, tick, part: w.part, aimQ, ids, ...(round?.item ? { ammo: ammoCode(round.item) } : {}) });
+    if (ids?.length && firesStraight(d)) b.fired.push({ owner: eid, tick, part: w.part, aimQ, ids, ...(round?.item ? { ammo: ammoCode(round.item) } : {}), ...(aug ? { aug: 1 as const } : {}) });
     // A rippling salvo: the rest of its shells, `gap` ticks apart, on the same lock
     if (d.salvo && d.salvo.count > 1) {
       let list = b.salvos.get(eid);

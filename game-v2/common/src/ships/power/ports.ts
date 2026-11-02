@@ -11,7 +11,7 @@
  * for energy, hundredths for material, ticks for timers. All lists are in part-index order.
  */
 
-import type { FireSpec, FunctionDef, MaterialDef, PlacedPart, Rot, Side, Vec2 } from '../types.js';
+import type { FireSpec, FunctionDef, MaterialDef, PlacedPart, Rot, Side, Vec2, WeaponMods } from '../types.js';
 import type { ShipTuning } from '../tuning.js';
 import { SIDE_NORMAL, transformPoint, transformSide } from '../catalog.js';
 import { fnOutput, isEngine, partDemand, partSupply } from '../grades.js';
@@ -26,7 +26,9 @@ export const PF_LATCH = 1;
 export const PF_LIT = 2;
 /** A Selector passing its second input */
 export const PF_SEL = 4;
-export const PF_MASK = 7;
+/** A beam burning augmented this tick (its augment buffer pays) */
+export const PF_AUG = 8;
+export const PF_MASK = 15;
 
 /** Material amounts are kept in hundredths */
 export const MAT_UNIT = 100;
@@ -44,7 +46,7 @@ export interface FeedDef {
   short?: string;
   /** What it is for */
   on: 'weapon' | 'engine';
-  /** The stats it multiplies: shot, damage, cycle, discharge, rest, burn, threshold, steady, thrust, boost, boostDrain */
+  /** The stats it multiplies: shot, damage, cycle, discharge, rest, burn, steady (the floor), thrust, boost, boostDrain */
   mod: Record<string, number>;
   color?: string;
   say?: string;
@@ -83,13 +85,23 @@ export interface PortsLayout {
   shot: Int32Array;
   rounds: Int32Array;
   relight: Int32Array;
-  /** Weapons' power profiles: passive eu a tick, discharge and rest in ticks, burst 0/1, threshold and steady in eu a tick */
+  /** Weapons' power profiles: passive eu a tick, discharge and rest in ticks, burst 0/1, and `steady`, the floor: eu a tick
+   * its lines must deliver while it fills, or what it has gathered collapses (a lone reactor can't trickle a heavy gun full) */
   passive: Int32Array;
   discharge: Int32Array;
   rest: Int32Array;
   burst: Uint8Array;
-  threshold: Int32Array;
   steady: Int32Array;
+  /** Weapons with an augment input (FunctionDef.augment): its buffer (eu), what a shot (a beam: a tick) costs, the most it
+   * takes a tick, its floor (eu a tick, as `steady`), and a beam's dps x while augmented. 0 cap: none */
+  augCap: Int32Array;
+  augCost: Int32Array;
+  augRate: Int32Array;
+  augSteady: Int32Array;
+  augDps: Float64Array;
+  /** Per part: its augment's mods (what an augmented shot adds) and name, or undefined */
+  augMods: readonly (WeaponMods | undefined)[];
+  augName: readonly (string | undefined)[];
   /** Weapons: the damage x its infrastructure tier gives it (FunctionDef.infra) */
   tierDmg: Float64Array;
   /** Tools: 1 for a shield generator */
@@ -113,7 +125,6 @@ export interface PortsLayout {
   mDischarge: Float64Array;
   mRest: Float64Array;
   mBurn: Float64Array;
-  mThreshold: Float64Array;
   mSteady: Float64Array;
   mThrust: Float64Array;
   mBoost: Float64Array;
@@ -127,6 +138,8 @@ export interface PortsLayout {
   linkFrom: Int32Array;
   linkTo: Int32Array;
   linkCap: Int32Array;
+  /** 1 for a link into a weapon's augment input */
+  linkAug: Uint8Array;
   /** Per part: its out links are links[outStart[p] .. outStart[p+1]], its in links inStart[p] .. (link ids) */
   outStart: Int32Array;
   outLink: Int32Array;
@@ -135,8 +148,8 @@ export interface PortsLayout {
   /** Per part: open in ports (a consumer's with nothing across) and open out ports (a generator's), for the hangar */
   openIn: Uint8Array;
   openOut: Uint8Array;
-  /** Every port, placed, for the hangar: part, dir (0 in, 1 out), x, y (its cell), side, rate (E/s), linked (0/1) */
-  ports: { part: number; dir: 0 | 1; x: number; y: number; side: Side; rate: number; link: number }[];
+  /** Every port, placed, for the hangar: part, dir (0 in, 1 out), x, y (its cell), side, rate (E/s), linked (0/1), a weapon's augment input (1) */
+  ports: { part: number; dir: 0 | 1; x: number; y: number; side: Side; rate: number; link: number; aug: 0 | 1 }[];
   /** Every feed point, placed: part, x, y, side, joined (0/1) */
   feedPts: { part: number; x: number; y: number; side: Side; joined: number; i: number }[];
 
@@ -174,6 +187,8 @@ export interface PortsState {
   mat: Uint8Array;
   /** Ticks a gun's ports stay shut (discharge, rest) */
   closed: Int16Array;
+  /** A weapon's augment buffer, eu */
+  aug: Int32Array;
   /** Tools: the share of what each wanted that it got this tick, 0..255 */
   sat: Uint8Array;
   shieldSat: number;
@@ -222,11 +237,12 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
   for (const w of input.weapons ?? []) weaponOf.set(w.part, w);
   const Z = () => new Int32Array(n);
   const role = new Uint8Array(n), cap = Z(), rate = Z(), burn = Z(), bBurn = Z(), boostMul = new Float64Array(n).fill(1);
-  const gun = new Uint8Array(n), shot = Z(), rounds = Z(), relight = Z(), passive = Z(), discharge = Z(), rest = Z(), burst = new Uint8Array(n), threshold = Z(), steady = Z();
+  const gun = new Uint8Array(n), shot = Z(), rounds = Z(), relight = Z(), passive = Z(), discharge = Z(), rest = Z(), burst = new Uint8Array(n), steady = Z();
+  const augCap = Z(), augCost = Z(), augRate = Z(), augSteady = Z(), augDps = new Float64Array(n).fill(1), augMods: (WeaponMods | undefined)[] = new Array(n).fill(undefined), augName: (string | undefined)[] = new Array(n).fill(undefined);
   const tierDmg = new Float64Array(n).fill(1);
   const shield = new Uint8Array(n), carrier = new Uint8Array(n), matCap = Z(), matUse = Z(), takes = Z(), tankFeed = new Uint8Array(n), feedPort = new Uint8Array(n);
   const mul = () => new Float64Array(n * W).fill(1);
-  const mShot = mul(), mDamage = mul(), mCycle = mul(), mDischarge = mul(), mRest = mul(), mBurn = mul(), mThreshold = mul(), mSteady = mul(), mThrust = mul(), mBoost = mul(), mBoostDrain = mul();
+  const mShot = mul(), mDamage = mul(), mCycle = mul(), mDischarge = mul(), mRest = mul(), mBurn = mul(), mSteady = mul(), mThrust = mul(), mBoost = mul(), mBoostDrain = mul();
   let supply = 0, engineDraw = 0, weaponDraw = 0;
 
   for (let i = 0; i < n; i++) {
@@ -250,30 +266,37 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
       const w = weaponOf.get(i);
       if (!w) continue;
       role[i] = P_WEAPON;
-      // (Its energy is what it draws today, as energy.ts gunDraw has it: a beam its draw a second from two seconds' worth; a
-      // cycle gun its draw over its beat, two shots held; a clip its reload's energy over the clip; a charge gun its charge's.
-      // The routing data's own shot/intake/burn (fire.shot...) is another scale and is left alone)
-      const f = w.fire, draw = partDemand(fn, a, m);
+      // Its energy is its draw over its cycle (a ports ship's own draw, infra.draw, else what it draws today): a cycle gun its
+      // draw over its beat, two shots held; a clip its draw over a whole clip and its reload, the clip held; a charge gun its
+      // draw over its charge and cooldown; a beam a tick's draw, two seconds held. It takes 1.5x its draw a tick, so a starved
+      // gun catches up; a floored one only a little over (its floor is its pace)
+      const f = w.fire, inf = fn.infra, draw = inf?.draw ?? partDemand(fn, a, m), pr = fn.profile ?? {};
       weaponDraw += draw;
       rounds[i] = 1;
-      rate[i] = perTickUp(1.5 * draw);
+      rate[i] = perTickUp((pr.steady ? 1.1 : 1.5) * draw);
       if (f.model === 'beam') {
         gun[i] = 3; shot[i] = draw > 0 ? Math.max(1, perTick(draw)) : 0; cap[i] = toEu(2 * draw);
         relight[i] = Math.floor(cap[i] * (f.relight ?? 0.5));
       } else if (f.model === 'clip') {
-        const clip = Math.max(1, Math.round(f.clip ?? 1)), reloadE = f.reloadE ?? (draw * (f.reload ?? 60)) / 60;
-        gun[i] = 2; shot[i] = toEu(reloadE / clip); cap[i] = shot[i] * clip;
+        const clip = Math.max(1, Math.round(f.clip ?? 1)), cycle = clip * w.interval + (f.reload ?? 60);
+        gun[i] = 2; shot[i] = toEu((draw * cycle) / 60 / clip); cap[i] = shot[i] * clip;
         if (shot[i] > 0) rounds[i] = Math.max(1, Math.min(Math.round(f.rounds ?? 1), clip));
       } else if (f.model === 'charge') {
-        gun[i] = 1; shot[i] = toEu(f.chargeE ?? (draw * ((f.charge ?? 60) + (f.cooldown ?? 0))) / 60); cap[i] = shot[i];
+        gun[i] = 1; shot[i] = toEu((draw * ((f.charge ?? 60) + (f.cooldown ?? 0))) / 60); cap[i] = shot[i];
       } else {
         gun[i] = 1; shot[i] = f.model === 'ammo' ? 0 : toEu((draw * w.interval) / 60); cap[i] = 2 * shot[i];
       }
-      const pr = fn.profile ?? {};
       passive[i] = perTick(pr.passive ?? 0); discharge[i] = Math.round((pr.discharge ?? 0) * TPS); rest[i] = Math.round((pr.rest ?? 0) * TPS);
-      // (A threshold rounds down, so a line rated exactly at it passes)
-      tierDmg[i] = fn.infra?.damage ?? 1;
-      burst[i] = pr.burst ? 1 : 0; threshold[i] = Math.floor(((pr.threshold ?? 0) * EU) / TPS); steady[i] = perTick(pr.steady ?? 0);
+      tierDmg[i] = inf?.damage ?? 1;
+      burst[i] = pr.burst ? 1 : 0; steady[i] = perTick(pr.steady ?? 0);
+      const ag = fn.augment;
+      if (ag) {
+        // (A shot's augment costs `cost` E; a beam's `cost` E a second while it burns. Its buffer holds `buffer` of them (a beam: seconds))
+        augCost[i] = gun[i] === 3 ? Math.max(1, perTick(ag.cost)) : toEu(ag.cost);
+        augCap[i] = gun[i] === 3 ? toEu(ag.cost * (ag.buffer ?? 2)) : augCost[i] * Math.max(1, Math.round(ag.buffer ?? 2));
+        augRate[i] = perTickUp(ag.rate); augSteady[i] = perTick(ag.floor ?? 0);
+        augDps[i] = 1 + (ag.mods?.mul?.dps ?? 0); augMods[i] = ag.mods; augName[i] = ag.name;
+      }
     } else if (isEngine(fn)) {
       role[i] = P_THRUSTER;
       const burnE = partDemand(fn, a, m), k = (fn.demand ?? 0) > 0 ? burnE / (fn.demand! * a) : 1;
@@ -302,7 +325,7 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
         const mods = { ...(feedDefs[f]!.mod), ...((fn.feedMods ?? {})[id] ?? {}) }, at = i * W + f;
         if (mods.shot !== undefined) mShot[at] = mods.shot; if (mods.damage !== undefined) mDamage[at] = mods.damage; if (mods.cycle !== undefined) mCycle[at] = mods.cycle;
         if (mods.discharge !== undefined) mDischarge[at] = mods.discharge; if (mods.rest !== undefined) mRest[at] = mods.rest; if (mods.burn !== undefined) mBurn[at] = mods.burn;
-        if (mods.threshold !== undefined) mThreshold[at] = mods.threshold; if (mods.steady !== undefined) mSteady[at] = mods.steady;
+        if (mods.steady !== undefined) mSteady[at] = mods.steady;
         if (mods.thrust !== undefined) mThrust[at] = mods.thrust; if (mods.boost !== undefined) mBoost[at] = mods.boost; if (mods.boostDrain !== undefined) mBoostDrain[at] = mods.boostDrain;
       }
       if (fn.feedPort) feedPort[i] = fn.feedPort.required ? 2 : 1;
@@ -318,20 +341,22 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
     frames.push(frameOf(parts[i], input.cells[i]));
     if (alive[i]) for (const c of input.cells[i]) occ.set(key(c[0], c[1]), i);
   }
-  type Port = { part: number; dir: 0 | 1; x: number; y: number; side: Side; nx: number; ny: number; rate: number; link: number };
+  type Port = { part: number; dir: 0 | 1; x: number; y: number; side: Side; nx: number; ny: number; rate: number; link: number; aug: 0 | 1 };
   const ports: Port[] = [];
   const byPart: Port[][] = Array.from({ length: n }, () => []);
   for (let i = 0; i < n; i++) {
     if (!alive[i] || role[i] === P_INERT || role[i] === P_TANK || role[i] === P_SELECTOR || role[i] === P_PIPE) continue;
-    for (const q of fns[i].ports ?? []) {
-      const e = placeEdge(parts[i], frames[i], q.side, q.cell ?? 0);
+    const ag = role[i] === P_WEAPON && augCap[i] > 0 ? fns[i].augment : undefined;
+    const specs: (PortSpec & { aug?: 1 })[] = ag ? [...(fns[i].ports ?? []), { dir: 'in', side: ag.side, cell: ag.cell, rate: ag.rate, aug: 1 }] : fns[i].ports ?? [];
+    for (const q of specs) {
+      const e = placeEdge(parts[i], frames[i], q.side, q.cell ?? 0), dir = q.dir === 'out' ? 1 : 0;
       // (A port past the piece's side lands on its last cell: a second one there is the same port, once. A 1-cell core has one N port, a 2-cell one two)
-      if (byPart[i].some((o) => o.x === e.x && o.y === e.y && o.side === e.side && o.dir === (q.dir === 'out' ? 1 : 0))) continue;
-      const port: Port = { part: i, dir: q.dir === 'out' ? 1 : 0, x: e.x, y: e.y, side: e.side, nx: e.nx, ny: e.ny, rate: q.rate * (role[i] === P_GEN ? health(i) : 1), link: -1 };
+      if (byPart[i].some((o) => o.x === e.x && o.y === e.y && o.side === e.side && o.dir === dir)) continue;
+      const port: Port = { part: i, dir, x: e.x, y: e.y, side: e.side, nx: e.nx, ny: e.ny, rate: q.rate * (role[i] === P_GEN ? health(i) : 1), link: -1, aug: q.aug ? 1 : 0 };
       ports.push(port); byPart[i].push(port);
     }
   }
-  const linkFrom: number[] = [], linkTo: number[] = [], linkCap: number[] = [];
+  const linkFrom: number[] = [], linkTo: number[] = [], linkCap: number[] = [], linkAug: number[] = [];
   const openIn = new Uint8Array(n), openOut = new Uint8Array(n);
   for (const pa of ports) {
     if (pa.dir !== 1) continue;
@@ -339,7 +364,7 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
     const pb = j === undefined || j === pa.part ? undefined : byPart[j].find((q) => q.dir === 0 && q.x === pa.nx && q.y === pa.ny && q.side === OPP[pa.side]);
     if (!pb) { if (role[pa.part] === P_GEN) openOut[pa.part] = 1; continue; }
     const id = linkFrom.length;
-    linkFrom.push(pa.part); linkTo.push(pb.part); linkCap.push(perTick(Math.min(pa.rate, pb.rate)));
+    linkFrom.push(pa.part); linkTo.push(pb.part); linkCap.push(perTick(Math.min(pa.rate, pb.rate))); linkAug.push(pb.aug);
     pa.link = id; pb.link = id;
   }
   for (const pb of ports) if (pb.dir === 0 && pb.link < 0 && (role[pb.part] === P_WEAPON || role[pb.part] === P_THRUSTER || role[pb.part] === P_TOOL)) openIn[pb.part] = 1;
@@ -350,7 +375,8 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
     inStart[i] = inLink.length; for (let l = 0; l < linkTo.length; l++) if (linkTo[l] === i) inLink.push(l);
   }
   outStart[n] = outLink.length; inStart[n] = inLink.length;
-  for (let i = 0; i < n; i++) if (role[i] === P_WEAPON || role[i] === P_THRUSTER || role[i] === P_TOOL) { let r = 0; for (let x = inStart[i]; x < inStart[i + 1]; x++) r += linkCap[inLink[x]]; rate[i] = Math.min(rate[i] || r, r) || rate[i]; }
+  // (A consumer takes at most what its own lines can bring: its main lines; an augment's are its own)
+  for (let i = 0; i < n; i++) if (role[i] === P_WEAPON || role[i] === P_THRUSTER || role[i] === P_TOOL) { let r = 0; for (let x = inStart[i]; x < inStart[i + 1]; x++) if (!linkAug[inLink[x]]) r += linkCap[inLink[x]]; rate[i] = Math.min(rate[i] || r, r) || rate[i]; }
 
   // ---- Feed points and networks (union-find; a Selector's points join nothing, they look across)
   type FP = { part: number; x: number; y: number; side: Side; nx: number; ny: number; joined: number; i: number };
@@ -397,11 +423,11 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
   for (let i = 0; i < n; i++) if (role[i] === P_THRUSTER || role[i] === P_TOOL || role[i] === P_WEAPON) consumers.push(i);
   let gaugeMax = 0; for (const r of relays) gaugeMax += cap[r];
   const L: PortsLayout = {
-    n, sig: 0, role, cap, rate, burn, bBurn, boostMul, tierDmg, gun, shot, rounds, relight, passive, discharge, rest, burst, threshold, steady, shield, carrier, matCap, matUse, takes, tankFeed, feedPort,
-    mShot, mDamage, mCycle, mDischarge, mRest, mBurn, mThreshold, mSteady, mThrust, mBoost, mBoostDrain, feeds, feedDefs,
-    links: linkFrom.length, linkFrom: Int32Array.from(linkFrom), linkTo: Int32Array.from(linkTo), linkCap: Int32Array.from(linkCap),
+    n, sig: 0, role, cap, rate, burn, bBurn, boostMul, tierDmg, gun, shot, rounds, relight, passive, discharge, rest, burst, steady, augCap, augCost, augRate, augSteady, augDps, augMods, augName, shield, carrier, matCap, matUse, takes, tankFeed, feedPort,
+    mShot, mDamage, mCycle, mDischarge, mRest, mBurn, mSteady, mThrust, mBoost, mBoostDrain, feeds, feedDefs,
+    links: linkFrom.length, linkFrom: Int32Array.from(linkFrom), linkTo: Int32Array.from(linkTo), linkCap: Int32Array.from(linkCap), linkAug: Uint8Array.from(linkAug),
     outStart, outLink: Int32Array.from(outLink), inStart, inLink: Int32Array.from(inLink), openIn, openOut,
-    ports: ports.map((p) => ({ part: p.part, dir: p.dir, x: p.x, y: p.y, side: p.side, rate: p.rate, link: p.link >= 0 ? 1 : 0 })),
+    ports: ports.map((p) => ({ part: p.part, dir: p.dir, x: p.x, y: p.y, side: p.side, rate: p.rate, link: p.link >= 0 ? 1 : 0, aug: p.aug })),
     feedPts: fps.map((f) => ({ part: f.part, x: f.x, y: f.y, side: f.side, joined: f.joined, i: f.i })),
     netOf, nets, selIn, selOut, drawers: Int32Array.from(drawers),
     gens: list(P_GEN), relays, thrusters: list(P_THRUSTER), tools: list(P_TOOL), weapons: list(P_WEAPON), tanks: list(P_TANK), carriers: Int32Array.from([...relays].filter((r) => carrier[r])),
@@ -416,7 +442,7 @@ export function portsSig(L: PortsLayout): number {
   let h = 0x811c9dc5 | 0;
   const mix = (v: number) => { h = Math.imul(h ^ (v | 0), 0x01000193); };
   const all = (a: ArrayLike<number>) => { mix(a.length); for (let i = 0; i < a.length; i++) mix(a[i]); };
-  mix(L.n); all(L.role); all(L.cap); all(L.burn); all(L.bBurn); all(L.gun); all(L.shot); all(L.rounds); all(L.passive); all(L.discharge); all(L.rest); all(L.threshold); all(L.steady);
+  mix(L.n); all(L.role); all(L.cap); all(L.burn); all(L.bBurn); all(L.gun); all(L.shot); all(L.rounds); all(L.passive); all(L.discharge); all(L.rest); all(L.steady); all(L.augCap); all(L.augCost); all(L.augSteady); all(L.linkAug);
   all(L.matCap); all(L.takes); all(L.tankFeed); all(L.linkFrom); all(L.linkTo); all(L.netOf); all(L.selOut);
   const s = ((h >>> 16) ^ (h & 0xffff)) & 0xffff;
   return s === 0 ? 1 : s;
@@ -424,12 +450,12 @@ export function portsSig(L: PortsLayout): number {
 
 // ================================================================ state
 export function createPortsState(L: PortsLayout): PortsState {
-  return fullPorts(L, { sig: L.sig, held: new Int32Array(L.n), flags: new Uint8Array(L.n), amt: new Int32Array(L.n), mat: new Uint8Array(L.n), closed: new Int16Array(L.n), sat: new Uint8Array(L.n), shieldSat: 255, gauge: 0 });
+  return fullPorts(L, { sig: L.sig, held: new Int32Array(L.n), flags: new Uint8Array(L.n), amt: new Int32Array(L.n), mat: new Uint8Array(L.n), closed: new Int16Array(L.n), aug: new Int32Array(L.n), sat: new Uint8Array(L.n), shieldSat: 255, gauge: 0 });
 }
 /** Everything full: stores, buffers and tanks; no material in the guns, lines or engines */
 export function fullPorts(L: PortsLayout, out?: PortsState): PortsState {
   if (!out || out.held.length !== L.n) return createPortsState(L);
-  out.held.set(L.cap);
+  out.held.set(L.cap); out.aug.set(L.augCap);
   for (const c of L.carriers) out.held[c] = 0;
   out.flags.fill(0); out.amt.fill(0); out.mat.fill(0); out.closed.fill(0); out.sat.fill(255); out.shieldSat = 255; out.sig = L.sig; out.gauge = portsGauge(L, out);
   return out;
@@ -440,6 +466,7 @@ export function remapPorts(e: PortsState, after: PortsLayout, sameDesign: boolea
   for (let i = 0; i < after.n; i++) {
     if (e.held[i] > after.cap[i]) e.held[i] = after.cap[i];
     if (e.held[i] < 0) e.held[i] = 0;
+    if (e.aug[i] > after.augCap[i]) e.aug[i] = after.augCap[i];
     if (e.amt[i] > after.matCap[i]) e.amt[i] = after.matCap[i];
     if (e.amt[i] <= 0) { e.amt[i] = 0; e.mat[i] = 0; }
     if (after.gun[i] === 0 && after.role[i] !== P_SELECTOR) e.flags[i] = 0;
@@ -463,7 +490,6 @@ export const effDamage = (L: PortsLayout, e: PortsState, p: number): number => {
 export const effCycle = (L: PortsLayout, e: PortsState, p: number): number => { const f = matOf(L, e, p); return f ? L.mCycle[p * W(L) + f] : 1; };
 const effDischarge = (L: PortsLayout, e: PortsState, p: number): number => { const f = matOf(L, e, p); return f ? Math.round(L.discharge[p] * L.mDischarge[p * W(L) + f]) : L.discharge[p]; };
 const effRest = (L: PortsLayout, e: PortsState, p: number): number => { const f = matOf(L, e, p); return f ? Math.round(L.rest[p] * L.mRest[p * W(L) + f]) : L.rest[p]; };
-const effThreshold = (L: PortsLayout, e: PortsState, p: number): number => { const f = matOf(L, e, p); return f ? Math.floor(L.threshold[p] * L.mThreshold[p * W(L) + f]) : L.threshold[p]; };
 const effSteady = (L: PortsLayout, e: PortsState, p: number): number => { const f = matOf(L, e, p); return f ? Math.round(L.steady[p] * L.mSteady[p * W(L) + f]) : L.steady[p]; };
 /** A gun's buffer under its material (a bigger shot: a bigger buffer) */
 export const effCap = (L: PortsLayout, e: PortsState, p: number): number => { const f = matOf(L, e, p); return f && L.gun[p] ? (L.gun[p] === 3 ? L.cap[p] : Math.round(L.cap[p] * L.mShot[p * W(L) + f])) : L.cap[p]; };
@@ -481,10 +507,13 @@ export interface PortsControls {
   reload: boolean;
 }
 let sOffer = new Int32Array(16), sSend = new Int32Array(16), sInNow = new Int32Array(16), sOutNow = new Int32Array(16), sFrac = new Float64Array(16), sMul = new Float64Array(16), sMatIn = new Int32Array(16), sBurnNow = new Int32Array(16);
-let sList = new Int32Array(16), sWant = new Int32Array(16);
+let sList = new Int32Array(16), sWant = new Int32Array(16), sAugIn = new Int32Array(16);
 function grow(nl: number, np: number): void {
   if (sOffer.length < nl) { const m = Math.max(nl, sOffer.length * 2); sOffer = new Int32Array(m); sSend = new Int32Array(m); }
-  if (sInNow.length < np) { const m = Math.max(np, sInNow.length * 2); sInNow = new Int32Array(m); sOutNow = new Int32Array(m); sFrac = new Float64Array(m); sMul = new Float64Array(m); sMatIn = new Int32Array(m); sBurnNow = new Int32Array(m); sList = new Int32Array(m); sWant = new Int32Array(m); }
+  if (sInNow.length < np) { const m = Math.max(np, sInNow.length * 2); sInNow = new Int32Array(m); sOutNow = new Int32Array(m); sFrac = new Float64Array(m); sMul = new Float64Array(m); sMatIn = new Int32Array(m); sBurnNow = new Int32Array(m); sAugIn = new Int32Array(m); }
+  // (sList and sWant hold link ids as well as part ids)
+  const k = Math.max(nl, np);
+  if (sList.length < k) { const m = Math.max(k, sList.length * 2); sList = new Int32Array(m); sWant = new Int32Array(m); }
 }
 /** Thruster parts: the share of its burn each got this tick (1 when inactive), and its boost multiplier. Module scratch, valid straight after portsTick */
 export function portsThrustFrac(): Float64Array { return sFrac; }
@@ -531,6 +560,17 @@ function drawMat(L: PortsLayout, e: PortsState, net: number, f: number, u: numbe
 }
 const accepts = (L: PortsLayout, e: PortsState, p: number, f: number): boolean => !(e.amt[p] > 0 && e.mat[p] !== f) && (L.takes[p] === -1 || L.role[p] === P_RELAY || (L.takes[p] & (1 << (f - 1))) !== 0);
 
+/** Grant `space` over taker p's in links [a, b) (only those whose augment flag is `aug`; -1 all), water-filled by offer */
+function takeOver(L: PortsLayout, a: number, b: number, aug: number, space: number): void {
+  const offer = sOffer, send = sSend;
+  let cnt = 0;
+  for (let x = a; x < b; x++) { const l = L.inLink[x]; if (aug >= 0 && L.linkAug[l] !== aug) continue; sList[cnt++] = l; sWant[l] = offer[l]; }
+  if (!cnt) return;
+  if (cnt === 1) { const l = sList[0]; send[l] = offer[l] < space ? offer[l] : space; return; }
+  waterfill(cnt, space);
+  for (let y = 0; y < cnt; y++) { const l = sList[y]; send[l] = sWant[l]; }
+}
+
 /** One tick. After it portsThrustFrac()/portsThrustMul() hold each thruster's share and boost; the guns are gated by portsGunReady etc. */
 export function portsTick(L: PortsLayout, e: PortsState, ctl: Readonly<PortsControls>): void {
   grow(L.links, L.n);
@@ -545,25 +585,23 @@ export function portsTick(L: PortsLayout, e: PortsState, ctl: Readonly<PortsCont
     waterfill(cnt, held[s]);
     for (let x = a; x < b; x++) { const l = L.outLink[x]; offer[l] = sWant[l]; }
   }
-  // 2. Accept: each taker up to its space, water-filled over its in links; a thresholded gun only from lines rated enough
+  // 2. Accept: each taker up to its space, water-filled over its in links. A weapon takes at most its own intake (its
+  // rhythm), and into its augment buffer only along its augment lines
   for (let l = 0; l < nl; l++) send[l] = 0;
   for (let p = 0; p < L.n; p++) {
     const a = L.inStart[p], b = L.inStart[p + 1]; if (a === b) continue;
     let space = spaceOf(L, e, p);
-    // (A gun takes at most its own intake, however well rated its lines: the rating is the threshold's, the intake its rhythm's)
     if (L.role[p] === P_WEAPON && space > L.rate[p]) space = L.rate[p];
-    const th = L.role[p] === P_WEAPON ? effThreshold(L, e, p) : 0;
-    if (th > 0) { let rated = 0; for (let x = a; x < b; x++) { const l = L.inLink[x]; if (offer[l] > 0) rated += L.linkCap[l]; } if (rated < th) space = 0; }
-    if (b - a === 1) { const l = L.inLink[a]; send[l] = offer[l] < space ? offer[l] : space; continue; }
-    let cnt = 0; for (let x = a; x < b; x++) { const l = L.inLink[x]; sList[cnt++] = l; sWant[l] = offer[l]; }
-    waterfill(cnt, space);
-    for (let x = a; x < b; x++) { const l = L.inLink[x]; send[l] = sWant[l]; }
+    if (L.augCap[p] === 0) { takeOver(L, a, b, -1, space); continue; }
+    takeOver(L, a, b, 0, space);
+    const room = L.augCap[p] - e.aug[p];
+    takeOver(L, a, b, 1, room < L.augRate[p] ? (room > 0 ? room : 0) : L.augRate[p]);
   }
   // 3. Apply
-  for (let p = 0; p < L.n; p++) { sInNow[p] = 0; sOutNow[p] = 0; }
-  for (let l = 0; l < nl; l++) { const s = send[l]; if (s > 0) { sOutNow[L.linkFrom[l]] += s; sInNow[L.linkTo[l]] += s; } }
+  for (let p = 0; p < L.n; p++) { sInNow[p] = 0; sOutNow[p] = 0; sAugIn[p] = 0; }
+  for (let l = 0; l < nl; l++) { const s = send[l]; if (s > 0) { sOutNow[L.linkFrom[l]] += s; if (L.linkAug[l]) sAugIn[L.linkTo[l]] += s; else sInNow[L.linkTo[l]] += s; } }
   for (const s of L.relays) held[s] += sInNow[s] - sOutNow[s];
-  for (const c of L.consumers) held[c] += sInNow[c];
+  for (const c of L.consumers) { held[c] += sInNow[c]; e.aug[c] += sAugIn[c]; }
   // 4. Material: drawers pull from their networks; then along the lines, line to line and line into a gun or engine
   const step = Math.round((MAT_RATE * MAT_UNIT) / TPS);
   for (const p of L.drawers) {
@@ -623,8 +661,9 @@ export function portsTick(L: PortsLayout, e: PortsState, ctl: Readonly<PortsCont
       if (!(e.flags[p] & PF_LATCH) && ((ctl.reload && held[p] < c) || held[p] < effShot(L, e, p) * L.rounds[p])) e.flags[p] |= PF_LATCH;
       if ((e.flags[p] & PF_LATCH) && held[p] >= c) e.flags[p] &= ~PF_LATCH;
     }
-    const st = effSteady(L, e, p);
-    if (st > 0 && e.closed[p] === 0 && held[p] > 0 && held[p] < effCap(L, e, p) - 2 * L.passive[p] && sInNow[p] < st) held[p] = 0;
+    const st = effSteady(L, e, p), shut = e.closed[p] > 0 || (e.flags[p] & PF_LIT) !== 0 || (L.gun[p] === 2 && !(e.flags[p] & PF_LATCH));
+    if (st > 0 && !shut && held[p] > 0 && held[p] < effCap(L, e, p) - 2 * L.passive[p] - L.rate[p] && sInNow[p] < st) held[p] = 0;
+    if (L.augSteady[p] > 0 && e.aug[p] > 0 && e.aug[p] < L.augCap[p] - L.augRate[p] && sAugIn[p] < L.augSteady[p]) e.aug[p] = 0;
     if (L.passive[p] > 0) { held[p] -= L.passive[p]; if (held[p] < 0) held[p] = 0; }
     if (e.amt[p] <= 0) { e.amt[p] = 0; e.mat[p] = 0; }
   }
@@ -652,10 +691,15 @@ export function portsGunReady(L: PortsLayout, e: PortsState, p: number, n = L.ro
   if (L.feedPort[p] === 2 && !matOf(L, e, p)) return false;
   return e.held[p] >= effShot(L, e, p) * n;
 }
-/** Pay for a shot: eu off the buffer, material off the feed buffer, the ports shut for the discharge. Returns the damage multiplier its material gives */
+let lastAug = false;
+/** Whether the shot portsSpendShot last paid for was augmented (its augment buffer held the cost, and paid it) */
+export function portsShotAugmented(): boolean { return lastAug; }
+/** Pay for a shot: eu off the buffer, material off the feed buffer, the ports shut for the discharge; the augment off its own buffer when it holds it. Returns the damage multiplier its material and tier give */
 export function portsSpendShot(L: PortsLayout, e: PortsState, p: number, n = L.rounds[p] || 1): number {
   const f = matOf(L, e, p), s = effShot(L, e, p) * n, h = e.held[p], paid = h < s ? h : s;
   const dmg = (f ? L.mDamage[p * L.feeds.length + f] : 1) * L.tierDmg[p];
+  lastAug = L.augCap[p] > 0 && e.aug[p] >= L.augCost[p] * n;
+  if (lastAug) e.aug[p] -= L.augCost[p] * n;
   e.held[p] = h - paid;
   const d = effDischarge(L, e, p); if (d > 0) e.closed[p] = d > 32000 ? 32000 : d;
   if (f) { e.amt[p] -= L.matUse[p] * n; if (e.amt[p] <= 0) { e.amt[p] = 0; e.mat[p] = 0; } }
@@ -665,19 +709,26 @@ export function portsSpendShot(L: PortsLayout, e: PortsState, p: number, n = L.r
 /** What a gun's hits are worth on a ports ship: its tier's damage and its material's (beams and pulses: the server's fireBeam) */
 export function portsDamageMul(L: PortsLayout, e: PortsState, p: number): number {
   const f = matOf(L, e, p);
-  return (f ? L.mDamage[p * L.feeds.length + f] : 1) * L.tierDmg[p];
+  return (f ? L.mDamage[p * L.feeds.length + f] : 1) * L.tierDmg[p] * ((e.flags[p] & PF_AUG) !== 0 ? L.augDps[p] : 1);
 }
 /** A beam's tick while the trigger's held: lights when it may (a burst beam only when full), burns a tick's worth, goes out and rests when it can't. Returns eu burnt */
 export function portsBeamStep(L: PortsLayout, e: PortsState, p: number, trigger: boolean): number {
   let fl = e.flags[p];
-  if (!trigger) { e.flags[p] = fl & ~PF_LIT; return 0; }
+  if (!trigger) { e.flags[p] = fl & ~(PF_LIT | PF_AUG); return 0; }
   const f = matOf(L, e, p), b = f ? Math.max(1, Math.round(L.shot[p] * L.mBurn[p * L.feeds.length + f])) : L.shot[p], h = e.held[p];
   if (L.feedPort[p] === 2 && !f) { e.flags[p] = fl & ~PF_LIT; return 0; }
   const light = L.burst[p] ? L.cap[p] - 2 * L.passive[p] - 1 : L.relight[p];
   if (!(fl & PF_LIT) && e.closed[p] === 0 && h >= light && h >= b) fl = (fl | PF_LIT) & ~PF_LATCH;
   if (fl & PF_LIT) {
-    if (h >= b) { e.held[p] = h - b; e.flags[p] = fl; if (f) { e.amt[p] -= L.matUse[p]; if (e.amt[p] <= 0) { e.amt[p] = 0; e.mat[p] = 0; } } return b; }
-    fl = (fl & ~PF_LIT) | PF_LATCH;
+    if (h >= b) {
+      e.held[p] = h - b;
+      // (Augmented while its augment buffer pays a tick's cost)
+      if (L.augCap[p] > 0 && e.aug[p] >= L.augCost[p]) { e.aug[p] -= L.augCost[p]; fl |= PF_AUG; } else fl &= ~PF_AUG;
+      e.flags[p] = fl;
+      if (f) { e.amt[p] -= L.matUse[p]; if (e.amt[p] <= 0) { e.amt[p] = 0; e.mat[p] = 0; } }
+      return b;
+    }
+    fl = (fl & ~(PF_LIT | PF_AUG)) | PF_LATCH;
     const r = effRest(L, e, p); if (r > 0) e.closed[p] = r > 32000 ? 32000 : r;
   }
   e.flags[p] = fl;
@@ -694,16 +745,16 @@ export function portsPurge(L: PortsLayout, e: PortsState): void {
 
 // ================================================================ the wire (the pilot row's energy slot, triples)
 /** What the slot means (in the wire hash: a change of meaning is a protocol bump) */
-export const PORTS_SLOT_LAYOUT = 'ports:triples(part,held*8+flags3,closed*2^24+mat*2^20+amt)';
+export const PORTS_SLOT_LAYOUT = 'ports:quads(part,held*16+flags4,closed*2^24+mat*2^20+amt,aug)';
 export const PORTS_ROW = { sig: 8, count: 9, at: 13 } as const;
-const FLAGS = 8, AMT_MOD = 1 << 20, MAT_MOD = 1 << 24;
+const FLAGS = 16, AMT_MOD = 1 << 20, MAT_MOD = 1 << 24, PER = 4;
 /** Append the triples to `out` (from data[PORTS_ROW.at]). Returns the triple count; the row carries -count in data[PORTS_ROW.count] and L.sig in data[PORTS_ROW.sig] */
 export function packPorts(L: PortsLayout, e: PortsState, out: number[]): number {
   let n = 0;
   for (let p = 0; p < L.n; p++) {
-    const c = L.cap[p], full = e.held[p] === c && e.flags[p] === 0 && e.amt[p] === 0 && e.closed[p] === 0;
+    const c = L.cap[p], full = e.held[p] === c && e.flags[p] === 0 && e.amt[p] === 0 && e.closed[p] === 0 && e.aug[p] === L.augCap[p];
     if ((c <= 0 && !L.matCap[p] && L.role[p] !== P_SELECTOR) || full) continue;
-    out.push(p, e.held[p] * FLAGS + (e.flags[p] & PF_MASK), Math.min(32000, e.closed[p]) * MAT_MOD + e.mat[p] * AMT_MOD + Math.min(AMT_MOD - 1, e.amt[p]));
+    out.push(p, e.held[p] * FLAGS + (e.flags[p] & PF_MASK), Math.min(32000, e.closed[p]) * MAT_MOD + e.mat[p] * AMT_MOD + Math.min(AMT_MOD - 1, e.amt[p]), e.aug[p]);
     n++;
   }
   return n;
@@ -711,7 +762,7 @@ export function packPorts(L: PortsLayout, e: PortsState, out: number[]): number 
 /** Where a ports row's slot ends (data[9] is -count) */
 export function portsSlotEnd(data: ArrayLike<number>): number {
   const n = Math.max(0, -(data[PORTS_ROW.count] | 0));
-  return Math.min(data.length, PORTS_ROW.at + 3 * n);
+  return Math.min(data.length, PORTS_ROW.at + PER * n);
 }
 export const isPortsRow = (data: ArrayLike<number> | undefined): boolean => !!data && data.length > PORTS_ROW.count && (data[PORTS_ROW.count] | 0) < 0;
 /** Read the slot into `e`: every part full and clear, then the triples. False (e untouched) when the sig isn't this layout's */
@@ -719,13 +770,14 @@ export function unpackPortsInto(L: PortsLayout, e: PortsState, data: ArrayLike<n
   if (!isPortsRow(data) || data[PORTS_ROW.sig] !== L.sig || e.held.length !== L.n) return false;
   fullPorts(L, e);
   const end = portsSlotEnd(data);
-  for (let k = PORTS_ROW.at; k + 2 < end; k += 3) {
-    const p = data[k], v = data[k + 1], m = data[k + 2];
+  for (let k = PORTS_ROW.at; k + PER - 1 < end; k += PER) {
+    const p = data[k], v = data[k + 1], m = data[k + 2], g = data[k + 3];
     if (!Number.isInteger(p) || p < 0 || p >= L.n || !Number.isInteger(v) || v < 0 || !Number.isInteger(m) || m < 0) continue;
     const h = Math.floor(v / FLAGS);
     e.held[p] = h > L.cap[p] ? L.cap[p] : h; e.flags[p] = v - h * FLAGS;
     e.closed[p] = Math.floor(m / MAT_MOD); const rest = m - e.closed[p] * MAT_MOD; e.mat[p] = Math.floor(rest / AMT_MOD); e.amt[p] = rest - e.mat[p] * AMT_MOD;
     if (e.amt[p] > L.matCap[p]) e.amt[p] = L.matCap[p];
+    e.aug[p] = Number.isInteger(g) && g > 0 ? Math.min(g, L.augCap[p]) : 0;
   }
   e.sig = L.sig; e.gauge = portsGauge(L, e);
   return true;
@@ -735,7 +787,7 @@ export function portsDigest(L: PortsLayout, e: PortsState): number {
   let h = 0x811c9dc5 | 0;
   for (let p = 0; p < L.n; p++) {
     if (L.cap[p] <= 0 && !L.matCap[p]) continue;
-    h = Math.imul(h ^ p, 0x01000193); h = Math.imul(h ^ e.held[p], 0x01000193); h = Math.imul(h ^ e.flags[p], 0x01000193); h = Math.imul(h ^ e.amt[p], 0x01000193);
+    h = Math.imul(h ^ p, 0x01000193); h = Math.imul(h ^ e.held[p], 0x01000193); h = Math.imul(h ^ e.flags[p], 0x01000193); h = Math.imul(h ^ e.amt[p], 0x01000193); h = Math.imul(h ^ e.aug[p], 0x01000193);
   }
   return ((h >>> 16) ^ (h & 0xffff)) & 0xffff;
 }

@@ -479,10 +479,11 @@ const SHIP_SHAPES: Record<string, Spec> = {
       'intake?': 'number', 'buffer?': 'number',
       // (The ports energy core, types.ts FunctionDef: ports, the weapons' power profiles and the feed layer)
       'ports?': arr(strict({ dir: oneOf('in', 'out'), side: oneOf('N', 'E', 'S', 'W'), 'cell?': 'number', rate: 'number' })),
-      'profile?': strict({ 'passive?': 'number', 'discharge?': 'number', 'rest?': 'number', 'burst?': 'boolean', 'threshold?': 'number', 'steady?': 'number' }),
+      'profile?': strict({ 'passive?': 'number', 'discharge?': 'number', 'rest?': 'number', 'burst?': 'boolean', 'steady?': 'number' }),
       'tank?': strict({ feed: 'string', holds: 'number' }), 'feedPoints?': arr(strict({ side: oneOf('N', 'E', 'S', 'W'), 'cell?': 'number' })),
       'selector?': 'boolean', 'pipe?': 'boolean', 'combiner?': 'boolean', 'pipeThrough?': 'boolean',
-      'infra?': strict({ tier: oneOf('simple', 'mid', 'heavy', 'super'), damage: 'number' }),
+      'infra?': strict({ tier: oneOf('simple', 'dual', 'heavy', 'super'), damage: 'number', 'draw?': 'number' }),
+      'augment?': strict({ name: 'string', say: 'string', side: oneOf('N', 'E', 'S', 'W'), 'cell?': 'number', rate: 'number', 'floor?': 'number', cost: 'number', 'buffer?': 'number', mods: 'any' }),
       'takes?': 'string[]', 'feedUse?': 'number', 'feedBuf?': 'number', 'feedMods?': rec(rec('number')), 'feedPort?': strict({ side: oneOf('N', 'E', 'S', 'W'), 'cell?': 'number', 'required?': 'boolean' }),
     })),
   }),
@@ -498,10 +499,11 @@ const SHIP_SHAPES: Record<string, Spec> = {
       'intake?': 'number', 'buffer?': 'number', 'oneWay?': 'boolean', 'relayOnly?': 'boolean',
       // (The ports energy core, types.ts FunctionDef: ports, the weapons' power profiles and the feed layer)
       'ports?': arr(strict({ dir: oneOf('in', 'out'), side: oneOf('N', 'E', 'S', 'W'), 'cell?': 'number', rate: 'number' })),
-      'profile?': strict({ 'passive?': 'number', 'discharge?': 'number', 'rest?': 'number', 'burst?': 'boolean', 'threshold?': 'number', 'steady?': 'number' }),
+      'profile?': strict({ 'passive?': 'number', 'discharge?': 'number', 'rest?': 'number', 'burst?': 'boolean', 'steady?': 'number' }),
       'tank?': strict({ feed: 'string', holds: 'number' }), 'feedPoints?': arr(strict({ side: oneOf('N', 'E', 'S', 'W'), 'cell?': 'number' })),
       'selector?': 'boolean', 'pipe?': 'boolean', 'combiner?': 'boolean', 'pipeThrough?': 'boolean',
-      'infra?': strict({ tier: oneOf('simple', 'mid', 'heavy', 'super'), damage: 'number' }),
+      'infra?': strict({ tier: oneOf('simple', 'dual', 'heavy', 'super'), damage: 'number', 'draw?': 'number' }),
+      'augment?': strict({ name: 'string', say: 'string', side: oneOf('N', 'E', 'S', 'W'), 'cell?': 'number', rate: 'number', 'floor?': 'number', cost: 'number', 'buffer?': 'number', mods: 'any' }),
       'takes?': 'string[]', 'feedUse?': 'number', 'feedBuf?': 'number', 'feedMods?': rec(rec('number')), 'feedPort?': strict({ side: oneOf('N', 'E', 'S', 'W'), 'cell?': 'number', 'required?': 'boolean' }),
       'mounting?': strict({ 'attach?': oneOf('back', 'any'), 'angle?': oneOf('straight', 'right'), 'arc?': 'number', 'clear?': 'any' }),
       // (A weapon's firing model: common/src/ships/types.ts FireSpec, guns.ts)

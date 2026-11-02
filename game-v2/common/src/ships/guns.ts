@@ -18,12 +18,12 @@
 import type { ShipState } from './state.js';
 import type { ShipTuning } from './tuning.js';
 import type { WeaponInfo } from './rebuild.js';
-import type { FireSpec } from './types.js';
+import type { FireSpec, WeaponMods } from './types.js';
 import { buildShot, shipPointToWorld, type ProjectileSpec, type ShipPose } from './shot.js';
 import { stepFixedGunAim, stepTurretAim } from './turret.js';
 import { SHOT_AIM_STEPS, shotAimQ } from './launch.js';
 import { BROWNOUT, chargeGroupsEnd, feedShare, type Charge } from './energy.js';
-import { PF_LATCH, effCap, effShot, portsBeamStep, portsGunReady, portsSpendShot, type PortsLayout, type PortsState } from './power/ports.js';
+import { PF_LATCH, effCap, effShot, portsBeamStep, portsGunReady, portsShotAugmented, portsSpendShot, type PortsLayout, type PortsState } from './power/ports.js';
 import { PILOT_EXTRAS } from './features/plan.js';
 
 export interface GunOrders {
@@ -46,6 +46,8 @@ export interface GunShot {
   /** The aim it fired with, in SHOT_AIM_STEPS (fire events carry it) */
   aimQ: number;
   shot: ProjectileSpec;
+  /** A ports ship's augmented shot (power/ports.ts): its augment's mods go on top of the gun's */
+  aug?: WeaponMods;
 }
 
 /** A pulse laser that starts a pulse this tick (pulse.ts): charged like a gun's reload, paid for as one shot */
@@ -385,8 +387,9 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
     ship.aim[p] = aimQ / SHOT_AIM_STEPS;
     // (A ports ship pays for the shot now, from the gun's buffer and its feed buffer; its material may make the shot hit harder)
     const dmg = pz ? portsSpendShot(pz, E, p, f.model === 'clip' ? f.rounds ?? 1 : 1) : 1;
+    const aug = pz && portsShotAugmented() ? pz.augMods[p] : undefined;
     if (weapons[w.kind]?.type === 'beam') pulses.push({ w, aimQ });
-    else { const shot = buildShot(w, ship, pose, tick, tuning); if (dmg !== 1) shot.damageScale *= dmg; shots.push({ w, aimQ, shot }); }
+    else { const shot = buildShot(w, ship, pose, tick, tuning); if (dmg !== 1) shot.damageScale *= dmg; shots.push(aug ? { w, aimQ, shot, aug } : { w, aimQ, shot }); }
     if (f.model === 'charge') ship.cooldown[p] = f.cooldown ?? w.interval;
     // Fired on time, it keeps the fraction of a tick it was late by (so an interval of 14.3 averages 14.3); after a wait, it starts afresh
     else ship.cooldown[p] = (cd > -1 ? cd : 0) + gunInterval(ship, w);

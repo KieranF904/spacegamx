@@ -526,6 +526,9 @@ draw their buffer but their `sat` isn't wired to the shield; a hazard's battery 
 
 ## 15. Two ways to arm a ship: infrastructure tiers (2026-11-03)
 
+> Superseded by section 17 the same day: link ratings gave way to floors (power actually delivered), damage a cell gave
+> way to scenarios, and mid guns became dual-purpose with an augment input. Kept for the history.
+
 The owner's framing: a ship is armed one of two ways. **Simple guns** need almost nothing (a Cell Reactor at the port),
 so a ship carries many of them: a spammer, resilient, nothing worth sniping. **Infrastructure guns** need rated lines,
 stores and feeds that eat the parts quota, so a ship carries two or three, and each must be much better and look it:
@@ -610,3 +613,63 @@ The scratch tools that made the table and the ships (measure.mjs, design.mjs) ar
   double-barrel 2x1; tier 3 a triple-barrel 2x1; tier 4 a quad-barrel 2x2. Each fires a pulse pattern cycling through
   its barrels, and the higher tiers need rated lines (the same 50 / 85 / 120 a port) and a feed input.
 - First: mining lasers are unaccounted on a ports ship today (they draw nothing); they need to become ports consumers.
+
+## 17. Arming a ship, reworked: floors, augments and scenarios (2026-11-03)
+
+The owner's notes after testing section 15: the meta is two strategies (many simple guns, or a few guns that cost
+infrastructure and are far more impressive); some guns should serve both, valid on one line as spam guns and much better
+wired into infrastructure, and not only by firing faster ("maybe some have optionally 2 buffers, and saturating both
+augments it"); and power must not just be cells times a number: "many weapons will be valid in their own scenarios".
+
+**What changed in the core** (`common/src/ships/power/ports.ts`):
+- **Floors replace ratings.** Section 15 checked the rating of the last link into a gun, so a Conduit (rated 200) on one
+  Cell Reactor passed the heavy check. Now a gun with a floor (`profile.steady`, E/s) loses what it has gathered on any
+  tick its lines deliver less than that while it fills. Delivered means what actually arrives: a Conduit holds 10 and
+  can't keep it up; a Fusion Plant can; a charged Surge Cell or Battery can for as long as it lasts, so a store lets a
+  weaker plant run a heavy gun in bursts. Materials move the floor (Damping Gel halves it, Accelerant raises it 1.5x).
+- **Heavy guns draw for real.** A heavy or super gun has its own draw on a ports ship (`infra.draw`, E/s), its energy a
+  cycle that draw over its cycle, and its floor 85% of it. The Longbarrel, Bastion, Spear, Rail Driver and Cutter draw
+  170 (a Fusion Plant a gun), the Tesla 100, the Lance 260 (Surge Cells on a Fusion Plant). A gun takes at most its own
+  intake, so a better line never makes it fire faster than its design.
+- **Two buffers.** A gun with an `augment` has a second input and its own buffer (`aug` on the state, on the wire). It
+  fires the same with or without it; a shot fired while the augment buffer holds its `cost` is augmented: the augment's
+  mods go on top of the gun's own (penetration, a burst, a fire, a tighter pattern, a chain...), and a beam burning on
+  it is hotter. The augment input has its own floor (45 for the dual guns: a lone Cell Reactor never fills it, an
+  Overclock, Battery or Surge Cell does), so it is a second line, not a free bonus. The shot carries the flag to every
+  client (fire events: part + 65536), which rebuild it with the augment's mods; protocol 24.
+
+**The roles** (models.mjs `ROLE`, `HEAVY`, `AUGMENT`):
+- simple: Pip, Rattler, Glint, Strobe, Stinger (and the ammunition guns, which pay in rounds).
+- dual: Hammer (Breaching charge: +1 penetration and a small burst inside), Twinlink (Tracer lock: a tight, fast,
+  harder stream), Chainsaw (Incendiary belt: every round lights the part), Coilgun (Choke: a tight heavy pattern twice
+  as far), Spark (Storm coil: six arcs further apart), Overpulse (Overdrive: three bolts a shot), Cloudmaker (Wide burst),
+  Searchlight (Sear: twice as hot), and the Slurry Cannon, whose feed is its second input.
+- heavy: Longbarrel (Penetrator: through two more ships), Bastion (Shatter: each ball bursts), Spear, Rail Driver (Coil
+  boost), Cutter (Focus), Tesla (Storm). super: Lance (Focus).
+
+**Judged in scenarios, not per cell.** `scripts/balance/weapon-scenarios.mjs` (run it after any change: `npm run
+build:common && node scripts/balance/weapon-scenarios.mjs --md docs/design/weapon-scenarios.md`) builds each gun a rig of
+real parts, fires it 70 s through the ports core, keeps its cheapest base build and its cheapest augmented build, and
+times a loadout (as many copies as fit in 16 cells and 40 build points) against seven situations: a swarm of drones,
+an armoured brick, a shielded ship, a kiter at 3,200, a line of three, a boss, and trading fire (a gun knocked out every
+2.5 s, which favours many cheap guns). The damage multipliers were tuned until each gun leads somewhere and none leads
+everywhere. The current report is `docs/design/weapon-scenarios.md`; in short: swarm goes to the Spark, Chainsaw on
+incendiary, Cloudmaker and Tesla; the brick and the boss to the Lance, Bastion with Shatter and the Slurry Cannon;
+shields to the Cutter with Focus, Hammer with its Breaching charge and the Overpulse; the kiter to the Rail Driver,
+Searchlight, Glint and Longbarrel; a line to the Longbarrel with its Penetrator and the Spear; trading fire to the
+Spark, Hammer, Twinlink, Stinger and Pip. The Rattler and the Strobe lead nowhere (they are the cheap starters).
+
+The model is written out in the tool and is simple on purpose (hit chance from spread, shell speed and the target's
+dodge; armour through the game's own penetration curve; splash, chains, pierce and burning counted per target); it
+ranks, it doesn't predict a fight.
+
+**Dev ships** (F9, Ports energy): Wasp, Hornet (simple); Brawler (Hammer and Twinlinks on Overclocks that feed both
+inputs); **Breacher** (four Hammers on Cell Reactors, the inner pair with their Breaching charge fed, the outer pair
+not: the same gun both ways side by side); **Gale** (swarm: Chainsaws on Incendiary, Sparks on Storm coils);
+**Longshot** (kiter: a Rail Driver on a Fusion Plant with Coil boost, Twinlinks on Tracer lock); **Heron** (now a
+Cutter cruiser with Focus); **Anvil** (Longbarrel on a Fusion Plant with Penetrator, Hammers with their charge);
+**Monitor** (Bastions on Fusion Plants, with Shatter); Pike (Lance); Manta (Slurry Cannons, Reaction Thrusters).
+The three early demos (Gunship, Lancer, Raider) are off the F9 list. The ship status panel shows each augment (ready,
+no line, or a line too weak) and each heavy gun (charged, charging, or starved: its lines give under its floor).
+
+Not done: the hangar shows no ports or augment inputs yet; tiers and augments are on ports ships only.

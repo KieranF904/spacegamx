@@ -258,8 +258,15 @@ export interface FunctionDef {
   // The ports energy core (power/ports.ts; docs/design/energy-ports-2026-11.md), for ships whose blueprint says `power: 'ports'`
   /** Its power ports, in its own frame (N the nose, `cell` the index along that side, `rate` E a second): power crosses only out → in over a shared edge */
   ports?: { dir: 'in' | 'out'; side: Side; cell?: number; rate: number }[];
-  /** Weapons: the shape of its draw. `passive` E/s leaked while held, `discharge`/`rest` s its ports shut after a shot / a burst, `burst` lights only when full, `threshold` the E/s its lines must be rated, `steady` the E/s under which its charge collapses */
-  profile?: { passive?: number; discharge?: number; rest?: number; burst?: boolean; threshold?: number; steady?: number };
+  /** Weapons: the shape of its draw. `passive` E/s leaked while held, `discharge`/`rest` s its ports shut after a shot / a burst, `burst` lights only when full, `steady` its floor: the E/s its lines must deliver while it fills, or what it gathered collapses */
+  profile?: { passive?: number; discharge?: number; rest?: number; burst?: boolean; steady?: number };
+  /**
+   * Weapons, ports ships: a second input with its own buffer (docs/design/energy-ports-2026-11.md section 17). It fires
+   * without it; a shot fired while this buffer holds `cost` E (a beam: `cost` E a second while it burns) is augmented:
+   * `mods` on top of its own, and a beam's dps x `mods.mul.dps`. Its port is at `side`/`cell` in the gun's frame, taking at
+   * most `rate` E/s; `floor` E/s it must be fed while it fills or it collapses; it holds `buffer` shots (a beam: seconds)
+   */
+  augment?: { name: string; say: string; side: Side; cell?: number; rate: number; floor?: number; cost: number; buffer?: number; mods: WeaponMods };
   /** Feed layer: a tank of one material (tuning.json feeds), `holds` units per cell */
   tank?: { feed: string; holds: number };
   /** Feed layer: where its pipes join, in its own frame (a tank's, a pipe's, a Passthrough's; a Selector's are its two inputs then its output) */
@@ -274,8 +281,8 @@ export interface FunctionDef {
   feedUse?: number;
   feedBuf?: number;
   feedMods?: Record<string, Record<string, number>>;
-  /** Weapons, ports ships: its infrastructure tier (simple guns run off a reactor; mid, heavy and super ones need rated lines: profile.threshold) and the damage x that pays for it */
-  infra?: { tier: 'simple' | 'mid' | 'heavy' | 'super'; damage: number };
+  /** Weapons, ports ships: its role in arming a ship (simple: runs off a reactor; dual: the same, and an augment input that makes it something more; heavy and super: a floor that only heavy infrastructure meets), its draw there (E/s; absent: its demand) and its damage x */
+  infra?: { tier: 'simple' | 'dual' | 'heavy' | 'super'; damage: number; draw?: number };
   /** Feed layer: its own feed input beside its power input (a pipe joins it there); `required`: it does nothing without material */
   feedPort?: { side: Side; cell?: number; required?: boolean };
   /** A mining laser (a beam that cuts rock while the pilot mines): `miner` itself, and the models of its family */

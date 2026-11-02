@@ -10,7 +10,7 @@
  *   J  jump drive: spool up, then fly far and fast along the nose (J again aborts)
  */
 
-import { ensurePortsCharge, stepPointDefenceAim, pointDefenceOf, chargeGroupsEnd, TELL_CHARGE_START, TELL_CHARGE_CANCEL } from '@space-game/common';
+import { stackMods, ensurePortsCharge, stepPointDefenceAim, pointDefenceOf, chargeGroupsEnd, TELL_CHARGE_START, TELL_CHARGE_CANCEL } from '@space-game/common';
 import { GunSync } from './gunSync';
 import { GunFeel } from './gunFeel';
 import './energyLooks';
@@ -304,7 +304,7 @@ export class ShipClient {
     this.replicas.apply(m.tick, m.ships, m.ctl);
     const out: EntityState[] = [];
     for (const [owner, ago, partAmmo, aimQ, ...ids] of m.fire ?? []) {
-      const tick = m.tick - ago, part = partAmmo % 256, ammo = Math.floor(partAmmo / 256);
+      const tick = m.tick - ago, part = partAmmo % 256, ammo = Math.floor(partAmmo / 256) % 256, aug = partAmmo >= 65536 ? (1 as const) : undefined;
       // A charge gun's tell (no shells): it started charging, or was let go (guns.ts TELL_CHARGE_*; drawn by the charge FX)
       if (ammo === TELL_CHARGE_START) {
         this.chargeTells.set(owner * 256 + part, tick);
@@ -338,7 +338,7 @@ export class ShipClient {
       // A pulse laser's pulse (a fire event with no shells): drawn from the tick it started
       const gun = ship.derived.weapons.find((w) => w.part === part);
       if (gun && this.opts.tuning.weapons?.[gun.kind]?.pulse) { this.beamFx?.startPulse(owner, part, tick); continue; }
-      const v = rebuildVolley({ owner, tick, part, aimQ, ids, ammo }, ship, st.body, this.opts.tuning);
+      const v = rebuildVolley({ owner, tick, part, aimQ, ids, ammo, aug }, ship, st.body, this.opts.tuning);
       if (!v) continue;
       // The ship's pose as it fired: the muzzle flash sits on the barrel in its frame
       for (const id of ids) this.firePoses.set(id, { x: st.body.x, y: st.body.y, angle: st.body.angle });
@@ -573,12 +573,12 @@ export class ShipClient {
     for (const { w } of pulses) this.beamFx?.startPulse(player.id, w.part, tick);
     if (burning) ship.mineUntil = 0;
     payMining(ship, !!input.fireRight && hasMiners && !burning, tick, energy);
-    for (const { w, shot } of shots) {
+    for (const { w, shot, aug } of shots) {
       // (Homing missiles change course: those the server sends as they fly)
       const pdef = partWeaponDef(this.opts.tuning, w.kind, ship.blueprint.parts[w.part], w);
       if (!firesStraight(pdef)) continue;
       // A pilot's shells move on the tick they're fired (as in preSnapshot)
-      for (const s of volleyShells(player.id, ship, w, shot, { ...pose, vx: player.vx, vy: player.vy }, tick, this.opts.tuning, this.ownAmmo?.(w.kind))) {
+      for (const s of volleyShells(player.id, ship, w, shot, { ...pose, vx: player.vx, vy: player.vy }, tick, this.opts.tuning, stackMods(this.ownAmmo?.(w.kind), aug))) {
         this.scene.predictShot({ owner: player.id, type: WEAPON_KIND_TYPE[w.kind] ?? 1, grade: w.grade, model: ship.blueprint.parts[w.part]?.fn, damage: pdef.damage, pierce: pdef.pierce, spawnX: s.x, spawnY: s.y, spawnTick: tick - 1, vx: s.vx, vy: s.vy, size: s.size, pose });
       }
     }

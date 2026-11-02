@@ -45,6 +45,16 @@ export function weaponDef(tuning: ShipTuning, kind: string): WeaponTuning {
 const modded = new WeakMap<WeaponTuning, WeakMap<WeaponMods, WeaponTuning>>();
 
 /** A kind's tuning with one gun's mods applied (the same object each time for the same pair) */
+/** Two sets of mods as one (b's on a's: multipliers compound (a mul is a change, 0.3 for x1.3), additions add, b's sets win): a round's and an augment's */
+export function stackMods(a: WeaponMods | undefined, b: WeaponMods | undefined): WeaponMods | undefined {
+  if (!a) return b;
+  if (!b) return a;
+  const mul: Record<string, number> = { ...(a.mul ?? {}) }, add: Record<string, number> = { ...(a.add ?? {}) };
+  for (const [k, v] of Object.entries(b.mul ?? {})) mul[k] = (1 + (mul[k] ?? 0)) * (1 + (v as number)) - 1;
+  for (const [k, v] of Object.entries(b.add ?? {})) add[k] = (add[k] ?? 0) + (v as number);
+  return { mul, add, set: { ...(a.set ?? {}), ...(b.set ?? {}) } };
+}
+
 export function moddedDef(def: WeaponTuning, mods: WeaponMods | undefined): WeaponTuning {
   if (!mods) return def;
   let byMods = modded.get(def);
@@ -247,6 +257,8 @@ export interface FireRecord {
   part: number;
   /** The ammunition it fired (ammoCode: 0 none, or plain rounds) */
   ammo?: number;
+  /** A ports ship's augmented shot (its gun's augment mods, power/ports.ts augMods, go on top) */
+  aug?: 1;
   /** Its aim offset, in SHOT_AIM_STEPS */
   aimQ: number;
   /** The shells' entity ids, in spawn order */
@@ -265,7 +277,7 @@ export function rebuildVolley(rec: FireRecord, ship: ShipState, pose: FirePose, 
   const aim = [...ship.aim];
   aim[rec.part] = rec.aimQ / SHOT_AIM_STEPS;
   const shot = buildShot(w, { ...ship, aim }, pose, rec.tick, tuning);
-  const shells = volleyShells(rec.owner, ship, w, shot, pose, rec.tick, tuning, ammoByCode(rec.ammo ?? 0)?.mods);
+  const shells = volleyShells(rec.owner, ship, w, shot, pose, rec.tick, tuning, stackMods(ammoByCode(rec.ammo ?? 0)?.mods, rec.aug ? ship.derived.ports?.augMods[rec.part] : undefined));
   if (shells.length !== rec.ids.length) return null;
   return { kind: w.kind, turret: shot.mount === 'turret', shells: shells.map((s, i) => ({ ...s, id: rec.ids[i] })) };
 }

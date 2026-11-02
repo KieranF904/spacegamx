@@ -438,7 +438,7 @@
     "relight": 0.5
   },
 
-  "_feeds": "The feed layer (common/src/ships/power/ports.ts; docs/design/energy-ports-2026-11.md section 10): materials a tank holds and a pipe carries, each a sidegrade of what takes it (models.json takes). shot: E a shot; damage; cycle: ticks between shots; discharge/rest: s the ports shut; burn: a beam's or engine's E a second; threshold/steady: the E/s a line must be rated / under which the charge collapses; thrust; boost: x the boost; boostDrain: x the boosted burn.",
+  "_feeds": "The feed layer (common/src/ships/power/ports.ts; docs/design/energy-ports-2026-11.md section 10): materials a tank holds and a pipe carries, each a sidegrade of what takes it (models.json takes). shot: E a shot; damage; cycle: ticks between shots; discharge/rest: s the ports shut; burn: a beam's or engine's E a second; steady: the floor, E/s a gun's lines must deliver while it fills or what it gathered collapses; thrust; boost: x the boost; boostDrain: x the boosted burn.",
   "feeds": {
     "overcharge": {
       "name": "Overcharge",
@@ -471,11 +471,11 @@
       "on": "weapon",
       "color": "#a78bfa",
       "mod": {
-        "threshold": 0.5,
+        "steady": 0.5,
         "steady": 0.5,
         "cycle": 1.25
       },
-      "say": "Half the line rating it needs, a quarter slower"
+      "say": "Half the floor a heavy gun needs, a quarter slower"
     },
     "flux": {
       "name": "Flux salts",
@@ -497,9 +497,9 @@
       "mod": {
         "cycle": 0.7,
         "shot": 1.25,
-        "threshold": 1.5
+        "steady": 1.5
       },
-      "say": "30% faster, a quarter more power a shot, needs heavier lines"
+      "say": "30% faster, a quarter more power a shot, a higher floor"
     },
     "lens": {
       "name": "Lens fluid",

@@ -24,7 +24,7 @@
  */
 
 import {
-  BROWNOUT, P_TANK, PF_SEL, MAT_UNIT, bankHeld, energyTuning, feedShare, gunLoad, poolHeld,
+  BROWNOUT, P_TANK, PF_SEL, MAT_UNIT, portsInflow, bankHeld, energyTuning, feedShare, gunLoad, poolHeld,
   type Charge, type ShipState, type ShipTuning,
 } from '@space-game/common';
 import type { RingGroup } from '../../ships/gunHud';
@@ -173,21 +173,27 @@ export function readStatus(inp: StatusInput, mem: StatusMemory, out: ShipStatus 
   readWeapons(ship, inp, out);
   readThrust(ship, inp, out);
   readParts(ship, inp, out);
-  out.features = ship.derived.ports && inp.charge.e ? [...portsLines(ship, inp.charge), ...inp.features] : inp.features;
+  out.features = ship.derived.ports && inp.charge.e ? [...portsLines(ship, inp.charge, inp.nameOf), ...inp.features] : inp.features;
   return out;
 }
 
-/** A ports ship (common/src/ships/power/ports.ts): each tank's material left, and what each Selector passes */
-const portsLineCache = new WeakMap<object, FeatureStatusLine[]>();
-function portsLines(ship: ShipState, c: Charge): FeatureStatusLine[] {
-  const L = ship.derived.ports!, e = c.e!;
-  let lines = portsLineCache.get(L);
-  if (!lines) {
-    lines = [];
+/**
+ * A ports ship (common/src/ships/power/ports.ts): each tank's material left, what each Selector passes, each gun's augment
+ * (its buffer, and whether its line keeps it fed) and each heavy gun whose lines don't deliver its floor (it can't charge)
+ */
+const portsLineCache = new WeakMap<object, { lines: FeatureStatusLine[]; aug: number[]; heavy: number[] }>();
+function portsLines(ship: ShipState, c: Charge, nameOf: (fn: string) => string): FeatureStatusLine[] {
+  const L = ship.derived.ports!, e = c.e!, parts = ship.blueprint.parts;
+  let cached = portsLineCache.get(L);
+  if (!cached) {
+    const lines: FeatureStatusLine[] = [], aug: number[] = [], heavy: number[] = [];
     for (const t of L.tanks) lines.push({ label: `${L.feedDefs[L.tankFeed[t]]?.name ?? 'Feed'} tank`, text: '', tone: 'ok', progress: 1 });
     for (const s of L.selectors) lines.push({ label: 'Selector (Y)', text: '', tone: 'ok' });
-    portsLineCache.set(L, lines);
+    for (const w of L.weapons) if (L.augCap[w] > 0) { aug.push(w); lines.push({ label: `${nameOf(parts[w].fn)}: ${L.augName[w]}`, text: '', tone: 'dim', progress: 0 }); }
+    for (const w of L.weapons) if (L.steady[w] > 0) { heavy.push(w); lines.push({ label: nameOf(parts[w].fn), text: '', tone: 'ok' }); }
+    portsLineCache.set(L, (cached = { lines, aug, heavy }));
   }
+  const lines = cached.lines, inflow = portsInflow();
   let k = 0;
   for (const t of L.tanks) {
     const r = lines[k++], f = L.cap[t] > 0 ? e.held[t] / L.cap[t] : 0;
@@ -198,6 +204,20 @@ function portsLines(ship: ShipState, c: Charge): FeatureStatusLine[] {
     const r = lines[k++], side = e.flags[s] & PF_SEL ? 1 : 0, net = L.selIn[2 * s + side];
     const tank = net >= 0 ? L.nets[net].tanks[0] : -1;
     r.text = tank >= 0 ? `passing ${L.feedDefs[L.tankFeed[tank]]?.name ?? 'feed'}` : 'nothing on that side';
+  }
+  // (An augment: ready while its buffer holds a shot's cost; no line into its input, or one too weak to fill it, says so)
+  for (const w of cached.aug) {
+    const r = lines[k++], f = e.aug[w] / L.augCap[w];
+    r.progress = f;
+    if (e.aug[w] >= L.augCost[w]) { r.text = 'ready'; r.tone = 'ok'; }
+    else { r.text = L.ports.some((q) => q.part === w && q.aug && q.link) ? 'its line is too weak' : 'no line to its augment input'; r.tone = 'dim'; }
+  }
+  // (A heavy gun short of its floor collapses what it gathers: say so)
+  for (const w of cached.heavy) {
+    const r = lines[k++], full = e.held[w] >= L.cap[w];
+    const short = !full && e.closed[w] === 0 && inflow[w] < L.steady[w];
+    r.text = full ? 'charged' : short ? `starved: its lines give under ${Math.round((L.steady[w] * 60) / 256)}/s` : 'charging';
+    r.tone = full ? 'ok' : short ? 'warn' : 'busy';
   }
   return lines;
 }

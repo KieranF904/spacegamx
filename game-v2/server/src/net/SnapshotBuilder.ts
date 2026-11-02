@@ -523,8 +523,8 @@ export class SnapshotBuilder {
       for (const f of this.ships.fired) {
         if (f.owner === conn.playerId || !conn.shipView.has(f.owner) || keyed.has(f.owner) || !conn.repKnown.has(f.owner)) continue;
         if (InSystem.systemId[f.owner] !== playerSystemId) continue;
-        // (the ammunition rides on the part: part + 256 × its code)
-        fire.push([f.owner, this.currentTick - f.tick, f.part + 256 * (f.ammo ?? 0), f.aimQ, ...f.ids]);
+        // (the ammunition rides on the part: part + 256 × its code, + 65536 for an augmented shot, power/ports.ts)
+        fire.push([f.owner, this.currentTick - f.tick, f.part + 256 * (f.ammo ?? 0) + (f.aug ? 65536 : 0), f.aimQ, ...f.ids]);
         for (const id of f.ids) covered.add(id);
       }
       for (const r of rows) {
