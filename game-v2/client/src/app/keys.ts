@@ -191,7 +191,7 @@ export const POST_KEYS: Readonly<Record<string, KeyFn>> = {
     if (!(h.loggedIn && h.navMarkers)) return false;
     const on = !settings.data.ui.navMarkers;
     settings.update((s) => { s.ui.navMarkers = on; });
-    h.showSystemMessage(on ? 'Nav markers on' : 'Nav markers off', '#7dd3fc');
+    // (No chat line: the markers appearing or going is the answer)
     return true;
   },
   // Respawn with R after being destroyed

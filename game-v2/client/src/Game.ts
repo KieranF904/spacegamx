@@ -2,6 +2,9 @@
  * Game - Main client orchestrator
  */
 
+import { ChatLog, lineText, parseTab, type ChatTab } from './ui/chatLog';
+
+const CHAT_TAB_KEY = 'spacegame.chatTab';
 import { buildWindows, type WindowHost, type WindowSet } from './app/windows';
 import { prefetchScreens } from './app/lazyScreens';
 import { installDevTools } from './app/devTools';
@@ -205,6 +208,8 @@ private xpFillEl: HTMLElement | null;
   private chatInputEl: HTMLInputElement | null;
   private chatSendBtn: HTMLElement | null;
   private chatFocused = false;
+  private chatLog = new ChatLog();
+  private chatTab: ChatTab = 'all';
   
   private lastStateHashTime = 0;
 
@@ -1205,6 +1210,10 @@ this.xpFillEl = document.getElementById('xpFill');
   }
 
   private setupChat(): void {
+    document.querySelectorAll<HTMLElement>('#chatTabs button').forEach((b) => b.addEventListener('click', () => this.setChatTab(parseTab(b.dataset.tab))));
+    let saved: string | null = null;
+    try { saved = localStorage.getItem(CHAT_TAB_KEY); } catch { /* no storage */ }
+    this.setChatTab(parseTab(saved));
     if (!this.chatInputEl || !this.chatSendBtn) return;
     
     // Send on Enter key
@@ -1250,29 +1259,38 @@ this.xpFillEl = document.getElementById('xpFill');
     this.chatInputEl.blur();
   }
   
+  /** A line for the chat panel: the game's own (isSystem) or a player's. See ui/chatLog.ts */
   private addChatMessage(playerName: string, text: string, isSystem = false, color?: string): void {
-    if (!this.chatMessagesEl) return;
-    
-    const msgEl = document.createElement('div');
-    msgEl.className = 'chat-message' + (isSystem ? ' system' : '');
-    
-    if (isSystem) {
-      msgEl.textContent = text;
-      msgEl.style.whiteSpace = 'pre-wrap';
-      if (color) msgEl.style.color = color;
-    } else {
-      msgEl.innerHTML = `<span class="player-name">${this.escapeHtml(playerName)}:</span> <span class="message-text">${this.escapeHtml(text)}</span>`;
-    }
-    
-    this.chatMessagesEl.appendChild(msgEl);
-    this.chatMessagesEl.scrollTop = this.chatMessagesEl.scrollHeight;
-    
-    // Limit chat history to 100 messages
-    while (this.chatMessagesEl.children.length > 100) {
-      this.chatMessagesEl.removeChild(this.chatMessagesEl.firstChild!);
-    }
+    this.chatLog.add(isSystem ? 'game' : 'chat', isSystem ? '' : playerName, text, color);
+    this.renderChat();
   }
-  
+
+  private renderChat(): void {
+    const box = this.chatMessagesEl;
+    if (!box) return;
+    box.textContent = '';
+    for (const line of this.chatLog.visible(this.chatTab)) {
+      const msgEl = document.createElement('div');
+      msgEl.className = 'chat-message' + (line.channel === 'game' ? ' system' : '');
+      if (line.channel === 'game') {
+        msgEl.textContent = lineText(line);
+        msgEl.style.whiteSpace = 'pre-wrap';
+        if (line.color) msgEl.style.color = line.color;
+      } else {
+        msgEl.innerHTML = `<span class="player-name">${this.escapeHtml(line.name)}:</span> <span class="message-text">${this.escapeHtml(line.text)}</span>`;
+      }
+      box.appendChild(msgEl);
+    }
+    box.scrollTop = box.scrollHeight;
+  }
+
+  private setChatTab(tab: ChatTab): void {
+    this.chatTab = tab;
+    try { localStorage.setItem(CHAT_TAB_KEY, tab); } catch { /* storage blocked: the tab just isn't remembered */ }
+    document.querySelectorAll<HTMLElement>('#chatTabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+    this.renderChat();
+  }
+
   private escapeHtml(text: string): string {
     const div = document.createElement('div');
     div.textContent = text;

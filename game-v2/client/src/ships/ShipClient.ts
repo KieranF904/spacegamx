@@ -841,7 +841,6 @@ export class ShipClient {
           // Inside the station: held at its centre (the server puts you back where you came in when you leave)
           const st = this.stationInRange(), me = this.opts.state.entities.get(this.opts.state.playerId);
           this.berth = this.docked && st && me ? { station: st.id, ox: me.x - st.x, oy: me.y - st.y } : null;
-          if (this.docked) this.opts.showMessage(`Docked at ${msg.station}`, '#7dd3fc');
           this.opts.sound?.(this.docked ? 'dock' : 'ui_open');
           if (this.opts.onDocked && this.docked) this.opts.onDocked(msg.station ?? 'Station');
           else this.hangar.use((h) => h.open());

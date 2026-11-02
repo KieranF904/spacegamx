@@ -1936,7 +1936,9 @@ this.devTeleport = opts.devTeleport ?? false;
       send: (num, msg) => this.broadcastToSystem(num, msg),
       announce: (num, text, kind) => {
         const color = { info: '#7dd3fc', warn: '#fbbf24', good: '#86efac', bad: '#f87171' }[kind];
-        this.broadcastToSystem(num, { type: 'systemMessage', text, color });
+        // Every pilot there gets the toast; only the outcomes (won, lost) are also kept in the chat log
+        // (raid starts, siege waves and boss sightings were the spam, and the toast already shows them)
+        if (kind === 'good' || kind === 'bad') this.broadcastToSystem(num, { type: 'systemMessage', text, color });
         for (const c of this.clients.values()) if (InSystem.systemId[c.playerId] === num) this.pilots.toast(c, text, kind);
       },
     };
