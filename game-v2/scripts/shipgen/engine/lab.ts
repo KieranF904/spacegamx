@@ -2,6 +2,8 @@
 // folders. A saved design is in data/ships/blueprints/dev, so re-running the exporter puts it in the lab, and
 // index.html#ship=<name> opens it.
 import { spawn } from 'child_process';
+import { join } from 'path';
+import { pathToFileURL } from 'url';
 
 /** Runs the lab's exporter in a child Node with this process's TypeScript loader (tsx); resolves with its output */
 export function runLabExporter(exporter: string, cwd: string, timeoutMs = 120000): Promise<string> {
@@ -19,4 +21,5 @@ export function runLabExporter(exporter: string, cwd: string, timeoutMs = 120000
   });
 }
 
-export const labUrl = (name: string) => `/lab/index.html#ship=${encodeURIComponent(name)}`;
+/** The lab's page for a ship, opened from disk */
+export const labUrl = (lab: string, name: string) => `${pathToFileURL(join(lab, 'index.html')).href}#ship=${encodeURIComponent(name)}`;

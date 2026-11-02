@@ -1,14 +1,14 @@
-// Runs started from the page: one at a time (they share the GPU). Each keeps every event (so a page that opens late, or
-// reconnects, replays them) and passes them on to listeners, with what the page needs added: picture URLs instead of
-// file paths, and each part's cells on a check (for the energy overlay). The best designs go to a gallery.
+// Runs started from the app: one at a time (they share the GPU). Each keeps every event (so a view that opens late
+// replays them) and passes them on to listeners, with what the app needs added: each picture's file (checked to lie in
+// the output folder), and each part's cells on a check (for the energy overlay). The best designs go to a gallery.
 import { relative, resolve, sep } from 'path';
 import type { Blueprint } from '../../../common/src/ships/index';
 import type { ShipgenContext } from '../core/index';
 import type { LoopDeps, RunOptions, RunOutcome, ShipgenEvent } from '../loop/index';
 import { partCells } from './parts';
 
-/** `seq`: the event's place in the run's stored events (its SSE id); token deltas are live only and have none */
-export type PageEvent = ShipgenEvent & { url?: string; seq?: number; cells?: Record<number, [number, number][]> };
+/** `seq`: the event's place in the run's stored events; token deltas are live only and have none. `file`: a picture, absolute */
+export type PageEvent = ShipgenEvent & { file?: string; seq?: number; cells?: Record<number, [number, number][]> };
 
 export interface GalleryItem {
   key: string;
@@ -17,7 +17,7 @@ export interface GalleryItem {
   name: string;
   score: number;
   valid: boolean;
-  url?: string;
+  file?: string;
   bp: Blueprint;
   model: string;
   role?: string;
@@ -52,26 +52,26 @@ export class Runs {
     return [...this.all.values()].find((r) => r.status === 'running');
   }
 
-  /** A file under the output folder as a page URL */
-  urlOf(path: string): string | undefined {
-    const rel = relative(resolve(this.outRoot), resolve(path));
+  /** A file under the output folder, absolute (undefined for one outside it) */
+  fileOf(path: string): string | undefined {
+    const abs = resolve(path), rel = relative(resolve(this.outRoot), abs);
     if (!rel || rel.startsWith('..') || rel.includes(`..${sep}`)) return undefined;
-    return '/out/' + rel.split(sep).map(encodeURIComponent).join('/');
+    return abs;
   }
 
   /** What the page needs added to each event of one run (call per run: it remembers the last design per lane) */
-  enricher(onBest?: (e: Extract<ShipgenEvent, { type: 'best' }>, url?: string) => void): (e: ShipgenEvent) => PageEvent {
+  enricher(onBest?: (e: Extract<ShipgenEvent, { type: 'best' }>, file?: string) => void): (e: ShipgenEvent) => PageEvent {
     const lastBp = new Map<string, Blueprint>();
     return (e) => {
       const pe: PageEvent = { ...e };
       const lane = e.lane ?? '';
       if (e.type === 'grid' && !e.partial) { if (e.bp) lastBp.set(lane, e.bp); else lastBp.delete(lane); }
       if (e.type === 'check') { const bp = lastBp.get(lane); if (bp) pe.cells = partCells(this.ctx, bp); }
-      if (e.type === 'render') pe.url = this.urlOf(e.path);
-      if (e.type === 'batch' && e.ship?.renderPath) pe.url = this.urlOf(e.ship.renderPath);
+      if (e.type === 'render') pe.file = this.fileOf(e.path);
+      if (e.type === 'batch' && e.ship?.renderPath) pe.file = this.fileOf(e.ship.renderPath);
       if (e.type === 'best') {
-        if (e.renderPath) pe.url = this.urlOf(e.renderPath);
-        onBest?.(e, pe.url);
+        if (e.renderPath) pe.file = this.fileOf(e.renderPath);
+        onBest?.(e, pe.file);
       }
       return pe;
     };
@@ -90,7 +90,7 @@ export class Runs {
       done: Promise.resolve(undefined),
     };
     this.all.set(run.id, run);
-    const enrich = this.enricher((e, url) => this.addToGallery(run, e, url));
+    const enrich = this.enricher((e, file) => this.addToGallery(run, e, file));
     const emit = (e: ShipgenEvent) => {
       const pe = enrich(e);
       if (pe.type !== 'token') {
@@ -107,7 +107,8 @@ export class Runs {
       }
       for (const l of run.listeners) l(pe);
     };
-    run.done = job(emit).then(
+    // (Begun on the next turn: the caller adds its listeners first, so none misses the opening events)
+    run.done = Promise.resolve().then(() => job(emit)).then(
       (r) => { run.status = meta.ac.signal.aborted ? 'stopped' : 'done'; return r; },
       (err) => {
         run.status = meta.ac.signal.aborted ? 'stopped' : 'failed';
@@ -128,10 +129,10 @@ export class Runs {
     return `${Date.now().toString(36)}-${++this.n}`;
   }
 
-  private addToGallery(run: Run, e: Extract<ShipgenEvent, { type: 'best' }>, url?: string): void {
+  private addToGallery(run: Run, e: Extract<ShipgenEvent, { type: 'best' }>, file?: string): void {
     const key = `${run.id}|${e.lane ?? ''}`;
     const item: GalleryItem = {
-      key, run: run.id, lane: e.lane, name: e.name, score: e.score, valid: e.valid, url, bp: e.bp,
+      key, run: run.id, lane: e.lane, name: e.name, score: e.score, valid: e.valid, file, bp: e.bp,
       model: run.mode === 'compare' ? (e.lane ?? '').replace(/ t\d+$/, '') : run.model, role: run.role, mode: run.mode,
     };
     const i = this.gallery.findIndex((g) => g.key === key);

@@ -1,11 +1,10 @@
-// Watching runs that were not started from the page (the CLI writes out/**/events.jsonl as it goes): list them, and
-// replay-then-follow one file as server-sent events, with the same enrichment the page's own runs get.
-import type { IncomingMessage, ServerResponse } from 'http';
+// Watching runs that were not started from the app (the CLI writes out/**/events.jsonl as it goes): list them, and
+// replay-then-follow one file, with the same enrichment the app's own runs get.
 import { closeSync, existsSync, openSync, readSync, readdirSync, statSync } from 'fs';
 import { join, relative, sep } from 'path';
 import type { ShipgenEvent } from '../loop/index';
-import { HttpError, inside } from './http';
-import type { Runs } from './runs';
+import { EngineError, inside } from './errors';
+import type { PageEvent, Runs } from './runs';
 
 export interface WatchRun {
   /** Folder under out/, with forward slashes: what the stream route is asked for */
@@ -116,22 +115,19 @@ export function watchFile(root: string, id: string): string | null {
   return inside(root, id.replace(/\/+$/, '') + '/events.jsonl');
 }
 
-/** GET /api/watch/events?run=<id>[&after=<n>]: replay, then follow, until the run is done or the client leaves */
-export function watchStream(req: IncomingMessage, res: ServerResponse, runs: Runs, root: string, url: URL, intervalMs = 500, staleMs = STALE_MS): void {
-  const id = url.searchParams.get('run') ?? '';
+/**
+ * Follows one run's record: replays it, then each event as it is written, through `send`, until the run is done (or has
+ * gone quiet for `staleMs`: it was stopped without finishing), then calls `onEnd` once. Returns a stopper.
+ */
+export function watchRun(runs: Runs, root: string, id: string, send: (e: PageEvent) => void, onEnd: () => void, intervalMs = 500, staleMs = STALE_MS): Follower {
   const file = id ? watchFile(root, id) : null;
-  if (!file) throw new HttpError(404, `no run ${id}`);
-  res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
-  const last = Number(req.headers['last-event-id'] ?? url.searchParams.get('after') ?? -1);
-  const skip = Number.isFinite(last) ? last + 1 : 0;
+  if (!file) throw new EngineError(404, `no run ${id}`);
   const enrich = runs.enricher();
-  let i = 0, ended = false;
-  const ping = setInterval(() => res.write(': ping\n\n'), 15000);
+  let ended = false;
   const follower = followJsonl(file, (e) => {
     if (ended) return;
-    const pe = enrich(e);
-    if (i++ >= skip) res.write(`id: ${i - 1}\ndata: ${JSON.stringify(pe)}\n\n`);
-    // (After this call returns: a finished file is read whole inside followJsonl's first tick, before \`follower\` is set)
+    send(enrich(e));
+    // (After this call returns: a finished file is read whole inside followJsonl's first tick, before `follower` is set)
     if (e.type === 'done') setImmediate(end);
   }, intervalMs);
   // (A run that never wrote 'done' and has gone quiet: say so and end, instead of polling for ever)
@@ -139,10 +135,10 @@ export function watchStream(req: IncomingMessage, res: ServerResponse, runs: Run
     let m = 0;
     try { m = statSync(file).mtimeMs; } catch { /* (gone) */ }
     if (ended || Date.now() - m < staleMs) return;
-    res.write(`data: ${JSON.stringify({ type: 'error', message: `this run wrote nothing for ${Math.round(staleMs / 60000)} min and never finished: it was probably stopped`, fatal: true, t: 0 })}\n\n`);
+    send({ type: 'error', message: `this run wrote nothing for ${Math.round(staleMs / 60000)} min and never finished: it was probably stopped`, fatal: true, t: 0 });
     end();
   }, Math.min(30000, Math.max(50, Math.floor(staleMs / 2))));
-  const stop = () => { clearInterval(ping); clearInterval(quiet); follower.stop(); };
-  function end() { if (ended) return; ended = true; stop(); res.write('event: end\ndata: {}\n\n'); res.end(); }
-  req.on('close', () => { ended = true; stop(); });
+  const stop = () => { clearInterval(quiet); follower.stop(); };
+  function end() { if (ended) return; ended = true; stop(); onEnd(); }
+  return { stop() { ended = true; stop(); } };
 }

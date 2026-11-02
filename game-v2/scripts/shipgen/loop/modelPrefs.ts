@@ -1,4 +1,4 @@
-// The reply contract each model does best with, measured (scripts/shipgen/TRIAL.md). `--contract auto` (and the page's
+// The reply contract each model does best with, measured (scripts/shipgen/TRIAL.md). `--contract auto` (and the app's
 // "auto") uses the first row whose pattern matches the model's name; a model with no row gets grid-json if it takes a
 // schema, else grid-text. Add a row when a trial shows a model does better with another contract.
 import type { Contract } from './contracts';

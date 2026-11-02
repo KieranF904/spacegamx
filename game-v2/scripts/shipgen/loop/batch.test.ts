@@ -10,8 +10,8 @@ import { ship } from '../core/testShips';
 import { type BatchDeps, type BatchOptions, buildFor, galleryHtml, runBatch } from './batch';
 import { fakeLlm } from './fakeLlm';
 import type { Renderer } from './render';
-import { listSavedShips } from '../web/ships';
-import { listWatchRuns } from '../web/watch';
+import { listSavedShips } from '../engine/ships';
+import { listWatchRuns } from '../engine/watch';
 
 const real = loadContext();
 const GOOD = blueprintToGrid(real, ship('dev/review-wren')).text;
@@ -125,7 +125,8 @@ describe('shipgen batch mode', () => {
     const ships = listSavedShips(root).filter((s) => s.run === rel(out));
     expect(ships.length).toBe(2);
     expect(ships[0]).toMatchObject({ role: 'alpha', model: 'fake' });
-    expect(ships[0].bp).toMatch(/^\/out\/.*\/blueprint\.json$/);
+    expect(existsSync(ships[0].bp)).toBe(true);
+    expect(ships[0].bp).toMatch(/blueprint\.json$/);
     // A batch resumed in the same folder numbers its attempts on
     await run({ roles: ['alpha'], maxShips: 1, outDir: out });
     expect(readdirSync(join(out, 'attempts'))).toContain('003-alpha');

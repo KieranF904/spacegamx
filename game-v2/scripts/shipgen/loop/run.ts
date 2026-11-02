@@ -30,7 +30,7 @@ export async function run(deps: LoopDeps, o: RunOptions, emitRaw: (e: ShipgenEve
   deps.models ??= await deps.llm.list().catch(() => []);
   for (const id of [...(o.mode === 'compare' ? o.models : [o.model]), ...(o.critic ? [o.critic] : [])]) {
     const m = deps.models.find((x) => x.id === (id.includes('/') ? id : `ollama/${id}`));
-    if (m?.off) throw new Error(`${id}: ${m.off} (asking it would load it there; set LMSTUDIO_CHAT=1 or tick "let LM Studio chat" on the page)`);
+    if (m?.off) throw new Error(`${id}: ${m.off} (asking it would load it there; set LMSTUDIO_CHAT=1 or tick "let LM Studio chat" in the app)`);
   }
   emit({
     type: 'start', mode: o.mode, model, ...(o.mode === 'compare' ? { models: o.models } : {}), ...(o.critic ? { critic: o.critic } : {}),

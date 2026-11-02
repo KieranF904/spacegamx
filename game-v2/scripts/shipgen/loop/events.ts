@@ -1,4 +1,4 @@
-// What the design loop reports, in order, for the CLI and the page. Every event carries `t` (ms since the run began)
+// What the design loop reports, in order, for the CLI and the app. Every event carries `t` (ms since the run began)
 // and, in compare and evolve runs, a `lane` (the model, or "gen 2 #3") saying which line of work it belongs to.
 import type { Blueprint } from '../../../common/src/ships/index';
 import type { BriefCheck, CheckResult, Concept, ConceptHint, GridError } from '../core/index';

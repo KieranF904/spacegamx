@@ -90,7 +90,7 @@ export interface LlmOptions {
   anthropicUrl?: string;
   /**
    * May chat requests go to LM Studio? Asking an LM Studio model loads it there, so by default its models are only
-   * listed: on only with LMSTUDIO_CHAT=1 or when this says so (the page's toggle).
+   * listed: on only with LMSTUDIO_CHAT=1 or when this says so (the app's toggle).
    */
   lmStudioChat?: () => boolean;
 }
@@ -210,7 +210,7 @@ export function createLlm(opts: LlmOptions = {}): Llm {
   async function chat(req: ChatRequest): Promise<ChatResult> {
     const { provider, name } = splitId(req.model);
     // (Before anything else: asking LM Studio would load the model there)
-    if (provider === 'lmstudio' && !lmsChat()) throw new Error(`${LMSTUDIO_OFF}: asking ${name} would load it in LM Studio. Set LMSTUDIO_CHAT=1 (or tick "let LM Studio chat" on the page) to allow it`);
+    if (provider === 'lmstudio' && !lmsChat()) throw new Error(`${LMSTUDIO_OFF}: asking ${name} would load it in LM Studio. Set LMSTUDIO_CHAT=1 (or tick "let LM Studio chat" in the app) to allow it`);
     // (No key, no request: not even the model listing)
     if (provider === 'anthropic' && !akey()) throw new Error('Anthropic: no ANTHROPIC_API_KEY (environment or game-v2/.env)');
     const mi = await info(req.model);

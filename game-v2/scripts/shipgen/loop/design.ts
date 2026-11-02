@@ -65,7 +65,7 @@ export interface DesignOptions {
   shapeIndex?: number;
   /**
    * The concept step: true asks the model for a short concept before the first round (a design that begins from a given
-   * ship doesn't), a Concept is used as given. Off by default here; the CLI and the page turn it on.
+   * ship doesn't), a Concept is used as given. Off by default here; the CLI and the app turn it on.
    */
   concept?: boolean | Concept;
   /** Variation: a number, and the one-line forms of concepts already used this session (conceptKey) */

@@ -3,7 +3,7 @@
 // pass under <out>/<role>/<NNN>-<slug>/ (blueprint, render, concept, metrics, check summary, the first valid draft). Rejected
 // attempts are logged, not saved. A running summary.json and a static gallery index.html are rewritten after every ship.
 // Every attempt writes its events as it goes to <out>/attempts/<NNN>-<role>/events.jsonl (the refinement's to refine/
-// under it), so the page's Watch can follow it live, with trace.jsonl beside them; the log lines go to <out>/batch.log too.
+// under it), so the app's live view can follow it, with trace.jsonl beside them; the log lines go to <out>/batch.log too.
 // Built to run unattended: every error is caught and logged, a model server that is down is waited for with a growing
 // delay, a stuck ship is cut off after a time cap, the renderer is restarted when it dies and closed on exit, a full disk
 // stops the loop cleanly, and only small per-ship records are kept in memory. One model call at a time.
@@ -72,7 +72,7 @@ export interface BatchDeps extends LoopDeps {
   /** A progress ping (default: scripts/notify.mjs); failures are ignored */
   notify?: (title: string, message: string) => Promise<void>;
   log?: (line: string) => void;
-  /** Every event of every ship as it comes (lane "#3 gunship", "#3 gunship refine"), and the batch's own (type 'batch'): the page's live view */
+  /** Every event of every ship as it comes (lane "#3 gunship", "#3 gunship refine"), and the batch's own (type 'batch'): the app's live view */
   tap?: (e: ShipgenEvent) => void;
 }
 
@@ -225,8 +225,8 @@ interface Capture {
 }
 
 /**
- * `events`: a file every event but the tokens is appended to as it comes (what the page's Watch follows); `tap`: a listener
- * for every event, each given `lane` (the page's live view)
+ * `events`: a file every event but the tokens is appended to as it comes (what the app's live view follows); `tap`: a listener
+ * for every event, each given `lane` (the app's live view)
  */
 const capture = (events?: string, tap?: (e: ShipgenEvent) => void, lane?: string): { cap: Capture; emit: (e: ShipgenEvent) => void } => {
   const cap: Capture = { modelErrors: 0, errors: [], trace: [], tokensIn: 0, tokensOut: 0 };
@@ -390,7 +390,7 @@ export async function runBatch(deps: BatchDeps, o: BatchOptions): Promise<BatchS
       const attempts = join(o.outDir, 'attempts');
       const adir = join(attempts, `${pad(nextNumber(attempts))}-${role}`);
       const d = capture(join(adir, 'events.jsonl'), deps.tap, `#${no} ${role}`);
-      // (Every try's ship is drawn as it comes, under the attempt's folder, for the page's live view; the renderer is the batch's own)
+      // (Every try's ship is drawn as it comes, under the attempt's folder, for the app's live view; the renderer is the batch's own)
       const dr = await run({ ...deps, renderer }, {
         mode: 'design', ...common, outDir: adir, build, rounds: o.rounds ?? 5, concept: o.concept !== false, conceptSeed: no, usedConcepts: used, shapeIndex: perRole - 1,
       }, d.emit);

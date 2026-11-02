@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "monitor": "node scripts/vpsmon/server.mjs",
-    "shipgen": "npx tsx scripts/shipgen/server.ts",
+    "shipgen": "pythonw scripts/shipgen/app/shipgen.pyw",
     "build:common": "cd common && npm run build",
     "build:server": "cd server && npm run build",
     "build:client": "cd client && npm run build",

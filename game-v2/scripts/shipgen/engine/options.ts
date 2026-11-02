@@ -5,7 +5,7 @@ import {
   type Brief, type Role, type ShipgenContext, blueprintToGrid, briefCheck, check, feedbackMessage, findRole,
 } from '../core/index';
 import { type BatchOptions, type ModelInfo, type RunOptions, parseContract } from '../loop/index';
-import { HttpError } from './http';
+import { EngineError } from './errors';
 
 export interface RunForm {
   mode?: 'design' | 'evolve' | 'compare' | 'batch';
@@ -47,7 +47,7 @@ const num = (x: unknown, lo: number, hi: number, d?: number) => {
 export function roleFor(ctx: ShipgenContext, f: RunForm): Role | undefined {
   if (!f.role) return undefined;
   const base = findRole(ctx, f.role);
-  if (!base) throw new HttpError(400, `no role ${f.role}`);
+  if (!base) throw new EngineError(400, `no role ${f.role}`);
   const maxLevel = num(f.maxLevel, 1, 99);
   const cells = Array.isArray(f.cells) && f.cells.length === 2 ? f.cells.map((c) => num(c, 1, 2000)!) as [number, number] : undefined;
   if (maxLevel === undefined && !cells) return base;
@@ -61,23 +61,23 @@ export function roleFor(ctx: ShipgenContext, f: RunForm): Role | undefined {
 export function known(models: ModelInfo[], id: string, what: string, vision = false): string {
   const full = id.includes('/') ? id : `ollama/${id}`;
   const m = models.find((x) => x.id === full);
-  if (!m) throw new HttpError(400, `no ${what} model ${id}`);
-  if (vision && !m.vision) throw new HttpError(400, `the critic must take images: ${id} doesn't`);
-  if (m.off) throw new HttpError(400, `${id}: ${m.off} (asking it would load it in LM Studio: tick "let LM Studio chat" first)`);
+  if (!m) throw new EngineError(400, `no ${what} model ${id}`);
+  if (vision && !m.vision) throw new EngineError(400, `the critic must take images: ${id} doesn't`);
+  if (m.off) throw new EngineError(400, `${id}: ${m.off} (asking it would load it in LM Studio: tick "let LM Studio chat" first)`);
   return full;
 }
 
 /** The page's batch form -> BatchOptions (loop/batch.ts): roles, a cap on ships, time per ship, and the design settings shared with a run */
 export function batchOptions(ctx: ShipgenContext, f: RunForm, models: ModelInfo[], opts: { outDir: string; signal: AbortSignal }): BatchOptions {
-  if (!f.model) throw new HttpError(400, 'pick a designer model');
+  if (!f.model) throw new EngineError(400, 'pick a designer model');
   const model = known(models, f.model, 'designer');
   const roles = (f.roles ?? []).map((r) => String(r).trim()).filter(Boolean);
-  if (!roles.length) throw new HttpError(400, 'pick at least one role');
-  for (const r of roles) if (!findRole(ctx, r)) throw new HttpError(400, `no role ${r}`);
+  if (!roles.length) throw new EngineError(400, 'pick at least one role');
+  for (const r of roles) if (!findRole(ctx, r)) throw new EngineError(400, `no role ${r}`);
   const contract = parseContract(f.contract ?? 'auto');
-  if (!contract) throw new HttpError(400, `bad reply format ${f.contract}`);
+  if (!contract) throw new EngineError(400, `bad reply format ${f.contract}`);
   const build = f.build ?? 'auto';
-  if (!['auto', 'oneshot', 'staged'].includes(build)) throw new HttpError(400, `bad build ${build}`);
+  if (!['auto', 'oneshot', 'staged'].includes(build)) throw new EngineError(400, `bad build ${build}`);
   const note = typeof f.note === 'string' ? f.note.trim().slice(0, 2000) : '';
   return {
     model, roles, outDir: opts.outDir, signal: opts.signal, build: build as 'auto' | 'oneshot' | 'staged', contract, mirror: f.mirror !== false, concept: f.concept !== false,
@@ -88,15 +88,15 @@ export function batchOptions(ctx: ShipgenContext, f: RunForm, models: ModelInfo[
 
 export function runOptions(ctx: ShipgenContext, f: RunForm, models: ModelInfo[], opts: { outDir: string; signal: AbortSignal; start?: Blueprint }): RunOptions {
   const mode = f.mode ?? 'design';
-  if (!['design', 'evolve', 'compare'].includes(mode)) throw new HttpError(400, `bad mode ${mode}`);
-  if (mode === 'batch') throw new HttpError(400, 'a batch is started by batchOptions');
+  if (!['design', 'evolve', 'compare'].includes(mode)) throw new EngineError(400, `bad mode ${mode}`);
+  if (mode === 'batch') throw new EngineError(400, 'a batch is started by batchOptions');
   const role = roleFor(ctx, f);
   const note = typeof f.note === 'string' ? f.note.trim().slice(0, 2000) : '';
   const brief: Brief = { ...(role ? { role } : {}), ...(note ? { text: note } : {}) };
   const contract = parseContract(f.contract ?? 'auto');
-  if (!contract) throw new HttpError(400, `bad reply format ${f.contract}`);
+  if (!contract) throw new EngineError(400, `bad reply format ${f.contract}`);
   const build = f.build ?? 'oneshot';
-  if (build !== 'oneshot' && build !== 'staged') throw new HttpError(400, `bad build ${build}`);
+  if (build !== 'oneshot' && build !== 'staged') throw new EngineError(400, `bad build ${build}`);
   const common = {
     brief, rounds: num(f.rounds, 1, 20, build === 'staged' ? 3 : 4), temperature: num(f.temperature, 0, 2, 0.6), think: !!f.think,
     ...(f.critic ? { critic: known(models, f.critic, 'critic', true) } : {}),
@@ -104,10 +104,10 @@ export function runOptions(ctx: ShipgenContext, f: RunForm, models: ModelInfo[],
   };
   if (mode === 'compare') {
     const ms = (f.models ?? []).filter(Boolean).map((m) => known(models, m, 'designer'));
-    if (ms.length < 2) throw new HttpError(400, 'compare needs two models');
+    if (ms.length < 2) throw new EngineError(400, 'compare needs two models');
     return { mode, ...common, models: ms, trials: num(f.trials, 1, 10, 2) };
   }
-  if (!f.model) throw new HttpError(400, 'pick a designer model');
+  if (!f.model) throw new EngineError(400, 'pick a designer model');
   const model = known(models, f.model, 'designer');
   if (mode === 'evolve') {
     return {

@@ -1,5 +1,5 @@
 // Every ship a batch saved, from any run under out/ (a folder holding blueprint.json and a metrics.json with the gallery
-// record): one list for the page's "Saved ships", newest first, with picture and blueprint URLs under /out/.
+// record): one list for the app's "Saved ships", newest first, with its picture and blueprint files.
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'fs';
 import { join, relative, sep } from 'path';
 
@@ -17,7 +17,7 @@ export interface SavedShip {
   concept?: string;
   model?: string;
   savedAt: string;
-  /** /out/ URLs */
+  /** Files, absolute */
   png?: string;
   bp: string;
   /** The owner's rating, 1-5 (rating.json beside the ship) */
@@ -37,7 +37,7 @@ export function rateShip(root: string, dir: string, rating: number): { dir: stri
 }
 
 const SKIP = new Set(['stills', 'timelapse', 'renders', 'designs', 'attempts', 'trace']);
-const url = (rel: string, file: string) => `/out/${rel.split('/').map(encodeURIComponent).join('/')}/${file}`;
+
 
 export function listSavedShips(root: string, maxDepth = 6): SavedShip[] {
   const out: SavedShip[] = [];
@@ -55,7 +55,7 @@ export function listSavedShips(root: string, maxDepth = 6): SavedShip[] {
           out.push({
             dir: rel, run: rel.split('/').slice(0, -2).join('/'), role: r.role ?? m.role, name: r.name, score: r.score, draftScore: r.draftScore,
             parts: r.parts, cells: r.cells, concept: r.concept, model: m.model, savedAt: r.savedAt ?? '',
-            ...(names.includes('render.png') ? { png: url(rel, 'render.png') } : {}), bp: url(rel, 'blueprint.json'), ...(rating ? { rating } : {}),
+            ...(names.includes('render.png') ? { png: join(dir, 'render.png') } : {}), bp: join(dir, 'blueprint.json'), ...(rating ? { rating } : {}),
           });
         }
       } catch { /* (half written) */ }
