@@ -23,6 +23,7 @@ import { buildShot, shipPointToWorld, type ProjectileSpec, type ShipPose } from 
 import { stepFixedGunAim, stepTurretAim } from './turret.js';
 import { SHOT_AIM_STEPS, shotAimQ } from './launch.js';
 import { BROWNOUT, chargeGroupsEnd, feedShare, type Charge } from './energy.js';
+import { PF_LATCH, effCap, effShot, portsBeamStep, portsGunReady, portsSpendShot, type PortsLayout, type PortsState } from './power/ports.js';
 import { PILOT_EXTRAS } from './features/plan.js';
 
 export interface GunOrders {
@@ -265,10 +266,13 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
   let tells = NO_TELLS as GunTell[];
   const weapons = tuning.weapons ?? {};
   const { aimWorld, aimDist } = orders;
+  // A ports ship (power/ports.ts): each gun fires from its own buffer, a shot's worth at a time, and a beam lights while its buffer
+  // can feed it; nothing is shared. (Unaccounted without the state, as the old one is without a charge)
+  const pz: PortsLayout | undefined = ship.derived.ports && orders.energy?.charge.e ? ship.derived.ports : undefined, E = orders.energy?.charge.e as PortsState;
   // Each gun's share of the power it asked for this tick (1 unaccounted, or with plenty)
-  const share = (w: WeaponInfo) => (orders.energy ? feedShare(ship.derived, orders.energy.charge, w.part, 'gun') : 1);
+  const share = (w: WeaponInfo) => (orders.energy && !pz ? feedShare(ship.derived, orders.energy.charge, w.part, 'gun') : 1);
   // (A beam short of power burns that share of the ticks, evenly spread)
-  const burns = (w: WeaponInfo) => { const r = share(w); return r >= BROWNOUT || (r > 0 && Math.floor(tick * r) !== Math.floor((tick - 1) * r)); };
+  const burns = (w: WeaponInfo) => { if (pz) return portsBeamStep(pz, E, w.part, true) > 0; const r = share(w); return r >= BROWNOUT || (r > 0 && Math.floor(tick * r) !== Math.floor((tick - 1) * r)); };
   const tell = (w: WeaponInfo, start: boolean) => {
     if (tells === NO_TELLS) tells = [];
     tells.push({ w, aimQ: shotAimQ(ship.aim[w.part]), start });
@@ -286,7 +290,11 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
     // (Reloading, a cycle gun loads at its share: a browned-out gun reloads slower. Every other model's beat needs no power)
     const cd0 = ship.cooldown[p];
     ship.cooldown[p] = Math.max(-MAX_WAIT, cd0 > 0 && (f.model === 'cycle' || f.model === 'auto') ? cd0 - share(w) : cd0 - 1);
-    if (f.model === 'clip') stepClip(ship, w, share(w));
+    if (f.model === 'clip') {
+      // (On a ports ship the clip is the gun's buffer: its rounds are the shots it holds, and it reloads, latched, until full)
+      if (pz) { const s = effShot(pz, E, p); ship.rounds[p] = Math.min(f.clip ?? 1, s > 0 ? Math.floor(E.held[p] / s) : 0); ship.reload[p] = E.flags[p] & PF_LATCH ? Math.max(1, Math.ceil((effCap(pz, E, p) - E.held[p]) / Math.max(1, pz.rate[p]))) : 0; }
+      else stepClip(ship, w, share(w));
+    }
     // (A charge let go early drains away)
     else if (f.model === 'charge' && ship.charge[p] < 0) ship.charge[p] = Math.min(0, ship.charge[p] + (f.charge ?? 60) / CHARGE_DRAIN);
     // (Point defence reloads here, drawing its power as any gun does, but aims and fires on its own: support.ts)
@@ -336,12 +344,12 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
       continue;
     }
     if (!want) {
-      // (A beam let go winds up again from nothing)
-      if (f.model === 'beam') ship.charge[p] = 0;
+      // (A beam let go winds up again from nothing; on a ports ship it goes out)
+      if (f.model === 'beam') { ship.charge[p] = 0; if (pz) portsBeamStep(pz, E, p, false); }
       continue;
     }
     if (f.model === 'beam') ready.push(w);
-    else if (ship.cooldown[p] <= 0 && (f.model !== 'clip' || (ship.rounds[p] >= (f.rounds ?? 1) && (f.regrow || ship.reload[p] <= 0)))) ready.push(w);
+    else if (ship.cooldown[p] <= 0 && (f.model !== 'clip' || (ship.rounds[p] >= (f.rounds ?? 1) && (f.regrow || ship.reload[p] <= 0))) && (!pz || portsGunReady(pz, E, p, f.model === 'clip' ? f.rounds ?? 1 : 1))) ready.push(w);
   }
   if (semiReady.length) {
     // One shot a click for each kind of semi-automatic gun: the one that has waited longest, so a pair takes turns
@@ -366,7 +374,8 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
     if (f.model === 'charge') {
       // A charge starts (over a draining one: afresh), and everyone is told; it fills at the gun's share, and full, it fires
       if (ship.charge[p] <= 0) { ship.charge[p] = 0; tell(w, true); }
-      ship.charge[p] += share(w);
+      // (On a ports ship it charges while its buffer holds the shot)
+      ship.charge[p] += pz ? (portsGunReady(pz, E, p) ? 1 : 0) : share(w);
       if (ship.charge[p] < (f.charge ?? 60) - 1e-9) continue;
       ship.charge[p] = 0;
     }
@@ -374,8 +383,10 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
     // The aim fires in fire-event steps, so clients build the same shells (see launch.ts)
     const aimQ = shotAimQ(ship.aim[p]);
     ship.aim[p] = aimQ / SHOT_AIM_STEPS;
+    // (A ports ship pays for the shot now, from the gun's buffer and its feed buffer; its material may make the shot hit harder)
+    const dmg = pz ? portsSpendShot(pz, E, p, f.model === 'clip' ? f.rounds ?? 1 : 1) : 1;
     if (weapons[w.kind]?.type === 'beam') pulses.push({ w, aimQ });
-    else shots.push({ w, aimQ, shot: buildShot(w, ship, pose, tick, tuning) });
+    else { const shot = buildShot(w, ship, pose, tick, tuning); if (dmg !== 1) shot.damageScale *= dmg; shots.push({ w, aimQ, shot }); }
     if (f.model === 'charge') ship.cooldown[p] = f.cooldown ?? w.interval;
     // Fired on time, it keeps the fraction of a tick it was late by (so an interval of 14.3 averages 14.3); after a wait, it starts afresh
     else ship.cooldown[p] = (cd > -1 ? cd : 0) + gunInterval(ship, w);

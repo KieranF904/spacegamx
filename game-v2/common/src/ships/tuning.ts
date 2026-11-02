@@ -65,6 +65,9 @@ export interface ShipTuning {
   /** Shields: recharge waits regenDelayTicks after a hit, then refills regenPerSecond of max per second */
   shield?: { regenDelayTicks: number; regenPerSecond: number; maxPerArea: number };
 
+  /** The feed layer's materials (power/ports.ts FeedDef), by id: what each multiplies on a gun or engine that takes it */
+  feeds?: Record<string, { name: string; short?: string; on: 'weapon' | 'engine'; mod: Record<string, number>; color?: string; say?: string }>;
+
   /** Mining lasers: beam reach (world units), damage per second to asteroids and to ships, and how far they swivel towards the cursor */
   miner?: { range: number; dps: number; shipDps: number; gimbalDeg: number };
 

@@ -36,6 +36,7 @@ export const ACTIONS: ActionDef[] = [
   { id: 'fire', label: 'Fire', category: 'Combat', key: 'Mouse0', alt: 'Mouse2', rebindable: false },
   { id: 'targetNext', label: 'Target the next hostile', category: 'Combat', key: 'Tab', hint: 'Nearest first. Missiles lock on to your target' },
   { id: 'targetCursor', label: 'Target the ship under the cursor', category: 'Combat', key: 'KeyT', hint: 'On empty space: clear the target' },
+  { id: 'feeds', label: 'Switch feeds (Selectors)', category: 'Combat', key: 'KeyY', hint: 'On a ports ship: every Selector passes its other tank; what is in the lines and buffers runs out first' },
   { id: 'ping', label: 'Ping for your party (with Shift: danger)', category: 'Combat', key: 'KeyB', hint: 'On a hostile: attack it. On loot: grab it. On the map: Shift + right-click' },
   { id: 'dock', label: 'Dock / open hangar', category: 'Ship & world', key: 'KeyH', hint: "Inside a station's docking ring" },
   { id: 'interact', label: 'Use jump gate / descend to a planet', category: 'Ship & world', key: 'KeyX', hint: 'In orbit close to a planet you can land on' },

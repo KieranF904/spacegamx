@@ -353,7 +353,7 @@ export class SnapshotBuilder {
           Math.round((ship?.jumpScale ?? 1) * 1000), // this jump's speed scale (prediction)
           field.flags,                           // in a charging field: 1 a star's ring, 2 a lodestone's (bits)
           charge.g,                              // [8] the ship pool's charge %
-          charge.groups.length,                  // [9] charge groups that follow from [13] (1 + banks)
+          charge.count,                          // [9] charge groups that follow from [13] (1 + banks; a ports ship: -(its parts' triples))
           field.prime,                           // a lodestone's priming left, ticks (prediction)
           warmthPercent(this.ships.warmthOf(eid)), // warmth % (common/src/ships/warmth.ts: the frost vignette, and the stage prediction flies and fires with)
           ship?.cargo ?? 0,                      // [12] the hold's cargo mass (common/src/ships/load.ts: prediction flies it)

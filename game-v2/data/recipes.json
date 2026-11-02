@@ -1537,6 +1537,149 @@
         "power_coupling": 1
       },
       "time": 200
+    },
+    "power_joiner_bank": {
+      "inputs": {
+        "steel_plate": 3,
+        "capacitor_cell": 2,
+        "copper_wire": 2
+      },
+      "time": 40
+    },
+    "power_splitter_bank": {
+      "inputs": {
+        "steel_plate": 3,
+        "capacitor_cell": 2,
+        "copper_wire": 2
+      },
+      "time": 40
+    },
+    "power_surge_cell": {
+      "inputs": {
+        "steel_plate": 1,
+        "capacitor_cell": 2,
+        "coil_winding": 1
+      },
+      "time": 0
+    },
+    "power_corner": {
+      "inputs": {
+        "alloy_plate": 1,
+        "copper_wire": 2,
+        "insulated_polymer": 1
+      },
+      "time": 0
+    },
+    "power_combiner": {
+      "inputs": {
+        "steel_plate": 2,
+        "power_coupling": 1,
+        "insulated_polymer": 1
+      },
+      "time": 0
+    },
+    "power_passthrough": {
+      "inputs": {
+        "alloy_plate": 1,
+        "copper_wire": 2,
+        "insulated_polymer": 2
+      },
+      "time": 0
+    },
+    "feed_pipe": {
+      "inputs": {
+        "alloy_plate": 1,
+        "insulated_polymer": 1
+      },
+      "time": 0
+    },
+    "feed_selector": {
+      "inputs": {
+        "steel_plate": 1,
+        "servo_motor": 1,
+        "insulated_polymer": 1
+      },
+      "time": 0
+    },
+    "feed_tank_overcharge": {
+      "inputs": {
+        "steel_plate": 2,
+        "insulated_polymer": 1
+      },
+      "time": 50
+    },
+    "feed_tank_coolant": {
+      "inputs": {
+        "steel_plate": 2,
+        "insulated_polymer": 1
+      },
+      "time": 0
+    },
+    "feed_tank_damping": {
+      "inputs": {
+        "steel_plate": 2,
+        "insulated_polymer": 1
+      },
+      "time": 50
+    },
+    "feed_tank_flux": {
+      "inputs": {
+        "steel_plate": 2,
+        "insulated_polymer": 1
+      },
+      "time": 0
+    },
+    "feed_tank_accelerant": {
+      "inputs": {
+        "steel_plate": 2,
+        "insulated_polymer": 1
+      },
+      "time": 50
+    },
+    "feed_tank_lens": {
+      "inputs": {
+        "steel_plate": 2,
+        "insulated_polymer": 1
+      },
+      "time": 50
+    },
+    "feed_tank_catalyst": {
+      "inputs": {
+        "steel_plate": 2,
+        "insulated_polymer": 1
+      },
+      "time": 0
+    },
+    "feed_tank_reaction": {
+      "inputs": {
+        "steel_plate": 2,
+        "insulated_polymer": 1
+      },
+      "time": 0
+    },
+    "feed_tank_burstgel": {
+      "inputs": {
+        "steel_plate": 2,
+        "insulated_polymer": 1
+      },
+      "time": 50
+    },
+    "engine_reaction_thruster": {
+      "inputs": {
+        "steel_plate": 2,
+        "servo_motor": 1,
+        "insulated_polymer": 1
+      },
+      "time": 0
+    },
+    "cannon_slurry": {
+      "inputs": {
+        "titanium_plate": 3,
+        "barrel_assembly": 2,
+        "insulated_polymer": 2,
+        "servo_motor": 1
+      },
+      "time": 100
     }
   }
 }

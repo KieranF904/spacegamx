@@ -35,7 +35,7 @@ const codes = (b: Blueprint) => validateBlueprint(catalog, b, tuning, null).erro
 // (test-brownout.json is short of power on purpose; devTestShips.test.ts in the server covers the test-* ships)
 const LIBRARY = [
   ...readdirSync(join(SHIP_DATA_DIR, 'blueprints')).filter((f) => f.endsWith('.json')),
-  ...readdirSync(join(SHIP_DATA_DIR, 'blueprints/dev')).filter((f) => f.endsWith('.json') && f !== 'test-brownout.json').map((f) => `dev/${f}`),
+  ...readdirSync(join(SHIP_DATA_DIR, 'blueprints/dev')).filter((f) => f.endsWith('.json') && f !== 'test-brownout.json' && !f.startsWith('ports-')).map((f) => `dev/${f}`),
 ];
 
 /** The same ship with stores that give without limit (the pool's and the banks'): what it would do without discharge rates */

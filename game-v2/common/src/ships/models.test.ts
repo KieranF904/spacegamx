@@ -57,7 +57,7 @@ describe('models', () => {
     for (const fn of ['core', 'hull', 'armor', 'cargo']) expect(FN(fn).legacy).toBeFalsy();
     expect(FN('conduit').legacy).toBe(true);
     // A family's models, in unlock order
-    expect(catalog.families.get('cannon')!.map((m) => m.name)).toEqual(['Pip', 'Hammer', 'Twinlink', 'Longbarrel', 'Bastion']);
+    expect(catalog.families.get('cannon')!.map((m) => m.name)).toEqual(['Pip', 'Hammer', 'Twinlink', 'Slurry Cannon', 'Longbarrel', 'Bastion']);
   });
 
   it('their material is only their HP, mass and resistances: their numbers are their own', () => {

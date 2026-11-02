@@ -16,7 +16,11 @@
       },
       "pieces": "*",
       "hpScale": 2,
-      "carriesFlow": true
+      "carriesFlow": true,
+      "ports": [
+        { "dir": "in", "side": "W", "rate": 60 }, { "dir": "in", "side": "E", "rate": 60 },
+        { "dir": "out", "side": "N", "rate": 150 }, { "dir": "out", "side": "S", "rate": 150 }
+      ]
     },
     {
       "id": "hull",

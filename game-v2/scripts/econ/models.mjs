@@ -630,6 +630,120 @@ for (const m of models) m.carriesFlow = true;
 // Components (docs §2) and recipes
 // ---------------------------------------------------------------------------
 
+// ---- The ports energy core (common/src/ships/power/ports.ts; docs/design/energy-ports-2026-11.md): every part's ports, the
+// weapons' power profiles, the feed layer's parts, and which guns and engines take which material (tuning.json feeds).
+// Read only by a design that says `power: 'ports'`; the live pool-and-banks system ignores all of it. A port is in the
+// part's own frame (a gun's or engine's: N its facing, S its back), `rate` E a second. Generators give out of their
+// front, one port a cell; stores take at the back and give at the front; guns, engines, shields and tools take at the
+// back, their rate a little over what they draw (a beam's its burn). Appended last, so no other model's order moves.
+{
+  const ports = (dir, side, cells, rate) => cells.map((cell) => ({ dir, side, cell, rate }));
+  const io = (inRate, outRate, inCells = [0], outCells = [0]) => [...ports('in', 'S', inCells, inRate), ...ports('out', 'N', outCells, outRate)];
+  // Fixed ports: the generators (a cell's worth each) and the stores (In at the back, Out at the front: Out over In, so a
+  // charged store pours; a Heavy Bank joins two lines into one)
+  const PORTS = {
+    power_cell_reactor: ports('out', 'N', [0], 35), power_isotope_pile: ports('out', 'N', [0], 18),
+    power_fusion_plant: ports('out', 'N', [0, 1], 100), power_overclock_reactor: ports('out', 'N', [0, 1], 70),
+    power_battery: io(40, 60), power_capacitor: io(40, 400), power_drive_cell: io(60, 250), power_heavy_bank: io(70, 150, [0, 1], [0]),
+    power_conduit: io(200, 200), power_diode: io(200, 200),
+  };
+  // Profiles and feeds (section 9, 10): what shapes a gun's draw, and the materials a gun or engine takes (about a third of the
+  // mid guns, half of the high ones; none of the starters)
+  const PROFILE = {
+    // (A thresholded gun's own ports are rated for it: a line below that rating, a lone Cell Reactor's, never fires it)
+    cannon_hammer: { profile: { threshold: 40 }, ports: ports('in', 'S', [0, 1], 20) },
+    cannon_longbarrel: { profile: { discharge: 1 }, takes: ['overcharge', 'coolant', 'flux'] },
+    cannon_bastion: { profile: { threshold: 90 }, takes: ['overcharge', 'accelerant'], ports: ports('in', 'S', [0, 1], 50) },
+    autocannon_chainsaw: { takes: ['coolant', 'flux'] },
+    pulse_overpulse: { takes: ['coolant', 'accelerant'] },
+    laser_cutter: { profile: { burst: true, rest: 1 }, takes: ['lens', 'coolant'] },
+    laser_searchlight: { takes: ['lens'] },
+    railgun_spear: { profile: { steady: 30, passive: 5 }, takes: ['damping', 'overcharge'], ports: ports('in', 'S', [0, 1], 30) },
+    railgun_rail_driver: { takes: ['accelerant', 'coolant'] },
+    lance_lance: { profile: { burst: true, rest: 2, passive: 20 }, takes: ['lens', 'coolant'] },
+    legendary_singularity: { profile: { passive: 30, discharge: 1.5 }, takes: ['overcharge', 'coolant', 'damping'] },
+    engine_plasma_drive: { takes: ['catalyst', 'reaction'] },
+    engine_fusion_torch: { takes: ['catalyst', 'burstgel'] },
+  };
+  const backCells = (piece) => (PIECE_AREA[piece] >= 2 ? [0, 1] : [0]);
+  for (const m of models) {
+    if (PORTS[m.id]) m.ports = PORTS[m.id];
+    else if (m.weapon || m.thrust || m.shield || m.gyro || m.jumpCapacity || m.mining || m.siphon || m.range || m.strafe || m.tow) {
+      // (Consumers: In at the back, a little over the draw, split over the back cells; an engine's its own intake)
+      const cells = backCells(m.pieces[0]), area = PIECE_AREA[m.pieces[0]];
+      const draw = m.thrust ? (m.intake ?? m.demand) * area : (m.demand ?? 0) * area * 1.5;
+      if (draw > 0) m.ports = ports('in', 'S', cells, Math.max(4, Math.ceil(draw / cells.length)));
+    }
+    if (PROFILE[m.id]) Object.assign(m, PROFILE[m.id]);
+  }
+  // The feed layer's parts and the power parts the ports meta wants: [id, name, family, pieces, level, material, fields, description, category, look]
+  const FEED_LOOK = { color: '#5b7a8c', decor: 'none' }, TANK_LOOK = (color) => ({ color, decor: 'battery', glow: color });
+  const TANKS = [
+    ['overcharge', 'Overcharge', 20, '#f97316', 'Harder hits and half the discharge, for 40% more power a shot'],
+    ['coolant', 'Coolant', 18, '#38bdf8', 'Half the discharge and rest, 15% softer hits'],
+    ['damping', 'Damping Gel', 22, '#a78bfa', 'Heavy guns run on half the line rating, a quarter slower'],
+    ['flux', 'Flux Salts', 18, '#facc15', '30% less power a shot, 15% softer hits'],
+    ['accelerant', 'Accelerant', 24, '#f43f5e', '30% faster fire for a quarter more power a shot; it needs heavier lines'],
+    ['lens', 'Lens Fluid', 20, '#2dd4bf', 'A beam burns a quarter less and hits a tenth softer, resting longer'],
+    ['catalyst', 'Catalyst', 16, '#84cc16', 'An engine burns 40% less for 15% less thrust'],
+    ['reaction', 'Reaction Mass', 18, '#e879f9', '40% more thrust for the same burn; a Reaction Thruster runs on it'],
+    ['burstgel', 'Burst Gel', 22, '#fb7185', 'Boost half again as hard for half the extra burn'],
+  ];
+  const FEED_PARTS = [
+    ['power_joiner_bank', 'Joiner Bank', 'battery', ['rect2'], 8, 'steel', { store: 150, discharge: 90, intake: 40, hpScale: 0.6, ports: [...ports('in', 'S', [0, 1], 40), ...ports('out', 'N', [0], 90)] },
+      'A battery that joins two lines into one: it takes 40 a second at each of its two back ports and gives 90 out of its front left. Holds 300.', 'power', legacyLook('battery')],
+    ['power_splitter_bank', 'Splitter Bank', 'battery', ['rect2'], 8, 'steel', { store: 150, discharge: 45, intake: 80, hpScale: 0.6, ports: [...ports('in', 'S', [0], 80), ...ports('out', 'N', [0, 1], 45)] },
+      'A battery that splits one line into two: it takes 80 a second at its back left and gives 45 out of each front port. Holds 300.', 'power', legacyLook('battery')],
+    ['power_surge_cell', 'Surge Cell', 'capacitor', ['sq'], 14, 'composite', { store: 120, discharge: 300, intake: 120, hpScale: 0.5, ports: io(120, 300) },
+      'A fast cell: it takes 120 a second and pours 300, so a gun that shuts its ports after a shot gets it all back the moment they open. Holds 120.', 'power', legacyLook('weapon_battery')],
+    ['power_corner', 'Corner Conduit', 'relay', ['sq'], 2, 'alloy', { store: 10, discharge: 200, intake: 200, relayOnly: true, hpScale: 0.5, ports: [...ports('in', 'S', [0], 200), ...ports('out', 'E', [0], 200)] },
+      'A power line that turns: in at the back, out to the right (flip it for the left), up to 200 a second.', 'power', { color: '#b0711f', decor: 'none' }],
+    ['power_combiner', 'Combiner', 'relay', ['sq'], 12, 'steel', { store: 10, discharge: 150, intake: 150, relayOnly: true, combiner: true, hpScale: 1.2, ports: io(150, 150), feedPoints: [{ side: 'W' }] },
+      'Joins a feed to a power line: a pipe at its left side brings a material, and the line out of its front carries it with the power, along conduits (a battery stops it) into a gun or engine that takes it. Tough.', 'power', { color: '#8c6b2a', decor: 'none', glow: '#f2c14e' }],
+    ['power_passthrough', 'Passthrough', 'relay', ['sq'], 10, 'alloy', { store: 10, discharge: 200, intake: 200, relayOnly: true, pipeThrough: true, hpScale: 0.5, ports: io(200, 200), feedPoints: [{ side: 'W' }, { side: 'E' }] },
+      'A power line with a pipe through it, side to side: the one way a feed crosses a line.', 'power', { color: '#b0711f', decor: 'none', glow: '#5b7a8c' }],
+    ['feed_pipe', 'Feed Pipe', 'feed', ['sq'], 10, 'alloy', { pipe: true, feedPoints: [{ side: 'N' }, { side: 'E' }, { side: 'S' }, { side: 'W' }], hpScale: 0.5 },
+      'A pipe: it joins tanks, Selectors, Combiners and guns with feed inputs on every side. It carries no power.', 'power', FEED_LOOK],
+    ['feed_selector', 'Selector', 'feed', ['sq'], 16, 'steel', { selector: true, feedPoints: [{ side: 'W' }, { side: 'E' }, { side: 'N' }], hpScale: 0.6 },
+      'Two feeds in (left and right), one out (front): the pilot switches which one passes (Y). What is already in the lines and buffers runs out first.', 'power', { ...FEED_LOOK, glow: '#f2c14e' }],
+    ...TANKS.map(([feed, name, level, color, what]) =>
+      [`feed_tank_${feed}`, `${name} Tank`, 'feed', ['sq'], level, 'steel', { tank: { feed, holds: 120 }, feedPoints: [{ side: 'N' }, { side: 'E' }, { side: 'S' }, { side: 'W' }], hpScale: 0.7 },
+        `A tank of ${name}: ${what}. Holds 120; pipes join it on every side. It is refilled in the hangar.`, 'power', TANK_LOOK(color)]),
+  ];
+  for (const [id, name, family, pieces, level, material, fields, description, category, look] of FEED_PARTS) {
+    models.push({
+      ...base(id, name, family, pieces, level, material, { grade: fields.grade }), ...fields, description,
+      rarity: level >= 20 ? 'rare' : level >= 5 ? 'uncommon' : 'common', category, fabOrder: next(category), ...look,
+      guide: { name, blurb: description.split(/[.:]/)[0], ...(pieces[0] !== 'sq' ? { piece: pieces[0] } : {}), order: guideOrder++ },
+    });
+  }
+  // The Reaction Thruster: an engine built for feed. On power alone a weak, cheap push; on Reaction Mass five times that
+  // for the same 4 a second (two Ion Drives push 4.5 for 18), on Catalyst a quarter of the burn, on Burst Gel a hard boost
+  models.push({
+    ...base('engine_reaction_thruster', 'Reaction Thruster', 'ion', ['sq'], 15, 'steel', {}),
+    hpScale: FNS.get('thruster').hpScale, demand: 4, priority: 1, thrust: 1.0, rated: 60, boost: 1, boostDrain: 0, intake: 6, buffer: 10,
+    ports: ports('in', 'S', [0], 6), feedPort: { side: 'W' }, takes: ['reaction', 'catalyst', 'burstgel'], feedUse: 1.2,
+    feedMods: { reaction: { thrust: 5 }, catalyst: { burn: 0.25, thrust: 2.5 }, burstgel: { thrust: 2.2, boost: 2.5 } },
+    rarity: 'uncommon', description: 'An engine built for feed: a weak push on power alone, five times that on Reaction Mass piped to its left side (1.2 a second while thrusting). Power stays with the guns; the price is tanks and space.',
+    category: 'engines', fabOrder: next('engines'), ...legacyLook('thruster'), glow: '#e879f9',
+    guide: { name: 'Reaction Thruster', blurb: 'An engine built for feed', order: guideOrder++ },
+  });
+  // The Slurry Cannon: two inputs, power at its back left and its own feed at its back right, and it fires only with feed
+  MOUNT.cannon_slurry = 'fixed';
+  MOUNTING.cannon_slurry = { attach: 'back', clear: ahead(2) };
+  const slurryDesc = 'The two-input gun: power at its back left (lines rated 40 or more; 60 on Accelerant) and its own feed input at its back right, and it fires only with a material in it: a heavy slug every 0.7 s that hits like a Hammer. Overcharge, Accelerant or Flux Salts.';
+  models.push({
+    ...base('cannon_slurry', 'Slurry Cannon', 'cannon', ['rect2'], 18, 'titanium', { grade: 3 }),
+    weapon: 'cannon', ...mounted('cannon_slurry', slurryDesc), hpScale: r2(FNS.get('weapon').hpScale * 1.1), demand: 18, priority: 2, fireInterval: 42,
+    weaponMods: { mul: { damage: xp(48 / 14), speed: xp(38 / 48), size: xp(1.5) }, add: { pen: 1 } }, blast: BLAST.weapon,
+    fire: { model: 'cycle', interval: 42, shot: 25, intake: 45, buffer: 1 },
+    ports: ports('in', 'S', [0], 60), feedPort: { side: 'S', cell: 1, required: true }, takes: ['overcharge', 'accelerant', 'flux'], profile: { threshold: 40 },
+    rarity: 'rare', category: 'weapons', fabOrder: next('weapons'), ...legacyLook('weapon'),
+    guide: { name: 'Slurry Cannon', blurb: 'The two-input gun', piece: 'rect2', order: guideOrder++ },
+  });
+}
+// ---- (end ports energy core)
+
 const COMPONENTS = [
   ['barrel_assembly', 'Barrel Assembly', 'uncommon', 60, { steel_plate: 2, servo_motor: 1 }, 45, '#a8a29e', 'A rifled barrel on a servo mount: cannons, autocannons, flak and mortars.'],
   ['coil_winding', 'Coil Winding', 'uncommon', 48, { copper_wire: 6, ferrite_plate: 1 }, 40, '#d97706', 'Copper wound on a ferrite core: railguns, arc and EMP projectors, jump coils.'],
@@ -734,6 +848,20 @@ Object.assign(RECIPES, {
   utility_gyro: { alloy_plate: 2, copper_wire: 1, servo_motor: 1 },
   utility_heavy_gyro: { titanium_plate: 4, coil_winding: 2, servo_motor: 2, power_coupling: 1 },
 });
+// (The ports energy core's parts: tanks and pipes are plate and polymer; the banks cells and coils; the Combiner a coupling)
+Object.assign(RECIPES, {
+  power_joiner_bank: { steel_plate: 3, capacitor_cell: 2, copper_wire: 2 },
+  power_splitter_bank: { steel_plate: 3, capacitor_cell: 2, copper_wire: 2 },
+  power_surge_cell: { steel_plate: 1, capacitor_cell: 2, coil_winding: 1 },
+  power_corner: { alloy_plate: 1, copper_wire: 2, insulated_polymer: 1 },
+  power_combiner: { steel_plate: 2, power_coupling: 1, insulated_polymer: 1 },
+  power_passthrough: { alloy_plate: 1, copper_wire: 2, insulated_polymer: 2 },
+  feed_pipe: { alloy_plate: 1, insulated_polymer: 1 },
+  feed_selector: { steel_plate: 1, servo_motor: 1, insulated_polymer: 1 },
+  engine_reaction_thruster: { steel_plate: 2, servo_motor: 1, insulated_polymer: 1 },
+  cannon_slurry: { titanium_plate: 3, barrel_assembly: 2, insulated_polymer: 2, servo_motor: 1 },
+});
+for (const feed of ['overcharge', 'coolant', 'damping', 'flux', 'accelerant', 'lens', 'catalyst', 'reaction', 'burstgel']) RECIPES[`feed_tank_${feed}`] = { steel_plate: 2, insulated_polymer: 1 };
 /** Plating comes in two sizes: its recipe is per cell */
 const PER_CELL = new Set(['plating_reactive_armour', 'plating_spaced_plating']);
 const KNOWN = new Set([...read('items.json').items.map((d) => d.id), ...read('recipes.json').refining.map((r) => r.id), ...COMPONENTS.map((c) => c[0])]);

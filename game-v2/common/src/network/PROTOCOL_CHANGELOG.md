@@ -12,3 +12,4 @@ except to fix a typo. A bump makes old clients reload (see PROTOCOL_VERSION in p
 - 20 (2026-10-31): gun-state slot carries reload progress in eighths
 - 21 (2026-11-01): parts: the Conduit and the Diode (energy routing P4), two model ids appended to the wire dictionary
 - 22 (2026-11-01): parts: the Gyro and the Heavy Gyro (reaction wheels), two model ids appended to the wire dictionary
+- 23 (2026-11-02): ports energy core: a ports ship's pilot row carries its parts' triples (count negative) and the new models

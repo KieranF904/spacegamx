@@ -25,6 +25,8 @@ export const FAMILY_LABEL: Record<string, string> = {
   strafer: 'Strafers', tow: 'Tow beams',
   // (Gyro and Heavy Gyro: common/src/ships/features/gyro)
   gyro: 'Gyros',
+  // (The feed layer's tanks, pipes and Selectors: common/src/ships/power/ports.ts)
+  feed: 'Feed',
 };
 export const LEGENDARY = 'Legendary';
 const FAMILY_ORDER = Object.keys(FAMILY_LABEL);

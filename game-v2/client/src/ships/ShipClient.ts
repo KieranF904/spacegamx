@@ -10,7 +10,7 @@
  *   J  jump drive: spool up, then fly far and fast along the nose (J again aborts)
  */
 
-import { stepPointDefenceAim, pointDefenceOf, chargeGroupsEnd, TELL_CHARGE_START, TELL_CHARGE_CANCEL } from '@space-game/common';
+import { ensurePortsCharge, stepPointDefenceAim, pointDefenceOf, chargeGroupsEnd, TELL_CHARGE_START, TELL_CHARGE_CANCEL } from '@space-game/common';
 import { GunSync } from './gunSync';
 import { GunFeel } from './gunFeel';
 import './energyLooks';
@@ -562,6 +562,7 @@ export class ShipClient {
     this.fireHeld = firing;
     const pose = { x: player.x, y: player.y, angle: player.angle };
     // Each shot spends stored energy, then the mining lasers pay for their segment, as on the server (energy.ts)
+    ensurePortsCharge(ship.derived, charge);
     const energy = { charge };
     // (Guns never read warmth: rework 2026-11)
     const { shots, beams, pulses } = stepGuns(ship, pose, { firing, aimWorld: input.targetAngle, aimDist: input.cursorDist ?? 0, energy }, tick, this.opts.tuning);
@@ -1016,6 +1017,13 @@ export class ShipClient {
       this.helm = !this.helm;
       return true;
     }
+    // Switch feeds (a ports ship's Selectors: common/src/ships/power/ports.ts)
+    if (code === 'KeyY') {
+      const ship = this.store.get(this.opts.state.playerId);
+      if (!ship?.derived.ports) this.opts.showMessage('No feed Selector fitted: nothing to switch', '#f2d24b');
+      else this.opts.send({ type: 'feedSwitch' });
+      return true;
+    }
     if (code === 'KeyJ') {
       const ph = this.localJump();
       const hold = settings.data.gameplay.jumpMode === 'hold';
@@ -1076,6 +1084,8 @@ export class ShipClient {
     // Charging fields round the step, exactly as the server has them (ShipBridge.stepMovement): the range boost from
     // where it starts, then a faster cooldown and a lodestone's priming from where it ends
     let res!: ReturnType<typeof stepShipPhysics>;
+    // (A ports ship's charge is its parts' state: made once, and read from the row the server sent: energy.ts)
+    ensurePortsCharge(ship.derived, charge);
     player.jumpPrime = pilotJumpStep(body, player.jumpPrime ?? 0, { central: this.central, lodestones: this.lodestones }, tick,
       ship.derived.jumpCooldown || this.jump.cooldownTicks, this.jump, (rangeBoost) => {
         // (The controls built as the server builds them: flightInputs.ts. The aim goes in as the message has it)

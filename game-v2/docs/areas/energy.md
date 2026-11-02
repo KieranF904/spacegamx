@@ -40,6 +40,9 @@ Add a store/generator: models.mjs fields (`produce`/`store`/`discharge`/`bank`/`
 - Legacy `drive_battery`/`weapon_battery` are plain pool batteries now.
 - If the library fight fails on the Heavy Bank's rate, lower `energy.boostDraw`, not the rate (design rule).
 
+## Ports core (designs with `power: 'ports'`; docs/design/energy-ports-2026-11.md §14)
+`common/src/ships/power/ports.ts`: `buildPortsLayout` (rebuild.ts, when `blueprint.power === 'ports'`: then `ShipDerived.ports` is set and `.power` is absent), `portsTick` (energy.ts `powerTick` branches to it; `Charge.e` is the `PortsState`), the guns' gates (`portsGunReady`, `portsSpendShot`, `portsBeamStep`: guns.ts), `portsSwitchFeeds` (the `feedSwitch` message, key Y), the wire (`packPorts`/`unpackPortsInto`: triples in the pilot row, counted negative in `data[9]`; `ensurePortsCharge` on the client). Data: models.mjs "ports energy core" block (`ports`, `profile`, `takes`, `feedPort`, the feed parts), tuning.json `feeds`, the core's ports in functions.json. Tests: `common/src/ships/power/ports.test.ts` on the three dev ships.
+
 ## Power core (P1 of docs/design/energy-routing-impl.md; nothing in the game runs it yet)
 `common/src/ships/power/` (exported from `@space-game/common`): the touch-routed replacement for circuits.ts/energy.ts, built
 to §0 of the spec: **no wires** (power moves only between parts that share a full edge: rebuild's `joins`, bespoke joins

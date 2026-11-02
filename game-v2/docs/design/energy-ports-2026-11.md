@@ -485,3 +485,41 @@ differ fourfold):
 
 Results are in the gallery: `prototypes/energy-lab/evolved/index.html` (over http: the lab server, then
 `/evolved/index.html`), each ship opening live in the lab.
+
+## 14. In the dev game (2026-11-03)
+
+The ports core runs in the game for any design whose blueprint says `"power": "ports"` (`common/src/ships/power/ports.ts`;
+the lab's `ports-model.js` is the reference). Such a ship gets `ShipDerived.ports` instead of `.power`; everything else
+reads `power` as optional. The hooks are the same places the pool-and-banks system uses:
+
+- `rebuild.ts` builds the layout (ports placed in each part's own frame: a gun's or engine's back is its back whatever
+  its facing; links where an out port faces an in port across a shared edge; feed networks by union-find through
+  pipes, tanks, Passthroughs and Combiners; Selectors look across). Every part on a ports ship is "satisfied": the
+  core decides what each gets, every tick.
+- `energy.ts`: `Charge.e` holds the parts' state; `powerTick`, `thrustShare` (each engine's share and its boost,
+  folded in: a ports ship's `boostFactor` is 1), `remapCharge`, `chargeTotal`, `packCharge`/`unpackCharge` branch on
+  it. The pilot row carries `(part, held×8+flags, closed·2^24+mat·2^20+amt)` triples for every part not full, counted
+  negative in `data[9]` (`PORTS_SLOT_LAYOUT` is in the wire hash: protocol 23), the layout's sig in `data[8]`. A client
+  reads the row once it has the layout (`ensurePortsCharge`, in `ShipClient.predict`/`predictGuns`).
+- `guns.ts`: a gun fires a shot's worth from its own buffer (`portsGunReady` / `portsSpendShot`: discharge shuts its
+  ports, material comes off its feed buffer and may scale the shot's damage); a clip's rounds are what its buffer holds
+  and it latches, reloading, until full; a beam lights and burns through `portsBeamStep` (a burst beam only when full,
+  resting after). Guns' energies are today's (`gunDraw`'s: draw × beat, a clip's reload energy, a charge gun's charge),
+  not the routing data's `fire.shot/intake/burn`.
+- Server: a spawn gives a ports ship a full state (`fullPortsCharge`); `feedSwitch` (key **Y**) flips every Selector.
+- Data (`scripts/econ/models.mjs`, the "ports energy core" block): every generator, store and consumer's ports; profiles
+  and `takes` on about a third of the mid guns and half of the high ones (Hammer threshold 40, Longbarrel discharge
+  1 s, Bastion threshold 90, Spear steady 30, Cutter and Lance burst beams, Singularity passive 30); the feed parts
+  (Joiner Bank, Splitter Bank, Surge Cell, Corner Conduit, Combiner, Passthrough, Feed Pipe, Selector, nine tanks),
+  the Reaction Thruster and the Slurry Cannon; `tuning.json feeds` is the material table. The core's ports are in
+  `functions.json`.
+
+Three dev ships (F9, `data/ships/blueprints/dev/ports-*.json`; `common/src/ships/power/ports.test.ts` checks them):
+**Ports Gunship** (six reactors into the core and two corner lines, a Pip and two Rattlers, three Ion Drives);
+**Ports Lancer** (a Lance on a Combiner line, a Selector between Coolant and Lens Fluid, its second port on a battery
+line round two corners); **Ports Slurry Raider** (the Slurry Cannon's Accelerant crossing its power line through a
+Passthrough, two Reaction Thrusters on one Reaction Mass tank).
+
+Not in this cut: the hangar draws no port glyphs and its load test skips ports ships; tanks refill only on a rebuild
+(a respawn or swap); mining lasers and part features (Tow, Strafer, Flash) are unaccounted on a ports ship; shields
+draw their buffer but their `sat` isn't wired to the shield; a hazard's battery cap is ignored.

@@ -119,6 +119,7 @@ import { GameData } from './data/GameData.js';
 import type { UserStore } from './auth/types.js';
 import type { ClientSocket, ClientLink } from '@space-game/common';
 import type { ShipBridge, ShipHost } from './ships/ShipBridge.js';
+import { portsSwitchFeeds } from '@space-game/common';
 import { Blueprint, ShipState, quantizeShipValue, skillValue, hasAll, removeAll, Economy, Bag, StarterKit, jumpTuning, jumpPhase, partItemId, rateShip, ratingOf, createShipState, gradeReward, gradeOf, accrueTraces, releaseTraces, unlocks, stationPerks, hazardFlight, stationTable, blueprintGrade, lookFn, warmthPercent, packCharge, nearerThan, fartherThan, type ShipDerived } from '@space-game/common';
 
 /** A station site by id */
@@ -2853,6 +2854,14 @@ this.devTeleport = opts.devTeleport ?? false;
         this.ammo.restock(conn, { report: true, quiet: true });
         this.pilots.toast(conn, bp ? `Flying the ${bp.name} (dev: not saved)` : 'Back in your own ship', 'info');
       }
+    });
+    // A ports ship's Selectors flipped (common/src/ships/power/ports.ts): the pilot's own, nothing spent
+    t.on('feedSwitch', (_ctx, conn) => {
+      const ship = this.ships.get(conn.playerId), c = this.ships.chargeOf(conn.playerId);
+      if (!ship?.derived.ports || !c.e) return;
+      if (!ship.derived.ports.selectors.length) { this.pilots.toast(conn, 'No Selector fitted: nothing to switch', 'warn'); return; }
+      portsSwitchFeeds(ship.derived.ports, c.e);
+      this.pilots.toast(conn, 'Feeds switched: the old material runs out first', 'info');
     });
     t.on('devBoss', (_ctx, conn, msg) => {
       if (!this.devTeleport && !conn.isAdmin) return;

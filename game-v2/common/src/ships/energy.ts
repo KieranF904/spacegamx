@@ -31,6 +31,9 @@ import type { ShipDerived, WeaponInfo } from './rebuild.js';
 import type { ShipTuning } from './tuning.js';
 import type { Vec2 } from './types.js';
 import { getPlan } from './features/plan.js';
+import {
+  type PortsControls, type PortsState, createPortsState, fullPorts, isPortsRow, packPorts, portsGaugePct, portsSlotEnd, portsThrustFrac, portsThrustMul, portsTick, remapPorts, unpackPortsInto,
+} from './power/ports.js';
 
 export interface EnergyInfo {
   /** What the pool holds full (the core's store and the batteries'), and what the Drive Cell and Capacitor banks hold */
@@ -58,6 +61,10 @@ export interface Charge {
   b: number[];
   eng?: number[];
   gun?: number[];
+  /** A ports ship's (power/ports.ts): what every part holds, in place of the pool and banks (`g` and `b` are then unused) */
+  e?: PortsState;
+  /** A ports row a client was sent and hasn't read yet (it needs the layout: ensurePortsCharge) */
+  row?: ArrayLike<number>;
 }
 
 export const FULL_CHARGE: Charge = { g: 100, b: [] };
@@ -80,6 +87,8 @@ export const CHARGE_GROUPS_AT = 13;
 export const MAX_CHARGE_GROUPS = 24;
 /** Where the charge groups end in a pilot row (the part features' values start there) */
 export function chargeGroupsEnd(data: ArrayLike<number>): number {
+  // (A ports ship's row carries its parts' triples instead, counted negative: power/ports.ts)
+  if ((data[PILOT_ROW.groups] | 0) < 0) return portsSlotEnd(data);
   return CHARGE_GROUPS_AT + Math.max(0, Math.min(MAX_CHARGE_GROUPS, data[PILOT_ROW.groups] | 0));
 }
 /** What the charge groups mean (in the wire hash: a change of meaning is a protocol bump) */
@@ -87,17 +96,24 @@ export const CHARGE_GROUPS_LAYOUT = 'pool+banks';
 const hundredths = (v: number) => Math.round(pctOf(v) * 100) / 100;
 
 /** The charge's fields for the snapshot row: the gauge, the pool's, and the groups (the pool's, then each bank's) */
-export function packCharge(d: ShipDerived | undefined, c: Charge): { total: number; g: number; groups: number[] } {
+export function packCharge(d: ShipDerived | undefined, c: Charge): { total: number; g: number; count: number; groups: number[] } {
+  // (A ports ship: its layout's sig in the pool's slot, its parts' triples in the groups', their count negative)
+  if (d?.ports && c.e) {
+    const groups: number[] = [], n = packPorts(d.ports, c.e, groups);
+    return { total: hundredths(portsGaugePct(d.ports, c.e)), g: d.ports.sig, count: -n, groups };
+  }
   const n = Math.min(MAX_CHARGE_GROUPS - 1, d?.power?.banks.length ?? 0);
   const groups = new Array<number>(n + 1);
   groups[0] = hundredths(c.g);
   for (let i = 0; i < n; i++) groups[i + 1] = hundredths(c.b[i] ?? 100);
-  return { total: d ? hundredths(chargeTotal(d, c)) : 100, g: groups[0], groups };
+  return { total: d ? hundredths(chargeTotal(d, c)) : 100, g: groups[0], count: groups.length, groups };
 }
 
 /** The charge a snapshot row says (data as packed above; an old row: full) */
 export function unpackCharge(data: number[] | undefined): Charge {
   if (!data || data.length <= PILOT_ROW.groups) return { g: 100, b: [] };
+  // (A ports row is read once the layout is at hand: ensurePortsCharge)
+  if (isPortsRow(data)) return { g: 100, b: [], row: data };
   const n = Math.max(0, Math.min(MAX_CHARGE_GROUPS, data[PILOT_ROW.groups] | 0));
   const fin = (v: number | undefined, dflt: number) => (v !== undefined && Number.isFinite(v) ? v : dflt);
   if (n === 0) return { g: fin(data[PILOT_ROW.pool], 100), b: [] };
@@ -136,6 +152,7 @@ export function bankHeld(d: ShipDerived, c: Charge, b: number): number {
 
 /** All the ship's stored energy as one percentage (the HUD's gauge) */
 export function chargeTotal(d: ShipDerived, c: Charge): number {
+  if (d.ports) return c.e ? portsGaugePct(d.ports, c.e) : 100;
   const L = d.power;
   if (!L) return 100;
   let held = poolHeld(d, c), max = L.pool.cap;
@@ -154,7 +171,7 @@ export function bankCharges(d: ShipDerived, c: Charge): { bank: number; kind: 'p
 
 /** The charge with every store held to at most `cap` percent (a hazard that saps the batteries) */
 export function capCharge(d: ShipDerived, c: Charge, cap: number): Charge {
-  if (cap >= 100) return c;
+  if (cap >= 100 || c.e) return c;
   const n = d.power?.banks.length ?? 0;
   return { g: Math.min(pctOf(c.g), cap), b: Array.from({ length: n }, (_, i) => Math.min(pctOf(c.b[i]), cap)) };
 }
@@ -298,6 +315,7 @@ function grow(nB: number, nF: number): void {
  * all together, and whether a boost was possible (it needs stored charge).
  */
 export function powerTick(d: ShipDerived, c: Charge, use: PowerUse, tuning: ShipTuning): PowerResult {
+  if (d.ports) return portsPowerTick(d, c, use);
   const L = d.power;
   if (!L || !d.energy) return { charge: c, power: 1, boost: use.boosting };
   const et = energyTuning(tuning);
@@ -446,6 +464,47 @@ export function powerTick(d: ShipDerived, c: Charge, use: PowerUse, tuning: Ship
   };
 }
 
+// ---- The ports core (power/ports.ts), in the same places
+let sActive = new Uint8Array(0);
+const PORTS_CTL: PortsControls = { active: null, boosting: false, toolWant: null, reload: false };
+/** A ports ship's tick: the thrusters pushing the way asked (every one, with no way given) burn; the tools draw; the guns' timers run */
+function portsPowerTick(d: ShipDerived, c: Charge, use: PowerUse): PowerResult {
+  const L = d.ports!;
+  if (!c.e || c.e.held.length !== L.n) c = { g: 100, b: [], e: c.e && c.e.held.length === L.n ? c.e : createPortsState(L) };
+  if (sActive.length < L.n) sActive = new Uint8Array(L.n);
+  sActive.fill(0, 0, L.n);
+  if (use.thrusting) for (const t of d.thrusters) {
+    if (!t.force[0] && !t.force[1]) continue;
+    if (use.dir && t.force[0] * use.dir[0] + t.force[1] * use.dir[1] <= 1e-9) continue;
+    sActive[t.part] = 1;
+  }
+  PORTS_CTL.active = sActive; PORTS_CTL.boosting = use.boosting && use.thrusting;
+  portsTick(L, c.e!, PORTS_CTL);
+  PORTS_CTL.active = null;
+  // (The engines' share all together; whether a boost is possible is each engine's own, folded into thrustShare)
+  const frac = portsThrustFrac();
+  let want = 0, got = 0;
+  if (use.thrusting) for (const t of d.thrusters) { if (!sActive[t.part]) continue; const v = Math.hypot(t.force[0], t.force[1]); want += v; got += v * frac[t.part]; }
+  return { charge: c, power: want > 1e-15 ? Math.min(1, got / want) : 1, boost: use.boosting && use.thrusting };
+}
+/** A client's charge for a ports ship: its state made (once a layout) and the row it was sent read into it */
+const clientStates = new WeakMap<object, PortsState>();
+export function ensurePortsCharge(d: ShipDerived, c: Charge): void {
+  const L = d.ports;
+  if (!L) return;
+  if (!c.e || c.e.held.length !== L.n) {
+    let e = clientStates.get(L);
+    if (!e) clientStates.set(L, (e = createPortsState(L)));
+    c.e = e;
+  }
+  if (c.row) { unpackPortsInto(L, c.e, c.row); c.row = undefined; }
+}
+/** A ports ship's charge for a load test or a fresh spawn: everything full */
+export function fullPortsCharge(d: ShipDerived): Charge {
+  return d.ports ? { g: 100, b: [], e: createPortsState(d.ports) } : FULL_CHARGE;
+}
+export { fullPorts };
+
 /** A feed group's share this tick (1 when it isn't accounted) */
 export function feedShare(d: ShipDerived, c: Charge | undefined, part: number, use: 'eng' | 'gun'): number {
   const f = d.power?.feedOf[part] ?? -1;
@@ -459,6 +518,19 @@ export function feedShare(d: ShipDerived, c: Charge | undefined, part: number, u
  * short): what flight scales the thrust by
  */
 export function thrustShare(d: ShipDerived, c: Charge, dir: Vec2, fade: (rated: number | undefined) => number): number {
+  if (d.ports) {
+    // (Each engine's share of its burn this tick, and its boost, straight after portsPowerTick)
+    if (!c.e) return 1;
+    const frac = portsThrustFrac(), mul = portsThrustMul();
+    let f = 0, got = 0;
+    for (const t of d.thrusters) {
+      const v = Math.max(0, t.force[0] * dir[0] + t.force[1] * dir[1]) * fade(t.rated);
+      if (v <= 0) continue;
+      f += v; got += v * frac[t.part] * mul[t.part];
+    }
+    const m = d.maneuverForce, full = Math.max(f, m);
+    return full > 0 ? Math.max(got, Math.min(m, full)) / full : 1;
+  }
   const L = d.power;
   if (!L || !c.eng) return 1;
   let f = 0, got = 0;
@@ -481,6 +553,7 @@ export function thrustShare(d: ShipDerived, c: Charge, dir: Vec2, fade: (rated: 
  * before (mended, or newly on a powered network) comes back empty
  */
 export function remapCharge(before: ShipDerived, after: ShipDerived, c: Charge): Charge {
+  if (after.ports) return { g: 100, b: [], e: c.e ? remapPorts(c.e, after.ports, c.e.held.length === after.ports.n) : createPortsState(after.ports) };
   const A = before.power, B = after.power;
   if (!B) return c;
   if (!A) return { g: pctOf(c.g), b: B.banks.map(() => 100) };

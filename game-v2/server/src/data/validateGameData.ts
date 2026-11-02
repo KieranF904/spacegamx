@@ -477,6 +477,12 @@ const SHIP_SHAPES: Record<string, Spec> = {
       'range?': 'number', 'weapon?': 'string', 'shield?': 'number', 'shieldRegen?': 'number', 'shieldDelay?': 'number', 'flash?': 'boolean', 'splashTaken?': 'number', 'jumpCooldown?': 'number', 'store?': 'number', 'pool?': oneOf('drive', 'weapon'), 'discharge?': 'number', 'bank?': 'boolean', 'legacy?': 'boolean',
       // (Energy routing, types.ts FunctionDef: a store's Takes, an engine's refill and buffer)
       'intake?': 'number', 'buffer?': 'number',
+      // (The ports energy core, types.ts FunctionDef: ports, the weapons' power profiles and the feed layer)
+      'ports?': arr(strict({ dir: oneOf('in', 'out'), side: oneOf('N', 'E', 'S', 'W'), 'cell?': 'number', rate: 'number' })),
+      'profile?': strict({ 'passive?': 'number', 'discharge?': 'number', 'rest?': 'number', 'burst?': 'boolean', 'threshold?': 'number', 'steady?': 'number' }),
+      'tank?': strict({ feed: 'string', holds: 'number' }), 'feedPoints?': arr(strict({ side: oneOf('N', 'E', 'S', 'W'), 'cell?': 'number' })),
+      'selector?': 'boolean', 'pipe?': 'boolean', 'combiner?': 'boolean', 'pipeThrough?': 'boolean',
+      'takes?': 'string[]', 'feedUse?': 'number', 'feedBuf?': 'number', 'feedMods?': rec(rec('number')), 'feedPort?': strict({ side: oneOf('N', 'E', 'S', 'W'), 'cell?': 'number', 'required?': 'boolean' }),
     })),
   }),
   // Player models (written by scripts/econ/models.mjs): functions with their own pieces, material, tier and unlock level
@@ -489,6 +495,12 @@ const SHIP_SHAPES: Record<string, Spec> = {
       'fireInterval?': 'number', 'capacity?': 'number', 'jumpCapacity?': 'number', 'range?': 'number', 'weapon?': 'string', 'shield?': 'number', 'shieldRegen?': 'number', 'shieldDelay?': 'number', 'flash?': 'boolean', 'splashTaken?': 'number', 'jumpCooldown?': 'number',
       'store?': 'number', 'pool?': oneOf('drive', 'weapon'), 'discharge?': 'number', 'bank?': 'boolean', 'dynamo?': 'number', 'armour?': 'number', 'massScale?': 'number', 'mount?': oneOf('fixed', 'turret'),
       'intake?': 'number', 'buffer?': 'number', 'oneWay?': 'boolean', 'relayOnly?': 'boolean',
+      // (The ports energy core, types.ts FunctionDef: ports, the weapons' power profiles and the feed layer)
+      'ports?': arr(strict({ dir: oneOf('in', 'out'), side: oneOf('N', 'E', 'S', 'W'), 'cell?': 'number', rate: 'number' })),
+      'profile?': strict({ 'passive?': 'number', 'discharge?': 'number', 'rest?': 'number', 'burst?': 'boolean', 'threshold?': 'number', 'steady?': 'number' }),
+      'tank?': strict({ feed: 'string', holds: 'number' }), 'feedPoints?': arr(strict({ side: oneOf('N', 'E', 'S', 'W'), 'cell?': 'number' })),
+      'selector?': 'boolean', 'pipe?': 'boolean', 'combiner?': 'boolean', 'pipeThrough?': 'boolean',
+      'takes?': 'string[]', 'feedUse?': 'number', 'feedBuf?': 'number', 'feedMods?': rec(rec('number')), 'feedPort?': strict({ side: oneOf('N', 'E', 'S', 'W'), 'cell?': 'number', 'required?': 'boolean' }),
       'mounting?': strict({ 'attach?': oneOf('back', 'any'), 'angle?': oneOf('straight', 'right'), 'arc?': 'number', 'clear?': 'any' }),
       // (A weapon's firing model: common/src/ships/types.ts FireSpec, guns.ts)
       'fire?': strict({ model: oneOf('cycle', 'clip', 'charge', 'ammo', 'beam', 'auto'), interval: 'number', 'clip?': 'number', 'reload?': 'number', 'reloadE?': 'number', 'regrow?': 'number',
@@ -544,6 +556,8 @@ const SHIP_SHAPES: Record<string, Spec> = {
     'shield?': obj({ regenDelayTicks: 'number', regenPerSecond: 'number', maxPerArea: 'number' }),
     // (The core and the pool, circuits.ts/energy.ts; coreIntake and relight: energy routing, docs/design/energy-routing-impl.md §5.2)
     'energy?': obj({ 'coreCapacity?': 'number', 'boostDraw?': 'number', 'coreDischarge?': 'number', 'discharge?': rec('number'), 'coreIntake?': 'number', 'relight?': 'number' }),
+    // (The feed layer's materials, common/src/ships/power/ports.ts FeedDef: what each multiplies on a part that takes it)
+    'feeds?': rec(strict({ name: 'string', 'short?': 'string', on: oneOf('weapon', 'engine'), mod: rec('number'), 'color?': 'string', 'say?': 'string' })),
     'miner?': obj({ range: 'number', dps: 'number', shipDps: 'number', gimbalDeg: 'number' }),
     turret: obj({ halfArcDeg: 'number', sampleDeg: 'number', slewRate: 'number', fireToleranceDeg: 'number', barrelMargin: 'number' }),
     debris: obj({ lifetimeTicks: 'number', pushSpeed: 'number', pushSpin: 'number' }),

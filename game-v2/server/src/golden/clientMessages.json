@@ -18,6 +18,7 @@
   "dock",
   "fabOrder",
   "fabOrderCancel",
+  "feedSwitch",
   "gemCut",
   "gemSocket",
   "gemUnsocket",

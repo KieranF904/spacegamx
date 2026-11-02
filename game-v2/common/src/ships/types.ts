@@ -254,6 +254,28 @@ export interface FunctionDef {
    * Pulse Dynamo never tops it up. Data sets it from P4
    */
   relayOnly?: boolean;
+
+  // The ports energy core (power/ports.ts; docs/design/energy-ports-2026-11.md), for ships whose blueprint says `power: 'ports'`
+  /** Its power ports, in its own frame (N the nose, `cell` the index along that side, `rate` E a second): power crosses only out → in over a shared edge */
+  ports?: { dir: 'in' | 'out'; side: Side; cell?: number; rate: number }[];
+  /** Weapons: the shape of its draw. `passive` E/s leaked while held, `discharge`/`rest` s its ports shut after a shot / a burst, `burst` lights only when full, `threshold` the E/s its lines must be rated, `steady` the E/s under which its charge collapses */
+  profile?: { passive?: number; discharge?: number; rest?: number; burst?: boolean; threshold?: number; steady?: number };
+  /** Feed layer: a tank of one material (tuning.json feeds), `holds` units per cell */
+  tank?: { feed: string; holds: number };
+  /** Feed layer: where its pipes join, in its own frame (a tank's, a pipe's, a Passthrough's; a Selector's are its two inputs then its output) */
+  feedPoints?: { side: Side; cell?: number }[];
+  /** Feed layer: a Selector (switches which of its two inputs reaches its output), a plain pipe, a Combiner (puts its network's material onto its power line), a Passthrough (a conduit a pipe crosses) */
+  selector?: boolean;
+  pipe?: boolean;
+  combiner?: boolean;
+  pipeThrough?: boolean;
+  /** Feed layer, guns and engines: the materials it takes (its feed buffer holds one at a time), units a shot or a second, its buffer in units (absent: 10 uses), and its own multipliers over the material's */
+  takes?: string[];
+  feedUse?: number;
+  feedBuf?: number;
+  feedMods?: Record<string, Record<string, number>>;
+  /** Feed layer: its own feed input beside its power input (a pipe joins it there); `required`: it does nothing without material */
+  feedPort?: { side: Side; cell?: number; required?: boolean };
   /** A mining laser (a beam that cuts rock while the pilot mines): `miner` itself, and the models of its family */
   mining?: boolean;
 
@@ -357,6 +379,8 @@ export interface Blueprint {
    * coordinates. Absent: auto-wired (wires.ts autoWire), as enemies' ships and old designs are
    */
   wires?: WireSeg[];
+  /** 'ports': runs on the ports energy core (power/ports.ts): power crosses between parts only through their ports, no wires. Absent: the pool and banks (energy.ts) */
+  power?: 'ports';
 }
 
 /** A wire segment: from cell (x0, y0) to the neighbouring cell (x1, y1) */

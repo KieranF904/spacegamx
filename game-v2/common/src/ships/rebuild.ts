@@ -17,6 +17,7 @@ import { netJoins, wireNetworks } from './wires.js';
 import { gunRate } from './launch.js';
 import { type EnergyInfo } from './energy.js';
 import { type PowerLayout, bankKind, powerLayout } from './circuits.js';
+import { type PortsLayout, buildPortsLayout } from './power/ports.js';
 import type { FeatureDerived } from './features/types.js';
 import { getPlan, featureBits, featureList } from './features/plan.js';
 
@@ -144,6 +145,8 @@ export interface ShipDerived {
   energy: EnergyInfo;
   /** The power layout: the ship's pool (the core's store and the batteries), the Capacitor and Drive Cell banks and the feed groups (circuits.ts; energy.ts runs them) */
   power?: PowerLayout;
+  /** The ports layout (power/ports.ts), for a design that says `power: 'ports'`: then `power` is absent and the ports core runs it */
+  ports?: PortsLayout;
   mass: number;
   /** Centre of mass, grid units */
   com: Vec2;
@@ -385,6 +388,8 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   parts.forEach((_, i) => {
     if (alive[i] && (fns[i].demand ?? 0) > 0 && network[i] < 0) satisfaction[i] = burst(i) && nearBank[i] ? 1 : 0;
   });
+  // (A ports design has no networks: its ports core decides what each part gets, every tick; nothing is starved here)
+  if (blueprint.power === 'ports') parts.forEach((_, i) => { if (alive[i]) satisfaction[i] = 1; });
 
   // 5. Derived physics
   const cs = tuning.cellSize;
@@ -575,10 +580,16 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   }
 
   // ---- The power layout (circuits.ts): the ship's pool and the banks, worked out here once, run by energy.ts every tick
-  const power = powerLayout({ fns, area, mats, alive, joins, network, networks, burst, engine: engineLike, gun: gunLike, core: coreAlive, tuning, health: hp.map((h, i) => healthFactor(h / (maxHp[i] || 1), tuning)) });
-  const batteryMax = power.pool.cap;
+  const health = hp.map((h, i) => healthFactor(h / (maxHp[i] || 1), tuning));
+  // (A ports design runs on the ports core instead, power/ports.ts: power crosses only through the parts' ports, and the old
+  // layout is left out, so everything that reads `power` must do without it)
+  const ports = blueprint.power === 'ports'
+    ? buildPortsLayout({ parts, fns, area, mats, alive, cells: geoms.map((g) => g.cells), core: coreAlive ? root : -1, tuning, health, weapons: weapons.map((w) => ({ part: w.part, fire: w.fire, interval: w.interval })) })
+    : undefined;
+  const power = ports ? undefined : powerLayout({ fns, area, mats, alive, joins, network, networks, burst, engine: engineLike, gun: gunLike, core: coreAlive, tuning, health });
+  const batteryMax = power ? power.pool.cap : ports!.gaugeMax / 256;
   let driveMax = 0, weaponMax = 0;
-  for (const B of power.banks) if (B.kind === 'drive') driveMax += B.cap; else weaponMax += B.cap;
+  if (power) for (const B of power.banks) if (B.kind === 'drive') driveMax += B.cap; else weaponMax += B.cap;
   // ---- (end power layout)
 
   const jump = jumpDriveStats(jumpCap, hullCells, jumpCap > 0 ? jumpGradeSum / jumpCap : 1, jt);
@@ -597,6 +608,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     satisfaction,
     energy: { max: Math.round(batteryMax), driveMax: Math.round(driveMax), weaponMax: Math.round(weaponMax), spare, supply: totalSupply, engineDraw, minerDraw, weaponDraw },
     power,
+    ...(ports ? { ports } : {}),
     mass,
     com,
     inertia: inertiaGrid * cs * cs,
@@ -604,7 +616,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     fullInertia: Math.max(inertiaGrid, fullInertiaGrid) * cs * cs,
     drive: driveFactor(mass, fullMass) * Math.max(0.1, Math.min(MAX_DRIVE, blueprint.drive ?? 1)),
     ...(blueprint.turn ? { turn: Math.max(0.1, Math.min(MAX_TURN, blueprint.turn)) } : {}),
-    boostFactor: thrustSum > 0 ? boostSum / thrustSum : 2.2,
+    boostFactor: ports ? 1 : thrustSum > 0 ? boostSum / thrustSum : 2.2,
     boostDrain: demandSum > 0 ? drainSum / demandSum : 1,
     thrusters,
     maxThrust,

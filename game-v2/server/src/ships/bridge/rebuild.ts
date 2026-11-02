@@ -10,7 +10,7 @@ import { hasComponent } from 'bitecs';
 import {
   Position, Velocity, Rotation, Radius, Health, Player, Dead, InSystem, Blueprint, ShipState, Vec2,
   validateBlueprint, ValidationResult, createShipState, rebuildShip, fillClips, damagePart, repairShip, healPart, restorePart,
-  computeJoins, localToWorldDir, seededRng, hashInts, shipPointToWorld, remapCharge, chargeTotal, blueprintGeometry,
+  computeJoins, localToWorldDir, seededRng, hashInts, shipPointToWorld, remapCharge, chargeTotal, fullPortsCharge, blueprintGeometry,
   type PlacedGeom,
 } from '@space-game/common';
 import { type BridgeCtx } from './core.js';
@@ -35,6 +35,8 @@ export function spawnOn(b: BridgeCtx, eid: number, bp: Blueprint, kind: 'ship' |
     const p = chargeTotal(was.derived, had);
     b.charge.set(eid, { g: p, b: ship.derived.power.banks.map(() => p) });
   }
+  // (A ports ship's state: every part full; the old one's is no use to it)
+  if (ship.derived.ports) b.charge.set(eid, fullPortsCharge(ship.derived));
   b.bodies.set(eid, ship);
   b.ungridded.add(eid);
   Radius.value[eid] = Math.max(1, ship.derived.radius);
