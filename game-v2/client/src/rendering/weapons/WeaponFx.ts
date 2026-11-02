@@ -26,11 +26,11 @@
  */
 
 import { Container, Graphics, Texture } from 'pixi.js';
-import { disc, softDot, streak, streakScale, petal, petalScale, ring, puff, DOT_SIZE } from '../fxTextures';
+import { disc, softDot, streak, streakScale, petal, petalScale, ring, puff, glowBall, DOT_SIZE } from '../fxTextures';
 import { ParticlePool } from '../particlePool';
 import { EntityType, WeaponType } from '@space-game/common';
 import type { GameState, InterpolatedEntity } from '../../state/GameState';
-import { WeaponStyle, weaponStyle, shotScale } from './weaponStyles';
+import { WeaponStyle, weaponStyle, shotScale, type ImpactLayers } from './weaponStyles';
 import type { Lighting } from '../lighting/Lighting';
 import { arcFraction, incomingTicks, landingPoint, sonarPeriod } from './ordnanceTells';
 
@@ -101,10 +101,31 @@ interface Flash {
   owner: number; ox: number; oy: number; rel: number;
 }
 interface Smoke { x: number; y: number; vx: number; vy: number; life: number; max: number; size: number; color?: number; alpha?: number }
-interface Spark { x: number; y: number; vx: number; vy: number; life: number; max: number; color: number; width?: number }
+interface Spark {
+  x: number; y: number; vx: number; vy: number; life: number; max: number; color: number; width?: number;
+  /** An ember: its colour cools to this as it dies (and it stays bright longer before fading) */
+  cool?: number;
+  /** Its speed kept a frame (default 0.9) */
+  drag?: number;
+}
+/** A layered impact's core flash or glow (ImpactLayers core, bloom) */
+interface HitGlow { x: number; y: number; life: number; max: number; size: number; color: number; core: boolean }
+/** A shock ring racing out from a hit (ImpactLayers shock); `life` starts below 0 for one that follows later */
+interface Shock { x: number; y: number; life: number; max: number; size: number; width: number; color: number }
+/** A glow on the hull where a hit landed, riding with the ship it struck (`owner`, at `ox, oy` in its frame), or still (owner -1) */
+interface Scorch { x: number; y: number; life: number; max: number; size: number; color: number; owner: number; ox: number; oy: number }
+/** The light a layered hit throws, fading over its life */
+interface HitLight { x: number; y: number; life: number; max: number; radius: number; power: number; color: number }
 interface Ring { x: number; y: number; life: number; max: number; size: number; color: number }
 
 const FADE_FRAMES = 9;
+/** Layered impacts' particles at most (the oldest go first past it) */
+const HIT_CAP = 600;
+
+/** A layered impact's scale from its shot's (shell size × damage scale): the square root, so a big shell reads big without taking over */
+export function impactScale(size: number): number {
+  return Math.sqrt(Math.max(0.2, size));
+}
 /** A shell drawn from its barrel's tip eases onto its true path over this many ticks */
 const BARREL_EASE = 8;
 /** A predicted shell the server hasn't confirmed by then was never fired: it fades */
@@ -156,6 +177,8 @@ const TEX = { get disc() { return disc(); }, get dot() { return softDot(0.5, 0.1
 /** The extra pool's textures (the glow pool holds its four already) */
 const SHIP_TYPES = [EntityType.Player, EntityType.Enemy, EntityType.NPC, EntityType.ShipBody];
 const TEX2 = { get ring() { return ring(); }, get puff() { return puff(); } };
+/** The layered impacts' pool's texture */
+const TEX3 = { get ball() { return glowBall(); } };
 
 /** A colour with its hue turned by `deg` degrees (impact shards of a prism's rainbow) */
 export function turnHue(c: number, deg: number): number {
@@ -184,6 +207,15 @@ export class WeaponFx {
   private smokeG = new ParticlePool('normal');
   /** Rings, puffs and cloud (a fifth texture would not fit the glow pool) */
   private extraG = new ParticlePool('normal');
+  /** Layered impacts (ImpactLayers): core flashes, glows and hull scorches as light (additive), and their shock rings as true thin rings */
+  private hitG = new ParticlePool('add');
+  private shockG = new ParticlePool('add', 'rings');
+  /** What the bloom takes: the glow pool and the layered impacts' light */
+  private glowRoot = new Container();
+  private hitGlows: HitGlow[] = [];
+  private shocks: Shock[] = [];
+  private scorches: Scorch[] = [];
+  private hitLights: HitLight[] = [];
   private clock = 0;
   private crackle = new Graphics();
   /** Redrawn every frame it's crackling, so a render group of its own (Pixi rebuilds its draw list, not the scene's) */
@@ -220,7 +252,7 @@ export class WeaponFx {
 
   /** Everything here that glows (for the bloom) */
   get glowLayer(): Container {
-    return this.glow.container;
+    return this.glowRoot;
   }
 
   /** Share of the impact sparks and smoke puffs made (the quality setting's particles) */
@@ -229,7 +261,8 @@ export class WeaponFx {
   constructor(layer: Container) {
     this.crackle.blendMode = 'add';
     this.crackleGroup.addChild(this.crackle);
-    layer.addChild(this.smokeG.container, this.glow.container, this.extraG.container, this.crackleGroup);
+    this.glowRoot.addChild(this.glow.container, this.hitG.container, this.shockG.container);
+    layer.addChild(this.smokeG.container, this.glowRoot, this.extraG.container, this.crackleGroup);
   }
 
   /** A line from (x0, y0) to (x1, y1), `width` thick with soft round ends */
@@ -302,6 +335,15 @@ export class WeaponFx {
       f.angle = o.renderAngle + f.rel;
     }
 
+    // Hull scorches ride with the ship they struck
+    for (const sc of this.scorches) {
+      const o = sc.owner >= 0 ? state.entities.get(sc.owner) : undefined;
+      if (!o) continue;
+      const c = Math.cos(o.renderAngle), sn = Math.sin(o.renderAngle);
+      sc.x = o.renderX + sc.ox * c - sc.oy * sn;
+      sc.y = o.renderY + sc.ox * sn + sc.oy * c;
+    }
+
     // Shots the server removed without a reported hit just burn out where they are
     for (const shot of this.shots.values()) {
       if (shot.predicted) {
@@ -335,6 +377,7 @@ export class WeaponFx {
     }
     for (const f of this.flashes) L.point(f.x, f.y, f.color, 70 + f.size * 7, 1.4 * (1 - f.life / f.max));
     for (const r of this.rings) L.point(r.x, r.y, r.color, 80 + r.size * 6, 1.1 * (1 - r.life / r.max));
+    for (const h of this.hitLights) { const f = 1 - h.life / h.max; L.point(h.x, h.y, h.color, h.radius, h.power * f * f); }
   }
 
   /** A lobbed shell reached its end: burst there, and shake a screen near enough (a Quake's) */
@@ -367,6 +410,7 @@ export class WeaponFx {
       }
     }
     const imp = style.impact;
+    if (style.hit) { this.layeredHit(style, style.hit, x, y, normal, size, shot); return; }
     for (let i = 0; i < imp.sparks * size * this.particleKeep; i++) {
       const a = normal + (Math.random() - 0.5) * 2.2;
       const s = imp.speed * (0.4 + Math.random());
@@ -390,6 +434,131 @@ export class WeaponFx {
       if (this.particleKeep < 1 && Math.random() > this.particleKeep) continue;
       const a = normal + (Math.random() - 0.5) * 1.2;
       this.smoke.push({ x, y, vx: Math.cos(a) * 0.8, vy: Math.sin(a) * 0.8, life: 0, max: 40 + Math.random() * 20, size: 6 * size });
+    }
+  }
+
+  /**
+   * A layered impact (ImpactLayers): a white-hot core, a glow round it, shock rings, a spray of streaks thrown back off the
+   * hit, embers that cool as they drift, a glow left on the hull, the impact's own light and maybe a shake. Sized by
+   * impactScale, not the flat flash's full scale.
+   */
+  private layeredHit(style: WeaponStyle, L: ImpactLayers, x: number, y: number, normal: number, size: number, shot: Shot | undefined): void {
+    const imp = style.impact, k = impactScale(size), nk = Math.min(1.5, k) * this.particleKeep;
+    const room = (): boolean => this.sparks.length < HIT_CAP * 2;
+    // A loose scatter round the hit
+    for (let i = 0, n = Math.round(imp.sparks * nk); i < n && room(); i++) {
+      const a = normal + (Math.random() - 0.5) * 2.4, s = imp.speed * (0.4 + Math.random());
+      const col = Math.random() < 0.25 ? 0xffffff : style.shardHue ? turnHue(imp.color, (Math.random() - 0.5) * style.shardHue) : imp.color;
+      this.sparks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0, max: imp.life * (0.6 + Math.random() * 0.6), color: col });
+    }
+    if (this.hitGlows.length < HIT_CAP) {
+      if (L.core) this.hitGlows.push({ x, y, life: 0, max: L.core.life, size: L.core.size * k, color: 0xffffff, core: true });
+      if (L.bloom) this.hitGlows.push({ x, y, life: 0, max: L.bloom.life, size: L.bloom.size * k, color: L.bloom.color ?? imp.color, core: false });
+    }
+    const sh = L.shock;
+    if (sh) {
+      for (let i = 0; i <= (sh.count ?? 0) && this.shocks.length < HIT_CAP; i++) {
+        const f = Math.pow(0.7, i);
+        this.shocks.push({ x, y, life: -i * (sh.gap ?? 4), max: sh.life * (1 - 0.15 * i), size: sh.size * k * f, width: sh.width * k * f, color: sh.color ?? imp.color });
+      }
+    }
+    const sp = L.spray;
+    if (sp) {
+      const cone = (sp.cone * Math.PI) / 180;
+      for (let i = 0, n = Math.round(sp.count * nk); i < n && room(); i++) {
+        // (most of it close to straight back, a few wide)
+        const u = Math.random() * 2 - 1, a = normal + u * Math.abs(u) * cone, s = sp.speed * (0.55 + Math.random() * 0.7);
+        this.sparks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0, max: sp.life * (0.6 + Math.random() * 0.6), color: Math.random() < 0.35 ? 0xffffff : sp.color ?? imp.color, width: 1.7, drag: 0.88 });
+      }
+    }
+    const em = L.embers;
+    if (em) {
+      for (let i = 0, n = Math.round(em.count * nk); i < n && room(); i++) {
+        const a = normal + (Math.random() - 0.5) * 2.8, s = em.speed * (0.3 + Math.random() * 0.9);
+        this.sparks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0, max: em.life * (0.6 + Math.random() * 0.7), color: em.hot, cool: em.cool, width: 2.4 + Math.random() * 1.4, drag: 0.965 });
+      }
+    }
+    if (L.scorch && this.scorches.length < HIT_CAP) {
+      // On the ship it struck (the nearest one, the shooter aside), riding with it
+      const st = this.state;
+      let owner = -1, best = 600 * 600, ox = 0, oy = 0;
+      if (st) {
+        for (const type of SHIP_TYPES) {
+          for (const e of st.entities.ofType(type)) {
+            if (e.id === shot?.owner) continue;
+            const dx = x - e.renderX, dy = y - e.renderY, d = dx * dx + dy * dy;
+            if (d >= best) continue;
+            best = d; owner = e.id;
+            const c = Math.cos(-e.renderAngle), sn = Math.sin(-e.renderAngle);
+            ox = dx * c - dy * sn; oy = dx * sn + dy * c;
+          }
+        }
+      }
+      this.scorches.push({ x, y, life: 0, max: L.scorch.life, size: L.scorch.size * k, color: L.scorch.color, owner, ox, oy });
+    }
+    if (this.hitLights.length < 64) {
+      const lt = L.light, glowR = (L.bloom?.size ?? L.core?.size ?? imp.flash * 0.5) * k;
+      this.hitLights.push({ x, y, life: 0, max: Math.max(L.bloom?.life ?? 0, L.core?.life ?? 0, 8), radius: lt ? lt.radius * k : 60 + glowR * 4, power: lt?.power ?? 1, color: L.bloom?.color ?? imp.color });
+    }
+    // A cloud left where it landed, and a puff of vapourised hull (at the layered scale)
+    const cloud = style.smokeCloud;
+    if (cloud) {
+      for (let i = 0; i < 5; i++) {
+        if (this.particleKeep < 1 && Math.random() > this.particleKeep) continue;
+        const a = Math.random() * Math.PI * 2, v = 0.3 + Math.random() * 0.8;
+        this.smoke.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0, max: cloud.life * (0.7 + Math.random() * 0.6), size: cloud.size * k * (0.6 + Math.random() * 0.6), color: cloud.color, alpha: 0.3 });
+      }
+    }
+    if (Math.random() < this.particleKeep) {
+      const a = normal + (Math.random() - 0.5) * 1.2;
+      this.smoke.push({ x, y, vx: Math.cos(a) * 0.8, vy: Math.sin(a) * 0.8, life: 0, max: 40 + Math.random() * 20, size: 5 * k });
+    }
+    const sk = L.shake, st = this.state, me = st?.entities.get(st.playerId);
+    if (sk && st && me) {
+      const d = Math.hypot(me.renderX - x, me.renderY - y);
+      if (d < sk.radius) st.triggerScreenShake(sk.strength * (1 - d / sk.radius), sk.time ?? 0.18);
+    }
+  }
+
+  /** Draws (and ages) the layered impacts' cores, glows, shock rings and hull scorches, and ages their lights */
+  private drawHits(frames: number): void {
+    const h = this.hitG, tex = TEX3.ball;
+    for (let i = this.hitGlows.length - 1; i >= 0; i--) {
+      const p = this.hitGlows[i];
+      p.life += frames;
+      if (p.life >= p.max) { this.hitGlows.splice(i, 1); continue; }
+      const n = p.life / p.max, f = 1 - n;
+      // The core is a hard white flash shrinking away; the glow swells out (eased) and fades slower
+      const r = p.core ? p.size * (1 - 0.35 * n) : p.size * (0.55 + 0.45 * (1 - f * f * f));
+      const kk = (r * 2) / DOT_SIZE;
+      h.take(tex, p.x, p.y, 0.5, 0.5, p.color, p.core ? f * f : 0.85 * Math.pow(f, 1.6), 0, kk, kk);
+    }
+    for (let i = this.scorches.length - 1; i >= 0; i--) {
+      const p = this.scorches[i];
+      p.life += frames;
+      if (p.life >= p.max) { this.scorches.splice(i, 1); continue; }
+      const n = p.life / p.max;
+      // White-hot for a moment, then its colour, cooling to a dull red as it fades
+      const col = n < 0.12 ? mixColor(0xffffff, p.color, n / 0.12) : mixColor(p.color, 0x5a1206, Math.min(1, (n - 0.12) / 0.7));
+      const r = p.size * (1 - 0.3 * n), kk = (r * 2) / DOT_SIZE;
+      h.take(tex, p.x, p.y, 0.5, 0.5, col, 0.95 * Math.pow(1 - n, 1.4), 0, kk, kk);
+      if (n < 0.35) { const k2 = kk * 0.45; h.take(tex, p.x, p.y, 0.5, 0.5, 0xfff4e0, 0.8 * (1 - n / 0.35), 0, k2, k2); }
+    }
+    for (let i = this.shocks.length - 1; i >= 0; i--) {
+      const s = this.shocks[i];
+      s.life += frames;
+      if (s.life >= s.max) { this.shocks.splice(i, 1); continue; }
+      if (s.life < 0) continue;
+      const n = s.life / s.max, f = 1 - n;
+      // Out fast and slowing (ease-out), the band thinning to a hairline as it goes
+      const r = s.size * (0.12 + 0.88 * (1 - f * f * f));
+      this.shockG.ring(s.x, s.y, r, Math.max(0.8, s.width * f), s.color, 0.9 * Math.pow(f, 1.3));
+      if (n < 0.4) this.shockG.ring(s.x, s.y, r * 0.96, Math.max(0.6, s.width * 0.35 * f), 0xffffff, 0.7 * (1 - n / 0.4));
+    }
+    for (let i = this.hitLights.length - 1; i >= 0; i--) {
+      const l = this.hitLights[i];
+      l.life += frames;
+      if (l.life >= l.max) this.hitLights.splice(i, 1);
     }
   }
 
@@ -653,6 +822,8 @@ export class WeaponFx {
     g.begin();
     this.smokeG.begin();
     this.extraG.begin();
+    this.hitG.begin();
+    this.shockG.begin();
     this.clock += frames;
     if (this.crackling) { this.crackle.clear(); this.crackling = false; }
 
@@ -841,11 +1012,16 @@ export class WeaponFx {
       const p = this.sparks[i];
       p.life += frames;
       if (p.life >= p.max) { this.sparks.splice(i, 1); continue; }
-      const drag = Math.pow(0.9, frames);
+      const drag = Math.pow(p.drag ?? 0.9, frames);
       p.vx *= drag; p.vy *= drag;
       p.x += p.vx * frames; p.y += p.vy * frames;
-      const fade = 1 - p.life / p.max;
-      this.line(p.x - p.vx * 2.5, p.y - p.vy * 2.5, p.x, p.y, p.width ?? 1.5, p.color, fade);
+      const n = p.life / p.max;
+      if (p.cool !== undefined) {
+        // An ember: cooling as it goes, bright for most of its life and fading at the end
+        this.line(p.x - p.vx * 2, p.y - p.vy * 2, p.x, p.y, p.width ?? 2.4, mixColor(p.color, p.cool, Math.min(1, n * 1.3)), 1 - n * n);
+        continue;
+      }
+      this.line(p.x - p.vx * 2.5, p.y - p.vy * 2.5, p.x, p.y, p.width ?? 1.5, p.color, 1 - n);
     }
 
     // Gun smoke and impact vapour (normal blending, so it reads as smoke, not light)
@@ -868,8 +1044,11 @@ export class WeaponFx {
       this.circle(g, TEX.disc, r.x, r.y, r.size * (0.3 + 0.7 * n), r.color, 0.35 * (1 - n));
       this.circle(g, TEX.disc, r.x, r.y, r.size * 0.25 * (1 - n) + 0.5, 0xffffff, 0.8 * (1 - n));
     }
+    this.drawHits(frames);
     g.end();
     this.smokeG.end();
     this.extraG.end();
+    this.hitG.end();
+    this.shockG.end();
   }
 }

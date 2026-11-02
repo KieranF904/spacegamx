@@ -93,7 +93,7 @@ export class PartFx {
           g.circle(x, y, r * 0.8).fill({ color: on && low ? RED : 0xffe9a8, alpha: on ? 0.3 : 0.08 });
           g.circle(x, y, r * 0.4).fill({ color: low && on ? 0xffc0b0 : 0xffffff, alpha: on ? 0.6 : 0.2 });
           // the slow-turning ring: three arcs
-          for (let k = 0; k < 3; k++) g.arc(x, y, r * 1.35, a + k * 2.094, a + k * 2.094 + 1.15).stroke({ color: low && on ? RED : 0xfde68a, width: Math.max(1.2, cs * 0.07), alpha: 0.7 });
+          for (let k = 0; k < 3; k++) arcAt(g, x, y, r * 1.35, a + k * 2.094, a + k * 2.094 + 1.15).stroke({ color: low && on ? RED : 0xfde68a, width: Math.max(1.2, cs * 0.07), alpha: 0.7 });
           break;
         }
         case 'overclock': {
@@ -129,7 +129,7 @@ export class PartFx {
         }
         case 'dynamo': {
           const a = t * 2.4 + seed;
-          for (let k = 0; k < 2; k++) g.arc(x, y, r * 1.2, a + k * Math.PI, a + k * Math.PI + 1.7).stroke({ color: VIOLET, width: Math.max(1.4, cs * 0.08), alpha: 0.85 });
+          for (let k = 0; k < 2; k++) arcAt(g, x, y, r * 1.2, a + k * Math.PI, a + k * Math.PI + 1.7).stroke({ color: VIOLET, width: Math.max(1.4, cs * 0.08), alpha: 0.85 });
           g.circle(x, y, r * 0.5).fill({ color: VIOLET, alpha: 0.3 });
           break;
         }
@@ -184,6 +184,15 @@ export class PartFx {
       }
     }
   }
+}
+
+/**
+ * An arc of its own: moved to its start first. Pixi carries a path on from the last point of the shape before it (a
+ * stroke or fill leaves the pen there), so a bare arc() is joined to whatever was drawn last by a straight line (the
+ * Fusion Plant's ring trailed a line off to the other plant, or wherever the pen had been).
+ */
+export function arcAt(g: Graphics, x: number, y: number, r: number, a0: number, a1: number): Graphics {
+  return g.moveTo(x + Math.cos(a0) * r, y + Math.sin(a0) * r).arc(x, y, r, a0, a1);
 }
 
 const HEX = new Array<number>(12).fill(0);

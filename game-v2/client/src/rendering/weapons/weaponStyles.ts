@@ -82,6 +82,34 @@ export interface WeaponStyle {
   jagged?: { color: number; amp: number };
   /** A faint ring at this radius round the head (a gravity well's pull) and motes streaming in to it, seen by everyone */
   pull?: { radius: number; color: number };
+  /** A layered impact (see ImpactLayers): when set, it replaces the flat flash and ring discs of `impact` */
+  hit?: ImpactLayers;
+}
+
+/**
+ * A layered impact, sized by the gun's power tier (heavy and super guns get all of it, mid ones a step down, simple ones a
+ * small quick mark). Every layer is optional. Sizes are world units for a shot of scale 1: the hit scales them by the
+ * square root of its shell size × damage scale (WeaponFx impactScale), gentler than the flat flash, so a big shell reads
+ * big without covering the screen; particle counts by the same, capped at 1.5×. `impact.sparks` is still thrown as a
+ * loose scatter round the hit (counted the same way), and `impact.color` is the default colour of every layer.
+ */
+export interface ImpactLayers {
+  /** A brief white-hot core: radius and frames (it shrinks a little as it dies) */
+  core?: { size: number; life: number };
+  /** The coloured glow round the core, swelling and fading: radius, frames */
+  bloom?: { size: number; life: number; color?: number };
+  /** A crisp shock ring racing out (eased) and thinning as it fades: radius reached, frames, band width at the start; `count` more follow `gap` frames apart, each smaller */
+  shock?: { size: number; life: number; width: number; color?: number; count?: number; gap?: number };
+  /** A spray of fast streaks thrown back off the hit in a cone `cone` degrees either side of straight back */
+  spray?: { count: number; speed: number; cone: number; life: number; color?: number };
+  /** Embers: slow, heavier sparks that drift off and cool from `hot` to `cool` as they die */
+  embers?: { count: number; speed: number; life: number; hot: number; cool: number };
+  /** A glow left on the hull where it struck (it rides with the ship), cooling from white through `color` to nothing */
+  scorch?: { size: number; life: number; color: number };
+  /** A light shake for a screen within `radius` world units of the hit: strength (triggerScreenShake's), seconds */
+  shake?: { strength: number; radius: number; time?: number };
+  /** How far the hit lights its surroundings (world units, scaled as the layers are) and how brightly (default: from the bloom) */
+  light?: { radius: number; power: number };
 }
 
 /**
@@ -113,7 +141,7 @@ export interface BeamLook {
   pool?: number;
   /** The beam is a lightning polyline of this amplitude (world units), re-jittered every frame (the Tesla's) */
   zap?: number;
-  /** Frost motes drifting off the beam and white crystals on what it lights: � the amount (0 or absent: none) */
+  /** Frost motes drifting off the beam and white crystals on what it lights: × the amount (0 or absent: none) */
   frost?: number;
 }
 
@@ -149,7 +177,9 @@ const styled = new Map<string, WeaponStyle>();
  */
 export function weaponStyle(weaponType: number, grade = 1, modelId?: string): WeaponStyle {
   const kind = WEAPON_STYLES[weaponType] ?? KINETIC;
-  const over = modelId ? MODEL_STYLES[modelId] : undefined;
+  // (An augmented shot, a ports ship's (common/src/ships/power/ports.ts): `<model>+aug`, its own entry if it has one, else its model's charged up)
+  const augOf = modelId?.endsWith(AUG) ? modelId.slice(0, -AUG.length) : undefined;
+  const over = !modelId ? undefined : augOf !== undefined ? MODEL_STYLES[modelId] ?? augmented({ ...kind, ...(MODEL_STYLES[augOf] ?? {}) }) : MODEL_STYLES[modelId];
   const g = Math.max(1, Math.min(5, Math.round(grade) || 1));
   if (g === 1 && !over) return kind;
   const key = `${modelId ?? ''}|${weaponType}|${g}`;
@@ -167,6 +197,24 @@ export function weaponStyle(weaponType: number, grade = 1, modelId?: string): We
   }
   styled.set(key, s);
   return s;
+}
+
+/** The model suffix of an augmented shot's look */
+export const AUG = '+aug';
+/**
+ * An augmented shot's look, from its gun's own: the same colours run hotter (a white core, a wider glow and halo), a short
+ * charged wake behind it, and a hit a step up (its layers a third bigger)
+ */
+function augmented(s: WeaponStyle): Partial<WeaponStyle> {
+  const k = 1.33, hit = s.hit;
+  return {
+    ...s,
+    coreColor: 0xffffff, coreWidth: s.coreWidth * 1.15, glowWidth: s.glowWidth * 1.35, glowAlpha: Math.min(0.85, s.glowAlpha * 1.25),
+    headRadius: Math.max(s.headRadius, 2) * 1.2, haloRadius: s.haloRadius * 1.35,
+    contrail: s.contrail ? { ...s.contrail, size: s.contrail.size * 1.3 } : { color: s.glowColor, size: Math.max(2, s.coreWidth), life: 22 },
+    impact: { ...s.impact, flash: s.impact.flash * k, sparks: Math.round(s.impact.sparks * k) },
+    ...(hit ? { hit: Object.fromEntries(Object.entries(hit).map(([key, v]) => [key, v && typeof v === 'object' && 'size' in v ? { ...v, size: (v as { size: number }).size * k } : v])) as typeof hit } : {}),
+  };
 }
 
 /** Forget the built styles (tests that change MODEL_STYLES) */

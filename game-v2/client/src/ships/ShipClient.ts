@@ -46,6 +46,7 @@ import { MiningBeamFx } from './MiningBeamFx';
 import { ScannerFx } from './ScannerFx';
 import { IncomingWarning } from '../ui/IncomingWarning';
 import type { ShellLook } from '../rendering/weapons/WeaponFx';
+import { AUG } from '../rendering/weapons/weaponStyles';
 import type { PilotState } from '../econ/clientEcon';
 import type { ThrustCommand } from './ThrusterFx';
 import { settings } from '../settings/Settings';
@@ -345,7 +346,8 @@ export class ShipClient {
       while (this.firePoses.size > 512) this.firePoses.delete(this.firePoses.keys().next().value!);
       // The gun's model and what a shot of it does (a model's look; the flash, recoil and impact scale with the damage)
       const wdef = partWeaponDef(this.opts.tuning, v.kind, ship.blueprint.parts[part], gun);
-      const look = { model: ship.blueprint.parts[part]?.fn, damage: wdef.damage, splash: wdef.splash?.radius, pierce: wdef.pierce };
+      // (An augmented shot looks charged up: weaponStyles AUG)
+      const fn = ship.blueprint.parts[part]?.fn, look = { model: fn && aug ? fn + AUG : fn, damage: wdef.damage, splash: wdef.splash?.radius, pierce: wdef.pierce };
       for (const id of ids) this.shellLooks.set(id, look);
       while (this.shellLooks.size > 512) this.shellLooks.delete(this.shellLooks.keys().next().value!);
       // A pilot's shots move on the tick they're fired (they're fired before shells move; pilotless ships' after)
@@ -579,7 +581,7 @@ export class ShipClient {
       if (!firesStraight(pdef)) continue;
       // A pilot's shells move on the tick they're fired (as in preSnapshot)
       for (const s of volleyShells(player.id, ship, w, shot, { ...pose, vx: player.vx, vy: player.vy }, tick, this.opts.tuning, stackMods(this.ownAmmo?.(w.kind), aug))) {
-        this.scene.predictShot({ owner: player.id, type: WEAPON_KIND_TYPE[w.kind] ?? 1, grade: w.grade, model: ship.blueprint.parts[w.part]?.fn, damage: pdef.damage, pierce: pdef.pierce, spawnX: s.x, spawnY: s.y, spawnTick: tick - 1, vx: s.vx, vy: s.vy, size: s.size, pose });
+        this.scene.predictShot({ owner: player.id, type: WEAPON_KIND_TYPE[w.kind] ?? 1, grade: w.grade, model: (ship.blueprint.parts[w.part]?.fn ?? '') + (aug ? AUG : ''), damage: pdef.damage, pierce: pdef.pierce, spawnX: s.x, spawnY: s.y, spawnTick: tick - 1, vx: s.vx, vy: s.vy, size: s.size, pose });
       }
     }
     return energy.charge;

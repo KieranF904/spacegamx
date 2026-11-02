@@ -90,8 +90,9 @@ export class ChargeFx {
         this.glow.circle(e.renderX, e.renderY, r).stroke({ color: 0xfde68a, width: 5, alpha: 0.1 * pulse });
         // Four corner brackets, turning slowly
         for (let i = 0; i < 4; i++) {
-          const a = spin + (i * Math.PI) / 2, sp = 0.2;
-          this.glow.arc(e.renderX, e.renderY, r * 1.12, a - sp, a + sp).stroke({ color: 0xfde68a, width: 2.5, alpha: 0.85 * pulse });
+          // (moved to each arc's start: a bare arc() is joined by a line to wherever the last shape left the pen)
+          const a = spin + (i * Math.PI) / 2, sp = 0.2, rb = r * 1.12;
+          this.glow.moveTo(e.renderX + Math.cos(a - sp) * rb, e.renderY + Math.sin(a - sp) * rb).arc(e.renderX, e.renderY, rb, a - sp, a + sp).stroke({ color: 0xfde68a, width: 2.5, alpha: 0.85 * pulse });
         }
       }
       for (const w of ship.derived.weapons) {
@@ -100,7 +101,7 @@ export class ChargeFx {
         const rr = r + 7, gap = 0.06, step = (Math.PI * 2) / segs;
         for (let i = 0; i < segs; i++) {
           const a0 = -Math.PI / 2 + i * step + gap;
-          this.glow.arc(e.renderX, e.renderY, rr, a0, a0 + step - gap * 2).stroke(i < lit ? { color: 0xf0abfc, width: 2.4, alpha: 0.7 } : { color: 0x86198f, width: 1.4, alpha: 0.35 });
+          this.glow.moveTo(e.renderX + Math.cos(a0) * rr, e.renderY + Math.sin(a0) * rr).arc(e.renderX, e.renderY, rr, a0, a0 + step - gap * 2).stroke(i < lit ? { color: 0xf0abfc, width: 2.4, alpha: 0.7 } : { color: 0x86198f, width: 1.4, alpha: 0.35 });
         }
         break;
       }

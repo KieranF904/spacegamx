@@ -59,3 +59,36 @@ describe('legendary looks', () => {
     expect(beamLook('legendary_frostbite')?.frost).toBeGreaterThan(0);
   });
 });
+
+describe('impacts by power tier', () => {
+  // The projectile guns (models.json infra.tier) whose shots WeaponFx draws; beams (Cutter, Tesla, Lance, Searchlight) are not here
+  const TIERS: Record<string, string[]> = {
+    heavy: ['cannon_bastion', 'cannon_longbarrel', 'railgun_spear', 'railgun_rail_driver'],
+    mid: ['cannon_hammer', 'cannon_slurry', 'railgun_needle', 'railgun_coilgun', 'cannon_twinlink', 'autocannon_chainsaw'],
+    simple: ['cannon_pip', 'autocannon_rattler', 'autocannon_stinger'],
+  };
+  const size = (id: string) => MODEL_STYLES[id].hit?.bloom?.size ?? 0;
+
+  it('heavy guns land the whole stack: core, glow, shock ring, spray, embers, a hull glow', () => {
+    for (const id of TIERS.heavy) {
+      const h = MODEL_STYLES[id].hit;
+      expect(h, id).toBeDefined();
+      for (const k of ['core', 'bloom', 'shock', 'spray', 'embers', 'scorch'] as const) expect(h![k], `${id} ${k}`).toBeDefined();
+    }
+    // the biggest shake for the biggest gun, and a light one at that
+    expect(MODEL_STYLES.cannon_bastion.hit?.shake?.strength).toBeLessThanOrEqual(4);
+  });
+
+  it('a step down for mid guns, and simple ones stay small and quick', () => {
+    const minHeavy = Math.min(...TIERS.heavy.map(size)), maxMid = Math.max(...TIERS.mid.map(size));
+    expect(maxMid).toBeLessThan(minHeavy);
+    for (const id of TIERS.mid) expect(MODEL_STYLES[id].hit?.shake, id).toBeUndefined();
+    for (const id of TIERS.simple) {
+      const h = MODEL_STYLES[id].hit!;
+      expect(h, id).toBeDefined();
+      expect(h.shock ?? h.embers ?? h.scorch ?? h.shake, id).toBeUndefined();
+      expect(h.core!.life + (h.bloom?.life ?? 0), id).toBeLessThanOrEqual(12);
+      expect(size(id), id).toBeLessThanOrEqual(maxMid);
+    }
+  });
+});
