@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Energy Lab: ports</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap">
+<style>
+/* Layout: header controls; parts bin | ship grid | what's happening. The same console look as index.html. */
+:root {
+  --bg: #0e1317; --panel: #151c22; --raise: #1d262e; --line: #2a3742; --ink: #dde5ea; --mute: #8b9ba7; --faint: #5d6c77;
+  --accent: #f5a83a; --in: #60a5fa; --full: #5fd18a; --part: #f2c14e; --starve: #ef6a5a; --idle: #6b7680;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 13px/1.45 var(--sans); padding: 10px 16px 24px; }
+h1 { font: 600 17px var(--sans); margin: 0 12px 0 0; }
+h1 a { color: var(--mute); font-weight: 400; font-size: 12px; margin-left: 8px; }
+h2 { font: 600 11px var(--sans); text-transform: uppercase; letter-spacing: .08em; color: var(--mute); margin: 0 0 8px; }
+.bar-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-bottom: 10px; }
+.sep { width: 1px; height: 22px; background: var(--line); margin: 0 4px; }
+button.b, select { background: var(--raise); color: var(--ink); border: 1px solid var(--line); border-radius: 5px; padding: 5px 10px; font: 13px var(--sans); cursor: pointer; }
+button.b:hover { border-color: var(--mute); }
+button.b.on { background: #3b2b10; border-color: var(--accent); color: #ffd99c; }
+button.b.danger.on { background: #3b1510; border-color: var(--starve); color: #ffb3a8; }
+button.b kbd { font: 11px var(--mono); color: var(--faint); margin-left: 4px; }
+button.b.on kbd { color: #c9a26a; }
+button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.wrap { display: grid; grid-template-columns: 230px minmax(0, 1fr) 400px; gap: 12px; align-items: start; }
+@media (max-width: 1250px) { .wrap { grid-template-columns: 200px minmax(0, 1fr); } .side { grid-column: 1 / -1; } }
+@media (max-width: 760px) { .wrap { grid-template-columns: 1fr; } }
+.pane { background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 10px 12px; }
+.left { max-height: calc(100vh - 80px); overflow: auto; position: sticky; top: 10px; }
+.cat summary { cursor: pointer; font: 600 11px var(--sans); text-transform: uppercase; letter-spacing: .08em; color: var(--mute); padding: 4px 0; }
+.pal { display: grid; gap: 2px; margin: 2px 0 8px; }
+.pal button { display: grid; grid-template-columns: 30px 1fr auto; gap: 7px; align-items: center; text-align: left; background: transparent; color: var(--ink);
+  border: 1px solid transparent; border-radius: 4px; padding: 3px 5px; font: 12.5px var(--sans); cursor: pointer; }
+.pal button:hover { background: var(--raise); }
+.pal button.on { border-color: var(--accent); background: #2a2214; }
+.pal .meta { font: 11px var(--mono); color: var(--faint); }
+.pal svg { display: block; }
+.mode { font-size: 12px; color: var(--mute); margin-bottom: 8px; min-height: 2.8em; }
+.canvas-wrap { overflow: auto; max-height: calc(100vh - 190px); border-radius: 5px; background: #0a0e11; }
+canvas { display: block; touch-action: none; }
+.about { margin: 8px 0 0; font-size: 12.5px; color: var(--mute); }
+.about b { color: var(--ink); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; font-size: 12px; color: var(--mute); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { display: inline-block; width: 14px; height: 10px; border-radius: 2px; }
+.tip { position: fixed; z-index: 10; pointer-events: none; max-width: 340px; background: #0b1013f2; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; font-size: 12.5px; box-shadow: 0 6px 20px #0008; }
+.tip b { display: block; margin-bottom: 2px; }
+.tip p { margin: 3px 0 0; color: var(--mute); }
+.side { display: grid; gap: 10px; }
+.flow-row { display: grid; grid-template-columns: 44px 1fr; gap: 8px; align-items: center; margin-bottom: 6px; font-size: 12px; color: var(--mute); }
+.stack { display: flex; height: 22px; border-radius: 4px; overflow: hidden; background: #0a0e11; }
+.stack div { height: 100%; min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; margin: 4px 0 2px; }
+.chips span { display: inline-flex; align-items: center; gap: 5px; color: var(--mute); }
+.chips b { color: var(--ink); font: 600 12px var(--mono); }
+.chips i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.verdict { margin: 8px 0 0; font-size: 13px; }
+.verdict p, .card p { margin: 3px 0; }
+.meter { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 7px 0; border-top: 1px solid #1e2830; }
+.meter:first-of-type { border-top: 0; }
+.meter .name { font-weight: 600; }
+.meter .val { font: 600 13px var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
+.meter .why { grid-column: 1 / -1; color: var(--mute); font-size: 12px; }
+.track { grid-column: 1 / -1; height: 8px; background: #0a0e11; border-radius: 4px; overflow: hidden; }
+.track i { display: block; height: 100%; border-radius: 4px; }
+.card .lead { font-size: 13.5px; }
+.sub { color: var(--mute); font-size: 12px; }
+.insp label { display: grid; grid-template-columns: 1fr 92px; gap: 8px; align-items: center; margin-bottom: 3px; font-size: 12px; color: var(--mute); }
+.insp input[type=number] { width: 92px; background: #0a0e11; color: var(--ink); border: 1px solid var(--line); border-radius: 3px; padding: 2px 5px; font: 12px var(--mono); }
+details.more summary { cursor: pointer; color: var(--mute); font-size: 12px; margin-top: 6px; }
+.note { color: var(--mute); font-size: 12px; margin: 6px 0 0; }
+textarea { width: 100%; height: 90px; background: #0a0e11; color: var(--ink); border: 1px solid var(--line); border-radius: 4px; font: 11px var(--mono); }
+.rules { font-size: 12px; color: var(--mute); margin: 0; padding-left: 18px; }
+.rules li { margin-bottom: 4px; }
+.row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.prob { font-size: 12.5px; margin: 3px 0; }
+.ok { color: var(--full); } .warn { color: var(--part); } .bad { color: var(--starve); } .amber { color: var(--accent); } .blue { color: var(--in); }
+</style>
+</head>
+<body>
+
+<div class="bar-top">
+  <h1>Energy Lab: ports <a href="index.html" title="The touch-routing lab">older lab</a></h1>
+  <select id="ship" aria-label="Load an example"></select>
+  <button class="b" id="zoomOut" title="Zoom out">−</button><button class="b" id="zoomFit">Fit</button><button class="b" id="zoomIn" title="Zoom in">+</button>
+  <span class="sep"></span>
+  <button class="b" id="cFire">Fire<kbd>F</kbd></button>
+  <select id="fireMode" aria-label="How the guns fire"><option value="hold">hold the trigger</option><option value="b35">bursts: 3 s on, 5 s off</option><option value="b16">bursts: 1 s on, 6 s off</option></select>
+  <button class="b" id="cThrust">Thrust<kbd>W</kbd></button>
+  <button class="b" id="cUtil">Shields<kbd>U</kbd></button>
+  <span class="sep"></span>
+  <button class="b" id="cPause">Pause<kbd>Space</kbd></button>
+  <select id="speed" aria-label="Speed"><option value="1">1× speed</option><option value="3">3× speed</option><option value="0.25">¼× speed</option></select>
+  <button class="b" id="fill">Charge all</button>
+  <button class="b" id="drain">Empty all</button>
+  <button class="b" id="repair">Repair all</button>
+</div>
+
+<div class="wrap">
+  <aside class="pane left">
+    <div class="mode" id="mode"></div>
+    <div class="row" style="margin-bottom:8px">
+      <button class="b" id="tInspect">Select<kbd>Esc</kbd></button>
+      <button class="b" id="tErase">Erase<kbd>X</kbd></button>
+      <button class="b danger" id="tBreak">Break<kbd>B</kbd></button>
+    </div>
+    <div class="row" style="margin-bottom:8px">
+      <button class="b" id="tRot">Rotate<kbd>R</kbd></button>
+      <button class="b" id="tFlip">Flip<kbd>T</kbd></button>
+      <span class="sub" id="orient"></span>
+    </div>
+    <div id="palette"></div>
+  </aside>
+
+  <main class="pane">
+    <div class="canvas-wrap" id="cwrap"><canvas id="cv"></canvas></div>
+    <p class="about" id="about"></p>
+    <div class="legend">
+      <span><b style="color:var(--accent)">▲</b> out port: power leaves here</span>
+      <span><b style="color:var(--in)">▼</b> in port: power enters here</span>
+      <span><i style="background:radial-gradient(circle,#ffe08a 30%,transparent 35%) 0 0/7px 10px"></i>Power crossing a link (out → in)</span>
+      <span><i style="background:linear-gradient(0deg,#4ade80 55%,transparent 55%)"></i>Liquid level: charge, or a weapon's buffer</span>
+      <span><i style="background:var(--full)"></i>Fed</span><span><i style="background:var(--part)"></i>Partly</span><span><i style="background:var(--starve)"></i>Starved, or a port facing nothing</span>
+      <span><i style="background:#3a3f44"></i>Destroyed</span><span><i style="background:rgba(239,106,90,.3)"></i>Damaged by a blast</span>
+    </div>
+  </main>
+
+  <section class="side">
+    <div class="pane"><h2>Power this second</h2><div id="flow"></div></div>
+    <div class="pane card" id="card"></div>
+    <div class="pane"><h2>Problems</h2><div id="probs"></div></div>
+    <div class="pane"><h2>Weapons</h2><div id="weap"></div></div>
+    <div class="pane"><h2>Engines and shields</h2><div id="eng"></div></div>
+    <div class="pane"><h2>Stores</h2><div id="stores"></div></div>
+    <div class="pane">
+      <details class="more" open><summary>Rules this lab follows</summary>
+        <ul class="rules" style="margin-top:6px">
+          <li><b>Power moves only out of an out port (<span class="amber">▲</span>) into an in port (<span class="blue">▼</span>) across a shared edge.</b> Ports are on specific edges of each part and turn with it (R rotates, T flips). Hull and armour have none.</li>
+          <li><b>Generators</b> give a fixed amount through each out port every second. A port facing nothing, or facing a part with no in port there, wastes its share.</li>
+          <li><b>Stores</b> (batteries, capacitors, the core) take through their in ports, up to each port's rate and the space left, and give through their out ports, up to each port's rate and what they hold. What comes in and isn't given stays as charge. Two in ports and one out joins lines; one in and two out splits one.</li>
+          <li><b>Conduits</b> are tiny stores with one in and one out: one-way lines, straight or cornered.</li>
+          <li><b>Weapons</b> fill a buffer through their in ports and fire when it holds a shot. Short of supply they fire slower, never weaker. A gun with two ports fed on one gets half. <b>Passive drain</b> leaves the buffer every second whether it fires or not: below it the gun never charges. Beams burn while lit and relight at half. Clips are magazines: empty, they refill the whole clip before firing.</li>
+          <li><b>Engines</b> burn from a buffer that refills through their ports; empty, they run at intake ÷ burn. Shields draw a flat rate.</li>
+          <li><b>Each tick</b> every giver offers across its links from what it had at the start of the tick, every taker accepts up to its space, then everything moves at once. Order never matters.</li>
+          <li><b>Break</b> destroys a part. Generators explode; a charged store explodes in proportion to its charge (0.6 × held, radius 1.5 + held ÷ 300); blasts set off their neighbours.</li>
+        </ul>
+      </details>
+      <details class="more"><summary>Save, share, reset</summary>
+        <div class="row" style="margin:6px 0">
+          <button class="b" id="exp">Copy design into the box</button>
+          <button class="b" id="imp">Load design from the box</button>
+          <button class="b" id="resetParams">Reset all numbers</button>
+        </div>
+        <textarea id="io" aria-label="Design as JSON" spellcheck="false"></textarea>
+        <p class="note" id="ioMsg">Your layout and edited numbers are saved in this browser.</p>
+      </details>
+    </div>
+  </section>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script src="ports-model.js"></script>
+<script src="ports-examples.js"></script>
+<script>
+'use strict';
+const { T, ORDER, CATS, SIDES, SIDE_V, DT } = PM;
+const EXAMPLES = window.PM_EXAMPLES || [];
+const DEFAULTS = JSON.parse(JSON.stringify(T));
+const tdef = (p) => T[p.type];
+
+// ================================================================ state
+let GW = 16, GH = 12;
+let parts = [], nextUid = 1, L = null, shipName = '', about = '';
+let tool = 'inspect', rot = 0, flip = false, selected = null, hover = null, hoverPart = null;
+const ctrl = { fire: true, thrust: false, util: true, paused: false };
+const settings = { fireMode: 'hold', speed: 1, zoom: 0 };
+let ticks = 0, simT = 0, F = { made: 0, wasted: 0, toStores: 0, fromStores: 0, weapons: 0, engines: 0, utils: 0, dps: 0, thrust: 0, shortW: 0, shortE: 0, shortU: 0 };
+const Fs = Object.assign({}, F);
+const ema = (cur, v) => cur + (v - cur) * Math.max(DT / 1.5, 1 / (ticks + 1));
+const key = (x, y) => y * GW + x;
+const isConsumer = (k) => k === 'weapon' || k === 'engine' || k === 'util';
+/** Is the trigger held this instant? Bursts fire in windows so stores can show what they are for */
+function firingNow() {
+  if (!ctrl.fire) return false;
+  if (settings.fireMode === 'b35') return simT % 8 < 3;
+  if (settings.fireMode === 'b16') return simT % 7 < 1;
+  return true;
+}
+
+function rebuild() { L = PM.build(parts, GW, GH); }
+function fitsCells(type, cells) {
+  if (type === 'core' && parts.some((p) => p.type === 'core' && !p.dead)) return false;
+  return cells.every(([x, y]) => x >= 0 && y >= 0 && x < GW && y < GH && !L.occ[key(x, y)]);
+}
+function addPart(type, x, y, r, f) { const p = { uid: nextUid++, type, rot: r || 0, flip: !!f, cells: PM.rectCells(type, x, y, r || 0) }; parts.push(p); return p; }
+function removePart(p) { parts = parts.filter((q) => q !== p); if (selected === p) selected = null; rebuild(); save(); renderCard(); }
+function chargeAll(full) {
+  for (const p of parts) { const t = tdef(p); if (t.kind === 'store') p.held = full ? t.hold : 0; if (t.kind === 'weapon') p.stored = full ? PM.capOf(t) : 0; if (t.kind === 'engine') p.stored = full ? t.buffer : 0; if (t.kind === 'util') p.stored = full ? t.e : 0; if (t.kind === 'weapon') p.latched = false; }
+}
+
+// ================================================================ drawing
+const cv = document.getElementById('cv'), cx = cv.getContext('2d'), cwrap = document.getElementById('cwrap');
+let CS = 32;
+function fitCS() { const w = cwrap.clientWidth - 4, h = Math.max(320, window.innerHeight - 210); return Math.max(10, Math.min(60, Math.floor(Math.min(w / GW, h / GH)))); }
+function sizeCanvas() {
+  CS = Math.max(8, Math.min(96, Math.round(fitCS() * Math.pow(1.25, settings.zoom))));
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = GW * CS * dpr; cv.height = GH * CS * dpr; cv.style.width = GW * CS + 'px'; cv.style.height = GH * CS + 'px';
+  cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+function mix(hex, a, bg = [16, 22, 27]) { const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+  return `rgb(${Math.round(bg[0] + (r - bg[0]) * a)},${Math.round(bg[1] + (g - bg[1]) * a)},${Math.round(bg[2] + (b - bg[2]) * a)})`; }
+const STATUS = { full: '#5fd18a', part: '#f2c14e', starve: '#ef6a5a', idle: '#6b7680' };
+function statusOf(p) {
+  const t = tdef(p);
+  if (t.kind === 'weapon') { if (!firingNow()) return 'idle'; if (!p.links.length) return 'starve'; return p.rate >= 0.9 ? 'full' : p.rate >= 0.4 ? 'part' : 'starve'; }
+  if (t.kind === 'engine') { if (!ctrl.thrust) return 'idle'; if (!p.links.length) return 'starve'; return p.sat >= 0.97 ? 'full' : p.sat >= 0.5 ? 'part' : 'starve'; }
+  if (t.kind === 'util') { if (!ctrl.util) return 'idle'; if (!p.links.length) return 'starve'; return p.sat >= 0.97 ? 'full' : p.sat >= 0.5 ? 'part' : 'starve'; }
+  return null;
+}
+function levelOf(p) { const t = tdef(p); if (t.kind === 'store' && !t.conduit) return p.held / t.hold; if (t.kind === 'weapon') return Math.min(1, p.stored / PM.capOf(t)); if (t.kind === 'engine') return p.stored / t.buffer; return null; }
+/** What a store refused this tick from its in links (full) */
+const refused = (p) => p.links.filter((l) => l.to === p).reduce((s, l) => s + (l.offer - l.send), 0) / DT;
+let tnow = 0;
+/** A port as a triangle on its edge: out points outward (apex on the edge), in points inward (base on the edge) */
+function drawPort(q, col, X0, Y0, cs, alpha) {
+  const [vx, vy] = SIDE_V[q.side], ux = -vy, uy = vx, s = cs * 0.2;
+  const ex = X0 + (q.x + 0.5) * cs + vx * cs / 2, ey = Y0 + (q.y + 0.5) * cs + vy * cs / 2;
+  cx.globalAlpha = alpha; cx.fillStyle = col; cx.beginPath();
+  if (q.dir === 'out') { cx.moveTo(ex - vx * 1, ey - vy * 1); cx.lineTo(ex - vx * s + ux * s, ey - vy * s + uy * s); cx.lineTo(ex - vx * s - ux * s, ey - vy * s - uy * s); }
+  else { cx.moveTo(ex - vx * 1 + ux * s, ey - vy * 1 + uy * s); cx.lineTo(ex - vx * 1 - ux * s, ey - vy * 1 - uy * s); cx.lineTo(ex - vx * s, ey - vy * s); }
+  cx.closePath(); cx.fill(); cx.globalAlpha = 1;
+}
+function portColour(p, q) {
+  const t = tdef(p);
+  if (q.clash) return [STATUS.starve, 1];
+  if (q.link) return [q.dir === 'out' ? '#f5a83a' : '#60a5fa', 1];
+  if (q.dir === 'in' && isConsumer(t.kind)) return [STATUS.starve, 0.9];
+  if (q.dir === 'out' && t.kind === 'gen') return [STATUS.starve, 0.7];
+  return [q.dir === 'out' ? '#f5a83a' : '#60a5fa', 0.35];
+}
+function draw() {
+  tnow = performance.now() / 1000;
+  const Wd = GW * CS, Ht = GH * CS;
+  cx.fillStyle = '#0a0e11'; cx.fillRect(0, 0, Wd, Ht);
+  cx.strokeStyle = '#141c22'; cx.lineWidth = 1; cx.beginPath();
+  for (let x = 0; x <= GW; x++) { cx.moveTo(x * CS + 0.5, 0); cx.lineTo(x * CS + 0.5, Ht); }
+  for (let y = 0; y <= GH; y++) { cx.moveTo(0, y * CS + 0.5); cx.lineTo(Wd, y * CS + 0.5); }
+  cx.stroke();
+  // 1. cells, charge levels
+  for (const p of parts) {
+    const t = tdef(p), inert = t.kind === 'inert';
+    cx.fillStyle = p.dead ? '#23282c' : mix(t.col, inert ? 0.45 : 0.24);
+    for (const [x, y] of p.cells) cx.fillRect(x * CS, y * CS, CS, CS);
+    if (p.dead) { cx.strokeStyle = '#3a3f44'; cx.lineWidth = 2; for (const [x, y] of p.cells) { cx.beginPath(); cx.moveTo(x * CS + 5, y * CS + 5); cx.lineTo((x + 1) * CS - 5, (y + 1) * CS - 5); cx.moveTo((x + 1) * CS - 5, y * CS + 5); cx.lineTo(x * CS + 5, (y + 1) * CS - 5); cx.stroke(); } continue; }
+    const lv = levelOf(p);
+    if (lv !== null) {
+      const y0 = Math.min(...p.cells.map((c) => c[1])), y1 = Math.max(...p.cells.map((c) => c[1])) + 1, top = y1 - lv * (y1 - y0);
+      cx.fillStyle = mix(t.col, 0.62);
+      for (const [x, y] of p.cells) { const a = Math.max(y, top); if (a < y + 1) cx.fillRect(x * CS, a * CS, CS, (y + 1 - a) * CS); }
+    }
+    if (t.kind === 'gen') { const g = 0.12 + 0.08 * Math.sin(tnow * 4 + p.uid); cx.fillStyle = `rgba(56,189,248,${g})`; for (const [x, y] of p.cells) cx.fillRect(x * CS, y * CS, CS, CS); }
+    if (t.kind === 'weapon' && (p.flash > 0 || p.on)) { cx.fillStyle = p.on ? 'rgba(255,240,200,.28)' : `rgba(255,245,220,${Math.min(1, p.flash * 6)})`; for (const [x, y] of p.cells) cx.fillRect(x * CS, y * CS, CS, CS); }
+    if (p.hp !== undefined && p.hp < t.hp) { cx.fillStyle = `rgba(239,106,90,${0.1 + 0.25 * (1 - p.hp / t.hp)})`; for (const [x, y] of p.cells) cx.fillRect(x * CS, y * CS, CS, CS); }
+  }
+  // 2. outlines by status
+  for (const p of L.alive) {
+    const t = tdef(p), st = statusOf(p);
+    let col = t.kind === 'inert' ? '#0a0e11' : mix(t.col, 0.8), w = 1.25;
+    if (st) { col = STATUS[st]; if (st !== 'idle') w = Math.max(2, CS / 12); }
+    else if (t.kind === 'store' && !t.conduit && p.held >= t.hold - 1e-6 && refused(p) > 1) { col = `rgba(245,168,58,${0.65 + 0.35 * Math.sin(tnow * 6)})`; w = Math.max(2, CS / 11); }
+    else if (t.kind === 'gen' && p.emaWaste > 1) { col = `rgba(239,106,90,${0.5 + 0.3 * Math.sin(tnow * 5)})`; w = Math.max(1.5, CS / 14); }
+    cx.strokeStyle = col; cx.lineWidth = w; outline(p.cells, p, w > 1.5 ? w / 2 : 0.5);
+  }
+  // 3. ports
+  if (CS >= 14) for (const p of L.alive) for (const q of p.ports) { const [c, a] = portColour(p, q); drawPort(q, c, 0, 0, CS, a); }
+  // 4. power crossing links: dots from out to in
+  for (const l of L.links) {
+    if (l.ema < 0.5) continue;
+    const ax = (l.pa.x + 0.5) * CS, ay = (l.pa.y + 0.5) * CS, bx = (l.pb.x + 0.5) * CS, by = (l.pb.y + 0.5) * CS;
+    const n = Math.min(4, 1 + Math.floor(Math.log10(l.ema + 1) * 1.5)), speed = 0.6 + Math.min(1.6, l.ema / 120);
+    cx.fillStyle = tdef(l.from).kind === 'gen' ? '#9fe3ff' : '#ffe08a';
+    for (let i = 0; i < n; i++) { const f = (tnow * speed + i / n) % 1; cx.beginPath(); cx.arc(ax + (bx - ax) * f, ay + (by - ay) * f, Math.max(1.6, CS / 13), 0, 7); cx.fill(); }
+  }
+  // 5. names and numbers
+  cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  for (const p of L.alive) {
+    const t = tdef(p); if (t.kind === 'inert') continue;
+    const xs = p.cells.map((c) => c[0]), ys = p.cells.map((c) => c[1]);
+    const bw = (Math.max(...xs) + 1 - Math.min(...xs)) * CS, bh = (Math.max(...ys) + 1 - Math.min(...ys)) * CS, X = p.cx * CS, Y = p.cy * CS;
+    const showName = bw >= 64 && bh >= 30 && CS >= 22;
+    if (showName) { cx.fillStyle = '#e9eff3'; cx.font = `600 ${Math.min(12, CS / 3)}px "IBM Plex Sans", sans-serif`; cx.fillText(t.name, X, Y); }
+    else if (CS >= 24) { cx.fillStyle = '#e9eff3'; cx.font = `600 ${Math.min(11, CS / 3.2)}px "IBM Plex Sans", sans-serif`; cx.fillText(t.name.split(/[ ,]/)[0].slice(0, 7), X, Y); }
+    if (isConsumer(t.kind) && !p.links.length && CS >= 16) { cx.fillStyle = '#ef6a5a'; cx.font = `700 ${Math.min(12, CS / 2.8)}px "IBM Plex Sans", sans-serif`; cx.fillText('no feed', X, Math.min(...ys) * CS + Math.min(9, CS / 4)); }
+  }
+  // 6. blast radius of what's under the pointer (a hazard worth seeing), selection, ghost
+  const hz = hoverPart && !hoverPart.dead ? PM.blastOf(hoverPart) : null;
+  if (hz) { cx.strokeStyle = 'rgba(239,106,90,.7)'; cx.setLineDash([6, 5]); cx.lineWidth = 1.5; cx.beginPath(); cx.arc(hoverPart.cx * CS, hoverPart.cy * CS, hz.r * CS, 0, 7); cx.stroke(); cx.setLineDash([]); }
+  if (selected && !selected.dead) { cx.strokeStyle = '#ffffff'; cx.setLineDash([5, 4]); cx.lineWidth = 2; outline(selected.cells, selected, -2); cx.setLineDash([]); }
+  if (hoverPart && hoverPart !== selected && !hoverPart.dead) { cx.strokeStyle = 'rgba(255,255,255,.55)'; cx.lineWidth = 1.5; outline(hoverPart.cells, hoverPart, -1.5); }
+  if (hover && T[tool]) {
+    const ghost = { uid: -1, type: tool, rot, flip, cells: PM.rectCells(tool, hover.x, hover.y, rot) }, ok = fitsCells(tool, ghost.cells);
+    cx.fillStyle = ok ? 'rgba(95,209,138,.3)' : 'rgba(239,106,90,.3)';
+    for (const [x, y] of ghost.cells) if (x < GW && y < GH) cx.fillRect(x * CS, y * CS, CS, CS);
+    if (CS >= 14) for (const q of PM.portsOf(ghost)) drawPort(q, q.dir === 'out' ? '#f5a83a' : '#60a5fa', 0, 0, CS, 0.9);
+  }
+}
+function outline(cells, p, inset) {
+  const ins = (x, y) => x >= 0 && y >= 0 && x < GW && y < GH && L.occ[key(x, y)] === p; const o = inset || 0;
+  cx.beginPath();
+  for (const [x, y] of cells) {
+    const X0 = x * CS, Y0 = y * CS, X1 = X0 + CS, Y1 = Y0 + CS;
+    if (!ins(x, y - 1)) { cx.moveTo(X0, Y0 + o); cx.lineTo(X1, Y0 + o); }
+    if (!ins(x, y + 1)) { cx.moveTo(X0, Y1 - o); cx.lineTo(X1, Y1 - o); }
+    if (!ins(x - 1, y)) { cx.moveTo(X0 + o, Y0); cx.lineTo(X0 + o, Y1); }
+    if (!ins(x + 1, y)) { cx.moveTo(X1 - o, Y0); cx.lineTo(X1 - o, Y1); }
+  }
+  cx.stroke();
+}
+/** A part with its ports as a small SVG, for the palette and the card */
+function glyph(type, r, f, px) {
+  const t = T[type], g = { uid: -1, type, rot: r || 0, flip: !!f, cells: PM.rectCells(type, 0, 0, r || 0) }, [w, h] = PM.dims(t, r || 0);
+  const cells = g.cells.map(([x, y]) => `<rect x="${x * px + 0.5}" y="${y * px + 0.5}" width="${px - 1}" height="${px - 1}" fill="${mix(t.col, 0.35)}" stroke="${mix(t.col, 0.8)}"/>`).join('');
+  const ports = PM.portsOf(g).map((q) => {
+    const [vx, vy] = SIDE_V[q.side], ux = -vy, uy = vx, s = px * 0.24, ex = (q.x + 0.5) * px + vx * px / 2, ey = (q.y + 0.5) * px + vy * px / 2;
+    const pts = q.dir === 'out' ? [[ex - vx, ey - vy], [ex - vx * s + ux * s, ey - vy * s + uy * s], [ex - vx * s - ux * s, ey - vy * s - uy * s]]
+      : [[ex - vx + ux * s, ey - vy + uy * s], [ex - vx - ux * s, ey - vy - uy * s], [ex - vx * s, ey - vy * s]];
+    return `<polygon points="${pts.map((c) => c.map((v) => v.toFixed(1)).join(',')).join(' ')}" fill="${q.dir === 'out' ? '#f5a83a' : '#60a5fa'}"/>`;
+  }).join('');
+  return `<svg width="${w * px}" height="${h * px}" viewBox="0 0 ${w * px} ${h * px}">${cells}${ports}</svg>`;
+}
+
+// ================================================================ plain-language explanations
+const n0 = (v) => (Math.abs(v) >= 100 ? Math.round(v).toLocaleString() : Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2));
+const pc = (v) => `${Math.round(v * 100)}%`;
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const SIDE_WORD = { N: 'front', E: 'right', S: 'back', W: 'left' };
+const nameOf = (p) => tdef(p).name;
+function explain(p) {
+  const t = tdef(p), out = [];
+  if (p.dead) return [`<span class="bad">Destroyed.</span> Repair all brings it back.`];
+  if (t.say) out.push(t.say);
+  if (t.kind === 'inert') return out;
+  // Ports, one line each
+  for (const q of p.ports) {
+    const rate = `${q.rate}/s`;
+    if (q.clash) out.push(`<span class="bad">${q.dir === 'out' ? 'Out' : 'In'} port (${SIDE_WORD[q.side]}, ${rate}) faces another ${q.dir} port on ${esc(nameOf(q.faces))}: nothing passes.</span>`);
+    else if (q.link) { const l = q.link, other = l.from === p ? l.to : l.from; out.push(`${q.dir === 'out' ? '<span class="amber">▲ Out</span>' : '<span class="blue">▼ In</span>'} (${SIDE_WORD[q.side]}, ${rate}) → ${q.dir === 'out' ? 'into' : 'from'} ${esc(nameOf(other))}: <b>${n0(l.ema)}</b> a second now${l.cap < q.rate ? ` (the other side's port allows ${l.cap})` : ''}.`); }
+    else if (q.dir === 'out' && t.kind === 'gen') out.push(`<span class="bad">▲ Out (${SIDE_WORD[q.side]}, ${rate}) faces ${q.faces ? esc(nameOf(q.faces)) + ', which has no in port there' : 'nothing'}: wasted.</span>`);
+    else if (q.dir === 'in' && isConsumer(t.kind)) out.push(`<span class="bad">▼ In (${SIDE_WORD[q.side]}, ${rate}) faces ${q.faces ? esc(nameOf(q.faces)) + ', which has no out port there' : 'nothing'}: it gets nothing here.</span>`);
+    else out.push(`<span class="sub">${q.dir === 'out' ? '▲ Out' : '▼ In'} (${SIDE_WORD[q.side]}, ${rate}): not connected.</span>`);
+  }
+  if (t.kind === 'gen') { if (p.emaWaste > 0.5) out.push(`<span class="bad">Wasting ${n0(p.emaWaste)} of its ${t.produce} a second</span>: what it faces is full or takes less than it gives.`); else out.push(`All ${t.produce} a second is taken.`); }
+  else if (t.kind === 'store') {
+    if (!t.conduit) out.push(`Holds <b>${n0(p.held)}</b> of ${t.hold}. In ${n0(p.emaIn)}, out ${n0(p.emaOut)} a second.`);
+    if (p.held >= t.hold - 1e-6 && refused(p) > 1) out.push(`<span class="amber">Full: refusing ${n0(refused(p))} a second.</span> That backs up to the generator and is wasted there.`);
+    if (!p.links.some((l) => l.to === p) && p.held < 1) out.push('<span class="bad">Nothing feeds it.</span>');
+    const b = PM.blastOf(p); if (b) out.push(`<span class="warn">Charged: if destroyed it blasts ${n0(b.dmg)} over ${b.r.toFixed(1)} cells.</span>`);
+  } else if (t.kind === 'weapon') {
+    const fedPorts = p.ports.filter((q) => q.link).length, supply = p.ports.filter((q) => q.link).reduce((s, q) => s + q.link.cap, 0);
+    if (t.beam) out.push(`A beam: burns ${t.burn} a second while lit from a ${t.bufferE} buffer, lights at half, and needs ${t.intake} a second to stay lit${t.passive ? `, plus ${t.passive} passive` : ''}.`);
+    else out.push(`Fires when its buffer holds ${t.shot}${t.buffer > 1 ? ` (it holds ${t.buffer} shots${t.clip ? ': a clip that refills whole once empty' : ''})` : ''} and its ${t.cycle} s cycle is done: ${t.intake} a second for full rate${t.passive ? `, plus ${t.passive} passive` : ''}.`);
+    if (t.passive) out.push(`<span class="warn">Passive drain ${t.passive} a second:</span> below that it never charges. Its ports can bring at most ${supply} a second, so it charges at up to ${n0(Math.max(0, supply - t.passive))}${supply <= t.passive ? ' <span class="bad">— it will never fire here</span>' : ''}.`);
+    else if (fedPorts < p.ports.length && fedPorts) out.push(`<span class="warn">${fedPorts} of ${p.ports.length} ports fed:</span> at most ${supply} of the ${t.intake} a second it wants.`);
+    if (firingNow()) out.push(p.latched ? `Reloading the clip: ${n0(p.stored)} of ${PM.capOf(t)}.` : `Getting ${n0(p.emaIn)} a second: firing at <b>${pc(Math.min(1, p.rate))}</b> of full rate (${n0(p.emaD)} damage a second).`);
+    else out.push(`Not firing (buffer ${n0(p.stored)} of ${PM.capOf(t)}).`);
+  } else if (t.kind === 'engine') {
+    out.push(`Buffer ${n0(p.stored)} of ${t.buffer}. Its ports bring at most ${t.intake} a second; full thrust burns ${t.burn}${t.intake >= t.burn ? ', so it can run flat out as long as the lines hold' : `, so from empty it gives ${pc(t.intake / t.burn)} thrust`}.`);
+    if (ctrl.thrust) out.push(`Now: ${pc(p.sat)} thrust.`);
+  } else if (t.kind === 'util') out.push(ctrl.util ? `Getting ${pc(p.sat)} of the ${t.e} a second it draws.` : 'Shields are off.');
+  if (t.kind !== 'store' || t.conduit) { const b = PM.blastOf(p); if (b) out.push(`<span class="warn">If destroyed it blasts ${n0(b.dmg)} over ${b.r} cells</span> (hull beside it has 75 hp).`); }
+  if (p.hp !== undefined && p.hp < t.hp) out.push(`<span class="warn">Damaged: ${n0(p.hp)} of ${t.hp} hp.</span>`);
+  return out;
+}
+
+// ================================================================ side panel
+function stackBar(segs, total) {
+  return `<div class="stack">${segs.filter((s) => s.v > 0.05).map((s) => `<div title="${esc(s.label)}: ${n0(s.v)} a second" style="width:${(s.v / total) * 100}%;background:${s.col}${s.hatch ? ';background-image:repeating-linear-gradient(45deg,transparent 0 4px,#0006 4px 8px)' : ''}"></div>`).join('')}</div>
+    <div class="chips">${segs.filter((s) => s.v > 0.05).map((s) => `<span><i style="background:${s.col}"></i>${esc(s.label)} <b>${n0(s.v)}</b></span>`).join('')}</div>`;
+}
+function renderFlow() {
+  const short = Fs.shortW + Fs.shortE + Fs.shortU;
+  const src = [{ label: 'Made by generators', v: Fs.made - Fs.wasted, col: '#38bdf8' }, { label: 'Wasted at generators', v: Fs.wasted, col: '#55606a' }];
+  const use = [{ label: 'Weapons', v: Fs.weapons, col: '#ef5f55' }, { label: 'Engines', v: Fs.engines, col: '#3fb0e0' }, { label: 'Shields', v: Fs.utils, col: '#4fbfb2' },
+    { label: 'Into stores (charging)', v: Fs.toStores - Fs.fromStores > 0 ? Fs.toStores - Fs.fromStores : 0, col: '#8bdca6' }, { label: 'Wanted, not arriving', v: short, col: '#ef6a5a', hatch: true }];
+  const total = Math.max(1, src.reduce((s, x) => s + x.v, 0), use.reduce((s, x) => s + x.v, 0));
+  const lines = [];
+  if (!parts.length) lines.push('Pick an example above, or place parts from the left.');
+  if (Fs.fromStores > Fs.toStores + 1) lines.push(`<span class="warn">Stores are draining:</span> ${n0(Fs.fromStores - Fs.toStores)} a second more going out than in.`);
+  if (short > 1) lines.push(`<span class="bad">${n0(short)} a second wanted but not arriving.</span>${Fs.wasted > 1 ? ` Meanwhile ${n0(Fs.wasted)} is wasted at generators: the power is in the wrong place.` : ''}`);
+  else if (parts.length) lines.push(`<span class="ok">Everything that's on gets what it asks for.</span>${Fs.wasted > 1 ? ` ${n0(Fs.wasted)} a second of generation is unused.` : ''}`);
+  lines.push(`<span class="sub">Damage ${n0(Fs.dps)} a second · thrust ${n0(Fs.thrust)}</span>`);
+  document.getElementById('flow').innerHTML = `<div class="flow-row"><span>From</span><div>${stackBar(src, total)}</div></div><div class="flow-row"><span>To</span><div>${stackBar(use, total)}</div></div><div class="verdict">${lines.map((l) => `<p>${l}</p>`).join('')}</div>`;
+}
+function renderProblems() {
+  const out = [];
+  for (const p of L.consumers) {
+    if (!p.links.length) out.push(`<p class="prob bad">${esc(nameOf(p))} has no feed: none of its in ports face an out port.</p>`);
+    else for (const q of p.openIn) out.push(`<p class="prob warn">${esc(nameOf(p))}: in port on its ${SIDE_WORD[q.side]} (${q.rate}) faces ${q.faces ? esc(nameOf(q.faces)) : 'nothing'}.</p>`);
+  }
+  for (const g of L.gens) for (const q of g.openOut) out.push(`<p class="prob bad">${esc(nameOf(g))}: out port on its ${SIDE_WORD[q.side]} (${q.rate}) faces ${q.faces ? esc(nameOf(q.faces)) : 'nothing'}: wasted.</p>`);
+  for (const c of L.clashes) out.push(`<p class="prob bad">${esc(nameOf(c.a))} and ${esc(nameOf(c.b))}: two ${c.port.dir} ports face each other. Turn one (R).</p>`);
+  for (const s of L.stores) { const t = tdef(s); if (!t.conduit && s.held >= t.hold - 1e-6 && refused(s) > 1) out.push(`<p class="prob amber">${esc(t.name)} is full and refusing ${n0(refused(s))} a second.</p>`); }
+  for (const w of L.weapons) { const t = tdef(w); if (t.passive && w.links.length) { const sup = w.ports.filter((q) => q.link).reduce((s, q) => s + q.link.cap, 0); if (sup <= t.passive) out.push(`<p class="prob bad">${esc(t.name)}: its lines bring ${sup} a second, its passive drain is ${t.passive}. It will never fire.</p>`); } }
+  const dead = parts.filter((p) => p.dead).length; if (dead) out.push(`<p class="prob sub">${dead} part${dead > 1 ? 's' : ''} destroyed. Repair all brings them back.</p>`);
+  document.getElementById('probs').innerHTML = out.join('') || '<p class="prob ok">None. Every port that should connect does.</p>';
+}
+function meter(name, count, frac, valText, why, col) {
+  return `<div class="meter"><span class="name">${esc(name)}${count > 1 ? ` <span style="color:var(--mute);font-weight:400">×${count}</span>` : ''}</span><span class="val" style="color:${col}">${valText}</span>
+    <div class="track"><i style="width:${Math.max(0, Math.min(100, frac * 100)).toFixed(1)}%;background:${col}"></i></div><span class="why">${why}</span></div>`;
+}
+const stCol = (f) => (f >= 0.9 ? STATUS.full : f >= 0.4 ? STATUS.part : STATUS.starve);
+function groups(list) { const m = new Map(); for (const p of list) { if (!m.has(p.type)) m.set(p.type, []); m.get(p.type).push(p); } return [...m.entries()]; }
+function renderLists() {
+  const avg = (a, f) => a.reduce((s, p) => s + f(p), 0) / a.length;
+  let dpsFull = 0;
+  const fire = firingNow();
+  const wh = groups(L.weapons).map(([type, ps]) => {
+    const t = T[type], rate = Math.min(1, avg(ps, (p) => p.rate)), got = avg(ps, (p) => p.emaIn); dpsFull += PM.fullDps(t) * ps.length;
+    const dead = ps.filter((p) => !p.links.length).length;
+    let why = fire ? (rate >= 0.9 ? `Firing at full rate.` : `Each gets ${n0(got)} of the ${t.intake} a second it wants${t.passive ? ` (${t.passive} of that is passive drain)` : ''}.`) : `Not firing. Each needs ${t.intake} a second at full rate.`;
+    if (dead) why += ` <span class="bad">${dead === ps.length ? 'No feed.' : dead + ' with no feed.'}</span>`;
+    return meter(t.name, ps.length, fire ? rate : 0, fire ? pc(rate) + ' rate' : 'idle', why, fire ? stCol(rate) : STATUS.idle);
+  });
+  document.getElementById('weap').innerHTML = L.weapons.length ? `<p class="sub" style="margin:0 0 4px">Damage now ${n0(Fs.dps)} of ${n0(dpsFull)} a second at full rate.</p>` + wh.join('') : '<p class="note">No weapons.</p>';
+  const thrustMax = L.engines.reduce((s, p) => s + tdef(p).thrust, 0), mass = L.alive.reduce((s, p) => s + tdef(p).mass, 0);
+  const eh = groups([...L.engines, ...L.utils]).map(([type, ps]) => {
+    const t = T[type], sat = avg(ps, (p) => p.sat), on = t.kind === 'engine' ? ctrl.thrust : ctrl.util, dead = ps.filter((p) => !p.links.length).length;
+    let why = t.kind === 'util' ? `Each draws ${t.e} a second.` : `Each: ${t.thrust} thrust for ${t.burn} a second, refilled at up to ${t.intake}. Buffer ${n0(avg(ps, (p) => p.stored))} of ${t.buffer}.`;
+    if (dead) why += ` <span class="bad">${dead === ps.length ? 'No feed.' : dead + ' with no feed.'}</span>`;
+    return meter(t.name, ps.length, on ? sat : 0, on ? pc(sat) + ' fed' : 'idle', why, on ? stCol(sat) : STATUS.idle);
+  });
+  document.getElementById('eng').innerHTML = eh.length ? `<p class="sub" style="margin:0 0 4px">Thrust now ${n0(Fs.thrust)} of ${n0(thrustMax)}. Mass ${n0(mass)}.</p>` + eh.join('') : '<p class="note">Nothing here.</p>';
+  const sh = groups(L.stores.filter((s) => !tdef(s).conduit)).map(([type, ps]) => {
+    const t = T[type], cap = t.hold * ps.length, held = ps.reduce((s, p) => s + p.held, 0), inn = ps.reduce((s, p) => s + p.emaIn, 0), out = ps.reduce((s, p) => s + p.emaOut, 0);
+    const full = ps.filter((p) => p.held >= t.hold - 1e-6 && refused(p) > 1).length;
+    let why = `In ${n0(inn)}, out ${n0(out)} a second.`; if (full) why += ` <span class="amber">${full} full and refusing.</span>`;
+    return meter(t.name, ps.length, held / cap, `${n0(held)} / ${n0(cap)}`, why, t.col);
+  });
+  document.getElementById('stores').innerHTML = sh.join('') || '<p class="note">No stores.</p>';
+}
+function renderCard() {
+  const el = document.getElementById('card');
+  if (!selected) {
+    el.innerHTML = `<h2>${esc(shipName || 'Your design')}</h2><p class="lead">Hover any part to see what it's doing and where its power comes from. Click one to pin it here and edit its numbers.</p>
+      <p class="sub">Power leaves a part only through an <span class="amber">▲ out port</span> and enters only through a <span class="blue">▼ in port</span>, across a shared edge. Yellow dots are power crossing; blue dots are fresh from a generator.</p>`;
+    return;
+  }
+  const p = selected, t = tdef(p), d = DEFAULTS[t.id], same = parts.filter((q) => q.type === t.id).length;
+  const swaps = ORDER.filter((id) => id !== t.id && T[id].kind === t.kind && T[id].w === t.w && T[id].h === t.h);
+  const nums = [];
+  if (t.kind === 'store') nums.push(['hold', 'Holds']);
+  if (t.kind === 'weapon') { if (t.beam) nums.push(['burn', 'Burns while lit (a second)'], ['bufferE', 'Buffer'], ['dps', 'Damage a second lit']); else nums.push(['shot', 'Energy a shot'], ['buffer', 'Shots held'], ['cycle', 'Cycle (s)'], ['damage', 'Damage a shot']); nums.push(['passive', 'Passive drain (a second)']); }
+  if (t.kind === 'engine') nums.push(['burn', 'Burns at full thrust'], ['buffer', 'Buffer'], ['thrust', 'Thrust']);
+  if (t.kind === 'util') nums.push(['e', 'Draws (a second)']);
+  nums.push(['hp', 'HP']);
+  if (t.blast) nums.push(['blast.dmg', 'Blast damage'], ['blast.r', 'Blast radius']);
+  const get = (k) => (k.startsWith('blast.') ? t.blast[k.slice(6)] : t[k]), getD = (k) => (k.startsWith('blast.') ? d.blast[k.slice(6)] : d[k]);
+  el.innerHTML = `<h2>Selected</h2><div class="row"><span>${glyph(t.id, p.rot, p.flip, 14)}</span><p class="lead" style="margin:0"><b>${esc(t.name)}</b> <span class="sub">level ${t.lvl}${t.isNew ? ' · new part' : ''}${p.rot || p.flip ? ` · turned ${p.rot * 90}°${p.flip ? ', flipped' : ''}` : ''}</span></p></div>
+    <div id="cardText">${explain(p).map((s) => `<p>${s}</p>`).join('')}</div>
+    <div class="row" style="margin-top:8px">${p.dead ? '' : '<button class="b" id="rotSel">Rotate it</button><button class="b" id="flipSel">Flip it</button>'}<button class="b" id="delSel">Remove it</button><button class="b" id="deselect">Done</button></div>
+    ${swaps.length ? `<div class="row" style="margin-top:8px"><span class="sub">Swap ${same > 1 ? 'all ' + same : 'it'} for</span><select id="swapSel">${swaps.map((id) => `<option value="${id}">${esc(T[id].name)}</option>`).join('')}</select><button class="b" id="swapGo">Swap</button></div>` : ''}
+    <details class="more insp"><summary>Edit the numbers for every ${esc(t.name)}</summary><div style="margin-top:6px">
+      ${t.ports.map((q, i) => `<label>${q.dir === 'out' ? '▲ out' : '▼ in'} port, ${SIDE_WORD[q.side]}${t.ports.filter((o) => o.side === q.side).length > 1 ? ` [${q.cell}]` : ''} (a second)${q.rate !== d.ports[i].rate ? ` <span class="warn">(was ${d.ports[i].rate})</span>` : ''}<input type="number" step="any" data-port="${i}" value="${q.rate}"></label>`).join('')}
+      ${nums.map(([k, label]) => `<label>${label}${get(k) !== getD(k) ? ` <span class="warn">(was ${getD(k)})</span>` : ''}<input type="number" step="any" data-k="${k}" value="${get(k)}"></label>`).join('')}
+    </div></details>`;
+  const refresh = () => { PM_recompute(t); for (const q of parts) if (q.type === t.id) { if (t.kind === 'weapon') q.stored = Math.min(q.stored ?? 0, PM.capOf(t)); if (t.kind === 'store') q.held = Math.min(q.held ?? 0, t.hold); } rebuild(); save(); renderCard(); renderPalette(); };
+  el.querySelectorAll('input[data-port]').forEach((inp) => inp.addEventListener('change', () => { const v = parseFloat(inp.value); if (Number.isFinite(v) && v >= 0) { t.ports[+inp.dataset.port].rate = v; refresh(); } }));
+  el.querySelectorAll('input[data-k]').forEach((inp) => inp.addEventListener('change', () => { const v = parseFloat(inp.value); if (!Number.isFinite(v) || v < 0) return; const k = inp.dataset.k; if (k.startsWith('blast.')) t.blast[k.slice(6)] = v; else t[k] = v; refresh(); }));
+  document.getElementById('swapGo')?.addEventListener('click', () => { const to = document.getElementById('swapSel').value; for (const q of parts) if (q.type === t.id) { q.type = to; delete q.held; delete q.stored; q.hp = undefined; } rebuild(); save(); renderCard(); });
+  document.getElementById('rotSel')?.addEventListener('click', () => turnPart(p, (p.rot + 1) % 4, p.flip));
+  document.getElementById('flipSel')?.addEventListener('click', () => turnPart(p, p.rot, !p.flip));
+  document.getElementById('delSel').addEventListener('click', () => removePart(p));
+  document.getElementById('deselect').addEventListener('click', () => { selected = null; renderCard(); });
+}
+function PM_recompute(t) { t.intake = t.ports.filter((q) => q.dir === 'in').reduce((s, q) => s + q.rate, 0); t.produce = t.ports.filter((q) => q.dir === 'out').reduce((s, q) => s + q.rate, 0); }
+/** Turn a placed part in place when its new footprint fits */
+function turnPart(p, r, f) {
+  const [x0, y0] = [Math.min(...p.cells.map((c) => c[0])), Math.min(...p.cells.map((c) => c[1]))];
+  const cells = PM.rectCells(p.type, x0, y0, r);
+  const others = parts.filter((q) => q !== p && !q.dead).flatMap((q) => q.cells.map(([x, y]) => key(x, y)));
+  if (cells.some(([x, y]) => x >= GW || y >= GH || others.includes(key(x, y)))) { flashMode('It doesn’t fit turned that way.'); return; }
+  p.rot = r; p.flip = f; p.cells = cells; rebuild(); save(); renderCard();
+}
+
+// ================================================================ palette, input
+function renderPalette() {
+  const el = document.getElementById('palette');
+  el.innerHTML = CATS.map((c, ci) => `<details class="cat" open><summary>${c}</summary><div class="pal">${ORDER.filter((id) => T[id].cat === ci).map((id) => {
+    const t = T[id];
+    const stat = t.kind === 'gen' ? `+${t.produce}` : t.kind === 'store' ? (t.conduit ? `${t.intake}` : `${t.intake}→${t.produce}·${t.hold}`) : isConsumer(t.kind) ? `${t.intake}` : '';
+    return `<button data-type="${id}" class="${tool === id ? 'on' : ''}" title="${esc(t.name)}: level ${t.lvl}, ${t.w}×${t.h}. ${esc(t.say || '')}"><span>${glyph(id, 0, false, t.w === 2 || t.h === 2 ? 12 : 20)}</span><span>${esc(t.name)}${t.isNew ? ' <span style="color:var(--accent)">new</span>' : ''}</span><span class="meta">${stat}</span></button>`;
+  }).join('')}</div></details>`).join('') + '<p class="note">Beside each part: what it makes (+), or its in ports → out ports · holds, or what it takes, a second. <span class="amber">▲</span> out, <span class="blue">▼</span> in.</p>';
+  el.querySelectorAll('button[data-type]').forEach((b) => b.addEventListener('click', () => setTool(b.dataset.type)));
+}
+let modeTimer = 0;
+function flashMode(msg) { document.getElementById('mode').textContent = msg; clearTimeout(modeTimer); modeTimer = setTimeout(() => setTool(tool), 1800); }
+function setTool(t) {
+  tool = t;
+  document.querySelectorAll('.pal button').forEach((b) => b.classList.toggle('on', b.dataset.type === t));
+  document.getElementById('tInspect').classList.toggle('on', t === 'inspect'); document.getElementById('tErase').classList.toggle('on', t === 'erase'); document.getElementById('tBreak').classList.toggle('on', t === 'break');
+  document.getElementById('orient').textContent = T[t] ? `${rot * 90}°${flip ? ', flipped' : ''}` : '';
+  document.getElementById('mode').textContent = T[t] ? `Placing ${T[t].name}. Click the grid; R turns it, T flips it; right-click removes. Ports: ${T[t].ports.map((q) => `${q.dir} ${q.rate}`).join(', ') || 'none'}.`
+    : t === 'erase' ? 'Erasing: click parts to remove them.' : t === 'break' ? 'Break: click a part to destroy it and set off its blast. Repair all undoes it.' : 'Pick a part below to place it, or click a part on the grid to select it. R and T turn a selected part.';
+}
+function cellAt(e) { const r = cv.getBoundingClientRect(); const x = Math.floor((e.clientX - r.left) / CS), y = Math.floor((e.clientY - r.top) / CS); return x >= 0 && y >= 0 && x < GW && y < GH ? { x, y } : null; }
+const tip = document.getElementById('tip');
+let painting = false;
+const partAt = (c) => L.occ[key(c.x, c.y)] || parts.find((p) => p.dead && p.cells.some(([x, y]) => x === c.x && y === c.y)) || null;
+cv.addEventListener('pointerdown', (e) => { const c = cellAt(e); if (!c) return; if (e.button === 2) { const p = partAt(c); if (p) removePart(p); return; } painting = true; act(c); });
+cv.addEventListener('pointermove', (e) => {
+  hover = cellAt(e); hoverPart = hover ? partAt(hover) : null;
+  if (hoverPart && !T[tool]) {
+    tip.innerHTML = `<b>${esc(nameOf(hoverPart))}</b>${explain(hoverPart).map((s) => `<p>${s}</p>`).join('')}`; tip.hidden = false;
+    tip.style.left = Math.min(e.clientX + 16, window.innerWidth - 360) + 'px'; tip.style.top = Math.min(e.clientY + 16, window.innerHeight - tip.offsetHeight - 10) + 'px';
+  } else tip.hidden = true;
+  if (painting && hover && (tool === 'erase' || (T[tool] && T[tool].w * T[tool].h === 1))) act(hover);
+});
+window.addEventListener('pointerup', () => { painting = false; });
+cv.addEventListener('pointerleave', () => { hover = null; hoverPart = null; tip.hidden = true; });
+cv.addEventListener('contextmenu', (e) => e.preventDefault());
+function act(c) {
+  const p = partAt(c);
+  if (tool === 'erase') { if (p) removePart(p); }
+  else if (tool === 'break') { if (p && !p.dead) { const gone = PM.destroy(L, p); rebuild(); flashMode(gone.length > 1 ? `${nameOf(p)} destroyed; its blast took ${gone.length - 1} more: ${gone.slice(1).map((g) => nameOf(g.part)).join(', ')}.` : `${nameOf(p)} destroyed.`); renderCard(); } }
+  else if (tool === 'inspect') { selected = p || null; renderCard(); }
+  else if (T[tool]) { const cells = PM.rectCells(tool, c.x, c.y, rot); if (fitsCells(tool, cells)) { const np = addPart(tool, c.x, c.y, rot, flip); selected = np; rebuild(); save(); renderCard(); } }
+}
+function rotateKey() { if (T[tool]) { rot = (rot + 1) % 4; setTool(tool); } else if (selected && !selected.dead) turnPart(selected, (selected.rot + 1) % 4, selected.flip); }
+function flipKey() { if (T[tool]) { flip = !flip; setTool(tool); } else if (selected && !selected.dead) turnPart(selected, selected.rot, !selected.flip); }
+const btn = (id, f) => document.getElementById(id).addEventListener('click', f);
+btn('tInspect', () => setTool('inspect')); btn('tErase', () => setTool('erase')); btn('tBreak', () => setTool('break')); btn('tRot', rotateKey); btn('tFlip', flipKey);
+const toggles = { cFire: 'fire', cThrust: 'thrust', cUtil: 'util', cPause: 'paused' };
+function syncCtrls() { for (const [id, k] of Object.entries(toggles)) document.getElementById(id).classList.toggle('on', ctrl[k]); }
+for (const [id, k] of Object.entries(toggles)) btn(id, () => { ctrl[k] = !ctrl[k]; syncCtrls(); });
+btn('fill', () => chargeAll(true)); btn('drain', () => chargeAll(false));
+btn('repair', () => { for (const p of parts) { p.dead = false; p.hp = undefined; } rebuild(); renderCard(); });
+btn('zoomIn', () => { settings.zoom++; sizeCanvas(); }); btn('zoomOut', () => { settings.zoom--; sizeCanvas(); }); btn('zoomFit', () => { settings.zoom = 0; sizeCanvas(); });
+document.getElementById('speed').addEventListener('change', (e) => { settings.speed = parseFloat(e.target.value); });
+document.getElementById('fireMode').addEventListener('change', (e) => { settings.fireMode = e.target.value; save(); });
+window.addEventListener('keydown', (e) => {
+  if (e.target.matches('input, textarea, select')) return;
+  const k = e.key.toLowerCase();
+  if (k === 'f') ctrl.fire = !ctrl.fire; else if (k === 'w') ctrl.thrust = !ctrl.thrust; else if (k === 'u') ctrl.util = !ctrl.util; else if (k === 'r') rotateKey(); else if (k === 't') flipKey();
+  else if (k === 'b') setTool('break'); else if (k === ' ') { ctrl.paused = !ctrl.paused; e.preventDefault(); } else if (k === 'escape') { setTool('inspect'); selected = null; renderCard(); }
+  else if (k === 'x') setTool('erase'); else if ((k === 'delete' || k === 'backspace') && selected) removePart(selected);
+  else return;
+  syncCtrls();
+});
+
+// ================================================================ examples
+function renderShipPicker() {
+  const sel = document.getElementById('ship');
+  sel.innerHTML = '<option value="">Load an example…</option>' + EXAMPLES.map((ex, i) => `<option value="ex:${i}">${esc(ex.name)}</option>`).join('') + '<option value="empty">Empty grid</option>';
+  sel.addEventListener('change', () => { if (sel.value) loadChoice(sel.value); sel.value = ''; });
+}
+function loadChoice(v) {
+  parts = []; selected = null; about = '';
+  GW = 16; GH = 12; rebuild();
+  if (v.startsWith('ex:')) {
+    const ex = EXAMPLES[+v.slice(3)]; shipName = ex.name; about = ex.about;
+    for (const [type, x, y, r, f] of ex.parts) { const cells = PM.rectCells(type, x, y, r || 0); if (fitsCells(type, cells)) { addPart(type, x, y, r, f); rebuild(); } }
+    armourRing();
+  } else shipName = 'Empty grid';
+  ticks = 0; simT = 0; rebuild(); settings.zoom = 0; sizeCanvas(); save(); renderCard(); renderAbout();
+}
+function renderAbout() { document.getElementById('about').innerHTML = about ? `<b>${esc(shipName)}.</b> ${esc(about)}` : ''; }
+function armourRing() {
+  const xs = parts.flatMap((p) => p.cells.map((c) => c[0])), ys = parts.flatMap((p) => p.cells.map((c) => c[1]));
+  const x0 = Math.min(...xs) - 1, y0 = Math.min(...ys) - 1, x1 = Math.max(...xs) + 1, y1 = Math.max(...ys) + 1;
+  for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) if ((x === x0 || x === x1 || y === y0 || y === y1) && fitsCells('armor', [[x, y]])) { addPart('armor', x, y); rebuild(); }
+}
+
+// ================================================================ saving
+const KEY = 'energy-ports-v1';
+let saveTimer = 0;
+function snapshot() {
+  const params = {};
+  for (const id of ORDER) {
+    const t = T[id], d = DEFAULTS[id], o = {};
+    for (const k of Object.keys(t)) if (typeof t[k] === 'number' && t[k] !== d[k]) o[k] = t[k];
+    if (t.blast && (t.blast.dmg !== d.blast.dmg || t.blast.r !== d.blast.r)) o.blast = t.blast;
+    const pr = t.ports.map((q, i) => (q.rate !== d.ports[i].rate ? q.rate : null)); if (pr.some((v) => v !== null)) o.ports = pr;
+    if (Object.keys(o).length) params[id] = o;
+  }
+  return { v: 1, name: shipName, about, parts: parts.map((p) => [p.type, Math.min(...p.cells.map((c) => c[0])), Math.min(...p.cells.map((c) => c[1])), p.rot, p.flip]), params, settings: { fireMode: settings.fireMode } };
+}
+function resetParams() { for (const id of ORDER) { const d = DEFAULTS[id], t = T[id]; for (const k of Object.keys(d)) if (typeof d[k] === 'number') t[k] = d[k]; if (d.blast) t.blast = Object.assign({}, d.blast); t.ports.forEach((q, i) => { q.rate = d.ports[i].rate; }); PM_recompute(t); } }
+function restore(s) {
+  resetParams();
+  for (const [id, ps] of Object.entries(s.params || {})) { const t = T[id]; if (!t) continue; for (const [k, v] of Object.entries(ps)) { if (k === 'ports') v.forEach((r, i) => { if (r !== null && t.ports[i]) t.ports[i].rate = r; }); else if (k === 'blast') t.blast = Object.assign({}, t.blast, v); else if (typeof v === 'number') t[k] = v; } PM_recompute(t); }
+  if (s.settings) Object.assign(settings, s.settings); document.getElementById('fireMode').value = settings.fireMode;
+  shipName = s.name || 'Your design'; about = s.about || ''; GW = 16; GH = 12;
+  parts = []; selected = null; rebuild();
+  for (const [type, x, y, r, f] of s.parts || []) if (T[type]) addPart(type, x, y, r, f);
+  ticks = 0; simT = 0; rebuild(); sizeCanvas(); renderPalette(); renderCard(); renderAbout();
+}
+function save() { clearTimeout(saveTimer); saveTimer = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify(snapshot())); } catch (e) { /* storage unavailable */ } }, 300); }
+btn('exp', () => { document.getElementById('io').value = JSON.stringify(snapshot()); document.getElementById('ioMsg').textContent = 'The design is in the box. Copy it to keep it or send it.'; });
+btn('imp', () => { try { restore(JSON.parse(document.getElementById('io').value)); save(); document.getElementById('ioMsg').textContent = 'Loaded the design from the box.'; } catch (e) { document.getElementById('ioMsg').textContent = 'That text isn’t a saved design. Paste all of it, starting with {.'; } });
+btn('resetParams', () => { resetParams(); rebuild(); save(); renderPalette(); renderCard(); document.getElementById('ioMsg').textContent = 'Every number is back to the proposal.'; });
+
+// ================================================================ run
+let last = performance.now(), acc = 0, frame = 0;
+function step() {
+  F = PM.tick(L, { fire: firingNow(), thrust: ctrl.thrust, util: ctrl.util }, ticks);
+  for (const k in F) Fs[k] = ema(Fs[k], F[k]);
+  ticks++; simT += DT;
+}
+function loop(now) {
+  const dt = Math.min(0.25, (now - last) / 1000); last = now;
+  if (!ctrl.paused) { acc += dt * settings.speed * 60; let n = 0; while (acc >= 1 && n < 400) { step(); acc -= 1; n++; } if (n >= 400) acc = 0; }
+  draw();
+  if (frame++ % 10 === 0) { renderFlow(); renderLists(); renderProblems(); if (selected) { const el = document.getElementById('cardText'); if (el) el.innerHTML = explain(selected).map((s) => `<p>${s}</p>`).join(''); } }
+  requestAnimationFrame(loop);
+}
+rebuild(); renderPalette(); renderShipPicker(); setTool('inspect');
+let loaded = false;
+// ports.html#ex=2 opens example 2
+const hash = new URLSearchParams(location.hash.slice(1));
+if (hash.get('ex')) { const i = parseInt(hash.get('ex'), 10) - 1; if (EXAMPLES[i]) { loadChoice('ex:' + i); loaded = true; } }
+if (!loaded) try { const s = localStorage.getItem(KEY); if (s) { restore(JSON.parse(s)); loaded = parts.length > 0; } } catch (e) { /* no storage */ }
+if (!loaded) loadChoice('ex:0');
+syncCtrls(); sizeCanvas(); renderCard();
+window.addEventListener('resize', sizeCanvas);
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

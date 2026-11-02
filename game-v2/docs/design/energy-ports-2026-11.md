@@ -1,0 +1,261 @@
+# Energy ports: directed power routing (2026-11-02)
+
+Status: **design for testing in the lab** (`prototypes/energy-lab/ports.html`), from the owner's direction on 2026-11-02.
+Nothing in the game changes until the lab has settled the numbers. It replaces the touch-and-even-out routing of
+`energy-routing-impl.md` (D1, D5), the bank and pool rules (`circuits.ts`), the Diode and the Pulse Dynamo. It keeps the
+weapon buffer model (`energy-economy-2026-11.md` §2: Shot, Intake, Buffer) and the thruster buffer.
+
+## 0. Why
+
+The ship evolver (`scripts/shipgen/evolver`) was fed the game's own numbers and asked for the best gunship. It
+built one and told us the meta:
+
+- **Power is the cheapest thing on the ship.** A Cell Reactor makes 35 E/s for 16 credits: five times the value of the
+  next generator. A spare reactor (16 credits, 1 build point) is cheaper than armouring one (35–70 credits, 2–4 points),
+  so the optimiser builds spares and leaves them exposed. Losing one changes nothing.
+- **Storage has no job.** No gun draws more than its steady supply, so a Capacitor (holds 160 for 57 credits) is a weak
+  reactor. Burst damage equals sustained damage on every evolved ship. Nothing ever carried a store.
+- **Blasts are too small to matter.** A reactor's 45 damage at 2 cells can't take out a 75 hp hull cell beside it.
+- **Layout doesn't matter.** Power pools through whatever touches; the only decision is "is it adjacent". A level-30
+  ship is a level-1 ship with more guns stuck on.
+
+The owner's answer: make power a thing you **route**. Every power part has ports on specific edges. Power moves only
+out of an out port into an in port across a shared edge. Generators are weak, dear and dangerous. Batteries are where
+lines join and split, so a good gun needs two generators through a battery, and a superweapon needs a ship built around
+its power chain. Then protecting the chain is the whole art of ship design, and the evolver can find it.
+
+## 1. Rules
+
+### 1.1 Ports
+
+- A **port** is one edge of one cell of a part, marked **in** or **out**, with a **rate** (E/s, the most that may cross
+  it in a second). A part may have any number of ports; most have one to four. Hull, armour and cargo have none and
+  never carry power.
+- Ports are in the part's own frame. Rotation (`rot`) and `flip` move them with the part. Unrotated: **N is the nose**
+  (forward). Guns fire N and take power from S; engines push S and take from N; generators give N; stores take S, give N.
+  A vertical chain reactor → battery → gun needs no rotation; the chain to the engines is the same parts turned about.
+- Two ports are **linked** when they lie on the same shared edge and one is out and the other in. Power crosses a link
+  from the out side to the in side, never back.
+- A port that faces no matching port is **open**. An open out port on a generator wastes its share. An open in port on
+  a gun means the gun is short that port's rate. Two outs or two ins facing each other **clash** and pass nothing (the
+  hangar warns).
+
+### 1.2 Parts
+
+| Kind | Ports | Holds | Behaviour |
+|---|---|---|---|
+| **Generator** | out only | none | Each out port offers its rate every tick. What isn't taken is wasted. A two-port generator is two lines of half the power, not one line of all of it. |
+| **Store** (battery, capacitor, bank, the core) | in and out | yes | Takes through in ports (each at most its rate; all together at most the space left), gives through out ports (each at most its rate; all together at most what it holds). What comes in and isn't given out stays as charge. |
+| **Conduit** | 1 in, 1 out | 10 (a few ticks) | A store too small to matter: a one-way line. Straight (in S, out N) or corner (in S, out E; flip for W). The old Diode is retired: every Conduit is one. |
+| **Consumer** (weapon, engine, shield, tool) | in only | its buffer | Takes through each in port at most that port's rate, into its buffer, until full. A part with two in ports fed on one gets at most half its intake. |
+
+Power never flows store → generator, consumer → anything, or through hull. There is no pool: the core is a store like
+any other, with the ports below.
+
+### 1.3 The tick (deterministic, synchronous)
+
+Every tick (60 a second), from the state at the start of the tick:
+
+1. **Offer.** Each giver (generator or store) offers across each of its out links `min(out rate, in rate) × dt`, the
+   link's cap. A generator offers the cap on every link. A store offers what it holds, water-filled across its out
+   links (smallest cap first), so no link gets more than its cap and the total never exceeds what it holds.
+2. **Accept.** Each taker accepts from its in links, water-filled: a store up to the space left in it, a consumer up to
+   the space left in its buffer. What a taker refuses stays with the giver.
+3. **Apply** every transfer at once. A store's charge changes by in − out; both were bounded by its start-of-tick state,
+   so it stays within 0..Holds.
+4. **Consumers act:** passive drain, firing, thrust, shields (§1.4, §1.5).
+
+Order doesn't matter within a step, so the result is the same on the server, in the pilot's prediction and in the
+hangar, and it parallelises. A conduit adds one tick of latency per cell; at 60 a second a ten-cell run is a sixth of a
+second, which is fine. Integer eu as today (`units.ts`).
+
+Backpressure falls out: a full store accepts nothing, so the store behind it fills, and so on back to the generator,
+whose offer is then wasted. "Wasted at generators" is the signal that a chain is over-supplied.
+
+### 1.4 Weapons
+
+Unchanged from `energy-economy-2026-11.md` §2 and the lab: a weapon has **Shot** (E a shot), **Buffer** (shots stored)
+and its in ports' rates sum to its **Intake**. It fires when its buffer holds a shot and its cycle is done; short of
+supply it fires slower, never weaker (`fire interval = max(cycle, Shot ÷ supply)`). Beams burn from the buffer while
+lit and relight at half. Clips are magazines (D2).
+
+**New: passive drain.** A weapon may have a **Passive** (E/s) that leaves its buffer every tick whether or not it fires:
+containment fields, targeting arrays, a lance's standing charge. Its buffer only fills at `supply − passive`, so
+`fire interval = max(cycle, Shot ÷ (supply − passive))`, and **below Passive it never fires at all**. Most weapons have
+0; the big ones have 5–15% of their intake. It is the floor under "a tier-1 generator can fire an endgame gun, slowly":
+it can fire a Longbarrel slowly, but it can't light a Lance. The hangar card says "needs at least 40 E/s to charge".
+
+### 1.5 Engines, shields and tools
+
+As in the lab today: a thruster burns from a buffer that refills through its in ports; once empty it runs at intake ÷
+burn. Shields and tools draw a flat rate into a one-second buffer; their share is what they get over what they want.
+Priority between a gun and an engine on the same store is settled by the store's ports: the ship's wiring is the
+priority, as the owner asked (2026-11-02), not a phase order.
+
+### 1.6 Damage
+
+- **Generators are weaker, dearer and far more explosive** (§3). A Cell Reactor's blast kills an alloy hull cell beside
+  it and sets off a reactor next to it, so packing reactors is a chain reaction waiting to happen.
+- **Charged stores explode in proportion to their charge:** `damage = 0.6 × held`, `radius = 1.5 + held ÷ 300` (at most
+  4.5). A full Capacitor (160) does 96 at 2 cells; a full Heavy Bank (1,200) does 720 at 4.5 cells: a bomb to bury. An
+  empty store is harmless. So a store is a liability as well as an asset, and the ship that discharges before it gets
+  hit is playing well.
+- Conduits and stores are fragile (§3). One hit on a line cuts everything downstream until it is repaired.
+- Blasts as `bridge/damage.ts applyBlast` today: linear falloff to the radius, explosive resist, chains.
+
+## 2. Design rules (how the numbers are chosen)
+
+1. **A store is three numbers: In, Out, Holds.** Sustained = min(ΣIn, ΣOut). Peak = ΣOut, for Holds ÷ (Out − In)
+   seconds. Refill = Holds ÷ (In − draw). **Out ≥ In always**: a store with Out below In is a bottleneck, not a store.
+   The gap is its character: a battery's Out is a little above its In (smoothing and joining), a capacitor's far above
+   (the alpha strike), a bank's about equal with huge Holds (endurance).
+2. **A store cell competes with a generator cell over a burst.** Over a firing window of T seconds a store cell is
+   worth Holds ÷ T E/s. With T ≈ 8 s and a reactor at 30 E/s, a store cell wants Holds ≈ 250–350 to be worth its
+   cell. Capacitors sit below that on purpose (their value is Out, not Holds); banks above.
+3. **A spare generator must cost more than covering one.** Generation is priced (credits and build points) so that
+   two reactors cost more than one reactor plus the two or three armour cells that hide it. Then the optimiser hides
+   them. Today it is the other way round.
+4. **Weapon tiers are infrastructure tiers.** Starter guns take one port at ≤ 35 E/s: one reactor, direct. Mid guns take
+   one port at ~70: two reactors through a Joiner Bank, or a plant port. Late guns take two ports: two joined lines or a
+   plant. End guns take two to four ports at 150 each: plants, banks and a Capacitor Array. The ship grows around the gun.
+5. **A gun is paid for by the ship around it.** A Lance is cheap for its damage; the 20 cells of plants, banks and
+   conduits it needs, and the armour to hide them, are the price. The swarm build (many starter guns on their own
+   reactors) stays viable because it loses one gun per hit instead of all of them; the superweapon build wins on
+   penetration and alpha, which the swarm can never have. Both must evolve in their scenarios (§6).
+6. **One sentence per part** (`rework-2026-11.md` §1). A battery's sentence is its ports: "Takes two lines in at 40
+   each, gives one out at 90; holds 300."
+
+## 3. The parts (first proposal: the lab's numbers)
+
+Ports are written `dir side[cell] rate`. Sides are the part's own, unrotated (N nose). `[0]` is the left (W) cell of a
+N or S side and the top (N) cell of a W or E side.
+
+### Generators
+
+| Part | Piece | Lvl | Ports | HP | Blast | Sentence |
+|---|---|---|---|---|---|---|
+| Cell Reactor | sq | 0 | out N 30 | 50 | 120 at 2.5 | The starter: one line of 30. Fragile; it takes its neighbours with it. (Today 35, 45 at 2.) |
+| Twin Reactor (new) | sq | 6 | out N 18, out S 18 | 50 | 140 at 2.5 | Two lines fore and aft. More power, one blast for two chains. |
+| Isotope Pile | round→sq | 9 | out N 15 | 150 | none | Weak, tough, never explodes: the armoured brick's heart. |
+| Overclock Reactor | rect2 | 24 | out N[0] 55, out N[1] 55 | 80 | 350 at 4 | Most power a cell; the biggest blast. |
+| Fusion Plant | block2 | 18 | out N[0] 60, out N[1] 60 | 300 | 260 at 3.5 | Two strong lines; heavy and tough. (Today 192 in one pool.) |
+| Stellarator (new, optional) | block2 | 36 | out N[0] 60, N[1] 60, S[0] 60, S[1] 60 | 400 | 400 at 4.5 | Four lines: the end-game plant. |
+
+### Stores and conduits
+
+| Part | Piece | Lvl | In | Out | Holds | HP | Sentence |
+|---|---|---|---|---|---|---|---|
+| Core | rect2 | — | W 60, E 60 | N[0] 150, N[1] 150, S[0] 150, S[1] 150 | 240 | 150 | Power in from the sides, out fore and aft: the free hub every ship has. |
+| Conduit | sq | 0 | S 200 | N 200 | 10 | 35 | A one-way line. |
+| Conduit, corner | sq | 0 | S 200 | E 200 | 10 | 35 | A one-way line that turns (flip it to turn the other way). |
+| Cell Battery | sq | 0 | S 40 | N 60 | 200 | 45 | Smooths one line. |
+| Joiner Bank | rect2 | 3 | S[0] 40, S[1] 40 | N[0] 90 | 300 | 90 | Two lines in, one out: the first thing a mid gun needs. |
+| Splitter Bank | rect2 | 5 | S[0] 80 | N[0] 45, N[1] 45 | 300 | 90 | One line in, two out: two guns on one plant port. |
+| Capacitor | sq | 7 | S 40 | N 400 | 160 | 30 | Pays a big shot at once, then 4 s to refill. |
+| Drive Cell | sq | 10 | S 60 | N 250 | 320 | 45 | The Capacitor for engines: a dodge or a boost, then 5 s. |
+| Flux Coil (new) | rect2 | 20 | S[0] 150, S[1] 150 | N[0] 300 | 160 | 70 | Joins two plant lines into one fast one. |
+| Heavy Bank | block2 | 20 | S[0] 70, S[1] 70 | N[0] 150 | 1,200 | 280 | Endurance: fills between fights, carries a gun through one. Full, it is a bomb. |
+| Capacitor Array | block2 | 26 | S[0] 60, S[1] 60, W[0] 60, W[1] 60, E[0] 60, E[1] 60 | N[0] 600, N[1] 600 | 600 | 150 | Six lines in at 60, two huge lines out at 600: the last stage before a superweapon. |
+
+Retired: Diode (every Conduit is one), Pulse Dynamo (wireless feeding has no place with ports), pools and banks in
+`circuits.ts`, the Capacitor's "guns only" and the Drive Cell's "engines only" (ports decide who is fed).
+
+### Weapons (the lab's subset; the rest follow the bands in §2.4)
+
+| Weapon | Piece | Lvl | In ports | Shot / Buffer / Cycle | Passive | DPS at full rate |
+|---|---|---|---|---|---|---|
+| Pip | sq | 0 | S 20 | 10 / 1 / 0.5 s | 0 | 56 |
+| Glint | sq | 9 | S 35 | 28 / 1 / 0.8 s | 0 | 54 |
+| Hammer | rect2 | 6 | S[0] 70 | 70 / 1 / 1 s | 0 | 69 |
+| Cutter (beam) | rect2 | 18 | S[0] 45, S[1] 45 | burns 90, buffer 180 | 5 | 150 lit |
+| Longbarrel | rect2 | 20 | S[0] 55, S[1] 55 | 220 / 1 / 2 s | 0 | 48 |
+| Spear | block2 | 28 | S[0] 45, S[1] 45 | 180 / 2 / 2 s | 10 | 85 |
+| Bastion | block2 | 30 | S[0] 55, S[1] 55, W[1] 55, E[1] 55 | 60 a round, clip 16, 0.25 s | 15 | 111 |
+| Lance (beam) | rect2 | 32 | S[0] 150, S[1] 150 | burns 300, buffer 600 | 40 | 210 lit |
+
+The Hammer at level 6 is the first gun one reactor can't feed: it wants a Joiner Bank (level 3) and two reactors, or
+to wait for a plant. The Lance on one Cell Reactor never lights (30 < 40 passive); on a Fusion Plant's two ports it runs
+at 120 − 40 = 80 E/s into a 300 E/s burn, so it fires a quarter of the time: that is "a tier-1 generator fires an endgame
+gun, slowly" with a floor under it.
+
+### Engines and shields
+
+| Part | Piece | In ports | Burn / Buffer | Thrust |
+|---|---|---|---|---|
+| Ion Drive | sq | N 12 | 9 / 30 | 2.26 |
+| Plasma Drive | rect2 | N[0] 25, N[1] 25 | 40 / 120 | 6.2 |
+| Deflector | sq | S 16 | flat 16 | — |
+
+### Costs (direction, not numbers)
+
+Credits come from recipes (`recipes.ts partValue` over `items.json`), and those values are guesses, not tied to how
+hard anything is to get (owner, 2026-11-02). The cost audit is separate work: an export that computes each item's
+effort (minutes of play to acquire at its level: mining rate × density × travel, drop rates × time a kill, refining and
+fabrication time) and reports it against today's value. Until then the rule in §2.3 is the target: a Cell Reactor
+about double today's 16 credits and 2 build points, so that a spare costs more than cover.
+
+## 4. The meta this is meant to produce
+
+| Build | Power layout | Strength | Weakness |
+|---|---|---|---|
+| Swarm | one reactor per starter gun, or a Splitter Bank per pair | loses one gun a hit; cheap; simple | no penetration; low alpha; many exposed reactors, each a small bomb |
+| Trunk | two or three mid guns on a joined trunk from the core | efficient; one chain to armour | the trunk is a single point of failure |
+| Superweapon | plants → Joiner Banks / Flux Coils → Capacitor Array → one gun | alpha and penetration nothing else has | most of the ship is power; one hit in the chain and it is a hull with a gun on it |
+| Brick | Isotope Piles and Heavy Banks under armour | survives; never explodes | slow, low output, a bomb if the banks are full |
+
+Penetration is what makes the superweapon worth its ship. The evolver's scenarios need the enemy's armour so that
+penetration counts (today it ignores it), and the hit simulation needs the new blasts. With those, the gunship
+scenario should evolve a trunk or a swarm and a "capital" scenario a superweapon, and both should bury their chains.
+
+## 5. Hangar and HUD
+
+- Every power part draws its ports on its edges: a filled triangle pointing out for an out port, a notch pointing in
+  for an in port; amber for out, blue for in. A linked pair glows; an open in port on a consumer is red; a clash is
+  red on both. Hovering a port shows its rate and what it faces.
+- Rotate (R) and flip (T) turn the ports with the part; the ghost shows them before placing.
+- The power overlay draws each live link with its E/s and dims the chain downstream of a broken part.
+- The card: the part's sentence (§2.6), then "Now: in 60, out 48, holds 220 of 300", then the warnings.
+- Blast rings on hover for generators and charged stores, as the hazard they are.
+
+## 6. Implementation (after the lab settles the numbers)
+
+| Phase | Change | Files |
+|---|---|---|
+| A ports in data | `ports: [{side, cell, dir, rate}]` on every power model, `passive` on weapons, new blast numbers, `storeBlast` in tuning; retire `bank`, `pool`, `dynamo`, `oneWay`, `discharge`, `intake` (port rates replace them) | `data/ships/models.json`, `tuning.json`, `scripts/econ/models.mjs`, `types.ts` |
+| B the tick | links built in `layout.ts` from ports + rot/flip; `tick.ts` becomes offer/accept over links (§1.3); banks, pools, dynamos and the thrust-first phase go | `power/layout.ts`, `power/tick.ts`, `power/blueprint.ts`, tests, goldens |
+| C validation | a consumer with every in port open is "unpowered" (hangar warning, not an error); a clash is a warning | `validate.ts`, `routeCheck` |
+| D hangar | port glyphs, link overlay, hover, R/T | `HangarUI`, `partTip`, `describe` |
+| E migration | a router that re-lays each bundled blueprint's power parts with ports and conduits (the evolver's `cheapest_build` is the start of it); players' saves show the overlay until they re-route | `scripts/ships/route.ts` (new), blueprints |
+| F evolver | the catalogue gains ports; placements carry rot/flip; a `route` change lays conduits; scoring runs the game's own tick over a fight timeline (firing windows) through the kept-open node process, so storage, passive drain and ports are measured exactly as the game does them | `scripts/shipgen/evolver/*` |
+
+Each phase is one PR, tested in the power suites and goldens, under the modular-layout rule.
+
+## 7. Decisions for Kieran
+
+1. **Generator split:** fixed per port (as written: a Twin Reactor is two lines of 18), or the part's total shared by
+   demand across its ports? Fixed is readable and makes placement count; shared is forgiving.
+2. **The core's ports:** in from the sides, out fore and aft (as written), or something else? It is the one free
+   store, so its shape sets what every starter ship looks like.
+3. **Passive drain:** on which weapons, and how much? Written: 0 on starter and mid guns, 5–15% of intake on late
+   and end guns, 40 on the Lance.
+4. **Charged-store blasts:** keep? The numbers (0.6 × held) make a full Heavy Bank a 720-damage bomb.
+5. **Conduit corners:** a separate part, or one Conduit with a corner rotation state? (The lab has two parts.)
+6. **Retire the Diode and the Pulse Dynamo,** or keep them as models with new meanings?
+7. **Engines fed from the front (N) and guns from the back (S),** as written? Or every consumer from any side with
+   per-side rates?
+
+## 8. The lab
+
+`prototypes/energy-lab/ports.html` runs these rules (the model is in `ports-model.js`, tested by `ports-model.test.mjs`).
+Place parts, R rotates, T flips, hover for what each part is doing, click to pin it and edit its numbers (port rates
+included). Fire runs the guns; **Bursts** fires in windows so you can see stores pay off; **Break** destroys a part and
+sets off its blast. Examples in the Load menu:
+
+1. **Starter: two reactors into the core, two Pips and two Ion Drives.** The core's in ports (60) are the limit.
+2. **A Hammer needs two reactors.** Joiner Bank under it; take a reactor away and watch it drop to half rate.
+3. **Two Glints on one line.** A Splitter Bank; the second plant port is wasted until you fix it.
+4. **Alpha: a Longbarrel on a Capacitor.** Charged, it fires at once; then the refill sets the pace. Try Bursts.
+5. **Passive: a Spear on one reactor.** It fills at 20 E/s net; the Lance beside it never charges.
+6. **A superweapon and its ship.** Two Fusion Plants and four reactors into Joiner Banks and a Capacitor Array, into a Lance.
+7. **Engines round a corner.** Core, Drive Cells and corner conduits to Ion Drives on the flanks.
+8. **Chain reaction.** Reactors packed beside the guns. Break one.
