@@ -428,6 +428,17 @@ find the same ones in a real ruleset.
 | Scores against the start ship | a weak start made gains huge and penalties invisible | fixed scales per scenario |
 | Any one-in-one-out part as wire | Scrubbers and Passthroughs laid as conduit | aimed lines are plain conduits |
 | Live conduits rewarded by count | 42-cell live snakes outscored the Sunbreaker | dropped |
+| No rule that a ship is one piece | guns and their reactors floating off the hull | parts not joined to the core pay (detached) |
+| One scorer crash lost a whole batch | (tooling) | the scorer restarts; a failed run keeps its best |
+
+The gallery's ships (best of two seeds each):
+
+| Scenario | Score | Damage a second | Dealt before the core went | Thrust for mass | Guns: links straight from a reactor |
+|---|---|---|---|---|---|
+| Gunship | 3.19 | 240 | 4,774 in 101 s | 0.124 (target 0.12) | 67% |
+| Raider | 1.75 | 148 | 3,662 in 96 s | 0.088 | 0% |
+| Siege | 0.38 | 19 | 296 in 111 s | 0.120 | 50% |
+| Capital (an earlier batch, before the detached rule) | 0.70 | 142 | 3,129 in 146 s | 0.014 (target 0.06) | 0% |
 
 What it says about the design itself (with the caveat that the search is still weak: two seeds of one scenario can
 differ fourfold):
@@ -441,6 +452,10 @@ differ fourfold):
   difference between a Longbarrel doing 55% and 115% damage, and runs that found it scored best.
 - **Thrust is the hardest thing to evolve** and was the largest loss in most runs: engines need wiring at the far end of
   the ship. The engine change helps; a real game would give the hangar an engine budget the player sees.
+- **The Siege is unsolved.** Its Longbarrels are fixed in place, but no run built them a working joined or buffered
+  line with tungsten; they deal 19 a second. Either the search needs a heavy-gun seed line (as the start ship has for
+  Pips) or the scenario is asking too much of 1,200 generations.
+- **The Capital barely moves** (its thrust is a quarter of the target) and is slow to evolve (about 4 s a generation).
 - **Heavy weapons need help to be found.** Random search rarely builds a Joiner tree to a heavy gun from scratch, so the
   Siege and Capital start with their guns fixed in place and evolve the ship around them. That matches the design
   intent anyway: you decide on the superweapon, then build its ship.
