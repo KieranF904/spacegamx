@@ -30,7 +30,15 @@ button.b.on kbd { color: #c9a26a; }
 button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .wrap { display: grid; grid-template-columns: 230px minmax(0, 1fr) 400px; gap: 12px; align-items: start; }
 @media (max-width: 1250px) { .wrap { grid-template-columns: 200px minmax(0, 1fr); } .side { grid-column: 1 / -1; } }
-@media (max-width: 760px) { .wrap { grid-template-columns: 1fr; } }
+@media (max-width: 760px) {
+  .wrap { grid-template-columns: 1fr; }
+  /* Phone: the grid first; the tools and parts sit in a short bar stuck to the bottom of the screen, categories folded */
+  main { order: 1; } .side { order: 3; }
+  .left { order: 2; position: sticky; top: auto; bottom: 0; z-index: 5; max-height: 38vh; padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)); box-shadow: 0 -6px 16px #000a; }
+  .canvas-wrap { max-height: 52vh; }
+  .pal { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .mode { min-height: 0; }
+}
 .pane { background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 10px 12px; }
 .left { max-height: calc(100vh - 80px); overflow: auto; position: sticky; top: 10px; }
 .cat summary { cursor: pointer; font: 600 11px var(--sans); text-transform: uppercase; letter-spacing: .08em; color: var(--mute); padding: 4px 0; }
@@ -491,8 +499,9 @@ function turnPart(p, r, f) {
 
 // ================================================================ palette, input
 function renderPalette() {
+  const phone = matchMedia('(max-width: 760px)').matches;
   const el = document.getElementById('palette');
-  el.innerHTML = CATS.map((c, ci) => `<details class="cat" open><summary>${c}</summary><div class="pal">${ORDER.filter((id) => T[id].cat === ci).map((id) => {
+  el.innerHTML = CATS.map((c, ci) => `<details class="cat"${phone ? '' : ' open'}><summary>${c}</summary><div class="pal">${ORDER.filter((id) => T[id].cat === ci).map((id) => {
     const t = T[id];
     const stat = t.kind === 'gen' ? `+${t.produce}` : t.kind === 'store' ? (t.conduit ? `${t.intake}` : `${t.intake}→${t.produce}·${t.hold}`) : isConsumer(t.kind) ? `${t.intake}` : '';
     return `<button data-type="${id}" class="${tool === id ? 'on' : ''}" title="${esc(t.name)}: level ${t.lvl}, ${t.w}×${t.h}. ${esc(t.say || '')}"><span>${glyph(id, 0, false, t.w === 2 || t.h === 2 ? 12 : 20)}</span><span>${esc(t.name)}${t.isNew ? ' <span style="color:var(--accent)">new</span>' : ''}</span><span class="meta">${stat}</span></button>`;
@@ -589,14 +598,14 @@ function snapshot() {
     const pr = t.ports.map((q, i) => (q.rate !== d.ports[i].rate ? q.rate : null)); if (pr.some((v) => v !== null)) o.ports = pr;
     if (Object.keys(o).length) params[id] = o;
   }
-  return { v: 1, name: shipName, about, parts: parts.map((p) => [p.type, Math.min(...p.cells.map((c) => c[0])), Math.min(...p.cells.map((c) => c[1])), p.rot, p.flip]), params, settings: { fireMode: settings.fireMode } };
+  return { v: 1, name: shipName, about, grid: [GW, GH], parts: parts.map((p) => [p.type, Math.min(...p.cells.map((c) => c[0])), Math.min(...p.cells.map((c) => c[1])), p.rot, p.flip]), params, settings: { fireMode: settings.fireMode } };
 }
 function resetParams() { for (const id of ORDER) { const d = DEFAULTS[id], t = T[id]; for (const k of Object.keys(d)) if (typeof d[k] === 'number') t[k] = d[k]; if (d.blast) t.blast = Object.assign({}, d.blast); t.ports.forEach((q, i) => { q.rate = d.ports[i].rate; }); PM_recompute(t); } }
 function restore(s) {
   resetParams();
   for (const [id, ps] of Object.entries(s.params || {})) { const t = T[id]; if (!t) continue; for (const [k, v] of Object.entries(ps)) { if (k === 'ports') v.forEach((r, i) => { if (r !== null && t.ports[i]) t.ports[i].rate = r; }); else if (k === 'blast') t.blast = Object.assign({}, t.blast, v); else if (typeof v === 'number') t[k] = v; } PM_recompute(t); }
   if (s.settings) Object.assign(settings, s.settings); document.getElementById('fireMode').value = settings.fireMode;
-  shipName = s.name || 'Your design'; about = s.about || ''; GW = 16; GH = 12;
+  shipName = s.name || 'Your design'; about = s.about || ''; [GW, GH] = Array.isArray(s.grid) ? s.grid : [16, 12];
   parts = []; selected = null; rebuild();
   for (const [type, x, y, r, f] of s.parts || []) if (T[type]) addPart(type, x, y, r, f);
   ticks = 0; simT = 0; rebuild(); sizeCanvas(); renderPalette(); renderCard(); renderAbout();
@@ -622,9 +631,12 @@ function loop(now) {
 }
 rebuild(); renderPalette(); renderShipPicker(); setTool('inspect');
 let loaded = false;
-// ports.html#ex=2 opens example 2
+// ports.html#ex=2 opens example 2; #design=<a saved design> opens that (the evolver's Open in lab); #file=evolved/<name>.json
+// fetches one (over http only: the evolver writes the latest best of each scenario to evolved/)
 const hash = new URLSearchParams(location.hash.slice(1));
 if (hash.get('ex')) { const i = parseInt(hash.get('ex'), 10) - 1; if (EXAMPLES[i]) { loadChoice('ex:' + i); loaded = true; } }
+if (hash.get('design')) { try { restore(JSON.parse(hash.get('design'))); save(); loaded = true; } catch (e) { /* not a design */ } }
+if (hash.get('file')) fetch(hash.get('file'), { cache: 'no-store' }).then((r) => r.json()).then((d) => { restore(d); save(); }).catch(() => { document.getElementById('about').textContent = `Couldn't load ${hash.get('file')} (it only works when the lab is served over http).`; });
 if (!loaded) try { const s = localStorage.getItem(KEY); if (s) { restore(JSON.parse(s)); loaded = parts.length > 0; } } catch (e) { /* no storage */ }
 if (!loaded) loadChoice('ex:0');
 syncCtrls(); sizeCanvas(); renderCard();

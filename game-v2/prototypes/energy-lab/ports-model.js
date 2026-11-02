@@ -72,14 +72,27 @@
   gun({ id: 'spear', name: 'Spear', lvl: 28, w: 2, h: 2, hp: 240, ports: [I('S', 45, 0), I('S', 45, 1)], shot: 180, cycle: 2.0, buffer: 2, damage: 170, passive: 10 });
   gun({ id: 'bastion', name: 'Bastion', lvl: 30, w: 2, h: 2, hp: 300, ports: [I('S', 55, 0), I('S', 55, 1), I('W', 55, 1), I('E', 55, 1)], shot: 60, cycle: 0.25, buffer: 16, clip: true, damage: 28, passive: 15 });
   gun({ id: 'lance', name: 'Lance', lvl: 32, w: 2, hp: 200, ports: [I('S', 150, 0), I('S', 150, 1)], beam: true, burn: 300, bufferE: 600, dps: 210, passive: 40 });
+  // The embedded superweapon: six lines of 60, from the back and both flanks, so the ship is built around it. Its passive
+  // drain (150) means it needs three of the six alive to charge at all, and all six to fire at its full rate.
+  gun({ id: 'sunbreaker', name: 'Sunbreaker', lvl: 34, w: 3, h: 3, hp: 600, mass: 12, armour: 2, isNew: true,
+    ports: [I('S', 60, 0), I('S', 60, 2), I('W', 60, 1), I('W', 60, 2), I('E', 60, 1), I('E', 60, 2)], shot: 600, cycle: 3.0, damage: 900, passive: 150,
+    say: 'Six lines in at 60, from the back and both flanks: the ship is built around it. It leaks 150 a second, so it needs three lines alive to charge at all.' });
 
   // Engines burn from a buffer that refills through their ports; empty, they run at intake ÷ burn. Shields draw a flat rate.
   def({ id: 'ion', name: 'Ion Drive', cat: 4, kind: 'engine', hp: 50, col: COL.engine, lvl: 0, ports: [I('N', 12)], burn: 9, buffer: 30, thrust: 2.26, say: 'Full thrust burns 9 a second from a 30 buffer that refills at 12.' });
   def({ id: 'plasma', name: 'Plasma Drive', cat: 4, kind: 'engine', w: 2, hp: 110, col: COL.engine, lvl: 16, ports: [I('N', 25, 0), I('N', 25, 1)], burn: 40, buffer: 120, thrust: 6.2, say: 'Full thrust burns 40 a second; two lines of 25 refill it.' });
   def({ id: 'deflector', name: 'Deflector', cat: 4, kind: 'util', hp: 56, col: COL.util, lvl: 11, ports: [I('S', 16)], e: 16, say: 'Draws 16 a second while shields are on.' });
 
+  // Credits, armour (against the pen of what hits it) and a gun's pen (against the enemy's armour): first guesses, for the
+  // evolver's budget and hit runs; the lab shows them but its tick doesn't use them
+  const COST = { core: 0, hull: 9, armor: 18, cell_reactor: 35, twin_reactor: 60, isotope: 70, fusion: 500, overclock: 700, stellarator: 1400,
+    conduit: 10, corner: 10, cell_battery: 40, joiner: 90, splitter: 90, capacitor: 60, drive_cell: 80, flux_coil: 300, heavy_bank: 400, cap_array: 600,
+    pip: 21, glint: 100, hammer: 110, cutter: 170, longbarrel: 300, spear: 600, bastion: 900, lance: 1200, sunbreaker: 2500, ion: 21, plasma: 210, deflector: 140 };
+  const ARMOUR = { armor: 2, isotope: 2, fusion: 2, heavy_bank: 2, stellarator: 2, spear: 2, bastion: 2 };
+  const PEN = { pip: 1, glint: 1, hammer: 2, cutter: 2, longbarrel: 3, spear: 4, bastion: 3, lance: 4, sunbreaker: 5 };
   for (const id of ORDER) {
     const t = T[id];
+    t.cost ??= COST[id] ?? 0; t.armour ??= ARMOUR[id] ?? 1; if (t.kind === 'weapon') t.pen ??= PEN[id] ?? 1;
     t.intake = t.ports.filter((p) => p.dir === 'in').reduce((s, p) => s + p.rate, 0);
     t.produce = t.ports.filter((p) => p.dir === 'out').reduce((s, p) => s + p.rate, 0);
     if (t.kind === 'weapon' && !t.beam) t.damage = t.damage || 1;
@@ -138,13 +151,15 @@
       if (pb.dir === pa.dir) { pa.clash = true; a.clash.push(pa); if (a.uid < b.uid) clashes.push({ a, b, port: pa }); continue; }
       if (pa.dir === 'out') { const l = { from: a, to: b, pa, pb, cap: Math.min(pa.rate, pb.rate), ema: 0, send: 0 }; pa.link = l; pb.link = l; links.push(l); a.links.push(l); b.links.push(l); }
     }
+    for (const p of alive) { p.outL = p.links.filter((l) => l.from === p); p.inL = p.links.filter((l) => l.to === p); }
     const by = (k) => alive.filter((p) => T[p.type].kind === k);
-    return { GW, GH, occ, key, alive, links, opens, clashes, gens: by('gen'), stores: by('store'), weapons: by('weapon'), engines: by('engine'), utils: by('util'),
-      consumers: [...by('weapon'), ...by('engine'), ...by('util')] };
+    const consumers = [...by('weapon'), ...by('engine'), ...by('util')], stores = by('store');
+    return { GW, GH, occ, key, alive, links, opens, clashes, gens: by('gen'), stores, weapons: by('weapon'), engines: by('engine'), utils: by('util'),
+      consumers, takers: [...stores, ...consumers] };
   }
 
   // ================================================================ the tick
-  const DT = 1 / 60, TAU = 1.5;
+  const DEF_DT = 1 / 60, DT = DEF_DT, TAU = 1.5;
   function waterfill(wants, supply) {
     const out = new Array(wants.length).fill(0);
     const idx = wants.map((_, i) => i).filter((i) => wants[i] > 1e-12).sort((a, b) => wants[a] - wants[b]);
@@ -156,18 +171,21 @@
   const spaceOf = (p) => { const t = T[p.type]; return t.kind === 'store' ? t.hold - p.held : t.kind === 'weapon' ? capOf(t) - p.stored : t.kind === 'engine' ? t.buffer - p.stored : t.e - p.stored; };
   const fullDps = (t) => (t.beam ? t.dps : t.damage / Math.max(t.cycle, t.shot / Math.max(1e-9, t.intake - t.passive)));
 
-  /** One tick. ctrl: {fire, thrust, util}. Returns this tick's totals (E/s). Mutates part state and link.send */
-  function tick(L, ctrl, ticks) {
+  /** One tick of dt seconds (default 1/60; the evolver uses 1/20, the most a 10-held conduit's 200 a second allows).
+   * ctrl: {fire, thrust, util}. Returns this tick's totals (E/s). Mutates part state and link.send */
+  function tick(L, ctrl, ticks, dt) {
+    const DT = dt || DEF_DT;
     const ema = (cur, v) => cur + (v - cur) * Math.max(DT / TAU, 1 / (ticks + 1));
     const emaSlow = (cur, v) => cur + (v - cur) * (DT / 5);
     // 1. Offer: generators the cap on every link; stores what they hold, water-filled over their out links
     for (const l of L.links) l.offer = 0;
-    for (const g of L.gens) for (const l of g.links) if (l.from === g) l.offer = l.cap * DT;
-    for (const s of L.stores) { const outs = s.links.filter((l) => l.from === s); const a = waterfill(outs.map((l) => l.cap * DT), s.held); outs.forEach((l, i) => { l.offer = a[i]; }); }
+    for (const g of L.gens) for (const l of g.outL) l.offer = l.cap * DT;
+    for (const s of L.stores) { const outs = s.outL; if (!outs.length) continue; if (outs.length === 1) { outs[0].offer = Math.min(outs[0].cap * DT, s.held); continue; } const a = waterfill(outs.map((l) => l.cap * DT), s.held); outs.forEach((l, i) => { l.offer = a[i]; }); }
     // 2. Accept: each taker up to the space left, water-filled over its in links
     for (const l of L.links) l.send = 0;
-    for (const p of [...L.stores, ...L.consumers]) {
-      const ins = p.links.filter((l) => l.to === p); if (!ins.length) continue;
+    for (const p of L.takers) {
+      const ins = p.inL; if (!ins.length) continue;
+      if (ins.length === 1) { ins[0].send = Math.min(ins[0].offer, Math.max(0, spaceOf(p))); continue; }
       const a = waterfill(ins.map((l) => l.offer), Math.max(0, spaceOf(p)));
       ins.forEach((l, i) => { l.send = a[i]; });
     }
@@ -184,7 +202,6 @@
     let dmg = 0, thrust = 0, shortW = 0, shortE = 0, shortU = 0;
     for (const p of L.weapons) {
       const t = T[p.type]; let d = 0;
-      p.stored = Math.max(0, p.stored - t.passive * DT);
       p.cd = Math.max(0, p.cd - DT); p.flash = Math.max(0, p.flash - DT);
       if (t.beam) {
         const need = t.burn * DT;
@@ -195,7 +212,9 @@
         if (p.latched && p.stored >= capOf(t) - 1e-9) p.latched = false;
         if (ctrl.fire && !p.latched && p.cd <= 1e-9 && p.stored >= t.shot - 1e-9) { p.stored -= t.shot; p.cd = t.cycle; d = t.damage; p.flash = 0.08; if (p.stored < t.shot - 1e-9) p.latched = true; }
       } else if (ctrl.fire && p.cd <= 1e-9 && p.stored >= t.shot - 1e-9) { p.stored -= t.shot; p.cd = t.cycle; d = t.damage; p.flash = 0.1; }
-      p.emaD = emaSlow(p.emaD, d / DT); dmg += d;
+      // (The passive drain after firing: a full buffer fires before it leaks)
+      p.stored = Math.max(0, p.stored - t.passive * DT);
+      p.dNow = d; p.emaD = emaSlow(p.emaD, d / DT); dmg += d;
       p.rate = p.emaD / fullDps(t);
       if (ctrl.fire) shortW += Math.max(0, t.intake * DT - p.inNow);
     }

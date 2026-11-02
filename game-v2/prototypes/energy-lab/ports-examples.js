@@ -58,5 +58,11 @@
         R('cell_reactor', 5, 5), R('cell_reactor', 6, 5), R('cell_reactor', 7, 5), R('cell_reactor', 8, 5), R('cell_reactor', 9, 5), R('cell_reactor', 10, 5),
         R('core', 7, 7), R('cell_reactor', 6, 7, 1), R('cell_reactor', 9, 7, 3), R('ion', 7, 8), R('ion', 8, 8)],
     },
+    {
+      name: '9. Sunbreaker: a gun the ship is built around',
+      about: 'The Sunbreaker takes six lines of 60: two from the back, two from each flank. Three Fusion Plants fill them, one on each side, so power comes from all round the gun. It leaks 150 a second, so with all six lines it fires every 3 s. Erase a flank plant (X) and it drops to one shot every 6.7 s; erase two and it never fires again. Now Repair all and Break (B) a flank plant instead: its blast also cuts the conduits under the gun, so one hit costs four lines and the gun goes dark. Cutting its lines is how you beat it, and keeping blasts away from them is how you protect it.',
+      parts: [R('sunbreaker', 6, 2), R('fusion', 4, 3, 1), R('fusion', 9, 3, 3), R('fusion', 6, 6), R('conduit', 6, 5), R('corner', 7, 5), R('corner', 8, 5, 1, true),
+        R('core', 6, 8), R('cell_reactor', 5, 8, 1), R('cell_reactor', 8, 8, 3), R('ion', 6, 9), R('ion', 7, 9)],
+    },
   ];
 });

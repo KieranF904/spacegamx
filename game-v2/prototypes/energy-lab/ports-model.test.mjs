@@ -123,3 +123,39 @@ test('a full Heavy Bank is a bomb; an empty one is harmless', () => {
   bank.held = 0; assert.equal(PM.blastOf(bank), null);
   bank.held = 1200; const b = PM.blastOf(bank); assert.ok(b.dmg === 720 && b.r === 4.5);
 });
+
+test('9: the Sunbreaker fires at full rate on six lines, slower on four, never on two', () => {
+  const rateWith = (drop) => {
+    // (Plants taken away, not blown up: a blast would cut more lines than the plant itself)
+    let parts = place(EXAMPLES[8].parts);
+    const plants = parts.filter((p) => p.type === 'fusion' && p.rot !== 0).slice(0, drop);
+    parts = parts.filter((p) => !plants.includes(p));
+    // (Damage over a minute after the first 20 s, against full rate: one shot every 6.7 s is too spiky for the smoothed rate)
+    const L = PM.build(parts, GW, GH); let dealt = 0;
+    for (let i = 0; i < 60 * 80; i++) { const F = PM.tick(L, FIRE, i); if (i >= 60 * 20) dealt += F.dps / 60; }
+    return dealt / 60 / PM.fullDps(PM.T.sunbreaker);
+  };
+  const six = rateWith(0), four = rateWith(1), two = rateWith(2);
+  assert.ok(six > 0.9, 'six lines ' + six.toFixed(2));
+  assert.ok(four > 0.35 && four < 0.55, 'four lines ' + four.toFixed(2));
+  assert.equal(two, 0, 'two lines: never');
+});
+
+test('a coarser step (1/20 s) gives the same steady rates', () => {
+  for (const i of [1, 2, 5, 8]) {
+    const fine = run(place(EXAMPLES[i].parts), FIRE, 60 * 40), L = PM.build(place(EXAMPLES[i].parts), GW, GH);
+    let F; for (let k = 0; k < 20 * 40; k++) F = PM.tick(L, FIRE, k, 1 / 20);
+    for (const w of L.weapons) {
+      const f = fine.L.weapons.find((q) => q.type === w.type && q.cells[0][0] === w.cells[0][0]);
+      assert.ok(Math.abs(w.rate - f.rate) < 0.12, `${EXAMPLES[i].name} ${w.type}: ${w.rate.toFixed(2)} vs ${f.rate.toFixed(2)}`);
+    }
+  }
+});
+
+test('9: breaking a flank plant blasts the conduits under the gun too, and it goes dark', () => {
+  const parts = place(EXAMPLES[8].parts), L = PM.build(parts, GW, GH);
+  const gone = PM.destroy(L, byType(L, 'fusion').find((p) => p.rot === 1));
+  assert.ok(gone.some((g) => g.part.type === 'conduit'));
+  const { L: L2 } = run(parts.filter((p) => !p.dead), FIRE, 60 * 30);
+  assert.equal(byType(L2, 'sunbreaker')[0].emaD, 0);
+});

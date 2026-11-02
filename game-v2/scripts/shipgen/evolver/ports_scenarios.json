@@ -1,0 +1,121 @@
+{
+ "_comment": "Scenarios for the ports evolver (ports_app.py, ports_evolve.py): the lab's parts and rules (docs/design/energy-ports-2026-11.md). silhouette: a file in samples/. level: parts up to that level. allow: part ids it may use (empty: all). budget: credits (the lab's first-guess costs). points: build points (1 a cell below level 10, 1.6 below 24, 2.5 above; the core is free). start_parts: [type, x, y, rot, flip] placed on the start (the right half and centre line). power_s: seconds of the power phase. fire: {on, off} seconds (no off: held). enemy_armour: against each gun's pen (the penetration table). incoming: the hits (damage, pen, dps, from, spread, flank, max_s). seeds: one hit run each. weights: each measure against the start's (a measure the start has none of against a fixed scale: wiring 1, live_conduits 10, sustained_dps 50). Measures: damage_before_down (damage dealt, after the enemy's armour, until the core goes), sustained_dps (power phase), systems_kept, alive_s, half_s, wiring (for each unfed port, the share of its shortest path to power built with conduits pointing the right way, a conduit counting fully once power reaches it; at most 1 a port), live_conduits (still carrying power at the end of the power phase), engine_zone, thrust_to_mass. Penalties: unpowered (guns, engines and shields getting under a quarter of what they want over the power phase), blocked (guns with the ship in front, engines with it behind), no_engines, shape_off, clashes (two outs or two ins facing).",
+ "scenarios": [
+  {
+   "name": "Gunship: head-on fight",
+   "about": "Most hits at the nose; scored on damage dealt before going down. Starter-to-mid parts.",
+   "silhouette": "gunship.json",
+   "level": 20,
+   "allow": [],
+   "budget": 4000,
+   "points": 220,
+   "start_parts": [],
+   "power_s": 30,
+   "fire": {
+    "on": 3,
+    "off": 5
+   },
+   "enemy_armour": 2,
+   "incoming": {
+    "damage": 40,
+    "pen": 2,
+    "dps": 120,
+    "from": "front",
+    "spread": 50,
+    "flank": 0.35,
+    "max_s": 120
+   },
+   "seeds": [
+    1,
+    2
+   ],
+   "weights": {
+    "damage_before_down": 1.0,
+    "sustained_dps": 0.3,
+    "systems_kept": 0.5,
+    "engine_zone": 0.1,
+    "wiring": 0.3,
+    "live_conduits": 0.5
+   },
+   "targets": {
+    "thrust_to_mass": {
+     "target": 0.12,
+     "weight": 1.0,
+     "gate": true
+    }
+   },
+   "penalties": {
+    "blocked": 1.0,
+    "no_engines": 3.0,
+    "shape_off": 0.03,
+    "clashes": 0.05,
+    "unpowered": 0.1
+   },
+   "shape": {
+    "margin": 2
+   }
+  },
+  {
+   "name": "Capital: Sunbreaker",
+   "about": "A capital ship built around a Sunbreaker at the nose: six lines of 60 to fill, heavy armour to beat (4), hard hits from the front.",
+   "silhouette": "capital.json",
+   "level": 36,
+   "allow": [],
+   "budget": 20000,
+   "points": 520,
+   "start_parts": [
+    [
+     "sunbreaker",
+     11,
+     3,
+     0,
+     false
+    ]
+   ],
+   "power_s": 30,
+   "fire": {
+    "on": 3,
+    "off": 5
+   },
+   "enemy_armour": 4,
+   "incoming": {
+    "damage": 60,
+    "pen": 3,
+    "dps": 240,
+    "from": "front",
+    "spread": 60,
+    "flank": 0.4,
+    "max_s": 150
+   },
+   "seeds": [
+    1,
+    2
+   ],
+   "weights": {
+    "damage_before_down": 1.0,
+    "sustained_dps": 0.2,
+    "systems_kept": 0.5,
+    "engine_zone": 0.1,
+    "wiring": 0.5,
+    "live_conduits": 0.5
+   },
+   "targets": {
+    "thrust_to_mass": {
+     "target": 0.06,
+     "weight": 1.0,
+     "gate": true
+    }
+   },
+   "penalties": {
+    "blocked": 1.0,
+    "no_engines": 3.0,
+    "shape_off": 0.03,
+    "clashes": 0.05,
+    "unpowered": 0.1
+   },
+   "shape": {
+    "margin": 2
+   }
+  }
+ ]
+}
