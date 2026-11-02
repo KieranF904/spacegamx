@@ -225,7 +225,83 @@ class PortsEvolver:
         for spec in self.sc.get('start_parts', []):
             self.put(s, PPart(spec[0], spec[1], spec[2], spec[3] if len(spec) > 3 else 0, bool(spec[4]) if len(spec) > 4 else False))
         del hull
+        self.seed_lines(s)
         return s
+
+    def seed_lines(self, s: PShip):
+        """The most basic connections, only for the start (evolution has no router): the core's two right-hand lines run
+        as conduits to the nearest gun and the nearest engine; every other gun or engine on the right gets a Cell Reactor
+        straight behind it, where the cell is free. Evolution takes it from there"""
+        core = next(p for p in s.parts if p.type == 'core')
+        srcs = [((core.x + dx, core.y + dy), side) for d, side, dx, dy in port_offsets(self.T['core'], core.rot, core.flip) if d == 'out' and side == 'E']
+        cons = []
+        for p in s.parts:
+            t = self.T[p.type]
+            if t['kind'] in ('weapon', 'engine') and p.x > self.mid:
+                for d, side, dx, dy in port_offsets(t, p.rot, p.flip):
+                    if d == 'in':
+                        cons.append((t['kind'], p, (p.x + dx, p.y + dy), side))
+        dist = lambda c: abs(c[2][0] - core.x) + abs(c[2][1] - core.y)
+        order = sorted([c for c in cons if c[0] == 'weapon'], key=dist)[:1] + sorted([c for c in cons if c[0] == 'engine'], key=dist)[:1]
+        served = set()
+        for c in order:
+            for i, (cell, side) in enumerate(srcs):
+                if self.route(s, cell, side, c[2], c[3]):
+                    served.add(id(c))
+                    srcs.pop(i)
+                    break
+        for c in cons:
+            if id(c) in served:
+                continue
+            (x, y), side = c[2], c[3]
+            vx, vy = SIDE_V[side]
+            # (A reactor across the port, its out port facing it: rot so that its N (out) faces back)
+            rot = {'S': 0, 'W': 1, 'N': 2, 'E': 3}[OPP[side]]
+            self.put(s, PPart('cell_reactor', x + vx, y + vy, rot, False))
+
+    def route(self, s: PShip, src_cell, src_side, dst_cell, dst_side) -> bool:
+        """Conduits from across a giver's out port to across a taker's in port, through hull or empty cells right of
+        the centre line (a breadth-first shortest path); False when there's no way"""
+        from collections import deque
+        sv, dv = SIDE_V[src_side], SIDE_V[dst_side]
+        start = (src_cell[0] + sv[0], src_cell[1] + sv[1])
+        goal = (dst_cell[0] + dv[0], dst_cell[1] + dv[1])
+        own = self.owner(s)
+        free = lambda c: c[0] > self.mid and (c[1], c[0]) in self.area and (c not in own or self.T[s.parts[own[c]].type]['kind'] == 'inert')
+        if not free(start) or not free(goal):
+            return False
+        prev = {start: None}
+        q = deque([start])
+        while q:
+            c = q.popleft()
+            if c == goal:
+                break
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                n = (c[0] + dx, c[1] + dy)
+                if n not in prev and free(n):
+                    prev[n] = c
+                    q.append(n)
+        if goal not in prev:
+            return False
+        path, c = [], goal
+        while c is not None:
+            path.append(c)
+            c = prev[c]
+        path.reverse()
+        toward = lambda a, b: {(1, 0): 'E', (-1, 0): 'W', (0, 1): 'S', (0, -1): 'N'}[(b[0] - a[0], b[1] - a[1])]
+        for i, c in enumerate(path):
+            back = src_cell if i == 0 else path[i - 1]
+            ahead = dst_cell if i == len(path) - 1 else path[i + 1]
+            ins, outs = toward(c, back), toward(c, ahead)
+            if ins == outs:
+                return False
+            cand = self.conduit_for(ins, outs)
+            if not cand:
+                return False
+            cid, r, f = cand[0]
+            if not self.put(s, PPart(cid, c[0], c[1], r, f)):
+                return False
+        return True
 
     # ---- scoring
     def score(self, s: PShip) -> dict:
