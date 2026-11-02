@@ -28,7 +28,7 @@ def run_one(job):
     sil = Silhouette.load(HERE / 'samples' / sc.get('silhouette', 'gunship.json'))
     scorer = PortsScorer()
     try:
-        ev = PortsEvolver(scorer, sil, sc, population=50, elite=5, seed=seed)
+        ev = PortsEvolver(scorer, sil, sc, population=40, elite=4, seed=seed)
         t0 = time.time()
         top, since = float('-inf'), 0
         for g in range(gens):

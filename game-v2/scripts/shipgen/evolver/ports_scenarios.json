@@ -35,7 +35,7 @@
     "systems_kept": 0.3,
     "engine_zone": 0.1,
     "wiring": 0.15,
-    "live_conduits": 0.1,
+    "live_conduits": 0,
     "feed_wiring": 0.1
    },
    "targets": {
@@ -117,7 +117,7 @@
     "systems_kept": 0.3,
     "engine_zone": 0.1,
     "wiring": 0.15,
-    "live_conduits": 0.1,
+    "live_conduits": 0,
     "feed_wiring": 0.1
    },
    "targets": {
@@ -191,7 +191,7 @@
     "systems_kept": 0.3,
     "engine_zone": 0.1,
     "wiring": 0.15,
-    "live_conduits": 0.1,
+    "live_conduits": 0,
     "feed_wiring": 0.1
    },
    "targets": {
@@ -273,7 +273,7 @@
     "systems_kept": 0.3,
     "engine_zone": 0.1,
     "wiring": 0.15,
-    "live_conduits": 0.1,
+    "live_conduits": 0,
     "feed_wiring": 0.1
    },
    "targets": {

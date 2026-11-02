@@ -21,7 +21,7 @@ ZERO_SCALE.update({'wiring': 1.0, 'live_conduits': 10.0, 'sustained_dps': 50.0, 
 SIDES = ['N', 'E', 'S', 'W']
 SIDE_V = {'N': (0, -1), 'E': (1, 0), 'S': (0, 1), 'W': (-1, 0)}
 OPP = {'N': 'S', 'S': 'N', 'E': 'W', 'W': 'E'}
-CHANGES = ('place', 'place', 'swap', 'clear', 'turn', 'turn', 'extend_out', 'extend_out', 'extend_in', 'extend_in', 'grow', 'shrink', 'feed', 'feed', 'move')
+CHANGES = ('place', 'place', 'swap', 'clear', 'turn', 'turn', 'extend_out', 'extend_out', 'extend_in', 'extend_in', 'grow', 'shrink', 'feed', 'feed', 'move', 'engine')
 # (An aimed change puts a conduit there most times, another part the rest)
 CONDUIT_SHARE = 0.6
 
@@ -126,7 +126,8 @@ class PortsEvolver:
         level = scenario.get('level', 99)
         allow = set(scenario.get('allow') or [])
         self.choices = [t for t in self.T.values() if t['id'] != 'core' and t['kind'] != 'inert' and t['lvl'] <= level and (not allow or t['id'] in allow)]
-        self.store_ids = [t['id'] for t in self.choices if t['kind'] == 'store' and t.get('conduit')]
+        # (Plain lines only: Passthroughs, Combiners and Scrubbers come in by swap and by the feed change, where they do something)
+        self.store_ids = [t['id'] for t in self.choices if t['id'] in ('conduit', 'corner')]
         self.margin = int((scenario.get('shape') or {}).get('margin', 0))
         self.area = sil.allowed(self.margin)
         self.mid = sil.mid
@@ -471,6 +472,31 @@ class PortsEvolver:
         if pick is None:
             return False
         return self.put(s, PPart(pick['id'], nx, ny))
+
+    def engine(self, s: PShip) -> bool:
+        """An engine where it can push: on a cell with nothing of the ship behind it (the aimed changes then wire it)"""
+        engines = [t for t in self.choices if t['kind'] == 'engine']
+        if not engines:
+            return False
+        t = self.rng.choice(engines)
+        own = self.owner(s)
+        occ = {c for p in self.full(s) for c in self.cells(p)}
+        spots = []
+        for (y, x) in self.area:
+            if x <= self.mid and not (t['w'] % 2 and x == self.mid):
+                continue
+            cells = [(x + dx, y + dy) for dy in range(t['h']) for dx in range(t['w'])]
+            if all(not any((cx, yy) in occ and (cx, yy) not in cells for yy in range(cy + 1, self.sil.h)) for cx, cy in cells):
+                spots.append((x, y))
+        if not spots:
+            return False
+        x, y = self.rng.choice(spots)
+        if t['w'] % 2 and x == self.mid:
+            x -= (t['w'] - 1) // 2
+        cells = [(x + dx, y + dy) for dy in range(t['h']) for dx in range(t['w'])]
+        if any(c in own and self.T[s.parts[own[c]].type]['kind'] != 'inert' for c in cells):
+            return False
+        return self.put(s, PPart(t['id'], x, y, 0, False))
 
     def move(self, s: PShip) -> bool:
         """A part shifted a cell (hull left where it was), so a layout can shuffle without being rebuilt"""
