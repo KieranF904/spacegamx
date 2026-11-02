@@ -101,7 +101,11 @@ textarea { width: 100%; height: 90px; background: #0a0e11; color: var(--ink); bo
   <button class="b" id="cFire">Fire<kbd>F</kbd></button>
   <select id="fireMode" aria-label="How the guns fire"><option value="hold">hold the trigger</option><option value="b35">bursts: 3 s on, 5 s off</option><option value="b16">bursts: 1 s on, 6 s off</option></select>
   <button class="b" id="cThrust">Thrust<kbd>W</kbd></button>
+  <button class="b" id="cBoost">Boost<kbd>G</kbd></button>
   <button class="b" id="cUtil">Shields<kbd>U</kbd></button>
+  <span class="sep"></span>
+  <button class="b" id="cSwitch" title="Flip every Selector to its other input">Switch feeds<kbd>K</kbd></button>
+  <button class="b" id="cPurge" title="Empty every feed buffer and line, wasting what was in them">Purge feeds<kbd>P</kbd></button>
   <span class="sep"></span>
   <button class="b" id="cPause">Pause<kbd>Space</kbd></button>
   <select id="speed" aria-label="Speed"><option value="1">1× speed</option><option value="3">3× speed</option><option value="0.25">¼× speed</option></select>
@@ -157,7 +161,8 @@ textarea { width: 100%; height: 90px; background: #0a0e11; color: var(--ink); bo
           <li><b>Engines</b> burn from a buffer that refills through their ports; empty, they run at intake ÷ burn. Shields draw a flat rate.</li>
           <li><b>Each tick</b> every giver offers across its links from what it had at the start of the tick, every taker accepts up to its space, then everything moves at once. Order never matters.</li>
           <li><b>Power profiles.</b> Some guns shut their ports for a moment after each shot (discharge) or when a beam burns out (rest): power arriving then is lost unless a store holds it. Burst beams (Cutter, Lance) shut their ports while lit: they light only when full, burn the whole buffer, rest, then recharge, so a store that pours fast shortens the wait. Some take power only from lines rated at least so much together (threshold): join lines to feed them. Some need an unbroken rate while charging (steady), or the charge collapses.</li>
-          <li><b>Feed.</b> Tanks hold a consumable; pipes join anything with a feed point (purple squares), on any side. A pipe can’t cross a power line: a Passthrough carries power back to front and feed side to side in one cell. A Combiner takes power at its back and feed on its side and gives one flavoured line: every gun downstream fires with the feed’s effect, at its share of the gun’s power. Feed guns (Scorcher, Slurry Cannon) have their own feed port and fire whatever they’re fed, stronger. A Scrubber takes the flavour off. Each consumable gives something and costs something, and does something nasty when its tank is hit.</li>
+          <li><b>Feed.</b> Tanks hold a material; pipes join anything with a feed point (purple squares), on any side. A pipe can’t cross a power line: a Passthrough carries power back to front and feed side to side in one cell. A gun or engine that takes feed has a feed buffer (its second bar) beside its energy buffer; the material in it reshapes its stats, something better and something worse, and each shot (or second) uses some. It takes material either at its own feed port, or from a combined line: a Combiner puts a material onto a power line and the conduits carry it on to the gun. Batteries and capacitors carry power only, so the Combiner goes after them. <b>One kind at a time:</b> anything holding a material refuses another until it is empty, so switching a Selector runs the old material out first. Guns take only the materials listed for them; most take none.</li>
+          <li><b>Boost</b> (G) multiplies every engine’s thrust by its boost and its draw by 1 + 2.2 × its boost drain.</li>
           <li><b>Break</b> destroys a part. Generators explode; a charged store explodes in proportion to its charge (0.6 × held, radius 1.5 + held ÷ 300); blasts set off their neighbours.</li>
         </ul>
       </details>
@@ -179,10 +184,9 @@ textarea { width: 100%; height: 90px; background: #0a0e11; color: var(--ink); bo
 <script src="ports-examples.js"></script>
 <script>
 'use strict';
-const { T, ORDER, CATS, SIDES, SIDE_V, DT, FLUIDS } = PM;
-/** A flavour's strongest fluid and its share, or null when (nearly) plain */
-const topFlav = (f) => { const e = Object.entries(f || {}).sort((a, b) => b[1] - a[1])[0]; return e && e[1] > 0.05 ? e : null; };
-const flavText = (f) => Object.entries(f || {}).filter(([, v]) => v > 0.02).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${FLUIDS[k].short} ${Math.round(v * 100)}%`).join(', ');
+const { T, ORDER, CATS, SIDES, SIDE_V, DT, MATS } = PM;
+const matName = (m) => (m && MATS[m] ? MATS[m].short : 'nothing');
+const matCol = (m) => (m && MATS[m] ? MATS[m].col : '#a77bdc');
 const EXAMPLES = window.PM_EXAMPLES || [];
 const DEFAULTS = JSON.parse(JSON.stringify(T));
 const tdef = (p) => T[p.type];
@@ -191,7 +195,7 @@ const tdef = (p) => T[p.type];
 let GW = 16, GH = 12;
 let parts = [], nextUid = 1, L = null, shipName = '', about = '';
 let tool = 'inspect', rot = 0, flip = false, selected = null, hover = null, hoverPart = null;
-const ctrl = { fire: true, thrust: false, util: true, paused: false };
+const ctrl = { fire: true, thrust: false, boost: false, util: true, paused: false };
 const settings = { fireMode: 'hold', speed: 1, zoom: 0 };
 let ticks = 0, simT = 0, F = { made: 0, wasted: 0, toStores: 0, fromStores: 0, weapons: 0, engines: 0, utils: 0, dps: 0, thrust: 0, shortW: 0, shortE: 0, shortU: 0 };
 const Fs = Object.assign({}, F);
@@ -214,7 +218,7 @@ function fitsCells(type, cells) {
 function addPart(type, x, y, r, f) { const p = { uid: nextUid++, type, rot: r || 0, flip: !!f, cells: PM.rectCells(type, x, y, r || 0) }; parts.push(p); return p; }
 function removePart(p) { parts = parts.filter((q) => q !== p); if (selected === p) selected = null; rebuild(); save(); renderCard(); }
 function chargeAll(full) {
-  for (const p of parts) { const t = tdef(p); if (t.kind === 'tank' && full) p.fill = t.fill; if (t.kind === 'store') { p.held = full ? t.hold : 0; if (!full) p.flav = {}; } if (t.kind === 'weapon') p.stored = full ? PM.capOf(t) : 0; if (t.kind === 'engine') p.stored = full ? t.buffer : 0; if (t.kind === 'util') p.stored = full ? t.e : 0; if (t.kind === 'weapon') p.latched = false; }
+  for (const p of parts) { const t = tdef(p); if (t.kind === 'tank' && full) p.fill = t.fill; if (!full) { p.matAmt = 0; p.mat = null; } if (t.kind === 'store') { p.held = full ? t.hold : 0; } if (t.kind === 'weapon') p.stored = full ? PM.capOf(t) : 0; if (t.kind === 'engine') p.stored = full ? t.buffer : 0; if (t.kind === 'util') p.stored = full ? t.e : 0; if (t.kind === 'weapon') p.latched = false; }
 }
 
 // ================================================================ drawing
@@ -252,7 +256,7 @@ function drawPort(q, col, X0, Y0, cs, alpha) {
 }
 function portColour(p, q) {
   const t = tdef(p);
-  if (q.dir === 'in' && (p.closed > 0 || p.frozen > 0)) return ['#8b9ba7', 0.9];
+  if (q.dir === 'in' && (p.closed > 0 || (t.burst && p.on))) return ['#8b9ba7', 0.9];
   if (q.clash) return [STATUS.starve, 1];
   if (q.link) return [q.dir === 'out' ? '#f5a83a' : '#60a5fa', 1];
   if (q.dir === 'in' && isConsumer(t.kind)) return [STATUS.starve, 0.9];
@@ -281,13 +285,18 @@ function draw() {
     }
     if (t.kind === 'gen') { const g = 0.12 + 0.08 * Math.sin(tnow * 4 + p.uid); cx.fillStyle = `rgba(56,189,248,${g})`; for (const [x, y] of p.cells) cx.fillRect(x * CS, y * CS, CS, CS); }
     if (t.kind === 'weapon' && (p.flash > 0 || p.on)) {
-      const fl = topFlav(p.shotMix), fc = fl && fl[1] > 0.2 ? FLUIDS[fl[0]].col : null;
+      const fc = (p.shotMat || (p.flash > 0 && p.lastMat)) ? matCol(p.shotMat || p.lastMat) : null;
       cx.fillStyle = fc ? fc + (p.on ? '66' : 'cc') : p.on ? 'rgba(255,240,200,.28)' : `rgba(255,245,220,${Math.min(1, p.flash * 6)})`;
       for (const [x, y] of p.cells) cx.fillRect(x * CS, y * CS, CS, CS);
     }
-    if (p.frozen > 0) { cx.fillStyle = 'rgba(127,216,255,.35)'; for (const [x, y] of p.cells) cx.fillRect(x * CS, y * CS, CS, CS); }
     if (p.collapsed > 0) { cx.fillStyle = `rgba(239,106,90,${p.collapsed})`; for (const [x, y] of p.cells) cx.fillRect(x * CS, y * CS, CS, CS); }
-    if (t.kind === 'store' && t.conduit) { const fl = topFlav(p.flav); if (fl && fl[1] > 0.2) { cx.fillStyle = FLUIDS[fl[0]].col + '55'; for (const [x, y] of p.cells) cx.fillRect(x * CS, y * CS, CS, CS); } }
+    // (Material on a line: a tint; in a gun or engine: a second bar along its bottom edge, in the material's colour)
+    if (t.conduit && p.matAmt > 0.05) { cx.fillStyle = matCol(p.mat) + '66'; for (const [x, y] of p.cells) cx.fillRect(x * CS, y * CS, CS, CS); }
+    if ((t.kind === 'weapon' || t.kind === 'engine') && t.takes.length && CS >= 12) {
+      const xs = p.cells.map((c) => c[0]), x0 = Math.min(...xs), w = (Math.max(...xs) + 1 - x0) * CS, y1 = (Math.max(...p.cells.map((c) => c[1])) + 1) * CS, h = Math.max(3, CS / 7);
+      cx.fillStyle = '#0a0e11'; cx.fillRect(x0 * CS + 2, y1 - h - 2, w - 4, h);
+      if (p.matAmt > 0) { cx.fillStyle = matCol(p.mat); cx.fillRect(x0 * CS + 2, y1 - h - 2, (w - 4) * Math.min(1, p.matAmt / (t.feedBuf || 1)), h); }
+    }
     if (p.hp !== undefined && p.hp < t.hp) { cx.fillStyle = `rgba(239,106,90,${0.1 + 0.25 * (1 - p.hp / t.hp)})`; for (const [x, y] of p.cells) cx.fillRect(x * CS, y * CS, CS, CS); }
   }
   // 2. outlines by status
@@ -304,11 +313,16 @@ function draw() {
   // 3b. the feed layer: pipe channels between joined feed points, in the colour of what the network holds
   if (CS >= 10) for (const p of L.alive) {
     if (!p.feeds || !p.feeds.length) continue;
-    const t = tdef(p), n = p.feedNet, st = n ? PM.netStock(n) : { s: {}, total: 0 }, top = Object.entries(st.s).sort((a, b) => b[1] - a[1])[0];
-    const col = top && top[1] > 0.5 ? FLUIDS[top[0]].col : '#a77bdc';
+    const t = tdef(p), sup = t.kind === 'selector' ? PM.supply(p.ins && p.ins[p.sel]) : PM.supply(p.feedNet);
+    const col = sup ? matCol(sup.mat) : '#a77bdc';
     cx.strokeStyle = col; cx.lineWidth = Math.max(2, CS / 7); cx.lineCap = 'round';
     const mid = (q) => [(q.x + 0.5) * CS, (q.y + 0.5) * CS], edge = (q) => { const [vx, vy] = SIDE_V[q.side]; return [(q.x + 0.5 + vx / 2) * CS, (q.y + 0.5 + vy / 2) * CS]; };
-    if (t.kind === 'pipe' || t.id === 'passthrough') {
+    if (t.kind === 'selector') {
+      // (Its three points; the live input and the output drawn as a channel through it)
+      const [cx0, cy0] = mid(p.feeds[0]);
+      for (const q of p.feeds) { const [bx, by] = edge(q), r = Math.max(2, CS / 9); cx.globalAlpha = q.i === p.sel || q.i === 2 ? 1 : 0.3; cx.fillStyle = q.i === 2 ? col : (q.i === p.sel ? col : '#a77bdc'); cx.fillRect(bx - r, by - r, 2 * r, 2 * r); }
+      cx.globalAlpha = 1; cx.beginPath(); const [ax, ay] = edge(p.feeds[p.sel]), [ox2, oy2] = edge(p.feeds[2]); cx.moveTo(ax, ay); cx.lineTo(cx0, cy0); cx.lineTo(ox2, oy2); cx.stroke();
+    } else if (t.kind === 'pipe' || t.id === 'passthrough') {
       cx.beginPath();
       for (const q of p.feeds) { if (t.kind === 'pipe' && !q.joined) continue; const [ax, ay] = mid(q), [bx, by] = edge(q); cx.moveTo(ax, ay); cx.lineTo(bx, by); }
       cx.stroke();
@@ -326,8 +340,7 @@ function draw() {
     if (l.ema < 0.5) continue;
     const ax = (l.pa.x + 0.5) * CS, ay = (l.pa.y + 0.5) * CS, bx = (l.pb.x + 0.5) * CS, by = (l.pb.y + 0.5) * CS;
     const n = Math.min(4, 1 + Math.floor(Math.log10(l.ema + 1) * 1.5)), speed = 0.6 + Math.min(1.6, l.ema / 120);
-    const lf = topFlav(l.from.flav);
-    cx.fillStyle = lf && lf[1] > 0.3 ? FLUIDS[lf[0]].col : tdef(l.from).kind === 'gen' ? '#9fe3ff' : '#ffe08a';
+    cx.fillStyle = l.from.matAmt > 0.05 && l.from.mat ? matCol(l.from.mat) : tdef(l.from).kind === 'gen' ? '#9fe3ff' : '#ffe08a';
     for (let i = 0; i < n; i++) { const f = (tnow * speed + i / n) % 1; cx.beginPath(); cx.arc(ax + (bx - ax) * f, ay + (by - ay) * f, Math.max(1.6, CS / 13), 0, 7); cx.fill(); }
   }
   // 5. names and numbers
@@ -338,7 +351,7 @@ function draw() {
     const bw = (Math.max(...xs) + 1 - Math.min(...xs)) * CS, bh = (Math.max(...ys) + 1 - Math.min(...ys)) * CS, X = p.cx * CS, Y = p.cy * CS;
     const showName = bw >= 64 && bh >= 30 && CS >= 22;
     if (showName) { cx.fillStyle = '#e9eff3'; cx.font = `600 ${Math.min(12, CS / 3)}px "IBM Plex Sans", sans-serif`; cx.fillText(t.name, X, Y); }
-    else if (CS >= 24) { cx.fillStyle = '#e9eff3'; cx.font = `600 ${Math.min(11, CS / 3.2)}px "IBM Plex Sans", sans-serif`; cx.fillText((t.kind === 'tank' ? FLUIDS[t.fluid].short : t.name.split(/[ ,]/)[0]).slice(0, 7), X, Y); }
+    else if (CS >= 24) { cx.fillStyle = '#e9eff3'; cx.font = `600 ${Math.min(11, CS / 3.2)}px "IBM Plex Sans", sans-serif`; cx.fillText((t.kind === 'tank' ? MATS[t.fluid].short : t.name.split(/[ ,]/)[0]).slice(0, 7), X, Y); }
     if (isConsumer(t.kind) && !p.links.length && CS >= 16) { cx.fillStyle = '#ef6a5a'; cx.font = `700 ${Math.min(12, CS / 2.8)}px "IBM Plex Sans", sans-serif`; cx.fillText('no feed', X, Math.min(...ys) * CS + Math.min(9, CS / 4)); }
   }
   // 6. blast radius of what's under the pointer (a hazard worth seeing), selection, ghost
@@ -385,15 +398,19 @@ const pc = (v) => `${Math.round(v * 100)}%`;
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const SIDE_WORD = { N: 'front', E: 'right', S: 'back', W: 'left' };
 const nameOf = (p) => tdef(p).name;
-/** A shot's effects in words */
-function fxText(fx) {
-  const w = [];
-  if (Math.abs(fx.dmg - 1) > 0.01) w.push(`${fx.dmg > 1 ? '+' : '−'}${Math.round(Math.abs(fx.dmg - 1) * 100)}% impact`);
-  if (fx.pen) w.push(`${fx.pen > 0 ? '+' : '−'}${Math.abs(fx.pen).toFixed(1)} penetration`);
-  if (Math.abs(fx.cycle - 1) > 0.01) w.push(`cycle ${fx.cycle > 1 ? '+' : '−'}${Math.round(Math.abs(fx.cycle - 1) * 100)}%`);
-  const names = { burn: 'burn', splash: 'splash', mark: 'mark', slow: 'slows the target', disrupt: 'disrupts its power' };
-  for (const k of PM.FX_KEYS) if (fx[k] > 0.005) w.push(`${names[k]} ${Math.round(fx[k] * 100)}%`);
-  return w.join(', ') || 'plain';
+/** A material's changes to a part, in words (its own overrides included) */
+function modText(t, m) {
+  const mods = Object.assign({}, MATS[m].mod, (t.feedMods || {})[m] || {}), names = { shot: 'energy a shot', damage: 'damage', dps: 'damage a second', cycle: 'cycle', discharge: 'discharge', rest: 'rest', burn: 'burn', threshold: 'threshold', steady: 'steady', thrust: 'thrust', boost: 'boost', boostDrain: 'boost draw' };
+  return Object.entries(mods).filter(([k]) => typeof t[k] === 'number' && t[k] !== 0).map(([k, v]) => `${names[k] || k} ×${v}`).join(', ');
+}
+function feedText(p) {
+  const t = tdef(p), out = [];
+  if (!t.takes.length) return out;
+  out.push(`Takes ${t.takes.map((m) => MATS[m].short).join(', ')}${t.feedPort ? ` at its own feed port${t.feedPort.required ? ' (and fires only with feed)' : ''}` : ' from a combined line'}; ${t.feedUse} ${t.beam || t.kind === 'engine' ? 'a second' : 'a shot'}, holding ${t.feedBuf}.`);
+  if (p.matAmt > 0) out.push(`Feed buffer: <b>${n0(p.matAmt)}</b> ${MATS[p.mat].short.toLowerCase()}${t.takes.includes(p.mat) ? `: ${modText(t, p.mat)}` : ' <span class="bad">(not something it takes)</span>'}. Until it is empty it takes no other material.`);
+  else out.push('Feed buffer empty: plain.');
+  if (p.feedRefused) out.push(`<span class="warn">Its network offers ${matName(p.feedRefused)}, which it ${p.matAmt > 0 ? 'can’t take while it holds ' + matName(p.mat) : 'doesn’t take'}.</span>`);
+  return out;
 }
 function explain(p) {
   const t = tdef(p), out = [];
@@ -410,21 +427,26 @@ function explain(p) {
     else out.push(`<span class="sub">${q.dir === 'out' ? '▲ Out' : '▼ In'} (${SIDE_WORD[q.side]}, ${rate}): not connected.</span>`);
   }
   if (t.kind === 'tank') {
-    const n = p.feedNet, st = n ? PM.netStock(n) : null, users = n ? n.users.length : 0;
-    out.push(`Holds <b>${n0(p.fill)}</b> of ${t.fill}. ${users ? `Joined to ${users} user${users > 1 ? 's' : ''} (Combiners and feed guns) through its network.` : '<span class="warn">Nothing that uses feed is joined to it.</span>'}`);
-    if (st && Object.keys(st.s).length > 1) out.push(`<span class="warn">Its network holds a mix: ${Object.entries(st.s).map(([k, v]) => `${FLUIDS[k].short} ${n0(v)}`).join(', ')}.</span> Every user gets the mix, each effect weaker.`);
-    const b = PM.blastOf(p); if (b) out.push(`<span class="warn">If hit: ${b.kind === 'freeze' ? `freezes guns and engines within ${b.r.toFixed(1)} cells for ${b.s.toFixed(0)} s` : b.kind === 'arc' ? `arcs ${n0(b.dmg)} into power parts within ${b.r.toFixed(1)} cells` : `${b.kind === 'fire' ? 'a fire' : 'a blast'} of ${n0(b.dmg)} over ${b.r.toFixed(1)} cells`}.</span>`);
+    const n = p.feedNet, st = n ? PM.netStock(n) : null, users = n ? n.users.length : 0, sels = n ? n.selectors.length : 0;
+    out.push(`Holds <b>${n0(p.fill)}</b> of ${t.fill}. ${users || sels ? `Joined to ${users} user${users === 1 ? '' : 's'}${sels ? ` and ${sels} Selector${sels > 1 ? 's' : ''}` : ''} through its network.` : '<span class="warn">Nothing that uses feed is joined to it.</span>'}`);
+    if (st && Object.keys(st.s).length > 1) out.push(`<span class="warn">Its network holds a mix: ${Object.entries(st.s).map(([k, v]) => `${MATS[k].short} ${n0(v)}`).join(', ')}.</span> It gives the most plentiful; a user holding the other waits.`);
     return out;
   }
-  if (t.kind === 'pipe') { const st = p.feedNet ? PM.netStock(p.feedNet) : { s: {}, total: 0 }; out.push(st.total ? `Its network holds ${Object.entries(st.s).map(([k, v]) => `${n0(v)} ${FLUIDS[k].short.toLowerCase()}`).join(', ')}, for ${p.feedNet.users.length} user${p.feedNet.users.length === 1 ? '' : 's'}.` : '<span class="warn">No tank on its network.</span>'); return out; }
-  if (t.combiner || t.id === 'passthrough') {
-    const n = p.feedNet, st = n ? PM.netStock(n) : { total: 0 };
-    if (t.combiner) out.push(st.total ? `Using ${n0(p.feedRate || 0)} feed a second; ${n0(st.total)} left on its network.` : '<span class="bad">No feed reaches its feed point (left side): what passes through stays plain.</span>');
+  if (t.kind === 'pipe') { const sup = PM.supply(p.feedNet), st = p.feedNet ? PM.netStock(p.feedNet) : { s: {}, total: 0 }; out.push(sup ? `Its network gives ${sup.mat ? MATS[sup.mat].short.toLowerCase() : ''} (${n0(sup.amt)} left), for ${p.feedNet.users.length} user${p.feedNet.users.length === 1 ? '' : 's'}.` : '<span class="warn">No tank (or live Selector) on its network.</span>'); if (Object.keys(st.s).length > 1) out.push('<span class="warn">Mixed tanks on this network.</span>'); return out; }
+  if (t.kind === 'selector') {
+    const a = PM.supply(p.ins && p.ins[0]), b = PM.supply(p.ins && p.ins[1]);
+    out.push(`Input 1 (${SIDE_WORD[p.feeds[0].side]}): ${a ? MATS[a.mat].short : 'nothing'}; input 2 (${SIDE_WORD[p.feeds[1].side]}): ${b ? MATS[b.mat].short : 'nothing'}. <b>Passing input ${p.sel + 1}</b> out of its ${SIDE_WORD[p.feeds[2].side]}${p.feeds[2].joined ? '' : ' <span class="bad">(nothing joined there)</span>'}.`);
+    return out;
   }
-  if (t.kind === 'store' && t.conduit && flavText(p.flav)) out.push(`Carrying flavoured power: ${flavText(p.flav)}.`);
+  if (t.combiner) {
+    const sup = PM.supply(p.feedNet);
+    out.push(sup ? `Fed ${MATS[sup.mat].short.toLowerCase()} (${n0(sup.amt)} left); holding ${n0(p.matAmt)} ${p.mat ? MATS[p.mat].short.toLowerCase() : ''} for the line.` : '<span class="bad">No feed reaches its feed point (left side): what passes through stays plain.</span>');
+    if (p.outL.some((l) => l.matBlocked)) out.push(`<span class="warn">The line ahead won’t take its ${matName(p.mat)}:</span> ${p.outL.filter((l) => l.matBlocked).map((l) => esc(nameOf(l.to)) + (tdef(l.to).kind === 'store' && !tdef(l.to).conduit ? ' (stores carry power only)' : tdef(l.to).matAmt > 0 ? ' (holding ' + matName(l.to.mat) + ')' : ' (doesn’t take it)')).join(', ')}.`);
+  }
+  if (t.conduit && !t.combiner && p.matAmt > 0.05) out.push(`Carrying ${n0(p.matAmt)} ${matName(p.mat).toLowerCase()} along the line${p.outL.some((l) => l.matBlocked) ? ' <span class="warn">— stuck: what’s ahead won’t take it</span>' : ''}.`);
   if (t.kind === 'gen') { if (p.emaWaste > 0.5) out.push(`<span class="bad">Wasting ${n0(p.emaWaste)} of its ${t.produce} a second</span>: what it faces is full or takes less than it gives.`); else out.push(`All ${t.produce} a second is taken.`); }
   else if (t.kind === 'store') {
-    if (!t.conduit) out.push(`Holds <b>${n0(p.held)}</b> of ${t.hold}${flavText(p.flav) ? ` (flavoured: ${flavText(p.flav)})` : ''}. In ${n0(p.emaIn)}, out ${n0(p.emaOut)} a second.`);
+    if (!t.conduit) out.push(`Holds <b>${n0(p.held)}</b> of ${t.hold}. In ${n0(p.emaIn)}, out ${n0(p.emaOut)} a second.`);
     if (p.held >= t.hold - 1e-6 && refused(p) > 1) out.push(`<span class="amber">Full: refusing ${n0(refused(p))} a second.</span> That backs up to the generator and is wasted there.`);
     if (!p.links.some((l) => l.to === p) && p.held < 1) out.push('<span class="bad">Nothing feeds it.</span>');
     const b = PM.blastOf(p); if (b) out.push(`<span class="warn">Charged: if destroyed it blasts ${n0(b.dmg)} over ${b.r.toFixed(1)} cells.</span>`);
@@ -439,15 +461,16 @@ function explain(p) {
     if (t.discharge) out.push(`Shuts its ports for ${t.discharge} s after each shot${p.closed > 0 ? ' <span class="sub">(shut now)</span>' : ''}: a buffer in front of it catches what arrives meanwhile.`);
     if (t.rest) out.push(`When the beam burns out it rests ${t.rest} s before taking power${p.closed > 0 ? ' <span class="sub">(resting now)</span>' : ''}.`);
     if (t.steady) out.push(`Steady ${t.steady}: while charging, less than that in a tick collapses the charge${p.collapsed > 0 ? ' <span class="bad">(it just did)</span>' : ''}.`);
-    if (t.feedPort) { const n = p.feedNet, st = n ? PM.netStock(n) : { s: {}, total: 0 }; out.push(st.total ? `Feed port: ${Object.entries(st.s).map(([k, v]) => `${n0(v)} ${FLUIDS[k].short.toLowerCase()}`).join(', ')} on its network (${t.feedPort.use} ${t.beam ? 'a second' : 'a shot'}).` : `<span class="bad">Feed port (${SIDE_WORD[PM.placeSide(t.feedPort.side, p.rot, p.flip)]}) has no feed${t.feedPort.required ? ': it can’t fire' : ''}.</span>`); }
-    if (flavText(p.flav)) out.push(`Its power is flavoured: ${flavText(p.flav)}.`);
-    if (p.fx && (p.fx.dmg !== 1 || p.fx.pen || PM.FX_KEYS.some((k) => p.fx[k]))) out.push(`Last shot: ${fxText(p.fx)}.`);
-    if (p.frozen > 0) out.push(`<span class="blue">Frozen for ${p.frozen.toFixed(1)} s.</span>`);
+    out.push(...feedText(p));
+    if (t.feedPort && !(p.feedNet && PM.supply(p.feedNet))) out.push(`<span class="bad">Its feed port (${SIDE_WORD[PM.placeSide(t.feedPort.side, p.rot, p.flip)]}) has no feed${t.feedPort.required ? ': it can’t fire' : ''}.</span>`);
     if (firingNow()) out.push(p.latched ? `Reloading the clip: ${n0(p.stored)} of ${PM.capOf(t)}.` : `Getting ${n0(p.emaIn)} a second: firing at <b>${pc(Math.min(1, p.rate))}</b> of full rate (${n0(p.emaD)} damage a second).`);
     else out.push(`Not firing (buffer ${n0(p.stored)} of ${PM.capOf(t)}).`);
   } else if (t.kind === 'engine') {
-    out.push(`Buffer ${n0(p.stored)} of ${t.buffer}. Its ports bring at most ${t.intake} a second; full thrust burns ${t.burn}${t.intake >= t.burn ? ', so it can run flat out as long as the lines hold' : `, so from empty it gives ${pc(t.intake / t.burn)} thrust`}.`);
-    if (ctrl.thrust) out.push(`Now: ${pc(p.sat)} thrust.`);
+    const E = PM.eff(p);
+    out.push(`Buffer ${n0(p.stored)} of ${t.buffer}. Its ports bring at most ${t.intake} a second; full thrust (${n0(E.thrust)}) burns ${n0(E.burn)}${t.intake >= E.burn ? ', so it can run flat out as long as the lines hold' : `, so from empty it gives ${pc(t.intake / E.burn)} thrust`}.${E.boost > 1 ? ` Boost: ×${n0(E.boost)} thrust for ×${n0(1 + 2.2 * E.boostDrain)} draw.` : ''}`);
+    out.push(...feedText(p));
+    if (t.feedPort && !(p.feedNet && PM.supply(p.feedNet))) out.push(`<span class="warn">Its feed point (${SIDE_WORD[PM.placeSide(t.feedPort.side, p.rot, p.flip)]}) has no feed: power only.</span>`);
+    if (ctrl.thrust) out.push(`Now: ${n0(p.thrustNow)} thrust (${pc(p.sat)} of what it asks) for ${n0(p.burnNow || 0)} a second.`);
   } else if (t.kind === 'util') out.push(ctrl.util ? `Getting ${pc(p.sat)} of the ${t.e} a second it draws.` : 'Shields are off.');
   if (t.kind !== 'store' || t.conduit) { const b = PM.blastOf(p); if (b) out.push(`<span class="warn">If destroyed it blasts ${n0(b.dmg)} over ${b.r} cells</span> (hull beside it has 75 hp).`); }
   if (p.hp !== undefined && p.hp < t.hp) out.push(`<span class="warn">Damaged: ${n0(p.hp)} of ${t.hp} hp.</span>`);
@@ -488,9 +511,19 @@ function renderProblems() {
     if (t.threshold && w.links.length && rated < t.threshold) out.push(`<p class="prob bad">${esc(t.name)}: its lines are rated ${rated}, under its threshold of ${t.threshold}. It takes nothing: join lines (a Joiner) or feed it from a store.</p>`);
     if (t.steady && w.links.length && rated < t.steady) out.push(`<p class="prob bad">${esc(t.name)}: its lines are rated ${rated}, under the steady ${t.steady} it needs while charging. Every charge collapses.</p>`);
   }
-  for (const w of L.weapons) { const t = tdef(w); if (t.feedPort && t.feedPort.required) { const st = w.feedNet ? PM.netStock(w.feedNet) : { total: 0 }; if (st.total < 1) out.push(`<p class="prob bad">${esc(t.name)}: no feed reaches its feed port. It can’t fire.</p>`); } }
-  for (const s of L.stores) { const t = tdef(s); if (t.combiner && !(s.feedNet && PM.netStock(s.feedNet).total > 0)) out.push(`<p class="prob warn">Combiner: no feed at its feed point, so it passes plain power.</p>`); }
-  for (const n of L.feedNets) { const st = PM.netStock(n); if (Object.keys(st.s).length > 1) out.push(`<p class="prob warn">A feed network mixes ${Object.keys(st.s).map((k) => FLUIDS[k].short.toLowerCase()).join(' and ')}: every effect on it is weaker.</p>`); if (n.tanks.length && !n.users.length) out.push(`<p class="prob sub">${n.tanks.length > 1 ? 'Tanks' : 'A tank'} of ${Object.keys(st.s).map((k) => FLUIDS[k].short.toLowerCase()).join(', ')} with nothing using it.</p>`); }
+  for (const w of [...L.weapons, ...L.engines]) {
+    const t = tdef(w);
+    if (t.feedPort && !(w.feedNet && PM.supply(w.feedNet))) out.push(`<p class="prob ${t.feedPort.required ? 'bad' : 'warn'}">${esc(t.name)}: no feed reaches its feed port${t.feedPort.required ? '. It can’t fire.' : ': power only.'}</p>`);
+    if (w.feedRefused) out.push(`<p class="prob warn">${esc(t.name)}: offered ${matName(w.feedRefused).toLowerCase()}, which it ${w.matAmt > 0 ? 'won’t take while it holds ' + matName(w.mat).toLowerCase() : 'doesn’t take'}.</p>`);
+  }
+  for (const s of L.stores) {
+    const t = tdef(s);
+    if (t.combiner && !(s.feedNet && PM.supply(s.feedNet))) out.push(`<p class="prob warn">Combiner: no feed at its feed point, so it passes plain power.</p>`);
+    if (t.conduit && s.matAmt > 0.05 && s.outL.length && s.outL.every((l) => l.matBlocked)) out.push(`<p class="prob warn">${esc(t.name)}: its ${matName(s.mat).toLowerCase()} is stuck: ${s.outL.map((l) => esc(nameOf(l.to)) + (tdef(l.to).kind === 'store' && !tdef(l.to).conduit ? ' carries power only' : tdef(l.to).matAmt > 0 ? ' holds ' + matName(l.to.mat).toLowerCase() : ' doesn’t take it')).join('; ')}.</p>`);
+  }
+  const selIn = new Set(L.selectors.flatMap((sel) => sel.ins || []));
+  for (const n of L.feedNets) { const st = PM.netStock(n); if (selIn.has(n)) continue; if (Object.keys(st.s).length > 1) out.push(`<p class="prob warn">A feed network mixes ${Object.keys(st.s).map((k) => MATS[k].short.toLowerCase()).join(' and ')}: it gives only the most plentiful.</p>`); if (n.tanks.length && !n.users.length && !n.selectors.length) out.push(`<p class="prob sub">${n.tanks.length > 1 ? 'Tanks' : 'A tank'} of ${Object.keys(st.s).map((k) => MATS[k].short.toLowerCase()).join(', ')} with nothing using it.</p>`); }
+  for (const sel of L.selectors) if (!sel.feeds[2].joined) out.push('<p class="prob warn">A Selector’s output faces nothing.</p>');
   const dead = parts.filter((p) => p.dead).length; if (dead) out.push(`<p class="prob sub">${dead} part${dead > 1 ? 's' : ''} destroyed. Repair all brings them back.</p>`);
   document.getElementById('probs').innerHTML = out.join('') || '<p class="prob ok">None. Every port that should connect does.</p>';
 }
@@ -508,7 +541,7 @@ function renderLists() {
     const t = T[type], rate = Math.min(1, avg(ps, (p) => p.rate)), got = avg(ps, (p) => p.emaIn); dpsFull += PM.fullDps(t) * ps.length;
     const dead = ps.filter((p) => !p.links.length).length;
     let why = fire ? (rate >= 0.9 ? `Firing at full rate.` : `Each gets ${n0(got)} of the ${t.intake} a second it wants${t.passive ? ` (${t.passive} of that is passive drain)` : ''}.`) : `Not firing. Each needs ${t.intake} a second at full rate.`;
-    const fxs = ps.map((p) => p.fx).filter(Boolean); if (fxs.length && fxText(fxs[0]) !== 'plain') why += ` <span style="color:var(--accent)">${fxText(fxs[0])}.</span>`;
+    const fedOnes = ps.filter((p) => p.matAmt > 0 && t.takes.includes(p.mat)); if (fedOnes.length) why += ` <span style="color:var(--accent)">${fedOnes.length === ps.length ? 'On' : fedOnes.length + ' on'} ${MATS[fedOnes[0].mat].short.toLowerCase()}: ${modText(t, fedOnes[0].mat)}.</span>`;
     if (dead) why += ` <span class="bad">${dead === ps.length ? 'No feed.' : dead + ' with no feed.'}</span>`;
     return meter(t.name, ps.length, fire ? rate : 0, fire ? pc(rate) + ' rate' : 'idle', why, fire ? stCol(rate) : STATUS.idle);
   });
@@ -516,11 +549,12 @@ function renderLists() {
   const thrustMax = L.engines.reduce((s, p) => s + tdef(p).thrust, 0), mass = L.alive.reduce((s, p) => s + tdef(p).mass, 0);
   const eh = groups([...L.engines, ...L.utils]).map(([type, ps]) => {
     const t = T[type], sat = avg(ps, (p) => p.sat), on = t.kind === 'engine' ? ctrl.thrust : ctrl.util, dead = ps.filter((p) => !p.links.length).length;
-    let why = t.kind === 'util' ? `Each draws ${t.e} a second.` : `Each: ${t.thrust} thrust for ${t.burn} a second, refilled at up to ${t.intake}. Buffer ${n0(avg(ps, (p) => p.stored))} of ${t.buffer}.`;
+    let why = t.kind === 'util' ? `Each draws ${t.e} a second.` : `Each: ${t.thrust} thrust for ${t.burn} a second, refilled at up to ${t.intake}. Buffer ${n0(avg(ps, (p) => p.stored))} of ${t.buffer}.${ctrl.thrust ? ` Now ${n0(ps.reduce((s, p) => s + p.thrustNow, 0))} thrust for ${n0(ps.reduce((s, p) => s + (p.burnNow || 0), 0))} a second.` : ''}`;
+    if (t.kind === 'engine') { const fedOnes = ps.filter((p) => p.matAmt > 0 && t.takes.includes(p.mat)); if (fedOnes.length) why += ` <span style="color:var(--accent)">On ${MATS[fedOnes[0].mat].short.toLowerCase()}: ${modText(t, fedOnes[0].mat)}.</span>`; }
     if (dead) why += ` <span class="bad">${dead === ps.length ? 'No feed.' : dead + ' with no feed.'}</span>`;
     return meter(t.name, ps.length, on ? sat : 0, on ? pc(sat) + ' fed' : 'idle', why, on ? stCol(sat) : STATUS.idle);
   });
-  document.getElementById('eng').innerHTML = eh.length ? `<p class="sub" style="margin:0 0 4px">Thrust now ${n0(Fs.thrust)} of ${n0(thrustMax)}. Mass ${n0(mass)}.</p>` + eh.join('') : '<p class="note">Nothing here.</p>';
+  document.getElementById('eng').innerHTML = eh.length ? `<p class="sub" style="margin:0 0 4px">Thrust now ${n0(Fs.thrust)} (plain cruise ${n0(thrustMax)}${ctrl.boost ? ', boosting' : ''}). Mass ${n0(mass)}.</p>` + eh.join('') : '<p class="note">Nothing here.</p>';
   const sh = groups(L.stores.filter((s) => !tdef(s).conduit)).map(([type, ps]) => {
     const t = T[type], cap = t.hold * ps.length, held = ps.reduce((s, p) => s + p.held, 0), inn = ps.reduce((s, p) => s + p.emaIn, 0), out = ps.reduce((s, p) => s + p.emaOut, 0);
     const full = ps.filter((p) => p.held >= t.hold - 1e-6 && refused(p) > 1).length;
@@ -542,8 +576,9 @@ function renderCard() {
   if (t.kind === 'store') nums.push(['hold', 'Holds']);
   if (t.kind === 'weapon') { if (t.beam) nums.push(['burn', 'Burns while lit (a second)'], ['bufferE', 'Buffer'], ['dps', 'Damage a second lit']); else nums.push(['shot', 'Energy a shot'], ['buffer', 'Shots held'], ['cycle', 'Cycle (s)'], ['damage', 'Damage a shot']); nums.push(['passive', 'Passive drain (a second)'], ['discharge', 'Ports shut after a shot (s)'], ['rest', 'Beam rest when it burns out (s)'], ['threshold', 'Threshold: lines rated at least'], ['steady', 'Steady: at least this a second while charging']); }
   if (t.kind === 'tank') nums.push(['fill', 'Holds']);
-  if (t.combiner) nums.push(['feedPerE', 'Feed for each power']);
-  if (t.kind === 'engine') nums.push(['burn', 'Burns at full thrust'], ['buffer', 'Buffer'], ['thrust', 'Thrust']);
+  if (t.takes && t.takes.length) nums.push(['feedUse', 'Feed used (a shot, or a second)'], ['feedBuf', 'Feed buffer']);
+  if (t.kind === 'engine') nums.push(['burn', 'Burns at full thrust'], ['boost', 'Boost (× thrust)'], ['boostDrain', 'Boost drain']);
+  if (t.kind === 'engine') nums.push(['buffer', 'Buffer'], ['thrust', 'Thrust']);
   if (t.kind === 'util') nums.push(['e', 'Draws (a second)']);
   nums.push(['hp', 'HP']);
   if (t.blast) nums.push(['blast.dmg', 'Blast damage'], ['blast.r', 'Blast radius']);
@@ -623,10 +658,12 @@ function rotateKey() { if (T[tool]) { rot = (rot + 1) % 4; setTool(tool); } else
 function flipKey() { if (T[tool]) { flip = !flip; setTool(tool); } else if (selected && !selected.dead) turnPart(selected, selected.rot, !selected.flip); }
 const btn = (id, f) => document.getElementById(id).addEventListener('click', f);
 btn('tInspect', () => setTool('inspect')); btn('tErase', () => setTool('erase')); btn('tBreak', () => setTool('break')); btn('tRot', rotateKey); btn('tFlip', flipKey);
-const toggles = { cFire: 'fire', cThrust: 'thrust', cUtil: 'util', cPause: 'paused' };
+const toggles = { cFire: 'fire', cThrust: 'thrust', cBoost: 'boost', cUtil: 'util', cPause: 'paused' };
 function syncCtrls() { for (const [id, k] of Object.entries(toggles)) document.getElementById(id).classList.toggle('on', ctrl[k]); }
 for (const [id, k] of Object.entries(toggles)) btn(id, () => { ctrl[k] = !ctrl[k]; syncCtrls(); });
 btn('fill', () => chargeAll(true)); btn('drain', () => chargeAll(false));
+btn('cSwitch', () => { PM.switchFeeds(L); flashMode(L.selectors.length ? 'Every Selector flipped. The old material runs out before the new one arrives.' : 'No Selector on this design.'); });
+btn('cPurge', () => { PM.purge(L); flashMode('Feed buffers and lines emptied.'); });
 btn('repair', () => { for (const p of parts) { p.dead = false; p.hp = undefined; } rebuild(); renderCard(); });
 btn('zoomIn', () => { settings.zoom++; sizeCanvas(); }); btn('zoomOut', () => { settings.zoom--; sizeCanvas(); }); btn('zoomFit', () => { settings.zoom = 0; sizeCanvas(); });
 document.getElementById('speed').addEventListener('change', (e) => { settings.speed = parseFloat(e.target.value); });
@@ -634,7 +671,8 @@ document.getElementById('fireMode').addEventListener('change', (e) => { settings
 window.addEventListener('keydown', (e) => {
   if (e.target.matches('input, textarea, select')) return;
   const k = e.key.toLowerCase();
-  if (k === 'f') ctrl.fire = !ctrl.fire; else if (k === 'w') ctrl.thrust = !ctrl.thrust; else if (k === 'u') ctrl.util = !ctrl.util; else if (k === 'r') rotateKey(); else if (k === 't') flipKey();
+  if (k === 'f') ctrl.fire = !ctrl.fire; else if (k === 'w') ctrl.thrust = !ctrl.thrust; else if (k === 'g') ctrl.boost = !ctrl.boost; else if (k === 'u') ctrl.util = !ctrl.util; else if (k === 'r') rotateKey(); else if (k === 't') flipKey();
+  else if (k === 'k') { PM.switchFeeds(L); flashMode('Every Selector flipped.'); } else if (k === 'p') { PM.purge(L); flashMode('Feed buffers and lines emptied.'); }
   else if (k === 'b') setTool('break'); else if (k === ' ') { ctrl.paused = !ctrl.paused; e.preventDefault(); } else if (k === 'escape') { setTool('inspect'); selected = null; renderCard(); }
   else if (k === 'x') setTool('erase'); else if ((k === 'delete' || k === 'backspace') && selected) removePart(selected);
   else return;
@@ -696,7 +734,7 @@ btn('resetParams', () => { resetParams(); rebuild(); save(); renderPalette(); re
 // ================================================================ run
 let last = performance.now(), acc = 0, frame = 0;
 function step() {
-  F = PM.tick(L, { fire: firingNow(), thrust: ctrl.thrust, util: ctrl.util }, ticks);
+  F = PM.tick(L, { fire: firingNow(), thrust: ctrl.thrust, boost: ctrl.boost, util: ctrl.util }, ticks);
   for (const k in F) Fs[k] = ema(Fs[k], F[k]);
   ticks++; simT += DT;
 }

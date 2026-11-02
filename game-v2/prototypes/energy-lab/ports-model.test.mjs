@@ -164,23 +164,69 @@ test('9: breaking a flank plant blasts the conduits under the gun too, and it go
 });
 
 const fxOf = (L, type, x) => L.weapons.find((p) => p.type === type && (x === undefined || p.cells[0][0] === x));
-test('10: the Combiner flavours the left Pip with incendiary; the right one is plain', () => {
-  const parts = place(EXAMPLES[9].parts), L = PM.build(parts, GW, GH);
-  let burnL = 0, burnR = 0;
-  for (let i = 0; i < 60 * 20; i++) { PM.tick(L, FIRE, i); const l = fxOf(L, 'pip', 7), r = fxOf(L, 'pip', 8); if (l.fx) burnL = Math.max(burnL, l.fx.burn); if (r.fx) burnR = Math.max(burnR, r.fx.burn); }
-  assert.ok(burnL > 0.5, 'left burns ' + burnL);
-  assert.equal(burnR, 0);
-  assert.ok(L.tanks[0].fill < 120, 'the tank is used');
+const shotsIn = (L, g, secs, ctrl = FIRE) => { let n = 0; for (let i = 0; i < 60 * secs; i++) { PM.tick(L, ctrl, i); if (g.dNow) n++; } return n; };
+
+test('10: Coolant and Overcharge reshape a Longbarrel; the plain one fires slowest', () => {
+  const L = PM.build(place(EXAMPLES[9].parts), GW, GH);
+  const plain = fxOf(L, 'longbarrel', 2), cool = fxOf(L, 'longbarrel', 6), over = fxOf(L, 'longbarrel', 10);
+  let n = [0, 0, 0], dmg = [0, 0, 0];
+  for (let i = 0; i < 60 * 60; i++) { PM.tick(L, FIRE, i); [plain, cool, over].forEach((g, k) => { if (g.dNow) { n[k]++; dmg[k] += g.dNow; } }); }
+  assert.ok(n[1] > n[0], `coolant fires more often: ${n[1]} vs ${n[0]}`);
+  assert.ok(dmg[2] / n[2] > dmg[0] / n[0] * 1.25, 'overcharge hits harder');
+  assert.ok(cool.mat === 'coolant' && over.mat === 'overcharge' && plain.mat === null);
 });
 
-test('11: the cryo feed crosses both power lines through Passthroughs to the Scorcher', () => {
-  const parts = place(EXAMPLES[10].parts), L = PM.build(parts, GW, GH);
-  const sc = fxOf(L, 'scorcher'); assert.ok(sc.feedNet && sc.feedNet.tanks.length === 1, 'scorcher on the tank network');
-  let slow = 0, dealt = 0; for (let i = 0; i < 60 * 20; i++) { PM.tick(L, FIRE, i); if (sc.fx) slow = Math.max(slow, sc.fx.slow); dealt += sc.dNow || 0; }
-  assert.ok(slow > 0.3 && dealt > 0, 'scorcher fires cryo: ' + slow);
-  assert.ok(fxOf(L, 'pip').emaD > 0, 'the pip still gets power through the passthroughs');
-  const cut = place(EXAMPLES[10].parts.map((q) => (q[0] === 'passthrough' && q[1] === 7 ? ['conduit', q[1], q[2], q[3], q[4]] : q))), L2 = PM.build(cut, GW, GH);
-  assert.equal(fxOf(L2, 'scorcher').feedNet?.tanks.length ?? 0, 0);
+test('11: the Slurry Cannon takes its feed through a Passthrough, and stops without it', () => {
+  const parts = place(EXAMPLES[10].parts), L = PM.build(parts, GW, GH), g = fxOf(L, 'slurry_cannon');
+  assert.ok(g.feedNet && g.feedNet.tanks.length === 1);
+  assert.ok(shotsIn(L, g, 30) > 6, 'fires with accelerant');
+  const cut = place(EXAMPLES[10].parts.map((q) => (q[0] === 'passthrough' ? ['conduit', q[1], q[2], q[3], q[4]] : q))), L2 = PM.build(cut, GW, GH);
+  assert.equal(shotsIn(L2, fxOf(L2, 'slurry_cannon'), 30), 0, 'no feed, no shot');
+});
+
+test('14: a Selector switch runs the old material out before the new one arrives', () => {
+  const L = PM.build(place(EXAMPLES[13].parts), GW, GH), g = fxOf(L, 'longbarrel');
+  for (let i = 0; i < 60 * 20; i++) PM.tick(L, FIRE, i);
+  assert.equal(g.mat, 'overcharge');
+  PM.switchFeeds(L);
+  let stillOld = 0, sawNew = false;
+  for (let i = 0; i < 60 * 150; i++) { PM.tick(L, FIRE, i); if (g.shotMat === 'overcharge') stillOld++; if (g.mat === 'flux') sawNew = true; }
+  assert.ok(stillOld > 0 && sawNew, `old shots after the switch ${stillOld}, then flux ${sawNew}`);
+});
+
+test('15: Catalyst lets a Plasma Drive hold thrust on a line that cannot cover its burn', () => {
+  const L = PM.build(place(EXAMPLES[14].parts), GW, GH);
+  const plain = L.engines.find((e) => e.type === 'plasma' && e.cells[0][0] === 3), cat = L.engines.find((e) => e.type === 'plasma' && e.cells[0][0] === 10);
+  for (let i = 0; i < 60 * 40; i++) PM.tick(L, ALL, i);
+  assert.ok(cat.thrustNow > plain.thrustNow, `catalyst ${cat.thrustNow.toFixed(2)} vs plain ${plain.thrustNow.toFixed(2)}`);
+  assert.ok(cat.burnNow < plain.burnNow);
+});
+
+test('16: Reaction Thrusters push five times as hard on feed, and fall back when the tank is gone', () => {
+  const L = PM.build(place(EXAMPLES[15].parts), GW, GH);
+  let F; for (let i = 0; i < 60 * 10; i++) F = PM.tick(L, ALL, i);
+  assert.ok(F.thrust > 9.5, 'fed: ' + F.thrust.toFixed(2));
+  for (const t of L.tanks) t.fill = 0;
+  for (let i = 0; i < 60 * 30; i++) F = PM.tick(L, ALL, i);
+  assert.ok(F.thrust < 2.5, 'dry: ' + F.thrust.toFixed(2));
+});
+
+test('17: a Capacitor stops material; a Combiner after it works', () => {
+  const L = PM.build(place(EXAMPLES[16].parts), GW, GH);
+  const left = fxOf(L, 'longbarrel', 3), right = fxOf(L, 'longbarrel', 10);
+  for (let i = 0; i < 60 * 30; i++) PM.tick(L, FIRE, i);
+  assert.equal(left.mat, null);
+  assert.equal(right.mat, 'coolant');
+  assert.ok(L.links.some((l) => l.matBlocked), 'the blocked line is marked');
+});
+
+test('one kind at a time: a gun holding one material refuses another until empty', () => {
+  const [g] = place([['longbarrel', 4, 4]]); PM.build([g], GW, GH);
+  g.mat = 'coolant'; g.matAmt = 3;
+  assert.equal(PM.accepts(g, 'flux'), false);
+  assert.equal(PM.accepts(g, 'coolant'), true);
+  g.matAmt = 0; assert.equal(PM.accepts(g, 'flux'), true);
+  assert.equal(PM.accepts(g, 'catalyst'), false, 'not something it takes');
 });
 
 test('12: Surge Cells win back the Longbarrel discharge', () => {
@@ -197,23 +243,6 @@ test('13: threshold: a Hammer on a reactor never fires, on a Joiner it does', ()
   assert.ok(fxOf(L, 'hammer', 10).emaD > 20);
 });
 
-test('14: the Slurry Cannon fires tungsten shells from a touching tank, and stops when the feed runs out', () => {
-  const L = PM.build(place(EXAMPLES[13].parts), GW, GH), g = fxOf(L, 'slurry_cannon');
-  let pen = 0, shots = 0; for (let i = 0; i < 60 * 30; i++) { PM.tick(L, FIRE, i); if (g.dNow) { shots++; pen = Math.max(pen, g.fx.pen); } }
-  assert.ok(shots > 5 && pen > 2.9, `${shots} shots, pen +${pen}`);
-  for (const t of L.tanks) t.fill = 0;
-  let after = 0; for (let i = 0; i < 60 * 10; i++) { PM.tick(L, FIRE, i); if (g.dNow) after++; }
-  assert.equal(after, 0, 'no feed, no shot');
-});
-
-test('hazards: a full shaped tank is a bomb, an empty one nothing; a cryo tank freezes guns without breaking them', () => {
-  const [a] = place([['tank_shaped', 4, 4]]); PM.build([a], GW, GH);
-  assert.equal(PM.blastOf(a).kind, 'blast');
-  a.fill = 0; assert.equal(PM.blastOf(a), null);
-  const parts = place([['tank_cryo', 4, 4], ['pip', 5, 4], ['hull', 3, 4]]), L2 = PM.build(parts, GW, GH);
-  PM.destroy(L2, parts[0]);
-  assert.ok(parts[1].frozen > 0 && !parts[1].dead && !parts[2].dead, 'frozen, not broken');
-});
 
 test('burst beams: ports shut while lit, so the Lance empties its buffer before it recharges', () => {
   const L = PM.build(place(EXAMPLES[5].parts), GW, GH), l = byType(L, 'lance')[0];

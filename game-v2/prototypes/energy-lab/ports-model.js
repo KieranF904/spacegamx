@@ -1,34 +1,42 @@
 // The ports model (docs/design/energy-ports-2026-11.md): parts with in and out ports on their edges, power crossing only
 // out → in over a shared edge, a synchronous offer/accept tick, weapons with buffers and power profiles, blasts. On top,
-// the feed layer: tanks of consumables joined by pipes (which cross power lines only through passthrough conduits), and
-// Combiners that join a feed and a power line into one flavoured line, so the guns downstream fire with its effect.
+// the feed layer: tanks of materials joined by pipes (which cross power lines only through Passthroughs), Selectors that
+// switch which tank a line draws from, and Combiners that put a material onto a power line. A gun or engine that takes
+// feed has a feed buffer beside its energy buffer; the material in it reshapes its stats (a sidegrade: something better,
+// something worse). Anything that holds material holds one kind at a time and takes no other until it's empty.
 // Plain script: ports.html uses it as window.PM; ports-model.test.mjs and the evolver's ports_score.cjs load it in node.
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory(); else root.PM = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  // ================================================================ consumables (the feed layer)
-  // Each changes the shots of the guns it reaches, at a strength 0..1 (its share of the gun's power, or its share of
-  // the feed at a feed port). At full strength: dmg multiplies impact damage, pen adds to penetration, cycle multiplies
-  // the gun's cycle; burn / splash / mark add damage of their own kind (a share of the impact), slow / disrupt take a
-  // share off the enemy's fire while they last. hazard: what a hit tank (or a broken line carrying it) does: fire and
-  // blast hurt everything in reach, arc hurts only power parts, freeze stops guns and engines in reach for s seconds.
-  const FLUIDS = {
-    incendiary: { name: 'Incendiary gel', short: 'Incendiary', col: '#ff7a3d', dmg: 0.8, burn: 0.6, hazard: { kind: 'fire', dmg: 90, r: 2 },
-      say: 'Shots set parts burning (60% of the hit again, over time) but hit 20% softer. A hit tank or line starts a fire.' },
-    cryo: { name: 'Cryo slurry', short: 'Cryo', col: '#7fd8ff', dmg: 0.9, slow: 0.25, hazard: { kind: 'freeze', s: 6, r: 1.8 },
-      say: 'Shots slow the target (a quarter off its fire while it lasts) and hit 10% softer. A hit tank freezes the parts around it.' },
-    ion: { name: 'Ion gas', short: 'Ion', col: '#b58cff', dmg: 0.85, cycle: 1.2, disrupt: 0.3, hazard: { kind: 'arc', dmg: 80, r: 2.2 },
-      say: 'Shots disrupt the target\'s power (30% off its fire) but hit softer and fire 20% slower. A hit tank arcs into your own power parts.' },
-    tungsten: { name: 'Tungsten dust', short: 'Tungsten', col: '#9aa4ad', pen: 2, cycle: 1.15, hazard: null, tankMass: 3,
-      say: 'Shots go 2 deeper into armour, but the guns cycle 15% slower and its tanks are heavy. Safe to carry.' },
-    shaped: { name: 'Shaped slurry', short: 'Shaped', col: '#ffd166', splash: 0.5, pen: -1, hazard: { kind: 'blast', dmg: 160, r: 2.5 },
-      say: 'Shots splash (half the hit again on what\'s around it) but go 1 less deep. A hit tank is a bomb.' },
-    tracer: { name: 'Tracer dust', short: 'Tracer', col: '#9effa1', dmg: 0.9, mark: 0.3, hazard: null,
-      say: 'Shots mark the target (30% more from everyone else) and hit 10% softer. Safe to carry.' },
+  // ================================================================ materials (the feed layer)
+  // Each is for weapons or engines, and multiplies some of the stats of what it's in: shot (energy a shot), damage, dps,
+  // cycle, discharge, rest, burn, threshold, steady for weapons; thrust, burn, boost, boostDrain for engines. A part may
+  // override them (feedMods: an engine built for feed takes far more from it). No hazards: a broken tank or pipe just
+  // stops the feed.
+  const MATS = {
+    overcharge: { name: 'Overcharge slurry', short: 'Overcharge', col: '#ff8a3d', on: 'weapon', mod: { damage: 1.3, dps: 1.3, discharge: 0.5, shot: 1.4, burn: 1.4 },
+      say: 'Hits 30% harder and halves the discharge, but each shot costs 40% more power.' },
+    coolant: { name: 'Coolant', short: 'Coolant', col: '#7fd8ff', on: 'weapon', mod: { discharge: 0.5, rest: 0.5, damage: 0.85, dps: 0.85 },
+      say: 'Halves discharge and rest, so the gun needs less buffering in front, but hits 15% softer.' },
+    damping: { name: 'Damping gel', short: 'Damping', col: '#b58cff', on: 'weapon', mod: { threshold: 0.5, steady: 0.5, cycle: 1.25 },
+      say: 'Halves the threshold and steady a gun needs, so a weak or shared line can feed it, but it cycles 25% slower.' },
+    flux: { name: 'Flux salts', short: 'Flux', col: '#ffd166', on: 'weapon', mod: { shot: 0.7, burn: 0.7, damage: 0.85, dps: 0.85 },
+      say: 'Shots cost 30% less power but hit 15% softer: more shots from the same reactors.' },
+    accelerant: { name: 'Accelerant', short: 'Accelerant', col: '#ff5fa2', on: 'weapon', mod: { cycle: 0.7, shot: 1.25, threshold: 1.5 },
+      say: 'Fires 30% faster, but each shot costs 25% more and it needs a 50% stronger line.' },
+    lens: { name: 'Lens fluid', short: 'Lens', col: '#9effa1', on: 'weapon', mod: { burn: 0.75, dps: 0.9, rest: 1.5 },
+      say: 'Beams: burn 25% less while lit (longer bursts from the same buffer), 10% less damage, and rest half again as long.' },
+    catalyst: { name: 'Catalyst', short: 'Catalyst', col: '#4ade80', on: 'engine', mod: { burn: 0.6, thrust: 0.85 },
+      say: 'Engines use 40% less power for 15% less thrust: power freed for the guns.' },
+    reaction: { name: 'Reaction mass', short: 'Reaction', col: '#e8e3d6', on: 'engine', mod: { thrust: 1.4 },
+      say: '40% more thrust for the same power, but it goes fast.' },
+    burstgel: { name: 'Burst gel', short: 'Burst gel', col: '#f5a83a', on: 'engine', mod: { boost: 1.5, boostDrain: 0.5, thrust: 0.9 },
+      say: 'Boost half again as strong for half the extra draw; cruising 10% weaker.' },
   };
-  const FX_KEYS = ['burn', 'splash', 'mark', 'slow', 'disrupt'];
+  const BOOST_DRAW = 2.2;          // (boosting draws × (1 + this × boostDrain), as the game's tuning)
+  const MRATE = 30;                // (material moves at most this much a second across a link or from a network)
 
   // ================================================================ parts
   // Ports in the part's own frame, unrotated: N is the nose. [dir, side, cell, rate]: cell counts from the W end of a N or S
@@ -37,7 +45,7 @@
   const T = {}, ORDER = [];
   const CATS = ['Core and hull', 'Generators', 'Stores and conduits', 'Weapons', 'Engines and shields', 'Feed'];
   const COL = { core: '#e8e3d6', hull: '#4b5660', armor: '#6e7a84', gen: '#38bdf8', store: '#4ade80', cap: '#f5a83a', conduit: '#a7b4be',
-    weapon: '#ef5f55', engine: '#3fb0e0', util: '#4fbfb2', pipe: '#a77bdc', feedgun: '#e2608f' };
+    weapon: '#ef5f55', engine: '#3fb0e0', util: '#4fbfb2', pipe: '#a77bdc', feedgun: '#e2608f', feedengine: '#8fd3c9' };
   const ALL4 = [['N', 0], ['E', 0], ['S', 0], ['W', 0]];
   function def(o) {
     o.w = o.w || 1; o.h = o.h || 1; o.ports = (o.ports || []).map(([dir, side, cell, rate]) => ({ dir, side, cell: cell || 0, rate }));
@@ -66,6 +74,8 @@
   def({ id: 'stellarator', name: 'Stellarator', cat: 1, kind: 'gen', w: 2, h: 2, hp: 400, blast: { r: 4.5, dmg: 400 }, mass: 10, col: COL.gen, lvl: 36, isNew: true,
     ports: [O('N', 60, 0), O('N', 60, 1), O('S', 60, 0), O('S', 60, 1)], say: 'Four lines of 60: the end-game plant.' });
 
+  // Lines (conduit: true) hold a few ticks of power and, on a combined line, a little material: they carry it on to the next
+  // line or to a gun that takes it. Stores with real holds (batteries, capacitors, banks) carry power only.
   def({ id: 'conduit', name: 'Conduit', cat: 2, kind: 'store', conduit: true, hold: 10, hp: 35, mass: 0.8, col: COL.conduit, lvl: 0, ports: [I('S', 200), O('N', 200)],
     say: 'A one-way line: in at the back, out at the front.' });
   def({ id: 'corner', name: 'Conduit, corner', cat: 2, kind: 'store', conduit: true, hold: 10, hp: 35, mass: 0.8, col: COL.conduit, lvl: 0, ports: [I('S', 200), O('E', 200)],
@@ -97,70 +107,83 @@
   //   rest       a beam that burns out shuts its ports for this long before it takes power again
   //   burst      a beam whose ports are shut while it's lit: it lights only when full, burns its whole buffer, rests,
   //              then recharges. How fast it recharges is what its lines (and any store in front) decide
-  //   threshold  it takes power only while its lines offer at least this much a second: one weak line gives it nothing
+  //   threshold  it takes power only from lines rated at least this much together: one weak line gives it nothing
   //   steady     while charging, if what arrives in a tick falls below this rate the charge collapses (back to nothing)
   //   clip       a magazine: fires its rounds, then refills the whole clip before firing again
-  //   feed       a feed port ([side, cell], use a shot or a second for beams, required): it fires with whatever it's fed
-  const gun = (o) => def(Object.assign({ cat: 3, kind: 'weapon', col: COL.weapon, passive: 0, buffer: 1, mass: 1.2, discharge: 0, rest: 0, threshold: 0, steady: 0, burst: false }, o));
+  // Feed: takes (the materials it accepts: none for most), feedUse (a shot, or a second while lit or thrusting), feedBuf
+  // (its feed buffer), feedPort (its own feed input: {side, cell, required}); without one it takes material from a
+  // combined line through its power ports.
+  const gun = (o) => def(Object.assign({ cat: 3, kind: 'weapon', col: COL.weapon, passive: 0, buffer: 1, mass: 1.2, discharge: 0, rest: 0, threshold: 0, steady: 0, burst: false, takes: [] }, o));
   gun({ id: 'pip', name: 'Pip', lvl: 0, hp: 60, ports: [I('S', 20)], shot: 10, cycle: 0.5, damage: 28,
     say: 'The starter gun: takes power from anything, at any rate.' });
   gun({ id: 'glint', name: 'Glint', lvl: 9, hp: 60, ports: [I('S', 35)], shot: 28, cycle: 0.8, damage: 43, discharge: 0.3,
     say: 'A pulse laser: its port shuts for 0.3 s after each shot.' });
   gun({ id: 'hammer', name: 'Hammer', lvl: 6, w: 2, hp: 120, ports: [I('S', 70, 0)], shot: 70, cycle: 1.0, damage: 69, threshold: 45,
-    say: 'A heavy cannon: it takes power only from a line offering at least 45 a second, so one reactor gives it nothing.' });
+    say: 'A heavy cannon: it takes power only from lines rated at least 45, so one reactor gives it nothing.' });
   gun({ id: 'cutter', name: 'Cutter', lvl: 18, w: 2, hp: 130, ports: [I('S', 45, 0), I('S', 45, 1)], beam: true, burn: 90, bufferE: 180, dps: 150, passive: 5, rest: 1.5, burst: true,
-    say: 'A burst beam: lights when full, burns its 180 in 2 s with its ports shut, rests 1.5 s, then recharges.' });
+    takes: ['lens', 'coolant'], feedUse: 1, feedBuf: 12,
+    say: 'A burst beam: lights when full, burns its 180 in 2 s with its ports shut, rests 1.5 s, then recharges. Takes Lens fluid or Coolant on a combined line.' });
   gun({ id: 'longbarrel', name: 'Longbarrel', lvl: 20, w: 2, hp: 150, ports: [I('S', 55, 0), I('S', 55, 1)], shot: 220, cycle: 2.0, damage: 96, discharge: 1.0,
-    say: 'A long gun: its ports shut for 1 s after each shot, so a buffer behind it wins back that second.' });
+    takes: ['overcharge', 'coolant', 'flux'], feedUse: 1, feedBuf: 10,
+    say: 'A long gun: its ports shut for 1 s after each shot, so a buffer behind it wins back that second. Takes Overcharge, Coolant or Flux on a combined line.' });
   gun({ id: 'spear', name: 'Spear', lvl: 28, w: 2, h: 2, hp: 240, ports: [I('S', 45, 0), I('S', 45, 1)], shot: 180, cycle: 2.0, buffer: 2, damage: 170, passive: 10, steady: 50,
-    say: 'A rail gun: while charging it needs at least 50 a second without a break, or the charge collapses. Give it a line of its own.' });
+    takes: ['damping', 'overcharge'], feedUse: 1.5, feedBuf: 15,
+    say: 'A rail gun: while charging it needs at least 50 a second without a break, or the charge collapses. Takes Damping gel or Overcharge.' });
   gun({ id: 'bastion', name: 'Bastion', lvl: 30, w: 2, h: 2, hp: 300, ports: [I('S', 55, 0), I('S', 55, 1), I('W', 55, 1), I('E', 55, 1)], shot: 60, cycle: 0.25, buffer: 16, clip: true, damage: 28, passive: 15,
     say: 'A heavy repeater: a 16-round clip, refilled whole once empty, from four lines.' });
   gun({ id: 'lance', name: 'Lance', lvl: 32, w: 2, hp: 200, ports: [I('S', 150, 0), I('S', 150, 1)], beam: true, burn: 300, bufferE: 600, dps: 210, passive: 40, rest: 2, burst: true,
-    say: 'The big burst beam: lights when full, burns its 600 in 2 s with its ports shut, rests 2 s, then recharges (it leaks 40 a second). A store in front that can pour fast shortens the recharge.' });
+    takes: ['lens', 'coolant'], feedUse: 3, feedBuf: 30,
+    say: 'The big burst beam: lights when full, burns its 600 in 2 s with its ports shut, rests 2 s, then recharges (it leaks 40 a second). Takes Lens fluid or Coolant.' });
   // The embedded superweapon: six lines of 60, from the back and both flanks, so the ship is built around it
   gun({ id: 'sunbreaker', name: 'Sunbreaker', lvl: 34, w: 3, h: 3, hp: 600, mass: 12, armour: 2, isNew: true,
     ports: [I('S', 60, 0), I('S', 60, 2), I('W', 60, 1), I('W', 60, 2), I('E', 60, 1), I('E', 60, 2)], shot: 600, cycle: 3.0, damage: 900, passive: 150, discharge: 1.0,
-    say: 'Six lines in at 60, from the back and both flanks: the ship is built around it. It leaks 150 a second (three lines to charge at all) and shuts for 1 s after each shot.' });
-  // Feed guns: power and a feed, through separate ports. fxMul: how strongly they carry their feed's effect
-  gun({ id: 'scorcher', name: 'Scorcher', lvl: 8, hp: 70, col: COL.feedgun, isNew: true, ports: [I('S', 30)], beam: true, burn: 30, bufferE: 60, dps: 45,
-    feedPort: { side: 'W', cell: 0, use: 1.5, required: true }, fxMul: 1.5,
-    say: 'A projector: a beam that needs power at its back and a feed on its left, and sprays whatever it\'s fed, its effect half again as strong.' });
+    takes: ['overcharge', 'coolant', 'damping'], feedUse: 4, feedBuf: 40,
+    say: 'Six lines in at 60, from the back and both flanks: the ship is built around it. It leaks 150 a second (three lines to charge at all) and shuts for 1 s after each shot. Takes Overcharge, Coolant or Damping.' });
+  // A gun with two inputs: power at its back left, its own feed port at its back right
   gun({ id: 'slurry_cannon', name: 'Slurry Cannon', lvl: 16, w: 2, hp: 140, col: COL.feedgun, isNew: true, ports: [I('S', 60, 0)], shot: 90, cycle: 1.5, damage: 110, threshold: 40,
-    feedPort: { side: 'S', cell: 1, use: 3, required: true }, fxMul: 1.5,
-    say: 'Fires shells packed with its feed (3 a shot, effect half again as strong). Power at its back left, feed at its back right; a line under 40 a second gives it nothing.' });
+    feedPort: { side: 'S', cell: 1, required: true }, takes: ['overcharge', 'accelerant', 'flux'], feedUse: 2, feedBuf: 20,
+    say: 'Two inputs: power at its back left (lines rated 40 or more), feed at its back right, and it fires only with feed (2 a shell). Takes Overcharge, Accelerant or Flux.' });
 
-  // Engines burn from a buffer that refills through their ports; empty, they run at intake ÷ burn. Shields draw a flat rate.
-  def({ id: 'ion', name: 'Ion Drive', cat: 4, kind: 'engine', hp: 50, col: COL.engine, lvl: 0, ports: [I('N', 12)], burn: 9, buffer: 30, thrust: 2.26, say: 'Full thrust burns 9 a second from a 30 buffer that refills at 12.' });
-  def({ id: 'plasma', name: 'Plasma Drive', cat: 4, kind: 'engine', w: 2, hp: 110, col: COL.engine, lvl: 16, ports: [I('N', 25, 0), I('N', 25, 1)], burn: 40, buffer: 120, thrust: 6.2, say: 'Full thrust burns 40 a second; two lines of 25 refill it.' });
+  // Engines burn from a buffer that refills through their ports; empty, they run at intake ÷ burn. Boost multiplies thrust
+  // (boost) and draws more (burn × (1 + 2.2 × boostDrain)). Shields draw a flat rate.
+  const engine = (o) => def(Object.assign({ cat: 4, kind: 'engine', col: COL.engine, boost: 1, boostDrain: 0, takes: [] }, o));
+  engine({ id: 'ion', name: 'Ion Drive', hp: 50, lvl: 0, ports: [I('N', 12)], burn: 9, buffer: 30, thrust: 2.26, rated: 34, boost: 2, boostDrain: 1,
+    say: 'Full thrust burns 9 a second from a 30 buffer that refills at 12. Boosts to double thrust.' });
+  engine({ id: 'plasma', name: 'Plasma Drive', w: 2, hp: 110, lvl: 16, ports: [I('N', 25, 0), I('N', 25, 1)], burn: 40, buffer: 120, thrust: 6.2, rated: 55, boost: 1.8, boostDrain: 0.8,
+    takes: ['catalyst', 'reaction'], feedUse: 1, feedBuf: 20,
+    say: 'Full thrust burns 40 a second; two lines of 25 refill it. Takes Catalyst or Reaction mass on a combined line.' });
+  // Built for the feed layer: on power alone it barely pushes; fed, it is a strong engine that hardly touches the power
+  engine({ id: 'reaction_thruster', name: 'Reaction Thruster', hp: 60, lvl: 12, isNew: true, col: COL.feedengine, ports: [I('N', 6)], burn: 4, buffer: 12, thrust: 1.0, rated: 60,
+    feedPort: { side: 'W', cell: 0, required: false }, takes: ['reaction', 'catalyst', 'burstgel'], feedUse: 1.2, feedBuf: 20,
+    feedMods: { reaction: { thrust: 5 }, catalyst: { burn: 0.25, thrust: 2.5 }, burstgel: { thrust: 2.2, boost: 2.5 } },
+    say: 'Built for feed: on power alone it pushes 1.0 for 4 a second; on Reaction mass 5.0 for the same 4 (1.2 feed a second). Feed point on its left.' });
   def({ id: 'deflector', name: 'Deflector', cat: 4, kind: 'util', hp: 56, col: COL.util, lvl: 11, ports: [I('S', 16)], e: 16, say: 'Draws 16 a second while shields are on.' });
 
-  // The feed layer. Tanks hold one consumable; touching tanks of it join. Pipes join anything with a feed point, any
-  // side; they cross a power line only through a Passthrough. A Combiner joins a feed and a power line into one
-  // flavoured line; a Scrubber takes the flavour off a line. Neither stores power (they hold a few ticks' worth).
-  for (const [fid, f] of Object.entries(FLUIDS))
-    def({ id: 'tank_' + fid, name: 'Tank: ' + f.short, cat: 5, kind: 'tank', fluid: fid, fill: 120, hp: 55, mass: f.tankMass || 1.5, col: f.col, lvl: 8, isNew: true, feed: ALL4,
-      say: `Holds 120 ${f.name.toLowerCase()} for the feed lines touching it. ${f.say}` });
-  def({ id: 'pipe', name: 'Feed pipe', cat: 5, kind: 'pipe', hp: 30, mass: 0.8, col: COL.pipe, lvl: 8, isNew: true, feed: ALL4,
+  // The feed layer. Tanks hold one material; touching tanks of it join. Pipes join anything with a feed point, any side;
+  // they cross a power line only through a Passthrough. A Selector passes one of its two inputs (the pilot switches). A
+  // Combiner takes power at its back and material on its side and gives one combined line.
+  for (const [mid, m] of Object.entries(MATS))
+    def({ id: 'tank_' + mid, name: 'Tank: ' + m.short, cat: 5, kind: 'tank', fluid: mid, fill: 120, hp: 55, mass: 1.5, col: m.col, lvl: m.on === 'engine' ? 10 : 14, isNew: true, feed: ALL4,
+      say: `Holds 120 ${m.name.toLowerCase()} for the feed lines touching it. ${m.say}` });
+  def({ id: 'pipe', name: 'Feed pipe', cat: 5, kind: 'pipe', hp: 30, mass: 0.8, col: COL.pipe, lvl: 10, isNew: true, feed: ALL4,
     say: 'Carries feed between whatever touches it, any side. It can\'t cross a power line: use a Passthrough there.' });
-  def({ id: 'passthrough', name: 'Passthrough', cat: 5, kind: 'store', conduit: true, hold: 10, hp: 45, mass: 0.5, col: COL.pipe, lvl: 8, isNew: true,
+  def({ id: 'passthrough', name: 'Passthrough', cat: 5, kind: 'store', conduit: true, hold: 10, hp: 45, mass: 0.8, col: COL.pipe, lvl: 10, isNew: true,
     ports: [I('S', 200), O('N', 200)], feed: [['E', 0], ['W', 0]],
     say: 'A power line (back to front) with a feed pipe crossing it (side to side): where the two networks cross.' });
   def({ id: 'combiner', name: 'Combiner', cat: 5, kind: 'store', conduit: true, combiner: true, hold: 10, hp: 140, mass: 1.5, col: COL.pipe, lvl: 10, isNew: true,
-    ports: [I('S', 150), O('N', 150)], feed: [['W', 0]], feedPerE: 0.02,
-    say: 'Power in at the back, feed on the left, one flavoured line out the front: every gun downstream fires with the feed. 1 feed for every 50 power. Tough, and it holds no charge.' });
-  def({ id: 'scrubber', name: 'Scrubber', cat: 5, kind: 'store', conduit: true, scrub: true, hold: 10, hp: 50, mass: 0.5, col: COL.pipe, lvl: 10, isNew: true,
-    ports: [I('S', 200), O('N', 200)],
-    say: 'A power line that takes the flavour off: what leaves it is plain power. Keeps a branch clean.' });
+    ports: [I('S', 150), O('N', 150)], feed: [['W', 0]], matCap: 4,
+    say: 'Power in at the back, feed on the left, one combined line out the front. Lines carry the material on (one kind at a time); batteries and capacitors don\'t, so put the Combiner after them. Tough, and it holds no charge.' });
+  def({ id: 'selector', name: 'Selector', cat: 5, kind: 'selector', hp: 60, mass: 1, col: COL.pipe, lvl: 25, isNew: true, feed: [['W', 0], ['E', 0], ['N', 0]],
+    say: 'Two feed inputs (its sides) and one output (its front): it passes one input at a time. Switch feeds flips it; what\'s already down the line runs out first.' });
 
   // Credits, armour (against the pen of what hits it) and a gun's pen (against the enemy's armour): first guesses, for the
   // evolver's budget and hit runs; the lab shows them but its tick doesn't use them
   const COST = { core: 0, hull: 9, armor: 18, cell_reactor: 35, twin_reactor: 60, isotope: 70, fusion: 500, overclock: 700, stellarator: 1400,
     conduit: 10, corner: 10, cell_battery: 40, joiner: 90, splitter: 90, capacitor: 60, surge_cell: 120, drive_cell: 80, flux_coil: 300, heavy_bank: 400, cap_array: 600,
-    pip: 21, glint: 100, hammer: 110, cutter: 170, longbarrel: 300, spear: 600, bastion: 900, lance: 1200, sunbreaker: 2500, scorcher: 90, slurry_cannon: 260,
-    ion: 21, plasma: 210, deflector: 140, pipe: 8, passthrough: 30, combiner: 120, scrubber: 40 };
+    pip: 21, glint: 100, hammer: 110, cutter: 170, longbarrel: 300, spear: 600, bastion: 900, lance: 1200, sunbreaker: 2500, slurry_cannon: 260,
+    ion: 21, plasma: 210, reaction_thruster: 90, deflector: 140, pipe: 8, passthrough: 30, combiner: 120, selector: 200 };
   const ARMOUR = { armor: 2, isotope: 2, fusion: 2, heavy_bank: 2, stellarator: 2, spear: 2, bastion: 2, combiner: 2 };
-  const PEN = { pip: 1, glint: 1, hammer: 2, cutter: 2, longbarrel: 3, spear: 4, bastion: 3, lance: 4, sunbreaker: 5, scorcher: 0, slurry_cannon: 2 };
+  const PEN = { pip: 1, glint: 1, hammer: 2, cutter: 2, longbarrel: 3, spear: 4, bastion: 3, lance: 4, sunbreaker: 5, slurry_cannon: 2 };
   for (const id of ORDER) {
     const t = T[id];
     t.cost ??= COST[id] ?? (t.kind === 'tank' ? 40 : 0); t.armour ??= ARMOUR[id] ?? 1; if (t.kind === 'weapon') t.pen ??= PEN[id] ?? 1;
@@ -168,6 +191,8 @@
     t.produce = t.ports.filter((p) => p.dir === 'out').reduce((s, p) => s + p.rate, 0);
     if (t.kind === 'weapon' && !t.beam) t.damage = t.damage || 1;
     if (t.feedPort) t.feed = [{ side: t.feedPort.side, cell: t.feedPort.cell }];
+    t.takes ??= [];
+    if (t.takes.length) { t.feedUse ??= 1; t.feedBuf ??= 10 * t.feedUse; }
   }
 
   // ================================================================ geometry
@@ -196,8 +221,8 @@
   }
   /** Every port of a placed part in world terms: {dir, rate, side, x, y (the port's cell), nx, ny (the cell across it), local} */
   function portsOf(p) { return T[p.type].ports.map((q) => Object.assign({ dir: q.dir, rate: q.rate, local: q }, edgeOf(p, q.side, q.cell))); }
-  /** Every feed point of a placed part in world terms */
-  function feedsOf(p) { return T[p.type].feed.map((q) => Object.assign({ local: q }, edgeOf(p, q.side, q.cell))); }
+  /** Every feed point of a placed part in world terms (a Selector's: index 0 and 1 its inputs, 2 its output) */
+  function feedsOf(p) { return T[p.type].feed.map((q, i) => Object.assign({ local: q, i }, edgeOf(p, q.side, q.cell))); }
 
   // ================================================================ the layout: links between facing ports, feed networks
   function build(parts, GW, GH) {
@@ -213,8 +238,9 @@
       if (t.kind === 'store' && p.held === undefined) p.held = 0;
       if ((t.kind === 'weapon' || t.kind === 'engine' || t.kind === 'util') && p.stored === undefined) p.stored = 0;
       if (t.kind === 'tank' && p.fill === undefined) p.fill = t.fill;
-      p.flav ??= {}; p.cd ??= 0; p.on ??= false; p.flash ??= 0; p.emaIn ??= 0; p.emaOut ??= 0; p.emaWaste ??= 0; p.emaD ??= 0; p.sat ??= 1; p.rate ??= 0; p.thrustNow ??= 0;
-      p.latched ??= false; p.closed ??= 0; p.frozen ??= 0; p.collapsed ??= 0; p.fx ??= null;
+      if (t.kind === 'selector') p.sel ??= 0;
+      p.mat ??= null; p.matAmt ??= 0; p.cd ??= 0; p.on ??= false; p.flash ??= 0; p.emaIn ??= 0; p.emaOut ??= 0; p.emaWaste ??= 0; p.emaD ??= 0; p.sat ??= 1; p.rate ??= 0;
+      p.thrustNow ??= 0; p.latched ??= false; p.closed ??= 0; p.collapsed ??= 0;
     }
     for (const a of alive) for (const pa of a.ports) {
       const b = pa.nx >= 0 && pa.ny >= 0 && pa.nx < GW && pa.ny < GH ? occ[key(pa.nx, pa.ny)] : null;
@@ -226,11 +252,11 @@
       if (pa.dir === 'out') { const l = { from: a, to: b, pa, pb, cap: Math.min(pa.rate, pb.rate), ema: 0, send: 0 }; pa.link = l; pb.link = l; links.push(l); a.links.push(l); b.links.push(l); }
     }
     for (const p of alive) { p.outL = p.links.filter((l) => l.from === p); p.inL = p.links.filter((l) => l.to === p); }
-    // Feed networks: parts joined where both sides of an edge have a feed point. Tanks join only tanks of their own fluid
-    // directly (a pipe between two tank types joins them, and mixes them)
-    const net = new Map(), parent = new Map();
+    // Feed networks: parts joined where both sides of an edge have a feed point. Touching tanks of different materials
+    // don't join (a pipe between them does). A Selector joins nothing: each of its points belongs to the network beyond it
+    const parent = new Map();
     const find = (p) => { while (parent.get(p) !== p) { parent.set(p, parent.get(parent.get(p))); p = parent.get(p); } return p; };
-    for (const p of alive) if (p.feeds.length) parent.set(p, p);
+    for (const p of alive) if (p.feeds.length && T[p.type].kind !== 'selector') parent.set(p, p);
     for (const a of alive) for (const fa of a.feeds) {
       fa.joined = null;
       const b = fa.nx >= 0 && fa.ny >= 0 && fa.nx < GW && fa.ny < GH ? occ[key(fa.nx, fa.ny)] : null;
@@ -239,81 +265,126 @@
       const ta = T[a.type], tb = T[b.type];
       if (ta.kind === 'tank' && tb.kind === 'tank' && ta.fluid !== tb.fluid) continue;
       fa.joined = b;
+      if (ta.kind === 'selector' || tb.kind === 'selector') continue;
       const ra = find(a), rb = find(b); if (ra !== rb) parent.set(ra, rb);
     }
-    const feedNets = [];
+    const nets = new Map(), feedNets = [];
     for (const p of parent.keys()) {
       const r = find(p);
-      if (!net.has(r)) { const n = { parts: [], tanks: [], users: [] }; net.set(r, n); feedNets.push(n); }
-      const n = net.get(r); n.parts.push(p); p.feedNet = n;
+      if (!nets.has(r)) { const n = { parts: [], tanks: [], users: [], selectors: [] }; nets.set(r, n); feedNets.push(n); }
+      const n = nets.get(r); n.parts.push(p); p.feedNet = n;
       const t = T[p.type];
       if (t.kind === 'tank') n.tanks.push(p); else if (t.combiner || t.feedPort) n.users.push(p);
     }
     const by = (k) => alive.filter((p) => T[p.type].kind === k);
+    const selectors = by('selector');
+    for (const s of selectors) {
+      s.ins = [0, 1].map((i) => { const j = s.feeds[i].joined; return j && j.feedNet ? j.feedNet : null; });
+      const o = s.feeds[2].joined; s.outNet = o && o.feedNet ? o.feedNet : null;
+      if (s.outNet) s.outNet.selectors.push(s);
+    }
     const consumers = [...by('weapon'), ...by('engine'), ...by('util')], stores = by('store');
-    return { GW, GH, occ, key, alive, links, opens, clashes, feedNets, gens: by('gen'), stores, weapons: by('weapon'), engines: by('engine'), utils: by('util'),
-      tanks: by('tank'), consumers, takers: [...stores, ...consumers] };
+    return { GW, GH, occ, key, alive, links, opens, clashes, feedNets, selectors, gens: by('gen'), stores, weapons: by('weapon'), engines: by('engine'), utils: by('util'),
+      tanks: by('tank'), consumers, takers: [...stores, ...consumers], carriers: stores.filter((s) => T[s.type].conduit) };
   }
 
   // ================================================================ feed
-  /** What a feed network holds: {fluid: units}, and the total */
-  function netStock(n) { const s = {}; let total = 0; for (const t of n.tanks) { const f = T[t.type].fluid; s[f] = (s[f] || 0) + t.fill; total += t.fill; } return { s, total }; }
-  /** Take up to u units from a feed network, from every tank in proportion. Returns the mix taken {fluid: units} */
-  function draw(n, u) {
-    const { total } = netStock(n), got = {};
-    if (!n || total <= 1e-9 || u <= 0) return got;
-    const k = Math.min(1, u / total);
-    for (const t of n.tanks) { const take = t.fill * k, f = T[t.type].fluid; t.fill -= take; got[f] = (got[f] || 0) + take; }
-    return got;
+  /** What a feed network holds: {material: units}, and the total */
+  function netStock(n) { const s = {}; let total = 0; if (n) for (const t of n.tanks) { const f = T[t.type].fluid; s[f] = (s[f] || 0) + t.fill; total += t.fill; } return { s, total }; }
+  /** What a network can give right now: its own tanks' material (the most plentiful, if it mixes kinds), or, with no tank
+   * of its own, what the Selector feeding it passes. {mat, net (whose tanks), amt} or null */
+  function supply(n, depth = 0) {
+    if (!n || depth > 6) return null;
+    const { s } = netStock(n);
+    const top = Object.entries(s).filter(([, v]) => v > 1e-6).sort((a, b) => b[1] - a[1])[0];
+    if (top) return { mat: top[0], net: n, amt: top[1] };
+    for (const sel of n.selectors) { const r = supply(sel.ins[sel.sel], depth + 1); if (r) return r; }
+    return null;
   }
-  const sumMix = (m) => Object.values(m).reduce((s, v) => s + v, 0);
-  /** Mix flavour b (weight wb) into a (weight wa): shares of the result */
-  function blend(a, wa, b, wb) {
-    const out = {}, w = wa + wb; if (w <= 1e-12) return out;
-    for (const [k, v] of Object.entries(a)) out[k] = (out[k] || 0) + v * wa / w;
-    for (const [k, v] of Object.entries(b)) out[k] = (out[k] || 0) + v * wb / w;
-    for (const k of Object.keys(out)) if (out[k] < 1e-4) delete out[k];
-    return out;
+  /** Take up to u of material m from a network's tanks of it, in proportion. Returns what it got */
+  function drawMat(n, m, u) {
+    const tanks = n.tanks.filter((t) => T[t.type].fluid === m && t.fill > 0), have = tanks.reduce((a, t) => a + t.fill, 0);
+    if (have <= 1e-9 || u <= 0) return 0;
+    const k = Math.min(1, u / have); for (const t of tanks) t.fill -= t.fill * k;
+    return Math.min(u, have);
   }
-  /** A shot's effects from its flavour shares (each 0..1): damage and cycle multipliers, pen added, and the effect amounts */
-  function effects(shares, fxMul) {
-    const fx = { dmg: 1, cycle: 1, pen: 0, burn: 0, splash: 0, mark: 0, slow: 0, disrupt: 0 };
-    for (const [f, s0] of Object.entries(shares || {})) {
-      // (A share is at most 1; a feed gun's fxMul then strengthens it, half again for the Scorcher)
-      const F = FLUIDS[f]; if (!F) continue; const s = Math.min(1, s0) * (fxMul || 1);
-      if (F.dmg) fx.dmg *= 1 + (F.dmg - 1) * s; if (F.cycle) fx.cycle *= 1 + (F.cycle - 1) * s; if (F.pen) fx.pen += F.pen * s;
-      for (const k of FX_KEYS) if (F[k]) fx[k] += F[k] * s;
+  /** May part p take material m into its material buffer now? (one kind at a time; a gun or engine only what it takes) */
+  function accepts(p, m) {
+    const t = T[p.type];
+    if (p.matAmt > 1e-9 && p.mat !== m) return false;
+    if (t.kind === 'weapon' || t.kind === 'engine') return t.takes.includes(m);
+    return true;
+  }
+  const matCap = (p) => { const t = T[p.type]; return t.kind === 'weapon' || t.kind === 'engine' ? t.feedBuf || 0 : t.combiner ? t.matCap : t.conduit ? 2 : 0; };
+  /** A part's stats with its material applied, if it holds enough for its next use: the part type itself otherwise */
+  const EFF = new Map();
+  function eff(p) {
+    const t = T[p.type];
+    if (!t.takes.length || !p.mat || p.matAmt < (t.feedUse || 1) * (t.beam || t.kind === 'engine' ? 1 / 60 : 1) - 1e-9 || !t.takes.includes(p.mat)) return t;
+    const k = t.id + '|' + p.mat;
+    if (!EFF.has(k)) {
+      const o = Object.assign({}, t), mods = Object.assign({}, MATS[p.mat].mod, (t.feedMods || {})[p.mat] || {});
+      for (const [s, v] of Object.entries(mods)) if (typeof t[s] === 'number') o[s] = t[s] * v;
+      o.fed = p.mat; EFF.set(k, o);
     }
-    return fx;
+    return EFF.get(k);
   }
+  /** Empty every gun's, engine's and line's material (the Purge button): whatever comes next can come in at once */
+  function purge(L) { for (const p of L.alive) { p.matAmt = 0; p.mat = null; } }
+  /** Flip every Selector to its other input (the Switch feeds button) */
+  function switchFeeds(L) { for (const s of L.selectors) s.sel = 1 - s.sel; }
 
   // ================================================================ the tick
   const DEF_DT = 1 / 60, DT = DEF_DT, TAU = 1.5;
-  function waterfill(wants, supply) {
+  function waterfill(wants, supplyAmt) {
     const out = new Array(wants.length).fill(0);
     const idx = wants.map((_, i) => i).filter((i) => wants[i] > 1e-12).sort((a, b) => wants[a] - wants[b]);
-    let left = Math.max(0, supply), k = idx.length;
+    let left = Math.max(0, supplyAmt), k = idx.length;
     for (const i of idx) { const g = Math.min(wants[i], left / k); out[i] = g; left -= g; k--; }
     return out;
   }
   const capOf = (t) => (t.beam ? t.bufferE : t.shot * t.buffer);
-  /** How much a taker will accept this tick: its space, or nothing while its ports are shut (discharge, rest, frozen) */
+  /** How much a taker will accept this tick: its space, or nothing while its ports are shut (discharge, rest, a lit burst beam) */
   function spaceOf(p) {
     const t = T[p.type];
     if (t.kind === 'store') return t.hold - p.held;
-    if (p.closed > 0 || p.frozen > 0 || (t.burst && p.on)) return 0;
-    return t.kind === 'weapon' ? capOf(t) - p.stored : t.kind === 'engine' ? t.buffer - p.stored : t.e - p.stored;
+    const E = eff(p);
+    if (p.closed > 0 || (t.burst && p.on)) return 0;
+    return t.kind === 'weapon' ? capOf(E) - p.stored : t.kind === 'engine' ? t.buffer - p.stored : t.e - p.stored;
   }
-  /** Damage a second at full supply: the cycle, or the time to charge a shot after the ports reopen, whichever is longer.
-   * A burst beam: lit for buffer ÷ burn, then the rest, then the recharge at its lines' full rate */
+  /** Damage a second at full supply (no feed): the cycle, or the time to charge a shot after the ports reopen, whichever is
+   * longer. A burst beam: lit for buffer ÷ burn, then the rest, then the recharge at its lines' full rate */
   function fullDps(t) {
     if (t.beam && t.burst) { const on = t.bufferE / t.burn, re = t.bufferE / Math.max(1e-9, t.intake - t.passive); return t.dps * on / (on + (t.rest || 0) + re); }
     if (t.beam) return t.dps;
     return t.damage / Math.max(t.cycle, (t.discharge || 0) + t.shot / Math.max(1e-9, t.intake - t.passive));
   }
 
+  /** Material moves: from each network into the Combiners and feed ports on it, then along combined lines (line to line,
+   * and line into a gun or engine that takes it). One kind at a time everywhere: a part holding one kind refuses another */
+  function moveMaterial(L, DT) {
+    const step = MRATE * DT;
+    for (const p of L.alive) {
+      const t = T[p.type];
+      if (!(t.combiner || t.feedPort) || !p.feedNet) continue;
+      const room = matCap(p) - p.matAmt; if (room <= 1e-9) continue;
+      const sup = supply(p.feedNet); if (!sup || !accepts(p, sup.mat)) { p.feedRefused = sup ? sup.mat : null; continue; }
+      p.feedRefused = null;
+      const got = drawMat(sup.net, sup.mat, Math.min(room, step)); if (got > 0) { p.mat = sup.mat; p.matAmt += got; }
+    }
+    for (const l of L.links) {
+      l.matBlocked = false;
+      const a = l.from; if (!T[a.type].conduit || a.matAmt <= 1e-9) continue;
+      const b = l.to, tb = T[b.type];
+      const carries = tb.conduit || ((tb.kind === 'weapon' || tb.kind === 'engine') && !tb.feedPort && tb.takes.length);
+      if (!carries || !accepts(b, a.mat)) { l.matBlocked = true; continue; }
+      const mv = Math.min(a.matAmt / Math.max(1, a.outL.length), matCap(b) - b.matAmt, step);
+      if (mv > 1e-9) { b.mat = a.mat; b.matAmt += mv; a.matAmt -= mv; if (a.matAmt <= 1e-9) { a.matAmt = 0; } }
+    }
+  }
+
   /** One tick of dt seconds (default 1/60; the evolver uses 1/20, the most a 10-held conduit's 200 a second allows).
-   * ctrl: {fire, thrust, util}. Returns this tick's totals (E/s). Mutates part state and link.send */
+   * ctrl: {fire, thrust, boost, util}. Returns this tick's totals (E/s). Mutates part state and link.send */
   function tick(L, ctrl, ticks, dt) {
     const DT = dt || DEF_DT;
     const ema = (cur, v) => cur + (v - cur) * Math.max(DT / TAU, 1 / (ticks + 1));
@@ -323,81 +394,54 @@
     for (const g of L.gens) for (const l of g.outL) l.offer = l.cap * DT;
     for (const s of L.stores) { const outs = s.outL; if (!outs.length) continue; if (outs.length === 1) { outs[0].offer = Math.min(outs[0].cap * DT, s.held); continue; } const a = waterfill(outs.map((l) => l.cap * DT), s.held); outs.forEach((l, i) => { l.offer = a[i]; }); }
     // 2. Accept: each taker up to the space left, water-filled over its in links. A gun with a threshold takes nothing
-    // unless the lines offering it power are rated at least that much together (a link's rating: the lower of its two
-    // ports): a reactor's 30 never qualifies for a 45 threshold, a Joiner's 90 or a Capacitor's 400 does
+    // unless the lines offering it power are rated at least that much together (a link's rating: the lower of its two ports)
     for (const l of L.links) l.send = 0;
     for (const p of L.takers) {
       const ins = p.inL; if (!ins.length) continue;
-      const t = T[p.type];
+      const E = eff(p);
       let space = Math.max(0, spaceOf(p));
-      if (t.threshold && ins.reduce((s, l) => s + (l.offer > 1e-12 ? l.cap : 0), 0) < t.threshold - 1e-9) space = 0;
+      if (E.threshold && ins.reduce((s, l) => s + (l.offer > 1e-12 ? l.cap : 0), 0) < E.threshold - 1e-9) space = 0;
       if (ins.length === 1) { ins[0].send = Math.min(ins[0].offer, space); continue; }
       const a = waterfill(ins.map((l) => l.offer), space);
       ins.forEach((l, i) => { l.send = a[i]; });
     }
-    // 3. Apply, carrying flavour: what arrives brings its giver's flavour (as it was at the start of the tick)
+    // 3. Apply
     let made = 0, wasted = 0, toStores = 0, toW = 0, toE = 0, toU = 0, fromStores = 0;
-    for (const p of L.alive) { p.inNow = 0; p.outNow = 0; p.inFlav = null; }
-    for (const l of L.links) {
-      l.from.outNow += l.send; l.to.inNow += l.send;
-      if (l.send > 0 && l.from.flav && Object.keys(l.from.flav).length) { const f = l.from.flav; l.to.inFlav = l.to.inFlav || {}; for (const k in f) l.to.inFlav[k] = (l.to.inFlav[k] || 0) + f[k] * l.send; }
-    }
+    for (const p of L.alive) { p.inNow = 0; p.outNow = 0; }
+    for (const l of L.links) { l.from.outNow += l.send; l.to.inNow += l.send; }
     for (const g of L.gens) { const t = T[g.type]; made += t.produce * DT; wasted += t.produce * DT - g.outNow; g.emaWaste = ema(g.emaWaste, (t.produce * DT - g.outNow) / DT); }
-    const mixIn = (p, keep) => {
-      // (keep: energy staying in the part, carrying its own flavour; what arrives: p.inNow carrying p.inFlav (units of flavoured energy))
-      let incoming = {}; if (p.inFlav && p.inNow > 0) for (const k in p.inFlav) incoming[k] = p.inFlav[k] / p.inNow;
-      const t = T[p.type];
-      if (t.scrub) incoming = {};
-      if (t.combiner && p.inNow > 0) {
-        // A Combiner flavours what passes through it with its feed network's mix, as far as the feed lasts
-        const want = p.inNow * t.feedPerE, got = p.feedNet ? draw(p.feedNet, want) : {}, gotU = sumMix(got);
-        if (gotU > 0) { const f = Math.min(1, gotU / want), mix = {}; for (const k in got) mix[k] = got[k] / gotU; incoming = blend(incoming, 1 - f, mix, f); }
-        p.feedRate = gotU / DT;
-      } else if (t.combiner) p.feedRate = 0;
-      p.flav = blend(p.flav || {}, Math.max(0, keep), incoming, p.inNow);
-    };
-    for (const s of L.stores) { const keep = s.held - s.outNow; mixIn(s, keep); s.held += s.inNow - s.outNow; fromStores += s.outNow; toStores += s.inNow; }
-    for (const p of L.consumers) { const k = T[p.type].kind; mixIn(p, p.stored); p.stored += p.inNow; if (k === 'weapon') toW += p.inNow; else if (k === 'engine') toE += p.inNow; else toU += p.inNow; }
+    for (const s of L.stores) { s.held += s.inNow - s.outNow; fromStores += s.outNow; toStores += s.inNow; }
+    for (const p of L.consumers) { const k = T[p.type].kind; p.stored += p.inNow; if (k === 'weapon') toW += p.inNow; else if (k === 'engine') toE += p.inNow; else toU += p.inNow; }
     for (const p of L.alive) { p.emaIn = ema(p.emaIn, p.inNow / DT); p.emaOut = ema(p.emaOut, p.outNow / DT); }
     for (const l of L.links) l.ema = ema(l.ema, l.send / DT);
-    // 4. Consumers act
+    moveMaterial(L, DT);
+    // 4. Consumers act, each with its material's stats while it holds enough for its next use
     let dmg = 0, thrust = 0, shortW = 0, shortE = 0, shortU = 0;
     for (const p of L.weapons) {
-      const t = T[p.type]; let d = 0; p.fx = null; p.feedShort = false;
+      const t = T[p.type]; let d = 0; p.shotMat = null;
       p.cd = Math.max(0, p.cd - DT); p.flash = Math.max(0, p.flash - DT); p.collapsed = Math.max(0, p.collapsed - DT);
       const wasClosed = p.closed > 0; p.closed = Math.max(0, p.closed - DT);
-      if (p.frozen > 0) { p.frozen = Math.max(0, p.frozen - DT); p.on = false; p.dNow = 0; p.emaD = emaSlow(p.emaD, 0); p.rate = p.emaD / fullDps(t); continue; }
+      const E = eff(p), fed = E !== t, need = t.feedPort && t.feedPort.required;
       // (Steady: a charge in progress collapses when less than the steady rate arrived this tick)
-      if (t.steady && !wasClosed && p.stored > 1e-9 && p.stored < capOf(t) - t.passive * DT * 2 - 1e-9 && p.inNow < t.steady * DT * 0.98) { p.stored = 0; p.collapsed = 0.4; }
-      // (A feed port: the shot's (or this tick's beam) feed, from the network at that port)
-      const feedFor = (u) => {
-        const fp = t.feedPort; if (!fp) return { ok: true, mix: {} };
-        const n = p.feedNet, have = n ? netStock(n).total : 0;
-        if (have < u - 1e-9) { p.feedShort = true; return { ok: !fp.required, mix: {} }; }
-        const got = draw(n, u), gu = sumMix(got), mix = {}; for (const k in got) mix[k] = got[k] / gu; return { ok: true, mix };
-      };
-      const shotFx = (feedMix) => { const sh = Object.assign({}, p.flav || {}); for (const k in feedMix) sh[k] = Math.min(1, (sh[k] || 0) + feedMix[k]); p.shotMix = sh; return effects(sh, t.fxMul); };
+      if (E.steady && !wasClosed && p.stored > 1e-9 && p.stored < capOf(E) - t.passive * DT * 2 - 1e-9 && p.inNow < E.steady * DT * 0.98) { p.stored = 0; p.collapsed = 0.4; }
       if (t.beam) {
-        const need = t.burn * DT;
-        // (A burst beam lights only when full (its passive leak allowed for); others at half)
-        const light = t.burst ? t.bufferE - t.passive * DT * 2 - 1e-6 : 0.5 * t.bufferE - 1e-9;
-        if (!ctrl.fire) p.on = false; else if (!p.on && p.closed <= 0 && p.stored >= light) p.on = true;
-        if (p.on && p.stored >= need - 1e-9) {
-          const fd = feedFor(t.feedPort ? t.feedPort.use * DT : 0);
-          if (fd.ok) { p.stored -= need; p.fx = shotFx(fd.mix); d = t.dps * DT * p.fx.dmg; } else p.on = false;
-        } else if (p.on) { p.on = false; if (t.rest) p.closed = t.rest; }
+        const burn = E.burn * DT;
+        const light = t.burst ? E.bufferE - t.passive * DT * 2 - 1e-6 : 0.5 * E.bufferE - 1e-9;
+        if (!ctrl.fire) p.on = false; else if (!p.on && p.closed <= 0 && p.stored >= light && (!need || fed)) p.on = true;
+        if (p.on && p.stored >= burn - 1e-9 && (!need || fed)) {
+          p.stored -= burn; d = E.dps * DT;
+          if (fed) { p.matAmt = Math.max(0, p.matAmt - t.feedUse * DT); p.shotMat = p.mat; }
+        } else if (p.on) { p.on = false; if (E.rest) p.closed = E.rest; }
       } else {
-        const ready = ctrl.fire && p.cd <= 1e-9 && p.stored >= t.shot - 1e-9 && !(t.clip && p.latched);
-        if (t.clip && p.latched && p.stored >= capOf(t) - 1e-9) p.latched = false;
-        if (ready) {
-          const fd = feedFor(t.feedPort ? t.feedPort.use : 0);
-          if (fd.ok) {
-            p.fx = shotFx(fd.mix); p.stored -= t.shot; p.cd = t.cycle * p.fx.cycle; d = t.damage * p.fx.dmg; p.flash = 0.1;
-            if (t.discharge) p.closed = t.discharge;
-            if (t.clip && p.stored < t.shot - 1e-9) p.latched = true;
-          }
+        if (t.clip && p.latched && p.stored >= capOf(E) - 1e-9) p.latched = false;
+        if (ctrl.fire && p.cd <= 1e-9 && p.stored >= E.shot - 1e-9 && !(t.clip && p.latched) && (!need || fed)) {
+          p.stored -= E.shot; p.cd = E.cycle; d = E.damage; p.flash = 0.1;
+          if (fed) { p.matAmt = Math.max(0, p.matAmt - t.feedUse); p.shotMat = p.mat; p.lastMat = p.mat; } else p.lastMat = null;
+          if (E.discharge) p.closed = E.discharge;
+          if (t.clip && p.stored < E.shot - 1e-9) p.latched = true;
         }
       }
+      if (p.matAmt <= 1e-9) { p.matAmt = 0; p.mat = null; }
       // (The passive drain after firing: a full buffer fires before it leaks)
       p.stored = Math.max(0, p.stored - t.passive * DT);
       p.dNow = d; p.emaD = emaSlow(p.emaD, d / DT); dmg += d;
@@ -405,10 +449,15 @@
       if (ctrl.fire) shortW += Math.max(0, t.intake * DT - p.inNow);
     }
     for (const p of L.engines) {
-      const t = T[p.type]; let frac = 1;
-      if (p.frozen > 0) { p.frozen = Math.max(0, p.frozen - DT); frac = 0; }
-      else if (ctrl.thrust) { const need = t.burn * DT, use = Math.min(p.stored, need); p.stored -= use; frac = use / need; shortE += Math.max(0, Math.min(t.intake, t.burn) * DT - p.inNow); }
-      p.sat = ctrl.thrust ? frac : 1; p.thrustNow = ctrl.thrust ? t.thrust * frac : 0; thrust += p.thrustNow;
+      const t = T[p.type], E = eff(p), fed = E !== t; let frac = 1;
+      const boost = !!ctrl.boost, mul = boost ? E.boost : 1, burnRate = E.burn * (boost ? 1 + BOOST_DRAW * E.boostDrain : 1);
+      if (ctrl.thrust) {
+        const need = burnRate * DT, use = Math.min(p.stored, need); p.stored -= use; frac = need > 0 ? use / need : 1;
+        shortE += Math.max(0, Math.min(t.intake, burnRate) * DT - p.inNow);
+        if (fed) p.matAmt = Math.max(0, p.matAmt - t.feedUse * DT);
+      }
+      if (p.matAmt <= 1e-9) { p.matAmt = 0; p.mat = null; }
+      p.sat = ctrl.thrust ? frac : 1; p.thrustNow = ctrl.thrust ? E.thrust * mul * frac : 0; p.burnNow = ctrl.thrust ? burnRate : 0; thrust += p.thrustNow;
     }
     for (const p of L.utils) {
       const t = T[p.type];
@@ -419,23 +468,14 @@
       dps: per(dmg), thrust, shortW: per(shortW), shortE: per(shortE), shortU: per(shortU) };
   }
 
-  // ================================================================ damage: destroy a part and let its blast or hazard run
-  /** What a part does when it goes: a generator's blast; a store's charge (0.6 × held); a tank's hazard (by how full it
-   * is); a pipe's or flavoured line's leak (a smaller share of its feed's hazard). {kind, r, dmg | s} or null */
+  // ================================================================ damage: destroy a part and let its blast run
+  /** A generator's blast, or a charged store's (0.6 × held); anything else just breaks. Feed parts have no hazards */
   function blastOf(p) {
     const t = T[p.type];
     if (t.kind === 'gen' && t.blast) return Object.assign({ kind: 'blast' }, t.blast);
-    if (t.kind === 'tank') { const h = FLUIDS[t.fluid].hazard, k = (p.fill ?? t.fill) / t.fill; return h && k > 0.05 ? scaleHazard(h, k) : null; }
-    if (t.kind === 'pipe' && p.feedNet) { const { s, total } = netStock(p.feedNet); const top = Object.entries(s).sort((a, b) => b[1] - a[1])[0]; const h = top && FLUIDS[top[0]].hazard; return h && total > 1 ? scaleHazard(h, 0.35) : null; }
-    if (t.kind === 'store') {
-      const fl = Object.entries(p.flav || {}).sort((a, b) => b[1] - a[1])[0], h = fl && fl[1] > 0.2 && FLUIDS[fl[0]].hazard;
-      if (!t.conduit && p.held > 1) return { kind: 'blast', r: Math.min(4.5, 1.5 + p.held / 300), dmg: 0.6 * p.held };
-      if (h) return scaleHazard(h, 0.35 * fl[1]);
-    }
+    if (t.kind === 'store' && !t.conduit && p.held > 1) return { kind: 'blast', r: Math.min(4.5, 1.5 + p.held / 300), dmg: 0.6 * p.held };
     return null;
   }
-  function scaleHazard(h, k) { const o = Object.assign({}, h); if (o.dmg) o.dmg *= k; if (o.s) o.s *= Math.max(0.3, k); o.r = Math.max(1.2, o.r * Math.sqrt(Math.max(0.3, k))); return o; }
-  const isPower = (q) => { const k = T[q.type].kind; return k === 'gen' || k === 'store'; };
   /** Kill part p (and chain). Returns the parts that went, in order, each with what took it (null for the first) */
   function destroy(L, p) {
     const gone = [], queue = [];
@@ -447,8 +487,6 @@
         if (q.dead) continue;
         const d = Math.hypot(q.cx - at[0], q.cy - at[1]);
         if (d >= b.r) continue;
-        if (b.kind === 'freeze') { const k = T[q.type].kind; if (k === 'weapon' || k === 'engine' || k === 'util') q.frozen = Math.max(q.frozen || 0, b.s); continue; }
-        if (b.kind === 'arc' && !isPower(q)) continue;
         q.hp = (q.hp ?? T[q.type].hp) - b.dmg * (1 - d / b.r);
         if (q.hp <= 0) kill(q, from);
       }
@@ -456,6 +494,6 @@
     return gone;
   }
 
-  return { T, ORDER, CATS, COL, FLUIDS, FX_KEYS, SIDES, SIDE_V, OPP, DT, dims, rectCells, placeCell, placeSide, portsOf, feedsOf, build, tick, waterfill, capOf, fullDps,
-    blastOf, destroy, netStock, draw, effects, blend };
+  return { T, ORDER, CATS, COL, MATS, FLUIDS: MATS, SIDES, SIDE_V, OPP, DT, dims, rectCells, placeCell, placeSide, portsOf, feedsOf, build, tick, waterfill, capOf, fullDps,
+    blastOf, destroy, netStock, supply, drawMat, accepts, eff, purge, switchFeeds, matCap };
 });
