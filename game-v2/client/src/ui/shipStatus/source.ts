@@ -24,7 +24,7 @@
  */
 
 import {
-  BROWNOUT, bankHeld, energyTuning, feedShare, gunLoad, poolHeld,
+  BROWNOUT, P_TANK, PF_SEL, MAT_UNIT, bankHeld, energyTuning, feedShare, gunLoad, poolHeld,
   type Charge, type ShipState, type ShipTuning,
 } from '@space-game/common';
 import type { RingGroup } from '../../ships/gunHud';
@@ -173,8 +173,33 @@ export function readStatus(inp: StatusInput, mem: StatusMemory, out: ShipStatus 
   readWeapons(ship, inp, out);
   readThrust(ship, inp, out);
   readParts(ship, inp, out);
-  out.features = inp.features;
+  out.features = ship.derived.ports && inp.charge.e ? [...portsLines(ship, inp.charge), ...inp.features] : inp.features;
   return out;
+}
+
+/** A ports ship (common/src/ships/power/ports.ts): each tank's material left, and what each Selector passes */
+const portsLineCache = new WeakMap<object, FeatureStatusLine[]>();
+function portsLines(ship: ShipState, c: Charge): FeatureStatusLine[] {
+  const L = ship.derived.ports!, e = c.e!;
+  let lines = portsLineCache.get(L);
+  if (!lines) {
+    lines = [];
+    for (const t of L.tanks) lines.push({ label: `${L.feedDefs[L.tankFeed[t]]?.name ?? 'Feed'} tank`, text: '', tone: 'ok', progress: 1 });
+    for (const s of L.selectors) lines.push({ label: 'Selector (Y)', text: '', tone: 'ok' });
+    portsLineCache.set(L, lines);
+  }
+  let k = 0;
+  for (const t of L.tanks) {
+    const r = lines[k++], f = L.cap[t] > 0 ? e.held[t] / L.cap[t] : 0;
+    r.text = `${Math.floor(e.held[t] / MAT_UNIT)} / ${Math.round(L.cap[t] / MAT_UNIT)}`;
+    r.progress = f; r.tone = f <= 0 ? 'bad' : f < 0.2 ? 'warn' : 'ok';
+  }
+  for (const s of L.selectors) {
+    const r = lines[k++], side = e.flags[s] & PF_SEL ? 1 : 0, net = L.selIn[2 * s + side];
+    const tank = net >= 0 ? L.nets[net].tanks[0] : -1;
+    r.text = tank >= 0 ? `passing ${L.feedDefs[L.tankFeed[tank]]?.name ?? 'feed'}` : 'nothing on that side';
+  }
+  return lines;
 }
 
 function readHull(ship: ShipState, h: ShipStatus['hull']): void {
@@ -369,6 +394,7 @@ const PART_STORE_FN = new Set(['core', 'battery', 'drive_battery', 'weapon_batte
  * The per-part readout. Stores show the charge of the pool or bank they belong to (the old energy system keeps no
  * per-part charge); at the P2 switch-over this reads each part's own EnergyState level instead.
  */
+const e0 = (cap: number, held: number) => (cap > 0 ? Math.max(0, Math.min(1, held / cap)) : 0);
 function readParts(ship: ShipState, inp: StatusInput, out: ShipStatus): void {
   const parts = ship.blueprint.parts, d = ship.derived, L = d.power, c = inp.charge, ps = out.parts;
   while (ps.length > parts.length) ps.pop();
@@ -377,6 +403,9 @@ function readParts(ship: ShipState, inp: StatusInput, out: ShipStatus): void {
     const r = ps[i], fn = parts[i].fn;
     r.kind = 'none'; r.fill = -1; r.glow = 0; r.flash = 0; r.clip = 0; r.brown = false; r.dim = false;
     const bank = L ? L.bankOf[i] : -1;
+    // (A ports ship: tanks show what's left, stores what they hold)
+    const P = d.ports;
+    if (P && c.e && (P.role[i] === P_TANK || (P.cap[i] > 0 && P.relays.includes(i)))) { r.kind = 'store'; r.fill = e0(P.cap[i], c.e.held[i]); continue; }
     if (bank >= 0) { r.kind = 'store'; r.fill = pctOf(c.b[bank]) / 100; r.brown = bankBrown(L!.feeds, bank, c); }
     else if (PART_STORE_FN.has(fn) || L?.pooled[i]) { r.kind = 'store'; r.fill = pctOf(c.g) / 100; }
     else if (fn === 'generator') { r.kind = 'gen'; r.glow = 1; }
