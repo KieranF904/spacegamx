@@ -5,6 +5,10 @@
 #   Block[gray,0,4,2]   a white block 4 wide and 2 high from the gray point (o: cells out from it, then w out, h down)
 #   Triangle[purple,0]  a white triangle at the purple point, turned to sit flat against what is beside it
 #   Turret[gray,4]      a cannon 4 cells out from the gray point
+# Or from scratch, in grid coordinates for the right half (x=0 the centre column, y=0 the nose row; the grid becomes
+# 21 x 32 and is cleared first), checked against the rules the design prompt gives:
+#   Block[11,0,2,10]    a block whose top-left cell is y=11, x=0, 2 wide and 10 high
+#   Turret[15,5]        a cannon at y=15, x=5
 #   pythonw scripts/shipgen/app/silhouette.py        (also opened from the Shipgen window's Silhouette button)
 import json
 import re
@@ -209,7 +213,7 @@ class Designer(QMainWindow):
             side.addWidget(b)
         side.addWidget(QLabel('Commands (one per line)'))
         self.cmds = QPlainTextEdit()
-        self.cmds.setPlaceholderText('Block[gray,0,4,2]\nTriangle[purple,0]\nTriangle[brown,0]\nTurret[gray,4]')
+        self.cmds.setPlaceholderText('From coloured points:\nBlock[gray,0,4,2]\nTriangle[purple,0]\nTurret[gray,4]\n\nOr from scratch (y,x; x=0 centre):\nBlock[11,0,2,10]\nTurret[15,5]')
         self.cmds.setMaximumHeight(120)
         self.cmds.setStyleSheet('background:#0e1217;border:1px solid #232c36;border-radius:4px;font-family:Consolas;')
         side.addWidget(self.cmds)
@@ -297,6 +301,10 @@ class Designer(QMainWindow):
         """Block[colour,o,w,h], Triangle[colour,o] (also Triange), Turret[colour,o]: built out from each colour's placement
         point, away from the centre line, mirrored. Points are read before any command runs, so a block may cover them.
         Triangles go last, each turned to sit flat against what is next to it. Returns the problems, one per bad line"""
+        first = next((l for l in text.splitlines() if l.strip() and not l.strip().startswith('#')), '')
+        m0 = re.match(r'^\s*\w+\s*\[\s*(-?\d+)\s*,', first)
+        if m0:
+            return self.apply_grid_commands(text)
         self.push_undo()
         points: dict[int, list[tuple[int, int]]] = {}
         for rc, (col, _sh) in self.cells.items():
@@ -360,6 +368,122 @@ class Designer(QMainWindow):
         self.canvas.update()
         self.update_info('Applied.' if not problems else '\n'.join(problems))
         return problems
+
+    # (The from-scratch format: right half, x=0 the centre column, y=0 the nose row)
+    GRID_W, GRID_H = 11, 32
+
+    def apply_grid_commands(self, text: str) -> list[str]:
+        """Block[y,x,w,h], Turret[y,x], Triangle[y,x] on an empty 21 x 32 grid (11 columns a half), mirrored. Returns the
+        problems: lines it could not read, and the design rules broken (it still draws what it can)"""
+        self.push_undo()
+        W, H = self.GRID_W, self.GRID_H
+        if (self.w, self.h) != (2 * W - 1, H):
+            self.w, self.h = 2 * W - 1, H
+            self.sw.setValue(self.w)
+            self.sh.setValue(self.h)
+        self.cells.clear()
+        self.comps.clear()
+        mid = self.w // 2
+        problems, blocks, turrets, triangles = [], [], [], []
+        for n, raw in enumerate(text.splitlines(), 1):
+            line = raw.strip()
+            if not line or line.startswith('#'):
+                continue
+            m = re.match(r'^(\w+)\s*\[\s*([^\]]*)\]\s*$', line)
+            if not m:
+                problems.append(f'line {n}: write Name[y,x,...]: "{line}"')
+                continue
+            kind = m.group(1).lower()
+            try:
+                nums = [int(a) for a in m.group(2).split(',')]
+            except ValueError:
+                problems.append(f'line {n}: whole numbers only: "{line}"')
+                continue
+            if kind == 'block' and len(nums) == 4:
+                blocks.append((n, *nums))
+            elif kind in ('turret', 'cannon', 'gun') and len(nums) == 2:
+                turrets.append((n, *nums))
+            elif kind in ('triangle', 'triange', 'tri') and len(nums) == 2:
+                triangles.append((n, *nums))
+            else:
+                problems.append(f'line {n}: write Block[y,x,w,h], Turret[y,x] or Triangle[y,x]: "{line}"')
+        # (Blocks: drawn, and each one's cells kept for the rules)
+        owner: dict[tuple[int, int], int] = {}
+        saved = (self.colour, self.shape, self.erasing, self.mirror)
+        self.erasing, self.mirror = False, True
+        for n, y, x, w, h in blocks:
+            if w < 1 or h < 1:
+                problems.append(f'line {n}: a block is at least 1 by 1')
+                continue
+            if x < 0 or y < 0 or x + w > W or y + h > H:
+                problems.append(f'line {n}: rule 6: outside y=0..{H - 1}, x=0..{W - 1}')
+            for yy in range(y, y + h):
+                for xx in range(x, x + w):
+                    if not (0 <= yy < H and 0 <= xx < W):
+                        continue
+                    if (yy, xx) in owner:
+                        problems.append(f'line {n}: rule 2: overlaps line {owner[(yy, xx)]} at y={yy}, x={xx}')
+                    owner[(yy, xx)] = n
+                    self.colour, self.shape = WHITE, 0
+                    self.paint((yy, mid + xx), False)
+        for n, y, x in triangles:
+            if not (0 <= y < H and 0 <= x < W):
+                problems.append(f'line {n}: rule 6: outside the grid')
+                continue
+            self.colour, self.shape = WHITE, self.turn(y, mid + x, 1)
+            self.paint((y, mid + x), False)
+        for n, y, x in turrets:
+            if (y, x) not in owner:
+                problems.append(f'line {n}: a turret goes on a block cell; y={y}, x={x} is empty')
+            if not (0 <= y < H and 0 <= x < W):
+                continue
+            self.colour, self.shape = GUN, 0
+            self.paint((y, mid + x), False)
+            self.comps[(y, mid + x)] = 'turret'
+            if x:
+                self.comps[(y, mid - x)] = 'turret'
+        self.colour, self.shape, self.erasing, self.mirror = saved
+        problems += self.grid_rules(owner, blocks)
+        self.canvas.update()
+        n_ok = len(blocks) + len(turrets) + len(triangles)
+        self.update_info(f'{n_ok} pieces placed.' + ('\n' + '\n'.join(problems) if problems else '\nEvery rule kept.'))
+        return problems
+
+    @staticmethod
+    def grid_rules(owner: dict[tuple[int, int], int], blocks: list) -> list[str]:
+        """Rules 1, 3 and 5 of the design prompt, on the right half's cells"""
+        out = []
+        if not owner:
+            return ['nothing was placed']
+        # 1: the centre column one unbroken run
+        ys = sorted(y for (y, x) in owner if x == 0)
+        if not ys:
+            out.append('rule 1: the centre column (x=0) is empty')
+        elif ys[-1] - ys[0] + 1 != len(ys):
+            gaps = [y for y in range(ys[0], ys[-1] + 1) if (y, 0) not in owner]
+            out.append(f'rule 1: the centre column has a gap at y={",".join(map(str, gaps[:6]))}')
+        # 3: one connected shape (through the cells, across blocks)
+        seen, todo = set(), [next(iter(owner))]
+        while todo:
+            c = todo.pop()
+            if c in seen:
+                continue
+            seen.add(c)
+            for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nb = (c[0] + dy, c[1] + dx)
+                if nb in owner and nb not in seen:
+                    todo.append(nb)
+        apart = sorted({owner[c] for c in owner if c not in seen})
+        if apart:
+            out.append(f'rule 3: not joined to the rest: line{"s" if len(apart) > 1 else ""} {", ".join(map(str, apart))}')
+        # 5: moving out, a column at most 2 rows shorter than the one inside it
+        height = lambda x: sum(1 for (y, xx) in owner if xx == x)
+        xs = sorted({x for (_y, x) in owner})
+        for x in xs:
+            if x > 0 and height(x) < height(x - 1) - 2:
+                rows = 'row' if height(x) == 1 else 'rows'
+                out.append(f'rule 5: column x={x} has {height(x)} {rows}, more than 2 fewer than x={x - 1} ({height(x - 1)})')
+        return out
 
     def inside(self, cell) -> bool:
         return 0 <= cell[0] < self.h and 0 <= cell[1] < self.w
