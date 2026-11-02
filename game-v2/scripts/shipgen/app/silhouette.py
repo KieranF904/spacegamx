@@ -9,12 +9,16 @@
 # 21 x 32 and is cleared first), checked against the rules the design prompt gives:
 #   Block[11,0,2,10]    a block whose top-left cell is y=11, x=0, 2 wide and 10 high
 #   Turret[15,5]        a cannon at y=15, x=5
+# Or a lettered ASCII grid of the right half (asciigrid.py): row numbers, then '.' empty, A B C ... parts, T turrets.
+# Each part gets its own colour and the panel lists the rules broken. Copy grid writes the drawing back out in that
+# format (a letter per colour), to start a prompt from; Copy pieces writes it as Block[y,x,w,h] / Turret[y,x].
 #   pythonw scripts/shipgen/app/silhouette.py        (also opened from the Shipgen window's Silhouette button)
 import json
 import re
 import sys
 from pathlib import Path
 
+import asciigrid
 from PySide6.QtCore import QPointF, QRectF, QSize, Qt
 from PySide6.QtGui import QColor, QIcon, QKeySequence, QPainter, QPen, QPixmap, QPolygonF, QShortcut
 from PySide6.QtWidgets import (
@@ -32,6 +36,8 @@ COLOUR_NAMES = {
     'purple': 8, 'pink': 8, 'magenta': 8, 'shield': 8, 'violet': 9, 'lavender': 9, 'diode': 9, 'brown': 10, 'cargo': 10, 'black': 11, 'dark': 11,
 }
 WHITE, GUN = 2, 3
+# (The colours an ASCII grid's parts take, A first)
+PART_COLOURS = [2, 5, 6, 4, 8, 7, 9, 10, 1, 0]
 # (Which sides of a cell each shape has flat: N E S W)
 FLAT = {1: {'S', 'W'}, 2: {'N', 'W'}, 3: {'N', 'E'}, 4: {'E', 'S'}}
 
@@ -207,13 +213,13 @@ class Designer(QMainWindow):
         size.addWidget(self.sh)
         side.addLayout(size)
         for text, fn in [('Undo  (Ctrl+Z)', self.do_undo), ('Clear', self.clear), ('Flip top to bottom', self.flip_v), ('Save...', self.save), ('Open...', self.open),
-                         ('Export PNG...', self.export_png), ('Copy row widths', self.copy_widths)]:
+                         ('Export PNG...', self.export_png), ('Copy row widths', self.copy_widths), ('Copy grid', self.copy_grid), ('Copy pieces', self.copy_pieces)]:
             b = QPushButton(text)
             b.clicked.connect(fn)
             side.addWidget(b)
         side.addWidget(QLabel('Commands (one per line)'))
         self.cmds = QPlainTextEdit()
-        self.cmds.setPlaceholderText('From coloured points:\nBlock[gray,0,4,2]\nTriangle[purple,0]\nTurret[gray,4]\n\nOr from scratch (y,x; x=0 centre):\nBlock[11,0,2,10]\nTurret[15,5]')
+        self.cmds.setPlaceholderText('Paste a lettered grid (right half):\n 6   A  A  .  .\n 7   A  B  B  .\n 8   T  B  .  .\n\nOr from scratch (y,x; x=0 centre):\nBlock[11,0,2,10]\nTurret[15,5]\n\nOr from coloured points:\nBlock[gray,0,4,2]\nTurret[gray,4]')
         self.cmds.setMaximumHeight(120)
         self.cmds.setStyleSheet('background:#0e1217;border:1px solid #232c36;border-radius:4px;font-family:Consolas;')
         side.addWidget(self.cmds)
@@ -301,6 +307,8 @@ class Designer(QMainWindow):
         """Block[colour,o,w,h], Triangle[colour,o] (also Triange), Turret[colour,o]: built out from each colour's placement
         point, away from the centre line, mirrored. Points are read before any command runs, so a block may cover them.
         Triangles go last, each turned to sit flat against what is next to it. Returns the problems, one per bad line"""
+        if asciigrid.looks_like_grid(text):
+            return self.apply_ascii(text)
         first = next((l for l in text.splitlines() if l.strip() and not l.strip().startswith('#')), '')
         m0 = re.match(r'^\s*\w+\s*\[\s*(-?\d+)\s*,', first)
         if m0:
@@ -368,6 +376,71 @@ class Designer(QMainWindow):
         self.canvas.update()
         self.update_info('Applied.' if not problems else '\n'.join(problems))
         return problems
+
+    def apply_ascii(self, text: str) -> list[str]:
+        """A lettered grid of the right half, mirrored (21 wide for 11 columns), cleared first. Each part letter gets a
+        colour; T is a turret on its cell. Returns what it could not read and the rules broken"""
+        g = asciigrid.parse(text)
+        if not g['parts']:
+            self.update_info('\n'.join(g['problems']))
+            return g['problems']
+        self.push_undo()
+        parts, turrets = g['parts'], g['turrets']
+        self.w, self.h = 2 * len(parts[0]) - 1, len(parts)
+        self.sw.setValue(self.w)
+        self.sh.setValue(self.h)
+        self.cells.clear()
+        self.comps.clear()
+        mid = self.w // 2
+        letters = list(dict.fromkeys(r[0] for r in asciigrid.rectangles(parts)))
+        colour_of = {s: PART_COLOURS[i % len(PART_COLOURS)] for i, s in enumerate(letters)}
+        for y, row in enumerate(parts):
+            for x, sym in enumerate(row):
+                if sym != asciigrid.EMPTY:
+                    for c in {mid + x, mid - x}:
+                        self.cells[(y, c)] = (colour_of[sym], 0)
+        for y, x in turrets:
+            for c in {mid + x, mid - x}:
+                self.cells[(y, c)] = (GUN, 0)
+                self.comps[(y, c)] = 'turret'
+        problems = g['problems'] + asciigrid.check(parts, turrets, g['names'])
+        key = ', '.join(f'{s} {PALETTE[colour_of[s]][0]}' + (f' ({g["names"][s]})' if s in g['names'] else '') for s in letters)
+        self.canvas.update()
+        self.update_info(f'Grid read: {len(letters)} parts ({key}), {len(turrets)} turrets a side.\n'
+                         + ('\n'.join(problems) if problems else 'Every rule kept.'))
+        return problems
+
+    def half_grid(self) -> tuple[list[list[str]], set[tuple[int, int]], dict[str, str]]:
+        """The drawing's right half as a lettered grid: a letter per colour (A first, in the order the colours appear
+        from the nose down), turrets as T; the names are the palette's"""
+        mid = self.w // 2
+        pool = 'ABCDEFGHIJKLMNOPQRSUVWXYZ'
+        letters: dict[int, str] = {}
+        parts = [[asciigrid.EMPTY] * (self.w - mid) for _ in range(self.h)]
+        turrets = set()
+        for (r, c), (col, _sh) in sorted(self.cells.items()):
+            if c < mid:
+                continue
+            if self.comps.get((r, c)) == 'turret':
+                turrets.add((r, c - mid))
+                continue
+            if col not in letters:
+                letters[col] = pool[len(letters) % len(pool)]
+            parts[r][c - mid] = letters[col]
+        asciigrid.under_turrets(parts, turrets)
+        return parts, turrets, {sym: PALETTE[col][0] for col, sym in letters.items()}
+
+    def copy_grid(self) -> None:
+        parts, turrets, names = self.half_grid()
+        QApplication.clipboard().setText(asciigrid.render(parts, turrets))
+        key = '\n'.join(f'{sym} = {n}' for sym, n in names.items())
+        self.update_info(f'Copied the right half as a lettered grid ({len(parts[0])} columns, {len(parts)} rows).\n{key}')
+
+    def copy_pieces(self) -> None:
+        parts, turrets, names = self.half_grid()
+        text = asciigrid.pieces(parts, turrets, names)
+        QApplication.clipboard().setText(text)
+        self.update_info(f'Copied {text.count("[")} pieces (Block[y,x,w,h], Turret[y,x]; right half, x=0 the centre column).')
 
     # (The from-scratch format: right half, x=0 the centre column, y=0 the nose row)
     GRID_W, GRID_H = 11, 32

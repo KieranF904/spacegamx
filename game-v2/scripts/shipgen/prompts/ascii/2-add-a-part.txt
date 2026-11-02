@@ -1,0 +1,60 @@
+You are adding one part to a top-down spaceship drawn on a grid.
+Only the RIGHT half is shown; it will be mirrored. Column 0 is the centre line. The nose points UP.
+
+SHIP: A heavy gunship with a long hull and swept-back wings.
+
+KEY
+. = empty
+A = Hull
+
+CURRENT GRID
+     0  1  2  3  4  5  6  7  8  9 10
+ 0   .  .  .  .  .  .  .  .  .  .  .
+ 1   .  .  .  .  .  .  .  .  .  .  .
+ 2   .  .  .  .  .  .  .  .  .  .  .
+ 3   .  .  .  .  .  .  .  .  .  .  .
+ 4   A  .  .  .  .  .  .  .  .  .  .
+ 5   A  .  .  .  .  .  .  .  .  .  .
+ 6   A  A  .  .  .  .  .  .  .  .  .
+ 7   A  A  .  .  .  .  .  .  .  .  .
+ 8   A  A  .  .  .  .  .  .  .  .  .
+ 9   A  A  .  .  .  .  .  .  .  .  .
+10   A  A  .  .  .  .  .  .  .  .  .
+11   A  A  .  .  .  .  .  .  .  .  .
+12   A  A  .  .  .  .  .  .  .  .  .
+13   A  A  .  .  .  .  .  .  .  .  .
+14   A  A  .  .  .  .  .  .  .  .  .
+15   A  A  .  .  .  .  .  .  .  .  .
+16   A  A  .  .  .  .  .  .  .  .  .
+17   A  A  .  .  .  .  .  .  .  .  .
+18   A  A  .  .  .  .  .  .  .  .  .
+19   A  A  .  .  .  .  .  .  .  .  .
+20   A  A  .  .  .  .  .  .  .  .  .
+21   A  A  .  .  .  .  .  .  .  .  .
+22   A  .  .  .  .  .  .  .  .  .  .
+23   A  .  .  .  .  .  .  .  .  .  .
+24   .  .  .  .  .  .  .  .  .  .  .
+25   .  .  .  .  .  .  .  .  .  .  .
+26   .  .  .  .  .  .  .  .  .  .  .
+27   .  .  .  .  .  .  .  .  .  .  .
+28   .  .  .  .  .  .  .  .  .  .  .
+29   .  .  .  .  .  .  .  .  .  .  .
+30   .  .  .  .  .  .  .  .  .  .  .
+31   .  .  .  .  .  .  .  .  .  .  .
+
+THIS STEP
+Part: Wing
+Symbol: B
+Instruction: Attach to the side of the hull, starting at row 11. Extend 4 cells out (to column 5). 6 rows deep at the root, narrowing to 2 rows at the tip. The trailing edge is straight; the leading edge slopes back.
+
+STILL TO COME (leave room for these)
+- Tail fins: two small fins at the back of the hull
+- Turrets: 1 or 2 on forward-facing edges
+
+RULES
+- Draw B only on empty (.) cells.
+- B must touch at least one existing filled cell.
+- Follow the sizes in the instruction.
+
+OUTPUT
+The full grid in the same format, with B added. No other text.
