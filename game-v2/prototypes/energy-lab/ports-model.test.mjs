@@ -85,15 +85,18 @@ test('5: passive drain and steady: the Spear on two reactors fires, the Lance on
   assert.ok(lance.stored < 1, 'lance never charges: ' + lance.stored.toFixed(1));
 });
 
-test('6: the superweapon runs nearly all the time; two lines cut and it stutters; the array gone and it is out', () => {
+/** Damage a second over a minute after a 10 s warm-up, against the gun's full rate (bursts are too spiky for the smoothed rate) */
+function dealtShare(parts, type) {
+  const L = PM.build(parts, GW, GH), g = byType(L, type)[0]; let dealt = 0;
+  for (let i = 0; i < 60 * 70; i++) { PM.tick(L, FIRE, i); if (i >= 600) dealt += g.dNow || 0; }
+  return dealt / 60 / PM.fullDps(PM.T[type]);
+}
+test('6: the superweapon bursts at its full rate; two lines cut costs little (the array has headroom); the array gone and it is out', () => {
   const parts = place(EXAMPLES[5].parts);
-  const a = run(parts, FIRE, 60 * 60);
-  const lance = byType(a.L, 'lance')[0];
-  assert.ok(lance.rate > 0.9, 'lance duty ' + lance.rate.toFixed(2));
-  const cut = parts.filter((p) => !(p.type === 'conduit' && p.cells[0][0] === 6));
-  const b = run(cut, FIRE, 60 * 60);
-  const r2 = byType(b.L, 'lance')[0].rate;
-  assert.ok(r2 < 0.9 && r2 > 0.4, 'two lines cut: ' + r2.toFixed(2));
+  const full = dealtShare(parts, 'lance');
+  assert.ok(full > 0.85, 'lance at full rate: ' + full.toFixed(2));
+  const r2 = dealtShare(place(EXAMPLES[5].parts).filter((p) => !(p.type === 'conduit' && p.cells[0][0] === 6)), 'lance');
+  assert.ok(r2 > 0.6 && r2 <= full + 0.05, 'two lines cut: ' + r2.toFixed(2));
   const fresh = place(EXAMPLES[5].parts), L = PM.build(fresh, GW, GH);
   PM.destroy(L, byType(L, 'cap_array')[0]);
   const c = run(fresh, FIRE, 60 * 30, PM.build(fresh, GW, GH));
@@ -210,4 +213,12 @@ test('hazards: a full shaped tank is a bomb, an empty one nothing; a cryo tank f
   const parts = place([['tank_cryo', 4, 4], ['pip', 5, 4], ['hull', 3, 4]]), L2 = PM.build(parts, GW, GH);
   PM.destroy(L2, parts[0]);
   assert.ok(parts[1].frozen > 0 && !parts[1].dead && !parts[2].dead, 'frozen, not broken');
+});
+
+test('burst beams: ports shut while lit, so the Lance empties its buffer before it recharges', () => {
+  const L = PM.build(place(EXAMPLES[5].parts), GW, GH), l = byType(L, 'lance')[0];
+  let lowest = Infinity, tookWhileLit = 0;
+  for (let i = 0; i < 60 * 20; i++) { const lit = l.on; PM.tick(L, FIRE, i); if (lit && l.on) { tookWhileLit += l.inNow; lowest = Math.min(lowest, l.stored); } }
+  assert.equal(tookWhileLit, 0);
+  assert.ok(lowest < 10, 'burns down to ' + lowest.toFixed(1));
 });

@@ -95,27 +95,29 @@
   //   passive    leaves the buffer every second whether or not it fires: below it the gun never charges
   //   discharge  after each shot its ports are shut for this long: power arriving then is lost unless something holds it
   //   rest       a beam that burns out shuts its ports for this long before it takes power again
+  //   burst      a beam whose ports are shut while it's lit: it lights only when full, burns its whole buffer, rests,
+  //              then recharges. How fast it recharges is what its lines (and any store in front) decide
   //   threshold  it takes power only while its lines offer at least this much a second: one weak line gives it nothing
   //   steady     while charging, if what arrives in a tick falls below this rate the charge collapses (back to nothing)
   //   clip       a magazine: fires its rounds, then refills the whole clip before firing again
   //   feed       a feed port ([side, cell], use a shot or a second for beams, required): it fires with whatever it's fed
-  const gun = (o) => def(Object.assign({ cat: 3, kind: 'weapon', col: COL.weapon, passive: 0, buffer: 1, mass: 1.2, discharge: 0, rest: 0, threshold: 0, steady: 0 }, o));
+  const gun = (o) => def(Object.assign({ cat: 3, kind: 'weapon', col: COL.weapon, passive: 0, buffer: 1, mass: 1.2, discharge: 0, rest: 0, threshold: 0, steady: 0, burst: false }, o));
   gun({ id: 'pip', name: 'Pip', lvl: 0, hp: 60, ports: [I('S', 20)], shot: 10, cycle: 0.5, damage: 28,
     say: 'The starter gun: takes power from anything, at any rate.' });
   gun({ id: 'glint', name: 'Glint', lvl: 9, hp: 60, ports: [I('S', 35)], shot: 28, cycle: 0.8, damage: 43, discharge: 0.3,
     say: 'A pulse laser: its port shuts for 0.3 s after each shot.' });
   gun({ id: 'hammer', name: 'Hammer', lvl: 6, w: 2, hp: 120, ports: [I('S', 70, 0)], shot: 70, cycle: 1.0, damage: 69, threshold: 45,
     say: 'A heavy cannon: it takes power only from a line offering at least 45 a second, so one reactor gives it nothing.' });
-  gun({ id: 'cutter', name: 'Cutter', lvl: 18, w: 2, hp: 130, ports: [I('S', 45, 0), I('S', 45, 1)], beam: true, burn: 90, bufferE: 180, dps: 150, passive: 5, rest: 1.5,
-    say: 'A beam: burns 90 a second while lit; when it burns out, its ports shut for 1.5 s.' });
+  gun({ id: 'cutter', name: 'Cutter', lvl: 18, w: 2, hp: 130, ports: [I('S', 45, 0), I('S', 45, 1)], beam: true, burn: 90, bufferE: 180, dps: 150, passive: 5, rest: 1.5, burst: true,
+    say: 'A burst beam: lights when full, burns its 180 in 2 s with its ports shut, rests 1.5 s, then recharges.' });
   gun({ id: 'longbarrel', name: 'Longbarrel', lvl: 20, w: 2, hp: 150, ports: [I('S', 55, 0), I('S', 55, 1)], shot: 220, cycle: 2.0, damage: 96, discharge: 1.0,
     say: 'A long gun: its ports shut for 1 s after each shot, so a buffer behind it wins back that second.' });
   gun({ id: 'spear', name: 'Spear', lvl: 28, w: 2, h: 2, hp: 240, ports: [I('S', 45, 0), I('S', 45, 1)], shot: 180, cycle: 2.0, buffer: 2, damage: 170, passive: 10, steady: 50,
     say: 'A rail gun: while charging it needs at least 50 a second without a break, or the charge collapses. Give it a line of its own.' });
   gun({ id: 'bastion', name: 'Bastion', lvl: 30, w: 2, h: 2, hp: 300, ports: [I('S', 55, 0), I('S', 55, 1), I('W', 55, 1), I('E', 55, 1)], shot: 60, cycle: 0.25, buffer: 16, clip: true, damage: 28, passive: 15,
     say: 'A heavy repeater: a 16-round clip, refilled whole once empty, from four lines.' });
-  gun({ id: 'lance', name: 'Lance', lvl: 32, w: 2, hp: 200, ports: [I('S', 150, 0), I('S', 150, 1)], beam: true, burn: 300, bufferE: 600, dps: 210, passive: 40, rest: 2,
-    say: 'The big beam: burns 300 a second, leaks 40, and rests 2 s when it burns out.' });
+  gun({ id: 'lance', name: 'Lance', lvl: 32, w: 2, hp: 200, ports: [I('S', 150, 0), I('S', 150, 1)], beam: true, burn: 300, bufferE: 600, dps: 210, passive: 40, rest: 2, burst: true,
+    say: 'The big burst beam: lights when full, burns its 600 in 2 s with its ports shut, rests 2 s, then recharges (it leaks 40 a second). A store in front that can pour fast shortens the recharge.' });
   // The embedded superweapon: six lines of 60, from the back and both flanks, so the ship is built around it
   gun({ id: 'sunbreaker', name: 'Sunbreaker', lvl: 34, w: 3, h: 3, hp: 600, mass: 12, armour: 2, isNew: true,
     ports: [I('S', 60, 0), I('S', 60, 2), I('W', 60, 1), I('W', 60, 2), I('E', 60, 1), I('E', 60, 2)], shot: 600, cycle: 3.0, damage: 900, passive: 150, discharge: 1.0,
@@ -299,11 +301,13 @@
   function spaceOf(p) {
     const t = T[p.type];
     if (t.kind === 'store') return t.hold - p.held;
-    if (p.closed > 0 || p.frozen > 0) return 0;
+    if (p.closed > 0 || p.frozen > 0 || (t.burst && p.on)) return 0;
     return t.kind === 'weapon' ? capOf(t) - p.stored : t.kind === 'engine' ? t.buffer - p.stored : t.e - p.stored;
   }
-  /** Damage a second at full supply: the cycle, or the time to charge a shot after the ports reopen, whichever is longer */
+  /** Damage a second at full supply: the cycle, or the time to charge a shot after the ports reopen, whichever is longer.
+   * A burst beam: lit for buffer ÷ burn, then the rest, then the recharge at its lines' full rate */
   function fullDps(t) {
+    if (t.beam && t.burst) { const on = t.bufferE / t.burn, re = t.bufferE / Math.max(1e-9, t.intake - t.passive); return t.dps * on / (on + (t.rest || 0) + re); }
     if (t.beam) return t.dps;
     return t.damage / Math.max(t.cycle, (t.discharge || 0) + t.shot / Math.max(1e-9, t.intake - t.passive));
   }
@@ -375,7 +379,9 @@
       const shotFx = (feedMix) => { const sh = Object.assign({}, p.flav || {}); for (const k in feedMix) sh[k] = Math.min(1, (sh[k] || 0) + feedMix[k]); p.shotMix = sh; return effects(sh, t.fxMul); };
       if (t.beam) {
         const need = t.burn * DT;
-        if (!ctrl.fire) p.on = false; else if (!p.on && p.closed <= 0 && p.stored >= 0.5 * t.bufferE - 1e-9) p.on = true;
+        // (A burst beam lights only when full (its passive leak allowed for); others at half)
+        const light = t.burst ? t.bufferE - t.passive * DT * 2 - 1e-6 : 0.5 * t.bufferE - 1e-9;
+        if (!ctrl.fire) p.on = false; else if (!p.on && p.closed <= 0 && p.stored >= light) p.on = true;
         if (p.on && p.stored >= need - 1e-9) {
           const fd = feedFor(t.feedPort ? t.feedPort.use * DT : 0);
           if (fd.ok) { p.stored -= need; p.fx = shotFx(fd.mix); d = t.dps * DT * p.fx.dmg; } else p.on = false;

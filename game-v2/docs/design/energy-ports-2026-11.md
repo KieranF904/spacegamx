@@ -294,6 +294,7 @@ straight against guns should be the starter's answer, not everyone's. Each profi
 | Passive | leaks this much a second whether it fires or not; below it, never charges | supply well above need |
 | Discharge | its ports shut for this long after each shot | a buffer in front (a Capacitor or Surge Cell catches what arrives meanwhile) |
 | Rest | a beam that burns out shuts its ports for this long | a buffer, or a beam that never burns out |
+| Burst (owner, 2026-11-03) | a beam whose ports are shut while lit: it lights only when full, burns the whole buffer, rests, then recharges | a store in front that pours fast (the recharge is the wait), and enough supply to refill it in time |
 | Threshold | takes power only from lines rated at least this much together (a link's rating is the lower of its two ports) | joining lines (a Joiner, a Flux Coil) or a store in front |
 | Steady | while charging, a tick with less than this arriving collapses the charge | a line of its own, smoothed, not shared |
 | Clip | empties, then refills the whole clip | a high-output store |
@@ -313,11 +314,11 @@ The lab's example 12 (a Longbarrel) shows 4.7 s against 3.7 s from the same two 
 | Pip | direct |
 | Glint | discharge 0.3 s |
 | Hammer | threshold 45 |
-| Cutter (beam) | passive 5, rest 1.5 s |
+| Cutter (beam) | burst, passive 5, rest 1.5 s |
 | Longbarrel | discharge 1 s |
 | Spear | passive 10, steady 50 |
 | Bastion | clip 16, passive 15, four ports |
-| Lance (beam) | passive 40, rest 2 s |
+| Lance (beam) | burst, passive 40, rest 2 s |
 | Sunbreaker | six ports, passive 150, discharge 1 s |
 | Scorcher (new) | feed (required), a beam |
 | Slurry Cannon (new) | feed (required), threshold 40 |

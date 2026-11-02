@@ -38,7 +38,7 @@
     },
     {
       name: '6. A superweapon and its ship',
-      about: 'A Lance burns 300 a second and leaks 40. Two Fusion Plants on the flanks (through conduits) and four reactors through two Joiner Banks fill a Capacitor Array (six lines in, 360) that gives the Lance two lines of 600. Nearly the whole ship is power. Break (B) the array and the Lance goes out at once; break one conduit and it loses a sixth of its feed: the six ports are its redundancy, and the array is the part to bury.',
+      about: 'A Lance is a burst beam: it lights only when full, burns its 600 in 2 s with its ports shut, rests 2 s, then recharges (and leaks 40 a second all the while). Two Fusion Plants on the flanks and four reactors through two Joiner Banks fill a Capacitor Array (six lines in, 360) that pours 1,200 a second into it, so it recharges in about 2 s. The array refills far faster than the Lance needs, so cutting a line or two costs little: the six ports are its redundancy. Break (B) the array and the Lance goes out: that is the part to bury.',
       parts: [R('lance', 7, 3), R('cap_array', 7, 4),
         R('joiner', 6, 6, 0, true), R('joiner', 8, 6), R('cell_reactor', 6, 7), R('cell_reactor', 7, 7), R('cell_reactor', 8, 7), R('cell_reactor', 9, 7),
         R('fusion', 4, 4, 1), R('conduit', 6, 4, 1), R('conduit', 6, 5, 1),
