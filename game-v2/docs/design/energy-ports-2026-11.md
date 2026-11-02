@@ -599,3 +599,14 @@ Example ships (F9, Ports energy): **Hornet** (eight simple guns, each on its own
 **Brawler** (a Hammer and two Twinlinks on Overclocks: 346, 42 cells), **Monitor** (two Bastions on Fusion Plants, 450 a
 ball: 500, 52 cells), **Pike** (one Lance on Surge Cells over a Fusion Plant with Lens Fluid: 630 while lit, 43 cells).
 The scratch tools that made the table and the ships (measure.mjs, design.mjs) are not in the repo.
+
+## 16. Parked: mining on the same two axes (owner's ideas, 2026-11-03; not built)
+
+- **Feeds gate rare rock.** Common rock mines plain with a starter laser. Rare rock lists the material it needs (a
+  solvent for tar and polymer rock, a cutting fluid for chromite and cobaltite, a resonance fluid for gem seams and opal
+  husks): without it the rock is seen but can't be mined. Scanners say what a rock needs; prospecting means carrying the
+  right tank, or coming back. On common rock a feed is a sidegrade (more yield, slower; faster, more waste).
+- **Tiers of mining laser, each with its infrastructure cost**, as the guns have: tier 1 the single Mining Laser; tier 2 a
+  double-barrel 2x1; tier 3 a triple-barrel 2x1; tier 4 a quad-barrel 2x2. Each fires a pulse pattern cycling through
+  its barrels, and the higher tiers need rated lines (the same 50 / 85 / 120 a port) and a feed input.
+- First: mining lasers are unaccounted on a ports ship today (they draw nothing); they need to become ports consumers.
