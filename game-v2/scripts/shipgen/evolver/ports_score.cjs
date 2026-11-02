@@ -261,6 +261,17 @@ function measure(req) {
   charge(parts);
   const L0 = PM.build(parts, req.w, req.h), blocked = blockedSet(parts, L0.occ, req.w, req.h);
   const mass = parts.reduce((s, p) => s + T[p.type].mass, 0);
+  // (Detached: parts not joined to the core through touching parts, as the game's validator requires)
+  const seen = new Set(), core = parts.find((p) => p.type === 'core'), stack = core ? [core] : [];
+  if (core) seen.add(core);
+  while (stack.length) {
+    const p = stack.pop();
+    for (const [x, y] of p.cells) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const q = L0.occ[(y + dy) * req.w + x + dx];
+      if (q && !seen.has(q) && x + dx >= 0 && x + dx < req.w && y + dy >= 0 && y + dy < req.h) { seen.add(q); stack.push(q); }
+    }
+  }
+  const detached = parts.length - seen.size;
   const pw = powerPhase(parts, req, sc, blocked);
   const fedOf = (p) => { const t = T[p.type]; return Math.min(1, (pw.got.get(p) || 0) / Math.max(1e-9, t.kind === 'weapon' ? t.intake : t.kind === 'engine' ? Math.min(t.intake, t.burn) : t.e)); };
   const wire = wiring(pw.L, pw.reached, pw.powered, fedOf), fw = feedWiring(L0);
@@ -289,7 +300,7 @@ function measure(req) {
   const direct = gunLinks.length ? gunLinks.filter((l) => T[l.from.type].kind === 'gen').length / gunLinks.length : 0;
   const nearBlast = L0.weapons.filter((w) => L0.alive.some((q) => q !== w && (T[q.type].kind === 'gen' || (T[q.type].kind === 'store' && !T[q.type].conduit && q.type !== 'core')) && Math.hypot(q.cx - w.cx, q.cy - w.cy) < 1.6)).length;
   return {
-    id: req.id, sustained_dps: pw.dps, thrust: pw.thrust, thrust_to_mass: mass ? pw.thrust / mass : 0, mass, wasted: pw.wasted,
+    id: req.id, detached, sustained_dps: pw.dps, thrust: pw.thrust, thrust_to_mass: mass ? pw.thrust / mass : 0, mass, wasted: pw.wasted,
     damage_before_down: avg('dealt'), alive_s: avg('alive_s'), half_s: avg('half_s'), systems_kept: avg('kept'),
     wiring: wire.credit, open_in: wire.ports, live_conduits: pw.live, unfed, unpowered, feed_wiring: fw.credit, feed_users: fw.users, idle: pw.idle, direct_share: direct, guns_near_blast: nearBlast, guns: L0.weapons.length, feed_used: pw.feedUsed, fx_share: pw.fxShare, open_feed: openFeed, blocked: blocked.size, blocked_ids: [...blocked].map((p) => p.uid - 1),
     engines_working: L0.engines.filter((e) => !blocked.has(e) && e.links.length).length, engine_zone: zt ? zw / zt : 0,

@@ -91,18 +91,33 @@ class PortsScorer:
     """ports_score.cjs in a node process kept open"""
 
     def __init__(self):
-        flags = 0x08000000 if sys.platform == 'win32' else 0
-        self.proc = subprocess.Popen(['node', str(SCORER)], cwd=str(HERE), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                                     text=True, encoding='utf-8', creationflags=flags)
-        if 'ready' not in self.proc.stdout.readline():
-            raise RuntimeError('the ports scorer did not start')
+        self.start()
         self.n = 0
         self.T = self.ask({'cmd': 'catalogue'})['T']
 
+    def start(self):
+        flags = 0x08000000 if sys.platform == 'win32' else 0
+        # (Node's heap raised: a long run scores hundreds of thousands of ships in one process)
+        self.proc = subprocess.Popen(['node', '--max-old-space-size=4096', str(SCORER)], cwd=str(HERE), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                     stderr=subprocess.DEVNULL, text=True, encoding='utf-8', creationflags=flags)
+        if 'ready' not in self.proc.stdout.readline():
+            raise RuntimeError('the ports scorer did not start')
+
     def ask(self, req: dict) -> dict:
-        self.proc.stdin.write(json.dumps(req) + '\n')
-        self.proc.stdin.flush()
-        return json.loads(self.proc.stdout.readline())
+        """One request; if the scorer process has died, it is started again and asked once more"""
+        for attempt in (0, 1):
+            try:
+                self.proc.stdin.write(json.dumps(req) + '\n')
+                self.proc.stdin.flush()
+                line = self.proc.stdout.readline()
+                if line.strip():
+                    return json.loads(line)
+            except (OSError, ValueError):
+                pass
+            if attempt == 0:
+                self.close()
+                self.start()
+        raise RuntimeError('the ports scorer stopped answering')
 
     def measure(self, full: list, w: int, h: int, scenario: dict) -> dict:
         self.n += 1

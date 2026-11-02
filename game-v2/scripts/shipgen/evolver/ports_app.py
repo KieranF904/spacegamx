@@ -36,7 +36,7 @@ MEASURES = [
     ('wiring', 'wiring credit (unfed ports: share of the shortest path built)'), ('live_conduits', 'conduits carrying power'), ('unpowered', 'guns, engines, shields under a quarter fed'),
     ('thrust_to_mass', 'thrust for its mass'), ('engine_zone', 'engines near the back'), ('wasted', 'power wasted at generators (a second)'), ('clashes', 'ports facing the same way'),
     ('fx_share', 'share of damage from shots carrying an effect'), ('feed_used', 'feed used in the power phase'), ('feed_wiring', 'feed wiring (Combiners and feed guns fed, or the share of their path)'),
-    ('idle', 'parts doing nothing'),
+    ('idle', 'parts doing nothing'), ('detached', 'parts not joined to the core'),
 ]
 
 

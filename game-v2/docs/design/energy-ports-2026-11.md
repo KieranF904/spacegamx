@@ -396,12 +396,54 @@ a batch of every scenario: `python ports_batch.py`). Ships are the lab's parts, 
   worth its impact after the enemy's armour (its pen plus its feed's), plus its burn, splash and mark as the scenario
   values them; slow and disrupt build a suppression that thins the incoming fire. Each measure is scored against the
   scenario's fixed scale (what counts as 1), so penalties weigh the same whatever the start.
-- **No router.** Changes are random; some are aimed: a part put so one of its ports faces an open port; a pipe or tank
-  put against an open feed point; a straight Conduit made a Passthrough where a pipe needs to cross; a part moved a cell.
+- **No router in evolution.** Changes are random; some are aimed: a part put so one of its ports faces an open port
+  (a plain conduit or corner most times); a pipe or tank put against an open feed point; a straight Conduit made a
+  Passthrough where a pipe needs to cross; an engine where nothing of the ship is behind it; a part moved a cell.
+- **The start ship** (owner's original idea: the most basic connections, then evolve): hull over the outline, an
+  upright core with a reactor above and below, Pips and Ion Drives on the silhouette's marks, the core's two right-hand
+  lines laid as conduits to the nearest gun and engine, and a Cell Reactor straight behind every other one. A
+  scenario's start parts (the Capital's Sunbreaker, the Siege's Longbarrels) are fixed like the core.
 - **Wiring rewards** (owner, 2026-11-02): for each unfed gun or engine port, the share of its shortest path to power
   built with conduits pointing the right way, fully once power reaches them; every conduit still carrying power at the
   end; for each Combiner or feed gun without feed, the share of its shortest path to a tank built with pipes.
 - **Idle penalty:** parts doing nothing (a store or line nothing passed through, a generator wasting every line, pipes
-  and tanks on a network without both a tank and a user).
+  and tanks on a network without both a tank and a user, pipes off every shortest path from a user to its tanks).
 - **Scenarios:** Gunship (level 20), Capital: Sunbreaker (36), Raider (burn valued as much as the hit, light armour),
   Siege (armour 5: penetration matters).
+
+
+## 13. What the evolver found overnight (2026-11-03)
+
+Five batches (every scenario, two seeds each, up to 2,000 generations). Most of the night went on loopholes in the
+scoring, each one a ship design that scored well for the wrong reason. They are worth knowing because a player would
+find the same ones in a real ruleset.
+
+| Loophole | What ships did | Fix |
+|---|---|---|
+| Wiring credit only for unfinished lines | left lines one cell short forever | every port counts; a fed one scores 1, so finishing always wins |
+| "Systems kept" averaged only over what the ship had | threw away every gun, then counted 100% kept | a missing system counts as 0; firepower weighs 60% |
+| Pipes weigh 0.3, hull 1 | 40–60 pipes as light hull to meet the thrust target | pipes off a tank-to-user path are idle; pipes and conduits weigh 0.8 |
+| Hits too weak | outlived the 120 s fight, so reactor placement didn't matter | 200 a second incoming (300 for the Capital) |
+| Unfed start guns cost points | deleted the Siege's Longbarrels and the Capital's Sunbreaker | start parts are fixed |
+| Scores against the start ship | a weak start made gains huge and penalties invisible | fixed scales per scenario |
+| Any one-in-one-out part as wire | Scrubbers and Passthroughs laid as conduit | aimed lines are plain conduits |
+| Live conduits rewarded by count | 42-cell live snakes outscored the Sunbreaker | dropped |
+
+What it says about the design itself (with the caveat that the search is still weak: two seeds of one scenario can
+differ fourfold):
+
+- **Generators next to guns is still common** (often every gun link straight from a reactor, every gun within a blast)
+  in the cheap scenarios, but not in the Siege or the Capital, where the guns need joined or buffered lines. That
+  supports profiles (threshold, discharge, steady) as the lever against it: direct wiring stays the starter's answer
+  and stops working for heavy guns.
+- **The feed layer gets used when it pays and dropped when it doesn't.** One gunship run did 98% of its damage with
+  feed-carrying shots (tungsten and incendiary through Combiners); other runs carried none. In the Siege, tungsten is the
+  difference between a Longbarrel doing 55% and 115% damage, and runs that found it scored best.
+- **Thrust is the hardest thing to evolve** and was the largest loss in most runs: engines need wiring at the far end of
+  the ship. The engine change helps; a real game would give the hangar an engine budget the player sees.
+- **Heavy weapons need help to be found.** Random search rarely builds a Joiner tree to a heavy gun from scratch, so the
+  Siege and Capital start with their guns fixed in place and evolve the ship around them. That matches the design
+  intent anyway: you decide on the superweapon, then build its ship.
+
+Results are in the gallery: `prototypes/energy-lab/evolved/index.html` (over http: the lab server, then
+`/evolved/index.html`), each ship opening live in the lab.

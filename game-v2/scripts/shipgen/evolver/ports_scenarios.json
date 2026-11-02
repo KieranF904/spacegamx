@@ -1,5 +1,5 @@
 {
- "_comment": "Scenarios for the ports evolver (ports_app.py, ports_evolve.py): the lab's parts and rules (docs/design/energy-ports-2026-11.md). silhouette: a file in samples/. level: parts up to that level. allow: part ids it may use (empty: all). budget: credits (the lab's first-guess costs). points: build points (1 a cell below level 10, 1.6 below 24, 2.5 above; the core is free). start_parts: [type, x, y, rot, flip] placed on the start (the right half and centre line). power_s: seconds of the power phase. fire: {on, off} seconds (no off: held). enemy_armour: against each gun's pen (the penetration table). incoming: the hits (damage, pen, dps, from, spread, flank, max_s). seeds: one hit run each. weights: each measure against the scenario's scales (what counts as 1). Measures: damage_before_down (damage dealt, after the enemy's armour, until the core goes), sustained_dps (power phase), systems_kept, alive_s, half_s, wiring (for each unfed port, the share of its shortest path to power built with conduits pointing the right way, a conduit counting fully once power reaches it; at most 1 a port), live_conduits (still carrying power at the end of the power phase), engine_zone, thrust_to_mass. Penalties: unpowered (guns, engines and shields getting under a quarter of what they want over the power phase), blocked (guns with the ship in front, engines with it behind), no_engines, shape_off, clashes (two outs or two ins facing). effects: what each consumable effect is worth: burn, splash and mark as a share of the hit's own damage; slow and disrupt build a suppression that stretches the time between incoming hits (at most 60% fewer). Measures for the feed layer: feed_wiring (for each Combiner or feed gun with no feed, the share of its shortest path to a tank built with pipes), fx_share (the share of damage dealt by shots carrying an effect), feed_used. idle: parts doing nothing (a store or line nothing passes through, a generator wasting every line, pipes and tanks on a feed network without both a tank and a user). scales: what counts as 1 for each weighted measure (fixed, so penalties weigh the same whatever the start).",
+ "_comment": "Scenarios for the ports evolver (ports_app.py, ports_evolve.py): the lab's parts and rules (docs/design/energy-ports-2026-11.md). silhouette: a file in samples/. level: parts up to that level. allow: part ids it may use (empty: all). budget: credits (the lab's first-guess costs). points: build points (1 a cell below level 10, 1.6 below 24, 2.5 above; the core is free). start_parts: [type, x, y, rot, flip] placed on the start (the right half and centre line). power_s: seconds of the power phase. fire: {on, off} seconds (no off: held). enemy_armour: against each gun's pen (the penetration table). incoming: the hits (damage, pen, dps, from, spread, flank, max_s). seeds: one hit run each. weights: each measure against the scenario's scales (what counts as 1). Measures: damage_before_down (damage dealt, after the enemy's armour, until the core goes), sustained_dps (power phase), systems_kept, alive_s, half_s, wiring (for each unfed port, the share of its shortest path to power built with conduits pointing the right way, a conduit counting fully once power reaches it; at most 1 a port), live_conduits (still carrying power at the end of the power phase), engine_zone, thrust_to_mass. Penalties: unpowered (guns, engines and shields getting under a quarter of what they want over the power phase), blocked (guns with the ship in front, engines with it behind), no_engines, shape_off, clashes (two outs or two ins facing). effects: what each consumable effect is worth: burn, splash and mark as a share of the hit's own damage; slow and disrupt build a suppression that stretches the time between incoming hits (at most 60% fewer). Measures for the feed layer: feed_wiring (for each Combiner or feed gun with no feed, the share of its shortest path to a tank built with pipes), fx_share (the share of damage dealt by shots carrying an effect), feed_used. idle: parts doing nothing (a store or line nothing passes through, a generator wasting every line, pipes and tanks on a feed network without both a tank and a user). scales: what counts as 1 for each weighted measure (fixed, so penalties weigh the same whatever the start). detached: parts not joined to the core through touching parts (the game refuses them).",
  "scenarios": [
   {
    "name": "Gunship: head-on fight",
@@ -51,7 +51,8 @@
     "no_engines": 1.0,
     "shape_off": 0.02,
     "clashes": 0.02,
-    "idle": 0.02
+    "idle": 0.02,
+    "detached": 0.3
    },
    "shape": {
     "margin": 2
@@ -133,7 +134,8 @@
     "no_engines": 1.0,
     "shape_off": 0.02,
     "clashes": 0.02,
-    "idle": 0.02
+    "idle": 0.02,
+    "detached": 0.3
    },
    "shape": {
     "margin": 2
@@ -207,7 +209,8 @@
     "no_engines": 1.0,
     "shape_off": 0.02,
     "clashes": 0.02,
-    "idle": 0.02
+    "idle": 0.02,
+    "detached": 0.3
    },
    "shape": {
     "margin": 2
@@ -289,7 +292,8 @@
     "no_engines": 1.0,
     "shape_off": 0.02,
     "clashes": 0.02,
-    "idle": 0.02
+    "idle": 0.02,
+    "detached": 0.3
    },
    "shape": {
     "margin": 2

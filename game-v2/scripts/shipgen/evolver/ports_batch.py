@@ -30,15 +30,22 @@ def run_one(job):
     try:
         ev = PortsEvolver(scorer, sil, sc, population=40, elite=4, seed=seed)
         t0 = time.time()
-        top, since = float('-inf'), 0
+        top, since, g, best, s = float('-inf'), 0, -1, None, None
         for g in range(gens):
-            best, s = ev.step()
+            try:
+                best, s = ev.step()
+            except Exception as e:
+                # (Keep what it had: the best so far is still worth seeing)
+                print(f"{sc['name']} seed {seed}: stopped at generation {g} ({type(e).__name__}: {e})", flush=True)
+                break
             if s['fit'] > top + 1e-6:
                 top, since = s['fit'], 0
             else:
                 since += 1
             if plateau and since >= plateau:
                 break
+        if best is None:
+            return None
         gens = g + 1
         m = s['m']
         about = (f"Evolved ({sc['name']}, {gens} generations, seed {seed}): score {s['fit']:.2f}; {m['sustained_dps']:.0f} damage a second, "
@@ -137,7 +144,33 @@ def ports_evolve_T():
     return _T
 
 
+def from_folders(folder: Path) -> list:
+    """Results read back from a batch folder's run folders (best.json, lab.json): the gallery without running again"""
+    T = ports_evolve_T()
+    scs = {s['name']: s for s in json.loads((HERE / 'ports_scenarios.json').read_text(encoding='utf-8'))['scenarios']}
+    out = []
+    for sub in sorted(folder.glob('*/best.json')):
+        d = json.loads(sub.read_text(encoding='utf-8'))
+        lab = json.loads((sub.parent / 'lab.json').read_text(encoding='utf-8'))
+        out.append({'scenario': d['scenario'], 'about': scs.get(d['scenario'], {}).get('about', ''), 'seed': d['seed'], 'score': d['score'], 'measures': d['measures'],
+                    'terms': d['terms'], 'lab': lab, 'T': {k: {'col': v['col'], 'kind': v['kind'], 'name': v['name']} for k, v in T.items()}, 'seconds': d.get('seconds', 0),
+                    'folder': str(sub.parent)})
+    return out
+
+
 def main():
+    if '--gallery' in sys.argv:
+        # python ports_batch.py --gallery <batch folder> [<more batch folders>]: the best of each scenario across them
+        folders = [Path(a) for a in sys.argv[sys.argv.index('--gallery') + 1:]]
+        results = [r for f in folders for r in from_folders(f)]
+        best = {}
+        for r in results:
+            if r['scenario'] not in best or r['score'] > best[r['scenario']]['score']:
+                best[r['scenario']] = r
+        write_gallery(list(best.values()), folders[0])
+        for r in best.values():
+            print(f"{r['scenario']}: score {r['score']:.2f} from {r['folder']}")
+        return
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
     seeds = int(sys.argv[sys.argv.index('--seeds') + 1]) if '--seeds' in sys.argv else 1
     plateau = int(sys.argv[sys.argv.index('--plateau') + 1]) if '--plateau' in sys.argv else 0
@@ -155,7 +188,7 @@ def main():
     jobs = [(sc, gens, 1000 + 97 * k, str(folder), plateau) for sc in scs for k in range(seeds)]
     t0 = time.time()
     with Pool(min(len(jobs), 6)) as pool:
-        results = pool.map(run_one, jobs)
+        results = [r for r in pool.map(run_one, jobs) if r]
     best = {}
     for r in results:
         if r['scenario'] not in best or r['score'] > best[r['scenario']]['score']:
