@@ -243,6 +243,16 @@ Each phase is one PR, tested in the power suites and goldens, under the modular-
 6. **Retire the Diode and the Pulse Dynamo,** or keep them as models with new meanings?
 7. **Engines fed from the front (N) and guns from the back (S),** as written? Or every consumer from any side with
    per-side rates?
+8. **Weapon power profiles (§9):** the assignment in §9.2 is a first pass. Which guns get which, and how hard?
+9. **Threshold reads line ratings, not what's flowing (§9.1).** A store behind a gun always qualifies, however empty.
+   That makes "a store or a joined line" the rule. The alternative (what arrives in the tick) turned out to be
+   bypassed by any store anyway, but less readably.
+10. **The feed layer (§10):** six consumables, each a trade-off and a hazard. Which to keep, and are the hazards
+    (fire, freeze, arc, bomb) the right flavour for the game?
+11. **Mixed feed networks** dilute every effect (as written) or should a pipe refuse to join two tanks of different
+    consumables (the lab already keeps touching tanks of different kinds apart)?
+12. **Pipes are undirected and unlimited in rate** (as written). A pump or rate limit would add another layout
+    constraint; I'd hold it back until the basic layer has been played.
 
 ## 8. The lab
 
@@ -255,7 +265,143 @@ sets off its blast. Examples in the Load menu:
 2. **A Hammer needs two reactors.** Joiner Bank under it; take a reactor away and watch it drop to half rate.
 3. **Two Glints on one line.** A Splitter Bank; the second plant port is wasted until you fix it.
 4. **Alpha: a Longbarrel on a Capacitor.** Charged, it fires at once; then the refill sets the pace. Try Bursts.
-5. **Passive: a Spear on one reactor.** It fills at 20 E/s net; the Lance beside it never charges.
+5. **Passive and steady: a Spear on two reactors, a Lance on one.** Erase a reactor under the Spear and every charge collapses.
 6. **A superweapon and its ship.** Two Fusion Plants and four reactors into Joiner Banks and a Capacitor Array, into a Lance.
 7. **Engines round a corner.** Core, Drive Cells and corner conduits to Ion Drives on the flanks.
 8. **Chain reaction.** Reactors packed beside the guns. Break one.
+9. **Sunbreaker.** Six lines from three Fusion Plants. Erase plants to see the passive floor; break one to see a blast cut four lines.
+10. **Feed: a Combiner flavours a line.** One Pip fires incendiary, its neighbour plain.
+11. **Crossing.** A cryo pipe crosses two power lines through Passthroughs to a Scorcher.
+12. **Discharge.** A Longbarrel straight on reactors against one behind Surge Cells: 4.7 s against 3.7 s a shot.
+13. **Threshold.** A Hammer on a reactor (nothing) against one on a Joiner Bank.
+14. **Two feeds.** A Slurry Cannon: power from a Cell Battery, tungsten from tanks touching it.
+
+The page also opens any design from its address: `ports.html#design=<json>` (the evolver's Open in lab) or
+`ports.html#file=evolved/<scenario>.json` when served over http (the evolver writes each scenario's latest best there;
+`evolved/index.html` lists them).
+
+
+## 9. Weapon power profiles (2026-11-02)
+
+Owner's direction: every weapon wants its power differently, and that is part of its identity. Generators sitting
+straight against guns should be the starter's answer, not everyone's. Each profile pushes towards a different structure.
+
+### 9.1 The profiles (all in the lab's model)
+
+| Profile | Rule | What it rewards |
+|---|---|---|
+| Direct | takes power from anything, any rate | nothing: starter simplicity |
+| Passive | leaks this much a second whether it fires or not; below it, never charges | supply well above need |
+| Discharge | its ports shut for this long after each shot | a buffer in front (a Capacitor or Surge Cell catches what arrives meanwhile) |
+| Rest | a beam that burns out shuts its ports for this long | a buffer, or a beam that never burns out |
+| Threshold | takes power only from lines rated at least this much together (a link's rating is the lower of its two ports) | joining lines (a Joiner, a Flux Coil) or a store in front |
+| Steady | while charging, a tick with less than this arriving collapses the charge | a line of its own, smoothed, not shared |
+| Clip | empties, then refills the whole clip | a high-output store |
+| Multi-port | lines from several sides | power from all round the ship |
+| Feed | a second input (§10) | a feed line or a tank at that edge |
+
+Profiles combine: the Sunbreaker is multi-port, passive and discharge; the Spear is steady and passive.
+
+Discharge, worked: a 60 E shot, a 1 s discharge and a 30 E/s reactor. Direct, it fires every 1 + 60/30 = 3 s (the
+reactor's output in that second is wasted). Behind a buffer that can give fast, every max(60/30, 1 + 60/out) = 2 s.
+The lab's example 12 (a Longbarrel) shows 4.7 s against 3.7 s from the same two reactors.
+
+### 9.2 First assignment
+
+| Weapon | Profile |
+|---|---|
+| Pip | direct |
+| Glint | discharge 0.3 s |
+| Hammer | threshold 45 |
+| Cutter (beam) | passive 5, rest 1.5 s |
+| Longbarrel | discharge 1 s |
+| Spear | passive 10, steady 50 |
+| Bastion | clip 16, passive 15, four ports |
+| Lance (beam) | passive 40, rest 2 s |
+| Sunbreaker | six ports, passive 150, discharge 1 s |
+| Scorcher (new) | feed (required), a beam |
+| Slurry Cannon (new) | feed (required), threshold 40 |
+
+New store for discharge: the **Surge Cell** (takes 120, gives 300, holds 120): a buffer fast enough on both sides to
+catch a whole plant line while a gun is shut. The Capacitor (takes 40) does the same for a reactor's line.
+
+## 10. The feed layer (2026-11-02)
+
+Owner's direction: not fuel for power (that's only logistics), but a second network carrying consumables that change
+what guns do. Effects are trade-offs, not straight bonuses. Some guns need power and a feed through separate inputs;
+others take a feed mixed into their power line. It should be infrastructure with spatial consequences, mostly internal,
+and it must be able to cross the power network.
+
+### 10.1 Rules
+
+- **Tanks** hold one consumable (120). Touching tanks of the same kind join. A hit tank does its consumable's hazard,
+  scaled by how full it is.
+- **Pipes** join anything with a feed point (tanks, pipes, Passthroughs, Combiners, feed ports), on any side. Undirected,
+  unlimited in rate. Everything joined is one **feed network**; its users draw from every tank on it in proportion.
+  Two consumables on one network mix: every effect on it is weaker.
+- **Passthrough**: a power conduit (back to front) with a pipe crossing it (side to side), in one cell: the only place
+  the two networks cross. Breaking one cuts both.
+- **Combiner** (owner's idea: a 2-to-1 like a Joiner): power in at the back, feed on its side, one flavoured line out.
+  It holds no charge, so it is tough and doesn't explode. 1 feed for every 50 power through it.
+- **Flavour** travels with power: every store and conduit carries the mix of what it holds, and passes it on. A gun's
+  shots take the flavour of its buffer: a gun on a half-flavoured line fires at half strength. A **Scrubber** takes the
+  flavour off a line. A broken flavoured line leaks a share of its feed's hazard where it breaks, so injecting near the
+  reactor flavours many guns but spreads the hazard through the ship; injecting near one gun is local but puts the tank
+  near the front.
+- **Feed guns** have their own feed port (a second input, on a given edge) and need it: no feed, no shot. They carry
+  their feed's effect half again as strongly. The **Scorcher** (a projector beam) and **Slurry Cannon** (shells) are the
+  first two.
+
+### 10.2 Consumables
+
+| Consumable | Gives | Costs | Hazard when hit |
+|---|---|---|---|
+| Incendiary gel | burn: 60% of the hit again, over time | impact −20% | fire (90 over 2 cells) |
+| Cryo slurry | slows the target (25% off its fire, fading) | impact −10% | freezes guns and engines within 1.8 cells for 6 s |
+| Ion gas | disrupts its power (30% off its fire, fading) | impact −15%, cycle +20% | arcs 80 into power parts within 2.2 cells |
+| Tungsten dust | +2 penetration | cycle +15%, heavy tanks | none |
+| Shaped slurry | splash: half the hit again around it | −1 penetration | a bomb (160 over 2.5 cells) |
+| Tracer dust | marks: 30% more from everyone else | impact −10% | none |
+
+### 10.3 Later (not in the lab)
+
+Selector (several tanks in, the pilot picks), Mixer (two feeds into a combined effect), Purge valve (dump a leaking
+tank), armoured pipe passthrough (through the armour belt), pumps (a length limit). And other networks the owner
+floated: heat (radiators on the hull, coolant loops) and voltage tiers (transformers for end-game guns).
+
+## 11. Staging (by level)
+
+A new player learns one network at a time.
+
+| Level | What opens |
+|---|---|
+| 0 | Power: reactors, conduits and corners, the Cell Battery, direct guns (Pip), Ion Drives |
+| 3–7 | Joiner and Splitter Banks, Capacitors, the first profiled guns (Hammer: threshold) |
+| 8–10 | The feed layer: tanks, pipes, Passthroughs, Combiners, Scrubbers; Scorcher |
+| 10–20 | Surge Cell, Drive Cell, discharge and rest guns (Glint, Cutter, Longbarrel), Slurry Cannon, Fusion Plants, Flux Coil, Heavy Bank |
+| 20–30 | Steady and clip guns (Spear, Bastion), Overclock Reactor, Capacitor Array |
+| 30+ | Superweapons (Lance, Sunbreaker), Stellarator; later: heat, voltage |
+
+Every power and feed part past the starters should be earned (rare inputs, blueprints from bosses and factions,
+research), so a build is something a player sets out to make. That needs the cost audit (effort to acquire, not guessed
+values) before the numbers mean anything.
+
+## 12. The ports evolver
+
+`npm run evolver:ports` (`scripts/shipgen/evolver/ports_app.py`; headless: `python ports_evolve.py "<scenario>" <gens>`;
+a batch of every scenario: `python ports_batch.py`). Ships are the lab's parts, scored by the lab's own model
+(`ports_score.cjs`), so the evolver and the lab can't disagree.
+
+- **Scoring:** a 30 s power phase (burst fire), then hit runs until the core goes (blasts, hazards, chains). A shot is
+  worth its impact after the enemy's armour (its pen plus its feed's), plus its burn, splash and mark as the scenario
+  values them; slow and disrupt build a suppression that thins the incoming fire. Each measure is scored against the
+  scenario's fixed scale (what counts as 1), so penalties weigh the same whatever the start.
+- **No router.** Changes are random; some are aimed: a part put so one of its ports faces an open port; a pipe or tank
+  put against an open feed point; a straight Conduit made a Passthrough where a pipe needs to cross; a part moved a cell.
+- **Wiring rewards** (owner, 2026-11-02): for each unfed gun or engine port, the share of its shortest path to power
+  built with conduits pointing the right way, fully once power reaches them; every conduit still carrying power at the
+  end; for each Combiner or feed gun without feed, the share of its shortest path to a tank built with pipes.
+- **Idle penalty:** parts doing nothing (a store or line nothing passed through, a generator wasting every line, pipes
+  and tanks on a network without both a tank and a user).
+- **Scenarios:** Gunship (level 20), Capital: Sunbreaker (36), Raider (burn valued as much as the hit, light armour),
+  Siege (armour 5: penetration matters).

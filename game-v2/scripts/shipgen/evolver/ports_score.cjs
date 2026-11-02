@@ -6,6 +6,11 @@
 // A ship enters the fight charged. Power phase: power_s seconds with the guns on the scenario's firing pattern and the
 // engines on, no hits: damage a second (after the enemy's armour), thrust, what's wasted, which conduits carry power.
 // Hit runs: the same, with hits from the scenario's directions until the core goes (blasts and chains as the lab's Break).
+// Effects: a shot's value is its impact after the enemy's armour (its pen plus its feed's), plus its burn, splash and
+// mark as the scenario values them (effects: {burn, splash, mark}); its slow and disrupt build up a suppression that
+// stretches the time between incoming hits (at most 60% fewer), fading over 4 s.
+// Feed wiring: for every Combiner or feed gun whose feed network holds nothing, the share of the shortest path from its
+// feed point to a tank built with pipes (or Passthroughs). Feed used: what the power phase took from the tanks.
 // Wiring: for every consumer in port that isn't fed, the shortest path (through empty cells, hull, armour and conduits)
 // from it to a power giver's out port; a conduit on such a path that points the right way counts half a cell, a whole
 // one when power already reaches it, and the port scores the share of its path built (at most 1). Live conduits: conduits still carrying power at the end of the power phase (a dead end fills up
@@ -32,6 +37,8 @@ function makeShip(req) {
 function charge(parts) {
   for (const p of parts) {
     const t = T[p.type]; p.dead = false; p.hp = t.hp; p.cd = 0; p.on = false; p.latched = false; p.flash = 0; p.emaIn = p.emaOut = p.emaWaste = p.emaD = 0;
+    p.flav = {}; p.closed = 0; p.frozen = 0; p.collapsed = 0; p.fx = null;
+    if (t.kind === 'tank') p.fill = t.fill;
     if (t.kind === 'store') p.held = t.conduit ? 0 : t.hold; else if (t.kind === 'weapon') p.stored = PM.capOf(t); else if (t.kind === 'engine') p.stored = t.buffer; else if (t.kind === 'util') p.stored = t.e;
   }
 }
@@ -50,18 +57,28 @@ function blockedSet(parts, occ, W, H) {
   }
   return out;
 }
+/** What a shot this tick is worth, and what it does to the enemy's fire (suppression) */
+function shotValue(w, sc, armour) {
+  const t = T[w.type], fx = w.fx || { pen: 0 }, d = w.dNow, E = sc.effects || {};
+  const v = d * penMul(t.pen + (fx.pen || 0) - armour) + d * ((fx.burn || 0) * (E.burn ?? 0.5) + (fx.splash || 0) * (E.splash ?? 0.4) + (fx.mark || 0) * (E.mark ?? 0.3));
+  const sup = ((fx.slow || 0) * (E.slow ?? 0.6) + (fx.disrupt || 0) * (E.disrupt ?? 0.6)) * Math.min(1, d / 40);
+  return { v, sup, fx: !!(fx.burn || fx.splash || fx.mark || fx.slow || fx.disrupt || fx.pen) };
+}
+const stockOf = (L) => L.tanks.reduce((s, t) => s + t.fill, 0);
 const firing = (sc, t) => { const f = sc.fire; if (!f || !f.off) return true; return t % (f.on + f.off) < f.on; };
 
 /** The power phase: averages over power_s seconds (charged at the start) */
 function powerPhase(parts, req, sc, blocked) {
   const L = PM.build(parts, req.w, req.h), secs = sc.power_s || 30, n = Math.round(secs / DT), armour = sc.enemy_armour ?? 0;
-  const flowLate = new Map(), got = new Map();
-  let dealt = 0, thrust = 0, wasted = 0;
+  const flowLate = new Map(), got = new Map(), flowAll = new Map();
+  let dealt = 0, thrust = 0, wasted = 0, fxDealt = 0;
+  const stock0 = stockOf(L);
   for (let i = 0; i < n; i++) {
     const t = i * DT, F = PM.tick(L, { fire: firing(sc, t), thrust: true, util: true }, i, DT);
-    for (const w of L.weapons) if (w.dNow && !blocked.has(w)) dealt += w.dNow * penMul(T[w.type].pen - armour);
+    for (const w of L.weapons) if (w.dNow && !blocked.has(w)) { const sv = shotValue(w, sc, armour); dealt += sv.v; if (sv.fx) fxDealt += sv.v; }
     for (const e of L.engines) if (!blocked.has(e)) thrust += e.thrustNow * DT;
     wasted += F.wasted * DT;
+    for (const s of L.stores) flowAll.set(s, (flowAll.get(s) || 0) + s.inNow + s.outNow);
     if (i >= n / 2) {
       for (const s of L.stores) if (T[s.type].conduit) flowLate.set(s, (flowLate.get(s) || 0) + s.inNow);
       for (const c of L.consumers) got.set(c, (got.get(c) || 0) + c.inNow / (secs / 2));
@@ -71,11 +88,58 @@ function powerPhase(parts, req, sc, blocked) {
   // (Stores that power reached: a generator feeds them, directly or down a line)
   const powered = new Set(L.stores.filter((s) => !T[s.type].conduit && s.emaIn > 0.5));
   const reached = new Set(L.stores.filter((s) => T[s.type].conduit && s.emaIn + s.held > 0.01 && (flowLate.get(s) || 0) + s.held > 0.01));
-  return { L, dps: dealt / secs, thrust: thrust / secs, wasted: wasted / secs, live, reached, powered, got };
+  // (Idle: parts doing nothing over the power phase. A store or line nothing passed through; a generator whose every
+  // line is wasted; a pipe or tank on a feed network without both a tank and something that uses it)
+  let idle = 0;
+  for (const s of L.stores) if (T[s.type].id !== 'core' && (flowAll.get(s) || 0) / secs < 0.5) idle++;
+  for (const g of L.gens) if (g.emaWaste >= T[g.type].produce - 0.5) idle++;
+  for (const nn of L.feedNets) if (!nn.tanks.length || !nn.users.length) idle += nn.parts.filter((q) => T[q.type].kind === 'pipe' || T[q.type].kind === 'tank').length;
+  return { L, dps: dealt / secs, thrust: thrust / secs, wasted: wasted / secs, live, reached, powered, got, fxShare: dealt ? fxDealt / dealt : 0, feedUsed: stock0 - stockOf(L), idle };
+}
+
+/** Shortest-path credit for pipes towards each Combiner or feed gun whose network holds no feed */
+function feedWiring(L) {
+  const { GW: W, GH: H, occ } = L, key = (x, y) => y * W + x;
+  const passable = (x, y) => {
+    if (x < 0 || y < 0 || x >= W || y >= H) return false; const q = occ[key(x, y)]; if (!q) return true; const t = T[q.type];
+    return t.kind === 'inert' || t.kind === 'pipe' || t.id === 'passthrough' || t.id === 'conduit';
+  };
+  const goal = [];
+  for (const tk of L.tanks) if (tk.fill > 1) for (const q of tk.feeds) if (passable(q.nx, q.ny)) goal.push([q.nx, q.ny]);
+  // (Every Combiner and feed gun counts: one with feed on its network scores 1, one without the share of its path to a
+  // tank built with pipes (at most 0.9); the measure is the mean, 0 when the ship has none)
+  const all = L.alive.filter((p) => T[p.type].combiner || T[p.type].feedPort);
+  const users = all.filter((p) => !(p.feedNet && p.feedNet.tanks.some((k) => k.fill > 1)));
+  const fedN = all.length - users.length;
+  if (!all.length) return { credit: 0, users: 0 };
+  if (!users.length || !goal.length) return { credit: fedN / all.length, users: users.length };
+  const bfs = (starts) => {
+    const d = new Int32Array(W * H).fill(-1), qx = [], qy = [];
+    for (const [x, y] of starts) if (d[key(x, y)] < 0) { d[key(x, y)] = 0; qx.push(x); qy.push(y); }
+    for (let i = 0; i < qx.length; i++) {
+      const x = qx[i], y = qy[i], v = d[key(x, y)];
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (passable(nx, ny) && d[key(nx, ny)] < 0) { d[key(nx, ny)] = v + 1; qx.push(nx); qy.push(ny); } }
+    }
+    return d;
+  };
+  const dS = bfs(goal);
+  let credit = fedN;
+  for (const u of users) for (const q of u.feeds) {
+    if (!passable(q.nx, q.ny)) continue;
+    const D = dS[key(q.nx, q.ny)]; if (D < 0) continue;
+    const dG = bfs([[q.nx, q.ny]]);
+    let got = 0;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const k = key(x, y), c = occ[k]; if (!c || dS[k] < 0 || dG[k] < 0 || dS[k] + dG[k] !== D) continue;
+      if (T[c.type].kind === 'pipe' || c.type === 'passthrough') got++;
+    }
+    credit += 0.9 * Math.min(1, got / (D + 1));
+  }
+  return { credit: credit / all.length, users: users.length };
 }
 
 /** Shortest-path credit for conduits towards each consumer in port that isn't fed */
-function wiring(L, reached, powered) {
+function wiring(L, reached, powered, fedOf) {
   const { GW: W, GH: H, occ } = L, key = (x, y) => y * W + x;
   const passable = (x, y) => { if (x < 0 || y < 0 || x >= W || y >= H) return false; const q = occ[key(x, y)]; if (!q) return true; const t = T[q.type]; return t.kind === 'inert' || !!t.conduit; };
   // Goals: cells across the out port of a generator, or of a store that power reaches, that a conduit could take from
@@ -85,7 +149,12 @@ function wiring(L, reached, powered) {
     if (!(t.kind === 'gen' || (t.kind === 'store' && !t.conduit && powered.has(p)))) continue;
     for (const q of p.ports) if (q.dir === 'out' && passable(q.nx, q.ny)) goal.push({ x: q.nx, y: q.ny, from: [q.x, q.y] });
   }
-  if (!goal.length) return { credit: 0, ports: 0 };
+  // (Every consumer in port counts: a fed one (linked, its part getting a quarter of what it wants) scores 1, an unfed one
+  // the share of its path built (at most 0.9), so finishing a line always beats leaving it; the measure is the mean)
+  const allPorts = L.consumers.reduce((s, p) => s + p.ports.filter((q) => q.dir === 'in').length, 0);
+  let fedPorts = 0;
+  for (const p of L.consumers) for (const q of p.ports) if (q.dir === 'in' && q.link && fedOf(p) >= 0.25) fedPorts++;
+  if (!goal.length) return { credit: allPorts ? fedPorts / allPorts : 0, ports: 0 };
   const bfs = (starts) => {
     const d = new Int32Array(W * H).fill(-1), qx = [], qy = [];
     for (const [x, y] of starts) if (d[key(x, y)] < 0) { d[key(x, y)] = 0; qx.push(x); qy.push(y); }
@@ -97,9 +166,9 @@ function wiring(L, reached, powered) {
   };
   const dS = bfs(goal.map((g) => [g.x, g.y]));
   const goalFrom = new Map(); for (const g of goal) { const k = key(g.x, g.y); if (!goalFrom.has(k)) goalFrom.set(k, []); goalFrom.get(k).push(g.from); }
-  let credit = 0, ports = 0;
+  let credit = fedPorts, ports = 0;
   for (const p of L.consumers) for (const q of p.ports) {
-    if (q.dir !== 'in' || q.link || !passable(q.nx, q.ny)) continue;
+    if (q.dir !== 'in' || (q.link && fedOf(p) >= 0.25) || !passable(q.nx, q.ny)) continue;
     const D = dS[key(q.nx, q.ny)]; if (D < 0) continue;
     ports++;
     const dG = bfs([[q.nx, q.ny]]);
@@ -114,9 +183,9 @@ function wiring(L, reached, powered) {
       if (inOk && outOk) got += reached.has(c) ? 2 : 1;
     }
     // (A port is worth at most 1: the share of its D + 1 cells of path built, a cell counting fully once power reaches it)
-    credit += Math.min(1, got / (2 * (D + 1)));
+    credit += 0.9 * Math.min(1, got / (2 * (D + 1)));
   }
-  return { credit, ports };
+  return { credit: allPorts ? credit / allPorts : 0, ports };
 }
 
 /** One hit run: hits until the core goes (or max_s), the power ticking all the while */
@@ -132,9 +201,10 @@ function hitRun(parts, req, sc, blocked0, seed, base) {
     for (const p of L.weapons) if (!blocked.has(p) && p.links.length) w += PM.fullDps(T[p.type]) * penMul(T[p.type].pen - armour);
     for (const p of L.engines) if (!blocked.has(p) && p.links.length) th += T[p.type].thrust;
     for (const p of L.gens) g += T[p.type].produce;
-    return [base.w ? w / base.w : null, base.th ? th / base.th : null, base.g ? g / base.g : null];
+    // (A ship without guns, engines or generators keeps none of them: 0, not left out, or shedding guns would score)
+    return [base.w ? w / base.w : 0, base.th ? th / base.th : 0, base.g ? g / base.g : 0];
   };
-  let cur = shares(), t = 0, dealt = 0, kept = 0, half = null, next = every, i = 0, coreDead = false;
+  let cur = shares(), t = 0, dealt = 0, kept = 0, half = null, next = every, i = 0, coreDead = false, sup = 0;
   const dirOf = (from, spread) => {
     const a0 = { front: -Math.PI / 2, rear: Math.PI / 2, left: Math.PI, right: 0 }[from];
     const a = from === 'all' || a0 === undefined ? r() * Math.PI * 2 : a0 + (r() - 0.5) * (spread * Math.PI / 180);
@@ -143,13 +213,14 @@ function hitRun(parts, req, sc, blocked0, seed, base) {
   };
   while (t < maxS && !coreDead) {
     PM.tick(L, { fire: firing(sc, t), thrust: true, util: true }, i++, DT);
-    for (const w of L.weapons) if (w.dNow && !blocked.has(w)) dealt += w.dNow * penMul(T[w.type].pen - armour);
-    const live = cur.filter((v) => v !== null);
-    kept += DT * (live.length ? live.reduce((s, v) => s + v, 0) / live.length : 0);
+    sup *= Math.exp(-DT / 4);
+    for (const w of L.weapons) if (w.dNow && !blocked.has(w)) { const sv = shotValue(w, sc, armour); dealt += sv.v; sup += sv.sup; }
+    // (Firepower counts most: 60%, thrust and generation 20% each)
+    kept += DT * (0.6 * cur[0] + 0.2 * cur[1] + 0.2 * cur[2]);
     t += DT;
     let changed = false;
     while (t >= next && !coreDead) {
-      next += every;
+      next += every / (1 - Math.min(0.6, sup));
       const from = r() < (inc.flank ?? 0) ? 'all' : inc.from ?? 'all';
       const [dx, dy] = dirOf(from, inc.spread ?? 45), off = (r() * 2 - 1) * reach;
       let x = cx - dx * reach - dy * off, y = cy - dy * reach + dx * off, hit = null;
@@ -179,7 +250,8 @@ function measure(req) {
   const L0 = PM.build(parts, req.w, req.h), blocked = blockedSet(parts, L0.occ, req.w, req.h);
   const mass = parts.reduce((s, p) => s + T[p.type].mass, 0);
   const pw = powerPhase(parts, req, sc, blocked);
-  const wire = wiring(pw.L, pw.reached, pw.powered);
+  const fedOf = (p) => { const t = T[p.type]; return Math.min(1, (pw.got.get(p) || 0) / Math.max(1e-9, t.kind === 'weapon' ? t.intake : t.kind === 'engine' ? Math.min(t.intake, t.burn) : t.e)); };
+  const wire = wiring(pw.L, pw.reached, pw.powered, fedOf), fw = feedWiring(L0);
   // (Engines near the back: thrust-weighted, zones of 3 rows up from the ship's last row)
   const last = Math.max(...parts.flatMap((p) => p.cells.map((c) => c[1])));
   let zw = 0, zt = 0;
@@ -192,14 +264,22 @@ function measure(req) {
   // Open ports on the intact ship, for the evolver's aimed changes
   const open = [];
   for (const p of L0.alive) for (const q of p.ports) if (!q.link) open.push([q.dir, T[p.type].kind, T[p.type].conduit ? 1 : 0, q.x, q.y, q.nx, q.ny, q.side]);
+  // (Feed points joined to nothing: where a pipe or tank could go)
+  const openFeed = [];
+  for (const p of L0.alive) for (const q of p.feeds) if (!q.joined) openFeed.push([T[p.type].kind, q.x, q.y, q.nx, q.ny, q.side]);
   // (Consumers under a quarter of what they want over the second half of the power phase: a dead line feeds nothing)
   const fedShare = {};
   for (const p of pw.L.consumers) { const t = T[p.type]; fedShare[p.uid - 1] = Math.min(1, (pw.got.get(p) || 0) / Math.max(1e-9, t.kind === 'weapon' ? t.intake : t.kind === 'engine' ? Math.min(t.intake, t.burn) : t.e)); }
   const unpowered = Object.values(fedShare).filter((v) => v < 0.25).length;
+  // (Diagnostics for the meta: the share of guns' power links that come straight from a generator, and how many guns
+  // sit within 1.5 cells of a generator or charged store, where its blast reaches them)
+  const gunLinks = L0.weapons.flatMap((w) => w.inL);
+  const direct = gunLinks.length ? gunLinks.filter((l) => T[l.from.type].kind === 'gen').length / gunLinks.length : 0;
+  const nearBlast = L0.weapons.filter((w) => L0.alive.some((q) => q !== w && (T[q.type].kind === 'gen' || (T[q.type].kind === 'store' && !T[q.type].conduit && q.type !== 'core')) && Math.hypot(q.cx - w.cx, q.cy - w.cy) < 1.6)).length;
   return {
     id: req.id, sustained_dps: pw.dps, thrust: pw.thrust, thrust_to_mass: mass ? pw.thrust / mass : 0, mass, wasted: pw.wasted,
     damage_before_down: avg('dealt'), alive_s: avg('alive_s'), half_s: avg('half_s'), systems_kept: avg('kept'),
-    wiring: wire.credit, open_in: wire.ports, live_conduits: pw.live, unfed, unpowered, blocked: blocked.size, blocked_ids: [...blocked].map((p) => p.uid - 1),
+    wiring: wire.credit, open_in: wire.ports, live_conduits: pw.live, unfed, unpowered, feed_wiring: fw.credit, feed_users: fw.users, idle: pw.idle, direct_share: direct, guns_near_blast: nearBlast, guns: L0.weapons.length, feed_used: pw.feedUsed, fx_share: pw.fxShare, open_feed: openFeed, blocked: blocked.size, blocked_ids: [...blocked].map((p) => p.uid - 1),
     engines_working: L0.engines.filter((e) => !blocked.has(e) && e.links.length).length, engine_zone: zt ? zw / zt : 0,
     no_engines: L0.engines.some((e) => !blocked.has(e) && e.links.length) ? 0 : 1, clashes: L0.clashes.length, open, fed: fedShare,
   };

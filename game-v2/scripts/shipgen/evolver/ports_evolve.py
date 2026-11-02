@@ -17,11 +17,11 @@ from model import HERE, Silhouette
 from score import ZERO_SCALE, fitness
 
 SCORER = HERE / 'ports_score.cjs'
-ZERO_SCALE.update({'wiring': 1.0, 'live_conduits': 10.0, 'sustained_dps': 50.0})
+ZERO_SCALE.update({'wiring': 1.0, 'live_conduits': 10.0, 'sustained_dps': 50.0, 'feed_wiring': 1.0, 'fx_share': 1.0})
 SIDES = ['N', 'E', 'S', 'W']
 SIDE_V = {'N': (0, -1), 'E': (1, 0), 'S': (0, 1), 'W': (-1, 0)}
 OPP = {'N': 'S', 'S': 'N', 'E': 'W', 'W': 'E'}
-CHANGES = ('place', 'place', 'swap', 'clear', 'turn', 'turn', 'extend_out', 'extend_out', 'extend_in', 'extend_in', 'grow', 'shrink')
+CHANGES = ('place', 'place', 'swap', 'clear', 'turn', 'turn', 'extend_out', 'extend_out', 'extend_in', 'extend_in', 'grow', 'shrink', 'feed', 'feed', 'move')
 # (An aimed change puts a conduit there most times, another part the rest)
 CONDUIT_SHARE = 0.6
 
@@ -45,6 +45,17 @@ def port_offsets(t: dict, rot: int, flip: bool) -> list:
         lx, ly = {'N': (c, 0), 'S': (c, t['h'] - 1), 'W': (0, c), 'E': (t['w'] - 1, c)}[side]
         dx, dy = place_cell(lx, ly, t['w'], t['h'], rot, flip)
         out.append((q['dir'], place_side(side, rot, flip), dx, dy))
+    return out
+
+
+def feed_offsets(t: dict, rot: int, flip: bool) -> list:
+    """Each feed point of a part placed so: (world side, dx, dy from the footprint's top-left)"""
+    out = []
+    for q in t.get('feed', []):
+        side, c = q['side'], q['cell']
+        lx, ly = {'N': (c, 0), 'S': (c, t['h'] - 1), 'W': (0, c), 'E': (t['w'] - 1, c)}[side]
+        dx, dy = place_cell(lx, ly, t['w'], t['h'], rot, flip)
+        out.append((place_side(side, rot, flip), dx, dy))
     return out
 
 
@@ -121,6 +132,9 @@ class PortsEvolver:
         self.mid = sil.mid
         self.points_cell = lambda t: 1 if t['lvl'] < 10 else 1.6 if t['lvl'] < 24 else 2.5
         self.cache: dict = {}
+        # (Each measure is scored against the scenario's fixed scale (scales: what counts as 1), not against the start:
+        # a weak start would make every gain look huge and every penalty negligible)
+        self.ref = dict(scenario.get('scales') or {})
         self.start = start or self.seed_ship()
         self.base = self.score(self.start)['m']
         self.gen = 0
@@ -220,7 +234,7 @@ class PortsEvolver:
             m['points'] = round(sum(self.points_cell(self.T[p.type]) * self.T[p.type]['w'] * self.T[p.type]['h'] for p in full if p.type != 'core'), 1)
             m['parts'] = len(full)
             m['valid'] = True
-            f, terms = fitness(self.sc, m, getattr(self, 'base', m))
+            f, terms = fitness(self.sc, m, self.ref)
             self.cache[k] = {'m': m, 'fit': f, 'terms': terms}
         return self.cache[k]
 
@@ -234,7 +248,7 @@ class PortsEvolver:
             nxt.append(self.child(a[2] if a[0] >= b[0] else b[2]))
         self.pop = nxt
         self.gen += 1
-        if len(self.cache) > 40000:
+        if len(self.cache) > 6000:
             keep = {s.key() for s in self.pop}
             self.cache = {k: v for k, v in self.cache.items() if k in keep}
         return best[2], self.score(best[2])
@@ -351,6 +365,52 @@ class PortsEvolver:
             return False
         return self.put(s, PPart(t['id'], x, y, r, f))
 
+    def feed(self, s: PShip) -> bool:
+        """Across a feed point joined to nothing: a pipe most times, else a tank (of a consumable the level allows); or,
+        where a straight Conduit is in the way at right angles, that Conduit made a Passthrough (same turn)"""
+        opts = [o for o in self.score(s)['m'].get('open_feed', []) if o[3] >= self.mid and (o[4], o[3]) in self.area]
+        if not opts:
+            return False
+        _k, _x, _y, nx, ny, side = self.rng.choice(opts)
+        own = self.owner(s)
+        if (nx, ny) in own:
+            i = own[(nx, ny)]
+            q = s.parts[i]
+            t = self.T[q.type]
+            if q.type == 'conduit' and 'passthrough' in self.T and self.T['passthrough']['lvl'] <= self.sc.get('level', 99):
+                if place_side('E', q.rot, q.flip) in (side, OPP[side]):
+                    s.parts[i] = PPart('passthrough', q.x, q.y, q.rot, q.flip)
+                    return True
+                return False
+            if t['kind'] != 'inert':
+                return False
+        tanks = [t for t in self.choices if t['kind'] == 'tank']
+        pipe = [t for t in self.choices if t['kind'] == 'pipe']
+        pick = self.rng.choice(tanks) if (tanks and (not pipe or self.rng.random() < 0.3)) else (pipe[0] if pipe else None)
+        if pick is None:
+            return False
+        return self.put(s, PPart(pick['id'], nx, ny))
+
+    def move(self, s: PShip) -> bool:
+        """A part shifted a cell (hull left where it was), so a layout can shuffle without being rebuilt"""
+        idx = [i for i, p in enumerate(s.parts) if self.T[p.type]['kind'] not in ('inert',) and p.type != 'core']
+        if not idx:
+            return False
+        i = self.rng.choice(idx)
+        p = s.parts[i]
+        dx, dy = self.rng.choice(((1, 0), (-1, 0), (0, 1), (0, -1)))
+        np = PPart(p.type, p.x + dx, p.y + dy, p.rot, p.flip)
+        rest = PShip(s.sil, [q for j, q in enumerate(s.parts) if j != i])
+        new_cells = set(self.cells(np))
+        own = self.owner(rest)
+        if any(self.T[rest.parts[own[c]].type]['kind'] != 'inert' for c in new_cells if c in own):
+            return False
+        if not self.put(rest, np):
+            return False
+        rest.parts += [PPart('hull', x, y) for (x, y) in self.cells(p) if x >= self.mid and (x, y) not in new_cells]
+        s.parts = rest.parts
+        return True
+
     def extend_out(self, s: PShip) -> bool:
         return self.aimed(s, 'in')
 
@@ -405,6 +465,6 @@ if __name__ == '__main__':
         best, s = ev.step()
         if g % 10 == 9 or g == G - 1:
             m = s['m']
-            print(f"{g + 1} {time.time() - t0:.0f}s fit {s['fit']:.2f} dps {m['sustained_dps']:.0f} dbd {m['damage_before_down']:.0f} wiring {m['wiring']} live {m['live_conduits']} unfed {m['unfed']} t/m {m['thrust_to_mass']:.3f} cost {m['cost']:.0f} pts {m['points']}", flush=True)
+            print(f"{g + 1} {time.time() - t0:.0f}s fit {s['fit']:.2f} dps {m['sustained_dps']:.0f} dbd {m['damage_before_down']:.0f} wiring {m['wiring']:.2f} live {m['live_conduits']} unpowered {m['unpowered']} feed {m['feed_wiring']:.2f}/{m['feed_users']} fx {m['fx_share']:.2f} t/m {m['thrust_to_mass']:.3f} cost {m['cost']:.0f} pts {m['points']}", flush=True)
     print('TERMS', [(t[0], round(t[2], 2), round(t[3], 2)) for t in s['terms']])
     scorer.close()

@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
 
 from app import STYLE, Bridge, Chart
 from model import GAME, HERE, Silhouette
-from ports_evolve import PortsEvolver, PortsScorer, PShip, lab_design, port_offsets, ship_from_json, ship_json
+from ports_evolve import PortsEvolver, PortsScorer, PShip, feed_offsets, lab_design, port_offsets, ship_from_json, ship_json
 
 OUT = HERE / 'out'
 SCENARIOS = HERE / 'ports_scenarios.json'
@@ -35,6 +35,8 @@ MEASURES = [
     ('alive_s', 'seconds until the core goes'), ('half_s', 'seconds until its guns are down to half'), ('systems_kept', 'firepower, thrust and power kept, over the seconds it lasts'),
     ('wiring', 'wiring credit (unfed ports: share of the shortest path built)'), ('live_conduits', 'conduits carrying power'), ('unpowered', 'guns, engines, shields under a quarter fed'),
     ('thrust_to_mass', 'thrust for its mass'), ('engine_zone', 'engines near the back'), ('wasted', 'power wasted at generators (a second)'), ('clashes', 'ports facing the same way'),
+    ('fx_share', 'share of damage from shots carrying an effect'), ('feed_used', 'feed used in the power phase'), ('feed_wiring', 'feed wiring (Combiners and feed guns fed, or the share of their path)'),
+    ('idle', 'parts doing nothing'),
 ]
 
 
@@ -126,6 +128,21 @@ class PortView(QWidget):
                     g.setPen(Qt.NoPen)
                     g.setBrush(c)
                     g.drawPolygon(QPolygonF([QPointF(*q) for q in pts]))
+            # (Feed: a pipe's channel to each side; a small square on any other part's feed point)
+            if k >= 8 and t.get('feed'):
+                pc = QColor('#a77bdc')
+                for side, dx, dy in feed_offsets(t, p.rot, p.flip):
+                    vx, vy = SIDE_V[side]
+                    cx0, cy0 = ox + (x0 + dx + 0.5) * k, oy + (y0 + dy + 0.5) * k
+                    ex, ey = cx0 + vx * k / 2, cy0 + vy * k / 2
+                    if t['kind'] == 'pipe' or t['id'] == 'passthrough':
+                        g.setPen(QPen(pc, max(2, k / 7)))
+                        g.drawLine(QPointF(cx0, cy0), QPointF(ex, ey))
+                    else:
+                        r0 = max(2, k / 9)
+                        g.setPen(Qt.NoPen)
+                        g.setBrush(pc)
+                        g.drawRect(QRectF(ex - vx * r0 - r0, ey - vy * r0 - r0, 2 * r0, 2 * r0))
             if t['kind'] in ('weapon', 'engine', 'util') and fed.get(str(i), fed.get(i, 1)) < 0.25:
                 g.setPen(QPen(QColor('#ff3b3b'), 2))
                 g.drawLine(rect.topLeft(), rect.bottomRight())
@@ -200,7 +217,8 @@ class Window(QMainWindow):
             views.addLayout(box, 1)
         ll.addLayout(views, 1)
         ll.addWidget(QLabel('Amber triangle: an out port; blue: an in port; faint: facing nothing; red: a gun or engine with a line missing, or a generator '
-                            'giving into nothing. Red cross: under a quarter fed. Hover a part for its numbers. Open in lab to run it live.', objectName='small', wordWrap=True))
+                            'giving into nothing. Purple: feed (pipe channels, and feed points on tanks, Combiners and feed guns). Red cross: under a quarter fed. '
+                            'Hover a part for its numbers. Open in lab to run it live.', objectName='small', wordWrap=True))
         split.addWidget(left)
         right = QTabWidget()
         run = QWidget()
