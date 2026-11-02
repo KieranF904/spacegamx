@@ -346,26 +346,35 @@ function watch(id) {
     follow();
   });
   es.onerror = () => { if (es.readyState === EventSource.CLOSED && state.watching === id) { setStatus('idle'); watchEnded = true; } };
-  setStatus('running', `watching ${short(id)}`);
+  setStatus('running', `live: ${short(id)}`);
   renderWatch();
 }
 const short = (id) => id.replace(/^runs\//, '');
 
-// (Follow: the newest live run; when the one watched ends, the next one that starts, e.g. a batch's next attempt)
-let watchEnded = false;
+// (Always live: whatever run did something last, from this page or the command line. A page run is attached, so its
+// tokens stream; a command-line run is read from its record as it grows. When the one shown ends, the next one that
+// starts takes its place (a batch's next attempt, its refinement). A run picked by hand stays until it ends.)
+let watchEnded = false, pinned = null;
+const isPageRecord = (id) => /-page(\/|$)/.test(id);
 async function follow() {
-  if (!$('followLatest').checked) return;
+  let pageRuns;
+  try { pageRuns = (await api('/api/runs')).runs; } catch { return; }
+  const pageLive = pageRuns.find((r) => r.status === 'running');
+  if (pageLive) { if (state.run !== pageLive.id) attach(pageLive.id, pageLive.mode); return; }
   if (state.run && $('status').textContent === 'running') return;
   try { watchRuns = (await api('/api/watch')).runs; } catch { return; }
   if ($('watchBox').open) renderWatch();
-  const cur = state.watching && watchRuns.find((r) => r.id === state.watching);
-  const curLive = cur && !cur.finished && !cur.stale && !watchEnded;
-  const live = watchRuns.find((r) => !r.finished && !r.stale);
-  if (live && live.id !== state.watching && !curLive) watch(live.id);
-  else if (!state.watching && !state.run && watchRuns[0]) watch(watchRuns[0].id);
+  const cli = watchRuns.filter((r) => !isPageRecord(r.id));
+  const cur = state.watching ? cli.find((r) => r.id === state.watching) : undefined;
+  const curLive = !!cur && !cur.finished && !cur.stale && !watchEnded;
+  if (pinned && pinned === state.watching && curLive) return;
+  pinned = null;
+  // (Newest activity first; a second run going at once takes over only once it is a minute ahead, so the view doesn't flicker)
+  const newest = cli.find((r) => !r.finished && !r.stale);
+  if (newest && newest.id !== state.watching && (!curLive || newest.modified - cur.modified > 60000)) watch(newest.id);
+  else if (!state.watching && !state.run && cli[0]) watch(cli[0].id);
 }
 setInterval(follow, 3000);
-$('followLatest').onchange = () => { store.set('follow', $('followLatest').checked); follow(); };
 
 let watchRuns = [];
 function renderWatch() {
@@ -378,8 +387,8 @@ function renderWatch() {
     row.className = `watchRow${state.watching === r.id ? ' on' : ''}`;
     const when = new Date(r.modified).toLocaleString();
     row.innerHTML = `<span class="pill ${r.finished ? 'done' : r.stale ? '' : 'running'}">${r.finished ? 'done' : r.stale ? 'stopped?' : 'live?'}</span> <b>${esc(short(r.id))}</b> <span class="muted small">${esc([r.mode, r.model, r.role].filter(Boolean).join(' · '))} · ${esc(when)}</span>`;
-    // (Picking a run by hand stops following the newest)
-    row.onclick = () => { $('followLatest').checked = false; store.set('follow', false); watch(r.id); };
+    // (A run picked by hand stays on screen until it ends; then the view goes back to the newest)
+    row.onclick = () => { pinned = r.id; watch(r.id); };
     el.appendChild(row);
   }
 }
@@ -569,9 +578,6 @@ $('start').onchange = async () => {
     refreshGallery();
     refreshWatch();
     refreshShips();
-    $('followLatest').checked = store.get('follow') ?? false;
-    const { runs } = await api('/api/runs');
-    const live = runs.find((r) => r.status === 'running') ?? runs.at(-1);
-    if (live) attach(live.id, live.mode); else follow();
+    follow();
   } catch (e) { msg('formMsg', e.message, 'err'); }
 })();

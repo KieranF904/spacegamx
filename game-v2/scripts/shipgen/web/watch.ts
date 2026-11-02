@@ -131,7 +131,8 @@ export function watchStream(req: IncomingMessage, res: ServerResponse, runs: Run
     if (ended) return;
     const pe = enrich(e);
     if (i++ >= skip) res.write(`id: ${i - 1}\ndata: ${JSON.stringify(pe)}\n\n`);
-    if (e.type === 'done') end();
+    // (After this call returns: a finished file is read whole inside followJsonl's first tick, before \`follower\` is set)
+    if (e.type === 'done') setImmediate(end);
   }, intervalMs);
   // (A run that never wrote 'done' and has gone quiet: say so and end, instead of polling for ever)
   const quiet = setInterval(() => {

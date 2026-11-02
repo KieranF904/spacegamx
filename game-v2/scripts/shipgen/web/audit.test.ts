@@ -166,6 +166,21 @@ describe('watching a run that never finished', () => {
     });
     expect(body).toMatch(/never finished/);
     expect(body).toMatch(/event: end/);
+    // A run that finished before anyone watched (its done already in the file) ends at once, not after the quiet timer
+    mkdirSync(join(out, 'over'), { recursive: true });
+    writeFileSync(join(out, 'over', 'events.jsonl'), [{ type: 'start', mode: 'design', model: 'm', t: 0 }, { type: 'done', cancelled: false, metrics: {}, t: 1 }].map((e) => JSON.stringify(e)).join('\n') + '\n');
+    const t0 = Date.now();
+    const done = await new Promise<string>((ok) => {
+      const s = createServer((req, res) => watchStream(req, res, new Runs(ctx, out, async () => ({ mode: 'design', outcome: {} as never })), out, new URL(req.url!, 'http://x'), 20, 600000));
+      s.listen(0, '127.0.0.1', () => {
+        const p = (s.address() as { port: number }).port;
+        request({ host: '127.0.0.1', port: p, path: '/?run=over' }, (res) => {
+          let t = ''; res.on('data', (c) => (t += c)); res.on('end', () => { s.close(); ok(t); });
+        }).end();
+      });
+    });
+    expect(done).toMatch(/"type":"done"[\s\S]*event: end/);
+    expect(Date.now() - t0).toBeLessThan(2000);
   });
 });
 
