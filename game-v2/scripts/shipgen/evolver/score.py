@@ -7,10 +7,21 @@
 #   number times that.
 #   Hits: shots from the scenario's directions travel in straight lines across the grid and land on the first part
 #   still standing, for damage × the game's penetration table (weapon pen − block armour) × the material's resist.
-#   A part is gone when its HP is; the power is worked out again then. The run ends when the core goes.
+#   A part is gone when its HP is; the power is worked out again then. A part that goes may blow up (reactors, engines,
+#   cannons: the game's blasts), hurting what is around it. Some hits (flank) come from every side. The run ends when
+#   the core goes.
+#   Systems kept: over the same run, the share of its firepower, thrust and power generation still working, averaged,
+#   added up over the seconds until the core goes. It keeps counting after the guns are gone, so a reactor or engine
+#   left where hits reach it costs something even when the guns die first.
 #   Damage before going down: the ship's damage per second, as it stands after each hit, added up over the time the
 #   hits took. A glass cannon dies fast; a well-armoured ship with starved guns barely shoots; one whose power lines
 #   are behind armour keeps firing.
+#   Line of sight: a gun with any of the outline in front of it (towards the nose), or an engine with any behind it,
+#   does nothing (it still draws its power) and is penalised (blocked).
+#   Engines: thrust for its mass (cruising, reactors alone) against the scenario's target; engine_zone rewards engines
+#   in the ship's last rows in steps of 3 (the bottom 3 rows count 1, the next 3 0.75, ...), so it isn't always the
+#   very last row; a ship with no working engine (in sight, and getting a quarter of its power) is penalised
+#   (no_engines).
 import math
 import random
 from collections import defaultdict, deque
@@ -166,10 +177,12 @@ def power(cat: Catalogue, parts: list, alive: list, nbrs: list, burst: bool, cel
     return {'fed': fed, 'through': through}
 
 
-def output(cat: Catalogue, parts: list, fed: dict) -> tuple[float, float]:
-    """Damage per second and thrust, each part at its fed share"""
+def output(cat: Catalogue, parts: list, fed: dict, blocked=frozenset()) -> tuple[float, float]:
+    """Damage per second and thrust, each part at its fed share; a blocked gun or engine none"""
     dps = thrust = 0.0
     for i, f in fed.items():
+        if i in blocked:
+            continue
         p = cat.parts[parts[i].pid]
         dps += (p.get('dps') or 0) * f
         thrust += (p.get('thrust') or 0) * f
@@ -183,14 +196,26 @@ def directions(spec: str, spread: float, rng: random.Random) -> tuple[float, flo
     return math.cos(math.radians(a)), math.sin(math.radians(a))
 
 
-def hits_run(cat: Catalogue, parts: list, nbrs: list, cell_owner: dict, inc: dict, seed: int, base_dps: float) -> dict:
-    """One run of incoming hits until the core goes (or the cap). Returns seconds alive, seconds until the guns are
-    down to half, and the damage dealt meanwhile"""
+def blast_reach(p, cx: float, cy: float) -> float:
+    """From a point (cells) to the nearest point of a part's cells"""
+    best = INF
+    for r, c in p.cells():
+        dx = max(c - cx, 0.0, cx - (c + 1))
+        dy = max(r - cy, 0.0, cy - (r + 1))
+        best = min(best, math.hypot(dx, dy))
+    return best
+
+
+def hits_run(cat: Catalogue, parts: list, nbrs: list, cell_owner: dict, inc: dict, seed: int, base_dps: float, blocked=frozenset()) -> dict:
+    """One run of incoming hits until the core goes (or the cap). A part that goes may blow up (its blast: damage
+    falling off to nothing at its radius, on every part still standing in reach, as bridge/damage.ts applyBlast), and
+    that may set off more. flank: the share of hits that come from any side instead of the scenario's direction.
+    Returns seconds alive, seconds until the guns are down to half, and the damage dealt meanwhile"""
     rng = random.Random(seed)
     hp = [cat.parts[p.pid]['hp'] for p in parts]
     alive = [True] * len(parts)
     owner = dict(cell_owner)
-    core = [i for i, p in enumerate(parts) if cat.parts[p.pid]['fn'] == 'core']
+    core = {i for i, p in enumerate(parts) if cat.parts[p.pid]['fn'] == 'core'}
     dmg, pen, kind = inc.get('damage', 40), inc.get('pen', 2), inc.get('type', 'kinetic')
     dt = dmg / max(1e-6, inc.get('dps', 100))
     cells = list(owner)
@@ -198,10 +223,31 @@ def hits_run(cat: Catalogue, parts: list, nbrs: list, cell_owner: dict, inc: dic
     cx = sum(c for _r, c in cells) / len(cells) + 0.5
     reach = max(math.hypot(r + 0.5 - cy, c + 0.5 - cx) for r, c in cells) + 2
     cur_dps = base_dps
-    t = dealt = 0.0
+    t = dealt = kept = 0.0
     half_at = None
-    for n in range(inc.get('max_hits', 3000)):
-        dx, dy = directions(inc.get('from', 'all'), inc.get('spread', 45), rng)
+    sources = [i for i, p in enumerate(parts) if cat.role(p.pid) in SOURCE_ROLES]
+    gen0 = sum((cat.parts[parts[i].pid].get('power') or {}).get('makes', 0) for i in sources)
+    _d, thrust0 = output(cat, parts, power(cat, parts, alive, nbrs, False, cell_owner)['fed'], blocked)
+    share = [base_dps > 0, thrust0 > 0, gen0 > 0]
+    cur = [1.0, 1.0, 1.0]
+
+    def hurt(i: int, amount: float, queue: list) -> bool:
+        """Damage part i; when it goes, take it off the grid and queue its blast. True if it was the core"""
+        hp[i] -= amount
+        if hp[i] > 0 or not alive[i]:
+            return False
+        alive[i] = False
+        for c in parts[i].cells():
+            if owner.get(c) == i:
+                del owner[c]
+        b = cat.parts[parts[i].pid].get('blast')
+        if b and i not in core:
+            queue.append(i)
+        return i in core
+
+    for _n in range(inc.get('max_hits', 3000)):
+        frm = 'all' if rng.random() < inc.get('flank', 0) else inc.get('from', 'all')
+        dx, dy = directions(frm, inc.get('spread', 45), rng)
         off = rng.uniform(-reach, reach)
         x, y = cx - dx * reach - dy * off, cy - dy * reach + dx * off
         hit = None
@@ -214,23 +260,39 @@ def hits_run(cat: Catalogue, parts: list, nbrs: list, cell_owner: dict, inc: dic
             y += dy * 0.4
         t += dt
         dealt += cur_dps * dt
+        kept += dt * (sum(c for c, on in zip(cur, share) if on) / max(1, sum(share)))
         if hit is None:
             continue
         p = cat.parts[parts[hit].pid]
-        hp[hit] -= dmg * cat.pen_mul(pen - p['armour']) * (p.get('resist') or {}).get(kind, 1)
-        if hp[hit] > 0:
-            continue
-        alive[hit] = False
-        for c in parts[hit].cells():
-            if owner.get(c) == hit:
-                del owner[c]
-        if hit in core:
+        queue: list = []
+        dead = hurt(hit, dmg * cat.pen_mul(pen - p['armour']) * (p.get('resist') or {}).get(kind, 1), queue)
+        lost_power = not alive[hit] and cat.role(parts[hit].pid) != 'none'
+        # (Blasts, and the blasts they set off)
+        while queue and not dead:
+            i = queue.pop(0)
+            b = cat.parts[parts[i].pid]['blast']
+            pc = parts[i]
+            bx, by = pc.x + pc.w / 2, pc.y + pc.h / 2
+            for j, q in enumerate(parts):
+                if not alive[j]:
+                    continue
+                d = blast_reach(q, bx, by)
+                if d < b['radius']:
+                    res = (cat.parts[q.pid].get('resist') or {}).get('explosive', 1)
+                    if hurt(j, b['damage'] * (1 - d / b['radius']) * res, queue):
+                        dead = True
+                        break
+                    if not alive[j] and cat.role(q.pid) != 'none':
+                        lost_power = True
+        if dead:
             break
-        if cat.role(parts[hit].pid) != 'none':
-            cur_dps, _th = output(cat, parts, power(cat, parts, alive, nbrs, False, cell_owner)['fed'])
+        if lost_power:
+            cur_dps, th = output(cat, parts, power(cat, parts, alive, nbrs, False, cell_owner)['fed'], blocked)
+            gen = sum((cat.parts[parts[i].pid].get('power') or {}).get('makes', 0) for i in sources if alive[i])
+            cur = [cur_dps / base_dps if base_dps else 0, th / thrust0 if thrust0 else 0, gen / gen0 if gen0 else 0]
             if half_at is None and cur_dps < base_dps * 0.5:
                 half_at = t
-    return {'alive_s': t, 'half_s': half_at if half_at is not None else t, 'dealt': dealt}
+    return {'alive_s': t, 'half_s': half_at if half_at is not None else t, 'dealt': dealt, 'kept': kept}
 
 
 def measure(cat: Catalogue, ship: Ship, scenario: dict, check: dict | None = None, seeds=(1, 2, 3)) -> dict:
@@ -244,8 +306,24 @@ def measure(cat: Catalogue, ship: Ship, scenario: dict, check: dict | None = Non
     alive = [True] * len(parts)
     sus = power(cat, parts, alive, nbrs, False, cell_owner)
     bur = power(cat, parts, alive, nbrs, True, cell_owner)
-    s_dps, s_thrust = output(cat, parts, sus['fed'])
-    b_dps, _b = output(cat, parts, bur['fed'])
+    # (Line of sight: guns forward, engines back, past the outline)
+    blocked, engines = set(), []
+    for i, p in enumerate(parts):
+        if cat.parts[p.pid].get('facing') != 'free':
+            continue
+        if cat.role(p.pid) == 'thruster' and (cat.parts[p.pid].get('thrust') or 0) > 0:
+            engines.append(i)
+            if not ship.sil.clear_below(p.cells()):
+                blocked.add(i)
+        elif cat.role(p.pid) == 'weapon' and not ship.sil.clear_above(p.cells()):
+            blocked.add(i)
+    s_dps, s_thrust = output(cat, parts, sus['fed'], blocked)
+    b_dps, _b = output(cat, parts, bur['fed'], blocked)
+    working = [i for i in engines if i not in blocked and bur['fed'].get(i, 0) >= 0.25]
+    # (Engine zones: steps of 3 rows up from the ship's last row, each worth a quarter less; thrust-weighted)
+    last = max(r for r, _c in ship.sil.cells)
+    zone_w = sum(cat.parts[parts[i].pid]['thrust'] for i in working)
+    zone = sum(cat.parts[parts[i].pid]['thrust'] * max(0.0, 1 - 0.25 * ((last - max(r for r, _c in parts[i].cells())) // 3)) for i in working) / zone_w if zone_w else 0.0
     mass = sum(cat.parts[p.pid]['mass'] for p in parts)
     cargo = sum(cat.parts[p.pid].get('cargo') or 0 for p in parts)
     cost = sum(cat.parts[p.pid]['cost'] or 0 for p in parts)
@@ -254,13 +332,14 @@ def measure(cat: Catalogue, ship: Ship, scenario: dict, check: dict | None = Non
     unpowered = [i for i, f in bur['fed'].items() if f < 0.25]
     idle = [i for i, f in bur['through'].items() if f <= 1e-6]
     inc = scenario.get('incoming', {})
-    runs = [hits_run(cat, parts, nbrs, cell_owner, inc, s, s_dps) for s in seeds] if inc else []
+    runs = [hits_run(cat, parts, nbrs, cell_owner, inc, s, s_dps, blocked) for s in seeds] if inc else []
     avg = lambda k: sum(r[k] for r in runs) / len(runs) if runs else 0.0
     return {
         'sustained_dps': s_dps, 'burst_dps': b_dps, 'thrust': s_thrust, 'thrust_to_mass': s_thrust / mass if mass else 0,
         'mass': mass, 'cargo': cargo, 'cost': cost, 'parts': len(parts),
-        'alive_s': avg('alive_s'), 'half_s': avg('half_s'), 'damage_before_down': avg('dealt'),
-        'unpowered': len(unpowered), 'idle': len(idle),
+        'alive_s': avg('alive_s'), 'half_s': avg('half_s'), 'damage_before_down': avg('dealt'), 'systems_kept': avg('kept'),
+        'unpowered': len(unpowered), 'idle': len(idle), 'blocked': len(blocked), 'engines_working': len(working),
+        'no_engines': 0 if working else 1, 'engine_zone': zone, 'blocked_ids': sorted(blocked),
         'fed': {i: f for i, f in sus['fed'].items()}, 'unpowered_ids': unpowered, 'idle_ids': idle,
         'points': (check or {}).get('points', sum(cat.parts[p.pid].get('points', 1) for p in parts)),
         'valid': (check or {}).get('valid', True), 'errors': (check or {}).get('errors', []),
@@ -271,15 +350,17 @@ METRICS = {
     'damage_before_down': 'damage dealt before the core goes',
     'alive_s': 'seconds until the core goes',
     'half_s': 'seconds until its guns are down to half',
+    'systems_kept': 'firepower, thrust and power kept, over the seconds it lasts',
     'sustained_dps': 'damage per second, reactors alone',
     'burst_dps': 'damage per second over a 10 s burst',
-    'thrust_to_mass': 'thrust for its mass',
+    'thrust_to_mass': 'thrust for its mass (cruising)',
+    'engine_zone': 'engines near the back (zones of 3 rows)',
     'cargo': 'cargo space',
 }
 
 
 # (What counts as 1 for a measure the starting ship has none of)
-ZERO_SCALE = {'cargo': 100.0, 'sustained_dps': 50.0, 'burst_dps': 50.0, 'damage_before_down': 1000.0, 'thrust_to_mass': 0.5}
+ZERO_SCALE = {'cargo': 1000.0, 'sustained_dps': 50.0, 'burst_dps': 50.0, 'damage_before_down': 1000.0, 'thrust_to_mass': 0.5}
 
 
 def fitness(scenario: dict, m: dict, base: dict) -> tuple[float, list]:
@@ -288,6 +369,13 @@ def fitness(scenario: dict, m: dict, base: dict) -> tuple[float, list]:
     turns down scores below any it accepts. Returns the score and its terms for the panel"""
     terms = []
     total = 0.0
+    # (Targets: a measure is worth its weight once it reaches the target, and no more: what keeps thrust in step
+    # with weapons instead of either running away)
+    for k, t in scenario.get('targets', {}).items():
+        if k in m and t.get('target'):
+            v = t.get('weight', 1) * min(1.0, m[k] / t['target'])
+            terms.append((f"{k} (target {t['target']})", t.get('weight', 1), m[k], v))
+            total += v
     for k, w in scenario.get('weights', {}).items():
         if not w or k not in m:
             continue

@@ -46,6 +46,8 @@ for (const fn of ctx.catalog.functions.values()) {
         id: model ? fn.id : `${fn.id}:${piece}:${material}`, fn: fn.id, name: fn.name, family: f.family ?? fn.id, model, category: fn.category,
         piece, w, h, full, material, grade: st.grade, mark: st.mark, unlock, points: partBuildPoints(ctx.catalog, { piece, material, fn: fn.id }),
         facing: partFacingRule(fn.id), oneWay: !!(fn as { oneWay?: boolean }).oneWay, mounting: (fn as { mounting?: unknown }).mounting ?? null,
+        // (What it does when destroyed: a model's own blast, else its function's (tuning partBlast), as bridge/damage.ts)
+        blast: (model ? (fn as { blast?: unknown }).blast : (ctx.tuning as { partBlast?: Record<string, unknown> }).partBlast?.[fn.id]) ?? null,
         hp: Math.round(st.hp * 10) / 10, armour: st.armour, resist: st.resist ?? {}, mass: Math.round(st.mass * 100) / 100, cost,
         carriesFlow: !!fn.carriesFlow, pool: f.pool ?? null, loss: f.loss ?? null,
         power: pw ? { role: pw.role, makes: pw.makes ?? 0, holds: pw.holds ?? 0, gives: pw.gives ?? 0, takes: pw.takes ?? 0, uses: pw.uses ?? 0, boostUses: pw.boostUses ?? 0, gun: pw.gun ?? null } : null,

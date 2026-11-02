@@ -4,8 +4,9 @@
 #   clear    a part back to plain hull, cell by cell
 #   regrade  hull, armour, cargo or the core to another material (Mk I-V)
 #   turn     a Diode to face another way
-# Any part the level has unlocked may be used (in the categories the scenario allows); a gun only where nothing of the
-# outline is in front of it, an engine only where nothing is behind it. Each child goes through the game's validator.
+# Any part the level has unlocked may be used (in the categories the scenario allows), anywhere: a gun with outline in
+# front of it or an engine with outline behind it is legal but does nothing, and the score punishes it (score.py).
+# Each child goes through the game's validator.
 # Each generation keeps the best few as they are and fills the rest from tournament picks, changed.
 import random
 
@@ -70,12 +71,8 @@ class Evolver:
         return s
 
     def allowed_at(self, s: Ship, q: dict, cells) -> bool:
-        """A gun needs nothing of the outline in front of it, an engine nothing behind it"""
-        if q.get('facing') != 'free':
-            return True
-        if self.cat.role(q['id']) == 'thruster':
-            return s.sil.clear_below(cells)
-        return s.sil.clear_above(cells)
+        """Anywhere: line of sight is the score's to punish, not a rule here"""
+        return True
 
     def facing_for(self, q: dict, s: Ship, cells) -> str | None:
         """A Diode faces a side with outline across it (its out edge must be joined)"""

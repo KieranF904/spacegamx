@@ -4,6 +4,8 @@
 # in front, engines with nothing behind), within the budget and the level's build points, and every ship goes through
 # the game's own validator. The best so far is drawn as it changes, with its score term by term against the start.
 # Parts lists the catalogue (the game's numbers); Scenarios edits scenarios.json; Notes keeps your feedback with the run.
+# Every 10 generations the best ship so far is saved (out/<run>/best.json and best.png) along with the score curve.
+#   --run "<scenario name>"   start evolving that scenario as soon as the window opens
 #   pythonw scripts/shipgen/evolver/app.py   or   npm run evolver
 import json
 import sys
@@ -444,6 +446,8 @@ class Window(QMainWindow):
         self.go.setEnabled(False)
         self.stop_btn.setEnabled(True)
         self.run_info = {'scenario': sc, 'silhouette': self.sil.name, 'started': time.strftime('%Y-%m-%d %H:%M:%S')}
+        self.run_dir = OUT / f"{time.strftime('%Y%m%d-%H%M%S')}-{''.join(ch if ch.isalnum() else '-' for ch in sc['name'].lower())[:30]}"
+        self.run_dir.mkdir(parents=True, exist_ok=True)
         ev = self.evolver
 
         def loop():
@@ -467,6 +471,17 @@ class Window(QMainWindow):
                             f"{m['cost']:.0f} of {sc['budget']} credits, {m['points']} of {sc['points']} build points, "
                             + ('valid in the game.' if m['valid'] else 'NOT valid in the game.'))
         self.report.setHtml(self.report_html(m, s, history))
+        if gen % 10 == 0:
+            self.autosave(gen)
+
+    def autosave(self, gen):
+        """The best so far, its picture and the score curve, in this run's folder"""
+        ship, s = self.best
+        d = ship.to_json()
+        d.update(run=self.run_info, generation=gen, score=s['fit'], history=self.evolver.history,
+                 terms=[list(t) for t in s['terms']], measures={k: v for k, v in s['m'].items() if not isinstance(v, (dict, list))})
+        (self.run_dir / 'best.json').write_text(json.dumps(d, indent=1), encoding='utf-8')
+        self.best_view.grab().save(str(self.run_dir / 'best.png'))
 
     def on_stopped(self, why):
         self.running = False
@@ -541,6 +556,13 @@ def main() -> int:
     app = QApplication(sys.argv)
     w = Window()
     w.show()
+    if '--run' in sys.argv:
+        name = sys.argv[sys.argv.index('--run') + 1] if len(sys.argv) > sys.argv.index('--run') + 1 else ''
+        i = w.scenario_box.findText(name)
+        if i >= 0:
+            w.scenario_box.setCurrentIndex(i)
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(800, w.start)
     code = app.exec()
     if w.validator:
         w.validator.close()
