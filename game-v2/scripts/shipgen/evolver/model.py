@@ -3,6 +3,10 @@
 # part on the centre line must sit across it evenly. Placements are whole parts: (part id, x, y, w, h, facing),
 # x = column, y = row (row 0 the nose); facing only matters for a Diode (the edge power leaves by).
 #
+# The outline is a target, not a wall: a ship may add cells a little beyond it (the scenario's shape margin) or leave
+# outline cells empty, and the score charges for each cell of difference (shape_off). Line of sight is past the
+# ship's own cells.
+#
 # What a ship may use is set by a level (a part's unlock level, a material's) and its build points (unlocks.json
 # complexity at that level), and its cost by a budget in credits.
 #
@@ -107,19 +111,31 @@ class Silhouette:
     def half(self) -> set:
         return {(r, c) for r, c in self.cells if c >= self.mid}
 
-    def clear_above(self, cells) -> bool:
-        """Nothing of the outline in front of these cells (towards the nose): a gun may fire from them"""
+    def clear_above(self, cells, occupied=None) -> bool:
+        """Nothing (of the ship, else of the outline) in front of these cells, towards the nose: a gun may fire"""
+        occupied = self.cells if occupied is None else occupied
         top = {}
         for r, c in cells:
             top[c] = min(r, top.get(c, r))
-        return all(not any((rr, c) in self.cells for rr in range(r)) for c, r in top.items())
+        return all(not any((rr, c) in occupied for rr in range(r)) for c, r in top.items())
 
-    def clear_below(self, cells) -> bool:
-        """Nothing of the outline behind these cells: an engine may push from them"""
+    def clear_below(self, cells, occupied=None) -> bool:
+        """Nothing (of the ship, else of the outline) behind these cells: an engine may push from them"""
+        occupied = self.cells if occupied is None else occupied
         bottom = {}
         for r, c in cells:
             bottom[c] = max(r, bottom.get(c, r))
-        return all(not any((rr, c) in self.cells for rr in range(r + 1, self.h)) for c, r in bottom.items())
+        return all(not any((rr, c) in occupied for rr in range(r + 1, self.h)) for c, r in bottom.items())
+
+    def allowed(self, margin: int) -> set:
+        """The outline grown by `margin` cells every way (diagonals too), kept on the grid"""
+        out = set(self.cells)
+        for r, c in self.cells:
+            for dr in range(-margin, margin + 1):
+                for dc in range(-margin, margin + 1):
+                    if 0 <= r + dr < self.h and 0 <= c + dc < self.w:
+                        out.add((r + dr, c + dc))
+        return out
 
     @staticmethod
     def load(path: Path) -> 'Silhouette':
@@ -163,14 +179,19 @@ class Ship:
                     o[c] = i
         return o
 
-    def fits(self, x: int, y: int, w: int, h: int) -> bool:
-        """Inside the outline's right half, and on the centre column only evenly across it (else it overlaps its own
-        mirror image)"""
+    def fits(self, x: int, y: int, w: int, h: int, allowed: set | None = None) -> bool:
+        """Inside the allowed area (the outline when none is given) on the right half, and on the centre column only
+        evenly across it (else it overlaps its own mirror image)"""
         if x <= self.sil.mid <= x + w - 1 and x + x + w - 1 != 2 * self.sil.mid:
             return False
         if x + w - 1 < self.sil.mid:
             return False
-        return all((y + dy, x + dx) in self.sil.cells for dy in range(h) for dx in range(w))
+        area = self.sil.cells if allowed is None else allowed
+        return all((y + dy, x + dx) in area for dy in range(h) for dx in range(w))
+
+    def occupied(self) -> set:
+        """Every cell the whole ship covers"""
+        return {c for p in self.full() for c in p.cells()}
 
     def key(self) -> tuple:
         return tuple(sorted((p.pid, p.x, p.y, p.w, p.facing or '') for p in self.half))

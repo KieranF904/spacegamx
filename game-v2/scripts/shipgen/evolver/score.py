@@ -16,8 +16,10 @@
 #   Damage before going down: the ship's damage per second, as it stands after each hit, added up over the time the
 #   hits took. A glass cannon dies fast; a well-armoured ship with starved guns barely shoots; one whose power lines
 #   are behind armour keeps firing.
-#   Line of sight: a gun with any of the outline in front of it (towards the nose), or an engine with any behind it,
+#   Line of sight: a gun with any of the ship in front of it (towards the nose), or an engine with any behind it,
 #   does nothing (it still draws its power) and is penalised (blocked).
+#   Shape: shape_off counts the cells where the ship and the outline differ (cells added beyond it, outline left
+#   empty). How exposed a part is is the hit runs' to judge, scenario by scenario.
 #   Engines: thrust for its mass (cruising, reactors alone) against the scenario's target; engine_zone rewards engines
 #   in the ship's last rows in steps of 3 (the bottom 3 rows count 1, the next 3 0.75, ...), so it isn't always the
 #   very last row; a ship with no working engine (in sight, and getting a quarter of its power) is penalised
@@ -306,22 +308,24 @@ def measure(cat: Catalogue, ship: Ship, scenario: dict, check: dict | None = Non
     alive = [True] * len(parts)
     sus = power(cat, parts, alive, nbrs, False, cell_owner)
     bur = power(cat, parts, alive, nbrs, True, cell_owner)
-    # (Line of sight: guns forward, engines back, past the outline)
+    # (Line of sight: guns forward, engines back, past the ship's own cells)
+    occupied = set(cell_owner)
     blocked, engines = set(), []
     for i, p in enumerate(parts):
         if cat.parts[p.pid].get('facing') != 'free':
             continue
         if cat.role(p.pid) == 'thruster' and (cat.parts[p.pid].get('thrust') or 0) > 0:
             engines.append(i)
-            if not ship.sil.clear_below(p.cells()):
+            if not ship.sil.clear_below(p.cells(), occupied):
                 blocked.add(i)
-        elif cat.role(p.pid) == 'weapon' and not ship.sil.clear_above(p.cells()):
+        elif cat.role(p.pid) == 'weapon' and not ship.sil.clear_above(p.cells(), occupied):
             blocked.add(i)
+    shape_off = len(occupied ^ ship.sil.cells)
     s_dps, s_thrust = output(cat, parts, sus['fed'], blocked)
     b_dps, _b = output(cat, parts, bur['fed'], blocked)
     working = [i for i in engines if i not in blocked and bur['fed'].get(i, 0) >= 0.25]
     # (Engine zones: steps of 3 rows up from the ship's last row, each worth a quarter less; thrust-weighted)
-    last = max(r for r, _c in ship.sil.cells)
+    last = max(r for r, _c in occupied)
     zone_w = sum(cat.parts[parts[i].pid]['thrust'] for i in working)
     zone = sum(cat.parts[parts[i].pid]['thrust'] * max(0.0, 1 - 0.25 * ((last - max(r for r, _c in parts[i].cells())) // 3)) for i in working) / zone_w if zone_w else 0.0
     mass = sum(cat.parts[p.pid]['mass'] for p in parts)
@@ -339,7 +343,7 @@ def measure(cat: Catalogue, ship: Ship, scenario: dict, check: dict | None = Non
         'mass': mass, 'cargo': cargo, 'cost': cost, 'parts': len(parts),
         'alive_s': avg('alive_s'), 'half_s': avg('half_s'), 'damage_before_down': avg('dealt'), 'systems_kept': avg('kept'),
         'unpowered': len(unpowered), 'idle': len(idle), 'blocked': len(blocked), 'engines_working': len(working),
-        'no_engines': 0 if working else 1, 'engine_zone': zone, 'blocked_ids': sorted(blocked),
+        'no_engines': 0 if working else 1, 'engine_zone': zone, 'blocked_ids': sorted(blocked), 'shape_off': shape_off,
         'fed': {i: f for i, f in sus['fed'].items()}, 'unpowered_ids': unpowered, 'idle_ids': idle,
         'points': (check or {}).get('points', sum(cat.parts[p.pid].get('points', 1) for p in parts)),
         'valid': (check or {}).get('valid', True), 'errors': (check or {}).get('errors', []),
@@ -365,15 +369,22 @@ ZERO_SCALE = {'cargo': 1000.0, 'sustained_dps': 50.0, 'burst_dps': 50.0, 'damage
 
 def fitness(scenario: dict, m: dict, base: dict) -> tuple[float, list]:
     """The scenario's weighted sum, each measure against the starting ship's (so 1 = as good as the start), less the
-    penalties. Over the budget (credits) or the level's build points costs heavily, and a ship the game's validator
-    turns down scores below any it accepts. Returns the score and its terms for the panel"""
+    penalties. A target marked gate scales everything good by 0.3 + 0.7 × how far it is met (no engines: 30% of the
+    score), so it can't be bought out by more of something else. Over the budget (credits) or the level's build points
+    costs heavily. A ship the game's validator turns down pays per error (penalty 'invalid'), so evolution can pass
+    through invalid ships on the way to valid ones. Returns the score and its terms for the panel"""
     terms = []
     total = 0.0
     # (Targets: a measure is worth its weight once it reaches the target, and no more: what keeps thrust in step
     # with weapons instead of either running away)
+    gates = []
     for k, t in scenario.get('targets', {}).items():
         if k in m and t.get('target'):
-            v = t.get('weight', 1) * min(1.0, m[k] / t['target'])
+            share = min(1.0, m[k] / t['target'])
+            if t.get('gate'):
+                gates.append((k, t['target'], m[k], share))
+                continue
+            v = t.get('weight', 1) * share
             terms.append((f"{k} (target {t['target']})", t.get('weight', 1), m[k], v))
             total += v
     for k, w in scenario.get('weights', {}).items():
@@ -384,7 +395,14 @@ def fitness(scenario: dict, m: dict, base: dict) -> tuple[float, list]:
         v = w * m[k] / ref
         terms.append((k, w, m[k], v))
         total += v
+    for k, target, have, share in gates:
+        f = 0.3 + 0.7 * share
+        v = total * f - total
+        terms.append((f"{k} gate (target {target}): × {f:.2f}", 0, have, v))
+        total += v
     for k, w in scenario.get('penalties', {}).items():
+        if k == 'invalid':
+            continue
         if w and k in m:
             v = -w * m[k]
             terms.append((k, -w, m[k], v))
@@ -395,7 +413,8 @@ def fitness(scenario: dict, m: dict, base: dict) -> tuple[float, list]:
             terms.append((name, 0, have, v))
             total += v
     if not m.get('valid', True):
-        v = -5 - 0.2 * len(m.get('errors', []))
-        terms.append(('not valid in the game', 0, len(m.get('errors', [])), v))
-        total += v
+        n = len(m.get('errors', [])) or 1
+        w = scenario.get('penalties', {}).get('invalid', 0.5)
+        terms.append(('not valid in the game (per error)', -w, n, -w * n))
+        total -= w * n
     return total, terms

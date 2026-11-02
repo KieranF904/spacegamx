@@ -4,16 +4,19 @@
 #   clear    a part back to plain hull, cell by cell
 #   regrade  hull, armour, cargo or the core to another material (Mk I-V)
 #   turn     a Diode to face another way
+#   grow     a 1x1 part on an empty cell beside the ship, up to the scenario's shape margin beyond the outline
+#   shrink   a 1x1 part on the ship's edge taken away (the outline is a target: the score charges for differing)
 # Any part the level has unlocked may be used (in the categories the scenario allows), anywhere: a gun with outline in
 # front of it or an engine with outline behind it is legal but does nothing, and the score punishes it (score.py).
-# Each child goes through the game's validator.
+# Each child goes through the game's validator; an invalid one only pays per error, so a line of descent can pass
+# through invalid ships and come out valid. The best valid ship so far is kept apart (best_valid).
 # Each generation keeps the best few as they are and fills the rest from tournament picks, changed.
 import random
 
 from model import SIDES, Catalogue, Place, Ship, Validator
 from score import fitness, measure
 
-CHANGES = ('swap', 'swap', 'place', 'place', 'clear', 'regrade', 'turn')
+CHANGES = ('swap', 'swap', 'place', 'place', 'clear', 'regrade', 'turn', 'grow', 'shrink')
 
 
 class Evolver:
@@ -28,11 +31,16 @@ class Evolver:
         self.cores = [p for p in cat.of(fn='core', level=level)]
         self.hull = min(cat.of(fn='hull', size=(1, 1), level=level), key=lambda p: p['cost'] or 0)['id']
         self.level = level
+        # (How far beyond the outline it may build: 0 keeps to the outline exactly)
+        self.margin = int((scenario.get('shape') or {}).get('margin', 0))
+        self.area = start.sil.allowed(self.margin)
+        self.edge_parts = [p for p in self.choices if (p['w'], p['h']) == (1, 1) and p['category'] in ('structure', 'shields', 'power')]
         self.cache: dict = {}
         self.base = self.measure(start)
         self.gen = 0
         self.pop: list[Ship] = [start] + [self.child(start) for _ in range(population - 1)]
         self.history: list[tuple[float, float]] = []
+        self.best_valid: tuple | None = None
 
     # ---- scoring
     def measure(self, s: Ship) -> dict:
@@ -47,9 +55,14 @@ class Evolver:
         return self.cache[k]
 
     def step(self) -> tuple[Ship, dict]:
-        """One generation. Returns the best ship and its score"""
+        """One generation. Returns the best valid ship so far and its score (the best of all while none is valid)"""
         scored = sorted(((self.score(s)['fit'], i, s) for i, s in enumerate(self.pop)), key=lambda t: -t[0])
         best = scored[0]
+        for f, _i, s in scored:
+            if self.score(s)['m']['valid']:
+                if self.best_valid is None or f > self.best_valid[0]:
+                    self.best_valid = (f, s.copy())
+                break
         self.history.append((best[0], sum(t[0] for t in scored) / len(scored)))
         nxt = [t[2] for t in scored[:self.elite]]
         while len(nxt) < self.population:
@@ -59,6 +72,8 @@ class Evolver:
         self.gen += 1
         if len(self.cache) > 20000:
             self.cache.clear()
+        if self.best_valid:
+            return self.best_valid[1], self.score(self.best_valid[1])
         return best[2], self.score(best[2])
 
     # ---- changes
@@ -66,9 +81,39 @@ class Evolver:
         s = parent.copy()
         for _ in range(self.rng.choice((1, 1, 2, 3))):
             for _try in range(12):
+                before = [Place(p.pid, p.x, p.y, p.w, p.h, p.facing) for p in s.half]
                 if getattr(self, self.rng.choice(CHANGES))(s):
-                    break
+                    if self.edges_ok(s):
+                        break
+                    s.half = before
         return s
+
+    def edges_ok(self, s: Ship) -> bool:
+        """The facing edges the game insists on (blueprint.ts partFacingRule, mounting): nothing across a gun's front
+        or an engine's back, something behind a gun that mounts by its back, something across a Diode's out edge.
+        Checked here so the validator isn't asked about ships it can only turn down"""
+        occ = s.occupied()
+        for p in s.full():
+            d = self.cat.parts[p.pid]
+            rule = d.get('facing')
+            if not rule:
+                continue
+            cols = range(p.x, p.x + p.w)
+            top, bottom = p.y - 1, p.y + p.h
+            if rule == 'free':
+                if self.cat.role(p.pid) == 'thruster':
+                    if any((bottom, c) in occ for c in cols):
+                        return False
+                else:
+                    if any((top, c) in occ for c in cols):
+                        return False
+                    if (d.get('mounting') or {}).get('attach') == 'back' and not any((bottom, c) in occ for c in cols):
+                        return False
+            elif rule == 'joined' and p.facing:
+                dr, dc = SIDES[p.facing]
+                if not all((r + dr, c + dc) in occ for r, c in p.cells() if (r + dr, c + dc) not in set(p.cells())):
+                    return False
+        return True
 
     def allowed_at(self, s: Ship, q: dict, cells) -> bool:
         """Anywhere: line of sight is the score's to punish, not a rule here"""
@@ -98,10 +143,10 @@ class Evolver:
     def place(self, s: Ship) -> bool:
         q = self.rng.choice(self.choices)
         w, h = (q['w'], q['h']) if self.rng.random() < 0.5 else (q['h'], q['w'])
-        r, c = self.rng.choice(list(s.sil.half()))
+        r, c = self.rng.choice([cell for cell in self.area if cell[1] >= s.sil.mid])
         # (Across the centre line it must sit evenly: put an odd-wide part there most times it lands on it)
         x = c - (w - 1) // 2 if (w % 2 and c == s.sil.mid and self.rng.random() < 0.7) else c
-        if not s.fits(x, r, w, h):
+        if not s.fits(x, r, w, h, self.area):
             return False
         foot = Place(q['id'], x, r, w, h)
         cells = set(foot.cells())
@@ -109,8 +154,9 @@ class Evolver:
         if not self.allowed_at(s, q, cells):
             return False
         owner = s.owner()
-        under = {owner.get(cell) for cell in cells if cell[1] >= s.sil.mid}
-        if None in under:
+        under = {owner.get(cell) for cell in cells if cell[1] >= s.sil.mid} - {None}
+        # (Empty cells may be built on only where the outline grows: within the margin)
+        if self.margin == 0 and any(owner.get(cell) is None for cell in cells if cell[1] >= s.sil.mid):
             return False
         for i in under:
             o = s.half[i]
@@ -139,6 +185,30 @@ class Evolver:
         if not opts:
             return False
         s.half[i] = Place(self.rng.choice(opts)['id'], p.x, p.y, p.w, p.h)
+        return True
+
+    def grow(self, s: Ship) -> bool:
+        if not self.margin or not self.edge_parts:
+            return False
+        owner = s.owner()
+        spots = [(r, c) for (r, c) in self.area if c >= s.sil.mid and (r, c) not in owner
+                 and any(n in owner for n in ((r + 1, c), (r - 1, c), (r, c + 1), (r, c - 1)))]
+        if not spots:
+            return False
+        r, c = self.rng.choice(spots)
+        q = self.rng.choice(self.edge_parts)
+        p = Place(q['id'], c, r, 1, 1)
+        p.facing = self.facing_for(q, s, p.cells())
+        s.half.append(p)
+        return True
+
+    def shrink(self, s: Ship) -> bool:
+        owner = s.owner()
+        idx = [i for i, p in enumerate(s.half) if (p.w, p.h) == (1, 1) and self.cat.parts[p.pid]['fn'] != 'core'
+               and any(n not in owner and n[1] >= s.sil.mid for n in ((p.y + 1, p.x), (p.y - 1, p.x), (p.y, p.x + 1), (p.y, p.x - 1)))]
+        if not idx:
+            return False
+        s.half.pop(self.rng.choice(idx))
         return True
 
     def turn(self, s: Ship) -> bool:
