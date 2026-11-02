@@ -1,7 +1,9 @@
-# The evolver's window: open a silhouette (Save... in the silhouette designer: turret markers are turrets, engine-green
-# cells are engines), pick a scenario, and evolve. The cheapest working ship is the start; the best so far is drawn
-# as it changes, with its score term by term against the start. Parts lists the catalogue (the game's numbers);
-# Scenarios edits scenarios.json; Notes keeps your feedback with the run it was about.
+# The evolver's window: open a silhouette (Save... in the silhouette designer: turret markers and engine-green cells
+# say where the start's guns and engines go), pick a scenario, a level and a budget, and evolve. The cheapest working
+# ship is the start; from there any part the level has unlocked may go anywhere in the outline (guns only with nothing
+# in front, engines with nothing behind), within the budget and the level's build points, and every ship goes through
+# the game's own validator. The best so far is drawn as it changes, with its score term by term against the start.
+# Parts lists the catalogue (the game's numbers); Scenarios edits scenarios.json; Notes keeps your feedback with the run.
 #   pythonw scripts/shipgen/evolver/app.py   or   npm run evolver
 import json
 import sys
@@ -18,7 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from evolve import Evolver
-from model import HERE, Catalogue, Ship, Silhouette, cheapest_build
+from model import HERE, SIDES, Catalogue, Ship, Silhouette, Validator, cheapest_build
 from score import METRICS, measure
 
 OUT = HERE / 'out'
@@ -97,12 +99,18 @@ class ShipView(QWidget):
             rect = QRectF(ox + p.x * k + 1, oy + p.y * k + 1, p.w * k - 2, p.h * k - 2)
             col = QColor(colour_of(cat, p.pid))
             g.setBrush(col)
-            g.setPen(QPen(QColor('#ffffff') if p.fixed else col.darker(160), 2 if p.fixed else 1))
+            g.setPen(QPen(col.darker(160), 1))
             g.drawRoundedRect(rect, 2, 2)
             role = cat.role(p.pid)
             if role == 'weapon':
                 g.setPen(QPen(QColor('#ffffff'), max(1.5, k * 0.12)))
                 g.drawLine(QPointF(rect.center().x(), rect.center().y()), QPointF(rect.center().x(), rect.top() - k * 0.25))
+            if p.facing and role == 'diode':
+                # (A Diode: an arrow to its out edge)
+                dr, dc = SIDES[p.facing]
+                cx, cy = rect.center().x(), rect.center().y()
+                g.setPen(QPen(QColor('#0b0e12'), max(1.5, k * 0.12)))
+                g.drawLine(QPointF(cx - dc * k * 0.3, cy - dr * k * 0.3), QPointF(cx + dc * k * 0.35, cy + dr * k * 0.35))
             if not cat.parts[p.pid]['model'] and p.pid.split(':')[-1] != 'alloy' and k >= 12:
                 g.setPen(QColor('#0b0e12'))
                 g.setFont(QFont('Segoe UI', max(6, int(k * 0.32))))
@@ -124,7 +132,7 @@ class ShipView(QWidget):
             if (r, c) in p.cells():
                 d = self.win.cat.parts[p.pid]
                 fed = self.m.get('fed', {}).get(i)
-                lines = [f"<b>{d['name']}</b> {d['mark']} {d['w']}x{d['h']}" + (' (fixed)' if p.fixed else ''),
+                lines = [f"<b>{d['name']}</b> {d['mark']} {d['w']}x{d['h']}",
                          f"HP {d['hp']:.0f}, armour {d['armour']}, mass {d['mass']}, {d['cost']} credits"]
                 pw = d.get('power') or {}
                 if pw.get('makes'):
@@ -211,26 +219,18 @@ class Window(QMainWindow):
         self.scenario_box = QComboBox()
         self.scenario_box.currentIndexChanged.connect(self.scenario_changed)
         bar.addWidget(self.scenario_box)
-        bar.addWidget(QLabel('Extra budget'))
+        bar.addWidget(QLabel('Level'))
+        self.level = QSpinBox()
+        self.level.setRange(0, 99)
+        self.level.setToolTip('Which parts and materials are unlocked, and the build points (data/unlocks.json)')
+        self.level.editingFinished.connect(self.rebuild)
+        bar.addWidget(self.level)
+        bar.addWidget(QLabel('Budget'))
         self.budget = QSpinBox()
-        self.budget.setRange(0, 100000)
-        self.budget.setSingleStep(250)
-        self.budget.setToolTip('Credits it may spend beyond the cheapest working ship')
+        self.budget.setRange(0, 1000000)
+        self.budget.setSingleStep(500)
+        self.budget.setToolTip('Credits for the whole ship (part recipe values)')
         bar.addWidget(self.budget)
-        bar.addWidget(QLabel('Turrets'))
-        self.turret_box = QComboBox()
-        bar.addWidget(self.turret_box)
-        bar.addWidget(QLabel('Engines'))
-        self.engine_box = QComboBox()
-        bar.addWidget(self.engine_box)
-        for p in sorted(self.cat.of(category='weapons', size=(1, 1)), key=lambda p: p['cost'] or 0):
-            if p['dps']:
-                self.turret_box.addItem(f"{p['name']} ({p['dps']:.0f}/s)", p['id'])
-        for p in sorted(self.cat.of(role='thruster', size=(1, 1)), key=lambda p: p['cost'] or 0):
-            if p['thrust']:
-                self.engine_box.addItem(f"{p['name']} ({p['thrust']:.1f})", p['id'])
-        self.turret_box.currentIndexChanged.connect(self.rebuild)
-        self.engine_box.currentIndexChanged.connect(self.rebuild)
         bar.addWidget(QLabel('Population'))
         self.pop = QSpinBox()
         self.pop.setRange(6, 200)
@@ -256,7 +256,7 @@ class Window(QMainWindow):
             box.addWidget(v, 1)
             views.addLayout(box, 1)
         ll.addLayout(views, 1)
-        ll.addWidget(QLabel('White border: fixed (turrets, engines). Red cross: under a quarter of its power. Number: Mk of hull, armour, cargo, core above Mk I. Hover a part for its numbers.', objectName='small'))
+        ll.addWidget(QLabel("Red cross: under a quarter of its power. Arrow: a Diode's out edge. Number: Mk of hull, armour, cargo, core above Mk I. Hover a part for its numbers.", objectName='small'))
         split.addWidget(left)
         right = QTabWidget()
         run = QWidget()
@@ -286,6 +286,11 @@ class Window(QMainWindow):
         lay.addWidget(split, 1)
         self.setCentralWidget(root)
         self.resize(1400, 860)
+        try:
+            self.validator = Validator()
+        except Exception as e:
+            self.validator = None
+            self.status.setText(f"The game's validator did not start ({e}): ships are scored unchecked.")
         self.load_scenarios()
         if SAMPLE.exists():
             self.load_silhouette(SAMPLE)
@@ -388,11 +393,14 @@ class Window(QMainWindow):
     def scenario(self) -> dict:
         s = dict(self.scenarios[max(0, self.scenario_box.currentIndex())])
         s['budget'] = self.budget.value()
+        s['level'] = self.level.value()
+        s['points'] = self.cat.points_limit(self.level.value())
         return s
 
     def scenario_changed(self, *_a):
         s = self.scenarios[max(0, self.scenario_box.currentIndex())]
         self.budget.setValue(int(s.get('budget') or 0))
+        self.level.setValue(int(s.get('level', 20)))
         self.scenario_box.setToolTip(s.get('about', ''))
         self.rebuild()
 
@@ -412,16 +420,18 @@ class Window(QMainWindow):
         self.rebuild()
 
     def rebuild(self, *_a):
-        if not self.sil or self.running or not self.turret_box.count():
+        if not self.sil or self.running:
             return
-        self.start_ship, notes = cheapest_build(self.sil, self.cat, self.turret_box.currentData(), self.engine_box.currentData())
-        m = measure(self.cat, self.start_ship, self.scenario())
+        sc = self.scenario()
+        self.start_ship, notes = cheapest_build(self.sil, self.cat, sc['level'])
+        m = measure(self.cat, self.start_ship, sc, self.validator.check(self.start_ship, self.cat) if self.validator else None)
         self.start_m = m
         self.start_view.show_ship(self.start_ship, m)
         self.best_view.show_ship(None, {})
         self.best = None
         self.chart.set([])
-        self.status.setText(('\n'.join(notes) + '\n' if notes else '') + f"Start: {m['cost']:.0f} credits, budget up to {m['cost'] + self.budget.value():.0f}.")
+        self.status.setText(('\n'.join(notes) + '\n' if notes else '') + f"Start: {m['cost']:.0f} of {sc['budget']} credits, {m['points']} of {sc['points']} build points"
+                            + ('.' if m['valid'] else f", and the game turns it down: {'; '.join(e['message'] for e in m['errors'][:4])}"))
         self.report.setHtml(self.report_html(m, None, []))
 
     # ---- running
@@ -429,12 +439,11 @@ class Window(QMainWindow):
         if self.running or not self.start_ship:
             return
         sc = self.scenario()
-        self.evolver = Evolver(self.cat, self.start_ship, sc, population=self.pop.value(), seed=int(time.time()) % 100000)
+        self.evolver = Evolver(self.cat, self.start_ship, sc, self.validator, population=self.pop.value(), seed=int(time.time()) % 100000)
         self.running, self.stop_flag = True, False
         self.go.setEnabled(False)
         self.stop_btn.setEnabled(True)
-        self.run_info = {'scenario': sc, 'turret': self.turret_box.currentData(), 'engine': self.engine_box.currentData(),
-                         'silhouette': self.sil.name, 'started': time.strftime('%Y-%m-%d %H:%M:%S')}
+        self.run_info = {'scenario': sc, 'silhouette': self.sil.name, 'started': time.strftime('%Y-%m-%d %H:%M:%S')}
         ev = self.evolver
 
         def loop():
@@ -453,8 +462,10 @@ class Window(QMainWindow):
         self.best_view.show_ship(best, s['m'])
         self.chart.set(history)
         m = s['m']
+        sc = self.evolver.sc
         self.status.setText(f"Generation {gen}: score {s['fit']:.3f} (the start scores {self.evolver.score(self.evolver.start)['fit']:.3f}), "
-                            f"{m['cost']:.0f} of {self.evolver.base['cost'] + self.budget.value():.0f} credits.")
+                            f"{m['cost']:.0f} of {sc['budget']} credits, {m['points']} of {sc['points']} build points, "
+                            + ('valid in the game.' if m['valid'] else 'NOT valid in the game.'))
         self.report.setHtml(self.report_html(m, s, history))
 
     def on_stopped(self, why):
@@ -479,7 +490,9 @@ class Window(QMainWindow):
         return (terms + '<h4>Measures</h4><table cellpadding=3><tr><th align=left></th><th>this ship</th><th>start</th></tr>' + ''.join(rows)
                 + f"<tr><td>cost (credits)</td><td align=right>{m['cost']:.0f}</td><td align=right>{base['cost']:.0f}</td></tr>"
                 + f"<tr><td>mass</td><td align=right>{m['mass']:.0f}</td><td align=right>{base['mass']:.0f}</td></tr>"
+                + f"<tr><td>build points</td><td align=right>{m['points']}</td><td align=right>{base['points']}</td></tr>"
                 + f"<tr><td>parts doing nothing (unpowered / idle)</td><td align=right>{m['unpowered']} / {m['idle']}</td><td align=right>{base['unpowered']} / {base['idle']}</td></tr></table>"
+                + ("<h4>The game's validator</h4><p>" + ('Valid.' if m['valid'] else '<br>'.join(e['message'] for e in m['errors'][:10])) + '</p>')
                 + f'<h4>Parts</h4><p>{parts}</p>')
 
     # ---- keeping things
@@ -498,7 +511,7 @@ class Window(QMainWindow):
     def adopt_best(self):
         if self.best and not self.running:
             self.start_ship = self.best[0].copy()
-            self.start_m = measure(self.cat, self.start_ship, self.scenario())
+            self.start_m = measure(self.cat, self.start_ship, self.scenario(), self.validator.check(self.start_ship, self.cat) if self.validator else None)
             self.start_view.show_ship(self.start_ship, self.start_m)
             self.status.setText('The best ship is the new start.')
 
@@ -528,7 +541,10 @@ def main() -> int:
     app = QApplication(sys.argv)
     w = Window()
     w.show()
-    return app.exec()
+    code = app.exec()
+    if w.validator:
+        w.validator.close()
+    return code
 
 
 if __name__ == '__main__':

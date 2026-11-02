@@ -1,5 +1,6 @@
 {
- "made": "2026-11-02T04:55:54.672Z",
+ "made": "2026-11-02T05:14:30.225Z",
+ "catalogVersion": 1,
  "materials": [
   "alloy",
   "steel",
@@ -14,6 +15,378 @@
   "-3": 0.1,
   "-2": 0.25,
   "-1": 0.55
+ },
+ "complexity": {
+  "base": 60,
+  "label": "Build points",
+  "levels": {
+   "5": 15,
+   "8": 15,
+   "12": 15,
+   "16": 15,
+   "20": 15,
+   "24": 20,
+   "28": 20,
+   "34": 20,
+   "40": 20,
+   "46": 30,
+   "54": 30,
+   "60": 30,
+   "66": 30,
+   "72": 40,
+   "80": 40,
+   "90": 40
+  }
+ },
+ "pieces": {
+  "sq": [
+   [
+    [
+     0,
+     0
+    ]
+   ],
+   [
+    [
+     0,
+     0
+    ]
+   ],
+   [
+    [
+     0,
+     0
+    ]
+   ],
+   [
+    [
+     0,
+     0
+    ]
+   ]
+  ],
+  "rect2": [
+   [
+    [
+     0,
+     0
+    ],
+    [
+     1,
+     0
+    ]
+   ],
+   [
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     1
+    ]
+   ],
+   [
+    [
+     0,
+     0
+    ],
+    [
+     -1,
+     0
+    ]
+   ],
+   [
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     -1
+    ]
+   ]
+  ],
+  "block2": [
+   [
+    [
+     0,
+     0
+    ],
+    [
+     1,
+     0
+    ],
+    [
+     0,
+     1
+    ],
+    [
+     1,
+     1
+    ]
+   ],
+   [
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     1
+    ],
+    [
+     -1,
+     0
+    ],
+    [
+     -1,
+     1
+    ]
+   ],
+   [
+    [
+     0,
+     0
+    ],
+    [
+     -1,
+     0
+    ],
+    [
+     0,
+     -1
+    ],
+    [
+     -1,
+     -1
+    ]
+   ],
+   [
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     -1
+    ],
+    [
+     1,
+     0
+    ],
+    [
+     1,
+     -1
+    ]
+   ]
+  ],
+  "block3": [
+   [
+    [
+     0,
+     0
+    ],
+    [
+     1,
+     0
+    ],
+    [
+     2,
+     0
+    ],
+    [
+     0,
+     1
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     2,
+     1
+    ],
+    [
+     0,
+     2
+    ],
+    [
+     1,
+     2
+    ],
+    [
+     2,
+     2
+    ]
+   ],
+   [
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     1
+    ],
+    [
+     0,
+     2
+    ],
+    [
+     -1,
+     0
+    ],
+    [
+     -1,
+     1
+    ],
+    [
+     -1,
+     2
+    ],
+    [
+     -2,
+     0
+    ],
+    [
+     -2,
+     1
+    ],
+    [
+     -2,
+     2
+    ]
+   ],
+   [
+    [
+     0,
+     0
+    ],
+    [
+     -1,
+     0
+    ],
+    [
+     -2,
+     0
+    ],
+    [
+     0,
+     -1
+    ],
+    [
+     -1,
+     -1
+    ],
+    [
+     -2,
+     -1
+    ],
+    [
+     0,
+     -2
+    ],
+    [
+     -1,
+     -2
+    ],
+    [
+     -2,
+     -2
+    ]
+   ],
+   [
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     -1
+    ],
+    [
+     0,
+     -2
+    ],
+    [
+     1,
+     0
+    ],
+    [
+     1,
+     -1
+    ],
+    [
+     1,
+     -2
+    ],
+    [
+     2,
+     0
+    ],
+    [
+     2,
+     -1
+    ],
+    [
+     2,
+     -2
+    ]
+   ]
+  ],
+  "round": [
+   [
+    [
+     0,
+     0
+    ]
+   ],
+   [
+    [
+     0,
+     0
+    ]
+   ],
+   [
+    [
+     0,
+     0
+    ]
+   ],
+   [
+    [
+     0,
+     0
+    ]
+   ]
+  ],
+  "tri": [
+   [
+    [
+     0,
+     0
+    ]
+   ],
+   [
+    [
+     0,
+     0
+    ]
+   ],
+   [
+    [
+     0,
+     0
+    ]
+   ],
+   [
+    [
+     0,
+     0
+    ]
+   ]
+  ]
  },
  "skipped": [
   "generator (legacy or not a player part)",
@@ -82,6 +455,11 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 0,
+   "points": 1,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 150,
    "armour": 1,
    "resist": {},
@@ -124,6 +502,11 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 5,
+   "points": 1.6,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 188,
    "armour": 2,
    "resist": {
@@ -171,6 +554,11 @@
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 12,
+   "points": 2.5,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 224,
    "armour": 3,
    "resist": {
@@ -217,6 +605,11 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 22,
+   "points": 3.8,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 262,
    "armour": 4,
    "resist": {
@@ -264,6 +657,11 @@
    "material": "neutronium",
    "grade": 5,
    "mark": "Mk V",
+   "unlock": 32,
+   "points": 5.5,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 300,
    "armour": 5,
    "resist": {
@@ -311,6 +709,11 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 0,
+   "points": 2,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 300,
    "armour": 1,
    "resist": {},
@@ -353,6 +756,11 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 5,
+   "points": 3.2,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 376,
    "armour": 2,
    "resist": {
@@ -400,6 +808,11 @@
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 12,
+   "points": 5,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 448,
    "armour": 3,
    "resist": {
@@ -446,6 +859,11 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 22,
+   "points": 7.6,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 524,
    "armour": 4,
    "resist": {
@@ -493,6 +911,11 @@
    "material": "neutronium",
    "grade": 5,
    "mark": "Mk V",
+   "unlock": 32,
+   "points": 11,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 600,
    "armour": 5,
    "resist": {
@@ -540,6 +963,11 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 0,
+   "points": 4,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 600,
    "armour": 1,
    "resist": {},
@@ -582,6 +1010,11 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 5,
+   "points": 6.4,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 752,
    "armour": 2,
    "resist": {
@@ -629,6 +1062,11 @@
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 12,
+   "points": 10,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 896,
    "armour": 3,
    "resist": {
@@ -675,6 +1113,11 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 22,
+   "points": 15.2,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 1048,
    "armour": 4,
    "resist": {
@@ -722,6 +1165,11 @@
    "material": "neutronium",
    "grade": 5,
    "mark": "Mk V",
+   "unlock": 32,
+   "points": 22,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 1200,
    "armour": 5,
    "resist": {
@@ -769,6 +1217,11 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 0,
+   "points": 9,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 1350,
    "armour": 1,
    "resist": {},
@@ -811,6 +1264,11 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 5,
+   "points": 14.4,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 1692,
    "armour": 2,
    "resist": {
@@ -858,6 +1316,11 @@
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 12,
+   "points": 22.5,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 2016,
    "armour": 3,
    "resist": {
@@ -904,6 +1367,11 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 22,
+   "points": 34.199999999999996,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 2358,
    "armour": 4,
    "resist": {
@@ -951,6 +1419,11 @@
    "material": "neutronium",
    "grade": 5,
    "mark": "Mk V",
+   "unlock": 32,
+   "points": 49.5,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 2700,
    "armour": 5,
    "resist": {
@@ -998,6 +1471,11 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 0,
+   "points": 1,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 75,
    "armour": 1,
    "resist": {},
@@ -1040,6 +1518,11 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 5,
+   "points": 1.6,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 94,
    "armour": 2,
    "resist": {
@@ -1087,6 +1570,11 @@
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 12,
+   "points": 2.5,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 112,
    "armour": 3,
    "resist": {
@@ -1133,6 +1621,11 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 22,
+   "points": 3.8,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 131,
    "armour": 4,
    "resist": {
@@ -1180,6 +1673,11 @@
    "material": "neutronium",
    "grade": 5,
    "mark": "Mk V",
+   "unlock": 32,
+   "points": 5.5,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 150,
    "armour": 5,
    "resist": {
@@ -1227,6 +1725,11 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 0,
+   "points": 2,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 150,
    "armour": 1,
    "resist": {},
@@ -1269,6 +1772,11 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 5,
+   "points": 3.2,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 188,
    "armour": 2,
    "resist": {
@@ -1316,6 +1824,11 @@
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 12,
+   "points": 5,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 224,
    "armour": 3,
    "resist": {
@@ -1362,6 +1875,11 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 22,
+   "points": 7.6,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 262,
    "armour": 4,
    "resist": {
@@ -1409,6 +1927,11 @@
    "material": "neutronium",
    "grade": 5,
    "mark": "Mk V",
+   "unlock": 32,
+   "points": 11,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 300,
    "armour": 5,
    "resist": {
@@ -1456,6 +1979,11 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 0,
+   "points": 4,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 300,
    "armour": 1,
    "resist": {},
@@ -1498,6 +2026,11 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 5,
+   "points": 6.4,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 376,
    "armour": 2,
    "resist": {
@@ -1545,6 +2078,11 @@
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 12,
+   "points": 10,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 448,
    "armour": 3,
    "resist": {
@@ -1591,6 +2129,11 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 22,
+   "points": 15.2,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 524,
    "armour": 4,
    "resist": {
@@ -1638,6 +2181,11 @@
    "material": "neutronium",
    "grade": 5,
    "mark": "Mk V",
+   "unlock": 32,
+   "points": 22,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 600,
    "armour": 5,
    "resist": {
@@ -1685,6 +2233,11 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 0,
+   "points": 9,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 675,
    "armour": 1,
    "resist": {},
@@ -1727,6 +2280,11 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 5,
+   "points": 14.4,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 846,
    "armour": 2,
    "resist": {
@@ -1774,6 +2332,11 @@
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 12,
+   "points": 22.5,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 1008,
    "armour": 3,
    "resist": {
@@ -1820,6 +2383,11 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 22,
+   "points": 34.199999999999996,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 1179,
    "armour": 4,
    "resist": {
@@ -1867,6 +2435,11 @@
    "material": "neutronium",
    "grade": 5,
    "mark": "Mk V",
+   "unlock": 32,
+   "points": 49.5,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 1350,
    "armour": 5,
    "resist": {
@@ -1914,6 +2487,11 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 0,
+   "points": 1,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 187.5,
    "armour": 2,
    "resist": {},
@@ -1956,6 +2534,11 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 5,
+   "points": 1.6,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 235,
    "armour": 3,
    "resist": {
@@ -2003,6 +2586,11 @@
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 12,
+   "points": 2.5,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 280,
    "armour": 4,
    "resist": {
@@ -2049,6 +2637,11 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 22,
+   "points": 3.8,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 327.5,
    "armour": 5,
    "resist": {
@@ -2096,6 +2689,11 @@
    "material": "neutronium",
    "grade": 5,
    "mark": "Mk V",
+   "unlock": 32,
+   "points": 5.5,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 375,
    "armour": 6,
    "resist": {
@@ -2143,6 +2741,11 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 0,
+   "points": 2,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 375,
    "armour": 2,
    "resist": {},
@@ -2185,6 +2788,11 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 5,
+   "points": 3.2,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 470,
    "armour": 3,
    "resist": {
@@ -2232,6 +2840,11 @@
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 12,
+   "points": 5,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 560,
    "armour": 4,
    "resist": {
@@ -2278,6 +2891,11 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 22,
+   "points": 7.6,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 655,
    "armour": 5,
    "resist": {
@@ -2325,6 +2943,11 @@
    "material": "neutronium",
    "grade": 5,
    "mark": "Mk V",
+   "unlock": 32,
+   "points": 11,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 750,
    "armour": 6,
    "resist": {
@@ -2372,6 +2995,11 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 0,
+   "points": 4,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 750,
    "armour": 2,
    "resist": {},
@@ -2414,6 +3042,11 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 5,
+   "points": 6.4,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 940,
    "armour": 3,
    "resist": {
@@ -2461,6 +3094,11 @@
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 12,
+   "points": 10,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 1120,
    "armour": 4,
    "resist": {
@@ -2507,6 +3145,11 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 22,
+   "points": 15.2,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 1310,
    "armour": 5,
    "resist": {
@@ -2554,6 +3197,11 @@
    "material": "neutronium",
    "grade": 5,
    "mark": "Mk V",
+   "unlock": 32,
+   "points": 22,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 1500,
    "armour": 6,
    "resist": {
@@ -2601,6 +3249,11 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 0,
+   "points": 9,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 1687.5,
    "armour": 2,
    "resist": {},
@@ -2643,6 +3296,11 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 5,
+   "points": 14.4,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 2115,
    "armour": 3,
    "resist": {
@@ -2690,6 +3348,11 @@
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 12,
+   "points": 22.5,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 2520,
    "armour": 4,
    "resist": {
@@ -2736,6 +3399,11 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 22,
+   "points": 34.199999999999996,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 2947.5,
    "armour": 5,
    "resist": {
@@ -2783,6 +3451,11 @@
    "material": "neutronium",
    "grade": 5,
    "mark": "Mk V",
+   "unlock": 32,
+   "points": 49.5,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 3375,
    "armour": 6,
    "resist": {
@@ -2830,6 +3503,11 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 0,
+   "points": 1,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 60,
    "armour": 1,
    "resist": {},
@@ -2872,6 +3550,11 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 5,
+   "points": 1.6,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 75.2,
    "armour": 2,
    "resist": {
@@ -2919,6 +3602,11 @@
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 12,
+   "points": 2.5,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 89.6,
    "armour": 3,
    "resist": {
@@ -2965,6 +3653,11 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 22,
+   "points": 3.8,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 104.8,
    "armour": 4,
    "resist": {
@@ -3012,6 +3705,11 @@
    "material": "neutronium",
    "grade": 5,
    "mark": "Mk V",
+   "unlock": 32,
+   "points": 5.5,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 120,
    "armour": 5,
    "resist": {
@@ -3059,6 +3757,11 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 0,
+   "points": 2,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 120,
    "armour": 1,
    "resist": {},
@@ -3101,6 +3804,11 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 5,
+   "points": 3.2,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 150.4,
    "armour": 2,
    "resist": {
@@ -3148,6 +3856,11 @@
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 12,
+   "points": 5,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 179.2,
    "armour": 3,
    "resist": {
@@ -3194,6 +3907,11 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 22,
+   "points": 7.6,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 209.6,
    "armour": 4,
    "resist": {
@@ -3241,6 +3959,11 @@
    "material": "neutronium",
    "grade": 5,
    "mark": "Mk V",
+   "unlock": 32,
+   "points": 11,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 240,
    "armour": 5,
    "resist": {
@@ -3288,6 +4011,11 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 0,
+   "points": 4,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 240,
    "armour": 1,
    "resist": {},
@@ -3330,6 +4058,11 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 5,
+   "points": 6.4,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 300.8,
    "armour": 2,
    "resist": {
@@ -3377,6 +4110,11 @@
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 12,
+   "points": 10,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 358.4,
    "armour": 3,
    "resist": {
@@ -3423,6 +4161,11 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 22,
+   "points": 15.2,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 419.2,
    "armour": 4,
    "resist": {
@@ -3470,6 +4213,11 @@
    "material": "neutronium",
    "grade": 5,
    "mark": "Mk V",
+   "unlock": 32,
+   "points": 22,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 480,
    "armour": 5,
    "resist": {
@@ -3517,6 +4265,11 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 0,
+   "points": 9,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 540,
    "armour": 1,
    "resist": {},
@@ -3559,6 +4312,11 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 5,
+   "points": 14.4,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 676.8,
    "armour": 2,
    "resist": {
@@ -3606,6 +4364,11 @@
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 12,
+   "points": 22.5,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 806.4,
    "armour": 3,
    "resist": {
@@ -3652,6 +4415,11 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 22,
+   "points": 34.199999999999996,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 943.2,
    "armour": 4,
    "resist": {
@@ -3699,6 +4467,11 @@
    "material": "neutronium",
    "grade": 5,
    "mark": "Mk V",
+   "unlock": 32,
+   "points": 49.5,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 1080,
    "armour": 5,
    "resist": {
@@ -3746,6 +4519,13 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 0,
+   "points": 1,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "attach": "back"
+   },
    "hp": 60,
    "armour": 1,
    "resist": {},
@@ -3788,6 +4568,19 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 6,
+   "points": 2,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "attach": "back",
+    "clear": [
+     [
+      0,
+      1
+     ]
+    ]
+   },
    "hp": 120,
    "armour": 1,
    "resist": {},
@@ -3830,6 +4623,13 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 12,
+   "points": 3.2,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "arc": 180
+   },
    "hp": 150.4,
    "armour": 2,
    "resist": {
@@ -3877,6 +4677,27 @@
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 20,
+   "points": 5,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "attach": "back",
+    "clear": [
+     [
+      0,
+      1
+     ],
+     [
+      0,
+      2
+     ],
+     [
+      0,
+      3
+     ]
+    ]
+   },
    "hp": 179.2,
    "armour": 3,
    "resist": {
@@ -3923,6 +4744,23 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 30,
+   "points": 15.2,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "attach": "back",
+    "clear": [
+     [
+      0,
+      1
+     ],
+     [
+      0,
+      2
+     ]
+    ]
+   },
    "hp": 545,
    "armour": 4,
    "resist": {
@@ -3970,6 +4808,13 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 3,
+   "points": 1,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "arc": 270
+   },
    "hp": 56.3,
    "armour": 1,
    "resist": {},
@@ -4012,6 +4857,14 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 14,
+   "points": 3.2,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "attach": "back",
+    "arc": 240
+   },
    "hp": 141,
    "armour": 2,
    "resist": {
@@ -4059,6 +4912,13 @@
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 24,
+   "points": 2.5,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "arc": 200
+   },
    "hp": 84,
    "armour": 3,
    "resist": {
@@ -4105,6 +4965,15 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 4,
+   "points": 1,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "attach": "back",
+    "angle": "right",
+    "arc": 200
+   },
    "hp": 60,
    "armour": 1,
    "resist": {},
@@ -4147,6 +5016,15 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 16,
+   "points": 3.2,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "attach": "back",
+    "angle": "right",
+    "arc": 240
+   },
    "hp": 150.4,
    "armour": 2,
    "resist": {
@@ -4194,6 +5072,13 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 7,
+   "points": 1,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "arc": 360
+   },
    "hp": 60,
    "armour": 1,
    "resist": {},
@@ -4236,6 +5121,14 @@
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 24,
+   "points": 5,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "attach": "back",
+    "arc": 360
+   },
    "hp": 179.2,
    "armour": 3,
    "resist": {
@@ -4282,6 +5175,13 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 9,
+   "points": 1,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "arc": 240
+   },
    "hp": 52.5,
    "armour": 1,
    "resist": {},
@@ -4324,6 +5224,19 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 18,
+   "points": 3.2,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "attach": "back",
+    "clear": [
+     [
+      0,
+      1
+     ]
+    ]
+   },
    "hp": 131.6,
    "armour": 2,
    "resist": {
@@ -4367,10 +5280,19 @@
    "piece": "round",
    "w": 1,
    "h": 1,
-   "full": true,
+   "full": false,
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 26,
+   "points": 1.9634954084936207,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "attach": "back",
+    "angle": "right",
+    "arc": 360
+   },
    "hp": 61.6,
    "armour": 3,
    "resist": {
@@ -4417,6 +5339,13 @@
    "material": "steel",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 10,
+   "points": 1,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "arc": 220
+   },
    "hp": 65.8,
    "armour": 1,
    "resist": {
@@ -4464,6 +5393,14 @@
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 25,
+   "points": 5,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "attach": "back",
+    "arc": 120
+   },
    "hp": 156.8,
    "armour": 3,
    "resist": {
@@ -4510,6 +5447,19 @@
    "material": "steel",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 11,
+   "points": 1,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "attach": "back",
+    "clear": [
+     [
+      0,
+      1
+     ]
+    ]
+   },
    "hp": 75.2,
    "armour": 1,
    "resist": {
@@ -4557,6 +5507,20 @@
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 21,
+   "points": 5,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "attach": "back",
+    "angle": "right",
+    "clear": [
+     [
+      0,
+      1
+     ]
+    ]
+   },
    "hp": 179.2,
    "armour": 3,
    "resist": {
@@ -4603,6 +5567,23 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 33,
+   "points": 15.2,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "attach": "back",
+    "clear": [
+     [
+      0,
+      1
+     ],
+     [
+      0,
+      2
+     ]
+    ]
+   },
    "hp": 503,
    "armour": 4,
    "resist": {
@@ -4650,6 +5631,23 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 13,
+   "points": 3.2,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "attach": "back",
+    "clear": [
+     [
+      0,
+      1
+     ],
+     [
+      0,
+      2
+     ]
+    ]
+   },
    "hp": 150.4,
    "armour": 2,
    "resist": {
@@ -4697,6 +5695,23 @@
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 22,
+   "points": 5,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "attach": "back",
+    "clear": [
+     [
+      0,
+      1
+     ],
+     [
+      0,
+      2
+     ]
+    ]
+   },
    "hp": 179.2,
    "armour": 3,
    "resist": {
@@ -4743,6 +5758,27 @@
    "material": "titanium",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 28,
+   "points": 15.2,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "attach": "back",
+    "clear": [
+     [
+      0,
+      1
+     ],
+     [
+      0,
+      2
+     ],
+     [
+      0,
+      3
+     ]
+    ]
+   },
    "hp": 430.1,
    "armour": 4,
    "resist": {
@@ -4789,6 +5825,13 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 15,
+   "points": 1.6,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "arc": 360
+   },
    "hp": 65.8,
    "armour": 2,
    "resist": {
@@ -4836,6 +5879,14 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 35,
+   "points": 15.2,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "attach": "back",
+    "arc": 120
+   },
    "hp": 366.8,
    "armour": 4,
    "resist": {
@@ -4883,6 +5934,13 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 17,
+   "points": 1.6,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "arc": 270
+   },
    "hp": 65.8,
    "armour": 2,
    "resist": {
@@ -4926,10 +5984,19 @@
    "piece": "round",
    "w": 1,
    "h": 1,
-   "full": true,
+   "full": false,
    "material": "titanium",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 29,
+   "points": 2.9845130209103035,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "attach": "back",
+    "angle": "right",
+    "arc": 300
+   },
    "hp": 61.6,
    "armour": 4,
    "resist": {
@@ -4976,6 +6043,23 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 19,
+   "points": 3.2,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "attach": "back",
+    "clear": [
+     [
+      0,
+      1
+     ],
+     [
+      0,
+      2
+     ]
+    ]
+   },
    "hp": 150.4,
    "armour": 2,
    "resist": {
@@ -5023,6 +6107,27 @@
    "material": "cobalt",
    "grade": 5,
    "mark": "Mk V",
+   "unlock": 38,
+   "points": 22,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "attach": "back",
+    "clear": [
+     [
+      0,
+      1
+     ],
+     [
+      0,
+      2
+     ],
+     [
+      0,
+      3
+     ]
+    ]
+   },
    "hp": 503,
    "armour": 5,
    "resist": {
@@ -5070,6 +6175,31 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 32,
+   "points": 7.6,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "attach": "back",
+    "clear": [
+     [
+      0,
+      1
+     ],
+     [
+      0,
+      2
+     ],
+     [
+      0,
+      3
+     ],
+     [
+      0,
+      4
+     ]
+    ]
+   },
    "hp": 209.6,
    "armour": 4,
    "resist": {
@@ -5117,6 +6247,19 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 12,
+   "points": 3.8,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "attach": "back",
+    "clear": [
+     [
+      0,
+      1
+     ]
+    ]
+   },
    "hp": 117.9,
    "armour": 4,
    "resist": {
@@ -5164,6 +6307,14 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 12,
+   "points": 7.6,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "attach": "back",
+    "arc": 150
+   },
    "hp": 235.8,
    "armour": 4,
    "resist": {
@@ -5211,6 +6362,13 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 22,
+   "points": 3.8,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "arc": 360
+   },
    "hp": 117.9,
    "armour": 4,
    "resist": {
@@ -5258,6 +6416,13 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 10,
+   "points": 3.8,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "arc": 270
+   },
    "hp": 104.8,
    "armour": 4,
    "resist": {
@@ -5305,6 +6470,27 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 26,
+   "points": 7.6,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "attach": "back",
+    "clear": [
+     [
+      0,
+      1
+     ],
+     [
+      0,
+      2
+     ],
+     [
+      0,
+      3
+     ]
+    ]
+   },
    "hp": 235.8,
    "armour": 4,
    "resist": {
@@ -5352,6 +6538,14 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 30,
+   "points": 3.8,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "attach": "back",
+    "arc": 180
+   },
    "hp": 131,
    "armour": 4,
    "resist": {
@@ -5399,6 +6593,11 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 0,
+   "points": 1,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": null,
    "hp": 52.5,
    "armour": 1,
    "resist": {},
@@ -5437,10 +6636,15 @@
    "piece": "tri",
    "w": 1,
    "h": 1,
-   "full": true,
+   "full": false,
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 2,
+   "points": 0.5,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": null,
    "hp": 26.3,
    "armour": 1,
    "resist": {},
@@ -5483,6 +6687,11 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 5,
+   "points": 1,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": null,
    "hp": 52.5,
    "armour": 1,
    "resist": {},
@@ -5525,6 +6734,11 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 8,
+   "points": 2,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": null,
    "hp": 105,
    "armour": 1,
    "resist": {},
@@ -5567,6 +6781,11 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 16,
+   "points": 3.2,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": null,
    "hp": 159.8,
    "armour": 2,
    "resist": {
@@ -5610,10 +6829,15 @@
    "piece": "round",
    "w": 1,
    "h": 1,
-   "full": true,
+   "full": false,
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 22,
+   "points": 1.9634954084936207,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": null,
    "hp": 61.6,
    "armour": 3,
    "resist": {
@@ -5660,6 +6884,11 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 30,
+   "points": 15.2,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": null,
    "hp": 445.4,
    "armour": 4,
    "resist": {
@@ -5707,6 +6936,11 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 0,
+   "points": 1,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 60,
    "armour": 1,
    "resist": {},
@@ -5745,10 +6979,15 @@
    "piece": "round",
    "w": 1,
    "h": 1,
-   "full": true,
+   "full": false,
    "material": "steel",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 9,
+   "points": 0.7853981633974483,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 118.1,
    "armour": 1,
    "resist": {
@@ -5796,6 +7035,11 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 18,
+   "points": 6.4,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 338.4,
    "armour": 2,
    "resist": {
@@ -5843,6 +7087,11 @@
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 24,
+   "points": 5,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 89.6,
    "armour": 3,
    "resist": {
@@ -5889,6 +7138,11 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 0,
+   "points": 1,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 45,
    "armour": 1,
    "resist": {},
@@ -5931,6 +7185,11 @@
    "material": "composite",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 7,
+   "points": 1,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 30,
    "armour": 1,
    "resist": {
@@ -5978,6 +7237,11 @@
    "material": "steel",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 10,
+   "points": 1,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 56.4,
    "armour": 1,
    "resist": {
@@ -6025,6 +7289,11 @@
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 20,
+   "points": 10,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 313.6,
    "armour": 3,
    "resist": {
@@ -6071,6 +7340,11 @@
    "material": "steel",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 11,
+   "points": 1,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 56.4,
    "armour": 1,
    "resist": {
@@ -6114,10 +7388,15 @@
    "piece": "round",
    "w": 1,
    "h": 1,
-   "full": true,
+   "full": false,
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 19,
+   "points": 1.2566370614359172,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 44.3,
    "armour": 2,
    "resist": {
@@ -6165,6 +7444,11 @@
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 27,
+   "points": 10,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 313.6,
    "armour": 3,
    "resist": {
@@ -6211,6 +7495,11 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 14,
+   "points": 1.6,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 75.2,
    "armour": 2,
    "resist": {
@@ -6258,6 +7547,11 @@
    "material": "cobalt",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 30,
+   "points": 15.2,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 419.2,
    "armour": 4,
    "resist": {
@@ -6305,6 +7599,11 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 12,
+   "points": 1.6,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 188,
    "armour": 4,
    "resist": {
@@ -6352,6 +7651,11 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 12,
+   "points": 3.2,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 376,
    "armour": 4,
    "resist": {
@@ -6399,6 +7703,11 @@
    "material": "titanium",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 22,
+   "points": 1.6,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 358.4,
    "armour": 3,
    "resist": {
@@ -6445,6 +7754,11 @@
    "material": "titanium",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 22,
+   "points": 3.2,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 716.8,
    "armour": 3,
    "resist": {
@@ -6491,6 +7805,11 @@
    "material": "titanium",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 18,
+   "points": 1.6,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 67.2,
    "armour": 2,
    "resist": {
@@ -6537,6 +7856,11 @@
    "material": "steel",
    "grade": 2,
    "mark": "Mk II",
+   "unlock": 13,
+   "points": 1.6,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 56.4,
    "armour": 2,
    "resist": {
@@ -6584,6 +7908,27 @@
    "material": "titanium",
    "grade": 4,
    "mark": "Mk IV",
+   "unlock": 29,
+   "points": 15.2,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "attach": "back",
+    "clear": [
+     [
+      0,
+      1
+     ],
+     [
+      0,
+      2
+     ],
+     [
+      0,
+      3
+     ]
+    ]
+   },
    "hp": 430.1,
    "armour": 4,
    "resist": {
@@ -6630,6 +7975,13 @@
    "material": "steel",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 10,
+   "points": 1,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": {
+    "arc": 300
+   },
    "hp": 56.4,
    "armour": 1,
    "resist": {
@@ -6677,6 +8029,11 @@
    "material": "steel",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 10,
+   "points": 1,
+   "facing": "free",
+   "oneWay": false,
+   "mounting": null,
    "hp": 56.4,
    "armour": 1,
    "resist": {
@@ -6724,6 +8081,11 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 0,
+   "points": 1,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 37.5,
    "armour": 1,
    "resist": {},
@@ -6766,6 +8128,11 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 4,
+   "points": 1,
+   "facing": "joined",
+   "oneWay": true,
+   "mounting": null,
    "hp": 37.5,
    "armour": 1,
    "resist": {},
@@ -6808,6 +8175,11 @@
    "material": "alloy",
    "grade": 1,
    "mark": "Mk I",
+   "unlock": 6,
+   "points": 1,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 60,
    "armour": 1,
    "resist": {},
@@ -6850,6 +8222,11 @@
    "material": "titanium",
    "grade": 3,
    "mark": "Mk III",
+   "unlock": 20,
+   "points": 10,
+   "facing": null,
+   "oneWay": false,
+   "mounting": null,
    "hp": 403.2,
    "armour": 3,
    "resist": {

@@ -1,9 +1,10 @@
 # Scores from part stats alone: no physics. Three measures, and a scenario (scenarios.json) that weighs them.
 #
 #   Power: a flow over the parts that touch. Reactors make E/s; relays (conduits, diodes, stores, the core) pass up to
-#   what they can give; weapons, engines and shields take what they use. Sustained is reactors alone; a burst (10 s)
-#   adds what the stores hold. A part's "fed" share is what reaches it over what it uses, so its damage per second
-#   (or thrust) is its catalogue number times that.
+#   what they can give (a Diode only out of its facing edge); weapons, engines and shields take what they use, all at
+#   the same priority (shared max-min fairly). Sustained is reactors alone; a burst (10 s) adds what the stores hold.
+#   A part's "fed" share is what reaches it over what it uses, so its damage per second (or thrust) is its catalogue
+#   number times that.
 #   Hits: shots from the scenario's directions travel in straight lines across the grid and land on the first part
 #   still standing, for damage × the game's penetration table (weapon pen − block armour) × the material's resist.
 #   A part is gone when its HP is; the power is worked out again then. The run ends when the core goes.
@@ -14,7 +15,7 @@ import math
 import random
 from collections import defaultdict, deque
 
-from model import CONSUMER_ROLES, POWER_ROLES_RELAY, Catalogue, Ship
+from model import CONSUMER_ROLES, RELAY_ROLES, SIDES, SOURCE_ROLES, Catalogue, Ship
 
 INF = float('inf')
 BURST_S = 10.0
@@ -62,52 +63,105 @@ def max_flow(cap: dict, s, t, flow=None) -> tuple[float, dict]:
         total += b
 
 
-def power(cat: Catalogue, parts: list, alive: list, nbrs: list, burst: bool) -> dict:
-    """Fed share per consumer, and the flow through each relay or reactor. Engines are served first, then the rest
-    from what is left (the game's local priority: power/tick.ts)"""
-    cap = defaultdict(dict)
+def power(cat: Catalogue, parts: list, alive: list, nbrs: list, burst: bool, cell_owner: dict | None = None) -> dict:
+    """Fed share per consumer, and the flow through each relay or reactor. Every consumer has the same priority: the
+    power is shared max-min fairly (each gets the same share of what it uses, unless what feeds it runs out first; then
+    the rest share what is left). So a gun starves an engine only through the ship's layout, never by rank.
+    A Diode gives only across its facing edge and takes from every other (power/layout.ts's oneWay)"""
     S, T = 'S', 'T'
     role = [cat.role(p.pid) for p in parts]
+    # (A Diode's out side: the part across its facing edge)
+    out = {}
+    if cell_owner is not None:
+        for i, p in enumerate(parts):
+            if role[i] == 'diode' and p.facing:
+                dr, dc = SIDES[p.facing]
+                for (r, c) in p.cells():
+                    j = cell_owner.get((r + dr, c + dc))
+                    if j is not None and j != i:
+                        out[i] = j
+                        break
+    may = lambda x, y: (role[x] != 'diode' or out.get(x) == y) and (role[y] != 'diode' or out.get(y) != x)
+    base = defaultdict(dict)
+    uses = {}
     for i, p in enumerate(parts):
         if not alive[i]:
             continue
         pw = cat.parts[p.pid].get('power') or {}
         rl = role[i]
-        if rl in ('generator', 'dynamo'):
-            cap[S][('o', i)] = pw.get('makes', 0)
-        elif rl in POWER_ROLES_RELAY:
-            gives = pw.get('gives', 0) or 0
-            cap[('i', i)][('o', i)] = gives
+        if rl in SOURCE_ROLES:
+            base[S][('o', i)] = pw.get('makes', 0) or 0
+        elif rl in RELAY_ROLES:
+            base[('i', i)][('o', i)] = pw.get('gives', 0) or 0
             if burst and pw.get('holds'):
-                cap[S][('o', i)] = min(gives, pw['holds'] / BURST_S)
+                base[S][('i', i)] = pw['holds'] / BURST_S
         elif rl in CONSUMER_ROLES:
-            cap[('i', i)][T] = (pw.get('uses', 0) or 0) if rl == 'thruster' else 0.0
+            if (pw.get('uses') or 0) > 0:
+                uses[i] = pw['uses']
+            continue
         else:
             continue
-        if rl in ('generator', 'dynamo') or rl in POWER_ROLES_RELAY:
-            for j in nbrs[i]:
-                if alive[j] and (role[j] in POWER_ROLES_RELAY or role[j] in CONSUMER_ROLES):
-                    cap[('o', i)][('i', j)] = INF
-    # (Back edges for the residual graph)
-    for u in list(cap):
-        for v in list(cap[u]):
-            cap[v].setdefault(u, 0.0)
-    _total, flow = max_flow(cap, S, T)
-    for i in range(len(parts)):
-        if alive[i] and role[i] in CONSUMER_ROLES and role[i] != 'thruster':
-            cap[('i', i)][T] = (cat.parts[parts[i].pid].get('power') or {}).get('uses', 0) or 0
-    max_flow(cap, S, T, flow)
+        for j in nbrs[i]:
+            if alive[j] and (role[j] in RELAY_ROLES or role[j] in CONSUMER_ROLES) and may(i, j):
+                base[('o', i)][('i', j)] = INF
+
+    def run(level: dict):
+        cap = defaultdict(dict, {u: dict(v) for u, v in base.items()})
+        for i, amt in level.items():
+            cap[('i', i)][T] = amt
+        for u in list(cap):
+            for v in list(cap[u]):
+                cap[v].setdefault(u, 0.0)
+        total, flow = max_flow(cap, S, T)
+        return total, flow, cap
+
+    # (Progressive filling: raise everyone still growing together; whoever can't grow past a level stays there)
+    frozen: dict = {}
+    active = set(uses)
+    lam = 0.0
+    flow = cap = None
+    while active:
+        want = lambda x: {**frozen, **{i: x * uses[i] for i in active}}
+        need = lambda x: sum(want(x).values())
+        tot, f, c = run(want(1.0))
+        if tot >= need(1.0) - 1e-6:
+            flow, cap = f, c
+            frozen.update({i: uses[i] for i in active})
+            break
+        lo, hi = lam, 1.0
+        best = run(want(lo))
+        for _ in range(7):
+            mid = (lo + hi) / 2
+            tot, f, c = run(want(mid))
+            if tot >= need(mid) - 1e-6:
+                lo, best = mid, (tot, f, c)
+            else:
+                hi = mid
+        _t, flow, cap = best
+        # (Who can still grow: reachable from the sources in what is left of the graph)
+        seen, q = {S}, deque([S])
+        while q:
+            u = q.popleft()
+            for v, cv in cap.get(u, {}).items():
+                if v not in seen and cv - flow[u][v] > 1e-9:
+                    seen.add(v)
+                    q.append(v)
+        stuck = [i for i in active if ('i', i) not in seen] or list(active)
+        for i in stuck:
+            frozen[i] = lo * uses[i]
+            active.discard(i)
+        lam = lo
+    if flow is None:
+        _t, flow, cap = run(frozen)
     fed, through = {}, {}
     for i, p in enumerate(parts):
         if not alive[i]:
             continue
-        pw = cat.parts[p.pid].get('power') or {}
         if role[i] in CONSUMER_ROLES:
-            uses = pw.get('uses', 0) or 0
-            fed[i] = 1.0 if uses <= 0 else min(1.0, flow[('i', i)][T] / uses)
-        elif role[i] in POWER_ROLES_RELAY:
-            through[i] = flow[('i', i)][('o', i)] + (flow[S][('o', i)] if burst else 0)
-        elif role[i] in ('generator', 'dynamo'):
+            fed[i] = 1.0 if i not in uses else min(1.0, flow[('i', i)][T] / uses[i])
+        elif role[i] in RELAY_ROLES:
+            through[i] = flow[('i', i)][('o', i)]
+        elif role[i] in SOURCE_ROLES:
             through[i] = flow[S][('o', i)]
     return {'fed': fed, 'through': through}
 
@@ -173,14 +227,14 @@ def hits_run(cat: Catalogue, parts: list, nbrs: list, cell_owner: dict, inc: dic
         if hit in core:
             break
         if cat.role(parts[hit].pid) != 'none':
-            cur_dps, _th = output(cat, parts, power(cat, parts, alive, nbrs, False)['fed'])
+            cur_dps, _th = output(cat, parts, power(cat, parts, alive, nbrs, False, cell_owner)['fed'])
             if half_at is None and cur_dps < base_dps * 0.5:
                 half_at = t
     return {'alive_s': t, 'half_s': half_at if half_at is not None else t, 'dealt': dealt}
 
 
-def measure(cat: Catalogue, ship: Ship, scenario: dict, seeds=(1, 2, 3)) -> dict:
-    """Everything a scenario can weigh, for one ship"""
+def measure(cat: Catalogue, ship: Ship, scenario: dict, check: dict | None = None, seeds=(1, 2, 3)) -> dict:
+    """Everything a scenario can weigh, for one ship. check: the game validator's answer (Validator.check)"""
     parts = ship.full()
     cell_owner = {}
     for i, p in enumerate(parts):
@@ -188,8 +242,8 @@ def measure(cat: Catalogue, ship: Ship, scenario: dict, seeds=(1, 2, 3)) -> dict
             cell_owner[c] = i
     nbrs = neighbours_of(parts, cell_owner)
     alive = [True] * len(parts)
-    sus = power(cat, parts, alive, nbrs, False)
-    bur = power(cat, parts, alive, nbrs, True)
+    sus = power(cat, parts, alive, nbrs, False, cell_owner)
+    bur = power(cat, parts, alive, nbrs, True, cell_owner)
     s_dps, s_thrust = output(cat, parts, sus['fed'])
     b_dps, _b = output(cat, parts, bur['fed'])
     mass = sum(cat.parts[p.pid]['mass'] for p in parts)
@@ -208,6 +262,8 @@ def measure(cat: Catalogue, ship: Ship, scenario: dict, seeds=(1, 2, 3)) -> dict
         'alive_s': avg('alive_s'), 'half_s': avg('half_s'), 'damage_before_down': avg('dealt'),
         'unpowered': len(unpowered), 'idle': len(idle),
         'fed': {i: f for i, f in sus['fed'].items()}, 'unpowered_ids': unpowered, 'idle_ids': idle,
+        'points': (check or {}).get('points', sum(cat.parts[p.pid].get('points', 1) for p in parts)),
+        'valid': (check or {}).get('valid', True), 'errors': (check or {}).get('errors', []),
     }
 
 
@@ -228,8 +284,8 @@ ZERO_SCALE = {'cargo': 100.0, 'sustained_dps': 50.0, 'burst_dps': 50.0, 'damage_
 
 def fitness(scenario: dict, m: dict, base: dict) -> tuple[float, list]:
     """The scenario's weighted sum, each measure against the starting ship's (so 1 = as good as the start), less the
-    penalties; over budget (the start's cost plus the scenario's budget) costs heavily. Returns the score and its
-    terms for the panel"""
+    penalties. Over the budget (credits) or the level's build points costs heavily, and a ship the game's validator
+    turns down scores below any it accepts. Returns the score and its terms for the panel"""
     terms = []
     total = 0.0
     for k, w in scenario.get('weights', {}).items():
@@ -245,9 +301,13 @@ def fitness(scenario: dict, m: dict, base: dict) -> tuple[float, list]:
             v = -w * m[k]
             terms.append((k, -w, m[k], v))
             total += v
-    budget = base.get('cost', 0) + scenario['budget'] if scenario.get('budget') is not None else None
-    if budget and m['cost'] > budget:
-        v = -10 * (m['cost'] / budget - 1) - 1
-        terms.append(('over budget', 0, m['cost'], v))
+    for name, have, limit in (('over budget', m['cost'], scenario.get('budget')), ('over build points', m['points'], scenario.get('points'))):
+        if limit and have > limit:
+            v = -10 * (have / limit - 1) - 1
+            terms.append((name, 0, have, v))
+            total += v
+    if not m.get('valid', True):
+        v = -5 - 0.2 * len(m.get('errors', []))
+        terms.append(('not valid in the game', 0, len(m.get('errors', [])), v))
         total += v
     return total, terms

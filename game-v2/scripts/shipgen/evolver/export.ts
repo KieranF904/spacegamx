@@ -4,10 +4,11 @@
 // are, and the structure (core, hull, armour, cargo) on the box pieces in the five standard materials (Mk I-V). The
 // legacy functions the models replace are left out. Nothing here is made up: change the game's data and run this again.
 //   node --import <tsx loader> scripts/shipgen/evolver/export.ts   ->  scripts/shipgen/evolver/catalogue.json
-import { writeFileSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { partStats } from '../../../common/src/ships/index';
+import { partBuildPoints, partFacingRule, partStats } from '../../../common/src/ships/index';
 import { partItemId } from '../../../common/src/econ/index';
+import { MATERIAL_LEVEL } from '../../../common/src/econ/market';
 import { loadContext } from '../core/context';
 import { partPower } from '../core/partPower';
 
@@ -21,9 +22,10 @@ const parts: Record<string, unknown>[] = [];
 const skipped: string[] = [];
 // (A piece's size from its cells, and whether it fills that box: round and wedge pieces don't)
 const box = (piece: string) => {
-  const cells = ctx.catalog.variants.get(piece)?.[0]?.cells ?? [];
+  const v = ctx.catalog.variants.get(piece)?.[0];
+  const cells = v?.cells ?? [];
   const w = Math.max(...cells.map((c) => c[0])) + 1, h = Math.max(...cells.map((c) => c[1])) + 1;
-  return { w, h, full: cells.length === w * h };
+  return { w, h, full: Math.abs((v?.area ?? 0) - w * h) < 1e-6 };
 };
 for (const fn of ctx.catalog.functions.values()) {
   const f = fn as typeof fn & { model?: unknown; material?: string; family?: string; pool?: string; loss?: number };
@@ -39,9 +41,11 @@ for (const fn of ctx.catalog.functions.values()) {
       let pw: ReturnType<typeof partPower> | null = null;
       try { pw = partPower(ctx, fn, piece, material); } catch { /* (not in the power core) */ }
       const { w, h, full } = box(piece);
+      const unlock = model ? ((fn as { unlock?: { level: number } }).unlock?.level ?? 0) : MATERIAL_LEVEL[material] ?? 0;
       parts.push({
         id: model ? fn.id : `${fn.id}:${piece}:${material}`, fn: fn.id, name: fn.name, family: f.family ?? fn.id, model, category: fn.category,
-        piece, w, h, full, material, grade: st.grade, mark: st.mark,
+        piece, w, h, full, material, grade: st.grade, mark: st.mark, unlock, points: partBuildPoints(ctx.catalog, { piece, material, fn: fn.id }),
+        facing: partFacingRule(fn.id), oneWay: !!(fn as { oneWay?: boolean }).oneWay, mounting: (fn as { mounting?: unknown }).mounting ?? null,
         hp: Math.round(st.hp * 10) / 10, armour: st.armour, resist: st.resist ?? {}, mass: Math.round(st.mass * 100) / 100, cost,
         carriesFlow: !!fn.carriesFlow, pool: f.pool ?? null, loss: f.loss ?? null,
         power: pw ? { role: pw.role, makes: pw.makes ?? 0, holds: pw.holds ?? 0, gives: pw.gives ?? 0, takes: pw.takes ?? 0, uses: pw.uses ?? 0, boostUses: pw.boostUses ?? 0, gun: pw.gun ?? null } : null,
@@ -54,6 +58,11 @@ for (const fn of ctx.catalog.functions.values()) {
 const out = join(__dirname, 'catalogue.json');
 // (Damage × this at each step of (weapon pen − block armour): tuning.json damage.penetration, as damage.ts reads it)
 const penetration = (ctx.tuning as { damage?: { penetration?: Record<string, number> } }).damage?.penetration ?? {};
-writeFileSync(out, JSON.stringify({ made: new Date().toISOString(), materials: MATERIALS, penetration, skipped, parts }, null, 1));
+// (Each piece's cells in each rotation, from its origin cell: a placement's rot and origin come from its footprint)
+const pieces: Record<string, number[][][]> = {};
+for (const id of new Set(parts.map((p) => p.piece as string))) pieces[id] = [0, 1, 2, 3].map((rot) => (ctx.catalog.variants.get(id)?.[rot]?.cells ?? []) as number[][]);
+// (Build points by level: unlocks.json complexity)
+const complexity = JSON.parse(readFileSync(join(ctx.dataDir, 'unlocks.json'), 'utf8')).complexity;
+writeFileSync(out, JSON.stringify({ made: new Date().toISOString(), catalogVersion: ctx.catalog.version, materials: MATERIALS, penetration, complexity, pieces, skipped, parts }, null, 1));
 console.log(`${parts.length} parts -> ${out}`);
 console.log(`skipped: ${skipped.join(', ')}`);
