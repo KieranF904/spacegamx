@@ -447,6 +447,11 @@ class MainWindow(QMainWindow):
             b.clicked.connect(lambda _=False, v=v: self.set_view(v))
             head.addWidget(b)
             self.view_buttons[v] = b
+        self.sil_button = QPushButton('Silhouette')
+        self.sil_button.setObjectName('tab')
+        self.sil_button.setToolTip('A quick symmetrical silhouette designer')
+        self.sil_button.clicked.connect(self.open_silhouette)
+        head.addWidget(self.sil_button)
         self.back = QPushButton('Back to the app')
         self.back.setObjectName('tab')
         self.back.clicked.connect(lambda: self.set_view('studio'))
@@ -1314,6 +1319,7 @@ class MainWindow(QMainWindow):
             self.draw_progress()
         self.preview_caption.setVisible(live)
         self.on_top.setVisible(live)
+        self.sil_button.setVisible(not live)
         self.borderless.setVisible(live)
         self.back.setVisible(live)
         self.grip.setVisible(live)
@@ -1338,6 +1344,13 @@ class MainWindow(QMainWindow):
             self.borderless.setChecked(False)
         self.caption()
         self.prefs.setValue('view', v)
+
+    def open_silhouette(self) -> None:
+        from silhouette import Designer
+        if getattr(self, 'sil', None) is None or not self.sil.isVisible():
+            self.sil = Designer()
+        self.sil.show()
+        self.sil.raise_()
 
     def keep_on_top(self, on: bool) -> None:
         g = self.geometry()
