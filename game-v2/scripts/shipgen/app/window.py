@@ -4,11 +4,12 @@
 import html
 import json
 import os
+import sys
 import time
 import webbrowser
 from pathlib import Path
 
-from PySide6.QtCore import QSettings, QSize, Qt, QTimer
+from PySide6.QtCore import QProcess, QSettings, QSize, Qt, QTimer
 from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap, QStandardItemModel
 from PySide6.QtWidgets import (
     QAbstractItemView, QButtonGroup, QCheckBox, QComboBox, QDoubleSpinBox, QFrame, QGridLayout, QHBoxLayout, QLabel,
@@ -1346,11 +1347,9 @@ class MainWindow(QMainWindow):
         self.prefs.setValue('view', v)
 
     def open_silhouette(self) -> None:
-        from silhouette import Designer
-        if getattr(self, 'sil', None) is None or not self.sil.isVisible():
-            self.sil = Designer()
-        self.sil.show()
-        self.sil.raise_()
+        # (Its own process: it stays open, and keeps any model reply coming, when this window closes)
+        exe = Path(sys.executable).with_name('pythonw.exe')
+        QProcess.startDetached(str(exe if exe.exists() else sys.executable), [str(Path(__file__).with_name('silhouette.py'))], str(Path(__file__).parent))
 
     def keep_on_top(self, on: bool) -> None:
         g = self.geometry()

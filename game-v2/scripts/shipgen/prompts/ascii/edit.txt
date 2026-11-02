@@ -1,0 +1,25 @@
+You are editing a top-down spaceship silhouette drawn on a grid of square cells.
+Only the RIGHT half is shown; it is mirrored to make the left half. Column 0 is the centre line. The nose points UP (row 0).
+
+KEY
+. = empty
+{{key}}
+T = turret
+
+CURRENT GRID
+{{grid}}
+
+CHANGE TO MAKE
+{{instruction}}
+
+RULES
+- Keep every part you are not asked to change exactly as it is.
+- Use the key's letters for existing parts. For a new part, use the next unused capital letter and give it a key line.
+- Every part must touch another part (left, right, above or below; diagonal does not count).
+- Something must be in column 0 (the centre line), so the two halves join.
+- T marks a turret on a filled cell: 1 or 2 in all. Each T must be the top filled cell of its column, with only '.' above it.
+- Stay on the grid: columns 0 to {{last_col}}, rows 0 to {{last_row}}.
+
+OUTPUT
+The full grid in the same format (every row, row numbers, a space between cells), then one key line per part, like: A = Hull
+No other text.

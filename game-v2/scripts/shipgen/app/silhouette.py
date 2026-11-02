@@ -12,17 +12,26 @@
 # Or a lettered ASCII grid of the right half (asciigrid.py): row numbers, then '.' empty, A B C ... parts, T turrets.
 # Each part gets its own colour and the panel lists the rules broken. Copy grid writes the drawing back out in that
 # format (a letter per colour), to start a prompt from; Copy pieces writes it as Block[y,x,w,h] / Turret[y,x].
-#   pythonw scripts/shipgen/app/silhouette.py        (also opened from the Shipgen window's Silhouette button)
+# Ask a model (Ollama or LM Studio, localllm.py): write what to change and Send. The prompt (prompts/ascii/edit.txt, read
+# fresh each time so it can be tuned while the window is open) carries the current grid and key; the reply, a lettered
+# grid, replaces the drawing (Ctrl+Z steps back). A reply that breaks the rules goes back with the problems, up to
+# Retries times. Every prompt and reply is kept in out/silhouettes/ai.
+#   pythonw scripts/shipgen/app/silhouette.py   or  npm run silhouette   (the Shipgen window's Silhouette button opens it
+#   as its own process too)
 import json
 import re
 import sys
+import threading
+import time
 from pathlib import Path
 
 import asciigrid
-from PySide6.QtCore import QPointF, QRectF, QSize, Qt
-from PySide6.QtGui import QColor, QIcon, QKeySequence, QPainter, QPen, QPixmap, QPolygonF, QShortcut
+import localllm
+from PySide6.QtCore import QObject, QPointF, QRectF, QSettings, QSize, Qt, Signal
+from PySide6.QtGui import QColor, QIcon, QKeySequence, QPainter, QPen, QPixmap, QPolygonF, QShortcut, QTextCursor
 from PySide6.QtWidgets import (
-    QApplication, QButtonGroup, QCheckBox, QFileDialog, QHBoxLayout, QLabel, QMainWindow, QPlainTextEdit, QPushButton, QSpinBox, QVBoxLayout, QWidget,
+    QApplication, QButtonGroup, QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QHBoxLayout, QLabel, QMainWindow, QPlainTextEdit, QPushButton,
+    QSpinBox, QTabWidget, QVBoxLayout, QWidget,
 )
 
 PALETTE = [
@@ -48,6 +57,16 @@ MIRROR_SHAPE = {0: 0, 1: 4, 4: 1, 2: 3, 3: 2}
 SHAPE_NAMES = {0: 'whole cell', 1: 'triangle, flat on the bottom and left', 2: 'triangle, flat on the top and left',
                3: 'triangle, flat on the top and right', 4: 'triangle, flat on the bottom and right'}
 BG, GRID_LINE, CENTRE = QColor('#080a0d'), QColor('#161c23'), QColor('#2f5f8c')
+EDIT_PROMPT = Path(__file__).resolve().parents[1] / 'prompts' / 'ascii' / 'edit.txt'
+LETTERS = 'ABCDEFGHIJKLMNOPQRSUVWXYZ'
+
+
+class Bridge(QObject):
+    """Carries a model's reply from its thread to the window"""
+    token = Signal(str, str)
+    done = Signal(dict)
+    failed = Signal(str)
+    models = Signal(list, list)
 
 
 def shape_poly(shape: int, x: float, y: float, s: float) -> QPolygonF:
@@ -140,6 +159,17 @@ class Designer(QMainWindow):
         self.erasing = False
         self.mirror = True
         self.undo: list[dict] = []
+        # (Part letters, kept across model edits so a part keeps its colour: letter -> (palette index, name))
+        self.legend: dict[str, tuple[int, str]] = {}
+        self.models: list[dict] = []
+        self.busy = False
+        self.stop_flag = False
+        self.prefs = QSettings('shipgen', 'silhouette')
+        self.bridge = Bridge()
+        self.bridge.token.connect(self.on_token)
+        self.bridge.done.connect(self.on_reply)
+        self.bridge.failed.connect(self.on_fail)
+        self.bridge.models.connect(self.on_models)
         self.canvas = Canvas(self)
         self.dir = Path(__file__).resolve().parents[1] / 'out' / 'silhouettes'
         self.setStyleSheet("""
@@ -231,10 +261,184 @@ class Designer(QMainWindow):
         self.info.setMinimumWidth(190)
         side.addWidget(self.info)
         side.addStretch(1)
+        lay.addLayout(self.ai_panel())
         self.setCentralWidget(root)
         QShortcut(QKeySequence.Undo, self, activated=self.do_undo)
-        self.resize(900, 780)
+        QShortcut(QKeySequence('Ctrl+Return'), self, activated=self.ask)
+        self.resize(1320, 820)
+        self.refresh_models()
         self.update_info('Left-click paints, drag to sweep, right-click erases. The nose is at the top.')
+
+    # ---- asking a model
+    def ai_panel(self) -> QVBoxLayout:
+        col = QVBoxLayout()
+        col.addWidget(QLabel('Ask a model'))
+        row = QHBoxLayout()
+        self.model_box = QComboBox()
+        self.model_box.setMinimumWidth(300)
+        self.model_box.currentIndexChanged.connect(lambda _i: self.prefs.setValue('model', self.model_box.currentData() or ''))
+        row.addWidget(self.model_box, 1)
+        again = QPushButton('Refresh')
+        again.setToolTip('List the models on Ollama and LM Studio again (listing never loads one)')
+        again.clicked.connect(self.refresh_models)
+        row.addWidget(again)
+        col.addLayout(row)
+        self.instruction = QPlainTextEdit()
+        self.instruction.setPlaceholderText('What to change, e.g.\nMake the wings swept back and 2 rows thinner.\nAdd two tail fins at the back of the hull.\n\nOn an empty grid: describe a ship to draw.')
+        self.instruction.setMaximumHeight(130)
+        self.instruction.setStyleSheet('background:#0e1217;border:1px solid #232c36;border-radius:4px;')
+        col.addWidget(self.instruction)
+        opts = QHBoxLayout()
+        opts.addWidget(QLabel('Temperature'))
+        self.temp = QDoubleSpinBox()
+        self.temp.setRange(0, 2)
+        self.temp.setSingleStep(0.1)
+        self.temp.setValue(float(self.prefs.value('temperature', 0.3)))
+        opts.addWidget(self.temp)
+        opts.addWidget(QLabel('Retries'))
+        self.retries = QSpinBox()
+        self.retries.setRange(0, 5)
+        self.retries.setValue(int(self.prefs.value('retries', 2)))
+        self.retries.setToolTip('A reply that breaks a rule goes back with the problems, this many times at most')
+        opts.addWidget(self.retries)
+        self.think = QCheckBox('Let it think')
+        self.think.setToolTip('Reasoning models: think before answering (slower)')
+        opts.addWidget(self.think)
+        opts.addStretch(1)
+        col.addLayout(opts)
+        btns = QHBoxLayout()
+        self.send = QPushButton('Send  (Ctrl+Enter)')
+        self.send.clicked.connect(self.ask)
+        btns.addWidget(self.send)
+        self.stop_btn = QPushButton('Stop')
+        self.stop_btn.setEnabled(False)
+        self.stop_btn.clicked.connect(lambda: setattr(self, 'stop_flag', True))
+        btns.addWidget(self.stop_btn)
+        col.addLayout(btns)
+        self.ai_status = QLabel('', objectName='small')
+        self.ai_status.setWordWrap(True)
+        col.addWidget(self.ai_status)
+        self.talk = QTabWidget()
+        self.reply_view, self.prompt_view = QPlainTextEdit(), QPlainTextEdit()
+        for v, name in ((self.reply_view, 'Reply'), (self.prompt_view, 'Prompt')):
+            v.setReadOnly(True)
+            v.setStyleSheet('background:#0e1217;border:1px solid #232c36;font-family:Consolas;font-size:12px;')
+            self.talk.addTab(v, name)
+        col.addWidget(self.talk, 1)
+        return col
+
+    def refresh_models(self) -> None:
+        self.ai_status.setText('Listing models...')
+        threading.Thread(target=lambda: self.bridge.models.emit(*localllm.list_models()), daemon=True).start()
+
+    def on_models(self, models: list, notes: list) -> None:
+        self.models = models
+        want = self.model_box.currentData() or self.prefs.value('model', '')
+        self.model_box.blockSignals(True)
+        self.model_box.clear()
+        for m in models:
+            self.model_box.addItem(m['label'], m['id'])
+        i = self.model_box.findData(want)
+        self.model_box.setCurrentIndex(max(i, 0))
+        self.model_box.blockSignals(False)
+        self.ai_status.setText(f'{len(models)} models.' + (' ' + ' '.join(notes) if notes else ''))
+
+    def build_prompt(self, instruction: str) -> str:
+        parts, turrets, names = self.half_grid()
+        key = '\n'.join(f'{sym} = {n}' for sym, n in names.items()) or '(no parts yet)'
+        fill = {'key': key, 'grid': asciigrid.render(parts, turrets), 'instruction': instruction.strip(),
+                'last_col': str(len(parts[0]) - 1), 'last_row': str(len(parts) - 1)}
+        text = EDIT_PROMPT.read_text(encoding='utf-8')
+        for k, v in fill.items():
+            text = text.replace('{{' + k + '}}', v)
+        return text
+
+    def ask(self) -> None:
+        if self.busy:
+            return
+        model = next((m for m in self.models if m['id'] == self.model_box.currentData()), None)
+        if not model:
+            self.ai_status.setText('No model chosen. Start Ollama or LM Studio, then Refresh.')
+            return
+        if not self.instruction.toPlainText().strip():
+            self.ai_status.setText('Write what to change first.')
+            return
+        self.prefs.setValue('temperature', self.temp.value())
+        self.prefs.setValue('retries', self.retries.value())
+        prompt = self.build_prompt(self.instruction.toPlainText())
+        self.job = {'model': model, 'messages': [{'role': 'user', 'content': prompt}], 'attempt': 1,
+                    'size': (self.w - self.w // 2, self.h), 'stamp': time.strftime('%Y%m%d-%H%M%S')}
+        self.prompt_view.setPlainText(prompt)
+        self.run_job()
+
+    def run_job(self) -> None:
+        j = self.job
+        self.busy, self.stop_flag = True, False
+        self.send.setEnabled(False)
+        self.stop_btn.setEnabled(True)
+        self.reply_view.clear()
+        self.talk.setCurrentWidget(self.reply_view)
+        j.update(t0=time.time(), chars=0, thinking=0)
+        self.save_log(f'{j["attempt"]}-prompt', j['messages'][-1]['content'])
+        temp = self.temp.value() + 0.1 * (j['attempt'] - 1)
+        think = self.think.isChecked()
+
+        def go():
+            try:
+                out = localllm.chat(j['model'], j['messages'], lambda d, k: self.bridge.token.emit(d, k), lambda: self.stop_flag, temperature=temp, think=think)
+                self.bridge.done.emit(out)
+            except localllm.Stopped:
+                self.bridge.failed.emit('Stopped.')
+            except Exception as e:
+                self.bridge.failed.emit(f'{type(e).__name__}: {e}')
+        threading.Thread(target=go, daemon=True).start()
+        self.ai_status.setText(f'Asking {j["model"]["name"]} (try {j["attempt"]})... a model that is not loaded yet takes a while to start.')
+
+    def on_token(self, d: str, kind: str) -> None:
+        j = self.job
+        if kind == 'content':
+            j['chars'] += len(d)
+            self.reply_view.moveCursor(QTextCursor.End)
+            self.reply_view.insertPlainText(d)
+        else:
+            j['thinking'] += len(d)
+        secs = time.time() - j['t0']
+        self.ai_status.setText(f'{j["model"]["name"]}, try {j["attempt"]}: {secs:.0f} s, {j["chars"]} characters'
+                               + (f', thinking {j["thinking"]} characters' if j['thinking'] else ''))
+
+    def on_fail(self, why: str) -> None:
+        self.end_job()
+        self.ai_status.setText(why)
+
+    def end_job(self) -> None:
+        self.busy = False
+        self.send.setEnabled(True)
+        self.stop_btn.setEnabled(False)
+
+    def on_reply(self, out: dict) -> None:
+        j = self.job
+        text = out['text']
+        self.save_log(f'{j["attempt"]}-reply', text + (f'\n\n--- thinking ---\n{out["thinking"]}' if out['thinking'] else ''))
+        secs = time.time() - j['t0']
+        speed = f', {out["output_tokens"] / secs:.1f} tokens/s' if out.get('output_tokens') and secs > 0 else ''
+        cut = ' The reply was cut off (it hit the length limit).' if out.get('stop_reason') in ('length', 'max_tokens') else ''
+        problems = self.apply_ascii(text, size=j['size'])
+        head = f'Try {j["attempt"]}: {secs:.0f} s{speed}.{cut}'
+        if problems and j['attempt'] <= self.retries.value():
+            j['messages'] += [{'role': 'assistant', 'content': text}, {'role': 'user', 'content':
+                              'YOUR ANSWER HAD PROBLEMS:\n' + '\n'.join(f'- {p}' for p in problems)
+                              + '\nAnswer again with the full grid and key, fixing these. No other text.'}]
+            j['attempt'] += 1
+            self.run_job()
+            self.ai_status.setText(f'{head} {len(problems)} problems; asking again.')
+            return
+        self.end_job()
+        self.ai_status.setText(f'{head} ' + ('Every rule kept.' if not problems else f'{len(problems)} problems left (see the left panel).'))
+
+    def save_log(self, name: str, text: str) -> None:
+        d = self.dir / 'ai'
+        d.mkdir(parents=True, exist_ok=True)
+        (d / f'{self.job["stamp"]}-{name}.txt').write_text(text, encoding='utf-8')
 
     @staticmethod
     def shape_icon(shape: int) -> QIcon:
@@ -377,10 +581,11 @@ class Designer(QMainWindow):
         self.update_info('Applied.' if not problems else '\n'.join(problems))
         return problems
 
-    def apply_ascii(self, text: str) -> list[str]:
-        """A lettered grid of the right half, mirrored (21 wide for 11 columns), cleared first. Each part letter gets a
-        colour; T is a turret on its cell. Returns what it could not read and the rules broken"""
-        g = asciigrid.parse(text)
+    def apply_ascii(self, text: str, size: tuple[int, int] | None = None) -> list[str]:
+        """A lettered grid of the right half, mirrored (21 wide for 11 columns), cleared first. Each part letter keeps
+        its colour from the legend (a new letter takes an unused one); T is a turret on its cell. Given a size (half
+        width, rows) the reply must fit it. Returns what it could not read and the rules broken"""
+        g = asciigrid.parse(text, *(size or (0, 0)))
         if not g['parts']:
             self.update_info('\n'.join(g['problems']))
             return g['problems']
@@ -393,7 +598,11 @@ class Designer(QMainWindow):
         self.comps.clear()
         mid = self.w // 2
         letters = list(dict.fromkeys(r[0] for r in asciigrid.rectangles(parts)))
-        colour_of = {s: PART_COLOURS[i % len(PART_COLOURS)] for i, s in enumerate(letters)}
+        for s in letters:
+            used = {col for col, _n in self.legend.values()}
+            col = self.legend[s][0] if s in self.legend else next((c for c in PART_COLOURS if c not in used), PART_COLOURS[len(self.legend) % len(PART_COLOURS)])
+            self.legend[s] = (col, g['names'].get(s) or (self.legend[s][1] if s in self.legend else f'part {s}'))
+        colour_of = {s: self.legend[s][0] for s in letters}
         for y, row in enumerate(parts):
             for x, sym in enumerate(row):
                 if sym != asciigrid.EMPTY:
@@ -404,7 +613,7 @@ class Designer(QMainWindow):
                 self.cells[(y, c)] = (GUN, 0)
                 self.comps[(y, c)] = 'turret'
         problems = g['problems'] + asciigrid.check(parts, turrets, g['names'])
-        key = ', '.join(f'{s} {PALETTE[colour_of[s]][0]}' + (f' ({g["names"][s]})' if s in g['names'] else '') for s in letters)
+        key = ', '.join(f'{s} {self.legend[s][1]}' for s in letters)
         self.canvas.update()
         self.update_info(f'Grid read: {len(letters)} parts ({key}), {len(turrets)} turrets a side.\n'
                          + ('\n'.join(problems) if problems else 'Every rule kept.'))
@@ -412,10 +621,10 @@ class Designer(QMainWindow):
 
     def half_grid(self) -> tuple[list[list[str]], set[tuple[int, int]], dict[str, str]]:
         """The drawing's right half as a lettered grid: a letter per colour (A first, in the order the colours appear
-        from the nose down), turrets as T; the names are the palette's"""
+        from the nose down), turrets as T. A colour already in the legend keeps its letter and name; a new one is named
+        after its palette colour and added"""
         mid = self.w // 2
-        pool = 'ABCDEFGHIJKLMNOPQRSUVWXYZ'
-        letters: dict[int, str] = {}
+        letters: dict[int, str] = {col: s for s, (col, _n) in self.legend.items()}
         parts = [[asciigrid.EMPTY] * (self.w - mid) for _ in range(self.h)]
         turrets = set()
         for (r, c), (col, _sh) in sorted(self.cells.items()):
@@ -425,10 +634,12 @@ class Designer(QMainWindow):
                 turrets.add((r, c - mid))
                 continue
             if col not in letters:
-                letters[col] = pool[len(letters) % len(pool)]
+                letters[col] = next((s for s in LETTERS if s not in self.legend), '#')
+                self.legend[letters[col]] = (col, PALETTE[col][0])
             parts[r][c - mid] = letters[col]
         asciigrid.under_turrets(parts, turrets)
-        return parts, turrets, {sym: PALETTE[col][0] for col, sym in letters.items()}
+        shown = {s for row in parts for s in row}
+        return parts, turrets, {s: n for s, (_c, n) in sorted(self.legend.items()) if s in shown}
 
     def copy_grid(self) -> None:
         parts, turrets, names = self.half_grid()
@@ -575,6 +786,7 @@ class Designer(QMainWindow):
         self.push_undo()
         self.cells.clear()
         self.comps.clear()
+        self.legend.clear()
         self.canvas.update()
         self.update_info()
 
@@ -619,7 +831,8 @@ class Designer(QMainWindow):
         if path:
             Path(path).write_text(json.dumps({'width': self.w, 'height': self.h, 'palette': PALETTE,
                                               'cells': [[r, c, col, sh] for (r, c), (col, sh) in sorted(self.cells.items())],
-                                              'components': [[r, c, k] for (r, c), k in sorted(self.comps.items())]}), encoding='utf-8')
+                                              'components': [[r, c, k] for (r, c), k in sorted(self.comps.items())],
+                                              'legend': [[s, col, n] for s, (col, n) in sorted(self.legend.items())]}), encoding='utf-8')
             self.update_info(f'Saved {Path(path).name}')
 
     def open(self) -> None:
@@ -634,6 +847,7 @@ class Designer(QMainWindow):
         self.sh.setValue(self.h)
         self.cells = {(r, c): (min(col, len(PALETTE) - 1), sh) for r, c, col, sh in d['cells']}
         self.comps = {(r, c): k for r, c, k in d.get('components', [])}
+        self.legend = {s: (col, n) for s, col, n in d.get('legend', [])}
         self.canvas.update()
         self.update_info(f'Opened {Path(path).name}')
 

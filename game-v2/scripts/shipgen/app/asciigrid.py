@@ -30,10 +30,11 @@ def looks_like_grid(text: str) -> bool:
     return len(rows) >= 3
 
 
-def parse(text: str, width: int = 0) -> dict:
+def parse(text: str, width: int = 0, height: int = 0) -> dict:
     """Read a model's grid, tolerantly: fences, prose, a header line, missing spaces, lowercase and short rows are
     all survivable. Returns {parts: rows of symbols, turrets: {(y, x)}, names: {symbol: name}, problems: [...]}.
-    A row with the wrong number of cells is left empty and reported; a missing row is empty"""
+    A row with the wrong number of cells is left empty and reported; a missing row is empty. Given a width or height,
+    the grid is that size (rows past it are reported and dropped); else it is read from the reply"""
     problems, rows, names = [], {}, {}
     header_w = 0
     for raw in text.splitlines():
@@ -55,7 +56,13 @@ def parse(text: str, width: int = 0) -> dict:
     if not width:
         counts = Counter(len(t) for t in rows.values() if len(t) > 1)
         width = header_w or (counts.most_common(1)[0][0] if counts else HALF_W)
-    height = max(HEIGHT, max(rows) + 1)
+    if height:
+        off = [y for y in rows if y >= height]
+        if off:
+            problems.append(f'rows {span(off)} are off the grid (rows 0 to {height - 1}); dropped')
+        rows = {y: t for y, t in rows.items() if y < height}
+    else:
+        height = max(HEIGHT, max(rows) + 1)
     parts = [[EMPTY] * width for _ in range(height)]
     turrets: set[tuple[int, int]] = set()
     odd = set()
@@ -79,7 +86,7 @@ def parse(text: str, width: int = 0) -> dict:
     under_turrets(parts, turrets)
     if odd:
         problems.append(f'read {", ".join(sorted(odd))} as filled cells of part #')
-    missing = [y for y in range(max(rows) + 1) if y not in rows]
+    missing = [y for y in range(max(rows) + 1) if y not in rows] if rows else []
     if missing:
         problems.append(f'rows missing (left empty): {span(missing)}')
     return {'parts': parts, 'turrets': turrets, 'names': names, 'problems': problems}
