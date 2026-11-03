@@ -1,61 +1,85 @@
 ---
-title: Suns and planets
+title: Reworking the graphics
 tags: [graphics]
 status: published
 slug: suns-and-planets
 date: 2026-11-01
-summary: Stars and planets are drawn in a new way. Before and after shots from the game, side by side.
+summary: New suns, planets and sky, rebuilt from scratch and cheaper to draw; a new sign-in screen, the Citadel, asteroids and the Brood Mother.
 cover: ../../../docs/panels/site-posts/jovan-before-after.jpg
 ---
 
-Stars and planets are now drawn with a new method. Each picture below is a before and after pair: the old look on the left, the new look on the right, taken in the live game from the same spot and zoom. In the star shots the heads-up display and chat are visible because they were on screen at the time.
+So the last few days I've been auditing and redoing a lot of the in-game graphics. The old shaders had become quite inefficient: crap stacked on top of crap to try and get an interesting, detailed look. So I decided to look at them from scratch and upgrade them.
 
-## Stars
+I found I can get a much better result in almost every case, with more detailed and interesting effects, and it turns out it's much cheaper on the graphics card too.
 
-Stars used to be a flat disc with a blurred edge. They are now a moving plasma surface with a ragged, glowing rim, drawn at half resolution so they cost less to render. The sky behind them now draws its stars as small sprites.
+In each picture below the old version is on the left and the new one on the right.
 
-### Sol
+## The suns
 
-![Sol's edge from close by, before (left) and after (right)](../../../docs/panels/site-posts/sol-sun-before-after.jpg)
+| Star | Old (ms a frame) | New (ms a frame) | Cheaper by |
+|---|---|---|---|
+| Sol | 0.19 | 0.048 | about 4× |
+| Nebula Prime | 0.39 | 0.042 | about 9× |
+| Borealis | 0.49 | 0.036 | about 13× |
 
-*Before / after.* Before, Sol's edge is a smooth orange disc with a soft blur and long pale streaks of haze across the sky to its left. After, the surface shows fine bright filaments and darker gaps, the edge is uneven, and a lighter glow fades out over the sky. In the benchmark harness the sun's cost per frame at 1080p went from 0.19 ms to 0.048 ms.
+*Measured at 1080p, at each star's edge. At 4K the old sun cost 0.8 to 2.2 ms a frame and the new one 0.13 to 0.29 ms.*
 
-### Nebula Prime
+As you can see, the old sun was far more expensive, and looked far worse. Even with a half-scale shader (which is almost indistinguishable from the full-size one for this) the new effect is better, and somewhere between about 4 and 13 times less expensive depending on the star and your zoom level.
 
-![Nebula Prime's star at its edge, before (left) and after (right)](../../../docs/panels/site-posts/nebula-prime-sun-before-after.jpg)
+![Sol's edge from close by, old (left) and new (right)](../../../docs/panels/site-posts/sol-sun-before-after.jpg)
 
-*Before / after.* Before, Nebula Prime's star is a pale pink disc with a hard edge and a visible horizontal band across it. After, the edge is a column of pink and white plasma that thins out into streaks and blends into the nebula behind it. The sun's cost per frame went from 0.39 ms to 0.042 ms.
+Sol used to be a smooth orange disc with a soft blur at the edge. Now it's a moving plasma surface with fine bright filaments and dark gaps, and a ragged edge that glows out into the sky.
 
-### Borealis
+![Nebula Prime's star, old (left) and new (right)](../../../docs/panels/site-posts/nebula-prime-sun-before-after.jpg)
 
-![Borealis' star at its edge, before (left) and after (right)](../../../docs/panels/site-posts/borealis-sun-before-after.jpg)
+Nebula Prime's star had a hard pink edge with a band running across it. Its edge now breaks up into pink and white plasma that fades into the nebula behind.
 
-*Before / after.* Before, Borealis' star is a smooth pale cyan disc with a visible seam near the top of the edge. After, it is blue with bright turbulent streaks running across the surface and a darker blue at the rim. The sun's cost per frame went from 0.49 ms to 0.036 ms.
+![Borealis' star, old (left) and new (right)](../../../docs/panels/site-posts/borealis-sun-before-after.jpg)
 
-## Planets
+Borealis went from a flat pale disc, with a visible seam near the top, to a deep blue star with turbulent streaks across it.
 
-Planets are drawn as lit spheres with their own surface detail, an atmosphere or heat glow at the edge, and shading that follows the direction of the star. In the pairs below the planet and the camera sit in slightly different places, because the two shots were taken in the live game at different moments.
+The stars in the background had a bit of optimisation too. They're now drawn as sprites in a single pass, which took the sky from 0.22 to 0.023 ms a frame, about ten times cheaper. They look slightly better, but it's not a huge change. If a sun fills the whole screen, the sky behind it isn't drawn at all.
 
-### Jovan
+## The planets
 
-![Jovan with its rings, before (left) and after (right)](../../../docs/panels/site-posts/jovan-before-after.jpg)
+Besides that, I also updated the planets. Each one is now a lit sphere with its own surface detail, an atmosphere or a heat glow at the edge, and shading that follows where its star is. Far out they cost about the same as before; up close they're up to about three times cheaper. A gas giant's surface up close went from 0.23 to 0.08 ms a frame, and at 4K Jovan's edge went from 0.74 to 0.27 ms.
 
-*Before / after.* Before, Jovan has wide brown and cream bands with a small swirl near the upper right edge and thin, faint rings. After, the bands are narrower and look like flowing, folded clouds, a large red storm sits on the right side, the rings are wider and let the planet show through, and the edge has a soft glow. Planets cost about the same from far away and up to three times less up close.
+The planets move along their orbits, so the old and new shots aren't framed exactly the same.
 
-### Terra Nova
+![Jovan, old (left) and new (right)](../../../docs/panels/site-posts/jovan-before-after.jpg)
 
-![Terra Nova, before (left) and after (right)](../../../docs/panels/site-posts/terra-nova-before-after.jpg)
+Jovan used to have wide, flat bands and thin, faint rings. Now its bands fold and flow like clouds, there's a great red storm on its side, and the rings are wider and see-through.
 
-*Before / after.* Before, Terra Nova has flat yellow-green patches on blue sea, a pale band across the top and a hard straight line where day ends and night begins. After, the continents have coastlines and varied ground colour, white ice covers the top, clouds drift over the surface, and the day side fades into the dark side through a soft twilight edge.
+![Terra Nova, old (left) and new (right)](../../../docs/panels/site-posts/terra-nova-before-after.jpg)
 
-### A lava world
+Terra Nova had flat green patches on blue and a hard line where night begins. It now has proper coastlines, ice at the pole, drifting clouds and a soft twilight edge.
 
-![Kindle, a lava world, before (left) and after (right)](../../../docs/panels/site-posts/lava-world-before-after.jpg)
+![Kindle, a lava world, old (left) and new (right)](../../../docs/panels/site-posts/lava-world-before-after.jpg)
 
-*Before / after.* Before, Kindle is a dark ball with smooth orange loops that look like contour lines. After, the surface is made of dark crust plates with rough edges, and the glowing orange rivers run in the cracks between them.
+The lava worlds went from a dark ball with orange contour lines to plates of dark crust with glowing rivers running through the cracks.
 
-### A brown dwarf
+![Ashfall's brown dwarf, old (left) and new (right)](../../../docs/panels/site-posts/brown-dwarf-before-after.jpg)
 
-![Ashfall's brown dwarf, before (left) and after (right)](../../../docs/panels/site-posts/brown-dwarf-before-after.jpg)
+The brown dwarf's stripes now break up into swirls and eddies, and the whole thing glows with its own heat.
 
-*Before / after.* Before, Ashfall's brown dwarf is a set of broad, smooth dark and light stripes. After, the stripes are broken into swirls and eddies, the whole surface glows orange from heat, and the rim has a thin bright halo. The branching bright scar across the middle is in both.
+## The sign-in screen
+
+I also updated the sign-in screen to show a random selection of celestial bodies from Sol, with the new sun off in the corner as the light. The sun itself still turns up about one visit in six. It loads in about the same time as before.
+
+![The sign-in screen, old (left) and new (right)](../../../docs/panels/site-posts/sign-in-before-after.jpg)
+
+![Two more of the sign-in backgrounds, Ares and Vesta](../../../docs/panels/site-posts/sign-in-ares-vesta.jpg)
+
+## Everything else
+
+The Citadel station got a new look as well. Its rings are now lit from one side, with highlights and shadow, instead of being evenly lit all over. The hub in the middle is a glass dome edged with lights, where it used to be a flat disc.
+
+![The Citadel, old (left) and new (right): the whole station on top, the hub up close underneath](../../../docs/panels/site-posts/final_citadel_before_after.png)
+
+The asteroids now come in eighteen types across six materials: stone, ice, crystal, metal, tar and leestone. Each one has its own look, so you can tell at a glance what you're about to mine. There's no old picture to compare against for this one.
+
+![The eighteen asteroid types](../../../docs/panels/site-posts/v12_panel.png)
+
+And there's a new boss on the way, the Brood Mother. Her look is done; her fight is still being built.
+
+![The Brood Mother](../../../docs/panels/site-posts/brood-mother.jpg)
