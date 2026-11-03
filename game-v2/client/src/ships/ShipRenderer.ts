@@ -545,12 +545,10 @@ export class ShipRenderer {
       seen.add(eid);
       let view = this.views.get(eid);
       if (!view) {
-        view = { id: eid, container: new Container(), flames: new Container(), guns: new Container(), turrets: [], ship: null, turretShip: null, turretRebuilds: -1, rebuilds: -1, hullKey: '', flashLevel: 0,
-          barrels: new Container(), fixed: [], lamps: 0, fade: 0, labelAlpha: 1, hullFor: null };
-        view.container.addChild(view.guns);
-        this.flamesLayer.addChild(view.flames);
-        this.underLayer.addChild(view.barrels);
-        this.overLayer.addChild(view.container);
+        // Back before it had faded out (its entity gone a moment and sent again, an id that came straight back): the
+        // fading view is taken up again. A second view beside it would lose its hull when the old one finished fading,
+        // the batch slot being the ship's id (hull gone for good, its guns and flames still drawn)
+        view = this.takeBack(eid) ?? this.newView(eid);
         this.views.set(eid, view);
       }
       // Docked: inside the station, out of sight
@@ -729,11 +727,30 @@ export class ShipRenderer {
     if (mine) this.hulls.place(view.id, x, y, c.rotation, view.fade, view.flashLevel * view.fade);
   }
 
+  /** A ship's view, empty (its hull, guns and flames come as it's drawn) */
+  private newView(eid: number): BodyView {
+    const view: BodyView = { id: eid, container: new Container(), flames: new Container(), guns: new Container(), turrets: [], ship: null, turretShip: null, turretRebuilds: -1, rebuilds: -1, hullKey: '', flashLevel: 0,
+      barrels: new Container(), fixed: [], lamps: 0, fade: 0, labelAlpha: 1, hullFor: null };
+    view.container.addChild(view.guns);
+    this.flamesLayer.addChild(view.flames);
+    this.underLayer.addChild(view.barrels);
+    this.overLayer.addChild(view.container);
+    return view;
+  }
+
+  /** A view of this ship still fading out, taken off the leaving list (it fades back in from where it had got to) */
+  private takeBack(eid: number): BodyView | undefined {
+    const i = this.leaving.findIndex((v) => v.id === eid);
+    return i < 0 ? undefined : this.leaving.splice(i, 1)[0];
+  }
+
   private dispose(view: BodyView): void {
     view.label?.destroy();
     view.bar?.destroy();
     view.flames.destroy({ children: true });
-    this.hulls.remove(view.id);
+    // (The batch slot is the ship's id: not taken from another view of it that's live now)
+    const live = this.views.get(view.id);
+    if (!live || live === view) this.hulls.remove(view.id);
     view.beam?.destroy();
     this.clearBarrels(view);
     view.barrels.destroy();
