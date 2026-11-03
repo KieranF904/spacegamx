@@ -12,10 +12,17 @@
  * Each record becomes the messages the server would have sent (projectileHit, ignite, detonation, damage), which go
  * through the usual handlers, so a hit looks just as it does without confirmed hits. What it can't work out (a shell
  * or ship it doesn't have) it asks the server to put right (hpResync), as it does when an hpCheck disagrees.
+ *
+ * Client-detected hits (part D, CAPS.SELF_HITS: SelfHits.ts finds them) go through the same rules, but in three steps
+ * over one frame: `own` (the hits it found, as the snapshot arrives: their HP at once, so the shipHps and hpCheck
+ * later in the frame meet the HP the server expects), `told` (the server's records for what it couldn't find or would
+ * get wrong: a record for a hit it found too puts that one right), `oldWay` (a shell the server told the old way: its
+ * own hit is dropped), then `flush` at the frame's end hands out the messages.
  */
 import {
   CAPS, unpackHits, gunShell, deriveShellHit, igniteRule, hitEndFx, hpChecksum, castParts, worldToLocalDir, shipPointToWorld,
   type ClientMessage, type ServerMessage, type ServerHitsMessage, type ServerHpCheckMessage, type ShipState, type HitCtx, type PlacedGeom,
+  hpWire, type ShellHitRecord, type HitEndFx,
 } from '@space-game/common';
 
 /** A shell as the client has it: who fired it, from which gun (a fire event's packing), and its straight line */
@@ -41,6 +48,32 @@ export interface HitsOutcome {
   gone: number[];
 }
 
+/** A hit this client found itself (SelfHits): the struck part, the tick, where on the line */
+export interface OwnHit { shell: number; tick: number; target: number; part: number; x: number; y: number }
+
+/** One hit worked out: what its messages will say, and how to take its HP back */
+export interface HitDone {
+  shell: number;
+  target: number;
+  /** The part the line struck (before a boss's cover): what the hit chain counts */
+  part: number;
+  tick: number;
+  owner: number;
+  glancing: boolean;
+  gone: boolean;
+  dealt: number;
+  ignite: number;
+  igniteTicks: number;
+  fx: HitEndFx | null;
+  at: [number, number];
+  /** It found this one itself (else the server's record) */
+  own: boolean;
+  /** The HP part it changed, what it was before and after, to take back (a shield's record, or the old way) */
+  undo: { part: number; hp: number; after: number } | null;
+  /** The shell's pass count before it */
+  prev: number;
+}
+
 export class ConfirmedHits {
   /** Ships each shell has passed through (records that didn't end it), as the server counts them for this client */
   private passes = new Map<number, number>();
@@ -53,52 +86,144 @@ export class ConfirmedHits {
   private dropping: readonly number[] = [];
   /** Ships whose HP it should be sent again (hpResync), gathered while handling a message */
   private resync = new Set<number>();
+  /** Client-detected hits: this frame's, waiting for the server's records and the frame's end */
+  private pending: HitDone[] = [];
+  /** ...and spent shells whose records couldn't be worked out */
+  private lostGone: number[] = [];
+  /** Shells worked out lately (shellOf) */
+  private recent = new Map<number, HitShell>();
   /** Counters (tests, the console) */
-  readonly stats = { records: 0, missed: 0, checks: 0, mismatches: 0, resyncs: 0 };
+  readonly stats = { records: 0, missed: 0, checks: 0, mismatches: 0, resyncs: 0, own: 0, overridden: 0, oldWay: 0 };
 
   constructor(private host: ConfirmedHitsHost) {}
 
+  /**
+   * A shell as the client has it: the game's, one the snapshot just removed, or one worked out lately (a correction
+   * can name a shell gone since)
+   */
+  private shellOf(id: number): HitShell | null {
+    const s = this.host.shell(id) ?? this.dropped.get(id) ?? this.recent.get(id) ?? null;
+    if (s && !this.recent.has(id)) {
+      this.recent.set(id, s);
+      if (this.recent.size > 512) this.recent.delete(this.recent.keys().next().value!);
+    }
+    return s;
+  }
+
+  /** A shell's ship passes so far (its pierce count, as the server counts it for this client) */
+  passesOf(shell: number): number {
+    return this.passes.get(shell) ?? 0;
+  }
+
   /** One hits message, `snapTick` the tick of the snapshot just applied (a record's hit tick counts back from it) */
   expand(msg: ServerHitsMessage, snapTick: number): HitsOutcome {
-    const { store } = this.host;
-    const out: HitsOutcome = { msgs: [], ships: new Set(), gone: [] };
-    const sums = new Map<string, { target: number; source: number; glancing: boolean; amount: number }>();
+    const done: HitDone[] = [], lost: number[] = [];
     for (const r of unpackHits(msg.h)) {
-      this.stats.records++;
-      const passes = this.passes.get(r.shell) ?? 0;
-      if (r.gone) { this.passes.delete(r.shell); out.gone.push(r.shell); } else this.passes.set(r.shell, passes + 1);
-      const s = this.host.shell(r.shell) ?? this.dropped.get(r.shell) ?? null, ship = store.get(r.target), owner = s ? store.get(s.owner) : undefined;
-      const sh = s && owner ? gunShell(store.tuning, owner, s.gun) : null;
-      if (!s || !ship || !sh) { this.stats.missed++; this.resync.add(r.target); continue; }
-      const tick = snapTick - r.ago;
-      const at = this.hitPoint(s, ship, r.target, r.part, tick);
-      out.msgs.push({ type: 'projectileHit', id: r.shell, x: at[0], y: at[1] });
-      let dealt: number, ignite: number;
-      if (r.shield) {
-        // (a shield took some: the HP comes after, in the shipHps)
-        dealt = 0;
-        ignite = igniteRule(ship, r.part, sh.def);
-      } else {
-        const d = deriveShellHit({ ctx: store, ship, struck: r.part, kind: sh.kind, def: sh.def, grade: sh.grade, strength: sh.strength, passes });
-        dealt = d.dealt;
-        ignite = d.ignite;
-        if (d.part >= 0) out.ships.add(r.target);
-      }
-      if (r.d10 !== undefined) dealt = r.d10 / 10;
-      if (r.ignite !== undefined) ignite = r.ignite;
-      if (ignite >= 0 && sh.def.ignite) out.msgs.push({ type: 'ignite', bodyId: r.target, part: ignite, ticks: sh.def.ignite.ticks });
-      const fx = hitEndFx(sh.kind, sh.def, r.gone);
-      if (fx) out.msgs.push({ type: 'detonation', kind: fx.kind, x: Math.round(at[0]), y: Math.round(at[1]), radius: fx.radius });
-      const key = `${r.target},${s.owner},${r.glancing ? 1 : 0}`;
-      const e = sums.get(key);
-      if (e) e.amount += dealt; else sums.set(key, { target: r.target, source: s.owner, glancing: r.glancing, amount: dealt });
+      const d = this.record(r, snapTick - r.ago, true);
+      if (d) done.push(d); else if (r.gone) lost.push(r.shell);
     }
-    // The damage, summed and rounded as the server's flushDamage does
-    for (const e of sums.values()) {
-      const amount = Math.round(e.amount * 10) / 10;
-      if (amount > 0) out.msgs.push({ type: 'damage', targetId: e.target, amount, sourceId: e.source, ...(e.glancing ? { glancing: true } : {}) });
+    const out = this.messages(done);
+    // (a spent shell goes even if its hit couldn't be worked out)
+    out.gone.push(...lost);
+    this.settle();
+    this.flush();
+    return out;
+  }
+
+  // ---- Client-detected hits (part D): own, told, oldWay, then flushPending at the frame's end ----
+
+  /** The hits this client found in the snapshot just applied (in tick, then shell order): worked out, HP at once */
+  own(hits: readonly OwnHit[]): void {
+    const { store } = this.host;
+    for (const o of hits) {
+      const s = this.shellOf(o.shell), ship = store.get(o.target), owner = s ? store.get(s.owner) : undefined;
+      const sh = s && owner ? gunShell(store.tuning, owner, s.gun) : null;
+      if (!s || !ship || !sh) continue;
+      const passes = this.passes.get(o.shell) ?? 0;
+      const before = ship.hp.slice();
+      const d = deriveShellHit({ ctx: store, ship, struck: o.part, kind: sh.kind, def: sh.def, grade: sh.grade, strength: sh.strength, passes });
+      if (d.gone) this.passes.delete(o.shell); else this.passes.set(o.shell, passes + 1);
+      this.stats.own++;
+      this.pending.push({
+        shell: o.shell, target: o.target, part: o.part, tick: o.tick, owner: s.owner, glancing: d.glancing, gone: d.gone, dealt: d.dealt,
+        ignite: d.ignite, igniteTicks: sh.def.ignite?.ticks ?? 0, fx: d.fx, at: [Math.round(o.x * 10) / 10, Math.round(o.y * 10) / 10], own: true,
+        undo: d.part >= 0 ? { part: d.part, hp: before[d.part], after: ship.hp[d.part] } : null, prev: passes,
+      });
+    }
+  }
+
+  /**
+   * The server's records this frame (part D: what this client couldn't find, or would get wrong). One for a hit it
+   * found too puts that one right (the number, a shield's share, the fire, the end); the rest are worked out as ever.
+   */
+  told(msg: ServerHitsMessage, snapTick: number): void {
+    for (const r of unpackHits(msg.h)) {
+      const mine = this.pending.find((d) => d.own && d.shell === r.shell && d.target === r.target);
+      if (!mine) {
+        const d = this.record(r, snapTick - r.ago, true);
+        if (d) this.pending.push(d);
+        else if (r.gone) this.lostGone.push(r.shell);
+        continue;
+      }
+      this.stats.overridden++;
+      mine.own = false;
+      // (Its pass count, as the record has it: spent, or one more than before)
+      if (r.gone !== mine.gone) { if (r.gone) this.passes.delete(r.shell); else this.passes.set(r.shell, mine.prev + 1); }
+      mine.gone = r.gone;
+      mine.glancing = r.glancing;
+      if (r.shield && mine.undo) {
+        // (a shield took some: its HP comes in the shipHps after, from what it was before)
+        this.takeBack(r.target, mine.undo);
+        mine.undo = null;
+      }
+      if (r.d10 !== undefined) mine.dealt = r.d10 / 10;
+      if (r.ignite !== undefined) mine.ignite = r.ignite;
+      const s = this.host.shell(r.shell) ?? this.dropped.get(r.shell);
+      const owner = s ? this.host.store.get(s.owner) : undefined, sh = s && owner ? gunShell(this.host.store.tuning, owner, s.gun) : null;
+      if (sh) mine.fx = hitEndFx(sh.kind, sh.def, r.gone);
     }
     this.settle();
+  }
+
+  /** A shell the server told the old way this frame (a projectileHit): a hit it found for it isn't one; its HP goes back */
+  oldWay(shell: number): void {
+    for (let i = this.pending.length - 1; i >= 0; i--) {
+      const d = this.pending[i];
+      if (!d.own || d.shell !== shell) continue;
+      if (d.undo) this.takeBack(d.target, d.undo);
+      // (its pass count back too)
+      if (d.prev) this.passes.set(shell, d.prev); else this.passes.delete(shell);
+      this.pending.splice(i, 1);
+      this.stats.oldWay++;
+    }
+  }
+
+  /** The frame's end: this frame's hits (found and told) as their messages, and the hits themselves (for the chain) */
+  flushPending(): { out: HitsOutcome; done: HitDone[] } {
+    const done = this.pending;
+    this.pending = [];
+    const out = this.messages(done);
+    out.gone.push(...this.lostGone.splice(0));
+    this.flush();
+    return { out, done };
+  }
+
+  /**
+   * A correction (hitFix): the hits this client missed worked out now as records (the number is the record's; one it
+   * can't work out asks for its ship's HP), and the hits it had that the server didn't taken back. The server checks
+   * the ships' HP soon after (hpCheck)
+   */
+  corrected(missed: readonly ShellHitRecord[], tick: number, wrong: readonly { target: number; undo: HitDone['undo'] }[]): HitsOutcome {
+    const done: HitDone[] = [], lost: number[] = [];
+    for (const r of missed) {
+      const d = this.record(r, tick - r.ago, true);
+      if (d) done.push(d); else if (r.gone) lost.push(r.shell);
+    }
+    const out = this.messages(done);
+    out.gone.push(...lost);
+    for (const w of wrong) {
+      if (w.undo) { this.takeBack(w.target, w.undo); out.ships.add(w.target); }
+    }
     this.flush();
     return out;
   }
@@ -132,6 +257,69 @@ export class ConfirmedHits {
     this.dropped.clear();
     this.dropping = [];
     this.resync.clear();
+    this.pending = [];
+    this.lostGone = [];
+    this.recent.clear();
+  }
+
+  /**
+   * One record worked out (`hp`: into the ship store, as a record does; false: a correction's, messages only). Null:
+   * it can't be (a shell or ship it doesn't have): their HP is asked for
+   */
+  private record(r: ShellHitRecord, tick: number, hp: boolean): HitDone | null {
+    const { store } = this.host;
+    this.stats.records++;
+    const passes = this.passes.get(r.shell) ?? 0;
+    if (r.gone) this.passes.delete(r.shell); else this.passes.set(r.shell, passes + 1);
+    const s = this.shellOf(r.shell), ship = store.get(r.target), owner = s ? store.get(s.owner) : undefined;
+    const sh = s && owner ? gunShell(store.tuning, owner, s.gun) : null;
+    if (!s || !ship || !sh) { this.stats.missed++; if (hp) this.resync.add(r.target); return null; }
+    const at = this.hitPoint(s, ship, r.target, r.part, tick);
+    let dealt = 0, ignite: number, undo: HitDone['undo'] = null;
+    if (r.shield || !hp) {
+      // (a shield took some, or a correction: the HP comes after, in the shipHps)
+      ignite = igniteRule(ship, r.part, sh.def);
+    } else {
+      const before = ship.hp.slice();
+      const d = deriveShellHit({ ctx: store, ship, struck: r.part, kind: sh.kind, def: sh.def, grade: sh.grade, strength: sh.strength, passes });
+      dealt = d.dealt;
+      ignite = d.ignite;
+      if (d.part >= 0) undo = { part: d.part, hp: before[d.part], after: ship.hp[d.part] };
+    }
+    if (r.d10 !== undefined) dealt = r.d10 / 10;
+    if (r.ignite !== undefined) ignite = r.ignite;
+    return {
+      shell: r.shell, target: r.target, part: r.part, tick, owner: s.owner, glancing: r.glancing, gone: r.gone, dealt, ignite,
+      igniteTicks: sh.def.ignite?.ticks ?? 0, fx: hitEndFx(sh.kind, sh.def, r.gone), at, own: false, undo, prev: passes,
+    };
+  }
+
+  /** Hits as the messages the server would have sent: each one's impact, fire and end, then the damage summed */
+  private messages(done: readonly HitDone[]): HitsOutcome {
+    const out: HitsOutcome = { msgs: [], ships: new Set(), gone: [] };
+    const sums = new Map<string, { target: number; source: number; glancing: boolean; amount: number }>();
+    for (const d of done) {
+      if (d.gone) out.gone.push(d.shell);
+      if (d.undo) out.ships.add(d.target);
+      out.msgs.push({ type: 'projectileHit', id: d.shell, x: d.at[0], y: d.at[1] });
+      if (d.ignite >= 0 && d.igniteTicks) out.msgs.push({ type: 'ignite', bodyId: d.target, part: d.ignite, ticks: d.igniteTicks });
+      if (d.fx) out.msgs.push({ type: 'detonation', kind: d.fx.kind, x: Math.round(d.at[0]), y: Math.round(d.at[1]), radius: d.fx.radius });
+      const key = `${d.target},${d.owner},${d.glancing ? 1 : 0}`;
+      const e = sums.get(key);
+      if (e) e.amount += d.dealt; else sums.set(key, { target: d.target, source: d.owner, glancing: d.glancing, amount: d.dealt });
+    }
+    // The damage, summed and rounded as the server's flushDamage does
+    for (const e of sums.values()) {
+      const amount = Math.round(e.amount * 10) / 10;
+      if (amount > 0) out.msgs.push({ type: 'damage', targetId: e.target, amount, sourceId: e.source, ...(e.glancing ? { glancing: true } : {}) });
+    }
+    return out;
+  }
+
+  /** A hit's HP taken back: what it took, given back (other hits on the part since keep theirs) */
+  private takeBack(target: number, u: { part: number; hp: number; after: number }): void {
+    const ship = this.host.store.get(target);
+    if (ship) ship.hp[u.part] = hpWire(ship.hp[u.part] + (u.hp - u.after));
   }
 
   private settle(): void {
@@ -175,18 +363,20 @@ export class ConfirmedHits {
 
 /**
  * The caps this client announces in its join: confirmed hits when `?hits=1` (remembered; `?hits=0` turns it off),
- * else what was remembered, else on in a dev build. The server takes them only where it allows (the dev server).
+ * else what was remembered, else on in a dev build. Client-detected hits (SELF_HITS) go with them unless `?selfhits=0`
+ * (remembered; `?selfhits=1` back on). The server takes them only where it allows (the dev server).
  */
 export function clientCaps(): number {
-  let on: boolean | null = null;
-  try {
-    const q = new URLSearchParams(globalThis.location?.search ?? '').get('hits');
-    if (q === '0' || q === '1') { on = q === '1'; globalThis.localStorage?.setItem('sg.hits', q); }
-    else {
-      const v = globalThis.localStorage?.getItem('sg.hits');
-      if (v === '0' || v === '1') on = v === '1';
-    }
-  } catch { /* no storage: the default */ }
-  if (on === null) on = !!(import.meta as { env?: { DEV?: boolean } }).env?.DEV;
-  return on ? CAPS.HITS : 0;
+  const flag = (q: string, key: string): boolean | null => {
+    try {
+      const v = new URLSearchParams(globalThis.location?.search ?? '').get(q);
+      if (v === '0' || v === '1') { globalThis.localStorage?.setItem(key, v); return v === '1'; }
+      const m = globalThis.localStorage?.getItem(key);
+      if (m === '0' || m === '1') return m === '1';
+    } catch { /* no storage: the default */ }
+    return null;
+  };
+  const on = flag('hits', 'sg.hits') ?? !!(import.meta as { env?: { DEV?: boolean } }).env?.DEV;
+  if (!on) return 0;
+  return CAPS.HITS | (flag('selfhits', 'sg.selfhits') ?? true ? CAPS.SELF_HITS : 0);
 }

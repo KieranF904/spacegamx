@@ -406,6 +406,8 @@ this.xpFillEl = document.getElementById('xpFill');
     
     // Set up network handlers
     this.network.onMessage = (msg) => this.handleServerMessage(msg);
+    // (Client-detected hits: a frame's hits go out once the whole frame is in, ships/hits/SelfHits.ts)
+    this.network.onFrameEnd = () => this.shipClient.frameEnd((m) => this.handleServerMessage(m));
     this.network.onConnect = () => this.onConnected();
     this.network.onDisconnect = (info) => this.onDisconnected(info);
 
@@ -1342,7 +1344,7 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'flex';
     // (Each carries our protocol version: a server on another one hangs up with PROTOCOL_MISMATCH_CLOSE)
     const pending = this.pendingAuth;
     // (A new connection: confirmed hits' shell counts start afresh, as the server's do)
-    this.shipClient.hits.reset();
+    this.shipClient.resetHits();
     if (pending) {
       // Guest
       this.network.send({ type: 'join', username: pending.username, protocol: PROTOCOL_VERSION, caps: clientCaps() });

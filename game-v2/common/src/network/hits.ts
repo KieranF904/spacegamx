@@ -8,8 +8,12 @@
 /**
  * What a client can do beyond the base protocol, announced in `join.caps` (a bit mask). The server accepts only the
  * bits it allows (GameServer netCaps). Later islands take the next bits.
+ *
+ *   HITS       confirmed hits: told "shell s hit part p of ship t", works out the rest (part C)
+ *   SELF_HITS  client-detected hits (part D, needs HITS): finds its shells' hits itself on its tick-faithful layer and
+ *              reports a 1-byte hash of them on its inputs; the server tells only what it couldn't find or got wrong
  */
-export const CAPS = { HITS: 1 } as const;
+export const CAPS = { HITS: 1, SELF_HITS: 2 } as const;
 
 /** One shell's hit on a ship, as a capable client is told it */
 export interface ShellHitRecord {
@@ -93,4 +97,38 @@ export function hpChecksum(hp: readonly number[]): number {
   let s = 0;
   for (let i = 0; i < hp.length; i++) s = (s + Math.round(hp[i] * 10) * (i + 1)) % 65536;
   return s < 0 ? s + 65536 : s;
+}
+
+// ---- Client-detected hits (part D, CAPS.SELF_HITS) ----
+
+/**
+ * One hit's share of a client's hit chain: its shell, the ship and the struck part, mixed to 32 bits. The tick is left
+ * out on purpose: a hit both sides saw, a tick apart, is the same hit (only its effects' moment differs).
+ */
+export function hitHash(shell: number, target: number, part: number): number {
+  let h = Math.imul(shell ^ 0x9e3779b9, 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13) ^ Math.imul(target + 0x632be5ab, 0xc2b2ae35), 0x27d4eb2f);
+  h = Math.imul(h ^ (h >>> 15) ^ Math.imul(part + 0x165667b1, 0x9e3779b1), 0x85ebca6b);
+  return (h ^ (h >>> 16)) >>> 0;
+}
+
+/**
+ * The hit chain after one more hit: a sum (mod 2^32), so it doesn't depend on the order hits are seen in. A hit seen
+ * in the next snapshot instead of this one puts both sides' chains back in step once both have it.
+ */
+export function chainAdd(chain: number, h: number): number {
+  return (chain + h) >>> 0;
+}
+
+/**
+ * What a client says of its hits, on its input (protocol 28): the low byte of its chain as of a snapshot's tick, and
+ * the number of corrections it has taken (mod 4: a report made before the last one arrived is from the old count, and
+ * is not compared). On the wire `tick` is its low 14 bits (protocol.ts encodeInputBinary); the server unwraps it.
+ */
+export interface HitReport { tick: number; hash: number; epoch: number }
+
+/** A tick from its low 14 bits: the one nearest `near` (a hit report's tick, 4.5 minutes either way) */
+export function unwrapTick14(low: number, near: number): number {
+  const d = ((low - near) % 16384 + 16384 + 8192) % 16384 - 8192;
+  return near + d;
 }

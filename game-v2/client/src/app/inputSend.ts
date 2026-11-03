@@ -225,7 +225,10 @@ export function tickInput(s: InputSendCtx): void {
   // Debris worked out here is confirmed on the next input, which goes now if nothing else would (ShipClient.takeAcks)
   const acks = s.shipClient?.takeAcks?.();
   if (acks) msg.acks = acks;
-  const send = changed || !!acks;
+  // Client-detected hits: the hit chain's report rides on an input going anyway, or goes on its own after a few ticks (SelfHits)
+  const hitReport = s.shipClient?.takeHitReport?.(changed || !!acks);
+  if (hitReport) msg.hitReport = hitReport;
+  const send = changed || !!acks || !!hitReport;
 
   // Proto: no targetTick (applied on the next tick) and no prediction queue.
   if (s.proto) {

@@ -1,6 +1,6 @@
 # Confirmed hits (design, 2026-11-04)
 
-Status: **built** (A: protocol 26; B: no wire change; C: protocol 27, on for the dev server only). What differs from the design is in the "as built" sections at the end; the measured result is docs/audits/confirmed-hits-impact-2026-11-04.md.
+Status: **built** (A: protocol 26; B: no wire change; C: protocol 27, on for the dev server only; D, client-detected hits: protocol 28, on for the dev server only). What differs from the design is in the "as built" sections at the end; the measured result is docs/audits/confirmed-hits-impact-2026-11-04.md.
 
 Today the server works out every hit and sends the results: ~40 B a landed hit over four messages (`projectileHit`,
 the shell again in `removed`, `damage`, a `shipHps` entry), plus `ignite` and `detonation` as plain keyed objects. In
@@ -487,3 +487,149 @@ fight), which go the old way; that is the next step, not another hidden input.
 - **Small ones.** Hits in another system are skipped per client (they were counted as "view" and cost a derive each).
   No hpCheck for debris the client is working out. The snapshot's hits are dropped even if the snapshot throws. The old
   `fireCannon` shell sets `Projectile.gun` to -1 (a reused id kept the last shell's gun).
+
+---
+
+## Part D: client-detected hits (2026-11-04, protocol 28)
+
+Part C still sends a record (5-8 B) for every hit. Part D has the client find the hits itself and send up one byte
+that says what it found; the server sends nothing for hits it agrees with. It sits on its own caps bit,
+`CAPS.SELF_HITS` (2), on top of `HITS`: a client with only `HITS` gets part C exactly as before, and a legacy client
+gets the old messages.
+
+### D1. Is the client's view tick-exact? (feasibility)
+
+| input | exact on the client? | why / what is done |
+|---|---|---|
+| a shell fired by another ship (fire event) | **yes** | `rebuildVolley` from the firing ship's replica pose with the shared deterministic maths. Compared during this work in the parity fight: the rebuilt spawn and velocity equal the server's `Projectile.spawnX`/`Velocity` bit for bit |
+| the client's own shells (projectile rows) | **no** | rows carry spawn to 0.1 and velocity to 0.01, so the line is off by ~0.1-0.3 units after a second of flight. This causes every correction left (D7) |
+| a shell's line each tick | yes, given its origin | the server moves shells `Position += Velocity` in f32; the client does the same (`Math.fround` each step). The line tested at tick k runs from its place at the end of tick k to one step on, as `collisionSystem` does |
+| the first tick a shell is tested | yes | pilots' shells are spawned before `projectileSystem` (spawnTick - 1 in rows and fire events), pilotless ships' in `ships.tick` after the collision step: both are first tested at spawnTick + 1 |
+| a target's pose at tick k | yes, with one rule | the replica's state at the end of a tick (`ShipReplicaSet.at`) is bit-exact. A pilot moves before the collision step (pose at k); everything else moves in `ships.tick` after it (pose at k - 1). Values go through `Math.fround`, as the server reads `Position`/`Rotation` |
+| a target whose path changed in the window | **no** | a keyframe in this snapshot means the replica's history before the keyframe's tick was a guess (a knock, a boss's drive). Left to the server (told) |
+| a target whose shape changed in the window | **no** | a rebuild (part lost) or first sight: a `shipSync` since the client's last snapshot. Told |
+| who may hurt whom | yes, except PvP zones | `sidesHurt` (common hitRules.ts) is `GameServer.canDamage` bar the zones; the server now calls it too. Pilot against pilot: told |
+| the cast | yes | `shipSegmentHit` (bounding circle, then `castShipAt` against standing parts) is the bridge's `segmentHit`, moved to common; the bridge calls it |
+| rock, mobs, walls, point defence, expiry | no | the client doesn't simulate them. A shell they end is in the snapshot's removed list: the client sits that shell out for the window, and the server tells its hits in that window |
+| own ship, debris | not attempted | own ship: its pose at the server's tick is the prediction's; debris: held and acked separately. Told |
+| shields, boss cover, marks, power | no | as part C: the record's extras. A hit whose record would carry an extra is told |
+
+So the client can simulate exactly: straight shells (fire events exact, own rows close) against replicated ships that
+weren't keyframed or synced in the window. Everything else the server tells, as part C records.
+
+### D2. The tick-faithful layer (client `ships/hits/SelfHits.ts`)
+
+- **Shells**: every straight shell from a gun the client is told of (rows with `gun`, fire events rebuilt), unless it
+  lobs, arms late or is a great orb (`size x 5 >= 20`). Kept apart from the drawn entities; dropped on removal, on a
+  spent hit, or when a projectileHit for it comes the old way (the client no longer knows what it passed through).
+- **Per snapshot** (`detect(tick)`, after the snapshot is applied): for each tick since the last snapshot, each shell
+  (by id) is moved and cast against each candidate ship; the first part struck (smallest t) is a hit. Pierce:
+  exclusions and `shellGone`, as the server's `onShipHit`.
+- **Candidates**: replicated ships in the store, not its own, not debris, not synced or keyframed in this frame,
+  `sidesHurt(shooter, target) === 1`.
+- **Applying**: the hits found are worked out at once (`ConfirmedHits.own`: HP into the store before the frame's
+  `shipHps` and `hpCheck`), and their messages wait for the frame's end. The frame's `hits` (told records) are merged:
+  one for a hit it found overrides it (number, shield, fire, end); the rest are worked out as in part C. A shell told
+  the old way drops its found hits (`oldWay`, HP taken back). At the frame's end (`NetworkManager.onFrameEnd`,
+  `LocalTransport` too) everything goes to the usual handlers.
+
+### D3. The chain and the report
+
+- Each hit (found or told) adds `hitHash(shell, target, struck part)` (a 32-bit mix) to the chain, a sum mod 2^32. The
+  tick is left out and the sum doesn't depend on order, so a hit seen a tick to the other side of a snapshot puts the
+  chains back in step one snapshot later.
+- When a snapshot changed the chain, its low byte goes up as `input.hitReport` (protocol 28: flags2 0x20, then 3
+  bytes: the byte, and 16 bits holding the snapshot tick's low 14 and a 2-bit correction count). It rides an input that
+  goes anyway (at most one per 6 input ticks), or goes on its own after 6 input ticks. No hits, no report.
+
+### D4. The server (`net/hits/HitLedger.ts`, `net/hits/SelfHitJournal.ts`)
+
+- `plan` for a finding client: each hit is **findable** or **told** (`unfindable`: own ship, debris, synced since its
+  last snapshot, keyframed this snapshot, shell removed this snapshot, orb, not straight, pilot against pilot, shell
+  with an earlier old-way hit). All are worked out on the client's HP copy as in part C, findable ones first in
+  tick-then-shell order (the order the client applies them). A findable hit whose record needs an extra (D, S, I, or the
+  client's own glancing or spent differs) is told. Records go only for told hits.
+- Every hit it should have goes into its journal (`close`): one window per snapshot, with the chain after each.
+- `report`: a report agreeing with the chain as of its tick settles everything up to it.
+- `judge` (each snapshot): once the client must have heard a window and answered (its ping + 12 ticks), its chain as of
+  then is its last report (silence: no change). Agree: settled. Disagree twice running (one snapshot apart): a
+  correction.
+- **Correction** (`hitFix {s, t, c, e, h}`, a COMPACT row): every hit after the last agreement up to t (records, each
+  with its number), the server's chain at t and the new correction count. The client works out the hits it missed (HP
+  and all), takes back the ones it had that the server didn't (each kept hit remembers its HP change), sets its chain
+  to `c` plus its own hits since t, and reports at once in the new count. Reports in the old count are ignored, and
+  judging waits for the new one. The ships go on the hpCheck rota; `hpCheck`/`hpResync` stay the backstop.
+- The switch: `netCaps` (a plain server message) tells the client the caps in effect from the snapshot just sent, so
+  both sides start (or stop) at the same window. Dev server: `NET_CAPS` defaults to `HITS | SELF_HITS`; client: on with
+  confirmed hits unless `?selfhits=0` (remembered). The admin's `/hits off` stops both (D needs C).
+
+### D5. Seams
+
+New: `client/src/ships/hits/SelfHits.ts`, `server/src/net/hits/SelfHitJournal.ts` (and its test),
+`server/src/net/hits/fakeHitsClient.testkit.ts` (the fake client the tests and the probe share; `*.testkit.ts` is left
+out of the server build), `server/src/net/hits/selfHits.test.ts`. Changed: `hits.ts` (`CAPS.SELF_HITS`, `hitHash`,
+`chainAdd`, `HitReport`, `unwrapTick14`), `protocol.ts` (`hitReport` on the binary input, the `hitFix` row,
+`netCaps`), `hitRules.ts` (`sidesHurt`, `nearShipSegment`, `castShipAt`, `shipSegmentHit`), bridge `weapons.ts`
+(`nearSegment` and `castShip` call common's), `GameServer.canDamage` (calls `sidesHurt`), `SnapshotBuilder` (the sync
+tick in `shipSynced.at`, keyframed ids to `plan`), `flight.ts` (the report), `ConfirmedHits.ts` (own, told, oldWay,
+flushPending, corrected), `ShipClient.ts` (afterSnapshot, frameEnd, onHitFix, onNetCaps, takeHitReport),
+`inputSend.ts`, `serverMessages.ts`, `NetworkManager`/`Transport`/`LocalTransport` (`onFrameEnd`).
+
+### D6. Tests
+
+- `server/src/net/hits/selfHits.test.ts`: a real server, a finding shooter, a legacy observer and a finding observer
+  (fire events). Pips on a dying freighter, railgun through two freighters, magma, a shielded freighter, a target
+  coasting across the line of fire: after every snapshot each client's part HP is the server's; at the end the same
+  damage, fires, impacts, detonations and removed shells as the legacy client; no corrections; no hpCheck mismatches.
+- Forced mismatch: the shooter throws away a third of the hits it finds. Every one is corrected (26 of 26), the missed
+  hits are drawn (as many impacts as the legacy client), the finding observer is untouched, and all HP is right by the
+  end.
+- `SelfHitJournal.test.ts`: agreement, silence, a missing hit (corrected at the second judging), a hit seen a snapshot
+  early or late (not corrected), an unexpected hit, stale reports after a correction.
+- Round trips: the input with a report (with and without debris acks), `hitFix` and `netCaps` (protocol.test.ts);
+  `hitHash`, `chainAdd`, `unwrapTick14` (hits.test.ts); `sidesHurt` against the old `canDamage` rule for every pair
+  of sides (hitRules.test.ts).
+
+### D7. Measured (probe, 20 s, 3 ticks each way, shooter A, decoded payload B/s)
+
+The same probe for all three runs (session scratchpad `net/self/netAuditSelf.ts`, `runself.sh`): A finds its hits
+with caps 3, takes records with 1, nothing with 0; B is a legacy observer (unchanged in every run).
+
+| scenario | no confirmed hits | part C (caps 1) | **part D (caps 3)** | D vs C | deflated C -> D | reports up |
+|---|---|---|---|---|---|---|
+| 2 Pips, parked freighter | 1,041 | 838 | **769** | -69 (-8%) | 729 -> 690 | 5.6/s, 17 B/s |
+| Hammerhead | 3,146 | 2,484 | **2,314** | -170 (-7%) | 1,625 -> 1,525 | 9.4/s, 28 B/s |
+| Gale | 4,313 | 2,998 | **2,768** | -230 (-8%) | 1,598 -> 1,609 | 10/s, 30 B/s |
+| Scrap Mother | 4,108 | 3,954 | **3,949** | -5 (0%) | 2,867 -> 2,863 | 4.5/s, 13 B/s |
+
+Records (`hits`) went 69 -> 0, 196 -> 24 (+2 hitFix), 238 -> 3 (+4 hitFix) and 68 -> 62 B/s. Frames/s did not
+change, so the ~66 B of headers a frame is the same. Deflate already squeezed the records, so the deflated gain is
+smaller (the Gale's is within noise). A report costs 3 B riding an input; one that must go alone costs a frame (~80 B
+with headers): in a fight inputs go most ticks, but a pilot holding still would pay that.
+
+**Mismatch rate** (journal disagreements and corrections per 100 hits the client was owed):
+
+| scenario | owed | found by the client | told | disagreements /100 | corrections /100 |
+|---|---|---|---|---|---|
+| Pips | 159 | 159 | 0 | 0.63 | 0 |
+| Hammerhead | 592 | 538 | 54 (synced, keyframed) | 0.34 | 0.17 (1 hit, wrong part) |
+| Gale | 676 | 669 | 7 | 0.59 | 0.30 (2 hits, wrong part) |
+| Scrap Mother | 150 | 16 | 134 (keyframed most snapshots) | 0 | 0 |
+
+0 hpCheck mismatches in all four. With the shooter's own shells given their exact origin (a probe-only cheat), the
+Hammerhead and Gale runs had **0 disagreements**: every correction left comes from own shell rows' rounding.
+Client cost: 0.03-0.06 ms a tick more on the fake client; server `stepMs` within noise.
+
+### D8. What's left
+
+1. **Own shells exact.** Either quantise a gun shell's spawn and velocity to the row's grid at spawn (one common
+   function used by `Weapons.spawn`, `rebuildVolley` and the pilot's predicted shot: rows and fire events both exact,
+   at the price of a golden shift), or match the pilot's own predicted shots (exact) to rows that round from them.
+   Either removes the corrections measured above.
+2. **Bosses.** Their drive and dash impulses aren't replicated, so a boss is keyframed most snapshots and its hits are
+   told. Replicating boss motion is what makes D pay there.
+3. **Rebuilt and synced ships** (the largest told group, and part C's old-way group): let the client find hits on the
+   shape it had before the sync, as part C's audit suggested.
+4. **Own ship as a target**: needs the prediction's history at the server's ticks (exact when the prediction was
+   right).
+5. Reports with no input to ride on cost a frame: a pilot sitting still while being shot could batch them longer.

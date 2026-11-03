@@ -9,6 +9,7 @@ export * from './binaryCodec.js';
 import { encodeBinary, BinaryReader, BinaryWriter, DICTIONARY } from './binaryCodec.js';
 import { fxKindCode, fxKindName, FX_KINDS } from './fxKinds.js';
 import { quantizeCursorAngle, dequantizeCursorAngle } from './cursorState.js';
+import type { HitReport } from './hits.js';
 /**
  * Network Protocol - All client/server message types
  */
@@ -29,9 +30,9 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
  * has updated PROTOCOL_VERSION and PROTOCOL_WIRE_HASH.
  */
 // History: PROTOCOL_CHANGELOG.md. Re-pin with `npm run wire:bump "reason"` (game-v2/), never by hand.
-export const PROTOCOL_VERSION = 27;
+export const PROTOCOL_VERSION = 28;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
-export const PROTOCOL_WIRE_HASH = '60aed11a';
+export const PROTOCOL_WIRE_HASH = '5837dfb3';
 /** WebSocket close code (and reason) for a client on another protocol version */
 export const PROTOCOL_MISMATCH_CLOSE = 4002;
 export const PROTOCOL_MISMATCH_REASON = 'version';
@@ -66,6 +67,8 @@ export interface ClientInputMessage {
   dodge?: boolean;
   /** Debris it worked out (debrisSplit), each piece's id and 8-bit check (ships/debris.ts debrisHash): [id, hash, id, hash, ...] */
   acks?: number[];
+  /** Client-detected hits (hits.ts CAPS.SELF_HITS): its hit chain's low byte as of a snapshot's tick (14 bits on the wire) */
+  hitReport?: HitReport;
 }
 
 /** Cursor distance is sent in steps of this many world units, up to CURSOR_DIST_MAX */
@@ -810,6 +813,8 @@ export type ServerMessage =
   | ServerProjectileHitMessage
   | ServerHitsMessage
   | ServerHpCheckMessage
+  | ServerHitFixMessage
+  | ServerNetCapsMessage
   | ServerDockResultMessage
   | ServerPartDestroyedMessage
   | ServerContactMessage
@@ -1196,6 +1201,32 @@ export interface ServerHpCheckMessage {
   sum: number;
 }
 
+/**
+ * Client-detected hits (hits.ts CAPS.SELF_HITS, docs/design/confirmed-hits.md part D): the client's hit chain and the
+ * server's stopped agreeing, so here is every hit after tick `s` up to tick `t`, as records (packHits, each `ago` from
+ * `t`, D always set), and the server's chain as of `t` (`c`, 32 bits). The client keeps the hits it had that are in
+ * the list, draws the ones it missed, asks for the HP of ships it hit wrongly (hpResync), takes `c` plus its own hits
+ * since `t` as its chain, and counts this correction (`e`, mod 4) on its reports from now on. The ships in the list
+ * get all their HP again with the next snapshot.
+ */
+export interface ServerHitFixMessage {
+  type: 'hitFix';
+  s: number;
+  t: number;
+  c: number;
+  e: number;
+  h: number[];
+}
+
+/**
+ * The caps in effect for this client from the snapshot just sent on (hits.ts CAPS): the join's (as the server takes
+ * them) and any admin switch. A client finding hits itself (SELF_HITS) starts or stops with the next snapshot.
+ */
+export interface ServerNetCapsMessage {
+  type: 'netCaps';
+  caps: number;
+}
+
 /** A projectile struck something at (x, y): clients end its tracer there and throw sparks. */
 export interface ServerProjectileHitMessage {
   type: 'projectileHit';
@@ -1288,7 +1319,7 @@ const BINARY_MSG_INPUT = 0x03;
 // [5]    : flags (forward, backward, left, right, boost, fireLeft, fireRight)
 // [6-7]  : aim angle in the 13-bit cursor quantization (the client only ever sends those)
 // [8-9]  : cursorDist / CURSOR_DIST_STEP (16 bits)
-// [10]   : flags2 (strafeLeft, strafeRight, helm, jump, has targetTick, -, dodge, -)  (0x20 and 0x80 free)
+// [10]   : flags2 (strafeLeft, strafeRight, helm, jump, has targetTick, hit report, dodge, -)  (0x80 free)
 // The tick the client was at isn't sent: nothing reads it.
 // (The old 17-byte form, type 0x01, still decodes.)
 
@@ -1299,11 +1330,14 @@ export function unwrapTick16(low: number, near: number): number {
 }
 
 /**
- * After the 11 bytes, optionally (protocol 25): debris acks, a count byte then each piece's id as a little-endian
- * base-128 varint and its 8-bit check (ClientInputMessage.acks)
+ * After the 11 bytes, optionally: a hit report (protocol 28, flags2 0x20: the chain's low byte, then 16 bits: the
+ * snapshot tick's low 14 and the correction count's 2, ClientInputMessage.hitReport), then debris acks (protocol 25: a
+ * count byte then each piece's id as a little-endian base-128 varint and its 8-bit check, ClientInputMessage.acks)
  */
 const INPUT_BYTES = 11;
 const MAX_INPUT_ACKS = 32;
+const HIT_REPORT = 0x20;
+const HIT_REPORT_BYTES = 3;
 
 function ackTail(acks: number[] | undefined): number[] {
   if (!acks?.length) return [];
@@ -1317,9 +1351,8 @@ function ackTail(acks: number[] | undefined): number[] {
   return out;
 }
 
-function readAcks(view: DataView): number[] | undefined {
-  if (view.byteLength <= INPUT_BYTES) return undefined;
-  let at = INPUT_BYTES;
+function readAcks(view: DataView, at = INPUT_BYTES): number[] | undefined {
+  if (view.byteLength <= at) return undefined;
   const n = Math.min(MAX_INPUT_ACKS, view.getUint8(at++));
   const out: number[] = [];
   for (let i = 0; i < n && at < view.byteLength; i++) {
@@ -1332,10 +1365,14 @@ function readAcks(view: DataView): number[] | undefined {
 }
 
 export function encodeInputBinary(msg: ClientInputMessage): ArrayBuffer {
-  const tail = ackTail(msg.acks);
-  const buffer = new ArrayBuffer(INPUT_BYTES + tail.length);
+  const tail = ackTail(msg.acks), rep = msg.hitReport, at = INPUT_BYTES + (rep ? HIT_REPORT_BYTES : 0);
+  const buffer = new ArrayBuffer(at + tail.length);
   const view = new DataView(buffer);
-  for (let i = 0; i < tail.length; i++) view.setUint8(INPUT_BYTES + i, tail[i]);
+  for (let i = 0; i < tail.length; i++) view.setUint8(at + i, tail[i]);
+  if (rep) {
+    view.setUint8(INPUT_BYTES, rep.hash & 0xff);
+    view.setUint16(INPUT_BYTES + 1, (rep.tick & 0x3fff) | ((rep.epoch & 3) << 14), true);
+  }
   view.setUint8(0, BINARY_MSG_INPUT);
   view.setUint16(1, msg.seq & 0xFFFF, true);
   view.setUint16(3, (msg.targetTick ?? 0) & 0xFFFF, true);
@@ -1355,6 +1392,7 @@ export function encodeInputBinary(msg: ClientInputMessage): ArrayBuffer {
     (msg.helm ? 0x04 : 0) |
     (msg.jump ? 0x08 : 0) |
     (msg.targetTick !== undefined ? 0x10 : 0) |
+    (rep ? HIT_REPORT : 0) |
     (msg.dodge ? 0x40 : 0));
   return buffer;
 }
@@ -1365,6 +1403,8 @@ export function decodeInputBinary(data: ArrayBuffer | Uint8Array): ClientInputMe
   if (view.getUint8(0) === BINARY_MSG_INPUT_V1) return decodeInputV1(view);
   const flags = view.getUint8(5);
   const flags2 = view.getUint8(10);
+  const rep = flags2 & HIT_REPORT && view.byteLength >= INPUT_BYTES + HIT_REPORT_BYTES;
+  const tt = rep ? view.getUint16(INPUT_BYTES + 1, true) : 0;
   return {
     type: 'input',
     seq: view.getUint16(1, true),
@@ -1385,7 +1425,8 @@ export function decodeInputBinary(data: ArrayBuffer | Uint8Array): ClientInputMe
     jump: (flags2 & 0x08) !== 0,
     dodge: (flags2 & 0x40) !== 0,
     cursorDist: view.getUint16(8, true) * CURSOR_DIST_STEP,
-    acks: readAcks(view),
+    acks: readAcks(view, rep ? INPUT_BYTES + HIT_REPORT_BYTES : INPUT_BYTES),
+    ...(rep ? { hitReport: { hash: view.getUint8(INPUT_BYTES), tick: tt & 0x3fff, epoch: tt >>> 14 } } : {}),
   };
 }
 
@@ -1480,6 +1521,8 @@ const COMPACT: [string, string[]][] = [
   // (Appended, protocol 27: confirmed hits, hits.ts)
   ['hits', ['h']],
   ['hpCheck', ['id', 'sum']],
+  // (Appended, protocol 28: client-detected hits, hits.ts SELF_HITS)
+  ['hitFix', ['s', 't', 'c', 'e', 'h']],
 ];
 
 /**

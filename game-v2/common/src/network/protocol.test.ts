@@ -263,6 +263,37 @@ describe('confirmed hits on the wire', () => {
   });
 });
 
+describe('client-detected hits on the wire (protocol 28)', () => {
+  it('a hit report rides the binary input (3 bytes), with debris acks after it or not', async () => {
+    const { encodeInputBinary, decodeInputBinary } = await import('./protocol.js');
+    const base = { type: 'input', seq: 77, tick: 0, targetTick: 70123, forward: true, backward: false, left: false, right: true, boost: false, fireLeft: true, fireRight: false, targetAngle: 1.25, cursorDist: 800 } as const;
+    const plain = encodeInputBinary(base as any);
+    const rep = { tick: 70119, hash: 0xa7, epoch: 2 };
+    const withRep = encodeInputBinary({ ...base, hitReport: rep } as any);
+    expect(withRep.byteLength).toBe(plain.byteLength + 3);
+    const back = decodeInputBinary(withRep);
+    expect(back.hitReport).toEqual({ tick: 70119 & 0x3fff, hash: 0xa7, epoch: 2 });
+    expect(back.acks).toBeUndefined();
+    expect(back.forward && back.right && back.fireLeft && !back.left).toBe(true);
+    const both = decodeInputBinary(encodeInputBinary({ ...base, hitReport: rep, acks: [4001, 17, 300000, 255] } as any));
+    expect(both.hitReport).toEqual({ tick: 70119 & 0x3fff, hash: 0xa7, epoch: 2 });
+    expect(both.acks).toEqual([4001, 17, 300000, 255]);
+    // (none: as before, and acks alone still read)
+    expect(decodeInputBinary(plain).hitReport).toBeUndefined();
+    expect(decodeInputBinary(encodeInputBinary({ ...base, acks: [9, 1] } as any)).acks).toEqual([9, 1]);
+  });
+
+  it('hitFix goes as a compact row; netCaps as a plain message', async () => {
+    const { encodeServerMessage, serverFrame, decodeServerFrame } = await import('./protocol.js');
+    const { packHits, unpackHits } = await import('./hits.js');
+    const recs = [{ shell: 7001, ago: 4, target: 1880, part: 7, gone: true, glancing: false, d10: 95 }];
+    const msgs = [{ type: 'hitFix', s: 70002, t: 70033, c: 4123456789, e: 3, h: packHits(recs) }, { type: 'netCaps', caps: 3 }];
+    const back = decodeServerFrame(serverFrame(msgs.map((m) => encodeServerMessage(m as any)))) as any[];
+    expect(back).toEqual(msgs);
+    expect(unpackHits(back[0].h)).toEqual(recs);
+  });
+});
+
 describe('protocol version', () => {
   it('the wire format matches the one PROTOCOL_VERSION was recorded for', async () => {
     const { PROTOCOL_VERSION, PROTOCOL_WIRE_HASH } = await import('./protocol.js');

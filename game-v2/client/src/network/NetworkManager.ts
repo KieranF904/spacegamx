@@ -23,6 +23,8 @@ export class NetworkManager implements ClientTransport {
   public onConnect: (() => void) | null = null;
   public onDisconnect: ((info?: DisconnectInfo) => void) | null = null;
   public onMessage: ((msg: ServerMessage) => void) | null = null;
+  /** After the last message of each frame (client-detected hits: ShipClient.frameEnd) */
+  public onFrameEnd: (() => void) | null = null;
   /** Traffic counters (bytes and frames each way), for the network readout */
   readonly traffic = { bytesIn: 0, bytesOut: 0, framesIn: 0, framesOut: 0 };
 
@@ -97,6 +99,11 @@ export class NetworkManager implements ClientTransport {
         } catch (e) {
           this.logOnce(typeof msg?.type === 'string' ? msg.type : '(no type)', e);
         }
+      }
+      try {
+        this.onFrameEnd?.();
+      } catch (e) {
+        this.logOnce('(frame end)', e);
       }
     };
   }

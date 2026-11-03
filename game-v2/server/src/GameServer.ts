@@ -78,6 +78,8 @@ asteroidParamsAt,
   OrbitType,
   asteroidRegistry,
   buildRangeRig,
+  sidesHurt,
+  SIDE,
 } from '@space-game/common';
 
 import {
@@ -2196,15 +2198,16 @@ this.devTeleport = opts.devTeleport ?? false;
    * owns a body (none yet) is treated like the player.
    */
   canDamage(attacker: number, target: number): boolean {
-    // Inside a station: out of the fight both ways
-    if (this.dockedShips.has(attacker) || this.dockedShips.has(target)) return false;
-    // People's ships are out of it
-    if (this.personCraft.has(attacker) || this.personCraft.has(target)) return false;
-    const aPlayer = hasComponent(this.world, Player, attacker), tPlayer = hasComponent(this.world, Player, target);
-    // Pilots and what they defend (wards: freighters, pylons, bastions, their turrets) are on one side
-    if ((aPlayer || this.wards.has(attacker)) && (tPlayer || this.wards.has(target)) && !(aPlayer && tPlayer)) return false;
-    if (!aPlayer || !tPlayer) return true;
-    return this.inPvpZone(attacker) && this.inPvpZone(target);
+    // Docked ships and people's craft are out of it; pilots and what they defend (wards: freighters, pylons, bastions,
+    // their turrets) are on one side (common hitRules.ts sidesHurt: a client finding its own hits asks the same)
+    const r = sidesHurt(this.sideOf(attacker), this.sideOf(target));
+    return r === 2 ? this.inPvpZone(attacker) && this.inPvpZone(target) : r === 1;
+  }
+
+  /** A ship's side, for who may hurt whom (hitRules.ts SIDE bits) */
+  private sideOf(eid: number): number {
+    return (hasComponent(this.world, Player, eid) ? SIDE.PILOT : 0) | (this.wards.has(eid) ? SIDE.WARD : 0)
+      | (this.dockedShips.has(eid) ? SIDE.DOCKED : 0) | (this.personCraft.has(eid) ? SIDE.PERSON : 0);
   }
 
   /** Inside a zone where players may fight each other */

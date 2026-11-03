@@ -40,10 +40,11 @@ export interface ClientConnection {
   /** Berthed in a station: held at its centre (ox, oy: 0), and put back out at `exit` (where it came in) when it leaves */
   docked: { station: number; ox: number; oy: number; exit?: { x: number; y: number } } | null;
   /**
-   * Ship bodies this client has been synced to: entity id → the ship state and rebuild count sent, and the snapshot
-   * its HP was last brought up to date at (`hpAt`: skip it while the ship's HP hasn't changed since)
+   * Ship bodies this client has been synced to: entity id → the ship state and rebuild count sent, the snapshot its HP
+   * was last brought up to date at (`hpAt`: skip it while the ship's HP hasn't changed since), and the tick a shipSync
+   * last went (`at`: a client finding its own hits leaves a ship synced in that snapshot to the records, HitLedger)
    */
-  shipSynced: Map<number, { ship: ShipState; rebuilds: number; hpAt?: number }>;
+  shipSynced: Map<number, { ship: ShipState; rebuilds: number; hpAt?: number; at?: number }>;
   /** Last part HP sent to this client, per ship body */
   shipHpSent: Map<number, number[]>;
   /** Entity names this client has been sent (names go once) */

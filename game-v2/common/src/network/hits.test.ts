@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { packHits, unpackHits, hpChecksum, CAPS, type ShellHitRecord } from './hits.js';
+import { packHits, unpackHits, hpChecksum, CAPS, hitHash, chainAdd, unwrapTick14, type ShellHitRecord } from './hits.js';
 import { encodeBinary, decodeBinaryAll } from './binaryCodec.js';
 
 describe('confirmed hit records (hits.ts)', () => {
@@ -51,5 +51,39 @@ describe('confirmed hit records (hits.ts)', () => {
     expect(hpChecksum([2.5, 1, 0])).not.toBe(hpChecksum([1, 2.5, 0]));
     expect(hpChecksum([0.1])).not.toBe(hpChecksum([0.2]));
     expect(CAPS.HITS).toBe(1);
+  });
+});
+
+describe('the hit chain (client-detected hits, part D)', () => {
+  it('hitHash is a 32-bit mix of shell, ship and part: each one changes it', () => {
+    const h = hitHash(5021, 1880, 7);
+    expect(h).toBe(hitHash(5021, 1880, 7));
+    expect(h >>> 0).toBe(h);
+    expect(hitHash(5022, 1880, 7)).not.toBe(h);
+    expect(hitHash(5021, 1881, 7)).not.toBe(h);
+    expect(hitHash(5021, 1880, 8)).not.toBe(h);
+    // (its low byte, what a report carries, spreads: 1,000 hits fill most of the 256 values)
+    const lows = new Set<number>();
+    for (let i = 0; i < 1000; i++) lows.add(hitHash(4000 + i, 1880, i % 40) & 0xff);
+    expect(lows.size).toBeGreaterThan(220);
+  });
+
+  it('the chain is a sum: the same hits in any order come to the same chain', () => {
+    const hits = [[5021, 1880, 7], [5023, 1880, 3], [4990, 2017, 140], [5100, 12, 0]].map(([s, t, p]) => hitHash(s, t, p));
+    const a = hits.reduce(chainAdd, 0), b = [...hits].reverse().reduce(chainAdd, 0);
+    expect(a).toBe(b);
+    expect(a >>> 0).toBe(a);
+    expect(hits.slice(1).reduce(chainAdd, 0)).not.toBe(a);
+  });
+
+  it('a report tick unwraps from its low 14 bits to the one nearest', () => {
+    for (const t of [0, 5, 16383, 16384, 70119, 1_000_000]) {
+      expect(unwrapTick14(t & 0x3fff, t + 40)).toBe(t);
+      expect(unwrapTick14(t & 0x3fff, t - 40)).toBe(t);
+    }
+  });
+
+  it('SELF_HITS is its own bit beside HITS', () => {
+    expect(CAPS.SELF_HITS & CAPS.HITS).toBe(0);
   });
 });

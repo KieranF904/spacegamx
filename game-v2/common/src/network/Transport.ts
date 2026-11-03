@@ -25,6 +25,8 @@ export interface ClientTransport {
   onConnect: (() => void) | null;
   onDisconnect: ((info?: DisconnectInfo) => void) | null;
   onMessage: ((msg: ServerMessage) => void) | null;
+  /** After the last message of each frame (client-detected hits hand out a frame's hits there) */
+  onFrameEnd?: (() => void) | null;
   connect(url: string): void;
   disconnect(): void;
   send(msg: ClientMessage): void;

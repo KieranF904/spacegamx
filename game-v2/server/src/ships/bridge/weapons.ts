@@ -7,11 +7,11 @@
  * Damage goes through the bridge (b.hurt), never an import of the damage module, so the modules can't form a cycle.
  */
 
-import { rayTerrain, portsDamageMul, stackMods, coverPart } from '@space-game/common';
+import { rayTerrain, portsDamageMul, stackMods, coverPart, nearShipSegment, castShipAt } from '@space-game/common';
 import { hasComponent } from 'bitecs';
 import {
-  Position, Input, Player, InSystem, Projectile, ShipState, Vec2, damagePart, weaponHit, shooterGrade, localToWorldDir,
-  castParts, pointInConvex, standing, shipPointToWorld,
+  Position, Rotation, Input, Player, InSystem, Projectile, ShipState, Vec2, damagePart, weaponHit, shooterGrade, localToWorldDir,
+  pointInConvex, shipPointToWorld,
   WeaponInfo, WeaponTuning, firesStraight, partWeaponDef, stepGuns, ammoCode, outputOf, payMining, MINE_CYCLE,
   MINING_PULSE, MINE_TAIL, mineFalloff, type Charge, pulseProfile, beamFalloff, windupScale, TELL_CHARGE_START, TELL_CHARGE_CANCEL,
   endsAtAim, aimReach, buildShot,
@@ -510,11 +510,8 @@ export function hitProjectile(
 
 /** Does a world-space segment come within a ship's bounding circle (segmentHit's first test) */
 export function nearSegment(b: BridgeCtx, eid: number, ship: ShipState, x0: number, y0: number, x1: number, y1: number, margin = 0): boolean {
-  const px = Position.x[eid], py = Position.y[eid];
-  const dx = x1 - x0, dy = y1 - y0;
-  const len2 = dx * dx + dy * dy || 1;
-  const u = Math.max(0, Math.min(1, ((px - x0) * dx + (py - y0) * dy) / len2));
-  return dhypot(x0 + dx * u - px, y0 + dy * u - py) <= ship.derived.radius + 1 + margin;
+  // (common hitRules.ts: a client finding its own hits runs the same test)
+  return nearShipSegment(Position.x[eid], Position.y[eid], ship.derived.radius, x0, y0, x1, y1, margin);
 }
 
 /**
@@ -529,11 +526,10 @@ export function segmentHit(b: BridgeCtx, eid: number, ship: ShipState, x0: numbe
 
 /** segmentHit without its bounding-circle test (for callers that have just made it) */
 export function castShip(bridge: BridgeCtx, eid: number, ship: ShipState, x0: number, y0: number, x1: number, y1: number, margin = 0): { part: number; t: number } | null {
-  const a = bridge.worldToGrid(eid, ship, x0, y0);
-  const b = bridge.worldToGrid(eid, ship, x1, y1);
   bridge.castOn = ship;
-  // (shots pass through bones and wrecks: stages.ts standing)
-  const h = castParts(bridge.geometry(ship), bridge.castOk, a[0], a[1], b[0], b[1], margin / bridge.tuning.cellSize);
+  // (shots pass through bones and wrecks: stages.ts standing. The cast is common's, hitRules.ts castShipAt: a client
+  // finding its own hits runs it on the pose it has)
+  const h = castShipAt(bridge.geometry(ship), bridge.castOk, bridge.tuning.cellSize, ship.derived.com, Position.x[eid], Position.y[eid], Rotation.angle[eid], x0, y0, x1, y1, margin);
   bridge.castOn = null;
   return h;
 }

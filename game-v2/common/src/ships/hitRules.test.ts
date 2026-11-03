@@ -229,3 +229,22 @@ describe('hitRules: deriveShellHit (the client view)', () => {
     expect(s.hp[2]).toBeLessThan(before);
   });
 });
+
+describe('sidesHurt (who may hurt whom: GameServer.canDamage bar its PvP zones)', () => {
+  it('matches the server rule for every pair of sides', async () => {
+    const { sidesHurt, SIDE } = await import('./hitRules.js');
+    // The server's rule as it was written before it moved here
+    const old = (a: number, t: number): 0 | 1 | 2 => {
+      if ((a | t) & SIDE.DOCKED) return 0;
+      if ((a | t) & SIDE.PERSON) return 0;
+      const ap = !!(a & SIDE.PILOT), tp = !!(t & SIDE.PILOT);
+      if ((ap || a & SIDE.WARD) && (tp || t & SIDE.WARD) && !(ap && tp)) return 0;
+      if (!ap || !tp) return 1;
+      return 2;
+    };
+    for (let a = 0; a < 16; a++) for (let t = 0; t < 16; t++) expect(sidesHurt(a, t), `${a} vs ${t}`).toBe(old(a, t));
+    expect(sidesHurt(SIDE.PILOT, 0)).toBe(1);
+    expect(sidesHurt(SIDE.PILOT, SIDE.WARD)).toBe(0);
+    expect(sidesHurt(SIDE.PILOT, SIDE.PILOT)).toBe(2);
+  });
+});

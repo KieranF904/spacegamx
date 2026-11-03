@@ -267,7 +267,7 @@ export class SnapshotBuilder {
       // A refit or respawn replaces the ShipState (its rebuild count restarts), so compare both
       if (syncs && (!synced || synced.ship !== ship || synced.rebuilds !== ship.rebuilds)) {
         const fresh = !synced || synced.ship !== ship;
-        synced = { ship, rebuilds: ship.rebuilds };
+        synced = { ship, rebuilds: ship.rebuilds, at: this.currentTick };
         conn.shipSynced.set(id, synced);
         const sync = this.syncWireOf(id, ship);
         const hp = sync.hp;
@@ -585,7 +585,7 @@ export class SnapshotBuilder {
       // (A client taking confirmed hits: its HP after its records, below; first, what it'll make of each hit)
       const hitsOn = !!this.hits?.wants(conn);
       this.sendShipUpdates(conn, playerSystemId, true, !hitsOn);
-      const gone = hitsOn ? this.hits!.plan(conn, (id) => prevStates.has(id) || newStates.has(id) || covered.has(id)) : null;
+      const gone = hitsOn ? this.hits!.plan(conn, (id) => prevStates.has(id) || newStates.has(id) || covered.has(id), keyed) : null;
 
       // Stations — sent once per system (they never move)
       for (const eid of stationQuery(this.world)) {

@@ -29,7 +29,7 @@ import {
   jumpFieldAt, fieldRangeBoost, fieldCharge, primeBoost, pilotJumpStep, withEmp, lodestonePosition, type JumpField, type LodestoneData,
   ShipReplicaSet, ServerSnapshotMessage, ServerDebrisSplitMessage, deriveSplit, unpackIds, unpackRuns, computeJoins, DEBRIS_STATUS, type DebrisShape, type Vec2,
   packCursorWeaponState, rebuildVolley, WEAPON_KIND_TYPE, EntityState, accelAlong, turnAccel, rateShip, stepGuns, volleyShells, firesStraight, partWeaponDef,
-  type ServerHitsMessage, type ServerHpCheckMessage,
+  type ServerHitsMessage, type ServerHpCheckMessage, type ServerHitFixMessage, type HitReport, CAPS, SIDE,
 } from '@space-game/common';
 import type { MenuShipInfo } from '../ui/GameMenuUI';
 import type { GameState, InterpolatedEntity } from '../state/GameState';
@@ -51,6 +51,7 @@ import type { ShellLook } from '../rendering/weapons/WeaponFx';
 import { AUG } from '../rendering/weapons/weaponStyles';
 import { hitSurface } from './hitSurface';
 import { ConfirmedHits } from './hits/ConfirmedHits';
+import { SelfHits } from './hits/SelfHits';
 import type { PilotState } from '../econ/clientEcon';
 import type { ThrustCommand } from './ThrusterFx';
 import { settings } from '../settings/Settings';
@@ -264,22 +265,97 @@ export class ShipClient {
       },
       send: (m) => opts.send(m),
     });
+    this.selfHits = new SelfHits({
+      store: this.store,
+      self: () => opts.state.playerId,
+      ships: () => this.replicas.ids(),
+      at: (id, tick) => this.replicas.at(id, tick)?.body ?? null,
+      side: (id) => {
+        const e = opts.state.entities.get(id), d = e?.data;
+        const pilot = id === opts.state.playerId || e?.type === EntityType.Player;
+        const side = !pilot && e?.type === EntityType.ShipBody && d ? d[10] : 0;
+        return (pilot ? SIDE.PILOT : 0) | (side === 1 ? SIDE.WARD : 0) | (side === 2 ? SIDE.PERSON : 0) | (this.replicas.isDocked(id) ? SIDE.DOCKED : 0);
+      },
+      passes: (shell) => this.hits.passesOf(shell),
+    });
   }
 
   /** Confirmed hits (docs/design/confirmed-hits.md): what the server's records came to, worked out here */
   readonly hits: ConfirmedHits;
+  /** Client-detected hits (part D): the hits found here on the tick-faithful layer, and the chain reported */
+  readonly selfHits: SelfHits;
   /** The tick of the snapshot last applied (a confirmed hit's tick counts back from it) */
   private snapTick = 0;
+  /** Handing out this frame's hits (their projectileHit messages aren't the old way) */
+  private handingOut = false;
 
   /**
    * A confirmed hits message (ships/hits/ConfirmedHits.ts): the messages the server would have sent go through
-   * `handle` (the usual handlers draw them), then the hull bars, then the spent shells go
+   * `handle` (the usual handlers draw them), then the hull bars, then the spent shells go. Finding hits here
+   * (SelfHits on), they're the server's word on this frame's hits, and wait with them for the frame's end
    */
   onHits(msg: ServerHitsMessage, handle: (m: ServerMessage) => void): void {
-    const r = this.hits.expand(msg, this.snapTick);
-    for (const m of r.msgs) handle(m);
+    if (this.selfHits.on) { this.hits.told(msg, this.snapTick); return; }
+    this.handOut(this.hits.expand(msg, this.snapTick), handle);
+  }
+
+  private handOut(r: { msgs: ServerMessage[]; ships: Set<number>; gone: number[] }, handle: (m: ServerMessage) => void): void {
+    this.handingOut = true;
+    try {
+      for (const m of r.msgs) handle(m);
+    } finally {
+      this.handingOut = false;
+    }
     for (const id of r.ships) this.fillHull(id);
     for (const id of r.gone) this.opts.state.removeShell(id);
+  }
+
+  /** A connection afresh: confirmed and client-detected hits start over, as the server's do */
+  resetHits(): void {
+    this.hits.reset();
+    this.selfHits.reset();
+  }
+
+  /** The caps in effect (netCaps): finding hits here starts (or stops) with the next snapshot */
+  onNetCaps(caps: number): void {
+    this.selfHits.setOn((caps & (CAPS.HITS | CAPS.SELF_HITS)) === (CAPS.HITS | CAPS.SELF_HITS), this.snapTick);
+  }
+
+  /**
+   * A snapshot applied (its replicas, rows and removals): its shells onto the tick-faithful layer (rows, and the fire
+   * events' shells preSnapshot rebuilt, as the server spawned them), then the hits found on the ticks since the last
+   * one, worked out now (their HP before the frame's shipHps and hpCheck)
+   */
+  afterSnapshot(m: ServerSnapshotMessage): void {
+    if (this.selfHits.on) {
+      for (const e of m.entities) {
+        const d = e.data;
+        if (e.type === EntityType.Projectile && d && (d[10] ?? -1) >= 0) this.selfHits.addShell(e.id, d[6], d[10], d[3], d[4], d[5], e.vx ?? 0, e.vy ?? 0, d[7]);
+      }
+    }
+    this.selfHits.onKeyframes(m.ships);
+    const found = this.selfHits.detect(m.tick);
+    if (found.length) this.hits.own(found);
+  }
+
+  /** The frame's end: this frame's hits (found here and told) handed out, and into the chain */
+  frameEnd(handle: (m: ServerMessage) => void): void {
+    if (!this.selfHits.on) return;
+    const { out, done } = this.hits.flushPending();
+    this.selfHits.settle(done);
+    if (done.length || out.gone.length) this.handOut(out, handle);
+  }
+
+  /** A correction (hitFix): the hits missed worked out and drawn, the wrong ones taken back, the chain the server's */
+  onHitFix(msg: ServerHitFixMessage, handle: (m: ServerMessage) => void): void {
+    if (!this.selfHits.on) return;
+    const { missed, wrong } = this.selfHits.fix(msg);
+    this.handOut(this.hits.corrected(missed, msg.t, wrong), handle);
+  }
+
+  /** The hit report for this input tick, if one is due (`riding`: an input goes anyway) */
+  takeHitReport(riding: boolean): HitReport | undefined {
+    return this.selfHits.on ? this.selfHits.takeReport(riding) : undefined;
   }
 
   /** The server's check of a ship's HP as this client should have it */
@@ -863,6 +939,7 @@ export class ShipClient {
         this.onDebrisSplit(msg);
         return true;
       case 'shipSync':
+        this.selfHits.onSync(msg.id);
         for (const part of this.store.onSync(msg)) this.damageFx?.onPartRestored(msg.id, part);
         this.fillHull(msg.id);
         return true;
@@ -916,6 +993,8 @@ export class ShipClient {
         if (msg.effectType === 12) this.damageFx?.shieldReform(msg.x, msg.y); // EffectType.ShieldFlash
         return false; // the game draws its own
       case 'projectileHit':
+        // (Told the old way: a hit found here for this shell wasn't one)
+        if (this.selfHits.on && !this.handingOut) { this.hits.oldWay(msg.id); this.selfHits.drop(msg.id); }
         this.damageFx?.shieldHit(msg.x, msg.y, this.shellLooks.get(msg.id)?.model);
         {
           // (A shell with a look of its own that no detonation tells now: a Prism's shards, DamageFx PLAIN_HIT_LOOKS)
@@ -969,6 +1048,7 @@ export class ShipClient {
       case 'snapshot':
         for (const id of msg.removed) this.store.remove(id);
         this.hits.forget(msg.removed);
+        this.selfHits.onRemoved(msg.removed);
         return false;
     }
     return false;

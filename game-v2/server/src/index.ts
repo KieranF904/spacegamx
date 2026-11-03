@@ -80,8 +80,9 @@ const gameServer = new GameServer({
   devRange: DEV_MODE ? loadRangeConfig(dataPath) : undefined,
   // Everyone (guests and signed-in pilots) is an admin on the dev server (never in production: GameServer refuses it there too)
   guestAdmin: DEV_MODE,
-  // Confirmed hits for clients that offer them (docs/design/confirmed-hits.md): the dev server; NET_CAPS (a bit mask) elsewhere
-  netCaps: process.env.NET_CAPS !== undefined ? Number(process.env.NET_CAPS) || 0 : DEV_MODE ? CAPS.HITS : 0,
+  // Confirmed hits and client-detected hits for clients that offer them (docs/design/confirmed-hits.md parts C, D): the dev
+  // server; NET_CAPS (a bit mask: 1 confirmed, 3 both) elsewhere
+  netCaps: process.env.NET_CAPS !== undefined ? Number(process.env.NET_CAPS) || 0 : DEV_MODE ? CAPS.HITS | CAPS.SELF_HITS : 0,
   // Admins may build anything in the hangar for free (the admin panel's switch; never in production: GameServer refuses it there too)
   freeBuild: DEV_MODE,
   // Every pilot joins and respawns in the dev Rockery (data/dev/rockery.json), not Sol (never in production: GameServer refuses it there too)

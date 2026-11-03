@@ -1,0 +1,204 @@
+/**
+ * A fake client for the confirmed-hits tests and the netcode probe: the client's own ShipStore, ShipReplicaSet,
+ * ConfirmedHits and SelfHits on a real GameServer connection, handling the hit messages as ShipClient does, and
+ * counting what it was shown (damage, fires, impacts, detonations, removed shells). Draws nothing. Not used by the game.
+ *
+ * With CAPS.SELF_HITS it finds its hits itself as ShipClient does (afterSnapshot, then the frame's end) and reports them
+ * on an input after each step (`report`). `drop` makes it miss hits on purpose (the forced-mismatch test).
+ */
+import {
+  CAPS, SIDE, EntityType, decodeServerFrame, encodeMessage, decodeMessage, rebuildVolley, ShipReplicaSet,
+  type ClientMessage, type ClientSocket, type ServerMessage, type ServerSnapshotMessage, type ShipState, type ReplicaEnv,
+} from '@space-game/common';
+import { ShipStore } from '../../../../client/src/ships/ShipStore.js';
+import { ConfirmedHits, type HitShell, type HitsOutcome, type OwnHit } from '../../../../client/src/ships/hits/ConfirmedHits.js';
+import { SelfHits } from '../../../../client/src/ships/hits/SelfHits.js';
+import type { GameServer } from '../../GameServer.js';
+
+export interface FakeHitsOptions {
+  name: string;
+  caps: number;
+  /** The replicas' world (gravity and the rest) for a ship: the server's own (Replication's host.env) */
+  env: (id: number) => ReplicaEnv;
+  /** Hits it found that it throws away (it "missed" them) */
+  drop?: (h: OwnHit) => boolean;
+  /** Hand frames in later (the probe's latency): the frame goes to `deliver` instead of being handled at once */
+  defer?: (data: Uint8Array) => void;
+}
+
+export class FakeHitsClient {
+  pid = -1;
+  readonly store: ShipStore;
+  readonly reps: ShipReplicaSet;
+  readonly hits: ConfirmedHits | null = null;
+  readonly selfHits: SelfHits | null = null;
+  readonly shells = new Map<number, HitShell>();
+  /** Entity types and ship-body status data, as the snapshots said */
+  private kinds = new Map<number, { type: number; side: number }>();
+  snapTick = 0;
+  damage = new Map<string, number>();
+  ignites: string[] = [];
+  removed = new Set<number>();
+  known = new Set<number>();
+  projectileHits = 0;
+  detonations = 0;
+  sawSnapshot = false;
+  /** Bytes it sent up (its hit reports' inputs) and how many */
+  upBytes = 0;
+  reports = 0;
+  /** Hits it threw away (drop) */
+  dropped = 0;
+  link: { receive(msg: ClientMessage): void } | null = null;
+  /** What it sends the server (hpResync, reports), delivered after the step (a real socket is never re-entered) */
+  outbox: ClientMessage[] = [];
+  private handingOut = false;
+  private seq = 1;
+
+  constructor(private server: GameServer, private opts: FakeHitsOptions) {
+    const ships = server.getShips();
+    this.store = new ShipStore(ships.catalog, ships.tuning);
+    this.reps = new ShipReplicaSet(ships.tuning, (id) => this.store.get(id)?.derived, () => opts.env(this.pid));
+    if (opts.caps & CAPS.HITS) {
+      this.hits = new ConfirmedHits({
+        store: this.store,
+        shell: (id) => this.shells.get(id) ?? null,
+        pose: (id, tick) => this.reps.at(id, tick)?.body ?? null,
+        send: (m) => this.outbox.push(m),
+      });
+    }
+    if (opts.caps & CAPS.SELF_HITS) {
+      this.selfHits = new SelfHits({
+        store: this.store,
+        self: () => this.pid,
+        ships: () => this.reps.ids(),
+        at: (id, tick) => this.reps.at(id, tick)?.body ?? null,
+        side: (id) => {
+          const k = this.kinds.get(id);
+          const pilot = id === this.pid || k?.type === EntityType.Player;
+          return (pilot ? SIDE.PILOT : 0) | (k?.side === 1 ? SIDE.WARD : 0) | (k?.side === 2 ? SIDE.PERSON : 0) | (this.reps.isDocked(id) ? SIDE.DOCKED : 0);
+        },
+        passes: (shell) => this.hits!.passesOf(shell),
+      });
+    }
+    const socket: ClientSocket = {
+      isOpen: () => true,
+      send: (data) => {
+        const bytes = data as Uint8Array;
+        if (opts.defer) opts.defer(Uint8Array.from(bytes)); else this.frame(bytes);
+      },
+    };
+    this.link = server.connect(socket);
+    this.link.receive({ type: 'join', username: opts.name, ...(opts.caps ? { caps: opts.caps } : {}) } as ClientMessage);
+    this.pid = server.getPlayerId(socket);
+  }
+
+  /** One frame from the server: each message, then the frame's end */
+  frame(data: Uint8Array): void {
+    for (const m of decodeServerFrame(data)) this.handle(m);
+    this.frameEnd();
+  }
+
+  /** After a step: what it owes the server (resyncs; a hit report on an input, as one goes every tick in a fight) */
+  flushUp(): void {
+    const rep = this.selfHits?.takeReport(true);
+    if (rep) {
+      const msg = { type: 'input', seq: this.seq++, tick: 0, forward: false, backward: false, left: false, right: false, boost: false, fireLeft: false, fireRight: false, targetAngle: 0, hitReport: rep } as ClientMessage;
+      const enc = encodeMessage(msg);
+      this.upBytes += 3;
+      this.reports++;
+      this.outbox.push(decodeMessage(enc) as ClientMessage);
+    }
+    for (const m of this.outbox.splice(0)) this.link?.receive(m);
+  }
+
+  private handle(m: ServerMessage): void {
+    switch (m.type) {
+      case 'shipSync': this.selfHits?.onSync(m.id); this.store.onSync(m); break;
+      case 'shipHps': this.store.onHps(m); break;
+      case 'netCaps': this.selfHits?.setOn((m.caps & (CAPS.HITS | CAPS.SELF_HITS)) === (CAPS.HITS | CAPS.SELF_HITS), this.snapTick); break;
+      case 'snapshot': this.snapshot(m as ServerSnapshotMessage); break;
+      case 'hits':
+        if (this.selfHits?.on) this.hits!.told(m, this.snapTick);
+        else this.handOut(this.hits!.expand(m, this.snapTick));
+        break;
+      case 'hitFix': {
+        if (!this.selfHits?.on) break;
+        const { missed, wrong } = this.selfHits.fix(m);
+        if (process.env.HITS_DEBUG) console.log('FIX', this.opts.name, JSON.stringify({ s: m.s, t: m.t, recs: m.h, missed, wrong }));
+        this.handOut(this.hits!.corrected(missed, m.t, wrong));
+        break;
+      }
+      case 'hpCheck': this.hits!.check(m); break;
+      case 'damage': {
+        const k = `${m.targetId},${m.sourceId}`;
+        this.damage.set(k, (this.damage.get(k) ?? 0) + m.amount);
+        break;
+      }
+      case 'ignite': this.ignites.push(`${m.bodyId}:${m.part}:${m.ticks}`); break;
+      case 'projectileHit':
+        if (this.selfHits?.on && !this.handingOut) { this.hits!.oldWay(m.id); this.selfHits.drop(m.id); }
+        this.projectileHits++;
+        break;
+      case 'detonation': this.detonations++; break;
+    }
+  }
+
+  private snapshot(s: ServerSnapshotMessage): void {
+    this.snapTick = s.tick;
+    this.sawSnapshot = true;
+    this.reps.apply(s.tick, s.ships, s.ctl);
+    for (const e of s.entities) {
+      const d = e.data;
+      if (e.type === EntityType.Player || e.type === EntityType.ShipBody) this.kinds.set(e.id, { type: e.type, side: e.type === EntityType.ShipBody && d ? d[10] ?? 0 : 0 });
+      if (e.type !== EntityType.Projectile) continue;
+      this.known.add(e.id);
+      if (d && (d[10] ?? -1) >= 0) {
+        const sh = { owner: d[6], gun: d[10], spawnTick: d[3], x: d[4], y: d[5], vx: e.vx ?? 0, vy: e.vy ?? 0 };
+        this.shells.set(e.id, sh);
+        this.selfHits?.addShell(e.id, sh.owner, sh.gun, sh.spawnTick, sh.x, sh.y, sh.vx, sh.vy, d[7]);
+      }
+    }
+    // Fire events: the shells rebuilt from the firing ship's replica, as ShipClient.preSnapshot does
+    for (const [owner, ago, partAmmo, aimQ, ...ids] of s.fire ?? []) {
+      for (const id of ids) this.known.add(id);
+      const tick = s.tick - ago, part = partAmmo % 256, ammo = Math.floor(partAmmo / 256) % 256, aug = partAmmo >= 65536 ? (1 as const) : undefined;
+      const ship = this.store.get(owner), st = this.reps.at(owner, tick);
+      const v = ship && st ? rebuildVolley({ owner, tick, part, aimQ, ids, ammo, aug }, ship as ShipState, st.body, this.server.getShips().tuning) : null;
+      const spawnTick = owner === this.pid || this.kinds.get(owner)?.type === EntityType.Player ? tick - 1 : tick;
+      for (const id of ids) {
+        const sh = v?.shells.find((x) => x.id === id);
+        this.shells.set(id, { owner, gun: partAmmo, spawnTick, x: sh?.x ?? 0, y: sh?.y ?? 0, vx: sh?.vx ?? 0, vy: sh?.vy ?? 0 });
+        if (sh) this.selfHits?.addShell(id, owner, partAmmo, spawnTick, sh.x, sh.y, sh.vx, sh.vy, sh.size);
+      }
+    }
+    // (as ShipClient: the ledger sees the removed list before the shells go)
+    this.hits?.forget(s.removed);
+    this.selfHits?.onRemoved(s.removed);
+    for (const id of s.removed) { if (this.known.has(id)) this.removed.add(id); this.shells.delete(id); this.store.remove(id); this.reps.remove(id); }
+    for (const id of s.out ?? []) this.reps.remove(id);
+    // Hits found here (ShipClient.afterSnapshot)
+    if (this.selfHits) {
+      this.selfHits.onKeyframes(s.ships);
+      let found = this.selfHits.detect(s.tick);
+      if (this.opts.drop && found.length) {
+        const before = found.length;
+        found = found.filter((h) => !this.opts.drop!(h));
+        this.dropped += before - found.length;
+      }
+      if (found.length) this.hits!.own(found);
+    }
+  }
+
+  private frameEnd(): void {
+    if (!this.selfHits?.on) return;
+    const { out, done } = this.hits!.flushPending();
+    this.selfHits.settle(done);
+    this.handOut(out);
+  }
+
+  private handOut(r: HitsOutcome): void {
+    this.handingOut = true;
+    try { for (const m of r.msgs) this.handle(m); } finally { this.handingOut = false; }
+    for (const id of r.gone) { this.removed.add(id); this.shells.delete(id); }
+  }
+}

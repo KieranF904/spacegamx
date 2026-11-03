@@ -29,6 +29,8 @@ export function registerFlightHandlers(t: HandlerRegistry): void {
   t.on('input', (ctx, conn, msg) => {
     // (Debris it worked out, confirmed straight away: they ride on inputs, protocol 25)
     if (Array.isArray(msg.acks) && msg.acks.length) ctx.snapshots.ackDebris(conn, msg.acks);
+    // (Client-detected hits: its hit chain's report rides here too, protocol 28: net/hits/HitLedger.ts)
+    if (msg.hitReport) ctx.hits.report(conn, msg.hitReport);
     // Queue for next tick boundary — don't apply mid-frame.
     // Messages still arrive instantly via setImmediate event loop.
     if (++conn.inputsThisTick > MAX_INPUTS_PER_TICK) return;

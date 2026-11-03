@@ -7,7 +7,7 @@
  * a module method, not widen the context (the snapshot path gets its own, wider host).
  */
 import type { IWorld } from 'bitecs';
-import type { ClientSocket, ServerMessage } from '@space-game/common';
+import type { ClientSocket, ServerMessage, HitReport } from '@space-game/common';
 import type { ClientConnection } from './ClientConnection.js';
 import type { MessageLimiter } from './MessageLimits.js';
 import type { GameData } from '../data/GameData.js';
@@ -49,8 +49,8 @@ export interface ServerCtx {
   readonly guestAdmin: boolean;
   /** The join caps this server takes (common network/hits.ts CAPS) */
   readonly netCaps: number;
-  /** Confirmed hits: a client's HP copy put right (hpResync) */
-  readonly hits: { resync(conn: ClientConnection, ids: readonly unknown[]): void };
+  /** Confirmed hits: a client's HP copy put right (hpResync); a client finding its own hits reports them (input hitReport) */
+  readonly hits: { resync(conn: ClientConnection, ids: readonly unknown[]): void; report(conn: ClientConnection, rep: HitReport): void };
   /** The ECS world (handlers only read components from it) */
   readonly world: IWorld;
   /** The hangar opens anywhere (proto) */

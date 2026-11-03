@@ -22,12 +22,13 @@ export class LocalTransport implements ClientTransport {
   public onConnect: (() => void) | null = null;
   public onDisconnect: (() => void) | null = null;
   public onMessage: ((msg: ServerMessage) => void) | null = null;
+  public onFrameEnd: (() => void) | null = null;
 
   private link: ClientLink | null = null;
   private open = false;
   private readonly socket: ClientSocket = {
     isOpen: () => this.open,
-    send: (data) => { for (const m of decodeServerFrame(data)) this.onMessage?.(m); },
+    send: (data) => { for (const m of decodeServerFrame(data)) this.onMessage?.(m); this.onFrameEnd?.(); },
   };
 
   constructor(private server: GameServer) {}

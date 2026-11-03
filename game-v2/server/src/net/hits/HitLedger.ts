@@ -15,16 +15,26 @@
  *   check     one ship a second it worked out: the server's copy of its HP as a checksum (hpCheck); a client that
  *             disagrees asks for them all again (hpResync)
  *
- * Switching a client's caps takes effect at a snapshot's end (endSnapshot), so a hit is never told both ways.
+ * Switching a client's caps takes effect at a snapshot's end (endSnapshot), so a hit is never told both ways; the
+ * client is told (netCaps).
+ *
+ * Client-detected hits (part D, CAPS.SELF_HITS on top of HITS): such a client finds most of its hits itself. `plan`
+ * splits its hits into those it can find (the shell's line and the ship's pose are exact on its tick-faithful layer:
+ * findable) and those it can't (told), works them all out on its HP copy as before (the findable ones first, in tick
+ * then shell order, as the client applies them), and sends records only for the told ones and for findable ones it
+ * would get wrong (an extra). Every hit goes into its journal (SelfHitJournal); its reports (on its inputs) are judged
+ * there, and a disagreement that lasts is put right with a hitFix and its ships' HP in full.
  */
-import type { IWorld } from 'bitecs';
+import { hasComponent, entityExists, type IWorld } from 'bitecs';
 import {
-  CAPS, Position, Projectile, InSystem, packHits, hpChecksum, gunShell, deriveShellHit, igniteRule, hitEndFx,
-  type ClientSocket, type ServerMessage, type ShellHitRecord, type ShipState,
+  CAPS, Position, Projectile, InSystem, Player, Radius, Dead, packHits, hpChecksum, gunShell, deriveShellHit, igniteRule, hitEndFx,
+  firesStraight, unwrapTick14,
+  type ClientSocket, type ServerMessage, type ShellHitRecord, type ShipState, type HitReport,
 } from '@space-game/common';
 import type { ClientConnection } from '../ClientConnection.js';
 import type { ShipBridge } from '../../ships/ShipBridge.js';
 import { damageMessage, projectileHitMessage, type Outbox } from '../snapshot/Outbox.js';
+import { SelfHitJournal, type JournalHit } from './SelfHitJournal.js';
 
 /** What the ledger needs of the server (GameServer itself) */
 export interface HitLedgerHost {
@@ -70,12 +80,17 @@ interface Plan {
   gone: Set<number>;
   /** Damage the records cover, by sum */
   covered: Map<string, number>;
+  /** Client-detected hits: each record the client finds itself (not sent), and each record's hit */
+  own: boolean[];
+  hits: Hit[];
 }
 
 const keyOf = (target: number, source: number, glancing: boolean) => `${target},${source},${glancing ? 1 : 0}`;
 
 /** One ship a second it worked out gets an hpCheck */
 const CHECK_TICKS = 60;
+/** Ticks a client's hit report may take beyond its round trip: the input ticks it may wait (client SelfHits REPORT_WAIT), and a margin */
+const REPORT_SLACK = 12;
 
 export class HitLedger {
   /** Some client has HITS on this snapshot (else every hit goes as ever, and nothing is kept) */
@@ -90,8 +105,20 @@ export class HitLedger {
   private passes = new WeakMap<ClientConnection, Map<number, number>>();
   /** Per client: ships it worked out since their last check, and when it was last checked */
   private checks = new WeakMap<ClientConnection, { due: Set<number>; at: number }>();
-  /** Counters (the netcode probe, the admin's `hits` command) */
-  readonly stats = { hits: 0, records: 0, legacy: 0, d: 0, s: 0, i: 0, checks: 0, why: {} as Record<string, number> };
+  /** Per client finding its own hits: its journal (SelfHitJournal) */
+  private journals = new WeakMap<ClientConnection, SelfHitJournal>();
+  /**
+   * ...and shells with a hit told it the old way: it doesn't know what they passed through, so it drops them (their
+   * projectileHit: ConfirmedHits.oldWay, SelfHits.drop) and their hits, that window's and later, are told
+   */
+  private oldWayShells = new WeakMap<ClientConnection, Set<number>>();
+  /** The view's own say on the last hit derive worked out (glancing, spent), for a client finding it itself */
+  private viewSaid = { glancing: false, gone: false };
+  /** Counters (the netcode probe, the admin's `hits` command); `own`: records the client found itself, `fixes`: corrections */
+  readonly stats = {
+    hits: 0, records: 0, legacy: 0, d: 0, s: 0, i: 0, checks: 0, why: {} as Record<string, number>,
+    own: 0, told: 0, reports: 0, fixes: 0, fixHits: 0, toldWhy: {} as Record<string, number>,
+  };
 
   constructor(private host: HitLedgerHost) {}
 
@@ -103,6 +130,11 @@ export class HitLedger {
   /** Is this client taking records this snapshot? */
   wants(conn: ClientConnection): boolean {
     return this.on && !!((conn.caps ?? 0) & CAPS.HITS);
+  }
+
+  /** Is this client finding its hits itself this snapshot (part D)? */
+  finds(conn: ClientConnection): boolean {
+    return this.wants(conn) && !!((conn.caps ?? 0) & CAPS.SELF_HITS);
   }
 
   // ---- During the tick ----
@@ -149,9 +181,9 @@ export class HitLedger {
    * old way. `known`: shells it has (a row, or a fire event, now or before). Returns the shells the records end
    * (left out of its removed list); null if it takes no records.
    */
-  plan(conn: ClientConnection, known: (id: number) => boolean): ReadonlySet<number> | null {
+  plan(conn: ClientConnection, known: (id: number) => boolean, keyframed?: ReadonlySet<number>): ReadonlySet<number> | null {
     if (!this.wants(conn)) return null;
-    const plan: Plan = { recs: [], keys: [], legacy: [], gone: new Set(), covered: new Map() };
+    const plan: Plan = { recs: [], keys: [], legacy: [], gone: new Set(), covered: new Map(), own: [], hits: [] };
     this.plans.set(conn, plan);
     if (!this.hits.length) return plan.gone;
     let passes = this.passes.get(conn);
@@ -159,19 +191,113 @@ export class HitLedger {
     let check = this.checks.get(conn);
     if (!check) this.checks.set(conn, (check = { due: new Set(), at: -Infinity }));
     const ships = this.host.getShips(), tick = this.host.currentTick, sys = InSystem.systemId[conn.playerId];
-    for (const h of this.hits) {
+    // Finding its own: the hits it can find first, in tick then shell order (as it works them out), then the rest
+    const finds = this.finds(conn);
+    let order: Hit[] = this.hits, findable = 0;
+    if (finds) {
+      const mine: Hit[] = [], rest: Hit[] = [];
+      for (const h of this.hits) if (h.sys === sys) (this.findable(conn, h, ships, keyframed) ? mine : rest).push(h);
+      mine.sort((a, b) => a.tick - b.tick || a.proj - b.proj);
+      findable = mine.length;
+      order = mine.concat(rest);
+    }
+    for (let i = 0; i < order.length; i++) {
+      const h = order[i];
       // (another system's: nothing of it goes to this client either way)
       if (h.sys !== sys) continue;
       const why = this.derive(conn, h, ships, known, passes, plan, tick);
       if (why) {
+        if (finds) this.oldWayOf(conn).add(h.proj);
         plan.legacy.push(h);
         this.stats.legacy++;
         this.stats.why[why] = (this.stats.why[why] ?? 0) + 1;
         continue;
       }
       check.due.add(h.target);
+      if (!finds) continue;
+      // (Found by the client itself, unless the record would carry something it can't know)
+      const r = plan.recs[plan.recs.length - 1];
+      plan.hits.push(h);
+      plan.own.push(i < findable && r.d10 === undefined && !r.shield && r.ignite === undefined && this.viewSaid.glancing === r.glancing && this.viewSaid.gone === r.gone);
     }
+    if (finds) this.close(conn, plan, tick);
     return plan.gone;
+  }
+
+  /**
+   * Can a client finding its own hits find this one exactly (part D)? Not on its own ship, debris, or a ship synced to
+   * it this snapshot (a rebuild changed its shape mid-window) or keyframed (its path changed: where it was before the
+   * keyframe's tick is the client's guess); not by a shell the snapshot will remove (its end tick
+   * isn't known), a great orb, one that doesn't fly straight or arms late; not between two pilots
+   */
+  private findable(conn: ClientConnection, h: Hit, ships: ShipBridge, keyframed?: ReadonlySet<number>): boolean {
+    const why = keyframed?.has(h.target) ? 'keyframed' : this.unfindable(conn, h, ships);
+    if (why) this.stats.toldWhy[why] = (this.stats.toldWhy[why] ?? 0) + 1;
+    return !why;
+  }
+
+  private unfindable(conn: ClientConnection, h: Hit, ships: ShipBridge): string | null {
+    const world = this.host.world;
+    if (h.target === conn.playerId) return 'self';
+    if (this.oldWayShells.get(conn)?.has(h.proj)) return 'oldWay';
+    const target = ships.get(h.target);
+    if (!target || target.kind === 'debris') return 'debris';
+    // (synced since its last snapshot: a sync can go in a frame with no snapshot, and the client holds it till the next)
+    const at = conn.shipSynced.get(h.target)?.at;
+    if (at !== undefined && at > conn.lastSnapshotSentTick) return 'synced';
+    if (this.removing(h.proj)) return 'removed';
+    if (Radius.value[h.proj] >= 19.95) return 'orb';
+    const owner = ships.get(h.owner), sh = owner ? gunShell(ships.tuning, owner, h.gun) : null;
+    if (!sh || !firesStraight(sh.def) || sh.def.lob || sh.def.arm) return 'curve';
+    if (hasComponent(world, Player, h.owner) && hasComponent(world, Player, h.target)) return 'pvp';
+    return null;
+  }
+
+  /** Will this snapshot remove the shell (dead, and not spent by a ship hit)? */
+  private removing(proj: number): boolean {
+    const world = this.host.world;
+    return (!entityExists(world, proj) || hasComponent(world, Dead, proj)) && !this.byProj.get(proj)?.gone;
+  }
+
+  /**
+   * A window closes for a client finding its own hits: a findable hit whose shell the snapshot removes after all (its
+   * last hit went the old way) is told; then every hit it should have goes into its journal
+   */
+  private close(conn: ClientConnection, plan: Plan, tick: number): void {
+    const world = this.host.world, jh: JournalHit[] = [];
+    for (let i = 0; i < plan.recs.length; i++) {
+      const h = plan.hits[i], r = plan.recs[i];
+      if (plan.own[i] && (!entityExists(world, h.proj) || hasComponent(world, Dead, h.proj)) && !plan.gone.has(h.proj)) {
+        plan.own[i] = false;
+        this.stats.toldWhy.removed = (this.stats.toldWhy.removed ?? 0) + 1;
+      }
+      // (a shell with a hit gone the old way this window: the client drops all its hits found here)
+      if (plan.own[i] && this.oldWayShells.get(conn)?.has(h.proj)) {
+        plan.own[i] = false;
+        this.stats.toldWhy.oldWay = (this.stats.toldWhy.oldWay ?? 0) + 1;
+      }
+      jh.push({ rec: r, tick: h.tick, dealt: h.dealt });
+    }
+    this.journalOf(conn).close(tick, jh);
+  }
+
+  private oldWayOf(conn: ClientConnection): Set<number> {
+    let s = this.oldWayShells.get(conn);
+    if (!s) this.oldWayShells.set(conn, (s = new Set()));
+    return s;
+  }
+
+  private journalOf(conn: ClientConnection): SelfHitJournal {
+    let j = this.journals.get(conn);
+    if (!j) this.journals.set(conn, (j = new SelfHitJournal(this.host.currentTick)));
+    return j;
+  }
+
+  /** A client's hit report (on its input): judged in its journal */
+  report(conn: ClientConnection, rep: HitReport): void {
+    if (!this.finds(conn) || typeof rep?.tick !== 'number' || typeof rep.hash !== 'number' || typeof rep.epoch !== 'number') return;
+    this.stats.reports++;
+    this.journalOf(conn).report(unwrapTick14(rep.tick & 0x3fff, this.host.currentTick), rep.hash & 0xff, rep.epoch & 3);
   }
 
   /** One hit for one client: a record (null), or why it goes the old way */
@@ -211,6 +337,8 @@ export class HitLedger {
       const out = deriveShellHit({ ctx: ships, ship: view, struck: h.part, kind: sh.kind, def: sh.def, grade: sh.grade, strength: sh.strength, passes: p });
       if (!(Math.abs(out.dealt - h.dealt) <= 1e-3)) { rec.d10 = Math.round(h.dealt * 10); this.stats.d++; }
       ignite = out.ignite;
+      this.viewSaid.glancing = out.glancing;
+      this.viewSaid.gone = out.gone;
     }
     if (ignite !== h.ignite) { rec.ignite = h.ignite; this.stats.i++; }
     // (and the HP diff after the records runs for it)
@@ -245,13 +373,45 @@ export class HitLedger {
       if (amount > 0) net.send(conn.ws, damageMessage(e, amount));
     }
     if (plan.recs.length) {
-      if (quiet) for (let i = 0; i < plan.recs.length; i++) if (quiet.has(plan.keys[i])) plan.recs[i].d10 = 0;
-      net.send(conn.ws, { type: 'hits', h: packHits(plan.recs) });
+      // (A record whose number shows in a sum sent anyway says so: sent even to a client that found it)
+      if (quiet) for (let i = 0; i < plan.recs.length; i++) if (quiet.has(plan.keys[i])) { plan.recs[i].d10 = 0; if (plan.own.length) plan.own[i] = false; }
+      let recs = plan.recs;
+      if (plan.own.length) {
+        recs = [];
+        for (let i = 0; i < plan.recs.length; i++) { if (plan.own[i]) this.stats.own++; else { this.stats.told++; recs.push(plan.recs[i]); } }
+      }
+      if (recs.length) net.send(conn.ws, { type: 'hits', h: packHits(recs) });
     }
     for (const h of plan.legacy) {
       if (net.nearClient(conn, h.sys, h.x, h.y)) net.send(conn.ws, projectileHitMessage(h.proj, h.x, h.y));
       for (const m of h.fx) net.sendAsSystem(conn, h.sys, m);
     }
+    if (this.finds(conn)) this.judge(conn);
+  }
+
+  /** A client finding its own hits: what it must have answered for by now, judged; a lasting disagreement put right */
+  private judge(conn: ClientConnection): void {
+    const now = this.host.currentTick;
+    const fix = this.journalOf(conn).judge(now, Math.ceil((conn.ping || 0) / (1000 / 60)) + REPORT_SLACK);
+    if (!fix) return;
+    this.stats.fixes++;
+    this.stats.fixHits += fix.hits.length;
+    // Every hit since the last agreement, each with its number: the client works out those it missed and takes back those
+    // it had wrongly; its copy of the HP is already the one it should come to, so the ships are checked soon (hpCheck)
+    const recs = fix.hits.map((x) => ({ ...x.rec, ago: Math.min(7, fix.t - x.tick), d10: Math.round(x.dealt * 10) }));
+    this.host.net.send(conn.ws, { type: 'hitFix', s: fix.s, t: fix.t, c: fix.c, e: fix.e, h: packHits(recs) });
+    const check = this.checks.get(conn);
+    if (check) for (const x of fix.hits) check.due.add(x.rec.target);
+  }
+
+  /** The journals' counters summed (the probe, tests) */
+  journalStats(conns: Iterable<ClientConnection>): SelfHitJournal['stats'] {
+    const t = { hits: 0, reports: 0, stale: 0, agreed: 0, disagreed: 0, fixes: 0, fixHits: 0 };
+    for (const c of conns) {
+      const j = this.journals.get(c);
+      if (j) for (const k of Object.keys(t) as (keyof typeof t)[]) t[k] += j.stats[k];
+    }
+    return t;
   }
 
   /** After its HP diff: one ship it worked out, once a second, checked */
@@ -277,6 +437,8 @@ export class HitLedger {
   dropShells(conn: ClientConnection, ids: readonly number[]): void {
     const m = this.passes.get(conn);
     if (m?.size) for (const id of ids) m.delete(id);
+    const o = this.oldWayShells.get(conn);
+    if (o?.size) for (const id of ids) o.delete(id);
   }
 
   /** The snapshot's gone: drop its hits, switch any client's caps, and see whether the next one keeps hits */
@@ -288,8 +450,13 @@ export class HitLedger {
     let on = false;
     for (const c of this.host.clients.values()) {
       if (c.capsNext !== undefined && c.capsNext !== c.caps) {
+        const was = c.caps ?? 0;
         c.caps = c.capsNext;
         if (!(c.caps & CAPS.HITS)) { this.passes.delete(c); this.checks.delete(c); }
+        // (Finding its own hits starts afresh from this snapshot on both sides; the client is told from when)
+        this.journals.delete(c);
+        this.oldWayShells.delete(c);
+        if (was !== c.caps) this.host.net.send(c.ws, { type: 'netCaps', caps: c.caps });
       }
       if ((c.caps ?? 0) & CAPS.HITS) on = true;
     }

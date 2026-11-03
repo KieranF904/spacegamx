@@ -260,7 +260,7 @@ function death(h: MessageHost, msg: Msg<'death'>): void {
 // (Hot ones first. One entry per line: structure.test.ts reads these keys.)
 
 const TABLE: Handlers = {
-  snapshot: (h, msg) => { h.state.applySnapshot(msg); },
+  snapshot: (h, msg) => { h.state.applySnapshot(msg); h.shipClient.afterSnapshot(msg); },
   pong,
   playerState,
   welcome,
@@ -357,6 +357,9 @@ const TABLE: Handlers = {
   // (Confirmed hits: each record handled as the messages it stands for, ships/hits/ConfirmedHits.ts)
   hits: (h, msg) => { h.shipClient.onHits(msg, (m) => handleServerMessage(h, m)); },
   hpCheck: (h, msg) => { h.shipClient.onHpCheck(msg); },
+  // (Client-detected hits, part D: a correction, and the caps in effect from the next snapshot)
+  hitFix: (h, msg) => { h.shipClient.onHitFix(msg, (m) => handleServerMessage(h, m)); },
+  netCaps: (h, msg) => { h.shipClient.onNetCaps(msg.caps); },
   projectileHit: (h, msg) => {
     h.renderer.showProjectileHit(msg.id, msg.x, msg.y);
     h.audio.play('hit', msg.x, msg.y, { pitch: 0.85 + Math.random() * 0.3, volume: 0.7 });

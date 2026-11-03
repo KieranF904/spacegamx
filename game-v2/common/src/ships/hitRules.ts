@@ -12,6 +12,9 @@
  *   hpWire        part HP as the wire carries it
  *   deriveShellHit  the lot, on a client's view of the target (shield unknown: 0; boss modifiers unknown: defaults)
  *   gunShell      what a gun's shell is (kind, tuning, grade, strength), from the firing ship as both sides have it
+ *   sidesHurt     whether one side's shells may hurt another's (GameServer.canDamage, bar its PvP zones)
+ *   shipSegmentHit  where a shell's line this tick first meets a ship at a pose (the bridge's segmentHit, on numbers a
+ *                 client has too: client-detected hits, part D)
  *
  * Arithmetic here is the server's own, in the same order: change nothing here without the hit golden
  * (server/src/game/hitRules.golden.test.ts) passing unchanged.
@@ -25,7 +28,8 @@ import type { Vec2 } from './types.js';
 import { damagePart } from './state.js';
 import { hitMultiplier, weaponHit, type HitInfo } from './damage.js';
 import { RUIN_HP, stageOf, currentStage, standing, deciding, stageParts } from './stages.js';
-import { partDistance } from './collide.js';
+import { partDistance, castParts } from './collide.js';
+import { worldToLocalDir } from './flight.js';
 import { gunDef, stackMods, ammoByCode } from './launch.js';
 import { dhypot } from '../math/detTrig.js';
 
@@ -320,4 +324,49 @@ export function gunShell(tuning: ShipTuning, ship: ShipState, gun: number): GunS
   const mods = stackMods(ammoByCode(ammo)?.mods, aug ? ship.derived.ports?.augMods[part] : undefined);
   const def = gunDef(tuning, w.kind, { mods: ship.blueprint.parts[part]?.mods, ammo: mods, grade: w.grade, size: w.size, model: w.model });
   return { kind: w.kind, def, grade: w.grade ?? 1, strength: w.strength ?? 1 };
+}
+
+// ---- Who may hurt whom, and where a shell meets a ship (client-detected hits, part D) ----
+
+/** What a ship is, for who may hurt whom: a pilot's, a ward (what pilots defend), docked, a person's craft */
+export const SIDE = { PILOT: 1, WARD: 2, DOCKED: 4, PERSON: 8 } as const;
+
+/**
+ * May a shell from a ship of side `a` (SIDE bits) hurt one of side `t`? 0 no, 1 yes, 2 both are pilots: only where
+ * the server says (its PvP zones; a client takes it as no). Docked ships and people's craft are out of it both ways;
+ * pilots and their wards are on one side. GameServer.canDamage is this plus the zones.
+ */
+export function sidesHurt(a: number, t: number): 0 | 1 | 2 {
+  if ((a | t) & (SIDE.DOCKED | SIDE.PERSON)) return 0;
+  const aOne = a & (SIDE.PILOT | SIDE.WARD), tOne = t & (SIDE.PILOT | SIDE.WARD), both = a & t & SIDE.PILOT;
+  if (aOne && tOne && !both) return 0;
+  return both ? 2 : 1;
+}
+
+/** Does a world-space segment come within a ship's bounding circle (radius + 1 + margin) at (px, py)? */
+export function nearShipSegment(px: number, py: number, radius: number, x0: number, y0: number, x1: number, y1: number, margin = 0): boolean {
+  const dx = x1 - x0, dy = y1 - y0;
+  const len2 = dx * dx + dy * dy || 1;
+  const u = Math.max(0, Math.min(1, ((px - x0) * dx + (py - y0) * dy) / len2));
+  return dhypot(x0 + dx * u - px, y0 + dy * u - py) <= radius + 1 + margin;
+}
+
+/**
+ * The first part `ok` lets through that a world-space segment touches, `margin` thick, on a ship at (px, py, angle)
+ * whose centre of mass is `com` (grid units): the segment taken into the ship's grid space and cast against the
+ * parts' shapes (collide.ts castParts). The server's bridge castShip, with the pose passed in.
+ */
+export function castShipAt(geoms: readonly PlacedGeom[], ok: (i: number) => boolean, cellSize: number, com: Vec2, px: number, py: number, angle: number, x0: number, y0: number, x1: number, y1: number, margin = 0): { part: number; t: number } | null {
+  const [la, lb] = worldToLocalDir([x0 - px, y0 - py], angle), [lc, ld] = worldToLocalDir([x1 - px, y1 - py], angle);
+  return castParts(geoms as PlacedGeom[], ok, la / cellSize + com[0], lb / cellSize + com[1], lc / cellSize + com[0], ld / cellSize + com[1], margin / cellSize);
+}
+
+/**
+ * Where a shell's line this tick first meets a ship at a pose: its bounding circle, then its standing parts (a wreck's
+ * bones and a beaten stage's ruins let shells through: stages.ts standing). The server's bridge segmentHit; a client
+ * finding its own hits runs it on the ship as it has it, at the pose the server's collision step saw.
+ */
+export function shipSegmentHit(ctx: HitCtx, ship: ShipState, px: number, py: number, angle: number, x0: number, y0: number, x1: number, y1: number, margin = 0): { part: number; t: number } | null {
+  if (!nearShipSegment(px, py, ship.derived.radius, x0, y0, x1, y1, margin)) return null;
+  return castShipAt(ctx.geometry(ship), (i) => standing(ctx.catalog, ship, i), ctx.tuning.cellSize, ship.derived.com, px, py, angle, x0, y0, x1, y1, margin);
 }
