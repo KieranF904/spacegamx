@@ -13,8 +13,9 @@ const T = {
   // server -> client (binary)
   BUNDLE: 21, PONG: 22, SNAP: 24,
 };
-/** Records inside a bundle (one bundle per tick that has something in it, plus heartbeats) */
-const R = { IN: 1, OWN: 2, ENTER: 3, EXIT: 4, CORR: 5, ROCK: 6, RCORR: 7, RDEAD: 8, LATE: 9, PULL: 10, GONE: 11 };
+/** Records inside a bundle (one bundle per tick that has something in it, plus heartbeats). RCV: how many of your
+ *  inputs the server had by this tick (low byte), sent only when it moved and only on a bundle going out anyway */
+const R = { IN: 1, RCV: 2, ENTER: 3, EXIT: 4, CORR: 5, ROCK: 6, RCORR: 7, RDEAD: 8, LATE: 9, PULL: 10, GONE: 11 };
 const REASON = { 1: 'mismatch', 2: 'missing', 3: 'spurious', 4: 'hash', 5: 'unseen' };
 const REASON_ID = { mismatch: 1, missing: 2, spurious: 3, hash: 4, unseen: 5 };
 /** Report ids: kind in the low 2 bits of the varint (so ids under 32 are one byte) */
@@ -58,11 +59,27 @@ const widen = (low, near) => near + ((((low - near) & 0xFFFF) + 32768) & 0xFFFF)
 const widen8 = (low, near) => near + ((((low - near) & 0xFF) + 128) & 0xFF) - 128;
 
 // ----------------------------------------------------------------------------------------------------------- inputs
-// 6 bytes: button bits (10 used), aim on a 13-bit grid, cursor distance / 4 (as the game's binary input)
+// 6 bytes: button bits (10 used), aim on a 13-bit grid, cursor distance / 4 (as the game's binary input). Used whole
+// only in entity snapshots; the input streams send what changed since the last one (wInpDelta).
 function wInp(w, inp) { w.u16(inp.b); w.u16(inp.aim >> 3); w.u16(inp.dist >> 2); }
 function rInp(r) { return { b: r.u16(), aim: r.u16() << 3, dist: r.u16() << 2, seq: 0 }; }
 const quantAim = (ba) => ((ba >> 3) << 3) & 0xFFFF;
-const quantDist = (d) => Math.min(65535 * 4, Math.max(0, Math.round(d / 4) * 4));
+const quantDist = (d, step = 4) => Math.min(65535 * 4, Math.max(0, Math.round(d / step) * step));
+const zz = (x) => (x >= 0 ? x * 2 : -x * 2 - 1);
+const unzz = (v) => (v % 2 ? -(v + 1) / 2 : v / 2);
+/** Which fields differ from prev: 1 buttons, 2 aim, 4 distance */
+const inpDiff = (inp, prev) => (inp.b !== prev.b ? 1 : 0) | (inp.aim !== prev.aim ? 2 : 0) | (inp.dist !== prev.dist ? 4 : 0);
+/** The fields in f: buttons as a varint, aim and distance as signed steps from prev (a mouse nudge is one byte) */
+function wInpDelta(w, inp, prev, f) {
+  if (f & 1) w.vu(inp.b);
+  if (f & 2) w.vu(zz(((((inp.aim - prev.aim) >> 3) + 4096) & 8191) - 4096));
+  if (f & 4) w.vu(zz((inp.dist - prev.dist) >> 2));
+}
+/** Read the fields in f without a base (the base can be the receiver's copy of the ship at a later moment) */
+function rInpDelta(r, f) { return { f, b: f & 1 ? r.vu() : 0, da: f & 2 ? unzz(r.vu()) : 0, dd: f & 4 ? unzz(r.vu()) : 0 }; }
+function applyInp(prev, d) {
+  return { b: d.f & 1 ? d.b : prev.b, aim: (prev.aim + d.da * 8) & 0xFFFF, dist: prev.dist + d.dd * 4, seq: 0 };
+}
 
 // ------------------------------------------------------------------------------------------------------- entities
 /** Full state of a ship (entry or correction snapshot), its live shells included */
@@ -118,12 +135,15 @@ function rRock(r, T) {
 }
 
 // ------------------------------------------------------------------------------------------------------ messages
-/** Client -> server, the one message of the new design: ack (my confirmed tick), maybe an input, event reports, hashes */
-function encUp({ ack, input, reports, hashes }) {
+/** Client -> server, the one message of the new design: ack (my confirmed tick), maybe an input, event reports, hashes.
+ *  The input is relative to the one before it (base: { target, inp }); its sequence number is implied (inputs arrive
+ *  in order, so the server counts them). */
+function encUp({ ack, input, base, reports, hashes }) {
   const w = new Writer(32);
+  const f = input ? inpDiff(input.inp, base.inp) : 0;
   w.mark('acks'); w.u8(T.UP); w.u16(ack);
-  w.u8((input ? 1 : 0) | (reports && reports.length ? 2 : 0) | (hashes ? 4 : 0));
-  if (input) { w.mark('inputs'); w.u16(input.target); w.u8(input.seq); wInp(w, input.inp); }
+  w.u8((input ? 1 : 0) | (reports && reports.length ? 2 : 0) | (hashes ? 4 : 0) | (f << 3));
+  if (input) { w.mark('inputs'); w.vu(zz(input.target - base.target)); wInpDelta(w, input.inp, base.inp, f); }
   if (reports && reports.length) {
     w.mark('reports'); w.vu(reports.length);
     for (const rp of reports) { w.vu(rp.id * 4 + rp.kind); w.u8(rp.hash); }
@@ -131,12 +151,18 @@ function encUp({ ack, input, reports, hashes }) {
   if (hashes) { w.mark('hashes'); w.u16(hashes.tick); w.vu(hashes.list.length); for (const h of hashes.list) w.u8(h); }
   const buf = w.done(); buf.cats = w.cats; return buf;
 }
-function decUp(r, nearTick, nearSeq) {
-  r.u8();
+/** -> { ack, input: { target, inp } | null, reports, hashes }; the reader's categories match encUp's */
+function decUp(r, nearTick, base) {
+  r.mark('acks'); r.u8();
   const ack = widen(r.u16(), nearTick), f = r.u8(), out = { ack, input: null, reports: [], hashes: null };
-  if (f & 1) { const target = widen(r.u16(), nearTick), seq = widen8(r.u8(), nearSeq); const inp = rInp(r); inp.seq = seq; out.input = { target, seq, inp }; }
-  if (f & 2) { const n = r.vu(); for (let i = 0; i < n; i++) { const v = r.vu(); out.reports.push({ kind: v & 3, id: Math.floor(v / 4), hash: r.u8() }); } }
-  if (f & 4) { const tick = widen(r.u16(), nearTick), n = r.vu(), list = []; for (let i = 0; i < n; i++) list.push(r.u8()); out.hashes = { tick, list }; }
+  if (f & 1) {
+    r.mark('inputs');
+    const target = base.target + unzz(r.vu());
+    out.input = { target, inp: applyInp(base.inp, rInpDelta(r, f >> 3)) };
+  }
+  if (f & 2) { r.mark('reports'); const n = r.vu(); for (let i = 0; i < n; i++) { const v = r.vu(); out.reports.push({ kind: v & 3, id: Math.floor(v / 4), hash: r.u8() }); } }
+  if (f & 4) { r.mark('hashes'); const tick = widen(r.u16(), nearTick), n = r.vu(), list = []; for (let i = 0; i < n; i++) list.push(r.u8()); out.hashes = { tick, list }; }
+  r.end();
   return out;
 }
 function encPing(t, rtt) { const w = new Writer(12); w.mark('ping'); w.u8(T.PING); w.f64(t); w.u16(Math.min(65535, Math.round(rtt))); const b = w.done(); b.cats = w.cats; return b; }
@@ -198,7 +224,7 @@ const view = (buf) => new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
  *  TLS 1.3 record 22 (5 header + 16 tag + 1 type). TCP acks the other way are left out. */
 function wireBytes(n, fromClient) { return n + 40 + 22 + (n < 126 ? 2 : n < 65536 ? 4 : 10) + (fromClient ? 4 : 0); }
 
-NL.Proto = { T, R, REASON, REASON_ID, IDK, Writer, Reader, widen, widen8, wInp, rInp, quantAim, quantDist, wShip, wLoot,
+NL.Proto = { T, R, REASON, REASON_ID, IDK, Writer, Reader, widen, widen8, wInp, rInp, quantAim, quantDist, inpDiff, wInpDelta, rInpDelta, applyInp, wShip, wLoot,
   wEntity, rEntity, wRock, rRock, encUp, decUp, encPing, encPong, encSnap, decSnap, view, wireBytes };
 if (typeof module === 'object' && module.exports) module.exports = NL;
 })(globalThis.NL = globalThis.NL || {});

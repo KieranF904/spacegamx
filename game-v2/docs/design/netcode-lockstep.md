@@ -26,7 +26,12 @@ own ship is predicted from your own inputs and re-simulated from the last confir
 - Each client keeps an estimate of the server clock from pings (2 a second; the offset comes from the lowest-round-trip
   recent sample, slewed 3 ms at a time, jumping only when more than 60 ms out).
 - An input is stamped for the tick it will arrive at: `floor(server tick now + RTT/2 in ticks) + 1 + margin`. Inputs are
-  sent only when they change; a player holds its last input.
+  sent only when they change; a player holds its last input. A change of aim or cursor distance alone goes out at most
+  every 2 ticks (30 Hz; a button change goes at once): the ship steers towards the aim and brakes on the way, so 30 Hz
+  flies the same.
+- An input is sent as what changed since the one before it (buttons whole, aim and distance as signed steps: a mouse
+  nudge is one byte), and its stamp as a step from the last one. It has no sequence number: inputs arrive in order, so
+  the server counts them.
 - The server applies each input on its stamped tick. **Late** (that tick already simulated): it is applied on the next
   tick and the client is told (`LATE` record: sequence number, how many ticks late). The client raises its margin by
   that much at once.
@@ -39,8 +44,12 @@ own ship is predicted from your own inputs and re-simulated from the last confir
   the inputs used that tick by the players in that client's awareness (only those that changed), plus the other records
   below. With nothing to say, a 3-byte heartbeat goes out every 4 ticks (15 Hz). An option sends a bundle every tick.
 - A gap in tick numbers therefore means "nothing changed in between": the client steps those ticks with held inputs.
-- Your own input comes back as a 1-byte sequence number (`OWN`), not the input. You know what you sent, and this tells
-  you which tick the server used it on.
+- Your own input isn't echoed. You know what you sent and which tick it is stamped for, and the server uses it on that
+  tick unless it arrives late, which `LATE` reports. The one other thing you need is whether it had arrived in time:
+  bundles that go out anyway carry `RCV`, the count of your inputs the server had by that tick (low byte), only when it
+  moved. A tick is only confirmed once a bundle for it or a later tick has arrived, and by then every late notice up to
+  it has too, so for each confirmed tick the client knows exactly which of its inputs was used: the newest one counted
+  in `RCV` stamped (or re-stamped by `LATE`) for that tick or before. No bundle is ever sent just for this.
 
 ### 4. Own-ship prediction
 - The screen shows the confirmed world (every tick the server has sent a bundle for) run forward to "now". With own
@@ -137,8 +146,8 @@ All binary and little-endian; varints are LEB128.
 | message / record | bytes | category |
 |---|---|---|
 | bundle header: type, tick (16 bits) | 3 | ticks |
-| `IN` another player's (or a puppet's) changed input: type, slot, 6-byte input | 8 | inputs |
-| `OWN` your input was used this tick: type, sequence (8 bits) | 2 | inputs |
+| `IN` another player's (or a puppet's) changed input: type, slot × 8 + which fields changed, the changed fields (against the input that ship flew with last tick) | 3-6 (aim nudge 3) | inputs |
+| `RCV` how many of your inputs the server had (low byte), on a bundle going out anyway, when it moved | 2 | inputs |
 | `ENTER` type, slot, pulled flag, entity: ship ~58 + 22 per live shell; loot 23 | ~60-130 | entries |
 | `EXIT` type, slot | 2 | entries |
 | `PULL` type, slot, flag (in/out of the radius; an AI coming in is re-sent as `ENTER`) | 3 | entries |
@@ -148,8 +157,8 @@ All binary and little-endian; varints are LEB128.
 | `RDEAD` rock destroyed: type, id | 2-3 | overrides |
 | `GONE` a shell hit something you don't hold: type, shooter slot, shot number, kill | 4 | shells |
 | `LATE` your input was late: type, sequence, ticks | 3 | ticks |
-| up: header (type, ack, flags) | 4 | acks |
-| up: input (target tick, sequence, 6-byte input) | 9 | inputs |
+| up: header (type, ack, flags incl. which input fields changed) | 4 | acks |
+| up: input (stamp as a step from the last, the changed fields) | 2-5 (aim nudge 2) | inputs |
 | up: reports: count, then [kind + id][hash] each | 1 + 2-3 each | reports |
 | up: hashes: tick, count, 1 byte per tracked entity | 3 + n | hashes |
 | ping 11 / pong 22 (pong carries the server clock and the smallest input lead) | | ping |
@@ -207,6 +216,22 @@ Also checked headlessly:
 - A bot fighting at the edge is pulled in from more than 1,500 units away.
 - Each drift is caught for its own reason: mismatch, missing, spurious, hash.
 - A late joiner into a world with half its rocks destroyed sees no desyncs.
+
+### Input changes (2026-11-03: no own-input echo, inputs as changes, aim at 30 Hz, cursor distance in 32s)
+Lockstep, 30 s headless, mouse moving the whole time (aim and distance change every tick), W held, fire bursts; B/s of
+payload for one client:
+
+| | inputs up | inputs down | messages up / down | wire up + down |
+|---|---|---|---|---|
+| alone, before | 537 | 274 | 62 / 64 | 9.5 KB/s |
+| alone, after | 64 | 127 | 33 / 27 | 4.4 KB/s |
+| 1 other player, before | 537 | 760 | 62 / 64 | 10.0 KB/s |
+| 1 other player, after | 64 | 249 | 34 / 40 | 5.5 KB/s |
+
+Most of the wire saving is messages: with no echo, your own input changing no longer makes the server send a bundle,
+so a moving mouse costs one up message every 2 ticks and nothing extra down. `node test.mjs` still shows no desyncs
+other than hits from outside the set (0 in the 3-client run); the 2-player headless fight went from 975 to 601 B/s
+down, the 8-bot fight from 2,009 to 1,831.
 
 ### Estimates for the game
 - **The payload is mostly other players' inputs.** Each tracked player costs about 8 B per input change. A mouse-aiming

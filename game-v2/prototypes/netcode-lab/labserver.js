@@ -90,7 +90,7 @@ class LabServer {
     const sh = this.spawnPlayer(Wo.rngRange(r, -400, 400), Wo.rngRange(r, -400, 400));
     Object.assign(c, {
       ready: true, mode, name: String(msg.name || `pilot ${c.id}`).slice(0, 20), uid: sh.uid, every: !!msg.every,
-      q: [], lastSeq: 0, appliedSeq: 0, rtt: 0, rttMax: 0, rttAt: 0, minLead: 127, late: 0, lateQ: [],
+      q: [], lastSeq: 0, appliedSeq: 0, inBase: { target: 0, inp: Sim.NEUTRAL }, rcvSent: 0, rtt: 0, rttMax: 0, rttAt: 0, minLead: 127, late: 0, lateQ: [],
       set: new Map(), slots: new Map(), freeAt: new Map(), hist: [], memb: new Map(), sticky: new Map(), rocks: new Set(),
       ack: W.tick, lastSent: W.tick, corr: new Map(), corrAt: new Map(), corrected: new Map(), tokens: 30,
       det: [], counts: { mismatch: 0, missing: 0, spurious: 0, hash: 0, unseen: 0 }, expected: 0, matched: 0,
@@ -129,22 +129,17 @@ class LabServer {
       c.minLead = 127;
       this.sendBin(c, pong, pong.cats);
     } else if (type === Pr.T.UP) {
-      const u = Pr.decUp(rd, this.W.tick, c.lastSeq);
-      rd.mark(null);
-      this.upCountUp(c, u, data.length);
-      if (u.input) this.queueInput(c, u.input);
+      const u = Pr.decUp(rd, this.W.tick, c.inBase);
+      for (const k in rd.cats) this.upCount(c, k, rd.cats[k]);
+      if (u.input) {
+        // (the next input is relative to this one, as sent: before any late re-stamp)
+        c.inBase = { target: u.input.target, inp: u.input.inp };
+        this.queueInput(c, { target: u.input.target, seq: c.lastSeq + 1, inp: u.input.inp });
+      }
       if (c.mode === 'lockstep') this.checkReports(c, u);
     }
   }
   upCount(c, k, n) { c.up[k] = (c.up[k] || 0) + n; }
-  upCountUp(c, u, n) {
-    // (the same split the encoder makes: 4 bytes header, 9 an input, the rest reports and hashes)
-    let rest = n - 4;
-    this.upCount(c, 'acks', 4);
-    if (u.input) { this.upCount(c, 'inputs', 9); rest -= 9; }
-    if (u.hashes) { const h = 2 + (u.hashes.list.length < 128 ? 1 : 2) + u.hashes.list.length; this.upCount(c, 'hashes', h); rest -= h; }
-    if (rest > 0) this.upCount(c, 'reports', rest);
-  }
   /** An input for tick `target`. Late (that tick is already simulated): used from the next tick, and the client is told. */
   queueInput(c, d) {
     const W = this.W;
@@ -203,20 +198,20 @@ class LabServer {
       if (!e || !sh) continue;
       inputs.set(c.uid, e.inp);
       c.appliedSeq = e.seq;
-      this.applied.set(c.uid, { inp: e.inp, changed: !Sim.sameInput(e.inp, sh.inp), seq: e.seq });
+      this.applied.set(c.uid, { inp: e.inp, prev: sh.inp, changed: !Sim.sameInput(e.inp, sh.inp), seq: e.seq });
     }
     for (const [uid, b] of this.bots) {
       const sh = W.byUid.get(uid);
       if (!sh) { this.bots.delete(uid); continue; }
       const inp = this.botInput(b, sh, T);
-      if (!Sim.sameInput(inp, sh.inp)) { inputs.set(uid, inp); this.applied.set(uid, { inp, changed: true, seq: -1 }); }
+      if (!Sim.sameInput(inp, sh.inp)) { inputs.set(uid, inp); this.applied.set(uid, { inp, prev: sh.inp, changed: true, seq: -1 }); }
     }
     // 2. Step (noting which AI brains changed their output: clients holding that AI as a puppet get it as an input)
     const before = new Map();
     for (const sh of W.ships) if (sh.kind !== 'player') before.set(sh.uid, sh.inp);
     Wo.step(W, inputs);
     this.aiChanged.clear();
-    for (const sh of W.ships) if (sh.kind !== 'player' && before.has(sh.uid) && !Sim.sameInput(before.get(sh.uid), sh.inp)) this.aiChanged.set(sh.uid, sh.inp);
+    for (const sh of W.ships) if (sh.kind !== 'player' && before.has(sh.uid) && !Sim.sameInput(before.get(sh.uid), sh.inp)) this.aiChanged.set(sh.uid, { inp: sh.inp, prev: before.get(sh.uid) });
     // 3. Logs: events with their report hashes, shells fired, who interacted with whom
     for (const e of W.events) {
       e.h8 = Wo.eventHash8(e);
@@ -356,17 +351,18 @@ class LabServer {
     const start = w.o;
     for (const n of c.lateQ) { w.u8(R.LATE); w.u8(n.seq); w.u8(Math.min(255, n.by)); }
     c.lateQ.length = 0;
-    // Inputs used this tick by players this client tracks (its own as a sequence number: it knows what it sent)
+    // Inputs that changed this tick, of the players (and puppet AIs) this client tracks: only the fields that changed,
+    // against the input that ship flew with last tick (which the client's copy has too). Not its own: it knows what it
+    // sent and when for; the one thing it can't know, an input arriving late, is in LATE above.
     w.mark('inputs');
+    const wIn = (slot, inp, prev) => { const f = Pr.inpDiff(inp, prev); w.u8(R.IN); w.vu(slot * 8 + f); Pr.wInpDelta(w, inp, prev, f); };
     for (const [uid, a] of this.applied) {
       const m = c.set.get(uid);
-      if (!m) continue;
-      if (uid === c.uid) { w.u8(R.OWN); w.u8(a.seq & 255); }
-      else if (a.changed) { w.u8(R.IN); w.vu(m.slot); Pr.wInp(w, a.inp); }
+      if (m && uid !== c.uid && a.changed) wIn(m.slot, a.inp, a.prev);
     }
-    for (const [uid, inp] of this.aiChanged) {
+    for (const [uid, a] of this.aiChanged) {
       const m = c.set.get(uid);
-      if (m && m.pulled) { w.u8(R.IN); w.vu(m.slot); Pr.wInp(w, inp); }
+      if (m && m.pulled) wIn(m.slot, a.inp, a.prev);
     }
     // A tracked shooter's shell hit something this client doesn't hold: name the shell (shooter slot + shot number) so
     // the client drops it too, instead of letting it fly on into something it does hold
@@ -469,6 +465,9 @@ class LabServer {
     while (c.hist.length && c.hist[0].to < T - HIST) c.hist.shift();
     if (T % 300 === 0) for (const [uid, l] of c.memb) { const k = l.filter((m) => m.to >= T - HIST); if (k.length) c.memb.set(uid, k); else c.memb.delete(uid); }
     if (w.o > start || c.every || T - c.lastSent >= HEARTBEAT) {
+      // How many of your inputs had arrived by this tick, when that moved: rides on a bundle going out anyway (never a
+      // reason to send one). With LATE it tells the client exactly which tick each of its inputs was used on.
+      if (c.lastSeq !== c.rcvSent) { w.mark('inputs'); w.u8(R.RCV); w.u8(c.lastSeq & 255); c.rcvSent = c.lastSeq; }
       const buf = w.done();
       c.lastSent = T;
       this.sendBin(c, buf, w.cats);

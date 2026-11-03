@@ -28,7 +28,8 @@ const input = {
     if (live.btn & 2) b |= IN.TURRET;
     if (live.keys.has('Space')) b |= IN.GUN | IN.TURRET;
     const aim = Pr.quantAim(Math.round(Math.atan2(live.ay, live.ax) * Sim.RAD) & 0xFFFF);
-    const inp = { b, aim, dist: Pr.quantDist(Math.min(4000, Math.hypot(live.ax, live.ay))), seq: 0 };
+    // (cursor distance in 32s: it only sets the turret's aim point, which sits 8 units off centre, so finer is noise)
+    const inp = { b, aim, dist: Pr.quantDist(Math.min(4000, Math.hypot(live.ax, live.ay)), 32), seq: 0 };
     const changes = [], p = this.prev;
     if (p) {
       const moveMask = live.helm ? (IN.W | IN.S | IN.Q | IN.E | IN.BOOST) : (IN.W | IN.A | IN.S | IN.D | IN.BOOST);
