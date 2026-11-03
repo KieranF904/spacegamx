@@ -277,7 +277,11 @@ After, by category (B/s): 8 bots around you: entries 287, ticks 78, ping 44, ord
   the whole world in these runs, but this is a small world; a crowded one is the test that matters.
 - `node test.mjs`: the 3-client run had 0 desyncs of any kind (was 31/20/47 unseen); the 8-bot fight went from 1,831 to
   418 B/s down, the 2-player fight from 601 to 328.
-- Not measured yet: the client's CPU for the bigger set, and the real link (the lab on the VPS still runs c279133).
+- **Real link** (`node server/probe.js`, VPS, RTT 9 ms, 30 s, same script as "Measured" above): lockstep down 429 B/s
+  payload, ~2,262 with headers, 29 msg/s (entries 243, ticks 80, inputs 43, ping 43, orders 17); the current style
+  6,881 / ~8,327 at 22 msg/s. Before this change the same probe gave lockstep 2,740 / 6,700 at 64 msg/s. Normal play:
+  1 spurious report, 0 unseen; all four injected drifts caught and corrected.
+- Not measured yet: the client's CPU for the bigger set.
 
 ### Estimates for the game
 - **The payload is mostly other players' inputs.** Each tracked player costs about 8 B per input change. A mouse-aiming

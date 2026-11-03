@@ -70,8 +70,8 @@ How Kieran wants to work:
 
 ## Recent state (2026-11-03)
 
-- Live at https://space.brotherk3d.com/netlab/ (in-page styles at `/netlab/offline.html`). Last deployed from commit
-  `7493f68`.
+- Live at https://space.brotherk3d.com/netlab/ (in-page styles at `/netlab/offline.html`), deployed with AI orders
+  (commit `53bec46` and its docs follow-up).
 - `node test.mjs` passes. Determinism: 0 differing entity-ticks across 3 client copies, other than "unseen" hits from
   outside the set, which are corrected by design.
 - **Last change:**
@@ -101,8 +101,7 @@ Not started unless marked. Ask Kieran which he wants; several were only offered.
 5. **Option: draw other ships at the confirmed tick** and predict only your own: today's trade, for comparison.
 6. ~~Bot inputs dominate download around fights~~: done 2026-11-03. AIs are a server-side commander (target) and a
    shared pilot; orders go out only when the target changes; pull-in follows needs with no cap (Kieran's call). Design
-   doc 6a and 7, numbers under "AI orders and unlimited pull-in". The live lab still runs the version before this
-   (deploy was blocked by a permission check; Kieran to run deploy.sh or allow it).
+   doc 6a and 7, numbers under "AI orders and unlimited pull-in". Deployed.
 7. **Header overhead.** About 66 B per message is more than the payload. Options: coalesce ticks per message, or
    UDP/WebTransport (open question 2 in the design doc).
 8. **Design doc open questions 1-9:**
@@ -122,7 +121,8 @@ Not started unless marked. Ask Kieran which he wants; several were only offered.
 - **Check:** `node test.mjs` (or `--server`). Run it after every change. It must pass, and there must be no new
   desyncs other than "unseen".
 - **Measure the real link:** `node server/probe.js wss://space.brotherk3d.com/netlab/ws [secs] [added ms]`.
-- **Deploy:** `bash prototypes/netcode-lab/deploy.sh`. Redeploying the lab is allowed whenever it helps Kieran test.
+- **Deploy:** `bash prototypes/netcode-lab/deploy.sh`. Kieran has said the lab may be deployed without asking (never
+  touch other projects on the VPS).
 - **Keep the docs in step with the code:**
   - the design doc: wire format table, measurements, decisions, open questions;
   - the README: readouts and controls.
