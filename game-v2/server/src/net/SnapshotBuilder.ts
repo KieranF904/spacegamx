@@ -19,7 +19,7 @@ import {
   Position, Velocity, Rotation, Radius, InSystem, Player, Dead, Health, Boost, Input, Projectile, Lifetime, DroppedItem, Station, Portal,
   ASTEROID_SEED, MAP_DOT_SLACK, STATION_DESIGNS, STATION_WEAPONS, EntityType, packCursorWeaponState, quantizeShipValue, packCharge, gunStateAt, packGunState, PILOT_ROW,
   warmthPercent, fartherThan,
-  mapDotFlags, legAt, packMapLeg, packMapRoute, unpackMapLegs, nearerThan, packIds, packRuns, DEBRIS_STATUS, TICK_RATE,
+  mapDotFlags, legAt, packMapLeg, packMapRoute, unpackMapLegs, nearerThan, packIds, packRuns, packRanges, DEBRIS_STATUS, TICK_RATE,
   type Leg, type EntityState, type ShipState, type ClientSocket, type ServerMessage, type ServerAsteroidSeedMessage, type StarSystemData, type AsteroidSpawnData,
 } from '@space-game/common';
 import type { GameData } from '../data/GameData.js';
@@ -840,8 +840,8 @@ export class SnapshotBuilder {
           ...(belt.extra ? { extra: belt.extra } : {}),
         },
         asteroidField: systemData?.asteroidField,
-        ids,
-        indices,
+        ids: packRanges(ids),
+        indices: packRanges(indices),
       } as ServerAsteroidSeedMessage);
       if (regrown.length) {
         for (const id of regrown) conn.knownEntities.add(id);

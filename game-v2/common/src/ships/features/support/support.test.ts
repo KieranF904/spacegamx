@@ -119,9 +119,9 @@ describe('repairAt', () => {
 });
 
 describe('support weapons: on the wire', () => {
-  it("an intercept goes as a plain message (no compact row: the wire tables don't change) and comes back whole", async () => {
+  it('an intercept goes as a compact row (protocol 26) and comes back whole', async () => {
     const { encodeServerMessage, serverFrame, decodeServerFrame, COMPACT_TYPES } = await import('../../../network/protocol.js');
-    expect(COMPACT_TYPES).not.toContain('intercept');
+    expect(COMPACT_TYPES).toContain('intercept');
     const msg = { type: 'intercept' as const, bodyId: 12, part: 3, proj: 4071, x: -1520, y: 880, fx: -1490, fy: 1300, down: true };
     expect(decodeServerFrame(serverFrame([encodeServerMessage(msg)]))).toEqual([msg]);
   });

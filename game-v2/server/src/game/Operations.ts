@@ -264,7 +264,8 @@ export class Operations {
   /** Construction in progress, by pilot, job and step: what's holding it up, or the piece going on */
   private building = new Map<string, Build>();
   /** Pilots we sent operations to last time (so they get an empty list when they're done) */
-  private shown = new Set<PilotConn>();
+  /** Who has been sent an ops view, and the last one (JSON): an unchanged view is not sent again */
+  private shown = new WeakMap<PilotConn, string>();
   private rand = 1;
 
   readonly rules: OpsRules;
@@ -764,8 +765,13 @@ export class Operations {
   private sendViews(): void {
     for (const conn of this.connections()) {
       const ops = this.views(conn);
-      if (!ops.length && !this.shown.has(conn)) continue;
-      if (ops.length) this.shown.add(conn); else this.shown.delete(conn);
+      const last = this.shown.get(conn);
+      if (!ops.length && last === undefined) continue;
+      if (ops.length) {
+        const key = JSON.stringify(ops);
+        if (key === last) continue;
+        this.shown.set(conn, key);
+      } else this.shown.delete(conn);
       this.host.send(conn, { type: 'ops', ops });
     }
   }

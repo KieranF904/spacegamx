@@ -7,6 +7,7 @@ export * from './contributorProtocol.js';
 export * from './replication.js';
 export * from './binaryCodec.js';
 import { encodeBinary, BinaryReader, BinaryWriter, DICTIONARY } from './binaryCodec.js';
+import { fxKindCode, fxKindName, FX_KINDS } from './fxKinds.js';
 import { quantizeCursorAngle, dequantizeCursorAngle } from './cursorState.js';
 /**
  * Network Protocol - All client/server message types
@@ -28,9 +29,9 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
  * has updated PROTOCOL_VERSION and PROTOCOL_WIRE_HASH.
  */
 // History: PROTOCOL_CHANGELOG.md. Re-pin with `npm run wire:bump "reason"` (game-v2/), never by hand.
-export const PROTOCOL_VERSION = 25;
+export const PROTOCOL_VERSION = 26;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
-export const PROTOCOL_WIRE_HASH = '1525a8b1';
+export const PROTOCOL_WIRE_HASH = 'f15c7577';
 /** WebSocket close code (and reason) for a client on another protocol version */
 export const PROTOCOL_MISMATCH_CLOSE = 4002;
 export const PROTOCOL_MISMATCH_REASON = 'version';
@@ -719,8 +720,8 @@ export interface ServerAsteroidSeedMessage {
   seed: string;           // global seed string
   belt: AsteroidBeltData;
   asteroidField?: string; // optional field ID for definition-based generation
-  ids: number[];          // asteroid entity ids in this system
-  indices: number[];      // original deterministic indices for ids
+  ids: number[];          // asteroid entity ids in this system, as ranges (ranges.ts: [start, count, ...])
+  indices: number[];      // original deterministic indices for ids, as ranges, in the same order
 }
 
 export interface AsteroidSpawnData {
@@ -1398,7 +1399,35 @@ const COMPACT: [string, string[]][] = [
   // (Packed first: see packSnapshot)
   ['snapshot', ['t', 'lp', 'e', 'p', 'r', 'k', 'c', 'o', 'f']],
   ['mapDots', ['tick', 'dots', 'routes', 'info', 'gone', 'names', 'full']],
+  // (Appended, protocol 26: the hot plain messages. Values change on the way in and out: COMPACT_HOOKS)
+  ['ignite', ['bodyId', 'part', 'ticks']],
+  ['detonation', ['kind', 'x', 'y', 'radius', 'from', 'mob']],
+  ['intercept', ['bodyId', 'part', 'proj', 'x', 'y', 'fx', 'fy', 'down']],
+  ['bossTelegraph', ['shape', 'kind', 'x', 'y', 'ticks', 'angle', 'length', 'width', 'radius', 'bodyId']],
+  ['pong', ['clientTime', 'serverTime', 'tick', 'serverProcessing']],
+  ['bossBeam', ['bodyId', 'x', 'y', 'a0', 'a1', 'ticks', 'length', 'width', 'kind']],
+  ['bossCharge', ['bodyId', 'kind', 'ticks']],
+  ['bossBlow', ['bodyId', 'part']],
 ];
+
+/**
+ * Per-type changes to a message's values on the way into a compact row, undone on the way out (so the client sees the
+ * message it always did). `pack` returns a copy, never the message itself.
+ */
+type Fields = Record<string, unknown>;
+const COMPACT_HOOKS: Record<string, { pack(m: Fields): Fields; unpack(m: Fields): Fields }> = {
+  // The kind goes by number when it is listed (fxKinds.ts)
+  detonation: {
+    pack: (m) => ({ ...m, kind: fxKindCode(m.kind as string) }),
+    unpack: (m) => ({ ...m, kind: fxKindName(m.kind as number | string) }),
+  },
+  // A flag goes as 0/1
+  intercept: {
+    pack: (m) => ({ ...m, down: m.down ? 1 : 0 }),
+    unpack: (m) => ({ ...m, down: m.down === 1 || m.down === true }),
+  },
+};
+
 const COMPACT_CODE = new Map(COMPACT.map(([type, fields], i) => [type, { code: i, fields, known: new Set(['type', ...fields]) }]));
 /** Message types by compact code (for tools that count traffic) */
 export const COMPACT_TYPES = COMPACT.map(([type]) => type);
@@ -1406,7 +1435,9 @@ export const COMPACT_TYPES = COMPACT.map(([type]) => type);
 function packCompact(msg: { type: string }): unknown[] | null {
   const c = COMPACT_CODE.get(msg.type);
   if (!c) return null;
-  const m = (msg.type === 'snapshot' ? packSnapshot(msg as ServerSnapshotMessage) : msg) as unknown as Record<string, unknown>;
+  let m = (msg.type === 'snapshot' ? packSnapshot(msg as ServerSnapshotMessage) : msg) as unknown as Record<string, unknown>;
+  const hook = COMPACT_HOOKS[msg.type];
+  if (hook) m = hook.pack(m);
   for (const k in m) if (m[k] !== undefined && !c.known.has(k)) return null;
   const row: unknown[] = [c.code];
   for (const f of c.fields) row.push(m[f] ?? null);
@@ -1419,7 +1450,8 @@ function unpackCompact(row: unknown[]): ServerMessage {
   const m: Record<string, unknown> = { type };
   for (let i = 1; i < row.length; i++) if (row[i] !== null) m[fields[i - 1]] = row[i];
   if (type === 'snapshot') return unpackSnapshot(m as unknown as PackedSnapshot);
-  return m as unknown as ServerMessage;
+  const hook = COMPACT_HOOKS[type];
+  return (hook ? hook.unpack(m) : m) as unknown as ServerMessage;
 }
 
 /** One message as it came off the wire (a packed snapshot, a compact row, or a plain object) */
@@ -1442,6 +1474,7 @@ const SNAP_FIELDS = ['id', 'type', 'x', 'y', 'angle', 'vx', 'vy', 'hp', 'maxHp',
 export function wireTables(): Record<string, unknown> {
   return {
     compact: COMPACT,
+    fxKinds: FX_KINDS,
     snapFields: SNAP_FIELDS,
     dictionary: DICTIONARY,
     binaryInput: [BINARY_MSG_INPUT_V1, BINARY_MSG_INPUT],

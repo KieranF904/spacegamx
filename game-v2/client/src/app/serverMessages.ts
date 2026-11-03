@@ -12,7 +12,7 @@
 import type { ServerMessage, DisconnectInfo } from '@space-game/common';
 import { showHitTick } from '../ui/HitTick';
 import { rangeFeed } from '../ui/devRangeFeed';
-import { PROTOCOL_VERSION, PROTOCOL_MISMATCH_CLOSE } from '@space-game/common';
+import { PROTOCOL_VERSION, PROTOCOL_MISMATCH_CLOSE, unpackRanges } from '@space-game/common';
 import type { RibbonsFile } from '@space-game/common';
 import ribbonData from '../../../data/achievements.json';
 import type { GameState } from '../state/GameState';
@@ -360,7 +360,7 @@ const TABLE: Handlers = {
   },
   asteroidSpawn: (h, msg) => { h.state.handleAsteroidSpawn(msg.tick, msg.asteroids); },
   asteroidSeed: (h, msg) => {
-    h.state.handleAsteroidSeed(msg.tick, msg.systemId, msg.seed, msg.belt, msg.ids, msg.indices, msg.asteroidField);
+    h.state.handleAsteroidSeed(msg.tick, msg.systemId, msg.seed, msg.belt, unpackRanges(msg.ids), unpackRanges(msg.indices), msg.asteroidField);
     // Feed belt geometry to the system map
     if (msg.belt) {
       h.systemMapUI.setBelt(msg.belt.innerRadius, msg.belt.outerRadius);

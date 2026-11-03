@@ -355,7 +355,6 @@ export class Quests {
     p.quests.fresh = p.quests.fresh?.filter((id) => p.quests.known.includes(id) && !this.isActive(p, id) && !p.quests.done.includes(id));
     if (!p.quests.fresh?.length) delete p.quests.fresh;
     this.send(conn);
-    this.people?.sendPeople(conn, true);
   }
 
   tick(): void {

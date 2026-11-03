@@ -140,6 +140,62 @@ describe('control rows', () => {
   });
 });
 
+describe('hot messages as compact rows (protocol 26)', () => {
+  const msgs: Record<string, unknown>[] = [
+    { type: 'ignite', bodyId: 2242, part: 7, ticks: 180 },
+    { type: 'detonation', kind: 'flak', x: 27415, y: 21046, radius: 120 },
+    { type: 'detonation', kind: 'arc', x: 100, y: -200, radius: 30, from: [90, -190] },
+    { type: 'detonation', kind: 'tesla_arc', x: 100, y: 200, radius: 30, from: [-9, 19] },
+    { type: 'detonation', kind: 'mob_burst', x: 5, y: 6, radius: 90, mob: 'mite' },
+    { type: 'detonation', kind: 'a_kind_nobody_listed', x: 5, y: 6, radius: 90 },
+    { type: 'intercept', bodyId: 9, part: 3, proj: 2316, x: 1000.5, y: -2000.25, fx: 990, fy: -1990, down: true },
+    { type: 'intercept', bodyId: 9, part: 3, proj: 2316, x: 1000.5, y: -2000.25, fx: 990, fy: -1990, down: false },
+    { type: 'bossTelegraph', shape: 'line', kind: 'lance', bodyId: 44, x: 12, y: -3, angle: 1.5707963, length: 3200, width: 150, ticks: 60 },
+    { type: 'bossTelegraph', shape: 'circle', kind: 'impact', x: 400, y: 900, radius: 260, ticks: 45 },
+    { type: 'pong', clientTime: 1792549411000.5, serverTime: 1792549411511, tick: 12345, serverProcessing: 0.4 },
+    { type: 'pong', clientTime: 1.5, serverTime: 1792549411511, tick: 5 },
+    { type: 'bossBeam', bodyId: 7, x: 10, y: 0, a0: -0.5, a1: 0.5, ticks: 90, length: 3000, width: 120 },
+    { type: 'bossBeam', bodyId: 7, x: 10, y: 0, a0: -0.5, a1: 0.5, ticks: 90, length: 3000, width: 120, kind: 'crystal' },
+    { type: 'bossCharge', bodyId: 7, kind: 'nova', ticks: 120 },
+    { type: 'bossBlow', bodyId: 7, part: 12 },
+  ];
+
+  it('each one round trips, as a row and inside a binary frame', async () => {
+    const { encodeMessage, encodeServerMessage, serverFrame, decodeServerFrame } = await import('./protocol.js');
+    for (const m of msgs) {
+      const wire = encodeMessage(m as any) as string;
+      expect(wire.startsWith('['), JSON.stringify(m)).toBe(true);
+      expect(decodeServerFrame(wire)).toEqual([m]);
+    }
+    const frame = serverFrame(msgs.map((m) => encodeServerMessage(m as any)));
+    expect(decodeServerFrame(frame)).toEqual(msgs);
+  });
+
+  it('is smaller than the keyed object was', async () => {
+    const { encodeServerMessage } = await import('./protocol.js');
+    const { encodeBinary } = await import('./binaryCodec.js');
+    for (const m of msgs) {
+      const row = encodeServerMessage(m as any).length;
+      const plain = encodeBinary(m).length;
+      expect(row, JSON.stringify(m)).toBeLessThan(plain);
+    }
+  });
+
+  it('a detonation kind goes by number when listed and as itself when not', async () => {
+    const { encodeMessage } = await import('./protocol.js');
+    const { FX_KINDS } = await import('./fxKinds.js');
+    const listed = JSON.parse(encodeMessage({ type: 'detonation', kind: 'flak', x: 1, y: 2, radius: 3 } as any) as string);
+    expect(listed[1]).toBe(FX_KINDS.indexOf('flak'));
+    const unlisted = JSON.parse(encodeMessage({ type: 'detonation', kind: 'brand_new', x: 1, y: 2, radius: 3 } as any) as string);
+    expect(unlisted[1]).toBe('brand_new');
+  });
+
+  it('a field the table does not know still goes as an object', async () => {
+    const { encodeMessage } = await import('./protocol.js');
+    expect((encodeMessage({ type: 'ignite', bodyId: 1, part: 2, ticks: 3, extra: 1 } as any) as string).startsWith('{')).toBe(true);
+  });
+});
+
 describe('binary frames', () => {
   it('the codec gives back exactly what JSON would, for every kind of value', async () => {
     const { encodeBinary, decodeBinaryAll } = await import('./binaryCodec.js');

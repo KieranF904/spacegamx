@@ -15,3 +15,4 @@ except to fix a typo. A bump makes old clients reload (see PROTOCOL_VERSION in p
 - 23 (2026-11-02): ports energy core: a ports ship's pilot row carries its parts' triples (count negative) and the new models
 - 24 (2026-11-02): ports: guns' augment buffers on the pilot row (quads), an augmented shot's flag on fire events (part + 65536)
 - 25 (2026-11-03): debris clients work out themselves (debrisSplit message; debris acks on the binary input's tail); engines' power and a refused boost in the replicated control bits (CTL.noBoost 16384, power from bit 15)
+- 26 (2026-11-03): COMPACT rows for ignite, detonation (kind codes, fxKinds.ts), intercept, bossTelegraph, pong, boss beam/charge/blow; asteroidSeed ids and indices as ranges

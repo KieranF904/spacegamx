@@ -373,3 +373,32 @@ cause (wing bonus, shield, satisfaction), make that input client-known next.
 5. hpCheck and `hpResync`.
 6. Parity, ledger and client tests; golden updates (`frameHash`, `serverMessages`, `clientMessages`).
 7. Probe with caps; measure; write the audit; decide what to make client-known next.
+
+---
+
+## Part A as built (2026-11-04, protocol 26)
+
+Built as designed. Differences from the text above:
+
+- The eight new `COMPACT` rows are appended after `mapDots`, not placed earlier. Existing codes keep their numbers.
+- `COMPACT_HOOKS` (protocol.ts) has two entries: `detonation` (kind by number, `FX_KINDS` in `fxKinds.ts`) and `intercept` (`down` as 0/1). Both undo themselves on unpack, so no client handler changed.
+- `fxKinds` is in `wireTables()`, so the hash covers it. Weapon kinds come first in `WEAPON_KIND_TYPE` order; `fxKinds.test.ts` holds that. The list also has `tesla_arc`, `mob_burst`, `mob_fizzle`, `eruption`, `synapse`, `scrap`, `sludge`.
+- `asteroidSeed` ranges use a general helper (`packRanges`/`unpackRanges`, network/ranges.ts): runs of "one more than the last", any order, so `ids` and `indices` stay aligned. The client unpacks in `serverMessages.ts`; `GameState.handleAsteroidSeed` is unchanged.
+- A8: the forced `sendPeople(conn, true)` at the end of `Quests.onLogin` was removed. `send(conn)` just before it already sends `people` (the connection has not been seen, so nothing is de-duplicated away).
+- A9: `Session.itemsKey` (Pilots). A10: `Party.sent` (a WeakMap by connection, cleared when a member leaves or the party disbands). The client only uses a member's x, y when that ship is not in view (nav marker fallback, map), so 1 km steps are enough. A11: `Operations.shown` is now a `WeakMap<conn, JSON>`.
+- `support.test.ts` used to assert `intercept` was not compact. It now asserts it is.
+- Golden change on purpose: `frameHash.golden.json` (frame bytes and counts change: `items` and `party` copies are gone). The `world` hash did not change.
+
+### Measured (probe, 20 s, 3 ticks latency, shooter A, raw B/s; before -> after)
+
+| scenario | A raw | ignite | detonation |
+|---|---|---|---|
+| idle | 293 -> 293 | | |
+| P_pip | 835 -> 835 | | |
+| P_hammerhead | 2,905 -> 2,905 | | |
+| P_spark (Gale) | 5,368 -> 3,567 | 1,152 -> 288 | 1,353 -> 416 |
+| P_heavy | 478 -> 467 | | 16 -> 6 |
+| boss | 5,237 -> 5,061 | | 125 -> 45 |
+| debris, npcfight, P_beam | unchanged | | |
+
+The Gale fight drops by a third. Deflated (what actually crosses the wire) goes 1,758 -> 1,667 B/s: deflate already squeezed the repeated keys, so the real saving is smaller than the raw figure. The probe does not count `pong`, `bossTelegraph`, `intercept` or `asteroidSeed`; the round-trip tests in protocol.test.ts and ranges.test.ts cover them. The before/after JSON is in the session scratchpad (`net/before-hits/`, `net/after-A1/`).

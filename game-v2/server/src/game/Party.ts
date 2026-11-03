@@ -24,6 +24,8 @@ export const WING_BONUS = 0.08;
 /** Members this close share a kill */
 export const SHARE_RANGE = 8000;
 const INVITE_MS = 60_000;
+/** Members' positions go to the party in steps this big (the map and the rally need no more), so a party that is only flying is not resent twice a second */
+const POS_STEP = 1000;
 
 export interface PartyHost {
   send(conn: PilotConn, msg: ServerMessage): void;
@@ -52,6 +54,8 @@ export class Party {
   private of = new Map<PilotConn, number>();
   private invites = new Map<PilotConn, { from: PilotConn; at: number }>();
   private wing = new Map<PilotConn, number>();
+  /** What each member was last sent of their party (JSON): an unchanged party is not sent again */
+  private sent = new WeakMap<PilotConn, string>();
   private lastPing = new WeakMap<PilotConn, number>();
   private nextId = 1;
   private ticks = 0;
@@ -199,6 +203,7 @@ export class Party {
     this.of.delete(conn);
     this.wing.delete(conn);
     this.host.setWing?.(conn, 1);
+    this.sent.delete(conn);
     this.host.send(conn, { type: 'party', id: 0, leader: '', members: [] });
     if (p.members.length <= 1) {
       // A party of one is no party
@@ -206,6 +211,7 @@ export class Party {
         this.of.delete(m);
         this.wing.delete(m);
         this.host.setWing?.(m, 1);
+        this.sent.delete(m);
         this.host.send(m, { type: 'party', id: 0, leader: '', members: [] });
         if (m !== conn) this.host.toast(m, 'Your party has disbanded', 'info');
       }
@@ -253,10 +259,16 @@ export class Party {
       const s = st.get(m);
       return {
         name: m.username, eid: m.playerId, leader: m === p.leader, level: s?.level ?? 1, ship: s?.ship ?? '',
-        system: s?.system ?? '', x: Math.round(s?.x ?? 0), y: Math.round(s?.y ?? 0), hull: Math.round((s?.hull ?? 0) * 100), alive: !!s?.alive,
+        system: s?.system ?? '', x: Math.round((s?.x ?? 0) / POS_STEP) * POS_STEP, y: Math.round((s?.y ?? 0) / POS_STEP) * POS_STEP, hull: Math.round((s?.hull ?? 0) * 20) * 5, alive: !!s?.alive,
         wing: this.wing.get(m) ?? 1,
       };
     });
-    for (const m of p.members) this.host.send(m, { type: 'party', id: p.id, leader: p.leader.username, members });
+    const msg = { type: 'party' as const, id: p.id, leader: p.leader.username, members };
+    const key = JSON.stringify(msg);
+    for (const m of p.members) {
+      if (this.sent.get(m) === key) continue;
+      this.sent.set(m, key);
+      this.host.send(m, msg);
+    }
   }
 }

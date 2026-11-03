@@ -101,6 +101,8 @@ interface Session {
   atStation: boolean;
   /** Last rebuild status sent (to avoid repeats) */
   rebuildKey: string;
+  /** The last `items` message sent, as JSON (an unchanged one is not sent again) */
+  itemsKey?: string;
   /** Last time we told them the station covered a rebuild (wall ms) */
   lastCreditNote: number;
   /** Station repair owed in fractions of a credit (charged a whole credit at a time) */
@@ -1115,10 +1117,15 @@ export class Pilots {
   sendItems(conn: PilotConn): void {
     const s = this.sessions.get(conn);
     if (!s) return;
-    this.host.send(conn, {
-      type: 'items', cargo: s.profile.cargo, storage: s.profile.storage, cargoCapacity: this.cargoCapacity(conn),
+    const msg = {
+      type: 'items' as const, cargo: s.profile.cargo, storage: s.profile.storage, cargoCapacity: this.cargoCapacity(conn),
       credits: s.profile.credits, atStation: this.atStation(conn),
-    });
+    };
+    // (A full state: a copy of what they already hold changes nothing for them)
+    const key = JSON.stringify(msg);
+    if (s.itemsKey === key) return;
+    s.itemsKey = key;
+    this.host.send(conn, msg);
   }
 
   toast(conn: PilotConn, text: string, kind: 'info' | 'good' | 'warn' | 'bad' = 'info'): void {
