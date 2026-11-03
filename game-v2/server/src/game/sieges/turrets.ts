@@ -31,24 +31,35 @@ export function ordersList(ctx: SiegeCtx): { id: string; label: string }[] {
   return Object.keys(TURRET_ORDERS).map((id) => ({ id, label: ctx.t(`sieges.orders.${id}` as never) }));
 }
 
+/** One candidate, reused (pickTarget runs for every turret every tick: no allocation per hostile) */
+const cand: Candidate = { eid: -1, d: 0, x: 0, y: 0, cost: 0, boss: false };
+
+/** How turret at (x, y) ranks hostile `e` by `orders` (Infinity: dead or out of reach) */
+function rankOf(ctx: SiegeCtx, run: Run, orders: TurretOrders, x: number, y: number, range: number, e: number, cost: number, boss: boolean): number {
+  if (!ctx.host.hostileAlive(e)) return Infinity;
+  const ex = Position.x[e], ey = Position.y[e], d = Math.hypot(ex - x, ey - y);
+  if (d > range) return Infinity;
+  cand.eid = e; cand.d = d; cand.x = ex; cand.y = ey; cand.cost = cost; cand.boss = boss;
+  return orders.rank(cand, run, ctx);
+}
+
 /** What the turret on pad `slot` fires on now (-1: nothing in reach) */
 export function pickTarget(ctx: SiegeCtx, run: Run, slot: number, range: number, now: number): number {
   const t = run.turrets[slot];
   if (!t) return -1;
   const x = Position.x[t.eid], y = Position.y[t.eid];
-  const inReach = (e: number) => ctx.host.hostileAlive(e) && Math.hypot(Position.x[e] - x, Position.y[e] - y) <= range;
   const f = run.focus;
-  if (f.target >= 0 && now < f.until && inReach(f.target)) return f.target;
+  if (f.target >= 0 && now < f.until && ctx.host.hostileAlive(f.target) && Math.hypot(Position.x[f.target] - x, Position.y[f.target] - y) <= range) return f.target;
   const orders = TURRET_ORDERS[t.orders] ?? TURRET_ORDERS[DEFAULT_ORDERS];
   let best = -1, br = Infinity;
-  const consider = (e: number, cost: number, boss: boolean) => {
-    if (!ctx.host.hostileAlive(e)) return;
-    const ex = Position.x[e], ey = Position.y[e], d = Math.hypot(ex - x, ey - y);
-    if (d > range) return;
-    const r = orders.rank({ eid: e, d, x: ex, y: ey, cost, boss }, run, ctx);
+  for (const [e, i] of run.info) {
+    const r = rankOf(ctx, run, orders, x, y, range, e, i.cost, !!i.boss);
     if (r < br) { br = r; best = e; }
-  };
-  for (const [e, i] of run.info) consider(e, i.cost, !!i.boss);
-  if (run.objective && run.objective.eid >= 0) consider(run.objective.eid, 1, false);
+  }
+  const o = run.objective;
+  if (o && o.eid >= 0) {
+    const r = rankOf(ctx, run, orders, x, y, range, o.eid, 1, false);
+    if (r < br) { br = r; best = o.eid; }
+  }
   return best;
 }

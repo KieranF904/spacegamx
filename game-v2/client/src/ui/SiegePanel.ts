@@ -141,7 +141,7 @@ export class SiegePanel {
   private timer = 0;
 
   constructor(private send: (m: ClientMessage) => void, host: Partial<SiegePanelHost> = {}) {
-    this.host = { tick: () => 0, target: () => 0, me: () => null, bastion: () => null, focusKey: () => 'U', ...host };
+    this.host = { tick: () => 0, target: () => 0, me: () => null, bastion: () => null, focusKey: () => '6', ...host };
     this.hud = new NightHud(() => this.host.tick(), () => this.host.bastion(), () => this.host.focusKey());
     // (the bastion's ground reads the state and the pad in focus from here)
     siegeFeed.padFocus = () => this.padFocus;

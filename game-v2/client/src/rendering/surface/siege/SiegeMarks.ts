@@ -31,6 +31,9 @@ const GLYPHS: Record<Glyph, Draw> = {
   },
 };
 
+/** The brackets' four corners */
+const CORNERS: readonly (readonly [number, number])[] = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+
 /** Local points (x right, y down on screen) turned upright on screen and placed at (x, y) */
 function turn(pts: number[], x: number, y: number, c: number, sn: number): number[] {
   const out: number[] = [];
@@ -42,8 +45,8 @@ export class SiegeMarks {
   readonly g = new Graphics();
   private t = 0;
 
-  /** `night` 0..1 (marks fade in after dusk), `zoom` the camera's, `angle` its turn (marks stay upright) */
-  update(dt: number, entities: Iterable<MarkEntity>, msg: ServerSiegeStateMessage | null, night: number, zoom: number, angle: number, tick: number): void {
+  /** `night` 0..1 (marks fade in after dusk), `zoom` the camera's, `angle` its turn (marks stay upright); (ox, oy) this Graphics' place in the world (the bastion's) */
+  update(dt: number, entities: Iterable<MarkEntity>, msg: ServerSiegeStateMessage | null, night: number, zoom: number, angle: number, tick: number, ox = 0, oy = 0): void {
     this.t += dt;
     const g = this.g;
     g.clear();
@@ -54,8 +57,8 @@ export class SiegeMarks {
     for (const e of entities) {
       if (e.type !== EntityType.ShipBody || e.data?.[0] !== 3) continue;
       const look = hostileLook(e.name, msg.tonight);
-      const r = Math.max((look.boss ? 30 : 19) * px, look.boss ? 150 : 70), arm = r * 0.45, w = 2.2 * px, a = 0.85 * show, x = e.renderX, y = e.renderY;
-      for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      const r = Math.max((look.boss ? 30 : 19) * px, look.boss ? 150 : 70), arm = r * 0.45, w = 2.2 * px, a = 0.85 * show, x = e.renderX - ox, y = e.renderY - oy;
+      for (const [sx, sy] of CORNERS) {
         g.poly(turn([sx * r, sy * (r - arm), sx * r, sy * r, sx * (r - arm), sy * r], x, y, c, sn), false).stroke({ color: look.color, width: w, alpha: a, join: 'miter' });
       }
       const [gx, gy] = turn([0, -(r + 11 * px)], x, y, c, sn);

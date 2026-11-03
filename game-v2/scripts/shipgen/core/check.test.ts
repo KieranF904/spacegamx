@@ -5,8 +5,9 @@ import { gridToBlueprint } from './grid';
 import { REVIEW_SHIPS, ship } from './testShips';
 
 const ctx = loadContext();
-/** What the review ships' write-ups (docs/panels/entries/2026-11-01-review-ships-*.md) recorded below full over 60 s */
-const HELD: Record<string, Record<string, number>> = { 'dev/review-heron': { Lance: 77, Glint: 30 } };
+/** What the review ships' write-ups (docs/panels/entries/2026-11-01-review-ships-*.md) recorded below full over 60 s
+ *  (the Lance 77% and the Glints 30% then; 81% and 41% since the Heavy Bank holds 450 a cell, 2026-11-04 energy audit) */
+const HELD: Record<string, Record<string, number>> = { 'dev/review-heron': { Lance: 81, Glint: 41 } };
 
 describe('shipgen check', () => {
   for (const path of REVIEW_SHIPS) {
@@ -20,7 +21,7 @@ describe('shipgen check', () => {
       for (const c of p.consumers) {
         expect(c.fed && c.linked, `${c.name} at ${c.row},${c.col}`).toBe(true);
         expect(c.pct, `${c.name} at ${c.row},${c.col}`).toBeGreaterThanOrEqual(95);
-        // (held for 60 s: full, but for the Heron's beams, which its review recorded as the Lance 77%, the Glints 30%)
+        // (held for 60 s: full, but for the Heron's beams, which its review recorded as the Lance 77% (81% with the deeper Heavy Banks), the Glints 30% (41%))
         const known = HELD[path]?.[c.name];
         if (known !== undefined) expect(Math.abs(c.pctLong - known), `${c.name} at ${c.row},${c.col}: ${c.pctLong}`).toBeLessThanOrEqual(3);
         else expect(c.pctLong, `${c.name} at ${c.row},${c.col}`).toBeGreaterThanOrEqual(95);

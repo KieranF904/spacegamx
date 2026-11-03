@@ -23,7 +23,8 @@ export const nest: SiegeObjectiveKind = {
     o.release = now + ctx.rules.objectives.nest.releaseSeconds * SECOND;
     const open = P.roster.filter((r) => r.from <= night && (r.until === undefined || night <= r.until)).sort((a, c) => a.cost - c.cost);
     const u = open[0];
-    if (u) run.extras.push(...ctx.host.spawnHostiles(run.num, [{ ship: u.ship, faction: u.faction, hp: (u.hp ?? 1) * (1 + P.hpPerNight * (night - 1)), range: u.range, aggro: u.aggro }], o.x, o.y, { x: b.x, y: b.y }, run.grade));
+    // (spawnHostiles gives -1 for one it couldn't make: not counted as a kill when the next step finds it "gone")
+    if (u) for (const e of ctx.host.spawnHostiles(run.num, [{ ship: u.ship, faction: u.faction, hp: (u.hp ?? 1) * (1 + P.hpPerNight * (night - 1)), range: u.range, aggro: u.aggro }], o.x, o.y, { x: b.x, y: b.y }, run.grade)) if (e >= 0) run.extras.push(e);
   },
   banner(ctx, _run, o, now) {
     const left = Math.max(0, Math.ceil((o.until - now) / SECOND));

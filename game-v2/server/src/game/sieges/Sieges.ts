@@ -228,12 +228,14 @@ export class Sieges implements SiegeCtx {
       }
       return null;
     });
-    // Fled off the moon (a beaten pirate runs): gone, and no longer holding back the dawn
+    // Fled off the moon (a beaten pirate runs): gone, and no longer holding back the dawn (nor paid for as a kill)
     const edge = run.sys.surface!.radius, bs = run.sys.surface!.bastion!;
-    for (const e of run.raiders) {
+    run.raiders = run.raiders.filter((e) => {
       const at = this.host.shipAt(e);
-      if (at && Math.hypot(at.x - bs.x, at.y - bs.y) > edge) { run.info.delete(e); this.owner.delete(e); this.host.removeHostile(e); }
-    }
+      if (!at || Math.hypot(at.x - bs.x, at.y - bs.y) <= edge) return true;
+      run.info.delete(e); this.owner.delete(e); this.host.removeHostile(e);
+      return false;
+    });
     // Kills pay a little into the supplies (double in a last stand)
     const alive = run.raiders.filter((e) => this.host.hostileAlive(e));
     const extras = run.extras.filter((e) => this.host.hostileAlive(e));

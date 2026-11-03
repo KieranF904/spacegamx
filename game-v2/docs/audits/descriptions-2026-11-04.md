@@ -114,7 +114,7 @@ Reviewed and left as they were because they are already plain: most ore, refined
 
 **ancient_relic**
 - Before: A small sealed case, far older than the colony: Halden work, collectors say, even the ones that turn up in the Maw. Nobody has opened one. Collectors pay well; fabricators pay better.
-- After: A small sealed case of unknown make. Sells to collectors and fabricators.
+- After: A small sealed case. Sells to collectors and fabricators.
 
 **railgun_quench**
 - Before: Railgun slugs with a cryogen core: poor slugs, 30% less damage, but Cinder Cult ships take two and a half times that (Forgemaster Hale's pattern: "cold cracks hot plate"). Not the Cult's great ones. 200 a crate. Pressed only by your own station's armoury.

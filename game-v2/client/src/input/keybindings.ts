@@ -38,7 +38,7 @@ export const ACTIONS: ActionDef[] = [
   { id: 'targetCursor', label: 'Target the ship under the cursor', category: 'Combat', key: 'KeyT', hint: 'On empty space: clear the target' },
   { id: 'feeds', label: 'Switch feeds (Selectors)', category: 'Combat', key: 'KeyY', hint: 'On a ports ship: every Selector passes its other tank; what is in the lines and buffers runs out first' },
   { id: 'ping', label: 'Ping for your party (with Shift: danger)', category: 'Combat', key: 'KeyB', hint: 'On a hostile: attack it. On loot: grab it. On the map: Shift + right-click' },
-  { id: 'siegeFocus', label: 'Moon siege: turrets focus on your target', category: 'Combat', key: 'KeyU', hint: 'At night on a siege moon: every turret in reach fires on your target for a few seconds (then it cools down)' },
+  { id: 'siegeFocus', label: 'Moon siege: turrets focus on your target', category: 'Combat', key: 'Digit6', hint: 'At night on a siege moon: every turret in reach fires on your target for a few seconds (then it cools down)' },
   { id: 'dock', label: 'Dock / open hangar', category: 'Ship & world', key: 'KeyH', hint: "Inside a station's docking ring" },
   { id: 'interact', label: 'Use jump gate / descend to a planet', category: 'Ship & world', key: 'KeyX', hint: 'In orbit close to a planet you can land on' },
   { id: 'autopilot', label: 'Autopilot to the job you follow', category: 'Ship & world', key: 'KeyG', hint: 'Or click a place on the map (M). Any flight key takes back control' },

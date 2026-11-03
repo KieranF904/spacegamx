@@ -33,6 +33,8 @@ import { PAD_EMPTY, TURRET_DEFAULT, TURRET_LOOKS, beaconPhase, coreGlow, dayLane
 const DEG = Math.PI / 180;
 /** How long before a front lands its beacon shows (ticks) */
 const BEACON_WARN = 20 * 60;
+/** How long after a front lands its lane stays painted (ticks) */
+const LANE_HOLD = 30 * 60;
 
 type Layout = { x: number; y: number; slots: { x: number; y: number }[]; platform?: { sides: number; radius: number }; walls?: { from: number; to: number; radius: number }[]; profile?: string };
 type Turret = NonNullable<NonNullable<ServerSiegeStateMessage['turrets']>[number]>;
@@ -49,6 +51,10 @@ export class BastionView {
   private pads: { x: number; y: number }[];
   private ground = new Graphics();
   private groundKey = '';
+  /** What the ground was last looked at for (BastionView.update) */
+  private groundIn: { msg: ServerSiegeStateMessage | null; focus: number; step: number; onLanes: number } = { msg: null, focus: -2, step: -1, onLanes: -1 };
+  /** The scorched pads (from the state) */
+  private lost = new Set<number>();
   private fx = new SiegeFx();
   private marks = new SiegeMarks();
   private approach: Approach | undefined;
@@ -129,17 +135,25 @@ export class BastionView {
     const night = f.night;
     this.events(msg, turrets, tick);
     this.emplace(turrets);
-    // The ground's marks: redrawn when what they show changes
+    // The ground's marks: redrawn when what they show changes (looked at only when the state, the pad in focus, the
+    // darkness's step or the count of fronts still on the lanes changes: no key string a frame)
     const focus = msg ? siegeFeed.padFocus() : -1;
     const atNight = msg?.phase === 'dusk' || msg?.phase === 'night';
-    const lanes = !msg ? [] : atNight && msg.incoming?.length ? frontLanes(msg.incoming.filter((x) => x.at > tick - 30 * 60), this.b.x, this.b.y) : dayLanes(this.approach);
-    const lost = new Set(msg?.padsLost ?? []);
-    const key = `${msg ? 1 : 0}|${turrets.map((t) => (t ? `${t.kind}:${Math.round(t.hull / 4)}:${t.range}` : '-')).join(',')}|${[...lost].join(',')}|${lanes.map((l) => l.angle.toFixed(2)).join(',')}|${focus}|${Math.round(night * 8)}`;
-    if (key !== this.groundKey) {
-      this.groundKey = key;
-      if (msg) drawGround(this.ground, { pads: this.pads, turrets, lost, lanes, laneFrom: this.laneFrom, laneTo: this.laneTo, focus, night });
-      else this.ground.clear();
+    let onLanes = 0;
+    if (msg && atNight && msg.incoming) for (const x of msg.incoming) if (x.at > tick - LANE_HOLD) onLanes++;
+    const step = Math.round(night * 8), G = this.groundIn;
+    if (msg !== G.msg || focus !== G.focus || step !== G.step || onLanes !== G.onLanes) {
+      G.msg = msg; G.focus = focus; G.step = step; G.onLanes = onLanes;
+      this.lost = new Set(msg?.padsLost ?? []);
+      const lanes = !msg ? [] : atNight && msg.incoming?.length ? frontLanes(msg.incoming.filter((x) => x.at > tick - LANE_HOLD), this.b.x, this.b.y) : dayLanes(this.approach);
+      const key = `${msg ? 1 : 0}|${turrets.map((t) => (t ? `${t.kind}:${Math.round(t.hull / 4)}:${t.range}` : '-')).join(',')}|${[...this.lost].join(',')}|${lanes.map((l) => l.angle.toFixed(2)).join(',')}|${focus}|${step}`;
+      if (key !== this.groundKey) {
+        this.groundKey = key;
+        if (msg) drawGround(this.ground, { pads: this.pads, turrets, lost: this.lost, lanes, laneFrom: this.laneFrom, laneTo: this.laneTo, focus, night });
+        else this.ground.clear();
+      }
     }
+    const lost = this.lost;
     // Moving light
     const hull = msg?.bastion ?? 100, breach = !!msg?.breach;
     const beacons = atNight ? (msg!.incoming ?? []).map((x) => ({ x: x.x - this.b.x, y: x.y - this.b.y, phase: beaconPhase(x.at, tick, BEACON_WARN), boss: !!x.boss })).filter((x) => x.phase >= 0) : [];
@@ -151,14 +165,8 @@ export class BastionView {
     this.fx.update(dt, { bx: 0, by: 0, night: msg ? night : 0, hull, breach, core, beacons, mends });
     this.smokes(dt, msg, turrets, lost, hull);
     // Over the ships: hostiles by role (marks are in the bastion's frame)
-    this.marks.update(dt, this.local(f.entities), msg, night, f.zoom, f.angle, tick);
-  }
-
-  /** Entities as the bastion's frame sees them (it's at the moon's middle, but not necessarily the world's) */
-  private *local(list: Iterable<MarkEntity>): Iterable<MarkEntity> {
-    const x0 = this.b.x, y0 = this.b.y;
-    if (!x0 && !y0) { yield* list; return; }
-    for (const e of list) yield { ...e, renderX: e.renderX - x0, renderY: e.renderY - y0 };
+    // (the marks' Graphics sits at the bastion, which is at the moon's middle but not necessarily the world's: no copy per entity)
+    this.marks.update(dt, f.entities, msg, night, f.zoom, f.angle, tick, this.b.x, this.b.y);
   }
 
   /** What changed since last frame: a turret shot down, the bastion hit, a front landed */

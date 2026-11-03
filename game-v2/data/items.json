@@ -981,7 +981,7 @@
       "rarity": "epic",
       "value": 400,
       "color": "#ffd54f",
-      "description": "A small sealed case of unknown make. Sells to collectors and fabricators."
+      "description": "A small sealed case. Sells to collectors and fabricators."
     },
     {
       "id": "repair_kit",
