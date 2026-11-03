@@ -47,8 +47,11 @@ export class WeaponRing {
     const on = show && !!ctx && groups.length > 0;
     if (on !== this.shown) { this.shown = on; this.canvas.style.display = on ? 'block' : 'none'; }
     if (!on || !ctx) return;
-    this.canvas.style.transform = `translate(${Math.round(x - C)}px, ${Math.round(y - C)}px)`;
+    const tx = Math.round(x - C), ty = Math.round(y - C);
+    if (tx !== this.tx || ty !== this.ty) { this.tx = tx; this.ty = ty; this.canvas.style.transform = `translate(${tx}px, ${ty}px)`; }
     this.sweep = (this.sweep + 0.12) % TAU;
+    // Redrawn only when what it shows changed (or a reload's pips are breathing): idle guns at the ready draw nothing
+    if (!this.changed(groups)) return;
     ctx.clearRect(0, 0, SIZE, SIZE);
     const n = groups.length, span = TAU / n;
     for (let i = 0; i < n; i++) {
@@ -56,6 +59,31 @@ export class WeaponRing {
       const a0 = -Math.PI / 2 + i * span + GAP / 2, a1 = -Math.PI / 2 + (i + 1) * span - GAP / 2;
       this.segment(ctx, groups[i], a0, n === 1 ? a0 + TAU - GAP : a1);
     }
+  }
+
+  /** The cursor's last place (CSS px) and what the ring last drew from (the groups' drawn fields, in order) */
+  private tx = NaN;
+  private ty = NaN;
+  private drawn: (number | string | boolean)[] = [];
+
+  /** Whether the groups differ from what was last drawn (remembering them if so); always while a reload sweeps */
+  private changed(groups: readonly RingGroup[]): boolean {
+    this.at = 0; this.diff = false;
+    let sweeping = false;
+    this.put(groups.length);
+    for (const g of groups) {
+      if (g.reloading && !g.starved) sweeping = true;
+      this.put(g.model); this.put(g.clip); this.put(g.rounds); this.put(g.reloading); this.put(g.starved); this.put(g.charge);
+      this.put(g.cooling); this.put(g.flash); this.put(g.ready); this.put(g.spin); this.put(g.bank); this.put(g.ammo); this.put(g.crates);
+    }
+    this.drawn.length = this.at;
+    return this.diff || sweeping;
+  }
+  private at = 0;
+  private diff = false;
+  private put(v: number | string | boolean): void {
+    if (this.drawn[this.at] !== v) { this.drawn[this.at] = v; this.diff = true; }
+    this.at++;
   }
 
   private segment(ctx: CanvasRenderingContext2D, g: RingGroup, a0: number, a1: number): void {
