@@ -13,7 +13,7 @@
 import type { Terrain } from '../terrain.js';
 import { FULL_CHARGE } from './energy.js';
 import type { FlightBody, FlightControls, GravityWell } from './flight.js';
-import { stepDrift, jumpTuning, inSolarRing, withSlowed, CTL_NO_BOOST, type FlightConstants } from './flight.js';
+import { stepDrift, jumpTuning, inSolarRing, withSlowed, CTL_NO_BOOST, CTL_POWER_MASK, CTL_SHARE_MASK, type FlightConstants } from './flight.js';
 import { jumpFieldAt, fieldCooldown, fieldRangeBoost, type FieldEnv } from './jumpFields.js';
 import { stepShipPhysics, quantizeShipBody, SHIP_FLIGHT_CONSTANTS } from './physics.js';
 import { withEmp } from './hazards.js';
@@ -55,6 +55,10 @@ export const CTL = {
   dodge: 8192,
   /** The stores refused a boost this step (flight.ts CTL_NO_BOOST). Above it, from bit 15, the engines' power (flight.ts ctlOfPower) */
   noBoost: CTL_NO_BOOST,
+  /** The engines' power (6 bits from bit 15: flight.ts ctlOfPower), a mask */
+  power: CTL_POWER_MASK,
+  /** What the part features' bursts got (6 bits from bit 21: flight.ts ctlOfShare), a mask */
+  share: CTL_SHARE_MASK,
 } as const;
 
 export interface ReplicaControls {

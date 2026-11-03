@@ -22,7 +22,7 @@ import * as bitecs from 'bitecs';
 import {
   Position, Velocity, Rotation, InSystem, createShipState, flightSignature, controlBits, replicaStep, ReplicaMode, CTL,
   quantizeCursorAngle, dequantizeCursorAngle, quantizeCursorDist, CURSOR_DIST_STEP, jumpTuning, packKeyframe, unpackKeyframe,
-  packGunState, gunStateAt, gunStateValue, CTL_POWER_SHIFT, GUN_STATE_RELOADING, GUN_STATE_PATIENCE, CHARGE_GROUPS_AT, PILOT_ROW, SNAPSHOT_RATE, TICK_RATE,
+  packGunState, gunStateAt, gunStateValue, GUN_STATE_RELOADING, GUN_STATE_PATIENCE, CHARGE_GROUPS_AT, PILOT_ROW, SNAPSHOT_RATE, TICK_RATE,
   type FlightBody, type Charge, type ShipState, type ShipTuning, type ReplicaEnv, type ClientInputMessage,
 } from '@space-game/common';
 import { PILOT_EXTRAS } from '../../../common/src/ships/features/plan.js';
@@ -65,7 +65,7 @@ interface Tick {
   /** Slowed (features/weaponry): the tick its slowing ends as the pilot's row told it before this step (0: not slowed), and whether the server flew this step slowed (its replica control bit) */
   slowUntil: number;
   slowedBit: boolean;
-  /** What the engines got and a refused boost, as its replica control bits carried them (flight.ts ctlOfPower, CTL.noBoost) */
+  /** What the engines and the part features' bursts got and a refused boost, as its replica control bits carried them (flight.ts ctlOfPower, ctlOfShare, CTL.noBoost) */
   powerBits: number;
 }
 
@@ -141,7 +141,7 @@ function runServer(sc: Scenario) {
     server.step();
     const ctlBits = ctlRec?.bits ?? 0;
     const slowedBit = (ctlBits & CTL.slowed) !== 0;
-    const powerBits = ctlBits & (CTL.noBoost | (63 << CTL_POWER_SHIFT));
+    const powerBits = ctlBits & (CTL.noBoost | CTL.power | CTL.share);
     // A Frostbite's beam on it this tick (its weapons step: after the flight step, so it slows the next)
     if ((sc as SlowScenario).slow?.some(([a, b]) => i >= a && i < b)) ships.slow(pid, 42);
     const left = ships.slowedTicksLeft(pid);

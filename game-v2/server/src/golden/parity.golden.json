@@ -20,13 +20,13 @@
   },
   "plain-thrust-turn/unrounded-aim": "tick 53: angVel server 0.018217 vs 0.018216",
   "strafer-energy-short/replica": {
-    "keyframes": "49-59,73-83,97-107,120-131,145-155,169-179,193-203,217-227,240-251,265-275,289-299,313-323,337-347,360-371,385-395,409-419,433-443,457-467,480-491,505-515,529-539,553-563,577-587,600-611,625-635,649-659,673-683,697-707,720-731,745-755,769-779,793-803",
-    "server": "3043e71f6bd578d3"
+    "keyframes": "",
+    "server": "6649b07865c0c010"
   },
   "strafer-energy-short/unrounded-aim": null,
   "strafer-every-way/replica": {
-    "keyframes": "198-203,311-322,363-374",
-    "server": "bf28b09ba0cee61d"
+    "keyframes": "",
+    "server": "958db6bc64800cb4"
   },
   "strafer-every-way/unrounded-aim": null,
   "strafer-heavy/replica": {

@@ -91,6 +91,8 @@ export interface FlightCtx {
   charging: boolean;
   /** The ship's power is accounted this tick (energy.ts powerTick runs: not for replicas and pilotless ships) */
   accounted: boolean;
+  /** A replica stepped on its control bits (not accounted, but told what the features' bursts got: `shares` from impulse on, when short) */
+  replay: boolean;
   /** thrustGate: what a feature draws this tick, per feed group (per second), by feature number (energy.ts PowerUse.extra); count what you set in `loads` */
   load: (ArrayLike<number> | undefined)[];
   loads: number;

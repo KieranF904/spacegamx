@@ -173,12 +173,12 @@ export const SCENARIOS: Scenario[] = [
   { name: 'plain-thrust-turn', ship: sparrow, script: flyAbout(), replayAt: [77, 200], replicaDiverges: false },
   { name: 'heavy-cargo', ship: sparrow, script: flyAbout(), cargo: 6, cargoOre: 60, replayAt: [120], replicaDiverges: false },
   // (The dev ship's flank strafers dodge on their Drive Cell banks first. Since proportional sharing (2026-11-04) the two
-  // banks refill from the pool at their intake while they dodge, so from about halfway the pool is dry and the unbanked engines
-  // run short: a replica on full charge is re-keyframed there, from tick 198)
-  { name: 'strafer-every-way', ship: () => blueprint('dev/test-strafer.json'), script: dodgeEveryWay(), replayAt: [12, 40, 200, 330], replicaDiverges: true },
+  // banks refill from the pool at their intake while they dodge, so from about halfway the pool is dry and the dodges run
+  // short: the replica flies them on the share its control bits carry, flight.ts ctlOfShare)
+  { name: 'strafer-every-way', ship: () => blueprint('dev/test-strafer.json'), script: dodgeEveryWay(), replayAt: [12, 40, 200, 330], replicaDiverges: false },
   { name: 'strafer-replay', ship: () => withParts(sparrow(), [RIGHT_FLANK, LEFT_FLANK]), script: replayScript(), replayAt: [14, 47, 100], replicaDiverges: false },
   { name: 'strafer-heavy', ship: () => withParts(sparrow(), [RIGHT_FLANK, LEFT_FLANK]), script: replayScript(), cargo: 4, cargoOre: 40, replayAt: [47], replicaDiverges: false },
-  { name: 'strafer-energy-short', ship: () => withParts(sparrow(), [RIGHT_FLANK]), script: dodgeTillDry(), replayAt: [501, 700], replicaDiverges: true },
+  { name: 'strafer-energy-short', ship: () => withParts(sparrow(), [RIGHT_FLANK]), script: dodgeTillDry(), replayAt: [501, 700], replicaDiverges: false },
   { name: 'tow', ship: () => withParts(sparrow(), [RIGHT_FLANK, LEFT_FLANK, TOW_BEAM]), script: towScript(), tow: { from: 2, wreckDist: 300 }, replayAt: [125, 200], replicaDiverges: true },
   { name: 'drive-bank-boost', ship: driveBankShip, script: driveBankScript(), replayAt: [41, 150], replicaDiverges: false },
   { name: 'jump-burn', ship: sparrow, script: jumpScript(), replayAt: [95, 150], replicaDiverges: true },

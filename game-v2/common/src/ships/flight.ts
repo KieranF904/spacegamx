@@ -410,8 +410,11 @@ export function thrustAlong(d: ShipDerived, dir: Vec2, speed = 0): number {
 const CTX: FlightCtx = {
   body: undefined as unknown as FlightBody, input: undefined as unknown as FlightControls, d: undefined as unknown as ShipDerived,
   tuning: undefined as unknown as ShipTuning, k: undefined as unknown as FlightConstants,
-  feature: 0, cargo: 0, wantX: 0, wantY: 0, charging: false, accounted: false, load: [], loads: 0, shares: undefined, scratch: {},
+  feature: 0, cargo: 0, wantX: 0, wantY: 0, charging: false, accounted: false, replay: false, load: [], loads: 0, shares: undefined, scratch: {},
 };
+
+/** A replica's part-feature shares (every feature at the one its control bits carry: shareOfCtl), reused every tick */
+const REPLAY_SHARES: number[] = [];
 
 /** Run one phase's part-feature hooks (features/plan.ts, in (order, feature) order) */
 function runHooks(list: readonly FlightEntry[], c: FlightCtx): void {
@@ -433,6 +436,7 @@ export function stepFlight(
   const c = CTX;
   c.body = body; c.input = input; c.d = d; c.tuning = tuning; c.k = k;
   c.cargo = body.cargo ?? 0; c.wantX = 0; c.wantY = 0; c.charging = false; c.accounted = boost.drainRate > 0 && !!d.energy; c.shares = undefined;
+  c.replay = !c.accounted && boost.replay !== undefined;
   if (c.loads) { c.load.fill(undefined); c.loads = 0; }
   runHooks(H.preJump, c);
 
@@ -524,7 +528,10 @@ export function stepFlight(
     // (A ports ship's engines burn only pushing the way asked)
     const pt = powerTick(d, capCharge(d, boost.charge, cap), d.ports ? { thrusting, boosting: !!input.boost, dir, load: boost.load } : { thrusting, boosting: !!input.boost, load: boost.load, extra: c.loads ? c.load : undefined }, tuning);
     charge = pt.charge;
-    c.shares = pt.extra;
+    // (Part features' shares on the replicated grid's steps, as the engines' power below: replicas are told it, ctlOfShare)
+    const sh = pt.extra;
+    if (sh) for (let x = 0; x < sh.length; x++) if (sh[x] !== undefined) sh[x] = quantizePower(sh[x]!);
+    c.shares = sh;
     canBoost = pt.boost;
     // (Each engine pushes on its own feed group's share: short of power, engines push that much less)
     if (dir) {
@@ -537,6 +544,14 @@ export function stepFlight(
     // A replica: what the engines got, as the ship's control bits carry it (replica.ts replicaStep)
     power = powerOfCtl(boost.replay);
     if (boost.replay & CTL_NO_BOOST) canBoost = false;
+    // (and what the part features' bursts got: the one share every feature that asked had, ctlOfShare)
+    const share = shareOfCtl(boost.replay);
+    if (share < 1) {
+      const n = getPlan().features.length;
+      REPLAY_SHARES.length = n;
+      for (let x = 0; x < n; x++) REPLAY_SHARES[x] = share;
+      c.shares = REPLAY_SHARES;
+    }
   }
   if (thrusting) {
     ix /= mag; iy /= mag;
@@ -572,7 +587,7 @@ export function stepFlight(
 
   // What a replica must be told to fly this step as it was flown: the engines' power, and a boost the stores refused
   const refused = boost.drainRate > 0 && !!d.energy && thrusting && !!input.boost && !isBoosting;
-  return { charge, isBoosting, accel, power, ctlPower: ctlOfPower(power) | (refused ? CTL_NO_BOOST : 0) };
+  return { charge, isBoosting, accel, power, ctlPower: ctlOfPower(power) | ctlOfShare(c.shares) | (refused ? CTL_NO_BOOST : 0) };
 }
 
 /**
@@ -584,7 +599,8 @@ export function stepFlight(
 export const POWER_STEPS = 32;
 export const CTL_POWER_SHIFT = 15;
 export const CTL_NO_BOOST = 16384;
-const POWER_MASK = 63 << CTL_POWER_SHIFT;
+export const CTL_POWER_MASK = 63 << CTL_POWER_SHIFT;
+const POWER_MASK = CTL_POWER_MASK;
 
 export function quantizePower(p: number): number {
   return Math.max(0, Math.min(63, Math.round(p * POWER_STEPS))) / POWER_STEPS;
@@ -597,6 +613,27 @@ export function ctlOfPower(p: number): number {
 export function powerOfCtl(bits: number): number {
   const e = (bits & POWER_MASK) >>> CTL_POWER_SHIFT;
   return (POWER_STEPS + (e >= 32 ? e - 64 : e)) / POWER_STEPS;
+}
+
+/**
+ * What the part features' bursts got (a Burst Strafer's dodge, a Gyro's turn: energy.ts PowerResult.extra, on the
+ * POWER_STEPS grid), sent in a replicated ship's control bits as (POWER_STEPS - steps) in the 6 bits from
+ * CTL_SHARE_SHIFT (all full, or nothing asked: nothing). One share for every feature that asked: the lowest (features
+ * in one feed group get the same; two short by different shares at once leave the replica off, and a keyframe follows)
+ */
+export const CTL_SHARE_SHIFT = 21;
+export const CTL_SHARE_MASK = 63 << CTL_SHARE_SHIFT;
+const SHARE_MASK = CTL_SHARE_MASK;
+
+export function ctlOfShare(shares: readonly (number | undefined)[] | undefined): number {
+  if (!shares) return 0;
+  let lo = 1;
+  for (let x = 0; x < shares.length; x++) { const v = shares[x]; if (v !== undefined && v < lo) lo = v; }
+  return (POWER_STEPS - Math.max(0, Math.min(POWER_STEPS, Math.round(lo * POWER_STEPS)))) << CTL_SHARE_SHIFT;
+}
+
+export function shareOfCtl(bits: number): number {
+  return (POWER_STEPS - Math.min(POWER_STEPS, (bits & SHARE_MASK) >>> CTL_SHARE_SHIFT)) / POWER_STEPS;
 }
 
 /** Debris: no thrust, no steering, same friction. */

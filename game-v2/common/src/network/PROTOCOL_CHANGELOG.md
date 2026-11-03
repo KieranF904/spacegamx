@@ -20,3 +20,4 @@ except to fix a typo. A bump makes old clients reload (see PROTOCOL_VERSION in p
 - 28 (2026-11-03): client-detected hits (CAPS.SELF_HITS): COMPACT hitFix row; input hit report tail (flags2 0x20: chain byte, tick14+epoch2); netCaps message
 - 29 (2026-11-03): Bit-packed frames (CAPS.PACKED, network/packed: packedTables in wireTables) and coalescing (CAPS.COALESCE; netCaps.hold); packedResync
 - 30 (2026-11-03): dev weapons range readout as rangeHead + compact rangeRow, changes only
+- 31 (2026-11-03): replica control bits carry what part features' bursts got (CTL.share, 6 bits from bit 21: flight.ts ctlOfShare) and name the engines' power mask (CTL.power): replicas fly a short dodge or gyro turn as the ship did

@@ -21,8 +21,10 @@ function gyroBefore(c: FlightCtx): void {
 function gyroAsk(c: FlightCtx): void {
   c.scratch.gyroAlpha = 0;
   const d = c.d;
-  if (!d.fx?.gyro || !c.accounted || !(d.inertia > 0)) return;
+  if (!d.fx?.gyro || !(d.inertia > 0)) return;
   const alpha = c.body.angVel - (c.scratch.gyroW as number);
+  // (A replica asks nothing, but browns out by the share its control bits carry, as the ship did: flight.ts shareOfCtl)
+  if (!c.accounted) { if (c.replay) c.scratch.gyroAlpha = gyroPart(d, alpha); return; }
   const use = gyroUse(d, alpha, turnScale(d, c.cargo) * (c.k.hazard?.control ?? 1));
   const l = gyroLoad(d, use);
   if (!l) return;
