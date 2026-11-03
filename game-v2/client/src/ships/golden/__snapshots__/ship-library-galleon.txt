@@ -17,7 +17,7 @@
     "demand": 0
   },
   "energy": {
-    "max": 1440,
+    "max": 2040,
     "driveMax": 0,
     "weaponMax": 0,
     "spare": 960,

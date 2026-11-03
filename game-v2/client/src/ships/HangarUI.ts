@@ -2134,14 +2134,15 @@ function pieceIcon(catalog: Catalog, id: string, rot: Rot, flip: boolean): strin
 
 /**
  * The hangar's energy readout, from the same power layout as the Power section
- * (circuits.ts, energy.ts): the pool and the ship's Output (spare generation +
- * what the pool can give a second), then how long engines and guns last. A
- * consumer draws on the banks it touches first (their cap, at their Gives rate),
- * then on the Output; a bank that feeds nothing counts for nothing, and one that
- * never refills is a single draught.
+ * (circuits.ts, energy.ts; the store and the Output are in that section): how
+ * long the engines and guns get full power, how low they drop after, and how
+ * long the stores take to fill from empty. A consumer draws on the banks it
+ * touches first (their cap, at their Gives rate), then on the Output; a bank
+ * that feeds nothing counts for nothing, and one that never refills is a single
+ * draught.
  */
 /** The load tests behind the hangar's Energy rows, per derived ship */
-const energyRuns = new WeakMap<ShipDerived, { cruise: LoadTestResult; boost: LoadTestResult; fire: LoadTestResult }>();
+const energyRuns = new WeakMap<ShipDerived, { cruise: LoadTestResult; boost: LoadTestResult; fire: LoadTestResult; refill: number }>();
 const ENERGY_ROW_SECONDS = 20;
 
 function energyHtml(e: ShipSummary['energy'], d: ShipDerived | null, tuning: ShipTuning): string {
@@ -2160,6 +2161,8 @@ function energyHtml(e: ShipSummary['energy'], d: ShipDerived | null, tuning: Shi
     cruise: loadTest(d, tuning, { fire: false, thrust: true, boost: false, seconds: ENERGY_ROW_SECONDS }),
     boost: loadTest(d, tuning, { fire: false, thrust: true, boost: true, seconds: ENERGY_ROW_SECONDS }),
     fire: loadTest(d, tuning, { fire: true, thrust: true, boost: false, seconds: ENERGY_ROW_SECONDS }),
+    // (From every store empty, idle: how long until they're full)
+    refill: loadTest(d, tuning, { fire: false, thrust: false, boost: false, seconds: 0, from: { g: 0, b: L.banks.map(() => 0) } }).refill,
   });
   const dash = '<span style="color:#8ea0bd">—</span>';
   const show = (r: LoadTestResult, share: number, any: boolean): { html: string; ok: boolean } => {
@@ -2168,18 +2171,21 @@ function energyHtml(e: ShipSummary['energy'], d: ShipDerived | null, tuning: Shi
       ? { html: '<span style="color:#4ade80">sustained</span>', ok: true }
       : { html: `<span style="color:#fbbf24">holds ${ENERGY_ROW_SECONDS} s+ · store ${Math.round(r.end)}%</span>`, ok: true };
     const t = r.brownAt;
-    return { html: `<span style="color:#f87171">brownout at ${t.toFixed(t < 10 ? 1 : 0)} s · down to ${Math.round(share * 100)}%</span>`, ok: false };
+    return { html: `<span style="color:#f87171">full power ${t.toFixed(t < 10 ? 1 : 0)} s, then ${Math.round(share * 100)}%</span>`, ok: false };
   };
   const cruise = show(runs.cruise, runs.cruise.engines, hasEng && engDraw > 0);
   const boosting = show(runs.boost, runs.boost.engines, hasEng && engDraw > 0);
   const firing = show(runs.fire, Math.min(runs.fire.engines, runs.fire.guns), hasGun);
   const dry = hasGun && !firing.ok;
 
+  const rf = runs.refill;
+  // (loadTest gives up after two minutes)
+  const refill = !Number.isFinite(rf) ? `<span style="color:#f87171">${L.spare > 0 || L.banks.some((B) => B.dynamo > 0) ? 'over 2 min' : 'never: no spare power'}</span>`
+    : rf <= 0 ? dash : `<span style="color:${rf > 30 ? '#fbbf24' : '#e5ecf7'}">${rf.toFixed(rf < 10 ? 1 : 0)} s from empty</span>`;
   return head
-    + row('Store', `<b style="color:#e5ecf7">${Math.round(L.pool.cap)}</b>`, 'The core store plus the batteries: one charge for the whole ship, drawn on after a consuming part own bank')
-    + row('Output', `<b style="color:#e5ecf7">${Math.round(output)}/s</b>`, 'The most the ship gives out a second: spare generation plus what the pool can discharge. Banks add to it only for the parts they feed')
-    + row('Cruising', cruise.html, `Engines thrusting for ${ENERGY_ROW_SECONDS} s, run through the ship's real power code: each bank pays only for the parts it touches`)
-    + row('Boosting', boosting.html, 'Engines boosting, same test')
-    + row('Firing, cruising', firing.html, 'Every gun firing flat out while the engines thrust, same test')
+    + row('Cruising', cruise.html, `Engines thrusting for ${ENERGY_ROW_SECONDS} s, run through the ship's real power code: each bank pays only for the parts it touches. Sustained: the generators keep up`)
+    + row('Boosting', boosting.html, `Engines boosting, same test: how long they get full power before the stores run dry, then the lowest share they get. Store ${Math.round(L.pool.cap)}, Output ${Math.round(output)}/s`)
+    + row('Firing, cruising', firing.html, 'Every gun firing flat out while the engines thrust, same test. Short of power, guns reload slower and beams flicker')
+    + row('Refills', refill, 'Idle, from every store empty: how long the spare generation takes to fill the pool and every bank that refills')
     + (dry ? `<div style="color:#fbbf24; font-size:11px; margin-top:4px">The guns run dry in a fight, then reload slower. Add generation, a battery, or a Capacitor bank touching the guns.</div>` : '');
 }

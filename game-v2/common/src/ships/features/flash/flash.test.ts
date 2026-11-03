@@ -20,7 +20,7 @@ describe('shield refill, per part', () => {
   it.each([
     ['shield_deflector', 8, 180, 40],
     ['shield_flicker_screen', 20, 60, 20],
-    ['shield_bulwark_projector', 5, 240, 45],
+    ['shield_bulwark_projector', 5, 240, 60],
   ])('%s refills at its own rate after its own delay', (fn, rate, delay, cap) => {
     const piece = fn === 'shield_bulwark_projector' ? 'block2' : fn === 'shield_flicker_screen' ? 'round' : 'sq';
     const d = ship([part(70, fn, -2, 0, piece)]).derived;

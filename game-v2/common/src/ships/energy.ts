@@ -48,7 +48,7 @@ export interface EnergyInfo {
   /** What the engines draw at full thrust, and the mining lasers while mining (per second) */
   engineDraw: number;
   minerDraw: number;
-  /** What the guns draw firing flat out (per second), for ratings and the hangar */
+  /** What the guns draw firing flat out (per second), each by its firing model (gunDrawFlatOut: an ammunition gun nothing), for ratings and the hangar */
   weaponDraw: number;
 }
 

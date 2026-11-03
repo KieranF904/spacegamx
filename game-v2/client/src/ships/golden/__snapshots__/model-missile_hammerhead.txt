@@ -10,12 +10,10 @@ Fire rate0.3/s · shells · Missiles (no energy)
 Modelammo: Fires rounds from your hold on a fixed beat; costs no energy; empty means weak plain rounds (40% damage).
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 2 clear cells ahead
-Power draw16/s
 
 == partStats (stats rows) ==
 GradeMk IV · Large
 Hits withExplosive · penetration 4
-Power draw16
 Hull · mass503 hp · 6.7
 Armour · build4 · 15.2 pts
 TakesKinetic −15% · Explosive −10% · Energy +15% · Exotic −10%
@@ -34,7 +32,7 @@ Large · Block
 a huge slow warhead · ammo
 
 == keyStats ==
-44 dmg/s · reach 8,008 · ammo · draws 16
+44 dmg/s · reach 8,008 · ammo
 
 == mountBadge ==
 FIXED
@@ -51,4 +49,4 @@ Needs 2 clear cells ahead
 {"open":true,"badge":"Lv 33","why":""}
 
 == partStats (raw) ==
-{"grade":4,"mark":"Mk IV","size":"Large","area":4,"hp":503.03999999999996,"mass":6.72,"firepower":44.09090909090909,"toughness":503.03999999999996,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":44.09090909090909,"range":8007.999999999999,"damageType":"explosive","pen":3.5,"draw":15.56}
+{"grade":4,"mark":"Mk IV","size":"Large","area":4,"hp":503.03999999999996,"mass":6.72,"firepower":44.09090909090909,"toughness":503.03999999999996,"armour":4,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.15,"exotic":0.9},"dps":44.09090909090909,"range":8007.999999999999,"damageType":"explosive","pen":3.5}

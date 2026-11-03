@@ -10,12 +10,10 @@ Fire rate0.3/s · shells · Torpedoes (no energy)
 Modelammo: Fires rounds from your hold on a fixed beat; costs no energy; empty means weak plain rounds (40% damage).
 MountFixed: aims with the ship
 FittingBolts on from behind only · Needs 2 clear cells ahead
-Power draw24/s
 
 == partStats (stats rows) ==
 GradeMk II · Medium
 Hits withExplosive · penetration 2
-Power draw24
 Hull · mass150 hp · 2.8
 Armour · build2 · 3.2 pts
 TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
@@ -34,7 +32,7 @@ Medium · Panel
 slow, huge, through shields · ammo
 
 == keyStats ==
-117 dmg/s · reach 7,800 · ammo · draws 24
+117 dmg/s · reach 7,800 · ammo
 
 == mountBadge ==
 FIXED
@@ -51,4 +49,4 @@ Needs 2 clear cells ahead
 {"open":true,"badge":"Lv 19","why":""}
 
 == partStats (raw) ==
-{"grade":2,"mark":"Mk II","size":"Medium","area":2,"hp":150.4,"mass":2.8,"firepower":117,"toughness":150.4,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":117,"range":7800,"damageType":"explosive","pen":3,"draw":24}
+{"grade":2,"mark":"Mk II","size":"Medium","area":2,"hp":150.4,"mass":2.8,"firepower":117,"toughness":150.4,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":117,"range":7800,"damageType":"explosive","pen":3}

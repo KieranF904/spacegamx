@@ -22,7 +22,7 @@
     "weaponMax": 0,
     "spare": 846,
     "engineDraw": 54,
-    "weaponDraw": 78,
+    "weaponDraw": 80.8,
     "boostDraw": 172.8
   },
   "guns": 4,

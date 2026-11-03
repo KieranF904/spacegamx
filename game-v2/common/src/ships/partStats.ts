@@ -111,7 +111,8 @@ export function partStats(catalog: Catalog, tuning: ShipTuning | undefined, p: {
     out.pen = hit.pen;
   }
   if ((fn.produce ?? 0) > 0) { out.supply = partSupply(fn, area, mat); out.size = sizeName(fn.model ? Math.max(1, area) : area); }
-  if ((fn.demand ?? 0) > 0) out.draw = partDemand(fn, area, mat);
+  // (An ammunition gun pays with its crates, never the ship's power: energy.ts gunDraw)
+  if ((fn.demand ?? 0) > 0 && fn.fire?.model !== 'ammo') out.draw = partDemand(fn, area, mat);
   if (isEngine(fn)) {
     out.thrust = partThrust(catalog, fn, area, mat);
     out.size = fn.model ? sizeName(Math.max(1, area)) : sizeName(weaponSizeFactor(catalog, fn, area) ** (1 / 1.15));

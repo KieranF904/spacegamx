@@ -236,10 +236,10 @@ describe('energy: the pool and the powered rule', () => {
     expect(powerTick(derived(design('galleon.json')), FULL_CHARGE, { thrusting: true, boosting: true, dir: [0, -1] }, tuning).power).toBe(1);
   });
 
-  it('the Heavy Bank holds 300 and gives 150/s a cell; the Battery 200 and 600/s', () => {
+  it('the Heavy Bank holds 450 and gives 150/s a cell (deeper a cell than any Mk I store); the Battery 200 and 600/s', () => {
     const L = derived(base([p(9, 'block2', 'power_heavy_bank', -3, 1), p(10, 'sq', 'power_battery', -1, 2)])).power!;
     const hb = catalog.functions.get('power_heavy_bank')!, bat = catalog.functions.get('power_battery')!;
-    expect(hb.store).toBe(300);
+    expect(hb.store).toBe(450);
     expect(hb.discharge).toBe(150);
     expect(bat.store).toBe(200);
     expect(bat.discharge).toBe(600);

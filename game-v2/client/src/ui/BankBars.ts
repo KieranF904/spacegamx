@@ -1,7 +1,8 @@
 /**
  * The pilot's banks beside the ENERGY gauge (common/src/ships/circuits.ts, energy.ts; docs/design/rework-2026-11.md
  * §2.4): a thin bar for each Capacitor bank (amber) and Drive Cell bank (blue), at most four, numbered as in the
- * hangar. The ENERGY gauge itself shows the whole ship. A bank that feeds parts short of power this tick flashes red.
+ * hangar. The ENERGY gauge itself shows the whole ship. A bank that feeds parts short of power this tick flashes red, and
+ * the ENERGY gauge flashes and reads LOW POWER while anything on the ship is short (engines or guns: a feed group's share).
  */
 
 import { BROWNOUT, type Charge, type ShipDerived } from '@space-game/common';
@@ -18,7 +19,12 @@ const CSS = `
   #bankBars .cb.brown .cb-l { color: #f87171 !important; }
   @keyframes cb-flash { 0% { background: rgba(239, 68, 68, 0.45); } 100% { background: rgba(239, 68, 68, 0.08); } }
   #boostBarRow { display: flex; gap: 6px; align-items: flex-end; }
+  #boostBar.brown { border-color: #ef4444; animation: cb-flash 0.35s steps(2) infinite; }
+  #boostLabel.brown { color: #f87171; }
 `;
+
+/** How long the gauge keeps showing a brownout after the last short tick (ms): a boost on an empty store is short every other tick */
+const BROWN_HOLD = 500;
 
 /** The most bank bars shown */
 const MAX_BARS = 4;
@@ -27,10 +33,17 @@ export class BankBars {
   private wrap: HTMLElement | null = null;
   private layout: ShipDerived['power'] | null = null;
   private bars: { el: HTMLElement; fill: HTMLElement; bank: number; pct: number; brown: boolean }[] = [];
+  /** The ENERGY gauge and its label, and whether they show a brownout */
+  private gauge: HTMLElement | null = null;
+  private label: HTMLElement | null = null;
+  private gaugeBrown = false;
+  private shortAt = -Infinity;
 
   constructor() {
     const hud = document.getElementById('boostHud'), bar = document.getElementById('boostBar');
     if (!hud || !bar) return;
+    this.gauge = bar;
+    this.label = document.getElementById('boostLabel');
     const style = document.createElement('style');
     style.textContent = CSS;
     document.head.appendChild(style);
@@ -46,6 +59,17 @@ export class BankBars {
   update(d: ShipDerived | null | undefined, c: Charge): void {
     if (!this.wrap) return;
     const L = d?.power ?? null;
+    // The gauge: short of power anywhere this tick (engines first, then guns: energy.ts powerTick's feed-group shares)
+    let short = false;
+    if (L) for (let f = 0; f < L.feeds.length && !short; f++) if (Math.min(c.eng?.[f] ?? 1, c.gun?.[f] ?? 1) < BROWNOUT) short = true;
+    const now = performance.now();
+    if (short) this.shortAt = now;
+    else short = now - this.shortAt < BROWN_HOLD;
+    if (short !== this.gaugeBrown) {
+      this.gaugeBrown = short;
+      this.gauge?.classList.toggle('brown', short);
+      if (this.label) { this.label.classList.toggle('brown', short); this.label.textContent = short ? 'LOW POWER' : 'ENERGY'; }
+    }
     // (The layout only changes with the ship's derived power layout, so compare its identity: no per-frame string)
     if (L !== this.layout) {
       this.layout = L;

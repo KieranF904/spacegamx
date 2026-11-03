@@ -9,12 +9,10 @@ Fire rate0.7/s · shells · Mortar Shells (no energy)
 Modelammo: Fires rounds from your hold on a fixed beat; costs no energy; empty means weak plain rounds (40% damage).
 MountTurret, 360°
 FittingBolts on any side
-Power draw10/s
 
 == partStats (stats rows) ==
 GradeMk I · Small
 Hits withExplosive · penetration 1
-Power draw10
 Hull · mass60 hp · 1.0
 Armour · build1 · 1 pts
 Rating scoretoughness 60
@@ -32,7 +30,7 @@ Small · Square
 lands where you aim · ammo
 
 == keyStats ==
-28 dmg/s · reach 2,640 · ammo · draws 10
+28 dmg/s · reach 2,640 · ammo
 
 == mountBadge ==
 TURRET 360°
@@ -48,4 +46,4 @@ Bolts on any side
 {"open":true,"badge":"Lv 7","why":""}
 
 == partStats (raw) ==
-{"grade":1,"mark":"Mk I","size":"Small","area":1,"hp":60,"mass":1,"firepower":28,"toughness":60,"armour":1,"dps":28,"range":2640,"damageType":"explosive","pen":0.5,"draw":10}
+{"grade":1,"mark":"Mk I","size":"Small","area":1,"hp":60,"mass":1,"firepower":28,"toughness":60,"armour":1,"dps":28,"range":2640,"damageType":"explosive","pen":0.5}

@@ -24,7 +24,7 @@
  */
 
 import {
-  BROWNOUT, P_TANK, PF_SEL, MAT_UNIT, portsInflow, bankHeld, energyTuning, feedShare, gunLoad, poolHeld,
+  BROWNOUT, P_TANK, PF_SEL, MAT_UNIT, portsInflow, bankHeld, chargeTotal, energyTuning, feedShare, gunLoad, poolHeld,
   type Charge, type ShipState, type ShipTuning,
 } from '@space-game/common';
 import type { RingGroup } from '../../ships/gunHud';
@@ -102,6 +102,8 @@ export interface ShipStatus {
     draining: boolean;
     /** Seconds until the stores run dry at this net rate (Infinity: not draining) */
     empty: number;
+    /** Seconds until they are full again at this net rate (Infinity: not filling) */
+    full: number;
     stores: StoreBar[];
   };
   weapons: WeaponLine[];
@@ -138,10 +140,13 @@ export interface StatusMemory {
   net: number;
   shield: number;
   hitAt: number;
+  /** When the engines and the guns were last short of power (ms): a brownout is held a moment (an empty-store boost is short every other tick) */
+  engAt: number;
+  gunAt: number;
 }
 
 export function newMemory(): StatusMemory {
-  return { ship: null, rebuilds: -1, held: NaN, at: 0, net: 0, shield: NaN, hitAt: -Infinity };
+  return { ship: null, rebuilds: -1, held: NaN, at: 0, net: 0, shield: NaN, hitAt: -Infinity, engAt: -Infinity, gunAt: -Infinity };
 }
 
 export function emptyStatus(): ShipStatus {
@@ -149,13 +154,16 @@ export function emptyStatus(): ShipStatus {
     has: false,
     hull: { parts: 0, intact: 0, lost: 0, integrity: 0, coreHp: 0, coreMax: 1 },
     shield: { max: 0, cur: 0, pct: 0, regen: 0, state: 'none', wait: 0 },
-    energy: { gen: 0, steady: 0, draw: 0, net: 0, held: 0, cap: 0, pct: 100, brownout: false, short: '', draining: false, empty: Infinity, stores: [] },
+    energy: { gen: 0, steady: 0, draw: 0, net: 0, held: 0, cap: 0, pct: 100, brownout: false, short: '', draining: false, empty: Infinity, full: Infinity, stores: [] },
     weapons: [],
     thrust: { engines: 0, boost: 'none', share: 1 },
     features: [],
     parts: [],
   };
 }
+
+/** How long a brownout stays on the readout after the last short tick (ms) */
+const BROWN_HOLD = 500;
 
 /** How long the net rate is smoothed over (s) */
 const NET_SMOOTH = 0.6;
@@ -165,7 +173,7 @@ export function readStatus(inp: StatusInput, mem: StatusMemory, out: ShipStatus 
   const ship = inp.ship;
   if (!ship || ship.kind !== 'ship') { out.has = false; mem.ship = null; return out; }
   const fresh = ship !== mem.ship || ship.rebuilds !== mem.rebuilds;
-  if (fresh) { mem.ship = ship; mem.rebuilds = ship.rebuilds; mem.held = NaN; mem.net = 0; mem.shield = NaN; mem.hitAt = -Infinity; }
+  if (fresh) { mem.ship = ship; mem.rebuilds = ship.rebuilds; mem.held = NaN; mem.net = 0; mem.shield = NaN; mem.hitAt = -Infinity; mem.engAt = -Infinity; mem.gunAt = -Infinity; }
   out.has = true;
   readHull(ship, out.hull);
   readShield(ship, inp, mem, out.shield);
@@ -291,7 +299,8 @@ function readEnergy(ship: ShipState, inp: StatusInput, mem: StatusMemory, e: Shi
   e.gen = supply + dynamo;
   e.held = held;
   e.cap = cap;
-  e.pct = cap > 0 ? (held / cap) * 100 : 100;
+  // (A ports ship has no pool or banks: its gauge is what its parts hold, power/ports.ts)
+  e.pct = cap > 0 ? (held / cap) * 100 : !L && d.ports ? chargeTotal(d, c) : 100;
   // Draw: steady loads, engines while thrusting, guns by their state this tick
   let draw = e.steady;
   if (L && inp.thrust.on) {
@@ -310,8 +319,12 @@ function readEnergy(ship: ShipState, inp: StatusInput, mem: StatusMemory, e: Shi
     if ((c.eng?.[f] ?? 1) < BROWNOUT) engShort = true;
     if ((c.gun?.[f] ?? 1) < BROWNOUT) gunShort = true;
   }
-  e.brownout = engShort || gunShort;
-  e.short = engShort && gunShort ? 'engines+guns' : engShort ? 'engines' : gunShort ? 'guns' : '';
+  // (Each held BROWN_HOLD after its last short tick)
+  if (engShort) mem.engAt = inp.now;
+  if (gunShort) mem.gunAt = inp.now;
+  const eng = inp.now - mem.engAt < BROWN_HOLD, gun = inp.now - mem.gunAt < BROWN_HOLD;
+  e.brownout = eng || gun;
+  e.short = eng && gun ? 'engines+guns' : eng ? 'engines' : gun ? 'guns' : '';
   // Net: the stores' measured rate (smoothed)
   if (Number.isFinite(mem.held) && inp.now > mem.at) {
     const dt = (inp.now - mem.at) / 1000;
@@ -323,6 +336,7 @@ function readEnergy(ship: ShipState, inp: StatusInput, mem: StatusMemory, e: Shi
   e.net = Math.abs(mem.net) < 0.05 ? 0 : mem.net;
   e.draining = draw > e.gen + 1e-6;
   e.empty = e.net < -0.05 && held > 0 ? held / -e.net : Infinity;
+  e.full = e.net > 0.05 && held < cap ? (cap - held) / e.net : Infinity;
 }
 
 /** The most store bars shown (the pool and three banks) */

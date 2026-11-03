@@ -10,12 +10,10 @@ Fire rate0.3/s · shells · Mortar Shells (3 a shot, no energy)
 Modelammo: Fires rounds from your hold on a fixed beat; costs no energy; empty means weak plain rounds (40% damage).
 MountTurret, 360°
 FittingBolts on from behind only
-Power draw10/s
 
 == partStats (stats rows) ==
 GradeMk III · Medium
 Hits withExplosive · penetration 3
-Power draw10
 Hull · mass179 hp · 2.0
 Armour · build3 · 5 pts
 TakesKinetic −5% · Thermal −15% · Cryo −10%
@@ -34,7 +32,7 @@ Medium · Panel
 huge splash, slow · ammo
 
 == keyStats ==
-43 dmg/s · reach 2,640 · ammo · draws 10
+43 dmg/s · reach 2,640 · ammo
 
 == mountBadge ==
 TURRET 360°
@@ -50,4 +48,4 @@ Bolts on from behind only
 {"open":true,"badge":"Lv 24","why":""}
 
 == partStats (raw) ==
-{"grade":3,"mark":"Mk III","size":"Medium","area":2,"hp":179.20000000000002,"mass":2,"firepower":42.54545454545455,"toughness":179.20000000000002,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"dps":42.54545454545455,"range":2640,"damageType":"explosive","pen":2.5,"draw":10}
+{"grade":3,"mark":"Mk III","size":"Medium","area":2,"hp":179.20000000000002,"mass":2,"firepower":42.54545454545455,"toughness":179.20000000000002,"armour":3,"resist":{"kinetic":0.95,"thermal":0.85,"cryo":0.9},"dps":42.54545454545455,"range":2640,"damageType":"explosive","pen":2.5}

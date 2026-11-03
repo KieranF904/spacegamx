@@ -110,7 +110,7 @@ export class Tutorial {
         done: () => this.flown > 700,
       },
       {
-        text: () => `Hold ${boostKey()} while thrusting to boost. The <b>ENERGY</b> gauge on the right is your ship's power pool: boosting, guns and shields all draw on it, and it refills from spare generation.`,
+        text: () => `Hold ${boostKey()} while thrusting to boost. The <b>ENERGY</b> gauge on the right is your ship's stored power: boosting and firing draw on it when the generators can't keep up, and it refills from spare generation. It reads LOW POWER when something gets less than it asks.`,
         done: () => { if (d.isKeyDown('ShiftLeft') || d.isKeyDown('ShiftRight')) this.boostTicks++; return this.boostTicks > 40; },
       },
       {

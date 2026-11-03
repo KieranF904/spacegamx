@@ -1,5 +1,5 @@
 /**
- * Ship HUD: core HP and the ship schematic, which is also the status readout (ui/shipStatus/Schematic.ts paints each
+ * Ship HUD: core HP, the ship schematic and the energy line under it (ui/shipStatus/energyLine.ts). The schematic is the status readout (ui/shipStatus/Schematic.ts paints each
  * part by HP, charge, reload, thrust and brownout from the record ui/shipStatus/source.ts reads, at STATUS_HZ).
  */
 
@@ -9,13 +9,16 @@ import { hpColor, numToCss } from './shipColors';
 import { settings } from '../settings/Settings';
 import { boundKeyName } from '../input/keybindings';
 import { Schematic } from '../ui/shipStatus/Schematic';
-import { readStatus, newMemory, emptyStatus, type StatusInput } from '../ui/shipStatus/source';
+import { readStatus, newMemory, emptyStatus, type StatusInput, type Tone } from '../ui/shipStatus/source';
+import { energyLine } from '../ui/shipStatus/energyLine';
 
 /** How often the schematic and status are refreshed (a second) */
 const STATUS_HZ = 10;
 /** The schematic's size (css px) */
 const SCHEM_W = 160;
-const SCHEM_H = 124;
+const SCHEM_H = 100;
+/** The energy line's colours (energy itself in the ENERGY gauge's blue) */
+const TONE: Record<Tone, string> = { ok: '#7cc4ff', busy: '#cfd8e6', warn: '#fbbf24', bad: '#f87171', dim: '#8ea0bd' };
 
 export class ShipHud {
   private root: HTMLDivElement;
@@ -24,6 +27,9 @@ export class ShipHud {
   private bar: HTMLDivElement;
 
   private mode: HTMLDivElement;
+  /** Energy under the schematic: how full, which way and how fast, and what's short (ui/shipStatus/energyLine.ts) */
+  private energy: HTMLDivElement;
+  private energyLine = energyLine(emptyStatus().energy);
   private statusMem = newMemory();
   private statusRec = emptyStatus();
   private statusAt = 0;
@@ -43,11 +49,13 @@ export class ShipHud {
     this.bar = document.createElement('div');
     this.bar.style.cssText = 'height: 100%; width: 100%; background: #4ade80; transition: width 0.1s;';
     track.appendChild(this.bar);
+    this.energy = document.createElement('div');
+    this.energy.style.cssText = 'margin-top: 3px; font-size: 11px; line-height: 13px;';
     this.mode = document.createElement('div');
     this.mode.style.cssText = 'margin-top: 6px; color: #8ea0bd; font-size: 11px;';
     const head = document.createElement('div');
     head.append(this.label);
-    col.append(head, track, this.schem.canvas, this.mode);
+    col.append(head, track, this.schem.canvas, this.energy, this.mode);
     this.root.append(col);
     document.body.appendChild(this.root);
   }
@@ -93,6 +101,11 @@ const ship = this.bridge.get(this.getPlayerId());
       if (inp) readStatus(inp, this.statusMem, this.statusRec);
       else this.statusRec.has = false;
       this.schem.draw(ship, this.bridge.geometry(ship), this.statusRec, now);
+      if (this.statusRec.has) {
+        const l = energyLine(this.statusRec.energy, this.energyLine);
+        setHtml(this.energy, `<div style="display:flex; justify-content:space-between"><b style="color:${TONE[l.headTone]}">${l.head}</b><span style="color:${TONE[l.rateTone]}">${l.rate}</span></div>`
+          + `<div style="color:${TONE[l.noteTone]}">${l.note}</div>`);
+      } else setHtml(this.energy, '');
     }
   }
 }

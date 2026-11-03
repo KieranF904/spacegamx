@@ -80,6 +80,24 @@ describe('ship status source', () => {
     st = readStatus(input(s, { g: 60, b: [], eng: shares, gun }, { now: 1100 }), mem);
     expect(st.energy.brownout).toBe(true);
     expect(st.energy.short).toBe('guns');
+    // Held a moment after the last short tick (an empty-store boost is short every other tick), with the engines' joining it
+    const eng = L.feeds.map(() => BROWNOUT - 0.2);
+    st = readStatus(input(s, { g: 60, b: [], eng, gun: shares }, { now: 1200 }), mem);
+    expect(st.energy.short).toBe('engines+guns');
+    st = readStatus(input(s, { g: 60, b: [], eng: shares, gun: shares }, { now: 1400 }), mem);
+    expect(st.energy.brownout).toBe(true);
+    st = readStatus(input(s, { g: 60, b: [], eng: shares, gun: shares }, { now: 1800 }), mem);
+    expect(st.energy.brownout).toBe(false);
+    expect(st.energy.short).toBe('');
+  });
+
+  it('says how long until the stores are full while they fill', () => {
+    const s = ship(), L = s.derived.power!, mem = newMemory();
+    readStatus(input(s, { g: 40, b: [] }, { now: 0 }), mem);
+    const st = readStatus(input(s, { g: 60, b: [] }, { now: 1000 }), mem);
+    expect(st.energy.net).toBeCloseTo(0.2 * L.pool.cap);
+    expect(st.energy.full).toBeCloseTo((0.4 * L.pool.cap) / st.energy.net);
+    expect(st.energy.empty).toBe(Infinity);
   });
 
   it('counts the hull: parts lost and integrity', () => {

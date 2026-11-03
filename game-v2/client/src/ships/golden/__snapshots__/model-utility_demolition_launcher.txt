@@ -9,12 +9,10 @@ Fire rate0.5/s · shells · Mining Charges (no energy)
 Modelammo: Fires rounds from your hold on a fixed beat; costs no energy; empty means weak plain rounds (40% damage).
 MountFixed: aims with the ship
 FittingBolts on any side
-Power draw8/s
 
 == partStats (stats rows) ==
 GradeMk I · Small
 Hits withExplosive · penetration 1
-Power draw8
 Hull · mass60 hp · 1.0
 Armour · build1 · 1 pts
 Rating scoretoughness 60
@@ -32,7 +30,7 @@ Small · Square
 cracks rock wide open
 
 == keyStats ==
-450 dmg/s · reach 2,400 · ammo · draws 8
+450 dmg/s · reach 2,400 · ammo
 
 == mountBadge ==
 FIXED
@@ -48,4 +46,4 @@ Bolts on any side
 {"open":true,"badge":"Lv 8","why":""}
 
 == partStats (raw) ==
-{"grade":1,"mark":"Mk I","size":"Small","area":1,"hp":60,"mass":1,"firepower":450,"toughness":60,"armour":1,"dps":450,"range":2400,"damageType":"explosive","pen":1,"draw":8}
+{"grade":1,"mark":"Mk I","size":"Small","area":1,"hp":60,"mass":1,"firepower":450,"toughness":60,"armour":1,"dps":450,"range":2400,"damageType":"explosive","pen":1}

@@ -4,7 +4,7 @@ Mk III · Block · 4 cells
 Hull · mass314 hp · 6.4
 Armour · build3 · 10 pts
 TakesKinetic −5% · Thermal −15% · Cryo −10%
-Holds1,200 energy
+Holds1,800 energy
 Givesup to 600/s into the ship's pool, on a powered network
 
 == partStats (stats rows) ==
@@ -27,7 +27,7 @@ Large · Block
 deep but slow: endurance, not alpha strikes
 
 == keyStats ==
-holds 1,200 · gives 600/s
+holds 1,800 · gives 600/s
 
 == mountBadge ==
 

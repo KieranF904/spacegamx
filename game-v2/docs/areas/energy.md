@@ -1,5 +1,5 @@
 # Energy & banks
-How a ship makes, stores and spends power. Power runs along wires (`Blueprint.wires`, hand-drawn or auto-wired) that join generators to consumers, exactly as before 5896116. The core's store and every battery on a powered network make **one ship pool**; Capacitors that touch form a **bank** that feeds the guns, beams and mining lasers it touches first, and touching Drive Cells a bank that feeds the engines and Burst Strafers they touch. Layout is computed once per `rebuild` (`circuits.ts`); the tick (`powerTick`) is identical on the server and in client prediction. Binding design: docs/design/rework-2026-11.md §2 (2.1 wiring, 2.2 pool and Output, 2.3 banks, 2.5 the wire). docs/design/energy-system.md is history (Phase 1 circuits, Phase 2 Surge: both cut).
+How a ship makes, stores and spends power. Every live library, player and enemy design runs the **pool and banks** below; designs that say `power: 'ports'` (the dev ports ships only) run the ports core (section at the end). Power runs along wires (`Blueprint.wires`; the hangar's wire tool is retired, so every new design is auto-wired as one network, and older saved wires stay, pruned as parts go) that join generators to consumers, exactly as before 5896116. The core's store and every battery on a powered network make **one ship pool**; Capacitors that touch form a **bank** that feeds the guns, beams and mining lasers it touches first, and touching Drive Cells a bank that feeds the engines and Burst Strafers they touch. Layout is computed once per `rebuild` (`circuits.ts`); the tick (`powerTick`) is identical on the server and in client prediction. Binding design: docs/design/rework-2026-11.md §2 (2.1 wiring, 2.2 pool and Output, 2.3 banks, 2.5 the wire). docs/design/energy-system.md is history (Phase 1 circuits, Phase 2 Surge: both cut).
 
 ## Files (what each owns)
 | path | owns |
@@ -10,9 +10,10 @@ How a ship makes, stores and spends power. Power runs along wires (`Blueprint.wi
 | common/src/ships/rebuild.ts | the "powered" rule (steady loads share their network's generators by priority; engines, guns, miners and burst features run if their network has a generator or a battery, or a bank of their kind touches them) and the `powerLayout` call -> `ShipDerived.power`, `.energy`, `.satisfaction` |
 | data/ships/tuning.json `energy` | `coreCapacity` 240, `boostDraw` 2.2, `coreDischarge` 720, `discharge{general,drive,bank}` |
 | scripts/econ/models.mjs | store/generator fields: `produce`, `store`, `pool` (`'drive'` makes a bank member a Drive Cell), `discharge`, `bank`, `dynamo` (Pulse Dynamo: per second into each bank it touches) |
-| client/src/ships/wireEdit.ts | hangar wire tool + `powerReport` (network colours `NET_COLORS`, unpowered warnings), as at 5896116^ |
-| client/src/ships/HangarUI.ts | POWER panel (`powerHtml`: networks, pool and Output, banks, load test), `drawPower` + `drawBanks` (bank outlines and straps) |
-| client/src/ui/BankBars.ts | HUD: a thin bar per bank (at most 4) beside the ENERGY gauge |
+| client/src/ships/wireEdit.ts | `powerReport` (network colours `NET_COLORS`, unpowered warnings) and `pruneWires`; the wire tool itself is retired (220e47d) |
+| client/src/ships/HangarUI.ts | POWER panel (`powerHtml`: networks, generation/steady/spare, pool and Output, flat-out draws, the boost-and-fire warning, banks), `drawPower` + `drawBanks` (bank outlines and straps); the ENERGY rows in the SHIP summary (`energyHtml`: `loadTest` runs for cruising, boosting, firing while cruising: full power for how long, then the lowest share; and Refills, idle from every store empty) |
+| client/src/ui/BankBars.ts | HUD: a thin bar per bank (at most 4) beside the ENERGY gauge; the gauge itself turns red and reads LOW POWER while any feed group is short (held 0.5 s) |
+| client/src/ui/shipStatus/source.ts, energyLine.ts | the ship panel's energy line under the schematic: ENERGY % and measured net rate, then what is short, empty in / full in, or the spare power |
 | client/src/ships/partTip.ts | Holds/Gives/Charges, Bank and "Fed by" rows |
 
 ## Public interface
@@ -39,6 +40,9 @@ Add a store/generator: models.mjs fields (`produce`/`store`/`discharge`/`bank`/`
 - Pre-5896116 rule: a battery on a network with no generator isn't in the pool, but it makes that network's engines and guns "powered" (they draw on the pool).
 - Legacy `drive_battery`/`weapon_battery` are plain pool batteries now.
 - If the library fight fails on the Heavy Bank's rate, lower `energy.boostDraw`, not the rate (design rule).
+- `EnergyInfo.weaponDraw` is each gun's `gunDrawFlatOut` (ammunition guns 0), and `partStats` gives an ammunition gun no `draw`: data `demand` on an ammo gun is only read by the unused power core.
+- Engines are served before guns, and a boost needs only *some* stored charge: a boost held on an empty store re-arms on every tick's trickle, so the engines take the Output every other tick and the guns get nothing on those ticks (about half rate). Measured in docs/audits/energy-audit-2026-11-04.md; the HUD holds its LOW POWER 0.5 s so it doesn't flicker.
+- Audit with tables (every library ship's sustain, boost and refill; every weapon's draw; stores, generators, engines): docs/audits/energy-audit-2026-11-04.md.
 
 ## Ports core (designs with `power: 'ports'`; docs/design/energy-ports-2026-11.md §14)
 `common/src/ships/power/ports.ts`: `buildPortsLayout` (rebuild.ts, when `blueprint.power === 'ports'`: then `ShipDerived.ports` is set and `.power` is absent), `portsTick` (energy.ts `powerTick` branches to it; `Charge.e` is the `PortsState`), the guns' gates (`portsGunReady`, `portsSpendShot`, `portsBeamStep`: guns.ts), `portsSwitchFeeds` (the `feedSwitch` message, key Y), the wire (`packPorts`/`unpackPortsInto`: triples in the pilot row, counted negative in `data[9]`; `ensurePortsCharge` on the client). Data: models.mjs "ports energy core" block (`ports`, `profile`, `takes`, `feedPort`, the feed parts), tuning.json `feeds`, the core's ports in functions.json. Tests: `common/src/ships/power/ports.test.ts` on the three dev ships.

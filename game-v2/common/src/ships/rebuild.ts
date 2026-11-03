@@ -15,7 +15,7 @@ import { DEFAULT_JUMP, coilCapacity, jumpDriveStats } from './flight.js';
 import { fnOutput, isEngine, partDemand, partGrade, partMaterial, partSupply, partThrust, weaponBaseArea, weaponStrength } from './grades.js';
 import { netJoins, wireNetworks } from './wires.js';
 import { gunRate } from './launch.js';
-import { type EnergyInfo } from './energy.js';
+import { type EnergyInfo, gunDrawFlatOut } from './energy.js';
 import { type PowerLayout, bankKind, powerLayout } from './circuits.js';
 import { type PortsLayout, buildPortsLayout } from './power/ports.js';
 import type { FeatureDerived } from './features/types.js';
@@ -484,7 +484,6 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     // (A pulse laser pays for a pulse at a time, as a gun does a shot)
     const fire = fireOf(tuning, fns[i]);
     const beam = fire.model === 'beam';
-    weaponDraw += draw;
     weapons.push({
       part: i,
       uid: parts[i].uid,
@@ -502,6 +501,8 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
       mount,
       window: mount === 'turret' ? computeTurretWindow(geoms, alive, i, dir, tuning, fns[i].mounting?.arc) : undefined,
     });
+    // (What it draws firing flat out, by its firing model: an ammunition gun nothing, a clip gun its reloads, a spinning one spun up: energy.ts)
+    weaponDraw += gunDrawFlatOut(weapons[weapons.length - 1], draw);
   }
 
   // 7. Cargo, mining lasers, scanners
