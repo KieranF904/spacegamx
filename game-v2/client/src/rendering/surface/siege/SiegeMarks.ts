@@ -67,9 +67,12 @@ export class SiegeMarks {
       if (view && (Math.abs(e.renderX - view.x) > view.hw + reach || Math.abs(e.renderY - view.y) > view.hh + reach)) continue;
       const look = hostileLook(e.name, msg.tonight);
       const r = Math.max((look.boss ? 30 : 19) * px, look.boss ? 150 : 70), arm = r * 0.45, w = 2.2 * px, a = 0.85 * show, x = e.renderX - ox, y = e.renderY - oy;
+      // The four brackets as one stroke (each its own open subpath: the same lines, one stroke to build, no arrays)
       for (const [sx, sy] of CORNERS) {
-        g.poly(turn([sx * r, sy * (r - arm), sx * r, sy * r, sx * (r - arm), sy * r], x, y, c, sn), false).stroke({ color: look.color, width: w, alpha: a, join: 'miter' });
+        const ax = sx * r, ay = sy * (r - arm), bx = sx * r, by = sy * r, cx = sx * (r - arm), cy = sy * r;
+        g.moveTo(x + c * ax - sn * ay, y + sn * ax + c * ay).lineTo(x + c * bx - sn * by, y + sn * bx + c * by).lineTo(x + c * cx - sn * cy, y + sn * cx + c * cy);
       }
+      g.stroke({ color: look.color, width: w, alpha: a, join: 'miter' });
       const [gx, gy] = turn([0, -(r + 11 * px)], x, y, c, sn);
       GLYPHS[look.glyph](g, gx, gy, (look.boss ? 8 : 5.5) * px, c, sn, look.color, a);
       if (e.id === focus) {
