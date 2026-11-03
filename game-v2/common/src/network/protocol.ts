@@ -289,13 +289,20 @@ export interface ClientDevRangeMessage {
   on?: boolean;
 }
 
-/** A moon siege's day: ready up (or not), refit, or buy from the shop */
+/**
+ * A moon siege: by day ready up (or not), refit, buy from the shop, upgrade or scrap; any time give a pad's turret its
+ * orders (`item`: its target priority); at night build on a pad you're near (dearer), or mark a hostile for every
+ * turret in reach to focus on (`target`)
+ */
 export interface ClientSiegeMessage {
   type: 'siege';
-  action: 'ready' | 'unready' | 'refit' | 'buy' | 'upgrade' | 'scrap' | 'claim';
+  action: 'ready' | 'unready' | 'refit' | 'buy' | 'upgrade' | 'scrap' | 'claim' | 'orders' | 'focus';
+  /** buy: the shop item; orders: the priority */
   item?: string;
-  /** The turret pad, for upgrade and scrap */
+  /** The turret pad: to build on (none: the first free one, by day), upgrade, scrap, or give orders */
   pad?: number;
+  /** focus: the hostile */
+  target?: number;
 }
 
 /** An admin command (server/src/game/AdminTools.ts lists them); refused for non-admins */
@@ -1046,13 +1053,41 @@ export interface ServerSiegeStateMessage {
   youReady?: boolean;
   pads?: { free: number; total: number };
   shop?: { id: string; label: string; cost: number; note: string }[];
-  /** What's built on each pad (null: empty), with what upgrading costs (absent: top mark) and what scrapping it gives back */
-  turrets?: ({ label: string; mark: number; hull: number; upgrade?: number; refund: number } | null)[];
+  /**
+   * What's built on each pad (null: empty), with what upgrading costs (absent: top mark) and what scrapping it gives
+   * back; its kind, reach and target orders, its kills tonight, and how far a pilot holding at it has got mending it (0..1)
+   */
+  turrets?: ({ label: string; mark: number; hull: number; upgrade?: number; refund: number; kind?: string; range?: number; orders?: string; kills?: number; mend?: number } | null)[];
   /** Your haul so far, paid out when you claim and leave by day (half, with no bonus, if you leave any other way or the bastion falls) */
   haul?: { xp: number; credits: number; nights: number; bonus: number; nextBonusAt: number; nextBonus: number };
   /** This moon's siege, and (by day) the boss tonight brings */
   profile?: { name: string; about: string };
   nextBoss?: string;
+  /** The target orders a turret can be given */
+  orders?: { id: string; label: string }[];
+  /** Fronts on their way tonight (from dusk): where they land, the server tick they land at, how many ships, a boss among them */
+  incoming?: { x: number; y: number; at: number; ships: number; boss?: boolean }[];
+  /** Tonight (from dusk): which night, its boss, the kinds new tonight, the roles some of tonight's ships play (sapper, runner...) */
+  tonight?: { night: number; boss?: string; newKinds: string[]; roles: { name: string; ship: string; note: string }[] };
+  /** The bastion's hull (%), hostiles still to beat tonight, and under 30%: the last stand (kills pay double, one free patch) */
+  bastion?: number;
+  left?: number;
+  breach?: boolean;
+  /** Pads whose turret was shot down tonight (scorched) */
+  padsLost?: number[];
+  /** Tonight's score so far, perfect nights in a row, the best night's score this siege */
+  score?: { night: number; streak: number; best: number };
+  /** Dawn: the night just held (sent by day until the next dusk) */
+  summary?: {
+    night: number; kills: number; yourKills: number; turretKills: number; mvp?: { label: string; kills: number }; hullLost: number;
+    turretsLost: number; objectives: number; supplies: number; streakBonus: number; perfect: boolean; streak: number; score: number; best: boolean;
+  };
+  /** Focus fire: the tick it can be used again, the hostile the turrets are on and until when */
+  focus?: { readyAt: number; target?: number; until?: number };
+  /** At night: building costs × buildCost within buildReach of the pad; holding still within mendReach of a damaged turret (or the bastion) mends it */
+  night?: { buildCost: number; buildReach: number; mendReach: number; mendSeconds: number; mendCost: number; mendHeal: number; bastionReach: number; bastionCost: number; bastionHeal: number };
+  /** Mending the bastion: how far a pilot holding at it has got (0..1) */
+  bastionMend?: number;
 }
 
 export interface ServerObjectiveEndMessage {
