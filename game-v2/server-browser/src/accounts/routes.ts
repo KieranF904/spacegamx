@@ -53,6 +53,7 @@ import { DeletedAccounts } from './DeletedAccounts.js';
 import type { UserStore, UserSummary } from './types.js';
 import { BAN_FOREVER, banMessage, safeEqual, validatePassword } from './utils.js';
 import { RateLimiter } from './RateLimiter.js';
+import { notifier } from './pushover.js';
 
 type Json = (res: http.ServerResponse, status: number, body: unknown) => void;
 type Body = (req: http.IncomingMessage) => Promise<any>;
@@ -145,6 +146,7 @@ export class AccountRoutes {
         else if (result.error === 'Invalid username or password') { this.failures.record(here); this.nameFailures.record(name); }
       }
       if (!result.success) { this.sendJson(res, action === 'login' ? 401 : 400, { success: false, error: result.error }); return true; }
+      if (action === 'register') notifier.registered(result.user.username);
       this.sendJson(res, 200, { success: true, username: result.user.username, token: result.token, isAdmin: result.user.is_admin });
       return true;
     }

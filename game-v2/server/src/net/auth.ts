@@ -9,6 +9,7 @@ import { PROTOCOL_VERSION, PROTOCOL_MISMATCH_CLOSE, PROTOCOL_MISMATCH_REASON } f
 import type { ClientConnection } from './ClientConnection.js';
 import type { HandlerRegistry } from './dispatch.js';
 import type { ServerCtx } from './ServerCtx.js';
+import { notifier } from '../auth/pushover.js';
 
 /** The join and sign-in messages */
 export function registerAuthHandlers(t: HandlerRegistry): void {
@@ -48,6 +49,8 @@ export async function handleJoin(ctx: ServerCtx, conn: ClientConnection, msg: an
       conn.authToken = msg.token;
       ctx.loginPilot(conn, user.id).catch((e) => ctx.fault('login', e));
       console.log(`Player ${conn.playerId} authenticated as ${user.username}${user.is_admin ? ' (admin)' : ''}`);
+      // (a notice to Kieran's phone on the live server; not for admins)
+      if (!user.is_admin) notifier.join(user.username, false, online(ctx));
     } else {
       // Expired, signed out or banned (or the lobby's unreachable): back to the sign-in screen, not in as a guest
       rejectAuth(ctx, conn, error || 'Your session has ended. Sign in again.');
@@ -68,6 +71,7 @@ export async function handleJoin(ctx: ServerCtx, conn: ClientConnection, msg: an
     conn.userId = null;
     conn.isAdmin = ctx.everyoneAdmin || ctx.guestAdmin;
     conn.isContributor = false;
+    notifier.join(conn.username, true, online(ctx));
   }
   
   // Send auth result back
@@ -102,6 +106,13 @@ export async function handleAuthLogin(ctx: ServerCtx, conn: ClientConnection, ms
   } else {
     rejectAuth(ctx, conn, result.error);
   }
+}
+
+/** Pilots on the server now (joined connections) */
+function online(ctx: ServerCtx): number {
+  let n = 0;
+  for (const c of ctx.clients.values()) if (c.joined) n++;
+  return n;
 }
 
 export function signedInOwner(ctx: ServerCtx, name: string): 'admin' | 'pilot' | null {

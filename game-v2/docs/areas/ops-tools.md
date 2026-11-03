@@ -21,6 +21,7 @@ How the game gets onto the user's shared VPS (space.brotherk3d.com), how it is b
 | `scripts/gen-sfx.mjs`, `gen-*.mjs`, `scripts/{sun-sky-proto,planet-proto,surface-art,terrain,bespoke}` | | Asset generators and render prototypes (`npm run gen:sfx` reads `.env`) |
 | `docs/panels/` (`index.md`, `<date>/<category>/`) | | Before/after panels for dev updates |
 | `docs/ops/`, `docs/audits/` | | Ops runbooks and audits (`server-robustness.md` lists what guards the live server) |
+| `server/src/auth/pushover.ts`, `server-browser/src/accounts/pushover.ts` | | Pushover notices to Kieran's phone: someone joins the game server (not admins; a name once per 30 min) or registers an account (the lobby). At most 30 an hour each, the rest counted into the next. On in production when `PUSHOVER_TOKEN`/`PUSHOVER_USER` are in `/etc/spacegame/secrets.env` (`deploy/vps/deploy.sh` copies them from `game-v2/.env`); `NOTIFY_EVENTS=0` turns it off. Off elsewhere unless `NOTIFY_EVENTS=1` (keys then from `game-v2/.env`) |
 
 ## Public interface
 - `bash deploy/vps/deploy.sh` (from `game-v2/`): the only way code reaches the VPS. `WITH_SITE=1` adds the website (takes over `/`, game moves to `/play`).
