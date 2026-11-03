@@ -28,7 +28,8 @@
     "wire:bump": "node scripts/wire/bump.mjs",
     "features:gen": "node scripts/features/gen.mjs",
     "features:check": "node scripts/features/gen.mjs --check",
-    "slideshow": "node scripts/slideshow/build.mjs"
+    "slideshow": "node scripts/slideshow/build.mjs",
+    "det:engines": "node scripts/det/engines.mjs"
   },
   "devDependencies": {
     "typescript": "^5.3.3",

@@ -14,6 +14,7 @@ import {
   type HitMods, type CoverMemo,
 } from '@space-game/common';
 import { GLANCING, EMP_IMMUNE_TICKS, type PendingBlast, type BridgeCtx } from './core.js';
+import { dhypot, dpow } from '@space-game/common';
 
 /** Seize a ship up (as an EMP) for `ticks`: hazards' storms */
 export function emp(b: BridgeCtx, eid: number, ticks: number): void {
@@ -297,7 +298,7 @@ function overheadShare(b: BridgeCtx, eid: number, ship: ShipState, part: number,
     if (!h || h.t >= own.t) break;
     skip.add(h.part);
   }
-  return Math.pow(OVERHEAD_LAYER, layers);
+  return dpow(OVERHEAD_LAYER, layers);
 }
 
 export function splashAt(b: BridgeCtx, systemNum: number, x: number, y: number, radius: number, damage: number, source: number, hit?: HitInfo, overhead?: Vec2): void {
@@ -396,7 +397,7 @@ export function hullDistance(b: BridgeCtx, eid: number, x: number, y: number, wi
   const ship = b.bodies.get(eid);
   if (!ship) return Infinity;
   const cs = b.tuning.cellSize;
-  if (Math.hypot(Position.x[eid] - x, Position.y[eid] - y) - ship.derived.radius - cs > within) return Infinity;
+  if (dhypot(Position.x[eid] - x, Position.y[eid] - y) - ship.derived.radius - cs > within) return Infinity;
   const [gx, gy] = b.worldToGrid(eid, ship, x, y), geoms = b.geometry(ship);
   let bd = within / cs, found = false;
   for (let i = 0; i < geoms.length; i++) {
@@ -437,7 +438,7 @@ export function nearestPart(b: BridgeCtx, eid: number, ship: ShipState, x: numbe
   ship.hp.forEach((hp, i) => {
     if (hp <= 0 || ship.detached[i] || i === exclude) return;
     const [px, py] = b.partWorld(eid, ship, i);
-    const d = Math.hypot(px - x, py - y);
+    const d = dhypot(px - x, py - y);
     if (d < bd) { bd = d; best = i; }
   });
   return best;
@@ -454,7 +455,7 @@ export function stepBurns(bridge: BridgeCtx, tick: number): void {
       const next = bridge.nearestPart(b.eid, ship, px, py, b.part);
       if (next < 0) continue;
       const [nx, ny] = bridge.partWorld(b.eid, ship, next);
-      if (Math.hypot(nx - px, ny - py) > b.radius * bridge.tuning.cellSize * 1.5) continue;
+      if (dhypot(nx - px, ny - py) > b.radius * bridge.tuning.cellSize * 1.5) continue;
       if (bridge.burns.some((o) => o !== b && o.eid === b.eid && o.part === next)) continue;
       b.part = next;
     }
@@ -505,7 +506,7 @@ export function applyBlast(bridge: BridgeCtx, b: PendingBlast): void {
   const tick = bridge.host.getTick();
   for (const [eid, ship] of bridge.bodies) {
     if (InSystem.systemId[eid] !== b.systemId || bridge.intangible.has(eid)) continue;
-    if (Math.hypot(Position.x[eid] - b.x, Position.y[eid] - b.y) > b.radius + ship.derived.radius) continue;
+    if (dhypot(Position.x[eid] - b.x, Position.y[eid] - b.y) > b.radius + ship.derived.radius) continue;
     let dealt = 0;
     // (By each part's own outline, as splash goes)
     const cs = bridge.tuning.cellSize, [gx, gy] = bridge.worldToGrid(eid, ship, b.x, b.y);

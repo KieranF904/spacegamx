@@ -7,9 +7,13 @@
  * order: fdlibm's kernels and argument reduction, written out as Horner steps. Accuracy is within an ulp or two of
  * Math's; what matters is that every engine gets the same answer.
  *
- * Used by what clients work out for themselves and must agree on with the server (debris: ships/debris.ts). The
- * first piece of the lockstep work (docs/design/netcode-lockstep.md). Lint rule for code that uses it: no Math.sin,
- * cos, tan, atan, atan2, hypot, pow, exp, log or `**` in the deterministic path.
+ * exp, log, log2 and pow (fdlibm's exp and log, pow built on them, whole powers by multiplication) are here too, on the
+ * same terms. Allocation-free: the hot paths (flight, shells) call these every tick.
+ *
+ * Used by what clients work out for themselves and must agree on with the server: debris (ships/debris.ts), and
+ * everything that moves ships and shells (flight, thrust, steering, turret and gun aim, shell spawn and homing, hit
+ * geometry: docs/design/deterministic-maths.md). Lint rule for code that uses it: no Math.sin, cos, tan, atan, atan2,
+ * hypot, pow, exp, log or `**` in the deterministic path. The cross-engine check: npm run det:engines.
  */
 
 // pi/2 in three parts (fdlibm __ieee754_rem_pio2): k × each part is exact for |k| < 2^20, so the reduction is too
@@ -49,17 +53,21 @@ function kCos(x: number): number {
   return w + (((1 - w) - hz) + z * r);
 }
 
-/** x reduced to [-pi/4, pi/4] and its quadrant (0-3). For |x| up to about 1e6: angles here are never far off */
-function reduce(x: number): [number, number] {
+// (reduce's result: module scratch, so the hot paths allocate nothing)
+let redR = 0, redQ = 0;
+
+/** x reduced to [-pi/4, pi/4] (redR) and its quadrant 0-3 (redQ). For |x| up to about 1e6: angles here are never far off */
+function reduce(x: number): void {
   const k = Math.round(x * INV_PIO2);
-  const r = ((x - k * PIO2_1) - k * PIO2_2) - k * PIO2_3;
-  return [r, ((k % 4) + 4) % 4];
+  redR = ((x - k * PIO2_1) - k * PIO2_2) - k * PIO2_3;
+  redQ = ((k % 4) + 4) % 4;
 }
 
 export function dsin(x: number): number {
   if (!Number.isFinite(x)) return NaN;
-  const [r, q] = reduce(x);
-  switch (q) {
+  reduce(x);
+  const r = redR;
+  switch (redQ) {
     case 0: return kSin(r);
     case 1: return kCos(r);
     case 2: return -kSin(r);
@@ -69,8 +77,9 @@ export function dsin(x: number): number {
 
 export function dcos(x: number): number {
   if (!Number.isFinite(x)) return NaN;
-  const [r, q] = reduce(x);
-  switch (q) {
+  reduce(x);
+  const r = redR;
+  switch (redQ) {
     case 0: return kCos(r);
     case 1: return -kSin(r);
     case 2: return -kCos(r);
@@ -81,9 +90,10 @@ export function dcos(x: number): number {
 /** Both at once (one reduction): out[0] = sin, out[1] = cos */
 export function dsincos(x: number, out: [number, number] = [0, 0]): [number, number] {
   if (!Number.isFinite(x)) { out[0] = out[1] = NaN; return out; }
-  const [r, q] = reduce(x);
+  reduce(x);
+  const r = redR;
   const s = kSin(r), c = kCos(r);
-  switch (q) {
+  switch (redQ) {
     case 0: out[0] = s; out[1] = c; break;
     case 1: out[0] = c; out[1] = -s; break;
     case 2: out[0] = -s; out[1] = -c; break;
@@ -141,4 +151,239 @@ export function datan2(y: number, x: number): number {
 /** sqrt(x² + y²): only + * and sqrt, so exact alike everywhere (no overflow care: world units are small) */
 export function dhypot(x: number, y: number): number {
   return Math.sqrt(x * x + y * y);
+}
+
+// ---------------------------------------------------------------------------
+// exp, log, log2, pow (fdlibm's e_exp.c and e_log.c kernels; pow built on them)
+// ---------------------------------------------------------------------------
+
+// (A double's two 32-bit words, through one module scratch: read and set the exponent without allocating)
+const F64 = new Float64Array(1);
+const U32 = new Uint32Array(F64.buffer);
+const LITTLE = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
+const HI = LITTLE ? 1 : 0, LO = LITTLE ? 0 : 1;
+
+const LN2_HI = 6.93147180369123816490e-01;
+const LN2_LO = 1.90821492927058770002e-10;
+const INV_LN2 = 1.44269504088896338700e+00;
+const LN2 = 6.93147180559945286227e-01;
+const TWO54 = 1.80143985094819840000e+16;
+
+// fdlibm __ieee754_log
+const LG1 = 6.666666666666735130e-01, LG2 = 3.999999999940941908e-01, LG3 = 2.857142874366239149e-01;
+const LG4 = 2.222219843214978396e-01, LG5 = 1.818357216161805012e-01, LG6 = 1.531383769920937332e-01;
+const LG7 = 1.479819860511658591e-01;
+
+/** Natural log (fdlibm e_log.c): within an ulp of Math.log, the same bits everywhere */
+export function dlog(x: number): number {
+  F64[0] = x;
+  let hx = U32[HI] | 0;
+  const lx = U32[LO];
+  let k = 0;
+  if (hx < 0x00100000) {
+    // (zero, negative or subnormal)
+    if (((hx & 0x7fffffff) | lx) === 0) return -Infinity;
+    if (hx < 0) return NaN;
+    k -= 54; x *= TWO54; F64[0] = x; hx = U32[HI] | 0;
+  }
+  if (hx >= 0x7ff00000) return x + x;
+  k += (hx >> 20) - 1023;
+  hx &= 0x000fffff;
+  const i = (hx + 0x95f64) & 0x100000;
+  // (x or x/2 into [sqrt(2)/2, sqrt(2)))
+  U32[HI] = hx | (i ^ 0x3ff00000);
+  x = F64[0];
+  k += i >> 20;
+  const f = x - 1;
+  const dk = k;
+  if ((0x000fffff & (2 + hx)) < 3) {
+    if (f === 0) return k === 0 ? 0 : dk * LN2_HI + dk * LN2_LO;
+    const R = f * f * (0.5 - 0.33333333333333333 * f);
+    return k === 0 ? f - R : dk * LN2_HI - ((R - dk * LN2_LO) - f);
+  }
+  const s = f / (2 + f);
+  const z = s * s;
+  const w = z * z;
+  const t1 = w * (LG2 + w * (LG4 + w * LG6));
+  const t2 = z * (LG1 + w * (LG3 + w * (LG5 + w * LG7)));
+  const R = t2 + t1;
+  if (((hx - 0x6147a) | (0x6b851 - hx)) > 0) {
+    const hfsq = 0.5 * f * f;
+    return k === 0 ? f - (hfsq - s * (hfsq + R)) : dk * LN2_HI - ((hfsq - (s * (hfsq + R) + dk * LN2_LO)) - f);
+  }
+  return k === 0 ? f - s * (f - R) : dk * LN2_HI - ((s * (f - R) - dk * LN2_LO) - f);
+}
+
+// fdlibm __ieee754_exp
+const EP1 = 1.66666666666666019037e-01, EP2 = -2.77777777770155933842e-03, EP3 = 6.61375632143793436117e-05;
+const EP4 = -1.65339022054652515390e-06, EP5 = 4.13813679705723846039e-08;
+const O_THRESHOLD = 7.09782712893383973096e+02;
+const U_THRESHOLD = -7.45133219101941108420e+02;
+const TWOM1000 = 9.33263618503218878990e-302;
+
+/** e^x (fdlibm e_exp.c): within an ulp of Math.exp, the same bits everywhere */
+export function dexp(x: number): number {
+  F64[0] = x;
+  let hx = U32[HI] | 0;
+  const neg = hx < 0;
+  hx &= 0x7fffffff;
+  if (hx >= 0x40862e42) {
+    if (hx >= 0x7ff00000) return x !== x ? x : neg ? 0 : Infinity;
+    if (x > O_THRESHOLD) return Infinity;
+    if (x < U_THRESHOLD) return 0;
+  }
+  let hi = 0, lo = 0, k = 0;
+  if (hx > 0x3fd62e42) {
+    // (|x| > ln2/2: x = k·ln2 + r, |r| <= ln2/2)
+    if (hx < 0x3ff0a2b2) {
+      hi = neg ? x + LN2_HI : x - LN2_HI; lo = neg ? -LN2_LO : LN2_LO; k = neg ? -1 : 1;
+    } else {
+      k = (INV_LN2 * x + (neg ? -0.5 : 0.5)) | 0;
+      hi = x - k * LN2_HI; lo = k * LN2_LO;
+    }
+    x = hi - lo;
+  } else if (hx < 0x3e300000) {
+    return 1 + x;
+  }
+  const t = x * x;
+  const c = x - t * (EP1 + t * (EP2 + t * (EP3 + t * (EP4 + t * EP5))));
+  if (k === 0) return 1 - ((x * c) / (c - 2) - x);
+  const y = 1 - ((lo - (x * c) / (2 - c)) - hi);
+  // (× 2^k on the exponent bits)
+  F64[0] = y;
+  if (k >= -1021) { U32[HI] = U32[HI] + (k << 20); return F64[0]; }
+  U32[HI] = U32[HI] + ((k + 1000) << 20);
+  return F64[0] * TWOM1000;
+}
+
+/** v × 2^n, exact unless it over- or underflows */
+function ldexp(v: number, n: number): number {
+  while (n > 1023) { v *= 8.98846567431158e307; n -= 1023; }
+  while (n < -1022) { v *= 2.2250738585072014e-308; n += 1022; }
+  F64[0] = 0;
+  U32[HI] = (n + 1023) << 20;
+  return v * F64[0];
+}
+
+// (splitDec's result: x = 2^decK × decM, decM in [sqrt(2)/2, sqrt(2)], for x > 0 finite)
+let decK = 0, decM = 0;
+const SQRT2 = 1.4142135623730951;
+
+function splitDec(x: number): void {
+  let k = 0;
+  if (x < 2.2250738585072014e-308) { x *= TWO54; k = -54; }
+  F64[0] = x;
+  const hx = U32[HI];
+  k += (hx >>> 20) - 1023;
+  U32[HI] = (hx & 0x000fffff) | 0x3ff00000;
+  let m = F64[0];
+  if (m > SQRT2) { m *= 0.5; k += 1; }
+  decK = k; decM = m;
+}
+
+/** log2 (exact for powers of two), within an ulp or two of Math.log2 */
+export function dlog2(x: number): number {
+  if (!(x > 0)) return x === 0 ? -Infinity : NaN;
+  if (x === Infinity) return x;
+  splitDec(x);
+  return decK + dlog(decM) * INV_LN2;
+}
+
+/**
+ * x^y, the same bits everywhere. Whole powers up to 4 are multiplication, as are whole numbers to whole powers that
+ * come out exact (10^k); otherwise 2^(k·y) × e^(y·ln m) for x = 2^k·m,
+ * within an ulp or two of Math.pow for the game's small exponents (a few ulps by |y·ln x| ≈ 25), exact when the answer
+ * is a power of two. Special cases as Math.pow. (A hot path with a fixed whole exponent multiplies it out instead:
+ * this is ~5x Math.pow's cost)
+ */
+export function dpow(x: number, y: number): number {
+  if (y === 0) return 1;
+  if (x !== x || y !== y) return NaN;
+  const yInt = y === Math.trunc(y);
+  if (yInt && y <= 4 && y >= -4 && x - x === 0) {
+    const n = y < 0 ? -y : y, x2 = x * x;
+    const r = n === 1 ? x : n === 2 ? x2 : n === 3 ? x2 * x : x2 * x2;
+    return y < 0 ? 1 / r : r;
+  }
+  // (A whole number to a whole power that comes out exact, as 10^k: multiplied out, so exact as Math.pow is)
+  if (yInt && y <= 64 && y >= -64 && x === Math.trunc(x) && x < 67108864 && x > -67108864) {
+    let r = 1, i = y < 0 ? -y : y;
+    for (; i > 0; i--) { const p = r * x; if (!exactProduct(r, x, p)) break; r = p; }
+    if (i === 0) return y < 0 ? 1 / r : r;
+  }
+  const odd = yInt && Math.abs(y) < 9007199254740992 && y % 2 !== 0;
+  if (y - y !== 0) {
+    // (y = ±Infinity)
+    const ax = x < 0 ? -x : x;
+    if (ax === 1) return NaN;
+    return (ax > 1) === (y > 0) ? Infinity : 0;
+  }
+  if (x === 0) {
+    const negZero = 1 / x < 0 && odd;
+    return y > 0 ? (negZero ? -0 : 0) : negZero ? -Infinity : Infinity;
+  }
+  if (x - x !== 0) {
+    // (x = ±Infinity)
+    if (x > 0) return y > 0 ? Infinity : 0;
+    return y > 0 ? (odd ? -Infinity : Infinity) : odd ? -0 : 0;
+  }
+  let sign = 1;
+  if (x < 0) { if (!yInt) return NaN; if (odd) sign = -1; x = -x; }
+  if (x === 1) return sign;
+  // (Far out of the game's range: plainly, it's 0, 1-ish or infinite anyway)
+  if (y > 1e20 || y < -1e20) return sign * dexp(y * dlog(x));
+  splitDec(x);
+  const k = decK, f = decM - 1;
+  // x^y = 2^(k·y) · e^(y·ln m): k·y = ph + pl exactly (k has at most 11 bits, so only y is split), n its whole part
+  const ph = k * y;
+  let c = SPLIT * y;
+  const yh = c - (c - y), yl = y - yh;
+  const pl = (k * yh - ph) + k * yl;
+  if (ph > 2100) return sign * Infinity;
+  if (ph < -2200) return sign * 0;
+  const n = Math.round(ph);
+  const fr = ph - n;
+  // ln m = f + tail (f = m - 1, exact), so y·ln m = y·f (exactly, as qh + ql) + y·tail
+  const qh = y * f;
+  c = SPLIT * f;
+  const fh = c - (c - f), fl = f - fh;
+  const ql = ((yh * fh - qh) + yh * fl + yl * fh) + yl * fl;
+  // fr·ln2 = ah + al
+  const ah = fr * LN2;
+  c = SPLIT * fr;
+  const rh = c - (c - fr), rl = fr - rh;
+  const al = ((rh * LN2_H - ah) + rh * LN2_L + rl * LN2_H) + rl * LN2_L + fr * LN2_TAIL;
+  // th + tl = the exponent, the roundings of its sums kept (twoSum) and applied after: e^(th + tl) ≈ e^th · (1 + tl)
+  const r = y * logTail(f);
+  const s1 = qh + r, b1 = s1 - qh;
+  const e1 = (qh - (s1 - b1)) + (r - b1);
+  const th = s1 + ah, b2 = th - s1;
+  const e2 = (s1 - (th - b2)) + (ah - b2);
+  const tl = e1 + e2 + al + ql + pl * LN2;
+  const e = dexp(th);
+  return sign * ldexp(e + e * tl, n);
+}
+
+const SPLIT = 134217729;
+// ln2 = LN2 + LN2_TAIL, and LN2 split into halves of 26 bits (LN2_H + LN2_L) for exact products
+const LN2_TAIL = 2.3190468138462996e-17;
+const LN2_H = 0.6931471824645996;
+const LN2_L = -1.904654323148236e-9;
+
+/** Is p = a × b with no rounding (Dekker's product: its error term is 0)? */
+function exactProduct(a: number, b: number, p: number): boolean {
+  let c = SPLIT * a;
+  const ah = c - (c - a), al = a - ah;
+  c = SPLIT * b;
+  const bh = c - (c - b), bl = b - bh;
+  return ((ah * bh - p) + ah * bl + al * bh) + al * bl === 0;
+}
+
+/** ln(1 + f) - f for f in [sqrt(2)/2 - 1, sqrt(2) - 1] (fdlibm's log kernel, without its f) */
+function logTail(f: number): number {
+  if (f === 0) return 0;
+  const s = f / (2 + f), z = s * s, w = z * z;
+  const R = z * (LG1 + w * (LG3 + w * (LG5 + w * LG7))) + w * (LG2 + w * (LG4 + w * LG6));
+  const hfsq = 0.5 * f * f;
+  return s * (hfsq + R) - hfsq;
 }

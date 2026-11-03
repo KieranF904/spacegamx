@@ -14,6 +14,7 @@
 import type { Vec2 } from './types.js';
 import type { PlacedGeom } from './grid.js';
 import { segmentConvexEntry } from './geometry.js';
+import { dhypot } from '../math/detTrig.js';
 
 type Box = { minX: number; minY: number; maxX: number; maxY: number };
 
@@ -74,7 +75,7 @@ export function capsuleConvexEntry(poly: Vec2[], x0: number, y0: number, x1: num
   if (r <= 0 || best === 0) return best;
   for (let i = 0; i < poly.length; i++) {
     const a = poly[i], b = poly[(i + 1) % poly.length];
-    const ex = b[0] - a[0], ey = b[1] - a[1], len = Math.hypot(ex, ey);
+    const ex = b[0] - a[0], ey = b[1] - a[1], len = dhypot(ex, ey);
     if (len < 1e-12) continue;
     // Outward normal (the inside is on the left of a→b)
     const nx = (ey / len) * r, ny = (-ex / len) * r;
@@ -112,7 +113,7 @@ export function pointConvexDistance(poly: Vec2[], x: number, y: number): number 
 function boxDistance(b: Box, x: number, y: number): number {
   const dx = x < b.minX ? b.minX - x : x > b.maxX ? x - b.maxX : 0;
   const dy = y < b.minY ? b.minY - y : y > b.maxY ? y - b.maxY : 0;
-  return dx === 0 ? dy : dy === 0 ? dx : Math.hypot(dx, dy);
+  return dx === 0 ? dy : dy === 0 ? dx : dhypot(dx, dy);
 }
 
 /** How far a point is from a part's outline (0 inside it); Infinity if that's further than `within` */

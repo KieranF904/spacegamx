@@ -17,6 +17,7 @@ import {
   type ShipState, type Vec2, type GravityWell, type FlightConstants, type FlightInputSource,
 } from '@space-game/common';
 import { K, centroidOf, CONTACT_MARGIN, BIG_BODY, type ContactPiece, type BridgeCtx } from './core.js';
+import { dcos, dhypot, dsin } from '@space-game/common';
 
 /** stepMovement's scratch: the held keys read from Input, and the controls built from them (reused every call; the step never keeps them) */
 const MOVE_SRC: FlightInputSource = {
@@ -283,7 +284,7 @@ export function tick(ctx: BridgeCtx): void {
   for (let [ids, ships, bi] = ctx.bodiesNow(); bi < ids.length; bi++) {
     const eid = ids[bi], ship = ships[bi];
     const horizon = ctx.host.gravityAt(eid)?.horizon;
-    if (!horizon || Math.hypot(Position.x[eid], Position.y[eid]) > horizon || ctx.host.invulnerable?.(eid)) continue;
+    if (!horizon || dhypot(Position.x[eid], Position.y[eid]) > horizon || ctx.host.invulnerable?.(eid)) continue;
     if (ship.kind === 'debris') { ctx.removeBody(eid); continue; }
     // (A distant ship drifted in: it dies as a live one does)
     ctx.wake(eid);
@@ -350,7 +351,7 @@ export function worldPieces(b: BridgeCtx, eid: number, ship: ShipState, near?: {
   const [cx, cy] = ship.derived.com;
   const px = Position.x[eid], py = Position.y[eid];
   const phi = Rotation.angle[eid] + Math.PI / 2;
-  const c = Math.cos(phi), s = Math.sin(phi);
+  const c = dcos(phi), s = dsin(phi);
   const out: ContactPiece[] = [];
   // Only the parts that could reach a circle (the other body's bounds): a boss's far side isn't transformed for a ship grinding its flank
   let nx = 0, ny = 0, nr = Infinity;
@@ -435,7 +436,7 @@ export function resolveContacts(ctx: BridgeCtx): void {
     const [ea, A] = list[i];
     const [eb, B] = list[j];
     const dx = Position.x[eb] - Position.x[ea], dy = Position.y[eb] - Position.y[ea];
-    if (Math.hypot(dx, dy) > A.derived.radius + B.derived.radius) continue;
+    if (dhypot(dx, dy) > A.derived.radius + B.derived.radius) continue;
 
     let deepest: { depth: number; nx: number; ny: number } | null = null;
     let at: Vec2 = [0, 0];

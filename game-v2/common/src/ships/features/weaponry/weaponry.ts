@@ -19,6 +19,7 @@
  */
 
 import type { WeaponTuning } from '../../tuning.js';
+import { datan2, dcos, dsin } from '../../../math/detTrig.js';
 
 /** Weapon role ids */
 export const ROLE_END_AT_AIM = 'endAtAim';
@@ -50,11 +51,11 @@ export function statusBits(marked: boolean, slowed: boolean): number {
  * as a unit vector (allocation-free). Server only today: a guided shell is sent as it flies.
  */
 export function steerToward(x: number, y: number, vx: number, vy: number, tx: number, ty: number, turn: number, out: { x: number; y: number }): void {
-  let a = Math.atan2(vy, vx);
-  let d = Math.atan2(ty - y, tx - x) - a;
+  let a = datan2(vy, vx);
+  let d = datan2(ty - y, tx - x) - a;
   while (d > Math.PI) d -= 2 * Math.PI;
   while (d < -Math.PI) d += 2 * Math.PI;
   a += Math.max(-turn, Math.min(turn, d));
-  out.x = Math.cos(a);
-  out.y = Math.sin(a);
+  out.x = dcos(a);
+  out.y = dsin(a);
 }

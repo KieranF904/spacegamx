@@ -6,6 +6,7 @@
 import type { Connector, PieceMount, PlacedPart, Side, Vec2 } from './types.js';
 import { Catalog, LineEdge, PieceVariant, SIDE_NORMAL, connectorEndpoints, getVariant } from './catalog.js';
 import { bounds, convexOverlap, cross, pointInConvex } from './geometry.js';
+import { dhypot } from '../math/detTrig.js';
 
 export interface PlacedGeom {
   part: PlacedPart;
@@ -75,7 +76,7 @@ const TOUCH = 0.2, TOUCH_GAP = 0.03;
 function edgesTouch(a: Vec2[], b: Vec2[]): boolean {
   for (let i = 0; i < a.length; i++) {
     const p = a[i], q = a[(i + 1) % a.length];
-    const ex = q[0] - p[0], ey = q[1] - p[1], len = Math.hypot(ex, ey);
+    const ex = q[0] - p[0], ey = q[1] - p[1], len = dhypot(ex, ey);
     if (len < TOUCH) continue;
     const ux = ex / len, uy = ey / len;
     for (let j = 0; j < b.length; j++) {

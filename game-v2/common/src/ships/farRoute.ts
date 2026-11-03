@@ -17,6 +17,7 @@
  */
 
 import { FRICTION } from '../constants.js';
+import { dcos, dhypot, dpow, dsin } from '../math/detTrig.js';
 
 export interface Leg {
   x: number;
@@ -40,11 +41,11 @@ export const CARRY = F / (1 - F);
 export function legAt(l: Leg, t: number, out: Motion = { x: 0, y: 0, vx: 0, vy: 0 }): Motion {
   if (!(t > 0)) { out.x = l.x; out.y = l.y; out.vx = l.vx; out.vy = l.vy; return out; }
   const th = l.thrust < 0 ? t : Math.min(t, l.thrust);
-  const Ft = Math.pow(F, th), c = CARRY * (1 - Ft);
+  const Ft = dpow(F, th), c = CARRY * (1 - Ft);
   let x = l.x + l.vx * c + l.wx * (th - c), y = l.y + l.vy * c + l.wy * (th - c);
   let vx = l.vx * Ft + l.wx * (1 - Ft), vy = l.vy * Ft + l.wy * (1 - Ft);
   if (t > th) {
-    const Fc = Math.pow(F, t - th), k = CARRY * (1 - Fc);
+    const Fc = dpow(F, t - th), k = CARRY * (1 - Fc);
     x += vx * k; y += vy * k;
     vx *= Fc; vy *= Fc;
   }
@@ -71,7 +72,7 @@ export function coastLeg(m: Motion): Leg {
  * (with that thrust it comes to rest exactly there: x0 + v0 CARRY + w t1)
  */
 export function legTo(m: Motion, tx: number, ty: number, speed: number): Leg {
-  const dx = tx - m.x - m.vx * CARRY, dy = ty - m.y - m.vy * CARRY, d = Math.hypot(dx, dy);
+  const dx = tx - m.x - m.vx * CARRY, dy = ty - m.y - m.vy * CARRY, d = dhypot(dx, dy);
   if (!(speed > 0) || d < 1) return coastLeg(m);
   return { x: m.x, y: m.y, vx: m.vx, vy: m.vy, wx: (dx / d) * speed, wy: (dy / d) * speed, thrust: d / speed };
 }
@@ -82,7 +83,7 @@ export function legTo(m: Motion, tx: number, ty: number, speed: number): Leg {
  */
 export function legArrival(l: Leg, tx: number, ty: number, arrive: number): number {
   const m: Motion = { x: 0, y: 0, vx: 0, vy: 0 };
-  const within = (t: number) => { legAt(l, t, m); return Math.hypot(m.x - tx, m.y - ty) <= arrive; };
+  const within = (t: number) => { legAt(l, t, m); return dhypot(m.x - tx, m.y - ty) <= arrive; };
   if (within(0)) return 0;
   // (It's at rest within a few CARRYs of its thrust ending: nothing changes after)
   const last = (l.thrust < 0 ? 60 * 60 * 30 : l.thrust) + CARRY * 6;
@@ -134,7 +135,7 @@ export function patrolOf(hx: number, hy: number, roam: number, speed: number): P
 export function patrolPoint(p: Patrol, seed: number): { x: number; y: number; seed: number } {
   const s1 = nextSeed(seed), s2 = nextSeed(s1);
   const a = (s1 / 4294967296) * Math.PI * 2, r = 600 + (s2 / 4294967296) * (p.roam - 600);
-  return { x: r2(p.hx + Math.cos(a) * r), y: r2(p.hy + Math.sin(a) * r), seed: s2 };
+  return { x: r2(p.hx + dcos(a) * r), y: r2(p.hy + dsin(a) * r), seed: s2 };
 }
 
 /** Under way from `from` (rounded here, as it's sent) at tick t0 for (tx, ty) */

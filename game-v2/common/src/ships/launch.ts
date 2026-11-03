@@ -19,6 +19,7 @@ import type { ShipTuning, WeaponTuning } from './tuning.js';
 import type { PlacedPart, WeaponMods } from './types.js';
 import { buildShot, type ProjectileSpec } from './shot.js';
 import type { WeaponInfo } from './rebuild.js';
+import { dcos, dpow, dsin } from '../math/detTrig.js';
 
 export interface LaunchShape {
   speedScale: number;
@@ -138,7 +139,7 @@ export function sizeMods(base: WeaponTuning, size: number | undefined): WeaponMo
   if (!bySize) sized.set(base, (bySize = new Map()));
   if (bySize.has(size)) return bySize.get(size);
   const mul: Record<string, number> = {};
-  for (const [k, e] of Object.entries(base.bySize)) if (typeof e === 'number' && k !== 'rate') mul[k] = Math.pow(size, e) - 1;
+  for (const [k, e] of Object.entries(base.bySize)) if (typeof e === 'number' && k !== 'rate') mul[k] = dpow(size, e) - 1;
   const out = Object.keys(mul).length ? { mul } : undefined;
   bySize.set(size, out);
   return out;
@@ -149,7 +150,7 @@ export function gunRate(tuning: ShipTuning, kind: string, grade: number | undefi
   const base = weaponDef(tuning, kind);
   const g = gradeMods(tuning, kind, grade)?.mul?.rate ?? 0;
   const e = base.bySize?.rate ?? 0;
-  return Math.max(0.2, 1 + g) * (size && e ? Math.pow(size, e) : 1);
+  return Math.max(0.2, 1 + g) * (size && e ? dpow(size, e) : 1);
 }
 
 /**
@@ -194,8 +195,8 @@ export function launchShot(def: WeaponTuning, kind: string, shape: LaunchShape, 
   // Shells inherit a little of the ship's motion
   return {
     speed,
-    vx: Math.cos(a) * speed + ownerVx * 0.3,
-    vy: Math.sin(a) * speed + ownerVy * 0.3,
+    vx: dcos(a) * speed + ownerVx * 0.3,
+    vy: dsin(a) * speed + ownerVy * 0.3,
     size: (def.size ?? 1) * (cannon ? shape.sizeScale : 1),
     // Slower shells live longer so the cannon keeps its range
     life: Math.round((def.life ?? 150) / (cannon ? shape.speedScale : 1)),

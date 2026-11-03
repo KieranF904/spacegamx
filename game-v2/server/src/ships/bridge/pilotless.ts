@@ -12,6 +12,7 @@ import {
   quantizeReplicaAngle, powerTick, gunLoadTick, FULL_CHARGE, type ShipState, type FlightConstants,
 } from '@space-game/common';
 import type { PilotOrders, BridgeCtx } from './core.js';
+import { datan2, dcos, dhypot, dsin } from '@space-game/common';
 
 /** Reused each tick (powerTick reads it and keeps nothing) */
 const PILOTLESS_USE: { thrusting: boolean; boosting: boolean; load: ArrayLike<number> | undefined } = { thrusting: false, boosting: false, load: undefined };
@@ -43,22 +44,22 @@ export function setAutopilot(b: BridgeCtx, eid: number, target: { x: number; y: 
  */
 export function autopilotControls(b: BridgeCtx, eid: number, target: { x: number; y: number; arriveRadius: number }) {
   const dx = target.x - Position.x[eid], dy = target.y - Position.y[eid];
-  const dist = Math.hypot(dx, dy);
+  const dist = dhypot(dx, dy);
   // Hold the heading until the course drifts a degree or so: fewer control changes to replicate
-  let want = Math.atan2(dy, dx);
+  let want = datan2(dy, dx);
   const held = b.apHeading.get(eid);
-  if (held !== undefined && Math.abs(Math.atan2(Math.sin(want - held), Math.cos(want - held))) < 0.02 && dist > target.arriveRadius) want = held;
+  if (held !== undefined && Math.abs(datan2(dsin(want - held), dcos(want - held))) < 0.02 && dist > target.arriveRadius) want = held;
   b.apHeading.set(eid, want);
   let err = want - Rotation.angle[eid];
   while (err > Math.PI) err -= 2 * Math.PI;
   while (err < -Math.PI) err += 2 * Math.PI;
   // Friction alone stops a ship moving at v within about v / (1 - FRICTION)
-  const speed = Math.hypot(Velocity.x[eid], Velocity.y[eid]);
+  const speed = dhypot(Velocity.x[eid], Velocity.y[eid]);
   const stopping = speed / (1 - FRICTION);
   const go = Math.abs(err) < 0.5 && dist - target.arriveRadius > stopping;
   // Mouse-steer controls are screen-relative (forward = up the screen): press the
   // screen directions nearest the nose, and the PD turn keeps the nose on target
-  const a = Rotation.angle[eid], cx = Math.cos(a), cy = Math.sin(a);
+  const a = Rotation.angle[eid], cx = dcos(a), cy = dsin(a);
   return { forward: go && cy < -0.38, backward: go && cy > 0.38, left: go && cx < -0.38, right: go && cx > 0.38, boost: false, targetAngle: want };
 }
 

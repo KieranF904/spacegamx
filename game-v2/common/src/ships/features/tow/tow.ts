@@ -15,6 +15,7 @@
  */
 
 import type { ShipTuning } from '../../tuning.js';
+import { dhypot } from '../../../math/detTrig.js';
 
 export interface TowTuning {
   /** How far from the hull's edge the beam takes hold (world units) */
@@ -100,7 +101,7 @@ export interface TowEnd { x: number; y: number; vx: number; vy: number; r: numbe
  */
 export function towPull(ship: TowEnd, obj: TowEnd, mass: number, share: number, t: TowTuning = DEFAULT_TOW): { dvx: number; dvy: number; snapped: boolean; stretch: number } {
   const dx = ship.x - obj.x, dy = ship.y - obj.y;
-  const dist = Math.hypot(dx, dy);
+  const dist = dhypot(dx, dy);
   const slack = t.rest + ship.r + obj.r;
   const stretch = dist - slack;
   if (stretch > t.snap) return { dvx: 0, dvy: 0, snapped: true, stretch };

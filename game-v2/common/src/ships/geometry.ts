@@ -7,6 +7,7 @@
  */
 
 import type { Segment, Vec2 } from './types.js';
+import { dcos, dhypot, dsin } from '../math/detTrig.js';
 
 const DEG = Math.PI / 180;
 export const EPS = 1e-9;
@@ -20,13 +21,13 @@ export function nearerThan(dx: number, dy: number, r: number): boolean {
   const q = dx * dx + dy * dy, r2 = r * r;
   if (q < r2 * (1 - 1e-9)) return true;
   if (q > r2 * (1 + 1e-9)) return false;
-  return Math.hypot(dx, dy) < r;
+  return dhypot(dx, dy) < r;
 }
 export function fartherThan(dx: number, dy: number, r: number): boolean {
   const q = dx * dx + dy * dy, r2 = r * r;
   if (q > r2 * (1 + 1e-9)) return true;
   if (q < r2 * (1 - 1e-9)) return false;
-  return Math.hypot(dx, dy) > r;
+  return dhypot(dx, dy) > r;
 }
 
 export function cross(ax: number, ay: number, bx: number, by: number): number {
@@ -40,7 +41,7 @@ export function snap(v: number): number {
 }
 
 export function arcPoint(c: Vec2, r: number, deg: number): Vec2 {
-  return [snap(c[0] + r * Math.cos(deg * DEG)), snap(c[1] + r * Math.sin(deg * DEG))];
+  return [snap(c[0] + r * dcos(deg * DEG)), snap(c[1] + r * dsin(deg * DEG))];
 }
 
 export function segmentStart(s: Segment): Vec2 {
@@ -115,7 +116,7 @@ export function outlineArea(outline: Segment[]): number {
       const t0 = s.a0 * DEG;
       const t1 = s.a1 * DEG;
       const [cx, cy] = s.c;
-      a += 0.5 * (s.r * cx * (Math.sin(t1) - Math.sin(t0)) - s.r * cy * (Math.cos(t1) - Math.cos(t0)) + s.r * s.r * (t1 - t0));
+      a += 0.5 * (s.r * cx * (dsin(t1) - dsin(t0)) - s.r * cy * (dcos(t1) - dcos(t0)) + s.r * s.r * (t1 - t0));
     }
   }
   return a;
@@ -266,7 +267,7 @@ export function shrinkConvex(poly: Vec2[], amount: number): Vec2[] | null {
     const a = poly[i];
     const b = poly[(i + 1) % poly.length];
     const ex = b[0] - a[0], ey = b[1] - a[1];
-    const len = Math.hypot(ex, ey);
+    const len = dhypot(ex, ey);
     // Interior is where cross(e, p - a) > 0; keep cross(e, p - a) >= amount * len
     // cross(e, p) = ex*py - ey*px  →  ey*px - ex*py <= -amount*len + (ey*ax - ex*ay)
     out = clipHalfPlane(out, ey, -ex, ey * a[0] - ex * a[1] - amount * len);

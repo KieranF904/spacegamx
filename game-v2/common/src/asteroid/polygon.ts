@@ -7,6 +7,8 @@
  * the same arguments always gives the same result.
  */
 
+import { dcos, dsin } from '../math/detTrig.js';
+
 // ── PRNG helpers ────────────────────────────────────────────────────
 
 /** FNV-1a hash — turns a string into a 32-bit unsigned seed. */
@@ -69,8 +71,8 @@ export function getAsteroidPolygon(
       const angle = (i / numPoints) * Math.PI * 2;
       const variance = 0.6 + rng() * 0.4; // 60-100% of radius (so it lies within `size` of the centre)
       const r = size * variance;
-      dx[i] = Math.cos(angle) * r;
-      dy[i] = Math.sin(angle) * r;
+      dx[i] = dcos(angle) * r;
+      dy[i] = dsin(angle) * r;
     }
     shape = { size, dx, dy };
     shapeCache.set(asteroidId, shape);
@@ -80,7 +82,7 @@ export function getAsteroidPolygon(
     for (let i = 0; i < points.length; i++) points[i] = { x: cx + shape.dx[i], y: cy + shape.dy[i] };
     return points;
   }
-  const c = Math.cos(angle), s = Math.sin(angle);
+  const c = dcos(angle), s = dsin(angle);
   for (let i = 0; i < points.length; i++) points[i] = { x: cx + shape.dx[i] * c - shape.dy[i] * s, y: cy + shape.dx[i] * s + shape.dy[i] * c };
   return points;
 }

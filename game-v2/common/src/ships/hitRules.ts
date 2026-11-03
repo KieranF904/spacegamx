@@ -27,6 +27,7 @@ import { hitMultiplier, weaponHit, type HitInfo } from './damage.js';
 import { RUIN_HP, stageOf, currentStage, standing, deciding, stageParts } from './stages.js';
 import { partDistance } from './collide.js';
 import { gunDef, stackMods, ammoByCode } from './launch.js';
+import { dhypot } from '../math/detTrig.js';
 
 /** A hit that gets less than this share through the armour it strikes shows as glancing */
 export const GLANCING = 0.6;
@@ -167,7 +168,7 @@ export function coverPart(ctx: HitCtx, ship: ShipState, part: number, at?: Vec2,
   for (const i of stageParts(catalog, ship, first)) {
     const g = geoms[i];
     if (!g || !standing(catalog, ship, i)) continue;
-    const d = (at ? partDistance(g, cx, cy) : Math.hypot(g.centroid[0] - cx, g.centroid[1] - cy)) + (deciding(catalog, ship, i) ? 0 : 1e6);
+    const d = (at ? partDistance(g, cx, cy) : dhypot(g.centroid[0] - cx, g.centroid[1] - cy)) + (deciding(catalog, ship, i) ? 0 : 1e6);
     if (d < bd) { bd = d; best = i; }
   }
   if (memo) { memo.first = first; memo.best = best; }

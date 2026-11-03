@@ -1,6 +1,7 @@
 /** The Point Defence Turret's tick (a weapon role of the support feature: ./index.ts). Moved from bridge/weapons.ts. */
 import { pointDefenceOf, stepPointDefenceAim, wrapPi, isOpen, shipPointToWorld, type ShipState, type WeaponInfo, type WeaponTuning } from '@space-game/common';
 import type { WeaponBridge } from '../../bridge/core.js';
+import { datan2, dcos, dhypot, dsin } from '@space-game/common';
 
 /**
  * Point-defence turrets: each turns to the nearest shot in reach it can bring to bear on (staying on the one it's on
@@ -22,13 +23,13 @@ export function pointDefence(b: WeaponBridge, eid: number, ship: ShipState, pose
     const [px, py] = shipPointToWorld(ship, pose, win.pivot, b.tuning.cellSize);
     const reach = pd.range;
     // (Local angle to a point, and whether it can fire that way: in its arc, and not through its own hull)
-    const local = (tx: number, ty: number) => Math.atan2(ty - py, tx - px) - (pose.angle + Math.PI / 2);
+    const local = (tx: number, ty: number) => datan2(ty - py, tx - px) - (pose.angle + Math.PI / 2);
     const bears = (a: number) => { const off = wrapPi(a - win.center); return (win.half >= Math.PI - 1e-9 || Math.abs(off) <= win.half) && isOpen(win, off); };
     let pick: { id: number; x: number; y: number } | null = null;
     if (!quiet && b.pdList.length) {
       const was = on?.get(w.part);
       for (const t of b.pdList) {
-        if (Math.hypot(t.x - px, t.y - py) > reach || !bears(local(t.x, t.y))) continue;
+        if (dhypot(t.x - px, t.y - py) > reach || !bears(local(t.x, t.y))) continue;
         if (t.id === was) { pick = t; break; }
         if (!pick) pick = t;
       }
@@ -39,7 +40,7 @@ export function pointDefence(b: WeaponBridge, eid: number, ship: ShipState, pose
     if (!pick || !res.canFire || ship.cooldown[w.part] > 0) continue;
     // From its barrel's tip, instantly: one of the shot's hits
     const a = win.center + res.offset;
-    const [mx, my] = shipPointToWorld(ship, pose, [win.pivot[0] + Math.cos(a) * win.barrel, win.pivot[1] + Math.sin(a) * win.barrel], b.tuning.cellSize);
+    const [mx, my] = shipPointToWorld(ship, pose, [win.pivot[0] + dcos(a) * win.barrel, win.pivot[1] + dsin(a) * win.barrel], b.tuning.cellSize);
     const cd = ship.cooldown[w.part];
     ship.cooldown[w.part] = (cd > -1 ? cd : 0) + w.interval;
     const target = pick.id;

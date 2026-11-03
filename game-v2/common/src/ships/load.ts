@@ -15,6 +15,8 @@
  * fly the same load.
  */
 
+import { dpow } from '../math/detTrig.js';
+
 /** Cargo's share in the ship's turning inertia, against its share in its mass */
 export const CARGO_TURN_SHARE = 0.5;
 
@@ -22,7 +24,7 @@ export const CARGO_TURN_SHARE = 0.5;
 export const CARGO_PRECISION = 2;
 
 export function quantizeCargo(m: number): number {
-  const k = 10 ** CARGO_PRECISION;
+  const k = dpow(10, CARGO_PRECISION);
   return Math.max(0, Math.round(m * k) / k);
 }
 

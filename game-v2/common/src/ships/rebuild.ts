@@ -20,6 +20,7 @@ import { type PowerLayout, bankKind, powerLayout } from './circuits.js';
 import { type PortsLayout, buildPortsLayout } from './power/ports.js';
 import type { FeatureDerived } from './features/types.js';
 import { getPlan, featureBits, featureList } from './features/plan.js';
+import { dhypot, dpow } from '../math/detTrig.js';
 
 const legacyFire = new WeakMap<FunctionDef, FireSpec>();
 /**
@@ -233,7 +234,7 @@ export interface RebuildInput {
  */
 export function driveFactor(mass: number, fullMass: number): number {
   if (fullMass <= 0 || mass >= fullMass) return 1;
-  return 0.2 + 0.8 * Math.pow(Math.max(0, mass / fullMass), 0.75);
+  return 0.2 + 0.8 * dpow(Math.max(0, mass / fullMass), 0.75);
 }
 
 /** Guns made of a conductive material recharge this much faster */
@@ -430,7 +431,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     const d = mats[i].density * (fns[i].massScale ?? 1);
     const dx = geoms[i].centroid[0] - com[0], dy = geoms[i].centroid[1] - com[1];
     inertiaGrid += d * (geoms[i].variant.polarMoment + area[i] * (dx * dx + dy * dy));
-    for (const p of geoms[i].polygon) radius = Math.max(radius, Math.hypot(p[0] - com[0], p[1] - com[1]));
+    for (const p of geoms[i].polygon) radius = Math.max(radius, dhypot(p[0] - com[0], p[1] - com[1]));
   }
 
   const thrusters: ThrusterInfo[] = [];

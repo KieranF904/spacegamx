@@ -19,6 +19,7 @@
  */
 
 import type { WeaponTuning } from './tuning.js';
+import { dpow } from '../math/detTrig.js';
 
 export interface PulseTuning {
   /** How long a pulse lasts */
@@ -80,7 +81,7 @@ export function pulseProfile(pulse: PulseTuning): PulseProfile {
     else {
       // Tail: from a flare just after the peak back down to nothing
       const y = (k - peak) / (ticks - peak);
-      intensity.push(k === peak + 1 ? 0.5 : 0.3 * Math.pow(1 - y, 1.6));
+      intensity.push(k === peak + 1 ? 0.5 : 0.3 * dpow(1 - y, 1.6));
     }
   }
   // Damage goes as the brightness squared: the flare carries nearly half of it, the fade in and out the rest

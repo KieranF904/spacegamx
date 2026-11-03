@@ -119,7 +119,7 @@ import { GameData } from './data/GameData.js';
 import type { UserStore } from './auth/types.js';
 import type { ClientSocket, ClientLink } from '@space-game/common';
 import type { ShipBridge, ShipHost } from './ships/ShipBridge.js';
-import { portsSwitchFeeds, CAPS } from '@space-game/common';
+import { portsSwitchFeeds, CAPS, dcos, dsin } from '@space-game/common';
 import { Blueprint, ShipState, quantizeShipValue, skillValue, hasAll, removeAll, Economy, Bag, StarterKit, jumpTuning, jumpPhase, partItemId, rateShip, ratingOf, createShipState, gradeReward, gradeOf, accrueTraces, releaseTraces, unlocks, stationPerks, hazardFlight, stationTable, blueprintGrade, lookFn, warmthPercent, packCharge, nearerThan, fartherThan, type ShipDerived } from '@space-game/common';
 
 /** A station site by id */
@@ -3512,15 +3512,15 @@ this.devTeleport = opts.devTeleport ?? false;
     const finalAngle = angle + angleVariance;
     
     // Spawn slightly ahead of player (modular ships pass their muzzle and offset 0)
-    const spawnX = x + Math.cos(angle) * spawnOffset;
-    const spawnY = y + Math.sin(angle) * spawnOffset;
+    const spawnX = x + dcos(angle) * spawnOffset;
+    const spawnY = y + dsin(angle) * spawnOffset;
     
     Position.x[eid] = spawnX;
     Position.y[eid] = spawnY;
     
     // Add player velocity to bullet
-    Velocity.x[eid] = Math.cos(finalAngle) * speed + Velocity.x[shooterEid] * 0.3;
-    Velocity.y[eid] = Math.sin(finalAngle) * speed + Velocity.y[shooterEid] * 0.3;
+    Velocity.x[eid] = dcos(finalAngle) * speed + Velocity.x[shooterEid] * 0.3;
+    Velocity.y[eid] = dsin(finalAngle) * speed + Velocity.y[shooterEid] * 0.3;
     
     Radius.value[eid] = 5 * shape.sizeScale;
     Projectile.ownerId[eid] = shooterEid;

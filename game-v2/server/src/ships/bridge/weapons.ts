@@ -19,6 +19,7 @@ import {
 import { K, BEAM_PAD, GLANCING, type BridgeCtx, type PendingSalvoShell } from './core.js';
 import { lastHurtSoak } from './damage.js';
 import { fireBeamHook, tickWeaponHooks } from '../features/weapons.js';
+import { datan2, dcos, dhypot, dsin } from '@space-game/common';
 
 export function lastFiredTick(b: BridgeCtx, eid: number): number {
   return b.lastFired.get(eid) ?? -Infinity;
@@ -62,7 +63,7 @@ export function nearestTarget(b: BridgeCtx, eid: number, x: number, y: number, r
   for (const [other, ship] of b.bodies) {
     if (other === eid || ship.kind !== 'ship' || InSystem.systemId[other] !== InSystem.systemId[eid] || b.dormant.has(other)) continue;
     // Distance first: it rules out nearly everything, and the checks after it are lookups
-    let d = Math.hypot(Position.x[other] - x, Position.y[other] - y);
+    let d = dhypot(Position.x[other] - x, Position.y[other] - y);
     if (hull) {
       if (d - ship.derived.radius - b.tuning.cellSize >= bd) continue;
       d = b.hullDistance(other, x, y, bd);
@@ -119,8 +120,8 @@ export function stepMiners(b: BridgeCtx, eid: number, ship: ShipState, on: boole
   const pose = b.pose(eid);
   const cs = b.tuning.cellSize;
   const gimbal = mt.gimbalDeg * Math.PI / 180;
-  const aimX = pose.x + Math.cos(aimWorld) * Math.max(aimDist, mt.range);
-  const aimY = pose.y + Math.sin(aimWorld) * Math.max(aimDist, mt.range);
+  const aimX = pose.x + dcos(aimWorld) * Math.max(aimDist, mt.range);
+  const aimY = pose.y + dsin(aimWorld) * Math.max(aimDist, mt.range);
   let nearest = 1;
   // The cutting is focused at the pulse's flare (the same curve as its look; a whole pulse still cuts what it did)
   const prof = pulseProfile(MINING_PULSE);
@@ -129,14 +130,14 @@ export function stepMiners(b: BridgeCtx, eid: number, ship: ShipState, on: boole
   for (const m of ship.derived.miners) {
     if (m.satisfaction <= 0.01) continue;
     const [x, y] = shipPointToWorld(ship, pose, m.muzzle, cs);
-    const facing = pose.angle + Math.PI / 2 + Math.atan2(m.dir[1], m.dir[0]);
-    let off = Math.atan2(aimY - y, aimX - x) - facing;
+    const facing = pose.angle + Math.PI / 2 + datan2(m.dir[1], m.dir[0]);
+    let off = datan2(aimY - y, aimX - x) - facing;
     while (off > Math.PI) off -= 2 * Math.PI;
     while (off < -Math.PI) off += 2 * Math.PI;
     const angle = facing + Math.max(-gimbal, Math.min(gimbal, off));
     // (It reaches past its range, fading: mineFalloff)
     const range = mt.range * (1 + MINE_TAIL);
-    const x1 = x + Math.cos(angle) * range, y1 = y + Math.sin(angle) * range;
+    const x1 = x + dcos(angle) * range, y1 = y + dsin(angle) * range;
     // Nearest hull along the beam (not our own)
     let shipHit: { eid: number; ship: ShipState; part: number; t: number } | null = null;
     for (const other of b.alongBeam(InSystem.systemId[eid], x, y, x1, y1, 0)) {
@@ -208,7 +209,7 @@ export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: 
     let locks: number[] | undefined;
     if (d.homing && !d.guided) {
       if (aimWorld !== undefined) {
-        const ax = pose.x + Math.cos(aimWorld) * Math.max(aimDist, 400), ay = pose.y + Math.sin(aimWorld) * Math.max(aimDist, 400);
+        const ax = pose.x + dcos(aimWorld) * Math.max(aimDist, 400), ay = pose.y + dsin(aimWorld) * Math.max(aimDist, 400);
         if (d.volleyTargets && d.volleyTargets > 1) {
           locks = nearestTargets(b, eid, ax, ay, 1400, d.volleyTargets);
           lock = locks.length ? locks[0] : -1;
@@ -260,8 +261,8 @@ function noteGuide(b: BridgeCtx, eid: number, tick: number, firing: boolean, pos
   if (aimWorld === undefined) return;
   // (No cursor distance known: a point well out along the aim, as a missile's lock looks)
   const d = Math.max(aimDist, 400);
-  g.x = pose.x + Math.cos(aimWorld) * d;
-  g.y = pose.y + Math.sin(aimWorld) * d;
+  g.x = pose.x + dcos(aimWorld) * d;
+  g.y = pose.y + dsin(aimWorld) * d;
 }
 
 /** Where a ship's guns aimed and whether its trigger was held, if they stepped this tick or the last (undefined: stale, or no guns) */
@@ -330,17 +331,17 @@ export function fireBeam(b: BridgeCtx, eid: number, ship: ShipState, w: WeaponIn
   let muzzle = w.muzzle, dir = w.dir;
   if (w.mount === 'turret' && w.window) {
     const a = w.window.center + ship.aim[w.part];
-    dir = [Math.cos(a), Math.sin(a)];
+    dir = [dcos(a), dsin(a)];
     muzzle = [w.window.pivot[0] + dir[0] * w.window.barrel, w.window.pivot[1] + dir[1] * w.window.barrel];
   } else if (ship.aim[w.part]) {
-    const a = Math.atan2(dir[1], dir[0]) + ship.aim[w.part];
-    dir = [Math.cos(a), Math.sin(a)];
+    const a = datan2(dir[1], dir[0]) + ship.aim[w.part];
+    dir = [dcos(a), dsin(a)];
   }
   const [x, y] = shipPointToWorld(ship, pose, muzzle, cs);
   const [dx, dy] = localToWorldDir(dir, pose.angle);
-  const angle = Math.atan2(dy, dx);
+  const angle = datan2(dy, dx);
   const range = def.range ?? 800;
-  const x1 = x + Math.cos(angle) * range, y1 = y + Math.sin(angle) * range;
+  const x1 = x + dcos(angle) * range, y1 = y + dsin(angle) * range;
   // (A hostile's beam burns at its kind's npcScale: the laser was made better for pilots, not for the scrap that fires it)
   const npc = hasComponent(b.host.world, Player, eid) ? 1 : def.npcScale ?? 1;
   // (A held beam with a windup burns up to full over its first ticks: guns.ts windupScale)
@@ -451,15 +452,15 @@ export function beamFrom(b: BridgeCtx, eid: number, ship: ShipState, w: WeaponIn
   let muzzle = w.muzzle, dir = w.dir;
   if (w.mount === 'turret' && w.window) {
     const a = w.window.center + ship.aim[w.part];
-    dir = [Math.cos(a), Math.sin(a)];
+    dir = [dcos(a), dsin(a)];
     muzzle = [w.window.pivot[0] + dir[0] * w.window.barrel, w.window.pivot[1] + dir[1] * w.window.barrel];
   } else if (ship.aim[w.part]) {
-    const a = Math.atan2(dir[1], dir[0]) + ship.aim[w.part];
-    dir = [Math.cos(a), Math.sin(a)];
+    const a = datan2(dir[1], dir[0]) + ship.aim[w.part];
+    dir = [dcos(a), dsin(a)];
   }
   const [x, y] = shipPointToWorld(ship, pose, muzzle, b.tuning.cellSize);
   const [dx, dy] = localToWorldDir(dir, pose.angle);
-  return { x, y, angle: Math.atan2(dy, dx) };
+  return { x, y, angle: datan2(dy, dx) };
 }
 
 /**
@@ -513,7 +514,7 @@ export function nearSegment(b: BridgeCtx, eid: number, ship: ShipState, x0: numb
   const dx = x1 - x0, dy = y1 - y0;
   const len2 = dx * dx + dy * dy || 1;
   const u = Math.max(0, Math.min(1, ((px - x0) * dx + (py - y0) * dy) / len2));
-  return Math.hypot(x0 + dx * u - px, y0 + dy * u - py) <= ship.derived.radius + 1 + margin;
+  return dhypot(x0 + dx * u - px, y0 + dy * u - py) <= ship.derived.radius + 1 + margin;
 }
 
 /**

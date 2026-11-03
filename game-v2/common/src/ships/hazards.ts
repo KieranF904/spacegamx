@@ -6,6 +6,7 @@
  */
 
 import type { WarmthRules } from './warmth.js';
+import { dhypot } from '../math/detTrig.js';
 
 export const HAZARDS = ['radiation', 'thermal', 'cryo', 'corrosive', 'gravitational', 'electromagnetic'] as const;
 export type Hazard = typeof HAZARDS[number];
@@ -43,7 +44,7 @@ export function hazardsAt(
 ): HazardRatings {
   const out: HazardRatings = {};
   for (const h of HAZARDS) if ((sys.hazardRatings?.[h] ?? 0) > 0) out[h] = sys.hazardRatings![h];
-  const d = Math.hypot(x, y), r = sys.starRadius ?? 0, type = sys.centralBody?.type ?? 'sun';
+  const d = dhypot(x, y), r = sys.starRadius ?? 0, type = sys.centralBody?.type ?? 'sun';
   const near = type === 'black_hole' ? rules.nearBlackHole : type === 'none' ? undefined : rules.nearStar;
   if (near && r > 0 && d < (near.margin !== undefined ? r + near.margin : (near.radii ?? 0) * r)) {
     for (const [h, v] of Object.entries(near.ratings)) out[h as Hazard] = Math.max(out[h as Hazard] ?? 0, v);

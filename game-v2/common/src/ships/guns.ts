@@ -25,6 +25,7 @@ import { SHOT_AIM_STEPS, shotAimQ } from './launch.js';
 import { BROWNOUT, chargeGroupsEnd, feedShare, type Charge } from './energy.js';
 import { PF_LATCH, effCap, effShot, portsBeamStep, portsGunReady, portsShotAugmented, portsSpendShot, type PortsLayout, type PortsState } from './power/ports.js';
 import { PILOT_EXTRAS } from './features/plan.js';
+import { datan2, dcos, dsin } from '../math/detTrig.js';
 
 export interface GunOrders {
   firing: boolean;
@@ -279,8 +280,8 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
     if (tells === NO_TELLS) tells = [];
     tells.push({ w, aimQ: shotAimQ(ship.aim[w.part]), start });
   };
-  const aimX = aimWorld === undefined ? 0 : pose.x + Math.cos(aimWorld) * aimDist;
-  const aimY = aimWorld === undefined ? 0 : pose.y + Math.sin(aimWorld) * aimDist;
+  const aimX = aimWorld === undefined ? 0 : pose.x + dcos(aimWorld) * aimDist;
+  const aimY = aimWorld === undefined ? 0 : pose.y + dsin(aimWorld) * aimDist;
   const ready: WeaponInfo[] = [];
   // A semi-automatic gun fires once per click: the click is kept a few ticks, for one pressed just before the gun is ready
   if (orders.firing && !ship.triggerHeld) ship.clickAt = tick;
@@ -308,7 +309,7 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
         let worldAngle = aimWorld;
         if (aimDist > 0) {
           const [px, py] = shipPointToWorld(ship, pose, w.window.pivot, tuning.cellSize);
-          worldAngle = Math.atan2(aimY - py, aimX - px);
+          worldAngle = datan2(aimY - py, aimX - px);
         }
         // World angle → local grid frame (grid forward is -y)
         desired = worldAngle - (pose.angle + Math.PI / 2);
@@ -322,9 +323,9 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
       let worldAngle = aimWorld;
       if (aimDist > 0) {
         const [mx, my] = shipPointToWorld(ship, pose, w.muzzle, tuning.cellSize);
-        worldAngle = Math.atan2(aimY - my, aimX - mx);
+        worldAngle = datan2(aimY - my, aimX - mx);
       }
-      const facing = Math.atan2(w.dir[1], w.dir[0]);
+      const facing = datan2(w.dir[1], w.dir[0]);
       const local = (a: number) => a - (pose.angle + Math.PI / 2) - facing;
       const res = stepFixedGunAim(local(worldAngle), tuning, local(aimWorld), f.model === 'beam' || weapons[w.kind]?.type === 'beam', weapons[w.kind]?.gimbalDeg);
       ship.aim[p] = res.offset;

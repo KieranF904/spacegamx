@@ -16,6 +16,7 @@ import { SIDE_NORMAL } from './catalog.js';
 import type { PlacedGeom } from './grid.js';
 import { pointInConvex, segmentConvexEntry } from './geometry.js';
 import type { ShipTuning } from './tuning.js';
+import { datan2, dcos, dhypot, dsin } from '../math/detTrig.js';
 
 const DEG = Math.PI / 180;
 
@@ -45,19 +46,19 @@ export function computeTurretWindow(
   const halfDeg = arcDeg !== undefined ? Math.max(0.5, Math.min(180, arcDeg / 2)) : t.halfArcDeg;
   // (A grid part's facing side, or a bespoke mount's direction)
   const n = typeof facing === 'string' ? SIDE_NORMAL[facing] : facing;
-  const center = Math.atan2(n[1], n[0]);
+  const center = datan2(n[1], n[0]);
   const half = halfDeg * DEG;
   const g = geoms[self];
   const pivot = g.centroid;
   let barrel = 0;
-  for (const p of g.polygon) barrel = Math.max(barrel, Math.hypot(p[0] - pivot[0], p[1] - pivot[1]));
+  for (const p of g.polygon) barrel = Math.max(barrel, dhypot(p[0] - pivot[0], p[1] - pivot[1]));
   barrel += t.barrelMargin;
 
   // Long enough to clear the whole ship
   let reach = 1;
   for (let i = 0; i < geoms.length; i++) {
     if (!alive[i]) continue;
-    for (const p of geoms[i].polygon) reach = Math.max(reach, Math.hypot(p[0] - pivot[0], p[1] - pivot[1]) + 1);
+    for (const p of geoms[i].polygon) reach = Math.max(reach, dhypot(p[0] - pivot[0], p[1] - pivot[1]) + 1);
   }
 
   // Each other live part's bounding circle (round its shrunk pieces, a hair larger): a ray that
@@ -77,14 +78,14 @@ export function computeTurretWindow(
     }
     if (x0 > x1) continue;
     cx[i] = (x0 + x1) / 2; cy[i] = (y0 + y1) / 2;
-    cr[i] = Math.hypot(x1 - x0, y1 - y0) / 2 + 1e-6;
+    cr[i] = dhypot(x1 - x0, y1 - y0) / 2 + 1e-6;
   }
 
   const steps = Math.max(1, Math.round((2 * halfDeg) / t.sampleDeg));
   const free: boolean[] = [];
   for (let k = 0; k <= steps; k++) {
     const a = center - half + (k / steps) * 2 * half;
-    const ca = Math.cos(a), sa = Math.sin(a);
+    const ca = dcos(a), sa = dsin(a);
     const x1 = pivot[0] + ca * reach, y1 = pivot[1] + sa * reach;
     let blocked = false;
     for (let i = 0; i < geoms.length && !blocked; i++) {

@@ -13,6 +13,7 @@ import {
   type ShipState, type Vec2, type FlightBody, type JumpField, type Charge,
 } from '@space-game/common';
 import type { BridgeCtx } from './core.js';
+import { dhypot } from '@space-game/common';
 
 /** A ship's battery charge (energy.ts) */
 export function chargeOf(b: BridgeCtx, eid: number): Charge {
@@ -89,7 +90,7 @@ export function towablesNear(b: BridgeCtx, systemNum: number, x: number, y: numb
   const out: number[] = [];
   for (const eid of b.bodies.keys()) {
     if (InSystem.systemId[eid] !== systemNum || !b.towable(eid)) continue;
-    if (Math.hypot(Position.x[eid] - x, Position.y[eid] - y) <= r + b.bodies.get(eid)!.derived.radius) out.push(eid);
+    if (dhypot(Position.x[eid] - x, Position.y[eid] - y) <= r + b.bodies.get(eid)!.derived.radius) out.push(eid);
   }
   return out;
 }

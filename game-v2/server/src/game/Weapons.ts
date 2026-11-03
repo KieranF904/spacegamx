@@ -25,6 +25,7 @@ import {
   endsAtAim, lifeToReach, steerToward, bursts, hitEndFx, pierceKeepOf, shellAmount, shellVs,
 } from '@space-game/common';
 import type { ShipBridge } from '../ships/ShipBridge.js';
+import { datan2, dcos, dhypot, dsin } from '@space-game/common';
 
 export interface WeaponsHost {
   readonly world: IWorld;
@@ -208,20 +209,20 @@ export class Weapons {
         const t = x.target;
         const alive = t >= 0 && this.ships.has(t) && InSystem.systemId[t] === InSystem.systemId[eid];
         let vx = Velocity.x[eid], vy = Velocity.y[eid];
-        const sp = Math.hypot(vx, vy) || 1;
+        const sp = dhypot(vx, vy) || 1;
         const max = x.def.maxSpeed ?? 40;
         const nsp = Math.min(max, sp + (x.def.accel ?? 0.5));
-        let ang = Math.atan2(vy, vx);
+        let ang = datan2(vy, vx);
         if (alive) {
           // Lead the target a little
-          const lead = Math.min(30, Math.hypot(Position.x[t] - Position.x[eid], Position.y[t] - Position.y[eid]) / Math.max(1, nsp));
-          const want = Math.atan2(Position.y[t] + Velocity.y[t] * lead - Position.y[eid], Position.x[t] + Velocity.x[t] * lead - Position.x[eid]);
+          const lead = Math.min(30, dhypot(Position.x[t] - Position.x[eid], Position.y[t] - Position.y[eid]) / Math.max(1, nsp));
+          const want = datan2(Position.y[t] + Velocity.y[t] * lead - Position.y[eid], Position.x[t] + Velocity.x[t] * lead - Position.x[eid]);
           let d = want - ang;
           while (d > Math.PI) d -= 2 * Math.PI;
           while (d < -Math.PI) d += 2 * Math.PI;
           ang += Math.max(-x.def.homing, Math.min(x.def.homing, d));
         }
-        vx = Math.cos(ang) * nsp; vy = Math.sin(ang) * nsp;
+        vx = dcos(ang) * nsp; vy = dsin(ang) * nsp;
         Velocity.x[eid] = vx; Velocity.y[eid] = vy;
       }
       // A held orb parks where it was aimed (its endTick) and pulls from there
@@ -233,7 +234,7 @@ export class Weapons {
         for (const [other, s] of this.ships.bodies) {
           if (other === x.owner || InSystem.systemId[other] !== InSystem.systemId[eid] || s.kind === 'debris') continue;
           const dx = px - Position.x[other], dy = py - Position.y[other];
-          const d = Math.hypot(dx, dy);
+          const d = dhypot(dx, dy);
           if (d > r || d < 1) continue;
           const k = x.def.pull.strength * (1 - d / r) * (1 - d / r) * 2;
           if (this.host.nudge) this.host.nudge(other, (dx / d) * k, (dy / d) * k);
@@ -308,7 +309,7 @@ export class Weapons {
    */
   private guide(eid: number, x: Extra): void {
     const vx = Velocity.x[eid], vy = Velocity.y[eid];
-    const sp = Math.hypot(vx, vy) || 1;
+    const sp = dhypot(vx, vy) || 1;
     const nsp = Math.min(x.def.maxSpeed ?? x.def.speed ?? 40, sp + (x.def.accel ?? 0));
     const g = this.ships.guideOf(x.owner, this.host.tick());
     if (g && g.held) steerToward(Position.x[eid], Position.y[eid], vx, vy, g.x, g.y, x.def.guided!.turn, this.steer);
@@ -339,13 +340,13 @@ export class Weapons {
   /** A prism bolt breaks into a fan of shards carrying on past what it hit */
   private shatter(proj: number, x: Extra, hit: { eid: number; x: number; y: number } | null): void {
     const sp = x.def.split!;
-    const heading = Math.atan2(Velocity.y[proj], Velocity.x[proj]);
+    const heading = datan2(Velocity.y[proj], Velocity.x[proj]);
     const arc = (sp.arc * Math.PI) / 180;
     for (let i = 0; i < sp.count; i++) {
       const a = heading + arc * ((sp.count > 1 ? i / (sp.count - 1) : 0.5) - 0.5);
       // (where it broke: what it hit, or where it burst at the aim)
       const px = hit ? hit.x : Position.x[proj], py = hit ? hit.y : Position.y[proj];
-      const shard = this.spawn(x.owner, sp.kind, px + Math.cos(a) * 8, py + Math.sin(a) * 8, a, x.damageScale, { speedScale: 1, sizeScale: 1, turret: false, noBurst: true });
+      const shard = this.spawn(x.owner, sp.kind, px + dcos(a) * 8, py + dsin(a) * 8, a, x.damageScale, { speedScale: 1, sizeScale: 1, turret: false, noBurst: true });
       if (hit) this.extras.get(shard)?.hit.add(hit.eid);
     }
   }

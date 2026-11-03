@@ -23,6 +23,7 @@
 
 import type { Catalog } from './catalog.js';
 import type { Blueprint, FunctionDef, MaterialDef } from './types.js';
+import { dpow } from '../math/detTrig.js';
 
 export const MARKS = ['', 'I', 'II', 'III', 'IV', 'V'];
 export const MAX_GRADE = 5;
@@ -78,7 +79,7 @@ export function weaponBaseArea(catalog: Catalog, fn: FunctionDef): number {
 /** How much harder a weapon of this size hits than its base size */
 export function weaponSizeFactor(catalog: Catalog, fn: FunctionDef, area: number): number {
   if (fn.model) return 1;
-  return Math.pow(area / weaponBaseArea(catalog, fn), WEAPON_SIZE_EXP);
+  return dpow(area / weaponBaseArea(catalog, fn), WEAPON_SIZE_EXP);
 }
 
 /** A weapon part's strength: grade × size (1 for a base-size Mk I) */
@@ -98,7 +99,7 @@ export function isEngine(fn: FunctionDef | undefined): boolean {
 export function partThrust(catalog: Catalog, fn: FunctionDef, area: number, m: MaterialDef | undefined): number {
   if (!isEngine(fn)) return 0;
   if (fn.model) return fn.thrust! * area;
-  return fn.thrust! * area * Math.pow(area / weaponBaseArea(catalog, fn), THRUST_SIZE_EXP) * Math.sqrt(outputOf(m));
+  return fn.thrust! * area * dpow(area / weaponBaseArea(catalog, fn), THRUST_SIZE_EXP) * Math.sqrt(outputOf(m));
 }
 
 /** Power a part makes (generators; 0 for everything else), at full health */
@@ -115,7 +116,7 @@ const GENERATOR_EXP = 1.5;
 
 export function partSupply(fn: FunctionDef, area: number, m: MaterialDef | undefined): number {
   if (!(fn.produce ?? 0)) return 0;
-  return fn.produce! * area * fnOutput(fn, m) ** GENERATOR_EXP;
+  return fn.produce! * area * dpow(fnOutput(fn, m), GENERATOR_EXP);
 }
 
 /**
@@ -142,7 +143,7 @@ export function buildPoints(catalog: Catalog, bp: { parts: { piece: string; mate
 export function partDemand(fn: FunctionDef, area: number, m: MaterialDef | undefined): number {
   if (!(fn.demand ?? 0)) return 0;
   if (fn.model) return fn.demand! * area;
-  return fn.demand! * area * (fn.weapon ? outputOf(m) ** WEAPON_DRAW_EXP : isGraded(fn) ? outputOf(m) : isEngine(fn) ? Math.sqrt(outputOf(m)) : 1);
+  return fn.demand! * area * (fn.weapon ? dpow(outputOf(m), WEAPON_DRAW_EXP) : isGraded(fn) ? outputOf(m) : isEngine(fn) ? Math.sqrt(outputOf(m)) : 1);
 }
 
 /** The material of a grade (the main one: Mk I is alloy, not composite) */
@@ -196,5 +197,5 @@ export function blueprintGrade(catalog: Catalog, bp: Blueprint): number {
 
 /** What killing a ship of a grade pays, against Mk I: output^1.6 (×1.5 at Mk II, ×4.6 at Mk V) */
 export function gradeReward(catalog: Catalog, grade: number): number {
-  return Math.pow(outputOf(catalog.materials.get(gradeMaterial(catalog, grade))), 1.6);
+  return dpow(outputOf(catalog.materials.get(gradeMaterial(catalog, grade))), 1.6);
 }

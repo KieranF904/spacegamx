@@ -14,6 +14,7 @@ import type { ShipDerived } from './rebuild.js';
 import type { ShipTuning } from './tuning.js';
 import { stepFlight, FlightBody, FlightControls, GravityWell, type FlightConstants } from './flight.js';
 import { collideTerrain, terrainRadius, type Terrain } from '../terrain.js';
+import { dpow } from '../math/detTrig.js';
 
 export const SHIP_FLIGHT_CONSTANTS = { friction: FRICTION, boostFactor: BOOST_FACTOR, worldSize: WORLD_SIZE };
 
@@ -21,7 +22,7 @@ export const SHIP_FLIGHT_CONSTANTS = { friction: FRICTION, boostFactor: BOOST_FA
 export const SHIP_PRECISION = { pos: 2, vel: 4, angle: 5, angVel: 6, fuel: 3 } as const;
 
 const round = (v: number, places: number) => {
-  const k = 10 ** places;
+  const k = dpow(10, places);
   const r = Math.round(v * k) / k;
   return r === 0 ? 0 : r; // no -0
 };

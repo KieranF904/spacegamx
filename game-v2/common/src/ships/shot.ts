@@ -9,6 +9,7 @@ import type { ShipState } from './state.js';
 import type { ShipTuning } from './tuning.js';
 import { localToWorldDir } from './flight.js';
 import { shotSeed } from './rng.js';
+import { datan2, dcos, dpow, dsin } from '../math/detTrig.js';
 
 export interface ProjectileSpec {
   /** 'base' = the engine's standard blaster shot */
@@ -43,12 +44,12 @@ export function buildShot(weapon: WeaponInfo, ship: ShipState, pose: ShipPose, t
     // Turrets fire along their current aim, from the end of the barrel
     const w = weapon.window;
     const a = w.center + ship.aim[weapon.part];
-    dir = [Math.cos(a), Math.sin(a)];
+    dir = [dcos(a), dsin(a)];
     muzzle = [w.pivot[0] + dir[0] * w.barrel, w.pivot[1] + dir[1] * w.barrel];
   } else if (ship.aim[weapon.part]) {
     // Fixed guns fire along their facing, turned by their small gimbal
-    const a = Math.atan2(dir[1], dir[0]) + ship.aim[weapon.part];
-    dir = [Math.cos(a), Math.sin(a)];
+    const a = datan2(dir[1], dir[0]) + ship.aim[weapon.part];
+    dir = [dcos(a), dsin(a)];
   }
   const [x, y] = shipPointToWorld(ship, pose, muzzle, tuning.cellSize);
   const [dx, dy] = localToWorldDir(dir, pose.angle);
@@ -56,11 +57,11 @@ export function buildShot(weapon: WeaponInfo, ship: ShipState, pose: ShipPose, t
     kind: 'base',
     x,
     y,
-    angle: Math.atan2(dy, dx),
+    angle: datan2(dy, dx),
     // Grade and size: a bigger, better gun throws bigger, faster, harder shells
     damageScale: Math.max(weapon.satisfaction, tuning.flow.minWeaponSatisfaction) * (weapon.strength ?? 1),
     // (A legacy fixed gun's shells are slower and bigger: tuning.fixedGun. A model's are its own, its weaponMods)
-    speedScale: (weapon.mount === 'fixed' && !weapon.model ? tuning.fixedGun?.speedScale ?? 1 : 1) * Math.pow(weapon.size ?? 1, 0.12),
+    speedScale: (weapon.mount === 'fixed' && !weapon.model ? tuning.fixedGun?.speedScale ?? 1 : 1) * dpow(weapon.size ?? 1, 0.12),
     sizeScale: (weapon.mount === 'fixed' && !weapon.model ? tuning.fixedGun?.sizeScale ?? 1 : 1) * Math.sqrt(weapon.size ?? 1),
     mount: weapon.mount,
     seed: shotSeed(ship.id, weapon.uid, tick),

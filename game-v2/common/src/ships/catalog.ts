@@ -16,6 +16,7 @@ import {
 } from './geometry.js';
 import { registerFunctionDefs } from './blueprint.js';
 import { HAZARDS } from './hazards.js';
+import { dhypot } from '../math/detTrig.js';
 
 export const SIDES: Side[] = ['N', 'E', 'S', 'W'];
 export const SIDE_NORMAL: Record<Side, Vec2> = { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0] };
@@ -255,7 +256,7 @@ function validateBespoke(p: PieceDef): void {
   if (!p.id) fail('missing id');
   if (p.outline.length < 3) fail('needs at least 3 points');
   for (const s of p.outline) if (s.type !== 'line' || ![...s.a, ...s.b].every(Number.isFinite)) fail('points must be numbers');
-  if (p.mount && (![...p.mount.at, ...p.mount.dir].every(Number.isFinite) || Math.hypot(p.mount.dir[0], p.mount.dir[1]) < 1e-6)) fail('mount needs a point and a direction');
+  if (p.mount && (![...p.mount.at, ...p.mount.dir].every(Number.isFinite) || dhypot(p.mount.dir[0], p.mount.dir[1]) < 1e-6)) fail('mount needs a point and a direction');
 }
 
 /** The grid cells a bespoke piece's shape covers some of (it lists none) */
@@ -320,7 +321,7 @@ export function buildVariant(p: PieceDef, rot: Rot, flip: boolean, shrink: numbe
 
 function transformMount(m: PieceMount, rot: Rot, flip: boolean): PieceMount {
   // (Directions turn like points do, less the shift: the mirror is x → 1 - x)
-  const d = transformDir(m.dir, rot, flip), len = Math.hypot(d[0], d[1]) || 1;
+  const d = transformDir(m.dir, rot, flip), len = dhypot(d[0], d[1]) || 1;
   return { at: transformPoint(m.at, rot, flip), dir: [d[0] / len, d[1] / len], width: m.width ?? 1 };
 }
 

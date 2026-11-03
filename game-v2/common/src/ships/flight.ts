@@ -12,6 +12,10 @@ import { cargoThrust, cargoTurn } from './load.js';
 import type { FlightCtx } from './features/types.js';
 import type { FlightEntry } from './features/plan.js';
 import { getPlan } from './features/plan.js';
+import { dhypot, dlog2, dpow, dsincos } from '../math/detTrig.js';
+
+// (dsincos's result, reused: the flight step allocates nothing for its trig)
+const SC: [number, number] = [0, 0];
 
 export interface FlightBody {
   x: number; y: number;
@@ -93,9 +97,10 @@ export interface GravityWell {
 /** Add one tick of the well's pull to a body's velocity. */
 export function applyGravity(body: { x: number; y: number; vx: number; vy: number }, g: GravityWell | null | undefined): void {
   if (!g) return;
-  const r = Math.hypot(body.x, body.y);
+  const r = dhypot(body.x, body.y);
   if (r < 1e-6) return;
-  const a = g.strength / Math.max(r, g.minRadius) ** 2;
+  const m = Math.max(r, g.minRadius);
+  const a = g.strength / (m * m);
   body.vx -= (body.x / r) * a;
   body.vy -= (body.y / r) * a;
 }
@@ -232,12 +237,12 @@ export function jumpDriveStats(capacity: number, demand: number, grade: number, 
   const sweetCool = t.cooldownTicks / (1 + t.gradeCooldown * g);
   let range: number, cool: number;
   if (ratio >= 1) {
-    const doublings = Math.log2(ratio);
+    const doublings = dlog2(ratio);
     range = sweetRange * (1 + Math.min(t.overRangeMax, t.overRange * doublings));
     cool = Math.max(sweetCool * t.cooldownFloor, t.minCooldownTicks, sweetCool / (1 + t.overCooldown * doublings));
   } else {
-    range = sweetRange * Math.max(t.underRangeFloor, ratio ** t.underRange);
-    cool = sweetCool * Math.min(t.underCooldownCap, ratio > 0 ? ratio ** -t.underCooldown : Infinity);
+    range = sweetRange * Math.max(t.underRangeFloor, dpow(ratio, t.underRange));
+    cool = sweetCool * Math.min(t.underCooldownCap, ratio > 0 ? dpow(ratio, -t.underCooldown) : Infinity);
   }
   return { range: Math.round(range), cooldown: Math.round(cool), ratio: Math.round(ratio * 100) / 100 };
 }
@@ -250,7 +255,7 @@ export function jumpRange(d: { jumpRange?: number }, t: JumpTuning, boost = 1): 
 /** Is (x, y) inside a system's charging ring (stars and pulsars; black holes have none) */
 export function inSolarRing(x: number, y: number, body: { type?: string; radius?: number } | null | undefined, t: JumpTuning): boolean {
   if (!body || body.type === 'black_hole' || body.type === 'none' || !body.radius) return false;
-  return Math.hypot(x, y) < solarRingRadius(body.radius, t);
+  return dhypot(x, y) < solarRingRadius(body.radius, t);
 }
 
 /** How far out a star's charging ring reaches (from its centre) */
@@ -325,14 +330,14 @@ export function wrapAngle(a: number): number {
 
 /** Ship-local grid frame → world: forward (-y) maps to the ship's heading. */
 export function localToWorldDir(v: Vec2, angle: number): Vec2 {
-  const phi = angle + Math.PI / 2;
-  const c = Math.cos(phi), s = Math.sin(phi);
+  dsincos(angle + Math.PI / 2, SC);
+  const s = SC[0], c = SC[1];
   return [v[0] * c - v[1] * s, v[0] * s + v[1] * c];
 }
 
 export function worldToLocalDir(v: Vec2, angle: number): Vec2 {
-  const phi = angle + Math.PI / 2;
-  const c = Math.cos(phi), s = Math.sin(phi);
+  dsincos(angle + Math.PI / 2, SC);
+  const s = SC[0], c = SC[1];
   return [v[0] * c + v[1] * s, -v[0] * s + v[1] * c];
 }
 
@@ -349,13 +354,15 @@ export function accelAlong(d: ShipDerived, dir: Vec2, speed = 0, cargo = 0): num
   return m > 0 ? ((thrustAlong(d, dir, speed) * (d.drive ?? 1)) / m) * cargoThrust(d, cargo) : 0;
 }
 
-/** Steepness of an engine's fade towards its rated speed: near full until close to it, none past it */
+/** Steepness of an engine's fade towards its rated speed: near full until close to it, none past it (ratedFade multiplies it out) */
 export const RATED_FADE_EXP = 6;
 
 /** How much of its thrust an engine rated `rated` gives at `speed` (world units a tick) its way; no rating, it never fades */
 export function ratedFade(rated: number | undefined, speed: number): number {
   if (!rated || speed <= 0) return 1;
-  return Math.max(0, Math.min(1, 1 - Math.pow(speed / rated, RATED_FADE_EXP)));
+  // ((speed / rated)^RATED_FADE_EXP, by multiplication: the same bits everywhere, and cheap per thruster per tick)
+  const r = speed / rated, r2 = r * r;
+  return Math.max(0, Math.min(1, 1 - r2 * r2 * r2));
 }
 
 /** Turning acceleration caps (cw, ccw), on the same terms as accelAlong */
@@ -446,8 +453,9 @@ export function stepFlight(
   if (jp === 'burn') {
     const speed = jumpBurnSpeed(j - jt.chargeTicks, jt, body.jumpScale ?? 1);
     body.angVel = 0;
-    body.vx = Math.cos(body.angle) * speed;
-    body.vy = Math.sin(body.angle) * speed;
+    dsincos(body.angle, SC);
+    body.vx = SC[1] * speed;
+    body.vy = SC[0] * speed;
     body.x = Math.max(-k.worldSize, Math.min(k.worldSize, body.x + body.vx));
     body.y = Math.max(-k.worldSize, Math.min(k.worldSize, body.y + body.vy));
     return { charge: boost.charge, isBoosting: false, accel: 0, power: 1, ctlPower: 0 };
@@ -500,7 +508,7 @@ export function stepFlight(
   runHooks(H.thrustGate, c);
   // Spooling the drive takes the engines: the ship can still aim, but brakes instead of thrusting
   if (charging) ix = iy = 0;
-  const mag = Math.hypot(ix, iy);
+  const mag = dhypot(ix, iy);
   let accel = 0;
   let charge = boost.charge;
   let isBoosting = false;
@@ -549,7 +557,7 @@ export function stepFlight(
   applyGravity(body, k.gravity);
   // A gravity hazard: a light ship is drawn towards the well
   if (k.hazard?.driftAccel) {
-    const r = Math.hypot(body.x, body.y);
+    const r = dhypot(body.x, body.y);
     if (r > 1) { body.vx -= (body.x / r) * k.hazard.driftAccel; body.vy -= (body.y / r) * k.hazard.driftAccel; }
   }
 

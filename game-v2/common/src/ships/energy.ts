@@ -34,6 +34,7 @@ import { getPlan } from './features/plan.js';
 import {
   type PortsControls, type PortsState, createPortsState, fullPorts, isPortsRow, packPorts, portsGaugePct, portsSlotEnd, portsThrustFrac, portsThrustMul, portsTick, remapPorts, unpackPortsInto,
 } from './power/ports.js';
+import { dhypot } from '../math/detTrig.js';
 
 export interface EnergyInfo {
   /** What the pool holds full (the core's store and the batteries'), and what the Drive Cell and Capacitor banks hold */
@@ -484,7 +485,7 @@ function portsPowerTick(d: ShipDerived, c: Charge, use: PowerUse): PowerResult {
   // (The engines' share all together; whether a boost is possible is each engine's own, folded into thrustShare)
   const frac = portsThrustFrac();
   let want = 0, got = 0;
-  if (use.thrusting) for (const t of d.thrusters) { if (!sActive[t.part]) continue; const v = Math.hypot(t.force[0], t.force[1]); want += v; got += v * frac[t.part]; }
+  if (use.thrusting) for (const t of d.thrusters) { if (!sActive[t.part]) continue; const v = dhypot(t.force[0], t.force[1]); want += v; got += v * frac[t.part]; }
   return { charge: c, power: want > 1e-15 ? Math.min(1, got / want) : 1, boost: use.boosting && use.thrusting };
 }
 /** A client's charge for a ports ship: its state made (once a layout) and the row it was sent read into it */

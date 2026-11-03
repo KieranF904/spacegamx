@@ -27,6 +27,7 @@
 import type { ShipDerived } from '../../rebuild.js';
 import type { Vec2 } from '../../types.js';
 import { FULL_CHARGE, PILOT_ROW, bankHeld, chargeGroupsEnd, poolHeld, type Charge } from '../../energy.js';
+import { datan2, dcos, dhypot, dsin } from '../../../math/detTrig.js';
 
 /** One strafer's push (ship-local force vector, x right, y back; as an engine's thrust: world units of acceleration × mass) */
 export interface StraferPart {
@@ -57,7 +58,7 @@ const EPS = 1e-6;
 const DIR_VEC: Vec2[] = Array.from({ length: DODGE_DIRS + 1 }, (_, i) => {
   if (!i) return [0, 0];
   const a = ((i - 1) * 2 * Math.PI) / DODGE_DIRS;
-  return [Math.round(Math.cos(a) * 1e6) / 1e6 || 0, Math.round(Math.sin(a) * 1e6) / 1e6 || 0];
+  return [Math.round(dcos(a) * 1e6) / 1e6 || 0, Math.round(dsin(a) * 1e6) / 1e6 || 0];
 });
 
 export const DODGE_RIGHT = 1;
@@ -74,7 +75,7 @@ export function dodgeVec(dir: number): Vec2 {
 export function dodgeDirOf(v: Vec2 | null | undefined): number {
   if (!v || (Math.abs(v[0]) < EPS && Math.abs(v[1]) < EPS)) return 0;
   const step = (2 * Math.PI) / DODGE_DIRS;
-  return ((Math.round(Math.atan2(v[1], v[0]) / step) % DODGE_DIRS) + DODGE_DIRS) % DODGE_DIRS + 1;
+  return ((Math.round(datan2(v[1], v[0]) / step) % DODGE_DIRS) + DODGE_DIRS) % DODGE_DIRS + 1;
 }
 
 /** The way opposite */
@@ -84,7 +85,7 @@ export function oppositeDir(dir: number): number {
 
 /** How much of a strafer's push goes along a way (0..1) */
 function shareAlong(p: StraferPart, u: Vec2): number {
-  const f = Math.hypot(p.push[0], p.push[1]);
+  const f = dhypot(p.push[0], p.push[1]);
   return f > EPS ? Math.max(0, (p.push[0] * u[0] + p.push[1] * u[1]) / f) : 0;
 }
 
