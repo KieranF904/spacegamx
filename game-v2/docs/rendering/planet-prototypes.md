@@ -159,12 +159,27 @@ same `shaderQuad` as today (the same quad, the same premultiplied output, `GLSL_
   - glowing rivers in a coarse crack network round dark crust plates, with fine cracks between;
   - a slow pulse;
   - the glow strongest on the night side, lighting the planet's own haze.
-- **Ocean.**
-  - continents and coastal shallows;
-  - land coloured by latitude;
-  - ice caps;
-  - sun glint on open water;
-  - cloud systems that drift on their own and cast shadows beside them.
+- **Ocean** (reworked 2026-11-03; panel `docs/panels/2026-11-03/graphics/terra-nova*.png`).
+  - **The sea:** deep ocean, lighter shelves and turquoise shallows, all from the continents' own height read. That read
+    is taken once a pixel (`gSeaH`): the relief's step and the colour reuse it.
+  - **The land:** coloured by climate. It is wet at the equator and on the coasts, with a dry subtropical belt, and
+    shades from rainforest through temperate and boreal forest to tundra.
+  - **Mountains:** ranges with snowy peaks. Only they have relief; the coast is sea level, so it no longer catches light
+    as a glowing ridge on the night side.
+  - **Ice:** smaller polar caps, with sea ice.
+  - **Sun glint:** on open water, broken a little by the waves.
+  - **Clouds:**
+    - cover banded by the climate (an equatorial band, clear subtropics, storm tracks);
+    - wound round cyclones (`seaCyclones`): the nearest only is worked out, two-armed spirals with a clear eye,
+      drifting east;
+    - torn into wisps by a finer read (not on Low);
+    - shaded on their flanks away from the star, and casting shadows on the surface.
+  - **Town lights:** on the night side, along the wet coasts and plains, dimmed under cloud. A settled world's `look`
+    turns them on with `emitColor` (Terra Nova's in systems.json); there are none by default.
+  - **On Low:** no cyclones, mountains or beaches (Low has no relief to show them) and no fine cloud read.
+  - **The surface view** (`surface/surfaceLooks.ts`, `terra_nova_surface`) shares the palette: navy deep water, teal
+    shallows, sand, greens, grey rock, snow. Its map is its own (seed 11), so continents seen from orbit aren't the
+    ones you land on.
 - **Toxic.** A thick swirling deck under deep haze.
 
 ### Rings

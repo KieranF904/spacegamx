@@ -15,8 +15,10 @@
  *   speed, two-phase flow so it never smears), turbulence torn hardest on the shear lines, a great storm the bands
  *   bend round and the cloud spirals into, a string of small white ovals, mottled polar hoods.
  * - Solid worlds: relief lit from the star (the height is read again a step toward the light: craters, canyons and
- *   ridges cast light and shade), Worley craters, crack networks, dunes, canyons, polar caps; oceans with sun glint,
- *   coastal shallows, clouds with their shadows; lava that glows through its cracks and lights its own haze.
+ *   ridges cast light and shade), Worley craters, crack networks, dunes, canyons, polar caps; oceans with deep sea,
+ *   shelves and shallows, land by climate with mountain ranges, sun glint, clouds banded by the climate and wound round
+ *   cyclones (with their shadows), and a settled world's town lights at night; lava that glows through its cracks and
+ *   lights its own haze.
  * - Rings: a radial profile from the noise (mipmapped, so no moiré far out), transparency from optical depth, a
  *   soft-edged planet shadow with a penumbra, and faint clumping along the orbit.
  * - Every look is data (`PlanetLook`): defaults per kind from the planet's hue, overrides per planet in systems.json
@@ -290,6 +292,65 @@ export const PLANET_PROTO_FRAG = /* glsl */ `
   /** The two reads a solid world's ground is built from (a: broad, d: finer, warped by a), in tiles */
   vec3 qA(vec3 b) { return b * uDetail.x * 0.5 + vec3(uSeed * 0.011, 0.31); }
   vec3 qD(vec3 b, vec4 a) { return b * uDetail.x * 1.3 + vec3(0.7, uSeed * 0.017) + (a.rgr - 0.5) * 0.35; }
+  // (ocean worlds)
+  /**
+   * The ocean world's sea-floor height (0..1, land above 0.555): the continents' own broad read, edged by a and, for a
+   * finer coast, d. Read once a pixel: heightOf's first call keeps it in gSeaH, the relief's step and solidSurface reuse it.
+   */
+  float gSeaH = -1.0;
+  /** How lit the cloud tops are (1: fully; an ocean world's clouds are shaded on their flanks away from the star) */
+  float gCloudLit = 1.0;
+  float seaH(vec3 b, vec4 a, vec4 d) {
+    float s = uDetail.x;
+    return tn(b * s * 0.22 + vec3(0.13, uSeed * 0.01), s * 0.22).r * 0.8 + a.r * 0.2 + 0.04 + (d.r - 0.5) * 0.05;
+  }
+  /** Mountain ranges (0..1): ridged along the d read's field, in some parts of the land (a.g), inland */
+  float seaMountains(vec4 a, vec4 d, float h) {
+    return smoothstep(0.6, 0.88, d.r) * smoothstep(0.45, 0.72, a.g) * smoothstep(0.57, 0.66, h);
+  }
+  /**
+   * The cloud layer turned about its weather systems: cyclones in the storm tracks, each hemisphere's turning its own
+   * way, a tight twist at the middle easing out (so the cloud read there winds into a spiral), drifting east. n: how
+   * many (lite: fewer). boost: the cover they add (a clear eye at the middle).
+   */
+  vec3 seaCyclones(vec3 cb, out float boost) {
+    boost = 0.0;
+    // (they drift east together; their places are fixed in that frame, from the seed. They never overlap, so only the
+    // nearest is worked out)
+    cb = spinY(cb, -uTime * 0.0012);
+#ifdef PLANET_LITE
+    const int N = 2;
+#else
+    const int N = 4;
+#endif
+    float best = 1e3, hem = 1.0, size = 1.0;
+    vec3 c = vec3(0.0, 1.0, 0.0);
+    vec2 dir = vec2(1.0, 0.0);
+    for (int k = 0; k < N; k++) {
+      float fk = float(k);
+      float hk = fk - 2.0 * floor(fk * 0.5) < 0.5 ? 1.0 : -1.0;
+      float cy = hk * (0.5 + 0.3 * fract(fk * 0.618034 + uSeed.x * 0.0311));
+      vec2 dk = normalize(vec2(fract(fk * 0.381966 + uSeed.y * 0.0173), fract(fk * 0.7071 + uSeed.x * 0.0129)) - 0.5 + 1e-3);
+      vec3 ck = vec3(dk * sqrt(1.0 - cy * cy), cy).xzy;
+      float sk = 0.26 + 0.1 * fract(fk * 0.7548 + uSeed.y * 0.011);
+      float rk = length(cb - ck) / sk;
+      if (rk < best) { best = rk; c = ck; hem = hk; size = sk; dir = dk; }
+    }
+    float rr = best;
+    if (rr < 2.0) {
+      // (its arms: a two-armed log spiral in its own tangent frame, wound the hemisphere's way)
+      vec3 v = cb - c;
+      vec3 e1 = vec3(-dir.y, 0.0, dir.x), e2 = cross(c, e1);
+      float arm = 0.5 + 0.5 * sin(2.0 * atan(dot(v, e2), dot(v, e1)) + hem * 4.5 * log(rr + 0.08));
+      float r2 = rr * rr, fall = exp(-r2 * 0.9);
+      boost = (arm - 0.4) * fall * 0.45 + fall * 0.05 - exp(-r2 * 40.0) * 0.4;
+      float th = hem * 1.8 * exp(-r2 * 1.6);
+      float ct = cos(th), st = sin(th);
+      cb = cb * ct + cross(c, cb) * st + c * dot(c, cb) * (1.0 - ct);
+    }
+    return cb;
+  }
+
   /** Whether a kind's look uses the crack channel of the a read (ice), and of the d read (desert, ice, lava) */
   bool cracksA() { return uKind > 1.5 && uKind < 2.5; }
   bool cracksD() { return uKind > 0.5 && uKind < 4.5 && !(uKind > 2.5 && uKind < 3.5); }
@@ -316,8 +377,9 @@ export const PLANET_PROTO_FRAG = /* glsl */ `
       // lava: crust plates between glowing cracks
       return a.r * 0.5 + smoothstep(0.0, 0.2, cd.x) * 0.3;
     }
-    // ocean: land above the sea
-    return smoothstep(0.555, 0.68, tn(b * s * 0.22 + vec3(0.13, uSeed * 0.01), s * 0.22).r * 0.8 + a.r * 0.2 + 0.04);
+    // ocean: the sea is level (the coast casts no shade), only the mountain ranges have relief
+    if (gSeaH < 0.0) gSeaH = seaH(b, a, d);
+    return (seaMountains(a, d, gSeaH) * 0.28 + d.g * 0.04) * smoothstep(0.56, 0.6, gSeaH);
   }
 
   vec3 solidSurface(vec3 b, vec3 lb, float lat, float px, vec4 a, vec4 d, vec3 ca, vec3 cd, out float emit, out float spec, out float cloud, out float cloudShade) {
@@ -367,26 +429,85 @@ export const PLANET_PROTO_FRAG = /* glsl */ `
       vec3 crust = uPal1 * (0.6 + 0.8 * a.g);
       return mix(crust, uPal0, emit);
     }
-    // ocean: seas deepening offshore, coasts, land by latitude, ice caps, clouds with shadows, glint
-    float h = tn(b * uDetail.x * 0.22 + vec3(0.13, uSeed * 0.01), uDetail.x * 0.22).r * 0.8 + a.r * 0.2 + 0.04;
-    float land = smoothstep(0.555, 0.57, h);
-    vec3 sea = mix(uPal1, uPal0, smoothstep(0.5, 0.555, h) * 0.8) * (0.9 + 0.2 * a.g);
-    vec3 green = mix(vec3(0.16, 0.3, 0.13), vec3(0.42, 0.36, 0.22), smoothstep(0.2, 0.55, abs(lat)) * 0.6 + d.g * 0.4);
-    vec3 ground = mix(green, vec3(0.52, 0.44, 0.3), smoothstep(0.62, 0.75, d.r));
+    // ocean: deep sea, shelves and turquoise shallows; land by climate (rainforest, temperate, arid belts, boreal,
+    // tundra), mountain ranges with snow on the peaks; ice caps and sea ice; weather; a settled world's lights at night
+    float h = gSeaH;
+    float land = smoothstep(0.555, 0.565, h);
+    float depth = smoothstep(0.555, 0.3, h);
+    vec3 sea = mix(uPal0, uPal1, smoothstep(0.0, 0.3, depth));
+    sea = mix(sea, uPal1 * 0.6, smoothstep(0.45, 1.0, depth));
+    sea = mix(sea, uPal0 * 1.15 + vec3(0.0, 0.05, 0.04), smoothstep(0.53, 0.554, h) * 0.5);
+    sea *= 0.93 + 0.14 * a.g;
+    // (the climate: wet at the equator and on the coasts, a dry belt in the subtropics; latitude ragged by the ground)
+    float al = abs(lat) + (d.g - 0.5) * 0.14;
+    float coast = smoothstep(0.66, 0.56, h);
+    float wet = clamp(a.g * 1.1 + coast * 0.3 + 0.3 * exp(-al * al * 25.0) - 0.4 * exp(-(al - 0.44) * (al - 0.44) * 59.0), 0.0, 1.0);
+    vec3 veg = mix(vec3(0.19, 0.3, 0.12), vec3(0.08, 0.2, 0.07), smoothstep(0.42, 0.16, al));
+    veg = mix(veg, vec3(0.12, 0.19, 0.12), smoothstep(0.78, 0.98, al));
+    vec3 ground = mix(vec3(0.56, 0.45, 0.29), veg, smoothstep(0.22, 0.5, wet));
+    ground = mix(ground, vec3(0.4, 0.38, 0.33), smoothstep(1.0, 1.12, al));
+    ground *= 0.84 + 0.32 * d.g;
+    // (mountains, their snow and the beaches: not on lite, which has no relief to show them)
+    float mtn = 0.0;
+#ifndef PLANET_LITE
+    mtn = seaMountains(a, d, h);
+    ground = mix(ground, vec3(0.4, 0.37, 0.32), smoothstep(0.12, 0.45, mtn) * 0.85);
+    ground = mix(ground, vec3(0.86, 0.88, 0.9), smoothstep(0.75, 1.0, mtn + al * 0.15) * 0.85);
+    ground = mix(vec3(0.7, 0.64, 0.48), ground, smoothstep(0.556, 0.57, h));
+#endif
     vec3 c = mix(sea, ground, land);
-    float ice = smoothstep(0.8, 0.86, abs(b.y) + (a.g - 0.5) * 0.12);
-    c = mix(c, vec3(0.9, 0.93, 0.96), ice);
-    spec = (1.0 - land) * (1.0 - ice);
-    // clouds: their own drift, swirled; read again a step toward the star for their shadow
+    float ice = smoothstep(0.9, 0.93, abs(b.y) + (a.g - 0.5) * 0.12 + (d.r - 0.5) * 0.05);
+    c = mix(c, mix(vec3(0.82, 0.88, 0.94), vec3(0.94, 0.96, 0.98), land), ice);
+    // (the water's glint, broken a little by the waves)
+    spec = (1.0 - land) * (1.0 - ice) * (0.75 + 0.5 * d.g);
+
+    // The lights of the towns on the night side (the look's emitColor: a settled world's; none by default): along the
+    // wet coasts and plains, clustered (the cells' points); dimmed under cloud below
+    float night = smoothstep(0.06, -0.14, dot(b, lb)) * land * (1.0 - ice);
+    if (uEmitColor.r + uEmitColor.g > 0.0 && night > 0.01) {
+      float pop = smoothstep(0.45, 0.8, wet * 0.45 + coast * 0.45 + a.r * 0.3) * smoothstep(1.05, 0.8, al) * (1.0 - smoothstep(0.1, 0.4, mtn));
+      float towns = smoothstep(0.36, 0.17, d.b) * (0.35 + 0.65 * d.g);
+#ifndef PLANET_LITE
+      if (fineW > 0.0) {
+        vec4 f = tn(b * uDetail.x * 6.0 + vec3(2.3, 0.7, 1.1), uDetail.x * 6.0);
+        towns = max(towns, smoothstep(0.34, 0.18, f.b) * smoothstep(0.35, 0.65, f.r) * fineW * 0.7);
+      }
+#endif
+      emit = night * pop * (towns * 1.1 + 0.03);
+    }
+
+    // clouds: their own drift, wound round the weather systems, banded by the climate; read again a step toward the star
+    // for their shadow
     float cs = uSpin * 0.6 * uTime;
-    vec3 cb = spinY(b, cs);
-    // (swirled by the low field, stretched along the latitudes, banded a little by the circulation cells)
-    vec3 cq = cb * vec3(0.9, 1.9, 0.9) + vec3(a.r - 0.5, 0.0, a.g - 0.5) * 0.12 + vec3(0.0, 0.0, 0.43);
-    vec4 cl = tn(cq, 1.9);
-    float cv = cl.g * 0.8 + cl.r * 0.2 + (1.0 - abs(sin(b.y * 5.0))) * 0.06;
-    cloud = smoothstep(0.52, 0.78, cv) * (0.7 + 0.3 * d.g) * uDetail.z;
-    vec4 cs2 = tn(cq + lb * vec3(0.015, 0.03, 0.015), 1.9);
-    cloudShade = smoothstep(0.52, 0.78, cs2.g * 0.8 + cs2.r * 0.2) * uDetail.z;
+    float boost;
+#ifdef PLANET_LITE
+    vec3 cb = spinY(b, cs); boost = 0.0;
+#else
+    vec3 cb = seaCyclones(spinY(b, cs), boost);
+#endif
+    // (stretched along the latitudes, warped by the low field)
+    vec3 cq = cb * vec3(0.6, 1.3, 0.6) + vec3(a.r - 0.5, 0.0, a.g - 0.5) * 0.12 + vec3(0.0, 0.0, 0.43);
+    vec4 cl = tn(cq, 1.3);
+    float clat = abs(cb.y);
+    float climate = 0.09 * exp(-clat * clat * 120.0) - 0.1 * exp(-(clat - 0.4) * (clat - 0.4) * 59.0) + 0.07 * exp(-(clat - 0.8) * (clat - 0.8) * 51.0) + boost;
+    float cv = cl.g * 0.8 + cl.r * 0.2 + climate;
+    // (close: the edges torn into wisps by a finer read)
+    float fineC = 0.0;
+#ifndef PLANET_LITE
+    if (fineW > 0.0) fineC = (tn(cq * 4.3 + vec3(0.31, 0.0, 0.17), 1.3 * 4.3).g - 0.5) * 0.34 * fineW;
+#endif
+    // (crisper edges where the finer read shows)
+    float cw = 0.1 - 0.04 * fineW;
+    // (thin at the edges, thick and opaque in the middle)
+    float cd2 = cv + fineC;
+    cloud = smoothstep(0.61 - cw, 0.61 + cw, cd2) * (0.6 + 0.4 * smoothstep(0.66, 0.85, cd2)) * uDetail.z;
+    vec4 cs2 = tn(cq + lb * vec3(0.012, 0.024, 0.012), 1.3);
+    float cvL = cs2.g * 0.8 + cs2.r * 0.2 + climate;
+    cloudShade = smoothstep(0.51, 0.71, cvL) * uDetail.z;
+    // (their flanks away from the star: thicker toward it, so shaded)
+    gCloudLit = 1.0 - 0.45 * clamp((cvL - cv) * 9.0, 0.0, 1.0);
+    emit *= 1.0 - cloud * 0.85;
+
     return c;
   }
 
@@ -520,7 +641,7 @@ export const PLANET_PROTO_FRAG = /* glsl */ `
         c = base * (lit * sunTint + 0.035);
         // clouds over the surface, their shadow just beside
         c *= 1.0 - cloudShade * 0.45 * step(0.0, d0);
-        c = mix(c, vec3(0.96) * (lit * sunTint + 0.03), cloud * 0.9);
+        c = mix(c, vec3(0.96) * gCloudLit * (lit * sunTint + 0.03), cloud * 0.9);
         // sun glint on open water
         vec3 hv = normalize(l3 + vec3(0.0, 0.0, 1.0));
         c += vec3(1.0, 0.95, 0.85) * (pow(max(dot(n, hv), 0.0), 60.0) * 0.8 + pow(max(dot(n, hv), 0.0), 8.0) * 0.06) * spec * (1.0 - cloud) * uLightAmt;
@@ -580,6 +701,7 @@ export interface PlanetLook {
   stormColor: number[];
   /** White ovals: latitude, count, size */
   storm2: [number, number, number];
+  /** Lava's glow; an ocean world's town lights on the night side (a settled world's: none by default) */
   emitColor: number[];
   spin: number;
   /** Rings: inner, outer (radii), opacity; inner and outer colours */
@@ -673,7 +795,7 @@ export function kindLook(kind: PlanetKind | 'dwarf', hue: number, seed: number):
         ...base,
         pal: [hsl(hue - 15, 0.6, 0.4), hsl(hue, 0.75, 0.17), hsl(hue, 0.5, 0.3)],
         atmoColor: hsl(205, 0.75, 0.65), sunsetColor: hsl(22, 0.9, 0.55),
-        atmo: [0.55, 0.014, 0.14], atmo2: [0.6, 1.0, 0.6], limb: [0, 0.5, 0], detail: [2.4, 1, 0.8], edge: [0.002, 0, 0.2], edge2: [0, 0.01, 0.15],
+        atmo: [0.72, 0.016, 0.16], atmo2: [0.7, 1.05, 0.6], limb: [0, 0.6, 0], detail: [2.4, 1, 0.8], edge: [0.002, 0, 0.2], edge2: [0, 0.01, 0.15],
       };
   }
   return base;

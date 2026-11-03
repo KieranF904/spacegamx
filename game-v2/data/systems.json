@@ -119,6 +119,7 @@
           "kind": "ocean",
           "radius": 1900,
           "surface": "terra_nova_surface",
+          "look": { "emitColor": [1.0, 0.68, 0.32] },
           "orbit": {
             "radius": 50000,
             "phase": 0.9,
