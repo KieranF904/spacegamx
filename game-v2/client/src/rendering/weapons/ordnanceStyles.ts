@@ -12,6 +12,8 @@
  *   Leviathan    huge dark hull with a red pulsing beacon, and a warning for a pilot it is heading at
  *
  * (The landing rings come from the shell's endTick: WeaponFx.drawLandings. They are the same for every mortar model.)
+ * (Where a shell strikes, its own mark is its kind's small BURST_MARK, in its `impact.color`: the blast is the detonation's,
+ * DamageFx. The heavy launchers' muzzle sizes are set against muzzleScale, which grows slower past a shot scale of 3.)
  */
 
 import type { WeaponStyle } from './weaponStyles';
@@ -47,8 +49,8 @@ export const ORDNANCE_STYLES: Record<string, Partial<WeaponStyle>> = {
     nose: { color: 0xff2a22, size: 7, period: 32, blink: true },
     guide: true,
     trail: { color: 0xf2f2ee, size: 10, life: 74 },
-    muzzle: { life: 10, size: 30, sparks: 6, color: 0xffc080, smoke: 9, girth: 1.4 },
-    impact: { sparks: 24, speed: 4.4, life: 22, color: 0xffb070, flash: 58, ring: 0xff8a3a },
+    muzzle: { life: 10, size: 20, sparks: 6, color: 0xffc080, smoke: 9, girth: 1.4 },
+    impact: { sparks: 16, speed: 4.4, life: 22, color: 0xffb070, flash: 58, ring: 0xff8a3a },
   },
   torpedo_eel: {
     coreColor: 0xfff0cc, glowColor: 0xffb040, glowAlpha: 0.5,
@@ -61,7 +63,7 @@ export const ORDNANCE_STYLES: Record<string, Partial<WeaponStyle>> = {
     nose: { color: 0xff1a1a, size: 11, period: 40 },
     incoming: { radius: 340 },
     trail: { color: 0x3a2f28, size: 15, life: 80 },
-    muzzle: { life: 14, size: 42, sparks: 10, color: 0xff9a5a, smoke: 12, girth: 1.9 },
-    impact: { sparks: 44, speed: 5.5, life: 32, color: 0xff9a4a, flash: 100, ring: 0xff4a1a },
+    muzzle: { life: 14, size: 26, sparks: 10, color: 0xff9a5a, smoke: 12, girth: 1.5 },
+    impact: { sparks: 24, speed: 5.5, life: 32, color: 0xff9a4a, flash: 100, ring: 0xff4a1a },
   },
 };

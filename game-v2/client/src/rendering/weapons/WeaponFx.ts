@@ -30,7 +30,7 @@ import { disc, softDot, streak, streakScale, petal, petalScale, ring, puff, glow
 import { ParticlePool } from '../particlePool';
 import { EntityType, WeaponType } from '@space-game/common';
 import type { GameState, InterpolatedEntity } from '../../state/GameState';
-import { WeaponStyle, weaponStyle, shotScale, type ImpactLayers } from './weaponStyles';
+import { WeaponStyle, weaponStyle, shotScale, muzzleScale, type ImpactLayers } from './weaponStyles';
 import type { Lighting } from '../lighting/Lighting';
 import { arcFraction, incomingTicks, landingPoint, sonarPeriod } from './ordnanceTells';
 import { BURST, burstLife, burstSpeed, hitAge, offSurface, throwAngle, type SurfaceNormal } from './impactAim';
@@ -978,7 +978,8 @@ export class WeaponFx {
     const tip = this.barrelTip?.(shot.owner, shot.spawnX, shot.spawnY, angle);
     if (tip) { shot.vox = tip.x - shot.spawnX; shot.voy = tip.y - shot.spawnY; }
     const x = tip?.x ?? shot.spawnX, y = tip?.y ?? shot.spawnY;
-    const size = m.size * shot.size * shot.power;
+    // (in step with the shot through the usual range, never a speck, and growing slower past a heavy launch: muzzleScale)
+    const size = m.size * muzzleScale(shot.size * shot.power);
     if (shot.style.heat) shot.hot = Math.max(0, Math.min(1, this.spinAt?.(shot.owner, shot.spawnX, shot.spawnY) ?? 0));
     // The barrel in the ship's frame: from the ship's pose on the fire tick (exact), else as it's drawn now (it's drawn at that tick)
     const ref = shot.pose ?? (owner ? { x: owner.renderX, y: owner.renderY, angle: owner.renderAngle } : undefined);

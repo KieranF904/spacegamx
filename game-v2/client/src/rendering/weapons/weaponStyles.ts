@@ -215,6 +215,19 @@ export function shotScale(damage: number | undefined): number {
   return Math.max(0.75, Math.min(1.7, Math.pow(damage / REF_DAMAGE, 0.3)));
 }
 
+/** A shot's scale (shell size × shotScale) where the muzzle flash stops growing in step with it */
+const FLASH_KNEE = 3;
+
+/**
+ * How big a muzzle flash is against its style's size, from the shot's scale (shell size × shotScale): in step with it
+ * through the usual range, at least 0.8 (a stream's flash still reads beside its tracer), and growing at 0.4 of the rate
+ * past 3 (a heavy torpedo or missile launch is big, not a screen of light)
+ */
+export function muzzleScale(s: number): number {
+  const v = Math.max(0.8, s);
+  return v <= FLASH_KNEE ? v : FLASH_KNEE + (v - FLASH_KNEE) * 0.4;
+}
+
 const styled = new Map<string, WeaponStyle>();
 
 /**
@@ -275,7 +288,7 @@ export function clearStyleCache(): void {
  * shock ring. `k` scales it, size and length both (a rail's bigger and longer than an autocannon's: from 1.2 a few
  * embers, from 1.5 a few fragments too); `color` is the spray's and streak's.
  */
-function DIRECTED_HIT(color: number, k: number, cone = 28): ImpactLayers {
+export function DIRECTED_HIT(color: number, k: number, cone = 28): ImpactLayers {
   return {
     core: { size: 3 * k, life: 2 + Math.round(k) }, bloom: { size: 6 * k, life: 4 + Math.round(k * 2), color },
     spray: { count: Math.round(8 * k), speed: 7.5 * Math.sqrt(k), cone, life: Math.round(10 + 3 * k), color },
@@ -284,6 +297,20 @@ function DIRECTED_HIT(color: number, k: number, cone = 28): ImpactLayers {
     // (the bigger ones a few embers, the biggest a few chips trailing off too)
     ...(k >= 1.2 ? { embers: { count: Math.round(2 * k), speed: 3.6, life: Math.round(14 * k), hot: color, cool: 0x3a2010 } } : {}),
     ...(k >= 1.5 ? { debris: { count: Math.round(2 * k), speed: 10, size: 2, life: Math.round(14 * k), hot: color, cool: 0x3a2010, drag: 0.92 } } : {}),
+  };
+}
+
+/**
+ * A warhead's own mark where its shell strikes (missiles, torpedoes, mortars, flak, EMP, the Hive's seekers, charges): a
+ * white pinpoint, a brief glow in the shot's impact colour, a few embers. Small, because the blast is the detonation's
+ * (DamageFx.onDetonation, sized by its blast radius); before, these drew the old flat flash at the shot's full scale, so
+ * a Leviathan's shell mark (476) reached three times past its own blast (160). Thrown back up the shell's line, centred.
+ */
+function BURST_MARK(ember: number, k = 1): ImpactLayers {
+  return {
+    core: { size: 4 * k, life: 3 }, bloom: { size: 10 * k, life: 8 },
+    embers: { count: Math.round(3 * k), speed: 3, life: Math.round(20 * k), hot: ember, cool: 0x3a1a0a },
+    light: { radius: 60 * k, power: 0.8 },
   };
 }
 
@@ -309,7 +336,7 @@ const KINETIC: WeaponStyle = {
  */
 export const WEAPON_STYLES: Record<number, WeaponStyle> = {
   // (Slugs ricochet off what they strike, hitThrow 'reflect'; bolts of light splash straight back out, 'normal'; the rest
-  // (explosives, flak, seekers, orbs) throw back up their line as before)
+  // (explosives, flak, seekers, orbs) throw back up their line as before, their shell's own mark small: BURST_MARK)
   // (and their hits lead with that throw: a streak along it, a spray round it, the centred flash small; ImpactLayers)
   [WeaponType.Cannon]: { ...KINETIC, hitThrow: 'reflect', hit: DIRECTED_HIT(0xffc070, 1) },
   // Railgun: a hypersonic slug, a long thin blue-white streak and a hard flash
@@ -321,32 +348,32 @@ export const WEAPON_STYLES: Record<number, WeaponStyle> = {
   // Flak: a stubby glowing shell (the burst is the show)
   [WeaponType.Flak]: {
     ...KINETIC, tracerTicks: 1.2, coreWidth: 3, glowWidth: 8, coreColor: 0xffe0b0, glowColor: 0xff8a3c, glowAlpha: 0.38,
-    headRadius: 3.5, haloRadius: 10, muzzle: { life: 6, size: 20, sparks: 5, color: 0xffb070, smoke: 4 },
+    headRadius: 3.5, haloRadius: 10, muzzle: { life: 6, size: 20, sparks: 5, color: 0xffb070, smoke: 4 }, hit: BURST_MARK(0xffb070, 0.8),
   },
   // Missile: a body with an engine flare and a smoke trail, steered by the server
   [WeaponType.Missile]: {
     ...KINETIC, motion: 'tracked', tracerTicks: 0.8, coreWidth: 4, glowWidth: 10, coreColor: 0xdfe6ee, glowColor: 0xff9a3c, glowAlpha: 0.5,
     headRadius: 3, haloRadius: 12, muzzle: { life: 8, size: 22, sparks: 4, color: 0xffc080, smoke: 6 },
-    trail: { color: 0x8c8780, size: 7, life: 50 },
+    trail: { color: 0x8c8780, size: 7, life: 50 }, hit: BURST_MARK(0xffc070),
   },
   // EMP: a crackling blue orb
   [WeaponType.Emp]: {
     ...KINETIC, tracerTicks: 1.5, coreWidth: 0, glowWidth: 14, coreColor: 0xe8f7ff, glowColor: 0x4fc3f7, glowAlpha: 0.3, ownerTint: 0,
     headRadius: 6, haloRadius: 22, muzzle: { life: 8, size: 24, sparks: 6, color: 0x9fe0ff, smoke: 0 },
-    impact: { sparks: 14, speed: 4, life: 16, color: 0x9fe0ff, flash: 30 }, orb: true,
+    impact: { sparks: 14, speed: 4, life: 16, color: 0x9fe0ff, flash: 30 }, orb: true, hit: BURST_MARK(0xd8f4ff),
   },
   // ---- Legendary ----
   // Rustjaw's Hive: little seekers with short smoky trails
   [WeaponType.Hive]: {
     ...KINETIC, motion: 'tracked', tracerTicks: 0.6, coreWidth: 3, glowWidth: 8, coreColor: 0xfff1d6, glowColor: 0xff9a3c, glowAlpha: 0.5,
     headRadius: 2.5, haloRadius: 9, muzzle: { life: 6, size: 16, sparks: 3, color: 0xffc080, smoke: 3 },
-    trail: { color: 0x7d7770, size: 4, life: 28 },
+    trail: { color: 0x7d7770, size: 4, life: 28 }, hit: BURST_MARK(0xffc080, 0.8),
   },
   // Cinder Bloom: a burning slug dripping embers
   [WeaponType.CinderBloom]: {
     ...KINETIC, tracerTicks: 2, coreWidth: 3.5, glowWidth: 12, coreColor: 0xfff0c0, glowColor: 0xff5a1a, glowAlpha: 0.55, ownerTint: 0,
     headRadius: 4.5, haloRadius: 16, muzzle: { life: 9, size: 26, sparks: 10, color: 0xff9a4a, smoke: 5 },
-    impact: { sparks: 20, speed: 3.5, life: 26, color: 0xff7a2a, flash: 30 }, trail: { color: 0x4a2a1a, size: 5, life: 26 },
+    impact: { sparks: 20, speed: 3.5, life: 26, color: 0xff7a2a, flash: 30 }, trail: { color: 0x4a2a1a, size: 5, life: 26 }, hit: BURST_MARK(0xffa040, 1.2),
   },
   // Magma (a boss's turrets): a great slow ball of molten rock, white-hot at its heart, trailing smoke and embers
   [WeaponType.Magma]: {
@@ -406,7 +433,7 @@ export const WEAPON_STYLES: Record<number, WeaponStyle> = {
   [WeaponType.Singularity]: {
     ...KINETIC, motion: 'tracked', tracerTicks: 1, coreWidth: 0, glowWidth: 26, coreColor: 0x1a0b2e, glowColor: 0x9b5de5, glowAlpha: 0.35, ownerTint: 0,
     headRadius: 12, headColor: 0x0b0414, haloRadius: 46, muzzle: { life: 12, size: 40, sparks: 10, color: 0xc084fc, smoke: 0 },
-    impact: { sparks: 20, speed: 5, life: 20, color: 0xd8b4fe, flash: 40 }, orb: true,
+    impact: { sparks: 20, speed: 5, life: 20, color: 0xd8b4fe, flash: 40 }, orb: true, hit: BURST_MARK(0xf0e0ff),
     // (the pull radius is the model's: data/ships/tuning.json singularity.pull.radius, pinned by weaponStyles.test.ts)
     pull: { radius: 900, color: 0xb98cf0 },
   },
@@ -422,15 +449,15 @@ export const WEAPON_STYLES: Record<number, WeaponStyle> = {
   // Torpedo: a fat, slow, glowing slug
   [WeaponType.Torpedo]: {
     ...KINETIC, motion: 'tracked', tracerTicks: 1.2, coreWidth: 6, glowWidth: 18, coreColor: 0xfff3d6, glowColor: 0xffa040, glowAlpha: 0.5, ownerTint: 0,
-    impact: { sparks: 24, speed: 5, life: 22, color: 0xffc46b, flash: 50 },
+    impact: { sparks: 24, speed: 5, life: 22, color: 0xffc46b, flash: 50 }, hit: BURST_MARK(0xffd08a, 1.2),
   },
   // Mortar: a dull shell (sent as it flies)
   [WeaponType.Mortar]: {
-    ...KINETIC, motion: 'tracked', tracerTicks: 1, coreWidth: 4, glowWidth: 9, coreColor: 0xe6ee9c, glowColor: 0x9e9d24, glowAlpha: 0.4,
+    ...KINETIC, motion: 'tracked', tracerTicks: 1, coreWidth: 4, glowWidth: 9, coreColor: 0xe6ee9c, glowColor: 0x9e9d24, glowAlpha: 0.4, hit: BURST_MARK(0xf0e0a0),
   },
   // Mining charge: a blinking amber canister
   [WeaponType.Charge]: {
-    ...KINETIC, tracerTicks: 1, coreWidth: 3.5, glowWidth: 10, coreColor: 0xfff3c4, glowColor: 0xffb300, glowAlpha: 0.5, ownerTint: 0,
+    ...KINETIC, tracerTicks: 1, coreWidth: 3.5, glowWidth: 10, coreColor: 0xfff3c4, glowColor: 0xffb300, glowAlpha: 0.5, ownerTint: 0, hit: BURST_MARK(0xffd060),
   },
   // Arc projector: a crackling blue spark
   [WeaponType.Arc]: {

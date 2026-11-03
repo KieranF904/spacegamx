@@ -10,7 +10,7 @@
  *   Repair Beam  braided teal strands, '+' motes
  */
 
-import { BEAM_LOOKS, MODEL_STYLES } from '../rendering/weapons/weaponStyles';
+import { BEAM_LOOKS, MODEL_STYLES, DIRECTED_HIT } from '../rendering/weapons/weaponStyles';
 
 Object.assign(BEAM_LOOKS, {
   // Always red, whatever the grade
@@ -54,6 +54,8 @@ Object.assign(MODEL_STYLES, {
     tracerTicks: 4.6, coreWidth: 2, glowWidth: 8, coreColor: 0xfdf4ff, glowColor: 0xd946ef, glowAlpha: 0.6, headRadius: 3,
     ringPulse: { color: 0xf5d0fe, size: 9, period: 8 },
     impact: { sparks: 8, speed: 3, life: 12, color: 0xe879f9, flash: 18 },
+    // (its hit in its own magenta: the kind's is the Strobe's pink)
+    hit: DIRECTED_HIT(0xf5c8ff, 1, 30),
   },
   // The orb carries its blast radius the whole way
   emp_blackout: {

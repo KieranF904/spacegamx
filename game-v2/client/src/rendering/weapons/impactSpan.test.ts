@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { WeaponType } from '@space-game/common';
-import { weaponStyle, shotScale, beamLook } from './weaponStyles';
+import { weaponStyle, shotScale, beamLook, muzzleScale } from './weaponStyles';
 import { impactSpan } from './impactSpan';
 import { BURST, burstLife, burstSpeed } from './impactAim';
 import '../../ships/energyLooks';
@@ -55,6 +55,33 @@ describe('impacts scale with what a gun can do', () => {
     expect(minOf(MID)).toBeGreaterThan(maxOf(LIGHT));
     expect(minOf(BIG)).toBeGreaterThan(maxOf(MID));
     expect(minOf(HEAVY)).toBeGreaterThan(maxOf(BIG));
+  });
+
+  it("a warhead's own mark stays well inside its blast (the detonation is the show) and its sparks are capped", () => {
+    // [kind, model, damage a shot, shell size, blast radius] (impact-audit's numbers)
+    const WARHEADS = [
+      [WeaponType.Missile, 'missile_swarm', 10, 1.5, 60], [WeaponType.Missile, 'missile_dart', 30, 1.5, 120], [WeaponType.Missile, 'missile_hammerhead', 105, 2.25, 150],
+      [WeaponType.Torpedo, 'torpedo_eel', 420, 2, 90], [WeaponType.Torpedo, 'torpedo_leviathan', 560, 2.8, 160],
+      [WeaponType.Mortar, 'mortar_lobber', 0, 1.6, 220], [WeaponType.Mortar, 'mortar_quake', 0, 1.6, 260], [WeaponType.Flak, 'flak_burst', 5, 1.3, 170],
+    ] as const;
+    for (const [type, model, dmg, size, blast] of WARHEADS) {
+      const st = weaponStyle(type, 1, model);
+      expect(st.hit?.core, model).toBeDefined();
+      expect(impactSpan(st, size * shotScale(dmg)).size, model).toBeLessThan(0.75 * blast);
+    }
+  });
+
+  it('muzzle flashes follow the shot through the usual range, never a speck, and grow slower past a heavy launch', () => {
+    expect(muzzleScale(0.3)).toBe(0.8);
+    expect(muzzleScale(1)).toBe(1);
+    expect(muzzleScale(2.5)).toBe(2.5);
+    expect(muzzleScale(4.76)).toBeGreaterThan(muzzleScale(3.74));
+    expect(muzzleScale(4.76)).toBeLessThan(3.8);
+    // a Leviathan's launch is the biggest, but no longer three Bastions
+    const flash = (type: number, model: string, damage: number, size: number) => weaponStyle(type, 1, model).muzzle.size * muzzleScale(size * shotScale(damage));
+    const lev = flash(WeaponType.Torpedo, 'torpedo_leviathan', 560, 2.8), bastion = flash(WeaponType.Cannon, 'cannon_bastion', 324, 2.2);
+    expect(lev).toBeGreaterThan(bastion);
+    expect(lev).toBeLessThan(1.6 * bastion);
   });
 
   it('held beams burn in step with their weight: the Cutter throws fragments, the Searchlight only a sizzle', () => {
