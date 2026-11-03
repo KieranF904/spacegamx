@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Netcode Lab (offline styles)</title>
+<style>
+/* One dark console look (as prototypes/energy-lab): controls on top, one or two game panes, readouts under each. */
+:root {
+  --bg: #0e1317; --panel: #151c22; --raise: #1d262e; --line: #2a3742; --ink: #dde5ea; --mute: #8b9ba7; --faint: #5d6c77;
+  --accent: #f5a83a; --you: #5fd3ff; --good: #5fd18a; --warn: #f2c14e; --bad: #ef6a5a;
+  --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 13px/1.4 var(--sans); padding: 8px 16px 16px; }
+h1 { font: 600 16px var(--sans); margin: 0 10px 0 0; }
+.top { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.top .sub { color: var(--mute); }
+.controls { display: grid; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.row > .lbl { font: 600 11px var(--sans); text-transform: uppercase; letter-spacing: .08em; color: var(--mute); width: 64px; }
+.ctl { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.ctl output { font: 12px var(--mono); color: var(--ink); min-width: 52px; }
+.ctl input[type=range] { width: 120px; accent-color: var(--accent); }
+button, select { background: var(--raise); color: var(--ink); border: 1px solid var(--line); border-radius: 5px; padding: 3px 9px; font: 12px var(--sans); cursor: pointer; }
+button:hover, select:hover { border-color: var(--mute); }
+button.on { background: #3b2b10; border-color: var(--accent); color: #ffd99c; }
+button kbd { font: 10px var(--mono); color: var(--faint); margin-left: 4px; }
+.presets { display: inline-flex; gap: 4px; }
+.panes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.panes.single { grid-template-columns: 1fr; }
+.panes.single .pane:nth-child(2) { display: none; }
+.pane { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; min-width: 0; }
+.pane-head { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.pane-head select { font-weight: 600; }
+.pane-head .desc { color: var(--mute); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+canvas.game { display: block; width: 100%; height: 52vh; min-height: 300px; cursor: none; background: #0a0f13; }
+.readout { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 8px 14px; padding: 8px 10px 10px; font: 12px/1.5 var(--mono); }
+.readout h3 { font: 600 10px var(--sans); text-transform: uppercase; letter-spacing: .08em; color: var(--mute); margin: 0 0 3px; }
+.readout table { border-collapse: collapse; width: 100%; }
+.readout td { padding: 0 6px 0 0; white-space: nowrap; vertical-align: top; }
+.readout td.dim, .readout div.dim { white-space: normal; font-size: 11px; }
+.readout td.n { text-align: right; }
+.readout .dim { color: var(--faint); }
+.readout .big { font-size: 15px; font-weight: 600; }
+.readout .good { color: var(--good); } .readout .warn { color: var(--warn); } .readout .bad { color: var(--bad); }
+.graphs { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px; }
+.graphs canvas { width: 100%; height: 64px; display: block; background: #0b1014; border: 1px solid var(--line); border-radius: 4px; }
+.keys { color: var(--mute); margin-top: 8px; font-size: 12px; }
+.keys kbd { font: 11px var(--mono); background: var(--raise); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; color: var(--ink); }
+@media (max-width: 1100px) { .panes { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>Netcode Lab</h1>
+  <span class="sub">The same ship and the same inputs under different network styles. Everything runs in this page: a pretend server, a pretend network, and you plus a scripted second player.</span>
+  <a href="index.html" style="color:#f5a83a">the real-server lab &rarr;</a>
+</div>
+
+<div class="controls">
+  <div class="row">
+    <span class="lbl">Network</span>
+    <span class="presets" id="presets"></span>
+    <label class="ctl">Your one-way <input type="range" id="latA" min="0" max="300" step="5"><output id="latAo"></output></label>
+    <label class="ctl">Other player <input type="range" id="latB" min="0" max="300" step="5"><output id="latBo"></output></label>
+    <label class="ctl"><input type="checkbox" id="linkLat"> same</label>
+    <label class="ctl">Jitter <input type="range" id="jitter" min="0" max="100" step="1"><output id="jittero"></output></label>
+    <label class="ctl">Loss <input type="range" id="loss" min="0" max="10" step="0.5"><output id="losso"></output></label>
+  </div>
+  <div class="row">
+    <span class="lbl">Sim</span>
+    <label class="ctl">Tick rate <select id="tickRate"><option>15</option><option>20</option><option>30</option><option selected>60</option></select> Hz</label>
+    <label class="ctl">Snapshots <select id="snapRate"><option>10</option><option selected>20</option><option>30</option><option>60</option></select> Hz</label>
+    <label class="ctl" title="Current style: ticks between sampling your input and using it (the game's inputDelayTicks, 2)">Current input delay <input type="range" id="curDelay" min="0" max="6" step="1"><output id="curDelayo"></output></label>
+    <label class="ctl" title="Lockstep: your input sampled at tick T is used at T + D">Lockstep delay <button id="lockAuto">Auto</button> <input type="range" id="lockDelay" min="0" max="40" step="1"><output id="lockDelayo"></output></label>
+    <label class="ctl" title="Rollback: your own input delay, and how far ahead of the confirmed tick it may guess">Rollback delay <input type="range" id="rbDelay" min="0" max="8" step="1"><output id="rbDelayo"></output></label>
+    <label class="ctl">max guess <input type="range" id="rbMaxPred" min="4" max="60" step="1"><output id="rbMaxPredo"></output></label>
+  </div>
+  <div class="row">
+    <span class="lbl">View</span>
+    <button id="sideBtn">Side by side<kbd>V</kbd></button>
+    <button id="ghostBtn">Server ghost<kbd>G</kbd></button>
+    <button id="helmBtn">Helm controls<kbd>H</kbd></button>
+    <button id="botBtn">Other player fires</button>
+    <button id="dronesBtn">Drones</button>
+    <button id="resetBtn">Reset<kbd>R</kbd></button>
+    <button id="desyncBtn" title="Lockstep/rollback: move your ship one unit in the other player's copy of the world">Inject desync</button>
+  </div>
+</div>
+
+<div class="panes" id="panes"></div>
+
+<div class="keys">
+  <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> thrust (screen directions; the ship turns to the mouse) &middot;
+  <kbd>Shift</kbd> boost &middot; left mouse fixed gun (fires when the nose is on the cursor) &middot; right mouse turret &middot; <kbd>Space</kbd> both &middot;
+  <kbd>H</kbd> helm: <kbd>A</kbd>/<kbd>D</kbd> turn, <kbd>W</kbd>/<kbd>S</kbd> along the nose, <kbd>Q</kbd>/<kbd>E</kbd> strafe &middot;
+  <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> left pane: current / lockstep / rollback &middot; <kbd>7</kbd><kbd>8</kbd><kbd>9</kbd> right pane &middot; wheel zoom.
+  Blue is you, orange the other player, red the drones.
+</div>
+
+<template id="paneTpl">
+  <section class="pane">
+    <div class="pane-head">
+      <select class="style"><option value="current">Current (predict + reconcile)</option><option value="lockstep">Lockstep (no prediction)</option><option value="rollback">Rollback (GGPO style)</option></select>
+      <span class="desc"></span>
+    </div>
+    <canvas class="game"></canvas>
+    <div class="readout">
+      <div class="c1"></div><div class="c2"></div><div class="c3"></div>
+      <div class="graphs"><canvas class="bw"></canvas><canvas class="dl"></canvas></div>
+    </div>
+  </section>
+</template>
+
+<script src="sim.js"></script>
+<script src="net.js"></script>
+<script src="styles.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

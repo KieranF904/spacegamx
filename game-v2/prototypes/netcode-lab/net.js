@@ -191,4 +191,5 @@ const view = (buf) => new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
 
 NL.Net = { Meter, Link, T, quantAim, quantDist, encInput, decInput, encLock, decLock, encRelay, decRelay, encPing, decPing,
   encPong, decPong, encSnap, decSnap, view, widen };
-})(typeof window !== 'undefined' ? window.NL : globalThis.NL);
+if (typeof module === 'object' && module.exports) module.exports = NL;
+})(globalThis.NL);

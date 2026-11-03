@@ -1,25 +1,211 @@
 # Netcode Lab
 
-A small standalone 2D space game that runs the same ship and the same inputs under three network styles, so you can
-feel and measure the input delay of each. It runs entirely in the page: a pretend server, a pretend network with
-latency, jitter and loss, and two clients (you, plus a scripted second player). It has nothing to do with the game's
-build and imports nothing from `client/`, `server/` or `common/`.
+A small standalone 2D space game for feeling and measuring network styles. It has two pages:
+
+* **`index.html`: the real-server lab.** A real server (Node, `server/`) runs one 6,000 × 6,000 world at 60 Hz:
+  asteroids you can shoot apart, freighters on routes, pirate drones, players, and bots on request. You play it over a
+  real connection in one of two styles:
+  * **Lockstep (new design)**: server-paced deterministic lockstep, as specified in
+    [docs/design/netcode-lockstep.md](../../docs/design/netcode-lockstep.md). Only inputs, entry snapshots and
+    corrections travel; your client simulates what it is aware of; your own ship is predicted.
+  * **Current (snapshots)**: the game's style today. 20 Hz snapshots of what is in range, your ship predicted and
+    reconciled, everyone else drawn a little in the past.
+
+  Two people (or two browsers) on the same server play together, in either style.
+* **`offline.html`: the in-page styles** (below). Everything runs in one page with a pretend server and network: the
+  current style, classic lockstep and rollback, side by side. No server needed.
+
+It imports nothing from the game's `client/`, `server/` or `common/`.
 
 ## Run it
 
-Open `index.html` in a browser. It uses plain scripts, so a file:// page works and no server is needed.
+**On the VPS:** https://space.brotherk3d.com/netlab/ connects straight away. Send a friend the same link to play
+together. The in-page styles are at https://space.brotherk3d.com/netlab/offline.html.
+
+**Locally:**
+```
+cd game-v2/prototypes/netcode-lab/server
+npm install            # once (the ws package)
+node server.js         # then open http://localhost:3120/   (PORT=, HOST=, SEED= to change)
+```
+The page connects to the server it was loaded from (`/ws` next to the page). The Server box takes any other address,
+e.g. `wss://space.brotherk3d.com/netlab/ws` from a local page. **In-page server** runs the same server code inside the
+page over a pretend 20 ms link (plus the added latency), so it works with no server at all.
+
+**Checks (no browser):** `node test.mjs` (all of it) or `node test.mjs --server` (the real-server lab only). What it
+checks:
+* sim determinism across server and client copies;
+* slot identities, quarantine and pull-in;
+* that every kind of injected drift is caught for the right reason and corrected;
+* that a laggy client stalls no one, and that a held-back client catches up without freezing;
+* bandwidth for a 2-player fight and an 8-bot fight in both styles.
+
+**Measure a real connection (no browser):** `node server/probe.js wss://space.brotherk3d.com/netlab/ws [secs] [added ms]`.
+It connects a lockstep and a current-style client, starts a bot fight, flies a script with own prediction on then off,
+injects each drift and prints the numbers.
+
+**Deploy:** `bash prototypes/netcode-lab/deploy.sh` (from anywhere; uses `~/.ssh/bk3d_deploy`). It installs to
+`/opt/spacegame-netlab` as the `spacegame-netlab` unit (127.0.0.1:3120, user `spacegame`). nginx serves it at `/netlab/`
+through `/etc/nginx/snippets/spacegame-netlab.conf`, included from the spacegame site. The script checks the box first,
+and puts things back if the new server or `nginx -t` fails.
+
+## Controls (index.html)
+
+| | |
+|---|---|
+| W A S D | thrust in screen directions; the ship turns towards the mouse |
+| Shift | boost |
+| Left mouse / right mouse / Space | fixed gun / turret / both |
+| H | helm controls (A/D turn, W/S along the nose, Q/E strafe) |
+| P | own prediction on/off (lockstep) |
+| G | confirmed ghost: dashed outlines where the confirmed state has everything (lockstep) |
+| B | bot fight at the edge of your awareness |
+| C | connect / reconnect; changing Style reconnects |
+| Wheel | zoom |
+
+**On screen:**
+* Ships: blue is you, orange other players and bots, red pirate drones, green freighters.
+* Yellow diamonds are loot from rocks; fly over them to pick them up.
+* The number next to each entity is its **slot**. A **violet ring** means it was pulled in (it is outside your radius
+  and is tracked because it interacts with something inside).
+* The dashed circle is the view radius (1,200); the solid one is the awareness radius (1,500).
+* The minimap shows the whole world.
+
+**Network row:**
+* *Added one-way* and *jitter* delay every message each way on top of the real connection, keeping them in order. Use
+  them to turn a good link into a bad one.
+* *Bundle every tick* makes the lockstep server send a bundle every tick instead of only when something changed (plus a
+  15 Hz heartbeat). Reconnect to apply.
+
+**Debug row** (lockstep). Each one knocks your copy of the world off the server's; the Desyncs card shows how it was
+caught:
+
+| button | does | caught as |
+|---|---|---|
+| Drift: HP | takes 7 HP off the ship last hit, in your copy | **mismatch** at its next hit (or **hash** if it isn't hit within 2 s) |
+| Drift: move | moves the ship last hit 400 units | **missing** (hits you should have seen don't happen), or hash |
+| Drift: into a shell | puts a ship in front of a live shell | **spurious** (you report a hit the server never had) |
+| Drift: silent | moves a quiet entity (no recent events, no shells near it) 1 unit | **hash**, at the next 2-second state hash |
+| Drop a message | throws away the next bundle that has inputs in it | whatever that causes: usually hash or mismatch |
+| Delay 500 ms | holds everything that arrives for 500 ms | nothing: watch the queue fill and the client catch up |
+
+*Bot fight at the edge* puts a freighter just inside your awareness and a bot outside it attacking the freighter, so you
+can watch the bot get pulled in. *+4 bots* puts four brawling bots around you. *Clear bots* removes everyone's bots
+(the server allows 24 at most).
+
+## The readouts (index.html)
+
+**Timing**
+* *round trip, jitter*: smoothed from pings, twice a second. They include any added latency.
+* *server tick*: your estimate of the server's tick now (from the pongs).
+* *own tick* (lockstep): the tick an input sampled now is stamped for. It is the server tick plus half a round trip
+  plus the margin; with own prediction on, the screen shows this tick.
+* *confirmed*: the last tick the server has sent you a bundle for. *shown*: the tick on screen. The difference is how
+  many ticks are re-simulated each time a bundle arrives.
+* *margin*: the ticks added to your stamps so inputs arrive in time. It rises on each late input and falls after 3 s of
+  slack. *late inputs*: inputs that reached the server after their tick (used a tick later).
+* *queue*: bundles received and not yet simulated. *behind*: how far your confirmed tick is behind where it should be.
+  *worst catch-up*: the most confirmed ticks simulated in one frame.
+* Current style:
+  * *lead*: how far your predicted ship runs ahead of the server.
+  * *others*: how far in the past everyone else is drawn.
+  * *corrections*: times the server disagreed with your prediction of your own ship.
+
+**Input to screen.** From the key or mouse event (its own timestamp) to the first frame drawn from a state that has used
+that input:
+* thrust: a movement key changed;
+* turn: the aim moved more than 6°;
+* fire: a button was pressed.
+
+Lockstep keeps separate rows for own prediction on and off, so you can compare them. With prediction off, expect about
+a round trip plus the margin plus a tick. The current style adds "server has your input" (when the snapshot that shows
+the server used it arrives).
+
+**Bandwidth.** Payload bytes per second by category: now (last second) and average since connecting. "wire" adds an
+estimate of IP/TCP/TLS/WebSocket headers per message (about 66 bytes), and messages per second. "lab" is the page's own
+info panel and isn't counted in either style's totals.
+* Lockstep, down:
+  * *inputs*: other players', puppets', and your own acknowledgements;
+  * *entries*: entry snapshots, exits, pull flags, rock overrides on entry;
+  * *corrections*;
+  * *overrides*: rocks destroyed elsewhere;
+  * *shells*: shells that hit something you don't hold;
+  * *ticks*: bundle headers, heartbeats, late notices.
+* Lockstep, up: *acks* (message header with your confirmed tick), *inputs*, *reports* (event hashes), *hashes* (the
+  2-second state hashes).
+* Current, down: *own* (your ship's full row), *others* (ships and loot in range), *shells* (others' fire), *hits*,
+  *rocks*, *header*.
+
+**Awareness** (lockstep)
+* *slots* in use, how many freed slots are in quarantine and for how long, and how many rocks you track.
+* *entries / exits* since connecting.
+* *pull-ins*: the total, and which entities are pulled in now.
+
+**Desyncs caught** (lockstep), by reason:
+* *mismatch*: your report for an event didn't match the server's;
+* *missing*: you didn't report an event you should have seen;
+* *spurious*: you reported an event the server never had;
+* *hash*: the 2-second state hash differed;
+* *unseen*: something you hold was hit by something outside your set. The server corrects it in the same tick; it
+  isn't your client's fault;
+* *dropped*: messages the debug button threw away.
+
+"reports sent / matched / expected" is the server's tally. The list shows the last few: reason, entity, ticks from the
+event to the server catching it, and for an injected drift, the time from the injection until the correction reached
+your screen.
+
+**Server**: who is connected (style and round trip), bots, entities, and the server's CPU time per tick.
+
+## Measured
+
+See [docs/design/netcode-lockstep.md](../../docs/design/netcode-lockstep.md#measured) for the full tables. Over the real
+connection to the VPS (10 ms round trip):
+* lockstep with own prediction: input on screen in the same frame;
+* lockstep without it: ~50 ms;
+* current style: ~31 ms plus a frame (its 2-tick input delay);
+* bandwidth down, by the lab's figures, around a bot fight: lockstep ~2.7 KB/s of payload against the current style's
+  ~7.6. With headers, 6.7 against 9.0 KB/s.
+
+## How it is built
+
+| file | what |
+|---|---|
+| `sim.js` | the deterministic core both pages use: fixed-point maths, table trig, flight, guns, shells, hash |
+| `world.js` | the open world on top of it: rocks from the seed and their override table, freighters, drones, loot, one RNG per entity, `step()` that runs the same on part of the world as on all of it, entity and event hashes |
+| `proto.js` | the wire format: varints, entity snapshots, bundles, the client's up message, current-style snapshots; byte counts per category |
+| `labserver.js` | the server: 60 Hz, input queues, awareness and pull-in, slots, bundles, report and hash checks, corrections, bots, current-style snapshots |
+| `labclient.js` | the two clients (`LsClient`, `CurClient`): clock, stamping, margin, catch-up, prediction, delay meters, debug drift |
+| `harness.js` | the server and clients in one process over pretend links (the page's in-page server, and the tests) |
+| `lab.js`, `index.html` | the real-server page |
+| `server/server.js` | Node: static files, the WebSocket at `/ws`, the 60 Hz loop. `server/shared.js` loads the shared files |
+| `server/probe.js` | scripted clients over a real socket, with numbers |
+| `test.mjs`, `test-lockstep.mjs` | the checks |
+| `deploy.sh`, `deploy/` | the VPS deploy: unit, nginx snippet, install script |
+| `offline.html`, `app.js`, `styles.js`, `net.js` | the in-page styles (below); `net.js` also gives the harness its pretend links |
+
+---
+
+# The in-page styles (offline.html)
+
+A small standalone 2D space game that runs the same ship and the same inputs under three network styles, so you can
+feel and measure the input delay of each. It runs entirely in the page: a pretend server, a pretend network with
+latency, jitter and loss, and two clients (you, plus a scripted second player).
+
+### Run it
+
+Open `offline.html` in a browser. It uses plain scripts, so a file:// page works and no server is needed.
 If you'd rather serve it:
 
 ```
 cd game-v2/prototypes/netcode-lab
-python -m http.server 8090      # then open http://localhost:8090
+python -m http.server 8090      # then open http://localhost:8090/offline.html
 ```
 
 Checks (no browser): `node test.mjs`. This runs every style on a fake clock, checks that the lockstep hashes agree,
 that the measured delays match the settings and that an injected one-unit error is caught, and prints a table of
 delay and bandwidth at 10, 40, 75 and 150 ms.
 
-## Controls
+### Controls
 
 The controls work like the game's default mouse-steer scheme:
 
@@ -39,11 +225,11 @@ Blue is you, orange is the other player (a bot that circles you and shoots in bu
 inside the simulation, with slow, dodgeable shells). The other player's latency has its own slider; tick "same" to
 keep it equal to yours.
 
-## The three styles
+### The three styles
 
 All three run the same simulation (`sim.js`). Only who runs it, and what crosses the network, changes.
 
-### 1. Current: server-authoritative with prediction (the game today)
+#### 1. Current: server-authoritative with prediction (the game today)
 
 * The server runs the world. You send an input only when it changes (the game's 11-byte binary input, stamped with
   the tick it is meant for). The server sends a snapshot to each client 20 times a second.
@@ -59,7 +245,7 @@ All three run the same simulation (`sim.js`). Only who runs it, and what crosses
   keyframes only when a ship goes off its predicted path. It also resends your own state only when it would have
   been wrong.
 
-### 2. Lockstep (pure, no prediction)
+#### 2. Lockstep (pure, no prediction)
 
 * Every client runs the whole world. Only inputs travel, one per player per tick, through the server, which relays
   them and runs a copy itself.
@@ -74,7 +260,7 @@ All three run the same simulation (`sim.js`). Only who runs it, and what crosses
   "Inject desync" button moves your ship one unit (1/65536 of it would do) in the other player's copy, to show that
   the check works.
 
-### 3. Rollback (GGPO style)
+#### 3. Rollback (GGPO style)
 
 * Lockstep inputs, but your client runs ahead to the present by guessing the other player's missing inputs (the last
   known one, repeated). When a real input arrives that differs from the guess, it rewinds to the last confirmed tick
@@ -82,7 +268,7 @@ All three run the same simulation (`sim.js`). Only who runs it, and what crosses
 * "max guess" caps how far past the confirmed tick it will guess. Beyond that it stalls, like lockstep.
 * Hashes are compared on confirmed ticks only.
 
-## What to try
+### What to try
 
 * **Set 150 ms (Overseas), side by side, current vs lockstep, and try to dodge the red drone shells.** On the left
   the ship answers in about 50 ms. On the right it answers about a third of a second later, every time.
@@ -108,7 +294,7 @@ All three run the same simulation (`sim.js`). Only who runs it, and what crosses
 * **Other player at 250 ms, you at 10 ms.** In the current style only your view of them suffers. In lockstep your own
   ship gets their latency too: the slowest player sets everyone's delay.
 
-## The readouts
+### The readouts
 
 * **Input to screen**: from the key or mouse event (its own timestamp) to the first frame drawn from a simulation
   state that has used that input. Thrust = a movement key change, turn = the aim moving more than 6° (or A/D in
@@ -122,7 +308,7 @@ All three run the same simulation (`sim.js`). Only who runs it, and what crosses
 * **Corrections / snaps / late inputs** (current), **stalls** (lockstep, rollback), **rollbacks / depth / pops /
   re-sim** (rollback), **hashes** (lockstep, rollback).
 
-## Measured (headless Chrome, 60 Hz, scripted play, both players at the same latency, no jitter or loss)
+### Measured (headless Chrome, 60 Hz, scripted play, both players at the same latency, no jitter or loss)
 
 | one-way each | current: thrust / turn / fire | current: server has it | lockstep D | lockstep: thrust / turn / fire | rollback (delay 2) |
 |---|---|---|---|---|---|
@@ -147,7 +333,7 @@ With two players, lockstep's payload is smaller, but at 60 packets a second each
 the same as the current style. Lockstep's download grows with the number of players (one input stream each).
 Snapshots grow with the number of things in view.
 
-## How the simulation stays deterministic
+### How the simulation stays deterministic
 
 * All state is integers: positions and velocities in Q16 fixed point, angles as 16-bit binary angles.
 * No `Math.sin/cos/atan2/sqrt/pow`. Those are not specified tightly enough to match across browsers. Instead there
@@ -159,7 +345,7 @@ Snapshots grow with the number of things in view.
   client and the server name the same shell the same.
 * The FNV hash covers every field of every ship and shell, plus the tick and the RNG.
 
-## Simplifications (vs the game)
+### Simplifications (vs the game)
 
 * One clock for everyone: clients know the server's tick exactly. The game estimates it from pongs.
 * The network is a WebSocket over TCP like the game's: in order, with loss turned into a resend about one round trip
@@ -168,9 +354,9 @@ Snapshots grow with the number of things in view.
 * Snapshots are full (all ships, every snapshot). See the current style above for how the game slims them down.
 * Frames show the newest tick; nothing is drawn between ticks. The game draws your ship half a tick back, between
   its last two steps.
-* There is no real two-window WebSocket server. Everything is in one page, which keeps the comparison exact.
+* There is no real server here: everything is in one page, which keeps the comparison exact. (The real-server lab is index.html, above.)
 
-## Files
+### Files
 
 | file | what |
 |---|---|
@@ -178,6 +364,6 @@ Snapshots grow with the number of things in view.
 | `net.js` | the pretend link (latency, jitter, loss, in-order resend), byte meters, binary message codec |
 | `styles.js` | the three styles (server and client for each), the bot, the delay meter, and `World` (runs it all in time order) |
 | `app.js` | input recording with timestamps, drawing, readouts, controls |
-| `index.html` | layout and styles |
+| `offline.html` | layout and styles |
 | `test.mjs` | `node test.mjs`: determinism and style checks without a browser |
 | `shots/` | screenshots |

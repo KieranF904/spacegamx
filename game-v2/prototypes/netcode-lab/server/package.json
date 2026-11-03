@@ -1,0 +1,13 @@
+{
+  "name": "netcode-lab-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The netcode lab's real server: the shared simulation at 60 Hz behind a WebSocket",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "8.19.0"
+  }
+}

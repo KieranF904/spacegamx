@@ -84,8 +84,9 @@ const BASE = {
 const RAD = 65536 / (2 * Math.PI);
 const DEG = 65536 / 360;
 
-/** Integer parameters for a tick rate (15, 20, 30 or 60: k = 60 / rate whole 60 Hz ticks per tick) */
-function makeParams(rate) {
+/** Integer parameters for a tick rate (15, 20, 30 or 60: k = 60 / rate whole 60 Hz ticks per tick), for a table of ship
+ *  kinds (BASE by default; the open world, world.js, passes its own with freighters and shorter guns) */
+function makeParams(rate, base = BASE) {
   const k = 60 / rate;
   if (k !== Math.floor(k)) throw new Error('tick rate must divide 60');
   let fk = 1; for (let i = 0; i < k; i++) fk *= 0.985;             // friction^k (no pow)
@@ -108,7 +109,7 @@ function makeParams(rate) {
     boostMul: 22,                              // /10
     boostMax: 600, boostDrain: 6 * k, boostRegen: 2 * k,
     respawn: Math.round(150 / k),
-    kinds: { player: kind(BASE.player), drone: kind(BASE.drone) },
+    kinds: Object.fromEntries(Object.entries(base).map(([name, b]) => [name, kind(b)])),
   };
 }
 
@@ -334,5 +335,10 @@ function shipEqual(a, b) {
 }
 
 NL.Sim = { FX, HALF_WORLD, N_PLAYERS, IN, NEUTRAL, sameInput, makeParams, create, clone, cloneShip, step, stepOne, hash,
-  shipEqual, iatan2, isin, icos, wrapBA, isqrt, RAD };
-})(typeof window !== 'undefined' ? (window.NL = window.NL || {}) : (globalThis.NL = globalThis.NL || {}));
+  shipEqual, iatan2, isin, icos, wrapBA, isqrt, RAD, DEG, BASE,
+  // (the pieces the open world, world.js, builds on)
+  fly, guns, sweptHit, rngNext, qmul, clamp };
+// Shared by the page (a plain <script>) and the Node server (server/shared.js runs it in its global scope; a CommonJS
+// require works as well): everything hangs off one NL namespace on the global object.
+if (typeof module === 'object' && module.exports) module.exports = NL;
+})(globalThis.NL = globalThis.NL || {});

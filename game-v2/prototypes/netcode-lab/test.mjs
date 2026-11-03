@@ -1,18 +1,21 @@
-// Netcode Lab checks, no browser: `node test.mjs` from this folder.
+// Netcode Lab checks, no browser: `node test.mjs` from this folder (`node test.mjs --server` runs part 3 only).
 // 1. Two copies of the simulation fed the same random inputs stay bit for bit equal (and one unit apart is caught).
-// 2. Each style runs on a fake clock with a scripted "you": lockstep/rollback hashes agree on both clients and the server,
-//    and the measured input delay and bandwidth come out where they should for the configured latency.
+// 2. Each in-page style (offline.html) runs on a fake clock with a scripted "you": lockstep/rollback hashes agree on both
+//    clients and the server, and the measured input delay and bandwidth come out where they should for the latency.
+// 3. The lab server and its clients (index.html) in one process over pretend links: test-lockstep.mjs.
 import { readFileSync } from 'fs';
 import vm from 'vm';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-for (const f of ['sim.js', 'net.js', 'styles.js']) vm.runInThisContext(readFileSync(join(here, f), 'utf8'), { filename: f });
+for (const f of ['sim.js', 'net.js', 'styles.js', 'world.js', 'proto.js', 'labserver.js', 'labclient.js', 'harness.js']) vm.runInThisContext(readFileSync(join(here, f), 'utf8'), { filename: f });
 const { Sim, Net, Styles } = globalThis.NL;
 let fails = 0;
 const check = (ok, msg) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${msg}`); if (!ok) fails++; };
 
+const ONLY_SERVER = process.argv.includes('--server');
+if (!ONLY_SERVER) {
 // ------------------------------------------------------------------------------------------------- 1. determinism
 {
   const P = Sim.makeParams(60);
@@ -111,5 +114,8 @@ for (const [jitter, loss] of [[30, 0], [20, 0.02]]) {
   for (let f = 300; f < 400; f++) r.w.advance(f * 1000 / 60);
   check(r.w.desync > 0, `injected one-unit error is reported as DESYNC at tick ${r.w.desync}`);
 }
+}  // (parts 1 and 2)
+
+fails += await (await import('./test-lockstep.mjs')).run(globalThis.NL);
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
 process.exit(fails ? 1 : 0);
