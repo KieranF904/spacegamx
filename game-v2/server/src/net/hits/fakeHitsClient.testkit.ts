@@ -12,7 +12,7 @@ import {
 } from '@space-game/common';
 import { ShipStore } from '../../../../client/src/ships/ShipStore.js';
 import { ConfirmedHits, type HitShell, type HitsOutcome, type OwnHit } from '../../../../client/src/ships/hits/ConfirmedHits.js';
-import { SelfHits } from '../../../../client/src/ships/hits/SelfHits.js';
+import { SelfHits, toldHits } from '../../../../client/src/ships/hits/SelfHits.js';
 import type { GameServer } from '../../GameServer.js';
 
 export interface FakeHitsOptions {
@@ -151,21 +151,23 @@ export class FakeHitsClient {
   private handle(m: ServerMessage): void {
     switch (m.type) {
       case 'shipSync': this.selfHits?.onSync(m.id); this.store.onSync(m); break;
-      case 'shipHps': this.store.onHps(m); break;
-      case 'netCaps': this.selfHits?.setOn((m.caps & (CAPS.HITS | CAPS.SELF_HITS)) === (CAPS.HITS | CAPS.SELF_HITS), this.snapTick); break;
+      case 'shipHps': this.findHits(); this.store.onHps(m); break;
+      case 'netCaps': this.findHits(); this.selfHits?.setOn((m.caps & (CAPS.HITS | CAPS.SELF_HITS)) === (CAPS.HITS | CAPS.SELF_HITS), this.snapTick); break;
       case 'snapshot': this.snapshot(m as ServerSnapshotMessage); break;
       case 'hits':
+        this.findHits(m.h);
         if (this.selfHits?.on) this.hits!.told(m, this.snapTick);
         else this.handOut(this.hits!.expand(m, this.snapTick));
         break;
       case 'hitFix': {
+        this.findHits();
         if (!this.selfHits?.on) break;
         const { missed, wrong } = this.selfHits.fix(m);
         if (process.env.HITS_DEBUG) console.log('FIX', this.opts.name, JSON.stringify({ s: m.s, t: m.t, recs: m.h, missed, wrong }));
         this.handOut(this.hits!.corrected(missed, m.t, wrong));
         break;
       }
-      case 'hpCheck': this.hits!.check(m); break;
+      case 'hpCheck': this.findHits(); this.hits!.check(m); break;
       case 'damage': {
         const k = `${m.targetId},${m.sourceId}`;
         this.damage.set(k, (this.damage.get(k) ?? 0) + m.amount);
@@ -182,6 +184,7 @@ export class FakeHitsClient {
   }
 
   private snapshot(s: ServerSnapshotMessage): void {
+    this.findHits();
     this.snapTick = s.tick;
     this.sawSnapshot = true;
     this.reps.apply(s.tick, s.ships, s.ctl);
@@ -220,20 +223,27 @@ export class FakeHitsClient {
     // (The game's client steps every replica as it draws, each frame; drawing nothing, this does it here. Left alone,
     // a replica no one asked for in 600 ticks stops short: ShipReplicaSet.at won't run that far in one go)
     for (const id of this.reps.ids()) this.reps.at(id, s.tick);
-    // Hits found here (ShipClient.afterSnapshot)
+    // Hits found here, once the frame's told records are in (ShipClient.afterSnapshot, findHits)
     if (this.selfHits) {
       this.selfHits.onKeyframes(s.ships);
-      let found = this.selfHits.detect(s.tick);
-      if (this.opts.drop && found.length) {
-        const before = found.length;
-        found = found.filter((h) => !this.opts.drop!(h));
-        this.dropped += before - found.length;
-      }
-      if (found.length) this.hits!.own(found);
+      this.selfHits.open(s.tick);
     }
   }
 
+  /** The snapshot's window searched (ShipClient.findHits): at its hits message, with its records, or before what reads the HP */
+  private findHits(told?: number[]): void {
+    if (!this.selfHits?.waiting) return;
+    let found = this.selfHits.detect(told ? toldHits(told, this.snapTick) : undefined);
+    if (this.opts.drop && found.length) {
+      const before = found.length;
+      found = found.filter((h) => !this.opts.drop!(h));
+      this.dropped += before - found.length;
+    }
+    if (found.length) this.hits!.own(found);
+  }
+
   private frameEnd(): void {
+    this.findHits();
     if (!this.selfHits || (!this.selfHits.on && !this.hits!.hasPending)) return;
     const { out, done } = this.hits!.flushPending();
     this.selfHits.settle(done);

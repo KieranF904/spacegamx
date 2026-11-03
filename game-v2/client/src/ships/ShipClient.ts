@@ -52,7 +52,7 @@ import { AUG } from '../rendering/weapons/weaponStyles';
 import { hitSurface } from './hitSurface';
 import { DrawnWorld } from './drawnHit';
 import { ConfirmedHits } from './hits/ConfirmedHits';
-import { SelfHits } from './hits/SelfHits';
+import { SelfHits, toldHits } from './hits/SelfHits';
 import type { PilotState } from '../econ/clientEcon';
 import type { ThrustCommand } from './ThrusterFx';
 import { settings } from '../settings/Settings';
@@ -323,8 +323,21 @@ export class ShipClient {
    * (SelfHits on), they're the server's word on this frame's hits, and wait with them for the frame's end
    */
   onHits(msg: ServerHitsMessage, handle: (m: ServerMessage) => void): void {
+    // (the snapshot's window searched with these records in: a shell told struck on a tick struck only that, SelfHits.detect)
+    this.findHits(msg);
     if (this.selfHits.on) { this.hits.told(msg, this.snapTick); return; }
     this.handOut(this.hits.expand(msg, this.snapTick), handle);
+  }
+
+  /**
+   * The last snapshot's window searched (SelfHits.detect), once: at its hits message (with its records), or before
+   * anything else after it that reads the HP (shipHps, hpCheck, hitFix, the frame's end). The hits found are worked out
+   * at once, before the told ones, as the server orders them (HitLedger.plan)
+   */
+  private findHits(told?: ServerHitsMessage): void {
+    if (!this.selfHits.waiting) return;
+    const found = this.selfHits.detect(told ? toldHits(told.h, this.snapTick) : undefined);
+    if (found.length) this.hits.own(found);
   }
 
   private handOut(r: { msgs: ServerMessage[]; ships: Set<number>; gone: number[] }, handle: (m: ServerMessage) => void): void {
@@ -347,15 +360,18 @@ export class ShipClient {
 
   /** The caps in effect (netCaps): finding hits here starts (or stops) with the next snapshot */
   onNetCaps(caps: number): void {
+    // (the snapshot before it was the old caps': its window searched as they were)
+    this.findHits();
     this.selfHits.setOn((caps & (CAPS.HITS | CAPS.SELF_HITS)) === (CAPS.HITS | CAPS.SELF_HITS), this.snapTick);
   }
 
   /**
    * A snapshot applied (its replicas, rows and removals): its shells onto the tick-faithful layer (rows, and the fire
-   * events' shells preSnapshot rebuilt, as the server spawned them), then the hits found on the ticks since the last
-   * one, worked out now (their HP before the frame's shipHps and hpCheck)
+   * events' shells preSnapshot rebuilt, as the server spawned them); its window is searched with the frame's told
+   * records (findHits: the hits found worked out before the frame's shipHps and hpCheck)
    */
   afterSnapshot(m: ServerSnapshotMessage): void {
+    this.findHits();
     if (this.selfHits.on) {
       for (const e of m.entities) {
         const d = e.data;
@@ -363,12 +379,13 @@ export class ShipClient {
       }
     }
     this.selfHits.onKeyframes(m.ships);
-    const found = this.selfHits.detect(m.tick);
-    if (found.length) this.hits.own(found);
+    // (searched once this frame's told records are in: findHits)
+    this.selfHits.open(m.tick);
   }
 
   /** The frame's end: this frame's hits (found here and told) handed out, and into the chain */
   frameEnd(handle: (m: ServerMessage) => void): void {
+    this.findHits();
     // (Switched off in this frame, its hits still go: the netCaps came after the snapshot's records)
     if (!this.selfHits.on && !this.hits.hasPending) return;
     const { out, done } = this.hits.flushPending();
@@ -378,6 +395,7 @@ export class ShipClient {
 
   /** A correction (hitFix): the hits missed worked out and drawn, the wrong ones taken back, the chain the server's */
   onHitFix(msg: ServerHitFixMessage, handle: (m: ServerMessage) => void): void {
+    this.findHits();
     if (!this.selfHits.on) return;
     const { missed, wrong } = this.selfHits.fix(msg);
     this.handOut(this.hits.corrected(missed, msg.t, wrong), handle);
@@ -390,6 +408,7 @@ export class ShipClient {
 
   /** The server's check of a ship's HP as this client should have it */
   onHpCheck(msg: ServerHpCheckMessage): void {
+    this.findHits();
     this.hits.check(msg);
   }
 
@@ -1042,10 +1061,12 @@ export class ShipClient {
         this.opts.sound?.('scan_ping');
         return true;
       case 'shipHp':
+        this.findHits();
         this.store.onHp(msg);
         this.fillHull(msg.id);
         return true;
       case 'shipHps':
+        this.findHits();
         this.store.onHps(msg);
         for (const [id] of msg.ships) this.fillHull(id);
         return true;

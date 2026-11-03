@@ -360,16 +360,16 @@ export class ConfirmedHits {
    * tenth, as the server's projectileHit.
    */
   private hitPoint(s: HitShell, ship: ShipState, id: number, part: number, tick: number): [number, number] {
-    let ax = Math.fround(s.x), ay = Math.fround(s.y);
-    const vx = Math.fround(s.vx), vy = Math.fround(s.vy);
-    for (let k = s.spawnTick; k < tick && k < s.spawnTick + 1200; k++) { ax = Math.fround(ax + vx); ay = Math.fround(ay + vy); }
+    let ax = s.x, ay = s.y;
+    const vx = s.vx, vy = s.vy;
+    for (let k = s.spawnTick; k < tick && k < s.spawnTick + 1200; k++) { ax += vx; ay += vy; }
     const bx = ax + vx, by = ay + vy;
     const pose = this.host.pose(id, this.host.pilot(id) ? tick : tick - 1);
     let x = ax, y = ay;
     const geoms = this.host.store.geometry(ship);
     if (pose && geoms[part]) {
       const cs = this.host.store.tuning.cellSize, com = ship.derived.com;
-      const px = Math.fround(pose.x), py = Math.fround(pose.y), pa = Math.fround(pose.angle);
+      const px = pose.x, py = pose.y, pa = pose.angle;
       const [la, lb] = worldToLocalDir([ax - px, ay - py], pa), [lc, ld] = worldToLocalDir([bx - px, by - py], pa);
       const ok = (j: number) => j === part;
       // (a grazing hit from a line a hair off, an own shell's row rounded: the same cast a little thick)

@@ -4,16 +4,21 @@
  * of what it found (on its inputs). The server compares with its own; when they agree it sends nothing for those hits.
  *
  * The tick-faithful layer, per snapshot window (the ticks after the last snapshot up to this one's):
- *   shells   each straight shell from a gun, from its spawn, moved a tick at a time as the server moves it (f32 sums,
+ *   shells   each straight shell from a gun, from its spawn, moved a tick at a time as the server moves it (in doubles,
  *            Position += Velocity), its line each tick the server's: from where it is to one step on
  *   ships    each ship's exact state at the tick (its replica, ShipReplicaSet.at): a pilot's after its move that tick,
- *            anyone else's from the tick before (pilotless ships move after the collision step), as f32
+ *            anyone else's from the tick before (pilotless ships move after the collision step)
  *   the cast the server's (common hitRules.ts shipSegmentHit), against the ship as this client has it; who may hurt
  *            whom by the server's rule (sidesHurt)
  *
  * It leaves alone what it can't have exactly, and the server tells those (as records): its own ship, debris, a ship
  * synced in this frame (rebuilt: its shape changed mid-window) or keyframed (its path did), shells the snapshot removed (rock, expiry, point
  * defence: their end tick isn't known), shells that don't fly straight or arm late, two pilots' fights.
+ *
+ * A window is searched once the frame's told records are in (`open` at the snapshot, `detect` at its hits message, or
+ * before anything after it that reads the HP): a shell the server says struck something on tick k (debris, a keyframed
+ * ship, this client's own) struck that, and nothing else, on k, and is spent or passes on from there as the record says.
+ * Searched without them, the layer flew such a shell on into a ship behind and found a hit the server never had.
  *
  * The hit chain: each hit (found or told) adds hitHash(shell, ship, part) to a sum. At a snapshot whose hits changed
  * it, the low byte goes up on the next input (or on its own after REPORT_WAIT input ticks). A correction (hitFix) says
@@ -33,7 +38,7 @@ interface Shell {
   def: WeaponTuning;
   /** The tick its line counts from (where it is at that tick's end: spawn) */
   spawnTick: number;
-  /** Where it is at the end of tick `at` (f32, as the server keeps it) and its step a tick (f32) */
+  /** Where it is at the end of tick `at` and its step a tick (doubles: the server's Position and Velocity are f64) */
   px: number;
   py: number;
   at: number;
@@ -62,6 +67,14 @@ export interface SelfHitsHost {
   passes(shell: number): number;
 }
 
+/** A hit the server told this frame (its record): the shell struck `target` on `tick`, and was spent if `gone` */
+export interface ToldHit { shell: number; tick: number; target: number; gone: boolean }
+
+/** A hits message's records as told hits (`snapTick`: the snapshot they count back from) */
+export function toldHits(h: readonly number[], snapTick: number): ToldHit[] {
+  return unpackHits(h).map((r) => ({ shell: r.shell, tick: snapTick - r.ago, target: r.target, gone: r.gone }));
+}
+
 /** A hit in the chain, kept a while for a correction: its HP change, to take back if the server never had it */
 export interface LogEntry { tick: number; shell: number; target: number; part: number; h: number; undo: HitDone['undo'] }
 
@@ -82,6 +95,8 @@ export class SelfHits {
   private dropped = new Set<number>();
   /** The last snapshot's tick: the next window starts after it */
   private lastTick = -1;
+  /** A snapshot's window waiting for the frame's told records (open, then detect): its tick, -1 none */
+  private due = -1;
   /** This frame: ships synced (their shape changed), shells the snapshot removed */
   private synced = new Set<number>();
   private removed = new Set<number>();
@@ -133,6 +148,7 @@ export class SelfHits {
     this.log = [];
     this.report = null;
     this.lastTick = -1;
+    this.due = -1;
   }
 
   /**
@@ -146,7 +162,7 @@ export class SelfHits {
     const sh = ship ? gunShell(this.host.store.tuning, ship, gun) : null;
     // (a great slow orb hits as wide as it's drawn: the server tells those)
     if (!sh || !firesStraight(sh.def) || sh.def.lob || sh.def.arm || size * 5 >= 19.95) return;
-    this.shells.set(id, { owner, def: sh.def, spawnTick, px: Math.fround(x), py: Math.fround(y), at: spawnTick, vx: Math.fround(vx), vy: Math.fround(vy), hit: null, dead: false, win: 0 });
+    this.shells.set(id, { owner, def: sh.def, spawnTick, px: x, py: y, at: spawnTick, vx, vy, hit: null, dead: false, win: 0 });
   }
 
   /**
@@ -185,15 +201,37 @@ export class SelfHits {
     for (const id of ids) this.removed.add(id);
   }
 
+  /** The snapshot at `tick` is in (its replicas, rows and removals): its window is searched once its told records are (detect) */
+  open(tick: number): void {
+    this.due = tick;
+  }
+
+  /** A window opened and not searched yet */
+  get waiting(): boolean {
+    return this.due >= 0;
+  }
+
   /**
-   * The snapshot at `tick` is in (its replicas, rows and removals): the hits on the ticks since the last one, in tick
-   * then shell order
+   * The open window searched, with the frame's told records (`told`: none came, or not yet: anything after the hits
+   * message reads the HP): the hits on the ticks since the last snapshot, in tick then shell order. A shell told struck
+   * on a tick struck that and only that then (one hit a tick: the server's collision step takes the nearest)
    */
-  detect(tick: number): OwnHit[] {
+  detect(told: readonly ToldHit[] = []): OwnHit[] {
     const out: OwnHit[] = [];
+    const tick = this.due;
+    if (tick < 0) return out;
+    this.due = -1;
     const from = this.lastTick;
     this.lastTick = tick;
     this.snapTick = tick;
+    const toldAt = new Map<number, ToldHit>();
+    for (const t of told) {
+      const s = this.shells.get(t.shell);
+      if (!s) continue;
+      // (before the window: already settled, or a record for a tick the layer has passed: its exclusion and end only)
+      if (t.tick <= from || t.tick > tick) { (s.hit ??= new Set()).add(t.target); if (t.gone) s.dead = true; continue; }
+      toldAt.set(t.shell * 4096 + (t.tick & 4095), t);
+    }
     if (this.on && from >= 0 && tick > from && tick - from <= 120) {
       this.stats.windows++;
       const { store } = this.host, me = this.host.self();
@@ -208,9 +246,17 @@ export class SelfHits {
         for (const id of ids) {
           const s = this.shells.get(id)!;
           if (s.dead || this.removed.has(id) || k <= s.spawnTick) continue;
-          // (Moved as the server moves it, a tick at a time in f32)
-          while (s.at < k) { s.px = Math.fround(s.px + s.vx); s.py = Math.fround(s.py + s.vy); s.at++; }
+          // (Moved as the server moves it, a tick at a time: Position += Velocity, in doubles as its components are)
+          while (s.at < k) { s.px += s.vx; s.py += s.vy; s.at++; }
           if (k - s.spawnTick > SHELL_TICKS) { s.dead = true; continue; }
+          // (The server's word for this tick: it struck what the record says, and passes on or is spent as it says)
+          const t = toldAt.size ? toldAt.get(id * 4096 + (k & 4095)) : undefined;
+          if (t) {
+            (s.hit ??= new Set()).add(t.target);
+            s.win++;
+            if (t.gone) s.dead = true;
+            continue;
+          }
           const x0 = s.px, y0 = s.py, x1 = x0 + s.vx, y1 = y0 + s.vy;
           let best = -1, bp = -1, bt = Infinity;
           const sideA = this.host.side(s.owner);
@@ -219,7 +265,7 @@ export class SelfHits {
             const ship = store.get(t)!;
             const pose = this.host.at(t, this.host.side(t) & SIDE.PILOT ? k : k - 1);
             if (!pose) continue;
-            const h = shipSegmentHit(store, ship, Math.fround(pose.x), Math.fround(pose.y), Math.fround(pose.angle), x0, y0, x1, y1);
+            const h = shipSegmentHit(store, ship, pose.x, pose.y, pose.angle, x0, y0, x1, y1);
             if (h && h.t < bt) { bt = h.t; best = t; bp = h.part; }
           }
           if (best < 0) continue;
