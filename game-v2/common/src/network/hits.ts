@@ -14,8 +14,10 @@
  *              reports a 1-byte hash of them on its inputs; the server tells only what it couldn't find or got wrong
  *   PACKED     bit-packed frames (network/packed): reads PACKED_FRAME messages as well as the base format
  *   COALESCE   (with PACKED) frames with nothing urgent wait a few ticks (netCaps.hold) and go several to a WebSocket message
+ *   OWN_SHOTS  its own straight shells come as fire events (built from its own predicted pose, exact while the prediction
+ *              holds), not projectile rows; rows still for a window the server corrects its ship in (server ownShots.ts)
  */
-export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8 } as const;
+export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16 } as const;
 
 /** One shell's hit on a ship, as a capable client is told it */
 export interface ShellHitRecord {

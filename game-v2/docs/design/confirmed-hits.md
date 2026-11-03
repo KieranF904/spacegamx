@@ -683,3 +683,54 @@ The fake client (fakeHitsClient.testkit.ts) gained what the game's client alread
 each snapshot's tick (the game's client steps them as it draws; a replica nobody asked for in 600 ticks stops short,
 which gave the probe a 1,426-unit "drift" from a stale shell origin at caps 1). Test: `server/src/net/hits/hitPoints.test.ts`
 (a seeded pirates fight; 155 hits on the client's ship, 41 on pirates; fails on the old hitPoint).
+
+(F1 note, later the same day: Kieran put visual consistency first. Every drawn shell now stops at the first surface it
+touches as drawn on the client (docs/areas/weapons.md, "Where a shell stops"), and the server's hits only confirm, so
+the derived point above draws an impact only for a shell the client isn't drawing.)
+
+### F2. Own shells exact: fire events for the pilot's own guns (CAPS.OWN_SHOTS = 16, no protocol change)
+
+The shooter's own shell rows cost 435-437 B/s in the Hammerhead and Gale fights and were the source of nearly every
+hash disagreement left: rows round the spawn to 0.1 and the velocity to 0.01. With exact spawns (a probe-only cheat)
+the disagreements were 0.
+
+**What the client needs to build its own shells exactly**, and where each comes from:
+
+| input | source | exact? |
+|---|---|---|
+| that a gun fired, on which tick, and the shells' ids | the fire event (as for every other ship) | yes: nothing to predict, so energy-limited fire, a clip, a dry gun and ammunition are the server's word |
+| the aim (turret or gimbal) | the fire event's `aimQ` | yes |
+| the ammunition and an augmented shot | the fire event's part packing | yes |
+| spread | `shellSeed(owner, gun uid, i)`, shared (launch.ts) | yes |
+| launch maths (muzzle, direction, speed, size) | `rebuildVolley`, deterministic (detTrig) | yes |
+| the ship's pose and velocity on the fire tick | its own prediction: `GameState.selfPoseAt(tick)` (noted on every predicted step and every replayed one after a correction) | while the prediction held on that tick |
+
+`lastProcessedInput` isn't needed: the history is kept by tick, and a tick the prediction got wrong is one the server
+corrects. So the server sends the pilot's own straight volleys as fire events (server `net/snapshot/ownShots.ts`,
+SnapshotBuilder's fire loop) unless the snapshot's own row is a correction (`selfRowState.fix`: forced, an input
+applied late, a new keyframe version, first sight, or a change to what its flight depends on), when that window's
+shells go as rows, as before. The client builds them in `ShipClient.preSnapshot` from `selfPoseAt` (rows for the rest,
+as ever). It is a caps bit of its own, not SELF_HITS: it helps any client (bytes and exact own lines), a client that
+doesn't build its own shells from fire events must not get them, and it can be switched on its own (`?ownshots=0|1`;
+on in dev builds; the dev server allows it, `NET_CAPS` 31 elsewhere).
+
+**Still rows** (by rule, and why):
+- a window whose own row corrects the prediction (above): the client's pose for those ticks was its guess;
+- shells that don't fly a straight line from the muzzle: homing, guided, lobbed, arming late (their rows carry where
+  they are, and their hits are told anyway);
+- clients without the bit.
+
+**Not exact, and not caught** (measured): a pose the prediction got wrong without the server knowing on that window
+(a hash mismatch found later: the 1-a-second state hash). In the probe (whose fake client takes the server's own pose
+as its prediction), 2 of 109 own shells in the boss fight and 7 of 821 in the debris fight were built off: a knock (a
+boss's blow, a collision with debris) in the tick it fired, which the window's own row didn't flag as a correction.
+SelfHits' hash and hitFix put those right, as before.
+
+Tests: `server/src/net/snapshot/ownShots.test.ts` (no own rows in a steady fight, every own shell bit for bit the
+server's, every found hit agreed, the same hits as a legacy observer; a stretch of forced corrections sends that
+stretch's shells as rows; without the bit, rows).
+
+Measured (probe, shooter, caps 15 -> 31): own shell rows 434 -> 0 B/s with 198 B/s of fire events instead
+(Hammerhead), 437 -> 0 with 155 (Gale), 76 -> 0 with 38 (Pips); payload 951 -> 713, 1,093 -> 808, 322 -> 285;
+hash disagreements 2 -> 0, 4 -> 0, 1 -> 0; corrections 1 -> 0, 2 -> 0. Details: docs/audits/netcode-phase2-3-impact-2026-11-04.md,
+"Follow-up".

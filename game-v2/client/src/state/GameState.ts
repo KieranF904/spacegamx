@@ -600,17 +600,17 @@ export class GameState {
    * server had it at a snapshot that corrected it). Where the server had it then, while the prediction held: what a
    * confirmed hit on it (ConfirmedHits.hitPoint) and a fire event of its own guns (ShipClient.preSnapshot) count from
    */
-  private selfPoses = new Map<number, { x: number; y: number; angle: number }>();
+  private selfPoses = new Map<number, { x: number; y: number; angle: number; vx: number; vy: number }>();
 
-  /** The local ship's pose at the end of `tick` (null: not predicted lately) */
-  selfPoseAt(tick: number): { x: number; y: number; angle: number } | null {
+  /** The local ship's pose and velocity at the end of `tick` (null: not predicted lately) */
+  selfPoseAt(tick: number): { x: number; y: number; angle: number; vx: number; vy: number } | null {
     return this.selfPoses.get(tick) ?? null;
   }
 
   private noteSelf(player: InterpolatedEntity, tick: number): void {
     const p = this.selfPoses.get(tick);
-    if (p) { p.x = player.x; p.y = player.y; p.angle = player.angle; }
-    else this.selfPoses.set(tick, { x: player.x, y: player.y, angle: player.angle });
+    if (p) { p.x = player.x; p.y = player.y; p.angle = player.angle; p.vx = player.vx; p.vy = player.vy; }
+    else this.selfPoses.set(tick, { x: player.x, y: player.y, angle: player.angle, vx: player.vx, vy: player.vy });
     if (this.selfPoses.size > SELF_POSE_TICKS) for (const t of this.selfPoses.keys()) if (t < tick - SELF_POSE_TICKS) this.selfPoses.delete(t);
   }
 

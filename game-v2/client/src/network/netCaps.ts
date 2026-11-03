@@ -21,7 +21,9 @@ export function netCaps(): number {
   const dev = !!(import.meta as { env?: { DEV?: boolean } }).env?.DEV;
   const packed = flag('packed', 'sg.packed') ?? dev;
   const coalesce = packed && (flag('coalesce', 'sg.coalesce') ?? true);
-  return clientCaps() | (packed ? CAPS.PACKED : 0) | (coalesce ? CAPS.COALESCE : 0);
+  // (its own shells as fire events, built from its own predicted pose: ShipClient.preSnapshot)
+  const ownShots = flag('ownshots', 'sg.ownshots') ?? dev;
+  return clientCaps() | (packed ? CAPS.PACKED : 0) | (coalesce ? CAPS.COALESCE : 0) | (ownShots ? CAPS.OWN_SHOTS : 0);
 }
 
 /**

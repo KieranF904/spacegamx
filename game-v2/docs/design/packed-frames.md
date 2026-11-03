@@ -132,11 +132,9 @@ Wire = payload + 66 B x messages/s. Deflated = the server's permessage-deflate (
    or as the periodic safety copy (`ClientConnection.selfRowQuiet`: SnapshotBuilder now tells that from a correction:
    a forced or late-input row, a new keyframe version, first sight, or a change to what its flight depends on, which
    all stay urgent, as do deaths, answers and everything outside the tick's stream). What it costs: the HP numbers of
-   its hits confirm up to COALESCE_TICKS (50 ms) later. Its own shells' impacts come from the hits it finds as the
-   snapshot arrives, now up to 3 ticks later, so a predicted shell flies up to 3 ticks further past the hull before
-   its hit stops it (it already flew a round trip's worth past: the impacts aren't predicted); other ships' shells are
-   drawn a coalescing hold behind on the interpolated timeline (`coalesceMs`), and their hits wait for the drawn head
-   (WeaponFx.strike), so they land as before. The adopt path is unchanged (more shells now come and go inside one
+   its hits confirm up to COALESCE_TICKS (50 ms) later. Impacts aren't affected: every drawn shell stops at the surface
+   it touches as drawn, in that frame, whatever the server's hit says (docs/areas/weapons.md, "Where a shell stops";
+   built right after this), so a late hit message no longer lets a shell fly on past a hull. The adopt path is unchanged (more shells now come and go inside one
    message: the client's own are adopted, others' drawn by follow-up 1). `PackedLink.stats.why` counts what made
    each early message go. Probe (caps 15, shooter): messages/s Pips 10.8 -> 8.3, Hammerhead 15.2 -> 9.8, Gale
    17.8 -> 10.1, debris 17.9 -> 10.2, boss 16.0 -> 13.7 (the boss's blows correct the pilot's ship: real

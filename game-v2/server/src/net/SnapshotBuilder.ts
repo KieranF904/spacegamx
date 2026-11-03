@@ -38,6 +38,7 @@ import { stationQuery } from '../game/Docking.js';
 import { portalQuery } from './handlers/flight.js';
 import { SELF_SAFETY_TICKS, SNAP_PROJECTILE_RANGE, SNAP_POD_RANGE, SHIP_VIEW_IN, SHIP_VIEW_OUT, MAP_DOTS_TICKS, DEBRIS_ACK_TICKS } from './snapshot/constants.js';
 import type { HitLedger } from './hits/HitLedger.js';
+import { ownShotsFor, ownVolleyExact } from './snapshot/ownShots.js';
 
 /** A debris body's status row as its key (rowKey): what a client makes itself for debris it works out (common ships/debris.ts) */
 const DEBRIS_ROW_KEY = DEBRIS_STATUS.join(',');
@@ -484,6 +485,22 @@ export class SnapshotBuilder {
 
   private snapshotCount = 0;
 
+  /**
+   * A client's own row this snapshot: whether it goes (`need`: its prediction needs correcting, its status changed, its
+   * warmth too, or now and then) and whether as a correction (`fix`: forced, an input applied late, a new keyframe
+   * version, first sight, or a change to what its flight depends on, apart from its HP: its slowing ending too,
+   * features/weaponry)
+   */
+  private selfRowState(conn: ClientConnection, r: SnapRow, prevStates: Map<number, string>): { need: boolean; fix: boolean; key: string; flight: string; version: number } {
+    const d = r.state.data ?? [];
+    const flight = JSON.stringify([d[4], d[5], d[PILOT_ROW.field], d[PILOT_ROW.warmth], this.slowEnd(r.id)]);
+    const key = JSON.stringify([r.state.hp, r.state.maxHp]) + flight;
+    const version = this.replication.versionOf(r.id);
+    const fix = conn.forceSnapshot || conn.selfLate || version !== conn.selfVersion || !prevStates.has(r.id) || flight !== conn.selfFlight;
+    const need = fix || key !== conn.selfKey || this.currentTick - conn.selfSentTick >= SELF_SAFETY_TICKS;
+    return { need, fix, key, flight, version };
+  }
+
   sendSnapshots(): void {
     // Skip entirely when no clients are connected — avoids building
     // per-entity state objects and JSON keys for nothing.
@@ -532,10 +549,16 @@ export class SnapshotBuilder {
       // Not for a ship it's only now getting a keyframe for (it can't place it back then), nor its
       // own (predicted, not replicated); those shells, and any flying in from further off, go as rows.
       const keyed = new Set(rep.ships.map((k) => k[0]));
+      // Its own row: whether it goes, and whether to correct its prediction (then its own shells this window go as rows)
+      const selfRow = rows.find((r) => r.id === conn.playerId);
+      const self = selfRow ? this.selfRowState(conn, selfRow, prevStates) : null;
+      // (Its own shells as fire events too, built from its own predicted pose, when it takes them: snapshot/ownShots.ts)
+      const ownShots = ownShotsFor(conn.caps, !self || self.fix);
       const fire: number[][] = [];
       const covered = new Set<number>();
       for (const f of this.ships.fired) {
-        if (f.owner === conn.playerId || !conn.shipView.has(f.owner) || keyed.has(f.owner) || !conn.repKnown.has(f.owner)) continue;
+        if (f.owner === conn.playerId) { if (!ownShots || !ownVolleyExact(this.ships, f)) continue; }
+        else if (!conn.shipView.has(f.owner) || keyed.has(f.owner) || !conn.repKnown.has(f.owner)) continue;
         if (InSystem.systemId[f.owner] !== playerSystemId) continue;
         // (the ammunition rides on the part: part + 256 × its code, + 65536 for an augmented shot, power/ports.ts)
         fire.push([f.owner, this.currentTick - f.tick, f.part + 256 * (f.ammo ?? 0) + (f.aug ? 65536 : 0), f.aimQ, ...f.ids]);
@@ -549,23 +572,15 @@ export class SnapshotBuilder {
         if (r.kind === 'projectile' && covered.has(r.id)) { newStates.set(r.id, r.key); continue; }
         if ((r.kind === 'projectile' || r.kind === 'mob') && fartherThan(r.x - px, r.y - py, SNAP_PROJECTILE_RANGE)) continue;
         if (r.kind === 'pod' && fartherThan(r.x - px, r.y - py, SNAP_POD_RANGE)) continue;
-        if (r.id === conn.playerId) {
+        if (r.id === conn.playerId && self) {
           // Its own ship: only when its prediction needs correcting, its status changed (its warmth too), or now and then
-          const d = r.state.data ?? [];
-          // (and when its slowing ends: its prediction flies a slowed ship, features/weaponry)
-          // (what its flight depends on, apart from its HP: a change there is as good as a correction)
-          const flight = JSON.stringify([d[4], d[5], d[PILOT_ROW.field], d[PILOT_ROW.warmth], this.slowEnd(r.id)]);
-          const key = JSON.stringify([r.state.hp, r.state.maxHp]) + flight;
-          const version = this.replication.versionOf(r.id);
-          const fix = conn.forceSnapshot || conn.selfLate || version !== conn.selfVersion || !prevStates.has(r.id) || flight !== conn.selfFlight;
-          const need = fix || key !== conn.selfKey || this.currentTick - conn.selfSentTick >= SELF_SAFETY_TICKS;
           newStates.set(r.id, 'self');
-          if (!need) continue;
-          conn.selfRowQuiet = !fix;
+          if (!self.need) continue;
+          conn.selfRowQuiet = !self.fix;
           conn.selfLate = false;
-          conn.selfVersion = version;
-          conn.selfKey = key;
-          conn.selfFlight = flight;
+          conn.selfVersion = self.version;
+          conn.selfKey = self.key;
+          conn.selfFlight = self.flight;
           conn.selfSentTick = this.currentTick;
         }
         let v = r.other && r.id !== conn.playerId ? r.other : r;

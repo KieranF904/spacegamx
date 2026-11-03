@@ -7,7 +7,7 @@
  * on an input after each step (`report`). `drop` makes it miss hits on purpose (the forced-mismatch test).
  */
 import {
-  CAPS, SIDE, EntityType, Position, Rotation, ServerFrameReader, encodeMessage, decodeMessage, rebuildVolley, ShipReplicaSet,
+  CAPS, SIDE, EntityType, Position, Rotation, Velocity, ServerFrameReader, encodeMessage, decodeMessage, rebuildVolley, ShipReplicaSet,
   type ClientMessage, type ClientSocket, type ServerMessage, type ServerSnapshotMessage, type ShipState, type ReplicaEnv,
 } from '@space-game/common';
 import { ShipStore } from '../../../../client/src/ships/ShipStore.js';
@@ -50,6 +50,9 @@ export class FakeHitsClient {
   reports = 0;
   /** Hits it threw away (drop) */
   dropped = 0;
+  /** Its own shells as projectile rows, and as fire events (CAPS.OWN_SHOTS: built from its own pose) */
+  ownRows = 0;
+  ownFired = 0;
   link: { receive(msg: ClientMessage): void } | null = null;
   /** What it sends the server (hpResync, reports), delivered after the step (a real socket is never re-entered) */
   outbox: ClientMessage[] = [];
@@ -104,13 +107,13 @@ export class FakeHitsClient {
    * Its own ship's pose at the end of each tick, as a client's prediction has it while it holds (GameState.selfPoseAt):
    * here the server's, noted after each step (the server's step is wrapped) and as each frame goes
    */
-  private selfHist = new Map<number, { x: number; y: number; angle: number }>();
+  private selfHist = new Map<number, { x: number; y: number; angle: number; vx: number; vy: number }>();
 
   /** Its own ship's pose this tick (what its prediction would say) */
   private noteSelf(): void {
     if (this.pid < 0) return;
     const t = this.server.getTick();
-    this.selfHist.set(t, { x: Position.x[this.pid], y: Position.y[this.pid], angle: Rotation.angle[this.pid] });
+    this.selfHist.set(t, { x: Position.x[this.pid], y: Position.y[this.pid], angle: Rotation.angle[this.pid], vx: Velocity.x[this.pid], vy: Velocity.y[this.pid] });
     this.selfHist.delete(t - 240);
   }
 
@@ -187,6 +190,7 @@ export class FakeHitsClient {
       if (e.type === EntityType.Player || e.type === EntityType.ShipBody) this.kinds.set(e.id, { type: e.type, side: e.type === EntityType.ShipBody && d ? d[10] ?? 0 : 0 });
       if (e.type !== EntityType.Projectile) continue;
       this.known.add(e.id);
+      if (d?.[6] === this.pid) this.ownRows++;
       if (d && (d[10] ?? -1) >= 0) {
         const sh = { owner: d[6], gun: d[10], spawnTick: d[3], x: d[4], y: d[5], vx: e.vx ?? 0, vy: e.vy ?? 0 };
         this.shells.set(e.id, sh);
@@ -196,9 +200,11 @@ export class FakeHitsClient {
     // Fire events: the shells rebuilt from the firing ship's replica, as ShipClient.preSnapshot does
     for (const [owner, ago, partAmmo, aimQ, ...ids] of s.fire ?? []) {
       for (const id of ids) this.known.add(id);
+      if (owner === this.pid) this.ownFired += ids.length;
       const tick = s.tick - ago, part = partAmmo % 256, ammo = Math.floor(partAmmo / 256) % 256, aug = partAmmo >= 65536 ? (1 as const) : undefined;
-      const ship = this.store.get(owner), st = this.reps.at(owner, tick);
-      const v = ship && st ? rebuildVolley({ owner, tick, part, aimQ, ids, ammo, aug }, ship as ShipState, st.body, this.server.getShips().tuning) : null;
+      // (its own: from its own pose on that tick, as the game's client builds them from its prediction: CAPS.OWN_SHOTS)
+      const ship = this.store.get(owner), body = owner === this.pid ? this.selfHist.get(tick) : this.reps.at(owner, tick)?.body;
+      const v = ship && body ? rebuildVolley({ owner, tick, part, aimQ, ids, ammo, aug }, ship as ShipState, body, this.server.getShips().tuning) : null;
       const spawnTick = owner === this.pid || this.kinds.get(owner)?.type === EntityType.Player ? tick - 1 : tick;
       for (const id of ids) {
         const sh = v?.shells.find((x) => x.id === id);
