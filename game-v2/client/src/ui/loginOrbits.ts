@@ -23,8 +23,8 @@ export const LOGIN_ORBITS = {
   size: { aroundPlanet: 0.026, aroundMoon: 0.05 },
   /** A ringed planet's disc is drawn at this fraction of that (its rings reach far past it) */
   ringedScale: 1,
-  /** A planet with no moon to float beside it still gets a small body (a Sol body at random) */
-  floaterWithoutMoon: true,
+  /** A planet with no moon to float beside it gets a small body anyway (a Sol body at random): off, as before (Kieran: no bodies added just to orbit) */
+  floaterWithoutMoon: false,
   /** Seconds between one leaving and the next coming in (picked between the two) */
   gap: [3, 14] as [number, number],
   /** The last few bodies that left aren't brought straight back */
