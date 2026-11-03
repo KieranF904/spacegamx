@@ -17,7 +17,7 @@ import { stepGuns } from './guns.js';
 import { stepShipPhysics } from './physics.js';
 import type { FlightBody, FlightControls } from './flight.js';
 import {
-  BROWNOUT, CHARGE_GROUPS_AT, PILOT_ROW, FULL_CHARGE, bankCharges, chargeTotal, gunLoad, loadTest, packCharge, powerTick, remapCharge, unpackCharge, type Charge,
+  BROWNOUT, CHARGE_GROUPS_AT, PILOT_ROW, FULL_CHARGE, bankCharges, chargeTotal, gunDrawFlatOut, gunLoad, loadTest, packCharge, powerTick, remapCharge, unpackCharge, type Charge,
 } from './energy.js';
 import { burstEnergy, DODGE_LEFT } from './features/strafer/strafer.js';
 import { readShipJson, testCatalog, SHIP_DATA_DIR } from './testData.js';
@@ -221,9 +221,9 @@ describe('energy: the pool and the powered rule', () => {
     for (const w of d.weapons) load[L.feedOf[w.part]] += L.draw[w.part];
     const r = powerTick(d, FULL_CHARGE, { thrusting: true, boosting: true, load }, tuning);
     expect(r.boost).toBe(true);
-    // (Engines first: the guns get no more of a share than they do)
+    // (Shared by what each asks: the guns get the same share as the engines)
     expect(r.power).toBeLessThan(BROWNOUT);
-    expect(Math.max(...r.charge.gun!)).toBeLessThanOrEqual(r.power + 1e-9);
+    for (const g of r.charge.gun!) expect(g).toBeCloseTo(r.power, 9);
     expect(chargeTotal(d, r.charge)).toBeGreaterThan(95);
     // Without the rates it wouldn't have
     const free = powerTick(unlimited(d), FULL_CHARGE, { thrusting: true, boosting: true, load }, tuning);
@@ -247,16 +247,26 @@ describe('energy: the pool and the powered rule', () => {
     expect(L.partCap[9]).toBeGreaterThan(1000);
   });
 
-  it('spare generation refills the pool and the banks, emptiest first', () => {
+  it('a bank not full asks the Output for its intake (the spare stream first, then the pool); the stream left refills the pool', () => {
     const b = base([p(9, 'sq', 'power_capacitor', 3, 0), p(10, 'sq', 'power_battery', -2, 1)]);
-    const d = derived(b);
-    expect(d.power!.banks.length).toBe(1);
-    expect(d.power!.banks[0].refills).toBe(true);
+    const d = derived(b), L = d.power!;
+    expect(L.banks.length).toBe(1);
+    expect(L.banks[0].refills).toBe(true);
+    // (A Capacitor takes 40/s a cell; the reactor's 35/s is less, so the pool pays the other 5/s)
+    expect(L.banks[0].intake).toBeCloseTo(40, 6);
+    expect(L.spare).toBeCloseTo(35, 6);
+    const held = (x: Charge) => ({ pool: (x.g / 100) * L.pool.cap, bank: (x.b[0] / 100) * L.banks[0].cap });
     let c: Charge = { g: 20, b: [80] };
+    const at0 = held(c);
     for (let t = 0; t < 30; t++) c = powerTick(d, c, { thrusting: false, boosting: false }, tuning).charge;
-    // (The pool, emptier, takes it all while the bank is fuller)
-    expect(c.g).toBeGreaterThan(20);
-    expect(c.b[0]).toBeCloseTo(80, 6);
+    expect(held(c).bank - at0.bank).toBeCloseTo(40 / 2, 1);
+    expect(held(c).pool - at0.pool).toBeCloseTo(-5 / 2, 1);
+    // Once the bank is full, all the stream goes to the pool
+    for (let t = 0; t < 60; t++) c = powerTick(d, c, { thrusting: false, boosting: false }, tuning).charge;
+    expect(c.b[0]).toBe(100);
+    const at1 = held(c);
+    for (let t = 0; t < 60; t++) c = powerTick(d, c, { thrusting: false, boosting: false }, tuning).charge;
+    expect(held(c).pool - at1.pool).toBeCloseTo(35, 0);
   });
 });
 
@@ -287,9 +297,9 @@ describe('energy: banks', () => {
     const r = shoot(b, 600, () => c, { thrusting: true, boosting: true });
     const flatOut = 600 / d.weapons.find((x) => x.part === 2)!.interval;
     expect(r.shots[2]).toBeGreaterThan(flatOut * 0.95);
-    // (The other shares what's left of the Output with nothing behind it)
-    expect(r.shots[1] ?? 0).toBeLessThan(r.shots[2] * 0.75);
-    expect(r.charge.b[0]).toBeLessThan(100);
+    // (The other shares the Output with the engines and the bank's refill, by what each asks: slower, but every tick)
+    expect(r.shots[1] ?? 0).toBeLessThan(r.shots[2]);
+    expect(r.shots[1] ?? 0).toBeGreaterThan(r.shots[2] * 0.5);
   });
 
   it('a Drive Cell gives a Burst Strafer 2 full bursts on an empty pool', () => {
@@ -384,6 +394,106 @@ describe('energy: banks', () => {
     expect(back.b).toEqual(c.b);
     expect(unpackCharge([1, 2, 3])).toEqual({ g: 100, b: [] });
     expect(bankCharges(d, c).map((x) => x.kind)).toEqual(['pool', 'cap', 'drive']);
+  });
+});
+
+describe('energy: proportional sharing (Kieran, 2026-11-04)', () => {
+  /**
+   * A bare power layout to put Kieran's numbers through the real powerTick: part 0 an engine drawing `eng`/s, part 1 a
+   * gun (its draw is the load), the pool empty so the Output is `spare` alone; optionally a Drive Cell bank (100, gives
+   * without limit) feeding the engine, `intake`/s in, at `pct`.
+   */
+  function bare(o: { spare: number; eng: number; bank?: { intake: number; pct: number } }): { d: ShipDerived; c: Charge; eng: number; gun: number } {
+    const banked = !!o.bank;
+    const power = {
+      pool: { cap: 240, rate: 720, coreCap: 240, coreRate: 720, parts: [] },
+      banks: banked ? [{ kind: 'drive', parts: [2], cap: 100, rate: 1e9, intake: o.bank!.intake, feeds: [0], shields: [], refills: true, dynamo: 0, dynamos: [] }] : [],
+      spare: o.spare,
+      feeds: banked ? [{ banks: [0] }, { banks: [] }] : [{ banks: [] }],
+      feedOf: banked ? [0, 1, -1] : [0, 0, -1],
+      bankOf: [-1, -1, banked ? 0 : -1],
+      draw: [o.eng, 0, 0],
+      boostDrain: [1, 0, 0],
+      partCap: [0, 0, banked ? 100 : 0],
+      pooled: [false, false, false],
+    };
+    const d = { power, energy: {}, thrusters: [{ part: 0, force: [0, -1] }] } as unknown as ShipDerived;
+    return { d, c: { g: 0, b: banked ? [o.bank!.pct] : [] }, eng: power.feedOf[0], gun: power.feedOf[1] };
+  }
+  const tick = (x: ReturnType<typeof bare>, gunDraw: number, c = x.c) => powerTick(x.d, c, { thrusting: true, boosting: false, load: x.eng === x.gun ? [gunDraw] : [0, gunDraw] }, tuning);
+
+  it('thrusters ask 10, weapons 20: short of the Output, the weapons get 2/3 of it and each gets the same share of its ask', () => {
+    const x = bare({ spare: 15, eng: 10 });
+    const r = tick(x, 20);
+    // (15 of Output against 30 asked: everyone at half)
+    expect(r.charge.eng![x.eng]).toBeCloseTo(0.5, 12);
+    expect(r.charge.gun![x.gun]).toBeCloseTo(0.5, 12);
+    const engGot = 10 * r.charge.eng![x.eng], gunGot = 20 * r.charge.gun![x.gun];
+    expect(gunGot / (engGot + gunGot)).toBeCloseTo(2 / 3, 12);
+    expect(r.power).toBeCloseTo(0.5, 12);
+    // Within the Output, everyone gets all they ask
+    const full = tick(bare({ spare: 30, eng: 10 }), 20);
+    expect(full.charge.eng![0]).toBe(1);
+    expect(full.charge.gun![0]).toBe(1);
+  });
+
+  it('a bank feeding the thrusters asks its intake (30) against the weapons\' 20: the thruster side gets 3/5 of a short Output, banked', () => {
+    // The thrusters draw their 10 on the bank (it holds charge); the bank asks 30 to refill, the guns 20; the Output is 25
+    const x = bare({ spare: 25, eng: 10, bank: { intake: 30, pct: 50 } });
+    let c = x.c;
+    for (let t = 0; t < 60; t++) {
+      const r = tick(x, 20, c);
+      c = r.charge;
+      expect(r.charge.eng![x.eng]).toBe(1);
+      // (25 of Output against 50 asked: the bank gets 15 = 3/5, the guns 10 = 2/5 of it)
+      expect(r.charge.gun![x.gun]).toBeCloseTo(0.5, 12);
+    }
+    // In a second the bank took in 15 and gave the thrusters 10
+    expect(c.b[0]).toBeCloseTo(55, 1);
+    // A dry bank feeds nothing, so its thrusters ask for themselves too: 10 + 30 + 20 asked of 25
+    const dry = bare({ spare: 25, eng: 10, bank: { intake: 30, pct: 0 } });
+    const r0 = tick(dry, 20);
+    expect(r0.charge.eng![dry.eng]).toBeCloseTo(25 / 60, 12);
+    expect(r0.charge.gun![dry.gun]).toBeCloseTo(25 / 60, 12);
+  });
+
+  it('a bank raises its side\'s share: the more intake, the more of a short Output goes to what it feeds', () => {
+    // (The weapons' share of 25 of Output, against thrusters that draw 10 on their bank)
+    const gunShare = (intake: number) => tick(bare({ spare: 25, eng: 10, bank: { intake, pct: 50 } }), 20).charge.gun![1];
+    // (No bank: 25 against 30 asked)
+    const none = bare({ spare: 25, eng: 10 });
+    expect(tick(none, 20).charge.gun![none.gun]).toBeCloseTo(25 / 30, 12);
+    // (A bank that takes in 10, all the thrusters draw: the same split; 30: the guns get 2/5 of it; 60: 1/4)
+    expect(gunShare(10)).toBeCloseTo(25 / 30, 12);
+    expect(gunShare(30)).toBeCloseTo(0.5, 12);
+    expect(gunShare(60)).toBeCloseTo(25 / 80, 12);
+    // A full bank asks only to replace what it gave: no more than its side drew
+    expect(tick(bare({ spare: 25, eng: 10, bank: { intake: 60, pct: 100 } }), 20).charge.gun![1]).toBeCloseTo(25 / 30, 12);
+  });
+
+  it('a boost held on an empty store gives the guns their share every tick (engines first left them nothing every other tick)', () => {
+    // The Drum: 124 spare against 168 boosting and 24 of guns. A boost re-arms on each tick's trickle into the pool, so the
+    // ticks alternate boosting and cruising; the guns now share both
+    const d = derived(design('drum.json')), L = d.power!;
+    const load = L.feeds.map(() => 0);
+    for (const w of d.weapons) load[L.feedOf[w.part]] += gunDrawFlatOut(w, L.draw[w.part]);
+    let c: Charge = { g: 0, b: [] };
+    let boosted = 0, minGun = 1;
+    for (let t = 0; t < 600; t++) {
+      const r = powerTick(d, c, { thrusting: true, boosting: true, load }, tuning);
+      c = r.charge;
+      if (r.boost) boosted++;
+      for (let f = 0; f < L.feeds.length; f++) {
+        if (load[f] <= 0) continue;
+        minGun = Math.min(minGun, c.gun![f]);
+        // (One share for engines and guns alike)
+        expect(c.gun![f]).toBeCloseTo(r.power, 9);
+      }
+    }
+    expect(boosted).toBeGreaterThan(200);
+    expect(boosted).toBeLessThan(400);
+    // (Boosting ticks: (124 + the trickle) / (168 + 24) of each ask; the cruising ones in full)
+    expect(minGun).toBeGreaterThan(0.8);
   });
 });
 

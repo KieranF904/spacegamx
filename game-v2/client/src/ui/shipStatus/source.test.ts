@@ -80,15 +80,19 @@ describe('ship status source', () => {
     st = readStatus(input(s, { g: 60, b: [], eng: shares, gun }, { now: 1100 }), mem);
     expect(st.energy.brownout).toBe(true);
     expect(st.energy.short).toBe('guns');
-    // Held a moment after the last short tick (an empty-store boost is short every other tick), with the engines' joining it
+    expect(st.energy.share).toBeCloseTo(BROWNOUT - 0.2);
+    // Held a moment after the last short tick (an empty-store boost re-arms every other tick), with the engines' joining it
     const eng = L.feeds.map(() => BROWNOUT - 0.2);
     st = readStatus(input(s, { g: 60, b: [], eng, gun: shares }, { now: 1200 }), mem);
     expect(st.energy.short).toBe('engines+guns');
     st = readStatus(input(s, { g: 60, b: [], eng: shares, gun: shares }, { now: 1400 }), mem);
     expect(st.energy.brownout).toBe(true);
+    // (with the share it last had)
+    expect(st.energy.share).toBeCloseTo(BROWNOUT - 0.2);
     st = readStatus(input(s, { g: 60, b: [], eng: shares, gun: shares }, { now: 1800 }), mem);
     expect(st.energy.brownout).toBe(false);
     expect(st.energy.short).toBe('');
+    expect(st.energy.share).toBe(1);
   });
 
   it('says how long until the stores are full while they fill', () => {

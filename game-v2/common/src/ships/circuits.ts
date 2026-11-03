@@ -11,9 +11,10 @@
  *   Drive Cells that touch are another; the two kinds never mix. A Capacitor
  *   bank feeds the guns, beams and mining lasers it touches; a Drive Cell bank
  *   the engines and Burst Strafers it touches. A fed part draws on its bank(s)
- *   first, then on the ship's Output. A bank refills from spare generation
- *   only if a member is on a powered network, plus 10/s (`dynamo`) from each
- *   Pulse Dynamo touching it.
+ *   first, then on the ship's Output. A bank not full asks the Output for its
+ *   charge rate (`intake`: its members' `intake`), sharing it with everything
+ *   else that asks (energy.ts powerTick), if a member is on a powered network;
+ *   plus 10/s (`dynamo`) from each Pulse Dynamo touching it.
  * - **Feed groups**: burst consumers (engines, guns, mining lasers, burst part
  *   features) that draw on the same banks. Their shares are per group.
  */
@@ -27,14 +28,15 @@ export interface Bank {
   kind: 'cap' | 'drive';
   /** Its members (part indices, ascending) */
   parts: number[];
-  /** What it holds full, and the most it gives a second (the sums over its members) */
+  /** What it holds full, the most it gives a second, and the most it takes in a second while not full (the sums over its members) */
   cap: number;
   rate: number;
+  intake: number;
   /** The consumer parts it feeds (touching, of its kind), ascending */
   feeds: number[];
   /** The Flash Screens it touches (a Capacitor bank only): it pays for their instant return (features/flash) */
   shields: number[];
-  /** Whether spare generation refills it (a member on a powered network) */
+  /** Whether it asks the Output for its intake while not full (a member on a powered network) */
   refills: boolean;
   /** What touching Pulse Dynamos put in a second, and the dynamos */
   dynamo: number;
@@ -115,6 +117,12 @@ export function partDischarge(fn: FunctionDef, area: number, m: MaterialDef | un
   return per * area * fnOutput(fn, m);
 }
 
+/** A store part's charge rate (per second): its `intake` a cell (absent: a quarter of its discharge, as power/layout.ts partTakes) */
+export function partIntake(fn: FunctionDef, area: number, m: MaterialDef | undefined, t: CircuitTuning): number {
+  if (!(fn.store ?? 0)) return 0;
+  return fn.intake !== undefined ? fn.intake * area * fnOutput(fn, m) : partDischarge(fn, area, m, t) / 4;
+}
+
 /** A store part's capacity */
 export function partCapacity(fn: FunctionDef, area: number, m: MaterialDef | undefined): number {
   return (fn.store ?? 0) * area * fnOutput(fn, m);
@@ -164,11 +172,12 @@ export function powerLayout(a: CircuitInput): PowerLayout {
     if (!k) continue;
     const r = find(i);
     let b = rootBank.get(r);
-    if (b === undefined) { b = banks.length; rootBank.set(r, b); banks.push({ kind: k, parts: [], cap: 0, rate: 0, feeds: [], shields: [], refills: false, dynamo: 0, dynamos: [] }); }
+    if (b === undefined) { b = banks.length; rootBank.set(r, b); banks.push({ kind: k, parts: [], cap: 0, rate: 0, intake: 0, feeds: [], shields: [], refills: false, dynamo: 0, dynamos: [] }); }
     const B = banks[b];
     B.parts.push(i);
     B.cap += partCap[i];
     B.rate += partDischarge(fns[i], area[i], mats[i], ct);
+    B.intake += partIntake(fns[i], area[i], mats[i], ct);
     if (onPowered(i)) B.refills = true;
     bankOf[i] = b;
     for (const j of touching[i]) {

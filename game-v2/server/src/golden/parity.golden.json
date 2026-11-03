@@ -1,7 +1,7 @@
 {
   "drive-bank-boost/replica": {
     "keyframes": "",
-    "server": "98a58bc16c6b2b98"
+    "server": "406655335cf0e743"
   },
   "drive-bank-boost/unrounded-aim": null,
   "heavy-cargo/replica": {
@@ -25,8 +25,8 @@
   },
   "strafer-energy-short/unrounded-aim": null,
   "strafer-every-way/replica": {
-    "keyframes": "",
-    "server": "629b0c1daafc9d55"
+    "keyframes": "198-203,311-322,363-374",
+    "server": "bf28b09ba0cee61d"
   },
   "strafer-every-way/unrounded-aim": null,
   "strafer-heavy/replica": {

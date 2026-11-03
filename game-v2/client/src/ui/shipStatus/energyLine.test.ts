@@ -28,10 +28,10 @@ describe('the ship panel energy line', () => {
     expect(l.note).toBe('full in 15 s');
   });
 
-  it('short of power: says what is short, in red, over everything else', () => {
-    const l = energyLine(energy({ pct: 0, net: -5, empty: 0.1, brownout: true, short: 'engines+guns' }));
+  it('short of power: says what is short and the share it gets (the same for all: proportional sharing), in red, over everything else', () => {
+    const l = energyLine(energy({ pct: 0, net: -5, empty: 0.1, brownout: true, short: 'engines+guns', share: 0.643 }));
     expect(l.head).toBe('LOW POWER 0%');
-    expect(l.note).toBe('engines, guns short');
+    expect(l.note).toBe('engines, guns get 64%');
     expect(l.noteTone).toBe('bad');
     expect(l.headTone).toBe('bad');
   });

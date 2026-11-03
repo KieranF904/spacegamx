@@ -13,7 +13,7 @@ export interface EnergyLine {
   /** "−38/s", "+52/s", or '' when steady */
   rate: string;
   rateTone: Tone;
-  /** "guns short", "empty in 6 s", "full in 4 s", "+768/s spare" */
+  /** "engines, guns get 64%" (short of power, everything drawing on the Output gets the same share), "empty in 6 s", "full in 4 s", "+768/s spare" */
   note: string;
   noteTone: Tone;
 }
@@ -30,7 +30,11 @@ export function energyLine(e: ShipStatus['energy'], out: EnergyLine = { head: ''
   // (Full, a rise still in the smoothed rate is no news)
   out.rate = r === 0 || (r > 0 && pct >= 99.5) ? '' : `${r > 0 ? '+' : '−'}${Math.abs(r)}/s`;
   out.rateTone = r < 0 ? 'warn' : 'ok';
-  if (e.brownout) { out.note = `${SHORT_WORDS[e.short] || 'power'} short`; out.noteTone = 'bad'; }
+  if (e.brownout) {
+    const words = SHORT_WORDS[e.short], p = Math.round(Math.max(0, e.share) * 100);
+    out.note = words && p < 100 ? `${words} get ${p}%` : `${words || 'power'} short`;
+    out.noteTone = 'bad';
+  }
   else if (Number.isFinite(e.empty)) { out.note = `empty in ${secs(e.empty)}`; out.noteTone = e.empty < 5 ? 'warn' : 'busy'; }
   else if (Number.isFinite(e.full) && pct < 99.5) { out.note = `full in ${secs(e.full)}`; out.noteTone = 'dim'; }
   else { out.note = `+${Math.round(Math.max(0, e.gen - e.draw))}/s spare`; out.noteTone = 'dim'; }

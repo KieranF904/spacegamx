@@ -6,6 +6,7 @@ Armour · build1 · 1 pts
 TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
 Holds (engines it touches)320 energy
 Givesup to 1,400/s first to the engines and strafers its bank touches; touching Drive Cells are one bank
+Takesup to 80/s while not full, from the ship's Output; short of power, it shares by what it asks, so more raises its parts' share
 
 == partStats (stats rows) ==
 GradeMk I

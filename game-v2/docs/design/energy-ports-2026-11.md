@@ -524,6 +524,13 @@ Not in this cut: the hangar draws no port glyphs and its load test skips ports s
 (a respawn or swap); mining lasers and part features (Tow, Strafer, Flash) are unaccounted on a ports ship; shields
 draw their buffer but their `sat` isn't wired to the shield; a hazard's battery cap is ignored.
 
+**Proportional sharing (Kieran, 2026-11-04): not in the ports core yet.** The pool and banks now share a short supply
+by what each asks (every asker gets supply × its want / all wanted; a store not full asks for its intake alongside the
+consumers, so a store's intake raises the share of what it feeds: energy.ts `powerTick`, docs/areas/energy.md). The
+ports core still water-fills offers and accepts by link cap (§1.3), and `ports.ts` was left as it is. When ports ships
+move past the dev cut (P2), the Accept step should split a giver's offer across its takers in proportion to what each
+asks (integer, the remainder by part index) instead of water-filling.
+
 ## 15. Two ways to arm a ship: infrastructure tiers (2026-11-03)
 
 > Superseded by section 17 the same day: link ratings gave way to floors (power actually delivered), damage a cell gave

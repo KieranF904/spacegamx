@@ -141,6 +141,14 @@ relay power, so it needs no special code.
     - Subtract g from `left` and decrement k.
 - **Local priority falls out of this.** A thruster is served first only against sources it shares. There is no
   reservation along chains.
+- **Carry over in P2: proportional sharing (Kieran, 2026-11-04).** The live pool and banks (energy.ts `powerTick`) now
+  share a short supply by what each asks: every asker gets supply × its want / all wanted, so a thruster asking 10 and
+  guns asking 20 get 1/3 and 2/3, and a store that isn't full asks for its intake (Takes) alongside the consumers (a
+  Capacitor taking 30 for the thrusters it feeds gets 3/5 against the guns' 20: a store's intake is how a system raises
+  its share). The waterfill above (smallest want first) fills small wants in full before large ones, and `tick.ts`
+  was left as it is. P2 should switch each source's split to proportional (integer: `floor(left × want / Σwant)`, the
+  remainder by part index, so it stays deterministic), with relays' intake counted as wants. docs/areas/energy.md and
+  docs/audits/energy-audit-2026-11-04.md ("Proportional sharing") have the rule as built.
 
 ### 1.4 Weapons (buffer, latch, beams)
 

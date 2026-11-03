@@ -192,6 +192,76 @@ Nothing in the goldens moves (the flight and server goldens use the Sparrow T, t
 snapshots updated for the intended changes: ammunition guns' draw rows, the Heavy Bank and Bulwark Projector numbers,
 the library summaries' stores, the dev ships' weapon draws.
 
+## Proportional sharing (2026-11-04)
+
+Kieran: "they should be prioritized basically by their proportional draw; if a thruster asks for 10, weapons asks for
+20, weapons will get 2/3rds of the draw ... if you have a capacitor feeding your thrusters that draws at 30, the
+thrusters would prioritize 3/5ths of the energy". Built in energy.ts `powerTick` (circuits.ts gives each bank its
+`intake`):
+
+1. Engines, guns, beams, miners and part features draw on the banks they touch first, as before.
+2. What each still wants, and each bank not full that can refill (a member on a powered network) for
+   `min(intake, room)`, asks the Output (spare + the pool's rate while it holds charge). Within the Output everyone gets
+   its ask; past it each gets Output × ask / all asked. Spare pays first, then the pool.
+3. The spare left refills the pool; then Pulse Dynamos. No more engines first, no more emptiest-first refill.
+
+Choices where the words didn't map one to one:
+- **A bank and what it feeds bid separately, and add up.** While the bank holds charge, its parts draw on it and ask
+  the Output nothing, so the bank's intake is the side's whole ask: Kieran's 30 against 20 gives 3/5 exactly. A dry
+  bank feeds nothing, so its parts ask for themselves as well (10 + 30 against 20: 2/3).
+- **A bank feeding several kinds** (a Drive Cell under an engine and a Burst Strafer; a Capacitor under guns and a
+  miner) asks once, for its intake; what it feeds shares it by what each asks, like everything else.
+- **A bank's charge rate is the part's `intake`** (models.mjs: the routing core's Takes): Capacitor 40/s a cell, Drive
+  Cell 80/s (absent: a quarter of its discharge). Before, banks refilled from leftover spare without a limit.
+- **Banks refill from the pool too**, because the Output includes it. Energy moves from the pool into the banks while
+  they're not full, so unbanked parts run short sooner after a bank has been used hard (below).
+- Within one feed group, engines and guns get one share, so `Charge.eng[f]` and `.gun[f]` are equal whenever both ask.
+  A boost still re-arms on any stored charge (decision 1's latch wasn't asked for), so on an empty store the ticks
+  still alternate boost and cruise; what changes is that the guns get their share on both.
+
+Library ships, before (engines first) and after. Same method as above (guns at `gunDrawFlatOut`; firing 90 s, average
+over the last 20; boosting 60 s, average over the last 20; minimums over the whole run). No library ship has a bank, so
+cruising, boosting alone and refill don't move; only the rows where engines and guns both ask do.
+
+| Ship | firing, cruising: before | after | boosting and firing, guns avg (min): before | after | engines avg (min): before | after |
+|---|---|---|---|---|---|---|
+| Sparrow T, Prospector, Arrow | sustained | sustained | 100% | 100% | 100% | 100% |
+| Drum | sustained | sustained | 50% (0%) | 93% (86%) | 99% (99%) | 93% (86%) |
+| Bulwark | 21.9 s, then guns 66%, engines 100% | 21.9 s, then guns 86%, engines 86% | 66% (0%) | 86% (56%) | 100% (68%) | 86% (56%) |
+| Corsair | sustained | sustained | 77% (32%) | 93% (79%) | 100% (100%) | 93% (79%) |
+| Lancer Frigate | sustained | sustained | 75% (0%) | 97% (50%) | 100% (53%) | 97% (50%) |
+| Galleon | sustained | sustained | 50% (0%) | 73% (45%) | 75% (49%) | 73% (45%) |
+| Bastion Dreadnought | sustained | sustained | 50% (0%) | 76% (49%) | 78% (54%) | 76% (49%) |
+| Hammerhead Carrier | sustained | sustained | 50% (0%) | 75% (49%) | 77% (46%) | 75% (49%) |
+| Ceres Hauler, Ark Tender | no guns | | | | | |
+
+Boosting alone (unchanged): Drum 5.4 s then 96%, Bulwark 3.5 s then 83%, Lancer 2.7 s then 69%, Galleon 1.7 s then
+79%, Bastion 3.2 s then 83%, Hammerhead 2.9 s then 80%, haulers 0.7 s then 70%; refills as in the first table.
+
+- **The empty-store boost no longer starves the guns** (decision 1): the guns' minimum goes from 0% to 45-86%, their
+  average from 50% to 73-93%. The engines pay for it: their share is the guns' share now, 2 to 14 points under what
+  engines first gave them (the Lancer's from 100% to 97%, the Drum's from 99% to 93%, the Bulwark's from 100% to 86%).
+- **The Bulwark** firing while cruising now browns out engines and guns together at 86% instead of guns alone at 66%.
+
+Guns with and without banks: circuits.test's ship (a Cell Reactor's 35/s, two Ion Drives boosting 58/s, two Pips 8/s
+each), boosting and firing for 20 s from an empty pool, with Capacitors on the right Pip:
+
+| Capacitors on the right Pip | left Pip (unbanked) avg (min) before | after | right Pip before | after | engines before | after | bank at the end before | after |
+|---|---|---|---|---|---|---|---|---|
+| 0 | 50% (0%) | 74% (49%) | 50% (0%) | 74% (49%) | 81% (63%) | 74% (49%) | | |
+| 1 | 50% (0%) | 85% (49%) | 100% | 100% | 88% (77%) | 85% (49%) | 0% | 100% |
+| 2 | 50% (0%) | 85% (49%) | 100% | 100% | 88% (77%) | 85% (49%) | 50% | 100% |
+
+The banked Pip keeps full rate either way; what changes is the bank: it used to run dry (refilled only by spare
+nobody else wanted), and now asks for its 40/s and holds full. Kieran's examples as numbers are in circuits.test
+("energy: proportional sharing").
+
+Goldens moved by this alone (checked by running them with the old energy.ts: all passed): flightTraces
+`drive-bank-boost` (the Drive Cell refills from the pool as it drains, so the pool runs dry sooner and the bank lasts
+the script) and `strafer-every-way` (the test-strafer's two Drive Cell banks refill from the pool while it dodges, the
+pool runs dry about halfway and the unbanked engines run short: its replica now re-keyframes, so the scenario says
+`replicaDiverges: true`); parity.golden for both; frameHash (the strafer pilot, from tick 400).
+
 ## For Kieran to decide
 
 1. **Boosting on an empty store starves the guns** (half rate, nothing on alternate ticks) on every ship whose store
@@ -199,6 +269,8 @@ the library summaries' stores, the dev ships' weapon draws.
    then the boost: stateless, but it changes the "engines first" rule in rework-2026-11 section 2.2); or latch the boost
    off when the store empties until the key is let go or the store refills to some level (a replicated flag and a
    protocol bump). Left as is; the HUD now says it.
+   **Answered by proportional sharing** (section above): the guns get their share every tick. The boost still re-arms
+   on each tick's trickle; a latch would stop that, if wanted.
 2. **Boost length by size**: endless on the Sparrow T, Prospector, Arrow and Corsair; 0.7 s on the haulers. More
    batteries on the Ceres Hauler and Ark Tender plans, or a lower `boostDraw`, would even it out.
 3. **The Bulwark plan** browns out while cruising and firing (22 s, then guns at 66%): one more Cell Reactor fixes it.

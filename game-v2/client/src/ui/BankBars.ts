@@ -59,7 +59,7 @@ export class BankBars {
   update(d: ShipDerived | null | undefined, c: Charge): void {
     if (!this.wrap) return;
     const L = d?.power ?? null;
-    // The gauge: short of power anywhere this tick (engines first, then guns: energy.ts powerTick's feed-group shares)
+    // The gauge: short of power anywhere this tick (shared by what each asks: energy.ts powerTick's feed-group shares)
     let short = false;
     if (L) for (let f = 0; f < L.feeds.length && !short; f++) if (Math.min(c.eng?.[f] ?? 1, c.gun?.[f] ?? 1) < BROWNOUT) short = true;
     const now = performance.now();

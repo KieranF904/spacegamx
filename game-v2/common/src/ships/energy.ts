@@ -7,18 +7,22 @@
  * the most it can give a second: its spare generation plus the pool's rate
  * while the pool holds charge. Each tick:
  *
- *   1. Engines take what they need first: from the Drive Cell banks they
- *      touch (fuller bank first, each giving at most its rate), then from the
- *      Output (the spare stream first, then the pool). Boosting draws far more,
- *      and needs stored charge.
- *   2. Guns, beams, mining lasers and part features (a Tow Beam's load, a Burst
- *      Strafer's burst: PowerUse.extra) draw on the banks they touch first (a
- *      gun Capacitor banks, a strafer Drive Cell banks), then share what is left
- *      of the Output equally: short of it, every one gets the same share (a
- *      brownout: guns reload slower, beams burn that share of the ticks).
- *   3. What's left of the spare stream refills the stores, emptiest first: the
- *      pool and every bank that can refill (one with a member on a powered
- *      network). Then each bank gets what its Pulse Dynamos make.
+ *   1. Banks first: engines (boosting draws far more, and needs stored charge),
+ *      guns, beams, mining lasers and part features (a Tow Beam's load, a Burst
+ *      Strafer's burst: PowerUse.extra) draw on the banks they touch (engines
+ *      and strafers Drive Cell banks, the rest Capacitor banks; fuller bank
+ *      first, each giving at most its rate).
+ *   2. Proportional sharing (Kieran, 2026-11-04): everything still short asks
+ *      the Output for the rest, and so does every bank not full that can
+ *      refill (a member on a powered network), for its charge rate (`intake`,
+ *      at most the room it has). Within the Output, every asker gets what it
+ *      asked; past it, each gets Output × its ask / all asked: the same share
+ *      for everyone (a brownout: guns reload slower, beams burn that share of
+ *      the ticks, thrust scales by it). The spare stream pays first, then the
+ *      pool. A bank's intake is how it raises its side's share: it asks while
+ *      what it feeds draws on it.
+ *   3. What's left of the spare stream refills the pool. Then each bank gets
+ *      what its Pulse Dynamos make.
  *
  * Steady loads (shields, scanners, jump coils) share their network's
  * generators at the rebuild, before any of this (rebuild.ts).
@@ -298,22 +302,23 @@ function gunLoadInto(ship: GunLoadShip, tick: number, out: number[]): number[] {
 }
 
 // ---- Scratch for powerTick (one ship at a time, never re-entered): grown as needed, so a tick allocates only its result
-let sHeld = new Float64Array(8), sAllow = new Float64Array(8), sAsk = new Float64Array(8), sOrder = new Int32Array(8);
-let sEngW = new Float64Array(8), sEngG = new Float64Array(8), sGunW = new Float64Array(8), sGunG = new Float64Array(8);
+let sHeld = new Float64Array(8), sAllow = new Float64Array(8), sAsk = new Float64Array(8), sFill = new Float64Array(8);
+let sEngW = new Float64Array(8), sGunW = new Float64Array(8), sGot = new Float64Array(8);
 let sRem = new Float64Array(8), sPick = new Int32Array(8), sUsed = new Int32Array(8);
 function grow(nB: number, nF: number): void {
-  if (sHeld.length < nB + 1) { const m = Math.max(nB + 1, sHeld.length * 2); sHeld = new Float64Array(m); sAllow = new Float64Array(m); sAsk = new Float64Array(m); sOrder = new Int32Array(m); }
+  if (sHeld.length < nB) { const m = Math.max(nB, sHeld.length * 2); sHeld = new Float64Array(m); sAllow = new Float64Array(m); sAsk = new Float64Array(m); sFill = new Float64Array(m); }
   if (sEngW.length < nF) {
     const m = Math.max(nF, sEngW.length * 2);
-    sEngW = new Float64Array(m); sEngG = new Float64Array(m); sGunW = new Float64Array(m); sGunG = new Float64Array(m);
+    sEngW = new Float64Array(m); sGunW = new Float64Array(m); sGot = new Float64Array(m);
     sRem = new Float64Array(m); sPick = new Int32Array(m); sUsed = new Int32Array(m);
   }
 }
 
 /**
  * One tick of the ship's power (steps 1 to 3 above). Returns the new charge
- * (with each feed group's share this tick: `eng`, `gun`), the engines' share
- * all together, and whether a boost was possible (it needs stored charge).
+ * (with each feed group's share this tick: `eng`, `gun`, the same for both, as
+ * every asker gets the same share of what it asks), the engines' share all
+ * together, and whether a boost was possible (it needs stored charge).
  */
 export function powerTick(d: ShipDerived, c: Charge, use: PowerUse, tuning: ShipTuning): PowerResult {
   if (d.ports) return portsPowerTick(d, c, use);
@@ -328,7 +333,7 @@ export function powerTick(d: ShipDerived, c: Charge, use: PowerUse, tuning: Ship
   const P = L.pool;
   let pool = (P.cap * pctOf(c.g)) / 100;
   const poolStart = pool;
-  let poolAllow = Math.min(pool, P.rate / 60);
+  const poolAllow = Math.min(pool, P.rate / 60);
   let stream = L.spare / 60;
 
   // Boosting needs charge stored for the engines: the pool's, or a Drive Cell bank's
@@ -337,9 +342,9 @@ export function powerTick(d: ShipDerived, c: Charge, use: PowerUse, tuning: Ship
   const boost = use.boosting && use.thrusting && stored > 0;
   const boostDraw = boost ? et.boostDraw : 0;
 
-  // What each feed group asks for this tick: engines (step 1), and guns, mining lasers and part features (step 2)
-  const engW = sEngW, engG = sEngG, gunW = sGunW, gunG = sGunG;
-  for (let f = 0; f < nF; f++) { engW[f] = 0; engG[f] = 0; gunW[f] = 0; gunG[f] = 0; }
+  // What each feed group asks for this tick: its engines, and its guns, mining lasers and part features
+  const engW = sEngW, gunW = sGunW;
+  for (let f = 0; f < nF; f++) { engW[f] = 0; gunW[f] = 0; }
   if (use.thrusting) {
     for (const t of d.thrusters) {
       const f = L.feedOf[t.part];
@@ -357,93 +362,74 @@ export function powerTick(d: ShipDerived, c: Charge, use: PowerUse, tuning: Ship
     for (let f = 0; f < nF; f++) { const w = Math.max(0, ask[f] ?? 0) / 60; if (w > 1e-15) { gunW[f] += w; anyExtra = true; } }
   }
 
-  /** One step: each group's want from its banks first (fuller bank first, a bank short of what's asked shared by what each asks), then the Output, shared equally */
-  const serve = (want: Float64Array, got: Float64Array) => {
-    const rem = sRem, pick = sPick, used = sUsed, ask = sAsk;
-    let maxBanks = 0;
-    for (let f = 0; f < nF; f++) { rem[f] = want[f]; used[f] = 0; if (F[f].banks.length > maxBanks) maxBanks = F[f].banks.length; }
-    for (let r = 0; r < maxBanks; r++) {
-      for (let b = 0; b < nB; b++) ask[b] = 0;
-      let any = false;
-      for (let f = 0; f < nF; f++) {
-        pick[f] = -1;
-        if (rem[f] <= 1e-15) continue;
-        const fb = F[f].banks;
-        let best = -1, bestPct = -1;
-        for (let j = 0; j < fb.length; j++) {
-          if (used[f] & (1 << j)) continue;
-          const b = fb[j], p = B[b].cap > 0 ? held[b] / B[b].cap : 0;
-          if (p > bestPct) { bestPct = p; best = j; }
-        }
-        if (best < 0) continue;
-        used[f] |= 1 << best;
-        pick[f] = fb[best];
-        ask[fb[best]] += rem[f];
-        any = true;
+  // 1. Each group's want from its banks first (fuller bank first, a bank short of what's asked shared by what each asks)
+  const rem = sRem, got = sGot, pick = sPick, used = sUsed, ask = sAsk;
+  let maxBanks = 0;
+  for (let f = 0; f < nF; f++) { rem[f] = engW[f] + gunW[f]; got[f] = 0; used[f] = 0; if (F[f].banks.length > maxBanks) maxBanks = F[f].banks.length; }
+  for (let r = 0; r < maxBanks; r++) {
+    for (let b = 0; b < nB; b++) ask[b] = 0;
+    let any = false;
+    for (let f = 0; f < nF; f++) {
+      pick[f] = -1;
+      if (rem[f] <= 1e-15) continue;
+      const fb = F[f].banks;
+      let best = -1, bestPct = -1;
+      for (let j = 0; j < fb.length; j++) {
+        if (used[f] & (1 << j)) continue;
+        const b = fb[j], p = B[b].cap > 0 ? held[b] / B[b].cap : 0;
+        if (p > bestPct) { bestPct = p; best = j; }
       }
-      if (!any) break;
-      for (let f = 0; f < nF; f++) {
-        const b = pick[f];
-        if (b < 0) continue;
-        const t = rem[f] * Math.min(1, ask[b] > 0 ? allow[b] / ask[b] : 0);
-        rem[f] -= t; got[f] += t;
-      }
-      for (let b = 0; b < nB; b++) if (ask[b] > 0) { const t = Math.min(allow[b], ask[b]); allow[b] -= t; held[b] -= t; }
+      if (best < 0) continue;
+      used[f] |= 1 << best;
+      pick[f] = fb[best];
+      ask[fb[best]] += rem[f];
+      any = true;
     }
-    let R = 0;
-    for (let f = 0; f < nF; f++) R += rem[f];
-    if (R <= 1e-15) return;
-    const give = Math.min(R, stream + poolAllow);
+    if (!any) break;
+    for (let f = 0; f < nF; f++) {
+      const b = pick[f];
+      if (b < 0) continue;
+      const t = rem[f] * Math.min(1, ask[b] > 0 ? allow[b] / ask[b] : 0);
+      rem[f] -= t; got[f] += t;
+    }
+    for (let b = 0; b < nB; b++) if (ask[b] > 0) { const t = Math.min(allow[b], ask[b]); allow[b] -= t; held[b] -= t; }
+  }
+
+  // 2. Proportional sharing: what each group still wants, and each bank not full that can refill its intake (at most its
+  // room), all ask the Output; past it, each gets Output x its ask / all asked (the spare stream pays first, then the pool)
+  const fill = sFill;
+  let asked = 0;
+  for (let f = 0; f < nF; f++) asked += rem[f];
+  for (let b = 0; b < nB; b++) {
+    const K = B[b], room = K.cap - held[b];
+    fill[b] = K.refills && room > 1e-12 ? Math.min(K.intake / 60, room) : 0;
+    asked += fill[b];
+  }
+  if (asked > 1e-15) {
+    const give = Math.min(asked, stream + poolAllow);
     const fromStream = Math.min(stream, give);
     stream -= fromStream;
-    const fromPool = give - fromStream;
-    poolAllow -= fromPool; pool -= fromPool;
-    const k = give / R;
+    pool -= give - fromStream;
+    const k = give / asked;
     for (let f = 0; f < nF; f++) got[f] += rem[f] * k;
-  };
-  serve(engW, engG);
-  serve(gunW, gunG);
-
-  // 3. The stream left refills the pool and the banks that can refill, emptiest first (all brought up to one level)
-  if (stream > 1e-15) {
-    const order = sOrder;
-    let m = 0;
-    const pctAt = (s: number) => (s === nB ? (P.cap > 0 ? pool / P.cap : 1) : B[s].cap > 0 ? held[s] / B[s].cap : 1);
-    const capAt = (s: number) => (s === nB ? P.cap : B[s].cap);
-    for (let s = 0; s <= nB; s++) {
-      if (capAt(s) <= 0 || (s < nB && !B[s].refills)) continue;
-      // (insertion sort by charge, emptiest first)
-      const p = pctAt(s);
-      let j = m++;
-      while (j > 0 && pctAt(order[j - 1]) > p) { order[j] = order[j - 1]; j--; }
-      order[j] = s;
-    }
-    let left = stream, k = 0, capSum = 0, level = m ? pctAt(order[0]) : 1;
-    while (left > 1e-15 && m > 0) {
-      while (k < m && pctAt(order[k]) <= level + 1e-12) capSum += capAt(order[k++]);
-      const next = k < m ? Math.min(1, pctAt(order[k])) : 1;
-      const need = (next - level) * capSum;
-      if (need >= left) { level += left / capSum; left = 0; break; }
-      left -= need; level = next;
-      if (level >= 1 && k >= m) break;
-    }
-    for (let j = 0; j < k; j++) {
-      const s = order[j];
-      if (s === nB) pool = Math.max(pool, level * P.cap); else held[s] = Math.max(held[s], level * B[s].cap);
-    }
+    for (let b = 0; b < nB; b++) if (fill[b] > 0) held[b] = Math.min(B[b].cap, held[b] + fill[b] * k);
   }
-  // (Then each bank's Pulse Dynamos)
+
+  // 3. The stream left refills the pool; then each bank's Pulse Dynamos
+  if (stream > 1e-15 && P.cap > 0) pool = Math.min(P.cap, pool + stream);
   for (let b = 0; b < nB; b++) if (B[b].dynamo > 0) held[b] = Math.min(B[b].cap, held[b] + B[b].dynamo / 60);
 
-  // Shares (nothing asked: whether anything could be given at all)
+  // Shares: one a group, its engines' and its guns' alike (nothing asked: whether anything could be given at all)
   const eng = new Array<number>(nF), gun = new Array<number>(nF);
   let wantAll = 0, gotAll = 0;
   for (let f = 0; f < nF; f++) {
     let reach = L.spare > 0 || poolStart > 0;
     if (!reach) for (const b of F[f].banks) if (pctOf(c.b[b]) > 0 || B[b].dynamo > 0) { reach = true; break; }
-    eng[f] = engW[f] > 1e-15 ? Math.min(1, engG[f] / engW[f]) : reach ? 1 : 0;
-    gun[f] = gunW[f] > 1e-15 ? Math.min(1, gunG[f] / gunW[f]) : reach ? 1 : 0;
-    wantAll += engW[f]; gotAll += engG[f];
+    const w = engW[f] + gunW[f];
+    const share = w > 1e-15 ? Math.min(1, got[f] / w) : reach ? 1 : 0;
+    eng[f] = engW[f] > 1e-15 ? share : reach ? 1 : 0;
+    gun[f] = gunW[f] > 1e-15 ? share : reach ? 1 : 0;
+    wantAll += engW[f]; gotAll += engW[f] * share;
   }
   const s = new Array<number>(nB);
   for (let b = 0; b < nB; b++) s[b] = pct(held[b], B[b].cap);

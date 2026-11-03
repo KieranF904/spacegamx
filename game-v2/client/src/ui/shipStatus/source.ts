@@ -98,6 +98,8 @@ export interface ShipStatus {
     brownout: boolean;
     /** What is short: engines, guns, both, or none */
     short: '' | 'engines' | 'guns' | 'engines+guns';
+    /** The lowest share of what it asked anything short got (0..1; 1 while nothing is short): short of Output, everything drawing on it gets the same share */
+    share: number;
     /** Draw beyond generation: the stores are paying */
     draining: boolean;
     /** Seconds until the stores run dry at this net rate (Infinity: not draining) */
@@ -140,13 +142,14 @@ export interface StatusMemory {
   net: number;
   shield: number;
   hitAt: number;
-  /** When the engines and the guns were last short of power (ms): a brownout is held a moment (an empty-store boost is short every other tick) */
+  /** When the engines and the guns were last short of power (ms), and the lowest share then: a brownout is held a moment (an empty-store boost re-arms every other tick, so the share flickers) */
   engAt: number;
   gunAt: number;
+  share: number;
 }
 
 export function newMemory(): StatusMemory {
-  return { ship: null, rebuilds: -1, held: NaN, at: 0, net: 0, shield: NaN, hitAt: -Infinity, engAt: -Infinity, gunAt: -Infinity };
+  return { ship: null, rebuilds: -1, held: NaN, at: 0, net: 0, shield: NaN, hitAt: -Infinity, engAt: -Infinity, gunAt: -Infinity, share: 1 };
 }
 
 export function emptyStatus(): ShipStatus {
@@ -154,7 +157,7 @@ export function emptyStatus(): ShipStatus {
     has: false,
     hull: { parts: 0, intact: 0, lost: 0, integrity: 0, coreHp: 0, coreMax: 1 },
     shield: { max: 0, cur: 0, pct: 0, regen: 0, state: 'none', wait: 0 },
-    energy: { gen: 0, steady: 0, draw: 0, net: 0, held: 0, cap: 0, pct: 100, brownout: false, short: '', draining: false, empty: Infinity, full: Infinity, stores: [] },
+    energy: { gen: 0, steady: 0, draw: 0, net: 0, held: 0, cap: 0, pct: 100, brownout: false, short: '', share: 1, draining: false, empty: Infinity, full: Infinity, stores: [] },
     weapons: [],
     thrust: { engines: 0, boost: 'none', share: 1 },
     features: [],
@@ -173,7 +176,7 @@ export function readStatus(inp: StatusInput, mem: StatusMemory, out: ShipStatus 
   const ship = inp.ship;
   if (!ship || ship.kind !== 'ship') { out.has = false; mem.ship = null; return out; }
   const fresh = ship !== mem.ship || ship.rebuilds !== mem.rebuilds;
-  if (fresh) { mem.ship = ship; mem.rebuilds = ship.rebuilds; mem.held = NaN; mem.net = 0; mem.shield = NaN; mem.hitAt = -Infinity; mem.engAt = -Infinity; mem.gunAt = -Infinity; }
+  if (fresh) { mem.ship = ship; mem.rebuilds = ship.rebuilds; mem.held = NaN; mem.net = 0; mem.shield = NaN; mem.hitAt = -Infinity; mem.engAt = -Infinity; mem.gunAt = -Infinity; mem.share = 1; }
   out.has = true;
   readHull(ship, out.hull);
   readShield(ship, inp, mem, out.shield);
@@ -314,17 +317,20 @@ function readEnergy(ship: ShipState, inp: StatusInput, mem: StatusMemory, e: Shi
   if (load) for (let f = 0; f < load.length; f++) draw += load[f];
   e.draw = draw;
   // Brownout: any feed group's share this tick below the line
-  let engShort = false, gunShort = false;
+  let engShort = false, gunShort = false, share = 1;
   if (L) for (let f = 0; f < L.feeds.length; f++) {
-    if ((c.eng?.[f] ?? 1) < BROWNOUT) engShort = true;
-    if ((c.gun?.[f] ?? 1) < BROWNOUT) gunShort = true;
+    const se = c.eng?.[f] ?? 1, sg = c.gun?.[f] ?? 1;
+    if (se < BROWNOUT) { engShort = true; share = Math.min(share, se); }
+    if (sg < BROWNOUT) { gunShort = true; share = Math.min(share, sg); }
   }
-  // (Each held BROWN_HOLD after its last short tick)
+  // (Each held BROWN_HOLD after its last short tick, with the share it last had)
   if (engShort) mem.engAt = inp.now;
   if (gunShort) mem.gunAt = inp.now;
+  if (engShort || gunShort) mem.share = share;
   const eng = inp.now - mem.engAt < BROWN_HOLD, gun = inp.now - mem.gunAt < BROWN_HOLD;
   e.brownout = eng || gun;
   e.short = eng && gun ? 'engines+guns' : eng ? 'engines' : gun ? 'guns' : '';
+  e.share = e.brownout ? mem.share : 1;
   // Net: the stores' measured rate (smoothed)
   if (Number.isFinite(mem.held) && inp.now > mem.at) {
     const dt = (inp.now - mem.at) / 1000;

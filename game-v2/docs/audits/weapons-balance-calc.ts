@@ -176,7 +176,7 @@ function applySetup(s: ShipState, e: EnergySetup): Charge {
   for (const t of thr) L.draw[t.part] = e.engines / thr.length;
   if (e.bank) {
     const guns = s.derived.weapons.map((w) => w.part);
-    L.banks.push({ kind: 'cap', parts: [], cap: e.bank.cap, rate: e.bank.rate, feeds: guns, shields: [], refills: true, dynamo: 0, dynamos: [] } as any);
+    L.banks.push({ kind: 'cap', parts: [], cap: e.bank.cap, rate: e.bank.rate, intake: e.bank.cap / 4 /* a Capacitor's 40 per 160 held */, feeds: guns, shields: [], refills: true, dynamo: 0, dynamos: [] } as any);
     const f = L.feeds.length;
     L.feeds.push({ banks: [L.banks.length - 1] });
     for (const p of guns) L.feedOf[p] = f;

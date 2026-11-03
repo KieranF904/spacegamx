@@ -8,7 +8,7 @@
 
 import {
   Catalog, Economy, FunctionDef, PlacedPart, ShipTuning, ShipDerived, Side, WeaponMods, Bag,
-  partStats, describePart, partItemId, placeCost, isStructural, outputOf, gradeOf, fnOutput, partGrade, partMaterial, energyTuning, loadTest, gunDrawFlatOut, circuitTuning, partDischarge, bankKind, jumpTuning, coilCapacity, CORE_CARGO, PIECE_NAMES, partBuildPoints, DAMAGE_NAMES, mountingWords, type DamageType } from '@space-game/common';
+  partStats, describePart, partItemId, placeCost, isStructural, outputOf, gradeOf, fnOutput, partGrade, partMaterial, energyTuning, loadTest, gunDrawFlatOut, circuitTuning, partDischarge, partIntake, bankKind, jumpTuning, coilCapacity, CORE_CARGO, PIECE_NAMES, partBuildPoints, DAMAGE_NAMES, mountingWords, type DamageType } from '@space-game/common';
 import { costHtml } from '../ui/windowKit';
 import { jumpRatioNote } from './shipSummary';
 import { functionColor, numToCss } from './shipColors';
@@ -178,6 +178,8 @@ export function partTipHtml(p: Pick<PlacedPart, 'fn' | 'material' | 'piece'> & P
     // The most it gives a second (circuits.ts): a pool battery into the ship's Output, a bank member only into what its bank touches
     const rate = partDischarge(fn, st.area, mat, circuitTuning(tuning));
     html += row('Gives', `up to ${n0(rate)}/s${kind ? ` <span style="color:#8ea0bd; font-weight:400">first to the ${kind === 'drive' ? 'engines and strafers' : 'guns, beams, mining lasers and Flash Screens'} its bank touches; touching ${kind === 'drive' ? 'Drive Cells' : 'Capacitors'} are one bank</span>` : fn.oneWay || fn.relayOnly ? ' <span style="color:#8ea0bd; font-weight:400">on to the parts it touches</span>' : ' <span style="color:#8ea0bd; font-weight:400">into the ship\'s pool, on a powered network</span>'}`);
+    // (A bank asks the ship's Output for its intake while not full, sharing it by what each asks: energy.ts powerTick)
+    if (kind) html += row('Takes', `up to ${n0(partIntake(fn, st.area, mat, circuitTuning(tuning)))}/s <span style="color:#8ea0bd; font-weight:400">while not full, from the ship's Output; short of power, it shares by what it asks, so more raises its parts' share</span>`);
   }
   if ((fn.dynamo ?? 0) > 0) html += row('Charges', `${n0(fn.dynamo!)}/s into each Capacitor or Drive Cell bank it touches <span style="color:#8ea0bd; font-weight:400">(no wires; it powers nothing itself)</span>`);
   if (fn.rated) html += row('Rated speed', `${n0(fn.rated * 60)} m/s <span style="color:#8ea0bd; font-weight:400">(its push fades out near it)</span>`);

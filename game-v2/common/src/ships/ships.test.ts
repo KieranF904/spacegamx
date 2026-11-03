@@ -334,22 +334,32 @@ describe('flow network and solver (M4)', () => {
     expect(poolHeld(damaged, idle.charge)).toBeCloseTo(dSupply / 60, 2);
   });
 
-  it('thrusting on empty stores, the engines take every bit of power and the guns fire only what they were loaded with', () => {
+  it('thrusting on empty stores, the engines and the guns share the generation by what they ask: the same share each, the guns reloading that much slower', () => {
     const b = oneReactor();
     const ship = createShipState(catalog, tuning, 1, b, 0);
     // Damage the generator so the engines need more than it makes
     const gi = reactorIndex(b);
     ship.derived = derive(b, (max, i) => (i === gi ? max * 0.2 : max));
-    expect(ship.derived.energy.spare).toBeLessThan(ship.derived.energy.engineDraw);
+    const d = ship.derived, L = d.power!;
+    expect(d.energy.spare).toBeLessThan(d.energy.engineDraw);
+    // (What the engines pushing forward ask)
+    let engAsk = 0;
+    for (const t of d.thrusters) if (L.feedOf[t.part] >= 0 && t.force[1] < -1e-9) engAsk += L.draw[t.part];
     const pose = { x: 0, y: 0, angle: -Math.PI / 2 };
     let charge: Charge = { g: 0, b: [] };
-    let fired = 0;
+    let fired = 0, gunTicks = 0;
     for (let t = 1; t < 240; t++) {
-      charge = powerTick(ship.derived, charge, { thrusting: true, boosting: false, dir: [0, -1], load: gunLoad(ship, t) }, tuning).charge;
+      const load = gunLoad(ship, t)!;
+      charge = powerTick(d, charge, { thrusting: true, boosting: false, dir: [0, -1], load }, tuning).charge;
+      // (Proportional sharing, Kieran 2026-11-04: everyone gets generation / all asked of what it asks; no engines first)
+      const asked = engAsk + load.reduce((s, v) => s + v, 0);
+      for (let f = 0; f < L.feeds.length; f++) expect(charge.eng![f]).toBeCloseTo(Math.min(1, L.spare / asked), 9);
+      if (load.some((v) => v > 0)) { gunTicks++; for (let f = 0; f < L.feeds.length; f++) if (load[f] > 0) expect(charge.gun![f]).toBeCloseTo(charge.eng![f], 9); }
       fired += stepGuns(ship, pose, { firing: true, aimWorld: -Math.PI / 2, aimDist: 0, energy: { charge } }, t, tuning).shots.length;
     }
-    // (A gun spawns loaded; its next shot's energy is drawn as it reloads, and the engines leave none)
-    expect(fired).toBe(ship.derived.weapons.length);
+    // (A gun spawns loaded; past that it reloads at its share, where engines first left it none)
+    expect(gunTicks).toBeGreaterThan(200);
+    expect(fired).toBeGreaterThan(d.weapons.length);
     expect(charge.g).toBe(0);
   });
 

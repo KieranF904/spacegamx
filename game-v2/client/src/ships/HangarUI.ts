@@ -1325,7 +1325,7 @@ export class HangarUI {
       const gen = rep.nets.reduce((s, n) => s + (n.powered ? n.supply : 0), 0), steady = Math.max(0, gen - L.spare);
       html += line(`Generation ${n0(gen)}/s · steady loads ${n0(steady)}/s · spare ${n0(L.spare)}/s`, 'What the generators make, what shields, scanners and coils take first, and what is left for the stores and the guns');
       const nb = L.pool.parts.length;
-      html += line(`Store ${n0(L.pool.cap)} (core ${n0(L.pool.coreCap)}${nb ? ` + ${nb} ${nb === 1 ? 'battery' : 'batteries'}` : ''}) · Output ${n0(L.spare + L.pool.rate)}/s`, 'Your ship can give out at most its Output each second; engines are served first, and when guns want more, they all reload slower');
+      html += line(`Store ${n0(L.pool.cap)} (core ${n0(L.pool.coreCap)}${nb ? ` + ${nb} ${nb === 1 ? 'battery' : 'batteries'}` : ''}) · Output ${n0(L.spare + L.pool.rate)}/s`, 'Your ship can give out at most its Output each second. Short of it, engines, guns and banks refilling share it by what each asks: thrust drops and guns reload slower. A bank asks for its intake, so it raises the share of what it feeds');
       const boost = energyTuning(this.deps.tuning).boostDraw;
       let eng = 0, engBoost = 0, guns = 0;
       for (const t of new Set(d.thrusters.filter((x) => x.force[0] || x.force[1]).map((x) => x.part))) { eng += L.draw[t]; engBoost += L.draw[t] * (1 + boost * L.boostDrain[t]); }
@@ -1337,7 +1337,9 @@ export class HangarUI {
         const unbanked = d.weapons.filter((w) => L.feedOf[w.part] >= 0 && !L.feeds[L.feedOf[w.part]].banks.length && gunDrawFlatOut(w, L.draw[w.part]) > 0);
         const share = unbanked.length ? Math.min(...unbanked.map((w) => r.part[w.part])) : 1;
         const act = guns > 0 ? 'Boosting while firing' : 'Boosting';
-        if (r.brownAt >= 0 && share < BROWNOUT) html += `<div style="font-size:11px; padding:1px 0 3px; color:${share < 0.5 ? '#f87171' : '#fbbf24'}">⚠ Boosting while firing: unbanked guns get ${Math.round(share * 100)}%</div>`;
+        // (Short of Output, the engines and the unbanked guns get the same share of what each asks: energy.ts powerTick)
+        const both = Math.min(share, r.engines);
+        if (r.brownAt >= 0 && share < BROWNOUT) html += `<div style="font-size:11px; padding:1px 0 3px; color:${both < 0.5 ? '#f87171' : '#fbbf24'}" title="Short of Output, everything drawing on it gets the same share of what it asks. A Capacitor bank touching the guns pays them first">⚠ Boosting while firing: engines and unbanked guns share the Output, down to ${Math.round(both * 100)}% each</div>`;
         else if (r.brownAt >= 0) html += `<div style="font-size:11px; padding:1px 0 3px; color:#fbbf24">⚠ ${act}: engines get ${Math.round(r.engines * 100)}%</div>`;
         else html += `<div style="font-size:11px; padding:1px 0 3px; color:#4ade80">Holds up: full power while ${guns > 0 ? 'boosting and firing' : 'boosting'}</div>`;
       }
@@ -2185,7 +2187,7 @@ function energyHtml(e: ShipSummary['energy'], d: ShipDerived | null, tuning: Shi
   return head
     + row('Cruising', cruise.html, `Engines thrusting for ${ENERGY_ROW_SECONDS} s, run through the ship's real power code: each bank pays only for the parts it touches. Sustained: the generators keep up`)
     + row('Boosting', boosting.html, `Engines boosting, same test: how long they get full power before the stores run dry, then the lowest share they get. Store ${Math.round(L.pool.cap)}, Output ${Math.round(output)}/s`)
-    + row('Firing, cruising', firing.html, 'Every gun firing flat out while the engines thrust, same test. Short of power, guns reload slower and beams flicker')
-    + row('Refills', refill, 'Idle, from every store empty: how long the spare generation takes to fill the pool and every bank that refills')
-    + (dry ? `<div style="color:#fbbf24; font-size:11px; margin-top:4px">The guns run dry in a fight, then reload slower. Add generation, a battery, or a Capacitor bank touching the guns.</div>` : '');
+    + row('Firing, cruising', firing.html, 'Every gun firing flat out while the engines thrust, same test. Short of power, engines and guns share it by what each asks: thrust drops, guns reload slower, beams flicker')
+    + row('Refills', refill, 'Idle, from every store empty: how long the spare generation takes to fill the pool and every bank that refills (a bank takes in at most its intake a second)')
+    + (dry ? `<div style="color:#fbbf24; font-size:11px; margin-top:4px">The ship runs short in a fight: engines and guns share what there is, so both slow. Add generation, a battery, or a Capacitor bank touching the guns (it pays them first, and its intake raises their share).</div>` : '');
 }
