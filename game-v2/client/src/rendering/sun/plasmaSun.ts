@@ -293,6 +293,9 @@ export interface PlasmaParams {
   spicules?: number;
   /** How fast the pattern evolves in place, and the warp's own evolution and wander */
   evolve?: number;
+  /** x how fast the surface's own pattern moves (its boil and its evolution, both above): 1.5 by default (Kieran,
+   * 2026-11-03: half again livelier); the star's turning keeps its own speed */
+  animate?: number;
   warpEvolve?: number;
   warpWander?: number;
   /** Fine detail, seen as the star grows on screen (all 0, and fineContrast 1: R5 exactly): threads (thin bright
@@ -375,6 +378,7 @@ export function starLook(id: string, cb: StarBody): StarLook {
   const tints = (ir?.colors ?? ['#ff5fa2', '#5fd0ff', '#b6ff6a']).map(hex);
   const reach = 3.0;
   const softEdge = o.softEdge ?? soft;
+  const anim = o.animate ?? 1.5;
   return {
     reach,
     softEdge,
@@ -383,7 +387,7 @@ export function starLook(id: string, cb: StarBody): StarLook {
       uReach: reach, uSeed: [rnd() * 10, rnd() * 10, rnd() * 10],
       uDark: palette.dark, uMid: palette.mid, uBright: palette.bright, uCore: palette.core, uHot: palette.hot, uRim: palette.rim, uCorona: palette.corona,
       uSurf: [o.scale ?? scale, o.warp ?? warp, o.contrast ?? contrast, o.core ?? core],
-      uMotion: [0.004 + rnd() * 0.003, 0.5 + rnd() * 0.4, 0.004 + rnd() * 0.003, 0.012 + rnd() * 0.008],
+      uMotion: [0.004 + rnd() * 0.003, 0.5 + rnd() * 0.4, (0.004 + rnd() * 0.003) * anim, 0.012 + rnd() * 0.008],
       uCor: [0.85 + rnd() * 0.3, 9 + Math.round(rnd() * 6), 0.7 + rnd() * 0.4, 10],
       uLimb: [softEdge, heat],
       uIrid: ir ? [ir.strength ?? 0.85, ir.mode === 'rainbow' ? 1 : 0, ir.drift ?? 0.01, ir.spread ?? (ir.mode === 'rainbow' ? 1.6 : 1.2)] : [0, 0, 0, 1],
@@ -392,7 +396,7 @@ export function starLook(id: string, cb: StarBody): StarLook {
       uLimbTint: [...(o.limbTint ? hex(o.limbTint) : palette.dark.map((c) => c * 1.6)), o.limbTintStrength ?? 0.45],
       uChromo: [o.rim ?? 0.6, o.rimWidth ?? 0.008, o.halo ?? 0.4, o.spicules ?? 0.035],
       uChromoCol: o.rimColor ? hex(o.rimColor) : lift(palette.rim, 0.1),
-      uEvolve: [o.evolve ?? 0.012, o.warpEvolve ?? 0.006, o.warpWander ?? 0.15],
+      uEvolve: [(o.evolve ?? 0.012) * anim, (o.warpEvolve ?? 0.006) * anim, o.warpWander ?? 0.15],
       uFine: [o.threads ?? 0, o.granulation ?? 0, o.fineContrast ?? 1, o.threadFlow ?? 0],
     },
   };
