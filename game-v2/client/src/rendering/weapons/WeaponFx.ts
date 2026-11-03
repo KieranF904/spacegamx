@@ -34,14 +34,7 @@ import { WeaponStyle, weaponStyle, shotScale, type ImpactLayers } from './weapon
 import type { Lighting } from '../lighting/Lighting';
 import { arcFraction, incomingTicks, landingPoint, sonarPeriod } from './ordnanceTells';
 import { BURST, burstLife, burstSpeed, hitAge, offSurface, throwAngle, type SurfaceNormal } from './impactAim';
-import { ImpactAnchor } from './impactAnchor';
-
-/**
- * One impact riding what it hit (ImpactAnchor): its surface-bound parts carry `anc` and are moved with the target each
- * frame; its free parts (`kick`) are given the hit point's velocity once it's known (the anchor's first step), then fly
- * on their own. `until`: the clock after which nothing of it rides any more.
- */
-interface AnchorRec { a: ImpactAnchor; born: number; until: number; hp: { x: number; y: number }; kick: { x: number; y: number; vx: number; vy: number; bx?: number; by?: number }[] | null }
+import { AnchorList, rideStep, type ImpactAnchor } from './impactAnchor';
 
 /** Which way a hit throws (impactAim): the angle its directional parts leave at, and the struck surface's normal if one was found */
 interface Aim { a: number; nx: number; ny: number; surface: boolean }
@@ -123,35 +116,35 @@ interface Flash {
   girth: number;
   owner: number; ox: number; oy: number; rel: number;
 }
-interface Smoke { x: number; y: number; vx: number; vy: number; life: number; max: number; size: number; color?: number; alpha?: number; /** Its target's velocity at the hit: drag slows it to this, not to rest */ bx?: number; by?: number }
+interface Smoke { x: number; y: number; vx: number; vy: number; life: number; max: number; size: number; color?: number; alpha?: number; /** The impact it came off rides its target: it flies in the target's frame (impactAnchor rideStep) */ anc?: ImpactAnchor }
 interface Spark {
   x: number; y: number; vx: number; vy: number; life: number; max: number; color: number; width?: number;
   /** An ember: its colour cools to this as it dies (and it stays bright longer before fading) */
   cool?: number;
   /** Its speed kept a frame (default 0.9) */
   drag?: number;
-  /** The velocity of the target it came off (AnchorRec kick): drag slows it to this, not to rest */
-  bx?: number; by?: number;
+  /** The impact it came off rides its target: it flies in the target's frame, its velocity relative to it (rideStep) */
+  anc?: ImpactAnchor;
 }
 /** A layered impact's core flash or glow (ImpactLayers core, bloom) */
 interface HitGlow {
   x: number; y: number; life: number; max: number; size: number; color: number; core: boolean;
   /** A fireball's (ImpactLayers.fireball): its drift, and the colour it cools to */
   vx?: number; vy?: number; cool?: number;
-  /** The impact it belongs to rides its target (AnchorRec) */
-  anc?: AnchorRec;
+  /** The impact it belongs to rides its target (ImpactAnchor) */
+  anc?: ImpactAnchor;
 }
 /** A fragment torn off a hull (ImpactLayers.debris): a glowing chunk slowing, cooling and trailing smoke */
-interface Frag { x: number; y: number; vx: number; vy: number; life: number; max: number; size: number; hot: number; cool: number; trail: number; drag: number; puff: number; /** Smokes for this share of its life (an outlier's trail crosses the screen) */ smokes: number; bx?: number; by?: number }
+interface Frag { x: number; y: number; vx: number; vy: number; life: number; max: number; size: number; hot: number; cool: number; trail: number; drag: number; puff: number; /** Smokes for this share of its life (an outlier's trail crosses the screen) */ smokes: number; anc?: ImpactAnchor }
 /** A shock ring racing out from a hit (ImpactLayers shock); `life` starts below 0 for one that follows later */
-interface Shock { x: number; y: number; life: number; max: number; size: number; width: number; color: number; anc?: AnchorRec }
+interface Shock { x: number; y: number; life: number; max: number; size: number; width: number; color: number; anc?: ImpactAnchor }
 /** A glow on the hull where a hit landed, riding with the ship it struck (`owner`, at `ox, oy` in its frame), or still (owner -1) */
-interface Scorch { x: number; y: number; life: number; max: number; size: number; color: number; anc?: AnchorRec }
+interface Scorch { x: number; y: number; life: number; max: number; size: number; color: number; anc?: ImpactAnchor }
 /** A rebound streak (ImpactLayers.flare): out from (x, y) along `a`, `len` long at full reach */
-interface Flare { x: number; y: number; a: number; len: number; width: number; life: number; max: number; color: number; anc?: AnchorRec }
+interface Flare { x: number; y: number; a: number; len: number; width: number; life: number; max: number; color: number; anc?: ImpactAnchor }
 /** The light a layered hit throws, fading over its life */
-interface HitLight { x: number; y: number; life: number; max: number; radius: number; power: number; color: number; anc?: AnchorRec }
-interface Ring { x: number; y: number; life: number; max: number; size: number; color: number; anc?: AnchorRec }
+interface HitLight { x: number; y: number; life: number; max: number; radius: number; power: number; color: number; anc?: ImpactAnchor }
+interface Ring { x: number; y: number; life: number; max: number; size: number; color: number; anc?: ImpactAnchor }
 
 const FADE_FRAMES = 9;
 /** Layered impacts' particles at most (the oldest go first past it) */
@@ -264,11 +257,9 @@ export class WeaponFx {
   /** Fragments made so far (a group's are the last made while it spawned: the oldest are dropped past the cap) */
   private fragsMade = 0;
   /** Impacts riding what they hit: one entity lookup each a frame */
-  private anchors: AnchorRec[] = [];
+  private anchors = new AnchorList();
   /** What the impact being made hit (an entity id, -1: nothing known): its group rides it */
   private hitTarget = -1;
-  private readonly anchorPose = { x: 0, y: 0, angle: 0 };
-  private readonly pointV = { vx: 0, vy: 0 };
   private clock = 0;
   private crackle = new Graphics();
   /** Redrawn every frame it's crackling, so a render group of its own (Pixi rebuilds its draw list, not the scene's) */
@@ -581,51 +572,19 @@ export class WeaponFx {
   /**
    * Makes `spawn`'s impact one group riding `target` (an entity id; -1 or gone: it stays where it is): what it adds to the
    * surface-bound lists (glows, fireballs, shock rings, scorches, lights, streaks, rings) is moved with the target each
-   * frame; what it adds to the free ones (sparks, sprays, embers, fragments, smoke) is given the hit point's velocity
+   * frame; what it adds to the free ones (sparks, sprays, embers, fragments, smoke) flies in the target's frame
    */
   private grouped(target: number, x: number, y: number, spawn: () => void): void {
-    const e = target >= 0 ? this.state?.entities.get(target) : undefined;
-    if (!e) { spawn(); return; }
     const n0 = this.hitGlows.length, n1 = this.shocks.length, n2 = this.scorches.length, n3 = this.hitLights.length, n4 = this.flares.length, n5 = this.rings.length;
     const n6 = this.sparks.length, n7 = this.smoke.length, f0 = this.fragsMade;
     spawn();
-    const ap = this.anchorPose;
-    ap.x = e.renderX; ap.y = e.renderY; ap.angle = e.renderAngle;
-    const rec: AnchorRec = { a: new ImpactAnchor(target, ap), born: this.clock, until: this.clock + 2, hp: { x, y }, kick: [] };
-    const bind = (arr: { anc?: AnchorRec; life: number; max: number }[], from: number): void => {
-      for (let i = from; i < arr.length; i++) { arr[i].anc = rec; rec.until = Math.max(rec.until, this.clock + arr[i].max - arr[i].life + 2); }
+    const anc = this.anchors.open(this.state?.entities, target, x, y);
+    if (!anc) return;
+    const bind = (arr: { anc?: ImpactAnchor; life: number; max: number }[], from: number): void => {
+      for (let i = from; i < arr.length; i++) { arr[i].anc = anc; anc.hold(arr[i].max - arr[i].life + 2); }
     };
     bind(this.hitGlows, n0); bind(this.shocks, n1); bind(this.scorches, n2); bind(this.hitLights, n3); bind(this.flares, n4); bind(this.rings, n5);
-    const kick = rec.kick!;
-    for (let i = n6; i < this.sparks.length; i++) kick.push(this.sparks[i]);
-    for (let i = n7; i < this.smoke.length; i++) kick.push(this.smoke[i]);
-    for (let i = Math.max(0, this.frags.length - (this.fragsMade - f0)); i < this.frags.length; i++) kick.push(this.frags[i]);
-    this.anchors.push(rec);
-  }
-
-  /**
-   * Once a frame (`frames` long, the clock already moved on): each impact's anchor follows its target's drawn pose (one
-   * lookup), or coasts on if it's gone; on its first step its free parts get the hit point's velocity. Spent ones go.
-   */
-  private stepAnchors(frames: number): void {
-    const st = this.state, before = this.clock - frames, ap = this.anchorPose;
-    for (let i = this.anchors.length - 1; i >= 0; i--) {
-      const r = this.anchors[i];
-      // (made this frame: the pose it was made at is the one now, no motion yet)
-      if (r.born >= before) continue;
-      const e = r.a.gone || !st ? undefined : st.entities.get(r.a.id);
-      if (e) { ap.x = e.renderX; ap.y = e.renderY; ap.angle = e.renderAngle; }
-      r.a.step(e ? ap : null, frames);
-      r.a.move(r.hp);
-      if (r.kick && frames > 0) {
-        if (r.a.steps > 0) {
-          const v = r.a.pointVelocity(r.hp.x, r.hp.y, this.pointV);
-          for (const p of r.kick) { p.vx += v.vx; p.vy += v.vy; p.bx = v.vx; p.by = v.vy; p.x += v.vx * frames; p.y += v.vy * frames; }
-        }
-        r.kick = null;
-      }
-      if (this.clock > r.until) { this.anchors[i] = this.anchors[this.anchors.length - 1]; this.anchors.pop(); }
-    }
+    bind(this.sparks, n6); bind(this.smoke, n7); bind(this.frags, Math.max(0, this.frags.length - (this.fragsMade - f0)));
   }
 
   /** An impact's parts at (x, y): layered (ImpactLayers) or the flat flash and rings */
@@ -791,7 +750,7 @@ export class WeaponFx {
       const p = this.hitGlows[i];
       p.life += frames;
       if (p.life >= p.max) { this.hitGlows.splice(i, 1); continue; }
-      if (p.anc) p.anc.a.move(p);
+      if (p.anc) p.anc.move(p);
       if (p.life < 0) continue;
       const n = p.life / p.max, f = 1 - n;
       if (p.cool !== undefined) {
@@ -812,7 +771,7 @@ export class WeaponFx {
       const p = this.scorches[i];
       p.life += frames;
       if (p.life >= p.max) { this.scorches.splice(i, 1); continue; }
-      if (p.anc) p.anc.a.move(p);
+      if (p.anc) p.anc.move(p);
       const n = p.life / p.max;
       // White-hot for a moment, then its colour, cooling to a dull red as it fades
       const col = n < 0.12 ? mixColor(0xffffff, p.color, n / 0.12) : mixColor(p.color, 0x5a1206, Math.min(1, (n - 0.12) / 0.7));
@@ -824,7 +783,7 @@ export class WeaponFx {
       const s = this.shocks[i];
       s.life += frames;
       if (s.life >= s.max) { this.shocks.splice(i, 1); continue; }
-      if (s.anc) s.anc.a.move(s);
+      if (s.anc) s.anc.move(s);
       if (s.life < 0) continue;
       const n = s.life / s.max, f = 1 - n;
       // Out fast and slowing (ease-out), the band thinning to a hairline as it goes
@@ -837,9 +796,8 @@ export class WeaponFx {
       const p = this.frags[i];
       p.life += frames;
       if (p.life >= p.max) { this.frags.splice(i, 1); continue; }
-      // (slowing to the velocity of what it came off, not to rest: it carries the target's momentum)
-      const dr = Math.pow(p.drag, frames), bx = p.bx ?? 0, by = p.by ?? 0;
-      p.vx = bx + (p.vx - bx) * dr; p.vy = by + (p.vy - by) * dr; p.x += p.vx * frames; p.y += p.vy * frames;
+      // (in the frame of what it came off, slowing to rest on it: it carries the target's motion)
+      rideStep(p, p.anc, p.drag, frames);
       const n = p.life / p.max, fade = n < 0.65 ? 1 : 1 - (n - 0.65) / 0.35, sp = Math.hypot(p.vx, p.vy);
       const col = mixColor(p.hot, p.cool, Math.min(1, n * 1.15));
       if (sp > 0.15) this.line(p.x - p.vx * 7, p.y - p.vy * 7, p.x, p.y, p.size * 0.9, p.trail, 0.45 * fade * Math.min(1, sp / 1.5));
@@ -850,14 +808,16 @@ export class WeaponFx {
       p.puff -= frames;
       if (p.puff <= 0 && n < p.smokes && this.smoke.length < SMOKE_CAP && Math.random() < this.particleKeep) {
         p.puff = 3 + Math.random() * 3;
-        this.smoke.push({ x: p.x, y: p.y, vx: p.vx * 0.1, vy: p.vy * 0.1, life: 0, max: 26 + Math.random() * 16, size: p.size * 1.3, color: 0x6a625a, alpha: 0.22 * (1 - n) });
+        const max = 26 + Math.random() * 16;
+        this.smoke.push({ x: p.x, y: p.y, vx: p.vx * 0.1, vy: p.vy * 0.1, life: 0, max, size: p.size * 1.3, color: 0x6a625a, alpha: 0.22 * (1 - n), anc: p.anc });
+        p.anc?.hold(max + 2);
       }
     }
     for (let i = this.flares.length - 1; i >= 0; i--) {
       const f = this.flares[i];
       f.life += frames;
       if (f.life >= f.max) { this.flares.splice(i, 1); continue; }
-      if (f.anc) { f.anc.a.move(f); f.a += f.anc.a.turn; }
+      if (f.anc) { f.anc.move(f); f.a += f.anc.turn; }
       const n = f.life / f.max, out = 1 - Math.pow(1 - Math.min(1, n / 0.3), 3);
       // Shoots out fast (eased) from the hit, its root lifting off after it as it fades, thinning
       const r1 = f.len * out, r0 = f.len * 0.55 * Math.max(0, (n - 0.25) / 0.75), c = Math.cos(f.a), sn = Math.sin(f.a);
@@ -869,7 +829,7 @@ export class WeaponFx {
       const l = this.hitLights[i];
       l.life += frames;
       if (l.life >= l.max) this.hitLights.splice(i, 1);
-      else if (l.anc) l.anc.a.move(l);
+      else if (l.anc) l.anc.move(l);
     }
   }
 
@@ -1139,7 +1099,7 @@ export class WeaponFx {
     this.shockG.begin();
     this.clock += frames;
     // (impacts ride what they hit: each anchor follows its target first, so everything on it is drawn where it now is)
-    if (this.anchors.length) this.stepAnchors(frames);
+    if (this.anchors.live.length) this.anchors.step(this.state?.entities, frames);
     if (this.crackling) { this.crackle.clear(); this.crackling = false; }
 
     // (Deleting the current entry while iterating a Map is safe)
@@ -1332,11 +1292,9 @@ export class WeaponFx {
       const p = this.sparks[i];
       p.life += frames;
       if (p.life >= p.max) { this.sparks.splice(i, 1); continue; }
-      // (slowing to the velocity of what it came off, if anything: its streak drawn by its own motion off that)
-      const drag = Math.pow(p.drag ?? 0.9, frames), bx = p.bx ?? 0, by = p.by ?? 0;
-      p.vx = bx + (p.vx - bx) * drag; p.vy = by + (p.vy - by) * drag;
-      p.x += p.vx * frames; p.y += p.vy * frames;
-      const n = p.life / p.max, rvx = p.vx - bx, rvy = p.vy - by;
+      // (in the frame of what it came off, if anything, slowing to rest on it: its streak drawn by its own motion off that)
+      rideStep(p, p.anc, p.drag ?? 0.9, frames);
+      const n = p.life / p.max, rvx = p.vx, rvy = p.vy;
       if (p.cool !== undefined) {
         // An ember: cooling as it goes, bright for most of its life and fading at the end
         this.line(p.x - rvx * 2, p.y - rvy * 2, p.x, p.y, p.width ?? 2.4, mixColor(p.color, p.cool, Math.min(1, n * 1.3)), 1 - n * n);
@@ -1350,9 +1308,7 @@ export class WeaponFx {
       const s = this.smoke[i];
       s.life += frames;
       if (s.life >= s.max) { this.smoke.splice(i, 1); continue; }
-      const drag = Math.pow(0.95, frames), bx = s.bx ?? 0, by = s.by ?? 0;
-      s.vx = bx + (s.vx - bx) * drag; s.vy = by + (s.vy - by) * drag;
-      s.x += s.vx * frames; s.y += s.vy * frames;
+      rideStep(s, s.anc, 0.95, frames);
       const k = s.life / s.max;
       this.circle(this.smokeG, TEX.dot, s.x, s.y, s.size * (1 + 1.8 * k) * 1.3, s.color ?? 0xb4aea6, (s.alpha ?? 0.16) * (1 - k) * Math.min(1, k * 8));
     }
@@ -1361,7 +1317,7 @@ export class WeaponFx {
       const r = this.rings[i];
       r.life += frames;
       if (r.life >= r.max) { this.rings.splice(i, 1); continue; }
-      if (r.anc) r.anc.a.move(r);
+      if (r.anc) r.anc.move(r);
       const n = r.life / r.max;
       this.circle(g, TEX.disc, r.x, r.y, r.size * (0.3 + 0.7 * n), r.color, 0.35 * (1 - n));
       this.circle(g, TEX.disc, r.x, r.y, r.size * 0.25 * (1 - n) + 0.5, 0xffffff, 0.8 * (1 - n));

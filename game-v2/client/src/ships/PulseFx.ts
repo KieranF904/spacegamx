@@ -27,6 +27,7 @@ import { beamLook } from '../rendering/weapons/weaponStyles';
 import { drawCone, drawStrands, sputterGain } from './beamLookFx';
 import { pulseIntensity, beamFalloff, effectiveRange, type PulseProfile, type WeaponTuning } from '@space-game/common';
 import { offSurface, type SurfaceNormal } from '../rendering/weapons/impactAim';
+import { AnchorList, rideStep, type ImpactAnchor, type PoseSource } from '../rendering/weapons/impactAnchor';
 
 /** The flare's bulge races from the muzzle to where the beam lands at about this speed (world units a tick), in 5 to 12 ticks (~0.1-0.2 s) */
 const BULGE_SPEED = 420;
@@ -90,6 +91,8 @@ export interface PulseRun {
   impact: number;
   /** Muzzle this frame (motes are drawn in to it) */
   mx: number; my: number;
+  /** What its bulge landed on (impactAnchor): the scorch and sparks it leaves while it burns ride it too */
+  anc?: ImpactAnchor;
 }
 
 interface Particle {
@@ -97,9 +100,11 @@ interface Particle {
   kind: number;
   x: number; y: number; vx: number; vy: number; life: number; max: number; color: number; size: number;
   run?: PulseRun;
+  /** A hit's spark or droplet rides what it struck (impactAnchor): it flies in that frame */
+  anc?: ImpactAnchor;
 }
-interface Ring { x: number; y: number; life: number; max: number; r0: number; r1: number; color: number; width: number }
-interface Scorch { x: number; y: number; life: number; max: number; r: number; color: number }
+interface Ring { x: number; y: number; life: number; max: number; r0: number; r1: number; color: number; width: number; anc?: ImpactAnchor }
+interface Scorch { x: number; y: number; life: number; max: number; r: number; color: number; anc?: ImpactAnchor }
 
 const MAX_PARTICLES = 500, MAX_RINGS = 32, MAX_SCORCH = 48;
 
@@ -107,6 +112,9 @@ export class PulseFx {
   /** The surface a beam struck (ships/hitSurface.ts): its sparks and droplets splash straight back out of it, not back up the beam */
   surfaceAt: ((x: number, y: number, dx: number, dy: number, owner: number, out: SurfaceNormal) => SurfaceNormal | null) | null = null;
   private readonly normal: SurfaceNormal = { nx: 0, ny: 0 };
+  /** Where what a hit struck is drawn (GameState.entities): the hit's sparks, rings and scorch ride it */
+  poses: PoseSource | null = null;
+  private anchors = new AnchorList();
   private particles: Particle[] = [];
   private rings: Ring[] = [];
   private scorch: Scorch[] = [];
@@ -123,6 +131,11 @@ export class PulseFx {
       }
       g.stroke({ color, width: Math.max(1, wid * 0.3), alpha: 0.85 * alpha });
     }
+  }
+
+  /** A new frame (`frames` long), before any pulse is drawn: the hits' anchors follow what they struck */
+  begin(frames: number): void {
+    if (this.anchors.live.length) this.anchors.step(this.poses, frames);
   }
 
   private spawn(p: Particle): void {
@@ -219,10 +232,17 @@ export class PulseFx {
         // On the hull: a hot glow where it burns (dimmer the further out), and a scorch left behind
         g.circle(hx, hy, wid * (1.4 + 2.4 * k) * (0.5 + 0.5 * land)).fill({ color: L.mid, alpha: 0.35 * a * land });
         g.circle(hx, hy, wid * (0.6 + 0.9 * k) * (0.5 + 0.5 * land)).fill({ color: L.core, alpha: 0.75 * a * land });
-        if (Math.random() < 0.35 * frames * land && this.scorch.length < MAX_SCORCH) this.scorch.push({ x: hx, y: hy, life: 0, max: 40 + Math.random() * 30, r: wid * (1.2 + Math.random()), color: 0xff7a2a });
+        // (riding what the bulge landed on while that's still followed)
+        const anc = run.anc && run.anc.left > 0 ? run.anc : undefined;
+        if (Math.random() < 0.35 * frames * land && this.scorch.length < MAX_SCORCH) {
+          const max = 40 + Math.random() * 30;
+          this.scorch.push({ x: hx, y: hy, life: 0, max, r: wid * (1.2 + Math.random()), color: 0xff7a2a, anc });
+          anc?.hold(max + 2);
+        }
         if (Math.random() < (0.25 + 0.5 * k) * frames * L.embers * land) {
-          const sa = Math.atan2(-uy, -ux) + (Math.random() - 0.5) * 2.4, s = 1.5 + Math.random() * 4;
-          this.spawn({ kind: 0, x: hx, y: hy, vx: Math.cos(sa) * s, vy: Math.sin(sa) * s, life: 0, max: 8 + Math.random() * 12, color: Math.random() < 0.5 ? 0xfff2c8 : L.mid, size: 1.3 });
+          const sa = Math.atan2(-uy, -ux) + (Math.random() - 0.5) * 2.4, s = 1.5 + Math.random() * 4, max = 8 + Math.random() * 12;
+          this.spawn({ kind: 0, x: hx, y: hy, vx: Math.cos(sa) * s, vy: Math.sin(sa) * s, life: 0, max, color: Math.random() < 0.5 ? 0xfff2c8 : L.mid, size: 1.3, anc });
+          anc?.hold(max + 2);
         }
       }
       // The tail sheds embers along its line
@@ -281,12 +301,16 @@ export class PulseFx {
   private land(run: PulseRun, x: number, y: number, hx: number, hy: number, ux: number, uy: number, hit: boolean, s: number, pw: number, peakWidth: number, L: PulseLook): void {
     void x; void y;
     if (s <= 0.02) return;
+    // Straight out of the surface it burned (a laser's hit splashes back along the normal), else back up the beam; all of it
+    // riding what it struck
+    this.normal.target = -1;
+    const n = hit ? this.surfaceAt?.(hx, hy, ux, uy, run.owner, this.normal) : null;
+    const anc = hit ? this.anchors.open(this.poses, this.normal.target ?? -1, hx, hy) ?? undefined : undefined;
+    const r0 = this.rings.length, p0 = this.particles.length, s0 = this.scorch.length;
     for (let i = 0; i < (hit ? L.rings : 1) && this.rings.length < MAX_RINGS; i++) {
       this.rings.push({ x: hx, y: hy, life: -i * 5, max: 18 + i * 6, r0: pw * 0.8, r1: peakWidth * (2.6 + i * 1.4) * (0.4 + 0.6 * s), color: i ? L.outer : L.mid, width: (3 - i) * (0.5 + 0.5 * s) });
     }
     if (!hit) return;
-    // Straight out of the surface it burned (a laser's hit splashes back along the normal), else back up the beam
-    const n = this.surfaceAt?.(hx, hy, ux, uy, run.owner, this.normal);
     const back = n ? Math.atan2(n.ny, n.nx) : Math.atan2(-uy, -ux);
     const out = (a: number): number => (n ? offSurface(a, n.nx, n.ny) : a);
     for (let i = 0; i < 16 * L.embers * s; i++) {
@@ -299,12 +323,16 @@ export class PulseFx {
       this.spawn({ kind: 1, x: hx, y: hy, vx: Math.cos(sa) * v, vy: Math.sin(sa) * v, life: 0, max: 30 + Math.random() * 30, color: 0xffa040, size: 1.6 + Math.random() * 1.6 });
     }
     if (this.scorch.length < MAX_SCORCH) this.scorch.push({ x: hx, y: hy, life: 0, max: 70, r: peakWidth * 0.9 * (0.5 + 0.5 * s), color: 0xff6a1a });
+    if (!anc) return;
+    run.anc = anc;
+    for (let i = r0; i < this.rings.length; i++) { this.rings[i].anc = anc; anc.hold(this.rings[i].max - this.rings[i].life + 2); }
+    for (let i = p0; i < this.particles.length; i++) { this.particles[i].anc = anc; anc.hold(this.particles[i].max + 2); }
+    for (let i = s0; i < this.scorch.length; i++) { this.scorch[i].anc = anc; anc.hold(this.scorch[i].max + 2); }
   }
 
   /** Every pulse's particles, rings and scorches move on and fade (once a frame, after the pulses) */
   drawAfter(g: Graphics, dt: number, frames: number): void {
     this.t += dt;
-    const drag = Math.pow(0.92, frames), slow = Math.pow(0.96, frames);
     let w = 0;
     for (const p of this.particles) {
       p.life += frames;
@@ -317,12 +345,10 @@ export class PulseFx {
         const px = run.mx + p.x * s, py = run.my + p.y * s;
         g.circle(px, py, p.size).fill({ color: p.color, alpha: 0.8 * (1 - f * 0.5) });
       } else if (p.kind === 0) {
-        p.vx *= drag; p.vy *= drag;
-        p.x += p.vx * frames; p.y += p.vy * frames;
+        rideStep(p, p.anc, 0.92, frames);
         g.moveTo(p.x - p.vx * 2.2, p.y - p.vy * 2.2).lineTo(p.x, p.y).stroke({ color: p.color, width: p.size, alpha: f });
       } else {
-        p.vx *= slow; p.vy *= slow;
-        p.x += p.vx * frames; p.y += p.vy * frames;
+        rideStep(p, p.anc, 0.96, frames);
         g.circle(p.x, p.y, p.size * (0.5 + 0.5 * f)).fill({ color: f > 0.5 ? p.color : 0xff4a2a, alpha: 0.8 * f });
       }
       this.particles[w++] = p;
@@ -332,6 +358,7 @@ export class PulseFx {
     for (const ring of this.rings) {
       ring.life += frames;
       if (ring.life >= ring.max) continue;
+      if (ring.anc) ring.anc.move(ring);
       if (ring.life >= 0) {
         const n = ring.life / ring.max, e = 1 - (1 - n) * (1 - n);
         g.circle(ring.x, ring.y, ring.r0 + (ring.r1 - ring.r0) * e).stroke({ color: ring.color, width: ring.width * (1.6 - n), alpha: 0.7 * (1 - n) });
@@ -343,6 +370,7 @@ export class PulseFx {
     for (const sc of this.scorch) {
       sc.life += frames;
       if (sc.life >= sc.max) continue;
+      if (sc.anc) sc.anc.move(sc);
       const f = 1 - sc.life / sc.max;
       g.circle(sc.x, sc.y, sc.r).fill({ color: sc.color, alpha: 0.16 * f * f });
       this.scorch[s++] = sc;

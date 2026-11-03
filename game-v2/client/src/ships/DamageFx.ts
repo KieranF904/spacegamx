@@ -32,6 +32,7 @@ import { EntityType, isRuined, lookFn, ServerContactMessage, ServerPartDestroyed
 import type { GameState } from '../state/GameState';
 import type { ShipSource } from './ShipStore';
 import type { Lighting } from '../rendering/lighting/Lighting';
+import { AnchorList, type ImpactAnchor } from '../rendering/weapons/impactAnchor';
 
 type Sound = (id: string, at?: { x: number; y: number }, volume?: number) => void;
 
@@ -49,6 +50,8 @@ interface P {
   jit?: boolean;
   /** Chunks: the hot edge while it glows (its outline, stroked once for the chunk's size) */
   hot?: Graphics;
+  /** A hit's spark, glow or chip riding the ship it struck (impactAnchor): its velocity is relative to that ship */
+  anc?: ImpactAnchor;
 }
 
 interface Pending { at: number; run: () => void }
@@ -91,6 +94,8 @@ export class DamageFx {
   /** Shield ripples: where the shot struck, about the ship's centre in its own frame (angle and distance), so it rides with it */
   private ripples: { id: number; a: number; d: number; life: number; model: number }[] = [];
   private ps: P[] = [];
+  /** Plating hits riding the ships they struck: one entity lookup each a frame */
+  private anchors = new AnchorList();
   private pending: Pending[] = [];
   private time = 0;
   private lastCrumbleSound = 0;
@@ -751,16 +756,19 @@ export class DamageFx {
       }
       if (hit < 0) continue;
       const reactive = parts[hit].fn === 'plating_reactive_armour';
+      // (thrown off the plate in the ship's frame: they ride it, impactAnchor, so they don't smear behind it as it flies)
+      const anc = this.anchors.open(this.state.entities, id, x, y), n0 = this.ps.length, bv = anc ? 0 : 1;
       if (reactive) {
-        this.burstSparks(x, y, e.vx, e.vy, 7, 3, 9, 0xffe9a0);
-        this.glow(x, y, e.vx, e.vy, 7, 5, 0xfff2c8, 0.7);
-        this.ring(x, y, e.vx, e.vy, 3, 13, 8, 0xffd98a, 0.5);
+        this.burstSparks(x, y, e.vx * bv, e.vy * bv, 7, 3, 9, 0xffe9a0);
+        this.glow(x, y, e.vx * bv, e.vy * bv, 7, 5, 0xfff2c8, 0.7);
+        this.ring(x, y, e.vx * bv, e.vy * bv, 3, 13, 8, 0xffd98a, 0.5);
       } else {
         const hurt = ship.maxHp[hit] > 0 ? 1 - ship.hp[hit] / ship.maxHp[hit] : 0;
-        this.chunks(x, y, e.vx, e.vy, 2 + Math.round(3 * hurt), 1.3, 3, 0x8a929e);
-        this.dustPuff(x, y, e.vx, e.vy, 6, 40, 0x8a857e, 0.3);
-        this.burstSparks(x, y, e.vx, e.vy, 3, 1.5, 4, 0xc9d0da);
+        this.chunks(x, y, e.vx * bv, e.vy * bv, 2 + Math.round(3 * hurt), 1.3, 3, 0x8a929e);
+        this.dustPuff(x, y, e.vx * bv, e.vy * bv, 6, 40, 0x8a857e, 0.3);
+        this.burstSparks(x, y, e.vx * bv, e.vy * bv, 3, 1.5, 4, 0xc9d0da);
       }
+      if (anc) for (let i = n0; i < this.ps.length; i++) { this.ps[i].anc = anc; anc.hold(this.ps[i].max + 2); }
       return;
     }
   }
@@ -817,6 +825,7 @@ export class DamageFx {
     }
     this.ambient(dt);
     this.fires(frames);
+    if (this.anchors.live.length) this.anchors.step(this.state.entities, frames);
     this.addSprites.begin();
     this.smokeSprites.begin();
     this.rings.begin();
@@ -935,6 +944,8 @@ export class DamageFx {
       const drag = Math.pow(p.drag, frames);
       p.vx *= drag; p.vy *= drag;
       p.x += p.vx * frames; p.y += p.vy * frames;
+      // (riding the ship it struck: carried by how far the hit point moved)
+      if (p.anc) { p.x += p.anc.dx; p.y += p.anc.dy; }
       p.size += p.grow * frames;
       p.rot += p.vr * frames;
       const k = p.life / p.max, fade = 1 - k;

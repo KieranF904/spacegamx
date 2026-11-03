@@ -21,6 +21,7 @@ import type { Graphics } from 'pixi.js';
 import { pulseIntensity, mineFalloff, type PulseProfile } from '@space-game/common';
 import type { BeamLook } from '../rendering/weapons/weaponStyles';
 import { drawCone, drawStrands, sputterGain } from './beamLookFx';
+import { AnchorList, rideStep, type ImpactAnchor, type PoseSource } from '../rendering/weapons/impactAnchor';
 
 const OUTER = 0x0284c7, MID = 0x4fc3f7, CORE = 0xe6f8ff;
 /** Rings are this far apart along the beam (world units) and travel this fast (units a tick) */
@@ -46,8 +47,9 @@ interface Line { x: number; y: number; hx: number; hy: number; hit: boolean }
 interface RingState { fade: number; x: number; y: number; hx: number; hy: number; lvl: number; w: number; seen: boolean }
 /** An ore mote on its way down the beam: `f` along it from the cut (0) to the ship (1) */
 interface Mote { key: number; f: number; speed: number; side: number; phase: number; color: number; size: number }
-interface Chip { x: number; y: number; vx: number; vy: number; rot: number; vr: number; life: number; max: number; len: number; color: number }
-interface Puff { x: number; y: number; vx: number; vy: number; life: number; max: number; r0: number; r1: number; color: number }
+/** Chips and dust ride the rock they came off (`anc`, impactAnchor): they fly in its frame, so they don't smear round its orbit */
+interface Chip { x: number; y: number; vx: number; vy: number; rot: number; vr: number; life: number; max: number; len: number; color: number; anc?: ImpactAnchor }
+interface Puff { x: number; y: number; vx: number; vy: number; life: number; max: number; r0: number; r1: number; color: number; anc?: ImpactAnchor }
 
 const MAX_MOTES = 90, MAX_CHIPS = 160, MAX_PUFFS = 60;
 
@@ -55,6 +57,12 @@ export class MiningFx {
   private motes: Mote[] = [];
   private chips: Chip[] = [];
   private puffs: Puff[] = [];
+  /** Where the rocks are drawn (GameState.entities), and the rock the beam about to be drawn is cutting (-1 none) */
+  poses: PoseSource | null = null;
+  target = -1;
+  private anchors = new AnchorList();
+  /** Each beam's anchor on the rock it's cutting (by its key), while it cuts the same one */
+  private cutAnchors = new Map<number, ImpactAnchor>();
   /** Each beam this frame (by its key), for its motes */
   private lines = new Map<number, Line>();
   private ringStates = new Map<number, RingState>();
@@ -62,8 +70,11 @@ export class MiningFx {
   private clock = 0;
 
   /** Once a frame, before the beams */
-  begin(now = 0): void {
+  begin(now = 0, frames = 0): void {
     this.clock = now;
+    // (what's riding a rock follows it first, before anything new is thrown off it this frame)
+    if (this.anchors.live.length) this.anchors.step(this.poses, frames);
+    if (this.cutAnchors.size) for (const [k, a] of this.cutAnchors) if (a.left <= 0) this.cutAnchors.delete(k);
     this.lines.clear();
     for (const r of this.ringStates.values()) r.seen = false;
   }
@@ -122,15 +133,17 @@ export class MiningFx {
     for (let i = 0; i < 5; i++) g.circle(hx, hy, pool * (2.3 - i * 0.4)).fill({ color: kind.hot, alpha: (0.05 + 0.05 * lvl) * (1 + i * 0.35) * reachStr });
     g.circle(hx, hy, pool * 0.5).fill({ color: 0xfff6e0, alpha: (0.5 + 0.45 * k) * env * reachStr });
     // Chips and dust thrown back along the beam, in a wide fan; motes set off from the cut
-    const back = Math.atan2(-uy, -ux);
+    const back = Math.atan2(-uy, -ux), anc = this.cutAnchor(key, hx, hy);
     if (Math.random() < (0.1 + 3.4 * k * k) * env * reachStr * frames && this.chips.length < MAX_CHIPS) {
-      const a = back + (Math.random() - 0.5) * 2.2, s = 1.4 + Math.random() * (2.4 + 2 * k);
-      this.chips.push({ x: hx, y: hy, vx: Math.cos(a) * s, vy: Math.sin(a) * s, rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.5, life: 0, max: 16 + Math.random() * 22,
-        len: 2.6 + Math.random() * 3.6, color: pal[Math.random() < 0.7 ? 0 : 2] });
+      const a = back + (Math.random() - 0.5) * 2.2, s = 1.4 + Math.random() * (2.4 + 2 * k), max = 16 + Math.random() * 22;
+      this.chips.push({ x: hx, y: hy, vx: Math.cos(a) * s, vy: Math.sin(a) * s, rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.5, life: 0, max,
+        len: 2.6 + Math.random() * 3.6, color: pal[Math.random() < 0.7 ? 0 : 2], anc });
+      anc?.hold(max + 2);
     }
     if (Math.random() < (0.04 + 0.7 * k * k) * env * reachStr * frames && this.puffs.length < MAX_PUFFS) {
-      const a = back + (Math.random() - 0.5) * 2.8, s = 0.3 + Math.random() * 0.8;
-      this.puffs.push({ x: hx, y: hy, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0, max: 34 + Math.random() * 26, r0: 4, r1: 16 + Math.random() * 12, color: pal[1] });
+      const a = back + (Math.random() - 0.5) * 2.8, s = 0.3 + Math.random() * 0.8, max = 34 + Math.random() * 26;
+      this.puffs.push({ x: hx, y: hy, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0, max, r0: 4, r1: 16 + Math.random() * 12, color: pal[1], anc });
+      anc?.hold(max + 2);
     }
     if (Math.random() < (0.08 + 2.2 * k * k) * env * reachStr * frames * (look?.motes ?? 1) && this.motes.length < MAX_MOTES) {
       this.motes.push({ key, f: 0.02, speed: MOTE_SPEED * (0.8 + Math.random() * 0.5), side: (Math.random() - 0.5) * 2, phase: Math.random() * 6.28, color: pal[Math.floor(Math.random() * 3)], size: 2.2 + Math.random() * 1.8 });
@@ -166,6 +179,16 @@ export class MiningFx {
   }
 
   /** Once a frame, after the beams: motes, chips and dust move on, are drawn, and fade */
+  /** The anchor on the rock beam `key` is cutting (`target`), at the cut (hx, hy): its last one while that's still riding the same rock */
+  private cutAnchor(key: number, hx: number, hy: number): ImpactAnchor | undefined {
+    if (this.target < 0) return undefined;
+    const old = this.cutAnchors.get(key);
+    if (old && old.id === this.target && old.left > 0 && !old.gone) return old;
+    const a = this.anchors.open(this.poses, this.target, hx, hy) ?? undefined;
+    if (a) this.cutAnchors.set(key, a); else this.cutAnchors.delete(key);
+    return a;
+  }
+
   drawAfter(g: Graphics, dt: number, frames: number): void {
     void dt;
     // Rings of a beam that's let go fade out where it was
@@ -200,8 +223,8 @@ export class MiningFx {
     for (const c of this.chips) {
       c.life += frames;
       if (c.life >= c.max) continue;
-      c.vx *= Math.pow(0.94, frames); c.vy *= Math.pow(0.94, frames);
-      c.x += c.vx * frames; c.y += c.vy * frames; c.rot += c.vr * frames;
+      rideStep(c, c.anc, 0.94, frames);
+      c.rot += c.vr * frames;
       const f = 1 - c.life / c.max, dx = Math.cos(c.rot) * c.len, dy = Math.sin(c.rot) * c.len;
       g.moveTo(c.x - dx, c.y - dy).lineTo(c.x + dx, c.y + dy).stroke({ color: c.color, width: 2.4, alpha: 0.9 * f });
       this.chips[w++] = c;
@@ -212,8 +235,7 @@ export class MiningFx {
     for (const p of this.puffs) {
       p.life += frames;
       if (p.life >= p.max) continue;
-      p.vx *= Math.pow(0.97, frames); p.vy *= Math.pow(0.97, frames);
-      p.x += p.vx * frames; p.y += p.vy * frames;
+      rideStep(p, p.anc, 0.97, frames);
       const f = p.life / p.max;
       // (Soft: a few rings, thinning outward)
       const r = p.r0 + (p.r1 - p.r0) * f, a = 0.07 * (1 - f);

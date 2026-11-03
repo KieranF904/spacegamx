@@ -74,6 +74,8 @@ export class MiningBeamFx {
     this.root.addChild(this.g);
     layer.addChild(this.root);
     this.pulseFx.surfaceAt = (x, y, dx, dy, owner, out) => hitSurface(source, state, x, y, dx, dy, owner, out);
+    this.pulseFx.poses = state.entities;
+    this.miningFx.poses = state.entities;
   }
 
   /** The frame's step (seconds) */
@@ -90,7 +92,7 @@ export class MiningBeamFx {
     if (!mt) return;
     const frames = Math.min(4, dt * 60);
     const prof = pulseProfile(MINING_PULSE), miningSeen = new Set<number>(), miningSounded = new Set<number>();
-    this.miningFx.begin(this.t * 60);
+    this.miningFx.begin(this.t * 60, frames);
     for (const [id, ship] of this.source.bodies) {
       if (ship.kind !== 'ship' || !ship.derived.miners.length) continue;
       const e = this.state.entities.get(id);
@@ -138,6 +140,7 @@ export class MiningBeamFx {
         miningSeen.add(key);
         // (Its newest pulse sets the beam's brightness; older ones are trailing off under it)
         const rock = t < 0.999 ? rockMaterial(this.rockHit) : null;
+        this.miningFx.target = t < 0.999 ? this.rockId : -1;
         this.miningFx.draw(g, key, prof, now - runs[runs.length - 1].start, !on, x, y, hx, hy, t < 0.999, rock, now, frames, mt.range, beamLook(ship.blueprint.parts[m.part]?.fn));
         if (t < 0.999 && Math.random() < 0.35 * frames) {
           const sa = a + Math.PI + (Math.random() - 0.5) * 2.2, s = 1.5 + Math.random() * 4;
@@ -413,6 +416,8 @@ export class MiningBeamFx {
   private mining = new Map<number, PulseRun[]>();
   /** The rock the last cast met (its composition: what its cut throws off) */
   private rockHit: Composition | undefined;
+  /** The rock the last cast met (-1 none) */
+  private rockId = -1;
   /** How mining beams are drawn (nothing like a weapon's pulse) */
   private miningFx = new MiningFx();
   /** A mining laser's pulse starting: where, and whether it's yours (its sound; once a ship, however many miners) */
@@ -441,6 +446,7 @@ export class MiningBeamFx {
    */
   private drawPulses(g: Graphics): void {
     const frames = Math.min(4, this.dt * 60);
+    this.pulseFx.begin(frames);
     if (this.pulses.length) {
       const present = this.state.getRawServerTick(), render = present - this.state.interpDelayMs / (1000 / 60);
       for (let i = this.pulses.length - 1; i >= 0; i--) {
@@ -514,6 +520,7 @@ export class MiningBeamFx {
   private cast(x0: number, y0: number, x1: number, y1: number, gas = false): number {
     let best = 1;
     this.rockHit = undefined;
+    this.rockId = -1;
     const minX = Math.min(x0, x1) - 200, maxX = Math.max(x0, x1) + 200, minY = Math.min(y0, y1) - 200, maxY = Math.max(y0, y1) + 200;
     for (const e of this.state.entities.values()) {
       if (e.type !== EntityType.Asteroid) continue;
@@ -523,7 +530,7 @@ export class MiningBeamFx {
       for (let i = 0; i < poly.length; i++) {
         const p1 = poly[i], p2 = poly[(i + 1) % poly.length];
         const t = segmentIntersectT(x0, y0, x1, y1, p1.x, p1.y, p2.x, p2.y);
-        if (t !== null && t < best) { best = t; this.rockHit = e.composition; }
+        if (t !== null && t < best) { best = t; this.rockHit = e.composition; this.rockId = e.id; }
       }
     }
     return best;
