@@ -153,10 +153,11 @@ export function stepTurretAim(
  * itself is pointed at the target (a close target can sit well off a muzzle
  * that's out on a wing), the gun fires anyway at the closest angle it can.
  * `beam`: a beam has no spread and no fat shell to forgive a near miss, so it
- * swings further (beamGimbalDeg).
+ * swings further (beamGimbalDeg). `gimbalDeg`: the gun's own reach, if its
+ * kind has one (tuning.json weapons.<kind>.gimbalDeg: the Lance's), over both.
  */
-export function stepFixedGunAim(desired: number, tuning: ShipTuning, heading = desired, beam = false): { offset: number; canFire: boolean } {
-  const g = ((beam ? tuning.fixedGun?.beamGimbalDeg : undefined) ?? tuning.fixedGun?.gimbalDeg ?? 2) * DEG;
+export function stepFixedGunAim(desired: number, tuning: ShipTuning, heading = desired, beam = false, gimbalDeg?: number): { offset: number; canFire: boolean } {
+  const g = (gimbalDeg ?? (beam ? tuning.fixedGun?.beamGimbalDeg : undefined) ?? tuning.fixedGun?.gimbalDeg ?? 2) * DEG;
   const tol = (tuning.fixedGun?.fireToleranceDeg ?? 0.5) * DEG;
   const wrap = (a: number) => {
     while (a > Math.PI) a -= 2 * Math.PI;

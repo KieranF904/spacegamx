@@ -544,7 +544,7 @@ const SHIP_SHAPES: Record<string, Spec> = {
       if (!isObj(v)) { c.err(path, `expected a weapon, got ${typeName(v)}`); return; }
       // (A pulse laser: damage a pulse, and its pulse's length and peak: common/src/ships/pulse.ts)
       if (v.type === 'beam' && v.pulse !== undefined) check(c, obj({ type: 'string', range: 'number', damage: 'number', pulse: strict({ ticks: 'number', peakAt: 'number' }), 'falloff?': strict({ start: 'number', floor: 'number' }) }), v, path);
-      else if (v.type === 'beam') check(c, obj({ type: 'string', range: 'number', dps: 'number' }), v, path);
+      else if (v.type === 'beam') check(c, obj({ type: 'string', range: 'number', dps: 'number', 'gimbalDeg?': 'number' }), v, path);
       else if (v.type === 'projectile') check(c, obj({ type: 'string', speed: 'number', damage: 'number', life: 'number', 'split?': obj({ count: 'number', arc: 'number', kind: 'string' }) }), v, path);
       else c.err(join(path, 'type'), `expected "projectile" or "beam", got ${JSON.stringify(v.type)}`);
     }),

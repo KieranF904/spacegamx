@@ -69,7 +69,7 @@
     "speedScale": 0.7,
     "sizeScale": 1.5
   },
-  "_weapons": "Per weapon kind. projectile: speed (u/tick), damage, life (ticks), size (shell scale), spread (deg). Extras: pierce (bodies it passes through), homing (turn rate), accel/maxSpeed, fuse (proximity radius), splash {radius, damage}, emp {radius, ticks}. beam: range, dps (no heat: it burns as long as the power lasts, rework 2026-11); or a pulse laser: damage a pulse, pulse {ticks, peakAt} (common/src/ships/pulse.ts: fades in, peaks for an instant, trails off; charges for its part's fireInterval; no heat); width (at a pulse's peak); falloff {start, floor}: full strength out to start x range (its effective range), then down steeply to floor at its full range, fading as it goes (a hull this near its line is hit), npcScale (hostiles' beams × this), armorBonus. stagger: a ship's guns of the kind (and interval) fire in turn, evenly over their interval (guns.ts). heal (beam): mends instead of hurting, HP a second (the Repair Beam: common/src/ships/support.ts). intercept: point defence can shoot a shot of this kind down, in this many hits (a boss nova never). pointDefence {range, slew}: fires on its own at interceptable shots, never at ships. bySize: how a bigger gun differs beyond hitting harder, each number x (size / base size)^this (rate: fire rate).",
+  "_weapons": "Per weapon kind. projectile: speed (u/tick), damage, life (ticks), size (shell scale), spread (deg). Extras: pierce (bodies it passes through), homing (turn rate), accel/maxSpeed, fuse (proximity radius), splash {radius, damage}, emp {radius, ticks}. beam: range, dps (no heat: it burns as long as the power lasts, rework 2026-11); or a pulse laser: damage a pulse, pulse {ticks, peakAt} (common/src/ships/pulse.ts: fades in, peaks for an instant, trails off; charges for its part's fireInterval; no heat); width (at a pulse's peak); falloff {start, floor}: full strength out to start x range (its effective range), then down steeply to floor at its full range, fading as it goes (a hull this near its line is hit), npcScale (hostiles' beams × this), armorBonus. stagger: a ship's guns of the kind (and interval) fire in turn, evenly over their interval (guns.ts). heal (beam): mends instead of hurting, HP a second (the Repair Beam: common/src/ships/support.ts). intercept: point defence can shoot a shot of this kind down, in this many hits (a boss nova never). pointDefence {range, slew}: fires on its own at interceptable shots, never at ships. gimbalDeg (a fixed gun of the kind): how far it swivels either side (degrees), in place of fixedGun gimbalDeg / beamGimbalDeg (the Lance: half as far again as other fixed beams). bySize: how a bigger gun differs beyond hitting harder, each number x (size / base size)^this (rate: fire rate).",
   "weapons": {
     "cannon": {
       "type": "projectile",
@@ -270,6 +270,7 @@
     "lance": {
       "type": "beam",
       "range": 500,
+      "gimbalDeg": 13.5,
       "dps": 210,
       "width": 22,
       "npcScale": 0.92,

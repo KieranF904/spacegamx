@@ -326,7 +326,7 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
       }
       const facing = Math.atan2(w.dir[1], w.dir[0]);
       const local = (a: number) => a - (pose.angle + Math.PI / 2) - facing;
-      const res = stepFixedGunAim(local(worldAngle), tuning, local(aimWorld), f.model === 'beam' || weapons[w.kind]?.type === 'beam');
+      const res = stepFixedGunAim(local(worldAngle), tuning, local(aimWorld), f.model === 'beam' || weapons[w.kind]?.type === 'beam', weapons[w.kind]?.gimbalDeg);
       ship.aim[p] = res.offset;
       canFire = res.canFire;
     }

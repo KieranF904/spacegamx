@@ -21,7 +21,8 @@
  *   emp         a spike, or a dish round one
  *   arc         a tesla coil: wound toroid, prongs
  *   torpedo     fat tubes
- *   lance       a long faceted prism with a lit core
+ *   lance       a heavy emitter: an armoured shroud slotted over its glowing core, a
+ *               faceted spar through focusing collars, a crystal between two prongs
  *   legendary   their own (honeycomb pod, ice spikes, petals, crystal, rings, orb)
  *
  * Pure (no DOM): the hull worker builds fixed barrels with it.
@@ -425,17 +426,44 @@ const DESIGNS: Record<string, Design> = {
     g.box(u - 0.05 * k, u + 0.05 * k, -0.31 * k, 0.31 * k, DK, true);
     g.box(u - 0.03 * k, u + 0.03 * k, -0.29 * k, 0.29 * k, g.paint);
   },
-  // ---- lance: a long prism
+  // ---- lance: the super-tier beam, a heavy emitter
   lance_lance: (g) => {
     const { k, m, b0 } = g;
-    g.house(-0.24 * k, 0.1 * k, 0.24 * k, 0.12);
-    const u0 = g.turret ? 0.05 * k : b0, a = u0 + (m - u0) * 0.15, b = m - 0.16 * k;
-    // Two facets: one lit, one in shade; the charged core between
-    g.add([u0, -0.07 * k, a, -0.12 * k, b, -0.09 * k, m, 0, b, 0.09 * k, a, 0.12 * k, u0, 0.07 * k], DK, true);
-    g.add([u0, 0, a, -0.1 * k, b, -0.075 * k, m - 0.02 * k, 0], LT);
-    g.add([u0, 0, a, 0.1 * k, b, 0.075 * k, m - 0.02 * k, 0], MT);
-    g.glow([a, -0.018 * k, b + 0.08 * k, -0.01 * k, b + 0.08 * k, 0.01 * k, a, 0.018 * k]);
-    for (const s of [-1, 1]) g.add([b - 0.06 * k, s * 0.1 * k, m + 0.02 * k, s * 0.05 * k, m + 0.02 * k, s * 0.075 * k, b - 0.06 * k, s * 0.14 * k], LT, true);
+    g.house(-0.3 * k, 0.12 * k, 0.27 * k, 0.12);
+    const u0 = g.turret ? 0.04 * k : b0, L = m - u0;
+    // An armoured shroud over the back half: tapered, chamfered at the front, its paint band at the back
+    const s1 = u0 + L * 0.5, sw = 0.19 * k;
+    g.add([u0, -sw, s1 - 0.04 * k, -sw * 0.92, s1 + 0.05 * k, -sw * 0.62, s1 + 0.05 * k, sw * 0.62, s1 - 0.04 * k, sw * 0.92, u0, sw], DK, true);
+    g.add([u0, -sw * 0.8, s1 - 0.05 * k, -sw * 0.74, s1 + 0.02 * k, -sw * 0.5, s1 + 0.02 * k, 0, u0, 0], LT);
+    g.add([u0, 0, s1 + 0.02 * k, 0, s1 + 0.02 * k, sw * 0.5, s1 - 0.05 * k, sw * 0.74, u0, sw * 0.8], MT);
+    g.box(u0 + L * 0.04, u0 + L * 0.09, -sw * 0.86, sw * 0.86, g.paint);
+    // Slots across it, the charged core glowing through each
+    for (const f of [0.17, 0.27, 0.37]) {
+      const u = u0 + L * f;
+      g.box(u - 0.024 * k, u + 0.024 * k, -sw * 0.66, sw * 0.66, BORE);
+      g.add([u - 0.012 * k, -sw * 0.5, u + 0.012 * k, -sw * 0.5, u + 0.012 * k, sw * 0.5, u - 0.012 * k, sw * 0.5], g.lens, false, true);
+    }
+    // The spar: a faceted prism, one face lit, one in shade, out to the head
+    const a = s1, b = m - 0.17 * k, pw = 0.085 * k;
+    g.add([a, -pw, b, -pw * 0.8, b + 0.04 * k, 0, b, pw * 0.8, a, pw], DK, true);
+    g.add([a, -pw * 0.75, b - 0.01 * k, -pw * 0.6, b + 0.02 * k, 0, a, 0], LT);
+    g.add([a, 0, b + 0.02 * k, 0, b - 0.01 * k, pw * 0.6, a, pw * 0.75], MT);
+    // Its core: a lit channel the whole length
+    g.add([u0 + L * 0.12, -0.02 * k, b + 0.03 * k, -0.012 * k, b + 0.03 * k, 0.012 * k, u0 + L * 0.12, 0.02 * k], g.lens, false, true);
+    // Focusing collars on the spar, smaller towards the head
+    for (const [f, w] of [[0.18, 0.105], [0.55, 0.09]] as const) {
+      const u = a + (b - a) * f;
+      g.box(u - 0.028 * k, u + 0.028 * k, -w * k, w * k, DK, true);
+      g.box(u - 0.016 * k, u + 0.016 * k, -w * k * 0.82, w * k * 0.82, LT);
+    }
+    // The head: two prongs swept forward and in, lit at their tips, a crystal between them
+    for (const s of [-1, 1]) {
+      g.add([b - 0.13 * k, s * 0.05 * k, b - 0.02 * k, s * 0.17 * k, m + 0.03 * k, s * 0.1 * k, m + 0.03 * k, s * 0.07 * k, b + 0.02 * k, s * 0.1 * k, b - 0.08 * k, s * 0.035 * k], DK, true);
+      g.add([b - 0.1 * k, s * 0.055 * k, b - 0.02 * k, s * 0.145 * k, m + 0.01 * k, s * 0.09 * k, b + 0.02 * k, s * 0.085 * k], s < 0 ? LT : MT);
+      g.ngon(m + 0.02 * k, s * 0.085 * k, 0.022 * k, 6, g.lens);
+    }
+    g.add([b - 0.02 * k, 0, b + 0.07 * k, -0.045 * k, m + 0.02 * k, 0, b + 0.07 * k, 0.045 * k], g.lens, false, true);
+    g.add([b + 0.03 * k, 0, b + 0.07 * k, -0.02 * k, m - 0.01 * k, 0, b + 0.07 * k, 0.02 * k], 0xf5ecff, false, true);
   },
   // ---- legendaries
   hive: (g) => {
@@ -577,7 +605,7 @@ const REACH: Record<string, number> = {
   mortar_lobber: 0.32, mortar_quake: 0.38, laser_glint: 0.45, laser_cutter: 0.38, laser_searchlight: 0.5,
   pulse_strobe: 0.5, pulse_overpulse: 0.6, missile_dart: 0.18, missile_swarm: 0.18, missile_hammerhead: 0.2,
   railgun_needle: 0.95, railgun_rail_driver: 0.8, railgun_coilgun: 0.85, railgun_spear: 1, emp_hush: 0.42, emp_blackout: 0.5,
-  arc_spark: 0.38, arc_tesla: 0.42, torpedo_eel: 0.55, torpedo_leviathan: 0.6, lance_lance: 0.75,
+  arc_spark: 0.38, arc_tesla: 0.42, torpedo_eel: 0.55, torpedo_leviathan: 0.6, lance_lance: 0.95,
   hive: 0.16, frostbite: 0.5, cinder_bloom: 0.45, prism: 0.5, phase: 0.55, singularity: 0.45, exotic: 0.42, demolition: 0.3,
 };
 const reachOf = (id: GunId) => REACH[id.model] ?? REACH[id.family] ?? REACH[FAMILY[id.family] ?? ''] ?? 0.5;
@@ -601,6 +629,11 @@ export function turretHead(fn: string, len: number, size: number): GunParts {
   if (HEADS.size >= HEADS_KEPT) HEADS.delete(HEADS.keys().next().value!);
   HEADS.set(key, head);
   return head;
+}
+
+/** How far a fixed gun's barrels reach past its edge (cells; `size` its cells): where its beam is drawn from */
+export function fixedReach(fn: string, size: number): number {
+  return reachOf(gunId(fn)) * Math.sqrt(Math.max(1, size));
 }
 
 /** A fixed gun's barrels, out of its edge (u 0), and how far they reach (cells) */

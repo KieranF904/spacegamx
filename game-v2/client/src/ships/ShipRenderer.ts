@@ -143,6 +143,10 @@ interface Barrel {
   nx: number;
   ny: number;
   len: number;
+  /** Where it points now: its gimbal's turn (radians, off its normal; ship.aim) and that turn's normal */
+  rot: number;
+  rx: number;
+  ry: number;
   kick: number;
   heat: number;
   debris: boolean;
@@ -411,7 +415,7 @@ export class ShipRenderer {
       if (d < bestD) { bestD = d; best = g; }
     };
     for (const t of view.turrets) near(t, t.x0 + Math.cos(t.barrel.rotation) * t.len, t.y0 + Math.sin(t.barrel.rotation) * t.len);
-    for (const b of view.fixed) near(b, b.x0 + b.nx * b.len, b.y0 + b.ny * b.len);
+    for (const b of view.fixed) near(b, b.x0 + b.rx * b.len, b.y0 + b.ry * b.len);
     const hit = best as { kick: number; heat: number; len: number } | null;
     if (!hit || bestD > hit.len + 40) return;
     hit.kick = Math.min(1.4, power);
@@ -456,8 +460,8 @@ export class ShipRenderer {
     const fits: { d: number; tip: number[] }[] = [];
     for (const b of view.fixed) {
       if (b.debris) continue;
-      // Pointing (about) the way the shot went, from the edge it spawned on
-      const nx = b.nx * cos - b.ny * sin, ny = b.nx * sin + b.ny * cos;
+      // Pointing (about) the way the shot went, from the edge it spawned on (turned on its gimbal)
+      const nx = b.rx * cos - b.ry * sin, ny = b.rx * sin + b.ry * cos;
       if (nx * ax + ny * ay < 0.94) continue;
       const [bx, by] = world(b.x0, b.y0);
       fits.push({ d: Math.hypot(bx - x, by - y), tip: [bx + nx * b.len, by + ny * b.len] });
@@ -822,7 +826,7 @@ export class ShipRenderer {
       bg.position.set(b.x0, b.y0);
       metal.tint = debris ? 0x555555 : GUN_TINT;
       view.barrels.addChild(bg);
-      view.fixed.push({ g: bg, metal, lit, part: b.part, look, x0: b.x0, y0: b.y0, nx: b.nx, ny: b.ny, len: b.len, kick: 0, heat: 0, debris, tm: -1, tl: -1, anim: debris ? undefined : animOf(ship.blueprint.parts[b.part].fn) });
+      view.fixed.push({ g: bg, metal, lit, part: b.part, look, x0: b.x0, y0: b.y0, nx: b.nx, ny: b.ny, len: b.len, rot: 0, rx: b.nx, ry: b.ny, kick: 0, heat: 0, debris, tm: -1, tl: -1, anim: debris ? undefined : animOf(ship.blueprint.parts[b.part].fn) });
     }
     this.hulls.set(view.id, build.hull, ship.derived.radius + cs);
     // Under the hull: its frame, if it has one, and its skeleton (a boss's: what's seen as its carapace comes off);
@@ -955,7 +959,7 @@ export class ShipRenderer {
     const share = reloadShare(left, reload);
     if (left > 0) {
       // The housing in the world (a turret's barrel turns with it)
-      const ang = 'barrel' in gun ? gun.barrel.rotation : 0, ca = Math.cos(ang), sa = Math.sin(ang);
+      const ang = 'barrel' in gun ? gun.barrel.rotation : gun.g.rotation, ca = Math.cos(ang), sa = Math.sin(ang);
       const cr = view.container.rotation, cc = Math.cos(cr), cs = Math.sin(cr);
       const bx = (dx * ca - dy * sa), by = (dx * sa + dy * ca);
       const lx = x0 + bx * len * 0.5, ly = y0 + by * len * 0.5;
@@ -1076,6 +1080,16 @@ export class ShipRenderer {
       t.heat = Math.max(0, t.heat - frames * COOL);
     }
     for (const b of view.fixed) {
+      // Turned on its gimbal as far as it aims (common/src/ships/turret.ts stepFixedGunAim: your own as predicted, another
+      // pilot's from their cursor, a pilotless ship's from its last shot: ShipClient.stepTurretVisuals / preSnapshot)
+      const rot = b.debris ? 0 : ship.aim[b.part] ?? 0;
+      if (rot !== b.rot) {
+        b.rot = rot;
+        const c = Math.cos(rot), s = Math.sin(rot);
+        b.rx = b.nx * c - b.ny * s; b.ry = b.nx * s + b.ny * c;
+        b.g.rotation = rot;
+        if (b.kick <= 0 && b.heat <= 0) b.g.position.set(b.x0, b.y0);
+      }
       const bf = ship.hp[b.part] / (ship.maxHp[b.part] || 1);
       const hot = Math.min(1, b.heat * 0.85 + b.kick * 0.3);
       const rg = b.anim ? this.animate(view, ship, b, this.weaponOfPart(ship, b.part), b.g, b.x0, b.y0, b.nx, b.ny, b.len, frames) : 0;
@@ -1087,7 +1101,7 @@ export class ShipRenderer {
       if (b.kick <= 0 && b.heat <= 0) continue;
       // Fixed guns slide back into the hull, and glow hot
       const back = RECOIL * 1.4 * b.len * b.kick * b.kick;
-      b.g.position.set(b.x0 - b.nx * back, b.y0 - b.ny * back);
+      b.g.position.set(b.x0 - b.rx * back, b.y0 - b.ry * back);
       b.kick = Math.max(0, b.kick - frames * RECOIL_RETURN);
       b.heat = Math.max(0, b.heat - frames * COOL);
       // Home and cool: settle exactly

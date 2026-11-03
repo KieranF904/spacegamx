@@ -449,9 +449,15 @@ function gunHousing(out: PartDecor, f: Frame, af: AF, kind: Housing, fn: string,
       for (const t of [0.36, 0.74]) B(plate(f, mid - half, mid + half, -D * t + th, -D * t - th, lance ? th * 0.9 : th * 0.3), -0.12, 0.035 * k);
       if (af.kind !== 'back') foot(out, af, k);
       B([...at(f, mid - w, -(D - 0.015)), ...at(f, mid + w, -(D - 0.015)), ...at(f, mid + w, -0.07 * k), ...at(f, mid + w * 0.7, fr), ...at(f, mid - w * 0.7, fr), ...at(f, mid - w, -0.07 * k)], 0, 0.05 * k);
-      for (const t of [0.36, 0.74]) for (const s of [-1, 1]) C(at(f, mid + s * (half - 0.06 * k), -D * t), 0.024 * k, BOLT, { sides: 6 });
+      // (a lance's saddles end in capacitor bulbs, lit)
+      for (const t of [0.36, 0.74]) for (const s of [-1, 1]) C(at(f, mid + s * (half - 0.06 * k), -D * t), (lance ? 0.04 : 0.024) * k, lance ? glow : BOLT, lance ? { glow: 0.55, sides: 8 } : { sides: 6 });
       for (const s of [-1, 1]) P(box(f, mid + s * spread * 0.75 - 0.015 * k, mid + s * spread * 0.75 + 0.015 * k, -0.05 * k, -(D - m * 3)), DARK);
-      for (const t of [0.2, 0.52, 0.6]) P(box(f, mid - w * 0.85, mid + w * 0.85, -D * t + 0.026 * k, -D * t - 0.026 * k), glow, { glow: 0.7 });
+      // Lit bands across the spine; a lance's are capacitor cells down it, each lit at its heart
+      if (lance) for (const t of [0.17, 0.3, 0.43, 0.56]) {
+        P(box(f, mid - w * 0.78, mid + w * 0.78, -D * t + 0.045 * k, -D * t - 0.045 * k), DARK, { bevel: 0.012 * k });
+        C(at(f, mid, -D * t), 0.034 * k, glow, { glow: 0.85, sides: 8 });
+      }
+      else for (const t of [0.2, 0.52, 0.6]) P(box(f, mid - w * 0.85, mid + w * 0.85, -D * t + 0.026 * k, -D * t - 0.026 * k), glow, { glow: 0.7 });
       const bw = Math.min(w * 1.45, W / 2 - m);
       B(plate(f, mid - bw, mid + bw, -(D - m) + 0.17 * k, -(D - m), 0.04 * k), 0.08, 0.04 * k);
       for (const s of [-1, 1]) C(at(f, mid + s * bw * 0.75, -(D - m) + 0.085 * k), 0.026 * k, BOLT, { sides: 6 });

@@ -868,6 +868,19 @@ describe('weapon balance: grades, sizes and the laser', () => {
     expect(stepFixedGunAim(20 * Math.PI / 180, tuning, 20 * Math.PI / 180, true).canFire).toBe(false);
   });
 
+  it('a weapon kind with its own gimbal (the Lance: tuning.json weapons.lance.gimbalDeg) swings that far, further than other fixed beams', () => {
+    const D = Math.PI / 180, own = tuning.weapons?.lance?.gimbalDeg;
+    expect(own).toBeGreaterThan(tuning.fixedGun!.beamGimbalDeg!);
+    const off = (tuning.fixedGun!.beamGimbalDeg! + 3) * D;
+    const beam = stepFixedGunAim(off, tuning, off, true);
+    const lance = stepFixedGunAim(off, tuning, off, true, own);
+    expect(beam.offset).toBeCloseTo(tuning.fixedGun!.beamGimbalDeg! * D, 9);
+    expect(lance.offset).toBeCloseTo(off, 9);
+    expect(lance.canFire).toBe(true);
+    // Clamped at its own reach, either side
+    expect(stepFixedGunAim(-40 * D, tuning, -40 * D, true, own).offset).toBeCloseTo(-own! * D, 9);
+  });
+
   it('a laser burns at full strength to its effective range, then tails off steeply to its full range (half as far again), and no further', () => {
     const laser = gun('laser', 'sq', 'alloy');
     const def = laser.def;

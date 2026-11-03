@@ -10,7 +10,7 @@
  *   J  jump drive: spool up, then fly far and fast along the nose (J again aborts)
  */
 
-import { endsAtAim, stackMods, ensurePortsCharge, stepPointDefenceAim, pointDefenceOf, chargeGroupsEnd, TELL_CHARGE_START, TELL_CHARGE_CANCEL } from '@space-game/common';
+import { endsAtAim, stackMods, ensurePortsCharge, stepPointDefenceAim, stepFixedGunAim, SHOT_AIM_STEPS, pointDefenceOf, chargeGroupsEnd, TELL_CHARGE_START, TELL_CHARGE_CANCEL } from '@space-game/common';
 import { GunSync } from './gunSync';
 import { GunFeel } from './gunFeel';
 import './energyLooks';
@@ -339,6 +339,9 @@ export class ShipClient {
       while (this.chargeTells.size > 256) this.chargeTells.delete(this.chargeTells.keys().next().value!);
       // A pulse laser's pulse (a fire event with no shells): drawn from the tick it started
       const gun = ship.derived.weapons.find((w) => w.part === part);
+      // (Another ship's gun points where this shot left: a pilotless ship's aim is known only from its shots; a pilot's
+      // follows their cursor between them, stepTurretVisuals)
+      if (gun && owner !== this.opts.state.playerId && !this.opts.tuning.weapons?.[gun.kind]?.pointDefence) ship.aim[part] = aimQ / SHOT_AIM_STEPS;
       if (gun && this.opts.tuning.weapons?.[gun.kind]?.pulse) { this.beamFx?.startPulse(owner, part, tick); continue; }
       const v = rebuildVolley({ owner, tick, part, aimQ, ids, ammo, aug }, ship, st.body, this.opts.tuning);
       if (!v) continue;
@@ -1246,18 +1249,24 @@ export class ShipClient {
     }
   }
 
+  /**
+   * Turrets and fixed guns' gimbals on ships whose guns your client doesn't step (yours does on each predicted tick, as
+   * the server's: predictGuns), aimed as the server aims them (guns.ts stepGuns): your own without prediction from your
+   * cursor, another pilot's from the cursor it sends. A pilotless ship sends none: its guns point where its last shot
+   * left (preSnapshot)
+   */
   private stepTurretVisuals(): void {
-    const { state } = this.opts;
+    const { state, tuning } = this.opts;
+    const weapons = tuning.weapons ?? {};
     for (const [id, ship] of this.store.bodies) {
-      if (ship.kind !== 'ship' || !ship.derived.weapons.some((w) => w.window)) continue;
+      if (ship.kind !== 'ship' || !ship.derived.weapons.length) continue;
       const e = state.entities.get(id);
       if (!e) continue;
       let angle: number, dist: number;
-      // Your own turrets aim on each predicted tick, as the server's do (predictGuns)
       if (id === state.playerId && state.predictionEnabled) continue;
       if (id === state.playerId) {
         ({ angle, dist } = this.opts.localAim());
-      } else if (e.data && e.data.length >= 1) {
+      } else if (e.type === EntityType.Player && e.data && e.data.length >= 1) {
         angle = unpackCursorWeaponState(e.data[0]).aimAngle;
         dist = e.data[2] ?? 0;
       } else continue;
@@ -1265,13 +1274,25 @@ export class ShipClient {
       const ax = pose.x + Math.cos(angle) * dist, ay = pose.y + Math.sin(angle) * dist;
       for (const w of ship.derived.weapons) {
         // (Point defence aims itself: stepPointDefenceVisuals)
-        if (!w.window || this.opts.tuning.weapons?.[w.kind]?.pointDefence) continue;
-        let worldAngle = angle;
-        if (dist > 0) {
-          const [px, py] = shipPointToWorld(ship, pose, w.window.pivot, this.opts.tuning.cellSize);
-          worldAngle = Math.atan2(ay - py, ax - px);
+        const def = weapons[w.kind];
+        if (def?.pointDefence || w.fire.model === 'auto') continue;
+        if (w.window) {
+          let worldAngle = angle;
+          if (dist > 0) {
+            const [px, py] = shipPointToWorld(ship, pose, w.window.pivot, tuning.cellSize);
+            worldAngle = Math.atan2(ay - py, ax - px);
+          }
+          ship.aim[w.part] = stepTurretAim(w.window, ship.aim[w.part], worldAngle - (pose.angle + Math.PI / 2), tuning).offset;
+        } else {
+          // A fixed gun: as close to the cursor point as its gimbal lets it, from its muzzle
+          let worldAngle = angle;
+          if (dist > 0) {
+            const [mx, my] = shipPointToWorld(ship, pose, w.muzzle, tuning.cellSize);
+            worldAngle = Math.atan2(ay - my, ax - mx);
+          }
+          const base = pose.angle + Math.PI / 2 + Math.atan2(w.dir[1], w.dir[0]);
+          ship.aim[w.part] = stepFixedGunAim(worldAngle - base, tuning, angle - base, w.fire.model === 'beam' || def?.type === 'beam', def?.gimbalDeg).offset;
         }
-        ship.aim[w.part] = stepTurretAim(w.window, ship.aim[w.part], worldAngle - (pose.angle + Math.PI / 2), this.opts.tuning).offset;
       }
     }
   }

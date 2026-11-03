@@ -1,5 +1,5 @@
 /**
- * Mining laser beams, weapon beams (lances, frostbite), pulse lasers' pulses
+ * Mining laser beams, weapon beams (frostbite, the Cutter; the Lance's own: LanceFx), pulse lasers' pulses
  * and stations' laser turrets. Your own mining beam shows as soon as you press
  * the button; other ships' beams come from the snapshot (the "right weapon
  * active" flag). Each beam is cast locally against the asteroids, so it stops
@@ -15,7 +15,7 @@ import { clearIfDrawn } from '../rendering/gfx';
 import { Container, Graphics } from 'pixi.js';
 import { GAS_TYPES } from '../rendering/AsteroidLook';
 import {
-  EntityType, ShipTuning, jumpTuning, jumpPhase, getAsteroidPolygon, segmentIntersectT, shipPointToWorld, worldToLocalDir, standing, castParts, unpackCursorWeaponState, partWeaponDef, feedShare, BROWNOUT, pulseProfile, MINING_PULSE, MINE_TAIL,
+  EntityType, ShipTuning, PF_LIT, jumpTuning, jumpPhase, getAsteroidPolygon, segmentIntersectT, shipPointToWorld, worldToLocalDir, standing, castParts, unpackCursorWeaponState, partWeaponDef, feedShare, BROWNOUT, pulseProfile, MINING_PULSE, MINE_TAIL,
   type ShipState, type WeaponInfo, type PulseTuning, type WeaponTuning, type Composition,
 } from '@space-game/common';
 import type { GameState } from '../state/GameState';
@@ -38,6 +38,8 @@ import { beamLook } from '../rendering/weapons/weaponStyles';
 import './energyLooks';
 import { drawCone, drawStrands, sputterGain } from './beamLookFx';
 import { PulseFx, type PulseRun } from './PulseFx';
+import { LanceFx } from './LanceFx';
+import { fixedReach } from './gunDecor';
 import { hitSurface } from './hitSurface';
 import { MiningFx } from './MiningFx';
 import { rockMaterial } from '../rendering/rocks/RockMaterials';
@@ -183,9 +185,10 @@ export class MiningBeamFx {
     return h;
   }
 
-  /** Pulse lasers and plasma lances: drawn while the ship's "left weapon active" flag is set (a laser's colour is its grade's: LASER_COLORS) */
+  /** Pulse lasers and plasma lances: drawn while the ship's "left weapon active" flag is set (a laser's colour is its grade's: LASER_COLORS); the Lance always (LanceFx) */
   private weaponBeams(g: Graphics): void {
     this.frameNo++;
+    this.lanceFx.begin(this.dt);
     const defs = this.tuning.weapons ?? {};
     for (const [id, ship] of this.source.bodies) {
       if (ship.kind !== 'ship') continue;
@@ -196,24 +199,27 @@ export class MiningBeamFx {
       if (!e) continue;
       // Your own: as predicted; other players: the cursor state's weapon flag; hostiles: snapshot data[6]
       const own = id === this.state.playerId && this.state.predictionEnabled && this.ownBeams ? this.ownBeams() : null;
-      if (own) { if (!own.size) continue; }
-      else if (!e.data?.length || (e.type === EntityType.Player ? !unpackCursorWeaponState(e.data[0]).leftActive : e.type !== EntityType.ShipBody || e.data[6] !== 1)) continue;
+      const on = own ? own.size > 0
+        : !!e.data?.length && (e.type === EntityType.Player ? unpackCursorWeaponState(e.data[0]).leftActive : e.type === EntityType.ShipBody && e.data[6] === 1);
+      // (A Lance is drawn lit or not: it charges, burns and goes out)
+      if (!on && !beams.some((w) => w.kind === 'lance')) continue;
       const pose = { x: e.renderX, y: e.renderY, angle: e.renderAngle };
       for (const w of beams) {
-        if (own && !own.has(w.part)) continue;
+        const lit = on && (!own || own.has(w.part));
         // Its own tuning: its grade's reach and width too (launch.ts gunDef)
         const def = partWeaponDef(this.tuning, w.kind, ship.blueprint.parts[w.part], w);
+        if (w.kind === 'lance') { this.lance(g, id, ship, w, pose, def, lit, own !== null); continue; }
+        if (!lit) continue;
         // A Repair Beam: a soft teal beam to the friendly hull it mends, sparkling where it lands (support.ts)
         if (def.heal) { this.repairBeam(g, id, ship, w, pose, def); continue; }
         const { x, y, hx, hy, t } = this.beamLine(id, ship, w, pose, def.range ?? 800, (def.width ?? 0) / 2);
-        const lance = w.kind === 'lance';
         const look = beamLook(ship.blueprint.parts[w.part]?.fn);
-        let [outer, mid, core] = lance ? [0x7c3aed, 0xc084fc, 0xf5e8ff] : w.kind === 'frostbite' ? [0x0284c7, 0x7dd3fc, 0xf0fbff] : LASER_COLORS[Math.max(0, Math.min(4, (w.grade ?? 1) - 1))];
+        let [outer, mid, core] = w.kind === 'frostbite' ? [0x0284c7, 0x7dd3fc, 0xf0fbff] : LASER_COLORS[Math.max(0, Math.min(4, (w.grade ?? 1) - 1))];
         const flick = 0.85 + 0.15 * Math.sin(this.t * 53 + id);
         // A wider beam (a better grade's) draws wider, and each mark up a little hotter
         // (A model's own look, if it has one: BEAM_LOOKS)
         if (look) { outer = look.outer ?? outer; mid = look.mid ?? mid; core = look.core ?? core; }
-        const wid = (lance ? 13 : w.kind === 'frostbite' ? 10 : 6) * flick * ((def.width ?? 1) / (defs[w.kind]!.width ?? 1)) * (1 + 0.08 * ((w.grade ?? 1) - 1)) * (look?.width ?? 1);
+        const wid = (w.kind === 'frostbite' ? 10 : 6) * flick * ((def.width ?? 1) / (defs[w.kind]!.width ?? 1)) * (1 + 0.08 * ((w.grade ?? 1) - 1)) * (look?.width ?? 1);
         // (Short of power a model with a sputter breaks up: your own ship's feed is known; others' beams burn steady)
         const starved = !!look?.sputter && id === this.state.playerId && feedShare(ship.derived, this.state.charge, w.part, 'gun') < BROWNOUT;
         const gain = starved ? sputterGain(look!.sputter, this.t, id + w.part) : 1;
@@ -239,17 +245,7 @@ export class MiningBeamFx {
           g.moveTo(x, y).lineTo(hx, hy).stroke({ color: core, width: wid * 0.45, alpha: 0.95 * gain });
         }
         if (look?.braid) drawStrands(g, x, y, bux, buy, bl, wid, look.braid.strands, look.braid.color, gain, this.t, id + w.part);
-        // A lance's crystal brightens the longer it's held, its prongs crackling at the muzzle
-        const warm = lance ? Math.min(1, hold.on / 2.5) : 0;
-        g.circle(x, y, wid * (1.2 + 0.9 * warm)).fill({ color: mid, alpha: (0.5 + 0.3 * warm) * gain });
-        if (lance) {
-          g.circle(x, y, wid * 0.55 * (0.6 + warm)).fill({ color: 0xffffff, alpha: (0.5 + 0.5 * warm) * gain });
-          for (let i = 0; i < 2; i++) {
-            const a = Math.atan2(buy, bux) + (i ? 1 : -1) * (0.5 + 0.25 * Math.sin(this.t * 40 + i * 2)), l = wid * (2.2 + 1.6 * Math.random());
-            g.moveTo(x, y).lineTo(x + Math.cos(a) * l * 0.5 + (Math.random() - 0.5) * 3, y + Math.sin(a) * l * 0.5 + (Math.random() - 0.5) * 3).lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l)
-              .stroke({ color: core, width: 1.1, alpha: 0.8 * gain });
-          }
-        }
+        g.circle(x, y, wid * 1.2).fill({ color: mid, alpha: 0.5 * gain });
         if (look?.frost) this.frostFx(g, x, y, bux, buy, bl, wid, t < 0.999, hx, hy, id + w.part, look.frost, mid);
         if (t < 0.999) {
           g.circle(hx, hy, wid * 2.6).fill({ color: mid, alpha: 0.3 });
@@ -266,7 +262,49 @@ export class MiningBeamFx {
       }
     }
     for (const [k, h] of this.holds) if (h.seen !== this.frameNo) this.holds.delete(k);
+    this.lanceFx.drawAfter(g, Math.min(4, this.dt * 60), this.poseOf);
+    this.lanceFx.sweep();
     this.drawPulses(g);
+  }
+
+  /** How the Lance is drawn (charging, lit, burning in, going out) */
+  private lanceFx = new LanceFx();
+  private poseOf = (id: number) => { const e = this.state.entities.get(id); return e ? { x: e.renderX, y: e.renderY, angle: e.renderAngle } : null; };
+
+  /**
+   * A Lance this frame (LanceFx): lit or not. How full its buffer is: your own as your ports state has it (a burst
+   * beam lights only when full); another ship's guessed from when it went out (it rests, then fills at its rate)
+   */
+  private lance(g: Graphics, id: number, ship: ShipState, w: WeaponInfo, pose: { x: number; y: number; angle: number }, def: WeaponTuning, lit: boolean, own: boolean): void {
+    const { x, y, hx, hy, t, ship: target } = this.beamLine(id, ship, w, pose, def.range ?? 500, (def.width ?? 0) / 2);
+    const look = beamLook(ship.blueprint.parts[w.part]?.fn);
+    const colors = { outer: look?.outer ?? 0x7c3aed, mid: look?.mid ?? 0xc084fc, core: look?.core ?? 0xf5e8ff, braid: look?.braid };
+    const L = ship.derived.ports, p = w.part;
+    let charge = -1;
+    const pe = own ? this.state.charge?.e : undefined;
+    if (L && pe && pe.held.length === L.n && L.cap[p] > 0) {
+      charge = pe.closed[p] > 0 || (pe.flags[p] & PF_LIT) ? 0 : Math.min(1, pe.held[p] / L.cap[p]);
+    } else if (L && L.cap[p] > 0 && L.rate[p] > 0) charge = this.lanceGuess(id * 256 + p, lit, L.rest[p], L.cap[p] / L.rate[p]);
+    const starved = !!look?.sputter && own && feedShare(ship.derived, this.state.charge, p, 'gun') < BROWNOUT;
+    const len = Math.hypot(hx - x, hy - y) || 1;
+    const base = this.tuning.weapons?.lance?.width ?? 1;
+    this.lanceFx.draw(g, id * 256 + p, {
+      // (a burn rides a ship it lands on; wreckage and rock only flare)
+      lit, charge, x, y, ux: (hx - x) / len, uy: (hy - y) / len, len, hit: t < 0.999, target: this.source.bodies.get(target)?.kind === 'ship' ? target : -1,
+      wid: 11 * ((def.width ?? base) / base) * (1 + 0.08 * ((w.grade ?? 1) - 1)) * (look?.width ?? 1),
+      colors, gain: starved ? sputterGain(look!.sputter, this.t, id + p) : 1,
+    }, this.dt, Math.min(4, this.dt * 60), this.poseOf);
+  }
+
+  /** Another ship's Lance: ticks since it went out (it rests `rest` ticks, then fills in `fill`), as a buffer 0..1 */
+  private lanceOut = new Map<number, number>();
+  private lanceGuess(key: number, lit: boolean, rest: number, fill: number): number {
+    const now = this.t * 60;
+    if (lit) { this.lanceOut.set(key, now); return 0; }
+    const out = this.lanceOut.get(key);
+    if (out === undefined) return 1;
+    if (now - out > rest + fill + 600) this.lanceOut.delete(key);
+    return Math.max(0, Math.min(1, (now - out - rest) / Math.max(1, fill)));
   }
 
   /**
@@ -326,24 +364,36 @@ export class MiningBeamFx {
 
   /** Where a beam weapon points now and what it meets: muzzle, hit point, and how far along (1: nothing) */
   /** (`half`: the beam's half-width, as the server burns it: a hull its edge touches stops it; `heal`: a Repair Beam's, stopped by friends only) */
-  private beamLine(id: number, ship: ShipState, w: WeaponInfo, pose: { x: number; y: number; angle: number }, range: number, half = 0, heal = false): { x: number; y: number; hx: number; hy: number; t: number } {
-    let muzzle = w.muzzle, dir = w.dir;
+  /** (`ship`: the ship it meets, -1 none. A fixed gun's beam is drawn from the tip of its barrel, which turns on its gimbal: ShipRenderer) */
+  private beamLine(id: number, ship: ShipState, w: WeaponInfo, pose: { x: number; y: number; angle: number }, range: number, half = 0, heal = false): { x: number; y: number; hx: number; hy: number; t: number; ship: number } {
+    let muzzle = w.muzzle, dir = w.dir, tip = 0;
     if (w.mount === 'turret' && w.window) {
       const a = w.window.center + (ship.aim[w.part] ?? 0);
       dir = [Math.cos(a), Math.sin(a)];
       muzzle = [w.window.pivot[0] + dir[0] * w.window.barrel, w.window.pivot[1] + dir[1] * w.window.barrel];
-    } else if (ship.aim[w.part]) {
+    } else {
       // A fixed gun on its gimbal (as the server burns it: ShipBridge.fireBeam)
-      const a = Math.atan2(dir[1], dir[0]) + ship.aim[w.part];
-      dir = [Math.cos(a), Math.sin(a)];
+      if (ship.aim[w.part]) {
+        const a = Math.atan2(dir[1], dir[0]) + ship.aim[w.part];
+        dir = [Math.cos(a), Math.sin(a)];
+      }
+      const part = ship.blueprint.parts[w.part];
+      tip = part ? fixedReach(part.fn, Math.max(1, this.source.geometry(ship)[w.part]?.area ?? 1)) * this.tuning.cellSize : 0;
     }
     const [x, y] = shipPointToWorld(ship, pose, muzzle, this.tuning.cellSize);
     const a = pose.angle + Math.PI / 2 + Math.atan2(dir[1], dir[0]);
     const x1 = x + Math.cos(a) * range, y1 = y + Math.sin(a) * range;
     // (A Repair Beam passes over rock as the server's does: only terrain and friends stop it)
-    const t = heal ? this.castShips(id, x, y, x1, y1, half, true) : Math.min(this.cast(x, y, x1, y1), this.castShips(id, x, y, x1, y1, half));
-    return { x, y, hx: x + (x1 - x) * t, hy: y + (y1 - y) * t, t };
+    this.shipHit = -1;
+    const ts = this.castShips(id, x, y, x1, y1, half, heal), target = this.shipHit;
+    const t = heal ? ts : Math.min(this.cast(x, y, x1, y1), ts);
+    // (from the barrel's tip, unless what it meets is nearer)
+    const k = Math.min(tip / range, t);
+    return { x: x + (x1 - x) * k, y: y + (y1 - y) * k, hx: x + (x1 - x) * t, hy: y + (y1 - y) * t, t, ship: t === ts && t < 1 ? target : -1 };
   }
+
+  /** The ship the last castShips met first (-1 none) */
+  private shipHit = -1;
 
   /** Pulses under way: by ship, its laser's part and the tick its pulse started (the server's fire events; your own, as your client fires them) */
   private pulses: PulseRun[] = [];
@@ -439,7 +489,8 @@ export class MiningBeamFx {
       // Not near it at all: on to the next
       const u = Math.max(0, Math.min(1, ((e.renderX - x0) * dx + (e.renderY - y0) * dy) / len2));
       if (Math.hypot(x0 + dx * u - e.renderX, y0 + dy * u - e.renderY) > ship.derived.radius + cs + half) continue;
-      best = Math.min(best, this.castShip(ship, e, x0, y0, x1, y1, half));
+      const t = this.castShip(ship, e, x0, y0, x1, y1, half);
+      if (t < best) { best = t; this.shipHit = id; }
     }
     return best;
   }

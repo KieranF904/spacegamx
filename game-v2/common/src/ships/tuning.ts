@@ -141,6 +141,8 @@ export interface WeaponTuning {
   armorBonus?: number;
   /** Beam: how wide it burns (world units): a hull this close to its line is hit */
   width?: number;
+  /** A fixed gun of this kind swivels this far either side of its facing (degrees), in place of fixedGun's gimbalDeg / beamGimbalDeg (turret.ts stepFixedGunAim) */
+  gimbalDeg?: number;
   /** Beam: hostiles' (pilotless ships') damage × this (so a change made for pilots doesn't make every enemy that carries it harder) */
   npcScale?: number;
   /**
