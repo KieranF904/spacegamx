@@ -12,6 +12,10 @@ Code read: `server/src/game/Sieges.ts` (1001 lines, rules + profiles + run loop)
 `objective` messages in `common/src/network/protocol.ts`, `sieges.test.ts`, `siegeProfiles.test.ts`, `data/rules.json`
 `sieges`, `data/systems.json` bastions.
 
+BEFORE panels (live dev game, Selene night 1): `docs/panels/2026-11-04/gameplay/siege-{day,panel,night,lane,combat}-before.png`.
+They are reproduced with `node scripts/boss-shots/siege-steps.mjs > steps.json` and
+`node scripts/boss-shots/shoot.mjs http://localhost:5273/ <out> @steps.json` (same framings for the AFTER shots).
+
 ## 1. The loop now
 
 - **Enter:** X over a siege moon (Selene I, Rimeholt II, Cinderhold III, Gloam IV, Last Light V). A pilot or party gets
