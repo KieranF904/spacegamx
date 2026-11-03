@@ -28,6 +28,8 @@ export * from './launch.js';
 export * from './grades.js';
 export * from './rating.js';
 export * from './damage.js';
+// What a shell's hit does, worked out alike on both sides (docs/design/confirmed-hits.md B)
+export * from './hitRules.js';
 export * from './partStats.js';
 export * from './describe.js';
 export * from './guns.js';

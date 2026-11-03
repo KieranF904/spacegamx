@@ -7,11 +7,11 @@
  * Damage goes through the bridge (b.hurt), never an import of the damage module, so the modules can't form a cycle.
  */
 
-import { rayTerrain, portsDamageMul, stackMods } from '@space-game/common';
+import { rayTerrain, portsDamageMul, stackMods, coverPart } from '@space-game/common';
 import { hasComponent } from 'bitecs';
 import {
   Position, Input, Player, InSystem, Projectile, ShipState, Vec2, damagePart, weaponHit, shooterGrade, localToWorldDir,
-  castParts, partDistance, pointInConvex, standing, deciding, stageOf, currentStage, stageParts, shipPointToWorld,
+  castParts, pointInConvex, standing, shipPointToWorld,
   WeaponInfo, WeaponTuning, firesStraight, partWeaponDef, stepGuns, ammoCode, outputOf, payMining, MINE_CYCLE,
   MINING_PULSE, MINE_TAIL, mineFalloff, type Charge, pulseProfile, beamFalloff, windupScale, TELL_CHARGE_START, TELL_CHARGE_CANCEL,
   endsAtAim, aimReach, buildShot,
@@ -538,28 +538,11 @@ export function castShip(bridge: BridgeCtx, eid: number, ship: ShipState, x0: nu
  * otherwise (a later stage's, or a wreck) the nearest part standing in that stage, one that decides it if any does;
  * -1 if nothing stands (between stages). Nearest to where it struck (`at`, grid space) by each part's own outline,
  * when that's known: so a shot at a boss's back goes to the plate nearest that spot (not one by its middle, the
- * first of two equally near: the left one, always); else to the struck part's middle.
+ * first of two equally near: the left one, always); else to the struck part's middle. The rule is common's
+ * (hitRules.ts coverPart), with this bridge's memo of the blast being dealt out.
  */
 export function cover(b: BridgeCtx, ship: ShipState, part: number, at?: Vec2): number {
-  if (!stageOf(b.catalog, ship, part)) return part;
-  const first = currentStage(b.catalog, ship);
-  if (!first) return -1;
-  if (stageOf(b.catalog, ship, part) === first && standing(b.catalog, ship, part)) return part;
-  // One blast's parts, all from the same point (coverMemo): while the part the last went to still stands, it's the
-  // nearest still (in the blast nothing heals or moves, so the parts standing only ever get fewer)
-  const memo = b.coverMemo?.ship === ship && b.coverMemo.at === at ? b.coverMemo : null;
-  if (memo && memo.first === first && memo.best >= 0 && standing(b.catalog, ship, memo.best)) return memo.best;
-  const geoms = b.geometry(ship), [cx, cy] = at ?? geoms[part].centroid;
-  let best = -1, bd = Infinity;
-  // (That stage's parts, in part order: the first of two equally near wins)
-  for (const i of stageParts(b.catalog, ship, first)) {
-    const g = geoms[i];
-    if (!g || !standing(b.catalog, ship, i)) continue;
-    const d = (at ? partDistance(g, cx, cy) : Math.hypot(g.centroid[0] - cx, g.centroid[1] - cy)) + (deciding(b.catalog, ship, i) ? 0 : 1e6);
-    if (d < bd) { bd = d; best = i; }
-  }
-  if (memo) { memo.first = first; memo.best = best; }
-  return best;
+  return coverPart(b, ship, part, at, b.coverMemo);
 }
 
 /** The ship part under a world point (debug key K). */

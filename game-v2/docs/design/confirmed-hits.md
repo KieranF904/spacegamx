@@ -402,3 +402,20 @@ Built as designed. Differences from the text above:
 | debris, npcfight, P_beam | unchanged | | |
 
 The Gale fight drops by a third. Deflated (what actually crosses the wire) goes 1,758 -> 1,667 B/s: deflate already squeezed the repeated keys, so the real saving is smaller than the raw figure. The probe does not count `pong`, `bossTelegraph`, `intercept` or `asteroidSeed`; the round-trip tests in protocol.test.ts and ranges.test.ts cover them. The before/after JSON is in the session scratchpad (`net/before-hits/`, `net/after-A1/`).
+
+## Part B as built (2026-11-04, no wire or golden change)
+
+The rules now live in `common/src/ships/hitRules.ts`. The server calls them; its numbers did not change.
+
+- **Safety net first.** `server/src/game/hitRules.golden.test.ts` was pinned on the old code before anything moved. It runs 420 direct hits (`hurt`, `damagePartBy`, `splashAt` with every weapon's HitInfo, shields, stage cover, a ruin piece, bane, marks, boss taken scales, an immune ship) and 40 volleys of live shells (cannon, railgun, flak, missile, magma, arc, cinder_bloom, prism, emp, phase, autocannon, mortar, torpedo) through Weapons and the collision step. It pins dealt, the glancing share, shield, shieldHitTick, last hitter, shield breaks, every part's HP, and every `ignite`/`detonation` Weapons sent. It passes unchanged after the move, as do `parity`, `frameHash` and `shipBridgeApi`.
+- **Moved:** `GLANCING` and `STAGE_COVER` (bridge/core.ts re-exports them), `hpWire` (SnapshotBuilder imports it), `bursts` (Weapons.ts re-exports it), `cover` -> `coverPart(ctx, ship, part, at?, memo?)` (bridge `cover` is now one line).
+- **New:** `partHit` (the body of `hurt`), `shellAmount`, `shellVs`, `pierceKeepOf`/`PIERCE_KEEP`, `shellGone`, `struckStands`, `igniteRule`, `hitEndFx`, `deriveShellHit`.
+- **Differences from section 2:**
+  - `ctx` is `{ catalog, tuning, geometry(ship) }`, not a geometry array. The ShipBridge is one as it stands. Geometry is only asked for when the cover needs it, as before.
+  - `mods` are lazy: `stageCover()`, `baneFaction()` and `taken()` are functions, called only where the old code called the host. So the boss hooks run exactly as often as before and a plain hit costs no lookups. A client view leaves them out (defaults: `STAGE_COVER`, no bane, taken 1).
+  - `partHit` reports `broke` and `hurt` calls `shieldBroken` after the hit, not in the middle. Its only listener (Flash) refills the shield, and nothing in between reads the shield, so the result is the same. `share` is what `b.lastThrough` holds (through × min(1, taken)).
+  - `hurt` reuses one mods object and one result object, so a hit allocates nothing new.
+  - `shellAmount` rounds to f32 at each step, as `Projectile.damage` stores it. `Weapons.spawn` now uses it; storing it gives the same f32.
+  - `Weapons.vsOf` uses `shellVs` for shells with extras. A plain cannon shell keeps no extras and still gets just `{ hit }`.
+  - `deriveShellHit` uses the passes *before* the hit for `gone` (spent when `passes >= pierce`), matching `onShipHit`. It leaves the view's shield alone, and sets the struck part's HP to the wire value. `hpAfter` is -1 when no part took the hit.
+- **Tests:** `common/src/ships/hitRules.test.ts` covers the small rules, `partHit` (plain hit, shield soak and break, splash, bane, taken, ruin floor), `coverPart` on Scrap Mother (stage cover, the boss's own share, the memo), and `deriveShellHit` against `partHit` for cannon, railgun, magma and flak with 0 and 1 passes.

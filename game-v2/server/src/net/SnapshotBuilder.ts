@@ -18,7 +18,7 @@ import { hasComponent, entityExists, defineQuery, type IWorld } from 'bitecs';
 import {
   Position, Velocity, Rotation, Radius, InSystem, Player, Dead, Health, Boost, Input, Projectile, Lifetime, DroppedItem, Station, Portal,
   ASTEROID_SEED, MAP_DOT_SLACK, STATION_DESIGNS, STATION_WEAPONS, EntityType, packCursorWeaponState, quantizeShipValue, packCharge, gunStateAt, packGunState, PILOT_ROW,
-  warmthPercent, fartherThan,
+  warmthPercent, fartherThan, hpWire,
   mapDotFlags, legAt, packMapLeg, packMapRoute, unpackMapLegs, nearerThan, packIds, packRuns, packRanges, DEBRIS_STATUS, TICK_RATE,
   type Leg, type EntityState, type ShipState, type ClientSocket, type ServerMessage, type ServerAsteroidSeedMessage, type StarSystemData, type AsteroidSpawnData,
 } from '@space-game/common';
@@ -71,11 +71,6 @@ export function designHash(bp: unknown): string {
     b = Math.imul(b ^ c, 0x5bd1e995) ^ (b >>> 15);
   }
   return (a >>> 0).toString(36) + (b >>> 0).toString(36);
-}
-
-/** Part HP on the wire: to a tenth, never rounded down to nothing */
-function hpWire(h: number): number {
-  return h <= 0 ? 0 : Math.max(0.1, Math.round(h * 10) / 10);
 }
 
 /** Convert a hex color (#RRGGBB) to hue 0-360 */

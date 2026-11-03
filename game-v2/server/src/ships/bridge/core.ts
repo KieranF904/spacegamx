@@ -143,15 +143,8 @@ export interface PilotOrders {
   impulse?: [number, number];
 }
 
-/** A hit that gets less than this share through the armour it strikes shows as glancing */
-export const GLANCING = 0.6;
-
-/**
- * A staged boss hit on a later stage's part (its back, under the plates): the nearest current-stage plate takes this
- * share of it (bosses.json rules.stageCover, or the boss's own stageCover, says otherwise). Under half, so aiming at
- * the stage being fought is plainly better; well above nothing, so a shot that lands still counts.
- */
-export const STAGE_COVER = 0.4;
+// (the glancing line and the stage cover share: common/src/ships/hitRules.ts, the rules a client works hits out by too)
+export { GLANCING, STAGE_COVER } from '@space-game/common';
 
 export interface PendingBlast { due: number; systemId: number; x: number; y: number; radius: number; damage: number; source: number }
 

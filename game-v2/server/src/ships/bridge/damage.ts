@@ -10,9 +10,10 @@ import { hasComponent } from 'bitecs';
 import {
   Position, Velocity, Player, InSystem, ShipState, Vec2, damagePart, coreHp, healPart, restorePart, hitMultiplier,
   type HitInfo, warmthStage, warmthPercent, insulationOf, THAW, WARMTH_STAGES, type WarmthStage, fartherThan,
-  nearestParts, castParts, partDistance, standing, stageOf, currentStage, RUIN_HP, seededRng, hashInts, MARK_TAKEN,
+  nearestParts, castParts, partDistance, standing, seededRng, hashInts, MARK_TAKEN, partHit, newPartHit, struckStands,
+  type HitMods, type CoverMemo,
 } from '@space-game/common';
-import { GLANCING, STAGE_COVER, EMP_IMMUNE_TICKS, type PendingBlast, type BridgeCtx } from './core.js';
+import { GLANCING, EMP_IMMUNE_TICKS, type PendingBlast, type BridgeCtx } from './core.js';
 
 /** Seize a ship up (as an EMP) for `ticks`: hazards' storms */
 export function emp(b: BridgeCtx, eid: number, ticks: number): void {
@@ -202,44 +203,41 @@ export function lastDamagedTick(b: BridgeCtx, eid: number): number {
 }
 
 /**
+ * What hurt tells the shared rules about the ship being hit (common hitRules.ts HitMods), asked only when a rule
+ * needs it: one, reused (partHit never calls back into hurt)
+ */
+const hurtMods: HitMods & { b: BridgeCtx | null; eid: number } = {
+  b: null, eid: -1, tick: 0, memo: null as CoverMemo | null,
+  stageCover(): number | undefined { return this.b!.host.stageCover?.(this.eid); },
+  baneFaction(): string | undefined { return this.b!.host.baneFaction?.(this.eid); },
+  // (marked by a Searchlight: more from every source, features/weaponry)
+  taken(): number {
+    const b = this.b!, eid = this.eid;
+    return (b.host.takenScale?.(eid) ?? 1) * (b.markedUntil.size && (b.markedUntil.get(eid) ?? 0) > b.host.getTick() ? MARK_TAKEN : 1);
+  },
+};
+const hurtOut = newPartHit();
+
+/**
  * All weapon and impact damage to a ship part goes through here: the shield
  * soaks it first (and stops recharging for a while), the part takes the rest,
  * as much of it as gets through (`vs.hit`: the weapon's damage type and
  * penetration against the part's armour and material: damage.ts).
+ * The rules are common's (hitRules.ts partHit: the cover, stage cover, splash share, bane, taken, shield, armour,
+ * ruin floor), so a client can work a hit out alike; here: who's immune, and who's told.
  * Returns the damage dealt (shield + hull).
  */
 export function hurt(b: BridgeCtx, eid: number, ship: ShipState, part: number, amount: number, source = -1, vs?: { splash?: boolean; shield?: number; hull?: number; hit?: HitInfo; at?: Vec2; bane?: { faction: string; damage: number } }): number {
   if (amount <= 0 || b.host.invulnerable?.(eid)) return 0;
-  const struck = part;
-  part = b.cover(ship, part, vs?.at);
-  if (part < 0) return 0;
-  // (a later stage's part: the plate covering it takes only a share, so the stage being fought is what to aim at)
-  if (part !== struck && stageOf(b.catalog, ship, struck) > currentStage(b.catalog, ship)) amount *= b.host.stageCover?.(eid) ?? STAGE_COVER;
-  // (ammunition made for one faction's ships: Quench Slugs on the Cinder Cult)
-  // (spaced plating: a blast does a share of its damage to the plate it lands on)
-  if (vs?.splash) amount *= b.catalog.functions.get(ship.blueprint.parts[part]?.fn)?.splashTaken ?? 1;
-  if (vs?.bane && b.host.baneFaction?.(eid) === vs.bane.faction) amount *= vs.bane.damage;
-  // (marked by a Searchlight: more from every source, features/weaponry)
-  const taken = (b.host.takenScale?.(eid) ?? 1) * (b.markedUntil.size && (b.markedUntil.get(eid) ?? 0) > b.host.getTick() ? MARK_TAKEN : 1);
-  amount *= taken;
-  const tick = b.host.getTick();
-  let dealt = 0;
-  if (ship.shield > 0 && ship.kind === 'ship' && (vs?.shield ?? 1) > 0) {
-    // What it does to shields (× vs.shield), and the rest of the shot goes on to the hull (a torpedo: shields don't stop it)
-    const k = vs?.shield ?? 1;
-    const soak = Math.min(ship.shield, amount * k);
-    ship.shield -= soak;
-    if (ship.shield <= 0) b.host.shieldBroken?.(eid);
-    amount -= soak / k;
-    dealt += soak;
-    ship.shieldHitTick = tick;
-  }
-  const through = vs?.hit && ship.blueprint.parts[part] ? hitMultiplier(b.catalog, b.tuning, ship.blueprint.parts[part], vs.hit) : 1;
+  const m = hurtMods, tick = b.host.getTick();
+  m.b = b; m.eid = eid; m.tick = tick; m.memo = b.coverMemo;
+  const r = partHit(b, ship, part, amount, vs, m, hurtOut);
+  m.b = null; m.memo = null;
+  if (r.part < 0) return 0;
+  const dealt = r.dealt, broke = r.broke;
   // (a braced boss shows the hit as glancing: wait for its opening)
-  b.lastThrough = through * Math.min(1, taken);
-  // (a piece that ruins never breaks: it's left wrecked, RUIN_HP to it)
-  const floor = b.catalog.pieces.get(ship.blueprint.parts[part]?.piece)?.ruin ? RUIN_HP : 0;
-  if (amount > 0) dealt += damagePart(ship, part, Math.min(amount * (vs?.hull ?? 1) * through, Math.max(0, ship.hp[part] - floor)), b.tuning);
+  b.lastThrough = r.share;
+  if (broke) b.host.shieldBroken?.(eid);
   if (dealt > 0) {
     b.lastDamaged.set(eid, tick);
     if (source >= 0 && source !== eid) b.lastHitBy.set(eid, source);
@@ -357,7 +355,7 @@ export function ignite(bridge: BridgeCtx, eid: number, x: number, y: number, dps
   const ship = bridge.bodies.get(eid);
   if (!ship || ship.kind !== 'ship') return -1;
   // The part the shot struck, or the one whose outline is nearest the point
-  const part = struck >= 0 && ship.hp[struck] > 0 && !ship.detached[struck] ? struck : bridge.closestPart(eid, ship, x, y);
+  const part = struckStands(ship, struck) ? struck : bridge.closestPart(eid, ship, x, y);
   if (part < 0) return -1;
   const until = bridge.host.getTick() + ticks;
   const cur = bridge.burns.find((b) => b.eid === eid && b.part === part);

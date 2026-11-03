@@ -22,7 +22,7 @@ import { addEntity, addComponent, hasComponent, entityExists, IWorld } from 'bit
 import {
   Position, Velocity, Radius, Projectile, Bullet, Lifetime, InSystem, NetworkSync, OwnedBy, Dead,
   ShipTuning, WeaponTuning, WEAPON_KIND_TYPE, ServerMessage, interceptHits, mulberry32, hashString, weaponDef, gunDef, launchShot, volleyAngles, weaponHit, type WeaponMods, type HitInfo,
-  endsAtAim, lifeToReach, steerToward,
+  endsAtAim, lifeToReach, steerToward, bursts, hitEndFx, pierceKeepOf, shellAmount, shellVs,
 } from '@space-game/common';
 import type { ShipBridge } from '../ships/ShipBridge.js';
 
@@ -90,7 +90,7 @@ export class Weapons {
     Velocity.y[eid] = shot.vy;
     Radius.value[eid] = 5 * shot.size;
     Projectile.ownerId[eid] = owner;
-    Projectile.damage[eid] = (def.damage ?? 14) * damageScale;
+    Projectile.damage[eid] = shellAmount(def, damageScale);
     Projectile.weaponType[eid] = WEAPON_KIND_TYPE[kind] ?? 1;
     // The gun's grade: how hard its shells punch through (damage.ts)
     Projectile.tier[eid] = shape.grade ?? 1;
@@ -139,11 +139,10 @@ export class Weapons {
   }
 
   /** A shot's damage against shields and hull, if its weapon has its own, what it hits with (damage.ts), and the faction its ammunition is made for */
-  vsOf(proj: number): { shield?: number; hull?: number; hit: HitInfo; bane?: { faction: string; damage: number } } {
-    const x = this.extras.get(proj), d = x?.def;
-    const hit = this.hitOf(proj);
-    const vs = d && (d.vsShield !== undefined || d.vsHull !== undefined) ? { shield: d.vsShield, hull: d.vsHull, hit } : { hit };
-    return d?.bane ? { ...vs, bane: d.bane } : vs;
+  vsOf(proj: number): { shield?: number; hull?: number; hit?: HitInfo; bane?: { faction: string; damage: number } } {
+    const x = this.extras.get(proj);
+    // (common hitRules.ts shellVs: what a client works it out from too; a plain cannon shell keeps no extras)
+    return x ? shellVs(x.kind, x.def, Projectile.tier[proj] || 1) : { hit: this.hitOf(proj) };
   }
 
   /** What a shot hits with: its weapon's damage type, and the gun's grade plus its penetration */
@@ -259,8 +258,9 @@ export class Weapons {
     if (x.pierceLeft > 0) {
       x.pierceLeft--;
       x.hit.add(hit.eid);
-      Projectile.damage[proj] *= x.def.pierceKeep ?? 0.75;
-      if (x.def.pierceKeep !== undefined) this.host.broadcast(InSystem.systemId[proj], { type: 'detonation', kind: x.kind, x: Math.round(hit.x), y: Math.round(hit.y), radius: 40 });
+      Projectile.damage[proj] *= pierceKeepOf(x.def);
+      const fx = hitEndFx(x.kind, x.def, false);
+      if (fx) this.host.broadcast(InSystem.systemId[proj], { type: 'detonation', kind: fx.kind, x: Math.round(hit.x), y: Math.round(hit.y), radius: fx.radius });
       return false;
     }
     if (x.def.split) this.shatter(proj, x, hit);
@@ -272,7 +272,7 @@ export class Weapons {
   onMobHit(proj: number, x: number, y: number): boolean {
     const e = this.extras.get(proj);
     if (!e) return true;
-    if (e.pierceLeft > 0) { e.pierceLeft--; Projectile.damage[proj] *= e.def.pierceKeep ?? 0.75; return false; }
+    if (e.pierceLeft > 0) { e.pierceLeft--; Projectile.damage[proj] *= pierceKeepOf(e.def); return false; }
     this.detonate(proj, x, y);
     return true;
   }
@@ -351,13 +351,12 @@ export class Weapons {
     if (x.def.emp) this.ships.empAt(num, px, py, x.def.emp.radius, x.def.emp.ticks, x.owner);
     // A plain slug (a Pip's, a Rattler's: nothing bursts, spreads or carries on) says nothing more: clients draw its
     // impact from the projectileHit they get anyway (WeaponFx), so a detonation would only repeat it (39 bytes a hit)
-    if (!bursts(x.def)) return;
-    const radius = x.def.splash?.radius ?? x.def.emp?.radius ?? 40;
-    this.host.broadcast(num, { type: 'detonation', kind: x.kind, x: Math.round(px), y: Math.round(py), radius });
+    // (common hitRules.ts hitEndFx: bursts(def) says whether, and the radius)
+    const fx = hitEndFx(x.kind, x.def, true);
+    if (!fx) return;
+    this.host.broadcast(num, { type: 'detonation', kind: fx.kind, x: Math.round(px), y: Math.round(py), radius: fx.radius });
   }
 }
 
-/** Does a shell of this kind do anything at its end a detonation has to tell (a burst, an EMP, shards, a pull, fire)? */
-export function bursts(def: WeaponTuning): boolean {
-  return !!(def.splash || def.emp || def.split || def.pierce || def.ignite || def.chain || def.pull || def.hold || def.fuse);
-}
+/** Does a shell of this kind do anything at its end a detonation has to tell? (common hitRules.ts, where it lives) */
+export { bursts };
