@@ -84,6 +84,8 @@ export const TELL_CHARGE_START = 255;
 export const TELL_CHARGE_CANCEL = 254;
 /** Fire-event ammo code (no shells) for a beam in pieces spending a piece: its pulse starts on that tick (power/ports.ts portsBeamStep), so every client draws it then */
 export const TELL_BEAM_PIECE = 253;
+/** Fire-event ammo code (no shells) for a ports ship's mining laser starting a pulse (power/ports.ts portsMineStep); its aim field carries the fulfilment it started at, 0..255 */
+export const TELL_MINE_PULSE = 252;
 
 const NO_TELLS: readonly GunTell[] = Object.freeze([]);
 

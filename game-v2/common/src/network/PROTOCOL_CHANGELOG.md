@@ -22,3 +22,4 @@ except to fix a typo. A bump makes old clients reload (see PROTOCOL_VERSION in p
 - 30 (2026-11-03): dev weapons range readout as rangeHead + compact rangeRow, changes only
 - 31 (2026-11-03): replica control bits carry what part features' bursts got (CTL.share, 6 bits from bit 21: flight.ts ctlOfShare) and name the engines' power mask (CTL.power): replicas fly a short dodge or gyro turn as the ship did
 - 32 (2026-11-03): Beams in pieces: a lit piece beam's ports closed field is its piece's ticks left; fire-event tell 253 (TELL_BEAM_PIECE) marks a piece spent
+- 33 (2026-11-03): Mining lasers on the ports core: a miner's closed field is its pulse's ticks left; fire-event tell 252 (TELL_MINE_PULSE, aim = fulfilment 0..255) marks a pulse started

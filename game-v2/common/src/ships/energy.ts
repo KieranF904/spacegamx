@@ -36,7 +36,7 @@ import type { ShipTuning } from './tuning.js';
 import type { Vec2 } from './types.js';
 import { getPlan } from './features/plan.js';
 import {
-  type PortsControls, type PortsState, createPortsState, fullPorts, isPortsRow, packPorts, portsGaugePct, portsSlotEnd, portsThrustFrac, portsThrustMul, portsTick, remapPorts, unpackPortsInto,
+  type PortsControls, type PortsState, createPortsState, portsMineStep, portsMineStop, fullPorts, isPortsRow, packPorts, portsGaugePct, portsSlotEnd, portsThrustFrac, portsThrustMul, portsTick, remapPorts, unpackPortsInto,
 } from './power/ports.js';
 import { dhypot } from '../math/detTrig.js';
 
@@ -564,9 +564,18 @@ export function remapCharge(before: ShipDerived, after: ShipDerived, c: Charge):
  * running stops, while the ship can give them nothing. Returns whether the
  * beams are on this tick; `ship.mineUntil` is updated.
  */
-export function payMining(ship: { derived: ShipDerived; minePaid?: number; mineUntil?: number }, on: boolean, tick: number, c: { charge: Charge }): boolean {
+export function payMining(ship: { derived: ShipDerived; minePaid?: number; mineUntil?: number }, on: boolean, tick: number, c: { charge: Charge }, stop = false): boolean {
   const miners = ship.derived.miners;
   if (!miners.length) return false;
+  // A ports ship: each mining laser runs its own pulses off its own buffer and cuts by its fulfilment (power/ports.ts portsMineStep)
+  const pz = ship.derived.ports, pe = c.charge.e;
+  if (pz && pe && pe.held.length === pz.n) {
+    if (stop) { portsMineStop(pz, pe); return false; }
+    let any = false;
+    for (const m of miners) if (portsMineStep(pz, pe, m.part, on) >= 0) any = true;
+    return any;
+  }
+  if (stop) ship.mineUntil = 0;
   const running = tick < (ship.mineUntil ?? 0);
   if (!on && !running) return false;
   let share = 1;

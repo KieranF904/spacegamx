@@ -291,6 +291,8 @@ export interface FunctionDef {
   feedPort?: { side: Side; cell?: number; required?: boolean };
   /** A mining laser (a beam that cuts rock while the pilot mines): `miner` itself, and the models of its family */
   mining?: boolean;
+  /** A mining laser on a ports ship (power/ports.ts portsMineStep): the length of one pulse, s. A press starts one, it runs to its end, a held button chains the next */
+  minePulse?: number;
 
   // Models (docs/parts-redesign.md §1): fixed named modules, each its own piece(s), material and numbers
   /** A player model: in the hangar palette, fabricated from its own recipe (data/ships/models.json) */

@@ -7,7 +7,7 @@
  * Damage goes through the bridge (b.hurt), never an import of the damage module, so the modules can't form a cycle.
  */
 
-import { rayTerrain, portsDamageMul, portsPiecePhase, shotAimQ, TELL_BEAM_PIECE, type PortsState, stackMods, coverPart, nearShipSegment, castShipAt } from '@space-game/common';
+import { rayTerrain, portsDamageMul, portsPiecePhase, portsMinePhase, miningPulse, shotAimQ, TELL_BEAM_PIECE, TELL_MINE_PULSE, type PortsState, stackMods, coverPart, nearShipSegment, castShipAt } from '@space-game/common';
 import { hasComponent } from 'bitecs';
 import {
   Position, Rotation, Input, Player, InSystem, Projectile, ShipState, Vec2, damagePart, weaponHit, shooterGrade, localToWorldDir,
@@ -103,7 +103,10 @@ export function stepWeapons(b: BridgeCtx, eid: number): boolean {
   const energy = { charge: b.chargeOf(eid) };
   b.fireWeapons(eid, ship, firing, Input.targetAngle[eid], Input.cursorDist[eid], b.targetOf(eid), energy);
   if (jumping) ship.mineUntil = 0;
-  const mining = payMining(ship, Input.fireRight[eid] === 1 && hasMiners && !jumping, b.host.getTick(), energy);
+  const mining = payMining(ship, Input.fireRight[eid] === 1 && hasMiners && !jumping, b.host.getTick(), energy, jumping);
+  // (A ports ship's mining laser starting a pulse: a fire event with no shells, so every client draws it from this tick, at its fulfilment)
+  const pz = ship.derived.ports, pe = energy.charge.e;
+  if (mining && pz && pe) for (const m of ship.derived.miners) if (portsMinePhase(pz, pe, m.part) === 0) b.fired.push({ owner: eid, tick: b.host.getTick(), part: m.part, aimQ: pe.sat[m.part], ids: [], ammo: TELL_MINE_PULSE });
   b.setCharge(eid, energy.charge);
   b.stepMiners(eid, ship, mining, Input.targetAngle[eid], Input.cursorDist[eid]);
   return true;
@@ -126,9 +129,15 @@ export function stepMiners(b: BridgeCtx, eid: number, ship: ShipState, on: boole
   // The cutting is focused at the pulse's flare (the same curve as its look; a whole pulse still cuts what it did)
   const prof = pulseProfile(MINING_PULSE);
   const age = Math.max(0, Math.min(prof.ticks - 1, b.host.getTick() - ((ship.mineUntil ?? 0) - MINE_CYCLE)));
-  const focus = prof.share[age] * prof.ticks;
+  // (A ports ship's mining lasers each run their own pulse, and cut by the share of their draw they got: power/ports.ts portsMineStep)
+  const pz = ship.derived.ports, pe = pz ? b.chargeOf(eid).e : undefined;
   for (const m of ship.derived.miners) {
-    if (m.satisfaction <= 0.01) continue;
+    const ph = pz && pe ? portsMinePhase(pz, pe, m.part) : -2;
+    if (ph === -1) continue;
+    const mp = ph >= 0 ? pulseProfile(miningPulse(pz!.minePulse[m.part])) : prof, ma = ph >= 0 ? Math.min(mp.ticks - 1, ph) : age;
+    const focus = mp.share[ma] * mp.ticks;
+    const fill = ph >= 0 ? pe!.sat[m.part] / 255 : 1;
+    if (m.satisfaction * fill <= 0.01) continue;
     const [x, y] = shipPointToWorld(ship, pose, m.muzzle, cs);
     const facing = pose.angle + Math.PI / 2 + datan2(m.dir[1], m.dir[0]);
     let off = datan2(aimY - y, aimX - x) - facing;
@@ -147,7 +156,7 @@ export function stepMiners(b: BridgeCtx, eid: number, ship: ShipState, on: boole
       const h = b.castShip(other, os, x, y, x1, y1);
       if (h && (!shipHit || h.t < shipHit.t)) shipHit = { eid: other, ship: os, ...h };
     }
-    const sat = m.satisfaction;
+    const sat = m.satisfaction * fill;
     const rockT = b.host.mineBeam?.(eid, x, y, angle, shipHit ? shipHit.t * range : range, (mt.dps / 60) * sat * focus, m.material, m.gas, mt.range) ?? 1;
     const rockFrac = rockT * (shipHit ? shipHit.t : 1);
     if (shipHit && rockT >= 0.999) {

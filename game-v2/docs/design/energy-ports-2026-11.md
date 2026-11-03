@@ -704,3 +704,25 @@ granularly turning it on/off as you like." A ports beam with `profile.pieces` (m
   fire event (`TELL_BEAM_PIECE`, ammo 253) on the tick a piece is spent, so replicas draw each pulse from the same tick.
 - Client: `beamPieces.ts` (the pulse's swell, on the spike's window), `MiningBeamFx` and `LanceFx` draw it; the weapon
   ring shows the pieces (`gunHud.ts` pieces fields, `WeaponRing.pieceArcs`). Tests: `power/beamPieces.test.ts`.
+
+## 19. Mining lasers on the ports core (Kieran, 2026-11-04)
+
+"Mining lasers ... will work similar to thrusters, constant feed usage, their effectiveness augmented by their energy
+fulfilment, but we'd also change it to fixed duration pulses rather than on/off as you like." On a ports ship
+(`ports.ts` `portsMineStep`, called from `energy.ts` `payMining` on the server and in the pilot's prediction):
+
+- A mining laser is a tool with ports and a one-second buffer (its draw), filled by the tick as any consumer's. `portsTick`
+  no longer drains it; it draws only while a pulse runs.
+- A press starts a pulse of `minePulse` s (FunctionDef, models.mjs: Mining Laser 0.9 s, the pulse its look already had;
+  Bore 1.2 s, its curve stretched: `pulse.ts miningPulse`). It runs to its end whatever the button does; held when it
+  ends, the next starts on the next tick. A jump or EMP stops it (`payMining`'s `stop`).
+- While a pulse runs it takes its draw from its buffer every tick, as a thruster burns; `e.sat` (0..255) is the share it
+  got, its fulfilment, and the server's `stepMiners` scales what it cuts (rock and hull) by it, on top of the pulse's own
+  flare curve.
+- Wire (protocol 33): a miner's `closed` is its pulse's ticks left, `PF_LIT` while one runs; a shell-less fire event
+  (`TELL_MINE_PULSE`, 252, its aim field the fulfilment it started at) marks the tick a pulse starts, so replicas draw
+  every pulse from the same tick.
+- Client: `minePulses.ts` (yours from your predicted state, others' from the tells), `MiningBeamFx`/`MiningFx` (a starved
+  beam burns dim and thin), and a mining segment on the weapon ring (the pulse, coloured by fulfilment; the buffer).
+- Pool-and-banks ships keep their mining as it was (`MINE_CYCLE`). Dev ship: Wren (`ports-wren.json`). Tests:
+  `power/minePulses.test.ts`.

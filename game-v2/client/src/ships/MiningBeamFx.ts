@@ -41,6 +41,7 @@ import { drawCone, drawStrands, sputterGain } from './beamLookFx';
 import { PulseFx, type PulseRun } from './PulseFx';
 import { LanceFx } from './LanceFx';
 import { PieceStarts, ownPiecePhase, pieceLook } from './beamPieces';
+import { MinePulses } from './minePulses';
 import { fixedReach } from './gunDecor';
 import { hitSurface } from './hitSurface';
 import { MiningFx } from './MiningFx';
@@ -108,8 +109,11 @@ export class MiningBeamFx {
         const c = unpackCursorWeaponState(e.data[0]);
         on = c.rightActive; aim = c.aimAngle; dist = e.data[2] ?? mt.range;
       }
+      // (A ports ship's mining lasers run pulses of their own length, on the server's ticks, and cut by their fulfilment: minePulses.ts)
+      const pz = ship.derived.ports ? this.minePulses.read(ship, id, id === this.state.playerId && this.state.predictionEnabled, this.state) : null;
+      if (pz) on = pz.any;
       // (A pulse already under way finishes when the button's let go: it just isn't followed by another)
-      const finishing = !on && ship.derived.miners.some((_, mi) => { const r = this.mining.get(id * 16 + mi); return !!r?.length && this.t * 60 - r[r.length - 1].start < MINING_EVERY; });
+      const finishing = !on && ship.derived.miners.some((_, mi) => { const r = this.mining.get(id * 16 + mi); return !!r?.length && this.t * 60 - r[r.length - 1].start < (pz ? pz.ticks[mi] : MINING_EVERY); });
       if (!on && !finishing) continue;
       if (id === this.state.playerId && finishing) this.localActive = true;
       const pose = { x: e.renderX, y: e.renderY, angle: e.renderAngle };
@@ -133,17 +137,25 @@ export class MiningBeamFx {
         let runs = this.mining.get(key);
         if (!runs) this.mining.set(key, (runs = []));
         const last = runs[runs.length - 1];
-        if (!last || now - last.start >= MINING_EVERY) {
+        if (pz) {
+          // (Each pulse from the tick it started, however the frames fall; one let go trails off)
+          const ph = pz.phase[mi];
+          if (ph >= 0 && (!last || Math.abs(now - ph - last.start) > 3 || now - last.start >= pz.ticks[mi])) {
+            runs.push(newRun(id, mi, now - ph));
+            if (!miningSounded.has(id)) { miningSounded.add(id); this.onMiningPulse?.(x, y, id === this.state.playerId); }
+          } else if (ph < 0 && (!last || now - last.start >= pz.ticks[mi])) continue;
+        } else if (!last || now - last.start >= MINING_EVERY) {
           if (!on) continue;
           runs.push(newRun(id, mi, last && now - last.start < MINING_EVERY * 2 ? last.start + MINING_EVERY : now));
           if (!miningSounded.has(id)) { miningSounded.add(id); this.onMiningPulse?.(x, y, id === this.state.playerId); }
         }
-        while (runs.length && now - runs[0].start >= prof.ticks) runs.shift();
+        while (runs.length && now - runs[0].start >= (pz ? pz.ticks[mi] : prof.ticks)) runs.shift();
+        if (!runs.length) continue;
         miningSeen.add(key);
         // (Its newest pulse sets the beam's brightness; older ones are trailing off under it)
         const rock = t < 0.999 ? rockMaterial(this.rockHit) : null;
         this.miningFx.target = t < 0.999 ? this.rockId : -1;
-        this.miningFx.draw(g, key, prof, now - runs[runs.length - 1].start, !on, x, y, hx, hy, t < 0.999, rock, now, frames, mt.range, beamLook(ship.blueprint.parts[m.part]?.fn));
+        this.miningFx.draw(g, key, pz ? pz.prof[mi] : prof, now - runs[runs.length - 1].start, pz ? pz.phase[mi] < 0 : !on, x, y, hx, hy, t < 0.999, rock, now, frames, mt.range, beamLook(ship.blueprint.parts[m.part]?.fn), pz ? pz.fill[mi] : 1);
         if (t < 0.999 && Math.random() < 0.35 * frames) {
           const sa = a + Math.PI + (Math.random() - 0.5) * 2.2, s = 1.5 + Math.random() * 4;
           this.sparks.push({ x: hx, y: hy, vx: Math.cos(sa) * s, vy: Math.sin(sa) * s, life: 0, max: 10 + Math.random() * 14 });
@@ -439,6 +451,10 @@ export class MiningBeamFx {
     if (this.stationRuns.length > 48) this.stationRuns.shift();
     this.onPulse?.(x, y, 1, false);
   }
+
+  /** Ports ships' mining pulses: other ships' from their TELL_MINE_PULSE fire events, yours from your predicted ports state */
+  private minePulses = new MinePulses();
+  startMinePulse(owner: number, part: number, tick: number, fill: number): void { this.minePulses.start(owner, part, tick, fill); }
 
   /** Other ships' beams in pieces: the tick each last spent a piece (ShipClient, from TELL_BEAM_PIECE fire events) */
   private pieces = new PieceStarts();

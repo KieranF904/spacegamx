@@ -7,7 +7,7 @@
  * every frame, so a frame allocates nothing.
  */
 
-import { BROWNOUT, PF_LIT, bankHeld, clipReloading, feedShare, portsPiecesHeld, type Charge, type FireModel, type PortsState, type ShipState } from '@space-game/common';
+import { BROWNOUT, PF_LIT, bankHeld, clipReloading, feedShare, portsMinePhase, portsPiecesHeld, type Charge, type FireModel, type PortsState, type ShipState } from '@space-game/common';
 
 export interface RingGroup {
   /** The model (the part's function id) these guns are */
@@ -52,6 +52,12 @@ export interface RingGroup {
   piecePart: number;
   pieceBurn: number;
   pieceCool: number;
+  /** A ports ship's mining lasers of one model (power/ports.ts portsMineStep), not a gun: how far through its pulse the first
+   * one is 0..1 (-1: none running), its fulfilment 0..1 (the share of its draw it gets), and its buffer 0..1 */
+  mine: boolean;
+  minePhase: number;
+  mineFill: number;
+  mineBuffer: number;
 }
 
 /** What `update` reads besides the ship: the stored energy, and the rounds a kind of gun has left aboard */
@@ -85,13 +91,27 @@ export class RingModel {
         g = {
           fn, model: w.fire.model, kind: w.kind, parts: [], ws: [], clip: w.fire.model === 'clip' ? (w.fire.clip ?? 1) : 0,
           rounds: 0, reloading: false, starved: false, charge: 0, cooling: 0, flash: 0, spin: 0, ready: 1, ammo: -1, crates: 0, bank: -1, prevCharge: 0,
-          pieces: 0, piecesFull: 0, piecePart: 0, pieceBurn: 0, pieceCool: 0,
+          pieces: 0, piecesFull: 0, piecePart: 0, pieceBurn: 0, pieceCool: 0, mine: false, minePhase: -1, mineFill: 1, mineBuffer: 1,
         };
         by.set(key, g);
         out.push(g);
       }
       g.parts.push(w.part);
       g.ws.push(w);
+    }
+    // (A ports ship's mining lasers: one group a model, after the guns, for their pulse and fulfilment)
+    if (ship.derived.ports) for (const m of ship.derived.miners) {
+      const fn = ship.blueprint.parts[m.part]?.fn ?? 'miner', key = `${fn}|mine`;
+      let g = by.get(key);
+      if (!g) {
+        g = {
+          fn, model: 'beam', kind: fn, parts: [], ws: [], clip: 0, rounds: 0, reloading: false, starved: false, charge: 0, cooling: 0, flash: 0, spin: 0, ready: 1, ammo: -1, crates: 0, bank: -1, prevCharge: 0,
+          pieces: 0, piecesFull: 0, piecePart: 0, pieceBurn: 0, pieceCool: 0, mine: true, minePhase: -1, mineFill: 1, mineBuffer: 1,
+        };
+        by.set(key, g);
+        out.push(g);
+      }
+      g.parts.push(m.part);
     }
     this.groups = out;
   }
@@ -102,6 +122,7 @@ export class RingModel {
     if (ship !== this.ship || ship.rebuilds !== this.rebuilds) this.regroup(ship);
     const d = ship.derived;
     for (const g of this.groups) {
+      if (g.mine) { this.mine(g, ship, src.charge); continue; }
       let rounds = 0, n = 0, reloading = false, starved = false, charge = 0, cooling = 0, spin = 0, ready = 1, bank = -1;
       for (let gi = 0; gi < g.parts.length; gi++) {
         const part = g.parts[gi], w = g.ws[gi];
@@ -150,6 +171,16 @@ export class RingModel {
       g.crates = a ? a.crates : 0;
     }
     return this.groups;
+  }
+
+  /** Mining lasers on a ports ship: the first one's pulse, fulfilment and buffer, as your predicted ports state has them */
+  private mine(g: RingGroup, ship: ShipState, charge: Charge): void {
+    const L = ship.derived.ports, e = charge.e as PortsState | undefined, p = g.parts[0];
+    if (!L || !e || e.held.length !== L.n || p === undefined) { g.minePhase = -1; g.mineFill = 1; g.mineBuffer = 1; return; }
+    const ph = portsMinePhase(L, e, p);
+    g.minePhase = ph >= 0 ? Math.min(1, (ph + 1) / Math.max(1, L.minePulse[p])) : -1;
+    g.mineFill = ph >= 0 ? e.sat[p] / 255 : 1;
+    g.mineBuffer = L.cap[p] > 0 ? Math.max(0, Math.min(1, e.held[p] / L.cap[p])) : 1;
   }
 
   /** A beam in pieces: its group's first gun's pieces, as your predicted ports state has them */

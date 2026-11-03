@@ -83,12 +83,13 @@ export class MiningFx {
    * One beam this frame: `age` ticks into its pulse (`ending`: let go, so no pulse follows it: it fades to nothing), from the muzzle (x, y) to
    * (hx, hy), `hit` if it meets rock there (`rock`: its material's name); full strength out to `full`, then trailing off
    */
-  draw(g: Graphics, key: number, prof: PulseProfile, age: number, ending: boolean, x: number, y: number, hx: number, hy: number, hit: boolean, rock: string | null, now: number, frames: number, full: number, look?: BeamLook): void {
+  draw(g: Graphics, key: number, prof: PulseProfile, age: number, ending: boolean, x: number, y: number, hx: number, hy: number, hit: boolean, rock: string | null, now: number, frames: number, full: number, look?: BeamLook, power = 1): void {
     const k = pulseIntensity(prof, age);
     const OUT = look?.outer ?? OUTER, MIDC = look?.mid ?? MID, COREC = look?.core ?? CORE;
     // Never quite out: a dim glow between pulses, the flare at each one's peak
     const env = ending ? Math.max(0, Math.min(1, (prof.ticks - age) / (prof.ticks - prof.peak))) : 1;
-    const lvl = (0.2 + 0.8 * k) * env * sputterGain(look?.sputter, now / 60, key);
+    // (`power`: a ports ship's mining laser's fulfilment, the share of its draw it got: starved, it burns dim and thin)
+    const lvl = (0.2 + 0.8 * k) * env * sputterGain(look?.sputter, now / 60, key) * (0.3 + 0.7 * Math.max(0, Math.min(1, power)));
     // (Where it cuts, past its range, it cuts less: the glow and the particles follow)
     const reachStr = hit ? mineFalloff(Math.hypot(hx - x, hy - y), full) : 1;
     const len = Math.hypot(hx - x, hy - y) || 1, ux = (hx - x) / len, uy = (hy - y) / len, nx = -uy, ny = ux;
@@ -113,7 +114,7 @@ export class MiningFx {
     line(w * 5.2, OUT, 0.09 * lvl);
     line(w * 2.4, MIDC, 0.26 * lvl);
     line(w * 1.1, MIDC, 0.4 * lvl);
-    line(Math.max(1.4, w * (0.35 + 0.35 * k)), COREC, (0.45 + 0.5 * k) * env);
+    line(Math.max(1.4, w * (0.35 + 0.35 * k)), COREC, (0.45 + 0.5 * k) * env * (0.3 + 0.7 * Math.max(0, Math.min(1, power))));
     if (look?.braid) drawStrands(g, x, y, ux, uy, Math.min(len, full), w, look.braid.strands, look.braid.color, lvl, now / 60, key);
     // Its muzzle: a steady glow
     g.circle(x, y, w * (1.3 + 1.1 * k)).fill({ color: MIDC, alpha: 0.38 * lvl });

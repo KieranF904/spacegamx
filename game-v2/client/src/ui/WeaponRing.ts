@@ -8,6 +8,8 @@
  *   bank bar         a thin arc outside the segment when a Capacitor bank feeds the group
  *   beam pieces      a beam in pieces (power/ports.ts): one short arc a piece, lit when whole, the one burning white and
  *                    shrinking, a part-filled one as a dim amber sliver (it can't fire), and the cooldown a thin grey arc inside
+ *   mining pulse     a ports ship's mining lasers: the pulse sweeping along the segment, cyan when fully fed and dimming to red
+ *                    as its fulfilment drops (the share of its draw it gets), its buffer a thin arc inside
  * Cycle and beam guns show a plain readiness arc. A transparent canvas that follows the mouse; nothing in it is
  * allocated per frame.
  */
@@ -77,6 +79,7 @@ export class WeaponRing {
       if (g.reloading && !g.starved) sweeping = true;
       this.put(g.model); this.put(g.clip); this.put(g.rounds); this.put(g.reloading); this.put(g.starved); this.put(g.charge);
       this.put(g.cooling); this.put(g.flash); this.put(g.ready); this.put(g.spin); this.put(g.bank); this.put(g.ammo); this.put(g.crates);
+      this.put(g.minePhase < 0 ? -1 : Math.round(g.minePhase * 30)); this.put(Math.round(g.mineFill * 20)); this.put(Math.round(g.mineBuffer * 20));
       this.put(g.pieces); this.put(g.piecesFull); this.put(Math.round(g.piecePart * 40)); this.put(Math.round(g.pieceBurn * 40)); this.put(Math.round(g.pieceCool * 40));
     }
     this.drawn.length = this.at;
@@ -105,7 +108,12 @@ export class WeaponRing {
     // The track
     arc(R, a0, a1, '#0b1220', 4.5, 0.35);
     const len = a1 - a0;
-    if (g.pieces > 0) {
+    if (g.mine) {
+      // The pulse sweeps the segment; its colour is the fulfilment (cyan fed, red starved); the buffer inside
+      arc(R, a0, a1, '#1e293b', 3, 0.8);
+      if (g.minePhase >= 0) arc(R, a0, a0 + len * g.minePhase, g.mineFill > 0.9 ? '#22d3ee' : g.mineFill > 0.4 ? '#facc15' : '#ef4444', 3.5, 0.35 + 0.6 * g.mineFill);
+      arc(R - 6, a0, a0 + len * g.mineBuffer, g.mineBuffer < 0.15 ? '#ef4444' : '#67e8f9', 1.5, 0.75);
+    } else if (g.pieces > 0) {
       this.pieceArcs(arc, g, a0, a1, accent);
     } else if (g.model === 'clip') {
       this.pips(ctx, g, a0, a1);

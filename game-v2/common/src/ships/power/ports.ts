@@ -116,6 +116,9 @@ export interface PortsLayout {
   tierDmg: Float64Array;
   /** Tools: 1 for a shield generator */
   shield: Uint8Array;
+  /** Tools: 1 for a mining laser (portsMineStep draws it, by the pulse), and its pulse's length in ticks */
+  miner: Uint8Array;
+  minePulse: Int32Array;
   /** Lines (conduit-like stores: they carry material too) */
   carrier: Uint8Array;
   /** Material a part may hold, hundredths (a tank: its cap; a gun or engine: its feed buffer; a line: a little); 0: none */
@@ -251,6 +254,7 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
   const pieces = new Uint8Array(n), pieceE = Z(), pieceT = Z(), spikeLo = Z(), spikeHi = Z(), spikeIn = new Float64Array(n).fill(1), spikeOut = new Float64Array(n).fill(1);
   const augCap = Z(), augCost = Z(), augRate = Z(), augSteady = Z(), augDps = new Float64Array(n).fill(1), augMods: (WeaponMods | undefined)[] = new Array(n).fill(undefined), augName: (string | undefined)[] = new Array(n).fill(undefined);
   const tierDmg = new Float64Array(n).fill(1);
+  const miner = new Uint8Array(n), minePulse = Z();
   const shield = new Uint8Array(n), carrier = new Uint8Array(n), matCap = Z(), matUse = Z(), takes = Z(), tankFeed = new Uint8Array(n), feedPort = new Uint8Array(n);
   const mul = () => new Float64Array(n * W).fill(1);
   const mShot = mul(), mDamage = mul(), mCycle = mul(), mDischarge = mul(), mRest = mul(), mBurn = mul(), mSteady = mul(), mThrust = mul(), mBoost = mul(), mBoostDrain = mul();
@@ -331,6 +335,7 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
       role[i] = P_TOOL;
       rate[i] = perTick(partDemand(fn, a, m)); cap[i] = rate[i] * TPS;
       if ((fn.shield ?? 0) > 0) shield[i] = 1;
+      if (fn.mining) { miner[i] = 1; minePulse[i] = Math.max(1, Math.round((fn.minePulse ?? 0.9) * TPS)); }
     }
     // Feed: what it takes, its buffer, and its stats under each material
     if (fn.takes?.length && (role[i] === P_WEAPON || role[i] === P_THRUSTER)) {
@@ -442,7 +447,7 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
   for (let i = 0; i < n; i++) if (role[i] === P_THRUSTER || role[i] === P_TOOL || role[i] === P_WEAPON) consumers.push(i);
   let gaugeMax = 0; for (const r of relays) gaugeMax += cap[r];
   const L: PortsLayout = {
-    n, sig: 0, role, cap, rate, burn, bBurn, boostMul, tierDmg, gun, shot, rounds, relight, passive, discharge, rest, burst, steady, pieces, pieceE, pieceT, spikeLo, spikeHi, spikeIn, spikeOut, augCap, augCost, augRate, augSteady, augDps, augMods, augName, shield, carrier, matCap, matUse, takes, tankFeed, feedPort,
+    n, sig: 0, role, cap, rate, burn, bBurn, boostMul, tierDmg, gun, shot, rounds, relight, passive, discharge, rest, burst, steady, pieces, pieceE, pieceT, spikeLo, spikeHi, spikeIn, spikeOut, augCap, augCost, augRate, augSteady, augDps, augMods, augName, shield, miner, minePulse, carrier, matCap, matUse, takes, tankFeed, feedPort,
     mShot, mDamage, mCycle, mDischarge, mRest, mBurn, mSteady, mThrust, mBoost, mBoostDrain, feeds, feedDefs,
     links: linkFrom.length, linkFrom: Int32Array.from(linkFrom), linkTo: Int32Array.from(linkTo), linkCap: Int32Array.from(linkCap), linkAug: Uint8Array.from(linkAug),
     outStart, outLink: Int32Array.from(outLink), inStart, inLink: Int32Array.from(inLink), openIn, openOut,
@@ -461,7 +466,7 @@ export function portsSig(L: PortsLayout): number {
   let h = 0x811c9dc5 | 0;
   const mix = (v: number) => { h = Math.imul(h ^ (v | 0), 0x01000193); };
   const all = (a: ArrayLike<number>) => { mix(a.length); for (let i = 0; i < a.length; i++) mix(a[i]); };
-  mix(L.n); all(L.role); all(L.cap); all(L.burn); all(L.bBurn); all(L.gun); all(L.shot); all(L.rounds); all(L.passive); all(L.discharge); all(L.rest); all(L.steady); all(L.pieces); all(L.pieceE); all(L.pieceT); all(L.augCap); all(L.augCost); all(L.augSteady); all(L.linkAug);
+  mix(L.n); all(L.role); all(L.cap); all(L.burn); all(L.bBurn); all(L.gun); all(L.shot); all(L.rounds); all(L.passive); all(L.discharge); all(L.rest); all(L.steady); all(L.pieces); all(L.pieceE); all(L.pieceT); all(L.miner); all(L.minePulse); all(L.augCap); all(L.augCost); all(L.augSteady); all(L.linkAug);
   all(L.matCap); all(L.takes); all(L.tankFeed); all(L.linkFrom); all(L.linkTo); all(L.netOf); all(L.selOut);
   const s = ((h >>> 16) ^ (h & 0xffff)) & 0xffff;
   return s === 0 ? 1 : s;
@@ -665,6 +670,8 @@ export function portsTick(L: PortsLayout, e: PortsState, ctl: Readonly<PortsCont
   const tw = ctl.toolWant;
   let shW = 0, shG = 0;
   for (const p of L.tools) {
+    // (A mining laser draws by its pulse: portsMineStep)
+    if (L.miner[p]) continue;
     const w = tw ? tw[p] : L.rate[p], want = w > 0 ? w : 0, got = held[p] < want ? held[p] : want;
     held[p] -= got;
     e.sat[p] = want > 0 ? Math.round((255 * got) / want) : 255;
@@ -814,6 +821,38 @@ function pieceBurn(L: PortsLayout, e: PortsState, p: number, fl: number): number
   if (matOf(L, e, p)) { e.amt[p] -= L.matUse[p]; if (e.amt[p] <= 0) { e.amt[p] = 0; e.mat[p] = 0; } }
   return 1;
 }
+// ---- Mining lasers (Kieran, 2026-11-04): "constant feed usage, their effectiveness augmented by their energy fulfilment,
+// fixed duration pulses rather than on/off as you like". A mining laser is a tool with a one-second buffer filled over its
+// ports. A press starts a pulse of minePulse ticks that runs to its end whatever the button does; held when it ends, the
+// next starts on the next tick. While a pulse runs it draws its rate every tick from its buffer, as a thruster burns, and
+// cuts by the share of that it got (e.sat, 0..255: its fulfilment). State: PF_LIT while a pulse runs, `closed` its ticks left
+/**
+ * A mining laser's tick (after portsTick, with the guns): a pulse ended last tick goes out, one starts if `on`, and a
+ * running one draws. Returns its fulfilment this tick (0..1, what it got of its draw), or -1 when no pulse runs
+ */
+export function portsMineStep(L: PortsLayout, e: PortsState, p: number, on: boolean): number {
+  if (!L.miner[p]) return -1;
+  let fl = e.flags[p];
+  if ((fl & PF_LIT) && e.closed[p] <= 0) fl &= ~PF_LIT;
+  if (!(fl & PF_LIT)) {
+    if (!on) { e.flags[p] = fl; e.sat[p] = 255; return -1; }
+    fl |= PF_LIT; e.closed[p] = L.minePulse[p];
+  }
+  e.flags[p] = fl;
+  e.closed[p]--;
+  const want = L.rate[p], h = e.held[p], got = h < want ? h : want;
+  e.held[p] = h - got;
+  e.sat[p] = want > 0 ? Math.round((255 * got) / want) : 255;
+  return e.sat[p] / 255;
+}
+/** Ticks into the mining laser's pulse running now (0 its first), or -1 */
+export function portsMinePhase(L: PortsLayout, e: PortsState, p: number): number {
+  return L.miner[p] && (e.flags[p] & PF_LIT) ? L.minePulse[p] - 1 - e.closed[p] : -1;
+}
+/** Stop every mining laser's pulse (a jump, an EMP) */
+export function portsMineStop(L: PortsLayout, e: PortsState): void {
+  for (const p of L.tools) if (L.miner[p]) { e.flags[p] &= ~PF_LIT; e.closed[p] = 0; e.sat[p] = 255; }
+}
 /** Flip a Selector (or every one with part < 0) to its other input */
 export function portsSwitchFeeds(L: PortsLayout, e: PortsState, part = -1): void {
   for (const s of L.selectors) if (part < 0 || s === part) e.flags[s] ^= PF_SEL;
@@ -825,7 +864,7 @@ export function portsPurge(L: PortsLayout, e: PortsState): void {
 
 // ================================================================ the wire (the pilot row's energy slot, triples)
 /** What the slot means (in the wire hash: a change of meaning is a protocol bump) */
-export const PORTS_SLOT_LAYOUT = 'ports:quads(part,held*16+flags4,closed*2^24+mat*2^20+amt,aug);closed=a lit piece beam ticks left';
+export const PORTS_SLOT_LAYOUT = 'ports:quads(part,held*16+flags4,closed*2^24+mat*2^20+amt,aug);closed=a lit piece beam ticks left, a mining pulse ticks left';
 export const PORTS_ROW = { sig: 8, count: 9, at: 13 } as const;
 const FLAGS = 16, AMT_MOD = 1 << 20, MAT_MOD = 1 << 24, PER = 4;
 /** Append the triples to `out` (from data[PORTS_ROW.at]). Returns the triple count; the row carries -count in data[PORTS_ROW.count] and L.sig in data[PORTS_ROW.sig] */

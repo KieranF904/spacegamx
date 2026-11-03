@@ -56,6 +56,14 @@ const profiles = new WeakMap<PulseTuning, PulseProfile>();
 /** A mining laser's pulse: its length is MINE_CYCLE (energy.ts); it cuts hardest at the flare, and the client draws the same curve */
 export const MINING_PULSE: PulseTuning = { ticks: 54, peakAt: 0.4 };
 
+const miningPulses = new Map<number, PulseTuning>([[MINING_PULSE.ticks, MINING_PULSE]]);
+/** A mining laser's pulse `ticks` long (a ports ship's: FunctionDef.minePulse), the same curve stretched; the same object each time */
+export function miningPulse(ticks: number): PulseTuning {
+  let p = miningPulses.get(ticks);
+  if (!p) miningPulses.set(ticks, (p = { ticks, peakAt: MINING_PULSE.peakAt }));
+  return p;
+}
+
 /** A mining laser reaches this much further than its range, fading out (and mining less) over the extra */
 export const MINE_TAIL = 0.4;
 

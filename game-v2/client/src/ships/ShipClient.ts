@@ -10,7 +10,7 @@
  *   J  jump drive: spool up, then fly far and fast along the nose (J again aborts)
  */
 
-import { endsAtAim, stackMods, ensurePortsCharge, stepPointDefenceAim, stepFixedGunAim, SHOT_AIM_STEPS, pointDefenceOf, chargeGroupsEnd, TELL_CHARGE_START, TELL_CHARGE_CANCEL, TELL_BEAM_PIECE } from '@space-game/common';
+import { endsAtAim, stackMods, ensurePortsCharge, stepPointDefenceAim, stepFixedGunAim, SHOT_AIM_STEPS, pointDefenceOf, chargeGroupsEnd, TELL_CHARGE_START, TELL_CHARGE_CANCEL, TELL_BEAM_PIECE, TELL_MINE_PULSE } from '@space-game/common';
 import { GunSync } from './gunSync';
 import { GunFeel } from './gunFeel';
 import './energyLooks';
@@ -522,6 +522,8 @@ export class ShipClient {
       }
       // A beam in pieces spent a piece (no shells): its pulse runs from that tick (power/ports.ts; drawn by MiningBeamFx)
       if (ammo === TELL_BEAM_PIECE) { this.beamFx?.startPiece(owner, part, tick); continue; }
+      // A ports ship's mining laser started a pulse (its aim field: the fulfilment it started at, 0..255)
+      if (ammo === TELL_MINE_PULSE) { this.beamFx?.startMinePulse(owner, part, tick, aimQ / 255); continue; }
       if (ammo === TELL_CHARGE_CANCEL) {
         this.chargeTells.delete(owner * 256 + part);
         this.tellSounds.get(owner * 256 + part)?.();
@@ -785,7 +787,7 @@ export class ShipClient {
     this.gunFeel.own(ship, tick);
     for (const { w } of pulses) this.beamFx?.startPulse(player.id, w.part, tick);
     if (burning) ship.mineUntil = 0;
-    payMining(ship, !!input.fireRight && hasMiners && !burning, tick, energy);
+    payMining(ship, !!input.fireRight && hasMiners && !burning, tick, energy, burning);
     for (const { w, shot, aug } of shots) {
       // (Homing missiles change course: those the server sends as they fly)
       const pdef = partWeaponDef(this.opts.tuning, w.kind, ship.blueprint.parts[w.part], w);
