@@ -15,7 +15,7 @@ import { SunRenderer } from '../rendering/sun/SunRenderer';
 import { batchProgram, shaderReady } from '../rendering/shaderWarmup';
 import type { StarSystemData } from '@space-game/common';
 import systemsData from '../../../data/systems.json';
-import { LoginBody, loginBodyForVisit, sunSpot } from './loginBody';
+import { LoginBody, loginBodyForVisit } from './loginBody';
 import { SkyRenderer, skyPrograms } from '../rendering/sky/SkyRenderer';
 import { skyBiome, type BiomeHints } from '../rendering/sky/skyBiome';
 import { attachVolumeUploads } from '../rendering/planet-proto/planetTextures';
@@ -103,7 +103,7 @@ export class LoginUI {
     this.parts.push([this.sky.container, skyPrograms()]);
 
     // One of Sol's bodies, a different one each visit (loginBody.ts): the sun as the game draws it, or a planet or moon
-    // lit by the sun drawn small at a top corner
+    // lit by the sun drawn small at a top corner (the sun and one small body orbit it, slowly)
     const id = loginBodyForVisit(sol);
     this.sunRenderer = new SunRenderer(this.app);
     this.sunRenderer.setStar('sol');
@@ -155,9 +155,9 @@ export class LoginUI {
     // texture, till its programs are compiled ahead: a compile here would hold up the sign-in screen's first frames)
     if (this.sky?.container.visible) this.sky.update(delta * 1000, time * 40, time * 12, 0.35);
     if (this.body) {
-      const sun = sunSpot(this.body.side, w, h);
+      // (the star and the small body orbit the big one, slowly: the body says where the star is)
+      const sun = this.body.update(delta, w / 2, cy, renderedRadius, w, h);
       this.sunRenderer.drawAt(delta, sun.x, sun.y, sun.r);
-      this.body.update(delta, w / 2, cy, renderedRadius, w, h, sun.x, sun.y);
     } else this.sunRenderer.drawAt(delta, w / 2, cy, renderedRadius);
 
     // Draw stars
