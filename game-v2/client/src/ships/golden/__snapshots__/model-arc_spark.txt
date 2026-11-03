@@ -4,7 +4,7 @@ Mk II · Small · Square · 1 cell
 Hull · mass66 hp · 1.4
 Armour · build2 · 1.6 pts
 TakesKinetic −15% · Explosive −10% · Energy +20% · Cryo +10%
-Damage45/s · reach 660
+Damage45/s · reach 1,980
 Hits withEnergy · penetration 2
 Fire rate1.3/s · shells
 Modelcycle: Fires on a fixed beat while held; each shot's energy is drawn as it reloads.
@@ -34,7 +34,7 @@ Small · Square
 instant zap, chains to 3 more ships
 
 == keyStats ==
-45 dmg/s · reach 660 · cycle · draws 18
+45 dmg/s · reach 1,980 · cycle · draws 18
 
 == mountBadge ==
 TURRET 270°
@@ -50,4 +50,4 @@ Bolts on any side
 {"open":true,"badge":"Lv 17","why":""}
 
 == partStats (raw) ==
-{"grade":2,"mark":"Mk II","size":"Small","area":1,"hp":65.8,"mass":1.4,"firepower":45.333333333333336,"toughness":65.8,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":45.333333333333336,"range":660,"damageType":"energy","pen":2,"draw":18}
+{"grade":2,"mark":"Mk II","size":"Small","area":1,"hp":65.8,"mass":1.4,"firepower":45.333333333333336,"toughness":65.8,"armour":2,"resist":{"kinetic":0.85,"explosive":0.9,"energy":1.2,"cryo":1.1},"dps":45.333333333333336,"range":1980,"damageType":"energy","pen":2,"draw":18}
