@@ -5,7 +5,7 @@
     "lostSeconds": 12,
     "startSupplies": 150,
     "killSupplies": 4,
-    "fortGradeBonus": 1,
+    "fortGradeBonus": 0,
     "fortMaxGrade": 5,
     "profiles": {
       "selene": {
@@ -649,9 +649,9 @@
       "every": 5
     },
     "wave": {
-      "base": 4,
-      "perWave": 3,
-      "perWave2": 0.12,
+      "base": 5,
+      "perWave": 4.5,
+      "perWave2": 0.18,
       "solo": 0.7,
       "perPilot": 0.3,
       "leanChance": 0.55,
@@ -685,8 +685,8 @@
       "xpPerNight": 20,
       "creditsBase": 8,
       "creditsPerNight": 6,
-      "suppliesBase": 70,
-      "suppliesPerNight": 15
+      "suppliesBase": 60,
+      "suppliesPerNight": 12
     },
     "partialHaul": 0.5
   },

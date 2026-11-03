@@ -79,7 +79,7 @@ export interface SiegeRules {
   startSupplies: number;
   /** Supplies each kill pays in */
   killSupplies: number;
-  /** Fortifications are built this many grades better than what comes at them, up to `fortMaxGrade` */
+  /** Fortifications are built this many grades better than what comes at them, up to `fortMaxGrade` (0: the same grade; at +1 a moon's turrets held the early nights alone) */
   fortGradeBonus: number;
   fortMaxGrade: number;
   /** Each moon's siege (its bastion's `profile`; `defaultProfile` otherwise) */
@@ -138,7 +138,7 @@ export const DEFAULT_SIEGE_RULES: SiegeRules = {
   lostSeconds: 12,
   startSupplies: 150,
   killSupplies: 4,
-  fortGradeBonus: 1,
+  fortGradeBonus: 0,
   fortMaxGrade: 5,
   profiles: {
     // Selene: the Scrapborn come down three lanes from their scrapyards, slow and many
@@ -287,13 +287,13 @@ export const DEFAULT_SIEGE_RULES: SiegeRules = {
   repair: { id: 'repair', label: 'Patch the bastion and turrets', cost: 60, note: '+30% hull to each', heal: 0.3 },
   scrapBack: 0.5,
   haulBonus: { per: 0.25, every: 5 },
-  wave: { base: 4, perWave: 3, perWave2: 0.12, solo: 0.7, perPilot: 0.3, leanChance: 0.55, leanSpread: 3, maxPicks: 90 },
+  wave: { base: 5, perWave: 4.5, perWave2: 0.18, solo: 0.7, perPilot: 0.3, leanChance: 0.55, leanSpread: 3, maxPicks: 90 },
   objectives: {
     distance: [2600, 4800],
     cache: { holdSeconds: 8, radius: 330, lifeSeconds: 75, supplies: 45, suppliesPerNight: 6, credits: 12 },
     nest: { hp: 1, lifeSeconds: 120, releaseSeconds: 7, supplies: 70, suppliesPerNight: 8, credits: 25 },
   },
-  dawn: { xpBase: 25, xpPerNight: 20, creditsBase: 8, creditsPerNight: 6, suppliesBase: 70, suppliesPerNight: 15 },
+  dawn: { xpBase: 25, xpPerNight: 20, creditsBase: 8, creditsPerNight: 6, suppliesBase: 60, suppliesPerNight: 12 },
   partialHaul: 0.5,
   night: {
     buildCost: 1.5, buildReach: 450,

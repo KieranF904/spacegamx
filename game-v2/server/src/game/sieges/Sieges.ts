@@ -80,7 +80,7 @@ export class Sieges implements SiegeCtx {
     this.t = texts(SIEGE_STRINGS, strings);
   }
 
-  /** Fortifications are built a grade better than what comes at them (Selene's: steel) */
+  /** Fortifications are built rules.fortGradeBonus grades better than what comes at them (up to fortMaxGrade) */
   fortGrade(grade: number): number {
     return Math.min(this.rules.fortMaxGrade, grade + this.rules.fortGradeBonus);
   }
@@ -228,6 +228,12 @@ export class Sieges implements SiegeCtx {
       }
       return null;
     });
+    // Fled off the moon (a beaten pirate runs): gone, and no longer holding back the dawn
+    const edge = run.sys.surface!.radius, bs = run.sys.surface!.bastion!;
+    for (const e of run.raiders) {
+      const at = this.host.shipAt(e);
+      if (at && Math.hypot(at.x - bs.x, at.y - bs.y) > edge) { run.info.delete(e); this.owner.delete(e); this.host.removeHostile(e); }
+    }
     // Kills pay a little into the supplies (double in a last stand)
     const alive = run.raiders.filter((e) => this.host.hostileAlive(e));
     const extras = run.extras.filter((e) => this.host.hostileAlive(e));

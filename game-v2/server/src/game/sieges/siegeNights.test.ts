@@ -322,6 +322,19 @@ describe('siege upgrades: building, orders, the night', () => {
     expect(s.run.tally.kills).toBe(1);
   });
 
+  it('a hostile that flees off the moon is gone: it no longer holds back the dawn', () => {
+    const s = onSelene();
+    toNight(s, 1);
+    for (const r of s.run.raiders) s.server.getShips().removeShip(r);
+    s.run.fronts = []; s.run.stream = []; s.run.nextObjective = Infinity;
+    const r = s.gameData.getSystemByNum(s.num)!.surface!.radius;
+    const e = raider(s, 'pirate_skiff', 0, -(r + 2000));
+    s.step(20);
+    expect(s.server.getShips().has(e)).toBe(false);
+    expect(s.run.tally.kills).toBe(0);
+    expect(s.run.phase).toBe('day');
+  });
+
   it('bigger parties get more fronts', () => {
     const P = siegeProfile(DEFAULT_SIEGE_RULES, 'selene');
     expect(frontCount(DEFAULT_SIEGE_RULES, P, 1, 1)).toBe(1);
