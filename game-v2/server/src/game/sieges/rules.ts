@@ -33,10 +33,17 @@ export interface SiegeUnit {
   aggro?: number;
   /** Comes this many at a time (for its cost) */
   group?: number;
+  /** How it fights (roles/: sapper, runner, artillery, escort), from night `roleFrom` (else from its first) */
+  role?: string;
+  roleFrom?: number;
 }
 
 /** A ship to spawn, tuned */
-export interface SiegeSpawn { ship: string; faction?: string; hp: number; damage?: number; range?: number; aggro?: number; plating?: number }
+export interface SiegeSpawn {
+  ship: string; faction?: string; hp: number; damage?: number; range?: number; aggro?: number; plating?: number;
+  /** Its role (roles/), what it cost from the night's budget (what killing it scores), and whether it's the night's boss */
+  role?: string; cost?: number; boss?: boolean;
+}
 
 /**
  * A moon's siege. The night's budget × `difficulty`; `approach`: where it comes
@@ -101,6 +108,28 @@ export interface SiegeRules {
   dawn: { xpBase: number; xpPerNight: number; creditsBase: number; creditsPerNight: number; suppliesBase: number; suppliesPerNight: number };
   /** What leaving any way but claiming by day keeps of the haul */
   partialHaul: number;
+  /**
+   * At night: building on a pad costs × `buildCost`, from within `buildReach` of it. A pilot staying within `mend.reach`
+   * of a damaged turret for `mend.seconds` mends it (+`heal` of its hull for `cost` supplies); the bastion likewise
+   * (`bastionMend`). A pilot can mark a hostile for every turret in reach to focus on for `focus.seconds`, once every
+   * `focus.cooldownSeconds` for the party.
+   */
+  night: {
+    buildCost: number; buildReach: number;
+    mend: { reach: number; seconds: number; cost: number; heal: number };
+    bastionMend: { reach: number; seconds: number; cost: number; heal: number };
+    focus: { seconds: number; cooldownSeconds: number };
+  };
+  /**
+   * A night's score: each kill's budget cost × `perKill`, each objective, the bastion's hull kept × `hullKept`, and
+   * `perfect` for a perfect night (no turret lost, the bastion at `perfectHull` or more). Perfect nights in a row
+   * add `streakStep` each to dawn's supplies, up to `streakMax`.
+   */
+  score: { perKill: number; objective: number; hullKept: number; perfect: number; perfectHull: number; streakStep: number; streakMax: number };
+  /** The last stand: the bastion under `below` of its hull at night: kills pay × `killSupplies`, and its first mend of the night is free */
+  breach: { below: number; killSupplies: number };
+  /** Bigger parties: a front more for every `frontPer` pilots past the first, and `streamPerPilot` more of the night streams in */
+  party: { frontPer: number; streamPerPilot: number };
 }
 
 export const DEFAULT_SIEGE_RULES: SiegeRules = {
@@ -120,11 +149,11 @@ export const DEFAULT_SIEGE_RULES: SiegeRules = {
         // The first nights are all slow Scrapborn (half a starter ship's speed); faster ships come later
         { ship: 'scrap_mite', cost: 1, from: 1, until: 12 },
         { ship: 'scrap_spitter', cost: 1.5, from: 1 },
-        { ship: 'scrap_crawler', cost: 3, from: 2 },
-        { ship: 'scrap_swarmer', cost: 2, from: 3, group: 3 },
+        { ship: 'scrap_crawler', cost: 3, from: 2, role: 'sapper', roleFrom: 4 },
+        { ship: 'scrap_swarmer', cost: 2, from: 3, group: 3, role: 'runner' },
         { ship: 'scrap_hulk', cost: 6, from: 4, hp: 1.6 },
         { ship: 'pirate_skiff', cost: 2, from: 5 },
-        { ship: 'scrap_lobber', cost: 5, from: 6, range: 1350, aggro: 2600 },
+        { ship: 'scrap_lobber', cost: 5, from: 6, range: 1350, aggro: 2600, role: 'artillery' },
         { ship: 'pirate_raider', cost: 3.5, from: 7 },
         { ship: 'pirate_gunship', cost: 7, from: 10 },
         { ship: 'cinder_zealot', cost: 6, from: 11 },
@@ -148,8 +177,8 @@ export const DEFAULT_SIEGE_RULES: SiegeRules = {
         { ship: 'scrap_mite', cost: 1, from: 1, until: 8 },
         { ship: 'scrap_spitter', cost: 1.5, from: 1 },
         { ship: 'frost_shard', cost: 3.5, from: 2 },
-        { ship: 'scrap_lobber', cost: 5, from: 3, range: 1350, aggro: 2600 },
-        { ship: 'frost_bulwark', cost: 7, from: 4, hp: 1.5 },
+        { ship: 'scrap_lobber', cost: 5, from: 3, range: 1350, aggro: 2600, role: 'artillery' },
+        { ship: 'frost_bulwark', cost: 7, from: 4, hp: 1.5, role: 'escort' },
         { ship: 'scrap_hulk', cost: 6, from: 5, hp: 1.6 },
         { ship: 'frost_warden', cost: 8, from: 6 },
         { ship: 'pirate_gunship', cost: 7, from: 9 },
@@ -170,11 +199,11 @@ export const DEFAULT_SIEGE_RULES: SiegeRules = {
       roster: [
         { ship: 'scrap_mite', cost: 1, from: 1, until: 6 },
         { ship: 'scrap_swarmer', cost: 2, from: 1, group: 3 },
-        { ship: 'cinder_zealot', cost: 4, from: 1 },
+        { ship: 'cinder_zealot', cost: 4, from: 1, role: 'runner', roleFrom: 2 },
         { ship: 'scrap_hulk', cost: 6, from: 3, hp: 1.6 },
         { ship: 'pirate_raider', cost: 3.5, from: 4 },
         { ship: 'cinder_brand', cost: 9, from: 6 },
-        { ship: 'scrap_lobber', cost: 5, from: 7, range: 1350, aggro: 2600 },
+        { ship: 'scrap_lobber', cost: 5, from: 7, range: 1350, aggro: 2600, role: 'artillery' },
         { ship: 'scav_harvester', cost: 9, from: 9, hp: 1.4 },
         { ship: 'void_reaver', cost: 13, from: 13 },
       ],
@@ -191,11 +220,11 @@ export const DEFAULT_SIEGE_RULES: SiegeRules = {
       difficulty: 1.45,
       roster: [
         { ship: 'pirate_raider', cost: 3, from: 1 },
-        { ship: 'scrap_lobber', cost: 5, from: 4, range: 1350, aggro: 2600 },
+        { ship: 'scrap_lobber', cost: 5, from: 4, range: 1350, aggro: 2600, role: 'artillery' },
         { ship: 'scrap_hulk', cost: 6, from: 4, hp: 1.6 },
         { ship: 'pirate_gunship', cost: 8, from: 1 },
         { ship: 'cinder_brand', cost: 10, from: 3 },
-        { ship: 'maw_lurker', cost: 9, from: 2 },
+        { ship: 'maw_lurker', cost: 9, from: 2, role: 'sapper' },
         { ship: 'void_reaver', cost: 12, from: 7 },
         { ship: 'maw_colossus', cost: 18, from: 10, hp: 1.3 },
       ],
@@ -211,7 +240,7 @@ export const DEFAULT_SIEGE_RULES: SiegeRules = {
       name: 'Shadowfall', about: 'Wraiths slip out of the dark close in, anywhere: the bastion gets little warning, and they are few but deadly',
       difficulty: 1.8,
       roster: [
-        { ship: 'scrap_lobber', cost: 4, from: 2, range: 1350, aggro: 2600 },
+        { ship: 'scrap_lobber', cost: 4, from: 2, range: 1350, aggro: 2600, role: 'artillery' },
         { ship: 'void_phantom', cost: 4, from: 1 },
         { ship: 'frost_bulwark', cost: 5, from: 2, hp: 1.5 },
         { ship: 'void_reaver', cost: 6, from: 2 },
@@ -266,6 +295,15 @@ export const DEFAULT_SIEGE_RULES: SiegeRules = {
   },
   dawn: { xpBase: 25, xpPerNight: 20, creditsBase: 8, creditsPerNight: 6, suppliesBase: 70, suppliesPerNight: 15 },
   partialHaul: 0.5,
+  night: {
+    buildCost: 1.5, buildReach: 450,
+    mend: { reach: 300, seconds: 3, cost: 20, heal: 0.15 },
+    bastionMend: { reach: 560, seconds: 5, cost: 45, heal: 0.1 },
+    focus: { seconds: 8, cooldownSeconds: 20 },
+  },
+  score: { perKill: 10, objective: 50, hullKept: 100, perfect: 100, perfectHull: 0.9, streakStep: 0.1, streakMax: 0.5 },
+  breach: { below: 0.3, killSupplies: 2 },
+  party: { frontPer: 2, streamPerPilot: 0.05 },
 };
 
 /** The turrets as built in (data/rules.json can change them for a server) */
@@ -316,5 +354,32 @@ export const SIEGE_STRINGS = {
   'sieges.banner.night': 'Night {night} · {left} hostile{s} left',
   'sieges.banner.lost': 'The bastion has fallen',
   'sieges.banner.meter': 'Bastion',
+  'sieges.banner.breach': 'Night {night} · LAST STAND · {left} hostile{s} left',
+  'sieges.padTaken': 'Pad {pad} already has a turret',
+  'sieges.tooFarToBuild': 'Fly to pad {pad} to build there at night',
+  'sieges.nightBuild': '{turret} on pad {pad} (night price)',
+  'sieges.onlyByDay': 'Only by day',
+  'sieges.mended': '{what} mended (+{heal}%, {cost} supplies)',
+  'sieges.mendedFree': '{what} patched (last stand: free)',
+  'sieges.mendShort': 'Not enough supplies to mend ({cost} needed)',
+  'sieges.focus': '{who} marked a target: turrets in reach focus on it',
+  'sieges.focusWait': 'Focus fire is ready in {secs}s',
+  'sieges.focusBad': 'Target a hostile first (Tab, or T on one)',
+  'sieges.orders': '{turret} on pad {pad}: {orders}',
+  'sieges.turretLost': '{turret} on pad {pad} destroyed',
+  'sieges.breach': 'The bastion is under 30%: last stand. Kills pay double, and its first mend tonight is free',
+  'sieges.perfect': 'Perfect night: {streak} in a row, +{bonus}% supplies at dawn',
+  'sieges.orders.nearest': 'Nearest',
+  'sieges.orders.bastion': 'Closest to the bastion',
+  'sieges.orders.toughest': 'Toughest first',
+  'sieges.orders.fastest': 'Fastest first',
+  'sieges.role.sapper': 'Sapper',
+  'sieges.role.sapperNote': 'goes for your turrets, nearest first',
+  'sieges.role.runner': 'Runner',
+  'sieges.role.runnerNote': 'ignores pilots and dives at the bastion',
+  'sieges.role.artillery': 'Artillery',
+  'sieges.role.artilleryNote': 'shells the bastion from long range',
+  'sieges.role.escort': 'Escort',
+  'sieges.role.escortNote': "guards its front's biggest ship",
 };
 

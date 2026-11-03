@@ -25,10 +25,19 @@ export interface SiegeHost {
   healStructure(eid: number, fraction: number): void;
   /** Mend a pilot's own ship */
   refit(eid: number): void;
-  /** A turret: aims at (leading by `shot`, its shells' speed; 0: no lead) and fires on hostiles within range, its damage × `damage` */
-  arm(eid: number, opts: { range: number; shot: number; damage: number }): void;
-  /** Hostiles (built in `grade`) at a point, sent at another: each its hull × `hp`, its reach and aggro if given (factions found from the designs unless given) */
+  /**
+   * A turret: aims at (leading by `shot`, its shells' speed; 0: no lead) and fires on hostiles within range, its damage
+   * × `damage`; `pick` chooses what it fires on first (an entity in range; -1: none), else the nearest hostile in range
+   */
+  arm(eid: number, opts: { range: number; shot: number; damage: number; pick?: () => number }): void;
+  /**
+   * Hostiles (built in `grade`) at a point, sent at another: each its hull × `hp`, its reach and aggro if given (factions
+   * found from the designs unless given). Their entities in the order of `ships` (-1: one that couldn't be made); ships
+   * of different roles fly in different packs
+   */
   spawnHostiles(num: number, ships: SiegeSpawn[], x: number, y: number, at: { x: number; y: number }, grade: number): number[];
+  /** Orders for hostiles: their pack sent at `at`; each going for `prey` first (-1: none), and only it if `only` */
+  order(eids: number[], o: { at?: { x: number; y: number }; prey?: number; only?: boolean }): void;
   /** A design's name (a boss's, for the banner) */
   shipName(design: string): string;
   /** Hold a ship where it is (a nest) */
@@ -54,6 +63,46 @@ export interface Turret {
   mark: number;
   /** Supplies put into it, for scrapping */
   spent: number;
+  /** What it fires on first (turrets.ts TURRET_ORDERS) */
+  orders: string;
+}
+
+/** One of tonight's hostiles: what it is, what it cost, its role, what that has it on */
+export interface RaiderInfo {
+  ship: string;
+  cost: number;
+  role?: string;
+  boss?: boolean;
+  /** Which front it came in with (-1: the stream, an objective's) */
+  front: number;
+  /** A sapper's turret, an escort's lead */
+  prey?: number;
+  lead?: number;
+  /** When its role may next re-send it */
+  nextOrder?: number;
+}
+
+/** Tonight so far */
+export interface Tally {
+  kills: number;
+  byPilot: Map<PilotConn, number>;
+  /** Kills by pad (its turret) */
+  byPad: Map<number, number>;
+  /** Kills' budget cost, for the score */
+  value: number;
+  objectives: number;
+  /** The bastion's hull at nightfall */
+  hullStart: number;
+  turretsLost: number;
+  /** Pads whose turret was shot down tonight */
+  padsLost: number[];
+}
+
+/** Dawn's look back at the night (what each pilot shot down: `byPilot`) */
+export interface NightSummary {
+  night: number; kills: number; turretKills: number; mvp?: { label: string; kills: number }; hullLost: number; turretsLost: number;
+  objectives: number; supplies: number; streakBonus: number; perfect: boolean; streak: number; score: number; best: boolean;
+  byPilot: Map<PilotConn, number>;
 }
 
 /** An objective out on the moon (its kind: objectives/index.ts) */
@@ -80,7 +129,7 @@ export interface Run {
   /** Its siege */
   profile: SiegeProfile;
   /** Tonight's fronts still to come (when, and what), and the ships still to stream in */
-  fronts: { at: number; ships: SiegeSpawn[]; pos?: { x: number; y: number } }[];
+  fronts: { at: number; ships: SiegeSpawn[]; pos: { x: number; y: number }; warned?: boolean }[];
   stream: SiegeSpawn[];
   nextStream: number;
   /** Tonight's side (arc), or the pincer's first */
@@ -96,6 +145,23 @@ export interface Run {
   lastPilots: number;
   shown: Map<PilotConn, string>;
   banner: string;
+  /** Tonight's hostiles (objectives' too) */
+  info: Map<number, RaiderInfo>;
+  tally: Tally;
+  /** Perfect nights in a row, the best night's score */
+  streak: number;
+  best: number;
+  /** Dawn's summary, shown by day */
+  summary: NightSummary | null;
+  /** What tonight brings (planned at dusk) */
+  tonight: { night: number; boss?: string; newKinds: string[]; roles: { name: string; ship: string; note: string }[] } | null;
+  /** Focus fire: on what, until when; when the party can use it again */
+  focus: { target: number; until: number; readyAt: number };
+  /** Mending under way: ticks held, by pad (-1: the bastion) */
+  mend: Map<number, number>;
+  /** The last stand (the bastion under rules.breach.below): its first mend tonight is still free */
+  breach: boolean;
+  freeMend: boolean;
 }
 
 export type SiegeText = keyof typeof SIEGE_STRINGS;

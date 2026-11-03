@@ -27,13 +27,16 @@
           {
             "ship": "scrap_crawler",
             "cost": 3,
-            "from": 2
+            "from": 2,
+            "role": "sapper",
+            "roleFrom": 4
           },
           {
             "ship": "scrap_swarmer",
             "cost": 2,
             "from": 3,
-            "group": 3
+            "group": 3,
+            "role": "runner"
           },
           {
             "ship": "scrap_hulk",
@@ -51,7 +54,8 @@
             "cost": 5,
             "from": 6,
             "range": 1350,
-            "aggro": 2600
+            "aggro": 2600,
+            "role": "artillery"
           },
           {
             "ship": "pirate_raider",
@@ -172,13 +176,15 @@
             "cost": 5,
             "from": 3,
             "range": 1350,
-            "aggro": 2600
+            "aggro": 2600,
+            "role": "artillery"
           },
           {
             "ship": "frost_bulwark",
             "cost": 7,
             "from": 4,
-            "hp": 1.5
+            "hp": 1.5,
+            "role": "escort"
           },
           {
             "ship": "scrap_hulk",
@@ -274,7 +280,9 @@
           {
             "ship": "cinder_zealot",
             "cost": 4,
-            "from": 1
+            "from": 1,
+            "role": "runner",
+            "roleFrom": 2
           },
           {
             "ship": "scrap_hulk",
@@ -297,7 +305,8 @@
             "cost": 5,
             "from": 7,
             "range": 1350,
-            "aggro": 2600
+            "aggro": 2600,
+            "role": "artillery"
           },
           {
             "ship": "scav_harvester",
@@ -368,7 +377,8 @@
             "cost": 5,
             "from": 4,
             "range": 1350,
-            "aggro": 2600
+            "aggro": 2600,
+            "role": "artillery"
           },
           {
             "ship": "scrap_hulk",
@@ -389,7 +399,8 @@
           {
             "ship": "maw_lurker",
             "cost": 9,
-            "from": 2
+            "from": 2,
+            "role": "sapper"
           },
           {
             "ship": "void_reaver",
@@ -456,7 +467,8 @@
             "cost": 4,
             "from": 2,
             "range": 1350,
-            "aggro": 2600
+            "aggro": 2600,
+            "role": "artillery"
           },
           {
             "ship": "void_phantom",

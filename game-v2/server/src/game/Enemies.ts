@@ -276,6 +276,9 @@ interface Enemy {
   lobs?: boolean;
   /** Where round a target it fights from, against the pack's side (radians): packs spread out to flank */
   flank: number;
+  /** One target it goes for first while it stands, from any distance (a siege's sapper on a turret); `preyOnly`: it ignores everything else, even what shoots it (a runner on the bastion) */
+  prey?: number;
+  preyOnly?: boolean;
 }
 
 interface Pack {
@@ -476,6 +479,14 @@ export class Enemies {
   tune(eid: number, patch: Partial<Behaviour>): void {
     const e = this.enemies.get(eid);
     if (e) e.behaviour = { ...(e.behaviour ?? this.data.factions[e.faction].behaviour), ...patch };
+  }
+
+  /** Give a hostile one target to go for first while it stands, from any distance (-1: none); `only`: nothing else, even what shoots it */
+  setPrey(eid: number, prey: number, only = false): void {
+    const e = this.enemies.get(eid);
+    if (!e) return;
+    e.prey = prey >= 0 ? prey : undefined;
+    e.preyOnly = prey >= 0 && only;
   }
 
   /** A passive pack's ship that nobody's provoked: it'll leave you be */
@@ -1120,6 +1131,11 @@ export class Enemies {
         }
         // Whoever's been hurting the pack gets its attention
         if (hitter >= 0) best = hitter;
+        // ...unless it has its prey (gone: it's back to the usual)
+        if (e.prey !== undefined) {
+          if (!this.targetable(e.prey)) e.prey = undefined;
+          else if (e.preyOnly || hitter < 0) best = e.prey;
+        }
         if (best < 0 && pack && !calm) {
           for (const m of pack.members) {
             const o = this.enemies.get(m);
@@ -1263,7 +1279,7 @@ export class Enemies {
   private gaveUp(e: Enemy, b: Behaviour, fromHome: number, hitter: number, now: number): boolean {
     const t = e.target;
     if (!this.targetable(t)) return true;
-    if (hitter === t) return false;
+    if (hitter === t || t === e.prey) return false;
     const d = Math.hypot(Position.x[t] - Position.x[e.eid], Position.y[t] - Position.y[e.eid]);
     if (d > Math.max(b.aggro * 2, e.reach ?? b.range * 1.8)) return true;
     return fromHome > b.leash * 2 && now - (e.engagedAt ?? 0) > CHASE_GRACE;

@@ -2033,12 +2033,13 @@ this.devTeleport = opts.devTeleport ?? false;
       shipAt: surfaceHost.shipAt,
       healStructure: (eid, fraction) => this.ships.healAll(eid, fraction),
       refit: (eid) => this.ships.repair(eid),
-      arm: (eid, { range, shot, damage }) => {
+      arm: (eid, { range, shot, damage, pick }) => {
         this.ships.setDamageScale(eid, damage);
-        // Aims at the nearest hostile in range (where it will be when the shells get there) and fires, turning to face it
+        // Aims at what the siege picks (else the nearest hostile in range), where it will be when the shells get there, and fires, turning to face it
         this.ships.setController(eid, () => {
           const x = Position.x[eid], y = Position.y[eid];
-          const t = this.ships.nearestTarget(eid, x, y, range, (o) => !!this.enemies.factionOf(o));
+          const picked = pick ? pick() : -1;
+          const t = picked >= 0 ? picked : this.ships.nearestTarget(eid, x, y, range, (o) => !!this.enemies.factionOf(o));
           if (t < 0) return { controls: still(Rotation.angle[eid]), firing: false };
           const d = Math.hypot(Position.x[t] - x, Position.y[t] - y), lead = shot > 0 ? d / shot : 0;
           const tx = Position.x[t] + Velocity.x[t] * lead, ty = Position.y[t] + Velocity.y[t] * lead;
@@ -2059,17 +2060,19 @@ this.devTeleport = opts.devTeleport ?? false;
       },
       gradeReward: (grade) => gradeReward(this.ships.catalog, grade),
       spawnHostiles: (num, ships, x, y, at, grade) => {
-        // Packs by faction, eight at most (a big pack would spread out over half the moon), all sent at the bastion
-        const byFaction = new Map<string, typeof ships>();
-        for (const s of ships) {
-          const f = s.faction ?? Object.keys(factions().factions).find((k) => s.ship in factions().factions[k].ships) ?? 'pirates';
-          const key = `${f}|${s.plating ?? 0}`;
-          byFaction.set(key, [...(byFaction.get(key) ?? []), s]);
-        }
-        const packs: [string, typeof ships][] = [];
+        // Packs by faction (and plating, and role), eight at most (a big pack would spread out over half the moon), all sent at the bastion
+        const byFaction = new Map<string, { s: (typeof ships)[number]; k: number }[]>();
+        ships.forEach((s, k) => {
+          const f = s.faction ?? Object.keys(factions().factions).find((id) => s.ship in factions().factions[id].ships) ?? 'pirates';
+          const key = `${f}|${s.plating ?? 0}|${s.role ?? ''}`;
+          byFaction.set(key, [...(byFaction.get(key) ?? []), { s, k }]);
+        });
+        const packs: [string, { s: (typeof ships)[number]; k: number }[]][] = [];
         for (const [key, list] of byFaction) for (let k = 0; k < list.length; k += 8) packs.push([key, list.slice(k, k + 8)]);
-        const out: number[] = [];
-        packs.forEach(([key, list], i) => {
+        // (In the order they were asked for: -1 for any that couldn't be made)
+        const out: number[] = ships.map(() => -1);
+        packs.forEach(([key, entries], i) => {
+          const list = entries.map((e) => e.s);
           const faction = key.split('|')[0];
           const a = (i / packs.length) * Math.PI * 2, r = packs.length > 1 ? 500 + packs.length * 60 : 0;
           const eids = this.enemies.spawnPack(num, { faction, ships: list.map((s) => s.ship), grade, plating: list[0]?.plating }, x + Math.cos(a) * r, y + Math.sin(a) * r);
@@ -2080,10 +2083,14 @@ this.devTeleport = opts.devTeleport ?? false;
             if (s.hp !== 1) this.ships.scaleHp(eid, s.hp);
             if (s.damage !== undefined) this.ships.setDamageScale(eid, s.damage);
             if (s.range !== undefined || s.aggro !== undefined) this.enemies.tune(eid, { ...(s.range !== undefined ? { range: s.range } : {}), ...(s.aggro !== undefined ? { aggro: s.aggro } : {}) });
+            out[entries[k].k] = eid;
           });
-          out.push(...eids);
         });
         return out;
+      },
+      order: (eids, { at, prey, only }) => {
+        if (at) this.enemies.sendPack(eids, at, 40000);
+        if (prey !== undefined) for (const e of eids) this.enemies.setPrey(e, prey, only);
       },
       shipName: (design) => this.enemies.displayName(design),
       effect: (num, x, y, kind) => this.arrivalEffect(num, x, y, kind),
@@ -2305,6 +2312,7 @@ this.devTeleport = opts.devTeleport ?? false;
       notifyProjectileHit: (proj, x, y, hit) => this.hits.shellHit(proj, x, y, hit),
       onShipDestroyed: (eid, lastHitBy, ship) => {
         this.enemies.onDestroyed(eid, lastHitBy, ship);
+        this.sieges?.onDestroyed(eid, lastHitBy);
         // A ward (freighter, pylon, bastion, turret) shot down: forget it before its entity number is reused
         if (this.wards.delete(eid)) { this.enemies.removeWard(eid); this.ships.setDamageScale(eid, 1); }
         this.derelictsMod.onPilotlessShipDestroyed(eid, lastHitBy);
