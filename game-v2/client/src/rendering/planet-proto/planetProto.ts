@@ -180,6 +180,14 @@ export const PLANET_PROTO_FRAG = /* glsl */ `
   }
 
   // ---------------------------------------------------------------- gas giants (and the brown dwarf, and toxic decks)
+  /**
+   * A hash of a small number pair (a band's number and the planet's seed) for the band tints and the string of ovals. No
+   * sin: the common hash's sin(dot(p, (127.1, 311.7))) is fed about 27000 here, where a float32 sin on the GPU is only
+   * good to about 0.002 and times 43758 that is no longer a number: now and then a frame came out with whole bands in
+   * the other tint (a band flicker, about one frame in 700 on a gas giant; measured 23 events in 16,800 frames before,
+   * 1 in 14,400 after). This one (Dave Hoskins' hash12) only does fract, multiply and dot on small values.
+   */
+  float hashP(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
   /** Zonal jet speed at a latitude (alternating, strongest at the equator) */
   float jetAt(float lat) {
     return (sin(lat * uBands.x + uSeed.x) * 0.7 + sin(lat * uBands.x * 2.3 + 1.3) * 0.3) * (1.0 - 0.4 * abs(lat));
@@ -242,10 +250,10 @@ export const PLANET_PROTO_FRAG = /* glsl */ `
     // the bands bow round the storm
     bnd += exp(-sr * sr * 0.7) * 0.45 * sd.y / (abs(sd.y) + 0.35);
     float bi = floor(bnd), bf = fract(bnd);
-    float h0 = hash(vec2(bi, uSeed.y)), h1 = hash(vec2(bi + 1.0, uSeed.y));
+    float h0 = hashP(vec2(bi, uSeed.y)), h1 = hashP(vec2(bi + 1.0, uSeed.y));
     float bv = mix(h0, h1, smoothstep(0.2, 0.8, bf));
     float zone = smoothstep(0.32, 0.68, bv);
-    vec3 belt = uPal1 * (0.85 + 0.3 * hash(vec2(bi, 7.0 + uSeed.y)));
+    vec3 belt = uPal1 * (0.85 + 0.3 * hashP(vec2(bi, 7.0 + uSeed.y)));
     vec3 c = mix(belt, uPal0, zone);
     // dark lanes where a pale zone meets a dark belt
     float lane = exp(-pow((bf - 0.5) / 0.09, 2.0)) * abs(h1 - h0);
@@ -263,7 +271,7 @@ export const PLANET_PROTO_FRAG = /* glsl */ `
       float n = uStorm2.y, step2 = 2.0 * PI / n;
       float oLon = lon - jetAt(uStorm2.x) * uBands.z * uTime - uSeed.x;
       float k2 = floor(oLon / step2 + 0.5);
-      float jit = (hash(vec2(k2, uSeed.y)) - 0.5) * step2 * 0.4;
+      float jit = (hashP(vec2(k2, uSeed.y)) - 0.5) * step2 * 0.4;
       vec2 od = vec2(wrapPi(oLon - k2 * step2 - jit) * cos(lat), lat - uStorm2.x) / (uStorm2.z * vec2(1.5, 1.0));
       float orr = length(od + (vec2(detail, acc.y) - 0.5) * 0.25);
       c = mix(c, uPal0 * 1.12, smoothstep(0.85, 0.45, orr) * 0.85);

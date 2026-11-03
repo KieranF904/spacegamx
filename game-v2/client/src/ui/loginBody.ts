@@ -195,6 +195,10 @@ export class LoginBody {
   /**
    * Each frame: the central body centred on (cx, cy), radius r px; w, h the screen. Returns where the star is to be drawn
    * (also before the body shows itself).
+   *
+   * Positions are left at their exact sub-pixel values on purpose: the bodies' shaders draw fine detail (a gas giant's
+   * band edges and ringlets, the star's plasma) that is evaluated per pixel, so the picture glides smoothly at the orbit's
+   * ~4 px a second; snapping to whole pixels made it slide a pixel at a time, about every quarter second (measured).
    */
   update(dt: number, cx: number, cy: number, r: number, w: number, h: number): SunSpot {
     const view: OrbitView = { cx, cy, R: r, w, h };

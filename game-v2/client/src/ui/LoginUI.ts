@@ -107,12 +107,15 @@ export class LoginUI {
     const id = loginBodyForVisit(sol);
     this.sunRenderer = new SunRenderer(this.app);
     this.sunRenderer.setStar('sol');
+    // The star goes in first, under the planets: it is the farthest thing in the scene, so the central body (its disc, haze
+    // and rings) and the small one cover it wherever it passes behind them. It is one container (the star's own pass drawn
+    // to a target and stretched over the screen: disc, plasma, corona, glow, flares), so one place in the order does it.
+    this.worldContainer.addChild(this.sunRenderer.container);
     if (id !== 'sun') {
       attachVolumeUploads(this.app.renderer);
       this.body = new LoginBody(id, sol);
       this.worldContainer.addChild(this.body.container);
     }
-    this.worldContainer.addChild(this.sunRenderer.container);
   }
 
   /** Show the backdrop: the game's canvas into the panel, under the form, and animated */
