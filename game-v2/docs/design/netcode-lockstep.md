@@ -313,6 +313,9 @@ attackers pulled in); after = coalesced bundles, batched reports, the churn fixe
 `node test.mjs`, 8-bot fight, lockstep: down 387 → 201 B/s payload, wire 2,211 → 1,289 (29 → 17 msg/s); up 278 → 177
 B/s, wire 1,989 → 800 (25 → 9 msg/s). No desyncs in any run.
 
+- **Real link** (probe on the VPS, RTT 10 ms, same script as before, which includes a second person whose inputs go at
+  once): lockstep down 200 B/s payload, ~1,582 wire, 22 msg/s (was 429 / 2,262 / 29); up 137 / ~778, 9 msg/s (was 234 /
+  1,809 / 23). The current style: 6,879 / ~8,324 down. No desyncs in normal play; all five injected drifts caught.
 - **The message rate is now the 15 Hz floor** in AI-only scenes: down is ~73% headers (17 × ~64 B).
 - **Entries fell the most** (594 → 184 B/s with 24 bots): smaller snapshots, and 3 s of stickiness instead of 1 (the
   set held is larger for it).
