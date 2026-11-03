@@ -105,6 +105,14 @@ Effort: S under 20 min, M 20-40 min, L 40+ min. Lanes: **srv** (sieges/ folder),
 | 9 | **Dusk and dawn.** Dusk tints the light warm then cold blue (ambient colour ramp, not just dimming), per-moon night tint in surfaceLooks (`night` colour); dawn sweeps light back over a second with a short chime and the DawnCard | gfx | S | Renderer already has `setNight`; add tint to the surface look |
 | 10 | **Hit and death readability.** Hostiles at night get a red rim marker (screen-space, small) so they read beyond headlights; bastion hits pulse a red vignette edge in the direction of the hit; a turret's death plays a big explosion and leaves the scorched pad | gfx+ui | S-M | hits on the bastion: hull drop in siegeState/banner is enough to trigger the pulse |
 
+**Built 2026-11-04 (gameplay lane):** 0 (the split), 1, 2 (server, NightHud, edge arrows through the nav markers),
+3, 4, 5, 6 (orders as a cycling button; focus on key U), 7 (mending the bastion too), and from P2: 13 (last stand) and
+15 (party scaling). Balance: fortifications at the moon's own grade, nights about 1.4x bigger, dawn supplies 60+12n.
+Hooks left for the graphics stage (8-10): `siegeState.turrets[].range/kind/mend`, `padsLost` (scorched pads),
+`bastion` and `breach` (core glow, alarm), `incoming[]` (ground beacons where fronts land), `SiegePanel.padFocus`
+(the pad hovered or picked in the panel: its range ring), `SiegePanel.selectPad(i)` (for a click on a pad on the
+ground). Not built: 11 modifiers, 12 abilities, 14 boss surges; best night is kept per run, not saved per pilot.
+
 ### P2: if time is left
 
 | # | What | Lane | Effort | Notes |
