@@ -308,6 +308,8 @@ export const PLANET_PROTO_FRAG = /* glsl */ `
   float gSeaH = -1.0;
   /** How lit the cloud tops are (1: fully; an ocean world's clouds are shaded on their flanks away from the star) */
   float gCloudLit = 1.0;
+  /** How much of a pixel is land, lit more softly (the ground scatters the light about; water doesn't) */
+  float gLandLit = 0.0;
   float seaH(vec3 b, vec4 a, vec4 d) {
     float s = uDetail.x;
     return tn(b * s * 0.22 + vec3(0.13, uSeed * 0.01), s * 0.22).r * 0.8 + a.r * 0.2 + 0.04 + (d.r - 0.5) * 0.05;
@@ -387,7 +389,7 @@ export const PLANET_PROTO_FRAG = /* glsl */ `
     }
     // ocean: the sea is level (the coast casts no shade), only the mountain ranges have relief
     if (gSeaH < 0.0) gSeaH = seaH(b, a, d);
-    return (seaMountains(a, d, gSeaH) * 0.28 + d.g * 0.04) * smoothstep(0.56, 0.6, gSeaH);
+    return (seaMountains(a, d, gSeaH) * 0.2 + d.g * 0.03) * smoothstep(0.56, 0.6, gSeaH);
   }
 
   vec3 solidSurface(vec3 b, vec3 lb, float lat, float px, vec4 a, vec4 d, vec3 ca, vec3 cd, out float emit, out float spec, out float cloud, out float cloudShade) {
@@ -442,32 +444,50 @@ export const PLANET_PROTO_FRAG = /* glsl */ `
     float h = gSeaH;
     float land = smoothstep(0.555, 0.565, h);
     float depth = smoothstep(0.555, 0.3, h);
-    vec3 sea = mix(uPal0, uPal1, smoothstep(0.0, 0.3, depth));
-    sea = mix(sea, uPal1 * 0.6, smoothstep(0.45, 1.0, depth));
-    sea = mix(sea, uPal0 * 1.15 + vec3(0.0, 0.05, 0.04), smoothstep(0.53, 0.554, h) * 0.5);
-    sea *= 0.93 + 0.14 * a.g;
+    // (the shelves a little darker than the shallows' own colour, so the sea sits with the land; the deep a little
+    // deeper or shallower in broad patches)
+    depth = clamp(depth + (a.r - 0.5) * 0.25, 0.0, 1.0);
+    vec3 sea = mix(uPal0 * 0.82, uPal1, smoothstep(0.0, 0.3, depth));
+    sea = mix(sea, uPal1 * 0.62, smoothstep(0.45, 1.0, depth));
+    sea = mix(sea, uPal0 + vec3(0.0, 0.03, 0.02), smoothstep(0.53, 0.554, h) * 0.38);
+    // (faint, broad colour in the water: currents, darker and lighter swathes, green plankton blooms offshore)
+    sea *= 0.92 + 0.16 * a.g;
+    float bloom = smoothstep(0.6, 0.85, a.r * 0.55 + d.g * 0.45) * smoothstep(0.1, 0.5, depth);
+    sea = mix(sea, sea * vec3(0.8, 1.18, 0.98) + vec3(0.0, 0.015, 0.008), bloom * 0.45);
     // (the climate: wet at the equator and on the coasts, a dry belt in the subtropics; latitude ragged by the ground)
     float al = abs(lat) + (d.g - 0.5) * 0.14;
     float coast = smoothstep(0.66, 0.56, h);
     float wet = clamp(a.g * 1.1 + coast * 0.3 + 0.3 * exp(-al * al * 25.0) - 0.4 * exp(-(al - 0.44) * (al - 0.44) * 59.0), 0.0, 1.0);
-    vec3 veg = mix(vec3(0.19, 0.3, 0.12), vec3(0.08, 0.2, 0.07), smoothstep(0.42, 0.16, al));
-    veg = mix(veg, vec3(0.12, 0.19, 0.12), smoothstep(0.78, 0.98, al));
-    vec3 ground = mix(vec3(0.56, 0.45, 0.29), veg, smoothstep(0.22, 0.5, wet));
-    ground = mix(ground, vec3(0.4, 0.38, 0.33), smoothstep(1.0, 1.12, al));
-    ground *= 0.84 + 0.32 * d.g;
+    vec3 veg = mix(vec3(0.28, 0.4, 0.16), vec3(0.15, 0.29, 0.1), smoothstep(0.42, 0.16, al));
+    veg = mix(veg, vec3(0.2, 0.3, 0.16), smoothstep(0.78, 0.98, al));
+    vec3 ground = mix(vec3(0.66, 0.54, 0.35), veg, smoothstep(0.22, 0.5, wet));
+    ground = mix(ground, vec3(0.52, 0.49, 0.42), smoothstep(1.0, 1.12, al));
+    ground *= 0.9 + 0.2 * d.g;
     // (mountains, their snow and the beaches: not on lite, which has no relief to show them)
     float mtn = 0.0;
 #ifndef PLANET_LITE
     mtn = seaMountains(a, d, h);
-    ground = mix(ground, vec3(0.4, 0.37, 0.32), smoothstep(0.12, 0.45, mtn) * 0.85);
+    ground = mix(ground, vec3(0.52, 0.48, 0.41), smoothstep(0.12, 0.45, mtn) * 0.8);
     ground = mix(ground, vec3(0.86, 0.88, 0.9), smoothstep(0.75, 1.0, mtn + al * 0.15) * 0.85);
-    ground = mix(vec3(0.7, 0.64, 0.48), ground, smoothstep(0.556, 0.57, h));
+    ground = mix(vec3(0.76, 0.69, 0.52), ground, smoothstep(0.556, 0.57, h));
+#endif
+    // (the water's glint, broken by the waves: wind streaks and swell along the latitudes, warped so they never tile;
+    // Low: the ground's finer read stands in)
+    float waves = d.g;
+#ifndef PLANET_LITE
+    if (land < 0.99) {
+      vec3 wq = b * uDetail.x * vec3(2.2, 9.0, 2.2) + vec3(a.g - 0.5, 0.0, a.r - 0.5) * 0.6 + vec3(0.37, 0.11, 0.73);
+      vec4 wv = tn(wq, uDetail.x * 9.0);
+      waves = wv.g * 0.65 + d.g * 0.35;
+      // (a hint of it in the water's own colour too)
+      sea *= 0.97 + 0.06 * wv.g;
+    }
 #endif
     vec3 c = mix(sea, ground, land);
     float ice = smoothstep(0.9, 0.93, abs(b.y) + (a.g - 0.5) * 0.12 + (d.r - 0.5) * 0.05);
     c = mix(c, mix(vec3(0.82, 0.88, 0.94), vec3(0.94, 0.96, 0.98), land), ice);
-    // (the water's glint, broken a little by the waves)
-    spec = (1.0 - land) * (1.0 - ice) * (0.75 + 0.5 * d.g);
+    gLandLit = land * (1.0 - ice);
+    spec = (1.0 - land) * (1.0 - ice) * (0.35 + 1.1 * waves * waves);
 
     // The lights of the towns on the night side (the look's emitColor: a settled world's; none by default): along the
     // wet coasts and plains, clustered (the cells' points); dimmed under cloud below
@@ -646,13 +666,15 @@ export const PLANET_PROTO_FRAG = /* glsl */ `
         float scar = rays * smoothstep(1.2, 0.12, id) * (0.55 + 0.45 * fine);
         c += uEmitColor * (scar * 0.5 + exp(-id * id * 45.0) * 0.35);
       } else {
-        c = base * (lit * sunTint + 0.035);
+        c = base * ((lit + gLandLit * 0.55 * lit * (1.0 - lit)) * sunTint + 0.035);
         // clouds over the surface, their shadow just beside
         c *= 1.0 - cloudShade * 0.45 * step(0.0, d0);
         c = mix(c, vec3(0.96) * gCloudLit * (lit * sunTint + 0.03), cloud * 0.9);
         // sun glint on open water
         vec3 hv = normalize(l3 + vec3(0.0, 0.0, 1.0));
-        c += vec3(1.0, 0.95, 0.85) * (pow(max(dot(n, hv), 0.0), 60.0) * 0.8 + pow(max(dot(n, hv), 0.0), 8.0) * 0.06) * spec * (1.0 - cloud) * uLightAmt;
+        // (a tight soft highlight and a faint sheen round it; none through thick cloud or its shadow)
+        float nh = max(dot(n, hv), 0.0);
+        c += vec3(1.0, 0.95, 0.86) * (pow(nh, 80.0) * 0.85 + pow(nh, 14.0) * 0.035) * spec * clamp(1.0 - cloud * 1.6, 0.0, 1.0) * (1.0 - cloudShade * 0.5) * uLightAmt;
         // lava's glow, strongest on the night side
         c += uEmitColor * emit * (0.55 + 0.45 * (1.0 - smoothstep(0.0, 0.3, d0)));
       }

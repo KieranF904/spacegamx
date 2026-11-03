@@ -167,7 +167,12 @@ same `shaderQuad` as today (the same quad, the same premultiplied output, `GLSL_
   - **Mountains:** ranges with snowy peaks. Only they have relief; the coast is sea level, so it no longer catches light
     as a glowing ridge on the night side.
   - **Ice:** smaller polar caps, with sea ice.
-  - **Sun glint:** on open water, broken a little by the waves.
+  - **Sun glint** (retuned 2026-11-03, panel `terra-nova-glint*.png`): a small, soft highlight with a faint sheen,
+    kept out of thick cloud and its shadow. It is broken by wind streaks and swell, from one stretched read (`wv`) that
+    also tints the water a little; Low uses the ground's d read instead.
+  - **The sea's colour:** broad faint swathes and offshore plankton blooms, from the a and d reads.
+  - **Land light:** land takes the light more softly than water (`gLandLit` in `main`), so the day side's land and sea
+    sit at a similar brightness.
   - **Clouds:**
     - cover banded by the climate (an equatorial band, clear subtropics, storm tracks);
     - wound round cyclones (`seaCyclones`): the nearest only is worked out, two-armed spirals with a clear eye,
