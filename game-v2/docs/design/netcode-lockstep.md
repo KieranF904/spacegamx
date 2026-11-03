@@ -258,7 +258,8 @@ down, the 8-bot fight from 2,009 to 1,831.
    on into things the client does hold.
 6. **AI brains at 15 Hz on the wire grid.** This cut lockstep's input traffic around a fight by about 45% (4.1 to
    2.4 KB/s in one run).
-7. **Your own input acknowledged by sequence** (2 bytes, not 8).
+7. **Your own input isn't echoed** (2026-11-03; before that, a 2-byte sequence echo on every change). `RCV` on bundles
+   going out anyway plus `LATE` tell the client which tick each input was used on (section 3).
 8. **Bundles on change, 15 Hz heartbeat.** Quiet stretches cost 3 bytes per 4 ticks. Every tick is an option (it raises
    the message rate, not the payload).
 

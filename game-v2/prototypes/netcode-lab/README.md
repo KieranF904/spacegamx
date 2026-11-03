@@ -125,7 +125,8 @@ the server used it arrives).
 estimate of IP/TCP/TLS/WebSocket headers per message (about 66 bytes), and messages per second. "lab" is the page's own
 info panel and isn't counted in either style's totals.
 * Lockstep, down:
-  * *inputs*: other players', puppets', and your own acknowledgements;
+  * *inputs*: other players' and puppets' input changes, and `RCV` (how many of your inputs the server had; it rides on
+    bundles going out anyway);
   * *entries*: entry snapshots, exits, pull flags, rock overrides on entry;
   * *corrections*;
   * *overrides*: rocks destroyed elsewhere;
