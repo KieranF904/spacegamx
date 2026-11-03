@@ -134,7 +134,13 @@ async function upload(file: string, dry: boolean): Promise<string> {
   let buf: Buffer;
   try { buf = await fs.readFile(file); } catch { die(`Image not found: ${file}`); }
   if (dry) { console.log(c.dim(`  would upload ${path.relative(process.cwd(), file)} (${Math.round(buf.length / 1024)} KB)`)); return `/uploads/(dry-run)/${path.basename(file)}`; }
-  const r = await call('POST', '/api/v1/uploads', undefined, true, { buf, type });
+  let r = await call('POST', '/api/v1/uploads', undefined, true, { buf, type });
+  // The site allows 30 uploads a minute; a post with more images waits out the window and carries on
+  for (let tries = 0; r.status === 429 && tries < 3; tries++) {
+    console.log(c.dim('  upload limit reached, waiting 60 s'));
+    await new Promise((res) => setTimeout(res, 61_000));
+    r = await call('POST', '/api/v1/uploads', undefined, true, { buf, type });
+  }
   if (r.status !== 201) die(`Upload of ${file} failed: ${r.body.error ?? r.status}`);
   console.log(c.dim(`  ↑ ${path.relative(process.cwd(), file)} → ${r.body.url}`));
   return r.body.url;
