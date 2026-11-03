@@ -57,6 +57,8 @@ export interface KeyHost {
   readonly playerStatsUI: PlayerStatsUI;
   readonly systemMapUI: SystemMapUI;
   readonly navMarkers: NavMarkersUI | null;
+  /** A moon siege's panel: focus fire (true if it took the key) */
+  readonly siegePanel?: { focus(): boolean };
   readonly regionUI: RegionUI;
   readonly audio: AudioManager;
   readonly network: { send(msg: any): void };
@@ -160,6 +162,8 @@ export const POST_KEYS: Readonly<Record<string, KeyFn>> = {
   }),
   // B: ping what's under the cursor for the party (Shift: danger)
   KeyB: flying((h) => h.pingUI.pingAtCursor(h.input.isKeyDown('ShiftLeft') || h.input.isKeyDown('ShiftRight'))),
+  // U: on a siege moon at night, the turrets focus on your target
+  KeyU: (h) => !!(h.loggedIn && !h.shipClient.hangarOpen && h.siegePanel?.focus()),
   // Tab: next hostile; T: the ship under the cursor
   Tab: flying((h) => h.targetUI.cycle()),
   KeyT: flying((h) => h.targetUI.pickAtCursor()),

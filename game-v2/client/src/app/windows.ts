@@ -80,6 +80,8 @@ export interface WindowHost {
   currentSystem(): StarSystemData | undefined;
   planetBelow(): string | null;
   wreckMarker(): { name: string; x: number; y: number; system: string }[];
+  /** A moon siege's fronts on their way (edge arrows with a countdown) */
+  siegeMarkers(): { name: string; x: number; y: number; system: string }[];
   toggleAutopilotToObjective(): void;
 }
 
@@ -290,7 +292,7 @@ export function buildWindows(host: WindowHost, uiOverlay: HTMLElement): WindowSe
     // Proto's empty scene has nothing to navigate to
     if (!host.proto) w.peopleUI = new PeopleUI(host.state, (x, y) => host.renderer.worldToScreen(x, y), () => w.quests.people);
     if (!host.proto) w.navMarkers = new NavMarkersUI(host.state, (x, y) => host.renderer.worldToScreen(x, y), () => host.objective(),
-      () => [...host.worldEvents.values()].filter((e) => e.system === host.state.systemId).concat(host.objectives.markers(host.state.systemId), host.wreckMarker()),
+      () => [...host.worldEvents.values()].filter((e) => e.system === host.state.systemId).concat(host.objectives.markers(host.state.systemId), host.wreckMarker(), host.siegeMarkers()),
       () => w.social.others().filter((m) => m.alive && m.system === host.state.systemId).map((m) => {
         const e = host.state.entities.get(m.eid);
         return { name: m.name, x: e?.renderX ?? m.x, y: e?.renderY ?? m.y };

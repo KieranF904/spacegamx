@@ -143,8 +143,14 @@ export class Game {
   private wreck: { system: string; x: number; y: number; until: number } | null = null;
   /** Objective banners (a city under siege) */
   private objectives = new ObjectiveBanner();
-  /** A moon siege's day panel */
-  private siegePanel = new SiegePanel((m) => this.network.send(m));
+  /** A moon siege's panel (and its night HUD and cards) */
+  private siegePanel = new SiegePanel((m) => this.network.send(m), {
+    tick: () => this.state.getRawServerTick(),
+    target: () => this.w?.targetUI.target ?? 0,
+    me: () => { const e = this.state.entities.get(this.state.playerId); return e ? { x: e.renderX, y: e.renderY } : null; },
+    bastion: () => this.currentSystem()?.surface?.bastion ?? null,
+    focusKey: () => boundKeyName('siegeFocus', settings.data.bindings),
+  });
   private lastTraffic = { t: 0, bytesIn: 0, bytesOut: 0, framesIn: 0 };
   private trafficText = '';
   private localDead = false;
@@ -817,6 +823,7 @@ this.xpFillEl = document.getElementById('xpFill');
       currentSystem: () => g.currentSystem(),
       planetBelow: () => g.planetBelow(),
       wreckMarker: () => g.wreckMarker(),
+      siegeMarkers: () => g.siegePanel.markers().map((m) => ({ ...m, system: g.state.systemId })),
       toggleAutopilotToObjective: () => g.toggleAutopilotToObjective(),
     };
   }
@@ -845,6 +852,7 @@ this.xpFillEl = document.getElementById('xpFill');
       get playerStatsUI() { return g.w.playerStatsUI; },
       get systemMapUI() { return g.w.systemMapUI; },
       get navMarkers() { return g.w.navMarkers; },
+      get siegePanel() { return g.siegePanel; },
       get regionUI() { return g.regionUI; },
       get audio() { return g.audio; },
       get network() { return g.network; },
