@@ -1067,8 +1067,8 @@ export interface ServerSiegeStateMessage {
   orders?: { id: string; label: string }[];
   /** Fronts on their way tonight (from dusk): where they land, the server tick they land at, how many ships, a boss among them */
   incoming?: { x: number; y: number; at: number; ships: number; boss?: boolean }[];
-  /** Tonight (from dusk): which night, its boss, the kinds new tonight, the roles some of tonight's ships play (sapper, runner...) */
-  tonight?: { night: number; boss?: string; newKinds: string[]; roles: { name: string; ship: string; note: string }[] };
+  /** Tonight (from dusk): which night, its boss, the kinds new tonight, the roles some of tonight's ships play (`id`: sapper, runner...) */
+  tonight?: { night: number; boss?: string; newKinds: string[]; roles: { id?: string; name: string; ship: string; note: string }[] };
   /** The bastion's hull (%), hostiles still to beat tonight, and under 30%: the last stand (kills pay double, one free patch) */
   bastion?: number;
   left?: number;

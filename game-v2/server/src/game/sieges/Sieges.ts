@@ -318,7 +318,7 @@ export class Sieges implements SiegeCtx {
     run.tonight = {
       night: run.wave, ...(run.boss ? { boss: run.boss } : {}),
       newKinds: names(run.profile.roster.filter((u) => u.from === night).map((u) => u.ship)),
-      roles: [...roles].map(([role, ship]) => ({ name: this.t(`sieges.role.${role}` as SiegeText), ship: this.host.shipName(ship), note: this.t(`sieges.role.${role}Note` as SiegeText) })),
+      roles: [...roles].map(([role, ship]) => ({ id: role, name: this.t(`sieges.role.${role}` as SiegeText), ship: this.host.shipName(ship), note: this.t(`sieges.role.${role}Note` as SiegeText) })),
     };
     for (const c of here) this.host.toast(c, boss ? this.t('sieges.duskBoss', { night: run.wave, boss: run.boss }) : this.t('sieges.dusk', { night: run.wave }), 'warn');
     this.sendState(run, true);
