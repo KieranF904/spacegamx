@@ -15,6 +15,7 @@ type Model = { id: string; name: string; weapon?: string; weaponMods?: WeaponMod
 const models = (data as unknown as { models: Model[] }).models;
 const T = tuning as unknown as ShipTuning;
 const ORDER = ['simple', 'dual', 'heavy', 'super'];
+const secs = (f: number) => `${(f / 60).toFixed(2)} s`;
 const rows: { tier: string; dmg: number; line: string }[] = [];
 for (const m of models) {
   if (!m.weapon || !m.infra) continue;
@@ -24,7 +25,7 @@ for (const m of models) {
   if (beam || type === undefined) {
     const dps = Math.round((def.dps ?? 0) * m.infra.damage), burn = beamLook(m.id)?.burn;
     const sp = burn ? impactSpan({ ...weaponStyle(WeaponType.Cannon), hit: burn.hit }, 1) : null;
-    rows.push({ tier: m.infra.tier, dmg: dps, line: `| ${m.name} | ${m.infra.tier} | ${def.pulse ? 'pulse' : `beam ${dps}/s`} | ${sp ? `${sp.size.toFixed(0)}, every ${burn!.every} frames` : '(its own FX)'} | ${sp ? `${(sp.frames / 60).toFixed(2)} s each` : ''} | ${sp ? sp.fragments : ''} |` });
+    rows.push({ tier: m.infra.tier, dmg: dps, line: `| ${m.name} | ${m.infra.tier} | ${def.pulse ? 'pulse' : `beam ${dps}/s`} | ${sp ? `${sp.size.toFixed(0)} / ${sp.tailSize.toFixed(0)}, every ${burn!.every} frames` : '(its own FX)'} | ${sp ? `${secs(sp.frames)} / ${secs(sp.tailFrames)} each` : ''} | ${sp ? sp.fragments : ''} |` });
     continue;
   }
   const dmg = (def.damage ?? weaponDef(T, m.weapon).damage ?? 0) * m.infra.damage;
@@ -32,7 +33,7 @@ for (const m of models) {
   const sp = impactSpan(st, (def.size ?? 1) * shotScale(dmg));
   // (explosives: their blast is the detonation's, DamageFx; this is only the shell's own mark)
   const blast = def.splash ? ` (+ blast ${Math.round(def.splash.radius)})` : '';
-  rows.push({ tier: m.infra.tier, dmg, line: `| ${m.name} | ${m.infra.tier} | ${Math.round(dmg)} | ${sp.size.toFixed(0)}${blast} | ${(sp.frames / 60).toFixed(2)} s | ${sp.fragments} |` });
+  rows.push({ tier: m.infra.tier, dmg, line: `| ${m.name} | ${m.infra.tier} | ${Math.round(dmg)} | ${sp.size.toFixed(0)} / ${sp.tailSize.toFixed(0)}${blast} | ${secs(sp.frames)} / ${secs(sp.tailFrames)} | ${sp.fragments} |` });
 }
 rows.sort((a, b) => ORDER.indexOf(a.tier) - ORDER.indexOf(b.tier) || a.dmg - b.dmg);
-console.log('| gun | tier | damage a shot | effect size (world units) | lasts | fragments |\n|---|---|---|---|---|---|\n' + rows.map((r) => r.line).join('\n'));
+console.log('| gun | tier | damage a shot | reach, typical / tail (world units) | lasts, typical / tail | fragments |\n|---|---|---|---|---|---|\n' + rows.map((r) => r.line).join('\n'));

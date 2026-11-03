@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { WeaponType } from '@space-game/common';
 import { weaponStyle, shotScale, beamLook } from './weaponStyles';
 import { impactSpan } from './impactSpan';
+import { BURST, burstLife, burstSpeed } from './impactAim';
 import '../../ships/energyLooks';
 
 /** A gun's hit as its shell lands: its kind, model, damage a shot and shell size (scripts/balance/impact-audit.ts prints them all) */
@@ -21,17 +22,25 @@ describe('impacts scale with what a gun can do', () => {
     }
   });
 
-  it('mid guns last about half a second with a few chips; the big slugs about a second', () => {
-    for (const [id, s] of all(MID)) { expect(s.frames / 60, id).toBeGreaterThan(0.4); expect(s.frames / 60, id).toBeLessThan(0.8); }
-    for (const [id, s] of all(BIG)) { expect(s.frames / 60, id).toBeGreaterThan(0.9); expect(s.fragments, id).toBeGreaterThanOrEqual(4); }
+  it('mid guns: about a third of a second, a few chips flying on to half a second or more; the big slugs about a second, carried by their outliers', () => {
+    for (const [id, s] of all(MID)) {
+      expect(s.frames / 60, id).toBeGreaterThan(0.28); expect(s.frames / 60, id).toBeLessThan(0.5);
+      expect(s.tailFrames / 60, id).toBeGreaterThan(0.5); expect(s.tailFrames / 60, id).toBeLessThan(0.9);
+    }
+    for (const [id, s] of all(BIG)) { expect(s.tailFrames / 60, id).toBeGreaterThan(0.95); expect(s.fragments, id).toBeGreaterThanOrEqual(4); }
   });
 
   it('heavy hits last longer, reach further and throw more fragments than light ones: one to two and a bit seconds, 8 or more fragments', () => {
     const lightMax = Math.max(...Object.values(LIGHT).map((s) => s.frames)), lightFrag = Math.max(...Object.values(LIGHT).map((s) => s.fragments));
     const lightReach = Math.max(...Object.values(LIGHT).map((s) => s.size));
     for (const [id, s] of all(HEAVY)) {
-      expect(s.frames, id).toBeGreaterThan(4 * lightMax);
-      expect(s.frames / 60, id).toBeLessThanOrEqual(2.3);
+      // (the typical fragment gone in about a second, the outliers carrying it on to one and a half to two)
+      expect(s.frames, id).toBeGreaterThan(3 * lightMax);
+      expect(s.frames / 60, id).toBeLessThanOrEqual(1.2);
+      expect(s.tailFrames / 60, id).toBeGreaterThanOrEqual(1.5);
+      expect(s.tailFrames / 60, id).toBeLessThanOrEqual(2.3);
+      // the outliers fly far past the typical fragment
+      expect(s.tailSize, id).toBeGreaterThan(2 * s.size);
       expect(s.fragments, id).toBeGreaterThanOrEqual(8);
       expect(s.fragments, id).toBeGreaterThan(lightFrag);
       expect(s.size, id).toBeGreaterThan(1.8 * lightReach);
@@ -54,5 +63,28 @@ describe('impacts scale with what a gun can do', () => {
     expect(burn('laser_cutter').frames).toBeGreaterThan(burn('arc_tesla').frames);
     expect(burn('arc_tesla').frames).toBeGreaterThan(burn('laser_searchlight').frames);
     expect(burn('laser_searchlight').fragments).toBe(0);
+  });
+});
+
+describe('a burst spreads its fragments', () => {
+  // (a fixed sequence of uniform draws: the same every run)
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const N = 4000, draws = Array.from({ length: N }, () => ({ s: burstSpeed(BURST.outliers, BURST.outSpeed, rnd(), rnd(), rnd()), l: burstLife(BURST.outliers, BURST.outLife, rnd(), rnd(), rnd()) }));
+  it('most near the typical speed and life, a share of outliers much faster or longer-lived', () => {
+    // (skewed: the middle fragment a little under the typical, the mean pulled up by the quick few)
+    const sp = draws.map((d) => d.s).sort((a, b) => a - b), mean = sp.reduce((t, v) => t + v, 0) / N;
+    expect(sp[N >> 1]).toBeGreaterThan(0.6); expect(sp[N >> 1]).toBeLessThan(1);
+    expect(mean).toBeGreaterThan(1.05); expect(mean).toBeLessThan(1.4);
+    // (twice the typical speed or more; more than half again its life)
+    const fast = draws.filter((d) => d.s >= 2).length / N, long = draws.filter((d) => d.l >= 1.6).length / N;
+    for (const share of [fast, long]) { expect(share).toBeGreaterThan(0.1); expect(share).toBeLessThan(0.22); }
+  });
+  it('speed and life drawn apart: fast and short, fast and long, slow and short, slow and long all turn up', () => {
+    const fast = (d: { s: number }) => d.s > 1.6, long = (d: { l: number }) => d.l > 1.4;
+    expect(draws.some((d) => fast(d) && !long(d))).toBe(true);
+    expect(draws.some((d) => fast(d) && long(d))).toBe(true);
+    expect(draws.some((d) => !fast(d) && !long(d))).toBe(true);
+    expect(draws.some((d) => !fast(d) && long(d))).toBe(true);
   });
 });

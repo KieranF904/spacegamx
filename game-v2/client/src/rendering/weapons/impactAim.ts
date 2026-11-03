@@ -82,6 +82,22 @@ export function offSurface(a: number, nx: number, ny: number): number {
   return k >= 0 ? a : Math.atan2(cy - 2 * k * ny, cx - 2 * k * nx);
 }
 
+/** Outlier defaults of a burst (ImpactLayers BurstSpread) */
+export const BURST = { outliers: 0.15, outSpeed: 2.2, outLife: 1.8 };
+
+/**
+ * One fragment's speed (or ember's), × its layer's typical: most near it on a skewed spread (0.55 to 2.35, averaging 1,
+ * a few of them quick), a share `out` of them outliers at `mul` × (0.8 to 1.3). `r` and `o` are uniform draws.
+ */
+export function burstSpeed(out: number, mul: number, r = Math.random(), o = Math.random(), j = Math.random()): number {
+  return o < out ? mul * (0.8 + 0.5 * j) : 0.55 + r * r * r * 1.8;
+}
+
+/** One fragment's life, × its layer's typical: 0.65 to 1.7 (averaging 1, most short), a share `out` at `mul` × (0.85 to 1.15); drawn apart from its speed */
+export function burstLife(out: number, mul: number, r = Math.random(), o = Math.random(), j = Math.random()): number {
+  return o < out ? mul * (0.85 + 0.3 * j) : 0.65 + r * r * 1.05;
+}
+
 /** How many ticks into its flight a shell leaving (sx, sy) at (vx, vy) a tick reaches the point on its line nearest (x, y) */
 export function hitAge(sx: number, sy: number, vx: number, vy: number, x: number, y: number): number {
   const v2 = vx * vx + vy * vy;

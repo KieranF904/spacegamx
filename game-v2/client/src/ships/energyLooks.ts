@@ -21,8 +21,8 @@ Object.assign(BEAM_LOOKS, {
     burn: {
       every: 7, color: 0xffb060, hit: {
         spray: { count: 8, speed: 7.5, cone: 34, life: 16, color: 0xffc890, width: 1.9 }, flare: { size: 34, width: 2.6, life: 10 }, scatter: 34,
-        embers: { count: 2, speed: 1.8, life: 50, hot: 0xffd080, cool: 0x7a2a08 },
-        debris: { count: 2, speed: 4.5, size: 2.6, life: 70, hot: 0xffc070, cool: 0x3a1408, trail: 0xff7a2a, cone: 50 },
+        embers: { count: 2, speed: 3.5, life: 30, hot: 0xffd080, cool: 0x7a2a08 },
+        debris: { count: 2, speed: 11, size: 2.6, life: 41, hot: 0xffc070, cool: 0x3a1408, trail: 0xff7a2a, cone: 50, drag: 0.92 },
         light: { radius: 70, power: 0.5 },
       },
     },
@@ -37,7 +37,7 @@ Object.assign(BEAM_LOOKS, {
     burn: {
       every: 6, color: 0xc8b8ff, hit: {
         spray: { count: 6, speed: 9, cone: 30, life: 14, color: 0xe8e0ff, width: 1.8 }, flare: { size: 28, width: 2.2, life: 8, count: 2, fan: 30 }, scatter: 30,
-        embers: { count: 2, speed: 2, life: 36, hot: 0xf0ecff, cool: 0x3a1a7a }, light: { radius: 60, power: 0.5 },
+        embers: { count: 2, speed: 4, life: 29, hot: 0xf0ecff, cool: 0x3a1a7a }, light: { radius: 60, power: 0.5 },
       },
     },
   },
@@ -72,8 +72,8 @@ Object.assign(MODEL_STYLES, {
       core: { size: 3.5, life: 3 }, bloom: { size: 8, life: 6, color: 0x6ac8ff },
       spray: { count: 16, speed: 9.5, cone: 24, life: 18, color: 0xd8f2ff, width: 2 },
       flare: { size: 50, width: 3, life: 12, count: 2, fan: 18 }, scatter: 24,
-      embers: { count: 4, speed: 1.8, life: 26, hot: 0xe8f8ff, cool: 0x1a4a8a },
-      debris: { count: 2, speed: 3.5, size: 1.8, life: 28, hot: 0xe8f8ff, cool: 0x1a3a6a, trail: 0x6ac8ff, cone: 40 }, light: { radius: 70, power: 0.8 },
+      embers: { count: 4, speed: 3.5, life: 21, hot: 0xe8f8ff, cool: 0x1a4a8a },
+      debris: { count: 2, speed: 9, size: 1.8, life: 16, hot: 0xe8f8ff, cool: 0x1a3a6a, trail: 0x6ac8ff, cone: 40, drag: 0.92 }, light: { radius: 70, power: 0.8 },
     },
   },
   // A canister that blinks (its blink quickening needs the shell's end tick, which the client doesn't have)

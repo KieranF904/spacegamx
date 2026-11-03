@@ -33,7 +33,7 @@ import type { GameState, InterpolatedEntity } from '../../state/GameState';
 import { WeaponStyle, weaponStyle, shotScale, type ImpactLayers } from './weaponStyles';
 import type { Lighting } from '../lighting/Lighting';
 import { arcFraction, incomingTicks, landingPoint, sonarPeriod } from './ordnanceTells';
-import { hitAge, offSurface, throwAngle, type SurfaceNormal } from './impactAim';
+import { BURST, burstLife, burstSpeed, hitAge, offSurface, throwAngle, type SurfaceNormal } from './impactAim';
 
 /** Which way a hit throws (impactAim): the angle its directional parts leave at, and the struck surface's normal if one was found */
 interface Aim { a: number; nx: number; ny: number; surface: boolean }
@@ -130,7 +130,7 @@ interface HitGlow {
   vx?: number; vy?: number; cool?: number;
 }
 /** A fragment torn off a hull (ImpactLayers.debris): a glowing chunk slowing, cooling and trailing smoke */
-interface Frag { x: number; y: number; vx: number; vy: number; life: number; max: number; size: number; hot: number; cool: number; trail: number; drag: number; puff: number }
+interface Frag { x: number; y: number; vx: number; vy: number; life: number; max: number; size: number; hot: number; cool: number; trail: number; drag: number; puff: number; /** Smokes for this share of its life (an outlier's trail crosses the screen) */ smokes: number }
 /** A shock ring racing out from a hit (ImpactLayers shock); `life` starts below 0 for one that follows later */
 interface Shock { x: number; y: number; life: number; max: number; size: number; width: number; color: number }
 /** A glow on the hull where a hit landed, riding with the ship it struck (`owner`, at `ox, oy` in its frame), or still (owner -1) */
@@ -652,9 +652,12 @@ export class WeaponFx {
         const cone = ((db.cone ?? 50) * Math.PI) / 180;
         for (let i = 0, n = Math.round(db.count * Math.min(1.5, k) * this.particleKeep); i < n; i++) {
           if (this.frags.length >= FRAG_CAP) this.frags.shift();
-          const u = Math.random() * 2 - 1, a0 = out + u * Math.abs(u) * cone, a = aim.surface ? offSurface(a0, aim.nx, aim.ny) : a0, sp = db.speed * (0.5 + Math.random() * 0.8);
-          this.frags.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0, max: db.life * (0.75 + Math.random() * 0.5), size: db.size * Math.min(1.5, k) * (0.6 + Math.random() * 0.8),
-            hot: db.hot, cool: db.cool, trail: db.trail ?? db.hot, drag: db.drag ?? 0.95, puff: Math.random() * 4 });
+          // (speed and life drawn apart, each mostly near its typical, a few outliers much faster or longer-lived)
+          const u = Math.random() * 2 - 1, a0 = out + u * Math.abs(u) * cone, a = aim.surface ? offSurface(a0, aim.nx, aim.ny) : a0;
+          const fs = burstSpeed(db.outliers ?? BURST.outliers, db.outSpeed ?? BURST.outSpeed), fl = burstLife(db.outliers ?? BURST.outliers, db.outLife ?? BURST.outLife);
+          const sp = db.speed * fs, big = fs > 1.6 || fl > 1.4;
+          this.frags.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0, max: db.life * fl, size: db.size * Math.min(1.5, k) * (0.6 + Math.random() * 0.8),
+            hot: db.hot, cool: db.cool, trail: db.trail ?? db.hot, drag: db.drag ?? 0.95, puff: Math.random() * 3, smokes: big ? 0.8 : 0.4 });
         }
       }
     }
@@ -672,8 +675,9 @@ export class WeaponFx {
       // (they drift off the surface itself where it's known, not along the throw)
       const base = aim.surface ? Math.atan2(aim.ny, aim.nx) : aim.a;
       for (let i = 0, n = Math.round(em.count * nk); i < n && room(); i++) {
-        const a0 = base + (Math.random() - 0.5) * 2.8, a = aim.surface ? offSurface(a0, aim.nx, aim.ny) : a0, s = em.speed * (0.3 + Math.random() * 0.9);
-        this.sparks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0, max: em.life * (0.6 + Math.random() * 0.7), color: em.hot, cool: em.cool, width: 2.4 + Math.random() * 1.4, drag: 0.965 });
+        const a0 = base + (Math.random() - 0.5) * 2.8, a = aim.surface ? offSurface(a0, aim.nx, aim.ny) : a0;
+        const s = em.speed * burstSpeed(em.outliers ?? BURST.outliers, em.outSpeed ?? BURST.outSpeed);
+        this.sparks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0, max: em.life * burstLife(em.outliers ?? BURST.outliers, em.outLife ?? BURST.outLife), color: em.hot, cool: em.cool, width: 2.4 + Math.random() * 1.4, drag: 0.94 });
       }
     }
     if (L.scorch && this.scorches.length < HIT_CAP) {
@@ -778,8 +782,8 @@ export class WeaponFx {
       this.circle(this.glow, TEX.disc, p.x, p.y, p.size * (1 - 0.35 * n), col, 0.95 * fade);
       if (n < 0.3) this.circle(this.glow, TEX.disc, p.x, p.y, p.size * 0.45, 0xffffff, 0.8 * (1 - n / 0.3));
       p.puff -= frames;
-      if (p.puff <= 0 && n < 0.75 && this.smoke.length < SMOKE_CAP && Math.random() < this.particleKeep) {
-        p.puff = 4 + Math.random() * 3;
+      if (p.puff <= 0 && n < p.smokes && this.smoke.length < SMOKE_CAP && Math.random() < this.particleKeep) {
+        p.puff = 3 + Math.random() * 3;
         this.smoke.push({ x: p.x, y: p.y, vx: p.vx * 0.1, vy: p.vy * 0.1, life: 0, max: 26 + Math.random() * 16, size: p.size * 1.3, color: 0x6a625a, alpha: 0.22 * (1 - n) });
       }
     }

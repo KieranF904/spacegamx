@@ -94,6 +94,15 @@ export interface WeaponStyle {
   hitThrow?: HitThrow;
 }
 
+/** How a burst's fragments or embers spread round their typical speed and life (ImpactLayers debris, embers; impactAim burstSpeed) */
+export interface BurstSpread {
+  /** The share that are outliers, drawn separately for speed and for life (default 0.15) */
+  outliers?: number;
+  /** An outlier's speed and life, × the typical (defaults 2.2 and 1.8) */
+  outSpeed?: number;
+  outLife?: number;
+}
+
 /**
  * A layered impact, sized by the gun's power tier (heavy and super guns get all of it, mid ones a step down, simple ones a
  * small quick mark). Every layer is optional. Sizes are world units for a shot of scale 1: the hit scales them by the
@@ -125,14 +134,17 @@ export interface ImpactLayers {
   fireball?: { size: number; life: number; count?: number; color?: number; cool?: number };
   /**
    * Fragments torn off the hull (heavy and mid guns): `count` glowing chunks `size` across thrown out (between the normal
-   * and the throw, `cone` degrees either side) at `speed`, slowing (`drag` a frame, default 0.95), cooling from `hot` to
-   * `cool`, leaving a fading streak of `trail` and puffs of smoke, and dimming away over `life` frames
+   * and the throw, `cone` degrees either side), slowing (`drag` a frame, default 0.95), cooling from `hot` to `cool`,
+   * leaving a fading streak of `trail` and puffs of smoke, dimming away at the end. `speed` and `life` are the typical
+   * fragment's: each is drawn on its own from a skewed spread round them (impactAim burstSpeed, burstLife), and a share
+   * (`outliers`, default 0.15, drawn separately for each) goes `outSpeed` times as fast (default 2.2) or lives `outLife`
+   * times as long (default 1.8): those carry the long streaks and smoke across the screen
    */
-  debris?: { count: number; speed: number; size: number; life: number; hot: number; cool: number; trail?: number; cone?: number; drag?: number };
+  debris?: { count: number; speed: number; size: number; life: number; hot: number; cool: number; trail?: number; cone?: number; drag?: number } & BurstSpread;
   /** The shell glancing off: a few long streaks of its own colour along the throw (a ricochet), `cone` degrees either side */
   ricochet?: { count: number; speed: number; cone: number; life: number };
   /** Embers: slow, heavier sparks that drift off (out of the surface, where one is known) and cool from `hot` to `cool` as they die */
-  embers?: { count: number; speed: number; life: number; hot: number; cool: number };
+  embers?: { count: number; speed: number; life: number; hot: number; cool: number } & BurstSpread;
   /** A glow left on the hull where it struck (it rides with the ship), cooling from white through `color` to nothing */
   scorch?: { size: number; life: number; color: number };
   /** A light shake for a screen within `radius` world units of the hit: strength (triggerScreenShake's), seconds */
@@ -270,8 +282,8 @@ function DIRECTED_HIT(color: number, k: number, cone = 28): ImpactLayers {
     flare: { size: 26 * k, width: 2 * Math.sqrt(k), life: Math.round(7 + 2 * k) }, scatter: cone,
     light: { radius: 35 * k, power: 0.5 },
     // (the bigger ones a few embers, the biggest a few chips trailing off too)
-    ...(k >= 1.2 ? { embers: { count: Math.round(2 * k), speed: 1.8, life: Math.round(18 * k), hot: color, cool: 0x3a2010 } } : {}),
-    ...(k >= 1.5 ? { debris: { count: Math.round(2 * k), speed: 4, size: 2, life: Math.round(24 * k), hot: color, cool: 0x3a2010 } } : {}),
+    ...(k >= 1.2 ? { embers: { count: Math.round(2 * k), speed: 3.6, life: Math.round(14 * k), hot: color, cool: 0x3a2010 } } : {}),
+    ...(k >= 1.5 ? { debris: { count: Math.round(2 * k), speed: 10, size: 2, life: Math.round(14 * k), hot: color, cool: 0x3a2010, drag: 0.92 } } : {}),
   };
 }
 
