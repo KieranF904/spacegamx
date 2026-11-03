@@ -181,7 +181,7 @@ describe('small parts', () => {
   it('pilot cards from profiles of any shape', () => {
     const card = toCard({ level: 7, xp: 900, credits: 1200, ship: { blueprint: { name: 'Stubborn' } }, hangar: [{}, null, {}],
       stats: { kills: 41, bosses: 2, 'boss:boss_scrap_mother': 2, 'sys:sol': 1, 'sys:vesta': 1, 'ach:first_blood': 1700000000 }, codex: { found: ['a', 'b'] }, createdAt: '2026-10-01T00:00:00Z' });
-    expect(card).toMatchObject({ level: 7, shipName: 'Stubborn', ships: 2, systemsVisited: 2, ribbons: 1, codexFound: 2, bossKills: { boss_scrap_mother: 2 } });
+    expect(card).toMatchObject({ level: 7, shipName: 'Stubborn', ships: 2, systemsVisited: 2, ribbons: 1, bossKills: { boss_scrap_mother: 2 } });
     expect(card.stats.kills).toBe(41);
     expect(toCard({}).level).toBe(1);
   });

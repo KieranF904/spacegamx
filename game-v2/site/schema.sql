@@ -89,3 +89,20 @@ CREATE TABLE IF NOT EXISTS site_api_tokens (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     last_used_at    TIMESTAMPTZ
 );
+
+-- Ships pilots have shared (the gallery at /ships): the plan to draw and the totals the game worked out.
+-- One per name per pilot (the unique index); the site also caps how many a pilot can have.
+CREATE TABLE IF NOT EXISTS site_ships (
+    id          BIGSERIAL PRIMARY KEY,
+    owner_id    BIGINT NOT NULL,
+    owner_name  TEXT NOT NULL,
+    name        TEXT NOT NULL,
+    plan        JSONB NOT NULL,
+    stats       JSONB NOT NULL,
+    power       TEXT NOT NULL DEFAULT 'pool',
+    hidden      BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_site_ships_owner_name ON site_ships(owner_id, lower(name));
+CREATE INDEX IF NOT EXISTS idx_site_ships_updated ON site_ships(updated_at DESC);

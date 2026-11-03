@@ -30,7 +30,6 @@ export interface PilotCard {
   stats: { kills: number; bosses: number; quests: number; mined: number; earned: number; crafted: number; deaths: number };
   systemsVisited: number;
   ribbons: number;
-  codexFound: number;
   /** Bosses beaten, by id (stats boss:<id>) */
   bossKills: Record<string, number>;
   since: string | null;
@@ -73,7 +72,6 @@ export function toCard(p: any): PilotCard {
     },
     systemsVisited: systems,
     ribbons,
-    codexFound: Array.isArray(p?.codex?.found) ? p.codex.found.length : 0,
     bossKills,
     since: typeof p?.createdAt === 'string' ? p.createdAt : null,
     lastFlown: typeof p?.updatedAt === 'string' ? p.updatedAt : null,

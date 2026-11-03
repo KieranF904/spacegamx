@@ -1,0 +1,76 @@
+/* The Database, ship gallery and status pages (tables, facts, ship drawings). Loaded after site.css. */
+
+/* ---- tabs and filters */
+.db-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.db-tabs a { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; font: 500 0.82rem/1 var(--mono); letter-spacing: 0.06em; color: var(--muted); border: 1px solid var(--line-2); background: rgba(7, 12, 22, 0.5); border-radius: 2px; }
+.db-tabs a:hover { color: var(--text-hi); border-color: rgba(125, 211, 252, 0.5); text-decoration: none; }
+.db-tabs a[aria-current="page"] { color: var(--bg); background: var(--sky); border-color: var(--sky); }
+.db-tabs .n, .guide-group-h .n { color: var(--dim); font-weight: 400; }
+.db-tabs a[aria-current="page"] .n { color: rgba(4, 7, 13, 0.6); }
+
+.db-filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 0 0 22px; }
+.db-filters input[type="search"] { flex: 1 1 220px; width: auto; min-width: 0; }
+.db-filters select { flex: 0 1 180px; width: auto; min-width: 0; }
+
+/* ---- tables */
+.table-scroll { overflow-x: auto; border: 1px solid var(--line); background: var(--panel-2); border-radius: 2px; }
+.db-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+.db-table th { text-align: left; font: 600 0.7rem/1.2 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); padding: 11px 14px; border-bottom: 1px solid var(--line-2); white-space: nowrap; }
+.db-table td { padding: 9px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.db-table tbody tr:last-child td { border-bottom: 0; }
+.db-table tbody tr:hover td { background: rgba(125, 211, 252, 0.04); }
+.db-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.db-table td:first-child { white-space: nowrap; }
+.db-table small { font-size: 0.78rem; }
+
+.rarity { font: 600 0.68rem/1 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 6px; border: 1px solid currentColor; color: var(--muted); white-space: nowrap; }
+.r-uncommon { color: #86efac; } .r-rare { color: var(--sky); } .r-epic { color: #c4a3ff; } .r-legendary { color: var(--gold); }
+
+.db-asof { margin-top: 22px; }
+.db-group { margin-bottom: 28px; }
+.db-hits { list-style: none; margin: 0; padding: 0; columns: 3 200px; column-gap: 24px; }
+.db-hits li { padding: 3px 0; break-inside: avoid; }
+
+/* ---- an entry */
+.db-entry { padding-block: 32px 72px; }
+.db-entry-head { margin: 14px 0 26px; }
+.db-entry-head h1 { margin-bottom: 10px; }
+.db-entry-head .lede { max-width: 70ch; }
+.db-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 18px; align-items: start; }
+.mt { margin-top: 18px; }
+.facts { margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px 18px; }
+.facts > div { min-width: 0; }
+.facts dt { font: 600 0.68rem/1.2 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); margin-bottom: 4px; }
+.facts dd { margin: 0; color: var(--text-hi); font-weight: 500; overflow-wrap: anywhere; }
+.plain { list-style: none; margin: 0 0 8px; padding: 0; }
+.plain li { padding: 3px 0; }
+.plain.cols { columns: 2 180px; column-gap: 22px; }
+.plain.cols li { break-inside: avoid; }
+.shape-row { display: flex; flex-wrap: wrap; gap: 12px; }
+.shape { margin: 0; width: 64px; text-align: center; }
+.shape svg { width: 100%; height: 56px; }
+.shape figcaption { font: 400 0.7rem var(--mono); color: var(--dim); margin-top: 4px; }
+
+/* ---- ship drawings and cards */
+svg.plan { display: block; width: 100%; height: 100%; }
+.ship-big { display: flex; align-items: center; justify-content: center; min-height: 320px; padding: 24px; }
+.ship-big svg.plan-big { width: auto; max-width: 100%; height: min(60vh, 520px); max-height: 520px; }
+.ship-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 14px; }
+.ship-card { display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 2px; color: var(--text); transition: border-color 0.15s, background 0.15s; }
+.ship-card:hover { border-color: var(--line-2); background: var(--panel-solid); text-decoration: none; }
+.ship-art { height: 190px; padding: 14px; display: flex; align-items: center; justify-content: center; background: rgba(3, 6, 12, 0.55); border-bottom: 1px solid var(--line); }
+.ship-art svg.plan { width: auto; max-width: 100%; height: 100%; }
+.ship-meta { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px 14px; }
+.ship-name { font: 600 1.02rem/1.25 var(--display); color: var(--text-hi); }
+.pilot-ships { margin-top: 18px; }
+
+/* ---- status */
+.status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 18px; align-items: start; }
+.status-sec .db-table td:first-child { white-space: normal; }
+
+@media (max-width: 520px) {
+  .db-filters select { flex: 1 1 100%; }
+  .ship-art { height: 150px; }
+  .db-table th, .db-table td { padding-inline: 10px; }
+}
+.nw { white-space: nowrap; }

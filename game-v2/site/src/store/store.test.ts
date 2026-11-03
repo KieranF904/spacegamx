@@ -127,6 +127,32 @@ function contract(name: string, make: () => Promise<{ store: SiteStore; done: ()
       await done();
     });
 
+    it('shared ships: one per name per pilot, a cap, hide, delete, and they go with the account', async () => {
+      const { store, done } = await make();
+      const ship = (ownerId: number, name: string) => ({ ownerId, ownerName: 'ace', name, plan: [{ fn: 'hull', piece: 'sq', x: 0, y: 0, rot: 0 }], stats: { parts: 1, cells: 1, mass: 1, hp: 75, gen: 0, draw: 0, thrust: 0, shield: 0, cargo: 0, guns: { fixed: 0, turret: 0 } }, power: 'pool' as const });
+      const a = await store.saveShip(ship(5, 'Dart'), 2);
+      expect(a).toMatchObject({ created: true, ship: { name: 'Dart', hidden: false } });
+      const again = await store.saveShip({ ...ship(5, 'dart'), name: 'DART' }, 2);
+      expect(again).toMatchObject({ created: false, ship: { name: 'DART' } });
+      expect((again as { ship: { id: number } }).ship.id).toBe((a as { ship: { id: number } }).ship.id);
+      expect(await store.saveShip(ship(5, 'Brick'), 2)).toMatchObject({ created: true });
+      expect(await store.saveShip(ship(5, 'Third'), 2)).toBe('cap');
+      expect(await store.saveShip(ship(5, 'brick'), 2)).toMatchObject({ created: false }); // (replacing is not adding)
+      expect(await store.saveShip(ship(6, 'Dart'), 2)).toMatchObject({ created: true }); // (another pilot's own Dart)
+      expect(await store.listShips({ ownerId: 5 })).toHaveLength(2);
+      const id = (a as { ship: { id: number } }).ship.id;
+      await store.setShipHidden(id, true);
+      expect((await store.listShips({ ownerId: 5 })).map((x) => x.name)).toEqual(['brick']);
+      expect(await store.listShips({ ownerId: 5, includeHidden: true })).toHaveLength(2);
+      expect((await store.getShip(id))?.hidden).toBe(true);
+      expect(await store.deleteShip(id)).toBe(true);
+      expect(await store.deleteShip(id)).toBe(false);
+      await store.forgetUser(5);
+      expect(await store.listShips({ ownerId: 5, includeHidden: true })).toEqual([]);
+      expect(await store.listShips({ ownerId: 6 })).toHaveLength(1);
+      await done();
+    });
+
     it('a deleted account: its shouts and votes go, its comments and suggestions stay unsigned', async () => {
       const { store, done } = await make();
       const p = (await store.createPost(post('gone')))!;

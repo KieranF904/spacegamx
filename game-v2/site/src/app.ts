@@ -10,6 +10,8 @@
  *                                  with Accept: application/json it answers { ok, id, item } (the list item's HTML)
  *   GET  /rss.xml                  RSS 2.0
  *   GET  /guides                   the guides (Markdown files in site/guides: src/guides.ts);  GET /guides/:slug  one guide
+ *   GET  /database[/:kind[/:id]]   parts, items, ships, bosses, stations (src/routes/catalog.ts)
+ *   GET  /ships[/:id]              the ship gallery (src/routes/ships.ts);  GET /status  the game server's state (src/routes/status.ts)
  *   GET  /suggestions[?sort=&status=]  POST /suggestions   POST /suggestions/:id/vote
  *   GET  /shoutbox/stream (SSE)    POST /shoutbox    POST /shoutbox/:id/delete (admin)
  *   GET  /signin /register         POST them;  POST /signout
@@ -20,7 +22,9 @@
  *
  * The API (JSON; admin: Bearer sgs_ token, Bearer lobby session of an admin, or the
  * admin's cookie session plus X-CSRF-Token):
- *   GET  /api/v1/status            public: pilots online
+ *   GET  /api/v1/status            public: online, pilots, and what else the game reports
+ *   GET  /api/v1/catalog           public: the catalog as JSON;  GET /api/v1/changelog  public: the "What's new" feed
+ *   GET  /api/v1/ships             public: shared ships;  POST/DELETE /api/v1/ships  the game server, with its key (src/routes/ships.ts)
  *   GET  /api/v1/me
  *   GET  /api/v1/posts[?status=all|draft|published]     GET /api/v1/posts/:slug
  *   POST /api/v1/posts             create, or update the post with that slug (upsert)
@@ -39,17 +43,24 @@ import type { SiteConfig } from './config.js';
 import type { html } from './html.js';
 import { HttpError, readBody, readFields, redirect, Router, safeNext, sendHtml, sendJson, str, type Params } from './http.js';
 import type { Lobby, LobbyUser } from './lobby.js';
+import { CatalogBook } from './catalog/book.js';
 import { GuideBook } from './guides.js';
 import { renderMarkdown } from './markdown.js';
 import { BOARDS, type PilotSource } from './pilots.js';
 import { postImages } from './postImages.js';
 import { gameIndex, injectHandoff, isDevGamePath, proxyToDev, proxyUpgradeToDev } from './play.js';
 import { checkPost } from './posts.js';
+import { registerCatalog } from './routes/catalog.js';
+import { registerChangelog } from './routes/changelog.js';
+import type { RouteEnv } from './routes/env.js';
+import { registerShips } from './routes/ships.js';
+import { registerStatus } from './routes/status.js';
 import { rssFeed } from './rss.js';
 import {
-  cookie, Csrf, CSRF_COOKIE, hashToken, LIMITS, newApiToken, parseCookies, RateLimiter, sameOrigin, securityHeaders,
+  cookie, Csrf, CSRF_COOKIE, hashToken, keyMatches, LIMITS, newApiToken, parseCookies, RateLimiter, sameOrigin, securityHeaders,
   SESSION_COOKIE, SESSION_MAX_AGE_S, TOKEN_PREFIX,
 } from './security.js';
+import { StatusFile, type ServerStatus } from './status.js';
 import { cleanShout, publicShout, SHOUT_KEEP, SHOUT_MAX, ShoutHub } from './shoutbox.js';
 import type { Post, SiteStore, SuggestionStatus } from './store/types.js';
 import { SUGGESTION_STATUSES } from './store/types.js';
@@ -67,6 +78,8 @@ export interface AppDeps {
   uploads: Uploads;
   /** (tests) */
   limiter?: RateLimiter;
+  catalog?: CatalogBook;
+  status?: { get(): Promise<ServerStatus | null> };
 }
 
 export interface Ctx {
@@ -81,6 +94,8 @@ export interface Ctx {
   csrfSeed: string;
   /** How an API call was authenticated */
   api: { via: 'token' | 'lobby' | 'session'; name: string; userId: number; author: string } | null;
+  /** The call carries the game server's key (SITE_GAME_KEY): it may share ships, and nothing else */
+  game: boolean;
   page: PageCtx;
 }
 
@@ -109,6 +124,8 @@ export function createApp(deps: AppDeps) {
   const guides = new GuideBook(cfg.guidesDir, cfg.production);
   const sessions = new Map<string, { user: LobbyUser | null; until: number }>();
   const router = new Router<Ctx>();
+  const catalog = deps.catalog ?? new CatalogBook(cfg.catalogFile, cfg.catalogGameFile);
+  const statusFile = deps.status ?? new StatusFile(cfg.statusFile);
 
   // ------------------------------------------------------------ helpers
 
@@ -459,13 +476,13 @@ export function createApp(deps: AppDeps) {
       }
     }
     if (!id || !shown) { page(ctx, 404, V.notFoundPage(ctx.page, 'pilot')); return; }
-    const card = await pilots.card(id);
+    const [card, ships, cat] = await Promise.all([pilots.card(id), store.listShips({ ownerId: id, limit: 12 }), catalog.get()]);
     const ranks: { label: string; rank: number; value: number }[] = [];
     if (rankings) for (const b of BOARDS) {
       const i = (rankings.allTime[b.key] ?? []).findIndex((r) => Number(r.userId) === id);
       if (i >= 0) ranks.push({ label: b.label, rank: i + 1, value: rankings.allTime[b.key][i].value });
     }
-    page(ctx, 200, V.pilotPage(ctx.page, { name: shown, card, ranks }));
+    page(ctx, 200, V.pilotPage(ctx.page, { name: shown, card, ranks, ships, render: cat?.render ?? null }));
   });
 
   // ------------------------------------------------------------ play
@@ -677,11 +694,6 @@ export function createApp(deps: AppDeps) {
     return { ...p, url: `${cfg.origin}/updates/${encodeURIComponent(p.slug)}` };
   }
 
-  router.get('/api/v1/status', async (ctx) => {
-    const live = await pilots.live();
-    sendJson(ctx.res, 200, { players: live?.fresh ? live.players : 0, online: !!live?.fresh });
-  });
-
   router.get('/api/v1/me', async (ctx) => {
     const who = await apiAdmin(ctx);
     if (who) sendJson(ctx.res, 200, { name: who.name, userId: who.userId, via: who.via });
@@ -774,6 +786,21 @@ export function createApp(deps: AppDeps) {
     sendJson(ctx.res, 200, { ok: true });
   });
 
+  // ------------------------------------------------------------ features (catalog, ships, status, changelog)
+
+  const env: RouteEnv = {
+    router, cfg, store, catalog, statusFile,
+    page: (ctx, status, body) => page(ctx, status, body),
+    notFound: (ctx, what) => page(ctx, 404, V.notFoundPage(ctx.page, what)),
+    limited: (ctx, key, rule) => limited(ctx, key, rule),
+    requireAdmin: (ctx) => requireAdmin(ctx),
+    fields: (ctx, max) => fields(ctx, max),
+  };
+  registerCatalog(env);
+  registerChangelog(env);
+  registerShips(env);
+  registerStatus(env);
+
   // ------------------------------------------------------------ the request
 
   function bearerOf(req: http.IncomingMessage): string | null {
@@ -833,8 +860,13 @@ export function createApp(deps: AppDeps) {
 
     // The API: a bearer token instead of cookies (no CSRF: nothing is sent automatically)
     let api: Ctx['api'] = null;
+    let game = false;
     const bearer = pathname.startsWith('/api/') ? bearerOf(req) : null;
-    if (bearer && !(pathname === '/api/v1/session' && req.method === 'DELETE')) {
+    if (bearer && keyMatches(bearer, cfg.gameKey)) {
+      // The game server: not an admin and not a browser session, so it can only do what the game-only routes allow
+      if (!limiter.hit(`api:${ip}`, LIMITS.api.limit, LIMITS.api.windowMs)) { sendJson(res, 429, { error: 'Slow down' }); return; }
+      game = true; user = null; token = null;
+    } else if (bearer && !(pathname === '/api/v1/session' && req.method === 'DELETE')) {
       const failKey = `apifail:${ip}`;
       if (!limiter.hit(`api:${ip}`, LIMITS.api.limit, LIMITS.api.windowMs)) { sendJson(res, 429, { error: 'Slow down' }); return; }
       if (limiter.retryAfter(failKey, LIMITS.apiAuthFail.limit, LIMITS.apiAuthFail.windowMs) > 0) { sendJson(res, 429, { error: 'Too many bad tokens; wait a few minutes' }); return; }
@@ -852,12 +884,12 @@ export function createApp(deps: AppDeps) {
     const csrfToken = csrf.token(csrfSeed);
     const live = await pilots.live();
     const ctx: Ctx = {
-      req, res, url, path: pathname, ip, token, user, csrf: csrfToken, csrfSeed, api,
+      req, res, url, path: pathname, ip, token, user, csrf: csrfToken, csrfSeed, api, game,
       page: { siteName: cfg.name, user, csrf: csrfToken, path: pathname, live: live ? { players: live.players, fresh: live.fresh } : null, origin: cfg.origin },
     };
 
     const unsafe = !['GET', 'HEAD', 'OPTIONS'].includes(req.method ?? 'GET');
-    if (unsafe && !api) {
+    if (unsafe && !api && !game) {
       // Cross-site posts are refused outright; same-site ones need the token
       // (forms send _csrf; scripts send X-CSRF-Token). /api/v1/session is a
       // credential exchange for the CLI and sends no cookies' worth of trust.

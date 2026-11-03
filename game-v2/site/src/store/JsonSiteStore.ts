@@ -7,7 +7,7 @@
 import fs from 'fs';
 import path from 'path';
 import type {
-  ApiToken, Comment, Post, PostInput, PostPatch, PostStatus, Shout, SiteStore, Suggestion, SuggestionStatus,
+  ApiToken, Comment, Post, PostInput, PostPatch, PostStatus, SharedShip, ShipInput, Shout, SiteStore, Suggestion, SuggestionStatus,
 } from './types.js';
 import { SUGGESTION_STATUSES } from './types.js';
 
@@ -22,6 +22,7 @@ interface StoreFile {
   votes: Vote[];
   shouts: Shout[];
   tokens: ApiToken[];
+  ships: SharedShip[];
 }
 
 const now = () => new Date().toISOString();
@@ -40,7 +41,7 @@ export class JsonSiteStore implements SiteStore {
   }
 
   private empty(): StoreFile {
-    return { version: 1, nextId: {}, posts: [], comments: [], suggestions: [], votes: [], shouts: [], tokens: [] };
+    return { version: 1, nextId: {}, posts: [], comments: [], suggestions: [], votes: [], shouts: [], tokens: [], ships: [] };
   }
 
   private load(): StoreFile {
@@ -53,7 +54,7 @@ export class JsonSiteStore implements SiteStore {
         nextId: raw.nextId ?? {},
         // (comments from before images were commentable have no `image`)
         posts: raw.posts ?? [], comments: (raw.comments ?? []).map((c) => ({ ...c, image: c.image ?? null })), suggestions: raw.suggestions ?? [],
-        votes: raw.votes ?? [], shouts: raw.shouts ?? [], tokens: raw.tokens ?? [],
+        votes: raw.votes ?? [], shouts: raw.shouts ?? [], tokens: raw.tokens ?? [], ships: raw.ships ?? [],
       } as StoreFile;
     } catch (err) {
       // Never overwrite a file we couldn't read: keep it aside and start empty
@@ -265,9 +266,49 @@ export class JsonSiteStore implements SiteStore {
 
   async revokeToken(id: number) { this.data.tokens = this.data.tokens.filter((t) => t.id !== id); this.save(); }
 
+  // ---------------------------------------------------------------- shared ships
+
+  async saveShip(s: ShipInput, cap: number) {
+    const old = this.data.ships.find((x) => x.ownerId === s.ownerId && x.name.toLowerCase() === s.name.toLowerCase());
+    if (!old && this.data.ships.filter((x) => x.ownerId === s.ownerId).length >= cap) return 'cap' as const;
+    if (old) {
+      Object.assign(old, { ownerName: s.ownerName, name: s.name, plan: s.plan, stats: s.stats, power: s.power, updatedAt: now() });
+      this.save();
+      return { ship: clone(old), created: false };
+    }
+    const t = now();
+    const row: SharedShip = { ...s, id: this.id('ship', this.data.ships), hidden: false, createdAt: t, updatedAt: t };
+    this.data.ships.push(row);
+    this.save();
+    return { ship: clone(row), created: true };
+  }
+
+  async listShips(opts: { ownerId?: number; includeHidden?: boolean; limit?: number }) {
+    const rows = this.data.ships
+      .filter((x) => (opts.includeHidden || !x.hidden) && (opts.ownerId === undefined || x.ownerId === opts.ownerId))
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.id - a.id);
+    return clone(rows.slice(0, opts.limit ?? 60));
+  }
+
+  async getShip(id: number) { const s = this.data.ships.find((x) => x.id === id); return s ? clone(s) : null; }
+
+  async deleteShip(id: number) {
+    const before = this.data.ships.length;
+    this.data.ships = this.data.ships.filter((x) => x.id !== id);
+    if (this.data.ships.length === before) return false;
+    this.save();
+    return true;
+  }
+
+  async setShipHidden(id: number, hidden: boolean) {
+    const s = this.data.ships.find((x) => x.id === id);
+    if (s) { s.hidden = hidden; this.save(); }
+  }
+
   // ---------------------------------------------------------------- accounts
 
   async forgetUser(userId: number) {
+    this.data.ships = this.data.ships.filter((x) => x.ownerId !== userId);
     this.data.shouts = this.data.shouts.filter((s) => s.authorId !== userId);
     this.data.votes = this.data.votes.filter((v) => v.userId !== userId);
     for (const c of this.data.comments) if (c.authorId === userId) { c.authorId = null; c.authorName = 'a former pilot'; }

@@ -6,8 +6,10 @@ import { decoratePostImages, type ImageStat } from '../postImages.js';
 import type { LobbyAccount } from '../lobby.js';
 import { BOARDS, type PilotCard, type Rankings } from '../pilots.js';
 import { SHOUT_MAX, publicShout } from '../shoutbox.js';
-import type { Comment, Post, Shout, Suggestion, SuggestionStatus } from '../store/types.js';
+import type { RenderData } from '../catalog/types.js';
+import type { Comment, Post, SharedShip, Shout, Suggestion, SuggestionStatus } from '../store/types.js';
 import { SUGGESTION_STATUSES } from '../store/types.js';
+import { pilotShips } from './ships.js';
 import {
   csrfField, empty, fmtDate, fmtNum, layout, livePill, sectionHead, signInPrompt, STATUS_LABEL, statusBadge, tagChip, when,
   type PageCtx,
@@ -122,8 +124,7 @@ export function homePage(ctx: PageCtx, d: { posts: Post[]; comments: Map<number,
       <div class="feature-text">
         <p class="feature-n">03 <span>Fight</span></p>
         <h3>Bosses</h3>
-        <p>Bosses fight in stages. Attacks are telegraphed, and shooting a part off stops the move it powers. The Scrap Mother is in the Drift.</p>
-        <blockquote class="ingame"><p>&ldquo;Something huge and patched together stirs in the hollow at the heart of the junk, grey veins glinting in the rock around it.&rdquo;</p><cite>In the game</cite></blockquote>
+        <p>Bosses fight in stages. Attacks are telegraphed, and shooting a part off stops the move it powers. The Scrap Mother is in the Drift.</p>
       </div>
     </div>
   </div>
@@ -328,7 +329,7 @@ export function pilotCard(card: PilotCard | null, name: string, opts: { own: boo
       <p class="dim">${card.shipName ? html`Flying the <b class="ship">${card.shipName}</b>` : 'No ship on record'}${card.ships > 1 ? ` · ${card.ships} ships in the hangar` : ''}</p></div>
   </div>
   <dl class="pc-stats">${tally.map(([k, v]) => html`<div><dt>${k}</dt><dd>${fmtNum(v)}</dd></div>`)}</dl>
-  <p class="pc-foot dim small">${card.ribbons ? html`${card.ribbons} ${card.ribbons === 1 ? 'ribbon' : 'ribbons'} · ` : ''}${card.codexFound ? html`${card.codexFound} codex records · ` : ''}${card.since ? html`Pilot since ${fmtDate(card.since)}` : ''}${card.lastFlown ? html` · last flew ${when(card.lastFlown)}` : ''}${opts.own ? html` · ${fmtNum(card.credits)} credits` : ''}</p>
+  <p class="pc-foot dim small">${card.ribbons ? html`${card.ribbons} ${card.ribbons === 1 ? 'ribbon' : 'ribbons'} · ` : ''}${card.since ? html`Pilot since ${fmtDate(card.since)}` : ''}${card.lastFlown ? html` · last flew ${when(card.lastFlown)}` : ''}${opts.own ? html` · ${fmtNum(card.credits)} credits` : ''}</p>
 </section>`;
 }
 
@@ -368,12 +369,13 @@ export function pilotsPage(ctx: PageCtx, d: { rankings: Rankings | null; period:
   return layout(ctx, { title: 'Pilots', body });
 }
 
-export function pilotPage(ctx: PageCtx, d: { name: string; card: PilotCard | null; ranks: { label: string; rank: number; value: number }[] }): SafeHtml {
+export function pilotPage(ctx: PageCtx, d: { name: string; card: PilotCard | null; ranks: { label: string; rank: number; value: number }[]; ships: SharedShip[]; render: RenderData | null }): SafeHtml {
   const body = html`
 <section class="wrap block-tight narrow-col">
   <p class="meta"><a href="/pilots">Pilots</a> <span class="sep">/</span> ${d.name}</p>
   ${pilotCard(d.card, d.name, { own: ctx.user?.username.toLowerCase() === d.name.toLowerCase() })}
   ${d.ranks.length ? html`<section class="panel"><div class="panel-head"><h2>On the boards</h2></div><ul class="rank-places">${d.ranks.map((r) => html`<li><span class="rk">#${r.rank}</span> ${r.label} <span class="val">${fmtNum(r.value)}</span></li>`)}</ul></section>` : ''}
+  ${pilotShips(d.ships, d.render)}
 </section>`;
   return layout(ctx, { title: d.name, body });
 }

@@ -4,14 +4,14 @@ import { html, raw, SafeHtml } from '../html.js';
 import { renderMarkdown, safeUrl } from '../markdown.js';
 import { postImages } from '../postImages.js';
 import type { AdminUser } from '../lobby.js';
-import type { ApiToken, Comment, Post, Shout, Suggestion, SuggestionStatus } from '../store/types.js';
+import type { ApiToken, Comment, Post, SharedShip, Shout, Suggestion, SuggestionStatus } from '../store/types.js';
 import { SUGGESTION_STATUSES } from '../store/types.js';
 import { csrfField, empty, fmtDate, layout, STATUS_LABEL, statusBadge, when, type PageCtx } from './layout.js';
 
-type Tab = 'overview' | 'posts' | 'comments' | 'suggestions' | 'shoutbox' | 'pilots' | 'tokens';
+type Tab = 'overview' | 'posts' | 'comments' | 'suggestions' | 'shoutbox' | 'ships' | 'pilots' | 'tokens';
 const TABS: [Tab, string, string][] = [
   ['overview', 'Overview', '/admin'], ['posts', 'Posts', '/admin/posts'], ['comments', 'Comments', '/admin/comments'],
-  ['suggestions', 'Suggestions', '/admin/suggestions'], ['shoutbox', 'Shoutbox', '/admin/shoutbox'],
+  ['suggestions', 'Suggestions', '/admin/suggestions'], ['shoutbox', 'Shoutbox', '/admin/shoutbox'], ['ships', 'Shared ships', '/admin/ships'],
   ['pilots', 'Pilots & bans', '/admin/pilots'], ['tokens', 'API tokens', '/admin/tokens'],
 ];
 
@@ -158,6 +158,20 @@ export function adminShoutbox(ctx: PageCtx, shouts: Shout[], notice?: { kind: 'o
     <div class="mod-meta"><b>${s.authorName}</b> · ${when(s.createdAt)}</div><div>${s.text}</div>
     <div class="mod-actions"><form method="post" action="/admin/shoutbox/${s.id}/delete">${csrfField(ctx)}<button class="btn btn-sm btn-danger" type="submit">Delete</button></form></div>
   </li>`)}</ol>` : empty('Nothing said yet', 'Shouts show up here.')}`, notice);
+}
+
+export function adminShips(ctx: PageCtx, ships: SharedShip[], notice?: { kind: 'ok' | 'error'; text: string } | null): SafeHtml {
+  return shell(ctx, 'ships', 'Shared ships', html`
+  <h1>Shared ships</h1>
+  <p class="dim">Ships pilots have shared from the game, newest first. A hidden ship stays in this list but not in the gallery.</p>
+  ${ships.length ? html`<ol class="mod-list compact">${ships.map((s) => html`<li>
+    <div class="mod-meta"><b>${s.name}</b> · ${s.ownerName} · ${s.stats.parts} parts · ${when(s.updatedAt)}${s.hidden ? ' · hidden' : ''}</div>
+    <div class="mod-actions">
+      <a class="btn btn-sm" href="/ships/${s.id}">View</a>
+      <form method="post" action="/admin/ships/${s.id}/${s.hidden ? 'show' : 'hide'}">${csrfField(ctx)}<button class="btn btn-sm" type="submit">${s.hidden ? 'Show' : 'Hide'}</button></form>
+      <form method="post" action="/admin/ships/${s.id}/delete">${csrfField(ctx)}<button class="btn btn-sm btn-danger" type="submit">Delete</button></form>
+    </div>
+  </li>`)}</ol>` : empty('No shared ships', 'Nothing has been shared yet.')}`, notice);
 }
 
 export function adminTokens(ctx: PageCtx, d: { tokens: ApiToken[]; created?: { name: string; token: string } }, notice?: { kind: 'ok' | 'error'; text: string } | null): SafeHtml {

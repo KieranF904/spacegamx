@@ -11,6 +11,8 @@
  * Every method is async, because the Postgres one is.
  */
 
+import type { PlanPart, ShipStats } from '../catalog/types.js';
+
 export type PostStatus = 'draft' | 'published';
 
 export interface Post {
@@ -91,6 +93,22 @@ export interface ApiToken {
   lastUsedAt: string | null;
 }
 
+/** A ship a pilot has shared (the gallery): the plan to draw, and totals the game worked out */
+export interface SharedShip {
+  id: number;
+  ownerId: number;
+  ownerName: string;
+  name: string;
+  plan: PlanPart[];
+  stats: ShipStats;
+  power: 'ports' | 'pool';
+  /** Hidden by an admin (kept, not shown) */
+  hidden: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+export type ShipInput = Pick<SharedShip, 'ownerId' | 'ownerName' | 'name' | 'plan' | 'stats' | 'power'>;
+
 export interface SiteStore {
   // Posts
   listPosts(opts: { status?: PostStatus | 'all'; tag?: string; limit?: number; offset?: number }): Promise<{ posts: Post[]; total: number }>;
@@ -136,7 +154,15 @@ export interface SiteStore {
   touchToken(id: number): Promise<void>;
   revokeToken(id: number): Promise<void>;
 
-  /** An account was deleted: its shouts and votes go, its comments and suggestions stay, unsigned */
+  // Shared ships (the gallery): one per name per pilot, up to `cap` per pilot
+  /** Adds the ship, or replaces the pilot's ship of that name; 'cap' if the pilot is at the limit with a new name */
+  saveShip(s: ShipInput, cap: number): Promise<{ ship: SharedShip; created: boolean } | 'cap'>;
+  listShips(opts: { ownerId?: number; includeHidden?: boolean; limit?: number }): Promise<SharedShip[]>;
+  getShip(id: number): Promise<SharedShip | null>;
+  deleteShip(id: number): Promise<boolean>;
+  setShipHidden(id: number, hidden: boolean): Promise<void>;
+
+  /** An account was deleted: its shouts, votes and shared ships go, its comments and suggestions stay, unsigned */
   forgetUser(userId: number): Promise<void>;
 
   close(): Promise<void>;

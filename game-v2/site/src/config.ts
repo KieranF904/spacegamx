@@ -10,6 +10,8 @@
  *   SITE_PROFILES_DIR    ../data/profiles  (read-only)
  *   SITE_STATUS_FILE     ../data/status/live.json  (read-only)
  *   SITE_GUIDES_DIR      ./guides  (the guides: Markdown files)
+ *   SITE_CATALOG_FILE    ../data/catalog/catalog.json  (the game's own catalog, if it writes one; else site/catalog/catalog.json)
+ *   SITE_GAME_KEY        (a long secret the game server sends to share ships: Authorization: Bearer; unset = sharing is off)
  *   SITE_TRUST_PROXY     1 behind nginx: the visitor's address from X-Forwarded-For / X-Real-IP
  *   LOBBY_URL            http://localhost:8787
  *   LOBBY_ADMIN_SECRET   dev: the lobby's dev secret (admin account tools); production: required, the lobby's own
@@ -46,6 +48,11 @@ export interface SiteConfig {
   publicDir: string;
   /** The guides: Markdown files (src/guides.ts) */
   guidesDir: string;
+  /** The site's catalog snapshot, and the game's own catalog file (used instead when it exists and is valid) */
+  catalogFile: string;
+  catalogGameFile: string;
+  /** The key the game server sends to share ships (empty: off) */
+  gameKey: string;
   lobbyUrl: string;
   lobbyAdminSecret: string;
   game: { mode: 'proxy' | 'static' | 'link'; devUrl: string; indexFile: string; url: string };
@@ -59,6 +66,7 @@ function checkProductionEnv(env: NodeJS.ProcessEnv): void {
   if (!env.LOBBY_ADMIN_SECRET) problems.push("LOBBY_ADMIN_SECRET is not set (the lobby's own: the site uses it for account tools)");
   if (!(env.SITE_ORIGIN || '').startsWith('https://')) problems.push('SITE_ORIGIN must be the public https address, e.g. https://space.brotherk3d.com');
   if ((env.SITE_STORE_BACKEND || '').toLowerCase() === 'postgres' && !env.DATABASE_URL) problems.push('SITE_STORE_BACKEND=postgres needs DATABASE_URL');
+  if (env.SITE_GAME_KEY && env.SITE_GAME_KEY.length < 32) problems.push('SITE_GAME_KEY is too short (32+ characters)');
   if (problems.length) throw new Error(`The site can't start in production:\n  - ${problems.join('\n  - ')}`);
 }
 
@@ -81,6 +89,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): SiteConfig {
     statusFile: path.resolve(env.SITE_STATUS_FILE || path.join(root, 'data/status/live.json')),
     publicDir: path.resolve(here, '../public'),
     guidesDir: path.resolve(env.SITE_GUIDES_DIR || path.join(here, '../guides')),
+    catalogFile: path.resolve(here, '../catalog/catalog.json'),
+    catalogGameFile: path.resolve(env.SITE_CATALOG_FILE || path.join(root, 'data/catalog/catalog.json')),
+    gameKey: env.SITE_GAME_KEY || '',
     lobbyUrl: (env.LOBBY_URL || 'http://localhost:8787').replace(/\/$/, ''),
     lobbyAdminSecret: env.LOBBY_ADMIN_SECRET || (production ? '' : 'dev-lobby-admin-secret'),
     game: {

@@ -11,7 +11,7 @@
  */
 
 import type {
-  ApiToken, Comment, Post, PostInput, PostPatch, PostStatus, Shout, SiteStore, Suggestion, SuggestionStatus,
+  ApiToken, Comment, Post, PostInput, PostPatch, PostStatus, SharedShip, ShipInput, Shout, SiteStore, Suggestion, SuggestionStatus,
 } from './types.js';
 import { SUGGESTION_STATUSES } from './types.js';
 
@@ -45,7 +45,31 @@ function token(r: any): ApiToken {
   return { id: Number(r.id), name: r.name, hash: r.hash, prefix: r.prefix, createdBy: Number(r.created_by), createdByName: r.created_by_name, createdAt: iso(r.created_at), lastUsedAt: isoOrNull(r.last_used_at) };
 }
 
-const SUGGESTION_SELECT = `SELECT s.*, (SELECT COUNT(*) FROM site_votes v WHERE v.suggestion_id = s.id)::int AS votes FROM site_suggestions s`;
+function ship(r: any): SharedShip {
+  return {
+    id: Number(r.id), ownerId: Number(r.owner_id), ownerName: r.owner_name, name: r.name, plan: r.plan ?? [], stats: r.stats ?? {},
+    power: r.power === 'ports' ? 'ports' : 'pool', hidden: !!r.hidden, createdAt: iso(r.created_at), updatedAt: iso(r.updated_at),
+  };
+}
+
+/** The same statements as schema.sql (kept in step by hand: store.test.ts applies schema.sql, upgrade() applies this) */
+const SHIPS_TABLE = `
+CREATE TABLE IF NOT EXISTS site_ships (
+    id          BIGSERIAL PRIMARY KEY,
+    owner_id    BIGINT NOT NULL,
+    owner_name  TEXT NOT NULL,
+    name        TEXT NOT NULL,
+    plan        JSONB NOT NULL,
+    stats       JSONB NOT NULL,
+    power       TEXT NOT NULL DEFAULT 'pool',
+    hidden      BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_site_ships_owner_name ON site_ships(owner_id, lower(name));
+CREATE INDEX IF NOT EXISTS idx_site_ships_updated ON site_ships(updated_at DESC);`;
+
+const SUGGESTION_SELECT =`SELECT s.*, (SELECT COUNT(*) FROM site_votes v WHERE v.suggestion_id = s.id)::int AS votes FROM site_suggestions s`;
 
 export class PostgresSiteStore implements SiteStore {
   constructor(private pool: PgPool) {}
@@ -65,6 +89,15 @@ export class PostgresSiteStore implements SiteStore {
    * alone: that database hasn't had schema.sql applied at all.
    */
   async upgrade(): Promise<void> {
+    const base = await this.pool.query(`SELECT to_regclass('site_posts') IS NOT NULL AS posts, to_regclass('site_ships') IS NOT NULL AS ships`);
+    if (base.rows[0]?.posts && !base.rows[0]?.ships) {
+      try {
+        await this.pool.query(SHIPS_TABLE);
+        console.log('[SiteStore] Added site_ships');
+      } catch (e) {
+        throw new Error(`There is no site_ships table and this database user can't add it: run site/schema.sql as the table owner (${e})`);
+      }
+    }
     const r = await this.pool.query(
       `SELECT to_regclass('site_comments') IS NOT NULL AS comments,
               EXISTS (SELECT 1 FROM information_schema.columns
@@ -226,7 +259,38 @@ export class PostgresSiteStore implements SiteStore {
   async touchToken(id: number) { await this.pool.query(`UPDATE site_api_tokens SET last_used_at = now() WHERE id = $1 AND (last_used_at IS NULL OR last_used_at < now() - interval '1 minute')`, [id]); }
   async revokeToken(id: number) { await this.pool.query('DELETE FROM site_api_tokens WHERE id = $1', [id]); }
 
+  async saveShip(s: ShipInput, cap: number) {
+    const old = await this.pool.query('SELECT id FROM site_ships WHERE owner_id = $1 AND lower(name) = lower($2)', [s.ownerId, s.name]);
+    if (old.rows[0]) {
+      const r = await this.pool.query(
+        'UPDATE site_ships SET owner_name = $2, name = $3, plan = $4, stats = $5, power = $6, updated_at = now() WHERE id = $1 RETURNING *',
+        [old.rows[0].id, s.ownerName, s.name, JSON.stringify(s.plan), JSON.stringify(s.stats), s.power]);
+      return { ship: ship(r.rows[0]), created: false };
+    }
+    const n = await this.pool.query('SELECT COUNT(*)::int AS n FROM site_ships WHERE owner_id = $1', [s.ownerId]);
+    if (n.rows[0].n >= cap) return 'cap' as const;
+    const r = await this.pool.query(
+      'INSERT INTO site_ships (owner_id, owner_name, name, plan, stats, power) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [s.ownerId, s.ownerName, s.name, JSON.stringify(s.plan), JSON.stringify(s.stats), s.power]);
+    return { ship: ship(r.rows[0]), created: true };
+  }
+
+  async listShips(opts: { ownerId?: number; includeHidden?: boolean; limit?: number }) {
+    const where: string[] = [];
+    const params: unknown[] = [];
+    if (!opts.includeHidden) where.push('NOT hidden');
+    if (opts.ownerId !== undefined) { params.push(opts.ownerId); where.push(`owner_id = $${params.length}`); }
+    params.push(opts.limit ?? 60);
+    const r = await this.pool.query(`SELECT * FROM site_ships ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY updated_at DESC, id DESC LIMIT $${params.length}`, params);
+    return r.rows.map(ship);
+  }
+
+  async getShip(id: number) { const r = await this.pool.query('SELECT * FROM site_ships WHERE id = $1', [id]); return r.rows[0] ? ship(r.rows[0]) : null; }
+  async deleteShip(id: number) { return (await this.pool.query('DELETE FROM site_ships WHERE id = $1 RETURNING id', [id])).rows.length > 0; }
+  async setShipHidden(id: number, hidden: boolean) { await this.pool.query('UPDATE site_ships SET hidden = $2 WHERE id = $1', [id, hidden]); }
+
   async forgetUser(userId: number) {
+    await this.pool.query('DELETE FROM site_ships WHERE owner_id = $1', [userId]);
     await this.pool.query('DELETE FROM site_shouts WHERE author_id = $1', [userId]);
     await this.pool.query('DELETE FROM site_votes WHERE user_id = $1', [userId]);
     await this.pool.query(`UPDATE site_comments SET author_id = NULL, author_name = 'a former pilot' WHERE author_id = $1`, [userId]);

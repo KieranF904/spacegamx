@@ -28,7 +28,7 @@ export interface PageOpts {
   feed?: boolean;
 }
 
-const NAV: [string, string][] = [['/updates', 'Updates'], ['/guides', 'Guides'], ['/pilots', 'Pilots'], ['/suggestions', 'Suggestions']];
+const NAV: [string, string][] = [['/updates', 'Updates'], ['/guides', 'Guides'], ['/database', 'Database'], ['/pilots', 'Pilots'], ['/suggestions', 'Suggestions']];
 
 /** The ship mark beside the wordmark: a small arrowhead hull with a lit core */
 export const MARK = raw(`<svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2 27 26l-11-5-11 5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M16 11v7" stroke="var(--gold)" stroke-width="3" stroke-linecap="round"/></svg>`);
@@ -67,7 +67,8 @@ ${p.image ? html`<meta property="og:image" content="${p.image.startsWith('/') ? 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="/static/site.css?v=4">
+<link rel="stylesheet" href="/static/site.css?v=5">
+<link rel="stylesheet" href="/static/features.css?v=1">
 <script src="/static/site.js?v=3" defer></script>
 </head>
 <body class="${p.bodyClass ?? ''}">
@@ -97,7 +98,7 @@ ${p.body}
   <div class="wrap foot-in">
     <div class="foot-brand">${MARK}<span>${ctx.siteName}</span><span class="dim">in development</span></div>
     <nav class="foot-nav" aria-label="Footer">
-      <a href="/updates">Updates</a><a href="/guides">Guides</a><a href="/pilots">Pilots</a><a href="/suggestions">Suggestions</a><a href="/rss.xml">RSS</a>
+      <a href="/updates">Updates</a><a href="/guides">Guides</a><a href="/database">Database</a><a href="/ships">Ships</a><a href="/pilots">Pilots</a><a href="/suggestions">Suggestions</a><a href="/status">Status</a><a href="/rss.xml">RSS</a>
       ${ctx.user ? html`<a href="/account">Account</a>` : html`<a href="/register">Create an account</a>`}
     </nav>
   </div>

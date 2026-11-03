@@ -64,7 +64,7 @@ class FakeLobby implements Lobby {
 }
 
 const pilots: PilotSource = {
-  async card(id) { return id === 2 ? { level: 9, xp: 1, credits: 5, shipName: 'Stubborn', ships: 1, stats: { kills: 3, bosses: 1, quests: 0, mined: 0, earned: 0, crafted: 0, deaths: 0 }, systemsVisited: 2, ribbons: 0, codexFound: 0, bossKills: {}, since: null, lastFlown: null } : null; },
+  async card(id) { return id === 2 ? { level: 9, xp: 1, credits: 5, shipName: 'Stubborn', ships: 1, stats: { kills: 3, bosses: 1, quests: 0, mined: 0, earned: 0, crafted: 0, deaths: 0 }, systemsVisited: 2, ribbons: 0, bossKills: {}, since: null, lastFlown: null } : null; },
   async rankings() { return { week: 1, weekly: {}, allTime: { kills: [{ userId: '2', name: 'vega', value: 3 }] } }; },
   async live() { return { players: 2, ships: 10, at: Date.now(), fresh: true }; },
 };

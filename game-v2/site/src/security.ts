@@ -113,6 +113,10 @@ export const LIMITS = {
   api: { limit: 120, windowMs: 60_000 },
   apiAuthFail: { limit: 10, windowMs: 10 * 60_000 },
   upload: { limit: 30, windowMs: 60_000 },
+  /** The game server sharing ships, per pilot */
+  shipShare: { limit: 20, windowMs: 3600_000 },
+  /** Public reads of the catalog and changelog, per address */
+  publicApi: { limit: 120, windowMs: 60_000 },
 } as const;
 
 /** Headers on every site page (the game page at /play gets its own) */
@@ -149,4 +153,12 @@ export function newApiToken(): { token: string; hash: string; prefix: string } {
 
 export function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+/** Does the key a caller sent match the configured one? (constant time; an unset key matches nothing) */
+export function keyMatches(given: string, expected: string): boolean {
+  if (!expected || !given) return false;
+  const a = crypto.createHash('sha256').update(given).digest();
+  const b = crypto.createHash('sha256').update(expected).digest();
+  return crypto.timingSafeEqual(a, b);
 }
