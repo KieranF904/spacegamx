@@ -24,7 +24,7 @@ import type { SurfaceData } from '@space-game/common';
 import { skyNoiseTexture } from '../sky/noiseTexture';
 import { cloudFrag, groundFragClassic, surfaceVert } from './surfaceShaders';
 import { groundFrag } from './groundShader';
-import { hexRgb, lookOf, lookUniforms } from './surfaceLooks';
+import { hexRgb, lookOf, lookUniforms, nightShade, type SurfaceLook } from './surfaceLooks';
 
 const SCALE = 1 / 2;
 /** Spare texels round the ground's picture (it slides by up to one, and a shake's roll swings its corners) */
@@ -47,7 +47,7 @@ const v2 = () => ({ value: new Float32Array(2), type: 'vec2<f32>' as const });
 const v3 = () => ({ value: new Float32Array(3), type: 'vec3<f32>' as const });
 const v4 = () => ({ value: new Float32Array(4), type: 'vec4<f32>' as const });
 const f = (v = 0) => ({ value: v, type: 'f32' as const });
-const common = () => ({ uCamera: v2(), uRes: v2(), uZoom: f(1), uTime: f(), uSeed: v2(), uSun: v2(), uCloud: v4(), uNight: f(), uShake: v3() });
+const common = () => ({ uCamera: v2(), uRes: v2(), uZoom: f(1), uTime: f(), uSeed: v2(), uSun: v2(), uCloud: v4(), uNight: f(), uNightTint: v3(), uShake: v3() });
 
 export class SurfaceRenderer {
   /** Goes at the very back of the stage, in place of the sky */
@@ -129,6 +129,8 @@ export class SurfaceRenderer {
   /** How dark it is (0 day .. 1 night), eased towards what it's set to */
   night = 0;
   private nightTarget = 0;
+  /** The surface's look (its night and dusk tints) */
+  private look: SurfaceLook | null = null;
 
   get active(): boolean {
     return !!this.surface;
@@ -159,6 +161,7 @@ export class SurfaceRenderer {
     this.direct.visible = this.full;
     this.sprite.visible = !this.full;
     const p = lookOf({ kind: s.kind, id }, this.classic);
+    this.look = p;
     const seed = s.seed ?? 1;
     this.mesh.shader = this.direct.shader = this.ground_;
     const gu = (this.ground_.resources.groundUniforms as any).uniforms;
@@ -191,6 +194,11 @@ export class SurfaceRenderer {
     return { ambient: lava ? 0.36 : 0.6, tint: hexRgb(p.haze), ground, sun: true };
   }
 
+  /** The light at this darkness (dusk warm, night cold: surfaceLooks nightShade) */
+  shade(): { ground: Rgb; ambient: Rgb; sun: Rgb } {
+    return nightShade(this.look ?? { nightTint: 0x29334f, duskTint: 0xffa070 }, this.night);
+  }
+
   /** `shake`: the screen's shake this frame (x, y in pixels, its roll) */
   update(deltaMs: number, camX: number, camY: number, zoom: number, shake: { x: number; y: number; rot: number } = { x: 0, y: 0, rot: 0 }): void {
     if (!this.surface) return;
@@ -211,10 +219,13 @@ export class SurfaceRenderer {
       this.sprite.position.set(w / 2 - rw / 2 + c * ox - n * oy, h / 2 - rh / 2 + n * ox + c * oy);
     }
     gu.uPx = this.full ? 1 / zoom : texel;
+    // (the shader mixes towards uNightTint by uNight: the tint that lands on nightShade's colour at this darkness)
+    const shade = this.shade(), k = Math.max(1e-3, this.night);
     for (const u of [gu, cu]) {
       u.uZoom = zoom;
       u.uTime = this.time;
       u.uNight = this.night;
+      for (let i = 0; i < 3; i++) u.uNightTint[i] = 1 + (shade.ground[i] - 1) / k;
       u.uShake[0] = shake.x; u.uShake[1] = shake.y; u.uShake[2] = shake.rot;
     }
     gu.uCamera[0] = sx; gu.uCamera[1] = sy;

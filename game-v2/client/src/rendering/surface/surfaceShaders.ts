@@ -28,6 +28,7 @@ uniform vec2 uSeed;
 uniform vec2 uSun;      // the way sunlight travels across the ground (unit)
 uniform vec4 uCloud;    // x cover (0 none .. 1 overcast), y world units per tile, z wind, w shadow strength
 uniform float uNight;   // 0 day .. 1 night
+uniform vec3 uNightTint; // what the ground keeps of each colour at full dark (dusk's warmth folded in: surfaceLooks nightShade)
 uniform vec3 uShake;    // the screen's shake: offset (pixels), roll
 
 /** The world point under a place on the screen (\`s\` pixels from its middle), \`k\` the layer's nearness (clouds slide faster) */
@@ -37,8 +38,8 @@ vec2 worldAt(vec2 s, float k) {
   return uCamera + vec2(c * p.x - n * p.y, n * p.x + c * p.y) / (uZoom * k);
 }
 
-/** Night: dark, and moonlit blue */
-vec3 night(vec3 c) { return mix(c, c * vec3(0.16, 0.2, 0.32), uNight); }
+/** Night: dark and cold (each world's own tint), warm on the way through dusk */
+vec3 night(vec3 c) { return mix(c, c * uNightTint, uNight); }
 
 mat2 rot(float a) { float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
 

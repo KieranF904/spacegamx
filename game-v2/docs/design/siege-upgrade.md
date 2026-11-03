@@ -113,6 +113,20 @@ Hooks left for the graphics stage (8-10): `siegeState.turrets[].range/kind/mend`
 (the pad hovered or picked in the panel: its range ring), `SiegePanel.selectPad(i)` (for a click on a pad on the
 ground). Not built: 11 modifiers, 12 abilities, 14 boss surges; best night is kept per run, not saved per pilot.
 
+**Built 2026-11-04 (graphics lane):** 8, 9, 10 and the ground beacon left from 2, in `client/src/rendering/surface/siege/`
+(BastionView reads `siegeFeed`, written by the panel). Ground: the keep (a dais and towers round the bastion), turret
+emplacements in their kind's colour with a pip a mark, day lanes from each profile's `approach` (lanes, arc; ring and
+pincer only at night) and night lanes down each front's bearing, reach rings (faint; the pad picked or hovered in the
+panel bright), pad lamps and a hull arc green / amber / red, scorched pads with embers and smoke. Light: a sweeping beacon
+at night (beam and cone light, red and faster in the last stand), the core's glow by hull, red beacons at front landing
+points for their last 20 s (a ring drawing in, turning dashes, a pillar and a red light), shock rings when a front lands,
+a turret dies (with a big explosion) or the bastion is hit, smoke and sparks off damaged turrets and a bastion under half.
+Dusk passes through a warm tint to each world's night tint (`surfaceLooks` `nightShade`, ground and lighting). Hostiles
+at night: brackets and a glyph by role (`siegeLook` ROLE_LOOKS; `tonight.roles[].id` added, JSON-only). UI: the NightHud
+(trailing hull, 30% mark, red screen edge on hits, front landed), the dusk title band with role chips, the dawn card
+(tiles, streak pips, count-up score), panel rows in their turret's colour. Not done: the dawn chime, turret weapon
+muzzle and hit effects (turrets fire their ordinary weapons; WeaponFx is another lane's), a ground click to pick a pad.
+
 ### P2: if time is left
 
 | # | What | Lane | Effort | Notes |

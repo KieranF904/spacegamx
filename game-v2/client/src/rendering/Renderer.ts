@@ -51,7 +51,7 @@ import {
 import { SkyRenderer } from './sky/SkyRenderer';
 import { SurfaceRenderer, SUN_DIR } from './surface/SurfaceRenderer';
 import { CityView } from './surface/CityView';
-import { BastionView } from './surface/BastionView';
+import { BastionView } from './surface/siege/BastionView';
 import { Lighting } from './lighting/Lighting';
 import { AsteroidBatch } from './lighting/AsteroidBatch';
 import { skyBiome, SkyBiome } from './sky/skyBiome';
@@ -255,7 +255,7 @@ export class Renderer {
   private surface: SurfaceRenderer;
   private city: { system: string; view: CityView | null; bastion: BastionView | null } | null = null;
   /** A surface's daylight (night dims it) */
-  private day = { ambient: [1, 1, 1] as [number, number, number], power: 0 };
+  private day = { ambient: [1, 1, 1] as [number, number, number], power: 0, sun: [1, 1, 1] as [number, number, number] };
   /** The edge of a surface's map */
   private surfaceEdge = new Graphics();
   /** On a surface, ships cast soft shadows on the ground (that's what puts them up in the air) */
@@ -791,6 +791,7 @@ export class Renderer {
       if (t) { this.terrainView = new TerrainView(t, this.lighting, surface?.kind === 'cavern'); this.terrainLayer.addChild(this.terrainView.container); }
     }
     this.terrainView?.update(Math.min(0.1, delta));
+    this.city?.bastion?.update(Math.min(0.1, delta), { night: this.surface.night, zoom: this.cameraZoom, angle: this.cameraAngle, entities: this.state.entities.values() });
     const lightKey = `${this.currentSystemId}|${this.systemVisuals.has(this.currentSystemId)}`;
     if (lightKey !== this.lightKey) {
       this.lightKey = lightKey;
@@ -802,10 +803,10 @@ export class Renderer {
       this.surface.update(Math.min(0.1, delta) * 1000, this.cameraX, this.cameraY, zoom,
         { x: (shake.offsetX || 0) * this.shakeScale, y: (shake.offsetY || 0) * this.shakeScale, rot: (shake.rotation || 0) * this.shakeScale - this.cameraAngle });
       this.drawShadows(this.day.power <= 0);
-      // Night falls on the light too (headlights come on by themselves in the dark)
-      const n = this.surface.night;
-      this.lighting.ambient = this.day.ambient.map((a) => a * (1 - 0.86 * n)) as [number, number, number];
-      this.lighting.sun.power = this.day.power * (1 - 0.92 * n);
+      // Night falls on the light too (headlights come on by themselves in the dark): warm through dusk, cold at night
+      const n = this.surface.night, shade = this.surface.shade(), sun = this.lighting.sun;
+      for (let i = 0; i < 3; i++) { this.lighting.ambient[i] = this.day.ambient[i] * shade.ambient[i]; sun.color[i] = this.day.sun[i] * shade.sun[i]; }
+      sun.power = this.day.power * (1 - 0.92 * n);
       this.shadows.container.alpha = 1 - n * 0.8;
     } else {
       this.shadows.begin();
@@ -1790,7 +1791,7 @@ export class Renderer {
         this.lighting.ambient = [0, 1, 2].map((i) => day.ambient * (0.45 + 0.55 * (day.tint[i] / tl))) as [number, number, number];
         this.lighting.sun.power = 0;
         this.lighting.ground = day.ground;
-        this.day = { ambient: [...this.lighting.ambient] as [number, number, number], power: 0 };
+        this.day = { ambient: [...this.lighting.ambient] as [number, number, number], power: 0, sun: [1, 1, 1] };
         return;
       }
       const lava = sys?.surface?.kind === 'lava';
@@ -1798,7 +1799,7 @@ export class Renderer {
       this.lighting.ambient = [0, 1, 2].map((i) => day.ambient * ((lava ? 0.55 : 0.8) + (lava ? 0.45 : 0.2) * (day.tint[i] / tl))) as [number, number, number];
       Object.assign(this.lighting.sun, { x: -SUN_DIR[0] * 1e8, y: -SUN_DIR[1] * 1e8, falloff: 1e9, power: 0.8, color: lava ? [1, 0.82, 0.66] : [1, 0.96, 0.88], elevation: 0.85 });
       this.lighting.ground = day.ground;
-      this.day = { ambient: [...this.lighting.ambient] as [number, number, number], power: 0.8 };
+      this.day = { ambient: [...this.lighting.ambient] as [number, number, number], power: 0.8, sun: [...this.lighting.sun.color] as [number, number, number] };
       return;
     }
     this.lighting.ground = [0, 0, 0];
@@ -1855,9 +1856,9 @@ export class Renderer {
     if (!sys?.surface) return;
     const s = sys.surface;
     const view = s.city ? new CityView(s.city, s.seed ?? 1, this.lighting) : null;
-    const bastion = s.bastion ? new BastionView(s.bastion, this.lighting) : null;
+    const bastion = s.bastion ? new BastionView(s.bastion, this.lighting, { radius: s.radius, boom: (x, y, r) => this.createExplosionAt(x, y, r) }) : null;
     if (view) this.backgroundContainer.addChild(view.container);
-    if (bastion) this.backgroundContainer.addChild(bastion.container);
+    if (bastion) { this.backgroundContainer.addChild(bastion.container); this.effectContainer.addChild(bastion.top); }
     this.city = { system: sys.id, view, bastion };
     // The edge: a dashed ring (fly past it to climb back to orbit)
     const R = s.radius, dashes = 120;

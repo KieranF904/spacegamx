@@ -21,6 +21,8 @@ import type { ClientMessage, ServerSiegeStateMessage } from '@space-game/common'
 import { NightHud } from './siege/NightHud';
 import { SiegeCards } from './siege/SiegeCards';
 import { focusState, frontMarkers, nextOrders, padName, padsInReach, type BastionLayout } from './siege/siegeView';
+import { siegeFeed } from '../rendering/surface/siege/siegeFeed';
+import { TURRET_DEFAULT, TURRET_LOOKS } from '../rendering/surface/siege/siegeLook';
 
 const esc = (s: unknown) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
@@ -37,7 +39,9 @@ function injectStyles(): void {
 /* The jobs tracker makes way while the siege is on */
 body.sg-open .qt { visibility: hidden; }
 .sg.night { border-color: rgba(248, 113, 113, 0.45); }
-.sg-h { padding: 10px 14px 8px; border-bottom: 1px solid rgba(140, 170, 220, 0.14); }
+.sg-h { padding: 10px 14px 8px; border-bottom: 1px solid rgba(140, 170, 220, 0.14); background: linear-gradient(180deg, rgba(125, 211, 252, 0.09), transparent); }
+.sg.night .sg-h { background: linear-gradient(180deg, rgba(248, 113, 113, 0.14), transparent); border-bottom-color: rgba(248, 113, 113, 0.2); }
+.sg.night { box-shadow: 0 16px 50px rgba(0,0,0,0.5), 0 0 24px rgba(239, 68, 68, 0.12); }
 .sg-t { font: 700 11px 'Segoe UI', sans-serif; letter-spacing: 3px; text-transform: uppercase; color: #7dd3fc; }
 .sg.night .sg-t { color: #fca5a5; }
 .sg-s { margin-top: 2px; color: #8fa0b8; }
@@ -56,6 +60,8 @@ body.sg-open .qt { visibility: hidden; }
 .sg-pad .row { display: flex; align-items: center; gap: 5px; }
 .sg-pad .n { flex: 1; min-width: 0; }
 .sg-pad .n small { display: block; color: #8394ad; font-size: 10.5px; }
+.sg-pad.built { border-left: 3px solid var(--k, #7dd3fc); background: linear-gradient(90deg, color-mix(in srgb, var(--k, #7dd3fc) 9%, transparent), transparent 60%); }
+.sg-pad .pip { display: inline-block; width: 6px; height: 6px; margin-left: 3px; border-radius: 50%; background: var(--k, #7dd3fc); box-shadow: 0 0 6px var(--k, #7dd3fc); vertical-align: 1px; }
 .sg-pad.empty { color: #8394ad; border-style: dashed; }
 .sg-pad.lost { border-color: rgba(248, 113, 113, 0.35); }
 .sg-pad.pick { border-color: rgba(125, 211, 252, 0.6); background: rgba(125, 211, 252, 0.06); }
@@ -137,6 +143,9 @@ export class SiegePanel {
   constructor(private send: (m: ClientMessage) => void, host: Partial<SiegePanelHost> = {}) {
     this.host = { tick: () => 0, target: () => 0, me: () => null, bastion: () => null, focusKey: () => 'U', ...host };
     this.hud = new NightHud(() => this.host.tick(), () => this.host.bastion(), () => this.host.focusKey());
+    // (the bastion's ground reads the state and the pad in focus from here)
+    siegeFeed.padFocus = () => this.padFocus;
+    siegeFeed.tick = () => this.host.tick();
     injectStyles();
     this.el.className = 'sg';
     // Clicks here aren't shots
@@ -174,6 +183,7 @@ export class SiegePanel {
   }
 
   update(m: ServerSiegeStateMessage): void {
+    siegeFeed.msg = m.active ? m : null;
     this.cards.update(m.active ? m : null);
     this.hud.update(m.active ? m : null);
     if (!m.active) { this.hide(); return; }
@@ -258,6 +268,15 @@ export class SiegePanel {
     return next ? `<button class="sg-mini ord" data-a="orders" data-pad="${i}" data-item="${esc(next)}" title="What it fires on first: click for the next">◎ ${esc(label)}</button>` : '';
   }
 
+  /** A built pad's row attributes: its kind's colour (the same as its emplacement and reach ring on the ground) */
+  private kindStyle(kind: string | undefined): string {
+    return `style="--k:#${(TURRET_LOOKS[kind ?? ''] ?? TURRET_DEFAULT).toString(16).padStart(6, '0')}"`;
+  }
+
+  private pips(mark: number): string {
+    return '<span class="pip"></span>'.repeat(Math.max(0, mark));
+  }
+
   private hullBar(hull: number, mend?: number): string {
     const cls = hull < 35 ? 'low' : hull < 70 ? 'mid' : '';
     return `<div class="hb"><i class="${cls}" style="width:${Math.max(0, Math.min(100, hull))}%"></i></div>`
@@ -290,8 +309,8 @@ export class SiegePanel {
           ? `<button class="sg-mini up" data-a="upgrade" data-pad="${i}"${supplies >= t.upgrade ? '' : ' disabled'} title="Upgrade to the next mark (full hull)">▲ ${t.upgrade}</button>`
           : '';
         const scrap = `<button class="sg-mini${armed(`scrap:${i}`) ? ' armed' : ''}" data-a="scrap" data-pad="${i}" title="Scrap it for half what it cost">${armed(`scrap:${i}`) ? 'Sure?' : `✕ +${t.refund}`}</button>`;
-        return `<div class="sg-pad" data-row="${i}"><div class="row"><span class="n">${esc(t.label)}<small>${esc(name)} · hull ${t.hull}%${t.range ? ` · reach ${t.range}` : ''}${t.upgrade === undefined ? ' · max mark' : ''}</small></span>${up}${scrap}</div>`
-          + `<div class="row" style="margin-top:4px">${this.ordersButton(m, i, t.orders)}</div></div>`;
+        return `<div class="sg-pad built" data-row="${i}" ${this.kindStyle(t.kind)}><div class="row"><span class="n">${esc(t.label)}${this.pips(t.mark)}<small>${esc(name)} · hull ${t.hull}%${t.range ? ` · reach ${t.range}` : ''}${t.upgrade === undefined ? ' · max mark' : ''}</small></span>${up}${scrap}</div>`
+          + `${this.hullBar(t.hull)}<div class="row" style="margin-top:4px">${this.ordersButton(m, i, t.orders)}</div></div>`;
       }).join('');
     }
     body += `<div class="sg-sec">Ship</div>`;
@@ -327,7 +346,7 @@ export class SiegePanel {
             + `<div class="kinds">${kinds.map((k) => { const c = Math.round(k.cost * N.buildCost); return `<button class="sg-mini kind" data-a="buy" data-item="${esc(k.id)}" data-pad="${i}"${supplies >= c ? '' : ' disabled'}>${esc(k.label.replace(/ turret$/i, ''))}<span>${c}</span></button>`; }).join('')}</div></div>`;
         }
         const kills = t.kills ? ` · ${t.kills} down` : '';
-        return `<div class="sg-pad" data-row="${i}"><div class="row"><span class="n">${esc(t.label)}<small>${esc(name)} · hull ${t.hull}%${kills}</small></span>${this.ordersButton(m, i, t.orders)}</div>${this.hullBar(t.hull, t.mend)}</div>`;
+        return `<div class="sg-pad built" data-row="${i}" ${this.kindStyle(t.kind)}><div class="row"><span class="n">${esc(t.label)}${this.pips(t.mark)}<small>${esc(name)} · hull ${t.hull}%${kills}</small></span>${this.ordersButton(m, i, t.orders)}</div>${this.hullBar(t.hull, t.mend)}</div>`;
       }).join('');
       const empty = pads.filter((t) => !t).length - reach.length;
       if (empty > 0 && N) body += `<div class="sg-hint">${empty} empty pad${empty === 1 ? '' : 's'}: fly to one to build there (×${N.buildCost} cost)</div>`;
