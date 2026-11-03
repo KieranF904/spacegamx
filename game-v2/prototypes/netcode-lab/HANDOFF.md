@@ -99,8 +99,10 @@ Not started unless marked. Ask Kieran which he wants; several were only offered.
 4. **Smooth prediction corrections.** The lab snaps; the game blends (`ShipReplicaSet`). Other ships' visible pops in
    the lab look worse than they would in the game.
 5. **Option: draw other ships at the confirmed tick** and predict only your own: today's trade, for comparison.
-6. **Bot inputs dominate download around fights** (~1.1 KB/s in the 8-bot probe; each AI brain's output goes out at
-   15 Hz).
+6. ~~Bot inputs dominate download around fights~~: done 2026-11-03. AIs are a server-side commander (target) and a
+   shared pilot; orders go out only when the target changes; pull-in follows needs with no cap (Kieran's call). Design
+   doc 6a and 7, numbers under "AI orders and unlimited pull-in". The live lab still runs the version before this
+   (deploy was blocked by a permission check; Kieran to run deploy.sh or allow it).
 7. **Header overhead.** About 66 B per message is more than the payload. Options: coalesce ticks per message, or
    UDP/WebTransport (open question 2 in the design doc).
 8. **Design doc open questions 1-9:**

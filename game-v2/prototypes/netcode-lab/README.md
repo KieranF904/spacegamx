@@ -6,8 +6,8 @@ A small standalone 2D space game for feeling and measuring network styles. It ha
   asteroids you can shoot apart, freighters on routes, pirate drones, players, and bots on request. You play it over a
   real connection in one of two styles:
   * **Lockstep (new design)**: server-paced deterministic lockstep, as specified in
-    [docs/design/netcode-lockstep.md](../../docs/design/netcode-lockstep.md). Only inputs, entry snapshots and
-    corrections travel; your client simulates what it is aware of; your own ship is predicted.
+    [docs/design/netcode-lockstep.md](../../docs/design/netcode-lockstep.md). Only inputs, AI orders, entry snapshots
+    and corrections travel; your client simulates what it is aware of; your own ship is predicted.
   * **Current (snapshots)**: the game's style today. 20 Hz snapshots of what is in range, your ship predicted and
     reconciled, everyone else drawn a little in the past.
 
@@ -67,7 +67,7 @@ and puts things back if the new server or `nginx -t` fails.
 * Ships: blue is you, orange other players and bots, red pirate drones, green freighters.
 * Yellow diamonds are loot from rocks; fly over them to pick them up.
 * The number next to each entity is its **slot**. A **violet ring** means it was pulled in (it is outside your radius
-  and is tracked because it interacts with something inside).
+  and is tracked because something you hold needs it: an AI's target, or a shooter whose shells can reach it).
 * The dashed circle is the view radius (1,200); the solid one is the awareness radius (1,500).
 * The minimap shows the whole world.
 
@@ -86,11 +86,12 @@ caught:
 | Drift: move | moves the ship last hit 400 units | **missing** (hits you should have seen don't happen), or hash |
 | Drift: into a shell | puts a ship in front of a live shell | **spurious** (you report a hit the server never had) |
 | Drift: silent | moves a quiet entity (no recent events, no shells near it) 1 unit | **hash**, at the next 2-second state hash |
-| Drop a message | throws away the next bundle that has inputs in it | whatever that causes: usually hash or mismatch |
+| Drop a message | throws away the next bundle that has inputs or orders in it | whatever that causes: usually hash or mismatch |
 | Delay 500 ms | holds everything that arrives for 500 ms | nothing: watch the queue fill and the client catch up |
 
 *Bot fight at the edge* puts a freighter just inside your awareness and a bot outside it attacking the freighter, so you
-can watch the bot get pulled in. *+4 bots* puts four brawling bots around you. *Clear bots* removes everyone's bots
+can watch the bot get pulled in, and whatever is shooting the bot after it. Bots, drones and freighters are AIs: the
+server decides each one's target and sends it as an order when it changes; every copy flies it from there. *+4 bots* puts four brawling bots around you. *Clear bots* removes everyone's bots
 (the server allows 24 at most).
 
 ## The readouts (index.html)
@@ -125,8 +126,9 @@ the server used it arrives).
 estimate of IP/TCP/TLS/WebSocket headers per message (about 66 bytes), and messages per second. The page's own JSON (the info
 panel, debug commands) isn't part of either design and isn't counted.
 * Lockstep, down:
-  * *inputs*: other players' and puppets' input changes, and `RCV` (how many of your inputs the server had; it rides on
-    bundles going out anyway);
+  * *inputs*: other people's input changes, and `RCV` (how many of your inputs the server had; it rides on bundles
+    going out anyway);
+  * *orders*: AIs' new targets (3 bytes each);
   * *entries*: entry snapshots, exits, pull flags, rock overrides on entry;
   * *corrections*;
   * *overrides*: rocks destroyed elsewhere;
@@ -172,9 +174,9 @@ connection to the VPS (10 ms round trip):
 | file | what |
 |---|---|
 | `sim.js` | the deterministic core both pages use: fixed-point maths, table trig, flight, guns, shells, hash |
-| `world.js` | the open world on top of it: rocks from the seed and their override table, freighters, drones, loot, one RNG per entity, `step()` that runs the same on part of the world as on all of it, entity and event hashes |
+| `world.js` | the open world on top of it: rocks from the seed and their override table, freighters, drones, loot, AI pilots, one RNG per entity, `step()` that runs the same on part of the world as on all of it, entity and event hashes |
 | `proto.js` | the wire format: varints, entity snapshots, bundles, the client's up message, current-style snapshots; byte counts per category |
-| `labserver.js` | the server: 60 Hz, input queues, awareness and pull-in, slots, bundles, report and hash checks, corrections, bots, current-style snapshots |
+| `labserver.js` | the server: 60 Hz, input queues, AI commanders and orders, awareness and pull-in, slots, bundles, report and hash checks, corrections, bots, current-style snapshots |
 | `labclient.js` | the two clients (`LsClient`, `CurClient`): clock, stamping, margin, catch-up, prediction, delay meters, debug drift |
 | `harness.js` | the server and clients in one process over pretend links (the page's in-page server, and the tests) |
 | `lab.js`, `index.html` | the real-server page |

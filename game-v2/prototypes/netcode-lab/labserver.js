@@ -5,8 +5,8 @@
 // Two kinds of client share the one world:
 //   lockstep ("server-paced deterministic lockstep", docs/design/netcode-lockstep.md) - the client runs the same
 //     simulation on the part of the world it is told about. The server sends tick-stamped bundles: the inputs of the
-//     players in that client's awareness, entry snapshots and exits (with slots), interaction pull-ins, rock overrides,
-//     and corrections when a client's event reports or state hashes show it has gone wrong.
+//     people in that client's awareness, the orders of its AIs, entry snapshots and exits (with slots), interaction
+//     pull-ins, rock overrides, and corrections when a client's event reports or state hashes show it has gone wrong.
 //   current - the game's style today: 20 Hz snapshots of what is in range, the client predicting only its own ship.
 (function (NL) {
 'use strict';
@@ -29,14 +29,14 @@ class LabServer {
     this.start = opts.now ?? 0;
     this.nextUid = 1; this.nextCid = 1;
     this.clients = new Map();
-    this.bots = new Map();           // uid -> bot brain state (bots are players whose inputs the server makes)
+    this.bots = new Map();           // uid -> { fixed }: a bot is a player's ship flown by an AI pilot (fixed: its given target)
     this.labShips = new Set();       // freighters made by debug commands (cleared with the bots)
     this.evlog = new Map();          // tick -> that tick's events (with report hashes)
     this.fireLog = new Map();        // tick -> shells fired that tick (current style's fire events)
     this.hashLog = new Map();        // tick -> Map uid -> 8-bit state hash (every HASH_EVERY ticks)
     this.inter = new Map();          // uid -> [{T, other}] recent interactions (what a correction also snapshots)
-    this.applied = new Map();        // this tick's player inputs: uid -> { inp, changed, seq }
-    this.aiChanged = new Map();      // this tick's AI brain outputs that changed: uid -> inp (relayed for puppets)
+    this.applied = new Map();        // this tick's people's inputs: uid -> { inp, changed, seq }
+    this.ordChanged = new Map();     // AIs whose order changed at the end of this tick: uid -> target uid
     this.perf = { ms: 0, n: 0, last: 0 };
     this.populate(opts);
   }
@@ -65,7 +65,8 @@ class LabServer {
   }
   addBot(x, y, target) {
     const sh = this.spawnPlayer(x, y);
-    this.bots.set(sh.uid, { fixed: target || 0, target: target || 0, inp: Sim.NEUTRAL, phase: sh.uid * 1.7, aimAt: 0 });
+    sh.bot = 1; sh.target = target || 0;
+    this.bots.set(sh.uid, { fixed: target || 0 });
     return sh;
   }
   clearBots() {
@@ -187,7 +188,7 @@ class LabServer {
   tick(now) {
     const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
     const W = this.W, T = W.tick + 1;
-    // 1. Inputs for this tick: each person's queued input stamped for it (the last one wins), each bot's brain
+    // 1. Inputs for this tick: each person's queued input stamped for it (the last one wins)
     const inputs = new Map();
     this.applied.clear();
     for (const c of this.clients.values()) {
@@ -200,18 +201,10 @@ class LabServer {
       c.appliedSeq = e.seq;
       this.applied.set(c.uid, { inp: e.inp, prev: sh.inp, changed: !Sim.sameInput(e.inp, sh.inp), seq: e.seq });
     }
-    for (const [uid, b] of this.bots) {
-      const sh = W.byUid.get(uid);
-      if (!sh) { this.bots.delete(uid); continue; }
-      const inp = this.botInput(b, sh, T);
-      if (!Sim.sameInput(inp, sh.inp)) { inputs.set(uid, inp); this.applied.set(uid, { inp, prev: sh.inp, changed: true, seq: -1 }); }
-    }
-    // 2. Step (noting which AI brains changed their output: clients holding that AI as a puppet get it as an input)
-    const before = new Map();
-    for (const sh of W.ships) if (sh.kind !== 'player') before.set(sh.uid, sh.inp);
+    for (const uid of this.bots.keys()) if (!W.byUid.has(uid)) this.bots.delete(uid);
+    // 2. Step, then the AIs' commanders (their new orders count from the next tick)
     Wo.step(W, inputs);
-    this.aiChanged.clear();
-    for (const sh of W.ships) if (sh.kind !== 'player' && before.has(sh.uid) && !Sim.sameInput(before.get(sh.uid), sh.inp)) this.aiChanged.set(sh.uid, { inp: sh.inp, prev: before.get(sh.uid) });
+    this.commandAI(T);
     // 3. Logs: events with their report hashes, shells fired, who interacted with whom
     for (const e of W.events) {
       e.h8 = Wo.eventHash8(e);
@@ -223,17 +216,16 @@ class LabServer {
     this.fireLog.set(T, fired);
     if (T % HASH_EVERY === 0) {
       const m = new Map();
-      for (const e of W.ships) m.set(e.uid, [Wo.fold8(Wo.entityHash(W, e)), Wo.fold8(Wo.entityHash(W, e, true))]);
-      for (const e of W.loot) { const h = Wo.fold8(Wo.entityHash(W, e)); m.set(e.uid, [h, h]); }
+      for (const list of [W.ships, W.loot]) for (const e of list) m.set(e.uid, Wo.fold8(Wo.entityHash(W, e)));
       this.hashLog.set(T, m);
     }
     for (const mp of [this.evlog, this.fireLog, this.hashLog]) for (const k of mp.keys()) { if (k < T - HIST) mp.delete(k); else break; }
     // 4. Every client's view of this tick
-    const adj = this.graph();
+    const need = this.needs();
     const killed = W.events.filter((e) => e.rock >= 0 && e.kill).map((e) => e.rock);
     for (const c of this.clients.values()) {
       if (!c.ready) continue;
-      if (c.mode === 'lockstep') this.bundle(c, adj, killed, T, now);
+      if (c.mode === 'lockstep') this.bundle(c, need, killed, T, now);
       else if ((T - c.lastSnap) >= SNAP_EVERY) this.snapshot(c, T);
       if (now - c.lastInfo >= 500) { c.lastInfo = now; this.sendJson(c, this.info(c)); }
     }
@@ -249,78 +241,60 @@ class LabServer {
     if (l.length > 64) l.splice(0, l.length - 64);
   }
 
-  /** A server bot: picks a target (or keeps the one it was given), circles it at ~500 and shoots; aim updated at 15 Hz */
-  botInput(b, sh, T) {
-    const W = this.W, FX = Sim.FX, IN = Sim.IN;
-    if (sh.dead) return sh.inp;
-    let tg = b.target ? W.byUid.get(b.target) : null;
-    if (b.fixed && (!tg || tg.dead) && W.byUid.has(b.fixed)) tg = W.byUid.get(b.fixed);
-    if (!b.fixed && (!tg || tg.dead || T % 120 === sh.uid % 120)) {
-      let best = null, bd = 2500 * 2500;
-      for (const o of W.ships) {
-        if (o === sh || o.dead) continue;
-        const d = ((o.x - sh.x) / FX) ** 2 + ((o.y - sh.y) / FX) ** 2;
-        if (d < bd) { bd = d; best = o; }
+  /** The commander half of every AI (server only, so plain floats are fine): what it is after. It runs at the end of a
+   *  tick; a change is an order, used from the next tick on, that goes to every client holding that AI. */
+  commandAI(T) {
+    const W = this.W;
+    this.ordChanged.clear();
+    const nearest = (sh, R, ok) => {
+      let best = 0, bd = R * R;
+      for (const o of W.ships) { if (o === sh || o.dead || !ok(o)) continue; const d = Wo.d2u(sh, o); if (d < bd) { bd = d; best = o.uid; } }
+      return best;
+    };
+    for (const sh of W.ships) {
+      if (sh.dead || (sh.kind === 'player' && !sh.bot)) continue;
+      const tg = sh.target ? W.byUid.get(sh.target) : null, b = this.bots.get(sh.uid);
+      let next = sh.target;
+      if (sh.bot) {
+        // A bot keeps the target it was given while that exists; otherwise the nearest ship, rechecked every 2 s
+        if (b && b.fixed && W.byUid.has(b.fixed)) next = b.fixed;
+        else if (!tg || tg.dead || (T + sh.uid) % 120 === 0) next = nearest(sh, 2500, () => true);
+      } else if (sh.kind === 'drone') {
+        // A drone hunts the nearest non-drone within SENSE, rechecked every 2 s
+        if (!tg || tg.dead || !Wo.within(sh, tg, C.SENSE) || (T + sh.uid) % 120 === 0) next = nearest(sh, C.SENSE, (o) => o.kind !== 'drone');
+      } else if (!tg || tg.dead || !Wo.within(sh, tg, C.FR_SENSE) || (T + sh.uid) % 60 === 0) {
+        // A freighter's turret takes the nearest drone within FR_SENSE, rechecked every second
+        next = nearest(sh, C.FR_SENSE, (o) => o.kind === 'drone');
       }
-      tg = best;
+      if (next !== sh.target) { sh.target = next; this.ordChanged.set(sh.uid, next); }
     }
-    b.target = tg && !tg.dead ? tg.uid : 0;
-    if (!b.target) return { b: 0, aim: sh.inp.aim, dist: 400, seq: 0 };
-    const sx = sh.x / FX, sy = sh.y / FX, tx = tg.x / FX, ty = tg.y / FX;
-    const th = T / 60 * 0.45 + b.phase, rad = tg.kind === 'freighter' ? 520 : 480;
-    const wx = tx + rad * Math.cos(th) - sx, wy = ty + rad * Math.sin(th) - sy;
-    let bits = 0;
-    if (wx > 60) bits |= IN.D; else if (wx < -60) bits |= IN.A;
-    if (wy > 60) bits |= IN.S; else if (wy < -60) bits |= IN.W;
-    const dist = Math.hypot(tx - sx, ty - sy);
-    if (T % 4 === 0 || !b.aimAt) {
-      const lead = Math.min(40, dist / 34);
-      b.aimAt = Pr.quantAim(Math.round(Math.atan2(ty + tg.vy / FX * lead - sy, tx + tg.vx / FX * lead - sx) * Sim.RAD) & 0xFFFF) || 8;
-    }
-    const aim = b.aimAt;
-    if (dist < 1000 && Math.abs(Sim.wrapBA(aim - sh.a)) < 1500) bits |= IN.GUN;
-    if (dist < 1100) bits |= IN.TURRET;
-    if ((T / 60 + b.phase) % 9 < 0.6) bits |= IN.BOOST;
-    return { b: bits, aim, dist: Pr.quantDist(Math.min(dist, 2000)), seq: 0 };
   }
 
   // --------------------------------------------------------------------------------------- interaction pull-in
-  /** Who interacts with whom this tick (server only, so plain floats): AI targets and what an AI can see, what each live
-   *  shell can still reach on its line, loot within reach of a ship. Rocks are keyed -1 - id. */
-  graph() {
-    const W = this.W, FX = Sim.FX, adj = new Map();
-    const add = (a, b) => {
-      if (a === b) return;
-      (adj.get(a) || adj.set(a, new Set()).get(a)).add(b);
-      (adj.get(b) || adj.set(b, new Set()).get(b)).add(a);
-    };
-    for (const sh of W.ships) {
-      if (sh.dead) continue;
-      const bt = this.bots.get(sh.uid);
-      const tgt = bt ? bt.target : sh.target;
-      if (tgt && W.byUid.has(tgt)) add(sh.uid, tgt);
-      if (sh.kind === 'drone' || sh.kind === 'freighter') {
-        const R = sh.kind === 'drone' ? C.SENSE + 200 : C.FR_SENSE + 200;
-        for (const o of W.ships) {
-          if (o === sh || o.dead || (sh.kind === 'drone' ? o.kind === 'drone' : o.kind !== 'drone')) continue;
-          if (Wo.within(sh, o, R)) add(sh.uid, o.uid);
-        }
-      }
-    }
+  /** What each entity needs a client to hold along with it this tick (server only, so plain floats): an AI needs its
+   *  target (its pilot flies against it); a ship needs the shooter of every live shell whose line can still reach it
+   *  (the shooter comes with its shells), and so does a rock; a shooter needs the rocks its shells can reach, and a
+   *  player the loot within reach. Rocks are keyed -1 - id. */
+  needs() {
+    const W = this.W, FX = Sim.FX, need = new Map();
+    const add = (a, b) => { if (a !== b) (need.get(a) || need.set(a, new Set()).get(a)).add(b); };
+    for (const sh of W.ships) if (!sh.dead && sh.target && W.byUid.has(sh.target)) add(sh.uid, sh.target);
     for (const p of W.shells) {
       const x0 = p.x / FX, y0 = p.y / FX, x1 = x0 + p.vx / FX * p.life, y1 = y0 + p.vy / FX * p.life;
       for (const sh of W.ships) {
         if (sh.dead || sh.uid === p.o || Wo.team(sh) === p.tm) continue;
-        if (segDist(x0, y0, x1, y1, sh.x / FX, sh.y / FX) < Wo.P.kinds[sh.kind].r + 150) add(p.o, sh.uid);
+        if (segDist(x0, y0, x1, y1, sh.x / FX, sh.y / FX) < Wo.P.kinds[sh.kind].r + 150) add(sh.uid, p.o);
       }
       for (const id of Wo.rocksIn(W, Math.min(x0, x1) - 100, Math.min(y0, y1) - 100, Math.max(x0, x1) + 100, Math.max(y0, y1) + 100)) {
         const rk = W.rocks.list[id];
         // (destroyed ones too: a client that never saw it go would still have it)
-        if (segDist(x0, y0, x1, y1, rk.x, rk.y) < rk.r + 40) add(p.o, rockKey(id));
+        if (segDist(x0, y0, x1, y1, rk.x, rk.y) >= rk.r + 40) continue;
+        add(p.o, rockKey(id));
+        if (Wo.rockAlive(W, id)) add(rockKey(id), p.o);
       }
     }
     for (const l of W.loot) for (const sh of W.ships) if (sh.kind === 'player' && !sh.dead && Wo.within(sh, l, 300)) add(sh.uid, l.uid);
-    return adj;
+    return need;
   }
 
   // ---------------------------------------------------------------------------------------------- lockstep client
@@ -345,13 +319,13 @@ class LabServer {
     return -1;
   }
 
-  bundle(c, adj, killed, T, now) {
+  bundle(c, need, killed, T, now) {
     const W = this.W, w = new Writer(64);
     w.mark('ticks'); w.u8(Pr.T.BUNDLE); w.u16(T);
     const start = w.o;
     for (const n of c.lateQ) { w.u8(R.LATE); w.u8(n.seq); w.u8(Math.min(255, n.by)); }
     c.lateQ.length = 0;
-    // Inputs that changed this tick, of the players (and puppet AIs) this client tracks: only the fields that changed,
+    // Inputs that changed this tick, of the people this client tracks: only the fields that changed,
     // against the input that ship flew with last tick (which the client's copy has too). Not its own: it knows what it
     // sent and when for; the one thing it can't know, an input arriving late, is in LATE above.
     w.mark('inputs');
@@ -359,10 +333,6 @@ class LabServer {
     for (const [uid, a] of this.applied) {
       const m = c.set.get(uid);
       if (m && uid !== c.uid && a.changed) wIn(m.slot, a.inp, a.prev);
-    }
-    for (const [uid, a] of this.aiChanged) {
-      const m = c.set.get(uid);
-      if (m && m.pulled) wIn(m.slot, a.inp, a.prev);
     }
     // A tracked shooter's shell hit something this client doesn't hold: name the shell (shooter slot + shot number) so
     // the client drops it too, instead of letting it fly on into something it does hold
@@ -372,10 +342,11 @@ class LabServer {
       const m = c.set.get(e.by), holds = e.rock >= 0 ? c.rocks.has(e.rock) : c.set.has(e.tgt);
       if (m && !holds) { w.u8(R.GONE); w.vu(m.slot); w.u8(e.n & 255); w.u8(e.kill); }
       // ...and the other way round: something this client holds was hit from outside its set. It can't have seen
-      // that, so it is corrected now (one hop of pull-in isn't always enough: this is the cost of stopping at one)
+      // that, so it is corrected now (pull-in should have brought the shooter in first: this counts where it didn't)
       if (!m && holds) this.detect(c, 'unseen', e.rock >= 0 ? rockKey(e.rock) : e.tgt, T, e);
     }
-    // Awareness: within AWARE of your ship (AWARE_OUT to stay), plus one hop of interactions, plus recent pull-ins
+    // Awareness: within AWARE of your ship (AWARE_OUT to stay), plus recent pull-ins; then everything a held entity needs
+    // (its target, the shooters of shells that can reach it, rocks, loot) and what those need in turn, with no limit
     const me = W.byUid.get(c.uid);
     if (me) c.center = { x: me.x, y: me.y };
     const ctr = c.center || { x: 0, y: 0 };
@@ -384,35 +355,31 @@ class LabServer {
       const cur = c.set.get(e.uid);
       if (Wo.within(ctr, e, cur && !cur.pulled ? C.AWARE_OUT : C.AWARE)) want.set(e.uid, false);
     }
-    for (const uid of [...want.keys()]) {
-      const nb = adj.get(uid);
-      if (!nb) continue;
-      for (const o of nb) {
-        if (o < 0) { rockPull.add(-1 - o); continue; }
-        if (want.has(o) || !W.byUid.has(o)) continue;
-        want.set(o, true); c.sticky.set(o, T + STICKY);
-      }
-    }
     for (const [uid, until] of c.sticky) {
       if (until < T || !W.byUid.has(uid)) c.sticky.delete(uid);
       else if (!want.has(uid)) want.set(uid, true);
     }
-    // Rocks are leaves (they never act on anything), so the rocks any tracked entity's shells can reach come in too
-    // (and so is loot: it only ever gets picked up)
-    for (const uid of [...want.keys()]) for (const o of adj.get(uid) || []) {
-      if (o < 0) rockPull.add(-1 - o);
-      else if (Wo.isLoot(o) && !want.has(o) && W.byUid.has(o)) { want.set(o, true); c.sticky.set(o, T + STICKY); }
+    const queue = [...want.keys()], nearRocks = new Set();
+    for (const rk of W.rocks.list) {
+      if (!Wo.within(ctr, { x: rk.x * Sim.FX, y: rk.y * Sim.FX }, c.rocks.has(rk.id) ? C.ROCK_OUT : C.ROCK_AWARE)) continue;
+      nearRocks.add(rk.id); queue.push(rockKey(rk.id));
+    }
+    while (queue.length) {
+      for (const o of need.get(queue.pop()) || []) {
+        if (o < 0) { if (!nearRocks.has(-1 - o) && !rockPull.has(-1 - o)) { rockPull.add(-1 - o); queue.push(o); } continue; }
+        if (want.get(o) === false || !W.byUid.has(o)) continue;
+        c.sticky.set(o, T + STICKY);
+        if (!want.has(o)) { want.set(o, true); queue.push(o); }
+      }
     }
     w.mark('entries');
     for (const [uid, m] of c.set) {
       if (want.has(uid)) {
         const pulled = want.get(uid);
         if (pulled === m.pulled) continue;
-        // In or out of the radius: a pulled-in AI is a puppet; one that comes into the radius needs its brain state
+        // In or out of the radius (for the page's display only: the client simulates both the same)
         m.pulled = pulled;
-        const e = W.byUid.get(uid);
-        if (!pulled && e && e.kind && e.kind !== 'player') { w.u8(R.ENTER); w.vu(m.slot); w.u8(0); Pr.wEntity(w, W, uid); }
-        else { w.u8(R.PULL); w.vu(m.slot); w.u8(pulled ? 1 : 0); }
+        w.u8(R.PULL); w.vu(m.slot); w.u8(pulled ? 1 : 0);
         continue;
       }
       w.u8(R.EXIT); w.vu(m.slot);
@@ -431,10 +398,18 @@ class LabServer {
     }
     // Rocks: tracked when near or pulled in; one that isn't in its default state gets its override on entry
     for (const rk of W.rocks.list) {
-      const near = Wo.within(ctr, { x: rk.x * Sim.FX, y: rk.y * Sim.FX }, c.rocks.has(rk.id) ? C.ROCK_OUT : C.ROCK_AWARE);
-      if (near || rockPull.has(rk.id)) {
+      if (nearRocks.has(rk.id) || rockPull.has(rk.id)) {
         if (!c.rocks.has(rk.id)) { c.rocks.add(rk.id); if (W.rockOv.has(rk.id)) { w.u8(R.ROCK); Pr.wRock(w, W, rk.id); } }
       } else c.rocks.delete(rk.id);
+    }
+    // Orders: an AI this client holds took a new target at the end of this tick (one that entered now has it already).
+    // Its target is held: pull-in follows orders.
+    w.mark('orders');
+    for (const [uid, tgt] of this.ordChanged) {
+      const m = c.set.get(uid);
+      if (!m || m.iv.from === T) continue;
+      const t = tgt ? c.set.get(tgt) : null;
+      w.u8(R.ORD); w.vu(m.slot); w.vu(t ? t.slot + 1 : 0);
     }
     // Destroyed rocks: everyone not already simulating that rock hears about it (id; the tick is the bundle's)
     w.mark('overrides');
@@ -521,8 +496,7 @@ class LabServer {
     const slots = c.hist.filter((x) => x.from <= h.tick && x.to > h.tick).sort((a, b) => a.slot - b.slot);
     if (slots.length !== h.list.length) return;
     slots.forEach((s, i) => {
-      // (a puppet's hash leaves out its brain state: either version will do)
-      if (!srv.has(s.uid) || srv.get(s.uid).includes(h.list[i])) return;
+      if (!srv.has(s.uid) || srv.get(s.uid) === h.list[i]) return;
       if ((c.corrected.get(s.uid) ?? -1) >= h.tick || c.corr.has(s.uid)) return;
       this.detect(c, 'hash', s.uid, h.tick, null);
     });

@@ -1,7 +1,7 @@
 // Netcode Lab checks, part 3: the lab server (labserver.js) and its clients (labclient.js), in one process over pretend
 // links (harness.js) on a fake clock. Run by test.mjs (`node test.mjs --server` for this part alone).
 //   a. determinism: two servers fed the same inputs stay equal; every client's copy of every entity equals the server's,
-//      tick by tick (a puppet's brain state aside), except entities a hit from outside the set was just corrected on
+//      tick by tick, except entities a hit from outside the set was just corrected on
 //   b. identities: each client's slot -> entity map equals the server's slot history at every tick; freed slots sit out
 //      their quarantine; a bot fighting just outside the awareness radius is pulled in
 //   c. drift: each injected drift is caught for the reason it should be (mismatch, missing, spurious, hash), and
@@ -112,7 +112,7 @@ export async function run(NL) {
         for (const e of [...cl.conf.ships, ...cl.conf.loot]) {
           const s = S.byUid.get(e.uid);
           checked++;
-          if (!s || Wo.entityHash(cl.conf, e, e.puppet) !== Wo.entityHash(S, s, e.puppet)) { diverged++; bad.push({ peer, uid: e.uid, T: cl.conf.tick }); }
+          if (!s || Wo.entityHash(cl.conf, e) !== Wo.entityHash(S, s)) { diverged++; bad.push({ peer, uid: e.uid, T: cl.conf.tick }); }
         }
       };
     };
@@ -193,7 +193,7 @@ export async function run(NL) {
         // Corrected: the entity matches the server again
         const cl = A.client, S = hist.get(cl.conf.tick), key = caught.key;
         const e = key >= 0 ? cl.conf.byUid.get(key) : null, s = key >= 0 && S ? S.byUid.get(key) : null;
-        const fixed = key < 0 ? true : !e || !s || Wo.entityHash(cl.conf, e, e.puppet) === Wo.entityHash(S, s, e.puppet);
+        const fixed = key < 0 ? true : !e || !s || Wo.entityHash(cl.conf, e) === Wo.entityHash(S, s);
         got = { kind, reason: caught.reason, ticks: caught.ticks, fixMs: caught.fixMs, fixed, attempt, key };
         void t0;
       }

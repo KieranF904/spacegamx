@@ -181,9 +181,9 @@ class LsClient extends BaseClient {
     const r = new Pr.Reader(buf);
     r.mark('ticks'); r.u8();
     const tick = Pr.widen(r.u16(), this.lastBundleTick);
-    const b = { tick, gone: [], ins: [], rcv: null, exits: [], enters: [], corrs: [], rocks: [], rcorrs: [], rdead: [], late: [] };
+    const b = { tick, gone: [], ins: [], rcv: null, exits: [], enters: [], ords: [], corrs: [], rocks: [], rcorrs: [], rdead: [], late: [] };
     const CAT = { [R.IN]: 'inputs', [R.RCV]: 'inputs', [R.ENTER]: 'entries', [R.EXIT]: 'entries', [R.ROCK]: 'entries',
-      [R.CORR]: 'corrections', [R.RCORR]: 'corrections', [R.RDEAD]: 'overrides', [R.LATE]: 'ticks', [R.PULL]: 'entries', [R.GONE]: 'shells' };
+      [R.CORR]: 'corrections', [R.RCORR]: 'corrections', [R.RDEAD]: 'overrides', [R.LATE]: 'ticks', [R.PULL]: 'entries', [R.GONE]: 'shells', [R.ORD]: 'orders' };
     while (r.more()) {
       const k = r.u[r.o];
       r.mark(CAT[k] || 'other'); r.u8();
@@ -198,10 +198,11 @@ class LsClient extends BaseClient {
       else if (k === R.LATE) b.late.push({ seq: r.u8(), by: r.u8() });
       else if (k === R.PULL) b.enters.push({ slot: r.vu(), pulled: !!r.u8(), flagOnly: true });
       else if (k === R.GONE) b.gone.push({ slot: r.vu(), n: r.u8(), kill: r.u8() });
+      else if (k === R.ORD) b.ords.push({ slot: r.vu(), tgt: r.vu() });
       else break;
     }
     this.down.add(now, r.end(), Pr.wireBytes(buf.length, false));
-    if (this.dropNext && b.ins.length && !b.enters.length && !b.exits.length && !b.late.length && b.rcv === null) { this.dropNext = false; this.dropped++; return; }
+    if (this.dropNext && (b.ins.length || b.ords.length) && !b.enters.length && !b.exits.length && !b.late.length && b.rcv === null) { this.dropNext = false; this.dropped++; return; }
     // Late inputs: the server used one later than stamped (from the tick after it arrived); it is used then here too,
     // and the margin gets room straight away
     for (const l of b.late) {
@@ -239,14 +240,13 @@ class LsClient extends BaseClient {
     }
     if (b) this.apply(b, now);
     if (W.tick % this.hashEvery === 0) {
-      const list = [...this.slots.keys()].sort((a, c) => a - c).map((s) => { const e = W.byUid.get(this.slots.get(s)); return e ? Wo.fold8(Wo.entityHash(W, e, e.puppet)) : 0; });
+      const list = [...this.slots.keys()].sort((a, c) => a - c).map((s) => { const e = W.byUid.get(this.slots.get(s)); return e ? Wo.fold8(Wo.entityHash(W, e)) : 0; });
       this.hashes = { tick: W.tick, list };
     }
     this.version++;
   }
-  install(e, shells, pulled) {
+  install(e, shells) {
     const W = this.conf;
-    if (e.kind) e.puppet = !!pulled && e.kind !== 'player';
     Wo.insertEntity(W, e);
     if (shells) Wo.setShellsOf(W, e.uid, shells);
   }
@@ -264,13 +264,17 @@ class LsClient extends BaseClient {
         const uid = this.slots.get(x.slot), e = uid !== undefined && W.byUid.get(uid);
         if (!e) continue;
         this.pulled.set(uid, x.pulled);
-        if (e.kind) e.puppet = x.pulled && e.kind !== 'player';
         continue;
       }
       const again = this.slots.get(x.slot) === x.ent.uid;
-      this.install(x.ent, x.shells, x.pulled);
+      this.install(x.ent, x.shells);
       this.slots.set(x.slot, x.ent.uid); this.slotOf.set(x.ent.uid, x.slot); this.pulled.set(x.ent.uid, x.pulled);
       if (!again) { this.st.entries++; if (x.pulled) this.st.pullIns++; }
+    }
+    // Orders: an AI's new target from the end of this tick (after the entries: the target may have just come in)
+    for (const o of b.ords) {
+      const sh = W.byUid.get(this.slots.get(o.slot));
+      if (sh) sh.target = o.tgt ? this.slots.get(o.tgt - 1) ?? 0 : 0;
     }
     const setRock = (x) => {
       const R0 = W.rocks.list[x.id];
@@ -287,7 +291,7 @@ class LsClient extends BaseClient {
       if (g.kill) { const s = W.byUid.get(uid); if (s) s.kills++; }
     }
     for (const x of b.corrs) {
-      this.install(x.ent, x.shells, this.pulled.get(x.ent.uid));
+      this.install(x.ent, x.shells);
       if (this.slots.get(x.slot) !== x.ent.uid) { this.slots.set(x.slot, x.ent.uid); this.slotOf.set(x.ent.uid, x.slot); }
       this.caught(x.reason, x.ent.uid, x.ago, now);
     }

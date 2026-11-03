@@ -14,8 +14,9 @@ const T = {
   BUNDLE: 21, PONG: 22, SNAP: 24,
 };
 /** Records inside a bundle (one bundle per tick that has something in it, plus heartbeats). RCV: how many of your
- *  inputs the server had by this tick (low byte), sent only when it moved and only on a bundle going out anyway */
-const R = { IN: 1, RCV: 2, ENTER: 3, EXIT: 4, CORR: 5, ROCK: 6, RCORR: 7, RDEAD: 8, LATE: 9, PULL: 10, GONE: 11 };
+ *  inputs the server had by this tick (low byte), sent only when it moved and only on a bundle going out anyway. ORD: an
+ *  AI's new order from the end of this tick (its slot, its target's slot + 1, 0 for none) */
+const R = { IN: 1, RCV: 2, ENTER: 3, EXIT: 4, CORR: 5, ROCK: 6, RCORR: 7, RDEAD: 8, LATE: 9, PULL: 10, GONE: 11, ORD: 12 };
 const REASON = { 1: 'mismatch', 2: 'missing', 3: 'spurious', 4: 'hash', 5: 'unseen' };
 const REASON_ID = { mismatch: 1, missing: 2, spurious: 3, hash: 4, unseen: 5 };
 /** Report ids: kind in the low 2 bits of the varint (so ids under 32 are one byte) */
@@ -82,9 +83,9 @@ function applyInp(prev, d) {
 }
 
 // ------------------------------------------------------------------------------------------------------- entities
-/** Full state of a ship (entry or correction snapshot), its live shells included */
+/** Full state of a ship (entry or correction snapshot), its live shells included. Kind byte: + 4 for a bot */
 function wShip(w, sh, shells, T) {
-  w.u8(W.KIND_ID[sh.kind]); w.vu(sh.uid);
+  w.u8(W.KIND_ID[sh.kind] + (sh.bot ? 4 : 0)); w.vu(sh.uid);
   w.i32(sh.x); w.i32(sh.y); w.i32(sh.vx); w.i32(sh.vy);
   w.u16(sh.a); w.i16(sh.av); w.i32(sh.tur); w.u8(sh.gcd); w.u8(sh.tcd);
   w.u16(sh.hp); w.u16(sh.dead); w.u16(sh.boost); w.vu(sh.kills); w.vu(sh.deaths); w.u16(sh.shots);
@@ -107,8 +108,9 @@ function rEntity(r, T) {
     const uid = r.vu() + W.C.LOOT_BASE;
     return { ent: { uid, x: r.i32(), y: r.i32(), vx: r.i32(), vy: r.i32(), life: r.u16() }, shells: null };
   }
-  const kind = W.KIND_NAME[k], uid = r.vu();
+  const kind = W.KIND_NAME[k & 3], uid = r.vu();
   const sh = W.makeShip(uid, kind, 0, 0, 0);
+  sh.bot = k >> 2;
   sh.x = r.i32(); sh.y = r.i32(); sh.vx = r.i32(); sh.vy = r.i32();
   sh.a = r.u16(); sh.av = r.i16(); sh.tur = r.i32(); sh.gcd = r.u8(); sh.tcd = r.u8();
   sh.hp = r.u16(); sh.dead = r.u16(); sh.boost = r.u16(); sh.kills = r.vu(); sh.deaths = r.vu(); sh.shots = r.u16();

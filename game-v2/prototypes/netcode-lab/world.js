@@ -5,20 +5,21 @@
 //
 // The world is 6000 x 6000 units: ~120 asteroids placed by the world seed (they never move; their state is the default
 // unless the override table says otherwise), freighters flying routes, pirate drones that hunt anything that is not a
-// drone, and players (people and the server's bots), whose inputs come from outside the simulation.
+// drone, and players: people, whose inputs come from outside the simulation, and the server's bots.
 //
 // A client holds only the entities the server has told it about (its awareness set). step() runs the same on a part of the
 // world as on the whole of it; it is the server's job (awareness plus interaction pull-in) to make sure that everything a
 // tracked entity touches is tracked too, and the event reports and hashes catch it when that wasn't enough.
 //
-// Every ship keeps the input it flew with this tick in sh.inp: a player's comes from outside, an AI's from its brain. An
-// AI that a client holds only because it was pulled in is a puppet there (sh.puppet, client-side only): the client can't
-// run its brain (what it is chasing may be out of that client's sight), so it flies the brain's output, which the server
-// relays like a player's input.
+// Every ship keeps the input it flew with this tick in sh.inp: a person's comes from outside, an AI's from its pilot.
+// An AI (drone, freighter, bot) has two halves. The commander, on the server only, decides what it is after: its target
+// (sh.target), set at the end of a tick and sent to clients as an order when it changes. The pilot, here, turns the order
+// into controls every 4 ticks on every copy, reading only the ship itself and its target, so a client that holds an AI
+// and its target flies it exactly; the server makes sure every client that holds an AI holds its target too.
 (function (NL) {
 'use strict';
 const S = NL.Sim;
-const { FX, IN, NEUTRAL, iatan2, isqrt, wrapBA, clamp, qmul, rngNext } = S;
+const { FX, IN, NEUTRAL, iatan2, isqrt, isin, icos, wrapBA, clamp, qmul, rngNext } = S;
 const HALF = S.HALF_WORLD;
 const RATE = 60;
 
@@ -92,7 +93,7 @@ function createWorld(seed, authority) {
 function makeShip(uid, kind, x, y, a) {
   return { uid, id: uid, kind, x: x * FX, y: y * FX, vx: 0, vy: 0, a: a & 0xFFFF, av: 0, tur: 0, gcd: 0, tcd: 0,
     hp: P.kinds[kind].hp, dead: 0, boost: P.boostMax, kills: 0, deaths: 0, seq: 0, shots: 0,
-    rng: Math.imul(uid, 0x9E3779B1) | 0 || 1, target: 0, aiFlip: 0, hx: x, hy: y, wpx: x, wpy: y, cargo: 0, inp: NEUTRAL };
+    rng: Math.imul(uid, 0x9E3779B1) | 0 || 1, target: 0, aiFlip: 0, hx: x, hy: y, wpx: x, wpy: y, cargo: 0, bot: 0, inp: NEUTRAL };
 }
 function index(W) { W.byUid.clear(); for (const s of W.ships) W.byUid.set(s.uid, s); for (const l of W.loot) W.byUid.set(l.uid, l); }
 const isLoot = (uid) => uid >= C.LOOT_BASE;
@@ -129,20 +130,11 @@ function moveBits(mx, my, thr) {
   if (my > thr) b |= IN.S; else if (my < -thr) b |= IN.W;
   return b;
 }
-/** Pirate drone: hunts the nearest non-drone within SENSE (rechecked every 2 s), circles it at 450-800 and leads its shots */
-function droneBrain(W, sh) {
-  const K = P.kinds.drone;
-  let tg = sh.target ? W.byUid.get(sh.target) : null;
-  if (tg && (tg.dead || !within(sh, tg, C.SENSE))) tg = null;
-  if (!tg || (W.tick + sh.uid) % 120 === 0) {
-    let best = null, bd = Infinity;
-    for (const o of W.ships) {
-      if (o.dead || o.kind === 'drone' || !within(sh, o, C.SENSE)) continue;
-      const d = d2u(sh, o); if (d < bd) { bd = d; best = o; }
-    }
-    tg = best;
-  }
-  sh.target = tg ? tg.uid : 0;
+/** The order's target, if it is still there to fly against (the commander replaces a dead or lost one) */
+const orderTarget = (W, sh) => { const tg = sh.target ? W.byUid.get(sh.target) : null; return tg && !tg.dead ? tg : null; };
+/** Pirate drone: circles its target at 450-800 and leads its shots; with none, goes home */
+function dronePilot(W, sh) {
+  const K = P.kinds.drone, tg = orderTarget(W, sh);
   if (!tg) {
     const dx = sh.hx - (sh.x >> 16), dy = sh.hy - (sh.y >> 16), d = isqrt(dx * dx + dy * dy);
     if (d < 150) return { b: 0, aim: sh.a, dist: 400, seq: 0 };
@@ -158,8 +150,8 @@ function droneBrain(W, sh) {
   if (d < 1100) b |= IN.GUN;
   return { b, aim, dist: Math.min(d, 2000), seq: 0 };
 }
-/** Freighter: flies to a waypoint (helm controls), picks the next from its RNG; its turret shoots the nearest drone */
-function freighterBrain(W, sh) {
+/** Freighter: flies to a waypoint (helm controls), picks the next from its RNG; its turret shoots its target */
+function freighterPilot(W, sh) {
   let dx = sh.wpx - (sh.x >> 16), dy = sh.wpy - (sh.y >> 16);
   if (dx * dx + dy * dy < 250 * 250) {
     sh.wpx = rngRange(sh, -2600, 2600); sh.wpy = rngRange(sh, -2600, 2600);
@@ -169,22 +161,29 @@ function freighterBrain(W, sh) {
   let b = IN.HELM;
   if (err > 1200) b |= IN.D; else if (err < -1200) b |= IN.A;
   if (Math.abs(err) < 12000) b |= IN.W;
-  let tg = sh.target ? W.byUid.get(sh.target) : null;
-  if (tg && (tg.dead || !within(sh, tg, C.FR_SENSE))) tg = null;
-  if (!tg || (W.tick + sh.uid) % 60 === 0) {
-    let best = null, bd = Infinity;
-    for (const o of W.ships) {
-      if (o.dead || o.kind !== 'drone' || !within(sh, o, C.FR_SENSE)) continue;
-      const d = d2u(sh, o); if (d < bd) { bd = d; best = o; }
-    }
-    tg = best;
-  }
-  sh.target = tg ? tg.uid : 0;
+  const tg = orderTarget(W, sh);
   if (!tg) return { b, aim: sh.a, dist: 400, seq: 0 };
   const tx = (tg.x - sh.x) >> 16, ty = (tg.y - sh.y) >> 16;
   return { b: b | IN.TURRET, aim: iatan2(ty, tx), dist: Math.min(isqrt(tx * tx + ty * ty), 2000), seq: 0 };
 }
-/** A brain's output on the wire's grid (aim 13 bits, distance in 4s), so a puppet flown from the relayed input matches */
+/** Server bot (a player's ship): circles its target at ~500 on a slow orbit, leads its shots, boosts now and then */
+function botPilot(W, sh) {
+  const tg = orderTarget(W, sh);
+  if (!tg) return { b: 0, aim: sh.inp.aim, dist: 400, seq: 0 };
+  const dx = (tg.x - sh.x) >> 16, dy = (tg.y - sh.y) >> 16, d = isqrt(dx * dx + dy * dy);
+  // (orbit 0.45 rad/s = 78 binary-angle units a tick, its phase from the uid)
+  const th = (W.tick * 78 + sh.uid * 17732) & 0xFFFF, rad = tg.kind === 'freighter' ? 520 : 480;
+  const wx = dx + Math.trunc(icos(th) * rad / FX), wy = dy + Math.trunc(isin(th) * rad / FX);
+  let b = moveBits(wx, wy, 60);
+  const lead = Math.min(40, Math.floor(d / 34));
+  const aim = iatan2(dy + Math.trunc(tg.vy * lead / FX), dx + Math.trunc(tg.vx * lead / FX));
+  if (d < 1000 && Math.abs(wrapBA(aim - sh.a)) < 1500) b |= IN.GUN;
+  if (d < 1100) b |= IN.TURRET;
+  if ((W.tick + sh.uid * 102) % 540 < 36) b |= IN.BOOST;
+  return { b, aim, dist: Math.min(d, 2000), seq: 0 };
+}
+const pilot = (W, sh) => (sh.bot ? botPilot : sh.kind === 'drone' ? dronePilot : freighterPilot)(W, sh);
+/** A pilot's output on the wire's grid (aim 13 bits, distance in 4s), so its held input survives an entity snapshot */
 const onGrid = (inp) => ({ b: inp.b, aim: ((inp.aim >> 3) << 3) & 0xFFFF, dist: (inp.dist >> 2) << 2, seq: 0 });
 function respawn(sh) {
   const K = P.kinds[sh.kind];
@@ -221,8 +220,8 @@ function spawnLoot(W, R, T, out) {
 }
 
 /**
- * Step the world one tick. `inputs` maps a player's uid to its input from this tick on (players hold their last input;
- * a player with no entry keeps it). Order: rock respawns; ships by uid (input or brain, flight, guns); shells in order
+ * Step the world one tick. `inputs` maps a person's uid to its input from this tick on (people hold their last input;
+ * one with no entry keeps it). Order: rock respawns; ships by uid (input or brain, flight, guns); shells in order
  * (hit a ship, else a rock; move; expire); loot (drift, pickup, expire); then this tick's new shells and loot join.
  * W.events gets this tick's hits and pickups.
  */
@@ -233,13 +232,13 @@ function step(W, inputs) {
   for (const [id, o] of W.rockOv) if (o.dead && T - o.dead >= C.ROCK_RESPAWN) W.rockOv.delete(id);
   const born = [], bornLoot = [], back = [];
   for (const sh of W.ships) {
-    const driven = sh.kind === 'player' || sh.puppet;
+    const driven = sh.kind === 'player' && !sh.bot;
     if (driven) { const n = inputs && inputs.get(sh.uid); if (n) sh.inp = n; }
     if (sh.kind === 'player') sh.seq = sh.inp.seq || 0;   // (bookkeeping for the delay readout, dead or alive; not hashed)
     if (sh.dead > 0) { if (--sh.dead === 0) { sh.dead = 1; back.push(sh); } continue; }
-    // (AI brains think at 15 Hz, staggered by uid, and hold their output between: a quarter of the inputs to relay for a puppet)
+    // (AI pilots think at 15 Hz, staggered by uid, and hold their output between)
     const think = !driven && (W.tick + sh.uid) % 4 === 0;
-    const inp = driven || !think ? sh.inp : onGrid(sh.kind === 'drone' ? droneBrain(W, sh) : freighterBrain(W, sh));
+    const inp = driven || !think ? sh.inp : onGrid(pilot(W, sh));
     if (!driven) sh.inp = inp;
     S.fly(sh, inp, P);
     const out = [];
@@ -307,20 +306,19 @@ function hasher() {
   return { mix, get: () => h >>> 0 };
 }
 const fold8 = (h) => (h ^ (h >>> 8) ^ (h >>> 16) ^ (h >>> 24)) & 255;
-const BODY = ['uid', 'x', 'y', 'vx', 'vy', 'a', 'av', 'tur', 'gcd', 'tcd', 'hp', 'dead', 'boost', 'kills', 'deaths', 'shots', 'cargo'];
-const FULL = BODY.concat(['rng', 'target', 'aiFlip', 'wpx', 'wpy']);
-/** body: leave out an AI's brain state (a puppet's copy of it goes stale; only the server runs that brain) */
-function mixShip(m, sh, body) {
-  for (const k of body && sh.kind !== 'player' ? BODY : FULL) m.mix(sh[k]);
+const FIELDS = ['uid', 'x', 'y', 'vx', 'vy', 'a', 'av', 'tur', 'gcd', 'tcd', 'hp', 'dead', 'boost', 'kills', 'deaths', 'shots', 'cargo',
+  'rng', 'target', 'aiFlip', 'wpx', 'wpy', 'bot'];
+function mixShip(m, sh) {
+  for (const k of FIELDS) m.mix(sh[k]);
   m.mix(sh.inp.b); m.mix(sh.inp.aim); m.mix(sh.inp.dist);
 }
 function mixShell(m, p) { m.mix(p.o); m.mix(p.n); m.mix(p.gun); m.mix(p.t0); m.mix(p.x); m.mix(p.y); m.mix(p.vx); m.mix(p.vy); m.mix(p.life); m.mix(p.dmg); }
 function mixLoot(m, l) { m.mix(l.uid); m.mix(l.x); m.mix(l.y); m.mix(l.vx); m.mix(l.vy); m.mix(l.life); }
-/** One entity's state hash (a ship's includes its live shells), 32 bits; `body` for a puppet (see mixShip) */
-function entityHash(W, e, body) {
+/** One entity's state hash (a ship's includes its live shells), 32 bits */
+function entityHash(W, e) {
   const m = hasher();
   if (isLoot(e.uid)) mixLoot(m, e);
-  else { mixShip(m, e, body); for (const p of W.shells) if (p.o === e.uid) mixShell(m, p); }
+  else { mixShip(m, e); for (const p of W.shells) if (p.o === e.uid) mixShell(m, p); }
   return m.get();
 }
 /** The whole world (determinism checks) */
@@ -342,6 +340,6 @@ function eventHash8(e) {
 
 NL.World = { P, C, KINDS, KIND_ID, KIND_NAME, RATE, rocksFor, rocksIn, rockHp, rockAlive, createWorld, makeShip, insertEntity,
   removeEntity, setShellsOf, shellOrder, cloneWorld, index, step, stepAlone, team, within, isLoot, entityHash, worldHash,
-  eventHash8, fold8, rngRange };
+  eventHash8, fold8, rngRange, d2u };
 if (typeof module === 'object' && module.exports) module.exports = NL;
 })(globalThis.NL = globalThis.NL || {});

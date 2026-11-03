@@ -9,8 +9,9 @@ which compared the current style with classic lockstep and rollback.
 
 The server runs the authoritative world on its own 60 Hz clock and never waits for anyone. Clients run the **same
 deterministic simulation**, but only on the part of the world the server says they are aware of. What travels is
-**inputs** (each stamped with the server tick it is for), **entry snapshots** when something comes into a client's
-awareness, and **corrections** when a client shows it has gone wrong. A client finds out it has gone wrong because it
+**inputs** (each stamped with the server tick it is for), **AI orders** (what each AI is after, when that changes),
+**entry snapshots** when something comes into a client's awareness, and **corrections** when a client shows it has gone
+wrong. A client finds out it has gone wrong because it
 **reports what it saw happen** (a 2-3 byte hash per event) and, every 2 s, a 1-byte hash of each thing it tracks. Your
 own ship is predicted from your own inputs and re-simulated from the last confirmed tick, so it answers at once.
 
@@ -54,7 +55,7 @@ own ship is predicted from your own inputs and re-simulated from the last confir
 ### 4. Own-ship prediction
 - The screen shows the confirmed world (every tick the server has sent a bundle for) run forward to "now". With own
   prediction **on**, "now" is the tick your next input would be stamped for, and your own unconfirmed inputs are applied
-  at their stamped ticks. Everyone else holds their last confirmed input; AI entities run their deterministic brains.
+  at their stamped ticks. Other people hold their last confirmed input; AIs hold their last order and fly it.
 - When new confirmed ticks arrive, the displayed world is rebuilt from the confirmed one: a rollback of only the
   ticks since confirmation, about one round trip plus the margin (3-4 ticks on a 10 ms link, 12-13 at 137 ms).
 - With prediction **off**, the screen shows the confirmed world, extrapolated with held inputs only if bundles are late.
@@ -75,31 +76,45 @@ own ship is predicted from your own inputs and re-simulated from the last confir
 - Things that had to be added for a world that clients only partly hold:
   - **Ships come back from the dead at the end of a tick**, so nothing can see a respawned ship before the server has
     put it in everyone's awareness at its new spot.
-  - **AI brains output on the wire's grid** (aim 13 bits, distance in 4s), so a brain's output and the same output
-    relayed as an input are identical.
-  - **AI brains think at 15 Hz** (every 4 ticks, staggered by uid) and hold their output in between.
+  - **AI pilots output on the wire's grid** (aim 13 bits, distance in 4s), so the input an AI holds survives an entity
+    snapshot exactly.
+  - **AI pilots think at 15 Hz** (every 4 ticks, staggered by uid) and hold their output in between.
+
+### 6a. AI: a commander on the server, a pilot everywhere (2026-11-03)
+- Every AI (drone, freighter, the server's bots) is split in two. The **commander** runs on the server only and decides
+  what the AI is after: its target. It can see the whole world and needn't be deterministic. It runs at the end of a
+  tick; when its decision changes, that is an **order**, used from the next tick, sent to every client holding the AI
+  (`ORD`: AI slot, target slot + 1, 3 bytes).
+- The **pilot** runs on every copy: from the AI's own state and its target's, it makes the controls (circle the target,
+  lead the aim, fire when lined up, fly a waypoint). It reads nothing else, so a client that holds an AI and its target
+  flies it exactly.
+- The commanders: a drone takes the nearest non-drone within 1,600 (rechecked every 2 s, or at once if its target dies
+  or leaves that range); a freighter's turret the nearest drone within 900 (every second); a bot the target it was given,
+  else the nearest ship within 2,500 (every 2 s).
+- This replaced puppets (a pulled-in AI flown from its brain's output relayed at up to 15 Hz) and the bots' inputs
+  (bots used to be players whose input the server made up, relayed like a person's).
 
 ### 7. Server-defined awareness, with interaction pull-in
 - A ship or loot is in your set when it is within **1,500** units of you (view 1,200 + 300 margin). It stays until it is
   past **1,700** (no flapping at the edge). Rocks are tracked within 1,700 / 1,900.
-- **Entry**: a snapshot of the entity's full state after tick T, effective from T, with its held input and its live
-  shells. **Exit**: at tick T, its shells go with it.
-- **Pull-in (one hop)**: the server builds an interaction graph each tick:
-  - AI targets, and what each AI could pick as a target (within its sensor range + 200);
-  - what each live shell can still reach on its line (ships within radius + 150, rocks within radius + 40);
-  - loot within 300 of a ship.
-  Anything one edge away from an entity in your radius is added to your set, marked as pulled in, and stays at least 1 s.
-- **Leaves**: rocks and loot don't act on anything, so the ones touched by *any* tracked entity (pulled-in ones too) come
-  in as well. This isn't a second hop of anything that acts.
-- **Pulled-in AIs are puppets.** A client can't run the brain of an AI it holds only because it was pulled in: what that
-  AI is chasing may be two hops away. So the server relays that AI's brain output to that client as an input, as it does
-  a player's ("snapshot plus its inputs from then on"). When the AI comes into your radius, it is re-sent in full
-  (its brain state included) and your client runs its brain from then on. A puppet's 2-second hash leaves out its brain
-  state.
-- **Hits from outside** ("unseen"): one hop is sometimes not enough. Something you hold can be hit by something two hops
-  out. The server knows that at once (the target is in your set, the shooter isn't), so the correction goes in **that
-  tick's bundle**. That is never rate-limited: held back, things inside your set react to the stale copy and the error
-  spreads (tested: with rate-limited ones, 45-95 entity-ticks wrong per 30 s; sent at once, none).
+- **Entry**: a snapshot of the entity's full state after tick T, effective from T, with its held input, its order and
+  its live shells. **Exit**: at tick T, its shells go with it.
+- **Pull-in (no limit, since 2026-11-03)**: each tick the server works out what each entity *needs* a client to hold
+  along with it:
+  - an AI needs its order's target (its pilot flies against it);
+  - a ship, or a live rock, needs the shooter of every live shell whose line can still reach it (ships within radius +
+    150, rocks within radius + 40); the shooter comes with its live shells;
+  - a shooter needs the rocks its shells can reach (destroyed ones too), and a player the loot within 300.
+
+  Starting from what is in your radius (and your nearby rocks), everything needed is added, then everything *that*
+  needs, and so on, with no cap. A pulled-in entity stays at least 1 s. An entity enters stamped with the tick the need
+  appeared, ahead of the interaction itself (a gun shell at 500 units is seen ~15 ticks before it lands), and is
+  applied at that tick on the confirmed timeline, so nothing needs correcting.
+- **Hits from outside** ("unseen"): if something you hold is hit by something you don't, the server knows at once
+  (the target is in your set, the shooter isn't), and the correction goes in **that tick's bundle**, never
+  rate-limited (held back, things inside your set react to the stale copy and the error spreads). With one hop of
+  pull-in this happened about once a second around a fight at the edge; with the closure, none were seen in the runs
+  below.
 - **Shells that hit something you don't hold**: the server names the shell (shooter slot + shot number, 3-4 bytes,
   `GONE`) so your copy drops it too, with a kill flag for the shooter's score.
 
@@ -146,11 +161,12 @@ All binary and little-endian; varints are LEB128.
 | message / record | bytes | category |
 |---|---|---|
 | bundle header: type, tick (16 bits) | 3 | ticks |
-| `IN` another player's (or a puppet's) changed input: type, slot × 8 + which fields changed, the changed fields (against the input that ship flew with last tick) | 3-6 (aim nudge 3) | inputs |
+| `IN` another person's changed input: type, slot × 8 + which fields changed, the changed fields (against the input that ship flew with last tick) | 3-6 (aim nudge 3) | inputs |
+| `ORD` an AI's new order from the end of this tick: type, AI slot, target slot + 1 (0: none) | 3 | orders |
 | `RCV` how many of your inputs the server had (low byte), on a bundle going out anyway, when it moved | 2 | inputs |
-| `ENTER` type, slot, pulled flag, entity: ship ~58 + 22 per live shell; loot 23 | ~60-130 | entries |
+| `ENTER` type, slot, pulled flag, entity (kind byte + 4 for a bot): ship ~58 + 22 per live shell; loot 23 | ~60-130 | entries |
 | `EXIT` type, slot | 2 | entries |
-| `PULL` type, slot, flag (in/out of the radius; an AI coming in is re-sent as `ENTER`) | 3 | entries |
+| `PULL` type, slot, flag (in/out of the radius; only for the page's display) | 3 | entries |
 | `ROCK` rock override on entry: type, id, HP (+ 2 if destroyed) | 4-6 | entries |
 | `CORR` type, slot, reason, ticks since the event, entity | ~64+ | corrections |
 | `RCORR` rock correction | 7-9 | corrections |
@@ -236,14 +252,41 @@ so a moving mouse costs one up message every 2 ticks and nothing extra down. `no
 other than hits from outside the set (0 in the 3-client run); the 2-player headless fight went from 975 to 601 B/s
 down, the 8-bot fight from 2,009 to 1,831.
 
+### AI orders and unlimited pull-in (2026-11-03)
+Headless, one lockstep client at 40 ms each way, 30 s after a 5 s warm-up. Before = commit c279133 (puppets, bot inputs
+relayed, one hop of pull-in), after = orders and the closure. "Held" is the client's set (sampled twice a second);
+"world" is every ship and loot on the server.
+
+| scenario | down payload, B/s | wire, B/s (msg/s) | held avg (pulled), max, of world | entries/s | desyncs in 30 s |
+|---|---|---|---|---|---|
+| 8 bots around you | 2,026 → **444** | 5,991 (62) → **2,232** (28) | 36.6 (8.8), 56 of 53 → 34.0 (12.5), 50 of 49 | 4.6 → 4.8 | 32 unseen → **0** |
+| 3 bot fights at the edge + 4 bots | 1,826 → **402** | 5,777 (62) → **2,240** (29) | 34.0 (10.9), 46 of 52 → 34.9 (15.9), 56 of 48 | 4.0 → 4.3 | 38 unseen → **0** |
+| 24 bots around you | 4,336 → **881** | 8,314 (62) → **3,483** (41) | 41.4 (17.9), 58 of 94 → 62.2 (33.7), 80 of 95 | 11.4 → 12.7 | 114 unseen + 1 spurious → **0** |
+| 16-bot brawl 2,200 away, you still | 3,476 → **667** | 7,450 (62) → **2,876** (35) | 38.0 (16.1), 56 of 65 → 46.9 (22.5), 71 of 73 | 8.3 → 9.9 | 72 unseen → **0** |
+
+After, by category (B/s): 8 bots around you: entries 287, ticks 78, ping 44, orders 21, inputs 13 (the RCV count).
+24 bots: entries 668, ticks 116, ping 44, orders 37, inputs 13, shells 3. Before, the same runs had inputs 1,403 and
+2,842 (bot and puppet inputs) and corrections 50 and 454.
+
+- **Inputs from AIs are gone.** Orders cost 20-37 B/s for 8-24 bots plus the world's drones and freighters.
+- **Unseen hits went to zero.** The last ones after the first version of the closure were all rocks hit by shooters the
+  client didn't hold; adding "a live rock needs the shooters that can reach it" removed them.
+- **Messages per second halved** (62 → 28-41), because AI decisions rarely change: most ticks have nothing to say.
+- **The cost is a bigger set.** Unlimited pull-in holds most of a fight: with 24 bots around you the client holds 62 of
+  95 entities on average (was 41), and entries rose slightly. Entries are now most of the payload. It never pulled in
+  the whole world in these runs, but this is a small world; a crowded one is the test that matters.
+- `node test.mjs`: the 3-client run had 0 desyncs of any kind (was 31/20/47 unseen); the 8-bot fight went from 1,831 to
+  418 B/s down, the 2-player fight from 601 to 328.
+- Not measured yet: the client's CPU for the bigger set, and the real link (the lab on the VPS still runs c279133).
+
 ### Estimates for the game
 - **The payload is mostly other players' inputs.** Each tracked player costs about 8 B per input change. A mouse-aiming
   human changes 15-60 times a second, so 120-480 B/s per tracked player, whatever they are doing. In the current style,
   each tracked entity costs a row every snapshot (~17-25 B at 20 Hz = 340-500 B/s) plus every shell and hit near you.
   Lockstep wins most where the current style is worst: heavy fire. Shells and hits cost nothing on the wire, because
   every copy simulates them.
-- **AI costs nothing inside your radius** (deterministic brains). At the edge it costs a puppet's inputs: ~8 B × up to
-  15/s, so ≤ 120 B/s each.
+- **AI costs an order when its decision changes** (3 bytes; a few a minute per AI in the lab), inside your radius or at
+  the edge, plus its entry. Only the pilot half has to be deterministic and shared; the commander stays on the server.
 - **Entries**: ~60-130 B each. A client flying fast through a busy area pays for every entry: about 300 B/s in these runs.
 - **Corrections**: hits from outside the set, ~0.3-1.5 a second around a fight at the edge, ~65 B each.
 - **Headers dominate the wire.** At 64 messages a second down and ~30 up, IP/TCP/TLS/WebSocket headers (~66 B each)
@@ -251,27 +294,26 @@ down, the 8-bot fight from 2,009 to 1,831.
   per-message cost (UDP / WebTransport datagrams, or coalescing ticks) lockstep is 2.5-3x cheaper.
 
 ## Decisions taken while building it (beyond the brief)
-1. **Pulled-in AIs are puppets** (inputs relayed). The alternative, running every pulled-in brain, needs everything that
-   brain can see, which is a second hop.
-2. **Rocks and loot are leaves** for pull-in (one hop from anything tracked, not just from the radius).
+1. ~~Pulled-in AIs are puppets~~ (replaced 2026-11-03 by commander and pilot, 6a: the server decides the target, so a
+   client only needs that target, not everything the AI could see).
+2. **Pull-in has no limit** (2026-11-03, Kieran's call: "even if it pulled in every entity on the map it may still be
+   less overhead"). It used to be one hop from the radius, with rocks and loot as leaves.
 3. **Destroyed rocks on a shell's line are pulled in too.** Without this, a late joiner's shells hit rocks that are no
    longer there (23 spurious reports in 30 s in a test before the fix, none after).
 4. **"Unseen" corrections go at once**, never rate-limited (see 7).
 5. **`GONE` records** for shells that hit something the client doesn't hold, so a pulled-in shooter's shells don't fly
    on into things the client does hold.
-6. **AI brains at 15 Hz on the wire grid.** This cut lockstep's input traffic around a fight by about 45% (4.1 to
-   2.4 KB/s in one run).
+6. **AI pilots at 15 Hz on the wire grid.** Earlier, when brain outputs were relayed, this cut input traffic around a
+   fight by about 45%; now it only keeps the held input exact through an entity snapshot.
 7. **Your own input isn't echoed** (2026-11-03; before that, a 2-byte sequence echo on every change). `RCV` on bundles
    going out anyway plus `LATE` tell the client which tick each input was used on (section 3).
 8. **Bundles on change, 15 Hz heartbeat.** Quiet stretches cost 3 bytes per 4 ticks. Every tick is an option (it raises
    the message rate, not the payload).
 
 ## Open questions
-1. **One hop and "unseen" hits.** Around a fight at your edge, things you hold get hit from two hops out about once a
-   second. Each is a full snapshot (~65 B). Options:
-   - a compact "hit from outside" record (target slot, damage, push: ~8 B);
-   - a second hop for shells only;
-   - a bigger pull-in margin.
+1. **How big does the closure get in a crowded world?** With no limit, unseen hits are gone, but a client holds most of
+   any fight it touches (62 of 95 entities with 24 bots around it). The lab's world is small; a stress test with many
+   separate fights linked by long shots is still to do, along with the client CPU for the bigger set.
 2. **The per-message cost.** On WebSocket/TCP/TLS the headers are bigger than the payload. Coalescing two ticks per
    message halves that and adds 8 ms. UDP or WebTransport would remove most of it.
 3. **Cross-browser determinism isn't tested yet.** Node and Chrome are both V8. The lab's maths avoids
@@ -290,5 +332,5 @@ down, the 8-bot fight from 2,009 to 1,831.
    applies a client's event.
 8. **Margin policy.** It rises on each late input and falls one tick after 3 s of slack. Under bursty jitter
    (Wi-Fi), a percentile of recent leads may beat "the smallest since the last pong".
-9. **Hash coverage**: rocks aren't in the 2-second hash (only their events are), and a puppet's brain state isn't. A
-   rotating slice instead of everything every 2 s would spread the bytes.
+9. **Hash coverage**: rocks aren't in the 2-second hash (only their events are). A rotating slice instead of everything
+   every 2 s would spread the bytes.
