@@ -177,6 +177,8 @@ const SERVER_TICK_SNAP = 20;
 const TICK_OFFSET_SMOOTHING = 0.03;
 /** The prediction re-syncs to the clock estimate (rather than stepping to it) when this far out */
 const PREDICT_RESYNC_TICKS = 30;
+/** A shell removed before any frame drew it waits for one at most this long (snapshot ticks: a hidden tab draws none) */
+const LATE_TICKS = 30;
 
 const NONE: ReadonlySet<InterpolatedEntity> = new Set();
 
@@ -594,18 +596,43 @@ export class GameState {
   // SNAPSHOT HANDLING
   // ============================================
 
-  /** Shells made and removed by the same snapshot: removed with the next one (applySnapshot) */
+  /**
+   * Shells removed before any frame drew them: kept until one has (interpolate), then removed with the next snapshot.
+   * A shell made and removed by the same snapshot is one; so is a shell made and removed by two snapshots that came in
+   * one WebSocket message (coalesced frames, docs/design/packed-frames.md: all its sub-frames are applied in one go, with
+   * no frame drawn between them). Without this the renderers never saw it: no tracer, only a mark where it hit
+   */
   private lateRemovals: number[] = [];
-  /** Shells the snapshot last applied made (removeShell) */
-  private madeNow = new Set<number>();
+  /** ...those a frame has drawn since: removed with the next snapshot */
+  private lateDrawn: number[] = [];
+  /** Shells made since the last frame drawn, and the snapshot tick each came in (removeShell, applySnapshot) */
+  private madeNow = new Map<number, number>();
 
   /**
    * A shell a confirmed hit ended (ships/hits/ConfirmedHits.ts), by the rule a snapshot's removal follows: gone now,
-   * or with the next snapshot if the one just applied made it (so its tracer and hit are drawn)
+   * or, if no frame has drawn it yet, once one has (so its tracer and hit are drawn)
    */
   removeShell(id: number): void {
-    if (this.madeNow.has(id)) this.lateRemovals.push(id);
+    if (this.undrawn(id)) this.lateRemovals.push(id);
     else this.entities.delete(id);
+  }
+
+  /**
+   * Made since the last frame drawn (and lately: with no frames drawn at all, a hidden tab, nothing waits more than
+   * LATE_TICKS of snapshots, or they would pile up)
+   */
+  private undrawn(id: number): boolean {
+    const t = this.madeNow.get(id);
+    return t !== undefined && this.serverTick - t <= LATE_TICKS;
+  }
+
+  /** A frame is being drawn (interpolate): what's made so far has been seen, and shells waiting on that can go */
+  private frameDrawn(): void {
+    this.madeNow.clear();
+    if (this.lateRemovals.length) {
+      for (const id of this.lateRemovals) this.lateDrawn.push(id);
+      this.lateRemovals.length = 0;
+    }
   }
 
   /** States seen in a snapshot for entities created later in the same snapshot */
@@ -613,7 +640,6 @@ export class GameState {
 
   applySnapshot(snapshot: ServerSnapshotMessage): void {
     this.serverTick = snapshot.tick;
-    this.madeNow.clear();
     const fired = this.preSnapshot?.(snapshot);
     if (fired?.length) snapshot.entities.push(...fired);
     
@@ -629,16 +655,27 @@ export class GameState {
       this.snapshotBuffer.shift();
     }
     
-    // Shells that came and went in the last snapshot have been seen once: gone now
-    for (const id of this.lateRemovals) this.entities.delete(id);
-    this.lateRemovals.length = 0;
+    // Shells removed before they were drawn, drawn once since: gone now
+    for (const id of this.lateDrawn) this.entities.delete(id);
+    this.lateDrawn.length = 0;
+    // (...and those still waiting that waited too long, or whose id this snapshot names again: used for something new)
+    if (this.lateRemovals.length) {
+      this.lateRemovals = this.lateRemovals.filter((id) => {
+        if (this.undrawn(id) && !entityMap.has(id)) return true;
+        this.entities.delete(id);
+        this.madeNow.delete(id);
+        return false;
+      });
+    }
+    if (this.madeNow.size > 512) for (const [id, t] of this.madeNow) if (this.serverTick - t > LATE_TICKS) this.madeNow.delete(id);
 
     // Handle removed entities
     for (const id of snapshot.removed) {
       const entity = this.entities.get(id);
-      if (entity) this.entities.delete(id);
+      // (A shell made by an earlier snapshot of this message, not drawn yet: it goes once it has been)
+      if (entity) { if (this.undrawn(id)) this.lateRemovals.push(id); else this.entities.delete(id); }
       // A shell fired and gone between two snapshots (its fire event and its removal in the same one: it hit at once,
-      // fired from inside a rock or point-blank): made below, then removed with the next snapshot, so its tracer and
+      // fired from inside a rock or point-blank): made below, then removed once a frame has drawn it, so its tracer and
       // hit are drawn (it used to be made after its removal and never removed, flying on as a ghost)
       else if (entityMap.get(id)?.type === EntityType.Projectile) this.lateRemovals.push(id);
     }
@@ -694,7 +731,7 @@ export class GameState {
         if (state.type === EntityType.Player && state.id !== this.playerId) { entity.status = state.data; entity.data = []; }
         
         if (state.type === EntityType.Projectile && state.data && state.data.length >= 6) {
-          this.madeNow.add(state.id);
+          this.madeNow.set(state.id, snapshot.tick);
           entity.spawnTick = state.data[3];
           entity.spawnX = state.data[4];
           entity.spawnY = state.data[5];
@@ -1039,6 +1076,7 @@ export class GameState {
 
   interpolate(delta: number): void {
     const now = performance.now();
+    this.frameDrawn();
     
     // Cache the estimated server tick ONCE per frame.
     // getEstimatedServerTick() has stateful EMA smoothing — calling it

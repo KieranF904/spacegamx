@@ -111,3 +111,16 @@ Wire = payload + 66 B x messages/s. Deflated = the server's permessage-deflate (
 - Open: the writer builds the decoded copy of every row as it writes (one function for both directions), so a packed
   client costs the server a snapshot's arrays again; and Slots finds the lowest free slot by a scan. Neither showed in
   the probe's tick times; worth measuring with many packed clients.
+
+## Follow-ups (2026-11-04)
+
+1. **Shells made and gone inside one coalesced message are drawn** (client only, no wire change). A coalesced
+   message's sub-frames are applied in one go, with no frame drawn between them, so a shell made by one snapshot and
+   removed by a later one in the same message (or spent by a confirmed hit there) was never seen by the renderers: no
+   tracer, only a mark where it hit. The probe counted 4-13 a run (the client's own are covered by WeaponFx.adopt since
+   88052f5; another ship's had nothing). GameState now keeps a shell removed before any frame drew it until one has
+   (`madeNow` is "made since the last frame drawn", cleared in `interpolate`; `lateRemovals` wait for a frame, then go
+   with the next snapshot), the rule it already had for a shell made and removed by one snapshot. An id the server
+   uses again while one waits replaces it; with no frames drawn at all (a hidden tab) nothing waits more than 30
+   snapshot ticks. The server sends nothing more. Test: client/src/state/lateRemovals.test.ts (real GameState and
+   WeaponFx: the tracer is made; 2 of its 7 fail on the old rule).
