@@ -580,6 +580,9 @@ export class GameState {
   // SNAPSHOT HANDLING
   // ============================================
 
+  /** Shells made and removed by the same snapshot: removed with the next one (applySnapshot) */
+  private lateRemovals: number[] = [];
+
   /** States seen in a snapshot for entities created later in the same snapshot */
   private pendingHist = new Map<number, { tick: number; x: number; y: number; vx: number; vy: number; angle: number }>();
 
@@ -600,10 +603,18 @@ export class GameState {
       this.snapshotBuffer.shift();
     }
     
+    // Shells that came and went in the last snapshot have been seen once: gone now
+    for (const id of this.lateRemovals) this.entities.delete(id);
+    this.lateRemovals.length = 0;
+
     // Handle removed entities
     for (const id of snapshot.removed) {
       const entity = this.entities.get(id);
       if (entity) this.entities.delete(id);
+      // A shell fired and gone between two snapshots (its fire event and its removal in the same one: it hit at once,
+      // fired from inside a rock or point-blank): made below, then removed with the next snapshot, so its tracer and
+      // hit are drawn (it used to be made after its removal and never removed, flying on as a ghost)
+      else if (entityMap.get(id)?.type === EntityType.Projectile) this.lateRemovals.push(id);
     }
     
     // Ships out of view: forgotten until they come back into it

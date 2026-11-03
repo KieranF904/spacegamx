@@ -33,6 +33,10 @@ import type { GameState, InterpolatedEntity } from '../../state/GameState';
 import { WeaponStyle, weaponStyle, shotScale, type ImpactLayers } from './weaponStyles';
 import type { Lighting } from '../lighting/Lighting';
 import { arcFraction, incomingTicks, landingPoint, sonarPeriod } from './ordnanceTells';
+import { hitAge, offSurface, throwAngle, type SurfaceNormal } from './impactAim';
+
+/** Which way a hit throws (impactAim): the angle its directional parts leave at, and the struck surface's normal if one was found */
+interface Aim { a: number; nx: number; ny: number; surface: boolean }
 
 interface Shot {
   id: number;
@@ -82,6 +86,17 @@ interface Shot {
   fading: number | null;
   /** Hulls it can still pass through (its gun's pierce; the server's count): a hit on one throws the impact and flies on */
   pierceLeft: number;
+  /**
+   * The tick its flight ends on its timeline (Infinity until known): the end of its life, where that's known (fire-event
+   * and predicted shells), or about where the server dropped it. A straight shell flies on to it after the server's
+   * removal comes (another pilot's is drawn a few ticks behind the server: a short-lived shell, the Spark's six ticks,
+   * would otherwise be gone before it got out of the barrel) and stops there however late the removal comes.
+   */
+  endAt: number;
+  /** The server has removed it: it flies out what's left of its flight on its timeline */
+  gone: boolean;
+  /** Hits reported ahead of where it's drawn (its timeline behind the server's): each lands as the head gets there */
+  pending: { x: number; y: number; age: number; at: number }[] | null;
   head: { x: number; y: number } | null;
   tail: { x: number; y: number } | null;
   /** Where its contrail was last laid down (NaN until the first frame) */
@@ -131,8 +146,11 @@ const BARREL_EASE = 8;
 /** A predicted shell the server hasn't confirmed by then was never fired: it fades */
 const CONFIRM_TICKS = 60;
 
-/** What a shell's gun is: its model's look (MODEL_STYLES), its damage and its blast radius */
-export interface ShellLook { model?: string; damage?: number; splash?: number; pierce?: number }
+/** A pending hit still waiting for its shell's head after this many frames lands anyway */
+const PENDING_FRAMES = 40;
+
+/** What a shell's gun is: its model's look (MODEL_STYLES), its damage, its blast radius, and the ticks it flies (straight shells: Shot.endAt) */
+export interface ShellLook { model?: string; damage?: number; splash?: number; pierce?: number; life?: number }
 
 export interface FirePoseXY { x: number; y: number; angle: number }
 
@@ -150,6 +168,8 @@ export interface PredictedShell {
   damage?: number;
   /** Hulls it passes through (its gun's pierce) */
   pierce?: number;
+  /** Ticks it flies (a straight shell's life), if known */
+  life?: number;
   spawnX: number;
   spawnY: number;
   spawnTick: number;
@@ -243,6 +263,15 @@ export class WeaponFx {
   /** Where your cursor is in the world while you hold fire (a guided shell's guide line), else null; the object may be reused */
   guideTo: (() => { x: number; y: number } | null) | null = null;
   /**
+   * The normal of the surface a shell flying (dx, dy) struck at (x, y), facing it (ships/hitSurface.ts: the part or rock
+   * edge its line crossed), into `out`; null if none is known. Asked only by styles whose hits throw off the surface (hitThrow).
+   */
+  surfaceAt: ((x: number, y: number, dx: number, dy: number, owner: number, out: SurfaceNormal) => SurfaceNormal | null) | null = null;
+  private readonly normalScratch: SurfaceNormal = { nx: 0, ny: 0 };
+  private readonly aim: Aim = { a: 0, nx: 0, ny: 0, surface: false };
+  /** Hits reported for shells not yet seen (the hit's message comes ahead of the snapshot that brings its shell): matched up on the next update */
+  private early: { id: number; x: number; y: number }[] = [];
+  /**
    * Shells heading at the local pilot that warn of it (`incoming` styles), refilled every update: where each is and the
    * ticks to its closest approach. `threatCount` of the slots are live.
    */
@@ -301,18 +330,8 @@ export class WeaponFx {
         shot = this.claim(e) ?? this.createShot(e);
         this.shots.set(e.id, shot);
       }
-      const t = this.timeline(shot, state, presentTick, renderTick);
-      shot.t = t;
-      // The flash goes off when the shot leaves the gun on its timeline (the ship is drawn at that tick too):
-      // not when it arrives, which is usually a little early. Shots first seen well downrange don't flash.
-      if (!shot.flashed && t >= shot.spawnTick) {
-        shot.flashed = true;
-        if (t - shot.spawnTick < 12) {
-          if (shot.type === WeaponType.PrismShard) this.splitFlash(shot); else this.muzzleFlash(shot, state.entities.get(shot.owner));
-        }
-      }
+      this.fly(shot, e, this.timeline(shot, state, presentTick, renderTick), state);
       if (shot.fading === null) {
-        this.place(shot, e, t);
         // A shell heading at you that the style warns of (a Leviathan): where it is and how long it has
         const inc = shot.style.incoming;
         if (inc && me && shot.head && shot.owner !== state.playerId && this.threatCount < this.threats.length) {
@@ -344,23 +363,33 @@ export class WeaponFx {
       sc.y = o.renderY + sc.ox * sn + sc.oy * c;
     }
 
-    // Shots the server removed without a reported hit just burn out where they are
+    // Hits that came ahead of their shells (the message before the snapshot that brought them): theirs now, else just a mark
+    if (this.early.length) {
+      for (const h of this.early) {
+        const s = this.shots.get(h.id);
+        if (s) this.strike(s, h.x, h.y); else this.impactAt(undefined, h.x, h.y);
+      }
+      this.early.length = 0;
+    }
+
+    // Shots the server removed without a reported hit fly out what's left of their flight (straight ones), or burn out where they are
     for (const shot of this.shots.values()) {
       if (shot.predicted) {
         // Not confirmed yet: it flies on its own (and fades if the server never fired it)
         if (shot.fading !== null) continue;
         if (presentTick - shot.spawnTick > CONFIRM_TICKS) { shot.fading = 0; continue; }
-        if (!shot.flashed && presentTick >= shot.spawnTick) {
-          shot.flashed = true;
-          this.muzzleFlash(shot, state.entities.get(shot.owner));
-        }
-        this.place(shot, undefined, presentTick);
+        this.fly(shot, undefined, presentTick, state);
         continue;
       }
       if (!seen.has(shot.id) && shot.fading === null) {
         // A shell that was lobbed to a point and is gone has landed there: its burst (the server's damage messages only come for what it hit)
         if (shot.style.landBurst && shot.endTick > 0 && !shot.hit && shot.t >= shot.endTick - 20) this.landed(shot, state);
-        else shot.fading = 0;
+        else if (shot.style.motion === 'linear') {
+          // (the server dropped it somewhere in the snapshot interval before the removal came: SNAPSHOT_RATE, every 3 ticks;
+          // never behind where it's drawn already: your own run ahead of the server, and stop where they are)
+          if (!shot.gone) { shot.gone = true; shot.endAt = Math.min(shot.endAt, Math.max(state.serverTick - 1, shot.t)); }
+          this.fly(shot, undefined, this.timeline(shot, state, presentTick, renderTick), state);
+        } else shot.fading = 0;
       }
     }
 
@@ -395,24 +424,110 @@ export class WeaponFx {
   /** A damage message with a hit point: stop that tracer there and throw sparks. */
   onHit(projectileId: number | undefined, x: number, y: number): void {
     const shot = projectileId !== undefined ? this.shots.get(projectileId) : undefined;
+    if (shot) { this.strike(shot, x, y); return; }
+    // (A shell not seen yet: its snapshot is usually right behind this message, so it's matched on the next update)
+    if (projectileId !== undefined && projectileId >= 0) { this.early.push({ id: projectileId, x, y }); return; }
+    this.impactAt(undefined, x, y);
+  }
+
+  /**
+   * One step of a shell's flight on its timeline (tick `t`): its muzzle flash as it leaves the gun, its place, the hits
+   * its head has reached, and the end of its flight (Shot.endAt), where it stops and fades
+   */
+  private fly(shot: Shot, e: InterpolatedEntity | undefined, t: number, state: GameState): void {
+    shot.t = t;
+    // The flash goes off when the shot leaves the gun on its timeline (the ship is drawn at that tick too):
+    // not when it arrives, which is usually a little early. Shots first seen well downrange don't flash.
+    if (!shot.flashed && t >= shot.spawnTick) {
+      shot.flashed = true;
+      if (t - shot.spawnTick < 12) {
+        if (shot.type === WeaponType.PrismShard) this.splitFlash(shot); else this.muzzleFlash(shot, state.entities.get(shot.owner));
+      }
+    }
+    if (shot.fading !== null) return;
+    const tt = Math.min(t, shot.endAt);
+    this.place(shot, e, tt);
+    if (shot.pending) this.landPending(shot, tt - shot.spawnTick, false);
+    if (shot.fading === null && t >= shot.endAt) {
+      if (shot.pending) this.landPending(shot, Infinity, true);
+      if (shot.fading === null) shot.fading = 0;
+    }
+  }
+
+  /**
+   * A hit on a shell: a straight one whose drawn head hasn't got there yet (its timeline runs behind the server's:
+   * another pilot's shot, or one not out of the barrel yet) lands when it does, so the impact goes off where and when
+   * the shell is drawn arriving; otherwise at once
+   */
+  private strike(shot: Shot, x: number, y: number): void {
+    if (shot.style.motion === 'linear' && shot.fading === null) {
+      const age = hitAge(shot.spawnX, shot.spawnY, shot.vx, shot.vy, x, y);
+      if (age > shot.t - shot.spawnTick + 0.5 && age < shot.endAt - shot.spawnTick + 1) {
+        (shot.pending ??= []).push({ x, y, age, at: this.clock });
+        return;
+      }
+    }
+    this.land(shot, x, y);
+  }
+
+  /** The pending hits the head has reached (`age` ticks into its flight), or have waited too long; all of them if `all` */
+  private landPending(shot: Shot, age: number, all: boolean): void {
+    const p = shot.pending!;
+    while (p.length && (all || p[0].age <= age + 0.5 || this.clock - p[0].at > PENDING_FRAMES)) {
+      const h = p.shift()!;
+      this.land(shot, h.x, h.y);
+    }
+    if (!p.length) shot.pending = null;
+  }
+
+  /** A hit lands: the shell stops there (a piercing one with hulls left flies on) and the impact goes off */
+  private land(shot: Shot, x: number, y: number): void {
+    // A piercing round that still has hulls to pass keeps flying (tracer, contrail and line carry on); only its last hit ends it
+    if (shot.pierceLeft > 0) shot.pierceLeft--;
+    else {
+      shot.hit = { x, y };
+      shot.head = { x, y };
+      if (shot.fading === null) shot.fading = 0;
+    }
+    this.impactAt(shot, x, y);
+  }
+
+  /**
+   * Which way a hit throws (the style's hitThrow, impactAim.ts): off the surface the shell struck where it's known (asked
+   * of surfaceAt only when the style throws off one), else back up its line; a hit with no shell anywhere
+   */
+  private aimOf(style: WeaponStyle, shot: Shot | undefined, x: number, y: number): Aim {
+    const aim = this.aim;
+    aim.surface = false;
+    const sp = shot ? Math.hypot(shot.vx, shot.vy) : 0;
+    if (!shot || sp < 1e-6) { aim.a = Math.random() * Math.PI * 2; aim.nx = Math.cos(aim.a); aim.ny = Math.sin(aim.a); return aim; }
+    const dx = shot.vx / sp, dy = shot.vy / sp, mode = style.hitThrow ?? 'back';
+    aim.nx = -dx; aim.ny = -dy;
+    if (mode !== 'back') {
+      const n = this.surfaceAt?.(x, y, dx, dy, shot.owner, this.normalScratch);
+      if (n) { aim.nx = n.nx; aim.ny = n.ny; aim.surface = true; }
+    }
+    aim.a = throwAngle(mode, dx, dy, aim.nx, aim.ny);
+    return aim;
+  }
+
+  /** A direction `spread` radians off the throw, kept out of the struck surface */
+  private dir(aim: Aim, spread: number): number {
+    const a = aim.a + spread;
+    return aim.surface ? offSurface(a, aim.nx, aim.ny) : a;
+  }
+
+  /** An impact at (x, y): its shell's style (a plain cannon's if none), thrown the way the style says */
+  private impactAt(shot: Shot | undefined, x: number, y: number): void {
     const style = shot?.style ?? weaponStyle(WeaponType.Cannon);
     // (The impact scales with the shot's damage as well as its shell's size)
     const size = (shot?.size ?? 1) * (shot?.power ?? 1);
-    let normal = Math.random() * Math.PI * 2;
-    if (shot) {
-      normal = Math.atan2(-shot.vy, -shot.vx);
-      // A piercing round that still has hulls to pass keeps flying (tracer, contrail and line carry on); only its last hit ends it
-      if (shot.pierceLeft > 0) shot.pierceLeft--;
-      else {
-        shot.hit = { x, y };
-        shot.head = { x, y };
-        if (shot.fading === null) shot.fading = 0;
-      }
-    }
+    const aim = this.aimOf(style, shot, x, y);
+    const normal = aim.a;
     const imp = style.impact;
-    if (style.hit) { this.layeredHit(style, style.hit, x, y, normal, size, shot); return; }
+    if (style.hit) { this.layeredHit(style, style.hit, x, y, aim, size, shot); return; }
     for (let i = 0; i < imp.sparks * size * this.particleKeep; i++) {
-      const a = normal + (Math.random() - 0.5) * 2.2;
+      const a = this.dir(aim, (Math.random() - 0.5) * 2.2);
       const s = imp.speed * (0.4 + Math.random());
       const col = Math.random() < 0.25 ? 0xffffff : style.shardHue ? turnHue(imp.color, (Math.random() - 0.5) * style.shardHue) : imp.color;
       this.sparks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0, max: imp.life * (0.6 + Math.random() * 0.6), color: col });
@@ -432,22 +547,23 @@ export class WeaponFx {
     // A puff of vapourised hull
     for (let i = 0; i < 2; i++) {
       if (this.particleKeep < 1 && Math.random() > this.particleKeep) continue;
-      const a = normal + (Math.random() - 0.5) * 1.2;
+      const a = (aim.surface ? Math.atan2(aim.ny, aim.nx) : normal) + (Math.random() - 0.5) * 1.2;
       this.smoke.push({ x, y, vx: Math.cos(a) * 0.8, vy: Math.sin(a) * 0.8, life: 0, max: 40 + Math.random() * 20, size: 6 * size });
     }
   }
 
   /**
-   * A layered impact (ImpactLayers): a white-hot core, a glow round it, shock rings, a spray of streaks thrown back off the
-   * hit, embers that cool as they drift, a glow left on the hull, the impact's own light and maybe a shake. Sized by
+   * A layered impact (ImpactLayers): a white-hot core, a glow round it, shock rings, a spray of streaks and the shell's
+   * own ricochet thrown off the hit (`aim`: off the struck surface or back up the line, by the style's hitThrow), embers
+   * that cool as they drift off the surface, a glow left on the hull, the impact's own light and maybe a shake. Sized by
    * impactScale, not the flat flash's full scale.
    */
-  private layeredHit(style: WeaponStyle, L: ImpactLayers, x: number, y: number, normal: number, size: number, shot: Shot | undefined): void {
+  private layeredHit(style: WeaponStyle, L: ImpactLayers, x: number, y: number, aim: Aim, size: number, shot: Shot | undefined): void {
     const imp = style.impact, k = impactScale(size), nk = Math.min(1.5, k) * this.particleKeep;
     const room = (): boolean => this.sparks.length < HIT_CAP * 2;
     // A loose scatter round the hit
     for (let i = 0, n = Math.round(imp.sparks * nk); i < n && room(); i++) {
-      const a = normal + (Math.random() - 0.5) * 2.4, s = imp.speed * (0.4 + Math.random());
+      const a = this.dir(aim, (Math.random() - 0.5) * 2.4), s = imp.speed * (0.4 + Math.random());
       const col = Math.random() < 0.25 ? 0xffffff : style.shardHue ? turnHue(imp.color, (Math.random() - 0.5) * style.shardHue) : imp.color;
       this.sparks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0, max: imp.life * (0.6 + Math.random() * 0.6), color: col });
     }
@@ -466,15 +582,26 @@ export class WeaponFx {
     if (sp) {
       const cone = (sp.cone * Math.PI) / 180;
       for (let i = 0, n = Math.round(sp.count * nk); i < n && room(); i++) {
-        // (most of it close to straight back, a few wide)
-        const u = Math.random() * 2 - 1, a = normal + u * Math.abs(u) * cone, s = sp.speed * (0.55 + Math.random() * 0.7);
+        // (most of it close to the throw, a few wide)
+        const u = Math.random() * 2 - 1, a = this.dir(aim, u * Math.abs(u) * cone), s = sp.speed * (0.55 + Math.random() * 0.7);
         this.sparks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0, max: sp.life * (0.6 + Math.random() * 0.6), color: Math.random() < 0.35 ? 0xffffff : sp.color ?? imp.color, width: 1.7, drag: 0.88 });
+      }
+    }
+    // The shell itself glancing off: long streaks of its own colour, tight round the throw
+    const rc = L.ricochet;
+    if (rc) {
+      const cone = (rc.cone * Math.PI) / 180, col = shot?.glow ?? style.glowColor;
+      for (let i = 0, n = Math.max(1, Math.round(rc.count * Math.min(1.5, k))); i < n && room(); i++) {
+        const a = this.dir(aim, (Math.random() * 2 - 1) * cone), s = rc.speed * (0.8 + Math.random() * 0.4);
+        this.sparks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0, max: rc.life * (0.8 + Math.random() * 0.4), color: i === 0 ? style.coreColor : col, width: 2.6, drag: 0.93 });
       }
     }
     const em = L.embers;
     if (em) {
+      // (they drift off the surface itself where it's known, not along the throw)
+      const base = aim.surface ? Math.atan2(aim.ny, aim.nx) : aim.a;
       for (let i = 0, n = Math.round(em.count * nk); i < n && room(); i++) {
-        const a = normal + (Math.random() - 0.5) * 2.8, s = em.speed * (0.3 + Math.random() * 0.9);
+        const a0 = base + (Math.random() - 0.5) * 2.8, a = aim.surface ? offSurface(a0, aim.nx, aim.ny) : a0, s = em.speed * (0.3 + Math.random() * 0.9);
         this.sparks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0, max: em.life * (0.6 + Math.random() * 0.7), color: em.hot, cool: em.cool, width: 2.4 + Math.random() * 1.4, drag: 0.965 });
       }
     }
@@ -510,7 +637,7 @@ export class WeaponFx {
       }
     }
     if (Math.random() < this.particleKeep) {
-      const a = normal + (Math.random() - 0.5) * 1.2;
+      const a = (aim.surface ? Math.atan2(aim.ny, aim.nx) : aim.a) + (Math.random() - 0.5) * 1.2;
       this.smoke.push({ x, y, vx: Math.cos(a) * 0.8, vy: Math.sin(a) * 0.8, life: 0, max: 40 + Math.random() * 20, size: 5 * k });
     }
     const sk = L.shake, st = this.state, me = st?.entities.get(st.playerId);
@@ -590,6 +717,7 @@ export class WeaponFx {
       pose: this.firePose?.(e.id),
       endTick: e.data?.[9] ?? 0, landX: 0, landY: 0, splash: look?.splash ?? 0, arc: 0, t: 0, pulse: 0,
       fading: null, pierceLeft: look?.pierce ?? 0,
+      endAt: look?.life ? (e.spawnTick ?? 0) + look.life : Infinity, gone: false, pending: null,
       head: null,
       tail: null, ctX: NaN, ctY: NaN,
     };
@@ -633,7 +761,8 @@ export class WeaponFx {
       id, style, size: p.size, power: shotScale(p.damage), phase: (-id * 0.618) % 1, dim: this.dimOf(style, -id), hot: 0, type: p.type, owner: p.owner,
       glow: mixColor(style.glowColor, hueColor((p.owner * 137) % 360), style.ownerTint),
       spawnX: p.spawnX, spawnY: p.spawnY, spawnTick: p.spawnTick, vx: p.vx, vy: p.vy,
-      hit: null, flashed: false, predicted: true, pose: p.pose, endTick: 0, landX: 0, landY: 0, splash: 0, arc: 0, t: 0, pulse: 0, fading: null, pierceLeft: p.pierce ?? 0, head: null, tail: null, ctX: NaN, ctY: NaN,
+      hit: null, flashed: false, predicted: true, pose: p.pose, endTick: 0, landX: 0, landY: 0, splash: 0, arc: 0, t: 0, pulse: 0, fading: null, pierceLeft: p.pierce ?? 0,
+      endAt: p.life ? p.spawnTick + p.life : Infinity, gone: false, pending: null, head: null, tail: null, ctX: NaN, ctY: NaN,
     });
   }
 
@@ -831,7 +960,12 @@ export class WeaponFx {
     for (const shot of this.shots.values()) {
       if (shot.fading !== null) {
         shot.fading += frames;
-        if (shot.fading >= FADE_FRAMES) { this.shots.delete(shot.id); continue; }
+        if (shot.fading >= FADE_FRAMES) {
+          // (a hit still waiting for its head goes off now)
+          if (shot.pending) this.landPending(shot, Infinity, true);
+          this.shots.delete(shot.id);
+          continue;
+        }
       }
       if (!shot.head || !shot.tail) continue;
       const fade = shot.fading === null ? 1 : 1 - shot.fading / FADE_FRAMES;

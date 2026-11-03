@@ -38,6 +38,7 @@ import { beamLook } from '../rendering/weapons/weaponStyles';
 import './energyLooks';
 import { drawCone, drawStrands, sputterGain } from './beamLookFx';
 import { PulseFx, type PulseRun } from './PulseFx';
+import { hitSurface } from './hitSurface';
 import { MiningFx } from './MiningFx';
 import { rockMaterial } from '../rendering/rocks/RockMaterials';
 
@@ -70,6 +71,7 @@ export class MiningBeamFx {
     this.g.blendMode = 'add';
     this.root.addChild(this.g);
     layer.addChild(this.root);
+    this.pulseFx.surfaceAt = (x, y, dx, dy, owner, out) => hitSurface(source, state, x, y, dx, dy, owner, out);
   }
 
   /** The frame's step (seconds) */

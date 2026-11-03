@@ -37,10 +37,17 @@ Object.assign(MODEL_STYLES, {
   emp_blackout: {
     glowColor: 0x2c4fd6, coreColor: 0xbfd4ff, haloRadius: 28, radiusRing: { color: 0x3b6cf0, radius: 320 },
   },
-  // A bolt of lightning down its whole (very fast) path
+  // A blue bolt of lightning that leaves the barrel and flies out to its reach: a tracer two ticks long (not its whole
+  // life, which drew it as a line stuck to the barrel), a hot head, a short fading wake; its hit splashes out of the hull
   arc_spark: {
-    tracerTicks: 6, coreWidth: 1.2, glowWidth: 8, coreColor: 0xf0fbff, glowColor: 0x8fd0ff, glowAlpha: 0.4, headRadius: 3,
-    jagged: { color: 0x9ad8ff, amp: 6 },
+    tracerTicks: 2, coreWidth: 1.8, glowWidth: 10, coreColor: 0xf0fbff, glowColor: 0x6ac8ff, glowAlpha: 0.55, headRadius: 3.6, haloRadius: 13,
+    jagged: { color: 0x9ad8ff, amp: 5 }, contrail: { color: 0x7fd0ff, size: 2, life: 8 },
+    muzzle: { life: 6, size: 16, sparks: 4, color: 0xa8e0ff, smoke: 0 },
+    impact: { sparks: 6, speed: 4.5, life: 14, color: 0x9ad8ff, flash: 22 },
+    hit: {
+      core: { size: 7, life: 4 }, bloom: { size: 18, life: 9, color: 0x6ac8ff }, shock: { size: 26, life: 10, width: 1.6, color: 0xbfe8ff },
+      spray: { count: 8, speed: 8, cone: 30, life: 10, color: 0xd8f2ff }, light: { radius: 90, power: 0.9 },
+    },
   },
   // A canister that blinks (its blink quickening needs the shell's end tick, which the client doesn't have)
   utility_demolition_launcher: { blink: 16 },

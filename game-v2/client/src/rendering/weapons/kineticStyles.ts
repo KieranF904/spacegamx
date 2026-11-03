@@ -6,6 +6,9 @@
  * spray thrown back off the hull, embers that cool, a glow left on the hull, the heaviest a light shake; mid guns
  * (Hammer, Slurry Cannon, Needle, Coilgun, Twinlink, Chainsaw) a smaller core and glow, a spray and at most a thin ring;
  * simple guns (Pip, Rattler, Stinger) a small quick spark and glow, so a ship with eight of them is not noise.
+ *
+ * Their kinds (cannon, autocannon, railgun) throw a hit's spray off the struck surface as a ricochet (hitThrow
+ * 'reflect'), and the rails and the heavier slugs send a streak or two of the shell itself glancing away (`ricochet`).
  */
 
 import type { WeaponStyle } from './weaponStyles';
@@ -28,7 +31,7 @@ export const KINETIC_MODEL_STYLES = {
     hit: {
       core: { size: 6, life: 5 }, bloom: { size: 16, life: 12, color: 0xe0782a },
       shock: { size: 26, life: 16, width: 2, color: 0xa39a90 },
-      spray: { count: 7, speed: 6, cone: 40, life: 14, color: 0xffc08a },
+      spray: { count: 7, speed: 6, cone: 40, life: 14, color: 0xffc08a }, ricochet: { count: 1, speed: 8, cone: 10, life: 12 },
       embers: { count: 3, speed: 1.8, life: 45, hot: 0xffc070, cool: 0x6a2a10 },
       scorch: { size: 5, life: 55, color: 0xd9682a }, light: { radius: 70, power: 0.8 },
     },
@@ -54,7 +57,7 @@ export const KINETIC_MODEL_STYLES = {
     hit: {
       core: { size: 11, life: 5 }, bloom: { size: 24, life: 12, color: 0xffd070 },
       shock: { size: 44, life: 15, width: 2.4, color: 0xffe6a0 },
-      spray: { count: 14, speed: 12, cone: 16, life: 14, color: 0xffe6a0 },
+      spray: { count: 14, speed: 12, cone: 16, life: 14, color: 0xffe6a0 }, ricochet: { count: 2, speed: 14, cone: 6, life: 10 },
       embers: { count: 4, speed: 2, life: 50, hot: 0xfff0c0, cool: 0x8a5010 },
       scorch: { size: 7, life: 70, color: 0xffc050 }, light: { radius: 130, power: 1 },
     },
@@ -70,7 +73,7 @@ export const KINETIC_MODEL_STYLES = {
     hit: {
       core: { size: 14, life: 7 }, bloom: { size: 34, life: 18, color: 0xff6a2a },
       shock: { size: 62, life: 22, width: 3.2, color: 0xffb27a, count: 1, gap: 5 },
-      spray: { count: 16, speed: 12, cone: 38, life: 18, color: 0xffc890 },
+      spray: { count: 16, speed: 12, cone: 38, life: 18, color: 0xffc890 }, ricochet: { count: 2, speed: 9, cone: 12, life: 14 },
       embers: { count: 10, speed: 2.6, life: 75, hot: 0xffd27a, cool: 0x8a1e08 },
       scorch: { size: 9, life: 100, color: 0xff5a1a },
       shake: { strength: 3, radius: 900 }, light: { radius: 140, power: 1.1 },
@@ -114,7 +117,7 @@ export const KINETIC_MODEL_STYLES = {
     impact: { sparks: 5, speed: 6, life: 16, color: CYAN.flash, flash: 30 },
     hit: {
       core: { size: 6, life: 4 }, bloom: { size: 14, life: 9, color: CYAN.glow }, shock: { size: 22, life: 10, width: 1.6, color: CYAN.flash },
-      spray: { count: 6, speed: 9, cone: 22, life: 11, color: 0xd8f6ff }, light: { radius: 70, power: 0.8 },
+      spray: { count: 6, speed: 9, cone: 22, life: 11, color: 0xd8f6ff }, ricochet: { count: 1, speed: 12, cone: 8, life: 9 }, light: { radius: 70, power: 0.8 },
     },
   },
   // The rail shotgun: five short streaks fanning out, a wide cone flash, a crackle ring
@@ -133,7 +136,7 @@ export const KINETIC_MODEL_STYLES = {
     hit: {
       core: { size: 12, life: 6 }, bloom: { size: 34, life: 16, color: 0x9a70ff },
       shock: { size: 66, life: 20, width: 3.6, color: 0xc4a8ff, count: 1, gap: 4 },
-      spray: { count: 16, speed: 11, cone: 24, life: 16, color: 0xe0d4ff },
+      spray: { count: 16, speed: 11, cone: 24, life: 16, color: 0xe0d4ff }, ricochet: { count: 3, speed: 14, cone: 8, life: 12 },
       embers: { count: 6, speed: 2.2, life: 55, hot: 0xf0e8ff, cool: 0x3a1a7a },
       scorch: { size: 8, life: 80, color: 0xa070ff },
       shake: { strength: 2, radius: 700 }, light: { radius: 170, power: 1.1 },
@@ -146,7 +149,7 @@ export const KINETIC_MODEL_STYLES = {
     impact: { sparks: 5, speed: 5, life: 12, color: CYAN.flash, flash: 22 },
     hit: {
       core: { size: 8, life: 4 }, bloom: { size: 20, life: 10, color: CYAN.glow }, shock: { size: 34, life: 12, width: 2, color: CYAN.flash },
-      spray: { count: 9, speed: 10, cone: 20, life: 12, color: 0xd8f6ff },
+      spray: { count: 9, speed: 10, cone: 20, life: 12, color: 0xd8f6ff }, ricochet: { count: 2, speed: 13, cone: 8, life: 10 },
       embers: { count: 3, speed: 1.8, life: 40, hot: 0xe0fbff, cool: 0x10406a },
       scorch: { size: 5, life: 50, color: CYAN.glow }, light: { radius: 100, power: 0.9 },
     },

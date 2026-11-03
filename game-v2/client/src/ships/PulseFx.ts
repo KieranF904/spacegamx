@@ -26,6 +26,7 @@ import type { Graphics } from 'pixi.js';
 import { beamLook } from '../rendering/weapons/weaponStyles';
 import { drawCone, drawStrands, sputterGain } from './beamLookFx';
 import { pulseIntensity, beamFalloff, effectiveRange, type PulseProfile, type WeaponTuning } from '@space-game/common';
+import { offSurface, type SurfaceNormal } from '../rendering/weapons/impactAim';
 
 /** The flare's bulge races from the muzzle to where the beam lands at about this speed (world units a tick), in 5 to 12 ticks (~0.1-0.2 s) */
 const BULGE_SPEED = 420;
@@ -103,6 +104,9 @@ interface Scorch { x: number; y: number; life: number; max: number; r: number; c
 const MAX_PARTICLES = 500, MAX_RINGS = 32, MAX_SCORCH = 48;
 
 export class PulseFx {
+  /** The surface a beam struck (ships/hitSurface.ts): its sparks and droplets splash straight back out of it, not back up the beam */
+  surfaceAt: ((x: number, y: number, dx: number, dy: number, owner: number, out: SurfaceNormal) => SurfaceNormal | null) | null = null;
+  private readonly normal: SurfaceNormal = { nx: 0, ny: 0 };
   private particles: Particle[] = [];
   private rings: Ring[] = [];
   private scorch: Scorch[] = [];
@@ -275,20 +279,23 @@ export class PulseFx {
 
   /** The bulge lands: a shockwave there, and on a hull sparks, molten droplets and a scorch, as strong as the beam is out there (`s`) */
   private land(run: PulseRun, x: number, y: number, hx: number, hy: number, ux: number, uy: number, hit: boolean, s: number, pw: number, peakWidth: number, L: PulseLook): void {
-    void run; void x; void y;
+    void x; void y;
     if (s <= 0.02) return;
     for (let i = 0; i < (hit ? L.rings : 1) && this.rings.length < MAX_RINGS; i++) {
       this.rings.push({ x: hx, y: hy, life: -i * 5, max: 18 + i * 6, r0: pw * 0.8, r1: peakWidth * (2.6 + i * 1.4) * (0.4 + 0.6 * s), color: i ? L.outer : L.mid, width: (3 - i) * (0.5 + 0.5 * s) });
     }
     if (!hit) return;
-    const back = Math.atan2(-uy, -ux);
+    // Straight out of the surface it burned (a laser's hit splashes back along the normal), else back up the beam
+    const n = this.surfaceAt?.(hx, hy, ux, uy, run.owner, this.normal);
+    const back = n ? Math.atan2(n.ny, n.nx) : Math.atan2(-uy, -ux);
+    const out = (a: number): number => (n ? offSurface(a, n.nx, n.ny) : a);
     for (let i = 0; i < 16 * L.embers * s; i++) {
-      const sa = back + (Math.random() - 0.5) * 2.8, v = 3 + Math.random() * 7;
+      const sa = out(back + (Math.random() - 0.5) * 2.8), v = 3 + Math.random() * 7;
       this.spawn({ kind: 0, x: hx, y: hy, vx: Math.cos(sa) * v, vy: Math.sin(sa) * v, life: 0, max: 10 + Math.random() * 14, color: Math.random() < 0.4 ? 0xffffff : 0xffd38a, size: 1.5 });
     }
     // Molten droplets: slower, longer, orange cooling to red
     for (let i = 0; i < 8 * L.embers * s; i++) {
-      const sa = back + (Math.random() - 0.5) * 2.2, v = 0.8 + Math.random() * 2.2;
+      const sa = out(back + (Math.random() - 0.5) * 2.2), v = 0.8 + Math.random() * 2.2;
       this.spawn({ kind: 1, x: hx, y: hy, vx: Math.cos(sa) * v, vy: Math.sin(sa) * v, life: 0, max: 30 + Math.random() * 30, color: 0xffa040, size: 1.6 + Math.random() * 1.6 });
     }
     if (this.scorch.length < MAX_SCORCH) this.scorch.push({ x: hx, y: hy, life: 0, max: 70, r: peakWidth * 0.9 * (0.5 + 0.5 * s), color: 0xff6a1a });

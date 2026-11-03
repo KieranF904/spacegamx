@@ -1675,6 +1675,11 @@ export class Renderer {
     this.weaponFx.guideTo = fn;
   }
 
+  /** The surface a shell struck, for its impact's direction (WeaponFx.surfaceAt) */
+  set surfaceAt(fn: WeaponFx['surfaceAt']) {
+    this.weaponFx.surfaceAt = fn;
+  }
+
   /** A shell your client fired ahead of the server (WeaponFx.predict) */
   predictShot(p: PredictedShell): void {
     this.weaponFx.predict(p);
