@@ -44,6 +44,13 @@ export interface HitsOutcome {
 export class ConfirmedHits {
   /** Ships each shell has passed through (records that didn't end it), as the server counts them for this client */
   private passes = new Map<number, number>();
+  /**
+   * Shells the snapshot just applied removed, kept for the hits message that follows it: a record can name one (a
+   * pierce's earlier pass, when its last went the old way or it expired). Their pass counts go once that message is
+   * handled, as the server forgets them after it plans the records (HitLedger.dropShells)
+   */
+  private dropped = new Map<number, HitShell>();
+  private dropping: readonly number[] = [];
   /** Ships whose HP it should be sent again (hpResync), gathered while handling a message */
   private resync = new Set<number>();
   /** Counters (tests, the console) */
@@ -60,7 +67,7 @@ export class ConfirmedHits {
       this.stats.records++;
       const passes = this.passes.get(r.shell) ?? 0;
       if (r.gone) { this.passes.delete(r.shell); out.gone.push(r.shell); } else this.passes.set(r.shell, passes + 1);
-      const s = this.host.shell(r.shell), ship = store.get(r.target), owner = s ? store.get(s.owner) : undefined;
+      const s = this.host.shell(r.shell) ?? this.dropped.get(r.shell) ?? null, ship = store.get(r.target), owner = s ? store.get(s.owner) : undefined;
       const sh = s && owner ? gunShell(store.tuning, owner, s.gun) : null;
       if (!s || !ship || !sh) { this.stats.missed++; this.resync.add(r.target); continue; }
       const tick = snapTick - r.ago;
@@ -91,6 +98,7 @@ export class ConfirmedHits {
       const amount = Math.round(e.amount * 10) / 10;
       if (amount > 0) out.msgs.push({ type: 'damage', targetId: e.target, amount, sourceId: e.source, ...(e.glancing ? { glancing: true } : {}) });
     }
+    this.settle();
     this.flush();
     return out;
   }
@@ -104,10 +112,32 @@ export class ConfirmedHits {
     this.flush();
   }
 
-  /** Shells removed (a snapshot's list): their pass counts go */
+  /**
+   * A snapshot's removed list, before the shells go from the game state: kept for the hits message after it (records
+   * can still name them), then their pass counts go (settle)
+   */
   forget(ids: readonly number[]): void {
-    if (!this.passes.size) return;
-    for (const id of ids) this.passes.delete(id);
+    this.settle();
+    if (!ids.length) return;
+    this.dropping = ids;
+    for (const id of ids) {
+      const s = this.host.shell(id);
+      if (s) this.dropped.set(id, s);
+    }
+  }
+
+  /** A new connection (a join): the server's count of each shell's passes starts afresh, so this one does too */
+  reset(): void {
+    this.passes.clear();
+    this.dropped.clear();
+    this.dropping = [];
+    this.resync.clear();
+  }
+
+  private settle(): void {
+    for (const id of this.dropping) this.passes.delete(id);
+    this.dropping = [];
+    this.dropped.clear();
   }
 
   private flush(): void {

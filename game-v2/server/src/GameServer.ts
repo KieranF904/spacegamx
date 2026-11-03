@@ -3536,6 +3536,8 @@ this.devTeleport = opts.devTeleport ?? false;
     Projectile.spawnX[eid] = spawnX;
     Projectile.spawnY[eid] = spawnY;
     Projectile.endTick[eid] = 0;
+    // (no gun a client knows: its hits go the old way, confirmed hits. A reused entity id would otherwise keep the last shell's)
+    Projectile.gun[eid] = -1;
     Bullet.speed[eid] = speed;
     // Slower shells live longer, so the range stays the same
     Lifetime.remaining[eid] = Math.round(BLASTER_LIFE_TICKS / shape.speedScale);
@@ -4164,8 +4166,8 @@ this.devTeleport = opts.devTeleport ?? false;
   private sendSnapshots(): void {
     // (The damage summed since the last one goes first, to ride the same frame; confirmed hits' clients get theirs after their records)
     this.net.flushDamage(this.hits.active ? CAPS.HITS : 0);
-    this.snapshots.sendSnapshots();
-    this.hits.endSnapshot();
+    // (Its hits are dropped even if the snapshot fails part way: never told twice)
+    try { this.snapshots.sendSnapshots(); } finally { this.hits.endSnapshot(); }
   }
 
   /** Clients in a system near a point (net/snapshot/Outbox.ts) */

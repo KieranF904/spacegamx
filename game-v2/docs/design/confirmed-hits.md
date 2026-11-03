@@ -470,3 +470,20 @@ Measured (docs/audits/confirmed-hits-impact-2026-11-04.md): the shooter's bytes 
 Hammerhead fight and 33% in the Gale fight (deflated: 25%, 16%, 21%). The client's own sums needed the server's number
 on 12 of 1,832 records. The main loss left is hits on ships that rebuilt before the snapshot (24% in the Hammerhead
 fight), which go the old way; that is the next step, not another hidden input.
+
+## Review fixes (2026-11-04)
+
+- **A shell removed just before its records.** A pierce shell could pass one ship (a record) and then end the old way
+  or expire in the same snapshot. Its id went in the snapshot's removed list, the client dropped the shell, and the
+  record that followed could not be worked out: no hit, no damage number, the HP off until a resync. The client now
+  keeps the shells a snapshot removed until the hits message after it (`ConfirmedHits.forget`). Test: "railgun through
+  a stack".
+- **Pass counts forgotten the same way on both sides.** The server forgot every removed shell; a client only forgets
+  what its removed list names. The server now forgets per client, from that client's list (`HitLedger.dropShells`),
+  and the client forgets after the hits message, as the server does after planning. A new connection starts the
+  client's counts afresh (`ConfirmedHits.reset`, on connect).
+- **A respawned or reused target.** A hit now keeps the target's state; if the ship at that id is a new one by the
+  snapshot, the hit goes the old way.
+- **Small ones.** Hits in another system are skipped per client (they were counted as "view" and cost a derive each).
+  No hpCheck for debris the client is working out. The snapshot's hits are dropped even if the snapshot throws. The old
+  `fireCannon` shell sets `Projectile.gun` to -1 (a reused id kept the last shell's gun).

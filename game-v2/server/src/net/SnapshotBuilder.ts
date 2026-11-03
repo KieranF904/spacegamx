@@ -627,6 +627,7 @@ export class SnapshotBuilder {
         conn.sentNames.delete(eid);
         conn.mapNamed.delete(eid);
       }
+      if (hitsOn && removed.length) this.hits!.dropShells(conn, removed);
 
       // HUD numbers (fuel, XP) once a second, whether or not anything else goes
       if (this.currentTick % 60 === 0) this.sendPlayerState(conn);
@@ -663,7 +664,6 @@ export class SnapshotBuilder {
     for (const [eid] of this.pendingRemovedEntities) {
       for (const conn of this.clients.values()) conn.knownEntities.delete(eid);
     }
-    this.hits?.removed(this.pendingRemovedEntities.keys());
     this.pendingRemovedEntities.clear();
     this.ships.debrisNet.afterSnapshot((id) => this.ships.has(id));
     this.replication.endSnapshot();

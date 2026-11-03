@@ -47,20 +47,22 @@ interface Fake {
   detonations: number;
   sawSnapshot: boolean;
   link: { receive(msg: ClientMessage): void } | null;
+  /** What it sends the server (hpResync), delivered after the step (a real socket is never re-entered) */
+  outbox: ClientMessage[];
 }
 
 function makeFake(server: GameServer, name: string, caps: number): Fake {
   const ships = server.getShips();
   const f: Fake = {
     pid: -1, store: new ShipStore(ships.catalog, ships.tuning), hits: null, shells: new Map(), snapTick: 0,
-    damage: new Map(), derivedHits: 0, ignites: [], removed: new Set(), known: new Set(), projectileHits: 0, detonations: 0, sawSnapshot: false, link: null,
+    damage: new Map(), derivedHits: 0, ignites: [], removed: new Set(), known: new Set(), projectileHits: 0, detonations: 0, sawSnapshot: false, link: null, outbox: [],
   };
   if (caps) {
     f.hits = new ConfirmedHits({
       store: f.store,
       shell: (id) => f.shells.get(id) ?? null,
       pose: () => null,
-      send: (m) => f.link?.receive(m),
+      send: (m) => f.outbox.push(m),
     });
   }
   const handle = (m: ServerMessage): void => {
@@ -80,8 +82,9 @@ function makeFake(server: GameServer, name: string, caps: number): Fake {
         for (const [owner, , partAmmo, , ...ids] of s.fire ?? []) {
           for (const id of ids) { f.known.add(id); f.shells.set(id, { owner, gun: partAmmo, spawnTick: s.tick, x: 0, y: 0, vx: 0, vy: 0 }); }
         }
-        for (const id of s.removed) { if (f.known.has(id)) f.removed.add(id); f.shells.delete(id); f.store.remove(id); }
+        // (as ShipClient: the ledger sees the removed list before the shells go from the game state)
         f.hits?.forget(s.removed);
+        for (const id of s.removed) { if (f.known.has(id)) f.removed.add(id); f.shells.delete(id); f.store.remove(id); }
         break;
       }
       case 'hits': {
@@ -131,6 +134,8 @@ interface Scenario {
   ammo?: string;
   /** A second freighter behind the first (a piercing shell's next pass) */
   behind?: boolean;
+  /** More freighters close behind the first (x past it, their parts' HP × hpScale): a pierce's later passes in the same snapshot */
+  stack?: { dx: number; hpScale: number }[];
   /** The capable client's switch turned off at this tick and on again 200 later (the admin's `hits` command) */
   toggleAt?: number;
   ticks?: number;
@@ -148,9 +153,13 @@ function run(sc: Scenario) {
     netCaps: CAPS.HITS,
   });
   const ships = server.getShips();
-  const step = () => { server.step(); clock.t += 1000 / 60; };
   const A = makeFake(server, 'hits_capable', CAPS.HITS);
   const B = makeFake(server, 'hits_legacy', 0);
+  const step = () => {
+    server.step();
+    clock.t += 1000 / 60;
+    for (const f of [A, B]) for (const m of f.outbox.splice(0)) f.link?.receive(m);
+  };
   for (let i = 0; i < 20; i++) step();
   // (Both pilots out of harm's way: a client whose ship is gone is told nothing, the old way or the new)
   for (const f of [A, B]) { const c = server.pilots.connOf(f.pid)!; c.isAdmin = true; server.admin.run(c, 'god', { on: 'on' }); }
@@ -165,6 +174,10 @@ function run(sc: Scenario) {
   place(B.pid, x0 - 300, y0 + 400);
   const target = sc.boss ? server.bosses.spawnAt(sc.boss, num, x0 + 1500, y0) : ships.spawnDummy(ships.library.get('hauler')!, x0 + 700, y0, 0, num);
   if (sc.behind) ships.spawnDummy(ships.library.get('hauler')!, x0 + 1300, y0, 0, num);
+  for (const st of sc.stack ?? []) {
+    const s = ships.get(ships.spawnDummy(ships.library.get('hauler')!, x0 + 700 + st.dx, y0, 0, num))!;
+    for (let i = 0; i < s.hp.length; i++) s.hp[i] *= st.hpScale;
+  }
   const ship = ships.get(target)!;
   if (sc.hpScale) for (let i = 0; i < ship.hp.length; i++) ship.hp[i] *= sc.hpScale;
   const ticks = sc.ticks ?? 600;
@@ -232,6 +245,11 @@ describe('confirmed hits: a capable client and a legacy one see the same fight',
 
   it('railgun: shells that pierce', () => {
     const r = run({ gun: 'railgun', ammo: 'railgun_slugs', hpScale: 0.5, behind: true });
+    expectParity(r);
+  }, 120_000);
+
+  it('railgun through a stack: a pierce whose last pass goes the old way (its removal rides the snapshot before the records)', () => {
+    const r = run({ gun: 'railgun', ammo: 'railgun_slugs', stack: [{ dx: 60, hpScale: 0.01 }, { dx: 120, hpScale: 0.01 }], ticks: 400 });
     expectParity(r);
   }, 120_000);
 

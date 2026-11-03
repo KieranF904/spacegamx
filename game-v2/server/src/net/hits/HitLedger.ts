@@ -11,6 +11,7 @@
  *             what it will get wrong (the record's extras), and its copy of the part HP (ClientConnection.shipHpSent)
  *             brought to what it will have, so the shipHps after the records corrects anything it got wrong
  *   write     after its snapshot: its damage sums less what the records cover, the records, the hits gone the old way
+ *   dropShells  its snapshot's removed list: the shells' pass counts go, as on its client
  *   check     one ship a second it worked out: the server's copy of its HP as a checksum (hpCheck); a client that
  *             disagrees asks for them all again (hpResync)
  *
@@ -47,6 +48,8 @@ interface Hit extends ShellHitInfo {
   x: number;
   y: number;
   gone: boolean;
+  /** The target's state at the hit (a respawn or a reused id makes a new one: that hit goes the old way) */
+  state: ShipState | undefined;
   /** The part it set burning (-1: none), and for how long */
   ignite: number;
   igniteTicks: number;
@@ -114,7 +117,7 @@ export class HitLedger {
     this.host.net.broadcastProjectileHit(proj, x, y, CAPS.HITS);
     const h: Hit = {
       ...hit, proj, owner: Projectile.ownerId[proj], gun: Projectile.gun[proj], sys: InSystem.systemId[proj], tick: this.host.currentTick,
-      x, y, gone: false, ignite: -1, igniteTicks: 0, end: null, fx: [],
+      x, y, gone: false, state: this.host.getShips().get(hit.target), ignite: -1, igniteTicks: 0, end: null, fx: [],
     };
     this.hits.push(h);
     this.byProj.set(proj, h);
@@ -155,8 +158,10 @@ export class HitLedger {
     if (!passes) this.passes.set(conn, (passes = new Map()));
     let check = this.checks.get(conn);
     if (!check) this.checks.set(conn, (check = { due: new Set(), at: -Infinity }));
-    const ships = this.host.getShips(), tick = this.host.currentTick;
+    const ships = this.host.getShips(), tick = this.host.currentTick, sys = InSystem.systemId[conn.playerId];
     for (const h of this.hits) {
+      // (another system's: nothing of it goes to this client either way)
+      if (h.sys !== sys) continue;
       const why = this.derive(conn, h, ships, known, passes, plan, tick);
       if (why) {
         plan.legacy.push(h);
@@ -173,7 +178,7 @@ export class HitLedger {
   private derive(conn: ClientConnection, h: Hit, ships: ShipBridge, known: (id: number) => boolean, passes: Map<number, number>, plan: Plan, tick: number): string | null {
     // The target as the client has it: in view, synced, not rebuilt since the hit (a rebuild's sync carries its HP)
     const ship = ships.get(h.target);
-    if (!ship || ship.rebuilds !== h.rebuilds) return 'rebuilt';
+    if (!ship || ship !== h.state || ship.rebuilds !== h.rebuilds) return 'rebuilt';
     if (!conn.shipView.has(h.target) || conn.debrisHeld.has(h.target)) return 'view';
     const synced = conn.shipSynced.get(h.target), sent = conn.shipHpSent.get(h.target);
     if (!synced || synced.ship !== ship || synced.rebuilds !== ship.rebuilds || !sent || sent.length !== ship.hp.length) return 'sync';
@@ -256,7 +261,7 @@ export class HitLedger {
     const id = c.due.values().next().value!;
     c.due.delete(id);
     const sent = conn.shipHpSent.get(id);
-    if (!sent || !conn.shipView.has(id)) return;
+    if (!sent || !conn.shipView.has(id) || conn.debrisHeld.has(id)) return;
     c.at = tick;
     this.stats.checks++;
     this.host.net.send(conn.ws, { type: 'hpCheck', id, sum: hpChecksum(sent) });
@@ -264,13 +269,14 @@ export class HitLedger {
 
   // ---- After the snapshot ----
 
-  /** Shells removed: their pass counts go */
-  removed(ids: Iterable<number>): void {
-    if (!this.on) return;
-    const maps: Map<number, number>[] = [];
-    for (const c of this.host.clients.values()) { const m = this.passes.get(c); if (m?.size) maps.push(m); }
-    if (!maps.length) return;
-    for (const id of ids) for (const m of maps) m.delete(id);
+  /**
+   * The shells this client's snapshot removed (its removed list, after its records are planned): their pass counts
+   * go, as its client forgets them after the hits message that follows (ConfirmedHits.forget). Only what it's told:
+   * a shell it never hears removed keeps its count on both sides alike
+   */
+  dropShells(conn: ClientConnection, ids: readonly number[]): void {
+    const m = this.passes.get(conn);
+    if (m?.size) for (const id of ids) m.delete(id);
   }
 
   /** The snapshot's gone: drop its hits, switch any client's caps, and see whether the next one keeps hits */

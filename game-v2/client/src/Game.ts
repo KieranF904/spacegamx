@@ -1333,6 +1333,8 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'flex';
     // Send join/auth message based on pending auth state
     // (Each carries our protocol version: a server on another one hangs up with PROTOCOL_MISMATCH_CLOSE)
     const pending = this.pendingAuth;
+    // (A new connection: confirmed hits' shell counts start afresh, as the server's do)
+    this.shipClient.hits.reset();
     if (pending) {
       // Guest
       this.network.send({ type: 'join', username: pending.username, protocol: PROTOCOL_VERSION, caps: clientCaps() });
