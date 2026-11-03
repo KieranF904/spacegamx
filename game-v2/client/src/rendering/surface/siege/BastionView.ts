@@ -26,7 +26,7 @@ import { LitGeometry } from '../../lighting/LitGeometry';
 import { Lighting, LitMesh } from '../../lighting/Lighting';
 import { drawGround } from './SiegeGround';
 import { SiegeFx } from './SiegeFx';
-import { SiegeMarks, type MarkEntity } from './SiegeMarks';
+import { SiegeMarks, type MarkEntity, type ViewBox } from './SiegeMarks';
 import { siegeFeed } from './siegeFeed';
 import { PAD_EMPTY, TURRET_DEFAULT, TURRET_LOOKS, beaconPhase, coreGlow, dayLanes, frontLanes, padLamp, type Approach } from './siegeLook';
 
@@ -39,7 +39,8 @@ const LANE_HOLD = 30 * 60;
 type Layout = { x: number; y: number; slots: { x: number; y: number }[]; platform?: { sides: number; radius: number }; walls?: { from: number; to: number; radius: number }[]; profile?: string };
 type Turret = NonNullable<NonNullable<ServerSiegeStateMessage['turrets']>[number]>;
 
-export interface BastionFrame { night: number; zoom: number; angle: number; entities: Iterable<MarkEntity> }
+/** `view`: the world on screen (marks off it aren't drawn); `entities` need only be the ships */
+export interface BastionFrame { night: number; zoom: number; angle: number; entities: Iterable<MarkEntity>; view?: ViewBox }
 
 export class BastionView {
   readonly container = new Container();
@@ -166,7 +167,7 @@ export class BastionView {
     this.smokes(dt, msg, turrets, lost, hull);
     // Over the ships: hostiles by role (marks are in the bastion's frame)
     // (the marks' Graphics sits at the bastion, which is at the moon's middle but not necessarily the world's: no copy per entity)
-    this.marks.update(dt, f.entities, msg, night, f.zoom, f.angle, tick, this.b.x, this.b.y);
+    this.marks.update(dt, f.entities, msg, night, f.zoom, f.angle, tick, this.b.x, this.b.y, f.view);
   }
 
   /** What changed since last frame: a turret shot down, the bastion hit, a front landed */

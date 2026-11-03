@@ -791,7 +791,7 @@ export class Renderer {
       if (t) { this.terrainView = new TerrainView(t, this.lighting, surface?.kind === 'cavern'); this.terrainLayer.addChild(this.terrainView.container); }
     }
     this.terrainView?.update(Math.min(0.1, delta));
-    this.city?.bastion?.update(Math.min(0.1, delta), { night: this.surface.night, zoom: this.cameraZoom, angle: this.cameraAngle, entities: this.state.entities.values() });
+    if (this.city?.bastion) { const vb = this.viewBox(); this.city.bastion.update(Math.min(0.1, delta), { night: this.surface.night, zoom: this.cameraZoom, angle: this.cameraAngle, entities: this.state.entities.ofType(EntityType.ShipBody), view: { x: this.cameraX, y: this.cameraY, hw: vb.hw, hh: vb.hh } }); }
     const lightKey = `${this.currentSystemId}|${this.systemVisuals.has(this.currentSystemId)}`;
     if (lightKey !== this.lightKey) {
       this.lightKey = lightKey;

@@ -11,6 +11,8 @@ import { EntityType, type ServerSiegeStateMessage } from '@space-game/common';
 import { hostileLook, type Glyph } from './siegeLook';
 
 export interface MarkEntity { id: number; type: number; data?: number[]; name?: string; renderX: number; renderY: number }
+/** The world on screen: the camera (x, y) and the half extents of the box round the turned view */
+export interface ViewBox { x: number; y: number; hw: number; hh: number }
 
 type Draw = (g: Graphics, x: number, y: number, s: number, c: number, sn: number, color: number, a: number) => void;
 /** Each glyph, `s` its half size, (c, sn) the screen's upright turn */
@@ -45,8 +47,12 @@ export class SiegeMarks {
   readonly g = new Graphics();
   private t = 0;
 
-  /** `night` 0..1 (marks fade in after dusk), `zoom` the camera's, `angle` its turn (marks stay upright); (ox, oy) this Graphics' place in the world (the bastion's) */
-  update(dt: number, entities: Iterable<MarkEntity>, msg: ServerSiegeStateMessage | null, night: number, zoom: number, angle: number, tick: number, ox = 0, oy = 0): void {
+  /**
+   * `night` 0..1 (marks fade in after dusk), `zoom` the camera's, `angle` its turn (marks stay upright); (ox, oy) this
+   * Graphics' place in the world (the bastion's); `view` the world box on screen (camera and half extents): hostiles
+   * whose marks would fall wholly outside it aren't drawn (a night's hostiles spread round the moon, most off screen)
+   */
+  update(dt: number, entities: Iterable<MarkEntity>, msg: ServerSiegeStateMessage | null, night: number, zoom: number, angle: number, tick: number, ox = 0, oy = 0, view?: ViewBox): void {
     this.t += dt;
     const g = this.g;
     g.clear();
@@ -54,8 +60,11 @@ export class SiegeMarks {
     if (!msg || show <= 0) return;
     const px = 1 / Math.max(0.05, zoom), c = Math.cos(angle), sn = Math.sin(angle);
     const focus = msg.focus?.target !== undefined && (msg.focus.until ?? 0) > tick ? msg.focus.target : -1;
+    // (the most a mark reaches from its hostile: the boss's bracket, its glyph above and the focus reticle round it)
+    const reach = Math.max(30 * px, 150) + 30 * px;
     for (const e of entities) {
       if (e.type !== EntityType.ShipBody || e.data?.[0] !== 3) continue;
+      if (view && (Math.abs(e.renderX - view.x) > view.hw + reach || Math.abs(e.renderY - view.y) > view.hh + reach)) continue;
       const look = hostileLook(e.name, msg.tonight);
       const r = Math.max((look.boss ? 30 : 19) * px, look.boss ? 150 : 70), arm = r * 0.45, w = 2.2 * px, a = 0.85 * show, x = e.renderX - ox, y = e.renderY - oy;
       for (const [sx, sy] of CORNERS) {
