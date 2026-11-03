@@ -233,7 +233,9 @@ export function createApp(deps: AppDeps) {
     if (limited(ctx, `commentDay:${user.id}`, LIMITS.commentDaily)) return fail(429, 'Daily comment limit reached.', body);
     // A comment on an image names it by its src; one that isn't an image of this post is just a comment on the post
     const wanted = str(f.image, 1000);
-    const on = wanted ? postImages(post.body).find((i) => i.src === wanted) : undefined;
+    const cover = V.coverOf(post);
+    const images = [...(cover && !postImages(post.body).some((i) => i.src === cover) ? [{ src: cover, alt: post.title }] : []), ...postImages(post.body)];
+    const on = wanted ? images.find((i) => i.src === wanted) : undefined;
     const c = await store.addComment({ postId: post.id, authorId: user.id, authorName: user.username, body, image: on?.src ?? null });
     if (json) sendJson(ctx.res, 200, { ok: true, id: c.id, item: String(V.commentItem(ctx.page, post, c, on?.alt ?? '')) });
     else redirect(ctx.res, `/updates/${encodeURIComponent(post.slug)}?ok=commented#c${c.id}`);

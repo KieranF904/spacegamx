@@ -162,7 +162,11 @@
   // Images in a post open large in a dialog, with that image's comments beside them. The comments are read from the
   // post's own list (so the page and the viewer never disagree); a new one is posted with fetch and added to both.
   const prose = $('.post .prose');
-  const pics = prose && 'HTMLDialogElement' in window ? $$('.pic > img', prose) : [];
+  // (The post's cover opens too: first, unless it's one of the body's own images, which it then opens at)
+  const bodyPics = prose && 'HTMLDialogElement' in window ? $$('.pic > img', prose) : [];
+  const coverImg = 'HTMLDialogElement' in window ? $('.post-cover-lg img[data-cover]') : null;
+  const coverTwin = coverImg ? bodyPics.find((img) => img.getAttribute('src') === coverImg.getAttribute('src')) : null;
+  const pics = coverImg && !coverTwin ? [coverImg, ...bodyPics] : bodyPics;
   const list = $('[data-comment-list]');
   if (pics.length && list) {
     const emptyNote = $('[data-comments-empty]');
@@ -362,6 +366,13 @@
       ev.preventDefault();
       open(pics.indexOf($('img', pic)), ev.target.closest('a') || $('img', pic));
     });
+    // (The cover: itself, or the body image it repeats)
+    if (coverImg) {
+      const at = () => pics.indexOf(coverTwin ?? coverImg);
+      coverImg.tabIndex = 0; coverImg.setAttribute('role', 'button'); coverImg.setAttribute('aria-label', 'View larger');
+      coverImg.addEventListener('click', (ev) => { if (!plain(ev)) return; ev.preventDefault(); open(at(), coverImg); });
+      if (coverTwin) coverImg.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); open(at(), coverImg); } });
+    }
     list.addEventListener('click', (ev) => {
       const link = ev.target.closest('[data-open-image]');
       const i = link && pics.findIndex((p) => srcOf(p) === link.closest('.comment').dataset.image);

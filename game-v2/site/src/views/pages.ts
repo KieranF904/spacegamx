@@ -199,9 +199,10 @@ export function postPage(ctx: PageCtx, d: { post: Post; comments: Comment[]; pre
     <h1>${p.title}</h1>
     ${p.summary ? html`<p class="lede">${p.summary}</p>` : ''}
     ${p.tags.length ? html`<div class="tags">${p.tags.map((t) => tagChip(t))}</div>` : ''}
+    ${p.status === 'published' ? html`<p class="meta"><a href="#comments">${d.comments.length ? `${d.comments.length} ${d.comments.length === 1 ? 'comment' : 'comments'}` : 'Leave a comment'}</a></p>` : ''}
     ${ctx.user?.isAdmin ? html`<p class="admin-inline"><a href="/admin/posts/${p.id}">Edit this post</a></p>` : ''}
   </header>
-  ${p.cover ? html`<figure class="post-cover-lg wrap"><img src="${cover}" alt=""></figure>` : ''}
+  ${p.cover ? html`<figure class="post-cover-lg wrap"><span class="pic"><img src="${cover}" alt="${p.title}" data-cover></span></figure>` : ''}
   <div class="prose wrap-narrow">${bodyHtml}</div>
   <nav class="post-nav wrap-narrow" aria-label="More updates">
     ${d.older ? html`<a href="/updates/${encodeURIComponent(d.older.slug)}"><small>Previous</small>${d.older.title}</a>` : html`<span></span>`}
