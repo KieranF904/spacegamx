@@ -689,6 +689,18 @@ export class Renderer {
     this.recenterBtn = b;
   }
 
+  /** Next frame the view goes straight onto your ship (pan, roll and all), no easing: behind the loading screen, so it
+   *  is already there when the screen lifts (app/loadingFlow.ts) */
+  snapCamera(): void {
+    this.cameraSnap = true;
+  }
+  private cameraSnap = false;
+
+  /** Rock chunks still to be built (and the relief atlas still coming): the loading screen waits for none */
+  buildPending(): number {
+    return this.rocks.pending;
+  }
+
   /** The view back onto your ship */
   recenter(): void {
     this.pan.x = 0;
@@ -708,6 +720,7 @@ export class Renderer {
     const heading = own ? this.cameraHeading : null;
     this.helmTime = heading === null ? 0 : this.helmTime + dt;
     const roll = heading === null ? { rate: NORTH_RETURN_RATE, maxSpin: MAX_VIEW_SPIN } : helmFollow(this.helmTime);
+    if (this.cameraSnap) { this.pan.x = this.pan.y = 0; this.cameraAngle = heading ?? 0; }
     this.cameraAngle = smoothAngle(this.cameraAngle, heading ?? 0, roll.rate, Math.min(0.1, dt), roll.maxSpin);
     if (heading === null && Math.abs(this.cameraAngle) < 1e-4) this.cameraAngle = 0;
     cameraView.angle = this.cameraAngle;
@@ -717,7 +730,8 @@ export class Renderer {
     // Smooth camera follow (tighter mid-jump, or the ship would leave the screen; a slow drift while dead).
     // cameraFollow is the catch-up per 60 Hz frame, so it's the same at any frame rate.
     const follow = this.deathOverlay ? this.cameraFollow * 0.12 : this.cameraFollow;
-    const lerpFactor = 1 - Math.pow(1 - Math.min(1, follow), Math.min(0.1, dt) * 60);
+    const lerpFactor = this.cameraSnap ? 1 : 1 - Math.pow(1 - Math.min(1, follow), Math.min(0.1, dt) * 60);
+    this.cameraSnap = false;
     this.cameraX += (tx - this.cameraX) * lerpFactor;
     this.cameraY += (ty - this.cameraY) * lerpFactor;
     if (own) {

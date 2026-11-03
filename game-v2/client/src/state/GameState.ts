@@ -279,6 +279,10 @@ export class GameState {
   private serverTickTargetTime: number = 0;
   /** Server tick minus our clock in ticks, smoothed (see getEstimatedServerTick) */
   private tickOffset: number | null = null;
+  /** A pong has come since the last join: the server tick estimate means something (before it, it's our own clock) */
+  public clockSynced = false;
+  /** The tick interpolate() last drew the world at */
+  public renderTickNow = 0;
   
   // ============================================
   // PING / JITTER / ADAPTIVE DELAY
@@ -397,6 +401,7 @@ export class GameState {
     this.serverTickTargetTime = now;
     
     if (this.tickOffset === null) this.tickOffset = this.serverTickTarget - now / TICK_MS;
+    this.clockSynced = true;
     
     // Adaptive interpolation delay formula
     const baseMin = this.smoothedPing < 60 ? 80 : 110;
@@ -426,6 +431,13 @@ export class GameState {
    */
   getRawServerTick(now: number = performance.now()): number {
     return this.serverTickTarget + (now - this.serverTickTargetTime) / TICK_MS;
+  }
+
+  /** The world drawn is caught up: a snapshot is buffered and the last frame's render tick has reached the oldest one
+   *  (so nothing is drawn from before it: the loading screen waits for this, app/readiness.ts) */
+  viewCaughtUp(): boolean {
+    const b = this.snapshotBuffer;
+    return b.length > 0 && this.renderTickNow >= b[0].tick;
   }
 
   getRenderTick(now: number = performance.now()): number {
@@ -1027,6 +1039,7 @@ export class GameState {
     
     const interpDelayTicks = this.interpDelayMs / TICK_MS;
     const renderTick = Math.max(0, estimatedTick - interpDelayTicks);
+    this.renderTickNow = renderTick;
     
     // Find bracketing snapshots
     const buffer = this.snapshotBuffer;

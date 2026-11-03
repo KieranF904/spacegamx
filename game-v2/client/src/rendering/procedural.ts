@@ -26,6 +26,11 @@ let worker: Worker | null | undefined;
 const pending = new Map<number, Job>();
 let nextId = 1;
 
+/** Requests still being built by the worker (the loading screen waits for none: app/loadingFlow.ts) */
+export function proceduralPending(): number {
+  return pending.size;
+}
+
 function inline(req: ProceduralRequest): unknown {
   switch (req.kind) {
     case 'rockAtlas': return buildRockAtlas();

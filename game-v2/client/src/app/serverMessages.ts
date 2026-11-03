@@ -133,8 +133,8 @@ function pong(h: MessageHost, msg: Msg<'pong'>): void {
 }
 
 function playerState(h: MessageHost, msg: Msg<'playerState'>): void {
-  // Track credit gains for stats
-  if (msg.credits > h.state.credits) {
+  // Track credit gains for stats (not the first update after joining: that's what you had, not a gain)
+  if (h.statsPrimed && msg.credits > h.state.credits) {
     const creditGain = msg.credits - h.state.credits;
     h.playerStatsUI.addCreditsEarned(creditGain);
     // Show floating credit text near player
@@ -142,7 +142,7 @@ function playerState(h: MessageHost, msg: Msg<'playerState'>): void {
     h.floatingRewardsUI.addCredits(playerPos.x, playerPos.y, creditGain);
   }
   // Track XP gains for stats
-  if (msg.xp > h.state.xp || msg.level > h.state.level) {
+  if (h.statsPrimed && (msg.xp > h.state.xp || msg.level > h.state.level)) {
     const xpGain = msg.xp - h.state.xp;
     if (xpGain > 0) {
       const playerPos = h.state.getPlayerPosition();

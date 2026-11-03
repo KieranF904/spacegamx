@@ -81,7 +81,11 @@ export function gradeOfMaterial(catalog: Catalog, material: string): number {
   return Math.max(1, Math.min(5, Math.round((catalog.materials.get(material) as { grade?: number } | undefined)?.grade ?? 1)));
 }
 
-let atlas: Texture | null = null, asked = false;
+let atlas: Texture | null = null, asked = false, built = false;
+/** The real hull atlas is in, or nothing has asked for it yet (the loading screen waits while it's coming) */
+export function hullAtlasReady(): boolean {
+  return !asked || built;
+}
 /** The hull atlas once built (a flat stand-in until then: no detail, no glow); a new texture when it arrives */
 export function hullAtlas(): Texture {
   if (!atlas) {
@@ -90,6 +94,7 @@ export function hullAtlas(): Texture {
   if (!asked) {
     asked = true;
     const done = (data: Uint8Array) => {
+      built = true;
       atlas = new Texture({ source: new BufferImageSource({
         resource: data, width: HULL_TILE * 4, height: HULL_TILE * HULL_ROWS,
         // Data, not colour: alpha is its own channel, never multiplied in

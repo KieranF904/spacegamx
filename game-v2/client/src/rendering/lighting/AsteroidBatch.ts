@@ -105,6 +105,13 @@ export class AsteroidBatch {
 
   constructor(private lighting: Lighting) {}
 
+  /** Chunks waiting to be rebuilt (their new rocks not drawn yet), plus 1 while the relief atlas is still coming */
+  get pending(): number {
+    let n = this.chunks.length && !rockAtlas() ? 1 : 0;
+    for (const c of this.chunks) if (c.dirty) n++;
+    return n;
+  }
+
   private newChunk(): Chunk {
     const lit = new LitMesh(new LitGeometry().toGeometry(), { slots: PER_CHUNK, chunk: true });
     lit.area = { x: 0, y: 0, r: 0 };

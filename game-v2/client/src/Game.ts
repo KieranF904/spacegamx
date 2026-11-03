@@ -62,6 +62,7 @@ import shipTuning from '../../data/ships/tuning.json';
 import miningTable from '../../data/mining.json';
 import { TICK_RATE, TICK_MS, xpToReach } from '@space-game/common';
 import { itemIcon } from './ui/itemIcons';
+import { LoadingFlow } from './app/loadingFlow';
 import { ServerMessage, asteroidComposition, MiningTable, registerRockTypes, EntityType, computeStateHash, ClientTransport, loadCatalog, ShipTuning, InventoryStub, QuestTarget, DisconnectInfo, PROTOCOL_VERSION, PROTOCOL_MISMATCH_CLOSE } from '@space-game/common';
 
 /** Keys that take the controls back from the autopilot */
@@ -179,6 +180,8 @@ export class Game {
   
   // UI elements - new HUD
   private loadingEl: HTMLElement | null;
+  /** The loading screen from choosing a server (and on arriving elsewhere, or respawning) until the world is in sync (none in proto) */
+  private loading: LoadingFlow | null = null;
   private topHudEl: HTMLElement | null;
 private xpHudEl: HTMLElement | null;
 private boostHudEl: HTMLElement | null;
@@ -370,6 +373,14 @@ this.xpFillEl = document.getElementById('xpFill');
     window.addEventListener('blur', () => { this.windowFocused = false; this.applyVolume(settings.data); });
     window.addEventListener('focus', () => { this.windowFocused = true; this.applyVolume(settings.data); });
     this.damageIndicatorUI = new DamageIndicatorUI(uiOverlay);
+    if (!this.proto) {
+      const g = this;
+      // (On the body: over the HUD, which sits outside the overlay's stacking)
+      this.loading = new LoadingFlow(document.body, {
+        state: this.state, renderer: this.renderer, shipClient: this.shipClient,
+        connected: () => g.network.isConnected(), loggedIn: () => g.loggedIn, systemName: (id) => g.systemNames.get(id),
+      });
+    }
     this.floatingRewardsUI = new FloatingRewardsUI(uiOverlay);
     
     // Setup login callbacks - show server browser after login
@@ -489,10 +500,8 @@ this.xpFillEl = document.getElementById('xpFill');
     this.serverName = server.name;
     this.serverAddress = `${server.host}:${server.port}`;
     this.clearLoadingClick();
-    if (this.loadingEl) {
-      this.loadingEl.textContent = `Connecting to ${server.name}...`;
-      this.loadingEl.style.display = 'block';
-    }
+    if (this.loadingEl) this.loadingEl.style.display = 'none';
+    this.loading?.begin('join', server.name);
     
     // Build WebSocket URL
     const protocol = server.secure ? 'wss' : 'ws';
@@ -1073,6 +1082,7 @@ this.xpFillEl = document.getElementById('xpFill');
     // Under a map that covers the screen the world isn't drawn at all (the GPU gets a rest), and kept up ten times a
     // second, not every frame (its effects run their course and views come and go; it's whole again as the map lifts)
     this.coveredDelta = covered ? this.coveredDelta + delta : 0;
+    this.loading?.update(now);
     if ((!paused || this.refreshWorld) && !this.loginUI.backdrop()) {
       if (this.app.stage.visible === covered) this.app.stage.visible = !covered;
       if (!covered) {
@@ -1303,6 +1313,8 @@ this.xpFillEl = document.getElementById('xpFill');
     this.prefetchScreens();
     this.clearLoadingClick();
     if (this.loadingEl) this.loadingEl.style.display = 'none';
+    // Covered until the world is in sync (a reconnect too)
+    this.loading?.begin('join', this.serverName);
     // The sign-in backdrop has done its job: free its renderer (it's rebuilt if the sign-in screen comes back)
     this.loginUI.releaseBackdrop();
     
@@ -1333,18 +1345,18 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'flex';
     }
     
     // Start ping loop (one per connection: a reconnect replaces it)
+    // The first now: until a pong comes the client has no idea of the server's tick (rock orbits, stations and
+    // other ships are placed at the wrong one, then jump), and the loading screen waits for it
     if (this.pingTimer) clearInterval(this.pingTimer);
-    this.pingTimer = setInterval(() => {
-      this.network.send({
-        type: 'ping',
-        clientTime: Date.now(),
-      });
-    }, 2000);
+    const ping = () => this.network.send({ type: 'ping', clientTime: Date.now() });
+    ping();
+    this.pingTimer = setInterval(ping, 2000);
   }
 
   private onDisconnected(info?: DisconnectInfo): void {
     console.log('Disconnected from server', info ?? '');
     this.loggedIn = false;
+    this.loading?.cancel();
     
     if (info?.code === PROTOCOL_MISMATCH_CLOSE || this.versionMismatch) {
       // A new version is out (or this one is newer than the server): only a reload helps

@@ -5,6 +5,16 @@
  */
 import type { HullDone, HullJob } from './hullWire';
 
+/** Every hull worker running (for hullJobsPending) */
+const live = new Set<HullWorker>();
+
+/** Hulls still being built, over every worker: until they come those ships aren't drawn (the loading screen waits) */
+export function hullJobsPending(): number {
+  let n = 0;
+  for (const w of live) n += w.pending;
+  return n;
+}
+
 export class HullWorker {
   private w: Worker | null = null;
   private next = 1;
@@ -20,6 +30,7 @@ export class HullWorker {
         cb?.(e.data.error ? null : e.data);
       };
       this.w.onerror = (e) => { console.warn('[hull worker] failed', e.message); this.fail(); };
+      live.add(this);
     } catch {
       this.w = null;
     }
@@ -46,6 +57,7 @@ export class HullWorker {
     this.w?.terminate();
     this.w = null;
     this.waiting.clear();
+    live.delete(this);
   }
 
   private fail(): void {
@@ -53,5 +65,6 @@ export class HullWorker {
     this.w = null;
     for (const cb of this.waiting.values()) cb(null);
     this.waiting.clear();
+    live.delete(this);
   }
 }
