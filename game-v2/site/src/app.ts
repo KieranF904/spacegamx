@@ -6,7 +6,8 @@
  * Routes (pages):
  *   GET  /                         home: hero, play, live count, latest updates, the game, shoutbox
  *   GET  /updates[?tag=&page=]     the feed;   GET /updates/:slug  a post and its comments
- *   POST /updates/:slug/comments   comment (signed in)
+ *   POST /updates/:slug/comments   comment (signed in); `image` (an image's src in the post) puts it on that image;
+ *                                  with Accept: application/json it answers { ok, id, item } (the list item's HTML)
  *   GET  /rss.xml                  RSS 2.0
  *   GET  /suggestions[?sort=&status=]  POST /suggestions   POST /suggestions/:id/vote
  *   GET  /shoutbox/stream (SSE)    POST /shoutbox    POST /shoutbox/:id/delete (admin)
@@ -39,6 +40,7 @@ import { HttpError, readBody, readFields, redirect, Router, safeNext, sendHtml, 
 import type { Lobby, LobbyUser } from './lobby.js';
 import { renderMarkdown } from './markdown.js';
 import { BOARDS, type PilotSource } from './pilots.js';
+import { postImages } from './postImages.js';
 import { gameIndex, injectHandoff, isDevGamePath, proxyToDev, proxyUpgradeToDev } from './play.js';
 import { checkPost } from './posts.js';
 import { rssFeed } from './rss.js';
@@ -222,13 +224,19 @@ export function createApp(deps: AppDeps) {
     const post = await store.getPostBySlug(p.slug);
     if (!post || post.status !== 'published') { page(ctx, 404, V.notFoundPage(ctx.page, 'update')); return; }
     const f = await fields(ctx);
+    const json = wantsJson(ctx); // (the image viewer posts with fetch; the forms post and redirect)
     const body = str(f.body, 5000).replace(/\r\n/g, '\n').trim();
-    if (!body) return showPost(ctx, p.slug, 400, { error: 'Write something first.', draft: body });
-    if (body.length > 2000) return showPost(ctx, p.slug, 400, { error: 'Comments can be 2000 characters at most.', draft: body.slice(0, 2000) });
-    if (limited(ctx, `comment:${user.id}`, LIMITS.comment)) return showPost(ctx, p.slug, 429, { error: slow(ctx, `comment:${user.id}`, LIMITS.comment), draft: body });
-    if (limited(ctx, `commentDay:${user.id}`, LIMITS.commentDaily)) return showPost(ctx, p.slug, 429, { error: "Daily comment limit reached.", draft: body });
-    const c = await store.addComment({ postId: post.id, authorId: user.id, authorName: user.username, body });
-    redirect(ctx.res, `/updates/${encodeURIComponent(post.slug)}?ok=commented#c${c.id}`);
+    const fail = (status: number, error: string, draft: string) => (json ? sendJson(ctx.res, status, { error }) : showPost(ctx, p.slug, status, { error, draft }));
+    if (!body) return fail(400, 'Write something first.', body);
+    if (body.length > 2000) return fail(400, 'Comments can be 2000 characters at most.', body.slice(0, 2000));
+    if (limited(ctx, `comment:${user.id}`, LIMITS.comment)) return fail(429, slow(ctx, `comment:${user.id}`, LIMITS.comment), body);
+    if (limited(ctx, `commentDay:${user.id}`, LIMITS.commentDaily)) return fail(429, 'Daily comment limit reached.', body);
+    // A comment on an image names it by its src; one that isn't an image of this post is just a comment on the post
+    const wanted = str(f.image, 1000);
+    const on = wanted ? postImages(post.body).find((i) => i.src === wanted) : undefined;
+    const c = await store.addComment({ postId: post.id, authorId: user.id, authorName: user.username, body, image: on?.src ?? null });
+    if (json) sendJson(ctx.res, 200, { ok: true, id: c.id, item: String(V.commentItem(ctx.page, post, c, on?.alt ?? '')) });
+    else redirect(ctx.res, `/updates/${encodeURIComponent(post.slug)}?ok=commented#c${c.id}`);
   });
 
   router.get('/rss.xml', async (ctx) => {

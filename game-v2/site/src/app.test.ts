@@ -243,6 +243,67 @@ describe('site routes', () => {
     expect([s.authorId, s.authorName, s.votes]).toEqual([null, 'a former pilot', 0]);
   });
 
+  it('comments on an image: checked against the post, shown with a thumbnail and a count, hidden ones gone', async () => {
+    const admin = new Browser();
+    await admin.signin('admin', 'admin');
+    await admin.page('/admin/posts/new');
+    const body = 'Look:\n\n![The sun, old and new](/uploads/aaaa00.png)\n\n![The moon](/uploads/bbbb00.png)\n\n[![A linked one](/uploads/cccc00.png)](https://example.com/)';
+    expect((await admin.req('/admin/posts', { method: 'POST', form: { title: 'Pictures', body, tags: 'news', status: 'published' } })).status).toBe(303);
+
+    const v = new Browser();
+    await v.page('/register');
+    await v.req('/register', { method: 'POST', form: { username: 'pixel', email: 'p@x.io', password: 'pw', next: '/updates/pictures' } });
+    const page = await v.page('/updates/pictures');
+    expect(page.text).toContain('<span class="pic"><img src="/uploads/aaaa00.png"');
+    expect(page.text).not.toContain('<span class="pic"><img src="/uploads/cccc00.png"'); // inside a link: left alone
+    expect(page.text).toContain('data-image-form'); // the form the viewer shows
+    expect(page.text).not.toContain('pic-count');
+
+    // With the form (no script): stored on the image, and the post shows it
+    expect((await v.req('/updates/pictures/comments', { method: 'POST', form: { body: 'Lovely sun', image: '/uploads/aaaa00.png' } })).status).toBe(303);
+    const post = (await store.getPostBySlug('pictures'))!;
+    let list = await store.listComments(post.id);
+    expect(list.map((c) => [c.body, c.image])).toEqual([['Lovely sun', '/uploads/aaaa00.png']]);
+    const shown = await v.page('/updates/pictures');
+    expect(shown.text).toContain('data-image="/uploads/aaaa00.png"');
+    expect(shown.text).toContain('class="c-thumb"');
+    expect(shown.text).toContain('1 comment on this image');
+
+    // An image that isn't in the post, or is inside a link: a comment on the post
+    await v.req('/updates/pictures/comments', { method: 'POST', form: { body: 'Wrong one', image: '/uploads/zzzz00.png' } });
+    await v.req('/updates/pictures/comments', { method: 'POST', form: { body: 'Linked one', image: '/uploads/cccc00.png' } });
+    list = await store.listComments(post.id);
+    expect(list.map((c) => [c.body, c.image])).toEqual([['Lovely sun', '/uploads/aaaa00.png'], ['Wrong one', null], ['Linked one', null]]);
+
+    // With script: JSON back, with the list item; same limits (4 a minute) and the same sign-in rule
+    const json = await v.req('/updates/pictures/comments', { method: 'POST', json: { body: 'Moon <b>too</b>', image: '/uploads/bbbb00.png' } });
+    expect(json.status).toBe(200);
+    const made = JSON.parse(json.text);
+    expect(made.item).toContain(`id="c${made.id}"`);
+    expect(made.item).toContain('data-image="/uploads/bbbb00.png"');
+    expect(made.item).toContain('On the image: The moon');
+    expect(made.item).not.toContain('<b>');
+    const slow = await v.req('/updates/pictures/comments', { method: 'POST', json: { body: 'One too many', image: '/uploads/bbbb00.png' } });
+    expect(slow.status).toBe(429);
+    expect(JSON.parse(slow.text).error).toMatch(/too fast|going a bit fast/);
+    expect((await new Browser().req('/updates/pictures/comments', { method: 'POST', json: { body: 'Hi' } })).status).toBe(403); // no session cookie, no token
+    const anon = new Browser();
+    await anon.page('/updates/pictures');
+    expect((await anon.req('/updates/pictures/comments', { method: 'POST', json: { body: 'Hi', image: '/uploads/aaaa00.png' } })).status).toBe(401);
+    expect((await anon.page('/updates/pictures')).text).toContain('to comment.'); // the viewer's form is the sign-in prompt
+
+    // Moderation: hidden ones are not shown, the badge counts only what is
+    await admin.page('/admin/comments');
+    const adminList = await admin.page('/admin/comments');
+    expect(adminList.text).toContain('class="mod-image"');
+    expect(adminList.text).toContain('On an image: The sun, old and new');
+    const sun = list[0];
+    expect((await admin.req(`/admin/comments/${sun.id}/hide`, { method: 'POST', form: { back: '/admin/comments' } })).status).toBe(303);
+    const after = await anon.page('/updates/pictures');
+    expect(after.text).not.toContain('Lovely sun');
+    expect(after.text.match(/class="pic-count"/g)).toHaveLength(1); // only the moon's
+  });
+
   it('pilot pages and Play (link mode redirects; no token in the URL)', async () => {
     const page = await new Browser().page('/pilots/vega');
     expect(page.text).toContain('Stubborn');

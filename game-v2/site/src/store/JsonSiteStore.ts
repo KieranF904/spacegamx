@@ -51,7 +51,8 @@ export class JsonSiteStore implements SiteStore {
       return {
         ...base, ...raw,
         nextId: raw.nextId ?? {},
-        posts: raw.posts ?? [], comments: raw.comments ?? [], suggestions: raw.suggestions ?? [],
+        // (comments from before images were commentable have no `image`)
+        posts: raw.posts ?? [], comments: (raw.comments ?? []).map((c) => ({ ...c, image: c.image ?? null })), suggestions: raw.suggestions ?? [],
         votes: raw.votes ?? [], shouts: raw.shouts ?? [], tokens: raw.tokens ?? [],
       } as StoreFile;
     } catch (err) {
@@ -148,8 +149,8 @@ export class JsonSiteStore implements SiteStore {
     return clone([...this.data.comments].sort((a, b) => b.id - a.id).slice(0, limit));
   }
 
-  async addComment(c: Omit<Comment, 'id' | 'createdAt' | 'hidden'>) {
-    const row: Comment = { ...c, id: this.id('comment', this.data.comments), createdAt: now(), hidden: false };
+  async addComment(c: Omit<Comment, 'id' | 'createdAt' | 'hidden' | 'image'> & { image?: string | null }) {
+    const row: Comment = { ...c, image: c.image ?? null, id: this.id('comment', this.data.comments), createdAt: now(), hidden: false };
     this.data.comments.push(row);
     this.save();
     return clone(row);

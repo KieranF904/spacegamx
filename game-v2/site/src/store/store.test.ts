@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync } from 'fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { JsonSiteStore } from './JsonSiteStore.js';
+import { PostgresSiteStore } from './PostgresSiteStore.js';
 import type { SiteStore } from './types.js';
 
 const post = (slug: string, status: 'draft' | 'published' = 'published') =>
@@ -53,6 +54,28 @@ function contract(name: string, make: () => Promise<{ store: SiteStore; done: ()
       expect((await store.listComments(p.id)).map((c) => c.body)).toEqual(['Second']);
       expect(await store.listComments(p.id, true)).toHaveLength(2);
       expect((await store.recentComments(5))[0].body).toBe('Second');
+      await store.deletePost(p.id);
+      expect(await store.listComments(p.id, true)).toEqual([]);
+      await done();
+    });
+
+    it('comments on an image: kept with the comment, listed, counted, hidden ones not shown, gone with the post', async () => {
+      const { store, done } = await make();
+      const p = (await store.createPost(post('pictures')))!;
+      const img = '/uploads/aaaa.jpg?size=big&x=1';
+      const plain = await store.addComment({ postId: p.id, authorId: 2, authorName: 'ace', body: 'On the post' });
+      const a = await store.addComment({ postId: p.id, authorId: 3, authorName: 'bob', body: 'Nice sun', image: img });
+      const b = await store.addComment({ postId: p.id, authorId: 4, authorName: 'cy', body: 'Too bright', image: img });
+      expect(plain.image).toBeNull();
+      expect(a.image).toBe(img);
+      expect((await store.listComments(p.id)).map((c) => [c.body, c.image])).toEqual([['On the post', null], ['Nice sun', img], ['Too bright', img]]);
+      expect((await store.recentComments(5)).find((c) => c.id === b.id)?.image).toBe(img);
+      await store.setCommentHidden(a.id, true);
+      expect((await store.listComments(p.id)).filter((c) => c.image === img).map((c) => c.body)).toEqual(['Too bright']);
+      expect((await store.listComments(p.id, true)).filter((c) => c.image === img)).toHaveLength(2);
+      expect((await store.commentCounts([p.id])).get(p.id)).toBe(2);
+      await store.forgetUser(4);
+      expect((await store.listComments(p.id)).find((c) => c.id === b.id)).toMatchObject({ authorId: null, image: img });
       await store.deletePost(p.id);
       expect(await store.listComments(p.id, true)).toEqual([]);
       await done();
@@ -119,6 +142,53 @@ function contract(name: string, make: () => Promise<{ store: SiteStore; done: ()
     });
   });
 }
+
+it('JSON store: comments saved before images were commentable load with no image', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'site-store-'));
+  const file = join(dir, 'site.json');
+  writeFileSync(file, JSON.stringify({ version: 1, nextId: {}, posts: [], comments: [{ id: 1, postId: 1, authorId: 2, authorName: 'ace', body: 'Old', createdAt: '2026-01-01T00:00:00Z', hidden: false }] }));
+  const store = new JsonSiteStore(file);
+  expect((await store.recentComments(5))[0]).toMatchObject({ body: 'Old', image: null });
+  await store.close();
+  rmSync(dir, { recursive: true, force: true });
+});
+
+describe('Postgres store: upgrading a database from before comments could be on an image (a fake pool, no database)', () => {
+  const fake = (state: { comments: boolean; image: boolean }, alterFails = false) => {
+    const sql: string[] = [];
+    const pool = {
+      async query(text: string) {
+        sql.push(text);
+        if (/^\s*SELECT/i.test(text)) return { rows: [state] };
+        if (alterFails) throw new Error('must be owner of table site_comments');
+        return { rows: [] };
+      },
+      async end() {},
+    };
+    return { store: new PostgresSiteStore(pool), alters: () => sql.filter((s) => /ALTER TABLE site_comments ADD COLUMN IF NOT EXISTS image TEXT/.test(s)).length };
+  };
+
+  it('adds the column when the table has none', async () => {
+    const f = fake({ comments: true, image: false });
+    await f.store.upgrade();
+    expect(f.alters()).toBe(1);
+  });
+  it('does nothing when it is there, or when schema.sql was never applied', async () => {
+    const has = fake({ comments: true, image: true });
+    await has.store.upgrade();
+    const fresh = fake({ comments: false, image: false });
+    await fresh.store.upgrade();
+    expect(has.alters() + fresh.alters()).toBe(0);
+  });
+  it('says what to do when this database user may not alter the table', async () => {
+    await expect(fake({ comments: true, image: false }, true).store.upgrade()).rejects.toThrow(/run site\/schema\.sql as the table's owner/);
+  });
+  it('schema.sql has the column in the table and as an idempotent ALTER', () => {
+    const sql = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../schema.sql'), 'utf-8');
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS site_comments \([^;]*\bimage\s+TEXT/);
+    expect(sql).toContain('ALTER TABLE site_comments ADD COLUMN IF NOT EXISTS image TEXT;');
+  });
+});
 
 contract('JSON', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'site-store-'));

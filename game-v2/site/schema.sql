@@ -39,8 +39,11 @@ CREATE TABLE IF NOT EXISTS site_comments (
     author_name TEXT NOT NULL,
     body        TEXT NOT NULL,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    hidden      BOOLEAN NOT NULL DEFAULT FALSE
+    hidden      BOOLEAN NOT NULL DEFAULT FALSE,
+    image       TEXT                         -- the post image this is about (its src as rendered), NULL: the post
 );
+-- (A database from before images were commentable has the table without the column; the site also adds it at startup)
+ALTER TABLE site_comments ADD COLUMN IF NOT EXISTS image TEXT;
 CREATE INDEX IF NOT EXISTS idx_site_comments_post ON site_comments(post_id, created_at);
 
 CREATE TABLE IF NOT EXISTS site_suggestions (

@@ -46,6 +46,8 @@ export interface Comment {
   createdAt: string;
   /** Hidden by a moderator (kept, not shown) */
   hidden: boolean;
+  /** The image of the post this is about (its src as rendered in the post), or null for the post as a whole */
+  image: string | null;
 }
 
 export const SUGGESTION_STATUSES = ['open', 'planned', 'in_progress', 'done', 'declined'] as const;
@@ -105,7 +107,7 @@ export interface SiteStore {
   listComments(postId: number, includeHidden?: boolean): Promise<Comment[]>;
   commentCounts(postIds: number[]): Promise<Map<number, number>>;
   recentComments(limit: number): Promise<Comment[]>;
-  addComment(c: Omit<Comment, 'id' | 'createdAt' | 'hidden'>): Promise<Comment>;
+  addComment(c: Omit<Comment, 'id' | 'createdAt' | 'hidden' | 'image'> & { image?: string | null }): Promise<Comment>;
   setCommentHidden(id: number, hidden: boolean): Promise<void>;
   deleteComment(id: number): Promise<void>;
 

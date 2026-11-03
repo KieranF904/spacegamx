@@ -29,7 +29,7 @@ function post(r: any): Post {
   };
 }
 function comment(r: any): Comment {
-  return { id: Number(r.id), postId: Number(r.post_id), authorId: r.author_id == null ? null : Number(r.author_id), authorName: r.author_name, body: r.body, createdAt: iso(r.created_at), hidden: !!r.hidden };
+  return { id: Number(r.id), postId: Number(r.post_id), authorId: r.author_id == null ? null : Number(r.author_id), authorName: r.author_name, body: r.body, createdAt: iso(r.created_at), hidden: !!r.hidden, image: r.image ?? null };
 }
 function suggestion(r: any): Suggestion {
   return {
@@ -53,7 +53,30 @@ export class PostgresSiteStore implements SiteStore {
   static async create(connectionString: string): Promise<PostgresSiteStore> {
     const moduleName = 'pg';
     const pg: any = await import(moduleName);
-    return new PostgresSiteStore(new pg.Pool({ connectionString }) as PgPool);
+    const store = new PostgresSiteStore(new pg.Pool({ connectionString }) as PgPool);
+    await store.upgrade();
+    return store;
+  }
+
+  /**
+   * Changes to tables that already exist (schema.sql only creates what is missing, and nobody re-applies it by
+   * hand on a deploy), made when the site starts. Each is the same statement schema.sql has, run only when needed
+   * (the check needs no special rights; the ALTER needs the table's owner). Tables that don't exist are left
+   * alone: that database hasn't had schema.sql applied at all.
+   */
+  async upgrade(): Promise<void> {
+    const r = await this.pool.query(
+      `SELECT to_regclass('site_comments') IS NOT NULL AS comments,
+              EXISTS (SELECT 1 FROM information_schema.columns
+                      WHERE table_schema = current_schema() AND table_name = 'site_comments' AND column_name = 'image') AS image`);
+    if (r.rows[0]?.comments && !r.rows[0]?.image) {
+      try {
+        await this.pool.query('ALTER TABLE site_comments ADD COLUMN IF NOT EXISTS image TEXT');
+        console.log('[SiteStore] Added site_comments.image');
+      } catch (e) {
+        throw new Error(`site_comments has no "image" column and this database user can't add it: run site/schema.sql as the table's owner (${e})`);
+      }
+    }
   }
 
   async listPosts(opts: { status?: PostStatus | 'all'; tag?: string; limit?: number; offset?: number }) {
@@ -120,8 +143,8 @@ export class PostgresSiteStore implements SiteStore {
 
   async recentComments(limit: number) { return (await this.pool.query('SELECT * FROM site_comments ORDER BY id DESC LIMIT $1', [limit])).rows.map(comment); }
 
-  async addComment(c: Omit<Comment, 'id' | 'createdAt' | 'hidden'>) {
-    const r = await this.pool.query('INSERT INTO site_comments (post_id, author_id, author_name, body) VALUES ($1, $2, $3, $4) RETURNING *', [c.postId, c.authorId, c.authorName, c.body]);
+  async addComment(c: Omit<Comment, 'id' | 'createdAt' | 'hidden' | 'image'> & { image?: string | null }) {
+    const r = await this.pool.query('INSERT INTO site_comments (post_id, author_id, author_name, body, image) VALUES ($1, $2, $3, $4, $5) RETURNING *', [c.postId, c.authorId, c.authorName, c.body, c.image ?? null]);
     return comment(r.rows[0]);
   }
 

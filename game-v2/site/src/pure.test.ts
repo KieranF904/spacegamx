@@ -9,6 +9,7 @@ import { cleanShout } from './shoutbox.js';
 import { sniffImage } from './uploads.js';
 import { toCard, toRankings } from './pilots.js';
 import { rssFeed } from './rss.js';
+import { decoratePostImages, postImages } from './postImages.js';
 import type http from 'http';
 
 describe('html templates escape by default', () => {
@@ -196,5 +197,19 @@ describe('small parts', () => {
     expect(xml).toContain('src="https://space.example/uploads/a.png"');
     expect(xml).toContain('<link>https://space.example/updates/a-b</link>');
     expect(xml.match(/<content:encoded><!\[CDATA\[[\s\S]*?\]\]><\/content:encoded>/)).not.toBeNull();
+  });
+});
+
+describe('post images', () => {
+  const md = '![One & two](/uploads/a.png?x=1&y=2)\n\n![](/uploads/b.png)\n\n![One again](/uploads/a.png?x=1&y=2)\n\n[![Linked](/uploads/c.png)](/somewhere)';
+  it('lists each image once, by its rendered src, and leaves linked ones alone', () => {
+    expect(postImages(md)).toEqual([{ src: '/uploads/a.png?x=1&y=2', alt: 'One & two' }, { src: '/uploads/b.png', alt: '' }]);
+    expect(postImages('No pictures here')).toEqual([]);
+  });
+  it('wraps them, with a count badge linking to the first comment on the image', () => {
+    const { html: out } = decoratePostImages(renderMarkdown(md, 'post'), new Map([['/uploads/b.png', { count: 2, firstId: 7 }]]));
+    expect(out.match(/<span class="pic">/g)).toHaveLength(3);
+    expect(out).toContain('<a class="pic-count" href="#c7" aria-label="2 comments on this image"');
+    expect(out).not.toContain('<span class="pic"><img src="/uploads/c.png"');
   });
 });

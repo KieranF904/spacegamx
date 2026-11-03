@@ -1,7 +1,8 @@
 /** Public pages: home, updates, a post, suggestions, pilots, sign-in, account */
 
 import { html, raw, SafeHtml } from '../html.js';
-import { firstImage, firstParagraph, renderMarkdown } from '../markdown.js';
+import { firstImage, firstParagraph, renderMarkdown, safeUrl } from '../markdown.js';
+import { decoratePostImages, type ImageStat } from '../postImages.js';
 import type { LobbyAccount } from '../lobby.js';
 import { BOARDS, type PilotCard, type Rankings } from '../pilots.js';
 import { SHOUT_MAX, publicShout } from '../shoutbox.js';
@@ -170,10 +171,25 @@ export function updatesPage(ctx: PageCtx, d: { posts: Post[]; total: number; pag
   return layout(ctx, { title: d.tag ? `Updates: ${d.tag}` : 'Updates', body, feed: true });
 }
 
+/** One comment in a post's list (also what the page's script adds after a comment is posted) */
+export function commentItem(ctx: PageCtx, post: Post, c: Comment, imageAlt = ''): SafeHtml {
+  const thumb = c.image && safeUrl(c.image, 'image');
+  return html`<li class="comment" id="c${c.id}"${c.image ? html` data-image="${c.image}"` : ''}>
+    <div class="comment-meta"><span class="c-name">${c.authorId ? html`<a href="/pilots/${encodeURIComponent(c.authorName)}">${c.authorName}</a>` : c.authorName}</span>${when(c.createdAt)}
+    ${ctx.user?.isAdmin ? html`<form method="post" action="/admin/comments/${c.id}/hide" class="inline-mod">${csrfField(ctx)}<input type="hidden" name="back" value="/updates/${post.slug}#comments"><button class="link-btn" type="submit">Hide</button></form>` : ''}</div>
+    ${thumb ? html`<a class="c-thumb" href="${c.image}" data-open-image title="${imageAlt ? `On the image: ${imageAlt}` : 'On an image in this post'}" aria-label="${imageAlt ? `View the image this comment is on: ${imageAlt}` : 'View the image this comment is on'}"><img src="${c.image}" alt="" loading="lazy"></a>` : ''}
+    <div class="comment-body prose-sm">${raw(renderMarkdown(c.body, 'comment'))}</div>
+  </li>`;
+}
+
 export function postPage(ctx: PageCtx, d: { post: Post; comments: Comment[]; preview?: boolean; error?: string; draft?: string; newer: Post | null; older: Post | null }): SafeHtml {
   const p = d.post;
   const cover = coverOf(p);
-  const bodyHtml = raw(renderMarkdown(p.body, 'post'));
+  const onImage = new Map<string, ImageStat>();
+  for (const c of d.comments) if (c.image) { const s = onImage.get(c.image); if (s) s.count++; else onImage.set(c.image, { count: 1, firstId: c.id }); }
+  const pictured = decoratePostImages(renderMarkdown(p.body, 'post'), onImage);
+  const bodyHtml = raw(pictured.html);
+  const altOf = new Map(pictured.images.map((i) => [i.src, i.alt]));
   // (The cover is shown in the header; if it's the body's own first image, the body keeps it too)
   const body = html`
 <article class="post">
@@ -193,14 +209,9 @@ export function postPage(ctx: PageCtx, d: { post: Post; comments: Comment[]; pre
   </nav>
 </article>
 <section class="comments wrap-narrow" id="comments" aria-labelledby="comments-h">
-  <h2 id="comments-h">Comments <span class="dim">${d.comments.length || ''}</span></h2>
-  ${d.comments.length
-    ? html`<ol class="comment-list">${d.comments.map((c) => html`<li class="comment" id="c${c.id}">
-        <div class="comment-meta"><span class="c-name">${c.authorId ? html`<a href="/pilots/${encodeURIComponent(c.authorName)}">${c.authorName}</a>` : c.authorName}</span>${when(c.createdAt)}
-        ${ctx.user?.isAdmin ? html`<form method="post" action="/admin/comments/${c.id}/hide" class="inline-mod">${csrfField(ctx)}<input type="hidden" name="back" value="/updates/${p.slug}#comments"><button class="link-btn" type="submit">Hide</button></form>` : ''}</div>
-        <div class="comment-body prose-sm">${raw(renderMarkdown(c.body, 'comment'))}</div>
-      </li>`)}</ol>`
-    : html`<p class="dim">No comments yet.</p>`}
+  <h2 id="comments-h">Comments <span class="dim" data-comment-total>${d.comments.length || ''}</span></h2>
+  <ol class="comment-list" data-comment-list>${d.comments.map((c) => commentItem(ctx, p, c, c.image ? altOf.get(c.image) : ''))}</ol>
+  <p class="dim" data-comments-empty${d.comments.length ? raw(' hidden') : ''}>No comments yet.</p>
   ${p.status !== 'published' ? '' : ctx.user
     ? html`<form class="comment-form" method="post" action="/updates/${encodeURIComponent(p.slug)}/comments">
         ${csrfField(ctx)}
@@ -210,6 +221,16 @@ export function postPage(ctx: PageCtx, d: { post: Post; comments: Comment[]; pre
         <div class="form-row"><span class="dim small">Moderators can hide comments.</span><button class="btn btn-primary" type="submit">Post comment</button></div>
       </form>`
     : signInPrompt(ctx, 'to comment.')}
+  ${!pictured.images.length || p.status !== 'published' ? '' : html`<template data-image-form>${ctx.user
+    ? html`<form class="comment-form" method="post" action="/updates/${encodeURIComponent(p.slug)}/comments">
+        ${csrfField(ctx)}
+        <input type="hidden" name="image" value="">
+        <label for="image-comment-body">Add a comment</label>
+        <textarea id="image-comment-body" name="body" rows="3" maxlength="2000" required></textarea>
+        <p class="form-error" data-form-error role="alert" hidden></p>
+        <div class="form-row"><span class="dim small">as ${ctx.user.username}</span><button class="btn btn-primary" type="submit">Post comment</button></div>
+      </form>`
+    : signInPrompt(ctx, 'to comment.')}</template>`}
 </section>`;
   return layout(ctx, { title: p.title, body, description: summaryOf(p, 200), image: cover, bodyClass: 'post-page' });
 }

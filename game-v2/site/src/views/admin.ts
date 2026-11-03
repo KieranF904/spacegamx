@@ -1,7 +1,8 @@
 /** The admin panel (isAdmin from the lobby) */
 
 import { html, raw, SafeHtml } from '../html.js';
-import { renderMarkdown } from '../markdown.js';
+import { renderMarkdown, safeUrl } from '../markdown.js';
+import { postImages } from '../postImages.js';
 import type { AdminUser } from '../lobby.js';
 import type { ApiToken, Comment, Post, Shout, Suggestion, SuggestionStatus } from '../store/types.js';
 import { SUGGESTION_STATUSES } from '../store/types.js';
@@ -116,8 +117,10 @@ export function adminComments(ctx: PageCtx, d: { comments: Comment[]; posts: Map
   <h1>Comments</h1>
   ${d.comments.length ? html`<ol class="mod-list">${d.comments.map((c) => {
     const post = d.posts.get(c.postId);
+    const alt = c.image && post ? postImages(post.body).find((i) => i.src === c.image)?.alt : '';
     return html`<li class="${c.hidden ? 'is-hidden' : ''}">
       <div class="mod-meta"><b>${c.authorName}</b> on ${post ? html`<a href="/updates/${encodeURIComponent(post.slug)}#c${c.id}">${post.title}</a>` : 'a deleted post'} · ${when(c.createdAt)}${c.hidden ? html` · <span class="pill pill-draft">hidden</span>` : ''}</div>
+      ${c.image && safeUrl(c.image, 'image') ? html`<p class="mod-image"><a class="c-thumb" href="${c.image}" target="_blank" rel="noopener"><img src="${c.image}" alt="" loading="lazy"></a> <span class="dim small">On an image${alt ? html`: ${alt}` : ''}</span></p>` : ''}
       <div class="prose-sm">${raw(renderMarkdown(c.body, 'comment'))}</div>
       <div class="mod-actions">
         <form method="post" action="/admin/comments/${c.id}/${c.hidden ? 'show' : 'hide'}">${csrfField(ctx)}${back('/admin/comments')}<button class="btn btn-sm" type="submit">${c.hidden ? 'Show' : 'Hide'}</button></form>
