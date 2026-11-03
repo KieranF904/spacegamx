@@ -20,7 +20,7 @@ import { loadCatalog } from '../../common/src/ships/catalog.js';
 import { partMount } from '../../common/src/ships/blueprint.js';
 import { partStats } from '../../common/src/ships/partStats.js';
 import type {
-  CatalogBoss, CatalogFile, CatalogItem, CatalogPart, CatalogShip, CatalogStation, CatalogSystem, PartCategory, PlanPart, RecipeInfo, ShipStats,
+  CatalogBoss, CatalogFile, CatalogItem, CatalogPart, CatalogRibbon, CatalogShip, CatalogStation, CatalogSystem, PartCategory, PlanPart, RecipeInfo, ShipStats,
 } from '../src/catalog/types.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -178,6 +178,8 @@ const systems: CatalogSystem[] = systemsFile.filter((s) => !s.private).map((s) =
   id: s.id, name: String(s.name), danger: s.danger ?? 1, hazards: s.hazards ?? [], stations: s.stations ?? [],
 }));
 
+const ribbons: CatalogRibbon[] = (rj('achievements.json').ribbons as any[]).map((r) => ({ id: String(r.id), name: String(r.name) }));
+
 const bosses: CatalogBoss[] = Object.entries(bossesFile).filter(([, b]) => !b._placeholder).map(([id, b]) => ({
   id, name: String(b.name), system: b.system, level: b.level ?? 0, phases: (b.phases ?? []).length, xp: b.xp ?? 0, credits: b.credits ?? 0,
   respawnSeconds: b.respawnSeconds ?? 0,
@@ -248,7 +250,7 @@ function sourceInfo(): CatalogFile['source'] {
 
 const file: CatalogFile = {
   version: 1, builtAt: new Date().toISOString(), source: sourceInfo(),
-  parts, items, ships, bosses, stations, systems, render: { shapes, colors },
+  parts, items, ships, bosses, stations, systems, ribbons, render: { shapes, colors },
 };
 
 /** One entry per line, so a changed part shows as one changed line in a diff */

@@ -10,6 +10,7 @@ import type { RenderData } from '../catalog/types.js';
 import type { Comment, Post, SharedShip, Shout, Suggestion, SuggestionStatus } from '../store/types.js';
 import { SUGGESTION_STATUSES } from '../store/types.js';
 import { pilotShips } from './ships.js';
+import type { Guide } from '../guides.js';
 import {
   csrfField, empty, fmtDate, fmtNum, layout, livePill, sectionHead, signInPrompt, STATUS_LABEL, statusBadge, tagChip, when,
   type PageCtx,
@@ -70,15 +71,19 @@ function miniBoard(r: Rankings | null): SafeHtml {
 
 // ---------------------------------------------------------------- home
 
-export function homePage(ctx: PageCtx, d: { posts: Post[]; comments: Map<number, number>; shouts: Shout[]; rankings: Rankings | null }): SafeHtml {
+/** The guides the home page points to first (by file slug) */
+const HOME_GUIDES = ['getting-started', 'controls-and-flight-modes', 'building-a-ship', 'mining-and-refining'];
+
+export function homePage(ctx: PageCtx, d: { posts: Post[]; comments: Map<number, number>; shouts: Shout[]; rankings: Rankings | null; guides?: Guide[] }): SafeHtml {
   const [lead, ...rest] = d.posts;
+  const featured = HOME_GUIDES.map((s) => d.guides?.find((g) => g.slug === s)).filter((g): g is Guide => !!g);
   const body = html`
 <section class="hero">
   <div class="hero-art" aria-hidden="true"><img src="/static/img/hero-corsair.webp" alt="" width="1600" height="900"></div>
   <div class="wrap hero-in">
     <p class="eyebrow eyebrow-hero">Space game <span class="sep">/</span> in development</p>
     <h1>Build it part by part.<br><span class="accent">Fly it into the dark.</span></h1>
-    <p class="lede">A space game about building ships. Mine, trade and take jobs at stations. Ships are built one part at a time, and power only reaches the parts it can travel through. Still in development.</p>
+    <p class="lede">A space game about building ships. Mine, trade and take jobs at stations. You build your ship one part at a time and fly it yourself. Still in development.</p>
     <div class="hero-cta">
       <a class="btn-play btn-play-lg" href="/play"><span>Play now</span><small>in the browser</small></a>
       ${lead ? html`<a class="btn btn-ghost" href="/updates/${encodeURIComponent(lead.slug)}">Latest update <span aria-hidden="true">&rarr;</span></a>` : ''}
@@ -97,17 +102,25 @@ export function homePage(ctx: PageCtx, d: { posts: Post[]; comments: Map<number,
     ? html`<div class="post-list home-posts">${postRow(lead, d.comments.get(lead.id) ?? 0, true)}${rest.slice(0, 2).map((p) => postRow(p, d.comments.get(p.id) ?? 0))}</div>`
     : empty('No updates yet', 'Nothing here yet.')}
 </section>
+${featured.length ? html`<section class="wrap block-tight" aria-labelledby="home-guides-h">
+  ${sectionHead('Guides', raw('<span id="home-guides-h">How it works</span>'), html`<a class="link-quiet" href="/guides">All guides <span aria-hidden="true">&rarr;</span></a>`)}
+  <div class="guide-grid guide-grid-4">${featured.map((x) => html`<a class="guide-card" href="/guides/${x.slug}">
+    <span class="guide-n">${String(x.order).padStart(2, '0')}</span>
+    <span class="guide-t">${x.title}</span>
+    <span class="guide-s">${x.summary}</span>
+  </a>`)}</div>
+</section>` : ''}
 
 <section class="features" aria-labelledby="feat-h">
   <div class="wrap">
     ${sectionHead('The game', raw('<span id="feat-h">Features</span>'))}
     <div class="feature">
-      <figure class="feature-art art-parts"><img src="/static/img/parts.webp" alt="A sheet of the game's ship components: guns, engines, reactors, batteries and shields, each with its name" loading="lazy"></figure>
+      <figure class="feature-art art-parts"><img src="/static/img/parts.webp" alt="Eight ship parts rendered in the game, each with its name: Bastion, Lance, Cutter, Fusion Torch, Cell Reactor, Battery, Deflector and Ion Drive" loading="lazy"></figure>
       <div class="feature-text">
         <p class="feature-n">01 <span>Build</span></p>
         <h3>Ships are built from parts</h3>
-        <p>Hull plates, reactors, batteries, engines, guns and shields. Power only flows between parts that touch.</p>
-        <p class="dim">Guns have mounting rules. The Component Guide (C) lists every part.</p>
+        <p>Hull plates, generators, batteries, engines, guns and shields go onto a grid in the hangar. Guns have mounting rules, and every part adds mass.</p>
+        <p class="feature-links"><a href="/guides/building-a-ship">Guide: Building a ship</a><a href="/database/parts">Database: every part</a></p>
       </div>
     </div>
     <div class="feature flip">
@@ -115,16 +128,18 @@ export function homePage(ctx: PageCtx, d: { posts: Post[]; comments: Map<number,
       <div class="feature-text">
         <p class="feature-n">02 <span>Fly</span></p>
         <h3>Mouse or helm controls</h3>
-        <p>Steer with the mouse, or switch to helm controls (V): A and D turn, Q and E strafe.</p>
-        <p class="dim">Engines have a rated speed.</p>
+        <p>Steer with the mouse, or switch to helm controls (V): A and D turn, Q and E strafe. Shift boosts, and the jump drive (J) crosses the gaps between systems.</p>
+        <p class="feature-links"><a href="/guides/controls-and-flight-modes">Guide: Controls and flight modes</a><a href="/guides/travel">Guide: Travel</a></p>
       </div>
     </div>
     <div class="feature">
-      <figure class="feature-art art-boss"><img src="/static/img/scrap-mother.webp" alt="The Scrap Mother, a huge patched-together boss with crane claws and glowing green vents" loading="lazy"></figure>
+      <figure class="feature-art art-boss"><img src="/static/img/scrap-mother.webp" alt="The Scrap Mother, a boss ship with crane claws and green vents" loading="lazy"></figure>
       <div class="feature-text">
         <p class="feature-n">03 <span>Fight</span></p>
         <h3>Bosses</h3>
-        <p>Bosses fight in stages. Attacks are telegraphed, and shooting a part off stops the move it powers. The Scrap Mother is in the Drift.</p>
+        <p>Bosses fight in stages. Attacks are telegraphed, and shooting a part off stops the move it powers. Everyone who damages a boss gets a share of the reward.</p>
+        <p class="feature-links"><a href="/guides/bosses-the-basics">Guide: Bosses, the basics</a><a href="/database/bosses">Database: every boss</a></p>
+
       </div>
     </div>
   </div>
@@ -196,7 +211,7 @@ export function postPage(ctx: PageCtx, d: { post: Post; comments: Comment[]; pre
 <article class="post">
   <header class="post-head wrap-narrow">
     ${p.status === 'draft' ? html`<p class="draft-flag">Draft: only admins can see this</p>` : ''}
-    <p class="meta"><a href="/updates">Updates</a> <span class="sep">/</span> ${when(p.publishedAt ?? p.updatedAt, false)} <span class="sep">/</span> ${p.authorName}</p>
+    <p class="meta"><a href="/updates">Updates</a> <span class="sep">/</span> ${when(p.publishedAt ?? p.updatedAt, false)} <span class="sep">/</span> ${ctx.authors?.[p.authorName.toLowerCase()] ?? p.authorName}</p>
     <h1>${p.title}</h1>
     ${p.summary ? html`<p class="lede">${p.summary}</p>` : ''}
     ${p.tags.length ? html`<div class="tags">${p.tags.map((t) => tagChip(t))}</div>` : ''}
@@ -313,23 +328,32 @@ function suggestionRow(ctx: PageCtx, s: Suggestion, voted: boolean): SafeHtml {
 
 // ---------------------------------------------------------------- pilots
 
-export function pilotCard(card: PilotCard | null, name: string, opts: { own: boolean }): SafeHtml {
+export interface CardNames { bosses: Record<string, string>; ribbons: Record<string, string> }
+
+/** An id the catalog doesn't know, as words ("boss_scrap_mother" -> "Scrap mother") */
+const plainId = (id: string) => { const t = id.replace(/^boss_/, '').replace(/_/g, ' ').trim(); return t.charAt(0).toUpperCase() + t.slice(1); };
+
+export function pilotCard(card: PilotCard | null, name: string, opts: { own: boolean; names?: CardNames; heading?: 'h1' | 'h2' }): SafeHtml {
   if (!card) {
     return html`<section class="pilot-card panel no-data">
-      <div class="pc-id"><span class="pc-badge">?</span><div><p class="eyebrow">Pilot</p><h2>${name}</h2></div></div>
+      <div class="pc-id"><span class="pc-badge">?</span><div><p class="eyebrow">Pilot</p>${opts.heading === 'h1' ? html`<h1>${name}</h1>` : html`<h2>${name}</h2>`}</div></div>
       ${empty('No record yet', opts.own ? 'The card fills in after you play.' : `No record for ${name}.`, opts.own ? html`<a class="btn-play" href="/play">Play now</a>` : undefined)}
     </section>`;
   }
   const s = card.stats;
   const tally: [string, number][] = [['Hostiles destroyed', s.kills], ['Boss kills', s.bosses], ['Jobs done', s.quests], ['Ore mined', s.mined], ['Credits earned', s.earned], ['Systems visited', card.systemsVisited]];
+  const bosses = Object.entries(card.bossKills).filter(([, n]) => n > 0).map(([id, n]) => ({ name: opts.names?.bosses[id] ?? plainId(id), n })).sort((a, b) => b.n - a.n || a.name.localeCompare(b.name));
+  const ribbonNames = opts.names ? (card.ribbonIds ?? []).map((id) => opts.names!.ribbons[id] ?? plainId(id)).sort((a, b) => a.localeCompare(b)) : [];
   return html`<section class="pilot-card panel">
   <div class="pc-id">
     <span class="pc-badge" aria-label="Level ${card.level}"><small>LVL</small>${card.level}</span>
-    <div><p class="eyebrow">Pilot</p><h2>${name}</h2>
+    <div><p class="eyebrow">Pilot</p>${opts.heading === 'h1' ? html`<h1>${name}</h1>` : html`<h2>${name}</h2>`}
       <p class="dim">${card.shipName ? html`Flying the <b class="ship">${card.shipName}</b>` : 'No ship on record'}${card.ships > 1 ? ` · ${card.ships} ships in the hangar` : ''}</p></div>
   </div>
   <dl class="pc-stats">${tally.map(([k, v]) => html`<div><dt>${k}</dt><dd>${fmtNum(v)}</dd></div>`)}</dl>
-  <p class="pc-foot dim small">${card.ribbons ? html`${card.ribbons} ${card.ribbons === 1 ? 'ribbon' : 'ribbons'} · ` : ''}${card.since ? html`Pilot since ${fmtDate(card.since)}` : ''}${card.lastFlown ? html` · last flew ${when(card.lastFlown)}` : ''}${opts.own ? html` · ${fmtNum(card.credits)} credits` : ''}</p>
+  ${bosses.length ? html`<div class="pc-list"><h3>Bosses beaten</h3><ul class="chips">${bosses.map((b) => html`<li>${b.name}${b.n > 1 ? html` <span class="n">&times;${b.n}</span>` : ''}</li>`)}</ul></div>` : ''}
+  ${ribbonNames.length ? html`<div class="pc-list"><h3>Ribbons <span class="dim">${ribbonNames.length}</span></h3><ul class="chips">${ribbonNames.map((n) => html`<li>${n}</li>`)}</ul></div>` : ''}
+  <p class="pc-foot dim small">${card.ribbons && !ribbonNames.length ? html`${card.ribbons} ${card.ribbons === 1 ? 'ribbon' : 'ribbons'} · ` : ''}${card.since ? html`Pilot since ${fmtDate(card.since)}` : ''}${card.lastFlown ? html` · last flew ${when(card.lastFlown)}` : ''}${opts.own ? html` · ${fmtNum(card.credits)} credits` : ''}</p>
 </section>`;
 }
 
@@ -355,25 +379,24 @@ export function pilotsPage(ctx: PageCtx, d: { rankings: Rankings | null; period:
 </section>
 <section class="wrap block-tight">
   ${any
-    ? html`<div class="boards">${BOARDS.map((b) => {
-        const rows = boards![b.key] ?? [];
+    ? html`<div class="boards">${BOARDS.filter((b) => (boards![b.key] ?? []).length).map((b) => {
+        const rows = boards![b.key];
         return html`<section class="board panel" aria-label="${b.label}">
           <div class="panel-head"><h2>${b.label}</h2></div>
-          ${rows.length
-            ? html`<ol class="rank-list">${rows.map((r, i) => html`<li class="${i < 3 ? `top top-${i + 1}` : ''}"><span class="rk">${i + 1}</span><a href="/pilots/${encodeURIComponent(r.name)}">${r.name}</a><span class="val">${fmtNum(r.value)}${b.unit ? html` <small>${b.unit}</small>` : ''}</span></li>`)}</ol>`
-            : html`<p class="dim small">No scores yet.</p>`}
+          <ol class="rank-list">${rows.map((r, i) => html`<li class="${i < 3 ? `top top-${i + 1}` : ''}"><span class="rk">${i + 1}</span><a href="/pilots/${encodeURIComponent(r.name)}">${r.name}</a><span class="val">${fmtNum(r.value)}${b.unit ? html` <small>${b.unit}</small>` : ''}</span></li>`)}</ol>
         </section>`;
-      })}</div>`
+      })}</div>
+      ${BOARDS.some((b) => !(boards![b.key] ?? []).length) ? html`<p class="dim small boards-none">No scores yet: ${BOARDS.filter((b) => !(boards![b.key] ?? []).length).map((b) => b.label.toLowerCase()).join(', ')}.</p>` : ''}`
     : empty(d.period === 'weekly' ? 'No scores this week.' : 'No scores yet.', '', html`<a class="btn-play" href="/play">Play now</a>`)}
 </section>`;
   return layout(ctx, { title: 'Pilots', body });
 }
 
-export function pilotPage(ctx: PageCtx, d: { name: string; card: PilotCard | null; ranks: { label: string; rank: number; value: number }[]; ships: SharedShip[]; render: RenderData | null }): SafeHtml {
+export function pilotPage(ctx: PageCtx, d: { name: string; card: PilotCard | null; ranks: { label: string; rank: number; value: number }[]; ships: SharedShip[]; render: RenderData | null; names?: CardNames }): SafeHtml {
   const body = html`
 <section class="wrap block-tight narrow-col">
-  <p class="meta"><a href="/pilots">Pilots</a> <span class="sep">/</span> ${d.name}</p>
-  ${pilotCard(d.card, d.name, { own: ctx.user?.username.toLowerCase() === d.name.toLowerCase() })}
+  <p class="meta crumb"><a href="/pilots">Pilots</a> <span class="sep">/</span> ${d.name}</p>
+  ${pilotCard(d.card, d.name, { own: ctx.user?.username.toLowerCase() === d.name.toLowerCase(), names: d.names, heading: 'h1' })}
   ${d.ranks.length ? html`<section class="panel"><div class="panel-head"><h2>On the boards</h2></div><ul class="rank-places">${d.ranks.map((r) => html`<li><span class="rk">#${r.rank}</span> ${r.label} <span class="val">${fmtNum(r.value)}</span></li>`)}</ul></section>` : ''}
   ${pilotShips(d.ships, d.render)}
 </section>`;
@@ -381,7 +404,12 @@ export function pilotPage(ctx: PageCtx, d: { name: string; card: PilotCard | nul
 }
 
 export function notFoundPage(ctx: PageCtx, what = 'page'): SafeHtml {
-  const body = html`<section class="wrap block narrow-col">${empty(`No such ${what}`, html`<a href="/">Home</a>`)}</section>`;
+  const body = html`<section class="wrap block narrow-col not-found">
+  <p class="eyebrow">404</p>
+  <h1>${what === 'page' ? 'Page not found' : `No such ${what}`}</h1>
+  <p class="lede">The address may be wrong, or the page has been removed.</p>
+  <p class="nf-links"><a class="btn" href="/">Home</a><a class="btn btn-ghost" href="/updates">Updates</a><a class="btn btn-ghost" href="/guides">Guides</a><a class="btn btn-ghost" href="/database">Database</a></p>
+</section>`;
   return layout(ctx, { title: 'Not found', body });
 }
 

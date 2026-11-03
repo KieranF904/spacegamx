@@ -80,6 +80,7 @@ The TypeScript types are in `site/src/catalog/types.ts` and are the contract. In
                   "sells": { "items": ["repair_kit"], "plans": ["hauler"], "parts": [ { "part": "utility_mining_laser", "material": "alloy", "label": "Alloy Mining Laser" } ] },
                   "pays": [ { "item": "titanium_ore", "mult": 1.2 } ] } ],
   "systems":  [ { "id": "sol", "name": "Sol System", "danger": 1, "hazards": [], "stations": ["sol_station_central"] } ],
+  "ribbons":  [ { "id": "first_blood", "name": "First Blood" } ],   // optional: names for the ribbon ids on pilot pages
   "render":   { "shapes": { "sq": ["1,0 1,1 0,1 0,0", "..."] }, "colors": { "hull": "#24324d", "cannon_pip": "#e05a4a" } }
 }
 ```

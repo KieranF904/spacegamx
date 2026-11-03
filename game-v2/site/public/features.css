@@ -74,3 +74,29 @@ svg.plan { display: block; width: 100%; height: 100%; }
   .db-table th, .db-table td { padding-inline: 10px; }
 }
 .nw { white-space: nowrap; }
+
+/* ---- refinements (2026-11-04) */
+.feature-links { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 4px; font-size: 0.92rem; }
+.feature-links a { color: var(--sky); }
+.crumb { margin-bottom: 18px; }
+.boards-none { margin-top: 16px; }
+.pc-list { margin-top: 18px; }
+.pc-list h3 { font: 500 0.72rem var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); margin: 0 0 8px; }
+.pc-list h3 .dim { margin-left: 6px; }
+.chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.chips li { padding: 4px 10px; border: 1px solid var(--line-2); background: var(--panel-solid); font-size: 0.88rem; color: var(--text); }
+.chips .n { font-family: var(--mono); color: var(--gold); }
+.pc-foot { margin-top: 18px; }
+.not-found { padding-block: clamp(48px, 9vw, 110px); }
+.not-found h1 { margin-bottom: 10px; }
+.not-found .lede { margin-bottom: 22px; }
+.nf-links { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; }
+@media (max-width: 560px) {
+  .btn-play-lg small { display: none; }
+  .pc-id { gap: 14px; margin-bottom: 18px; }
+}
+@media (max-width: 600px) {
+  .prose .pic.pic-wide { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .prose .pic.pic-wide > img { width: calc(var(--r, 3) * 190px); max-width: none; height: 190px; }
+}
+@media (min-width: 1000px) { .guide-grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }

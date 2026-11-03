@@ -30,6 +30,8 @@ export interface PilotCard {
   stats: { kills: number; bosses: number; quests: number; mined: number; earned: number; crafted: number; deaths: number };
   systemsVisited: number;
   ribbons: number;
+  /** Ids of the ribbons earned (names are in the catalog) */
+  ribbonIds: string[];
   /** Bosses beaten, by id (stats boss:<id>) */
   bossKills: Record<string, number>;
   since: string | null;
@@ -53,10 +55,11 @@ export function toCard(p: any): PilotCard {
   const stats = (p?.stats && typeof p.stats === 'object') ? p.stats as Record<string, unknown> : {};
   const bossKills: Record<string, number> = {};
   let systems = 0, ribbons = 0;
+  const ribbonIds: string[] = [];
   for (const [k, v] of Object.entries(stats)) {
     if (k.startsWith('boss:')) bossKills[k.slice(5)] = num(v);
     else if (k.startsWith('sys:')) systems++;
-    else if (k.startsWith('ach:') && num(v) > 0) ribbons++;
+    else if (k.startsWith('ach:') && num(v) > 0) { ribbons++; ribbonIds.push(k.slice(4)); }
   }
   const hangar = Array.isArray(p?.hangar) ? p.hangar.filter(Boolean) : [];
   const name = p?.ship?.blueprint?.name;
@@ -72,6 +75,7 @@ export function toCard(p: any): PilotCard {
     },
     systemsVisited: systems,
     ribbons,
+    ribbonIds,
     bossKills,
     since: typeof p?.createdAt === 'string' ? p.createdAt : null,
     lastFlown: typeof p?.updatedAt === 'string' ? p.updatedAt : null,

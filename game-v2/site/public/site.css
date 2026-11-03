@@ -496,7 +496,7 @@ details[open] > summary { margin-bottom: 12px; }
 .pilot-search input { width: 240px; }
 .pilot-card { margin-bottom: 20px; }
 .pc-id { display: flex; align-items: center; gap: 18px; margin-bottom: 22px; }
-.pc-id h2 { font-size: 1.9rem; margin: 0 0 4px; }
+.pc-id h1, .pc-id h2 { font-size: 1.9rem; margin: 0 0 4px; }
 .pc-id .eyebrow { margin-bottom: 6px; }
 .pc-id p { margin: 0; }
 .pc-badge { width: 76px; height: 76px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; font: 700 1.9rem/1 var(--display); color: var(--bg); background: linear-gradient(160deg, var(--gold-soft), var(--gold) 60%, #d99a0b); clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px); }
@@ -651,7 +651,7 @@ details[open] > summary { margin-bottom: 12px; }
   .pilot-search, .pilot-search input, .inline-form input { width: 100%; }
   .sugg { grid-template-columns: 48px 1fr; gap: 12px; }
   .vote-btn { width: 48px; height: 54px; }
-  .pc-id h2 { font-size: 1.5rem; }
+  .pc-id h1, .pc-id h2 { font-size: 1.5rem; }
   .pc-badge { width: 62px; height: 62px; font-size: 1.5rem; }
   .pc-stats dd { font-size: 1.2rem; }
   .post-nav { grid-template-columns: 1fr; }

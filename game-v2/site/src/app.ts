@@ -210,9 +210,9 @@ export function createApp(deps: AppDeps) {
   // ------------------------------------------------------------ home, updates
 
   router.get('/', async (ctx) => {
-    const [{ posts }, shouts, rankings] = await Promise.all([store.listPosts({ limit: 3 }), store.recentShouts(30), pilots.rankings()]);
+    const [{ posts }, shouts, rankings, guideList] = await Promise.all([store.listPosts({ limit: 3 }), store.recentShouts(30), pilots.rankings(), guides.all()]);
     const comments = await store.commentCounts(posts.map((p) => p.id));
-    page(ctx, 200, V.homePage(ctx.page, { posts, comments, shouts, rankings }));
+    page(ctx, 200, V.homePage(ctx.page, { posts, comments, shouts, rankings, guides: guideList }));
   });
 
   router.get('/updates', async (ctx) => {
@@ -482,7 +482,7 @@ export function createApp(deps: AppDeps) {
       const i = (rankings.allTime[b.key] ?? []).findIndex((r) => Number(r.userId) === id);
       if (i >= 0) ranks.push({ label: b.label, rank: i + 1, value: rankings.allTime[b.key][i].value });
     }
-    page(ctx, 200, V.pilotPage(ctx.page, { name: shown, card, ranks, ships, render: cat?.render ?? null }));
+    page(ctx, 200, V.pilotPage(ctx.page, { name: shown, card, ranks, ships, render: cat?.render ?? null, names: { bosses: cat ? Object.fromEntries(cat.bosses.map((b) => [b.id, b.name])) : {}, ribbons: Object.fromEntries((cat?.ribbons ?? []).map((r) => [r.id, r.name])) } }));
   });
 
   // ------------------------------------------------------------ play
@@ -885,7 +885,7 @@ export function createApp(deps: AppDeps) {
     const live = await pilots.live();
     const ctx: Ctx = {
       req, res, url, path: pathname, ip, token, user, csrf: csrfToken, csrfSeed, api, game,
-      page: { siteName: cfg.name, user, csrf: csrfToken, path: pathname, live: live ? { players: live.players, fresh: live.fresh } : null, origin: cfg.origin },
+      page: { siteName: cfg.name, user, csrf: csrfToken, path: pathname, live: live ? { players: live.players, fresh: live.fresh } : null, origin: cfg.origin, authors: cfg.authors },
     };
 
     const unsafe = !['GET', 'HEAD', 'OPTIONS'].includes(req.method ?? 'GET');

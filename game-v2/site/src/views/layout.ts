@@ -12,6 +12,8 @@ export interface PageCtx {
   path: string;
   live: { players: number; fresh: boolean } | null;
   origin: string;
+  /** Account name (lower-case) -> the name shown on its posts */
+  authors?: Record<string, string>;
   /** A fixed note after a redirect (?ok=...) */
   notice?: { kind: 'ok' | 'error'; text: string } | null;
 }
@@ -67,9 +69,9 @@ ${p.image ? html`<meta property="og:image" content="${p.image.startsWith('/') ? 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="/static/site.css?v=5">
-<link rel="stylesheet" href="/static/features.css?v=1">
-<script src="/static/site.js?v=3" defer></script>
+<link rel="stylesheet" href="/static/site.css?v=6">
+<link rel="stylesheet" href="/static/features.css?v=3">
+<script src="/static/site.js?v=4" defer></script>
 </head>
 <body class="${p.bodyClass ?? ''}">
 <a class="skip" href="#main">Skip to content</a>

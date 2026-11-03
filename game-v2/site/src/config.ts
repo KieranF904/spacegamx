@@ -11,6 +11,7 @@
  *   SITE_STATUS_FILE     ../data/status/live.json  (read-only)
  *   SITE_GUIDES_DIR      ./guides  (the guides: Markdown files)
  *   SITE_CATALOG_FILE    ../data/catalog/catalog.json  (the game's own catalog, if it writes one; else site/catalog/catalog.json)
+ *   SITE_AUTHORS         admin=Kieran  (the name shown on a post by an account: account=Name, comma separated)
  *   SITE_GAME_KEY        (a long secret the game server sends to share ships: Authorization: Bearer; unset = sharing is off)
  *   SITE_TRUST_PROXY     1 behind nginx: the visitor's address from X-Forwarded-For / X-Real-IP
  *   LOBBY_URL            http://localhost:8787
@@ -51,6 +52,8 @@ export interface SiteConfig {
   /** The site's catalog snapshot, and the game's own catalog file (used instead when it exists and is valid) */
   catalogFile: string;
   catalogGameFile: string;
+  /** The name shown on a post for the account that wrote it (lower-case account -> shown name) */
+  authors: Record<string, string>;
   /** The key the game server sends to share ships (empty: off) */
   gameKey: string;
   lobbyUrl: string;
@@ -68,6 +71,17 @@ function checkProductionEnv(env: NodeJS.ProcessEnv): void {
   if ((env.SITE_STORE_BACKEND || '').toLowerCase() === 'postgres' && !env.DATABASE_URL) problems.push('SITE_STORE_BACKEND=postgres needs DATABASE_URL');
   if (env.SITE_GAME_KEY && env.SITE_GAME_KEY.length < 32) problems.push('SITE_GAME_KEY is too short (32+ characters)');
   if (problems.length) throw new Error(`The site can't start in production:\n  - ${problems.join('\n  - ')}`);
+}
+
+/** "admin=Kieran, other=Name" to a map keyed by lower-case account name */
+export function parseAuthors(v: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const part of v.split(',')) {
+    const i = part.indexOf('=');
+    const k = part.slice(0, i).trim().toLowerCase(), n = part.slice(i + 1).trim().slice(0, 40);
+    if (i > 0 && k && n) out[k] = n;
+  }
+  return out;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): SiteConfig {
@@ -91,6 +105,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): SiteConfig {
     guidesDir: path.resolve(env.SITE_GUIDES_DIR || path.join(here, '../guides')),
     catalogFile: path.resolve(here, '../catalog/catalog.json'),
     catalogGameFile: path.resolve(env.SITE_CATALOG_FILE || path.join(root, 'data/catalog/catalog.json')),
+    authors: parseAuthors(env.SITE_AUTHORS ?? 'admin=Kieran'),
     gameKey: env.SITE_GAME_KEY || '',
     lobbyUrl: (env.LOBBY_URL || 'http://localhost:8787').replace(/\/$/, ''),
     lobbyAdminSecret: env.LOBBY_ADMIN_SECRET || (production ? '' : 'dev-lobby-admin-secret'),

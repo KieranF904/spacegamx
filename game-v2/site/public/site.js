@@ -431,4 +431,24 @@
       file.value = '';
     });
   }
+  // ---------------------------------------------------------------- wide pictures on a phone
+  // A strip several times wider than tall (a row of frames) is shrunk to nothing at phone width: show it at a
+  // readable height and let it scroll sideways inside its own box (tapping still opens the viewer).
+  (() => {
+    const mq = window.matchMedia ? window.matchMedia('(max-width: 600px)') : null;
+    if (!mq) return;
+    const mark = (img) => {
+      const wide = img.naturalWidth > 0 && img.naturalWidth / img.naturalHeight > 2.3;
+      const pic = img.closest('.pic');
+      if (!pic) return;
+      pic.classList.toggle('pic-wide', wide);
+      if (wide) pic.style.setProperty('--r', (img.naturalWidth / img.naturalHeight).toFixed(2));
+    };
+    const all = () => $$('.prose .pic > img').forEach((img) => {
+      if (img.complete) mark(img); else img.addEventListener('load', () => mark(img), { once: true });
+    });
+    if (mq.matches) all();
+    const change = () => { if (mq.matches) all(); else $$('.pic-wide').forEach((p) => p.classList.remove('pic-wide')); };
+    if (mq.addEventListener) mq.addEventListener('change', change);
+  })();
 })();

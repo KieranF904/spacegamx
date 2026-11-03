@@ -142,6 +142,9 @@ export interface CatalogStation {
   blurb?: string;
 }
 
+/** A ribbon's name, for the pilot page (the profile only keeps ids) */
+export interface CatalogRibbon { id: string; name: string }
+
 export interface CatalogSystem { id: string; name: string; danger: number; hazards: string[]; stations: string[] }
 
 /** How a plan is drawn: each shape's outline in cell units (8 variants: rotation 0-3, then the same flipped), and a colour per function */
@@ -161,6 +164,8 @@ export interface CatalogFile {
   bosses: CatalogBoss[];
   stations: CatalogStation[];
   systems: CatalogSystem[];
+  /** Optional: ribbon names by id (a game-written file may leave it out) */
+  ribbons?: CatalogRibbon[];
   render: RenderData;
 }
 
