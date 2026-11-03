@@ -553,15 +553,19 @@ export class SnapshotBuilder {
           // Its own ship: only when its prediction needs correcting, its status changed (its warmth too), or now and then
           const d = r.state.data ?? [];
           // (and when its slowing ends: its prediction flies a slowed ship, features/weaponry)
-          const key = JSON.stringify([r.state.hp, r.state.maxHp, d[4], d[5], d[PILOT_ROW.field], d[PILOT_ROW.warmth], this.slowEnd(r.id)]);
+          // (what its flight depends on, apart from its HP: a change there is as good as a correction)
+          const flight = JSON.stringify([d[4], d[5], d[PILOT_ROW.field], d[PILOT_ROW.warmth], this.slowEnd(r.id)]);
+          const key = JSON.stringify([r.state.hp, r.state.maxHp]) + flight;
           const version = this.replication.versionOf(r.id);
-          const need = conn.forceSnapshot || conn.selfLate || version !== conn.selfVersion || key !== conn.selfKey
-            || this.currentTick - conn.selfSentTick >= SELF_SAFETY_TICKS || !prevStates.has(r.id);
+          const fix = conn.forceSnapshot || conn.selfLate || version !== conn.selfVersion || !prevStates.has(r.id) || flight !== conn.selfFlight;
+          const need = fix || key !== conn.selfKey || this.currentTick - conn.selfSentTick >= SELF_SAFETY_TICKS;
           newStates.set(r.id, 'self');
           if (!need) continue;
+          conn.selfRowQuiet = !fix;
           conn.selfLate = false;
           conn.selfVersion = version;
           conn.selfKey = key;
+          conn.selfFlight = flight;
           conn.selfSentTick = this.currentTick;
         }
         let v = r.other && r.id !== conn.playerId ? r.other : r;

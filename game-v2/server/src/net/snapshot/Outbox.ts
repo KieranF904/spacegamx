@@ -15,7 +15,7 @@ import { hasComponent, type IWorld } from 'bitecs';
 import { CAPS, InSystem, Player, Position, encodeServerMessage, serverFrame, type ClientSocket, type ServerMessage } from '@space-game/common';
 import type { ClientConnection } from '../ClientConnection.js';
 import { LAZY_TYPES, LAZY_TICKS, FX_RANGE, COALESCE_TICKS } from './constants.js';
-import { PackedLink } from './PackedLink.js';
+import { PackedLink, quietHits } from './PackedLink.js';
 
 /** What the outbox needs of the server (GameServer itself) */
 export interface OutboxHost {
@@ -106,8 +106,8 @@ export class Outbox {
   private packedQueue(conn: ClientConnection, msg: ServerMessage, bytes: Uint8Array | null): void {
     const link = conn.packed!;
     if (msg.type === 'pong' || !this.batching) { this.countPacked(link.now({ msg, bytes }, this.currentTick)); return; }
-    // (The first snapshot after a hit to or from its ship goes at once)
-    if (msg.type === 'snapshot' && this.hitPilots.delete(conn.playerId)) link.wantSnapshot = true;
+    // (The first snapshot after a hit to or from its ship goes at once; not to a client that finds its own hits)
+    if (msg.type === 'snapshot' && this.hitPilots.delete(conn.playerId) && !quietHits(conn.caps)) link.wantSnapshot = true;
     link.add({ msg, bytes }, LAZY_TYPES.has(msg.type), this.currentTick);
     this.packedWaiting.add(conn);
   }

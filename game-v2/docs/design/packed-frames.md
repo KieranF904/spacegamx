@@ -124,3 +124,23 @@ Wire = payload + 66 B x messages/s. Deflated = the server's permessage-deflate (
    uses again while one waits replaces it; with no frames drawn at all (a hidden tab) nothing waits more than 30
    snapshot ticks. The server sends nothing more. Test: client/src/state/lateRemovals.test.ts (real GameState and
    WeaponFx: the tracer is made; 2 of its 7 fail on the old rule).
+
+2. **A client that finds its own hits isn't sent its hits early** (no wire change; behind `CAPS.COALESCE` with
+   `HITS | SELF_HITS`). Damage to or from its ship and the first snapshot after a hit made a frame urgent, so a
+   shooter's messages almost never coalesced (Hammerhead: 297 of 304 went early; Gale and debris: all). For such a
+   client (`quietHits`, PackedLink.ts) none of that is urgent now, nor its own row when the row went only for its HP
+   or as the periodic safety copy (`ClientConnection.selfRowQuiet`: SnapshotBuilder now tells that from a correction:
+   a forced or late-input row, a new keyframe version, first sight, or a change to what its flight depends on, which
+   all stay urgent, as do deaths, answers and everything outside the tick's stream). What it costs: the HP numbers of
+   its hits confirm up to COALESCE_TICKS (50 ms) later. Its own shells' impacts come from the hits it finds as the
+   snapshot arrives, now up to 3 ticks later, so a predicted shell flies up to 3 ticks further past the hull before
+   its hit stops it (it already flew a round trip's worth past: the impacts aren't predicted); other ships' shells are
+   drawn a coalescing hold behind on the interpolated timeline (`coalesceMs`), and their hits wait for the drawn head
+   (WeaponFx.strike), so they land as before. The adopt path is unchanged (more shells now come and go inside one
+   message: the client's own are adopted, others' drawn by follow-up 1). `PackedLink.stats.why` counts what made
+   each early message go. Probe (caps 15, shooter): messages/s Pips 10.8 -> 8.3, Hammerhead 15.2 -> 9.8, Gale
+   17.8 -> 10.1, debris 17.9 -> 10.2, boss 16.0 -> 13.7 (the boss's blows correct the pilot's ship: real
+   corrections), pirates 10.5 -> 10.1, cruising 7.3 (unchanged); wire estimate Hammerhead 1,961 -> 1,595, Gale
+   2,280 -> 1,756, Pips 1,040 -> 874, debris 3,471 -> 2,945 B/s. Hash disagreements, corrections and hpCheck
+   mismatches unchanged. Test: packedFrames.test.ts ("the shooter finds its own hits": no hit-urgent messages, its
+   sub-frames share messages, and it sees the same hits, fires, blasts and removed shells as the legacy observer).

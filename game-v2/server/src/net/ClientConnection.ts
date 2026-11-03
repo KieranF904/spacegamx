@@ -85,6 +85,14 @@ export interface ClientConnection {
   selfVersion: number;
   selfKey: string;
   selfSentTick: number;
+  /**
+   * Its own row went in the last snapshot only for its HP or now and then (SELF_SAFETY_TICKS), not to correct its
+   * prediction or tell it something its flight depends on: a client finding its own hits needn't have it at once
+   * (PackedLink urgentFor)
+   */
+  selfRowQuiet?: boolean;
+  /** ...the part of selfKey its flight depends on (all but its HP) */
+  selfFlight?: string;
   /** Hash of its ship's state at each recent tick (the client checks its prediction against these) */
   selfHashes: Map<number, number>;
   /**

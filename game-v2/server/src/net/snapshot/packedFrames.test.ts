@@ -190,6 +190,23 @@ describe('packed frames: a packed and a base-format observer see the same fight'
     expect(p.bytes).toBeLessThan(b.bytes * 0.75);
   }, 120_000);
 
+  it("the shooter finds its own hits, so they don't make its frames go early; it still sees every hit", () => {
+    const r = fight({});
+    const st = server(r).S!;
+    if (process.env.PACKED_DEBUG) console.log(JSON.stringify({ S: st, counts: r.counts }));
+    // (Before, damage to or from its ship and the snapshot after a hit went at once: nearly every message was early)
+    expect(st.why.damage ?? 0).toBe(0);
+    expect(st.why.hitSnapshot ?? 0).toBe(0);
+    // (what is left: the test re-placing its ship each tick, a correction; the join)
+    expect(st.urgent).toBeLessThan(st.messages * 0.2);
+    // ...so its sub-frames share messages as an idle pilot's do
+    expect(st.subFrames).toBeGreaterThan(st.messages * 1.6);
+    // The same hits, fires and blasts as the legacy observer, its shells gone the same, and the server's HP
+    expectSameView(r.S, r.B);
+    expect(hpOff(r.server, r.S, 'S').slice(0, 5)).toEqual([]);
+    expect(r.S.hits!.stats.mismatches).toBe(0);
+  }, 120_000);
+
   it('switching packed frames off and on mid-fight keeps everything in order', () => {
     const r = fight({ ticks: 600, switches: [[150, 0], [300, PACKED], [420, CAPS.PACKED], [500, PACKED]] });
     expect(r.tee.bad).toEqual([]);

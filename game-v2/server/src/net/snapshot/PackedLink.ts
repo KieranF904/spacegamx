@@ -6,12 +6,16 @@
  *
  * Urgent (sent at once, with whatever waits before it): anything but the tick's stream (CAN_WAIT: answers to requests,
  * deaths, corrections, boss warnings...), a snapshot that corrects the client's own ship (its row or a keyframe), damage
- * to or from it, and the first snapshot after a hit to or from its ship (`wantSnapshot`: Outbox.addDamage marks it, so
- * a client finding its own hits isn't kept waiting for them).
+ * to or from it, and the first snapshot after a hit to or from its ship (`wantSnapshot`: Outbox.addDamage marks it).
+ * A client that finds its own hits (CAPS.HITS + CAPS.SELF_HITS: `quietHits`) gets none of the hit ones, nor its own
+ * row when it went only for its HP or as the periodic safety copy (ClientConnection.selfRowQuiet): it draws its
+ * own shells' impacts from what it finds as the snapshot comes, and others' shells (drawn a coalescing hold behind on
+ * its interpolated timeline) land when their drawn heads get there, so a hit's frame waiting COALESCE_TICKS changes
+ * only when its HP numbers confirm (docs/design/packed-frames.md, follow-ups).
  *
  * The bytes go out through the client's own socket; Outbox counts them.
  */
-import { PackedEncoder, encodeServerMessage, serverFrame, type PackedPart, type ServerMessage } from '@space-game/common';
+import { CAPS, PackedEncoder, encodeServerMessage, serverFrame, type PackedPart, type ServerMessage } from '@space-game/common';
 import type { ClientConnection } from '../ClientConnection.js';
 import { LAZY_TICKS } from './constants.js';
 
@@ -21,16 +25,24 @@ const CAN_WAIT = new Set([
   'shipHps', 'shipSync', 'debrisSplit', 'hits', 'hpCheck', 'mapDots', 'playerState', 'effect', 'party', 'ops',
 ]);
 
-/** Does this message make its frame go at once (for the client flying `pid`)? */
-export function urgentFor(msg: ServerMessage, pid: number): boolean {
-  if (!CAN_WAIT.has(msg.type)) return true;
+/**
+ * Why this message makes its frame go at once (for the client flying `pid`; `quietHits`: it finds its own hits, so
+ * damage to or from it can wait), or null: it can wait
+ */
+export function urgentFor(msg: ServerMessage, pid: number, quietHits = false): string | null {
+  if (!CAN_WAIT.has(msg.type)) return msg.type;
   if (msg.type === 'snapshot') {
-    for (const e of msg.entities) if (e.id === pid) return true;
-    if (msg.ships) for (const k of msg.ships) if (k[0] === pid) return true;
-    return false;
+    for (const e of msg.entities) if (e.id === pid) return 'ownRow';
+    if (msg.ships) for (const k of msg.ships) if (k[0] === pid) return 'ownKeyframe';
+    return null;
   }
-  if (msg.type === 'damage') return msg.targetId === pid || msg.sourceId === pid;
-  return false;
+  if (msg.type === 'damage' && !quietHits && (msg.targetId === pid || msg.sourceId === pid)) return 'damage';
+  return null;
+}
+
+/** A client that finds its own hits (part D): nothing about its hits is urgent */
+export function quietHits(caps: number | undefined): boolean {
+  return ((caps ?? 0) & (CAPS.HITS | CAPS.SELF_HITS)) === (CAPS.HITS | CAPS.SELF_HITS);
 }
 
 export class PackedLink {
@@ -44,8 +56,10 @@ export class PackedLink {
   private urgent = false;
   /** The next snapshot goes at once (a hit to or from its ship: Outbox.addDamage) */
   wantSnapshot = false;
-  /** WebSocket messages, sub-frames and bytes sent; messages sent early for being urgent (the netcode probe) */
-  readonly stats = { messages: 0, subFrames: 0, bytes: 0, urgent: 0, failed: 0 };
+  /** WebSocket messages, sub-frames and bytes sent; messages sent early for being urgent, and what made each so (the netcode probe) */
+  readonly stats = { messages: 0, subFrames: 0, bytes: 0, urgent: 0, failed: 0, why: {} as Record<string, number> };
+  /** What first made the waiting frames urgent */
+  private why = '';
 
   constructor(private readonly conn: ClientConnection) {}
 
@@ -60,8 +74,12 @@ export class PackedLink {
       if (!this.lazy.length) this.lazySince = tick;
       this.lazy.push(part);
     } else this.box.push(part);
-    if (urgentFor(part.msg, this.conn.playerId)) this.urgent = true;
-    else if (this.wantSnapshot && part.msg.type === 'snapshot') { this.urgent = true; this.wantSnapshot = false; }
+    const quiet = quietHits(this.conn.caps);
+    let why = urgentFor(part.msg, this.conn.playerId, quiet);
+    // (its own row only for its HP, or now and then: not a correction)
+    if (why === 'ownRow' && quiet && this.conn.selfRowQuiet) why = null;
+    if (why) this.markUrgent(why);
+    else if (this.wantSnapshot && part.msg.type === 'snapshot') { this.markUrgent('hitSnapshot'); this.wantSnapshot = false; }
   }
 
   /**
@@ -108,6 +126,11 @@ export class PackedLink {
     this.enc.reset();
   }
 
+  private markUrgent(why: string): void {
+    if (!this.urgent) this.why = why;
+    this.urgent = true;
+  }
+
   private hold(sub: PackedPart[], tick: number): void {
     if (!sub.length) return;
     if (!this.held.length) this.heldSince = tick;
@@ -129,7 +152,7 @@ export class PackedLink {
     this.stats.messages++;
     this.stats.subFrames += this.held.length;
     this.stats.bytes += data.length;
-    if (this.urgent) this.stats.urgent++;
+    if (this.urgent) { this.stats.urgent++; this.stats.why[this.why] = (this.stats.why[this.why] ?? 0) + 1; }
     this.held = [];
     this.heldSince = -1;
     this.urgent = false;
