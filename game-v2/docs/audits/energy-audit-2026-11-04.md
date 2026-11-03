@@ -262,6 +262,89 @@ the script) and `strafer-every-way` (the test-strafer's two Drive Cell banks ref
 pool runs dry about halfway and the unbanked engines run short: its replica now re-keyframes, so the scenario says
 `replicaDiverges: true`); parity.golden for both; frameHash (the strafer pilot, from tick 400).
 
+**Replica divergence fixed (protocol 31).** The cause: a Burst Strafer's dodge pushes on its share of the power
+(`PowerResult.extra`), which replicas never had (they took 1). Once the banks refilled from the pool and the pool ran
+dry, three dodges got about 40% and 9-15%, and the replica pushed them in full. The pilot's step now rounds the
+features' shares to the 1/32 grid, and the lowest share of the features that asked goes in the replicated control bits
+(`CTL.share`, 6 bits from bit 21: flight.ts `ctlOfShare`/`shareOfCtl`; a Gyro's replica browns out by it as well).
+`strafer-every-way` and `strafer-energy-short` (re-keyframed every burst since the strafer landed) now fly with no
+keyframes; both are `replicaDiverges: false`.
+
+## Source-agnostic check (2026-11-04)
+
+Kieran: "each part draws X, outputs Y, they don't judge where it comes from, it's up to the player to make their
+architecture sustainable." Under that rule, what reaches a part may depend only on the layout (what touches what, port
+and link rates, what each part holds and asks), never on what kind of part is asking or giving. Findings only: nothing
+here is changed yet. The pool and banks are being retired (the game moves to the ports core), so the ports core comes
+first.
+
+### The ports core (common/src/ships/power/ports.ts `portsTick`, design §1.3)
+
+How a tick works today: (1) **Offer**: a generator offers each out link its cap; a store offers what it holds,
+water-filled over its out links by link cap (`waterfill`, smallest first). (2) **Accept**: each taker takes up to its
+space, water-filled over its in links by what each offers (`takeOver`). (3) Apply. What a taker refuses stays with
+the giver.
+
+What breaks the rule, or isn't proportional:
+
+1. **A store's offer ignores what its takers ask** (judgement, should go). The split over its out links is by link cap,
+   decided before anyone asks. A store holding 10 with two out links offers 5 and 5 even when one taker is full and
+   the other wants 10: the refused 5 stays home this tick while the other side is short. Proposed: the store splits
+   what it can give by what each out link asks (below).
+2. **Smallest want first** (judgement, should go). `waterfill` fills the smallest wants completely and splits the rest
+   equally, so a small asker is never short while a big one is: a gun asking 2 eu and an engine asking 20 from a store
+   holding 11 get 2 and 9 (proportional: 1 and 10). The same in `takeOver` for a taker's in links (it takes evenly from
+   each giver instead of by what each offers).
+3. **Integer remainders go to the biggest want, then the highest part index** (judgement, small): `floor(left / k)`
+   leaves the remainder to the last in the sort. Proposed: the remainder one eu at a time by part index, lowest first.
+4. **A weapon's space is capped at its own intake (`L.rate`) in Accept; engines, tools and stores aren't** (a kind
+   special case, though it is the part's own X). Proposed: one rule for every taker, ask = min(room, intake), with
+   intake a stat of every part that takes (stores have one in the pool system: Capacitor 40/s a cell, Drive Cell 80/s).
+5. **A generator's port rates scale by its health; its unused offer on one port is wasted, not moved to its other
+   ports** (physical layout: fine; design §1.2 says a two-port generator is two lines of half the power).
+6. **A gun's ports shut while it discharges, rests, a burst beam burns or a clip isn't latched** (`spaceOf`); the
+   steady collapse and passive leak. The part's own behaviour, its X: fine.
+7. **Replicas assume every thruster's intake is met** (`portsThrustersFree`): a replica shortcut, not a rule; the
+   engines' power in the control bits (protocol 25) already covers it.
+8. **Material**: a network gives its most plentiful kind (`supplyOf`); a carrier moves `floor(held / outs)` link by
+   link, so earlier links get more as it runs low; drawMat's remainder comes off tanks in index order (its comment says
+   "the fullest"). Order judgements in the feed layer; the same proportional rule would apply (split by what each asks,
+   remainder by part index).
+9. **Order of acting** (thrusters, tools, weapons in step 5) doesn't matter: each burns its own buffer. Fine.
+
+**A proportional Offer/Accept, integer and deterministic** (what replacing the water-fill would take):
+- *Ask*: each taker asks each in link for `min(link cap, its space)`, its space being `min(room, intake)` for every kind
+  alike (item 4). A taker asks every line in full: it can't know which giver will have it.
+- *Grant*: a generator grants each link `min(ask, link cap)` (its ports are independent lines). A store with `A` asked
+  over its out links and `h` held grants everything when `A <= h`, else `floor(h * ask / A)` a link, the remainder one
+  eu a link in the takers' part-index order (ties by link index).
+- *Trim*: a taker granted `G` above its space accepts `floor(space * grant / G)` a link, the remainder by giver part
+  index; what it refuses stays with the giver.
+- Cost: one more pass over the links, the same scratch arrays (`sOffer`, `sSend`, `sWant`), no sort (the insertion sort
+  goes), integer throughout, so the server, the prediction and the hangar still agree to the eu.
+- Open point: a grant trimmed by a taker fed from two sides stays with its giver for the tick, though another taker of
+  that giver was short. A second Grant/Trim round (a fixed count, so still deterministic) would pass most of it on; at
+  60 ticks a second the leftover is back in play next tick anyway. Kieran to choose one round or two.
+- A store asks as a taker like any other (its room, at most its intake), so a store between a generator and a gun
+  raises its line's share exactly as a bank's intake does in the pool system's proportional sharing.
+
+### The pool and banks (energy.ts, circuits.ts, rebuild.ts), for the record
+
+Retiring, so not proposed for change; listed so the ports core doesn't carry any of them over.
+- **Bank kinds by part kind**: Drive Cells feed only engines and engine-burst features, Capacitors guns, miners and the
+  rest (circuits.ts `a.engine`/`a.gun`, rebuild.ts `nearBank`): judgement.
+- **A boost needs stored charge in the pool or a Drive Cell bank**, not a Capacitor: judgement by kind.
+- **Pulse Dynamos fill only the bank they touch** (never the pool or a part): judgement by kind.
+- **A bank refills only with a member on a powered network** (`refills`): a bank touching a generator directly can't
+  refill without one: judgement.
+- **Banks serve fuller bank first** (`powerTick` step 1): an order rule; proportional by what each holds would be neutral.
+- **One share a feed group for engines and guns**: a consequence of grouping by bank, layout. Fine.
+- **Steady loads (shields, scanners, jump coils) are settled at the rebuild, before anything else, by `priority`**
+  (rebuild.ts `allocateFlow`): they always come first, by kind: judgement.
+- **Burst consumers run at full satisfaction with any generator, battery or bank of their kind near** (rebuild.ts, the
+  "powered" rule): a kind special case.
+- "Engines first" and emptiest-first refill are gone since proportional sharing.
+
 ## For Kieran to decide
 
 1. **Boosting on an empty store starves the guns** (half rate, nothing on alternate ticks) on every ship whose store
