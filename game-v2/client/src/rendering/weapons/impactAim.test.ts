@@ -27,6 +27,18 @@ describe('the struck surface', () => {
     }
   });
 
+  it('tells whose surface it is: the owner of the edge crossed first (the impact rides it)', () => {
+    const p = new SurfaceProbe().begin(-40, -40, 10, 10, 0, 0, 5);
+    // a far box (id 3) behind a near one (id 9) on the line
+    p.edge(-100, 20, 100, 20, 3);
+    p.edge(-100, 0, 100, 0, 9);
+    const out = { nx: 0, ny: 0, target: -1 };
+    p.result(out);
+    expect(out.target).toBe(9);
+    expect(new SurfaceProbe().begin(0, 0, 1, 1, 500, 500, 5).result(out)).toBeNull();
+    expect(out.target).toBe(-1);
+  });
+
   it('falls back to the nearest edge within reach when the line misses (a drawn pose a little off the server one)', () => {
     // The hit reported 3 units above the face, the line stopping short of it
     const p = new SurfaceProbe().begin(-30, -33, -2, -5, 0, -3, 5);

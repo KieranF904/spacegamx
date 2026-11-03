@@ -3,7 +3,8 @@
  * already draws, the hit point the server sent (projectileHit) and the shell's line, so it costs no network. The
  * shell's line, from a little back along its path to a little past the hit, is cast against the standing parts of
  * every ship near the hit (their real outlines, in world space at their drawn pose) and the outline of every rock
- * near it (getAsteroidPolygon, as the server's hit test); the first edge it crosses is the surface.
+ * near it (getAsteroidPolygon, as the server's hit test); the first edge it crosses is the surface, and its owner what
+ * was hit (out.target: the impact rides it, WeaponFx anchors).
  */
 
 import { EntityType, getAsteroidPolygon, localToWorldDir, standing } from '@space-game/common';
@@ -43,7 +44,7 @@ export function hitSurface(source: ShipSource, state: GameState, x: number, y: n
           const p = poly[k], q = poly[(k + 1) % poly.length];
           const [ax, ay] = localToWorldDir([(p[0] - com[0]) * cs, (p[1] - com[1]) * cs], e.renderAngle);
           const [bx, by] = localToWorldDir([(q[0] - com[0]) * cs, (q[1] - com[1]) * cs], e.renderAngle);
-          probe.edge(e.renderX + ax, e.renderY + ay, e.renderX + bx, e.renderY + by);
+          probe.edge(e.renderX + ax, e.renderY + ay, e.renderX + bx, e.renderY + by, id);
         }
       }
     }
@@ -56,8 +57,26 @@ export function hitSurface(source: ShipSource, state: GameState, x: number, y: n
     const poly = getAsteroidPolygon(e.id, e.renderX, e.renderY, size, e.renderAngle);
     for (let k = 0; k < poly.length; k++) {
       const p = poly[k], q = poly[(k + 1) % poly.length];
-      probe.edge(p.x, p.y, q.x, q.y);
+      probe.edge(p.x, p.y, q.x, q.y, e.id);
     }
   }
-  return probe.result(out);
+  const n = probe.result(out);
+  // (no outline here: what it hit is the nearest body round the point that has none, a single-body enemy or a station)
+  if (!n) out.target = nearestBody(state, x, y, owner);
+  return n;
+}
+
+const BODY_TYPES = [EntityType.Enemy, EntityType.NPC, EntityType.Player, EntityType.ShipBody, EntityType.Station];
+
+/** The entity (not `owner`) whose middle is nearest (x, y), within its own size (a station's radius, else 90): -1 if none */
+function nearestBody(state: GameState, x: number, y: number, owner: number): number {
+  let best = -1, bd = Infinity;
+  for (const type of BODY_TYPES) {
+    for (const e of state.entities.ofType(type)) {
+      if (e.id === owner) continue;
+      const d = Math.hypot(e.renderX - x, e.renderY - y);
+      if (d < (e.stationRadius ?? 90) && d < bd) { bd = d; best = e.id; }
+    }
+  }
+  return best;
 }
