@@ -9,6 +9,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join, resolve } from 'path';
 import { spawnSync } from 'child_process';
 import { planetCrackCells, planetNoiseData, PLANET_NOISE_SIZE } from '../../client/src/rendering/planet-proto/planetNoise';
+import { moonOffset, planetPosition } from '../../common/src/world/planets';
 import { lookFor } from '../../client/src/rendering/planet-proto/planetProto';
 import { backdropLayer, bodiesOf, bodyLayer, lightAmtOf, planetPrograms, shaderConsts, sourcesFrom, VARIANT_LABEL, type Body, type Layer, type Placement, type Variant, type View } from './layers';
 
@@ -28,6 +29,7 @@ const systems: any[] = Array.isArray(systemsJson) ? systemsJson : systemsJson.sy
 type Entry = Body & { system: any };
 const ALL: Entry[] = systems.flatMap((s) => bodiesOf(s).map((b) => ({ ...b, system: s })));
 const byId = (id: string) => ALL.find((b) => b.id === id)!;
+const byIdMaybe = (id: string) => ALL.find((b) => b.id === id);
 
 let t0 = Date.now();
 writeFileSync(join(out, 'planetNoise.rgba'), planetNoiseData());
@@ -89,7 +91,7 @@ const KINDS: Record<string, string[]> = {
   desert: ['ares', 'kiln'],
   ice: ['nereid', 'thule', 'prism', 'glacia'],
   lava: ['kindle', 'pyre', 'ashfall'],
-  ocean: ['terra_nova', 'halcyon'],
+  ocean: ['terra_nova', 'halcyon', 'pelagia'],
   toxic: ['verdance'],
   moons: ['jovan.moon0', 'jovan.moon1', 'terra_nova.moon0'],
 };
@@ -253,6 +255,70 @@ if (set === 'panels') {
         return { file };
       });
       composites.push({ out: `panels/${topic}-${variant === 'cur' ? 'before' : 'after'}.png`, cols: ids.length > 3 ? 3 : ids.length, cells });
+    }
+  }
+}
+
+/**
+ * A water world's panels (docs/panels), straight into the panels folder (OUT is the date's category folder):
+ *   WATER_ID=pelagia WATER_SYSTEM=borealis node scripts/planet-proto/run.mjs water <out dir>
+ * Before: the system without the world (and the world with an ordinary ocean's look: its `sea` field dropped); after:
+ * as the data has it. Nothing is drawn on the pictures but the bodies and a plain disc for the star. High level.
+ */
+if (set === 'water') {
+  const id = process.env.WATER_ID ?? 'pelagia', sysId = process.env.WATER_SYSTEM ?? 'borealis', topic = process.env.WATER_TOPIC ?? 'water-world';
+  const sys = systems.find((s) => s.id === sysId);
+  const frag = `void main() { vec2 p = (vUV - 0.5) * 2.0; float r = length(p); float core = smoothstep(0.42, 0.4, r); float glow = exp(-max(r - 0.4, 0.0) * 7.0) * 0.55 * smoothstep(1.0, 0.8, r); vec3 c = mix(vec3(0.62, 0.82, 1.0), vec3(0.95, 0.98, 1.0), smoothstep(0.4, 0.0, r)); float a = core + glow * (1.0 - core); fragColor = vec4(c * a, a); }`;
+  programs['star'] = { vert: programs['backdrop'].vert, frag: `#version 330 core
+precision highp float;
+in vec2 vUV;
+out vec4 fragColor;
+${frag}` };
+  const bodiesFor = (withIt: boolean): { b: Body; at: Placement }[] => {
+    const list: { b: Body; at: Placement }[] = [];
+    for (const p of sys.planets) {
+      if (!withIt && p.id === id) continue;
+      const pos = planetPosition(p, 0), d = Math.hypot(pos.x, pos.y);
+      const light: [number, number] = [-pos.x / d, -pos.y / d];
+      list.push({ b: byId(p.id), at: { x: pos.x, y: pos.y, light, lightAmt: 1 } });
+      (p.moons ?? []).forEach((m: any, i: number) => {
+        const o = moonOffset(p, i, 0);
+        list.push({ b: byId(`${p.id}.moon${i}`), at: { x: pos.x + o.x, y: pos.y + o.y, light, lightAmt: 1 } });
+      });
+    }
+    return list;
+  };
+  // (the whole system: the star at the middle, the planets where the data puts them at tick 0)
+  const SPAN = 125000, SIZE = 1500;
+  const sysView: View = { w: SIZE, h: SIZE, dpr: 1, cam: [0, 0], zoom: SIZE / SPAN, t: 300 };
+  const R = sys.centralBody.radius * 2.4;
+  const starQuad = [-1, 1, 0, 0, 1, 1, 1, 0, -1, -1, 0, 1, 1, -1, 1, 1].map((v, i) => (i % 4 < 2 ? v * (R * sysView.zoom) / (SIZE / 2) : v));
+  for (const [name, withIt] of [['before', false], ['after', true]] as [string, boolean][]) {
+    if (withIt && !byIdMaybe(id)) continue;
+    const layers: Layer[] = [backdropLayer(sysView), { name: 'star', program: 'star', blend: 'normal', verts: starQuad, uniforms: {} }];
+    for (const { b, at } of bodiesFor(withIt)) layers.push(bodyLayer(b, 'proto.fine', sysView, at));
+    job(`${topic}-system.${name}`, sysView, layers, { out: `${topic}-system-${name}.png` });
+  }
+  if (byIdMaybe(id)) composites.push({ out: `${topic}-system.png`, cols: 2, cells: [{ file: `${topic}-system-before.png` }, { file: `${topic}-system-after.png` }] });
+  // (the world itself: whole, and its lit limb up close; before with an ordinary ocean's look)
+  const w = byIdMaybe(id);
+  if (w) {
+    // its neighbourhood: the planet and its moon as the game's far zoom shows them (before: the empty orbit)
+    const wp = sys.planets.find((p: any) => p.id === id), wpos = planetPosition(wp, 0);
+    const near: View = { w: 1000, h: 1000, dpr: 1, cam: [wpos.x, wpos.y], zoom: 1000 / 16000, t: 300 };
+    for (const [name, withIt] of [['before', false], ['after', true]] as [string, boolean][]) {
+      const layers: Layer[] = [backdropLayer(near)];
+      for (const { b, at } of bodiesFor(withIt)) layers.push(bodyLayer(b, 'proto.fine', near, at));
+      job(`${topic}-near.${name}`, near, layers, { out: `${topic}-near-${name}.png` });
+    }
+    composites.push({ out: `${topic}-near.png`, cols: 2, cells: [{ file: `${topic}-near-before.png` }, { file: `${topic}-near-after.png` }] });
+    const plain: Entry = { ...w, look: Object.fromEntries(Object.entries(w.look ?? {}).filter(([k]) => k !== 'sea')) as any };
+    for (const [vn, v] of Object.entries(views(w, 300))) {
+      if (vn === 'term') continue;
+      for (const [name, b] of [['before', plain], ['after', w]] as [string, Entry][]) {
+        job(`${topic}-${vn}.${name}`, v, scene(b, 'proto.fine', v), { out: `${topic}-${vn === 'whole' ? '' : vn + '-'}${name}.png`.replace('--', '-') });
+      }
+      composites.push({ out: `${topic}${vn === 'whole' ? '' : '-' + vn}.png`, cols: 2, cells: [{ file: `${topic}-${vn === 'whole' ? '' : vn + '-'}before.png` }, { file: `${topic}-${vn === 'whole' ? '' : vn + '-'}after.png` }] });
     }
   }
 }

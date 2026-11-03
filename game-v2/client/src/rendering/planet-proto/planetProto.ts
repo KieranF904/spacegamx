@@ -312,7 +312,8 @@ export const PLANET_PROTO_FRAG = /* glsl */ `
   float gLandLit = 0.0;
   float seaH(vec3 b, vec4 a, vec4 d) {
     float s = uDetail.x;
-    return tn(b * s * 0.22 + vec3(0.13, uSeed * 0.01), s * 0.22).r * 0.8 + a.r * 0.2 + 0.04 + (d.r - 0.5) * 0.05;
+    // (uSea.x: how far the sea stands above the usual level: a water world's land is only its highest ground)
+    return tn(b * s * 0.22 + vec3(0.13, uSeed * 0.01), s * 0.22).r * 0.8 + a.r * 0.2 + 0.04 + (d.r - 0.5) * 0.05 - uSea.x;
   }
   /** Mountain ranges (0..1): ridged along the d read's field, in some parts of the land (a.g), inland */
   float seaMountains(vec4 a, vec4 d, float h) {
@@ -527,10 +528,10 @@ export const PLANET_PROTO_FRAG = /* glsl */ `
     // (crisper edges where the finer read shows)
     float cw = 0.1 - 0.04 * fineW;
     // (thin at the edges, thick and opaque in the middle)
-    float cd2 = cv + fineC;
+    float cd2 = cv + fineC + uSea.z;
     cloud = smoothstep(0.61 - cw, 0.61 + cw, cd2) * (0.6 + 0.4 * smoothstep(0.66, 0.85, cd2)) * uDetail.z;
     vec4 cs2 = tn(cq + lb * vec3(0.012, 0.024, 0.012), 1.3);
-    float cvL = cs2.g * 0.8 + cs2.r * 0.2 + climate;
+    float cvL = cs2.g * 0.8 + cs2.r * 0.2 + climate + uSea.z;
     cloudShade = smoothstep(0.51, 0.71, cvL) * uDetail.z;
     // (their flanks away from the star: thicker toward it, so shaded)
     gCloudLit = 1.0 - 0.45 * clamp((cvL - cv) * 9.0, 0.0, 1.0);
@@ -674,7 +675,12 @@ export const PLANET_PROTO_FRAG = /* glsl */ `
         vec3 hv = normalize(l3 + vec3(0.0, 0.0, 1.0));
         // (a tight soft highlight and a faint sheen round it; none through thick cloud or its shadow)
         float nh = max(dot(n, hv), 0.0);
-        c += vec3(1.0, 0.95, 0.86) * (pow(nh, 80.0) * 0.85 + pow(nh, 14.0) * 0.035) * spec * clamp(1.0 - cloud * 1.6, 0.0, 1.0) * (1.0 - cloudShade * 0.5) * uLightAmt;
+        float openSea = spec * clamp(1.0 - cloud * 1.6, 0.0, 1.0) * (1.0 - cloudShade * 0.5) * uLightAmt;
+        c += vec3(1.0, 0.95, 0.86) * (pow(nh, 80.0) * 0.85 + pow(nh, 14.0) * 0.035) * uSea.y * openSea;
+        // (a water world's sea is most of its face: a broad sheen of the sun round the glint, and the sky mirrored
+        // toward the limb, both on the lit side only)
+        float glassy = max(uSea.y - 1.0, 0.0);
+        c += (vec3(1.0, 0.95, 0.86) * pow(nh, 5.0) * 0.045 + uAtmoColor * pow(1.0 - z, 3.0) * 0.4) * glassy * openSea * smoothstep(0.0, 0.3, d0);
         // lava's glow, strongest on the night side
         c += uEmitColor * emit * (0.55 + 0.45 * (1.0 - smoothstep(0.0, 0.3, d0)));
       }
@@ -733,6 +739,10 @@ export interface PlanetLook {
   storm2: [number, number, number];
   /** Lava's glow; an ocean world's town lights on the night side (a settled world's: none by default) */
   emitColor: number[];
+  /** An ocean world's water: how far the sea stands above its usual level (0.2: land only on the highest ground),
+   *  the sun glint's strength (above 1 it also gets a broad sheen and the sky mirrored toward the limb), cover added
+   *  to the clouds */
+  sea: [number, number, number];
   spin: number;
   /** Rings: inner, outer (radii), opacity; inner and outer colours */
   ring: [number, number, number];
@@ -760,7 +770,7 @@ export function kindLook(kind: PlanetKind | 'dwarf', hue: number, seed: number):
     pal: [hsl(hue, 0.2, 0.6), hsl(hue, 0.15, 0.35), hsl(hue, 0.15, 0.2)],
     atmoColor: hsl(hue, 0.6, 0.65), sunsetColor: hsl(20, 0.85, 0.55),
     atmo: [0.3, 0.012, 0.12], atmo2: [0.4, 1.0, 0.8], limb: [0, 1, 0], detail: [3, 1, 0], edge: [0.003, 0.03, 0.25], edge2: [0, 0.01, 0.2],
-    bands: [7, 1, 0.004], storm: [0, 0, 0.1], stormColor: [-2, 0, 0], storm2: none, emitColor: [0, 0, 0], spin: 0.008,
+    bands: [7, 1, 0.004], storm: [0, 0, 0.1], stormColor: [-2, 0, 0], storm2: none, emitColor: [0, 0, 0], sea: [0, 1, 0], spin: 0.008,
     ring: none, ringCol0: [0, 0, 0], ringCol1: [0, 0, 0],
   };
   switch (kind) {
@@ -870,7 +880,7 @@ export function planetProtoUniforms(look: PlanetLook, kind: PlanetKind | 'dwarf'
     uPal0: look.pal[0], uPal1: look.pal[1], uPal2: look.pal[2],
     uAtmoColor: look.atmoColor, uSunsetColor: look.sunsetColor, uAtmo: look.atmo, uAtmo2: look.atmo2, uLimb: look.limb,
     uEdge: look.edge, uEdge2: look.edge2, uDetail: look.detail, uBands: look.bands, uStorm: look.storm, uStormCol: look.stormColor, uStorm2: look.storm2,
-    uEmitColor: look.emitColor, uRing: look.ring, uRingCol0: look.ringCol0, uRingCol1: look.ringCol1,
+    uEmitColor: look.emitColor, uSea: look.sea, uRing: look.ring, uRingCol0: look.ringCol0, uRingCol1: look.ringCol1,
   };
 }
 

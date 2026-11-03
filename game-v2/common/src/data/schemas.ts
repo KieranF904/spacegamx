@@ -103,7 +103,7 @@ export type PlanetKind = 'rocky' | 'desert' | 'ice' | 'gas' | 'lava' | 'ocean' |
  */
 export const PLANET_LOOK_FIELDS = {
   pal: 'pal', atmoColor: 'rgb', sunsetColor: 'rgb', atmo: 'vec3', atmo2: 'vec3', limb: 'vec3', edge: 'vec3', edge2: 'vec3', detail: 'vec3', bands: 'vec3',
-  storm: 'vec3', stormColor: 'vec3', storm2: 'vec3', emitColor: 'rgb', spin: 'number', ring: 'vec3', ringCol0: 'rgb', ringCol1: 'rgb',
+  storm: 'vec3', stormColor: 'vec3', storm2: 'vec3', emitColor: 'rgb', sea: 'vec3', spin: 'number', ring: 'vec3', ringCol0: 'rgb', ringCol1: 'rgb',
 } as const;
 type LookFieldValue<S> = S extends 'number' ? number : S extends 'pal' ? [number[], number[], number[]] : S extends 'rgb' ? number[] : [number, number, number];
 /** A planet's (or a brown dwarf's) look over its kind's defaults: any of the fields, each replacing the default's */

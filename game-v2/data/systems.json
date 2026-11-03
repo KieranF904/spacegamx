@@ -1238,6 +1238,28 @@
           "description": "An ice world with a Halden site beneath its glaciers. Descend with X in orbit."
         },
         {
+          "id": "pelagia",
+          "name": "Pelagia",
+          "kind": "ocean",
+          "hue": 224,
+          "radius": 2200,
+          "look": { "sea": [0.42, 1.8, 0.1], "atmoColor": [0.3, 0.52, 0.95], "pal": [[0.07, 0.5, 0.68], [0.014, 0.065, 0.27], [0.1, 0.3, 0.5]] },
+          "orbit": {
+            "radius": 47500,
+            "phase": 2.2,
+            "period": 500
+          },
+          "moons": [
+            {
+              "radius": 300,
+              "distance": 3500,
+              "period": 14,
+              "phase": 3
+            }
+          ],
+          "description": "A water world: open sea almost to the poles, a few island chains and small polar ice caps. One moon. Between Glacia and Boreas Major. No landing."
+        },
+        {
           "id": "boreas_major",
           "name": "Boreas Major",
           "kind": "gas",
