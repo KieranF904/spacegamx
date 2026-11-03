@@ -3,6 +3,8 @@ import { SurfaceProbe, hitAge, offSurface, throwAngle } from './impactAim';
 import { weaponStyle } from './weaponStyles';
 import { WeaponType } from '@space-game/common';
 import '../../ships/energyLooks';
+import tuning from '../../../../data/ships/tuning.json';
+import models from '../../../../data/ships/models.json';
 
 const deg = (a: number) => Math.round(((a * 180) / Math.PI + 360) % 360);
 
@@ -74,10 +76,13 @@ describe('impacts choose their throw by kind', () => {
     for (const t of [WeaponType.Flak, WeaponType.Missile, WeaponType.Torpedo, WeaponType.Mortar]) expect(weaponStyle(t).hitThrow ?? 'back').toBe('back');
   });
 
-  it('the Spark is a bolt that leaves the barrel, not a line its whole flight long', () => {
+  it('the Spark is a long bolt that leaves the barrel, not a line its whole flight long', () => {
     const s = weaponStyle(WeaponType.Arc, 1, 'arc_spark');
-    // (its life is 6 ticks: a tracer that long stays pinned to the barrel the whole flight)
-    expect(s.tracerTicks).toBeLessThanOrEqual(3);
-    expect(s.hit?.spray).toBeDefined();
+    // (a tracer as long as its life stays pinned to the barrel the whole flight: the old bug)
+    const model = (models as unknown as { models: { id: string; weaponMods?: { mul?: { life?: number } } }[] }).models.find((m) => m.id === 'arc_spark')!;
+    const life = tuning.weapons.arc.life * (1 + (model.weaponMods?.mul?.life ?? 0));
+    expect(s.tracerTicks).toBeLessThanOrEqual(life / 3);
+    expect(s.tracerTicks).toBeGreaterThanOrEqual(4);
+    expect(s.hit?.flare).toBeDefined();
   });
 });

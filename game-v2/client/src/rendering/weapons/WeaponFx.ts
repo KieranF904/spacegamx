@@ -129,6 +129,8 @@ interface HitGlow { x: number; y: number; life: number; max: number; size: numbe
 interface Shock { x: number; y: number; life: number; max: number; size: number; width: number; color: number }
 /** A glow on the hull where a hit landed, riding with the ship it struck (`owner`, at `ox, oy` in its frame), or still (owner -1) */
 interface Scorch { x: number; y: number; life: number; max: number; size: number; color: number; owner: number; ox: number; oy: number }
+/** A rebound streak (ImpactLayers.flare): out from (x, y) along `a`, `len` long at full reach */
+interface Flare { x: number; y: number; a: number; len: number; width: number; life: number; max: number; color: number }
 /** The light a layered hit throws, fading over its life */
 interface HitLight { x: number; y: number; life: number; max: number; radius: number; power: number; color: number }
 interface Ring { x: number; y: number; life: number; max: number; size: number; color: number }
@@ -236,6 +238,7 @@ export class WeaponFx {
   private shocks: Shock[] = [];
   private scorches: Scorch[] = [];
   private hitLights: HitLight[] = [];
+  private flares: Flare[] = [];
   private clock = 0;
   private crackle = new Graphics();
   /** Redrawn every frame it's crackling, so a render group of its own (Pixi rebuilds its draw list, not the scene's) */
@@ -561,9 +564,10 @@ export class WeaponFx {
   private layeredHit(style: WeaponStyle, L: ImpactLayers, x: number, y: number, aim: Aim, size: number, shot: Shot | undefined): void {
     const imp = style.impact, k = impactScale(size), nk = Math.min(1.5, k) * this.particleKeep;
     const room = (): boolean => this.sparks.length < HIT_CAP * 2;
-    // A loose scatter round the hit
+    // A loose scatter round the throw (tight for a directional hit, wide for a burst)
+    const scat = ((L.scatter ?? (style.hitThrow && style.hitThrow !== 'back' ? 40 : 69)) * Math.PI) / 180;
     for (let i = 0, n = Math.round(imp.sparks * nk); i < n && room(); i++) {
-      const a = this.dir(aim, (Math.random() - 0.5) * 2.4), s = imp.speed * (0.4 + Math.random());
+      const a = this.dir(aim, (Math.random() * 2 - 1) * scat), s = imp.speed * (0.4 + Math.random());
       const col = Math.random() < 0.25 ? 0xffffff : style.shardHue ? turnHue(imp.color, (Math.random() - 0.5) * style.shardHue) : imp.color;
       this.sparks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0, max: imp.life * (0.6 + Math.random() * 0.6), color: col });
     }
@@ -584,7 +588,18 @@ export class WeaponFx {
       for (let i = 0, n = Math.round(sp.count * nk); i < n && room(); i++) {
         // (most of it close to the throw, a few wide)
         const u = Math.random() * 2 - 1, a = this.dir(aim, u * Math.abs(u) * cone), s = sp.speed * (0.55 + Math.random() * 0.7);
-        this.sparks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0, max: sp.life * (0.6 + Math.random() * 0.6), color: Math.random() < 0.35 ? 0xffffff : sp.color ?? imp.color, width: 1.7, drag: 0.88 });
+        this.sparks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0, max: sp.life * (0.6 + Math.random() * 0.6), color: Math.random() < 0.35 ? 0xffffff : sp.color ?? imp.color, width: sp.width ?? 1.7, drag: 0.88 });
+      }
+    }
+    // The rebound line: bright streaks shooting out along the throw
+    const fl = L.flare;
+    if (fl && this.flares.length < 128) {
+      const n = fl.count ?? 1, fan = ((fl.fan ?? 0) * Math.PI) / 180, col = fl.color ?? L.spray?.color ?? imp.color;
+      for (let i = 0; i < n; i++) {
+        const off = n > 1 ? (i / (n - 1) - 0.5) * 2 * fan : 0, a = this.dir(aim, off + (Math.random() - 0.5) * 0.08);
+        // (the middle one longest)
+        const len = fl.size * k * (n > 1 ? 1 - 0.35 * Math.abs(i / (n - 1) - 0.5) * 2 : 1) * (0.9 + Math.random() * 0.2);
+        this.flares.push({ x, y, a, len, width: fl.width * Math.min(1.5, k), life: 0, max: fl.life, color: col });
       }
     }
     // The shell itself glancing off: long streaks of its own colour, tight round the throw
@@ -681,6 +696,17 @@ export class WeaponFx {
       const r = s.size * (0.12 + 0.88 * (1 - f * f * f));
       this.shockG.ring(s.x, s.y, r, Math.max(0.8, s.width * f), s.color, 0.9 * Math.pow(f, 1.3));
       if (n < 0.4) this.shockG.ring(s.x, s.y, r * 0.96, Math.max(0.6, s.width * 0.35 * f), 0xffffff, 0.7 * (1 - n / 0.4));
+    }
+    for (let i = this.flares.length - 1; i >= 0; i--) {
+      const f = this.flares[i];
+      f.life += frames;
+      if (f.life >= f.max) { this.flares.splice(i, 1); continue; }
+      const n = f.life / f.max, out = 1 - Math.pow(1 - Math.min(1, n / 0.3), 3);
+      // Shoots out fast (eased) from the hit, its root lifting off after it as it fades, thinning
+      const r1 = f.len * out, r0 = f.len * 0.55 * Math.max(0, (n - 0.25) / 0.75), c = Math.cos(f.a), sn = Math.sin(f.a);
+      const fade = Math.pow(1 - n, 1.3), w = f.width * (1 - 0.6 * n);
+      this.line(f.x + c * r0, f.y + sn * r0, f.x + c * r1, f.y + sn * r1, w * 2.6, f.color, 0.55 * fade);
+      this.line(f.x + c * r0, f.y + sn * r0, f.x + c * r1, f.y + sn * r1, w, 0xffffff, 0.95 * fade);
     }
     for (let i = this.hitLights.length - 1; i >= 0; i--) {
       const l = this.hitLights[i];

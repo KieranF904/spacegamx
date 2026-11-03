@@ -108,8 +108,16 @@ export interface ImpactLayers {
   bloom?: { size: number; life: number; color?: number };
   /** A crisp shock ring racing out (eased) and thinning as it fades: radius reached, frames, band width at the start; `count` more follow `gap` frames apart, each smaller */
   shock?: { size: number; life: number; width: number; color?: number; count?: number; gap?: number };
-  /** A spray of fast streaks thrown off the hit (the way its style's hitThrow says) in a cone `cone` degrees either side */
-  spray?: { count: number; speed: number; cone: number; life: number; color?: number };
+  /** A spray of fast streaks thrown off the hit (the way its style's hitThrow says) in a cone `cone` degrees either side, `width` thick (default 1.7) */
+  spray?: { count: number; speed: number; cone: number; life: number; color?: number; width?: number };
+  /**
+   * The rebound line itself: `count` bright streaks shooting out from the hit along the throw (fanned across `fan` degrees),
+   * reaching `size` long (world units, scaled as the layers are) and `width` thick, then thinning away over `life` frames:
+   * the leading read of a directional hit
+   */
+  flare?: { size: number; width: number; life: number; count?: number; fan?: number; color?: number };
+  /** How wide the loose scatter of `impact.sparks` fans round the throw, degrees either side (default 40 for a directional hitThrow, 69 for 'back') */
+  scatter?: number;
   /** The shell glancing off: a few long streaks of its own colour along the throw (a ricochet), `cone` degrees either side */
   ricochet?: { count: number; speed: number; cone: number; life: number };
   /** Embers: slow, heavier sparks that drift off (out of the surface, where one is known) and cool from `hot` to `cool` as they die */
@@ -233,6 +241,20 @@ export function clearStyleCache(): void {
 }
 
 
+/**
+ * A directional hit (ImpactLayers) for a kind with no model of its own (an NPC's shells, a model that sets none): led by a
+ * streak along the throw and a spray in a `cone`-degree cone round it, the centred core and glow small and brief, no
+ * shock ring. `k` scales it (a rail's bigger than an autocannon's); `color` is the spray's and streak's.
+ */
+function DIRECTED_HIT(color: number, k: number, cone = 28): ImpactLayers {
+  return {
+    core: { size: 3 * k, life: 2 + Math.round(k) }, bloom: { size: 6 * k, life: 4 + Math.round(k * 2), color },
+    spray: { count: Math.round(8 * k), speed: 7.5 * Math.sqrt(k), cone, life: Math.round(10 + 3 * k), color },
+    flare: { size: 26 * k, width: 2 * Math.sqrt(k), life: Math.round(7 + 2 * k) }, scatter: cone,
+    light: { radius: 35 * k, power: 0.5 },
+  };
+}
+
 // Sized for ships with 24-unit cells; each shot is further scaled by its shell size
 const KINETIC: WeaponStyle = {
   motion: 'linear',
@@ -256,12 +278,13 @@ const KINETIC: WeaponStyle = {
 export const WEAPON_STYLES: Record<number, WeaponStyle> = {
   // (Slugs ricochet off what they strike, hitThrow 'reflect'; bolts of light splash straight back out, 'normal'; the rest
   // (explosives, flak, seekers, orbs) throw back up their line as before)
-  [WeaponType.Cannon]: { ...KINETIC, hitThrow: 'reflect' },
+  // (and their hits lead with that throw: a streak along it, a spray round it, the centred flash small; ImpactLayers)
+  [WeaponType.Cannon]: { ...KINETIC, hitThrow: 'reflect', hit: DIRECTED_HIT(0xffc070, 1) },
   // Railgun: a hypersonic slug, a long thin blue-white streak and a hard flash
   [WeaponType.Railgun]: {
     ...KINETIC, tracerTicks: 1.4, coreWidth: 2, glowWidth: 9, coreColor: 0xf2fbff, glowColor: 0x6ab8ff, glowAlpha: 0.45, ownerTint: 0.05,
     headRadius: 3.5, haloRadius: 14, muzzle: { life: 9, size: 30, sparks: 10, color: 0xbfe3ff, smoke: 4 },
-    impact: { sparks: 22, speed: 6, life: 20, color: 0xbfe3ff, flash: 34 }, hitThrow: 'reflect',
+    impact: { sparks: 22, speed: 6, life: 20, color: 0xbfe3ff, flash: 34 }, hitThrow: 'reflect', hit: DIRECTED_HIT(0xd8f6ff, 1.6, 18),
   },
   // Flak: a stubby glowing shell (the burst is the show)
   [WeaponType.Flak]: {
@@ -318,7 +341,7 @@ export const WEAPON_STYLES: Record<number, WeaponStyle> = {
   [WeaponType.Rivet]: {
     ...KINETIC, tracerTicks: 1.6, coreWidth: 3, glowWidth: 9, coreColor: 0xfff6d0, glowColor: 0xffc030, glowAlpha: 0.55, ownerTint: 0,
     headRadius: 3.5, haloRadius: 10, muzzle: { life: 7, size: 22, sparks: 6, color: 0xffd080, smoke: 3 },
-    impact: { sparks: 14, speed: 4, life: 16, color: 0xffc060, flash: 18 }, hitThrow: 'reflect',
+    impact: { sparks: 14, speed: 4, life: 16, color: 0xffc060, flash: 18 }, hitThrow: 'reflect', hit: DIRECTED_HIT(0xffd080, 1.2),
   },
   [WeaponType.ScrapChunk]: {
     ...KINETIC, tracerTicks: 0.5, coreWidth: 4, glowWidth: 7, coreColor: 0x2a2d31, glowColor: 0x3aff9a, glowAlpha: 0.85, ownerTint: 0,
@@ -334,18 +357,18 @@ export const WEAPON_STYLES: Record<number, WeaponStyle> = {
   [WeaponType.Prism]: {
     ...KINETIC, tracerTicks: 1.8, coreWidth: 3, glowWidth: 13, coreColor: 0xffffff, glowColor: 0xe879f9, glowAlpha: 0.5, ownerTint: 0,
     headRadius: 5, haloRadius: 18, muzzle: { life: 8, size: 24, sparks: 8, color: 0xf5d0fe, smoke: 0 },
-    impact: { sparks: 18, speed: 5, life: 16, color: 0x67e8f9, flash: 26 }, hitThrow: 'normal',
+    impact: { sparks: 18, speed: 5, life: 16, color: 0x67e8f9, flash: 26 }, hitThrow: 'normal', hit: { ...DIRECTED_HIT(0xf5d0fe, 1.4, 34), flare: { size: 40, width: 3, life: 10, count: 3, fan: 36 } },
   },
   [WeaponType.PrismShard]: {
     ...KINETIC, tracerTicks: 2.4, coreWidth: 1.6, glowWidth: 6, coreColor: 0xffffff, glowColor: 0x67e8f9, glowAlpha: 0.5, ownerTint: 0,
     headRadius: 2, haloRadius: 7, muzzle: { life: 1, size: 1, sparks: 0, color: 0xffffff, smoke: 0 },
-    impact: { sparks: 6, speed: 3, life: 10, color: 0xf0abfc, flash: 12 }, shardHue: 360, hitThrow: 'normal',
+    impact: { sparks: 6, speed: 3, life: 10, color: 0xf0abfc, flash: 12 }, shardHue: 360, hitThrow: 'normal', hit: DIRECTED_HIT(0xf0abfc, 0.7),
   },
   // Phase Cannon: a shimmering violet slug
   [WeaponType.Phase]: {
     ...KINETIC, tracerTicks: 2.6, coreWidth: 4, glowWidth: 16, coreColor: 0xf5f3ff, glowColor: 0x8b5cf6, glowAlpha: 0.5, ownerTint: 0,
     headRadius: 6, haloRadius: 24, muzzle: { life: 10, size: 34, sparks: 6, color: 0xc4b5fd, smoke: 0 },
-    impact: { sparks: 14, speed: 4, life: 18, color: 0xc4b5fd, flash: 30 }, hitThrow: 'normal',
+    impact: { sparks: 14, speed: 4, life: 18, color: 0xc4b5fd, flash: 30 }, hitThrow: 'normal', hit: { ...DIRECTED_HIT(0xddd6fe, 1.6, 26), flare: { size: 50, width: 3.6, life: 11, count: 2, fan: 14 } },
   },
   // Singularity: a dark orb ringed with light
   [WeaponType.Singularity]: {
@@ -357,12 +380,12 @@ export const WEAPON_STYLES: Record<number, WeaponStyle> = {
   },
   // Autocannon: short, quick tracers
   [WeaponType.Autocannon]: {
-    ...KINETIC, tracerTicks: 0.9, coreWidth: 1.6, glowWidth: 5, coreColor: 0xffe8c0, glowColor: 0xffa040, glowAlpha: 0.35, hitThrow: 'reflect',
+    ...KINETIC, tracerTicks: 0.9, coreWidth: 1.6, glowWidth: 5, coreColor: 0xffe8c0, glowColor: 0xffa040, glowAlpha: 0.35, hitThrow: 'reflect', hit: DIRECTED_HIT(0xffd9a0, 0.8),
   },
   // Pulse laser: hot pink bolts
   [WeaponType.Pulse]: {
     ...KINETIC, tracerTicks: 2.2, coreWidth: 2.4, glowWidth: 10, coreColor: 0xffe4f2, glowColor: 0xff4fa3, glowAlpha: 0.55, ownerTint: 0,
-    impact: { sparks: 8, speed: 3, life: 12, color: 0xff8cc6, flash: 18 }, hitThrow: 'normal',
+    impact: { sparks: 8, speed: 3, life: 12, color: 0xff8cc6, flash: 18 }, hitThrow: 'normal', hit: DIRECTED_HIT(0xffb0d8, 1, 30),
   },
   // Torpedo: a fat, slow, glowing slug
   [WeaponType.Torpedo]: {
@@ -380,7 +403,7 @@ export const WEAPON_STYLES: Record<number, WeaponStyle> = {
   // Arc projector: a crackling blue spark
   [WeaponType.Arc]: {
     ...KINETIC, tracerTicks: 2.8, coreWidth: 2.2, glowWidth: 14, coreColor: 0xf0fbff, glowColor: 0x6ac8ff, glowAlpha: 0.6, ownerTint: 0,
-    impact: { sparks: 12, speed: 4, life: 14, color: 0x9ad8ff, flash: 26 }, hitThrow: 'normal',
+    impact: { sparks: 12, speed: 4, life: 14, color: 0x9ad8ff, flash: 26 }, hitThrow: 'normal', hit: DIRECTED_HIT(0xd8f2ff, 1.1, 26),
   },
 };
 

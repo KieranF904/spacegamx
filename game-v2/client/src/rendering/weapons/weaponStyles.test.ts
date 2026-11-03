@@ -69,11 +69,11 @@ describe('impacts by power tier', () => {
   };
   const size = (id: string) => MODEL_STYLES[id].hit?.bloom?.size ?? 0;
 
-  it('heavy guns land the whole stack: core, glow, shock ring, spray, embers, a hull glow', () => {
+  it('heavy guns land the whole stack: a rebound streak and spray, a core, a glow, embers, a hull glow', () => {
     for (const id of TIERS.heavy) {
       const h = MODEL_STYLES[id].hit;
       expect(h, id).toBeDefined();
-      for (const k of ['core', 'bloom', 'shock', 'spray', 'embers', 'scorch'] as const) expect(h![k], `${id} ${k}`).toBeDefined();
+      for (const k of ['core', 'bloom', 'flare', 'spray', 'embers', 'scorch'] as const) expect(h![k], `${id} ${k}`).toBeDefined();
     }
     // the biggest shake for the biggest gun, and a light one at that
     expect(MODEL_STYLES.cannon_bastion.hit?.shake?.strength).toBeLessThanOrEqual(4);
@@ -90,5 +90,28 @@ describe('impacts by power tier', () => {
       expect(h.core!.life + (h.bloom?.life ?? 0), id).toBeLessThanOrEqual(12);
       expect(size(id), id).toBeLessThanOrEqual(maxMid);
     }
+  });
+});
+
+describe('directional impacts lead with the rebound', () => {
+  const ALL = ['cannon_bastion', 'cannon_longbarrel', 'railgun_spear', 'railgun_rail_driver', 'cannon_hammer', 'cannon_slurry', 'railgun_needle', 'railgun_coilgun', 'cannon_twinlink', 'autocannon_chainsaw', 'cannon_pip', 'autocannon_rattler', 'autocannon_stinger'];
+  it('every slug and rail hit throws a streak along the rebound and a spray round it; the centred part is small and brief, no shock ring', () => {
+    for (const id of ALL) {
+      const h = MODEL_STYLES[id].hit!;
+      expect(h.flare, id).toBeDefined();
+      expect(h.shock, id).toBeUndefined();
+      // the streak reaches well past the glow, which is gone in a few frames
+      expect(h.flare!.size, id).toBeGreaterThan(2.5 * h.bloom!.size);
+      expect(h.bloom!.life, id).toBeLessThanOrEqual(9);
+      expect(h.spray!.count, id).toBeGreaterThanOrEqual(5);
+    }
+  });
+  it('heavier guns still read heavier: longer streaks and thicker sprays', () => {
+    const f = (id: string) => MODEL_STYLES[id].hit!.flare!.size;
+    expect(Math.min(f('cannon_bastion'), f('cannon_longbarrel'), f('railgun_spear'), f('railgun_rail_driver'))).toBeGreaterThan(Math.max(f('cannon_hammer'), f('railgun_needle'), f('cannon_slurry')));
+    expect(Math.min(f('cannon_hammer'), f('railgun_needle'), f('cannon_slurry'))).toBeGreaterThan(Math.max(f('cannon_pip'), f('autocannon_rattler'), f('autocannon_stinger')));
+  });
+  it('kinds without a model of their own throw directionally too', () => {
+    for (const t of [WeaponType.Cannon, WeaponType.Railgun, WeaponType.Autocannon, WeaponType.Pulse, WeaponType.Arc]) expect(weaponStyle(t).hit?.flare, String(t)).toBeDefined();
   });
 });

@@ -37,16 +37,19 @@ Object.assign(MODEL_STYLES, {
   emp_blackout: {
     glowColor: 0x2c4fd6, coreColor: 0xbfd4ff, haloRadius: 28, radiusRing: { color: 0x3b6cf0, radius: 320 },
   },
-  // A blue bolt of lightning that leaves the barrel and flies out to its reach: a tracer two ticks long (not its whole
-  // life, which drew it as a line stuck to the barrel), a hot head, a short fading wake; its hit splashes out of the hull
+  // A long blue laser bolt with a hot head that leaves the barrel and flies out to its reach (its life, about 3,960 at
+  // 36 ticks): a tracer ten ticks long (about 1,100, the longest of any gun's; not its whole life, which pinned it to the
+  // barrel), lightning down it, a short fading wake. Its hit splashes straight out of the hull it burns: a bright streak
+  // and a spray along the normal
   arc_spark: {
-    tracerTicks: 2, coreWidth: 1.8, glowWidth: 10, coreColor: 0xf0fbff, glowColor: 0x6ac8ff, glowAlpha: 0.55, headRadius: 3.6, haloRadius: 13,
-    jagged: { color: 0x9ad8ff, amp: 5 }, contrail: { color: 0x7fd0ff, size: 2, life: 8 },
+    tracerTicks: 10, coreWidth: 2.2, glowWidth: 12, coreColor: 0xf4fcff, glowColor: 0x5ec4ff, glowAlpha: 0.6, headRadius: 4.2, haloRadius: 16,
+    jagged: { color: 0x9ad8ff, amp: 6 }, contrail: { color: 0x7fd0ff, size: 2, life: 8 },
     muzzle: { life: 6, size: 16, sparks: 4, color: 0xa8e0ff, smoke: 0 },
     impact: { sparks: 6, speed: 4.5, life: 14, color: 0x9ad8ff, flash: 22 },
     hit: {
-      core: { size: 7, life: 4 }, bloom: { size: 18, life: 9, color: 0x6ac8ff }, shock: { size: 26, life: 10, width: 1.6, color: 0xbfe8ff },
-      spray: { count: 8, speed: 8, cone: 30, life: 10, color: 0xd8f2ff }, light: { radius: 90, power: 0.9 },
+      core: { size: 3.5, life: 3 }, bloom: { size: 8, life: 6, color: 0x6ac8ff },
+      spray: { count: 16, speed: 9.5, cone: 24, life: 14, color: 0xd8f2ff, width: 2 },
+      flare: { size: 48, width: 3, life: 11, count: 2, fan: 18 }, scatter: 24, light: { radius: 70, power: 0.8 },
     },
   },
   // A canister that blinks (its blink quickening needs the shell's end tick, which the client doesn't have)
