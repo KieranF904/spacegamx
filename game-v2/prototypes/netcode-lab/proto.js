@@ -1,7 +1,7 @@
 // Netcode Lab: the wire format between the lab server and its clients (both ends load this file). Binary, little-endian,
 // varints (LEB128: 1 byte for 0-127, 2 up to 16,383). Each writer and reader keeps a byte count per category, so both
 // ends can show where the bandwidth goes. JSON text frames carry only the lab's own chatter (hello, debug commands,
-// the info panel), counted as "lab" and left out of the design's numbers.
+// the info panel), not metered: they are not part of either design.
 (function (NL) {
 'use strict';
 const W = NL.World;

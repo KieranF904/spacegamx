@@ -336,13 +336,12 @@ function readouts(now) {
     const keys = [...new Set([...Object.keys(r.cats), ...Object.keys(t.cats)])].sort((a, b) => (t.cats[b] || 0) - (t.cats[a] || 0));
     return keys.map((k) => `<tr><td>${k}</td><td class="n">${bps(r.cats[k] || 0)}</td><td class="n dim">${bps((t.cats[k] || 0) / secs)}</td></tr>`).join('');
   };
-  const sum = (t) => { let p = 0; for (const k in t.cats) if (k !== 'lab') p += t.cats[k]; return p; };
+  const sum = (t) => { let p = 0; for (const k in t.cats) p += t.cats[k]; return p; };
   h = `<h3>Bandwidth (payload; now / average)</h3><table>
-    <tr><td><b>down</b></td><td class="n big">${bps(st.down.payload - (st.down.cats.lab || 0))}</td><td class="n dim">${bps(sum(st.downTot) / secs)}</td></tr>${cats(st.down, st.downTot)}
+    <tr><td><b>down</b></td><td class="n big">${bps(st.down.payload)}</td><td class="n dim">${bps(sum(st.downTot) / secs)}</td></tr>${cats(st.down, st.downTot)}
     <tr><td class="dim">wire</td><td class="n dim">${bps(st.down.wire)}</td><td class="dim">${st.down.msgs} msg/s, incl. IP/TCP/TLS/WS headers</td></tr>
-    <tr><td><b>up</b></td><td class="n big">${bps(st.up.payload - (st.up.cats.lab || 0))}</td><td class="n dim">${bps(sum(st.upTot) / secs)}</td></tr>${cats(st.up, st.upTot)}
-    <tr><td class="dim">wire</td><td class="n dim">${bps(st.up.wire)}</td><td class="dim">${st.up.msgs} msg/s</td></tr></table>
-    <div class="dim">"lab" is this page's own chatter (info panel), not part of either design</div>`;
+    <tr><td><b>up</b></td><td class="n big">${bps(st.up.payload)}</td><td class="n dim">${bps(sum(st.upTot) / secs)}</td></tr>${cats(st.up, st.upTot)}
+    <tr><td class="dim">wire</td><td class="n dim">${bps(st.up.wire)}</td><td class="dim">${st.up.msgs} msg/s</td></tr></table>`;
   $('cBw').innerHTML = h;
   // Awareness
   const you = st.info && st.info.you;

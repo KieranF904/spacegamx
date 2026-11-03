@@ -122,8 +122,8 @@ a round trip plus the margin plus a tick. The current style adds "server has you
 the server used it arrives).
 
 **Bandwidth.** Payload bytes per second by category: now (last second) and average since connecting. "wire" adds an
-estimate of IP/TCP/TLS/WebSocket headers per message (about 66 bytes), and messages per second. "lab" is the page's own
-info panel and isn't counted in either style's totals.
+estimate of IP/TCP/TLS/WebSocket headers per message (about 66 bytes), and messages per second. The page's own JSON (the info
+panel, debug commands) isn't part of either design and isn't counted.
 * Lockstep, down:
   * *inputs*: other players' and puppets' input changes, and `RCV` (how many of your inputs the server had; it rides on
     bundles going out anyway);

@@ -165,6 +165,9 @@ All binary and little-endian; varints are LEB128.
 
 ## Measured
 
+Message rates (msg/s) recorded before 2026-11-03's last change include the page's own info panel, 2 a second down;
+its bytes were never in the payload or wire figures. It is no longer metered.
+
 ### Over the real connection (lab server on the VPS, clients on Kieran's PC, `node server/probe.js`)
 A lockstep client and a current-style client fly the same scripted pattern: thrust flips every 450 ms, aim steps every
 150 ms, fire bursts. They fly next to a bot fight at the lockstep client's awareness edge, plus 4 bots and the world's

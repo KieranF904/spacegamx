@@ -87,9 +87,8 @@ How Kieran wants to work:
 
 Not started unless marked. Ask Kieran which he wants; several were only offered.
 
-1. **"Lab" bandwidth row (~2 KB/s in lockstep).** This is the page's own info panel: JSON twice a second, ~1 KB, mostly
-   the last 8 desync records. It isn't part of either design and is already left out of the totals. Offered: send the
-   records only when a new one appears, or halve the rate.
+1. ~~"Lab" bandwidth row~~: done 2026-11-03. The page's own JSON (info panel twice a second, debug commands) is no
+   longer metered, so it is gone from the panel and from msg/s.
 2. **A strict lockstep display mode (offered).** With own prediction off, the screen still runs a few ticks past the
    confirmed tick over quiet stretches, assuming nothing changed. A late bundle then causes a small correction that is
    not a desync. A strict mode would never draw past the confirmed tick, plus an optional playout delay, to show pure

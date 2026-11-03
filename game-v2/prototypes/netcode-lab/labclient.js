@@ -78,7 +78,6 @@ class CatMeter {
   }
   totals() { let p = 0; for (const k in this.tot) p += this.tot[k]; return { cats: Object.assign({}, this.tot), payload: p, wire: this.wire, msgs: this.msgs }; }
 }
-const jsonCats = (s) => ({ lab: s.length });
 const toBytes = (d) => (typeof d === 'string' ? d : d instanceof Uint8Array ? d : new Uint8Array(d));
 
 class BaseClient {
@@ -90,8 +89,8 @@ class BaseClient {
     this.held = []; this.holdUntil = 0; this.dropNext = false; this.dropped = 0;
   }
   send(buf, now) {
-    if (typeof buf === 'string') this.up.add(now, jsonCats(buf), 0);   // (the lab's own chatter: no wire cost counted)
-    else this.up.add(now, buf.cats || { other: buf.length }, Pr.wireBytes(buf.length, true));
+    // (the lab's own JSON chatter isn't metered)
+    if (typeof buf !== 'string') this.up.add(now, buf.cats || { other: buf.length }, Pr.wireBytes(buf.length, true));
     this.send0(buf);
   }
   /** Raw arrival: debug "delay" holds everything for a while (in order); then handle() */
@@ -107,7 +106,6 @@ class BaseClient {
   }
   handle(data, now) {
     if (typeof data === 'string') {
-      this.down.add(now, jsonCats(data), 0);
       const m = JSON.parse(data);
       if (m.t === 'welcome') this.welcome(m, now);
       else if (m.t === 'info') this.info = m;
