@@ -293,7 +293,7 @@
           "emerald": 1.2,
           "prism_shard": 1.1
         },
-        "note": "Relay: a little of everything, at a price."
+        "note": "Relay: a little of everything."
       }
     },
     {
@@ -379,7 +379,7 @@
           "void_opal": 1.4,
           "ancient_relic": 1.2
         },
-        "note": "Black market: no questions, steep prices."
+        "note": "Black market: steep prices."
       }
     },
     {
@@ -566,7 +566,7 @@
           "silicate": 1.05,
           "ice": 1.05
         },
-        "note": "Prospectors: they pay over the odds for common ore."
+        "note": "Prospectors: pay above market for common ore."
       }
     },
     {
@@ -685,7 +685,7 @@
           "leestone": 1.25,
           "copper_wire": 1.1
         },
-        "note": "Plain stores at plain prices. The Hall pays well for leestone, since nobody else will."
+        "note": "Plain stores at plain prices. Pays well for leestone."
       }
     },
     {
@@ -722,7 +722,7 @@
           "power_coupling": 1.15,
           "crystal_lens": 1.1
         },
-        "note": "Directorate procurement: fair prices, paid on the minute, itemised."
+        "note": "Directorate procurement: fair prices."
       }
     }
   ]

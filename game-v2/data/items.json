@@ -8,7 +8,7 @@
       "rarity": "common",
       "value": 2,
       "color": "#a1887f",
-      "description": "The backbone of every hull. Found in almost every belt.",
+      "description": "Common ore found in almost every belt. Alloyed into plate.",
       "family": "ferrous",
       "tier": 1,
       "short": "Iron"
@@ -20,7 +20,7 @@
       "rarity": "common",
       "value": 3,
       "color": "#b0bec5",
-      "description": "Alloyed with iron into hull plating.",
+      "description": "Common ore. Alloyed with iron into hull plating.",
       "family": "ferrous",
       "tier": 1,
       "short": "Nickel"
@@ -82,7 +82,7 @@
       "rarity": "rare",
       "value": 18,
       "color": "#5c6bc0",
-      "description": "Dense blue ore from dangerous belts. Refined into cobalt superalloy.",
+      "description": "Ore from dangerous belts. Refined into cobalt superalloy.",
       "family": "exotic",
       "tier": 4,
       "short": "Cobalt"
@@ -94,7 +94,7 @@
       "rarity": "epic",
       "value": 34,
       "color": "#9b6bd6",
-      "description": "Impossibly dense ore from the deepest, deadliest belts (the Void, the Maw). Refined into Mk V plating.",
+      "description": "Ore from the Void and the Maw. Refined into Mk V plating.",
       "family": "exotic",
       "tier": 5,
       "short": "Neutronium",
@@ -107,7 +107,7 @@
       "rarity": "rare",
       "value": 25,
       "color": "#80deea",
-      "description": "Glasswater's crystal: the clearest greyseam anyone has found. Hums under a scanner. Focuses beams and stores charge.",
+      "description": "Crystal ore from Glasswater. Focuses beams and stores charge.",
       "family": "crystalline",
       "tier": 2,
       "short": "Crystal",
@@ -147,7 +147,7 @@
       "rarity": "epic",
       "value": 220,
       "color": "#b388ff",
-      "description": "A gem that shifts colour as you turn it. Only the hardest mining tools crack it free. Very valuable to traders.",
+      "description": "A gem. Only the hardest mining tools crack it free. Very valuable.",
       "family": "crystalline",
       "tier": 4,
       "short": "Void opal"
@@ -171,7 +171,7 @@
       "rarity": "common",
       "value": 8,
       "color": "#7a6450",
-      "description": "Dense, magnetic iron ore, thick in the Maw's slag. Heavy plate that holds its place in a gravity well.",
+      "description": "Dense iron ore, thickest in the Maw. Refined into ferrite plate.",
       "family": "ferrous",
       "tier": 3,
       "short": "Ferrite"
@@ -183,7 +183,7 @@
       "rarity": "uncommon",
       "value": 16,
       "color": "#5a5f6b",
-      "description": "Black, glassy chromium ore. Hardens steel for railgun barrels and armour-piercing slugs.",
+      "description": "Chromium ore. Hardens steel for railgun barrels and armour-piercing slugs.",
       "family": "ferrous",
       "tier": 4,
       "short": "Chromite"
@@ -195,7 +195,7 @@
       "rarity": "rare",
       "value": 60,
       "color": "#ffd54f",
-      "description": "Gold-bright flecks in noble ore, only found by refining it. Conducts like nothing else.",
+      "description": "A trace metal found by refining copper ore. A very good conductor.",
       "family": "noble",
       "tier": 2,
       "short": "Aurum",
@@ -209,7 +209,7 @@
       "rarity": "rare",
       "value": 90,
       "color": "#e3ecf4",
-      "description": "A trace metal in ice and volatile ore, found by refining it. Very dense, and it stops radiation.",
+      "description": "A trace metal found by refining ice and volatile ore. Very dense; stops radiation.",
       "family": "noble",
       "tier": 3,
       "short": "Iridium",
@@ -235,7 +235,7 @@
       "rarity": "rare",
       "value": 70,
       "color": "#7fe0ff",
-      "description": "A natural glass, in traces through crystal ore and richest in gem seams. Found by refining. Refiners say a batch of it hums for a while after.",
+      "description": "A trace glass found by refining crystal ore, richest in gem seams.",
       "family": "crystalline",
       "tier": 3,
       "short": "Voidglass",
@@ -262,7 +262,7 @@
       "rarity": "uncommon",
       "value": 14,
       "color": "#7ff0d0",
-      "description": "Ice grown inside the aurora, threaded with greyseam, from the floes of the Rime Shoal. Under a scanner it barely hums at all. Refined into hush panes.",
+      "description": "Ice from the aurora floes of the Rime Shoal. Refined into hush panes.",
       "family": "volatile",
       "tier": 2,
       "short": "Rime",
@@ -300,7 +300,7 @@
       "rarity": "epic",
       "value": 400,
       "color": "#5e35b1",
-      "description": "Specks of collapsed matter in the mega rocks of the Maw and the Void, found only by refining them.",
+      "description": "A trace material found by refining the mega rocks of the Maw and the Void.",
       "family": "exotic",
       "tier": 5,
       "short": "Singularity",
@@ -688,7 +688,7 @@
       "rarity": "uncommon",
       "value": 45,
       "color": "#b2f5ea",
-      "description": "Aurora rime pressed into a pane. Behind one, a receiver hears nothing but hiss. Borealis Research pays for every one."
+      "description": "Aurora rime pressed into a pane. Borealis Research buys them."
     },
     {
       "id": "propellant",
@@ -727,7 +727,7 @@
       "rarity": "epic",
       "value": 450,
       "color": "#7e57c2",
-      "description": "Refined singularity dust: specks of collapsed matter, pressed into grains. Rare, and valuable to traders.",
+      "description": "Refined singularity dust. Rare and valuable.",
       "mass": 0.15
     },
     {
@@ -774,7 +774,7 @@
       "rarity": "common",
       "value": 8,
       "color": "#9ccc65",
-      "description": "Salvaged boards and cracked cores. Every wreck has some; technicians check it under a microscope for whiskering before they trust it."
+      "description": "Salvaged boards and cracked cores. Every wreck has some."
     },
     {
       "id": "servo_motor",
@@ -819,7 +819,7 @@
       "rarity": "rare",
       "value": 80,
       "color": "#26c6da",
-      "description": "Jump plotting and scanners: current through a sliver of greyseam. Pilots swear some fly better than others; the yard says it's the batch."
+      "description": "Plots jumps and drives scanners."
     },
     {
       "id": "quantum_core",
@@ -828,7 +828,7 @@
       "rarity": "epic",
       "value": 260,
       "color": "#e040fb",
-      "description": "The heart of capital-class cores: greyseam packed dense, with more current through it than anything else aboard. Engineers argue over its firmware endlessly."
+      "description": "The heart of capital-class cores."
     },
     {
       "id": "void_ichor",
@@ -837,7 +837,7 @@
       "rarity": "rare",
       "value": 110,
       "color": "#7c4dff",
-      "description": "Bled by wraiths. Refiners say it hums wrong, and won't say more."
+      "description": "Dropped by wraiths."
     },
     {
       "id": "frost_gland",
@@ -855,7 +855,7 @@
       "rarity": "uncommon",
       "value": 38,
       "color": "#ff7043",
-      "description": "Ash from the Cinder Cult's altars, still warm. Used to fabricate the Cinder Bloom."
+      "description": "Ash from the Cinder Cult's altars. Used to make the Cinder Bloom."
     },
     {
       "id": "barrel_assembly",
@@ -927,7 +927,7 @@
       "rarity": "legendary",
       "value": 1500,
       "color": "#ff8f00",
-      "description": "A cog torn from Rustjaw's drive train, teeth still sharp. Very rare: few kills leave one whole. Rustjaw's Hive can't be made without it."
+      "description": "A drive cog from Rustjaw. A rare drop; Rustjaw's Hive can't be made without it."
     },
     {
       "id": "frost_heart",
@@ -936,7 +936,7 @@
       "rarity": "legendary",
       "value": 1800,
       "color": "#b3e5fc",
-      "description": "A dense blue core cut from the Hoarfrost Matriarch's wreck. Frost forms on anything that touches it. Very rare: few kills leave one whole. The Frostbite Lance can't be made without it."
+      "description": "A core from the Hoarfrost Matriarch's wreck. A rare drop; the Frostbite Lance can't be made without it."
     },
     {
       "id": "cinder_ember",
@@ -945,7 +945,7 @@
       "rarity": "legendary",
       "value": 2000,
       "color": "#ff5722",
-      "description": "A coal from a Cinder furnace, the Warden's or the Pyreclast's, still hot to the touch. Very rare: few kills leave one whole. The Cinder Bloom can't be made without it."
+      "description": "A coal from the Warden or the Pyreclast. A rare drop; the Cinder Bloom can't be made without it."
     },
     {
       "id": "prism_shard",
@@ -954,7 +954,7 @@
       "rarity": "legendary",
       "value": 2200,
       "color": "#e1f5fe",
-      "description": "A shard broken from the Prism Colossus. It splits any light that touches it. Very rare: few kills leave one whole. The Prism Splitter can't be made without it."
+      "description": "A shard from the Prism Colossus. A rare drop; the Prism Splitter can't be made without it."
     },
     {
       "id": "void_pearl",
@@ -963,7 +963,7 @@
       "rarity": "legendary",
       "value": 2600,
       "color": "#9575cd",
-      "description": "A smooth, dark pearl the size of a fist, found in the Void Leviathan's wreck. Very rare: few kills leave one whole. The Phase Cannon can't be made without it."
+      "description": "A pearl from the Void Leviathan's wreck. A rare drop; the Phase Cannon can't be made without it."
     },
     {
       "id": "maw_fragment",
@@ -972,7 +972,7 @@
       "rarity": "legendary",
       "value": 4000,
       "color": "#212121",
-      "description": "A dark, heavy fragment broken from the Heart of the Maw. Very rare: few kills leave one whole. The Singularity Launcher can't be made without it."
+      "description": "A fragment of the Heart of the Maw. A rare drop; the Singularity Launcher can't be made without it."
     },
     {
       "id": "ancient_relic",
@@ -981,7 +981,7 @@
       "rarity": "epic",
       "value": 400,
       "color": "#ffd54f",
-      "description": "A small sealed case, far older than the colony: Halden work, collectors say, even the ones that turn up in the Maw. Nobody has opened one. Collectors pay well; fabricators pay better."
+      "description": "A small sealed case of unknown make. Sells to collectors and fabricators."
     },
     {
       "id": "repair_kit",
@@ -1155,7 +1155,7 @@
       "rarity": "uncommon",
       "value": 55,
       "color": "#4fc3f7",
-      "description": "Railgun slugs with a cryogen core: poor slugs, 30% less damage, but Cinder Cult ships take two and a half times that (Forgemaster Hale's pattern: \"cold cracks hot plate\"). Not the Cult's great ones. 200 a crate. Pressed only by your own station's armoury.",
+      "description": "Railgun slugs with a cryogen core: 30% less damage, but 2.5 times that against Cinder Cult ships (not their great ones). 200 a crate. Pressed only by your own station's armoury.",
       "ammoFor": {
         "weapon": "railgun",
         "rounds": 200,
@@ -1362,7 +1362,7 @@
       "rarity": "common",
       "value": 14,
       "color": "#ffe082",
-      "description": "Cannon shells that fly half as fast again (as far as ever: they just get there sooner). 150 a crate. A cannon fires its own plain shells without them.",
+      "description": "Cannon shells that fly 50% faster. 150 a crate. A cannon fires its own plain shells without them.",
       "ammoFor": {
         "weapon": "cannon",
         "rounds": 150,
@@ -1382,7 +1382,7 @@
       "rarity": "uncommon",
       "value": 0,
       "color": "#a8a29e",
-      "description": "A slab of the Kestrel's hull, split clean along a seam. Dr. Osei wants it."
+      "description": "A slab of the Kestrel's hull. Dr. Osei wants it."
     },
     {
       "id": "foundry_log",
@@ -1403,7 +1403,7 @@
       "rarity": "rare",
       "value": 0,
       "color": "#fb923c",
-      "description": "Old Pell's drawings for a field crucible: how the Halcyon foundry poured its first steel."
+      "description": "Pell's drawings for a field crucible."
     },
     {
       "id": "field_crucible",
@@ -1413,7 +1413,7 @@
       "rarity": "epic",
       "value": 0,
       "color": "#f97316",
-      "description": "A crucible small enough to fly, hot enough to make steel. Dr. Osei's experiment."
+      "description": "A portable crucible for making steel. Dr. Osei's experiment."
     },
     {
       "id": "probe_core",
@@ -1423,7 +1423,7 @@
       "rarity": "uncommon",
       "value": 0,
       "color": "#c4b5fd",
-      "description": "The memory of one of Sabine Kerr's listening probes, full of static."
+      "description": "The memory core of one of Sabine Kerr's listening probes."
     },
     {
       "id": "drone_core",
@@ -1433,7 +1433,7 @@
       "rarity": "uncommon",
       "value": 0,
       "color": "#c9a46a",
-      "description": "The core of a Scrapborn relay drone, more or less in one piece. The Sentinel Watch yard wants a look at it. The old hands say it's cursed."
+      "description": "The core of a Scrapborn relay drone. The Sentinel Watch yard wants it."
     },
     {
       "id": "smuggler_cache",
@@ -1443,7 +1443,7 @@
       "rarity": "rare",
       "value": 0,
       "color": "#e05a4a",
-      "description": "A sealed cargo cache from the Lanes, still warm. The Patrol will want to see inside."
+      "description": "A sealed cargo cache from the Lanes. The Patrol will want to inspect it."
     },
     {
       "id": "vigil_log",
@@ -1454,7 +1454,7 @@
       "rarity": "rare",
       "value": 0,
       "color": "#9aa7b4",
-      "description": "The Dreadnought Vigil's last log, pulled from its bridge. The Tenth Fleet's final hours, and three days of entries after its crew was logged dead. Warden Holt puts that down to a faulty clock."
+      "description": "The Dreadnought Vigil's bridge log, pulled from the wreck."
     },
     {
       "id": "meridian_beacon",
@@ -1464,7 +1464,7 @@
       "rarity": "rare",
       "value": 0,
       "color": "#38bdf8",
-      "description": "A landing beacon older than any record, dug out of the Pale Reef on Terra Nova. The Museum Guild argues over whose landing it marks."
+      "description": "A landing beacon dug out of the Pale Reef on Terra Nova."
     },
     {
       "id": "buoy_frame",
@@ -1474,7 +1474,7 @@
       "rarity": "uncommon",
       "value": 0,
       "color": "#94a3b8",
-      "description": "A nav buoy's base ring and keel. The first piece to go up."
+      "description": "A nav buoy's base ring and keel."
     },
     {
       "id": "buoy_mast",
@@ -1484,7 +1484,7 @@
       "rarity": "uncommon",
       "value": 0,
       "color": "#cbd5e1",
-      "description": "A nav buoy's mast: the spine everything else hangs on."
+      "description": "A nav buoy's mast."
     },
     {
       "id": "buoy_cell",
@@ -1494,7 +1494,7 @@
       "rarity": "uncommon",
       "value": 0,
       "color": "#fbbf24",
-      "description": "A pair of power cells for a nav buoy, good for a decade on a trickle."
+      "description": "A pair of power cells for a nav buoy."
     },
     {
       "id": "buoy_dish",
@@ -1504,7 +1504,7 @@
       "rarity": "uncommon",
       "value": 0,
       "color": "#7dd3fc",
-      "description": "A nav buoy's dish and transponder: what Traffic actually talks to."
+      "description": "A nav buoy's dish and transponder."
     },
     {
       "id": "halvard_log",
@@ -1515,7 +1515,7 @@
       "rarity": "uncommon",
       "value": 0,
       "color": "#fde68a",
-      "description": "The flight log of the Lighter Halvard, an early colony lander, lost on the ice road centuries ago."
+      "description": "The flight log of the Lighter Halvard, an early colony lander lost on the ice road."
     },
     {
       "id": "halden_cache",
@@ -1526,7 +1526,7 @@
       "rarity": "rare",
       "value": 0,
       "color": "#a9cfd8",
-      "description": "A small sealed case of slate, cut out of the ice under Glacia. It's light. Whatever is inside, there isn't much of it."
+      "description": "A small sealed case of slate, cut out of the ice under Glacia."
     },
     {
       "id": "leestone_ore",
@@ -1535,7 +1535,7 @@
       "rarity": "rare",
       "value": 22,
       "color": "#3f424a",
-      "description": "A dense, dark stone, found in traces in rock across the cluster and thickest in the Maw's shard ring. Its grain looks worked; Horizon Watch's assayers put that down to the Maw's pressures. The Ark buys it. Nobody else much wants it.",
+      "description": "A dark, dense stone. Found in traces in rock across the cluster, thickest in the Maw's shard ring. Refined into leestone.",
       "family": "exotic",
       "tier": 4,
       "short": "Leestone",
@@ -1548,7 +1548,7 @@
       "rarity": "rare",
       "value": 70,
       "color": "#4a4d55",
-      "description": "Dressed leestone: dark, dense and dear. Only the Ark builds with it, so everyone calls it Ark stone. Nobody else sees the point.",
+      "description": "Refined leestone. Made into leestone plate.",
       "mass": 0.12
     },
     {
@@ -1558,7 +1558,7 @@
       "rarity": "rare",
       "value": 130,
       "color": "#565a63",
-      "description": "Leestone faced on a steel backing: Ark plating. Heavier than steel, no tougher than titanium, and dear to patch. The Ark says it's tradition and durability; pilots call the ships that carry it Ark-heavy.",
+      "description": "Hull plating: leestone faced on a steel backing. Heavy.",
       "mass": 0.12
     },
     {
@@ -1569,7 +1569,7 @@
       "rarity": "uncommon",
       "value": 0,
       "color": "#9ca3af",
-      "description": "A crate of retired machinery from the Ark Depot: pump housings, coil packs, a core cradle. Every piece logged, tagged and taken out of service long before it wore out."
+      "description": "A crate of retired machinery from the Ark Depot: pump housings, coil packs, a core cradle."
     },
     {
       "id": "helios_cell",
@@ -1579,7 +1579,7 @@
       "rarity": "uncommon",
       "value": 0,
       "color": "#fde68a",
-      "description": "A pallet of Helios Directorate power cells, stencilled for the Seat. Heavier than it looks."
+      "description": "A pallet of Helios Directorate power cells, for the Seat."
     },
     {
       "id": "helios_perf_logs",
@@ -1589,7 +1589,7 @@
       "rarity": "uncommon",
       "value": 0,
       "color": "#fcd34d",
-      "description": "A Helios service dock's performance logs: output per tonne of greyseam on the Array's rail, week by week. Engineer Rask wants them for her chart."
+      "description": "A Helios service dock's weekly performance logs. Engineer Rask wants them."
     },
     {
       "id": "helios_drone_logs",
@@ -1600,7 +1600,7 @@
       "rarity": "uncommon",
       "value": 0,
       "color": "#e8c86a",
-      "description": "A month of one Helios drone's service log, pulled from a drone stalled on the Array's rail."
+      "description": "A month of one Helios drone's service log."
     },
     {
       "id": "kerr_recorder",
@@ -1610,7 +1610,7 @@
       "rarity": "uncommon",
       "value": 0,
       "color": "#c4b5fd",
-      "description": "One of Sabine Kerr's listening recorders, older than you are and wrapped in tape. She wants it back with half a minute of the Helios Array on it."
+      "description": "One of Sabine Kerr's listening recorders. She wants it back with half a minute of the Helios Array recorded on it."
     }
   ]
 }

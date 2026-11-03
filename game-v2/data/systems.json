@@ -135,7 +135,7 @@
               "phase": 0
             }
           ],
-          "description": "An ocean world with a breathable atmosphere, and the colony's first settled world. Descend with X in orbit."
+          "description": "An ocean world with a breathable atmosphere. Descend with X in orbit."
         },
         {
           "id": "jovan",
@@ -221,7 +221,7 @@
               "phase": 5
             }
           ],
-          "description": "A blue ice giant with a thin ring, on the outer edge of Sol. Survey drones sent close to it have a high loss rate."
+          "description": "A blue ice giant with a thin ring, on the outer edge of Sol."
         },
         {
           "id": "thule",
@@ -255,7 +255,7 @@
             "phase": 5.2,
             "period": 560
           },
-          "description": "A dark planetoid split along a single greyseam vein about a hundred kilometres long. The Miners' Guild works the seam."
+          "description": "A dark planetoid with a long greyseam vein. The Miners' Guild works the seam."
         }
       ],
       "derelicts": [
@@ -472,7 +472,7 @@
             "from": 41,
             "count": 9
           },
-          "description": "A ring of solar collectors around the sun, serviced by automated drones, and the seat of the Helios Directorate. Its oldest arc is of unknown origin."
+          "description": "A ring of solar collectors around the sun, serviced by automated drones. The seat of the Helios Directorate."
         }
       ],
       "nests": [
@@ -916,7 +916,7 @@
     {
       "id": "ashfall",
       "name": "Ashfall Drift",
-      "description": "A brown dwarf with a dense, dusty asteroid belt. Halden ruins are found throughout the system. Prospectors work the belt; Redtooth raiders operate from an outpost in the outer system.",
+      "description": "A brown dwarf with a dense, dusty asteroid belt and Halden ruins. Prospectors work the belt; Redtooth raiders hold an outpost in the outer system.",
       "starColor": "#C2552E",
       "starRadius": 18000,
       "position": {
@@ -1007,7 +1007,7 @@
               "phase": 3.1
             }
           ],
-          "description": "A banded gas giant nearly as large as its star. Its larger moon, Halden, is where the first Halden ruin was found; the Redtooth dig there."
+          "description": "A banded gas giant nearly as large as its star. The Redtooth dig on its moon Halden."
         }
       ],
       "structures": [
@@ -1017,7 +1017,7 @@
           "kind": "ruin_ring",
           "radius": 31000,
           "segments": 30,
-          "description": "A ruined Halden structure: a ring around the brown dwarf, broken into arcs and scorched on the side facing the star. Its purpose is unknown."
+          "description": "A ruined Halden ring around the brown dwarf, broken into arcs."
         }
       ],
       "derelicts": [
@@ -1386,7 +1386,7 @@
           },
           "size": 350,
           "rough": true,
-          "description": "A small stillstone in the Curtain, first charted a few years ago. Jump drives charge faster within its field. A Frost Brood roost surrounds it."
+          "description": "A small stillstone in the Curtain. Jump drives charge faster within its field. A Frost Brood roost surrounds it."
         }
       ],
       "traffic": [
@@ -1439,7 +1439,7 @@
     {
       "id": "nebula_prime",
       "name": "Nebula Prime",
-      "description": "A young star inside its birth cloud. Rich asteroids and poor visibility. The observatory here reports the clearest signal reception in the cluster.",
+      "description": "A young star inside its birth cloud. Rich asteroids and poor visibility. Nebula Prime Observatory is here.",
       "starColor": "#FF66AA",
       "starRadius": 26000,
       "position": {
@@ -1865,7 +1865,7 @@
     {
       "id": "cinder_reach",
       "name": "Cinder Reach",
-      "description": "A red giant shedding its outer layers and expanding unusually fast. Ember dust fills the inner system; the belt is slag and iron.",
+      "description": "A red giant. Ember dust fills the inner system; the belt is slag and iron.",
       "starColor": "#FF4A1A",
       "starRadius": 40000,
       "position": {
@@ -2134,7 +2134,7 @@
     {
       "id": "the_maw",
       "name": "The Maw",
-      "description": "A supermassive black hole with a bright accretion disk, circled by a ring of shards from a destroyed world. Horizon Watch recovers inscribed fragments from the debris.",
+      "description": "A supermassive black hole with a bright accretion disk, circled by a ring of shards. Horizon Watch recovers inscribed fragments from the debris.",
       "starColor": "#FFB040",
       "starRadius": 4200,
       "position": {
@@ -2202,7 +2202,7 @@
             "phase": 5,
             "period": 300
           },
-          "description": "The remaining half of a broken planet. The rest of it forms the shard ring."
+          "description": "Half a planet, beside the shard ring."
         },
         {
           "id": "pyre",
@@ -2341,7 +2341,7 @@
     {
       "id": "glasswater",
       "name": "Glasswater Expanse",
-      "description": "A pulsar system with a frozen field of crystal and ice. The pulsar's period has not varied in recorded history.",
+      "description": "A pulsar system with a frozen field of crystal and ice.",
       "starColor": "#9FF4FF",
       "starRadius": 900,
       "position": {
@@ -2408,7 +2408,7 @@
             "outer": 2.4,
             "hue": 180
           },
-          "description": "A ringed ice world with crystal plains, lit by each sweep of the pulsar's beam."
+          "description": "A ringed ice world with crystal plains."
         },
         {
           "id": "halcyon",
@@ -2429,7 +2429,7 @@
               "phase": 1.5
             }
           ],
-          "description": "A grey-green ocean world at the edge of the field. The Halcyon foundry, sealed for forty years, lies in its crust."
+          "description": "A grey-green ocean world at the edge of the field, with the sealed Halcyon foundry in its crust."
         }
       ],
       "derelicts": [
@@ -2582,7 +2582,7 @@
     {
       "id": "selene_siege",
       "name": "Selene",
-      "description": "Terra Nova's moon. A bastion of unknown origin stands in its central crater and is attacked every night.",
+      "description": "Terra Nova's moon. A bastion stands in its central crater and is attacked every night.",
       "danger": 3,
       "starColor": "#FFDD44",
       "starRadius": 0,
@@ -2704,7 +2704,7 @@
     {
       "id": "rimeholt_siege",
       "name": "Rimeholt",
-      "description": "Glacia's moon. A bastion of unknown origin stands on it and is attacked every night, harder than Selene.",
+      "description": "Glacia's moon. A bastion stands on it and is attacked every night, harder than at Selene.",
       "danger": 4,
       "starColor": "#88CCFF",
       "starRadius": 0,
@@ -2913,7 +2913,7 @@
     {
       "id": "ashfall_surface",
       "name": "Ashfall",
-      "description": "The surface of Ashfall: a cracked crust over molten rock, glowing through every seam. A cave opens in the rock to the north.",
+      "description": "The surface of Ashfall: cracked crust over molten rock. A cave opens in the rock to the north.",
       "danger": 8,
       "starColor": "#FF4A1A",
       "starRadius": 0,
@@ -2948,7 +2948,7 @@
     {
       "id": "ashfall_cavern",
       "name": "The Pyreclast's Cavern",
-      "description": "A cavern under Ashfall's crust: a long canyon in the dark, its floor cracked with glowing seams, running to a vault where the Pyreclast waits.",
+      "description": "A cavern under Ashfall's crust: a long canyon running to the vault where the Pyreclast waits.",
       "danger": 8,
       "starColor": "#FF4A1A",
       "starRadius": 0,
@@ -3197,7 +3197,7 @@
     {
       "id": "halcyon_foundry",
       "name": "The Deep Foundry",
-      "description": "The sealed Halcyon foundry beneath Halcyon's crust. Its furnace is still burning.",
+      "description": "The sealed Halcyon foundry beneath Halcyon's crust.",
       "danger": 2,
       "starColor": "#FF7A2A",
       "starRadius": 0,
@@ -3275,7 +3275,7 @@
     {
       "id": "sol_scrap_nest",
       "name": "The Scrap Mother's Nest",
-      "description": "Inside the Scrap Mother's nest, out in the Drift: a thick field of rock and junk, grey veins showing in much of the stone, round an open hollow where she waits. A lane runs in from the south.",
+      "description": "The Scrap Mother's nest in the Drift: a thick field of rock and junk round an open hollow where she waits. A lane runs in from the south.",
       "danger": 2,
       "starColor": "#FFDD44",
       "starRadius": 0,
