@@ -1,0 +1,129 @@
+/**
+ * One client's bit-packed frames (CAPS.PACKED) and their coalescing (CAPS.COALESCE): what Outbox does for a base-format
+ * client (a frame per flush, effects that wait LAZY_TICKS for the next one), but each frame becomes a sub-frame of a
+ * packed WebSocket message (common network/packed), and with coalescing a sub-frame with nothing urgent in it waits up
+ * to COALESCE_TICKS for the next, so several ticks share one message's headers (~66 B on the wire each).
+ *
+ * Urgent (sent at once, with whatever waits before it): anything but the tick's stream (CAN_WAIT: answers to requests,
+ * deaths, corrections, boss warnings...), a snapshot that corrects the client's own ship (its row or a keyframe), damage
+ * to or from it, and the first snapshot after a hit to or from its ship (`wantSnapshot`: Outbox.addDamage marks it, so
+ * a client finding its own hits isn't kept waiting for them).
+ *
+ * The bytes go out through the client's own socket; Outbox counts them.
+ */
+import { PackedEncoder, type PackedPart, type ServerMessage } from '@space-game/common';
+import type { ClientConnection } from '../ClientConnection.js';
+import { LAZY_TICKS } from './constants.js';
+
+/** The tick's stream: these can wait for the next frame; anything else is urgent */
+const CAN_WAIT = new Set([
+  'snapshot', 'damage', 'projectileHit', 'partDestroyed', 'contact', 'detonation', 'ignite', 'stationFire', 'intercept',
+  'shipHps', 'shipSync', 'debrisSplit', 'hits', 'hpCheck', 'mapDots', 'playerState', 'effect', 'party', 'ops',
+]);
+
+/** Does this message make its frame go at once (for the client flying `pid`)? */
+export function urgentFor(msg: ServerMessage, pid: number): boolean {
+  if (!CAN_WAIT.has(msg.type)) return true;
+  if (msg.type === 'snapshot') {
+    for (const e of msg.entities) if (e.id === pid) return true;
+    if (msg.ships) for (const k of msg.ships) if (k[0] === pid) return true;
+    return false;
+  }
+  if (msg.type === 'damage') return msg.targetId === pid || msg.sourceId === pid;
+  return false;
+}
+
+export class PackedLink {
+  readonly enc = new PackedEncoder();
+  /** This flush's messages, the effects waiting for a frame, and the sub-frames waiting to go (coalescing) */
+  private box: PackedPart[] = [];
+  private lazy: PackedPart[] = [];
+  private lazySince = -1;
+  private held: PackedPart[][] = [];
+  private heldSince = -1;
+  private urgent = false;
+  /** The next snapshot goes at once (a hit to or from its ship: Outbox.addDamage) */
+  wantSnapshot = false;
+  /** WebSocket messages, sub-frames and bytes sent; messages sent early for being urgent (the netcode probe) */
+  readonly stats = { messages: 0, subFrames: 0, bytes: 0, urgent: 0 };
+
+  constructor(private readonly conn: ClientConnection) {}
+
+  /** Anything waiting (this flush's messages, effects, sub-frames held back) */
+  get waiting(): boolean {
+    return this.box.length > 0 || this.lazy.length > 0 || this.held.length > 0;
+  }
+
+  /** A message for the next flush (`lazy`: an effect that can wait LAZY_TICKS for a frame) */
+  add(part: PackedPart, lazy: boolean, tick: number): void {
+    if (lazy) {
+      if (!this.lazy.length) this.lazySince = tick;
+      this.lazy.push(part);
+    } else this.box.push(part);
+    if (urgentFor(part.msg, this.conn.playerId)) this.urgent = true;
+    else if (this.wantSnapshot && part.msg.type === 'snapshot') { this.urgent = true; this.wantSnapshot = false; }
+  }
+
+  /**
+   * The flush (Outbox.flushOutbox): this flush's messages become a sub-frame (the effects waiting ride with them, or go
+   * alone once they've waited LAZY_TICKS), then what waits goes if coalescing is off, it's urgent, or it has waited
+   * `coalesce` ticks. Returns the bytes sent
+   */
+  flush(tick: number, coalesce: number): number {
+    if (this.box.length) {
+      this.hold(this.lazy.length ? this.lazy.concat(this.box) : this.box, tick);
+      this.box = [];
+      this.lazy = [];
+    } else if (this.lazy.length && tick - this.lazySince >= LAZY_TICKS) {
+      this.hold(this.lazy, tick);
+      this.lazy = [];
+    }
+    if (!this.held.length) return 0;
+    if (!coalesce || this.urgent || tick - this.heldSince >= coalesce) return this.emit();
+    return 0;
+  }
+
+  /** A message that goes now (a pong, or one sent outside a tick or request), after whatever waits */
+  now(part: PackedPart, tick: number): number {
+    this.hold([part], tick);
+    return this.emit();
+  }
+
+  /** The effects waiting go now, with whatever waits (Outbox.flushLazy) */
+  flushLazy(tick: number): number {
+    if (this.lazy.length) { this.hold(this.lazy, tick); this.lazy = []; }
+    return this.held.length ? this.emit() : 0;
+  }
+
+  /** Everything goes now (the client switched packed frames off: the base format follows) */
+  drain(tick: number): number {
+    if (this.box.length || this.lazy.length) this.hold(this.lazy.concat(this.box), tick);
+    this.box = [];
+    this.lazy = [];
+    return this.held.length ? this.emit() : 0;
+  }
+
+  /** The client lost track (packedResync): the next message starts afresh */
+  resync(): void {
+    this.enc.reset();
+  }
+
+  private hold(sub: PackedPart[], tick: number): void {
+    if (!sub.length) return;
+    if (!this.held.length) this.heldSince = tick;
+    this.held.push(sub);
+  }
+
+  private emit(): number {
+    const data = this.enc.encode(this.held, this.conn.playerId);
+    this.stats.messages++;
+    this.stats.subFrames += this.held.length;
+    this.stats.bytes += data.length;
+    if (this.urgent) this.stats.urgent++;
+    this.held = [];
+    this.heldSince = -1;
+    this.urgent = false;
+    if (this.conn.ws.isOpen()) this.conn.ws.send(data);
+    return data.length;
+  }
+}

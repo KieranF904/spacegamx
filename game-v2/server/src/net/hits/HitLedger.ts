@@ -34,6 +34,7 @@ import {
 import type { ClientConnection } from '../ClientConnection.js';
 import type { ShipBridge } from '../../ships/ShipBridge.js';
 import { damageMessage, projectileHitMessage, type Outbox } from '../snapshot/Outbox.js';
+import { COALESCE_TICKS } from '../snapshot/constants.js';
 import { SelfHitJournal, type JournalHit } from './SelfHitJournal.js';
 
 /** What the ledger needs of the server (GameServer itself) */
@@ -392,7 +393,9 @@ export class HitLedger {
   /** A client finding its own hits: what it must have answered for by now, judged; a lasting disagreement put right */
   private judge(conn: ClientConnection): void {
     const now = this.host.currentTick;
-    const fix = this.journalOf(conn).judge(now, Math.ceil((conn.ping || 0) / (1000 / 60)) + REPORT_SLACK);
+    // (A client whose frames are coalesced may hear a window COALESCE_TICKS later: net/snapshot/PackedLink.ts)
+    const held = ((conn.caps ?? 0) & (CAPS.PACKED | CAPS.COALESCE)) === (CAPS.PACKED | CAPS.COALESCE) ? COALESCE_TICKS : 0;
+    const fix = this.journalOf(conn).judge(now, Math.ceil((conn.ping || 0) / (1000 / 60)) + REPORT_SLACK + held);
     if (!fix) return;
     this.stats.fixes++;
     this.stats.fixHits += fix.hits.length;
@@ -456,7 +459,7 @@ export class HitLedger {
         // (Finding its own hits starts afresh from this snapshot on both sides; the client is told from when)
         this.journals.delete(c);
         this.oldWayShells.delete(c);
-        if (was !== c.caps) this.host.net.send(c.ws, { type: 'netCaps', caps: c.caps });
+        if (was !== c.caps) this.host.net.send(c.ws, { type: 'netCaps', caps: c.caps, ...(c.caps & CAPS.COALESCE ? { hold: COALESCE_TICKS } : {}) });
       }
       if ((c.caps ?? 0) & CAPS.HITS) on = true;
     }

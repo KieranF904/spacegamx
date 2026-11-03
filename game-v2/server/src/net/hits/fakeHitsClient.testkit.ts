@@ -7,7 +7,7 @@
  * on an input after each step (`report`). `drop` makes it miss hits on purpose (the forced-mismatch test).
  */
 import {
-  CAPS, SIDE, EntityType, decodeServerFrame, encodeMessage, decodeMessage, rebuildVolley, ShipReplicaSet,
+  CAPS, SIDE, EntityType, ServerFrameReader, encodeMessage, decodeMessage, rebuildVolley, ShipReplicaSet,
   type ClientMessage, type ClientSocket, type ServerMessage, type ServerSnapshotMessage, type ShipState, type ReplicaEnv,
 } from '@space-game/common';
 import { ShipStore } from '../../../../client/src/ships/ShipStore.js';
@@ -92,10 +92,22 @@ export class FakeHitsClient {
     this.pid = server.getPlayerId(socket);
   }
 
-  /** One frame from the server: each message, then the frame's end */
+  /** Base-format frames and bit-packed messages (CAPS.PACKED: one or more frames each) */
+  private reader = new ServerFrameReader();
+  /** WebSocket messages it got, the frames in them (a packed message may hold several: coalescing), their bytes */
+  messages = 0;
+  frames = 0;
+  bytes = 0;
+
+  /** One WebSocket message from the server: each frame's messages, then the frame's end */
   frame(data: Uint8Array): void {
-    for (const m of decodeServerFrame(data)) this.handle(m);
-    this.frameEnd();
+    this.messages++;
+    this.bytes += data.length;
+    for (const msgs of this.reader.read(data)) {
+      this.frames++;
+      for (const m of msgs) this.handle(m);
+      this.frameEnd();
+    }
   }
 
   /** After a step: what it owes the server (resyncs; a hit report on an input, as one goes every tick in a fight) */

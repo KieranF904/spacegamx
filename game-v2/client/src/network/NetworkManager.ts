@@ -6,7 +6,7 @@ import {
   ClientMessage,
   ServerMessage,
   encodeMessage,
-  decodeServerFrame,
+  ServerFrameReader,
   ClientTransport,
   DisconnectInfo,
   PROTOCOL_MISMATCH_CLOSE,
@@ -32,6 +32,10 @@ export class NetworkManager implements ClientTransport {
   private closing = false;
   /** Message types that failed to handle, each logged once */
   private failedTypes = new Set<string>();
+  /** Reads base-format frames and bit-packed messages (CAPS.PACKED: one or more frames each); one per socket */
+  private reader = new ServerFrameReader();
+  /** When it last asked the server to start its packed frames afresh (performance.now) */
+  private resyncAt = -Infinity;
 
   connect(url: string): void {
     this.connectSocket(url, false);
@@ -54,6 +58,7 @@ export class NetworkManager implements ClientTransport {
       return;
     }
     this.ws = ws;
+    this.reader = new ServerFrameReader();
     ws.binaryType = 'arraybuffer'; // Enable binary message handling
 
     ws.onopen = () => {
@@ -82,28 +87,35 @@ export class NetworkManager implements ClientTransport {
     ws.onmessage = (event) => {
       if (this.ws !== ws) return;
       // Handle both binary (ArrayBuffer) and text (string) messages
-      // A frame may carry one message or a tick's worth
+      // A frame may carry one message or a tick's worth; a packed message (CAPS.PACKED) one or more frames
       this.traffic.framesIn++;
       this.traffic.bytesIn += typeof event.data === 'string' ? event.data.length : (event.data as ArrayBuffer).byteLength;
-      let msgs: ServerMessage[];
+      let frames: ServerMessage[][];
       try {
-        msgs = decodeServerFrame(event.data);
+        frames = this.reader.read(event.data);
       } catch (e) {
         this.logOnce('(undecodable frame)', e);
-        return;
+        frames = [];
       }
-      // One message failing doesn't lose the rest of the frame (the tick's snapshot among them)
-      for (const msg of msgs) {
-        try {
-          this.onMessage?.(msg);
-        } catch (e) {
-          this.logOnce(typeof msg?.type === 'string' ? msg.type : '(no type)', e);
+      // A packed message that didn't decode: the server starts its next one afresh (asked at most once a second)
+      if (this.reader.needsResync && performance.now() - this.resyncAt > 1000) {
+        this.resyncAt = performance.now();
+        this.send({ type: 'packedResync' });
+      }
+      for (const msgs of frames) {
+        // One message failing doesn't lose the rest of the frame (the tick's snapshot among them)
+        for (const msg of msgs) {
+          try {
+            this.onMessage?.(msg);
+          } catch (e) {
+            this.logOnce(typeof msg?.type === 'string' ? msg.type : '(no type)', e);
+          }
         }
-      }
-      try {
-        this.onFrameEnd?.();
-      } catch (e) {
-        this.logOnce('(frame end)', e);
+        try {
+          this.onFrameEnd?.();
+        } catch (e) {
+          this.logOnce('(frame end)', e);
+        }
       }
     };
   }

@@ -291,6 +291,8 @@ export class GameState {
   public rawPing: number = 0;
   public jitter: number = 0;
   public interpDelayMs: number = 120;
+  /** Coalesced frames (CAPS.COALESCE) may come this much later: the interpolation delay is that much longer (network/netCaps.ts) */
+  public coalesceMs = 0;
   private targetInterpDelayMs: number = 120;
   private pingHistory: number[] = [];
   private smoothedPing: number = 0;
@@ -406,7 +408,7 @@ export class GameState {
     // Adaptive interpolation delay formula
     const baseMin = this.smoothedPing < 60 ? 80 : 110;
     const target = Math.max(baseMin, Math.min(INTERP_MAX_DELAY_MS,
-      this.smoothedPing * 0.7 + this.smoothedJitter * 4 + 90
+      this.smoothedPing * 0.7 + this.smoothedJitter * 4 + 90 + this.coalesceMs
     ));
     this.targetInterpDelayMs = Math.max(INTERP_MIN_DELAY_MS, target);
   }

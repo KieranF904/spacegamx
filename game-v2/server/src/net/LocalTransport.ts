@@ -14,7 +14,7 @@ import {
   ServerMessage,
   encodeMessage,
   decodeMessage,
-  decodeServerFrame,
+  ServerFrameReader,
 } from '@space-game/common';
 import type { GameServer } from '../GameServer.js';
 
@@ -26,9 +26,13 @@ export class LocalTransport implements ClientTransport {
 
   private link: ClientLink | null = null;
   private open = false;
+  /** Base-format frames and bit-packed messages (one or more frames each, when the client takes CAPS.PACKED) */
+  private reader = new ServerFrameReader();
   private readonly socket: ClientSocket = {
     isOpen: () => this.open,
-    send: (data) => { for (const m of decodeServerFrame(data)) this.onMessage?.(m); this.onFrameEnd?.(); },
+    send: (data) => {
+      for (const msgs of this.reader.read(data)) { for (const m of msgs) this.onMessage?.(m); this.onFrameEnd?.(); }
+    },
   };
 
   constructor(private server: GameServer) {}

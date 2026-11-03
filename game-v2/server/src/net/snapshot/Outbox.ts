@@ -6,11 +6,16 @@
  * around a tick or a request.
  *
  * Per-tick path: no closures or objects beyond what the moved bodies already made; the host's pieces are plain fields.
+ *
+ * A client with bit-packed frames (CAPS.PACKED) gets the same messages at the same moments through its PackedLink
+ * (ClientConnection.packed): each frame a sub-frame of a packed message, and with CAPS.COALESCE frames with nothing
+ * urgent wait a few ticks to share one (PackedLink.ts).
  */
 import { hasComponent, type IWorld } from 'bitecs';
-import { InSystem, Player, Position, encodeServerMessage, serverFrame, type ClientSocket, type ServerMessage } from '@space-game/common';
+import { CAPS, InSystem, Player, Position, encodeServerMessage, serverFrame, type ClientSocket, type ServerMessage } from '@space-game/common';
 import type { ClientConnection } from '../ClientConnection.js';
-import { LAZY_TYPES, LAZY_TICKS, FX_RANGE } from './constants.js';
+import { LAZY_TYPES, LAZY_TICKS, FX_RANGE, COALESCE_TICKS } from './constants.js';
+import { PackedLink } from './PackedLink.js';
 
 /** What the outbox needs of the server (GameServer itself) */
 export interface OutboxHost {
@@ -63,6 +68,8 @@ export class Outbox {
 
   send(ws: ClientSocket, msg: ServerMessage): void {
     if (ws.isOpen()) {
+      const conn = this.clients.get(ws);
+      if (conn && this.packedOf(conn)) { this.packedQueue(conn, msg, null); return; }
       const data = encodeServerMessage(msg);
       const byteLen = data.length;
       this.snapshotBytesSent += byteLen;
@@ -72,6 +79,50 @@ export class Outbox {
       this.queue(ws, data, LAZY_TYPES.has(msg.type));
     }
   }
+
+  /**
+   * A client's packed link while it takes packed frames (made when it switches them on; drained, then dropped, when it
+   * switches them off, so its frames stay in order)
+   */
+  private packedOf(conn: ClientConnection): PackedLink | null {
+    if ((conn.caps ?? 0) & CAPS.PACKED) {
+      if (!conn.packed) {
+        conn.packed = new PackedLink(conn);
+        // (Effects waiting in the base format go first)
+        const l = this.lazy.get(conn.ws);
+        if (l) { this.lazy.delete(conn.ws); if (conn.ws.isOpen()) conn.ws.send(serverFrame(l.parts)); }
+      }
+      return conn.packed;
+    }
+    if (conn.packed) {
+      this.countPacked(conn.packed.drain(this.currentTick));
+      conn.packed = undefined;
+      this.packedWaiting.delete(conn);
+    }
+    return null;
+  }
+
+  /** A message for a packed client (it has a link: packedOf): as queue does (a pong, or outside a tick or request: at once) */
+  private packedQueue(conn: ClientConnection, msg: ServerMessage, bytes: Uint8Array | null): void {
+    const link = conn.packed!;
+    if (msg.type === 'pong' || !this.batching) { this.countPacked(link.now({ msg, bytes }, this.currentTick)); return; }
+    // (The first snapshot after a hit to or from its ship goes at once)
+    if (msg.type === 'snapshot' && this.hitPilots.delete(conn.playerId)) link.wantSnapshot = true;
+    link.add({ msg, bytes }, LAZY_TYPES.has(msg.type), this.currentTick);
+    this.packedWaiting.add(conn);
+  }
+
+  private countPacked(n: number): void {
+    if (!n) return;
+    this.snapshotBytesSent += n;
+    this.bytesByType['(packed)'] = (this.bytesByType['(packed)'] || 0) + n;
+  }
+
+  /** Pilots hit, or whose ships hit something, and when (a packed link sends the next snapshot after at once) */
+  private readonly hitPilots = new Map<number, number>();
+  private prunedAt = -1;
+  /** Packed clients with something waiting (only they are looked at in a flush: one runs after every request) */
+  private readonly packedWaiting = new Set<ClientConnection>();
 
   private queue(ws: ClientSocket, data: Uint8Array, lazy = false): void {
     if (!this.batching) { ws.send(serverFrame([data])); return; }
@@ -96,6 +147,20 @@ export class Outbox {
       if (!ws.isOpen()) { this.lazy.delete(ws); continue; }
       if (this.currentTick - l.since >= LAZY_TICKS) { ws.send(serverFrame(l.parts)); this.lazy.delete(ws); }
     }
+    // Packed clients: the same frames, as sub-frames (coalesced when they take that)
+    for (const conn of this.packedWaiting) {
+      const link = conn.packed;
+      if (!link || this.clients.get(conn.ws) !== conn) { this.packedWaiting.delete(conn); continue; }
+      if (!this.packedOf(conn)) continue;
+      const coalesce = (conn.caps ?? 0) & CAPS.COALESCE ? COALESCE_TICKS : 0;
+      this.countPacked(link.flush(this.currentTick, coalesce));
+      if (!link.waiting) this.packedWaiting.delete(conn);
+    }
+    // (A hit's snapshot is due within a snapshot's ticks; older marks are for clients that got none. Once a tick)
+    if (this.hitPilots.size && this.prunedAt !== this.currentTick) {
+      this.prunedAt = this.currentTick;
+      for (const [pid, at] of this.hitPilots) if (this.currentTick - at > 2 * LAZY_TICKS + COALESCE_TICKS) this.hitPilots.delete(pid);
+    }
   }
 
   /** Send the effects still waiting now (tests that look at a tick's messages straight after it) */
@@ -103,6 +168,7 @@ export class Outbox {
     this.flushDamage();
     for (const [ws, l] of this.lazy) if (ws.isOpen()) ws.send(serverFrame(l.parts));
     this.lazy.clear();
+    for (const conn of this.packedWaiting) if (conn.packed) this.countPacked(conn.packed.flushLazy(this.currentTick));
   }
 
   /** `skipCaps`: leave out the clients with any of these caps on (confirmed hits: they're told their own way) */
@@ -120,8 +186,8 @@ export class Outbox {
       if (InSystem.systemId[client.playerId] !== systemId) continue;
       if (!client.ws.isOpen() || !hasComponent(this.world, Player, client.playerId)) continue;
       if (skipCaps && (client.caps ?? 0) & skipCaps) continue;
-      this.queue(client.ws, data, LAZY_TYPES.has(msg.type));
-      sent++;
+      if (this.packedOf(client)) this.packedQueue(client, msg, data);
+      else { this.queue(client.ws, data, LAZY_TYPES.has(msg.type)); sent++; }
     }
     const total = byteLen * sent;
     this.snapshotBytesSent += total;
@@ -135,6 +201,8 @@ export class Outbox {
   private readonly damageSums = new Map<string, { sys: number; target: number; source: number; glancing: boolean; amount: number }>();
 
   addDamage(systemId: number, target: number, amount: number, source: number, glancing: boolean): void {
+    this.hitPilots.set(target, this.currentTick);
+    this.hitPilots.set(source, this.currentTick);
     const key = `${target},${source},${glancing ? 1 : 0}`;
     const e = this.damageSums.get(key);
     if (e) e.amount += amount;
@@ -171,6 +239,7 @@ export class Outbox {
       const pid = client.playerId;
       if (Math.hypot(Position.x[pid] - x, Position.y[pid] - y) > FX_RANGE && !also.includes(pid)) continue;
       if (skipCaps && (client.caps ?? 0) & skipCaps) continue;
+      if (this.packedOf(client)) { this.packedQueue(client, msg, data); continue; }
       this.queue(client.ws, data, LAZY_TYPES.has(msg.type));
       this.snapshotBytesSent += this.getMessageByteLength(data);
     }

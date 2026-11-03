@@ -8,6 +8,7 @@ export * from './replication.js';
 export * from './binaryCodec.js';
 import { encodeBinary, BinaryReader, BinaryWriter, DICTIONARY } from './binaryCodec.js';
 import { fxKindCode, fxKindName, FX_KINDS } from './fxKinds.js';
+import { packedTables } from './packed/tables.js';
 import { quantizeCursorAngle, dequantizeCursorAngle } from './cursorState.js';
 import type { HitReport } from './hits.js';
 /**
@@ -30,9 +31,9 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
  * has updated PROTOCOL_VERSION and PROTOCOL_WIRE_HASH.
  */
 // History: PROTOCOL_CHANGELOG.md. Re-pin with `npm run wire:bump "reason"` (game-v2/), never by hand.
-export const PROTOCOL_VERSION = 28;
+export const PROTOCOL_VERSION = 29;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
-export const PROTOCOL_WIRE_HASH = '5837dfb3';
+export const PROTOCOL_WIRE_HASH = 'a386fbd2';
 /** WebSocket close code (and reason) for a client on another protocol version */
 export const PROTOCOL_MISMATCH_CLOSE = 4002;
 export const PROTOCOL_MISMATCH_REASON = 'version';
@@ -182,6 +183,11 @@ export interface ClientHpResyncMessage {
   ids: number[];
 }
 
+/** Bit-packed frames (packed/packedCodec.ts): a packed message didn't decode, so the server starts afresh (a reset) */
+export interface ClientPackedResyncMessage {
+  type: 'packedResync';
+}
+
 export interface ClientAuthLoginMessage {
   type: 'authLogin';
   username: string;
@@ -224,6 +230,7 @@ export type ClientMessage =
   | ClientAuthRegisterMessage
   | ClientStateHashMessage
   | ClientHpResyncMessage
+  | ClientPackedResyncMessage
   | ClientShipEditMessage
   | ClientDockMessage
   | ClientUndockMessage
@@ -1225,6 +1232,8 @@ export interface ServerHitFixMessage {
 export interface ServerNetCapsMessage {
   type: 'netCaps';
   caps: number;
+  /** Coalescing (CAPS.COALESCE): how many ticks a frame with nothing urgent may wait (the client widens its interpolation delay by as much) */
+  hold?: number;
 }
 
 /** A projectile struck something at (x, y): clients end its tracer there and throw sparks. */
@@ -1594,6 +1603,8 @@ export function wireTables(): Record<string, unknown> {
     dictionary: DICTIONARY,
     binaryInput: [BINARY_MSG_INPUT_V1, BINARY_MSG_INPUT],
     serverFrame: SERVER_FRAME,
+    // (Protocol 29: the bit-packed frames, CAPS.PACKED)
+    packed: packedTables(),
   };
 }
 
@@ -1721,6 +1732,19 @@ export function unpackSnapshot(p: PackedSnapshot): ServerSnapshotMessage {
 // message's wire form (a compact row, or a plain object) one after another.
 
 export const SERVER_FRAME = 0x02;
+
+/**
+ * A server message's wire form (its compact row, a packed snapshot's row, or the plain object): what
+ * encodeServerMessage writes as bytes and the bit-packed frames (network/packed) write as bits
+ */
+export function serverWire(msg: ServerMessage): unknown {
+  return packCompact(msg) ?? msg;
+}
+
+/** A wire form back to its message (as a frame's reader does) */
+export function serverFromWire(wire: unknown): ServerMessage {
+  return unpackServer(wire);
+}
 
 /** A server message's bytes (encode once, send to every client it's for) */
 export function encodeServerMessage(msg: ServerMessage): Uint8Array {

@@ -12,8 +12,10 @@
  *   HITS       confirmed hits: told "shell s hit part p of ship t", works out the rest (part C)
  *   SELF_HITS  client-detected hits (part D, needs HITS): finds its shells' hits itself on its tick-faithful layer and
  *              reports a 1-byte hash of them on its inputs; the server tells only what it couldn't find or got wrong
+ *   PACKED     bit-packed frames (network/packed): reads PACKED_FRAME messages as well as the base format
+ *   COALESCE   (with PACKED) frames with nothing urgent wait a few ticks (netCaps.hold) and go several to a WebSocket message
  */
-export const CAPS = { HITS: 1, SELF_HITS: 2 } as const;
+export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8 } as const;
 
 /** One shell's hit on a ship, as a capable client is told it */
 export interface ShellHitRecord {

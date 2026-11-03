@@ -43,7 +43,7 @@ import systemsDataForMenu from '../../data/systems.json';
 import { DamageIndicatorUI } from './ui/DamageIndicatorUI';
 import { FloatingRewardsUI } from './ui/FloatingRewardsUI';
 import { ShipClient } from './ships/ShipClient';
-import { clientCaps } from './ships/hits/ConfirmedHits';
+import { netCaps } from './network/netCaps';
 import type { AdminPanel } from './ui/AdminPanel';
 import type { ContributorPanel } from './ui/ContributorPanel';
 
@@ -1347,14 +1347,14 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'flex';
     this.shipClient.resetHits();
     if (pending) {
       // Guest
-      this.network.send({ type: 'join', username: pending.username, protocol: PROTOCOL_VERSION, caps: clientCaps() });
+      this.network.send({ type: 'join', username: pending.username, protocol: PROTOCOL_VERSION, caps: netCaps() });
       this.pendingAuth = null;
     } else if (this.authToken) {
       // Signed in at the lobby: the server checks the token with it
-      this.network.send({ type: 'join', token: this.authToken, username: this.state.playerName, protocol: PROTOCOL_VERSION, caps: clientCaps() });
+      this.network.send({ type: 'join', token: this.authToken, username: this.state.playerName, protocol: PROTOCOL_VERSION, caps: netCaps() });
     } else {
       // Fallback guest
-      this.network.send({ type: 'join', username: this.state.playerName || 'Player', protocol: PROTOCOL_VERSION, caps: clientCaps() });
+      this.network.send({ type: 'join', username: this.state.playerName || 'Player', protocol: PROTOCOL_VERSION, caps: netCaps() });
     }
     
     // Start ping loop (one per connection: a reconnect replaces it)

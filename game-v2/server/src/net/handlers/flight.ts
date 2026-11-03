@@ -41,6 +41,10 @@ export function registerFlightHandlers(t: HandlerRegistry): void {
   t.on('hpResync', (ctx, conn, msg) => {
     if (Array.isArray(msg.ids)) ctx.hits.resync(conn, msg.ids);
   });
+  // (Bit-packed frames: a packed message didn't decode, so its next one starts afresh: net/snapshot/PackedLink.ts)
+  t.on('packedResync', (ctx, conn) => {
+    conn.packed?.resync();
+  });
   t.on('mapView', (ctx, conn, msg) => {
     // (Opened: the far ships at once, then once a second while it's open)
     conn.mapOpen = msg.open === true;

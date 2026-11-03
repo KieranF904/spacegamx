@@ -3,6 +3,7 @@
  * import the type without importing GameServer.
  */
 import type { ClientSocket, Blueprint, ShipState, Leg } from '@space-game/common';
+import type { PackedLink } from './snapshot/PackedLink.js';
 
 export interface ClientConnection {
   ws: ClientSocket;
@@ -94,4 +95,6 @@ export interface ClientConnection {
   caps?: number;
   capsNext?: number;
   capsOffered?: number;
+  /** Its bit-packed frames while it takes them (CAPS.PACKED: net/snapshot/PackedLink.ts, made and dropped by Outbox) */
+  packed?: PackedLink;
 }

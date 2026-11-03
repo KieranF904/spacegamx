@@ -40,6 +40,7 @@ export const MESSAGE_LIMITS: Readonly<Record<string, Limit>> = {
   shipNeed: { per: 1200, burst: 200 },
   // Every part's HP of a few ships resent (confirmed hits: a client whose copy is off)
   hpResync: { per: 600, burst: 20 },
+  packedResync: { per: 60, burst: 3 },
 };
 
 class Bucket {

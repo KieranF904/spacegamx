@@ -18,3 +18,4 @@ except to fix a typo. A bump makes old clients reload (see PROTOCOL_VERSION in p
 - 26 (2026-11-03): COMPACT rows for ignite, detonation (kind codes, fxKinds.ts), intercept, bossTelegraph, pong, boss beam/charge/blow; asteroidSeed ids and indices as ranges
 - 27 (2026-11-03): Confirmed hits: COMPACT rows hits and hpCheck, join.caps, authResult.caps, client hpResync, projectile rows carry the gun that fired them (row index 8, data[10])
 - 28 (2026-11-03): client-detected hits (CAPS.SELF_HITS): COMPACT hitFix row; input hit report tail (flags2 0x20: chain byte, tick14+epoch2); netCaps message
+- 29 (2026-11-03): Bit-packed frames (CAPS.PACKED, network/packed: packedTables in wireTables) and coalescing (CAPS.COALESCE; netCaps.hold); packedResync

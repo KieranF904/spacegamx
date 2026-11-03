@@ -12,6 +12,7 @@
 import type { ServerMessage, DisconnectInfo } from '@space-game/common';
 import { showHitTick } from '../ui/HitTick';
 import { rangeFeed } from '../ui/devRangeFeed';
+import { coalesceDelayMs } from '../network/netCaps';
 import { PROTOCOL_VERSION, PROTOCOL_MISMATCH_CLOSE, unpackRanges } from '@space-game/common';
 import type { RibbonsFile } from '@space-game/common';
 import ribbonData from '../../../data/achievements.json';
@@ -359,7 +360,7 @@ const TABLE: Handlers = {
   hpCheck: (h, msg) => { h.shipClient.onHpCheck(msg); },
   // (Client-detected hits, part D: a correction, and the caps in effect from the next snapshot)
   hitFix: (h, msg) => { h.shipClient.onHitFix(msg, (m) => handleServerMessage(h, m)); },
-  netCaps: (h, msg) => { h.shipClient.onNetCaps(msg.caps); },
+  netCaps: (h, msg) => { h.shipClient.onNetCaps(msg.caps); h.state.coalesceMs = coalesceDelayMs(msg.caps, msg.hold); },
   projectileHit: (h, msg) => {
     h.renderer.showProjectileHit(msg.id, msg.x, msg.y);
     h.audio.play('hit', msg.x, msg.y, { pitch: 0.85 + Math.random() * 0.3, volume: 0.7 });
