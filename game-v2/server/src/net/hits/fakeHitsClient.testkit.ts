@@ -202,7 +202,7 @@ export class FakeHitsClient {
   }
 
   private frameEnd(): void {
-    if (!this.selfHits?.on) return;
+    if (!this.selfHits || (!this.selfHits.on && !this.hits!.hasPending)) return;
     const { out, done } = this.hits!.flushPending();
     this.selfHits.settle(done);
     this.handOut(out);
@@ -212,5 +212,6 @@ export class FakeHitsClient {
     this.handingOut = true;
     try { for (const m of r.msgs) this.handle(m); } finally { this.handingOut = false; }
     for (const id of r.gone) { this.removed.add(id); this.shells.delete(id); }
+    this.selfHits?.spent(r.gone);
   }
 }

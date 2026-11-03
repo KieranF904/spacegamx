@@ -101,10 +101,18 @@ export class SelfHits {
 
   constructor(private host: SelfHitsHost) {}
 
-  /** Switched on or off (netCaps): on, everything starts afresh from the last snapshot, as the server's journal does */
+  /**
+   * Switched on or off (netCaps): on, everything starts afresh from the last snapshot, as the server's journal does.
+   * Shells already flying sit it out (what they hit before isn't known here): the server tells their hits (HitLedger
+   * endSnapshot), as for a shell told the old way
+   */
   setOn(on: boolean, lastTick: number): void {
     if (on === this.on) return;
     this.on = on;
+    if (on) {
+      for (const id of this.shells.keys()) this.dropped.add(id);
+      this.shells.clear();
+    }
     this.chain = 0;
     this.epoch = 0;
     this.log = [];
@@ -132,7 +140,8 @@ export class SelfHits {
    * `spawnTick`, (vx, vy) its step. Only straight shells from a gun of a ship it has; once
    */
   addShell(id: number, owner: number, gun: number, spawnTick: number, x: number, y: number, vx: number, vy: number, size = 1): void {
-    if (this.shells.has(id) || !(gun >= 0) || this.dropped.has(id)) return;
+    // (The same shell told again stays as it is; an id the server used again, after its shell went unseen here, is a new shell)
+    if (this.shells.get(id)?.spawnTick === spawnTick || !(gun >= 0) || this.dropped.has(id)) return;
     const ship = this.host.store.get(owner);
     const sh = ship ? gunShell(this.host.store.tuning, ship, gun) : null;
     // (a great slow orb hits as wide as it's drawn: the server tells those)
@@ -148,6 +157,14 @@ export class SelfHits {
     this.shells.delete(id);
     // (its row may come again: it stays out)
     this.dropped.add(id);
+  }
+
+  /**
+   * Shells spent by a hit (found, told or corrected: no removal names them): gone from the layer, so their ids are
+   * free for new shells (the server uses ids again)
+   */
+  spent(ids: readonly number[]): void {
+    for (const id of ids) { this.shells.delete(id); this.dropped.delete(id); }
   }
 
   /** A ship synced this frame (a rebuild, or new to this client): left to the server's records this window */

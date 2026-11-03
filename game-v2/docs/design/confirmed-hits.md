@@ -633,3 +633,25 @@ Client cost: 0.03-0.06 ms a tick more on the fake client; server `stepMs` within
 4. **Own ship as a target**: needs the prediction's history at the server's ticks (exact when the prediction was
    right).
 5. Reports with no input to ride on cost a frame: a pilot sitting still while being shot could batch them longer.
+
+### D9. Review fixes (2026-11-04)
+
+A review of parts D, packed frames and the deterministic maths (commits a05b5b8, 6acc352, 4cb9e56) found and fixed:
+
+1. **Hits lost when finding is switched off.** The server switches caps at a snapshot's end, so `netCaps` comes in
+   the same frame as that snapshot's records, after them. The client (ShipClient.frameEnd, and the test kit) only
+   handed out the frame's waiting hits while SelfHits was on, so the switching frame's hits (found and told) were never
+   drawn, their spent shells never removed, and they sat in ConfirmedHits' pending list until the next switch on.
+   The frame's end now hands them out whenever any wait (`ConfirmedHits.hasPending`).
+2. **Shells flying when finding is switched on.** What they passed through before isn't on the client's layer (no
+   pierce exclusions, no spent mark), so it found false hits on them, put right only by a correction. Both sides now
+   treat them alike: the server marks every shell then flying in the client's system as told (HitLedger endSnapshot,
+   the `oldWay` set), and the client drops its layer's shells (SelfHits.setOn). A told shell spent by its record
+   leaves that set (HitLedger.write), as a removed one already did.
+3. **Ids used again.** The server reuses entity ids. A shell spent by a record never comes in a removed list, so its
+   entry stayed on the layer (dead) until the 256-shell prune, and a new shell given its id was refused
+   (`addShell` returned on any entry). Now `SelfHits.spent` takes spent shells (and dropped ones) off the layer when
+   their records are handed out, and an entry with another spawn tick is replaced.
+
+Tests: selfHits.test.ts, a finder switched to part C and back mid-fight (the first switch lands on a frame with hits
+waiting: 2 impacts were lost before), and the layer's id handling.

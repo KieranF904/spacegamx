@@ -11,7 +11,7 @@
  *
  * The bytes go out through the client's own socket; Outbox counts them.
  */
-import { PackedEncoder, type PackedPart, type ServerMessage } from '@space-game/common';
+import { PackedEncoder, encodeServerMessage, serverFrame, type PackedPart, type ServerMessage } from '@space-game/common';
 import type { ClientConnection } from '../ClientConnection.js';
 import { LAZY_TICKS } from './constants.js';
 
@@ -45,7 +45,7 @@ export class PackedLink {
   /** The next snapshot goes at once (a hit to or from its ship: Outbox.addDamage) */
   wantSnapshot = false;
   /** WebSocket messages, sub-frames and bytes sent; messages sent early for being urgent (the netcode probe) */
-  readonly stats = { messages: 0, subFrames: 0, bytes: 0, urgent: 0 };
+  readonly stats = { messages: 0, subFrames: 0, bytes: 0, urgent: 0, failed: 0 };
 
   constructor(private readonly conn: ClientConnection) {}
 
@@ -115,7 +115,17 @@ export class PackedLink {
   }
 
   private emit(): number {
-    const data = this.enc.encode(this.held, this.conn.playerId);
+    let data: Uint8Array;
+    try {
+      data = this.enc.encode(this.held, this.conn.playerId);
+    } catch (e) {
+      // (A message the codec choked on: its tables may be half written, so the next packed message starts afresh, and
+      // these frames go in the base format, which the client reads as ever. Never thrown into the tick)
+      this.enc.reset();
+      this.stats.failed++;
+      if (this.stats.failed === 1) console.error('[packed] encode failed; sent as base frames', e);
+      return this.emitBase();
+    }
     this.stats.messages++;
     this.stats.subFrames += this.held.length;
     this.stats.bytes += data.length;
@@ -125,5 +135,20 @@ export class PackedLink {
     this.urgent = false;
     if (this.conn.ws.isOpen()) this.conn.ws.send(data);
     return data.length;
+  }
+
+  /** What waits, as base-format frames (one per sub-frame, in order) */
+  private emitBase(): number {
+    const held = this.held;
+    this.held = [];
+    this.heldSince = -1;
+    this.urgent = false;
+    let n = 0;
+    for (const sub of held) {
+      const data = serverFrame(sub.map((p) => p.bytes ?? encodeServerMessage(p.msg)));
+      n += data.length;
+      if (this.conn.ws.isOpen()) this.conn.ws.send(data);
+    }
+    return n;
   }
 }

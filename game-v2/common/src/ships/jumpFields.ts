@@ -16,7 +16,8 @@
  */
 
 import type { LodestoneData } from '../data/schemas.js';
-import { planetPosition } from '../world/planets.js';
+import { planetAngle } from '../world/planets.js';
+import { dcos, dsin } from '../math/detTrig.js';
 import { inSolarRing, type JumpTuning } from './flight.js';
 
 /** Where a system's fields are */
@@ -38,11 +39,11 @@ export const NO_FIELD: JumpField = Object.freeze({ ring: false, lodestone: null 
 /** Nowhere with fields */
 export const NO_FIELDS: FieldEnv = Object.freeze({ central: null });
 
-/** Where a lodestone is at a tick (whole units) */
+/** Where a lodestone is at a tick (whole units; its orbit by the deterministic sin and cos: replicas fly by its field) */
 export function lodestonePosition(l: LodestoneData, tick: number): { x: number; y: number } {
   if (l.orbit) {
-    const p = planetPosition({ orbit: l.orbit }, tick);
-    return { x: Math.round(p.x), y: Math.round(p.y) };
+    const a = planetAngle({ orbit: l.orbit }, tick), r = l.orbit.radius;
+    return { x: Math.round(dcos(a) * r), y: Math.round(dsin(a) * r) };
   }
   return { x: l.position?.x ?? 0, y: l.position?.y ?? 0 };
 }

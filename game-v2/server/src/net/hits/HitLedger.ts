@@ -25,7 +25,7 @@
  * would get wrong (an extra). Every hit goes into its journal (SelfHitJournal); its reports (on its inputs) are judged
  * there, and a disagreement that lasts is put right with a hitFix and its ships' HP in full.
  */
-import { hasComponent, entityExists, type IWorld } from 'bitecs';
+import { hasComponent, entityExists, defineQuery, type IWorld } from 'bitecs';
 import {
   CAPS, Position, Projectile, InSystem, Player, Radius, Dead, packHits, hpChecksum, gunShell, deriveShellHit, igniteRule, hitEndFx,
   firesStraight, unwrapTick14,
@@ -85,6 +85,9 @@ interface Plan {
   own: boolean[];
   hits: Hit[];
 }
+
+/** Every shell (a client switched to finding its hits: those already flying are told, endSnapshot) */
+const shellQuery = defineQuery([Projectile]);
 
 const keyOf = (target: number, source: number, glancing: boolean) => `${target},${source},${glancing ? 1 : 0}`;
 
@@ -387,6 +390,9 @@ export class HitLedger {
       if (net.nearClient(conn, h.sys, h.x, h.y)) net.send(conn.ws, projectileHitMessage(h.proj, h.x, h.y));
       for (const m of h.fx) net.sendAsSystem(conn, h.sys, m);
     }
+    // (A told shell spent by its record never comes in a removed list: it goes from the told set here, so a reused id is new)
+    const old = this.oldWayShells.get(conn);
+    if (old?.size) for (const id of plan.gone) old.delete(id);
     if (this.finds(conn)) this.judge(conn);
   }
 
@@ -456,9 +462,16 @@ export class HitLedger {
         const was = c.caps ?? 0;
         c.caps = c.capsNext;
         if (!(c.caps & CAPS.HITS)) { this.passes.delete(c); this.checks.delete(c); }
-        // (Finding its own hits starts afresh from this snapshot on both sides; the client is told from when)
+        // (Finding its own hits starts afresh from this snapshot on both sides; the client is told from when. Shells
+        // already flying are told on both sides: what they hit before isn't on its layer, SelfHits.setOn)
         this.journals.delete(c);
         this.oldWayShells.delete(c);
+        const both = CAPS.HITS | CAPS.SELF_HITS;
+        if ((c.caps & both) === both && (was & both) !== both) {
+          const told = new Set<number>(), sys = InSystem.systemId[c.playerId];
+          for (const id of shellQuery(this.host.world)) if (InSystem.systemId[id] === sys) told.add(id);
+          this.oldWayShells.set(c, told);
+        }
         if (was !== c.caps) this.host.net.send(c.ws, { type: 'netCaps', caps: c.caps, ...(c.caps & CAPS.COALESCE ? { hold: COALESCE_TICKS } : {}) });
       }
       if ((c.caps ?? 0) & CAPS.HITS) on = true;

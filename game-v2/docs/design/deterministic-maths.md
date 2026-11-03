@@ -58,3 +58,8 @@ First run (Windows, 1200 ticks, 1184 shots, 609 ship hits, 157 rebuilds, 2 jumps
 Goldens: flightTraces and parity didn't move (the per-tick rounding to SHIP_PRECISION hides last-bit changes there);
 frameHash and the hit-rules golden did. With native Math swapped back in for every new detTrig use (a vitest alias, not
 committed) all four pass on the old pins, so those shifts come only from the trig values; they were regenerated.
+
+Review fix (2026-11-04): lodestones' orbits (jumpFields.ts lodestonePosition) still used Math.cos/sin through
+planetPosition, and replicas and the pilot's prediction fly by their jump fields. They now use dcos/dsin (rounded to
+whole units as before; planetPosition itself, for drawing and the server's planets, is unchanged). frameHash fails the
+same way with and without this change (its stream hashes, from the protocol bumps), so no golden moved.

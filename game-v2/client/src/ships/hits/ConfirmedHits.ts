@@ -198,6 +198,14 @@ export class ConfirmedHits {
     }
   }
 
+  /**
+   * Hits waiting for the frame's end (finding hits may have been switched off in this frame: netCaps comes after the
+   * snapshot's records, so they're still handed out)
+   */
+  get hasPending(): boolean {
+    return this.pending.length > 0 || this.lostGone.length > 0;
+  }
+
   /** The frame's end: this frame's hits (found and told) as their messages, and the hits themselves (for the chain) */
   flushPending(): { out: HitsOutcome; done: HitDone[] } {
     const done = this.pending;

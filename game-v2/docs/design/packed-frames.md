@@ -98,3 +98,16 @@ Wire = payload + 66 B x messages/s. Deflated = the server's permessage-deflate (
 - Coalescing for the shooter: own hits are urgent by rule; a client that shows its own hits from its cosmetic layer
   could let them wait.
 - Client -> server is untouched (inputs are already 11-14 bytes).
+
+## Review fixes (2026-11-04)
+
+- An encode that throws (a message the codec chokes on) no longer reaches the tick: PackedLink sends what it held as
+  base-format frames, in order, and resets its encoder, so the next packed message starts afresh (the codec's tables
+  may be half written; a client that read on from them would get wrong ids without noticing). Counted in
+  `stats.failed`, logged once. Test: PackedLink.test.ts.
+- Open: after a client loses track (packedResync), the messages it dropped until the reset are gone, and nothing
+  re-sends the world (a missed removal leaves an entity behind). The codec is lossless and both sides run the same
+  code, so this should only follow a bug; if it is ever seen, the resync should also start the client's view afresh.
+- Open: the writer builds the decoded copy of every row as it writes (one function for both directions), so a packed
+  client costs the server a snapshot's arrays again; and Slots finds the lowest free slot by a scan. Neither showed in
+  the probe's tick times; worth measuring with many packed clients.

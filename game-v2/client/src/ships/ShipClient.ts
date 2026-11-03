@@ -308,6 +308,7 @@ export class ShipClient {
     }
     for (const id of r.ships) this.fillHull(id);
     for (const id of r.gone) this.opts.state.removeShell(id);
+    this.selfHits.spent(r.gone);
   }
 
   /** A connection afresh: confirmed and client-detected hits start over, as the server's do */
@@ -340,7 +341,8 @@ export class ShipClient {
 
   /** The frame's end: this frame's hits (found here and told) handed out, and into the chain */
   frameEnd(handle: (m: ServerMessage) => void): void {
-    if (!this.selfHits.on) return;
+    // (Switched off in this frame, its hits still go: the netCaps came after the snapshot's records)
+    if (!this.selfHits.on && !this.hits.hasPending) return;
     const { out, done } = this.hits.flushPending();
     this.selfHits.settle(done);
     if (done.length || out.gone.length) this.handOut(out, handle);

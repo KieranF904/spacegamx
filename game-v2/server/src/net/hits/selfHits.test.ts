@@ -23,6 +23,7 @@ import { loadShipConfigFromDisk } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../proto/createProtoServer.js';
 import { FakeHitsClient } from './fakeHitsClient.testkit.js';
 import type { OwnHit } from '../../../../client/src/ships/hits/ConfirmedHits.js';
+import { SelfHits } from '../../../../client/src/ships/hits/SelfHits.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const files = readGameDataFiles(dataDir);
@@ -45,6 +46,8 @@ interface Scenario {
   drop?: (h: OwnHit) => boolean;
   /** The target is pushed across the line of fire once and coasts (a moving target) */
   drift?: number;
+  /** The shooter's caps switched mid-fight: [tick of the run, caps] (the admin's `hits` command does this) */
+  switches?: [number, number][];
 }
 
 function run(sc: Scenario) {
@@ -99,6 +102,7 @@ function run(sc: Scenario) {
       if (sc.shield) ships.get(target)!.shield = sc.shield;
     }
     place(A.pid, x0, y0);
+    for (const [at, caps] of sc.switches ?? []) if (at === t) server.pilots.connOf(A.pid)!.capsNext = caps;
     for (const f of fakes) f.sawSnapshot = false;
     step();
     for (const f of fakes) {
@@ -205,5 +209,57 @@ describe('client-detected hits: a forced mismatch is put right', () => {
     expect(r.finalOff.slice(0, 5)).toEqual([]);
     // The missed hits were drawn from the correction: as many impacts as the legacy observer saw
     expect(r.A.projectileHits).toBe(r.B.projectileHits);
+  }, 120_000);
+});
+
+describe('client-detected hits: switched off and on mid-fight', () => {
+  it("a finder switched to confirmed hits only, then back: the switching frame's hits aren't lost, HP stays the server's", () => {
+    // (The first lands on a snapshot whose frame has hits waiting: they were lost at its end before the fix; the second
+    // switches back with shells flying that hit before: told, on both sides)
+    const r = run({ ticks: 600, switches: [[112, CAPS.HITS], [301, BOTH], [451, CAPS.HITS]] });
+    if (process.env.HITS_DEBUG) console.log(JSON.stringify({ rates: rates(r), off: r.off.slice(0, 5), A: r.A.selfHits!.stats }));
+    expect(r.A.selfHits!.stats.found).toBeGreaterThan(0);
+    expect(r.off.slice(0, 5)).toEqual([]);
+    expect(r.finalOff.slice(0, 5)).toEqual([]);
+    expect(r.A.hits!.stats.mismatches).toBe(0);
+    // The same impacts as the legacy observer
+    expect(r.A.projectileHits).toBe(r.B.projectileHits);
+  }, 120_000);
+});
+
+describe('client-detected hits: the layer and ids used again', () => {
+  it("a spent shell's id, used again by the server, is a new shell on the layer", () => {
+    const r = run({ ticks: 30 });
+    const { A } = r;
+    const me = A.store.get(A.pid)!;
+    const gun = me.derived.weapons[0].part;
+    const layer = new SelfHits({ store: A.store, self: () => A.pid, ships: () => [], at: () => null, side: () => 0, passes: () => 0 });
+    const shells = (layer as unknown as { shells: Map<number, { spawnTick: number; dead: boolean }> }).shells;
+    layer.setOn(true, 0);
+    layer.addShell(77, A.pid, gun, 10, 0, 0, 5, 0);
+    expect(shells.get(77)?.spawnTick).toBe(10);
+    // (the same shell told again: kept as it is)
+    shells.get(77)!.dead = true;
+    layer.addShell(77, A.pid, gun, 10, 0, 0, 5, 0);
+    expect(shells.get(77)?.dead).toBe(true);
+    // (its id used again, never removed here: a new shell)
+    layer.addShell(77, A.pid, gun, 50, 0, 0, 5, 0);
+    expect(shells.get(77)).toMatchObject({ spawnTick: 50, dead: false });
+    // Spent by a record: off the layer; a dropped one's id is free again too
+    layer.spent([77]);
+    expect(shells.has(77)).toBe(false);
+    layer.addShell(78, A.pid, gun, 10, 0, 0, 5, 0);
+    layer.drop(78);
+    layer.addShell(78, A.pid, gun, 60, 0, 0, 5, 0);
+    expect(shells.has(78)).toBe(false);
+    layer.spent([78]);
+    layer.addShell(78, A.pid, gun, 70, 0, 0, 5, 0);
+    expect(shells.get(78)?.spawnTick).toBe(70);
+    // Switched on again: shells already flying sit it out (the server tells their hits)
+    layer.setOn(false, 80);
+    layer.setOn(true, 80);
+    expect(shells.size).toBe(0);
+    layer.addShell(78, A.pid, gun, 90, 0, 0, 5, 0);
+    expect(shells.has(78)).toBe(false);
   }, 120_000);
 });

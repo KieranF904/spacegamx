@@ -4,7 +4,8 @@ import {
   lodestonePosition, lodestoneAt, jumpFieldAt, fieldCharge, fieldRangeBoost, fieldCooldown, stepPrime, pilotJumpStep, NO_FIELD,
   lodestoneFieldRadius, lodestoneBoostOf, lodestoneLabel, lodestoneStop, primeBoost, wholeTicks, type FieldEnv,
 } from './jumpFields.js';
-import { planetPosition } from '../world/planets.js';
+import { planetPosition, planetAngle } from '../world/planets.js';
+import { dcos, dsin } from '../math/detTrig.js';
 import type { LodestoneData } from '../data/schemas.js';
 
 const t = DEFAULT_JUMP;
@@ -22,10 +23,13 @@ const coolTicks = (f: (typeof NO_FIELD)) => {
 };
 
 describe('stillstones', () => {
-  it('orbit as planets do (whole units), or stay put', () => {
+  it('orbit as planets do (whole units, by the deterministic sin and cos: replicas fly by them), or stay put', () => {
     for (const tick of [0, 12345, 9e6]) {
-      const p = planetPosition({ orbit: moving.orbit! }, tick);
-      expect(lodestonePosition(moving, tick)).toEqual({ x: Math.round(p.x), y: Math.round(p.y) });
+      const p = planetPosition({ orbit: moving.orbit! }, tick), a = planetAngle({ orbit: moving.orbit! }, tick), r = moving.orbit!.radius;
+      const q = lodestonePosition(moving, tick);
+      expect(q).toEqual({ x: Math.round(dcos(a) * r), y: Math.round(dsin(a) * r) });
+      expect(Math.abs(q.x - p.x)).toBeLessThanOrEqual(0.5 + 1e-6);
+      expect(Math.abs(q.y - p.y)).toBeLessThanOrEqual(0.5 + 1e-6);
       expect(lodestonePosition(fixed, tick)).toEqual({ x: 60000, y: 0 });
     }
     // Slowly: a minute moves it a little, not out from under a ship
