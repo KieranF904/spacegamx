@@ -88,9 +88,10 @@ describe('enemies', () => {
     const w = server.getWorld();
     const station = (id: string) => [...Array(8000).keys()].find((e) => bitecs.entityExists(w, e) && bitecs.hasComponent(w, StationComp, e)
       && StationComp.stationId[e] === server['gameData'].getStationNum(id))!;
-    hold(pid, 40000, 40000);
     // Sentinel Watch: four lasers (at a Mk V skiff: a Mk I one can go down to the first few, by where they land)
     const st = station('sol_station_sentinel');
+    // (Near enough to see it: a station's shots, as every effect, go only to pilots within FX_RANGE)
+    hold(pid, Position.x[st] + 4000, Position.y[st] + 4000);
     const [foe] = enemies.spawnPack(InSystem.systemId[pid], { faction: 'pirates', ships: ['pirate_skiff'], grade: 5 }, Position.x[st] + 900, Position.y[st]);
     const ship = bridge.get(foe)!;
     const full = ship.hp.reduce((a, b) => a + b, 0);

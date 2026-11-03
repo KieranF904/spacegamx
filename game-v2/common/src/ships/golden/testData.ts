@@ -175,7 +175,7 @@ export const SCENARIOS: Scenario[] = [
   { name: 'strafer-heavy', ship: () => withParts(sparrow(), [RIGHT_FLANK, LEFT_FLANK]), script: replayScript(), cargo: 4, cargoOre: 40, replayAt: [47], replicaDiverges: false },
   { name: 'strafer-energy-short', ship: () => withParts(sparrow(), [RIGHT_FLANK]), script: dodgeTillDry(), replayAt: [501, 700], replicaDiverges: true },
   { name: 'tow', ship: () => withParts(sparrow(), [RIGHT_FLANK, LEFT_FLANK, TOW_BEAM]), script: towScript(), tow: { from: 2, wreckDist: 300 }, replayAt: [125, 200], replicaDiverges: true },
-  { name: 'drive-bank-boost', ship: driveBankShip, script: driveBankScript(), replayAt: [41, 150], replicaDiverges: true },
+  { name: 'drive-bank-boost', ship: driveBankShip, script: driveBankScript(), replayAt: [41, 150], replicaDiverges: false },
   { name: 'jump-burn', ship: sparrow, script: jumpScript(), replayAt: [95, 150], replicaDiverges: true },
 ];
 

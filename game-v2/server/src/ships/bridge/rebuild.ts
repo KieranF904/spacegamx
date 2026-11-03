@@ -10,7 +10,7 @@ import { hasComponent } from 'bitecs';
 import {
   Position, Velocity, Rotation, Radius, Health, Player, Dead, InSystem, Blueprint, ShipState, Vec2,
   validateBlueprint, ValidationResult, createShipState, rebuildShip, fillClips, damagePart, repairShip, healPart, restorePart,
-  computeJoins, localToWorldDir, seededRng, hashInts, shipPointToWorld, remapCharge, chargeTotal, fullPortsCharge, blueprintGeometry,
+  computeJoins, localToWorldDir, seededRng, hashInts, splitPose, splitRng, debrisSpin, debrisMotion, debrisBlueprint, debrisHash, shipPointToWorld, remapCharge, chargeTotal, fullPortsCharge, blueprintGeometry,
   type PlacedGeom,
 } from '@space-game/common';
 import { type BridgeCtx } from './core.js';
@@ -39,6 +39,7 @@ export function spawnOn(b: BridgeCtx, eid: number, bp: Blueprint, kind: 'ship' |
   if (ship.derived.ports) b.charge.set(eid, fullPortsCharge(ship.derived));
   b.bodies.set(eid, ship);
   b.ungridded.add(eid);
+  b.debrisNet.noteCom(eid, ship.rebuilds, ship.derived.com);
   Radius.value[eid] = Math.max(1, ship.derived.radius);
   return ship;
 }
@@ -128,6 +129,7 @@ export function forget(b: BridgeCtx, eid: number): void {
   b.dormant.delete(eid);
   b.lastFired.delete(eid);
   b.ungridded.delete(eid);
+  b.debrisNet.forget(eid);
   b.host.shipForgotten?.(eid);
   for (const [k, v] of b.targets) if (v === eid) b.targets.delete(k);
 }
@@ -339,7 +341,7 @@ export function noteRebuild(b: BridgeCtx, t0: number): void {
   b.stats.rebuildCount++;
 }
 
-export function rebuildNow(b: BridgeCtx, eid: number, ship: ShipState): void {
+export function rebuildNow(b: BridgeCtx, eid: number, ship: ShipState, derivable = true): void {
   const oldCom: Vec2 = ship.derived.com;
   // (Its banks may split or join, its pool grow or shrink: each store keeps what it held, energy.ts remapCharge)
   const before = ship.derived;
@@ -347,14 +349,22 @@ export function rebuildNow(b: BridgeCtx, eid: number, ship: ShipState): void {
   const t0 = b.now();
   rebuildShip(ship, b.catalog, b.tuning);
   b.noteRebuild(t0);
+  b.debrisNet.noteCom(eid, ship.rebuilds, ship.derived.com);
 
   // Orphaned groups leave as debris (for a ship with no core, that's everything)
   const groups = ship.derived.orphanGroups;
   if (groups.length) {
     // (what breaks off debris only to be seen is only to be seen too)
-    groups.forEach((g, k) => { const d = b.spawnDebris(eid, ship, g, oldCom, pose, k); if (b.intangible.has(eid)) b.intangible.add(d); });
+    const ids = groups.map((g, k) => { const d = b.spawnDebris(eid, ship, g, oldCom, pose, k); if (b.intangible.has(eid)) b.intangible.add(d); return d; });
+    // Clients that have this ship as it was can work the pieces out themselves (bridge/debrisNet.ts, SnapshotBuilder)
+    if (derivable && !b.intangible.has(eid)) {
+      const parts = groups.flat().sort((x, y) => x - y);
+      b.debrisNet.noteSplit(eid, { ship, tick: b.host.getTick(), com: oldCom, ids, groups: groups.map((g) => [...g]), parts });
+      for (const d of ids) { const sp = b.bodies.get(d); if (sp) b.debrisNet.spawns.set(d, { hash: debrisHash(b.readBody(d, sp)), rebuilds: sp.rebuilds }); }
+    }
     for (const g of groups) for (const i of g) ship.detached[i] = true;
     rebuildShip(ship, b.catalog, b.tuning);
+    b.debrisNet.noteCom(eid, ship.rebuilds, ship.derived.com);
   }
   const held = b.charge.get(eid);
   if (held) b.setCharge(eid, remapCharge(before, ship.derived, held));
@@ -398,38 +408,28 @@ export function shed(b: BridgeCtx, eid: number, groups: number[][], fling = 0, c
   const pose = b.pose(eid), com = ship.derived.com;
   live.forEach((g, k) => { const d = b.spawnDebris(eid, ship, g, com, pose, k, fling, crumble); if (intangible) b.intangible.add(d); });
   for (const g of live) for (const i of g) ship.detached[i] = true;
-  b.rebuildNow(eid, ship);
+  // (Pieces shed whole aren't for clients to work out: what then hangs off nothing isn't either, it goes as before)
+  b.rebuildNow(eid, ship, false);
 }
 
 /** A connected group of parts leaves `ship` as a new debris body built from the same parts and HP. */
 export function spawnDebris(b: BridgeCtx, parentEid: number, ship: ShipState, group: number[], parentCom: Vec2, pose: { x: number; y: number; angle: number }, k: number, fling = 0, crumble = 0): number {
-  const parts = group.map((i) => ship.blueprint.parts[i]);
   const hp = group.map((i) => ship.hp[i]);
-  const bp: Blueprint = { name: `${ship.blueprint.name} debris`, catalogVersion: ship.blueprint.catalogVersion, parts };
   const eid = b.host.createBody();
   InSystem.systemId[eid] = InSystem.systemId[parentEid]; // debris stays in its ship's system
-  const rng = seededRng(hashInts(parentEid, b.host.getTick(), k));
-  const debris = b.spawnOn(eid, bp, 'debris', hp, ship.angVel + (rng() - 0.5) * 2 * b.tuning.debris.pushSpin);
+  // (Worked out as clients do, common ships/debris.ts: from the ship on the replicated grid, seeded by ship, tick and group)
+  const p = splitPose(pose.x, pose.y, pose.angle, Velocity.x[parentEid], Velocity.y[parentEid], ship.angVel);
+  const rng = splitRng(parentEid, b.host.getTick(), k);
+  const spin = debrisSpin(p.angVel, rng, b.tuning.debris.pushSpin);
+  const debris = b.spawnOn(eid, debrisBlueprint(ship.blueprint, group), 'debris', hp, spin);
   // Debris breaking up further keeps its parts' crumble times
   const parentDecay = b.decayAt.get(parentEid);
   if (parentDecay) b.decayAt.set(eid, group.map((i) => parentDecay[i]));
   if (crumble > 0) { const now = b.host.getTick(); b.decayAt.set(eid, group.map(() => now + Math.round(crumble * (0.5 + 0.5 * rng())))); }
 
-  const cs = b.tuning.cellSize;
-  const [rx, ry] = localToWorldDir([(debris.derived.com[0] - parentCom[0]) * cs, (debris.derived.com[1] - parentCom[1]) * cs], pose.angle);
-  Position.x[eid] = pose.x + rx;
-  Position.y[eid] = pose.y + ry;
-  Rotation.angle[eid] = pose.angle;
-  // Parent's velocity at the group's centre of mass, plus a small seeded push
-  const push = b.tuning.debris.pushSpeed * (0.5 + rng());
-  const dir = rng() * Math.PI * 2;
-  Velocity.x[eid] = Velocity.x[parentEid] - ship.angVel * ry + Math.cos(dir) * push;
-  Velocity.y[eid] = Velocity.y[parentEid] + ship.angVel * rx + Math.sin(dir) * push;
-  if (fling > 0) {
-    const l = Math.hypot(rx, ry) || 1, f = fling * (0.6 + 0.8 * rng());
-    Velocity.x[eid] += (rx / l) * f;
-    Velocity.y[eid] += (ry / l) * f;
-  }
+  // Parent's velocity at the group's centre of mass, plus a small seeded push (and a fling)
+  const body = debrisMotion(p, parentCom, debris.derived.com, b.tuning.cellSize, spin, rng, b.tuning.debris.pushSpeed, fling);
+  b.writeBody(eid, debris, body);
   return eid;
 }
 

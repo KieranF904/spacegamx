@@ -45,17 +45,17 @@ export function stepShipPhysics(
   derived: ShipDerived,
   tuning: ShipTuning,
   /** The charge, whether it's accounted (drainRate 0: not), and what the guns and mining lasers draw this tick per feed group (energy.ts gunLoad) */
-  boost: { charge: Charge; drainRate: number; load?: ArrayLike<number>; tick?: number },
+  boost: { charge: Charge; drainRate: number; load?: ArrayLike<number>; tick?: number; replay?: number },
   gravity: GravityWell | null = null,
   jumpBoost = 1,
   hazard?: FlightConstants['hazard'],
   terrain?: Terrain | null,
-): { charge: Charge; isBoosting: boolean; power: number } {
+): { charge: Charge; isBoosting: boolean; power: number; ctlPower: number } {
   const k = gravity || jumpBoost !== 1 || hazard ? { ...SHIP_FLIGHT_CONSTANTS, gravity, jumpBoost, hazard } : SHIP_FLIGHT_CONSTANTS;
   const res = stepFlight(body, input, derived, tuning, boost, k);
   // A surface's rock: pushed out of it, alike on every side (terrain.ts)
   if (terrain) collideTerrain(body, terrainRadius(derived.radius), terrain);
   quantizeShipBody(body);
   // (The charge comes back rounded alike on server and client: energy.ts)
-  return { charge: res.charge, isBoosting: res.isBoosting, power: res.power };
+  return { charge: res.charge, isBoosting: res.isBoosting, power: res.power, ctlPower: res.ctlPower };
 }

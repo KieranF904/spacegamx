@@ -19,7 +19,7 @@ import {
   Position, Velocity, Rotation, Radius, InSystem, Player, Dead, Health, Boost, Input, Projectile, Lifetime, DroppedItem, Station, Portal,
   ASTEROID_SEED, MAP_DOT_SLACK, STATION_DESIGNS, STATION_WEAPONS, EntityType, packCursorWeaponState, quantizeShipValue, packCharge, gunStateAt, packGunState, PILOT_ROW,
   warmthPercent, fartherThan,
-  mapDotFlags, legAt, packMapLeg, packMapRoute, unpackMapLegs, nearerThan,
+  mapDotFlags, legAt, packMapLeg, packMapRoute, unpackMapLegs, nearerThan, packIds, packRuns, DEBRIS_STATUS, TICK_RATE,
   type Leg, type EntityState, type ShipState, type ClientSocket, type ServerMessage, type ServerAsteroidSeedMessage, type StarSystemData, type AsteroidSpawnData,
 } from '@space-game/common';
 import type { GameData } from '../data/GameData.js';
@@ -36,7 +36,10 @@ import type { LootPods } from '../game/LootPods.js';
 import type { ServerFeatures } from '../ships/features/host.js';
 import { stationQuery } from '../game/Docking.js';
 import { portalQuery } from './handlers/flight.js';
-import { SELF_SAFETY_TICKS, SNAP_PROJECTILE_RANGE, SNAP_POD_RANGE, SHIP_VIEW_IN, SHIP_VIEW_OUT, MAP_DOTS_TICKS } from './snapshot/constants.js';
+import { SELF_SAFETY_TICKS, SNAP_PROJECTILE_RANGE, SNAP_POD_RANGE, SHIP_VIEW_IN, SHIP_VIEW_OUT, MAP_DOTS_TICKS, DEBRIS_ACK_TICKS } from './snapshot/constants.js';
+
+/** A debris body's status row as its key (rowKey): what a client makes itself for debris it works out (common ships/debris.ts) */
+const DEBRIS_ROW_KEY = DEBRIS_STATUS.join(',');
 
 /** Pilots, projectiles and loot pods (GameServer reads the same queries) */
 export const playerQuery = defineQuery([Player, Position, Velocity, Rotation, Input, Health, Boost]);
@@ -249,11 +252,12 @@ export class SnapshotBuilder {
       if (!this.ships.has(id)) { conn.shipSynced.delete(id); conn.shipHpSent.delete(id); }
     }
     const hps: [number, [number, number][]][] = [];
+    // (Debris it's working out itself waits for its confirmation: ackDebris)
     // Ships out of view wait (the client keeps what it had, and catches up when one comes back). The view was
     // made this snapshot from the system's bodies in their order (updateShipView), so this goes in that order too
     for (const id of conn.shipView) {
       const ship = this.ships.bodies.get(id);
-      if (!ship || InSystem.systemId[id] !== systemId) continue;
+      if (!ship || InSystem.systemId[id] !== systemId || conn.debrisHeld.has(id)) continue;
       let synced = conn.shipSynced.get(id);
       // A refit or respawn replaces the ShipState (its rebuild count restarts), so compare both
       if (!synced || synced.ship !== ship || synced.rebuilds !== ship.rebuilds) {
@@ -479,6 +483,7 @@ export class SnapshotBuilder {
     if (this.clients.size === 0) {
       this.pendingRemovedEntities.clear();
       this.ships.fired.length = 0;
+      this.ships.debrisNet.afterSnapshot((id) => this.ships.has(id));
       return;
     }
     this.snapshotCount++;
@@ -508,12 +513,14 @@ export class SnapshotBuilder {
       // Interest management: what's near is sent every snapshot; distant ships every few
       // (the client dead-reckons in between); distant projectiles and loot not at all
       const px = Position.x[conn.playerId], py = Position.y[conn.playerId];
+      // Debris it can work out itself: told how (first, before the ship's own sync), and held back till it confirms
+      this.holdDebris(conn);
       // Ships that left its view: it forgets them, and gets each again on its own when it comes back
       const out = this.updateShipView(conn, playerSystemId, px, py);
       // (its structure too: the client drops a ship it hasn't seen for a moment, so it's synced afresh when it comes back)
       for (const id of out) { conn.sentNames.delete(id); conn.shipSynced.delete(id); conn.shipHpSent.delete(id); }
       // Ship motion: keyframes where needed, control changes otherwise
-      const rep = this.replication.forClient(playerSystemId, conn.playerId, conn.repKnown, this.currentTick, conn.shipView);
+      const rep = this.replication.forClient(playerSystemId, conn.playerId, conn.repKnown, this.currentTick, conn.shipView, conn.debrisHeld);
       // Shots from ships it replicates go as fire events: it builds the shells itself (launch.ts).
       // Not for a ship it's only now getting a keyframe for (it can't place it back then), nor its
       // own (predicted, not replicated); those shells, and any flying in from further off, go as rows.
@@ -529,6 +536,9 @@ export class SnapshotBuilder {
       }
       for (const r of rows) {
         if ((r.kind === 'player' || r.kind === 'ship') && !conn.shipView.has(r.id)) continue;
+        // (Debris it's working out itself: nothing till it confirms; once it has, the status row it made itself counts as sent)
+        if (conn.debrisHeld.has(r.id)) continue;
+        if (conn.debrisRowOk.size && conn.debrisRowOk.delete(r.id) && r.key === DEBRIS_ROW_KEY) { newStates.set(r.id, r.key); continue; }
         if (r.kind === 'projectile' && covered.has(r.id)) { newStates.set(r.id, r.key); continue; }
         if ((r.kind === 'projectile' || r.kind === 'mob') && fartherThan(r.x - px, r.y - py, SNAP_PROJECTILE_RANGE)) continue;
         if (r.kind === 'pod' && fartherThan(r.x - px, r.y - py, SNAP_POD_RANGE)) continue;
@@ -594,10 +604,13 @@ export class SnapshotBuilder {
         markIfChanged({ id: eid, type: EntityType.Portal, x: Math.round(Position.x[eid]), y: Math.round(Position.y[eid]), data: [Portal.targetSystem[eid], Portal.kind[eid], Portal.hue[eid]] });
       }
 
-      // Removals this client cares about: things in its system, or that it was sent
+      // Removals this client cares about: only what it was sent (a row, a fire event's shell, a seeded rock, a station) or
+      // made itself (debris it worked out: conn.debrisHeld). A shell 60 km off it never had costs it nothing
       const removed: number[] = [];
-      for (const [eid, sys] of this.pendingRemovedEntities) {
-        if (sys !== playerSystemId && !prevStates.has(eid) && !conn.knownEntities.has(eid)) continue;
+      for (const [eid] of this.pendingRemovedEntities) {
+        // (Debris it worked out: held, or confirmed but its row not yet counted as sent, debrisRowOk: it has it all the same)
+        const made = conn.debrisHeld.delete(eid) || conn.debrisRowOk.delete(eid);
+        if (!prevStates.has(eid) && !conn.knownEntities.has(eid) && !made) continue;
         removed.push(eid);
         conn.sentNames.delete(eid);
         conn.mapNamed.delete(eid);
@@ -635,6 +648,7 @@ export class SnapshotBuilder {
       for (const conn of this.clients.values()) conn.knownEntities.delete(eid);
     }
     this.pendingRemovedEntities.clear();
+    this.ships.debrisNet.afterSnapshot((id) => this.ships.has(id));
     this.replication.endSnapshot();
     this.ships.fired.length = 0;
     [this.keysWere, this.keysNow] = [this.keysNow, this.keysWere];
@@ -645,6 +659,55 @@ export class SnapshotBuilder {
   }
 
   private lastMapDotsTick = -Infinity;
+
+  /** Debris confirmations: right, wrong (sent in full instead), and never (sent in full when its time ran out) */
+  readonly debrisAcks = { ok: 0, wrong: 0, late: 0, gone: 0 };
+
+  /**
+   * Splits this client can work out itself (common ships/debris.ts deriveSplit): it has the ship as it was (its last
+   * sync is the structure the split started from) and replicates it. Each goes as a debrisSplit, before the ship's own
+   * sync and the snapshot, and its pieces are held back (no sync, keyframe, status row or HP) until the client
+   * confirms them (ackDebris), or its time runs out and they go as any ship does. Never for its own ship.
+   */
+  private holdDebris(conn: ClientConnection): void {
+    const now = this.currentTick;
+    for (const [id, h] of conn.debrisHeld) {
+      // (A piece removed meanwhile stays held till the removal goes: it has it)
+      if (h.until < now && this.ships.has(id)) { conn.debrisHeld.delete(id); this.debrisAcks.late++; }
+      else if (h.until < now - 600) conn.debrisHeld.delete(id);
+    }
+    for (const [parent, splits] of this.ships.debrisNet.splits) {
+      if (parent === conn.playerId || !conn.shipView.has(parent) || !conn.repKnown.has(parent)) continue;
+      const synced = conn.shipSynced.get(parent), had = conn.shipHpSent.get(parent);
+      if (!synced || !had) continue;
+      // (Its copy is the structure the split started from if its centre of mass is that one: HP-band rebuilds don't move it)
+      const com = this.ships.debrisNet.comAt(parent, synced.rebuilds);
+      for (const sp of splits) {
+        if (synced.ship !== sp.ship || !com || com[0] !== sp.com[0] || com[1] !== sp.com[1]) continue;
+        const until = now + DEBRIS_ACK_TICKS + 2 * Math.ceil(conn.ping / (1000 / TICK_RATE));
+        sp.ids.forEach((id, k) => conn.debrisHeld.set(id, { until, hp: sp.groups[k].map((i) => had[i] ?? 0) }));
+        this.send(conn.ws, { type: 'debrisSplit', id: parent, tick: sp.tick, e: packIds(sp.ids), p: packRuns(sp.parts) });
+      }
+    }
+  }
+
+  /** A client's confirmations of debris it worked out ([id, check, ...], on its input): right, it counts as sent */
+  ackDebris(conn: ClientConnection, acks: readonly number[]): void {
+    for (let i = 0; i + 1 < acks.length; i += 2) {
+      const id = acks[i], held = conn.debrisHeld.get(id);
+      if (!held) continue;
+      conn.debrisHeld.delete(id);
+      const sp = this.ships.debrisNet.spawns.get(id), ship = this.ships.bodies.get(id);
+      // (Wrong: it goes in full, and it's keyframed for everyone, so what it knocked into meanwhile comes right too)
+      if (!sp || !ship) { this.debrisAcks.gone++; continue; }
+      if (sp.hash !== acks[i + 1]) { this.debrisAcks.wrong++; this.ships.debrisNet.touched.add(id); continue; }
+      this.debrisAcks.ok++;
+      conn.shipSynced.set(id, { ship, rebuilds: sp.rebuilds });
+      conn.shipHpSent.set(id, held.hp);
+      conn.repKnown.set(id, 1);
+      conn.debrisRowOk.add(id);
+    }
+  }
 
   /**
    * The system map's ships past the snapshot's ship view, once a second to

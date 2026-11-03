@@ -1,12 +1,12 @@
 {
   "drive-bank-boost": {
     "ticks": 590,
-    "trace": "0bd34dfad7a358d9",
+    "trace": "27759ca8b1b5dbad",
     "charge": "0cc46e709465dac8",
     "final": {
-      "x": 1968.82,
+      "x": 1967.76,
       "y": -26805.45,
-      "vx": 14.5441,
+      "vx": 14.5393,
       "vy": -7.05,
       "angle": 0.39965,
       "angVel": 0,

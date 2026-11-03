@@ -349,7 +349,15 @@ export class Weapons {
     const num = InSystem.systemId[proj];
     if (x.def.splash) this.ships.splashAt(num, px, py, x.def.splash.radius, x.def.splash.damage * x.damageScale, x.owner, weaponHit(x.kind, x.def, Projectile.tier[proj] || 1), overhead ? [Projectile.spawnX[proj], Projectile.spawnY[proj]] : undefined);
     if (x.def.emp) this.ships.empAt(num, px, py, x.def.emp.radius, x.def.emp.ticks, x.owner);
+    // A plain slug (a Pip's, a Rattler's: nothing bursts, spreads or carries on) says nothing more: clients draw its
+    // impact from the projectileHit they get anyway (WeaponFx), so a detonation would only repeat it (39 bytes a hit)
+    if (!bursts(x.def)) return;
     const radius = x.def.splash?.radius ?? x.def.emp?.radius ?? 40;
     this.host.broadcast(num, { type: 'detonation', kind: x.kind, x: Math.round(px), y: Math.round(py), radius });
   }
+}
+
+/** Does a shell of this kind do anything at its end a detonation has to tell (a burst, an EMP, shards, a pull, fire)? */
+export function bursts(def: WeaponTuning): boolean {
+  return !!(def.splash || def.emp || def.split || def.pierce || def.ignite || def.chain || def.pull || def.hold || def.fuse);
 }

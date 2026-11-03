@@ -40,6 +40,9 @@ export * from './starfield.js';
 // Modular ships (proto/modular-ships)
 export * from './ships/index.js';
 
+// Deterministic trigonometry (the same bits in every engine): math/detTrig.ts
+export * from './math/detTrig.js';
+
 // Economy: items, stacks, recipes, player profiles
 export * from './econ/index.js';
 export * from './terrain.js';

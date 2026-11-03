@@ -28,9 +28,9 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
  * has updated PROTOCOL_VERSION and PROTOCOL_WIRE_HASH.
  */
 // History: PROTOCOL_CHANGELOG.md. Re-pin with `npm run wire:bump "reason"` (game-v2/), never by hand.
-export const PROTOCOL_VERSION = 24;
+export const PROTOCOL_VERSION = 25;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
-export const PROTOCOL_WIRE_HASH = '79852a87';
+export const PROTOCOL_WIRE_HASH = '1525a8b1';
 /** WebSocket close code (and reason) for a client on another protocol version */
 export const PROTOCOL_MISMATCH_CLOSE = 4002;
 export const PROTOCOL_MISMATCH_REASON = 'version';
@@ -63,6 +63,8 @@ export interface ClientInputMessage {
   jump?: boolean;
   /** Burst Strafer: held to dodge, the way the movement keys ask (ships/features/strafer) */
   dodge?: boolean;
+  /** Debris it worked out (debrisSplit), each piece's id and 8-bit check (ships/debris.ts debrisHash): [id, hash, id, hash, ...] */
+  acks?: number[];
 }
 
 /** Cursor distance is sent in steps of this many world units, up to CURSOR_DIST_MAX */
@@ -781,6 +783,7 @@ export type ServerMessage =
   | ServerShipSyncMessage
   | ServerShipHpMessage
   | ServerShipHpBatchMessage
+  | ServerDebrisSplitMessage
   | ServerShipEditResultMessage
   | ServerProjectileHitMessage
   | ServerDockResultMessage
@@ -1174,6 +1177,20 @@ export interface ServerShipHpBatchMessage {
   ships: [number, [number, number][]][];
 }
 
+/**
+ * A ship lost parts that broke away as debris, and this client can work the pieces out itself (ships/debris.ts
+ * deriveSplit) instead of being sent each: `id` the ship, `tick` the split's, `e` the pieces' entity ids in group order
+ * (packIds), `p` the parts that left (packRuns). It confirms each piece (ClientInputMessage.acks); a piece it gets
+ * wrong, or doesn't confirm in time, is sent as before (protocol 25)
+ */
+export interface ServerDebrisSplitMessage {
+  type: 'debrisSplit';
+  id: number;
+  tick: number;
+  e: number[];
+  p: number[];
+}
+
 /** The client has no blueprint for this ship (it was dropped): send a full sync */
 export interface ClientShipNeedMessage {
   type: 'shipNeed';
@@ -1211,9 +1228,44 @@ export function unwrapTick16(low: number, near: number): number {
   return near + d;
 }
 
+/**
+ * After the 11 bytes, optionally (protocol 25): debris acks, a count byte then each piece's id as a little-endian
+ * base-128 varint and its 8-bit check (ClientInputMessage.acks)
+ */
+const INPUT_BYTES = 11;
+const MAX_INPUT_ACKS = 32;
+
+function ackTail(acks: number[] | undefined): number[] {
+  if (!acks?.length) return [];
+  const n = Math.min(MAX_INPUT_ACKS, acks.length >> 1);
+  const out = [n];
+  for (let i = 0; i < n; i++) {
+    let id = Math.max(0, Math.floor(acks[i * 2])) >>> 0;
+    do { const b = id & 0x7f; id >>>= 7; out.push(id ? b | 0x80 : b); } while (id);
+    out.push(acks[i * 2 + 1] & 0xff);
+  }
+  return out;
+}
+
+function readAcks(view: DataView): number[] | undefined {
+  if (view.byteLength <= INPUT_BYTES) return undefined;
+  let at = INPUT_BYTES;
+  const n = Math.min(MAX_INPUT_ACKS, view.getUint8(at++));
+  const out: number[] = [];
+  for (let i = 0; i < n && at < view.byteLength; i++) {
+    let id = 0, shift = 0, b = 0;
+    do { if (at >= view.byteLength || shift > 28) return out; b = view.getUint8(at++); id += (b & 0x7f) * 2 ** shift; shift += 7; } while (b & 0x80);
+    if (at >= view.byteLength) return out;
+    out.push(id, view.getUint8(at++));
+  }
+  return out.length ? out : undefined;
+}
+
 export function encodeInputBinary(msg: ClientInputMessage): ArrayBuffer {
-  const buffer = new ArrayBuffer(11);
+  const tail = ackTail(msg.acks);
+  const buffer = new ArrayBuffer(INPUT_BYTES + tail.length);
   const view = new DataView(buffer);
+  for (let i = 0; i < tail.length; i++) view.setUint8(INPUT_BYTES + i, tail[i]);
   view.setUint8(0, BINARY_MSG_INPUT);
   view.setUint16(1, msg.seq & 0xFFFF, true);
   view.setUint16(3, (msg.targetTick ?? 0) & 0xFFFF, true);
@@ -1263,6 +1315,7 @@ export function decodeInputBinary(data: ArrayBuffer | Uint8Array): ClientInputMe
     jump: (flags2 & 0x08) !== 0,
     dodge: (flags2 & 0x40) !== 0,
     cursorDist: view.getUint16(8, true) * CURSOR_DIST_STEP,
+    acks: readAcks(view),
   };
 }
 
@@ -1336,6 +1389,7 @@ const COMPACT: [string, string[]][] = [
   ['partDestroyed', ['bodyId', 'part', 'fn', 'how', 'x', 'y', 'vx', 'vy', 'size']],
   ['contact', ['x', 'y', 'nx', 'ny', 'speed']],
   ['shipHps', ['ships']],
+  ['debrisSplit', ['id', 'tick', 'e', 'p']],
   ['shipSync', ['id', 'kind', 'hp', 'detached', 'rebuilds', 'design', 'blueprint', 'hpd', 'ghosts']],
   ['effect', ['effectType', 'x', 'y', 'targetX', 'targetY', 'entityId', 'data']],
   ['death', ['entityId', 'entityType', 'killerId']],

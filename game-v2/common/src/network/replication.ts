@@ -22,6 +22,12 @@
  */
 
 import { ReplicaMode, ReplicaControls, ReplicaEnv, FlightBody, ShipTuning, ShipDerived, replicaStep } from '../ships/index.js';
+import { stepDebrisWorld, type DebrisBody } from '../ships/debris.js';
+import { SHIP_FLIGHT_CONSTANTS } from '../ships/physics.js';
+import type { Vec2 } from '../ships/types.js';
+
+/** A piece of debris's shape for the knocks (ShipReplicaSet's debrisShape): its mass, radius, centre and convex pieces */
+export interface DebrisShape { mass: number; radius: number; com: Vec2; pieces: readonly (readonly Vec2[])[] }
 import { quantizeCursorAngle, dequantizeCursorAngle } from './cursorState.js';
 
 export type KeyframeRow = number[];
@@ -181,7 +187,68 @@ export class ShipReplicaSet {
     private env: () => ReplicaEnv,
     /** A station's position at a tick (docked ships ride along) */
     private stationAt?: (station: number, tick: number) => { x: number; y: number } | null,
+    /** A piece of debris's shape (null: not known yet; it drifts without knocking) */
+    private debrisShape?: (id: number) => DebrisShape | null,
   ) {}
+
+  /** Debris is stepped all together (drift, then knocks: common ships/debris.ts), as on the server: through this tick */
+  private dLast = -Infinity;
+  /** ...and from this tick on it must be stepped again (a keyframe or a new piece came for an earlier tick) */
+  private dDirty = Infinity;
+
+  /** A piece of debris worked out here (common ships/debris.ts deriveSplit): it starts at `tick` as `body` */
+  spawnDebris(id: number, tick: number, body: FlightBody): void {
+    this.reps.set(id, { mode: ReplicaMode.Drift, events: new Map(), hist: new Map([[tick, { body: cloneBody(body), bits: 0, q: 0 }]]), last: tick, kf: tick, q: 0 });
+    this.dDirty = Math.min(this.dDirty, tick);
+  }
+
+  /**
+   * Every piece of debris to tick `to`, a tick at a time and all together, in id order: each drifts, then pieces that
+   * overlap are pushed apart (stepDebrisWorld, the server's step). A keyframe (or a new piece) is its state at the end
+   * of its tick, after that tick's step on the server: it takes no part in that tick's step, and joins in from the next.
+   * A keyframe or new piece for a tick already stepped makes them all step again from there.
+   */
+  private stepDebrisTo(to: number): void {
+    if (to <= this.dLast && this.dDirty > this.dLast) return;
+    const drift: [number, Rep][] = [];
+    for (const e of this.reps) if (e[1].mode === ReplicaMode.Drift && e[1].hist.size) drift.push(e);
+    if (!drift.length) { this.dLast = Math.max(this.dLast, to); this.dDirty = Infinity; return; }
+    drift.sort((a, b) => a[0] - b[0]);
+    let from = Math.min(this.dLast, this.dDirty);
+    if (from === -Infinity) { from = Infinity; for (const [, r] of drift) from = Math.min(from, r.kf); }
+    // (Stepped again from `from`: what came after it goes, bar keyframes)
+    for (const [, r] of drift) {
+      let last = -Infinity;
+      for (const t of [...r.hist.keys()]) { if (t > from && t !== r.kf) r.hist.delete(t); else if (t > last) last = t; }
+      r.last = last;
+    }
+    const env = this.env();
+    const k = env.gravity ? { ...SHIP_FLIGHT_CONSTANTS, gravity: env.gravity } : SHIP_FLIGHT_CONSTANTS;
+    const cs = this.tuning.cellSize, restitution = this.tuning.collision?.restitution ?? 0.3;
+    const end = Math.min(to, from + 600);
+    const list: DebrisBody[] = [], reps: Rep[] = [];
+    for (let t = from + 1; t <= end; t++) {
+      list.length = reps.length = 0;
+      for (const [id, r] of drift) {
+        // (its keyframe or spawn is this tick's end: kept as it is)
+        if (r.kf === t) continue;
+        const prev = r.hist.get(t - 1);
+        if (!prev) continue;
+        const shape = this.debrisShape?.(id);
+        list.push({ id, body: cloneBody(prev.body), mass: shape?.mass ?? 0, radius: shape?.radius ?? 0, com: shape?.com ?? [0, 0], pieces: shape?.pieces ?? [] });
+        reps.push(r);
+      }
+      stepDebrisWorld(list, k, cs, restitution);
+      for (let i = 0; i < list.length; i++) {
+        reps[i].hist.set(t, { body: list[i].body, bits: 0, q: 0 });
+        reps[i].last = t;
+      }
+    }
+    // (Stepped again from `from`, it's been stepped to `end` only: what came after went in the rewind)
+    this.dLast = end;
+    this.dDirty = Infinity;
+    for (const [, r] of drift) for (const t of r.hist.keys()) if (t < end - HISTORY) r.hist.delete(t);
+  }
 
   has(id: number): boolean {
     return this.reps.has(id);
@@ -220,6 +287,8 @@ export class ShipReplicaSet {
       r.hist.set(tick, { body: k.body, bits: k.ctl.bits, q: k.q });
       r.last = tick;
       r.kf = tick;
+      // (Debris: its keyframe is how that tick ended, so that tick is stepped again, the others without it: stepDebrisTo)
+      if (k.mode === ReplicaMode.Drift) this.dDirty = Math.min(this.dDirty, tick - 1);
     }
     for (const packed of ctl ?? []) {
       const id = controlRowId(packed);
@@ -265,6 +334,8 @@ export class ShipReplicaSet {
   at(id: number, tick: number): Step | null {
     const r = this.reps.get(id);
     if (!r || !r.hist.size) return null;
+    // (Debris steps as a world: all of it to this tick, knocks and all)
+    if (r.mode === ReplicaMode.Drift) this.stepDebrisTo(tick);
     const exact = r.hist.get(tick);
     if (exact) return exact;
     if (tick < r.last) {
@@ -281,7 +352,7 @@ export class ShipReplicaSet {
       const body = { ...cloneBody(cur.body), x: st.x + r.dock!.ox, y: st.y + r.dock!.oy, vx: 0, vy: 0 };
       return { body, bits: cur.bits, q: cur.q };
     }
-    if (!d) return cur;
+    if (!d || r.mode === ReplicaMode.Drift) return cur;
     const env = this.env();
     // Don't run away: a ship we haven't heard about for a long time simply waits
     const to = Math.min(tick, r.last + 600);

@@ -27,7 +27,8 @@ import {
   stationInteractRadius, stepShipPhysics, stepTurretAim, shipPointToWorld, unpackCursorWeaponState, GravityWell,
   JumpTuning, jumpPhase, jumpTuning, coreHp, FRICTION, worldToLocalDir, partItemId, inSolarRing, jumpRange,
   jumpFieldAt, fieldRangeBoost, fieldCharge, primeBoost, pilotJumpStep, withEmp, lodestonePosition, type JumpField, type LodestoneData,
-  ShipReplicaSet, ServerSnapshotMessage, packCursorWeaponState, rebuildVolley, WEAPON_KIND_TYPE, EntityState, accelAlong, turnAccel, rateShip, stepGuns, volleyShells, firesStraight, partWeaponDef,
+  ShipReplicaSet, ServerSnapshotMessage, ServerDebrisSplitMessage, deriveSplit, unpackIds, unpackRuns, computeJoins, DEBRIS_STATUS, type DebrisShape, type Vec2,
+  packCursorWeaponState, rebuildVolley, WEAPON_KIND_TYPE, EntityState, accelAlong, turnAccel, rateShip, stepGuns, volleyShells, firesStraight, partWeaponDef,
 } from '@space-game/common';
 import type { MenuShipInfo } from '../ui/GameMenuUI';
 import type { GameState, InterpolatedEntity } from '../state/GameState';
@@ -41,7 +42,7 @@ import { Lazy } from '../lazy';
 import { JumpFx } from './JumpFx';
 import { terrainFor } from '../rendering/terrainData';
 import { BossFx } from './BossFx';
-import { DamageFx } from './DamageFx';
+import { DamageFx, PLAIN_HIT_LOOKS } from './DamageFx';
 import { MiningBeamFx } from './MiningBeamFx';
 import { ScannerFx } from './ScannerFx';
 import { IncomingWarning } from '../ui/IncomingWarning';
@@ -58,6 +59,8 @@ import type { QualityProfile } from '../settings/quality';
 
 /** A pulse laser's sound by its grade, Mk I-V: subtle, and centred low (the wide Mk IV deepest, the x-ray Mk V a touch brighter) */
 const PULSE_GRADE_PITCH = [0.98, 0.94, 1.01, 0.9, 1.04];
+/** A shell's weapon kind from its snapshot weapon type (WEAPON_KIND_TYPE turned round) */
+const KIND_OF_TYPE = new Map(Object.entries(WEAPON_KIND_TYPE).map(([k, t]) => [t, k]));
 
 export interface ShipClientOptions {
   catalog: Catalog;
@@ -241,7 +244,56 @@ export class ShipClient {
       (station) => {
         const e = opts.state.entities.get(station);
         return e ? { x: e.renderX, y: e.renderY } : null;
-      });
+      },
+      (id) => this.debrisShape(id));
+  }
+
+  /** Debris worked out here (debrisSplit) to confirm on the next input ([id, check, ...]: InputSend takes them) */
+  private debrisAcks: number[] = [];
+  /** ...and their status rows, made here (the server doesn't send them), for the next snapshot */
+  private debrisRows: EntityState[] = [];
+  private debrisShapes = new WeakMap<ShipState, { rebuilds: number; shape: DebrisShape }>();
+
+  /** The debris to confirm, taken (the input path sends them) */
+  takeAcks(): number[] | undefined {
+    if (!this.debrisAcks.length) return undefined;
+    const a = this.debrisAcks;
+    this.debrisAcks = [];
+    return a;
+  }
+
+  /** A piece of debris's shape for the knocks (its alive parts' convex pieces), worked out once per rebuild */
+  private debrisShape(id: number): DebrisShape | null {
+    const ship = this.store.get(id);
+    if (!ship || ship.kind !== 'debris') return null;
+    const had = this.debrisShapes.get(ship);
+    if (had && had.rebuilds === ship.rebuilds) return had.shape;
+    const pieces: Vec2[][] = [];
+    this.store.geometry(ship).forEach((g, i) => { if (ship.derived.alive[i]) for (const p of g.convexShrunk) pieces.push(p); });
+    const shape = { mass: ship.derived.mass, radius: ship.derived.radius, com: ship.derived.com, pieces };
+    this.debrisShapes.set(ship, { rebuilds: ship.rebuilds, shape });
+    return shape;
+  }
+
+  /**
+   * A ship broke apart and we can work the pieces out ourselves (the server checked we have it as it was): from its
+   * blueprint, its pose at the split's tick and the parts that left (common ships/debris.ts deriveSplit, the server's
+   * own steps). Each piece goes in the store and the replicas, its row into the next snapshot, and its check is sent
+   * back; one we get wrong (or never confirm) the server sends as before. Runs before the ship's own sync is taken in.
+   */
+  private onDebrisSplit(msg: ServerDebrisSplitMessage): void {
+    const parent = this.store.get(msg.id);
+    const at = parent ? this.replicas.at(msg.id, msg.tick) : null;
+    if (!parent || !at) return;
+    const parts = new Set(unpackRuns(msg.p, parent.blueprint.parts.length));
+    const got = deriveSplit(this.store.catalog, this.store.tuning, parent, msg.id, msg.tick, unpackIds(msg.e), parts, computeJoins(this.store.geometry(parent)), at.body, (i) => parent.hp[i]);
+    if (!got) return;
+    for (const d of got) {
+      this.store.bodies.set(d.id, d.ship);
+      this.replicas.spawnDebris(d.id, msg.tick, d.body);
+      this.debrisRows.push({ id: d.id, type: EntityType.ShipBody, x: d.body.x, y: d.body.y, angle: d.body.angle, data: [...DEBRIS_STATUS] });
+      this.debrisAcks.push(d.id, d.hash);
+    }
   }
 
   /** Designs party members sent (newest first, a few kept) */
@@ -305,6 +357,8 @@ export class ShipClient {
   preSnapshot(m: ServerSnapshotMessage): EntityState[] {
     this.replicas.apply(m.tick, m.ships, m.ctl);
     const out: EntityState[] = [];
+    // (Debris worked out here since the last snapshot: its rows, as the server would have sent them)
+    if (this.debrisRows.length) out.push(...this.debrisRows.splice(0));
     for (const [owner, ago, partAmmo, aimQ, ...ids] of m.fire ?? []) {
       const tick = m.tick - ago, part = partAmmo % 256, ammo = Math.floor(partAmmo / 256) % 256, aug = partAmmo >= 65536 ? (1 as const) : undefined;
       // A charge gun's tell (no shells): it started charging, or was let go (guns.ts TELL_CHARGE_*; drawn by the charge FX)
@@ -764,6 +818,9 @@ export class ShipClient {
   /** Returns true when the message was a ship message. */
   handleMessage(msg: ServerMessage): boolean {
     switch (msg.type) {
+      case 'debrisSplit':
+        this.onDebrisSplit(msg);
+        return true;
       case 'shipSync':
         for (const part of this.store.onSync(msg)) this.damageFx?.onPartRestored(msg.id, part);
         this.fillHull(msg.id);
@@ -819,6 +876,11 @@ export class ShipClient {
         return false; // the game draws its own
       case 'projectileHit':
         this.damageFx?.shieldHit(msg.x, msg.y, this.shellLooks.get(msg.id)?.model);
+        {
+          // (A shell with a look of its own that no detonation tells now: a Prism's shards, DamageFx PLAIN_HIT_LOOKS)
+          const kind = KIND_OF_TYPE.get(this.opts.state.entities.get(msg.id)?.data?.[0] ?? -1);
+          if (kind && PLAIN_HIT_LOOKS.has(kind)) this.damageFx?.onDetonation(kind, msg.x, msg.y, 40);
+        }
         return false; // the game stops the tracer and throws the sparks
       case 'scanPulse':
         this.scannerFx?.pulse(msg.seconds);

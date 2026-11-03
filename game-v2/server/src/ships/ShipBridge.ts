@@ -25,6 +25,7 @@ import * as wpn from './bridge/weapons.js';
 import * as dmg from './bridge/damage.js';
 import * as flt from './bridge/flight.js';
 import * as plt from './bridge/pilotless.js';
+import { DebrisNet } from './bridge/debrisNet.js';
 
 // (The engine interface, events and constants now live in bridge/core.ts; re-exported for everything that imports them from here)
 export { STAGE_COVER };
@@ -80,6 +81,8 @@ export class ShipBridge {
   private restoreProgress = new Map<number, number>();
   /** Last contact effect per pair of bodies */
   private contactFx = new Map<string, number>();
+  /** Debris clients work out themselves: splits to tell, spawn checks, what moved otherwise (bridge/debrisNet.ts) */
+  readonly debrisNet = new DebrisNet();
   private joinCache = new WeakMap<Blueprint, [number, number][]>();
   /** EMP'd ships: engines and guns dead until this tick */
   private empUntil = new Map<number, number>();
@@ -247,6 +250,9 @@ export class ShipBridge {
    * pieces whose bounding boxes they meet: the rest can't overlap.
    */
   private resolveContacts(): void { return flt.resolveContacts(this.ctx); }
+
+  /** Every live piece of debris, one tick: drift, then push-only knocks among debris, in id order (common ships/debris.ts) */
+  stepDebrisWorld(ids: readonly number[]): void { this.debrisNet.step(this.ctx, ids); }
 
   private damageContact(eid: number, ship: ShipState, parts: Set<number>, amount: number, source: number): void { return flt.damageContact(this.ctx, eid, ship, parts, amount, source); }
 
@@ -502,7 +508,7 @@ export class ShipBridge {
 
   private noteRebuild(t0: number): void { return rbd.noteRebuild(this.ctx, t0); }
 
-  private rebuildNow(eid: number, ship: ShipState): void { return rbd.rebuildNow(this.ctx, eid, ship); }
+  private rebuildNow(eid: number, ship: ShipState, derivable = true): void { return rbd.rebuildNow(this.ctx, eid, ship, derivable); }
 
   shed(eid: number, groups: number[][], fling = 0, crumble = 0, intangible = false): void { return rbd.shed(this.ctx, eid, groups, fling, crumble, intangible); }
 

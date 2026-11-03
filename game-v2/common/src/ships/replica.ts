@@ -13,10 +13,11 @@
 import type { Terrain } from '../terrain.js';
 import { FULL_CHARGE } from './energy.js';
 import type { FlightBody, FlightControls, GravityWell } from './flight.js';
-import { stepDrift, jumpTuning, inSolarRing, withSlowed, type FlightConstants } from './flight.js';
+import { stepDrift, jumpTuning, inSolarRing, withSlowed, CTL_NO_BOOST, type FlightConstants } from './flight.js';
 import { jumpFieldAt, fieldCooldown, fieldRangeBoost, type FieldEnv } from './jumpFields.js';
 import { stepShipPhysics, quantizeShipBody, SHIP_FLIGHT_CONSTANTS } from './physics.js';
 import { withEmp } from './hazards.js';
+import { stepDebrisBody } from './debris.js';
 import { warmthStage, withNumb } from './warmth.js';
 
 /** (What a numb drive flies with) */
@@ -52,6 +53,8 @@ export const CTL = {
   slowed: 4096,
   /** Burst Strafer: dodge held (its way comes from the movement bits): features/strafer, whose input owns it (features.wire.json). (16384 is free) */
   dodge: 8192,
+  /** The stores refused a boost this step (flight.ts CTL_NO_BOOST). Above it, from bit 15, the engines' power (flight.ts ctlOfPower) */
+  noBoost: CTL_NO_BOOST,
 } as const;
 
 export interface ReplicaControls {
@@ -123,7 +126,7 @@ export function replicaStep(mode: ReplicaMode, body: FlightBody, c: ReplicaContr
       const hazard = env.hazard?.(derived, body.x, body.y);
       // (numb with cold, then slowed, then EMP'd: the order the server and the pilot's prediction apply them in)
       const flown = withSlowed(c.bits & CTL.numb ? withNumb(hazard, NUMB) : hazard, (c.bits & CTL.slowed) !== 0);
-      stepShipPhysics(body, flightControls(c, body), derived, tuning, { charge: FULL_CHARGE, drainRate: 0 }, env.gravity, boost, c.bits & CTL.emp ? withEmp(flown) : flown, env.terrain);
+      stepShipPhysics(body, flightControls(c, body), derived, tuning, { charge: FULL_CHARGE, drainRate: 0, replay: c.bits }, env.gravity, boost, c.bits & CTL.emp ? withEmp(flown) : flown, env.terrain);
       // A charging field (a star's ring, a stillstone's): the drive cools down faster
       body.jump = fieldCooldown(body.jump ?? 0, derived.jumpCooldown || jt.cooldownTicks, jumpFieldAt(body.x, body.y, env, tick, jt), jt, tick);
       return;
@@ -134,8 +137,8 @@ export function replicaStep(mode: ReplicaMode, body: FlightBody, c: ReplicaContr
       return;
     }
     case ReplicaMode.Drift:
-      stepDrift(body, k);
-      quantizeShipBody(body);
+      // (Debris: the deterministic drift every side runs, ships/debris.ts; ShipReplicaSet steps debris as a world, knocks and all)
+      stepDebrisBody(body, k);
       return;
     case ReplicaMode.Anchored: {
       const spin = body.angVel;

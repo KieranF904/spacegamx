@@ -23,3 +23,5 @@ export const LAZY_TICKS = 2;
 
 /** Combat effects (hits, damage numbers, parts blown off) only go to clients this near them */
 export const FX_RANGE = SHIP_VIEW_OUT;
+/** Debris a client was told to work out itself waits this long (plus twice its ping) for its confirmation, then goes as any ship does */
+export const DEBRIS_ACK_TICKS = 30;

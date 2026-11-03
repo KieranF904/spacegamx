@@ -100,11 +100,17 @@ export class Outbox {
 
   /** Send the effects still waiting now (tests that look at a tick's messages straight after it) */
   flushLazy(): void {
+    this.flushDamage();
     for (const [ws, l] of this.lazy) if (ws.isOpen()) ws.send(serverFrame(l.parts));
     this.lazy.clear();
   }
 
   broadcastToSystem(systemId: number, msg: ServerMessage): void {
+    // An effect only for the eye and ear (LAZY_TYPES) that happens somewhere goes only to clients near enough to see it
+    if (LAZY_TYPES.has(msg.type)) {
+      const at = fxPoint(msg);
+      if (at) { this.broadcastNear(systemId, at[0], at[1], msg); return; }
+    }
     const data = encodeServerMessage(msg);
     const byteLen = this.getMessageByteLength(data);
     let sent = 0;
@@ -119,6 +125,29 @@ export class Outbox {
     const total = byteLen * sent;
     this.snapshotBytesSent += total;
     this.bytesByType[msg.type] = (this.bytesByType[msg.type] || 0) + total;
+  }
+
+  /**
+   * Damage dealt since the last snapshot, summed per target, source and glancing (one number for a burst of hits, not
+   * one each), sent to the clients near the target when the next snapshot goes (flushDamage), to a tenth
+   */
+  private readonly damageSums = new Map<string, { sys: number; target: number; source: number; glancing: boolean; amount: number }>();
+
+  addDamage(systemId: number, target: number, amount: number, source: number, glancing: boolean): void {
+    const key = `${target},${source},${glancing ? 1 : 0}`;
+    const e = this.damageSums.get(key);
+    if (e) e.amount += amount;
+    else this.damageSums.set(key, { sys: systemId, target, source, glancing, amount });
+  }
+
+  /** The damage summed since the last snapshot: out with it (just before the snapshot, so it rides that frame) */
+  flushDamage(): void {
+    for (const e of this.damageSums.values()) {
+      const amount = Math.round(e.amount * 10) / 10;
+      if (amount <= 0) continue;
+      this.broadcastNear(e.sys, Position.x[e.target], Position.y[e.target], { type: 'damage', targetId: e.target, amount, sourceId: e.source, ...(e.glancing ? { glancing: true } : {}) }, [e.source]);
+    }
+    this.damageSums.clear();
   }
 
   broadcastProjectileHit(proj: number, x: number, y: number): void {
@@ -137,4 +166,12 @@ export class Outbox {
       this.snapshotBytesSent += this.getMessageByteLength(data);
     }
   }
+}
+
+/** Where an effect happens: its own x, y, or the entity it's about (a part catching fire, a station firing). null: nowhere in particular */
+function fxPoint(msg: ServerMessage): [number, number] | null {
+  const m = msg as unknown as Record<string, unknown>;
+  if (typeof m.x === 'number' && typeof m.y === 'number') return [m.x, m.y];
+  const id = m.bodyId ?? m.targetId ?? m.station ?? m.entityId;
+  return typeof id === 'number' ? [Position.x[id], Position.y[id]] : null;
 }

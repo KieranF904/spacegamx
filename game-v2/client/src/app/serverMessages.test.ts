@@ -5,7 +5,7 @@ import { HANDLERS } from './serverMessages';
 /** ServerMessage types the table need not handle because ShipClient.handleMessage consumes them (ships/ShipClient.ts) */
 const HANDLED_BY_SHIP_CLIENT = [
   'shipSync', 'partDestroyed', 'contact', 'detonation', 'intercept', 'stationFire', 'ignite',
-  'bossCharge', 'bossTelegraph', 'bossBeam', 'bossBlow',
+  'bossCharge', 'bossTelegraph', 'bossBeam', 'bossBlow', 'debrisSplit',
 ];
 
 describe('server message table', () => {

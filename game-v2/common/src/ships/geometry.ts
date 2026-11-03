@@ -365,7 +365,7 @@ export function convexPenetration(a: Vec2[], b: Vec2[]): { depth: number; nx: nu
       const p = poly[i];
       const q = poly[(i + 1) % poly.length];
       let ax = q[1] - p[1], ay = p[0] - q[0];
-      const len = Math.hypot(ax, ay);
+      const len = Math.sqrt(ax * ax + ay * ay); // (not Math.hypot: the same bits in every engine, ships/debris.ts)
       if (len < 1e-12) continue;
       ax /= len; ay /= len;
       // Both projections, inline (this runs for every pair of touching pieces: no arrays)

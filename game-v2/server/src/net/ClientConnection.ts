@@ -50,6 +50,13 @@ export interface ClientConnection {
   sentNames: Map<number, string>;
   /** Ship keyframe versions this client has (replication) */
   repKnown: Map<number, number>;
+  /**
+   * Debris it was told to work out itself (debrisSplit) and hasn't confirmed: id → the tick it may wait till, and its
+   * parts' HP as the client has them (SnapshotBuilder.holdDebris, ackDebris)
+   */
+  debrisHeld: Map<number, { until: number; hp: number[] }>;
+  /** Debris it confirmed: the status row it made itself counts as sent at the next snapshot */
+  debrisRowOk: Set<number>;
   /** Ships in this client's view (the rest of the system's ships cost it nothing) */
   shipView: Set<number>;
   /** Ships out of view it's been told the names of, for the map (mapDots) */

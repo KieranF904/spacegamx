@@ -59,6 +59,14 @@ const CHUNK = [-1, -0.6, 0.8, -0.8, 1, 0.5, -0.5, 1];
 /** A parked hot edge's (nothing) */
 const EMPTY = new GraphicsContext();
 
+/** Slugs: a hit of one is drawn by WeaponFx from projectileHit; a detonation of one comes only when its ammunition bursts */
+const KINETIC_KINDS = new Set(['cannon', 'autocannon', 'pulse', 'laser']);
+/**
+ * Shells whose plain hit (no detonation: server Weapons.bursts) still has a look of its own here: ShipClient plays it from
+ * the projectileHit, by the shell's weapon type (WEAPON_KIND_TYPE)
+ */
+export const PLAIN_HIT_LOOKS = new Set(['prism_shard']);
+
 export class DamageFx {
   private add = new Graphics();
   /** Redrawn every frame, so a render group of its own: Pixi rebuilds its draw list, not the whole glow layer's */
@@ -254,6 +262,14 @@ export class DamageFx {
       this.glow(x, y, 0, 0, 50, 9, tesla ? 0xb8a4ff : 0x9ad8ff, 0.9);
       this.burstSparks(x, y, 0, 0, 5, 2.5, 8, tesla ? 0xe4dcff : 0xbfe9ff);
       this.sound('hit', { x, y }, 0.5);
+      return;
+    }
+    if (KINETIC_KINDS.has(kind)) {
+      // A slug that bursts after all (its ammunition gives it a splash): a hot puff, no fireball and no shake. A plain
+      // slug's hit sends no detonation at all: WeaponFx draws its impact from projectileHit
+      this.glow(x, y, 0, 0, Math.max(14, radius * 0.5), 8, 0xffd08a, 0.8);
+      this.burstSparks(x, y, 0, 0, 10, 2.5, 8, 0xffc46b);
+      this.sound('hit', { x, y }, 0.6);
       return;
     }
     if (kind === 'singularity') {

@@ -33,6 +33,7 @@ import type { Docking } from '../game/Docking.js';
 import type { Enemies } from '../game/Enemies.js';
 import type { Surfaces } from '../game/Surfaces.js';
 import type { HomeStations } from '../game/HomeStations.js';
+import type { SnapshotBuilder } from './SnapshotBuilder.js';
 
 export interface ServerCtx {
   // ---- state (read only to handlers) ----
@@ -52,6 +53,8 @@ export interface ServerCtx {
   readonly shipEditAnywhere: boolean;
   /** Wall clock (ms); tests pass a fake one */
   readonly clock: () => number;
+  /** The snapshot path, for what a client confirms of it (debris it worked out) */
+  readonly snapshots: Pick<SnapshotBuilder, 'ackDebris'>;
 
   // ---- verbs ----
   send(ws: ClientSocket, msg: ServerMessage): void;

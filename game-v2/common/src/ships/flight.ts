@@ -108,6 +108,8 @@ export interface FlightResult {
   power: number;
   /** Linear acceleration applied this tick, world units / tick² */
   accel: number;
+  /** What a replica must be told in the control bits to fly this step the same (power, a refused boost): ctlOfPower */
+  ctlPower: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -415,7 +417,7 @@ export function stepFlight(
   d: ShipDerived,
   tuning: ShipTuning,
   /** The charge, whether it's accounted (drainRate 0: not), and what the guns and mining lasers draw this tick per feed group (energy.ts gunLoad) */
-  boost: { charge: Charge; drainRate: number; load?: ArrayLike<number>; tick?: number },
+  boost: { charge: Charge; drainRate: number; load?: ArrayLike<number>; tick?: number; replay?: number },
   k: FlightConstants,
 ): FlightResult {
   const ft = tuning.flight;
@@ -448,7 +450,7 @@ export function stepFlight(
     body.vy = Math.sin(body.angle) * speed;
     body.x = Math.max(-k.worldSize, Math.min(k.worldSize, body.x + body.vx));
     body.y = Math.max(-k.worldSize, Math.min(k.worldSize, body.y + body.vy));
-    return { charge: boost.charge, isBoosting: false, accel: 0, power: 1 };
+    return { charge: boost.charge, isBoosting: false, accel: 0, power: 1, ctlPower: 0 };
   }
   const charging = jp === 'charging';
 
@@ -521,6 +523,12 @@ export function stepFlight(
       const along = (body.vx * ix + body.vy * iy) / mag;
       power = thrustShare(d, charge, dir, (rated) => ratedFade(rated, along));
     }
+    // (On the replicated grid: replicas, which have no charge, are told it in the control bits, ctlPower)
+    power = quantizePower(power);
+  } else if (boost.replay !== undefined) {
+    // A replica: what the engines got, as the ship's control bits carry it (replica.ts replicaStep)
+    power = powerOfCtl(boost.replay);
+    if (boost.replay & CTL_NO_BOOST) canBoost = false;
   }
   if (thrusting) {
     ix /= mag; iy /= mag;
@@ -554,7 +562,33 @@ export function stepFlight(
   body.x = Math.max(-k.worldSize, Math.min(k.worldSize, body.x + body.vx));
   body.y = Math.max(-k.worldSize, Math.min(k.worldSize, body.y + body.vy));
 
-  return { charge, isBoosting, accel, power };
+  // What a replica must be told to fly this step as it was flown: the engines' power, and a boost the stores refused
+  const refused = boost.drainRate > 0 && !!d.energy && thrusting && !!input.boost && !isBoosting;
+  return { charge, isBoosting, accel, power, ctlPower: ctlOfPower(power) | (refused ? CTL_NO_BOOST : 0) };
+}
+
+/**
+ * The engines' power on the wire (protocol 25): a step of 1/POWER_STEPS, sent in a replicated ship's control bits as
+ * (steps - POWER_STEPS) in the 6 bits from CTL_POWER_SHIFT (full power: nothing), and CTL_NO_BOOST when the stores
+ * refused a boost. So a ship short of power (a ports ship starving its engines, a pool ship run dry) is stepped by its
+ * replicas exactly as it flew, instead of needing a keyframe every snapshot
+ */
+export const POWER_STEPS = 32;
+export const CTL_POWER_SHIFT = 15;
+export const CTL_NO_BOOST = 16384;
+const POWER_MASK = 63 << CTL_POWER_SHIFT;
+
+export function quantizePower(p: number): number {
+  return Math.max(0, Math.min(63, Math.round(p * POWER_STEPS))) / POWER_STEPS;
+}
+
+export function ctlOfPower(p: number): number {
+  return ((Math.round(p * POWER_STEPS) - POWER_STEPS) & 63) << CTL_POWER_SHIFT;
+}
+
+export function powerOfCtl(bits: number): number {
+  const e = (bits & POWER_MASK) >>> CTL_POWER_SHIFT;
+  return (POWER_STEPS + (e >= 32 ? e - 64 : e)) / POWER_STEPS;
 }
 
 /** Debris: no thrust, no steering, same friction. */

@@ -56,6 +56,8 @@ const sameDock = (a: Shadow['dock'], b: Shadow['dock']) => (!a && !b) || (!!a &&
 
 export class Replication {
   private shadows = new Map<number, Shadow>();
+  /** Pairs of debris that knocked since the last snapshot (a client with one in view and not the other is off on it) */
+  private readonly knocks: [number, number][] = [];
   /** Keyframes sent (for the stats) */
   keyframes = 0;
   /** Why ships left their predicted path (for the stats) */
@@ -88,7 +90,8 @@ export class Replication {
       }
       const rec = this.ships.replicaCtl.get(eid);
       const dock = docks ? docks.get(eid) ?? null : this.host.dockOf(eid);
-      const mode = dock ? ReplicaMode.Docked : rec?.mode ?? ReplicaMode.Pilotless;
+      // (A piece of debris spawned this tick had no step yet: it drifts from the next, so it starts as Drift, not a keyframe later)
+      const mode = dock ? ReplicaMode.Docked : rec?.mode ?? (ship.kind === 'debris' ? ReplicaMode.Drift : ReplicaMode.Pilotless);
       const bits = dock ? 0 : rec?.bits ?? CTL.hold;
       const q = dock ? 0 : rec?.q ?? 0;
       let s = this.shadows.get(eid);
@@ -110,6 +113,12 @@ export class Replication {
       }
       if (s.diverged || mode === ReplicaMode.Docked) continue;
       if (occupied && !occupied.has(InSystem.systemId[eid])) { s.diverged = true; continue; }
+      // Debris is stepped as a world (drift and knocks, common ships/debris.ts), alike by clients: only a piece something
+      // else moved (bridge/debrisNet.ts) is off what they have
+      if (mode === ReplicaMode.Drift) {
+        if (this.ships.debrisNet.touched.has(eid)) { s.diverged = true; this.why('Drift:moved'); }
+        continue;
+      }
       replicaStep(mode, s.body, { bits, targetAngle: replicaAngle(mode, q) }, rec?.derived ?? ship.derived, this.ships.tuning, this.host.env(eid), tick);
       // (The real state, as real() has it, read in place: this runs for every ship every tick)
       const rx = Position.x[eid], ry = Position.y[eid], rvx = Velocity.x[eid], rvy = Velocity.y[eid], ra = Rotation.angle[eid];
@@ -125,6 +134,7 @@ export class Replication {
       }
     }
     this.ships.replicaCtl.clear();
+    for (const pair of this.ships.debrisNet.pairs) this.knocks.push(pair);
   }
 
   /** A ship's keyframe version (bumped whenever it left its predicted path) */
@@ -147,6 +157,8 @@ export class Replication {
 
   /** After the snapshots: the control changes have been delivered */
   endSnapshot(): void {
+    this.knocks.length = 0;
+    this.ships.debrisNet.clearTouched();
     for (const s of this.shadows.values()) {
       if (s.events.length) s.events = [];
       s.qSent = s.q;
@@ -157,12 +169,19 @@ export class Replication {
    * One client's share: keyframes for ships it's new to or behind on, control
    * changes for the rest. `known` is the client's ship → keyframe version.
    */
-  forClient(systemId: number, self: number, known: Map<number, number>, snapshotTick: number, view?: Set<number>): { ships: KeyframeRow[]; ctl: ControlRow[] } {
+  forClient(systemId: number, self: number, known: Map<number, number>, snapshotTick: number, view?: Set<number>, held?: ReadonlyMap<number, unknown>): { ships: KeyframeRow[]; ctl: ControlRow[] } {
     const ships: KeyframeRow[] = [];
     const ctl: ControlRow[] = [];
     for (const id of known.keys()) if (!this.shadows.has(id)) known.delete(id);
+    // (A piece of debris knocked by one this client doesn't step, out of view or not had yet: what it has of it is off)
+    if (view) {
+      const steps = (x: number) => view.has(x) && (known.has(x) || !!held?.has(x));
+      for (const [a, c] of this.knocks) { const sa = steps(a), sc = steps(c); if (sa !== sc) known.delete(sa ? a : c); }
+    }
     for (const [eid, s] of this.shadows) {
       if (eid === self || InSystem.systemId[eid] !== systemId) continue;
+      // Debris it's working out itself (unconfirmed): nothing yet (SnapshotBuilder sends it all if it isn't confirmed)
+      if (held?.has(eid)) continue;
       // Out of the client's view: nothing (and a keyframe when it comes back)
       if (view && !view.has(eid)) { known.delete(eid); continue; }
       if (known.get(eid) !== s.version) {

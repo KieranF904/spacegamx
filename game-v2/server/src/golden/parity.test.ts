@@ -22,7 +22,7 @@ import * as bitecs from 'bitecs';
 import {
   Position, Velocity, Rotation, InSystem, createShipState, flightSignature, controlBits, replicaStep, ReplicaMode, CTL,
   quantizeCursorAngle, dequantizeCursorAngle, quantizeCursorDist, CURSOR_DIST_STEP, jumpTuning, packKeyframe, unpackKeyframe,
-  packGunState, gunStateAt, gunStateValue, GUN_STATE_RELOADING, GUN_STATE_PATIENCE, CHARGE_GROUPS_AT, PILOT_ROW, SNAPSHOT_RATE, TICK_RATE,
+  packGunState, gunStateAt, gunStateValue, CTL_POWER_SHIFT, GUN_STATE_RELOADING, GUN_STATE_PATIENCE, CHARGE_GROUPS_AT, PILOT_ROW, SNAPSHOT_RATE, TICK_RATE,
   type FlightBody, type Charge, type ShipState, type ShipTuning, type ReplicaEnv, type ClientInputMessage,
 } from '@space-game/common';
 import { PILOT_EXTRAS } from '../../../common/src/ships/features/plan.js';
@@ -65,6 +65,8 @@ interface Tick {
   /** Slowed (features/weaponry): the tick its slowing ends as the pilot's row told it before this step (0: not slowed), and whether the server flew this step slowed (its replica control bit) */
   slowUntil: number;
   slowedBit: boolean;
+  /** What the engines got and a refused boost, as its replica control bits carried them (flight.ts ctlOfPower, CTL.noBoost) */
+  powerBits: number;
 }
 
 /** A scenario some of whose ticks the pilot's ship is slowed on (a Frostbite's beam on it: [from, to) 0-based, renewed each tick as a held beam does) */
@@ -116,7 +118,7 @@ function runServer(sc: Scenario) {
   ship.angVel = 0;
   if (sc.cargoOre) server.pilots.get(conn)!.cargo.push({ id: 'iron_ore', n: sc.cargoOre });
   const wreck = sc.tow ? ships.spawnWreck(corsair(), 40000 - sc.tow.wreckDist, 40000, 0, InSystem.systemId[pid], 7) : 0;
-  const read = (): Omit<Tick, 'tick' | 'slowUntil' | 'slowedBit'> => ({
+  const read = (): Omit<Tick, 'tick' | 'slowUntil' | 'slowedBit' | 'powerBits'> => ({
     body: {
       x: Position.x[pid], y: Position.y[pid], vx: Velocity.x[pid], vy: Velocity.y[pid], angle: Rotation.angle[pid], angVel: ship.angVel,
       jump: ship.jump, jumpScale: ship.jumpScale, cargo: ship.cargo, dodge: ship.dodge, dodgeDir: ship.dodgeDir,
@@ -127,21 +129,24 @@ function runServer(sc: Scenario) {
   const ticks: Tick[] = [];
   // (What the pilot's row says of its slowing: the tick it ends, as of the last snapshot)
   let slowKnown = 0;
-  // (The control bits its flight step recorded for the replicas: Replication clears them at the end of the tick)
-  let ctlBits = 0;
+  // (The control bits its flight step recorded for the replicas: Replication clears them at the end of the tick. The record
+  // itself: the step adds the engines' power to it after recording it)
+  let ctlRec: { bits: number } | undefined;
   const ctl = ships.replicaCtl, setCtl = ctl.set.bind(ctl);
-  ctl.set = (k, v) => { if (k === pid) ctlBits = v.bits; return setCtl(k, v); };
+  ctl.set = (k, v) => { if (k === pid) ctlRec = v; return setCtl(k, v); };
   sc.script.forEach((s, i) => {
     t.send({ type: 'input', seq: i + 1, tick: 0, fireLeft: !!(s as FireTick).fire, fireRight: false, ...keysOf(s), targetAngle: s.aim, cursorDist: s.dist ?? 0 } as any);
     if (sc.tow && i === sc.tow.from) t.send({ type: 'tow', on: true } as any);
     const slowUntil = slowKnown;
     server.step();
+    const ctlBits = ctlRec?.bits ?? 0;
     const slowedBit = (ctlBits & CTL.slowed) !== 0;
+    const powerBits = ctlBits & (CTL.noBoost | (63 << CTL_POWER_SHIFT));
     // A Frostbite's beam on it this tick (its weapons step: after the flight step, so it slows the next)
     if ((sc as SlowScenario).slow?.some(([a, b]) => i >= a && i < b)) ships.slow(pid, 42);
     const left = ships.slowedTicksLeft(pid);
     slowKnown = left > 0 ? server.getTick() + left : 0;
-    ticks.push({ ...read(), tick: server.getTick(), slowUntil, slowedBit });
+    ticks.push({ ...read(), tick: server.getTick(), slowUntil, slowedBit, powerBits });
   });
   const env: ReplicaEnv = (server as any).replicaEnv(InSystem.systemId[pid]);
   return { start, ticks, derived: ship.derived, env, wreck, ships, pid };
@@ -164,7 +169,7 @@ function clientPredictor(sc: Scenario, env: ReplicaEnv, sync?: GunSync) {
   return {
     ship,
     /** A player entity as the pilot's snapshot gives it */
-    player(t: Omit<Tick, 'tick' | 'slowUntil' | 'slowedBit'>) {
+    player(t: Omit<Tick, 'tick' | 'slowUntil' | 'slowedBit' | 'powerBits'>) {
       const b = t.body;
       return { id: 1, x: b.x, y: b.y, vx: b.vx, vy: b.vy, angle: b.angle, angVel: b.angVel, jump: b.jump ?? 0, jumpScale: b.jumpScale, cargoMass: b.cargo ?? 0, dodge: b.dodge ?? 0, dodgeDir: b.dodgeDir ?? 0, jumpPrime: t.jumpPrime, warmth: 100 } as any;
     },
@@ -204,7 +209,7 @@ function runReplica(sc: Scenario, run: ReturnType<typeof runServer>, from: numbe
   for (let i = from + 1; i < sc.script.length; i++) {
     const s = sc.script[i];
     // (A slowed ship's replica gets CTL.slowed in its control bits, as the server flew it)
-    replicaStep(ReplicaMode.Player, body, { bits: controlBits(keysOf(s)) | (run.ticks[i].slowedBit ? CTL.slowed : 0), targetAngle: replicaAngle(ReplicaMode.Player, quantizeReplicaAngle(s.aim)) }, run.derived, tuning, run.env, run.ticks[i].tick);
+    replicaStep(ReplicaMode.Player, body, { bits: controlBits(keysOf(s)) | (run.ticks[i].slowedBit ? CTL.slowed : 0) | run.ticks[i].powerBits, targetAngle: replicaAngle(ReplicaMode.Player, quantizeReplicaAngle(s.aim)) }, run.derived, tuning, run.env, run.ticks[i].tick);
     if (!sameRow(bodyRow(body), bodyRow(run.ticks[i].body))) {
       keyframes.push(i);
       body = keyframe(run.ticks[i].body);

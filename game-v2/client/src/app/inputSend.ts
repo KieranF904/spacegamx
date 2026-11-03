@@ -222,10 +222,14 @@ export function tickInput(s: InputSendCtx): void {
 
   // Check if anything changed from last sent state
   const changed = inputChanged(s, msg, quantized, cursorDistQ);
+  // Debris worked out here is confirmed on the next input, which goes now if nothing else would (ShipClient.takeAcks)
+  const acks = s.shipClient?.takeAcks?.();
+  if (acks) msg.acks = acks;
+  const send = changed || !!acks;
 
   // Proto: no targetTick (applied on the next tick) and no prediction queue.
   if (s.proto) {
-    if (changed) {
+    if (send) {
       msg.seq = s.state.nextInputSeq();
       msg.targetTick = undefined;
       s.network.send(msg);
@@ -234,8 +238,8 @@ export function tickInput(s: InputSendCtx): void {
     return;
   }
 
-  // Only send over network if something changed
-  if (changed) {
+  // Only send over network if something changed (or debris is to be confirmed)
+  if (send) {
     msg.seq = s.state.nextInputSeq();
     s.network.send(msg);
     // Queue for delayed application (physics runs when targetTick is reached)

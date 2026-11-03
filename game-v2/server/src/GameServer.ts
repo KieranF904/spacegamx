@@ -2279,7 +2279,8 @@ this.devTeleport = opts.devTeleport ?? false;
       notifyDamage: (targetEid, amount, sourceEid, glancing) => {
         this.bosses?.onDamage(targetEid, amount, sourceEid);
         this.range?.onDamage(targetEid, amount);
-        this.broadcastNear(InSystem.systemId[targetEid], Position.x[targetEid], Position.y[targetEid], { type: 'damage', targetId: targetEid, amount, sourceId: sourceEid, ...(glancing ? { glancing: true } : {}) }, [sourceEid]);
+        // (Summed per target and source until the next snapshot, net/snapshot/Outbox.ts flushDamage)
+        this.net.addDamage(InSystem.systemId[targetEid], targetEid, amount, sourceEid, !!glancing);
       },
       notifyProjectileHit: (proj, x, y) => this.broadcastProjectileHit(proj, x, y),
       onShipDestroyed: (eid, lastHitBy, ship) => {
@@ -2676,6 +2677,8 @@ this.devTeleport = opts.devTeleport ?? false;
       shipHpSent: new Map(),
       sentNames: new Map(),
       repKnown: new Map(),
+      debrisHeld: new Map(),
+      debrisRowOk: new Set(),
       shipView: new Set(),
       mapNamed: new Set(),
       aheadHashes: new Map(),
@@ -4138,6 +4141,8 @@ this.devTeleport = opts.devTeleport ?? false;
 
   /** A snapshot to every client, then the map's dots (net/SnapshotBuilder.ts; netBench and tests wrap this name) */
   private sendSnapshots(): void {
+    // (The damage summed since the last one goes first, to ride the same frame)
+    this.net.flushDamage();
     this.snapshots.sendSnapshots();
   }
 

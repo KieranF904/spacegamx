@@ -27,6 +27,8 @@ export const portalQuery = defineQuery([Portal, Position]);
 
 export function registerFlightHandlers(t: HandlerRegistry): void {
   t.on('input', (ctx, conn, msg) => {
+    // (Debris it worked out, confirmed straight away: they ride on inputs, protocol 25)
+    if (Array.isArray(msg.acks) && msg.acks.length) ctx.snapshots.ackDebris(conn, msg.acks);
     // Queue for next tick boundary — don't apply mid-frame.
     // Messages still arrive instantly via setImmediate event loop.
     if (++conn.inputsThisTick > MAX_INPUTS_PER_TICK) return;

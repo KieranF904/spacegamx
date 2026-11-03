@@ -198,6 +198,8 @@ export function stepMovement(b: BridgeCtx, eid: number): boolean {
     res = stepShipPhysics(body, controls, ship.derived, b.tuning, { charge: b.chargeOf(eid), drainRate: 1, load: gunLoadTick(ship, b.host.getTick()), tick: b.host.getTick() }, b.host.gravityAt(eid), rangeBoost, emp ? withEmp(hazard) : hazard, b.host.terrainAt?.(eid));
   });
   b.setCharge(eid, res.charge);
+  // (What the engines got, and a boost the stores refused, go in the replicated controls: replicas have no charge)
+  if (res.ctlPower) b.replicaCtl.get(eid)!.bits |= res.ctlPower;
   b.writeBody(eid, ship, body);
   if (res.isBoosting) Boost.lastUseTick[eid] = b.host.getTick();
   return true;
@@ -227,7 +229,8 @@ export function tick(ctx: BridgeCtx): void {
   if (tick % 10 === 0 && ctx.burns.length) ctx.stepBurns(tick);
   if (tick % 15 === 0 && ctx.kits.size) ctx.stepRepairKits(tick);
 
-  // 1. Prune and move everything nobody pilots
+  // 1. Prune and move everything nobody pilots (debris after, all together: ships/debris.ts)
+  const debrisNow: number[] = [];
   for (let [ids, ships, bi] = ctx.bodiesNow(); bi < ids.length; bi++) {
     const eid = ids[bi], ship = ships[bi];
     if (!entityExists(world, eid) || hasComponent(world, Dead, eid)) {
@@ -243,9 +246,7 @@ export function tick(ctx: BridgeCtx): void {
       if (tick >= ship.despawnTick) { ctx.removeBody(eid); continue; }
       ctx.decay(eid, ship, tick);
       ctx.replicaCtl.set(eid, { mode: ReplicaMode.Drift, bits: 0, q: 0, derived: ship.derived });
-      const body = ctx.readBody(eid, ship);
-      stepDrift(body, k);
-      ctx.writeBody(eid, ship, body);
+      debrisNow.push(eid);
     } else if (ctx.anchored.has(eid)) {
       // Wrecks turn slowly and coast when shoved, but no well pulls them in
       ctx.replicaCtl.set(eid, { mode: ReplicaMode.Anchored, bits: 0, q: 0, derived: ship.derived });
@@ -259,6 +260,9 @@ export function tick(ctx: BridgeCtx): void {
     }
   }
 
+  // Debris drifts and knocks into other debris (only), by the step every client runs too
+  ctx.stepDebrisWorld(debrisNow);
+
   // Shields recharge once they've gone a while without a hit
   {
     for (const ship of ctx.bodies.values()) {
@@ -271,7 +275,7 @@ export function tick(ctx: BridgeCtx): void {
     }
   }
 
-  // 2. Ship-to-ship and ship-to-debris contacts
+  // 2. Ship-to-ship contacts (debris knocks only into debris, above)
   ctx.resolveContacts();
 
   // Past an event horizon nothing survives: every part is crushed (ships then
@@ -324,6 +328,8 @@ export function tick(ctx: BridgeCtx): void {
     quantizeShipBody(body);
     ctx.writeBody(eid, ship, body);
   }
+  // (Debris that something besides its step moved this tick: keyframes, Replication)
+  ctx.debrisNet.endTick(ctx);
   let debris = 0;
   for (const s of ctx.bodies.values()) if (s.kind === 'debris') debris++;
   ctx.stats.debrisCount = debris;
@@ -384,7 +390,7 @@ export function resolveContacts(ctx: BridgeCtx): void {
   // Who can touch anything at all (none of it changes while this runs)
   const list: [number, ShipState][] = [];
   for (const e of ctx.bodies) {
-    if (e[1].derived.mass > 0 && !ctx.dormant.has(e[0]) && !ctx.isJumping(e[1]) && !ctx.host.sheltered?.(e[0]) && !ctx.intangible.has(e[0])) list.push(e);
+    if (e[1].kind !== 'debris' && e[1].derived.mass > 0 && !ctx.dormant.has(e[0]) && !ctx.isJumping(e[1]) && !ctx.host.sheltered?.(e[0]) && !ctx.intangible.has(e[0])) list.push(e);
   }
   const n = list.length;
   const pairs: number[] = [];
