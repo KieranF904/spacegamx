@@ -4,10 +4,11 @@
  * and die away a little slower. Your own ship reads your controls; every other
  * ship's command is inferred from how its velocity and spin are changing.
  *
- * Looks: per engine a layered additive plume (soft glow, outer flame, hot inner
- * flame, white core, shock diamonds at high throttle) with smooth flicker, a
- * faint nozzle glow at idle, and exhaust particles left behind in the world.
- * Boost makes plumes longer and hotter.
+ * Looks: each engine model's own (engineLooks.ts: the table and the arithmetic,
+ * shared with the native renderer). Every nozzle has the same fixed set of
+ * sprites (a haze, the nozzle glow, two rings, the flame's body, core and
+ * diamonds, two blobs); the look decides which are on and where. Exhaust
+ * particles are left behind in the world. Boost makes plumes longer and hotter.
  *
  * All of it is sprites of textures painted once (rendering/fxTextures.ts) and
  * the exhaust a particle container: each frame only moves, stretches and fades
@@ -15,10 +16,13 @@
  */
 
 import { Container, Particle, ParticleContainer, Sprite, Texture } from 'pixi.js';
-import { plumeBody, plumeCore, plumeDiamonds, plumeKey, plumeScale, PLUME_ANCHOR, puff, ring, softDot, DOT_SIZE, type PlumeShape } from '../rendering/fxTextures';
+import { plumeBody, plumeCore, plumeDiamonds, plumeKey, plumeScale, PLUME_ANCHOR, puff, ring, softDot, DOT_SIZE } from '../rendering/fxTextures';
 import { FRICTION, ShipState, Vec2, worldToLocalDir } from '@space-game/common';
 import { decorOf } from './partDecor';
-import { engineLookOf, plumeSpec, puffFlicker, sailRing, FROST_MOTES, type EngineLook, type Palette } from './engineLooks';
+import {
+  engineLookOf, initMote, moteAlpha, moteRadius, moteRate, moteTint, newMote, newNozzleDraw, nozzleDraw, stepMote,
+  BOOST_LIGHT, PLUME_SLOT, SLOTS, SLOT_TEX, TEX_PX, type EngineLook, type Mote, type NozzleDraw, type Palette, type SlotTex,
+} from './engineLooks';
 import type { InterpolatedEntity } from '../state/GameState';
 import type { ShipSource } from './ShipStore';
 import type { Lighting } from '../rendering/lighting/Lighting';
@@ -43,7 +47,8 @@ interface EngineState {
   boost: number;
 }
 
-interface Spark { x: number; y: number; vx: number; vy: number; life: number; max: number; size: number; hot: boolean; p: Particle; tint: [number, number, number] }
+/** An exhaust mote and its particle (pooled: a spent one goes back to `spare` whole) */
+interface Spark extends Mote { p: Particle }
 
 const MAX_PARTICLES = 900;
 
@@ -70,15 +75,23 @@ export function hsl(h: number, s: number, l: number): number {
 /** A flame in one hue (10° steps, so a handful of textures at most): outer, inner, glow */
 interface Flame { body: Texture; inner: number; light: number }
 
-/** One nozzle's sprites (pooled per ship) */
-interface Nozzle { idle: Sprite; body: Sprite; core: Sprite; diamonds: Sprite; puffA: Sprite; puffB: Sprite; ringA: Sprite; ringB: Sprite }
+/** One nozzle's sprites (pooled per ship), one per engineLooks SLOTS entry in that order, and the tint each was last given */
+interface Nozzle { s: Sprite[]; tint: number[] }
+const BODY_SLOT = SLOTS.indexOf('body');
+/** Per slot, by index: anchored as a plume, and the texture's size in px (the centred ones) */
+const SLOT_PLUME = SLOTS.map((s) => PLUME_SLOT[s]);
+const SLOT_PX = SLOTS.map((s) => TEX_PX[SLOT_TEX[s]]);
+/** plumeScale is linear in length and width: its factors */
+const PLUME_PER = plumeScale(1, 1);
 
 export class ThrusterFx {
   private engines = new Map<number, EngineState>();
   private particles: Spark[] = [];
   private exhaust = new ParticleContainer({ dynamicProperties: { position: true, vertex: true, color: true, rotation: false, uvs: false } });
   private dot = softDot(0.45, 0.07);
-  private spare: Particle[] = [];
+  private spare: Spark[] = [];
+  /** One nozzle's layers, refilled for each nozzle drawn */
+  private layers: NozzleDraw = newNozzleDraw();
   private time = 0;
   private nozzles = new WeakMap<Container, Nozzle[]>();
   private tex = {
@@ -88,6 +101,10 @@ export class ThrusterFx {
     diamonds: plumeDiamonds(),
     puff: puff(),
     ring: ring(),
+  };
+  /** The texture each slot starts with (the body's is swapped per palette) */
+  private slotTex: Record<SlotTex, Texture> = {
+    white: Texture.WHITE, body: this.tex.body, core: this.tex.core, diamonds: this.tex.diamonds, puff: this.tex.puff, ring: this.tex.ring,
   };
 
   constructor(worldLayer: Container, private source: ShipSource) {
@@ -101,7 +118,7 @@ export class ThrusterFx {
   }
 
   /** Each ship's engines as one light: where (thrust-weighted), how hard, boosting, its colour; refreshed when drawn */
-  private glows = new Map<number, { x: number; y: number; power: number; boost: number; at: number; color: number }>();
+  private glows = new Map<number, { x: number; y: number; power: number; boost: number; at: number; color: number; boostColor: number }>();
   private flames = new Map<number, Flame>();
   private blue: Flame = { body: this.tex.body, inner: PAL.inner, light: 0x5a9bff };
 
@@ -123,31 +140,23 @@ export class ThrusterFx {
     for (const [id, g] of this.glows) {
       if (g.at !== this.time) { this.glows.delete(id); continue; }
       if (g.power < 0.05) continue;
-      L.point(g.x, g.y, g.boost > 0.5 ? 0x9a7bff : g.color, 110 + 70 * Math.min(4, g.power), Math.min(1.3, 0.35 * g.power) * (1 + 0.5 * g.boost), 40);
+      L.point(g.x, g.y, g.boost > 0.5 ? g.boostColor : g.color, 110 + 70 * Math.min(4, g.power), Math.min(1.3, 0.35 * g.power) * (1 + 0.5 * g.boost), 40);
     }
   }
 
   /** Once per frame, before the per-ship draws */
   beginFrame(dt: number): void {
     this.time += dt;
-    // Age the exhaust left in the world
+    // Age the exhaust left in the world (each look's drag and swirl; they cool through its three colours, a soft halo spreading)
     let w = 0;
     for (const s of this.particles) {
-      s.life -= dt;
-      if (s.life <= 0) { this.spare.push(s.p); continue; }
-      s.x += s.vx * dt;
-      s.y += s.vy * dt;
-      s.vx *= 0.97;
-      s.vy *= 0.97;
-      // Hot sparks cool from white-blue to deep blue, a soft halo spreading as they go
-      const k = s.life / s.max;
-      const r = s.size * (0.6 + 0.9 * (1 - k));
+      if (!stepMote(s, dt)) { this.spare.push(s); continue; }
       const p = s.p;
       p.x = s.x;
       p.y = s.y;
-      p.scaleX = p.scaleY = (r * 2.2 * 2) / DOT_SIZE;
-      p.tint = k > 0.6 ? s.tint[0] : k > 0.3 ? s.tint[1] : s.tint[2];
-      p.alpha = (s.hot ? 0.75 : 0.5) * k;
+      p.scaleX = p.scaleY = (moteRadius(s) * 2.2 * 2) / DOT_SIZE;
+      p.tint = moteTint(s);
+      p.alpha = moteAlpha(s);
       this.particles[w++] = s;
     }
     this.particles.length = w;
@@ -162,8 +171,8 @@ export class ThrusterFx {
     return this.exhaust;
   }
 
-  private spark(): Particle {
-    return this.spare.pop() ?? new Particle({ texture: this.dot, anchorX: 0.5, anchorY: 0.5 });
+  private spark(): Spark {
+    return this.spare.pop() ?? Object.assign(newMote(), { p: new Particle({ texture: this.dot, anchorX: 0.5, anchorY: 0.5 }) });
   }
 
   private sprite(c: Container, texture: Texture, anchorX: number, anchorY: number): Sprite {
@@ -179,30 +188,31 @@ export class ThrusterFx {
     let list = this.nozzles.get(c);
     if (!list) { list = []; this.nozzles.set(c, list); }
     while (list.length <= i) {
-      list.push({
-        idle: this.sprite(c, Texture.WHITE, 0.5, 0.5),
-        body: this.sprite(c, this.tex.body, PLUME_ANCHOR.x, PLUME_ANCHOR.y),
-        core: this.sprite(c, this.tex.core, PLUME_ANCHOR.x, PLUME_ANCHOR.y),
-        diamonds: this.sprite(c, this.tex.diamonds, PLUME_ANCHOR.x, PLUME_ANCHOR.y),
-        puffA: this.sprite(c, this.tex.puff, 0.5, 0.5),
-        puffB: this.sprite(c, this.tex.puff, 0.5, 0.5),
-        ringA: this.sprite(c, this.tex.ring, 0.5, 0.5),
-        ringB: this.sprite(c, this.tex.ring, 0.5, 0.5),
-      });
-      const z = list[list.length - 1];
-      z.puffA.visible = z.puffB.visible = z.ringA.visible = z.ringB.visible = false;
+      const z: Nozzle = { s: [], tint: [] };
+      for (const slot of SLOTS) {
+        const sp = this.sprite(c, this.slotTex[SLOT_TEX[slot]], PLUME_SLOT[slot] ? PLUME_ANCHOR.x : 0.5, PLUME_SLOT[slot] ? PLUME_ANCHOR.y : 0.5);
+        sp.visible = false;
+        z.s.push(sp);
+        z.tint.push(0xffffff);
+      }
+      list.push(z);
     }
     return list[i];
   }
 
-  /** The body texture for a palette and shape (painted once each) */
+  /** The body texture for a palette and shape (painted once each; found by the palette object, so no key is built per frame) */
   private bodyTex(p: Palette): Texture {
-    const k = plumeKey(p.outer, p.inner, p.glow, p.shape);
-    let t = this.bodies.get(k);
-    if (!t) { t = plumeBody(p.outer, p.inner, p.glow, p.shape); this.bodies.set(k, t); }
+    let t = this.bodyOf.get(p);
+    if (!t) {
+      const k = plumeKey(p.outer, p.inner, p.glow, p.shape);
+      t = this.bodies.get(k) ?? plumeBody(p.outer, p.inner, p.glow, p.shape);
+      this.bodies.set(k, t);
+      this.bodyOf.set(p, t);
+    }
     return t;
   }
   private bodies = new Map<string, Texture>();
+  private bodyOf = new Map<Palette, Texture>();
 
   /**
    * Draw one ship's engines into `g` (the ship's rotating container, grid units
@@ -210,7 +220,10 @@ export class ThrusterFx {
    */
   draw(c: Container, ship: ShipState, e: InterpolatedEntity, command: ThrustCommand | null, dt: number, cs: number, tint?: number, frost = 0, emp = false): void {
     let used = 0;
-    const hideRest = () => { for (const n of (this.nozzles.get(c) ?? []).slice(used)) n.idle.visible = n.body.visible = n.core.visible = n.diamonds.visible = n.puffA.visible = n.puffB.visible = n.ringA.visible = n.ringB.visible = false; };
+    const hideRest = () => {
+      const list = this.nozzles.get(c);
+      if (list) for (let k = used; k < list.length; k++) for (const sp of list[k].s) sp.visible = false;
+    };
     if (ship.kind !== 'ship' || !ship.derived.thrusters.length) { hideRest(); return; }
     let st = this.engines.get(e.id);
     if (!st) {
@@ -230,7 +243,7 @@ export class ThrusterFx {
     const ca = Math.cos(angle), sa = Math.sin(angle);
     const shipVx = e.vx * 60, shipVy = e.vy * 60; // world units / s
 
-    let gx = 0, gy = 0, gp = 0;
+    let gx = 0, gy = 0, gp = 0, top = 0, light = flame.light, boostLight = BOOST_LIGHT;
     ship.derived.thrusters.forEach((t, i) => {
       const f = Math.hypot(t.force[0], t.force[1]);
       // (a rigid design flies on its engines as built: only those still on it burn)
@@ -250,92 +263,55 @@ export class ThrusterFx {
         const mx = (nz.at[0] - cx) * cs, my = (nz.at[1] - cy) * cs;
         const edge = nz.width * cs * 1.05;
         const tx = nz.t[0], ty = nz.t[1];
-        this.plume(this.nozzle(c, used++), mx, my, n[0], n[1], tx, ty, edge, thr, st!.boost, st!.seed + i * 1.7, cs, flame, look, frost);
-        // Its share of the engines' light, a little behind the nozzle
+        const pulse = this.plume(this.nozzle(c, used++), mx, my, n[0], n[1], tx, ty, edge, thr, st!.boost, st!.seed + i * 1.7, cs, flame, look, frost);
+        // Its share of the engines' light, a little behind the nozzle (coloured as the strongest engine burns)
         const lp = thr * (edge / cs);
         if (lp > 0) {
           const lx = mx + n[0] * cs, ly = my + n[1] * cs;
           gx += (e.renderX + lx * ca - ly * sa) * lp; gy += (e.renderY + lx * sa + ly * ca) * lp; gp += lp;
+          if (lp > top) { top = lp; light = look.light ?? look.pal?.outer ?? flame.light; boostLight = look.boostPal?.outer ?? look.light ?? BOOST_LIGHT; }
         }
         // Exhaust: spawn in world space, thrown out of the nozzle on top of the ship's own motion
-        if (thr > 0.25 && this.particles.length < MAX_PARTICLES) {
-          const rate = thr * (edge / cs) * (1 + st!.boost * (look.boostGain > 0 ? 1 : 0)) * 38 * look.motes;
-          let count = rate * dt;
-          while (count > 0) {
+        let count = this.particles.length < MAX_PARTICLES ? moteRate(look, thr, st!.boost, edge, cs, pulse) * dt : 0;
+        if (count > 0) {
+          const ox = e.renderX + mx * ca - my * sa, oy = e.renderY + mx * sa + my * ca;
+          const nx = n[0] * ca - n[1] * sa, ny = n[0] * sa + n[1] * ca, wtx = tx * ca - ty * sa, wty = tx * sa + ty * ca;
+          while (count > 0 && this.particles.length < MAX_PARTICLES) {
             if (count < 1 && Math.random() > count) break;
             count -= 1;
-            const off = (Math.random() - 0.5) * edge * 0.7;
-            const lx = mx + tx * off + n[0] * cs * 0.3, ly = my + ty * off + n[1] * cs * 0.3;
-            const wx = e.renderX + lx * ca - ly * sa, wy = e.renderY + lx * sa + ly * ca;
-            const nx = n[0] * ca - n[1] * sa, ny = n[0] * sa + n[1] * ca;
-            const speed = (220 + Math.random() * 180) * (1 + st!.boost * (look.boostGain > 0 ? 0.6 : 0)) * (0.6 + 0.4 * thr) * look.moteSpeed * (frost > 0 ? 0.6 : 1);
-            const life = 0.25 + Math.random() * 0.45;
-            this.particles.push({
-              x: wx, y: wy, vx: shipVx + nx * speed + (Math.random() - 0.5) * 40, vy: shipVy + ny * speed + (Math.random() - 0.5) * 40,
-              life, max: life, size: (edge * 0.11 + 1.2) * (0.7 + Math.random() * 0.6), hot: Math.random() < 0.35, p: this.spark(), tint: frost > 0 ? FROST_MOTES : look.moteTint,
-            });
+            this.particles.push(initMote(this.spark(), look, thr, st!.boost, edge, cs, frost, Math.random, ox, oy, nx, ny, wtx, wty, shipVx, shipVy) as Spark);
           }
         }
       }
     });
-    this.glows.set(e.id, { x: gp > 0 ? gx / gp : e.renderX, y: gp > 0 ? gy / gp : e.renderY, power: gp, boost: st.boost, at: this.time, color: flame.light });
+    this.glows.set(e.id, { x: gp > 0 ? gx / gp : e.renderX, y: gp > 0 ? gy / gp : e.renderY, power: gp, boost: st.boost, at: this.time, color: light, boostColor: boostLight });
     hideRest();
   }
 
-  /** One engine's flame, in the ship's frame: base at (mx, my) on the nozzle edge, pointing along n */
+  /**
+   * One nozzle's layers (engineLooks.nozzleDraw), in the ship's frame: the exit's middle at (mx, my), pointing along n,
+   * across it t. Every slot is placed the same way whatever the model; the look decides which are on. Returns the throb
+   * (the exhaust follows it).
+   */
   private plume(z: Nozzle, mx: number, my: number, nx: number, ny: number, tx: number, ty: number,
-    edge: number, thr: number, boost: number, seed: number, cs: number, flame: Flame, look: EngineLook, frost = 0): void {
-    const w = edge * 0.42; // half-width at the nozzle
-    // Idle: just a faint glow in the nozzle (none on a cold-gas jet or a sail)
-    z.idle.visible = look.kind === 'plume';
-    z.idle.position.set(mx, my);
-    z.idle.rotation = Math.atan2(ty, tx);
-    z.idle.scale.set(w * 2, Math.max(1.5, cs * 0.18));
-    z.idle.tint = look.pal ? look.pal.inner : flame.inner;
-    z.idle.alpha = 0.18 + 0.6 * thr;
-    const t = this.time;
-    if (look.kind === 'puff') {
-      // Cold gas: white puffs that blink on and off, no flame
-      z.body.visible = z.core.visible = z.diamonds.visible = z.ringA.visible = z.ringB.visible = false;
-      const f = thr < 0.03 ? 0 : puffFlicker(t, seed) * Math.min(1, thr * 1.5);
-      z.puffA.visible = z.puffB.visible = f > 0;
-      if (f <= 0) return;
-      const d = (edge * 1.1) / 64;
-      z.puffA.position.set(mx + nx * cs * 0.3, my + ny * cs * 0.3);
-      z.puffA.tint = 0xf2f7ff; z.puffA.alpha = 0.85 * f; z.puffA.scale.set(d * (0.8 + 0.4 * f));
-      z.puffB.position.set(mx + nx * cs * 0.85, my + ny * cs * 0.85);
-      z.puffB.tint = 0xc9d6e6; z.puffB.alpha = 0.4 * f; z.puffB.scale.set(d * (1.3 + 0.5 * f));
-      return;
-    }
-    if (look.kind === 'sail') {
-      // A sail: two soft rings breathing against each other behind the nozzle, a glow between
-      z.body.visible = z.core.visible = z.diamonds.visible = z.puffB.visible = false;
-      const r = sailRing(t, seed, thr), k = (edge * 2 * (64 / 56)) / 64;
-      z.ringA.visible = z.ringB.visible = z.puffA.visible = true;
-      z.ringA.position.set(mx + nx * cs * 0.6, my + ny * cs * 0.6);
-      z.ringA.tint = 0x9fd4ff; z.ringA.alpha = r.a; z.ringA.scale.set(k * r.r * 0.9);
-      z.ringB.position.set(mx + nx * cs * 1.0, my + ny * cs * 1.0);
-      z.ringB.tint = 0xc8e6ff; z.ringB.alpha = r.a2; z.ringB.scale.set(k * r.r2 * 1.3);
-      z.puffA.position.set(mx + nx * cs * 0.8, my + ny * cs * 0.8);
-      z.puffA.tint = 0x6aa8ff; z.puffA.alpha = 0.16 + 0.3 * thr; z.puffA.scale.set((edge * 2.4) / 64);
-      return;
-    }
-    z.puffA.visible = z.puffB.visible = z.ringA.visible = z.ringB.visible = false;
-    if (thr < 0.03) { z.body.visible = z.core.visible = z.diamonds.visible = false; return; }
-    const sp = plumeSpec(look, thr, boost, edge, cs, t, seed, frost);
+    edge: number, thr: number, boost: number, seed: number, cs: number, flame: Flame, look: EngineLook, frost = 0): number {
+    const d = nozzleDraw(this.layers, look, thr, boost, edge, cs, this.time, seed, flame.inner, frost);
     const rot = Math.atan2(ny, nx);
-    const sc = plumeScale(sp.L, sp.w);
-    z.body.position.set(mx, my); z.body.rotation = rot; z.body.scale.set(sc.x, sc.y);
-    z.core.position.set(mx, my); z.core.rotation = rot; z.core.scale.set(sc.x * sp.coreLen, sc.y * sp.coreWidth);
-    z.diamonds.position.set(mx, my); z.diamonds.rotation = rot; z.diamonds.scale.set(sc.x, sc.y);
-    z.body.visible = true;
-    z.body.texture = sp.pal ? this.bodyTex(sp.pal) : flame.body;
-    z.body.alpha = thr;
-    z.core.visible = true;
-    z.core.alpha = Math.min(1, thr * 1.4);
-    // Shock diamonds once the engine is really working
-    z.diamonds.visible = sp.diamonds > 0;
-    if (sp.diamonds > 0) z.diamonds.alpha = sp.diamonds;
+    for (let i = 0; i < SLOTS.length; i++) {
+      const l = d[SLOTS[i]], sp = z.s[i];
+      sp.visible = l.on;
+      if (!l.on) continue;
+      sp.position.set(mx + nx * l.a + tx * l.s, my + ny * l.a + ty * l.s);
+      sp.rotation = rot + l.rot;
+      // (a tint is parsed each time it's set: only when it changes)
+      if (z.tint[i] !== l.tint) { sp.tint = l.tint; z.tint[i] = l.tint; }
+      sp.alpha = l.alpha;
+      if (SLOT_PLUME[i]) sp.scale.set(l.len * PLUME_PER.x, l.wid * PLUME_PER.y);
+      else sp.scale.set(l.len / SLOT_PX[i], l.wid / SLOT_PX[i]);
+    }
+    // (the body's texture: the look's palette, or the ship's tinted flame)
+    if (d.body.on) z.s[BODY_SLOT].texture = d.pal ? this.bodyTex(d.pal) : flame.body;
+    return d.pulse;
   }
 
   /**

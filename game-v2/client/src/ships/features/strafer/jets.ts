@@ -9,6 +9,10 @@ import { Graphics, type Container } from 'pixi.js';
 import { dodgePhase, dodgeVec } from '@space-game/common';
 import { decorOf } from '../../partDecor';
 import type { ShipDrawCtx } from '../types';
+import { engineLookOf } from '../../engineLooks';
+
+/** The sideways pops: the Burst Strafer's blobs in its engine look */
+const POP = engineLookOf('engine_burst_strafer').blobs ?? { tint: [0xfbcfe8, 0xf472b6] as [number, number], side: 1, size: 1, alpha: 1 };
 
 const jets = new WeakMap<Container, Graphics>();
 
@@ -42,6 +46,12 @@ export function drawJets(ctx: ShipDrawCtx, counter: number | undefined, dir: num
       const core = [bx + nz.n[0] * len * 0.6, by + nz.n[1] * len * 0.6];
       g.poly([bx + nz.t[0] * hw * 0.45, by + nz.t[1] * hw * 0.45, core[0], core[1], bx - nz.t[0] * hw * 0.45, by - nz.t[1] * hw * 0.45]).fill({ color: 0xffffff, alpha: 0.85 * k });
       g.circle(bx, by, hw * (1.3 + 1.2 * k)).fill({ color: 0xfbcfe8, alpha: 0.65 * k });
+      // Gas bursts popping out sideways from the mouth and gone fast (the Burst Strafer's look: engineLooks)
+      const out = 1 - k, pa = 0.6 * k * k * POP.alpha;
+      for (const sd of [1, -1]) {
+        const at = hw * (0.6 + 2.6 * out) * POP.side * sd, along = len * 0.18 * (0.5 + out);
+        g.circle(bx + nz.n[0] * along + nz.t[0] * at, by + nz.n[1] * along + nz.t[1] * at, hw * (0.5 + 1.1 * out) * POP.size).fill({ color: POP.tint[sd > 0 ? 0 : 1], alpha: pa });
+      }
     }
   }
   // Afterimage: three fading pink copies of the hull strung out behind, so the dodge reads as a jump

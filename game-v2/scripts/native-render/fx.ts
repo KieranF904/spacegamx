@@ -9,7 +9,10 @@
 import { mulberry32 } from '@space-game/common';
 import { PAL, hsl, hueOf } from '../../client/src/ships/ThrusterFx';
 import { PLUME_ANCHOR, plumeKey, plumeScale } from '../../client/src/rendering/fxTextures';
-import { engineLookOf, plumeSpec, puffFlicker, sailRing, FROST_MOTES } from '../../client/src/ships/engineLooks';
+import {
+  engineLookOf, initMote, moteAlpha, moteRadius, moteRate, moteTint, newMote, newNozzleDraw, nozzleDraw, stepMote,
+  BOOST_LIGHT, PLUME_SLOT, SLOTS, SLOT_TEX, type Mote, type SlotTex,
+} from '../../client/src/ships/engineLooks';
 import type { Draw } from './scene';
 
 /** One engine: its part's model (its look), its thrust direction (grid frame) and where its flames start */
@@ -18,6 +21,8 @@ export interface Engine { index: number; fn?: string; f: [number, number]; nozzl
 export interface FxParams { flames: number; boost: boolean; exhaust: boolean; frost?: boolean }
 
 const DOT = 64;
+/** The GL worker's texture name for each slot texture (the body's is the palette's, or the tinted flame's) */
+const TEX_NAME: Record<Exclude<SlotTex, 'body'>, string> = { white: 'white', core: 'plume:core', diamonds: 'plume:diamonds', puff: 'puff', ring: 'ring' };
 /** A flame in one hue (ThrusterFx.flameFor): the textures' names, the inner colour (the idle glow), the engines' light */
 function flameFor(tint: number | undefined): { body: string; inner: number; light: number } {
   const h = tint === undefined ? null : hueOf(tint);
@@ -70,8 +75,9 @@ export function flames(engines: Engine[], thrust: [number, number], cs: number, 
   const boost = p.boost ? 1 : 0;
   // The command the viewer gives: its thrust direction × flames
   const mag = p.flames, ux = thrust[0], uy = thrust[1], seed0 = (id * 7.31) % 100;
-  let gx = 0, gy = 0, gp = 0;
-  const sparks: { x: number; y: number; n: [number, number]; thr: number; edge: number; look: ReturnType<typeof engineLookOf> }[] = [];
+  let gx = 0, gy = 0, gp = 0, top = 0, color = flame.light, boostColor = BOOST_LIGHT;
+  const sparks: { x: number; y: number; n: [number, number]; t: [number, number]; thr: number; edge: number; pulse: number; look: ReturnType<typeof engineLookOf> }[] = [];
+  const d = newNozzleDraw();
   for (const e of engines) {
     const f = Math.hypot(e.f[0], e.f[1]);
     const look = engineLookOf(e.fn ?? '');
@@ -80,76 +86,53 @@ export function flames(engines: Engine[], thrust: [number, number], cs: number, 
     const thr = want, seed = seed0 + e.index * 1.7;
     for (const nz of e.nozzles) {
       const { mx, my, edge } = nz, [nx, ny] = nz.n, [tx, ty] = nz.t;
-      const w = edge * 0.42;
-      // Idle: a faint glow in the nozzle
-      if (look.kind === 'plume') q('white').sprite(mx, my, w * 2, Math.max(1.5, cs * 0.18), 0.5, 0.5, Math.atan2(ty, tx), look.pal ? look.pal.inner : flame.inner, 0.18 + 0.6 * thr);
-      if (look.kind === 'puff' && thr >= 0.03) {
-        // Cold gas: blinking white puffs (ThrusterFx.plume)
-        const f = puffFlicker(time, seed) * Math.min(1, thr * 1.5);
-        if (f > 0) {
-          const d = (edge * 1.1);
-          q('puff').sprite(mx + nx * cs * 0.3, my + ny * cs * 0.3, d * (0.8 + 0.4 * f), d * (0.8 + 0.4 * f), 0.5, 0.5, 0, 0xf2f7ff, 0.85 * f);
-          q('puff').sprite(mx + nx * cs * 0.85, my + ny * cs * 0.85, d * (1.3 + 0.5 * f), d * (1.3 + 0.5 * f), 0.5, 0.5, 0, 0xc9d6e6, 0.4 * f);
-        }
-      } else if (look.kind === 'sail') {
-        const r = sailRing(time, seed, thr), k = edge / 28, ring = (cx: number, cy: number, s: number, tint: number, a: number) => q('ring').sprite(cx, cy, 64 * s, 64 * s, 0.5, 0.5, 0, tint, a);
-        ring(mx + nx * cs * 0.6, my + ny * cs * 0.6, k * r.r * 0.9, 0x9fd4ff, r.a);
-        ring(mx + nx * cs * 1.0, my + ny * cs * 1.0, k * r.r2 * 1.3, 0xc8e6ff, r.a2);
-        const g = edge * 2.4;
-        q('puff').sprite(mx + nx * cs * 0.8, my + ny * cs * 0.8, g, g, 0.5, 0.5, 0, 0x6aa8ff, 0.16 + 0.3 * thr);
-      } else if (thr >= 0.03) {
-        const sp = plumeSpec(look, thr, boost, edge, cs, time, seed, p.frost ? 1 : 0), rot = Math.atan2(ny, nx), sc = plumeScale(sp.L, sp.w);
-        const sw = 256 * sc.x, sh = 128 * sc.y;
-        q(sp.pal ? plumeKey(sp.pal.outer, sp.pal.inner, sp.pal.glow, sp.pal.shape) : flame.body).sprite(mx, my, sw, sh, PLUME_ANCHOR.x, PLUME_ANCHOR.y, rot, 0xffffff, thr);
-        q('plume:core').sprite(mx, my, sw * sp.coreLen, sh * sp.coreWidth, PLUME_ANCHOR.x, PLUME_ANCHOR.y, rot, 0xffffff, Math.min(1, thr * 1.4));
-        if (sp.diamonds > 0) q('plume:diamonds').sprite(mx, my, sw, sh, PLUME_ANCHOR.x, PLUME_ANCHOR.y, rot, 0xffffff, sp.diamonds);
+      // The nozzle's layers (engineLooks.nozzleDraw), every slot placed as ThrusterFx.plume places it
+      nozzleDraw(d, look, thr, boost, edge, cs, time, seed, flame.inner, p.frost ? 1 : 0);
+      const rot = Math.atan2(ny, nx);
+      for (const slot of SLOTS) {
+        const l = d[slot];
+        if (!l.on) continue;
+        const px = mx + nx * l.a + tx * l.s, py = my + ny * l.a + ty * l.s, tex = SLOT_TEX[slot];
+        const name = tex === 'body' ? (d.pal ? plumeKey(d.pal.outer, d.pal.inner, d.pal.glow, d.pal.shape) : flame.body) : TEX_NAME[tex];
+        if (PLUME_SLOT[slot]) {
+          const sc = plumeScale(l.len, l.wid);
+          q(name).sprite(px, py, 256 * sc.x, 128 * sc.y, PLUME_ANCHOR.x, PLUME_ANCHOR.y, rot + l.rot, l.tint, l.alpha);
+        } else q(name).sprite(px, py, l.len, l.wid, 0.5, 0.5, rot + l.rot, l.tint, l.alpha);
       }
       const lp = thr * (edge / cs);
-      if (lp > 0) { gx += (mx + nx * cs) * lp; gy += (my + ny * cs) * lp; gp += lp; sparks.push({ x: mx, y: my, n: nz.n, thr, edge, look }); }
-      else if (thr > 0.25) sparks.push({ x: mx, y: my, n: nz.n, thr, edge, look });
+      if (lp > 0) {
+        gx += (mx + nx * cs) * lp; gy += (my + ny * cs) * lp; gp += lp;
+        if (lp > top) { top = lp; color = look.light ?? look.pal?.outer ?? flame.light; boostColor = look.boostPal?.outer ?? look.light ?? BOOST_LIGHT; }
+      }
+      if (thr > 0.25) sparks.push({ x: mx, y: my, n: nz.n, t: nz.t, thr, edge, pulse: d.pulse, look });
     }
   }
 
   // Exhaust: the game's rules (ThrusterFx.draw / beginFrame), run at 60 Hz for a second from a seeded start, the ship still
   if (p.exhaust && engines.length) {
     const rnd = mulberry32(1013 + id * 7919);
-    interface Spark { x: number; y: number; vx: number; vy: number; life: number; max: number; size: number; hot: boolean; tint: [number, number, number] }
-    let list: Spark[] = [];
+    let list: Mote[] = [];
     const dt = 1 / 60, MAX = 900;
     for (let frame = 0; frame < 90; frame++) {
       // age (beginFrame), then spawn (draw)
-      list = list.filter((s) => {
-        s.life -= dt;
-        if (s.life <= 0) return false;
-        s.x += s.vx * dt; s.y += s.vy * dt; s.vx *= 0.97; s.vy *= 0.97;
-        return true;
-      });
+      list = list.filter((s) => stepMote(s, dt));
       for (const s of sparks) {
-        if (s.thr <= 0.25 || list.length >= MAX) continue;
-        const [nx, ny] = s.n, tx = -ny, ty = nx;
-        const bg = s.look.boostGain > 0 ? 1 : 0;
-        let count = s.thr * (s.edge / cs) * (1 + boost * bg) * 38 * s.look.motes * dt;
-        while (count > 0) {
+        let count = list.length < MAX ? moteRate(s.look, s.thr, boost, s.edge, cs, s.pulse) * dt : 0;
+        while (count > 0 && list.length < MAX) {
           if (count < 1 && rnd() > count) break;
           count -= 1;
-          const off = (rnd() - 0.5) * s.edge * 0.7;
-          const speed = (220 + rnd() * 180) * (1 + boost * 0.6 * bg) * (0.6 + 0.4 * s.thr) * s.look.moteSpeed, life = 0.25 + rnd() * 0.45;
-          list.push({
-            x: s.x + tx * off + nx * cs * 0.3, y: s.y + ty * off + ny * cs * 0.3,
-            vx: nx * speed + (rnd() - 0.5) * 40, vy: ny * speed + (rnd() - 0.5) * 40,
-            life, max: life, size: (s.edge * 0.11 + 1.2) * (0.7 + rnd() * 0.6), hot: rnd() < 0.35, tint: p.frost ? FROST_MOTES : s.look.moteTint,
-          });
+          list.push(initMote(newMote(), s.look, s.thr, boost, s.edge, cs, p.frost ? 1 : 0, rnd, s.x, s.y, s.n[0], s.n[1], s.t[0], s.t[1], 0, 0));
         }
       }
     }
-    // (the soft dot, scaled so a particle is r × 4.4 across; hot sparks cool from white-blue to deep blue as they age)
+    // (the soft dot, scaled so a particle is r × 4.4 across)
     for (const s of list) {
-      const k = s.life / s.max, r = s.size * (0.6 + 0.9 * (1 - k)), side = r * 2.2 * 2;
-      q('dot:0.45:0.07').sprite(s.x, s.y, side, side, 0.5, 0.5, 0, k > 0.6 ? s.tint[0] : k > 0.3 ? s.tint[1] : s.tint[2], (s.hot ? 0.75 : 0.5) * k);
+      const side = moteRadius(s) * 2.2 * 2;
+      q('dot:0.45:0.07').sprite(s.x, s.y, side, side, 0.5, 0.5, 0, moteTint(s), moteAlpha(s));
     }
   }
 
-  const light = gp > 0 ? { x: gx / gp, y: gy / gp, radius: 110 + 70 * Math.min(4, gp), power: Math.min(1.3, 0.35 * gp) * (1 + 0.5 * boost), color: boost > 0.5 ? 0x9a7bff : flame.light, height: 40 } : null;
+  const light = gp > 0 ? { x: gx / gp, y: gy / gp, radius: 110 + 70 * Math.min(4, gp), power: Math.min(1.3, 0.35 * gp) * (1 + 0.5 * boost), color: boost > 0.5 ? boostColor : color, height: 40 } : null;
   // (exhaust first, as the game layers it, then the nozzles)
   const order = [...quads.entries()].sort((a, b) => Number(b[0].startsWith('dot')) - Number(a[0].startsWith('dot')));
   return { draws: order.map(([k, v]) => v.draw(k.split('|')[0], k.split('|')[1] as 'add' | 'normal')), light };
