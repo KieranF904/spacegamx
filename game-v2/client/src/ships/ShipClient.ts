@@ -398,12 +398,11 @@ export class ShipClient {
   placeReplica(e: InterpolatedEntity, renderTick: number): boolean {
     const p = this.replicas.pose(e.id, renderTick);
     if (!p) return false;
-    // A keyframe correcting a small drift is eased in; anything big (a teleport, a fresh ship) snaps
-    const jumpBy = Math.hypot(p.x - e.renderX, p.y - e.renderY);
-    const ease = jumpBy > 4 && jumpBy < 400 && !this.burning(e) ? 0.35 : 1;
+    // (A keyframe's correction is already blended into the pose (ShipReplicaSet.pose): drawn as it is. Easing the
+    // drawn position here as well trailed any ship moving more than 4 units a frame, a boss tens of units behind.)
     e.x = p.x; e.y = p.y; e.angle = p.angle; e.vx = p.vx; e.vy = p.vy;
-    e.renderX += (p.x - e.renderX) * ease;
-    e.renderY += (p.y - e.renderY) * ease;
+    e.renderX = p.x;
+    e.renderY = p.y;
     e.renderAngle = p.angle;
     e.angVel = 0;
     // (Its Burst Strafer's dodge: the jets, ShipRenderer)
@@ -418,10 +417,6 @@ export class ShipClient {
       ];
     }
     return true;
-  }
-
-  private burning(e: InterpolatedEntity): boolean {
-    return jumpPhase(JumpFx.counter(e, false), this.jump).phase === 'burn';
   }
 
   /** The graphics tier's effect settings (kept for the effects made at init) */

@@ -1084,10 +1084,14 @@ export class GameState {
         // An asteroid is placed by the whole tick: nothing to do until the tick changes
         if (entity.orbitTimeScale === undefined) {
           if (entity.orbitTick === rawTickRounded) continue;
-          // Out of sight: every few ticks, each rock on its own turn (and at once if it has gone a while)
-          if (focus && (rawTickRounded + entity.id) % ORBIT_FAR_TICKS !== 0 && rawTickRounded - (entity.orbitTick ?? -1e9) < 2 * ORBIT_FAR_TICKS
-            && (Math.abs(entity.x - focus.cx) > focus.hw || Math.abs(entity.y - focus.cy) > focus.hh)
-            && (Math.abs(entity.x - focus.px) > focus.hw || Math.abs(entity.y - focus.py) > focus.hh)) continue;
+          // Out of sight: every few ticks, each rock on its own turn (and at once if it has gone a while). Out of
+          // sight means all of it: its reach (as Renderer.radiusOf culls it) is added, or a big rock whose middle is
+          // just off the view while its body is on it stepped every ORBIT_FAR_TICKS
+          if (focus && (rawTickRounded + entity.id) % ORBIT_FAR_TICKS !== 0 && rawTickRounded - (entity.orbitTick ?? -1e9) < 2 * ORBIT_FAR_TICKS) {
+            const r = entity.type === EntityType.Asteroid ? (entity.data?.[0] || 30) * 1.3 : 0;
+            if ((Math.abs(entity.x - focus.cx) > focus.hw + r || Math.abs(entity.y - focus.cy) > focus.hh + r)
+              && (Math.abs(entity.x - focus.px) > focus.hw + r || Math.abs(entity.y - focus.py) > focus.hh + r)) continue;
+          }
         }
         entity.orbitTick = rawTickRounded;
         const { x, y } = calcAsteroidPosition({

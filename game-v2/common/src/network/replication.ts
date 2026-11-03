@@ -131,9 +131,37 @@ interface Rep {
   kf: number;
   /** The newest aim it was sent (control rows give aims as steps from it) */
   q: number;
+  /** The tick it was last drawn at (pose; undefined: not yet) */
+  drawn?: number;
+  /**
+   * Keyframes that moved it off the path it was being drawn on, for pose to blend: at the keyframe's tick t the old
+   * path was off by (dx, dy, da) (old less new). From s (the tick it was drawn at when the keyframe came, if that
+   * was before t - 1) the drawn path bends onto the keyframe by t; otherwise (it came late) the correction eases
+   * out after t, over SMOOTH_TICKS.
+   */
+  fixes?: { t: number; s: number; dx: number; dy: number; da: number }[];
 }
 
 const HISTORY = 240;
+/** A keyframe's correction is bent in over up to this many ticks before it (drawing only: `at` is always exact) */
+const BEND_TICKS = 8;
+/** ...or, when it came too late for that, eased out over this many after */
+const SMOOTH_TICKS = 8;
+/** Corrections this big or more (a teleport, a blink, the jump drive) snap */
+const SMOOTH_MAX = 400;
+/** The old path is stepped up to a keyframe's tick only if it's this close (ticks) */
+const GAP_MAX = 60;
+
+const smoothstep = (u: number) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
+
+/** How much of a correction is added to the drawn pose at tick t (drawn = stepped path + d × this) */
+function fixWeight(f: { t: number; s: number }, t: number): number {
+  // Between the tick before the keyframe and the keyframe, the stepped path runs from the old path into the new
+  // one (pose's lerp): k of the correction comes in with it
+  const k = Math.max(0, Math.min(1, t - (f.t - 1)));
+  if (f.s < f.t - 1) return t >= f.t ? 0 : k - smoothstep((t - f.s) / (f.t - f.s));
+  return t < f.t ? k : 1 - smoothstep((t - f.t) / SMOOTH_TICKS);
+}
 
 const cloneBody = (b: FlightBody): FlightBody => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, angle: b.angle, angVel: b.angVel, jump: b.jump, jumpScale: b.jumpScale, cargo: b.cargo, dodge: b.dodge, dodgeDir: b.dodgeDir });
 
@@ -182,6 +210,7 @@ export class ShipReplicaSet {
       const k = unpackKeyframe(row);
       let r = this.reps.get(k.id);
       if (!r) { r = { mode: k.mode, events: new Map(), hist: new Map(), last: tick, kf: tick, q: k.q }; this.reps.set(k.id, r); }
+      else this.correction(k.id, r, tick, k);
       r.q = k.q;
       r.mode = k.mode;
       r.dock = k.dock;
@@ -210,6 +239,26 @@ export class ShipReplicaSet {
       }
       if (!r.hist.size) this.reps.delete(id); // nothing to replay from: wait for a keyframe
     }
+  }
+
+  /**
+   * A keyframe for a ship already being drawn: the path it was on is stepped on to the keyframe's tick (the ticks
+   * before it are still drawn from that path; left unstepped, they showed the keyframe early, the ship jumping ahead
+   * and waiting there for the view to catch up), and how far that path was off there is kept, to ease out (pose).
+   */
+  private correction(id: number, r: Rep, tick: number, k: Keyframe): void {
+    // (A path rewritten from here on: corrections at or after it went with it)
+    if (r.fixes) { r.fixes = r.fixes.filter((f) => f.t < tick); if (!r.fixes.length) r.fixes = undefined; }
+    if (!r.hist.size || tick <= r.kf || k.mode !== r.mode || k.mode === ReplicaMode.Docked || tick - r.last > GAP_MAX) return;
+    const was = this.at(id, tick);
+    if (!was || r.hist.get(tick) !== was) return;
+    const dx = was.body.x - k.body.x, dy = was.body.y - k.body.y;
+    let da = was.body.angle - k.body.angle;
+    while (da > Math.PI) da -= 2 * Math.PI;
+    while (da < -Math.PI) da += 2 * Math.PI;
+    if (Math.hypot(dx, dy) >= SMOOTH_MAX) { r.fixes = undefined; return; }
+    if ((!dx && !dy && !da) || r.drawn === undefined) return;
+    (r.fixes ??= []).push({ t: tick, s: Math.max(r.drawn, tick - BEND_TICKS), dx, dy, da });
   }
 
   /** The state at a whole tick, stepping forward as needed (null: unknown ship) */
@@ -251,7 +300,11 @@ export class ShipReplicaSet {
     return cur;
   }
 
-  /** Where a ship is at a fractional tick (between two stepped states) */
+  /**
+   * Where a ship is drawn at a fractional tick: between two stepped states, with any keyframe's correction blended
+   * in (fixWeight), so a ship pushed off its predicted path (a boss's drive, a collision) bends onto the true one
+   * instead of stepping. Drawing only: the states themselves (`at`) stay exact.
+   */
   pose(id: number, t: number): { x: number; y: number; angle: number; vx: number; vy: number; jump: number; jumpScale: number; dodge: number; dodgeDir: number; aim: number; bits: number } | null {
     const f = Math.floor(t);
     const a = this.at(id, f);
@@ -261,9 +314,24 @@ export class ShipReplicaSet {
     let da = b.body.angle - a.body.angle;
     while (da > Math.PI) da -= 2 * Math.PI;
     while (da < -Math.PI) da += 2 * Math.PI;
-    const mode = this.reps.get(id)!.mode;
+    const rep = this.reps.get(id)!;
+    const mode = rep.mode;
+    let x = a.body.x + (b.body.x - a.body.x) * k, y = a.body.y + (b.body.y - a.body.y) * k, angle = a.body.angle + da * k;
+    rep.drawn = t;
+    if (rep.fixes) {
+      let n = 0;
+      for (const fix of rep.fixes) {
+        // (Done with once the view is past it: bent in by its tick, or eased out after)
+        if (t >= fix.t + (fix.s < fix.t - 1 ? 0 : SMOOTH_TICKS)) continue;
+        rep.fixes[n++] = fix;
+        const w = fixWeight(fix, t);
+        x += fix.dx * w; y += fix.dy * w; angle += fix.da * w;
+      }
+      rep.fixes.length = n;
+      if (!n) rep.fixes = undefined;
+    }
     return {
-      x: a.body.x + (b.body.x - a.body.x) * k, y: a.body.y + (b.body.y - a.body.y) * k, angle: a.body.angle + da * k,
+      x, y, angle,
       vx: b.body.vx, vy: b.body.vy, jump: b.body.jump ?? 0, jumpScale: b.body.jumpScale ?? 1, dodge: b.body.dodge ?? 0, dodgeDir: b.body.dodgeDir ?? 0, aim: replicaAngle(mode, b.q), bits: b.bits,
     };
   }
