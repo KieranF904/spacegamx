@@ -7,7 +7,7 @@
  * Damage goes through the bridge (b.hurt), never an import of the damage module, so the modules can't form a cycle.
  */
 
-import { rayTerrain, portsDamageMul, stackMods, coverPart, nearShipSegment, castShipAt } from '@space-game/common';
+import { rayTerrain, portsDamageMul, portsPiecePhase, shotAimQ, TELL_BEAM_PIECE, type PortsState, stackMods, coverPart, nearShipSegment, castShipAt } from '@space-game/common';
 import { hasComponent } from 'bitecs';
 import {
   Position, Rotation, Input, Player, InSystem, Projectile, ShipState, Vec2, damagePart, weaponHit, shooterGrade, localToWorldDir,
@@ -184,7 +184,10 @@ export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: 
   if (pending) stepSalvos(b, eid, ship, pose, tick, pending);
   // A charge gun starting to charge, or let go early: a fire event with no shells, so everyone sees its tell (ammo code: guns.ts TELL_CHARGE_*)
   for (const t of tells) b.fired.push({ owner: eid, tick, part: t.w.part, aimQ: t.aimQ, ids: [], ammo: t.start ? TELL_CHARGE_START : TELL_CHARGE_CANCEL });
+  const pz = ship.derived.ports, pe = pz ? (energy?.charge.e as PortsState | undefined) : undefined;
   for (const w of beams) {
+    // (A beam in pieces that spent a piece this tick: a fire event with no shells, so every client draws its pulse from this tick)
+    if (pz && pe && portsPiecePhase(pz, pe, w.part) === 0) b.fired.push({ owner: eid, tick, part: w.part, aimQ: shotAimQ(ship.aim[w.part]), ids: [], ammo: TELL_BEAM_PIECE });
     // (A beam of a weapon role fires its own way: a Repair Beam mends a friendly hull instead, features/support)
     const hook = fireBeamHook(def(w));
     const t = hook ? hook(b, eid, ship, w, def(w)) : b.fireBeam(eid, ship, w, def(w));

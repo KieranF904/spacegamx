@@ -258,8 +258,12 @@ export interface FunctionDef {
   // The ports energy core (power/ports.ts; docs/design/energy-ports-2026-11.md), for ships whose blueprint says `power: 'ports'`
   /** Its power ports, in its own frame (N the nose, `cell` the index along that side, `rate` E a second): power crosses only out → in over a shared edge */
   ports?: { dir: 'in' | 'out'; side: Side; cell?: number; rate: number }[];
-  /** Weapons: the shape of its draw. `passive` E/s leaked while held, `discharge`/`rest` s its ports shut after a shot / a burst, `burst` lights only when full, `steady` its floor: the E/s its lines must deliver while it fills, or what it gathered collapses */
-  profile?: { passive?: number; discharge?: number; rest?: number; burst?: boolean; steady?: number };
+  /** Weapons: the shape of its draw. `passive` E/s leaked while held, `discharge`/`rest` s its ports shut after a shot / a burst, `burst` lights only when full, `steady` its floor: the E/s its lines must deliver while it fills, or what it gathered collapses.
+   * A beam with `pieces` fires in fixed pulses (power/ports.ts portsBeamStep): its buffer is that many equal pieces, a press
+   * spends one whole piece and burns for its share of the buffer's burn time, a held trigger chains the next, and `rest` s
+   * after the last its ports stay shut (the cooldown). `spike` (0..1) of a piece's damage is moved into a peak at its centre,
+   * `spikeWidth` (a share of the piece) wide: the same damage a piece, timed */
+  profile?: { passive?: number; discharge?: number; rest?: number; burst?: boolean; steady?: number; pieces?: number; spike?: number; spikeWidth?: number };
   /**
    * Weapons, ports ships: a second input with its own buffer (docs/design/energy-ports-2026-11.md section 17). It fires
    * without it; a shot fired while this buffer holds `cost` E (a beam: `cost` E a second while it burns) is augmented:

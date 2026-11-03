@@ -6,6 +6,8 @@
  *   ammo count       the rounds left in the open crate (red when out), by the segment
  *   spin arc         a thin inner arc for a spinning gun
  *   bank bar         a thin arc outside the segment when a Capacitor bank feeds the group
+ *   beam pieces      a beam in pieces (power/ports.ts): one short arc a piece, lit when whole, the one burning white and
+ *                    shrinking, a part-filled one as a dim amber sliver (it can't fire), and the cooldown a thin grey arc inside
  * Cycle and beam guns show a plain readiness arc. A transparent canvas that follows the mouse; nothing in it is
  * allocated per frame.
  */
@@ -75,6 +77,7 @@ export class WeaponRing {
       if (g.reloading && !g.starved) sweeping = true;
       this.put(g.model); this.put(g.clip); this.put(g.rounds); this.put(g.reloading); this.put(g.starved); this.put(g.charge);
       this.put(g.cooling); this.put(g.flash); this.put(g.ready); this.put(g.spin); this.put(g.bank); this.put(g.ammo); this.put(g.crates);
+      this.put(g.pieces); this.put(g.piecesFull); this.put(Math.round(g.piecePart * 40)); this.put(Math.round(g.pieceBurn * 40)); this.put(Math.round(g.pieceCool * 40));
     }
     this.drawn.length = this.at;
     return this.diff || sweeping;
@@ -102,7 +105,9 @@ export class WeaponRing {
     // The track
     arc(R, a0, a1, '#0b1220', 4.5, 0.35);
     const len = a1 - a0;
-    if (g.model === 'clip') {
+    if (g.pieces > 0) {
+      this.pieceArcs(arc, g, a0, a1, accent);
+    } else if (g.model === 'clip') {
       this.pips(ctx, g, a0, a1);
     } else if (g.model === 'charge' || (g.model === 'beam' && g.charge > 0)) {
       // Fills as it charges; white at full and for a moment after the shot
@@ -130,6 +135,20 @@ export class WeaponRing {
       ctx.fillText(g.ammo > 0 || g.crates > 0 ? String(g.ammo) : '0', tx, ty);
     }
     ctx.globalAlpha = 1;
+  }
+
+  /** A beam's pieces: one arc each, a small gap between; the cooldown draining inside */
+  private pieceArcs(arc: (r: number, from: number, to: number, color: string, width: number, alpha?: number) => void, g: RingGroup, a0: number, a1: number, accent: string): void {
+    const N = g.pieces, gap = Math.min(0.08, (a1 - a0) / (N * 4)), each = (a1 - a0 - gap * (N - 1)) / N;
+    const burning = g.pieceBurn > 0 ? 1 : 0;
+    for (let k = 0; k < N; k++) {
+      const s = a0 + k * (each + gap), e = s + each;
+      arc(R, s, e, '#1e293b', 3.5, 0.8);
+      if (k < g.piecesFull) arc(R, s, e, accent, 3.5, 0.95);
+      else if (burning && k === g.piecesFull) arc(R, s, s + each * g.pieceBurn, '#ffffff', 4.5, 0.95);
+      else if (k === g.piecesFull + burning && g.piecePart > 0) arc(R, s, s + each * g.piecePart, '#f59e0b', 2, 0.55);
+    }
+    if (g.pieceCool > 0) arc(R - 6, a0, a0 + (a1 - a0) * g.pieceCool, '#94a3b8', 1.6, 0.85);
   }
 
   /** Clip pips along the arc: lit for each round, grey (not lit) while a reload waits on power, sweeping while it runs */

@@ -92,6 +92,16 @@ export interface PortsLayout {
   rest: Int32Array;
   burst: Uint8Array;
   steady: Int32Array;
+  /** Beams fired in pieces (FunctionDef.profile.pieces; portsBeamStep): how many pieces its buffer is (0: a plain beam), eu a
+   * piece, ticks a piece burns (its share of the buffer's burn time), and its centre spike: the ticks [spikeLo, spikeHi) of a
+   * piece burn x spikeIn, the rest x spikeOut (the same damage a piece: spikeOut x (T - w) + spikeIn x w = T) */
+  pieces: Uint8Array;
+  pieceE: Int32Array;
+  pieceT: Int32Array;
+  spikeLo: Int32Array;
+  spikeHi: Int32Array;
+  spikeIn: Float64Array;
+  spikeOut: Float64Array;
   /** Weapons with an augment input (FunctionDef.augment): its buffer (eu), what a shot (a beam: a tick) costs, the most it
    * takes a tick, its floor (eu a tick, as `steady`), and a beam's dps x while augmented. 0 cap: none */
   augCap: Int32Array;
@@ -238,6 +248,7 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
   const Z = () => new Int32Array(n);
   const role = new Uint8Array(n), cap = Z(), rate = Z(), burn = Z(), bBurn = Z(), boostMul = new Float64Array(n).fill(1);
   const gun = new Uint8Array(n), shot = Z(), rounds = Z(), relight = Z(), passive = Z(), discharge = Z(), rest = Z(), burst = new Uint8Array(n), steady = Z();
+  const pieces = new Uint8Array(n), pieceE = Z(), pieceT = Z(), spikeLo = Z(), spikeHi = Z(), spikeIn = new Float64Array(n).fill(1), spikeOut = new Float64Array(n).fill(1);
   const augCap = Z(), augCost = Z(), augRate = Z(), augSteady = Z(), augDps = new Float64Array(n).fill(1), augMods: (WeaponMods | undefined)[] = new Array(n).fill(undefined), augName: (string | undefined)[] = new Array(n).fill(undefined);
   const tierDmg = new Float64Array(n).fill(1);
   const shield = new Uint8Array(n), carrier = new Uint8Array(n), matCap = Z(), matUse = Z(), takes = Z(), tankFeed = new Uint8Array(n), feedPort = new Uint8Array(n);
@@ -289,6 +300,14 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
       passive[i] = perTick(pr.passive ?? 0); discharge[i] = Math.round((pr.discharge ?? 0) * TPS); rest[i] = Math.round((pr.rest ?? 0) * TPS);
       tierDmg[i] = inf?.damage ?? 1;
       burst[i] = pr.burst ? 1 : 0; steady[i] = perTick(pr.steady ?? 0);
+      if (gun[i] === 3 && (pr.pieces ?? 0) >= 1 && shot[i] > 0) {
+        // (Pieces: N equal shares of the buffer, each burning N-th of the time the whole buffer burns at its draw)
+        const N = Math.min(16, Math.round(pr.pieces!)), T = Math.max(1, Math.round(cap[i] / (shot[i] * N)));
+        const s = Math.max(0, Math.min(0.95, pr.spike ?? 0)), w = Math.max(1, Math.min(T, Math.round(T * (pr.spikeWidth ?? 0.2))));
+        pieces[i] = N; pieceE[i] = Math.floor(cap[i] / N); pieceT[i] = T;
+        spikeLo[i] = Math.floor((T - w) / 2); spikeHi[i] = spikeLo[i] + w;
+        spikeOut[i] = 1 - s; spikeIn[i] = 1 - s + (s * T) / w;
+      }
       const ag = fn.augment;
       if (ag) {
         // (A shot's augment costs `cost` E; a beam's `cost` E a second while it burns. Its buffer holds `buffer` of them (a beam: seconds))
@@ -423,7 +442,7 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
   for (let i = 0; i < n; i++) if (role[i] === P_THRUSTER || role[i] === P_TOOL || role[i] === P_WEAPON) consumers.push(i);
   let gaugeMax = 0; for (const r of relays) gaugeMax += cap[r];
   const L: PortsLayout = {
-    n, sig: 0, role, cap, rate, burn, bBurn, boostMul, tierDmg, gun, shot, rounds, relight, passive, discharge, rest, burst, steady, augCap, augCost, augRate, augSteady, augDps, augMods, augName, shield, carrier, matCap, matUse, takes, tankFeed, feedPort,
+    n, sig: 0, role, cap, rate, burn, bBurn, boostMul, tierDmg, gun, shot, rounds, relight, passive, discharge, rest, burst, steady, pieces, pieceE, pieceT, spikeLo, spikeHi, spikeIn, spikeOut, augCap, augCost, augRate, augSteady, augDps, augMods, augName, shield, carrier, matCap, matUse, takes, tankFeed, feedPort,
     mShot, mDamage, mCycle, mDischarge, mRest, mBurn, mSteady, mThrust, mBoost, mBoostDrain, feeds, feedDefs,
     links: linkFrom.length, linkFrom: Int32Array.from(linkFrom), linkTo: Int32Array.from(linkTo), linkCap: Int32Array.from(linkCap), linkAug: Uint8Array.from(linkAug),
     outStart, outLink: Int32Array.from(outLink), inStart, inLink: Int32Array.from(inLink), openIn, openOut,
@@ -442,7 +461,7 @@ export function portsSig(L: PortsLayout): number {
   let h = 0x811c9dc5 | 0;
   const mix = (v: number) => { h = Math.imul(h ^ (v | 0), 0x01000193); };
   const all = (a: ArrayLike<number>) => { mix(a.length); for (let i = 0; i < a.length; i++) mix(a[i]); };
-  mix(L.n); all(L.role); all(L.cap); all(L.burn); all(L.bBurn); all(L.gun); all(L.shot); all(L.rounds); all(L.passive); all(L.discharge); all(L.rest); all(L.steady); all(L.augCap); all(L.augCost); all(L.augSteady); all(L.linkAug);
+  mix(L.n); all(L.role); all(L.cap); all(L.burn); all(L.bBurn); all(L.gun); all(L.shot); all(L.rounds); all(L.passive); all(L.discharge); all(L.rest); all(L.steady); all(L.pieces); all(L.pieceE); all(L.pieceT); all(L.augCap); all(L.augCost); all(L.augSteady); all(L.linkAug);
   all(L.matCap); all(L.takes); all(L.tankFeed); all(L.linkFrom); all(L.linkTo); all(L.netOf); all(L.selOut);
   const s = ((h >>> 16) ^ (h & 0xffff)) & 0xffff;
   return s === 0 ? 1 : s;
@@ -662,9 +681,11 @@ export function portsTick(L: PortsLayout, e: PortsState, ctl: Readonly<PortsCont
       if ((e.flags[p] & PF_LATCH) && held[p] >= c) e.flags[p] &= ~PF_LATCH;
     }
     const st = effSteady(L, e, p), shut = e.closed[p] > 0 || (e.flags[p] & PF_LIT) !== 0 || (L.gun[p] === 2 && !(e.flags[p] & PF_LATCH));
-    if (st > 0 && !shut && held[p] > 0 && held[p] < effCap(L, e, p) - 2 * L.passive[p] - L.rate[p] && sInNow[p] < st) held[p] = 0;
+    // (A beam in pieces keeps its whole pieces: only the piece filling collapses)
+    if (st > 0 && !shut && held[p] > 0 && held[p] < effCap(L, e, p) - 2 * L.passive[p] - L.rate[p] && sInNow[p] < st) held[p] = L.pieces[p] ? held[p] - (held[p] % L.pieceE[p]) : 0;
     if (L.augSteady[p] > 0 && e.aug[p] > 0 && e.aug[p] < L.augCap[p] - L.augRate[p] && sAugIn[p] < L.augSteady[p]) e.aug[p] = 0;
-    if (L.passive[p] > 0) { held[p] -= L.passive[p]; if (held[p] < 0) held[p] = 0; }
+    // (Its passive leaks while it charges; a beam in pieces, burning or cooling down, holds its whole pieces)
+    if (L.passive[p] > 0 && !(L.pieces[p] && shut)) { held[p] -= L.passive[p]; if (held[p] < 0) held[p] = 0; }
     if (e.amt[p] <= 0) { e.amt[p] = 0; e.mat[p] = 0; }
   }
   for (const p of L.thrusters) if (e.amt[p] <= 0) { e.amt[p] = 0; e.mat[p] = 0; }
@@ -709,10 +730,12 @@ export function portsSpendShot(L: PortsLayout, e: PortsState, p: number, n = L.r
 /** What a gun's hits are worth on a ports ship: its tier's damage and its material's (beams and pulses: the server's fireBeam) */
 export function portsDamageMul(L: PortsLayout, e: PortsState, p: number): number {
   const f = matOf(L, e, p);
-  return (f ? L.mDamage[p * L.feeds.length + f] : 1) * L.tierDmg[p] * ((e.flags[p] & PF_AUG) !== 0 ? L.augDps[p] : 1);
+  return (f ? L.mDamage[p * L.feeds.length + f] : 1) * L.tierDmg[p] * ((e.flags[p] & PF_AUG) !== 0 ? L.augDps[p] : 1) * portsPieceSpike(L, p, portsPiecePhase(L, e, p));
 }
-/** A beam's tick while the trigger's held: lights when it may (a burst beam only when full), burns a tick's worth, goes out and rests when it can't. Returns eu burnt */
+/** A beam's tick while the trigger's held: lights when it may (a burst beam only when full), burns a tick's worth, goes out and rests when it can't. Returns eu burnt
+ * (a beam in pieces: piecesStep, called whatever the trigger while a piece burns) */
 export function portsBeamStep(L: PortsLayout, e: PortsState, p: number, trigger: boolean): number {
+  if (L.pieces[p]) return piecesStep(L, e, p, trigger);
   let fl = e.flags[p];
   if (!trigger) { e.flags[p] = fl & ~(PF_LIT | PF_AUG); return 0; }
   const f = matOf(L, e, p), b = f ? Math.max(1, Math.round(L.shot[p] * L.mBurn[p * L.feeds.length + f])) : L.shot[p], h = e.held[p];
@@ -734,6 +757,63 @@ export function portsBeamStep(L: PortsLayout, e: PortsState, p: number, trigger:
   e.flags[p] = fl;
   return 0;
 }
+// ---- Beams in pieces (FunctionDef.profile.pieces; Kieran, 2026-11-04). The buffer is N equal pieces. A press with a whole
+// piece held spends it at once and burns for pieceT ticks, whatever the trigger does meanwhile; held when it ends, with
+// another whole piece, the next starts on that tick (a chain); otherwise the beam goes out and its ports stay shut `rest`
+// ticks (the cooldown) before it charges again. A piece only part full never fires, and spending a whole piece throws the
+// part-filled one away. Its ports are shut from the press to the cooldown's end. While lit, `closed` counts the piece's
+// ticks left (so the wire's closed field carries it: PORTS_SLOT_LAYOUT); after, the cooldown's
+/** Whole pieces a beam holds (with a passive's slack: a full buffer leaking its passive each tick still holds them all) */
+export function portsPiecesHeld(L: PortsLayout, e: PortsState, p: number): number {
+  const pe = L.pieceE[p];
+  if (!L.pieces[p] || pe <= 0) return 0;
+  const k = Math.floor((e.held[p] + 2 * L.passive[p] + 1) / pe);
+  return k < L.pieces[p] ? k : L.pieces[p];
+}
+/** Ticks into the piece burning now (0 on the tick it was spent), or -1 */
+export function portsPiecePhase(L: PortsLayout, e: PortsState, p: number): number {
+  return L.pieces[p] && (e.flags[p] & PF_LIT) ? L.pieceT[p] - e.closed[p] : -1;
+}
+/** A piece is burning (portsBeamStep must be called this tick, trigger or not, to burn it, end it or chain the next) */
+export function portsPieceLit(L: PortsLayout, e: PortsState, p: number): boolean {
+  return L.pieces[p] !== 0 && (e.flags[p] & PF_LIT) !== 0;
+}
+/** A piece's damage x at `phase` ticks in: the centre spike, the same total a piece (1 outside a piece) */
+export function portsPieceSpike(L: PortsLayout, p: number, phase: number): number {
+  if (!L.pieces[p] || phase < 0) return 1;
+  return phase >= L.spikeLo[p] && phase < L.spikeHi[p] ? L.spikeIn[p] : L.spikeOut[p];
+}
+function piecesStep(L: PortsLayout, e: PortsState, p: number, trigger: boolean): number {
+  let fl = e.flags[p];
+  if (fl & PF_LIT) {
+    if (e.closed[p] > 0) return pieceBurn(L, e, p, fl);
+    // (The piece is spent: the next, if held and there is one; else out, and the cooldown)
+    if (trigger && pieceSpend(L, e, p)) return pieceBurn(L, e, p, e.flags[p]);
+    fl &= ~(PF_LIT | PF_AUG);
+    e.flags[p] = fl | PF_LATCH;
+    const r = effRest(L, e, p); e.closed[p] = r > 32000 ? 32000 : r;
+    return 0;
+  }
+  if (!trigger || e.closed[p] > 0 || !pieceSpend(L, e, p)) { if (e.closed[p] === 0) e.flags[p] = fl & ~PF_LATCH; return 0; }
+  return pieceBurn(L, e, p, e.flags[p]);
+}
+/** Spend a whole piece (the part-filled one goes with it) and light: false when it holds none */
+function pieceSpend(L: PortsLayout, e: PortsState, p: number): boolean {
+  if (L.feedPort[p] === 2 && !matOf(L, e, p)) return false;
+  const k = portsPiecesHeld(L, e, p);
+  if (k < 1) return false;
+  e.held[p] = (k - 1) * L.pieceE[p];
+  e.closed[p] = L.pieceT[p];
+  e.flags[p] = (e.flags[p] | PF_LIT) & ~PF_LATCH;
+  return true;
+}
+/** A tick of a lit piece: its energy was paid when it was spent; its augment and material pay by the tick. Returns 1 (it burns) */
+function pieceBurn(L: PortsLayout, e: PortsState, p: number, fl: number): number {
+  if (L.augCap[p] > 0 && e.aug[p] >= L.augCost[p]) { e.aug[p] -= L.augCost[p]; fl |= PF_AUG; } else fl &= ~PF_AUG;
+  e.flags[p] = fl;
+  if (matOf(L, e, p)) { e.amt[p] -= L.matUse[p]; if (e.amt[p] <= 0) { e.amt[p] = 0; e.mat[p] = 0; } }
+  return 1;
+}
 /** Flip a Selector (or every one with part < 0) to its other input */
 export function portsSwitchFeeds(L: PortsLayout, e: PortsState, part = -1): void {
   for (const s of L.selectors) if (part < 0 || s === part) e.flags[s] ^= PF_SEL;
@@ -745,7 +825,7 @@ export function portsPurge(L: PortsLayout, e: PortsState): void {
 
 // ================================================================ the wire (the pilot row's energy slot, triples)
 /** What the slot means (in the wire hash: a change of meaning is a protocol bump) */
-export const PORTS_SLOT_LAYOUT = 'ports:quads(part,held*16+flags4,closed*2^24+mat*2^20+amt,aug)';
+export const PORTS_SLOT_LAYOUT = 'ports:quads(part,held*16+flags4,closed*2^24+mat*2^20+amt,aug);closed=a lit piece beam ticks left';
 export const PORTS_ROW = { sig: 8, count: 9, at: 13 } as const;
 const FLAGS = 16, AMT_MOD = 1 << 20, MAT_MOD = 1 << 24, PER = 4;
 /** Append the triples to `out` (from data[PORTS_ROW.at]). Returns the triple count; the row carries -count in data[PORTS_ROW.count] and L.sig in data[PORTS_ROW.sig] */

@@ -7,7 +7,7 @@
  * every frame, so a frame allocates nothing.
  */
 
-import { BROWNOUT, bankHeld, clipReloading, feedShare, type Charge, type FireModel, type ShipState } from '@space-game/common';
+import { BROWNOUT, PF_LIT, bankHeld, clipReloading, feedShare, portsPiecesHeld, type Charge, type FireModel, type PortsState, type ShipState } from '@space-game/common';
 
 export interface RingGroup {
   /** The model (the part's function id) these guns are */
@@ -44,6 +44,14 @@ export interface RingGroup {
   bank: number;
   /** The previous frame's charge (for the flash after a shot) */
   prevCharge: number;
+  /** A beam in pieces (power/ports.ts; the group's first gun): its pieces (0: not one), whole pieces held, how full the next
+   * one is 0..1 (a part-filled piece: it can't fire, and is thrown away when a whole one is spent), how much of the piece
+   * burning is left 0..1 (0: none burning), and how much of the cooldown is left 0..1 */
+  pieces: number;
+  piecesFull: number;
+  piecePart: number;
+  pieceBurn: number;
+  pieceCool: number;
 }
 
 /** What `update` reads besides the ship: the stored energy, and the rounds a kind of gun has left aboard */
@@ -77,6 +85,7 @@ export class RingModel {
         g = {
           fn, model: w.fire.model, kind: w.kind, parts: [], ws: [], clip: w.fire.model === 'clip' ? (w.fire.clip ?? 1) : 0,
           rounds: 0, reloading: false, starved: false, charge: 0, cooling: 0, flash: 0, spin: 0, ready: 1, ammo: -1, crates: 0, bank: -1, prevCharge: 0,
+          pieces: 0, piecesFull: 0, piecePart: 0, pieceBurn: 0, pieceCool: 0,
         };
         by.set(key, g);
         out.push(g);
@@ -122,6 +131,7 @@ export class RingModel {
         const B = b >= 0 ? d.power!.banks[b] : null;
         if (B && B.cap > 0) bank = Math.max(bank, Math.min(1, bankHeld(d, src.charge, b) / B.cap));
       }
+      this.pieces(g, ship, src.charge);
       g.rounds = n ? rounds / n : 0;
       g.reloading = reloading;
       g.starved = starved;
@@ -140,5 +150,17 @@ export class RingModel {
       g.crates = a ? a.crates : 0;
     }
     return this.groups;
+  }
+
+  /** A beam in pieces: its group's first gun's pieces, as your predicted ports state has them */
+  private pieces(g: RingGroup, ship: ShipState, charge: Charge): void {
+    const L = ship.derived.ports, e = charge.e as PortsState | undefined, p = g.parts[0];
+    if (g.model !== 'beam' || !L || !e || e.held.length !== L.n || p === undefined || !L.pieces[p]) { g.pieces = 0; return; }
+    const N = L.pieces[p], pe = Math.max(1, L.pieceE[p]), full = portsPiecesHeld(L, e, p), lit = (e.flags[p] & PF_LIT) !== 0;
+    g.pieces = N;
+    g.piecesFull = full;
+    g.piecePart = full < N ? Math.max(0, Math.min(0.999, (e.held[p] - full * pe) / pe)) : 0;
+    g.pieceBurn = lit ? Math.max(0, Math.min(1, e.closed[p] / Math.max(1, L.pieceT[p]))) : 0;
+    g.pieceCool = !lit && e.closed[p] > 0 ? Math.min(1, e.closed[p] / Math.max(1, L.rest[p])) : 0;
   }
 }

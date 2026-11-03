@@ -649,6 +649,10 @@ for (const m of models) m.carriesFlow = true;
     power_battery: io(40, 60), power_capacitor: io(40, 400), power_drive_cell: io(60, 250), power_heavy_bank: io(70, 150, [0, 1], [0]),
     power_conduit: io(200, 200), power_diode: io(200, 200),
   };
+  // (Beams in pieces, Kieran 2026-11-04: `pieces` equal shares of the buffer, each a fixed pulse of its share of the burn time;
+  // `rest` is the cooldown after a pulse or a chain of them; `spike` of a pulse's damage moves into a peak `spikeWidth` of it
+  // wide at its centre, the same damage a pulse. power/ports.ts portsBeamStep)
+  const PULSE = (pieces, rest, spike = 0.35, spikeWidth = 0.2) => ({ pieces, rest, spike, spikeWidth });
   // Profiles and feeds (section 9, 10): what shapes a gun's draw, and the materials a gun or engine takes (about a third of the
   // mid guns, half of the high ones; none of the starters)
   const PROFILE = {
@@ -656,11 +660,11 @@ for (const m of models) m.carriesFlow = true;
     cannon_bastion: { takes: ['overcharge', 'accelerant'] },
     autocannon_chainsaw: { takes: ['coolant', 'flux'] },
     pulse_overpulse: { takes: ['coolant', 'accelerant'] },
-    laser_cutter: { profile: { burst: true, rest: 0.5 }, takes: ['lens', 'coolant'] },
-    laser_searchlight: { takes: ['lens'] },
+    laser_cutter: { profile: { burst: true, ...PULSE(3, 0.5) }, takes: ['lens', 'coolant'] },
+    laser_searchlight: { profile: PULSE(4, 0.3, 0.25), takes: ['lens'] },
     railgun_spear: { profile: { steady: 30, passive: 5 }, takes: ['damping', 'overcharge'] },
     railgun_rail_driver: { takes: ['accelerant', 'coolant'] },
-    lance_lance: { profile: { burst: true, rest: 1, passive: 20 }, takes: ['lens', 'coolant'] },
+    lance_lance: { profile: { burst: true, passive: 20, ...PULSE(2, 1, 0.4, 0.15) }, takes: ['lens', 'coolant'] },
     legendary_singularity: { profile: { passive: 30, discharge: 1.5 }, takes: ['overcharge', 'coolant', 'damping'] },
     engine_plasma_drive: { takes: ['catalyst', 'reaction'] },
     engine_fusion_torch: { takes: ['catalyst', 'burstgel'] },

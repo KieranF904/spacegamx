@@ -680,3 +680,27 @@ The three early demos (Gunship, Lancer, Raider) are off the F9 list. The ship st
 no line, or a line too weak) and each heavy gun (charged, charging, or starved: its lines give under its floor).
 
 Not done: the hangar shows no ports or augment inputs yet; tiers and augments are on ports ships only.
+
+## 18. Beams in pieces (Kieran, 2026-11-04)
+
+"Whenever activated, they should consume a fixed portion of their buffer for a fixed portion of time, rather than
+granularly turning it on/off as you like." A ports beam with `profile.pieces` (models.mjs `PULSE`) fires in pulses
+(`ports.ts` `portsBeamStep` → `piecesStep`):
+
+- Its buffer is N equal pieces (`pieceE` = cap / N). A press with at least one whole piece spends one at once and the beam
+  burns for `pieceT` = (the buffer's burn time at its draw) / N ticks. Letting go doesn't cut it short (`guns.ts` keeps
+  stepping a lit piece with the trigger off).
+- Held when a piece ends, with another whole piece, the next starts on that tick (a chain). Otherwise it goes out and its
+  ports stay shut for `rest` (the cooldown; a material's rest multiplier applies), then it charges as before. Its ports are
+  shut from the press to the cooldown's end, and its passive doesn't leak meanwhile, so whole pieces stay whole.
+- A part-filled piece never fires; spending a whole piece throws the part-filled one away (held = (whole - 1) × pieceE).
+  A floor collapse (`steady`) only empties the piece filling. A full buffer counts as whole with a passive's slack.
+- Damage: `spike` of a piece's damage moves into a window `spikeWidth` of the piece wide at its centre, so a piece deals
+  what the same burn did before and DPS is unchanged (`portsPieceSpike`, folded into `portsDamageMul`).
+- Values: Cutter 3 pieces, 0.5 s cooldown, spike 0.35 over the middle 20%; Lance 2, 1 s, 0.4 over 15%; Searchlight 4,
+  0.3 s, 0.25 over 20%. The Tesla (an arc with its own zap rhythm), the Frostbite and the Repair Beam are left as they are.
+  A material's `burn` multiplier no longer changes a piece beam's use (a piece costs a piece).
+- Wire (protocol 32): while lit, the ports slot's `closed` carries the piece's ticks left; the server sends a shell-less
+  fire event (`TELL_BEAM_PIECE`, ammo 253) on the tick a piece is spent, so replicas draw each pulse from the same tick.
+- Client: `beamPieces.ts` (the pulse's swell, on the spike's window), `MiningBeamFx` and `LanceFx` draw it; the weapon
+  ring shows the pieces (`gunHud.ts` pieces fields, `WeaponRing.pieceArcs`). Tests: `power/beamPieces.test.ts`.

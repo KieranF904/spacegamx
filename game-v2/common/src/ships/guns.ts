@@ -23,7 +23,7 @@ import { buildShot, shipPointToWorld, type ProjectileSpec, type ShipPose } from 
 import { stepFixedGunAim, stepTurretAim } from './turret.js';
 import { SHOT_AIM_STEPS, shotAimQ } from './launch.js';
 import { BROWNOUT, chargeGroupsEnd, feedShare, type Charge } from './energy.js';
-import { PF_LATCH, effCap, effShot, portsBeamStep, portsGunReady, portsShotAugmented, portsSpendShot, type PortsLayout, type PortsState } from './power/ports.js';
+import { PF_LATCH, effCap, effShot, portsBeamStep, portsGunReady, portsPieceLit, portsShotAugmented, portsSpendShot, type PortsLayout, type PortsState } from './power/ports.js';
 import { PILOT_EXTRAS } from './features/plan.js';
 import { datan2, dcos, dsin } from '../math/detTrig.js';
 
@@ -82,6 +82,8 @@ export const CLIP_IDLE = 60;
 /** Fire-event ammo codes that mark a charge tell (no shells): a charge started, a charge let go */
 export const TELL_CHARGE_START = 255;
 export const TELL_CHARGE_CANCEL = 254;
+/** Fire-event ammo code (no shells) for a beam in pieces spending a piece: its pulse starts on that tick (power/ports.ts portsBeamStep), so every client draws it then */
+export const TELL_BEAM_PIECE = 253;
 
 const NO_TELLS: readonly GunTell[] = Object.freeze([]);
 
@@ -209,6 +211,9 @@ function stagger(ship: ShipState, w: WeaponInfo): void {
   }
 }
 
+/** Beams in pieces burning on with the trigger let go (stepGuns' scratch, cleared each call) */
+const letGo = new Set<number>();
+
 /** A loaded gun counts on below 0 while it waits (how long it has: see stepGuns), down to this */
 const MAX_WAIT = 600;
 
@@ -275,7 +280,8 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
   // Each gun's share of the power it asked for this tick (1 unaccounted, or with plenty)
   const share = (w: WeaponInfo) => (orders.energy && !pz ? feedShare(ship.derived, orders.energy.charge, w.part, 'gun') : 1);
   // (A beam short of power burns that share of the ticks, evenly spread)
-  const burns = (w: WeaponInfo) => { if (pz) return portsBeamStep(pz, E, w.part, true) > 0; const r = share(w); return r >= BROWNOUT || (r > 0 && Math.floor(tick * r) !== Math.floor((tick - 1) * r)); };
+  // (A beam in pieces burns a piece out whatever the trigger: `want` only decides whether the next follows)
+  const burns = (w: WeaponInfo, want: boolean) => { if (pz) return portsBeamStep(pz, E, w.part, want) > 0; const r = share(w); return r >= BROWNOUT || (r > 0 && Math.floor(tick * r) !== Math.floor((tick - 1) * r)); };
   const tell = (w: WeaponInfo, start: boolean) => {
     if (tells === NO_TELLS) tells = [];
     tells.push({ w, aimQ: shotAimQ(ship.aim[w.part]), start });
@@ -283,6 +289,7 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
   const aimX = aimWorld === undefined ? 0 : pose.x + dcos(aimWorld) * aimDist;
   const aimY = aimWorld === undefined ? 0 : pose.y + dsin(aimWorld) * aimDist;
   const ready: WeaponInfo[] = [];
+  letGo.clear();
   // A semi-automatic gun fires once per click: the click is kept a few ticks, for one pressed just before the gun is ready
   if (orders.firing && !ship.triggerHeld) ship.clickAt = tick;
   ship.triggerHeld = orders.firing;
@@ -347,8 +354,11 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
       continue;
     }
     if (!want) {
-      // (A beam let go winds up again from nothing; on a ports ship it goes out)
-      if (f.model === 'beam') { ship.charge[p] = 0; if (pz) portsBeamStep(pz, E, p, false); }
+      // (A beam let go winds up again from nothing; on a ports ship it goes out, but a piece once spent burns to its end)
+      if (f.model === 'beam') {
+        if (pz && portsPieceLit(pz, E, p)) { ready.push(w); letGo.add(p); continue; }
+        ship.charge[p] = 0; if (pz) portsBeamStep(pz, E, p, false);
+      }
       continue;
     }
     if (f.model === 'beam') ready.push(w);
@@ -365,7 +375,7 @@ export function stepGuns(ship: ShipState, pose: ShipPose, orders: GunOrders, tic
   for (const w of ready) {
     const f = w.fire, p = w.part;
     if (f.model === 'beam') {
-      if (!burns(w)) continue;
+      if (!burns(w, !letGo.has(p))) continue;
       // (A beam pays a tick at a time: each one is a shot. Its windup counts the ticks it has burned)
       ship.cooldown[p] = 1;
       if (f.windup) ship.charge[p] = Math.min(f.windup, ship.charge[p] + 1);

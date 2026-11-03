@@ -10,7 +10,7 @@ import { packKeyframe } from './replication.js';
 import { CTL, ReplicaMode } from '../ships/replica.js';
 import { CHARGE_GROUPS_AT, CHARGE_GROUPS_LAYOUT, MAX_CHARGE_GROUPS, PILOT_ROW } from '../ships/energy.js';
 import { PORTS_SLOT_LAYOUT } from '../ships/power/ports.js';
-import { GUN_STATE_LAYOUT, TELL_CHARGE_CANCEL, TELL_CHARGE_START } from '../ships/guns.js';
+import { GUN_STATE_LAYOUT, TELL_BEAM_PIECE, TELL_CHARGE_CANCEL, TELL_CHARGE_START } from '../ships/guns.js';
 
 /** FNV-1a, 32 bits, as hex */
 export function fnv1a(s: string): string {
@@ -31,7 +31,7 @@ export function computeWireHash(): string {
   // (Layouts that are positions, not tables: the control bits, a keyframe's optional tail, where the pilot row's charge groups start and what they mean)
   const layouts = {
     ctl: CTL, chargeGroups: [CHARGE_GROUPS_AT, MAX_CHARGE_GROUPS, CHARGE_GROUPS_LAYOUT, PORTS_SLOT_LAYOUT], pilotRow: PILOT_ROW,
-    gunState: GUN_STATE_LAYOUT, tells: [TELL_CHARGE_START, TELL_CHARGE_CANCEL],
+    gunState: GUN_STATE_LAYOUT, tells: [TELL_CHARGE_START, TELL_CHARGE_CANCEL, TELL_BEAM_PIECE],
     keyframe: packKeyframe({ id: 2, mode: ReplicaMode.Player, body: { x: 1, y: 2, vx: 3, vy: 4, angle: 0.5, angVel: 0, jump: 0, cargo: 6, dodge: 7, dodgeDir: 8 }, ctl: { bits: 16, targetAngle: 0 }, q: 4000 }),
   };
   const msgs = [

@@ -10,7 +10,7 @@
  *   J  jump drive: spool up, then fly far and fast along the nose (J again aborts)
  */
 
-import { endsAtAim, stackMods, ensurePortsCharge, stepPointDefenceAim, stepFixedGunAim, SHOT_AIM_STEPS, pointDefenceOf, chargeGroupsEnd, TELL_CHARGE_START, TELL_CHARGE_CANCEL } from '@space-game/common';
+import { endsAtAim, stackMods, ensurePortsCharge, stepPointDefenceAim, stepFixedGunAim, SHOT_AIM_STEPS, pointDefenceOf, chargeGroupsEnd, TELL_CHARGE_START, TELL_CHARGE_CANCEL, TELL_BEAM_PIECE } from '@space-game/common';
 import { GunSync } from './gunSync';
 import { GunFeel } from './gunFeel';
 import './energyLooks';
@@ -520,6 +520,8 @@ export class ShipClient {
         }
         continue;
       }
+      // A beam in pieces spent a piece (no shells): its pulse runs from that tick (power/ports.ts; drawn by MiningBeamFx)
+      if (ammo === TELL_BEAM_PIECE) { this.beamFx?.startPiece(owner, part, tick); continue; }
       if (ammo === TELL_CHARGE_CANCEL) {
         this.chargeTells.delete(owner * 256 + part);
         this.tellSounds.get(owner * 256 + part)?.();
