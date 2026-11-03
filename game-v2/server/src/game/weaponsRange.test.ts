@@ -6,7 +6,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
-import { Position, Velocity, Rotation, InSystem, Projectile, type ServerMessage } from '@space-game/common';
+import { Position, Velocity, Rotation, InSystem, Projectile, encodeServerMessage, serverFrame, decodeServerFrame, type ServerMessage } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { withDevData, loadRangeConfig } from '../data/devData.js';
@@ -43,7 +43,16 @@ function start(opts: { dev?: boolean; production?: boolean } = {}) {
 
 /** GameServer.step runs one tick: this runs n */
 const run = (server: GameServer, n: number) => { for (let i = 0; i < n; i++) server.step(); };
-const lastState = (server: GameServer, got: ServerMessage[]) => { server.flushOutbox(); return [...got].reverse().find((m) => m.type === 'rangeState') as any; };
+/** The readout as the client puts it together: the last head, then every row since (as client devRangeFeed.ts does) */
+const lastState = (server: GameServer, got: ServerMessage[]) => {
+  server.flushOutbox();
+  let state: any;
+  for (const m of got) {
+    if (m.type === 'rangeHead') state = { ...m, dummies: m.dummies.map((d) => ({ ...d })) };
+    else if (m.type === 'rangeRow' && state) Object.assign(state.dummies[m.i], { ...m, ttk: m.ttk ?? null });
+  }
+  return state;
+};
 const projectiles = (server: GameServer) => bitecs.defineQuery([Projectile])(server.world as any);
 const pose = (server: GameServer, eids: number[]) => eids.map((e) => [Position.x[e], Position.y[e], Velocity.x[e], Velocity.y[e], Rotation.angle[e]]);
 
@@ -103,7 +112,7 @@ describe('weapons range: dummies', () => {
     expect(fresh.hp.every((h, i) => h === fresh.maxHp[i])).toBe(true);
 
     // The readout: a kill time, and a state message to the pilot
-    const state = lastState(server, got) as Extract<ServerMessage, { type: 'rangeState' }> | undefined;
+    const state = lastState(server, got);
     expect(state).toBeTruthy();
     expect(state!.dummies.length).toBe(config.dummies.length);
     expect(state!.dummies[0].ttk).not.toBeNull();
@@ -125,6 +134,28 @@ describe('weapons range: dummies', () => {
     const next = lastState(server, got);
     expect(next.dummies[2].dmg5).toBe(0);
     expect(range.eids().every((x) => x >= 0)).toBe(true);
+  });
+
+  it('the readout goes as changes only: nothing while idle, one small row for a dummy that is hit', () => {
+    const { server, t, got } = start();
+    t.send({ type: 'devRange', action: 'go' } as any);
+    run(server, 130);
+    server.flushOutbox();
+    expect(got.filter((m) => m.type === 'rangeHead').length).toBe(1);
+    expect(got.filter((m) => m.type === 'rangeRow').length).toBe(config.dummies.length);
+    got.length = 0;
+    run(server, 120);
+    server.flushOutbox();
+    expect(got.filter((m) => m.type === 'rangeHead' || m.type === 'rangeRow')).toEqual([]);
+    const range = server.range!;
+    range.onDamage(range.eids()[3], 25);
+    run(server, 15);
+    server.flushOutbox();
+    const rows = got.filter((m) => m.type === 'rangeRow') as Extract<ServerMessage, { type: 'rangeRow' }>[];
+    expect(rows.map((r) => r.i)).toEqual([3]);
+    expect(rows[0].dmg5).toBe(25);
+    expect(encodeServerMessage(rows[0]).length).toBeLessThan(20);
+    expect(decodeServerFrame(serverFrame([encodeServerMessage(rows[0])]))).toEqual([rows[0]]);
   });
 
   it('moving targets sweep, and switching back puts them on their spots', () => {

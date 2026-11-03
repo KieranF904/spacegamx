@@ -11,7 +11,7 @@
  */
 import type { ServerMessage, DisconnectInfo } from '@space-game/common';
 import { showHitTick } from '../ui/HitTick';
-import { rangeFeed } from '../ui/devRangeFeed';
+import { rangeHead, rangeRow } from '../ui/devRangeFeed';
 import { coalesceDelayMs } from '../network/netCaps';
 import { PROTOCOL_VERSION, PROTOCOL_MISMATCH_CLOSE, unpackRanges } from '@space-game/common';
 import type { RibbonsFile } from '@space-game/common';
@@ -378,7 +378,8 @@ const TABLE: Handlers = {
   effect: (h, msg) => { h.renderer.showEffect(msg.effectType, msg.x, msg.y, msg.data, msg.targetX, msg.targetY, msg.entityId); },
   systemMessage: (h, msg) => { h.showSystemMessage(msg.text, msg.color); },
   // (dev weapons range readout: nobody listens outside a dev build)
-  rangeState: (_h, msg) => { rangeFeed(msg); },
+  rangeHead: (_h, msg) => { rangeHead(msg); },
+  rangeRow: (_h, msg) => { rangeRow(msg); },
   chat: (h, msg) => { h.addChatMessage(msg.playerName, msg.text); },
   authResult: (h, msg) => { h.handleAuthResult(msg); },
   adminStats: (h, msg) => { h.adminPanel?.onStats(msg); },

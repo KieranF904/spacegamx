@@ -9,7 +9,7 @@
  * from the first hit to the kill. GameServer builds this only on a dev server (devTeleport, never NODE_ENV=production).
  */
 
-import { InSystem, Position, type ServerRangeStateMessage, type RangeDummyState } from '@space-game/common';
+import { InSystem, Position, type ServerRangeStateMessage, type ServerRangeHeadMessage, type ServerRangeRowMessage, type RangeDummyState } from '@space-game/common';
 import type { Enemies } from './Enemies.js';
 import type { ShipBridge } from '../ships/ShipBridge.js';
 
@@ -79,7 +79,7 @@ export interface RangeHost {
   players(num: number): number[];
   /** What the readout says about this pilot's own guns and ammunition */
   pilot(player: number): Pick<ServerRangeStateMessage, 'ideal' | 'guns'>;
-  send(player: number, msg: ServerRangeStateMessage): void;
+  send(player: number, msg: ServerRangeHeadMessage | ServerRangeRowMessage): void;
 }
 
 export class WeaponsRange {
@@ -87,6 +87,8 @@ export class WeaponsRange {
   private byEid = new Map<number, Slot>();
   moving = false;
   private num = -1;
+  /** What each pilot here was last sent: the head (as a key) and each dummy's row (as a key), so only changes go */
+  private sent = new Map<number, { head: string; rows: string[] }>();
 
   constructor(readonly cfg: RangeConfig, private enemies: Enemies, private ships: ShipBridge, private host: RangeHost) {
     this.slots = cfg.dummies.map((spec) => {
@@ -113,6 +115,7 @@ export class WeaponsRange {
     if (!players.length) {
       // Nobody here: put them all away (nothing is remembered about them)
       if (this.byEid.size) this.clear();
+      this.sent.clear();
       return;
     }
     for (const s of this.slots) {
@@ -120,9 +123,36 @@ export class WeaponsRange {
       if (s.eid < 0 && (s.deadAt < 0 || now - s.deadAt >= this.cfg.respawnSeconds * TPS)) this.spawn(s);
       else if (s.eid >= 0 && this.moving) this.sweep(s);
     }
-    if (now % READOUT_TICKS === 0) {
-      const dummies = this.readout(now);
-      for (const p of players) this.host.send(p, { type: 'rangeState', moving: this.moving, dummies, ...this.host.pilot(p) });
+    if (now % READOUT_TICKS === 0) this.sendReadout(now, players);
+  }
+
+  /**
+   * The readout, as changes only: a pilot gets the head when they arrive or it changes (switches, guns, labels), then a
+   * row for each dummy whose numbers moved (as they go on the wire: whole percent, tenths of a second). Idle, nothing goes.
+   */
+  private sendReadout(now: number, players: number[]): void {
+    for (const p of this.sent.keys()) if (!players.includes(p)) this.sent.delete(p);
+    const dummies = this.readout(now);
+    const rows = dummies.map((d, i): ServerRangeRowMessage => ({
+      type: 'rangeRow', i, dead: d.dead, hull: d.hull, shield: d.shield, dmg5: d.dmg5, dps: d.dps, fight: d.fight, total: d.total,
+      ...(d.ttk === null ? {} : { ttk: d.ttk }),
+    }));
+    const keys = rows.map((r) => `${+r.dead},${Math.round(r.hull * 100)},${Math.round(r.shield * 100)},${r.dmg5},${r.dps},${Math.round(r.fight * 10)},${r.total},${r.ttk === undefined ? '' : Math.round(r.ttk * 10)}`);
+    const labels = dummies.map((d) => ({ id: d.id, name: d.name, dist: d.dist }));
+    for (const p of players) {
+      const head: ServerRangeHeadMessage = { type: 'rangeHead', moving: this.moving, ...this.host.pilot(p), dummies: labels };
+      const headKey = JSON.stringify(head);
+      let was = this.sent.get(p);
+      if (!was || was.head !== headKey) {
+        this.host.send(p, head);
+        was = { head: headKey, rows: [] };
+        this.sent.set(p, was);
+      }
+      for (let i = 0; i < rows.length; i++) {
+        if (was.rows[i] === keys[i]) continue;
+        was.rows[i] = keys[i];
+        this.host.send(p, rows[i]);
+      }
     }
   }
 

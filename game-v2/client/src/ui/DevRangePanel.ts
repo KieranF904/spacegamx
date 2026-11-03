@@ -4,7 +4,7 @@
  * read each dummy's damage, rate and time-to-kill. The server (devRange, WeaponsRange.ts) does all of it; nothing is saved.
  */
 import type { ServerRangeStateMessage, RangeDummyState } from '@space-game/common';
-import { setRangeSink } from './devRangeFeed';
+import { setRangeSink, rangeState } from './devRangeFeed';
 
 export interface RangeGun { id: string; name: string; kind: string; fire: string; grade: number; mount: string }
 
@@ -32,6 +32,9 @@ export class DevRangePanel {
     if (e.code !== 'F10') return;
     e.preventDefault();
     this.el.style.display = this.el.style.display === 'none' ? 'block' : 'none';
+    // (the readout only comes as changes, so draw what's known on opening)
+    const now = rangeState();
+    if (now) this.onState(now);
   };
 
   constructor(private guns: RangeGun[], private send: (m: RangeAction) => void, private restore: () => void) {

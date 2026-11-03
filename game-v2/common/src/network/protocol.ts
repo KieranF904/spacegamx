@@ -31,9 +31,9 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
  * has updated PROTOCOL_VERSION and PROTOCOL_WIRE_HASH.
  */
 // History: PROTOCOL_CHANGELOG.md. Re-pin with `npm run wire:bump "reason"` (game-v2/), never by hand.
-export const PROTOCOL_VERSION = 29;
+export const PROTOCOL_VERSION = 30;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
-export const PROTOCOL_WIRE_HASH = 'a386fbd2';
+export const PROTOCOL_WIRE_HASH = '8566e933';
 /** WebSocket close code (and reason) for a client on another protocol version */
 export const PROTOCOL_MISMATCH_CLOSE = 4002;
 export const PROTOCOL_MISMATCH_REASON = 'version';
@@ -489,7 +489,10 @@ export interface RangeDummyState {
   total: number;
 }
 
-/** Dev tool: the weapons range's readout, a few times a second to a pilot in it (WeaponsRange.ts) */
+/**
+ * The weapons range's readout as the client's panel sees it (client devRangeFeed.ts puts it together from rangeHead
+ * and rangeRow; never sent whole)
+ */
 export interface ServerRangeStateMessage {
   type: 'rangeState';
   moving: boolean;
@@ -497,6 +500,36 @@ export interface ServerRangeStateMessage {
   /** Each gun you carry: its model's name, its kind, and the crate "ideal ammo" gives it (or the one it is firing) */
   guns: { name: string; kind: string; crate?: string }[];
   dummies: RangeDummyState[];
+}
+
+/**
+ * Dev tool, the weapons range (WeaponsRange.ts): what changes rarely, sent when a pilot arrives and when any of it
+ * changes: the switches, your guns, and each dummy's label (its rangeRow index is its place here)
+ */
+export interface ServerRangeHeadMessage {
+  type: 'rangeHead';
+  moving: boolean;
+  ideal: boolean;
+  guns: { name: string; kind: string; crate?: string }[];
+  dummies: { id: string; name: string; dist: number }[];
+}
+
+/**
+ * Dev tool, the weapons range: one dummy's numbers, sent (a compact row) only when they change. On the wire `dead` is
+ * 0/1, hull and shield are whole percent, fight and ttk tenths of a second (COMPACT_HOOKS); ttk absent is "none"
+ */
+export interface ServerRangeRowMessage {
+  type: 'rangeRow';
+  /** The dummy's index in rangeHead.dummies */
+  i: number;
+  dead: boolean;
+  hull: number;
+  shield: number;
+  dmg5: number;
+  dps: number;
+  fight: number;
+  total: number;
+  ttk?: number;
 }
 
 export interface ServerSystemMessage {
@@ -794,7 +827,8 @@ export type ServerMessage =
   | ServerBankMessage
   | ServerChatMessage
   | ServerSystemMessage
-  | ServerRangeStateMessage
+  | ServerRangeHeadMessage
+  | ServerRangeRowMessage
   | ServerDialogueMessage
   | ServerShopMessage
   | ServerDamageMessage
@@ -1532,6 +1566,8 @@ const COMPACT: [string, string[]][] = [
   ['hpCheck', ['id', 'sum']],
   // (Appended, protocol 28: client-detected hits, hits.ts SELF_HITS)
   ['hitFix', ['s', 't', 'c', 'e', 'h']],
+  // (Appended, protocol 30: the dev weapons range's readout, a row per changed dummy)
+  ['rangeRow', ['i', 'dead', 'hull', 'shield', 'dmg5', 'dps', 'fight', 'total', 'ttk']],
 ];
 
 /**
@@ -1544,6 +1580,17 @@ const COMPACT_HOOKS: Record<string, { pack(m: Fields): Fields; unpack(m: Fields)
   detonation: {
     pack: (m) => ({ ...m, kind: fxKindCode(m.kind as string) }),
     unpack: (m) => ({ ...m, kind: fxKindName(m.kind as number | string) }),
+  },
+  // Fractions as whole percent, seconds as tenths, the flag as 0/1 (all small whole numbers: a byte each)
+  rangeRow: {
+    pack: (m) => ({
+      ...m, dead: m.dead ? 1 : 0, hull: Math.round((m.hull as number) * 100), shield: Math.round((m.shield as number) * 100),
+      fight: Math.round((m.fight as number) * 10), ttk: m.ttk === undefined ? undefined : Math.round((m.ttk as number) * 10),
+    }),
+    unpack: (m) => ({
+      ...m, dead: m.dead === 1 || m.dead === true, hull: (m.hull as number) / 100, shield: (m.shield as number) / 100,
+      fight: (m.fight as number) / 10, ttk: m.ttk === undefined ? undefined : (m.ttk as number) / 10,
+    }),
   },
   // A flag goes as 0/1
   intercept: {
