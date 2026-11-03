@@ -118,6 +118,17 @@ export interface ImpactLayers {
   flare?: { size: number; width: number; life: number; count?: number; fan?: number; color?: number };
   /** How wide the loose scatter of `impact.sparks` fans round the throw, degrees either side (default 40 for a directional hitThrow, 69 for 'back') */
   scatter?: number;
+  /**
+   * A fireball at the surface (heavy guns): `count` swelling glows thrown a little way out from the hull (between the
+   * surface's normal and the throw), turning from `color` to `cool` as they drift and fade over `life` frames, `size` across
+   */
+  fireball?: { size: number; life: number; count?: number; color?: number; cool?: number };
+  /**
+   * Fragments torn off the hull (heavy and mid guns): `count` glowing chunks `size` across thrown out (between the normal
+   * and the throw, `cone` degrees either side) at `speed`, slowing (`drag` a frame, default 0.95), cooling from `hot` to
+   * `cool`, leaving a fading streak of `trail` and puffs of smoke, and dimming away over `life` frames
+   */
+  debris?: { count: number; speed: number; size: number; life: number; hot: number; cool: number; trail?: number; cone?: number; drag?: number };
   /** The shell glancing off: a few long streaks of its own colour along the throw (a ricochet), `cone` degrees either side */
   ricochet?: { count: number; speed: number; cone: number; life: number };
   /** Embers: slow, heavier sparks that drift off (out of the surface, where one is known) and cool from `hot` to `cool` as they die */
@@ -161,6 +172,11 @@ export interface BeamLook {
   zap?: number;
   /** Frost motes drifting off the beam and white crystals on what it lights: × the amount (0 or absent: none) */
   frost?: number;
+  /**
+   * What a held beam's burn throws off the surface it lights, every `every` frames while it burns (WeaponFx.beamBurn):
+   * an impact like a shot's (ImpactLayers), splashing straight out of the surface; `color` its sparks' default
+   */
+  burn?: { every: number; color: number; hit: ImpactLayers };
 }
 
 /** Beam looks by model id (PlacedPart.fn); filled in by the per-model units */
@@ -244,7 +260,8 @@ export function clearStyleCache(): void {
 /**
  * A directional hit (ImpactLayers) for a kind with no model of its own (an NPC's shells, a model that sets none): led by a
  * streak along the throw and a spray in a `cone`-degree cone round it, the centred core and glow small and brief, no
- * shock ring. `k` scales it (a rail's bigger than an autocannon's); `color` is the spray's and streak's.
+ * shock ring. `k` scales it, size and length both (a rail's bigger and longer than an autocannon's: from 1.2 a few
+ * embers, from 1.5 a few fragments too); `color` is the spray's and streak's.
  */
 function DIRECTED_HIT(color: number, k: number, cone = 28): ImpactLayers {
   return {
@@ -252,6 +269,9 @@ function DIRECTED_HIT(color: number, k: number, cone = 28): ImpactLayers {
     spray: { count: Math.round(8 * k), speed: 7.5 * Math.sqrt(k), cone, life: Math.round(10 + 3 * k), color },
     flare: { size: 26 * k, width: 2 * Math.sqrt(k), life: Math.round(7 + 2 * k) }, scatter: cone,
     light: { radius: 35 * k, power: 0.5 },
+    // (the bigger ones a few embers, the biggest a few chips trailing off too)
+    ...(k >= 1.2 ? { embers: { count: Math.round(2 * k), speed: 1.8, life: Math.round(18 * k), hot: color, cool: 0x3a2010 } } : {}),
+    ...(k >= 1.5 ? { debris: { count: Math.round(2 * k), speed: 4, size: 2, life: Math.round(24 * k), hot: color, cool: 0x3a2010 } } : {}),
   };
 }
 

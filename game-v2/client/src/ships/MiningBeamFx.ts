@@ -34,7 +34,7 @@ const LASER_COLORS: [number, number, number][] = [
 import type { ShipSource } from './ShipStore';
 import { JumpFx } from './JumpFx';
 import { canHurt, canHeal } from './sides';
-import { beamLook } from '../rendering/weapons/weaponStyles';
+import { beamLook, type BeamLook } from '../rendering/weapons/weaponStyles';
 import './energyLooks';
 import { drawCone, drawStrands, sputterGain } from './beamLookFx';
 import { PulseFx, type PulseRun } from './PulseFx';
@@ -167,10 +167,12 @@ export class MiningBeamFx {
   }
 
   /** How long each held beam (by ship × 256 + part) has been on, and burning the same spot (`burn`: it starts over if the spot jumps or is lost for a moment) */
-  private holds = new Map<number, { on: number; burn: number; lx: number; ly: number; miss: number; seen: number }>();
+  private holds = new Map<number, { on: number; burn: number; lx: number; ly: number; miss: number; seen: number; next?: number }>();
+  /** A held beam's burn throws an impact off what it lights (BeamLook.burn): where, the beam's direction, whose, and the look's burn */
+  onBurn: ((x: number, y: number, dx: number, dy: number, owner: number, burn: NonNullable<BeamLook['burn']>) => void) | null = null;
   private frameNo = 0;
 
-  private held(key: number, hx: number, hy: number, hit: boolean, dt: number): { on: number; burn: number } {
+  private held(key: number, hx: number, hy: number, hit: boolean, dt: number): { on: number; burn: number; next?: number } {
     let h = this.holds.get(key);
     if (!h) this.holds.set(key, (h = { on: 0, burn: 0, lx: hx, ly: hy, miss: 0, seen: 0 }));
     h.seen = this.frameNo;
@@ -258,6 +260,11 @@ export class MiningBeamFx {
             g.circle(hx, hy, r * 0.5).fill({ color: 0xfff1c9, alpha: 0.4 + 0.5 * ramp });
           }
           if (Math.random() < 0.6 + (look?.pool !== undefined ? 1.6 * ramp : 0)) this.sparks.push({ x: hx, y: hy, vx: (Math.random() - 0.5) * (7 + 6 * ramp), vy: (Math.random() - 0.5) * (7 + 6 * ramp), life: 0, max: 8 + Math.random() * 10 });
+          // Its burn throws an impact off the surface every few frames, sized as its data says (BeamLook.burn)
+          if (look?.burn && this.onBurn) {
+            hold.next = (hold.next ?? 0) - this.dt * 60;
+            if (hold.next <= 0) { hold.next = look.burn.every; this.onBurn(hx, hy, bux, buy, id, look.burn); }
+          }
         }
       }
     }

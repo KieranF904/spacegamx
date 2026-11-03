@@ -465,6 +465,8 @@ export class ShipClient {
       return { firing: !!this.opts.miningHeld?.() && !!ship?.derived.miners.length && !this.hangarOpen, aim: aim.angle, dist: aim.dist };
     });
     this.beamFx.ownBeams = () => this.ownBeams;
+    // A held beam's burn throws impacts off what it lights (BeamLook.burn: the Cutter's, the Tesla's, the Searchlight's)
+    this.beamFx.onBurn = (x, y, dx, dy, owner, burn) => this.scene?.beamBurn(x, y, dx, dy, owner, burn);
     // A pulse laser's pulse: its charge whine, the crack at its peak and its fading tail (pitched by its grade)
     this.beamFx.onPulse = (x, y, grade, own) => { this.opts.sound?.('laser_pulse', own ? undefined : { x, y }, own ? 0.42 : 0.7, PULSE_GRADE_PITCH[Math.max(0, Math.min(4, grade - 1))]); };
     // A mining laser's pulse: a deep, soft throb, one a ship however many miners it has

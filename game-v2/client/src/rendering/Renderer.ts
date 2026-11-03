@@ -1689,6 +1689,11 @@ export class Renderer {
     this.weaponFx.guideTo = fn;
   }
 
+  /** A held beam's burn throws an impact off what it lights (WeaponFx.beamBurn) */
+  beamBurn(...a: Parameters<WeaponFx['beamBurn']>): void {
+    this.weaponFx.beamBurn(...a);
+  }
+
   /** The surface a shell struck, for its impact's direction (WeaponFx.surfaceAt) */
   set surfaceAt(fn: WeaponFx['surfaceAt']) {
     this.weaponFx.surfaceAt = fn;

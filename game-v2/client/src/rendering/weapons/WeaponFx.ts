@@ -124,7 +124,13 @@ interface Spark {
   drag?: number;
 }
 /** A layered impact's core flash or glow (ImpactLayers core, bloom) */
-interface HitGlow { x: number; y: number; life: number; max: number; size: number; color: number; core: boolean }
+interface HitGlow {
+  x: number; y: number; life: number; max: number; size: number; color: number; core: boolean;
+  /** A fireball's (ImpactLayers.fireball): its drift, and the colour it cools to */
+  vx?: number; vy?: number; cool?: number;
+}
+/** A fragment torn off a hull (ImpactLayers.debris): a glowing chunk slowing, cooling and trailing smoke */
+interface Frag { x: number; y: number; vx: number; vy: number; life: number; max: number; size: number; hot: number; cool: number; trail: number; drag: number; puff: number }
 /** A shock ring racing out from a hit (ImpactLayers shock); `life` starts below 0 for one that follows later */
 interface Shock { x: number; y: number; life: number; max: number; size: number; width: number; color: number }
 /** A glow on the hull where a hit landed, riding with the ship it struck (`owner`, at `ox, oy` in its frame), or still (owner -1) */
@@ -138,6 +144,9 @@ interface Ring { x: number; y: number; life: number; max: number; size: number; 
 const FADE_FRAMES = 9;
 /** Layered impacts' particles at most (the oldest go first past it) */
 const HIT_CAP = 600;
+/** Fragments live at most (the oldest go first past it), and smoke puffs they may add */
+const FRAG_CAP = 240;
+const SMOKE_CAP = 700;
 
 /** A layered impact's scale from its shot's (shell size × damage scale): the square root, so a big shell reads big without taking over */
 export function impactScale(size: number): number {
@@ -239,6 +248,7 @@ export class WeaponFx {
   private scorches: Scorch[] = [];
   private hitLights: HitLight[] = [];
   private flares: Flare[] = [];
+  private frags: Frag[] = [];
   private clock = 0;
   private crackle = new Graphics();
   /** Redrawn every frame it's crackling, so a render group of its own (Pixi rebuilds its draw list, not the scene's) */
@@ -424,6 +434,27 @@ export class WeaponFx {
     }
   }
 
+  /** Impact styles of held beams' burns (BeamLook.burn), built once each */
+  private burnStyles = new WeakMap<object, WeaponStyle>();
+
+  /**
+   * A held beam's burn throws an impact off the surface it lights (MiningBeamFx, every `burn.every` frames): its layers
+   * splash straight out of the surface (the beam flying `dx, dy`), as a laser's do
+   */
+  beamBurn(x: number, y: number, dx: number, dy: number, owner: number, burn: { color: number; hit: ImpactLayers }): void {
+    let style = this.burnStyles.get(burn);
+    if (!style) {
+      style = { ...weaponStyle(WeaponType.Cannon), hitThrow: 'normal', impact: { sparks: 0, speed: 0, life: 0, color: burn.color, flash: 0 }, hit: burn.hit };
+      this.burnStyles.set(burn, style);
+    }
+    const aim = this.aim;
+    aim.nx = -dx; aim.ny = -dy; aim.surface = false;
+    const n = this.surfaceAt?.(x, y, dx, dy, owner, this.normalScratch);
+    if (n) { aim.nx = n.nx; aim.ny = n.ny; aim.surface = true; }
+    aim.a = throwAngle('normal', dx, dy, aim.nx, aim.ny);
+    this.layeredHit(style, burn.hit, x, y, aim, 1, undefined);
+  }
+
   /** A damage message with a hit point: stop that tracer there and throw sparks. */
   onHit(projectileId: number | undefined, x: number, y: number): void {
     const shot = projectileId !== undefined ? this.shots.get(projectileId) : undefined;
@@ -602,6 +633,31 @@ export class WeaponFx {
         this.flares.push({ x, y, a, len, width: fl.width * Math.min(1.5, k), life: 0, max: fl.life, color: col });
       }
     }
+    // A heavy hit's explosion: thrown out between the surface's normal and the throw (straight out for a 'normal' hit)
+    const fb = L.fireball, db = L.debris;
+    if (fb || db) {
+      const out = aim.surface ? Math.atan2(aim.ny + Math.sin(aim.a), aim.nx + Math.cos(aim.a)) : aim.a;
+      const oc = Math.cos(out), os = Math.sin(out);
+      if (fb && this.hitGlows.length < HIT_CAP) {
+        const n = fb.count ?? 3;
+        for (let i = 0; i < n; i++) {
+          const d = fb.size * k * (0.15 + (0.6 * i) / Math.max(1, n - 1)), side = (Math.random() - 0.5) * fb.size * k * 0.5, v = 0.5 + Math.random() * 0.9;
+          this.hitGlows.push({
+            x: x + oc * d - os * side, y: y + os * d + oc * side, life: -i, max: fb.life * (0.8 + Math.random() * 0.4), size: fb.size * k * (1 - 0.25 * i / n) * (0.85 + Math.random() * 0.3),
+            color: fb.color ?? 0xffb050, cool: fb.cool ?? 0x5a1a08, core: false, vx: oc * v, vy: os * v,
+          });
+        }
+      }
+      if (db) {
+        const cone = ((db.cone ?? 50) * Math.PI) / 180;
+        for (let i = 0, n = Math.round(db.count * Math.min(1.5, k) * this.particleKeep); i < n; i++) {
+          if (this.frags.length >= FRAG_CAP) this.frags.shift();
+          const u = Math.random() * 2 - 1, a0 = out + u * Math.abs(u) * cone, a = aim.surface ? offSurface(a0, aim.nx, aim.ny) : a0, sp = db.speed * (0.5 + Math.random() * 0.8);
+          this.frags.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0, max: db.life * (0.75 + Math.random() * 0.5), size: db.size * Math.min(1.5, k) * (0.6 + Math.random() * 0.8),
+            hot: db.hot, cool: db.cool, trail: db.trail ?? db.hot, drag: db.drag ?? 0.95, puff: Math.random() * 4 });
+        }
+      }
+    }
     // The shell itself glancing off: long streaks of its own colour, tight round the throw
     const rc = L.ricochet;
     if (rc) {
@@ -669,7 +725,17 @@ export class WeaponFx {
       const p = this.hitGlows[i];
       p.life += frames;
       if (p.life >= p.max) { this.hitGlows.splice(i, 1); continue; }
+      if (p.life < 0) continue;
       const n = p.life / p.max, f = 1 - n;
+      if (p.cool !== undefined) {
+        // A fireball: it drifts out, swells fast and cools from its colour to a dull red as it fades
+        const dr = Math.pow(0.9, frames);
+        p.vx! *= dr; p.vy! *= dr; p.x += p.vx! * frames; p.y += p.vy! * frames;
+        const r = p.size * (0.4 + 0.6 * (1 - Math.pow(1 - Math.min(1, n * 2.5), 2))), kk = (r * 2) / DOT_SIZE;
+        h.take(tex, p.x, p.y, 0.5, 0.5, mixColor(p.color, p.cool, Math.min(1, n * 1.4)), 0.9 * Math.pow(f, 1.2), 0, kk, kk);
+        if (n < 0.25) { const k2 = kk * 0.45; h.take(tex, p.x, p.y, 0.5, 0.5, 0xfff4d8, 0.9 * (1 - n / 0.25), 0, k2, k2); }
+        continue;
+      }
       // The core is a hard white flash shrinking away; the glow swells out (eased) and fades slower
       const r = p.core ? p.size * (1 - 0.35 * n) : p.size * (0.55 + 0.45 * (1 - f * f * f));
       const kk = (r * 2) / DOT_SIZE;
@@ -696,6 +762,26 @@ export class WeaponFx {
       const r = s.size * (0.12 + 0.88 * (1 - f * f * f));
       this.shockG.ring(s.x, s.y, r, Math.max(0.8, s.width * f), s.color, 0.9 * Math.pow(f, 1.3));
       if (n < 0.4) this.shockG.ring(s.x, s.y, r * 0.96, Math.max(0.6, s.width * 0.35 * f), 0xffffff, 0.7 * (1 - n / 0.4));
+    }
+    // Fragments: slowing, cooling, a fading streak behind each and a puff of smoke now and then; dimming away at the end
+    for (let i = this.frags.length - 1; i >= 0; i--) {
+      const p = this.frags[i];
+      p.life += frames;
+      if (p.life >= p.max) { this.frags.splice(i, 1); continue; }
+      const dr = Math.pow(p.drag, frames);
+      p.vx *= dr; p.vy *= dr; p.x += p.vx * frames; p.y += p.vy * frames;
+      const n = p.life / p.max, fade = n < 0.65 ? 1 : 1 - (n - 0.65) / 0.35, sp = Math.hypot(p.vx, p.vy);
+      const col = mixColor(p.hot, p.cool, Math.min(1, n * 1.15));
+      if (sp > 0.15) this.line(p.x - p.vx * 7, p.y - p.vy * 7, p.x, p.y, p.size * 0.9, p.trail, 0.45 * fade * Math.min(1, sp / 1.5));
+      // (a soft glow round it while it's hot)
+      if (n < 0.7) this.circle(this.glow, TEX.dot, p.x, p.y, p.size * 2.4, p.trail, 0.28 * (1 - n / 0.7));
+      this.circle(this.glow, TEX.disc, p.x, p.y, p.size * (1 - 0.35 * n), col, 0.95 * fade);
+      if (n < 0.3) this.circle(this.glow, TEX.disc, p.x, p.y, p.size * 0.45, 0xffffff, 0.8 * (1 - n / 0.3));
+      p.puff -= frames;
+      if (p.puff <= 0 && n < 0.75 && this.smoke.length < SMOKE_CAP && Math.random() < this.particleKeep) {
+        p.puff = 4 + Math.random() * 3;
+        this.smoke.push({ x: p.x, y: p.y, vx: p.vx * 0.1, vy: p.vy * 0.1, life: 0, max: 26 + Math.random() * 16, size: p.size * 1.3, color: 0x6a625a, alpha: 0.22 * (1 - n) });
+      }
     }
     for (let i = this.flares.length - 1; i >= 0; i--) {
       const f = this.flares[i];
