@@ -83,9 +83,7 @@ The asteroids now come in eighteen types across six materials: stone, ice, cryst
 I've also added some bosses: the Pyreclast, the Scrap Mother and the Brood Mother.
 
 ![The Pyreclast](../../../docs/panels/site-posts/boss-pyreclast.jpg)
-
 ![The Scrap Mother](../../../docs/panels/site-posts/boss-scrap-mother.jpg)
-
 ![The Brood Mother](../../../docs/panels/site-posts/boss-brood-mother.jpg)
 
 They each break apart, and have three stages, and each stage behaves differently. They haven't really been heavily play tested yet: the foundations are there, but more work has to be done.
@@ -93,11 +91,8 @@ They each break apart, and have three stages, and each stage behaves differently
 This is the Pyreclast. You break through its carapace, then the complete outer shell, then you fight a stripped metal chassis, then the core itself.
 
 ![The Pyreclast whole, before a shot is fired](../../../docs/panels/site-posts/pyreclast-stage-1.jpg)
-
 ![Its carapace breaking away, the frame underneath showing through](../../../docs/panels/site-posts/pyreclast-stage-1b.jpg)
-
 ![The outer shell, once the carapace is gone](../../../docs/panels/site-posts/pyreclast-stage-2.jpg)
-
-![The shell wrecked down to its metal chassis](../../../docs/panels/site-posts/pyreclast-stage-2b.jpg)
-
-![The core itself](../../../docs/panels/site-posts/pyreclast-stage-3.jpg)
+![The outer shell, wrecked](../../../docs/panels/site-posts/pyreclast-stage-2b.jpg)
+![The stripped metal chassis round its core](../../../docs/panels/site-posts/pyreclast-stage-3.jpg)
+![The core itself](../../../docs/panels/site-posts/pyreclast-stage-3b.jpg)
