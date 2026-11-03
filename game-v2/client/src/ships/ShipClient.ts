@@ -50,6 +50,7 @@ import { IncomingWarning } from '../ui/IncomingWarning';
 import type { ShellLook } from '../rendering/weapons/WeaponFx';
 import { AUG } from '../rendering/weapons/weaponStyles';
 import { hitSurface } from './hitSurface';
+import { DrawnWorld } from './drawnHit';
 import { ConfirmedHits } from './hits/ConfirmedHits';
 import { SelfHits } from './hits/SelfHits';
 import type { PilotState } from '../econ/clientEcon';
@@ -267,19 +268,38 @@ export class ShipClient {
       pilot: (id) => id === opts.state.playerId || opts.state.entities.get(id)?.type === EntityType.Player,
       send: (m) => opts.send(m),
     });
+    this.drawnWorld = new DrawnWorld(this.store, opts.state, (id) => this.sideOf(id));
     this.selfHits = new SelfHits({
       store: this.store,
       self: () => opts.state.playerId,
       ships: () => this.replicas.ids(),
       at: (id, tick) => this.replicas.at(id, tick)?.body ?? null,
-      side: (id) => {
-        const e = opts.state.entities.get(id), d = e?.data;
-        const pilot = id === opts.state.playerId || e?.type === EntityType.Player;
-        const side = !pilot && e?.type === EntityType.ShipBody && d ? d[10] : 0;
-        return (pilot ? SIDE.PILOT : 0) | (side === 1 ? SIDE.WARD : 0) | (side === 2 ? SIDE.PERSON : 0) | (this.replicas.isDocked(id) ? SIDE.DOCKED : 0);
-      },
+      side: (id) => this.sideOf(id),
       passes: (shell) => this.hits.passesOf(shell),
     });
+  }
+
+  /** A ship's side, as this client knows it (hitRules SIDE bits: who may hurt whom) */
+  private sideOf(id: number): number {
+    const { state } = this.opts;
+    const e = state.entities.get(id), d = e?.data;
+    const pilot = id === state.playerId || e?.type === EntityType.Player;
+    const side = !pilot && e?.type === EntityType.ShipBody && d ? d[10] : 0;
+    return (pilot ? SIDE.PILOT : 0) | (side === 1 ? SIDE.WARD : 0) | (side === 2 ? SIDE.PERSON : 0) | (this.replicas.isDocked(id) ? SIDE.DOCKED : 0);
+  }
+
+  /** The world as drawn, for where a shell is seen to strike (ships/drawnHit.ts) */
+  private readonly drawnWorld: DrawnWorld;
+
+  /**
+   * A shell's hit, where it's seen to strike (WeaponFx.onStruck), or where the server says for one not drawn here: a
+   * raised shield's ripple and plating's sparks there, and the hit look a shell with no detonation of its own has
+   */
+  private struckFx(id: number, x: number, y: number, type: number): void {
+    this.damageFx?.shieldHit(x, y, this.shellLooks.get(id)?.model);
+    // (A shell with a look of its own that no detonation tells now: a Prism's shards, DamageFx PLAIN_HIT_LOOKS)
+    const kind = KIND_OF_TYPE.get(type);
+    if (kind && PLAIN_HIT_LOOKS.has(kind)) this.damageFx?.onDetonation(kind, x, y, 40);
   }
 
   /** Confirmed hits (docs/design/confirmed-hits.md): what the server's records came to, worked out here */
@@ -462,7 +482,7 @@ export class ShipClient {
     if (!best) return undefined;
     const part = ship.blueprint.parts[best.part];
     const def = partWeaponDef(this.opts.tuning, best.kind, part, best);
-    l = { model: part?.fn, damage: def.damage, splash: def.splash?.radius, pierce: def.pierce };
+    l = { model: part?.fn, damage: def.damage, splash: def.splash?.radius, pierce: def.pierce, arm: def.arm };
     this.shellLooks.set(e.id, l);
     while (this.shellLooks.size > 512) this.shellLooks.delete(this.shellLooks.keys().next().value!);
     return l;
@@ -525,7 +545,7 @@ export class ShipClient {
       // The gun's model and what a shot of it does (a model's look; the flash, recoil and impact scale with the damage)
       const wdef = partWeaponDef(this.opts.tuning, v.kind, ship.blueprint.parts[part], gun);
       // (An augmented shot looks charged up: weaponStyles AUG)
-      const fn = ship.blueprint.parts[part]?.fn, look = { model: fn && aug ? fn + AUG : fn, damage: wdef.damage, splash: wdef.splash?.radius, pierce: wdef.pierce, life: straightLife(wdef, v.shells[0]?.life) };
+      const fn = ship.blueprint.parts[part]?.fn, look = { model: fn && aug ? fn + AUG : fn, damage: wdef.damage, splash: wdef.splash?.radius, pierce: wdef.pierce, life: straightLife(wdef, v.shells[0]?.life), arm: wdef.arm };
       for (const id of ids) this.shellLooks.set(id, look);
       while (this.shellLooks.size > 512) this.shellLooks.delete(this.shellLooks.keys().next().value!);
       // A pilot's shots move on the tick they're fired (they're fired before shells move; pilotless ships' after)
@@ -621,6 +641,9 @@ export class ShipClient {
     renderer.shellLookOf = (id, e) => this.shellInfo(e);
     // The surface a shell struck (its impact throws off it: WeaponFx.surfaceAt), from the drawn ships and rocks
     renderer.surfaceAt = (x, y, dx, dy, owner, out) => hitSurface(this.store, this.opts.state, x, y, dx, dy, owner, out);
+    // Every drawn shell stops at the first drawn surface it touches (ships/drawnHit.ts), and its hit shows there
+    renderer.castHit = (x0, y0, x1, y1, owner, skip, out) => this.drawnWorld.cast(x0, y0, x1, y1, owner, skip, out);
+    renderer.onStruck = (id, x, y, type) => this.struckFx(id, x, y, type);
     // A guided shell's guide line runs to your cursor while you hold fire
     renderer.guideTo = () => {
       if (!this.fireHeld) return null;
@@ -759,7 +782,7 @@ export class ShipClient {
       if (!firesStraight(pdef)) continue;
       // A pilot's shells move on the tick they're fired (as in preSnapshot)
       for (const s of volleyShells(player.id, ship, w, shot, { ...pose, vx: player.vx, vy: player.vy }, tick, this.opts.tuning, stackMods(this.ownAmmo?.(w.kind), aug))) {
-        this.scene.predictShot({ owner: player.id, type: WEAPON_KIND_TYPE[w.kind] ?? 1, grade: w.grade, model: (ship.blueprint.parts[w.part]?.fn ?? '') + (aug ? AUG : ''), damage: pdef.damage, pierce: pdef.pierce, life: straightLife(pdef, s.life), spawnX: s.x, spawnY: s.y, spawnTick: tick - 1, vx: s.vx, vy: s.vy, size: s.size, pose });
+        this.scene.predictShot({ owner: player.id, type: WEAPON_KIND_TYPE[w.kind] ?? 1, grade: w.grade, model: (ship.blueprint.parts[w.part]?.fn ?? '') + (aug ? AUG : ''), damage: pdef.damage, pierce: pdef.pierce, life: straightLife(pdef, s.life), arm: pdef.arm, spawnX: s.x, spawnY: s.y, spawnTick: tick - 1, vx: s.vx, vy: s.vy, size: s.size, pose });
       }
     }
     return energy.charge;
@@ -999,12 +1022,8 @@ export class ShipClient {
       case 'projectileHit':
         // (Told the old way: a hit found here for this shell wasn't one)
         if (this.selfHits.on && !this.handingOut) { this.hits.oldWay(msg.id); this.selfHits.drop(msg.id); }
-        this.damageFx?.shieldHit(msg.x, msg.y, this.shellLooks.get(msg.id)?.model);
-        {
-          // (A shell with a look of its own that no detonation tells now: a Prism's shards, DamageFx PLAIN_HIT_LOOKS)
-          const kind = KIND_OF_TYPE.get(this.opts.state.entities.get(msg.id)?.data?.[0] ?? -1);
-          if (kind && PLAIN_HIT_LOOKS.has(kind)) this.damageFx?.onDetonation(kind, msg.x, msg.y, 40);
-        }
+        // (A shell drawn here shows its hit where it's seen to strike, struckFx; the server's only confirms it)
+        if (!this.scene?.drawsShell(msg.id)) this.struckFx(msg.id, msg.x, msg.y, this.opts.state.entities.get(msg.id)?.data?.[0] ?? -1);
         return false; // the game stops the tracer and throws the sparks
       case 'scanPulse':
         this.scannerFx?.pulse(msg.seconds);

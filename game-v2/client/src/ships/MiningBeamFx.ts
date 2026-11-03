@@ -11,6 +11,7 @@
  * as it cuts; a station turret's, one pulse a shot.
  */
 
+import { bubbleRadius, circleEntry, shieldOf } from './drawnHit';
 import { clearIfDrawn } from '../rendering/gfx';
 import { Container, Graphics } from 'pixi.js';
 import { GAS_TYPES } from '../rendering/AsteroidLook';
@@ -501,8 +502,10 @@ export class MiningBeamFx {
       if (jumpPhase(JumpFx.counter(e, id === this.state.playerId), jt).phase === 'burn' || !(heal ? canHeal(this.state, self, id) : canHurt(this.state, self, id))) continue;
       // Not near it at all: on to the next
       const u = Math.max(0, Math.min(1, ((e.renderX - x0) * dx + (e.renderY - y0) * dy) / len2));
-      if (Math.hypot(x0 + dx * u - e.renderX, y0 + dy * u - e.renderY) > ship.derived.radius + cs + half) continue;
-      const t = this.castShip(ship, e, x0, y0, x1, y1, half);
+      if (Math.hypot(x0 + dx * u - e.renderX, y0 + dy * u - e.renderY) > Math.max(ship.derived.radius + cs + half, bubbleRadius(ship))) continue;
+      // (a raised shield's bubble first, as a shell stops at it: drawnHit.ts)
+      const sb = ship.kind === 'ship' && shieldOf(e) > 0 ? circleEntry(x0, y0, dx, dy, e.renderX, e.renderY, bubbleRadius(ship)) : null;
+      const t = sb ?? this.castShip(ship, e, x0, y0, x1, y1, half);
       if (t < best) { best = t; this.shipHit = id; }
     }
     return best;

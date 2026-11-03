@@ -1700,6 +1700,21 @@ export class Renderer {
     this.weaponFx.surfaceAt = fn;
   }
 
+  /** The first drawn surface a shell's line meets: every drawn shell stops there (WeaponFx.castHit) */
+  set castHit(fn: WeaponFx['castHit']) {
+    this.weaponFx.castHit = fn;
+  }
+
+  /** A shell stopped (or passed, piercing) at a drawn surface: its other hit effects there (WeaponFx.onStruck) */
+  set onStruck(fn: WeaponFx['onStruck']) {
+    this.weaponFx.onStruck = fn;
+  }
+
+  /** Is this shell drawn (now or lately)? Its hit effects then go where it's seen to strike (WeaponFx.draws) */
+  drawsShell(id: number): boolean {
+    return this.weaponFx.draws(id);
+  }
+
   /** A shell your client fired ahead of the server (WeaponFx.predict) */
   predictShot(p: PredictedShell): void {
     this.weaponFx.predict(p);

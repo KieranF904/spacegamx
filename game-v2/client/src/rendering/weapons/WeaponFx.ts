@@ -105,7 +105,25 @@ interface Shot {
   /** Where its contrail was last laid down (NaN until the first frame) */
   ctX: number;
   ctY: number;
+  /**
+   * It stopped at a surface drawn here (castHit), or at the server's hit: nothing of it is drawn past that point, and
+   * from then on the server's hits for it only confirm (never move its impact or bring it back)
+   */
+  ended: boolean;
+  /** When it ended (clock): it's kept, undrawn, for a while after its fade, so a late row, hit or adopt finds it ended */
+  endedAt: number;
+  /** Ships it has passed through (a piercing shell's surfaces, as drawn here): not struck again */
+  passed: number[] | null;
+  /** Hits drawn here the server hasn't told yet: its hits for them are taken as said */
+  unconfirmed: number;
+  /** Ticks into its flight before it can strike anything (a shell that arms late: the Leviathan's) */
+  arm: number;
 }
+
+/** Where a shell's drawn line meets a drawn surface (WeaponFx.castHit fills it) */
+export interface DrawnHit { t: number; x: number; y: number; target: number }
+/** An ended shell is kept (undrawn) this many frames after it ends, for what the server says of it later */
+const KEEP_ENDED_FRAMES = 150;
 
 /** A piece of contrail left in the world: it stays where it was laid and fades over `max` frames, long after the shot has gone */
 interface TrailSeg { x0: number; y0: number; x1: number; y1: number; age: number; max: number; width: number; color: number; alpha: number }
@@ -178,7 +196,7 @@ const ADOPT_TICKS = 40;
 const PENDING_FRAMES = 40;
 
 /** What a shell's gun is: its model's look (MODEL_STYLES), its damage, its blast radius, and the ticks it flies (straight shells: Shot.endAt) */
-export interface ShellLook { model?: string; damage?: number; splash?: number; pierce?: number; life?: number }
+export interface ShellLook { model?: string; damage?: number; splash?: number; pierce?: number; life?: number; arm?: number }
 
 export interface FirePoseXY { x: number; y: number; angle: number }
 
@@ -198,6 +216,8 @@ export interface PredictedShell {
   pierce?: number;
   /** Ticks it flies (a straight shell's life), if known */
   life?: number;
+  /** Ticks before it can strike anything (it arms late), if any */
+  arm?: number;
   spawnX: number;
   spawnY: number;
   spawnTick: number;
@@ -303,6 +323,19 @@ export class WeaponFx {
    * edge its line crossed), into `out`; null if none is known. Asked only by styles whose hits throw off the surface (hitThrow).
    */
   surfaceAt: ((x: number, y: number, dx: number, dy: number, owner: number, out: SurfaceNormal) => SurfaceNormal | null) | null = null;
+  /**
+   * The first drawn surface the segment (x0, y0) -> (x1, y1) meets (ships' parts at their drawn pose, a raised shield's
+   * bubble, rocks: ships/drawnHit.ts), not `owner`'s nor those in `skip`, into `out`; false if none. Every drawn shell
+   * stops at the first one it touches, in that frame
+   */
+  castHit: ((x0: number, y0: number, x1: number, y1: number, owner: number, skip: readonly number[] | null, out: DrawnHit) => boolean) | null = null;
+  /** A shell stopped (or passed, piercing) at a drawn surface: what else shows a hit there (a shield's ripple), by its shell's id and type */
+  onStruck: ((id: number, x: number, y: number, type: number) => void) | null = null;
+  private readonly drawn: DrawnHit = { t: 0, x: 0, y: 0, target: -1 };
+  /** Ids of ended shells let go (and their spawn tick): a row or hit for one later doesn't bring it back */
+  private spent = new Map<number, number>();
+  /** Shells stopped at a drawn surface, and hits the server told that a drawn one had already shown (the probe, tests) */
+  readonly stats = { struck: 0, confirmed: 0, serverLanded: 0, early: 0 };
   private readonly normalScratch: SurfaceNormal = { nx: 0, ny: 0 };
   private readonly aim: Aim = { a: 0, nx: 0, ny: 0, surface: false };
   /** Hits reported for shells not yet seen (the hit's message comes ahead of the snapshot that brings its shell): matched up on the next update */
@@ -362,6 +395,8 @@ export class WeaponFx {
       seen.add(e.id);
       let shot = this.shots.get(e.id);
       if (!shot) {
+        // (one that ended here and was let go: a later row for it doesn't bring it back)
+        if (this.spent.get(e.id) === (e.spawnTick ?? 0)) continue;
         // Your own shell, already flying since your client fired it? The server's copy takes it over
         shot = this.claim(e) ?? this.createShot(e);
         this.shots.set(e.id, shot);
@@ -427,7 +462,7 @@ export class WeaponFx {
   /** Shots, muzzle flashes and impacts light what's near them (see rendering/lighting) */
   collectLights(L: Lighting): void {
     for (const s of this.shots.values()) {
-      if (!s.head) continue;
+      if (!s.head || (s.fading !== null && s.fading >= FADE_FRAMES)) continue;
       const f = s.fading === null ? 1 : 1 - s.fading / FADE_FRAMES;
       // (a great orb lights no further than a big shell: its own glow is light enough)
       L.point(s.head.x, s.head.y, s.glow, 90 + 150 * Math.min(s.size, 3) + s.style.haloRadius * 3, 0.45 * f * (s.style.orb ? 2 : 1));
@@ -476,6 +511,8 @@ export class WeaponFx {
   onHit(projectileId: number | undefined, x: number, y: number): void {
     const shot = projectileId !== undefined ? this.shots.get(projectileId) : undefined;
     if (shot) { this.strike(shot, x, y); return; }
+    // (a shell that ended here and was let go: the server only confirms it)
+    if (projectileId !== undefined && this.spent.has(projectileId)) { this.stats.confirmed++; return; }
     // (A shell not seen yet: its snapshot is usually right behind this message, so it's matched on the next update)
     if (projectileId !== undefined && projectileId >= 0) { this.early.push({ id: projectileId, x, y }); return; }
     this.impactAt(undefined, x, y);
@@ -497,7 +534,12 @@ export class WeaponFx {
     }
     if (shot.fading !== null) return;
     const tt = Math.min(t, shot.endAt);
+    // (where its head was drawn last: this frame's stretch of its flight runs from there, or from its spawn)
+    const had = shot.head !== null, px = had ? shot.head!.x : shot.spawnX, py = had ? shot.head!.y : shot.spawnY;
     this.place(shot, e, tt);
+    // Stopped by the first surface it touches as drawn (not a lobbed shell, which flies over to its end; not before it arms)
+    if (shot.head && this.castHit && !shot.style.lob && shot.endTick <= 0 && tt - shot.spawnTick >= shot.arm) this.touch(shot, px, py);
+    if (shot.fading !== null) return;
     if (shot.pending) this.landPending(shot, tt - shot.spawnTick, false);
     if (shot.fading === null && t >= shot.endAt) {
       if (shot.pending) this.landPending(shot, Infinity, true);
@@ -511,6 +553,9 @@ export class WeaponFx {
    * the shell is drawn arriving; otherwise at once
    */
   private strike(shot: Shot, x: number, y: number): void {
+    // (Drawn already: it ended at a surface here, or passed one the server now tells. Its hit only confirms)
+    if (shot.ended) { this.stats.confirmed++; return; }
+    if (shot.unconfirmed > 0) { shot.unconfirmed--; this.stats.confirmed++; return; }
     if (shot.style.motion === 'linear' && shot.fading === null) {
       const age = hitAge(shot.spawnX, shot.spawnY, shot.vx, shot.vy, x, y);
       if (age > shot.t - shot.spawnTick + 0.5 && age < shot.endAt - shot.spawnTick + 1) {
@@ -533,14 +578,61 @@ export class WeaponFx {
 
   /** A hit lands: the shell stops there (a piercing one with hulls left flies on) and the impact goes off */
   private land(shot: Shot, x: number, y: number): void {
+    // (The server's hit on something not drawn in its way here: the drawn world had the target a little elsewhere, or
+    // this shell on another line)
+    this.stats.serverLanded++;
     // A piercing round that still has hulls to pass keeps flying (tracer, contrail and line carry on); only its last hit ends it
     if (shot.pierceLeft > 0) shot.pierceLeft--;
     else {
+      // Its end, short of the server's point if a drawn surface stands between: from where it was fired to there
+      const h = this.drawn;
+      if (this.castHit?.(shot.spawnX, shot.spawnY, x, y, shot.owner, shot.passed, h)) { x = h.x; y = h.y; }
       shot.hit = { x, y };
+      // (and nothing of it past there: a tracer that had flown on collapses into it)
+      const sp = Math.hypot(shot.vx, shot.vy) || 1;
+      if (shot.tail && ((shot.tail.x - x) * shot.vx + (shot.tail.y - y) * shot.vy) / sp > 0) shot.tail = { x, y };
       shot.head = { x, y };
       if (shot.fading === null) shot.fading = 0;
+      shot.ended = true;
+      shot.endedAt = this.clock;
     }
     this.impactAt(shot, x, y);
+    this.onStruck?.(shot.id, x, y, shot.type);
+  }
+
+  /**
+   * This frame's stretch of a shell's flight, (x0, y0) to its head, against what's drawn: at the first surface it
+   * touches it stops there (head and all), its impact goes off there now, and nothing of it shows past it; a piercing
+   * shell with hulls left marks the surface and flies on. A hit the server told first (waiting for the head) is this one
+   */
+  private touch(shot: Shot, x0: number, y0: number): void {
+    const h = this.drawn, head = shot.head!;
+    if (!this.castHit!(x0, y0, head.x, head.y, shot.owner, shot.passed, h)) return;
+    this.stats.struck++;
+    const x = h.x, y = h.y;
+    if (shot.pending?.length) { shot.pending.shift(); if (!shot.pending.length) shot.pending = null; this.stats.confirmed++; }
+    else shot.unconfirmed++;
+    if (shot.pierceLeft > 0) {
+      shot.pierceLeft--;
+      (shot.passed ??= []).push(h.target);
+    } else {
+      head.x = x; head.y = y;
+      shot.hit = { x, y };
+      // (a shell first drawn already this far along, its contact behind its tail: the tracer collapses into it, never past)
+      const tail = shot.tail;
+      if (tail && (tail.x - x) * shot.vx + (tail.y - y) * shot.vy > 0) { tail.x = x; tail.y = y; }
+      shot.ended = true;
+      shot.endedAt = this.clock;
+      shot.fading = 0;
+      shot.pending = null;
+    }
+    this.impactAt(shot, x, y);
+    this.onStruck?.(shot.id, x, y, shot.type);
+  }
+
+  /** Has this shell been drawn (now or lately)? Then its hit effects are drawn where it's seen to strike (onStruck) */
+  draws(id: number): boolean {
+    return this.shots.has(id) || this.spent.has(id);
   }
 
   /**
@@ -877,6 +969,7 @@ export class WeaponFx {
       endAt: look?.life ? (e.spawnTick ?? 0) + look.life : Infinity, gone: false, pending: null,
       head: null,
       tail: null, ctX: NaN, ctY: NaN,
+      ended: false, endedAt: 0, passed: null, unconfirmed: 0, arm: look?.arm ?? 0,
     };
     if (shot.endTick > 0) {
       const o = { x: 0, y: 0 };
@@ -920,6 +1013,7 @@ export class WeaponFx {
       spawnX: p.spawnX, spawnY: p.spawnY, spawnTick: p.spawnTick, vx: p.vx, vy: p.vy,
       hit: null, flashed: false, predicted: true, pose: p.pose, endTick: 0, landX: 0, landY: 0, splash: 0, arc: 0, t: 0, pulse: 0, fading: null, pierceLeft: p.pierce ?? 0,
       endAt: p.life ? p.spawnTick + p.life : Infinity, gone: false, pending: null, head: null, tail: null, ctX: NaN, ctY: NaN,
+      ended: false, endedAt: 0, passed: null, unconfirmed: 0, arm: p.arm ?? 0,
     });
   }
 
@@ -933,7 +1027,8 @@ export class WeaponFx {
     const sx = e.spawnX ?? e.x, sy = e.spawnY ?? e.y, tick = e.spawnTick ?? 0;
     let best: Shot | null = null, bd = Infinity;
     for (const s of this.shots.values()) {
-      if (!s.predicted || s.owner !== owner || s.type !== type || s.fading !== null) continue;
+      // (one that already ended at a surface too: the server's copy takes it over ended, so it isn't drawn again)
+      if (!s.predicted || s.owner !== owner || s.type !== type || (s.fading !== null && !s.ended)) continue;
       const dt = Math.abs(s.spawnTick - tick);
       if (dt > 3) continue;
       const d = Math.hypot(s.spawnX - sx, s.spawnY - sy) + Math.hypot(s.vx - e.vx, s.vy - e.vy) * 20 + dt * 10;
@@ -958,7 +1053,7 @@ export class WeaponFx {
   private adopt(h: { id: number; x: number; y: number }, present: number): Shot | null {
     let best: Shot | null = null, bp = Infinity;
     for (const s of this.shots.values()) {
-      if (!s.predicted || s.fading !== null || s.style.motion !== 'linear') continue;
+      if (!s.predicted || (s.fading !== null && !s.ended) || s.style.motion !== 'linear') continue;
       const age = hitAge(s.spawnX, s.spawnY, s.vx, s.vy, h.x, h.y), flown = Math.min(present, s.endAt) - s.spawnTick;
       if (age < -1 || age > flown + 1 || flown - age > ADOPT_TICKS) continue;
       const off = Math.hypot(s.spawnX + s.vx * age - h.x, s.spawnY + s.vy * age - h.y);
@@ -1131,6 +1226,26 @@ export class WeaponFx {
     }
   }
 
+  /**
+   * The shots' fades this frame: one faded out goes (a hit still waiting for its head goes off first), except an ended
+   * one, kept undrawn a while for what the server says of it later, then remembered by id (spent)
+   */
+  private ageShots(frames: number): void {
+    // (Deleting the current entry while iterating a Map is safe)
+    for (const shot of this.shots.values()) {
+      if (shot.fading === null) continue;
+      shot.fading += frames;
+      if (shot.fading < FADE_FRAMES) continue;
+      if (shot.pending) this.landPending(shot, Infinity, true);
+      if (shot.ended && this.clock - shot.endedAt < KEEP_ENDED_FRAMES) continue;
+      if (shot.ended && shot.id >= 0) {
+        this.spent.set(shot.id, shot.spawnTick);
+        if (this.spent.size > 1024) this.spent.delete(this.spent.keys().next().value!);
+      }
+      this.shots.delete(shot.id);
+    }
+  }
+
   private draw(frames: number): void {
     const g = this.glow;
     g.begin();
@@ -1143,18 +1258,9 @@ export class WeaponFx {
     if (this.anchors.live.length) this.anchors.step(this.state?.entities, frames);
     if (this.crackling) { this.crackle.clear(); this.crackling = false; }
 
-    // (Deleting the current entry while iterating a Map is safe)
+    this.ageShots(frames);
     for (const shot of this.shots.values()) {
-      if (shot.fading !== null) {
-        shot.fading += frames;
-        if (shot.fading >= FADE_FRAMES) {
-          // (a hit still waiting for its head goes off now)
-          if (shot.pending) this.landPending(shot, Infinity, true);
-          this.shots.delete(shot.id);
-          continue;
-        }
-      }
-      if (!shot.head || !shot.tail) continue;
+      if (!shot.head || !shot.tail || (shot.fading !== null && shot.fading >= FADE_FRAMES)) continue;
       const fade = shot.fading === null ? 1 : 1 - shot.fading / FADE_FRAMES;
       const st = shot.style;
       // A dying tracer shrinks towards its head
@@ -1174,7 +1280,7 @@ export class WeaponFx {
         glowCol = mixColor(shot.glow, st.heat.cold, 0.5 + 0.3 * shot.hot);
       }
       if (st.blink) alpha *= ((this.clock / st.blink + shot.phase * 2) % 1) < 0.5 ? 1 : 0.2;
-      if (st.wobble) {
+      if (st.wobble && !shot.ended) {
         // The head sways across its line, the tail trailing the sway
         const w = st.wobble, sw = Math.sin(((this.clock + shot.phase * w.period) / w.period) * Math.PI * 2) * w.amp * z;
         hx += nx * sw; hy += ny * sw;
@@ -1185,6 +1291,14 @@ export class WeaponFx {
         // A pair runs as two thinner tracers either side of the line
         const off = lanes === 2 ? (lane === 0 ? -0.5 : 0.5) * st.pair!.gap * z : 0, wk = lanes === 2 ? 0.7 : 1;
         const ox = nx * off, oy = ny * off;
+        if (shot.ended) {
+          // Ended at a surface: the tracer collapses into the impact point, its round end kept behind it, no head or halo
+          // past it (the impact is drawn there)
+          const gw = st.glowWidth * z * wk, cw = st.coreWidth * z * wk;
+          if (gw > 0 && dl > gw) this.line(bx + ox, by + oy, hx + ox - ux * gw * 0.5, hy + oy - uy * gw * 0.5, gw, glowCol, st.glowAlpha * alpha);
+          if (cw > 0 && dl > cw) this.line(bx + ox, by + oy, hx + ox - ux * cw * 0.5, hy + oy - uy * cw * 0.5, cw, coreCol, 0.9 * alpha);
+          continue;
+        }
         if (st.glowWidth > 0) this.line(bx + ox, by + oy, hx + ox, hy + oy, st.glowWidth * z * wk, glowCol, st.glowAlpha * alpha);
         if (st.coreWidth > 0) this.line(bx + ox, by + oy, hx + ox, hy + oy, st.coreWidth * z * wk, coreCol, 0.9 * alpha);
         if (st.haloRadius > 0) {
