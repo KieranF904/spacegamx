@@ -25,6 +25,9 @@ import {
   hpWire, type ShellHitRecord, type HitEndFx,
 } from '@space-game/common';
 
+/** A line that misses the struck part is cast again this thick (world units) before falling back to its middle */
+const GRAZE = 2;
+
 /** A shell as the client has it: who fired it, from which gun (a fire event's packing), and its straight line */
 export interface HitShell { owner: number; gun: number; spawnTick: number; x: number; y: number; vx: number; vy: number }
 
@@ -33,8 +36,13 @@ export interface ConfirmedHitsHost {
   readonly store: HitCtx & { get(id: number): ShipState | undefined };
   /** A shell it has (a projectile row, or a fire event's), null if none or not from a gun */
   shell(id: number): HitShell | null;
-  /** Where a ship was at a tick (its replica, else where it is), null if unknown */
+  /**
+   * Where a ship was at the end of a tick, null if unknown: its replica's state, the local ship's predicted pose
+   * (GameState.selfPoseAt), else where it is
+   */
   pose(id: number, tick: number): { x: number; y: number; angle: number } | null;
+  /** Is it flown by a pilot (the local ship too)? A pilot moves before the server's collision step, the rest after */
+  pilot(id: number): boolean;
   send(msg: ClientMessage): void;
 }
 
@@ -344,23 +352,32 @@ export class ConfirmedHits {
   }
 
   /**
-   * Where the shell struck: its line from the tick before the hit to the tick after, cast against the struck part
-   * where the ship was at the hit's tick; if the line misses it (the pose is a little off), the point of the line
-   * nearest the part's middle. To a tenth, as the server's projectileHit.
+   * Where the shell struck: its line on the hit's tick, as the server's collision step tests it (from where the shell
+   * is at the end of that tick, moved as the server moves it, to one step on: SelfHits does the same), cast against
+   * the struck part where the ship was when that step ran (a pilot's pose after its move that tick, anyone else's
+   * from the tick before: they move after the collision step); if the line misses it (the pose is a little off: a
+   * keyframed ship's path before the keyframe was a guess), the point of the line nearest the part's middle. To a
+   * tenth, as the server's projectileHit.
    */
   private hitPoint(s: HitShell, ship: ShipState, id: number, part: number, tick: number): [number, number] {
-    const t0 = tick - 1 - s.spawnTick, t1 = tick + 1 - s.spawnTick;
-    const ax = s.x + s.vx * t0, ay = s.y + s.vy * t0, bx = s.x + s.vx * t1, by = s.y + s.vy * t1;
-    const pose = this.host.pose(id, tick);
-    let x = (ax + bx) / 2, y = (ay + by) / 2;
+    let ax = Math.fround(s.x), ay = Math.fround(s.y);
+    const vx = Math.fround(s.vx), vy = Math.fround(s.vy);
+    for (let k = s.spawnTick; k < tick && k < s.spawnTick + 1200; k++) { ax = Math.fround(ax + vx); ay = Math.fround(ay + vy); }
+    const bx = ax + vx, by = ay + vy;
+    const pose = this.host.pose(id, this.host.pilot(id) ? tick : tick - 1);
+    let x = ax, y = ay;
     const geoms = this.host.store.geometry(ship);
     if (pose && geoms[part]) {
       const cs = this.host.store.tuning.cellSize, com = ship.derived.com;
-      const [la, lb] = worldToLocalDir([ax - pose.x, ay - pose.y], pose.angle), [lc, ld] = worldToLocalDir([bx - pose.x, by - pose.y], pose.angle);
-      const h = castParts(geoms as PlacedGeom[], (j) => j === part, la / cs + com[0], lb / cs + com[1], lc / cs + com[0], ld / cs + com[1]);
+      const px = Math.fround(pose.x), py = Math.fround(pose.y), pa = Math.fround(pose.angle);
+      const [la, lb] = worldToLocalDir([ax - px, ay - py], pa), [lc, ld] = worldToLocalDir([bx - px, by - py], pa);
+      const ok = (j: number) => j === part;
+      // (a grazing hit from a line a hair off, an own shell's row rounded: the same cast a little thick)
+      const h = castParts(geoms as PlacedGeom[], ok, la / cs + com[0], lb / cs + com[1], lc / cs + com[0], ld / cs + com[1])
+        ?? castParts(geoms as PlacedGeom[], ok, la / cs + com[0], lb / cs + com[1], lc / cs + com[0], ld / cs + com[1], GRAZE / cs);
       if (h) { x = ax + (bx - ax) * h.t; y = ay + (by - ay) * h.t; }
       else {
-        const [cx, cy] = shipPointToWorld(ship, pose, geoms[part].centroid, cs);
+        const [cx, cy] = shipPointToWorld(ship, { x: px, y: py, angle: pa }, geoms[part].centroid, cs);
         const dx = bx - ax, dy = by - ay, u = Math.max(0, Math.min(1, ((cx - ax) * dx + (cy - ay) * dy) / (dx * dx + dy * dy || 1)));
         x = ax + dx * u; y = ay + dy * u;
       }

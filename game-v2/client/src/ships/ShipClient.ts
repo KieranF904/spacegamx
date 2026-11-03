@@ -258,11 +258,13 @@ export class ShipClient {
         return { owner: d[6], gun: d[10], spawnTick: e.spawnTick ?? d[3], x: e.spawnX ?? d[4], y: e.spawnY ?? d[5], vx: e.vx, vy: e.vy };
       },
       pose: (id, tick) => {
-        const st = this.replicas.at(id, tick);
-        if (st) return st.body;
+        // (yours: as predicted for that tick, which is where the server had it while the prediction held)
+        const st = id === opts.state.playerId ? opts.state.selfPoseAt(tick) : this.replicas.at(id, tick)?.body;
+        if (st) return st;
         const e = opts.state.entities.get(id);
         return e ? { x: e.x, y: e.y, angle: e.angle } : null;
       },
+      pilot: (id) => id === opts.state.playerId || opts.state.entities.get(id)?.type === EntityType.Player,
       send: (m) => opts.send(m),
     });
     this.selfHits = new SelfHits({

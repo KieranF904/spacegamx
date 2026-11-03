@@ -62,6 +62,7 @@ function makeFake(server: GameServer, name: string, caps: number): Fake {
       store: f.store,
       shell: (id) => f.shells.get(id) ?? null,
       pose: () => null,
+      pilot: () => false,
       send: (m) => f.outbox.push(m),
     });
   }

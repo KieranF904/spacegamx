@@ -655,3 +655,31 @@ A review of parts D, packed frames and the deterministic maths (commits a05b5b8,
 
 Tests: selfHits.test.ts, a finder switched to part C and back mid-fight (the first switch lands on a frame with hits
 waiting: 2 impacts were lost before), and the layer's id handling.
+
+---
+
+## Follow-ups (2026-11-04)
+
+### F1. Where a told hit is drawn (no wire change)
+
+With caps >= 1 the client's impact points for hits it was told (records) drifted from the server's: up to 36 units in
+the probe's fights, 27-28 hits a run more than 20 off with Scrap Mother, 6-7 in the pirates fight, 2 with the
+Hammerhead. Three causes in `ConfirmedHits.hitPoint`, all about when and where it cast:
+
+| cause | before | now |
+|---|---|---|
+| the target's pose | the replica's state at the end of the hit's tick, for every ship | as the server's collision step saw it: a pilot's at the hit's tick (it moves before the step), anyone else's at the tick before (they move in `ships.tick`, after it), in f32: the rule SelfHits uses (host `pilot(id)`) |
+| the client's own ship | no replica, so the fake had no pose (the line's middle) and the game used the ship's current predicted pose, a latency ahead | its predicted pose at that tick: `GameState.selfPoseAt` (a 180-tick history noted on each predicted step, each replayed step after a correction, and at a correcting snapshot's own row). Where the server had it while the prediction held |
+| the line | two steps wide, centred on the hit's tick | the server's: from where the shell is at the end of that tick (moved in f32 as the server moves it) to one step on; a line a hair off (an own shell's rounded row grazing the part) is cast again 2 units thick before falling back to the point nearest the part's middle |
+
+Measured (probe, caps 1 / 3 / 15, hits more than 20 units off, before -> after): Scrap Mother 28 / 27 / 27 -> 1 / 1 / 1
+(a hit on the boss in the snapshot that keyframed it: its path before the keyframe is the client's guess), pirates
+7 / 6 / 6 -> 0, Hammerhead 2 / 2 / 2 -> 0, Pips and Gale 0 -> 0. What is left over 20 is debris (2-3 corrections a run
+whose records' hit ticks are clamped at 7 ticks back, and hits the client found a tick early: the weak case the
+phase 2-3 audit names).
+
+The fake client (fakeHitsClient.testkit.ts) gained what the game's client already does: its own ship's pose per tick
+(the server's, as a prediction that held: noted as each frame goes and after each step) and every replica stepped to
+each snapshot's tick (the game's client steps them as it draws; a replica nobody asked for in 600 ticks stops short,
+which gave the probe a 1,426-unit "drift" from a stale shell origin at caps 1). Test: `server/src/net/hits/hitPoints.test.ts`
+(a seeded pirates fight; 155 hits on the client's ship, 41 on pirates; fails on the old hitPoint).

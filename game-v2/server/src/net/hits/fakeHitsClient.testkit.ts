@@ -7,7 +7,7 @@
  * on an input after each step (`report`). `drop` makes it miss hits on purpose (the forced-mismatch test).
  */
 import {
-  CAPS, SIDE, EntityType, ServerFrameReader, encodeMessage, decodeMessage, rebuildVolley, ShipReplicaSet,
+  CAPS, SIDE, EntityType, Position, Rotation, ServerFrameReader, encodeMessage, decodeMessage, rebuildVolley, ShipReplicaSet,
   type ClientMessage, type ClientSocket, type ServerMessage, type ServerSnapshotMessage, type ShipState, type ReplicaEnv,
 } from '@space-game/common';
 import { ShipStore } from '../../../../client/src/ships/ShipStore.js';
@@ -41,6 +41,8 @@ export class FakeHitsClient {
   removed = new Set<number>();
   known = new Set<number>();
   projectileHits = 0;
+  /** Where each impact it was shown went (shell id and point: the server's projectileHit, or its own worked out) */
+  impacts: { id: number; x: number; y: number }[] = [];
   detonations = 0;
   sawSnapshot = false;
   /** Bytes it sent up (its hit reports' inputs) and how many */
@@ -62,7 +64,8 @@ export class FakeHitsClient {
       this.hits = new ConfirmedHits({
         store: this.store,
         shell: (id) => this.shells.get(id) ?? null,
-        pose: (id, tick) => this.reps.at(id, tick)?.body ?? null,
+        pose: (id, tick) => (id === this.pid ? this.selfHist.get(tick) : this.reps.at(id, tick)?.body) ?? null,
+        pilot: (id) => id === this.pid || this.kinds.get(id)?.type === EntityType.Player,
         send: (m) => this.outbox.push(m),
       });
     }
@@ -84,12 +87,31 @@ export class FakeHitsClient {
       isOpen: () => true,
       send: (data) => {
         const bytes = data as Uint8Array;
+        // (frames go at the step's end: its ship is where this tick left it)
+        this.noteSelf();
         if (opts.defer) opts.defer(Uint8Array.from(bytes)); else this.frame(bytes);
       },
     };
     this.link = server.connect(socket);
     this.link.receive({ type: 'join', username: opts.name, ...(opts.caps ? { caps: opts.caps } : {}) } as ClientMessage);
     this.pid = server.getPlayerId(socket);
+    // (its own ship's pose every tick, not only those a frame went on: the server's step, wrapped)
+    const step = server.step.bind(server);
+    server.step = () => { step(); this.noteSelf(); };
+  }
+
+  /**
+   * Its own ship's pose at the end of each tick, as a client's prediction has it while it holds (GameState.selfPoseAt):
+   * here the server's, noted after each step (the server's step is wrapped) and as each frame goes
+   */
+  private selfHist = new Map<number, { x: number; y: number; angle: number }>();
+
+  /** Its own ship's pose this tick (what its prediction would say) */
+  private noteSelf(): void {
+    if (this.pid < 0) return;
+    const t = this.server.getTick();
+    this.selfHist.set(t, { x: Position.x[this.pid], y: Position.y[this.pid], angle: Rotation.angle[this.pid] });
+    this.selfHist.delete(t - 240);
   }
 
   /** Base-format frames and bit-packed messages (CAPS.PACKED: one or more frames each) */
@@ -150,6 +172,7 @@ export class FakeHitsClient {
       case 'projectileHit':
         if (this.selfHits?.on && !this.handingOut) { this.hits!.oldWay(m.id); this.selfHits.drop(m.id); }
         this.projectileHits++;
+        this.impacts.push({ id: m.id, x: m.x, y: m.y });
         break;
       case 'detonation': this.detonations++; break;
     }
@@ -188,6 +211,9 @@ export class FakeHitsClient {
     this.selfHits?.onRemoved(s.removed);
     for (const id of s.removed) { if (this.known.has(id)) this.removed.add(id); this.shells.delete(id); this.store.remove(id); this.reps.remove(id); }
     for (const id of s.out ?? []) this.reps.remove(id);
+    // (The game's client steps every replica as it draws, each frame; drawing nothing, this does it here. Left alone,
+    // a replica no one asked for in 600 ticks stops short: ShipReplicaSet.at won't run that far in one go)
+    for (const id of this.reps.ids()) this.reps.at(id, s.tick);
     // Hits found here (ShipClient.afterSnapshot)
     if (this.selfHits) {
       this.selfHits.onKeyframes(s.ships);

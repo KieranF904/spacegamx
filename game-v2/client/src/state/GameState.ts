@@ -179,6 +179,8 @@ const TICK_OFFSET_SMOOTHING = 0.03;
 const PREDICT_RESYNC_TICKS = 30;
 /** A shell removed before any frame drew it waits for one at most this long (snapshot ticks: a hidden tab draws none) */
 const LATE_TICKS = 30;
+/** The local ship's predicted poses kept (ticks) */
+const SELF_POSE_TICKS = 180;
 
 const NONE: ReadonlySet<InterpolatedEntity> = new Set();
 
@@ -590,6 +592,26 @@ export class GameState {
     const after = this.shipGuns?.(player, input, tick, this.charge);
     if (after != null) this.charge = after;
     this.boostFuel = this.chargeTotal?.(this.charge) ?? this.serverBoostFuel;
+    this.noteSelf(player, tick);
+  }
+
+  /**
+   * The local ship's pose at the end of each recent tick, as predicted (and replayed after a correction, and as the
+   * server had it at a snapshot that corrected it). Where the server had it then, while the prediction held: what a
+   * confirmed hit on it (ConfirmedHits.hitPoint) and a fire event of its own guns (ShipClient.preSnapshot) count from
+   */
+  private selfPoses = new Map<number, { x: number; y: number; angle: number }>();
+
+  /** The local ship's pose at the end of `tick` (null: not predicted lately) */
+  selfPoseAt(tick: number): { x: number; y: number; angle: number } | null {
+    return this.selfPoses.get(tick) ?? null;
+  }
+
+  private noteSelf(player: InterpolatedEntity, tick: number): void {
+    const p = this.selfPoses.get(tick);
+    if (p) { p.x = player.x; p.y = player.y; p.angle = player.angle; }
+    else this.selfPoses.set(tick, { x: player.x, y: player.y, angle: player.angle });
+    if (this.selfPoses.size > SELF_POSE_TICKS) for (const t of this.selfPoses.keys()) if (t < tick - SELF_POSE_TICKS) this.selfPoses.delete(t);
   }
 
   // ============================================
@@ -986,6 +1008,7 @@ export class GameState {
       this.serverCharge = unpackCharge(serverState.data);
     }
     this.charge = { ...this.serverCharge };
+    this.noteSelf(player, snapshot.tick);
     
     // Debug: log pending ticks BEFORE filtering
     const preFilterCount = this.pendingInputsByTick.length;
@@ -1068,6 +1091,7 @@ export class GameState {
     const c = this.shipPhysics?.(player, input, this.charge, tick);
     if (c != null) this.charge = c;
     this.boostFuel = this.chargeTotal?.(this.charge) ?? this.serverBoostFuel;
+    this.noteSelf(player, tick);
   }
 
   // ============================================
