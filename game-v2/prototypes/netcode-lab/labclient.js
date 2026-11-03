@@ -16,7 +16,8 @@ const TICK_MS = 1000 / Wo.RATE;
 const FX = Sim.FX;
 const CATCHUP = 30;         // most confirmed ticks simulated in one frame when behind
 const MAXPRED = 120;        // most ticks the screen runs past the confirmed tick (2 s)
-const HEARTBEAT_UP = 6;     // ack at least every 6 confirmed ticks even with nothing to report
+const HEARTBEAT_UP = 30;    // ack at least every 30 confirmed ticks even with nothing else to send
+const REPORT_WAIT = 6;      // event reports wait up to 6 confirmed ticks for something else to ride with
 const AIM_TICKS = 2;        // an input whose buttons didn't change (aim, cursor distance) goes out at most every 2 ticks
 
 // ----------------------------------------------------------------------------------------------------- shared bits
@@ -113,7 +114,8 @@ class BaseClient {
     }
     if (data[0] === Pr.T.PONG) {
       const r = new Pr.Reader(data); r.u8();
-      const t = r.f64(), serverMs = r.f64(), tick = r.u32(), minLead = r.i8();
+      const t16 = r.u16(), serverMs = r.u32(), tick = r.vu(), minLead = r.i8();
+      const t = now - ((Math.round(now) - t16) & 0xFFFF);
       this.down.add(now, { ping: data.length }, Pr.wireBytes(data.length, false));
       this.clock.sample(t, now, serverMs);
       this.pong(tick, minLead, now);
@@ -141,7 +143,7 @@ class BaseClient {
   }
   /** The one up message, its input relative to the last one sent (the server counts inputs, so no sequence number) */
   encUp(ack, input, reports, hashes) {
-    const buf = Pr.encUp({ ack, input, base: this.upBase, reports, hashes });
+    const buf = Pr.encUp({ ack, lastAck: this.lastAckSent || 0, input, base: this.upBase, reports, hashes });
     if (input) this.upBase = { target: input.target, inp: input.inp };
     return buf;
   }
@@ -157,7 +159,7 @@ class LsClient extends BaseClient {
     this.stream = [];           // own inputs sent and not yet used in the confirmed world: { seq, target, inp }
     this.rcv = 0;               // how many of them the server had by the newest bundle (RCV)
     this.margin = opts.margin ?? 2; this.lastTarget = 0; this.slack = 0; this.lastLate = -1e9;
-    this.reports = []; this.hashes = null; this.lastAckSent = 0;
+    this.reports = []; this.repSince = -1; this.hashes = null; this.lastAckSent = 0;
     this.delays = { on: new DelayMeter(), off: new DelayMeter() };
     this.st = { late: 0, entries: 0, exits: 0, pullIns: 0, corrections: 0, resim: 0, resimLast: 0, catchup: 0, maxBehind: 0,
       reported: 0, hashSent: 0, steps: 0, injected: [], caught: [], counts: { mismatch: 0, missing: 0, spurious: 0, hash: 0, unseen: 0 },
@@ -180,16 +182,22 @@ class LsClient extends BaseClient {
   // --- bundles ---------------------------------------------------------------------------------------------------
   binary(buf, now) {
     if (buf[0] !== Pr.T.BUNDLE || !this.conf) return;
+    // One message can carry several ticks: the first in the header (a step from the last message's), each later one
+    // after a TICK record. A tick with nothing in it is one where nothing changed.
     const r = new Pr.Reader(buf);
     r.mark('ticks'); r.u8();
-    const tick = Pr.widen(r.u16(), this.lastBundleTick);
-    const b = { tick, gone: [], ins: [], rcv: null, exits: [], enters: [], ords: [], corrs: [], rocks: [], rcorrs: [], rdead: [], late: [] };
+    const blank = (tick) => ({ tick, gone: [], ins: [], rcv: null, exits: [], enters: [], ords: [], corrs: [], rocks: [], rcorrs: [], rdead: [], late: [] });
+    let b = blank(this.lastBundleTick + r.vu());
+    const bs = [b];
     const CAT = { [R.IN]: 'inputs', [R.RCV]: 'inputs', [R.ENTER]: 'entries', [R.EXIT]: 'entries', [R.ROCK]: 'entries',
-      [R.CORR]: 'corrections', [R.RCORR]: 'corrections', [R.RDEAD]: 'overrides', [R.LATE]: 'ticks', [R.PULL]: 'entries', [R.GONE]: 'shells', [R.ORD]: 'orders' };
+      [R.CORR]: 'corrections', [R.RCORR]: 'corrections', [R.RDEAD]: 'overrides', [R.LATE]: 'ticks', [R.PULL]: 'entries', [R.GONE]: 'shells',
+      [R.ORD]: 'orders', [R.TICK]: 'ticks' };
     while (r.more()) {
       const k = r.u[r.o];
       r.mark(CAT[k] || 'other'); r.u8();
-      if (k === R.IN) { const v = r.vu(); b.ins.push(Object.assign({ slot: Math.floor(v / 8) }, Pr.rInpDelta(r, v % 8))); }
+      const tick = b.tick;
+      if (k === R.TICK) { b = blank(tick + r.vu()); bs.push(b); }
+      else if (k === R.IN) { const v = r.vu(); b.ins.push(Object.assign({ slot: Math.floor(v / 8) }, Pr.rInpDelta(r, v % 8))); }
       else if (k === R.RCV) b.rcv = r.u8();
       else if (k === R.EXIT) b.exits.push(r.vu());
       else if (k === R.ENTER) { const slot = r.vu(), pulled = r.u8(); b.enters.push(Object.assign({ slot, pulled: !!pulled }, Pr.rEntity(r, tick))); }
@@ -204,19 +212,24 @@ class LsClient extends BaseClient {
       else break;
     }
     this.down.add(now, r.end(), Pr.wireBytes(buf.length, false));
-    if (this.dropNext && (b.ins.length || b.ords.length) && !b.enters.length && !b.exits.length && !b.late.length && b.rcv === null) { this.dropNext = false; this.dropped++; return; }
-    // Late inputs: the server used one later than stamped (from the tick after it arrived); it is used then here too,
-    // and the margin gets room straight away
-    for (const l of b.late) {
-      const e = this.stream.find((x) => (x.seq & 255) === l.seq);
-      if (e) e.target += l.by;
-      this.st.late++; this.margin = Math.min(30, this.margin + Math.min(3, l.by)); this.slack = 0; this.lastLate = now;
+    this.lastBundleTick = b.tick;
+    // (debug: throw away a message with inputs or orders in it and nothing that would break the stream for good: slots
+    // and late notices can't be recovered, RCV is a running count so the next one puts it right)
+    const any = (f) => bs.some(f);
+    if (this.dropNext && any((x) => x.ins.length || x.ords.length) && !any((x) => x.enters.length || x.exits.length || x.late.length)) { this.dropNext = false; this.dropped++; return; }
+    for (const x of bs) {
+      // Late inputs: the server used one later than stamped (from the tick after it arrived); it is used then here too,
+      // and the margin gets room straight away
+      for (const l of x.late) {
+        const e = this.stream.find((s) => (s.seq & 255) === l.seq);
+        if (e) e.target += l.by;
+        this.st.late++; this.margin = Math.min(30, this.margin + Math.min(3, l.by)); this.slack = 0; this.lastLate = now;
+      }
+      // (taken now, not when this tick is stepped: every late notice up to here has been applied above, so for any tick
+      // up to this one, an input the server had was used at its target and one it hadn't comes later)
+      if (x.rcv !== null) this.rcv = Pr.widen8(x.rcv, this.rcv);
+      this.pending.push(x);
     }
-    // (taken now, not when this bundle's ticks are stepped: every late notice up to here has been applied above, so
-    // for any tick up to this bundle's, an input the server had was used at its target and one it hadn't comes later)
-    if (b.rcv !== null) this.rcv = Pr.widen8(b.rcv, this.rcv);
-    this.lastBundleTick = tick;
-    this.pending.push(b);
   }
   /** Your input the server used at tick t, if a new one: the newest it had (seq <= rcv) stamped for t or before */
   ownAt(t) {
@@ -338,6 +351,7 @@ class LsClient extends BaseClient {
       n++;
     }
     if (n > 1) this.st.catchup = Math.max(this.st.catchup, n);
+    if (this.reports.length && this.repSince < 0) this.repSince = this.conf.tick;
     // 2. Input: stamped for the tick it will reach the server at (its tick now + the trip + the margin)
     let smp = null;
     if (this.clock.ready()) smp = this.sampleInput(now);
@@ -350,13 +364,16 @@ class LsClient extends BaseClient {
       this.delays[this.predOn ? 'on' : 'off'].note(smp.changes, smp.inp.seq);
       input = { target, inp: smp.inp };
     }
-    // 3. One message up: the input, what this client saw happen (reports), state hashes, and how far it has got (ack)
+    // 3. One message up: the input, what this client saw happen (reports), state hashes, and how far it has got (ack).
+    // Reports alone wait up to REPORT_WAIT confirmed ticks for an input or hashes to ride with
     const ack = this.conf.tick;
-    if (input || this.reports.length || this.hashes || ack - this.lastAckSent >= HEARTBEAT_UP) {
-      const buf = this.encUp(ack & 0xFFFF, input, this.reports.slice(0, 200), this.hashes);
+    const repDue = this.reports.length && ack - this.repSince >= REPORT_WAIT;
+    if (input || repDue || this.hashes || ack - this.lastAckSent >= HEARTBEAT_UP) {
+      const buf = this.encUp(ack, input, this.reports.slice(0, 200), this.hashes);
       this.st.reported += Math.min(200, this.reports.length);
       if (this.hashes) this.st.hashSent++;
       this.reports = this.reports.slice(200); this.hashes = null; this.lastAckSent = ack;
+      this.repSince = this.reports.length ? ack : -1;
       this.send(buf, now);
     }
     // 4. The screen
@@ -490,7 +507,7 @@ class CurClient extends BaseClient {
       const target = this.pt + 1 + this.curDelay;
       this.delay.note(smp.changes, smp.inp.seq);
       this.queue.push({ target, inp: smp.inp });
-      this.send(this.encUp(0, { target, inp: smp.inp }), now);
+      this.send(this.encUp(0, { target, inp: smp.inp }), now);   // (no ack in this style: always a step of 0)
     }
     const goal = Math.floor(this.clock.tick(now)) + this.lead;
     if (goal - this.pt > 30) this.pt = goal - 1;

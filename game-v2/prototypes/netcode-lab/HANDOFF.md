@@ -102,8 +102,8 @@ Not started unless marked. Ask Kieran which he wants; several were only offered.
 6. ~~Bot inputs dominate download around fights~~: done 2026-11-03. AIs are a server-side commander (target) and a
    shared pilot; orders go out only when the target changes; pull-in follows needs with no cap (Kieran's call). Design
    doc 6a and 7, numbers under "AI orders and unlimited pull-in". Deployed.
-7. **Header overhead.** About 66 B per message is more than the payload. Options: coalesce ticks per message, or
-   UDP/WebTransport (open question 2 in the design doc).
+7. ~~Header overhead~~: coalescing done 2026-11-03 (down at its 15 Hz floor in AI-only scenes; reports batched up).
+   Still ~73% of the down wire is headers; below 15 Hz means waiting longer, or UDP/WebTransport.
 8. **Design doc open questions 1-9:**
    - one-hop "unseen" hits;
    - per-message cost;

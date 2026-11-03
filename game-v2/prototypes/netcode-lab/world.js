@@ -93,10 +93,13 @@ function createWorld(seed, authority) {
   return { seed, tick: 0, authority: !!authority, rocks: rocksFor(seed), ships: [], loot: [], shells: [],
     rockOv: new Map(), events: [], byUid: new Map() };
 }
+/** (a drone's home and a freighter's waypoint are its kind's own: other ships keep them 0, so snapshots can leave them out) */
 function makeShip(uid, kind, x, y, a) {
+  const dr = kind === 'drone', fr = kind === 'freighter';
   return { uid, id: uid, kind, x: x * FX, y: y * FX, vx: 0, vy: 0, a: a & 0xFFFF, av: 0, tur: 0, gcd: 0, tcd: 0,
     hp: P.kinds[kind].hp, dead: 0, boost: P.boostMax, kills: 0, deaths: 0, seq: 0, shots: 0,
-    rng: Math.imul(uid, 0x9E3779B1) | 0 || 1, target: 0, aiFlip: 0, hx: x, hy: y, wpx: x, wpy: y, cargo: 0, bot: 0, nt: 0, nat: 0, inp: NEUTRAL };
+    rng: Math.imul(uid, 0x9E3779B1) | 0 || 1, target: 0, aiFlip: 0, hx: dr ? x : 0, hy: dr ? y : 0, wpx: fr ? x : 0, wpy: fr ? y : 0,
+    cargo: 0, bot: 0, nt: 0, nat: 0, inp: NEUTRAL };
 }
 function index(W) { W.byUid.clear(); for (const s of W.ships) W.byUid.set(s.uid, s); for (const l of W.loot) W.byUid.set(l.uid, l); }
 const isLoot = (uid) => uid >= C.LOOT_BASE;

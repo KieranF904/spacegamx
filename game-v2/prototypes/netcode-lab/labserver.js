@@ -18,7 +18,7 @@ const SNAP_EVERY = 3;        // current style: 20 Hz
 const HASH_EVERY = 120;      // background state hashes every 2 s
 const HEARTBEAT = 4;         // a bundle at least every 4 ticks when nothing happens
 const HIST = 900;            // ticks of event, hash and slot history kept (15 s)
-const STICKY = 60;           // a pulled-in entity stays at least 1 s after its last interaction
+const STICKY = 180;          // a pulled-in entity stays at least 3 s after it was last needed (re-entries cost a snapshot)
 const CORR_GAP = 15;         // ticks between two corrections of the same entity for one client
 const rockKey = (id) => -1 - id;
 
@@ -92,7 +92,8 @@ class LabServer {
     Object.assign(c, {
       ready: true, mode, name: String(msg.name || `pilot ${c.id}`).slice(0, 20), uid: sh.uid, every: !!msg.every,
       q: [], lastSeq: 0, appliedSeq: 0, inBase: { target: 0, inp: Sim.NEUTRAL }, rcvSent: 0, rtt: 0, rttMax: 0, rttAt: 0, minLead: 127, late: 0, lateQ: [],
-      set: new Map(), slots: new Map(), freeAt: new Map(), hist: [], memb: new Map(), sticky: new Map(), rocks: new Set(),
+      set: new Map(), slots: new Map(), freeAt: new Map(), hist: [], memb: new Map(), sticky: new Map(), rocks: new Set(), rockSig: new Map(),
+      out: null, upAck: W.tick,
       ack: W.tick, lastSent: W.tick, corr: new Map(), corrAt: new Map(), corrected: new Map(), tokens: 30,
       det: [], counts: { mismatch: 0, missing: 0, spurious: 0, hash: 0, unseen: 0 }, expected: 0, matched: 0,
       entries: 0, exits: 0, pullIns: 0, down: {}, downWire: 0, downMsgs: 0, up: {}, upWire: 0, upMsgs: 0,
@@ -122,15 +123,16 @@ class LabServer {
     const rd = new Pr.Reader(data), type = data[0];
     c.upMsgs++; c.upWire += Pr.wireBytes(data.length, true);
     if (type === Pr.T.PING) {
-      rd.u8(); const t = rd.f64(), rtt = rd.u16();
+      rd.u8(); const t = rd.u16(), rtt = rd.u16();
       this.upCount(c, 'ping', data.length);
       c.rtt = rtt;
       if (rtt > c.rttMax || now - c.rttAt > 10000) { c.rttMax = rtt; c.rttAt = now; }
       const pong = Pr.encPong(t, now - this.start, this.W.tick, c.minLead === 127 ? -128 : c.minLead);
       c.minLead = 127;
       this.sendBin(c, pong, pong.cats);
-    } else if (type === Pr.T.UP) {
-      const u = Pr.decUp(rd, this.W.tick, c.inBase);
+    } else if (Pr.isUp(type)) {
+      const u = Pr.decUp(rd, c.upAck, c.inBase);
+      c.upAck = u.ack;
       for (const k in rd.cats) this.upCount(c, k, rd.cats[k]);
       if (u.input) {
         // (the next input is relative to this one, as sent: before any late re-stamp)
@@ -325,16 +327,17 @@ class LabServer {
   }
 
   bundle(c, need, killed, T, now) {
+    // This tick's records. They wait for the client's next message (see the end) unless something here shouldn't
     const W = this.W, w = new Writer(64);
-    w.mark('ticks'); w.u8(Pr.T.BUNDLE); w.u16(T);
-    const start = w.o;
-    for (const n of c.lateQ) { w.u8(R.LATE); w.u8(n.seq); w.u8(Math.min(255, n.by)); }
+    let urgent = c.every;
+    w.mark('ticks');
+    for (const n of c.lateQ) { w.u8(R.LATE); w.u8(n.seq); w.u8(Math.min(255, n.by)); urgent = true; }
     c.lateQ.length = 0;
     // Inputs that changed this tick, of the people this client tracks: only the fields that changed,
     // against the input that ship flew with last tick (which the client's copy has too). Not its own: it knows what it
     // sent and when for; the one thing it can't know, an input arriving late, is in LATE above.
     w.mark('inputs');
-    const wIn = (slot, inp, prev) => { const f = Pr.inpDiff(inp, prev); w.u8(R.IN); w.vu(slot * 8 + f); Pr.wInpDelta(w, inp, prev, f); };
+    const wIn = (slot, inp, prev) => { const f = Pr.inpDiff(inp, prev); w.u8(R.IN); w.vu(slot * 8 + f); Pr.wInpDelta(w, inp, prev, f); urgent = true; };
     for (const [uid, a] of this.applied) {
       const m = c.set.get(uid);
       if (m && uid !== c.uid && a.changed) wIn(m.slot, a.inp, a.prev);
@@ -401,11 +404,15 @@ class LabServer {
       w.u8(R.ENTER); w.vu(slot); w.u8(pulled ? 1 : 0); Pr.wEntity(w, W, uid);
       c.entries++; if (pulled) c.pullIns++;
     }
-    // Rocks: tracked when near or pulled in; one that isn't in its default state gets its override on entry
+    // Rocks: tracked when near or pulled in. Every client has every rock; on entry it gets the rock's override only if
+    // that changed since its copy was last right (when it stopped tracking it, or was last sent it)
+    const sig = (id) => { const o = W.rockOv.get(id); return o ? o.hp * 1e7 + o.dead : -1; };
     for (const rk of W.rocks.list) {
       if (nearRocks.has(rk.id) || rockPull.has(rk.id)) {
-        if (!c.rocks.has(rk.id)) { c.rocks.add(rk.id); if (W.rockOv.has(rk.id)) { w.u8(R.ROCK); Pr.wRock(w, W, rk.id); } }
-      } else c.rocks.delete(rk.id);
+        if (c.rocks.has(rk.id)) continue;
+        c.rocks.add(rk.id);
+        if (sig(rk.id) !== (c.rockSig.get(rk.id) ?? -1)) { w.u8(R.ROCK); Pr.wRock(w, W, rk.id); }
+      } else if (c.rocks.delete(rk.id)) c.rockSig.set(rk.id, sig(rk.id));
     }
     // Orders: an AI this client holds was given a next target at the end of this tick (one that entered now has it
     // already). Its next target is held from now: pull-in follows orders.
@@ -418,9 +425,10 @@ class LabServer {
     }
     // Destroyed rocks: everyone not already simulating that rock hears about it (id; the tick is the bundle's)
     w.mark('overrides');
-    for (const id of killed) if (!c.rocks.has(id)) { w.u8(R.RDEAD); w.vu(id); }
+    for (const id of killed) if (!c.rocks.has(id)) { w.u8(R.RDEAD); w.vu(id); c.rockSig.set(id, sig(id)); }
     // Corrections due (rate limited)
     w.mark('corrections');
+    let bundleUrgent = false;
     c.tokens = Math.min(30, c.tokens + 0.5);
     for (const [key, k] of c.corr) {
       // A hit from outside the set ("unseen") is something this client cannot know: always corrected in the same tick's
@@ -429,6 +437,7 @@ class LabServer {
       if (!urgent && c.tokens < 1) continue;
       if (!urgent && (c.corrAt.get(key) ?? -1e9) > T - CORR_GAP) continue;
       c.corr.delete(key);
+      bundleUrgent = true;
       if (key < 0) {
         const id = -1 - key;
         w.u8(R.RCORR); w.u8(REASON_ID[k.reason]); w.u16(Math.min(65535, T - k.eventT)); Pr.wRock(w, W, id);
@@ -444,14 +453,27 @@ class LabServer {
     // Prune slot history
     while (c.hist.length && c.hist[0].to < T - HIST) c.hist.shift();
     if (T % 300 === 0) for (const [uid, l] of c.memb) { const k = l.filter((m) => m.to >= T - HIST); if (k.length) c.memb.set(uid, k); else c.memb.delete(uid); }
-    if (w.o > start || c.every || T - c.lastSent >= HEARTBEAT) {
-      // How many of your inputs had arrived by this tick, when that moved: rides on a bundle going out anyway (never a
+    // Coalescing: this tick's records join the message being built, which goes out when it holds another person's input,
+    // a late notice or a correction, or HEARTBEAT ticks after the last one (orders, entries, exits and rocks can wait:
+    // they are applied at their own tick either way, and pull-in brings things in well before they act)
+    if (w.o) this.section(c, T, w);
+    if (urgent || bundleUrgent || T - c.lastSent >= HEARTBEAT) {
+      if (!c.out || c.out.tick !== T) this.section(c, T, null);
+      const o = c.out.w;
+      // How many of your inputs had arrived by this tick, when that moved: rides on a message going out anyway (never a
       // reason to send one). With LATE it tells the client exactly which tick each of its inputs was used on.
-      if (c.lastSeq !== c.rcvSent) { w.mark('inputs'); w.u8(R.RCV); w.u8(c.lastSeq & 255); c.rcvSent = c.lastSeq; }
-      const buf = w.done();
-      c.lastSent = T;
-      this.sendBin(c, buf, w.cats);
+      if (c.lastSeq !== c.rcvSent) { o.mark('inputs'); o.u8(R.RCV); o.u8(c.lastSeq & 255); c.rcvSent = c.lastSeq; }
+      const buf = o.done();
+      c.out = null; c.lastSent = T;
+      this.sendBin(c, buf, o.cats);
     }
+  }
+  /** Add tick T's records (w, or none) to the message being built for this client: the first tick in its header, as a
+   *  step from the last message's tick; each later one after a TICK record, as a step from the one before */
+  section(c, T, w) {
+    if (!c.out) { const o = new Writer(64); o.mark('ticks'); o.u8(Pr.T.BUNDLE); o.vu(T - c.lastSent); c.out = { w: o, tick: T }; }
+    else { const o = c.out.w; o.mark('ticks'); o.u8(R.TICK); o.vu(T - c.out.tick); c.out.tick = T; }
+    if (w) c.out.w.append(w);
   }
 
   /** The window (c.ack, u.ack]: every event this client should have seen, against what it reported */

@@ -41,9 +41,15 @@ own ship is predicted from your own inputs and re-simulated from the last confir
   250 ms ±60 jitter, at 2-3 ticks.
 
 ### 3. Inputs relayed, not world state
-- Each tick that has something to say, the server sends each client a **bundle** stamped with that tick. A bundle holds
-  the inputs used that tick by the players in that client's awareness (only those that changed), plus the other records
-  below. With nothing to say, a 3-byte heartbeat goes out every 4 ticks (15 Hz). An option sends a bundle every tick.
+- Each tick that has something to say gets a **section** of records for that client: the inputs used that tick by the
+  people in its awareness (only those that changed), plus the other records below. Sections go out in a **bundle**
+  message, which can carry several ticks (the first tick in the header as a step from the last message's, each later one
+  after a `TICK` record).
+- **Coalescing** (2026-11-03): a bundle goes out at once when it holds another person's input, a late notice or a
+  correction. Anything else (orders, entries, exits, rocks, `RCV`) waits for the next bundle, at most 4 ticks (15 Hz);
+  with nothing at all, a 2-byte heartbeat goes out every 4 ticks. Waiting costs nothing on the confirmed timeline (every
+  record is applied at its own tick) and pull-in brings things in well before they act. An option sends a bundle every
+  tick.
 - A gap in tick numbers therefore means "nothing changed in between": the client steps those ticks with held inputs.
 - Your own input isn't echoed. You know what you sent and which tick it is stamped for, and the server uses it on that
   tick unless it arrives late, which `LATE` reports. The one other thing you need is whether it had arrived in time:
@@ -88,6 +94,11 @@ own ship is predicted from your own inputs and re-simulated from the last confir
 - The **pilot** runs on every copy: from the AI's own state and its target's, it makes the controls (circle the target,
   lead the aim, fire when lined up, fly a waypoint). It reads nothing else, so a client that holds an AI and its target
   flies it exactly.
+- **Decided ahead**: the commander's decision at the end of tick T switches the AI over at tick T + 15 (`ORDER_LEAD`,
+  250 ms, a reaction time). The order, and the new target if a client didn't hold it, reach clients before the switch,
+  even on their predicted screens (which run a round trip plus the margin ahead), so the screen never shows an AI on the
+  wrong target. Measured: AIs more than 2 units off on the predicted screen, 0.4-3.5% of AI-ticks with a lead of 1, 0.0%
+  with 15, at 40 and 70 ms each way.
 - The commanders: a drone takes the nearest non-drone within 1,600 (rechecked every 2 s, or at once if its target dies
   or leaves that range); a freighter's turret the nearest drone within 900 (every second); a bot the target it was given,
   else the nearest ship within 2,500 (every 2 s).
@@ -101,13 +112,14 @@ own ship is predicted from your own inputs and re-simulated from the last confir
   its live shells. **Exit**: at tick T, its shells go with it.
 - **Pull-in (no limit, since 2026-11-03)**: each tick the server works out what each entity *needs* a client to hold
   along with it:
-  - an AI needs its order's target (its pilot flies against it);
+  - an AI needs its target and its next one (its pilot flies against them), and each of those needs the AI: whatever is
+    after something you hold comes in as soon as it picks it, before it acts;
   - a ship, or a live rock, needs the shooter of every live shell whose line can still reach it (ships within radius +
     150, rocks within radius + 40); the shooter comes with its live shells;
   - a shooter needs the rocks its shells can reach (destroyed ones too), and a player the loot within 300.
 
   Starting from what is in your radius (and your nearby rocks), everything needed is added, then everything *that*
-  needs, and so on, with no cap. A pulled-in entity stays at least 1 s. An entity enters stamped with the tick the need
+  needs, and so on, with no cap. A pulled-in entity stays at least 3 s (1 s made 38% of entries re-entries). An entity enters stamped with the tick the need
   appeared, ahead of the interaction itself (a gun shell at 500 units is seen ~15 ticks before it lands), and is
   applied at that tick on the confirmed timeline, so nothing needs correcting.
 - **Hits from outside** ("unseen"): if something you hold is hit by something you don't, the server knows at once
@@ -129,7 +141,8 @@ own ship is predicted from your own inputs and re-simulated from the last confir
 
 ### 9. Event reports (client to server)
 - For every event the client simulates on its confirmed timeline, it sends **[kind + id][8-bit hash]** in its next
-  message. Events covered: hits on ships or rocks (with damage, HP after and kill), and pickups. The hash covers the tick,
+  message. Reports wait up to 6 confirmed ticks for an input or hashes to ride with (2026-11-03: up messages that carried
+  only reports were 63% of them). Events covered: hits on ships or rocks (with damage, HP after and kill), and pickups. The hash covers the tick,
   what, by whom, the damage, the HP after and the kill. Each client message carries **ack** = its confirmed tick, and
   its reports are exactly those for ticks after its previous ack.
 - The server knows which events that client should have seen in that window: those whose target and shooter (or picker)
@@ -144,7 +157,9 @@ own ship is predicted from your own inputs and re-simulated from the last confir
 ### 10. Rock overrides
 - Rocks follow the seed: position, size and HP. The server keeps an override table of rocks not in their default state
   (damaged: HP; destroyed: the tick).
-- A rock entering a client's set comes with its override, if any. A destruction goes to every client not already
+- A rock entering a client's set comes with its override only if that changed since the client's copy was last right
+  (when it stopped tracking the rock, or was last sent it). Before, rocks flickering in and out of pull-in were re-sent
+  unchanged: 67% of override records. A destruction goes to every client not already
   simulating that rock as **rock id** (the tick is the bundle's): 2-3 bytes.
 - A destroyed rock comes back 90 s later. Every copy works that out from the destruction tick; nothing is sent.
 
@@ -160,11 +175,12 @@ All binary and little-endian; varints are LEB128.
 
 | message / record | bytes | category |
 |---|---|---|
-| bundle header: type, tick (16 bits) | 3 | ticks |
+| bundle header: type, first tick as a step from the last bundle's (varint) | 2 | ticks |
+| `TICK` the records after it are for a later tick: type, step | 2 | ticks |
 | `IN` another person's changed input: type, slot × 8 + which fields changed, the changed fields (against the input that ship flew with last tick) | 3-6 (aim nudge 3) | inputs |
-| `ORD` an AI's new order from the end of this tick: type, AI slot, target slot + 1 (0: none) | 3 | orders |
+| `ORD` an AI's order, decided this tick, switched to 15 ticks later: type, AI slot, next target slot + 1 (0: none) | 3 | orders |
 | `RCV` how many of your inputs the server had (low byte), on a bundle going out anyway, when it moved | 2 | inputs |
-| `ENTER` type, slot, pulled flag, entity (kind byte + 4 for a bot): ship ~58 + 22 per live shell; loot 23 | ~60-130 | entries |
+| `ENTER` type, slot, pulled flag, entity: kind (+ 4 for a bot), uid, a flags byte for the fields not at their default, position (2 × 32 bits), velocity and small values as varints, kind-only fields (drone home, freighter waypoint); a shell's life and damage only if they don't follow from its age and gun. Ship 33-44 B (was 63) + ~18 per live shell (was 22); loot ~17 | ~35-170 | entries |
 | `EXIT` type, slot | 2 | entries |
 | `PULL` type, slot, flag (in/out of the radius; only for the page's display) | 3 | entries |
 | `ROCK` rock override on entry: type, id, HP (+ 2 if destroyed) | 4-6 | entries |
@@ -173,11 +189,11 @@ All binary and little-endian; varints are LEB128.
 | `RDEAD` rock destroyed: type, id | 2-3 | overrides |
 | `GONE` a shell hit something you don't hold: type, shooter slot, shot number, kill | 4 | shells |
 | `LATE` your input was late: type, sequence, ticks | 3 | ticks |
-| up: header (type, ack, flags incl. which input fields changed) | 4 | acks |
+| up: header (64 + flags incl. which input fields changed, in one byte; ack as a step from the last one sent) | 2 | acks |
 | up: input (stamp as a step from the last, the changed fields) | 2-5 (aim nudge 2) | inputs |
 | up: reports: count, then [kind + id][hash] each | 1 + 2-3 each | reports |
-| up: hashes: tick, count, 1 byte per tracked entity | 3 + n | hashes |
-| ping 11 / pong 22 (pong carries the server clock and the smallest input lead) | | ping |
+| up: hashes: tick (a step back from the ack), count, 1 byte per tracked entity | 2 + n | hashes |
+| ping 5 (low 16 bits of the client clock in ms, round trip) / pong ~11 (those 16 bits, server clock in ms, tick, smallest input lead) | | ping |
 
 ## Measured
 
@@ -283,6 +299,26 @@ After, by category (B/s): 8 bots around you: entries 287, ticks 78, ping 44, ord
   1 spurious report, 0 unseen; all four injected drifts caught and corrected.
 - Not measured yet: the client's CPU for the bigger set.
 
+### Orders decided ahead, coalescing and packing (2026-11-03)
+Same harness and scenarios as above (one client at 40 ms each way, 30 s). Before = commit 685e9ea (orders decided ahead,
+attackers pulled in); after = coalesced bundles, batched reports, the churn fixes and the packed formats.
+
+| scenario | down payload, B/s | down wire, B/s (msg/s) | held avg, max | AIs wrong on screen |
+|---|---|---|---|---|
+| 8 bots around you | 346 → **181** | 2,147 (28) → **1,269** (17) | 35 → 38, 47 → 49 | 0.0% |
+| 3 bot fights at the edge + 4 bots | 321 → **183** | 2,103 (28) → **1,271** (17) | 39 → 41, 53 → 57 | 0.0% |
+| 24 bots around you | 817 → **337** | 3,510 (42) → **1,425** (17) | 63 → 75, 90 → 111 | 0.0% |
+| 16-bot brawl 2,200 away | 545 → **245** | 2,775 (35) → **1,333** (17) | 50 → 58, 68 → 77 | 0.0% |
+
+`node test.mjs`, 8-bot fight, lockstep: down 387 → 201 B/s payload, wire 2,211 → 1,289 (29 → 17 msg/s); up 278 → 177
+B/s, wire 1,989 → 800 (25 → 9 msg/s). No desyncs in any run.
+
+- **The message rate is now the 15 Hz floor** in AI-only scenes: down is ~73% headers (17 × ~64 B).
+- **Entries fell the most** (594 → 184 B/s with 24 bots): smaller snapshots, and 3 s of stickiness instead of 1 (the
+  set held is larger for it).
+- Everything a client receives still arrives at its own tick; the cost of coalescing is that orders and entries reach
+  the client up to 4 ticks later, inside the 15-tick order lead.
+
 ### Estimates for the game
 - **The payload is mostly other players' inputs.** Each tracked player costs about 8 B per input change. A mouse-aiming
   human changes 15-60 times a second, so 120-480 B/s per tracked player, whatever they are doing. In the current style,
@@ -318,8 +354,8 @@ After, by category (B/s): 8 bots around you: entries 287, ticks 78, ping 44, ord
 1. **How big does the closure get in a crowded world?** With no limit, unseen hits are gone, but a client holds most of
    any fight it touches (62 of 95 entities with 24 bots around it). The lab's world is small; a stress test with many
    separate fights linked by long shots is still to do, along with the client CPU for the bigger set.
-2. **The per-message cost.** On WebSocket/TCP/TLS the headers are bigger than the payload. Coalescing two ticks per
-   message halves that and adds 8 ms. UDP or WebTransport would remove most of it.
+2. **The per-message cost.** On WebSocket/TCP/TLS the headers are bigger than the payload. Coalescing (up to 4 ticks)
+   brought the lab to its 15 Hz floor; going lower means waiting longer, or UDP / WebTransport.
 3. **Cross-browser determinism isn't tested yet.** Node and Chrome are both V8. The lab's maths avoids
    transcendental functions, but Firefox and Safari should each be connected to the VPS lab for a while, watching the
    hash and mismatch counters.

@@ -74,8 +74,9 @@ and puts things back if the new server or `nginx -t` fails.
 **Network row:**
 * *Added one-way* and *jitter* delay every message each way on top of the real connection, keeping them in order. Use
   them to turn a good link into a bad one.
-* *Bundle every tick* makes the lockstep server send a bundle every tick instead of only when something changed (plus a
-  15 Hz heartbeat). Reconnect to apply.
+* *Bundle every tick* makes the lockstep server send a bundle every tick instead of coalescing (a bundle goes at once
+  only with another person's input, a late notice or a correction; anything else waits up to 4 ticks). Reconnect to
+  apply.
 
 **Debug row** (lockstep). Each one knocks your copy of the world off the server's; the Desyncs card shows how it was
 caught:
@@ -86,7 +87,7 @@ caught:
 | Drift: move | moves the ship last hit 400 units | **missing** (hits you should have seen don't happen), or hash |
 | Drift: into a shell | puts a ship in front of a live shell | **spurious** (you report a hit the server never had) |
 | Drift: silent | moves a quiet entity (no recent events, no shells near it) 1 unit | **hash**, at the next 2-second state hash |
-| Drop a message | throws away the next bundle that has inputs or orders in it | whatever that causes: usually hash or mismatch |
+| Drop a message | throws away the next message that has inputs or orders in it (and no entries, exits or late notices) | whatever that causes: usually missing, hash or mismatch |
 | Delay 500 ms | holds everything that arrives for 500 ms | nothing: watch the queue fill and the client catch up |
 
 *Bot fight at the edge* puts a freighter just inside your awareness and a bot outside it attacking the freighter, so you
@@ -152,6 +153,10 @@ panel, debug commands) isn't part of either design and isn't counted.
 * *unseen*: something you hold was hit by something outside your set. The server corrects it in the same tick; it
   isn't your client's fault;
 * *dropped*: messages the debug button threw away.
+
+"On screen vs confirmed" scores the predicted screen: each ship as it was first drawn at a tick, against the confirmed
+world when that tick arrives (more than 2 units out counts as wrong), AIs and people apart. People's inputs are guessed
+(held) by design; AIs should be 0%, because their orders arrive 15 ticks before they act.
 
 "reports sent / matched / expected" is the server's tally. The list shows the last few: reason, entity, ticks from the
 event to the server catching it, and for an injected drift, the time from the injection until the correction reached
