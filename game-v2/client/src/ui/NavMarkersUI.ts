@@ -89,8 +89,8 @@ export class NavMarkersUI {
     const here = this.state.systemId;
     if (t.system === here) {
       if (t.station) {
-        for (const e of this.state.entities.values()) {
-          if (e.type === EntityType.Station && e.name === t.station) return { kind: 'objective', name: t.label, x: e.renderX, y: e.renderY };
+        for (const e of this.state.entities.ofType(EntityType.Station)) {
+          if (e.name === t.station) return { kind: 'objective', name: t.label, x: e.renderX, y: e.renderY };
         }
         return null;
       }
@@ -137,6 +137,16 @@ export class NavMarkersUI {
 
   private avoid: Box[] = [];
   private avoidAt = -1e9;
+  /** The fixed HUD panels' boxes, built again only when the window's size changes */
+  private hud: Box[] = [];
+  private hudW = -1;
+  private hudH = -1;
+  /** Reused every frame (no arrays or objects made per frame): the off-screen candidates, their order, the boxes placed */
+  private cands: Cand[] = [];
+  private nCands = 0;
+  private order: Cand[] = [];
+  private placed: Box[] = [];
+  private boxes: Box[] = [];
 
   update(): void {
     if (this.hidden) return;
@@ -146,13 +156,16 @@ export class NavMarkersUI {
     const W = window.innerWidth, H = window.innerHeight;
     const cx = W / 2, cy = H / 2;
     // Markers ride a rectangle inset from the edges, clear of the HUD panels
-    const inset = { l: 30, r: 30, t: 30, b: 132 };
-    const hud: Box[] = [
-      { x0: 0, y0: 0, x1: 210, y1: 262 },                   // ship schematic
-      { x0: W - 300, y0: 0, x1: W, y1: 222 },               // minimap / net stats
-      { x0: cx - 300, y0: H - 140, x1: cx + 300, y1: H },   // hotbar + jump gauge
-      { x0: 0, y0: H - 72, x1: 345, y1: H },                // chat
-    ];
+    const il = 30, ir = 30, it = 30, ib = 132;
+    if (W !== this.hudW || H !== this.hudH) {
+      this.hudW = W; this.hudH = H;
+      this.hud = [
+        { x0: 0, y0: 0, x1: 210, y1: 262 },                   // ship schematic
+        { x0: W - 300, y0: 0, x1: W, y1: 222 },               // minimap / net stats
+        { x0: cx - 300, y0: H - 140, x1: cx + 300, y1: H },   // hotbar + jump gauge
+        { x0: 0, y0: H - 72, x1: 345, y1: H },                // chat
+      ];
+    }
     // Panels that move or grow (the job tracker, the pilot readout): measured 4 times a second, not
     // every frame (reading layout every frame makes the browser lay the page out every frame)
     const now = performance.now();
@@ -165,21 +178,24 @@ export class NavMarkersUI {
         if (r.width && r.height) this.avoid.push({ x0: r.left - 6, y0: r.top - 6, x1: r.right + 6, y1: r.bottom + 6 });
       });
     }
-    hud.push(...this.avoid);
 
+    // The places off screen (on screen it's already visible), in the order they were always taken: the objective,
+    // events, ops, party, then the system's places; then sorted (a stable sort, so ties keep that order)
+    this.nCands = 0;
+    const mx = me.renderX, my = me.renderY;
     const obj = this.objectiveTarget();
-    const evs: Target[] = [
-      ...this.events().map((e) => ({ kind: 'event' as Kind, name: e.name, x: e.x, y: e.y })),
-      ...this.ops().map((e) => ({ kind: 'op' as Kind, name: e.name, x: e.x, y: e.y })),
-      ...this.party().map((e) => ({ kind: 'party' as Kind, name: e.name, x: e.x, y: e.y })),
-    ];
-    const list = [...(obj ? [obj] : []), ...evs, ...this.targets()]
-      .map((t) => ({ ...t, d: Math.hypot(t.x - me.renderX, t.y - me.renderY), s: this.worldToScreen(t.x, t.y) }))
-      .filter((t) => t.s.x < 0 || t.s.x > W || t.s.y < 0 || t.s.y > H) // on screen it's already visible
-      .sort((a, b) => rank(a.kind) - rank(b.kind) || (STYLE[a.kind].dim ? 1 : 0) - (STYLE[b.kind].dim ? 1 : 0) || a.d - b.d)
-      .slice(0, MAX_MARKERS);
+    if (obj) this.cand(obj.kind, obj.name, obj.x, obj.y, mx, my, W, H);
+    for (const e of this.events()) this.cand('event', e.name, e.x, e.y, mx, my, W, H);
+    for (const e of this.ops()) this.cand('op', e.name, e.x, e.y, mx, my, W, H);
+    for (const e of this.party()) this.cand('party', e.name, e.x, e.y, mx, my, W, H);
+    for (const t of this.targets()) this.cand(t.kind, t.name, t.x, t.y, mx, my, W, H);
+    const order = this.order;
+    order.length = 0;
+    for (let i = 0; i < this.nCands; i++) order.push(this.cands[i]);
+    order.sort(byRank);
+    const count = Math.min(order.length, MAX_MARKERS);
 
-    while (this.pool.length < list.length) {
+    while (this.pool.length < count) {
       const el = document.createElement('div');
       el.className = 'nav-mk';
       el.innerHTML = '<span class="arrow">➤</span><span class="ic"></span><span class="nm"></span><span class="dist"></span>';
@@ -187,36 +203,49 @@ export class NavMarkersUI {
       this.pool.push(el);
     }
 
-    const placed: Box[] = [...hud];
-    this.pool.forEach((el, i) => {
-      const t = list[i];
-      if (!t) { setStyle(el, 'display', 'none'); return; }
+    const placed = this.placed;
+    placed.length = 0;
+    for (const b of this.hud) placed.push(b);
+    for (const b of this.avoid) placed.push(b);
+    let used = 0;
+    for (let i = 0; i < this.pool.length; i++) {
+      const el = this.pool[i];
+      if (i >= count) { setStyle(el, 'display', 'none'); continue; }
+      const t = order[i];
       const st = STYLE[t.kind];
       // Where the direction to the target leaves the inset rectangle
-      const dx = t.s.x - cx, dy = t.s.y - cy;
-      const kx = dx > 0 ? (W - inset.r - cx) / dx : dx < 0 ? (inset.l - cx) / dx : Infinity;
-      const ky = dy > 0 ? (H - inset.b - cy) / dy : dy < 0 ? (inset.t - cy) / dy : Infinity;
+      const dx = t.sx - cx, dy = t.sy - cy;
+      const kx = dx > 0 ? (W - ir - cx) / dx : dx < 0 ? (il - cx) / dx : Infinity;
+      const ky = dy > 0 ? (H - ib - cy) / dy : dy < 0 ? (it - cy) / dy : Infinity;
       const k = Math.min(kx, ky);
       const onSide = kx < ky; // left/right edge: slide vertically; top/bottom: horizontally
       const bx = cx + dx * k, by = cy + dy * k;
       const dist = formatDist(t.d);
       const w = (t.name.length + dist.length) * 6.4 + 40, h = 17;
       // Slide along the edge until it overlaps neither another marker nor a HUD panel
-      let spot: { x: number; y: number } | null = null;
-      for (let n = 0; n < 60 && !spot; n++) {
+      let found = false, sxp = 0, syp = 0;
+      for (let n = 0; n < 60 && !found; n++) {
         const off = (n % 2 ? 1 : -1) * Math.ceil(n / 2) * 19;
-        const x = Math.max(inset.l + w / 2 - 20, Math.min(W - inset.r - w / 2 + 20, onSide ? bx : bx + off));
-        const y = Math.max(inset.t, Math.min(H - inset.b, onSide ? by + off : by));
-        const box = { x0: x - w / 2, y0: y - h / 2, x1: x + w / 2, y1: y + h / 2 };
-        if (!placed.some((o) => box.x0 < o.x1 && box.x1 > o.x0 && box.y0 < o.y1 && box.y1 > o.y0)) {
-          placed.push(box);
-          spot = { x, y };
+        const x = Math.max(il + w / 2 - 20, Math.min(W - ir - w / 2 + 20, onSide ? bx : bx + off));
+        const y = Math.max(it, Math.min(H - ib, onSide ? by + off : by));
+        const x0 = x - w / 2, y0 = y - h / 2, x1 = x + w / 2, y1 = y + h / 2;
+        let hit = false;
+        for (let j = 0; j < placed.length; j++) {
+          const o = placed[j];
+          if (x0 < o.x1 && x1 > o.x0 && y0 < o.y1 && y1 > o.y0) { hit = true; break; }
+        }
+        if (!hit) {
+          const b = this.boxes[used] ?? (this.boxes[used] = { x0: 0, y0: 0, x1: 0, y1: 0 });
+          used++;
+          b.x0 = x0; b.y0 = y0; b.x1 = x1; b.y1 = y1;
+          placed.push(b);
+          found = true; sxp = x; syp = y;
         }
       }
-      if (!spot) { setStyle(el, 'display', 'none'); return; }
+      if (!found) { setStyle(el, 'display', 'none'); continue; }
       // (Only what changed is written: every write makes the browser restyle)
       setStyle(el, 'display', 'flex');
-      setStyle(el, 'transform', `translate(${Math.round(spot.x)}px, ${Math.round(spot.y)}px) translate(-50%, -50%)`);
+      setStyle(el, 'transform', `translate(${Math.round(sxp)}px, ${Math.round(syp)}px) translate(-50%, -50%)`);
       setStyle(el, 'color', st.color);
       setStyle(el, 'opacity', st.dim ? '0.6' : '0.95');
       setStyle(el, 'flexDirection', dx > 0 ? 'row-reverse' : 'row');
@@ -224,11 +253,27 @@ export class NavMarkersUI {
       setText(el.children[1], st.icon);
       setText(el.children[2], t.name);
       setText(el.children[3], dist);
-    });
+    }
+  }
+
+  /** One place, kept (in the next reused slot) only if it's off screen */
+  private cand(kind: Kind, name: string, x: number, y: number, mx: number, my: number, W: number, H: number): void {
+    const s = this.worldToScreen(x, y);
+    if (!(s.x < 0 || s.x > W || s.y < 0 || s.y > H)) return;
+    const c = this.cands[this.nCands] ?? (this.cands[this.nCands] = { kind, name, d: 0, sx: 0, sy: 0 });
+    this.nCands++;
+    c.kind = kind; c.name = name; c.d = Math.hypot(x - mx, y - my); c.sx = s.x; c.sy = s.y;
   }
 }
 
 interface Box { x0: number; y0: number; x1: number; y1: number }
+/** A place off screen this frame: its distance from the pilot and its screen point */
+interface Cand { kind: Kind; name: string; d: number; sx: number; sy: number }
+
+/** Objectives first, then events, then everything else; the bright before the dim; then the nearest */
+function byRank(a: Cand, b: Cand): number {
+  return rank(a.kind) - rank(b.kind) || (STYLE[a.kind].dim ? 1 : 0) - (STYLE[b.kind].dim ? 1 : 0) || a.d - b.d;
+}
 
 /** Objectives first, then events, then everything else */
 function rank(k: Kind): number {
