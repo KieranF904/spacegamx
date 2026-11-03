@@ -11,6 +11,7 @@
  *   hitEndFx      the detonation a shell's end (or a pierce pass) is told with
  *   hpWire        part HP as the wire carries it
  *   deriveShellHit  the lot, on a client's view of the target (shield unknown: 0; boss modifiers unknown: defaults)
+ *   gunShell      what a gun's shell is (kind, tuning, grade, strength), from the firing ship as both sides have it
  *
  * Arithmetic here is the server's own, in the same order: change nothing here without the hit golden
  * (server/src/game/hitRules.golden.test.ts) passing unchanged.
@@ -25,6 +26,7 @@ import { damagePart } from './state.js';
 import { hitMultiplier, weaponHit, type HitInfo } from './damage.js';
 import { RUIN_HP, stageOf, currentStage, standing, deciding, stageParts } from './stages.js';
 import { partDistance } from './collide.js';
+import { gunDef, stackMods, ammoByCode } from './launch.js';
 
 /** A hit that gets less than this share through the armour it strikes shows as glancing */
 export const GLANCING = 0.6;
@@ -298,4 +300,23 @@ export function deriveShellHit(view: ShellHitView): ShellHitOutcome {
   if (r.part >= 0) ship.hp[r.part] = hpAfter;
   const gone = shellGone(def, view.passes);
   return { part: r.part, dealt: r.dealt, hpAfter, glancing: r.glancing, ignite: igniteRule(ship, view.struck, def), gone, fx: hitEndFx(view.kind, def, gone) };
+}
+
+/** A gun's shell as a client knows it: its kind, the tuning it flies and hits with, its gun's grade and strength */
+export interface GunShell { kind: string; def: WeaponTuning; grade: number; strength: number }
+
+/**
+ * What a shell from `ship`'s gun is, worked out from the firing ship alone (its blueprint and rebuild), so the server
+ * and a client with the same copy of the ship get the same answer. `gun` packs as a fire event's part does: part +
+ * 256 × ammunition code + 65536 for an augmented shot. Null: no such gun. The server's own shell may differ (power,
+ * a ward's scale, a dry round): that is what a confirmed hit's extras carry.
+ */
+export function gunShell(tuning: ShipTuning, ship: ShipState, gun: number): GunShell | null {
+  if (!(gun >= 0)) return null;
+  const part = gun % 256, ammo = Math.floor(gun / 256) % 256, aug = gun >= 65536;
+  const w = ship.derived.weapons.find((x) => x.part === part);
+  if (!w) return null;
+  const mods = stackMods(ammoByCode(ammo)?.mods, aug ? ship.derived.ports?.augMods[part] : undefined);
+  const def = gunDef(tuning, w.kind, { mods: ship.blueprint.parts[part]?.mods, ammo: mods, grade: w.grade, size: w.size, model: w.model });
+  return { kind: w.kind, def, grade: w.grade ?? 1, strength: w.strength ?? 1 };
 }

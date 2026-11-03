@@ -119,7 +119,7 @@ import { GameData } from './data/GameData.js';
 import type { UserStore } from './auth/types.js';
 import type { ClientSocket, ClientLink } from '@space-game/common';
 import type { ShipBridge, ShipHost } from './ships/ShipBridge.js';
-import { portsSwitchFeeds } from '@space-game/common';
+import { portsSwitchFeeds, CAPS } from '@space-game/common';
 import { Blueprint, ShipState, quantizeShipValue, skillValue, hasAll, removeAll, Economy, Bag, StarterKit, jumpTuning, jumpPhase, partItemId, rateShip, ratingOf, createShipState, gradeReward, gradeOf, accrueTraces, releaseTraces, unlocks, stationPerks, hazardFlight, stationTable, blueprintGrade, lookFn, warmthPercent, packCharge, nearerThan, fartherThan, type ShipDerived } from '@space-game/common';
 
 /** A station site by id */
@@ -176,6 +176,7 @@ import { HandlerRegistry, dispatch, registerHandlers, type Handler, type Handler
 import * as flight from './net/handlers/flight.js';
 import { registerFlightHandlers, portalQuery } from './net/handlers/flight.js';
 import { Outbox } from './net/snapshot/Outbox.js';
+import { HitLedger } from './net/hits/HitLedger.js';
 import { SnapshotBuilder, designHash, playerQuery, projectileQuery, droppedItemQuery } from './net/SnapshotBuilder.js';
 
 // ============================================
@@ -481,6 +482,8 @@ export interface GameServerOptions {
   everyoneAdmin?: boolean;
   /** Guests (not signed in) are admins: the dev server only. Refused outright under NODE_ENV=production. */
   guestAdmin?: boolean;
+  /** The join caps this server takes (common network/hits.ts CAPS): confirmed hits on the dev server (index.ts) */
+  netCaps?: number;
   /** Designs every guest finds in their hangar: the dev server only, like guestAdmin */
   guestShips?: Blueprint[];
   /** Modular ships: every player flies one. */
@@ -649,6 +652,10 @@ export class GameServer implements ServerCtx {
 
   /** Outgoing messages: outboxes, lazy effects, broadcasts, byte counters (net/snapshot/Outbox.ts) */
   readonly net: Outbox;
+  /** Confirmed hits: what capable clients are told of shells' hits on ships instead (net/hits/HitLedger.ts) */
+  readonly hits: HitLedger;
+  /** The join caps this server takes (GameServerOptions.netCaps) */
+  readonly netCaps: number;
   /** The snapshot path: rows, snapshots, ship structure, map dots, entering a system (net/SnapshotBuilder.ts) */
   readonly snapshots: SnapshotBuilder;
 
@@ -670,6 +677,8 @@ export class GameServer implements ServerCtx {
   constructor(opts: GameServerOptions) {
     this.world = createWorld();
     this.net = new Outbox(this);
+    this.hits = new HitLedger(this);
+    this.netCaps = opts.netCaps ?? 0;
     this.gameData = opts.gameData;
     this.adminServer = opts.adminServer || null;
     this.userDB = opts.userDB;
@@ -711,6 +720,7 @@ export class GameServer implements ServerCtx {
       world: this.world,
       tick: () => this.currentTick,
       broadcast: (num, msg) => this.broadcastToSystem(num, msg),
+      hitFx: (proj, msg) => this.hits.hitFx(proj, msg),
       remove: (eid) => { addComponent(this.world, Dead, eid); this.pendingRemovedEntities.add(eid); },
       nudge: (eid, ax, ay) => {
         if (hasComponent(this.world, Dead, eid) || this.ships.get(eid)?.kind === 'debris') return;
@@ -977,6 +987,7 @@ this.devTeleport = opts.devTeleport ?? false;
       lingering: this.lingering,
       pendingRemovedEntities: this.pendingRemovedEntities,
       lastEntityStates: this.lastEntityStates,
+      hits: this.hits,
     }, this);
 
     // Hook up admin server events
@@ -1869,6 +1880,14 @@ this.devTeleport = opts.devTeleport ?? false;
       contributors: () => this.contrib.contributors().map((r) => r.username),
       accounts: this.userDB.admin ?? null,
       freeBuildAllowed: () => this.freeBuildAllowed,
+      // (Confirmed hits for a pilot whose client offered them: at the next snapshot's end, net/hits/HitLedger.ts)
+      setHits: (c, on) => {
+        const conn = C(c);
+        if (on && !((conn.capsOffered ?? 0) & CAPS.HITS)) return false;
+        conn.capsNext = on ? (conn.capsNext ?? 0) | CAPS.HITS : (conn.capsNext ?? 0) & ~CAPS.HITS;
+        return true;
+      },
+      hitStats: () => this.hits.stats,
       freeBuildChanged: (c) => this.hangar.send(C(c)),
       setAdminLive: (c, on) => {
         C(c).isAdmin = on;
@@ -2268,7 +2287,7 @@ this.devTeleport = opts.devTeleport ?? false;
       fireBaseShot: (ownerEid, x, y, angle, damageScale, shape) => {
         const ids: number[] = [];
         this.weapons.spawn(ownerEid, shape?.kind ?? 'cannon', x, y, angle, damageScale,
-          { speedScale: shape?.speedScale ?? 1, sizeScale: shape?.sizeScale ?? 1, turret: shape?.turret ?? false, target: shape?.target, seed: shape?.seed, mods: shape?.mods, dry: shape?.dry, ammoMods: shape?.ammoMods, reach: shape?.reach, grade: shape?.grade, size: shape?.size, model: shape?.model }, ids);
+          { speedScale: shape?.speedScale ?? 1, sizeScale: shape?.sizeScale ?? 1, turret: shape?.turret ?? false, target: shape?.target, seed: shape?.seed, mods: shape?.mods, dry: shape?.dry, ammoMods: shape?.ammoMods, reach: shape?.reach, grade: shape?.grade, size: shape?.size, model: shape?.model, gun: shape?.gun }, ids);
         return ids;
       },
       shotVs: (proj) => this.weapons.vsOf(proj),
@@ -2282,7 +2301,8 @@ this.devTeleport = opts.devTeleport ?? false;
         // (Summed per target and source until the next snapshot, net/snapshot/Outbox.ts flushDamage)
         this.net.addDamage(InSystem.systemId[targetEid], targetEid, amount, sourceEid, !!glancing);
       },
-      notifyProjectileHit: (proj, x, y) => this.broadcastProjectileHit(proj, x, y),
+      // (A shell's hit on a ship: confirmed hits tell capable clients their own way, net/hits/HitLedger.ts)
+      notifyProjectileHit: (proj, x, y, hit) => this.hits.shellHit(proj, x, y, hit),
       onShipDestroyed: (eid, lastHitBy, ship) => {
         this.enemies.onDestroyed(eid, lastHitBy, ship);
         // A ward (freighter, pylon, bastion, turret) shot down: forget it before its entity number is reused
@@ -3711,6 +3731,7 @@ this.devTeleport = opts.devTeleport ?? false;
         if (this.weapons.onShipHit(proj, shipHit)) {
           addComponent(this.world, Dead, proj);
           this.pendingRemovedEntities.add(proj);
+          this.hits.end(proj);
         }
         continue;
       }
@@ -4141,9 +4162,10 @@ this.devTeleport = opts.devTeleport ?? false;
 
   /** A snapshot to every client, then the map's dots (net/SnapshotBuilder.ts; netBench and tests wrap this name) */
   private sendSnapshots(): void {
-    // (The damage summed since the last one goes first, to ride the same frame)
-    this.net.flushDamage();
+    // (The damage summed since the last one goes first, to ride the same frame; confirmed hits' clients get theirs after their records)
+    this.net.flushDamage(this.hits.active ? CAPS.HITS : 0);
     this.snapshots.sendSnapshots();
+    this.hits.endSnapshot();
   }
 
   /** Clients in a system near a point (net/snapshot/Outbox.ts) */

@@ -32,6 +32,9 @@ export async function handleJoin(ctx: ServerCtx, conn: ClientConnection, msg: an
     return;
   }
   conn.joined = true;
+  // What it can do beyond the base protocol, as far as this server takes it (confirmed hits: common network/hits.ts)
+  conn.capsOffered = (typeof msg.caps === 'number' ? msg.caps : 0) & ctx.netCaps;
+  conn.capsNext = conn.capsOffered;
   if (msg.token) {
     // Authenticated join - validate token
     const { user, error } = ctx.userDB.checkSession
@@ -74,6 +77,7 @@ export async function handleJoin(ctx: ServerCtx, conn: ClientConnection, msg: an
     username: conn.username,
     isAdmin: conn.isAdmin,
     isContributor: ctx.contrib.allowed(conn),
+    ...(conn.capsOffered ? { caps: conn.capsOffered } : {}),
   });
 }
 

@@ -12,6 +12,7 @@ export * from './network/protocol.js';
 export * from './network/inputFields.js';
 export * from './network/ranges.js';
 export * from './network/fxKinds.js';
+export * from './network/hits.js';
 export * from './network/cursorState.js';
 export * from './network/Transport.js';
 

@@ -144,6 +144,7 @@ export const Projectile = defineComponent({
   miningYield: Types.f32,     // Ore per damage on asteroids (relative to the mining table's damagePerUnit)
   miningHardness: Types.ui8,  // Hardest rock it can crack
   endTick: Types.ui32,        // A shell that ends at a chosen point (a mortar's, an aim burst's): the tick it ends, in spawn + velocity × (tick - spawnTick) terms (0: none). Projectile row data[9]
+  gun: Types.i32,             // The gun that fired it, packed as a fire event's part (part + 256 × ammo + 65536 augmented; -1: none, Weapons.spawn always sets it). Projectile row data[10] (confirmed hits)
 });
 
 /** Bullet-specific data (cannon, scatter) */

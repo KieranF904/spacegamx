@@ -29,9 +29,9 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
  * has updated PROTOCOL_VERSION and PROTOCOL_WIRE_HASH.
  */
 // History: PROTOCOL_CHANGELOG.md. Re-pin with `npm run wire:bump "reason"` (game-v2/), never by hand.
-export const PROTOCOL_VERSION = 26;
+export const PROTOCOL_VERSION = 27;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
-export const PROTOCOL_WIRE_HASH = 'f15c7577';
+export const PROTOCOL_WIRE_HASH = '60aed11a';
 /** WebSocket close code (and reason) for a client on another protocol version */
 export const PROTOCOL_MISMATCH_CLOSE = 4002;
 export const PROTOCOL_MISMATCH_REASON = 'version';
@@ -166,6 +166,17 @@ export interface ClientJoinMessage {
   username: string;    // Display name (for guests)
   /** The client's PROTOCOL_VERSION (absent: a client from before the handshake) */
   protocol?: number;
+  /** What it can do beyond the base protocol (hits.ts CAPS): the server takes the bits it allows */
+  caps?: number;
+}
+
+/**
+ * Confirmed hits (hits.ts): the client's copy of these ships' part HP disagrees with an hpCheck, or it could not work
+ * out a hit on them. The server sends every part's HP with the next snapshot.
+ */
+export interface ClientHpResyncMessage {
+  type: 'hpResync';
+  ids: number[];
 }
 
 export interface ClientAuthLoginMessage {
@@ -209,6 +220,7 @@ export type ClientMessage =
   | ClientAuthLoginMessage
   | ClientAuthRegisterMessage
   | ClientStateHashMessage
+  | ClientHpResyncMessage
   | ClientShipEditMessage
   | ClientDockMessage
   | ClientUndockMessage
@@ -618,6 +630,8 @@ export interface ServerAuthResultMessage {
   /** Contributor rank (admins are contributors too): the contributor tools */
   isContributor?: boolean;
   error?: string;
+  /** The join's caps the server took (hits.ts CAPS) */
+  caps?: number;
 }
 
 export interface ServerAdminStatsMessage {
@@ -787,6 +801,8 @@ export type ServerMessage =
   | ServerDebrisSplitMessage
   | ServerShipEditResultMessage
   | ServerProjectileHitMessage
+  | ServerHitsMessage
+  | ServerHpCheckMessage
   | ServerDockResultMessage
   | ServerPartDestroyedMessage
   | ServerContactMessage
@@ -1127,6 +1143,24 @@ export interface ServerDockResultMessage {
   error?: string;
 }
 
+/**
+ * Confirmed hits (hits.ts packHits): shells that hit ships since the snapshot just sent, for a client that announced
+ * CAPS.HITS. It works out each one's damage, part HP, fire, hit point and end itself, as the server's legacy messages
+ * would have told it (client ships/hits/ConfirmedHits.ts). Comes after the snapshot and before the shipHps that
+ * corrects anything it got wrong.
+ */
+export interface ServerHitsMessage {
+  type: 'hits';
+  h: number[];
+}
+
+/** Confirmed hits: the server's copy of a ship's part HP as this client should have it (hits.ts hpChecksum) */
+export interface ServerHpCheckMessage {
+  type: 'hpCheck';
+  id: number;
+  sum: number;
+}
+
 /** A projectile struck something at (x, y): clients end its tracer there and throw sparks. */
 export interface ServerProjectileHitMessage {
   type: 'projectileHit';
@@ -1408,6 +1442,9 @@ const COMPACT: [string, string[]][] = [
   ['bossBeam', ['bodyId', 'x', 'y', 'a0', 'a1', 'ticks', 'length', 'width', 'kind']],
   ['bossCharge', ['bodyId', 'kind', 'ticks']],
   ['bossBlow', ['bodyId', 'part']],
+  // (Appended, protocol 27: confirmed hits, hits.ts)
+  ['hits', ['h']],
+  ['hpCheck', ['id', 'sum']],
 ];
 
 /**
@@ -1486,8 +1523,9 @@ interface PackedSnapshot { type: 'snapshot'; t: number; lp: number; e?: unknown[
 
 /**
  * Projectiles have rows of their own (they're most of a fight's rows):
- *   [id, vx, vy, weaponType, ticks since fired, spawnX, spawnY, ownerId, tier?, sizeScale?, turret?, ticks to its end?, x?, y?]
- * tier 1, size 1, no turret and no end go as null (trailing ones dropped); the
+ *   [id, vx, vy, weaponType, ticks since fired, spawnX, spawnY, ownerId, gun?, tier?, sizeScale?, turret?, ticks to its end?, x?, y?]
+ * gun (data[10]: the gun that fired it, packed as a fire event's part: hits.ts; -1 none) is for confirmed hits.
+ * No gun, tier 1, size 1, no turret and no end go as null (trailing ones dropped); the
  * end (data[9], the tick a shell that ends at a chosen point lands or bursts:
  * mortars, aim bursts) goes as ticks after the snapshot's; x and y only when
  * it's off the straight line from the muzzle (missiles). The hue is the owner's,
@@ -1495,8 +1533,8 @@ interface PackedSnapshot { type: 'snapshot'; t: number; lp: number; e?: unknown[
  */
 function packProjectile(s: EntityState, tick: number): (number | null)[] | null {
   const d = s.data;
-  if (!d || d.length !== 10 || s.angle !== undefined || s.hp !== undefined || s.name !== undefined) return null;
-  const row: (number | null)[] = [s.id, s.vx ?? 0, s.vy ?? 0, d[0], tick - d[3], d[4], d[5], d[6],
+  if (!d || (d.length !== 10 && d.length !== 11) || s.angle !== undefined || s.hp !== undefined || s.name !== undefined) return null;
+  const row: (number | null)[] = [s.id, s.vx ?? 0, s.vy ?? 0, d[0], tick - d[3], d[4], d[5], d[6], (d[10] ?? -1) >= 0 ? d[10] : null,
     d[1] === 1 ? null : d[1], d[7] === 1 ? null : d[7], d[8] === 0 ? null : d[8], d[9] ? d[9] - tick : null, s.x ?? null, s.y ?? null];
   while (row[row.length - 1] === null) row.pop();
   return row;
@@ -1506,10 +1544,10 @@ function unpackProjectile(r: (number | null)[], tick: number): EntityState {
   const owner = r[7] as number;
   const s: EntityState = {
     id: r[0] as number, type: EntityType.Projectile, vx: r[1] as number, vy: r[2] as number,
-    data: [r[3] as number, r[8] ?? 1, (owner * 137) % 360, tick - (r[4] as number), r[5] as number, r[6] as number, owner, r[9] ?? 1, r[10] ?? 0,
-      r[11] != null ? tick + r[11] : 0],
+    data: [r[3] as number, r[9] ?? 1, (owner * 137) % 360, tick - (r[4] as number), r[5] as number, r[6] as number, owner, r[10] ?? 1, r[11] ?? 0,
+      r[12] != null ? tick + r[12] : 0, r[8] ?? -1],
   } as EntityState;
-  if (r[12] != null) { s.x = r[12]; s.y = r[13] as number; }
+  if (r[13] != null) { s.x = r[13]; s.y = r[14] as number; }
   return s;
 }
 

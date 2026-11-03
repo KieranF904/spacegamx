@@ -47,6 +47,10 @@ export interface ServerCtx {
   /** Every connection is an admin (proto) / guests are admins (dev server) */
   readonly everyoneAdmin: boolean;
   readonly guestAdmin: boolean;
+  /** The join caps this server takes (common network/hits.ts CAPS) */
+  readonly netCaps: number;
+  /** Confirmed hits: a client's HP copy put right (hpResync) */
+  readonly hits: { resync(conn: ClientConnection, ids: readonly unknown[]): void };
   /** The ECS world (handlers only read components from it) */
   readonly world: IWorld;
   /** The hangar opens anywhere (proto) */

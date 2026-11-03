@@ -38,6 +38,8 @@ export const MESSAGE_LIMITS: Readonly<Record<string, Limit>> = {
   pilotInfo: { per: 120, burst: 20 },
   // A ship's whole design resent (a client entering a crowded system asks for many at once)
   shipNeed: { per: 1200, burst: 200 },
+  // Every part's HP of a few ships resent (confirmed hits: a client whose copy is off)
+  hpResync: { per: 600, burst: 20 },
 };
 
 class Bucket {

@@ -23,7 +23,7 @@ export interface ShipHost {
   removeBody(eid: number): void;
   /** A projectile weapon's shot (kind = tuning.weapons key), spawned exactly at (x, y). `target` is a homing target (or -1). */
   /** Returns the shells' entity ids, in spawn order */
-  fireBaseShot(ownerEid: number, x: number, y: number, angle: number, damageScale: number, shape?: { speedScale: number; sizeScale: number; turret: boolean; kind?: string; target?: number; seed?: string; mods?: WeaponMods; dry?: boolean; ammoMods?: WeaponMods; reach?: number; grade?: number; size?: number; model?: WeaponMods }): number[] | void;
+  fireBaseShot(ownerEid: number, x: number, y: number, angle: number, damageScale: number, shape?: { speedScale: number; sizeScale: number; turret: boolean; kind?: string; target?: number; seed?: string; mods?: WeaponMods; dry?: boolean; ammoMods?: WeaponMods; reach?: number; grade?: number; size?: number; model?: WeaponMods; gun?: number }): number[] | void;
   /** A shot's damage against shields and hull (pulse lasers), if it has its own */
   shotVs?(proj: number): { shield?: number; hull?: number; hit?: HitInfo; bane?: { faction: string; damage: number } } | undefined;
   /** Where a hazard bites: beam heat or shield regeneration × this (1 where nothing does) */
@@ -45,8 +45,11 @@ export interface ShipHost {
   beamAsteroid?(eid: number, x: number, y: number, angle: number, range: number, damage: number, kind: string): number;
   /** `glancing`: the hit barely got through the armour it struck (a gun too weak for it) */
   notifyDamage(targetEid: number, amount: number, sourceEid: number, glancing?: boolean): void;
-  /** A projectile hit something at (x, y) */
-  notifyProjectileHit(proj: number, x: number, y: number): void;
+  /**
+   * A projectile hit something at (x, y). A shell's hit on a ship says what it did (`hit`: the part it struck, the
+   * damage, glancing, what a shield took, the ship's rebuild count): confirmed hits (net/hits/HitLedger.ts)
+   */
+  notifyProjectileHit(proj: number, x: number, y: number, hit?: { target: number; part: number; dealt: number; glancing: boolean; soak: number; rebuilds: number }): void;
   /**
    * Ship bodies whose bounding circles may come within `pad` of a segment (the
    * tick's broadphase; beams cast through it). Absent: every body is tried.

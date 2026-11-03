@@ -29,6 +29,7 @@ import {
   jumpFieldAt, fieldRangeBoost, fieldCharge, primeBoost, pilotJumpStep, withEmp, lodestonePosition, type JumpField, type LodestoneData,
   ShipReplicaSet, ServerSnapshotMessage, ServerDebrisSplitMessage, deriveSplit, unpackIds, unpackRuns, computeJoins, DEBRIS_STATUS, type DebrisShape, type Vec2,
   packCursorWeaponState, rebuildVolley, WEAPON_KIND_TYPE, EntityState, accelAlong, turnAccel, rateShip, stepGuns, volleyShells, firesStraight, partWeaponDef,
+  type ServerHitsMessage, type ServerHpCheckMessage,
 } from '@space-game/common';
 import type { MenuShipInfo } from '../ui/GameMenuUI';
 import type { GameState, InterpolatedEntity } from '../state/GameState';
@@ -49,6 +50,7 @@ import { IncomingWarning } from '../ui/IncomingWarning';
 import type { ShellLook } from '../rendering/weapons/WeaponFx';
 import { AUG } from '../rendering/weapons/weaponStyles';
 import { hitSurface } from './hitSurface';
+import { ConfirmedHits } from './hits/ConfirmedHits';
 import type { PilotState } from '../econ/clientEcon';
 import type { ThrustCommand } from './ThrusterFx';
 import { settings } from '../settings/Settings';
@@ -246,6 +248,43 @@ export class ShipClient {
         return e ? { x: e.renderX, y: e.renderY } : null;
       },
       (id) => this.debrisShape(id));
+    this.hits = new ConfirmedHits({
+      store: this.store,
+      // (a shell from a gun: its row's data[10], or its fire event's part packing, preSnapshot)
+      shell: (id) => {
+        const e = opts.state.entities.get(id), d = e?.data;
+        if (!e || e.type !== EntityType.Projectile || !d || !((d[10] ?? -1) >= 0)) return null;
+        return { owner: d[6], gun: d[10], spawnTick: e.spawnTick ?? d[3], x: e.spawnX ?? d[4], y: e.spawnY ?? d[5], vx: e.vx, vy: e.vy };
+      },
+      pose: (id, tick) => {
+        const st = this.replicas.at(id, tick);
+        if (st) return st.body;
+        const e = opts.state.entities.get(id);
+        return e ? { x: e.x, y: e.y, angle: e.angle } : null;
+      },
+      send: (m) => opts.send(m),
+    });
+  }
+
+  /** Confirmed hits (docs/design/confirmed-hits.md): what the server's records came to, worked out here */
+  readonly hits: ConfirmedHits;
+  /** The tick of the snapshot last applied (a confirmed hit's tick counts back from it) */
+  private snapTick = 0;
+
+  /**
+   * A confirmed hits message (ships/hits/ConfirmedHits.ts): the messages the server would have sent go through
+   * `handle` (the usual handlers draw them), then the hull bars, then the spent shells go
+   */
+  onHits(msg: ServerHitsMessage, handle: (m: ServerMessage) => void): void {
+    const r = this.hits.expand(msg, this.snapTick);
+    for (const m of r.msgs) handle(m);
+    for (const id of r.ships) this.fillHull(id);
+    for (const id of r.gone) this.opts.state.removeShell(id);
+  }
+
+  /** The server's check of a ship's HP as this client should have it */
+  onHpCheck(msg: ServerHpCheckMessage): void {
+    this.hits.check(msg);
   }
 
   /** Debris worked out here (debrisSplit) to confirm on the next input ([id, check, ...]: InputSend takes them) */
@@ -355,6 +394,7 @@ export class ShipClient {
    * replicated pose and its blueprint: common/src/ships/launch.ts)
    */
   preSnapshot(m: ServerSnapshotMessage): EntityState[] {
+    this.snapTick = m.tick;
     this.replicas.apply(m.tick, m.ships, m.ctl);
     const out: EntityState[] = [];
     // (Debris worked out here since the last snapshot: its rows, as the server would have sent them)
@@ -416,7 +456,8 @@ export class ShipClient {
         const age = m.tick - spawnTick;
         out.push({
           id: s.id, type: EntityType.Projectile, x: s.x + s.vx * age, y: s.y + s.vy * age, vx: s.vx, vy: s.vy,
-          data: [WEAPON_KIND_TYPE[v.kind] ?? 1, grade, (owner * 137) % 360, spawnTick, s.x, s.y, owner, s.size, v.turret ? 1 : 0],
+          // (no end; the gun as the fire event packs it, which a confirmed hit works out from: data[10])
+          data: [WEAPON_KIND_TYPE[v.kind] ?? 1, grade, (owner * 137) % 360, spawnTick, s.x, s.y, owner, s.size, v.turret ? 1 : 0, 0, partAmmo],
         });
       }
     }
@@ -927,6 +968,7 @@ export class ShipClient {
         return true;
       case 'snapshot':
         for (const id of msg.removed) this.store.remove(id);
+        this.hits.forget(msg.removed);
         return false;
     }
     return false;

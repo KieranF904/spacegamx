@@ -17,6 +17,7 @@ import {
   endsAtAim, aimReach, buildShot,
 } from '@space-game/common';
 import { K, BEAM_PAD, GLANCING, type BridgeCtx, type PendingSalvoShell } from './core.js';
+import { lastHurtSoak } from './damage.js';
 import { fireBeamHook, tickWeaponHooks } from '../features/weapons.js';
 
 export function lastFiredTick(b: BridgeCtx, eid: number): number {
@@ -221,11 +222,13 @@ export function fireWeapons(b: BridgeCtx, eid: number, ship: ShipState, firing: 
     // (A ports ship's augmented shot: its augment's mods on the round's, power/ports.ts)
     const mods = stackMods(round?.mods, aug);
     const damageScale = shot.damageScale * b.damageMul(eid) * (round?.scale ?? 1);
+    // (A straight flyer's shells carry their gun, packed as its fire event's part: clients work their hits out from it)
+    const straight = firesStraight(d), ammo = round?.item ? ammoCode(round.item) : 0;
     // (A shell that ends at the aim flies the aim distance: a lobbed mortar's, an aim burst's, a walking salvo's first)
     const ids = b.host.fireBaseShot(eid, shot.x, shot.y, shot.angle, damageScale,
       { speedScale: shot.speedScale, sizeScale: shot.sizeScale, turret: shot.mount === 'turret', kind: w.kind, target: lock, seed: `${eid}:${ship.blueprint.parts[w.part].uid}`, mods: gunMods, dry: round?.dry, ammoMods: mods,
-        reach: endsAtAim(d) ? aimReach(aimDist, d, 0) : undefined, grade: w.grade, size: w.size, model: w.model });
-    if (ids?.length && firesStraight(d)) b.fired.push({ owner: eid, tick, part: w.part, aimQ, ids, ...(round?.item ? { ammo: ammoCode(round.item) } : {}), ...(aug ? { aug: 1 as const } : {}) });
+        reach: endsAtAim(d) ? aimReach(aimDist, d, 0) : undefined, grade: w.grade, size: w.size, model: w.model, gun: straight ? w.part + 256 * ammo + (aug ? 65536 : 0) : undefined });
+    if (ids?.length && straight) b.fired.push({ owner: eid, tick, part: w.part, aimQ, ids, ...(round?.item ? { ammo } : {}), ...(aug ? { aug: 1 as const } : {}) });
     // A rippling salvo: the rest of its shells, `gap` ticks apart, on the same lock
     if (d.salvo && d.salvo.count > 1) {
       let list = b.salvos.get(eid);
@@ -498,8 +501,9 @@ export function hitProjectile(
   if (!best) return null;
   const hx = x0 + (x1 - x0) * best.t, hy = y0 + (y1 - y0) * best.t;
   const dealt = b.hurt(best.eid, best.ship, best.part, Projectile.damage[proj], ownerId, { ...b.host.shotVs?.(proj), at: b.worldToGrid(best.eid, best.ship, hx, hy) });
-  b.host.notifyDamage(best.eid, dealt, ownerId, b.lastThrough < GLANCING);
-  b.host.notifyProjectileHit(proj, hx, hy);
+  const glancing = b.lastThrough < GLANCING;
+  b.host.notifyDamage(best.eid, dealt, ownerId, glancing);
+  b.host.notifyProjectileHit(proj, hx, hy, { target: best.eid, part: best.part, dealt, glancing, soak: dealt > 0 ? lastHurtSoak() : 0, rebuilds: best.ship.rebuilds });
   return { eid: best.eid, x: hx, y: hy, part: best.part };
 }
 

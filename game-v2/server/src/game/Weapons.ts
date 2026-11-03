@@ -35,6 +35,12 @@ export interface WeaponsHost {
   remove(eid: number): void;
   /** Mining yield and hardness for a weapon's shots (asteroids) */
   miningTool(kind: string, turret: boolean): { yield: number; hardness: number };
+  /**
+   * What a shell's hit on a ship sets off that a client can work out itself (its fire, a pierce pass's flash, its end's
+   * burst): confirmed hits (net/hits/HitLedger.ts) take it, and send it on to whoever still needs telling. False:
+   * broadcast it as ever
+   */
+  hitFx?(proj: number, msg: ServerMessage): boolean;
 }
 
 interface Extra {
@@ -65,7 +71,7 @@ export class Weapons {
    * which clients use to build the same volley from a fire event.
    */
   spawn(owner: number, kind: string, x: number, y: number, angle: number, damageScale: number,
-    shape: { speedScale: number; sizeScale: number; turret: boolean; target?: number; noBurst?: boolean; seed?: string; index?: number; mods?: WeaponMods; dry?: boolean; ammoMods?: WeaponMods; reach?: number; grade?: number; size?: number; model?: WeaponMods; intercept?: boolean }, out?: number[]): number {
+    shape: { speedScale: number; sizeScale: number; turret: boolean; target?: number; noBurst?: boolean; seed?: string; index?: number; mods?: WeaponMods; dry?: boolean; ammoMods?: WeaponMods; reach?: number; grade?: number; size?: number; model?: WeaponMods; intercept?: boolean; gun?: number }, out?: number[]): number {
     const w = this.host.world;
     // The gun's own mods (gems), then its ammunition's, its grade's and its size's: the same as the pilot's client builds the shells from (launch.ts gunDef)
     const full = gunDef(this.tuning, kind, { mods: shape.mods, ammo: shape.ammoMods, grade: shape.grade, size: shape.size, model: shape.model });
@@ -111,6 +117,8 @@ export class Weapons {
     const stopAt = ends && def.hold ? this.host.tick() + Lifetime.remaining[eid] - def.hold : 0;
     // (and everyone is told when: projectile row data[9], in spawn + velocity × age terms)
     Projectile.endTick[eid] = stopAt || (ends ? this.host.tick() + Lifetime.remaining[eid] : 0);
+    // (The gun that fired it, as its fire event packs it: a client works out its hits from that, confirmed hits)
+    Projectile.gun[eid] = shape.gun ?? -1;
     InSystem.systemId[eid] = InSystem.systemId[owner];
     OwnedBy.ownerId[eid] = owner;
     // (A plain cannon shell has nothing to track: one with a grade's or a gem's changes does)
@@ -253,18 +261,18 @@ export class Weapons {
     if (x.def.ignite) {
       const ig = x.def.ignite;
       const part = this.ships.ignite(hit.eid, hit.x, hit.y, ig.dps * x.damageScale, ig.ticks, ig.radius, x.owner, this.hitOf(proj), hit.part ?? -1);
-      if (part >= 0) this.host.broadcast(InSystem.systemId[proj], { type: 'ignite', bodyId: hit.eid, part, ticks: ig.ticks });
+      if (part >= 0) this.atHit(proj, { type: 'ignite', bodyId: hit.eid, part, ticks: ig.ticks });
     }
     if (x.pierceLeft > 0) {
       x.pierceLeft--;
       x.hit.add(hit.eid);
       Projectile.damage[proj] *= pierceKeepOf(x.def);
       const fx = hitEndFx(x.kind, x.def, false);
-      if (fx) this.host.broadcast(InSystem.systemId[proj], { type: 'detonation', kind: fx.kind, x: Math.round(hit.x), y: Math.round(hit.y), radius: fx.radius });
+      if (fx) this.atHit(proj, { type: 'detonation', kind: fx.kind, x: Math.round(hit.x), y: Math.round(hit.y), radius: fx.radius });
       return false;
     }
     if (x.def.split) this.shatter(proj, x, hit);
-    this.detonate(proj, hit.x, hit.y);
+    this.detonate(proj, hit.x, hit.y, false, true);
     return true;
   }
 
@@ -342,7 +350,12 @@ export class Weapons {
     }
   }
 
-  private detonate(proj: number, px: number, py: number, overhead = false): void {
+  /** What a shell's hit on a ship sets off, that a client may work out itself (WeaponsHost.hitFx), else broadcast */
+  private atHit(proj: number, msg: ServerMessage): void {
+    if (!this.host.hitFx?.(proj, msg)) this.host.broadcast(InSystem.systemId[proj], msg);
+  }
+
+  private detonate(proj: number, px: number, py: number, overhead = false, atHit = false): void {
     const x = this.extras.get(proj);
     if (!x) return;
     this.extras.delete(proj);
@@ -354,7 +367,8 @@ export class Weapons {
     // (common hitRules.ts hitEndFx: bursts(def) says whether, and the radius)
     const fx = hitEndFx(x.kind, x.def, true);
     if (!fx) return;
-    this.host.broadcast(num, { type: 'detonation', kind: fx.kind, x: Math.round(px), y: Math.round(py), radius: fx.radius });
+    const msg: ServerMessage = { type: 'detonation', kind: fx.kind, x: Math.round(px), y: Math.round(py), radius: fx.radius };
+    if (atHit) this.atHit(proj, msg); else this.host.broadcast(num, msg);
   }
 }
 

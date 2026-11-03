@@ -218,6 +218,11 @@ const hurtMods: HitMods & { b: BridgeCtx | null; eid: number } = {
 };
 const hurtOut = newPartHit();
 
+/** What the shield took of the last hit `hurt` dealt (read straight after a hurt that dealt something) */
+export function lastHurtSoak(): number {
+  return hurtOut.soak;
+}
+
 /**
  * All weapon and impact damage to a ship part goes through here: the shield
  * soaks it first (and stops recharging for a while), the part takes the rest,

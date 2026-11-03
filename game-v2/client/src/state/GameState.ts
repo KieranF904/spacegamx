@@ -594,12 +594,24 @@ export class GameState {
 
   /** Shells made and removed by the same snapshot: removed with the next one (applySnapshot) */
   private lateRemovals: number[] = [];
+  /** Shells the snapshot last applied made (removeShell) */
+  private madeNow = new Set<number>();
+
+  /**
+   * A shell a confirmed hit ended (ships/hits/ConfirmedHits.ts), by the rule a snapshot's removal follows: gone now,
+   * or with the next snapshot if the one just applied made it (so its tracer and hit are drawn)
+   */
+  removeShell(id: number): void {
+    if (this.madeNow.has(id)) this.lateRemovals.push(id);
+    else this.entities.delete(id);
+  }
 
   /** States seen in a snapshot for entities created later in the same snapshot */
   private pendingHist = new Map<number, { tick: number; x: number; y: number; vx: number; vy: number; angle: number }>();
 
   applySnapshot(snapshot: ServerSnapshotMessage): void {
     this.serverTick = snapshot.tick;
+    this.madeNow.clear();
     const fired = this.preSnapshot?.(snapshot);
     if (fired?.length) snapshot.entities.push(...fired);
     
@@ -680,6 +692,7 @@ export class GameState {
         if (state.type === EntityType.Player && state.id !== this.playerId) { entity.status = state.data; entity.data = []; }
         
         if (state.type === EntityType.Projectile && state.data && state.data.length >= 6) {
+          this.madeNow.add(state.id);
           entity.spawnTick = state.data[3];
           entity.spawnX = state.data[4];
           entity.spawnY = state.data[5];

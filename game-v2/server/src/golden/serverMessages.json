@@ -22,6 +22,8 @@
   "effect",
   "gained",
   "hangar",
+  "hits",
+  "hpCheck",
   "items",
   "mapDots",
   "mapPing",

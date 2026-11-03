@@ -1,6 +1,6 @@
 # Confirmed hits (design, 2026-11-04)
 
-Status: **design, not built.** It is meant to be built from this file without re-deriving anything.
+Status: **built** (A: protocol 26; B: no wire change; C: protocol 27, on for the dev server only). What differs from the design is in the "as built" sections at the end; the measured result is docs/audits/confirmed-hits-impact-2026-11-04.md.
 
 Today the server works out every hit and sends the results: ~40 B a landed hit over four messages (`projectileHit`,
 the shell again in `removed`, `damage`, a `shipHps` entry), plus `ignite` and `detonation` as plain keyed objects. In
@@ -419,3 +419,54 @@ The rules now live in `common/src/ships/hitRules.ts`. The server calls them; its
   - `Weapons.vsOf` uses `shellVs` for shells with extras. A plain cannon shell keeps no extras and still gets just `{ hit }`.
   - `deriveShellHit` uses the passes *before* the hit for `gone` (spent when `passes >= pierce`), matching `onShipHit`. It leaves the view's shield alone, and sets the struck part's HP to the wire value. `hpAfter` is -1 when no part took the hit.
 - **Tests:** `common/src/ships/hitRules.test.ts` covers the small rules, `partHit` (plain hit, shield soak and break, splash, bane, taken, ruin floor), `coverPart` on Scrap Mother (stage cover, the boss's own share, the memo), and `deriveShellHit` against `partHit` for cannon, railgun, magma and flak with 0 and 1 passes.
+
+## Part C as built (2026-11-04, protocol 27)
+
+Built as designed, behind the switch: on for clients that announce it on the dev server, off everywhere else. A legacy
+client gets the same messages at the same moments (the Outbox's `skipCaps`). Differences from sections 3-5:
+
+- **Files.** New: `common/src/network/hits.ts` (`CAPS`, `ShellHitRecord`, `packHits`/`unpackHits`, `hpChecksum`),
+  `server/src/net/hits/HitLedger.ts`, `client/src/ships/hits/ConfirmedHits.ts`. `gunShell` (what a gun's shell is, from
+  the firing ship as both sides have it) went into hitRules.ts.
+- **Seams.** No new host calls: bridge `notifyProjectileHit` gained an optional `hit` argument (target, part, dealt,
+  glancing, soak, rebuild count), and Weapons sends the ignite, pierce flash and end detonation of a ship hit through an
+  optional `WeaponsHost.hitFx`. GameServer wires those to the ledger and calls `hits.end(proj)` where a shell is spent.
+  `lastHurtSoak()` (bridge/damage.ts) reads the shield's share of the last hit.
+- **The switch.** `join.caps`; the server keeps `capsOffered` (what it allows: `netCaps`), `capsNext` (join, or the
+  admin's `/hits on|off [name]`), and `caps` (in effect). `caps` changes only in `HitLedger.endSnapshot`, so no hit is
+  told both ways. `authResult.caps` (not `welcome`, which goes before the join) tells the client. The client's switch:
+  `?hits=1` or `?hits=0` (remembered in localStorage), else on in dev builds. No settings checkbox yet. `/hits` with
+  no on/off shows the ledger's counters.
+- **No ledger work without a capable client.** `shellHit` keeps nothing and broadcasts as before unless some client had
+  HITS when the snapshot window began.
+- **Damage.** `flushDamage` sends the sums to legacy clients and holds them (`heldDamage`) for capable ones, which get
+  theirs in `write`: a sum the records cover entirely isn't sent (the client sums the records); a sum with something
+  else in it too (a blast) goes as ever, and the records with that sum get `D = 0` so the number isn't shown twice.
+- **The plan runs in the snapshot loop**, after the syncs and before the removed list: it needs the shells the client
+  has (its rows, now or before, and this snapshot's fire events) and must leave the spent ones out of `removed`. The
+  derivation runs there too, on `Object.create(liveShip)` with `hp` = `shipHpSent` and no shield, so `shipHpSent` is
+  updated in place.
+- **The old way, per client.** A hit goes the old way (to that client alone, after its snapshot) when: the target
+  rebuilt since the hit or isn't synced or in view; the shell has no gun or the client never had it; the shooter isn't
+  synced; it's out of range; the gun is gone; the end the client would draw isn't what the server sent (a dry round,
+  out of ammunition, has no effects); a fire's length differs.
+- **The record's point of impact** is worked out on the client: the shell's line from the tick before the hit to the
+  tick after, cast against the struck part at the replica's pose for the hit's tick; if that misses, the point of the
+  line nearest the part's middle. `deriveShellHit` runs with no `at` on both sides (a boss's cover then picks by the
+  struck part's middle; the shipHps fixes any difference).
+- **The shell's end.** `GameState.removeShell` follows the snapshot rule: removed now, or with the next snapshot if the
+  one just applied made it.
+- **hpCheck**: one ship a second from those worked out since their last check; `hpResync` takes up to 32 ids, limited to
+  10 a second.
+
+Tests: `server/src/net/hits/confirmedHits.test.ts` (parity, nine fights, both clients compared after every snapshot),
+`common/src/network/hits.test.ts` (packing, a 1,000-batch fuzz through the binary codec, the checksum), round trips in
+protocol.test.ts. Golden changes on purpose: `frameHash.golden.json` (the frames carry the gun on projectile rows; the
+world hash changes only because `Projectile.gun` is a new component field, and matches the old one with it left out),
+`serverMessages.json` (`hits`, `hpCheck`), `clientMessages.json` (`hpResync`). `parity.golden.json` and
+`shipBridgeApi.json` did not change.
+
+Measured (docs/audits/confirmed-hits-impact-2026-11-04.md): the shooter's bytes fall 23% with Pips, 19% in the
+Hammerhead fight and 33% in the Gale fight (deflated: 25%, 16%, 21%). The client's own sums needed the server's number
+on 12 of 1,832 records. The main loss left is hits on ships that rebuilt before the snapshot (24% in the Hammerhead
+fight), which go the old way; that is the next step, not another hidden input.

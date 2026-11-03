@@ -354,6 +354,9 @@ const TABLE: Handlers = {
     h.toasts.show(`Next: ${msg.text}`, 'info');
   },
   damage,
+  // (Confirmed hits: each record handled as the messages it stands for, ships/hits/ConfirmedHits.ts)
+  hits: (h, msg) => { h.shipClient.onHits(msg, (m) => handleServerMessage(h, m)); },
+  hpCheck: (h, msg) => { h.shipClient.onHpCheck(msg); },
   projectileHit: (h, msg) => {
     h.renderer.showProjectileHit(msg.id, msg.x, msg.y);
     h.audio.play('hit', msg.x, msg.y, { pitch: 0.85 + Math.random() * 0.3, volume: 0.7 });

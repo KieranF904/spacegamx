@@ -85,4 +85,12 @@ export interface ClientConnection {
   selfSentTick: number;
   /** Hash of its ship's state at each recent tick (the client checks its prediction against these) */
   selfHashes: Map<number, number>;
+  /**
+   * What it can do beyond the base protocol (common network/hits.ts CAPS): `capsOffered` what its join announced and
+   * this server allows, `capsNext` what it's switched to (join, the admin's `hits` command), `caps` what's in effect
+   * (switched at a snapshot's end: net/hits/HitLedger.ts). Absent: none
+   */
+  caps?: number;
+  capsNext?: number;
+  capsOffered?: number;
 }

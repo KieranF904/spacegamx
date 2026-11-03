@@ -37,6 +37,7 @@ import type { ServerFeatures } from '../ships/features/host.js';
 import { stationQuery } from '../game/Docking.js';
 import { portalQuery } from './handlers/flight.js';
 import { SELF_SAFETY_TICKS, SNAP_PROJECTILE_RANGE, SNAP_POD_RANGE, SHIP_VIEW_IN, SHIP_VIEW_OUT, MAP_DOTS_TICKS, DEBRIS_ACK_TICKS } from './snapshot/constants.js';
+import type { HitLedger } from './hits/HitLedger.js';
 
 /** A debris body's status row as its key (rowKey): what a client makes itself for debris it works out (common ships/debris.ts) */
 const DEBRIS_ROW_KEY = DEBRIS_STATUS.join(',');
@@ -127,6 +128,8 @@ export interface SnapshotHost {
   readonly pendingRemovedEntities: Map<number, number>;
   /** Each pilot's entities as last sent (playerId -> entity id -> key) */
   readonly lastEntityStates: Map<number, Map<number, string>>;
+  /** Confirmed hits (net/hits/HitLedger.ts): a capable client's records, after its snapshot and before its HP */
+  readonly hits?: HitLedger | null;
 }
 
 export class SnapshotBuilder {
@@ -159,6 +162,7 @@ export class SnapshotBuilder {
   private readonly lingering: ReadonlyMap<number, { conn: ClientConnection; until: number }>;
   private readonly pendingRemovedEntities: Map<number, number>;
   private readonly lastEntityStates: Map<number, Map<number, string>>;
+  private readonly hits: HitLedger | null;
   /** The server itself, for its tick (read, never held) */
   private readonly ticks: { readonly currentTick: number };
 
@@ -190,6 +194,7 @@ export class SnapshotBuilder {
     this.lingering = host.lingering;
     this.pendingRemovedEntities = host.pendingRemovedEntities;
     this.lastEntityStates = host.lastEntityStates;
+    this.hits = host.hits ?? null;
     this.ticks = ticks;
   }
 
@@ -242,8 +247,12 @@ export class SnapshotBuilder {
     return next;
   }
 
-  private sendShipUpdates(conn: ClientConnection, systemId: number): void {
-    for (const id of conn.shipSynced.keys()) {
+  /**
+   * `syncs` and `hps`: a client taking confirmed hits gets its syncs before its snapshot (as everyone does) and its HP
+   * after its records (HitLedger: they bring its copy up to date first), so the two go separately
+   */
+  private sendShipUpdates(conn: ClientConnection, systemId: number, syncs = true, hps_ = true): void {
+    if (syncs) for (const id of conn.shipSynced.keys()) {
       if (!this.ships.has(id)) { conn.shipSynced.delete(id); conn.shipHpSent.delete(id); }
     }
     const hps: [number, [number, number][]][] = [];
@@ -254,8 +263,9 @@ export class SnapshotBuilder {
       const ship = this.ships.bodies.get(id);
       if (!ship || InSystem.systemId[id] !== systemId || conn.debrisHeld.has(id)) continue;
       let synced = conn.shipSynced.get(id);
+      if (!syncs && !synced) continue;
       // A refit or respawn replaces the ShipState (its rebuild count restarts), so compare both
-      if (!synced || synced.ship !== ship || synced.rebuilds !== ship.rebuilds) {
+      if (syncs && (!synced || synced.ship !== ship || synced.rebuilds !== ship.rebuilds)) {
         const fresh = !synced || synced.ship !== ship;
         synced = { ship, rebuilds: ship.rebuilds };
         conn.shipSynced.set(id, synced);
@@ -283,6 +293,7 @@ export class SnapshotBuilder {
           ghosts: sync.ghosts,
         });
       }
+      if (!hps_ || !synced) continue;
       // HP for the visuals: to a tenth, and only what changed (nothing to look at if it hasn't changed since this client was last brought up to date)
       const wire = this.hpWireOf(id, ship);
       const at = synced.hpAt;
@@ -417,10 +428,11 @@ export class SnapshotBuilder {
       const vx = Math.round(Velocity.x[eid] * 100) / 100, vy = Math.round(Velocity.y[eid] * 100) / 100;
       // data: [weaponType, tier, hue (golden-angle hash of the owner), spawnTick, spawnX, spawnY, ownerId, sizeScale, turret,
       // endTick (a shell that ends at a chosen point: the tick it lands or bursts, 0 none: Weapons.spawn)]
+      // (data[10]: the gun that fired it, packed as a fire event's part, -1 none: a client works its hits out from it, HitLedger)
       const data = [
         Projectile.weaponType[eid], Projectile.tier[eid], (ownerId * 137) % 360, Projectile.spawnTick[eid],
         Math.round(Projectile.spawnX[eid] * 10) / 10, Math.round(Projectile.spawnY[eid] * 10) / 10,
-        ownerId, Math.round((Projectile.sizeScale[eid] || 1) * 100) / 100, Projectile.turret[eid], Projectile.endTick[eid],
+        ownerId, Math.round((Projectile.sizeScale[eid] || 1) * 100) / 100, Projectile.turret[eid], Projectile.endTick[eid], Projectile.gun[eid],
       ];
       // Where it is goes only if the client can't work it out (spawn + velocity × age: see GameState)
       const x = Math.round(Position.x[eid] * 100) / 100, y = Math.round(Position.y[eid] * 100) / 100;
@@ -570,7 +582,10 @@ export class SnapshotBuilder {
         }
       }
       // Ship structure: full sync on first sight and after every rebuild, HP deltas otherwise
-      this.sendShipUpdates(conn, playerSystemId);
+      // (A client taking confirmed hits: its HP after its records, below; first, what it'll make of each hit)
+      const hitsOn = !!this.hits?.wants(conn);
+      this.sendShipUpdates(conn, playerSystemId, true, !hitsOn);
+      const gone = hitsOn ? this.hits!.plan(conn, (id) => prevStates.has(id) || newStates.has(id) || covered.has(id)) : null;
 
       // Stations — sent once per system (they never move)
       for (const eid of stationQuery(this.world)) {
@@ -603,6 +618,8 @@ export class SnapshotBuilder {
       // made itself (debris it worked out: conn.debrisHeld). A shell 60 km off it never had costs it nothing
       const removed: number[] = [];
       for (const [eid] of this.pendingRemovedEntities) {
+        // (a shell a confirmed hit ends: the record says so)
+        if (gone?.has(eid)) continue;
         // (Debris it worked out: held, or confirmed but its row not yet counted as sent, debrisRowOk: it has it all the same)
         const made = conn.debrisHeld.delete(eid) || conn.debrisRowOk.delete(eid);
         if (!prevStates.has(eid) && !conn.knownEntities.has(eid) && !made) continue;
@@ -614,9 +631,12 @@ export class SnapshotBuilder {
       // HUD numbers (fuel, XP) once a second, whether or not anything else goes
       if (this.currentTick % 60 === 0) this.sendPlayerState(conn);
 
-      const shouldSend = conn.forceSnapshot || entities.length > 0 || removed.length > 0 || rep.ships.length > 0 || rep.ctl.length > 0 || out.length > 0 || fire.length > 0;
+      // (Records count from the snapshot they follow: one always goes with them)
+      const shouldSend = conn.forceSnapshot || entities.length > 0 || removed.length > 0 || rep.ships.length > 0 || rep.ctl.length > 0 || out.length > 0 || fire.length > 0
+        || (hitsOn && this.hits!.pending(conn));
       if (!shouldSend) {
         this.lastEntityStates.set(conn.playerId, newStates);
+        if (hitsOn) this.afterHits(conn, playerSystemId);
         continue;
       }
 
@@ -635,6 +655,7 @@ export class SnapshotBuilder {
       conn.forceSnapshot = false;
       conn.lastSnapshotSentTick = this.currentTick;
       this.lastEntityStates.set(conn.playerId, newStates);
+      if (hitsOn) this.afterHits(conn, playerSystemId);
     }
 
     // Clear pending removed entities after sending to all clients
@@ -642,6 +663,7 @@ export class SnapshotBuilder {
     for (const [eid] of this.pendingRemovedEntities) {
       for (const conn of this.clients.values()) conn.knownEntities.delete(eid);
     }
+    this.hits?.removed(this.pendingRemovedEntities.keys());
     this.pendingRemovedEntities.clear();
     this.ships.debrisNet.afterSnapshot((id) => this.ships.has(id));
     this.replication.endSnapshot();
@@ -654,6 +676,13 @@ export class SnapshotBuilder {
   }
 
   private lastMapDotsTick = -Infinity;
+
+  /** A client taking confirmed hits, after its snapshot: its records (and what goes the old way), then its HP, then a check */
+  private afterHits(conn: ClientConnection, systemId: number): void {
+    this.hits!.write(conn);
+    this.sendShipUpdates(conn, systemId, false, true);
+    this.hits!.check(conn);
+  }
 
   /** Debris confirmations: right, wrong (sent in full instead), and never (sent in full when its time ran out) */
   readonly debrisAcks = { ok: 0, wrong: 0, late: 0, gone: 0 };

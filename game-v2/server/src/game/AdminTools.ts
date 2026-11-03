@@ -22,6 +22,9 @@ export interface AdminConn {
   username: string;
   isAdmin: boolean;
   ping: number;
+  /** Join caps in effect, and switched to (common network/hits.ts CAPS: confirmed hits) */
+  caps?: number;
+  capsNext?: number;
   /** Contributor rank (ContributorNotes) */
   isContributor?: boolean;
   /** Their account (null: a guest) */
@@ -72,6 +75,10 @@ export interface AdminHost {
   freeBuildAllowed?(): boolean;
   /** Someone's free build was switched on or off: tell their hangar */
   freeBuildChanged?(c: AdminConn): void;
+  /** Confirmed hits on or off for someone (false: their client didn't offer them, or the server doesn't take them) */
+  setHits?(c: AdminConn, on: boolean): boolean;
+  /** Confirmed hits' counters (net/hits/HitLedger.ts) */
+  hitStats?(): { hits: number; records: number; legacy: number; d: number; s: number; i: number; checks: number; why: Record<string, number> };
 }
 
 type Args = Record<string, unknown>;
@@ -105,6 +112,7 @@ const HELP = [
   '/announce text · /who · F2: admin panel · F3: teleport to the cursor',
   '/contributor name on|off (the contributor rank: map notes, F6) · /contributors (who has it)',
   '/freebuild [on|off] (dev servers: place any part in the hangar, nothing taken)',
+  '/hits [on|off] [name] (confirmed hits: the network test switch; no on/off: the counters)',
   '/players [name] (online or not) · /rank name player|contributor|admin · /ban name 1h|1d|7d|perm [reason] · /unban name',
   'Party: /p message · /invite name · /leave · /kick name · /promote name',
 ];
@@ -293,6 +301,19 @@ export class AdminTools {
         if (on) this.freeBuilders.add(me); else this.freeBuilders.delete(me);
         this.host.freeBuildChanged?.(me);
         return { ok: true, text: `Free build ${on ? 'on: place any part in the hangar, and saves take nothing' : 'off'}` };
+      }
+
+      case 'hits': {
+        // Confirmed hits (docs/design/confirmed-hits.md): switch someone's, or show the counters
+        const t = target();
+        if (a.on === undefined || a.on === '') {
+          const st = this.host.hitStats?.();
+          const on = !!((t.capsNext ?? t.caps ?? 0) & 1);
+          return { ok: true, text: `Confirmed hits ${on ? 'on' : 'off'} for ${t.username}${st ? ` · hits ${st.hits}, records ${st.records}, old way ${st.legacy} ${JSON.stringify(st.why)}, D ${st.d} S ${st.s} I ${st.i}, checks ${st.checks}` : ''}` };
+        }
+        const on = onOff(a.on, false);
+        if (!this.host.setHits?.(t, on)) return { ok: false, text: `${t.username}'s client didn't offer confirmed hits (or this server doesn't take them)` };
+        return { ok: true, text: `Confirmed hits ${on ? 'on' : 'off'} for ${t.username} (from the next snapshot)` };
       }
 
       case 'heal': {
@@ -572,6 +593,10 @@ export class AdminTools {
         return { cmd, args: { on: flag, player: a[0] } };
       }
       case 'freebuild': return { cmd, args: { on: a[0] } };
+      case 'hits': {
+        const flag = a[0] === 'on' || a[0] === 'off' ? a.shift() : undefined;
+        return { cmd, args: { on: flag, player: a[0] } };
+      }
       case 'credits': case 'xp': case 'skillpoints': return { cmd, args: { n: a[0], player: a[1] } };
       case 'codex': return { cmd, args: a.length > 1 ? { player: a[0], what: a[1] } : { what: a[0] } };
       case 'give': {

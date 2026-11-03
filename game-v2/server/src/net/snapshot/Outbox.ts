@@ -105,11 +105,12 @@ export class Outbox {
     this.lazy.clear();
   }
 
-  broadcastToSystem(systemId: number, msg: ServerMessage): void {
+  /** `skipCaps`: leave out the clients with any of these caps on (confirmed hits: they're told their own way) */
+  broadcastToSystem(systemId: number, msg: ServerMessage, skipCaps = 0): void {
     // An effect only for the eye and ear (LAZY_TYPES) that happens somewhere goes only to clients near enough to see it
     if (LAZY_TYPES.has(msg.type)) {
       const at = fxPoint(msg);
-      if (at) { this.broadcastNear(systemId, at[0], at[1], msg); return; }
+      if (at) { this.broadcastNear(systemId, at[0], at[1], msg, [], skipCaps); return; }
     }
     const data = encodeServerMessage(msg);
     const byteLen = this.getMessageByteLength(data);
@@ -118,7 +119,7 @@ export class Outbox {
       // (System first: the cheapest check, and it rules out most)
       if (InSystem.systemId[client.playerId] !== systemId) continue;
       if (!client.ws.isOpen() || !hasComponent(this.world, Player, client.playerId)) continue;
-      
+      if (skipCaps && (client.caps ?? 0) & skipCaps) continue;
       this.queue(client.ws, data, LAZY_TYPES.has(msg.type));
       sent++;
     }
@@ -140,32 +141,64 @@ export class Outbox {
     else this.damageSums.set(key, { sys: systemId, target, source, glancing, amount });
   }
 
+  /**
+   * The sums the last flushDamage held back from the clients it skipped (`skipCaps`: confirmed hits work out their
+   * own share, net/hits/HitLedger.ts write): theirs to send, until the next flush
+   */
+  heldDamage: { sys: number; target: number; source: number; glancing: boolean; amount: number }[] = [];
+
   /** The damage summed since the last snapshot: out with it (just before the snapshot, so it rides that frame) */
-  flushDamage(): void {
+  flushDamage(skipCaps = 0): void {
+    this.heldDamage = skipCaps ? [...this.damageSums.values()] : [];
     for (const e of this.damageSums.values()) {
       const amount = Math.round(e.amount * 10) / 10;
       if (amount <= 0) continue;
-      this.broadcastNear(e.sys, Position.x[e.target], Position.y[e.target], { type: 'damage', targetId: e.target, amount, sourceId: e.source, ...(e.glancing ? { glancing: true } : {}) }, [e.source]);
+      this.broadcastNear(e.sys, Position.x[e.target], Position.y[e.target], damageMessage(e, amount), [e.source], skipCaps);
     }
     this.damageSums.clear();
   }
 
-  broadcastProjectileHit(proj: number, x: number, y: number): void {
-    this.broadcastNear(InSystem.systemId[proj], x, y, { type: 'projectileHit', id: proj, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 });
+  broadcastProjectileHit(proj: number, x: number, y: number, skipCaps = 0): void {
+    this.broadcastNear(InSystem.systemId[proj], x, y, projectileHitMessage(proj, x, y), [], skipCaps);
   }
 
   /** Clients in a system near a point (combat effects: nobody further out has the ships involved) */
-  broadcastNear(systemId: number, x: number, y: number, msg: ServerMessage, also: number[] = []): void {
+  broadcastNear(systemId: number, x: number, y: number, msg: ServerMessage, also: number[] = [], skipCaps = 0): void {
     const data = encodeServerMessage(msg);
     for (const client of this.clients.values()) {
       if (InSystem.systemId[client.playerId] !== systemId) continue;
       if (!client.ws.isOpen() || !hasComponent(this.world, Player, client.playerId)) continue;
       const pid = client.playerId;
       if (Math.hypot(Position.x[pid] - x, Position.y[pid] - y) > FX_RANGE && !also.includes(pid)) continue;
+      if (skipCaps && (client.caps ?? 0) & skipCaps) continue;
       this.queue(client.ws, data, LAZY_TYPES.has(msg.type));
       this.snapshotBytesSent += this.getMessageByteLength(data);
     }
   }
+
+  /** Would broadcastNear send this client something (in the system, near the point, or `also`)? */
+  nearClient(client: ClientConnection, systemId: number, x: number, y: number, also = -1): boolean {
+    if (InSystem.systemId[client.playerId] !== systemId) return false;
+    if (!client.ws.isOpen() || !hasComponent(this.world, Player, client.playerId)) return false;
+    const pid = client.playerId;
+    return Math.hypot(Position.x[pid] - x, Position.y[pid] - y) <= FX_RANGE || pid === also;
+  }
+
+  /** One client's copy of what broadcastToSystem sends (a confirmed hit gone the old way after all) */
+  sendAsSystem(client: ClientConnection, systemId: number, msg: ServerMessage): void {
+    const at = LAZY_TYPES.has(msg.type) ? fxPoint(msg) : null;
+    if (at ? this.nearClient(client, systemId, at[0], at[1]) : InSystem.systemId[client.playerId] === systemId && client.ws.isOpen() && hasComponent(this.world, Player, client.playerId)) this.send(client.ws, msg);
+  }
+}
+
+/** A damage sum's message, as flushDamage sends it */
+export function damageMessage(e: { target: number; source: number; glancing: boolean }, amount: number): ServerMessage {
+  return { type: 'damage', targetId: e.target, amount, sourceId: e.source, ...(e.glancing ? { glancing: true } : {}) };
+}
+
+/** A shell's hit point, as broadcastProjectileHit sends it */
+export function projectileHitMessage(proj: number, x: number, y: number): ServerMessage {
+  return { type: 'projectileHit', id: proj, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
 }
 
 /** Where an effect happens: its own x, y, or the entity it's about (a part catching fire, a station firing). null: nowhere in particular */

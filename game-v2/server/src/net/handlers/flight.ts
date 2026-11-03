@@ -35,6 +35,10 @@ export function registerFlightHandlers(t: HandlerRegistry): void {
     ctx.inputQueue.push({ conn, msg });
   });
   t.on('ping', handlePing);
+  // (Confirmed hits: its copy of these ships' HP is off, so all of it goes again: net/hits/HitLedger.ts)
+  t.on('hpResync', (ctx, conn, msg) => {
+    if (Array.isArray(msg.ids)) ctx.hits.resync(conn, msg.ids);
+  });
   t.on('mapView', (ctx, conn, msg) => {
     // (Opened: the far ships at once, then once a second while it's open)
     conn.mapOpen = msg.open === true;

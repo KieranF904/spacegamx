@@ -18,6 +18,7 @@ import { createShipBridge } from './proto/createProtoServer.js';
 import { createProfileStore } from './profile/index.js';
 import { contribFileStore } from './game/contribFiles.js';
 import { worldFileStore } from './game/SystemMemory.js';
+import { CAPS } from '@space-game/common';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dataPath = join(__dirname, '../../data');
@@ -79,6 +80,8 @@ const gameServer = new GameServer({
   devRange: DEV_MODE ? loadRangeConfig(dataPath) : undefined,
   // Everyone (guests and signed-in pilots) is an admin on the dev server (never in production: GameServer refuses it there too)
   guestAdmin: DEV_MODE,
+  // Confirmed hits for clients that offer them (docs/design/confirmed-hits.md): the dev server; NET_CAPS (a bit mask) elsewhere
+  netCaps: process.env.NET_CAPS !== undefined ? Number(process.env.NET_CAPS) || 0 : DEV_MODE ? CAPS.HITS : 0,
   // Admins may build anything in the hangar for free (the admin panel's switch; never in production: GameServer refuses it there too)
   freeBuild: DEV_MODE,
   // Every pilot joins and respawns in the dev Rockery (data/dev/rockery.json), not Sol (never in production: GameServer refuses it there too)

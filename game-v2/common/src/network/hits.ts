@@ -1,0 +1,96 @@
+/**
+ * Confirmed hits (docs/design/confirmed-hits.md, part C): the server tells a capable client only "shell s hit part p
+ * of ship t", and the client works out the rest (damage, part HP, fire, the hit point, the shell's end) with the
+ * shared rules (ships/hitRules.ts). This file is the wire side: the per-player switch, the record and its packing,
+ * and the HP checksum the server checks a client's copy against.
+ */
+
+/**
+ * What a client can do beyond the base protocol, announced in `join.caps` (a bit mask). The server accepts only the
+ * bits it allows (GameServer netCaps). Later islands take the next bits.
+ */
+export const CAPS = { HITS: 1 } as const;
+
+/** One shell's hit on a ship, as a capable client is told it */
+export interface ShellHitRecord {
+  /** The shell's entity id */
+  shell: number;
+  /** The snapshot's tick minus the hit's (0-7: older ones say 7) */
+  ago: number;
+  /** The ship it hit */
+  target: number;
+  /** The part it struck (as the shot's line met it: before a boss's cover) */
+  part: number;
+  /** The shell is spent (removed now; not in the snapshot's removed list) */
+  gone: boolean;
+  /** It barely got through the armour (the damage number shows glancing) */
+  glancing: boolean;
+  /** D: the damage dealt × 10, when the client's own sum would be wrong (0: show no number, a damage message has it) */
+  d10?: number;
+  /** S: a shield took some of it (the client leaves the HP alone: the shipHps after it has them) */
+  shield?: boolean;
+  /** I: the part set burning, when the client's rule would pick another (-1: none) */
+  ignite?: number;
+}
+
+// Meta bits: ago (0-2), a target follows, gone, glancing, extras follow. Always under 128: one byte
+const M_AGO = 7, M_NEW = 8, M_GONE = 16, M_GLANCE = 32, M_EXTRA = 64;
+// Extras: D follows, S, I follows (bit 3 is kept for an explicit hit point: curving shells, later)
+const X_D = 1, X_S = 2, X_I = 4;
+
+/**
+ * Records as one flat list of integers, in the order given: per hit the shell id as the step from the last one,
+ * the meta byte, the target (only when it changes), the struck part, then the extras when there are any
+ */
+export function packHits(recs: readonly ShellHitRecord[]): number[] {
+  const h: number[] = [];
+  let shell = 0, target = -1;
+  for (const r of recs) {
+    const x = (r.d10 !== undefined ? X_D : 0) | (r.shield ? X_S : 0) | (r.ignite !== undefined ? X_I : 0);
+    const fresh = r.target !== target;
+    h.push(r.shell - shell, Math.max(0, Math.min(M_AGO, r.ago | 0)) | (fresh ? M_NEW : 0) | (r.gone ? M_GONE : 0) | (r.glancing ? M_GLANCE : 0) | (x ? M_EXTRA : 0));
+    if (fresh) h.push(r.target);
+    h.push(r.part);
+    if (x) {
+      h.push(x);
+      if (r.d10 !== undefined) h.push(r.d10);
+      if (r.ignite !== undefined) h.push(r.ignite);
+    }
+    shell = r.shell;
+    target = r.target;
+  }
+  return h;
+}
+
+/** packHits undone. A list cut short or malformed gives the records read so far */
+export function unpackHits(h: readonly number[]): ShellHitRecord[] {
+  const out: ShellHitRecord[] = [];
+  let i = 0, shell = 0, target = -1;
+  const int = (v: unknown) => typeof v === 'number' && Number.isInteger(v);
+  while (i + 1 < h.length) {
+    const ds = h[i], m = h[i + 1];
+    if (!int(ds) || !int(m) || m < 0) break;
+    let j = i + 2;
+    if (m & M_NEW) { if (!int(h[j])) break; target = h[j++]; }
+    if (target < 0 || !int(h[j])) break;
+    const r: ShellHitRecord = { shell: shell + ds, ago: m & M_AGO, target, part: h[j++], gone: !!(m & M_GONE), glancing: !!(m & M_GLANCE) };
+    if (m & M_EXTRA) {
+      const x = h[j++];
+      if (!int(x)) break;
+      if (x & X_D) { if (!int(h[j])) break; r.d10 = h[j++]; }
+      if (x & X_S) r.shield = true;
+      if (x & X_I) { if (!int(h[j])) break; r.ignite = h[j++]; }
+    }
+    out.push(r);
+    shell = r.shell;
+    i = j;
+  }
+  return out;
+}
+
+/** A ship's part HP (on the wire's tenth) as one number, for the server to check a client's copy: Σ round(hp × 10) × (i + 1) mod 65536 */
+export function hpChecksum(hp: readonly number[]): number {
+  let s = 0;
+  for (let i = 0; i < hp.length; i++) s = (s + Math.round(hp[i] * 10) * (i + 1)) % 65536;
+  return s < 0 ? s + 65536 : s;
+}
