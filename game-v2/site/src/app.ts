@@ -9,6 +9,7 @@
  *   POST /updates/:slug/comments   comment (signed in); `image` (an image's src in the post) puts it on that image;
  *                                  with Accept: application/json it answers { ok, id, item } (the list item's HTML)
  *   GET  /rss.xml                  RSS 2.0
+ *   GET  /guides                   the guides (Markdown files in site/guides: src/guides.ts);  GET /guides/:slug  one guide
  *   GET  /suggestions[?sort=&status=]  POST /suggestions   POST /suggestions/:id/vote
  *   GET  /shoutbox/stream (SSE)    POST /shoutbox    POST /shoutbox/:id/delete (admin)
  *   GET  /signin /register         POST them;  POST /signout
@@ -38,6 +39,7 @@ import type { SiteConfig } from './config.js';
 import type { html } from './html.js';
 import { HttpError, readBody, readFields, redirect, Router, safeNext, sendHtml, sendJson, str, type Params } from './http.js';
 import type { Lobby, LobbyUser } from './lobby.js';
+import { GuideBook } from './guides.js';
 import { renderMarkdown } from './markdown.js';
 import { BOARDS, type PilotSource } from './pilots.js';
 import { postImages } from './postImages.js';
@@ -53,6 +55,7 @@ import type { Post, SiteStore, SuggestionStatus } from './store/types.js';
 import { SUGGESTION_STATUSES } from './store/types.js';
 import { contentType, MAX_UPLOAD_BYTES, Uploads } from './uploads.js';
 import * as A from './views/admin.js';
+import * as G from './views/guides.js';
 import type { PageCtx } from './views/layout.js';
 import * as V from './views/pages.js';
 
@@ -103,6 +106,7 @@ export function createApp(deps: AppDeps) {
   const limiter = deps.limiter ?? new RateLimiter();
   const csrf = new Csrf(cfg.secret);
   const hub = new ShoutHub(store);
+  const guides = new GuideBook(cfg.guidesDir, cfg.production);
   const sessions = new Map<string, { user: LobbyUser | null; until: number }>();
   const router = new Router<Ctx>();
 
@@ -217,6 +221,16 @@ export function createApp(deps: AppDeps) {
   }
 
   router.get('/updates/:slug', async (ctx, p) => showPost(ctx, p.slug));
+
+  // ------------------------------------------------------------ guides
+
+  router.get('/guides', async (ctx) => page(ctx, 200, G.guidesIndexPage(ctx.page, await guides.all())));
+
+  router.get('/guides/:slug', async (ctx, p) => {
+    const hit = /^[a-z0-9-]{1,60}$/.test(p.slug) ? await guides.get(p.slug) : null;
+    if (!hit) { page(ctx, 404, V.notFoundPage(ctx.page, 'guide')); return; }
+    page(ctx, 200, G.guidePage(ctx.page, hit));
+  });
 
   router.post('/updates/:slug/comments', async (ctx, p) => {
     const user = requireUser(ctx);

@@ -9,6 +9,7 @@
  *   SITE_DATA_DIR        ../data/site   (site.json, uploads/)
  *   SITE_PROFILES_DIR    ../data/profiles  (read-only)
  *   SITE_STATUS_FILE     ../data/status/live.json  (read-only)
+ *   SITE_GUIDES_DIR      ./guides  (the guides: Markdown files)
  *   SITE_TRUST_PROXY     1 behind nginx: the visitor's address from X-Forwarded-For / X-Real-IP
  *   LOBBY_URL            http://localhost:8787
  *   LOBBY_ADMIN_SECRET   dev: the lobby's dev secret (admin account tools); production: required, the lobby's own
@@ -43,6 +44,8 @@ export interface SiteConfig {
   profilesDir: string;
   statusFile: string;
   publicDir: string;
+  /** The guides: Markdown files (src/guides.ts) */
+  guidesDir: string;
   lobbyUrl: string;
   lobbyAdminSecret: string;
   game: { mode: 'proxy' | 'static' | 'link'; devUrl: string; indexFile: string; url: string };
@@ -77,6 +80,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): SiteConfig {
     profilesDir: path.resolve(env.SITE_PROFILES_DIR || path.join(root, 'data/profiles')),
     statusFile: path.resolve(env.SITE_STATUS_FILE || path.join(root, 'data/status/live.json')),
     publicDir: path.resolve(here, '../public'),
+    guidesDir: path.resolve(env.SITE_GUIDES_DIR || path.join(here, '../guides')),
     lobbyUrl: (env.LOBBY_URL || 'http://localhost:8787').replace(/\/$/, ''),
     lobbyAdminSecret: env.LOBBY_ADMIN_SECRET || (production ? '' : 'dev-lobby-admin-secret'),
     game: {

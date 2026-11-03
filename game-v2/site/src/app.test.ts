@@ -116,11 +116,27 @@ describe('site routes', () => {
     expect(home.headers.get('content-security-policy')).toContain("script-src 'self'");
     expect(home.headers.get('x-frame-options')).toBe('DENY');
     expect(home.text).toContain('2 pilots online');
-    for (const p of ['/updates', '/suggestions', '/pilots', '/signin', '/register', '/rss.xml']) expect((await b.page(p)).status, p).toBe(200);
+    for (const p of ['/updates', '/guides', '/suggestions', '/pilots', '/signin', '/register', '/rss.xml']) expect((await b.page(p)).status, p).toBe(200);
     expect((await b.page('/nope')).status).toBe(404);
     const r = await b.signin('admin', 'admin');
     expect(r.status).toBe(303);
     expect(r.headers.getSetCookie().find((c) => c.startsWith('sg_session='))).toMatch(/HttpOnly; Max-Age=/);
+  });
+
+  it('guides: the list, one guide with its contents and neighbours, an unknown one is a 404', async () => {
+    const b = new Browser();
+    const list = await b.page('/guides');
+    expect(list.status).toBe(200);
+    expect(list.text).toContain('Getting started');
+    expect(list.text).toContain('href="/guides/energy-and-ports"');
+    const one = await b.page('/guides/energy-and-ports');
+    expect(one.status).toBe(200);
+    expect(one.text).toContain('<h2 id="banks">');
+    expect(one.text).toContain('href="#banks"');
+    expect(one.text).toContain('Previous');
+    expect(one.text).not.toContain('TODO');
+    expect((await b.page('/guides/nope')).status).toBe(404);
+    expect((await b.page('/guides/..%2f..%2fREVIEW')).status).toBe(404);
   });
 
   it('register, comment (escaped), suggest, vote once, shout with limits', async () => {
