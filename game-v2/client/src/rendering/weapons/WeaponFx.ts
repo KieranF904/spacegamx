@@ -19,7 +19,9 @@
  * tick it predicts (common/src/ships/guns.ts), from the same barrel with the
  * same spread (predict). When the server's copy arrives it takes over the
  * shell already flying (same tick, same spawn, same heading), so hits stop it;
- * one the server never fired fades out after CONFIRM_TICKS.
+ * one the server never fired fades out after CONFIRM_TICKS. A shell fired and
+ * spent between two snapshots never arrives: its hit takes the predicted shell
+ * on its line instead (adopt).
  *
  * Everything is pooled sprites of painted textures (fxTextures.ts), so a frame
  * only moves and fades them; only an EMP orb's crackle is drawn as lines.
@@ -161,6 +163,16 @@ export function impactScale(size: number): number {
 const BARREL_EASE = 8;
 /** A predicted shell the server hasn't confirmed by then was never fired: it fades */
 const CONFIRM_TICKS = 60;
+/**
+ * A hit on a shell of yours no snapshot ever brought takes the predicted shell whose line passes within this of the hit
+ * point (WeaponFx.adopt; a predicted line is the server's to a fraction of a unit when the prediction holds)...
+ */
+const ADOPT_REACH = 30;
+/**
+ * ...whose head, on your timeline, passed the hit at most this many ticks ago (your timeline runs ahead of the server's by
+ * the input lead; the hit is told a snapshot window, a lazy message or a coalescing hold after it happened)
+ */
+const ADOPT_TICKS = 40;
 
 /** A pending hit still waiting for its shell's head after this many frames lands anyway */
 const PENDING_FRAMES = 40;
@@ -378,10 +390,11 @@ export class WeaponFx {
       f.angle = o.renderAngle + f.rel;
     }
 
-    // Hits that came ahead of their shells (the message before the snapshot that brought them): theirs now, else just a mark
+    // Hits that came ahead of their shells (the message before the snapshot that brought them): theirs now; a shell of
+    // yours this client never had, the one you fired on that line (adopt); else just a mark
     if (this.early.length) {
       for (const h of this.early) {
-        const s = this.shots.get(h.id);
+        const s = this.shots.get(h.id) ?? this.adopt(h, presentTick);
         if (s) this.strike(s, h.x, h.y); else this.impactAt(undefined, h.x, h.y);
       }
       this.early.length = 0;
@@ -930,6 +943,33 @@ export class WeaponFx {
     this.shots.delete(best.id);
     best.id = e.id;
     best.predicted = false;
+    return best;
+  }
+
+  /**
+   * A hit on a shell this client never saw (h.id unknown after the snapshot it came with): one of yours that was fired
+   * and spent between two snapshots, so no row ever brought it (a fast shell at close range: most Spark bolts inside
+   * about 350), or one that came and went in a single coalesced message. Its predicted shell is flying still: without
+   * this it was never claimed and flew on through what it hit to the end of its reach. The hit takes the predicted shell
+   * whose line runs through the hit point (within ADOPT_REACH) and whose head, on your timeline (`present`), has got
+   * there, not more than ADOPT_TICKS ago; of several (a stream from one gun lies along one line; twin turrets cross at
+   * the aim), the oldest, as the hits come in firing order.
+   */
+  private adopt(h: { id: number; x: number; y: number }, present: number): Shot | null {
+    let best: Shot | null = null, bp = Infinity;
+    for (const s of this.shots.values()) {
+      if (!s.predicted || s.fading !== null || s.style.motion !== 'linear') continue;
+      const age = hitAge(s.spawnX, s.spawnY, s.vx, s.vy, h.x, h.y), flown = Math.min(present, s.endAt) - s.spawnTick;
+      if (age < -1 || age > flown + 1 || flown - age > ADOPT_TICKS) continue;
+      const off = Math.hypot(s.spawnX + s.vx * age - h.x, s.spawnY + s.vy * age - h.y);
+      if (off > ADOPT_REACH) continue;
+      if (!best || s.spawnTick < best.spawnTick - 0.5 || (Math.abs(s.spawnTick - best.spawnTick) <= 0.5 && off < bp)) { best = s; bp = off; }
+    }
+    if (!best) return null;
+    this.shots.delete(best.id);
+    best.id = h.id;
+    best.predicted = false;
+    this.shots.set(h.id, best);
     return best;
   }
 
