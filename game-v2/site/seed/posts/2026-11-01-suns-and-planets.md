@@ -4,7 +4,7 @@ tags: [graphics]
 status: published
 slug: suns-and-planets
 date: 2026-11-01
-summary: New suns, planets and sky, rebuilt from scratch and cheaper to draw; a new sign-in screen, the Citadel, asteroids and the Brood Mother.
+summary: New suns, planets and sky, rebuilt from scratch and cheaper to draw; a new sign-in screen, the Citadel, asteroids, and the first bosses.
 cover: ../../../docs/panels/site-posts/jovan-before-after.jpg
 ---
 
@@ -80,6 +80,24 @@ The asteroids now come in eighteen types across six materials: stone, ice, cryst
 
 ![The eighteen asteroid types](../../../docs/panels/site-posts/v12_panel.png)
 
-And there's a new boss on the way, the Brood Mother. Her look is done; her fight is still being built.
+I've also added some bosses: the Pyreclast, the Scrap Mother and the Brood Mother.
 
-![The Brood Mother](../../../docs/panels/site-posts/brood-mother.jpg)
+![The Pyreclast](../../../docs/panels/site-posts/boss-pyreclast.jpg)
+
+![The Scrap Mother](../../../docs/panels/site-posts/boss-scrap-mother.jpg)
+
+![The Brood Mother](../../../docs/panels/site-posts/boss-brood-mother.jpg)
+
+They each break apart, and have three stages, and each stage behaves differently. They haven't really been heavily play tested yet: the foundations are there, but more work has to be done.
+
+This is the Pyreclast. You break through its carapace, then the complete outer shell, then you fight a stripped metal chassis, then the core itself.
+
+![The Pyreclast whole, before a shot is fired](../../../docs/panels/site-posts/pyreclast-stage-1.jpg)
+
+![Its carapace breaking away, the frame underneath showing through](../../../docs/panels/site-posts/pyreclast-stage-1b.jpg)
+
+![The outer shell, once the carapace is gone](../../../docs/panels/site-posts/pyreclast-stage-2.jpg)
+
+![The shell wrecked down to its metal chassis](../../../docs/panels/site-posts/pyreclast-stage-2b.jpg)
+
+![The core itself](../../../docs/panels/site-posts/pyreclast-stage-3.jpg)
