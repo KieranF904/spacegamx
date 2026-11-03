@@ -160,7 +160,9 @@ class LsClient extends BaseClient {
     this.reports = []; this.hashes = null; this.lastAckSent = 0;
     this.delays = { on: new DelayMeter(), off: new DelayMeter() };
     this.st = { late: 0, entries: 0, exits: 0, pullIns: 0, corrections: 0, resim: 0, resimLast: 0, catchup: 0, maxBehind: 0,
-      reported: 0, hashSent: 0, steps: 0, injected: [], caught: [], counts: { mismatch: 0, missing: 0, spurious: 0, hash: 0, unseen: 0 } };
+      reported: 0, hashSent: 0, steps: 0, injected: [], caught: [], counts: { mismatch: 0, missing: 0, spurious: 0, hash: 0, unseen: 0 },
+      shownAi: { n: 0, wrong: 0, err: 0 }, shownPpl: { n: 0, wrong: 0, err: 0 } };
+    this.shown = new Map();     // tick -> Map uid -> [x, y] as the screen first showed it (scored when that tick is confirmed)
     this.sparks = []; this.seenFx = new Set(); this.recent = new Map();   // uid -> tick of its last event (for the silent pick)
   }
   start() { this.hello('lockstep', { every: this.every }); }
@@ -239,11 +241,25 @@ class LsClient extends BaseClient {
       else { const s = this.slotOf.get(e.tgt); if (s !== undefined) this.reports.push({ kind: IDK.SLOT, id: s, hash: Wo.eventHash8(e) }); }
     }
     if (b) this.apply(b, now);
+    this.scoreShown(W);
     if (W.tick % this.hashEvery === 0) {
       const list = [...this.slots.keys()].sort((a, c) => a - c).map((s) => { const e = W.byUid.get(this.slots.get(s)); return e ? Wo.fold8(Wo.entityHash(W, e)) : 0; });
       this.hashes = { tick: W.tick, list };
     }
     this.version++;
+  }
+  /** How far the screen was off: each ship (yours aside) as shown at this tick against the confirmed world. "Wrong" is
+   *  more than 2 units out. AIs and people are kept apart (people's held inputs are a guess by design). */
+  scoreShown(W) {
+    const sh = this.shown.get(W.tick);
+    for (const k of this.shown.keys()) { if (k <= W.tick) this.shown.delete(k); else break; }
+    if (!sh) return;
+    for (const s of W.ships) {
+      const p = s.uid !== this.uid && !s.dead && sh.get(s.uid);
+      if (!p) continue;
+      const m = s.kind === 'player' && !s.bot ? this.st.shownPpl : this.st.shownAi, d = Math.hypot(s.x - p[0], s.y - p[1]) / FX;
+      m.n++; m.err += d; if (d > 2) m.wrong++;
+    }
   }
   install(e, shells) {
     const W = this.conf;
@@ -271,10 +287,11 @@ class LsClient extends BaseClient {
       this.slots.set(x.slot, x.ent.uid); this.slotOf.set(x.ent.uid, x.slot); this.pulled.set(x.ent.uid, x.pulled);
       if (!again) { this.st.entries++; if (x.pulled) this.st.pullIns++; }
     }
-    // Orders: an AI's new target from the end of this tick (after the entries: the target may have just come in)
+    // Orders: an AI's next target, decided this tick, switched to ORDER_LEAD ticks later (after the entries: the target
+    // may have just come in)
     for (const o of b.ords) {
       const sh = W.byUid.get(this.slots.get(o.slot));
-      if (sh) sh.target = o.tgt ? this.slots.get(o.tgt - 1) ?? 0 : 0;
+      if (sh) { sh.nt = o.tgt ? this.slots.get(o.tgt - 1) ?? 0 : 0; sh.nat = b.tick + Wo.C.ORDER_LEAD; }
     }
     const setRock = (x) => {
       const R0 = W.rocks.list[x.id];
@@ -377,6 +394,11 @@ class LsClient extends BaseClient {
     }
     if (this.seenFx.size > 600) this.seenFx = new Set([...this.seenFx].slice(-300));
     this.dispTick = this.pred.tick;
+    if (!this.shown.has(this.pred.tick) && this.pred.tick > C) {
+      const m = new Map();
+      for (const s of this.pred.ships) if (!s.dead) m.set(s.uid, [s.x, s.y]);
+      this.shown.set(this.pred.tick, m);
+    }
     const me = this.pred.byUid.get(this.uid);
     if (me) this.delays[this.predOn ? 'on' : 'off'].shown(me.seq, now);
   }

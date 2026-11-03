@@ -357,7 +357,9 @@ function readouts(now) {
     h = `<h3>Desyncs caught</h3><table>
       <tr><td>mismatch</td><td class="n">${cn.mismatch}</td><td>missing</td><td class="n">${cn.missing}</td><td>spurious</td><td class="n">${cn.spurious}</td></tr>
       <tr><td>hash</td><td class="n">${cn.hash}</td><td>unseen</td><td class="n">${cn.unseen}</td><td>dropped</td><td class="n">${st.dropped}</td></tr></table>
-      <div class="dim">reports ${st.st.reported} sent${you ? `, server matched ${you.matched} of ${you.expected} expected` : ''}; "unseen" = hit from outside your set (one hop isn't always enough)</div><table>`;
+      <div class="dim">reports ${st.st.reported} sent${you ? `, server matched ${you.matched} of ${you.expected} expected` : ''}; "unseen" = hit from outside your set (pull-in missed it)</div>`;
+    const sw = (m) => (m.n ? `${(m.wrong / m.n * 100).toFixed(1)}% wrong, mean ${(m.err / m.n).toFixed(1)} u` : '-');
+    h += `<div class="dim">on screen vs confirmed (more than 2 u out): AIs ${sw(st.st.shownAi)}; people ${sw(st.st.shownPpl)}</div><table>`;
     for (const k of st.st.caught.slice(-6).reverse()) {
       h += `<tr><td class="${k.reason === 'unseen' ? 'dim' : 'warn'}">${k.reason}</td><td>${entName(k.key)}</td><td class="n">${k.ticks} t (${f0(k.ticks * TK)} ms)</td><td class="dim">${k.inj ? `${k.inj}: fixed ${f0(k.fixMs)} ms after` : ''}</td></tr>`;
     }

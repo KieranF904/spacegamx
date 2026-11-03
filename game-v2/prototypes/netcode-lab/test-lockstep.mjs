@@ -190,6 +190,8 @@ export async function run(NL) {
         t = play(h, t, kind === 'silent' ? 3500 : 2500);
         const caught = A.client.st.caught.find((x) => x.inj === kind);
         if (!caught) continue;
+        // (the right drift, caught the other way - e.g. an HP drift on a ship not hit again before the hash tick: another seed)
+        if (!want[kind].includes(caught.reason) && attempt < 5) continue;
         // Corrected: the entity matches the server again
         const cl = A.client, S = hist.get(cl.conf.tick), key = caught.key;
         const e = key >= 0 ? cl.conf.byUid.get(key) : null, s = key >= 0 && S ? S.byUid.get(key) : null;

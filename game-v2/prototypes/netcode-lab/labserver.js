@@ -36,7 +36,7 @@ class LabServer {
     this.hashLog = new Map();        // tick -> Map uid -> 8-bit state hash (every HASH_EVERY ticks)
     this.inter = new Map();          // uid -> [{T, other}] recent interactions (what a correction also snapshots)
     this.applied = new Map();        // this tick's people's inputs: uid -> { inp, changed, seq }
-    this.ordChanged = new Map();     // AIs whose order changed at the end of this tick: uid -> target uid
+    this.ordChanged = new Map();     // AIs given an order at the end of this tick: uid -> next target uid
     this.perf = { ms: 0, n: 0, last: 0 };
     this.populate(opts);
   }
@@ -242,7 +242,8 @@ class LabServer {
   }
 
   /** The commander half of every AI (server only, so plain floats are fine): what it is after. It runs at the end of a
-   *  tick; a change is an order, used from the next tick on, that goes to every client holding that AI. */
+   *  tick; a change is an order, switched to ORDER_LEAD ticks later, that goes to every client holding that AI. It judges
+   *  from the target the AI will have (a pending order's, if any). */
   commandAI(T) {
     const W = this.W;
     this.ordChanged.clear();
@@ -253,8 +254,8 @@ class LabServer {
     };
     for (const sh of W.ships) {
       if (sh.dead || (sh.kind === 'player' && !sh.bot)) continue;
-      const tg = sh.target ? W.byUid.get(sh.target) : null, b = this.bots.get(sh.uid);
-      let next = sh.target;
+      const cur = sh.nat ? sh.nt : sh.target, tg = cur ? W.byUid.get(cur) : null, b = this.bots.get(sh.uid);
+      let next = cur;
       if (sh.bot) {
         // A bot keeps the target it was given while that exists; otherwise the nearest ship, rechecked every 2 s
         if (b && b.fixed && W.byUid.has(b.fixed)) next = b.fixed;
@@ -266,19 +267,23 @@ class LabServer {
         // A freighter's turret takes the nearest drone within FR_SENSE, rechecked every second
         next = nearest(sh, C.FR_SENSE, (o) => o.kind === 'drone');
       }
-      if (next !== sh.target) { sh.target = next; this.ordChanged.set(sh.uid, next); }
+      if (next !== cur) { sh.nt = next; sh.nat = T + C.ORDER_LEAD; this.ordChanged.set(sh.uid, next); }
     }
   }
 
   // --------------------------------------------------------------------------------------- interaction pull-in
   /** What each entity needs a client to hold along with it this tick (server only, so plain floats): an AI needs its
-   *  target (its pilot flies against it); a ship needs the shooter of every live shell whose line can still reach it
+   *  target and its next one (its pilot flies against them), and each of those needs the AI (whatever is after something
+   *  comes in as soon as it picks it, before it acts); a ship needs the shooter of every live shell whose line can still reach it
    *  (the shooter comes with its shells), and so does a rock; a shooter needs the rocks its shells can reach, and a
    *  player the loot within reach. Rocks are keyed -1 - id. */
   needs() {
     const W = this.W, FX = Sim.FX, need = new Map();
     const add = (a, b) => { if (a !== b) (need.get(a) || need.set(a, new Set()).get(a)).add(b); };
-    for (const sh of W.ships) if (!sh.dead && sh.target && W.byUid.has(sh.target)) add(sh.uid, sh.target);
+    for (const sh of W.ships) {
+      if (sh.dead) continue;
+      for (const t of [sh.target, sh.nat ? sh.nt : 0]) if (t && W.byUid.has(t)) { add(sh.uid, t); add(t, sh.uid); }
+    }
     for (const p of W.shells) {
       const x0 = p.x / FX, y0 = p.y / FX, x1 = x0 + p.vx / FX * p.life, y1 = y0 + p.vy / FX * p.life;
       for (const sh of W.ships) {
@@ -402,8 +407,8 @@ class LabServer {
         if (!c.rocks.has(rk.id)) { c.rocks.add(rk.id); if (W.rockOv.has(rk.id)) { w.u8(R.ROCK); Pr.wRock(w, W, rk.id); } }
       } else c.rocks.delete(rk.id);
     }
-    // Orders: an AI this client holds took a new target at the end of this tick (one that entered now has it already).
-    // Its target is held: pull-in follows orders.
+    // Orders: an AI this client holds was given a next target at the end of this tick (one that entered now has it
+    // already). Its next target is held from now: pull-in follows orders.
     w.mark('orders');
     for (const [uid, tgt] of this.ordChanged) {
       const m = c.set.get(uid);

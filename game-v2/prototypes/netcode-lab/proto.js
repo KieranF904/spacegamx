@@ -15,7 +15,7 @@ const T = {
 };
 /** Records inside a bundle (one bundle per tick that has something in it, plus heartbeats). RCV: how many of your
  *  inputs the server had by this tick (low byte), sent only when it moved and only on a bundle going out anyway. ORD: an
- *  AI's new order from the end of this tick (its slot, its target's slot + 1, 0 for none) */
+ *  AI's order decided this tick, switched to ORDER_LEAD ticks later (its slot, its next target's slot + 1, 0 for none) */
 const R = { IN: 1, RCV: 2, ENTER: 3, EXIT: 4, CORR: 5, ROCK: 6, RCORR: 7, RDEAD: 8, LATE: 9, PULL: 10, GONE: 11, ORD: 12 };
 const REASON = { 1: 'mismatch', 2: 'missing', 3: 'spurious', 4: 'hash', 5: 'unseen' };
 const REASON_ID = { mismatch: 1, missing: 2, spurious: 3, hash: 4, unseen: 5 };
@@ -90,6 +90,7 @@ function wShip(w, sh, shells, T) {
   w.u16(sh.a); w.i16(sh.av); w.i32(sh.tur); w.u8(sh.gcd); w.u8(sh.tcd);
   w.u16(sh.hp); w.u16(sh.dead); w.u16(sh.boost); w.vu(sh.kills); w.vu(sh.deaths); w.u16(sh.shots);
   w.i32(sh.rng); w.vu(sh.target); w.u8(sh.aiFlip); w.i16(sh.hx); w.i16(sh.hy); w.i16(sh.wpx); w.i16(sh.wpy); w.u16(sh.cargo);
+  w.vu(sh.nt); w.u8(sh.nat ? sh.nat - T : 0);
   wInp(w, sh.inp);
   w.u8(shells.length);
   for (const p of shells) {
@@ -115,6 +116,7 @@ function rEntity(r, T) {
   sh.a = r.u16(); sh.av = r.i16(); sh.tur = r.i32(); sh.gcd = r.u8(); sh.tcd = r.u8();
   sh.hp = r.u16(); sh.dead = r.u16(); sh.boost = r.u16(); sh.kills = r.vu(); sh.deaths = r.vu(); sh.shots = r.u16();
   sh.rng = r.i32(); sh.target = r.vu(); sh.aiFlip = r.u8(); sh.hx = r.i16(); sh.hy = r.i16(); sh.wpx = r.i16(); sh.wpy = r.i16(); sh.cargo = r.u16();
+  sh.nt = r.vu(); const nat = r.u8(); sh.nat = nat ? T + nat : 0;
   sh.inp = rInp(r);
   const n = r.u8(), shells = [], tm = W.team(sh);
   for (let i = 0; i < n; i++) {

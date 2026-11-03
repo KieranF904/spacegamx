@@ -12,10 +12,12 @@
 // tracked entity touches is tracked too, and the event reports and hashes catch it when that wasn't enough.
 //
 // Every ship keeps the input it flew with this tick in sh.inp: a person's comes from outside, an AI's from its pilot.
-// An AI (drone, freighter, bot) has two halves. The commander, on the server only, decides what it is after: its target
-// (sh.target), set at the end of a tick and sent to clients as an order when it changes. The pilot, here, turns the order
-// into controls every 4 ticks on every copy, reading only the ship itself and its target, so a client that holds an AI
-// and its target flies it exactly; the server makes sure every client that holds an AI holds its target too.
+// An AI (drone, freighter, bot) has two halves. The commander, on the server only, decides what it is after: its next
+// target (sh.nt), decided at the end of a tick and switched to ORDER_LEAD ticks later (sh.nat), so the order, and the
+// target if a client didn't hold it, reach clients before the AI acts on it, even on their predicted screens. The pilot,
+// here, turns the order into controls every 4 ticks on every copy, reading only the ship itself and its target, so a
+// client that holds an AI and its target flies it exactly; the server makes sure every client that holds an AI holds its
+// target too (and the other way round: whatever is after something you hold comes in as soon as it picks it).
 (function (NL) {
 'use strict';
 const S = NL.Sim;
@@ -48,6 +50,7 @@ const C = {
   LOOT_LIFE: 1200, LOOT_BASE: 0x100000, LOOT_FR: Math.round(0.97 * FX),
   ROCK_RESPAWN: 5400,    // a destroyed rock comes back 90 s later, worked out from its destruction tick (no message)
   CELL: 500, GRID: 12,   // asteroids: one per 500-unit cell at most
+  ORDER_LEAD: 15,        // an AI switches target this many ticks after its commander decides (250 ms: a reaction time)
 };
 
 const rngRange = (s, lo, hi) => lo + (rngNext(s) % (hi - lo + 1));
@@ -93,7 +96,7 @@ function createWorld(seed, authority) {
 function makeShip(uid, kind, x, y, a) {
   return { uid, id: uid, kind, x: x * FX, y: y * FX, vx: 0, vy: 0, a: a & 0xFFFF, av: 0, tur: 0, gcd: 0, tcd: 0,
     hp: P.kinds[kind].hp, dead: 0, boost: P.boostMax, kills: 0, deaths: 0, seq: 0, shots: 0,
-    rng: Math.imul(uid, 0x9E3779B1) | 0 || 1, target: 0, aiFlip: 0, hx: x, hy: y, wpx: x, wpy: y, cargo: 0, bot: 0, inp: NEUTRAL };
+    rng: Math.imul(uid, 0x9E3779B1) | 0 || 1, target: 0, aiFlip: 0, hx: x, hy: y, wpx: x, wpy: y, cargo: 0, bot: 0, nt: 0, nat: 0, inp: NEUTRAL };
 }
 function index(W) { W.byUid.clear(); for (const s of W.ships) W.byUid.set(s.uid, s); for (const l of W.loot) W.byUid.set(l.uid, l); }
 const isLoot = (uid) => uid >= C.LOOT_BASE;
@@ -192,7 +195,7 @@ function respawn(sh) {
   else if (sh.kind === 'freighter') { x = rngRange(sh, -2500, 2500); y = rngRange(sh, -2500, 2500); sh.wpx = x; sh.wpy = y; }
   else { x = clamp((sh.x >> 16) + rngRange(sh, -700, 700), -2800, 2800); y = clamp((sh.y >> 16) + rngRange(sh, -700, 700), -2800, 2800); }
   sh.x = x * FX; sh.y = y * FX; sh.vx = sh.vy = sh.av = sh.tur = 0; sh.a = rngNext(sh) & 0xFFFF;
-  sh.hp = K.hp; sh.boost = P.boostMax; sh.target = 0; sh.gcd = sh.tcd = 0; sh.dead = 0;
+  sh.hp = K.hp; sh.boost = P.boostMax; sh.target = sh.nt = sh.nat = 0; sh.gcd = sh.tcd = 0; sh.dead = 0;
 }
 
 // ------------------------------------------------------------------------------------------------------------ one tick
@@ -232,6 +235,7 @@ function step(W, inputs) {
   for (const [id, o] of W.rockOv) if (o.dead && T - o.dead >= C.ROCK_RESPAWN) W.rockOv.delete(id);
   const born = [], bornLoot = [], back = [];
   for (const sh of W.ships) {
+    if (sh.nat && T >= sh.nat) { sh.target = sh.nt; sh.nt = sh.nat = 0; }   // (an order's switch comes due)
     const driven = sh.kind === 'player' && !sh.bot;
     if (driven) { const n = inputs && inputs.get(sh.uid); if (n) sh.inp = n; }
     if (sh.kind === 'player') sh.seq = sh.inp.seq || 0;   // (bookkeeping for the delay readout, dead or alive; not hashed)
@@ -307,7 +311,7 @@ function hasher() {
 }
 const fold8 = (h) => (h ^ (h >>> 8) ^ (h >>> 16) ^ (h >>> 24)) & 255;
 const FIELDS = ['uid', 'x', 'y', 'vx', 'vy', 'a', 'av', 'tur', 'gcd', 'tcd', 'hp', 'dead', 'boost', 'kills', 'deaths', 'shots', 'cargo',
-  'rng', 'target', 'aiFlip', 'wpx', 'wpy', 'bot'];
+  'rng', 'target', 'aiFlip', 'wpx', 'wpy', 'bot', 'nt', 'nat'];
 function mixShip(m, sh) {
   for (const k of FIELDS) m.mix(sh[k]);
   m.mix(sh.inp.b); m.mix(sh.inp.aim); m.mix(sh.inp.dist);
