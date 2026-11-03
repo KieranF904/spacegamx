@@ -297,6 +297,14 @@ export class HitLedger {
     return j;
   }
 
+  /**
+   * A shell sent to this client as a projectile row (not a fire event): its row is rounded, so a client finding its own
+   * hits doesn't put it on its tick-aligned layer (SelfHits.row), and its hits are told, as a shell told the old way
+   */
+  rowShell(conn: ClientConnection, id: number): void {
+    if (this.finds(conn)) this.oldWayOf(conn).add(id);
+  }
+
   /** A client's hit report (on its input): judged in its journal */
   report(conn: ClientConnection, rep: HitReport): void {
     if (!this.finds(conn) || typeof rep?.tick !== 'number' || typeof rep.hash !== 'number' || typeof rep.epoch !== 'number') return;

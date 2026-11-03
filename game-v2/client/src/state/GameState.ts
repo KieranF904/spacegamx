@@ -597,8 +597,9 @@ export class GameState {
 
   /**
    * The local ship's pose at the end of each recent tick, as predicted (and replayed after a correction, and as the
-   * server had it at a snapshot that corrected it). Where the server had it then, while the prediction held: what a
-   * confirmed hit on it (ConfirmedHits.hitPoint) and a fire event of its own guns (ShipClient.preSnapshot) count from
+   * server had it at a snapshot that corrected it). Where the server had it then, while the prediction held: where a
+   * told hit on it is drawn (ConfirmedHits.hitPoint). Cosmetic only: its own shells' fire events are built from its
+   * confirmed ship (its replica), never from this (ShipClient.preSnapshot)
    */
   private selfPoses = new Map<number, { x: number; y: number; angle: number; vx: number; vy: number }>();
 

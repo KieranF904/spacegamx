@@ -168,18 +168,23 @@ export class Replication {
   /**
    * One client's share: keyframes for ships it's new to or behind on, control
    * changes for the rest. `known` is the client's ship → keyframe version.
+   * `own`: its own ship too (CAPS.OWN_SHOTS): the very rows everyone else gets of
+   * it, so it has its ship as the server's shadow has it, tick by tick, beside its
+   * prediction (its own shells are built from that: SnapshotBuilder, ownShots.ts)
    */
-  forClient(systemId: number, self: number, known: Map<number, number>, snapshotTick: number, view?: Set<number>, held?: ReadonlyMap<number, unknown>): { ships: KeyframeRow[]; ctl: ControlRow[] } {
+  forClient(systemId: number, self: number, known: Map<number, number>, snapshotTick: number, view?: Set<number>, held?: ReadonlyMap<number, unknown>, own = false): { ships: KeyframeRow[]; ctl: ControlRow[] } {
     const ships: KeyframeRow[] = [];
     const ctl: ControlRow[] = [];
     for (const id of known.keys()) if (!this.shadows.has(id)) known.delete(id);
+    // (Not sent its own: what it has of it goes stale, so it starts again from a keyframe when it is)
+    if (!own) known.delete(self);
     // (A piece of debris knocked by one this client doesn't step, out of view or not had yet: what it has of it is off)
     if (view) {
       const steps = (x: number) => view.has(x) && (known.has(x) || !!held?.has(x));
       for (const [a, c] of this.knocks) { const sa = steps(a), sc = steps(c); if (sa !== sc) known.delete(sa ? a : c); }
     }
     for (const [eid, s] of this.shadows) {
-      if (eid === self || InSystem.systemId[eid] !== systemId) continue;
+      if ((eid === self && !own) || InSystem.systemId[eid] !== systemId) continue;
       // Debris it's working out itself (unconfirmed): nothing yet (SnapshotBuilder sends it all if it isn't confirmed)
       if (held?.has(eid)) continue;
       // Out of the client's view: nothing (and a keyframe when it comes back)

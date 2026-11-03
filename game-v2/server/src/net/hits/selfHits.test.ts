@@ -28,7 +28,8 @@ import { SelfHits } from '../../../../client/src/ships/hits/SelfHits.js';
 const dataDir = join(__dirname, '../../../../data');
 const files = readGameDataFiles(dataDir);
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
-const BOTH = CAPS.HITS | CAPS.SELF_HITS;
+// (Finding its own hits: its own shells as fire events too, from its confirmed ship; as rows they would be told, not found)
+const BOTH = CAPS.HITS | CAPS.SELF_HITS | CAPS.OWN_SHOTS;
 
 function withGuns(bp: Blueprint, from: string, fn: string): Blueprint {
   return { ...bp, parts: bp.parts.map((p) => (p.fn === from ? { ...p, fn } : p)) };

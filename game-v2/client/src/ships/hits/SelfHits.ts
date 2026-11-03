@@ -152,8 +152,8 @@ export class SelfHits {
   }
 
   /**
-   * A shell it was told of (a projectile row from a gun, or a fire event's, rebuilt): (x, y) where it is at the end of
-   * `spawnTick`, (vx, vy) its step. Only straight shells from a gun of a ship it has; once
+   * A shell it was told of by a fire event (rebuilt: exact): (x, y) where it is at the end of `spawnTick`, (vx, vy) its
+   * step. Only straight shells from a gun of a ship it has; once. (A row's shell isn't: row)
    */
   addShell(id: number, owner: number, gun: number, spawnTick: number, x: number, y: number, vx: number, vy: number, size = 1): void {
     // (The same shell told again stays as it is; an id the server used again, after its shell went unseen here, is a new shell)
@@ -166,8 +166,16 @@ export class SelfHits {
   }
 
   /**
-   * A shell told the old way (a projectileHit not from these hits): what it passed through isn't known here, so it's
-   * dropped; the server tells its hits from now on (HitLedger oldWayShells)
+   * A shell that came as a projectile row (not a fire event): rounded to the row's grid, so not exact here. It sits out
+   * till it's gone, and the server tells its hits (HitLedger.rowShell), as for one told the old way
+   */
+  row(id: number): void {
+    this.drop(id);
+  }
+
+  /**
+   * A shell told the old way (a projectile row, or a projectileHit not from these hits): what it passed through isn't
+   * known here, so it's dropped; the server tells its hits from now on (HitLedger oldWayShells)
    */
   drop(id: number): void {
     this.shells.delete(id);

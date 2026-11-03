@@ -279,12 +279,6 @@ export class ShipClient {
     });
   }
 
-  /** Your own ship's pose on a tick, as a fire event of yours needs it (its body: GameState.selfPoseAt) */
-  private selfFire(tick: number): { body: { x: number; y: number; angle: number; vx: number; vy: number } } | null {
-    const body = this.opts.state.selfPoseAt(tick);
-    return body ? { body } : null;
-  }
-
   /** A ship's side, as this client knows it (hitRules SIDE bits: who may hurt whom) */
   private sideOf(id: number): number {
     const { state } = this.opts;
@@ -373,9 +367,14 @@ export class ShipClient {
   afterSnapshot(m: ServerSnapshotMessage): void {
     this.findHits();
     if (this.selfHits.on) {
+      // (a fire event's shells, rebuilt exactly; a row's are rounded: they sit out, and the server tells their hits)
+      const fired = new Set<number>();
+      for (const f of m.fire ?? []) for (let i = 4; i < f.length; i++) fired.add(f[i]);
       for (const e of m.entities) {
         const d = e.data;
-        if (e.type === EntityType.Projectile && d && (d[10] ?? -1) >= 0) this.selfHits.addShell(e.id, d[6], d[10], d[3], d[4], d[5], e.vx ?? 0, e.vy ?? 0, d[7]);
+        if (e.type !== EntityType.Projectile) continue;
+        if (!fired.has(e.id)) this.selfHits.row(e.id);
+        else if (d && (d[10] ?? -1) >= 0) this.selfHits.addShell(e.id, d[6], d[10], d[3], d[4], d[5], e.vx ?? 0, e.vy ?? 0, d[7]);
       }
     }
     this.selfHits.onKeyframes(m.ships);
@@ -550,9 +549,9 @@ export class ShipClient {
         continue;
       }
       const ship = this.store.get(owner);
-      // (Your own shells (CAPS.OWN_SHOTS): from your ship as predicted on that tick, which is where the server had it while
-      // the prediction held; it sends rows instead for a window it corrects you in)
-      const st = owner === this.opts.state.playerId ? this.selfFire(tick) : this.replicas.at(owner, tick);
+      // (Your own shells too (CAPS.OWN_SHOTS): from your confirmed ship, replicated to you as to everyone, not your
+      // prediction: the tick-aligned layer counts from the server's ship. Your drawn shells are your prediction's, WeaponFx)
+      const st = this.replicas.at(owner, tick);
       if (!ship || !st) continue;
       this.chargeTells.delete(owner * 256 + part);
       this.tellSounds.delete(owner * 256 + part);

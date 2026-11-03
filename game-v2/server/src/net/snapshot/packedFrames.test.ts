@@ -30,7 +30,8 @@ const dataDir = join(__dirname, '../../../../data');
 const files = readGameDataFiles(dataDir);
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
 const PACKED = CAPS.PACKED | CAPS.COALESCE;
-const ALL = CAPS.HITS | CAPS.SELF_HITS | PACKED;
+// (Finding its own hits takes its own shells as fire events too: as rows they are told, not found)
+const ALL = CAPS.HITS | CAPS.SELF_HITS | PACKED | CAPS.OWN_SHOTS;
 
 /** Every packed message encoded is decoded on the side (a decoder per encoder) and compared with the base format */
 function teeEncoder() {

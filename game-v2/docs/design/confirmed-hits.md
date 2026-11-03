@@ -734,3 +734,62 @@ Measured (probe, shooter, caps 15 -> 31): own shell rows 434 -> 0 B/s with 198 B
 (Hammerhead), 437 -> 0 with 155 (Gale), 76 -> 0 with 38 (Pips); payload 951 -> 713, 1,093 -> 808, 322 -> 285;
 hash disagreements 2 -> 0, 4 -> 0, 1 -> 0; corrections 1 -> 0, 2 -> 0. Details: docs/audits/netcode-phase2-3-impact-2026-11-04.md,
 "Follow-up".
+
+### F3. Zero disagreements by construction (no protocol change)
+
+Kieran (2026-11-04): "There shouldn't be disagreements, if the tick aligned simulation is accurate, if something gets
+knocked, it's expected and replicated on both." And: "the visual shots should be predicted, but the simulation/damage
+etc should be from the tick accurate ship". So a client keeps two layers that never feed each other:
+
+| layer | what it is | where it comes from |
+|---|---|---|
+| **drawn** (cosmetic) | its own shells launched at once from its predicted ship, each stopped by the first surface it touches as drawn; told hits' impact points on its own ship | its prediction (`GameState.selfPoseAt`, WeaponFx) |
+| **tick-aligned** | every shell's line, every hit, damage, part HP, fire, the hit chain and its hash | the server's ticks: fire events built from replicas (its own ship's too), told records |
+
+The one link is the existing adopt/claim step: the server's (or the tick layer's) shell or hit takes over the drawn
+shell already flying, keeping the drawn line (WeaponFx.claim/adopt never move a drawn shell). dee6fd1 mixed them: its
+own fire events were built from `selfPoseAt`, so its own shells on the tick layer were exact only while its prediction
+held. Every disagreement left had a cause on the tick layer, each now removed rather than corrected:
+
+| cause | seen as | fix |
+|---|---|---|
+| a window searched before the frame's told records were read | debris: a shell the server said struck debris (or a keyframed ship, or the client's own) flew on, on the client's layer, into the hauler behind; a hit the server never had, then the client's HP off the server's copy and hits on parts the server had lost (28-32 disagreements, 16 corrections and 3 hpCheck mismatches a run) | `SelfHits.open` at the snapshot, `detect(told)` once: at its hits message with its records, or before anything after the snapshot that reads the HP (shipHps, shipHp, hpCheck, hitFix, netCaps, the frame's end). A told record for tick k is that shell's hit on k (the server's collision step takes one ship a tick, the nearest): its exclusion, its pass, its end (commit 3812fb1) |
+| the layer in f32, the server in f64 | a line a thousandth of a unit off: now and then the neighbouring part (D1's "f32" was wrong: Position, Velocity and Rotation are f64) | doubles, as the server (SelfHits, ConfirmedHits.hitPoint) (3812fb1) |
+| own shells from the prediction | exact only while the prediction held; a knock in the fire tick (boss blows, debris) put them off unflagged; with a prediction 5 units off, every own shell was off (Pips 106, Hammerhead 190, Gale 197, debris 182 disagreements) | the client is sent its **own ship's replication** (Replication.forClient `own`: the very keyframes and control rows everyone else gets of it; switched off, it starts again from a keyframe), and builds its own volleys from that replica at the fire tick, as every other ship's. A window its ship is keyframed in (a knock: the shadow left its path) goes as rows, as for any ship |
+| shells as projectile rows were on the layer | rows round spawn to 0.1 and velocity to 0.01: the caps-15 own-row disagreements (Hammerhead 2, Gale 2), and any row a keyframed window sends | a shell sent as a row is told on both sides: the server puts it in the client's told set (`HitLedger.rowShell`), the client sits it out (`SelfHits.row`); only fire events' shells, rebuilt bit for bit, are on the layer |
+
+"Confirmed own state" is therefore exactly the server's shadow of the pilot (the same `Replication` shadow that makes
+every other pilot's replica exact: stepped with the controls the real ship used, keyframed when a knock, a blast, an
+EMP or a rebuild moves it off), not "shadow plus acknowledged inputs" re-derived on the client: the replicated controls
+carry what the engines got (`ctlPower`), which only the server's charge knows, so the client couldn't derive them from
+its inputs without its prediction.
+
+Measured (probe, shooter, 20 s, 3 ticks each way; caps 31; "prediction off" = the fake's prediction moved by up to 5
+units and 0.05 rad, `predictionError`, cosmetic layer only):
+
+| scenario | disagreements before / after | prediction off: after (before) | corrections before / after | payload B/s before / after |
+|---|---|---|---|---|
+| Idle | 0 / 0 | 0 (0) | 0 / 0 | 152 / 152 |
+| 2 Pips | 0 / 0 | 0 (106) | 0 / 0 | 285 / 285 |
+| Hammerhead | 0 / 0 | 0 (190) | 0 / 0 | 713 / 716 |
+| Gale | 0 / 0 | 0 (197) | 0 / 0 | 808 / 808 |
+| Pirates fight | 0 / 0 | 0 (2) | 0 / 0 | 560 / 680 |
+| Scrap Mother | 0 / 0 | 0 (4) | 0 / 0 | 1,936 / 2,118 |
+| Debris | **32 / 0** | 0 (182) | 16 / 0 (hpCheck mismatches 3 / 0) | 2,011 / 1,962 |
+| Beam | 0 / 0 | 0 (0) | 0 / 0 | 307 / 307 |
+| Cruising | 0 / 0 | 0 (0) | 0 / 0 | 161 / 161 |
+
+- Every own shell built from a fire event is the server's bit for bit, with and without the prediction error (pips
+  160/160, Hammerhead 822/822, Gale 694/694, debris 813 of 820 checked, the rest spent inside the tick they were fired).
+- **The price is the own ship's replication**: its control rows and keyframes, Pirates +116 B/s of control rows,
+  boss +84 control and +97 keyframes (the boss's blows keyframe it, and the own row still corrects the prediction with
+  the same news), Hammerhead +3, debris +14 (debris is still 49 B/s down, from the hits no longer corrected). Two ways
+  down, not built: the own row could leave its motion out when an own keyframe goes with it (the prediction would take
+  the keyframe's lossless state), and the aim (q) of the own control rows could come from the client's own inputs when
+  they were applied on their target tick (most of the control bytes are aim changes).
+- caps 15 (no OWN_SHOTS): own shells are rows, so now told rather than found: 0 disagreements (Hammerhead 2, Gale 2
+  before) for 70-115 B/s more records (Hammerhead 951 -> 1,016, Gale 1,091 -> 1,182). caps 31 is the configuration.
+
+Tests: `ownShots.test.ts` (a forced correction and a prediction 6 units off change nothing: every own shell exact, 0
+disagreements; a knocked window's own shells go as rows and are told, 0 disagreements); `selfHits.test.ts` and
+`packedFrames.test.ts` finders now take OWN_SHOTS (as rows their own shells are told, not found).

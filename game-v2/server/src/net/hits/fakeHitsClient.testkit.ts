@@ -24,6 +24,11 @@ export interface FakeHitsOptions {
   drop?: (h: OwnHit) => boolean;
   /** Hand frames in later (the probe's latency): the frame goes to `deliver` instead of being handled at once */
   defer?: (data: Uint8Array) => void;
+  /**
+   * Its prediction off by this much on a tick (x, y, angle): the cosmetic layer only (where told hits on its own ship
+   * are drawn). Nothing on its tick-aligned layer may depend on it (the tests and the probe check that)
+   */
+  predictionError?: (tick: number) => { dx: number; dy: number; da: number } | null;
 }
 
 export class FakeHitsClient {
@@ -53,6 +58,8 @@ export class FakeHitsClient {
   /** Its own shells as projectile rows, and as fire events (CAPS.OWN_SHOTS: built from its own pose) */
   ownRows = 0;
   ownFired = 0;
+  /** Its own shells that came as rows (ids) */
+  readonly ownRowIds = new Set<number>();
   link: { receive(msg: ClientMessage): void } | null = null;
   /** What it sends the server (hpResync, reports), delivered after the step (a real socket is never re-entered) */
   outbox: ClientMessage[] = [];
@@ -113,7 +120,8 @@ export class FakeHitsClient {
   private noteSelf(): void {
     if (this.pid < 0) return;
     const t = this.server.getTick();
-    this.selfHist.set(t, { x: Position.x[this.pid], y: Position.y[this.pid], angle: Rotation.angle[this.pid], vx: Velocity.x[this.pid], vy: Velocity.y[this.pid] });
+    const e = this.opts.predictionError?.(t);
+    this.selfHist.set(t, { x: Position.x[this.pid] + (e?.dx ?? 0), y: Position.y[this.pid] + (e?.dy ?? 0), angle: Rotation.angle[this.pid] + (e?.da ?? 0), vx: Velocity.x[this.pid], vy: Velocity.y[this.pid] });
     this.selfHist.delete(t - 240);
   }
 
@@ -193,20 +201,18 @@ export class FakeHitsClient {
       if (e.type === EntityType.Player || e.type === EntityType.ShipBody) this.kinds.set(e.id, { type: e.type, side: e.type === EntityType.ShipBody && d ? d[10] ?? 0 : 0 });
       if (e.type !== EntityType.Projectile) continue;
       this.known.add(e.id);
-      if (d?.[6] === this.pid) this.ownRows++;
-      if (d && (d[10] ?? -1) >= 0) {
-        const sh = { owner: d[6], gun: d[10], spawnTick: d[3], x: d[4], y: d[5], vx: e.vx ?? 0, vy: e.vy ?? 0 };
-        this.shells.set(e.id, sh);
-        this.selfHits?.addShell(e.id, sh.owner, sh.gun, sh.spawnTick, sh.x, sh.y, sh.vx, sh.vy, d[7]);
-      }
+      if (d?.[6] === this.pid) { this.ownRows++; this.ownRowIds.add(e.id); }
+      if (d && (d[10] ?? -1) >= 0) this.shells.set(e.id, { owner: d[6], gun: d[10], spawnTick: d[3], x: d[4], y: d[5], vx: e.vx ?? 0, vy: e.vy ?? 0 });
+      // (a row's shell is rounded: it sits out, the server tells its hits, as ShipClient.afterSnapshot)
+      if (this.selfHits?.on) this.selfHits.row(e.id);
     }
     // Fire events: the shells rebuilt from the firing ship's replica, as ShipClient.preSnapshot does
     for (const [owner, ago, partAmmo, aimQ, ...ids] of s.fire ?? []) {
       for (const id of ids) this.known.add(id);
       if (owner === this.pid) this.ownFired += ids.length;
       const tick = s.tick - ago, part = partAmmo % 256, ammo = Math.floor(partAmmo / 256) % 256, aug = partAmmo >= 65536 ? (1 as const) : undefined;
-      // (its own: from its own pose on that tick, as the game's client builds them from its prediction: CAPS.OWN_SHOTS)
-      const ship = this.store.get(owner), body = owner === this.pid ? this.selfHist.get(tick) : this.reps.at(owner, tick)?.body;
+      // (its own too, CAPS.OWN_SHOTS: from its confirmed ship, replicated to it as to everyone; never its prediction)
+      const ship = this.store.get(owner), body = this.reps.at(owner, tick)?.body;
       const v = ship && body ? rebuildVolley({ owner, tick, part, aimQ, ids, ammo, aug }, ship as ShipState, body, this.server.getShips().tuning) : null;
       const spawnTick = owner === this.pid || this.kinds.get(owner)?.type === EntityType.Player ? tick - 1 : tick;
       for (const id of ids) {

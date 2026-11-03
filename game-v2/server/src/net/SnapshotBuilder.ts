@@ -543,21 +543,21 @@ export class SnapshotBuilder {
       const out = this.updateShipView(conn, playerSystemId, px, py);
       // (its structure too: the client drops a ship it hasn't seen for a moment, so it's synced afresh when it comes back)
       for (const id of out) { conn.sentNames.delete(id); conn.shipSynced.delete(id); conn.shipHpSent.delete(id); }
-      // Ship motion: keyframes where needed, control changes otherwise
-      const rep = this.replication.forClient(playerSystemId, conn.playerId, conn.repKnown, this.currentTick, conn.shipView, conn.debrisHeld);
+      // Ship motion: keyframes where needed, control changes otherwise (its own ship's too, when it builds its own
+      // shells: its confirmed ship, beside its prediction, snapshot/ownShots.ts)
+      const ownShots = ownShotsFor(conn.caps);
+      const rep = this.replication.forClient(playerSystemId, conn.playerId, conn.repKnown, this.currentTick, conn.shipView, conn.debrisHeld, ownShots);
       // Shots from ships it replicates go as fire events: it builds the shells itself (launch.ts).
       // Not for a ship it's only now getting a keyframe for (it can't place it back then), nor its
-      // own (predicted, not replicated); those shells, and any flying in from further off, go as rows.
+      // own unless it replicates that too; those shells, and any flying in from further off, go as rows.
       const keyed = new Set(rep.ships.map((k) => k[0]));
-      // Its own row: whether it goes, and whether to correct its prediction (then its own shells this window go as rows)
+      // Its own row: whether it goes, and whether to correct its prediction
       const selfRow = rows.find((r) => r.id === conn.playerId);
       const self = selfRow ? this.selfRowState(conn, selfRow, prevStates) : null;
-      // (Its own shells as fire events too, built from its own predicted pose, when it takes them: snapshot/ownShots.ts)
-      const ownShots = ownShotsFor(conn.caps, !self || self.fix);
       const fire: number[][] = [];
       const covered = new Set<number>();
       for (const f of this.ships.fired) {
-        if (f.owner === conn.playerId) { if (!ownShots || !ownVolleyExact(this.ships, f)) continue; }
+        if (f.owner === conn.playerId) { if (!ownShots || keyed.has(f.owner) || !conn.repKnown.has(f.owner) || !ownVolleyExact(this.ships, f)) continue; }
         else if (!conn.shipView.has(f.owner) || keyed.has(f.owner) || !conn.repKnown.has(f.owner)) continue;
         if (InSystem.systemId[f.owner] !== playerSystemId) continue;
         // (the ammunition rides on the part: part + 256 × its code, + 65536 for an augmented shot, power/ports.ts)
@@ -592,6 +592,8 @@ export class SnapshotBuilder {
             v = { ...v, state: { ...v.state, x: undefined!, y: undefined!, angle: undefined } };
           }
         }
+        // (A shell as a row isn't exact on its client (rounded): one finding its own hits leaves it to the server's records)
+        if (r.kind === 'projectile') this.hits?.rowShell(conn, r.id);
         // Names go once (the client keeps them)
         if (r.name !== undefined && conn.sentNames.get(r.id) !== r.name) {
           conn.sentNames.set(r.id, r.name);
