@@ -95,7 +95,7 @@ export class FakeHitsClient {
     this.store = new ShipStore(ships.catalog, ships.tuning);
     // (Debris it works out itself, and the knocks its replicas work out: client ships/debris/DebrisSplits.ts)
     this.debris = new DebrisSplits({ store: this.store, reps: () => this.reps, splitPose: () => (this.causes?.on ? (id, t) => this.causes!.beforeRebuild(id, t) : null) });
-    this.reps = new ShipReplicaSet(ships.tuning, (id) => this.store.get(id)?.derived, () => opts.env(this.pid), undefined, (id) => this.debris.shape(id));
+    this.reps = new ShipReplicaSet(ships.tuning, (id) => this.store.get(id)?.derived, () => opts.env(this.pid), undefined, this.debris);
     if (opts.caps & CAPS.HITS) {
       this.hits = new ConfirmedHits({
         store: this.store,
@@ -196,7 +196,7 @@ export class FakeHitsClient {
 
   private handle(m: ServerMessage): void {
     switch (m.type) {
-      case 'shipSync': this.selfHits?.onSync(m.id); this.own?.beforeSync(m.id); this.causes?.beforeSync(m.id); this.store.onSync(m); break;
+      case 'shipSync': this.debris.onSync(m); this.selfHits?.onSync(m.id); this.own?.beforeSync(m.id); this.causes?.beforeSync(m.id); this.store.onSync(m); break;
       case 'shipHps': this.findHits(); this.store.onHps(m); break;
       case 'netCaps':
         this.findHits();

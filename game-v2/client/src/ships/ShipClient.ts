@@ -180,7 +180,7 @@ export class ShipClient {
 
   constructor(private opts: ShipClientOptions) {
     this.store = new ShipStore(opts.catalog, opts.tuning);
-    this.debris = new DebrisSplits({ store: this.store, reps: () => this.replicas, splitPose: () => (this.causes.on ? (id, t) => this.causes.beforeRebuild(id, t) : null) });
+    this.debris = new DebrisSplits({ store: this.store, reps: () => this.replicas, splitPose: () => (this.causes.on ? (id, t) => this.causes.beforeRebuild(id, t) : null), crumbled: (m) => this.damageFx?.onPartDestroyed(m) });
     this.features = new ClientFeatures(CLIENT_FEATURES, {
       catalog: opts.catalog,
       playerId: () => opts.state.playerId,
@@ -257,7 +257,7 @@ export class ShipClient {
         const e = opts.state.entities.get(station);
         return e ? { x: e.renderX, y: e.renderY } : null;
       },
-      (id) => this.debris.shape(id));
+      this.debris);
     this.hits = new ConfirmedHits({
       store: this.store,
       // (a shell from a gun: its row's data[10], or its fire event's part packing, preSnapshot)
@@ -1069,6 +1069,7 @@ export class ShipClient {
         this.cells.onCells(msg);
         return true;
       case 'shipSync':
+        this.debris.onSync(msg);
         this.selfHits.onSync(msg.id);
         this.own.beforeSync(msg.id);
         this.causes.beforeSync(msg.id);

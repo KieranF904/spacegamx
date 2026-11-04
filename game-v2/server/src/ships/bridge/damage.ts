@@ -248,6 +248,8 @@ export function hurt(b: BridgeCtx, eid: number, ship: ShipState, part: number, a
   if (dealt > 0) {
     b.lastDamaged.set(eid, tick);
     if (source >= 0 && source !== eid) b.lastHitBy.set(eid, source);
+    // (A piece of debris hurt: its clients are told it from now on, bridge/debrisNet.ts)
+    if (ship.kind === 'debris') b.debrisNet.told.add(eid);
   }
   return dealt;
 }

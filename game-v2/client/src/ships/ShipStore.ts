@@ -76,6 +76,8 @@ export class ShipStore implements ShipSource, StructSource {
     if (!msg.blueprint && !prev) { this.onMissing?.(msg.id); return []; }
     const sameShape = !!prev && (!msg.blueprint || sameBlueprint(prev.blueprint, msg.blueprint));
     const wasAlive = sameShape && prev && prev.kind === 'ship' ? [...prev.derived.alive] : null;
+    // (A piece of debris's structure before this sync: the one it flew till the rebuild's tick, for its knocks then)
+    const before = sameShape && prev?.kind === 'debris' ? prev.derived : undefined;
     const ship = sameShape
       ? prev!
       : createShipState(this.catalog, this.tuning, msg.id, msg.blueprint!, 0, { kind: msg.kind });
@@ -94,7 +96,7 @@ export class ShipStore implements ShipSource, StructSource {
     if (msg.aloof) this.aloof.add(msg.id);
     else if (!sameShape) this.aloof.delete(msg.id);
     this.bodies.set(msg.id, ship);
-    this.noteStruct(msg.id, msg.at, ship.derived, !sameShape);
+    this.noteStruct(msg.id, msg.at, ship.derived, !sameShape, before);
     return wasAlive && ship.kind === 'ship' ? ship.derived.alive.map((a, i) => (a && !wasAlive[i] ? i : -1)).filter((i) => i >= 0) : [];
   }
 
@@ -130,11 +132,11 @@ export class ShipStore implements ShipSource, StructSource {
     this.aloof.delete(id);
   }
 
-  private noteStruct(id: number, at: number | undefined, derived: ShipDerived, fresh: boolean): void {
+  private noteStruct(id: number, at: number | undefined, derived: ShipDerived, fresh: boolean, before?: ShipDerived): void {
     let list = this.structs.get(id);
     if (at === undefined || fresh) { this.structs.delete(id); list = undefined; }
     if (at === undefined) return;
-    if (!list) this.structs.set(id, (list = []));
+    if (!list) this.structs.set(id, (list = before ? [{ at: -Infinity, derived: before }] : []));
     if (list.length && list[list.length - 1].at >= at) list.length = list.findIndex((e) => e.at >= at);
     list.push({ at, derived });
     if (list.length > 16) list.shift();

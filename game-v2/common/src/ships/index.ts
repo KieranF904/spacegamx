@@ -54,4 +54,6 @@ export * from './features/index.js';
 export * from './rangeRig.js';
 // Debris worked out alike on both sides (deterministic trig, push-only knocks): ships/debris.ts
 export * from './debris.js';
+// ...and its life after its spawn (crumbling), for a client running it (CAPS.DEBRIS): ships/debrisLife.ts
+export * from './debrisLife.js';
 export * from './contact.js';

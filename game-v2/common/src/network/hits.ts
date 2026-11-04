@@ -52,8 +52,17 @@
  *              or a contact with one rebuilt since, is worked out on its tick layer, not keyframed (server bridge/structLog.ts)
  *   CARGO      (with CAUSES or OWN_SIM, protocol 42: no wire change) a ship's hold mass changing (a pickup, a sale, a tow taken on) comes
  *              as a CARGO cause at the tick it is first flown with (network/ownTick.ts), not a keyframe of the ship
+ *   DEBRIS     (protocol 44) debris it worked out from a split it runs from then on (debrisSplit `l`): its parts crumble on
+ *              ticks fixed at its spawn and each crumble's rebuild is worked out here (ships/debrisLife.ts), so nothing of
+ *              the piece comes after its spawn (no syncs, HP, crumble effects or keyframes for its recentring) but its
+ *              removal, until something else touches it (a shot, a tow: a shipSync, and it's told from then)
  */
-export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16, ROUGH: 32, OWN_SIM: 64, INPUTS: 128, BODIES: 256, BLOCKS: 512, FOCUS: 1024, CAUSES: 2048, WAYPOINTS: 4096, PILOTS: 8192, CROWD: 16384, STRUCTS: 32768, CARGO: 65536 } as const;
+export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16, ROUGH: 32, OWN_SIM: 64, INPUTS: 128, BODIES: 256, BLOCKS: 512, FOCUS: 1024, CAUSES: 2048, WAYPOINTS: 4096, PILOTS: 8192, CROWD: 16384, STRUCTS: 32768, CARGO: 65536, DEBRIS: 131072 } as const;
+
+/** Does this client run the debris it works out from then on (CAPS.DEBRIS)? */
+export function debrisFor(caps: number | undefined): boolean {
+  return ((caps ?? 0) & CAPS.DEBRIS) !== 0;
+}
 
 /** Does this client take a hold's mass changing as a CARGO cause (CAPS.CARGO)? */
 export function cargoFor(caps: number | undefined): boolean {

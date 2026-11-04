@@ -106,7 +106,7 @@ export function partGroups(count: number, joins: readonly [number, number][], pa
 }
 
 /** One piece a client worked out from a split */
-export interface DerivedDebris { id: number; ship: ShipState; body: FlightBody; hash: number }
+export interface DerivedDebris { id: number; ship: ShipState; body: FlightBody; hash: number; /** The parent's parts it is (its blueprint's, in order) */ parts: number[] }
 
 /**
  * A client's side of a split (the server's: ships/bridge/rebuild.ts spawnDebris, with the same functions): the pieces
@@ -127,7 +127,7 @@ export function deriveSplit(catalog: Catalog, tuning: ShipTuning, parent: ShipSt
     const ship = createShipState(catalog, tuning, ids[k], debrisBlueprint(parent.blueprint, g), tick, { kind: 'debris', hp: g.map(hpOf), angVel: spin });
     const body = debrisMotion(p, parent.derived.com, ship.derived.com, tuning.cellSize, spin, rng, tuning.debris.pushSpeed);
     ship.angVel = body.angVel;
-    out.push({ id: ids[k], ship, body, hash: debrisHash(body) });
+    out.push({ id: ids[k], ship, body, hash: debrisHash(body), parts: g });
   });
   return out;
 }

@@ -33,9 +33,9 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
  * has updated PROTOCOL_VERSION and PROTOCOL_WIRE_HASH.
  */
 // History: PROTOCOL_CHANGELOG.md. Re-pin with `npm run wire:bump "reason"` (game-v2/), never by hand.
-export const PROTOCOL_VERSION = 43;
+export const PROTOCOL_VERSION = 44;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
-export const PROTOCOL_WIRE_HASH = '34880c44';
+export const PROTOCOL_WIRE_HASH = '7c100f84';
 /** WebSocket close code (and reason) for a client on another protocol version */
 export const PROTOCOL_MISMATCH_CLOSE = 4002;
 export const PROTOCOL_MISMATCH_REASON = 'version';
@@ -1383,6 +1383,11 @@ export interface ServerDebrisSplitMessage {
   tick: number;
   e: number[];
   p: number[];
+  /**
+   * The pieces are this client's to run from their spawn (CAPS.DEBRIS, common ships/debrisLife.ts): their parts crumble
+   * on their own ticks, worked out here, and nothing more is sent of them but their removal (1)
+   */
+  l?: number;
 }
 
 /**
@@ -1669,7 +1674,7 @@ const COMPACT: [string, string[]][] = [
   ['partDestroyed', ['bodyId', 'part', 'fn', 'how', 'x', 'y', 'vx', 'vy', 'size']],
   ['contact', ['x', 'y', 'nx', 'ny', 'speed']],
   ['shipHps', ['ships']],
-  ['debrisSplit', ['id', 'tick', 'e', 'p']],
+  ['debrisSplit', ['id', 'tick', 'e', 'p', 'l']],
   ['shipSync', ['id', 'kind', 'hp', 'detached', 'rebuilds', 'design', 'blueprint', 'hpd', 'ghosts', 'at', 'born', 'aloof']],
   ['effect', ['effectType', 'x', 'y', 'targetX', 'targetY', 'entityId', 'data']],
   ['death', ['entityId', 'entityType', 'killerId']],

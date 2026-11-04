@@ -100,6 +100,8 @@ export function holdTowed(b: BridgeCtx, eid: number): void {
   const ship = b.bodies.get(eid);
   if (!ship || ship.kind !== 'debris') return;
   const tick = b.host.getTick();
+  // (Its life is no longer its own: told from now on)
+  b.debrisNet.told.add(eid);
   ship.despawnTick = Math.max(ship.despawnTick, tick + 120);
   const at = b.decayAt.get(eid);
   if (at) for (let i = 0; i < at.length; i++) if (ship.hp[i] > 0) at[i] = Math.max(at[i], tick + 120);

@@ -18,7 +18,7 @@ import { hasComponent } from 'bitecs';
 import {
   Position, Velocity, Rotation, Radius, Health, Player, Dead, InSystem, Blueprint, ShipState, Vec2,
   validateBlueprint, ValidationResult, createShipState, rebuildShip, fillClips, damagePart, repairShip, healPart, restorePart,
-  computeJoins, seededRng, hashInts, splitPose, splitRng, debrisSpin, debrisMotion, debrisBlueprint, debrisHash, shipPointToWorld, remapCharge, chargeTotal, fullPortsCharge, blueprintGeometry, recentreShift, flightSignature,
+  computeJoins, seededRng, hashInts, debrisDecay, splitPose, splitRng, debrisSpin, debrisMotion, debrisBlueprint, debrisHash, shipPointToWorld, remapCharge, chargeTotal, fullPortsCharge, blueprintGeometry, recentreShift, flightSignature,
   type PlacedGeom,
 } from '@space-game/common';
 import { type BridgeCtx } from './core.js';
@@ -290,13 +290,9 @@ export function partWorld(b: BridgeCtx, eid: number, ship: ShipState, part: numb
  * time (spread around decayTicks), and what is left splits as it goes.
  */
 export function decay(b: BridgeCtx, eid: number, ship: ShipState, tick: number): void {
+  // (Fixed at its spawn, spawnDebris: common ships/debrisLife.ts, as a client running it has them)
   let at = b.decayAt.get(eid);
-  if (!at) {
-    const life = b.tuning.debris.decayTicks ?? 1200;
-    const rng = seededRng(hashInts(eid, ship.spawnTick, 77));
-    at = ship.hp.map(() => tick + Math.round(life * (0.25 + rng())));
-    b.decayAt.set(eid, at);
-  }
+  if (!at) b.decayAt.set(eid, (at = debrisDecay(eid, ship.spawnTick, ship.hp.length, b.tuning)));
   at.forEach((t, i) => {
     if (tick < t || ship.hp[i] <= 0 || ship.detached[i]) return;
     damagePart(ship, i, Infinity, b.tuning);
@@ -387,6 +383,11 @@ export function rebuildNow(b: BridgeCtx, eid: number, ship: ShipState, derivable
   rebuildShip(ship, b.catalog, b.tuning);
   b.noteRebuild(t0);
   b.debrisNet.noteCom(eid, ship.rebuilds, ship.derived.com);
+  // (A piece of debris that lost a part before its time: not its crumbling, so its clients are told it from now on)
+  if (ship.kind === 'debris' && !b.debrisNet.told.has(eid)) {
+    const at = b.decayAt.get(eid), tick = b.host.getTick();
+    if (before.alive.some((a, i) => a && ship.hp[i] <= 0 && !(at && at[i] <= tick))) b.debrisNet.told.add(eid);
+  }
 
   // Orphaned groups leave as debris (for a ship with no core, that's everything)
   const groups = ship.derived.orphanGroups;
@@ -427,6 +428,9 @@ export function rebuildNow(b: BridgeCtx, eid: number, ship: ShipState, derivable
     Position.x[eid] += w[0];
     Position.y[eid] += w[1];
   }
+  // (A piece of debris recentred: clients running it work that out (its crumbling, common ships/debrisLife.ts), and
+  // clients keeping each structure by tick recentre it from its sync (CAPS.STRUCTS); the rest get a keyframe, Replication)
+  if (ship.kind === 'debris') b.debrisNet.shifted(eid, b.readBody(eid, ship));
   // (A client recentres its tick-aligned replica alike, from the structures it has: its own ship, network/ownTick.ts
   // REBUILD; any other it holds, CAPS.CAUSES; a rebuild that changes nothing it flies or touches with isn't one for it)
   if (ship.kind !== 'debris' && (w || before.alive.some((a, i) => a !== ship.derived.alive[i]) || flightSignature(before) !== flightSignature(ship.derived))) b.ownCauses.add(eid, { kind: 2, from: oldCom, to: newCom });
@@ -464,10 +468,11 @@ export function spawnDebris(b: BridgeCtx, parentEid: number, ship: ShipState, gr
   const rng = splitRng(parentEid, b.host.getTick(), k);
   const spin = debrisSpin(p.angVel, rng, b.tuning.debris.pushSpin);
   const debris = b.spawnOn(eid, debrisBlueprint(ship.blueprint, group), 'debris', hp, spin);
-  // Debris breaking up further keeps its parts' crumble times
+  // When each part crumbles, fixed now (common ships/debrisLife.ts): debris breaking up further keeps its parts'; a shed's
+  // within its own time; else seeded by the piece and its spawn
   const parentDecay = b.decayAt.get(parentEid);
-  if (parentDecay) b.decayAt.set(eid, group.map((i) => parentDecay[i]));
   if (crumble > 0) { const now = b.host.getTick(); b.decayAt.set(eid, group.map(() => now + Math.round(crumble * (0.5 + 0.5 * rng())))); }
+  else b.decayAt.set(eid, parentDecay ? group.map((i) => parentDecay[i]) : debrisDecay(eid, debris.spawnTick, group.length, b.tuning));
 
   // Parent's velocity at the group's centre of mass, plus a small seeded push (and a fling)
   const body = debrisMotion(p, parentCom, debris.derived.com, b.tuning.cellSize, spin, rng, b.tuning.debris.pushSpeed, fling);

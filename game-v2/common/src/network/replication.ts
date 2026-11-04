@@ -28,6 +28,22 @@ import type { Vec2 } from '../ships/types.js';
 
 /** A piece of debris's shape for the knocks (ShipReplicaSet's debrisShape): its mass, radius, centre and convex pieces */
 export interface DebrisShape { mass: number; radius: number; com: Vec2; pieces: readonly (readonly Vec2[])[]; born?: number }
+
+/**
+ * What a client's debris world asks of the debris it holds (client ships/debris/DebrisSplits.ts): each piece's shape
+ * on a tick, and, for a piece it runs itself (CAPS.DEBRIS: common ships/debrisLife.ts), its life on that tick
+ */
+export interface DebrisWorld {
+  /** Its shape on tick t's step (null: not known yet; it drifts without knocking) */
+  shape(id: number, t: number): DebrisShape | null;
+  /** Gone before tick t's step (its time is up) */
+  gone?(id: number, t: number): boolean;
+  /**
+   * After tick t's step, the tick's rebuild point: a crumble rebuilt it there, and what's left is recentred in place
+   * (`body` moved). False: nothing was left of it (it went at t)
+   */
+  after?(id: number, t: number, body: FlightBody): boolean;
+}
 import { quantizeCursorAngle, dequantizeCursorAngle } from './cursorState.js';
 import { dhypot } from '../math/detTrig.js';
 
@@ -252,9 +268,13 @@ export class ShipReplicaSet {
     private env: () => ReplicaEnv,
     /** A station's position at a tick (docked ships ride along) */
     private stationAt?: (station: number, tick: number) => { x: number; y: number } | null,
-    /** A piece of debris's shape (null: not known yet; it drifts without knocking) */
-    private debrisShape?: (id: number) => DebrisShape | null,
-  ) {}
+    /** The debris it holds: each piece's shape (and a piece's life, one it runs itself) */
+    debris?: ((id: number) => DebrisShape | null) | DebrisWorld,
+  ) {
+    this.debris = typeof debris === 'function' ? { shape: (id) => debris(id) } : debris;
+  }
+
+  private readonly debris?: DebrisWorld;
 
   /** Debris is stepped all together (drift, then knocks: common ships/debris.ts), as on the server: through this tick */
   private dLast = -Infinity;
@@ -299,13 +319,15 @@ export class ShipReplicaSet {
         // (its keyframe or spawn is this tick's end: kept as it is)
         if (r.kf === t) continue;
         const prev = r.hist.get(t - 1);
-        if (!prev) continue;
-        const shape = this.debrisShape?.(id);
+        if (!prev || this.debris?.gone?.(id, t)) continue;
+        const shape = this.debris?.shape(id, t);
         list.push({ id, body: cloneBody(prev.body), mass: shape?.mass ?? 0, radius: shape?.radius ?? 0, com: shape?.com ?? [0, 0], pieces: shape?.pieces ?? [], born: shape?.born });
         reps.push(r);
       }
       stepDebrisWorld(list, k, cs, restitution, t);
       for (let i = 0; i < list.length; i++) {
+        // (A piece it runs: its rebuild point; nothing left of it, it has no state at t's end, and isn't stepped again)
+        if (this.debris?.after && !this.debris.after(list[i].id, t, list[i].body)) continue;
         reps[i].hist.set(t, { body: list[i].body, bits: 0, q: 0 });
         reps[i].last = t;
       }

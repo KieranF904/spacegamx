@@ -60,7 +60,12 @@ export interface ClientConnection {
    * Debris it was told to work out itself (debrisSplit) and hasn't confirmed: id → the tick it may wait till, and its
    * parts' HP as the client has them (SnapshotBuilder.holdDebris, ackDebris)
    */
-  debrisHeld: Map<number, { until: number; hp: number[] }>;
+  debrisHeld: Map<number, { until: number; hp: number[]; live?: boolean }>;
+  /**
+   * Debris it runs itself (CAPS.DEBRIS: confirmed, and told it's its to run, debrisSplit `l`): nothing of it is sent
+   * but its removal, until it's told (DebrisNet.told: a shipSync then, and it's sent as any ship from there)
+   */
+  debrisLive?: Set<number>;
   /** Debris it confirmed: the status row it made itself counts as sent at the next snapshot */
   debrisRowOk: Set<number>;
   /** Ships in this client's view (the rest of the system's ships cost it nothing) */

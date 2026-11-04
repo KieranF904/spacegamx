@@ -20,7 +20,7 @@ import {
   ASTEROID_SEED, MAP_DOT_SLACK, STATION_DESIGNS, STATION_WEAPONS, EntityType, packCursorWeaponState, quantizeShipValue, packCharge, gunStateAt, packGunState, PILOT_ROW,
   warmthPercent, fartherThan, hpWire, derivedRow, type BlockStore,
   mapDotFlags, legAt, packMapLeg, packMapRoute, unpackMapLegs, nearerThan, packIds, packRuns, packRanges, DEBRIS_STATUS, TICK_RATE,
-  FOCUS_RANGE, CROWD_BASE_WINDOW, structsFor, cargoFor,
+  FOCUS_RANGE, CROWD_BASE_WINDOW, structsFor, cargoFor, debrisFor,
   type Leg, type EntityState, type ShipState, type ClientSocket, type ServerMessage, type ServerAsteroidSeedMessage, type StarSystemData, type AsteroidSpawnData, dhypot,
 } from '@space-game/common';
 import type { GameData } from '../data/GameData.js';
@@ -339,10 +339,24 @@ export class SnapshotBuilder {
     // (Debris it's working out itself waits for its confirmation: ackDebris)
     // Ships out of view wait (the client keeps what it had, and catches up when one comes back). The view was
     // made this snapshot from the system's bodies in their order (updateShipView), so this goes in that order too
+    // (Debris it runs itself, CAPS.DEBRIS: let go once out of view or gone; told once something else touched it)
+    const live = conn.debrisLive;
+    if (live?.size) for (const id of live) if (!conn.shipView.has(id) || !this.ships.has(id)) live.delete(id);
     for (const id of conn.shipView) {
       const ship = this.ships.bodies.get(id);
       if (!ship || InSystem.systemId[id] !== systemId || conn.debrisHeld.has(id)) continue;
       let synced = conn.shipSynced.get(id);
+      if (live?.has(id)) {
+        // (Its crumbling it works out: what it has is the server's, so nothing goes. Told: a sync (it takes that as the
+        // word it's told from now on), at least of the structure it has now, and its HP since)
+        if (!this.ships.debrisNet.told.has(id) && synced?.ship === ship) {
+          if (syncs) { synced.rebuilds = ship.rebuilds; conn.shipHpSent.set(id, this.syncWireOf(id, ship).hp.slice()); }
+          continue;
+        }
+        live.delete(id);
+        if (synced?.ship === ship) synced.rebuilds = Math.min(synced.rebuilds, ship.rebuilds - 1);
+        else { conn.shipSynced.delete(id); synced = undefined; }
+      }
       if (!syncs && !synced) continue;
       // A refit or respawn replaces the ShipState (its rebuild count restarts), so compare both
       if (syncs && (!synced || synced.ship !== ship || synced.rebuilds !== ship.rebuilds)) {
@@ -718,7 +732,7 @@ export class SnapshotBuilder {
       }, this.currentTick);
       const rep = this.replication.forClient(playerSystemId, conn.playerId, conn.repKnown, this.currentTick, conn.shipView, conn.debrisHeld, ownShots, (id) => conn.shipSynced.get(id)?.rebuilds, bodies ? (id) => bodies.runs(conn, id) : undefined, causes, structsFor(conn.caps) ? (id) => this.keptAfter(conn, id, playerSystemId) : undefined,
         // (A ship a body it runs reads, keyframed now: the body's ship goes again too, Replication.forClient)
-        bodies ? (ships) => bodies.readersOf(conn, conn.playerId, ships) : undefined, cargoFor(conn.caps));
+        bodies ? (ships) => bodies.readersOf(conn, conn.playerId, ships) : undefined, cargoFor(conn.caps), conn.debrisLive);
       // Shots from ships it replicates go as fire events: it builds the shells itself (launch.ts).
       // Not for a ship it's only now getting a keyframe for (it can't place it back then), nor its
       // own unless it replicates that too; those shells, and any flying in from further off, go as rows.
@@ -946,22 +960,27 @@ export class SnapshotBuilder {
       if (h.until < now && this.ships.has(id)) { conn.debrisHeld.delete(id); this.debrisAcks.late++; }
       else if (h.until < now - 600) conn.debrisHeld.delete(id);
     }
-    for (const [parent, splits] of this.ships.debrisNet.splits) {
+    const net = this.ships.debrisNet, live = conn.debrisLive;
+    for (const [parent, splits] of net.splits) {
       if (parent === conn.playerId || !conn.shipView.has(parent) || !conn.repKnown.has(parent)) continue;
       // (Dead or gone, with causes this window: those never reach it, so its pose at the split is off there: sent in full)
       const dead = !this.ships.has(parent) || (hasComponent(this.world, Player, parent) && Health.current[parent] <= 0);
       if (dead && this.replication.causedInWindow(parent)) continue;
       // (A piece of debris something moved this window: its replica there is off till its keyframe, so its pieces would be)
-      if (this.ships.debrisNet.touched.has(parent)) continue;
+      if (net.touched.has(parent)) continue;
       const synced = conn.shipSynced.get(parent), had = conn.shipHpSent.get(parent);
       if (!synced || !had) continue;
+      // (A piece it runs, as the server has it: it worked its crumbling out, so it has it as it was whatever its last sync)
+      const runs = !!live?.has(parent) && !net.told.has(parent);
       // (Its copy is the structure the split started from if its centre of mass is that one: HP-band rebuilds don't move it)
-      const com = this.ships.debrisNet.comAt(parent, synced.rebuilds);
+      const com = net.comAt(parent, synced.rebuilds);
       for (const sp of splits) {
-        if (synced.ship !== sp.ship || !com || com[0] !== sp.com[0] || com[1] !== sp.com[1]) continue;
+        if (synced.ship !== sp.ship || (!runs && (!com || com[0] !== sp.com[0] || com[1] !== sp.com[1]))) continue;
         const until = now + DEBRIS_ACK_TICKS + 2 * Math.ceil(conn.ping / (1000 / TICK_RATE));
-        sp.ids.forEach((id, k) => conn.debrisHeld.set(id, { until, hp: sp.groups[k].map((i) => had[i] ?? 0) }));
-        this.send(conn.ws, { type: 'debrisSplit', id: parent, tick: sp.tick, e: packIds(sp.ids), p: packRuns(sp.parts) });
+        // (Its to run from their spawn, CAPS.DEBRIS: pieces of a ship, or of a piece it runs: it knows when each part crumbles)
+        const l = debrisFor(conn.caps) && (sp.ship.kind !== 'debris' || runs);
+        sp.ids.forEach((id, k) => conn.debrisHeld.set(id, { until, hp: sp.groups[k].map((i) => had[i] ?? 0), live: l }));
+        this.send(conn.ws, { type: 'debrisSplit', id: parent, tick: sp.tick, e: packIds(sp.ids), p: packRuns(sp.parts), l: l ? 1 : undefined });
       }
     }
   }
@@ -975,13 +994,20 @@ export class SnapshotBuilder {
       // (Gone meanwhile: it stays held till its removal goes, or the client keeps the piece it worked out for ever)
       if (!sp || !ship) { this.debrisAcks.gone++; continue; }
       conn.debrisHeld.delete(id);
-      // (Wrong: it goes in full, and it's keyframed for everyone, so what it knocked into meanwhile comes right too)
-      if (sp.hash !== acks[i + 1]) { this.debrisAcks.wrong++; this.ships.debrisNet.touched.add(id); continue; }
+      // (Wrong: it goes to this client in full, keyframe and all. A piece in its grace knocked nothing meanwhile, so that's
+      // all that's off; one past it, what it knocked into is off too: it's keyframed for everyone)
+      if (sp.hash !== acks[i + 1]) {
+        this.debrisAcks.wrong++;
+        conn.repKnown.delete(id);
+        if (!this.ships.debrisNet.young(ship, this.currentTick)) this.ships.debrisNet.touched.add(id);
+        continue;
+      }
       this.debrisAcks.ok++;
       conn.shipSynced.set(id, { ship, rebuilds: sp.rebuilds });
       conn.shipHpSent.set(id, held.hp);
       conn.repKnown.set(id, 1);
       conn.debrisRowOk.add(id);
+      if (held.live) (conn.debrisLive ??= new Set()).add(id);
     }
   }
 

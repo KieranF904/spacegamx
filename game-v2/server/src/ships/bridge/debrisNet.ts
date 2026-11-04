@@ -4,7 +4,7 @@
  * piece was spawned as (its check), and which pieces something other than the shared drift-and-knock step moved this
  * tick (they need a keyframe). The step itself is flight.ts stepDebrisWorld.
  */
-import { InSystem, Position, stepDebrisWorld as stepWorld, debrisYoung, type DebrisBody, type FlightBody, type ShipState, type Vec2 } from '@space-game/common';
+import { InSystem, Position, stepDebrisWorld as stepWorld, debrisYoung, quantizeShipBody, type DebrisBody, type FlightBody, type ShipState, type Vec2 } from '@space-game/common';
 import { K, type BridgeCtx } from './core.js';
 
 /** A split a client may work out itself: the ship, the tick, its centre of mass then (grid), the pieces and their parts */
@@ -29,6 +29,15 @@ export class DebrisNet {
    * Replication keyframes them all at the snapshot, which clears it (clearTouched)
    */
   readonly touched = new Set<number>();
+  /**
+   * Pieces something besides their drift, knocks and crumbling changed (a shot, a blast, fire, a tow): a client running
+   * one (CAPS.DEBRIS) is told it from then on (a shipSync), and its rebuilds go as any ship's
+   */
+  readonly told = new Set<number>();
+  /** Pieces recentred by a rebuild since the last snapshot (a client that can't work that out knocks them wrong meanwhile) */
+  readonly recentred = new Set<number>();
+  /** ...and those, with what's near them and what they knocked into: off for such a client till their keyframes (Replication) */
+  readonly offLegacy = new Set<number>();
   /** Pairs that knocked this tick (Replication: a client with one but not the other gets a keyframe) */
   pairs: [number, number][] = [];
   /** Each piece as the shared step left it this tick, and as the tick left it (both rounded) */
@@ -61,6 +70,7 @@ export class DebrisNet {
 
   forget(eid: number): void {
     this.spawns.delete(eid);
+    this.told.delete(eid);
     this.expect.delete(eid);
     this.last.delete(eid);
     // (Not its splits nor its centre of mass yet: a ship blown apart is gone before the snapshot tells its pieces: afterSnapshot)
@@ -115,6 +125,18 @@ export class DebrisNet {
     }
   }
 
+  /**
+   * A piece's crumble rebuilt it and recentred what's left (common ships/debrisLife.ts): clients running it work that
+   * out, so it's where the shared rules leave it, not moved by something else
+   */
+  shifted(eid: number, body: FlightBody): void {
+    this.recentred.add(eid);
+    if (!this.expect.has(eid)) return;
+    const q = copy(body);
+    quantizeShipBody(q);
+    this.expect.set(eid, q);
+  }
+
   /** The tick's end (bodies rounded): a piece that isn't where the shared step left it was moved by something else */
   endTick(b: BridgeCtx): void {
     for (const [eid, want] of this.expect) {
@@ -126,34 +148,39 @@ export class DebrisNet {
     }
     this.expect.clear();
     // (Clients have a piece that's off where it was: one near it may knock it there and not here, or here and not
-    // there. Every piece within reach of an off one is off too: its keyframe goes with the other's)
-    if (this.touched.size) this.touchNear(b);
-    // (A knock with a piece that's off for clients is off too: round the pairs till nothing more joins)
-    for (let more = this.touched.size > 0, n = 0; more && n < 8; n++) {
-      more = false;
-      for (const [a, c] of this.pairs) {
-        const ta = this.touched.has(a), tc = this.touched.has(c);
-        if (ta !== tc) { this.touched.add(ta ? c : a); more = true; }
-      }
-    }
+    // there. Every piece within reach of an off one is off too, and so is what knocks into one: its keyframe goes with
+    // the other's)
+    if (this.touched.size) this.spread(b, this.touched);
+    // (Recentred by a rebuild: a client that neither runs the piece nor recentres it from its syncs has it where it was
+    // till its keyframe, and what's near it off with it: Replication)
+    if (this.recentred.size) { for (const id of this.recentred) this.offLegacy.add(id); this.spread(b, this.offLegacy); }
   }
 
-  /** Debris within reach of a touched piece (their circles closer than NEAR_SLACK) joins it: endTick */
-  private touchNear(b: BridgeCtx): void {
+  /** Debris within reach of a piece in `set` (their circles closer than NEAR_SLACK), and what knocked into one, join it */
+  private spread(b: BridgeCtx, set: Set<number>): void {
     const off: { eid: number; x: number; y: number; r: number; sys: number }[] = [];
-    for (const eid of this.touched) {
+    for (const eid of set) {
       const ship = b.bodies.get(eid);
       if (ship?.kind === 'debris' && !b.intangible.has(eid)) off.push({ eid, x: Position.x[eid], y: Position.y[eid], r: ship.derived.radius, sys: InSystem.systemId[eid] });
     }
-    if (!off.length) return;
-    for (const eid of this.last.keys()) {
-      if (this.touched.has(eid) || b.intangible.has(eid)) continue;
+    const tick = b.host.getTick();
+    if (off.length) for (const eid of this.last.keys()) {
+      if (set.has(eid) || b.intangible.has(eid)) continue;
       const ship = b.bodies.get(eid);
-      if (!ship) continue;
+      // (In its grace: nothing knocks it)
+      if (!ship || this.young(ship, tick + 1)) continue;
       const x = Position.x[eid], y = Position.y[eid], r = ship.derived.radius, sys = InSystem.systemId[eid];
       for (const o of off) {
         const reach = o.r + r + NEAR_SLACK, dx = o.x - x, dy = o.y - y;
-        if (o.sys === sys && dx * dx + dy * dy < reach * reach) { this.touched.add(eid); break; }
+        if (o.sys === sys && dx * dx + dy * dy < reach * reach) { set.add(eid); break; }
+      }
+    }
+    // (A knock with an off piece is off too: round the pairs till nothing more joins)
+    for (let more = set.size > 0, n = 0; more && n < 8; n++) {
+      more = false;
+      for (const [a, c] of this.pairs) {
+        const ta = set.has(a), tc = set.has(c);
+        if (ta !== tc) { set.add(ta ? c : a); more = true; }
       }
     }
   }
@@ -165,7 +192,9 @@ export class DebrisNet {
 
   /** The snapshot took them (keyframes) */
   clearTouched(due?: (eid: number) => boolean): void {
-    if (due) { for (const id of [...this.touched]) if (due(id)) this.touched.delete(id); return; }
+    if (due) { for (const s of [this.touched, this.recentred, this.offLegacy]) for (const id of [...s]) if (due(id)) s.delete(id); return; }
     this.touched.clear();
+    this.recentred.clear();
+    this.offLegacy.clear();
   }
 }

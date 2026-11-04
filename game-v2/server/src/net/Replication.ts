@@ -88,6 +88,13 @@ interface Shadow {
   cver: number;
   /** The count both versions are taken from (so a version names one state, whoever holds it) */
   gen: number;
+  /**
+   * A piece of debris: the keyframe version of clients running it (CAPS.DEBRIS) or keeping each structure by tick
+   * (CAPS.STRUCTS): bumped only when it left what they work out (not for its rebuilds)
+   */
+  dver: number;
+  /** A piece of debris rebuilt this window (those clients worked it out; the rest get a keyframe) */
+  lived?: boolean;
   diverged: boolean;
   /** A cause moved it this window (worked out on the shadow: clients without CAUSES get a keyframe) */
   caused: boolean;
@@ -193,7 +200,7 @@ export class Replication {
       const q = dock ? 0 : rec?.q ?? 0;
       let s = this.shadows.get(eid);
       if (!s) {
-        this.shadows.set(eid, { mode, body: this.real(eid), bits, q, version: 1, cver: 1, gen: 1, diverged: false, caused: false, causes: [], rebuilds: ship.rebuilds, sig: flightSignature(ship.derived), dock, events: [], qSent: q });
+        this.shadows.set(eid, { mode, body: this.real(eid), bits, q, version: 1, cver: 1, gen: 1, dver: 1, diverged: false, caused: false, causes: [], rebuilds: ship.rebuilds, sig: flightSignature(ship.derived), dock, events: [], qSent: q });
         continue;
       }
       if (mode !== s.mode || !sameDock(dock, s.dock)) { if (!s.diverged) this.why('mode'); s.diverged = true; s.mode = mode; s.dock = dock; if (s.bodied) s.bodied.diverged = true; }
@@ -209,7 +216,10 @@ export class Replication {
       if (ship.rebuilds !== s.rebuilds) {
         s.rebuilds = ship.rebuilds;
         const sig = flightSignature(ship.derived);
-        if (sig !== s.sig) {
+        // (A piece of debris rebuilt: clients running it (CAPS.DEBRIS) worked its crumbling out, recentring and all, and
+        // clients keeping each structure by tick (CAPS.STRUCTS) recentre it from its sync; the rest get a keyframe)
+        if (mode === ReplicaMode.Drift) { s.sig = sig; s.lived = true; }
+        else if (sig !== s.sig) {
           s.sig = sig;
           if (!worked?.rows.some((r) => r[0] === OWN_CAUSE.REBUILD)) { if (!s.diverged) this.why('rebuild'); s.diverged = true; if (s.bodied) s.bodied.diverged = true; }
         }
@@ -471,10 +481,11 @@ export class Replication {
       // (Off its path: a keyframe for everyone. Moved by causes only: for those who don't take them)
       if (s.diverged) {
         s.diverged = false;
-        s.version = s.cver = ++s.gen;
+        s.version = s.cver = s.dver = ++s.gen;
         s.body = this.real(eid);
-      } else if (s.caused) s.version = ++s.gen;
-      s.caused = false;
+      } else if (s.lived) s.version = s.cver = ++s.gen;
+      else if (s.caused) s.version = ++s.gen;
+      s.caused = s.lived = false;
     }
   }
 
@@ -518,12 +529,13 @@ export class Replication {
    * it, so it has its ship as the server's shadow has it, tick by tick, beside its
    * prediction (its own shells are built from that: SnapshotBuilder, ownShots.ts)
    */
-  forClient(systemId: number, self: number, known: Map<number, number>, snapshotTick: number, view?: Set<number>, held?: ReadonlyMap<number, unknown>, own = false, synced?: (id: number) => number | undefined, bodies?: (id: number) => boolean, causes = false, kept?: Kept, readers?: (ships: KeyframeRow[]) => Iterable<number>, cargo = false): { ships: KeyframeRow[]; ctl: ControlRow[]; own?: number[][]; ownRebuild?: number; causes?: number[][]; caused?: number[] } {
+  forClient(systemId: number, self: number, known: Map<number, number>, snapshotTick: number, view?: Set<number>, held?: ReadonlyMap<number, unknown>, own = false, synced?: (id: number) => number | undefined, bodies?: (id: number) => boolean, causes = false, kept?: Kept, readers?: (ships: KeyframeRow[]) => Iterable<number>, cargo = false, live?: ReadonlySet<number>): { ships: KeyframeRow[]; ctl: ControlRow[]; own?: number[][]; ownRebuild?: number; causes?: number[][]; caused?: number[] } {
     const ships: KeyframeRow[] = [];
     const ctl: ControlRow[] = [];
     const out: { own?: number[][]; ownRebuild?: number; causes?: number[][]; caused?: number[]; ownEvents?: CauseEvent[] } = {};
-    // (Which version of a ship this client goes by: CAPS.CAUSES clients' moves only when causes don't explain it)
-    const ver = (s: Shadow) => (causes ? s.cver : s.version);
+    // (Which version of a ship this client goes by: CAPS.CAUSES clients' moves only when causes don't explain it; a piece
+    // of debris it runs, CAPS.DEBRIS, only when it left what it works out)
+    const ver = (s: Shadow, eid: number) => (s.mode === ReplicaMode.Drift && (kept || live?.has(eid)) ? s.dver : causes ? s.cver : s.version);
     const bver = (s: Shadow) => (causes ? s.bodied!.cver : s.bodied!.version);
     // Its own ship, stepped by itself (CAPS.OWN_SIM): this window's causes, the real controls only where its inputs
     // don't say them, and a keyframe only when it can't have its ship otherwise (first, before the others' versions move on)
@@ -536,6 +548,9 @@ export class Replication {
     if (view) {
       const steps = (x: number) => view.has(x) && (known.has(x) || !!held?.has(x));
       for (const [a, c] of this.knocks) { const sa = steps(a), sc = steps(c); if (sa !== sc) known.delete(sa ? a : c); }
+      // (...or one a rebuild recentred this window that it neither runs nor recentres from its syncs, CAPS.DEBRIS and
+      // STRUCTS: it has that one where it was till its keyframe, and what's near it and what it knocked off with it)
+      if (!kept) for (const x of this.ships.debrisNet.offLegacy) if (!live?.has(x)) known.delete(x);
     }
     // (CAPS.CAUSES: ships whose causes go this snapshot, and those keyframed: a contact with one of them carries its state)
     const caused: [number, Shadow][] = [];
@@ -559,8 +574,8 @@ export class Replication {
         } else if (causes && s.causes.length) caused.push([eid, s]);
         continue;
       }
-      if (known.get(eid) !== ver(s)) {
-        known.set(eid, ver(s));
+      if (known.get(eid) !== ver(s, eid)) {
+        known.set(eid, ver(s, eid));
         ships.push(s.keyRow ??= packKeyframe({ id: eid, mode: s.mode, body: this.real(eid), ctl: { bits: s.bits, targetAngle: 0 }, q: s.q, dock: s.dock ?? undefined }));
         this.keyframes++;
         keyed.add(eid);

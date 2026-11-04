@@ -57,9 +57,11 @@ export function netCaps(): number {
   const structs = causes && (flag('structs', 'sg.structs') ?? dev);
   // (a hold's mass changing as a cause at its tick, worked out on its tick layer, not a keyframe of the ship)
   const cargo = ownSim && (flag('cargo', 'sg.cargo') ?? dev);
+  // (debris it works out run from then on: its parts crumble on their own ticks here, nothing more sent of it but its removal)
+  const debris = flag('debris', 'sg.debris') ?? dev;
   return hits | (compact ? CAPS.INPUTS : 0) | (packed ? CAPS.PACKED : 0) | (coalesce ? CAPS.COALESCE : 0) | (ownShots ? CAPS.OWN_SHOTS : 0) | (rough ? CAPS.ROUGH : 0) | (ownSim ? CAPS.OWN_SIM : 0) | (bodies ? CAPS.BODIES : 0)
     | (blocks ? CAPS.BLOCKS : 0) | (focus ? CAPS.FOCUS : 0) | (causes ? CAPS.CAUSES : 0) | (waypoints ? CAPS.WAYPOINTS : 0) | (pilots ? CAPS.PILOTS : 0) | (crowd ? CAPS.CROWD : 0)
-    | (structs ? CAPS.STRUCTS : 0) | (cargo ? CAPS.CARGO : 0);
+    | (structs ? CAPS.STRUCTS : 0) | (cargo ? CAPS.CARGO : 0) | (debris ? CAPS.DEBRIS : 0);
 }
 
 /**
