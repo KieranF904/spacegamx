@@ -263,6 +263,7 @@ export class FakeHitsClient {
     // Hits found here, once the frame's told records are in (ShipClient.afterSnapshot, findHits)
     if (this.selfHits) {
       this.selfHits.onKeyframes(s.ships);
+      for (const id of this.bodies?.ids() ?? []) this.selfHits.onSync(id);
       this.selfHits.open(s.tick);
     }
   }
