@@ -50,8 +50,15 @@
  *   STRUCTS    (with CAUSES, protocol 42) every structure a ship it holds flew: one shipSync a rebuild tick, each stamped
  *              with its tick (`at`), kept by tick (client ShipStore.derivedAt), so a window with two rebuilds of a ship,
  *              or a contact with one rebuilt since, is worked out on its tick layer, not keyframed (server bridge/structLog.ts)
+ *   CARGO      (with CAUSES or OWN_SIM, protocol 42: no wire change) a ship's hold mass changing (a pickup, a sale, a tow taken on) comes
+ *              as a CARGO cause at the tick it is first flown with (network/ownTick.ts), not a keyframe of the ship
  */
-export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16, ROUGH: 32, OWN_SIM: 64, INPUTS: 128, BODIES: 256, BLOCKS: 512, FOCUS: 1024, CAUSES: 2048, WAYPOINTS: 4096, PILOTS: 8192, CROWD: 16384, STRUCTS: 32768 } as const;
+export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16, ROUGH: 32, OWN_SIM: 64, INPUTS: 128, BODIES: 256, BLOCKS: 512, FOCUS: 1024, CAUSES: 2048, WAYPOINTS: 4096, PILOTS: 8192, CROWD: 16384, STRUCTS: 32768, CARGO: 65536 } as const;
+
+/** Does this client take a hold's mass changing as a CARGO cause (CAPS.CARGO)? */
+export function cargoFor(caps: number | undefined): boolean {
+  return ((caps ?? 0) & CAPS.CARGO) !== 0;
+}
 
 /** Does this client keep every structure a ship flew, by its rebuild tick (CAPS.STRUCTS, with CAUSES)? */
 export function structsFor(caps: number | undefined): boolean {

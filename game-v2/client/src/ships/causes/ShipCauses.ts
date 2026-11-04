@@ -13,7 +13,7 @@
  * The own ship's causes are OwnTick's (ships/own/OwnTick.ts); it is never one of these.
  */
 import {
-  applyOwnCauses, applyCauseRows, causesByShip, replicaHash, replicasByte, type CauseRow, CONTACT_BIG_BODY, OWN_CAUSE, CONTACT_FLAG,
+  applyOwnCauses, applyCauseRows, cargoBefore, causesByShip, replicaHash, replicasByte, type CauseRow, CONTACT_BIG_BODY, OWN_CAUSE, CONTACT_FLAG,
   type ReplicaCauses, type ShipReplicaSet, type ShipDerived, type ShipState, type ShipTuning, type FlightBody,
   type OwnCauseEnv, type OwnShape, type PlacedGeom, type ServerSnapshotMessage, type Vec2,
 } from '@space-game/common';
@@ -169,6 +169,11 @@ export class ShipCauses implements ReplicaCauses {
 
   has(id: number, t: number): boolean {
     return !!this.rows.get(id)?.has(t);
+  }
+
+  preStep(id: number, t: number, body: FlightBody): void {
+    const rows = this.rows.get(id)?.get(t);
+    if (rows) cargoBefore(body, rows.map((r) => r.row));
   }
 
   after(id: number, t: number, body: FlightBody): void {

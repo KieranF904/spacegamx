@@ -194,7 +194,10 @@ export function stepMovement(b: BridgeCtx, eid: number): boolean {
   const body = b.readBody(eid, ship);
   // The hold's cargo flies with it (ships/load.ts), as the pilot's prediction and every replica have it
   // (and what its part features add as load: a Tow Beam's tow, ships/features/tow)
+  const had = body.cargo ?? 0;
   body.cargo = quantizeCargo((b.host.cargoMass?.(eid) ?? 0) + (b.host.featureCargo?.(eid) ?? 0));
+  // (Changed since its last step, a pickup, a sale, a tow: its clients fly the new mass from this step on, CAPS.CARGO)
+  if (body.cargo !== had) b.ownCauses.add(eid, { kind: 3, cargo: body.cargo });
   // (Part features' held inputs, a Burst Strafer's dodge, come with the keys: readInputsInto)
   const q = quantizeReplicaAngle(Input.targetAngle[eid]);
   // An EMP cripples the drive (thrust and steering × EMP_CONTROL) and stops a jump starting; the pilot's prediction flies it the same

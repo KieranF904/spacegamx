@@ -2,7 +2,7 @@
  * What moved a ship this tick besides its own controls, as each happened (CAPS.OWN_SIM for a pilot's own ship, common
  * network/ownTick.ts, docs/design/confirmed-hits.md part G; CAPS.CAUSES for every other, network/causes.ts): a pull's
  * push (pilots: only theirs is rounded to be sent), a contact (with the other body as the contact pass had it), a
- * rebuild's recentring. Replication (net/Replication.ts) takes them after the tick, works them out on its shadow of the
+ * rebuild's recentring, the hold's mass changing. Replication (net/Replication.ts) takes them after the tick, works them out on its shadow of the
  * ship with the very functions clients run, and hands them to clients as causes. Kept for every ship, whatever anyone's
  * caps (a contact is rare and costs a few numbers).
  */
@@ -25,7 +25,9 @@ export interface OwnContact {
   seq?: number;
 }
 export interface OwnRebuild { kind: 2; from: Vec2; to: Vec2; seq?: number }
-export type OwnCause = OwnPull | OwnContact | OwnRebuild;
+/** The hold's mass changed: the mass it flies this tick's step with (it goes in before the step: common ownTick.ts CARGO) */
+export interface OwnCargo { kind: 3; cargo: number; seq?: number }
+export type OwnCause = OwnPull | OwnContact | OwnRebuild | OwnCargo;
 
 /** A ship's structure as a contact reads it */
 export function ownShape(ship: ShipState, geom: OwnShape['geom']): OwnShape {

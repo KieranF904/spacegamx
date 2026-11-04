@@ -20,7 +20,7 @@ import {
   ASTEROID_SEED, MAP_DOT_SLACK, STATION_DESIGNS, STATION_WEAPONS, EntityType, packCursorWeaponState, quantizeShipValue, packCharge, gunStateAt, packGunState, PILOT_ROW,
   warmthPercent, fartherThan, hpWire, derivedRow, type BlockStore,
   mapDotFlags, legAt, packMapLeg, packMapRoute, unpackMapLegs, nearerThan, packIds, packRuns, packRanges, DEBRIS_STATUS, TICK_RATE,
-  FOCUS_RANGE, CROWD_BASE_WINDOW, structsFor,
+  FOCUS_RANGE, CROWD_BASE_WINDOW, structsFor, cargoFor,
   type Leg, type EntityState, type ShipState, type ClientSocket, type ServerMessage, type ServerAsteroidSeedMessage, type StarSystemData, type AsteroidSpawnData, dhypot,
 } from '@space-game/common';
 import type { GameData } from '../data/GameData.js';
@@ -715,7 +715,7 @@ export class SnapshotBuilder {
       }, this.currentTick);
       const rep = this.replication.forClient(playerSystemId, conn.playerId, conn.repKnown, this.currentTick, conn.shipView, conn.debrisHeld, ownShots, (id) => conn.shipSynced.get(id)?.rebuilds, bodies ? (id) => bodies.runs(conn, id) : undefined, causes, structsFor(conn.caps) ? (id) => this.keptAfter(conn, id, playerSystemId) : undefined,
         // (A ship a body it runs reads, keyframed now: the body's ship goes again too, Replication.forClient)
-        bodies ? (ships) => bodies.readersOf(conn, conn.playerId, ships) : undefined);
+        bodies ? (ships) => bodies.readersOf(conn, conn.playerId, ships) : undefined, cargoFor(conn.caps));
       // Shots from ships it replicates go as fire events: it builds the shells itself (launch.ts).
       // Not for a ship it's only now getting a keyframe for (it can't place it back then), nor its
       // own unless it replicates that too; those shells, and any flying in from further off, go as rows.

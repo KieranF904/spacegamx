@@ -204,6 +204,8 @@ export interface OwnTimeline {
   derived(t: number): ShipDerived | null | undefined;
   /** After its step at tick t: that tick's causes, then rounded */
   after(t: number, body: FlightBody): void;
+  /** Before its step at tick t: what goes in first (a CARGO cause: the hold's mass it flies the step with) */
+  preStep?(t: number, body: FlightBody): void;
 }
 
 /**
@@ -230,6 +232,8 @@ export interface ReplicaCauses {
   has(id: number, t: number): boolean;
   /** After its step at tick t: that tick's causes, then rounded */
   after(id: number, t: number, body: FlightBody): void;
+  /** Before its step at tick t (only asked when it has causes then): a CARGO cause, the hold's mass it flies the step with */
+  preStep?(id: number, t: number, body: FlightBody): void;
 }
 
 /**
@@ -543,6 +547,9 @@ export class ShipReplicaSet {
       const body = cloneBody(cur.body);
       if (by) { body.vx += by.ix; body.vy += by.iy; }
       const cs = own ? null : this.causes;
+      // (The hold's mass it flies this step with, if that changed: a CARGO cause, CAPS.CARGO)
+      if (own) own.preStep?.(t, body);
+      else if (cs?.has(id, t)) cs.preStep?.(id, t, body);
       replicaStep(r.mode, body, { bits, targetAngle: replicaAngle(r.mode, q) }, (own ? own.derived(t) : cs?.derived(id, t)) || d, this.tuning, env, t);
       if (own) {
         this.ownPre.set(t, cloneBody(body));

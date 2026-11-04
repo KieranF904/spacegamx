@@ -43,6 +43,7 @@ export function workCauses(causes: readonly OwnCause[], window: readonly CauseEv
   for (const c of causes) {
     seqs.push(c.seq ?? 0);
     if (c.kind === 0) rows.push([OWN_CAUSE.PULL, c.dvx, c.dvy]);
+    else if (c.kind === 3) rows.push([OWN_CAUSE.CARGO, c.cargo]);
     else if (c.kind === 1) {
       if (contacts.has(c.other)) return 'contact twice';
       contacts.set(c.other, c);

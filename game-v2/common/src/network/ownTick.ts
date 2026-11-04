@@ -13,6 +13,9 @@
  *            whose drive isn't replicated: TEMPORARY until AI decisions are inputs)
  *   REBUILD  [ago, 2]: the ship was rebuilt (parts lost or regrown) on that tick: it flew the structure it had until
  *            then (the client keeps it when the new one comes, shipSync) and its centre moved with its centre of mass
+ *   CARGO    [ago, 3, mass]: the hold's mass (load.ts, on the CARGO_PRECISION grid) the ship flies that tick's step
+ *            with, changed since the tick before (CAPS.CARGO). Unlike the rest it goes in BEFORE that tick's step
+ *            (cargoBefore); applying it again after is a no-op
  *
  * Nothing here sends the ship's resulting state: a client works every push out. The server runs the same functions
  * on its shadow of the ship (net/Replication.ts), so it knows the client has its ship exactly; the client also hashes
@@ -33,7 +36,7 @@ export function ownSimCaps(caps: number | undefined): boolean {
 }
 
 /** A tick-layer cause's kind (a snapshot's `own` row's second value) */
-export const OWN_CAUSE = { PULL: 0, CONTACT: 1, REBUILD: 2 } as const;
+export const OWN_CAUSE = { PULL: 0, CONTACT: 1, REBUILD: 2, CARGO: 3 } as const;
 
 /** A CONTACT row's flags */
 export const CONTACT_FLAG = {
@@ -126,11 +129,21 @@ export function applyCauseRows(body: FlightBody, rows: readonly (readonly number
         if (w) { body.x += w[0]; body.y += w[1]; }
         break;
       }
+      case OWN_CAUSE.CARGO:
+        body.cargo = r[1];
+        break;
       default:
         ok = false;
     }
   }
   return ok;
+}
+
+/** A tick's CARGO causes, before its step: the hold's mass it flies the step with (true: there was one) */
+export function cargoBefore(body: FlightBody, rows: readonly (readonly number[])[]): boolean {
+  let any = false;
+  for (const r of rows) if (r[0] === OWN_CAUSE.CARGO) { body.cargo = r[1]; any = true; }
+  return any;
 }
 
 // ---- The check: a hash of the client's tick-aligned own state, on inputs it sends anyway ----

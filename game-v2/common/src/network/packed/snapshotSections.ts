@@ -58,6 +58,7 @@ function causeRowOk(row: unknown): boolean {
   if (!Number.isInteger(ago) || ago < 0 || !isId(a)) return false;
   if (kind === 0) return row.length === 5;
   if (kind === 2) return row.length === 3;
+  if (kind === 3) return row.length === 4 && row[3] >= 0;
   if (kind !== 1 || !isId(row[3]) || !Number.isInteger(row[4]) || row[4] < 0 || row[4] >= 64) return false;
   const f = row[4] as number;
   return row.length === 5 + (f & PAIR.A_STATE ? 5 : 0) + (f & PAIR.B_STATE ? 5 : 0);
@@ -192,6 +193,8 @@ export function causesIO(io: PackedIO, rows: unknown[][] | null, tick: number): 
     const a = ship(row?.[2]);
     const o: number[] = [ago, kind, a];
     if (kind === 0) for (let i = 0; i < 2; i++) o.push(io.num(row?.[3 + i], 5, 5, io.prevOf(-1), i) as number);
+    // (a hold's mass, CAPS.CARGO: on the CARGO_PRECISION grid)
+    else if (kind === 3) o.push(io.num(row?.[3], 2, 6) as number);
     else if (kind === 1) {
       const b = ship(row?.[3]), f = io.bit((row?.[4] ?? 0) !== 0) ? io.u(row?.[4] ?? 0, 6) : 0;
       o.push(b, f);
@@ -236,6 +239,8 @@ function ownRowIO(io: PackedIO, row: unknown[] | undefined, tick: number): unkno
         o.push(io.num(v, d, c, pv, k));
       }
       else if (kind === 1) o.push(io.num(v, 0, 3));
+      // (a hold's mass, CAPS.CARGO: on the CARGO_PRECISION grid)
+      else if (kind === 3) o.push(io.num(v, 2, 6));
       else o.push(io.num(v, 0, 3));
     }
     return o;

@@ -16,7 +16,7 @@
  * after the server had to fix it (a keyframe of its own ship after the first), stepping back down after each clean one.
  */
 import {
-  applyOwnCauses, applyCauseRows, buildFlightInputs, controlBits, quantizeReplicaAngle, unpackControlRow, controlRowId, ownBodyHash, ownHpHash,
+  applyOwnCauses, applyCauseRows, cargoBefore, buildFlightInputs, controlBits, quantizeReplicaAngle, unpackControlRow, controlRowId, ownBodyHash, ownHpHash,
   ownCheckRules, CONFIRM, CONTACT_BIG_BODY, OWN_CAUSE, CONTACT_FLAG,
   type OwnTimeline, type ShipReplicaSet, type ShipDerived, type ShipState, type ShipTuning, type FlightBody, type OwnCheck,
   type OwnCauseEnv, type OwnShape, type PlacedGeom, type ServerSnapshotMessage, type ClientInputMessage, type Vec2,
@@ -160,6 +160,12 @@ export class OwnTick implements OwnTimeline {
     if (kept) return kept;
     if (this.until && t <= this.until.tick) return this.until.derived;
     return this.host.store.get(this.host.self())?.derived;
+  }
+
+  /** Before its step at tick t: a CARGO cause, the hold's mass it flies the step with */
+  preStep(t: number, body: FlightBody): void {
+    const rows = this.causes.get(t);
+    if (rows) cargoBefore(body, rows);
   }
 
   after(t: number, body: FlightBody): void {

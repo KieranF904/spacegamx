@@ -21,7 +21,7 @@
 
 import {
   Position, Velocity, Rotation, InSystem, FlightBody, ReplicaMode, ReplicaEnv, CTL, KeyframeRow, ControlRow,
-  replicaStep, replicaAngle, packKeyframe, packControlRow, flightSignature, applyOwnCauses, quantizeShipBody, OWN_CAUSE,
+  replicaStep, replicaAngle, packKeyframe, packControlRow, flightSignature, applyOwnCauses, cargoBefore, quantizeShipBody, OWN_CAUSE,
   type ShipState, CELL_HOLD_TICKS, cellMemberHash, replicaHash, replicasByte,
 } from '@space-game/common';
 import type { ShipBridge } from '../ships/ShipBridge.js';
@@ -146,7 +146,7 @@ export class Replication {
   readonly reasons: Record<string, number> = {};
   private why(r: string): void { this.reasons[r] = (this.reasons[r] ?? 0) + 1; }
   /** Pilots' own ships (CAPS.OWN_SIM): causes told, keyframes of their own ship and why, exceptions rows */
-  readonly ownStats = { causes: 0, pull: 0, contact: 0, contactState: 0, rebuild: 0, keyframes: 0, exc: 0, why: {} as Record<string, number> };
+  readonly ownStats = { causes: 0, pull: 0, contact: 0, contactState: 0, rebuild: 0, cargo: 0, keyframes: 0, exc: 0, why: {} as Record<string, number> };
   /** Other ships' causes (CAPS.CAUSES): ticks a ship's were worked out, rows sent, contacts sent without state, keyframes for ones a client couldn't work out */
   readonly causeStats = { worked: 0, failed: {} as Record<string, number>, rows: 0, stateless: 0, unworkable: 0 };
 
@@ -228,6 +228,8 @@ export class Replication {
         if (this.ships.debrisNet.touched.has(eid)) { s.diverged = true; this.why('Drift:moved'); }
         continue;
       }
+      // (The hold's mass it flew this step with, if that changed: a CARGO cause goes in first)
+      if (worked) cargoBefore(s.body, worked.rows);
       replicaStep(mode, s.body, { bits, targetAngle: replicaAngle(mode, q) }, rec?.derived ?? ship.derived, this.ships.tuning, this.host.env(eid), tick);
       s.stepped = tick;
       // Its causes, worked out as its clients work them out (ones that can't be: a keyframe for everyone)
@@ -313,6 +315,7 @@ export class Replication {
     // (Flown again (undocked): from a keyframe)
     if (o.held !== undefined) { o.held = undefined; o.heldDock = undefined; return hard('mode'); }
     if (o.hard) { s.body = this.real(eid); return; }
+    if (worked) cargoBefore(s.body, worked.rows);
     replicaStep(mode, s.body, { bits, targetAngle: replicaAngle(mode, q) }, derived, this.ships.tuning, this.host.env(eid), tick);
     if (worked) {
       s.pre = { ...s.body };
@@ -344,6 +347,7 @@ export class Replication {
     if (sb.diverged) return;
     const b = sb.body;
     b.vx += by.ix; b.vy += by.iy;
+    if (worked) cargoBefore(b, worked.rows);
     replicaStep(ReplicaMode.Pilotless, b, { bits: by.bits, targetAngle: replicaAngle(ReplicaMode.Pilotless, by.q) }, derived, this.ships.tuning, this.host.env(eid), tick);
     this.bodyStats.stepped++;
     sb.stepped = tick;
@@ -514,7 +518,7 @@ export class Replication {
    * it, so it has its ship as the server's shadow has it, tick by tick, beside its
    * prediction (its own shells are built from that: SnapshotBuilder, ownShots.ts)
    */
-  forClient(systemId: number, self: number, known: Map<number, number>, snapshotTick: number, view?: Set<number>, held?: ReadonlyMap<number, unknown>, own = false, synced?: (id: number) => number | undefined, bodies?: (id: number) => boolean, causes = false, kept?: Kept, readers?: (ships: KeyframeRow[]) => Iterable<number>): { ships: KeyframeRow[]; ctl: ControlRow[]; own?: number[][]; ownRebuild?: number; causes?: number[][]; caused?: number[] } {
+  forClient(systemId: number, self: number, known: Map<number, number>, snapshotTick: number, view?: Set<number>, held?: ReadonlyMap<number, unknown>, own = false, synced?: (id: number) => number | undefined, bodies?: (id: number) => boolean, causes = false, kept?: Kept, readers?: (ships: KeyframeRow[]) => Iterable<number>, cargo = false): { ships: KeyframeRow[]; ctl: ControlRow[]; own?: number[][]; ownRebuild?: number; causes?: number[][]; caused?: number[] } {
     const ships: KeyframeRow[] = [];
     const ctl: ControlRow[] = [];
     const out: { own?: number[][]; ownRebuild?: number; causes?: number[][]; caused?: number[]; ownEvents?: CauseEvent[] } = {};
@@ -524,7 +528,7 @@ export class Replication {
     // Its own ship, stepped by itself (CAPS.OWN_SIM): this window's causes, the real controls only where its inputs
     // don't say them, and a keyframe only when it can't have its ship otherwise (first, before the others' versions move on)
     const mine = own && this.host.ownSim?.(self) ? this.shadows.get(self) : undefined;
-    if (mine?.own && InSystem.systemId[self] === systemId && (!view || view.has(self))) this.ownFor(self, mine, mine.own, known, snapshotTick, ships, ctl, out, synced, causes, kept);
+    if (mine?.own && InSystem.systemId[self] === systemId && (!view || view.has(self))) this.ownFor(self, mine, mine.own, known, snapshotTick, ships, ctl, out, synced, causes, kept, cargo);
     for (const id of known.keys()) if (!this.shadows.has(id)) known.delete(id);
     // (Not sent its own: what it has of it goes stale, so it starts again from a keyframe when it is)
     if (!own) known.delete(self);
@@ -543,7 +547,7 @@ export class Replication {
       // Out of the client's view: nothing (and a keyframe when it comes back)
       if (view && !view.has(eid)) { known.delete(eid); continue; }
       // (Causes it can't work out: a contact with a ship whose structure it hasn't got as the pass had it: a keyframe)
-      if (causes && s.causes.length && !this.workable(s, synced, self, mine, view, eid, kept)) { known.delete(eid); this.causeStats.unworkable++; }
+      if (causes && s.causes.length && !this.workable(s, synced, self, mine, view, eid, kept, cargo)) { known.delete(eid); this.causeStats.unworkable++; }
       // Flown by its body on this client's tick layer (CAPS.BODIES): a keyframe only when its bodied shadow left the ship
       if (s.bodied && bodies?.(eid)) {
         if (known.get(eid) !== bver(s)) {
@@ -630,8 +634,10 @@ export class Replication {
    * Can a client work this window's causes of a ship out: has it each contact's other's structure as the pass had it
    * (or will it, by this frame's sync: one in view rebuilt no further since; syncs go before the snapshot)
    */
-  private workable(s: Shadow, synced: ((id: number) => number | undefined) | undefined, self: number, mine: Shadow | undefined, view?: Set<number>, eid?: number, kept?: Kept): boolean {
+  private workable(s: Shadow, synced: ((id: number) => number | undefined) | undefined, self: number, mine: Shadow | undefined, view?: Set<number>, eid?: number, kept?: Kept, cargo = false): boolean {
     for (const e of s.causes) {
+      // (The hold's mass changing: a CARGO cause only for a client taking them, CAPS.CARGO)
+      if (e.row[0] === OWN_CAUSE.CARGO && !cargo) return false;
       if (e.rebuild && !this.rebuildOk(eid!, e, s.causes, synced, kept)) return false;
       const c = e.contact;
       if (!c) continue;
@@ -668,7 +674,9 @@ export class Replication {
   }
 
   /** One pilot's own ship (CAPS.OWN_SIM): see forClient */
-  private ownFor(eid: number, s: Shadow, o: OwnShadow, known: Map<number, number>, snapshotTick: number, ships: KeyframeRow[], ctl: ControlRow[], out: { own?: number[][]; ownRebuild?: number; ownEvents?: CauseEvent[] }, synced?: (id: number) => number | undefined, causes = false, kept?: Kept): void {
+  private ownFor(eid: number, s: Shadow, o: OwnShadow, known: Map<number, number>, snapshotTick: number, ships: KeyframeRow[], ctl: ControlRow[], out: { own?: number[][]; ownRebuild?: number; ownEvents?: CauseEvent[] }, synced?: (id: number) => number | undefined, causes = false, kept?: Kept, cargo = false): void {
+    // (The hold's mass changing: a CARGO cause only for a client taking them, CAPS.CARGO)
+    if (!cargo && o.events.some((e) => e.row[0] === OWN_CAUSE.CARGO)) { o.version--; this.ownWhy('cargo'); }
     // (A contact whose other it can't have as the pass had it: rebuilt since, or a ship this client doesn't have)
     for (const e of o.events) {
       const c = e.contact;
@@ -707,6 +715,7 @@ export class Replication {
       this.ownStats.causes++;
       if (r[1] === OWN_CAUSE.PULL) this.ownStats.pull++;
       else if (r[1] === OWN_CAUSE.CONTACT) { this.ownStats.contact++; if (r.length > 4) this.ownStats.contactState++; }
+      else if (r[1] === OWN_CAUSE.CARGO) this.ownStats.cargo++;
       else { this.ownStats.rebuild++; out.ownRebuild = Math.max(out.ownRebuild ?? -Infinity, e.tick); }
     }
     out.own = rows;
