@@ -31,7 +31,8 @@ export class StructLog {
   note(eid: number, ship: ShipState, tick: number): void {
     let list = this.log.get(eid);
     if (!list) this.log.set(eid, (list = []));
-    if (list.length && list[list.length - 1].ship !== ship) list.length = 0;
+    // (Another ship state, or a tick before the last one's (a clock it moved off: travel): it starts over)
+    if (list.length && (list[list.length - 1].ship !== ship || list[list.length - 1].tick > tick)) list.length = 0;
     const e: StructEntry = {
       tick, rebuilds: ship.rebuilds, ship, com: ship.derived.com, hp: [...ship.rebuildHp],
       detached: ship.detached.flatMap((d, i) => (d ? [i] : [])),

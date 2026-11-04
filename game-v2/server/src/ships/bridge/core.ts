@@ -18,6 +18,8 @@ import type { ShipBridge } from '../ShipBridge.js';
 export interface ShipHost {
   readonly world: IWorld;
   getTick(): number;
+  /** The tick of the system a body is in (its own clock, crowd dilation: sim/SystemClocks.ts); unset: getTick */
+  systemTick?(eid: number): number;
   /** New entity with Position, Velocity, Rotation, Radius */
   createBody(): number;
   removeBody(eid: number): void;

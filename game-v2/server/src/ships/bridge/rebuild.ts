@@ -49,7 +49,7 @@ export function spawnOn(b: BridgeCtx, eid: number, bp: Blueprint, kind: 'ship' |
   b.bodies.set(eid, ship);
   b.ungridded.add(eid);
   b.debrisNet.noteCom(eid, ship.rebuilds, ship.derived.com);
-  b.structLog.note(eid, ship, b.host.getTick());
+  b.structLog.note(eid, ship, b.host.systemTick?.(eid) ?? b.host.getTick());
   Radius.value[eid] = Math.max(1, ship.derived.radius);
   return ship;
 }
@@ -403,7 +403,7 @@ export function rebuildNow(b: BridgeCtx, eid: number, ship: ShipState, derivable
     rebuildShip(ship, b.catalog, b.tuning);
     b.debrisNet.noteCom(eid, ship.rebuilds, ship.derived.com);
   }
-  b.structLog.note(eid, ship, b.host.getTick());
+  b.structLog.note(eid, ship, b.host.systemTick?.(eid) ?? b.host.getTick());
   const held = b.charge.get(eid);
   if (held) b.setCharge(eid, remapCharge(before, ship.derived, held));
 

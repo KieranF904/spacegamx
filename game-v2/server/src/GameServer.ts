@@ -2365,6 +2365,7 @@ this.devTeleport = opts.devTeleport ?? false;
     return {
       world: this.world,
       getTick: () => this.currentTick,
+      systemTick: (eid) => (this.clocks ? this.clocks.tickOf(InSystem.systemId[eid]) : this.currentTick),
       // (The tick's broadphase: ships are filed by their bounding circles as the tick began)
       shipsAlong: (num, x0, y0, x1, y1, pad) => {
         const out: number[] = [];
