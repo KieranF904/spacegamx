@@ -39,7 +39,10 @@ self.onmessage = async (e: MessageEvent<HullJob>) => {
       const { done: { id: _, ...built } } = runHullJob(catalog, tuning, job, designs);
       return built;
     });
-    (self as unknown as Worker).postMessage({ ...hull, id }, hullBuffers(hull));
+    // (A copy of its own: jobs for one design asked together share the cache's one hull, and a transfer detaches its
+    // buffers, so the second answer would fail; a pack of custom enemies appearing at once does just that)
+    const own = structuredClone(hull);
+    (self as unknown as Worker).postMessage({ ...own, id }, hullBuffers(own));
   } catch (err) {
     (self as unknown as Worker).postMessage({ id, error: String(err) });
   }
