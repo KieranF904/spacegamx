@@ -1,0 +1,40 @@
+{
+ "id": "censer",
+ "name": "Censer",
+ "faction": "cinder",
+ "sky": "cinder_reach",
+ "replaces": "cinder_zealot",
+ "role": "sniper / lancer",
+ "level": "15-20",
+ "threat": "medium",
+ "parts": 9,
+ "groups": {
+  "vane_l": [
+   "vane_l"
+  ],
+  "vane_r": [
+   "vane_r"
+  ],
+  "core": [
+   "hull",
+   "reliquary"
+  ],
+  "lance": [
+   "blade",
+   "tine_l",
+   "tine_r"
+  ],
+  "brazier": [
+   "brazier"
+  ],
+  "drive": [
+   "drive"
+  ]
+ },
+ "damaged": [
+  "lance",
+  "vane_l"
+ ],
+ "radiusCells": 5.832,
+ "radius": 140
+}

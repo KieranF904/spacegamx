@@ -1,0 +1,98 @@
+{
+ "name": "Maw Lurker",
+ "catalogVersion": 1,
+ "paint": "#34363c",
+ "rigid": true,
+ "parts": [
+  {
+   "uid": 0,
+   "piece": "maw_lurker_vents",
+   "fn": "hull",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 1,
+   "piece": "maw_lurker_flank_l0",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 2,
+   "piece": "maw_lurker_flank_l1",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 3,
+   "piece": "maw_lurker_flank_r0",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 4,
+   "piece": "maw_lurker_flank_r1",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 5,
+   "piece": "maw_lurker_body",
+   "fn": "hull",
+   "material": "leestone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 6,
+   "piece": "maw_lurker_node",
+   "fn": "core",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 7,
+   "piece": "maw_lurker_rail",
+   "fn": "railgun",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 8,
+   "piece": "maw_lurker_eye",
+   "fn": "scanner",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  }
+ ]
+}

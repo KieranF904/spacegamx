@@ -1,0 +1,58 @@
+{
+ "name": "Slag Ray (damaged)",
+ "catalogVersion": 1,
+ "paint": "#34363c",
+ "rigid": true,
+ "parts": [
+  {
+   "uid": 0,
+   "piece": "slag_ray_wing_l",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 1,
+   "piece": "slag_ray_horn_l",
+   "fn": "hull",
+   "material": "leestone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 2,
+   "piece": "slag_ray_horn_r",
+   "fn": "hull",
+   "material": "leestone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 3,
+   "piece": "slag_ray_body",
+   "fn": "armor",
+   "material": "leestone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 4,
+   "piece": "slag_ray_heart",
+   "fn": "core",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  }
+ ]
+}

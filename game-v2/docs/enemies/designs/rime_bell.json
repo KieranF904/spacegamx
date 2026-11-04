@@ -1,0 +1,68 @@
+{
+ "name": "Rime Bell",
+ "catalogVersion": 1,
+ "paint": "#34363c",
+ "rigid": true,
+ "parts": [
+  {
+   "uid": 0,
+   "piece": "rime_bell_tendril_l",
+   "fn": "flak",
+   "material": "brood_rime",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 1,
+   "piece": "rime_bell_tendril_c",
+   "fn": "flak",
+   "material": "brood_rime",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 2,
+   "piece": "rime_bell_tendril_r",
+   "fn": "flak",
+   "material": "brood_rime",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 3,
+   "piece": "rime_bell_frill",
+   "fn": "emp",
+   "material": "brood_membrane",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 4,
+   "piece": "rime_bell_bell",
+   "fn": "armor",
+   "material": "brood_ice",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 5,
+   "piece": "rime_bell_gland",
+   "fn": "core",
+   "material": "brood_gland",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  }
+ ]
+}

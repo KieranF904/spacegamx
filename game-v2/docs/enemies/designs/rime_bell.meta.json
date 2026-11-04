@@ -1,0 +1,35 @@
+{
+ "id": "rime_bell",
+ "name": "Rime Bell",
+ "faction": "frost",
+ "sky": "borealis",
+ "replaces": "frost_shard",
+ "role": "swarmer / support",
+ "level": "6-9",
+ "threat": "low",
+ "parts": 6,
+ "groups": {
+  "tendril_l": [
+   "tendril_l"
+  ],
+  "tendril_c": [
+   "tendril_c"
+  ],
+  "tendril_r": [
+   "tendril_r"
+  ],
+  "frill": [
+   "frill"
+  ],
+  "core": [
+   "bell",
+   "gland"
+  ]
+ },
+ "damaged": [
+  "frill",
+  "tendril_r"
+ ],
+ "radiusCells": 4.208,
+ "radius": 101
+}

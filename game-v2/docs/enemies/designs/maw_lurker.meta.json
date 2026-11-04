@@ -1,0 +1,40 @@
+{
+ "id": "maw_lurker",
+ "name": "Maw Lurker",
+ "faction": "maw",
+ "sky": "the_maw",
+ "replaces": "maw_lurker",
+ "role": "sniper",
+ "level": "24-30",
+ "threat": "high",
+ "parts": 9,
+ "groups": {
+  "vents": [
+   "vents"
+  ],
+  "flank_l": [
+   "flank_l0",
+   "flank_l1"
+  ],
+  "flank_r": [
+   "flank_r0",
+   "flank_r1"
+  ],
+  "core": [
+   "body",
+   "node"
+  ],
+  "rail": [
+   "rail"
+  ],
+  "eye": [
+   "eye"
+  ]
+ },
+ "damaged": [
+  "eye",
+  "flank_l"
+ ],
+ "radiusCells": 6.71,
+ "radius": 161
+}

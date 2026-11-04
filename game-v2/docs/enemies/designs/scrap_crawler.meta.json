@@ -1,0 +1,50 @@
+{
+ "id": "scrap_crawler",
+ "name": "Scrap Crawler",
+ "faction": "scrapborn",
+ "sky": "sol_scrap_nest",
+ "replaces": "scrap_crawler",
+ "role": "puller / brawler",
+ "level": "3-6",
+ "threat": "medium",
+ "parts": 14,
+ "groups": {
+  "legs": [
+   "leg_l",
+   "leg_r"
+  ],
+  "core": [
+   "spine",
+   "lamp"
+  ],
+  "shell_l": [
+   "shell_l"
+  ],
+  "shell_r": [
+   "shell_r"
+  ],
+  "claw_l": [
+   "arm_l",
+   "pincer_l",
+   "finger_l"
+  ],
+  "claw_r": [
+   "arm_r",
+   "pincer_r",
+   "finger_r"
+  ],
+  "magnet": [
+   "magnet"
+  ],
+  "drive": [
+   "drive"
+  ]
+ },
+ "damaged": [
+  "claw_l",
+  "shell_r",
+  "magnet"
+ ],
+ "radiusCells": 6.092,
+ "radius": 146
+}
