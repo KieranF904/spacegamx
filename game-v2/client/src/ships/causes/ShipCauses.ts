@@ -25,6 +25,8 @@ export interface ShipCausesHost {
   self(): number;
   /** The structure its own ship flew tick t with (OwnTick.derived: a contact with it reads it) */
   ownDerived?(t: number): ShipDerived | null | undefined;
+  /** Its own ship on tick t as the contact pass had it when it touched `other` (OwnTick.midOf) */
+  ownMid?(t: number, other: number): FlightBody | null;
   tuning: ShipTuning;
 }
 
@@ -41,6 +43,8 @@ export class ShipCauses implements ReplicaCauses {
   private readonly until = new Map<number, { derived: ShipDerived; tick: number; from: Vec2; to: Vec2 }>();
   /** A contact's other as it was before its shipSync (OTHER_BEFORE), by tick and id */
   private readonly touched = new Map<string, ShipDerived>();
+  /** A contact's other as the snapshot found it, by tick and id (it may be gone by the time the replica is stepped: removed in that very snapshot) */
+  private readonly kept = new Map<string, ShipState>();
   readonly stats = { rows: 0, failed: 0 };
 
   constructor(private readonly host: ShipCausesHost) {}
@@ -82,8 +86,10 @@ export class ShipCauses implements ReplicaCauses {
         earliest = Math.min(earliest, t);
         this.stats.rows += rows.length;
         for (const r of rows) {
-          if (r.row[0] === OWN_CAUSE.CONTACT && r.row[2] & CONTACT_FLAG.OTHER_BEFORE) {
-            const d = this.before.get(r.row[1]);
+          if (r.row[0] === OWN_CAUSE.CONTACT) {
+            const os = store.get(r.row[1]);
+            if (os) this.kept.set(t + ':' + r.row[1], os);
+            const d = r.row[2] & CONTACT_FLAG.OTHER_BEFORE ? this.before.get(r.row[1]) : undefined;
             if (d) this.touched.set(t + ':' + r.row[1], d);
           }
           if (r.row[0] === OWN_CAUSE.REBUILD) {
@@ -101,7 +107,7 @@ export class ShipCauses implements ReplicaCauses {
       if (!ticks.size || !reps.has(id)) this.rows.delete(id);
     }
     for (const [id, u] of this.until) if (u.tick < old || !reps.has(id)) this.until.delete(id);
-    if (this.touched.size > 64) for (const k of [...this.touched.keys()]) if (Number(k.split(':')[0]) < old) this.touched.delete(k);
+    for (const m of [this.touched, this.kept] as Map<string, unknown>[]) if (m.size > 64) for (const k of [...m.keys()]) if (Number(k.split(':')[0]) < old) m.delete(k);
   }
 
   /** A ship gone (removed, out of view): its causes with it */
@@ -114,6 +120,7 @@ export class ShipCauses implements ReplicaCauses {
     this.rows.clear();
     this.until.clear();
     this.touched.clear();
+    this.kept.clear();
     this.before.clear();
   }
 
@@ -164,13 +171,14 @@ export class ShipCauses implements ReplicaCauses {
       restitution: tuning.collision?.restitution ?? 0.3,
       self: ship && d ? shapeOf(ship, d, store.geometry(ship)) : null,
       other: (o) => {
-        const os = store.get(o);
+        const os = store.get(o) ?? this.kept.get(t + ':' + o);
         if (!os) return null;
         const od = this.touched.get(t + ':' + o) ?? (o === this.host.self() ? this.host.ownDerived?.(t) : this.derived(o, t)) ?? os.derived;
         if (!od) return null;
         // (Its replica as the pass had it: a row with the state doesn't read it, and one not held has none)
         const row = rows.find((r) => r.row[0] === OWN_CAUSE.CONTACT && r.row[1] === o);
-        const at = reps.has(o) && row && !(row.row[2] & CONTACT_FLAG.STATE) ? this.midOf(o, t, row.seq) : null;
+        const stateless = reps.has(o) && row && !(row.row[2] & CONTACT_FLAG.STATE);
+        const at = !stateless ? null : o === this.host.self() ? this.host.ownMid?.(t, id) ?? null : this.midOf(o, t, row.seq);
         return { shape: shapeOf(os, od, store.geometry(os)), body: at ? { x: at.x, y: at.y, angle: at.angle, vx: at.vx, vy: at.vy } : { x: 0, y: 0, angle: 0, vx: 0, vy: 0 } };
       },
       rebuilt: () => (u && u.tick === t ? { from: u.from, to: u.to } : null),

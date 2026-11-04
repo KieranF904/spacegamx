@@ -20,7 +20,11 @@ export interface CauseEvent {
    * A contact: whether a replica of the other before that tick's causes is the pass's (then the row may go without the
    * state), the other's versions then (a keyframe of it since: the client's replica moved), and its rebuilds then
    */
-  contact?: { other: number; inStep: boolean; preStep?: boolean; version: number; cver: number; rebuilds: number; before?: boolean };
+  contact?: {
+    other: number; inStep: boolean; preStep?: boolean; version: number; cver: number; rebuilds: number; before?: boolean;
+    /** The other flown by its body (CAPS.BODIES): whether its bodied shadow, as clients running it have it, was the pass's; its version then */
+    bodyStep?: boolean; bcver?: number;
+  };
 }
 
 /** A tick's causes as rows (a contact with the other's state), with what applying them needs */
@@ -67,7 +71,7 @@ export function recordCauses(list: CauseEvent[], w: WorkedCauses, tick: number):
 }
 
 /** What a shadow is, for settling a contact with it: stepped on which tick, its body before that tick's causes, and those */
-export interface ContactOther { stepped?: number; pre?: FlightBody; preTick?: number; body: FlightBody; version: number; cver: number; bodied?: unknown; own?: unknown; worked?: WorkedCauses; workedTick?: number }
+export interface ContactOther { stepped?: number; pre?: FlightBody; preTick?: number; body: FlightBody; version: number; cver: number; bodied?: ContactOther; worked?: WorkedCauses; workedTick?: number }
 
 /**
  * This tick's contacts, once every shadow is stepped: is the other's replica, as the pass had it before the pair, what
@@ -88,14 +92,16 @@ export function settleContacts(events: readonly CauseEvent[], tick: number, shad
     c.inStep = ok && same(midOf(o!, tick, events[i].seq));
     // (Before all its causes that tick: what a pilot's own client reads of it, OwnTick, which has no other's causes in order)
     c.preStep = ok && same(o!.preTick === tick ? o!.pre : o!.body);
+    // (Flown by its body: the shadow clients running it have)
+    const ob = o?.bodied;
+    c.bcver = ob?.cver ?? -1;
+    c.bodyStep = !!ob && ob.stepped === tick && same(midOf(ob, tick, events[i].seq));
   }
 }
 
 /** A shadow's body on this tick just before the cause at `seq`: before the tick's causes, then the ones before it */
 function midOf(o: ContactOther, tick: number, seq: number): FlightBody | null {
   if (o.preTick !== tick || o.workedTick !== tick || !o.worked) return o.body;
-  // (A pilot's own ship: its client's other causes that tick aren't among the records, so only before them all)
-  if (o.own) return o.pre!;
   const w = o.worked, body = { ...o.pre! }, rows: number[][] = [];
   for (let i = 0; i < w.rows.length; i++) if (w.seqs[i] < seq) rows.push(w.rows[i]);
   if (rows.length && !applyCauseRows(body, rows, w.env)) return null;

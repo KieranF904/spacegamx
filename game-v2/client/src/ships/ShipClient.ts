@@ -285,7 +285,7 @@ export class ShipClient {
     this.own = new OwnTick({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, tuning: opts.tuning, restep: () => this.bodies.on });
     this.bodies = new BodyRunner({ reps: this.replicas });
     // (Other ships' causes on the tick layer, CAPS.CAUSES: ships/causes/ShipCauses.ts)
-    this.causes = new ShipCauses({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, ownDerived: (t) => this.own.derived(t), tuning: opts.tuning });
+    this.causes = new ShipCauses({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, ownDerived: (t) => this.own.derived(t), ownMid: (t, o) => (this.own.on ? this.own.midOf(t, o) : null), tuning: opts.tuning });
     // (Cells dropped from its focus, kept a while: CAPS.FOCUS, ships/cells/CellCache.ts)
     this.cells = new CellCache({ reps: this.replicas, send: (m) => opts.send(m), forget: (id) => { this.bodies.remove(id); opts.state.entities.delete(id); } });
   }

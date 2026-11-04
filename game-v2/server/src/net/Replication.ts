@@ -112,7 +112,7 @@ interface Shadow {
    * controls and push the body made. Its own keyframe versions (counting down from -1, as an own ship's): a client that
    * runs the body is sent a keyframe only when this leaves the real ship (a contact, a shed, an EMP), never rows
    */
-  bodied?: { body: FlightBody; version: number; cver: number; gen: number; diverged: boolean; caused: boolean; rebuilds: number };
+  bodied?: { body: FlightBody; version: number; cver: number; gen: number; diverged: boolean; caused: boolean; rebuilds: number; stepped?: number; pre?: FlightBody; preTick?: number; worked?: WorkedCauses; workedTick?: number };
   /** Its control changes of earlier windows, [tick, bits, q], the last CELL_HOLD_TICKS and more (the focus grid's logs, CAPS.FOCUS) */
   log?: number[];
 }
@@ -310,8 +310,12 @@ export class Replication {
     b.vx += by.ix; b.vy += by.iy;
     replicaStep(ReplicaMode.Pilotless, b, { bits: by.bits, targetAngle: replicaAngle(ReplicaMode.Pilotless, by.q) }, derived, this.ships.tuning, this.host.env(eid), tick);
     this.bodyStats.stepped++;
+    sb.stepped = tick;
     // (Its causes: CAUSES clients running it work them out; the rest are sent a keyframe of it)
     if (worked) {
+      sb.pre = { ...b };
+      sb.preTick = sb.workedTick = tick;
+      sb.worked = worked;
       if (!applyOwnCauses(b, worked.rows, worked.env)) { sb.diverged = true; return; }
       sb.caused = true;
     }
@@ -490,13 +494,17 @@ export class Replication {
     // step (no keyframe of it since the contact, none now) and not flown by its body here
     if (caused.length) {
       const ownKeyed = !!mine?.own && known.get(self) !== mine.own.version;
-      const inStep = (o: number, cver: number) => {
-        if (o === self) return !!mine?.own && !ownKeyed;
+      const inStep = (c: NonNullable<CauseEvent['contact']>) => {
+        const o = c.other;
+        if (o === self) return c.inStep && !!mine?.own && !ownKeyed;
         const os = this.shadows.get(o);
-        return !!os && !keyed.has(o) && !(os.bodied && bodies?.(o)) && os.cver === cver && known.get(o) === os.cver;
+        if (!os || keyed.has(o)) return false;
+        // (One flown by its body here: its bodied shadow is what this client has of it)
+        if (os.bodied && bodies?.(o)) return !!c.bodyStep && os.bodied.cver === c.bcver && known.get(o) === os.bodied.cver;
+        return c.inStep && os.cver === c.cver && known.get(o) === os.cver;
       };
       const { rows, stateless } = causeRecords(caused.map(([eid, s]) => [eid, s.causes] as const), snapshotTick,
-        (e) => !!e.contact && e.contact.inStep && inStep(e.contact.other, e.contact.cver), (e) => !!e.contact && this.before(e.contact, synced));
+        (e) => !!e.contact && inStep(e.contact), (e) => !!e.contact && this.before(e.contact, synced));
       this.causeStats.rows += rows.length;
       this.causeStats.stateless += stateless;
       out.causes = rows;
