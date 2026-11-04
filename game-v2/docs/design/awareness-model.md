@@ -6,6 +6,43 @@ docs/design/packed-frames.md, docs/design/deterministic-maths.md and the two 202
 (docs/audits/lockstep-alignment-2026-11-04.md, docs/audits/optimisation-before-after-2026-11-04.md). Code references are
 to the working tree on `refactor/split` at 764619d.
 
+## 0. Kieran's decisions (2026-11-04; they override the text below where they differ)
+
+- **Cells.** Fixed 8,192-unit grid, origin at the system centre.
+- **Focus = every cell within 19 km of your ship**, picked by distance, one flat threshold (no in/out hysteresis, no
+  anchor cell), fixed whatever the zoom. A cell counts when its nearest point is within 19 km. That is 27 cells on
+  average (25-30), about 1,800 km², roughly a third of today's 5,000 km² view circle (the 3x3 was 576 km²). Simulated bit
+  for bit on the client's tick layer.
+- **Fade from 18 km.** The client draws entities as ghosts from 18 km in, by distance, purely visual: nothing on the wire
+  depends on it.
+- **Ring = every cell within 35 km**, ghosts only, not simulated, flat threshold. About 75 cells in all, so about 48
+  beyond the focus.
+- **Dropped-cell cache.** When a cell leaves the focus the client keeps its state, stamped with the drop tick, for 10 s.
+  On re-entry it sends (cell, tick T, hash H). If the server's recorded hash for that cell at T matches and the cell's log
+  since T is smaller than a snapshot, the server sends the log (inputs, decision inputs, entry records) since T and the
+  client fast-forwards. Otherwise it sends a snapshot. The server keeps per-cell encoded logs for the hold period, shared,
+  with no per-client cache state. The client caps its replay length.
+- **No context inheritance. Effects, not sources.** Server-resolved scheduled waypoints go to focus entities whose target
+  is outside the focus, and are derived locally when both ends are simulated. Updates are tick-stamped, at a predictable
+  (not fixed) cadence when the server wants one.
+- **Rebuilds at most once per ship per tick**, batched like damage.
+- **Large ships** (255-part limits, turret arcs) are out of scope here.
+
+Where the text below says "3x3", "9 cells", "the 16-cell ring", "anchor cell", "anchor hysteresis" (h_f) or "recentre",
+read the rule above. What this changes:
+
+- No anchor: the focus set is recomputed from your ship's position each window, so it moves by whole cells exactly when a
+  cell's nearest point crosses 19 km. Dithering on a threshold costs a drop and a re-entry, which the 10 s cache makes
+  cheap (a log replay, not a snapshot). That replaces the hysteresis; the bench counts re-entries and their size.
+- The nearest focus edge is 19 km away at the nearest point, further on most sides: weapon reach never meets the edge,
+  and resolved streams (6.6) are needed only for entities near the focus edge whose target is further out.
+- Estimates (section 9): the focus is about 3x the cells of the 3x3 (27 vs 9) and about a third of today's view; the ring
+  is 48 cells, not 16. Scattered and front layouts hold about 3x more pilots than the 3x3 figures say (still about a third
+  of today); the ball is unchanged (everyone is in everyone's focus). Server cost per client is the same shape, with a
+  larger constant, and the crowd bench (docs/audits/crowd-baseline.md) is the yardstick.
+- Cell snapshots: a 19 km move is 2-3 cells at a time on the leading edge (about 3-5 new cells a second at cruise), so
+  the log-replay cache matters more than the snapshot cache in 7.3.
+
 ## 1. Summary
 
 **The problem.** The snapshot path does most of its work per client, multiplied by every ship in the system. Each snapshot,
@@ -25,9 +62,9 @@ view. The cost is clients × entities, and the bytes grow with N² (optimisation
 
 1. **Cells.** Each system is cut into a fixed grid of square cells, 8,192 units a side. Every entity has exactly one
    **home cell** (where it is, with a little hysteresis). A cell is a list, not a copy of anything.
-2. **Focus = the 3×3 around you.** Your client simulates, bit for bit, every entity homed in the 9 cells around its
-   anchor cell. The anchor moves only once you are 2 km past a border.
-   **Context ring = the 16 cells around that.** It is not simulated. It carries ghosts (low-rate closed-form legs, as
+2. **Focus = every cell within 19 km of you.** Your client simulates, bit for bit, every entity homed in those cells
+   (about 27), by distance, with no hysteresis (section 0).
+   **Context ring = the cells within 35 km.** It is not simulated. It carries ghosts (low-rate closed-form legs, as
    map dots do today), designs and names sent ahead so an entry later is small, and nothing else.
 3. **Send effects, not sources.** Things are self-contained by default:
    - A shell entering your focus from outside comes with its own entry record. Its parent never joins your set.
@@ -59,7 +96,7 @@ view. The cost is clients × entities, and the bytes grow with N² (optimisation
 **What it buys** (section 9):
 - **Server CPU** goes from clients × system entities to entities + clients × bytes copied.
 - **Per-client bandwidth** in spread-out fights falls by a quarter to three quarters from the smaller focus alone
-  (24×24 km instead of a 40 km radius), and further, to roughly the input floor, as decision inputs and derived HP
+  (a 19 km focus, about a third of the area of a 40 km radius), and further, to roughly the input floor, as decision inputs and derived HP
   land.
 - **A ball of 300 pilots** in one place stays O(N) per client and O(N²) in egress. No interest scheme removes that:
   everyone there is relevant to everyone. Encode-once makes it affordable in CPU. An in-focus priority budget (phase 7)
@@ -276,9 +313,9 @@ docs/design/netcode-lockstep.md section 7, prototypes/netcode-lab/labserver.js `
 |---|---|
 | cell | a square of side **C = 8,192** units in one system, fixed, indexed by `(floor(x / C), floor(y / C))` |
 | home cell | the one cell an entity's records go in: the cell its position is in, changed only once it is `h_e = 256` past the border |
-| anchor cell | the client's own ship's cell, changed only once it is `h_f = 2,048` past the border |
-| focus | the 3×3 cells around the anchor: every entity homed there is simulated on the client's tick layer |
-| ring | the 16 cells around the focus: ghosts, prefetch, nothing simulated |
+| anchor cell | (dropped: the focus is picked by distance, section 0) |
+| focus | every cell whose nearest point is within 19 km of the client's ship: every entity homed there is simulated on the client's tick layer |
+| ring | every cell within 35 km that is not in the focus: ghosts, prefetch, nothing simulated |
 | footprint (nimbus) | the cells an entity's reach touches: its home cell ± `ceil(reach / C)` (section 7.1) |
 | entity block | one entity's records for one snapshot window, encoded once |
 | cell records | births, removals, rock overrides and destructions in a cell for one window |
@@ -645,9 +682,9 @@ Reach per kind (data/ships/tuning.json `weapons`; reach of a shell = speed × li
 - **Ships on cell borders.** Home-cell hysteresis h_e = 256: a ship changes home only once it is 256 into the next cell,
   so dithering on a border costs nothing. Each real change costs an arrival only in the inflow blocks of clients that
   had the old cell but not the new one, which are few.
-- **The focus edge.** Anchor hysteresis h_f = 2,048 (C/4). The focus re-centres only once you are 2 km into the next
-  cell, so the nearest focus edge is always at least C - h_f = 6 km away and the nearest ring edge 14 km. At 1 km/s you
-  recentre about once every 8 s, and each recentre brings 3 cell snapshots.
+- **The focus edge.** Superseded (section 0): a flat 19 km threshold, no hysteresis. A cell crosses it as your ship
+  moves; dithering costs a drop and a re-entry, and the 10 s dropped-cell cache turns the re-entry into a log replay.
+  At 1 km/s a cell enters about every 8 s per leading edge.
 - **Ships at exactly weapon range.** Not a boundary any more: nothing is pulled in by range, so there is nothing to flap.
   The lab's 3 s stickiness is no longer needed for that.
 - **Fast ships crossing many cells.**
@@ -660,10 +697,15 @@ Reach per kind (data/ships/tuning.json `weapons`; reach of a shell = speed × li
     the burn.
 - **Teleports, respawns, system changes, rifts.** A full focus entry: 9 cell snapshots. Respawns already happen at the
   end of a tick, the lab's rule.
-- **A cell's sticky exit.** Not needed with anchor hysteresis. If churn shows up in the bench, keep a dropped cell held
-  2 s.
+- **A cell's exit.** The client holds a dropped cell for 10 s (section 0 and 7.3), so re-entry costs a log, not a snapshot.
 
 ### 7.3 Cell entry snapshots: shared and cached
+
+Dropped-cell cache (Kieran, section 0): the client keeps a dropped cell stamped with the drop tick for 10 s and sends
+(cell, T, H) on re-entry. If the server's hash for that cell at T matches and the log since T is smaller than a snapshot,
+it sends the log and the client fast-forwards, else a snapshot. The server keeps shared per-cell encoded logs for the
+10 s hold period and nothing per client; the client caps its replay length. What follows is the snapshot cache, which
+still serves first entries and mismatches.
 
 - **Shared.** A snapshot of cell c at tick T is the same for every client entering c at T, so it is encoded once.
 - **Cached.** Snapshot(T0) plus c's blocks and its inflows (all 8 directions) for T0..T is a valid entry at T. Invariant
@@ -688,8 +730,8 @@ Reach per kind (data/ships/tuning.json `weapons`; reach of a shell = speed × li
 - **The screen.** The furthest flight zoom (InputManager `minZoom` 0.04) shows about ±24 km by ±13.5 km. Focus plus ring
   covers ±14 to ±22 km, with simulated motion inside 6-14 km. Further out, ghosts and today's map-dot legs (SimLod
   routes, `MAP_DOT_SLACK`) draw what's there.
-- **Density.** A 3×3 of 8 km is 576 km², against today's view circle of about 5,000 km² (40 km radius): nine times less
-  area to simulate in spread-out play.
+- **Density.** A 19 km focus is about 27 cells, 1,800 km², against today's view circle of about 5,000 km² (40 km
+  radius): about three times less area to simulate in spread-out play (the 3x3 was nine times less).
 - **Smaller cells (4 km)** would put fights 3 km away into the ring, as unsimulated ghosts at the default zoom, and
   multiply arrivals. **Bigger cells (16 km)** bring today's 40 km view back.
 
@@ -897,7 +939,7 @@ Rocks are already seeded, plus an override table. With cells:
 
 | today | in this design |
 |---|---|
-| `shipView` (40/48 km radius, party, target) | the focus (9 cells, anchor hysteresis); party and target as ghosts in the ring or the map unless in focus |
+| `shipView` (40/48 km radius, party, target) | the focus (cells within 19 km, flat); party and target as ghosts in the ring or the map unless in focus |
 | `systemRows` built per system, then filtered and keyed per client | entity blocks built once per entity; cells list them |
 | `lastEntityStates`, `repKnown`, `shipSynced`, `shipHpSent` per client | the wire shadow, per entity |
 | `Replication.forClient` per client | gone: keyframes and control rows are block content |
