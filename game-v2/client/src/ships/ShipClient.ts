@@ -444,7 +444,7 @@ export class ShipClient {
     this.selfHits.onKeyframes(m.ships);
     this.selfHits.onCaused(m.causes);
     // (a boss its body flies here: its hits are the server's records until its body has its hit rules, HitLedger 'body')
-    for (const id of this.bodies.ids()) this.selfHits.onSync(id);
+    for (const id of this.bodies.told()) this.selfHits.onSync(id);
     // (searched once this frame's told records are in: findHits)
     this.selfHits.open(m.tick);
   }

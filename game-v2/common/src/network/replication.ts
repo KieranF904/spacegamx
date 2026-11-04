@@ -196,8 +196,8 @@ export interface OwnTimeline {
  * from `step`: not this tick (the body is off: the rows fly it).
  */
 export interface BodyDriver {
-  /** Tick t's controls and push, from the ship as it ended tick t - 1 */
-  step(t: number, prev: FlightBody): { bits: number; q: number; ix: number; iy: number } | null;
+  /** Tick t's controls and push, from the ship as it ended tick t - 1 and the aim it flew that tick with */
+  step(t: number, prev: FlightBody, prevQ: number): { bits: number; q: number; ix: number; iy: number } | null;
   /** After its step at tick t (the body's check is of this) */
   after?(t: number, body: FlightBody): void;
 }
@@ -503,7 +503,7 @@ export class ShipReplicaSet {
       const t = r.last + 1;
       const ev = own ? own.ctl(t) : r.events.get(t);
       // (Flown by its body: its controls and push from that, CAPS.BODIES)
-      const by = driver?.step(t, cur.body);
+      const by = driver?.step(t, cur.body, cur.q);
       const bits = by ? by.bits : ev ? ev[0] : cur.bits, q = by ? by.q : ev ? ev[1] : cur.q;
       const body = cloneBody(cur.body);
       if (by) { body.vx += by.ix; body.vy += by.iy; }

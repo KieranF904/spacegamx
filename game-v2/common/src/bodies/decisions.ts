@@ -105,7 +105,7 @@ export function applyDecision(s: BodyState, op: number, args: readonly number[],
 
 /** Is this a row the decisions can take ([id, dt, op, ...args], whole numbers, a known op)? */
 export function decisionRowOk(row: unknown): row is number[] {
-  if (!Array.isArray(row) || row.length < 3 || row.length > 16) return false;
+  if (!Array.isArray(row) || row.length < 3 || row.length > 32) return false;
   for (const v of row) if (typeof v !== 'number' || !Number.isInteger(v)) return false;
   return row[0] >= 0 && row[2] >= 0 && row[2] < DECISION_OPS;
 }
@@ -113,4 +113,9 @@ export function decisionRowOk(row: unknown): row is number[] {
 /** Do these caps have the client run bosses' bodies (CAPS.BODIES, with OWN_SIM: a body reads its own ship there)? */
 export function bodiesFor(caps: number | undefined): boolean {
   return ((caps ?? 0) & CAPS.BODIES) !== 0 && ownSimCaps(caps);
+}
+
+/** Do these caps have the client run the enemy AI's pilots too (CAPS.PILOTS, with BODIES)? */
+export function pilotsFor(caps: number | undefined): boolean {
+  return ((caps ?? 0) & CAPS.PILOTS) !== 0 && bodiesFor(caps);
 }

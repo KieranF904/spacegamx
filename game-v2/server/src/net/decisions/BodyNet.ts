@@ -16,7 +16,7 @@
  * A body is only as exact as what it reads: a target whose replica was off on a client this window (it gets a
  * keyframe of it) costs that client a keyframe of the boss too.
  */
-import { DECISION, bodyHash, bodyCheckByte, syncArgs, unwrapTick12, type BodyState, type FlightBody } from '@space-game/common';
+import { DECISION, BODY_KINDS, bodyHash, bodyCheckByte, syncArgs, unwrapTick12, type BodyState, type FlightBody } from '@space-game/common';
 
 /** Decisions kept a boss (ticks): longer than any client's snapshots are apart */
 const KEEP_TICKS = 600;
@@ -27,6 +27,8 @@ export interface BodyNetHost {
   tick(): number;
   /** The boss's ship as it is now (null: gone) */
   body(eid: number): FlightBody | null;
+  /** Is its ship still there */
+  has(eid: number): boolean;
 }
 
 /** What a client sends of its bodies (CAPS.BODIES): the low byte of its hash sum as of a snapshot's tick */
@@ -56,7 +58,7 @@ export class BodyNet {
     b.state = state;
     // (Its body off and its ship gone (despawned, blown apart: its brain let go): nothing more to send of it. Its id may
     // be another ship's later (entity ids are reused), so it's forgotten now, not when some client's snapshot notices)
-    if (op === DECISION.OFF && !this.host.body(eid)) { this.bosses.delete(eid); return; }
+    if (op === DECISION.OFF && !this.host.has(eid)) { this.bosses.delete(eid); return; }
     b.log.push([this.host.tick(), op, ...args]);
     this.stats.decisions++;
     const old = this.host.tick() - KEEP_TICKS;
@@ -76,27 +78,38 @@ export class BodyNet {
     return this.clients.get(conn)?.runs.has(eid) ?? false;
   }
 
+  /** Does this client run its body, one whose hits are told (a boss's: what a hit does is still its brain's, BodyKind.toldHits) */
+  toldHits(conn: object, eid: number): boolean {
+    if (!this.runs(conn, eid)) return false;
+    const b = this.bosses.get(eid);
+    return !!b && !!BODY_KINDS[b.state.kind]?.toldHits;
+  }
+
   /**
    * One snapshot's decision rows for a client ([id, dt, op, ...args]). `view(id)`: in its view; its target must be,
    * or be itself. `known`: its keyframe versions (a boss it starts running is dropped from it: a keyframe goes with the
    * SYNC). `rekeyed(id)`: this snapshot brings it a keyframe of that ship (what it had of it this window was off): a
    * boss whose target that is gets one too, as its body read the target off
    */
-  forClient(conn: object, self: number, systemOf: (eid: number) => number, systemId: number, known: Map<number, number>, tick: number, view: (eid: number) => boolean, rekeyed?: (eid: number) => boolean): number[][] {
+  forClient(conn: object, self: number, systemOf: (eid: number) => number, systemId: number, known: Map<number, number>, tick: number, view: (eid: number) => boolean, rekeyed?: (eid: number) => boolean, pilots = false): number[][] {
     const c = this.client(conn), rows: number[][] = [];
+    const holds = (id: number) => id === self || known.has(id) || view(id);
     for (const [eid, b] of this.bosses) {
-      if (!this.host.body(eid)) { this.bosses.delete(eid); c.runs.delete(eid); continue; }
-      const s = b.state;
-      const can = s.on && systemOf(eid) === systemId && view(eid) && (s.target === self || known.has(s.target) || view(s.target));
+      if (!this.host.has(eid)) { this.bosses.delete(eid); c.runs.delete(eid); continue; }
+      const s = b.state, kind = BODY_KINDS[s.kind];
       const runs = c.runs.has(eid);
+      if (!runs && (!s.on || systemOf(eid) !== systemId)) continue;
+      // (Every ship its body reads held: its target, a pack's other ships. The enemy AI's pilots only with CAPS.PILOTS)
+      const reads = kind?.reads(eid, s) ?? [];
+      const can = !!kind && s.on && (pilots || !kind.pilot) && systemOf(eid) === systemId && view(eid) && reads.every(holds);
       if (can && !runs) {
         rows.push([eid, 0, DECISION.SYNC, ...syncArgs(s)]);
         rekey(known, eid);
         c.runs.add(eid);
         this.stats.syncs++;
       } else if (can) {
-        // (its target was off on this client this window: so was what its body made of it)
-        if (rekeyed?.(s.target)) { rekey(known, eid); this.stats.targetKeyed++; }
+        // (a ship it reads was off on this client this window: so was what its body made of it)
+        if (rekeyed && reads.some(rekeyed)) { rekey(known, eid); this.stats.targetKeyed++; }
         for (const d of b.log) {
           if (d[0] <= c.through) continue;
           if (d[0] > tick) break;

@@ -12,7 +12,7 @@ const state = (on: boolean): BodyState => ({ kind: 0, homeX: 0, homeY: 0, stage:
 function net() {
   const live = new Set<number>([5, 7]);
   let tick = 100;
-  const n = new BodyNet({ tick: () => tick, body: (eid) => (live.has(eid) ? pose : null) });
+  const n = new BodyNet({ tick: () => tick, body: (eid) => (live.has(eid) ? pose : null), has: (eid) => live.has(eid) });
   const rows = (conn: object) => n.forClient(conn, 7, () => 1, 1, new Map([[5, 1], [7, 1]]), tick, () => true);
   return { n, live, rows, step: () => tick++ };
 }

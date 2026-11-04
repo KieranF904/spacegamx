@@ -297,7 +297,7 @@ export class FakeHitsClient {
     if (this.selfHits) {
       this.selfHits.onKeyframes(s.ships);
       this.selfHits.onCaused(s.causes);
-      for (const id of this.bodies?.ids() ?? []) this.selfHits.onSync(id);
+      for (const id of this.bodies?.told() ?? []) this.selfHits.onSync(id);
       this.selfHits.open(s.tick);
     }
   }

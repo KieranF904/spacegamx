@@ -71,7 +71,7 @@ export abstract class StagedBrain implements BossBrain {
 
   constructor(protected host: BrainHost, protected tables: StagedTables, brain: string) {
     const kind = Math.max(0, BODY_KINDS.findIndex((k) => k.brain === brain));
-    this.flight = BODY_KINDS[kind].flight;
+    this.flight = BODY_KINDS[kind].flight!;
     this.body = { kind, homeX: 0, homeY: 0, stage: 1, side: 1, target: -1, want: wantFly(), wantAt: 0, on: false };
   }
 

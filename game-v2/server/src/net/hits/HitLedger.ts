@@ -49,7 +49,7 @@ export interface HitLedgerHost {
   readonly net: Outbox;
   getShips(): ShipBridge;
   /** Bosses flown by their bodies on a client's tick layer (CAPS.BODIES, net/decisions/BodyNet.ts) */
-  readonly bodies?: { runs(conn: object, eid: number): boolean };
+  readonly bodies?: { toldHits(conn: object, eid: number): boolean };
 }
 
 /** What bridge hitProjectile says of a shell's hit on a ship */
@@ -259,7 +259,7 @@ export class HitLedger {
     if (h.target === conn.playerId) return 'self';
     // (A boss its body flies here: how much of a hit it takes (braced, laid open, between stages) is still its brain's,
     // until its body has its hit rules too: decision inputs build stage 4)
-    if (this.host.bodies?.runs(conn, h.target)) return 'body';
+    if (this.host.bodies?.toldHits(conn, h.target)) return 'body';
     if (this.oldWayShells.get(conn)?.has(h.proj)) return 'oldWay';
     const target = ships.get(h.target);
     if (!target || target.kind === 'debris') return 'debris';

@@ -14,8 +14,8 @@
  * hash at the last snapshot's tick, on an input that goes anyway, every CHECK_EVERY ticks at most.
  */
 import {
-  DECISION, BODY_KINDS, applyDecision, bodyStateOfSync, cloneBodyState, stagedFlight, bodyHash, bodyCheckByte,
-  type BodyState, type BodyDriver, type ShipReplicaSet, type FlightBody,
+  DECISION, BODY_KINDS, applyDecision, bodyStateOfSync, cloneBodyState, bodyHash, bodyCheckByte,
+  type BodyState, type BodyDriver, type BodyReads, type ShipReplicaSet, type FlightBody,
 } from '@space-game/common';
 
 /** Ticks between its checks (riding an input) */
@@ -65,6 +65,11 @@ export class BodyRunner {
   /** Bosses it runs now */
   ids(): IterableIterator<number> {
     return this.runs.keys();
+  }
+
+  /** Those whose hits are told (a boss's: its hit rules are still its brain's, BodyKind.toldHits) */
+  *told(): IterableIterator<number> {
+    for (const [id, run] of this.runs) if (BODY_KINDS[run.states.get(run.syncTick)?.kind ?? -1]?.toldHits) yield id;
   }
 
   /** A snapshot's decisions, after its keyframes and rows went in (ShipReplicaSet.apply) */
@@ -140,14 +145,15 @@ export class BodyRunner {
 
   private driver(id: number, run: Run): BodyDriver {
     return {
-      step: (t: number, prev: FlightBody) => {
+      step: (t: number, prev: FlightBody, prevQ: number) => {
         const s = this.stateAt(run, t);
-        if (!s?.on || s.target < 0) return null;
-        const tg = this.host.reps.preAt(s.target, t);
-        if (!tg) { this.stats.blind++; return null; }
-        const kind = BODY_KINDS[s.kind];
-        if (!kind) return null;
-        return stagedFlight(kind.flight, s, prev, tg, t);
+        const kind = s?.on ? BODY_KINDS[s.kind] : undefined;
+        if (!s || !kind) return null;
+        // (its target as the server's step reads it; the rest as they ended the tick before)
+        const read: BodyReads = { now: (o) => this.host.reps.preAt(o, t), before: (o) => this.host.reps.at(o, t - 1)?.body ?? null };
+        const out = kind.step(id, s, prev, read, t, prevQ);
+        if (!out) this.stats.blind++;
+        return out;
       },
     };
   }

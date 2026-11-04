@@ -705,6 +705,7 @@ export class GameServer implements ServerCtx {
         const s = this.ships.get(eid);
         return s ? { x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid], angle: Rotation.angle[eid], angVel: s.angVel } : null;
       },
+      has: (eid) => this.ships.has(eid),
     });
     // (what flies by the waypoint law: homing shells and mobs)
     this.guides = new GuideNet({ tick: () => this.currentTick, sources: () => [this.weapons, this.mobs], systemOf: (eid) => InSystem.systemId[eid] });
@@ -1775,6 +1776,8 @@ this.devTeleport = opts.devTeleport ?? false;
       effect: (num: number, x: number, y: number, kind: 'warning' | 'warpIn' | 'launch') => this.arrivalEffect(num, x, y, kind),
       gates: (num: number) => [...portalQuery(this.world)].filter((g) => InSystem.systemId[g] === num && Portal.kind[g] === 0).map((g) => ({ x: Position.x[g], y: Position.y[g] })),
       safeAt: (num: number, x: number, y: number) => inSafeSpace(this.gameData.getSystemByNum(num), x, y),
+      // (the enemy AI's pilots' decisions, CAPS.PILOTS: net/decisions/BodyNet.ts)
+      decide: (eid: number, op: number, args: readonly number[], state: BodyState) => this.bodies.decide(eid, op, args, state),
       systemNum: (id: string) => (this.gameData.getSystem(id) ? this.gameData.getSystemNum(id) : -1),
       systemId: (num: number) => this.gameData.getSystemByNum(num)?.id,
       systemRadius: (num: number) => {

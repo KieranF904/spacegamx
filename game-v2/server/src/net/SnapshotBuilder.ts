@@ -39,7 +39,7 @@ import { portalQuery } from './handlers/flight.js';
 import { SELF_SAFETY_TICKS, SNAP_PROJECTILE_RANGE, SNAP_POD_RANGE, SHIP_VIEW_IN, SHIP_VIEW_OUT, MAP_DOTS_TICKS, DEBRIS_ACK_TICKS } from './snapshot/constants.js';
 import type { HitLedger } from './hits/HitLedger.js';
 import { ownShotsFor, ownVolleyExact, ownSimFor } from './snapshot/ownShots.js';
-import { bodiesFor, focusFor, causesFor, waypointsFor, replicasByte, jumpPhase, jumpTuning } from '@space-game/common';
+import { bodiesFor, pilotsFor, focusFor, causesFor, waypointsFor, replicasByte, jumpPhase, jumpTuning } from '@space-game/common';
 import { FocusCells } from './cells/FocusCells.js';
 import type { BodyNet } from './decisions/BodyNet.js';
 import type { GuideNet } from './guides/GuideNet.js';
@@ -614,7 +614,7 @@ export class SnapshotBuilder {
       // (Other ships' causes on its tick layer, CAPS.CAUSES: keyframes only where they don't explain a ship's path)
       const causes = causesFor(conn.caps);
       const decisions = bodies?.forClient(conn, conn.playerId, (e) => InSystem.systemId[e] ?? -1, playerSystemId ?? -1, conn.repKnown, this.currentTick,
-        (e) => !conn.shipView || conn.shipView.has(e), (e) => this.replication.keysFor(e, conn.playerId, conn.repKnown, causes));
+        (e) => !conn.shipView || conn.shipView.has(e), (e) => this.replication.keysFor(e, conn.playerId, conn.repKnown, causes), pilotsFor(conn.caps));
       // Homing shells and mobs on its tick layer (CAPS.WAYPOINTS): their SYNCs and records, and from here no rows of them
       const guidesOn = this.guides && waypointsFor(conn.caps) ? this.guides : null;
       if (!guidesOn) this.guides?.drop(conn);

@@ -32,7 +32,9 @@ import {
   Position, Velocity, Rotation, InSystem, Player, Dead, Radius,
   Blueprint, Bag, ShipState, partItemId, mulberry32,
   MAX_GRADE, markName, regrade, blueprintGrade, gradeReward, rateShip, ratingOf, createShipState, placeCost, type Economy, plated, partWeaponDef, endsAtAim, migratePartItem,
-  nestPosition, NEST_RADIUS, type NestData, type PlanetData, type StarSystemData, datan2, dcos, dhypot, dsin } from '@space-game/common';
+  nestPosition, NEST_RADIUS, type NestData, type PlanetData, type StarSystemData, datan2, dcos, dhypot, dsin,
+  orderEngage, orderFlee, orderPatrol, orderReturn, aiAimError, type BodyState, type WantRec } from '@space-game/common';
+import { AiPilots } from './brains/aiPilot.js';
 import { nestBand, clampBand, stepRound, placesOfInterest, looseWaypoint, nomadDestination, LOOSE_REACH, type RoamStyle, type Band, type XY } from './Roaming.js';
 import type { ShipBridge, PilotOrders } from '../ships/ShipBridge.js';
 import type { Intent, Plan, FarPose } from '../ships/SimLod.js';
@@ -235,6 +237,8 @@ export interface EnemyHost {
   gates?(num: number): { x: number; y: number }[];
   /** In the system's safe space (inner Sol): hostiles leave pilots there alone */
   safeAt?(num: number, x: number, y: number): boolean;
+  /** A pilot's decision, for the clients that run its body (CAPS.PILOTS: net/decisions/BodyNet.ts) */
+  decide?(eid: number, op: number, args: readonly number[], state: BodyState): void;
 }
 
 /** Party members this close to a kill share it */
@@ -267,10 +271,9 @@ interface Enemy {
   waypoint: { x: number; y: number };
   strafe: number;
   nextThink: number;
-  /** Aim error (radians), re-rolled as it thinks: nobody shoots perfectly */
+  /** Aim error (radians): its aim's off by up to this either way, re-rolled from `aimSeed` every 12 + id % 7 ticks */
   aimErr: number;
-  /** The heading it steers by, held until the wanted one drifts a couple of degrees (fewer control changes to replicate) */
-  face?: number;
+  aimSeed?: number;
   /** How far its guns really reach (worked out from its loadout the first time it fights), and whether it lobs shells */
   reach?: number;
   lobs?: boolean;
@@ -315,6 +318,8 @@ interface Pack {
   /** A nomad: where it's heading (its home slides there), or how long it stays where it is */
   dest?: XY;
   settleUntil?: number;
+  /** Its ships (in id order) and their centroid as they ended the last tick: where a pack's fighters spread round from */
+  cent?: { ids: number[]; x: number; y: number };
 }
 
 /** How fast a nest's ships come out of it (units a tick) */
@@ -361,7 +366,12 @@ export class Enemies {
     this.wards.delete(eid);
   }
 
-  constructor(private host: EnemyHost, private ships: ShipBridge, private data: FactionsFile, private designs: Record<string, Blueprint>) {}
+  /** Its ships' pilots: the commander's orders flown by the shared pilot body (brains/aiPilot.ts) */
+  private readonly pilots: AiPilots;
+
+  constructor(private host: EnemyHost, private ships: ShipBridge, private data: FactionsFile, private designs: Record<string, Blueprint>) {
+    this.pilots = new AiPilots(host);
+  }
 
   /** Is this entity a hostile ship (and of which faction) */
   factionOf(eid: number): string | undefined {
@@ -447,7 +457,7 @@ export class Enemies {
   /** What the enemy AI would do with this ship this tick (a boss's brain starts from it: its target, aim and guns) */
   pilot(eid: number, ship: ShipState): PilotOrders | null {
     const e = this.enemies.get(eid);
-    return e ? this.fly(e, ship) : null;
+    return e ? this.fly(e, ship, false) : null;
   }
 
   /** Send these ships' pack somewhere new (raids head for a station) */
@@ -649,10 +659,19 @@ export class Enemies {
     for (const [eid, e] of this.enemies) {
       if (!this.ships.has(eid)) {
         this.enemies.delete(eid);
+        this.pilots.forget(eid);
         this.packs.get(e.pack)?.members.delete(eid);
       }
     }
     for (const [id, p] of this.packs) {
+      // (Where its fighters spread round from: its ships as they ended the last tick, summed in id order, as a client
+      // running their pilots sums its replicas: common bodies/aiPilot.ts)
+      if (p.members.size > 1) {
+        const ids = [...p.members].sort((a, b) => a - b);
+        let x = 0, y = 0;
+        for (const m of ids) { x += Position.x[m]; y += Position.y[m]; }
+        p.cent = { ids, x: x / ids.length, y: y / ids.length };
+      } else p.cent = undefined;
       if (p.members.size) continue;
       this.packs.delete(id);
       if (p.nest) this.nestCleared(p, now);
@@ -1093,7 +1112,7 @@ export class Enemies {
   // The pilot
   // ---------------------------------------------------------------------------
 
-  private fly(e: Enemy, ship: ShipState): PilotOrders {
+  private fly(e: Enemy, ship: ShipState, asBody = true): PilotOrders {
     const now = this.host.tick();
     const eid = e.eid;
     const f = this.data.factions[e.faction];
@@ -1160,77 +1179,44 @@ export class Enemies {
         e.waypoint = { x: home.x + dcos(a) * r, y: home.y + dsin(a) * r };
       }
       if (this.rng() < 0.04) e.strafe = -e.strafe;
-      // Worse aim against fast movers and at range
+      // Nobody shoots perfectly: its aim's off by up to this much either way, re-rolled as it goes from a seed it rolled
+      // once (common bodies/aiPilot.ts aiAimError: its pilot's body, on the clients that run it too)
       const acc = (b.accuracy ?? 0.85) + (e.elite ? 0.05 : 0);
-      const err = (1 - acc) * 0.45;
-      e.aimErr = (this.rng() - 0.5) * 2 * err;
+      e.aimErr = (1 - acc) * 0.45;
+      const roll = this.rng();
+      e.aimSeed ??= Math.floor(roll * 256);
     }
 
     const t = e.target;
     // Gone, or safe at a station or in safe space: break off (every tick, not just when thinking)
     if ((e.state === 'engage' || e.state === 'flee') && (!this.targetable(t) || (now % 20 === 0 && this.spared(e, t, now)))) { e.state = 'return'; e.target = -1; }
 
-    let mx = 0, my = 0, face = Rotation.angle[eid], firing = false, boost = false;
-    let aim: number | undefined, aimDist = 0;
+    // Its order, flown by the shared pilot (common bodies/aiPilot.ts): on the clients that run its body too
+    let want: WantRec, cent: [number, number] | null = null, reach = 0;
     if (e.state === 'engage') {
-      const tx = Position.x[t], ty = Position.y[t];
-      const dx = tx - x, dy = ty - y;
-      const d = dhypot(dx, dy) || 1;
       if (e.reach === undefined) this.learnLoadout(e, ship);
-      const reach = e.reach ?? Math.max(b.range * 1.8, 900);
-      // Lead the target by the shell's flight time
-      const tof = Math.min(40, d / 45);
-      const rvx = Velocity.x[t] - Velocity.x[eid], rvy = Velocity.y[t] - Velocity.y[eid];
-      const lx = dx + rvx * tof, ly = dy + rvy * tof;
-      face = datan2(ly, lx) + e.aimErr;
-      aim = face;
-      aimDist = dhypot(lx, ly);
-      // Where to fight from: its preferred distance, round the target at its place in the pack's spread;
-      // shot at from beyond its own guns' reach, it closes in fast instead of sitting there taking it
-      const outgunned = d > reach * 0.85 && now - this.ships.lastDamagedTick(eid) < 150 && this.ships.lastHitter(eid) === t;
-      const want = outgunned ? Math.min(b.range, reach * 0.6) : b.range;
-      let side = datan2(y - ty, x - tx);
-      if (pack && pack.members.size > 1) {
-        let cx = 0, cy = 0;
-        for (const m of pack.members) { cx += Position.x[m]; cy += Position.y[m]; }
-        side = datan2(cy / pack.members.size - ty, cx / pack.members.size - tx) + e.flank;
-      }
-      const sx = tx + dcos(side) * want - x, sy = ty + dsin(side) * want - y;
-      const off = dhypot(sx, sy);
-      const ux = dx / d, uy = dy / d;
-      if (outgunned) { mx = ux; my = uy; boost = true; }
-      else if (off > Math.max(250, want * 0.35)) { mx = sx / off; my = sy / off; boost = off > want * 2.5; }
-      else if (d < want * 0.7) { mx = -ux; my = -uy; }
-      else if (b.strafe === undefined || ((now + eid * 7) % 180) / 180 < b.strafe) { mx = -uy * e.strafe; my = ux * e.strafe; }
-      else {
-        // Hold: brake against our own drift
-        const v = dhypot(Velocity.x[eid], Velocity.y[eid]);
-        if (v > 0.6) { mx = -Velocity.x[eid] / v; my = -Velocity.y[eid] / v; }
-      }
+      reach = Math.round(e.reach ?? Math.max(b.range * 1.8, 900));
+      // (shot at lately by its target: its commander's to know, from the damage ledger)
+      const hitBy = now - this.ships.lastDamagedTick(eid) < 150 && this.ships.lastHitter(eid) === t;
+      const c = pack?.cent, mates = c && c.ids.includes(eid) ? c.ids.filter((m) => m !== eid) : undefined;
+      if (c && mates?.length) cent = [c.x, c.y];
+      want = orderEngage(eid, b.range, reach, hitBy, e.aimErr, e.aimSeed ?? 0, b.strafe, cent ? e.flank : undefined, cent ? mates : undefined);
+    } else if (e.state === 'flee') want = orderFlee();
+    else if (e.state === 'return') want = orderReturn(home.x, home.y);
+    else want = orderPatrol(e.waypoint.x, e.waypoint.y, pack?.pace ?? 0.58, pack?.pauseUntil ?? 0);
+    const fights = e.state === 'engage' || e.state === 'flee';
+    const pose = (id: number) => ({ x: Position.x[id], y: Position.y[id], angle: Rotation.angle[id], vx: Velocity.x[id], vy: Velocity.y[id] });
+    // (its body flies it while what it fights is a pilot's ship, or nothing: brains/aiPilot.ts)
+    const bodied = asBody && (!fights || hasComponent(this.host.world, Player, t));
+    const out = this.pilots.fly(eid, fights ? t : -1, e.strafe, want, pose(eid), fights ? pose(t) : null, cent, bodied);
+    let firing = false;
+    if (e.state === 'engage') {
       // Fire within its guns' real reach, when a hit is likely: a big, slow, near target, or a lobbed shell
-      const across = Math.abs(rvx * uy - rvy * ux);
-      const spread = d * (Math.abs(e.aimErr) + 0.015) + across * tof * 0.6;
+      const spread = out.d * (Math.abs(aiAimError(want, eid, now)) + 0.015) + out.across * out.tof * 0.6;
       const size = this.ships.get(t)?.derived.radius ?? Radius.value[t] ?? 60;
-      firing = d <= reach * 0.95 && (d < 900 || e.lobs === true || size / Math.max(1, spread) > 0.25);
-    } else if (e.state === 'flee') {
-      const dx = x - Position.x[t], dy = y - Position.y[t];
-      const d = dhypot(dx, dy) || 1;
-      mx = dx / d; my = dy / d; boost = true;
-      face = datan2(my, mx);
-    } else {
-      const wp = e.state === 'return' ? home : e.waypoint;
-      const dx = wp.x - x, dy = wp.y - y;
-      const d = dhypot(dx, dy) || 1;
-      if (d > 200) { mx = dx / d; my = dy / d; face = datan2(dy, dx); }
-      // Cruise gently on patrol: thrust in pulses (each pack at its own pace), or hold still a while
-      if (e.state === 'patrol' && ((now + eid * 13) % 120 > 120 * (pack?.pace ?? 0.58) || now < (pack?.pauseUntil ?? 0))) { mx = 0; my = 0; }
+      firing = out.d <= reach * 0.95 && (out.d < 900 || e.lobs === true || size / Math.max(1, spread) > 0.25);
     }
-    // Steer by a heading held steady until the wanted one drifts (the guns aim separately, every tick)
-    if (e.face === undefined || Math.abs(datan2(dsin(face - e.face), dcos(face - e.face))) > (e.state === 'engage' ? 0.004 : 0.02)) e.face = face;
-    // Mouse-steer controls are screen-relative: press the directions nearest the wanted motion
-    const controls = { forward: my < -0.38, backward: my > 0.38, left: mx < -0.38, right: mx > 0.38, boost, targetAngle: e.face };
-    void ship;
-    return { controls, firing, aim, aimDist, target: t };
+    return this.pilots.orders(eid, out, firing, t);
   }
 
   /** How far an enemy's guns really reach (its longest), and whether any lob shells */

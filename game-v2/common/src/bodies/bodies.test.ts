@@ -13,6 +13,7 @@ import {
 import { stagedFlight } from './stagedFlight.js';
 import { BODY_KINDS, bodyKindOf } from './registry.js';
 import { bodyHash } from './hash.js';
+import { AI_ORDER, aiAimError, aiPilot, aiReads, orderEngage, orderPack, orderPatrol, packCentroid } from './aiPilot.js';
 
 const rows = [
   [4253, 0, DECISION.SYNC, 0, 64840, 32349, 1, 1, 4242, WANT.FLY],
@@ -87,7 +88,7 @@ describe('a body\'s state and flight', () => {
   });
 
   it('the staged flight is a pure function of its inputs, on the wire\'s grids', () => {
-    const T = BODY_KINDS[bodyKindOf('scrap_mother')].flight;
+    const T = BODY_KINDS[bodyKindOf('scrap_mother')].flight!;
     const s = bodyStateOfSync([0, 64840, 32349, 2, 1, 4243, WANT.FLY], 100);
     const me = { x: 63003.59, y: 35798.18, angle: -2.45234, vx: -17.4099, vy: -4.3344 }, tg = { x: 62341.91, y: 35535.17, angle: -0.39507, vx: -13.8178, vy: -6.3139 };
     const a = stagedFlight(T, s, me, tg, 101), b = stagedFlight(T, { ...s }, { ...me }, { ...tg }, 101);
@@ -106,5 +107,34 @@ describe('a body\'s state and flight', () => {
     expect(h.ix).toBe(0);
     expect(h.iy).toBe(0);
     expect(bodyHash(1, { ...me, angVel: 0 }, s)).toBe(bodyHash(1, { ...me, angVel: 0 }, { ...s }));
+  });
+
+  it('the enemy AI pilot: its orders whole numbers through a SYNC, pure of its inputs, its pack read in id order', () => {
+    const want = orderEngage(4250, 700, 1800.4, true, 0.0675, 201, 0.55, -0.6, [4252, 4249]);
+    for (const v of want) expect(Number.isInteger(v)).toBe(true);
+    expect(want[0]).toBe(AI_ORDER.ENGAGE);
+    expect(orderPack(4250, want)).toEqual([4249, 4250, 4252]);
+    const kind = bodyKindOf('ai');
+    const s = bodyStateOfSync(syncArgs({ kind, homeX: 0, homeY: 0, stage: 1, side: -1, target: 4243, want, wantAt: 300, on: true }), 300);
+    expect(s.want).toEqual(want);
+    expect(aiReads(4250, s)).toEqual([4243, 4249, 4252]);
+    expect(decisionRowOk([4250, 0, DECISION.SYNC, ...syncArgs(s)])).toBe(true);
+    // (its aim error: within its bound, the same for the same tick, re-rolled every 12 + id % 7 ticks)
+    const errs = new Set<number>();
+    for (let t = 0; t < 600; t++) { const e = aiAimError(want, 4250, t); expect(Math.abs(e)).toBeLessThanOrEqual(0.0675 + 1e-9); errs.add(e); }
+    expect(errs.size).toBeGreaterThan(20);
+    expect(aiAimError(want, 4250, 333)).toBe(aiAimError([...want], 4250, 333));
+    const me = { x: 1000.25, y: -40.5, angle: 1.2, vx: 2.5, vy: -1.25 }, tg = { x: 1800, y: 300, angle: 0, vx: -3, vy: 1 };
+    const c = packCentroid([4249, 4250, 4252], (id) => ({ x: id * 3.3, y: -id * 1.1 }));
+    const a = aiPilot(s, me, tg, c, 301, 4250, 1234), b = aiPilot({ ...s }, { ...me }, { ...tg }, c && [c[0], c[1]], 301, 4250, 1234);
+    expect(a).toEqual(b);
+    expect(a.q).toBeGreaterThanOrEqual(0);
+    expect(a.q).toBeLessThan(8191);
+    expect(a.ix).toBe(0);
+    // (its heading held: a hair off the aim it flew with is no change)
+    const p = bodyStateOfSync(syncArgs({ ...s, want: orderPatrol(1000.25, -40.5, 0.5, 0) }), 300);
+    expect(aiPilot(p, me, null, null, 301, 4250, 1566).q).toBe(1566);
+    expect(aiPilot(p, me, null, null, 301, 4250, 1234).q).toBe(1564);
+    expect(BODY_KINDS[kind].toldHits).toBe(false);
   });
 });

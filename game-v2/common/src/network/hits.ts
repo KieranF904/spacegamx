@@ -42,8 +42,11 @@
  *   WAYPOINTS  (with OWN_SIM, protocol 40) homing shells on its tick layer (guidance/, docs/design/awareness-model.md
  *              6.3): one in range comes once as a SYNC and flies by the shared waypoint law, planned here from its
  *              target's replica when it holds the target, else from the server's waypoint records; no rows of it after
+ *   PILOTS     (with BODIES, protocol 41) the enemy AI's ships flown by their pilot's body on its tick layer (bodies/
+ *              aiPilot.ts, docs/design/decision-inputs.md 6.5): the server's commander sends its orders, targets and
+ *              strafe sides as decisions; no control rows of them
  */
-export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16, ROUGH: 32, OWN_SIM: 64, INPUTS: 128, BODIES: 256, BLOCKS: 512, FOCUS: 1024, CAUSES: 2048, WAYPOINTS: 4096 } as const;
+export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16, ROUGH: 32, OWN_SIM: 64, INPUTS: 128, BODIES: 256, BLOCKS: 512, FOCUS: 1024, CAUSES: 2048, WAYPOINTS: 4096, PILOTS: 8192 } as const;
 
 /** Does this client hold the focus grid's cells rather than the view circle (CAPS.FOCUS)? */
 export function focusFor(caps: number | undefined): boolean {
