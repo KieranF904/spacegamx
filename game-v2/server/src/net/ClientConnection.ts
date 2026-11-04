@@ -4,6 +4,7 @@
  */
 import type { ClientSocket, Blueprint, ShipState, Leg } from '@space-game/common';
 import type { PackedLink } from './snapshot/PackedLink.js';
+import type { FocusState } from './cells/FocusCells.js';
 
 export interface ClientConnection {
   ws: ClientSocket;
@@ -114,4 +115,6 @@ export interface ClientConnection {
   capsOffered?: number;
   /** Its bit-packed frames while it takes them (CAPS.PACKED: net/snapshot/PackedLink.ts, made and dropped by Outbox) */
   packed?: PackedLink;
+  /** Its focus grid (CAPS.FOCUS: net/cells/FocusCells.ts): its cells, the ones it dropped and the ones waiting on its answer */
+  focus?: FocusState;
 }

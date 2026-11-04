@@ -39,7 +39,8 @@ import { portalQuery } from './handlers/flight.js';
 import { SELF_SAFETY_TICKS, SNAP_PROJECTILE_RANGE, SNAP_POD_RANGE, SHIP_VIEW_IN, SHIP_VIEW_OUT, MAP_DOTS_TICKS, DEBRIS_ACK_TICKS } from './snapshot/constants.js';
 import type { HitLedger } from './hits/HitLedger.js';
 import { ownShotsFor, ownVolleyExact, ownSimFor } from './snapshot/ownShots.js';
-import { bodiesFor } from '@space-game/common';
+import { bodiesFor, focusFor } from '@space-game/common';
+import { FocusCells } from './cells/FocusCells.js';
 import type { BodyNet } from './decisions/BodyNet.js';
 import type { OwnChecks } from './own/OwnChecks.js';
 
@@ -182,6 +183,8 @@ export class SnapshotBuilder {
   private fireRows = new WeakMap<object, number[]>();
   /** The server itself, for its tick (read, never held) */
   private readonly ticks: { readonly currentTick: number };
+  /** The focus grid (CAPS.FOCUS: net/cells/FocusCells.ts): capable clients' views by cell, in place of the circle */
+  readonly focus: FocusCells;
 
   constructor(host: SnapshotHost, ticks: { readonly currentTick: number }) {
     this.world = host.world;
@@ -216,6 +219,20 @@ export class SnapshotBuilder {
     this.bodies = host.bodies ?? null;
     this.blocks = host.blocks ?? null;
     this.ticks = ticks;
+    this.focus = new FocusCells({
+      bodies: () => this.ships.bodies.keys(),
+      has: (eid) => this.ships.has(eid),
+      partyOf: (conn) => (this.party.partyId(conn) ? this.party.members(conn).map((m) => m.playerId) : []),
+      targetOf: (eid) => this.ships.targetOf(eid),
+      runsBody: (conn, eid) => !!this.bodies && bodiesFor(conn.caps) && this.bodies.runs(conn, eid),
+      send: (conn, msg) => this.send(conn.ws, msg),
+      rowsSent: (conn) => this.lastEntityStates.get(conn.playerId),
+    }, this.replication);
+  }
+
+  /** A client's answer about cells it dropped (cellCache, CAPS.FOCUS) */
+  cellCache(conn: ClientConnection, c: readonly unknown[]): void {
+    this.focus.reply(conn, c);
   }
 
   private get currentTick(): number {
@@ -543,10 +560,14 @@ export class SnapshotBuilder {
     this.syncWire.clear();
     const bySystem = new Map<number, SnapRow[]>();
     this.replication.beginSnapshot();
+    // (The focus grid's home cells, for the systems with a client holding cells: CAPS.FOCUS)
+    const focusSystems = new Set<number>();
+    for (const conn of this.clients.values()) if (focusFor(conn.caps) && hasComponent(this.world, Player, conn.playerId)) focusSystems.add(InSystem.systemId[conn.playerId]);
+    if (focusSystems.size) this.focus.beginRound(this.currentTick, focusSystems);
 
     for (const conn of this.clients.values()) {
       // No snapshot this round: it misses the control changes, so it starts over with keyframes
-      if (!conn.ws.isOpen() || !hasComponent(this.world, Player, conn.playerId)) { conn.repKnown.clear(); continue; }
+      if (!conn.ws.isOpen() || !hasComponent(this.world, Player, conn.playerId)) { conn.repKnown.clear(); if (conn.focus) this.focus.reset(conn); continue; }
 
       const playerSystemId = InSystem.systemId[conn.playerId];
       if (conn.lastSystemId !== playerSystemId) this.enterSystem(conn, playerSystemId);
@@ -568,7 +589,9 @@ export class SnapshotBuilder {
       // Debris it can work out itself: told how (first, before the ship's own sync), and held back till it confirms
       this.holdDebris(conn);
       // Ships that left its view: it forgets them, and gets each again on its own when it comes back
-      const out = this.updateShipView(conn, playerSystemId, px, py);
+      // (Holding cells, CAPS.FOCUS: the ships homed in its focus cells, net/cells/FocusCells.ts)
+      if (conn.focus && !focusFor(conn.caps)) this.focus.reset(conn);
+      const out = focusFor(conn.caps) ? this.focus.view(conn, playerSystemId, px, py) : this.updateShipView(conn, playerSystemId, px, py);
       // (its structure too: the client drops a ship it hasn't seen for a moment, so it's synced afresh when it comes back)
       for (const id of out) { conn.sentNames.delete(id); conn.shipSynced.delete(id); conn.shipHpSent.delete(id); }
       // Ship motion: keyframes where needed, control changes otherwise (its own ship's too, when it builds its own
@@ -696,6 +719,7 @@ export class SnapshotBuilder {
       if (!shouldSend) {
         this.lastEntityStates.set(conn.playerId, newStates);
         if (hitsOn) this.afterHits(conn, playerSystemId);
+        if (conn.focus) this.focus.after(conn);
         continue;
       }
 
@@ -721,6 +745,8 @@ export class SnapshotBuilder {
       if (this.ownChecks && ownSimFor(conn.caps) && conn.repKnown.has(conn.playerId)) this.noteOwn(conn);
       // ...and of the bodies it runs (CAPS.BODIES: net/decisions/BodyNet.ts)
       bodies?.note(conn, this.currentTick);
+      // (Cells leaving its focus dropped, cells back settled: CAPS.FOCUS)
+      if (conn.focus) this.focus.after(conn);
     }
 
     // Clear pending removed entities after sending to all clients
@@ -837,7 +863,9 @@ export class SnapshotBuilder {
     };
     const now = this.currentTick;
     for (const conn of this.clients.values()) {
-      if (!conn.mapOpen || !(due || conn.mapDotsDue) || !conn.ws.isOpen() || !hasComponent(this.world, Player, conn.playerId)) continue;
+      // (Holding cells with its map shut: its ghosts, the ring's ships as legs: CAPS.FOCUS)
+      const ghost = conn.mapOpen ? null : this.focus.ghost(conn);
+      if (!(conn.mapOpen || ghost) || !(due || conn.mapDotsDue) || !conn.ws.isOpen() || !hasComponent(this.world, Player, conn.playerId)) continue;
       conn.mapDotsDue = false;
       const sent = (conn.mapSent ??= new Map());
       const full = conn.mapFresh === true;
@@ -846,7 +874,7 @@ export class SnapshotBuilder {
       const names: (number | string)[] = [];
       const on = new Set<number>();
       for (const r of rowsFor(InSystem.systemId[conn.playerId])) {
-        if (r.eid === conn.playerId || conn.shipView.has(r.eid)) continue;
+        if (r.eid === conn.playerId || conn.shipView.has(r.eid) || (ghost && !ghost(r.eid))) continue;
         on.add(r.eid);
         const was = sent.get(r.eid);
         // (A live one: how far it's strayed from where the client has it, carried on along what it was sent)
@@ -891,6 +919,7 @@ export class SnapshotBuilder {
   /** A client's first snapshot in a system: world events, the asteroid seed, and a clean slate */
   enterSystem(conn: ClientConnection, playerSystemId: number): void {
     conn.lastSystemId = playerSystemId;
+    this.focus.reset(conn);
     for (const m of this.events.briefing(playerSystemId)) this.send(conn.ws, m);
     for (const m of this.surfaces.briefing(playerSystemId)) this.send(conn.ws, m);
     conn.knownEntities.clear();

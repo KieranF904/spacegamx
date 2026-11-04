@@ -41,6 +41,8 @@ export const MESSAGE_LIMITS: Readonly<Record<string, Limit>> = {
   // Every part's HP of a few ships resent (confirmed hits: a client whose copy is off)
   hpResync: { per: 600, burst: 20 },
   packedResync: { per: 60, burst: 3 },
+  // What it kept of cells it dropped (CAPS.FOCUS: one a few seconds at a cruise, a burst after a jump)
+  cellCache: { per: 1200, burst: 60 },
 };
 
 class Bucket {

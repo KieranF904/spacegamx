@@ -84,7 +84,7 @@ const gameServer = new GameServer({
   // (docs/design/confirmed-hits.md parts C, D, E; docs/design/packed-frames.md): the dev server; NET_CAPS (a bit mask: 1
   // confirmed, 2 client-detected, 4 packed, 8 coalesced, 16 own shots as fire events, 32 adaptive validation, 64 its own ship
   // stepped by itself, 128 compact inputs; 255 all) elsewhere
-  netCaps: process.env.NET_CAPS !== undefined ? Number(process.env.NET_CAPS) || 0 : DEV_MODE ? CAPS.HITS | CAPS.SELF_HITS | CAPS.PACKED | CAPS.COALESCE | CAPS.OWN_SHOTS | CAPS.ROUGH | CAPS.OWN_SIM | CAPS.INPUTS | CAPS.BODIES | CAPS.BLOCKS : 0,
+  netCaps: process.env.NET_CAPS !== undefined ? Number(process.env.NET_CAPS) || 0 : DEV_MODE ? CAPS.HITS | CAPS.SELF_HITS | CAPS.PACKED | CAPS.COALESCE | CAPS.OWN_SHOTS | CAPS.ROUGH | CAPS.OWN_SIM | CAPS.INPUTS | CAPS.BODIES | CAPS.BLOCKS | CAPS.FOCUS : 0,
   // Admins may build anything in the hangar for free (the admin panel's switch; never in production: GameServer refuses it there too)
   freeBuild: DEV_MODE,
   // Every pilot joins and respawns in the dev Rockery (data/dev/rockery.json), not Sol (never in production: GameServer refuses it there too)

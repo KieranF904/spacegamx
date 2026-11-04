@@ -15,6 +15,7 @@ import { ConfirmedHits, type HitShell, type HitsOutcome, type OwnHit } from '../
 import { SelfHits, toldHits } from '../../../../client/src/ships/hits/SelfHits.js';
 import { OwnTick } from '../../../../client/src/ships/own/OwnTick.js';
 import { BodyRunner } from '../../../../client/src/ships/bodies/BodyRunner.js';
+import { CellCache } from '../../../../client/src/ships/cells/CellCache.js';
 import { bodiesFor } from '@space-game/common';
 import { ownSimFor } from '../snapshot/ownShots.js';
 import type { GameServer } from '../../GameServer.js';
@@ -46,6 +47,8 @@ export class FakeHitsClient {
   /** Bosses flown by their bodies on its tick-aligned layer (CAPS.BODIES: client ships/bodies/BodyRunner.ts) */
   readonly bodies: BodyRunner | null = null;
   readonly shells = new Map<number, HitShell>();
+  /** Dropped cells it keeps (CAPS.FOCUS: client ships/cells/CellCache.ts) */
+  readonly cells: CellCache;
   /** Entity types and ship-body status data, as the snapshots said */
   private kinds = new Map<number, { type: number; side: number }>();
   snapTick = 0;
@@ -105,6 +108,7 @@ export class FakeHitsClient {
     }
     if (ownSimFor(opts.caps)) this.own = new OwnTick({ store: this.store, reps: this.reps, self: () => this.pid, tuning: ships.tuning, restep: () => !!this.bodies?.on });
     if (bodiesFor(opts.caps)) this.bodies = new BodyRunner({ reps: this.reps });
+    this.cells = new CellCache({ reps: this.reps, send: (m) => this.outbox.push(m), forget: (id) => this.bodies?.remove(id) });
     const socket: ClientSocket = {
       isOpen: () => true,
       send: (data) => {
@@ -188,6 +192,7 @@ export class FakeHitsClient {
         this.levels.push([this.snapTick, m.caps & CAPS.ROUGH ? m.lvl ?? 1 : 1]);
         break;
       case 'snapshot': this.snapshot(m as ServerSnapshotMessage); break;
+      case 'cells': this.cells.onCells(m); break;
       case 'hits':
         this.findHits(m.h);
         if (this.selfHits?.on) this.hits!.told(m, this.snapTick);

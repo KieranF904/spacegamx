@@ -3,6 +3,7 @@
   "ammoPrefer",
   "authLogin",
   "authRegister",
+  "cellCache",
   "chat",
   "codexRead",
   "contrib",
