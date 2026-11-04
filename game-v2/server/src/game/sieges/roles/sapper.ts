@@ -2,6 +2,7 @@
 
 import type { Run, SiegeCtx } from '../types.js';
 import { bastionAt, type SiegeRole } from './index.js';
+import { dhypot } from '@space-game/common';
 
 /** The nearest turret standing to (x, y), or the bastion */
 function nearestTurret(ctx: SiegeCtx, run: Run, x: number, y: number): { eid: number; x: number; y: number } {
@@ -9,7 +10,7 @@ function nearestTurret(ctx: SiegeCtx, run: Run, x: number, y: number): { eid: nu
   for (const t of run.turrets) {
     const at = t && ctx.host.shipAt(t.eid);
     if (!t || !at) continue;
-    const d = Math.hypot(at.x - x, at.y - y);
+    const d = dhypot(at.x - x, at.y - y);
     if (d < bd) { bd = d; best = { eid: t.eid, x: at.x, y: at.y }; }
   }
   return best;

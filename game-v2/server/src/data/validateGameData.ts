@@ -21,7 +21,7 @@
 import { BRAIN_IDS } from '../game/brains/ids.js';
 import {
   FN_NAMES, WEAPON_KIND_TYPE, WEAPON_MOD_NUMBERS, DICTIONARY, DAMAGE_TYPES, DEFAULT_ASTEROID_FIELDS, DEFAULT_ASTEROIDS, parsePartItemId, MINERAL_FAMILIES, MATERIAL_TRAITS, HAZARDS, UNLOCK_KEYS,
-  nestReach, safeRadius, CODEX_TABS, MAX_DRIVE, PLANET_LOOK_FIELDS, STAR_PLASMA_FIELDS, type Blueprint, type CatalogFiles, type ShipTuning, type InventoryStub,
+  nestReach, safeRadius, CODEX_TABS, MAX_DRIVE, PLANET_LOOK_FIELDS, STAR_PLASMA_FIELDS, type Blueprint, type CatalogFiles, type ShipTuning, type InventoryStub, dhypot,
 } from '@space-game/common';
 import type { GameDataFiles } from './GameData.js';
 
@@ -808,7 +808,7 @@ export function validateGameData(files: GameDataFiles, opts: ValidateOptions = {
         if (sys(F, `${P}.pocket.entrance.system`, pk.entrance.system) && (systems.get(pk.entrance.system).surface || systems.get(pk.entrance.system).pocket)) c.err(`${P}.pocket.entrance.system`, `"${pk.entrance.system}" is a surface or a pocket: a pocket's way in is out in space`, F);
         if (isObj(pk.entrance.look)) faction(F, `${P}.pocket.entrance.look.faction`, pk.entrance.look.faction);
         if (s.surface) c.err(`${P}.pocket`, 'a system is a surface or a pocket, not both', F);
-        if (isObj(pk.landing) && typeof pk.radius === 'number' && Math.hypot(pk.landing.x, pk.landing.y) >= pk.radius) c.err(`${P}.pocket.landing`, `outside its edge (radius ${pk.radius}): you'd be sent straight back out`, F);
+        if (isObj(pk.landing) && typeof pk.radius === 'number' && dhypot(pk.landing.x, pk.landing.y) >= pk.radius) c.err(`${P}.pocket.landing`, `outside its edge (radius ${pk.radius}): you'd be sent straight back out`, F);
       }
       list(s?.planets).forEach((pl, j) => {
         const pp = `${P}.planets[${j}]`;

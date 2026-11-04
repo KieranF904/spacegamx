@@ -1,5 +1,5 @@
 /** The Repair Beam's beam (a weapon role of the support feature: ./index.ts): mends a friendly hull instead of hurting. Moved from bridge/weapons.ts. */
-import { rayTerrain, repairAt, InSystem, type ShipState, type WeaponInfo, type WeaponTuning } from '@space-game/common';
+import { rayTerrain, repairAt, InSystem, type ShipState, type WeaponInfo, type WeaponTuning, dcos, dsin } from '@space-game/common';
 import type { WeaponBridge } from '../../bridge/core.js';
 
 /**
@@ -10,7 +10,7 @@ import type { WeaponBridge } from '../../bridge/core.js';
 export function repairBeam(b: WeaponBridge, eid: number, ship: ShipState, w: WeaponInfo, def: WeaponTuning): number {
   const { x, y, angle } = b.beamFrom(eid, ship, w);
   const range = def.range ?? 500;
-  const x1 = x + Math.cos(angle) * range, y1 = y + Math.sin(angle) * range;
+  const x1 = x + dcos(angle) * range, y1 = y + dsin(angle) * range;
   const half = (def.width ?? 0) / 2, sys = InSystem.systemId[eid];
   let hit: { eid: number; ship: ShipState; part: number; t: number } | null = null;
   for (const other of b.alongBeam(sys, x, y, x1, y1, half)) {

@@ -17,7 +17,7 @@
  * A rock that keeps still (a stationary field's: `fixed`) is filed only in the
  * cells round its spot, there for its whole clock.
  */
-import { ORBIT_MU } from '@space-game/common';
+import { ORBIT_MU, dcos, dsin } from '@space-game/common';
 
 /** Cell size of the timetable (world units) */
 const ORBIT_CELL = 1000;
@@ -216,7 +216,7 @@ export class AsteroidOrbits {
   private walk(system: number, s: OrbitShape, emit: (key: number, lo: number, hi: number) => void): void {
     if (s.fixed) {
       // Still: the cells round its spot, all its clock (which never moves off 0)
-      const x = Math.cos(s.argPeriapsis) * s.semiMajorAxis, y = Math.sin(s.argPeriapsis) * s.semiMajorAxis, reach = s.size + SPACE_SLACK;
+      const x = dcos(s.argPeriapsis) * s.semiMajorAxis, y = dsin(s.argPeriapsis) * s.semiMajorAxis, reach = s.size + SPACE_SLACK;
       for (let cx = Math.floor((x - reach) / ORBIT_CELL); cx <= Math.floor((x + reach) / ORBIT_CELL); cx++) {
         for (let cy = Math.floor((y - reach) / ORBIT_CELL); cy <= Math.floor((y + reach) / ORBIT_CELL); cy++) emit(AsteroidOrbits.key(system, cx, cy), 0, TWO_PI);
       }
@@ -224,7 +224,7 @@ export class AsteroidOrbits {
     }
     const a = s.semiMajorAxis, e = s.eccentricity;
     const b = a * Math.sqrt(1 - e * e);
-    const cw = Math.cos(s.argPeriapsis), sw = Math.sin(s.argPeriapsis);
+    const cw = dcos(s.argPeriapsis), sw = dsin(s.argPeriapsis);
     // Arc speed along E is at most a, so a step of E covers at most a·dE of arc
     const steps = Math.max(16, Math.ceil(TWO_PI * a / ORBIT_STEP));
     const dE = TWO_PI / steps;
@@ -234,8 +234,8 @@ export class AsteroidOrbits {
     for (let k = 0; k < steps; k++) {
       const e0 = k * dE, e1 = k === steps - 1 ? TWO_PI : (k + 1) * dE, em = (e0 + e1) / 2;
       // Clock at both ends of the step, and where it is halfway (every point of the step is within reach of it)
-      const m0 = e0 - e * Math.sin(e0), m1 = e1 - e * Math.sin(e1);
-      const px = a * (Math.cos(em) - e), py = b * Math.sin(em);
+      const m0 = e0 - e * dsin(e0), m1 = e1 - e * dsin(e1);
+      const px = a * (dcos(em) - e), py = b * dsin(em);
       const x = px * cw - py * sw, y = px * sw + py * cw;
       const cx0 = Math.floor((x - reach) / ORBIT_CELL), cx1 = Math.floor((x + reach) / ORBIT_CELL);
       const cy0 = Math.floor((y - reach) / ORBIT_CELL), cy1 = Math.floor((y + reach) / ORBIT_CELL);

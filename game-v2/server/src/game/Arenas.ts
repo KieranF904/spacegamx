@@ -13,6 +13,7 @@
 
 import type { StarSystemData } from '@space-game/common';
 import type { PilotConn } from './Pilots.js';
+import { datan2, mulberry32 } from '@space-game/common';
 
 export interface ArenaHost {
   tick(): number;
@@ -53,6 +54,8 @@ interface Run {
 
 export class Arenas {
   private runs = new Map<number, Run>();
+  /** Server-only randomness, seeded (math/rng.ts): where a pilot comes in */
+  private rng = mulberry32(0xa4e7a);
   private solo = new Map<PilotConn, number>();
   private nextSolo = -1;
 
@@ -77,7 +80,7 @@ export class Arenas {
       this.runs.set(free, run);
     }
     const e = sys.surface!.arena!.entry;
-    this.host.travel(conn, run.num, e.x + (Math.random() - 0.5) * 800, e.y);
+    this.host.travel(conn, run.num, e.x + (this.rng() - 0.5) * 800, e.y);
     this.host.toast(conn, `Down into ${sys.name}. Fly out past the edge to leave`, 'info');
     return null;
   }
@@ -97,7 +100,7 @@ export class Arenas {
         for (const p of pilots) this.host.toast(p.conn, 'The way back up opens in a few seconds', 'good');
       }
       if (run.won >= 0 && now - run.won >= LIFT) {
-        for (const p of pilots) this.host.toOrbit(p.conn, run.sys, Math.atan2(p.y, p.x));
+        for (const p of pilots) this.host.toOrbit(p.conn, run.sys, datan2(p.y, p.x));
         this.clear(run);
         continue;
       }

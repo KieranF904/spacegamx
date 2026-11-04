@@ -14,7 +14,7 @@
  */
 
 import { hasComponent } from 'bitecs';
-import { Position, Velocity, InSystem, Dead, Input, canTow, feedShare, towLoad, towPull, towTuning, type ShipTuning, type TowKind } from '@space-game/common';
+import { Position, Velocity, InSystem, Dead, Input, canTow, feedShare, towLoad, towPull, towTuning, type ShipTuning, type TowKind, dcos, dhypot, dsin } from '@space-game/common';
 import type { ShipBridge } from '../../ShipBridge.js';
 import type { LootPods } from '../../../game/LootPods.js';
 import type { FeatureHost, FeatureInstance, FeatureMessageHandler } from '../types.js';
@@ -37,7 +37,7 @@ export class Towing implements FeatureInstance {
   readonly messages: Readonly<Record<string, FeatureMessageHandler>> = {
     tow: (p, msg) => {
       const a = Input.targetAngle[p], dist = Input.cursorDist[p];
-      this.request(p, !!msg.on, { x: Position.x[p] + Math.cos(a) * dist, y: Position.y[p] + Math.sin(a) * dist });
+      this.request(p, !!msg.on, { x: Position.x[p] + dcos(a) * dist, y: Position.y[p] + dsin(a) * dist });
     },
   };
 
@@ -102,8 +102,8 @@ export class Towing implements FeatureInstance {
     const consider = (eid: number, kind: TowKind, er: number) => {
       if (eid === pilot || this.towedBy(eid) !== undefined) return;
       const ex = Position.x[eid], ey = Position.y[eid];
-      if (Math.hypot(ex - x, ey - y) - er > reach) return;
-      const d = Math.hypot(ex - aim.x, ey - aim.y) - er;
+      if (dhypot(ex - x, ey - y) - er > reach) return;
+      const d = dhypot(ex - aim.x, ey - aim.y) - er;
       if (d < bestD) { bestD = d; best = eid; bestKind = kind; }
     };
     for (const eid of this.ships.towablesNear(sys, x, y, reach)) { const b = this.ships.towable(eid)!; consider(eid, b.kind, b.radius); }

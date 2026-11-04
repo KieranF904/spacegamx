@@ -9,7 +9,7 @@
  * (PilotOrders.impulse); a heavy hull turns as its blueprint's `turn` lets it (flight.ts), as every client replays it.
  */
 
-import { Position, Velocity, Rotation, InSystem, ServerMessage, ShipState, shipPointToWorld, localToWorldDir, isRuined, type Vec2, type Terrain } from '@space-game/common';
+import { Position, Velocity, Rotation, InSystem, ServerMessage, ShipState, shipPointToWorld, localToWorldDir, isRuined, type Vec2, type Terrain, datan2, dcos, dsin } from '@space-game/common';
 import type { ShipBridge, PilotOrders } from '../../ships/ShipBridge.js';
 import type { Mobs } from '../Mobs.js';
 
@@ -86,14 +86,14 @@ export function partMount(host: BrainHost, eid: number, ship: ShipState, part: n
   const p = pose(eid);
   const [x, y] = shipPointToWorld(ship, p, at, host.ships.tuning.cellSize);
   const [dx, dy] = localToWorldDir(d, p.angle);
-  return { x, y, dir: Math.atan2(dy, dx) };
+  return { x, y, dir: datan2(dy, dx) };
 }
 
 /** A point on the body in its own frame (world units, nose along +x): what telegraphs and beams ride on */
 export function bodyFrame(host: BrainHost, eid: number, ship: ShipState, part: number): { x: number; y: number } {
   const m = partMount(host, eid, ship, part);
   const p = pose(eid);
-  const dx = m.x - p.x, dy = m.y - p.y, c = Math.cos(-p.angle), s = Math.sin(-p.angle);
+  const dx = m.x - p.x, dy = m.y - p.y, c = dcos(-p.angle), s = dsin(-p.angle);
   return { x: dx * c - dy * s, y: dx * s + dy * c };
 }
 

@@ -6,6 +6,7 @@
 import { DEFAULT_SIEGE_RULES, DEG, FRONT_WARN, SECOND, type SiegeProfile, type SiegeRules, type SiegeSpawn, type SiegeUnit } from './rules.js';
 import { ROLES } from './roles/index.js';
 import type { Run } from './types.js';
+import { dcos, dsin, mulberry32 } from '@space-game/common';
 
 /** What claiming your haul by day multiplies it by: +25% for every five nights you held */
 export function haulBonus(nights: number, rules: SiegeRules = DEFAULT_SIEGE_RULES): number {
@@ -18,7 +19,7 @@ export function siegeProfile(rules: SiegeRules, id?: string): SiegeProfile {
 }
 
 /** The night's ships: its budget (growing faster as the nights go on) spent on the toughest things it can afford, most of the time */
-export function wavePlan(wave: number, pilots: number, rnd: () => number = Math.random, rules: SiegeRules = DEFAULT_SIEGE_RULES, profile: SiegeProfile = siegeProfile(rules)): SiegeUnit[] {
+export function wavePlan(wave: number, pilots: number, rnd: () => number = mulberry32(wave), rules: SiegeRules = DEFAULT_SIEGE_RULES, profile: SiegeProfile = siegeProfile(rules)): SiegeUnit[] {
   const w = rules.wave;
   let budget = (w.base + wave * w.perWave + wave * wave * w.perWave2) * profile.difficulty * (w.solo + w.perPilot * Math.max(1, pilots));
   const open = profile.roster.filter((r) => r.from <= wave && (r.until === undefined || wave <= r.until));
@@ -35,7 +36,7 @@ export function wavePlan(wave: number, pilots: number, rnd: () => number = Math.
 }
 
 /** The night's ships by design (a group counts each of its ships) */
-export function waveRoster(wave: number, pilots: number, rnd: () => number = Math.random, rules: SiegeRules = DEFAULT_SIEGE_RULES, profile?: SiegeProfile): string[] {
+export function waveRoster(wave: number, pilots: number, rnd: () => number = mulberry32(wave), rules: SiegeRules = DEFAULT_SIEGE_RULES, profile?: SiegeProfile): string[] {
   return wavePlan(wave, pilots, rnd, rules, profile).flatMap((u) => Array.from({ length: u.group ?? 1 }, () => u.ship));
 }
 
@@ -74,13 +75,13 @@ export function frontCount(rules: SiegeRules, profile: SiegeProfile, wave: numbe
  */
 export function planNight(rules: SiegeRules, run: Run, pilots: number, start: number): void {
   const P = run.profile, night = run.wave + run.offset;
-  const plan = wavePlan(night, pilots, Math.random, rules, P);
+  const plan = wavePlan(night, pilots, run.rng, rules, P);
   // The stream: a share of the night, one at a time (from its night; a bigger party's is bigger)
   const share = P.stream.share + rules.party.streamPerPilot * Math.max(0, pilots - 1);
   const stream: SiegeSpawn[] = [], main: SiegeSpawn[][] = [];
   for (const u of plan) {
     const ships = unitSpawns(u, P, night);
-    if (night >= P.stream.from && Math.random() < share) stream.push(...ships);
+    if (night >= P.stream.from && run.rng() < share) stream.push(...ships);
     else main.push(ships);
   }
   const n = frontCount(rules, P, run.wave, pilots);
@@ -90,22 +91,22 @@ export function planNight(rules: SiegeRules, run: Run, pilots: number, start: nu
   if (boss) fronts[0].unshift(...unitSpawns(boss, P, night).map((s) => ({ ...s, plating: 1, boss: true })));
   run.frontNo = 0;
   // An arc's side: its set one, or a new one each night
-  run.side = (P.approach.angles?.length && P.approach.kind === 'arc' ? P.approach.angles[0] * DEG : Math.random() * Math.PI * 2);
+  run.side = (P.approach.angles?.length && P.approach.kind === 'arc' ? P.approach.angles[0] * DEG : run.rng() * Math.PI * 2);
   run.fronts = fronts.filter((f) => f.length).map((ships, i) => ({ at: start + FRONT_WARN + i * P.fronts.gapSeconds * SECOND, ships, pos: frontPoint(run) }));
   run.stream = stream;
   run.nextStream = start + 5 * SECOND;
-  run.nextObjective = start + P.objectives.everySeconds * SECOND * (0.3 + Math.random() * 0.4);
+  run.nextObjective = start + P.objectives.everySeconds * SECOND * (0.3 + run.rng() * 0.4);
 }
 
 /** Where the next lot comes from, by the moon's approach */
 function approachAngle(run: Run): number {
   const a = run.profile.approach, k = run.frontNo++;
-  const jitter = (deg: number) => (Math.random() - 0.5) * 2 * deg * DEG;
+  const jitter = (deg: number) => (run.rng() - 0.5) * 2 * deg * DEG;
   switch (a.kind) {
-    case 'lanes': { const L = a.angles?.length ? a.angles : [0]; return L[Math.floor(Math.random() * L.length)] * DEG + jitter(a.spread ?? 10); }
+    case 'lanes': { const L = a.angles?.length ? a.angles : [0]; return L[Math.floor(run.rng() * L.length)] * DEG + jitter(a.spread ?? 10); }
     case 'arc': return run.side + jitter(a.spread ?? 40);
     case 'pincer': return run.side + (k % 2 ? Math.PI : 0) + jitter(a.spread ?? 15);
-    default: return Math.random() * Math.PI * 2;
+    default: return run.rng() * Math.PI * 2;
   }
 }
 
@@ -115,5 +116,5 @@ export function frontPoint(run: Run): { x: number; y: number } {
   const a = approachAngle(run);
   // Out of the dark, but not so far that slow drones take all night to arrive
   const k = run.profile.approach.radius;
-  return { x: b.x + Math.cos(a) * R * k, y: b.y + Math.sin(a) * R * k };
+  return { x: b.x + dcos(a) * R * k, y: b.y + dsin(a) * R * k };
 }

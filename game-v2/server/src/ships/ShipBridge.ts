@@ -13,7 +13,7 @@ import {
   Velocity, Blueprint, Catalog,
   ShipState, ShipTuning, PlacedGeom, Vec2, InventoryStub, ValidationResult,
   GravityWell, FlightConstants, type HitInfo, type WarmthStage, type JumpField, standing,
-  WeaponInfo, WeaponTuning, ReplicaMode, FireRecord, type FlightBody, type Charge,
+  WeaponInfo, WeaponTuning, ReplicaMode, FireRecord, type FlightBody, type Charge, dhypot,
 } from '@space-game/common';
 import {
   STAGE_COVER, type ShipHost, type PartDestroyedEvent, type PilotOrders, type PendingBlast, type PendingSalvoShell,
@@ -175,7 +175,7 @@ export class ShipBridge {
 
   /** Is this ship holding still enough to use a repair kit? */
   isStill(eid: number): boolean {
-    return Math.hypot(Velocity.x[eid], Velocity.y[eid]) <= ShipBridge.KIT_STILL_SPEED;
+    return dhypot(Velocity.x[eid], Velocity.y[eid]) <= ShipBridge.KIT_STILL_SPEED;
   }
 
   // -------------------------------------------------------------------------

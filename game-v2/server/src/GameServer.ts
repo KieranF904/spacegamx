@@ -79,7 +79,7 @@ asteroidParamsAt,
   asteroidRegistry,
   buildRangeRig,
   sidesHurt,
-  SIDE,
+  SIDE, datan2, dcos, dhypot, dsin,
 } from '@space-game/common';
 
 import {
@@ -121,7 +121,7 @@ import { GameData } from './data/GameData.js';
 import type { UserStore } from './auth/types.js';
 import type { ClientSocket, ClientLink } from '@space-game/common';
 import type { ShipBridge, ShipHost } from './ships/ShipBridge.js';
-import { portsSwitchFeeds, CAPS, dcos, dsin } from '@space-game/common';
+import { portsSwitchFeeds, CAPS } from '@space-game/common';
 import { Blueprint, ShipState, quantizeShipValue, skillValue, hasAll, removeAll, Economy, Bag, StarterKit, jumpTuning, jumpPhase, partItemId, rateShip, ratingOf, createShipState, gradeReward, gradeOf, accrueTraces, releaseTraces, unlocks, stationPerks, hazardFlight, stationTable, blueprintGrade, lookFn, warmthPercent, packCharge, nearerThan, fartherThan, type ShipDerived } from '@space-game/common';
 
 /** A station site by id */
@@ -526,6 +526,8 @@ const NO_ROCKS: number[] = [];
 
 export class GameServer implements ServerCtx {
   readonly world: IWorld;
+  /** Server-only randomness, seeded (math/rng.ts): spawn spots and groups, the people's chatter */
+  private rng = mulberry32(0x6a3e5);
   gameData: GameData;
   clients: Map<ClientSocket, ClientConnection> = new Map();
   scene: 'sectors' | 'empty';
@@ -879,7 +881,7 @@ export class GameServer implements ServerCtx {
         if (!this.derelicts.some((d) => d.data.log) || !this.flying(eid)) return [];
         const num = InSystem.systemId[eid], x = Position.x[eid], y = Position.y[eid];
         return this.derelicts.filter((d) => d.data.log && d.systemNum === num && d.eid >= 0 && this.ships.has(d.eid)
-          && Math.hypot(Position.x[d.eid] - x, Position.y[d.eid] - y) < DERELICT_LOG_RANGE).map((d) => d.data.log!.codex);
+          && dhypot(Position.x[d.eid] - x, Position.y[d.eid] - y) < DERELICT_LOG_RANGE).map((d) => d.data.log!.codex);
       },
     }, this.pilots, this.gameData.codexFile, this.gameData.itemsFile.items, this.gameData.stringsFile);
     this.quests.codex = this.codex;
@@ -951,7 +953,7 @@ export class GameServer implements ServerCtx {
       distance: (a, b) => {
         const ea = a.playerId, eb = b.playerId;
         if (!this.flying(ea) || !this.flying(eb) || InSystem.systemId[ea] !== InSystem.systemId[eb]) return Infinity;
-        return Math.hypot(Position.x[ea] - Position.x[eb], Position.y[ea] - Position.y[eb]);
+        return dhypot(Position.x[ea] - Position.x[eb], Position.y[ea] - Position.y[eb]);
       },
       now: this.clock,
       log: (t) => console.log(`[Trade] ${t}`),
@@ -1092,17 +1094,17 @@ this.devTeleport = opts.devTeleport ?? false;
   private starterSpot(): { x: number; y: number } {
     const id = this.gameData.getStation('sol_station_central') ? 'sol_station_central' : undefined;
     const st = id ? [...stationQuery(this.world)].find((e) => this.gameData.getStationByNum(Station.stationId[e])?.id === id) : undefined;
-    const a = Math.random() * Math.PI * 2;
+    const a = this.rng() * Math.PI * 2;
     if (st !== undefined) {
       // (Inside its docking ring, where the tutorial's first stop is, clear of its hull)
       const d = this.gameData.getStation(id!);
       const r = Math.max((d?.radius ?? 0) + 120, stationInteractRadius(d?.radius ?? 0, d?.design) * 0.85);
-      return { x: Position.x[st] + Math.cos(a) * r, y: Position.y[st] + Math.sin(a) * r };
+      return { x: Position.x[st] + dcos(a) * r, y: Position.y[st] + dsin(a) * r };
     }
     // (No station yet: well clear of the star)
     const sys = this.gameData.getSystem('sol');
     const r = (sys?.centralBody?.radius ?? sys?.starRadius ?? 0) + 12000;
-    return { x: Math.cos(a) * r, y: Math.sin(a) * r };
+    return { x: dcos(a) * r, y: dsin(a) * r };
   }
 
   /**
@@ -1115,7 +1117,7 @@ this.devTeleport = opts.devTeleport ?? false;
     const belt = sys?.asteroidBelt?.innerRadius ?? 0;
     const r = Math.max(star + 1500, belt - 600);
     const a = (eid * 2.399) % (Math.PI * 2);
-    return { system: this.devStartNum, x: Math.cos(a) * r, y: Math.sin(a) * r };
+    return { system: this.devStartNum, x: dcos(a) * r, y: dsin(a) * r };
   }
 
   private createPilotHost(): PilotHost {
@@ -1141,7 +1143,7 @@ this.devTeleport = opts.devTeleport ?? false;
         const cb = sys.centralBody;
         // (Clear of the star's surface, whatever its size)
         const body = Math.max(cb?.gravity?.horizon ?? 0, cb?.radius ?? sys.starRadius ?? 0);
-        return body <= 0 || Math.hypot(x, y) > body + 4000;
+        return body <= 0 || dhypot(x, y) > body + 4000;
       },
       place: (conn, num, x, y) => {
         // Someone's station only exists while it's loaded: back out by its jump point
@@ -1269,7 +1271,7 @@ this.devTeleport = opts.devTeleport ?? false;
       if (ship && (phase === 'charging' || phase === 'burn')) {
         // (Its reach with every boost a field can give, and then some)
         const reach = Math.max(jt.baseRange, ship.derived.jumpRange || 0) * 1.6, a = Rotation.angle[p];
-        list.push(x, y, x + Math.cos(a) * reach, y + Math.sin(a) * reach);
+        list.push(x, y, x + dcos(a) * reach, y + dsin(a) * reach);
       } else list.push(x, y, x, y);
     }
     // Wards count as someone being there (hostiles near one go for it), while their system's occupied
@@ -1360,9 +1362,9 @@ this.devTeleport = opts.devTeleport ?? false;
         const num = this.gameData.getSystemNum(system);
         // Whoever lives where it happens: the zone it's in (the Drift's Scrapborn, the Lanes' pirates), else the system's own packs
         const sp = factions.spawns?.[system];
-        const zone = (sp?.zones ?? []).find((z) => { const d = Math.hypot(at.x - (z.x ?? 0), at.y - (z.y ?? 0)); return d >= z.inner && d <= z.outer && z.groups.some((g) => !g.passive); });
+        const zone = (sp?.zones ?? []).find((z) => { const d = dhypot(at.x - (z.x ?? 0), at.y - (z.y ?? 0)); return d >= z.inner && d <= z.outer && z.groups.some((g) => !g.passive); });
         const groups = (zone?.groups ?? sp?.groups ?? []).filter((g) => !g.passive);
-        const g = groups.length ? groups[Math.floor(Math.random() * groups.length)] : { faction: 'pirates', ships: ['pirate_skiff', 'pirate_skiff'] };
+        const g = groups.length ? groups[Math.floor(this.rng() * groups.length)] : { faction: 'pirates', ships: ['pirate_skiff', 'pirate_skiff'] };
         const ships = Array.from({ length: Math.max(1, Math.min(7, size)) }, (_, i) => g.ships[i % g.ships.length]);
         const eids = this.enemies.spawnPack(num, { faction: g.faction, ships }, x, y);
         this.enemies.sendPack(eids, at, 9000);
@@ -1440,9 +1442,9 @@ this.devTeleport = opts.devTeleport ?? false;
         for (let i = 0; i < 40; i++) {
           const seg = which && belt.extra?.[which - 1] ? belt.extra[which - 1] : beltSegment(belt, Math.floor(rng() * beltTotal(belt)));
           const a = rng() * Math.PI * 2, r = seg.innerRadius + rng() * (seg.outerRadius - seg.innerRadius);
-          const x = Math.cos(a) * r, y = Math.sin(a) * r;
-          if (stations.some((s) => Math.hypot(Position.x[s] - x, Position.y[s] - y) < 8000)) continue;
-          if (players.some((p) => Math.hypot(Position.x[p] - x, Position.y[p] - y) < 2500)) continue;
+          const x = dcos(a) * r, y = dsin(a) * r;
+          if (stations.some((s) => dhypot(Position.x[s] - x, Position.y[s] - y) < 8000)) continue;
+          if (players.some((p) => dhypot(Position.x[p] - x, Position.y[p] - y) < 2500)) continue;
           return { x, y };
         }
         return null;
@@ -1475,13 +1477,13 @@ this.devTeleport = opts.devTeleport ?? false;
         let best = -1, bd = range;
         for (const p of playerQuery(this.world)) {
           if (InSystem.systemId[p] !== num || hasComponent(this.world, Dead, p) || !this.ships.has(p)) continue;
-          const d = Math.hypot(Position.x[p] - x, Position.y[p] - y);
+          const d = dhypot(Position.x[p] - x, Position.y[p] - y);
           if (d < bd) { bd = d; best = p; }
         }
         return best;
       },
       radiusOf: (eid: number) => this.ships.get(eid)?.derived.radius ?? Radius.value[eid] ?? 40,
-      hullGap: (eid: number, x: number, y: number, within: number) => (this.ships.has(eid) ? this.ships.hullDistance(eid, x, y, within) : Math.hypot(Position.x[eid] - x, Position.y[eid] - y) - (Radius.value[eid] ?? 40)),
+      hullGap: (eid: number, x: number, y: number, within: number) => (this.ships.has(eid) ? this.ships.hullDistance(eid, x, y, within) : dhypot(Position.x[eid] - x, Position.y[eid] - y) - (Radius.value[eid] ?? 40)),
       blast: (num: number, x: number, y: number, radius: number, damage: number, owner: number) => this.ships.splashAt(num, x, y, radius, damage, owner),
       burst: (num: number, x: number, y: number, radius: number, kind: string, fizzle: boolean) =>
         this.broadcastToSystem(num, { type: 'detonation', kind: fizzle ? 'mob_fizzle' : 'mob_burst', x: Math.round(x), y: Math.round(y), radius: Math.round(radius), mob: kind }),
@@ -1611,7 +1613,7 @@ this.devTeleport = opts.devTeleport ?? false;
    * the laser's yield. Returns how far along the beam it hit (1 = nothing).
    */
   private mineBeam(eid: number, x: number, y: number, angle: number, range: number, damage: number, material: string, gas = false, full = range): number {
-    const x1 = x + Math.cos(angle) * range, y1 = y + Math.sin(angle) * range;
+    const x1 = x + dcos(angle) * range, y1 = y + dsin(angle) * range;
     const systemNum = InSystem.systemId[eid];
     let best = 1, hit = -1;
     for (const a of this.asteroidOrbits.query(systemNum, x, y, x1, y1, 120, this.currentTick)) {
@@ -1633,7 +1635,7 @@ this.devTeleport = opts.devTeleport ?? false;
     damage *= mineFalloff(best * range, full);
     if (damage <= 0) return best;
     Asteroid.hp[hit] -= damage;
-    const nl = Math.hypot(hx - Position.x[hit], hy - Position.y[hit]) || 1;
+    const nl = dhypot(hx - Position.x[hit], hy - Position.y[hit]) || 1;
     const siphon = (tbl.tools as unknown as Record<string, { yield: number; hardness: number }>).siphon;
     this.mining.extract(hit, eid, damage, gas && siphon ? siphon : { yield: tbl.tools.miner.yield, hardness: tbl.tools.minerByMaterial[material] ?? tbl.tools.miner.hardness, grade: gradeOf(this.ships.catalog.materials.get(material)) },
       hx, hy, (hx - Position.x[hit]) / nl, (hy - Position.y[hit]) / nl);
@@ -1692,7 +1694,7 @@ this.devTeleport = opts.devTeleport ?? false;
   private beamAsteroid(eid: number, x: number, y: number, angle: number, range: number, damage: number, kind: string): number {
     const tools = this.gameData.miningTable.tools as unknown as Record<string, { yield: number; hardness: number }>;
     const tool = tools[kind] ?? { yield: 0.05, hardness: 1 };
-    const x1 = x + Math.cos(angle) * range, y1 = y + Math.sin(angle) * range;
+    const x1 = x + dcos(angle) * range, y1 = y + dsin(angle) * range;
     const systemNum = InSystem.systemId[eid];
     let best = 1, hit = -1;
     for (const a of this.asteroidOrbits.query(systemNum, x, y, x1, y1, 120, this.currentTick)) {
@@ -1709,7 +1711,7 @@ this.devTeleport = opts.devTeleport ?? false;
     if (hit < 0) return 1;
     const hx = x + (x1 - x) * best, hy = y + (y1 - y) * best;
     Asteroid.hp[hit] -= damage;
-    const nl = Math.hypot(hx - Position.x[hit], hy - Position.y[hit]) || 1;
+    const nl = dhypot(hx - Position.x[hit], hy - Position.y[hit]) || 1;
     this.mining.extract(hit, eid, damage, tool, hx, hy, (hx - Position.x[hit]) / nl, (hy - Position.y[hit]) / nl);
     if (Asteroid.hp[hit] <= 0 && !hasComponent(this.world, Dead, hit)) {
       addComponent(this.world, Dead, hit);
@@ -1747,7 +1749,7 @@ this.devTeleport = opts.devTeleport ?? false;
         const sys = this.gameData.getSystemByNum(num);
         const cb = sys?.centralBody;
         const body = Math.max(cb?.gravity?.horizon ?? 0, cb?.radius ?? sys?.starRadius ?? 0);
-        return body > 0 && Math.hypot(x, y) < body + 5000;
+        return body > 0 && dhypot(x, y) < body + 5000;
       },
       reward: (killer: number, xp: number, credits: number, assist: boolean, label: string) => {
         const pc = this.pilots.connOf(killer);
@@ -1850,7 +1852,7 @@ this.devTeleport = opts.devTeleport ?? false;
         else if (ships?.length) group = { faction: Object.keys(f.factions).find((k) => ships.some((t) => t in f.factions[k].ships)) ?? 'pirates', ships };
         else {
           const groups = (f.spawns?.[system]?.groups ?? []).filter((g) => !g.passive);
-          group = groups.length ? groups[Math.floor(Math.random() * groups.length)] : { faction: 'pirates', ships: ['pirate_skiff', 'pirate_raider'] };
+          group = groups.length ? groups[Math.floor(this.rng() * groups.length)] : { faction: 'pirates', ships: ['pirate_skiff', 'pirate_raider'] };
         }
         const valid = group.ships.filter((t) => this.ships.enemyDesigns[t]);
         if (!valid.length) return 0;
@@ -1861,7 +1863,7 @@ this.devTeleport = opts.devTeleport ?? false;
       clearHostiles: (system, explode, at) => {
         let n = 0;
         for (const eid of hostilesIn(sysNum(system))) {
-          if (at && Math.hypot(Position.x[eid] - at.x, Position.y[eid] - at.y) > at.radius) continue;
+          if (at && dhypot(Position.x[eid] - at.x, Position.y[eid] - at.y) > at.radius) continue;
           const ship = this.ships.get(eid);
           const core = ship?.blueprint.parts.findIndex((p) => p.fn === 'core') ?? -1;
           if (explode && ship && core >= 0) this.ships.damagePartFraction(eid, core, 1);
@@ -1981,7 +1983,7 @@ this.devTeleport = opts.devTeleport ?? false;
     let rate = Infinity;
     for (const st of stationQuery(this.world)) {
       if (InSystem.systemId[st] !== InSystem.systemId[eid]) continue;
-      if (Math.hypot(Position.x[st] - Position.x[eid], Position.y[st] - Position.y[eid]) >= Radius.value[st] + range) continue;
+      if (dhypot(Position.x[st] - Position.x[eid], Position.y[st] - Position.y[eid]) >= Radius.value[st] + range) continue;
       rate = Math.min(rate, this.gameData.getStationByNum(Station.stationId[st])?.repairCostPerHp ?? 0);
     }
     return rate === Infinity ? 0 : rate * this.hazards.repairScale(eid);
@@ -1996,7 +1998,7 @@ this.devTeleport = opts.devTeleport ?? false;
       stationName: (id) => this.gameData.getStation(id)?.name ?? id,
       stationSystem: (id) => this.gameData.getStation(id)?.system,
       itemName: (id) => this.econ.items.name(id),
-      random: Math.random,
+      random: () => this.rng(),
     };
   }
 
@@ -2043,10 +2045,10 @@ this.devTeleport = opts.devTeleport ?? false;
           const picked = pick ? pick() : -1;
           const t = picked >= 0 ? picked : this.ships.nearestTarget(eid, x, y, range, (o) => !!this.enemies.factionOf(o));
           if (t < 0) return { controls: still(Rotation.angle[eid]), firing: false };
-          const d = Math.hypot(Position.x[t] - x, Position.y[t] - y), lead = shot > 0 ? d / shot : 0;
+          const d = dhypot(Position.x[t] - x, Position.y[t] - y), lead = shot > 0 ? d / shot : 0;
           const tx = Position.x[t] + Velocity.x[t] * lead, ty = Position.y[t] + Velocity.y[t] * lead;
-          const a = Math.atan2(ty - y, tx - x);
-          return { controls: still(a), firing: true, aim: a, aimDist: Math.hypot(tx - x, ty - y), target: t };
+          const a = datan2(ty - y, tx - x);
+          return { controls: still(a), firing: true, aim: a, aimDist: dhypot(tx - x, ty - y), target: t };
         });
       },
       rateShips: (ships, grade) => {
@@ -2077,7 +2079,7 @@ this.devTeleport = opts.devTeleport ?? false;
           const list = entries.map((e) => e.s);
           const faction = key.split('|')[0];
           const a = (i / packs.length) * Math.PI * 2, r = packs.length > 1 ? 500 + packs.length * 60 : 0;
-          const eids = this.enemies.spawnPack(num, { faction, ships: list.map((s) => s.ship), grade, plating: list[0]?.plating }, x + Math.cos(a) * r, y + Math.sin(a) * r);
+          const eids = this.enemies.spawnPack(num, { faction, ships: list.map((s) => s.ship), grade, plating: list[0]?.plating }, x + dcos(a) * r, y + dsin(a) * r);
           this.enemies.sendPack(eids, at, 40000);
           eids.forEach((eid, k) => {
             const s = list[k];
@@ -2219,7 +2221,7 @@ this.devTeleport = opts.devTeleport ?? false;
     // Station rings are always safe
     for (const st of stationQuery(this.world)) {
       if (InSystem.systemId[st] !== InSystem.systemId[eid]) continue;
-      const d = Math.hypot(Position.x[st] - Position.x[eid], Position.y[st] - Position.y[eid]);
+      const d = dhypot(Position.x[st] - Position.x[eid], Position.y[st] - Position.y[eid]);
       if (d < (pvp.mode === 'outer' ? safe : Math.max(Radius.value[st] + 1500, 2200))) return false;
     }
     return true;
@@ -2355,7 +2357,7 @@ this.devTeleport = opts.devTeleport ?? false;
         const range = this.ships.tuning.repair?.range ?? 0;
         for (const st of stationQuery(this.world)) {
           if (InSystem.systemId[st] !== InSystem.systemId[eid]) continue;
-          const d = Math.hypot(Position.x[st] - Position.x[eid], Position.y[st] - Position.y[eid]);
+          const d = dhypot(Position.x[st] - Position.x[eid], Position.y[st] - Position.y[eid]);
           if (d < Radius.value[st] + range) return true;
         }
         return false;
@@ -2902,7 +2904,7 @@ this.devTeleport = opts.devTeleport ?? false;
       const pid = conn.playerId, num = InSystem.systemId[pid];
       let boss = -1, bd = Infinity;
       for (const b of this.bosses.inSystem(num)) {
-        const d = Math.hypot(Position.x[b] - Position.x[pid], Position.y[b] - Position.y[pid]);
+        const d = dhypot(Position.x[b] - Position.x[pid], Position.y[b] - Position.y[pid]);
         if (d < bd) { bd = d; boss = b; }
       }
       if (boss < 0) { this.pilots.toast(conn, 'No boss in this system', 'warn'); return; }
@@ -3055,7 +3057,7 @@ this.devTeleport = opts.devTeleport ?? false;
     const sys = this.gameData.getSystemByNum(num);
     const groups = ((this.gameData.factionsFile as FactionsFile).spawns?.[sys?.id ?? '']?.groups ?? []).filter((g) => !g.passive);
     const g = msg.faction && msg.ships?.length ? { faction: msg.faction, ships: msg.ships.slice(0, 8) }
-      : groups.length ? groups[Math.floor(Math.random() * groups.length)] : { faction: 'pirates', ships: ['pirate_skiff', 'pirate_raider'] };
+      : groups.length ? groups[Math.floor(this.rng() * groups.length)] : { faction: 'pirates', ships: ['pirate_skiff', 'pirate_raider'] };
     this.enemies.spawnPack(num, { faction: g.faction, ships: g.ships }, msg.x, msg.y);
   }
 
@@ -3164,7 +3166,7 @@ this.devTeleport = opts.devTeleport ?? false;
       const cooling = (this.riftCooldown.get(eid) ?? 0) > this.currentTick;
       for (const rift of portalQuery(this.world)) {
         if (Portal.kind[rift] !== 1 || InSystem.systemId[rift] !== InSystem.systemId[eid]) continue;
-        if (Math.hypot(Position.x[rift] - Position.x[eid], Position.y[rift] - Position.y[eid]) > Radius.value[rift]) continue;
+        if (dhypot(Position.x[rift] - Position.x[eid], Position.y[rift] - Position.y[eid]) > Radius.value[rift]) continue;
         // Just come through (or thrown back out): not again until you've been clear of it a moment, however long you sit in it
         if (cooling) { this.riftCooldown.set(eid, Math.max(this.riftCooldown.get(eid)!, this.currentTick + 30)); break; }
         this.riftCooldown.set(eid, this.currentTick + RIFT_COOLDOWN_TICKS);
@@ -3172,8 +3174,8 @@ this.devTeleport = opts.devTeleport ?? false;
         if (barred) {
           // The rift throws unlicensed ships back out
           const dx = Position.x[eid] - Position.x[rift], dy = Position.y[eid] - Position.y[rift];
-          const d = Math.hypot(dx, dy) || 1;
-          const push = Math.max(12, Math.hypot(Velocity.x[eid], Velocity.y[eid]));
+          const d = dhypot(dx, dy) || 1;
+          const push = Math.max(12, dhypot(Velocity.x[eid], Velocity.y[eid]));
           Velocity.x[eid] = (dx / d) * push;
           Velocity.y[eid] = (dy / d) * push;
           this.pilots.toast(conn, barred, 'warn');
@@ -3645,7 +3647,7 @@ this.devTeleport = opts.devTeleport ?? false;
     Asteroid.hp[hitAsteroid] -= damage;
     // Any weapon mines a little (mining tools far more)
     if (Projectile.miningYield[proj] > 0) {
-      const nl = Math.hypot(hitX - ax, hitY - ay) || 1;
+      const nl = dhypot(hitX - ax, hitY - ay) || 1;
       this.mining.extract(hitAsteroid, ownerId, damage, { yield: Projectile.miningYield[proj], hardness: Projectile.miningHardness[proj] },
         hitX, hitY, (hitX - ax) / nl, (hitY - ay) / nl);
     }
@@ -3924,7 +3926,7 @@ this.devTeleport = opts.devTeleport ?? false;
         const st = this.stationEntity(slot.data.route[0], slot.systemNum);
         if (!bp || st < 0) continue;
         const a = (hashString(slot.data.id) % 628) / 100;
-        slot.eid = this.ships.spawnDummy(bp, Position.x[st] + Math.cos(a) * 900, Position.y[st] + Math.sin(a) * 900, a + Math.PI, slot.systemNum);
+        slot.eid = this.ships.spawnDummy(bp, Position.x[st] + dcos(a) * 900, Position.y[st] + dsin(a) * 900, a + Math.PI, slot.systemNum);
         slot.leg = 1 % slot.data.route.length;
         slot.dwell = 0;
       }
@@ -3932,7 +3934,7 @@ this.devTeleport = opts.devTeleport ?? false;
       if (this.ships.isDormant(slot.eid)) continue;
       const st = this.stationEntity(slot.data.route[slot.leg], slot.systemNum);
       if (st < 0) continue;
-      const dist = Math.hypot(Position.x[st] - Position.x[slot.eid], Position.y[st] - Position.y[slot.eid]);
+      const dist = dhypot(Position.x[st] - Position.x[slot.eid], Position.y[st] - Position.y[slot.eid]);
       if (dist < TRAFFIC_ARRIVE_RADIUS + 200) {
         if (++slot.dwell > TRAFFIC_DWELL_TICKS) {
           slot.leg = (slot.leg + 1) % slot.data.route.length;
@@ -3952,7 +3954,7 @@ this.devTeleport = opts.devTeleport ?? false;
     const slot = this.traffic.find((t) => t.eid === eid);
     if (!slot) return undefined;
     let st = this.stationEntity(slot.data.route[slot.leg], slot.systemNum);
-    if (st >= 0 && Math.hypot(Position.x[st] - at.x, Position.y[st] - at.y) < TRAFFIC_ARRIVE_RADIUS + 200) {
+    if (st >= 0 && dhypot(Position.x[st] - at.x, Position.y[st] - at.y) < TRAFFIC_ARRIVE_RADIUS + 200) {
       const left = TRAFFIC_DWELL_TICKS - slot.dwell;
       if (left > 0) { slot.dwell = TRAFFIC_DWELL_TICKS; return { kind: 'hold', until: at.tick + left }; }
       slot.leg = (slot.leg + 1) % slot.data.route.length;
@@ -3989,7 +3991,7 @@ this.devTeleport = opts.devTeleport ?? false;
           if (!this.flying(p)) continue;
           for (const g of portalQuery(this.world)) {
             if (InSystem.systemId[g] !== InSystem.systemId[p]) continue;
-            if (Math.hypot(Position.x[g] - Position.x[p], Position.y[g] - Position.y[p]) < Radius.value[g] + MEMORY_GATE_MOUTH) out.add(Portal.targetSystem[g]);
+            if (dhypot(Position.x[g] - Position.x[p], Position.y[g] - Position.y[p]) < Radius.value[g] + MEMORY_GATE_MOUTH) out.add(Portal.targetSystem[g]);
           }
         }
         return out;

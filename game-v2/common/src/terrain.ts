@@ -12,6 +12,7 @@
 
 import type { Vec2 } from './ships/types.js';
 import { convexDecompose, normalizePolygon } from './ships/geometry.js';
+import { dhypot } from './math/detTrig.js';
 
 export interface TerrainFile {
   _comment?: string;
@@ -96,7 +97,7 @@ function circleOut(p: Piece, x: number, y: number, r: number): { depth: number; 
   let best = -Infinity, bnx = 0, bny = 0, inside = true;
   let cd = Infinity, cx = 0, cy = 0;
   for (let i = 0; i < n; i++) {
-    const j = (i + 1) % n, ax = pts[i * 2], ay = pts[i * 2 + 1], ex = pts[j * 2] - ax, ey = pts[j * 2 + 1] - ay, l = Math.hypot(ex, ey) || 1;
+    const j = (i + 1) % n, ax = pts[i * 2], ay = pts[i * 2 + 1], ex = pts[j * 2] - ax, ey = pts[j * 2 + 1] - ay, l = dhypot(ex, ey) || 1;
     // outward normal
     const nx = (ey / l) * sgn, ny = (-ex / l) * sgn;
     const d = (x - ax) * nx + (y - ay) * ny;
@@ -104,7 +105,7 @@ function circleOut(p: Piece, x: number, y: number, r: number): { depth: number; 
     if (d > best) { best = d; bnx = nx; bny = ny; }
     // the nearest point of this edge
     const t = Math.max(0, Math.min(1, ((x - ax) * ex + (y - ay) * ey) / (l * l)));
-    const qx = ax + ex * t, qy = ay + ey * t, qd = Math.hypot(x - qx, y - qy);
+    const qx = ax + ex * t, qy = ay + ey * t, qd = dhypot(x - qx, y - qy);
     if (qd < cd) { cd = qd; cx = qx; cy = qy; }
   }
   if (inside) return { depth: r - best, nx: bnx, ny: bny };

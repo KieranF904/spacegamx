@@ -11,7 +11,7 @@ import { hasComponent, entityExists, removeEntity, defineQuery } from 'bitecs';
 import {
   Position, Velocity, Rotation, Health, Player, Input, Boost, Portal, InSystem, Dead,
   TICK_RATE, inSafeSpace, unwrapTick16, computeStateHash, PROTOCOL_VERSION,
-  replicaAngle, quantizeReplicaAngle, ReplicaMode, INPUT_BOOLS, INPUT_HELD,
+  replicaAngle, quantizeReplicaAngle, ReplicaMode, INPUT_BOOLS, INPUT_HELD, dcos, dsin, hashUnit,
 } from '@space-game/common';
 import type { FactionsFile } from '../../game/Enemies.js';
 import type { ClientConnection } from '../ClientConnection.js';
@@ -224,8 +224,9 @@ export function handleRespawn(ctx: ServerCtx, conn: ClientConnection, rally?: st
       if (!m || !ctx.flying(me)) ctx.pilots.toast(conn, `${rally} isn't flying right now: you're back at your home station`, 'warn');
       else if (ctx.currentTick - ctx.ships.lastDamagedTick(me) < 60 * 8) ctx.pilots.toast(conn, `${rally} is under fire: you're back at your home station`, 'warn');
       else {
-        const a = Math.random() * Math.PI * 2;
-        ctx.placePlayer(conn, InSystem.systemId[me], Position.x[me] + Math.cos(a) * 450, Position.y[me] + Math.sin(a) * 450);
+        // (where beside them: seeded by the pilot and the tick, a server decision: math/rng.ts)
+        const a = hashUnit(me, ctx.currentTick, 0x7a11) * Math.PI * 2;
+        ctx.placePlayer(conn, InSystem.systemId[me], Position.x[me] + dcos(a) * 450, Position.y[me] + dsin(a) * 450);
         ctx.pilots.toast(conn, `Rallied with ${rally}`, 'good');
       }
     }
@@ -256,6 +257,6 @@ export function trainingDrone(ctx: ServerCtx, conn: ClientConnection): void {
   if (prev !== undefined && ctx.enemies.isAlive(prev)) return;
   if (!inSafeSpace(ctx.gameData.getSystemByNum(num), Position.x[eid], Position.y[eid]) || !(ctx.gameData.factionsFile as FactionsFile).factions?.helios) return;
   const a = Rotation.angle[eid];
-  const [d] = ctx.enemies.spawnPack(num, { faction: 'helios', ships: ['helios_drone'], passive: true }, Position.x[eid] + Math.cos(a) * 1400, Position.y[eid] + Math.sin(a) * 1400);
+  const [d] = ctx.enemies.spawnPack(num, { faction: 'helios', ships: ['helios_drone'], passive: true }, Position.x[eid] + dcos(a) * 1400, Position.y[eid] + dsin(a) * 1400);
   if (d !== undefined) ctx.trainers.set(eid, d);
 }

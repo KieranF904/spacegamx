@@ -11,7 +11,7 @@
 import { addEntity, addComponent, hasComponent, entityExists, defineQuery, IWorld } from 'bitecs';
 import {
   Position, Velocity, Radius, DroppedItem, Lifetime, InSystem, NetworkSync, Dead, Player,
-  Bag, ItemCatalog, RARITIES, POD_DRAG, podDrift,
+  Bag, ItemCatalog, RARITIES, POD_DRAG, podDrift, dcos, dhypot, dsin, mulberry32,
 } from '@space-game/common';
 
 export interface PodHost {
@@ -46,6 +46,8 @@ const PULL_RANGE = 380;
 
 export class LootPods {
   private contents = new Map<number, Bag>();
+  /** Server-only randomness, seeded (math/rng.ts): a scatter's way (pods go to clients as drift anchors) */
+  private rng = mulberry32(0x9d5);
   /** Pods a ship just dropped don't come straight back to it */
   private ignore = new Map<number, { eid: number; until: number }>();
   /** Ore chunks: who mined them (collecting your own chunk counts as mining) */
@@ -97,8 +99,8 @@ export class LootPods {
   }
 
   scatter(systemNum: number, x: number, y: number, vx: number, vy: number, items: Bag, spread = 2): void {
-    const a0 = Math.random() * Math.PI * 2;
-    this.spawn(systemNum, x, y, vx + Math.cos(a0) * spread, vy + Math.sin(a0) * spread, items);
+    const a0 = this.rng() * Math.PI * 2;
+    this.spawn(systemNum, x, y, vx + dcos(a0) * spread, vy + dsin(a0) * spread, items);
   }
 
   get(eid: number): Bag | undefined {
@@ -111,7 +113,7 @@ export class LootPods {
     const out: number[] = [];
     for (const eid of podQuery(this.host.world)) {
       if (InSystem.systemId[eid] !== systemNum || hasComponent(this.host.world, Dead, eid) || !this.contents.has(eid)) continue;
-      if (Math.hypot(Position.x[eid] - x, Position.y[eid] - y) <= r) out.push(eid);
+      if (dhypot(Position.x[eid] - x, Position.y[eid] - y) <= r) out.push(eid);
     }
     return out;
   }
@@ -183,7 +185,7 @@ export class LootPods {
       if (!near) collectors.set(sys, (near = this.host.collectors(sys).filter((p) => hasComponent(w, Player, p) && !hasComponent(w, Dead, p))));
       for (const p of near) {
         // Distance first: the rest only matters for a ship in reach
-        const d = Math.hypot(Position.x[p] - Position.x[eid], Position.y[p] - Position.y[eid]) - this.host.shipRadius(p);
+        const d = dhypot(Position.x[p] - Position.x[eid], Position.y[p] - Position.y[eid]) - this.host.shipRadius(p);
         if (d >= PULL_RANGE || d >= best || roomOf(p) < 1) continue;
         const ig = this.ignore.get(eid);
         if (ig && ig.eid === p && this.ticks < ig.until) continue;
@@ -211,7 +213,7 @@ export class LootPods {
       }
       // Tractor: accelerate towards the ship, matching its velocity as it closes
       const dx = Position.x[target] - Position.x[eid], dy = Position.y[target] - Position.y[eid];
-      const d = Math.hypot(dx, dy) || 1;
+      const d = dhypot(dx, dy) || 1;
       const pull = 0.6 + 2.4 * (1 - Math.min(1, best / PULL_RANGE));
       Velocity.x[eid] += (dx / d) * pull + (Velocity.x[target] - Velocity.x[eid]) * 0.08;
       Velocity.y[eid] += (dy / d) * pull + (Velocity.y[target] - Velocity.y[eid]) * 0.08;

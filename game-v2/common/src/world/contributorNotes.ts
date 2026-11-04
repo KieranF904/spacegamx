@@ -19,6 +19,7 @@ import { planetPosition, moonOffset } from './planets.js';
 import { nestPosition } from './nests.js';
 import { calcAsteroidPosition, scaledOrbitTick, stationOrbitTimeScale } from '../asteroid/orbit.js';
 import { TICK_RATE } from '../constants.js';
+import { datan2, dhypot } from '../math/detTrig.js';
 
 export type NoteStatus = 'open' | 'done' | 'wontdo';
 export const NOTE_STATUSES: readonly NoteStatus[] = ['open', 'done', 'wontdo'];
@@ -190,8 +191,8 @@ export function orbitAngleDeg(a: Extract<NoteAnchor, { kind: 'orbit' }>, tick: n
  */
 export function orbitThrough(around: NoteOrbitCentre, x: number, y: number, b: NoteBodies, tick: number, periodMinutes: number, direction: 1 | -1): Extract<NoteAnchor, { kind: 'orbit' }> {
   const c = noteBodyPosition(b, around, tick) ?? { x: 0, y: 0 };
-  const radius = Math.hypot(x - c.x, y - c.y);
-  const now = Math.atan2(y - c.y, x - c.x) / DEG;
+  const radius = dhypot(x - c.x, y - c.y);
+  const now = datan2(y - c.y, x - c.x) / DEG;
   const turns = periodMinutes ? (tick / (periodMinutes * TICKS_PER_MINUTE)) * direction : 0;
   const phaseDeg = ((((now - turns * 360) % 360) + 360) % 360);
   return { kind: 'orbit', around, radius: round2(radius), phaseDeg: round2(phaseDeg), periodMinutes, direction };
@@ -203,7 +204,7 @@ export function nearestNoteBody(b: NoteBodies, x: number, y: number, tick: numbe
   const consider = (ref: NoteBodyRef, name: string, radius: number) => {
     const p = noteBodyPosition(b, ref, tick);
     if (!p) return;
-    const dist = Math.hypot(p.x - x, p.y - y);
+    const dist = dhypot(p.x - x, p.y - y);
     if (!best || dist < best.dist) best = { ref, name, dist, x: p.x, y: p.y, radius };
   };
   for (const pl of b.planets ?? []) {
@@ -238,9 +239,9 @@ export function noteShapeReach(s: NoteShape): number {
     case 'point': return 0;
     case 'circle': return s.radius;
     case 'ring': return s.outer;
-    case 'rect': return Math.hypot(s.w, s.h) / 2;
-    case 'line': case 'arrow': return Math.hypot(s.dx, s.dy);
-    case 'polygon': return Math.max(0, ...s.points.map(([x, y]) => Math.hypot(x, y)));
+    case 'rect': return dhypot(s.w, s.h) / 2;
+    case 'line': case 'arrow': return dhypot(s.dx, s.dy);
+    case 'polygon': return Math.max(0, ...s.points.map(([x, y]) => dhypot(x, y)));
   }
 }
 
@@ -416,7 +417,7 @@ export function describeShape(s: NoteShape): string {
     case 'circle': return `circle, radius ${n0(s.radius)} u (diameter ${n0(s.radius * 2)} u)`;
     case 'ring': return `ring, inner radius ${n0(s.inner)} u, outer radius ${n0(s.outer)} u (width ${n0(s.outer - s.inner)} u)`;
     case 'rect': return `rectangle ${n0(s.w)} × ${n0(s.h)} u, rotated ${fmtAngle(s.rotationDeg)}`;
-    case 'line': case 'arrow': return `${s.kind} from the anchor to offset (${n0(s.dx)}, ${n0(s.dy)}) u, length ${n0(Math.hypot(s.dx, s.dy))} u${s.kind === 'arrow' ? ', head at the far end' : ''}`;
+    case 'line': case 'arrow': return `${s.kind} from the anchor to offset (${n0(s.dx)}, ${n0(s.dy)}) u, length ${n0(dhypot(s.dx, s.dy))} u${s.kind === 'arrow' ? ', head at the far end' : ''}`;
     case 'polygon': return `polygon of ${s.points.length} corners relative to the anchor: ${s.points.map(([x, y]) => `(${n0(x)}, ${n0(y)})`).join(' ')} (reaches ${n0(noteShapeReach(s))} u)`;
   }
 }
@@ -468,7 +469,7 @@ export function formatNotes(notes: readonly ContributorNote[], opts: { bodiesOf:
     out.push(`  Movement: ${mv[0]}`);
     for (const l of mv.slice(1)) out.push(`            ${l}`);
     out.push(pos
-      ? `  Position now: (${n0(pos.x)}, ${n0(pos.y)}) world units, ${n0(Math.hypot(pos.x, pos.y))} u from the system centre`
+      ? `  Position now: (${n0(pos.x)}, ${n0(pos.y)}) world units, ${n0(dhypot(pos.x, pos.y))} u from the system centre`
       : '  Position now: unknown (the body it goes with is missing)');
     out.push(`  Status: ${n.status}${n.resolution ? ` · resolution: ${n.resolution}` : ''}${n.statusBy ? ` (by ${n.statusBy})` : ''}`);
     out.push(`  Created ${fmtDate(n.createdAt)} · updated ${fmtDate(n.updatedAt)}`);

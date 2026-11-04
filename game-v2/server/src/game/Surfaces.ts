@@ -18,7 +18,7 @@
  * past the pocket's edge and you're back beside the way in.
  */
 
-import { moonOffset, planetPosition, pocketAt, pocketExit, type PlanetData, type ServerMessage, type StarSystemData } from '@space-game/common';
+import { moonOffset, planetPosition, pocketAt, pocketExit, type PlanetData, type ServerMessage, type StarSystemData, datan2, dcos, dhypot, dsin, mulberry32 } from '@space-game/common';
 import type { PilotConn } from './Pilots.js';
 import { mergeRules, texts, type RulesPatch, type StringsFile, type Texts } from '../data/rules.js';
 
@@ -138,6 +138,8 @@ export type PartyEntry = (conn: PilotConn, surface: StarSystemData) => { num: nu
 
 export class Surfaces {
   private sieges = new Map<number, Siege>();
+  /** Server-only randomness, seeded (math/rng.ts): where a raid comes from */
+  private rng = mulberry32(0x5f4ce);
   private surfaces: StarSystemData[];
   private pockets: StarSystemData[];
   /** Siege moons (a surface with a bastion: everyone gets their own copy) are handed to this */
@@ -179,7 +181,7 @@ export class Surfaces {
       // A job's arena has no way down from orbit (Arenas.ts sends you), nor has a cave (it's entered from its surface)
       if (surface.surface!.of !== system.id || surface.surface!.arena || surface.surface!.under) continue;
       const b = this.bodyOf(surface, tick);
-      if (b && Math.hypot(x - b.x, y - b.y) < b.radius + this.rules.descendRange) return { name: b.name, surface, px: b.x, py: b.y };
+      if (b && dhypot(x - b.x, y - b.y) < b.radius + this.rules.descendRange) return { name: b.name, surface, px: b.x, py: b.y };
     }
     return null;
   }
@@ -211,11 +213,11 @@ export class Surfaces {
       this.host.toast(conn, this.t('surfaces.downOn', { name: near.name }), 'info');
       return true;
     }
-    const a = Math.atan2(y - near.py, x - near.px);
+    const a = datan2(y - near.py, x - near.px);
     const r = near.surface.surface!.radius * this.rules.arriveRadius;
     // (a surface with its own landing spot: there, whichever way you came in)
     const land = near.surface.surface!.landing;
-    this.host.travel(conn, this.host.systemNum(near.surface.id), land ? land.x : Math.cos(a) * r, land ? land.y : Math.sin(a) * r);
+    this.host.travel(conn, this.host.systemNum(near.surface.id), land ? land.x : dcos(a) * r, land ? land.y : dsin(a) * r);
     this.host.toast(conn, this.t('surfaces.entering', { name: near.name }), 'info');
     return true;
   }
@@ -225,7 +227,7 @@ export class Surfaces {
     if (!system.surface) return null;
     for (const s of this.surfaces) {
       const u = s.surface!.under;
-      if (u && u.surface === system.id && Math.hypot(x - u.x, y - u.y) < u.radius) return s;
+      if (u && u.surface === system.id && dhypot(x - u.x, y - u.y) < u.radius) return s;
     }
     return null;
   }
@@ -235,7 +237,7 @@ export class Surfaces {
     const b = this.bodyOf(surface, this.host.tick());
     if (!b) return;
     const d = b.radius + this.rules.descendRange + this.rules.orbitMargin;
-    this.host.travel(conn, this.host.systemNum(b.system), b.x + Math.cos(angle) * d, b.y + Math.sin(angle) * d);
+    this.host.travel(conn, this.host.systemNum(b.system), b.x + dcos(angle) * d, b.y + dsin(angle) * d);
     this.host.toast(conn, this.t('surfaces.backInOrbit', { name: b.name }), 'info');
   }
 
@@ -247,13 +249,13 @@ export class Surfaces {
         const pilots = this.host.pilots(num);
         // Past the edge: back to orbit, beside the planet (or moon) on that side
         for (const p of pilots) {
-          if (Math.hypot(p.x, p.y) <= s.surface!.radius) continue;
+          if (dhypot(p.x, p.y) <= s.surface!.radius) continue;
           // Out of a cave: back up beside its mouth (south of it); out of anything else: back to orbit
           const u = s.surface!.under;
           if (u) {
             this.host.travel(p.conn, this.host.systemNum(u.surface), u.x, u.y + u.radius + 700);
             this.host.toast(p.conn, this.t('surfaces.surfacing', { name: this.host.systems().find((x) => x.id === u.surface)?.name ?? u.surface }), 'info');
-          } else this.toOrbit(p.conn, s, Math.atan2(p.y, p.x));
+          } else this.toOrbit(p.conn, s, datan2(p.y, p.x));
         }
         if (s.surface!.city && s.surface!.siege) this.stepSiege(s, num, pilots, now);
       }
@@ -262,8 +264,8 @@ export class Surfaces {
     for (const s of this.pockets) {
       for (const num of this.host.instances(s.id)) {
         for (const p of this.host.pilots(num)) {
-          if (Math.hypot(p.x, p.y) <= s.pocket!.radius) continue;
-          const out = pocketExit(s, Math.atan2(p.y, p.x));
+          if (dhypot(p.x, p.y) <= s.pocket!.radius) continue;
+          const out = pocketExit(s, datan2(p.y, p.x));
           if (!out) continue;
           this.host.travel(p.conn, this.host.systemNum(out.system), out.x, out.y);
           this.host.toast(p.conn, this.t('surfaces.pocket.out', { name: s.pocket!.entrance.name }), 'info');
@@ -303,7 +305,7 @@ export class Surfaces {
 
     if (g.phase !== 'calm' && g.phase !== 'fallen') {
       // Who's defending: pilots near the city while it's under attack
-      for (const p of pilots) if (Math.hypot(p.x - city.x, p.y - city.y) < city.radius * R.defendRadius) g.defenders.add(p.conn);
+      for (const p of pilots) if (dhypot(p.x - city.x, p.y - city.y) < city.radius * R.defendRadius) g.defenders.add(p.conn);
       if (now - g.lastPilots > R.abandonSeconds * SECOND) return this.endSiege(g, null, now);
       if (!standing.length) return this.endSiege(g, false, now);
     }
@@ -369,8 +371,8 @@ export class Surfaces {
     const size = Math.min(w.maxSize, w.base + g.wave * w.perWave + Math.max(0, pilots - 1) * w.perExtraPilot);
     const fronts = g.wave >= w.twoFrontsFrom ? 2 : 1;
     for (let f = 0; f < fronts; f++) {
-      const a = Math.random() * Math.PI * 2;
-      const x = Math.cos(a) * R * w.spawnRadius, y = Math.sin(a) * R * w.spawnRadius;
+      const a = this.rng() * Math.PI * 2;
+      const x = dcos(a) * R * w.spawnRadius, y = dsin(a) * R * w.spawnRadius;
       const target = nearest(standing, { x, y }) ?? { x: 0, y: 0 };
       g.raiders.push(...this.host.spawnRaid(g.num, cfg.faction ?? 'pirates', x, y, Math.ceil(size / fronts), target));
     }
@@ -434,6 +436,6 @@ export class Surfaces {
 
 function nearest<T extends { x: number; y: number }>(list: T[], from: { x: number; y: number }): T | null {
   let best: T | null = null, bd = Infinity;
-  for (const p of list) { const d = Math.hypot(p.x - from.x, p.y - from.y); if (d < bd) { bd = d; best = p; } }
+  for (const p of list) { const d = dhypot(p.x - from.x, p.y - from.y); if (d < bd) { bd = d; best = p; } }
   return best;
 }

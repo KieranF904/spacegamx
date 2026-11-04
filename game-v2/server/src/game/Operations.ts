@@ -29,6 +29,7 @@ import type { Quests } from './Quests.js';
 import type { PilotConn } from './Pilots.js';
 import { mergeRules, texts, type RulesPatch, type StringsFile, type Texts } from '../data/rules.js';
 import type { ServerMessage, OpView, OpMarkerView, QuestStep, QuestTarget } from '@space-game/common';
+import { datan2, dcos, dhypot, dsin } from '@space-game/common';
 
 export interface OpsHost {
   tick(): number;
@@ -372,7 +373,7 @@ export class Operations {
     const me = this.host.pilot(conn);
     const left = this.host.derelicts(system).filter((w) => !data?.[`w:${w.name}`]);
     if (!me || me.system !== system) return left[0];
-    left.sort((a, b) => Math.hypot(a.x - me.x, a.y - me.y) - Math.hypot(b.x - me.x, b.y - me.y));
+    left.sort((a, b) => dhypot(a.x - me.x, a.y - me.y) - dhypot(b.x - me.x, b.y - me.y));
     return left[0];
   }
 
@@ -382,9 +383,9 @@ export class Operations {
     let near: { eid: number; name: string } | null = null;
     for (const w of this.host.derelicts(step.system)) {
       if (data?.[`w:${w.name}`]) continue;
-      if (Math.hypot(w.x - me.x, w.y - me.y) < this.rules.scanRange) { near = w; break; }
+      if (dhypot(w.x - me.x, w.y - me.y) < this.rules.scanRange) { near = w; break; }
     }
-    const steady = Math.hypot(me.vx, me.vy) < this.rules.scanSpeed;
+    const steady = dhypot(me.vx, me.vy) < this.rules.scanSpeed;
     if (!near || !steady) {
       const cur = this.scanning.get(conn);
       if (cur && near && cur.wreck === near.eid) return; // drifting a little: keep the progress, don't add to it
@@ -424,7 +425,7 @@ export class Operations {
       h = Math.imul(h ^ (h >>> 13), 0x5bd1e995) >>> 0;
       a += ((i % 2 ? 1 : -1) * (0.5 + ((h % 1000) / 1000) * 0.7));
       const d = step.spacing ?? this.rules.course.spacing;
-      x += Math.cos(a) * d; y += Math.sin(a) * d;
+      x += dcos(a) * d; y += dsin(a) * d;
       out.push({ x: Math.round(x), y: Math.round(y) });
     }
     return out;
@@ -441,27 +442,27 @@ export class Operations {
     if (step.type === 'recover') {
       // Already aboard (picked up, or carried over): done
       if ((this.host.holds?.(conn, step.item) ?? 0) > 0) { this.finishTask(conn, quest, key, t, this.t('ops.recover.done', { label: step.label })); return; }
-      if (!me || me.system !== step.system || Math.hypot(me.x - step.x, me.y - step.y) > R.recover.appearRange) return;
+      if (!me || me.system !== step.system || dhypot(me.x - step.x, me.y - step.y) > R.recover.appearRange) return;
       if (t.pod < 0 || !this.host.podAlive?.(t.pod)) t.pod = this.host.spawnCargo?.(conn, step.system, step.x, step.y, { [step.item]: 1 }) ?? -1;
       if (step.guard && !t.guarded) {
         t.guarded = true;
         const a = this.rng() * Math.PI * 2;
-        t.raiders = this.host.spawnRaid(step.system, step.x + Math.cos(a) * R.recover.guardRing, step.y + Math.sin(a) * R.recover.guardRing, step.guard, { x: step.x, y: step.y });
+        t.raiders = this.host.spawnRaid(step.system, step.x + dcos(a) * R.recover.guardRing, step.y + dsin(a) * R.recover.guardRing, step.guard, { x: step.x, y: step.y });
       }
       return;
     }
     if (!me || me.system !== step.system) return;
     if (step.type === 'hold') {
       const r = step.radius ?? R.hold.radius;
-      const inside = Math.hypot(me.x - step.x, me.y - step.y) < r;
-      const steady = Math.hypot(me.vx, me.vy) < R.hold.speed;
+      const inside = dhypot(me.x - step.x, me.y - step.y) < r;
+      const steady = dhypot(me.vx, me.vy) < R.hold.speed;
       if (inside && steady) t.ticks += STEP;
       else if (!inside) t.ticks = Math.max(0, t.ticks - STEP * R.hold.drain);
       // Once you've started, whatever doesn't want it done comes for you
       if (inside && t.ticks > 0 && step.raid && !t.raided) {
         t.raided = true;
         const a = this.rng() * Math.PI * 2;
-        t.raiders = this.host.spawnRaid(step.system, step.x + Math.cos(a) * R.hold.raidRing, step.y + Math.sin(a) * R.hold.raidRing, step.raid, { x: step.x, y: step.y });
+        t.raiders = this.host.spawnRaid(step.system, step.x + dcos(a) * R.hold.raidRing, step.y + dsin(a) * R.hold.raidRing, step.raid, { x: step.x, y: step.y });
         this.host.toast(conn, this.t('ops.hold.raid', { label: step.label }), 'warn');
       }
       if (t.ticks >= step.seconds * SECOND) this.finishTask(conn, quest, key, t, this.t('ops.hold.done', { label: step.label }));
@@ -470,7 +471,7 @@ export class Operations {
     // A course: start at its spot, then each ring in turn before the clock runs out
     const rings = this.ringsOf(quest, step);
     if (!t.deadline) {
-      if (Math.hypot(me.x - step.x, me.y - step.y) < R.course.startRange) {
+      if (dhypot(me.x - step.x, me.y - step.y) < R.course.startRange) {
         t.deadline = now + step.seconds * SECOND;
         t.ring = 0;
         this.host.toast(conn, this.t('ops.course.start', { n: step.rings, secs: step.seconds }), 'info');
@@ -479,7 +480,7 @@ export class Operations {
       return;
     }
     const next = rings[t.ring];
-    if (next && Math.hypot(me.x - next.x, me.y - next.y) < R.course.ringRadius) {
+    if (next && dhypot(me.x - next.x, me.y - next.y) < R.course.ringRadius) {
       t.ring++;
       if (t.ring >= rings.length) { this.finishTask(conn, quest, key, t, this.t('ops.course.done', { secs: Math.max(0, Math.round((t.deadline - now) / SECOND)) })); return; }
       this.quests.send(conn);
@@ -503,12 +504,12 @@ export class Operations {
     const R = this.rules.construct;
     const status = (s: Build['status'], piece?: string, ticks = 0) => this.building.set(key, { status: s, piece, ticks });
     const cur = this.building.get(key);
-    if (!me || me.system !== step.system || Math.hypot(me.x - step.x, me.y - step.y) > R.range) { status('away'); return; }
+    if (!me || me.system !== step.system || dhypot(me.x - step.x, me.y - step.y) > R.range) { status('away'); return; }
     if (!this.host.fitted?.(conn, R.tool)) { status('noTool'); return; }
     const left = step.pieces.filter((pc) => !state.data?.[`b:${pc.id}`]);
     const next = left.find((pc) => (this.host.holds?.(conn, pc.item) ?? 0) > 0);
     if (!next) { status('noParts'); return; }
-    if (Math.hypot(me.vx, me.vy) > R.speed) { status('moving', next.id, cur?.piece === next.id ? cur.ticks : 0); return; }
+    if (dhypot(me.vx, me.vy) > R.speed) { status('moving', next.id, cur?.piece === next.id ? cur.ticks : 0); return; }
     const ticks = (cur?.piece === next.id ? cur.ticks : 0) + STEP;
     if (ticks < (step.seconds ?? R.seconds) * SECOND) { status('building', next.id, ticks); return; }
     // The piece goes on
@@ -577,14 +578,14 @@ export class Operations {
     if (step.type === 'escort') { inst.from = step.from; inst.to = step.to; }
     if (step.type === 'defend') {
       const d = this.rules.defend.siteDistance;
-      inst.site = { x: st.x + Math.cos(a) * d, y: st.y + Math.sin(a) * d };
+      inst.site = { x: st.x + dcos(a) * d, y: st.y + dsin(a) * d };
     }
     if (step.type === 'uplink') {
       const U = this.rules.uplink;
-      inst.site = { x: st.x + Math.cos(a) * U.siteDistance, y: st.y + Math.sin(a) * U.siteDistance };
+      inst.site = { x: st.x + dcos(a) * U.siteDistance, y: st.y + dsin(a) * U.siteDistance };
       for (let i = 0; i < step.beacons; i++) {
         const b = a + Math.PI / 2 + (i / step.beacons) * Math.PI * 2;
-        inst.beacons.push({ x: inst.site.x + Math.cos(b) * U.beaconRing, y: inst.site.y + Math.sin(b) * U.beaconRing });
+        inst.beacons.push({ x: inst.site.x + dcos(b) * U.beaconRing, y: inst.site.y + dsin(b) * U.beaconRing });
       }
       inst.held = inst.beacons.map(() => false);
       inst.need = step.seconds * 60;
@@ -598,7 +599,7 @@ export class Operations {
     if (inst.phase === 'done') return;
     const here = conns.map((c) => ({ c, p: this.host.pilot(c) })).filter((x) => x.p && x.p.system === inst.system) as { c: PilotConn; p: NonNullable<ReturnType<OpsHost['pilot']>> }[];
     const centre = inst.kind === 'escort' && inst.phase === 'running' ? this.host.shipAt(inst.ward) ?? inst.site : inst.site;
-    if (here.some((x) => Math.hypot(x.p.x - centre.x, x.p.y - centre.y) < this.rules.awayRange)) inst.seen = now;
+    if (here.some((x) => dhypot(x.p.x - centre.x, x.p.y - centre.y) < this.rules.awayRange)) inst.seen = now;
     const size = Math.max(1, conns.length);
     if (inst.kind === 'escort') this.driveEscort(inst, step as Extract<QuestStep, { type: 'escort' }>, conns, here, size);
     else if (inst.kind === 'defend') this.driveDefend(inst, conns, here, size);
@@ -616,14 +617,14 @@ export class Operations {
       // A job's own ship (Dr. Osei's shuttle) has its name; bounty freighters get one
       inst.wardName = step.ward ?? '';
       inst.text = this.t('ops.escort.meet', { ward, station: from.name });
-      if (!here.some((x) => Math.hypot(x.p.x - from.x, x.p.y - from.y) < E.meetRange)) return;
-      const ang = Math.atan2(to.y - from.y, to.x - from.x);
+      if (!here.some((x) => dhypot(x.p.x - from.x, x.p.y - from.y) < E.meetRange)) return;
+      const ang = datan2(to.y - from.y, to.x - from.x);
       inst.wardName = step.ward ?? this.t('ops.escort.freighterName', {
         kind: size > 1 ? this.t('ops.escort.heavyFreighter') : this.t('ops.escort.freighter'),
         name: E.freighterNames[hash(inst.quest) % E.freighterNames.length],
       });
-      inst.ward = this.host.spawnWard('freighter', inst.system, from.x + Math.cos(ang) * E.launchDistance, from.y + Math.sin(ang) * E.launchDistance, ang, inst.wardName);
-      inst.totalDist = Math.hypot(to.x - from.x, to.y - from.y);
+      inst.ward = this.host.spawnWard('freighter', inst.system, from.x + dcos(ang) * E.launchDistance, from.y + dsin(ang) * E.launchDistance, ang, inst.wardName);
+      inst.totalDist = dhypot(to.x - from.x, to.y - from.y);
       inst.ambushAt = Array.from({ length: step.ambushes }, (_, i) => E.ambushStart + (E.ambushSpan * (i + 0.5)) / step.ambushes);
       inst.phase = 'running';
       inst.seen = now;
@@ -632,16 +633,16 @@ export class Operations {
     }
     const at = this.host.shipAt(inst.ward);
     if (!at) return this.finish(inst, conns, false, this.t('ops.escort.destroyed', { ward: inst.wardName }));
-    const dist = Math.hypot(to.x - at.x, to.y - at.y);
+    const dist = dhypot(to.x - at.x, to.y - at.y);
     this.host.steer(inst.ward, { x: to.x, y: to.y, arrive: E.arrive });
     inst.raiders = inst.raiders.filter((e) => this.host.hostileAlive(e));
     if (inst.raiders.length) this.host.sendRaid(inst.raiders, at);
     const progress = Math.max(0, Math.min(1, 1 - dist / Math.max(1, inst.totalDist)));
     if (inst.ambushAt.length && progress >= inst.ambushAt[0]) {
       inst.ambushAt.shift();
-      const dir = Math.atan2(to.y - at.y, to.x - at.x) + (this.rng() < 0.5 ? -1 : 1) * (E.ambushAngleMin + this.rng() * E.ambushAngleExtra);
+      const dir = datan2(to.y - at.y, to.x - at.x) + (this.rng() < 0.5 ? -1 : 1) * (E.ambushAngleMin + this.rng() * E.ambushAngleExtra);
       const n = this.raidSize(inst.system) + (size - 1);
-      inst.raiders.push(...this.host.spawnRaid(inst.system, at.x + Math.cos(dir) * E.ambushRing, at.y + Math.sin(dir) * E.ambushRing, n, at));
+      inst.raiders.push(...this.host.spawnRaid(inst.system, at.x + dcos(dir) * E.ambushRing, at.y + dsin(dir) * E.ambushRing, n, at));
       for (const c of conns) this.host.toast(c, this.t('ops.escort.ambush', { ward }), 'warn');
     }
     const n = inst.raiders.length;
@@ -666,7 +667,7 @@ export class Operations {
     const D = this.rules.defend;
     if (inst.phase === 'waiting') {
       inst.text = this.t('ops.defend.flyTo');
-      if (!here.some((x) => Math.hypot(x.p.x - inst.site.x, x.p.y - inst.site.y) < D.arriveRange)) return;
+      if (!here.some((x) => dhypot(x.p.x - inst.site.x, x.p.y - inst.site.y) < D.arriveRange)) return;
       inst.wardName = this.t('ops.outpost');
       inst.ward = this.host.spawnWard('outpost', inst.system, inst.site.x, inst.site.y, 0, inst.wardName);
       inst.phase = 'running';
@@ -694,7 +695,7 @@ export class Operations {
         inst.nextWave = Infinity;
         const a = this.rng() * Math.PI * 2;
         const n = this.rules.raid.base + Math.floor(inst.wave / this.rules.raid.defendWavesPer) + Math.floor(this.host.danger(inst.system) / this.rules.raid.dangerPer) + (size - 1);
-        inst.raiders = this.host.spawnRaid(inst.system, inst.site.x + Math.cos(a) * D.ring, inst.site.y + Math.sin(a) * D.ring, n, inst.site);
+        inst.raiders = this.host.spawnRaid(inst.system, inst.site.x + dcos(a) * D.ring, inst.site.y + dsin(a) * D.ring, n, inst.site);
         for (const c of conns) this.host.toast(c, this.t('ops.defend.incoming', { wave: inst.wave, waves: inst.waves }), 'warn');
       }
     }
@@ -710,7 +711,7 @@ export class Operations {
   private driveUplink(inst: Inst, conns: PilotConn[], here: { c: PilotConn; p: { x: number; y: number } }[], size: number): void {
     const now = this.host.tick();
     const U = this.rules.uplink;
-    inst.held = inst.beacons.map((b) => here.some((x) => Math.hypot(x.p.x - b.x, x.p.y - b.y) < U.holdRange));
+    inst.held = inst.beacons.map((b) => here.some((x) => dhypot(x.p.x - b.x, x.p.y - b.y) < U.holdRange));
     const all = inst.held.every(Boolean);
     inst.charge = all ? inst.charge + STEP : Math.max(0, inst.charge - STEP / U.decay);
     inst.raiders = inst.raiders.filter((e) => this.host.hostileAlive(e));
@@ -719,7 +720,7 @@ export class Operations {
       const b = inst.beacons[Math.floor(this.rng() * inst.beacons.length)];
       const a = this.rng() * Math.PI * 2;
       const n = this.raidSize(inst.system) + Math.max(0, size - 2);
-      inst.raiders.push(...this.host.spawnRaid(inst.system, b.x + Math.cos(a) * U.ring, b.y + Math.sin(a) * U.ring, n, b));
+      inst.raiders.push(...this.host.spawnRaid(inst.system, b.x + dcos(a) * U.ring, b.y + dsin(a) * U.ring, n, b));
       for (const c of conns) this.host.toast(c, this.t('ops.uplink.jammers'), 'warn');
     }
     const heldN = inst.held.filter(Boolean).length;
@@ -828,7 +829,7 @@ export class Operations {
           const to = inst.to ? this.host.station(inst.to) : null;
           if (to) {
             markers.push({ x: Math.round(to.x), y: Math.round(to.y), r: R.escort.arriveRange, label: this.t('ops.escort.destination', { station: to.name }), state: 'idle' });
-            progress = Math.max(0, Math.min(1, 1 - Math.hypot(to.x - at.x, to.y - at.y) / Math.max(1, inst.totalDist)));
+            progress = Math.max(0, Math.min(1, 1 - dhypot(to.x - at.x, to.y - at.y) / Math.max(1, inst.totalDist)));
           }
         } else {
           markers.push({ x: Math.round(inst.site.x), y: Math.round(inst.site.y), r: R.escort.meetRange, label: this.t('ops.escort.meetMarker', { ward: inst.wardName || this.t('ops.theFreighter') }), state: 'idle' });

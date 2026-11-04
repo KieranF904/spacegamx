@@ -7,7 +7,7 @@
  * callback, the memory host and systemRows read them on hot paths, so those call sites stay as they were.
  */
 import { hasComponent, type IWorld } from 'bitecs';
-import { Player, hashString, isStructural, towTuning, type TowKind, type Bag, type DerelictData, type ClientSocket, type ServerMessage } from '@space-game/common';
+import { Player, hashString, isStructural, towTuning, type TowKind, type Bag, type DerelictData, type ClientSocket, type ServerMessage, dcos, dsin } from '@space-game/common';
 import type { Economy } from '@space-game/common';
 import type { GameData } from '../data/GameData.js';
 import type { ClientConnection } from '../net/ClientConnection.js';
@@ -169,7 +169,7 @@ export class Derelicts {
         let left = Math.floor(n);
         while (left > 0) {
           const k = Math.min(left, 6), a = i++ * 2.39996;
-          this.pods.spawnChunk(slot.systemNum, x, y, Math.cos(a) * 2, Math.sin(a) * 2, { [id]: k }, lastHitBy);
+          this.pods.spawnChunk(slot.systemNum, x, y, dcos(a) * 2, dsin(a) * 2, { [id]: k }, lastHitBy);
           left -= k;
         }
       }

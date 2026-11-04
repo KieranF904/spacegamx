@@ -9,6 +9,7 @@ import type { PilotConn } from '../Pilots.js';
 import { DEFAULT_SIEGE_RULES, SECOND, type SiegeRules } from './rules.js';
 import { DEFAULT_ORDERS, TURRET_ORDERS, pickTarget } from './turrets.js';
 import type { PilotAt, Run, SiegeCtx } from './types.js';
+import { dhypot } from '@space-game/common';
 
 export interface ShopItem { id: string; label: string; cost: number; note: string }
 
@@ -64,7 +65,7 @@ export function buildAtNight(ctx: SiegeCtx, run: Run, conn: PilotConn, id: strin
   if (slot < 0) return;
   if (run.turrets[slot]) return host.toast(conn, t('sieges.padTaken', { pad: slot + 1 }), 'warn');
   const b = run.sys.surface!.bastion!, p = b.slots[slot];
-  if (!me || Math.hypot(me.x - (b.x + p.x), me.y - (b.y + p.y)) > rules.night.buildReach) return host.toast(conn, t('sieges.tooFarToBuild', { pad: slot + 1 }), 'warn');
+  if (!me || dhypot(me.x - (b.x + p.x), me.y - (b.y + p.y)) > rules.night.buildReach) return host.toast(conn, t('sieges.tooFarToBuild', { pad: slot + 1 }), 'warn');
   const cost = nightCost(rules, def.marks[0].cost);
   if (run.supplies < cost) return host.toast(conn, t('sieges.shortOfSupplies', { cost }), 'warn');
   if (!place(ctx, run, slot, kind, 0, cost)) return;
@@ -138,7 +139,7 @@ export function stepMending(ctx: SiegeCtx, run: Run, pilots: PilotAt[]): void {
   jobs.push({ key: -1, eid: run.bastion, x: b.x, y: b.y, what: t('sieges.banner.meter'), m: rules.night.bastionMend });
   for (const j of jobs) {
     const hull = host.shipAt(j.eid)?.hull ?? 1;
-    const near = hull < 0.999 ? pilots.filter((p) => Math.hypot(p.x - j.x, p.y - j.y) <= j.m.reach) : [];
+    const near = hull < 0.999 ? pilots.filter((p) => dhypot(p.x - j.x, p.y - j.y) <= j.m.reach) : [];
     if (!near.length) { run.mend.delete(j.key); continue; }
     const held = (run.mend.get(j.key) ?? 0) + 10;
     if (held < j.m.seconds * SECOND) { run.mend.set(j.key, held); continue; }

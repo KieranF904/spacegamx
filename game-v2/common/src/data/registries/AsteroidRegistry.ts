@@ -86,16 +86,16 @@ export class AsteroidRegistry extends BaseRegistry<string, AsteroidDefinition> {
       case 'quadratic':
         return baseHealth * (size / def.size.min);
       case 'cubic':
-        return baseHealth * Math.pow(size / def.size.min, 2);
+        return baseHealth * (size / def.size.min) * (size / def.size.min);
       default:
         return baseHealth;
     }
   }
 
   /**
-   * Calculate resource yield for a specific asteroid instance
+   * Calculate resource yield for a specific asteroid instance (rng: a seeded generator, math/rng.ts)
    */
-  calculateResources(definitionId: string, size: number): Map<string, number> {
+  calculateResources(definitionId: string, size: number, rng: () => number): Map<string, number> {
     const def = this.get(definitionId);
     const resources = new Map<string, number>();
     if (!def) return resources;
@@ -103,7 +103,7 @@ export class AsteroidRegistry extends BaseRegistry<string, AsteroidDefinition> {
     // Primary resource
     const primary = def.resources.primary;
     const primaryAmount = Math.floor(
-      size * (primary.minPerSize + Math.random() * (primary.maxPerSize - primary.minPerSize))
+      size * (primary.minPerSize + rng() * (primary.maxPerSize - primary.minPerSize))
     );
     resources.set(primary.type, primaryAmount);
 
@@ -111,15 +111,15 @@ export class AsteroidRegistry extends BaseRegistry<string, AsteroidDefinition> {
     if (def.resources.secondary) {
       const secondary = def.resources.secondary;
       const secondaryAmount = Math.floor(
-        size * (secondary.minPerSize + Math.random() * (secondary.maxPerSize - secondary.minPerSize))
+        size * (secondary.minPerSize + rng() * (secondary.maxPerSize - secondary.minPerSize))
       );
       resources.set(secondary.type, secondaryAmount);
     }
 
     // Bonus resource (chance-based)
-    if (def.resources.bonus && Math.random() < def.resources.bonus.chance) {
+    if (def.resources.bonus && rng() < def.resources.bonus.chance) {
       const bonus = def.resources.bonus;
-      const bonusAmount = bonus.min + Math.floor(Math.random() * (bonus.max - bonus.min + 1));
+      const bonusAmount = bonus.min + Math.floor(rng() * (bonus.max - bonus.min + 1));
       resources.set(bonus.type, bonusAmount);
     }
 
@@ -143,14 +143,14 @@ export class AsteroidRegistry extends BaseRegistry<string, AsteroidDefinition> {
   }
 
   /**
-   * Pick random asteroid type for a field based on weights
+   * Pick random asteroid type for a field based on weights (rng: a seeded generator, math/rng.ts)
    */
-  pickRandomForField(fieldId: string): string | null {
+  pickRandomForField(fieldId: string, rng: () => number): string | null {
     const weights = this.getFieldSpawnWeights(fieldId);
     if (weights.size === 0) return null;
 
     const totalWeight = Array.from(weights.values()).reduce((a, b) => a + b, 0);
-    let random = Math.random() * totalWeight;
+    let random = rng() * totalWeight;
 
     for (const [id, weight] of weights) {
       random -= weight;
@@ -162,13 +162,13 @@ export class AsteroidRegistry extends BaseRegistry<string, AsteroidDefinition> {
   }
 
   /**
-   * Generate random size for asteroid
+   * Generate random size for asteroid (rng: a seeded generator, math/rng.ts)
    */
-  generateSize(definitionId: string): number {
+  generateSize(definitionId: string, rng: () => number): number {
     const def = this.get(definitionId);
     if (!def) return 50;
 
-    return def.size.min + Math.random() * (def.size.max - def.size.min);
+    return def.size.min + rng() * (def.size.max - def.size.min);
   }
 }
 

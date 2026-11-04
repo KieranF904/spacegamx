@@ -18,7 +18,7 @@
  */
 
 import { IWorld } from 'bitecs';
-import { Position, Velocity, Rotation, InSystem, Bag, Blueprint, ShipState, ServerMessage, mulberry32, plated, stagedIntegrity } from '@space-game/common';
+import { Position, Velocity, Rotation, InSystem, Bag, Blueprint, ShipState, ServerMessage, mulberry32, plated, stagedIntegrity, dcos, dhypot, dsin } from '@space-game/common';
 import type { ShipBridge } from '../ships/ShipBridge.js';
 import type { Enemies, Behaviour, EnemyAi } from './Enemies.js';
 import type { FarPose } from '../ships/SimLod.js';
@@ -342,7 +342,7 @@ export class Bosses {
     // A wanderer moves on while nobody's fighting it
     const roamed = this.roam(b, now, target);
     // Quiet again (everyone left or died): the next one gets the card too
-    if (!roamed && b.engaged && !this.host.players(b.systemNum).some((p) => Math.hypot(Position.x[p] - x, Position.y[p] - y) < this.file.rules.barRange)) b.engaged = false;
+    if (!roamed && b.engaged && !this.host.players(b.systemNum).some((p) => dhypot(Position.x[p] - x, Position.y[p] - y) < this.file.rules.barRange)) b.engaged = false;
     // Novas: warn, then fire a ring of shots
     if (b.nova && b.novaAt < 0 && now >= b.nextNova && target >= 0) {
       b.novaAt = now + b.nova.warnTicks;
@@ -353,7 +353,7 @@ export class Bosses {
       const a0 = this.rng() * Math.PI * 2;
       for (let i = 0; i < b.nova.count; i++) {
         const a = a0 + (i / b.nova.count) * Math.PI * 2;
-        this.host.fire(b.eid, b.nova.kind, x + Math.cos(a) * r, y + Math.sin(a) * r, a, b.def.damage * b.rage, { intercept: b.nova.intercept ?? false });
+        this.host.fire(b.eid, b.nova.kind, x + dcos(a) * r, y + dsin(a) * r, a, b.def.damage * b.rage, { intercept: b.nova.intercept ?? false });
       }
       b.novaAt = -1;
       b.nextNova = now + b.nova.every;
@@ -361,7 +361,7 @@ export class Bosses {
     // Blinks: fold space and come out beside the target
     if (b.blinkEvery > 0 && now >= b.nextBlink && target >= 0) {
       const a = this.rng() * Math.PI * 2, d = 700 + this.rng() * 500;
-      const nx = Position.x[target] + Math.cos(a) * d, ny = Position.y[target] + Math.sin(a) * d;
+      const nx = Position.x[target] + dcos(a) * d, ny = Position.y[target] + dsin(a) * d;
       this.host.warpFx(b.systemNum, x, y, true);
       this.ships.teleport(b.eid, nx, ny);
       this.host.warpFx(b.systemNum, nx, ny, false);
@@ -373,7 +373,7 @@ export class Bosses {
   private roam(b: Live, now: number, target: number): boolean {
     if (!b.def.roam || target >= 0 || now % (b.def.roam.everySeconds * 60) !== 0) return false;
     const a = this.rng() * Math.PI * 2, d = b.def.roam.radius * (0.3 + 0.7 * this.rng());
-    this.enemies.sendPack([b.eid], { x: b.def.lair.x + Math.cos(a) * d, y: b.def.lair.y + Math.sin(a) * d });
+    this.enemies.sendPack([b.eid], { x: b.def.lair.x + dcos(a) * d, y: b.def.lair.y + dsin(a) * d });
     return true;
   }
 
@@ -390,7 +390,7 @@ export class Bosses {
       // Out of its launch bays, at its hull (not out of nowhere beside you)
       const x = Position.x[b.eid], y = Position.y[b.eid];
       const a = this.rng() * Math.PI * 2, r = (this.ships.get(b.eid)?.derived.radius ?? 300) + 120;
-      const lx = x + Math.cos(a) * r, ly = y + Math.sin(a) * r;
+      const lx = x + dcos(a) * r, ly = y + dsin(a) * r;
       this.host.effect?.(b.systemNum, lx, ly, 'launch');
       const eids = this.enemies.spawnPack(b.systemNum, { faction: b.def.faction, ships: p.escorts }, lx, ly);
       this.enemies.own(eids, 'escort');
@@ -409,7 +409,7 @@ export class Bosses {
     const r = this.file.rules;
     const winners = new Set<number>();
     for (const [p, d] of b.dealt) if (now - d.last < r.creditWindowTicks && this.host.players(b.systemNum).includes(p)) winners.add(p);
-    for (const p of this.host.players(b.systemNum)) if (Math.hypot(Position.x[p] - x, Position.y[p] - y) < r.creditRange) winners.add(p);
+    for (const p of this.host.players(b.systemNum)) if (dhypot(Position.x[p] - x, Position.y[p] - y) < r.creditRange) winners.add(p);
     if (killer !== undefined && this.host.players(b.systemNum).includes(killer)) winners.add(killer);
     // (Support credit: whoever kept a winner flying, here, wins too)
     for (const p of [...winners]) for (const s of this.host.supportersOf?.(p) ?? []) if (this.host.players(b.systemNum).includes(s)) winners.add(s);

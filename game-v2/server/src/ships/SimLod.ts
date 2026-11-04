@@ -41,7 +41,7 @@ import {
   InSystem, Position, Velocity, Rotation, FRICTION, BOOST_FACTOR, WORLD_SIZE, CARRY,
   stepFlight, FULL_CHARGE, legAt, legFrom, legTo, legArrival, coastLeg, nextSeed, MIN_LEG, PATROL_ARRIVE,
   patrolOf, patrolPoint, patrolFrom, patrolNext,
-  type Leg, type Motion, type Patrol, type PatrolState, type ShipDerived, type ShipState, type Blueprint, type ShipTuning,
+  type Leg, type Motion, type Patrol, type PatrolState, type ShipDerived, type ShipState, type Blueprint, type ShipTuning, datan2, dcos, dhypot, dsin,
 } from '@space-game/common';
 import type { ShipBridge } from './ShipBridge.js';
 
@@ -145,7 +145,7 @@ function measureCruise(d: ShipDerived, tuning: ShipTuning): Cruise {
   let speed = 0;
   for (let i = 0; i < 1200; i++) {
     stepFlight(body, go, d, tuning, boost, K);
-    const s = Math.hypot(body.vx, body.vy);
+    const s = dhypot(body.vx, body.vy);
     if (i > 60 && s - speed < 1e-4) { speed = s; break; }
     speed = s;
   }
@@ -159,7 +159,7 @@ function measureCruise(d: ShipDerived, tuning: ShipTuning): Cruise {
   return { speed, turn: (Math.PI / 2) / Math.max(1, ticks + 1) };
 }
 
-const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+const wrap = (a: number) => datan2(dsin(a), dcos(a));
 
 /** Squared distance from a point to a segment */
 function segDist2(px: number, py: number, s: number[], i: number): number {
@@ -394,7 +394,7 @@ export class SimLod {
     if (intent?.kind === 'patrol' && c.speed * (intent.pace ?? 1) > 0) {
       // Its first point the one it was making for (unless it's there), the rest rolled
       const pt = patrolOf(intent.x, intent.y, intent.roam, c.speed * (intent.pace ?? 1));
-      const wp = intent.wp && Math.hypot(intent.wp.x - p.x, intent.wp.y - p.y) > PATROL_ARRIVE ? { ...intent.wp, seed: far.seed } : patrolPoint(pt, far.seed);
+      const wp = intent.wp && dhypot(intent.wp.x - p.x, intent.wp.y - p.y) > PATROL_ARRIVE ? { ...intent.wp, seed: far.seed } : patrolPoint(pt, far.seed);
       far.patrol = { p: pt, s: patrolFrom(pt, t, p, wp.x, wp.y, wp.seed) };
       far.a0 = p.angle; far.turn = c.turn; far.spin = 0;
       this.patrolLeg(far);
@@ -412,7 +412,7 @@ export class SimLod {
         if (lead && intent.lead !== eid && this.advance(intent.lead, lead, t)) {
           const L = legFrom(lead.leg, t - lead.t0), hold = L.thrust < 0 ? REASK : L.thrust;
           tx = L.x + L.vx * CARRY + L.wx * hold + intent.dx; ty = L.y + L.vy * CARRY + L.wy * hold + intent.dy;
-          speed = Math.hypot(L.wx, L.wy); arrive = 200; until = lead.end;
+          speed = dhypot(L.wx, L.wy); arrive = 200; until = lead.end;
         } else {
           // (Its lead's live, or gone: where it is now, near enough, asked again soon)
           tx = Position.x[intent.lead] + intent.dx; ty = Position.y[intent.lead] + intent.dy;
@@ -427,11 +427,11 @@ export class SimLod {
         end = t + (arr < 0 ? leg.thrust + CARRY * 3 : arr);
       }
       if (until !== undefined) end = Math.min(end, until);
-      if (leg.wx || leg.wy) aim = Math.atan2(leg.wy, leg.wx);
+      if (leg.wx || leg.wy) aim = datan2(leg.wy, leg.wx);
     }
     far.t0 = t; far.leg = leg; far.a0 = p.angle; far.aim = aim; far.turn = c.turn; far.spin = spin;
     far.end = end === Infinity ? Infinity : Math.ceil(Math.max(t + MIN_LEG, end));
-    far.speed = Math.max(Math.hypot(leg.vx, leg.vy), Math.hypot(leg.wx, leg.wy));
+    far.speed = Math.max(dhypot(leg.vx, leg.vy), dhypot(leg.wx, leg.wy));
     far.seq = ++this.routes;
     this.counts.legs++;
     return true;
@@ -449,8 +449,8 @@ export class SimLod {
   private patrolLeg(far: Far): void {
     const s = far.patrol!.s, leg = s.leg;
     far.t0 = s.t0; far.leg = leg; far.end = s.end;
-    far.aim = leg.wx || leg.wy ? Math.atan2(leg.wy, leg.wx) : far.a0;
-    far.speed = Math.max(Math.hypot(leg.vx, leg.vy), Math.hypot(leg.wx, leg.wy));
+    far.aim = leg.wx || leg.wy ? datan2(leg.wy, leg.wx) : far.a0;
+    far.speed = Math.max(dhypot(leg.vx, leg.vy), dhypot(leg.wx, leg.wy));
     this.counts.legs++;
   }
 

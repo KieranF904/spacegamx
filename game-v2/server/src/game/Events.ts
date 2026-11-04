@@ -17,7 +17,7 @@
  * Events are rolled once a minute per occupied system, with a cooldown.
  */
 
-import { Position, Bag, ServerMessage, mulberry32 } from '@space-game/common';
+import { Position, Bag, ServerMessage, mulberry32, dcos, dhypot, dsin } from '@space-game/common';
 import type { Enemies, FactionsFile } from './Enemies.js';
 import { mergeRules, texts, type RulesPatch, type StringsFile, type Texts } from '../data/rules.js';
 
@@ -235,9 +235,9 @@ export class Events {
     for (let k = 0; k < R.packs; k++) {
       const g = groups[Math.floor(this.rng() * groups.length)];
       const b = a + (k - 0.5) * R.spread;
-      ships.push(...this.enemies.spawnPack(num, g, sx + Math.cos(b) * R.spawnRing, sy + Math.sin(b) * R.spawnRing));
+      ships.push(...this.enemies.spawnPack(num, g, sx + dcos(b) * R.spawnRing, sy + dsin(b) * R.spawnRing));
     }
-    const hold = { x: sx + Math.cos(a) * R.holdRing, y: sy + Math.sin(a) * R.holdRing };
+    const hold = { x: sx + dcos(a) * R.holdRing, y: sy + dsin(a) * R.holdRing };
     this.enemies.sendPack(ships, hold, R.leash);
     const e = this.add({
       kind: 'raid', systemNum: num, title: this.t('events.raid.title', { station: st.name }),
@@ -264,7 +264,7 @@ export class Events {
       bag[id] = S.countMin + Math.floor(this.rng() * (S.countSpread + d));
       if (this.rng() < S.rareChancePerDanger * d) bag[rare[Math.floor(this.rng() * rare.length)]] = 1;
       const a = this.rng() * Math.PI * 2, r = S.scatterMin + this.rng() * S.scatterExtra;
-      this.host.spawnPod(num, at.x + Math.cos(a) * r, at.y + Math.sin(a) * r, Math.cos(a) * S.drift, Math.sin(a) * S.drift, bag, S.podLifeSeconds);
+      this.host.spawnPod(num, at.x + dcos(a) * r, at.y + dsin(a) * r, dcos(a) * S.drift, dsin(a) * S.drift, bag, S.podLifeSeconds);
     }
     // Something else heard the mayday
     const groups = this.groupsOf(num, cfg.salvageZone);
@@ -272,7 +272,7 @@ export class Events {
     if (groups.length) {
       const g = groups[Math.floor(this.rng() * groups.length)];
       const a = this.rng() * Math.PI * 2;
-      ships.push(...this.enemies.spawnPack(num, g, at.x + Math.cos(a) * S.spawnRing, at.y + Math.sin(a) * S.spawnRing));
+      ships.push(...this.enemies.spawnPack(num, g, at.x + dcos(a) * S.spawnRing, at.y + dsin(a) * S.spawnRing));
       this.enemies.sendPack(ships, at, S.leash);
     }
     const e = this.add({
@@ -295,8 +295,8 @@ export class Events {
     let at: { x: number; y: number } | null = null;
     for (let i = 0; i < 30 && !at; i++) {
       const a = this.rng() * Math.PI * 2, r = zone.inner + (0.3 + 0.6 * this.rng()) * (zone.outer - zone.inner);
-      const x = (zone.x ?? 0) + Math.cos(a) * r, y = (zone.y ?? 0) + Math.sin(a) * r;
-      if (players.every((p) => Math.hypot(Position.x[p] - x, Position.y[p] - y) > 9000)) at = { x, y };
+      const x = (zone.x ?? 0) + dcos(a) * r, y = (zone.y ?? 0) + dsin(a) * r;
+      if (players.every((p) => dhypot(Position.x[p] - x, Position.y[p] - y) > 9000)) at = { x, y };
     }
     if (!at) return null;
     const ships: number[] = [];
@@ -304,7 +304,7 @@ export class Events {
     for (let k = 0; k < W.packs; k++) {
       const g = k === 0 ? lead : wb.groups[Math.floor(this.rng() * wb.groups.length)];
       const a = (k / W.packs) * Math.PI * 2;
-      const eids = this.enemies.spawnPack(num, { ...g, plating: (g.plating ?? 0) + (k === 0 ? 1 : 0) }, at.x + Math.cos(a) * 900, at.y + Math.sin(a) * 900);
+      const eids = this.enemies.spawnPack(num, { ...g, plating: (g.plating ?? 0) + (k === 0 ? 1 : 0) }, at.x + dcos(a) * 900, at.y + dsin(a) * 900);
       this.enemies.sendPack(eids, at, W.leash);
       ships.push(...eids);
     }
@@ -327,12 +327,12 @@ export class Events {
     for (let i = 0; i < pk.pods; i++) {
       const id = pk.goods[Math.floor(this.rng() * pk.goods.length)];
       const a = this.rng() * Math.PI * 2, r = P.scatterMin + this.rng() * P.scatterExtra;
-      this.host.spawnPod(num, at.x + Math.cos(a) * r, at.y + Math.sin(a) * r, Math.cos(a) * P.drift, Math.sin(a) * P.drift, { [id]: P.countMin + Math.floor(this.rng() * P.countSpread) }, P.podLifeSeconds);
+      this.host.spawnPod(num, at.x + dcos(a) * r, at.y + dsin(a) * r, dcos(a) * P.drift, dsin(a) * P.drift, { [id]: P.countMin + Math.floor(this.rng() * P.countSpread) }, P.podLifeSeconds);
     }
     // The flock bursts out of the middle and flies off, away from it
     const away = this.rng() * Math.PI * 2;
     const ships = this.enemies.spawnPack(num, pk.flock, at.x, at.y);
-    this.enemies.sendPack(ships, { x: at.x + Math.cos(away) * P.fleeRing, y: at.y + Math.sin(away) * P.fleeRing }, P.leash);
+    this.enemies.sendPack(ships, { x: at.x + dcos(away) * P.fleeRing, y: at.y + dsin(away) * P.fleeRing }, P.leash);
     const e = this.add({
       kind: 'peak', systemNum: num, title: this.t('events.peak.title'), text: this.t('events.peak.text'),
       x: at.x, y: at.y, endsAt: this.host.tick() + P.durationSeconds * SECOND, ships,
@@ -371,7 +371,7 @@ export class Events {
         const d = Math.max(1, this.host.danger(e.systemNum));
         const at = e.last ?? { x: e.x, y: e.y };
         for (const p of this.host.players(e.systemNum)) {
-          if (Math.hypot(Position.x[p] - at.x, Position.y[p] - at.y) > W.rewardRange) continue;
+          if (dhypot(Position.x[p] - at.x, Position.y[p] - at.y) > W.rewardRange) continue;
           this.host.reward(p, W.creditsPerDanger * d, W.xpPerDanger * d, { ...W.reputation }, 'warband');
         }
         this.host.announce(e.systemNum, this.t('events.warband.over', { faction: e.stationName ?? '' }), 'good');
@@ -384,7 +384,7 @@ export class Events {
       const sx = e.station !== undefined ? Position.x[e.station] : e.x, sy = e.station !== undefined ? Position.y[e.station] : e.y;
       const d = Math.max(1, this.host.danger(e.systemNum));
       for (const p of this.host.players(e.systemNum)) {
-        if (Math.hypot(Position.x[p] - sx, Position.y[p] - sy) > R.rewardRange) continue;
+        if (dhypot(Position.x[p] - sx, Position.y[p] - sy) > R.rewardRange) continue;
         this.host.reward(p, R.creditsPerDanger * d, R.xpPerDanger * d, { ...R.reputation }, 'raid');
       }
       this.host.announce(e.systemNum, this.t('events.raid.over', { station: e.stationName ?? e.title }), 'good');

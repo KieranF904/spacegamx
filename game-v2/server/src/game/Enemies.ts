@@ -32,7 +32,7 @@ import {
   Position, Velocity, Rotation, InSystem, Player, Dead, Radius,
   Blueprint, Bag, ShipState, partItemId, mulberry32,
   MAX_GRADE, markName, regrade, blueprintGrade, gradeReward, rateShip, ratingOf, createShipState, placeCost, type Economy, plated, partWeaponDef, endsAtAim, migratePartItem,
-  nestPosition, NEST_RADIUS, type NestData, type PlanetData, type StarSystemData } from '@space-game/common';
+  nestPosition, NEST_RADIUS, type NestData, type PlanetData, type StarSystemData, datan2, dcos, dhypot, dsin } from '@space-game/common';
 import { nestBand, clampBand, stepRound, placesOfInterest, looseWaypoint, nomadDestination, LOOSE_REACH, type RoamStyle, type Band, type XY } from './Roaming.js';
 import type { ShipBridge, PilotOrders } from '../ships/ShipBridge.js';
 import type { Intent, Plan, FarPose } from '../ships/SimLod.js';
@@ -404,7 +404,7 @@ export class Enemies {
     if (!sp) return 0;
     const grade = sp.grade ?? 1;
     // A band of the system (a region): the zones in it, and the system's own packs in its innermost band
-    const inBand = (z: SpawnZone) => { const r = z.x !== undefined ? Math.hypot(z.x, z.y ?? 0) : (z.inner + z.outer) / 2; return !band || (r >= band.inner && r < band.outer); };
+    const inBand = (z: SpawnZone) => { const r = z.x !== undefined ? dhypot(z.x, z.y ?? 0) : (z.inner + z.outer) / 2; return !band || (r >= band.inner && r < band.outer); };
     // (Nests by how far out what they circle is; the system's own groups and zones only if they send packs of their own: else they're just who lives there)
     const nestR = (n: SpawnNest) => { const pl = n.place?.around !== undefined ? n.planets?.find((q) => q.id === n.place!.around) : undefined; return pl ? pl.orbit.radius : n.place?.orbit.radius ?? 0; };
     const groups = [
@@ -517,13 +517,13 @@ export class Enemies {
     const x = at.x, y = at.y;
     const home = pack ? this.homeAt(pack, now) : { x, y };
     if (e.state === 'return') {
-      if (Math.hypot(x - home.x, y - home.y) >= b.leash * 0.5) return { kind: 'goto', x: home.x, y: home.y, arrive: b.leash * 0.5 };
+      if (dhypot(x - home.x, y - home.y) >= b.leash * 0.5) return { kind: 'goto', x: home.x, y: home.y, arrive: b.leash * 0.5 };
       e.state = 'patrol';
     }
     let until: number | undefined;
     if (pack?.nestDef && pack.style !== 'anchored') {
       const lead = pack.members.values().next().value ?? eid, k = [...pack.members].indexOf(eid);
-      const off = { x: Math.cos(k * 2.4) * 380, y: Math.sin(k * 2.4) * 380 };
+      const off = { x: dcos(k * 2.4) * 380, y: dsin(k * 2.4) * 380 };
       if (k > 0 && this.ships.isDormant(lead)) return { kind: 'follow', lead, dx: off.x, dy: off.y };
       const wp = this.wander(pack, lead, now, k <= 0 ? at : undefined, at.rng);
       e.waypoint = k <= 0 ? wp : { x: wp.x + off.x, y: wp.y + off.y };
@@ -531,10 +531,10 @@ export class Enemies {
     } else if (!pack?.nestDef) {
       // Round a home that stays put: a patrol worked out by its own dice (the map's told it once: SimLod, common farRoute.ts)
       return { kind: 'patrol', x: home.x, y: home.y, roam: pack?.roam ?? 2400, pace: pack?.pace ?? 0.58, wp: e.waypoint };
-    } else if (Math.hypot(x - e.waypoint.x, y - e.waypoint.y) < 300) {
+    } else if (dhypot(x - e.waypoint.x, y - e.waypoint.y) < 300) {
       const roam = pack?.roam ?? 2400;
       const a = at.rng() * Math.PI * 2, r = 600 + at.rng() * (roam - 600);
-      e.waypoint = { x: home.x + Math.cos(a) * r, y: home.y + Math.sin(a) * r };
+      e.waypoint = { x: home.x + dcos(a) * r, y: home.y + dsin(a) * r };
     }
     // (Packs cruise in pulses at their own pace, and a loose one stops a while now and then)
     const paused = now < (pack?.pauseUntil ?? 0);
@@ -586,7 +586,7 @@ export class Enemies {
       const r = i === 0 ? 0 : 260 + i * 90;
       // The leader takes the front; the rest fan out either side of it
       const flank = i === 0 ? 0 : (i % 2 ? 1 : -1) * Math.min(1.6, 0.55 * Math.ceil(i / 2));
-      const eid = this.spawnShip(pack, type, group.faction, grade, group.plating ?? 0, elite, x + Math.cos(a) * r, y + Math.sin(a) * r, null, flank);
+      const eid = this.spawnShip(pack, type, group.faction, grade, group.plating ?? 0, elite, x + dcos(a) * r, y + dsin(a) * r, null, flank);
       if (eid < 0) return;
       this.enemies.get(eid)!.waypoint = { x, y };
       pack.size0 = pack.members.size;
@@ -668,7 +668,7 @@ export class Enemies {
         const packs = all.filter((p) => !p.zone && !p.nest);
         // Zones: kept stocked around the pilots inside them; a zone's packs nobody's been near for a while are recycled (new ones come in where the pilots are)
         for (const z of sp.zones ?? []) {
-          const inside = players.filter((p) => { const r = Math.hypot(Position.x[p] - (z.x ?? 0), Position.y[p] - (z.y ?? 0)); return r > z.inner - 3000 && r < z.outer + 3000; });
+          const inside = players.filter((p) => { const r = dhypot(Position.x[p] - (z.x ?? 0), Position.y[p] - (z.y ?? 0)); return r > z.inner - 3000 && r < z.outer + 3000; });
           const mine = all.filter((p) => p.zone === z.id);
           if (inside.length) for (const p of mine) p.lastSeen = now;
           const key = `${num}:${z.id}`;
@@ -721,14 +721,14 @@ export class Enemies {
     const key = `${num}:${n.id}`;
     const at = nestPosition(n.place, n.planets, now);
     const wake = this.data.rules.nestWake ?? 36000;
-    const near = players.some((p) => Math.hypot(Position.x[p] - at.x, Position.y[p] - at.y) < wake);
+    const near = players.some((p) => dhypot(Position.x[p] - at.x, Position.y[p] - at.y) < wake);
     let out = 0;
     for (const p of all) {
       if (p.nest !== key) continue;
       out++;
       // A nomad is awake while a pilot is near it, wherever it's got to; the rest go where the nest goes
       if (p.style === 'nomad') {
-        if (players.some((q) => Math.hypot(Position.x[q] - p.home.x, Position.y[q] - p.home.y) < wake)) this.steerNomad(num, n, p, players, now);
+        if (players.some((q) => dhypot(Position.x[q] - p.home.x, Position.y[q] - p.home.y) < wake)) this.steerNomad(num, n, p, players, now);
         continue;
       }
       p.home = at;
@@ -736,7 +736,7 @@ export class Enemies {
     // Nobody near it: it still sends its nomads out while there are pilots in its band of the system for them to find
     const band = n.band;
     const nomadsOnly = !near && !!band && n.groups.some((g) => (g.style ?? n.style) === 'nomad')
-      && players.some((q) => { const r = Math.hypot(Position.x[q], Position.y[q]); return r > band.min - 10000 && r < band.max + 10000; });
+      && players.some((q) => { const r = dhypot(Position.x[q], Position.y[q]); return r > band.min - 10000 && r < band.max + 10000; });
     if ((!near && !nomadsOnly) || out >= n.packs) return;
     if (!out && now >= (this.nestRebuilt.get(key) ?? 0)) {
       const stocked = [...all];
@@ -781,7 +781,7 @@ export class Enemies {
    */
   private launch(num: number, n: SpawnNest, key: string, gi: number, at: { x: number; y: number }, out = false): number[] {
     const g = n.groups[gi];
-    const a = this.rng() * Math.PI * 2, c = Math.cos(a), s = Math.sin(a);
+    const a = this.rng() * Math.PI * 2, c = dcos(a), s = dsin(a);
     const from = out ? NEST_RADIUS + (n.roam ?? 2400) * (0.3 + 0.7 * this.rng()) : NEST_RADIUS;
     const mx = at.x + c * from, my = at.y + s * from;
     if (!out) this.host.effect?.(num, mx, my, 'launch');
@@ -796,7 +796,7 @@ export class Enemies {
     eids.forEach((eid, i) => {
       Position.x[eid] = mx + c * i * 170; Position.y[eid] = my + s * i * 170;
       const v = out ? LAUNCH_SPEED * 0.3 : LAUNCH_SPEED, h = out ? a + (this.rng() - 0.5) * 2 : a;
-      Velocity.x[eid] = Math.cos(h) * v; Velocity.y[eid] = Math.sin(h) * v;
+      Velocity.x[eid] = dcos(h) * v; Velocity.y[eid] = dsin(h) * v;
       Rotation.angle[eid] = h;
       const e = this.enemies.get(eid)!;
       if (leash && f) e.behaviour = { ...f.behaviour, leash };
@@ -812,7 +812,7 @@ export class Enemies {
   /** Places a pack might head for: planets, belts, stations' outskirts, gates, the system's other nests (in its band) */
   private places(num: number, n: SpawnNest, now: number, rng = this.rng): XY[] {
     const extra: XY[] = [];
-    const out = (x: number, y: number, d: number) => { const r = Math.hypot(x, y) || 1; extra.push({ x: x + (x / r) * d, y: y + (y / r) * d }); };
+    const out = (x: number, y: number, d: number) => { const r = dhypot(x, y) || 1; extra.push({ x: x + (x / r) * d, y: y + (y / r) * d }); };
     for (const st of this.host.stations(num)) out(Position.x[st], Position.y[st], 9000);
     for (const g of this.host.gates?.(num) ?? []) out(g.x, g.y, 6000);
     for (const o of this.data.spawns[this.host.systemId(num) ?? '']?.nests ?? []) if (o !== n && o.place) extra.push(nestPosition(o.place, o.planets, now));
@@ -842,7 +842,7 @@ export class Enemies {
     // Travelling: a little ahead of its home, on the way
     if (p.style === 'nomad' && p.dest) return stepRound(p.home, p.dest, 2500).at;
     const at = from ? { x: from.x, y: from.y } : { x: Position.x[lead], y: Position.y[lead] };
-    if (p.wp && now < (p.wpUntil ?? 0) && Math.hypot(at.x - p.wp.x, at.y - p.wp.y) > 600) return p.wp;
+    if (p.wp && now < (p.wpUntil ?? 0) && dhypot(at.x - p.wp.x, at.y - p.wp.y) > 600) return p.wp;
     const lane = p.style !== 'nomad' && n.place && n.place.around === undefined ? n.place.orbit.radius : 0;
     const w = looseWaypoint(at, this.homeAt(p, now), p.roam ?? 2400, n.bias ?? 0.5, n.band ?? { min: 0, max: 1e9 }, this.places(p.systemNum, n, now, rng), lane, rng);
     p.wp = w.wp;
@@ -1005,11 +1005,11 @@ export class Enemies {
       const p = players[Math.floor(this.rng() * players.length)];
       // Out past the radar, in the zone's ring (a narrow ring: as far as it allows)
       const a = this.rng() * Math.PI * 2, d = (tries < 30 ? lo : lo * 0.7) + this.rng() * (hi - lo);
-      const x = Position.x[p] + Math.cos(a) * d, y = Position.y[p] + Math.sin(a) * d;
-      const r = Math.hypot(x - (z.x ?? 0), y - (z.y ?? 0));
+      const x = Position.x[p] + dcos(a) * d, y = Position.y[p] + dsin(a) * d;
+      const r = dhypot(x - (z.x ?? 0), y - (z.y ?? 0));
       if (r < z.inner || r > z.outer || this.host.unsafe(num, x, y)) continue;
-      if (players.some((q) => Math.hypot(Position.x[q] - x, Position.y[q] - y) < (tries < 30 ? lo : lo * 0.7))) continue;
-      if (stations.some((s) => Math.hypot(Position.x[s] - x, Position.y[s] - y) < this.data.rules.minStationDistance)) continue;
+      if (players.some((q) => dhypot(Position.x[q] - x, Position.y[q] - y) < (tries < 30 ? lo : lo * 0.7))) continue;
+      if (stations.some((s) => dhypot(Position.x[s] - x, Position.y[s] - y) < this.data.rules.minStationDistance)) continue;
       return { x, y };
     }
     return null;
@@ -1032,13 +1032,13 @@ export class Enemies {
       if (passive || this.rng() >= (R.approachChance ?? 0.6) || !out.length) return undefined;
       const p = out[Math.floor(this.rng() * out.length)];
       const a = this.rng() * Math.PI * 2, d = 2500 + this.rng() * 2500;
-      return { x: Position.x[p] + Math.cos(a) * d, y: Position.y[p] + Math.sin(a) * d };
+      return { x: Position.x[p] + dcos(a) * d, y: Position.y[p] + dsin(a) * d };
     };
     // Launched from the faction's outpost (the Redtooth Hold sends its cutters out)
     const base = this.bosses?.launcher(num, group.faction);
     if (base && this.rng() < 0.5) {
       const a = this.rng() * Math.PI * 2;
-      const x = base.x + Math.cos(a) * base.r, y = base.y + Math.sin(a) * base.r;
+      const x = base.x + dcos(a) * base.r, y = base.y + dsin(a) * base.r;
       this.host.effect?.(num, x, y, 'launch');
       const eids = this.spawnPack(num, group, x, y, zone?.id);
       this.own(eids, zone ? 'zone' : 'system');
@@ -1047,11 +1047,11 @@ export class Enemies {
       return;
     }
     // Through a gate, seen spooling up first (not one a pilot's sitting on)
-    const gates = (this.host.gates?.(num) ?? []).filter((g) => players.every((p) => Math.hypot(Position.x[p] - g.x, Position.y[p] - g.y) > 6000));
+    const gates = (this.host.gates?.(num) ?? []).filter((g) => players.every((p) => dhypot(Position.x[p] - g.x, Position.y[p] - g.y) > 6000));
     if (gates.length && this.rng() < (R.gateChance ?? 0.3)) {
       const g = gates[Math.floor(this.rng() * gates.length)];
       const a = this.rng() * Math.PI * 2;
-      const x = g.x + Math.cos(a) * 600, y = g.y + Math.sin(a) * 600;
+      const x = g.x + dcos(a) * 600, y = g.y + dsin(a) * 600;
       this.host.effect?.(num, x, y, 'warning');
       this.arrivals.push({ due: this.host.tick() + Math.round((R.warnSeconds ?? 3) * 60), num, group, x, y, zone: zone?.id, approach: towards() });
       return;
@@ -1078,12 +1078,12 @@ export class Enemies {
       // Near a player's part of the system, so packs are found, but beyond their sight
       const p = players[Math.floor(this.rng() * players.length)];
       const a = this.rng() * Math.PI * 2, d = lo + this.rng() * (hi - lo);
-      const x = Position.x[p] + Math.cos(a) * d, y = Position.y[p] + Math.sin(a) * d;
-      if (Math.hypot(x, y) > R * 1.2 || this.host.unsafe(num, x, y)) continue;
+      const x = Position.x[p] + dcos(a) * d, y = Position.y[p] + dsin(a) * d;
+      if (dhypot(x, y) > R * 1.2 || this.host.unsafe(num, x, y)) continue;
       // Hostiles come in outside the safe space
       if (!passive && this.host.safeAt?.(num, x, y)) continue;
-      if (players.some((q) => Math.hypot(Position.x[q] - x, Position.y[q] - y) < lo)) continue;
-      if (stations.some((s) => Math.hypot(Position.x[s] - x, Position.y[s] - y) < this.data.rules.minStationDistance)) continue;
+      if (players.some((q) => dhypot(Position.x[q] - x, Position.y[q] - y) < lo)) continue;
+      if (stations.some((s) => dhypot(Position.x[s] - x, Position.y[s] - y) < this.data.rules.minStationDistance)) continue;
       return { x, y };
     }
     return null;
@@ -1104,7 +1104,7 @@ export class Enemies {
 
     if (now >= e.nextThink) {
       e.nextThink = now + 12 + (eid % 7);
-      const fromHome = Math.hypot(x - home.x, y - home.y);
+      const fromHome = dhypot(x - home.x, y - home.y);
       // Hurt? run (if the faction does); and when most of the pack is gone, its nerve breaks
       const broken = b.flee > 0 && !e.boss && pack && (pack.size0 ?? 1) >= 3 && pack.members.size <= (pack.size0 ?? 1) * 0.4 && this.ships.coreFraction(eid) < 0.75;
       // Passive packs (safe systems) only fight once one of them has been shot (a wingmate of their own faction bumping
@@ -1121,12 +1121,12 @@ export class Enemies {
         let best = -1, bd = calm ? 0 : b.aggro;
         for (const p of this.host.players(InSystem.systemId[eid])) {
           if (this.host.sheltered?.(p) || this.spared(e, p, now)) continue;
-          const d = Math.hypot(Position.x[p] - x, Position.y[p] - y);
+          const d = dhypot(Position.x[p] - x, Position.y[p] - y);
           if (d < bd) { bd = d; best = p; }
         }
         for (const w of this.wards) {
           if (!this.ships.has(w) || InSystem.systemId[w] !== InSystem.systemId[eid]) continue;
-          const d = Math.hypot(Position.x[w] - x, Position.y[w] - y);
+          const d = dhypot(Position.x[w] - x, Position.y[w] - y);
           if (!calm && d < bd) { bd = d; best = w; }
         }
         // Whoever's been hurting the pack gets its attention
@@ -1153,11 +1153,11 @@ export class Enemies {
         // Loose and nomad packs wander as one: each to its own spot round the pack's waypoint
         const lead = pack.members.values().next().value ?? eid;
         const wp = this.wander(pack, lead, now), k = [...pack.members].indexOf(eid);
-        e.waypoint = k <= 0 ? wp : { x: wp.x + Math.cos(k * 2.4) * 380, y: wp.y + Math.sin(k * 2.4) * 380 };
-      } else if (e.state === 'patrol' && Math.hypot(x - e.waypoint.x, y - e.waypoint.y) < 300) {
+        e.waypoint = k <= 0 ? wp : { x: wp.x + dcos(k * 2.4) * 380, y: wp.y + dsin(k * 2.4) * 380 };
+      } else if (e.state === 'patrol' && dhypot(x - e.waypoint.x, y - e.waypoint.y) < 300) {
         const roam = pack?.roam ?? 2400;
         const a = this.rng() * Math.PI * 2, r = 600 + this.rng() * (roam - 600);
-        e.waypoint = { x: home.x + Math.cos(a) * r, y: home.y + Math.sin(a) * r };
+        e.waypoint = { x: home.x + dcos(a) * r, y: home.y + dsin(a) * r };
       }
       if (this.rng() < 0.04) e.strafe = -e.strafe;
       // Worse aim against fast movers and at range
@@ -1175,28 +1175,28 @@ export class Enemies {
     if (e.state === 'engage') {
       const tx = Position.x[t], ty = Position.y[t];
       const dx = tx - x, dy = ty - y;
-      const d = Math.hypot(dx, dy) || 1;
+      const d = dhypot(dx, dy) || 1;
       if (e.reach === undefined) this.learnLoadout(e, ship);
       const reach = e.reach ?? Math.max(b.range * 1.8, 900);
       // Lead the target by the shell's flight time
       const tof = Math.min(40, d / 45);
       const rvx = Velocity.x[t] - Velocity.x[eid], rvy = Velocity.y[t] - Velocity.y[eid];
       const lx = dx + rvx * tof, ly = dy + rvy * tof;
-      face = Math.atan2(ly, lx) + e.aimErr;
+      face = datan2(ly, lx) + e.aimErr;
       aim = face;
-      aimDist = Math.hypot(lx, ly);
+      aimDist = dhypot(lx, ly);
       // Where to fight from: its preferred distance, round the target at its place in the pack's spread;
       // shot at from beyond its own guns' reach, it closes in fast instead of sitting there taking it
       const outgunned = d > reach * 0.85 && now - this.ships.lastDamagedTick(eid) < 150 && this.ships.lastHitter(eid) === t;
       const want = outgunned ? Math.min(b.range, reach * 0.6) : b.range;
-      let side = Math.atan2(y - ty, x - tx);
+      let side = datan2(y - ty, x - tx);
       if (pack && pack.members.size > 1) {
         let cx = 0, cy = 0;
         for (const m of pack.members) { cx += Position.x[m]; cy += Position.y[m]; }
-        side = Math.atan2(cy / pack.members.size - ty, cx / pack.members.size - tx) + e.flank;
+        side = datan2(cy / pack.members.size - ty, cx / pack.members.size - tx) + e.flank;
       }
-      const sx = tx + Math.cos(side) * want - x, sy = ty + Math.sin(side) * want - y;
-      const off = Math.hypot(sx, sy);
+      const sx = tx + dcos(side) * want - x, sy = ty + dsin(side) * want - y;
+      const off = dhypot(sx, sy);
       const ux = dx / d, uy = dy / d;
       if (outgunned) { mx = ux; my = uy; boost = true; }
       else if (off > Math.max(250, want * 0.35)) { mx = sx / off; my = sy / off; boost = off > want * 2.5; }
@@ -1204,7 +1204,7 @@ export class Enemies {
       else if (b.strafe === undefined || ((now + eid * 7) % 180) / 180 < b.strafe) { mx = -uy * e.strafe; my = ux * e.strafe; }
       else {
         // Hold: brake against our own drift
-        const v = Math.hypot(Velocity.x[eid], Velocity.y[eid]);
+        const v = dhypot(Velocity.x[eid], Velocity.y[eid]);
         if (v > 0.6) { mx = -Velocity.x[eid] / v; my = -Velocity.y[eid] / v; }
       }
       // Fire within its guns' real reach, when a hit is likely: a big, slow, near target, or a lobbed shell
@@ -1214,19 +1214,19 @@ export class Enemies {
       firing = d <= reach * 0.95 && (d < 900 || e.lobs === true || size / Math.max(1, spread) > 0.25);
     } else if (e.state === 'flee') {
       const dx = x - Position.x[t], dy = y - Position.y[t];
-      const d = Math.hypot(dx, dy) || 1;
+      const d = dhypot(dx, dy) || 1;
       mx = dx / d; my = dy / d; boost = true;
-      face = Math.atan2(my, mx);
+      face = datan2(my, mx);
     } else {
       const wp = e.state === 'return' ? home : e.waypoint;
       const dx = wp.x - x, dy = wp.y - y;
-      const d = Math.hypot(dx, dy) || 1;
-      if (d > 200) { mx = dx / d; my = dy / d; face = Math.atan2(dy, dx); }
+      const d = dhypot(dx, dy) || 1;
+      if (d > 200) { mx = dx / d; my = dy / d; face = datan2(dy, dx); }
       // Cruise gently on patrol: thrust in pulses (each pack at its own pace), or hold still a while
       if (e.state === 'patrol' && ((now + eid * 13) % 120 > 120 * (pack?.pace ?? 0.58) || now < (pack?.pauseUntil ?? 0))) { mx = 0; my = 0; }
     }
     // Steer by a heading held steady until the wanted one drifts (the guns aim separately, every tick)
-    if (e.face === undefined || Math.abs(Math.atan2(Math.sin(face - e.face), Math.cos(face - e.face))) > (e.state === 'engage' ? 0.004 : 0.02)) e.face = face;
+    if (e.face === undefined || Math.abs(datan2(dsin(face - e.face), dcos(face - e.face))) > (e.state === 'engage' ? 0.004 : 0.02)) e.face = face;
     // Mouse-steer controls are screen-relative: press the directions nearest the wanted motion
     const controls = { forward: my < -0.38, backward: my > 0.38, left: mx < -0.38, right: mx > 0.38, boost, targetAngle: e.face };
     void ship;
@@ -1280,7 +1280,7 @@ export class Enemies {
     const t = e.target;
     if (!this.targetable(t)) return true;
     if (hitter === t || t === e.prey) return false;
-    const d = Math.hypot(Position.x[t] - Position.x[e.eid], Position.y[t] - Position.y[e.eid]);
+    const d = dhypot(Position.x[t] - Position.x[e.eid], Position.y[t] - Position.y[e.eid]);
     if (d > Math.max(b.aggro * 2, e.reach ?? b.range * 1.8)) return true;
     return fromHome > b.leash * 2 && now - (e.engagedAt ?? 0) > CHASE_GRACE;
   }
@@ -1326,7 +1326,7 @@ export class Enemies {
     const support = new Set(killer !== undefined && this.alive(killer) ? this.host.supportersOf?.(killer) ?? [] : []);
     for (const p of this.host.players(num)) {
       if (p === killer) continue;
-      const d = Math.hypot(Position.x[p] - x, Position.y[p] - y);
+      const d = dhypot(Position.x[p] - x, Position.y[p] - y);
       if (party.has(p) && d < PARTY_SHARE_RANGE) {
         this.host.reward(p, Math.round(pay.xp * k * 0.75), Math.round(pay.credits * k * 0.4), true, label);
         this.host.questKill(p, e.type, e.faction);
@@ -1382,7 +1382,7 @@ export class Enemies {
         const gun = def && def.turrets > 0 ? this.data.rules.stationDefence[def.weapon] : undefined;
         if (!def || !gun) continue;
         const reach = gun.range + Radius.value[st];
-        const near = foes.map((eid) => ({ eid, d: Math.hypot(Position.x[st] - Position.x[eid], Position.y[st] - Position.y[eid]) }))
+        const near = foes.map((eid) => ({ eid, d: dhypot(Position.x[st] - Position.x[eid], Position.y[st] - Position.y[eid]) }))
           .filter((f) => f.d <= reach && this.ships.get(f.eid))
           .sort((a, b) => a.d - b.d);
         if (!near.length) continue;
@@ -1417,7 +1417,7 @@ export class Enemies {
     hit(target, gun.damage);
     if (!gun.splash) return;
     for (const eid of foes) {
-      if (eid !== target && Math.hypot(Position.x[eid] - x, Position.y[eid] - y) < gun.splash) hit(eid, gun.damage * 0.5);
+      if (eid !== target && dhypot(Position.x[eid] - x, Position.y[eid] - y) < gun.splash) hit(eid, gun.damage * 0.5);
     }
   }
 }

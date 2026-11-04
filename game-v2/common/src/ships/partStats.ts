@@ -19,6 +19,7 @@ import type { WeaponMods } from './types.js';
 import { baseWeaponDps } from './rating.js';
 import { towTuning, DEFAULT_TOW } from './features/tow/tow.js';
 import { partArmour, weaponHit, DAMAGE_TYPES, type DamageType } from './damage.js';
+import { dlog, dpow } from '../math/detTrig.js';
 
 export interface PartStats {
   grade: number;
@@ -70,7 +71,7 @@ const SIZE_NAMES: [number, string][] = [[1, 'Small'], [2, 'Medium'], [4, 'Large'
 /** "Small" for a base-size weapon, up to "Heavy" for 9× (wedges and odd shapes: the nearest) */
 export function sizeName(ratio: number): string {
   let best = SIZE_NAMES[0];
-  for (const s of SIZE_NAMES) if (Math.abs(Math.log(ratio / s[0])) < Math.abs(Math.log(ratio / best[0]))) best = s;
+  for (const s of SIZE_NAMES) if (Math.abs(dlog(ratio / s[0])) < Math.abs(dlog(ratio / best[0]))) best = s;
   return ratio < 0.75 ? 'Light' : best[1];
 }
 
@@ -86,7 +87,7 @@ export function partStats(catalog: Catalog, tuning: ShipTuning | undefined, p: {
   if (Object.keys(resist).length) out.resist = resist;
   if (fn.weapon) {
     // (A model is its own size: named by its piece, a square Small, a panel Medium, a block Large)
-    out.size = fn.model ? sizeName(Math.max(1, area)) : sizeName(weaponSizeFactor(catalog, fn, area) ** (1 / 1.15));
+    out.size = fn.model ? sizeName(Math.max(1, area)) : sizeName(dpow(weaponSizeFactor(catalog, fn, area), 1 / 1.15));
     // Its own tuning: its kind's, with its grade's character and its size's (launch.ts gunDef)
     // (A model is its own size, with its own changes)
     const size = fn.model ? 1 : area / weaponBaseArea(catalog, fn);
@@ -115,7 +116,7 @@ export function partStats(catalog: Catalog, tuning: ShipTuning | undefined, p: {
   if ((fn.demand ?? 0) > 0 && fn.fire?.model !== 'ammo') out.draw = partDemand(fn, area, mat);
   if (isEngine(fn)) {
     out.thrust = partThrust(catalog, fn, area, mat);
-    out.size = fn.model ? sizeName(Math.max(1, area)) : sizeName(weaponSizeFactor(catalog, fn, area) ** (1 / 1.15));
+    out.size = fn.model ? sizeName(Math.max(1, area)) : sizeName(dpow(weaponSizeFactor(catalog, fn, area), 1 / 1.15));
     out.boost = fn.boost ?? 2.2;
     out.boostDrain = fn.boostDrain ?? 1;
   }

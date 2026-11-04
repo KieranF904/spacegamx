@@ -8,7 +8,7 @@
  */
 
 import * as bitecs from 'bitecs';
-import { Position, Velocity, Rotation, Health, ClientInputMessage, Blueprint, seededRng, hashInts } from '@space-game/common';
+import { Position, Velocity, Rotation, Health, ClientInputMessage, Blueprint, seededRng, hashInts, dsin } from '@space-game/common';
 import { createProtoServer, ProtoServerOptions } from '../proto/createProtoServer.js';
 import { LocalTransport } from '../net/LocalTransport.js';
 import type { ShipBridge } from './ShipBridge.js';
@@ -28,7 +28,7 @@ export function recordInputs(seed: number, ticks: number): RecordedInput[] {
         targetAngle: (rng() * 2 - 1) * Math.PI,
       };
     }
-    out.push({ ...cur, targetAngle: cur.targetAngle + Math.sin(t / 20) * 0.3 });
+    out.push({ ...cur, targetAngle: cur.targetAngle + dsin(t / 20) * 0.3 });
   }
   return out;
 }

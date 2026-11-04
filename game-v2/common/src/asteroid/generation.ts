@@ -5,6 +5,7 @@ import { hashString, mulberry32 } from './polygon.js';
 import { asteroidRegistry } from '../data/registries/AsteroidRegistry.js';
 import { AsteroidFieldConfig, AsteroidDefinition } from '../data/definitions/AsteroidDefinition.js';
 import type { OutlierTable } from '../econ/mining.js';
+import { datan2, dcos, dhypot, dpow, dsin } from '../math/detTrig.js';
 
 let outliers: OutlierTable | null = null;
 
@@ -47,21 +48,21 @@ export function stationarySpot(systemId: string, seed: string, belt: AsteroidBel
   const u = (k + 0.5) / n, a0 = k * GOLDEN;
   const rr = Math.sqrt(r0 * r0 + u * (r1 * r1 - r0 * r0));
   const ja = rng() * Math.PI * 2, jr = Math.sqrt(rng()) * 0.3 * spacing;
-  let x = Math.cos(a0) * rr + Math.cos(ja) * jr, y = Math.sin(a0) * rr + Math.sin(ja) * jr;
+  let x = dcos(a0) * rr + dcos(ja) * jr, y = dsin(a0) * rr + dsin(ja) * jr;
   // (Inside the edges, its whole size)
   const lo = Math.min(r0 + size, (r0 + r1) / 2), hi = Math.max(r1 - size, (r0 + r1) / 2);
-  const d = Math.hypot(x, y) || 1, dc = Math.max(lo, Math.min(hi, d));
+  const d = dhypot(x, y) || 1, dc = Math.max(lo, Math.min(hi, d));
   x *= dc / d; y *= dc / d;
   const lane = ring.lane;
   if (lane) {
-    const c = Math.cos(lane.angle), s = Math.sin(lane.angle);
+    const c = dcos(lane.angle), s = dsin(lane.angle);
     const along = x * c + y * s, across = -x * s + y * c, clear = lane.width / 2 + size;
     if (along > 0 && Math.abs(across) < clear) {
       const out = (across < 0 ? -1 : 1) * (clear + rng() * 0.5 * spacing);
       x = along * c - out * s; y = along * s + out * c;
     }
   }
-  return { r: Math.hypot(x, y), angle: Math.atan2(y, x) };
+  return { r: dhypot(x, y), angle: datan2(y, x) };
 }
 
 /** A stationary ring's rock: its orbit made a fixed spot */
@@ -172,7 +173,7 @@ export function makeAsteroidParamsFromField(
   
   // Orbital parameters (same as before - Keplerian mechanics)
   const orbitType = OrbitType.Elliptic;
-  const eccentricity = ASTEROID_ECC_MAX * Math.pow(rng(), ASTEROID_ECC_CURVE);
+  const eccentricity = ASTEROID_ECC_MAX * dpow(rng(), ASTEROID_ECC_CURVE);
   const seg = beltSegment(belt, index);
   const minA = seg.innerRadius / (1 + eccentricity);
   const maxA = seg.outerRadius / (1 - eccentricity);
@@ -222,7 +223,7 @@ export function makeAsteroidParams(
 ): AsteroidParams {
   const rng = mulberry32(hashString(`${seed}:${systemId}:${spawnTick}:${index}`));
   const orbitType = OrbitType.Elliptic;
-  const eccentricity = ASTEROID_ECC_MAX * Math.pow(rng(), ASTEROID_ECC_CURVE);
+  const eccentricity = ASTEROID_ECC_MAX * dpow(rng(), ASTEROID_ECC_CURVE);
   const seg = beltSegment(belt, index);
   const minA = seg.innerRadius / (1 + eccentricity);
   const maxA = seg.outerRadius / (1 - eccentricity);

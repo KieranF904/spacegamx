@@ -75,7 +75,7 @@
  * everything. More pilots, more of everything too.
  */
 
-import { Position, Velocity, ShipState, rayTerrain, currentStage, deciding, isRuined, pointInConvex, stageOf, stagedIntegrity, RUIN_HP } from '@space-game/common';
+import { Position, Velocity, ShipState, rayTerrain, currentStage, deciding, isRuined, pointInConvex, stageOf, stagedIntegrity, RUIN_HP, datan2, dcos, dhypot, dsin } from '@space-game/common';
 import type { PilotOrders } from '../../ships/ShipBridge.js';
 import { BossBrain, BossView, BrainHost, bodyFrame, lead, partMount, partsWith, pose, strike, wrap } from './kit.js';
 
@@ -181,7 +181,7 @@ export class PyreclastBrain implements BossBrain {
       return base;
     }
     const me = pose(view.eid);
-    if (Math.hypot(Position.x[t] - me.x, Position.y[t] - me.y) > CHARGE_AWAY) { if (this.away < 0) this.away = now; } else this.away = -1;
+    if (dhypot(Position.x[t] - me.x, Position.y[t] - me.y) > CHARGE_AWAY) { if (this.away < 0) this.away = now; } else this.away = -1;
     if (!this.move && now >= this.restUntil) this.move = this.pick(now);
     this.passives(now);
     if (this.move && this.move.next().done) {
@@ -211,27 +211,27 @@ export class PyreclastBrain implements BossBrain {
     const w = this.want;
     if (w.move === 'hold') {
       // Brake against its own drift
-      const v = Math.hypot(Velocity.x[this.view.eid], Velocity.y[this.view.eid]);
+      const v = dhypot(Velocity.x[this.view.eid], Velocity.y[this.view.eid]);
       if (v > 0.8) { mx = -Velocity.x[this.view.eid] / v; my = -Velocity.y[this.view.eid] / v; }
     } else if (w.move) {
       [mx, my] = w.move;
     } else {
       // Circle at range: a point round the target, a little further on each time
       if (this.host.rng() < 0.004) this.side = -this.side;
-      const a = Math.atan2(me.y - ty, me.x - tx) + CIRCLE[si] * this.side;
-      const [px, py] = this.keepHome(tx + Math.cos(a) * range, ty + Math.sin(a) * range);
-      const sx = px - me.x, sy = py - me.y, s = Math.hypot(sx, sy) || 1;
+      const a = datan2(me.y - ty, me.x - tx) + CIRCLE[si] * this.side;
+      const [px, py] = this.keepHome(tx + dcos(a) * range, ty + dsin(a) * range);
+      const sx = px - me.x, sy = py - me.y, s = dhypot(sx, sy) || 1;
       if (s > 160) { mx = sx / s; my = sy / s; }
     }
-    const face = w.face ?? (mx || my ? Math.atan2(my, mx) : me.angle);
+    const face = w.face ?? (mx || my ? datan2(my, mx) : me.angle);
     const controls = {
       forward: my < -0.38, backward: my > 0.38, left: mx < -0.38, right: mx > 0.38,
-      boost: !w.move && Math.hypot(tx - me.x, ty - me.y) > range * 1.6 && this.fromHome(me.x, me.y) < HOME_R * 0.8, targetAngle: face,
+      boost: !w.move && dhypot(tx - me.x, ty - me.y) > range * 1.6 && this.fromHome(me.x, me.y) < HOME_R * 0.8, targetAngle: face,
     };
     // Lighter for each stage it's lost: it drives harder than its engines alone (the same engines throughout: as built)
     let impulse = w.impulse;
     if (DRIVE[si] && w.move !== 'hold' && (mx || my)) {
-      const l = Math.hypot(mx, my);
+      const l = dhypot(mx, my);
       impulse = [(impulse?.[0] ?? 0) + (mx / l) * DRIVE[si], (impulse?.[1] ?? 0) + (my / l) * DRIVE[si]];
     }
     return {
@@ -245,20 +245,20 @@ export class PyreclastBrain implements BossBrain {
 
   /** A point kept within its ground (pulled in to the edge of it) */
   private keepHome(x: number, y: number): [number, number] {
-    const h = this.view.home, dx = x - h.x, dy = y - h.y, d = Math.hypot(dx, dy);
+    const h = this.view.home, dx = x - h.x, dy = y - h.y, d = dhypot(dx, dy);
     return d <= HOME_R ? [x, y] : [h.x + (dx / d) * HOME_R, h.y + (dy / d) * HOME_R];
   }
 
   private fromHome(x: number, y: number): number {
-    return Math.hypot(x - this.view.home.x, y - this.view.home.y);
+    return dhypot(x - this.view.home.x, y - this.view.home.y);
   }
 
   /** A unit way to go, bent back in if `reach` along it would take it off its ground */
   private homeward(vx: number, vy: number, reach: number): [number, number] {
     const me = pose(this.view.eid);
     if (this.fromHome(me.x + vx * reach, me.y + vy * reach) <= HOME_R) return [vx, vy];
-    const hx = this.view.home.x - me.x, hy = this.view.home.y - me.y, hl = Math.hypot(hx, hy) || 1;
-    const bx = vx * 0.3 + (hx / hl) * 0.9, by = vy * 0.3 + (hy / hl) * 0.9, bl = Math.hypot(bx, by) || 1;
+    const hx = this.view.home.x - me.x, hy = this.view.home.y - me.y, hl = dhypot(hx, hy) || 1;
+    const bx = vx * 0.3 + (hx / hl) * 0.9, by = vy * 0.3 + (hy / hl) * 0.9, bl = dhypot(bx, by) || 1;
     return [bx / bl, by / bl];
   }
 
@@ -339,7 +339,7 @@ export class PyreclastBrain implements BossBrain {
   /** Parts in clockwise order round its middle (as seen: y down), from its nose */
   private clockwise(parts: number[]): number[] {
     const geo = this.host.ships.geometry(this.ship), c = this.ship.derived.com;
-    const turn = (i: number) => { const [x, y] = geo[i].centroid; return (Math.atan2(y - c[1], x - c[0]) + Math.PI / 2 + 4 * Math.PI) % (2 * Math.PI); };
+    const turn = (i: number) => { const [x, y] = geo[i].centroid; return (datan2(y - c[1], x - c[0]) + Math.PI / 2 + 4 * Math.PI) % (2 * Math.PI); };
     return [...parts].sort((a, b) => turn(a) - turn(b));
   }
 
@@ -348,7 +348,7 @@ export class PyreclastBrain implements BossBrain {
     if (this.reachOf.stage !== this.stage) {
       const geo = this.host.ships.geometry(this.ship), c = this.ship.derived.com;
       let r = 0;
-      geo.forEach((g, i) => { if (this.ship.derived.alive[i]) for (const [x, y] of g.polygon) r = Math.max(r, Math.hypot(x - c[0], y - c[1])); });
+      geo.forEach((g, i) => { if (this.ship.derived.alive[i]) for (const [x, y] of g.polygon) r = Math.max(r, dhypot(x - c[0], y - c[1])); });
       this.reachOf = { stage: this.stage, r: r * this.host.ships.tuning.cellSize };
     }
     return this.reachOf.r;
@@ -379,7 +379,7 @@ export class PyreclastBrain implements BossBrain {
       const n = bay.count + (this.rage() < 1 ? 1 : 0) + Math.floor((this.view.fighters - 1) / 2);
       for (let i = 0; i < n && this.drones.size < cap; i++) {
         const a = m.dir + (i / Math.max(1, n - 1) - 0.5) * 0.9;
-        const d = mobs.spawn(bay.mob, this.view.systemNum, m.x + Math.cos(a) * 30, m.y + Math.sin(a) * 30, a, 13, eid, this.view.damage);
+        const d = mobs.spawn(bay.mob, this.view.systemNum, m.x + dcos(a) * 30, m.y + dsin(a) * 30, a, 13, eid, this.view.damage);
         if (d >= 0) this.drones.add(d);
       }
     }
@@ -392,16 +392,16 @@ export class PyreclastBrain implements BossBrain {
     const turn = this.host.rng() < 0.5 ? 1 : -1;
     for (let i = 0; i < 45; i++) {
       const me = pose(eid);
-      this.want = { move: 'hold', face: Math.atan2(Position.y[t] - me.y, Position.x[t] - me.x) + turn * Math.PI / 2 };
+      this.want = { move: 'hold', face: datan2(Position.y[t] - me.y, Position.x[t] - me.x) + turn * Math.PI / 2 };
       yield;
     }
     const me = pose(eid), heading = me.angle;
     // (the target in its own frame: which side it's on)
-    const c = Math.cos(-heading), s = Math.sin(-heading), dx = Position.x[t] - me.x, dy = Position.y[t] - me.y;
+    const c = dcos(-heading), s = dsin(-heading), dx = Position.x[t] - me.x, dy = Position.y[t] - me.y;
     const tx = dx * c - dy * s, ty = dx * s + dy * c;
     const all = this.guns().map((part) => ({ part, at: bodyFrame(this.host, eid, this.ship, part) }));
     const near = all.filter((g) => Math.sign(g.at.y) === Math.sign(ty));
-    const guns = (near.length ? near : all).map((g) => ({ ...g, angle: Math.atan2(ty - g.at.y, tx - g.at.x) }));
+    const guns = (near.length ? near : all).map((g) => ({ ...g, angle: datan2(ty - g.at.y, tx - g.at.x) }));
     const warn = this.haste(55);
     for (const g of guns) this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'line', kind: 'lance', bodyId: eid, x: Math.round(g.at.x), y: Math.round(g.at.y), angle: g.angle, length: 3200, width: 150, ticks: warn });
     for (let i = 0; i < warn; i++) { this.want = { move: 'hold', face: heading }; yield; }
@@ -410,7 +410,7 @@ export class PyreclastBrain implements BossBrain {
       for (const g of guns) {
         if (!this.ship.derived.alive[g.part]) continue;
         const m = partMount(this.host, eid, this.ship, g.part), a = now.angle + g.angle;
-        this.host.fire(eid, 'magma', m.x + Math.cos(a) * 50, m.y + Math.sin(a) * 50, a, this.view.damage * BROADSIDE_BITE);
+        this.host.fire(eid, 'magma', m.x + dcos(a) * 50, m.y + dsin(a) * 50, a, this.view.damage * BROADSIDE_BITE);
       }
       for (let i = 0; i < 8; i++) { this.want = { move: 'hold', face: heading }; yield; }
     }
@@ -428,8 +428,8 @@ export class PyreclastBrain implements BossBrain {
   private *mortarWall(): Move {
     const mortars = partsWith(this.host, this.ship, 'mortar');
     const t = this.target, me = pose(this.view.eid);
-    const tx = Position.x[t], ty = Position.y[t], d = Math.hypot(tx - me.x, ty - me.y) || 1;
-    const tv = Math.hypot(Velocity.x[t], Velocity.y[t]);
+    const tx = Position.x[t], ty = Position.y[t], d = dhypot(tx - me.x, ty - me.y) || 1;
+    const tv = dhypot(Velocity.x[t], Velocity.y[t]);
     const [ux, uy] = tv > 4 ? [Velocity.x[t] / tv, Velocity.y[t] / tv] : [(tx - me.x) / d, (ty - me.y) / d];
     const nx = -uy, ny = ux;
     const lane = 400, radius = 200, warn = this.haste(80);
@@ -439,10 +439,10 @@ export class PyreclastBrain implements BossBrain {
     for (const side of [-1, 1]) for (let along = -600; along <= reach; along += step) spots.push([tx + ux * along + nx * side * lane, ty + uy * along + ny * side * lane]);
     for (let across = -lane + 200; across <= lane - 200; across += 200) spots.push([tx + ux * (reach + 150) + nx * across, ty + uy * (reach + 150) + ny * across]);
     // Every other pilot gets one
-    const pilots = this.host.players(this.view.systemNum).filter((q) => q !== t && Math.hypot(Position.x[q] - me.x, Position.y[q] - me.y) < 5000);
+    const pilots = this.host.players(this.view.systemNum).filter((q) => q !== t && dhypot(Position.x[q] - me.x, Position.y[q] - me.y) < 5000);
     for (const q of pilots) { const l = lead(q, warn * 0.6); spots.push([l.x, l.y]); }
     // (nearest it first: the walls run out away from it)
-    spots.sort((a, b) => Math.hypot(a[0] - me.x, a[1] - me.y) - Math.hypot(b[0] - me.x, b[1] - me.y));
+    spots.sort((a, b) => dhypot(a[0] - me.x, a[1] - me.y) - dhypot(b[0] - me.x, b[1] - me.y));
     const now = this.host.tick();
     const due = spots.map(([x, y], i) => {
       const ticks = warn + Math.floor(i / 2) * 3;
@@ -478,14 +478,14 @@ export class PyreclastBrain implements BossBrain {
       if (t < 0 || !coils) return;
       const last = k === dashes - 1;
       const me = pose(this.view.eid);
-      const dx = Position.x[t] - me.x, dy = Position.y[t] - me.y, d = Math.hypot(dx, dy) || 1;
+      const dx = Position.x[t] - me.x, dy = Position.y[t] - me.y, d = dhypot(dx, dy) || 1;
       // Across the line to the target, alternating, and pulling back towards its range; the last one through
       this.side = this.host.rng() < 0.75 ? -this.side : this.side;
       const ux = dx / d, uy = dy / d;
       const radial = last ? 0.6 : Math.max(-0.9, Math.min(0.9, (d - RANGE[1]) / RANGE[1]));
-      const vl0 = Math.hypot(-uy * this.side + ux * radial, ux * this.side + uy * radial) || 1;
+      const vl0 = dhypot(-uy * this.side + ux * radial, ux * this.side + uy * radial) || 1;
       const [vx, vy] = this.homeward((-uy * this.side + ux * radial) / vl0, (ux * this.side + uy * radial) / vl0, last ? 2200 : 1500);
-      const dir = Math.atan2(vy, vx);
+      const dir = datan2(vy, vx);
       const wind = this.haste(45);
       // The streak: where it's about to go
       this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'line', kind: 'dash', bodyId: this.view.eid, x: 0, y: 0, angle: wrap(dir - me.angle), length: last ? 2400 : 1700, width: 160, ticks: wind });
@@ -508,12 +508,12 @@ export class PyreclastBrain implements BossBrain {
     if (t < 0) return;
     const me = pose(this.view.eid);
     const r = this.ship.derived.radius * 0.7;
-    const ox = me.x + Math.cos(me.angle) * r, oy = me.y + Math.sin(me.angle) * r;
-    const at = lead(t, Math.hypot(Position.x[t] - ox, Position.y[t] - oy) / 36);
-    const a0 = Math.atan2(at.y - oy, at.x - ox);
+    const ox = me.x + dcos(me.angle) * r, oy = me.y + dsin(me.angle) * r;
+    const at = lead(t, dhypot(Position.x[t] - ox, Position.y[t] - oy) / 36);
+    const a0 = datan2(at.y - oy, at.x - ox);
     for (let i = 0; i < count; i++) {
       const a = a0 + (i / Math.max(1, count - 1) - 0.5) * 0.55;
-      this.host.fire(this.view.eid, 'cinder_bloom', ox + Math.cos(a) * 30, oy + Math.sin(a) * 30, a, this.view.damage);
+      this.host.fire(this.view.eid, 'cinder_bloom', ox + dcos(a) * 30, oy + dsin(a) * 30, a, this.view.damage);
     }
   }
 
@@ -530,11 +530,11 @@ export class PyreclastBrain implements BossBrain {
     // Turn on the target first, then warn along where the sweep starts
     for (let i = 0; i < 20; i++) {
       const me = pose(this.view.eid);
-      this.want = { move: 'hold', face: Math.atan2(Position.y[t] - me.y, Position.x[t] - me.x) };
+      this.want = { move: 'hold', face: datan2(Position.y[t] - me.y, Position.x[t] - me.x) };
       yield;
     }
     const me0 = pose(this.view.eid);
-    const heading = Math.atan2(Position.y[t] - me0.y, Position.x[t] - me0.x);
+    const heading = datan2(Position.y[t] - me0.y, Position.x[t] - me0.x);
     this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'line', kind: 'lance', bodyId: this.view.eid, x: at.x, y: at.y, angle: a0, length, width, ticks: wind });
     for (let i = 0; i < wind; i++) { this.want = { move: 'hold', face: heading }; yield; }
     const ticks = this.haste(100);
@@ -550,10 +550,10 @@ export class PyreclastBrain implements BossBrain {
   /** A beam's burn this tick, from a point on the body (its own frame) at an angle off its heading; it stops at rock */
   private beam(at: { x: number; y: number }, rel: number, length: number, width: number, damage: number): void {
     const me = pose(this.view.eid), a = me.angle + rel;
-    const c = Math.cos(me.angle), s = Math.sin(me.angle);
+    const c = dcos(me.angle), s = dsin(me.angle);
     const x0 = me.x + at.x * c - at.y * s, y0 = me.y + at.x * s + at.y * c;
-    const reach = length * rayTerrain(this.host.terrain?.(this.view.systemNum), x0, y0, x0 + Math.cos(a) * length, y0 + Math.sin(a) * length);
-    this.burn(x0, y0, x0 + Math.cos(a) * reach, y0 + Math.sin(a) * reach, width, damage * this.view.damage);
+    const reach = length * rayTerrain(this.host.terrain?.(this.view.systemNum), x0, y0, x0 + dcos(a) * length, y0 + dsin(a) * length);
+    this.burn(x0, y0, x0 + dcos(a) * reach, y0 + dsin(a) * reach, width, damage * this.view.damage);
   }
 
   /** Its wires mark where its target will be if it flies straight on, again and again: lightning strikes each mark a moment later (keep turning) */
@@ -564,7 +564,7 @@ export class PyreclastBrain implements BossBrain {
       const t = this.target;
       if (t < 0) break;
       // Where they'll be, straight on (brake or turn, and it misses), and every other pilot, every other mark
-      const who = [t, ...(k % 2 ? [] : this.host.players(this.view.systemNum).filter((q) => q !== t && Math.hypot(Position.x[q] - Position.x[this.view.eid], Position.y[q] - Position.y[this.view.eid]) < 5000))];
+      const who = [t, ...(k % 2 ? [] : this.host.players(this.view.systemNum).filter((q) => q !== t && dhypot(Position.x[q] - Position.x[this.view.eid], Position.y[q] - Position.y[this.view.eid]) < 5000))];
       for (const q of who) {
         const { x, y } = lead(q, fuse);
         this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'circle', kind: 'synapse', x: Math.round(x), y: Math.round(y), radius, ticks: fuse });
@@ -585,13 +585,13 @@ export class PyreclastBrain implements BossBrain {
     for (let i = 0; i < wind; i++) {
       me = pose(this.view.eid);
       const at = lead(t, 25);
-      const face = Math.atan2(at.y - me.y, at.x - me.x);
+      const face = datan2(at.y - me.y, at.x - me.x);
       if (i === 18) this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'line', kind: 'charge', bodyId: this.view.eid, x: 0, y: 0, angle: 0, length: 3600, width: r * 1.2, ticks: wind - 18 });
       this.want = { move: 'hold', face };
       yield;
     }
     me = pose(this.view.eid);
-    const vx = Math.cos(me.angle), vy = Math.sin(me.angle);
+    const vx = dcos(me.angle), vy = dsin(me.angle);
     // (a ram carries it ~66× its kick: no further than the far side of its ground)
     let room = 0;
     for (let s = 0; s < 4 * HOME_R; s += 200) { if (this.fromHome(me.x + vx * s, me.y + vy * s) > HOME_R + 1500) break; room = s; }
@@ -601,7 +601,7 @@ export class PyreclastBrain implements BossBrain {
     let hit = false;
     for (let i = 0; i < 40; i++) {
       // (stopped dead, early: it ran into something)
-      if (i > 6 && Math.hypot(Velocity.x[this.view.eid], Velocity.y[this.view.eid]) < speed * 0.35) hit = true;
+      if (i > 6 && dhypot(Velocity.x[this.view.eid], Velocity.y[this.view.eid]) < speed * 0.35) hit = true;
       this.want = hit ? { move: 'hold' } : { move: [vx, vy], face: me.angle };
       yield;
     }
@@ -613,13 +613,13 @@ export class PyreclastBrain implements BossBrain {
   /** Before each of its heart's moves: a short, quick burst to a new angle on its target */
   private *darting(then: Move): Move {
     const t = this.target, me = pose(this.view.eid);
-    const dx = Position.x[t] - me.x, dy = Position.y[t] - me.y, d = Math.hypot(dx, dy) || 1;
+    const dx = Position.x[t] - me.x, dy = Position.y[t] - me.y, d = dhypot(dx, dy) || 1;
     const ux = dx / d, uy = dy / d, side = this.host.rng() < 0.5 ? 1 : -1;
     const radial = Math.max(-0.7, Math.min(0.7, (d - RANGE[2]) / RANGE[2]));
-    const l0 = Math.hypot(-uy * side + ux * radial, ux * side + uy * radial) || 1;
+    const l0 = dhypot(-uy * side + ux * radial, ux * side + uy * radial) || 1;
     const [vx, vy] = this.homeward((-uy * side + ux * radial) / l0, (ux * side + uy * radial) / l0, 1000);
     const wind = this.haste(24);
-    this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'line', kind: 'dash', bodyId: this.view.eid, x: 0, y: 0, angle: wrap(Math.atan2(vy, vx) - me.angle), length: 1000, width: 110, ticks: wind });
+    this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'line', kind: 'dash', bodyId: this.view.eid, x: 0, y: 0, angle: wrap(datan2(vy, vx) - me.angle), length: 1000, width: 110, ticks: wind });
     for (let i = 0; i < wind; i++) { this.want = { move: 'hold' }; yield; }
     this.want = { impulse: [vx * 20, vy * 20], move: [vx, vy] };
     yield;
@@ -632,10 +632,10 @@ export class PyreclastBrain implements BossBrain {
     const t = this.target, eid = this.view.eid;
     for (let i = 0; i < 18; i++) {
       const me = pose(eid);
-      this.want = { move: 'hold', face: Math.atan2(Position.y[t] - me.y, Position.x[t] - me.x) };
+      this.want = { move: 'hold', face: datan2(Position.y[t] - me.y, Position.x[t] - me.x) };
       yield;
     }
-    const me = pose(eid), heading = Math.atan2(Position.y[t] - me.y, Position.x[t] - me.x);
+    const me = pose(eid), heading = datan2(Position.y[t] - me.y, Position.x[t] - me.x);
     const order = this.rage() < 1 ? RAGE_BEAMS : BEAMS;
     const warn = this.haste(45), gap = this.haste(16), burn = 22, length = 9000, width = 60;
     const end = (order.length - 1) * gap + warn + burn;
@@ -670,7 +670,7 @@ export class PyreclastBrain implements BossBrain {
 
   /** One spark out of its core this way (`speed`: × a spark's) */
   private spark(c: { x: number; y: number }, a: number, speed = 1): void {
-    this.host.fire(this.view.eid, 'heart_spark', c.x + Math.cos(a) * 140, c.y + Math.sin(a) * 140, a, this.view.damage, { speed });
+    this.host.fire(this.view.eid, 'heart_spark', c.x + dcos(a) * 140, c.y + dsin(a) * 140, a, this.view.damage, { speed });
   }
 
   /** A quick fan of sparks out of its core at where its target's going (what makes you move, when the rest could be sat out) */
@@ -678,7 +678,7 @@ export class PyreclastBrain implements BossBrain {
     const t = this.target;
     if (t < 0) return;
     const c = this.coreAt(), speed = 1.35 * (this.host.ships.tuning.weapons?.heart_spark?.speed ?? 12);
-    const at = lead(t, Math.hypot(Position.x[t] - c.x, Position.y[t] - c.y) / speed), a0 = Math.atan2(at.y - c.y, at.x - c.x);
+    const at = lead(t, dhypot(Position.x[t] - c.x, Position.y[t] - c.y) / speed), a0 = datan2(at.y - c.y, at.x - c.x);
     for (let k = 0; k < count; k++) this.spark(c, a0 + (k / Math.max(1, count - 1) - 0.5) * spread, 1.35);
   }
 
@@ -688,7 +688,7 @@ export class PyreclastBrain implements BossBrain {
     yield* this.gather(this.haste(30));
     const c0 = this.coreAt(), t = this.target;
     // (a gap's middle at off + half a gap; the solid's middle a quarter turn on: there, its target)
-    let off = Math.atan2(Position.y[t] - c0.y, Position.x[t] - c0.x) - Math.PI / 2 - (gapW / 2 / n) * Math.PI * 2;
+    let off = datan2(Position.y[t] - c0.y, Position.x[t] - c0.x) - Math.PI / 2 - (gapW / 2 / n) * Math.PI * 2;
     for (let r = 0; r < rings; r++) {
       const c = this.coreAt();
       for (let j = 0; j < n; j++) {
@@ -721,14 +721,14 @@ export class PyreclastBrain implements BossBrain {
   /** Seekers out of its core all round it, then hunting: its target, and the others too */
   private *swarm(): Move {
     const t = this.target, eid = this.view.eid;
-    const others = this.host.players(this.view.systemNum).filter((q) => q !== t && Math.hypot(Position.x[q] - Position.x[eid], Position.y[q] - Position.y[eid]) < 6000);
+    const others = this.host.players(this.view.systemNum).filter((q) => q !== t && dhypot(Position.x[q] - Position.x[eid], Position.y[q] - Position.y[eid]) < 6000);
     const who = [t, ...others];
     const count = Math.min(18, (this.rage() < 1 ? 12 : 10) + 2 * others.length);
     yield* this.gather(this.haste(36));
     const c = this.coreAt(), a0 = this.host.rng() * Math.PI * 2;
     for (let j = 0; j < count; j++) {
       const a = a0 + (j / count) * Math.PI * 2;
-      this.host.fire(eid, 'heart_seeker', c.x + Math.cos(a) * 90, c.y + Math.sin(a) * 90, a, this.view.damage, { target: who[j % who.length] });
+      this.host.fire(eid, 'heart_seeker', c.x + dcos(a) * 90, c.y + dsin(a) * 90, a, this.view.damage, { target: who[j % who.length] });
     }
     for (let i = 0; i < 50; i++) { this.want = {}; yield; }
   }
@@ -773,11 +773,11 @@ export class PyreclastBrain implements BossBrain {
       const t = this.target;
       if (t < 0 || !ship.derived.alive[s.part]) continue;
       const m = partMount(this.host, eid, ship, s.part);
-      const aim = lead(t, Math.hypot(Position.x[t] - m.x, Position.y[t] - m.y) / speed);
-      const a = Math.atan2(aim.y - m.y, aim.x - m.x);
+      const aim = lead(t, dhypot(Position.x[t] - m.x, Position.y[t] - m.y) / speed);
+      const a = datan2(aim.y - m.y, aim.x - m.x);
       for (let k = 0; k < s.fan; k++) {
         const ak = a + (s.fan > 1 ? (k / (s.fan - 1) - 0.5) * 0.36 : 0);
-        this.host.fire(eid, 'magma', m.x + Math.cos(ak) * 50, m.y + Math.sin(ak) * 50, ak, this.view.damage * s.bite);
+        this.host.fire(eid, 'magma', m.x + dcos(ak) * 50, m.y + dsin(ak) * 50, ak, this.view.damage * s.bite);
       }
     }
   }
@@ -802,7 +802,7 @@ export class PyreclastBrain implements BossBrain {
   private scorch(reach: number, dps: number): void {
     const eid = this.view.eid;
     for (const q of this.host.players(this.view.systemNum)) {
-      if (Math.hypot(Position.x[q] - Position.x[eid], Position.y[q] - Position.y[eid]) > reach) continue;
+      if (dhypot(Position.x[q] - Position.x[eid], Position.y[q] - Position.y[eid]) > reach) continue;
       const part = this.host.ships.ignite(q, Position.x[eid], Position.y[eid], dps * this.view.damage, 150, 1.2, eid);
       if (part >= 0) this.host.send(this.view.systemNum, { type: 'ignite', bodyId: q, part, ticks: 150 });
     }
@@ -838,7 +838,7 @@ export class PyreclastBrain implements BossBrain {
     const groups = new Map<string, number[]>();
     for (const i of parts) { const k = ids[i].replace(/_[lr]$/, ''); groups.set(k, [...(groups.get(k) ?? []), i]); }
     const rank = (k: string) => (k === 'core' || k === 's3_core' ? 2 : /^heart_\d$/.test(k) ? 1 : 0);
-    const far = (g: number[]) => Math.max(...g.flatMap((i) => geo[i].polygon.map(([x, y]) => Math.hypot(x - c[0], y - c[1]))));
+    const far = (g: number[]) => Math.max(...g.flatMap((i) => geo[i].polygon.map(([x, y]) => dhypot(x - c[0], y - c[1]))));
     return [...groups.entries()].sort(([ka, a], [kb, b]) => rank(ka) - rank(kb) || far(b) - far(a)).map(([, g]) => g);
   }
 
@@ -876,7 +876,7 @@ export class PyreclastBrain implements BossBrain {
   /** Where a part is in the world */
   private at(i: number): { x: number; y: number } {
     const g = this.host.ships.geometry(this.ship)[i].centroid, me = pose(this.view.eid), cs = this.host.ships.tuning.cellSize;
-    const lx = (g[0] - this.ship.derived.com[0]) * cs, ly = (g[1] - this.ship.derived.com[1]) * cs, c = Math.cos(me.angle), s = Math.sin(me.angle);
+    const lx = (g[0] - this.ship.derived.com[0]) * cs, ly = (g[1] - this.ship.derived.com[1]) * cs, c = dcos(me.angle), s = dsin(me.angle);
     return { x: me.x + lx * c - ly * s, y: me.y + lx * s + ly * c };
   }
 
@@ -890,7 +890,7 @@ export class PyreclastBrain implements BossBrain {
     const geo = this.host.ships.geometry(this.ship), c = this.ship.derived.com, out: number[][] = Array.from({ length: 9 }, () => []);
     for (const i of parts) {
       if (this.ship.blueprint.parts[i].fn === 'core') { out[8].push(i); continue; }
-      const [x, y] = geo[i].centroid, a = Math.atan2(y - c[1], x - c[0]);
+      const [x, y] = geo[i].centroid, a = datan2(y - c[1], x - c[0]);
       out[Math.floor(((a + Math.PI) / (2 * Math.PI)) * 8) % 8].push(i);
     }
     return out.filter((g) => g.length);

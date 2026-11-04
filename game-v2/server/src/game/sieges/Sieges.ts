@@ -61,6 +61,7 @@ import { dawnSummary, freshTally } from './score.js';
 import { OBJECTIVES } from './objectives/index.js';
 import { ROLES } from './roles/index.js';
 import type { PilotAt, RaiderInfo, Run, SiegeCtx, SiegeHost, SiegeText } from './types.js';
+import { datan2, dcos, dhypot, dsin, mulberry32, hashInts } from '@space-game/common';
 
 export class Sieges implements SiegeCtx {
   private runs = new Map<number, Run>();
@@ -103,7 +104,7 @@ export class Sieges implements SiegeCtx {
       run = this.open(key, free, surface);
     }
     const b = surface.surface!.bastion!;
-    return { num: run.num, x: b.x + (Math.random() - 0.5) * 600, y: b.y + 1400 };
+    return { num: run.num, x: b.x + (run.rng() - 0.5) * 600, y: b.y + 1400 };
   }
 
   /** A pilot's request from the panel: the day's shop and readying up; any time, orders; at night, focus fire and building near a pad */
@@ -151,7 +152,7 @@ export class Sieges implements SiegeCtx {
       const here = this.host.pilots(run.num).find((p) => p.conn === conn);
       this.settle(run, conn, run.phase === 'day');
       this.forget(run, conn);
-      if (here) this.host.toOrbit(conn, run.sys, Math.atan2(here.y, here.x));
+      if (here) this.host.toOrbit(conn, run.sys, datan2(here.y, here.x));
     }
     this.solo.delete(conn);
   }
@@ -180,7 +181,7 @@ export class Sieges implements SiegeCtx {
     const b = sys.surface!.bastion!;
     const grade = b.grade ?? 1;
     const run: Run = {
-      key, num, sys, name: sys.name, grade, offset: b.offset ?? 0, phase: 'day', wave: 0, supplies: this.rules.startSupplies, ready: new Set(),
+      key, num, rng: mulberry32(hashInts(key, num, this.host.tick())), sys, name: sys.name, grade, offset: b.offset ?? 0, phase: 'day', wave: 0, supplies: this.rules.startSupplies, ready: new Set(),
       bastion: this.host.spawnStructure(BASTION, num, b.x, b.y, this.t('sieges.bastionName', { name: sys.name }), this.fortGrade(grade)),
       turrets: b.slots.map(() => null), haul: new Map(), raiders: [], next: 0, lastPilots: this.host.tick(), shown: new Map(), banner: '',
       profile: siegeProfile(this.rules, b.profile), fronts: [], stream: [], nextStream: 0, side: 0, frontNo: 0, boss: '', extras: [], objective: null, nextObjective: 0,
@@ -200,7 +201,7 @@ export class Sieges implements SiegeCtx {
     for (const e of run.info.keys()) this.owner.delete(e);
     for (const t of run.turrets) if (t !== null) this.host.removeStructure(t.eid);
     this.host.removeStructure(run.bastion);
-    for (const p of this.host.pilots(run.num)) this.host.toOrbit(p.conn, run.sys, Math.atan2(p.y, p.x));
+    for (const p of this.host.pilots(run.num)) this.host.toOrbit(p.conn, run.sys, datan2(p.y, p.x));
     for (const c of run.shown.keys()) this.host.send(c, { type: 'siegeState', active: false } as ServerMessage);
     this.runs.delete(run.num);
   }
@@ -232,7 +233,7 @@ export class Sieges implements SiegeCtx {
     const edge = run.sys.surface!.radius, bs = run.sys.surface!.bastion!;
     run.raiders = run.raiders.filter((e) => {
       const at = this.host.shipAt(e);
-      if (!at || Math.hypot(at.x - bs.x, at.y - bs.y) <= edge) return true;
+      if (!at || dhypot(at.x - bs.x, at.y - bs.y) <= edge) return true;
       run.info.delete(e); this.owner.delete(e); this.host.removeHostile(e);
       return false;
     });
@@ -284,7 +285,7 @@ export class Sieges implements SiegeCtx {
         while (run.fronts.length && now >= run.fronts[0].at) { const f = run.fronts.shift()!; this.spawnFront(run, f.ships, f.pos, f.at); }
         if (run.stream.length && now >= run.nextStream) {
           this.spawnFront(run, [run.stream.shift()!], frontPoint(run), -1);
-          run.nextStream = now + run.profile.stream.everySeconds * SECOND * (0.6 + Math.random() * 0.8);
+          run.nextStream = now + run.profile.stream.everySeconds * SECOND * (0.6 + run.rng() * 0.8);
         }
         // Roles at work (a sapper's turret fell: on to the next)
         for (const [e, i] of run.info) if (i.role) ROLES[i.role]?.step?.(this, run, e, now);
@@ -373,9 +374,9 @@ export class Sieges implements SiegeCtx {
     if (!o) {
       const kinds = P.objectives.kinds.filter((k) => OBJECTIVES[k]);
       if (night < P.objectives.from || now < run.nextObjective || !kinds.length) return;
-      const kind = OBJECTIVES[kinds[Math.floor(Math.random() * kinds.length)]];
-      const a = Math.random() * Math.PI * 2, d = O.distance[0] + Math.random() * (O.distance[1] - O.distance[0]);
-      const x = b.x + Math.cos(a) * d, y = b.y + Math.sin(a) * d;
+      const kind = OBJECTIVES[kinds[Math.floor(run.rng() * kinds.length)]];
+      const a = run.rng() * Math.PI * 2, d = O.distance[0] + run.rng() * (O.distance[1] - O.distance[0]);
+      const x = b.x + dcos(a) * d, y = b.y + dsin(a) * d;
       const eid = kind.start(this, run, x, y, now);
       if (eid === null) { run.nextObjective = now + P.objectives.everySeconds * SECOND; return; }
       run.objective = { kind: kind.id, x, y, until: now + kind.pay(this.rules).lifeSeconds * SECOND, held: 0, eid, release: now + O.nest.releaseSeconds * SECOND };
@@ -393,7 +394,7 @@ export class Sieges implements SiegeCtx {
     const o = run.objective;
     if (!o) return;
     run.objective = null;
-    run.nextObjective = this.host.tick() + run.profile.objectives.everySeconds * SECOND * (0.7 + Math.random() * 0.6);
+    run.nextObjective = this.host.tick() + run.profile.objectives.everySeconds * SECOND * (0.7 + run.rng() * 0.6);
     if (o.eid >= 0) this.host.removeHostile(o.eid);
     const pilots = this.host.pilots(run.num);
     for (const p of [...pilots.map((q) => q.conn), ...run.shown.keys()]) this.host.send(p, { type: 'objectiveEnd', id: `moonobj:${run.num}` } as ServerMessage);
@@ -484,7 +485,7 @@ export class Sieges implements SiegeCtx {
     const me = this.host.pilots(run.num).find((p) => p.conn === conn);
     this.settle(run, conn, true);
     this.forget(run, conn);
-    if (me) this.host.toOrbit(conn, run.sys, Math.atan2(me.y, me.x));
+    if (me) this.host.toOrbit(conn, run.sys, datan2(me.y, me.x));
     if (!this.host.pilots(run.num).some((p) => p.conn !== conn)) this.close(run);
     else this.sendState(run, true);
   }

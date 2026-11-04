@@ -14,7 +14,7 @@
  */
 
 import { addComponent, addEntity, removeEntity, IWorld } from 'bitecs';
-import { Position, Velocity, Rotation, Radius, InSystem, segmentNearCircle, insideTerrain, type Terrain } from '@space-game/common';
+import { Position, Velocity, Rotation, Radius, InSystem, segmentNearCircle, insideTerrain, type Terrain, datan2, dcos, dhypot, dsin } from '@space-game/common';
 
 export interface MobDef {
   name: string;
@@ -109,7 +109,7 @@ export class Mobs {
     addComponent(w, Radius, eid);
     addComponent(w, InSystem, eid);
     Position.x[eid] = x; Position.y[eid] = y;
-    Velocity.x[eid] = Math.cos(angle) * speed; Velocity.y[eid] = Math.sin(angle) * speed;
+    Velocity.x[eid] = dcos(angle) * speed; Velocity.y[eid] = dsin(angle) * speed;
     Rotation.angle[eid] = angle;
     Radius.value[eid] = def.radius;
     InSystem.systemId[eid] = systemNum;
@@ -149,10 +149,10 @@ export class Mobs {
         const t = m.target;
         if (t >= 0) {
           const tx = Position.x[t], ty = Position.y[t];
-          const d = Math.hypot(tx - x, ty - y);
+          const d = dhypot(tx - x, ty - y);
           // A little lead, more the further off it is
           const lead = Math.min(18, d / Math.max(4, def.speed));
-          const want = Math.atan2(ty + Velocity.y[t] * lead - y, tx + Velocity.x[t] * lead - x);
+          const want = datan2(ty + Velocity.y[t] * lead - y, tx + Velocity.x[t] * lead - x);
           let da = want - ang;
           while (da > Math.PI) da -= 2 * Math.PI;
           while (da < -Math.PI) da += 2 * Math.PI;
@@ -161,11 +161,11 @@ export class Mobs {
           const gap = this.host.hullGap ? this.host.hullGap(t, x, y, def.blast.fuse) : d - this.host.radiusOf(t);
           if (gap < def.blast.fuse) { this.kill(m, false); continue; }
         }
-        vx += Math.cos(ang) * def.accel; vy += Math.sin(ang) * def.accel;
+        vx += dcos(ang) * def.accel; vy += dsin(ang) * def.accel;
         // It flies where it points: sideways drift bleeds away fast
-        const fx = Math.cos(ang), fy = Math.sin(ang), along = vx * fx + vy * fy;
+        const fx = dcos(ang), fy = dsin(ang), along = vx * fx + vy * fy;
         vx = fx * along + (vx - fx * along) * 0.86; vy = fy * along + (vy - fy * along) * 0.86;
-        const sp = Math.hypot(vx, vy);
+        const sp = dhypot(vx, vy);
         if (sp > def.speed) { vx *= def.speed / sp; vy *= def.speed / sp; }
       } else {
         // Out of the bay: coasting, slowing a little
@@ -212,7 +212,7 @@ export class Mobs {
   splash(systemNum: number, x: number, y: number, radius: number, damage: number): void {
     for (const m of [...this.live.values()]) {
       if (InSystem.systemId[m.eid] !== systemNum) continue;
-      const d = Math.hypot(Position.x[m.eid] - x, Position.y[m.eid] - y) - m.def.radius;
+      const d = dhypot(Position.x[m.eid] - x, Position.y[m.eid] - y) - m.def.radius;
       if (d < radius) this.hurt(m.eid, damage * (1 - 0.5 * Math.max(0, d) / radius));
     }
   }

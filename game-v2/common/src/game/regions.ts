@@ -6,6 +6,7 @@
  */
 
 import type { StarSystemData, SystemRegionData } from '../data/schemas.js';
+import { dhypot } from '../math/detTrig.js';
 
 export type RegionDanger = SystemRegionData['danger'];
 
@@ -13,7 +14,7 @@ export type RegionDanger = SystemRegionData['danger'];
 export function regionAt(sys: Pick<StarSystemData, 'regions'> | undefined, x: number, y: number): SystemRegionData | null {
   const list = sys?.regions;
   if (!list?.length) return null;
-  const r = Math.hypot(x, y);
+  const r = dhypot(x, y);
   for (const g of list) if (r <= g.outer) return g;
   return list[list.length - 1];
 }
@@ -31,7 +32,7 @@ export function safeRadius(sys: Pick<StarSystemData, 'regions'> | undefined): nu
 /** In the system's safe space */
 export function inSafeSpace(sys: Pick<StarSystemData, 'regions'> | undefined, x: number, y: number): boolean {
   const r = safeRadius(sys);
-  return r > 0 && Math.hypot(x, y) <= r;
+  return r > 0 && dhypot(x, y) <= r;
 }
 
 /** Where a band starts (the previous one's edge) */

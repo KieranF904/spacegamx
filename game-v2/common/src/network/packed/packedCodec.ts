@@ -229,7 +229,7 @@ class PackedIO {
 
   /** An unsigned varint: c bits a chunk, low first, each followed by a "more" bit */
   vu(v: number, c: number): number {
-    const step = 2 ** c;
+    const step = 1 << c; // (c is a few bits: 1 << c is 2^c exactly)
     if (this.reading) {
       let n = 0, mul = 1, more: boolean;
       do {

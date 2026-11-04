@@ -2,6 +2,7 @@
 
 import { SECOND } from '../rules.js';
 import type { SiegeObjectiveKind } from './index.js';
+import { dhypot } from '@space-game/common';
 
 export const cache: SiegeObjectiveKind = {
   id: 'cache',
@@ -11,7 +12,7 @@ export const cache: SiegeObjectiveKind = {
   start: () => -1,
   step(ctx, _run, o, pilots) {
     const C = ctx.rules.objectives.cache;
-    const there = pilots.filter((p) => Math.hypot(p.x - o.x, p.y - o.y) < C.radius);
+    const there = pilots.filter((p) => dhypot(p.x - o.x, p.y - o.y) < C.radius);
     if (there.length) o.held += 10;
     if (o.held >= C.holdSeconds * SECOND) return there.map((p) => p.conn);
   },

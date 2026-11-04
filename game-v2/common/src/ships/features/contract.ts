@@ -37,6 +37,7 @@ import { getPlan, featureFacts, setPlanForTests, type WireManifest } from './pla
 import { pilotExtras } from './strafer/strafer.js';
 import type { Fact } from './types.js';
 import WIRE from './features.wire.json' with { type: 'json' };
+import { dsin } from '../../math/detTrig.js';
 
 type Keys = Partial<Omit<FlightControls, 'targetAngle' | 'jumpDist'>>;
 
@@ -149,7 +150,7 @@ export function runPartContract(id: string, opts: PartContractOptions = {}): voi
         const featureOn = (t >= 20 && t < 60) || (t >= 90 && t < 110);
         const keys: Record<string, boolean> = { forward: t < 100, left: t >= 40 && t < 55, right: t >= 120, boost: t >= 70 && t < 85, strafeLeft: t >= 100 && t < 112 };
         for (const n of mine) keys[n] = featureOn;
-        return { keys: keys as Keys, aim: -Math.PI / 2 + Math.sin(t / 20) * 0.8 };
+        return { keys: keys as Keys, aim: -Math.PI / 2 + dsin(t / 20) * 0.8 };
       });
       const fly = (replica: boolean, off = false) => {
         const s = ship(parts), d = s.derived;

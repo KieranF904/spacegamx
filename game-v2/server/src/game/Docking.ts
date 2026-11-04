@@ -12,7 +12,7 @@ import { hasComponent, entityExists, defineQuery, type IWorld } from 'bitecs';
 import {
   Position, Velocity, InSystem, Radius, Station, Player, Dead,
   fartherThan, stationReachMax, stationInteractRadius,
-  type ClientSocket, type ServerMessage,
+  type ClientSocket, type ServerMessage, dhypot,
 } from '@space-game/common';
 import type { GameData } from '../data/GameData.js';
 import type { ClientConnection } from '../net/ClientConnection.js';
@@ -74,7 +74,7 @@ export class Docking {
       const dx = Position.x[st] - Position.x[eid], dy = Position.y[st] - Position.y[eid];
       // (Further than any station of its size reaches: no need to look up its design. Enemies ask this of every pilot they might go for)
       if (fartherThan(dx, dy, stationReachMax(Radius.value[st]))) continue;
-      if (Math.hypot(dx, dy) < stationInteractRadius(Radius.value[st], this.gameData.getStationByNum(Station.stationId[st])?.design)) return st;
+      if (dhypot(dx, dy) < stationInteractRadius(Radius.value[st], this.gameData.getStationByNum(Station.stationId[st])?.design)) return st;
     }
     return -1;
   }

@@ -111,6 +111,8 @@ export interface SiegeObjective { kind: string; x: number; y: number; until: num
 export interface Run {
   key: number;
   num: number;
+  /** The siege's own generator (seeded by its key and instance: a server decision, math/rng.ts) */
+  rng: () => number;
   sys: StarSystemData;
   name: string;
   /** Mk I-V: what the nights, the bastion and the turrets are built of */

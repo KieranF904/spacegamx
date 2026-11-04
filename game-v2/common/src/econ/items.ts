@@ -12,6 +12,7 @@ import type { Catalog } from '../ships/catalog.js';
 import type { FunctionDef, WeaponMods } from '../ships/types.js';
 import { weaponSizeFactor } from '../ships/grades.js';
 import { sizeName } from '../ships/partStats.js';
+import { dpow } from '../math/detTrig.js';
 
 /** quest: a job's own items (worth nothing, taken back if you abandon it) */
 export type ItemCategory = 'mineral' | 'gem' | 'volatile' | 'refined' | 'component' | 'artefact' | 'consumable' | 'ammo' | 'jewel' | 'part' | 'plan' | 'quest';
@@ -217,7 +218,7 @@ export class ItemCatalog {
 
 /** "Small" .. "Heavy" for weapons, engines and generators (null for parts named by their shape) */
 function sizedName(ships: Catalog, fn: FunctionDef, area: number): string | null {
-  if (fn.weapon || (fn.thrust ?? 0) > 0) return sizeName(Math.pow(weaponSizeFactor(ships, fn, area), 1 / 1.15));
+  if (fn.weapon || (fn.thrust ?? 0) > 0) return sizeName(dpow(weaponSizeFactor(ships, fn, area), 1 / 1.15));
   if ((fn.produce ?? 0) > 0) return sizeName(area);
   return null;
 }

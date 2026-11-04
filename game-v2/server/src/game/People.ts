@@ -19,7 +19,7 @@
 
 import {
   PersonDef, PersonPlace, PeopleFile, Line, Cond, CondContext, TalkView, PersonView, PlayerProfile, QuestDef, QuestStep, Bag, ServerMessage,
-  condHolds, marksAdvance,
+  condHolds, marksAdvance, dhypot,
 } from '@space-game/common';
 import type { Pilots, PilotConn } from './Pilots.js';
 import type { Quests } from './Quests.js';
@@ -197,7 +197,7 @@ export class People {
       return this.host.stationAt(conn) === at.station ? null : this.t('people.dockToTalk', { name: d.name, station: this.host.stationName(at.station) });
     }
     const w = this.host.where(conn);
-    if (!w || w.system !== at.system || Math.hypot(w.x - at.x, w.y - at.y) > TALK_RANGE) return this.t('people.flyCloser', { name: d.name });
+    if (!w || w.system !== at.system || dhypot(w.x - at.x, w.y - at.y) > TALK_RANGE) return this.t('people.flyCloser', { name: d.name });
     return null;
   }
 
@@ -208,7 +208,7 @@ export class People {
     if (!p || !w) return null;
     for (const d of this.defs.values()) {
       const at = this.placeOf(conn, p, d);
-      if (!('station' in at) && at.system === w.system && Math.hypot(w.x - at.x, w.y - at.y) <= TALK_RANGE) return d;
+      if (!('station' in at) && at.system === w.system && dhypot(w.x - at.x, w.y - at.y) <= TALK_RANGE) return d;
     }
     return null;
   }

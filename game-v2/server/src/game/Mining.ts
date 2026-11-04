@@ -16,7 +16,7 @@
  * last stage breaks up like any other rock.
  */
 
-import { Composition, MiningTable, Bag, asteroidComposition, pickOre, MARKS, type TraceSource } from '@space-game/common';
+import { Composition, MiningTable, Bag, asteroidComposition, pickOre, MARKS, type TraceSource, dcos, dhypot, dsin } from '@space-game/common';
 
 export interface MiningTool {
   yield: number;
@@ -169,10 +169,10 @@ export class Mining {
       let dx = nx, dy = ny;
       const at = this.host.minerAt?.(miner);
       if (at) {
-        const d = Math.hypot(at.x - sx, at.y - sy);
+        const d = dhypot(at.x - sx, at.y - sy);
         if (d > 1) { dx = (at.x - sx) / d; dy = (at.y - sy) / d; spread *= 0.25; s += CHUNK_BOOST; }
       }
-      const c = Math.cos(spread), sn = Math.sin(spread);
+      const c = dcos(spread), sn = dsin(spread);
       this.host.spawnChunk(r.systemNum, sx, sy, (dx * c - dy * sn) * s, (dx * sn + dy * c) * s, bag, miner);
       r.pending.set(miner, {});
     }

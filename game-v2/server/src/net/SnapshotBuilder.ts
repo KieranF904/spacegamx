@@ -20,7 +20,7 @@ import {
   ASTEROID_SEED, MAP_DOT_SLACK, STATION_DESIGNS, STATION_WEAPONS, EntityType, packCursorWeaponState, quantizeShipValue, packCharge, gunStateAt, packGunState, PILOT_ROW,
   warmthPercent, fartherThan, hpWire,
   mapDotFlags, legAt, packMapLeg, packMapRoute, unpackMapLegs, nearerThan, packIds, packRuns, packRanges, DEBRIS_STATUS, TICK_RATE,
-  type Leg, type EntityState, type ShipState, type ClientSocket, type ServerMessage, type ServerAsteroidSeedMessage, type StarSystemData, type AsteroidSpawnData,
+  type Leg, type EntityState, type ShipState, type ClientSocket, type ServerMessage, type ServerAsteroidSeedMessage, type StarSystemData, type AsteroidSpawnData, dhypot,
 } from '@space-game/common';
 import type { GameData } from '../data/GameData.js';
 import type { ClientConnection } from './ClientConnection.js';
@@ -805,7 +805,7 @@ export class SnapshotBuilder {
         on.add(r.eid);
         const was = sent.get(r.eid);
         // (A live one: how far it's strayed from where the client has it, carried on along what it was sent)
-        const off = was && r.seq < 0 ? (() => { const p = legAt(was.leg, now - was.tick); return Math.hypot(p.x - r.leg.x, p.y - r.leg.y); })() : 0;
+        const off = was && r.seq < 0 ? (() => { const p = legAt(was.leg, now - was.tick); return dhypot(p.x - r.leg.x, p.y - r.leg.y); })() : 0;
         if (!was || was.seq !== r.seq || off > MAP_DOT_SLACK) {
           const at = dots.length;
           if (r.patrol) packMapRoute(routes, r.eid, now, r.patrol.p, r.patrol.s);

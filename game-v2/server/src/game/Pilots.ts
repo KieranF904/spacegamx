@@ -21,7 +21,7 @@ import {
   Player, Position, Velocity, Rotation, Health, InSystem, Dead, Boost,
   Economy, PlayerProfile, StarterKit, Stack, Bag, ServerMessage, Blueprint,
   newProfile, migrateProfile, setActiveShip, holdClass, sweeps, STORE_SWEEPS, type StoreSweep, secureHold, SECURE_HOLD, countOf, addTo, removeFrom, hasAll, removeAll, partItemId, buyPrice,
-  BOOST_FUEL_DEFAULT, ShipRecord, SALVAGE, skillValue, refundRetiredSkills, salvageOf, salvageParts, isStructuralItem, parsePartItemId, licenceName, DOCK_FEE_LEVEL,
+  BOOST_FUEL_DEFAULT, ShipRecord, SALVAGE, skillValue, refundRetiredSkills, salvageOf, salvageParts, isStructuralItem, parsePartItemId, licenceName, DOCK_FEE_LEVEL, dcos, dsin,
 } from '@space-game/common';
 import type { ShipBridge } from '../ships/ShipBridge.js';
 import type { ProfileStore } from '../profile/ProfileStore.js';
@@ -719,8 +719,8 @@ export class Pilots {
     if (n <= 0) return;
     const a = Rotation.angle[eid] + Math.PI;
     const r = (this.ships.get(eid)?.derived.radius ?? 40) + 40;
-    this.host.spawnPod(InSystem.systemId[eid], Position.x[eid] + Math.cos(a) * r, Position.y[eid] + Math.sin(a) * r,
-      Velocity.x[eid] + Math.cos(a) * 1.5, Velocity.y[eid] + Math.sin(a) * 1.5, { [msg.id]: n }, eid);
+    this.host.spawnPod(InSystem.systemId[eid], Position.x[eid] + dcos(a) * r, Position.y[eid] + dsin(a) * r,
+      Velocity.x[eid] + dcos(a) * 1.5, Velocity.y[eid] + dsin(a) * 1.5, { [msg.id]: n }, eid);
     s.dirty = true;
     this.sendItems(conn);
   }
@@ -1094,7 +1094,7 @@ export class Pilots {
     const a = (sess.conn.playerId * 2.399) % (Math.PI * 2);
     // Just inside its docking ring, clear of the station itself (Sol Central's a big one)
     const r = Math.max(650, (this.host.stationInfo(st)?.radius ?? 0) * 0.85);
-    return { system: InSystem.systemId[st], x: Position.x[st] + Math.cos(a) * r, y: Position.y[st] + Math.sin(a) * r };
+    return { system: InSystem.systemId[st], x: Position.x[st] + dcos(a) * r, y: Position.y[st] + dsin(a) * r };
   }
 
   // ---------------------------------------------------------------------------

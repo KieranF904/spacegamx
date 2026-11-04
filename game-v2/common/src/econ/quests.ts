@@ -19,6 +19,7 @@
 
 import type { Bag } from './stacks.js';
 import type { Cond, Line } from './dialogue.js';
+import { dpow } from '../math/detTrig.js';
 
 /**
  * Every step can end with a word from the quest's person (their `say` lines,
@@ -582,7 +583,7 @@ export const SKILL_POINT_CAP = Object.values(SKILLS).reduce((n, s) => n + s.max,
 export function skillValue(id: string, points: number): number {
   const s = SKILLS[id];
   const n = Math.max(0, Math.min(s?.max ?? 0, Math.floor(points)));
-  return s && n > 0 ? s.first * (1 - SKILL_FALLOFF ** n) / (1 - SKILL_FALLOFF) : 0;
+  return s && n > 0 ? s.first * (1 - dpow(SKILL_FALLOFF, n)) / (1 - SKILL_FALLOFF) : 0;
 }
 
 /** Points spent in skills */

@@ -41,7 +41,7 @@
  * From her last phase she's enraged: quicker, warns you for less time, more of everything.
  */
 
-import { Position } from '@space-game/common';
+import { Position, datan2, dcos, dhypot, dsin } from '@space-game/common';
 import { bodyFrame, lead, pose, wrap } from './kit.js';
 import type { BrainHost } from './kit.js';
 import { StagedBrain, type Move } from './staged.js';
@@ -92,7 +92,7 @@ export class ScrapMotherBrain extends StagedBrain {
   protected interrupt(now: number): Move | null {
     if (this.stage !== 2 || this.target < 0) return null;
     const me = pose(this.view.eid), t = this.target;
-    if (Math.hypot(Position.x[t] - me.x, Position.y[t] - me.y) > CHARGE_AWAY) { if (this.away < 0) this.away = now; } else this.away = -1;
+    if (dhypot(Position.x[t] - me.x, Position.y[t] - me.y) > CHARGE_AWAY) { if (this.away < 0) this.away = now; } else this.away = -1;
     if (this.away >= 0 && now - this.away > CHARGE_WAIT && now >= this.nextCharge && this.fromHome(Position.x[t], Position.y[t]) < this.tables.homeR + 2500) {
       this.nextCharge = now + CHARGE_COOL;
       this.away = -1;
@@ -132,7 +132,7 @@ export class ScrapMotherBrain extends StagedBrain {
   /** A point ahead of her (her own frame): her maw, her claws' meeting */
   private ahead(d: number): { x: number; y: number } {
     const me = pose(this.view.eid);
-    return { x: me.x + Math.cos(me.angle) * d, y: me.y + Math.sin(me.angle) * d };
+    return { x: me.x + dcos(me.angle) * d, y: me.y + dsin(me.angle) * d };
   }
 
   // ---- Stage one: the hoard ----
@@ -155,7 +155,7 @@ export class ScrapMotherBrain extends StagedBrain {
       if (now < r.at) continue;
       if (!this.ship.derived.alive[r.part]) { this.rivets.splice(k, 1); continue; }
       const m = this.mount(r.part), a = me.angle + r.rel;
-      this.host.fire(this.view.eid, 'rivet', m.x + Math.cos(a) * 40, m.y + Math.sin(a) * 40, a, this.view.damage);
+      this.host.fire(this.view.eid, 'rivet', m.x + dcos(a) * 40, m.y + dsin(a) * 40, a, this.view.damage);
       r.at = now + 3;
       if (--r.left <= 0) this.rivets.splice(k, 1);
     }
@@ -190,7 +190,7 @@ export class ScrapMotherBrain extends StagedBrain {
         const tx = r * 0.75;
         for (const w of this.wrists()) {
           const at = bodyFrame(this.host, eid, this.ship, w);
-          this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'line', kind: 'claw', bodyId: eid, x: Math.round(at.x), y: Math.round(at.y), angle: Math.atan2(-at.y, tx - at.x), length: Math.round(Math.hypot(at.y, tx - at.x) + 300), width: 380, ticks: pullTicks - snapAt });
+          this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'line', kind: 'claw', bodyId: eid, x: Math.round(at.x), y: Math.round(at.y), angle: datan2(-at.y, tx - at.x), length: Math.round(dhypot(at.y, tx - at.x) + 300), width: 380, ticks: pullTicks - snapAt });
         }
       }
       this.want = { move: 'hold' };
@@ -198,7 +198,7 @@ export class ScrapMotherBrain extends StagedBrain {
     }
     if (!claws) return;
     // Snap: down each claw's line and where they meet
-    const me = pose(eid), c = Math.cos(me.angle), s = Math.sin(me.angle);
+    const me = pose(eid), c = dcos(me.angle), s = dsin(me.angle);
     const due: { x: number; y: number; at: number }[] = [];
     for (const w of this.wrists()) {
       const at = bodyFrame(this.host, eid, this.ship, w), tx = r * 0.75;
@@ -222,7 +222,7 @@ export class ScrapMotherBrain extends StagedBrain {
       const n = 3 + (this.rage() < 1 ? 1 : 0) + Math.floor((this.view.fighters - 1) / 2);
       for (let i = 0; i < n && this.drones.size < cap; i++) {
         const a = m.dir + (i / Math.max(1, n - 1) - 0.5) * 0.9;
-        const d = mobs.spawn('scrap_mite', this.view.systemNum, m.x + Math.cos(a) * 30, m.y + Math.sin(a) * 30, a, 12, eid, this.view.damage);
+        const d = mobs.spawn('scrap_mite', this.view.systemNum, m.x + dcos(a) * 30, m.y + dsin(a) * 30, a, 12, eid, this.view.damage);
         if (d >= 0) this.drones.add(d);
       }
     }
@@ -257,7 +257,7 @@ export class ScrapMotherBrain extends StagedBrain {
       const m = this.mount(v);
       this.host.launchFx(this.view.systemNum, m.x, m.y);
       const here = lead(t, 0), ahead = lead(t, warn * 0.8), side = this.host.rng() * Math.PI * 2;
-      spots.push([here.x, here.y], [ahead.x, ahead.y], [ahead.x + Math.cos(side) * 450, ahead.y + Math.sin(side) * 450]);
+      spots.push([here.x, here.y], [ahead.x, ahead.y], [ahead.x + dcos(side) * 450, ahead.y + dsin(side) * 450]);
     }
     for (const q of this.pilots().slice(1)) { const l = lead(q, warn * 0.6); spots.push([l.x, l.y]); }
     const due = spots.map(([x, y], i) => {
@@ -291,7 +291,7 @@ export class ScrapMotherBrain extends StagedBrain {
 
   /** One scrap chunk out of a point this way (`speed`: × a chunk's) */
   private chunk(x: number, y: number, a: number, speed = 1, off = 150): void {
-    this.host.fire(this.view.eid, 'scrap_chunk', x + Math.cos(a) * off, y + Math.sin(a) * off, a, this.view.damage, { speed });
+    this.host.fire(this.view.eid, 'scrap_chunk', x + dcos(a) * off, y + dsin(a) * off, a, this.view.damage, { speed });
   }
 
   /** A ring of chunks from a point, two gaps in it (the first ring solid where its target is) */
@@ -314,7 +314,7 @@ export class ScrapMotherBrain extends StagedBrain {
     const stacks = this.named(P('stacks')), rings = this.rage() < 1 ? 4 : 3, n = 26, gapW = 3, every = this.haste(45);
     yield* this.gather(stacks, this.haste(34), 320);
     const c0 = this.mount(stacks), t = this.target;
-    let off = Math.atan2(Position.y[t] - c0.y, Position.x[t] - c0.x) - Math.PI / 2 - (gapW / 2 / n) * Math.PI * 2;
+    let off = datan2(Position.y[t] - c0.y, Position.x[t] - c0.x) - Math.PI / 2 - (gapW / 2 / n) * Math.PI * 2;
     for (let r = 0; r < rings; r++) {
       if (this.named(P('stacks')) < 0) return;
       this.ring(this.mount(stacks), n, gapW, off);
@@ -331,11 +331,11 @@ export class ScrapMotherBrain extends StagedBrain {
       me = pose(this.view.eid);
       const at = lead(t, 25);
       if (i === 18) this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'line', kind: 'charge', bodyId: this.view.eid, x: 0, y: 0, angle: 0, length: 3600, width: r * 1.1, ticks: wind - 18 });
-      this.want = { move: 'hold', face: Math.atan2(at.y - me.y, at.x - me.x) };
+      this.want = { move: 'hold', face: datan2(at.y - me.y, at.x - me.x) };
       yield;
     }
     me = pose(this.view.eid);
-    const vx = Math.cos(me.angle), vy = Math.sin(me.angle);
+    const vx = dcos(me.angle), vy = dsin(me.angle);
     let room = 0;
     for (let s = 0; s < 4 * this.tables.homeR; s += 200) { if (this.fromHome(me.x + vx * s, me.y + vy * s) > this.tables.homeR + 1500) break; room = s; }
     const speed = Math.max(12, Math.min(26, room / 66));
@@ -374,10 +374,10 @@ export class ScrapMotherBrain extends StagedBrain {
     let k = 0;
     const per = this.rage() < 1 ? 3 : 2;
     for (const s of this.spikes()) {
-      const m = this.mount(s), out = Math.atan2(m.y - Position.y[eid], m.x - Position.x[eid]);
+      const m = this.mount(s), out = datan2(m.y - Position.y[eid], m.x - Position.x[eid]);
       for (let j = 0; j < per; j++) {
         const a = out + (j / Math.max(1, per - 1) - 0.5) * 0.7;
-        this.host.fire(eid, 'seam_seeker', m.x + Math.cos(a) * 60, m.y + Math.sin(a) * 60, a, this.view.damage, { target: who[k++ % who.length] });
+        this.host.fire(eid, 'seam_seeker', m.x + dcos(a) * 60, m.y + dsin(a) * 60, a, this.view.damage, { target: who[k++ % who.length] });
       }
     }
     for (let i = 0; i < 50; i++) { this.want = {}; yield; }
@@ -423,7 +423,7 @@ export class ScrapMotherBrain extends StagedBrain {
     this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'circle', kind: 'iris', bodyId: eid, x: 0, y: 0, radius: Math.round(reach + 300), ticks: open });
     this.irisUntil = this.host.tick() + open;
     const c0 = this.coreAt(), t = this.target;
-    let off = t >= 0 ? Math.atan2(Position.y[t] - c0.y, Position.x[t] - c0.x) - Math.PI / 2 - (gapW / 2 / n) * Math.PI * 2 : 0;
+    let off = t >= 0 ? datan2(Position.y[t] - c0.y, Position.x[t] - c0.x) - Math.PI / 2 - (gapW / 2 / n) * Math.PI * 2 : 0;
     for (let i = 0; i < open; i++) {
       if (i > 20 && (i - 20) % 40 === 0 && (i - 20) / 40 < rings && this.core() >= 0) { this.ring(this.coreAt(), n, gapW, off); off += 0.5; }
       this.want = { move: 'hold' };

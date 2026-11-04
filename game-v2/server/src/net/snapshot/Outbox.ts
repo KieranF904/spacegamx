@@ -12,7 +12,7 @@
  * urgent wait a few ticks to share one (PackedLink.ts).
  */
 import { hasComponent, type IWorld } from 'bitecs';
-import { CAPS, InSystem, Player, Position, encodeServerMessage, serverFrame, type ClientSocket, type ServerMessage } from '@space-game/common';
+import { CAPS, InSystem, Player, Position, encodeServerMessage, serverFrame, type ClientSocket, type ServerMessage, dhypot } from '@space-game/common';
 import type { ClientConnection } from '../ClientConnection.js';
 import { LAZY_TYPES, LAZY_TICKS, FX_RANGE, COALESCE_TICKS } from './constants.js';
 import { PackedLink, quietHits } from './PackedLink.js';
@@ -237,7 +237,7 @@ export class Outbox {
       if (InSystem.systemId[client.playerId] !== systemId) continue;
       if (!client.ws.isOpen() || !hasComponent(this.world, Player, client.playerId)) continue;
       const pid = client.playerId;
-      if (Math.hypot(Position.x[pid] - x, Position.y[pid] - y) > FX_RANGE && !also.includes(pid)) continue;
+      if (dhypot(Position.x[pid] - x, Position.y[pid] - y) > FX_RANGE && !also.includes(pid)) continue;
       if (skipCaps && (client.caps ?? 0) & skipCaps) continue;
       if (this.packedOf(client)) { this.packedQueue(client, msg, data); continue; }
       this.queue(client.ws, data, LAZY_TYPES.has(msg.type));
@@ -250,7 +250,7 @@ export class Outbox {
     if (InSystem.systemId[client.playerId] !== systemId) return false;
     if (!client.ws.isOpen() || !hasComponent(this.world, Player, client.playerId)) return false;
     const pid = client.playerId;
-    return Math.hypot(Position.x[pid] - x, Position.y[pid] - y) <= FX_RANGE || pid === also;
+    return dhypot(Position.x[pid] - x, Position.y[pid] - y) <= FX_RANGE || pid === also;
   }
 
   /** One client's copy of what broadcastToSystem sends (a confirmed hit gone the old way after all) */

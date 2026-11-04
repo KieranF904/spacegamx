@@ -29,6 +29,7 @@ import type { Vec2 } from '../ships/types.js';
 /** A piece of debris's shape for the knocks (ShipReplicaSet's debrisShape): its mass, radius, centre and convex pieces */
 export interface DebrisShape { mass: number; radius: number; com: Vec2; pieces: readonly (readonly Vec2[])[] }
 import { quantizeCursorAngle, dequantizeCursorAngle } from './cursorState.js';
+import { dhypot } from '../math/detTrig.js';
 
 export type KeyframeRow = number[];
 export type ControlRow = number[];
@@ -325,7 +326,7 @@ export class ShipReplicaSet {
     let da = was.body.angle - k.body.angle;
     while (da > Math.PI) da -= 2 * Math.PI;
     while (da < -Math.PI) da += 2 * Math.PI;
-    if (Math.hypot(dx, dy) >= SMOOTH_MAX) { r.fixes = undefined; return; }
+    if (dhypot(dx, dy) >= SMOOTH_MAX) { r.fixes = undefined; return; }
     if ((!dx && !dy && !da) || r.drawn === undefined) return;
     (r.fixes ??= []).push({ t: tick, s: Math.max(r.drawn, tick - BEND_TICKS), dx, dy, da });
   }

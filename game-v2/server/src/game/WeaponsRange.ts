@@ -9,7 +9,7 @@
  * from the first hit to the kill. GameServer builds this only on a dev server (devTeleport, never NODE_ENV=production).
  */
 
-import { InSystem, Position, type ServerRangeStateMessage, type ServerRangeHeadMessage, type ServerRangeRowMessage, type RangeDummyState } from '@space-game/common';
+import { InSystem, Position, type ServerRangeStateMessage, type ServerRangeHeadMessage, type ServerRangeRowMessage, type RangeDummyState, datan2, dcos, dsin } from '@space-game/common';
 import type { Enemies } from './Enemies.js';
 import type { ShipBridge } from '../ships/ShipBridge.js';
 
@@ -93,9 +93,9 @@ export class WeaponsRange {
   constructor(readonly cfg: RangeConfig, private enemies: Enemies, private ships: ShipBridge, private host: RangeHost) {
     this.slots = cfg.dummies.map((spec) => {
       const b = (spec.bearing * Math.PI) / 180;
-      const x = cfg.origin.x + Math.sin(b) * spec.distance, y = cfg.origin.y - Math.cos(b) * spec.distance;
+      const x = cfg.origin.x + dsin(b) * spec.distance, y = cfg.origin.y - dcos(b) * spec.distance;
       return {
-        spec, x, y, angle: Math.atan2(cfg.origin.y - y, cfg.origin.x - x), lx: Math.cos(b), ly: Math.sin(b), eid: -1,
+        spec, x, y, angle: datan2(cfg.origin.y - y, cfg.origin.x - x), lx: dcos(b), ly: dsin(b), eid: -1,
         name: spec.label ?? this.enemies.displayName(spec.ship), deadAt: -1, hits: [], first: -1, last: -1, total: 0, ttk: null, side: 1,
       };
     });

@@ -1404,8 +1404,8 @@ function readAcks(view: DataView, at = INPUT_BYTES): number[] | undefined {
   const n = Math.min(MAX_INPUT_ACKS, view.getUint8(at++));
   const out: number[] = [];
   for (let i = 0; i < n && at < view.byteLength; i++) {
-    let id = 0, shift = 0, b = 0;
-    do { if (at >= view.byteLength || shift > 28) return out; b = view.getUint8(at++); id += (b & 0x7f) * 2 ** shift; shift += 7; } while (b & 0x80);
+    let id = 0, shift = 0, b = 0, mul = 1;
+    do { if (at >= view.byteLength || shift > 28) return out; b = view.getUint8(at++); id += (b & 0x7f) * mul; mul *= 128; shift += 7; } while (b & 0x80);
     if (at >= view.byteLength) return out;
     out.push(id, view.getUint8(at++));
   }

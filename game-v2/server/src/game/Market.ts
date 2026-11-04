@@ -12,7 +12,7 @@
 
 import {
   Economy, StationData, ServerMessage, VendorView, QuestsFile,
-  marketShift, unitSellPrice, saleTotal, vendorPrice, repRank, REP_RANKS, RANK_DISCOUNT, MARKET_CYCLE_MS, MARKET_RECOVERY_MS,
+  marketShift, unitSellPrice, saleTotal, vendorPrice, repRank, REP_RANKS, RANK_DISCOUNT, MARKET_CYCLE_MS, MARKET_RECOVERY_MS, dpow,
 } from '@space-game/common';
 import type { Pilots, PilotConn } from './Pilots.js';
 
@@ -35,7 +35,7 @@ export class Market {
   saturation(station: string, id: string): number {
     const e = this.sat.get(station)?.get(id);
     if (!e) return 0;
-    const n = e.n * Math.pow(0.5, (this.host.now() - e.at) / MARKET_RECOVERY_MS);
+    const n = e.n * dpow(0.5, (this.host.now() - e.at) / MARKET_RECOVERY_MS);
     return n < 0.5 ? 0 : n;
   }
 

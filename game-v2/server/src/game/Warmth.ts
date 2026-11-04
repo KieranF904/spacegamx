@@ -8,7 +8,7 @@
  * The pilot is told its warmth in its snapshot (data[PILOT_ROW.warmth]) and gets a word when it slips a stage (a toast).
  */
 
-import { hazardsAt, insulationOf, stepWarmth, starHeat, warmthStage, warmthPercent, planetPosition, type HazardRules, type StarSystemData, type WarmthRules, type WarmthStageName } from '@space-game/common';
+import { hazardsAt, insulationOf, stepWarmth, starHeat, warmthStage, warmthPercent, planetPosition, type HazardRules, type StarSystemData, type WarmthRules, type WarmthStageName, dhypot } from '@space-game/common';
 import type { ShipBridge } from '../ships/ShipBridge.js';
 import type { PilotConn } from './Pilots.js';
 
@@ -55,24 +55,24 @@ export class Warmth {
     let heat = 0;
     // (Any star: as hazardsAt has it, not a black hole and not a surface's 'none')
     const type = sys.centralBody?.type ?? 'sun';
-    if (src.star && type !== 'black_hole' && type !== 'none') heat = Math.max(heat, starHeat(this.w!, Math.hypot(x, y), sys.centralBody?.radius ?? sys.starRadius ?? 0));
+    if (src.star && type !== 'black_hole' && type !== 'none') heat = Math.max(heat, starHeat(this.w!, dhypot(x, y), sys.centralBody?.radius ?? sys.starRadius ?? 0));
     if (src.station) {
       if (this.host.docked(eid)) heat = Math.max(heat, src.station.docked);
-      else for (const st of this.host.stations(eid)) if (Math.hypot(st.x - x, st.y - y) < st.radius + src.station.margin) heat = Math.max(heat, src.station.rate);
+      else for (const st of this.host.stations(eid)) if (dhypot(st.x - x, st.y - y) < st.radius + src.station.margin) heat = Math.max(heat, src.station.rate);
     }
     if (src.burning && heat < src.burning.rate) {
       const num = this.host.systemNum(eid);
       for (const b of this.ships.burning()) {
         if (this.host.systemNum(b.eid) !== num) continue;
         const p = this.host.position(b.eid);
-        if (Math.hypot(p.x - x, p.y - y) < src.burning.radius) { heat = Math.max(heat, src.burning.rate); break; }
+        if (dhypot(p.x - x, p.y - y) < src.burning.radius) { heat = Math.max(heat, src.burning.rate); break; }
       }
     }
     if (src.planet && heat < src.planet.rate) {
       for (const pl of sys.planets ?? []) {
         if (!src.planet.kinds.includes(pl.kind)) continue;
         const p = planetPosition(pl, this.host.tick());
-        if (Math.hypot(p.x - x, p.y - y) < pl.radius + src.planet.margin) { heat = Math.max(heat, src.planet.rate); break; }
+        if (dhypot(p.x - x, p.y - y) < pl.radius + src.planet.margin) { heat = Math.max(heat, src.planet.rate); break; }
       }
     }
     return heat;

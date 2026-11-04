@@ -2,6 +2,8 @@
  * Complete Game Constants - Migrated from v1
  */
 
+import { dpow } from './math/detTrig.js';
+
 // ============================================
 // WORLD PARAMETERS
 // ============================================
@@ -109,7 +111,7 @@ export const POD_DRAG = 0.985;
 
 /** Where a drifting pod is `n` ticks after an anchor (x, y, vx, vy) */
 export function podDrift(a: { x: number; y: number; vx: number; vy: number }, n: number): { x: number; y: number; vx: number; vy: number } {
-  const dn = Math.pow(POD_DRAG, Math.max(0, n));
+  const dn = dpow(POD_DRAG, Math.max(0, n));
   const f = (POD_DRAG * (1 - dn)) / (1 - POD_DRAG);
   return { x: a.x + a.vx * f, y: a.y + a.vy * f, vx: a.vx * dn, vy: a.vy * dn };
 }

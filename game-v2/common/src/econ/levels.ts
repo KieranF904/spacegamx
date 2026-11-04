@@ -8,13 +8,15 @@
  *   XP      4.0k  18.9k  46.3k  213k   520k    3.01M
  */
 
+import { dpow } from '../math/detTrig.js';
+
 
 export const LEVEL_CAP = 100;
 const XP_BASE = 120, XP_EXP = 2.2;
 
 /** Total XP to reach a level */
 export function xpToReach(level: number): number {
-  return level <= 1 ? 0 : Math.round(XP_BASE * (Math.pow(Math.min(level, LEVEL_CAP), XP_EXP) - 1));
+  return level <= 1 ? 0 : Math.round(XP_BASE * (dpow(Math.min(level, LEVEL_CAP), XP_EXP) - 1));
 }
 
 /** The level a total of XP makes a pilot */

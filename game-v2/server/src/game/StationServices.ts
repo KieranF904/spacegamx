@@ -19,7 +19,7 @@
 import {
   Economy, StationData, Bag, CraftRecipe, ServerMessage, CraftJob,
   canCraft, sellPrice, buyPrice, queueSlots, unlocks, countOf, removeFrom, isStructuralItem, cutInputs, gemItemId, type GemsFile,
-  stationPerks, stationLearned, armouryRound, stationTable, type Outpost,
+  stationPerks, stationLearned, armouryRound, stationTable, type Outpost, mulberry32,
 } from '@space-game/common';
 import type { Pilots, PilotConn } from './Pilots.js';
 import type { Market } from './Market.js';
@@ -62,6 +62,8 @@ export const isRefineJob = (j: { recipe: string }) => j.recipe.startsWith(REFINE
 export class StationServices {
   /** Cut gems (data/gems.json) */
   gems?: GemsFile;
+  /** Server-only randomness, seeded (math/rng.ts): whether a gem cut fails */
+  private rng = mulberry32(0xc075);
 
   constructor(private host: StationHost, private pilots: Pilots, private econ: Economy, private market?: Market) {}
 
@@ -384,7 +386,7 @@ export class StationServices {
         // Each cut may fail: half the stone comes back
         const fail = Math.max(0, (this.gems?.cuts[j.recipe.split(':').pop()!]?.fail ?? 0) - stationPerks(p.outpost).cutFail);
         for (let k = j.done; k < ready; k++) {
-          if (Math.random() >= fail) { for (const [id, n] of Object.entries(j.out)) bag[id] = (bag[id] ?? 0) + n; continue; }
+          if (this.rng() >= fail) { for (const [id, n] of Object.entries(j.out)) bag[id] = (bag[id] ?? 0) + n; continue; }
           for (const [id, n] of Object.entries(cut)) if (Math.floor(n / 2) > 0) bag[id] = (bag[id] ?? 0) + Math.floor(n / 2);
           this.pilots.toast(conn, `The cut failed: half the stone is back in storage`, 'warn');
         }

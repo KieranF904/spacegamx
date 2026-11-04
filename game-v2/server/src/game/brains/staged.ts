@@ -11,7 +11,7 @@
  *   dev          `forceShed` steps through its stages' looks: shot off, wrecked, blown away
  */
 
-import { Position, Velocity, ShipState, rayTerrain, currentStage, deciding, isRuined, pointInConvex, stageOf, stagedIntegrity, RUIN_HP } from '@space-game/common';
+import { Position, Velocity, ShipState, rayTerrain, currentStage, deciding, isRuined, pointInConvex, stageOf, stagedIntegrity, RUIN_HP, datan2, dcos, dhypot, dsin } from '@space-game/common';
 import type { PilotOrders } from '../../ships/ShipBridge.js';
 import { BossBrain, BossView, BrainHost, lead, partMount, pose, strike, wrap } from './kit.js';
 
@@ -125,25 +125,25 @@ export abstract class StagedBrain implements BossBrain {
     let mx = 0, my = 0;
     const w = this.want;
     if (w.move === 'hold') {
-      const v = Math.hypot(Velocity.x[this.view.eid], Velocity.y[this.view.eid]);
+      const v = dhypot(Velocity.x[this.view.eid], Velocity.y[this.view.eid]);
       if (v > 0.8) { mx = -Velocity.x[this.view.eid] / v; my = -Velocity.y[this.view.eid] / v; }
     } else if (w.move) {
       [mx, my] = w.move;
     } else {
       if (this.host.rng() < 0.004) this.side = -this.side;
-      const a = Math.atan2(me.y - ty, me.x - tx) + T.circle[si] * this.side;
-      const [px, py] = this.keepHome(tx + Math.cos(a) * range, ty + Math.sin(a) * range);
-      const sx = px - me.x, sy = py - me.y, s = Math.hypot(sx, sy) || 1;
+      const a = datan2(me.y - ty, me.x - tx) + T.circle[si] * this.side;
+      const [px, py] = this.keepHome(tx + dcos(a) * range, ty + dsin(a) * range);
+      const sx = px - me.x, sy = py - me.y, s = dhypot(sx, sy) || 1;
       if (s > 160) { mx = sx / s; my = sy / s; }
     }
     const controls = {
       forward: my < -0.38, backward: my > 0.38, left: mx < -0.38, right: mx > 0.38,
-      boost: !w.move && Math.hypot(tx - me.x, ty - me.y) > range * 1.6 && this.fromHome(me.x, me.y) < T.homeR * 0.8,
-      targetAngle: w.face ?? (mx || my ? Math.atan2(my, mx) : me.angle),
+      boost: !w.move && dhypot(tx - me.x, ty - me.y) > range * 1.6 && this.fromHome(me.x, me.y) < T.homeR * 0.8,
+      targetAngle: w.face ?? (mx || my ? datan2(my, mx) : me.angle),
     };
     let impulse = w.impulse;
     if (T.drive[si] && w.move !== 'hold' && (mx || my)) {
-      const l = Math.hypot(mx, my);
+      const l = dhypot(mx, my);
       impulse = [(impulse?.[0] ?? 0) + (mx / l) * T.drive[si], (impulse?.[1] ?? 0) + (my / l) * T.drive[si]];
     }
     // (it turns as its hull lets it, braking onto its heading: bosses.json turn)
@@ -151,20 +151,20 @@ export abstract class StagedBrain implements BossBrain {
   }
 
   protected keepHome(x: number, y: number): [number, number] {
-    const h = this.view.home, dx = x - h.x, dy = y - h.y, d = Math.hypot(dx, dy), R = this.tables.homeR;
+    const h = this.view.home, dx = x - h.x, dy = y - h.y, d = dhypot(dx, dy), R = this.tables.homeR;
     return d <= R ? [x, y] : [h.x + (dx / d) * R, h.y + (dy / d) * R];
   }
 
   protected fromHome(x: number, y: number): number {
-    return Math.hypot(x - this.view.home.x, y - this.view.home.y);
+    return dhypot(x - this.view.home.x, y - this.view.home.y);
   }
 
   /** A unit way to go, bent back in if `reach` along it would take it off its ground */
   protected homeward(vx: number, vy: number, reach: number): [number, number] {
     const me = pose(this.view.eid);
     if (this.fromHome(me.x + vx * reach, me.y + vy * reach) <= this.tables.homeR) return [vx, vy];
-    const hx = this.view.home.x - me.x, hy = this.view.home.y - me.y, hl = Math.hypot(hx, hy) || 1;
-    const bx = vx * 0.3 + (hx / hl) * 0.9, by = vy * 0.3 + (hy / hl) * 0.9, bl = Math.hypot(bx, by) || 1;
+    const hx = this.view.home.x - me.x, hy = this.view.home.y - me.y, hl = dhypot(hx, hy) || 1;
+    const bx = vx * 0.3 + (hx / hl) * 0.9, by = vy * 0.3 + (hy / hl) * 0.9, bl = dhypot(bx, by) || 1;
     return [bx / bl, by / bl];
   }
 
@@ -172,7 +172,7 @@ export abstract class StagedBrain implements BossBrain {
   protected *hold(ticks: number): Move {
     for (let i = 0; i < ticks; i++) {
       const me = pose(this.view.eid), t = this.target;
-      this.want = { move: 'hold', ...(t >= 0 ? { face: Math.atan2(Position.y[t] - me.y, Position.x[t] - me.x) } : {}) };
+      this.want = { move: 'hold', ...(t >= 0 ? { face: datan2(Position.y[t] - me.y, Position.x[t] - me.x) } : {}) };
       yield;
     }
   }
@@ -181,13 +181,13 @@ export abstract class StagedBrain implements BossBrain {
   protected *dart(reach = 1000, speed = 20, warnTicks = 24): Move {
     const t = this.target, me = pose(this.view.eid);
     if (t < 0) return;
-    const dx = Position.x[t] - me.x, dy = Position.y[t] - me.y, d = Math.hypot(dx, dy) || 1;
+    const dx = Position.x[t] - me.x, dy = Position.y[t] - me.y, d = dhypot(dx, dy) || 1;
     const ux = dx / d, uy = dy / d, side = this.host.rng() < 0.5 ? 1 : -1;
     const range = this.tables.range[this.stage - 1], radial = Math.max(-0.7, Math.min(0.7, (d - range) / range));
-    const l0 = Math.hypot(-uy * side + ux * radial, ux * side + uy * radial) || 1;
+    const l0 = dhypot(-uy * side + ux * radial, ux * side + uy * radial) || 1;
     const [vx, vy] = this.homeward((-uy * side + ux * radial) / l0, (ux * side + uy * radial) / l0, reach);
     const wind = this.haste(warnTicks);
-    this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'line', kind: 'dash', bodyId: this.view.eid, x: 0, y: 0, angle: wrap(Math.atan2(vy, vx) - me.angle), length: reach, width: 140, ticks: wind });
+    this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'line', kind: 'dash', bodyId: this.view.eid, x: 0, y: 0, angle: wrap(datan2(vy, vx) - me.angle), length: reach, width: 140, ticks: wind });
     for (let i = 0; i < wind; i++) { this.want = { move: 'hold' }; yield; }
     this.want = { impulse: [vx * speed, vy * speed], move: [vx, vy] };
     yield;
@@ -237,14 +237,14 @@ export abstract class StagedBrain implements BossBrain {
   /** Parts in clockwise order round its middle (as seen: y down), from its nose */
   protected clockwise(parts: number[]): number[] {
     const geo = this.host.ships.geometry(this.ship), c = this.ship.derived.com;
-    const turn = (i: number) => { const [x, y] = geo[i].centroid; return (Math.atan2(y - c[1], x - c[0]) + Math.PI / 2 + 4 * Math.PI) % (2 * Math.PI); };
+    const turn = (i: number) => { const [x, y] = geo[i].centroid; return (datan2(y - c[1], x - c[0]) + Math.PI / 2 + 4 * Math.PI) % (2 * Math.PI); };
     return [...parts].sort((a, b) => turn(a) - turn(b));
   }
 
   /** Pilots near it (within `r`), its target first */
   protected pilots(r = 5000): number[] {
     const eid = this.view.eid, t = this.target;
-    const near = this.host.players(this.view.systemNum).filter((q) => q !== t && Math.hypot(Position.x[q] - Position.x[eid], Position.y[q] - Position.y[eid]) < r);
+    const near = this.host.players(this.view.systemNum).filter((q) => q !== t && dhypot(Position.x[q] - Position.x[eid], Position.y[q] - Position.y[eid]) < r);
     return t >= 0 ? [t, ...near] : near;
   }
 
@@ -265,10 +265,10 @@ export abstract class StagedBrain implements BossBrain {
   /** A beam's burn this tick from a point on the body (its own frame) at an angle off its heading; it stops at rock */
   protected beam(at: { x: number; y: number }, rel: number, length: number, width: number, damage: number): void {
     const me = pose(this.view.eid), a = me.angle + rel;
-    const c = Math.cos(me.angle), s = Math.sin(me.angle);
+    const c = dcos(me.angle), s = dsin(me.angle);
     const x0 = me.x + at.x * c - at.y * s, y0 = me.y + at.x * s + at.y * c;
-    const reach = length * rayTerrain(this.host.terrain?.(this.view.systemNum), x0, y0, x0 + Math.cos(a) * length, y0 + Math.sin(a) * length);
-    const x1 = x0 + Math.cos(a) * reach, y1 = y0 + Math.sin(a) * reach, ships = this.host.ships;
+    const reach = length * rayTerrain(this.host.terrain?.(this.view.systemNum), x0, y0, x0 + dcos(a) * length, y0 + dsin(a) * length);
+    const x1 = x0 + dcos(a) * reach, y1 = y0 + dsin(a) * reach, ships = this.host.ships;
     for (const p of this.host.players(this.view.systemNum)) {
       const sh = ships.get(p);
       if (!sh) continue;
@@ -280,7 +280,7 @@ export abstract class StagedBrain implements BossBrain {
   /** Every pilot within `reach` of a point catches fire */
   protected scorch(x: number, y: number, reach: number, dps: number): void {
     for (const q of this.host.players(this.view.systemNum)) {
-      if (Math.hypot(Position.x[q] - x, Position.y[q] - y) > reach) continue;
+      if (dhypot(Position.x[q] - x, Position.y[q] - y) > reach) continue;
       const part = this.host.ships.ignite(q, x, y, dps * this.view.damage, 150, 1.2, this.view.eid);
       if (part >= 0) this.host.send(this.view.systemNum, { type: 'ignite', bodyId: q, part, ticks: 150 });
     }
@@ -289,7 +289,7 @@ export abstract class StagedBrain implements BossBrain {
   /** Pull every pilot within `r` of a point towards it (`k` world units a tick at its middle, none at the edge) */
   protected pull(x: number, y: number, r: number, k: number): void {
     for (const q of this.host.players(this.view.systemNum)) {
-      const dx = x - Position.x[q], dy = y - Position.y[q], d = Math.hypot(dx, dy);
+      const dx = x - Position.x[q], dy = y - Position.y[q], d = dhypot(dx, dy);
       if (d > r || d < 1) continue;
       const f = k * (1 - d / r);
       Velocity.x[q] += (dx / d) * f;
@@ -299,8 +299,8 @@ export abstract class StagedBrain implements BossBrain {
 
   /** Aimed at where a pilot will be when a shot `speed` fast gets there */
   protected aimAt(t: number, x: number, y: number, speed: number): number {
-    const at = lead(t, Math.hypot(Position.x[t] - x, Position.y[t] - y) / speed);
-    return Math.atan2(at.y - y, at.x - x);
+    const at = lead(t, dhypot(Position.x[t] - x, Position.y[t] - y) / speed);
+    return datan2(at.y - y, at.x - x);
   }
 
   // ---- Its stages ----
@@ -320,7 +320,7 @@ export abstract class StagedBrain implements BossBrain {
     const groups = new Map<string, number[]>();
     for (const i of parts) { const k = ship.blueprint.parts[i].piece.replace(/_[lr]$/, ''); groups.set(k, [...(groups.get(k) ?? []), i]); }
     const last = (g: number[]) => (g.includes(core) ? 1 : 0);
-    const far = (g: number[]) => Math.max(...g.flatMap((i) => geo[i].polygon.map(([x, y]) => Math.hypot(x - c[0], y - c[1]))));
+    const far = (g: number[]) => Math.max(...g.flatMap((i) => geo[i].polygon.map(([x, y]) => dhypot(x - c[0], y - c[1]))));
     return [...groups.values()].sort((a, b) => last(a) - last(b) || far(b) - far(a));
   }
 
@@ -355,7 +355,7 @@ export abstract class StagedBrain implements BossBrain {
   /** Where a part is in the world */
   protected at(i: number): { x: number; y: number } {
     const g = this.host.ships.geometry(this.ship)[i].centroid, me = pose(this.view.eid), cs = this.host.ships.tuning.cellSize;
-    const lx = (g[0] - this.ship.derived.com[0]) * cs, ly = (g[1] - this.ship.derived.com[1]) * cs, c = Math.cos(me.angle), s = Math.sin(me.angle);
+    const lx = (g[0] - this.ship.derived.com[0]) * cs, ly = (g[1] - this.ship.derived.com[1]) * cs, c = dcos(me.angle), s = dsin(me.angle);
     return { x: me.x + lx * c - ly * s, y: me.y + lx * s + ly * c };
   }
 
@@ -369,7 +369,7 @@ export abstract class StagedBrain implements BossBrain {
     const geo = this.host.ships.geometry(this.ship), c = this.ship.derived.com, out: number[][] = Array.from({ length: 9 }, () => []);
     for (const i of parts) {
       if (this.ship.blueprint.parts[i].fn === 'core') { out[8].push(i); continue; }
-      const [x, y] = geo[i].centroid, a = Math.atan2(y - c[1], x - c[0]);
+      const [x, y] = geo[i].centroid, a = datan2(y - c[1], x - c[0]);
       out[Math.floor(((a + Math.PI) / (2 * Math.PI)) * 8) % 8].push(i);
     }
     return out.filter((g) => g.length);

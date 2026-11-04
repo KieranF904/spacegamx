@@ -14,6 +14,7 @@
 
 import type { ServerMessage, PartyMemberView } from '@space-game/common';
 import type { PilotConn } from './Pilots.js';
+import { dhypot } from '@space-game/common';
 
 /** Party size when the host doesn't say (it's the leader's: econ/unlocks.ts) */
 export const PARTY_MAX = 4;
@@ -241,7 +242,7 @@ export class Party {
         if (me?.alive) {
           for (const o of p.members) {
             const s = st.get(o);
-            if (o !== m && s?.alive && s.system === me.system && Math.hypot(s.x - me.x, s.y - me.y) < WING_RANGE) near++;
+            if (o !== m && s?.alive && s.system === me.system && dhypot(s.x - me.x, s.y - me.y) < WING_RANGE) near++;
           }
         }
         const k = 1 + WING_BONUS * Math.min(3, near);

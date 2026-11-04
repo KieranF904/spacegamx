@@ -30,7 +30,7 @@
 
 import {
   PlayerProfile, QuestDef, QuestStep, QuestsFile, QuestRewards, BountyContext, ServerMessage, QuestView, QuestLead, RewardView, QuestTarget,
-  bountyIds, bountyDef, fleetIds, fleetDef, stepCount, stepText, stepHint, sectorLicence, SKILLS, BOUNTY_WINDOW_MS, OP_STEPS, condHolds, type CondContext, stationPerks, type BuildView,
+  bountyIds, bountyDef, fleetIds, fleetDef, stepCount, stepText, stepHint, sectorLicence, SKILLS, BOUNTY_WINDOW_MS, OP_STEPS, condHolds, type CondContext, stationPerks, type BuildView, dhypot,
 } from '@space-game/common';
 import type { Pilots, PilotConn, PilotEvent } from './Pilots.js';
 import type { People } from './People.js';
@@ -484,7 +484,7 @@ export class Quests {
       case 'courier': return station === s.station;
       case 'visit': {
         const w = this.host.where?.(conn);
-        if (!w || w.system !== s.system || Math.hypot(w.x - s.x, w.y - s.y) > (s.radius ?? VISIT_RADIUS)) return false;
+        if (!w || w.system !== s.system || dhypot(w.x - s.x, w.y - s.y) > (s.radius ?? VISIT_RADIUS)) return false;
         if (s.give) {
           // Found there: into the hold (or storage, if it's full)
           const left = this.pilots.give(conn, s.give, { source: 'quest' });

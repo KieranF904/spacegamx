@@ -8,7 +8,7 @@
  * unloaded for the next pilot.
  */
 
-import { stationTable, trackStructure, type Blueprint } from '@space-game/common';
+import { stationTable, trackStructure, type Blueprint, dcos, dsin } from '@space-game/common';
 import type { Pilots, PilotConn } from './Pilots.js';
 
 export interface HomeHost {
@@ -112,7 +112,7 @@ export class HomeStations {
       home.built.delete(id);
       if (tier <= 0) return;
       const a = -Math.PI / 2 + ((i + 0.5) / ids.length) * Math.PI * 2;
-      const eid = this.host.spawnStructure(trackStructure(id, tier), home.num, Math.cos(a) * RING, Math.sin(a) * RING, `${file.tracks[id].name} ${tier}`);
+      const eid = this.host.spawnStructure(trackStructure(id, tier), home.num, dcos(a) * RING, dsin(a) * RING, `${file.tracks[id].name} ${tier}`);
       if (eid >= 0) home.built.set(id, { eid, tier });
     });
   }
