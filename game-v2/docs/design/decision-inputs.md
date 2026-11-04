@@ -5,7 +5,8 @@ rather than sending whole states, or giving client access to the random number g
 server side only, sent to the client at fixed intervals, basically a cheap 1 byte input that determines behaviour
 that both sides can execute deterministically at the right tick."
 
-This is the design for that, bosses first, then the regular AI. Nothing here is built yet. It builds on
+This is the design for that, bosses first, then the regular AI. Build stages 1 and 2 are built (protocol 36,
+`CAPS.BODIES` 256): section 11 says what, where it differs from this design, and what the probe measured. It builds on
 docs/design/deterministic-maths.md (all simulation maths through detTrig, seeded generators in common/src/math/rng.ts),
 docs/design/confirmed-hits.md parts D-G (the tick-aligned layer, client-found hits, the adaptive levels, the own ship
 stepped by its client), docs/design/packed-frames.md, and the lab's commander/pilot split
@@ -376,8 +377,9 @@ Per fight, at about three minutes: **~570 KB on the wire today** (397 KB payload
 left after that are not decisions: `shipSync` and `partDestroyed` (audit group D, rebuild derivation: ~230 more), the
 pilot's own fire events and row. Upstream adds the body check: at ROUGH one byte a second riding an input.
 
-The "after" columns are estimates from the attribution above, not a measurement; build stage 2's checkpoint is to
-run this probe and replace them.
+The "after" columns are estimates from the attribution above, not a measurement. Build stage 2's measurement is in
+section 11.4: the flight alone took the boss's keyframes from 445 to 306 B/s close in (contacts with the pilot keep most
+of them) and from 245 to 90 held off at range.
 
 The pirates fight (no boss, regular AI, 6.5): 328 B/s of AI control rows, expected to fall to ~30 plus ~10 of
 orders, about -45% of its payload.
@@ -428,3 +430,105 @@ orders, about -45% of its payload.
 7. **The regular AI**: commander/pilot split of `Enemies.fly` with `ORDER`/`TARGET`/`WAYPOINT` (flies the phase
    bosses and escorts too), then siege turrets and roles, station defence, traffic.
 8. **Mobs**: `LAUNCH` for mites and ember drones, the mob step in common, its target rule, mob hits (audit group G).
+
+## 11. Built: stages 1 and 2 (2026-11-04, protocol 36)
+
+### 11.1 What there is
+
+- **common/src/bodies/**: `decisions.ts` (the ops, the wants, `applyDecision`, `bodiesFor`), `stagedFlight.ts` (the
+  staged bosses' flight: circle at range held to home, boost, the stage drive, hold, hold facing the target, a heading
+  or its lead, drive a way with a first-tick kick), `registry.ts` (`BODY_KINDS` by brain id: the Scrap Mother, and the
+  Brood Mother, who borrows her flight), `hash.ts` (`bodyHash`, the check's byte).
+- **The brain** (server/src/game/brains/staged.ts): `fly` is the body. Moves set `want` as a quantised record
+  (`wantFly`, `wantHold`, `wantAim`, `wantFace`, `wantLead`, `wantDrive`); each tick the brain decides what changed
+  (`TARGET`; `SIDE`, its 0.4% roll still the brain's; `STAGE`; `WANT`), folds it into its `BodyState` and hands it to
+  `BrainHost.decide`; then `stagedFlight` makes the controls and the push (`PilotOrders.body`). No target: `OFF`, the
+  enemy AI flies it; back on: a `SYNC` in the log. The flight tables moved from the brains into the registry.
+- **The wire**: a snapshot's `decisions` (`d`, compact index 11, an 11-bit packed mask): `[id, dt, op, ...args]`, dt
+  the decision's tick less the snapshot's (0 or less); packed by `decisionsIO` (the boss's slot, dt, a 4-bit op, args
+  as signed varints): 2-3 bytes a record. The body check on inputs: 3 bytes (the hash byte, the tick's low 12 bits),
+  in the base layout flag byte 5's 0x80 after the own check, in the compact one `CI_EXTRA.BODY_CHECK`.
+- **Server** (server/src/net/decisions/BodyNet.ts): one decision log per boss, shared by every client; per client the
+  bosses it runs. A boss it can run (body on, in view, its target itself or a ship it has) and doesn't yet: a `SYNC`
+  (the whole state at the snapshot's tick) and a keyframe; one it runs: the log since its last snapshot; one it can't
+  any more: `OFF`. `note`/`check` judge its checks; off, it's synced again. Replication keeps a **bodied shadow** per
+  boss (stepped with the body's controls and push; its own versions, counting down from -1): a running client gets no
+  control rows of the boss, and a keyframe only when that shadow leaves the ship (a contact, a shed's recentring, an
+  EMP) or when it's about to get a keyframe of the boss's target (`Replication.keysFor`: what the body read of the
+  target this window was off).
+- **Client** (client/src/ships/bodies/BodyRunner.ts): decisions folded in at their ticks (a tick already stepped is
+  stepped again), and each snapshot the bodies are re-stepped from just after the last one (what they read of other
+  ships is final only then). `ShipReplicaSet.setDriver` steps a bodied replica with its body's controls and push;
+  `ShipReplicaSet.preAt` gives the target as the server's boss step reads it (after its own step, before that tick's
+  pulls and contacts). The check goes every 30 ticks at most, riding an input that goes anyway. Offered in dev builds
+  (`?bodies=0|1`, with `ownsim`), allowed by the dev server.
+- **Legacy and STRICT clients**: unchanged; the boss's control rows and keyframes go as before (the legacy shadow is
+  untouched).
+
+### 11.2 Where it differs from the design
+
+- **No grid and no lead for flight wants.** A move's wants change inside its generator on ticks only it knows (hold
+  for `warn`, then drive), so a `WANT` takes effect on the tick it's decided, written into the snapshot after it. The
+  tick-aligned layer is never late (2.3 holds: the decision is in before the snapshot that covers its tick). The 4-tick
+  grid and the 16-tick lead stay the plan for `MOVE` (stage 4), where the predicted layer needs the lead.
+- **`SYNC` is an op**, not a `bodySync` message: the flight's whole state is 7-9 small numbers, and a sync goes with a
+  keyframe in the same snapshot anyway.
+- **The check is a snapshot's sum**, not a window's chain: the body's state at a snapshot's tick folds in every tick
+  before it (a tick wrong leaves the state wrong), as the own check does.
+- **A body is only as exact as what it reads.** A boss flying at another pilot reads that pilot's replica, which is
+  off between that pilot's divergence and its keyframe; the server keyframes the boss for that client in the same
+  snapshot (`targetKeyed`), so the boss is exact at every snapshot's tick, and hits in such a window are told
+  (keyframed), as before.
+- **Hits on a boss a client runs stay told** (`HitLedger` 'body'; the client leaves them to the records each window).
+  With fewer keyframes the client would find them itself, but how much of a hit the boss takes (braced, laid open,
+  between stages) is its brain's until stage 4 puts `taken` and `invulnerable` in the body. Without this the probe
+  went STRICT (4 disagreements in 78 hits).
+- **The own layer re-steps from the last snapshot each snapshot** (OwnTick.onSnapshot): a boss's body may ask for the
+  own ship between its `shipSync` and the snapshot carrying its rebuild, which stepped it with the new structure early.
+
+### 11.3 Tests
+
+server/src/net/decisions/bodies.test.ts (a real server, a fake client with every cap, a legacy observer): through her
+three stages (the dev shed), the client's replica of the Scrap Mother equals the server's ship at all 433 snapshot
+ticks, with no control rows of her, 33 keyframes of her against the observer's 285, and 50 checks agreeing; a lost
+decision is caught by the check and put right with a SYNC and a keyframe; a client arriving mid-fight is synced at once
+and exact from there. common/src/bodies/bodies.test.ts: decision rows through the base and packed formats, the body
+check through both input layouts, decisions folded in, the flight pure of its inputs and on its grids. The boss tests
+(scrapMother, bosses, scrapNest) pass with their assertions unchanged: quantising the wants moved nothing they pin.
+frameHash's streams moved (the protocol version); every world hash held.
+
+### 11.4 Measured (the probe, 2026-11-04)
+
+The session scratchpad's `net/bodies/netAuditBodies.ts` (section 7's probe, plus the boss on the client's tick layer
+against the server's at every snapshot and every tick of each window), copied into server/src/bench while it ran and
+deleted after. A Hammerhead against the Scrap Mother, 20 s, 3 ticks each way, the shooter's bytes; caps 127
+(everything but bodies) against 383 (with bodies). "Close" holds 1300-1700 from her (touching her hull much of the
+time); "far" holds 2300-2700.
+
+| | close, 127 | close, 383 | far, 127 | far, 383 | pirates, 127 / 383 |
+|---|---|---|---|---|---|
+| payload B/s | 1,984 | 1,837 (-7%) | 1,720 | 1,542 (-10%) | 640 / 640 |
+| wire B/s (payload + 66 a message) | 2,888 | 2,728 (-6%) | 2,598 | 2,400 (-8%) | 1,307 / 1,307 |
+| messages a second (urgent) | 13.7 (7.5) | 13.5 (7.5) | 13.3 (6.4) | 13.0 (6.4) | 10.1 (0.3) |
+| keyframes section B/s | 445 | 306 | 245 | 90 | 46 |
+| control rows section B/s | 91 | 80 | 120 | 92 | 362 |
+| snapshots with a keyframe of her | 359 of 400 | 194 of 384 | 235 of 395 | 55 of 379 | |
+| her control rows | 38 | 0 | 106 | 10 (while OFF) | |
+| decisions (B/s) | | 21 (4.0) | | 12 (2.3) | |
+| her replica off at a snapshot tick | | 0 of 383 | | 0 of 335 | |
+| body checks (off) | | 40 (0) | | 36 (0) | |
+| hit disagreements, fixes | 0, 0 | 0, 0 | 0, 0 | 0, 0 | 0, 0 |
+| own-ship keyframes | 2 | 2 | 3 | 3 | 2 |
+
+Her bodied shadow left her 188 times in 20 s close in and 26 times held off: contacts with the pilot's hull (close in,
+the probe's pilot keeps touching her edge) and her sheds' recentring are what keyframe her now. 35 and 29 more were her
+target's replica off on the client (`targetKeyed`: the observer is pulled by her magnets). The pirates fight has no
+body yet (stage 7), so it's the same either way.
+
+### 11.5 Left, in order
+
+1. **Contacts and sheds**, most of her keyframes left: the client that touched her already works out its own half of a
+   contact; the boss's half for that client, and a shed's recentring as the own ship's `REBUILD` cause does it. Then
+   the target re-keys (a pilot's replica exact for everyone: its pulls as causes for all, not only its own client).
+2. Stage 3 (novas, blinks, phases), stage 4 (her moves, with `taken`/`invulnerable` in the body, so hits on her are
+   found by the client), then stages 5-8 as section 10.
