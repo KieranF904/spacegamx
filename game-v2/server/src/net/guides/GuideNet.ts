@@ -1,12 +1,12 @@
 /**
- * Homing shells on clients' tick layers (CAPS.WAYPOINTS; common guidance/, docs/design/awareness-model.md 6.3): the
+ * Homing shells and mobs on clients' tick layers (CAPS.WAYPOINTS; common guidance/, docs/design/awareness-model.md 6.3): the
  * waypoint records the server's planner made (one log a shell, shared by every client), which clients run which
  * shells, and in which mode.
  *
  *   record     a planner's record at a tick (Weapons: WP, NEXT, LOST)
  *   forClient  a snapshot's guide rows for one client: a shell within its range that it doesn't run yet gets a SYNC
  *              (its state and guide as this tick ended); one it runs gets, for the window since its last snapshot, its
- *              mode (MODE when it changes) and, in "sent" mode, the window's WP and NEXT records; LOST always; one
+ *              mode (MODE when it changes) and, in "sent" mode, the window's WP and NEXT records; LOST and TARGET always; one
  *              out of range an OFF
  *   heldSum    what its running shells add to its own check (OwnChecks; off: resync, every one SYNCed again)
  *
@@ -14,19 +14,23 @@
  * it held the target through the whole window: at its last snapshot and now, and not keyframed in this one (what it
  * had of it was off). Otherwise "sent". Both give the same waypoints, so a switch never moves the shell.
  */
-import { GUIDE, MODE_DERIVED, MODE_SENT, guideHash, guideSyncArgs, type Guide, type GuideBody } from '@space-game/common';
+import { GUIDE, MODE_DERIVED, MODE_SENT, guideFirst, guideHash, guideSyncArgs, type Guide, type GuideBody } from '@space-game/common';
 
 /** Records kept a shell (ticks): longer than any client's snapshots are apart */
 const KEEP_TICKS = 600;
 
+/** What flies by the waypoint law (Weapons' homing shells, Mobs): every one, and each one's motion and birth */
+export interface GuideSource {
+  guided(): Iterable<[number, Guide]>;
+  /** Its motion now (null: not one of these, gone, or dead this tick) */
+  guideBody(eid: number): GuideBody | null;
+  /** The tick it was made (an entity id is reused: a new one in an old one's id is another) */
+  guideBorn(eid: number): number;
+}
+
 export interface GuideNetHost {
   tick(): number;
-  /** Every homing shell flying by the waypoint law */
-  guided(): Iterable<[number, Guide]>;
-  /** A shell's motion now (null: gone, or dead this tick) */
-  body(eid: number): GuideBody | null;
-  /** The tick it was fired (an entity id is reused: a new shell in an old one's id is another shell) */
-  born(eid: number): number;
+  sources(): readonly GuideSource[];
   systemOf(eid: number): number;
 }
 
@@ -53,8 +57,18 @@ export class GuideNet {
 
   constructor(private readonly host: GuideNetHost) {}
 
+  /** Its source's word on it (the first that has it) */
+  private body(eid: number): GuideBody | null {
+    for (const src of this.host.sources()) { const b = src.guideBody(eid); if (b) return b; }
+    return null;
+  }
+  private born(eid: number): number {
+    for (const src of this.host.sources()) if (src.guideBody(eid)) return src.guideBorn(eid);
+    return -1;
+  }
+
   record(eid: number, tick: number, op: number, args: readonly number[]): void {
-    const born = this.host.born(eid);
+    const born = this.born(eid);
     let log = this.logs.get(eid);
     if (!log || log.born !== born) this.logs.set(eid, (log = { born, recs: [] }));
     const recs = log.recs;
@@ -83,7 +97,7 @@ export class GuideNet {
     if (this.listTick === tick) return this.list;
     this.listTick = tick;
     this.list = [];
-    for (const [eid, g] of this.host.guided()) this.list.push({ eid, g, born: this.host.born(eid), body: this.host.body(eid), system: this.host.systemOf(eid) });
+    for (const src of this.host.sources()) for (const [eid, g] of src.guided()) this.list.push({ eid, g, born: src.guideBorn(eid), body: src.guideBody(eid), system: this.host.systemOf(eid) });
     return this.list;
   }
 
@@ -113,9 +127,10 @@ export class GuideNet {
       if (log?.born === born) for (const d of log.recs) {
         if (d[0] <= c.through) continue;
         if (d[0] > tick) break;
-        if (d[1] !== GUIDE.LOST && mode !== MODE_SENT) continue;
+        // (a lost target and a brain's new one go to everyone; waypoints only to those in sent mode)
+        if (!guideFirst(d[1]) && mode !== MODE_SENT) continue;
         rows.push([eid, d[0] - tick, ...d.slice(1)]);
-        if (d[1] !== GUIDE.LOST) this.stats.sent++;
+        if (!guideFirst(d[1])) this.stats.sent++;
       }
     }
     for (const eid of c.runs.keys()) if (!seen.has(eid)) c.runs.delete(eid);
@@ -129,7 +144,7 @@ export class GuideNet {
     const c = this.clients.get(conn);
     let sum = 0;
     if (c) for (const eid of c.runs.keys()) {
-      const b = this.host.body(eid);
+      const b = this.body(eid);
       if (b) sum = (sum + guideHash(eid, b)) >>> 0;
     }
     return sum;
@@ -148,6 +163,6 @@ export class GuideNet {
 
   /** Logs of shells that are gone */
   sweep(): void {
-    for (const eid of this.logs.keys()) if (!this.host.body(eid)) this.logs.delete(eid);
+    for (const eid of this.logs.keys()) if (!this.body(eid)) this.logs.delete(eid);
   }
 }

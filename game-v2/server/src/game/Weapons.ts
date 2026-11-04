@@ -272,9 +272,20 @@ export class Weapons {
     return this.extras.get(eid)?.guide ?? null;
   }
 
-  /** Every homing shell flying by the waypoint law */
+  /** Every homing shell flying by the waypoint law (GuideNet's sources) */
   *guided(): IterableIterator<[number, Guide]> {
     for (const [eid, x] of this.extras) if (x.guide) yield [eid, x.guide];
+  }
+
+  /** A homing shell's motion (null: not one, or gone) */
+  guideBody(eid: number): GuideBody | null {
+    const w = this.host.world;
+    return this.extras.get(eid)?.guide && entityExists(w, eid) && !hasComponent(w, Dead, eid) ? { x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid] } : null;
+  }
+
+  /** The tick it was fired (an id reused is another shell) */
+  guideBorn(eid: number): number {
+    return Projectile.spawnTick[eid];
   }
 
   /** The shot hit a ship: true when it's spent (piercing shots carry on) */

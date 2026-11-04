@@ -9,12 +9,19 @@
  *             and bursts when anything it may hurt comes within its fuse (or
  *             when its life runs out, harmlessly)
  *
+ * It flies by the scheduled-waypoint law (common guidance/waypoints.ts, FLIGHT_MOB), its state on the law's grid: its
+ * clients fly it on their tick layers (CAPS.WAYPOINTS, net/guides/GuideNet.ts). Who it hunts is its brain's (its
+ * owner's target, else the nearest pilot): a new one goes to them as a TARGET record.
+ *
  * Only pilots' damage hurts them (their owner's own shells pass through), and
  * they travel in the snapshot as plain entities (EntityType.Enemy).
  */
 
 import { addComponent, addEntity, removeEntity, IWorld } from 'bitecs';
-import { Position, Velocity, Rotation, Radius, InSystem, segmentNearCircle, insideTerrain, type Terrain, datan2, dcos, dhypot, dsin } from '@space-game/common';
+import {
+  Position, Velocity, Rotation, Radius, InSystem, segmentNearCircle, insideTerrain, type Terrain, dcos, dhypot, dsin,
+  FLIGHT_MOB, GUIDE, PLAN_NONE, PLAN_WP, guideKind, guideRetarget, guideTick, newGuide, qAngle, qGuide, wpArgs, type Guide, type GuideBody,
+} from '@space-game/common';
 
 export interface MobDef {
   name: string;
@@ -59,6 +66,10 @@ export interface MobHost {
   removed(eid: number): void;
   /** A surface's rock (it bursts against it) */
   terrain?(systemNum: number): Terrain | undefined;
+  /** Is this ship still there to hunt (gone: it lets go, and its clients are told) */
+  alive?(eid: number): boolean;
+  /** A mob's guide record at this tick (common guidance/records.ts: WP, NEXT, TARGET), for its clients (GuideNet) */
+  guided?(eid: number, tick: number, op: number, args: number[]): void;
 }
 
 interface Live {
@@ -72,6 +83,8 @@ interface Live {
   target: number;
   /** Damage scale (its owner's) */
   scale: number;
+  /** Its flight (the waypoint law; its target is the guide's) */
+  guide: Guide;
 }
 
 export class Mobs {
@@ -108,12 +121,15 @@ export class Mobs {
     addComponent(w, Rotation, eid);
     addComponent(w, Radius, eid);
     addComponent(w, InSystem, eid);
-    Position.x[eid] = x; Position.y[eid] = y;
-    Velocity.x[eid] = dcos(angle) * speed; Velocity.y[eid] = dsin(angle) * speed;
-    Rotation.angle[eid] = angle;
+    // (on the waypoint law's grid: its clients fly it exactly)
+    Position.x[eid] = qGuide(x); Position.y[eid] = qGuide(y);
+    Velocity.x[eid] = qGuide(dcos(angle) * speed); Velocity.y[eid] = qGuide(dsin(angle) * speed);
+    Rotation.angle[eid] = qAngle(angle);
     Radius.value[eid] = def.radius;
     InSystem.systemId[eid] = systemNum;
-    this.live.set(eid, { eid, id, def, index: this.ids.indexOf(id), hp: def.hp, owner, born: this.host.tick(), target: -1, scale });
+    const born = this.host.tick();
+    const guide = newGuide(-1, guideKind(def.turn, def.accel, def.speed, FLIGHT_MOB, born + (def.arm ?? 0)));
+    this.live.set(eid, { eid, id, def, index: this.ids.indexOf(id), hp: def.hp, owner, born, target: -1, scale, guide });
     return eid;
   }
 
@@ -130,49 +146,49 @@ export class Mobs {
     return out;
   }
 
+  /** A new target (its brain's), and its clients told */
+  private retarget(m: Live, t: number, now: number): void {
+    m.target = t;
+    guideRetarget(m.guide, t);
+    this.host.guided?.(m.eid, now, GUIDE.TARGET, [t + 1]);
+  }
+
+  private readonly gm: GuideBody = { x: 0, y: 0, vx: 0, vy: 0, a: 0 };
+  private readonly gt: GuideBody = { x: 0, y: 0, vx: 0, vy: 0 };
+
   tick(): void {
     const now = this.host.tick();
     for (const m of [...this.live.values()]) {
-      const { eid, def } = m;
+      const { eid, def, guide: g } = m;
       const num = InSystem.systemId[eid];
       const age = now - m.born;
       if (age >= def.life) { this.kill(m, true); continue; }
       const x = Position.x[eid], y = Position.y[eid];
-      let vx = Velocity.x[eid], vy = Velocity.y[eid];
-      let ang = Rotation.angle[eid];
-      if (age >= (def.arm ?? 0)) {
-        // Its owner's target, or the nearest pilot about
+      const armed = age >= (def.arm ?? 0);
+      if (armed) {
+        // Its owner's target, or the nearest pilot about (its brain: told to its clients when it changes)
         if (now % 15 === m.eid % 15 || m.target < 0) {
           const t = this.host.targetOf(m.owner);
-          m.target = t >= 0 && InSystem.systemId[t] === num ? t : this.host.nearestPlayer(num, x, y, 4000);
+          const pick = t >= 0 && InSystem.systemId[t] === num ? t : this.host.nearestPlayer(num, x, y, 4000);
+          if (pick !== m.target) this.retarget(m, pick, now);
         }
-        const t = m.target;
-        if (t >= 0) {
-          const tx = Position.x[t], ty = Position.y[t];
-          const d = dhypot(tx - x, ty - y);
-          // A little lead, more the further off it is
-          const lead = Math.min(18, d / Math.max(4, def.speed));
-          const want = datan2(ty + Velocity.y[t] * lead - y, tx + Velocity.x[t] * lead - x);
-          let da = want - ang;
-          while (da > Math.PI) da -= 2 * Math.PI;
-          while (da < -Math.PI) da += 2 * Math.PI;
-          ang += Math.max(-def.turn, Math.min(def.turn, da));
-          // Burst once within its fuse of the hull
-          const gap = this.host.hullGap ? this.host.hullGap(t, x, y, def.blast.fuse) : d - this.host.radiusOf(t);
-          if (gap < def.blast.fuse) { this.kill(m, false); continue; }
-        }
-        vx += dcos(ang) * def.accel; vy += dsin(ang) * def.accel;
-        // It flies where it points: sideways drift bleeds away fast
-        const fx = dcos(ang), fy = dsin(ang), along = vx * fx + vy * fy;
-        vx = fx * along + (vx - fx * along) * 0.86; vy = fy * along + (vy - fy * along) * 0.86;
-        const sp = dhypot(vx, vy);
-        if (sp > def.speed) { vx *= def.speed / sp; vy *= def.speed / sp; }
-      } else {
-        // Out of the bay: coasting, slowing a little
-        vx *= 0.98; vy *= 0.98;
+        // (one gone lets go: the next pick is its brain's again)
+        if (m.target >= 0 && (InSystem.systemId[m.target] !== num || !(this.host.alive?.(m.target) ?? true))) this.retarget(m, -1, now);
       }
+      // Its flight: the waypoint law, its waypoints planned from its target as it is now (a pilot after its step)
+      const mb = this.gm, t = m.target, tg = this.gt;
+      mb.x = x; mb.y = y; mb.vx = Velocity.x[eid]; mb.vy = Velocity.y[eid]; mb.a = Rotation.angle[eid];
+      if (t >= 0) { tg.x = Position.x[t]; tg.y = Position.y[t]; tg.vx = Velocity.x[t]; tg.vy = Velocity.y[t]; }
+      const did = guideTick(g, eid, mb, t >= 0 ? tg : null, now);
+      if (did !== PLAN_NONE) this.host.guided?.(eid, now, did === PLAN_WP ? GUIDE.WP : GUIDE.NEXT, wpArgs(did === PLAN_WP ? g.w! : g.n!, mb));
+      if (armed && t >= 0) {
+        // Burst once within its fuse of the hull
+        const gap = this.host.hullGap ? this.host.hullGap(t, x, y, def.blast.fuse) : dhypot(Position.x[t] - x, Position.y[t] - y) - this.host.radiusOf(t);
+        if (gap < def.blast.fuse) { this.kill(m, false); continue; }
+      }
+      const vx = mb.vx, vy = mb.vy;
       Velocity.x[eid] = vx; Velocity.y[eid] = vy;
-      Rotation.angle[eid] = ang;
+      Rotation.angle[eid] = mb.a!;
       Position.x[eid] = x + vx;
       Position.y[eid] = y + vy;
       // Flown into rock: it bursts against it (weakly, as one shot down)
@@ -195,6 +211,21 @@ export class Mobs {
       if (!best || t < best.t) best = { eid: m.eid, t };
     }
     return best;
+  }
+
+  /** Every mob, by the waypoint law (GuideNet's sources) */
+  *guided(): IterableIterator<[number, Guide]> {
+    for (const m of this.live.values()) yield [m.eid, m.guide];
+  }
+
+  /** A mob's motion and heading (null: not one) */
+  guideBody(eid: number): GuideBody | null {
+    return this.live.has(eid) ? { x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid], a: Rotation.angle[eid] } : null;
+  }
+
+  /** The tick it was launched (an id reused is another mob) */
+  guideBorn(eid: number): number {
+    return this.live.get(eid)?.born ?? -1;
   }
 
   /** Damage one; true if that killed it */

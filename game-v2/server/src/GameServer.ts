@@ -706,13 +706,8 @@ export class GameServer implements ServerCtx {
         return s ? { x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid], angle: Rotation.angle[eid], angVel: s.angVel } : null;
       },
     });
-    this.guides = new GuideNet({
-      tick: () => this.currentTick,
-      guided: () => this.weapons.guided(),
-      body: (eid) => (entityExists(this.world, eid) && !hasComponent(this.world, Dead, eid) && this.weapons.guideOf(eid) ? { x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid] } : null),
-      born: (eid) => Projectile.spawnTick[eid],
-      systemOf: (eid) => InSystem.systemId[eid],
-    });
+    // (what flies by the waypoint law: homing shells and mobs)
+    this.guides = new GuideNet({ tick: () => this.currentTick, sources: () => [this.weapons, this.mobs], systemOf: (eid) => InSystem.systemId[eid] });
     this.netCaps = opts.netCaps ?? 0;
     this.gameData = opts.gameData;
     this.adminServer = opts.adminServer || null;
@@ -1526,6 +1521,8 @@ this.devTeleport = opts.devTeleport ?? false;
         this.broadcastToSystem(num, { type: 'detonation', kind: fizzle ? 'mob_fizzle' : 'mob_burst', x: Math.round(x), y: Math.round(y), radius: Math.round(radius), mob: kind }),
       removed: (eid: number) => this.pendingRemovedEntities.add(eid),
       terrain: (num: number) => this.terrainOf(num),
+      alive: (eid: number) => this.ships.has(eid) && !hasComponent(this.world, Dead, eid),
+      guided: (eid: number, tick: number, op: number, args: number[]) => this.guides.record(eid, tick, op, args),
     };
   }
 

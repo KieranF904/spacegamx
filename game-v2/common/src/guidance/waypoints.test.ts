@@ -45,7 +45,7 @@ function clientFlight(s: ReturnType<typeof serverFlight>, from: number, ticks: n
     guideAdvance(g, t);
     if (mode(t) === 'sent') { for (const x of r) if (x[0] !== GUIDE.LOST) applyGuideRec(g, x[0], x.slice(1), m, t); }
     else guidePlan(g, ID, m, g.target >= 0 ? target(t) : null, t);
-    guideSteer(g, m);
+    guideSteer(g, m, t);
     m.x += m.vx; m.y += m.vy;
     const want = s.states.get(t)!;
     if (m.x !== want.x || m.y !== want.y || m.vx !== want.vx || m.vy !== want.vy) off++;

@@ -615,7 +615,7 @@ export class SnapshotBuilder {
       const causes = causesFor(conn.caps);
       const decisions = bodies?.forClient(conn, conn.playerId, (e) => InSystem.systemId[e] ?? -1, playerSystemId ?? -1, conn.repKnown, this.currentTick,
         (e) => !conn.shipView || conn.shipView.has(e), (e) => this.replication.keysFor(e, conn.playerId, conn.repKnown, causes));
-      // Homing shells on its tick layer (CAPS.WAYPOINTS): their SYNCs and records, and from here no rows of them
+      // Homing shells and mobs on its tick layer (CAPS.WAYPOINTS): their SYNCs and records, and from here no rows of them
       const guidesOn = this.guides && waypointsFor(conn.caps) ? this.guides : null;
       if (!guidesOn) this.guides?.drop(conn);
       const guided = guidesOn?.forClient(conn, {
@@ -653,6 +653,13 @@ export class SnapshotBuilder {
         if (r.kind === 'projectile' && covered.has(r.id)) { newStates.set(r.id, r.key); continue; }
         // (a homing shell it runs, its row once sent: it flies it itself)
         if (r.kind === 'projectile' && guidesOn?.runs(conn, r.id) && prevStates.has(r.id)) { newStates.set(r.id, r.key); continue; }
+        // (a mob it runs: its row again only when its HP changes)
+        if (r.kind === 'mob' && guidesOn?.runs(conn, r.id)) {
+          const k = `hp:${r.state.hp},${r.state.maxHp}`;
+          newStates.set(r.id, k);
+          if (prevStates.get(r.id) !== k) entities.push(r.state);
+          continue;
+        }
         if ((r.kind === 'projectile' || r.kind === 'mob') && fartherThan(r.x - px, r.y - py, SNAP_PROJECTILE_RANGE)) continue;
         if (r.kind === 'pod' && fartherThan(r.x - px, r.y - py, SNAP_POD_RANGE)) continue;
         if (r.id === conn.playerId && self) {

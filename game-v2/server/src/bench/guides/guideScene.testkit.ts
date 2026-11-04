@@ -1,12 +1,13 @@
 /**
  * A scene for homing shells on a client's tick layer (CAPS.WAYPOINTS): a real GameServer, a WAYPOINTS client A (its
  * shells compared with the server's on every tick it steps), a legacy observer B, a pilot P to chase, a shooter D and a
- * dummy H. Used by guides.test.ts and the measurements.
+ * dummy H. Used by net/guides/guides.test.ts and the measurements (here under bench/: it makes a GameServer, which nothing
+ * under net/ may import at runtime).
  */
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import {
-  Position, Velocity, InSystem, CAPS, EntityType, encodeMessage, decodeMessage,
+  Position, Velocity, Rotation, InSystem, CAPS, EntityType, encodeMessage, decodeMessage,
   type ReplicaEnv, type ClientMessage, type ServerSnapshotMessage, type GuideBody,
 } from '@space-game/common';
 import { GameServer } from '../../GameServer.js';
@@ -14,7 +15,7 @@ import { GameData } from '../../data/GameData.js';
 import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
 import { loadShipConfigFromDisk } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../proto/createProtoServer.js';
-import { FakeHitsClient } from '../hits/fakeHitsClient.testkit.js';
+import { FakeHitsClient } from '../../net/hits/fakeHitsClient.testkit.js';
 import type { Weapons } from '../../game/Weapons.js';
 
 const dataDir = join(__dirname, '../../../../data');
@@ -36,6 +37,8 @@ export interface Opts {
   /** Something done on tick t (a drift injected) */
   each?: (t: number, w: World) => void;
   caps?: number;
+  /** Mobs of this kind launched instead (their brain picks who they hunt) */
+  mob?: string;
 }
 export interface World { server: GameServer; A: FakeHitsClient; B: FakeHitsClient; P: FakeHitsClient; D: number; H: number }
 
@@ -62,7 +65,7 @@ export function run(o: Opts) {
       const s = truth.get(`${id}:${t}`);
       if (!s) return;
       got.checked++;
-      if (s.x !== m.x || s.y !== m.y || s.vx !== m.vx || s.vy !== m.vy) { got.off++; if (!got.firstOff) got.firstOff = `${id}@${t}: ${JSON.stringify(m)} vs ${JSON.stringify(s)}`; }
+      if (s.x !== m.x || s.y !== m.y || s.vx !== m.vx || s.vy !== m.vy || (s.a ?? 0) !== (m.a ?? 0)) { got.off++; if (!got.firstOff) got.firstOff = `${id}@${t}: ${JSON.stringify(m)} vs ${JSON.stringify(s)}`; }
     },
   });
   const B = new FakeHitsClient(server, { name: 'legacy_obs', caps: 0, env });
@@ -72,7 +75,7 @@ export function run(o: Opts) {
   const firstRow = new Set<number>();
   const fa = A as unknown as { snapshot(s: ServerSnapshotMessage): void }, oa = fa.snapshot.bind(A);
   fa.snapshot = (s) => {
-    for (const e of s.entities) if (e.type === EntityType.Projectile && weapons.guideOf(e.id)) {
+    for (const e of s.entities) if ((e.type === EntityType.Projectile && weapons.guideOf(e.id)) || e.type === EntityType.Enemy) {
       rows.A++;
       if (firstRow.has(e.id)) rows.Aafter++;
       firstRow.add(e.id);
@@ -81,7 +84,7 @@ export function run(o: Opts) {
     oa(s);
   };
   const fb = B as unknown as { snapshot(s: ServerSnapshotMessage): void }, ob = fb.snapshot.bind(B);
-  fb.snapshot = (s) => { for (const e of s.entities) if (e.type === EntityType.Projectile && weapons.guideOf(e.id)) rows.B++; ob(s); };
+  fb.snapshot = (s) => { for (const e of s.entities) if ((e.type === EntityType.Projectile && weapons.guideOf(e.id)) || e.type === EntityType.Enemy) rows.B++; ob(s); };
   let seq = 1, pseq = 1, now = -1;
   let chk: ReturnType<NonNullable<FakeHitsClient['own']>['takeCheck']>;
   const input = (f: FakeHitsClient, s: number, c: { forward: boolean; targetAngle: number }, extra?: object) => {
@@ -98,6 +101,7 @@ export function run(o: Opts) {
     server.step();
     const tick = server.getTick();
     for (const [eid] of weapons.guided()) truth.set(`${eid}:${tick}`, { x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid] });
+    for (const [eid] of server.mobs.guided()) truth.set(`${eid}:${tick}`, { x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid], a: Rotation.angle[eid] });
     clock.t += 1000 / 60;
     chk = A.own?.takeCheck(true, tick);
     const rep = A.selfHits?.takeReport(true);
@@ -125,7 +129,8 @@ export function run(o: Opts) {
     o.each?.(t, w);
     if (t % o.every === 0) {
       const tg = o.at(w), ang = Math.atan2(Position.y[tg] - Position.y[D], Position.x[tg] - Position.x[D]);
-      weapons.spawn(D, 'missile', Position.x[D], Position.y[D], ang, 1, { speedScale: 1, sizeScale: 1, turret: false, target: tg });
+      if (o.mob) server.mobs.spawn(o.mob, num, Position.x[D], Position.y[D], ang, 12, D);
+      else weapons.spawn(D, 'missile', Position.x[D], Position.y[D], ang, 1, { speedScale: 1, sizeScale: 1, turret: false, target: tg });
     }
     step();
   }

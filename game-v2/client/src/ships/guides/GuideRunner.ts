@@ -1,9 +1,9 @@
 /**
- * Homing shells on this client's tick-aligned layer (CAPS.WAYPOINTS; common guidance/, docs/design/awareness-model.md
+ * Homing shells and mobs on this client's tick-aligned layer (CAPS.WAYPOINTS; common guidance/, docs/design/awareness-model.md
  * 6.3). One in range comes once as a SYNC (its state and guide as a snapshot's tick ended), and from there it is flown
  * by the shared waypoint law, a tick at a time, as the server flies it:
  *
- *   LOST     its target is gone (every client is told)
+ *   LOST     its target is gone; TARGET a mob's brain chose another (every client is told)
  *   advance  the queued waypoint takes over at its start
  *   plan     "derived" ticks (it holds the target): the planner, from its replica of the target as the server read it
  *            (a pilot after its step, before that tick's causes: ShipReplicaSet.preAt; anything else as it ended the
@@ -15,7 +15,7 @@
  * hash as of the snapshot's tick, on its own check (OwnTick extraHash).
  */
 import {
-  EntityType, GUIDE, MODE_SENT, ReplicaMode, applyGuideRec, guideAdvance, guideHash, guideOfSync, guidePlan, guideRowOk, guideSteer, replicasByte,
+  EntityType, GUIDE, MODE_SENT, ReplicaMode, applyGuideRec, guideFirst, guideAdvance, guideHash, guideOfSync, guidePlan, guideRowOk, guideSteer, replicasByte,
   type EntityState, type Guide, type GuideBody, type ShipReplicaSet,
 } from '@space-game/common';
 
@@ -109,13 +109,14 @@ export class GuideRunner {
     const out: EntityState[] = [];
     if (!this.runs.size) return out;
     const rows = new Map<number, EntityState>();
-    for (const e of entities) if (e.type === EntityType.Projectile && this.runs.has(e.id)) rows.set(e.id, e);
+    for (const e of entities) if ((e.type === EntityType.Projectile || e.type === EntityType.Enemy) && this.runs.has(e.id)) rows.set(e.id, e);
     for (const [id, r] of this.runs) {
       if (r.last !== tick) continue;
       const row = rows.get(id);
-      if (row) { row.x = r.m.x; row.y = r.m.y; row.vx = r.m.vx; row.vy = r.m.vy; continue; }
+      // (a mob's heading too: it points where it steers)
+      if (row) { row.x = r.m.x; row.y = r.m.y; row.vx = r.m.vx; row.vy = r.m.vy; if (r.m.a !== undefined) row.angle = r.m.a; continue; }
       const d = data(id);
-      if (d) out.push({ id, type: EntityType.Projectile, x: r.m.x, y: r.m.y, vx: r.m.vx, vy: r.m.vy, data: d });
+      if (d) out.push({ id, type: r.m.a !== undefined ? EntityType.Enemy : EntityType.Projectile, x: r.m.x, y: r.m.y, vx: r.m.vx, vy: r.m.vy, ...(r.m.a !== undefined ? { angle: r.m.a } : {}), data: d });
     }
     return out;
   }
@@ -168,16 +169,16 @@ export class GuideRunner {
     const end = Math.min(to, run.last + MAX_STEP);
     for (let t = run.last + 1; t <= end; t++) {
       const recs = run.recs.get(t);
-      if (recs) for (const r of recs) if (r[0] === GUIDE.LOST) applyGuideRec(g, r[0], r.slice(1), m, t);
+      if (recs) for (const r of recs) if (guideFirst(r[0])) applyGuideRec(g, r[0], r.slice(1), m, t);
       guideAdvance(g, t);
       if (this.modeAt(run, t) === MODE_SENT) {
-        if (recs) for (const r of recs) if (r[0] !== GUIDE.LOST) applyGuideRec(g, r[0], r.slice(1), m, t);
+        if (recs) for (const r of recs) if (!guideFirst(r[0])) applyGuideRec(g, r[0], r.slice(1), m, t);
       } else {
         const tg = g.target >= 0 ? this.targetAt(g.target, t) : null;
         if (g.target >= 0 && !tg) this.stats.blind++;
         if (guidePlan(g, id, m, tg, t)) this.stats.plans++;
       }
-      guideSteer(g, m);
+      guideSteer(g, m, t);
       m.x += m.vx;
       m.y += m.vy;
       run.recs.delete(t);

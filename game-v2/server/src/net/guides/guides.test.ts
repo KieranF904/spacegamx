@@ -3,12 +3,12 @@
  * ships/guides/GuideRunner.ts). Missiles fired at ships near the client (derived: it plans their waypoints itself) and
  * at a pilot who jumps out of its focus and back (sent while it lacks the target, derived again after, the switch
  * mid-flight). Every shell it runs is compared with the server's on every tick it steps; a legacy observer still gets
- * rows. The scene: guidesScene.testkit.ts.
+ * rows. The scene: bench/guides/guideScene.testkit.ts.
  */
 import { describe, it, expect } from 'vitest';
 import { Position, Velocity } from '@space-game/common';
 import type { Weapons } from '../../game/Weapons.js';
-import { run, BASE } from './guidesScene.testkit.js';
+import { run, BASE } from '../../bench/guides/guideScene.testkit.js';
 
 describe('homing shells on the tick layer (CAPS.WAYPOINTS)', () => {
   it('both ends held: it plans their waypoints itself, nothing sent; every shell exact, no rows after the first', () => {
@@ -63,6 +63,27 @@ describe('homing shells on the tick layer (CAPS.WAYPOINTS)', () => {
     expect(r.got.off).toBeGreaterThan(0);
     expect(r.checks.bodyOff).toBeGreaterThan(0);
     expect(r.net.resyncs).toBeGreaterThan(0);
+  }, 120_000);
+
+  it('mobs: launched at it and at a pilot beside it who jumps away (their brain picks again), exact; rows only for HP', () => {
+    const r = run({
+      every: 20, from: [2500, -800], at: (w) => w.A.pid, pAt: [1800, 600], ticks: 600, mob: 'scrap_mite',
+      // (the pilot they may pick jumps out of the focus and back)
+      each: (t, w) => {
+        const to = t === 200 ? [26000, 4000] : t === 380 ? [1500, 900] : null;
+        if (!to) return;
+        const p = w.P.pid, a = w.A.pid;
+        Position.x[p] = Position.x[a] + to[0]; Position.y[p] = Position.y[a] + to[1]; Velocity.x[p] = 0; Velocity.y[p] = 0;
+      },
+    });
+    if (process.env.GUIDE_DEBUG) console.log('GUIDE', JSON.stringify({ got: r.got, rows: r.rows, checks: r.checks, net: r.net, runner: r.runner }));
+    expect(r.rows.syncs).toBeGreaterThan(15);
+    expect(r.got.checked).toBeGreaterThan(2000);
+    expect(r.got.off, r.got.firstOff).toBe(0);
+    expect(r.runner!.plans).toBeGreaterThan(50);
+    expect(r.runner!.blind).toBe(0);
+    expect(r.rows.Aafter).toBeLessThan(r.rows.syncs);
+    expect(r.checks.bodyOff).toBe(0);
   }, 120_000);
 
   it('legacy clients (no WAYPOINTS) get rows as before', () => {
