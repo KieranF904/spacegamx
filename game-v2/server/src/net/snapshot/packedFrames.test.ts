@@ -75,7 +75,7 @@ function makeServer() {
     scene: 'sectors', autoStart: false,
     ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
     clock: () => clock.t,
-    netCaps: ALL,
+    netCaps: ALL | CAPS.BLOCKS,
   });
   const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
   return { server, clock, env };
@@ -99,6 +99,8 @@ interface Fight {
   /** At these ticks the packed observer's caps change to these (switching packed frames off and on) */
   switches?: [number, number][];
   seed?: number;
+  /** Extra caps for the shooter and the packed observer (CAPS.BLOCKS: encode-once blocks) */
+  more?: number;
 }
 
 function fight(sc: Fight) {
@@ -113,8 +115,8 @@ function fight(sc: Fight) {
   const tee = teeEncoder();
   const { server, clock, env } = makeServer();
   const ships = server.getShips();
-  const S = new FakeHitsClient(server, { name: 'shooter', caps: ALL, env });
-  const P = new FakeHitsClient(server, { name: 'packed_obs', caps: PACKED, env });
+  const S = new FakeHitsClient(server, { name: 'shooter', caps: ALL | (sc.more ?? 0), env });
+  const P = new FakeHitsClient(server, { name: 'packed_obs', caps: PACKED | (sc.more ?? 0), env });
   const B = new FakeHitsClient(server, { name: 'legacy_obs', caps: 0, env });
   const fakes = [S, P, B];
   const step = () => {
@@ -214,6 +216,34 @@ describe('packed frames: a packed and a base-format observer see the same fight'
     expectSameView(r.P, r.B);
     expect(hpOff(r.server, r.P, 'P').slice(0, 5)).toEqual([]);
     expect(r.server.pilots.connOf(r.P.pid)!.packed).toBeDefined();
+  }, 120_000);
+});
+
+describe('packed frames in encode-once blocks (CAPS.BLOCKS)', () => {
+  it('the same fight: every snapshot as blocks decodes to what the base format carries; the same view, the same HP', () => {
+    const r = fight({ more: CAPS.BLOCKS });
+    expect(r.tee.bad).toEqual([]);
+    expectSameView(r.P, r.B);
+    expectSameView(r.S, r.B);
+    for (const [f, tag] of [[r.S, 'S'], [r.P, 'P'], [r.B, 'B']] as const) expect(hpOff(r.server, f, tag).slice(0, 5)).toEqual([]);
+    expect(r.server.hits.stats.fixes).toBe(0);
+    expect(r.S.hits!.stats.mismatches).toBe(0);
+    // (Every snapshot went as blocks; each row was encoded once however many clients took it)
+    const enc = (f: FakeHitsClient) => r.server.pilots.connOf(f.pid)!.packed!.enc.stats;
+    expect(enc(r.P).blocks).toBeGreaterThan(100);
+    expect(enc(r.S).blocks).toBeGreaterThan(100);
+    const st = r.server.net.blocks.stats;
+    expect(st.k + st.c + st.f + st.e).toBeGreaterThan(100);
+    // (No more bytes than the per-connection packing, within a little)
+    const [, p, b] = r.counts;
+    expect(p.bytes).toBeLessThan(b.bytes * 0.8);
+  }, 120_000);
+
+  it('switching blocks (and packed frames) off and on mid-fight keeps everything in order', () => {
+    const r = fight({ ticks: 600, more: CAPS.BLOCKS, switches: [[150, PACKED], [250, PACKED | CAPS.BLOCKS], [330, 0], [420, PACKED | CAPS.BLOCKS]] });
+    expect(r.tee.bad).toEqual([]);
+    expectSameView(r.P, r.B);
+    expect(hpOff(r.server, r.P, 'P').slice(0, 5)).toEqual([]);
   }, 120_000);
 });
 

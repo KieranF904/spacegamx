@@ -18,6 +18,7 @@ export * from './network/hits.js';
 export * from './network/ownTick.js';
 export * from './network/packed/tables.js';
 export * from './network/packed/packedCodec.js';
+export { BlockStore, derivedRow, ROW_BASE, type BlockRec } from './network/packed/blocks.js';
 export * from './network/cursorState.js';
 export * from './network/Transport.js';
 

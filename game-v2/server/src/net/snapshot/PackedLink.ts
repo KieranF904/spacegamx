@@ -15,7 +15,7 @@
  *
  * The bytes go out through the client's own socket; Outbox counts them.
  */
-import { CAPS, PackedEncoder, encodeServerMessage, serverFrame, type PackedPart, type ServerMessage } from '@space-game/common';
+import { CAPS, PackedEncoder, encodeServerMessage, serverFrame, type BlockStore, type PackedPart, type ServerMessage } from '@space-game/common';
 import type { ClientConnection } from '../ClientConnection.js';
 import { LAZY_TICKS } from './constants.js';
 
@@ -45,8 +45,13 @@ export function quietHits(caps: number | undefined): boolean {
   return ((caps ?? 0) & (CAPS.HITS | CAPS.SELF_HITS)) === (CAPS.HITS | CAPS.SELF_HITS);
 }
 
+/** Does this client take its snapshots in encode-once blocks (CAPS.BLOCKS, with PACKED: common network/packed/blocks.ts)? */
+export function blocksFor(caps: number | undefined): boolean {
+  return ((caps ?? 0) & (CAPS.PACKED | CAPS.BLOCKS)) === (CAPS.PACKED | CAPS.BLOCKS);
+}
+
 export class PackedLink {
-  readonly enc = new PackedEncoder();
+  readonly enc: PackedEncoder;
   /** This flush's messages, the effects waiting for a frame, and the sub-frames waiting to go (coalescing) */
   private box: PackedPart[] = [];
   private lazy: PackedPart[] = [];
@@ -61,7 +66,15 @@ export class PackedLink {
   /** What first made the waiting frames urgent */
   private why = '';
 
-  constructor(private readonly conn: ClientConnection) {}
+  /** `blocks`: the server's encode-once blocks, shared by every link (its snapshots go as blocks while it takes them) */
+  constructor(private readonly conn: ClientConnection, blocks: BlockStore | null = null) {
+    this.enc = new PackedEncoder(blocks);
+  }
+
+  /** A snapshot's blocks are made as it's queued (in snapshot order, whenever its frame goes) */
+  private prepare(part: PackedPart): void {
+    if (part.msg.type === 'snapshot' && blocksFor(this.conn.caps)) this.enc.prepare(part.msg, this.conn.playerId);
+  }
 
   /** Anything waiting (this flush's messages, effects, sub-frames held back) */
   get waiting(): boolean {
@@ -70,6 +83,7 @@ export class PackedLink {
 
   /** A message for the next flush (`lazy`: an effect that can wait LAZY_TICKS for a frame) */
   add(part: PackedPart, lazy: boolean, tick: number): void {
+    this.prepare(part);
     if (lazy) {
       if (!this.lazy.length) this.lazySince = tick;
       this.lazy.push(part);
@@ -103,6 +117,7 @@ export class PackedLink {
 
   /** A message that goes now (a pong, or one sent outside a tick or request), after whatever waits */
   now(part: PackedPart, tick: number): number {
+    this.prepare(part);
     this.hold([part], tick);
     return this.emit();
   }

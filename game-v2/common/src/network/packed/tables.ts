@@ -22,6 +22,8 @@ export const PACKED_FRAME = 0x04;
 export const PK = {
   END: 0, LAST: 1, LEGACY: 2, SNAPSHOT: 3, HITS: 4, DAMAGE: 5, PROJECTILE_HIT: 6, SHIP_HPS: 7, HP_CHECK: 8,
   DETONATION: 9, IGNITE: 10, PART_DESTROYED: 11, CONTACT: 12, SHIP_SYNC: 13, PLAYER_STATE: 14,
+  /** A snapshot in encode-once blocks (CAPS.BLOCKS: blocks.ts, blocksSnapshot.ts) */
+  BLOCKS: 15,
 } as const;
 export const PK_BITS = 4;
 
@@ -111,6 +113,6 @@ export function packedTables(): Record<string, unknown> {
   return {
     frame: PACKED_FRAME, pk: PK, bits: PK_BITS, keys: PK_KEYS, fields: PACKED_FIELDS, entity: PK_ENTITY, entityDefault: PK_ENTITY_DEFAULT,
     dataChunk: PK_DATA_CHUNK, projectile: PK_PROJECTILE, keyframe: PK_KEYFRAME, keyframeTail: PK_KEYFRAME_TAIL, guess: PK_GUESS_TICKS, control: PK_CONTROL,
-    tableMax: PK_TABLE_MAX, pendingMax: PK_PENDING_MAX, version: 1,
+    tableMax: PK_TABLE_MAX, pendingMax: PK_PENDING_MAX, version: 2,
   };
 }

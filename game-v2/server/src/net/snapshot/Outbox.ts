@@ -12,7 +12,7 @@
  * urgent wait a few ticks to share one (PackedLink.ts).
  */
 import { hasComponent, type IWorld } from 'bitecs';
-import { CAPS, InSystem, Player, Position, encodeServerMessage, serverFrame, type ClientSocket, type ServerMessage, dhypot } from '@space-game/common';
+import { BlockStore, CAPS, InSystem, Player, Position, encodeServerMessage, serverFrame, type ClientSocket, type ServerMessage, dhypot } from '@space-game/common';
 import type { ClientConnection } from '../ClientConnection.js';
 import { LAZY_TYPES, LAZY_TICKS, FX_RANGE, COALESCE_TICKS } from './constants.js';
 import { PackedLink, quietHits } from './PackedLink.js';
@@ -28,6 +28,11 @@ export class Outbox {
   private readonly world: IWorld;
   private readonly clients: ReadonlyMap<ClientSocket, ClientConnection>;
   private readonly host: OutboxHost;
+  /**
+   * Encode-once blocks (CAPS.BLOCKS): every packed link's snapshot rows about other entities, each bit-packed once a
+   * snapshot (common network/packed/blocks.ts). SnapshotBuilder tells it what was removed (its wire ids go back)
+   */
+  readonly blocks = new BlockStore((eid) => InSystem.systemId[eid]);
   /** Bytes sent since the admin dashboard last asked, all told and by message type (it resets them) */
   snapshotBytesSent = 0;
   bytesByType: Record<string, number> = {};
@@ -87,7 +92,7 @@ export class Outbox {
   private packedOf(conn: ClientConnection): PackedLink | null {
     if ((conn.caps ?? 0) & CAPS.PACKED) {
       if (!conn.packed) {
-        conn.packed = new PackedLink(conn);
+        conn.packed = new PackedLink(conn, this.blocks);
         // (Effects waiting in the base format go first)
         const l = this.lazy.get(conn.ws);
         if (l) { this.lazy.delete(conn.ws); if (conn.ws.isOpen()) conn.ws.send(serverFrame(l.parts)); }

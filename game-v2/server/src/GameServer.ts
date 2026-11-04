@@ -1015,6 +1015,7 @@ this.devTeleport = opts.devTeleport ?? false;
       hits: this.hits,
       ownChecks: this.ownChecks,
       bodies: this.bodies,
+      blocks: this.net.blocks,
     }, this);
 
     // Hook up admin server events

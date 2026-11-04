@@ -6,6 +6,7 @@
 import { BinaryReader, DICTIONARY } from '../binaryCodec.js';
 import { PK_KEY_COUNT, PK_PROJECTILE, PK_KEYFRAME, PK_TABLE_MAX, PK_PENDING_MAX, type PackedField } from './tables.js';
 import type { ServerMessage } from '../protocol.js';
+import { BlockPeer } from './blockPeer.js';
 
 // (Both are globals in browsers and Node; common is built without the DOM types)
 declare const TextEncoder: { new (): { encode(s: string): Uint8Array } };
@@ -94,9 +95,12 @@ export class PackedIO {
   private firers = new Map<number, number[]>();
   private hps = new Map<number, number>();
   private scratch = [0];
+  /** Encode-once blocks (CAPS.BLOCKS): the wire ids and chains this connection's ends keep (blockPeer.ts) */
+  readonly blk = new BlockPeer();
 
   resetState(you: number): void {
     this.you = you;
+    this.blk.reset();
     this.things = new Slots();
     this.shells = new Slots();
     this.pending = [];
@@ -274,6 +278,40 @@ export class PackedIO {
   /** Bits written so far (tools that count what each part costs) */
   get bitLength(): number {
     return this.len * 8 + this.nacc;
+  }
+
+  /** What was written, as bits (a block: blocks.ts copies it into frames as it is) */
+  takeBits(): { b: Uint8Array; n: number } {
+    const n = this.bitLength;
+    return { b: this.take(), n };
+  }
+
+  /** Another writer's bits, as they are (an encode-once block) */
+  copyBits(b: Uint8Array, n: number): void {
+    const whole = n >>> 3, rest = n & 7;
+    this.room(whole + 2);
+    if (this.nacc === 0) {
+      this.out.set(b.subarray(0, whole), this.len);
+      this.len += whole;
+    } else for (let i = 0; i < whole; i++) this.put(b[i], 8);
+    if (rest) this.put(b[whole] >>> (8 - rest), rest);
+  }
+
+  /**
+   * A per-system wire id (encode-once blocks): a 2-bit prefix, then 0-63 in 6 bits, 64-575 in 9, 576-4671 in 12,
+   * else 16 (up to 70207)
+   */
+  wid(w: number): number {
+    if (this.reading) {
+      const p = this.get(2);
+      return p === 0 ? this.get(6) : p === 1 ? 64 + this.get(9) : p === 2 ? 576 + this.get(12) : 4672 + this.get(16);
+    }
+    if (w < 64) { this.put(0, 2); this.put(w, 6); }
+    else if (w < 576) { this.put(1, 2); this.put(w - 64, 9); }
+    else if (w < 4672) { this.put(2, 2); this.put(w - 576, 12); }
+    else if (w < 4672 + 65536) { this.put(3, 2); this.put(w - 4672, 16); }
+    else throw new Error('packed: wire id out of range');
+    return w;
   }
 
   take(): Uint8Array {

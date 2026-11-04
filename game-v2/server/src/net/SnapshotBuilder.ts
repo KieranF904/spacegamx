@@ -18,7 +18,7 @@ import { hasComponent, entityExists, defineQuery, type IWorld } from 'bitecs';
 import {
   Position, Velocity, Rotation, Radius, InSystem, Player, Dead, Health, Boost, Input, Projectile, Lifetime, DroppedItem, Station, Portal,
   ASTEROID_SEED, MAP_DOT_SLACK, STATION_DESIGNS, STATION_WEAPONS, EntityType, packCursorWeaponState, quantizeShipValue, packCharge, gunStateAt, packGunState, PILOT_ROW,
-  warmthPercent, fartherThan, hpWire,
+  warmthPercent, fartherThan, hpWire, derivedRow, type BlockStore,
   mapDotFlags, legAt, packMapLeg, packMapRoute, unpackMapLegs, nearerThan, packIds, packRuns, packRanges, DEBRIS_STATUS, TICK_RATE,
   type Leg, type EntityState, type ShipState, type ClientSocket, type ServerMessage, type ServerAsteroidSeedMessage, type StarSystemData, type AsteroidSpawnData, dhypot,
 } from '@space-game/common';
@@ -63,7 +63,9 @@ interface SnapRow {
   /** What decides "changed since the last snapshot" */
   key: string;
   /** Players: the row other pilots get (status only: their motion is replicated) */
-  other?: { state: EntityState; key: string };
+  other?: { state: EntityState; key: string; strip?: EntityState };
+  /** Its status without where it is (a ship a client already has: one object for all of them, so it's encoded once) */
+  strip?: EntityState;
 }
 
 /** A blueprint's hash (designs are sent once per client; see ServerShipSyncMessage.design) */
@@ -138,6 +140,8 @@ export interface SnapshotHost {
   readonly ownChecks?: OwnChecks | null;
   /** Bosses' decisions for clients that run their bodies (CAPS.BODIES: net/decisions/BodyNet.ts) */
   readonly bodies?: BodyNet | null;
+  /** Encode-once blocks (CAPS.BLOCKS, Outbox.blocks): told what was removed, so wire ids go back */
+  readonly blocks?: BlockStore | null;
 }
 
 export class SnapshotBuilder {
@@ -173,6 +177,9 @@ export class SnapshotBuilder {
   private readonly hits: HitLedger | null;
   private readonly ownChecks: OwnChecks | null;
   private readonly bodies: BodyNet | null;
+  private readonly blocks: BlockStore | null;
+  /** Each fire event's row this snapshot (one array for every client, so it's encoded once: CAPS.BLOCKS) */
+  private fireRows = new WeakMap<object, number[]>();
   /** The server itself, for its tick (read, never held) */
   private readonly ticks: { readonly currentTick: number };
 
@@ -207,6 +214,7 @@ export class SnapshotBuilder {
     this.hits = host.hits ?? null;
     this.ownChecks = host.ownChecks ?? null;
     this.bodies = host.bodies ?? null;
+    this.blocks = host.blocks ?? null;
     this.ticks = ticks;
   }
 
@@ -524,6 +532,7 @@ export class SnapshotBuilder {
     // Skip entirely when no clients are connected — avoids building
     // per-entity state objects and JSON keys for nothing.
     if (this.clients.size === 0) {
+      this.blocks?.removed(this.pendingRemovedEntities.keys());
       this.pendingRemovedEntities.clear();
       this.ships.fired.length = 0;
       this.ships.debrisNet.afterSnapshot((id) => this.ships.has(id));
@@ -587,7 +596,9 @@ export class SnapshotBuilder {
         else if (!conn.shipView.has(f.owner) || keyed.has(f.owner) || !conn.repKnown.has(f.owner)) continue;
         if (InSystem.systemId[f.owner] !== playerSystemId) continue;
         // (the ammunition rides on the part: part + 256 × its code, + 65536 for an augmented shot, power/ports.ts)
-        fire.push([f.owner, this.currentTick - f.tick, f.part + 256 * (f.ammo ?? 0) + (f.aug ? 65536 : 0), f.aimQ, ...f.ids]);
+        let row = this.fireRows.get(f);
+        if (!row) { row = [f.owner, this.currentTick - f.tick, f.part + 256 * (f.ammo ?? 0) + (f.aug ? 65536 : 0), f.aimQ, ...f.ids]; this.fireRows.set(f, row); }
+        fire.push(row);
         for (const id of f.ids) covered.add(id);
       }
       for (const r of rows) {
@@ -615,7 +626,7 @@ export class SnapshotBuilder {
           if (prevStates.get(r.id) === v.key) continue;
           // Another ship it already has: its motion is replicated, so the status goes without where it is
           if ((r.kind === 'player' || r.kind === 'ship') && prevStates.has(r.id)) {
-            v = { ...v, state: { ...v.state, x: undefined!, y: undefined!, angle: undefined } };
+            v = { ...v, state: v.strip ??= { ...v.state, x: undefined!, y: undefined!, angle: undefined } };
           }
         }
         // (A shell as a row isn't exact on its client (rounded): one finding its own hits leaves it to the server's records)
@@ -623,7 +634,7 @@ export class SnapshotBuilder {
         // Names go once (the client keeps them)
         if (r.name !== undefined && conn.sentNames.get(r.id) !== r.name) {
           conn.sentNames.set(r.id, r.name);
-          entities.push({ ...v.state, name: r.name });
+          entities.push(derivedRow(v.state, { name: r.name }));
         } else {
           entities.push(v.state);
         }
@@ -717,6 +728,8 @@ export class SnapshotBuilder {
     for (const [eid] of this.pendingRemovedEntities) {
       for (const conn of this.clients.values()) conn.knownEntities.delete(eid);
     }
+    // (Encode-once blocks: the removed give their wire ids back; ones no block has named for a while too)
+    if (this.blocks) { this.blocks.removed(this.pendingRemovedEntities.keys()); this.blocks.sweep(this.currentTick); }
     this.pendingRemovedEntities.clear();
     this.ships.debrisNet.afterSnapshot((id) => this.ships.has(id));
     this.replication.endSnapshot();

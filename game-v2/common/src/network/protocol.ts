@@ -33,9 +33,9 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
  * has updated PROTOCOL_VERSION and PROTOCOL_WIRE_HASH.
  */
 // History: PROTOCOL_CHANGELOG.md. Re-pin with `npm run wire:bump "reason"` (game-v2/), never by hand.
-export const PROTOCOL_VERSION = 36;
+export const PROTOCOL_VERSION = 37;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
-export const PROTOCOL_WIRE_HASH = '7ee9d4ca';
+export const PROTOCOL_WIRE_HASH = '987b4c7d';
 /** WebSocket close code (and reason) for a client on another protocol version */
 export const PROTOCOL_MISMATCH_CLOSE = 4002;
 export const PROTOCOL_MISMATCH_REASON = 'version';
@@ -1710,7 +1710,7 @@ function unpackServer(x: unknown): ServerMessage {
  *   [id, type, x, y, angle, vx, vy, hp, maxHp, data, name, av]
  * with absent fields as null and trailing nulls dropped.
  */
-const SNAP_FIELDS = ['id', 'type', 'x', 'y', 'angle', 'vx', 'vy', 'hp', 'maxHp', 'data', 'name', 'av'] as const;
+export const SNAP_FIELDS = ['id', 'type', 'x', 'y', 'angle', 'vx', 'vy', 'hp', 'maxHp', 'data', 'name', 'av'] as const;
 
 /** What the encoding is defined by, for protocol.test.ts to hash (a change here needs a PROTOCOL_VERSION bump) */
 export function wireTables(): Record<string, unknown> {
@@ -1740,7 +1740,7 @@ interface PackedSnapshot { type: 'snapshot'; t: number; lp: number; e?: unknown[
  * it's off the straight line from the muzzle (missiles). The hue is the owner's,
  * worked out again on arrival.
  */
-function packProjectile(s: EntityState, tick: number): (number | null)[] | null {
+export function packProjectile(s: EntityState, tick: number): (number | null)[] | null {
   const d = s.data;
   if (!d || (d.length !== 10 && d.length !== 11) || s.angle !== undefined || s.hp !== undefined || s.name !== undefined) return null;
   const row: (number | null)[] = [s.id, s.vx ?? 0, s.vy ?? 0, d[0], tick - d[3], d[4], d[5], d[6], (d[10] ?? -1) >= 0 ? d[10] : null,

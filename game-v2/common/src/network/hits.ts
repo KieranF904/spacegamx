@@ -30,8 +30,11 @@
  *              docs/design/decision-inputs.md): their brains' decisions come in a snapshot's `decisions` rows, and it
  *              is sent no control rows of them and keyframes only where their bodies don't say what moved them; it
  *              checks them with a hash on its inputs (BodyCheck)
+ *   BLOCKS     (with PACKED) snapshots in encode-once blocks (network/packed/blocks.ts, protocol 37): other entities'
+ *              status rows, keyframes, control rows and fire events are bit-packed once per snapshot for every client,
+ *              named by per-system wire ids and coded from per-entity chains; the client decodes the same messages
  */
-export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16, ROUGH: 32, OWN_SIM: 64, INPUTS: 128, BODIES: 256 } as const;
+export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16, ROUGH: 32, OWN_SIM: 64, INPUTS: 128, BODIES: 256, BLOCKS: 512 } as const;
 
 /**
  * Adaptive validation (CAPS.ROUGH; docs/design/confirmed-hits.md part E): how closely the server checks a finding
