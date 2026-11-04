@@ -54,6 +54,9 @@ export class BodyNet {
     let b = this.bosses.get(eid);
     if (!b) this.bosses.set(eid, (b = { state, log: [] }));
     b.state = state;
+    // (Its body off and its ship gone (despawned, blown apart: its brain let go): nothing more to send of it. Its id may
+    // be another ship's later (entity ids are reused), so it's forgotten now, not when some client's snapshot notices)
+    if (op === DECISION.OFF && !this.host.body(eid)) { this.bosses.delete(eid); return; }
     b.log.push([this.host.tick(), op, ...args]);
     this.stats.decisions++;
     const old = this.host.tick() - KEEP_TICKS;
@@ -143,6 +146,19 @@ export class BodyNet {
   /** Every boss it runs synced again with its next snapshot */
   resync(conn: object): void {
     this.clients.get(conn)?.runs.clear();
+  }
+
+  /**
+   * It no longer runs bodies (its caps switched off CAPS.BODIES, or OWN_SIM: the client stopped every body, BodyRunner.
+   * setOn): it runs none here either, so its rows and keyframes come the old way, its hits aren't 'body' ones, and when
+   * the cap comes back each boss starts with a SYNC again
+   */
+  drop(conn: object): void {
+    const c = this.clients.get(conn);
+    if (!c?.runs.size) return;
+    c.runs.clear();
+    c.expect.clear();
+    c.ticks.length = 0;
   }
 }
 

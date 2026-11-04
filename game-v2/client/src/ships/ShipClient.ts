@@ -279,7 +279,7 @@ export class ShipClient {
       side: (id) => this.sideOf(id),
       passes: (shell) => this.hits.passesOf(shell),
     });
-    this.own = new OwnTick({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, tuning: opts.tuning });
+    this.own = new OwnTick({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, tuning: opts.tuning, restep: () => this.bodies.on });
     this.bodies = new BodyRunner({ reps: this.replicas });
   }
 
@@ -354,10 +354,11 @@ export class ShipClient {
     this.selfHits.spent(r.gone);
   }
 
-  /** A connection afresh: confirmed and client-detected hits start over, as the server's do */
+  /** A connection afresh: confirmed and client-detected hits start over, as the server's do, and so do bosses' bodies (BodyRunner.reset) */
   resetHits(): void {
     this.hits.reset();
     this.selfHits.reset();
+    this.bodies.reset();
   }
 
   /**

@@ -29,6 +29,11 @@ export interface OwnTickHost {
   /** Its own ship's id */
   self(): number;
   tuning: ShipTuning;
+  /**
+   * Is anything stepping on its layer able to read its ship before a snapshot's structure and causes are in (a boss's
+   * body reading its target, CAPS.BODIES)? Then each snapshot steps it again from just after the last. Unset: always
+   */
+  restep?(): boolean;
 }
 
 /** Ticks of inputs kept (a snapshot window is never this far behind the inputs it needs) */
@@ -99,7 +104,7 @@ export class OwnTick implements OwnTimeline {
     if (!this.on) { this.before = null; this.othersBefore.clear(); return; }
     // (What it stepped past the last snapshot is stepped again: something may have asked for its ship there before this
     // frame's structure and causes were in, a boss's body reading its target, CAPS.BODIES)
-    let earliest = prev + 1;
+    let earliest = (this.host.restep?.() ?? true) ? prev + 1 : Infinity;
     if (m.ships?.some((k) => k[0] === self)) {
       // (A keyframe of its own ship after the first: the server had to put it right)
       if (this.keyed) { this.stats.fixes++; this.level = CONFIRM.STRICT; this.levelSince = m.tick; }

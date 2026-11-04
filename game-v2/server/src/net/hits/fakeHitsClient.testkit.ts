@@ -103,7 +103,7 @@ export class FakeHitsClient {
         passes: (shell) => this.hits!.passesOf(shell),
       });
     }
-    if (ownSimFor(opts.caps)) this.own = new OwnTick({ store: this.store, reps: this.reps, self: () => this.pid, tuning: ships.tuning });
+    if (ownSimFor(opts.caps)) this.own = new OwnTick({ store: this.store, reps: this.reps, self: () => this.pid, tuning: ships.tuning, restep: () => !!this.bodies?.on });
     if (bodiesFor(opts.caps)) this.bodies = new BodyRunner({ reps: this.reps });
     const socket: ClientSocket = {
       isOpen: () => true,

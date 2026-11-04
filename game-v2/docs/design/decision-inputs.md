@@ -525,7 +525,31 @@ the probe's pilot keeps touching her edge) and her sheds' recentring are what ke
 target's replica off on the client (`targetKeyed`: the observer is pulled by her magnets). The pirates fight has no
 body yet (stage 7), so it's the same either way.
 
-### 11.5 Left, in order
+### 11.5 Review (2026-11-04): lifecycle fixes
+
+A review of stages 1 and 2 for determinism, late decisions, joins, reconnects, the cap switching and legacy clients
+found no maths or ordering leak (the body is detTrig only, both sides fold decisions in tick order, the hash sum is
+order-free), but four lifecycle holes, now closed:
+
+- **The cap switched off mid-session** (`capsNext`, the admin's switch): the client stopped every body, but BodyNet
+  still counted it as running them, so when the cap came back no SYNC went and the boss was flown by stale controls, its
+  checks never sent; its hits were also told as `body` while off. SnapshotBuilder now calls `BodyNet.drop` for a client
+  without the cap: it runs none, rows come the old way, and the cap back on starts with a SYNC.
+- **A boss let go** (despawned, defeated): its brain went without an OFF, so its body stayed on in BodyNet. Entity ids
+  are reused, so a later ship on that id could be SYNCed and flown as her. `StagedBrain.dispose` now decides OFF, and
+  an OFF whose ship is gone forgets the boss there and then (not only when a capable client's snapshot noticed).
+- **A reconnect**: the client kept its runs from the old connection; a boss whose body was off on the server (nothing
+  to SYNC it) went on being flown here, its rows ignored. `ShipClient.resetHits` (a new connection) now resets the
+  BodyRunner too.
+- **The own layer's re-step** (11.2) now runs only while bodies are on (OwnTickHost.restep): with the cap off, OwnTick
+  is as it was before stage 1.
+
+Hot path: BodyRunner no longer copies a body state every tick (a tick with no decisions shares the one before; states
+are never changed once kept), no longer goes through every kept state each tick to trim them, and its rewind doesn't
+copy the key list. Tests: bodies.test.ts adds the cap off and back on mid-fight (her rows while off, a SYNC and an exact
+replica after) and her removal mid-fight; BodyNet.test.ts the forgotten boss (its id reused, never synced) and `drop`.
+
+### 11.6 Left, in order
 
 1. **Contacts and sheds**, most of her keyframes left: the client that touched her already works out its own half of a
    contact; the boss's half for that client, and a shed's recentring as the own ship's `REBUILD` cause does it. Then

@@ -27,8 +27,8 @@ const files = readGameDataFiles(dataDir);
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
 const ALL = CAPS.HITS | CAPS.SELF_HITS | CAPS.PACKED | CAPS.COALESCE | CAPS.OWN_SHOTS | CAPS.ROUGH | CAPS.OWN_SIM | CAPS.INPUTS | CAPS.BODIES;
 
-interface Got { snapshots: number; checked: number; off: number; keyframes: number; ctlRows: number; decisions: number; syncs: number; running: number }
-const zero = (): Got => ({ snapshots: 0, checked: 0, off: 0, keyframes: 0, ctlRows: 0, decisions: 0, syncs: 0, running: 0 });
+interface Got { snapshots: number; checked: number; off: number; keyframes: number; ctlRows: number; decisions: number; syncs: number; running: number; ctlWhileOff: number }
+const zero = (): Got => ({ snapshots: 0, checked: 0, off: 0, keyframes: 0, ctlRows: 0, decisions: 0, syncs: 0, running: 0, ctlWhileOff: 0 });
 
 interface Opts {
   ticks?: number;
@@ -38,6 +38,11 @@ interface Opts {
   dropAt?: number;
   /** A second capable client joins at this tick (arriving mid-fight) */
   lateAt?: number;
+  /** The capable client's caps switched off CAPS.BODIES at this tick, and back on at `capsOnAt` (the admin's switch) */
+  capsOffAt?: number;
+  capsOnAt?: number;
+  /** She's taken away at this tick (Bosses.remove: her arena emptied) */
+  removeAt?: number;
 }
 
 function fight(o: Opts = {}) {
@@ -69,7 +74,7 @@ function fight(o: Opts = {}) {
       orig(s);
       g.snapshots++;
       if (s.ships?.some((k) => k[0] === boss)) g.keyframes++;
-      if (s.ctl?.some((r) => controlRowId(r) === boss)) g.ctlRows++;
+      if (s.ctl?.some((r) => controlRowId(r) === boss)) { g.ctlRows++; if (capsOff) g.ctlWhileOff++; }
       for (const d of s.decisions ?? []) if (d[0] === boss) { g.decisions++; if (d[2] === DECISION.SYNC) g.syncs++; }
       if (!f.bodies || ![...f.bodies.ids()].includes(boss)) return;
       g.running++;
@@ -80,7 +85,7 @@ function fight(o: Opts = {}) {
       if (st.x !== r[0] || st.y !== r[1] || st.vx !== r[2] || st.vy !== r[3] || st.angle !== r[4] || st.angVel !== r[5]) g.off++;
     };
   };
-  let dropped = false;
+  let dropped = false, capsOff = false;
   watch(A, got.A, () => { if (o.dropAt === undefined || dropped || server.getTick() < o.dropAt) return false; dropped = true; return true; });
   watch(B, got.B);
   let seq = 1;
@@ -133,6 +138,9 @@ function fight(o: Opts = {}) {
       const st = brain.stage;
       for (let n = 1; n < 400 && brain.stage === st; n++) brain.forceShed(n);
     }
+    if (o.capsOffAt === t) { server.pilots.connOf(A.pid)!.capsNext = ALL & ~CAPS.BODIES; capsOff = true; }
+    if (o.capsOnAt === t) { server.pilots.connOf(A.pid)!.capsNext = ALL; capsOff = false; }
+    if (o.removeAt === t) server.bosses.remove(boss);
     if (o.lateAt === t) {
       C = new FakeHitsClient(server, { name: 'bodies_c', caps: ALL, env });
       god(C);
@@ -141,7 +149,8 @@ function fight(o: Opts = {}) {
     }
     step(t);
   }
-  return { server, boss, brain, got, A, stats: server.bodies.stats, rep: server.replication.bodyStats };
+  const tracked = (server.bodies as unknown as { bosses: Map<number, unknown> }).bosses.has(boss);
+  return { server, boss, brain, got, A, tracked, stats: server.bodies.stats, rep: server.replication.bodyStats };
 }
 
 describe('decision inputs: the Scrap Mother flown by her body on both sides (CAPS.BODIES)', () => {
@@ -180,5 +189,29 @@ describe('decision inputs: the Scrap Mother flown by her body on both sides (CAP
     expect(r.got.C.checked).toBeGreaterThan(100);
     expect(r.got.C.off).toBe(0);
     expect(r.got.C.ctlRows).toBe(0);
+  }, 240_000);
+
+  it('the cap switched off mid-fight: her rows the old way, no checks judged; back on: a SYNC, her replica exact again', () => {
+    const r = fight({ ticks: 900, capsOffAt: 300, capsOnAt: 550 });
+    const conn = r.server.pilots.connOf(r.A.pid)!;
+    // (off: the client runs her no longer, nor does the server think it does: her rows came again)
+    expect(r.got.A.ctlWhileOff).toBeGreaterThan(0);
+    // (on again: synced afresh, her replica the server's ship from there, the checks agreeing)
+    expect(r.got.A.syncs).toBeGreaterThan(1);
+    expect(r.A.bodies!.on).toBe(true);
+    expect([...r.A.bodies!.ids()]).toContain(r.boss);
+    expect(r.server.bodies.runs(conn, r.boss)).toBe(true);
+    expect(r.got.A.off).toBe(0);
+    expect(r.stats.off).toBe(0);
+    // (a reconnect: the client lets every body go, until the new connection SYNCs it, ShipClient.resetHits)
+    r.A.bodies!.reset();
+    expect([...r.A.bodies!.ids()]).toEqual([]);
+  }, 240_000);
+
+  it('taken away mid-fight: her decisions forgotten at once (her id may be another ship\'s later), the client stops her', () => {
+    const r = fight({ ticks: 500, removeAt: 400 });
+    expect(r.tracked).toBe(false);
+    expect([...r.A.bodies!.ids()]).not.toContain(r.boss);
+    expect(r.server.bodies.runs(r.server.pilots.connOf(r.A.pid)!, r.boss)).toBe(false);
   }, 240_000);
 });

@@ -51,6 +51,17 @@ export class BodyRunner {
     if (!on) for (const id of [...this.runs.keys()]) this.stop(id);
   }
 
+  /**
+   * A connection afresh (a reconnect: the server's BodyNet starts with none run): every boss back to its rows, until
+   * the new connection SYNCs it. Left running, a boss whose body is off on the server (nothing to SYNC it) would go on
+   * being flown here from what the old connection said, its rows ignored and its checks never judged
+   */
+  reset(): void {
+    for (const id of [...this.runs.keys()]) this.stop(id);
+    this.snapTick = -Infinity;
+    this.lastCheck = { tick: -Infinity, snap: -Infinity };
+  }
+
   /** Bosses it runs now */
   ids(): IterableIterator<number> {
     return this.runs.keys();
@@ -98,7 +109,8 @@ export class BodyRunner {
   }
 
   private rewind(id: number, run: Run, t: number): void {
-    for (const k of [...run.states.keys()]) if (k >= t && k !== run.syncTick) run.states.delete(k);
+    // (deleting while going through a Map is safe: no copy of its keys each snapshot)
+    for (const k of run.states.keys()) if (k >= t && k !== run.syncTick) run.states.delete(k);
     this.host.reps.rewind(id, t);
   }
 
@@ -113,11 +125,16 @@ export class BodyRunner {
     if (!base) return null;
     let s = base;
     for (let k = from + 1; k <= t; k++) {
-      s = cloneBodyState(s);
-      for (const d of run.log.get(k) ?? []) applyDecision(s, d[0], d.slice(1), k);
+      // (A state is never changed once kept: a tick with no decisions shares the one before it, no copy a tick)
+      const ds = run.log.get(k);
+      if (ds) {
+        s = cloneBodyState(s);
+        for (const d of ds) applyDecision(s, d[0], d.slice(1), k);
+      }
       run.states.set(k, s);
     }
-    for (const k of run.states.keys()) if (k < t - KEEP_TICKS && k !== run.syncTick) run.states.delete(k);
+    // (Trimmed now and then, not gone through every tick)
+    if (run.states.size > KEEP_TICKS + 60) for (const k of run.states.keys()) if (k < t - KEEP_TICKS && k !== run.syncTick) run.states.delete(k);
     return s;
   }
 

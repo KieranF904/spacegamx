@@ -118,6 +118,8 @@ export abstract class StagedBrain implements BossBrain {
   }
 
   dispose(): void {
+    // (Let go of (despawned, defeated): its body stops on every client running it, and its decisions are forgotten)
+    if (this.view) this.bodyOff();
     if (this.view) this.host.mobs?.clear(this.view.systemNum, this.view.eid);
     this.drones.clear();
   }

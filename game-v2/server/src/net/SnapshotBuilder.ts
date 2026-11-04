@@ -567,6 +567,8 @@ export class SnapshotBuilder {
       const ownShots = ownShotsFor(conn.caps);
       // Bosses flown by their bodies on its tick layer (CAPS.BODIES): their decisions, and from here no rows or drive keyframes of them
       const bodies = this.bodies && bodiesFor(conn.caps) ? this.bodies : null;
+      // (its caps switched it off: none run there any more, BodyNet.drop)
+      if (!bodies) this.bodies?.drop(conn);
       const decisions = bodies?.forClient(conn, conn.playerId, (e) => InSystem.systemId[e] ?? -1, playerSystemId ?? -1, conn.repKnown, this.currentTick,
         (e) => !conn.shipView || conn.shipView.has(e), (e) => this.replication.keysFor(e, conn.playerId, conn.repKnown));
       const rep = this.replication.forClient(playerSystemId, conn.playerId, conn.repKnown, this.currentTick, conn.shipView, conn.debrisHeld, ownShots, (id) => conn.shipSynced.get(id)?.rebuilds, bodies ? (id) => bodies.runs(conn, id) : undefined);
