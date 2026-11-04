@@ -59,7 +59,8 @@ export async function runCase(o: CaseOpts): Promise<any> {
   Math.random = seed;
   clock.t = 1_000_000;
   const wallStart = performance.now();
-  const server = makeServer(o.crowd ? 262143 : 16383);
+  // (Every cap the probes may ask for; crowd fallbacks only with --crowd: STRUCTS, CARGO and DEBRIS were left out before)
+  const server = makeServer(o.crowd ? 262143 : 262143 & ~16384);
   const ships = server.getShips() as any, srv = server as any;
 
   // ---- the meter: wrapped before anything else, so the probes' own wrappers sit outside it ----

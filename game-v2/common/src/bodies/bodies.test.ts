@@ -138,3 +138,15 @@ describe('a body\'s state and flight', () => {
     expect(BODY_KINDS[kind].toldHits).toBe(false);
   });
 });
+
+describe('pilotsFor', () => {
+  it('runs the enemy AI\'s pilots only with BODIES, OWN_SIM and CAUSES (without causes: control rows, as before)', async () => {
+    const { pilotsFor } = await import('./decisions.js');
+    const { CAPS } = await import('../network/hits.js');
+    const all = CAPS.OWN_SHOTS | CAPS.OWN_SIM | CAPS.BODIES | CAPS.PILOTS | CAPS.CAUSES;
+    expect(pilotsFor(all)).toBe(true);
+    expect(pilotsFor(all & ~CAPS.CAUSES)).toBe(false);
+    expect(pilotsFor(all & ~CAPS.BODIES)).toBe(false);
+    expect(pilotsFor(all & ~CAPS.OWN_SIM)).toBe(false);
+  });
+});

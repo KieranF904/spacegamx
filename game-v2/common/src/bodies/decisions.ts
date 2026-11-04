@@ -115,7 +115,11 @@ export function bodiesFor(caps: number | undefined): boolean {
   return ((caps ?? 0) & CAPS.BODIES) !== 0 && ownSimCaps(caps);
 }
 
-/** Do these caps have the client run the enemy AI's pilots too (CAPS.PILOTS, with BODIES)? */
+/**
+ * Do these caps have the client run the enemy AI's pilots too (CAPS.PILOTS, with BODIES and CAUSES)? Without other
+ * ships' causes a pilot's body reads targets that contacts keyframe mid-window, and its client's AI ships came off
+ * its tick layer (the crowd bench, ball 50: 12 AI ticks off without a keyframe), so such a client gets control rows
+ */
 export function pilotsFor(caps: number | undefined): boolean {
-  return ((caps ?? 0) & CAPS.PILOTS) !== 0 && bodiesFor(caps);
+  return ((caps ?? 0) & (CAPS.PILOTS | CAPS.CAUSES)) === (CAPS.PILOTS | CAPS.CAUSES) && bodiesFor(caps);
 }

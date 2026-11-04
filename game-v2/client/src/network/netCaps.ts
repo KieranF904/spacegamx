@@ -50,7 +50,8 @@ export function netCaps(): number {
   // (homing shells flown on its tick layer by the waypoint law: planned here when it holds the target, else sent)
   const waypoints = ownSim && (flag('waypoints', 'sg.waypoints') ?? dev);
   // (the enemy AI's ships flown by their pilot's body on the tick layer, from the commander's orders)
-  const pilots = bodies && (flag('pilots', 'sg.pilots') ?? dev);
+  // (with other ships' causes: the server takes it only with them, common bodies/decisions.ts pilotsFor)
+  const pilots = bodies && causes && (flag('pilots', 'sg.pilots') ?? dev);
   // (crowd fallbacks: its system's level, a smaller focus, a wider window, a slower clock: common network/crowd.ts)
   const crowd = flag('crowd', 'sg.crowd') ?? dev;
   // (every structure a ship it holds flew, kept by its rebuild's tick: two rebuilds in a window worked out, not keyframed)
