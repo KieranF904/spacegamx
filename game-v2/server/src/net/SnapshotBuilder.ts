@@ -969,10 +969,11 @@ export class SnapshotBuilder {
     for (let i = 0; i + 1 < acks.length; i += 2) {
       const id = acks[i], held = conn.debrisHeld.get(id);
       if (!held) continue;
-      conn.debrisHeld.delete(id);
       const sp = this.ships.debrisNet.spawns.get(id), ship = this.ships.bodies.get(id);
-      // (Wrong: it goes in full, and it's keyframed for everyone, so what it knocked into meanwhile comes right too)
+      // (Gone meanwhile: it stays held till its removal goes, or the client keeps the piece it worked out for ever)
       if (!sp || !ship) { this.debrisAcks.gone++; continue; }
+      conn.debrisHeld.delete(id);
+      // (Wrong: it goes in full, and it's keyframed for everyone, so what it knocked into meanwhile comes right too)
       if (sp.hash !== acks[i + 1]) { this.debrisAcks.wrong++; this.ships.debrisNet.touched.add(id); continue; }
       this.debrisAcks.ok++;
       conn.shipSynced.set(id, { ship, rebuilds: sp.rebuilds });
