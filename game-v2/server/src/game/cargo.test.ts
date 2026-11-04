@@ -60,16 +60,20 @@ describe('cargo mass in the server', () => {
     expect(full.speed).toBeLessThan(empty.speed * 0.9);
   });
 
-  it('taking cargo on sends one keyframe carrying it; otherwise replicas stay on the real path', () => {
-    const { server, conn, input, run } = world();
+  it('taking cargo on goes as one CARGO cause (one keyframe for a client without CAPS.CARGO); replicas stay on the real path', () => {
+    const { server, pid, conn, input, run } = world();
     const rep = (server as any).replication;
     input({ forward: true, targetAngle: 0.4 });
     run(30);
-    const before = { ...rep.reasons };
+    const before = { ...rep.reasons }, v0 = rep.versionOf(pid), worked0 = rep.causeStats.worked;
     server.pilots.get(conn)!.cargo.push({ id: 'iron_ore', n: 20 });
     run(30);
     const after = Object.fromEntries(Object.entries(rep.reasons as Record<string, number>).map(([k, v]) => [k, v - (before[k] ?? 0)]).filter(([k, v]) => k.startsWith('Player:') && (v as number) > 0));
-    expect(after).toEqual({ 'Player:cargo': 1 });
+    // (The shadow worked the new mass out: never off its path, so no divergence; its version moved once, the keyframe a
+    // client without the cap gets)
+    expect(after).toEqual({});
+    expect(rep.causeStats.worked - worked0).toBe(1);
+    expect(rep.versionOf(pid) - v0).toBe(1);
   });
 });
 
