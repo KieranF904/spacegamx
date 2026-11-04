@@ -4,11 +4,14 @@
  * piece was spawned as (its check), and which pieces something other than the shared drift-and-knock step moved this
  * tick (they need a keyframe). The step itself is flight.ts stepDebrisWorld.
  */
-import { InSystem, stepDebrisWorld as stepWorld, type DebrisBody, type FlightBody, type ShipState, type Vec2 } from '@space-game/common';
+import { InSystem, Position, stepDebrisWorld as stepWorld, type DebrisBody, type FlightBody, type ShipState, type Vec2 } from '@space-game/common';
 import { K, type BridgeCtx } from './core.js';
 
 /** A split a client may work out itself: the ship, the tick, its centre of mass then (grid), the pieces and their parts */
 export interface DebrisSplit { ship: ShipState; tick: number; com: Vec2; ids: number[]; groups: number[][]; parts: number[] }
+
+/** How far past touching a piece near an off one counts as within its reach (touchNear): more than an off piece strays before its keyframe */
+const NEAR_SLACK = 8;
 
 const same = (a: FlightBody, b: FlightBody) => a.x === b.x && a.y === b.y && a.vx === b.vx && a.vy === b.vy && a.angle === b.angle && a.angVel === b.angVel;
 const copy = (b: FlightBody): FlightBody => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, angle: b.angle, angVel: b.angVel });
@@ -120,12 +123,35 @@ export class DebrisNet {
       this.last.set(eid, copy(body));
     }
     this.expect.clear();
+    // (Clients have a piece that's off where it was: one near it may knock it there and not here, or here and not
+    // there. Every piece within reach of an off one is off too: its keyframe goes with the other's)
+    if (this.touched.size) this.touchNear(b);
     // (A knock with a piece that's off for clients is off too: round the pairs till nothing more joins)
     for (let more = this.touched.size > 0, n = 0; more && n < 8; n++) {
       more = false;
       for (const [a, c] of this.pairs) {
         const ta = this.touched.has(a), tc = this.touched.has(c);
         if (ta !== tc) { this.touched.add(ta ? c : a); more = true; }
+      }
+    }
+  }
+
+  /** Debris within reach of a touched piece (their circles closer than NEAR_SLACK) joins it: endTick */
+  private touchNear(b: BridgeCtx): void {
+    const off: { eid: number; x: number; y: number; r: number; sys: number }[] = [];
+    for (const eid of this.touched) {
+      const ship = b.bodies.get(eid);
+      if (ship?.kind === 'debris' && !b.intangible.has(eid)) off.push({ eid, x: Position.x[eid], y: Position.y[eid], r: ship.derived.radius, sys: InSystem.systemId[eid] });
+    }
+    if (!off.length) return;
+    for (const eid of this.last.keys()) {
+      if (this.touched.has(eid) || b.intangible.has(eid)) continue;
+      const ship = b.bodies.get(eid);
+      if (!ship) continue;
+      const x = Position.x[eid], y = Position.y[eid], r = ship.derived.radius, sys = InSystem.systemId[eid];
+      for (const o of off) {
+        const reach = o.r + r + NEAR_SLACK, dx = o.x - x, dy = o.y - y;
+        if (o.sys === sys && dx * dx + dy * dy < reach * reach) { this.touched.add(eid); break; }
       }
     }
   }
