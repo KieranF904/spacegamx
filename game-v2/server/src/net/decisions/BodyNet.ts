@@ -34,7 +34,13 @@ export interface BodyNetHost {
 /** What a client sends of its bodies (CAPS.BODIES): the low byte of its hash sum as of a snapshot's tick */
 export interface BodyCheckIn { hash: number; tick: number }
 
-interface Boss { state: BodyState; log: number[][] }
+interface Boss {
+  state: BodyState;
+  log: number[][];
+  /** The ships its body reads now, and those it stopped reading lately ([tick, id]: a pack's ship shot down, what a client made of it that window may be off) */
+  reads: number[];
+  dropped: [number, number][];
+}
 interface Client {
   /** Bosses it runs (synced, and not stopped since) */
   runs: Set<number>;
@@ -54,8 +60,12 @@ export class BodyNet {
 
   decide(eid: number, op: number, args: readonly number[], state: BodyState): void {
     let b = this.bosses.get(eid);
-    if (!b) this.bosses.set(eid, (b = { state, log: [] }));
+    if (!b) this.bosses.set(eid, (b = { state, log: [], reads: [], dropped: [] }));
     b.state = state;
+    const reads = BODY_KINDS[state.kind]?.reads(eid, state) ?? [];
+    for (const r of b.reads) if (!reads.includes(r)) b.dropped.push([this.host.tick(), r]);
+    while (b.dropped.length && b.dropped[0][0] < this.host.tick() - KEEP_TICKS) b.dropped.shift();
+    b.reads = reads;
     // (Its body off and its ship gone (despawned, blown apart: its brain let go): nothing more to send of it. Its id may
     // be another ship's later (entity ids are reused), so it's forgotten now, not when some client's snapshot notices)
     if (op === DECISION.OFF && !this.host.has(eid)) { this.bosses.delete(eid); return; }
@@ -101,7 +111,11 @@ export class BodyNet {
       if (!runs && (!s.on || systemOf(eid) !== systemId)) continue;
       // (Every ship its body reads held: its target, a pack's other ships. The enemy AI's pilots only with CAPS.PILOTS)
       const reads = kind?.reads(eid, s) ?? [];
-      const can = !!kind && s.on && (pilots || !kind.pilot) && systemOf(eid) === systemId && view(eid) && reads.every(holds);
+      // (A pack's ship it reads gone (shot down, out of view) while it runs it: what it made of it this window was off,
+      // so it goes again with a keyframe; its next order no longer reads it)
+      const gone = runs && kind?.pilot ? reads.filter((r) => r !== s.target && (!this.host.has(r) || !holds(r))) : [];
+      const can = !!kind && s.on && (pilots || !kind.pilot) && systemOf(eid) === systemId && view(eid) && reads.every((r) => holds(r) || gone.includes(r));
+      if (can && runs && (gone.length || b.dropped.some(([t, r]) => t > c.through && (!this.host.has(r) || !holds(r))))) { rekey(known, eid); this.stats.targetKeyed++; }
       if (can && !runs) {
         rows.push([eid, 0, DECISION.SYNC, ...syncArgs(s)]);
         rekey(known, eid);
