@@ -59,6 +59,11 @@ export class DebrisLives {
     this.stats.pieces++;
   }
 
+  /** A connection afresh: the server's ids start over, so none of these are its pieces */
+  clear(): void {
+    this.lives.clear();
+  }
+
   /** The server tells it from now on (a shipSync), or it's gone */
   drop(id: number): void {
     if (this.lives.delete(id)) this.stats.dropped++;

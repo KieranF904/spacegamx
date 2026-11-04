@@ -59,6 +59,18 @@ export class DebrisSplits implements DebrisWorld {
   /** Bodies before a rebuild recentred them, by id and tick (a split from it starts there) */
   private readonly pre = new Map<number, { t: number; body: FlightBody }[]>();
 
+  /**
+   * A connection afresh (ShipClient.resetHits): the old server's pieces, checks and waiting splits are no part of the new
+   * one's (its ids start over: an old check sent on would confirm an id it never split)
+   */
+  reset(): void {
+    this.lives.clear();
+    this.pre.clear();
+    this.waiting.length = 0;
+    this.acks = [];
+    this.rows = [];
+  }
+
   // ---- DebrisWorld (the replica set's debris world) ----
 
   gone(id: number, t: number): boolean {

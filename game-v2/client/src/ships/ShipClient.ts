@@ -407,6 +407,7 @@ export class ShipClient {
     this.bodies.reset();
     this.guides.reset();
     this.causes.clear();
+    this.debris.reset();
   }
 
   /**

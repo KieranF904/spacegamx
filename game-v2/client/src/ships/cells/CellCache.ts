@@ -77,10 +77,12 @@ export class CellCache {
     const members: [number, number][] = [], ships = new Map<number, ReplicaHold>();
     for (const id of list) {
       const st = this.host.reps.at(id, T);
-      if (st) members.push([id, cellMemberHash(id, st.body, st.bits, st.q)]);
       const hold = st ? this.host.reps.detach(id) : null;
       this.host.forget(id);
+      // (Only what it keeps counts: one held but not kept, a piece of debris say, makes the hash miss, so it comes back as
+      // new rather than as a log naming a ship it no longer has)
       if (!hold) continue;
+      members.push([id, cellMemberHash(id, st!.body, st!.bits, st!.q)]);
       ships.set(id, hold);
       this.ids.set(id, cell);
     }
