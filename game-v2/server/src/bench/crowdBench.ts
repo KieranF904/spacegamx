@@ -64,7 +64,7 @@ const rows = results.map((r) => [
 ].map(String));
 const w = head.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i].length)));
 const line = (r: string[]) => r.map((c, i) => c.padStart(w[i])).join('  ');
-console.log(`\nbulk sockets: ${arg('bulk', 'legacy')}; probes: ${arg('probes', '4')} (caps ${arg('caps', '511')}, latency ${arg('lat', '3')} ticks)\n`);
+console.log(`\nbulk sockets: ${arg('bulk', 'legacy')}; probes: ${arg('probes', '4')} (caps ${opts('ball', 0).caps}, latency ${arg('lat', '3')} ticks)\n`);
 console.log(line(head)); console.log(w.map((x) => '-'.repeat(x)).join('  ')); for (const r of rows) console.log(line(r));
 
 console.log('\ndebris: pieces mean/max, server step ms/tick, probe client debris-world ms/tick, capable debris B/s by type, debris corrections, off/checked (no keyframe)');

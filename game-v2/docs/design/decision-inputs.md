@@ -578,6 +578,11 @@ replica after) and her removal mid-fight; BodyNet.test.ts the forgotten boss (it
   its blink phase: every hostile run is the server's ship at every snapshot, no control rows, checks agreeing; a lost
   second of decisions caught; a BODIES client without PILOTS runs none). Behaviour moved on purpose: frameHash
   regenerated (world and streams).
+- **Needs CAUSES (review, 2026-11-05)**: `pilotsFor` takes PILOTS only with CAUSES. Without other ships' causes a
+  pilot's body reads targets that contacts keyframe mid-window, and the crowd bench's ball 50 had 12 AI ticks off
+  without a keyframe (caps 511 | PILOTS). Such a client gets control rows of AI ships, as before PILOTS. The bench also
+  shows the bodies' rekeys cost corrections: ball 50 with every cap 3.7 a second per probe, without PILOTS 1.0 (bytes
+  1.5% up); spread 50 1.3 against 0.2 (bytes 14% up).
 - **Measured**: docs/audits/decisions-2026-11-04.md. Section 11.4's gap (-7% for bodies) is closed by CAUSES: bodies
   now -25.6% payload, -18% wire on the Scrap Mother; the wire gap left is stage 4's (telegraphs and own-row urgent frames).
 

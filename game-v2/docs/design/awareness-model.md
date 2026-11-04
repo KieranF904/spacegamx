@@ -1286,3 +1286,32 @@ the probes, and the parity tests (replication, confirmedHits, selfHits, bodies, 
 Phases 2-3 help every layout and need no change to what anyone sees. Phases 4-5 are the visible change: the
 smaller simulated area, and the ghosts beyond it. Each phase is behind a caps bit like the other netcode work, legacy
 clients keep today's path, and the deploy freeze holds (memory: deploy-freeze).
+
+## 12. As built (2026-11-05): the whole run, reviewed
+
+Every phase above that was built sits behind its own caps bit, on by default only on the dev server and in dev
+clients; a client without a bit gets the path it had before, and the review's caps matrix (each bit off in turn from
+all of them, crowd bench ball 50 and spread 50) shows zero tick-layer disagreements in every combination.
+
+| Bit | Value | Protocol | What it does | Needs |
+|---|--:|--:|---|---|
+| BLOCKS | 512 | 37 | snapshots as shared encode-once blocks (phase 3) | PACKED |
+| FOCUS | 1024 | 38 | the focus grid: 19 km cells on the tick layer, 35 km ring as ghosts, dropped-cell cache (phase 4) | |
+| CAUSES | 2048 | 39 | other ships' contacts, rebuilds and pulls as cause records, not keyframes (phase 5, the cause half) | OWN_SIM |
+| WAYPOINTS | 4096 | 40 | homing shells and mobs on the shared waypoint law (phase 6, shells and mobs) | OWN_SIM |
+| PILOTS | 8192 | 40 | the enemy AI flown by a shared pilot body from its commander's orders | BODIES, CAUSES |
+| CROWD | 16384 | 41 | crowd fallbacks: smaller focus, wider window, per-system time dilation (phase 7, 7.11) | |
+| STRUCTS | 32768 | 42 | every structure a ship flew, kept by its rebuild tick (two rebuilds in a window worked out) | CAUSES |
+| CARGO | 65536 | 42 | a hold's mass changing as a cause before the tick's step | OWN_SIM or CAUSES |
+| DEBRIS | 131072 | 44-47 | debris worked out from its split and run for its whole life on the client | |
+
+PILOTS needs CAUSES since the review: without it a pilot's body read targets that contacts keyframed mid-window, and
+ball 50 had 12 AI ticks off without a keyframe (now 0; such a client gets control rows, as before PILOTS).
+
+**Not built from the plan:** phase 1's structure hash and cached sync wire form; phase 2 (records per entity rather
+than per client: `HitLedger.plan`, `shipSynced`, `shipHpSent` are still walked per client, about 17 ms at ball 300 before
+the crowd fallbacks); shells named by (owner, counter); shell spawn quantisation, arrivals and itineraries; the
+per-cell background hash; guided shells, siege turrets, station defence and traffic on the waypoint law or the pilot
+body; design and name prefetch for the ring; large ships (out of scope by decision).
+
+The before and after numbers for the whole run are in docs/audits/netcode-all-2026-11.md.
