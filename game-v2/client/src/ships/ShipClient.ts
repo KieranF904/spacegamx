@@ -27,7 +27,7 @@ import {
   stationInteractRadius, stepShipPhysics, stepTurretAim, shipPointToWorld, unpackCursorWeaponState, GravityWell,
   JumpTuning, jumpPhase, jumpTuning, coreHp, FRICTION, worldToLocalDir, partItemId, inSolarRing, jumpRange,
   jumpFieldAt, fieldRangeBoost, fieldCharge, primeBoost, pilotJumpStep, withEmp, lodestonePosition, type JumpField, type LodestoneData,
-  ShipReplicaSet, ServerSnapshotMessage, ServerDebrisSplitMessage, deriveSplit, unpackIds, unpackRuns, computeJoins, DEBRIS_STATUS, type DebrisShape, type Vec2,
+  ShipReplicaSet, ServerSnapshotMessage,
   packCursorWeaponState, rebuildVolley, WEAPON_KIND_TYPE, EntityState, accelAlong, turnAccel, rateShip, stepGuns, volleyShells, firesStraight, partWeaponDef,
   type ServerHitsMessage, type ServerHpCheckMessage, type ServerHitFixMessage, type HitReport, type OwnCheck, type BodyCheck, CAPS, SIDE, ownSimCaps, bodiesFor, focusFor, causesFor, ghostWeight,
 } from '@space-game/common';
@@ -55,6 +55,7 @@ import { ConfirmedHits } from './hits/ConfirmedHits';
 import { SelfHits, toldHits } from './hits/SelfHits';
 import { OwnTick } from './own/OwnTick';
 import { ShipCauses } from './causes/ShipCauses';
+import { DebrisSplits } from './debris/DebrisSplits';
 import { BodyRunner } from './bodies/BodyRunner';
 import type { PilotState } from '../econ/clientEcon';
 import type { ThrustCommand } from './ThrusterFx';
@@ -178,6 +179,7 @@ export class ShipClient {
 
   constructor(private opts: ShipClientOptions) {
     this.store = new ShipStore(opts.catalog, opts.tuning);
+    this.debris = new DebrisSplits({ store: this.store, reps: () => this.replicas, splitPose: () => (this.causes.on ? (id, t) => this.causes.beforeRebuild(id, t) : null) });
     this.features = new ClientFeatures(CLIENT_FEATURES, {
       catalog: opts.catalog,
       playerId: () => opts.state.playerId,
@@ -254,7 +256,7 @@ export class ShipClient {
         const e = opts.state.entities.get(station);
         return e ? { x: e.renderX, y: e.renderY } : null;
       },
-      (id) => this.debrisShape(id));
+      (id) => this.debris.shape(id));
     this.hits = new ConfirmedHits({
       store: this.store,
       // (a shell from a gun: its row's data[10], or its fire event's part packing, preSnapshot)
@@ -484,52 +486,12 @@ export class ShipClient {
     this.hits.check(msg);
   }
 
-  /** Debris worked out here (debrisSplit) to confirm on the next input ([id, check, ...]: InputSend takes them) */
-  private debrisAcks: number[] = [];
-  /** ...and their status rows, made here (the server doesn't send them), for the next snapshot */
-  private debrisRows: EntityState[] = [];
-  private debrisShapes = new WeakMap<ShipState, { rebuilds: number; shape: DebrisShape }>();
+  /** Debris worked out here (debrisSplit): its pieces, their rows and checks (ships/debris/DebrisSplits.ts) */
+  private readonly debris: DebrisSplits;
 
   /** The debris to confirm, taken (the input path sends them) */
   takeAcks(): number[] | undefined {
-    if (!this.debrisAcks.length) return undefined;
-    const a = this.debrisAcks;
-    this.debrisAcks = [];
-    return a;
-  }
-
-  /** A piece of debris's shape for the knocks (its alive parts' convex pieces), worked out once per rebuild */
-  private debrisShape(id: number): DebrisShape | null {
-    const ship = this.store.get(id);
-    if (!ship || ship.kind !== 'debris') return null;
-    const had = this.debrisShapes.get(ship);
-    if (had && had.rebuilds === ship.rebuilds) return had.shape;
-    const pieces: Vec2[][] = [];
-    this.store.geometry(ship).forEach((g, i) => { if (ship.derived.alive[i]) for (const p of g.convexShrunk) pieces.push(p); });
-    const shape = { mass: ship.derived.mass, radius: ship.derived.radius, com: ship.derived.com, pieces };
-    this.debrisShapes.set(ship, { rebuilds: ship.rebuilds, shape });
-    return shape;
-  }
-
-  /**
-   * A ship broke apart and we can work the pieces out ourselves (the server checked we have it as it was): from its
-   * blueprint, its pose at the split's tick and the parts that left (common ships/debris.ts deriveSplit, the server's
-   * own steps). Each piece goes in the store and the replicas, its row into the next snapshot, and its check is sent
-   * back; one we get wrong (or never confirm) the server sends as before. Runs before the ship's own sync is taken in.
-   */
-  private onDebrisSplit(msg: ServerDebrisSplitMessage): void {
-    const parent = this.store.get(msg.id);
-    const at = parent ? this.replicas.at(msg.id, msg.tick) : null;
-    if (!parent || !at) return;
-    const parts = new Set(unpackRuns(msg.p, parent.blueprint.parts.length));
-    const got = deriveSplit(this.store.catalog, this.store.tuning, parent, msg.id, msg.tick, unpackIds(msg.e), parts, computeJoins(this.store.geometry(parent)), at.body, (i) => parent.hp[i]);
-    if (!got) return;
-    for (const d of got) {
-      this.store.bodies.set(d.id, d.ship);
-      this.replicas.spawnDebris(d.id, msg.tick, d.body);
-      this.debrisRows.push({ id: d.id, type: EntityType.ShipBody, x: d.body.x, y: d.body.y, angle: d.body.angle, data: [...DEBRIS_STATUS] });
-      this.debrisAcks.push(d.id, d.hash);
-    }
+    return this.debris.takeAcks();
   }
 
   /** Designs party members sent (newest first, a few kept) */
@@ -597,11 +559,13 @@ export class ShipClient {
     this.own.onSnapshot(m);
     // (other ships' causes, CAPS.CAUSES: before their fire events are built from them)
     this.causes.onSnapshot(m);
+    // (splits that waited for them: their parents' poses as the server split them)
+    this.debris.flush();
     // (bosses' decisions, CAPS.BODIES: their bodies fly them on the tick layer from here: ships/bodies/BodyRunner.ts)
     this.bodies.onSnapshot(m.tick, m.decisions);
     const out: EntityState[] = [];
     // (Debris worked out here since the last snapshot: its rows, as the server would have sent them)
-    if (this.debrisRows.length) out.push(...this.debrisRows.splice(0));
+    out.push(...this.debris.takeRows());
     for (const [owner, ago, partAmmo, aimQ, ...ids] of m.fire ?? []) {
       const tick = m.tick - ago, part = partAmmo % 256, ammo = Math.floor(partAmmo / 256) % 256, aug = partAmmo >= 65536 ? (1 as const) : undefined;
       // A charge gun's tell (no shells): it started charging, or was let go (guns.ts TELL_CHARGE_*; drawn by the charge FX)
@@ -1082,7 +1046,7 @@ export class ShipClient {
   handleMessage(msg: ServerMessage): boolean {
     switch (msg.type) {
       case 'debrisSplit':
-        this.onDebrisSplit(msg);
+        this.debris.onSplit(msg);
         return true;
       case 'cells':
         this.cells.onCells(msg);

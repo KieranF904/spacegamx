@@ -149,6 +149,15 @@ export class ShipCauses implements ReplicaCauses {
   }
 
   /**
+   * A ship's body on tick t as the server rebuilt it (after that tick's contacts, before its recentring: where a split's
+   * pieces start, DebrisSplits); null: no rebuild of it that tick here
+   */
+  beforeRebuild(id: number, t: number): FlightBody | null {
+    const row = this.rows.get(id)?.get(t)?.find((r) => r.row[0] === OWN_CAUSE.REBUILD);
+    return row ? this.midOf(id, t, row.seq) : null;
+  }
+
+  /**
    * A ship's body on tick t just before the cause at `seq` (the contact pass had it so): before the tick's causes, then
    * its causes before that one, unrounded. Its own ship's: before its causes (the server sends the state otherwise)
    */

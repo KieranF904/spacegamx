@@ -17,6 +17,7 @@ import { OwnTick } from '../../../../client/src/ships/own/OwnTick.js';
 import { BodyRunner } from '../../../../client/src/ships/bodies/BodyRunner.js';
 import { CellCache } from '../../../../client/src/ships/cells/CellCache.js';
 import { ShipCauses } from '../../../../client/src/ships/causes/ShipCauses.js';
+import { DebrisSplits } from '../../../../client/src/ships/debris/DebrisSplits.js';
 import { bodiesFor, causesFor } from '@space-game/common';
 import { ownSimFor } from '../snapshot/ownShots.js';
 import type { GameServer } from '../../GameServer.js';
@@ -52,6 +53,8 @@ export class FakeHitsClient {
   readonly cells: CellCache;
   /** Other ships' causes on its tick-aligned layer (CAPS.CAUSES: client ships/causes/ShipCauses.ts) */
   readonly causes: ShipCauses | null = null;
+  /** Debris it works out itself (debrisSplit), as the game client does */
+  readonly debris: DebrisSplits;
   /** Entity types and ship-body status data, as the snapshots said */
   private kinds = new Map<number, { type: number; side: number }>();
   snapTick = 0;
@@ -85,7 +88,9 @@ export class FakeHitsClient {
   constructor(private server: GameServer, private opts: FakeHitsOptions) {
     const ships = server.getShips();
     this.store = new ShipStore(ships.catalog, ships.tuning);
-    this.reps = new ShipReplicaSet(ships.tuning, (id) => this.store.get(id)?.derived, () => opts.env(this.pid));
+    // (Debris it works out itself, and the knocks its replicas work out: client ships/debris/DebrisSplits.ts)
+    this.debris = new DebrisSplits({ store: this.store, reps: () => this.reps, splitPose: () => (this.causes?.on ? (id, t) => this.causes!.beforeRebuild(id, t) : null) });
+    this.reps = new ShipReplicaSet(ships.tuning, (id) => this.store.get(id)?.derived, () => opts.env(this.pid), undefined, (id) => this.debris.shape(id));
     if (opts.caps & CAPS.HITS) {
       this.hits = new ConfirmedHits({
         store: this.store,
@@ -197,6 +202,7 @@ export class FakeHitsClient {
         this.levels.push([this.snapTick, m.caps & CAPS.ROUGH ? m.lvl ?? 1 : 1]);
         break;
       case 'snapshot': this.snapshot(m as ServerSnapshotMessage); break;
+      case 'debrisSplit': this.debris.onSplit(m); break;
       case 'cells': this.cells.onCells(m); break;
       case 'hits':
         this.findHits(m.h);
@@ -236,6 +242,9 @@ export class FakeHitsClient {
     this.own?.onSnapshot(s);
     // (other ships' causes, CAPS.CAUSES, before their fire events are built from them)
     this.causes?.onSnapshot(s);
+    this.debris.flush();
+    // (the status rows of debris it worked out: the game client shows them; nothing here)
+    this.debris.takeRows();
     // (bosses' decisions, CAPS.BODIES: their bodies fly them from here)
     this.bodies?.onSnapshot(s.tick, s.decisions);
     for (const e of s.entities) {

@@ -91,10 +91,11 @@ export class Probe {
     while (this.bckQ.length && this.bckQ[0].at <= now) bck = this.bckQ.shift()!.v;
     while (this.repQ.length && this.repQ[0].at <= now) rep = this.repQ.shift()!.v;
     while (this.chkQ.length && this.chkQ[0].at <= now) chk = this.chkQ.shift()!.v;
-    if (key === this.lastKey && !rep && !chk && !bck) return;
+    const acks = f.debris?.takeAcks();
+    if (key === this.lastKey && !rep && !chk && !bck && !acks) return;
     this.lastKey = key;
     this.sentAt = now;
-    const msg = { type: 'input', seq: this.seq++, tick: 0, targetTick: now + 1, ...c, ...(rep ? { hitReport: rep } : {}), ...(chk ? { ownCheck: chk } : {}), ...(bck ? { bodyCheck: bck } : {}) } as unknown as ClientMessage;
+    const msg = { type: 'input', seq: this.seq++, tick: 0, targetTick: now + 1, ...c, ...(rep ? { hitReport: rep } : {}), ...(chk ? { ownCheck: chk } : {}), ...(bck ? { bodyCheck: bck } : {}), ...(acks ? { acks } : {}) } as unknown as ClientMessage;
     const enc = encodeMessage(msg) as ArrayBuffer;
     if (this.measuring) { this.upMsgs++; this.upBytes += enc.byteLength; }
     const dec = decodeMessage(enc) as ClientMessage;
