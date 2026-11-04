@@ -1164,6 +1164,13 @@ the probes, and the parity tests (replication, confirmedHits, selfHits, bodies, 
   panels in docs/panels/ (memory: dev-update-panels).
 
 **Phase 5: arrivals and effects across borders.**
+- *Status (2026-11-04):* the cause half is built behind `CAPS.CAUSES` (2048, protocol 39), on the dev server: contacts
+  (every pair, a cell border or not), rebuilds and pilots' pulls go as cause records on the ships they moved, worked out
+  on every client's tick layer with the shared function; contacts and rebuilds no longer keyframe other ships for such a
+  client, and its own check covers every ship it holds (docs/areas/networking.md, "Other ships' causes"; measured in
+  docs/audits/effects-2026-11-04.md). Not built: shell spawn quantisation and arrivals (out-of-view shells still come as
+  rounded rows, their hits told), itineraries and inflow blocks, debris knocked by debris a client doesn't hold
+  (keyframed as before).
 - Shell spawn quantisation (a golden shift).
 - Itineraries; directional inflow blocks; arrivals.
 - Retire projectile rows for out-of-view shells.

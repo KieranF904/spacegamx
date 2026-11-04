@@ -128,6 +128,27 @@ messages PK.SNAPSHOT does. Blocks frames go undeflated (`ClientSocket.send(data,
 every client the same row objects (the stripped status row, named rows via `derivedRow`, one fire row per event): a row
 object is a block. Measured: docs/audits/encode-once-2026-11-04.md.
 
+### Other ships' causes (protocol 39, `CAPS.CAUSES` 2048, common network/causes.ts)
+With OWN_SIM (dev builds; `?causes=0|1`). What moved a ship besides its controls (a contact, a rebuild's recentring, a
+pilot's pull) is noted for every ship (bridge/ownCauses.ts, each with its place in the tick's order: a contact pair
+shares one) and worked out on every shadow by the clients' own function (`applyOwnCauses`; net/causes/shadowCauses.ts:
+`workCauses`, `settleContacts`, `causeRecords`). A shadow has two versions from one count: `version` (moves for causes
+too: everyone else's keyframes) and `cver` (CAUSES clients': only when the shadow, causes and all, left the ship; a
+bodied boss the same, counting down). A CAUSES client is sent a snapshot's `causes` records (`x`, index 12; packed
+`causesIO`, ships named before in the section by their place there): `[ago, 0, id, dvx, dvy]` a pull, `[ago, 1, a, b,
+flags, (a's state), (b's state)]` a contact once for both ships (`PAIR` flags: pins, states, OTHER_BEFORE either
+side), `[ago, 2, id]` a rebuild. A side's other goes without its state when the client's replica of it, worked to that
+pair (its own causes before it in the tick: ShipCauses.midOf, the own ship's OwnTick.midOf), is the pass's
+(`inStep`/`bodyStep`, judged per client after the snapshot's keyframes are known). The client (client
+ships/causes/ShipCauses.ts, through `ShipReplicaSet.setCauses`: pre-cause states, a rebuild's structure split) applies
+each record to the ships it holds that aren't keyframed now; hits on a ship a record names are told that window
+(SelfHits.onCaused, HitLedger's keyed set); fire events are built from `preAt`. What a client can't work out (a contact
+with a ship whose structure it lacks, two rebuilds in a window, a rebuild between structures it doesn't have:
+`rebuildOk`) is a keyframe. The own check's state byte adds a byte over every ship it holds (`replicasByte`, server
+`Replication.heldByte`); off, every ship it holds is keyframed again. Split debris waits for the snapshot's causes
+(the parent's pose as the server split it: ShipCauses.beforeRebuild; client ships/debris/DebrisSplits.ts, shared with
+the fakes). Tests: server/src/net/causes/causes.test.ts. Measured: docs/audits/effects-2026-11-04.md.
+
 ### Debris (protocol 25)
 When a part's loss splits a ship (rebuildNow's orphan groups; not boss sheds, which are scenery), a client that has the ship as it was (its last sync's centre of mass is the split's: `DebrisNet.comAt`) and replicates it gets a `debrisSplit` `[id, tick, e (piece ids, packIds), p (the parts that left, packRuns)]` before the ship's own sync, and works the pieces out itself (`deriveSplit`: the parts' joins into groups in rebuild order, each piece's blueprint, HP as it has them, its pose from the ship's replica at the split's tick, push and spin seeded by ship, tick and group, deterministic trig). It adds them to its store and replicas, makes their status rows (`DEBRIS_STATUS`) and acks each with `debrisHash`. The server holds the pieces back from that client meanwhile (`ClientConnection.debrisHeld`: no sync, keyframe, row or HP); a right ack marks them sent (`SnapshotBuilder.ackDebris`); a wrong one, or none within `DEBRIS_ACK_TICKS` plus twice the ping, and they go as any ship does. Debris then drifts and knocks into other debris only (ships ignore it), push only, all pieces of a system stepped together in id order (`stepDebrisWorld`) on the server and in `ShipReplicaSet` (`stepDebrisTo`: a keyframe or new piece is how its tick ended; the world is stepped again from the tick before). A piece moved by anything else (a rebuild's shift, a blast, a tow), and whatever knocked into it before the snapshot, is keyframed (`DebrisNet.touched`, Replication `Drift:moved`); so is a piece knocked by one a client doesn't step (out of view, or not had yet). Damage, crumbling and removal stay server-told.
 
