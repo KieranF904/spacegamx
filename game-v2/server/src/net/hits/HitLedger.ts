@@ -24,11 +24,14 @@
  * then shell order, as the client applies them), and sends records only for the told ones and for findable ones it
  * would get wrong (an extra). Every hit goes into its journal (SelfHitJournal); its reports (on its inputs) are judged
  * there, and a disagreement that lasts is put right with a hitFix and its ships' HP in full.
+ *
+ * Adaptive validation (part E, CAPS.ROUGH on top): how closely that client is judged follows its record
+ * (ConfirmLevel: ROUGH while it keeps agreeing, STRICT after a correction, every hit told), told to it in netCaps.lvl.
  */
 import { hasComponent, entityExists, defineQuery, type IWorld } from 'bitecs';
 import {
   CAPS, Position, Projectile, InSystem, Player, Radius, Dead, packHits, hpChecksum, gunShell, deriveShellHit, igniteRule, hitEndFx,
-  firesStraight, unwrapTick14,
+  firesStraight, unwrapTick14, CONFIRM, confirmRules,
   type ClientSocket, type ServerMessage, type ShellHitRecord, type ShipState, type HitReport,
 } from '@space-game/common';
 import type { ClientConnection } from '../ClientConnection.js';
@@ -36,6 +39,7 @@ import type { ShipBridge } from '../../ships/ShipBridge.js';
 import { damageMessage, projectileHitMessage, type Outbox } from '../snapshot/Outbox.js';
 import { COALESCE_TICKS } from '../snapshot/constants.js';
 import { SelfHitJournal, type JournalHit } from './SelfHitJournal.js';
+import { ConfirmLevel } from './ConfirmLevel.js';
 
 /** What the ledger needs of the server (GameServer itself) */
 export interface HitLedgerHost {
@@ -95,6 +99,8 @@ const keyOf = (target: number, source: number, glancing: boolean) => `${target},
 const CHECK_TICKS = 60;
 /** Ticks a client's hit report may take beyond its round trip: the input ticks it may wait (client SelfHits REPORT_WAIT), and a margin */
 const REPORT_SLACK = 12;
+/** The input ticks a NORMAL level's report may wait (part D's; another level adds what it waits beyond: part E) */
+const NORMAL_REPORT_EVERY = confirmRules(CONFIRM.NORMAL).reportEvery;
 
 export class HitLedger {
   /** Some client has HITS on this snapshot (else every hit goes as ever, and nothing is kept) */
@@ -111,6 +117,8 @@ export class HitLedger {
   private checks = new WeakMap<ClientConnection, { due: Set<number>; at: number }>();
   /** Per client finding its own hits: its journal (SelfHitJournal) */
   private journals = new WeakMap<ClientConnection, SelfHitJournal>();
+  /** ...and its confirmation level (part E: ConfirmLevel; NORMAL for good without CAPS.ROUGH) */
+  private levels = new WeakMap<ClientConnection, ConfirmLevel>();
   /**
    * ...and shells with a hit told it the old way: it doesn't know what they passed through, so it drops them (their
    * projectileHit: ConfirmedHits.oldWay, SelfHits.drop) and their hits, that window's and later, are told
@@ -122,6 +130,8 @@ export class HitLedger {
   readonly stats = {
     hits: 0, records: 0, legacy: 0, d: 0, s: 0, i: 0, checks: 0, why: {} as Record<string, number>,
     own: 0, told: 0, reports: 0, fixes: 0, fixHits: 0, toldWhy: {} as Record<string, number>,
+    /** Confirmation level changes, by the level changed to (part E) */
+    levels: [0, 0, 0],
   };
 
   constructor(private host: HitLedgerHost) {}
@@ -242,6 +252,8 @@ export class HitLedger {
 
   private unfindable(conn: ClientConnection, h: Hit, ships: ShipBridge): string | null {
     const world = this.host.world;
+    // (STRICT: a client that needed correcting is told every hit for a while: part E)
+    if (this.levels.get(conn)?.rules.strict) return 'strict';
     if (h.target === conn.playerId) return 'self';
     if (this.oldWayShells.get(conn)?.has(h.proj)) return 'oldWay';
     const target = ships.get(h.target);
@@ -295,6 +307,13 @@ export class HitLedger {
     let j = this.journals.get(conn);
     if (!j) this.journals.set(conn, (j = new SelfHitJournal(this.host.currentTick)));
     return j;
+  }
+
+  /** A finding client's confirmation level (part E), made with its journal */
+  levelOf(conn: ClientConnection): ConfirmLevel {
+    let l = this.levels.get(conn);
+    if (!l) this.levels.set(conn, (l = new ConfirmLevel(this.host.currentTick, !!((conn.caps ?? 0) & CAPS.ROUGH))));
+    return l;
   }
 
   /**
@@ -409,8 +428,14 @@ export class HitLedger {
     const now = this.host.currentTick;
     // (A client whose frames are coalesced may hear a window COALESCE_TICKS later: net/snapshot/PackedLink.ts)
     const held = ((conn.caps ?? 0) & (CAPS.PACKED | CAPS.COALESCE)) === (CAPS.PACKED | CAPS.COALESCE) ? COALESCE_TICKS : 0;
-    const fix = this.journalOf(conn).judge(now, Math.ceil((conn.ping || 0) / (1000 / 60)) + REPORT_SLACK + held);
-    if (!fix) return;
+    // (Its level's report spacing beyond part D's, and STRICT's later frames: part E)
+    const level = this.levelOf(conn), rules = level.rules, journal = this.journalOf(conn);
+    const slack = Math.max(0, rules.reportEvery - NORMAL_REPORT_EVERY) + rules.delayTicks;
+    const bad = journal.stats.disagreed;
+    const fix = journal.judge(now, Math.ceil((conn.ping || 0) / (1000 / 60)) + REPORT_SLACK + held + slack);
+    if (journal.stats.disagreed > bad) level.disagreed(now);
+    if (!fix) { level.step(now); return; }
+    level.corrected(now);
     this.stats.fixes++;
     this.stats.fixHits += fix.hits.length;
     // Every hit since the last agreement, each with its number: the client works out those it missed and takes back those
@@ -431,10 +456,11 @@ export class HitLedger {
     return t;
   }
 
-  /** After its HP diff: one ship it worked out, once a second, checked */
+  /** After its HP diff: one ship it worked out, once a second (a finding client: as often as its level says), checked */
   check(conn: ClientConnection): void {
     const c = this.checks.get(conn), tick = this.host.currentTick;
-    if (!c || !c.due.size || tick - c.at < CHECK_TICKS) return;
+    const every = this.finds(conn) ? this.levelOf(conn).rules.checkTicks : CHECK_TICKS;
+    if (!c || !c.due.size || tick - c.at < every) return;
     const id = c.due.values().next().value!;
     c.due.delete(id);
     const sent = conn.shipHpSent.get(id);
@@ -473,6 +499,7 @@ export class HitLedger {
         // (Finding its own hits starts afresh from this snapshot on both sides; the client is told from when. Shells
         // already flying are told on both sides: what they hit before isn't on its layer, SelfHits.setOn)
         this.journals.delete(c);
+        this.levels.delete(c);
         this.oldWayShells.delete(c);
         const both = CAPS.HITS | CAPS.SELF_HITS;
         if ((c.caps & both) === both && (was & both) !== both) {
@@ -481,6 +508,10 @@ export class HitLedger {
           this.oldWayShells.set(c, told);
         }
         if (was !== c.caps) this.host.net.send(c.ws, { type: 'netCaps', caps: c.caps, ...(c.caps & CAPS.COALESCE ? { hold: COALESCE_TICKS } : {}) });
+      } else if ((c.caps ?? 0) & CAPS.ROUGH && this.finds(c) && this.levelOf(c).apply(this.host.currentTick)) {
+        // (Its confirmation level changes from the next snapshot, on both sides at once: part E)
+        this.stats.levels[this.levelOf(c).level]++;
+        this.host.net.send(c.ws, { type: 'netCaps', caps: c.caps!, ...(c.caps! & CAPS.COALESCE ? { hold: COALESCE_TICKS } : {}), lvl: this.levelOf(c).level });
       }
       if ((c.caps ?? 0) & CAPS.HITS) on = true;
     }

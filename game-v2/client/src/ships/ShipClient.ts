@@ -352,11 +352,15 @@ export class ShipClient {
     this.selfHits.reset();
   }
 
-  /** The caps in effect (netCaps): finding hits here starts (or stops) with the next snapshot */
-  onNetCaps(caps: number): void {
+  /**
+   * The caps in effect (netCaps): finding hits here starts (or stops) with the next snapshot; with CAPS.ROUGH, the
+   * confirmation level too (`lvl`: how often it reports; at STRICT the server tells every hit)
+   */
+  onNetCaps(caps: number, lvl?: number): void {
     // (the snapshot before it was the old caps': its window searched as they were)
     this.findHits();
     this.selfHits.setOn((caps & (CAPS.HITS | CAPS.SELF_HITS)) === (CAPS.HITS | CAPS.SELF_HITS), this.snapTick);
+    this.selfHits.setLevel(caps & CAPS.ROUGH ? lvl : undefined);
   }
 
   /**

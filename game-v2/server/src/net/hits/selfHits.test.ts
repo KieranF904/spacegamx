@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import {
-  Position, Velocity, Input, InSystem, CAPS, hpWire, ReplicaMode, replicaAngle, quantizeReplicaAngle,
+  Position, Velocity, Input, InSystem, CAPS, CONFIRM, hpWire, ReplicaMode, replicaAngle, quantizeReplicaAngle,
   type Blueprint, type ShipState, type ReplicaEnv,
 } from '@space-game/common';
 import { GameServer } from '../../GameServer.js';
@@ -49,6 +49,8 @@ interface Scenario {
   drift?: number;
   /** The shooter's caps switched mid-fight: [tick of the run, caps] (the admin's `hits` command does this) */
   switches?: [number, number][];
+  /** The shooter's caps (BOTH if not said) */
+  caps?: number;
 }
 
 function run(sc: Scenario) {
@@ -60,11 +62,11 @@ function run(sc: Scenario) {
     scene: 'sectors', autoStart: false,
     ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
     clock: () => clock.t,
-    netCaps: BOTH,
+    netCaps: BOTH | CAPS.ROUGH,
   });
   const ships = server.getShips();
   const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
-  const A = new FakeHitsClient(server, { name: 'self_shooter', caps: BOTH, env, drop: sc.drop });
+  const A = new FakeHitsClient(server, { name: 'self_shooter', caps: sc.caps ?? BOTH, env, drop: sc.drop });
   const B = new FakeHitsClient(server, { name: 'legacy_obs', caps: 0, env });
   const C = new FakeHitsClient(server, { name: 'self_obs', caps: BOTH, env });
   const fakes = [A, B, C];
@@ -211,6 +213,32 @@ describe('client-detected hits: a forced mismatch is put right', () => {
     // The missed hits were drawn from the correction: as many impacts as the legacy observer saw
     expect(r.A.projectileHits).toBe(r.B.projectileHits);
   }, 120_000);
+});
+
+describe('adaptive validation (part E, CAPS.ROUGH)', () => {
+  it('a client that keeps agreeing goes ROUGH (fewer reports); a desync makes it STRICT, and it steps back down once clean', () => {
+    // (it misses a third of its hits for a while, past its first clean stretch: a persistent desync)
+    const t0 = 20 + 750, t1 = t0 + 150;
+    const r = run({ ticks: 2400, caps: BOTH | CAPS.ROUGH, hpScale: 40, drop: (h) => h.tick > t0 && h.tick < t1 && h.shell % 3 === 0 });
+    const lvl = r.server.hits.levelOf(r.server.pilots.connOf(r.A.pid)!);
+    if (process.env.HITS_DEBUG) console.log(JSON.stringify({ history: lvl.history, told: r.A.levels, rates: rates(r), dropped: r.A.dropped }));
+    expect(r.A.dropped).toBeGreaterThan(0);
+    const seq = lvl.history.map((h) => h[1]);
+    // NORMAL -> ROUGH (clean) -> STRICT (the desync, corrected) -> NORMAL -> ROUGH (clean again)
+    expect(seq).toEqual([CONFIRM.ROUGH, CONFIRM.STRICT, CONFIRM.NORMAL, CONFIRM.ROUGH]);
+    // The client was told each change, and went by it
+    expect(r.A.levels.slice(1).map((l) => l[1])).toEqual(seq);
+    // Caught within a few seconds of the desync starting
+    const strictAt = lvl.history[1][0];
+    expect(strictAt - t0).toBeLessThan(240);
+    // Corrected, and right in the end; the observer finding its own (no ROUGH) untouched
+    expect(r.stats.fixes).toBeGreaterThan(0);
+    expect(r.finalOff.slice(0, 5)).toEqual([]);
+    expect(r.C.selfHits!.stats.fixes).toBe(0);
+    expect(r.A.projectileHits).toBe(r.B.projectileHits);
+    // STRICT told everything: while it lasted the shooter found nothing itself
+    expect(r.stats.toldWhy.strict ?? 0).toBeGreaterThan(0);
+  }, 180_000);
 });
 
 describe('client-detected hits: switched off and on mid-fight', () => {

@@ -1,9 +1,10 @@
 /**
  * What this client offers the server in its join (common network/hits.ts CAPS): confirmed and client-detected hits
  * (ships/hits/ConfirmedHits.ts clientCaps), and bit-packed frames with coalescing (common network/packed): both on in
- * dev builds; `?packed=0|1` and `?coalesce=0|1` switch them (remembered). The server takes what it allows (netCaps).
+ * dev builds; `?packed=0|1` and `?coalesce=0|1` switch them (remembered), as do `?ownshots=0|1` (its own shells as fire
+ * events) and `?rough=0|1` (adaptive validation, with client-detected hits). The server takes what it allows (netCaps).
  */
-import { CAPS, TICK_MS } from '@space-game/common';
+import { CAPS, TICK_MS, confirmRules } from '@space-game/common';
 import { clientCaps } from '../ships/hits/ConfirmedHits';
 
 /** A switch from the address (remembered) or from storage; null: not set */
@@ -23,13 +24,19 @@ export function netCaps(): number {
   const coalesce = packed && (flag('coalesce', 'sg.coalesce') ?? true);
   // (its own shells as fire events, built from its own ship as replicated to it, not its prediction: ShipClient.preSnapshot)
   const ownShots = flag('ownshots', 'sg.ownshots') ?? dev;
-  return clientCaps() | (packed ? CAPS.PACKED : 0) | (coalesce ? CAPS.COALESCE : 0) | (ownShots ? CAPS.OWN_SHOTS : 0);
+  // (adaptive validation of the hits it finds: checked roughly while it agrees, closely once it hasn't. docs/design/confirmed-hits.md part E)
+  const hits = clientCaps();
+  const rough = !!(hits & CAPS.SELF_HITS) && (flag('rough', 'sg.rough') ?? dev);
+  return hits | (packed ? CAPS.PACKED : 0) | (coalesce ? CAPS.COALESCE : 0) | (ownShots ? CAPS.OWN_SHOTS : 0) | (rough ? CAPS.ROUGH : 0);
 }
 
 /**
  * How much later frames may come with these caps in effect (coalescing: the server's netCaps says how many ticks they
- * may wait): the interpolation delay grows by as much (ms)
+ * may wait), and how much later its confirmation level wants them shown (CAPS.ROUGH, netCaps.lvl: STRICT's two ticks,
+ * so every hit's record is in before the frames that show it): the interpolation delay grows by as much (ms)
  */
-export function coalesceDelayMs(caps: number, hold = 0): number {
-  return (caps & (CAPS.PACKED | CAPS.COALESCE)) === (CAPS.PACKED | CAPS.COALESCE) ? Math.max(0, Math.min(30, hold)) * TICK_MS : 0;
+export function coalesceDelayMs(caps: number, hold = 0, lvl?: number): number {
+  const coalesce = (caps & (CAPS.PACKED | CAPS.COALESCE)) === (CAPS.PACKED | CAPS.COALESCE) ? Math.max(0, Math.min(30, hold)) : 0;
+  const confirm = caps & CAPS.ROUGH ? confirmRules(lvl).delayTicks : 0;
+  return (coalesce + confirm) * TICK_MS;
 }

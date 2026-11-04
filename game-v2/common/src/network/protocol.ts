@@ -1268,6 +1268,11 @@ export interface ServerNetCapsMessage {
   caps: number;
   /** Coalescing (CAPS.COALESCE): how many ticks a frame with nothing urgent may wait (the client widens its interpolation delay by as much) */
   hold?: number;
+  /**
+   * Adaptive validation (CAPS.ROUGH): the confirmation level (hits.ts CONFIRM) from the snapshot just sent on; sent
+   * again, with the same caps, whenever it changes. Absent: NORMAL
+   */
+  lvl?: number;
 }
 
 /** A projectile struck something at (x, y): clients end its tracer there and throw sparks. */

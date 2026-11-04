@@ -58,6 +58,8 @@ export class FakeHitsClient {
   /** Its own shells as projectile rows, and as fire events (CAPS.OWN_SHOTS: built from its own pose) */
   ownRows = 0;
   ownFired = 0;
+  /** Its confirmation levels as told (netCaps.lvl, CAPS.ROUGH): [the snapshot tick it came after, level] */
+  readonly levels: [number, number][] = [];
   /** Its own shells that came as rows (ids) */
   readonly ownRowIds = new Set<number>();
   link: { receive(msg: ClientMessage): void } | null = null;
@@ -160,7 +162,12 @@ export class FakeHitsClient {
     switch (m.type) {
       case 'shipSync': this.selfHits?.onSync(m.id); this.store.onSync(m); break;
       case 'shipHps': this.findHits(); this.store.onHps(m); break;
-      case 'netCaps': this.findHits(); this.selfHits?.setOn((m.caps & (CAPS.HITS | CAPS.SELF_HITS)) === (CAPS.HITS | CAPS.SELF_HITS), this.snapTick); break;
+      case 'netCaps':
+        this.findHits();
+        this.selfHits?.setOn((m.caps & (CAPS.HITS | CAPS.SELF_HITS)) === (CAPS.HITS | CAPS.SELF_HITS), this.snapTick);
+        this.selfHits?.setLevel(m.caps & CAPS.ROUGH ? m.lvl : undefined);
+        this.levels.push([this.snapTick, m.caps & CAPS.ROUGH ? m.lvl ?? 1 : 1]);
+        break;
       case 'snapshot': this.snapshot(m as ServerSnapshotMessage); break;
       case 'hits':
         this.findHits(m.h);

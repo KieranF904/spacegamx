@@ -26,8 +26,8 @@
  * plus this client's hits since.
  */
 import {
-  hitHash, chainAdd, shipSegmentHit, sidesHurt, SIDE, gunShell, firesStraight, unpackHits, shellGone,
-  type HitCtx, type HitReport, type ShipState, type ServerHitFixMessage, type WeaponTuning,
+  hitHash, chainAdd, shipSegmentHit, sidesHurt, SIDE, gunShell, firesStraight, unpackHits, shellGone, confirmRules, CONFIRM,
+  type HitCtx, type ConfirmRules, type HitReport, type ShipState, type ServerHitFixMessage, type WeaponTuning,
 } from '@space-game/common';
 import type { HitDone, OwnHit } from './ConfirmedHits';
 
@@ -78,10 +78,12 @@ export function toldHits(h: readonly number[], snapTick: number): ToldHit[] {
 /** A hit in the chain, kept a while for a correction: its HP change, to take back if the server never had it */
 export interface LogEntry { tick: number; shell: number; target: number; part: number; h: number; undo: HitDone['undo'] }
 
-/** Input ticks a report may wait for an input to ride on before it goes on its own */
+/**
+ * Input ticks a report may wait for an input to ride on before it goes on its own, and at least as many between two
+ * reports riding on inputs (the chain covers the snapshots between): part D's, the NORMAL level's. A level of its own
+ * (CAPS.ROUGH, netCaps.lvl) sets its own (common hits.ts CONFIRM_RULES)
+ */
 export const REPORT_WAIT = 6;
-/** ...and at least this many between two reports riding on inputs (the chain covers the snapshots between) */
-const REPORT_MIN = 6;
 /** Hits kept for a correction to be compared against (ticks) */
 const LOG_TICKS = 600;
 /** A shell no snapshot has removed is let go after this many ticks */
@@ -112,6 +114,10 @@ export class SelfHits {
   /** A correction came: report even if the chain didn't change */
   private reportDue = false;
   private snapTick = 0;
+  /** Its confirmation level's rules (CAPS.ROUGH: netCaps.lvl; else NORMAL, part D) */
+  private rules: ConfirmRules = confirmRules(CONFIRM.NORMAL);
+  /** The level (hits.ts CONFIRM) */
+  level: number = CONFIRM.NORMAL;
   readonly stats = { windows: 0, found: 0, reports: 0, fixes: 0, fixMissed: 0, fixWrong: 0 };
 
   constructor(private host: SelfHitsHost) {}
@@ -136,6 +142,16 @@ export class SelfHits {
     this.lastTick = lastTick;
   }
 
+  /**
+   * Its confirmation level (netCaps.lvl, CAPS.ROUGH), from the snapshot just sent on: how often it reports, and at
+   * STRICT it finds nothing itself (the server tells every hit). Its layer goes on (shells, what struck what), so it
+   * finds again as soon as the level drops
+   */
+  setLevel(level: number | undefined): void {
+    this.level = level ?? CONFIRM.NORMAL;
+    this.rules = confirmRules(this.level);
+  }
+
   /** A connection afresh (a join) */
   reset(): void {
     this.on = false;
@@ -149,6 +165,7 @@ export class SelfHits {
     this.report = null;
     this.lastTick = -1;
     this.due = -1;
+    this.setLevel(undefined);
   }
 
   /**
@@ -240,7 +257,8 @@ export class SelfHits {
       if (t.tick <= from || t.tick > tick) { (s.hit ??= new Set()).add(t.target); if (t.gone) s.dead = true; continue; }
       toldAt.set(t.shell * 4096 + (t.tick & 4095), t);
     }
-    if (this.on && from >= 0 && tick > from && tick - from <= 120) {
+    // (STRICT: the server tells every hit; the told records still go through the layer, at settle)
+    if (this.on && !this.rules.strict && from >= 0 && tick > from && tick - from <= 120) {
       this.stats.windows++;
       const { store } = this.host, me = this.host.self();
       const targets: number[] = [];
@@ -318,14 +336,15 @@ export class SelfHits {
   }
 
   /**
-   * The report for this input tick: when an input goes anyway (`riding`), or when it has waited REPORT_WAIT input
-   * ticks for one (then the input goes for it). Undefined: nothing to say
+   * The report for this input tick: when an input goes anyway (`riding`), or when it has waited its level's
+   * `reportEvery` input ticks for one (then the input goes for it). Undefined: nothing to say
    */
   takeReport(riding: boolean): HitReport | undefined {
     this.since++;
     if (!this.report) return undefined;
-    // (at most one every REPORT_MIN input ticks: the chain covers the snapshots between)
-    if (++this.waited < REPORT_WAIT && !(riding && this.since >= REPORT_MIN)) return undefined;
+    // (at most one every `reportEvery` input ticks: the chain covers the snapshots between)
+    const every = this.rules.reportEvery;
+    if (++this.waited < every && !(riding && this.since >= every)) return undefined;
     const r = this.report;
     this.report = null;
     this.waited = 0;

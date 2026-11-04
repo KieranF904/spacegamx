@@ -17,8 +17,50 @@
  *   OWN_SHOTS  its own straight shells come as fire events, not projectile rows, built from its own confirmed ship: it is
  *              sent its own ship's keyframes and control rows as everyone else is, so they're exact whatever its prediction
  *              did; rows (told, not found) for a window its ship is keyframed in (server ownShots.ts)
+ *   ROUGH      (with SELF_HITS) adaptive validation (part E): its hit chain is checked as closely as its record calls for,
+ *              at the level the server's netCaps.lvl says (CONFIRM)
  */
-export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16 } as const;
+export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16, ROUGH: 32 } as const;
+
+/**
+ * Adaptive validation (CAPS.ROUGH; docs/design/confirmed-hits.md part E): how closely the server checks a finding
+ * client's hit chain. Its tick-aligned layer is exact by construction, so a client that keeps agreeing is checked
+ * roughly; one that disagreed is checked closely, then steps back down after a clean stretch. Damage is the server's
+ * whatever the level: a level only decides how soon a client's own view of the hits is put right.
+ *
+ *   ROUGH   a report at most once a second (when its chain changed); judged when it comes, silence past a deadline
+ *           counts as a disagreement; the server keeps only each window's chain sum. One disagreement: NORMAL, with a
+ *           coarse correction (the chain, and the struck ships' HP in full)
+ *   NORMAL  part D: a report every 6 input ticks when the chain changed, judged every snapshot, a correction with the
+ *           hits after two disagreements running
+ *   STRICT  after a correction: it finds nothing itself, every hit is told (a record); its interpolation runs two
+ *           ticks later so the records are in before the frames that show them, and the server waits as much longer
+ */
+export const CONFIRM = { ROUGH: 0, NORMAL: 1, STRICT: 2 } as const;
+
+/** What a confirmation level asks of the client and the server */
+export interface ConfirmRules {
+  /** Input ticks between two reports (at least), and the most a report waits for an input to ride on */
+  reportEvery: number;
+  /** It finds nothing itself: every hit is told */
+  strict: boolean;
+  /** Ticks more of interpolation delay (client) and of waiting for its reports (server) */
+  delayTicks: number;
+  /** Ticks between two hpChecks (the HP backstop) */
+  checkTicks: number;
+}
+
+/** CONFIRM levels' rules, by level */
+export const CONFIRM_RULES: readonly ConfirmRules[] = [
+  { reportEvery: 60, strict: false, delayTicks: 0, checkTicks: 180 },
+  { reportEvery: 6, strict: false, delayTicks: 0, checkTicks: 60 },
+  { reportEvery: 6, strict: true, delayTicks: 2, checkTicks: 30 },
+];
+
+/** A level's rules (no level said: NORMAL, part D) */
+export function confirmRules(level: number | undefined): ConfirmRules {
+  return CONFIRM_RULES[level ?? CONFIRM.NORMAL] ?? CONFIRM_RULES[CONFIRM.NORMAL];
+}
 
 /** One shell's hit on a ship, as a capable client is told it */
 export interface ShellHitRecord {

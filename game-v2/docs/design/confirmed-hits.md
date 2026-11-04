@@ -1,6 +1,6 @@
 # Confirmed hits (design, 2026-11-04)
 
-Status: **built** (A: protocol 26; B: no wire change; C: protocol 27, on for the dev server only; D, client-detected hits: protocol 28, on for the dev server only). What differs from the design is in the "as built" sections at the end; the measured result is docs/audits/confirmed-hits-impact-2026-11-04.md.
+Status: **built** (A: protocol 26; B: no wire change; C: protocol 27, on for the dev server only; D, client-detected hits: protocol 28, on for the dev server only; F3, zero disagreements by construction, and E, rough adaptive validation (CAPS.ROUGH): no protocol change, dev server only). What differs from the design is in the "as built" sections at the end; the measured result is docs/audits/confirmed-hits-impact-2026-11-04.md.
 
 Today the server works out every hit and sends the results: ~40 B a landed hit over four messages (`projectileHit`,
 the shell again in `removed`, `damage`, a `shipHps` entry), plus `ignite` and `detonation` as plain keyed objects. In
@@ -793,3 +793,96 @@ units and 0.05 rad, `predictionError`, cosmetic layer only):
 Tests: `ownShots.test.ts` (a forced correction and a prediction 6 units off change nothing: every own shell exact, 0
 disagreements; a knocked window's own shells go as rows and are told, 0 disagreements); `selfHits.test.ts` and
 `packedFrames.test.ts` finders now take OWN_SHOTS (as rows their own shells are told, not found).
+
+---
+
+## Part E: rough, adaptive validation (CAPS.ROUGH = 32, no protocol change)
+
+Kieran (2026-11-04): "we can get away with a very rough validation for shot hits, people who don't pass get more
+confirmation, or slightly more tick delay, or both". With F3 the tick-aligned layer agrees by construction, so a
+finding client's hit chain only needs checking closely when it has stopped agreeing.
+
+### E1. What the check is for, and why a cheat gains nothing
+
+The server applies its own damage, always: it alone decides hits, damage, kills and rewards (part C's rule, unchanged).
+A client's chain decides only how soon **its own view** (its HP copy, its drawn hits) is put right. A client that
+claims agreement it doesn't have, or never reports, changes nothing anyone else sees and nothing the server applies;
+at worst it shows itself wrong numbers for a few seconds. So validation is about catching a client whose view has
+drifted (a bug, a lost message), cheaply, not about trust.
+
+### E2. Levels (common hits.ts `CONFIRM`, `CONFIRM_RULES`; server net/hits/ConfirmLevel.ts)
+
+| level | report (client) | judging (server) | hits found by the client | delay | hpCheck |
+|---|---|---|---|---|---|
+| **ROUGH** (0) | at most one a second (60 input ticks), when its chain changed | as part D, but waits the 54 ticks more a report may take (`reportEvery` - 6) | all it can (part D) | 0 | one ship / 3 s |
+| **NORMAL** (1) | part D: one per 6 input ticks when it changed | part D: every snapshot, after its ping + 12 ticks | all it can | 0 | one ship / s |
+| **STRICT** (2) | as NORMAL | as NORMAL, 2 ticks later | **none**: every hit told as a record (`unfindable` 'strict'; `SelfHits` skips its search) | +2 ticks of interpolation (client, `coalesceDelayMs`) and of waiting (server) | one ship / 0.5 s |
+
+- Every client starts NORMAL. **Down**: a level with no disagreement for `CLEAN_TICKS` (600 ticks, 10 s) steps down
+  one (STRICT -> NORMAL -> ROUGH). **Up**: any correction (`hitFix`), at any level, means STRICT; a lone disagreement
+  starts the clean stretch again.
+- A change takes effect at a snapshot's end on both sides (HitLedger.endSnapshot: `netCaps` with the same caps and
+  `lvl`), exactly as a caps switch does, so the server's plan and the client's search use the same level for every
+  window. The client searches the snapshot before the `netCaps` at the old level (ShipClient.findHits).
+- STRICT's two ticks: every hit is the server's record, and the records come with the snapshot; drawing two ticks
+  later means they are in before the frames that show them. The server waits as long again before judging.
+- ROUGH still catches a persistent desync within a couple of seconds: the first report after it (at most a second
+  later) misses the server's chain with odds 255/256, and two disagreements running (one snapshot apart) make the
+  correction. A client that goes silent while the server's chain moves is judged as before (silence = no change: a
+  disagreement).
+- **Server cost**: three numbers a client (`ConfirmLevel`: level, next, since) on top of part D's journal; the judging
+  is part D's per snapshot. ROUGH cuts the reports it handles from 5-10 to at most 1 a second. Without CAPS.ROUGH a
+  client stays NORMAL (part D exactly).
+
+### E3. Measured (probe, shooter, caps 31 = part D + F3 against caps 63 = + ROUGH; 3 ticks each way)
+
+Steady (measured after 800 ticks, so the caps-63 client is ROUGH throughout; same seeded fights):
+
+| scenario | reports up /s: NORMAL -> ROUGH | report bytes up B/s | hpCheck B/s down | payload B/s | disagreements | server stepMs |
+|---|---|---|---|---|---|---|
+| 2 Pips | 4.45 -> 1.0 | 13 -> 3 | 4.8 -> 1.7 | 243 -> 240 | 0 / 0 | 0.199 / 0.202 |
+| Hammerhead | 9.2 -> 1.0 | 28 -> 3 | 4.9 -> 1.7 | 552 -> 549 | 0 / 0 | 0.255 / 0.262 |
+| Gale | 9.9 -> 1.0 | 30 -> 3 | 4.8 -> 1.7 | 740 -> 737 | 0 / 0 | 0.258 / 0.260 |
+| Pirates fight | 1.95 -> 0.65 | 6 -> 2 | 3.0 -> 1.3 | 749 -> 747 | 0 / 0 | 0.250 / 0.262 |
+| Scrap Mother | 0.15 -> 0.15 | 0 -> 0 | 0.8 -> 0.8 | 1,870 -> 1,870 | 0 / 0 | 0.322 / 0.320 |
+| Debris | 6.1 -> 0.7 | 18 -> 2 | 4.5 -> 1.5 | 1,697 -> 1,694 | 0 / 0 | 0.409 / 0.387 |
+| Idle, beam, cruising | 0 | 0 | 0 | unchanged | 0 / 0 | |
+
+Messages down per second are unchanged (hits ride the snapshots' frames either way). The upstream saving is 10-27 B/s
+of report bytes when every report rides an input that goes anyway (the probe's case); a report with no input to ride
+costs a frame of its own (~70 B with headers), and ROUGH has at most one a second instead of up to 10. From the start
+(NORMAL for the first 10 s, then ROUGH) the 20-second averages fall half way: reports 8.75 -> 3.4 /s (Hammerhead),
+9.95 -> 3.9 (Gale), 9.25 -> 3.75 (debris).
+
+**A forced desync** (caps 63, 40 s, the client throws away a third of the hits it finds from 5 s to 8 s; ROUGH before):
+
+| scenario | caught (STRICT) at | hits it threw away first | corrections | level over the run (one digit per 0.5 s) |
+|---|---|---|---|---|
+| 2 Pips | 6.4 s | 4 | 2 | `00000000000002222222222222222222221111111111111111111100000000000000000000000000` |
+| Hammerhead | 5.4 s | 1 | 2 | `00000000000222222222222222222222111111111111111111110000000000000000000000000000` |
+| Gale | 5.3 s | 4 | 3 | `00000000000222222222222222222222111111111111111111110000000000000000000000000000` |
+| Debris | 6.3 s | 5 | 2 | `00000000000002222222222222222222211111111111111111111000000000000000000000000000` |
+
+Caught 0.3-1.4 s after it began, STRICT for 10 s (records for every hit: records, fixes and checks over the 40 s
+Hammerhead 58 B/s against 20 without the desync, Gale 55 against 12, Pips 15 against 2, debris 30 against 17), NORMAL
+for 10 s, then ROUGH again. The HP backstop found the client's HP wrong 0-2 times while it was off (each answered by a
+resync); the test below checks it is the server's at the end. Once STRICT, the client found nothing itself, so its own dropping stopped mattering: what it threw away was
+the hits before the level rose. The scrap mother fight has almost no hits a client can find (keyframed boss), so
+there was nothing to desync.
+
+### E4. Tests
+
+`server/src/net/hits/ConfirmLevel.test.ts` (the level's rules: up on a correction, down a level per clean stretch, a
+disagreement restarts it, a change only at a snapshot's end, NORMAL for good without ROUGH); `selfHits.test.ts`
+"adaptive validation" (a real server: a ROUGH shooter's persistent desync goes STRICT within 4 s, steps down to NORMAL
+and ROUGH, the client told each change; HP right at the end, the same impacts as the legacy observer, the other finder
+untouched).
+
+### E5. Left
+
+- A correction at ROUGH can come in two (the first covers windows before the bad report, which had agreed but were
+  not yet settled: no hits missed or wrong in it). Judging at the bad report's tick would make it one.
+- Nothing escalates for a client whose reports are just late (a bad connection): two disagreements running correct
+  it like any other. Its delay could rise with its ping instead (not built).
+- The switch: on in dev builds with client-detected hits (`?rough=0|1`, remembered); the dev server allows it
+  (`NET_CAPS` 63 elsewhere).
