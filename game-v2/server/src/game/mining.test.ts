@@ -104,11 +104,14 @@ describe('the laser crowd curve', () => {
     expect(crowdFactor(3, 1.5, 2)).toBeCloseTo((2 * 1.5 * 3) / (1.5 * 1.5 + 9), 12);
   });
 
-  /** Units a second (a full-strength 42 dps mining laser) each of `n` lasers of `gap` grades from the rock's tier gets on a `type` rock */
+  /**
+   * Units a second (a full-strength 42 dps mining laser) each of `n` lasers of `gap` grades from the rock's tier gets on a `type` rock,
+   * at the table's damagePerUnit scaled back to 12 (the curve's shape, measured in a few seconds; 'mining pace' below pins the real pace)
+   */
   function perLaser(type: string, n: number, gap = 0): number {
     let t = 0;
     const h: MiningHost = { spawnChunk: () => {}, awardXp: () => {}, notify: () => {}, tick: () => t, respawn: () => {}, crumble: () => {}, rockTier: () => 3 };
-    const m = new Mining(h, table);
+    const m = new Mining(h, { ...table, damagePerUnit: 12 });
     m.register(1, 0, 0, type, 'k', 1e6, 3);
     const before = m.remaining(1);
     for (t = 0; t < 600; t++) for (let i = 0; i < n; i++) m.extract(1, 100 + i, 42 / 60, { yield: 1.6, hardness: 3, grade: 3 + gap }, 0, 0, 1, 0);
@@ -156,7 +159,7 @@ describe('the laser crowd curve', () => {
     m.register(1, 0, 0, 'asteroid_metal', 'k', 1e6, 1);
     const before = m.remaining(1);
     for (t = 0; t < 600; t++) for (let i = 0; i < 4; i++) m.extract(1, 100 + i, 10, { yield: 0.06, hardness: 1 }, 0, 0, 1, 0);
-    expect(before - m.remaining(1)).toBe(Math.floor((600 * 10 * 0.06) / 12) * 4);
+    expect(before - m.remaining(1)).toBe(Math.floor((600 * 10 * 0.06) / table.damagePerUnit) * 4);
   });
 
   it('a hard rock with too few lasers on it says so, quietly; a soft rock says nothing', () => {
@@ -173,5 +176,31 @@ describe('the laser crowd curve', () => {
     expect(said[0]).toBe('Hard rock: works best with 4-6 lasers on it');
     // (Throttled: once every 6 seconds)
     expect(said.length).toBeLessThanOrEqual(2);
+  });
+});
+
+describe('mining pace', () => {
+  /** Seconds `n` matching mining lasers (42 dps each, grade = the system's tier) take to mine out a `size` rock of `type` */
+  function mineOut(type: string, size: number, n: number, gap = 0): number {
+    let t = 0, gone = false;
+    const h: MiningHost = { spawnChunk: () => {}, awardXp: () => {}, notify: () => {}, tick: () => t, respawn: () => {}, crumble: () => { gone = true; }, rockTier: () => 3 };
+    const m = new Mining(h, table);
+    m.register(1, 0, 0, type, 'pace', size, 3);
+    for (t = 0; t < 60 * 3600 && !gone; t++) for (let i = 0; i < n; i++) m.extract(1, 100 + i, 42 / 60, { yield: 1.6, hardness: 3, grade: 3 + gap }, 0, 0, 1, 0);
+    return t / 60;
+  }
+
+  it('one matching laser takes 5 to 10 seconds on a small soft rock, and longer on bigger ones', () => {
+    const small = mineOut('asteroid_metal', 33, 1), typical = mineOut('asteroid_metal', 60, 1), large = mineOut('asteroid_metal', 100, 1);
+    expect(small).toBeGreaterThanOrEqual(5);
+    expect(small).toBeLessThanOrEqual(10);
+    expect(typical).toBeGreaterThan(small);
+    expect(large).toBeGreaterThan(typical);
+    expect(large).toBeLessThan(30);
+  });
+
+  it('more lasers on a soft rock mine it out sooner', () => {
+    expect(mineOut('asteroid_metal', 33, 2)).toBeLessThan(mineOut('asteroid_metal', 33, 1));
+    expect(mineOut('asteroid_metal', 33, 4)).toBeLessThan(mineOut('asteroid_metal', 33, 2));
   });
 });

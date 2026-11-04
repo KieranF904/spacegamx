@@ -229,6 +229,7 @@ describe('quests: nothing is forced', () => {
     take(w, 'main_01');
     away(server, pid);
     const mining = (server as any).mining;
+    mining.table = { ...files.mining, damagePerUnit: 12 }; // (the pace is mining.test.ts's business)
     const wd = server.getWorld();
     const rock = [...Array(8000).keys()].find((e) => bitecs.entityExists(wd, e) && bitecs.hasComponent(wd, Asteroid, e) && mining.get(e)?.hardness === 1 && mining.remaining(e) >= 15)!;
     for (let i = 0; i < 160; i++) mining.extract(rock, pid, 14, files.mining.tools.fixed, Position.x[pid] + 40, Position.y[pid], -1, 0);

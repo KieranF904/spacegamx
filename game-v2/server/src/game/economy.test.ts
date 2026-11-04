@@ -82,6 +82,7 @@ describe('mining', () => {
     const soft = rocks(server, pid).find((r) => r.comp.hardness === 1 && r.comp.units >= 12)!;
     expect(soft).toBeDefined();
     const mining = (server as any).mining;
+    mining.table = { ...files.mining, damagePerUnit: 12 }; // (the pace is mining.test.ts's business: this checks the chain from rock to hold)
     // Pretend a cannon has been chipping at it for a while, from right beside the ship (11 units: chunks break off 5 to 10 at a time)
     for (let i = 0; i < 160; i++) {
       mining.extract(soft.eid, pid, 14, files.mining.tools.fixed, Position.x[pid] + 60, Position.y[pid], -1, 0);
@@ -96,6 +97,7 @@ describe('mining', () => {
     const { server, t, pid } = world();
     const rock = rocks(server, pid).find((r) => r.comp.hardness === 1)!;
     const mining = (server as any).mining;
+    mining.table = { ...files.mining, damagePerUnit: 12 }; // (the pace is mining.test.ts's business)
     const units = mining.remaining(rock.eid);
     for (let i = 0; i < 240; i++) {
       // Hold station just below the rock, nose up, guns firing
@@ -137,6 +139,7 @@ describe('mining', () => {
       Position.x[pid] = Position.x[rock.eid]; Position.y[pid] = Position.y[rock.eid] + Asteroid.size[rock.eid] + 120;
       Velocity.x[pid] = 0; Velocity.y[pid] = 0; Rotation.angle[pid] = -Math.PI / 2;
     };
+    (server as any).mining.table = { ...files.mining, damagePerUnit: 12 }; // (the pace is mining.test.ts's business)
     const units = (server as any).mining.remaining(rock.eid);
     for (let i = 0; i < 120; i++) {
       freeze();

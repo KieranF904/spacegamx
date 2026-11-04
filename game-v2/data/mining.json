@@ -2,7 +2,7 @@
   "_comment": "Mining. Every asteroid type has an ore mix and a hardness; the system's danger tier boosts rarer ores and makes gem seams more common. A shot or beam extracts ore in proportion to damage × the tool's yield, provided the tool is hard enough. Asteroids respawn after respawnSeconds.",
   "respawnSeconds": 300,
   "unitsPerSize": 0.15,
-  "damagePerUnit": 12,
+  "damagePerUnit": 96,
   "chunkUnits": [
     5,
     10
