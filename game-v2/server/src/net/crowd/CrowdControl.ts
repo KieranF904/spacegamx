@@ -16,11 +16,14 @@ import { InSystem, CROWD_BASE_WINDOW, CROWD_LEVELS, CROWD_MAX_LEVEL, CROWD_RATE_
 import type { ClientConnection } from '../ClientConnection.js';
 
 /** A system over this (ms of server time per base tick, smoothed) goes up a level */
-export const CROWD_HIGH_MS = 10;
+export const CROWD_HIGH_MS = 13;
 /** ...under this, down one */
-export const CROWD_LOW_MS = 4.5;
-/** Base ticks a level holds before it may go up again, and before it may come down */
-const UP_DWELL = 90, DOWN_DWELL = 300;
+export const CROWD_LOW_MS = 6;
+/**
+ * Base ticks a level holds before it may go up again, and before it may come down; and how long the cost must have
+ * stayed over the high mark (under the low one) all along for that
+ */
+const UP_DWELL = 90, DOWN_DWELL = 300, UP_HOLD = 30, DOWN_HOLD = 300;
 /** The smoothing (per base tick) */
 const ALPHA = 1 / 30;
 
@@ -51,6 +54,9 @@ interface SystemCrowd {
   changed: number;
   /** The tick it was last announced from (its system tick) */
   from: number;
+  /** Base ticks its cost has been over the high mark, and under the low one, without a break */
+  over: number;
+  under: number;
 }
 
 export class CrowdControl {
@@ -75,7 +81,7 @@ export class CrowdControl {
 
   private sys(system: number): SystemCrowd {
     let s = this.systems.get(system);
-    if (!s) this.systems.set(system, (s = { lv: 0, forced: null, cost: 0, now: 0, changed: -Infinity, from: 0 }));
+    if (!s) this.systems.set(system, (s = { lv: 0, forced: null, cost: 0, now: 0, changed: -Infinity, from: 0, over: 0, under: 0 }));
     return s;
   }
 
@@ -149,8 +155,10 @@ export class CrowdControl {
       s.now = 0;
       if (s.forced !== null) continue;
       if (!this.auto) { if (s.lv) this.set(system, s, 0, false); continue; }
-      if (s.cost > CROWD_HIGH_MS && s.lv < this.maxLevel && t - s.changed >= UP_DWELL) this.set(system, s, s.lv + 1, false);
-      else if (s.cost < CROWD_LOW_MS && s.lv > 0 && t - s.changed >= DOWN_DWELL) this.set(system, s, s.lv - 1, false);
+      s.over = s.cost > CROWD_HIGH_MS ? s.over + 1 : 0;
+      s.under = s.cost < CROWD_LOW_MS ? s.under + 1 : 0;
+      if (s.over >= UP_HOLD && s.lv < this.maxLevel && t - s.changed >= UP_DWELL) this.set(system, s, s.lv + 1, false);
+      else if (s.under >= DOWN_HOLD && s.lv > 0 && t - s.changed >= DOWN_DWELL) this.set(system, s, s.lv - 1, false);
       if (s.lv === 0 && s.cost < 0.01 && s.forced === null) this.systems.delete(system);
     }
   }

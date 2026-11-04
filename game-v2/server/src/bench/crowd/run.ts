@@ -15,6 +15,8 @@ export interface CaseOpts {
   bulk: 'legacy' | 'packed' | 'blocks' | 'focus';
   /** Full probe clients among the n */
   probes: number;
+  /** Crowd fallbacks on, automatic (CAPS.CROWD): the levels the scene's system reaches, and its cost settling */
+  crowd?: boolean;
   /** The probes' caps (default everything) and latency in ticks */
   caps: number;
   lat: number;
@@ -57,7 +59,7 @@ export async function runCase(o: CaseOpts): Promise<any> {
   Math.random = seed;
   clock.t = 1_000_000;
   const wallStart = performance.now();
-  const server = makeServer(16383);
+  const server = makeServer(o.crowd ? 32767 : 16383);
   const ships = server.getShips() as any, srv = server as any;
 
   // ---- the meter: wrapped before anything else, so the probes' own wrappers sit outside it ----
@@ -93,7 +95,10 @@ export async function runCase(o: CaseOpts): Promise<any> {
   const probeIdx = new Set<number>();
   for (let i = 0; i < k; i++) probeIdx.add(Math.floor((i * o.n) / k));
   let scene!: Scene;
-  const ring = new PoseRing(server);
+  // (The scene's system's tick: its own clock once dilated, --crowd)
+  let sysNum = -1;
+  const sysTick = () => (sysNum >= 0 && server.clocks ? server.clocks.tickOf(sysNum) : server.getTick());
+  const ring = new PoseRing(server, sysTick);
   const klass = classifier(server, () => scene?.bossId ?? -1);
   const bulkCaps = o.bulk === 'packed' ? 4 | 8 : o.bulk === 'blocks' ? 4 | 8 | 512 : o.bulk === 'focus' ? 4 | 8 | 512 | 1024 : 0;
   const counters = new Map<number, Counter>();
@@ -102,7 +107,7 @@ export async function runCase(o: CaseOpts): Promise<any> {
   const pids: number[] = [];
   for (let i = 0; i < o.n; i++) {
     if (probeIdx.has(i)) {
-      const p = new Probe(server, `probe${i}`, o.caps, o.lat, ring, klass);
+      const p = new Probe(server, `probe${i}`, o.caps, o.lat, ring, klass, 0, sysTick);
       probes.set(i, p);
       pids.push(p.pid);
     } else {
@@ -131,9 +136,10 @@ export async function runCase(o: CaseOpts): Promise<any> {
   for (let i = 0; i < 20; i++) { server.step(); clock.t += 1000 / 60; }
   scene = new Scene(server, o.layout, o.n);
   scene.setup(pids, probeIdx);
+  sysNum = scene.num;
 
   const stepOnce = () => {
-    const now = server.getTick();
+    const now = sysTick();
     scene.tick(now, (b) => {
       const p = probes.get(b.index);
       const c = scene.controls(b);
@@ -155,8 +161,16 @@ export async function runCase(o: CaseOpts): Promise<any> {
   const hits0 = snap(srv.hits.stats), reasons0 = snap(srv.replication.reasons), bodies0 = snap({ net: srv.bodies?.stats, rep: srv.replication.bodyStats });
   const m0 = server.getTick();
   const ticks = o.secs * 60;
+  // (--crowd: the base ticks' times, and the scene's system's level, by second)
+  const crowdSecs: { lv: number; cost: number; tickMs: number; steps: number }[] = [];
+  let secStart = tickMs.length, secSys = sysTick();
   for (let i = 0; i < ticks; i++) {
     stepOnce();
+    if (o.crowd && i % 60 === 59) {
+      const ms = tickMs.slice(secStart);
+      crowdSecs.push({ lv: srv.crowd?.levelOf(sysNum) ?? 0, cost: r2(srv.crowd?.costOf(sysNum) ?? 0), tickMs: r2(mean(ms)), steps: sysTick() - secSys });
+      secStart = tickMs.length; secSys = sysTick();
+    }
     // (what each probe holds on its tick layer: the focus grid's view, or the 40 km circle)
     if (i % 30 === 0) for (const p of probes.values()) held.push([...p.fake.reps.ids()].length);
   }
@@ -227,6 +241,13 @@ export async function runCase(o: CaseOpts): Promise<any> {
         logShipsPerSec: per(d.logShips ?? 0), refused: (d.refusedHash ?? 0) + (d.refusedSize ?? 0) + (d.refusedLate ?? 0) + (d.refusedNone ?? 0) };
     })(),
     probeClientMsPerTick: r2(mean(probeList.map((p) => p.clientMs / ticks))),
+    crowd: o.crowd ? {
+      bySecond: crowdSecs,
+      log: srv.crowd?.log ?? [],
+      // (the last third of the measured seconds: where it settled)
+      settledTickMs: r2(mean(crowdSecs.slice(-Math.max(1, Math.floor(crowdSecs.length / 3))).map((c) => c.tickMs))),
+      settledLevel: crowdSecs.at(-1)?.lv ?? 0,
+    } : undefined,
     wallSeconds: r2((performance.now() - wallStart) / 1000),
     ticks: server.getTick() - m0,
   };

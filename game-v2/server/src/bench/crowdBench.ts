@@ -9,6 +9,8 @@
  *   --n 20,100  --layouts spread,ball,cruise  --secs 10  --bulk packed|blocks|focus  --caps 2047  --probes 4  --out file.json
  *   (cruise: pilots flying out and back over 24 km, the focus grid's churn; caps 2047 = with CAPS.FOCUS)
  *   --case <layout>:<n>                    one case in this process (what the matrix runs), prints one JSON line
+ *   --crowd                                crowd fallbacks on and automatic (CAPS.CROWD, probes with every cap): each
+ *                                          second's level and base-tick time, where it settled (try --secs 40)
  */
 import { spawnSync } from 'child_process';
 import { writeFileSync } from 'fs';
@@ -23,7 +25,8 @@ const flag = (name: string) => argv.includes(`--${name}`);
 const full = flag('full');
 const opts = (layout: Layout, n: number): CaseOpts => ({
   layout, n, secs: Number(arg('secs', full ? '15' : '10')), bulk: (arg('bulk', 'legacy') as 'legacy' | 'packed' | 'blocks' | 'focus'),
-  probes: Number(arg('probes', '4')), caps: Number(arg('caps', '511')), lat: Number(arg('lat', '3')), warm: Number(arg('warm', '240')), sample: Number(arg('sample', '4')),
+  crowd: flag('crowd'),
+  probes: Number(arg('probes', '4')), caps: Number(arg('caps', flag('crowd') ? '32767' : '511')), lat: Number(arg('lat', '3')), warm: Number(arg('warm', '240')), sample: Number(arg('sample', '4')),
 });
 
 const one = arg('case');
@@ -63,6 +66,16 @@ const w = head.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i].length))
 const line = (r: string[]) => r.map((c, i) => c.padStart(w[i])).join('  ');
 console.log(`\nbulk sockets: ${arg('bulk', 'legacy')}; probes: ${arg('probes', '4')} (caps ${arg('caps', '511')}, latency ${arg('lat', '3')} ticks)\n`);
 console.log(line(head)); console.log(w.map((x) => '-'.repeat(x)).join('  ')); for (const r of rows) console.log(line(r));
+
+if (flag('crowd')) {
+  console.log('\ncrowd fallbacks (automatic): level and base-tick ms by second; settled = the last third');
+  for (const r of results) {
+    const c = r.crowd;
+    if (!c) continue;
+    console.log(`${r.layout} ${r.n}: settled level ${c.settledLevel}, ${c.settledTickMs} ms a base tick (budget ${(1000 / 60).toFixed(1)})`);
+    console.log('  ' + c.bySecond.map((s: any) => `L${s.lv}:${s.tickMs.toFixed(1)}`).join(' '));
+  }
+}
 
 const out = arg('out');
 if (out) writeFileSync(out, JSON.stringify({ when: new Date().toISOString().slice(0, 10), mode: full ? 'full' : 'quick', bulk: arg('bulk', 'legacy'), results }, null, 1));

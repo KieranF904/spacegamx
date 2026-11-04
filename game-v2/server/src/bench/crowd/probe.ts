@@ -13,9 +13,10 @@ export type Pose = Float64Array;
 /** The server's ship poses, every tick of the last 32, shared by all probes */
 export class PoseRing {
   private ticks = new Map<number, Map<number, Pose>>();
-  constructor(private server: GameServer) {}
+  /** `tick`: the scene's system's tick (its own clock once dilated: --crowd) */
+  constructor(private server: GameServer, private tick: () => number = () => server.getTick()) {}
   record(): void {
-    const ships = this.server.getShips(), t = this.server.getTick(), m = new Map<number, Pose>();
+    const ships = this.server.getShips(), t = this.tick(), m = new Map<number, Pose>();
     for (const [eid] of ships.bodies) m.set(eid, Float64Array.of(Position.x[eid], Position.y[eid], Velocity.x[eid], Velocity.y[eid], Rotation.angle[eid], ships.get(eid)?.angVel ?? 0));
     this.ticks.set(t, m);
     this.ticks.delete(t - 32);
@@ -52,13 +53,15 @@ export class Probe {
   snapshots = 0;
   clientMs = 0;
 
-  constructor(private server: GameServer, readonly name: string, caps: number, lat: number, private ring: PoseRing, private classOf: (id: number) => Klass, private onTick = 0) {
+  constructor(private server: GameServer, readonly name: string, caps: number, lat: number, private ring: PoseRing, private classOf: (id: number) => Klass, private onTick = 0,
+    /** Its system's tick (its own clock once dilated, --crowd: latency is counted in its ticks too) */
+    private tick: () => number = () => server.getTick()) {
     const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
     this.fake = new FakeHitsClient(server, {
       name, caps, env,
       defer: (data) => {
         if (this.measuring) { this.frames.push(Buffer.from(data)); this.rawBytes += data.length; this.messages++; }
-        this.down.push({ at: server.getTick() + lat, data });
+        this.down.push({ at: this.tick() + lat, data });
       },
     });
     this.pid = this.fake.pid;
@@ -105,7 +108,7 @@ export class Probe {
 
   /** After the server's step: frames that have arrived, what it owes, its messages on their way up */
   afterStep(): void {
-    const t0 = performance.now(), now = this.server.getTick(), f = this.fake as any;
+    const t0 = performance.now(), now = this.tick(), f = this.fake as any;
     while (this.down.length && this.down[0].at <= now) f.frame(this.down.shift()!.data);
     const rep = f.selfHits?.on ? f.selfHits.takeReport(true) : undefined;
     if (rep) this.repQ.push({ at: now + this.lat, v: rep });

@@ -41,6 +41,7 @@ export const CROWD_LEVELS: readonly CrowdLevel[] = [
   { focus: 10000, window: 9, rate: 45 },
   { focus: 10000, window: 9, rate: 30 },
   { focus: 10000, window: 9, rate: 20 },
+  { focus: 10000, window: 9, rate: 15 },
 ];
 
 export const CROWD_MAX_LEVEL = CROWD_LEVELS.length - 1;
