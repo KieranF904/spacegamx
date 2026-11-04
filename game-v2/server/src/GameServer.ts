@@ -147,6 +147,8 @@ import { People, type PeopleHost } from './game/People.js';
 import { Codex } from './game/Codex.js';
 import { Arenas, type ArenaHost } from './game/Arenas.js';
 import { Bosses, BossesFile } from './game/Bosses.js';
+import { ArenaGates } from './game/arenas/ArenaGates.js';
+import { CombatClock } from './game/arenas/CombatClock.js';
 import { Mobs, MobsFile } from './game/Mobs.js';
 import { Events } from './game/Events.js';
 import { AdminTools, type AdminConn, type AdminHost } from './game/AdminTools.js';
@@ -163,7 +165,7 @@ import { Replication } from './net/Replication.js';
 import { SimLod, type Plan, type Intent, type FarPose } from './ships/SimLod.js';
 import { SystemMemory, shipMemory, restoreHp, type WorldStore, type MemoryHost, type ShipMemory } from './game/SystemMemory.js';
 import { Achievements } from './game/Achievements.js';
-import { huntedBoss, RibbonsFile, mineFalloff, rayTerrain, type Terrain } from '@space-game/common';
+import { huntedBoss, RibbonsFile, mineFalloff, rayTerrain, insideArena, type Terrain } from '@space-game/common';
 import { MemoryProfileStore, type ProfileStore } from './profile/ProfileStore.js';
 import { MessageLimiter } from './net/MessageLimits.js';
 import { checkTickOrder, type TickSystem } from './tickOrder.js';
@@ -631,6 +633,10 @@ export class GameServer implements ServerCtx {
   /** Jobs' private battlegrounds */
   readonly arenas: Arenas;
   readonly bosses: Bosses;
+  /** Who was last in combat (damage dealt or taken): leaving a boss arena, enemies' recovery */
+  readonly combat = new CombatClock();
+  /** Boss arenas' barriers: passing them (game/arenas/ArenaGates.ts) */
+  readonly arenaGates: ArenaGates;
   /** Single-body enemies (data/mobs.json): what boss bays launch */
   readonly mobs: Mobs;
   readonly events: Events;
@@ -885,6 +891,17 @@ export class GameServer implements ServerCtx {
     this.bosses = new Bosses(this.createBossHost(), this.enemies, this.ships, this.gameData.bossesFile as BossesFile, this.ships.enemyDesigns);
     this.mobs = new Mobs(this.createMobHost(), this.gameData.mobsFile as MobsFile);
     this.bosses.mobs = this.mobs;
+    this.arenaGates = new ArenaGates({
+      tick: () => this.currentTick,
+      arenaOf: (num) => this.gameData.getSystemByNum(num)?.arena,
+      players: (num) => this.bosses.livePlayers(num),
+      shipRadius: (eid) => this.ships.get(eid)?.derived.radius ?? -1,
+      teleport: (eid, x, y) => this.ships.teleport(eid, x, y),
+      toast: (eid, text, kind) => { const pc = this.pilots.connOf(eid); if (pc) this.pilots.toast(pc, text, kind); },
+      warpFx: (num, x, y, out) => this.broadcastToSystem(num, { type: 'effect', effectType: out ? EffectType.WarpOut : EffectType.WarpIn, x: Math.round(x), y: Math.round(y) }),
+      combat: this.combat,
+    });
+    this.bosses.gates = this.arenaGates;
     this.enemies.mobs = this.mobs;
     this.events = new Events(this.createEventHost(), this.enemies, this.gameData.factionsFile as FactionsFile, this.gameData.rulesFile.events, this.gameData.stringsFile);
     this.party = new Party(this.createPartyHost());
@@ -1237,6 +1254,9 @@ this.devTeleport = opts.devTeleport ?? false;
         return body <= 0 || dhypot(x, y) > body + 4000;
       },
       place: (conn, num, x, y) => {
+        // (Logged out inside a boss's arena: back outside its barrier, common world/gates.ts)
+        const arena = this.gameData.getSystemByNum(num)?.arena;
+        if (arena && insideArena(arena, x, y)) { x = arena.outside.x; y = arena.outside.y; }
         // Someone's station only exists while it's loaded: back out by its jump point
         if (this.gameData.getSystemByNum(num)?.private && num !== this.devStartNum) {
           const out = this.homes.exitFor(num) ?? this.siteExit(conn as ClientConnection);
@@ -1610,6 +1630,7 @@ this.devTeleport = opts.devTeleport ?? false;
       players: alivePlayers,
       terrain: (num: number) => this.terrainOf(num),
       send: (num: number, msg: ServerMessage) => this.broadcastToSystem(num, msg),
+      arenaOf: (num: number) => this.gameData.getSystemByNum(num)?.arena,
       announce: (num: number, text: string, kind: 'info' | 'warn' | 'good' | 'bad') => {
         for (const c of this.clients.values()) if (InSystem.systemId[c.playerId] === num) this.pilots.toast(c, text, kind);
       },
@@ -2413,6 +2434,7 @@ this.devTeleport = opts.devTeleport ?? false;
       spendAmmo: (eid, kind, free) => { const pc = this.pilots.connOf(eid); return pc ? this.ammo.spend(pc, kind, free) : { scale: 1, dry: false }; },
       beamAsteroid: (eid, x, y, angle, range, damage, kind) => this.beamAsteroid(eid, x, y, angle, range, damage, kind),
       notifyDamage: (targetEid, amount, sourceEid, glancing) => {
+        this.combat.note(targetEid, sourceEid, this.currentTick);
         this.bosses?.onDamage(targetEid, amount, sourceEid);
         this.range?.onDamage(targetEid, amount);
         // (Summed per target and source until the next snapshot, net/snapshot/Outbox.ts flushDamage)
@@ -2452,8 +2474,8 @@ this.devTeleport = opts.devTeleport ?? false;
         return down;
       },
       // --- end support weapons ---
-      invulnerable: (eid) => (this.admin?.isGod(eid) ?? false) || this.dockedShips.has(eid) || this.personCraft.has(eid) || !!this.bosses?.brainOf(eid)?.invulnerable?.(),
-      takenScale: (eid) => this.bosses?.brainOf(eid)?.taken?.() ?? 1,
+      invulnerable: (eid) => (this.admin?.isGod(eid) ?? false) || this.dockedShips.has(eid) || this.personCraft.has(eid) || !!this.bosses?.invulnerable(eid),
+      takenScale: (eid) => this.bosses?.taken(eid) ?? 1,
       stageCover: (eid) => this.bosses?.stageCover(eid),
       baneFaction: (eid) => { const e = this.enemies?.info(eid); return e && !e.boss ? e.faction : undefined; },
       sheltered: (eid) => this.dockedShips.has(eid),
@@ -4146,7 +4168,7 @@ this.devTeleport = opts.devTeleport ?? false;
         const due = (t: number) => (t > now ? { respawnAt: t + offset } : {});
         const snap = {
           packs: this.enemies.capture(num, where, offset, evict),
-          bosses: this.bosses.capture(num, where, evict),
+          bosses: this.bosses.capture(num, where, evict, offset),
           traffic: this.traffic.filter((t) => t.systemNum === num).map((t) => ({ id: t.data.id, leg: t.leg, dwell: t.dwell, ...(t.eid >= 0 && this.ships.has(t.eid) ? { ship: ship(t.eid) } : due(t.respawnTick)) })),
           derelicts: this.derelicts.filter((d) => d.systemNum === num).map((d) => ({ id: d.data.id, spawns: d.spawns, ...(d.eid >= 0 && this.ships.has(d.eid) ? { ship: ship(d.eid) } : due(d.respawnTick)) })),
         };
@@ -4161,7 +4183,7 @@ this.devTeleport = opts.devTeleport ?? false;
         const adopt = (eid: number, at: FarPose) => { if (this.ships.sleep(eid, { damaged: 0, fired: 0 })) this.lod.adopt(eid, from, at); };
         const local = (t?: number) => (t === undefined ? this.currentTick : t - offset);
         this.enemies.restore(num, snap.packs ?? [], offset, mend.ships, adopt);
-        this.bosses.restore(num, snap.bosses ?? [], mend.bosses, adopt);
+        this.bosses.restore(num, snap.bosses ?? [], mend.bosses, adopt, offset);
         for (const m of snap.traffic ?? []) {
           const slot = this.traffic.find((t) => t.systemNum === num && t.data.id === m.id);
           if (!slot || slot.eid >= 0) continue;

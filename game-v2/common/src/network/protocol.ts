@@ -1,9 +1,11 @@
 import type { EconClientMessage, EconServerMessage } from './econProtocol.js';
 import type { SocialClientMessage, SocialServerMessage } from './socialProtocol.js';
 import type { ClientContribMessage, ContribServerMessage } from './contributorProtocol.js';
+import type { ClientBossDevMessage, BossServerMessage } from './bossProtocol.js';
 export * from './econProtocol.js';
 export * from './socialProtocol.js';
 export * from './contributorProtocol.js';
+export * from './bossProtocol.js';
 export * from './replication.js';
 export * from './binaryCodec.js';
 import { encodeBinary, BinaryReader, BinaryWriter, DICTIONARY } from './binaryCodec.js';
@@ -255,7 +257,8 @@ export type ClientMessage =
   | ClientSiegeMessage
   | EconClientMessage
   | SocialClientMessage
-  | ClientContribMessage;
+  | ClientContribMessage
+  | ClientBossDevMessage;
 
 /**
  * Dev tool (map click): jump to a system, optionally to a spot in it. Only
@@ -914,7 +917,8 @@ export type ServerMessage =
   | ServerSiegeStateMessage
   | EconServerMessage
   | SocialServerMessage
-  | ContribServerMessage;
+  | ContribServerMessage
+  | BossServerMessage;
 
 /**
  * The ships of a client's system it doesn't have in view (further than the

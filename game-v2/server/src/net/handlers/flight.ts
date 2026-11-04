@@ -205,6 +205,8 @@ export function handleInteract(ctx: ServerCtx, conn: ClientConnection, msg: any)
   
   // In orbit over a planet with a surface: down you go
   const here = ctx.gameData.getSystemByNum(playerSystemId);
+  // A boss arena's barrier: through it (game/arenas/ArenaGates.ts)
+  if (!hasComponent(ctx.world, Dead, playerEid) && ctx.arenaGates.interact(playerEid)) return;
   if (here && !hasComponent(ctx.world, Dead, playerEid) && ctx.surfaces.descend(conn, here, playerX, playerY)) return;
 
   // Check for nearby jump gates (rifts trigger on their own when flown into)

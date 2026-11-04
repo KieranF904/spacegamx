@@ -3331,6 +3331,12 @@
           "full": 7000
         }
       },
+      "arena": {
+        "boss": "boss_scrap_mother",
+        "centre": { "x": 0, "y": 0 },
+        "radius": 7000,
+        "outside": { "x": 0, "y": 7900 }
+      },
       "centralBody": {
         "type": "none"
       },

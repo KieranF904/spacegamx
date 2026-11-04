@@ -34,6 +34,7 @@ import { LitMesh, type Lighting } from './lighting/Lighting';
 import { rockProgram } from './lighting/rockShader';
 import { skyNoiseTexture } from './sky/noiseTexture';
 import { LavaStreams } from './LavaStreams';
+import { BarrierView } from './BarrierView';
 
 const FOOT = 0x2c2224, FACE = 0x3a3033, TOP = 0x302a2d, FAR = 0x241d21;
 /** A boulder's rings, drawn in from its outline (of its size), and how far over their faces lean (0 flat .. 1 sheer) */
@@ -102,8 +103,10 @@ const HEIGHT = ROWS.map((_, r) => {
 
 export class TerrainView {
   readonly container = new Container();
-  private lit: LitMesh;
+  private lit: LitMesh | null = null;
   private streams: LavaStreams | null = null;
+  /** A boss arena's barrier (world/gates.ts) */
+  private barrier: BarrierView | null = null;
 
   /** `cave`: a cavern (dark: its walls fall away into black past their face, the floor's glow lights their foot) */
   constructor(terrain: Terrain, private lighting: Lighting, cave = false) {
@@ -199,6 +202,9 @@ export class TerrainView {
       this.dome(g, rock, round, cx, cy, r);
     }
     tag(0, 1, -1, BOULDER_KIND);
+    if (f.gates?.length) { this.barrier = new BarrierView(f.gates); this.container.addChild(this.barrier.gfx); }
+    // (Nothing but a barrier: no rock to draw)
+    if (!g.vertexCount) return;
     this.lit = new LitMesh(g.toGeometry(undefined, { aRock: { buffer: new Float32Array(rock), format: 'float32x4' } }), {
       chunk: true, program: rockProgram(),
       resources: { uNoise: skyNoiseTexture().source, rockUniforms: { uRock: { value: new Float32Array([EXPOSED, BLACK, FOOT_GLOW, cave ? 1 : 0]), type: 'vec4<f32>' } } },
@@ -331,12 +337,13 @@ export class TerrainView {
 
   update(dt: number): void {
     this.streams?.update(dt);
+    this.barrier?.update(dt);
   }
 
   destroy(): void {
     this.streams?.destroy();
-    this.lighting.remove(this.lit);
-    this.lit.destroy();
+    this.barrier?.destroy();
+    if (this.lit) { this.lighting.remove(this.lit); this.lit.destroy(); }
     this.container.destroy({ children: true });
   }
 }

@@ -31,6 +31,8 @@ export interface TerrainFile {
   holes?: Vec2[][];
   /** Ridges of rock (look only: put their footprint in `mass` to make them solid): each a line along its crest, and its half-width and height at each point */
   ridges?: { pts: Vec2[]; w: number[]; h: number[] }[];
+  /** A boss arena's barrier (world/gates.ts, from systems.json `arena`): solid both ways, drawn as a shimmer, not rock */
+  gates?: Vec2[][];
 }
 
 interface Piece { pts: number[]; x0: number; y0: number; x1: number; y1: number }
@@ -51,7 +53,7 @@ const key = (cx: number, cy: number) => (cx + 4096) * 8192 + (cy + 4096);
 export function buildTerrain(file: TerrainFile): Terrain {
   const pieces: Piece[] = [];
   const grid = new Map<number, number[]>();
-  for (const rock of [...file.rocks, ...(file.mass ?? [])]) {
+  for (const rock of [...file.rocks, ...(file.mass ?? []), ...(file.gates ?? [])]) {
     if (rock.length < 3) continue;
     for (const c of convexDecompose(normalizePolygon(rock.map(([x, y]) => [x, y] as Vec2)))) {
       let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;

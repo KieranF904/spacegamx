@@ -15,6 +15,10 @@
  *
  * An `arena` boss has no lair out in the world: a job spawns it in a party's
  * own copy of an arena (Arenas.ts, spawnAt), once, for that fight.
+ *
+ * A lair boss whose system has an `arena` for it (systems.json, common world/gates.ts) lives by its lifecycle
+ * (bosses/Lifecycle.ts): dormant with no entity until a pilot passes its barrier inward, then waking, fighting,
+ * recovering out of combat and sinking back dormant. Its pilots are those inside the barrier (arenas/ArenaGates.ts).
  */
 
 import { IWorld } from 'bitecs';
@@ -29,6 +33,9 @@ import { PyreclastBrain } from './brains/pyreclast.js';
 import { ScrapMotherBrain } from './brains/scrapMother.js';
 import { BroodMotherBrain } from './brains/broodMother.js';
 import { SimPass } from '../sim/SystemClocks.js';
+import { Lifecycle } from './bosses/Lifecycle.js';
+import type { ArenaGates } from './arenas/ArenaGates.js';
+import { LIFE_ASLEEP_RESET, type ArenaDef } from '@space-game/common';
 
 /** Bosses with a mind of their own (bosses.json `brain`): their moves are written out in server/src/game/brains */
 const BRAINS: Record<string, (host: BrainHost) => BossBrain> = {
@@ -133,6 +140,8 @@ export interface BossHost {
   supportersOf?(player: number): number[];
   /** A brain's decision for its body (BrainHost.decide): to the clients that run bodies (net/decisions/BodyNet.ts) */
   decide?(eid: number, op: number, args: readonly number[], state: import('@space-game/common').BodyState): void;
+  /** A system's boss arena (systems.json `arena`) */
+  arenaOf?(num: number): ArenaDef | undefined;
 }
 
 interface Live {
@@ -165,6 +174,8 @@ export interface BossMemory extends ShipMemory {
   id: string;
   phase: number;
   ai?: EnemyAi;
+  /** A boss kept by its lifecycle: the world tick it was put away (back dormant and full after LIFE_ASLEEP_RESET) */
+  left?: number;
 }
 
 export class Bosses {
@@ -174,6 +185,12 @@ export class Bosses {
   private rng = mulberry32(0xb055);
   /** Single-body enemies (what brood bays launch) */
   mobs?: Mobs;
+  /** Lair bosses kept dormant until a pilot comes into their arena (bosses/Lifecycle.ts) */
+  readonly life: Lifecycle;
+  /** Boss arenas' barriers (who is inside: its pilots; a pilot passing in wakes it) */
+  private gatesRef: ArenaGates | null = null;
+  /** (dev) ships that can't be hurt (the boss tools' dummy pilots) */
+  readonly unhurt = new Set<number>();
 
   constructor(private host: BossHost, private enemies: Enemies, private ships: ShipBridge, readonly file: BossesFile, private designs: Record<string, Blueprint>) {
     enemies.bosses = {
@@ -185,6 +202,48 @@ export class Bosses {
       },
       launcher: (num, faction) => this.launcher(num, faction),
     };
+    this.life = new Lifecycle({
+      tick: () => host.tick(),
+      active: (num) => SimPass.on(num),
+      present: (num) => this.gatesRef?.present(num) ?? [],
+      players: (num) => host.players(num),
+      lastHurt: (eid) => ships.lastDamagedTick(eid),
+      spawn: (id) => { const d = this.file.bosses[id], num = d ? host.systemNum(d.system) : -1; return d && num >= 0 ? this.create(id, id, d, num, d.lair.x, d.lair.y, true) : -1; },
+      remove: (eid) => { const b = this.byEid.get(eid); if (b) this.despawn(b); },
+      heal: (eid, share) => ships.healAll(eid, share),
+      restore: (eid) => ships.repair(eid),
+      due: (id) => host.tick() >= (this.nextSpawn.get(id) ?? 0),
+      send: (num, msg) => host.send(num, msg),
+      intro: (eid) => { const b = this.byEid.get(eid); if (b) this.engage(b); },
+    });
+  }
+
+  /** The arenas' barriers (GameServer hands them over): a pilot passing inward wakes that arena's boss */
+  set gates(g: ArenaGates | null) {
+    this.gatesRef = g;
+    if (g) g.onEnter = (num) => this.life.entered(num);
+  }
+
+  get gates(): ArenaGates | null {
+    return this.gatesRef;
+  }
+
+  /** Its arena's, if it lairs in one (a lair boss of a system whose `arena` is for it) */
+  private arenaFor(id: string, def: BossDef): ArenaDef | undefined {
+    if (def.arena) return undefined;
+    const a = this.host.arenaOf?.(this.host.systemNum(def.system));
+    return a?.boss === id ? a : undefined;
+  }
+
+  /** It can't be hurt now: its brain says so (between stages), it's waking or sinking back, or it's a dev dummy */
+  invulnerable(eid: number): boolean {
+    return this.unhurt.has(eid) || !!this.byEid.get(eid)?.brain?.invulnerable?.() || (this.byEid.has(eid) && !this.life.engageable(eid));
+  }
+
+  /** What share of a hit it takes now: its brain's (braced, laid open) and its windows' (common bosses/windows.ts) */
+  taken(eid: number): number {
+    const brain = this.byEid.get(eid)?.brain;
+    return brain ? (brain.taken?.() ?? 1) * (brain.windowShare?.() ?? 1) : 1;
   }
 
   def(id: string): BossDef | undefined {
@@ -231,7 +290,10 @@ export class Bosses {
   /** Take a boss away (its arena emptied) */
   remove(eid: number): void {
     const b = this.byEid.get(eid);
-    if (b) this.despawn(b);
+    if (!b) return;
+    this.despawn(b);
+    // (one kept by its lifecycle lies dormant again, full)
+    this.life.gone(b.id);
   }
 
   /** `quiet`: brought back as it was (SystemMemory), not newly sighted */
@@ -256,9 +318,16 @@ export class Bosses {
       // Its brain flies it, from what the enemy AI would do (who to fight, where its turrets aim)
       const brain = make(this.brainHost());
       b.brain = brain;
-      this.ships.setController(eid, (id, ship) => brain.orders(this.enemies.pilot(id, ship), ship, {
-        eid: id, systemNum: b.systemNum, phase: b.phase, damage: b.def.damage * b.rage, fighters: Math.max(1, this.fighters(b)), home: b.home,
-      }));
+      this.ships.setController(eid, (id, ship) => {
+        const base = this.enemies.pilot(id, ship);
+        // (Rising out of its lair or sinking back: it holds still and does nothing)
+        if (!this.life.engageable(id)) return base && { ...base, controls: { ...base.controls, forward: false, backward: false, left: false, right: false, boost: false }, firing: false, impulse: undefined };
+        const arena = this.arenaFor(b.id, b.def);
+        return brain.orders(base, ship, {
+          eid: id, systemNum: b.systemNum, phase: b.phase, damage: b.def.damage * b.rage, fighters: Math.max(1, this.fighters(b)), home: b.home,
+          ...(arena && this.gatesRef ? { present: this.gatesRef.present(b.systemNum) } : {}),
+        });
+      });
     }
     this.live.set(key, b);
     this.byEid.set(eid, b);
@@ -293,7 +362,10 @@ export class Bosses {
   /** Damage report from the ship bridge: who's fighting a boss */
   onDamage(target: number, amount: number, source: number): void {
     const b = this.byEid.get(target);
-    if (!b || source < 0 || !this.host.players(b.systemNum).includes(source)) return;
+    if (!b) return;
+    // (Its windows count every hit, the dev tools' dummies' too)
+    b.brain?.landed?.(amount);
+    if (source < 0 || !this.host.players(b.systemNum).includes(source)) return;
     const now = this.host.tick();
     const d = b.dealt.get(source) ?? { amount: 0, last: now };
     d.amount += amount;
@@ -317,9 +389,12 @@ export class Bosses {
         if (def.arena || this.live.has(id)) continue;
         const num = this.host.systemNum(def.system);
         if (num < 0 || !SimPass.on(num)) continue;
+        // (One with an arena lies dormant: a pilot passing its barrier inward wakes it, bosses/Lifecycle.ts)
+        if (this.arenaFor(id, def)) { this.life.adopt(id, num); continue; }
         if (this.host.players(num).length > 0 && now >= (this.nextSpawn.get(id) ?? 0)) this.spawn(id);
       }
     }
+    this.life.tick();
     for (const b of [...this.live.values()]) {
       if (!this.ships.has(b.eid)) { this.forget(b); continue; }
       // (Its system's pass: crowd dilation, sim/SystemClocks.ts)
@@ -432,6 +507,7 @@ export class Bosses {
     this.host.announce(b.systemNum, `${b.def.name} is destroyed!`, 'good');
     if (!b.def.arena) this.nextSpawn.set(b.id, now + b.def.respawnSeconds * 60);
     this.forget(b);
+    this.life.gone(b.id);
   }
 
   private rollLoot(def: BossDef): Bag {
@@ -448,13 +524,17 @@ export class Bosses {
    * out). `evict`: and taken out of the world, quietly (not a kill: no respawn
    * clock, nothing paid)
    */
-  capture(num: number, where: (eid: number) => FarPose, evict: boolean): BossMemory[] {
+  capture(num: number, where: (eid: number) => FarPose, evict: boolean, offset = 0): BossMemory[] {
     const out: BossMemory[] = [];
     for (const b of [...this.live.values()]) {
       if (b.systemNum !== num || b.def.arena || b.key !== b.id) continue;
-      const ship = this.ships.get(b.eid);
-      if (ship) out.push({ id: b.id, phase: b.phase, ...shipMemory(ship, where(b.eid)), ai: this.enemies.aiOf(b.eid) });
-      if (evict) this.despawn(b);
+      const ship = this.ships.get(b.eid), kept = this.life.manages(b.id);
+      // (One kept by its lifecycle, waking or sinking back: it's simply dormant, full, when its system comes back)
+      const st = this.life.stateOf(b.id);
+      if (ship && !(kept && (st === 'waking' || st === 'sleeping'))) {
+        out.push({ id: b.id, phase: b.phase, ...shipMemory(ship, where(b.eid)), ai: this.enemies.aiOf(b.eid), ...(kept ? { left: this.host.tick() + offset } : {}) });
+      }
+      if (evict) { this.despawn(b); if (kept) this.life.reset(b.id); }
     }
     return out;
   }
@@ -464,11 +544,17 @@ export class Bosses {
    * less `heal` of each part's max, in the phases their hulls now call for
    * (mended past one, it's back before it), quietly; handed to `adopt`
    */
-  restore(num: number, list: BossMemory[], heal: number, adopt: (eid: number, pose: FarPose) => void): void {
+  restore(num: number, list: BossMemory[], heal: number, adopt: (eid: number, pose: FarPose) => void, offset = 0): void {
     for (const m of list) {
       const def = this.file.bosses[m.id];
       if (!def || def.arena || this.live.has(m.id) || this.host.systemNum(def.system) !== num) continue;
+      // (Kept by its lifecycle: away as long as its recovery takes, it's back dormant and full; sooner, as it was, recovering)
+      if (this.arenaFor(m.id, def)) {
+        this.life.adopt(m.id, num);
+        if (m.left === undefined || this.host.tick() + offset - m.left >= LIFE_ASLEEP_RESET) continue;
+      }
       const eid = this.create(m.id, m.id, def, num, m.x, m.y, true);
+      if (this.arenaFor(m.id, def)) this.life.resume(m.id, eid);
       const b = this.byEid.get(eid), ship = this.ships.get(eid);
       if (!b || !ship) continue;
       Rotation.angle[eid] = m.a; Velocity.x[eid] = m.vx; Velocity.y[eid] = m.vy;
@@ -524,6 +610,11 @@ export class Bosses {
     if (this.enemies.targetOf(eid) >= 0 || b.novaAt >= 0) return true;
     if (b.brain && !(b.brain.idle?.() ?? false)) return true;
     return (this.mobs?.ownedBy(b.systemNum, eid) ?? 0) > 0;
+  }
+
+  /** Living pilots in a system (as bosses count them: not hidden admins, not docked) */
+  livePlayers(num: number): number[] {
+    return this.host.players(num);
   }
 
   /** Living bosses in a system, for the snapshot */

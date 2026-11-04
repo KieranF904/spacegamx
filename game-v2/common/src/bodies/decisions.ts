@@ -13,15 +13,18 @@
  *   SIDE    [side]: which way round it circles (1: clockwise as the brain counts it, 0 the other)
  *   STAGE   [stage]: the stage it fights in (its range, circle and drive)
  *   WANT    [...want]: what its move wants of the ship (WANT below)
+ *   PERSONAL [slot, attack, seed]: a personal attack drawn (common bosses/personal.ts): on the pilot in that slot of the
+ *           boss's pilot list, from its stage's pool, with its own seed. Its body's flight doesn't change (the attack's
+ *           shots and strikes are the boss's, told the usual way): clients may play its tell from it
  */
 
 import { quantizeCursorAngle } from '../network/cursorState.js';
 import { ownSimCaps } from '../network/ownTick.js';
 import { CAPS } from '../network/hits.js';
 
-export const DECISION = { SYNC: 0, OFF: 1, TARGET: 2, SIDE: 3, STAGE: 4, WANT: 5 } as const;
+export const DECISION = { SYNC: 0, OFF: 1, TARGET: 2, SIDE: 3, STAGE: 4, WANT: 5, PERSONAL: 6 } as const;
 /** Ops there are (a row whose op is past this is dropped) */
-export const DECISION_OPS = 6;
+export const DECISION_OPS = 7;
 
 /**
  * A want: [kind, ...args], angles in the 13-bit aim quantisation (q13)

@@ -46,6 +46,8 @@ export interface BossView {
   fighters: number;
   /** Where it holds ground (its lair): it keeps near here, out of the rock round it */
   home: { x: number; y: number };
+  /** Its pilots, in slot order: those inside its arena (the dev tools' dummies too); absent, those near it */
+  present?: number[];
 }
 
 export interface BossBrain {
@@ -67,6 +69,29 @@ export interface BossBrain {
   invulnerable?(): boolean;
   /** What share of a hit it takes now (braced, or laid open): absent, all of it */
   taken?(): number;
+  /** What share its weak-point windows let through now (common bosses/windows.ts): absent, all of it */
+  windowShare?(): number;
+  /** Damage it took (as taken): counted into its window (a crack's bonus follows) */
+  landed?(amount: number): void;
+  /** What it's doing now, for the dev damage log (its move, or whose personal attack) */
+  readonly fight?: { cause: string };
+}
+
+/** What the boss tools (game/dev/bossDev.ts) can ask of a brain that has them (StagedBrain) */
+export interface BossDevHooks {
+  devHold: boolean;
+  readonly moveName: string;
+  readonly stageNow: number;
+  devMoves(): string[];
+  devPersonal(): string[];
+  devPlay(name: string): void;
+  devWindow(name?: string): void;
+  devPersonalOn(name: string, target: number): boolean;
+  readonly fight: import('./fightRules.js').FightRules;
+}
+
+export function devHooks(b: BossBrain | undefined): BossDevHooks | undefined {
+  return b && typeof (b as Partial<BossDevHooks>).devPlay === 'function' ? (b as unknown as BossDevHooks) : undefined;
 }
 
 /** Parts still on the ship whose function has this ability (bosses' own parts: functions.json `ability`) */

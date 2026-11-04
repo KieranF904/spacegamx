@@ -431,6 +431,7 @@ const SHAPES: Record<string, Spec> = {
         'arena?': obj({ boss: 'xy', entry: 'xy' }), 'landing?': 'xy', 'fixedWalls?': 'boolean',
       }),
       'instance?': obj({ slots: 'number' }), 'private?': 'boolean', 'visuals?': 'any',
+      'arena?': strict({ boss: 'string', centre: 'xy', radius: 'number', 'barrier?': arr(arr('number')), outside: 'xy' }),
       'pocket?': strict({
         entrance: strict({ system: 'string', x: 'number', y: 'number', radius: 'number', name: 'string', 'look?': strict({ kind: oneOf('dig', 'scrap', 'den', 'roost', 'sift', 'shrine', 'knot', 'dock'), faction: 'string', 'scale?': 'number' }) }),
         landing: 'xy', radius: 'number', 'dread?': obj({ x: 'number', y: 'number', from: 'number', full: 'number' }),
@@ -810,6 +811,15 @@ export function validateGameData(files: GameDataFiles, opts: ValidateOptions = {
         if (isObj(pk.entrance.look)) faction(F, `${P}.pocket.entrance.look.faction`, pk.entrance.look.faction);
         if (s.surface) c.err(`${P}.pocket`, 'a system is a surface or a pocket, not both', F);
         if (isObj(pk.landing) && typeof pk.radius === 'number' && dhypot(pk.landing.x, pk.landing.y) >= pk.radius) c.err(`${P}.pocket.landing`, `outside its edge (radius ${pk.radius}): you'd be sent straight back out`, F);
+      }
+      // A boss arena: its boss lairs here, and where a pilot is put out of it is outside it
+      const ar = s?.arena;
+      if (isObj(ar)) {
+        const bd = bosses.get(ar.boss);
+        if (!bd) c.err(`${P}.arena.boss`, `no boss "${ar.boss}" in bosses.json`, F);
+        else if (bd.system !== s.id || bd.arena) c.err(`${P}.arena.boss`, `"${ar.boss}" doesn't lair in "${s.id}"`, F);
+        if (isObj(ar.outside) && isObj(ar.centre) && typeof ar.radius === 'number' && dhypot(ar.outside.x - ar.centre.x, ar.outside.y - ar.centre.y) <= ar.radius + 100) c.err(`${P}.arena.outside`, 'inside the arena: a pilot put out would be put back in', F);
+        if (ar.barrier !== undefined && (!Array.isArray(ar.barrier) || ar.barrier.length !== 2 || ar.barrier.some((p: unknown) => !Array.isArray(p) || p.length !== 2))) c.err(`${P}.arena.barrier`, 'two points, [[x, y], [x, y]]', F);
       }
       list(s?.planets).forEach((pl, j) => {
         const pp = `${P}.planets[${j}]`;

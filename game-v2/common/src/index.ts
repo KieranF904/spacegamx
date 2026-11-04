@@ -42,6 +42,7 @@ export * from './world/planets.js';
 export * from './world/nests.js';
 export * from './world/pockets.js';
 export * from './world/contributorNotes.js';
+export * from './world/gates.js';
 
 
 // Game systems
@@ -62,5 +63,7 @@ export * from './econ/index.js';
 export * from './terrain.js';
 // Decision inputs: bosses' bodies, the same on both sides (docs/design/decision-inputs.md)
 export * from './bodies/index.js';
+// Boss rules both sides share: windows, personal attacks, a lair boss's life (docs/bosses/rework-2026-11.md)
+export * from './bosses/index.js';
 // Scheduled waypoints: homing shells flown by the shared law on both sides (docs/design/awareness-model.md 6.3)
 export * from './guidance/index.js';

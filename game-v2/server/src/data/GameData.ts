@@ -2,7 +2,7 @@
  * Data Loader - Loads and indexes game data from JSON files
  */
 
-import { buildTerrain, type Terrain, type TerrainFile } from '@space-game/common';
+import { buildTerrain, withArenaGates, type Terrain, type TerrainFile } from '@space-game/common';
 import {
   ItemDef,
   RecipesFile,
@@ -198,7 +198,10 @@ export class GameData {
   /** A surface's rock (built once), or undefined where there's none */
   terrain(systemId: string): Terrain | undefined {
     let t = this.terrains.get(systemId);
-    if (!t && this.terrainFiles[systemId]) this.terrains.set(systemId, (t = buildTerrain(this.terrainFiles[systemId])));
+    if (t) return t;
+    // (A boss arena's barrier is part of its rock: world/gates.ts)
+    const file = withArenaGates(this.terrainFiles[systemId], this.systems.get(systemId)?.arena);
+    if (file) this.terrains.set(systemId, (t = buildTerrain(file)));
     return t;
   }
 

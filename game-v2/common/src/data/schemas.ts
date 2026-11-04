@@ -486,6 +486,8 @@ export interface StarSystemData {
   private?: boolean;
   /** A pocket of space reached from a spot in another system rather than by gate (a boss's nest; not on the galaxy map) */
   pocket?: PocketData;
+  /** A lair boss's enclosed arena: its barrier is solid both ways, passed by interact (world/gates.ts) */
+  arena?: import('../world/gates.js').ArenaDef;
   /** Data-driven visual overrides */
   visuals?: SystemVisualsData;
   /** Visual hazard tags (the screen treatment) */

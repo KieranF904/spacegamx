@@ -21,6 +21,7 @@ import type { Quests } from '../game/Quests.js';
 import type { People } from '../game/People.js';
 import type { Codex } from '../game/Codex.js';
 import type { Arenas } from '../game/Arenas.js';
+import type { ArenaGates } from '../game/arenas/ArenaGates.js';
 import type { AdminTools } from '../game/AdminTools.js';
 import type { ContributorNotes } from '../game/ContributorNotes.js';
 import type { Sieges } from '../game/Sieges.js';
@@ -93,6 +94,8 @@ export interface ServerCtx {
   readonly people: People;
   readonly codex: Codex;
   readonly arenas: Arenas;
+  /** Boss arenas' barriers (interact passes them) */
+  readonly arenaGates: ArenaGates;
   readonly admin: AdminTools;
   readonly contrib: ContributorNotes<ClientConnection>;
   readonly sieges: Sieges;
