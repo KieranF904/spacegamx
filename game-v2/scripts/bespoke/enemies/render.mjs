@@ -9,6 +9,8 @@
  *   node scripts/bespoke/enemies/build-all.mjs && node scripts/bespoke/enemies/render.mjs [outDir] [mirrorDir]
  *   (outDir default docs/panels/2026-11-04/enemies; mirrorDir default <os tmp>/enemy-roster-render)
  *   ONLY=id1,id2  just those designs;  REFS=1  the Pyreclast and Scrap Mother too (to judge against)
+ *   Every design also at play zoom (the game's default, 1): intact and damaged, and the grid enemy it replaces intact and
+ *   damaged (-play, -play-damaged, -play-before, -play-before-damaged), with the starter ship (ref-starter-play) beside
  */
 import { spawn } from 'child_process';
 import { readFileSync, cpSync, existsSync, mkdirSync, readdirSync, rmSync, symlinkSync, writeFileSync, copyFileSync, openSync } from 'fs';
@@ -42,6 +44,8 @@ for (const m of metas) {
   for (const v of [m.id, `${m.id}_damaged`]) copyFileSync(join(DESIGNS, `${v}.json`), join(BP, `${v}.json`));
   if (m.replaces) copyFileSync(join(root, 'data/ships/blueprints/enemy', `${m.replaces}.json`), join(BP, `before_${m.replaces}.json`));
 }
+// (the starter ship, at play zoom beside them: a starter's first fights)
+copyFileSync(join(root, 'data/ships/blueprints/sparrow-t.json'), join(BP, 'ref_sparrow-t.json'));
 const REFS = process.env.REFS === '1';
 if (REFS) for (const id of ['pyreclast', 'pyreclast_heart', 'scrap_mother']) {
   copyFileSync(join(root, 'data/ships/bespoke', `${id}.json`), join(ships, 'bespoke', `${id}.json`));
@@ -110,7 +114,10 @@ for (const m of metas) {
   if (m.replaces) SHOTS.push([`${m.id}-before`, `before_${m.replaces}`, { zoom, sky, heat: 1, damage: 0 }]);
   // (at flight zoom: the game's default, 1, and zoomed out, 0.45; small frames, as big as it is on screen)
   SHOTS.push([`${m.id}-play`, m.id, { zoom: 1, w: 480, h: 480, sky, heat: 1, damage: 0 }], [`${m.id}-far`, m.id, { zoom: 0.45, w: 240, h: 240, sky, heat: 1, damage: 0 }]);
+  SHOTS.push([`${m.id}-play-damaged`, `${m.id}_damaged`, { zoom: 1, w: 480, h: 480, sky, heat: 1, damage: 0.4 }]);
+  if (m.replaces) SHOTS.push([`${m.id}-play-before`, `before_${m.replaces}`, { zoom: 1, w: 480, h: 480, sky, heat: 1, damage: 0 }], [`${m.id}-play-before-damaged`, `before_${m.replaces}`, { zoom: 1, w: 480, h: 480, sky, heat: 1, damage: 0.4 }]);
 }
+if (!SURF) SHOTS.push(['ref-starter-play', 'ref_sparrow-t', { zoom: 1, w: 480, h: 480, sky: 'sol', heat: 1, damage: 0 }]);
 if (REFS) SHOTS.push(['ref-pyreclast', 'pyreclast', { zoom: 'fit', sky: 'ashfall_cavern', heat: 1, damage: 0 }], ['ref-scrap-mother', 'scrap_mother', { zoom: 'fit', sky: 'sol_scrap_nest', heat: 1, damage: 0 }]);
 
 const log = join(M, 'service.log');

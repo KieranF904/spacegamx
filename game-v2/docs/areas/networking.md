@@ -170,6 +170,21 @@ too (`remove`). Not on it: guided shells (they follow the owner's cursor), AI sh
 Tests: common/src/guidance/waypoints.test.ts, server/src/net/guides/guides.test.ts (scene:
 server/src/bench/guides/guideScene.testkit.ts). Measured: docs/audits/waypoints-2026-11-04.md.
 
+### Mob volleys (`CAPS.LAUNCHES` 262144, with WAYPOINTS; protocol 48, no wire change)
+A volley of mobs laid at once (a Rivet Sower's mines, `Mobs.launch`) is one guide row:
+`LAUNCH [turn, accel, max, arm, x, y, line, n, ring, gap, ...ids]`. The fields are:
+- the mobs' guide kind, as a SYNC carries it
+- the pattern round a point on the guide grid: along a q13 line `gap` apart, or in a ring of radius `gap`
+- the ids in spot order, as `packIds` runs
+
+`common/src/guidance/launch.ts` has `launchSpots`, `launchArgs` and `launchOfArgs`. The server lays the mobs with the
+same `launchSpots`.
+
+`GuideNet.launchRows` offers each volley once to each client, by sequence. A volley laid between ticks is as of a tick
+the client's last snapshot may already have covered. It is offered only while every one of its mobs is still there as
+laid, in the client's system and in range; otherwise each mob gets a SYNC, as for any mob. The client's `GuideRunner`
+makes each mob's run from the row.
+
 ### The enemy AI's pilots (`CAPS.PILOTS` 8192, with BODIES; protocol 40, no wire change)
 Dev builds (`?pilots=0|1`). Enemies.ts's think is the commander (server only: state, target, waypoint, strafe side,
 aim-error seed); the rest of its flight is common bodies/aiPilot.ts, run for every AI ship on the server
@@ -258,14 +273,14 @@ Debris then drifts and knocks into other debris only (ships ignore it), push onl
 - `npx vitest run server/src/net/snapshot` : packed frames on a real fight (every packed message decoded on the side and compared; a packed and a base-format observer see the same; switching off and on; coalescing).
 - `npx vitest run server/src/net` : replication/keyframes (`replication.test.ts`), lodestones, ship view, socket limits (`socketTransport.test.ts`), confirmed hits parity (`hits/confirmedHits.test.ts`: a capable and a legacy client in the same fight end with the same HP, damage, fires and removals).
 - `npx vitest run server/src/proto server/src/game/robustness.test.ts` : transport and hostile input.
-- `npx vitest run common/src/guidance server/src/net/guides` : homing shells and mobs on the tick layer (CAPS.WAYPOINTS): derived, sent, the switch, a drift caught, legacy rows.
+- `npx vitest run common/src/guidance server/src/net/guides` : homing shells and mobs on the tick layer (CAPS.WAYPOINTS): derived, sent, the switch, a drift caught, legacy rows; a volley of mines as LAUNCH rows (CAPS.LAUNCHES).
 - Bandwidth bench: `cd server && npm run bench:net` (server/src/bench/netBench.ts).
 - `npx vitest run server/src/net/cells client/src/ships/cells` : the focus grid (leaving and coming back with and without the cache, a bad hash, the 19 km edge, jumps, a new system; the cache's hash covers only the ships it kept).
 - `npx vitest run server/src/net/causes server/src/net/own server/src/net/decisions server/src/net/debris server/src/net/crowd` : causes, the own ship, bodies and AI pilots, debris lives, crowd fallbacks; every held ship exact at every snapshot.
 - Crowd bench: `cd server && npm run bench:crowd -- --full --bulk focus --caps 245759` (every cap but CROWD), `--crowd` for the fallbacks. A caps matrix (each bit off in turn, `--case ball:50 --caps N`) is how the review checked each bit restores the old path; numbers in docs/audits/netcode-all-2026-11.md.
 
 ## Gotchas
-- The lockstep caps depend on each other: OWN_SIM needs OWN_SHOTS; BODIES, CAUSES, WAYPOINTS and CARGO need OWN_SIM; PILOTS needs BODIES and CAUSES; STRUCTS needs CAUSES; BLOCKS needs PACKED. Use the `*For(caps)` helpers (`causesFor`, `pilotsFor`, `structsFor`...), never a bare bit test. The table is in docs/design/awareness-model.md section 12.
+- The lockstep caps depend on each other: OWN_SIM needs OWN_SHOTS; BODIES, CAUSES, WAYPOINTS and CARGO need OWN_SIM; PILOTS needs BODIES and CAUSES; STRUCTS needs CAUSES; LAUNCHES needs WAYPOINTS; BLOCKS needs PACKED. Use the `*For(caps)` helpers (`causesFor`, `pilotsFor`, `structsFor`...), never a bare bit test. The table is in docs/design/awareness-model.md section 12.
 - The crowd bench's server allows every cap but CROWD unless `--crowd` (before the review it allowed only 16383, so STRUCTS, CARGO and DEBRIS were silently off in plain runs).
 - Changing a wire table without a bump makes every cached client mis-decode silently. Do not repin the hash alone; use `wire:bump`.
 - Pilot-row groups shift later fields; Strafer/Tow extras were appended after them for that reason.

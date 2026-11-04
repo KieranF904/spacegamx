@@ -1,11 +1,82 @@
-# Custom enemy roster (design only, 2026-11-04)
+# Custom enemy roster (designed 2026-11-04, in the game 2026-11-05)
 
 Kieran: "more custom geometry enemies that don't fit strictly in the grid-shaped cell layout. The more of these we
 have, the less we need to re-make everything every time we change ship mechanics."
 
-Eight small and medium enemies built from bespoke pieces (any polygon), the way the Pyreclast and the Scrap Mother
-are. Five replace a grid enemy, three are new. **Nothing here is in the game**: no file is in `data/`, and the live
-enemies are unchanged.
+Nine small and medium enemies are built from bespoke pieces (any polygon), the way the Pyreclast and the Scrap Mother
+are. Six replace a grid enemy and three are new.
+
+## What's built (2026-11-05)
+
+**In the game, in the old types' spawns.** `factions.json` `custom.types` puts each design in the place of a ship type:
+
+| Design | Replaces |
+|---|---|
+| Censer | `cinder_zealot` |
+| Maw Lurker | `maw_lurker` |
+| Hookboat | `pirate_raider` |
+| Rime Bell | `frost_shard` |
+| Scrap Crawler | `scrap_crawler` |
+| Helios Drone | `helios_drone` (new, below; also the training drone) |
+
+The grid blueprints stay in `data/ships/blueprints/enemy/`, but nothing spawns them. Three were renamed
+`grid_scrap_crawler`, `grid_maw_lurker` and `grid_helios_drone`, because the custom designs took their names.
+
+**Built, not placed.** Rivet Sower, Slag Ray and Clinker have hulls, moves and stats. The Scrap Mother's and the
+Pyreclast's stages place them in their dens.
+
+**Open questions 1 to 3, settled:**
+1. **Groups.** A blueprint part has an optional `group` (0 to 7). The order is fixed in
+   `common/src/bodies/custom/roster.json`, core first, and only rigid designs use it.
+   - A part going down takes the rest of its group with it (`common/src/ships/groups.ts`, `state.ts damagePart`).
+     The rebuild treats a gone group as not intact.
+   - Which groups are gone is one byte. It rides in the custom order, which already travels as a decision, so no
+     damage row is added.
+2. **Stats.** They are in an enemy-side table, `factions.json` `custom.designs`:
+   - range and reach
+   - HP per group at Mk I (shared among the group's parts by area)
+   - each move's numbers and the guns between moves
+   - firepower, for ratings
+
+   The enemy AI no longer reads reach from a custom design's weapon parts.
+3. **Grades.** `custom.grades` scales HP and damage for Mk I to V: hp 1 to 3.6, damage 1 to 2.6. Elites also take
+   `rules.eliteHp`. `Enemies.design` no longer regrades a custom design's materials, so it looks the same at every
+   grade. Faction `hpScale` and `damageScale` don't apply.
+
+**Size (question 4).** The replacements keep the bigger, readable size: radius 123 to 183. The den enemies are kept
+on the order of the grid enemies they live among: Scrap Crawler 102, Rivet Sower 100, Slag Ray 107 and Clinker 96 in
+the generators' units (100 to 107 in the game's). That is about a grid Scrapborn hulk (113) or a Cinder Brand (109).
+Their pieces still read at play zoom (`docs/panels/2026-11-05/enemies/*-play-zoom.png`). The Scrap Crawler does
+both jobs at den size.
+
+**Materials (question 5).** The Maw has `maw_slate` and `maw_glass`, and the pirates have `pirate_plate` and
+`pirate_paint` (protocol 48). The Maw Lurker and the Hookboat are drawn in them.
+
+**Moves.**
+- **Shared code.** Each design's flight is a module in `common/src/bodies/custom/<id>.ts`. It rides on the shared AI
+  pilot body as `AI_ORDER.CUSTOM`. That is the enemy AI's ENGAGE with the design index, the groups gone, and the
+  move under way with its argument, an 8-bit seed and its start tick. The steps are explicit.
+- **Server side.** What a move does to the world is the server's: `server/src/game/custom/` has `CustomEnemies.ts`,
+  `moves.ts` and `kit.ts`.
+- **Rule 6.** Every piece is read at the tick it acts.
+- **Fire.** Shots go through the boss shot path (`GameServer.hostileShot`), not part guns.
+- **Pulls.** A pull on a pilot made while the pilotless ships step is applied after they all have
+  (`ShipBridge.pushQueue`). This way a body reads its target as its clients do.
+
+**The Clinker's `under` rule.** It now works outside a boss's stages (`common/src/ships/hitRules.ts underCover`).
+While a plate covers a spot, a hit on the magma there goes to the plate. Once the plate is gone, the magma takes it.
+
+**The Sower's mines.** They are a new `mine` mob behaviour (`rivet_mine`). A volley is one guide row, `LAUNCH`,
+behind `CAPS.LAUNCHES` (262144). The row carries the pattern around a point on the guide grid and the ids as runs.
+Each mine is run from that row, with no SYNC per mine (`common/src/guidance/launch.ts`).
+
+**Tests.** Every design's moves and lost pieces are exact on the tick layer, with no control rows
+(`server/src/net/decisions/customEnemies.test.ts`). That includes the Sower's mines, laid mid-tick, on a
+`LAUNCHES` client. `server/src/game/custom/custom.test.ts` covers:
+- groups
+- the under rule
+- the tables
+- that every design holds together as built
 
 - Generators: `scripts/bespoke/enemies/<id>.mjs` (shared helpers in `kit.mjs`; `build-all.mjs` runs them all). They
   write to `docs/enemies/designs/`: `<id>.pieces.json` (the bespoke pieces), `<id>.json` (the design),
@@ -52,6 +123,7 @@ changes what the enemy does, so there's a reason to aim.
 | 6 | Maw Lurker | Maw Spawn | `maw_lurker` | sniper | 165 | 7 / 6 | 24-30 | high |
 | 7 | Hookboat | Pirates | `pirate_raider` | puller | 138 | 11 / 5 | 8-12 | medium |
 | 8 | Rime Bell | Frost Brood | `frost_shard` | swarmer / support | 125 | 6 / 5 | 6-9 | low |
+| 9 | Helios Drone | Helios Drones | `helios_drone` | passive / welder | 73 | 11 / 6 | 1-3 | low |
 
 Radius is in world units (24 to a cell). The grid enemies they replace are about 60-100 across their radius. The
 custom ones are a little bigger so their pieces read at game zoom; each design's `scale` in `write()` is a single
@@ -175,6 +247,25 @@ membrane frill around its back edge, three crystal tendrils trailing.
   matches how the game's people talk about them (Maya: "animal behaviour"). Six parts make it cheap enough to send in
   swarms.
 
+### 9. Helios Drone (Helios Drones, Sol; replaces `helios_drone`; added 2026-11-05)
+
+One of the Array's maintenance drones that strayed, as `docs/lore-canon.md` has them. It is drawn as Directorate
+engineering:
+- a clean titanium service chassis with gold trim and stencilled hatches
+- a sensor dome lit on one half and cracked dark on the other (half-blind)
+- a jointed welding arm ending in a torch
+- two folding solar panels and one small drive
+
+It is a starter's first kill, a little smaller than the starter ship.
+
+- **Behaviour:** passive. It drifts on its round and noses in to weld whatever comes within reach (`torch`).
+- **Pieces:**
+  - `torch`: gone, it can't weld.
+  - `eye`, `panel_l`, `panel_r`: these do nothing to its flight.
+  - `drive`: gone, it drifts.
+  - `core`: the service cell under the chassis.
+- No new lore or player-facing text. Its name and faction are the ones the game already had.
+
 ## Build notes (on the existing architecture)
 
 **Hull.** Each is a bespoke design like the bosses: `data/ships/bespoke/<id>.json` plus
@@ -217,6 +308,8 @@ with ports, so the energy rework leaves them alone. Their `fn` in the blueprint 
 travels today. That's the same as or less than a grid enemy.
 
 ## Open questions
+
+(Questions 1 to 6 are settled: see "What's built" at the top. The original text is kept below.)
 
 1. **The `group` field**: add it to blueprint parts (and shed groups together in `ShipBridge`), or keep one polygon
    per destroyable piece and live with fewer shapes? The designs assume `group`.
