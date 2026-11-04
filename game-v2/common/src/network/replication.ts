@@ -360,6 +360,11 @@ export class ShipReplicaSet {
     r.last = Math.max(...r.hist.keys(), -Infinity);
   }
 
+  /** Its replica's mode as last heard (undefined: not held): a pilot's is stepped before other ships each tick */
+  modeOf(id: number): ReplicaMode | undefined {
+    return this.reps.get(id)?.mode;
+  }
+
   /** Is this ship docked (riding inside its station) as last heard */
   isDocked(id: number): boolean {
     return this.reps.get(id)?.mode === ReplicaMode.Docked;

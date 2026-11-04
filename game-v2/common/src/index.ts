@@ -61,3 +61,5 @@ export * from './econ/index.js';
 export * from './terrain.js';
 // Decision inputs: bosses' bodies, the same on both sides (docs/design/decision-inputs.md)
 export * from './bodies/index.js';
+// Scheduled waypoints: homing shells flown by the shared law on both sides (docs/design/awareness-model.md 6.3)
+export * from './guidance/index.js';

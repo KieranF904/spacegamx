@@ -15,10 +15,11 @@ import { ConfirmedHits, type HitShell, type HitsOutcome, type OwnHit } from '../
 import { SelfHits, toldHits } from '../../../../client/src/ships/hits/SelfHits.js';
 import { OwnTick } from '../../../../client/src/ships/own/OwnTick.js';
 import { BodyRunner } from '../../../../client/src/ships/bodies/BodyRunner.js';
+import { GuideRunner } from '../../../../client/src/ships/guides/GuideRunner.js';
 import { CellCache } from '../../../../client/src/ships/cells/CellCache.js';
 import { ShipCauses } from '../../../../client/src/ships/causes/ShipCauses.js';
 import { DebrisSplits } from '../../../../client/src/ships/debris/DebrisSplits.js';
-import { bodiesFor, causesFor } from '@space-game/common';
+import { bodiesFor, causesFor, waypointsFor, type GuideBody } from '@space-game/common';
 import { ownSimFor } from '../snapshot/ownShots.js';
 import type { GameServer } from '../../GameServer.js';
 
@@ -36,6 +37,8 @@ export interface FakeHitsOptions {
    * are drawn). Nothing on its tick-aligned layer may depend on it (the tests and the probe check that)
    */
   predictionError?: (tick: number) => { dx: number; dy: number; da: number } | null;
+  /** A homing shell it runs stepped to tick t (CAPS.WAYPOINTS: compared with the server's) */
+  onGuideStep?: (id: number, t: number, m: Readonly<GuideBody>) => void;
 }
 
 export class FakeHitsClient {
@@ -48,6 +51,8 @@ export class FakeHitsClient {
   readonly own: OwnTick | null = null;
   /** Bosses flown by their bodies on its tick-aligned layer (CAPS.BODIES: client ships/bodies/BodyRunner.ts) */
   readonly bodies: BodyRunner | null = null;
+  /** Homing shells flown on its tick-aligned layer (CAPS.WAYPOINTS: client ships/guides/GuideRunner.ts) */
+  readonly guides: GuideRunner | null = null;
   readonly shells = new Map<number, HitShell>();
   /** Dropped cells it keeps (CAPS.FOCUS: client ships/cells/CellCache.ts) */
   readonly cells: CellCache;
@@ -114,8 +119,9 @@ export class FakeHitsClient {
         passes: (shell) => this.hits!.passesOf(shell),
       });
     }
-    if (ownSimFor(opts.caps)) this.own = new OwnTick({ store: this.store, reps: this.reps, self: () => this.pid, tuning: ships.tuning, restep: () => !!this.bodies?.on, extraHash: (t) => this.causes?.heldByte(t) });
+    if (ownSimFor(opts.caps)) this.own = new OwnTick({ store: this.store, reps: this.reps, self: () => this.pid, tuning: ships.tuning, restep: () => !!this.bodies?.on, extraHash: (t) => (this.causes?.heldByte(t) ?? 0) + (this.guides?.byte(t) ?? 0) });
     if (bodiesFor(opts.caps)) this.bodies = new BodyRunner({ reps: this.reps });
+    if (waypointsFor(opts.caps)) this.guides = new GuideRunner({ reps: this.reps, onStep: opts.onGuideStep });
     if (causesFor(opts.caps)) this.causes = new ShipCauses({ store: this.store, reps: this.reps, self: () => this.pid, ownDerived: (t) => this.own?.derived(t), ownMid: (t, o) => (this.own?.on ? this.own.midOf(t, o) : null), tuning: ships.tuning });
     this.cells = new CellCache({ reps: this.reps, send: (m) => this.outbox.push(m), forget: (id) => this.bodies?.remove(id) });
     const socket: ClientSocket = {
@@ -198,6 +204,7 @@ export class FakeHitsClient {
         this.selfHits?.setLevel(m.caps & CAPS.ROUGH ? m.lvl : undefined);
         this.own?.setOn(ownSimFor(m.caps));
         this.bodies?.setOn(bodiesFor(m.caps));
+        this.guides?.setOn(waypointsFor(m.caps));
         this.causes?.setOn(causesFor(m.caps));
         this.levels.push([this.snapTick, m.caps & CAPS.ROUGH ? m.lvl ?? 1 : 1]);
         break;
@@ -247,6 +254,8 @@ export class FakeHitsClient {
     this.debris.takeRows();
     // (bosses' decisions, CAPS.BODIES: their bodies fly them from here)
     this.bodies?.onSnapshot(s.tick, s.decisions);
+    // (homing shells, CAPS.WAYPOINTS: flown from their SYNCs and waypoints)
+    this.guides?.onSnapshot(s.tick, s.guides);
     for (const e of s.entities) {
       const d = e.data;
       if (e.type === EntityType.Player || e.type === EntityType.ShipBody) this.kinds.set(e.id, { type: e.type, side: e.type === EntityType.ShipBody && d ? d[10] ?? 0 : 0 });
@@ -276,13 +285,14 @@ export class FakeHitsClient {
     // (as ShipClient: the ledger sees the removed list before the shells go)
     this.hits?.forget(s.removed);
     this.selfHits?.onRemoved(s.removed);
-    for (const id of s.removed) { if (this.known.has(id)) this.removed.add(id); this.shells.delete(id); this.store.remove(id); this.bodies?.remove(id); this.causes?.remove(id); this.reps.remove(id); }
+    for (const id of s.removed) { if (this.known.has(id)) this.removed.add(id); this.shells.delete(id); this.store.remove(id); this.bodies?.remove(id); this.causes?.remove(id); this.reps.remove(id); this.guides?.remove(id, s.tick); }
     for (const id of s.out ?? []) { this.bodies?.remove(id); this.causes?.remove(id); this.reps.remove(id); }
     // (The game's client steps every replica as it draws, each frame; drawing nothing, this does it here. Left alone,
     // a replica no one asked for in 600 ticks stops short: ShipReplicaSet.at won't run that far in one go)
     for (const id of this.reps.ids()) this.reps.at(id, s.tick);
     // (the ships it holds now, for its check: CAPS.CAUSES)
     this.causes?.noteHeld(s.tick);
+    this.guides?.noteHeld(s.tick);
     // Hits found here, once the frame's told records are in (ShipClient.afterSnapshot, findHits)
     if (this.selfHits) {
       this.selfHits.onKeyframes(s.ships);
@@ -315,7 +325,7 @@ export class FakeHitsClient {
   private handOut(r: HitsOutcome): void {
     this.handingOut = true;
     try { for (const m of r.msgs) this.handle(m); } finally { this.handingOut = false; }
-    for (const id of r.gone) { this.removed.add(id); this.shells.delete(id); }
+    for (const id of r.gone) { this.removed.add(id); this.shells.delete(id); this.guides?.remove(id); }
     this.selfHits?.spent(r.gone);
   }
 }

@@ -39,8 +39,11 @@
  *   CAUSES     (with OWN_SIM, protocol 39) other ships' causes (network/causes.ts): what moved a ship it holds besides
  *              its controls (a contact, a rebuild's recentring, a pilot's pull) comes as that cause at its tick, worked
  *              out on its tick layer by the shared functions, instead of a keyframe of the ship
+ *   WAYPOINTS  (with OWN_SIM, protocol 40) homing shells on its tick layer (guidance/, docs/design/awareness-model.md
+ *              6.3): one in range comes once as a SYNC and flies by the shared waypoint law, planned here from its
+ *              target's replica when it holds the target, else from the server's waypoint records; no rows of it after
  */
-export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16, ROUGH: 32, OWN_SIM: 64, INPUTS: 128, BODIES: 256, BLOCKS: 512, FOCUS: 1024, CAUSES: 2048 } as const;
+export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16, ROUGH: 32, OWN_SIM: 64, INPUTS: 128, BODIES: 256, BLOCKS: 512, FOCUS: 1024, CAUSES: 2048, WAYPOINTS: 4096 } as const;
 
 /** Does this client hold the focus grid's cells rather than the view circle (CAPS.FOCUS)? */
 export function focusFor(caps: number | undefined): boolean {

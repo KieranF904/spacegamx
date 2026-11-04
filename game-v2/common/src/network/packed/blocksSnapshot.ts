@@ -76,10 +76,10 @@ export function planBlocks(store: BlockStore, m: ServerSnapshotMessage, you: num
   }
   // (What goes the connection's way is checked as a snapshot's is)
   const w = [SNAPSHOT_CODE, tick, m.lastProcessedInput ?? null, own.length ? own : null, null, m.removed.length ? m.removed : null,
-    null, null, m.out?.length ? m.out : null, null, m.own?.length ? m.own : null, m.decisions?.length ? m.decisions : null, m.causes?.length ? m.causes : null];
+    null, null, m.out?.length ? m.out : null, null, m.own?.length ? m.own : null, m.decisions?.length ? m.decisions : null, m.causes?.length ? m.causes : null, m.guides?.length ? m.guides : null];
   if (!snapshotOk(w)) return null;
   const present = [true, m.lastProcessedInput != null, plan.e.length > 0, plan.p.length > 0, m.removed.length > 0, plan.k.length > 0,
-    plan.c.length > 0, !!m.out?.length, plan.f.length > 0, !!m.own?.length, !!m.decisions?.length, !!m.causes?.length];
+    plan.c.length > 0, !!m.out?.length, plan.f.length > 0, !!m.own?.length, !!m.decisions?.length, !!m.causes?.length, !!m.guides?.length];
   for (let i = 0; i < present.length; i++) if (present[i]) plan.mask |= 1 << i;
   return plan;
 }
@@ -114,7 +114,7 @@ export function blocksWrite(io: PackedIO, plan: BlocksPlan, st: BlockBits = bloc
   const blk = io.blk;
   let at = io.bitLength;
   const part = (k: keyof BlockBits) => { const now = io.bitLength; st[k] += now - at; at = now; };
-  io.u(mask, 12);
+  io.u(mask, 13);
   io.num(tick, 0, 3, io.head, 0);
   if (has(2)) io.num(m.lastProcessedInput, 0, 2, io.head, 1);
   // Intros: each wid this client doesn't know yet, once
@@ -157,6 +157,7 @@ export function blocksWrite(io: PackedIO, plan: BlocksPlan, st: BlockBits = bloc
   if (has(10)) ownIO(io, m.own as unknown[][], tick);
   if (has(11)) decisionsIO(io, m.decisions as unknown[][]);
   if (has(12)) causesIO(io, m.causes as unknown[][], tick);
+  if (has(13)) decisionsIO(io, m.guides as unknown[][]);
   part('nd');
   for (const id of m.removed) blk.forget(id);
   if (m.out) for (const id of m.out) blk.forget(id);
@@ -166,9 +167,9 @@ export function blocksWrite(io: PackedIO, plan: BlocksPlan, st: BlockBits = bloc
 /** Reads a BLOCKS snapshot back into the snapshot's compact row (what snapshotIO reads), its blocks by this client's chains */
 export function blocksRead(io: PackedIO): unknown[] {
   const blk = io.blk;
-  const mask = io.u(0, 12);
+  const mask = io.u(0, 13);
   const has = (i: number) => (mask & (1 << (i - 1))) !== 0;
-  const out: unknown[] = [SNAPSHOT_CODE, null, null, null, null, null, null, null, null, null, null, null, null];
+  const out: unknown[] = [SNAPSHOT_CODE, null, null, null, null, null, null, null, null, null, null, null, null, null];
   const tick = io.num(null, 0, 3, io.head, 0) as number;
   out[1] = tick;
   if (has(2)) out[2] = io.num(null, 0, 2, io.head, 1);
@@ -270,6 +271,7 @@ export function blocksRead(io: PackedIO): unknown[] {
   if (has(10)) out[10] = ownIO(io, null, tick);
   if (has(11)) out[11] = decisionsIO(io, null);
   if (has(12)) out[12] = causesIO(io, null, tick);
+  if (has(13)) out[13] = decisionsIO(io, null);
   for (const id of (out[5] as number[] | null) ?? []) blk.forget(id);
   for (const id of (out[8] as number[] | null) ?? []) blk.forget(id);
   blk.trimGuns();

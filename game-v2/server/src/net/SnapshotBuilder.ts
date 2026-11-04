@@ -39,9 +39,10 @@ import { portalQuery } from './handlers/flight.js';
 import { SELF_SAFETY_TICKS, SNAP_PROJECTILE_RANGE, SNAP_POD_RANGE, SHIP_VIEW_IN, SHIP_VIEW_OUT, MAP_DOTS_TICKS, DEBRIS_ACK_TICKS } from './snapshot/constants.js';
 import type { HitLedger } from './hits/HitLedger.js';
 import { ownShotsFor, ownVolleyExact, ownSimFor } from './snapshot/ownShots.js';
-import { bodiesFor, focusFor, causesFor, jumpPhase, jumpTuning } from '@space-game/common';
+import { bodiesFor, focusFor, causesFor, waypointsFor, replicasByte, jumpPhase, jumpTuning } from '@space-game/common';
 import { FocusCells } from './cells/FocusCells.js';
 import type { BodyNet } from './decisions/BodyNet.js';
+import type { GuideNet } from './guides/GuideNet.js';
 import type { OwnChecks } from './own/OwnChecks.js';
 
 /** A debris body's status row as its key (rowKey): what a client makes itself for debris it works out (common ships/debris.ts) */
@@ -141,6 +142,8 @@ export interface SnapshotHost {
   readonly ownChecks?: OwnChecks | null;
   /** Bosses' decisions for clients that run their bodies (CAPS.BODIES: net/decisions/BodyNet.ts) */
   readonly bodies?: BodyNet | null;
+  /** Homing shells on clients' tick layers (CAPS.WAYPOINTS: net/guides/GuideNet.ts) */
+  readonly guides?: GuideNet | null;
   /** Encode-once blocks (CAPS.BLOCKS, Outbox.blocks): told what was removed, so wire ids go back */
   readonly blocks?: BlockStore | null;
 }
@@ -178,6 +181,7 @@ export class SnapshotBuilder {
   private readonly hits: HitLedger | null;
   private readonly ownChecks: OwnChecks | null;
   private readonly bodies: BodyNet | null;
+  private readonly guides: GuideNet | null;
   private readonly blocks: BlockStore | null;
   /** Each fire event's row this snapshot (one array for every client, so it's encoded once: CAPS.BLOCKS) */
   private fireRows = new WeakMap<object, number[]>();
@@ -217,6 +221,7 @@ export class SnapshotBuilder {
     this.hits = host.hits ?? null;
     this.ownChecks = host.ownChecks ?? null;
     this.bodies = host.bodies ?? null;
+    this.guides = host.guides ?? null;
     this.blocks = host.blocks ?? null;
     this.ticks = ticks;
     this.focus = new FocusCells({
@@ -526,7 +531,9 @@ export class SnapshotBuilder {
     if (!ship || !ctl) return;
     const body = { x: Position.x[id], y: Position.y[id], vx: Velocity.x[id], vy: Velocity.y[id], angle: Rotation.angle[id], angVel: ship.angVel, jump: ship.jump, jumpScale: ship.jumpScale, cargo: ship.cargo, dodge: ship.dodge, dodgeDir: ship.dodgeDir };
     // (CAPS.CAUSES: every other ship it holds goes in the check too)
-    const held = causesFor(conn.caps) ? this.replication.heldByte(conn.repKnown, id, this.bodies ? (e) => this.bodies!.runs(conn, e) : undefined) : 0;
+    let held = causesFor(conn.caps) ? this.replication.heldByte(conn.repKnown, id, this.bodies ? (e) => this.bodies!.runs(conn, e) : undefined) : 0;
+    // (CAPS.WAYPOINTS: the homing shells it runs too; off, they're all SYNCed again)
+    if (this.guides && waypointsFor(conn.caps)) held += replicasByte(this.guides.heldSum(conn));
     this.ownChecks!.note(conn, this.currentTick, body, ctl.bits, ctl.q, conn.shipHpSent.get(id), held);
   }
 
@@ -608,6 +615,15 @@ export class SnapshotBuilder {
       const causes = causesFor(conn.caps);
       const decisions = bodies?.forClient(conn, conn.playerId, (e) => InSystem.systemId[e] ?? -1, playerSystemId ?? -1, conn.repKnown, this.currentTick,
         (e) => !conn.shipView || conn.shipView.has(e), (e) => this.replication.keysFor(e, conn.playerId, conn.repKnown, causes));
+      // Homing shells on its tick layer (CAPS.WAYPOINTS): their SYNCs and records, and from here no rows of them
+      const guidesOn = this.guides && waypointsFor(conn.caps) ? this.guides : null;
+      if (!guidesOn) this.guides?.drop(conn);
+      const guided = guidesOn?.forClient(conn, {
+        self: conn.playerId, systemId: playerSystemId,
+        near: (e) => !fartherThan(Position.x[e] - px, Position.y[e] - py, SNAP_PROJECTILE_RANGE),
+        holds: (e) => conn.shipView.has(e) && conn.repKnown.has(e),
+        rekeyed: (e) => this.replication.keysFor(e, conn.playerId, conn.repKnown, causes),
+      }, this.currentTick);
       const rep = this.replication.forClient(playerSystemId, conn.playerId, conn.repKnown, this.currentTick, conn.shipView, conn.debrisHeld, ownShots, (id) => conn.shipSynced.get(id)?.rebuilds, bodies ? (id) => bodies.runs(conn, id) : undefined, causes);
       // Shots from ships it replicates go as fire events: it builds the shells itself (launch.ts).
       // Not for a ship it's only now getting a keyframe for (it can't place it back then), nor its
@@ -635,6 +651,8 @@ export class SnapshotBuilder {
         if (conn.debrisHeld.has(r.id)) continue;
         if (conn.debrisRowOk.size && conn.debrisRowOk.delete(r.id) && r.key === DEBRIS_ROW_KEY) { newStates.set(r.id, r.key); continue; }
         if (r.kind === 'projectile' && covered.has(r.id)) { newStates.set(r.id, r.key); continue; }
+        // (a homing shell it runs, its row once sent: it flies it itself)
+        if (r.kind === 'projectile' && guidesOn?.runs(conn, r.id) && prevStates.has(r.id)) { newStates.set(r.id, r.key); continue; }
         if ((r.kind === 'projectile' || r.kind === 'mob') && fartherThan(r.x - px, r.y - py, SNAP_PROJECTILE_RANGE)) continue;
         if (r.kind === 'pod' && fartherThan(r.x - px, r.y - py, SNAP_POD_RANGE)) continue;
         if (r.id === conn.playerId && self) {
@@ -720,7 +738,7 @@ export class SnapshotBuilder {
       if (this.currentTick % 60 === 0) this.sendPlayerState(conn);
 
       // (Records count from the snapshot they follow: one always goes with them)
-      const shouldSend = conn.forceSnapshot || entities.length > 0 || removed.length > 0 || rep.ships.length > 0 || rep.ctl.length > 0 || out.length > 0 || fire.length > 0 || !!rep.own?.length || !!rep.causes?.length || !!decisions?.length
+      const shouldSend = conn.forceSnapshot || entities.length > 0 || removed.length > 0 || rep.ships.length > 0 || rep.ctl.length > 0 || out.length > 0 || fire.length > 0 || !!rep.own?.length || !!rep.causes?.length || !!decisions?.length || !!guided?.active || !!guided?.rows.length
         || (hitsOn && this.hits!.pending(conn));
       if (!shouldSend) {
         this.lastEntityStates.set(conn.playerId, newStates);
@@ -742,6 +760,7 @@ export class SnapshotBuilder {
         own: rep.own,
         decisions: decisions?.length ? decisions : undefined,
         causes: rep.causes,
+        guides: guided?.rows.length ? guided.rows : undefined,
       });
 
       conn.forceSnapshot = false;
@@ -766,6 +785,7 @@ export class SnapshotBuilder {
     this.pendingRemovedEntities.clear();
     this.ships.debrisNet.afterSnapshot((id) => this.ships.has(id));
     this.replication.endSnapshot();
+    this.guides?.sweep();
     this.ships.fired.length = 0;
     [this.keysWere, this.keysNow] = [this.keysNow, this.keysWere];
     this.keysNow.clear();

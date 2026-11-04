@@ -181,6 +181,7 @@ import { Outbox } from './net/snapshot/Outbox.js';
 import { HitLedger } from './net/hits/HitLedger.js';
 import { OwnChecks } from './net/own/OwnChecks.js';
 import { BodyNet } from './net/decisions/BodyNet.js';
+import { GuideNet } from './net/guides/GuideNet.js';
 import type { BodyState } from '@space-game/common';
 import { ownSimFor } from './net/snapshot/ownShots.js';
 import { SnapshotBuilder, designHash, playerQuery, projectileQuery, droppedItemQuery } from './net/SnapshotBuilder.js';
@@ -666,6 +667,8 @@ export class GameServer implements ServerCtx {
   readonly ownChecks: OwnChecks;
   /** Bosses' decisions, for the clients that run their bodies, and those clients' checks (CAPS.BODIES, net/decisions/BodyNet.ts) */
   readonly bodies: BodyNet;
+  /** Homing shells for the clients that run them on their tick layers (CAPS.WAYPOINTS, net/guides/GuideNet.ts) */
+  readonly guides: GuideNet;
   /** The join caps this server takes (GameServerOptions.netCaps) */
   readonly netCaps: number;
   /** The snapshot path: rows, snapshots, ship structure, map dots, entering a system (net/SnapshotBuilder.ts) */
@@ -693,7 +696,7 @@ export class GameServer implements ServerCtx {
     this.ownChecks = new OwnChecks({
       tick: () => this.currentTick,
       // (CAPS.CAUSES: its check covers every ship it holds, so all of them go again: OwnChecks)
-      rekey: (conn) => { if (causesFor(conn.caps)) conn.repKnown.clear(); else conn.repKnown.delete(conn.playerId); },
+      rekey: (conn) => { if (causesFor(conn.caps)) conn.repKnown.clear(); else conn.repKnown.delete(conn.playerId); this.guides.resync(conn); },
       resyncHp: (conn) => { conn.shipHpSent.delete(conn.playerId); conn.shipSynced.delete(conn.playerId); },
     });
     this.bodies = new BodyNet({
@@ -702,6 +705,13 @@ export class GameServer implements ServerCtx {
         const s = this.ships.get(eid);
         return s ? { x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid], angle: Rotation.angle[eid], angVel: s.angVel } : null;
       },
+    });
+    this.guides = new GuideNet({
+      tick: () => this.currentTick,
+      guided: () => this.weapons.guided(),
+      body: (eid) => (entityExists(this.world, eid) && !hasComponent(this.world, Dead, eid) && this.weapons.guideOf(eid) ? { x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid] } : null),
+      born: (eid) => Projectile.spawnTick[eid],
+      systemOf: (eid) => InSystem.systemId[eid],
     });
     this.netCaps = opts.netCaps ?? 0;
     this.gameData = opts.gameData;
@@ -746,6 +756,7 @@ export class GameServer implements ServerCtx {
       tick: () => this.currentTick,
       broadcast: (num, msg) => this.broadcastToSystem(num, msg),
       hitFx: (proj, msg) => this.hits.hitFx(proj, msg),
+      guided: (proj, tick, op, args) => this.guides.record(proj, tick, op, args),
       remove: (eid) => { addComponent(this.world, Dead, eid); this.pendingRemovedEntities.add(eid); },
       // (A pilot's push is told to its client, TEMPORARY: ShipBridge.push)
       nudge: (eid, ax, ay) => this.ships.push(eid, ax, ay),
@@ -1016,6 +1027,7 @@ this.devTeleport = opts.devTeleport ?? false;
       hits: this.hits,
       ownChecks: this.ownChecks,
       bodies: this.bodies,
+      guides: this.guides,
       blocks: this.net.blocks,
     }, this);
 

@@ -29,3 +29,4 @@ except to fix a typo. A bump makes old clients reload (see PROTOCOL_VERSION in p
 - 37 (2026-11-04): Encode-once blocks (CAPS.BLOCKS = 512): PK.BLOCKS snapshots, other entities' status rows, keyframes, control rows and fire events bit-packed once per snapshot for every client, named by per-system wire ids (intros), coded from per-entity chains (network/packed/blocks.ts)
 - 38 (2026-11-04): CAPS.FOCUS: the focus grid's cells message (drops, offers, logs) and cellCache reply
 - 39 (2026-11-04): Other ships' causes (CAPS.CAUSES = 2048): a snapshot's causes records (field x, packed: causesIO; [ago, kind, id, ...], a contact once for both ships with states only where needed); packed snapshots' field mask is 12 bits
+- 40 (2026-11-04): Scheduled waypoints (CAPS.WAYPOINTS = 4096): a snapshot's guides records (field w, packed as the decisions are; [id, dt, op, ...args]: SYNC, WP, NEXT, LOST, MODE, OFF, guidance/records.ts); packed snapshots' field mask is 13 bits

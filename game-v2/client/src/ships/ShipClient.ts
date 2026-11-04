@@ -29,7 +29,7 @@ import {
   jumpFieldAt, fieldRangeBoost, fieldCharge, primeBoost, pilotJumpStep, withEmp, lodestonePosition, type JumpField, type LodestoneData,
   ShipReplicaSet, ServerSnapshotMessage,
   packCursorWeaponState, rebuildVolley, WEAPON_KIND_TYPE, EntityState, accelAlong, turnAccel, rateShip, stepGuns, volleyShells, firesStraight, partWeaponDef,
-  type ServerHitsMessage, type ServerHpCheckMessage, type ServerHitFixMessage, type HitReport, type OwnCheck, type BodyCheck, CAPS, SIDE, ownSimCaps, bodiesFor, focusFor, causesFor, ghostWeight,
+  type ServerHitsMessage, type ServerHpCheckMessage, type ServerHitFixMessage, type HitReport, type OwnCheck, type BodyCheck, CAPS, SIDE, ownSimCaps, bodiesFor, focusFor, causesFor, waypointsFor, ghostWeight,
 } from '@space-game/common';
 import type { MenuShipInfo } from '../ui/GameMenuUI';
 import type { GameState, InterpolatedEntity } from '../state/GameState';
@@ -57,6 +57,7 @@ import { OwnTick } from './own/OwnTick';
 import { ShipCauses } from './causes/ShipCauses';
 import { DebrisSplits } from './debris/DebrisSplits';
 import { BodyRunner } from './bodies/BodyRunner';
+import { GuideRunner } from './guides/GuideRunner';
 import type { PilotState } from '../econ/clientEcon';
 import type { ThrustCommand } from './ThrusterFx';
 import { settings } from '../settings/Settings';
@@ -284,8 +285,10 @@ export class ShipClient {
       side: (id) => this.sideOf(id),
       passes: (shell) => this.hits.passesOf(shell),
     });
-    this.own = new OwnTick({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, tuning: opts.tuning, restep: () => this.bodies.on, extraHash: (t) => this.causes.heldByte(t) });
+    this.own = new OwnTick({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, tuning: opts.tuning, restep: () => this.bodies.on, extraHash: (t) => (this.causes.heldByte(t) ?? 0) + this.guides.byte(t) });
     this.bodies = new BodyRunner({ reps: this.replicas });
+    // (Homing shells on the tick layer, CAPS.WAYPOINTS: ships/guides/GuideRunner.ts)
+    this.guides = new GuideRunner({ reps: this.replicas });
     // (Other ships' causes on the tick layer, CAPS.CAUSES: ships/causes/ShipCauses.ts)
     this.causes = new ShipCauses({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, ownDerived: (t) => this.own.derived(t), ownMid: (t, o) => (this.own.on ? this.own.midOf(t, o) : null), tuning: opts.tuning });
     // (Cells dropped from its focus, kept a while: CAPS.FOCUS, ships/cells/CellCache.ts)
@@ -352,6 +355,8 @@ export class ShipClient {
   readonly own: OwnTick;
   /** Bosses flown by their bodies on the tick-aligned layer, from their brains' decisions (CAPS.BODIES: bodies/BodyRunner.ts) */
   readonly bodies: BodyRunner;
+  /** Homing shells flown on the tick-aligned layer by the waypoint law (CAPS.WAYPOINTS: guides/GuideRunner.ts) */
+  readonly guides: GuideRunner;
   /** The tick of the snapshot last applied (a confirmed hit's tick counts back from it) */
   private snapTick = 0;
   /** Handing out this frame's hits (their projectileHit messages aren't the old way) */
@@ -388,7 +393,7 @@ export class ShipClient {
       this.handingOut = false;
     }
     for (const id of r.ships) this.fillHull(id);
-    for (const id of r.gone) this.opts.state.removeShell(id);
+    for (const id of r.gone) { this.opts.state.removeShell(id); this.guides.remove(id); }
     this.selfHits.spent(r.gone);
   }
 
@@ -398,6 +403,7 @@ export class ShipClient {
     this.hits.reset();
     this.selfHits.reset();
     this.bodies.reset();
+    this.guides.reset();
     this.causes.clear();
   }
 
@@ -413,6 +419,7 @@ export class ShipClient {
     this.own.setOn(ownSimCaps(caps));
     this.focusOn = focusFor(caps);
     this.bodies.setOn(bodiesFor(caps));
+    this.guides.setOn(waypointsFor(caps));
     this.causes.setOn(causesFor(caps));
   }
 
@@ -566,6 +573,9 @@ export class ShipClient {
     const out: EntityState[] = [];
     // (Debris worked out here since the last snapshot: its rows, as the server would have sent them)
     out.push(...this.debris.takeRows());
+    // (homing shells, CAPS.WAYPOINTS: flown on the tick layer from their SYNCs and waypoints; drawn where it has them)
+    this.guides.onSnapshot(m.tick, m.guides);
+    out.push(...this.guides.draw(m.tick, m.entities, (id) => this.opts.state.entities.get(id)?.data));
     for (const [owner, ago, partAmmo, aimQ, ...ids] of m.fire ?? []) {
       const tick = m.tick - ago, part = partAmmo % 256, ammo = Math.floor(partAmmo / 256) % 256, aug = partAmmo >= 65536 ? (1 as const) : undefined;
       // A charge gun's tell (no shells): it started charging, or was let go (guns.ts TELL_CHARGE_*; drawn by the charge FX)
@@ -665,6 +675,9 @@ export class ShipClient {
     for (const id of m.out ?? []) { this.bodies.remove(id); this.causes.remove(id); this.replicas.remove(id); }
     // (the ships it holds now, for its check: CAPS.CAUSES)
     this.causes.noteHeld(m.tick);
+    for (const id of m.removed) this.guides.remove(id, m.tick);
+    // (the shells it runs now, for its check: CAPS.WAYPOINTS)
+    this.guides.noteHeld(m.tick);
   }
 
   /** Place a replicated ship for this frame (false: not one, or not ready yet) */

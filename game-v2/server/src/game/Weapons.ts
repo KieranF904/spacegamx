@@ -23,6 +23,7 @@ import {
   Position, Velocity, Radius, Projectile, Bullet, Lifetime, InSystem, NetworkSync, OwnedBy, Dead,
   ShipTuning, WeaponTuning, WEAPON_KIND_TYPE, ServerMessage, interceptHits, mulberry32, hashString, weaponDef, gunDef, launchShot, volleyAngles, weaponHit, type WeaponMods, type HitInfo,
   endsAtAim, lifeToReach, steerToward, bursts, hitEndFx, pierceKeepOf, shellAmount, shellVs,
+  GUIDE, PLAN_NONE, PLAN_WP, guideKind, guideLost, guideTick, newGuide, qGuide, wpArgs, type Guide, type GuideBody,
 } from '@space-game/common';
 import type { ShipBridge } from '../ships/ShipBridge.js';
 import { datan2, dcos, dhypot, dsin } from '@space-game/common';
@@ -42,6 +43,11 @@ export interface WeaponsHost {
    * broadcast it as ever
    */
   hitFx?(proj: number, msg: ServerMessage): boolean;
+  /**
+   * A homing shell's guide record at this tick (common guidance/records.ts GUIDE: WP, NEXT, LOST): CAPS.WAYPOINTS
+   * clients that lack its target take them (net/guides/GuideNet.ts)
+   */
+  guided?(proj: number, tick: number, op: number, args: number[]): void;
 }
 
 interface Extra {
@@ -55,6 +61,8 @@ interface Extra {
   sizeScale: number;
   /** Point defence: hits left to shoot it down (0: it can't be; common/src/ships/features/support/support.ts) */
   intercept: number;
+  /** A homing shell's guidance (common guidance/waypoints.ts: the scheduled-waypoint law, the same on its clients) */
+  guide?: Guide;
 }
 
 export class Weapons {
@@ -126,6 +134,12 @@ export class Weapons {
     if (kind !== 'cannon' || def !== this.def(kind)) {
       // (Point defence may shoot it down if its kind can be, unless it's told not (a boss's nova): support.ts)
       this.extras.set(eid, { kind, def, owner, target: shape.target ?? -1, pierceLeft: def.pierce ?? 0, hit: new Set(), damageScale, sizeScale: shot.size, intercept: shape.intercept === false ? 0 : interceptHits(def) });
+      // A homing shell flies by the waypoint law, its state on the law's grid so its clients can fly it exactly
+      if (def.homing && !def.guided) {
+        Position.x[eid] = qGuide(x); Position.y[eid] = qGuide(y);
+        Velocity.x[eid] = qGuide(shot.vx); Velocity.y[eid] = qGuide(shot.vy);
+        this.extras.get(eid)!.guide = newGuide(shape.target ?? -1, guideKind(def.homing, def.accel ?? 0.5, def.maxSpeed ?? 40));
+      }
     }
     out?.push(eid);
     return eid;
@@ -205,26 +219,7 @@ export class Weapons {
     for (const [eid, x] of this.extras) {
       if (!entityExists(w, eid) || hasComponent(w, Dead, eid)) { this.extras.delete(eid); continue; }
       if (x.def.guided) this.guide(eid, x);
-      else if (x.def.homing) {
-        const t = x.target;
-        const alive = t >= 0 && this.ships.has(t) && InSystem.systemId[t] === InSystem.systemId[eid];
-        let vx = Velocity.x[eid], vy = Velocity.y[eid];
-        const sp = dhypot(vx, vy) || 1;
-        const max = x.def.maxSpeed ?? 40;
-        const nsp = Math.min(max, sp + (x.def.accel ?? 0.5));
-        let ang = datan2(vy, vx);
-        if (alive) {
-          // Lead the target a little
-          const lead = Math.min(30, dhypot(Position.x[t] - Position.x[eid], Position.y[t] - Position.y[eid]) / Math.max(1, nsp));
-          const want = datan2(Position.y[t] + Velocity.y[t] * lead - Position.y[eid], Position.x[t] + Velocity.x[t] * lead - Position.x[eid]);
-          let d = want - ang;
-          while (d > Math.PI) d -= 2 * Math.PI;
-          while (d < -Math.PI) d += 2 * Math.PI;
-          ang += Math.max(-x.def.homing, Math.min(x.def.homing, d));
-        }
-        vx = dcos(ang) * nsp; vy = dsin(ang) * nsp;
-        Velocity.x[eid] = vx; Velocity.y[eid] = vy;
-      }
+      else if (x.guide) this.home(eid, x.guide);
       // A held orb parks where it was aimed (its endTick) and pulls from there
       const parked = !!x.def.hold && this.host.tick() >= Projectile.endTick[eid];
       if (parked) { Velocity.x[eid] = 0; Velocity.y[eid] = 0; }
@@ -251,6 +246,35 @@ export class Weapons {
         }
       }
     }
+  }
+
+  private readonly gm: GuideBody = { x: 0, y: 0, vx: 0, vy: 0 };
+  private readonly gt: GuideBody = { x: 0, y: 0, vx: 0, vy: 0 };
+
+  /**
+   * A homing shell's tick (common guidance/waypoints.ts): its waypoints planned from its target as it is now (a pilot
+   * after its step, anything else as it ended the last tick), and steered on; what the planner did goes to its clients
+   */
+  private home(eid: number, g: Guide): void {
+    const t = g.target, tick = this.host.tick();
+    const alive = t >= 0 && this.ships.has(t) && InSystem.systemId[t] === InSystem.systemId[eid];
+    const m = this.gm, tg = this.gt;
+    m.x = Position.x[eid]; m.y = Position.y[eid]; m.vx = Velocity.x[eid]; m.vy = Velocity.y[eid];
+    if (t >= 0 && !alive) { guideLost(g); this.host.guided?.(eid, tick, GUIDE.LOST, []); }
+    if (alive) { tg.x = Position.x[t]; tg.y = Position.y[t]; tg.vx = Velocity.x[t]; tg.vy = Velocity.y[t]; }
+    const did = guideTick(g, eid, m, alive ? tg : null, tick);
+    if (did !== PLAN_NONE) this.host.guided?.(eid, tick, did === PLAN_WP ? GUIDE.WP : GUIDE.NEXT, wpArgs(did === PLAN_WP ? g.w! : g.n!, m));
+    Velocity.x[eid] = m.vx; Velocity.y[eid] = m.vy;
+  }
+
+  /** A homing shell's guidance and where it is (null: not one, or gone): CAPS.WAYPOINTS clients are synced from this */
+  guideOf(eid: number): Guide | null {
+    return this.extras.get(eid)?.guide ?? null;
+  }
+
+  /** Every homing shell flying by the waypoint law */
+  *guided(): IterableIterator<[number, Guide]> {
+    for (const [eid, x] of this.extras) if (x.guide) yield [eid, x.guide];
   }
 
   /** The shot hit a ship: true when it's spent (piercing shots carry on) */

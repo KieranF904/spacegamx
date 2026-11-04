@@ -4,6 +4,7 @@
  */
 import { COMPACT_TYPES } from '../protocol.js';
 import { decisionRowOk } from '../../bodies/decisions.js';
+import { guideRowOk } from '../../guidance/records.js';
 import { PAIR } from '../causes.js';
 import { PK_PROJECTILE, PK_CONTROL } from './tables.js';
 import { PackedIO, isId, bitsFor, K, K_TICK } from './packedIO.js';
@@ -14,8 +15,10 @@ const isArr = Array.isArray;
 
 /** Can the snapshot's row go packed (ids where ids go, rows the shapes the packing expects)? */
 export function snapshotOk(w: unknown[]): boolean {
-  if (w.length > 13) return false;
-  const [, , , e, p, r, k, c, o, f, n, d, x] = w as unknown[][];
+  if (w.length > 14) return false;
+  const [, , , e, p, r, k, c, o, f, n, d, x, g] = w as unknown[][];
+  // (Homing shells' guide records: rows of whole numbers as the decisions', decisionsIO packs them)
+  if (g != null && !(isArr(g) && g.every((row) => guideRowOk(row) && isId(row[0]) && row[1] > -4096 && row.every((v, i) => i < 3 || (v >= -(2 ** 30) && v < 2 ** 30))))) return false;
   // (Decisions: rows of whole numbers, a boss's id first, an op the packing knows: decisionsIO)
   if (d != null && !(isArr(d) && d.every((row) => decisionRowOk(row) && isId(row[0]) && row[1] <= 0 && row[1] > -4096 && row.every((v, i) => i < 3 || (v >= -(2 ** 30) && v < 2 ** 30))))) return false;
   // (Own-ship causes: rows of numbers, a kind the packing knows: ownIO)
