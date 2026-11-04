@@ -14,6 +14,7 @@ import { TurretWindow, computeTurretWindow } from './turret.js';
 import { DEFAULT_JUMP, coilCapacity, jumpDriveStats } from './flight.js';
 import { fnOutput, isEngine, partDemand, partGrade, partMaterial, partSupply, partThrust, weaponBaseArea, weaponStrength } from './grades.js';
 import { netJoins, wireNetworks } from './wires.js';
+import { groupsGone } from './groups.js';
 import { gunRate } from './launch.js';
 import { type EnergyInfo, gunDrawFlatOut } from './energy.js';
 import { type PowerLayout, bankKind, powerLayout } from './circuits.js';
@@ -314,7 +315,9 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   const fns = parts.map((p) => catalog.functions.get(p.fn)!);
   // (A model is made of its own material, whatever the part says)
   const mats = parts.map((p) => partMaterial(catalog, p)!);
-  const intact = (i: number) => hp[i] > 0 && !detached[i];
+  // (A custom enemy's piece breaks as one: a part of a group that's gone isn't intact either, groups.ts)
+  const gone = groupsGone(blueprint, hp, detached);
+  const intact = gone ? (i: number) => hp[i] > 0 && !detached[i] && !(parts[i].group !== undefined && gone & (1 << parts[i].group!)) : (i: number) => hp[i] > 0 && !detached[i];
 
   // 1. Joins (between intact parts only: dead parts don't hold anything together)
   const allJoins = computeJoins(geoms);

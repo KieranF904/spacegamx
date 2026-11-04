@@ -17,6 +17,8 @@ export * from './blueprint.js';
 export * from './rebuild.js';
 export * from './state.js';
 export * from './stages.js';
+// A custom enemy's destroyable pieces (blueprint part `group`)
+export * from './groups.js';
 export * from './flight.js';
 export * from './jumpAim.js';
 export * from './farRoute.js';

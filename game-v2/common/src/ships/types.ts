@@ -424,6 +424,11 @@ export interface PlacedPart {
   mods?: WeaponMods;
   /** weapons: the cut gems in its sockets (econ/gems.ts), which its mods come from */
   gems?: string[];
+  /**
+   * A custom enemy's destroyable piece it belongs to (0..7: ships/groups.ts): a piece drawn as several parts (a claw's
+   * arm, palm and finger) breaks as one, and which pieces are gone fits in one byte
+   */
+  group?: number;
 }
 
 /**

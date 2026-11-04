@@ -1,0 +1,14 @@
+{
+ "_comment": "Custom enemies' designs (docs/enemies/custom-roster.md): each one's destroyable pieces (blueprint part `group`: the index here, core first), in the order the generators (scripts/bespoke/enemies) number them. A design's place in this list is its index on the wire (an order's design): append only.",
+ "designs": [
+  { "id": "censer", "groups": ["core", "lance", "brazier", "vane_l", "vane_r", "drive"] },
+  { "id": "maw_lurker", "groups": ["core", "eye", "rail", "root_l", "root_r", "tail"] },
+  { "id": "hookboat", "groups": ["core", "harpoon", "outrigger", "drive_l", "drive_r"] },
+  { "id": "rime_bell", "groups": ["core", "frill", "tendril_l", "tendril_c", "tendril_r"] },
+  { "id": "scrap_crawler", "groups": ["core", "magnet", "claw_l", "claw_r", "shell_l", "shell_r", "legs", "drive"] },
+  { "id": "rivet_sower", "groups": ["core", "drum", "sensors", "pannier_l", "pannier_r", "drive"] },
+  { "id": "slag_ray", "groups": ["core", "horns", "tail", "wing_l", "wing_r"] },
+  { "id": "clinker", "groups": ["core", "chimney_l", "chimney_r", "plate_front", "plate_right", "plate_back", "plate_left"] },
+  { "id": "helios_drone", "groups": ["core", "torch", "eye", "panel_l", "panel_r", "drive"] }
+ ]
+}

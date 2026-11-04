@@ -30,8 +30,14 @@ import { CTL } from '../ships/replica.js';
 import { hashUnit } from '../math/rng.js';
 import type { BodyState, WantRec } from './decisions.js';
 import type { BodyOut, BodyPose } from './stagedFlight.js';
+import { CUSTOM_DESIGNS, CO, moveAt, type CustomCtx, type CustomFlight } from './custom/index.js';
 
-export const AI_ORDER = { PATROL: 0, RETURN: 1, ENGAGE: 2, FLEE: 3 } as const;
+/** CUSTOM: a custom enemy's ENGAGE, its design, pieces gone and move in it (bodies/custom/order.ts) */
+export const AI_ORDER = { PATROL: 0, RETURN: 1, ENGAGE: 2, FLEE: 3, CUSTOM: 4 } as const;
+/** An order that fights its target (ENGAGE, or a custom enemy's) */
+const engages = (w: WantRec) => w[0] === AI_ORDER.ENGAGE || w[0] === AI_ORDER.CUSTOM;
+/** Where an engage order's mates start */
+const matesAt = (w: WantRec) => (w[0] === AI_ORDER.CUSTOM ? CO.MATES : 8);
 /** The aim error's grid (radians × this) */
 export const AIM_ERR_GRID = 4096;
 /** Strafing every tick (no `strafe` share in its behaviour) */
@@ -60,9 +66,10 @@ export function orderEngage(id: number, range: number, reach: number, hitBy: boo
 
 /** An engage order's pack (its own id with its mates', in id order), or null: it fights alone */
 export function orderPack(id: number, w: WantRec): number[] | null {
-  if (w[0] !== AI_ORDER.ENGAGE || !w[7] || w.length <= 8) return null;
+  const m0 = matesAt(w);
+  if (!engages(w) || !w[7] || w.length <= m0) return null;
   const ids = [id];
-  for (let i = 8; i < w.length; i++) ids.push(id + w[i]);
+  for (let i = m0; i < w.length; i++) ids.push(id + w[i]);
   return ids.sort((a, b) => a - b);
 }
 
@@ -79,14 +86,14 @@ export function packCentroid(ids: readonly number[], at: (id: number) => { x: nu
 
 /** An engage order's aim error at tick t (radians): re-rolled every 12 + id % 7 ticks from the order's seed */
 export function aiAimError(w: WantRec, id: number, t: number): number {
-  if (w[0] !== AI_ORDER.ENGAGE || !w[4]) return 0;
+  if (!engages(w) || !w[4]) return 0;
   return (w[4] / AIM_ERR_GRID) * (hashUnit(w[5], id, Math.floor(t / (12 + (id % 7)))) * 2 - 1);
 }
 
 /** Ships its body reads besides itself (its target, its pack's): a client must hold them all to run it */
 export function aiReads(id: number, s: BodyState): number[] {
   const w = s.want;
-  if (w[0] !== AI_ORDER.ENGAGE && w[0] !== AI_ORDER.FLEE) return [];
+  if (!engages(w) && w[0] !== AI_ORDER.FLEE) return [];
   const out = s.target >= 0 ? [s.target] : [];
   for (const m of orderPack(id, w) ?? []) if (m !== id) out.push(m);
   return out;
@@ -110,10 +117,12 @@ export interface AiPilotOut extends BodyOut {
 export function aiPilot(s: BodyState, me: BodyPose, tgt: BodyPose | null, centroid: readonly [number, number] | null, tick: number, id: number, prevQ: number): AiPilotOut {
   const w = s.want, state = w[0];
   let mx = 0, my = 0, face = me.angle, boost = false, aim: number | undefined, aimDist = 0, d = 0, across = 0, tof = 0;
-  if (state === AI_ORDER.ENGAGE && tgt) {
+  // (A custom enemy: its module, the move under way and its pieces gone: bodies/custom)
+  const custom = state === AI_ORDER.CUSTOM && tgt ? customCtx(w, id, tick, me, tgt) : null;
+  if ((state === AI_ORDER.ENGAGE || state === AI_ORDER.CUSTOM) && tgt) {
     const tx = tgt.x, ty = tgt.y, dx = tx - me.x, dy = ty - me.y;
     d = dhypot(dx, dy) || 1;
-    const range = w[1], reach = w[2];
+    const [range, reach] = custom?.design.ranges ? custom.design.ranges(custom.c, w[1], w[2]) : [w[1], w[2]];
     // Lead the target by the shell's flight time
     tof = Math.min(40, d / 45);
     const rvx = tgt.vx - me.vx, rvy = tgt.vy - me.vy;
@@ -139,6 +148,11 @@ export function aiPilot(s: BodyState, me: BodyPose, tgt: BodyPose | null, centro
       if (v > 0.6) { mx = -me.vx / v; my = -me.vy / v; }
     }
     across = Math.abs(rvx * uy - rvy * ux);
+    if (custom?.design.fly) {
+      const f: CustomFlight = { mx, my, face, boost };
+      custom.design.fly(custom.c, f);
+      mx = f.mx; my = f.my; face = f.face; boost = f.boost;
+    }
   } else if (state === AI_ORDER.FLEE && tgt) {
     const dx = me.x - tgt.x, dy = me.y - tgt.y, dd = dhypot(dx, dy) || 1;
     mx = dx / dd; my = dy / dd; boost = true;
@@ -151,10 +165,18 @@ export function aiPilot(s: BodyState, me: BodyPose, tgt: BodyPose | null, centro
   }
   // Steer by a heading held steady until the wanted one drifts (the guns aim separately, every tick)
   const held = dequantizeCursorAngle(prevQ);
-  let q = Math.abs(datan2(dsin(face - held), dcos(face - held))) > (state === AI_ORDER.ENGAGE ? 0.004 : 0.02) ? quantizeCursorAngle(face) : prevQ;
+  let q = Math.abs(datan2(dsin(face - held), dcos(face - held))) > (engages(w) ? 0.004 : 0.02) ? quantizeCursorAngle(face) : prevQ;
   // (a whole turn is no turn: the aim as the server's step rounds it again)
   if (q === AIM_TURN) q = 0;
   // Mouse-steer controls are screen-relative: press the directions nearest the wanted motion
   const bits = (my < -0.38 ? CTL.forward : 0) | (my > 0.38 ? CTL.backward : 0) | (mx < -0.38 ? CTL.left : 0) | (mx > 0.38 ? CTL.right : 0) | (boost ? CTL.boost : 0);
   return { bits, q, ix: 0, iy: 0, aim, aimDist, d, across, tof };
+}
+
+/** A custom enemy's module and what it reads this tick (null: its design isn't known: it flies as the plain AI) */
+function customCtx(w: WantRec, id: number, t: number, me: BodyPose, tgt: BodyPose): { design: (typeof CUSTOM_DESIGNS)[number]; c: CustomCtx } | null {
+  const design = CUSTOM_DESIGNS[w[CO.DESIGN]];
+  if (!design) return null;
+  const m = moveAt(w, t, (i) => design.moves[i]?.ticks ?? 0);
+  return { design, c: { w, id, t, me, tgt, gone: w[CO.GONE], move: m ? m.move : -1, k: m ? m.k : -1, arg: w[CO.ARG], seed: w[CO.MSEED] } };
 }

@@ -8,6 +8,7 @@ import type { Catalog } from './catalog.js';
 import type { ShipTuning } from './tuning.js';
 import { partMaxHp } from './blueprint.js';
 import { ShipDerived, rebuild } from './rebuild.js';
+import { shedGroup } from './groups.js';
 
 export interface ShipState {
   /** Engine entity id */
@@ -167,6 +168,8 @@ export function damagePart(state: ShipState, part: number, amount: number, tunin
   if (after <= 0 || band(before, state.maxHp[part], tuning.hpBandSize) !== band(after, state.maxHp[part], tuning.hpBandSize)) {
     state.dirty = true;
   }
+  // (A custom enemy's piece goes as one: the rest of its group with it, groups.ts)
+  if (after <= 0) shedGroup(state.blueprint, state.hp, part);
   return before - after;
 }
 

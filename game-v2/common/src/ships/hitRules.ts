@@ -23,7 +23,7 @@
 import type { Catalog } from './catalog.js';
 import type { ShipState } from './state.js';
 import type { ShipTuning, WeaponTuning } from './tuning.js';
-import type { PlacedGeom } from './grid.js';
+import { geomContainsPoint, type PlacedGeom } from './grid.js';
 import type { Vec2 } from './types.js';
 import { damagePart } from './state.js';
 import { hitMultiplier, weaponHit, type HitInfo } from './damage.js';
@@ -158,7 +158,7 @@ export function shellVs(kind: string, def: WeaponTuning, grade: number): HitVs {
  */
 export function coverPart(ctx: HitCtx, ship: ShipState, part: number, at?: Vec2, coverMemo?: CoverMemo | null): number {
   const catalog = ctx.catalog;
-  if (!stageOf(catalog, ship, part)) return part;
+  if (!stageOf(catalog, ship, part)) return underCover(ctx, ship, part, at);
   const first = currentStage(catalog, ship);
   if (!first) return -1;
   if (stageOf(catalog, ship, part) === first && standing(catalog, ship, part)) return part;
@@ -177,6 +177,22 @@ export function coverPart(ctx: HitCtx, ship: ShipState, part: number, at?: Vec2,
   }
   if (memo) { memo.first = first; memo.best = best; }
   return best;
+}
+
+/**
+ * The `under` rule off a boss's stages (a custom enemy's: the Clinker's magma under its plates, a core under its hull):
+ * a hit on a piece drawn beneath the rest goes to the first standing part over it at the spot it struck (`at`, grid
+ * space; else the struck part's middle), in part order. Where nothing covers it (a plate shot off), it takes the hit.
+ */
+function underCover(ctx: HitCtx, ship: ShipState, part: number, at?: Vec2): number {
+  const catalog = ctx.catalog, parts = ship.blueprint.parts;
+  if (!catalog.pieces.get(parts[part]?.piece)?.under) return part;
+  const geoms = ctx.geometry(ship), [x, y] = at ?? geoms[part].centroid;
+  for (let i = 0; i < parts.length; i++) {
+    if (i === part || catalog.pieces.get(parts[i].piece)?.under || !standing(catalog, ship, i)) continue;
+    if (geoms[i] && geomContainsPoint(geoms[i], x, y)) return i;
+  }
+  return part;
 }
 
 /**
