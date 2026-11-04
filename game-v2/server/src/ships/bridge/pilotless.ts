@@ -84,7 +84,7 @@ export function stepPilotless(b: BridgeCtx, eid: number, ship: ShipState, k: Fli
   }
   // EMP'd: it keeps flying, crippled (as a pilot does); slowed by a Frostbite's beam, sluggish (features/weaponry)
   const slowed = b.slowedUntil.size > 0 && b.slowedTicksLeft(eid) > 0;
-  b.replicaCtl.set(eid, { mode: ReplicaMode.Pilotless, bits: (controls === hold ? CTL.hold : controlBits(controls)) | (emp ? CTL.emp : 0) | (slowed ? CTL.slowed : 0), q, derived: ship.derived });
+  b.replicaCtl.set(eid, { mode: ReplicaMode.Pilotless, bits: (controls === hold ? CTL.hold : controlBits(controls)) | (emp ? CTL.emp : 0) | (slowed ? CTL.slowed : 0), q, derived: ship.derived, body: orders?.body });
   if (orders?.impulse && !emp) { body.vx += orders.impulse[0]; body.vy += orders.impulse[1]; }
   const hazard = withSlowed(undefined, slowed);
   stepFlight(body, controls, ship.derived, b.tuning, { charge: FULL_CHARGE, drainRate: 0 }, emp ? { ...k, hazard: withEmp(hazard) } : hazard ? { ...k, hazard } : k);

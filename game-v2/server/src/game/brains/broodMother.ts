@@ -10,12 +10,11 @@ import { StagedBrain, type Move } from './staged.js';
 
 export class BroodMotherBrain extends StagedBrain {
   constructor(host: BrainHost) {
-    // (the Scrap Mother's tables, until she has moves of her own)
+    // (the Scrap Mother's tables and flight, until she has moves of her own)
     super(host, {
       loop: [[], [], []],
-      range: [2100, 1500, 1200], circle: [0.3, 0.4, 0.55], rest: [95, 75, 60], haste: [1, 0.85, 0.75],
-      drive: [0.12, 0.2, 0.3], homeR: 5000,
-    });
+      rest: [95, 75, 60], haste: [1, 0.85, 0.75],
+    }, 'brood_mother');
   }
 
   protected make(_id: string): Move | null {

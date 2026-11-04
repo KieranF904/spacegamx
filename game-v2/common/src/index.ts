@@ -56,3 +56,5 @@ export { tickRng, hashUnit } from './math/rng.js';
 // Economy: items, stacks, recipes, player profiles
 export * from './econ/index.js';
 export * from './terrain.js';
+// Decision inputs: bosses' bodies, the same on both sides (docs/design/decision-inputs.md)
+export * from './bodies/index.js';

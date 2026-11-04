@@ -13,7 +13,7 @@
  */
 import {
   type ClientInputMessage, encodeInputBinary, decodeInputBinary, inputAckTail, readInputAcks,
-  writeHitReport, readHitReport, writeOwnCheck, readOwnCheck, CURSOR_DIST_MAX,
+  writeHitReport, readHitReport, writeOwnCheck, readOwnCheck, writeBodyCheck, readBodyCheck, CURSOR_DIST_MAX,
 } from './protocol.js';
 import { quantizeCursorAngle, dequantizeCursorAngle } from './cursorState.js';
 import {
@@ -136,9 +136,10 @@ export class InputDecoder {
       dist = CURSOR_DIST_GRID[distIdx];
     }
     const seq = extra & CI_EXTRA.SEQ ? u16() : (r.seq + 1) & 0xffff;
-    let hitReport, ownCheck, acks;
+    let hitReport, ownCheck, bodyCheck, acks;
     if (extra & CI_EXTRA.HIT_REPORT) { need(3); hitReport = readHitReport(view, at); at += 3; }
     if (extra & CI_EXTRA.OWN_CHECK) { need(3); ownCheck = readOwnCheck(view, at); at += 3; }
+    if (extra & CI_EXTRA.BODY_CHECK) { need(3); bodyCheck = readBodyCheck(view, at); at += 3; }
     if (extra & CI_EXTRA.ACKS) acks = readInputAcks(view, at);
     this.ref = { tick, seq, keys, modes, q, dist, distIdx };
     const msg: ClientInputMessage = {
@@ -153,12 +154,13 @@ export class InputDecoder {
     if (acks) msg.acks = acks;
     if (hitReport) msg.hitReport = hitReport;
     if (ownCheck) msg.ownCheck = ownCheck;
+    if (bodyCheck) msg.bodyCheck = bodyCheck;
     return msg;
   }
 }
 
 /** The input's fields the compact layout carries (anything else set: the base layout) */
-const CARRIED = new Set<string>(['type', 'seq', 'tick', 'targetTick', 'targetAngle', 'cursorDist', 'acks', 'hitReport', 'ownCheck', ...CI_KEYS, ...CI_MODES]);
+const CARRIED = new Set<string>(['type', 'seq', 'tick', 'targetTick', 'targetAngle', 'cursorDist', 'acks', 'hitReport', 'ownCheck', 'bodyCheck', ...CI_KEYS, ...CI_MODES]);
 
 /** The client's side: one per socket (a new socket starts afresh on both ends) */
 export class InputEncoder {
@@ -215,11 +217,12 @@ export class InputEncoder {
     const tail: number[] = [];
     const seq = msg.seq & 0xffff;
     if (seq !== ((r.seq + 1) & 0xffff)) { extra |= CI_EXTRA.SEQ; tail.push(seq & 0xff, seq >> 8); }
-    const riders = (msg.hitReport ? 3 : 0) + (msg.ownCheck ? 3 : 0);
+    const riders = (msg.hitReport ? 3 : 0) + (msg.ownCheck ? 3 : 0) + (msg.bodyCheck ? 3 : 0);
     const at = tail.length;
     for (let i = 0; i < riders; i++) tail.push(0);
     if (msg.hitReport) extra |= CI_EXTRA.HIT_REPORT;
     if (msg.ownCheck) extra |= CI_EXTRA.OWN_CHECK;
+    if (msg.bodyCheck) extra |= CI_EXTRA.BODY_CHECK;
     const acks = inputAckTail(msg.acks);
     if (acks.length) { extra |= CI_EXTRA.ACKS; tail.push(...acks); }
     if (extra) mask |= CI.EXTRA;
@@ -235,7 +238,8 @@ export class InputEncoder {
     const view = new DataView(out.buffer);
     let w = head + at;
     if (msg.hitReport) { writeHitReport(view, w, msg.hitReport); w += 3; }
-    if (msg.ownCheck) writeOwnCheck(view, w, msg.ownCheck);
+    if (msg.ownCheck) { writeOwnCheck(view, w, msg.ownCheck); w += 3; }
+    if (msg.bodyCheck) writeBodyCheck(view, w, msg.bodyCheck);
     return out.buffer;
   }
 }

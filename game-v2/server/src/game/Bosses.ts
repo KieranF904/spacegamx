@@ -130,6 +130,8 @@ export interface BossHost {
   defeated?(boss: string, def: BossDef, players: number[]): void;
   /** Pilots who've been mending this one (Repair Beams: ships/features/support/Support.ts): a boss counts them among its winners */
   supportersOf?(player: number): number[];
+  /** A brain's decision for its body (BrainHost.decide): to the clients that run bodies (net/decisions/BodyNet.ts) */
+  decide?(eid: number, op: number, args: readonly number[], state: import('@space-game/common').BodyState): void;
 }
 
 interface Live {
@@ -275,6 +277,7 @@ export class Bosses {
       launchFx: (num, x, y) => host.effect?.(num, x, y, 'launch'),
       players: (num) => host.players(num),
       terrain: (num) => host.terrain?.(num),
+      decide: host.decide ? (eid, op, args, state) => host.decide!(eid, op, args, state) : undefined,
     };
   }
 

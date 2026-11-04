@@ -273,6 +273,9 @@ export function tickInput(s: InputSendCtx): void {
   // Its own ship's check (CAPS.OWN_SIM) rides too, or goes on its own now and then (ShipClient.takeOwnCheck)
   const ownCheck = s.shipClient?.takeOwnCheck?.(changed || !!acks || !!hitReport);
   if (ownCheck) msg.ownCheck = ownCheck;
+  // ...and the bosses' bodies' (CAPS.BODIES), only ever riding an input that goes anyway (ShipClient.takeBodyCheck)
+  const bodyCheck = s.shipClient?.takeBodyCheck?.(changed || !!acks || !!hitReport || !!ownCheck);
+  if (bodyCheck) msg.bodyCheck = bodyCheck;
   const send = changed || !!acks || !!hitReport || !!ownCheck;
 
   // Proto: no targetTick (applied on the next tick) and no prediction queue.

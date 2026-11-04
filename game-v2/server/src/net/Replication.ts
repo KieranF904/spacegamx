@@ -96,6 +96,12 @@ interface Shadow {
   stepped?: number;
   /** Its pilot's client steps it itself (CAPS.OWN_SIM) */
   own?: OwnShadow;
+  /**
+   * Flown by its body (CAPS.BODIES, common bodies/): the ship as a client running the body has it, stepped with the
+   * controls and push the body made. Its own keyframe versions (counting down from -1, as an own ship's): a client that
+   * runs the body is sent a keyframe only when this leaves the real ship (a contact, a shed, an EMP), never rows
+   */
+  bodied?: { body: FlightBody; version: number; diverged: boolean; rebuilds: number };
 }
 
 const sameDock = (a: Shadow['dock'], b: Shadow['dock']) => (!a && !b) || (!!a && !!b && a.station === b.station && a.ox === b.ox && a.oy === b.oy);
@@ -149,7 +155,7 @@ export class Replication {
         this.shadows.set(eid, { mode, body: this.real(eid), bits, q, version: 1, diverged: false, rebuilds: ship.rebuilds, sig: flightSignature(ship.derived), dock, events: [], qSent: q });
         continue;
       }
-      if (mode !== s.mode || !sameDock(dock, s.dock)) { if (!s.diverged) this.why('mode'); s.diverged = true; s.mode = mode; s.dock = dock; }
+      if (mode !== s.mode || !sameDock(dock, s.dock)) { if (!s.diverged) this.why('mode'); s.diverged = true; s.mode = mode; s.dock = dock; if (s.bodied) s.bodied.diverged = true; }
       if (bits !== s.bits || q !== s.q) {
         s.bits = bits;
         s.q = q;
@@ -159,8 +165,11 @@ export class Replication {
       if (ship.rebuilds !== s.rebuilds) {
         s.rebuilds = ship.rebuilds;
         const sig = flightSignature(ship.derived);
-        if (sig !== s.sig) { if (!s.diverged) this.why('rebuild'); s.sig = sig; s.diverged = true; }
+        if (sig !== s.sig) { if (!s.diverged) this.why('rebuild'); s.sig = sig; s.diverged = true; if (s.bodied) s.bodied.diverged = true; }
       }
+      // (Flown by its body: the shadow its body-running clients have, whatever the others need)
+      if (rec?.body && mode === ReplicaMode.Pilotless) this.stepBodied(eid, s, rec.body, rec.derived ?? ship.derived, tick);
+      else if (s.bodied) s.bodied.diverged = true;
       // A pilot whose client steps its own ship: its shadow is that, whatever the others need (stepOwn)
       if (ship.kind === 'ship' && this.host.ownSim?.(eid)) { this.stepOwn(eid, s, mode, bits, q, rec?.derived ?? ship.derived, tick, causes); continue; }
       if (s.own) s.own = undefined;
@@ -268,6 +277,41 @@ export class Replication {
     }
   }
 
+  /** Bodies' clients' shadow of a ship its body flies (Shadow.bodied): stepped as their tick layer steps it */
+  readonly bodyStats = { stepped: 0, keyframes: 0, why: {} as Record<string, number> };
+  private stepBodied(eid: number, s: Shadow, by: { bits: number; q: number; ix: number; iy: number }, derived: ShipState['derived'], tick: number): void {
+    const ship = this.ships.get(eid)!;
+    const sb = s.bodied ??= { body: this.real(eid), version: -1, diverged: true, rebuilds: ship.rebuilds };
+    const rebuilt = sb.rebuilds !== ship.rebuilds;
+    sb.rebuilds = ship.rebuilds;
+    if (sb.diverged) return;
+    const b = sb.body;
+    b.vx += by.ix; b.vy += by.iy;
+    replicaStep(ReplicaMode.Pilotless, b, { bits: by.bits, targetAngle: replicaAngle(ReplicaMode.Pilotless, by.q) }, derived, this.ships.tuning, this.host.env(eid), tick);
+    this.bodyStats.stepped++;
+    if (b.x !== Position.x[eid] || b.y !== Position.y[eid] || b.vx !== Velocity.x[eid] || b.vy !== Velocity.y[eid] || b.angle !== Rotation.angle[eid] || b.angVel !== ship.angVel) {
+      sb.diverged = true;
+      const w = (rebuilt ? 'rebuilt:' : '') + (b.x !== Position.x[eid] || b.y !== Position.y[eid] ? 'pos' : b.vx !== Velocity.x[eid] || b.vy !== Velocity.y[eid] ? 'vel' : 'turn');
+      this.bodyStats.why[w] = (this.bodyStats.why[w] ?? 0) + 1;
+    }
+  }
+
+  /** Its bodied shadow's keyframe version (CAPS.BODIES clients' known version of it), or undefined: not flown by its body */
+  bodyVersionOf(eid: number): number | undefined {
+    return this.shadows.get(eid)?.bodied?.version;
+  }
+
+  /**
+   * Will this snapshot bring a client a keyframe of this ship (what it had of it is off): its own ship (CAPS.OWN_SIM)
+   * by its own versions, any other by the shared ones. Asked before forClient
+   */
+  keysFor(eid: number, self: number, known: ReadonlyMap<number, number>): boolean {
+    const s = this.shadows.get(eid);
+    if (!s) return true;
+    if (eid === self) return !!s.own && known.get(eid) !== s.own.version;
+    return known.get(eid) !== (s.bodied && known.get(eid)! < 0 ? s.bodied.version : s.version);
+  }
+
   /** A ship's keyframe version (bumped whenever it left its predicted path) */
   versionOf(eid: number): number {
     return this.shadows.get(eid)?.version ?? 0;
@@ -286,6 +330,7 @@ export class Replication {
         this.ownWhy(s.own.why ?? '?');
         s.own.why = undefined;
       }
+      if (s.bodied?.diverged) { s.bodied.diverged = false; s.bodied.version--; s.bodied.body = this.real(eid); }
       if (!s.diverged) continue;
       s.diverged = false;
       s.version++;
@@ -327,7 +372,7 @@ export class Replication {
    * it, so it has its ship as the server's shadow has it, tick by tick, beside its
    * prediction (its own shells are built from that: SnapshotBuilder, ownShots.ts)
    */
-  forClient(systemId: number, self: number, known: Map<number, number>, snapshotTick: number, view?: Set<number>, held?: ReadonlyMap<number, unknown>, own = false, synced?: (id: number) => number | undefined): { ships: KeyframeRow[]; ctl: ControlRow[]; own?: number[][]; ownRebuild?: number } {
+  forClient(systemId: number, self: number, known: Map<number, number>, snapshotTick: number, view?: Set<number>, held?: ReadonlyMap<number, unknown>, own = false, synced?: (id: number) => number | undefined, bodies?: (id: number) => boolean): { ships: KeyframeRow[]; ctl: ControlRow[]; own?: number[][]; ownRebuild?: number } {
     const ships: KeyframeRow[] = [];
     const ctl: ControlRow[] = [];
     const out: { own?: number[][]; ownRebuild?: number } = {};
@@ -349,6 +394,16 @@ export class Replication {
       if (held?.has(eid)) continue;
       // Out of the client's view: nothing (and a keyframe when it comes back)
       if (view && !view.has(eid)) { known.delete(eid); continue; }
+      // Flown by its body on this client's tick layer (CAPS.BODIES): a keyframe only when its bodied shadow left the ship
+      if (s.bodied && bodies?.(eid)) {
+        if (known.get(eid) !== s.bodied.version) {
+          known.set(eid, s.bodied.version);
+          ships.push(s.keyRow ??= packKeyframe({ id: eid, mode: s.mode, body: this.real(eid), ctl: { bits: s.bits, targetAngle: 0 }, q: s.q, dock: s.dock ?? undefined }));
+          this.keyframes++;
+          this.bodyStats.keyframes++;
+        }
+        continue;
+      }
       if (known.get(eid) !== s.version) {
         known.set(eid, s.version);
         ships.push(s.keyRow ??= packKeyframe({ id: eid, mode: s.mode, body: this.real(eid), ctl: { bits: s.bits, targetAngle: 0 }, q: s.q, dock: s.dock ?? undefined }));

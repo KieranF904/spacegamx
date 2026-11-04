@@ -2,8 +2,9 @@
  * What this client offers the server in its join (common network/hits.ts CAPS): confirmed and client-detected hits
  * (ships/hits/ConfirmedHits.ts clientCaps), and bit-packed frames with coalescing (common network/packed): both on in
  * dev builds; `?packed=0|1` and `?coalesce=0|1` switch them (remembered), as do `?ownshots=0|1` (its own shells as fire
- * events), `?rough=0|1` (adaptive validation, with client-detected hits), `?ownsim=0|1` (its own ship stepped by itself) and `?compact=0|1` (compact inputs: common
- * network/inputCompact.ts). The server takes what it allows (netCaps).
+ * events), `?rough=0|1` (adaptive validation, with client-detected hits), `?ownsim=0|1` (its own ship stepped by itself), `?compact=0|1` (compact inputs: common
+ * network/inputCompact.ts) and `?bodies=0|1` (bosses flown by their bodies from their brains' decisions, with ownsim:
+ * docs/design/decision-inputs.md). The server takes what it allows (netCaps).
  */
 import { CAPS, TICK_MS, confirmRules } from '@space-game/common';
 import { clientCaps } from '../ships/hits/ConfirmedHits';
@@ -32,7 +33,9 @@ export function netCaps(): number {
   const ownSim = ownShots && (flag('ownsim', 'sg.ownsim') ?? dev);
   // (compact inputs: only what changed, by app/inputCompactSend.ts's rules)
   const compact = flag('compact', 'sg.compact') ?? dev;
-  return hits | (compact ? CAPS.INPUTS : 0) | (packed ? CAPS.PACKED : 0) | (coalesce ? CAPS.COALESCE : 0) | (ownShots ? CAPS.OWN_SHOTS : 0) | (rough ? CAPS.ROUGH : 0) | (ownSim ? CAPS.OWN_SIM : 0);
+  // (bosses flown by their bodies on the tick layer, from their brains' decisions: they read its own ship there)
+  const bodies = ownSim && (flag('bodies', 'sg.bodies') ?? dev);
+  return hits | (compact ? CAPS.INPUTS : 0) | (packed ? CAPS.PACKED : 0) | (coalesce ? CAPS.COALESCE : 0) | (ownShots ? CAPS.OWN_SHOTS : 0) | (rough ? CAPS.ROUGH : 0) | (ownSim ? CAPS.OWN_SIM : 0) | (bodies ? CAPS.BODIES : 0);
 }
 
 /**

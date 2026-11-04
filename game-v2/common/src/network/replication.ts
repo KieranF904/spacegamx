@@ -188,6 +188,18 @@ export interface OwnTimeline {
 }
 
 /**
+ * A ship flown by its body on the client's tick-aligned layer (CAPS.BODIES, bodies/): its controls and its drive's push
+ * each tick come from its body (the decisions it was sent, and the replicas it reads), not from control rows. Null
+ * from `step`: not this tick (the body is off: the rows fly it).
+ */
+export interface BodyDriver {
+  /** Tick t's controls and push, from the ship as it ended tick t - 1 */
+  step(t: number, prev: FlightBody): { bits: number; q: number; ix: number; iy: number } | null;
+  /** After its step at tick t (the body's check is of this) */
+  after?(t: number, body: FlightBody): void;
+}
+
+/**
  * Every replicated ship a client knows: keyframes and control changes from
  * snapshots go in, states at any tick come out (stepped with the shared
  * replicaStep, exactly as the server's shadow does). A control change that
@@ -275,6 +287,36 @@ export class ShipReplicaSet {
   setOwn(id: number, src: OwnTimeline | null): void {
     this.own = src ? { id, src } : null;
     this.rewind(id, -Infinity);
+  }
+
+  /** Ships flown by their bodies (CAPS.BODIES), by id */
+  private drivers = new Map<number, BodyDriver>();
+  setDriver(id: number, d: BodyDriver | null): void {
+    if (d) this.drivers.set(id, d); else this.drivers.delete(id);
+    this.rewind(id, -Infinity);
+  }
+
+  /** The own ship's state after each tick's step and before that tick's causes (preAt) */
+  private ownPre = new Map<number, FlightBody>();
+
+  /**
+   * A ship's state at tick t before that tick's causes (the own ship's pulls and contacts, CAPS.OWN_SIM): what a boss's
+   * body reads of its target, as the server's boss step runs after the pilots have moved and before contacts. Any
+   * other ship's is its state at t
+   */
+  preAt(id: number, t: number): FlightBody | null {
+    if (this.own?.id !== id) return this.at(id, t)?.body ?? null;
+    const r = this.reps.get(id);
+    if (!r) return null;
+    if (r.last >= t) return this.ownPre.get(t) ?? this.at(id, t)?.body ?? null;
+    // (Not stepped to t yet, or being stepped to it now: t's step again, without its causes)
+    const prev = r.last === t - 1 ? r.hist.get(t - 1) : this.at(id, t - 1);
+    const d = this.derived(id);
+    if (!prev || !d || r.mode === ReplicaMode.Docked || r.mode === ReplicaMode.Drift) return prev?.body ?? null;
+    const src = this.own.src, ev = src.ctl(t);
+    const body = cloneBody(prev.body);
+    replicaStep(r.mode, body, { bits: ev ? ev[0] : prev.bits, targetAngle: replicaAngle(r.mode, ev ? ev[1] : prev.q) }, src.derived(t) || d, this.tuning, this.env(), t);
+    return body;
   }
 
   /** What it was stepped to from tick t on must be stepped again (its timeline changed there); its keyframe stays */
@@ -376,6 +418,7 @@ export class ShipReplicaSet {
       return best ?? r.hist.get(r.last)!;
     }
     const own = this.own?.id === id ? this.own.src : null;
+    const driver = this.drivers.get(id);
     const d = this.derived(id);
     let cur = r.hist.get(r.last)!;
     if (r.mode === ReplicaMode.Docked) {
@@ -391,10 +434,18 @@ export class ShipReplicaSet {
     while (r.last < to) {
       const t = r.last + 1;
       const ev = own ? own.ctl(t) : r.events.get(t);
-      const bits = ev ? ev[0] : cur.bits, q = ev ? ev[1] : cur.q;
+      // (Flown by its body: its controls and push from that, CAPS.BODIES)
+      const by = driver?.step(t, cur.body);
+      const bits = by ? by.bits : ev ? ev[0] : cur.bits, q = by ? by.q : ev ? ev[1] : cur.q;
       const body = cloneBody(cur.body);
+      if (by) { body.vx += by.ix; body.vy += by.iy; }
       replicaStep(r.mode, body, { bits, targetAngle: replicaAngle(r.mode, q) }, (own && own.derived(t)) || d, this.tuning, env, t);
-      if (own) own.after(t, body);
+      if (own) {
+        this.ownPre.set(t, cloneBody(body));
+        this.ownPre.delete(t - 64);
+        own.after(t, body);
+      }
+      driver?.after?.(t, body);
       cur = { body, bits, q };
       r.hist.set(t, cur);
       r.last = t;

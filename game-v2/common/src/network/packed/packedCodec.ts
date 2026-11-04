@@ -12,6 +12,7 @@
 import { BinaryReader, DICTIONARY, encodeBinary } from '../binaryCodec.js';
 import { COMPACT_TYPES, decodeServerFrame, serverFromWire, serverWire, type ServerMessage } from '../protocol.js';
 import { packHits, unpackHits } from '../hits.js';
+import { decisionRowOk } from '../../bodies/decisions.js';
 import {
   PACKED_FRAME, PK, PK_BITS, PACKED_FIELDS, PK_KEY_COUNT, PK_ENTITY, PK_ENTITY_DEFAULT, PK_DATA_CHUNK, PK_PROJECTILE,
   PK_KEYFRAME, PK_KEYFRAME_TAIL, PK_GUESS_TICKS, PK_CONTROL, PK_TABLE_MAX, PK_PENDING_MAX, type PackedField,
@@ -589,8 +590,10 @@ const isArr = Array.isArray;
 
 /** Can the snapshot's row go packed (ids where ids go, rows the shapes the packing expects)? */
 function snapshotOk(w: unknown[]): boolean {
-  if (w.length > 11) return false;
-  const [, , , e, p, r, k, c, o, f, n] = w as unknown[][];
+  if (w.length > 12) return false;
+  const [, , , e, p, r, k, c, o, f, n, d] = w as unknown[][];
+  // (Decisions: rows of whole numbers, a boss's id first, an op the packing knows: decisionsIO)
+  if (d != null && !(isArr(d) && d.every((row) => decisionRowOk(row) && isId(row[0]) && row[1] <= 0 && row[1] > -4096 && row.every((v, i) => i < 3 || (v >= -(2 ** 30) && v < 2 ** 30))))) return false;
   // (Own-ship causes: rows of numbers, a kind the packing knows: ownIO)
   if (n != null && !(isArr(n) && n.every((row) => isArr(row) && row.length >= 2 && row.length <= 15 && row.every((v) => typeof v === 'number') && Number.isInteger(row[0]) && (row[0] as number) >= 0 && Number.isInteger(row[1]) && (row[1] as number) >= 0 && (row[1] as number) < 4))) return false;
   if (e != null && !(isArr(e) && e.every((row) => isArr(row) && row.length >= 2 && row.length <= 15 && isId(row[0]) && Number.isInteger(row[1]) && (row[1] as number) >= 0 && (row[1] as number) < 32))) return false;
@@ -620,11 +623,11 @@ function snapshotOk(w: unknown[]): boolean {
   return true;
 }
 
-/** A snapshot's compact row ([code, t, lp, e, p, r, k, c, o, f, n], trailing nulls dropped) */
+/** A snapshot's compact row ([code, t, lp, e, p, r, k, c, o, f, n, d], trailing nulls dropped) */
 function snapshotIO(io: PackedIO, w: unknown[] | null): unknown[] {
   let mask = 0;
   if (w) for (let i = 1; i < w.length; i++) if (w[i] != null) mask |= 1 << (i - 1);
-  mask = io.u(mask, 10);
+  mask = io.u(mask, 11);
   const out: unknown[] = [SNAPSHOT_CODE];
   const has = (i: number) => (mask & (1 << (i - 1))) !== 0;
   const at = (i: number) => (w ? w[i] : null) as unknown[][];
@@ -655,6 +658,8 @@ function snapshotIO(io: PackedIO, w: unknown[] | null): unknown[] {
   out[9] = has(9) ? fireIO(io, at(9)) : null;
   sec?.('n', io.bitLength);
   out[10] = has(10) ? ownIO(io, at(10), tick) : null;
+  sec?.('d', io.bitLength);
+  out[11] = has(11) ? decisionsIO(io, at(11)) : null;
   sec?.('end', io.bitLength);
   while (out.length > 1 && out[out.length - 1] === null) out.pop();
   return out;
@@ -818,6 +823,26 @@ function ownIO(io: PackedIO, rows: unknown[][] | null, tick: number): unknown[][
       else if (kind === 1) o.push(io.num(v, 0, 3));
       else o.push(io.num(v, 0, 3));
     }
+    out.push(o);
+  }
+  return out;
+}
+
+/**
+ * Bosses' decisions (common bodies/decisions.ts: [id, dt, op, ...args]): the boss by its slot, how many ticks before the
+ * snapshot's (dt, 0 or less), the op (4 bits), the count of args, each a signed varint (most are a byte or less)
+ */
+function decisionsIO(io: PackedIO, rows: unknown[][] | null): unknown[][] {
+  const n = io.vu(rows?.length ?? 0, 2);
+  const out: unknown[][] = [];
+  for (let r = 0; r < n; r++) {
+    const row = rows?.[r] as number[] | undefined;
+    const id = io.thing(row?.[0] ?? 0);
+    const ago = io.vu(-(row?.[1] ?? 0), 2);
+    const op = io.u(row?.[2] ?? 0, 4);
+    const len = io.vu(row ? row.length - 3 : 0, 2);
+    const o: number[] = [id, ago ? -ago : 0, op];
+    for (let i = 0; i < len; i++) o.push(io.vs(row?.[3 + i] ?? 0, 3));
     out.push(o);
   }
   return out;

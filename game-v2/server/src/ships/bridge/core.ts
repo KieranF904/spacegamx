@@ -144,6 +144,8 @@ export interface PilotOrders {
   target?: number;
   /** A sudden burst of speed this tick (a boss's dash or charge: world units a tick, added to its velocity) */
   impulse?: [number, number];
+  /** Flown by its body (common bodies/, CAPS.BODIES): the controls and push it made, as a client's body makes them */
+  body?: { bits: number; q: number; ix: number; iy: number };
 }
 
 // (the glancing line and the stage cover share: common/src/ships/hitRules.ts, the rules a client works hits out by too)

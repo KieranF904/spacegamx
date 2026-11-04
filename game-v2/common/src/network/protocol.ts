@@ -33,9 +33,9 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
  * has updated PROTOCOL_VERSION and PROTOCOL_WIRE_HASH.
  */
 // History: PROTOCOL_CHANGELOG.md. Re-pin with `npm run wire:bump "reason"` (game-v2/), never by hand.
-export const PROTOCOL_VERSION = 35;
+export const PROTOCOL_VERSION = 36;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
-export const PROTOCOL_WIRE_HASH = 'c25fa940';
+export const PROTOCOL_WIRE_HASH = '7ee9d4ca';
 /** WebSocket close code (and reason) for a client on another protocol version */
 export const PROTOCOL_MISMATCH_CLOSE = 4002;
 export const PROTOCOL_MISMATCH_REASON = 'version';
@@ -74,7 +74,12 @@ export interface ClientInputMessage {
   hitReport?: HitReport;
   /** Its own ship on its tick-aligned layer (hits.ts CAPS.OWN_SIM): a hash of its state as of a snapshot's tick (network/ownTick.ts) */
   ownCheck?: OwnCheck;
+  /** The bosses' bodies it runs (CAPS.BODIES, common bodies/hash.ts): their hashes' sum's low byte as of a snapshot's tick (12 bits) */
+  bodyCheck?: BodyCheck;
 }
+
+/** A body check as it rides an input (CAPS.BODIES) */
+export interface BodyCheck { hash: number; tick: number }
 
 /** Cursor distance is sent in steps of this many world units, up to CURSOR_DIST_MAX */
 export const CURSOR_DIST_STEP = 4;
@@ -441,6 +446,11 @@ export interface ServerSnapshotMessage {
    * the server's step had them
    */
   own?: number[][];
+  /**
+   * Bosses' decisions for the bodies it runs (CAPS.BODIES, common bodies/decisions.ts): [id, dt, op, ...args], dt the
+   * decision's tick less the snapshot's
+   */
+  decisions?: number[][];
 }
 
 export interface ServerPlayerStateMessage {
@@ -1400,6 +1410,9 @@ const HIT_REPORT_BYTES = 3;
 /** (protocol 34, flags2 0x80: an own check after the hit report: the state hash's byte, then 16 bits: the hp hash's 4 and the tick's low 12) */
 const OWN_CHECK = 0x80;
 const OWN_CHECK_BYTES = 3;
+/** (Protocol 36, CAPS.BODIES: the first flags byte's top bit, a body check after the own check) */
+const BODY_CHECK = 0x80;
+const BODY_CHECK_BYTES = 3;
 
 /** Debris acks as they follow an input (both layouts): a count byte, then each piece's id as a base-128 varint and its check */
 export function inputAckTail(acks: number[] | undefined): number[] {
@@ -1436,6 +1449,14 @@ export function readHitReport(view: DataView, at: number): HitReport {
   const tt = view.getUint16(at + 1, true);
   return { hash: view.getUint8(at), tick: tt & 0x3fff, epoch: tt >>> 14 };
 }
+/** A body check as it follows an input (3 bytes: the hash byte, then the tick's low 12 bits) */
+export function writeBodyCheck(view: DataView, at: number, chk: BodyCheck): void {
+  view.setUint8(at, chk.hash & 0xff);
+  view.setUint16(at + 1, chk.tick & 0xfff, true);
+}
+export function readBodyCheck(view: DataView, at: number): BodyCheck {
+  return { hash: view.getUint8(at), tick: view.getUint16(at + 1, true) & 0xfff };
+}
 /** An own check as it follows an input (3 bytes: the state hash's byte, then the tick's low 12 bits and the hp hash's 4) */
 export function writeOwnCheck(view: DataView, at: number, chk: OwnCheck): void {
   view.setUint8(at, chk.body & 0xff);
@@ -1447,12 +1468,13 @@ export function readOwnCheck(view: DataView, at: number): OwnCheck {
 }
 
 export function encodeInputBinary(msg: ClientInputMessage): ArrayBuffer {
-  const tail = inputAckTail(msg.acks), rep = msg.hitReport, chk = msg.ownCheck, at0 = INPUT_BYTES + (rep ? HIT_REPORT_BYTES : 0), at = at0 + (chk ? OWN_CHECK_BYTES : 0);
+  const tail = inputAckTail(msg.acks), rep = msg.hitReport, chk = msg.ownCheck, bck = msg.bodyCheck, at0 = INPUT_BYTES + (rep ? HIT_REPORT_BYTES : 0), at1 = at0 + (chk ? OWN_CHECK_BYTES : 0), at = at1 + (bck ? BODY_CHECK_BYTES : 0);
   const buffer = new ArrayBuffer(at + tail.length);
   const view = new DataView(buffer);
   for (let i = 0; i < tail.length; i++) view.setUint8(at + i, tail[i]);
   if (rep) writeHitReport(view, INPUT_BYTES, rep);
   if (chk) writeOwnCheck(view, at0, chk);
+  if (bck) writeBodyCheck(view, at1, bck);
   view.setUint8(0, BINARY_MSG_INPUT);
   view.setUint16(1, msg.seq & 0xFFFF, true);
   view.setUint16(3, (msg.targetTick ?? 0) & 0xFFFF, true);
@@ -1463,7 +1485,8 @@ export function encodeInputBinary(msg: ClientInputMessage): ArrayBuffer {
     (msg.right ? 0x08 : 0) |
     (msg.boost ? 0x10 : 0) |
     (msg.fireLeft ? 0x20 : 0) |
-    (msg.fireRight ? 0x40 : 0));
+    (msg.fireRight ? 0x40 : 0) |
+    (bck ? BODY_CHECK : 0));
   view.setUint16(6, quantizeCursorAngle(msg.targetAngle), true);
   view.setUint16(8, quantizeCursorDist(msg.cursorDist ?? 0), true);
   view.setUint8(10,
@@ -1488,6 +1511,8 @@ export function decodeInputBinary(data: ArrayBuffer | Uint8Array): ClientInputMe
   const rep = flags2 & HIT_REPORT && view.byteLength >= INPUT_BYTES + HIT_REPORT_BYTES;
   const at0 = rep ? INPUT_BYTES + HIT_REPORT_BYTES : INPUT_BYTES;
   const chk = flags2 & OWN_CHECK && view.byteLength >= at0 + OWN_CHECK_BYTES;
+  const at1 = chk ? at0 + OWN_CHECK_BYTES : at0;
+  const bck = flags & BODY_CHECK && view.byteLength >= at1 + BODY_CHECK_BYTES;
   return {
     type: 'input',
     seq: view.getUint16(1, true),
@@ -1508,9 +1533,10 @@ export function decodeInputBinary(data: ArrayBuffer | Uint8Array): ClientInputMe
     jump: (flags2 & 0x08) !== 0,
     dodge: (flags2 & 0x40) !== 0,
     cursorDist: view.getUint16(8, true) * CURSOR_DIST_STEP,
-    acks: readInputAcks(view, chk ? at0 + OWN_CHECK_BYTES : at0),
+    acks: readInputAcks(view, bck ? at1 + BODY_CHECK_BYTES : at1),
     ...(rep ? { hitReport: readHitReport(view, INPUT_BYTES) } : {}),
     ...(chk ? { ownCheck: readOwnCheck(view, at0) } : {}),
+    ...(bck ? { bodyCheck: readBodyCheck(view, at1) } : {}),
   };
 }
 
@@ -1591,7 +1617,7 @@ const COMPACT: [string, string[]][] = [
   ['stationFire', ['station', 'target', 'turret']],
   ['playerState', ['hp', 'maxHp', 'boostFuel', 'maxBoostFuel', 'xp', 'level', 'credits', 'systemId']],
   // (Packed first: see packSnapshot)
-  ['snapshot', ['t', 'lp', 'e', 'p', 'r', 'k', 'c', 'o', 'f', 'n']],
+  ['snapshot', ['t', 'lp', 'e', 'p', 'r', 'k', 'c', 'o', 'f', 'n', 'd']],
   ['mapDots', ['tick', 'dots', 'routes', 'info', 'gone', 'names', 'full']],
   // (Appended, protocol 26: the hot plain messages. Values change on the way in and out: COMPACT_HOOKS)
   ['ignite', ['bodyId', 'part', 'ticks']],
@@ -1698,7 +1724,7 @@ export function wireTables(): Record<string, unknown> {
   };
 }
 
-interface PackedSnapshot { type: 'snapshot'; t: number; lp: number; e?: unknown[][]; p?: (number | null)[][]; r?: number[]; k?: number[][]; c?: number[][]; o?: number[]; f?: number[][]; n?: number[][] }
+interface PackedSnapshot { type: 'snapshot'; t: number; lp: number; e?: unknown[][]; p?: (number | null)[][]; r?: number[]; k?: number[][]; c?: number[][]; o?: number[]; f?: number[][]; n?: number[][]; d?: number[][] }
 
 /**
  * Projectiles have rows of their own (they're most of a fight's rows):
@@ -1756,6 +1782,7 @@ export function packSnapshot(m: ServerSnapshotMessage): PackedSnapshot {
   if (m.out?.length) out.o = m.out;
   if (m.fire?.length) out.f = packFire(m.fire);
   if (m.own?.length) out.n = m.own;
+  if (m.decisions?.length) out.d = m.decisions;
   return out;
 }
 
@@ -1811,7 +1838,7 @@ export function unpackSnapshot(p: PackedSnapshot): ServerSnapshotMessage {
     return s as unknown as EntityState;
   });
   for (const r of p.p ?? []) entities.push(unpackProjectile(r, p.t));
-  return { type: 'snapshot', tick: p.t, lastProcessedInput: p.lp, entities, removed: p.r ?? [], ships: p.k, ctl: p.c && unpackCtlIds(p.c), out: p.o, fire: p.f && unpackFire(p.f), ...(p.n ? { own: p.n } : {}) };
+  return { type: 'snapshot', tick: p.t, lastProcessedInput: p.lp, entities, removed: p.r ?? [], ships: p.k, ctl: p.c && unpackCtlIds(p.c), out: p.o, fire: p.f && unpackFire(p.f), ...(p.n ? { own: p.n } : {}), ...(p.d ? { decisions: p.d } : {}) };
 }
 
 /**
@@ -1869,10 +1896,10 @@ function rowBytes(cache: WeakMap<readonly number[], Uint8Array>, row: readonly n
 
 function encodeSnapshot(m: ServerSnapshotMessage): Uint8Array {
   const { e, p } = packEntities(m);
-  // (The compact row: [code, t, lp, e, p, r, k, c, o, f, n], absent ones null and trailing nulls dropped)
+  // (The compact row: [code, t, lp, e, p, r, k, c, o, f, n, d], absent ones null and trailing nulls dropped)
   const row: unknown[] = [SNAPSHOT_CODE, m.tick ?? null, m.lastProcessedInput ?? null, e.length ? e : null, p.length ? p : null,
     m.removed.length ? m.removed : null, m.ships?.length ? m.ships : null, m.ctl?.length ? m.ctl : null,
-    m.out?.length ? m.out : null, m.fire?.length ? packFire(m.fire) : null, m.own?.length ? m.own : null];
+    m.out?.length ? m.out : null, m.fire?.length ? packFire(m.fire) : null, m.own?.length ? m.own : null, m.decisions?.length ? m.decisions : null];
   while (row.length > 1 && row[row.length - 1] === null) row.pop();
   const w = snapWriter;
   w.arrayHeader(row.length);

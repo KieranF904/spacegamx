@@ -29,7 +29,7 @@ import {
   jumpFieldAt, fieldRangeBoost, fieldCharge, primeBoost, pilotJumpStep, withEmp, lodestonePosition, type JumpField, type LodestoneData,
   ShipReplicaSet, ServerSnapshotMessage, ServerDebrisSplitMessage, deriveSplit, unpackIds, unpackRuns, computeJoins, DEBRIS_STATUS, type DebrisShape, type Vec2,
   packCursorWeaponState, rebuildVolley, WEAPON_KIND_TYPE, EntityState, accelAlong, turnAccel, rateShip, stepGuns, volleyShells, firesStraight, partWeaponDef,
-  type ServerHitsMessage, type ServerHpCheckMessage, type ServerHitFixMessage, type HitReport, type OwnCheck, CAPS, SIDE, ownSimCaps,
+  type ServerHitsMessage, type ServerHpCheckMessage, type ServerHitFixMessage, type HitReport, type OwnCheck, type BodyCheck, CAPS, SIDE, ownSimCaps, bodiesFor,
 } from '@space-game/common';
 import type { MenuShipInfo } from '../ui/GameMenuUI';
 import type { GameState, InterpolatedEntity } from '../state/GameState';
@@ -54,6 +54,7 @@ import { DrawnWorld } from './drawnHit';
 import { ConfirmedHits } from './hits/ConfirmedHits';
 import { SelfHits, toldHits } from './hits/SelfHits';
 import { OwnTick } from './own/OwnTick';
+import { BodyRunner } from './bodies/BodyRunner';
 import type { PilotState } from '../econ/clientEcon';
 import type { ThrustCommand } from './ThrusterFx';
 import { settings } from '../settings/Settings';
@@ -279,6 +280,7 @@ export class ShipClient {
       passes: (shell) => this.hits.passesOf(shell),
     });
     this.own = new OwnTick({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, tuning: opts.tuning });
+    this.bodies = new BodyRunner({ reps: this.replicas });
   }
 
   /** A ship's side, as this client knows it (hitRules SIDE bits: who may hurt whom) */
@@ -310,6 +312,8 @@ export class ShipClient {
   readonly selfHits: SelfHits;
   /** Its own ship on the tick-aligned layer, stepped from its own inputs and the causes it's told (CAPS.OWN_SIM: own/OwnTick.ts) */
   readonly own: OwnTick;
+  /** Bosses flown by their bodies on the tick-aligned layer, from their brains' decisions (CAPS.BODIES: bodies/BodyRunner.ts) */
+  readonly bodies: BodyRunner;
   /** The tick of the snapshot last applied (a confirmed hit's tick counts back from it) */
   private snapTick = 0;
   /** Handing out this frame's hits (their projectileHit messages aren't the old way) */
@@ -366,6 +370,7 @@ export class ShipClient {
     this.selfHits.setOn((caps & (CAPS.HITS | CAPS.SELF_HITS)) === (CAPS.HITS | CAPS.SELF_HITS), this.snapTick);
     this.selfHits.setLevel(caps & CAPS.ROUGH ? lvl : undefined);
     this.own.setOn(ownSimCaps(caps));
+    this.bodies.setOn(bodiesFor(caps));
   }
 
   /**
@@ -417,6 +422,11 @@ export class ShipClient {
   /** Its own ship's check for this input tick, if one is due (CAPS.OWN_SIM; `riding`: an input goes anyway) */
   takeOwnCheck(riding: boolean): OwnCheck | undefined {
     return this.own.takeCheck(riding, this.opts.state.serverTick);
+  }
+
+  /** The bosses' bodies' check for this input tick, if one is due (CAPS.BODIES; it only rides an input going anyway) */
+  takeBodyCheck(riding: boolean): BodyCheck | undefined {
+    return this.bodies.takeCheck(riding, this.opts.state.serverTick);
   }
 
   /** An input it sent: its own ship's controls on the tick-aligned layer from its target tick (OwnTick) */
@@ -541,6 +551,8 @@ export class ShipClient {
     this.replicas.apply(m.tick, m.ships, m.ctl);
     // (its own ship's causes and controls, CAPS.OWN_SIM: before its own fire events are built from it)
     this.own.onSnapshot(m);
+    // (bosses' decisions, CAPS.BODIES: their bodies fly them on the tick layer from here: ships/bodies/BodyRunner.ts)
+    this.bodies.onSnapshot(m.tick, m.decisions);
     const out: EntityState[] = [];
     // (Debris worked out here since the last snapshot: its rows, as the server would have sent them)
     if (this.debrisRows.length) out.push(...this.debrisRows.splice(0));
@@ -638,8 +650,8 @@ export class ShipClient {
   /** After a snapshot: ships that are gone (and new status rows get their hull %) */
   onReplication(m: ServerSnapshotMessage): void {
     for (const s of m.entities) if (s.type === EntityType.ShipBody) this.fillHull(s.id);
-    for (const id of m.removed) this.replicas.remove(id);
-    for (const id of m.out ?? []) this.replicas.remove(id);
+    for (const id of m.removed) { this.bodies.remove(id); this.replicas.remove(id); }
+    for (const id of m.out ?? []) { this.bodies.remove(id); this.replicas.remove(id); }
   }
 
   /** Place a replicated ship for this frame (false: not one, or not ready yet) */

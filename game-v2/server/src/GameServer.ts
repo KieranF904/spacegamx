@@ -180,6 +180,8 @@ import { registerFlightHandlers, portalQuery } from './net/handlers/flight.js';
 import { Outbox } from './net/snapshot/Outbox.js';
 import { HitLedger } from './net/hits/HitLedger.js';
 import { OwnChecks } from './net/own/OwnChecks.js';
+import { BodyNet } from './net/decisions/BodyNet.js';
+import type { BodyState } from '@space-game/common';
 import { ownSimFor } from './net/snapshot/ownShots.js';
 import { SnapshotBuilder, designHash, playerQuery, projectileQuery, droppedItemQuery } from './net/SnapshotBuilder.js';
 
@@ -662,6 +664,8 @@ export class GameServer implements ServerCtx {
   readonly hits: HitLedger;
   /** Pilots' own ships on their clients' tick-aligned layer: the checks they send of them (CAPS.OWN_SIM, net/own/OwnChecks.ts) */
   readonly ownChecks: OwnChecks;
+  /** Bosses' decisions, for the clients that run their bodies, and those clients' checks (CAPS.BODIES, net/decisions/BodyNet.ts) */
+  readonly bodies: BodyNet;
   /** The join caps this server takes (GameServerOptions.netCaps) */
   readonly netCaps: number;
   /** The snapshot path: rows, snapshots, ship structure, map dots, entering a system (net/SnapshotBuilder.ts) */
@@ -690,6 +694,13 @@ export class GameServer implements ServerCtx {
       tick: () => this.currentTick,
       rekey: (conn) => { conn.repKnown.delete(conn.playerId); },
       resyncHp: (conn) => { conn.shipHpSent.delete(conn.playerId); conn.shipSynced.delete(conn.playerId); },
+    });
+    this.bodies = new BodyNet({
+      tick: () => this.currentTick,
+      body: (eid) => {
+        const s = this.ships.get(eid);
+        return s ? { x: Position.x[eid], y: Position.y[eid], vx: Velocity.x[eid], vy: Velocity.y[eid], angle: Rotation.angle[eid], angVel: s.angVel } : null;
+      },
     });
     this.netCaps = opts.netCaps ?? 0;
     this.gameData = opts.gameData;
@@ -1003,6 +1014,7 @@ this.devTeleport = opts.devTeleport ?? false;
       lastEntityStates: this.lastEntityStates,
       hits: this.hits,
       ownChecks: this.ownChecks,
+      bodies: this.bodies,
     }, this);
 
     // Hook up admin server events
@@ -1526,6 +1538,8 @@ this.devTeleport = opts.devTeleport ?? false;
       },
       // (Support credit: ships/features/support/Support.ts)
       supportersOf: (player: number) => this.support.supporters(player, this.currentTick),
+      // (Decision inputs, CAPS.BODIES: net/decisions/BodyNet.ts)
+      decide: (eid: number, op: number, args: readonly number[], state: BodyState) => this.bodies.decide(eid, op, args, state),
       fire: (owner: number, kind: string, x: number, y: number, angle: number, scale: number, opts?: { target?: number; speed?: number; intercept?: boolean }) => {
         // (A boss's nova punches through as its own grade does; `intercept: false`, point defence can't touch it: support.ts)
         const ship = this.ships.get(owner);

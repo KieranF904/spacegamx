@@ -39,6 +39,8 @@ import { portalQuery } from './handlers/flight.js';
 import { SELF_SAFETY_TICKS, SNAP_PROJECTILE_RANGE, SNAP_POD_RANGE, SHIP_VIEW_IN, SHIP_VIEW_OUT, MAP_DOTS_TICKS, DEBRIS_ACK_TICKS } from './snapshot/constants.js';
 import type { HitLedger } from './hits/HitLedger.js';
 import { ownShotsFor, ownVolleyExact, ownSimFor } from './snapshot/ownShots.js';
+import { bodiesFor } from '@space-game/common';
+import type { BodyNet } from './decisions/BodyNet.js';
 import type { OwnChecks } from './own/OwnChecks.js';
 
 /** A debris body's status row as its key (rowKey): what a client makes itself for debris it works out (common ships/debris.ts) */
@@ -134,6 +136,8 @@ export interface SnapshotHost {
   readonly hits?: HitLedger | null;
   /** Pilots' checks of their own ships (CAPS.OWN_SIM): what each snapshot should come to (net/own/OwnChecks.ts) */
   readonly ownChecks?: OwnChecks | null;
+  /** Bosses' decisions for clients that run their bodies (CAPS.BODIES: net/decisions/BodyNet.ts) */
+  readonly bodies?: BodyNet | null;
 }
 
 export class SnapshotBuilder {
@@ -168,6 +172,7 @@ export class SnapshotBuilder {
   private readonly lastEntityStates: Map<number, Map<number, string>>;
   private readonly hits: HitLedger | null;
   private readonly ownChecks: OwnChecks | null;
+  private readonly bodies: BodyNet | null;
   /** The server itself, for its tick (read, never held) */
   private readonly ticks: { readonly currentTick: number };
 
@@ -201,6 +206,7 @@ export class SnapshotBuilder {
     this.lastEntityStates = host.lastEntityStates;
     this.hits = host.hits ?? null;
     this.ownChecks = host.ownChecks ?? null;
+    this.bodies = host.bodies ?? null;
     this.ticks = ticks;
   }
 
@@ -559,7 +565,11 @@ export class SnapshotBuilder {
       // Ship motion: keyframes where needed, control changes otherwise (its own ship's too, when it builds its own
       // shells: its confirmed ship, beside its prediction, snapshot/ownShots.ts)
       const ownShots = ownShotsFor(conn.caps);
-      const rep = this.replication.forClient(playerSystemId, conn.playerId, conn.repKnown, this.currentTick, conn.shipView, conn.debrisHeld, ownShots, (id) => conn.shipSynced.get(id)?.rebuilds);
+      // Bosses flown by their bodies on its tick layer (CAPS.BODIES): their decisions, and from here no rows or drive keyframes of them
+      const bodies = this.bodies && bodiesFor(conn.caps) ? this.bodies : null;
+      const decisions = bodies?.forClient(conn, conn.playerId, (e) => InSystem.systemId[e] ?? -1, playerSystemId ?? -1, conn.repKnown, this.currentTick,
+        (e) => !conn.shipView || conn.shipView.has(e), (e) => this.replication.keysFor(e, conn.playerId, conn.repKnown));
+      const rep = this.replication.forClient(playerSystemId, conn.playerId, conn.repKnown, this.currentTick, conn.shipView, conn.debrisHeld, ownShots, (id) => conn.shipSynced.get(id)?.rebuilds, bodies ? (id) => bodies.runs(conn, id) : undefined);
       // Shots from ships it replicates go as fire events: it builds the shells itself (launch.ts).
       // Not for a ship it's only now getting a keyframe for (it can't place it back then), nor its
       // own unless it replicates that too; those shells, and any flying in from further off, go as rows.
@@ -668,7 +678,7 @@ export class SnapshotBuilder {
       if (this.currentTick % 60 === 0) this.sendPlayerState(conn);
 
       // (Records count from the snapshot they follow: one always goes with them)
-      const shouldSend = conn.forceSnapshot || entities.length > 0 || removed.length > 0 || rep.ships.length > 0 || rep.ctl.length > 0 || out.length > 0 || fire.length > 0 || !!rep.own?.length
+      const shouldSend = conn.forceSnapshot || entities.length > 0 || removed.length > 0 || rep.ships.length > 0 || rep.ctl.length > 0 || out.length > 0 || fire.length > 0 || !!rep.own?.length || !!decisions?.length
         || (hitsOn && this.hits!.pending(conn));
       if (!shouldSend) {
         this.lastEntityStates.set(conn.playerId, newStates);
@@ -687,6 +697,7 @@ export class SnapshotBuilder {
         out: out.length ? out : undefined,
         fire: fire.length ? fire : undefined,
         own: rep.own,
+        decisions: decisions?.length ? decisions : undefined,
       });
 
       conn.forceSnapshot = false;
@@ -695,6 +706,8 @@ export class SnapshotBuilder {
       if (hitsOn) this.afterHits(conn, playerSystemId);
       // What its check of its own ship should say for this snapshot (CAPS.OWN_SIM: net/own/OwnChecks.ts)
       if (this.ownChecks && ownSimFor(conn.caps) && conn.repKnown.has(conn.playerId)) this.noteOwn(conn);
+      // ...and of the bodies it runs (CAPS.BODIES: net/decisions/BodyNet.ts)
+      bodies?.note(conn, this.currentTick);
     }
 
     // Clear pending removed entities after sending to all clients

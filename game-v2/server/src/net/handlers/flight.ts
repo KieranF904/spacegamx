@@ -33,6 +33,8 @@ export function registerFlightHandlers(t: HandlerRegistry): void {
     if (msg.hitReport) ctx.hits.report(conn, msg.hitReport);
     // (Its own ship's check, CAPS.OWN_SIM: net/own/OwnChecks.ts)
     if (msg.ownCheck) ctx.ownChecks.check(conn, msg.ownCheck);
+    // (The bosses' bodies it runs, CAPS.BODIES: net/decisions/BodyNet.ts)
+    if (msg.bodyCheck) ctx.bodies.check(conn, msg.bodyCheck);
     // Queue for next tick boundary — don't apply mid-frame.
     // Messages still arrive instantly via setImmediate event loop.
     // (Dropped: a client stepping its own ship had it on its target tick, so its ship is off: Replication ownLate)

@@ -14,6 +14,8 @@ import { ShipStore } from '../../../../client/src/ships/ShipStore.js';
 import { ConfirmedHits, type HitShell, type HitsOutcome, type OwnHit } from '../../../../client/src/ships/hits/ConfirmedHits.js';
 import { SelfHits, toldHits } from '../../../../client/src/ships/hits/SelfHits.js';
 import { OwnTick } from '../../../../client/src/ships/own/OwnTick.js';
+import { BodyRunner } from '../../../../client/src/ships/bodies/BodyRunner.js';
+import { bodiesFor } from '@space-game/common';
 import { ownSimFor } from '../snapshot/ownShots.js';
 import type { GameServer } from '../../GameServer.js';
 
@@ -41,6 +43,8 @@ export class FakeHitsClient {
   readonly selfHits: SelfHits | null = null;
   /** Its own ship on its tick-aligned layer, stepped by itself (CAPS.OWN_SIM: client ships/own/OwnTick.ts) */
   readonly own: OwnTick | null = null;
+  /** Bosses flown by their bodies on its tick-aligned layer (CAPS.BODIES: client ships/bodies/BodyRunner.ts) */
+  readonly bodies: BodyRunner | null = null;
   readonly shells = new Map<number, HitShell>();
   /** Entity types and ship-body status data, as the snapshots said */
   private kinds = new Map<number, { type: number; side: number }>();
@@ -100,6 +104,7 @@ export class FakeHitsClient {
       });
     }
     if (ownSimFor(opts.caps)) this.own = new OwnTick({ store: this.store, reps: this.reps, self: () => this.pid, tuning: ships.tuning });
+    if (bodiesFor(opts.caps)) this.bodies = new BodyRunner({ reps: this.reps });
     const socket: ClientSocket = {
       isOpen: () => true,
       send: (data) => {
@@ -158,11 +163,13 @@ export class FakeHitsClient {
   /** After a step: what it owes the server (resyncs; a hit report on an input, as one goes every tick in a fight) */
   flushUp(): void {
     const rep = this.selfHits?.takeReport(true);
-    if (rep) {
-      const msg = { type: 'input', seq: this.seq++, tick: 0, forward: false, backward: false, left: false, right: false, boost: false, fireLeft: false, fireRight: false, targetAngle: 0, hitReport: rep } as ClientMessage;
+    // (its bodies' check rides along, CAPS.BODIES)
+    const bck = this.bodies?.takeCheck(true, this.server.getTick());
+    if (rep || bck) {
+      const msg = { type: 'input', seq: this.seq++, tick: 0, forward: false, backward: false, left: false, right: false, boost: false, fireLeft: false, fireRight: false, targetAngle: 0, ...(rep ? { hitReport: rep } : {}), ...(bck ? { bodyCheck: bck } : {}) } as ClientMessage;
       const enc = encodeMessage(msg);
-      this.upBytes += 3;
-      this.reports++;
+      this.upBytes += (rep ? 3 : 0) + (bck ? 3 : 0);
+      if (rep) this.reports++;
       this.outbox.push(decodeMessage(enc) as ClientMessage);
     }
     for (const m of this.outbox.splice(0)) this.link?.receive(m);
@@ -177,6 +184,7 @@ export class FakeHitsClient {
         this.selfHits?.setOn((m.caps & (CAPS.HITS | CAPS.SELF_HITS)) === (CAPS.HITS | CAPS.SELF_HITS), this.snapTick);
         this.selfHits?.setLevel(m.caps & CAPS.ROUGH ? m.lvl : undefined);
         this.own?.setOn(ownSimFor(m.caps));
+        this.bodies?.setOn(bodiesFor(m.caps));
         this.levels.push([this.snapTick, m.caps & CAPS.ROUGH ? m.lvl ?? 1 : 1]);
         break;
       case 'snapshot': this.snapshot(m as ServerSnapshotMessage); break;
@@ -216,6 +224,8 @@ export class FakeHitsClient {
     this.reps.apply(s.tick, s.ships, s.ctl);
     // (its own ship's causes and controls, CAPS.OWN_SIM, before its fire events are built from it)
     this.own?.onSnapshot(s);
+    // (bosses' decisions, CAPS.BODIES: their bodies fly them from here)
+    this.bodies?.onSnapshot(s.tick, s.decisions);
     for (const e of s.entities) {
       const d = e.data;
       if (e.type === EntityType.Player || e.type === EntityType.ShipBody) this.kinds.set(e.id, { type: e.type, side: e.type === EntityType.ShipBody && d ? d[10] ?? 0 : 0 });
@@ -245,8 +255,8 @@ export class FakeHitsClient {
     // (as ShipClient: the ledger sees the removed list before the shells go)
     this.hits?.forget(s.removed);
     this.selfHits?.onRemoved(s.removed);
-    for (const id of s.removed) { if (this.known.has(id)) this.removed.add(id); this.shells.delete(id); this.store.remove(id); this.reps.remove(id); }
-    for (const id of s.out ?? []) this.reps.remove(id);
+    for (const id of s.removed) { if (this.known.has(id)) this.removed.add(id); this.shells.delete(id); this.store.remove(id); this.bodies?.remove(id); this.reps.remove(id); }
+    for (const id of s.out ?? []) { this.bodies?.remove(id); this.reps.remove(id); }
     // (The game's client steps every replica as it draws, each frame; drawing nothing, this does it here. Left alone,
     // a replica no one asked for in 600 ticks stops short: ShipReplicaSet.at won't run that far in one go)
     for (const id of this.reps.ids()) this.reps.at(id, s.tick);

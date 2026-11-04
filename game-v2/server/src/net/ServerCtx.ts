@@ -7,7 +7,7 @@
  * a module method, not widen the context (the snapshot path gets its own, wider host).
  */
 import type { IWorld } from 'bitecs';
-import type { ClientSocket, ServerMessage, HitReport, OwnCheck } from '@space-game/common';
+import type { ClientSocket, ServerMessage, HitReport, OwnCheck, BodyCheck } from '@space-game/common';
 import type { ClientConnection } from './ClientConnection.js';
 import type { MessageLimiter } from './MessageLimits.js';
 import type { GameData } from '../data/GameData.js';
@@ -53,6 +53,8 @@ export interface ServerCtx {
   readonly hits: { resync(conn: ClientConnection, ids: readonly unknown[]): void; report(conn: ClientConnection, rep: HitReport): void };
   /** A client stepping its own ship checks it (input ownCheck, CAPS.OWN_SIM: net/own/OwnChecks.ts) */
   readonly ownChecks: { check(conn: ClientConnection, c: OwnCheck): void };
+  /** Bosses' bodies its client runs: its checks of them (CAPS.BODIES, net/decisions/BodyNet.ts) */
+  readonly bodies: { check(conn: ClientConnection, c: BodyCheck): void };
   /** The ECS world (handlers only read components from it) */
   readonly world: IWorld;
   /** The hangar opens anywhere (proto) */

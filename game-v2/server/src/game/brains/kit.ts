@@ -9,7 +9,7 @@
  * (PilotOrders.impulse); a heavy hull turns as its blueprint's `turn` lets it (flight.ts), as every client replays it.
  */
 
-import { Position, Velocity, Rotation, InSystem, ServerMessage, ShipState, shipPointToWorld, localToWorldDir, isRuined, type Vec2, type Terrain, datan2, dcos, dsin } from '@space-game/common';
+import { Position, Velocity, Rotation, InSystem, ServerMessage, ShipState, shipPointToWorld, localToWorldDir, isRuined, type Vec2, type Terrain, type BodyState, datan2, dcos, dsin } from '@space-game/common';
 import type { ShipBridge, PilotOrders } from '../../ships/ShipBridge.js';
 import type { Mobs } from '../Mobs.js';
 
@@ -27,6 +27,11 @@ export interface BrainHost {
   players(systemNum: number): number[];
   /** A surface's rock (its lance stops at it) */
   terrain?(systemNum: number): Terrain | undefined;
+  /**
+   * A decision its brain took for its body this tick (common bodies/decisions.ts), with the state it leaves: sent to the
+   * clients that run the body (server/src/net/decisions). Absent: nobody runs bodies (tests)
+   */
+  decide?(eid: number, op: number, args: readonly number[], state: BodyState): void;
 }
 
 /** A brain's view of its boss right now */

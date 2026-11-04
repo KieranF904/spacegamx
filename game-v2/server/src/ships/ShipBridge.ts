@@ -47,7 +47,7 @@ export class ShipBridge {
    * What each body flew with this tick (replication: the server's shadow of each
    * ship replays exactly this, with the structure the step used)
    */
-  readonly replicaCtl = new Map<number, { mode: ReplicaMode; bits: number; q: number; derived: ShipState['derived'] }>();
+  readonly replicaCtl = new Map<number, { mode: ReplicaMode; bits: number; q: number; derived: ShipState['derived']; body?: PilotOrders['body'] }>();
   /** What moved each pilot's ship this tick besides its controls (CAPS.OWN_SIM: Replication hands them to its client as causes) */
   readonly ownCauses = new OwnCauses();
   /** Repair kits only work on a ship holding still (world units per tick) */

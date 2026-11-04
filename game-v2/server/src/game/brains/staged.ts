@@ -11,36 +11,31 @@
  *   dev          `forceShed` steps through its stages' looks: shot off, wrecked, blown away
  */
 
-import { Position, Velocity, ShipState, rayTerrain, currentStage, deciding, isRuined, pointInConvex, stageOf, stagedIntegrity, RUIN_HP, datan2, dcos, dhypot, dsin } from '@space-game/common';
+import {
+  Position, Velocity, Rotation, ShipState, rayTerrain, currentStage, deciding, isRuined, pointInConvex, stageOf, stagedIntegrity, RUIN_HP, datan2, dcos, dhypot, dsin,
+  CTL, DECISION, WANT, BODY_KINDS, applyDecision, sameWant, stagedFlight, syncArgs, wantAim, wantDrive, wantFly, wantHold, dequantizeCursorAngle,
+  type BodyState, type StagedFlightTables, type WantRec,
+} from '@space-game/common';
 import type { PilotOrders } from '../../ships/ShipBridge.js';
 import { BossBrain, BossView, BrainHost, lead, partMount, pose, strike, wrap } from './kit.js';
 
 export type Move = Generator<void, void, void>;
 
-/** What a move wants of the ship this tick */
-export interface Want {
-  /** Fly this way (unit-ish world vector), or hold still */
-  move?: [number, number] | 'hold';
-  /** Face this way (unset: the way it's flying, or holding its heading: its flanks and back are there to be hit) */
-  face?: number;
-  impulse?: [number, number];
-}
+/**
+ * What a move wants of the ship this tick (common bodies/decisions.ts WANT: fly, hold, hold facing its target or a
+ * heading or where its target is going, drive a way with a kick). Its body flies the ship from it, on the server and on
+ * the clients that run it alike (common bodies/stagedFlight.ts): a want that changes is a decision sent them
+ */
+export type Want = WantRec;
 
-/** A staged boss's shape of fight: its tables, by stage (index 0 its first) */
+/** A staged boss's shape of fight: its tables, by stage (index 0 its first); its flight is its body's (common bodies/registry.ts) */
 export interface StagedTables {
   /** Its moves in the order it goes through them */
   loop: string[][];
-  /** The range it holds off at between moves, and how far round it circles each time */
-  range: number[];
-  circle: number[];
   /** Ticks of rest between moves */
   rest: number[];
   /** Warnings × this */
   haste: number[];
-  /** How much harder than its engines it drives (world units a tick) */
-  drive: number[];
-  /** Never further than this from home */
-  homeR: number;
 }
 
 /** Between stages: ticks it holds still before (and after) blowing a stage away, and between each blast */
@@ -56,7 +51,7 @@ export abstract class StagedBrain implements BossBrain {
   protected view!: BossView;
   protected ship!: ShipState;
   protected target = -1;
-  protected want: Want = {};
+  protected want: Want = wantFly();
   protected move: Move | null = null;
   /** Its place in its stage's loop */
   protected step = 0;
@@ -69,8 +64,16 @@ export abstract class StagedBrain implements BossBrain {
   /** Its drones (mobs it launched) */
   protected drones = new Set<number>();
   private forced = 0;
+  /** Its flight (its body's: range, circle, drive and ground by stage) */
+  protected readonly flight: StagedFlightTables;
+  /** Its body's state as its decisions have left it (the clients that run its body fold the same decisions in) */
+  readonly body: BodyState;
 
-  constructor(protected host: BrainHost, protected tables: StagedTables) {}
+  constructor(protected host: BrainHost, protected tables: StagedTables, brain: string) {
+    const kind = Math.max(0, BODY_KINDS.findIndex((k) => k.brain === brain));
+    this.flight = BODY_KINDS[kind].flight;
+    this.body = { kind, homeX: 0, homeY: 0, stage: 1, side: 1, target: -1, want: wantFly(), wantAt: 0, on: false };
+  }
 
   /** A move by name, or null if it can't do it now (its part is gone) */
   protected abstract make(id: string): Move | null;
@@ -89,16 +92,18 @@ export abstract class StagedBrain implements BossBrain {
     const now = this.host.tick();
     const t = base?.target ?? -1;
     this.target = t;
-    this.want = {};
+    this.want = wantFly();
     this.shedding(now);
     // (blown apart: nothing left to fly)
     if (!this.host.ships.get(view.eid)) return null;
     if (this.blows.length && base) {
       this.move = null;
-      this.want = { move: 'hold' };
-      return t >= 0 ? this.fly(base, t) : { ...base, firing: false };
+      this.want = wantHold();
+      if (t >= 0) return this.fly(base, t);
+      this.bodyOff();
+      return { ...base, firing: false };
     }
-    if (t < 0) { this.move = null; return base; }
+    if (t < 0) { this.move = null; this.bodyOff(); return base; }
     if (!this.move && now >= this.restUntil) this.move = this.pick(now);
     this.passives(now);
     if (this.move && this.move.next().done) {
@@ -119,39 +124,50 @@ export abstract class StagedBrain implements BossBrain {
 
   // ---- Flying ----
 
+  /**
+   * Flown by its body (common bodies/stagedFlight.ts) from its decisions: what changed since the last tick (its target,
+   * which way round, its stage, what its move wants) is decided first, at this tick, then the body works the controls and
+   * its drive's push out, as every client running the body does from the same decisions
+   */
   protected fly(base: PilotOrders, t: number): PilotOrders {
-    const me = pose(this.view.eid), si = this.stage - 1, T = this.tables;
-    const tx = Position.x[t], ty = Position.y[t], range = T.range[si];
-    let mx = 0, my = 0;
-    const w = this.want;
-    if (w.move === 'hold') {
-      const v = dhypot(Velocity.x[this.view.eid], Velocity.y[this.view.eid]);
-      if (v > 0.8) { mx = -Velocity.x[this.view.eid] / v; my = -Velocity.y[this.view.eid] / v; }
-    } else if (w.move) {
-      [mx, my] = w.move;
-    } else {
-      if (this.host.rng() < 0.004) this.side = -this.side;
-      const a = datan2(me.y - ty, me.x - tx) + T.circle[si] * this.side;
-      const [px, py] = this.keepHome(tx + dcos(a) * range, ty + dsin(a) * range);
-      const sx = px - me.x, sy = py - me.y, s = dhypot(sx, sy) || 1;
-      if (s > 160) { mx = sx / s; my = sy / s; }
+    const now = this.host.tick(), b = this.body, eid = this.view.eid;
+    if (!b.on) {
+      // (Its body takes over (again): the whole state; the clients running it start from it here)
+      b.on = true;
+      b.homeX = Math.round(this.view.home.x); b.homeY = Math.round(this.view.home.y);
+      b.target = t; b.stage = this.stage; b.side = this.side > 0 ? 1 : -1; b.want = this.want; b.wantAt = now;
+      this.host.decide?.(eid, DECISION.SYNC, syncArgs(b), b);
     }
+    if (b.target !== t) this.decide(DECISION.TARGET, [t + 1]);
+    if (b.stage !== this.stage) this.decide(DECISION.STAGE, [this.stage]);
+    // (Which way round it circles: now and then it turns about, rolled here, never by its body)
+    if (this.want[0] === WANT.FLY && this.host.rng() < 0.004) this.side = -this.side;
+    if ((b.side > 0) !== (this.side > 0)) this.decide(DECISION.SIDE, [this.side > 0 ? 1 : 0]);
+    if (!sameWant(b.want, this.want)) this.decide(DECISION.WANT, this.want);
+    const me = { x: Position.x[eid], y: Position.y[eid], angle: Rotation.angle[eid], vx: Velocity.x[eid], vy: Velocity.y[eid] };
+    const tg = { x: Position.x[t], y: Position.y[t], angle: Rotation.angle[t], vx: Velocity.x[t], vy: Velocity.y[t] };
+    const out = stagedFlight(this.flight, b, me, tg, now);
     const controls = {
-      forward: my < -0.38, backward: my > 0.38, left: mx < -0.38, right: mx > 0.38,
-      boost: !w.move && dhypot(tx - me.x, ty - me.y) > range * 1.6 && this.fromHome(me.x, me.y) < T.homeR * 0.8,
-      targetAngle: w.face ?? (mx || my ? datan2(my, mx) : me.angle),
+      forward: (out.bits & CTL.forward) !== 0, backward: (out.bits & CTL.backward) !== 0, left: (out.bits & CTL.left) !== 0, right: (out.bits & CTL.right) !== 0,
+      boost: (out.bits & CTL.boost) !== 0, targetAngle: dequantizeCursorAngle(out.q),
     };
-    let impulse = w.impulse;
-    if (T.drive[si] && w.move !== 'hold' && (mx || my)) {
-      const l = dhypot(mx, my);
-      impulse = [(impulse?.[0] ?? 0) + (mx / l) * T.drive[si], (impulse?.[1] ?? 0) + (my / l) * T.drive[si]];
-    }
     // (it turns as its hull lets it, braking onto its heading: bosses.json turn)
-    return { ...base, controls, firing: false, impulse };
+    return { ...base, controls, firing: false, impulse: out.ix || out.iy ? [out.ix, out.iy] : undefined, body: out };
+  }
+
+  /** A decision: folded into its body's state now, and sent to the clients that run it (BrainHost.decide) */
+  private decide(op: number, args: readonly number[]): void {
+    applyDecision(this.body, op, args, this.host.tick());
+    this.host.decide?.(this.view.eid, op, args, this.body);
+  }
+
+  /** No target: the enemy AI flies it, not its body */
+  private bodyOff(): void {
+    if (this.body.on) this.decide(DECISION.OFF, []);
   }
 
   protected keepHome(x: number, y: number): [number, number] {
-    const h = this.view.home, dx = x - h.x, dy = y - h.y, d = dhypot(dx, dy), R = this.tables.homeR;
+    const h = this.view.home, dx = x - h.x, dy = y - h.y, d = dhypot(dx, dy), R = this.flight.homeR;
     return d <= R ? [x, y] : [h.x + (dx / d) * R, h.y + (dy / d) * R];
   }
 
@@ -162,7 +178,7 @@ export abstract class StagedBrain implements BossBrain {
   /** A unit way to go, bent back in if `reach` along it would take it off its ground */
   protected homeward(vx: number, vy: number, reach: number): [number, number] {
     const me = pose(this.view.eid);
-    if (this.fromHome(me.x + vx * reach, me.y + vy * reach) <= this.tables.homeR) return [vx, vy];
+    if (this.fromHome(me.x + vx * reach, me.y + vy * reach) <= this.flight.homeR) return [vx, vy];
     const hx = this.view.home.x - me.x, hy = this.view.home.y - me.y, hl = dhypot(hx, hy) || 1;
     const bx = vx * 0.3 + (hx / hl) * 0.9, by = vy * 0.3 + (hy / hl) * 0.9, bl = dhypot(bx, by) || 1;
     return [bx / bl, by / bl];
@@ -171,8 +187,7 @@ export abstract class StagedBrain implements BossBrain {
   /** Hold still, turning to face its target, for `ticks` */
   protected *hold(ticks: number): Move {
     for (let i = 0; i < ticks; i++) {
-      const me = pose(this.view.eid), t = this.target;
-      this.want = { move: 'hold', ...(t >= 0 ? { face: datan2(Position.y[t] - me.y, Position.x[t] - me.x) } : {}) };
+      this.want = this.target >= 0 ? wantAim() : wantHold();
       yield;
     }
   }
@@ -183,15 +198,16 @@ export abstract class StagedBrain implements BossBrain {
     if (t < 0) return;
     const dx = Position.x[t] - me.x, dy = Position.y[t] - me.y, d = dhypot(dx, dy) || 1;
     const ux = dx / d, uy = dy / d, side = this.host.rng() < 0.5 ? 1 : -1;
-    const range = this.tables.range[this.stage - 1], radial = Math.max(-0.7, Math.min(0.7, (d - range) / range));
+    const range = this.flight.range[this.stage - 1], radial = Math.max(-0.7, Math.min(0.7, (d - range) / range));
     const l0 = dhypot(-uy * side + ux * radial, ux * side + uy * radial) || 1;
     const [vx, vy] = this.homeward((-uy * side + ux * radial) / l0, (ux * side + uy * radial) / l0, reach);
     const wind = this.haste(warnTicks);
     this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'line', kind: 'dash', bodyId: this.view.eid, x: 0, y: 0, angle: wrap(datan2(vy, vx) - me.angle), length: reach, width: 140, ticks: wind });
-    for (let i = 0; i < wind; i++) { this.want = { move: 'hold' }; yield; }
-    this.want = { impulse: [vx * speed, vy * speed], move: [vx, vy] };
+    for (let i = 0; i < wind; i++) { this.want = wantHold(); yield; }
+    const dir = datan2(vy, vx);
+    this.want = wantDrive(dir, undefined, speed);
     yield;
-    for (let i = 0; i < 14; i++) { this.want = { move: [vx, vy] }; yield; }
+    for (let i = 0; i < 14; i++) { this.want = wantDrive(dir); yield; }
   }
 
   // ---- Choosing ----

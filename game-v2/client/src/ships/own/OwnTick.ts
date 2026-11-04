@@ -94,10 +94,12 @@ export class OwnTick implements OwnTimeline {
    * earliest tick they change
    */
   onSnapshot(m: ServerSnapshotMessage): void {
-    const self = this.host.self();
+    const self = this.host.self(), prev = this.snapTick;
     this.snapTick = m.tick;
     if (!this.on) { this.before = null; this.othersBefore.clear(); return; }
-    let earliest = Infinity;
+    // (What it stepped past the last snapshot is stepped again: something may have asked for its ship there before this
+    // frame's structure and causes were in, a boss's body reading its target, CAPS.BODIES)
+    let earliest = prev + 1;
     if (m.ships?.some((k) => k[0] === self)) {
       // (A keyframe of its own ship after the first: the server had to put it right)
       if (this.keyed) { this.stats.fixes++; this.level = CONFIRM.STRICT; this.levelSince = m.tick; }
