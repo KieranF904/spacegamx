@@ -79,11 +79,11 @@ describe('asteroid composition', () => {
 describe('mining', () => {
   it('any gun mines soft rock: ore breaks off as chunks the ship pulls into its hold', () => {
     const { server, pid, profile } = world();
-    const soft = rocks(server, pid).find((r) => r.comp.hardness === 1 && r.comp.units >= 8)!;
+    const soft = rocks(server, pid).find((r) => r.comp.hardness === 1 && r.comp.units >= 12)!;
     expect(soft).toBeDefined();
     const mining = (server as any).mining;
-    // Pretend a cannon has been chipping at it for a while, from right beside the ship
-    for (let i = 0; i < 60; i++) {
+    // Pretend a cannon has been chipping at it for a while, from right beside the ship (11 units: chunks break off 5 to 10 at a time)
+    for (let i = 0; i < 160; i++) {
       mining.extract(soft.eid, pid, 14, files.mining.tools.fixed, Position.x[pid] + 60, Position.y[pid], -1, 0);
     }
     for (let i = 0; i < 240; i++) server.step();

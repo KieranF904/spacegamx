@@ -10,13 +10,17 @@
  * extract far more per damage, so they get the most out of a rock.
  * Broken asteroids come back after a while.
  *
+ * Mining lasers on one rock share a crowd factor (common crowdFactor): each
+ * cuts best with the rock's efficient number on it, and more always mine it
+ * faster in all, with less from each. Other weapons get none.
+ *
  * Outliers (a rock in a hundred or so, several times the size) come apart in
  * stages: mined down to what the next stage holds, or blasted apart, a stage
  * breaks away and leaves a smaller rock with the ore that's left, until the
  * last stage breaks up like any other rock.
  */
 
-import { Composition, MiningTable, Bag, asteroidComposition, pickOre, MARKS, type TraceSource, dcos, dhypot, dsin } from '@space-game/common';
+import { Composition, MiningTable, Bag, asteroidComposition, pickOre, MARKS, crowdFactor, rockCrowd, type TraceSource, dcos, dhypot, dsin } from '@space-game/common';
 
 export interface MiningTool {
   yield: number;
@@ -66,6 +70,8 @@ interface Rock extends Composition {
   seed: number;
   /** An outlier: its size whole (each stage's is a share of that) */
   wholeSize?: number;
+  /** Mining lasers on it, by miner: the tick of their last cut, cuts that tick and the tick before */
+  lasers?: Map<number, { tick: number; cur: number; last: number }>;
 }
 
 export class Mining {
@@ -122,12 +128,23 @@ export class Mining {
       this.warn(miner, `This rock is too hard for your ${tool.hardness <= 1 ? 'guns: fit a mining laser' : 'tools'}`);
       return;
     }
-    // A mining laser behind the system's tier makes slow work of its rock
+    // A mining laser behind the system's tier makes slow work of its rock, and shares it with the others on it
     let eff = 1;
     if (tool.grade !== undefined) {
       const gap = Math.max(-2, Math.min(2, tool.grade - r.tier));
-      eff = this.table.tierEfficiency?.[String(gap)] ?? 1;
-      if (eff < 1) this.warn(miner, `Mk ${MARKS[r.tier]} rock: your Mk ${MARKS[tool.grade]} mining laser gets ${Math.round(eff * 100)}% of what a Mk ${MARKS[r.tier]} one would`);
+      const tierEff = (eff = this.table.tierEfficiency?.[String(gap)] ?? 1);
+      const crowd = rockCrowd(this.table, r.type, gap);
+      if (crowd) {
+        const n = this.lasersOn(r, miner);
+        eff *= crowd.base * crowdFactor(n, crowd.k, crowd.sharp);
+        const lo = Math.max(1, Math.floor(crowd.k * 0.8)), best = `works best with ${lo}-${Math.max(2, Math.ceil(crowd.k * 1.2))} lasers on it`;
+        if (gap < 0) {
+          // (One laser alone, against one of the rock's own grade alone)
+          const own = rockCrowd(this.table, r.type, 0)!;
+          const pct = Math.round((tierEff * crowdFactor(1, crowd.k, crowd.sharp) / crowdFactor(1, own.k, own.sharp)) * 100);
+          this.warn(miner, `Mk ${MARKS[r.tier]} rock: a Mk ${MARKS[tool.grade]} mining laser alone gets ${pct}% of what a Mk ${MARKS[r.tier]} one would, and ${best}`);
+        } else if (crowd.hint && n < lo) this.warn(miner, `Hard rock: ${best}`);
+      } else if (eff < 1) this.warn(miner, `Mk ${MARKS[r.tier]} rock: your Mk ${MARKS[tool.grade]} mining laser gets ${Math.round(eff * 100)}% of what a Mk ${MARKS[r.tier]} one would`);
     }
     let owed = (r.progress.get(miner) ?? 0) + (damage * tool.yield * eff) / this.table.damagePerUnit;
     const bag = r.pending.get(miner) ?? {};
@@ -178,6 +195,26 @@ export class Mining {
     }
     // Mined out (or an outlier, mined down to its next stage): nothing left to hold it together
     if (r.left <= floor) this.host.crumble(asteroid);
+  }
+
+  /**
+   * Count a miner's laser cut on a rock this tick, and how many mining lasers
+   * are on it: each miner's cuts this tick or the tick before (one a laser a
+   * tick), for those who cut it within the window.
+   */
+  private lasersOn(r: Rock, miner: number): number {
+    const now = this.host.tick(), window = this.table.crowd?.window ?? 54;
+    const lasers = (r.lasers ??= new Map());
+    let e = lasers.get(miner);
+    if (!e) lasers.set(miner, (e = { tick: now, cur: 0, last: 0 }));
+    else if (e.tick !== now) { e.last = now - e.tick <= window ? e.cur : 0; e.cur = 0; e.tick = now; }
+    e.cur++;
+    let n = 0;
+    for (const [id, l] of lasers) {
+      if (now - l.tick > window) { lasers.delete(id); continue; }
+      n += Math.max(l.cur, l.last);
+    }
+    return n;
   }
 
   /** The most common ore in the rock that the tool can crack */

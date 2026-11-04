@@ -230,8 +230,8 @@ describe('quests: nothing is forced', () => {
     away(server, pid);
     const mining = (server as any).mining;
     const wd = server.getWorld();
-    const rock = [...Array(8000).keys()].find((e) => bitecs.entityExists(wd, e) && bitecs.hasComponent(wd, Asteroid, e) && mining.get(e)?.hardness === 1 && mining.remaining(e) >= 10)!;
-    for (let i = 0; i < 80; i++) mining.extract(rock, pid, 14, files.mining.tools.fixed, Position.x[pid] + 40, Position.y[pid], -1, 0);
+    const rock = [...Array(8000).keys()].find((e) => bitecs.entityExists(wd, e) && bitecs.hasComponent(wd, Asteroid, e) && mining.get(e)?.hardness === 1 && mining.remaining(e) >= 15)!;
+    for (let i = 0; i < 160; i++) mining.extract(rock, pid, 14, files.mining.tools.fixed, Position.x[pid] + 40, Position.y[pid], -1, 0);
     for (let i = 0; i < 240; i++) { Position.x[pid] = 40000; Position.y[pid] = 40000; Velocity.x[pid] = 0; Velocity.y[pid] = 0; server.step(); }
     const q = profile().quests.active.main_01;
     expect(q.stage > 0 || q.progress > 0).toBe(true);

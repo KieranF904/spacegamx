@@ -87,6 +87,6 @@ describe('outlier asteroids', () => {
     const { m, calls } = host();
     m.register(5, 0, 3, 'asteroid_metal', 'sol:3:0', 1000, 1, { stage: 0, wholeSize: 1000 });
     m.onBroken(5, 0, 0);
-    expect(calls.shed).toEqual([{ eid: 5, stage: 1, size: 750, left: 75 }]);
+    expect(calls.shed).toEqual([{ eid: 5, stage: 1, size: 750, left: Math.round(750 * table.unitsPerSize) }]);
   });
 });

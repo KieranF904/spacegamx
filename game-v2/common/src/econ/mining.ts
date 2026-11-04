@@ -21,7 +21,7 @@ export interface MiningTable {
    * name and size [min, max]: a rock type of its own (econ/rocks.ts), moving
    * and spawning `like` another type.
    */
-  types: Record<string, { hardness: number; ores: Bag; traceMul?: number; traceBoost?: Record<string, number>; name?: string; size?: [number, number]; like?: string; gas?: boolean }>;
+  types: Record<string, { hardness: number; ores: Bag; traceMul?: number; traceBoost?: Record<string, number>; name?: string; size?: [number, number]; like?: string; gas?: boolean; crowd?: string }>;
   /** The comet's passes (server/src/GameServer.ts) */
   comet?: { days: number; hours: number; systems: string[]; traceTier: number };
   /** Each belt's mix of rock types by weight (econ/rocks.ts) */
@@ -32,6 +32,8 @@ export interface MiningTable {
   seamGemChance: number;
   /** A mining laser's yield by (its grade − the rock's tier), clamped to ±2 */
   tierEfficiency?: Record<string, number>;
+  /** Mining lasers sharing a rock (crowdFactor) */
+  crowd?: CrowdTable;
   /** The rare outsized rocks (asteroid/generation.ts rolls them; server/src/game/Mining.ts mines them down a stage at a time) */
   outliers?: OutlierTable;
   /** Rare traces found when their carrier ores are refined (econ/traces.ts) */
@@ -61,6 +63,58 @@ export interface OutlierTable {
   common: number;
   boost: Bag;
   rare: number;
+}
+
+/**
+ * Mining lasers sharing a rock: each laser's extraction × crowdFactor(n, k,
+ * sharp) × the profile's base, n being the mining lasers on the rock. A rock
+ * type names its profile (`types[t].crowd`, else `default`). Lasers below the
+ * rock's tier find its k `kByGap` times as high (clamped to -2).
+ */
+export interface CrowdTable {
+  /** Ticks a laser counts towards n after its last cut (about a pulse) */
+  window: number;
+  default: string;
+  profiles: Record<string, CrowdProfile>;
+  kByGap?: Record<string, number>;
+}
+
+export interface CrowdProfile {
+  /** The efficient number of lasers on it */
+  k: number;
+  /** How steeply each laser's share climbs towards k (a whole number, 2 or more) */
+  sharp: number;
+  /** Every laser's extraction on it × this */
+  base: number;
+  /** Shown to its miners (e.g. a hard rock's hint) */
+  hint?: boolean;
+}
+
+/**
+ * Each laser's efficiency with `n` on a rock whose efficient number is `k`:
+ * g(n) = q·y^(q-1) / (1 + (q-1)·y^q), y = n/k, q = `sharp`. It peaks at
+ * g(k) = 1, and the total n·g(n) only ever rises, towards k·q/(q-1) (2k for
+ * q = 2: Kieran's 2kn / (k² + n²)). A higher q climbs more steeply to k and
+ * gains less past it. Integer powers only (deterministic).
+ */
+export function crowdFactor(n: number, k: number, sharp: number): number {
+  if (n <= 0 || k <= 0) return 1;
+  const q = Math.max(2, Math.round(sharp));
+  const y = n / k;
+  let yq1 = 1;
+  for (let i = 1; i < q; i++) yq1 *= y;
+  return (q * yq1) / (1 + (q - 1) * yq1 * y);
+}
+
+/** A rock type's crowd profile for a laser `gap` grades from its tier (k raised for lasers below it) */
+export function rockCrowd(table: MiningTable, type: string, gap: number): CrowdProfile | null {
+  const c = table.crowd;
+  if (!c) return null;
+  const p = c.profiles[table.types[type]?.crowd ?? c.default] ?? c.profiles[c.default];
+  if (!p) return null;
+  const g = Math.max(-2, Math.min(0, Math.round(gap)));
+  const kMul = g < 0 ? c.kByGap?.[String(g)] ?? 1 : 1;
+  return { ...p, k: p.k * kMul };
 }
 
 export interface Composition {

@@ -343,7 +343,7 @@ const SHAPES: Record<string, Spec> = {
   }),
   'mining.json': strict({
     respawnSeconds: 'number', unitsPerSize: 'number', damagePerUnit: 'number', chunkUnits: 'number[]', breakFraction: 'number', xpPerUnit: 'number',
-    types: rec(obj({ hardness: 'number', ores: rec('number'), 'traceMul?': 'number', 'traceBoost?': rec('number'), 'name?': 'string', 'size?': 'number[]', 'like?': 'string', 'gas?': 'boolean' })),
+    types: rec(obj({ hardness: 'number', ores: rec('number'), 'traceMul?': 'number', 'traceBoost?': rec('number'), 'name?': 'string', 'size?': 'number[]', 'like?': 'string', 'gas?': 'boolean', 'crowd?': 'string' })),
     'fields?': rec(rec('number')),
     'comet?': obj({ days: 'number', hours: 'number', systems: 'string[]', traceTier: 'number' }),
     oreHardness: rec('number'),
@@ -351,6 +351,7 @@ const SHAPES: Record<string, Spec> = {
     seams: arr(obj({ gem: 'string', hardness: 'number', minTier: 'number', weight: 'number' })),
     seamGemChance: 'number',
     'tierEfficiency?': rec('number'),
+    'crowd?': strict({ window: 'number', default: 'string', profiles: rec(strict({ k: 'number', sharp: 'number', base: 'number', 'hint?': 'boolean' })), 'kByGap?': rec('number') }),
     'outliers?': strict({ chance: 'number', scale: 'number[]', stages: 'number[]', 'exclude?': 'string[]', 'systems?': rec('number'), common: 'number', boost: rec('number'), rare: 'number' }),
     'traces?': rec(obj({ from: 'string[]', per100: 'number[]', 'seamMul?': 'number', 'megaOnly?': 'boolean' })),
     tools: (v, path, c) => {
