@@ -79,6 +79,8 @@ interface BodyView {
   flashLevel: number;
   /** Fading in on arrival, out on leaving (0..1) */
   fade: number;
+  /** How much of it is drawn this frame: its fade, less what it's a ghost from far off (ghostOf: the focus grid) */
+  vis?: number;
   /** When its hull was last built (ms) */
   builtAt?: number;
   /**
@@ -527,6 +529,12 @@ export class ShipRenderer {
     return [this.flamesLayer, this.engines.exhaustLayer];
   }
 
+  /**
+   * How much of a ghost this ship is drawn as (0 none, 1 all: its hull goes, the ghost layer's marker stands in): the focus
+   * grid draws ships from 18 km out as ghosts (CAPS.FOCUS: ShipClient sets it, common network/cells.ts ghostWeight)
+   */
+  ghostOf: (eid: number) => number = () => 0;
+
   update(): void {
     const cs = this.bridge.tuning.cellSize;
     const seen = new Set<number>();
@@ -580,7 +588,8 @@ export class ShipRenderer {
       }
       // (fading in only once its hull's there to show: built off the main thread, it may take a frame or two)
       if (view.hullFor === ship) view.fade = Math.min(1, view.fade + dt / FADE);
-      view.container.alpha = view.barrels.alpha = view.flames.alpha = view.fade;
+      view.vis = view.fade * (1 - this.ghostOf(eid));
+      view.container.alpha = view.barrels.alpha = view.flames.alpha = view.vis;
       // Its structure (which parts are attached) only changes when it's rebuilt; damage is data (below)
       const big = ship.blueprint.parts.length >= BIG_HULL;
       if ((ship !== view.ship || ship.rebuilds !== view.rebuilds) && !(big && ship === view.ship && now - (view.builtAt ?? 0) < BUILD_EVERY)) {
@@ -630,7 +639,7 @@ export class ShipRenderer {
         // Counter-scaled when zoomed out, so it stays readable
         const k = this.renderer.tagScale;
         view.label.scale.set(k);
-        view.label.alpha = view.labelAlpha * view.fade;
+        view.label.alpha = view.labelAlpha * view.vis;
         // Below the ship on screen, upright however the camera's rolled (helm)
         const a = cameraView.angle, below = ship.derived.radius + 24, ux = -Math.sin(a), uy = Math.cos(a);
         view.label.x = entity.renderX + ux * below;
@@ -644,7 +653,7 @@ export class ShipRenderer {
           view.bar.position.set(view.label.x + ux * 32 * k, view.label.y + uy * 32 * k);
           view.bar.rotation = a;
           view.bar.scale.set(k);
-          view.bar.alpha = view.fade;
+          view.bar.alpha = view.vis;
           const key = `${f}|${sh}`;
           if (key !== view.barKey) {
             view.barKey = key;
@@ -675,10 +684,12 @@ export class ShipRenderer {
     for (const view of this.leaving) {
       view.fade -= dt / FADE;
       if (view.fade <= 0) { this.dispose(view); continue; }
-      view.container.alpha = view.barrels.alpha = view.flames.alpha = view.fade;
+      // (a ghost already, dropped from the focus far off: it doesn't come back solid to fade out)
+      view.vis = Math.min(view.vis ?? view.fade, view.fade);
+      view.container.alpha = view.barrels.alpha = view.flames.alpha = view.vis;
       this.placeHull(view);
-      if (view.label) view.label.alpha = view.labelAlpha * view.fade;
-      if (view.bar) view.bar.alpha = view.fade;
+      if (view.label) view.label.alpha = view.labelAlpha * view.vis;
+      if (view.bar) view.bar.alpha = view.vis;
       if (view.beam) view.beam.visible = false;
       this.leaving[w++] = view;
     }
@@ -717,14 +728,15 @@ export class ShipRenderer {
     if (view.frame) {
       view.frame.c.position.set(x, y);
       view.frame.c.rotation = c.rotation;
-      view.frame.c.alpha = view.fade;
+      view.frame.c.alpha = view.vis ?? view.fade;
       if (!mine) view.frame.c.visible = false;
       // (its heat eases in: the glow creeping out along the girders)
       const want = this.heats.get(view.id) ?? 0;
       view.heat = (view.heat ?? 0) + (want - (view.heat ?? 0)) * 0.03;
       if (view.frame.hot) view.frame.hot.mesh.alpha = view.heat * (0.75 + 0.25 * Math.sin(performance.now() / 260 + view.id));
     }
-    if (mine) this.hulls.place(view.id, x, y, c.rotation, view.fade, view.flashLevel * view.fade);
+    const vis = view.vis ?? view.fade;
+    if (mine) this.hulls.place(view.id, x, y, c.rotation, vis, view.flashLevel * vis);
   }
 
   /** A ship's view, empty (its hull, guns and flames come as it's drawn) */

@@ -29,7 +29,7 @@ import {
   jumpFieldAt, fieldRangeBoost, fieldCharge, primeBoost, pilotJumpStep, withEmp, lodestonePosition, type JumpField, type LodestoneData,
   ShipReplicaSet, ServerSnapshotMessage, ServerDebrisSplitMessage, deriveSplit, unpackIds, unpackRuns, computeJoins, DEBRIS_STATUS, type DebrisShape, type Vec2,
   packCursorWeaponState, rebuildVolley, WEAPON_KIND_TYPE, EntityState, accelAlong, turnAccel, rateShip, stepGuns, volleyShells, firesStraight, partWeaponDef,
-  type ServerHitsMessage, type ServerHpCheckMessage, type ServerHitFixMessage, type HitReport, type OwnCheck, type BodyCheck, CAPS, SIDE, ownSimCaps, bodiesFor,
+  type ServerHitsMessage, type ServerHpCheckMessage, type ServerHitFixMessage, type HitReport, type OwnCheck, type BodyCheck, CAPS, SIDE, ownSimCaps, bodiesFor, focusFor, ghostWeight,
 } from '@space-game/common';
 import type { MenuShipInfo } from '../ui/GameMenuUI';
 import type { GameState, InterpolatedEntity } from '../state/GameState';
@@ -63,6 +63,7 @@ import { ClientFeatures } from './features/host';
 import { CLIENT_FEATURES } from './features/index';
 import type { QualityProfile } from '../settings/quality';
 import { CellCache } from './cells/CellCache';
+import { GhostLayer, type Ghost } from './cells/GhostLayer';
 
 /** A pulse laser's sound by its grade, Mk I-V: subtle, and centred low (the wide Mk IV deepest, the x-ray Mk V a touch brighter) */
 const PULSE_GRADE_PITCH = [0.98, 0.94, 1.01, 0.9, 1.04];
@@ -288,6 +289,30 @@ export class ShipClient {
 
   /** Dropped cells kept on the side (CAPS.FOCUS): their ships come back from here, fast-forwarded */
   readonly cells: CellCache;
+  /** Holding the focus grid's cells (CAPS.FOCUS, netCaps): ships from 18 km out are drawn as ghosts, the ring's too */
+  private focusOn = false;
+  private ghosts: GhostLayer | null = null;
+  private ghostList: Ghost[] = [];
+  private ghostOwn = { x: 0, y: 0 };
+
+  /** The focus grid's ghosts this frame (CAPS.FOCUS): the ring's ships from their legs, and held ships 18 km off and more */
+  private drawGhosts(): void {
+    const { state } = this.opts, scene = this.scene;
+    if (!this.ghosts || !scene) return;
+    const list = this.ghostList;
+    list.length = 0;
+    if (this.focusOn) {
+      for (const [id, e] of state.entities) {
+        if (id === state.playerId || (e.type !== EntityType.Player && e.type !== EntityType.ShipBody) || !this.store.get(id)) continue;
+        const w = ghostWeight(Math.hypot(e.renderX - this.ghostOwn.x, e.renderY - this.ghostOwn.y));
+        if (w > 0) list.push({ x: e.renderX, y: e.renderY, kind: e.type === EntityType.Player ? 4 : e.data?.[0] ?? 0, rank: e.type === EntityType.ShipBody ? (e.data?.[4] ?? 0) : 0, w });
+      }
+      for (const f of state.farShips.list(state.systemId, state.getRawServerTick(), (id) => state.entities.has(id) || id === state.playerId)) {
+        list.push({ x: f.renderX, y: f.renderY, kind: f.kind, rank: f.rank, w: 1 });
+      }
+    }
+    this.ghosts.draw(list, scene.getZoom(), (x, y) => scene.inView(x, y, 400));
+  }
 
   /** A ship's side, as this client knows it (hitRules SIDE bits: who may hurt whom) */
   private sideOf(id: number): number {
@@ -378,6 +403,7 @@ export class ShipClient {
     this.selfHits.setOn((caps & (CAPS.HITS | CAPS.SELF_HITS)) === (CAPS.HITS | CAPS.SELF_HITS), this.snapTick);
     this.selfHits.setLevel(caps & CAPS.ROUGH ? lvl : undefined);
     this.own.setOn(ownSimCaps(caps));
+    this.focusOn = focusFor(caps);
     this.bodies.setOn(bodiesFor(caps));
   }
 
@@ -699,10 +725,17 @@ export class ShipClient {
   init(app: Application, renderer: Renderer): void {
     void app;
     this.scene = renderer;
+    this.ghosts = new GhostLayer(renderer.getShipLayer());
     this.renderer = new ShipRenderer(this.store, renderer, this.opts.state, (id) =>
       id === this.opts.state.playerId ? this.localThrustCommand() : null,
     // Docked ships are inside their station: yours while you're berthed, others as the server says
     (id) => (id === this.opts.state.playerId ? this.docked : this.replicas.isDocked(id)), this.features);
+    // (Holding cells, CAPS.FOCUS: a ship 18 km off and more fades to its ghost, GhostLayer; the drawn own ship's place, drawGhosts)
+    this.renderer.ghostOf = (id) => {
+      if (!this.focusOn || id === this.opts.state.playerId) return 0;
+      const e = this.opts.state.entities.get(id);
+      return e ? ghostWeight(Math.hypot(e.renderX - this.ghostOwn.x, e.renderY - this.ghostOwn.y)) : 0;
+    };
     renderer.onMuzzle = (owner, x, y, power) => {
       this.renderer?.kick(owner, x, y, power);
       // A heavy shot shoves the shooter's view (a small nudge, only for your own gun)
@@ -1454,7 +1487,9 @@ export class ShipClient {
         if (mine.data && this.features.hasParsers) this.features.parsePilot(mine.data, chargeGroupsEnd(mine.data), mine.fx ??= {});
         else mine.fx = undefined;
       } }
+    { const me = state.entities.get(state.playerId); if (me) { this.ghostOwn.x = me.renderX; this.ghostOwn.y = me.renderY; } }
     this.renderer?.update();
+    this.drawGhosts();
     this.hud.update();
     const dt = this.lastFrame ? Math.min(0.1, (now - this.lastFrame) / 1000) : 0;
     this.lastFrame = now;
