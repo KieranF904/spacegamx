@@ -47,6 +47,8 @@ export * from './ships/index.js';
 
 // Deterministic trigonometry (the same bits in every engine): math/detTrig.ts
 export * from './math/detTrig.js';
+// Deterministic randomness (hashInts, seededRng and mulberry32 come through ships/ and asteroid/): math/rng.ts
+export { tickRng, hashUnit } from './math/rng.js';
 
 // Economy: items, stacks, recipes, player profiles
 export * from './econ/index.js';

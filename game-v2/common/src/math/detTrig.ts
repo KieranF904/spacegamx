@@ -8,12 +8,14 @@
  * Math's; what matters is that every engine gets the same answer.
  *
  * exp, log, log2 and pow (fdlibm's exp and log, pow built on them, whole powers by multiplication) are here too, on the
- * same terms. Allocation-free: the hot paths (flight, shells) call these every tick.
+ * same terms, and sinh, cosh, tanh, asinh and log1p on them (asteroid orbits). Allocation-free: the hot paths (flight,
+ * shells) call these every tick.
  *
- * Used by what clients work out for themselves and must agree on with the server: debris (ships/debris.ts), and
- * everything that moves ships and shells (flight, thrust, steering, turret and gun aim, shell spawn and homing, hit
- * geometry: docs/design/deterministic-maths.md). Lint rule for code that uses it: no Math.sin, cos, tan, atan, atan2,
- * hypot, pow, exp, log or `**` in the deterministic path. The cross-engine check: npm run det:engines.
+ * Used by all of common/ and the server's simulation (docs/design/deterministic-maths.md): flight, shells, hits, debris,
+ * asteroid orbits, AI, bosses, spawns. The guard, common/src/math/simMaths.test.ts, fails on Math.sin, cos, tan, atan,
+ * atan2, hypot, pow, exp, log, the hyperbolics, `**` (but 2 ** a whole literal) or Math.random there. The cross-engine
+ * check: npm run det:engines. Angles are reduced exactly for |x| up to about 1e6; past that still the same bits
+ * everywhere, but less accurate.
  */
 
 // pi/2 in three parts (fdlibm __ieee754_rem_pio2): k × each part is exact for |k| < 2^20, so the reduction is too
@@ -386,4 +388,61 @@ function logTail(f: number): number {
   const R = z * (LG1 + w * (LG3 + w * (LG5 + w * LG7))) + w * (LG2 + w * (LG4 + w * LG6));
   const hfsq = 0.5 * f * f;
   return s * (hfsq + R) - hfsq;
+}
+
+// ---------------------------------------------------------------------------
+// sinh, cosh, tanh, asinh (asteroid orbits' hyperbolic Kepler: asteroid/orbit.ts), on dexp and dlog
+// ---------------------------------------------------------------------------
+
+/** sinh's odd series for |x| < 0.5 (to x^17: the next term is under an ulp), so no cancellation near 0 */
+function sinhSeries(x: number): number {
+  const z = x * x;
+  return x + x * z * (1 / 6 + z * (1 / 120 + z * (1 / 5040 + z * (1 / 362880 + z * (1 / 39916800
+    + z * (1 / 6227020800 + z * (1 / 1307674368000 + z * (1 / 355687428096000))))))));
+}
+
+/** sinh, within a few ulps of Math.sinh, the same bits everywhere */
+export function dsinh(x: number): number {
+  if (x !== x) return x;
+  const a = x < 0 ? -x : x;
+  if (a < 0.5) return sinhSeries(x);
+  if (a > 710) return x < 0 ? -Infinity : Infinity;
+  const e = dexp(a), r = 0.5 * (e - 1 / e);
+  return x < 0 ? -r : r;
+}
+
+/** cosh, within a few ulps of Math.cosh, the same bits everywhere */
+export function dcosh(x: number): number {
+  if (x !== x) return x;
+  const a = x < 0 ? -x : x;
+  if (a > 710) return Infinity;
+  const e = dexp(a);
+  return 0.5 * (e + 1 / e);
+}
+
+/** tanh, within 4 ulps of Math.tanh, the same bits everywhere */
+export function dtanh(x: number): number {
+  if (x !== x || x === 0) return x;
+  const a = x < 0 ? -x : x;
+  if (a > 22) return x < 0 ? -1 : 1;
+  let r: number;
+  if (a < 0.5) { const s = sinhSeries(a); r = s / Math.sqrt(1 + s * s); } else { r = 1 - 2 / (dexp(2 * a) + 1); }
+  return x < 0 ? -r : r;
+}
+
+/** ln(1 + x) for x > -1, near 0 too (Goldberg's: log(u)·x/(u - 1), u = 1 + x rounded) */
+export function dlog1p(x: number): number {
+  const u = 1 + x;
+  if (u === 1) return x;
+  return dlog(u) * (x / (u - 1));
+}
+
+/** asinh, within a few ulps of Math.asinh, the same bits everywhere */
+export function dasinh(x: number): number {
+  if (x !== x || x - x !== 0 || x === 0) return x;
+  const a = x < 0 ? -x : x;
+  let r: number;
+  if (a > 1e8) r = dlog(a) + LN2;
+  else if (a < 0.5) { const z = a * a; r = dlog1p(a + z / (1 + Math.sqrt(1 + z))); } else r = dlog(a + Math.sqrt(a * a + 1));
+  return x < 0 ? -r : r;
 }

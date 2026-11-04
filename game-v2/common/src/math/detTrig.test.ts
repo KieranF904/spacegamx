@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { dsin, dcos, dsincos, datan2, dhypot, dexp, dlog, dlog2, dpow } from './detTrig.js';
+import { dsin, dcos, dsincos, datan2, dhypot, dexp, dlog, dlog2, dpow, dsinh, dcosh, dtanh, dasinh, dlog1p } from './detTrig.js';
 
 // (Distance in ulps between two doubles: how close to Math's each is)
 const F = new Float64Array(2), B = new BigInt64Array(F.buffer);
@@ -69,5 +69,23 @@ describe('detTrig: exp, log, log2, pow', () => {
       mix(sc[0] - dsin(a)); mix(sc[1] - dcos(a));
     }
     expect((h >>> 0).toString(16)).toBe('92dbde78');
+  });
+
+  it('sinh, cosh, tanh, asinh and log1p are within a few ulps of Math (asteroid orbits; tanh 4)', () => {
+    const r2 = seeded(23);
+    for (const span of [1, 8, 40]) {
+      expect(worst(30000, () => [(r2() - 0.5) * span], dsinh, Math.sinh)).toBeLessThanOrEqual(3);
+      expect(worst(30000, () => [(r2() - 0.5) * span], dcosh, Math.cosh)).toBeLessThanOrEqual(3);
+      expect(worst(30000, () => [(r2() - 0.5) * span], dtanh, Math.tanh)).toBeLessThanOrEqual(4);
+      expect(worst(30000, () => [(r2() - 0.5) * span * span], dasinh, Math.asinh)).toBeLessThanOrEqual(3);
+    }
+    expect(worst(30000, () => [(r2() - 0.5) * 1e-6], dlog1p, Math.log1p)).toBeLessThanOrEqual(2);
+    expect(worst(30000, () => [r2() * 10 - 0.9], dlog1p, Math.log1p)).toBeLessThanOrEqual(2);
+    for (const x of [0, -0, NaN, Infinity, -Infinity]) {
+      expect(Object.is(dsinh(x), Math.sinh(x))).toBe(true);
+      expect(Object.is(dtanh(x), Math.tanh(x))).toBe(true);
+      expect(Object.is(dasinh(x), Math.asinh(x))).toBe(true);
+    }
+    expect(dcosh(0)).toBe(1);
   });
 });

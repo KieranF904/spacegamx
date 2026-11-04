@@ -9,29 +9,10 @@
 
 import { dcos, dsin } from '../math/detTrig.js';
 
-// ── PRNG helpers ────────────────────────────────────────────────────
+// ── PRNG helpers (math/rng.ts; re-exported here for the callers that always took them from here) ──
 
-/** FNV-1a hash — turns a string into a 32-bit unsigned seed. */
-export function hashString(str: string): number {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return h >>> 0;
-}
-
-/** Mulberry32 seeded PRNG — returns a function that yields [0, 1). */
-export function mulberry32(seed: number): () => number {
-  let t = seed >>> 0;
-  return () => {
-    t += 0x6D2B79F5;
-    let x = t;
-    x = Math.imul(x ^ (x >>> 15), x | 1);
-    x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
-    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
-  };
-}
+import { hashString, mulberry32 } from '../math/rng.js';
+export { hashString, mulberry32 };
 
 // ── Asteroid polygon ────────────────────────────────────────────────
 
