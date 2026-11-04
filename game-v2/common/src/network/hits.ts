@@ -33,8 +33,16 @@
  *   BLOCKS     (with PACKED) snapshots in encode-once blocks (network/packed/blocks.ts, protocol 37): other entities'
  *              status rows, keyframes, control rows and fire events are bit-packed once per snapshot for every client,
  *              named by per-system wire ids and coded from per-entity chains; the client decodes the same messages
+ *   FOCUS      (protocol 38) the focus grid (network/cells.ts, docs/design/awareness-model.md section 0): it holds the
+ *              ships homed in the cells within 19 km of its ship instead of a 40 km circle, the ring out to 35 km as
+ *              map-dot ghosts; a dropped cell is kept 10 s and, back, fast-forwarded from a log when its hash agrees
  */
-export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16, ROUGH: 32, OWN_SIM: 64, INPUTS: 128, BODIES: 256, BLOCKS: 512 } as const;
+export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16, ROUGH: 32, OWN_SIM: 64, INPUTS: 128, BODIES: 256, BLOCKS: 512, FOCUS: 1024 } as const;
+
+/** Does this client hold the focus grid's cells rather than the view circle (CAPS.FOCUS)? */
+export function focusFor(caps: number | undefined): boolean {
+  return ((caps ?? 0) & CAPS.FOCUS) !== 0;
+}
 
 /**
  * Adaptive validation (CAPS.ROUGH; docs/design/confirmed-hits.md part E): how closely the server checks a finding

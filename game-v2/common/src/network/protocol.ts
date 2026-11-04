@@ -33,9 +33,9 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
  * has updated PROTOCOL_VERSION and PROTOCOL_WIRE_HASH.
  */
 // History: PROTOCOL_CHANGELOG.md. Re-pin with `npm run wire:bump "reason"` (game-v2/), never by hand.
-export const PROTOCOL_VERSION = 37;
+export const PROTOCOL_VERSION = 38;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
-export const PROTOCOL_WIRE_HASH = '987b4c7d';
+export const PROTOCOL_WIRE_HASH = 'c5043897';
 /** WebSocket close code (and reason) for a client on another protocol version */
 export const PROTOCOL_MISMATCH_CLOSE = 4002;
 export const PROTOCOL_MISMATCH_REASON = 'version';
@@ -239,6 +239,7 @@ export type ClientMessage =
   | ClientAuthRegisterMessage
   | ClientStateHashMessage
   | ClientHpResyncMessage
+  | ClientCellCacheMessage
   | ClientPackedResyncMessage
   | ClientShipEditMessage
   | ClientDockMessage
@@ -873,6 +874,7 @@ export type ServerMessage =
   | ServerShipHpMessage
   | ServerShipHpBatchMessage
   | ServerDebrisSplitMessage
+  | ServerCellsMessage
   | ServerShipEditResultMessage
   | ServerProjectileHitMessage
   | ServerHitsMessage
@@ -1363,6 +1365,25 @@ export interface ServerDebrisSplitMessage {
   p: number[];
 }
 
+/**
+ * The focus grid's changes after a snapshot (CAPS.FOCUS, protocol 38; wire forms in cells.ts): `d` cells dropped with
+ * the snapshot of `tick` (keep their ships as of it), `b` dropped cells back in focus (answer cellCache), `l` logs
+ * (put a kept cell's ships back and fast-forward them through `tick`)
+ */
+export interface ServerCellsMessage {
+  type: 'cells';
+  tick: number;
+  d?: number[];
+  b?: number[];
+  l?: number[];
+}
+
+/** What it kept of dropped cells the server asked about (cells `b`): [cell, T, hash (0: none kept)] per cell (CAPS.FOCUS) */
+export interface ClientCellCacheMessage {
+  type: 'cellCache';
+  c: number[];
+}
+
 /** The client has no blueprint for this ship (it was dropped): send a full sync */
 export interface ClientShipNeedMessage {
   type: 'shipNeed';
@@ -1639,6 +1660,8 @@ const COMPACT: [string, string[]][] = [
   ['hitFix', ['s', 't', 'c', 'e', 'h']],
   // (Appended, protocol 30: the dev weapons range's readout, a row per changed dummy)
   ['rangeRow', ['i', 'dead', 'hull', 'shield', 'dmg5', 'dps', 'fight', 'total', 'ttk']],
+  // (Appended, protocol 38: the focus grid's drops, offers and logs, cells.ts)
+  ['cells', ['tick', 'd', 'b', 'l']],
 ];
 
 /**

@@ -27,3 +27,4 @@ except to fix a typo. A bump makes old clients reload (see PROTOCOL_VERSION in p
 - 35 (2026-11-04): Compact inputs (CAPS.INPUTS 128): first byte 0x80 | the groups that changed since the last input on the socket (tick step, keys, modes, aim as a fine or coarse step or itself, cursor distance on a log grid), seq implied; read through a per-socket InputDecoder
 - 36 (2026-11-04): Decision inputs (CAPS.BODIES = 256): a snapshot's decisions rows (d, packed: decisionsIO), a body check on inputs (base layout: the first flags byte's top bit; compact: CI_EXTRA.BODY_CHECK)
 - 37 (2026-11-04): Encode-once blocks (CAPS.BLOCKS = 512): PK.BLOCKS snapshots, other entities' status rows, keyframes, control rows and fire events bit-packed once per snapshot for every client, named by per-system wire ids (intros), coded from per-entity chains (network/packed/blocks.ts)
+- 38 (2026-11-04): CAPS.FOCUS: the focus grid's cells message (drops, offers, logs) and cellCache reply
