@@ -1,0 +1,183 @@
+/**
+ * Other ships' causes on this client's tick-aligned layer (CAPS.CAUSES; common network/causes.ts). What moved a ship
+ * it holds besides its controls comes as that cause at its tick (a snapshot's `causes` rows): after the ship's step on
+ * that tick the replica set hands its body here (ShipReplicaSet.setCauses), and the cause is worked out with the very
+ * function the server's shadow runs (applyOwnCauses), so the replica stays the server's ship and no keyframe comes.
+ *
+ *   structure  a rebuild's tick splits the structure it flew until then (the one it had before this frame's shipSync,
+ *              beforeSync) from the new one
+ *   contacts   one record a pair, each side it holds pushed: the other body's pose as the record gives it, or,
+ *              without the state, this layer's replica of it on that tick before its own causes (ShipReplicaSet.preAt);
+ *              its structure as it was then (OTHER_BEFORE: from before this frame's shipSync)
+ *
+ * The own ship's causes are OwnTick's (ships/own/OwnTick.ts); it is never one of these.
+ */
+import {
+  applyOwnCauses, applyCauseRows, causesByShip, type CauseRow, CONTACT_BIG_BODY, OWN_CAUSE, CONTACT_FLAG,
+  type ReplicaCauses, type ShipReplicaSet, type ShipDerived, type ShipState, type ShipTuning, type FlightBody,
+  type OwnCauseEnv, type OwnShape, type PlacedGeom, type ServerSnapshotMessage, type Vec2,
+} from '@space-game/common';
+
+export interface ShipCausesHost {
+  store: { get(id: number): ShipState | undefined; geometry(ship: ShipState): PlacedGeom[] };
+  reps: ShipReplicaSet;
+  /** Its own ship's id */
+  self(): number;
+  /** The structure its own ship flew tick t with (OwnTick.derived: a contact with it reads it) */
+  ownDerived?(t: number): ShipDerived | null | undefined;
+  tuning: ShipTuning;
+}
+
+/** Ticks of causes kept (a window is never this far back) */
+const KEEP_TICKS = 600;
+
+export class ShipCauses implements ReplicaCauses {
+  on = false;
+  /** Causes by ship, then tick ([kind, ...], with their place among the tick's) */
+  private readonly rows = new Map<number, Map<number, CauseRow[]>>();
+  /** Ships' structures before their shipSync this frame */
+  private readonly before = new Map<number, ShipDerived>();
+  /** A rebuild: the structure flown up to (and on) its tick, and the centres of mass either side, by ship */
+  private readonly until = new Map<number, { derived: ShipDerived; tick: number; from: Vec2; to: Vec2 }>();
+  /** A contact's other as it was before its shipSync (OTHER_BEFORE), by tick and id */
+  private readonly touched = new Map<string, ShipDerived>();
+  readonly stats = { rows: 0, failed: 0 };
+
+  constructor(private readonly host: ShipCausesHost) {}
+
+  /** Switched on or off (netCaps): the replica set asks here after each step, or not */
+  setOn(on: boolean): void {
+    if (on === this.on) return;
+    this.on = on;
+    this.rows.clear();
+    this.until.clear();
+    this.touched.clear();
+    this.host.reps.setCauses(on ? this : null);
+  }
+
+  /** A ship's structure is about to change (shipSync): the one it flew until now */
+  beforeSync(id: number): void {
+    if (!this.on || id === this.host.self()) return;
+    const d = this.host.store.get(id)?.derived;
+    if (d) this.before.set(id, d);
+  }
+
+  /**
+   * A snapshot, after the replicas took its keyframes: its causes, each ship's rebuild split, and each such ship stepped
+   * again from its earliest; a ship keyframed now forgets the ones before (its keyframe is how that tick ended)
+   */
+  onSnapshot(m: ServerSnapshotMessage): void {
+    if (!this.on) { this.before.clear(); return; }
+    const { reps, store } = this.host;
+    const keyed = new Set<number>();
+    for (const k of m.ships ?? []) { this.drop(k[0], m.tick); keyed.add(k[0]); }
+    // (Each record to the ships it names that this layer steps: held, not its own, not keyframed now)
+    const self = this.host.self();
+    for (const [id, ticks] of causesByShip(m.causes, m.tick, (id) => id !== self && !keyed.has(id) && reps.has(id))) {
+      let mine = this.rows.get(id);
+      if (!mine) this.rows.set(id, (mine = new Map()));
+      let earliest = Infinity;
+      for (const [t, rows] of ticks) {
+        mine.set(t, rows);
+        earliest = Math.min(earliest, t);
+        this.stats.rows += rows.length;
+        for (const r of rows) {
+          if (r.row[0] === OWN_CAUSE.CONTACT && r.row[2] & CONTACT_FLAG.OTHER_BEFORE) {
+            const d = this.before.get(r.row[1]);
+            if (d) this.touched.set(t + ':' + r.row[1], d);
+          }
+          if (r.row[0] === OWN_CAUSE.REBUILD) {
+            const now = store.get(id)?.derived, was = this.before.get(id) ?? now;
+            if (was && now) this.until.set(id, { derived: was, tick: t, from: was.com, to: now.com });
+          }
+        }
+      }
+      reps.rewind(id, earliest);
+    }
+    this.before.clear();
+    const old = m.tick - KEEP_TICKS;
+    for (const [id, ticks] of this.rows) {
+      for (const t of ticks.keys()) if (t < old) ticks.delete(t);
+      if (!ticks.size || !reps.has(id)) this.rows.delete(id);
+    }
+    for (const [id, u] of this.until) if (u.tick < old || !reps.has(id)) this.until.delete(id);
+    if (this.touched.size > 64) for (const k of [...this.touched.keys()]) if (Number(k.split(':')[0]) < old) this.touched.delete(k);
+  }
+
+  /** A ship gone (removed, out of view): its causes with it */
+  remove(id: number): void {
+    this.rows.delete(id);
+    this.until.delete(id);
+  }
+
+  clear(): void {
+    this.rows.clear();
+    this.until.clear();
+    this.touched.clear();
+    this.before.clear();
+  }
+
+  /** (A keyframe at tick k: its causes up to k are in it) */
+  private drop(id: number, k: number): void {
+    const ticks = this.rows.get(id);
+    if (ticks) for (const t of ticks.keys()) if (t <= k) ticks.delete(t);
+    const u = this.until.get(id);
+    if (u && u.tick <= k) this.until.delete(id);
+  }
+
+  // ---- ReplicaCauses (ShipReplicaSet asks these as it steps another ship) ----
+
+  derived(id: number, t: number): ShipDerived | undefined {
+    const u = this.until.get(id);
+    return u && t <= u.tick ? u.derived : undefined;
+  }
+
+  has(id: number, t: number): boolean {
+    return !!this.rows.get(id)?.has(t);
+  }
+
+  after(id: number, t: number, body: FlightBody): void {
+    const rows = this.rows.get(id)?.get(t);
+    if (rows && !applyOwnCauses(body, rows.map((r) => r.row), this.env(id, t, rows))) this.stats.failed++;
+  }
+
+  /**
+   * A ship's body on tick t just before the cause at `seq` (the contact pass had it so): before the tick's causes, then
+   * its causes before that one, unrounded. Its own ship's: before its causes (the server sends the state otherwise)
+   */
+  private midOf(id: number, t: number, seq: number): FlightBody | null {
+    const pre = this.host.reps.preAt(id, t);
+    const rows = id === this.host.self() ? undefined : this.rows.get(id)?.get(t);
+    const earlier = rows?.filter((r) => r.seq < seq);
+    if (!pre || !earlier?.length) return pre;
+    const body = { ...pre };
+    if (!applyCauseRows(body, earlier.map((r) => r.row), this.env(id, t, earlier))) this.stats.failed++;
+    return body;
+  }
+
+  private env(id: number, t: number, rows: readonly CauseRow[]): OwnCauseEnv {
+    const { store, reps, tuning } = this.host;
+    const ship = store.get(id), d = this.derived(id, t) ?? ship?.derived;
+    const u = this.until.get(id);
+    return {
+      cellSize: tuning.cellSize,
+      restitution: tuning.collision?.restitution ?? 0.3,
+      self: ship && d ? shapeOf(ship, d, store.geometry(ship)) : null,
+      other: (o) => {
+        const os = store.get(o);
+        if (!os) return null;
+        const od = this.touched.get(t + ':' + o) ?? (o === this.host.self() ? this.host.ownDerived?.(t) : this.derived(o, t)) ?? os.derived;
+        if (!od) return null;
+        // (Its replica as the pass had it: a row with the state doesn't read it, and one not held has none)
+        const row = rows.find((r) => r.row[0] === OWN_CAUSE.CONTACT && r.row[1] === o);
+        const at = reps.has(o) && row && !(row.row[2] & CONTACT_FLAG.STATE) ? this.midOf(o, t, row.seq) : null;
+        return { shape: shapeOf(os, od, store.geometry(os)), body: at ? { x: at.x, y: at.y, angle: at.angle, vx: at.vx, vy: at.vy } : { x: 0, y: 0, angle: 0, vx: 0, vy: 0 } };
+      },
+      rebuilt: () => (u && u.tick === t ? { from: u.from, to: u.to } : null),
+    };
+  }
+}
+
+function shapeOf(ship: ShipState, d: ShipDerived, geom: PlacedGeom[]): OwnShape {
+  return { geom, alive: d.alive, com: d.com, mass: d.mass, radius: d.radius, big: ship.blueprint.parts.length > CONTACT_BIG_BODY };
+}

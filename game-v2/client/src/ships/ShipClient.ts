@@ -29,7 +29,7 @@ import {
   jumpFieldAt, fieldRangeBoost, fieldCharge, primeBoost, pilotJumpStep, withEmp, lodestonePosition, type JumpField, type LodestoneData,
   ShipReplicaSet, ServerSnapshotMessage, ServerDebrisSplitMessage, deriveSplit, unpackIds, unpackRuns, computeJoins, DEBRIS_STATUS, type DebrisShape, type Vec2,
   packCursorWeaponState, rebuildVolley, WEAPON_KIND_TYPE, EntityState, accelAlong, turnAccel, rateShip, stepGuns, volleyShells, firesStraight, partWeaponDef,
-  type ServerHitsMessage, type ServerHpCheckMessage, type ServerHitFixMessage, type HitReport, type OwnCheck, type BodyCheck, CAPS, SIDE, ownSimCaps, bodiesFor, focusFor, ghostWeight,
+  type ServerHitsMessage, type ServerHpCheckMessage, type ServerHitFixMessage, type HitReport, type OwnCheck, type BodyCheck, CAPS, SIDE, ownSimCaps, bodiesFor, focusFor, causesFor, ghostWeight,
 } from '@space-game/common';
 import type { MenuShipInfo } from '../ui/GameMenuUI';
 import type { GameState, InterpolatedEntity } from '../state/GameState';
@@ -54,6 +54,7 @@ import { DrawnWorld } from './drawnHit';
 import { ConfirmedHits } from './hits/ConfirmedHits';
 import { SelfHits, toldHits } from './hits/SelfHits';
 import { OwnTick } from './own/OwnTick';
+import { ShipCauses } from './causes/ShipCauses';
 import { BodyRunner } from './bodies/BodyRunner';
 import type { PilotState } from '../econ/clientEcon';
 import type { ThrustCommand } from './ThrusterFx';
@@ -283,12 +284,16 @@ export class ShipClient {
     });
     this.own = new OwnTick({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, tuning: opts.tuning, restep: () => this.bodies.on });
     this.bodies = new BodyRunner({ reps: this.replicas });
+    // (Other ships' causes on the tick layer, CAPS.CAUSES: ships/causes/ShipCauses.ts)
+    this.causes = new ShipCauses({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, ownDerived: (t) => this.own.derived(t), tuning: opts.tuning });
     // (Cells dropped from its focus, kept a while: CAPS.FOCUS, ships/cells/CellCache.ts)
     this.cells = new CellCache({ reps: this.replicas, send: (m) => opts.send(m), forget: (id) => { this.bodies.remove(id); opts.state.entities.delete(id); } });
   }
 
   /** Dropped cells kept on the side (CAPS.FOCUS): their ships come back from here, fast-forwarded */
   readonly cells: CellCache;
+  /** Other ships' causes (CAPS.CAUSES) */
+  private readonly causes: ShipCauses;
   /** Holding the focus grid's cells (CAPS.FOCUS, netCaps): ships from 18 km out are drawn as ghosts, the ring's too */
   private focusOn = false;
   private ghosts: GhostLayer | null = null;
@@ -391,6 +396,7 @@ export class ShipClient {
     this.hits.reset();
     this.selfHits.reset();
     this.bodies.reset();
+    this.causes.clear();
   }
 
   /**
@@ -405,6 +411,7 @@ export class ShipClient {
     this.own.setOn(ownSimCaps(caps));
     this.focusOn = focusFor(caps);
     this.bodies.setOn(bodiesFor(caps));
+    this.causes.setOn(causesFor(caps));
   }
 
   /**
@@ -426,6 +433,7 @@ export class ShipClient {
       }
     }
     this.selfHits.onKeyframes(m.ships);
+    this.selfHits.onCaused(m.causes);
     // (a boss its body flies here: its hits are the server's records until its body has its hit rules, HitLedger 'body')
     for (const id of this.bodies.ids()) this.selfHits.onSync(id);
     // (searched once this frame's told records are in: findHits)
@@ -587,6 +595,8 @@ export class ShipClient {
     this.replicas.apply(m.tick, m.ships, m.ctl);
     // (its own ship's causes and controls, CAPS.OWN_SIM: before its own fire events are built from it)
     this.own.onSnapshot(m);
+    // (other ships' causes, CAPS.CAUSES: before their fire events are built from them)
+    this.causes.onSnapshot(m);
     // (bosses' decisions, CAPS.BODIES: their bodies fly them on the tick layer from here: ships/bodies/BodyRunner.ts)
     this.bodies.onSnapshot(m.tick, m.decisions);
     const out: EntityState[] = [];
@@ -622,7 +632,8 @@ export class ShipClient {
       // prediction: the tick-aligned layer counts from the server's ship. Your drawn shells are your prediction's, WeaponFx)
       // (with CAPS.OWN_SIM, where it was as its guns fired: before that tick's pulls and contacts, OwnTick.firePose)
       const fp = owner === this.opts.state.playerId && this.own.on ? this.own.firePose(tick) : null;
-      const st = fp ? { body: fp } : this.replicas.at(owner, tick);
+      // (another ship where it was as its guns fired: before that tick's causes, CAPS.CAUSES)
+      const pose = fp ?? this.replicas.preAt(owner, tick), st = pose ? { body: pose } : null;
       if (!ship || !st) continue;
       this.chargeTells.delete(owner * 256 + part);
       this.tellSounds.delete(owner * 256 + part);
@@ -686,8 +697,8 @@ export class ShipClient {
   /** After a snapshot: ships that are gone (and new status rows get their hull %) */
   onReplication(m: ServerSnapshotMessage): void {
     for (const s of m.entities) if (s.type === EntityType.ShipBody) this.fillHull(s.id);
-    for (const id of m.removed) { this.bodies.remove(id); this.replicas.remove(id); }
-    for (const id of m.out ?? []) { this.bodies.remove(id); this.replicas.remove(id); }
+    for (const id of m.removed) { this.bodies.remove(id); this.causes.remove(id); this.replicas.remove(id); }
+    for (const id of m.out ?? []) { this.bodies.remove(id); this.causes.remove(id); this.replicas.remove(id); }
   }
 
   /** Place a replicated ship for this frame (false: not one, or not ready yet) */
@@ -1079,6 +1090,7 @@ export class ShipClient {
       case 'shipSync':
         this.selfHits.onSync(msg.id);
         this.own.beforeSync(msg.id);
+        this.causes.beforeSync(msg.id);
         for (const part of this.store.onSync(msg)) this.damageFx?.onPartRestored(msg.id, part);
         this.fillHull(msg.id);
         return true;

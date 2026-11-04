@@ -15,7 +15,7 @@ import { packHits, unpackHits } from '../hits.js';
 import { PACKED_FRAME, PK, PK_BITS, PACKED_FIELDS, type PackedField } from './tables.js';
 import { PackedIO, isId, type PackedPart } from './packedIO.js';
 import {
-  SNAPSHOT_CODE, snapshotOk, entitiesIO, projectilesIO, removedIO, keyframesIO, controlsIO, outIO, fireIO, ownIO, decisionsIO,
+  SNAPSHOT_CODE, snapshotOk, entitiesIO, projectilesIO, removedIO, keyframesIO, controlsIO, outIO, fireIO, ownIO, decisionsIO, causesIO,
 } from './snapshotSections.js';
 
 import type { BlockStore } from './blocks.js';
@@ -29,11 +29,11 @@ const HITS_CODE = COMPACT_TYPES.indexOf('hits');
 const HPS_CODE = COMPACT_TYPES.indexOf('shipHps');
 const isArr = Array.isArray;
 
-/** A snapshot's compact row ([code, t, lp, e, p, r, k, c, o, f, n, d], trailing nulls dropped) */
+/** A snapshot's compact row ([code, t, lp, e, p, r, k, c, o, f, n, d, x], trailing nulls dropped) */
 function snapshotIO(io: PackedIO, w: unknown[] | null): unknown[] {
   let mask = 0;
   if (w) for (let i = 1; i < w.length; i++) if (w[i] != null) mask |= 1 << (i - 1);
-  mask = io.u(mask, 11);
+  mask = io.u(mask, 12);
   const out: unknown[] = [SNAPSHOT_CODE];
   const has = (i: number) => (mask & (1 << (i - 1))) !== 0;
   const at = (i: number) => (w ? w[i] : null) as unknown[][];
@@ -59,6 +59,8 @@ function snapshotIO(io: PackedIO, w: unknown[] | null): unknown[] {
   out[10] = has(10) ? ownIO(io, at(10), tick) : null;
   sec?.('d', io.bitLength);
   out[11] = has(11) ? decisionsIO(io, at(11)) : null;
+  sec?.('x', io.bitLength);
+  out[12] = has(12) ? causesIO(io, at(12), tick) : null;
   sec?.('end', io.bitLength);
   while (out.length > 1 && out[out.length - 1] === null) out.pop();
   return out;

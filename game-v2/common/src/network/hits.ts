@@ -36,8 +36,11 @@
  *   FOCUS      (protocol 38) the focus grid (network/cells.ts, docs/design/awareness-model.md section 0): it holds the
  *              ships homed in the cells within 19 km of its ship instead of a 40 km circle, the ring out to 35 km as
  *              map-dot ghosts; a dropped cell is kept 10 s and, back, fast-forwarded from a log when its hash agrees
+ *   CAUSES     (with OWN_SIM, protocol 39) other ships' causes (network/causes.ts): what moved a ship it holds besides
+ *              its controls (a contact, a rebuild's recentring, a pilot's pull) comes as that cause at its tick, worked
+ *              out on its tick layer by the shared functions, instead of a keyframe of the ship
  */
-export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16, ROUGH: 32, OWN_SIM: 64, INPUTS: 128, BODIES: 256, BLOCKS: 512, FOCUS: 1024 } as const;
+export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16, ROUGH: 32, OWN_SIM: 64, INPUTS: 128, BODIES: 256, BLOCKS: 512, FOCUS: 1024, CAUSES: 2048 } as const;
 
 /** Does this client hold the focus grid's cells rather than the view circle (CAPS.FOCUS)? */
 export function focusFor(caps: number | undefined): boolean {

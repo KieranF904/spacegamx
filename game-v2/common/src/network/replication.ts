@@ -203,6 +203,20 @@ export interface BodyDriver {
 }
 
 /**
+ * Other ships' causes on the tick-aligned layer (CAPS.CAUSES, network/causes.ts): after a ship's step at a tick, what
+ * else moved it then (a contact, a rebuild's recentring, a pull), worked out as the server's shadow works it out; and
+ * the structure it flew a tick with where that wasn't its current one (a rebuild later in the window)
+ */
+export interface ReplicaCauses {
+  /** The structure ship `id` flew tick t with, if not its current one */
+  derived(id: number, t: number): ShipDerived | undefined;
+  /** Has it causes on tick t? */
+  has(id: number, t: number): boolean;
+  /** After its step at tick t: that tick's causes, then rounded */
+  after(id: number, t: number, body: FlightBody): void;
+}
+
+/**
  * Every replicated ship a client knows: keyframes and control changes from
  * snapshots go in, states at any tick come out (stepped with the shared
  * replicaStep, exactly as the server's shadow does). A control change that
@@ -302,13 +316,29 @@ export class ShipReplicaSet {
   /** The own ship's state after each tick's step and before that tick's causes (preAt) */
   private ownPre = new Map<number, FlightBody>();
 
+  /** Other ships' causes (CAPS.CAUSES), and each such ship's state after a tick's step and before that tick's causes */
+  private causes: ReplicaCauses | null = null;
+  private pres = new Map<number, Map<number, FlightBody>>();
+  /** The ship whose causes are being worked out now, and on which tick (its pre-cause state is the one to read) */
+  private busy = new Map<number, number>();
+  setCauses(src: ReplicaCauses | null): void {
+    this.causes = src;
+    this.pres.clear();
+    for (const id of this.reps.keys()) if (this.own?.id !== id) this.rewind(id, -Infinity);
+  }
+
   /**
    * A ship's state at tick t before that tick's causes (the own ship's pulls and contacts, CAPS.OWN_SIM): what a boss's
    * body reads of its target, as the server's boss step runs after the pilots have moved and before contacts. Any
    * other ship's is its state at t
    */
   preAt(id: number, t: number): FlightBody | null {
-    if (this.own?.id !== id) return this.at(id, t)?.body ?? null;
+    if (this.own?.id !== id) {
+      // (Other ships' causes, CAPS.CAUSES: its state before them; read while they're being worked out, the one kept then)
+      if (this.busy.get(id) === t) return this.pres.get(id)?.get(t) ?? null;
+      const st = this.at(id, t);
+      return (this.causes?.has(id, t) ? this.pres.get(id)?.get(t) : undefined) ?? st?.body ?? null;
+    }
     const r = this.reps.get(id);
     if (!r) return null;
     if (r.last >= t) return this.ownPre.get(t) ?? this.at(id, t)?.body ?? null;
@@ -337,10 +367,12 @@ export class ShipReplicaSet {
 
   remove(id: number): void {
     this.reps.delete(id);
+    this.pres.delete(id);
   }
 
   clear(): void {
     this.reps.clear();
+    this.pres.clear();
   }
 
   /**
@@ -470,11 +502,20 @@ export class ShipReplicaSet {
       const bits = by ? by.bits : ev ? ev[0] : cur.bits, q = by ? by.q : ev ? ev[1] : cur.q;
       const body = cloneBody(cur.body);
       if (by) { body.vx += by.ix; body.vy += by.iy; }
-      replicaStep(r.mode, body, { bits, targetAngle: replicaAngle(r.mode, q) }, (own && own.derived(t)) || d, this.tuning, env, t);
+      const cs = own ? null : this.causes;
+      replicaStep(r.mode, body, { bits, targetAngle: replicaAngle(r.mode, q) }, (own ? own.derived(t) : cs?.derived(id, t)) || d, this.tuning, env, t);
       if (own) {
         this.ownPre.set(t, cloneBody(body));
         this.ownPre.delete(t - 64);
         own.after(t, body);
+      } else if (cs?.has(id, t)) {
+        // (Its causes on this tick, CAPS.CAUSES: what it was before them is kept, for a contact another ship works out)
+        let p = this.pres.get(id);
+        if (!p) this.pres.set(id, (p = new Map()));
+        p.set(t, cloneBody(body));
+        if (p.size > 64) for (const k of p.keys()) if (k < t - HISTORY) p.delete(k);
+        this.busy.set(id, t);
+        try { cs.after(id, t, body); } finally { this.busy.delete(id); }
       }
       driver?.after?.(t, body);
       cur = { body, bits, q };

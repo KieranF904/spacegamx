@@ -16,7 +16,8 @@ import { SelfHits, toldHits } from '../../../../client/src/ships/hits/SelfHits.j
 import { OwnTick } from '../../../../client/src/ships/own/OwnTick.js';
 import { BodyRunner } from '../../../../client/src/ships/bodies/BodyRunner.js';
 import { CellCache } from '../../../../client/src/ships/cells/CellCache.js';
-import { bodiesFor } from '@space-game/common';
+import { ShipCauses } from '../../../../client/src/ships/causes/ShipCauses.js';
+import { bodiesFor, causesFor } from '@space-game/common';
 import { ownSimFor } from '../snapshot/ownShots.js';
 import type { GameServer } from '../../GameServer.js';
 
@@ -49,6 +50,8 @@ export class FakeHitsClient {
   readonly shells = new Map<number, HitShell>();
   /** Dropped cells it keeps (CAPS.FOCUS: client ships/cells/CellCache.ts) */
   readonly cells: CellCache;
+  /** Other ships' causes on its tick-aligned layer (CAPS.CAUSES: client ships/causes/ShipCauses.ts) */
+  readonly causes: ShipCauses | null = null;
   /** Entity types and ship-body status data, as the snapshots said */
   private kinds = new Map<number, { type: number; side: number }>();
   snapTick = 0;
@@ -108,6 +111,7 @@ export class FakeHitsClient {
     }
     if (ownSimFor(opts.caps)) this.own = new OwnTick({ store: this.store, reps: this.reps, self: () => this.pid, tuning: ships.tuning, restep: () => !!this.bodies?.on });
     if (bodiesFor(opts.caps)) this.bodies = new BodyRunner({ reps: this.reps });
+    if (causesFor(opts.caps)) this.causes = new ShipCauses({ store: this.store, reps: this.reps, self: () => this.pid, ownDerived: (t) => this.own?.derived(t), tuning: ships.tuning });
     this.cells = new CellCache({ reps: this.reps, send: (m) => this.outbox.push(m), forget: (id) => this.bodies?.remove(id) });
     const socket: ClientSocket = {
       isOpen: () => true,
@@ -181,7 +185,7 @@ export class FakeHitsClient {
 
   private handle(m: ServerMessage): void {
     switch (m.type) {
-      case 'shipSync': this.selfHits?.onSync(m.id); this.own?.beforeSync(m.id); this.store.onSync(m); break;
+      case 'shipSync': this.selfHits?.onSync(m.id); this.own?.beforeSync(m.id); this.causes?.beforeSync(m.id); this.store.onSync(m); break;
       case 'shipHps': this.findHits(); this.store.onHps(m); break;
       case 'netCaps':
         this.findHits();
@@ -189,6 +193,7 @@ export class FakeHitsClient {
         this.selfHits?.setLevel(m.caps & CAPS.ROUGH ? m.lvl : undefined);
         this.own?.setOn(ownSimFor(m.caps));
         this.bodies?.setOn(bodiesFor(m.caps));
+        this.causes?.setOn(causesFor(m.caps));
         this.levels.push([this.snapTick, m.caps & CAPS.ROUGH ? m.lvl ?? 1 : 1]);
         break;
       case 'snapshot': this.snapshot(m as ServerSnapshotMessage); break;
@@ -229,6 +234,8 @@ export class FakeHitsClient {
     this.reps.apply(s.tick, s.ships, s.ctl);
     // (its own ship's causes and controls, CAPS.OWN_SIM, before its fire events are built from it)
     this.own?.onSnapshot(s);
+    // (other ships' causes, CAPS.CAUSES, before their fire events are built from them)
+    this.causes?.onSnapshot(s);
     // (bosses' decisions, CAPS.BODIES: their bodies fly them from here)
     this.bodies?.onSnapshot(s.tick, s.decisions);
     for (const e of s.entities) {
@@ -248,7 +255,7 @@ export class FakeHitsClient {
       const tick = s.tick - ago, part = partAmmo % 256, ammo = Math.floor(partAmmo / 256) % 256, aug = partAmmo >= 65536 ? (1 as const) : undefined;
       // (its own too, CAPS.OWN_SHOTS: from its confirmed ship, replicated to it as to everyone; never its prediction)
       // (its own, CAPS.OWN_SIM: where it was as it fired, before that tick's pulls and contacts: OwnTick.firePose)
-      const ship = this.store.get(owner), body = owner === this.pid && this.own?.on ? this.own.firePose(tick) : this.reps.at(owner, tick)?.body;
+      const ship = this.store.get(owner), body = owner === this.pid && this.own?.on ? this.own.firePose(tick) : this.reps.preAt(owner, tick);
       const v = ship && body ? rebuildVolley({ owner, tick, part, aimQ, ids, ammo, aug }, ship as ShipState, body, this.server.getShips().tuning) : null;
       const spawnTick = owner === this.pid || this.kinds.get(owner)?.type === EntityType.Player ? tick - 1 : tick;
       for (const id of ids) {
@@ -260,14 +267,15 @@ export class FakeHitsClient {
     // (as ShipClient: the ledger sees the removed list before the shells go)
     this.hits?.forget(s.removed);
     this.selfHits?.onRemoved(s.removed);
-    for (const id of s.removed) { if (this.known.has(id)) this.removed.add(id); this.shells.delete(id); this.store.remove(id); this.bodies?.remove(id); this.reps.remove(id); }
-    for (const id of s.out ?? []) { this.bodies?.remove(id); this.reps.remove(id); }
+    for (const id of s.removed) { if (this.known.has(id)) this.removed.add(id); this.shells.delete(id); this.store.remove(id); this.bodies?.remove(id); this.causes?.remove(id); this.reps.remove(id); }
+    for (const id of s.out ?? []) { this.bodies?.remove(id); this.causes?.remove(id); this.reps.remove(id); }
     // (The game's client steps every replica as it draws, each frame; drawing nothing, this does it here. Left alone,
     // a replica no one asked for in 600 ticks stops short: ShipReplicaSet.at won't run that far in one go)
     for (const id of this.reps.ids()) this.reps.at(id, s.tick);
     // Hits found here, once the frame's told records are in (ShipClient.afterSnapshot, findHits)
     if (this.selfHits) {
       this.selfHits.onKeyframes(s.ships);
+      this.selfHits.onCaused(s.causes);
       for (const id of this.bodies?.ids() ?? []) this.selfHits.onSync(id);
       this.selfHits.open(s.tick);
     }

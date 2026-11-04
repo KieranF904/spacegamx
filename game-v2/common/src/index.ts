@@ -17,6 +17,7 @@ export * from './network/fxKinds.js';
 export * from './network/hits.js';
 export * from './network/ownTick.js';
 export * from './network/cells.js';
+export * from './network/causes.js';
 export * from './network/packed/tables.js';
 export * from './network/packed/packedCodec.js';
 export { BlockStore, derivedRow, ROW_BASE, type BlockRec } from './network/packed/blocks.js';

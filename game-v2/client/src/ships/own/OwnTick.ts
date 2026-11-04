@@ -170,8 +170,9 @@ export class OwnTick implements OwnTimeline {
       restitution: tuning.collision?.restitution ?? 0.3,
       self: self && d ? shapeOf(self, d, store.geometry(self)) : null,
       other: (id) => {
-        const ship = store.get(id), at = reps.at(id, t);
-        return ship && at ? { shape: shapeOf(ship, this.touched.get(t + ':' + id) ?? ship.derived, store.geometry(ship)), body: { x: at.body.x, y: at.body.y, angle: at.body.angle, vx: at.body.vx, vy: at.body.vy } } : null;
+        // (Its replica on that tick before its own causes there: CAPS.CAUSES works them out on it, ShipReplicaSet.preAt)
+        const ship = store.get(id), at = reps.preAt(id, t);
+        return ship && at ? { shape: shapeOf(ship, this.touched.get(t + ':' + id) ?? ship.derived, store.geometry(ship)), body: { x: at.x, y: at.y, angle: at.angle, vx: at.vx, vy: at.vy } } : null;
       },
       rebuilt: () => (this.until && this.until.tick === t ? { from: this.until.from, to: this.until.to } : null),
     };

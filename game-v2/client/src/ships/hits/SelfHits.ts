@@ -26,7 +26,7 @@
  * plus this client's hits since.
  */
 import {
-  hitHash, chainAdd, shipSegmentHit, sidesHurt, SIDE, gunShell, firesStraight, unpackHits, shellGone, confirmRules, CONFIRM,
+  hitHash, chainAdd, shipSegmentHit, sidesHurt, SIDE, gunShell, firesStraight, unpackHits, shellGone, confirmRules, CONFIRM, OWN_CAUSE,
   type HitCtx, type ConfirmRules, type HitReport, type ShipState, type ServerHitFixMessage, type WeaponTuning,
 } from '@space-game/common';
 import type { HitDone, OwnHit } from './ConfirmedHits';
@@ -219,6 +219,15 @@ export class SelfHits {
    */
   onKeyframes(rows: readonly (readonly number[])[] | undefined): void {
     if (rows) for (const r of rows) this.synced.add(r[0]);
+  }
+
+  /**
+   * Ships the snapshot's causes moved (CAPS.CAUSES: a contact, a rebuild): the server tells their hits this window, as
+   * it does a keyframed ship's (HitLedger), so they're left to its records
+   */
+  onCaused(rows: readonly (readonly number[])[] | undefined): void {
+    // (network/causes.ts records: [ago, kind, id, (a contact's other), ...])
+    if (rows) for (const r of rows) { this.synced.add(r[2]); if (r[1] === OWN_CAUSE.CONTACT) this.synced.add(r[3]); }
   }
 
   /** The snapshot's removed list (before it's applied): those shells sit this window out, and go */

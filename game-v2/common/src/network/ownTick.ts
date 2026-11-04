@@ -90,6 +90,16 @@ export interface OwnCauseEnv {
  * here (a structure not had); the body is then left as far as it got.
  */
 export function applyOwnCauses(body: FlightBody, rows: readonly (readonly number[])[], env: OwnCauseEnv): boolean {
+  const ok = applyCauseRows(body, rows, env);
+  quantizeShipBody(body);
+  return ok;
+}
+
+/**
+ * The causes alone, unrounded (as the server's step has a body between them: a contact later in the same tick reads it
+ * so). False: one couldn't be worked out here
+ */
+export function applyCauseRows(body: FlightBody, rows: readonly (readonly number[])[], env: OwnCauseEnv): boolean {
   let ok = true;
   for (const r of rows) {
     switch (r[0]) {
@@ -120,7 +130,6 @@ export function applyOwnCauses(body: FlightBody, rows: readonly (readonly number
         ok = false;
     }
   }
-  quantizeShipBody(body);
   return ok;
 }
 

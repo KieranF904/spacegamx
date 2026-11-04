@@ -447,9 +447,11 @@ export function resolveContacts(ctx: BridgeCtx): void {
     pieces.delete(eb);
     Velocity.x[ea] = a.vx; Velocity.y[ea] = a.vy;
     Velocity.x[eb] = b.vx; Velocity.y[eb] = b.vy;
-    // A pilot's ship pushed: its client works the push out (CAPS.OWN_SIM, network/ownTick.ts), told whom it touched
-    if (hasComponent(ctx.host.world, Player, ea)) ctx.ownCauses.add(ea, { kind: 1, other: eb, flags: (pinB ? CONTACT_FLAG.OTHER_PINNED : 0) | (pinA ? CONTACT_FLAG.SELF_PINNED : 0), pre: preB, self: ownShape(A, ctx.geometry(A)), otherShape: ownShape(B, ctx.geometry(B)), otherRebuilds: B.rebuilds });
-    if (hasComponent(ctx.host.world, Player, eb)) ctx.ownCauses.add(eb, { kind: 1, other: ea, flags: CONTACT_FLAG.SECOND | (pinA ? CONTACT_FLAG.OTHER_PINNED : 0) | (pinB ? CONTACT_FLAG.SELF_PINNED : 0), pre: preA, self: ownShape(B, ctx.geometry(B)), otherShape: ownShape(A, ctx.geometry(A)), otherRebuilds: A.rebuilds });
+    // Both pushed: their clients work the push out (a pilot's own ship, CAPS.OWN_SIM, network/ownTick.ts; any ship a
+    // client holds, CAPS.CAUSES, network/causes.ts), told whom each touched
+    const shapeA = ownShape(A, ctx.geometry(A)), shapeB = ownShape(B, ctx.geometry(B)), seq = ctx.ownCauses.next();
+    ctx.ownCauses.add(ea, { kind: 1, other: eb, flags: (pinB ? CONTACT_FLAG.OTHER_PINNED : 0) | (pinA ? CONTACT_FLAG.SELF_PINNED : 0), pre: preB, self: shapeA, otherShape: shapeB, otherRebuilds: B.rebuilds, seq });
+    ctx.ownCauses.add(eb, { kind: 1, other: ea, flags: CONTACT_FLAG.SECOND | (pinA ? CONTACT_FLAG.OTHER_PINNED : 0) | (pinB ? CONTACT_FLAG.SELF_PINNED : 0), pre: preA, self: shapeB, otherShape: shapeA, otherRebuilds: A.rebuilds, seq });
     const { nx, ny, at, partsA, partsB } = res;
     if (res.closing <= 0) continue; // already separating
     const closing = res.closing;

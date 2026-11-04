@@ -39,7 +39,7 @@ import { portalQuery } from './handlers/flight.js';
 import { SELF_SAFETY_TICKS, SNAP_PROJECTILE_RANGE, SNAP_POD_RANGE, SHIP_VIEW_IN, SHIP_VIEW_OUT, MAP_DOTS_TICKS, DEBRIS_ACK_TICKS } from './snapshot/constants.js';
 import type { HitLedger } from './hits/HitLedger.js';
 import { ownShotsFor, ownVolleyExact, ownSimFor } from './snapshot/ownShots.js';
-import { bodiesFor, focusFor, jumpPhase, jumpTuning } from '@space-game/common';
+import { bodiesFor, focusFor, causesFor, jumpPhase, jumpTuning } from '@space-game/common';
 import { FocusCells } from './cells/FocusCells.js';
 import type { BodyNet } from './decisions/BodyNet.js';
 import type { OwnChecks } from './own/OwnChecks.js';
@@ -602,9 +602,11 @@ export class SnapshotBuilder {
       const bodies = this.bodies && bodiesFor(conn.caps) ? this.bodies : null;
       // (its caps switched it off: none run there any more, BodyNet.drop)
       if (!bodies) this.bodies?.drop(conn);
+      // (Other ships' causes on its tick layer, CAPS.CAUSES: keyframes only where they don't explain a ship's path)
+      const causes = causesFor(conn.caps);
       const decisions = bodies?.forClient(conn, conn.playerId, (e) => InSystem.systemId[e] ?? -1, playerSystemId ?? -1, conn.repKnown, this.currentTick,
-        (e) => !conn.shipView || conn.shipView.has(e), (e) => this.replication.keysFor(e, conn.playerId, conn.repKnown));
-      const rep = this.replication.forClient(playerSystemId, conn.playerId, conn.repKnown, this.currentTick, conn.shipView, conn.debrisHeld, ownShots, (id) => conn.shipSynced.get(id)?.rebuilds, bodies ? (id) => bodies.runs(conn, id) : undefined);
+        (e) => !conn.shipView || conn.shipView.has(e), (e) => this.replication.keysFor(e, conn.playerId, conn.repKnown, causes));
+      const rep = this.replication.forClient(playerSystemId, conn.playerId, conn.repKnown, this.currentTick, conn.shipView, conn.debrisHeld, ownShots, (id) => conn.shipSynced.get(id)?.rebuilds, bodies ? (id) => bodies.runs(conn, id) : undefined, causes);
       // Shots from ships it replicates go as fire events: it builds the shells itself (launch.ts).
       // Not for a ship it's only now getting a keyframe for (it can't place it back then), nor its
       // own unless it replicates that too; those shells, and any flying in from further off, go as rows.
@@ -667,7 +669,8 @@ export class SnapshotBuilder {
       // (A client taking confirmed hits: its HP after its records, below; first, what it'll make of each hit)
       const hitsOn = !!this.hits?.wants(conn);
       this.sendShipUpdates(conn, playerSystemId, true, !hitsOn);
-      const gone = hitsOn ? this.hits!.plan(conn, (id) => prevStates.has(id) || newStates.has(id) || covered.has(id), keyed) : null;
+      // (Hits on a ship its causes moved this window are told, as on one keyframed: its client leaves them, SelfHits.onCaused)
+      const gone = hitsOn ? this.hits!.plan(conn, (id) => prevStates.has(id) || newStates.has(id) || covered.has(id), rep.caused ? new Set([...keyed, ...rep.caused]) : keyed) : null;
 
       // Stations — sent once per system (they never move)
       for (const eid of stationQuery(this.world)) {
@@ -715,7 +718,7 @@ export class SnapshotBuilder {
       if (this.currentTick % 60 === 0) this.sendPlayerState(conn);
 
       // (Records count from the snapshot they follow: one always goes with them)
-      const shouldSend = conn.forceSnapshot || entities.length > 0 || removed.length > 0 || rep.ships.length > 0 || rep.ctl.length > 0 || out.length > 0 || fire.length > 0 || !!rep.own?.length || !!decisions?.length
+      const shouldSend = conn.forceSnapshot || entities.length > 0 || removed.length > 0 || rep.ships.length > 0 || rep.ctl.length > 0 || out.length > 0 || fire.length > 0 || !!rep.own?.length || !!rep.causes?.length || !!decisions?.length
         || (hitsOn && this.hits!.pending(conn));
       if (!shouldSend) {
         this.lastEntityStates.set(conn.playerId, newStates);
@@ -736,6 +739,7 @@ export class SnapshotBuilder {
         fire: fire.length ? fire : undefined,
         own: rep.own,
         decisions: decisions?.length ? decisions : undefined,
+        causes: rep.causes,
       });
 
       conn.forceSnapshot = false;

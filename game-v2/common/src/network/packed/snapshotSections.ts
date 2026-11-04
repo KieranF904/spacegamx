@@ -4,6 +4,7 @@
  */
 import { COMPACT_TYPES } from '../protocol.js';
 import { decisionRowOk } from '../../bodies/decisions.js';
+import { PAIR } from '../causes.js';
 import { PK_PROJECTILE, PK_CONTROL } from './tables.js';
 import { PackedIO, isId, bitsFor, K, K_TICK } from './packedIO.js';
 import { entityFieldsIO, keyframeFieldsIO, ticksSince } from './rowsIO.js';
@@ -13,12 +14,14 @@ const isArr = Array.isArray;
 
 /** Can the snapshot's row go packed (ids where ids go, rows the shapes the packing expects)? */
 export function snapshotOk(w: unknown[]): boolean {
-  if (w.length > 12) return false;
-  const [, , , e, p, r, k, c, o, f, n, d] = w as unknown[][];
+  if (w.length > 13) return false;
+  const [, , , e, p, r, k, c, o, f, n, d, x] = w as unknown[][];
   // (Decisions: rows of whole numbers, a boss's id first, an op the packing knows: decisionsIO)
   if (d != null && !(isArr(d) && d.every((row) => decisionRowOk(row) && isId(row[0]) && row[1] <= 0 && row[1] > -4096 && row.every((v, i) => i < 3 || (v >= -(2 ** 30) && v < 2 ** 30))))) return false;
   // (Own-ship causes: rows of numbers, a kind the packing knows: ownIO)
-  if (n != null && !(isArr(n) && n.every((row) => isArr(row) && row.length >= 2 && row.length <= 15 && row.every((v) => typeof v === 'number') && Number.isInteger(row[0]) && (row[0] as number) >= 0 && Number.isInteger(row[1]) && (row[1] as number) >= 0 && (row[1] as number) < 4))) return false;
+  if (n != null && !(isArr(n) && n.every(ownRowOk))) return false;
+  // (Other ships' causes: records in tick order, the ships ids, a contact's flags and states as causesIO packs them)
+  if (x != null && !(isArr(x) && x.every((row, i) => causeRowOk(row) && (i === 0 || (row as number[])[0] <= (x[i - 1] as number[])[0])))) return false;
   if (e != null && !(isArr(e) && e.every((row) => isArr(row) && row.length >= 2 && row.length <= 15 && isId(row[0]) && Number.isInteger(row[1]) && (row[1] as number) >= 0 && (row[1] as number) < 32))) return false;
   if (p != null && !(isArr(p) && p.every((row) => isArr(row) && row.length >= 8 && row.length <= 15 && isId(row[0]) && isId(row[7])))) return false;
   if (r != null && !(isArr(r) && r.every(isId))) return false;
@@ -44,6 +47,21 @@ export function snapshotOk(w: unknown[]): boolean {
     }
   }
   return true;
+}
+
+function causeRowOk(row: unknown): boolean {
+  if (!isArr(row) || row.length < 3 || row.length > 15 || !row.every((v) => typeof v === 'number')) return false;
+  const [ago, kind, a] = row as number[];
+  if (!Number.isInteger(ago) || ago < 0 || !isId(a)) return false;
+  if (kind === 0) return row.length === 5;
+  if (kind === 2) return row.length === 3;
+  if (kind !== 1 || !isId(row[3]) || !Number.isInteger(row[4]) || row[4] < 0 || row[4] >= 64) return false;
+  const f = row[4] as number;
+  return row.length === 5 + (f & PAIR.A_STATE ? 5 : 0) + (f & PAIR.B_STATE ? 5 : 0);
+}
+
+function ownRowOk(row: unknown): boolean {
+  return isArr(row) && row.length >= 2 && row.length <= 15 && row.every((v) => typeof v === 'number') && Number.isInteger(row[0]) && (row[0] as number) >= 0 && Number.isInteger(row[1]) && (row[1] as number) >= 0 && (row[1] as number) < 4;
 }
 
 /** Out of view: forgotten here, as removals are */
@@ -142,8 +160,62 @@ const OWN_STATE: readonly [number, number, number, number][] = [[2, 6, K + 1, K 
 export function ownIO(io: PackedIO, rows: unknown[][] | null, tick: number): unknown[][] {
   const n = io.vu(rows?.length ?? 0, 1);
   const out: unknown[][] = [];
+  for (let r = 0; r < n; r++) out.push(ownRowIO(io, rows?.[r], tick));
+  return out;
+}
+
+/**
+ * Other ships' causes (network/causes.ts: [ago, kind, id, ...], in tick order): the first's ago, then each as the drop
+ * from the one before (mostly none), the kind, the ships by their slots, a pull's push as an own row's, a contact's
+ * flags (6 bits) and any states as an own row's contact state (steps from that ship's last values)
+ */
+export function causesIO(io: PackedIO, rows: unknown[][] | null, tick: number): unknown[][] {
+  const n = io.vu(rows?.length ?? 0, 2);
+  const out: unknown[][] = [];
+  // (A ship named before in the section goes by its place among those: grinding pairs come tick after tick)
+  const named: number[] = [];
+  const ship = (id: number | undefined): number => {
+    const at = id === undefined ? -1 : named.indexOf(id);
+    if (named.length && io.bit(at >= 0)) return named[io.u(at, bitsFor(named.length - 1))];
+    const v = io.thing(id ?? 0);
+    named.push(v);
+    return v;
+  };
+  let ago = 0;
   for (let r = 0; r < n; r++) {
-    const row = rows?.[r];
+    const row = rows?.[r] as number[] | undefined;
+    ago = r === 0 ? io.vu(row?.[0] ?? 0, 2) : ago - io.vu(ago - (row?.[0] ?? 0), 1);
+    const kind = io.u(row?.[1] ?? 0, 2);
+    const a = ship(row?.[2]);
+    const o: number[] = [ago, kind, a];
+    if (kind === 0) for (let i = 0; i < 2; i++) o.push(io.num(row?.[3 + i], 5, 5, io.prevOf(-1), i) as number);
+    else if (kind === 1) {
+      const b = ship(row?.[3]), f = io.bit((row?.[4] ?? 0) !== 0) ? io.u(row?.[4] ?? 0, 6) : 0;
+      o.push(b, f);
+      let at = 5;
+      for (const [on, id] of [[f & PAIR.A_STATE, a], [f & PAIR.B_STATE, b]] as const) {
+        if (!on) continue;
+        stateIO(io, row, at, io.prevOf(id), tick - ago, o);
+        at += 5;
+      }
+    }
+    out.push(o);
+  }
+  return out;
+}
+
+/** A body's pose and velocity (x, y, angle, vx, vy) as an own row's contact state: steps from that ship's last values */
+function stateIO(io: PackedIO, row: readonly unknown[] | undefined, at: number, pv: number[], tick: number, out: unknown[]): void {
+  const dt = ticksSince(pv, K_TICK, tick);
+  for (let i = 0; i < 5; i++) {
+    const [d, c, k, by] = OWN_STATE[i];
+    if (by >= 0) io.guess(pv, k, by, d, by === K + 6 ? 6 : 4, dt);
+    out.push(io.num(row?.[at + i], d, c, pv, k));
+  }
+}
+
+function ownRowIO(io: PackedIO, row: unknown[] | undefined, tick: number): unknown[] {
+  {
     const len = io.u(row?.length ?? 2, 4);
     const ago = io.vu((row?.[0] as number) ?? 0, 2), kind = io.u((row?.[1] as number) ?? 0, 2);
     const o: unknown[] = [ago, kind];
@@ -163,9 +235,8 @@ export function ownIO(io: PackedIO, rows: unknown[][] | null, tick: number): unk
       else if (kind === 1) o.push(io.num(v, 0, 3));
       else o.push(io.num(v, 0, 3));
     }
-    out.push(o);
+    return o;
   }
-  return out;
 }
 
 /**

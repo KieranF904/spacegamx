@@ -421,9 +421,9 @@ export function rebuildNow(b: BridgeCtx, eid: number, ship: ShipState, derivable
     Position.x[eid] += w[0];
     Position.y[eid] += w[1];
   }
-  // (A pilot's client recentres its own tick-aligned ship alike, from the structures it has: network/ownTick.ts REBUILD;
-  // a rebuild that changes nothing it flies or touches with isn't one for it)
-  if (hasComponent(b.host.world, Player, eid) && (w || before.alive.some((a, i) => a !== ship.derived.alive[i]) || flightSignature(before) !== flightSignature(ship.derived))) b.ownCauses.add(eid, { kind: 2, from: oldCom, to: newCom });
+  // (A client recentres its tick-aligned replica alike, from the structures it has: its own ship, network/ownTick.ts
+  // REBUILD; any other it holds, CAPS.CAUSES; a rebuild that changes nothing it flies or touches with isn't one for it)
+  if (ship.kind !== 'debris' && (w || before.alive.some((a, i) => a !== ship.derived.alive[i]) || flightSignature(before) !== flightSignature(ship.derived))) b.ownCauses.add(eid, { kind: 2, from: oldCom, to: newCom });
   Radius.value[eid] = Math.max(1, ship.derived.radius);
   b.host.shipRebuilt?.(eid);
 }

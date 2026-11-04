@@ -33,9 +33,9 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
  * has updated PROTOCOL_VERSION and PROTOCOL_WIRE_HASH.
  */
 // History: PROTOCOL_CHANGELOG.md. Re-pin with `npm run wire:bump "reason"` (game-v2/), never by hand.
-export const PROTOCOL_VERSION = 38;
+export const PROTOCOL_VERSION = 39;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
-export const PROTOCOL_WIRE_HASH = 'c5043897';
+export const PROTOCOL_WIRE_HASH = '947fd4eb';
 /** WebSocket close code (and reason) for a client on another protocol version */
 export const PROTOCOL_MISMATCH_CLOSE = 4002;
 export const PROTOCOL_MISMATCH_REASON = 'version';
@@ -452,6 +452,11 @@ export interface ServerSnapshotMessage {
    * decision's tick less the snapshot's
    */
   decisions?: number[][];
+  /**
+   * Other ships' tick-layer causes (hits.ts CAPS.CAUSES, network/causes.ts): [ago, kind, id, ...] (a contact once for
+   * both ships), by tick, in the order the server's step had them
+   */
+  causes?: number[][];
 }
 
 export interface ServerPlayerStateMessage {
@@ -1642,7 +1647,7 @@ const COMPACT: [string, string[]][] = [
   ['stationFire', ['station', 'target', 'turret']],
   ['playerState', ['hp', 'maxHp', 'boostFuel', 'maxBoostFuel', 'xp', 'level', 'credits', 'systemId']],
   // (Packed first: see packSnapshot)
-  ['snapshot', ['t', 'lp', 'e', 'p', 'r', 'k', 'c', 'o', 'f', 'n', 'd']],
+  ['snapshot', ['t', 'lp', 'e', 'p', 'r', 'k', 'c', 'o', 'f', 'n', 'd', 'x']],
   ['mapDots', ['tick', 'dots', 'routes', 'info', 'gone', 'names', 'full']],
   // (Appended, protocol 26: the hot plain messages. Values change on the way in and out: COMPACT_HOOKS)
   ['ignite', ['bodyId', 'part', 'ticks']],
@@ -1751,7 +1756,7 @@ export function wireTables(): Record<string, unknown> {
   };
 }
 
-interface PackedSnapshot { type: 'snapshot'; t: number; lp: number; e?: unknown[][]; p?: (number | null)[][]; r?: number[]; k?: number[][]; c?: number[][]; o?: number[]; f?: number[][]; n?: number[][]; d?: number[][] }
+interface PackedSnapshot { type: 'snapshot'; t: number; lp: number; e?: unknown[][]; p?: (number | null)[][]; r?: number[]; k?: number[][]; c?: number[][]; o?: number[]; f?: number[][]; n?: number[][]; d?: number[][]; x?: number[][] }
 
 /**
  * Projectiles have rows of their own (they're most of a fight's rows):
@@ -1810,6 +1815,7 @@ export function packSnapshot(m: ServerSnapshotMessage): PackedSnapshot {
   if (m.fire?.length) out.f = packFire(m.fire);
   if (m.own?.length) out.n = m.own;
   if (m.decisions?.length) out.d = m.decisions;
+  if (m.causes?.length) out.x = m.causes;
   return out;
 }
 
@@ -1865,7 +1871,7 @@ export function unpackSnapshot(p: PackedSnapshot): ServerSnapshotMessage {
     return s as unknown as EntityState;
   });
   for (const r of p.p ?? []) entities.push(unpackProjectile(r, p.t));
-  return { type: 'snapshot', tick: p.t, lastProcessedInput: p.lp, entities, removed: p.r ?? [], ships: p.k, ctl: p.c && unpackCtlIds(p.c), out: p.o, fire: p.f && unpackFire(p.f), ...(p.n ? { own: p.n } : {}), ...(p.d ? { decisions: p.d } : {}) };
+  return { type: 'snapshot', tick: p.t, lastProcessedInput: p.lp, entities, removed: p.r ?? [], ships: p.k, ctl: p.c && unpackCtlIds(p.c), out: p.o, fire: p.f && unpackFire(p.f), ...(p.n ? { own: p.n } : {}), ...(p.d ? { decisions: p.d } : {}), ...(p.x ? { causes: p.x } : {}) };
 }
 
 /**
@@ -1923,10 +1929,10 @@ function rowBytes(cache: WeakMap<readonly number[], Uint8Array>, row: readonly n
 
 function encodeSnapshot(m: ServerSnapshotMessage): Uint8Array {
   const { e, p } = packEntities(m);
-  // (The compact row: [code, t, lp, e, p, r, k, c, o, f, n, d], absent ones null and trailing nulls dropped)
+  // (The compact row: [code, t, lp, e, p, r, k, c, o, f, n, d, x], absent ones null and trailing nulls dropped)
   const row: unknown[] = [SNAPSHOT_CODE, m.tick ?? null, m.lastProcessedInput ?? null, e.length ? e : null, p.length ? p : null,
     m.removed.length ? m.removed : null, m.ships?.length ? m.ships : null, m.ctl?.length ? m.ctl : null,
-    m.out?.length ? m.out : null, m.fire?.length ? packFire(m.fire) : null, m.own?.length ? m.own : null, m.decisions?.length ? m.decisions : null];
+    m.out?.length ? m.out : null, m.fire?.length ? packFire(m.fire) : null, m.own?.length ? m.own : null, m.decisions?.length ? m.decisions : null, m.causes?.length ? m.causes : null];
   while (row.length > 1 && row[row.length - 1] === null) row.pop();
   const w = snapWriter;
   w.arrayHeader(row.length);
