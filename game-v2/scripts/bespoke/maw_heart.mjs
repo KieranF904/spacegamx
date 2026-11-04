@@ -39,8 +39,9 @@ const norm = ([x, y]) => { const l = Math.hypot(x, y) || 1; return [x / l, y / l
 
 /** Drawn at this scale on the way out */
 const S = 1.6;
-// Stand-in materials (the game's own, so it renders today). The proposed boss materials are in the doc, section 2.
-const ROCK = 'dense_ferrite', STONE = 'leestone', METAL = 'leaded_iridium', SEAM = 'pyre_glass', GLASS = 'titanium', TOOTH = 'steel';
+// Its proposed materials (not in the game's table: maw_heart_render.mjs adds them, and their surfaces, to its private
+// renderer only; the doc's section 2 has them). METAL is the game's leaded iridium: the node's machined collar and root tips
+const ROCK = 'maw_crust', STONE = 'maw_heartstone', METAL = 'leaded_iridium', SEAM = 'maw_seamglass', GLASS = 'maw_shardglass', BONE = 'maw_bone';
 // Its palette: three steps of stone (deep, face, rim), warm stone where the seams light it, gold from deep to white-hot
 const DEEP = '#26272b', FACE = '#45474d', TOP = '#585b62', RIM = '#9097a1', WARM1 = '#d9a356', WARM2 = '#94713f';
 const GOLD = '#ffb238', GOLD2 = '#ffd27a', HOT = '#fff4d8', PIT = '#121215', BRONZE = '#8a6a3a', GREY = '#8d939c';
@@ -79,13 +80,53 @@ const glow = (at, r, color = GOLD) => ({ kind: 'glow', at, r, color });
 const halo = (at, r, w, color = GOLD) => ({ kind: 'halo', at, r, w, color });
 const vein = (pts, w = 0.3, color = GOLD) => ({ kind: 'vein', w, color, poly: pts });
 const crystal = (at, dir, r, w, color) => ({ kind: 'shard', crystal: true, ...(color ? { color } : {}), at, dir: norm(dir), r, w });
-/** A seam of light down an axis: warm stone either side of it (the seam lighting the rock), then the gold channel */
-const seamDetail = (r0, r1, deg, w0, w1) => [
-  raise(strip(radial(r0, r1, deg), w0 * 4.2, w1 * 3.2), WARM2),
-  raise(strip(radial(r0 + 0.4, r1 - 0.4, deg), w0 * 2.4, w1 * 1.9), WARM1),
-  channel(strip(radial(r0, r1, deg), w0, w1)),
-  channel(strip(radial(r0 + 0.6, r0 + (r1 - r0) * 0.55, deg), w0 * 0.42, w1 * 0.2), HOT),
-];
+/** Fixed noise in [0, 1) from a number (the same every run) */
+const nz = (a) => { const v = Math.sin(a * 12.9898 + 78.233) * 43758.5453; return v - Math.floor(v); };
+/** A polygon chipped: each corner pulled in or out from its middle a little, by place, so no two plates are alike */
+function chip(poly, amp, seed) {
+  const c = [poly.reduce((a, p) => a + p[0], 0) / poly.length, poly.reduce((a, p) => a + p[1], 0) / poly.length];
+  return poly.map(([x, y], i) => { const f = 1 + (nz(seed * 31 + i * 7.3) - 0.55) * amp; return [round(c[0] + (x - c[0]) * f), round(c[1] + (y - c[1]) * f)]; });
+}
+/** A path wobbled sideways at its inner points (its ends held) */
+function wob(path, amp, seed) {
+  return path.map((p, i) => {
+    if (i === 0 || i === path.length - 1) return p;
+    const a = path[i - 1], b = path[i + 1], [ux, uy] = norm([b[0] - a[0], b[1] - a[1]]), o = (nz(seed * 17 + i * 3.1) - 0.5) * 2 * amp;
+    return [round(p[0] - uy * o), round(p[1] + ux * o)];
+  });
+}
+/** Gold that fades as it runs out from the heart: bright near it, ember at the crust's edge */
+const FADE = ['#ffcf72', '#e0962f', '#b07024', '#80521e', '#5a3d1a'];
+const fade = (r) => FADE[Math.max(0, Math.min(FADE.length - 1, Math.floor((r - 4) / 7)))];
+/**
+ * A vein of the heartbeat out along an axis: a wobbling main vein, tapering, its gold fading with distance from the
+ * heart, capillaries branching off it into the crust (alternate sides, shorter and dimmer outward), a few of them
+ * forking again. Not a bar: a thing that carries something
+ */
+function veinTree(r0, r1, deg, w, seed, branches = 4) {
+  const out = [], steps = 7;
+  const main = wob(Array.from({ length: steps + 1 }, (_, k) => P(r0 + ((r1 - r0) * k) / steps, deg + (nz(seed + k) - 0.5) * 3)), 0.5, seed);
+  // (in two lengths, so the outer one can be dimmer and thinner)
+  const cut = Math.ceil(steps * 0.45);
+  out.push(vein(main.slice(0, cut + 1), w, fade(r0)), vein(main.slice(cut), w * 0.55, fade(r0 + (r1 - r0) * 0.6)));
+  for (let b = 0; b < branches; b++) {
+    const t = 0.22 + (b / branches) * 0.68 + (nz(seed * 3 + b) - 0.5) * 0.08, r = r0 + (r1 - r0) * t, side = b % 2 ? 1 : -1;
+    const ang = deg + side * (32 + nz(seed + b * 5) * 26), len = (r1 - r0) * (0.32 - t * 0.14) * (0.8 + nz(seed * 7 + b) * 0.5);
+    const root = P(r, deg), [dx, dy] = [Math.sin(ang * DEG), -Math.cos(ang * DEG)];
+    const pts = wob(Array.from({ length: 4 }, (_, k) => [round(root[0] + dx * len * (k / 3)), round(root[1] + dy * len * (k / 3))]), 0.35, seed * 11 + b);
+    out.push(vein(pts, w * (0.42 - t * 0.18), fade(r + 4)));
+    if (nz(seed * 13 + b) > 0.45) {
+      const fr = pts[2], fa = ang + side * 34, fl = len * 0.45;
+      out.push(vein([fr, [round(fr[0] + Math.sin(fa * DEG) * fl * 0.5), round(fr[1] - Math.cos(fa * DEG) * fl * 0.5)], [round(fr[0] + Math.sin(fa * DEG) * fl), round(fr[1] - Math.cos(fa * DEG) * fl)]], w * 0.2, fade(r + 10)));
+    }
+  }
+  return out;
+}
+/** A rounded lobe (a ventricle's half): its outer edge bulging, `r0` to `r1` at its middle, from a0 to a1 */
+function lobe(r0, r1, a0, a1, mid, half, n, seed) {
+  const outer = Array.from({ length: n + 1 }, (_, k) => { const a = a0 + ((a1 - a0) * k) / n, f = Math.cos(Math.min(1, Math.abs(a - mid) / half) * Math.PI / 2) ** 0.55; return P(r0 + 2 + (r1 - r0 - 2) * f + (nz(seed + k) - 0.5) * 0.7, a); });
+  return [...outer, ...Array.from({ length: 4 }, (_, k) => P(r0, a1 - ((a1 - a0) * k) / 3))];
+}
 
 const pieces = [], parts = [];
 const extra = [];
@@ -112,148 +153,7 @@ function onAxes(fn) {
   }
 }
 const DIAG = [[0, -45], [1, -135]];
-
-// =====================================================================================================================
-// Stage 3, the node: beneath everything (drawn first), bared when its chambers burst
-// =====================================================================================================================
-const S3 = { stage: 3, under: true };
-// Its ring: dark metal, a lit rim, rivets of light round it
-part('s3_ring', 'conduit', METAL, ringPts([0, 0], 10.2, 24, 0.13), {
-  ...S3,
-  detail: [
-    raise(ringPts([0, 0], 9.6, 24, 0.13), TOP), raise(ringPts([0, 0], 8.8, 24, 0.13), FACE),
-    halo([0, 0], 9.9, 0.25, RIM),
-    ...Array.from({ length: 12 }, (_, k) => glow(P(9.2, k * 30 + 15), 0.32, GOLD2)),
-  ],
-});
-// Its valve teeth: fangs on the diagonals, lying over the ring and the core, a gold channel down each to a hot tip
-for (const [k, deg] of DIAG) {
-  const pg = [P(5, deg - 22), P(10.5, deg - 15), P(16.5, deg - 4), P(17.6, deg), P(16.5, deg + 4), P(10.5, deg + 15), P(5, deg + 22)];
-  pair(`s3_valve${k}`, 'generator', TOOTH, pg, {
-    ...S3, ruin: true, relief: 'ridge',
-    detail: [raise([P(6, deg - 18), P(10.5, deg - 12), P(15.8, deg - 2.5), P(15.8, deg + 2.5), P(10.5, deg + 12), P(6, deg + 18)], FACE), raise([P(7.5, deg - 11), P(14.5, deg - 1.5), P(14.5, deg + 1.5), P(7.5, deg + 11)], TOP), channel(strip(radial(6.5, 16.2, deg), 1.3, 0.4)), channel(strip(radial(7, 15, deg), 0.5, 0.16), HOT), glow(P(16.4, deg), 0.75, GOLD2)],
-  });
-}
-// Its stubs: on the axes, where the arteries met it
-onAxes((k, deg, emit) => emit(`s3_stub_${k}`, 'conduit', METAL, [P(8.5, deg - 13), P(13.6, deg - 7), P(14.4, deg), P(13.6, deg + 7), P(8.5, deg + 13)], {
-  ...S3, detail: [raise([P(8.8, deg - 11.5), P(13.3, deg - 6), P(13.3, deg + 6), P(8.8, deg + 11.5)], FACE), raise([P(9.5, deg - 9), P(12.8, deg - 4.5), P(12.8, deg + 4.5), P(9.5, deg + 9)], TOP), glow(P(12.2, deg), 0.8), glow(P(12.2, deg), 0.35, HOT)],
-}));
-// The core, last: seam glass lit from within: a dark iris round it, rings of light, veins out to its rim
-part('s3_core', 'core', SEAM, ringPts([0, 0], 7.4, 24, 0.13), {
-  ...S3, ruin: true,
-  detail: [
-    recess(ringPts([0, 0], 6.8, 24, 0.13), '#15110c'),
-    ...Array.from({ length: 8 }, (_, k) => vein([P(4.4, k * 45 + 22.5), P(5.4, k * 45 + 28), P(6.5, k * 45 + 24)], 0.3, BRONZE)),
-    halo([0, 0], 6.6, 0.3, BRONZE), halo([0, 0], 4.9, 0.22, GOLD),
-    glow([0, 0], 4.4, '#4a2a0c'), glow([0, 0], 3.6, '#a8621a'), glow([0, 0], 2.7, GOLD), glow([0, 0], 1.7, GOLD2), glow([0, 0], 0.8, HOT),
-  ],
-});
-
-// =====================================================================================================================
-// Stage 2, the chambers. Worn out, each gapes (a wreck) until the Heart bursts them, one a beat
-// =====================================================================================================================
-const S2 = { stage: 2, ruin: true };
-const CH_HALF = 34, CH_R1 = 28;
-onAxes((k, deg, emit) => {
-  const r1 = k === 'apex' ? 31 : CH_R1;
-  // Its two walls: dark metal, plated, a lit rim along the outer edge and a ridge where they meet
-  for (const [s, a0, a1] of [['a', deg - CH_HALF, deg + 0.5], ['b', deg - 0.5, deg + CH_HALF]]) {
-    const m = (a0 + a1) / 2, out = s === 'a' ? a0 : a1;
-    emit(`ch_${k}_wall${s}`, 'armor', METAL, block(9.5, r1, a0, a1, 1.4, 8), {
-      ...S2, relief: 'plate',
-      detail: [
-        raise(block(11.5, r1 - 2.2, a0 + 3, a1 - 3, 1.2, 6), FACE),
-        raise(block(13, r1 - 3.6, a0 + 5, a1 - 5, 1, 6), TOP),
-        raise(strip(Array.from({ length: 7 }, (_, j) => P(r1 - 1.1, out + (j / 6) * (m - out) * 1.6)), 0.7), RIM),
-        recess(oval(P(r1 - 6, m), 1.0, 0.7, [Math.sin(m * DEG), -Math.cos(m * DEG)], 10)),
-        glow(P(r1 - 6, m), 0.4, GOLD2),
-      ],
-    });
-  }
-  // Its valve lip: the throat it opens through, deep and dark, light glowing at the bottom of it
-  const lip = r1 + 4.2;
-  emit(`ch_${k}_valve`, 'generator', SEAM, block(r1 - 6, lip, deg - 16, deg + 16, 1.2, 8), {
-    ...S2, relief: 'plate',
-    detail: [
-      raise(block(r1 - 5, lip - 0.8, deg - 14, deg + 14, 1, 6), '#3a2a20'),
-      recess(block(r1 - 4.4, lip - 1.2, deg - 12.5, deg + 12.5, 0.8, 6), '#0e0c0a'),
-      { kind: 'vent', color: '#9a5c18', fins: 5, poly: block(r1 - 3.2, lip - 2.2, deg - 9, deg + 9, 0.5, 6) },
-      channel(strip(Array.from({ length: 9 }, (_, j) => P(lip - 0.7, deg - 13 + j * 3.25)), 0.55), GOLD2),
-    ],
-  });
-});
-// The septum over the middle: the chambers' shared wall, an iris where the core shows through
-part('septum', 'armor', STONE, ringPts([0, 0], 11.5, 24, 0.13), {
-  ...S2, relief: 'plate',
-  detail: [
-    raise(ringPts([0, 0], 10, 24, 0.13), FACE), raise(ringPts([0, 0], 8.4, 24, 0.13), TOP),
-    ...[0, 90, 180, 270].flatMap((d) => [channel(strip(radial(4.2, 11.2, d), 0.9, 0.5)), channel(strip(radial(4.6, 10.4, d), 0.35, 0.18), HOT)]),
-    recess(ringPts([0, 0], 4.2, 16, 0.2), '#0d0c0b'), glow([0, 0], 3.0, '#a06418'), glow([0, 0], 2.0, GOLD), glow([0, 0], 0.9, HOT), halo([0, 0], 4.3, 0.3, BRONZE),
-  ],
-});
-// Its arteries on the diagonals, between the chambers: glass tubes, light running out along them
-for (const [k, deg] of DIAG) {
-  const pg = [P(9.5, deg - 7.5), P(18, deg - 4.2), P(29, deg - 3), P(31, deg), P(29, deg + 3), P(18, deg + 4.2), P(9.5, deg + 7.5)];
-  pair(`artery${k}`, 'conduit', SEAM, pg, {
-    stage: 2, relief: 'round',
-    detail: [vein(radial(10.5, 29.5, deg, 8), 0.75, GOLD), ...[15, 21, 27].map((r) => halo(P(r, deg), 1.25, 0.32, BRONZE)), glow(P(30, deg), 0.6, GOLD2)],
-  });
-}
-
-// =====================================================================================================================
-// Stage 1, the bed. The caps decide it; the rest calves away when shot (toward the black hole)
-// =====================================================================================================================
-const S1 = { stage: 1 };
-// The buttresses first (the caps lie over them): on the diagonals, inner and outer, stepped rock
-for (const [k, deg] of DIAG) {
-  const a0 = deg - 26, a1 = deg + 26;
-  pair(`crust_diag${k}_in`, 'hull', ROCK, block(12.5, 23.5, a0, a1, 1.6, 8), {
-    ...S1, relief: 'plate',
-    detail: [raise(block(14.5, 21.8, a0 + 6, a1 - 6, 1.3, 6), FACE), raise(block(16.2, 20.4, a0 + 11, a1 - 11, 1, 4), TOP), recess(oval(P(18.3, deg), 0.9, 0.6, [1, 0], 8)), glow(P(18.3, deg), 0.35, GOLD)],
-  });
-  pair(`crust_diag${k}_out`, 'armor', ROCK, block(22.5, 32, a0 + 3, a1 - 3, 1.8, 8, 0.4), {
-    ...S1, relief: 'plate',
-    detail: [raise(block(24.5, 30.2, a0 + 8, a1 - 8, 1.3, 6, 0.3), FACE), raise(block(26, 29, a0 + 13, a1 - 13, 1, 4), TOP), vein([P(24, deg - 10), P(27, deg - 3), P(30.5, deg - 6)], 0.22, BRONZE)],
-  });
-}
-// The caps: one over each chamber, stepped stone, split down its axis by the seam it opens along
-onAxes((k, deg, emit) => {
-  const r1 = k === 'apex' ? 38 : k === 'base' ? 35 : 34.5, half = 25;
-  emit(`cap_${k}`, 'armor', STONE, block(13.5, r1, deg - half, deg + half, 2.2, 10, 0.55), {
-    ...S1, ruin: true, relief: 'plate',
-    detail: [
-      raise(block(15.5, r1 - 2.4, deg - half + 4, deg + half - 4, 1.8, 8), FACE),
-      raise(block(17.5, r1 - 4.8, deg - half + 7.5, deg + half - 7.5, 1.4, 8), TOP),
-      // (its rim: the lit lip of the plate's outer edge)
-      raise(strip(Array.from({ length: 11 }, (_, j) => P(r1 - 1.2, deg - half + 5 + j * ((2 * half - 10) / 10))), 0.8), RIM),
-      ...seamDetail(14, r1 - 1.6, deg, 1.5, 0.7),
-      glow(P(r1 - 2.4, deg), 0.9, GOLD2), glow(P(r1 - 2.4, deg), 0.4, HOT),
-      // (veins forking off the seam, faint: the light reaching into the stone)
-      vein([P(19, deg + 1.2), P(22.5, deg + 5), P(25.5, deg + 12), P(27, deg + 17)], 0.34, BRONZE),
-      vein([P(24, deg - 1.2), P(27, deg - 6), P(r1 - 4.5, deg - 13)], 0.3, BRONZE),
-    ],
-  });
-});
-// The keystone over the middle: stepped rings round the eye, where the four seams meet and the core shows through
-part('crust_key', 'armor', STONE, ringPts([0, 0], 15, 24, 0.13), {
-  ...S1, relief: 'plate',
-  detail: [
-    raise(ringPts([0, 0], 13.2, 24, 0.13), FACE), raise(ringPts([0, 0], 11, 24, 0.13), TOP),
-    halo([0, 0], 14.3, 0.4, '#666a72'),
-    ...[0, 90, 180, 270].flatMap((d) => seamDetail(5.6, 15.2, d, 1.7, 1.4)),
-    recess(ringPts([0, 0], 5.4, 20, 0.1), '#0c0b0a'), halo([0, 0], 5.6, 0.45, BRONZE),
-    glow([0, 0], 4.3, '#6b3f10'), glow([0, 0], 3.3, '#c47a1c'), glow([0, 0], 2.3, GOLD), glow([0, 0], 1.4, GOLD2), glow([0, 0], 0.6, HOT),
-  ],
-});
-// The crown: three shards of glass on the apex only (the first break in its symmetry)
-for (const [n, deg, len, w] of [['crown_mid', 0, 15, 2.6], ['crown_side', -11, 10, 2.0]]) {
-  const r = 35.5, base = [P(r - 2.2, deg - w * 2.2), P(r - 2.2, deg + w * 2.2)];
-  const pg = [base[0], P(r + len * 0.4, deg - w * 1.3), P(r + len, deg), P(r + len * 0.4, deg + w * 1.3), base[1]];
-  const opts = { ...S1, relief: 'ridge', detail: [channel(strip(radial(r - 1, r + len * 0.75, deg, 3), 0.8, 0.2), GOLD2), glow(P(r + len * 0.2, deg), 0.5, HOT)] };
-  if (deg === 0) part(n, 'armor', GLASS, pg, opts); else pair(n, 'armor', GLASS, pg, opts);
-}
-// The roots: four, on the diagonals, curling back to grip the bed. The back pair longer (the second break: the side it
-// lies buried on). Each holds through a knot of glowing glass; three lengths taper to a point
+const AXSEED = { apex: 3, flank: 7, base: 11 };
 function spline(pts, n) {
   const out = [];
   for (let k = 0; k <= n; k++) {
@@ -278,6 +178,185 @@ function tentacle(pts, w0, w1, segs, per = 6) {
     return { poly: [...L, ...R.reverse()].map((q) => q.map(round)), path: c.slice(k0, k1 + 1).map((q) => q.map(round)) };
   });
 }
+/** A clutch of crystal round a point, pointing out from it (the Maw's glass, not a lens) */
+const clutch = (c, n, len, seed, color = '#c79a52') => Array.from({ length: n }, (_, i) => {
+  const a = (i / n) * 360 + nz(seed + i) * 40;
+  return crystal([round(c[0] + Math.sin(a * DEG) * 0.6), round(c[1] - Math.cos(a * DEG) * 0.6)], [Math.sin(a * DEG), -Math.cos(a * DEG)], len * (0.7 + nz(seed * 3 + i) * 0.6), len * 0.32, color);
+});
+/** A feathered light: many thin steps from ember at its edge to white at its middle, so it falls off smoothly */
+function feather(c, r, steps = 14) {
+  const ramp = [[0, [0x4a, 0x26, 0x0a]], [0.3, [0x9a, 0x54, 0x14]], [0.55, [0xe0, 0x90, 0x2c]], [0.75, [0xff, 0xc8, 0x66]], [0.9, [0xff, 0xea, 0xb8]], [1, [0xff, 0xfb, 0xf2]]];
+  const at = (t) => { let k = 0; while (k < ramp.length - 2 && t > ramp[k + 1][0]) k++; const [t0, a] = ramp[k], [t1, b] = ramp[k + 1], f = (t - t0) / (t1 - t0); return '#' + a.map((v, i) => Math.round(v + (b[i] - v) * f).toString(16).padStart(2, '0')).join(''); };
+  return Array.from({ length: steps }, (_, k) => { const t = k / (steps - 1); return { kind: 'glow', at: c, r: round(r * (1 - t * 0.82)), color: at(t), sides: 40 }; });
+}
+
+// =====================================================================================================================
+// Stage 3, the node: beneath everything (drawn first), bared when its chambers burst. Half made, half grown: a machined
+// collar of dark metal, its plates exact, its rings true, with roots grown over it and through it, holding the core
+// =====================================================================================================================
+const S3 = { stage: 3, under: true };
+// Its collar: engineered. Eight equal plates in a ring, exact gaps, two true rings
+part('s3_ring', 'conduit', METAL, ringPts([0, 0], 12.2, 48, 0), {
+  ...S3, relief: 'raise',
+  detail: [
+    ...Array.from({ length: 8 }, (_, k) => raise(band(8.2, 11.6, k * 45 + 2.0, k * 45 + 43, 6), k % 2 ? '#4f5258' : '#5e6168')),
+    ...Array.from({ length: 8 }, (_, k) => raise(band(10.4, 11.3, k * 45 + 8, k * 45 + 37, 5), '#787c84')),
+    { kind: 'ring', at: [0, 0], r: 12.1, w: 0.4, sides: 48, color: '#8a8e96' },
+    { kind: 'ring', at: [0, 0], r: 7.9, w: 0.3, sides: 48, color: '#6c7078' },
+    ...Array.from({ length: 16 }, (_, k) => ({ kind: 'ring', at: P(9.3, k * 22.5 + 11.25), r: 0.28, w: 0.14, sides: 8, color: '#a2a8b0' })),
+  ],
+});
+// Its valve teeth: grown. The last four roots holding the core, curved and uneven, lying over the collar
+for (const [k, deg, len, curl, w] of [[0, -45, 12.5, 24, 5.4], [1, 45, 15.5, -17, 5.8], [2, -135, 16.5, -28, 6.2], [3, 135, 11, 14, 5.0]]) {
+  const pts = [P(5.6, deg), P(5.6 + len * 0.4, deg + curl * 0.25), P(5.6 + len * 0.75, deg + curl * 0.65), P(5.6 + len, deg + curl)];
+  const [sg] = tentacle(pts, w, 0.7, 1, 12), n = sg.path.length;
+  part(`s3_valve${k}`, 'generator', ROCK, sg.poly, {
+    ...S3, ruin: true, relief: 'round',
+    detail: [raise(strip(sg.path.slice(1, n - 2), w * 0.55, w * 0.18), FACE), raise(strip(sg.path.slice(2, n - 3), w * 0.26, w * 0.1), TOP), vein(sg.path.slice(0, Math.floor(n * 0.6)), 0.28, '#b8762c')],
+  });
+}
+// Its stubs: knobs of growth on the axes, where the arteries met it, each its own size, a rib of it over the collar
+onAxes((k, deg, emit) => {
+  const sz = { apex: 1.9, flank: 2.3, base: 1.6 }[k], c = P(12.4, deg);
+  emit(`s3_stub_${k}`, 'conduit', ROCK, chip(oval(c, sz * 1.25, sz, [Math.sin(deg * DEG), -Math.cos(deg * DEG)], 10), 0.18, AXSEED[k]), {
+    ...S3, relief: 'round', detail: [raise(chip(oval(c, sz * 0.8, sz * 0.6, [1, 0], 8), 0.2, AXSEED[k] + 1), TOP)],
+  });
+});
+// The core, last: seam glass, a dark iris, and the beat in its middle: a feathered light, brightest of anything on it
+part('s3_core', 'core', 'maw_coreglass', ringPts([0, 0], 7.6, 40, 0), {
+  ...S3, ruin: true,
+  detail: [
+    recess(ringPts([0, 0], 7.0, 40, 0), '#120e0a'),
+    ...feather([0, 0], 6.4, 30),
+  ],
+});
+
+// =====================================================================================================================
+// Stage 2, the chambers: four ventricles hollowed in the rock. Worn out, each gapes (a wreck) until the Heart bursts
+// them, one a beat
+// =====================================================================================================================
+const S2 = { stage: 2, ruin: true };
+const CH_HALF = 36;
+onAxes((k, deg, emit) => {
+  const r1 = k === 'apex' ? 31.5 : k === 'base' ? 29.5 : 28.5, sd = AXSEED[k];
+  // Its two halves: a rounded lobe of rock, ribbed across, a wet sheen near its rim
+  for (const [s, a0, a1] of [['a', deg - CH_HALF, deg + 0.5], ['b', deg - 0.5, deg + CH_HALF]]) {
+    const ribs = [13.5, 18, 22.5].map((r, i) => raise(strip(wob(Array.from({ length: 6 }, (_, j) => P(r + (nz(sd + i + j) - 0.5) * 0.8, a0 + 7 + ((a1 - a0 - 14) * j) / 5)), 0.3, sd * 5 + i), 1.5 - i * 0.2, 1.1 - i * 0.2), i === 1 ? TOP : FACE));
+    emit(`ch_${k}_wall${s}`, 'armor', STONE, lobe(9.5, r1, a0, a1, deg, CH_HALF, 10, sd * 3 + (s === 'a' ? 0 : 1)), {
+      ...S2, relief: 'plate',
+      detail: [
+        raise(lobe(11, r1 - 2.2, a0 + 3, a1 - 3, deg, CH_HALF, 8, sd * 7), '#3b3c41'),
+        ...ribs,
+      ],
+    });
+  }
+  // Its valve: the ventricle's mouth, a fleshy lip round a deep wet hollow, gold pooled at the bottom of it
+  const c = P(r1 - 0.6, deg), dir = [Math.cos(deg * DEG), Math.sin(deg * DEG)];
+  emit(`ch_${k}_valve`, 'generator', SEAM, chip(oval(c, 7.2, 4.8, dir, 18), 0.07, sd), {
+    ...S2, relief: 'round',
+    detail: [
+      raise(chip(oval(c, 6.2, 3.9, dir, 16), 0.06, sd + 1), '#3e2c24'),
+      recess(chip(oval(c, 5.0, 2.9, dir, 16), 0.08, sd + 2), '#060504'),
+      glow(P(r1 - 2.1, deg), 1.6, '#5a3410'), glow(P(r1 - 2.0, deg), 0.9, '#c47a24'), glow(P(r1 - 2.0, deg), 0.4, GOLD2),
+      raise(strip([P(r1 + 1.9, deg - 7), P(r1 + 2.5, deg - 2), P(r1 + 2.4, deg + 3)], 0.35, 0.12), '#8a7a72'),
+    ],
+  });
+});
+// The septum over the middle: the chambers' shared wall, its iris where the core shows through, veins out from it
+part('septum', 'armor', STONE, chip(ringPts([0, 0], 11.5, 22, 0.13), 0.06, 21), {
+  ...S2, relief: 'plate',
+  detail: [
+    raise(chip(ringPts([0, 0], 10, 16, 0.3), 0.1, 22), FACE), raise(chip(ringPts([0, 0], 8.2, 12, 0.1), 0.12, 23), TOP),
+    ...[0, 90, 180, 270].flatMap((d, i) => veinTree(4.4, 11, d, 0.36, 40 + i, 2)),
+    recess(chip(ringPts([0, 0], 4.3, 14, 0.2), 0.12, 24), '#0d0c0b'), ...feather([0, 0], 3.6, 18),
+  ],
+});
+// Its braces on the diagonals, between the chambers: sinew and bone, not pipes (optional: they feed its pull)
+for (const [k, deg] of DIAG) {
+  const pts = [P(9, deg), P(17, deg + 3.5), P(24, deg - 1.5), P(30.5, deg + 4)];
+  const [sg] = tentacle(pts, 4.4, 1.4, 1, 12), n = sg.path.length;
+  pair(`artery${k}`, 'conduit', BONE, sg.poly, {
+    stage: 2, relief: 'round',
+    detail: [raise(strip(sg.path.slice(1, n - 1), 2.4, 0.7), '#8a8275'), raise(strip(sg.path.slice(2, n - 3), 1.0, 0.3), '#a9a090'), vein(sg.path.slice(0, n - 4), 0.3, '#8a5520')],
+  });
+}
+
+// =====================================================================================================================
+// Stage 1, the bed. The caps decide it; the rest calves away when shot (toward the black hole)
+// =====================================================================================================================
+const S1 = { stage: 1 };
+// The buttresses first (the caps lie over them): on the diagonals, inner and outer, rock in uneven plates
+for (const [k, deg] of DIAG) {
+  const a0 = deg - 26, a1 = deg + 26;
+  pair(`crust_diag${k}_in`, 'hull', ROCK, block(12.5, 23.5, a0, a1, 1.6, 8, 0.5), {
+    ...S1, relief: 'plate',
+    detail: [
+      raise(chip(block(14.2, 21.4, a0 + 4, deg + 2, 1.2, 4), 0.14, k * 10 + 1), FACE),
+      raise(chip(block(15.5, 22, deg + 4, a1 - 5, 1, 4), 0.16, k * 10 + 2), '#505259'),
+      raise(chip(oval(P(19.5, deg - 9), 1.4, 0.9, [1, 0.3], 7), 0.2, k * 10 + 3), '#5d6067'),
+      vein(wob([P(13, deg + 3), P(16.5, deg + 8), P(19.5, deg + 6), P(22, deg + 13)], 0.4, k * 10 + 4), 0.22, '#6e4920'),
+    ],
+  });
+  pair(`crust_diag${k}_out`, 'armor', ROCK, block(22.5, 32, a0 + 3, a1 - 3, 1.8, 8, 0.9), {
+    ...S1, relief: 'plate',
+    detail: [
+      raise(chip(block(24.2, 30, a0 + 6, deg - 1, 1.2, 4, 0.4), 0.15, k * 10 + 5), TOP),
+      raise(chip(block(24.8, 29.2, deg + 1, a1 - 8, 1, 4, 0.4), 0.15, k * 10 + 6), FACE),
+      raise(chip(oval(P(30.6, deg + 6), 1.6, 0.8, [1, 0], 7), 0.25, k * 10 + 7), '#5d6067'),
+    ],
+  });
+}
+// The caps: one over each chamber, stone in uneven plates, its vein of the heartbeat branching down its axis
+onAxes((k, deg, emit) => {
+  const r1 = k === 'apex' ? 38 : k === 'base' ? 35 : 34.5, half = 25, sd = AXSEED[k];
+  emit(`cap_${k}`, 'armor', STONE, block(13.5, r1, deg - half, deg + half, 2.2, 10, 0.9), {
+    ...S1, ruin: true, relief: 'plate',
+    detail: [
+      // (three plates of different sizes and shades, not a stepped emblem)
+      raise(chip(block(15.5, r1 - 2.6, deg - half + 3.5, deg - 1.5, 1.4, 5, 0.5), 0.1, sd), FACE),
+      raise(chip(block(17, r1 - 1.8, deg + 1, deg + half - 4.5, 1.4, 5, 0.6), 0.1, sd + 1), '#505259'),
+      raise(chip(block(21, r1 - 6.5, deg - half + 7, deg - 6, 1, 4, 0.4), 0.16, sd + 2), TOP),
+      // (chips of lighter stone at its edges: weathering)
+      raise(chip(oval(P(r1 - 1.6, deg - half + 6), 1.5, 0.8, [1, 0.2], 7), 0.25, sd + 3), '#5d6067'),
+      raise(chip(oval(P(r1 - 2.4, deg + half - 9), 1.1, 0.7, [1, -0.2], 7), 0.25, sd + 4), '#55585e'),
+      raise(chip(oval(P(16.5, deg + half - 5), 0.9, 0.6, [0.4, 1], 6), 0.25, sd + 5), '#55585e'),
+      // (warm stone round the vein, near the heart only)
+      raise(chip(strip(radial(14, 22, deg), 3.6, 1.6), 0.08, sd + 6), WARM2),
+      ...veinTree(14, r1 - 2.5, deg, 1.0, sd * 19),
+    ],
+  });
+});
+// Its overgrowth: a lump of crust grown over its right shoulder, glass coming through it (a break in the symmetry the
+// way rock breaks it, not a design)
+part('crust_growth', 'hull', ROCK, chip([P(28, 50), P(33.5, 55), P(37.5, 64), P(36, 74), P(31.5, 80), P(27, 76), P(25.5, 62)], 0.08, 61), {
+  ...S1, relief: 'plate',
+  detail: [
+    raise(chip([P(29, 55), P(33.5, 59), P(35, 67), P(32, 75), P(28.5, 70)], 0.14, 62), FACE),
+    raise(chip(oval(P(33.5, 62), 1.3, 0.8, [1, 0], 7), 0.25, 63), RIM),
+    ...clutch(P(31.5, 68), 3, 3.6, 64, '#6d6253'),
+    vein(wob([P(26.5, 63), P(29.5, 66), P(31.5, 68)], 0.3, 65), 0.24, '#9a6224'),
+  ],
+});
+// The keystone over the middle: uneven rings of stone round the eye, where the four veins rise and the beat shows
+part('crust_key', 'armor', STONE, chip(ringPts([0, 0], 15, 22, 0.13), 0.05, 31), {
+  ...S1, relief: 'plate',
+  detail: [
+    raise(chip(ringPts([0, 0], 13.2, 14, 0.3), 0.1, 32), FACE), raise(chip(ringPts([0, 0], 10.6, 11, 0.1), 0.14, 33), TOP),
+    raise(chip(ringPts([0, 0], 8.0, 9, 0.5), 0.12, 34), '#3c3d42'),
+    ...[0, 90, 180, 270].flatMap((d, i) => [raise(chip(strip(radial(5.2, 11, d), 3.8, 2.0), 0.1, 35 + i), WARM1), ...veinTree(5.4, 15.2, d, 1.6, 50 + i * 7, 2)]),
+    recess(chip(ringPts([0, 0], 5.4, 14, 0.1), 0.1, 39), '#0c0b0a'),
+    ...feather([0, 0], 4.8, 24),
+  ],
+});
+// The crown: three shards of glass on the apex only (the first break in its symmetry)
+for (const [n, deg, len, w] of [['crown_mid', 0, 15, 2.6], ['crown_side', -11, 10, 2.0]]) {
+  const r = 35.5, base = [P(r - 2.2, deg - w * 2.2), P(r - 2.2, deg + w * 2.2)];
+  const pg = [base[0], P(r + len * 0.4, deg - w * 1.3), P(r + len, deg), P(r + len * 0.4, deg + w * 1.3), base[1]];
+  const opts = { ...S1, relief: 'ridge', detail: [vein(wob(radial(r - 1, r + len * 0.7, deg, 3), 0.15, n.length), 0.3, '#8a5a24')] };
+  if (deg === 0) part(n, 'armor', GLASS, pg, opts); else pair(n, 'armor', GLASS, pg, opts);
+}
+// The roots: four, on the diagonals, curling back to grip the bed. The back pair longer (the second break: the side it
+// lies buried on). Each held by a knot: a clutch of the Maw's glass grown round a light, not a porthole
 for (const [k, deg, len, curl] of [[0, -45, 25, -26], [1, -135, 33, -24]]) {
   const r0 = 31, w = 7.2;
   const pts = [P(r0 - 2, deg), P(r0 + len * 0.35, deg + curl * 0.15), P(r0 + len * 0.7, deg + curl * 0.5), P(r0 + len, deg + curl)];
@@ -285,14 +364,17 @@ for (const [k, deg, len, curl] of [[0, -45, 25, -26], [1, -135, 33, -24]]) {
     const n = sg.path.length, mid = sg.path.slice(1, n - 1);
     pair(`root${k}${'abc'[s]}`, s === 0 ? 'armor' : 'hull', s === 2 ? METAL : ROCK, sg.poly, {
       ...S1, relief: 'round',
-      detail: [raise(strip(mid, w * (0.5 - s * 0.14), w * (0.38 - s * 0.12)), s === 0 ? TOP : FACE), vein(mid, 0.28 - s * 0.06, BRONZE)],
+      detail: [raise(strip(mid, w * (0.5 - s * 0.14), w * (0.38 - s * 0.12)), s === 0 ? TOP : FACE), vein(mid, 0.24 - s * 0.05, '#6e4920')],
     });
   });
-  // (the knot, over the root's base: shoot it and the root comes away whole)
   const kc = P(r0, deg);
-  pair(`root${k}_knot`, 'conduit', SEAM, oval(kc, 4.6, 4.2, [Math.sin(deg * DEG), -Math.cos(deg * DEG)], 16), {
+  pair(`root${k}_knot`, 'conduit', SEAM, chip(oval(kc, 4.6, 4.0, [Math.sin(deg * DEG), -Math.cos(deg * DEG)], 14), 0.16, 70 + k), {
     ...S1, relief: 'round',
-    detail: [recess(oval(kc, 3.4, 3.1, [1, 0], 14), '#16110b'), glow(kc, 2.3, '#a8661a'), glow(kc, 1.5, GOLD), glow(kc, 0.7, HOT), halo(kc, 4.1, 0.4, BRONZE)],
+    detail: [
+      raise(chip(oval(kc, 3.6, 3.0, [1, 0.4], 11), 0.18, 72 + k), '#3e2c24'),
+      ...clutch(kc, 7, 2.3, 74 + k * 9),
+      glow(kc, 1.3, '#a8661a'), glow(kc, 0.6, GOLD2),
+    ],
   });
 }
 
@@ -363,8 +445,12 @@ for (const p of pieces.filter((q) => q.stage === 3)) {
 }
 
 // ---- Dim: the bed's light down to embers, for its dormant still (render only) ----
-const DIMMED = { [GOLD]: '#5a3a12', [GOLD2]: '#6a4616', [HOT]: '#7a5420', [WARM1]: '#4c4234', [WARM2]: '#3f3830' };
-for (const p of pieces.filter((q) => q.stage === 1)) pieces.push({ ...p, id: `${p.id}_dim`, detail: p.detail?.filter((d) => !(d.kind === 'glow' && d.r < 2)).map((d) => (DIMMED[d.color] ? { ...d, color: DIMMED[d.color] } : d)) });
+/** A colour taken down to `f` of itself */
+const darken = (c, f) => '#' + [1, 3, 5].map((i) => Math.round(parseInt(c.slice(i, i + 2), 16) * f).toString(16).padStart(2, '0')).join('');
+for (const p of pieces.filter((q) => q.stage === 1)) pieces.push({
+  ...p, id: `${p.id}_dim`,
+  detail: p.detail?.filter((d) => !(d.kind === 'glow' && d.r < 2 * S)).map((d) => (d.kind === 'vein' ? { kind: 'channel', color: darken(d.color, 0.38), poly: strip(d.poly, d.w * 0.8, d.w * 0.3) } : d.kind === 'channel' ? { ...d, color: darken(d.color, 0.32) } : d.kind === 'glow' ? { ...d, color: darken(d.color, 0.4) } : [WARM1, WARM2].includes(d.color) ? { ...d, color: '#3f3830' } : d)),
+});
 
 // ---- Connectivity (a quick geometric check: every part reaches the core through overlapping parts, also with the
 // earlier stages gone). The real check is ShipBridge's orphanGroups (doc section 9) ----

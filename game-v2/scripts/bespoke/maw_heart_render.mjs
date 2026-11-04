@@ -30,6 +30,20 @@ mkdirSync(join(ships, 'bespoke'), { recursive: true });
 mkdirSync(join(ships, 'blueprints/maw'), { recursive: true });
 for (const f of ['tuning.json', 'pieces.json', 'functions.json', 'materials.json', 'models.json']) copyFileSync(join(root, 'data/ships', f), join(ships, f));
 copyFileSync(join(DESIGN, 'maw_heart.pieces.json'), join(ships, 'bespoke/maw_heart.json'));
+// (its proposed materials, in the mirror's table only: the game's own is untouched)
+{
+  const mf = join(ships, 'materials.json'), mats = JSON.parse(readFileSync(mf, 'utf8')), list = mats.materials ?? mats;
+  const boss = (id, name, color, density, toughness, resist) => ({ id, name, exclusive: 'boss', grade: 5, output: 1.8, color, density, toughness, resist });
+  list.push(
+    boss('maw_crust', 'Heart Crust', '#3e3f44', 1.6, 110, { thermal: 0.95, energy: 1.05 }),
+    boss('maw_heartstone', 'Heartstone', '#45464c', 1.9, 120, { kinetic: 0.9, exotic: 1.1 }),
+    boss('maw_seamglass', 'Seam Glass', '#3a2a22', 1.3, 96, { energy: 0.85, thermal: 1.1 }),
+    boss('maw_bone', 'Heart Bone', '#8c8476', 1.1, 90, { kinetic: 1.05 }),
+    boss('maw_coreglass', 'Core Glass', '#4a3420', 1.3, 96, { energy: 0.85 }),
+    boss('maw_shardglass', 'Shard Glass', '#5c5650', 1.4, 92, { kinetic: 1.1, thermal: 0.9 }),
+  );
+  writeFileSync(mf, JSON.stringify(mats));
+}
 for (const f of readdirSync(DESIGN).filter((f) => /^maw_heart.*\.json$/.test(f) && !f.includes('pieces'))) copyFileSync(join(DESIGN, f), join(ships, 'blueprints/maw', f));
 // (the live Heart's design too, for a before still at the same scale)
 copyFileSync(join(root, 'data/ships/blueprints/enemy/maw_heart_titan.json'), join(ships, 'blueprints/maw/maw_heart_titan.json'));
@@ -57,6 +71,36 @@ await esbuild.build({
   alias: { '@space-game/common': join(root, 'common/src'), earcut: join(root, 'client/node_modules/earcut') },
   define: { __dirname: JSON.stringify(nr.replace(/\\/g, '/')) },
   banner: { js: "import { createRequire as __cr } from 'module'; const require = __cr(import.meta.url);" },
+  // (its proposed surfaces, in this bundle only: scripts/bespoke/maw_heart_tiles.ts in place of the Scrap Mother's tiles
+  // 18-21, and the proposed materials' looks in HULL_MAT. The game's own sources are read, never written)
+  plugins: [{
+    name: 'maw-heart-surfaces',
+    setup(b) {
+      b.onLoad({ filter: /client[\\/]src[\\/]ships[\\/]hullTextures\.ts$/ }, (args) => {
+        let src = readFileSync(args.path, 'utf8');
+        const hook = '  if (kind >= 18) return scrapTile(kind, h, e, bump, groove);';
+        if (!src.includes(hook)) throw new Error('hullTextures.ts changed: the tile hook is gone');
+        src = src.replace(hook, '  if (kind >= 18 && kind <= 22) return mawTile(kind, h, e, groove);\n' + hook);
+        return { contents: src + '\n' + readFileSync(join(root, 'scripts/bespoke/maw_heart_tiles.ts'), 'utf8'), loader: 'ts' };
+      });
+      b.onLoad({ filter: /client[\\/]src[\\/]ships[\\/]hullLook\.ts$/ }, (args) => {
+        let src = readFileSync(args.path, 'utf8').replace(/^\s*scrap_(iron|rust|paint|steel|seam):.*$/gm, '');
+        const at = src.indexOf('  pyre_glass:');
+        if (at < 0) throw new Error('hullLook.ts changed: HULL_MAT not found');
+        const GOLD = '[1.0, 0.7, 0.3]';
+        src = src.slice(0, at) + [
+          `  maw_crust: { tile: 18, tint: 0.9, metal: 0.3, glow: 0.35, boost: 0.35, any: true, emit: ${GOLD}, hot: 2.2 },`,
+          `  maw_heartstone: { tile: 19, tint: 0.92, metal: 0.4, glow: 0, boost: 0.55, any: true, emit: ${GOLD}, hot: 1.6 },`,
+          `  maw_seamglass: { tile: 20, tint: 0.9, metal: 0.7, glow: 0.8, boost: 1.2, any: true, emit: ${GOLD}, hot: 2.0 },`,
+          `  maw_bone: { tile: 21, tint: 0.95, metal: 0.15, glow: 0, boost: 0.3, any: true, emit: ${GOLD}, hot: 1 },`,
+          `  maw_coreglass: { tile: 22, tint: 0.9, metal: 0.6, glow: 0, boost: 1.0, any: true, emit: ${GOLD}, hot: 1 },`,
+          `  maw_shardglass: { tile: 17, tint: 0.85, metal: 0.75, glow: 0.5, boost: 1.3, any: true, emit: ${GOLD}, hot: 1.3 },`,
+          '',
+        ].join('\n') + src.slice(at);
+        return { contents: src, loader: 'ts' };
+      });
+    },
+  }],
 });
 
 // ---- the stills: [file, design, params] ----
@@ -70,6 +114,10 @@ const SHOTS = [
   ['maw-heart-stage2-chambers', 'maw_heart_chambers', { light: 'sun', heat: 1, damage: 0.1, lightDir: 300 }],
   ['maw-heart-stage3-node', 'maw_heart_node', { light: 'sun', heat: 1, damage: 0.1, lightDir: 300, zoom: 0.7 }],
   ['maw-heart-dead', 'maw_heart_spent', { light: 'dark', heat: 0, damage: 0.5, lightDir: 300, zoom: 0.7 }],
+  // (close-ups at play distance: a patch of the crust round a cap and a knot, a chamber, the core)
+  ['maw-heart-closeup-crust', 'maw_heart', { light: 'sun', heat: 1, damage: 0, lightDir: 300, zoom: 1.5, x: -420, y: -760, w: 1400, h: 1000 }],
+  ['maw-heart-closeup-chamber', 'maw_heart_chambers', { light: 'sun', heat: 1, damage: 0, lightDir: 300, zoom: 1.4, x: -820, y: 0, w: 1400, h: 1000 }],
+  ['maw-heart-closeup-core', 'maw_heart_node', { light: 'sun', heat: 1, damage: 0, lightDir: 300, zoom: 1.35, w: 1400, h: 1100 }],
   ...(REFS ? [['ref-pyreclast', 'pyreclast', { light: 'sun', heat: 1, damage: 0, lightDir: 300 }], ['ref-scrap-mother', 'scrap_mother', { light: 'sun', heat: 1, damage: 0, lightDir: 300 }]] : []),
 ].concat(process.env.SHOTS_JSON ? JSON.parse(readFileSync(process.env.SHOTS_JSON, 'utf8')) : []).filter(([f]) => !process.env.ONLY || process.env.ONLY.split(',').some((o) => f.includes(o)));
 

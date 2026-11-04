@@ -33,67 +33,123 @@ round it instead: pilots must reposition to reach the open chamber.
 
 ![The stages](../panels/2026-11-04/bosses/maw-heart/maw-heart.png)
 
-Generator: `scripts/bespoke/maw_heart.mjs` (61 parts, plus 39 render-only boulders for the dormant still). It is
-four-fold about its middle (the four axes), mirrored left to right, with **two deliberate breaks**: a crown of glass on
-the apex only, and longer roots behind (the side it lies buried on). So it reads as one thing with a front and a back,
-not as a wheel.
+Generator: `scripts/bespoke/maw_heart.mjs` (62 parts, plus 39 render-only boulders for the dormant still). It is
+four-fold about its middle (the four axes), mirrored left to right, with **deliberate breaks**: a crown of glass on the
+apex only, longer roots behind (the side it lies buried on), and a lump of overgrowth on its right shoulder. So it
+reads as one thing with a front and a back, not as a wheel.
 
-**Second pass (2026-11-04, after Kieran's "a bit chaotic and flat").** The first pass had ten roots and seven crown
-shards of uneven length, crust in many same-sized slabs, and gold only as thin slivers. The outline read as noise. The
-refined look is built in three sizes:
-- **Big masses** that set the silhouette: four caps, four buttresses, four roots, the crown.
-- **A middle layer** of structure: stepped plates (each cap is three stepped faces with a lit rim), the knots, and the
-  chamber walls.
-- **Fine detail** only where the eye should go: the four gold seams. Each is a wide channel with a hot core line and
-  warm-lit stone either side, so the light reads as falling on the rock. The seams converge on the **eye** at the
-  middle, where the core glows through an iris in the keystone.
-
-Depth comes from layering:
-- **Overlap and relief.** Caps lie over the buttresses, every plate casts a shadow and has a side wall (`plate` relief),
-  and recesses are darker than faces, which are darker than rims.
-- **The throats.** The chambers' throats are sunk and dark, with light at the bottom.
-- **Contrast between layers.** The pale bone of the lattice under the crust stands against the dark stone and the gold.
-- **The bed.** The rubble is now a crater rim of graded boulders (big on the diagonals, small between, a gap ahead) and
-  a drift over its back, so the Heart is clearly the subject.
-- The first pass is kept for comparison: `maw-heart-v1-vs-v2.png` and `v1-maw-heart.png` in the panels folder.
+How the look got here (each pass is kept in the panels folder: `maw-heart-v1-vs-v2.png`, `maw-heart-v2-vs-v3.png`):
+1. **First pass:** chaotic. Ten roots and seven crown shards of uneven length, crust in many same-sized slabs, gold as
+   thin slivers.
+2. **Second pass** (after "a bit chaotic and flat"): a clear hierarchy. A few big masses (caps, buttresses, four roots),
+   stepped plates with lit rims, gold seams converging on an eye, and the crater bed. But it swung too clean: an
+   emblem, a compass, a machine.
+3. **Third pass** (after "too mechanical" and "the textures are flat"): it keeps the second pass's silhouette, depth and
+   bed, and makes it look grown rather than built.
+   - **Veins, not bars.** The gold runs along the four axes as branching, tapering, slightly wandering veins, with
+     capillaries feeding off into the crust, some forking again. The gold fades with distance from the heart (white-gold
+     near it, ember at the crust's edge), so **the beat at the middle is the brightest thing**, and the gold is no
+     longer everywhere.
+   - **Irregular stone inside a symmetric outline.** Each cap is three plates of different sizes and shades, chipped,
+     with rough edges and lighter weathered chips. The buttresses are the same. A lump of overgrowth with glass coming
+     through it sits on one shoulder.
+   - **Ventricles, not boxes.** Stage 2's chambers are rounded lobes of stone, ribbed across. Each mouth is a fleshy lip
+     round a deep, wet, dark hollow with gold pooled at the bottom. The ladder struts are now **sinew and bone braces**.
+   - **The node: half made, half grown.** A machined collar of dark metal (eight equal plates, exact gaps, true rings,
+     bolts) with the last four roots grown over and through it. The roots are curved and uneven, not mirrored. Round
+     the collar sit small knobs of growth. The core is smooth glass with a **feathered light**: thirty steps from ember
+     at its rim to white at its middle, so it falls off smoothly instead of as a hard disc.
+   - **The root knots** are no longer ringed portholes. Each is a lump of seam glass with a clutch of crystal grown out
+     of it round a small light.
+   - **Surface texture** (below): the stone, glass and bone now have visible grain, strata, pits and cracks up close.
 
 - **Size.** Its roots reach **~2460 world units** from its middle and its crust **~1470**. The live Heart is about 640
   (`maw-heart-before.png` and `maw-heart-after.png` are drawn at the same zoom). The Brood Mother is ~1600, the Scrap
   Mother ~1365 and the Pyreclast ~1135, so this is the largest boss by body, and by reach after the Brood Mother's arms.
-- **Silhouette at a glance.** A round, stepped mass with a gold cross through it and a glowing eye at the middle, a
-  crown of three glass shards on its apex, two short roots sweeping out ahead, and two long roots curling back behind.
-  The cross echoes the live boss's phase line: "four channels in, along its axes".
-- **Stage 1, the bed** (34 parts):
+- **Silhouette at a glance.** A round mass of stone with four veins of light branching through it from a glowing eye at
+  the middle, a crown of three glass shards on its apex, two short roots sweeping out ahead, and two long roots curling
+  back behind. The veins echo the live boss's phase line: "four channels in, along its axes".
+- **Stage 1, the bed** (35 parts):
   - four **caps** on the axes, which seal the four chambers (`ruin`: these decide the stage);
-  - four **buttresses** on the diagonals, each inner and outer (8 pieces), and a **keystone** over the middle with the
-    eye in it;
+  - four **buttresses** on the diagonals, each inner and outer (8 pieces), a **keystone** over the middle with the eye
+    in it, and the **overgrowth** on the right shoulder;
   - a crown of three glass shards;
-  - **four roots**, each held by a glowing **knot** at its base, with three tapering lengths;
+  - **four roots**, each held by a crystalline **knot** at its base, with three tapering lengths;
   - the **lattice** under the crust: its skeleton, pale bone veins that fork the same way at every scale, with a gold
     vein in the inner ring. It is bared as the crust calves away.
-- **Stage 2, the chambers** (17 parts): apex, two flanks and base. Each has two dark-metal walls with lit rims, and a
-  **valve lip** whose throat is sunk deep and dark with light glowing at its bottom. A **septum** with an iris sits over
-  the middle. These are all `ruin`: worn out, they gape, they don't fall. Four glass **arteries** run on the diagonals
-  between the chambers (optional: they feed its pull).
-- **Stage 3, the node** (10 parts, `under`): a **core** of seam glass lit from within (a dark iris round a gold sphere,
-  white-hot at its middle) in a ring of dark metal; four **valve teeth** on the diagonals (`ruin`: they and the core
-  decide the fight); four **stubs** on the axes (optional).
+- **Stage 2, the chambers** (17 parts): apex, two flanks and base. Each is a ribbed stone ventricle in two halves, with
+  a **valve** mouth: a fleshy lip round a deep, dark hollow with light pooled at its bottom. A **septum** with an iris
+  sits over the middle. These are all `ruin`: worn out, they gape, they don't fall. Four **braces** of sinew and bone
+  run on the diagonals between the chambers (optional: they feed its pull).
+- **Stage 3, the node** (10 parts, `under`): a **core** of smooth glass with a feathered light in a machined metal
+  **collar**; four curved root **valve teeth** grown over the collar (`ruin`: they and the core decide the fight);
+  four **stubs**, knobs of growth on the axes (optional).
 - **Connectivity**: the generator checks that every part reaches the core through overlapping parts: in full, with stage
   1 gone, and with stages 1 and 2 gone. All three pass. The real check (`rebuildShip` `orphanGroups`) is in the build
   list.
 
+### Surface texture: what the renderer can do, and what it would cost
+
+Kieran: "the textures are also quite flat, there's no detail on the surfaces really."
+
+**Why it was flat.** A hull part's surface comes from the hull atlas (`client/src/ships/hullTextures.ts`). Each
+material in `HULL_MAT` (`client/src/ships/hullLook.ts`) names a 256² tile carrying slope, cavity and its own light;
+the hull shader (`ShipBatch.ts`) lights it.
+- The ordinary materials' tiles (4–15) repeat every **two cells**. On a 2400-unit boss that grain is far below a pixel,
+  so the first two passes, on stand-ins like `dense_ferrite` and `leestone`, looked smooth.
+- The bosses' own tiles (16–23: the Pyreclast's glass and crystal, the Scrap Mother's salvage, the Brood Mother's
+  carapace) are drawn **six times larger** (`vUV *= 0.16` for tiles 16 and up). From tile 18 on, each part takes its own
+  turned patch. That is where those bosses' surface interest comes from: the Pyreclast's fissured glass and the Scrap
+  Mother's rust and welds.
+- Detail polygons (`raise`, `recess`, `vein` and the rest) add shape, not texture. More of them would be faking it with
+  geometry.
+
+**What the third pass does, without touching the game.** `scripts/bespoke/maw_heart_tiles.ts` is a prototype of the
+Heart's own tiles. `maw_heart_render.mjs` splices it into a **private copy** of `hullTextures.ts` and `hullLook.ts`,
+in its own render bundle only, borrowing the Scrap Mother's slots 18–22. It also adds the proposed materials to its
+mirror's `materials.json`. The game's sources and data are read, never written.
+
+| material (proposed) | tile (prototype) | surface |
+|---|---|---|
+| `maw_crust` (buttresses, roots, overgrowth, the node's teeth) | 18 | chunks of rock each tilted its own way, cracks between (a few lit gold deep down), coarse and fine grain, rare uneven pits, weathered edges |
+| `maw_heartstone` (caps, keystone, ventricles, septum) | 19 | warped strata of uneven thickness, each band its own shade, hairline cracks, rare pits |
+| `maw_seamglass` (knots, valve mouths) | 20 | dark glass with a flow through it, some fissures lit |
+| `maw_bone` (the braces) | 21 | fibrous grain one way, pores, faint growth rings |
+| `maw_coreglass` (the core) | 22 | smooth, a faint swirl: nothing to break up its feathered light |
+| `maw_shardglass` (crown) | 17 (the Pyreclast's crystal tile, gold light) | gabled prisms lit from within |
+
+The close-ups (`maw-heart-closeups.png`: crust, a ventricle, the core, at zoom 1.35 to 1.5) show it at play distance.
+
+**What it would cost to build for real** (no shader rewrite):
+- [ ] **A seventh atlas row** (`HULL_ROWS` 6 to 7) holding the five tiles as `mawTile` in `hullTextures.ts` (about 70
+      lines, from the prototype). It must not borrow the Scrap Mother's slots.
+- [ ] `uWear[8]` to `uWear[12]` in the `ShipBatch.ts` hull shader (one line). The shader indexes `uWear[tl - 16]` for
+      every tile from 16 up, so tiles 24–28 need the array longer. Do the same in the native renderer's uniform table
+      (`scene.ts`, `gl_worker.py` take it as is).
+- [ ] Five `HULL_MAT` entries (`any: true`, `emit` gold) and five `materials.json` entries, then `npm run wire:sync`.
+- [ ] **Cost at runtime:** the atlas grows by one row of 4 × 256² RGBA (1 MB of GPU memory). It is built once in the
+      worker (`hullAtlasWorker.ts`), adding roughly 40 to 60 ms to a cold start for five more Voronoi/fbm tiles, off
+      the main thread. Nothing per frame.
+- [ ] **Not possible today: texture on the skeleton.** The lattice is drawn by `skeletonBuild.ts` as lit geometry in
+      its palette, with no atlas tile, so its bone can be coloured but not grained. Grain there would need the lit
+      shader to sample a tile: small shader work, optional.
+- [ ] **A true soft glow** (optional): the core's feathered light is thirty stacked `glow` discs. Up close a few faint
+      steps still show at its very middle. A `flare` detail drawn as one radial-gradient sprite (the native renderer
+      already draws `sprite` draws for bloom) would be smoother and cheaper. That is new detail-kind work in
+      `bespokeRelief.ts` and the renderers.
+
 ### Materials (and how they reflect the Maw)
 
-The stills use stand-ins from the game's own table: `dense_ferrite` for buttresses and roots, `leestone` for caps,
-keystone and septum, `leaded_iridium` for chamber walls, the node's ring and root tips, `pyre_glass` for seam glass,
-`steel` for the valve teeth and `titanium` for the crown. All the gold, and the stepped faces, are detail colour.
-Proposed boss materials (`exclusive: "boss"`, grade 5, to add to `materials.json` and `HULL_MAT` when it's built):
+The stills now render the proposed materials and their prototype tiles above, in the private renderer only. The node's
+collar and the root tips are the game's own `leaded_iridium`: engineered metal against grown stone. All the gold, and
+the plates' shades, are detail colour. Proposed boss materials (`exclusive: "boss"`, grade 5, to add to
+`materials.json` and `HULL_MAT` when it's built):
 
 | id (proposed) | where | look | why it's the Maw | resist (taken; above 1 = takes more) |
 |---|---|---|---|---|
-| `maw_crust` "Heart Crust" | buttresses, roots, keystone | the shard ring's dark rock, grey veins with faint self-glow | the asteroid field is `maw_shards`; the Heart "looks grown out of the shard ring's dark rock" (live intro) | kinetic 1.0, thermal 0.95, energy 1.05 |
-| `maw_heartstone` "Heartstone" | caps, chamber walls, septum | dense, dark, a grain that looks too regular | the shard ring is "richest in leestone" (public canon); see open question 3 | kinetic 0.9, thermal 1.0, exotic 1.1 |
-| `maw_seamglass` "Seam Glass" | knots, valves, arteries, node | dull grey glass, gold light inside | greyseam veins in rock (lore-canon "Visual language") lit by the disk's gold | energy 0.85, thermal 1.1, kinetic 1.0 |
+| `maw_crust` "Heart Crust" | buttresses, roots, overgrowth, the node's teeth | the shard ring's dark rock, grey veins with faint self-glow | the asteroid field is `maw_shards`; the Heart "looks grown out of the shard ring's dark rock" (live intro) | kinetic 1.0, thermal 0.95, energy 1.05 |
+| `maw_heartstone` "Heartstone" | caps, keystone, ventricle walls, septum | dense, dark, a grain that looks too regular | the shard ring is "richest in leestone" (public canon); see open question 3 | kinetic 0.9, thermal 1.0, exotic 1.1 |
+| `maw_seamglass` "Seam Glass" | knots, valve mouths (plus `maw_coreglass` for the core, `maw_bone` for the braces) | dull grey glass, gold light inside | greyseam veins in rock (lore-canon "Visual language") lit by the disk's gold | energy 0.85, thermal 1.1, kinetic 1.0 |
 | `maw_shardglass` "Shard Glass" | crown | dark glass, gold-edged | the inscribed fragments the Watch recovers from the debris | kinetic 1.1, thermal 0.9 |
 
 Glow `emit` for all four: **[1.0, 0.76, 0.34]**, disk gold. Plates stay mid-dark (the guide's warning about bright flat
@@ -111,7 +167,7 @@ fought **round its beat**. In every stage the same clock opens part of it and cl
 | Beat period | 8 s | 7 s, **0.5 s shorter for each chamber wrecked** (arrhythmia; at least 5 s) | 6 s (4.8 s enraged) |
 | Window (diastole) | 3 s on the open cap | 2.5 s on the open pair | 2 s, **+0.5 s for each valve tooth wrecked** (it can't close fully) |
 | Beaten by | the four caps (`ruin`) | the chambers and septum (`ruin`) | the four valve teeth and the core (`ruin`) |
-| Optional parts, and what breaking them does | roots (cut at the knot: the whole root comes away), buttresses, keystone, crown | arteries | stubs |
+| Optional parts, and what breaking them does | roots (cut at the knot: the whole root comes away), buttresses, keystone, crown | braces | stubs |
 | Its movement | turns to keep the **closed** caps toward its target (it hides the window) | turns to put an axis on its target | still; it never turns |
 
 So stage 1 makes you **fly round it** to reach the open cap. Stage 2 lets you choose which open chamber to work on, and
@@ -141,7 +197,7 @@ every one you wreck **speeds the beat up and takes a move away**. Stage 3 is a f
 
 - **Weak-point windows.** In diastole, the open deciding parts take **150%**, up to a **cap per pilot per window**:
   1500 in stages 1 and 2, 1200 in stage 3. Past the cap that pilot's hits drop to 25%. Outside windows, deciding parts
-  take **25%**. Optional parts (roots, buttresses, keystone, crown, arteries, stubs) always take **100%**. So some damage lands
+  take **25%**. Optional parts (roots, buttresses, keystone, crown, braces, stubs) always take **100%**. So some damage lands
   outside windows, and part-breaking is never wasted.
 - **Signature moves.** Shared, **one at a time**, never scaled with pilot count. Every signature lands on a beat and is
   followed by **a rest beat**: a full beat with no signature, window open as usual. Each has **one dodge rule that
@@ -182,10 +238,10 @@ break it.
 |---|---|---|---|---|
 | **Spit** (apex) | apex lip swells | five big slow glass orbs in a tight fan **along the apex's axis** (fixed to the body; the Heart turns slowly) | **Never be on a chamber's axis when its lip swells.** | the opposite pair is open, so the safe spot is the paying one |
 | **Spill** (flanks) | that flank's lip swells | pours a band of molten seam that sweeps 90° from the flank's axis **toward the apex**, pooling for 4 s (burn) | **When a flank swells, go aft of it.** | as usual |
-| **Undertow** (base) | base lip swells; the arena light dims a touch | a well under the target (radius 1100): pull 0.5 units a tick toward its middle for 2.5 s, then it collapses (strike, radius 350, at the middle). Strength scales with arteries standing (0 to 4: x0.4 to x1) | **Leave the circle before it closes.** | as usual |
+| **Undertow** (base) | base lip swells; the arena light dims a touch | a well under the target (radius 1100): pull 0.5 units a tick toward its middle for 2.5 s, then it collapses (strike, radius 350, at the middle). Strength scales with braces standing (0 to 4: x0.4 to x1) | **Leave the circle before it closes.** | as usual |
 
-- **Per-pilot: vein tap** (25% a beat). A thin gold line from the nearest standing artery to the pilot for 1 s. Then a
-  lance down the line, frozen where it was drawn. Move off the line. **Each artery cut removes its taps.** With all four
+- **Per-pilot: vein tap** (25% a beat). A thin gold line from the nearest standing brace to the pilot for 1 s. Then a
+  lance down the line, frozen where it was drawn. Move off the line. **Each brace cut removes its taps.** With all four
   gone there are no taps, and Undertow is at x0.4.
 
 ### 4.4 Stage 3, the node (33.4% to 0): the hardest
@@ -236,7 +292,7 @@ Flatline's withheld windows (already inside the averages).
 
 The caps squeeze the range from the top: better aim saves under a minute. The fight lands inside 8–12 minutes for most
 pilots, and no build can burst it down. Optional parts (roots ~4k each, buttresses ~2k each, keystone 3k, crown
-~1k a shard, arteries 1.5k, stubs 1k: about 48k in all) are on top. They take time, but they buy safety.
+~1k a shard, braces 1.5k, stubs 1k: about 48k in all) are on top. They take time, but they buy safety.
 
 **In a group** (no HP scaling, caps per pilot): three pilots of the same kind deal about 3x, so ~3.5–4 minutes. The
 signatures stay the same, and the per-pilot attacks scale with presence (each pilot carries their own). Open question
@@ -309,7 +365,7 @@ Tough bot (`scaleHp` x40), still versus circling versus the dodge rules followed
 | Projectiles alive at once | ≤ 10 | ≤ 12 (+ pools ≤ 6) | ≤ 20 |
 | Fight length, solo, accuracy 0.45 / 0.6 / 0.75 | | | 12 / 10 / 9 min (4.5) |
 
-Performance budget as the guide's: ≤ 0.5 ms average a tick, ≤ 6 ms worst. 61 parts is about half the Brood Mother's
+Performance budget as the guide's: ≤ 0.5 ms average a tick, ≤ 6 ms worst. 62 parts is about half the Brood Mother's
 117, so the hull builds faster.
 
 ## 7. Den: the approach, and its enemies
@@ -405,7 +461,7 @@ dormancy, activation and recovery.
 - [ ] Den enemies on the AI pilot body, with a `beat` order: they read the Heart's beat clock (body only, no bytes).
 
 **Tests** (`server/src/game/mawHeart.test.ts`, copy `scrapMother.test.ts`'s helpers):
-- [ ] pieces staged 34 / 17 / 10; caps, chambers, septum, teeth and core `ruin`; node `under`; `orphanGroups` empty in
+- [ ] pieces staged 35 / 17 / 10; caps, chambers, septum, teeth and core `ruin`; node `under`; `orphanGroups` empty in
       full and with stages removed;
 - [ ] beat and window timings per stage; arrhythmia (−0.5 s per chamber wrecked, never under 5 s); windows +0.5 s
       per tooth;
