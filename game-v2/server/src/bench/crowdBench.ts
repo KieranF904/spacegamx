@@ -26,7 +26,7 @@ const full = flag('full');
 const opts = (layout: Layout, n: number): CaseOpts => ({
   layout, n, secs: Number(arg('secs', full ? '15' : '10')), bulk: (arg('bulk', 'legacy') as 'legacy' | 'packed' | 'blocks' | 'focus'),
   crowd: flag('crowd'),
-  probes: Number(arg('probes', '4')), caps: Number(arg('caps', flag('crowd') ? '65535' : '511')), lat: Number(arg('lat', '3')), warm: Number(arg('warm', '240')), sample: Number(arg('sample', '4')),
+  probes: Number(arg('probes', '4')), caps: Number(arg('caps', flag('crowd') ? '131071' : '511')), lat: Number(arg('lat', '3')), warm: Number(arg('warm', '240')), sample: Number(arg('sample', '4')),
 });
 
 const one = arg('case');

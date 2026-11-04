@@ -59,7 +59,7 @@ export async function runCase(o: CaseOpts): Promise<any> {
   Math.random = seed;
   clock.t = 1_000_000;
   const wallStart = performance.now();
-  const server = makeServer(o.crowd ? 65535 : 16383);
+  const server = makeServer(o.crowd ? 131071 : 16383);
   const ships = server.getShips() as any, srv = server as any;
 
   // ---- the meter: wrapped before anything else, so the probes' own wrappers sit outside it ----
@@ -237,7 +237,7 @@ export async function runCase(o: CaseOpts): Promise<any> {
       keyframeCorrectionsPerSecPerProbe: r2(mean(probeList.map((p) => p.keyframesCorrect / secs))),
       correctionsByClass: probeList.reduce((acc, p) => { for (const [k, v] of Object.entries(p.corrections)) { const a = (acc[k] ??= { n: 0, same: 0 }); a.n += v!.n; a.same += v!.same; } return acc; }, {} as Record<string, { n: number; same: number }>),
       keyframeEntriesPerSecPerProbe: r2(mean(probeList.map((p) => p.keyframesEntry / secs))),
-      server: { hits: hitsDiff, reasons: numericDiff(snap(srv.replication.reasons), reasons0), bodies: numericDiff(snap({ net: srv.bodies?.stats, rep: srv.replication.bodyStats }), bodies0) },
+      server: { causes: snap(srv.replication.causeStats), own: snap(srv.replication.ownStats), hits: hitsDiff, reasons: numericDiff(snap(srv.replication.reasons), reasons0), bodies: numericDiff(snap({ net: srv.bodies?.stats, rep: srv.replication.bodyStats }), bodies0) },
     },
     focus: (() => {
       const d = numericDiff(snap(srv.snapshots.focus.stats), focus0), c: Record<string, number> = {};

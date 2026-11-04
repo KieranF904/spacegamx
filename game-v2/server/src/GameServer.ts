@@ -1116,11 +1116,14 @@ this.devTeleport = opts.devTeleport ?? false;
     const base = this.currentTick;
     for (const sys of this.clocks.due()) {
       const t0 = performance.now();
-      this.currentTick = this.clocks.step(sys);
       SimPass.main = false;
       SimPass.system = sys;
       try {
+        // (Its clients' inputs at its last tick, as the main pass drains them before it moves on: one for the tick
+        // about to run is on time, not late, and one for the tick after waits for it)
+        this.currentTick = this.clocks.tickOf(sys);
         this.guard('inputs', () => this.drainInputQueue());
+        this.currentTick = this.clocks.step(sys);
         this.tick(true);
         const skip = this.snapshots.ownRound(sys);
         if (skip) this.guard('snapshots', () => this.sendSnapshots(skip));

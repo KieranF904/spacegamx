@@ -202,7 +202,11 @@ describe('crowd fallbacks (CAPS.CROWD)', () => {
     const told = w.seen.crowd.at(-1)!;
     expect(told).toMatchObject({ lv: 7, r: 30, w: 9 });
     expect(told.tick).toBe(w.now() + 30);
-    w.run(300);
+    // (Its pilots' inputs, each for its system's next tick, land on time: none applied late, as its own pass drains
+    // them at its last tick, not the one it is about to run)
+    let late = 0;
+    for (let i = 0; i < 300; i++) { w.run(1); for (const f of w.P) if (w.server.pilots.connOf(f.pid)!.selfLate) late++; }
+    expect(late).toBe(0);
     // (30 ticks at full rate to the stated tick, then half: about 30 + 135 of its ticks in 300 base ticks)
     const ran = w.now() - base0;
     expect(ran).toBeGreaterThan(160);
