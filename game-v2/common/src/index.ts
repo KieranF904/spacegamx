@@ -10,6 +10,8 @@ export * from './data/index.js';
 // Network Protocol
 export * from './network/protocol.js';
 export * from './network/inputFields.js';
+export * from './network/inputCompactTables.js';
+export * from './network/inputCompact.js';
 export * from './network/ranges.js';
 export * from './network/fxKinds.js';
 export * from './network/hits.js';

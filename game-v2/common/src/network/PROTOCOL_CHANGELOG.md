@@ -24,3 +24,4 @@ except to fix a typo. A bump makes old clients reload (see PROTOCOL_VERSION in p
 - 32 (2026-11-03): Beams in pieces: a lit piece beam's ports closed field is its piece's ticks left; fire-event tell 253 (TELL_BEAM_PIECE) marks a piece spent
 - 33 (2026-11-03): Mining lasers on the ports core: a miner's closed field is its pulse's ticks left; fire-event tell 252 (TELL_MINE_PULSE, aim = fulfilment 0..255) marks a pulse started
 - 34 (2026-11-04): Own ship stepped by its client (CAPS.OWN_SIM 64): a snapshot's own rows (field n: pulls, contacts, rebuilds as causes) and an input's own check (flags2 0x80, 3 bytes); packed snapshots' field mask is 10 bits
+- 35 (2026-11-04): Compact inputs (CAPS.INPUTS 128): first byte 0x80 | the groups that changed since the last input on the socket (tick step, keys, modes, aim as a fine or coarse step or itself, cursor distance on a log grid), seq implied; read through a per-socket InputDecoder

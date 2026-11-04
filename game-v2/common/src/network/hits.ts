@@ -24,8 +24,10 @@
  *              contacts, rebuilds) worked out alike on both sides (network/ownTick.ts, part G). It is sent no control
  *              rows or keyframes of its own ship unless its inputs don't say what it flew with, and checks its own
  *              state with a hash on its inputs (OwnCheck)
+ *   INPUTS     compact inputs (network/inputCompact.ts, protocol 35): it sends only what changed since its last input,
+ *              aim as a step, by the send rules of client app/inputCompactSend.ts. The server reads both layouts anyway
  */
-export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16, ROUGH: 32, OWN_SIM: 64 } as const;
+export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16, ROUGH: 32, OWN_SIM: 64, INPUTS: 128 } as const;
 
 /**
  * Adaptive validation (CAPS.ROUGH; docs/design/confirmed-hits.md part E): how closely the server checks a finding

@@ -12,6 +12,7 @@ import { packedTables } from './packed/tables.js';
 import { quantizeCursorAngle, dequantizeCursorAngle } from './cursorState.js';
 import type { HitReport } from './hits.js';
 import type { OwnCheck } from './ownTick.js';
+import { CI_FLAG, compactInputTables } from './inputCompactTables.js';
 /**
  * Network Protocol - All client/server message types
  */
@@ -32,9 +33,9 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
  * has updated PROTOCOL_VERSION and PROTOCOL_WIRE_HASH.
  */
 // History: PROTOCOL_CHANGELOG.md. Re-pin with `npm run wire:bump "reason"` (game-v2/), never by hand.
-export const PROTOCOL_VERSION = 34;
+export const PROTOCOL_VERSION = 35;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
-export const PROTOCOL_WIRE_HASH = '24baa0c1';
+export const PROTOCOL_WIRE_HASH = 'c25fa940';
 /** WebSocket close code (and reason) for a client on another protocol version */
 export const PROTOCOL_MISMATCH_CLOSE = 4002;
 export const PROTOCOL_MISMATCH_REASON = 'version';
@@ -1378,6 +1379,8 @@ const BINARY_MSG_INPUT = 0x03;
 // [10]   : flags2 (strafeLeft, strafeRight, helm, jump, has targetTick, hit report, dodge, own check)
 // The tick the client was at isn't sent: nothing reads it.
 // (The old 17-byte form, type 0x01, still decodes.)
+// (Protocol 35, CAPS.INPUTS: the compact form, first byte 0x80 | the groups that changed: inputCompactTables.ts. It needs
+// the last input on the socket to read, so it decodes only through an InputDecoder, never decodeInputBinary.)
 
 /** A tick from its low 16 bits: the one nearest `near` */
 export function unwrapTick16(low: number, near: number): number {
@@ -1398,7 +1401,8 @@ const HIT_REPORT_BYTES = 3;
 const OWN_CHECK = 0x80;
 const OWN_CHECK_BYTES = 3;
 
-function ackTail(acks: number[] | undefined): number[] {
+/** Debris acks as they follow an input (both layouts): a count byte, then each piece's id as a base-128 varint and its check */
+export function inputAckTail(acks: number[] | undefined): number[] {
   if (!acks?.length) return [];
   const n = Math.min(MAX_INPUT_ACKS, acks.length >> 1);
   const out = [n];
@@ -1410,7 +1414,7 @@ function ackTail(acks: number[] | undefined): number[] {
   return out;
 }
 
-function readAcks(view: DataView, at = INPUT_BYTES): number[] | undefined {
+export function readInputAcks(view: DataView, at = INPUT_BYTES): number[] | undefined {
   if (view.byteLength <= at) return undefined;
   const n = Math.min(MAX_INPUT_ACKS, view.getUint8(at++));
   const out: number[] = [];
@@ -1423,19 +1427,32 @@ function readAcks(view: DataView, at = INPUT_BYTES): number[] | undefined {
   return out.length ? out : undefined;
 }
 
+/** A hit report as it follows an input (3 bytes: the chain's low byte, then the tick's low 14 bits and the epoch's 2) */
+export function writeHitReport(view: DataView, at: number, rep: HitReport): void {
+  view.setUint8(at, rep.hash & 0xff);
+  view.setUint16(at + 1, (rep.tick & 0x3fff) | ((rep.epoch & 3) << 14), true);
+}
+export function readHitReport(view: DataView, at: number): HitReport {
+  const tt = view.getUint16(at + 1, true);
+  return { hash: view.getUint8(at), tick: tt & 0x3fff, epoch: tt >>> 14 };
+}
+/** An own check as it follows an input (3 bytes: the state hash's byte, then the tick's low 12 bits and the hp hash's 4) */
+export function writeOwnCheck(view: DataView, at: number, chk: OwnCheck): void {
+  view.setUint8(at, chk.body & 0xff);
+  view.setUint16(at + 1, (chk.tick & 0xfff) | ((chk.hp & 15) << 12), true);
+}
+export function readOwnCheck(view: DataView, at: number): OwnCheck {
+  const ct = view.getUint16(at + 1, true);
+  return { body: view.getUint8(at), hp: ct >>> 12, tick: ct & 0xfff };
+}
+
 export function encodeInputBinary(msg: ClientInputMessage): ArrayBuffer {
-  const tail = ackTail(msg.acks), rep = msg.hitReport, chk = msg.ownCheck, at0 = INPUT_BYTES + (rep ? HIT_REPORT_BYTES : 0), at = at0 + (chk ? OWN_CHECK_BYTES : 0);
+  const tail = inputAckTail(msg.acks), rep = msg.hitReport, chk = msg.ownCheck, at0 = INPUT_BYTES + (rep ? HIT_REPORT_BYTES : 0), at = at0 + (chk ? OWN_CHECK_BYTES : 0);
   const buffer = new ArrayBuffer(at + tail.length);
   const view = new DataView(buffer);
   for (let i = 0; i < tail.length; i++) view.setUint8(at + i, tail[i]);
-  if (rep) {
-    view.setUint8(INPUT_BYTES, rep.hash & 0xff);
-    view.setUint16(INPUT_BYTES + 1, (rep.tick & 0x3fff) | ((rep.epoch & 3) << 14), true);
-  }
-  if (chk) {
-    view.setUint8(at0, chk.body & 0xff);
-    view.setUint16(at0 + 1, (chk.tick & 0xfff) | ((chk.hp & 15) << 12), true);
-  }
+  if (rep) writeHitReport(view, INPUT_BYTES, rep);
+  if (chk) writeOwnCheck(view, at0, chk);
   view.setUint8(0, BINARY_MSG_INPUT);
   view.setUint16(1, msg.seq & 0xFFFF, true);
   view.setUint16(3, (msg.targetTick ?? 0) & 0xFFFF, true);
@@ -1465,13 +1482,12 @@ export function decodeInputBinary(data: ArrayBuffer | Uint8Array): ClientInputMe
   // (A Node Buffer shares a larger ArrayBuffer: respect its offset and length)
   const view = data instanceof ArrayBuffer ? new DataView(data) : new DataView(data.buffer, data.byteOffset, data.byteLength);
   if (view.getUint8(0) === BINARY_MSG_INPUT_V1) return decodeInputV1(view);
+  if (view.getUint8(0) & CI_FLAG) throw new Error('a compact input decodes only through an InputDecoder');
   const flags = view.getUint8(5);
   const flags2 = view.getUint8(10);
   const rep = flags2 & HIT_REPORT && view.byteLength >= INPUT_BYTES + HIT_REPORT_BYTES;
-  const tt = rep ? view.getUint16(INPUT_BYTES + 1, true) : 0;
   const at0 = rep ? INPUT_BYTES + HIT_REPORT_BYTES : INPUT_BYTES;
   const chk = flags2 & OWN_CHECK && view.byteLength >= at0 + OWN_CHECK_BYTES;
-  const ct = chk ? view.getUint16(at0 + 1, true) : 0;
   return {
     type: 'input',
     seq: view.getUint16(1, true),
@@ -1492,9 +1508,9 @@ export function decodeInputBinary(data: ArrayBuffer | Uint8Array): ClientInputMe
     jump: (flags2 & 0x08) !== 0,
     dodge: (flags2 & 0x40) !== 0,
     cursorDist: view.getUint16(8, true) * CURSOR_DIST_STEP,
-    acks: readAcks(view, chk ? at0 + OWN_CHECK_BYTES : at0),
-    ...(rep ? { hitReport: { hash: view.getUint8(INPUT_BYTES), tick: tt & 0x3fff, epoch: tt >>> 14 } } : {}),
-    ...(chk ? { ownCheck: { body: view.getUint8(at0), hp: ct >>> 12, tick: ct & 0xfff } } : {}),
+    acks: readInputAcks(view, chk ? at0 + OWN_CHECK_BYTES : at0),
+    ...(rep ? { hitReport: readHitReport(view, INPUT_BYTES) } : {}),
+    ...(chk ? { ownCheck: readOwnCheck(view, at0) } : {}),
   };
 }
 
@@ -1535,7 +1551,7 @@ export function isBinaryMessage(data: ArrayBuffer | Uint8Array | string): boolea
     view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   }
   const firstByte = view.getUint8(0);
-  return firstByte === BINARY_MSG_INPUT || firstByte === BINARY_MSG_INPUT_V1;
+  return firstByte === BINARY_MSG_INPUT || firstByte === BINARY_MSG_INPUT_V1 || (firstByte & CI_FLAG) !== 0;
 }
 
 // ============================================
@@ -1674,6 +1690,8 @@ export function wireTables(): Record<string, unknown> {
     snapFields: SNAP_FIELDS,
     dictionary: DICTIONARY,
     binaryInput: [BINARY_MSG_INPUT_V1, BINARY_MSG_INPUT],
+    // (Protocol 35: the compact inputs, CAPS.INPUTS)
+    compactInput: compactInputTables(),
     serverFrame: SERVER_FRAME,
     // (Protocol 29: the bit-packed frames, CAPS.PACKED)
     packed: packedTables(),
