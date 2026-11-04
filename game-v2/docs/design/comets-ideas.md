@@ -115,6 +115,9 @@ seeded path, not a special case. Rocks that despawn mid-mine need clean handling
 
 ### 2.3 The nucleus run (an icy interior you fly into)
 
+*This is now folded into 2.10, as the inside of the long comet. Below is the stand-alone version, a short run with no
+exit at the end, for Halvorsen.*
+
 **Fantasy:** the comet's crust cracks open near the sun, and you fly into the ice tunnels before it seals again.
 
 **Minute to minute:** Around perihelion the nucleus shows open vents (a moving pocket entrance). X near a vent takes
@@ -344,132 +347,221 @@ per-pilot "fresh" ledger like traces.
 **Risks:** Perishables touch inventory conservation rules ("items conserve"). A ledger (fresh units owed, decaying)
 is safer than mutating stacks. Keep it out of the energy and thermal coupling that energy-system.md defers.
 
-### 2.10 Riding a comet to a hidden sector (Kieran's idea)
+### 2.10 Inside the comet, out of the system (Kieran's idea)
 
-**Fantasy:** grab hold of a comet as it whips round the sun and let it carry you out past the edge of the charts, to a
-place no jump drive can reach.
+**Kieran's version:** "You press X to enter an instance inside of it; if you stay on it until it leaves the system,
+you can exit into a secret system."
 
-**The comet:** This needs a new comet, not Halvorsen. Halvorsen's aphelion (78,900) is well inside Sol. Call the new
-one "the Long Comet" until it has a name. It sits on a high-eccentricity orbit (say e ≈ 0.9) with a period of about
-3–4 hours, so its aphelion is far beyond Sol's charted edge (beyond 250,000). Because the orbit is so eccentric, it
-spends only about 15 minutes in the inner system and the rest of the time far out. It is drawn at its real position
-like Halvorsen; out past the map edge it shows as an arrow with a distance.
+**Fantasy:** fly into a comet as it rounds the sun, survive inside it as it heads out into the dark, and come out
+somewhere no chart shows.
 
-**How you ride it (latching):**
+This takes over the nucleus run (2.3) and the thaw finds (2.4): they become the inside of this comet. Halvorsen could
+keep a short version with no exit at the end.
 
-- **Boarding.** The ride starts in the comet's lee: a box behind the nucleus, in the comet's own frame, sheltered by
-  the coma. On the outbound leg, from perihelion until a set "last boarding" point, a pilot who flies into the lee
-  and matches its speed for about 3 seconds gets the prompt "Hold to latch on". Once latched, the ship is carried.
-- **While latched,** its position is the comet's position plus an offset in the comet's frame. The pilot steers that
-  offset around inside the lee box at reduced thrust, and does not fly freely. It is a kinematic mode in the shared
-  flight step: a carried ship needs no physics, and a replica needs only a flag and an offset. That is cheaper on the
-  wire than a free ship.
-- **Jumping** while latched lets go. The jump drive can't be used to ride.
+**The comet:** It needs a new comet, because Halvorsen's aphelion (78,900) is inside Sol. Call it "the Long Comet"
+until it has a name. Its orbit is very eccentric (e ≈ 0.9) with a period of about 3 hours, so its aphelion is far
+beyond Sol's charted edge. The **shelf** is a fixed radius, past the outermost chart: crossing it outbound is "leaving
+the system". The orbit is tuned so the comet takes about **20 minutes from perihelion to the shelf**. That is the
+length of a full stay.
 
-**The ride (about 8–12 minutes, perihelion to the "shelf"):**
+#### How the instance works
 
-- **Heat first.** Boarding is near the star, so the near-star thermal hazard and star heat apply.
-- **Jets.** As the nucleus warms, jets fire from its surface on a timetable seeded by passage number. Each is
-  telegraphed (a vent glows, then fires) and sweeps part of the lee box. If a jet catches you, it knocks you off: you
-  unlatch with the comet's velocity plus a kick. The timetable is pure, so prediction gets the knock exactly right.
-- **Debris.** If calving (2.2) is built, fresh fragments tumble through the lee. They are ordinary collisions, and a
-  hard knock moves your offset.
-- **Then cold.** The ride heads into the dark, so a cryo rating builds along the way and the warmth meter falls. If
-  your ship seizes, you lose your grip and fall off. Insulated hulls ride further, which gives a build choice weight.
-- **Riders** (2.5), if built: a few nest packs ride along and pick at latched ships. They do damage only and don't
-  knock you off, but they add pressure while you dodge jets.
-- **Falling off before the shelf** is not a death. You are flung outward at comet speed, far from anything, and
-  coast or jump home. That is a real cost in time, but nothing is lost.
+- **Entering:** while the comet is within the entry window, from about 3 minutes before perihelion to about 5 minutes
+  after it, X near the nucleus enters the interior. This is the same X path as `Surfaces.descend`/`pocketAt`, but with
+  a **moving entrance**: its position comes from `cometPosition(tick)`, not a fixed point. Outside the window the
+  chart line shows the countdown, and X does nothing.
+- **What the instance is:** a pocket system with terrain (tunnels of ice, built by a generator script in the style of
+  the Ashfall cavern), run as an instance using the siege moons' `instance.slots` (`GameData.getSystemInstances`).
+  There is **one public instance per passage**: everyone who enters during that window joins the same copy, and a
+  party always lands together. If a passage is crowded (above a cap, say 16), a second copy opens, as the seam
+  allows. The copy is cleared after it closes and nobody is left in it.
+- **The clock is the orbit:** everything inside keys off the comet's distance from the star, `r(tick)`, which every
+  client computes. A **heat phase** (warm, active, near the star) turns into a **cooling phase** as it heads out.
+  Geysers, ice gates and the cold are all timetables seeded by `(comet, passage)`, so the client simulates the
+  interior exactly, with no messages.
+- **Leaving early:** at any time, fly into an open vent, or press X at a vent, and you leave. You come out next to the
+  comet's current position in Sol (`pocketExit` with the moving entrance), with a modest share of its velocity. If
+  you leave late in the stay, that is far out, and it is a long way home.
+- **The payoff:** when the comet crosses the shelf, the **far vent** opens deep inside for about 3 minutes. Anyone
+  who reaches it can exit into the secret system. Anyone still inside when the instance closes is pushed out at the
+  comet's position beyond the shelf, which leaves a long cruise home.
 
-**Arrival (the "shelf"):** The comet crosses a fixed radius, the shelf, which is a circle on the system map. Every ship
-still latched at that moment is taken into the hidden sector (`travelTo` into a pocket, as pockets work today). Only
-ships that are latched at the crossing go in, which is what keeps the sector unreachable any other way. It isn't on
-any gate or rift, and warping or jumping to the comet out there gets you nothing, because the passage is earned by
-the ride.
+#### What makes staying hard
 
-**Where it goes:** A pocket system (`pocket`, with its own terrain and fields): the comet's far reach, a dark, cold
-sector round a frozen cloud of ice bodies. Placeholder name: "Halvorsen's Reach" or "the Far Cloud", named by whoever
-charted it. Worth the trip because it holds:
+- **Cold that climbs with r:** the cryo rating rises as the comet goes out, so the warmth meter falls. If your ship
+  seizes, the ice holds you until you thaw, which costs time; seize too often and you miss the far vent. Insulated
+  hulls and the hearths below make it survivable.
+- **Ice gates that freeze shut:** passages close in order on the outbound timetable, so the route to the far vent
+  narrows. Fall behind and your side of the comet seals off from the far vent. You can still leave early, but not go
+  through.
+- **Geysers:** during the heat phase, geysers fire often (telegraphed, timed by seed). As it cools, they fire rarely
+  but harder. The first build has them deal damage and heat rather than push, so they act only on the server and
+  prediction is untouched. Pushes (in the shared flight step) can come later, with golden traces.
+- **Riders:** a nest deep inside (2.5) hatches packs while the comet is warm, sized to the pilots in the instance.
+  Outbound they go dormant, and the ones still about are slow but tough.
+- **Dying** is ordinary death: you respawn at your station, and your cargo drops as a pod inside the instance, where
+  others can find it.
 
-- **Rich ice and rock found nowhere else:** high trace tiers (pale iridium, a little voidglass), aphelion ice, and a
-  cold-only material for insulated plate. That gives cold builds an economy.
-- **A frozen wreck field** of earlier crews who rode out. Their logs are records with owners: a Guild prospector, a
-  Patrol report, an ice-crew legend with its plain reading. It pairs with the thaw finds (2.4).
-- **A cache for each pilot on each visit** (a `recover` task), and later perhaps a boss built to boss-design.md,
-  fought in the cold.
-- **A plan found only here** (an ice-runner hull), so the trip feeds progression and not just credits.
+#### Activities in the interior
 
-**Getting back (three ways, all available):**
+These are things you can only do inside a comet, so going in pays even if you never ride it out. Each one behaves
+differently as the comet heats and cools.
 
-1. **The slow way, always open.** Fly out past the pocket's edge and you are put back in Sol, far beyond the shelf
-   (`pocketExit` at the comet's far position). From there you cruise and jump home: several minutes and a few jumps.
-   Nobody is ever trapped. Logging out there sends you to your station on login, as logging out in a hazard already
-   does.
-2. **The comet's return.** Hours later the comet turns inbound and crosses the shelf. A ship latched on in the sector
-   at that time rides it back in, and is dropped at perihelion near the inner stations with a jump-field boost. It
-   is fast and spectacular, and it has its own "last call" countdown inside the sector.
-3. **A beacon you build.** A `construct` field task in the sector (parts from your hold) builds your own return
-   beacon. Once built, you can leave from it straight to Sol's rim at any time. It is per pilot, so no world state
-   changes, and a pilot's party can use it with them. It is a mid-term goal for regulars.
+1. **Core sampling.** Hold a mining beam steady on a banded ice wall while a strata readout fills, layer by layer.
+   - *Heat:* the outer layers boil off and expose deeper, richer strata, but the wall spits vapour that knocks your
+     aim.
+   - *Cooling:* the wall goes still and easy to read, but only shallow layers are left before it freezes over.
+   - *Rewards:* "comet cores" (an item) that Quinn's observatory buys for standing and credits, plus trace accrual.
+     Each core records the passage and depth, and a set of cores from different depths is worth more.
+   - *Solo/group:* solo. Pilots on neighbouring walls each sample their own.
+2. **Thaw salvage (2.4).** The heat exposes one seeded wreck or cache per passage, frozen in the ice, and the ice
+   refreezes over it on the way out.
+   - *Heat:* the ice is soft, so cutting the wreck free is quick, but geysers make it dangerous.
+   - *Cooling:* the ice hardens again, cutting slows, and finally the find seals.
+   - *Rewards:* salvage credits, parts, and logs that file records (each with an owner).
+   - *Solo/group:* everyone who cut or towed is paid, not just the last shot.
+3. **Chimney climbing.** Fly up a geyser chimney between eruptions to reach the upper galleries: a timing puzzle on a
+   seeded timetable that anyone can learn.
+   - *Heat:* eruptions come every few seconds, so the gaps are short.
+   - *Cooling:* eruptions are rare, so the gaps are long, but the chimney walls ice over and narrow.
+   - *Rewards:* the galleries hold rime crystal, a cold-only material found nowhere else, used for insulated plate.
+   - *Solo/group:* solo skill. A ribbon for climbing every chimney in a passage.
+4. **Hearths.** Tap a thermal vent with a small `construct` job (parts from your hold) to light a hearth: a warmth
+   source for every ship near it, as stations are now.
+   - *Heat:* hearths aren't needed yet, and building is cheap.
+   - *Cooling:* they become the only warm places, and each fades unless someone feeds it ice.
+   - *Rewards:* builders and feeders are paid for the warmth others draw (the Support ledger). This is what lets a
+     group stay to the end.
+   - *Solo/group:* a soloist can manage one. A group can keep a chain of hearths alive toward the far vent. This is
+     the group activity.
+5. **Charting the passage.** The side passages open differently each passage, from the seed. A scanner pulse charts
+   the gallery you are in, and charting every gallery fills that passage's map, which the Miners' Guild buys.
+   - *Heat:* the chart changes as passages melt open.
+   - *Cooling:* gates freeze, and a finished chart shows the route to the far vent early.
+   - *Rewards:* Guild credits and standing. A party pools its chart, and each member is paid for the galleries they
+     scanned.
+   - *Solo/group:* a party covers the galleries faster, and nobody is paid less for it.
+6. **Clearing the clutch.** Break the riders' nest (2.5) while it is warm and hatching.
+   - *Heat:* the nest hatches waves.
+   - *Cooling:* it goes dormant, which makes it easier to break, but it is deep in, behind gates that are closing.
+   - *Rewards:* a warband-style bounty for everyone who fought, and a quieter outbound leg for everyone inside.
+   - *Solo/group:* packs are sized to the pilots taking part.
 
-**How often, and how players predict it:** One outbound window per orbit (about every 3–4 hours), with boarding open
-for about 5 minutes after perihelion. The orbit is data, so the next window is computable on every client. The
-almanac (2.8) lists "Long Comet perihelion in 1:12:40", and the chart line shows the shelf crossing time.
+#### The secret system
 
-**Secret but discoverable:** The *how* is plain, which satisfies lore rule 6 (nothing a player needs is hidden in a
-hint). The chart line reads: "Comet on a long orbit past the system's edge. Ships can latch on in its lee while it is
-outbound." The lee prompt appears to anyone who matches the comet. What is *out there* is unknown until you go:
+- **What it is:** a full pocket system, the comet's far cloud: a dark, cold sector of ice bodies with no star.
+  Placeholder name: "the Far Cloud", named by whoever charted it. It needs no instance: it is public and shared, and
+  it holds no state that a pilot's visit changes.
+- **Worth the trip:**
+  - rock and ice found nowhere else, with high trace tiers (pale iridium, a little voidglass);
+  - rime crystal in bulk;
+  - a field of frozen wrecks from earlier crews, whose logs are records with owners;
+  - a cache for each pilot on each visit (`recover`);
+  - a plan found only here (an ice-runner hull);
+  - later, a boss built to boss-design.md, fought in the cold.
+- **Getting home** (all three ways available):
+  1. **The slow way, always open:** fly past the pocket's edge and you come out in Sol beyond the shelf, then cruise
+     and jump home. Logging out there returns you to your station, as logging out in a hazard already does. Nobody is
+     ever trapped.
+  2. **The comet's return:** as the comet crosses the shelf inbound, its vent opens in the Far Cloud. Enter, survive
+     the run in reverse (it warms as you go, so hearths matter less and geysers wake up), and exit at perihelion
+     beside the inner stations.
+  3. **Your own beacon:** a `construct` job in the Far Cloud builds a per-pilot return beacon. From then on, you can
+     leave from it to Sol's rim at any time. It changes no world state.
 
-- the sector is not on anyone's map until they have been (per-pilot discovery, and clients are told the pocket id only
-  then, as siege instances are);
-- the shelf circle is drawn only after a first ride;
-- people talk about it with owners: an old ice-crew pilot claims a crew rode the comet out and came back with frozen
-  cargo (Sander's crews, superstitions), and the Guild calls it a tall tale;
-- a thaw-find log (2.4) records a crew holding on.
+#### Soft pressure: why you don't stay in the Far Cloud forever
 
-A ribbon for the first ride, and a record for each log found, make it a collection to complete.
+The aim is a growing reason to leave, never a timer that kills you. Every rule here is per pilot, deterministic (it
+depends only on time since that pilot arrived and what they did), and blind to group size. The slow way home stays
+open always: no rule here ever traps anyone.
 
-**Fit with jump drives, map, orbits and netcode:**
+Options:
 
-- **Jump drives:** latching and jumping exclude each other. The sector is a pocket, so no drive reaches it. On the
-  way home the comet's coma could give the jump-field boost (2.7) as a reward.
-- **Map:** the comet's position, the lee and the shelf crossing are all functions of the tick. The map draws the
-  comet's orbit (already done), a boarding countdown, and the shelf once the pilot has discovered it.
-- **Orbits:** `cometPosition` is already deterministic. The Kepler solve needs checking at e ≈ 0.9 (12 Newton steps;
-  start E at π for large e, or add steps) and golden-traced, because carried ships' positions now depend on it.
-- **Netcode:** A latched ship's wire state is a flag plus a small offset. Its world position is derived exactly by
-  every client. Jets come from a seeded timetable, so knock-offs are predicted. The server decides only latch, unlatch
-  and the shelf transfer: three events, each easy to validate. This needs one new flight mode in the shared step,
-  with golden traces and a protocol bump.
+- **A. Deep chill (a hazard that wears parts).** Separate from warmth, which recovers: a per-pilot exposure meter
+  rises with time in the Far Cloud. After a grace period (say 20 minutes) it lowers your parts' maximum HP a little
+  each minute ("frost-brittle"), to a floor (say 60%). It never destroys anything. It only makes a fight there riskier
+  and leaves a repair bill. Any station mends it, as part damage is mended now, and leaving resets the meter.
+  Insulation slows it. Hearths slow it for everyone near them, which helps groups and never hurts them.
+- **B. No services.** No station, repair, refinery or resupply. Your ammunition, field kits and hold space are the
+  natural clock. This costs nothing to build, because it is simply true of the place.
+- **C. Finds that thin out.** A per-pilot visit ledger, a rate rather than a roll, like traces. Mining yield and trace
+  accrual run at full rate for the first 25 minutes of a visit, then taper to 25% by 60 minutes. Each per-pilot cache
+  opens once per visit. A visit only starts by riding the comet in again, so the taper resets naturally and leaving
+  never loses anything.
+- **D. The good way home closes.** The comet's return (way 2) is the fast, comfortable way back, and its vent is open
+  only during the inbound shelf crossing. Miss it and you are left with the slow way or a beacon. This is a nudge,
+  not a door shut: the slow way never closes.
 
-**Solo / group:** Solo is complete. A party that is latched at the crossing arrives together in the same pocket. It
-is public: everyone who rode that passage shares it. The sector's threats are sized per head, and its caches are per
-pilot, so riding as a group only helps:
+**Recommendation: B + C, with a light A.**
+- B is free, and it already makes long stays self-limiting for fighters.
+- C removes the *reason* to stay without punishing anyone for staying. It is the fairest lever: a pilot who lingers
+  loses only extra yield, never what they already earned.
+- A, kept mild (a floor, mended at any station, slowed by hearths), adds a felt, visible reason to head home. The HUD
+  shows "Frost-brittle: parts at 85%".
+- D comes for free with the comet's return and needs no rule of its own. Use it as flavour, not as the pressure.
+- Reject anything that destroys parts, damages hulls over time, or closes the slow way home.
 
-- more guns against riders on the way;
-- shared beacon use at home;
-- a light "draft" bonus: ships deeper in the lee behind another latched ship are sheltered from one jet in three,
-  which is seeded and predictable.
+#### Timing and how players find out
 
-**Reuses:** Pockets and `travelTo`, terrain, warmth (cryo) and the near-star hazard, Operations (`recover`,
-`construct`), derelicts and logs, codex, ribbons, `cometPosition`, nests (riders), and the almanac. **New:** a long
-comet, the latched flight mode (shared step, replicas, wire), the jet timetable, the shelf transfer, per-pilot
-discovery of a pocket, the sector itself (terrain, fields, contents), and the return beacon.
+- **How often:** one window per orbit, about every 3 hours. The almanac (2.8) shows "Long Comet perihelion in
+  1:12:40", and inside, a HUD timer counts down to the shelf. Every time is computable from the orbit on the client.
+  A second long comet in another system (Borealis) could offer a second schedule, so a missed window isn't a 3-hour
+  wait.
+- **Secret but discoverable:** the *how* is plain, which lore rule 6 requires. The chart line reads: "Comet on a long
+  orbit past the system's edge. Vents open near the sun: you can fly inside." The interior's HUD shows "Leaves the
+  system in 14:20", and the far vent's prompt is plain when it opens. *What* is out there stays unknown until you go:
+  - the Far Cloud isn't on anyone's map until they have been there (per-pilot discovery; clients are told its id only
+    then, as siege instances are);
+  - people talk about it with owners: an ice-crew pilot of Sander's says someone rode the comet out and came back
+    with frozen cargo, and the Guild calls it a tall tale;
+  - a thaw-find log records a crew who stayed in too long.
+- A ribbon for the first exit, and a record for each log, turn it into a collection.
 
-**Size:** L. Two slices:
+#### Netcode and existing systems
 
-- (a) the latch and the ride, with the shelf dropping you into a small, mostly empty pocket and the slow way home;
-- (b) the sector's contents, the comet's return and the beacon.
+- **Instance and terrain:** a pocket with terrain is what Ashfall's cavern and the siege moons already are. The
+  terrain is static data that every client loads, and collision (`collideTerrain`) is already in the shared step, so
+  flying inside is predicted exactly. The instance slots come from the siege moon seam. No new kind of world sim is
+  needed.
+- **Timing:** the interior's phase, gates, geysers and the far vent's opening are pure functions of
+  `cometPosition(c, tick)` and the passage seed. The server decides only entry, exit, spawns and payouts. The ice
+  gates are timed terrain pieces, solid only between their times; `collideTerrain` needs a "solid at tick" check,
+  which is the one change in shared flight code. The Kepler solve needs checking at e ≈ 0.9 (start E at π, or more
+  steps) and golden-tracing, because gate timing and the moving entrance depend on it.
+- **Wire:** nothing new per tick. Entry and exit are travel messages, as pockets use now. A protocol bump is needed
+  only for the moving entrance's data and the far vent's prompt.
+
+**Solo / group:**
+- Solo: everything is completable alone with a well-insulated ship.
+- Groups: one shared public instance per passage, threats sized per head, caches and cores per pilot. Hearths and
+  charting reward working together, so a group stays longer more easily, and nobody earns less for being in one.
+
+**Reuses:** pockets (`pocketAt`, `pocketExit`), siege instance slots, terrain and its generator scripts, warmth
+(cryo) and heat sources, Operations (`recover`, `construct`), the Support ledger, derelicts and logs, codex, nests and
+Events pay, ribbons, and the almanac.
+
+**New:**
+- the long comet;
+- a moving, timed pocket entrance;
+- the passage-keyed instance life;
+- timed ice gates in terrain;
+- geyser and hearth sources;
+- core sampling and chimney content;
+- the Far Cloud and per-pilot discovery;
+- the return beacon.
+
+**Size:** L, in two slices:
+
+- **(a)** the long comet; X to enter a near-empty ice instance; leaving early; cold rising with r; the far vent at the
+  shelf into a sparse Far Cloud; the slow way home.
+- **(b)** the activities, ice gates, riders, the comet's return and the beacon.
 
 **Risks:**
-
-- The latched mode touches the flight step, the most sensitive code there is. It needs golden traces, a protocol
-  bump, and prediction tests for latch and unlatch.
-- A 3–4 hour cadence suits an occasion but could frustrate someone who just missed it. The almanac and a second, more
-  frequent long comet in another system help.
-- AFK riding: the ride must ask for something (jets, cold, riders) or it becomes a free taxi.
-- Lore: whatever is out there needs owners, and nothing may suggest the comet *takes* people anywhere on purpose.
-  The plain reading is orbital mechanics.
+- The ice gates change shared collision, so they need golden traces.
+- A crowded public instance needs a cap and an overflow copy.
+- A 3-hour cadence suits an occasion but punishes someone who just missed it.
+- Lore: everything out there needs an owner, and nothing may suggest the comet *takes* anyone anywhere. The plain
+  reading is orbital mechanics.
 
 ## 3. Recommendation
 
@@ -483,15 +575,18 @@ discovery of a pocket, the sector itself (terrain, fields, contents), and the re
 2. **The almanac (2.8)**, starting with just the data plus a "next perihelion" countdown on the map and chart. It is
    cheap, and it is how players find every other comet idea. Adding a Borealis comet makes the existing "Sol and
    Borealis" bonus honest.
-3. **Riding a comet to the hidden sector (2.10).** It is the strongest "enter the comet and do a special thing" idea,
-   because it gives the comet a destination. Every part of it is predictable from the orbit: the boarding window, the
-   jets, the shelf crossing. The server decides only latch, unlatch and transfer. It reuses pockets, warmth,
-   Operations and derelict logs. The thaw finds (2.4) slot in as the sector's wreck logs. It is L, and it builds
-   straight on the passage clock from the first slice and on the almanac.
+3. **Inside the comet, out of the system (2.10).** This is Kieran's idea, and it absorbs the nucleus run (2.3) and
+   the thaw finds (2.4).
+   - It is a public instance you enter with X, worth entering for its activities alone (core sampling, chimneys,
+     hearths, charting).
+   - Staying to the end exits into the Far Cloud.
+   - It is all keyed to the comet's distance from the star, so clients simulate it exactly. The server decides only
+     entry, exit, spawns and pay.
+   - It is built from existing seams: pockets, terrain, siege instance slots, warmth, Operations.
+   - It is L, and it builds straight on the passage clock from the first slice.
 
-Next after those: **the nucleus run (2.3)**. It is the other "inside the comet" piece, but it overlaps 2.10's appeal
-for more art cost. **The moving jump field (2.7)** is S and very elegant to network, but it needs a lore decision
-first. It would also make a nice reward on the comet's return ride.
+Next after those: **the moving jump field (2.7)** is S and very elegant to network, but it needs a lore decision
+first. It would also make a nice reward on the comet's return trip.
 
 **First slice to build** (S–M, about one session)
 
@@ -507,8 +602,13 @@ first. It would also make a nice reward on the comet's return ride.
 5. Data: a plain chart description, and one Guild line (with an owner) that mentions skimming.
 
 Calving fragments (2.2) are the next slice, once the passage clock exists, because they need rock lifetimes in the
-asteroid timetable. The comet ride's slice (a) follows: the long comet's data, the latched flight mode with golden
-traces, the jet timetable, and the shelf dropping riders into a near-empty pocket.
+asteroid timetable. 2.10's slice (a) follows:
+- the long comet's data;
+- X to enter a near-empty ice instance, through a moving, timed entrance;
+- leaving early;
+- cold rising with distance from the star;
+- the far vent at the shelf, opening into a sparse Far Cloud;
+- the slow way home, with soft pressures B and C.
 
 ## 4. Open questions for Kieran
 
@@ -522,12 +622,16 @@ traces, the jet timetable, and the shelf dropping riders into a near-empty pocke
 5. **Comet coma as a jump field (2.7):** is that acceptable given the stillstone lore, if the text explains it as
    cold-cloud physics?
 6. **Perishable cargo (2.9):** is decaying cargo something you want in the game at all?
-7. **Interior run (2.3):** worth the L build now, or after the siege and boss work settles?
+7. **Halvorsen's interior (2.3):** should Halvorsen also get a short run with no exit, or should only the long comet
+   have an inside?
 8. **Thaw finds (2.4):** do frozen-wreck logs belong to existing threads (the early landers, the Lighter Halvard
    pattern), or stay as stand-alone prospector stories?
-9. **The comet ride (2.10):**
-   - How often should the window open? Every 3–4 hours, or more often with a second long comet elsewhere?
-   - Is a kinematic "latched" mode OK, or would you rather riders fly free in formation? Free flying is simpler for
-     the netcode but tiring for 10 minutes.
-   - Which of the three ways home do you want first? (The slow way is the minimum.)
-   - What should the hidden sector hold, and should it get a boss eventually?
+9. **Inside the comet (2.10):**
+   - How often should the window open? Every 3 hours, or more often with a second long comet (Borealis)?
+   - Is about 20 minutes from entry to the far vent the right length for a full stay?
+   - One public instance per passage, with an overflow copy above a cap (16?), or one copy per party, as sieges do?
+   - Which activities first? My order: hearths and core sampling, then thaw salvage, charting, chimneys, the clutch.
+   - Should geysers push ships (shared flight code, golden traces), or only damage and heat (server-side, safer)?
+   - Which of the three ways home first? The slow way is the minimum.
+   - Soft pressure in the Far Cloud: is B + C with a mild deep chill (A) right? What floor and grace period?
+   - What should the Far Cloud hold, and should it get a boss eventually?
