@@ -15,7 +15,7 @@
  * run in every pass and skip what isn't the pass's (SimPass.on); the rest (the economy, clients' bookkeeping) run in
  * the main pass only. A client's messages are handled at its system's tick (GameServer.handleMessage: clocks.as).
  */
-import { TICK_RATE, crowdClockStep } from '@space-game/common';
+import { TICK_RATE, crowdClockStep, type ShipState } from '@space-game/common';
 
 export interface SystemClock {
   /** Its tick (the last stepped) */
@@ -51,6 +51,18 @@ export const SimPass = {
     this.own.clear();
   },
 };
+
+/**
+ * A ship moving between systems whose ticks differ (one has a clock of its own): what it keeps as ticks is moved by
+ * `delta` (the new system's tick minus the old's), so a cooldown, a shield's wait or a click waits as long as it did
+ */
+export function rebaseShipTicks(ship: ShipState, delta: number): void {
+  ship.spawnTick += delta;
+  ship.shieldHitTick += delta;
+  ship.clickAt += delta;
+  if (ship.mineUntil !== undefined) ship.mineUntil += delta;
+  if (ship.despawnTick >= 0) ship.despawnTick += delta;
+}
 
 export class SystemClocks {
   private readonly clocks = new Map<number, SystemClock>();

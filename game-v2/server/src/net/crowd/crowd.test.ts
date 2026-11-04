@@ -122,7 +122,7 @@ function world(o: { fire?: boolean; far?: number; free?: boolean } = {}) {
   if (o.free) { step(); where = null; }
   const run = (n: number) => { for (let i = 0; i < n; i++) step(); };
   const system = () => InSystem.systemId[A.pid];
-  return { server, A, L, P, seen, run, now, conn: server.pilots.connOf(A.pid)! as ClientConnection, system };
+  return { server, A, L, P, seen, run, now, truth, conn: server.pilots.connOf(A.pid)! as ClientConnection, system };
 }
 
 const gaps = (ticks: number[]) => ticks.slice(1).map((t, i) => t - ticks[i]);
@@ -224,6 +224,56 @@ describe('crowd fallbacks (CAPS.CROWD)', () => {
     expect(w.seen.offIds).toEqual([]);
     expect(w.seen.fixes).toBe(0);
     expect((w.server as unknown as { hits: { stats: { hits: number } } }).hits.stats.hits).toBeGreaterThan(20);
+  });
+
+  it('travel into a dilated system and out: told its clock on arrival, its ticks from then; exact while there', () => {
+    const w = world({ fire: true, far: 1500, free: true });
+    const env = (id: number) => (w.server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
+    const X = new FakeHitsClient(w.server, { name: 'traveller', caps: ALL, env });
+    const msgs: ServerCrowdMessage[] = [];
+    const xs: number[] = [];
+    const fx = X as unknown as { snapshot(s: ServerSnapshotMessage): void; handle(m: ServerMessage): void };
+    const xh = fx.handle.bind(X), xsn = fx.snapshot.bind(X);
+    fx.handle = (m) => { if (m.type === 'crowd') msgs.push(m); xh(m); };
+    fx.snapshot = (s) => { xsn(s); xs.push(s.tick); };
+    const sys = w.system();
+    const other = [...Array(40).keys()].find((n) => n !== sys && !!w.server.gameData.getSystemByNum(n) && !w.server.gameData.getSystemByNum(n)!.private)!;
+    const xc = w.server.pilots.connOf(X.pid)!;
+    const travel = (to: number, x: number, y: number) => (w.server as unknown as { travelTo(c: ClientConnection, s: number, x: number, y: number, k: boolean): void }).travelTo(xc, to, x, y, false);
+    w.run(5);
+    travel(other, 70000, 70000);
+    w.run(60);
+    w.server.crowd!.force(sys, 7);
+    w.run(240);
+    const lag = w.server.getTick() - w.now();
+    expect(lag).toBeGreaterThan(80);
+    // Into the dilated system, beside the watcher
+    const a0 = msgs.length, x0 = xs.length, d0 = w.now();
+    travel(sys, Position.x[w.A.pid] + 400, Position.y[w.A.pid] - 300);
+    w.run(240);
+    expect(msgs.slice(a0)[0]).toMatchObject({ lv: 7, r: 30 });
+    expect(Math.abs(msgs.slice(a0)[0].tick - d0)).toBeLessThan(10);
+    // (its snapshots are the system's ticks now: 9 apart)
+    const there = xs.slice(x0 + 1);
+    expect(there.every((t) => t <= w.now())).toBe(true);
+    expect(gaps(there).every((g) => g === 9)).toBe(true);
+    // (the pilots: a traffic ship it picked up on arrival can be off a while, dilated or not, a gap of travel not of this)
+    const pilots = new Set([w.A.pid, ...w.P.map((p) => p.pid)]);
+    const held = [...X.reps.ids()].filter((id) => id !== X.pid && pilots.has(id));
+    expect(held.length).toBeGreaterThan(0);
+    // ...and every ship it holds is the server's at its last snapshot's tick
+    const t = X.snapTick, tr = w.truth.get(t)!;
+    const off = held.filter((id) => { const st = X.reps.at(id, t)?.body, r = tr.get(id); return !!st && !!r && (st.x !== r[0] || st.y !== r[1] || st.vx !== r[2] || st.vy !== r[3] || st.angle !== r[4]); });
+    expect(held.filter((id) => tr.has(id) && X.reps.at(id, t)).length).toBeGreaterThan(0);
+    expect(off).toEqual([]);
+    // Out again: the server's clock, told so
+    const b0 = msgs.length, y0 = xs.length, base = w.server.getTick();
+    travel(other, 70000, 70000);
+    w.run(60);
+    expect(msgs.slice(b0)[0]).toMatchObject({ lv: 0, r: 60 });
+    expect(Math.abs(msgs.slice(b0)[0].tick - base)).toBeLessThan(10);
+    expect(xs.slice(y0 + 1).every((t) => t > w.now())).toBe(true);
+    expect(w.seen.offIds).toEqual([]);
   });
 
   it('automatic: over budget it goes up a level at a time, holds, and comes down in reverse without flapping', () => {

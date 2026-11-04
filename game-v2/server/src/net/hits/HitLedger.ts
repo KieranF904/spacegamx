@@ -531,6 +531,17 @@ export class HitLedger {
     this.on = on;
   }
 
+  /**
+   * Its client's ticks changed under it (it went to a system on another clock: crowd dilation): its journal and level
+   * start afresh, and every shell flying there is told, as when it switches to finding its own hits
+   */
+  restart(c: ClientConnection): void {
+    if (!this.journals.has(c) && !this.levels.has(c)) return;
+    this.journals.delete(c);
+    this.levels.delete(c);
+    this.oldWayShells.delete(c);
+  }
+
   /** A client's copy of these ships' HP is off (hpResync): every part goes with the next snapshot */
   resync(conn: ClientConnection, ids: readonly unknown[]): void {
     for (const id of ids.slice(0, 32)) {

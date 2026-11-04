@@ -166,7 +166,8 @@ export class FocusCells {
     for (const c of now) if (!st.pending.has(c)) take(c);
     for (const c of st.leaving) take(c);
     const left: number[] = [];
-    for (const id of was) if (!view.has(id) && this.host.has(id) && InSystem.systemId[id] === system) left.push(id);
+    // (A ship gone to another system has left its view too: its client would keep it where it was, stepping it on)
+    for (const id of was) if (!view.has(id) && this.host.has(id)) left.push(id);
     conn.shipView = view;
     return left;
   }

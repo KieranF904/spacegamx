@@ -34,6 +34,9 @@ export interface CrowdHost {
   tickOf(system: number): number;
   /** Set a system's rate from its tick `at` on (the system clocks); absent: no dilation, the top levels are left out */
   setRate?(system: number, rate: number, at: number): void;
+  /** Does it keep a clock of its own, and its rate now */
+  ownClock?(system: number): boolean;
+  rateOf?(system: number): number;
 }
 
 interface SystemCrowd {
@@ -174,11 +177,23 @@ export class CrowdControl {
     this.host.send(conn, { type: 'crowd', tick: s && s.from > 0 ? s.from : this.host.tickOf(system), lv, f: L.focus, w: L.window, r: L.rate });
   }
 
-  /** A client entering a system (its first snapshot there): told the level there, unless it and the last were both none */
+  /**
+   * A client entering a system (its first snapshot there): told the level there and its clock (its tick, its rate), unless
+   * it and the last were both none on the server's clock
+   */
   enter(conn: ClientConnection, system: number): void {
-    if (this.levelOf(system) === 0 && (this.told.get(conn) ?? 0) === 0) return;
-    this.tell(conn, system, true);
+    const own = this.host.ownClock?.(system) ?? false;
+    if (this.levelOf(system) === 0 && (this.told.get(conn) ?? 0) === 0 && !own && !this.ownTold.has(conn)) return;
+    if (own) this.ownTold.add(conn); else this.ownTold.delete(conn);
+    const s = this.systems.get(system), lv = s?.lv ?? 0, L = crowdLevel(lv);
+    if (!crowdFor(conn.caps)) return;
+    this.told.set(conn, lv);
+    // (Its tick now and the rate now: a rate said ahead and not yet in effect comes with the change when it is)
+    this.host.send(conn, { type: 'crowd', tick: this.host.tickOf(system), lv, f: L.focus, w: L.window, r: this.host.rateOf?.(system) ?? L.rate });
+    if (s && s.from > this.host.tickOf(system) && L.rate !== (this.host.rateOf?.(system) ?? L.rate)) this.tell(conn, system, true);
   }
+  /** Clients last told of a system with a clock of its own */
+  private readonly ownTold = new WeakSet<ClientConnection>();
 
   /** The dev control (admin /crowd, F9): `to` a level to pin, 'auto' to let go, '' for the status */
   admin(system: number, to: string): { ok: boolean; text: string } {

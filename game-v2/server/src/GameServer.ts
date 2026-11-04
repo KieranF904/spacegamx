@@ -185,7 +185,7 @@ import { GuideNet } from './net/guides/GuideNet.js';
 import type { BodyState } from '@space-game/common';
 import { ownSimFor } from './net/snapshot/ownShots.js';
 import { CrowdControl } from './net/crowd/CrowdControl.js';
-import { SystemClocks, SimPass } from './sim/SystemClocks.js';
+import { SystemClocks, SimPass, rebaseShipTicks } from './sim/SystemClocks.js';
 import { SnapshotBuilder, type RoundSkip, designHash, playerQuery, projectileQuery, droppedItemQuery } from './net/SnapshotBuilder.js';
 
 // ============================================
@@ -1003,6 +1003,8 @@ this.devTeleport = opts.devTeleport ?? false;
       send: (conn, msg) => this.send(conn.ws, msg),
       tickOf: (s) => this.clocks?.tickOf(s) ?? this.currentTick,
       setRate: (s, r, at) => this.clocks?.setRate(s, r, at),
+      ownClock: (s) => !!this.clocks?.owns(s),
+      rateOf: (s) => this.clocks?.rateOf(s) ?? 60,
     }) : null;
     // Each system's own clock once it's dilated (sim/SystemClocks.ts): with crowd fallbacks only
     this.clocks = this.crowd ? new SystemClocks({
@@ -3240,6 +3242,8 @@ this.devTeleport = opts.devTeleport ?? false;
     if (fromSystem !== systemNum && !target.private && !target.surface && !target.pocket) this.pilots.track(conn, `visit_${target.id}`, { from: this.gameData.getSystemByNum(fromSystem)?.id }, true);
     this.broadcastToSystem(fromSystem, { type: 'effect', effectType: EffectType.WarpOut, x: Position.x[eid], y: Position.y[eid] });
     InSystem.systemId[eid] = systemNum;
+    // (From or into a system with a clock of its own, crowd dilation: what it keeps as ticks moves with it)
+    if (this.clocks && fromSystem !== systemNum) this.changeClock(conn, this.clocks.tickOf(systemNum) - this.clocks.tickOf(fromSystem));
     Position.x[eid] = x;
     Position.y[eid] = y;
     if (!keepMomentum) {
@@ -3255,6 +3259,25 @@ this.devTeleport = opts.devTeleport ?? false;
     conn.forceSnapshot = true;
     this.broadcastToSystem(systemNum, { type: 'effect', effectType: EffectType.WarpIn, x, y });
     this.sendPlayerState(conn);
+  }
+
+  /**
+   * A pilot gone to a system whose tick differs by `delta` (crowd dilation: sim/SystemClocks.ts): its ship's ticks and
+   * the server's notes of its client keyed by tick move with it; inputs and checks said in the old system's ticks go
+   */
+  private changeClock(conn: ClientConnection, delta: number): void {
+    if (!delta) return;
+    const eid = conn.playerId, ship = this.ships.get(eid);
+    if (ship) rebaseShipTicks(ship, delta);
+    conn.scheduledInputs = [];
+    conn.aheadHashes.clear();
+    conn.selfHashes.clear();
+    conn.liveTick += delta;
+    conn.selfSentTick += delta;
+    conn.lastSnapshotSentTick += delta;
+    const rift = this.riftCooldown.get(eid);
+    if (rift !== undefined) this.riftCooldown.set(eid, rift + delta);
+    this.hits.restart(conn);
   }
 
   /** Rifts fast-travel any player ship that flies into them. */
