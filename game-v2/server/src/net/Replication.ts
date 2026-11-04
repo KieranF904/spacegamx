@@ -514,7 +514,7 @@ export class Replication {
    * it, so it has its ship as the server's shadow has it, tick by tick, beside its
    * prediction (its own shells are built from that: SnapshotBuilder, ownShots.ts)
    */
-  forClient(systemId: number, self: number, known: Map<number, number>, snapshotTick: number, view?: Set<number>, held?: ReadonlyMap<number, unknown>, own = false, synced?: (id: number) => number | undefined, bodies?: (id: number) => boolean, causes = false, kept?: Kept): { ships: KeyframeRow[]; ctl: ControlRow[]; own?: number[][]; ownRebuild?: number; causes?: number[][]; caused?: number[] } {
+  forClient(systemId: number, self: number, known: Map<number, number>, snapshotTick: number, view?: Set<number>, held?: ReadonlyMap<number, unknown>, own = false, synced?: (id: number) => number | undefined, bodies?: (id: number) => boolean, causes = false, kept?: Kept, readers?: (ships: KeyframeRow[]) => Iterable<number>): { ships: KeyframeRow[]; ctl: ControlRow[]; own?: number[][]; ownRebuild?: number; causes?: number[][]; caused?: number[] } {
     const ships: KeyframeRow[] = [];
     const ctl: ControlRow[] = [];
     const out: { own?: number[][]; ownRebuild?: number; causes?: number[][]; caused?: number[]; ownEvents?: CauseEvent[] } = {};
@@ -570,6 +570,18 @@ export class Replication {
           s.ctlRow = packControlRow(eid, events, s.qSent);
         }
         ctl.push(s.ctlRow);
+      }
+    }
+    // (A body it runs reads a ship keyframed now: what the body made of it this window was off too, so the body's ship
+    // goes again as well (BodyNet.readersOf). Before any contact is settled: one with that ship then carries its state)
+    if (readers && ships.length) {
+      for (const id of readers(ships)) {
+        const n = ships.length;
+        this.keyNow(id, known, ships, causes);
+        if (ships.length === n) continue;
+        keyed.add(id);
+        const i = caused.findIndex(([e]) => e === id);
+        if (i >= 0) caused.splice(i, 1);
       }
     }
     // (Its own ship's contacts with a ship keyframed now after all (new to it, or one it couldn't work out): the other's

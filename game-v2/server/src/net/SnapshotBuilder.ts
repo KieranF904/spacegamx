@@ -713,13 +713,12 @@ export class SnapshotBuilder {
         holds: (e) => conn.shipView.has(e) && conn.repKnown.has(e),
         rekeyed: (e) => this.replication.keysFor(e, conn.playerId, conn.repKnown, causes),
       }, this.currentTick);
-      const rep = this.replication.forClient(playerSystemId, conn.playerId, conn.repKnown, this.currentTick, conn.shipView, conn.debrisHeld, ownShots, (id) => conn.shipSynced.get(id)?.rebuilds, bodies ? (id) => bodies.runs(conn, id) : undefined, causes, structsFor(conn.caps) ? (id) => this.keptAfter(conn, id, playerSystemId) : undefined);
+      const rep = this.replication.forClient(playerSystemId, conn.playerId, conn.repKnown, this.currentTick, conn.shipView, conn.debrisHeld, ownShots, (id) => conn.shipSynced.get(id)?.rebuilds, bodies ? (id) => bodies.runs(conn, id) : undefined, causes, structsFor(conn.caps) ? (id) => this.keptAfter(conn, id, playerSystemId) : undefined,
+        // (A ship a body it runs reads, keyframed now: the body's ship goes again too, Replication.forClient)
+        bodies ? (ships) => bodies.readersOf(conn, conn.playerId, ships) : undefined);
       // Shots from ships it replicates go as fire events: it builds the shells itself (launch.ts).
       // Not for a ship it's only now getting a keyframe for (it can't place it back then), nor its
       // own unless it replicates that too; those shells, and any flying in from further off, go as rows.
-      // (A ship a body it runs reads got a keyframe decided only in there (its own, after a contact it couldn't work out):
-      // what the body made of it this window was off too, so the body's ship goes again as well)
-      if (bodies && rep.ships.length) for (const id of bodies.readersOf(conn, conn.playerId, rep.ships)) this.replication.keyNow(id, conn.repKnown, rep.ships, causes);
       const keyed = new Set(rep.ships.map((k) => k[0]));
       // Its own row: whether it goes, and whether to correct its prediction
       const selfRow = rows.find((r) => r.id === conn.playerId);
