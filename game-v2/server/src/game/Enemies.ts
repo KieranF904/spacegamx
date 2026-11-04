@@ -1209,7 +1209,8 @@ export class Enemies {
     const fights = e.state === 'engage' || e.state === 'flee';
     const pose = (id: number) => ({ x: Position.x[id], y: Position.y[id], angle: Rotation.angle[id], vx: Velocity.x[id], vy: Velocity.y[id] });
     // (its body flies it while what it fights is a pilot's ship, or nothing: brains/aiPilot.ts)
-    const bodied = asBody && (!fights || hasComponent(this.host.world, Player, t));
+    // (Pinned (a fixed boss, a range target): it only turns, its thrust dropped (bridge/pilotless.ts), which its body doesn't know: the rows fly it)
+    const bodied = asBody && !this.ships.isPinned(eid) && (!fights || hasComponent(this.host.world, Player, t));
     const out = this.pilots.fly(eid, fights ? t : -1, e.strafe, want, pose(eid), fights ? pose(t) : null, cent, bodied);
     let firing = false;
     if (e.state === 'engage') {

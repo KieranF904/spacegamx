@@ -81,6 +81,8 @@ export function stepPilotless(b: BridgeCtx, eid: number, ship: ShipState, k: Fli
   if (controls !== hold) {
     q = quantizeReplicaAngle(controls.targetAngle);
     controls = { ...controls, targetAngle: replicaAngle(ReplicaMode.Pilotless, q) };
+    // (Pinned: it only turns. Its thrust would move it on every replica while the pin holds it here)
+    if (b.pinned.has(eid)) controls = { ...controls, forward: false, backward: false, left: false, right: false, boost: false };
   }
   // EMP'd: it keeps flying, crippled (as a pilot does); slowed by a Frostbite's beam, sluggish (features/weaponry)
   const slowed = b.slowedUntil.size > 0 && b.slowedTicksLeft(eid) > 0;
