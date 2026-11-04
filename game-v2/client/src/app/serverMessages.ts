@@ -150,11 +150,15 @@ function playerState(h: MessageHost, msg: Msg<'playerState'>): void {
       h.floatingRewardsUI.addXP(playerPos.x, playerPos.y, xpGain, msg.level > h.state.level);
     }
   }
-  h.state.hp = msg.hp;
+  // (hp and boost fuel come timed in every snapshot's own row; this message's are untimed, so they only seed the first
+  // value, or a flicker back to an old hp / fuel follows each message)
+  if (!h.statsPrimed) {
+    h.state.hp = msg.hp;
+    h.state.boostFuel = msg.boostFuel;
+    h.state.serverBoostFuel = msg.boostFuel;
+  }
   h.state.maxHp = msg.maxHp;
-  h.state.boostFuel = msg.boostFuel;
   h.state.maxBoostFuel = msg.maxBoostFuel;
-  h.state.serverBoostFuel = msg.boostFuel; // anchor for reconciliation
   // Sounds for gains and travel (not for the first update after joining)
   if (h.statsPrimed) {
     if (msg.level > h.state.level) h.audio.playUI('level_up');

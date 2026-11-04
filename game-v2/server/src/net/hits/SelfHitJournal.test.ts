@@ -92,3 +92,64 @@ describe('SelfHitJournal', () => {
     expect(j.stats.fixes).toBe(1);
   });
 });
+
+/**
+ * A model client at a level's report spacing: it sees each window `lag` ticks late, folds the changes between its
+ * (rate-limited) reports into the next, and applies a correction as SelfHits.fix does. One bogus hit, or one dropped.
+ */
+function wrongOnce(seed: number, every: number, wait: number, lag: number, mode: 'bogus' | 'drop'): number {
+  let s = seed;
+  const rnd = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
+  const j = new SelfHitJournal(0);
+  let dropped = false, chain = 0, epoch = 0, lastSent = -999, shell = 1000, fixes = 0;
+  let report: { tick: number; hash: number; epoch: number } | null = null;
+  const log: { tick: number; shell: number; h: number }[] = [];
+  const later: { at: number; run: () => void }[] = [];
+  const wrongAt = 600 + 3 * (seed % 17);
+  for (let now = 3; now < 1500; now += 3) {
+    const hits: JournalHit[] = [];
+    if (rnd() < 0.35) hits.push(hit(++shell, 50, (rnd() * 6) | 0, now));
+    j.close(now, hits);
+    const skip = mode === 'drop' && !dropped && now >= wrongAt && hits.length > 0;
+    if (skip) dropped = true;
+    const mine = (skip ? [] : hits).map((h) => ({ tick: h.tick, shell: h.rec.shell, h: hitHash(h.rec.shell, h.rec.target, h.rec.part) }));
+    if (mode === 'bogus' && now === wrongAt) mine.push({ tick: now, shell: 9999, h: hitHash(9999, 50, 1) });
+    later.push({ at: now + lag, run: () => {
+      for (const e of mine) { chain = chainAdd(chain, e.h); log.push(e); }
+      if (mine.length) report = { tick: now, hash: chain & 0xff, epoch };
+    } });
+    for (let i = 0; i < later.length; i++) if (later[i].at <= now) { later[i].run(); later.splice(i--, 1); }
+    if (report && now - lastSent >= every) {
+      const r = report;
+      report = null; lastSent = now;
+      later.push({ at: now + 3, run: () => j.report(r.tick, r.hash, r.epoch) });
+    }
+    const fix = j.judge(now, wait);
+    if (!fix) continue;
+    fixes++;
+    const theirs = new Set(fix.hits.map((h) => h.rec.shell));
+    let c = fix.c >>> 0;
+    const keep: typeof log = [];
+    for (const e of log) { if (e.tick <= fix.t || theirs.has(e.shell)) continue; c = chainAdd(c, e.h); keep.push(e); }
+    log.length = 0; log.push(...keep);
+    chain = c; epoch = fix.e; report = { tick: now, hash: chain & 0xff, epoch };
+  }
+  return fixes;
+}
+
+describe('SelfHitJournal: one mistake, one correction', () => {
+  it('at ROUGH, where reports come a second apart and fold several windows into one, a wrong hit is corrected once', () => {
+    // (Judging at the time its latest report was not yet in made the first correction cover windows that had agreed)
+    for (let seed = 1; seed <= 60; seed++) {
+      const lag = [0, 3, 6][seed % 3];
+      expect(wrongOnce(seed * 7919, 60, 24 + 54, lag, 'bogus'), `bogus ${seed}`).toBe(1);
+    }
+  });
+
+  it('...and so is a hit the client missed', () => {
+    for (let seed = 1; seed <= 60; seed++) {
+      const lag = [0, 3, 6][seed % 3];
+      expect(wrongOnce(seed * 7919, 60, 24 + 54, lag, 'drop'), `drop ${seed}`).toBe(1);
+    }
+  });
+});

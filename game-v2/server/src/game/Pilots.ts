@@ -103,6 +103,8 @@ interface Session {
   rebuildKey: string;
   /** The last `items` message sent, as JSON (an unchanged one is not sent again) */
   itemsKey?: string;
+  /** The last `profile` message sent, as JSON without its clock (an unchanged one is not sent again) */
+  profileKey?: string;
   /** Last time we told them the station covered a rebuild (wall ms) */
   lastCreditNote: number;
   /** Station repair owed in fractions of a credit (charged a whole credit at a time) */
@@ -1107,11 +1109,17 @@ export class Pilots {
     const p = s.profile;
     const homeEid = this.host.stationEntity(p.home);
     const lo = this.loadout?.(p);
-    this.host.send(conn, {
-      type: 'profile', guest: conn.userId === null, credits: p.credits, xp: p.xp, level: p.level,
+    const msg = {
+      type: 'profile' as const, guest: conn.userId === null, credits: p.credits, xp: p.xp, level: p.level,
       xpLevel: xpToReach(p.level), xpNext: xpToReach(p.level + 1), skillPoints: p.skillPoints, skills: p.skills,
       plans: p.plans, recipes: p.recipes, licences: p.licences, home: p.home, quickbar: p.quickbar, debt: p.debt ?? 0, ammo: p.ammo?.open ?? {}, ammoPrefer: lo?.first ?? p.ammo?.prefer ?? {}, loadout: lo?.load ?? {}, outpost: p.outpost ?? null, now: this.now(), homeName: (homeEid >= 0 ? this.host.stationInfo(homeEid)?.name : undefined) ?? p.home,
-    });
+    };
+    // (A full state, and its clock only seeds the client's skew: a copy of what they hold is not sent again; mining and
+    // ammo used to resend it every second or so)
+    const key = JSON.stringify({ ...msg, now: 0 });
+    if (s.profileKey === key) return;
+    s.profileKey = key;
+    this.host.send(conn, msg);
   }
 
   sendItems(conn: PilotConn): void {

@@ -588,7 +588,9 @@ export class SnapshotBuilder {
       const prevStates = this.lastEntityStates.get(conn.playerId) || new Map<number, string>();
       const newStates = new Map<number, string>();
       const markIfChanged = (state: EntityState) => {
-        const key = JSON.stringify(state);
+        // (hp and boost fuel ride every snapshot's own row, timed; here they are only the first values, so they are not part of
+    // the key: a change in them alone sent a message that the client then wrote over its prediction with)
+    const key = JSON.stringify({ ...state, hp: 0, boostFuel: 0 });
         newStates.set(state.id, key);
         if (prevStates.get(state.id) !== key) entities.push(state);
       };

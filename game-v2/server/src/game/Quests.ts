@@ -87,6 +87,8 @@ type Progress = { stage: number; progress: number; data?: Record<string, number 
 export class Quests {
   private defs = new Map<string, QuestDef>();
   private ticks = 0;
+  /** The last `quests` view each profile was sent, as JSON */
+  private sent = new WeakMap<object, string>();
   /** Who you can talk to (set once People is built) */
   people: People | null = null;
   /** Records a job can pay (set once Codex is built) */
@@ -779,10 +781,16 @@ export class Quests {
     }
     const finished = p.quests.done.filter((id) => !Quests.generated(id)).map((id) => this.defs.get(id)).filter((q): q is QuestDef => !!q)
       .map((q) => ({ id: q.id, name: q.name, chain: q.chain, outro: q.outro }));
-    this.host.send(conn, {
-      type: 'quests', active, done: p.quests.done.filter((id) => !id.startsWith('bounty:')).length, leads, finished, hidden, builds: this.builds(p),
+    const msg = {
+      type: 'quests' as const, active, done: p.quests.done.filter((id) => !id.startsWith('bounty:')).length, leads, finished, hidden, builds: this.builds(p),
       reputation: p.reputation, reputations: this.file.reputations,
-    });
+    };
+    // (The whole view, 3.9 KB: a copy of what they hold is not sent again, as every counted event used to)
+    const key = JSON.stringify(msg);
+    if (this.sent.get(p) !== key) {
+      this.sent.set(p, key);
+      this.host.send(conn, msg);
+    }
     this.people?.sendPeople(conn);
   }
 

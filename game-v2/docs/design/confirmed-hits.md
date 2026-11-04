@@ -880,8 +880,11 @@ untouched).
 
 ### E5. Left
 
-- A correction at ROUGH can come in two (the first covers windows before the bad report, which had agreed but were
-  not yet settled: no hits missed or wrong in it). Judging at the bad report's tick would make it one.
+- (Fixed.) A correction at ROUGH used to come in two or three: reports a second apart fold the changes between into the
+  next, so judging at `now - wait` compared the client's value there with an older report and corrected windows that had
+  agreed. The journal now judges a later report that is already in at that report's own tick (SelfHitJournal.judge):
+  a model client at ROUGH went from 1 correction in 60 cases to 300 of 300, one wrong hit one correction
+  (SelfHitJournal.test.ts).
 - Nothing escalates for a client whose reports are just late (a bad connection): two disagreements running correct
   it like any other. Its delay could rise with its ping instead (not built).
 - The switch: on in dev builds with client-detected hits (`?rough=0|1`, remembered); the dev server allows it

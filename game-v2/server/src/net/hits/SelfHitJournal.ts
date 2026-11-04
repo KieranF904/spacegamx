@@ -73,12 +73,24 @@ export class SelfHitJournal {
       if (now - this.awaitingSince < AWAIT_MAX) return null;
       this.awaitingSince = -1;
     }
-    const j = now - wait;
+    let j = now - wait;
     if (!this.wins.length || this.wins[0].tick > j) { this.badSince = -1; return null; }
     // Its value as of j: its last report at or before (none since: nothing changed)
     while (this.claims.length && this.claims[0].tick <= j) this.claimed = this.claims.shift()!;
-    const s = this.sumAt(j);
+    // (A report judged at its own tick, below, stays the one judged until j passes it)
+    const ahead = this.claimed.tick > j;
+    j = Math.max(j, this.claimed.tick);
+    let s = this.sumAt(j);
     if ((s & 0xff) === this.claimed.hash) { this.stats.agreed++; this.settle(j, s); return null; }
+    // A later report is already here (past j): the client's reports are rate-limited and fold the changes between into
+    // the next, so its value at j is not known but at that report's own tick it is. Judge there: a client that was only
+    // late to report agrees, and one that is wrong is corrected once, not once for the windows before its bad report
+    if (this.claims.length && !ahead) {
+      this.claimed = this.claims.shift()!;
+      j = this.claimed.tick;
+      s = this.sumAt(j);
+      if ((s & 0xff) === this.claimed.hash) { this.stats.agreed++; this.settle(j, s); return null; }
+    }
     this.stats.disagreed++;
     if (this.badSince < 0) { this.badSince = now; return null; }
     if (now - this.badSince < GRACE) return null;
