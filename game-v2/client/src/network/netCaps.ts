@@ -5,7 +5,8 @@
  * events), `?rough=0|1` (adaptive validation, with client-detected hits), `?ownsim=0|1` (its own ship stepped by itself), `?compact=0|1` (compact inputs: common
  * network/inputCompact.ts) and `?bodies=0|1` (bosses flown by their bodies from their brains' decisions, with ownsim:
  * docs/design/decision-inputs.md) and `?blocks=0|1` (snapshots in encode-once blocks, with packed: common
- * network/packed/blocks.ts). The server takes what it allows (netCaps).
+ * network/packed/blocks.ts) and `?focus=0|1` (the focus grid: the ships in the cells within 19 km held, the ring as ghosts,
+ * dropped cells kept a while: common network/cells.ts). The server takes what it allows (netCaps).
  */
 import { CAPS, TICK_MS, confirmRules } from '@space-game/common';
 import { clientCaps } from '../ships/hits/ConfirmedHits';
@@ -38,8 +39,10 @@ export function netCaps(): number {
   const bodies = ownSim && (flag('bodies', 'sg.bodies') ?? dev);
   // (snapshots in encode-once blocks: the same messages, each row bit-packed once on the server for every client)
   const blocks = packed && (flag('blocks', 'sg.blocks') ?? dev);
+  // (the focus grid: the ships homed in the cells within 19 km on its tick layer, the ring out to 35 km as ghosts)
+  const focus = flag('focus', 'sg.focus') ?? dev;
   return hits | (compact ? CAPS.INPUTS : 0) | (packed ? CAPS.PACKED : 0) | (coalesce ? CAPS.COALESCE : 0) | (ownShots ? CAPS.OWN_SHOTS : 0) | (rough ? CAPS.ROUGH : 0) | (ownSim ? CAPS.OWN_SIM : 0) | (bodies ? CAPS.BODIES : 0)
-    | (blocks ? CAPS.BLOCKS : 0);
+    | (blocks ? CAPS.BLOCKS : 0) | (focus ? CAPS.FOCUS : 0);
 }
 
 /**

@@ -62,6 +62,7 @@ import { boundKeyName } from '../input/keybindings';
 import { ClientFeatures } from './features/host';
 import { CLIENT_FEATURES } from './features/index';
 import type { QualityProfile } from '../settings/quality';
+import { CellCache } from './cells/CellCache';
 
 /** A pulse laser's sound by its grade, Mk I-V: subtle, and centred low (the wide Mk IV deepest, the x-ray Mk V a touch brighter) */
 const PULSE_GRADE_PITCH = [0.98, 0.94, 1.01, 0.9, 1.04];
@@ -281,7 +282,12 @@ export class ShipClient {
     });
     this.own = new OwnTick({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, tuning: opts.tuning, restep: () => this.bodies.on });
     this.bodies = new BodyRunner({ reps: this.replicas });
+    // (Cells dropped from its focus, kept a while: CAPS.FOCUS, ships/cells/CellCache.ts)
+    this.cells = new CellCache({ reps: this.replicas, send: (m) => opts.send(m), forget: (id) => { this.bodies.remove(id); opts.state.entities.delete(id); } });
   }
+
+  /** Dropped cells kept on the side (CAPS.FOCUS): their ships come back from here, fast-forwarded */
+  readonly cells: CellCache;
 
   /** A ship's side, as this client knows it (hitRules SIDE bits: who may hurt whom) */
   private sideOf(id: number): number {
@@ -356,6 +362,7 @@ export class ShipClient {
 
   /** A connection afresh: confirmed and client-detected hits start over, as the server's do, and so do bosses' bodies (BodyRunner.reset) */
   resetHits(): void {
+    this.cells.clear();
     this.hits.reset();
     this.selfHits.reset();
     this.bodies.reset();
@@ -1033,6 +1040,9 @@ export class ShipClient {
       case 'debrisSplit':
         this.onDebrisSplit(msg);
         return true;
+      case 'cells':
+        this.cells.onCells(msg);
+        return true;
       case 'shipSync':
         this.selfHits.onSync(msg.id);
         this.own.beforeSync(msg.id);
@@ -1424,7 +1434,8 @@ export class ShipClient {
   /** Once per frame, after interpolation. */
   update(now: number): void {
     const { state } = this.opts;
-    this.store.prune((id) => state.entities.has(id), now);
+    // (a ship in a kept cell keeps its structure: it comes back without a sync)
+    this.store.prune((id) => state.entities.has(id) || this.cells.has(id), now);
 
     // (The last ship flown, for the hangar while its sync is away)
     const mine = this.store.get(state.playerId);

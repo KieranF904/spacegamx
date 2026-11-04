@@ -170,6 +170,8 @@ function playerState(h: MessageHost, msg: Msg<'playerState'>): void {
   if (msg.systemId !== h.state.systemId) {
     h.state.clearDeterministicAsteroids();
     h.state.clearForSystemChange();
+    // (cells kept from the system it left: CAPS.FOCUS)
+    h.shipClient.cells.clear();
   }
   h.state.systemId = msg.systemId;
 }
