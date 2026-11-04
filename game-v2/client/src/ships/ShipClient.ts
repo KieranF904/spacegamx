@@ -568,10 +568,10 @@ export class ShipClient {
     this.own.onSnapshot(m);
     // (other ships' causes, CAPS.CAUSES: before their fire events are built from them)
     this.causes.onSnapshot(m);
-    // (splits that waited for them: their parents' poses as the server split them)
-    this.debris.flush();
     // (bosses' decisions, CAPS.BODIES: their bodies fly them on the tick layer from here: ships/bodies/BodyRunner.ts)
     this.bodies.onSnapshot(m.tick, m.decisions);
+    // (splits that waited for them, and for the decisions: their parents' poses as the server split them)
+    this.debris.flush(new Set(m.ships?.map((k) => k[0])));
     const out: EntityState[] = [];
     // (Debris worked out here since the last snapshot: its rows, as the server would have sent them)
     out.push(...this.debris.takeRows());

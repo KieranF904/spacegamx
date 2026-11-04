@@ -58,6 +58,8 @@ export class Probe {
   clientMs = 0;
   /** Of which its debris world (ShipReplicaSet.stepDebrisTo) */
   debrisMs = 0;
+  /** Debris it had off with no keyframe (the first few) */
+  readonly debrisOffs: object[] = [];
   /** Pieces of debris it was sent (a removal's id is one after the piece is gone) */
   private readonly debrisSeen = new Set<number>();
 
@@ -117,7 +119,17 @@ export class Probe {
         if (!r || !st) continue;
         const a = this.agree[id === this.pid ? 'self' : this.classOf(id)];
         a.checked++;
-        if (st.x !== r[0] || st.y !== r[1] || st.vx !== r[2] || st.vy !== r[3] || st.angle !== r[4] || st.angVel !== r[5]) { a.off++; if (!kf.has(id)) a.offNoKf++; }
+        if (st.x !== r[0] || st.y !== r[1] || st.vx !== r[2] || st.vy !== r[3] || st.angle !== r[4] || st.angVel !== r[5]) {
+          a.off++;
+          if (!kf.has(id)) {
+            a.offNoKf++;
+            // (Debris off with no keyframe: what's known of it, for chasing)
+            if (a === this.agree.debris && this.debrisOffs.length < 30) {
+              const c = server.pilots.connOf(this.pid) as unknown as { debrisLive?: Set<number>; debrisHeld: Map<number, unknown> }, sh = server.getShips();
+              this.debrisOffs.push({ id, tick: s.tick, d: [st.x - r[0], st.y - r[1], st.vx - r[2], st.vy - r[3]].map((v) => +v.toFixed(3)), runs: !!f.debris?.lives?.has(id), live: !!c.debrisLive?.has(id), told: sh.debrisNet.told.has(id), born: sh.get(id)?.spawnTick, aloof: f.store?.aloof?.has(id) });
+            }
+          }
+        }
       }
     };
   }

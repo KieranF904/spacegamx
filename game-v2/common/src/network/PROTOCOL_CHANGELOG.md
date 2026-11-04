@@ -35,3 +35,4 @@ except to fix a typo. A bump makes old clients reload (see PROTOCOL_VERSION in p
 - 43 (2026-11-04): shipSync born and aloof: a piece of debris's grace and whether it knocks (DEBRIS_GRACE_TICKS)
 - 44 (2026-11-04): debrisSplit l: the pieces are the client's to run from their spawn (CAPS.DEBRIS 131072)
 - 45 (2026-11-04): debrisSplit g: what a ship shed whole, derived as the split's first pieces (fling, crumble, aloof)
+- 46 (2026-11-04): debrisSplit s: a destroyed ship's pose as its split took it

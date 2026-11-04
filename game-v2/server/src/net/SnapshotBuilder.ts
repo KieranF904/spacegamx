@@ -963,11 +963,12 @@ export class SnapshotBuilder {
     const net = this.ships.debrisNet, live = conn.debrisLive;
     for (const [parent, splits] of net.splits) {
       if (parent === conn.playerId || !conn.shipView.has(parent) || !conn.repKnown.has(parent)) continue;
-      // (Dead or gone, with causes this window: those never reach it, so its pose at the split is off there: sent in full)
-      const dead = !this.ships.has(parent) || (hasComponent(this.world, Player, parent) && Health.current[parent] <= 0);
-      if (dead && this.replication.causedInWindow(parent)) continue;
       // (A piece of debris something moved this window: its replica there is off till its keyframe, so its pieces would be)
       if (net.touched.has(parent)) continue;
+      // (Dead or gone, with causes this window: those never reach it, so its pose at a split is off there unless the split
+      // says it: sent in full)
+      const dead = !this.ships.has(parent) || (hasComponent(this.world, Player, parent) && Health.current[parent] <= 0);
+      const unsure = dead && this.replication.causedInWindow(parent);
       const synced = conn.shipSynced.get(parent), had = conn.shipHpSent.get(parent);
       if (!synced || !had) continue;
       // (A piece it runs, as the server has it: it worked its crumbling out, so it has it as it was whatever its last sync)
@@ -975,12 +976,14 @@ export class SnapshotBuilder {
       // (Its copy is the structure the split started from if its centre of mass is that one: HP-band rebuilds don't move it)
       const com = net.comAt(parent, synced.rebuilds);
       for (const sp of splits) {
-        if (synced.ship !== sp.ship || (!runs && (!com || com[0] !== sp.com[0] || com[1] !== sp.com[1]))) continue;
+        if (synced.ship !== sp.ship || (!runs && (!com || com[0] !== sp.com[0] || com[1] !== sp.com[1])) || (unsure && !sp.pose)) continue;
         const until = now + DEBRIS_ACK_TICKS + 2 * Math.ceil(conn.ping / (1000 / TICK_RATE));
         // (Its to run from their spawn, CAPS.DEBRIS: pieces of a ship, or of a piece it runs: it knows when each part crumbles)
         const l = debrisFor(conn.caps) && (sp.ship.kind !== 'debris' || runs);
         sp.ids.forEach((id, k) => conn.debrisHeld.set(id, { until, hp: sp.groups[k].map((i) => had[i] ?? 0), live: l }));
-        this.send(conn.ws, { type: 'debrisSplit', id: parent, tick: sp.tick, e: packIds(sp.ids), p: packRuns(sp.parts), l: l ? 1 : undefined, g: sp.sheds ? packSheds(sp.sheds) : undefined });
+        // (A ship destroyed: where it was, for what it had of it this window may never come right)
+        const at = sp.pose && [sp.pose.x, sp.pose.y, sp.pose.angle, sp.pose.vx, sp.pose.vy, sp.pose.angVel];
+        this.send(conn.ws, { type: 'debrisSplit', id: parent, tick: sp.tick, e: packIds(sp.ids), p: packRuns(sp.parts), l: l ? 1 : undefined, g: sp.sheds ? packSheds(sp.sheds) : undefined, s: at });
       }
     }
   }

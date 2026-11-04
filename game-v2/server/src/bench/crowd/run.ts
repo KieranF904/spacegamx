@@ -240,6 +240,7 @@ export async function runCase(o: CaseOpts): Promise<any> {
       disagreeNoKeyframe: ['self', 'player', 'ai', 'boss'].reduce((n, k) => n + (agree[k]?.offNoKf ?? 0), 0),
       checked: ['self', 'player', 'ai', 'boss'].reduce((n, k) => n + (agree[k]?.checked ?? 0), 0),
       otherDisagree: (agree.other?.offNoKf ?? 0) + (agree.debris?.offNoKf ?? 0), otherChecked: (agree.other?.checked ?? 0) + (agree.debris?.checked ?? 0),
+      debrisOffAt: probeList.flatMap((p) => p.debrisOffs).slice(0, 30),
       debrisDisagree: agree.debris?.offNoKf ?? 0, debrisOff: agree.debris?.off ?? 0, debrisChecked: agree.debris?.checked ?? 0,
       keyframeCorrectionsPerSecPerProbe: r2(mean(probeList.map((p) => p.keyframesCorrect / secs))),
       correctionsByClass: probeList.reduce((acc, p) => { for (const [k, v] of Object.entries(p.corrections)) { const a = (acc[k] ??= { n: 0, same: 0 }); a.n += v!.n; a.same += v!.same; } return acc; }, {} as Record<string, { n: number; same: number }>),

@@ -125,6 +125,9 @@ export class DebrisSplits implements DebrisWorld {
     const parent = run ?? store.get(msg.id);
     if (!parent) return;
     const joins = computeJoins(store.geometry(parent));
+    // (A ship destroyed: the split says where it was)
+    const s = msg.s;
+    if (s && s.length >= 6) { this.derive(msg, parent, joins, { x: s[0], y: s[1], angle: s[2], vx: s[3], vy: s[4], angVel: s[5] }); return; }
     if (run) { this.waiting.push({ msg, parent: run, joins, run: true }); return; }
     // (With causes: once the snapshot's are in, flush; the parent as it is now, its sync comes after this)
     if (this.host.splitPose?.()) {
@@ -135,8 +138,11 @@ export class DebrisSplits implements DebrisWorld {
     if (at) this.derive(msg, parent, joins, at.body);
   }
 
-  /** The snapshot's causes are in: the splits waiting on them worked out (with the parent's pose as the server split it) */
-  flush(): void {
+  /**
+   * The snapshot's causes and decisions are in: the splits waiting on them worked out (with the parent's pose as the
+   * server split it); `keyed`, the ships the snapshot keyframed
+   */
+  flush(keyed?: ReadonlySet<number>): void {
     // (Pieces it ran that it no longer holds: removed, or out of view)
     const reps = this.host.reps();
     for (const id of [...this.lives.ids()]) if (!reps.has(id)) this.lives.drop(id);
@@ -145,8 +151,14 @@ export class DebrisSplits implements DebrisWorld {
     for (const w of this.waiting.splice(0)) {
       // (A piece it runs: its world stepped to the tick, the snapshot's keyframes in, and its body before it was recentred)
       if (w.run) { reps.at(w.msg.id, w.msg.tick); const pre = this.preAt(w.msg.id, w.msg.tick); if (pre) this.derive(w.msg, w.parent, w.joins, pre); continue; }
-      // (No rebuild of it among the causes, debris splitting again: its replica's at the tick, as it was when the split came)
-      const body = pose?.(w.msg.id, w.msg.tick) ?? w.now;
+      // (No rebuild of it among the causes: its replica's at the tick, now the snapshot's controls and decisions are in,
+      // when its structures are kept by tick (CAPS.STRUCTS: it flew that tick as it was); else as it was when the split
+      // came, before its sync)
+      // (A piece recentred there: where it was before. Keyframed in this snapshot: as it was when the split came)
+      const kept = !!this.host.store.derivedAt(w.msg.id, w.msg.tick) && !keyed?.has(w.msg.id);
+      // (stepped there first: a piece's sync since may have it stepped again, recentred at the tick)
+      if (kept) reps.at(w.msg.id, w.msg.tick);
+      const body = this.preAt(w.msg.id, w.msg.tick) ?? pose?.(w.msg.id, w.msg.tick) ?? (kept ? reps.at(w.msg.id, w.msg.tick)?.body : undefined) ?? w.now;
       if (body) this.derive(w.msg, w.parent, w.joins, body);
     }
   }

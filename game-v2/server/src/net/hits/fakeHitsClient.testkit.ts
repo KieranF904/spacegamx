@@ -249,11 +249,11 @@ export class FakeHitsClient {
     this.own?.onSnapshot(s);
     // (other ships' causes, CAPS.CAUSES, before their fire events are built from them)
     this.causes?.onSnapshot(s);
-    this.debris.flush();
-    // (the status rows of debris it worked out: the game client shows them; nothing here)
-    this.debris.takeRows();
     // (bosses' decisions, CAPS.BODIES: their bodies fly them from here)
     this.bodies?.onSnapshot(s.tick, s.decisions);
+    this.debris.flush(new Set(s.ships?.map((k) => k[0])));
+    // (the status rows of debris it worked out: the game client shows them; nothing here)
+    this.debris.takeRows();
     // (homing shells, CAPS.WAYPOINTS: flown from their SYNCs and waypoints)
     this.guides?.onSnapshot(s.tick, s.guides);
     for (const e of s.entities) {

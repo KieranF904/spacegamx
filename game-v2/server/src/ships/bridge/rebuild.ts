@@ -403,7 +403,10 @@ export function rebuildNow(b: BridgeCtx, eid: number, ship: ShipState, derivable
     // Clients that have this ship as it was can work the pieces out themselves (bridge/debrisNet.ts, SnapshotBuilder)
     if (derivable) {
       const parts = groups.flat().sort((x, y) => x - y);
-      b.debrisNet.noteSplit(eid, { ship, tick: b.host.getTick(), com: oldCom, ids, groups: [...sheds.flatMap((s) => s.groups), ...groups.map((g) => [...g])], parts, sheds: sheds.length ? sheds : undefined });
+      // (Nothing left of it: it goes now, and what its clients had of it this window may never come right, so the split
+      // says where it was, common ships/debris.ts splitPose)
+      const gone = ship.derived.root < 0 ? splitPose(pose.x, pose.y, pose.angle, Velocity.x[eid], Velocity.y[eid], ship.angVel) : undefined;
+      b.debrisNet.noteSplit(eid, { ship, tick: b.host.getTick(), com: oldCom, ids, groups: [...sheds.flatMap((s) => s.groups), ...groups.map((g) => [...g])], parts, sheds: sheds.length ? sheds : undefined, pose: gone });
       for (const d of ids) { const sp = b.bodies.get(d); if (sp) b.debrisNet.spawns.set(d, { hash: debrisHash(b.readBody(d, sp)), rebuilds: sp.rebuilds }); }
     }
     for (const g of groups) for (const i of g) ship.detached[i] = true;
