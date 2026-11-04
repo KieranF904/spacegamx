@@ -13,7 +13,13 @@ enemies are unchanged.
 - Stills: `scripts/bespoke/enemies/render.mjs`, a private copy of the native renderer on port 5318 that reads a mirror
   folder outside the tree (the same approach as `maw_heart_render.mjs`). Sheets: `scripts/bespoke/enemies/sheet.py`.
 - Panels: `docs/panels/2026-11-04/enemies/`. `<id>.png` shows the grid enemy it replaces (if any), the design intact
-  and the design damaged, all at one zoom. `roster.png` and `roster-damaged.png` show all eight.
+  and the design damaged, all at one zoom. `roster.png` and `roster-damaged.png` show all eight. `play-zoom.png` shows each as big as it is on
+  screen: at the game's default zoom (1) on top and zoomed out (0.45) below. All eight still read by silhouette and
+  colour at both; rivets and thin struts disappear, as expected. The Rime Bell was the one that faded out, so it is now
+  a quarter bigger. `<id>-v1-vs-v2.png` shows the first draft over the rework for the four designs reworked after review.
+- The Maw Lurker is drawn with the Heart of the Maw redesign's proposed materials and surfaces. Those replace the Scrap
+  Mother's tiles, so `render.mjs` renders the Maw designs in a second pass of their own (`surfaces: 'maw'` on the card,
+  port 5319).
 
 ```
 node scripts/bespoke/enemies/build-all.mjs
@@ -41,11 +47,11 @@ changes what the enemy does, so there's a reason to aim.
 | 1 | Scrap Crawler | Scrapborn | `scrap_crawler` | puller / brawler | 146 | 14 / 8 | 3-6 | medium |
 | 2 | Rivet Sower | Scrapborn | new | mine layer | 157 | 9 / 6 | 4-7 | medium |
 | 3 | Slag Ray | the Pyreclast's cavern | new | skirmisher / area denial | 159 | 7 / 5 | 26-32 | medium |
-| 4 | Clinker | the Pyreclast's cavern | new | tank / artillery | 119 | 10 / 8 | 26-32 | high |
+| 4 | Clinker | the Pyreclast's cavern | new | tank / artillery | 124 | 13 / 7 | 26-32 | high |
 | 5 | Censer | Cinder Cult | `cinder_zealot` | sniper / lancer | 140 | 9 / 6 | 15-20 | medium |
-| 6 | Maw Lurker | Maw Spawn | `maw_lurker` | sniper | 161 | 9 / 6 | 24-30 | high |
+| 6 | Maw Lurker | Maw Spawn | `maw_lurker` | sniper | 165 | 7 / 6 | 24-30 | high |
 | 7 | Hookboat | Pirates | `pirate_raider` | puller | 138 | 11 / 5 | 8-12 | medium |
-| 8 | Rime Bell | Frost Brood | `frost_shard` | swarmer / support | 101 | 6 / 5 | 6-9 | low |
+| 8 | Rime Bell | Frost Brood | `frost_shard` | swarmer / support | 125 | 6 / 5 | 6-9 | low |
 
 Radius is in world units (24 to a cell). The grid enemies they replace are about 60-100 across their radius. The
 custom ones are a little bigger so their pieces read at game zoom; each design's `scale` in `write()` is a single
@@ -61,6 +67,9 @@ back, a copper-wound electromagnet between two crusher claws, two hind legs brac
 - **Pieces:** `magnet` (gone: no pull, so it has to crawl up to you at its slow pace); `claw_l` / `claw_r` (each one
   gone halves the snap; both gone, it rams instead); `shell_l` / `shell_r` (armour: each one gone bares the spine and
   lamp on that side, so shots to that side hit the core); `legs` (armour); `drive` (gone: it drifts and can only turn).
+- **Look (rework):** the first draft's clean teal strips read as high-tech. It now keeps the Scrap Mother's greyseam
+  green, but only as low leaks through grime and a dirty lamp, with warm amber work lamps. The Rivet Sower's mines are
+  lit unevenly, and some have gone dead.
 - **Why it's better:** the grid crawler is a 5x4 block with one cannon, and nothing about it looks like what it does.
   This one shows its threat (the magnet and claws), and you can stop the threat by shooting it.
 
@@ -91,17 +100,20 @@ molten heart with gill slits glowing down its back, two curled horns either side
 
 ### 4. Clinker (Pyreclast's cavern; new)
 
-A lump of cooled slag that crawls: five crust plates domed over a pool of magma, a vent at its crown, two banded
-chimneys on its back plates, a blunt beak of crust. Lava glows in the cracks between the plates, and floods out where a
-plate comes off (see `clinker-damaged.png`).
+A tortoise of cooled slag. It has an oval shell of four crust plates around a lava vent at its crown: a beaked front,
+a right, a back carrying two banded chimneys, and a left. Each plate is a raised scute in a bevelled frame, with growth
+ridges and a single crack of lava down it. A darker rim runs round the edge. The plates part along the diagonals, so
+the magma under the shell shows as a glowing X; where a plate comes off, the magma floods out (`clinker-damaged.png`).
+The first draft was a lumpy pile of random shards (`clinker-v1-vs-v2.png`).
 
 - **Behaviour:** it settles into a lane and lobs magma over the rock from its chimneys, in a fixed left-right order.
-- **Pieces:** `plate0`-`plate4` (crust: they soak fire; once one comes off, the magma under it is bared and takes 150%,
-  but hitting the magma also splashes the shooter if they're close); `chimney_l` / `chimney_r` (each one gone removes
-  half its volleys; both gone, it crawls at you to ram); `core` (the vent and the magma: under the plates, so while a
-  plate covers a spot, hits there go to the plate, which is the bespoke `under` rule).
+- **Pieces:** `plate_front` / `plate_right` / `plate_back` / `plate_left` (crust, each with its length of rim and the
+  front one with the beak: they soak fire; once one is off, the magma under it is bared and takes 150%, but hitting the
+  magma also splashes the shooter if they're close); `chimney_l` / `chimney_r` (each one gone removes half its volleys;
+  both gone, it crawls at you to ram); `core` (the vent and the magma under the plates: while a plate covers a spot,
+  hits there go to the plate, which is the bespoke `under` rule).
 - It's a small version of the Pyreclast's "a vent window where it takes 150%": a tank you get through by cracking it,
-  not just a big health bar.
+  not just a big health bar. You can see which plate to crack.
 
 ### 5. Censer (Cinder Cult; replaces `cinder_zealot`)
 
@@ -119,19 +131,21 @@ on chains from two swept vanes.
 
 ### 6. Maw Lurker (Maw Spawn; replaces `maw_lurker`)
 
-A splinter of dark rock that hunts: a chunky knot of slate, a long obsidian horn forward with a gold-lit groove down it
-(its rail), one gold eye beside the horn's root, broken glassy shards grown out at odd angles (two to the left, one of
-them reaching forward, two to the right), gold light in the cracks of the knot at its root. Stand-in materials
-(leestone, pyre glass) until the Maw has its own, as for the Heart's redesign.
+A small kin of the Heart of the Maw, in its v3 visual language. A seed of shard-ring crust in uneven plates, with one
+gold eye in a socket at its front. The heartbeat's veins branch back from the eye across the crust and fade from gold
+to ember as they go, as on the Heart. A long horn of heartstone points forward with a vein down it (its rail). Two
+roots sweep back from glowing knots on its flanks, and a short tail root ends in a knot of crystal. It uses the Heart
+redesign's proposed materials (`maw_crust`, `maw_heartstone`, `maw_seamglass`), so it looks related to its boss. The
+first draft was a spike with loose shards (`maw_lurker-v1-vs-v2.png`).
 
 - **Behaviour:** it hangs far off in the shard field, its eye draws a thin gold line on you, then the rail fires one
   heavy slug.
 - **Pieces:** `eye` (gone: its line wobbles and its shot spreads, so it moves closer to make up for it); `rail` (gone:
-  it closes in and rams with the knot); `flank_l` / `flank_r` (glass shards as armour on each side); `vents` (gone: it
-  drifts more slowly and can't keep its range).
+  it closes in and rams with the seed); `root_l` / `root_r` (shoot a root's knot and the root goes; each one gone, it
+  drifts and turns slowly towards that side); `tail` (gone: it can't hold its range and drifts in).
 - **Why it's better:** the grid Lurker has a railgun and two missile pods on an 8x5 grid, the same shape as everything
-  else there. This one reads as part of the shard ring (dark rock with gold seams, like the Heart), and its one threat
-  is a single line you can watch for.
+  else there. This one looks like a small version of the Maw's boss, and its one threat is a single line you can watch
+  for.
 
 ### 7. Hookboat (Pirates; replaces `pirate_raider`)
 
@@ -173,7 +187,8 @@ sheds the group together, and a body reads "is the magnet there" as one bit.
 **Materials.** Only the bosses' own materials (`scrap_*`, `pyre_*`, `brood_*`) and `leestone` / `titanium` read as
 hull at this zoom. The catalogue's other materials (`dense_ferrite`, `conductive_steel`, `steel`) show a 2-cell panel
 grid that makes them look like grid ships again. A `core` part shows its glowing honeycomb wherever it isn't covered,
-so every core here is small and sits in a recess or under another part. Drives use `pyre_steel` or `scrap_steel`,
+so every core here is small and sits in a recess or under another part. The Maw Lurker uses the
+Heart redesign's proposed materials (rendered in their own pass). Drives use `pyre_steel` or `scrap_steel`,
 because other materials give purple or blue housings. The Maw and the pirates use stand-ins: they should each get two
 materials of their own (`maw_slate`, `maw_glass`; `pirate_plate`, `pirate_paint`), as the bosses did.
 
@@ -213,7 +228,7 @@ travels today. That's the same as or less than a grid enemy.
 4. **Size**: the custom enemies are 100-160 units across their radius, against the grid ones' 60-100. Should they be
    scaled down to the old sizes (one number per design), or should the bigger, more readable size become the rule?
 5. **Own materials for the Maw and the pirates** (see Build notes): a protocol bump each, since they're not in the wire
-   dictionary.
+   dictionary. The Maw Lurker already uses the Heart redesign's proposed ones, so it gets them when the Heart does.
 6. **Which to build first**: the Hookboat and the Crawler need nothing that doesn't exist yet except the move module
    and `group`. The Sower needs mob LAUNCH ids (decision-inputs stage 8). The Clinker needs the `under` hit rule on a
    non-boss.

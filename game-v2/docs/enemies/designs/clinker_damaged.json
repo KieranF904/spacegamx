@@ -16,9 +16,9 @@
   },
   {
    "uid": 1,
-   "piece": "clinker_plate0",
+   "piece": "clinker_plate_front",
    "fn": "armor",
-   "material": "pyre_glass",
+   "material": "leestone",
    "x": 0,
    "y": 0,
    "rot": 0,
@@ -26,9 +26,9 @@
   },
   {
    "uid": 2,
-   "piece": "clinker_plate2",
+   "piece": "clinker_plate_right",
    "fn": "armor",
-   "material": "pyre_glass",
+   "material": "leestone",
    "x": 0,
    "y": 0,
    "rot": 0,
@@ -36,7 +36,7 @@
   },
   {
    "uid": 3,
-   "piece": "clinker_plate3",
+   "piece": "clinker_plate_back",
    "fn": "armor",
    "material": "leestone",
    "x": 0,
@@ -46,6 +46,46 @@
   },
   {
    "uid": 4,
+   "piece": "clinker_rim_front",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 5,
+   "piece": "clinker_rim_right",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 6,
+   "piece": "clinker_rim_back",
+   "fn": "armor",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 7,
+   "piece": "clinker_beak",
+   "fn": "armor",
+   "material": "leestone",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 8,
    "piece": "clinker_chimney_l",
    "fn": "magma_mortar",
    "material": "leestone",
@@ -55,20 +95,10 @@
    "flip": false
   },
   {
-   "uid": 5,
+   "uid": 9,
    "piece": "clinker_vent",
    "fn": "core",
    "material": "pyre_glass",
-   "x": 0,
-   "y": 0,
-   "rot": 0,
-   "flip": false
-  },
-  {
-   "uid": 6,
-   "piece": "clinker_beak",
-   "fn": "armor",
-   "material": "leestone",
    "x": 0,
    "y": 0,
    "rot": 0,

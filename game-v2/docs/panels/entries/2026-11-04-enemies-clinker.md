@@ -7,5 +7,6 @@ files:
 - "enemies/clinker-after.png"
 - "enemies/clinker-damaged.png"
 - "enemies/clinker.png"
+- "enemies/clinker-v1-vs-v2.png"
 ---
-Clinker (the Pyreclast's cavern, new tank and artillery; design only). Five crust plates over a pool of magma, two chimneys that lob magma. Damaged: two plates and a chimney gone, the magma flooding out where the plates were (it takes extra damage there). 10 parts, 8 groups. docs/enemies/custom-roster.md.
+Clinker (the Pyreclast's cavern, new tank and artillery; design only). Reworked from a lumpy pile of shards (v1-vs-v2, first draft on top) into a tortoise shell: four bevelled crust plates round a lava vent, the magma beneath glowing in an X of seams along the diagonals, two chimneys on the back plate. Damaged: the left plate and a chimney gone, the magma flooding out where the plate was (it takes extra damage there). 13 parts, 7 groups. docs/enemies/custom-roster.md.

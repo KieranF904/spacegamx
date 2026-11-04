@@ -8,7 +8,8 @@
 import { design, mid, bar, ringPts, limb, curve, inset, rivet, rivets, glow, halo, ring, raise, recess, channel, stripes, dent, bell } from './kit.mjs';
 
 const IRON = 'scrap_iron', RUST = 'scrap_rust', PAINT = 'scrap_paint', STEEL = 'scrap_steel', SEAM = 'scrap_seam';
-const SEAMGLOW = '#7affd2', HAZ = '#c9a23a', DARK = '#202226';
+// (greyseam's green kept to the Scrap Mother's own, but its mines lit unevenly, some dead; amber work lamps; grime)
+const SEAMGLOW = '#7affd2', SEAMDIM = '#3f9a78', AMBER = '#ffa53a', GRIME = '#2a2620', HAZ = '#c9a23a', DARK = '#202226';
 
 const d = design('rivet_sower', {
   name: 'Rivet Sower', faction: 'scrapborn', sky: 'sol_scrap_nest',
@@ -21,12 +22,13 @@ const gear = (c, r0, r1, teeth) => Array.from({ length: teeth * 4 }, (_, k) => {
   return [c[0] + Math.cos(a) * r, c[1] + Math.sin(a) * r];
 });
 /** A rivet mine as drawn racked: a steel cap and its greyseam light */
-const mine = (at, r = 0.36) => [ring(at, r, r * 0.38, '#8a8e94', 8), glow(at, r * 0.55, SEAMGLOW)];
+let mines = 0;
+const mine = (at, r = 0.36) => { const k = mines++ % 5; return [ring(at, r, r * 0.38, '#7a7268', 8), ...(k === 3 ? [recess(ringPts(at, r * 0.5, 8), GRIME)] : [glow(at, r * (k === 1 ? 0.3 : 0.45), k === 1 ? SEAMDIM : SEAMGLOW)])]; };
 
 // The whiskers: long sensor feelers forward, a lit bulb at each tip
 d.pair('whisker', 'scanner', STEEL, limb([[-0.35, -3.2], ...curve([-0.7, -3.9], [-2.1, -5.6], [-2.4, -8.0], 5)], [0.3, 0.26, 0.22, 0.18, 0.14, 0.12, 0.1]), {
   group: 'sensors', shared: true, relief: 'round',
-  detail: [glow([-2.4, -7.9], 0.28, SEAMGLOW), ring([-0.9, -4.2], 0.24, 0.09, HAZ)],
+  detail: [glow([-2.4, -7.9], 0.24, AMBER), ring([-0.9, -4.2], 0.24, 0.09, HAZ)],
 });
 // The body: a long riveted shell, a spine plate down it
 const body = [[0, -4.3], [-0.95, -3.95], [-1.65, -2.7], [-1.95, -0.6], [-1.85, 1.4], [-1.25, 2.5], [0, 2.75], [1.25, 2.5], [1.85, 1.4], [1.95, -0.6], [1.65, -2.7], [0.95, -3.95]];
@@ -35,14 +37,14 @@ d.part('body', 'hull', IRON, body, {
   detail: [
     raise([[-0.75, -3.4], [0.75, -3.4], [1.1, 2.0], [-1.1, 2.0]], '#4a4e55'),
     ...rivets([-1.45, -2.4], [-1.65, 1.3], 5, 0.12), ...rivets([1.45, -2.4], [1.65, 1.3], 5, 0.12),
-    channel(bar([0, -0.6], [0, 1.8], 0.18), SEAMGLOW),
+    recess(bar([0, -0.6], [0, 1.8], 0.3), GRIME), glow([0, 0.4], 0.12, SEAMDIM), dent([-1.1, 0.9], 0.3, 2.2, GRIME),
     dent([1.2, 0.6], 0.35, 4.1),
   ],
 });
 // The lamp, forward in the shell (its core)
 d.part('lamp', 'core', SEAM, ringPts([0, -2.2], 0.78, 6, Math.PI / 6), {
   group: 'core', relief: 'recess',
-  detail: [ring([0, -2.2], 0.62, 0.18, '#9a9ea4', 6), glow([0, -2.2], 0.45, SEAMGLOW, 6)],
+  detail: [ring([0, -2.2], 0.62, 0.18, '#9a9ea4', 6), recess(ringPts([0, -2.2], 0.45, 6, Math.PI / 6), GRIME), glow([0, -2.2], 0.3, SEAMGLOW, 6)],
 });
 // The panniers: racks of spare mines slung either side (rust on one, paint on the other)
 const pan = [[-1.75, -2.2], [-3.2, -1.95], [-3.65, -0.4], [-3.55, 1.25], [-3.05, 1.95], [-1.8, 1.7]];

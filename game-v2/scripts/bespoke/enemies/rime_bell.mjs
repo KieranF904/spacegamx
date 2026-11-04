@@ -52,4 +52,4 @@ d.part('gland', 'core', GLAND, ringPts(C, 0.95, 8, Math.PI / 8), {
   detail: [recess(ringPts(C, 0.62, 8, Math.PI / 8), DEEP), glow(C, 0.55, VIOLET), glow(C, 0.22, PALE)],
 });
 
-d.write({ damaged: ['frill', 'tendril_r'], scale: 0.5 });
+d.write({ damaged: ['frill', 'tendril_r'], scale: 0.62 });
