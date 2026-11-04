@@ -28,7 +28,7 @@ const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGl
 const BODIES = CAPS.HITS | CAPS.SELF_HITS | CAPS.PACKED | CAPS.COALESCE | CAPS.OWN_SHOTS | CAPS.ROUGH | CAPS.OWN_SIM | CAPS.INPUTS | CAPS.BODIES | CAPS.CAUSES;
 const ALL = BODIES | CAPS.PILOTS;
 
-interface Got { snapshots: number; checked: number; off: number; keyframes: number; ctlRows: number; decisions: number; syncs: number; running: number; ran: Set<number>; offAt: string[]; ops: Record<string, number> }
+interface Got { snapshots: number; checked: number; off: number; keyframes: number; ctlRows: number; decisions: number; syncs: number; running: number; ran: Set<number>; offAt: string[]; ops: Record<string, number>; lastTick?: number }
 const zero = (): Got => ({ snapshots: 0, checked: 0, off: 0, keyframes: 0, ctlRows: 0, decisions: 0, syncs: 0, running: 0, ran: new Set(), offAt: [], ops: {} });
 
 interface Opts {
@@ -39,6 +39,11 @@ interface Opts {
   dropAt?: number;
   /** Packs: ships each, and where from the pilot */
   packs?: { ships: string[]; dx: number; dy: number }[];
+  /** A boss the enemy AI flies (bosses.json without a brain), this far off; its escorts come as its phases do */
+  boss?: string;
+  /** Its hull brought down to this share at this tick (its phases: escorts, novas, blinks) */
+  hurtAt?: number;
+  hurt?: number;
 }
 
 function fight(o: Opts = {}) {
@@ -57,13 +62,14 @@ function fight(o: Opts = {}) {
   const caps = o.caps ?? ALL;
   const A = new FakeHitsClient(server, { name: 'pilots_a', caps, env });
   const B = new FakeHitsClient(server, { name: 'legacy_b', caps: 0, env });
-  let foes: number[] = [];
-  const foe = new Set<number>();
+  // (every hostile, escorts spawned mid-fight too)
+  const foe = { has: (id: number) => ships.has(id) && !!server.enemies.factionOf(id) };
+  const foeIds = () => [...ships.bodies.keys()].filter((id) => foe.has(id));
   /** Every hostile's real state at each tick's end */
   const truth = new Map<number, Map<number, number[]>>();
   const got = { A: zero(), B: zero() };
   const real = (id: number) => [Position.x[id], Position.y[id], Velocity.x[id], Velocity.y[id], Rotation.angle[id], ships.get(id)!.angVel];
-  const now = () => { const m = new Map<number, number[]>(); for (const id of foes) if (ships.has(id)) m.set(id, real(id)); return m; };
+  const now = () => { const m = new Map<number, number[]>(); for (const id of foeIds()) m.set(id, real(id)); return m; };
   const watch = (f: FakeHitsClient, g: Got, drop?: () => boolean) => {
     const fa = f as unknown as { snapshot(s: ServerSnapshotMessage): void };
     const orig = fa.snapshot.bind(f);
@@ -72,6 +78,7 @@ function fight(o: Opts = {}) {
       const running = new Set(f.bodies?.ids() ?? []);
       orig(s);
       g.snapshots++;
+      (g as { lastTick?: number }).lastTick = s.tick;
       for (const k of s.ships ?? []) if (foe.has(k[0])) g.keyframes++;
       // (a ship run since the last snapshot gets no control rows)
       for (const r of s.ctl ?? []) if (running.has(controlRowId(r)) && f.bodies?.ids() && [...f.bodies.ids()].includes(controlRowId(r))) g.ctlRows++;
@@ -84,7 +91,7 @@ function fight(o: Opts = {}) {
         const st = f.reps.at(id, s.tick)?.body, r = tr?.get(id);
         if (!st || !r) continue;
         g.checked++;
-        if (st.x !== r[0] || st.y !== r[1] || st.vx !== r[2] || st.vy !== r[3] || st.angle !== r[4] || st.angVel !== r[5]) { g.off++; if (g.offAt.length < 8) g.offAt.push(`${id}@${s.tick}`); }
+        if (st.x !== r[0] || st.y !== r[1] || st.vx !== r[2] || st.vy !== r[3] || st.angle !== r[4] || st.angVel !== r[5]) { g.off++; if (g.offAt.length < 8) g.offAt.push(`${id}@${s.tick}:${[st.x - r[0], st.y - r[1], st.vx - r[2], st.vy - r[3], st.angle - r[4], st.angVel - r[5]].map((v) => +v.toPrecision(3)).join(",")}${s.ships?.some((k) => k[0] === id) ? ":kf" : ""}:own${s.ships?.some((k) => k[0] === f.pid) ? "kf" : ""}:tg${server.enemies.targetOf(id)}=${f.pid}/${B.pid}:tkf${s.ships?.some((k) => k[0] === server.enemies.targetOf(id)) ? 1 : 0}:boss${boss}:cz${JSON.stringify(s.causes?.filter((c) => c.includes(id)))}:d${JSON.stringify(s.decisions?.filter((d) => d[0] === id))}:ctl${JSON.stringify(s.ctl?.filter((c) => controlRowId(c) === id))}:prev${s.tick - (g.lastTick ?? 0)}`); }
       }
     };
   };
@@ -95,8 +102,7 @@ function fight(o: Opts = {}) {
   let chk: ReturnType<NonNullable<FakeHitsClient['own']>['takeCheck']>;
   const nearest = () => {
     let best = -1, bd = Infinity;
-    for (const id of foes) {
-      if (!ships.has(id)) continue;
+    for (const id of foeIds()) {
       const d = Math.hypot(Position.x[id] - Position.x[A.pid], Position.y[id] - Position.y[A.pid]);
       if (d < bd) { bd = d; best = id; }
     }
@@ -139,13 +145,19 @@ function fight(o: Opts = {}) {
   const x0 = Position.x[A.pid] + 30000, y0 = Position.y[A.pid] + 30000;
   Position.x[A.pid] = x0; Position.y[A.pid] = y0; Velocity.x[A.pid] = 0; Velocity.y[A.pid] = 0;
   Position.x[B.pid] = x0 - 300; Position.y[B.pid] = y0 + 1400;
-  for (const p of o.packs ?? [{ ships: ['pirate_raider', 'pirate_skiff', 'pirate_skiff'], dx: 1500, dy: 900 }, { ships: ['pirate_raider'], dx: -2500, dy: -600 }]) {
-    foes.push(...server.enemies.spawnPack(num, { faction: 'pirates', ships: p.ships } as never, x0 + p.dx, y0 + p.dy));
+  let boss = -1;
+  if (o.boss) boss = server.bosses.spawnAt(o.boss, num, x0 + 1800, y0);
+  for (const p of o.packs ?? (o.boss ? [] : [{ ships: ['pirate_raider', 'pirate_skiff', 'pirate_skiff'], dx: 1500, dy: 900 }, { ships: ['pirate_raider'], dx: -2500, dy: -600 }])) {
+    server.enemies.spawnPack(num, { faction: 'pirates', ships: p.ships } as never, x0 + p.dx, y0 + p.dy);
   }
-  for (const id of foes) foe.add(id);
-  for (let t = 0; t < (o.ticks ?? 900); t++) step(t);
-  foes = foes.filter((id) => ships.has(id));
-  return { server, got, A, stats: server.bodies.stats, rep: server.replication.bodyStats };
+  for (let t = 0; t < (o.ticks ?? 900); t++) {
+    if (o.hurtAt === t && ships.has(boss)) {
+      // (its hull brought down: every part to this share, as many hits would, so its phases come)
+      ships.setPartHp(boss, () => o.hurt ?? 0.5);
+    }
+    step(t);
+  }
+  return { server, got, A, boss, stats: server.bodies.stats, rep: server.replication.bodyStats };
 }
 
 describe('decision inputs: the enemy AI flown by its pilot\'s body on both sides (CAPS.PILOTS)', () => {
@@ -176,5 +188,26 @@ describe('decision inputs: the enemy AI flown by its pilot\'s body on both sides
     const r = fight({ ticks: 500, caps: BODIES });
     expect(r.got.A.ran.size).toBe(0);
     expect(r.got.A.decisions).toBe(0);
+  }, 240_000);
+
+  it("a boss the enemy AI flies (Rustjaw): it and the escorts its phases bring are the server's ships at every snapshot, no control rows", () => {
+    const r = fight({ ticks: 1200, boss: 'boss_rustjaw', hurtAt: 300, hurt: 0.3 });
+    if (process.env.BODY_DEBUG) console.log('RUSTJAW', JSON.stringify({ got: { ...r.got.A, ran: [...r.got.A.ran] }, stats: r.stats, rep: r.rep, runner: r.A.bodies?.stats, phase: r.server.bosses.of(r.boss)?.phase }));
+    expect(r.got.A.ran.has(r.boss)).toBe(true);
+    expect(r.got.A.ran.size).toBeGreaterThan(1);
+    expect(r.got.A.checked).toBeGreaterThan(300);
+    expect(r.got.A.off).toBe(0);
+    expect(r.got.A.ctlRows).toBe(0);
+    expect(r.stats.off).toBe(0);
+  }, 240_000);
+
+  it("a blinking boss (Hushwing): its blinks keyframe it, its flight between is its body's", () => {
+    const r = fight({ ticks: 1200, boss: 'boss_hushwing', hurtAt: 200, hurt: 0.4 });
+    if (process.env.BODY_DEBUG) console.log('HUSHWING', JSON.stringify({ got: { ...r.got.A, ran: [...r.got.A.ran] }, stats: r.stats, rep: r.rep, runner: r.A.bodies?.stats, phase: r.server.bosses.of(r.boss)?.phase }));
+    expect(r.got.A.ran.has(r.boss)).toBe(true);
+    expect(r.got.A.checked).toBeGreaterThan(300);
+    expect(r.got.A.off).toBe(0);
+    expect(r.got.A.ctlRows).toBe(0);
+    expect(r.stats.off).toBe(0);
   }, 240_000);
 });

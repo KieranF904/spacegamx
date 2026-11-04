@@ -377,6 +377,16 @@ export class Replication {
     return replicasByte(sum);
   }
 
+  /** A keyframe of this ship added to a client's snapshot after its forClient (BodyNet.readersOf) */
+  keyNow(eid: number, known: Map<number, number>, ships: KeyframeRow[], causes = false): void {
+    const s = this.shadows.get(eid);
+    if (!s || !known.has(eid)) return;
+    known.set(eid, s.bodied ? (causes ? s.bodied.cver : s.bodied.version) : causes ? s.cver : s.version);
+    ships.push(s.keyRow ??= packKeyframe({ id: eid, mode: s.mode, body: this.real(eid), ctl: { bits: s.bits, targetAngle: 0 }, q: s.q, dock: s.dock ?? undefined }));
+    this.keyframes++;
+    if (s.bodied) this.bodyStats.keyframes++;
+  }
+
   /** A ship's keyframe version (bumped whenever it left its predicted path) */
   versionOf(eid: number): number {
     return this.shadows.get(eid)?.version ?? 0;

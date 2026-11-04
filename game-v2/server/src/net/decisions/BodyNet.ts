@@ -127,6 +127,19 @@ export class BodyNet {
     return rows;
   }
 
+  /** Bodies it runs that read a ship in these keyframes and aren't in them themselves */
+  readersOf(conn: object, self: number, keyed: readonly (readonly number[])[]): number[] {
+    const c = this.clients.get(conn), out: number[] = [];
+    if (!c?.runs.size) return out;
+    const ids = new Set(keyed.map((k) => k[0]));
+    for (const eid of c.runs) {
+      const b = this.bosses.get(eid);
+      if (!b || ids.has(eid)) continue;
+      if (BODY_KINDS[b.state.kind]?.reads(eid, b.state).some((r) => ids.has(r))) { out.push(eid); this.stats.targetKeyed++; }
+    }
+    return out;
+  }
+
   /** A snapshot went to it: what its check should say for it (nothing if it runs no body) */
   note(conn: object, tick: number): void {
     const c = this.clients.get(conn);
