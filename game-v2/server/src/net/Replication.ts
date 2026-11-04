@@ -67,10 +67,15 @@ interface OwnShadow {
   hard: boolean;
   /** Why (the stats) */
   why?: string;
+  /** Not flown by its pilot (docked) since its last keyframe, in this mode: no keyframe again till it moves (stepOwn) */
+  held?: ReplicaMode;
+  heldDock?: Shadow['dock'];
 }
 
 /** (A shadow rounded as every body is at a tick's end) */
 const quantizeOwn = (b: FlightBody): void => quantizeShipBody(b);
+/** The same pose and motion (a docked ship's shadow against the real one) */
+const sameBody = (a: FlightBody, b: FlightBody) => a.x === b.x && a.y === b.y && a.vx === b.vx && a.vy === b.vy && a.angle === b.angle && a.angVel === b.angVel;
 
 interface Shadow {
   mode: ReplicaMode;
@@ -287,7 +292,19 @@ export class Replication {
     o.excLast = !want || want.bits !== bits || want.q !== q;
     if (o.excLast) o.exc = true;
     if (this.host.ownLate?.(eid)) return hard('late input');
-    if (mode !== ReplicaMode.Player) return hard('mode');
+    // (Not flown by its pilot: its client has it from its last keyframe, so another only when that's out of date. Docked,
+    // its keyframe says where at its station (it rides the station as every client's docked replica does); else when it moved)
+    if (mode !== ReplicaMode.Player) {
+      const same = o.held === mode && (mode === ReplicaMode.Docked ? sameDock(o.heldDock ?? null, s.dock) : sameBody(s.body, this.real(eid)));
+      // (Its shadow stays what its keyframe carried: what its client has, and checks against. A docked ship's velocity
+      // isn't its client's to follow)
+      if (same) { if (o.hard) s.body = this.real(eid); return; }
+      o.held = mode;
+      o.heldDock = s.dock;
+      return hard('mode');
+    }
+    // (Flown again (undocked): from a keyframe)
+    if (o.held !== undefined) { o.held = undefined; o.heldDock = undefined; return hard('mode'); }
     if (o.hard) { s.body = this.real(eid); return; }
     replicaStep(mode, s.body, { bits, targetAngle: replicaAngle(mode, q) }, derived, this.ships.tuning, this.host.env(eid), tick);
     if (worked) {
@@ -397,6 +414,12 @@ export class Replication {
     ships.push(s.keyRow ??= packKeyframe({ id: eid, mode: s.mode, body: this.real(eid), ctl: { bits: s.bits, targetAngle: 0 }, q: s.q, dock: s.dock ?? undefined }));
     this.keyframes++;
     if (s.bodied) this.bodyStats.keyframes++;
+  }
+
+  /** A pilot's own ship not flown by them (docked) as its client has it: its last keyframe's body (stepOwn); null otherwise */
+  ownHeld(eid: number): FlightBody | null {
+    const s = this.shadows.get(eid);
+    return s?.own?.held !== undefined ? s.body : null;
   }
 
   /** Ships removed lately that had causes in their last window, and when (causedInWindow) */

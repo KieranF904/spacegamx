@@ -541,7 +541,8 @@ export class SnapshotBuilder {
   private noteOwn(conn: ClientConnection): void {
     const id = conn.playerId, ship = this.ships.get(id), ctl = this.replication.controlsOf(id);
     if (!ship || !ctl) return;
-    const body = { x: Position.x[id], y: Position.y[id], vx: Velocity.x[id], vy: Velocity.y[id], angle: Rotation.angle[id], angVel: ship.angVel, jump: ship.jump, jumpScale: ship.jumpScale, cargo: ship.cargo, dodge: ship.dodge, dodgeDir: ship.dodgeDir };
+    // (Docked, its shadow: what its last keyframe carried, Replication.stepOwn)
+    const body = this.replication.ownHeld(id) ?? { x: Position.x[id], y: Position.y[id], vx: Velocity.x[id], vy: Velocity.y[id], angle: Rotation.angle[id], angVel: ship.angVel, jump: ship.jump, jumpScale: ship.jumpScale, cargo: ship.cargo, dodge: ship.dodge, dodgeDir: ship.dodgeDir };
     // (CAPS.CAUSES: every other ship it holds goes in the check too)
     let held = causesFor(conn.caps) ? this.replication.heldByte(conn.repKnown, id, this.bodies ? (e) => this.bodies!.runs(conn, e) : undefined) : 0;
     // (CAPS.WAYPOINTS: the homing shells it runs too; off, they're all SYNCed again)

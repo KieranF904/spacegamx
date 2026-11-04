@@ -19,6 +19,7 @@ import { readGameDataFiles } from '../../data/loadGameDataFromDisk.js';
 import { loadShipConfigFromDisk } from '../../ships/loadShipConfig.js';
 import { createShipBridge } from '../../proto/createProtoServer.js';
 import { FakeHitsClient } from '../hits/fakeHitsClient.testkit.js';
+import { stationQuery } from '../../game/Docking.js';
 
 const dataDir = join(__dirname, '../../../../data');
 const files = readGameDataFiles(dataDir);
@@ -203,4 +204,27 @@ describe('its own ship stepped by itself (CAPS.OWN_SIM)', () => {
     // (put right: the last snapshots' own layer is the server's again)
     expect(r.got.off).toBeLessThan(40);
   }, 120_000);
+
+  it('docked: one keyframe of its own ship as it docks and one as it leaves, none between, its checks agreeing', () => {
+    let station = -1;
+    const r = fly({
+      ticks: 520,
+      each: (t, w) => {
+        const A = w.A, srv = w.server;
+        if (t === 60) {
+          let bd = Infinity;
+          for (const st of stationQuery(srv.getWorld())) { if (InSystem.systemId[st] !== InSystem.systemId[A.pid]) continue; const d = Math.hypot(Position.x[st] - Position.x[A.pid], Position.y[st] - Position.y[A.pid]); if (d < bd) { bd = d; station = st; } }
+          Position.x[A.pid] = Position.x[station] + 150; Position.y[A.pid] = Position.y[station]; Velocity.x[A.pid] = 0; Velocity.y[A.pid] = 0;
+        }
+        if (t === 100) A.link!.receive({ type: 'dock' } as ClientMessage);
+        if (t === 420) A.link!.receive({ type: 'undock' } as ClientMessage);
+      },
+    });
+    expect(station).toBeGreaterThanOrEqual(0);
+    // (the move beside the station, docking, undocking: no more)
+    expect(r.got.keyframes).toBeLessThanOrEqual(4);
+    expect(r.checks.checks).toBeGreaterThan(5);
+    expect(r.checks.bodyOff).toBe(0);
+  }, 120_000);
 });
+
