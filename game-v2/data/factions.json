@@ -2375,6 +2375,22 @@
       "_comment": "Ashfall is a starter system, but the Redtooth are aggressive: they come for anyone they see near their digs. Everything here launches from a nest; its own groups are who raids and events send. Their outpost (bosses.json boss_redtooth_hold) sits in the belt."
     }
   },
+  "custom": {
+    "_comment": "Custom enemies (docs/enemies/custom-roster.md; server/src/game/custom): `types` puts a design (data/ships/blueprints/enemy, its moves common/src/bodies/custom) in a ship type's place wherever it spawns; each design's `range`/`reach` (its fighting range, and how far its moves reach), `hp` per destroyable piece and its moves' and guns' numbers at Mk I, `firepower` for ratings. A grade scales hp and damage by `grades` (Mk I-V) instead of regrading its materials; elites take rules.eliteHp too. Faction hpScale/damageScale don't apply: these numbers are the design's own.",
+    "grades": {"hp": [1, 1.45, 2.0, 2.7, 3.6], "damage": [1, 1.3, 1.65, 2.1, 2.6]},
+    "types": {"cinder_zealot": "censer", "maw_lurker": "maw_lurker", "pirate_raider": "hookboat", "frost_shard": "rime_bell", "scrap_crawler": "scrap_crawler", "helios_drone": "helios_drone", "rivet_sower": "rivet_sower", "slag_ray": "slag_ray", "clinker": "clinker"},
+    "designs": {
+      "censer": {"range": 1300, "reach": 1800, "firepower": 260, "hp": {"core": 700, "lance": 260, "brazier": 220, "vane_l": 180, "vane_r": 180, "drive": 140}, "moves": {"lance": {"every": 200, "length": 1800, "width": 46, "damage": 7}}, "brazier": {"reach": 900, "haste": 0.8}},
+      "maw_lurker": {"range": 2000, "reach": 2600, "firepower": 300, "hp": {"core": 1300, "eye": 260, "rail": 420, "root_l": 220, "root_r": 220, "tail": 240}, "moves": {"aim": {"every": 230, "damage": 2.6, "spread": 0.12}}},
+      "hookboat": {"range": 900, "reach": 1300, "firepower": 150, "hp": {"core": 520, "harpoon": 220, "outrigger": 300, "drive_l": 120, "drive_r": 90}, "moves": {"harpoon": {"every": 260, "length": 1300, "damage": 1.2, "reel": 150, "pull": 0.4, "slack": 320}}, "guns": {"outrigger": {"kind": "autocannon", "every": 14, "damage": 1.4, "reach": 1100}}},
+      "rime_bell": {"range": 700, "reach": 900, "firepower": 40, "hp": {"core": 300, "frill": 130, "tendril_l": 45, "tendril_c": 45, "tendril_r": 45}, "moves": {"pulse": {"every": 300, "radius": 520, "emp": 75}}, "guns": {"tendrils": {"kind": "prism_shard", "every": 50, "damage": 0.5, "reach": 650}}},
+      "scrap_crawler": {"range": 500, "reach": 1300, "firepower": 90, "hp": {"core": 260, "magnet": 90, "claw_l": 70, "claw_r": 70, "shell_l": 90, "shell_r": 90, "legs": 60, "drive": 40}, "moves": {"pull": {"every": 260, "radius": 1300, "pull": 0.45, "snap": 150, "snapRadius": 150, "damage": 50}}},
+      "rivet_sower": {"range": 900, "reach": 1600, "firepower": 70, "hp": {"core": 180, "drum": 90, "sensors": 50, "pannier_l": 50, "pannier_r": 50, "drive": 60}, "moves": {"lay": {"every": 360, "mines": 6, "ring": 260}}, "pannier": {"radius": 220, "damage": 60}},
+      "slag_ray": {"range": 800, "reach": 1400, "firepower": 220, "hp": {"core": 1100, "horns": 300, "tail": 260, "wing_l": 380, "wing_r": 380}, "moves": {"pass": {"every": 220, "cone": 30, "damage": 0.9, "wake": 20, "pool": 140, "poolTicks": 150, "burn": 3}}},
+      "clinker": {"range": 1500, "reach": 2200, "firepower": 260, "hp": {"core": 900, "chimney_l": 300, "chimney_r": 300, "plate_front": 700, "plate_right": 700, "plate_back": 700, "plate_left": 700}, "moves": {"volley": {"every": 230, "radius": 170, "damage": 60, "spread": 220}}},
+      "helios_drone": {"range": 300, "reach": 420, "firepower": 8, "hp": {"core": 80, "torch": 30, "eye": 20, "panel_l": 20, "panel_r": 20, "drive": 15}, "moves": {"torch": {"every": 150, "reach": 230, "damage": 0.25}}}
+    }
+  },
   "rules": {
     "minStationDistance": 7000,
     "minPlayerDistance": 3200,

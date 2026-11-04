@@ -370,10 +370,13 @@ const SHIPS = {
   ], { blocks: true, drive: 0.5 }],
 };
 
+const REPLACED = new Set(['scrap_crawler', 'maw_lurker']);
+
 // An optional fourth entry: { drive } (engine output, 0.1..1: the Scrapborn's worn-out drives), { blocks } (a giant)
 for (const [file, [name, material, rows, opts]] of Object.entries(SHIPS)) {
   const bp = (opts?.blocks ? buildBlocks : build)(name, material, rows);
   if (opts?.drive) bp.drive = opts.drive;
-  writeFileSync(join(out, `${file}.json`), JSON.stringify(bp, null, 1) + '\n');
+  // (Replaced by a custom design of the same id, docs/enemies/custom-roster.md: kept under grid_, not spawned)
+  writeFileSync(join(out, `${REPLACED.has(file) ? `grid_${file}` : file}.json`), JSON.stringify(bp, null, 1) + '\n');
 }
 console.log(`${Object.keys(SHIPS).length} enemy ships written to ${out}`);

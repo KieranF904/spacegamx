@@ -178,6 +178,8 @@ export function push(b: BridgeCtx, eid: number, ax: number, ay: number): void {
   const ship = b.bodies.get(eid);
   if (ship?.kind === 'debris' || hasComponent(b.host.world, Dead, eid)) return;
   if (ship && hasComponent(b.host.world, Player, eid)) {
+    // (While the pilotless ships step: once they all have, so none reads this tick's pull: tick)
+    if (b.pushQueue) { b.pushQueue.push([eid, ax, ay]); return; }
     const dvx = quantizePull(ax), dvy = quantizePull(ay);
     Velocity.x[eid] += dvx; Velocity.y[eid] += dvy;
     b.ownCauses.add(eid, { kind: 0, dvx, dvy });
@@ -258,6 +260,7 @@ export function tick(ctx: BridgeCtx): void {
 
   // 1. Prune and move everything nobody pilots (debris after, all together: ships/debris.ts)
   const debrisNow: number[] = [];
+  ctx.pushQueue = [];
   for (let [ids, ships, bi] = ctx.bodiesNow(); bi < ids.length; bi++) {
     const eid = ids[bi], ship = ships[bi];
     if (!entityExists(world, eid) || hasComponent(world, Dead, eid)) {
@@ -286,6 +289,11 @@ export function tick(ctx: BridgeCtx): void {
       ctx.stepPilotless(eid, ship, k, tick);
     }
   }
+
+  // (This tick's pulls on pilots, as they were made: none read by a ship stepping after the one that pulled)
+  const pushes = ctx.pushQueue;
+  ctx.pushQueue = null;
+  for (const [eid, ax, ay] of pushes) ctx.push(eid, ax, ay);
 
   // Debris drifts and knocks into other debris (only), by the step every client runs too
   ctx.stepDebrisWorld(debrisNow);

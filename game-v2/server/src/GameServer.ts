@@ -885,6 +885,7 @@ export class GameServer implements ServerCtx {
     this.bosses = new Bosses(this.createBossHost(), this.enemies, this.ships, this.gameData.bossesFile as BossesFile, this.ships.enemyDesigns);
     this.mobs = new Mobs(this.createMobHost(), this.gameData.mobsFile as MobsFile);
     this.bosses.mobs = this.mobs;
+    this.enemies.mobs = this.mobs;
     this.events = new Events(this.createEventHost(), this.enemies, this.gameData.factionsFile as FactionsFile, this.gameData.rulesFile.events, this.gameData.stringsFile);
     this.party = new Party(this.createPartyHost());
     this.admin = new AdminTools(this.createAdminHost());
@@ -1584,6 +1585,13 @@ this.devTeleport = opts.devTeleport ?? false;
     };
   }
 
+  /** A shot a boss's or a custom enemy's move fires (not from a part gun) */
+  private hostileShot(owner: number, kind: string, x: number, y: number, angle: number, scale: number, opts?: { target?: number; speed?: number; intercept?: boolean }): void {
+    // (A boss's nova punches through as its own grade does; `intercept: false`, point defence can't touch it: support.ts)
+    const ship = this.ships.get(owner);
+    this.weapons.spawn(owner, kind, x, y, angle, scale, { speedScale: opts?.speed ?? 1, sizeScale: 1, turret: false, noBurst: true, target: opts?.target, grade: ship ? blueprintGrade(this.ships.catalog, ship.blueprint) : 1, intercept: opts?.intercept });
+  }
+
   private createBossHost() {
     const effect = (num: number, x: number, y: number, kind: 'warning' | 'warpIn' | 'launch') => this.arrivalEffect(num, x, y, kind);
     const alivePlayers = (num: number) => {
@@ -1609,11 +1617,7 @@ this.devTeleport = opts.devTeleport ?? false;
       supportersOf: (player: number) => this.support.supporters(player, this.currentTick),
       // (Decision inputs, CAPS.BODIES: net/decisions/BodyNet.ts)
       decide: (eid: number, op: number, args: readonly number[], state: BodyState) => this.bodies.decide(eid, op, args, state),
-      fire: (owner: number, kind: string, x: number, y: number, angle: number, scale: number, opts?: { target?: number; speed?: number; intercept?: boolean }) => {
-        // (A boss's nova punches through as its own grade does; `intercept: false`, point defence can't touch it: support.ts)
-        const ship = this.ships.get(owner);
-        this.weapons.spawn(owner, kind, x, y, angle, scale, { speedScale: opts?.speed ?? 1, sizeScale: 1, turret: false, noBurst: true, target: opts?.target, grade: ship ? blueprintGrade(this.ships.catalog, ship.blueprint) : 1, intercept: opts?.intercept });
-      },
+      fire: (owner: number, kind: string, x: number, y: number, angle: number, scale: number, opts?: { target?: number; speed?: number; intercept?: boolean }) => this.hostileShot(owner, kind, x, y, angle, scale, opts),
       warpFx: (num: number, x: number, y: number, out: boolean) => {
         this.broadcastToSystem(num, { type: 'effect', effectType: out ? EffectType.WarpOut : EffectType.WarpIn, x, y });
       },
@@ -1835,6 +1839,9 @@ this.devTeleport = opts.devTeleport ?? false;
       safeAt: (num: number, x: number, y: number) => inSafeSpace(this.gameData.getSystemByNum(num), x, y),
       // (the enemy AI's pilots' decisions, CAPS.PILOTS: net/decisions/BodyNet.ts)
       decide: (eid: number, op: number, args: readonly number[], state: BodyState) => this.bodies.decide(eid, op, args, state),
+      // (custom enemies' moves: game/custom; their shots go as a boss's do)
+      fire: (owner: number, kind: string, x: number, y: number, angle: number, scale: number, opts?: { target?: number; speed?: number }) => this.hostileShot(owner, kind, x, y, angle, scale, opts),
+      send: (num: number, msg: ServerMessage) => this.broadcastToSystem(num, msg),
       systemNum: (id: string) => (this.gameData.getSystem(id) ? this.gameData.getSystemNum(id) : -1),
       systemId: (num: number) => this.gameData.getSystemByNum(num)?.id,
       systemRadius: (num: number) => {

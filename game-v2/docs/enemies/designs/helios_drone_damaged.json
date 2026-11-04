@@ -1,0 +1,58 @@
+{
+ "name": "Helios Drone (damaged)",
+ "catalogVersion": 1,
+ "paint": "#c9ccd2",
+ "rigid": true,
+ "parts": [
+  {
+   "uid": 0,
+   "piece": "helios_drone_cell",
+   "fn": "core",
+   "material": "titanium",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 1,
+   "piece": "helios_drone_chassis",
+   "fn": "hull",
+   "material": "titanium",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 2,
+   "piece": "helios_drone_eye",
+   "fn": "scanner",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 3,
+   "piece": "helios_drone_panel_l",
+   "fn": "hull",
+   "material": "titanium",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 4,
+   "piece": "helios_drone_drive",
+   "fn": "thruster",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  }
+ ]
+}

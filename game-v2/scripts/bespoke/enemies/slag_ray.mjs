@@ -62,4 +62,4 @@ d.part('heart', 'core', GLASS, heart, {
   detail: [recess(inset(heart, 0.99), '#2a1a12'), recess(inset(heart, 0.8), PIT), glow([0, -0.4], 0.6, EMBER), glow([0, -0.4], 0.25, HOT), vein([[-0.5, -0.5], [0, -0.3], [0.45, -0.55]], 0.06, HOT)],
 });
 
-d.write({ damaged: ['wing_r', 'tail'], scale: 0.62 });
+d.write({ damaged: ['wing_r', 'tail'], scale: 0.42 });

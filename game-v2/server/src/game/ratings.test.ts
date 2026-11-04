@@ -85,7 +85,7 @@ describe('grades, sizes and ship ratings', () => {
   it('a system builds its hostiles in its grade, and names them for it', () => {
     const { server, gameData } = world();
     const num = gameData.getSystemNum('cinder_reach');
-    const [eid] = server.enemies.spawnPack(num, { faction: 'pirates', ships: ['pirate_raider'] }, 1000, 1000);
+    const [eid] = server.enemies.spawnPack(num, { faction: 'pirates', ships: ['pirate_skiff'] }, 1000, 1000);
     const info = server.enemies.info(eid)!;
     expect(info.grade).toBe(3);
     expect(info.name).toContain('Mk III');

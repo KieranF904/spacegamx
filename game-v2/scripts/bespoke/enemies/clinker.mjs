@@ -71,4 +71,4 @@ d.part('vent', 'core', GLASS, vent, {
   detail: [recess(ringPts(C, R0 + 0.12, 12, 0.13), '#2a1a12'), ring(C, 1.3, 0.28, ASH2), recess(ringPts(C, 1.0, 12), PIT), glow(C, 0.85, EMBER), glow(C, 0.36, HOT), shard([-0.15, 0.2], [0.3, -1], 0.5, 0.2, HOT)],
 });
 
-d.write({ damaged: ['plate_left', 'chimney_r'], scale: 0.9 });
+d.write({ damaged: ['plate_left', 'chimney_r'], scale: 0.7 });

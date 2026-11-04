@@ -13,7 +13,7 @@ const IRON = 'scrap_iron', RUST = 'scrap_rust', PAINT = 'scrap_paint', STEEL = '
 const SEAMGLOW = '#7affd2', SEAMDIM = '#3f9a78', AMBER = '#ffa53a', GRIME = '#2a2620', HAZ = '#c9a23a', DARK = '#202226', COPPER = '#b0702a';
 
 const d = design('scrap_crawler', {
-  name: 'Scrap Crawler', faction: 'scrapborn', sky: 'sol_scrap_nest', replaces: 'scrap_crawler',
+  name: 'Scrap Crawler', faction: 'scrapborn', sky: 'sol_scrap_nest', replaces: 'grid_scrap_crawler',
   role: 'puller / brawler', level: '3-6', threat: 'medium',
 });
 
@@ -72,4 +72,4 @@ d.part('drive', 'plasma_drive', STEEL, [[-0.95, 3.3], [0.95, 3.3], [1.15, 5.0], 
   detail: [bell([0, 5.0], [0, 1], 1.7, 1.2), ...stripes([-0.85, 3.6], [0.85, 3.6], 0.35, 4, HAZ, DARK)],
 });
 
-d.write({ damaged: ['claw_l', 'shell_r', 'magnet'], scale: 0.72 });
+d.write({ damaged: ['claw_l', 'shell_r', 'magnet'], scale: 0.5 });

@@ -147,6 +147,16 @@ export function scaleHp(b: BridgeCtx, eid: number, k: number): void {
   if (k !== 1) ship.scaledHp = true;
 }
 
+/** Every part's most HP set outright (a custom enemy's pieces, factions.json custom), at full HP */
+export function setMaxHp(b: BridgeCtx, eid: number, hp: readonly number[]): void {
+  const ship = b.bodies.get(eid);
+  if (!ship || hp.length !== ship.maxHp.length) return;
+  ship.maxHp = [...hp];
+  ship.hp = [...hp];
+  ship.rebuildHp = [...hp];
+  ship.scaledHp = true;
+}
+
 /** Toughen one function's parts (a boss's core) by `k` */
 export function hardenParts(b: BridgeCtx, eid: number, fn: string, k: number): void {
   const ship = b.bodies.get(eid);

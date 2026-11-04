@@ -7,18 +7,20 @@
  *   sniper: it hangs far off in the shard field, its eye draws a thin gold line on you, then the rail fires one slug.
  *   node scripts/bespoke/enemies/maw_lurker.mjs
  *
- * Drawn with the Heart redesign's proposed materials and surfaces (render.mjs SURFACES=maw), like the Heart.
+ * In the game: the Maw's own two materials (maw_slate, maw_glass).
  */
 import { design, P, D, DEG, round, mid, ringPts, oval, limb, curve, inset, glow, ring, raise, recess, vein, shard, hash } from './kit.mjs';
 
-const CRUST = 'maw_crust', STONE = 'maw_heartstone', SEAM = 'maw_seamglass', GLASS = 'maw_shardglass';
+// (the Maw's own materials: its slate crust and heartstone, its glass seams and shards; the Heart redesign's proposed
+// four, maw_crust, maw_heartstone, maw_seamglass and maw_shardglass, fold into these two in the game)
+const CRUST = 'maw_slate', STONE = 'maw_slate', SEAM = 'maw_glass', GLASS = 'maw_glass';
 const FACE = '#45474d', TOP = '#585b62', DEEP = '#26272b', PIT = '#121215', HOT = '#fff4d8', GOLD2 = '#ffd27a';
 /** The heartbeat's gold, fading as it runs out from the eye (the Heart's FADE) */
 const FADE = ['#ffcf72', '#e0962f', '#b07024', '#80521e', '#5a3d1a'];
 const fade = (dist) => FADE[Math.max(0, Math.min(FADE.length - 1, Math.floor(dist / 1.4)))];
 
 const d = design('maw_lurker', {
-  name: 'Maw Lurker', faction: 'maw', sky: 'the_maw', replaces: 'maw_lurker', surfaces: 'maw',
+  name: 'Maw Lurker', faction: 'maw', sky: 'the_maw', replaces: 'grid_maw_lurker',
   role: 'sniper', level: '24-30', threat: 'high',
 });
 

@@ -73,6 +73,7 @@
   "setController",
   "setDamageScale",
   "setGhosts",
+  "setMaxHp",
   "setPartHp",
   "setSkills",
   "setTarget",

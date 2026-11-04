@@ -141,6 +141,12 @@ export class ShipBridge {
   private ghosts = new Map<number, Set<number>>();
   /** Ships marked for a rebuild whose pieces breaking off aren't for clients to work out (shed whole): bridge/rebuild.ts markRebuild */
   private underivable = new Set<number>();
+  /**
+   * Pushes on pilots made while the pilotless ships step (a boss's or a custom enemy's pull), applied once they all have:
+   * a body reads its target before that tick's pulls (bodies/, ShipReplicaSet.preAt), so a ship stepping after the one
+   * that pulled reads it as unpulled, as its clients do (bridge/flight.ts push)
+   */
+  private pushQueue: [number, number, number][] | null = null;
   /** How much of the last hit got through the armour it struck (hitMultiplier): under GLANCING it shows as glancing */
   private lastThrough = 1;
   /** While a splash hurts one body's parts (all from the point `at`): the part cover last sent a hit to, and in what stage */
@@ -400,6 +406,8 @@ export class ShipBridge {
 
   /** Make a ship tougher (elite enemies): every part's max HP × k, at full HP */
   scaleHp(eid: number, k: number): void { return dmg.scaleHp(this.ctx, eid, k); }
+  /** Every part's most HP set outright (a custom enemy's pieces), at full HP */
+  setMaxHp(eid: number, hp: readonly number[]): void { return dmg.setMaxHp(this.ctx, eid, hp); }
 
   /** Toughen one function's parts (a boss's core) by `k` */
   hardenParts(eid: number, fn: string, k: number): void { return dmg.hardenParts(this.ctx, eid, fn, k); }

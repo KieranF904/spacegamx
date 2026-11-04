@@ -233,7 +233,7 @@ export interface BridgeInternals {
   pulseHit: ShipBridge['pulseHit']; apHeading: ShipBridge['apHeading']; controllers: ShipBridge['controllers'];
   dormant: ShipBridge['dormant']; lastFired: ShipBridge['lastFired']; damageMuls: ShipBridge['damageMuls'];
   wing: ShipBridge['wing']; targets: ShipBridge['targets']; kits: ShipBridge['kits'];
-  ghosts: ShipBridge['ghosts']; underivable: ShipBridge['underivable']; lastThrough: ShipBridge['lastThrough']; coverMemo: ShipBridge['coverMemo'];
+  ghosts: ShipBridge['ghosts']; underivable: ShipBridge['underivable']; pushQueue: ShipBridge['pushQueue']; lastThrough: ShipBridge['lastThrough']; coverMemo: ShipBridge['coverMemo'];
   beams: ShipBridge['beams']; pdList: ShipBridge['pdList']; pdOn: ShipBridge['pdOn'];
   ungridded: ShipBridge['ungridded']; castOn: ShipBridge['castOn']; castOk: ShipBridge['castOk'];
   gravityK: ShipBridge['gravityK'];

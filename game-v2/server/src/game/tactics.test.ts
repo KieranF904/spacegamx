@@ -101,8 +101,8 @@ describe('enemy tactics', () => {
     const { pid } = w.pilots[0];
     const num = InSystem.systemId[pid];
     hold(pid, 90000, 90000);
-    // A pirate prefers 700 out; its cannon reaches far further
-    const [foe] = w.enemies.spawnPack(num, { faction: 'pirates', ships: ['pirate_raider'] }, 90000, 91800);
+    // A pirate skiff (grid: its guns are parts) prefers 700 out; its cannon reaches far further
+    const [foe] = w.enemies.spawnPack(num, { faction: 'pirates', ships: ['pirate_skiff'] }, 90000, 91800);
     w.enemies.pin?.(foe);
     let shots = 0;
     const ship = w.bridge.get(pid)!;

@@ -35,6 +35,9 @@ import {
   nestPosition, NEST_RADIUS, type NestData, type PlanetData, type StarSystemData, datan2, dcos, dhypot, dsin,
   orderEngage, orderFlee, orderPatrol, orderReturn, aiAimError, type BodyState, type WantRec } from '@space-game/common';
 import { AiPilots } from './brains/aiPilot.js';
+import { CustomEnemies } from './custom/CustomEnemies.js';
+import type { CustomTable } from './custom/types.js';
+import type { Mobs } from './Mobs.js';
 import { nestBand, clampBand, stepRound, placesOfInterest, looseWaypoint, nomadDestination, LOOSE_REACH, type RoamStyle, type Band, type XY } from './Roaming.js';
 import type { ShipBridge, PilotOrders } from '../ships/ShipBridge.js';
 import type { Intent, Plan, FarPose } from '../ships/SimLod.js';
@@ -107,6 +110,8 @@ export interface FactionsFile {
   /** Per system: `grade` (Mk I-V, default I) is what its ships are built of (ships/grades.ts) */
   /** `groups` is also who lives there (events and raids draw on it); `packs` of them roam free, coming in from outside (0: all from nests) */
   spawns: Record<string, { grade?: number; packs: number; groups: SpawnGroup[]; zones?: SpawnZone[]; nests?: SpawnNest[]; events?: import('./Events.js').SystemEvents }>;
+  /** Custom enemies (docs/enemies/custom-roster.md): designs in ship types' places, their pieces' HP and moves' numbers (custom/) */
+  custom?: CustomTable;
   rules: {
     minStationDistance: number;
     minPlayerDistance: number;
@@ -240,6 +245,9 @@ export interface EnemyHost {
   safeAt?(num: number, x: number, y: number): boolean;
   /** A pilot's decision, for the clients that run its body (CAPS.PILOTS: net/decisions/BodyNet.ts) */
   decide?(eid: number, op: number, args: readonly number[], state: BodyState): void;
+  /** Custom enemies' moves (custom/): a shot from a ship (tuning.json weapons kind), a message to a system */
+  fire?(owner: number, kind: string, x: number, y: number, angle: number, damageScale: number, opts?: { target?: number; speed?: number }): void;
+  send?(systemNum: number, msg: import('@space-game/common').ServerMessage): void;
 }
 
 /** Party members this close to a kill share it */
@@ -369,9 +377,20 @@ export class Enemies {
 
   /** Its ships' pilots: the commander's orders flown by the shared pilot body (brains/aiPilot.ts) */
   private readonly pilots: AiPilots;
+  /** Custom enemies' pieces and moves (custom/CustomEnemies.ts) */
+  readonly custom: CustomEnemies;
+  /** What mines are laid as (set once mobs exist) */
+  mobs: Mobs | undefined;
 
   constructor(private host: EnemyHost, private ships: ShipBridge, private data: FactionsFile, private designs: Record<string, Blueprint>) {
     this.pilots = new AiPilots(host);
+    const self = this;
+    this.custom = new CustomEnemies({
+      tick: () => host.tick(), ships, players: (num) => host.players(num), get mobs() { return self.mobs; },
+      fire: host.fire ? (o, k, x, y, a, d, opts) => host.fire!(o, k, x, y, a, d, opts) : undefined,
+      send: host.send ? (num, msg) => host.send!(num, msg) : undefined,
+      launchFx: host.effect ? (num, x, y) => host.effect!(num, x, y, 'launch') : undefined,
+    }, data.custom);
   }
 
   /** Is this entity a hostile ship (and of which faction) */
@@ -382,7 +401,7 @@ export class Enemies {
   info(eid: number): { name: string; faction: string; factionIndex: number; elite: boolean; boss?: string; grade: number; rating: number } | undefined {
     const e = this.enemies.get(eid);
     if (!e) return undefined;
-    const base = (e.boss && this.bosses?.name(eid)) || (this.designs[e.type]?.name ?? e.type);
+    const base = (e.boss && this.bosses?.name(eid)) || (this.design(e.type, 1)?.name ?? e.type);
     // Above Mk I, the grade is part of the name: a Mk III raider is a different fight
     const name = !e.boss && e.grade > 1 ? `${base} ${markName(e.grade)}` : base;
     return {
@@ -401,6 +420,9 @@ export class Enemies {
   private graded = new Map<string, Blueprint>();
   /** `plating`: its armour plates that many grades better (elites, bosses) */
   design(type: string, grade: number, plating = 0): Blueprint | undefined {
+    // (A custom enemy's design is its own at every grade: its grade scales its pieces' HP and its damage instead, custom/)
+    const custom = this.custom.designOf(type);
+    if (custom) return this.designs[custom];
     const bp = this.designs[type];
     if (!bp || (grade <= 1 && !plating && blueprintGrade(this.ships.catalog, bp) === 1)) return bp;
     const key = `${type}@${grade}+${plating}`;
@@ -427,6 +449,8 @@ export class Enemies {
       let fp = 0, tough = 0;
       const f = this.data.factions[g.faction];
       for (const type of g.ships) {
+        const cs = this.custom.statsOf(type);
+        if (cs) { fp += this.custom.firepower(type, grade); tough += Object.values(cs.hp).reduce((a, h) => a + h, 0) * 4; continue; }
         const bp = this.design(type, grade, g.plating ?? 0);
         if (!bp) continue;
         const r = rateShip(this.ships.catalog, this.ships.tuning, createShipState(this.ships.catalog, this.ships.tuning, 0, bp, 0), f?.hpScale ?? 1);
@@ -575,7 +599,7 @@ export class Enemies {
 
   /** A ship type's name (for quest text) */
   displayName(type: string): string {
-    return this.designs[type]?.name ?? type.replace(/^boss_/, '').replace(/_/g, ' ').replace(/\w/g, (c) => c.toUpperCase());
+    return this.design(type, 1)?.name ?? type.replace(/^boss_/, '').replace(/_/g, ' ').replace(/\w/g, (c) => c.toUpperCase());
   }
 
   count(systemNum?: number): number {
@@ -641,12 +665,18 @@ export class Enemies {
     const bp = this.design(type, grade, plating + (elite ? 1 : 0));
     if (!bp) return -1;
     const eid = this.ships.spawnDummy(bp, x, y, angle ?? this.rng() * Math.PI * 2, pack.systemNum);
-    const hp = (this.data.factions[faction]?.hpScale ?? 1) * (elite ? this.data.rules.eliteHp : 1);
-    if (hp !== 1) this.ships.scaleHp(eid, hp);
-    const dmg = this.data.factions[faction]?.damageScale;
-    if (dmg !== undefined && dmg !== 1) this.ships.setDamageScale?.(eid, dmg);
+    const custom = this.custom.statsOf(type);
+    if (custom) {
+      // (A custom enemy: its pieces' HP and its damage are its design's own, by grade: custom/CustomEnemies.ts)
+      this.custom.adopt(eid, type, grade, elite ? this.data.rules.eliteHp : 1);
+    } else {
+      const hp = (this.data.factions[faction]?.hpScale ?? 1) * (elite ? this.data.rules.eliteHp : 1);
+      if (hp !== 1) this.ships.scaleHp(eid, hp);
+      const dmg = this.data.factions[faction]?.damageScale;
+      if (dmg !== undefined && dmg !== 1) this.ships.setDamageScale?.(eid, dmg);
+    }
     const ship = this.ships.get(eid);
-    const rating = ship ? rateShip(this.ships.catalog, this.ships.tuning, ship).rating : 0;
+    const rating = !ship ? 0 : custom ? ratingOf(this.custom.firepower(type, grade), ship.maxHp.reduce((a, h) => a + h, 0) * 4) : rateShip(this.ships.catalog, this.ships.tuning, ship).rating;
     const e: Enemy = { eid, type, faction, pack: pack.id, elite, grade, plating, rating, state: 'patrol', target: -1, waypoint: { x, y }, strafe: this.rng() < 0.5 ? 1 : -1, nextThink: 0, aimErr: 0, flank };
     this.enemies.set(eid, e);
     pack.members.add(eid);
@@ -661,6 +691,7 @@ export class Enemies {
       if (!this.ships.has(eid)) {
         this.enemies.delete(eid);
         this.pilots.forget(eid);
+        this.custom.forget(eid);
         this.packs.get(e.pack)?.members.delete(eid);
       }
     }
@@ -1195,14 +1226,17 @@ export class Enemies {
 
     // Its order, flown by the shared pilot (common bodies/aiPilot.ts): on the clients that run its body too
     let want: WantRec, cent: [number, number] | null = null, reach = 0;
+    // (A custom enemy: its range and reach are its design's, and its order carries its move and lost pieces: custom/)
+    const cs = this.custom.has(eid) ? this.custom.statsOf(e.type) : undefined;
     if (e.state === 'engage') {
-      if (e.reach === undefined) this.learnLoadout(e, ship);
+      if (e.reach === undefined) { if (cs) e.reach = cs.reach; else this.learnLoadout(e, ship); }
       reach = Math.round(e.reach ?? Math.max(b.range * 1.8, 900));
       // (shot at lately by its target: its commander's to know, from the damage ledger)
       const hitBy = now - this.ships.lastDamagedTick(eid) < 150 && this.ships.lastHitter(eid) === t;
       const c = pack?.cent, mates = c && c.ids.includes(eid) ? c.ids.filter((m) => m !== eid) : undefined;
       if (c && mates?.length) cent = [c.x, c.y];
-      want = orderEngage(eid, b.range, reach, hitBy, e.aimErr, e.aimSeed ?? 0, b.strafe, cent ? e.flank : undefined, cent ? mates : undefined);
+      want = orderEngage(eid, cs?.range ?? b.range, reach, hitBy, e.aimErr, e.aimSeed ?? 0, b.strafe, cent ? e.flank : undefined, cent ? mates : undefined);
+      if (cs) want = this.custom.order(eid, want, t);
     } else if (e.state === 'flee') want = orderFlee();
     else if (e.state === 'return') want = orderReturn(home.x, home.y);
     else want = orderPatrol(e.waypoint.x, e.waypoint.y, pack?.pace ?? 0.58, pack?.pauseUntil ?? 0);
@@ -1213,7 +1247,9 @@ export class Enemies {
     const bodied = asBody && !this.ships.isPinned(eid) && (!fights || hasComponent(this.host.world, Player, t));
     const out = this.pilots.fly(eid, fights ? t : -1, e.strafe, want, pose(eid), fights ? pose(t) : null, cent, bodied);
     let firing = false;
-    if (e.state === 'engage') {
+    // (Its moves and guns: what they do this tick, custom/moves.ts; it fires no part guns)
+    if (cs) { if (asBody) this.custom.step(eid, t, e.state === 'engage'); }
+    else if (e.state === 'engage') {
       // Fire within its guns' real reach, when a hit is likely: a big, slow, near target, or a lobbed shell
       const spread = out.d * (Math.abs(aiAimError(want, eid, now)) + 0.015) + out.across * out.tof * 0.6;
       const size = this.ships.get(t)?.derived.radius ?? Radius.value[t] ?? 60;

@@ -8,6 +8,8 @@
  *   kamikaze  homes on its target with a little lead, turning at its own rate,
  *             and bursts when anything it may hurt comes within its fuse (or
  *             when its life runs out, harmlessly)
+ *   mine      sits where it was laid (it never hunts: its flight is the law's unarmed drift) and bursts when a pilot
+ *             comes within its fuse, the nearest by (distance, id)
  *
  * It flies by the scheduled-waypoint law (common guidance/waypoints.ts, FLIGHT_MOB), its state on the law's grid: its
  * clients fly it on their tick layers (CAPS.WAYPOINTS, net/guides/GuideNet.ts). Who it hunts is its brain's (its
@@ -26,7 +28,7 @@ import { SimPass } from '../sim/SystemClocks.js';
 
 export interface MobDef {
   name: string;
-  behaviour: 'kamikaze';
+  behaviour: 'kamikaze' | 'mine';
   hp: number;
   /** Hit radius (world units) */
   radius: number;
@@ -69,6 +71,8 @@ export interface MobHost {
   terrain?(systemNum: number): Terrain | undefined;
   /** Is this ship still there to hunt (gone: it lets go, and its clients are told) */
   alive?(eid: number): boolean;
+  /** A volley laid at once (Mobs.launch): its ids, in order */
+  launched?(systemNum: number, owner: number, ids: readonly number[]): void;
   /** A mob's guide record at this tick (common guidance/records.ts: WP, NEXT, TARGET), for its clients (GuideNet) */
   guided?(eid: number, tick: number, op: number, args: number[]): void;
 }
@@ -111,6 +115,20 @@ export class Mobs {
     return n;
   }
 
+  /**
+   * A volley laid at once (a Rivet Sower's mines): one at each spot, still, for `owner`. Their ids in order (a LAUNCH:
+   * the run of ids a body's volley took, docs/design/decision-inputs.md 6.3)
+   */
+  launch(id: string, systemNum: number, spots: readonly { x: number; y: number }[], owner: number, scale = 1): number[] {
+    const out: number[] = [];
+    for (const p of spots) {
+      const eid = this.spawn(id, systemNum, p.x, p.y, 0, 0, owner, scale);
+      if (eid >= 0) out.push(eid);
+    }
+    if (out.length) this.host.launched?.(systemNum, owner, out);
+    return out;
+  }
+
   /** Launch one: out of (x, y) heading `angle` at `speed`, flying for `owner` (whose target it hunts) */
   spawn(id: string, systemNum: number, x: number, y: number, angle: number, speed: number, owner: number, scale = 1): number {
     const def = this.file.mobs[id];
@@ -129,7 +147,8 @@ export class Mobs {
     Radius.value[eid] = def.radius;
     InSystem.systemId[eid] = systemNum;
     const born = this.host.tick();
-    const guide = newGuide(-1, guideKind(def.turn, def.accel, def.speed, FLIGHT_MOB, born + (def.arm ?? 0)));
+    // (A mine never arms its flight: it drifts as laid for its whole life)
+    const guide = newGuide(-1, guideKind(def.turn, def.accel, def.speed, FLIGHT_MOB, born + (def.behaviour === 'mine' ? def.life : def.arm ?? 0)));
     this.live.set(eid, { eid, id, def, index: this.ids.indexOf(id), hp: def.hp, owner, born, target: -1, scale, guide });
     return eid;
   }
@@ -167,7 +186,13 @@ export class Mobs {
       const age = now - m.born;
       if (age >= def.life) { this.kill(m, true); continue; }
       const x = Position.x[eid], y = Position.y[eid];
-      const armed = age >= (def.arm ?? 0);
+      if (def.behaviour === 'mine') {
+        // A mine: the nearest pilot within its fuse sets it off
+        const p = this.host.nearestPlayer(num, x, y, def.blast.fuse + 300);
+        const gap = p < 0 ? Infinity : this.host.hullGap ? this.host.hullGap(p, x, y, def.blast.fuse) : dhypot(Position.x[p] - x, Position.y[p] - y) - this.host.radiusOf(p);
+        if (age >= (def.arm ?? 0) && gap < def.blast.fuse) { this.kill(m, false); continue; }
+      }
+      const armed = def.behaviour !== 'mine' && age >= (def.arm ?? 0);
       if (armed) {
         // Its owner's target, or the nearest pilot about (its brain: told to its clients when it changes)
         if (now % 15 === m.eid % 15 || m.target < 0) {

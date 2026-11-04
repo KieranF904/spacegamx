@@ -3,7 +3,7 @@
  "name": "Scrap Crawler",
  "faction": "scrapborn",
  "sky": "sol_scrap_nest",
- "replaces": "scrap_crawler",
+ "replaces": "grid_scrap_crawler",
  "role": "puller / brawler",
  "level": "3-6",
  "threat": "medium",
@@ -45,6 +45,6 @@
   "shell_r",
   "magnet"
  ],
- "radiusCells": 6.092,
- "radius": 146
+ "radiusCells": 4.23,
+ "radius": 102
 }

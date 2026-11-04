@@ -1,0 +1,107 @@
+{
+ "name": "Rivet Sower",
+ "catalogVersion": 1,
+ "paint": "#34363c",
+ "rigid": true,
+ "parts": [
+  {
+   "uid": 0,
+   "piece": "rivet_sower_whisker_l",
+   "fn": "scanner",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "group": 2
+  },
+  {
+   "uid": 1,
+   "piece": "rivet_sower_whisker_r",
+   "fn": "scanner",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "group": 2
+  },
+  {
+   "uid": 2,
+   "piece": "rivet_sower_body",
+   "fn": "hull",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "group": 0
+  },
+  {
+   "uid": 3,
+   "piece": "rivet_sower_lamp",
+   "fn": "core",
+   "material": "scrap_seam",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "group": 0
+  },
+  {
+   "uid": 4,
+   "piece": "rivet_sower_pannier_l",
+   "fn": "cargo",
+   "material": "scrap_rust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "group": 3
+  },
+  {
+   "uid": 5,
+   "piece": "rivet_sower_pannier_r",
+   "fn": "cargo",
+   "material": "scrap_paint",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "group": 4
+  },
+  {
+   "uid": 6,
+   "piece": "rivet_sower_drive_l",
+   "fn": "thruster",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "group": 5
+  },
+  {
+   "uid": 7,
+   "piece": "rivet_sower_drive_r",
+   "fn": "thruster",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "group": 5
+  },
+  {
+   "uid": 8,
+   "piece": "rivet_sower_drum",
+   "fn": "conduit",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "group": 1
+  }
+ ]
+}

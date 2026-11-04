@@ -1,0 +1,118 @@
+{
+ "name": "Helios Drone",
+ "catalogVersion": 1,
+ "paint": "#c9ccd2",
+ "rigid": true,
+ "parts": [
+  {
+   "uid": 0,
+   "piece": "helios_drone_cell",
+   "fn": "core",
+   "material": "titanium",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 1,
+   "piece": "helios_drone_chassis",
+   "fn": "hull",
+   "material": "titanium",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 2,
+   "piece": "helios_drone_eye",
+   "fn": "scanner",
+   "material": "pyre_crystal",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 3,
+   "piece": "helios_drone_shoulder",
+   "fn": "hull",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 4,
+   "piece": "helios_drone_upper",
+   "fn": "hull",
+   "material": "titanium",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 5,
+   "piece": "helios_drone_elbow",
+   "fn": "hull",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 6,
+   "piece": "helios_drone_fore",
+   "fn": "hull",
+   "material": "titanium",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 7,
+   "piece": "helios_drone_torch",
+   "fn": "hull",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 8,
+   "piece": "helios_drone_panel_l",
+   "fn": "hull",
+   "material": "titanium",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 9,
+   "piece": "helios_drone_panel_r",
+   "fn": "hull",
+   "material": "titanium",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 10,
+   "piece": "helios_drone_drive",
+   "fn": "thruster",
+   "material": "pyre_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  }
+ ]
+}

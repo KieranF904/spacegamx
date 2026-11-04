@@ -7,7 +7,7 @@
  */
 import { design, mid, bar, ringPts, oval, inset, rivets, glow, ring, raise, recess, channel, stripes, dent, bell, cable } from './kit.mjs';
 
-const GREY = 'titanium', RUST = 'scrap_rust', STEEL = 'scrap_steel', DRIVE = 'pyre_steel';
+const GREY = 'pirate_plate', PAINT = 'pirate_paint', RUST = 'scrap_rust', STEEL = 'scrap_steel', DRIVE = 'pyre_steel';
 const RED = '#8e2a22', REDB = '#b8372b', CREAM = '#d8cdb4', GLASS = '#16202a', LAMP = '#ff5a3a', GUNM = '#3a3e44', DECK = '#5b6068', ROPE = '#c8c2b0';
 
 const d = design('hookboat', {
@@ -40,7 +40,7 @@ d.part('hull', 'hull', GREY, hull, {
   ],
 });
 // The wheelhouse: aft, off to starboard, windows along its front, its running lamp
-d.part('wheelhouse', 'hull', GREY, [[0.0, 1.5], [1.25, 1.4], [1.35, 3.8], [0.05, 3.9]], {
+d.part('wheelhouse', 'hull', PAINT, [[0.0, 1.5], [1.25, 1.4], [1.35, 3.8], [0.05, 3.9]], {
   group: 'core', relief: 'plate',
   detail: [recess([[0.15, 1.65], [1.1, 1.58], [1.12, 2.0], [0.17, 2.08]], GLASS), raise([[0.2, 2.4], [1.1, 2.35], [1.15, 3.6], [0.25, 3.65]], DECK), glow([0.7, 3.05], 0.2, LAMP), channel(bar([0.2, 1.85], [1.05, 1.8], 0.1), '#9fd4ff')],
 });

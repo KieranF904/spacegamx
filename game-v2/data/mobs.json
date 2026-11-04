@@ -1,5 +1,5 @@
 {
-  "_comment": "Single-body enemies (server/src/game/Mobs.ts): one hit circle (radius), one HP, a simple way of flying. speed/accel in world units a tick, turn in radians a tick, life and arm in ticks; blast: fuse distance from the target's hull, radius, damage (× its owner's damage scale). shape is the look only: world units, nose along +x.",
+  "_comment": "Single-body enemies (server/src/game/Mobs.ts; behaviour kamikaze or mine): one hit circle (radius), one HP, a simple way of flying. speed/accel in world units a tick, turn in radians a tick, life and arm in ticks; blast: fuse distance from the target's hull, radius, damage (× its owner's damage scale). shape is the look only: world units, nose along +x.",
   "mobs": {
     "ember_drone": {
       "name": "Ember Drone",
@@ -30,6 +30,21 @@
       "shape": [[26, 0], [14, 14], [-4, 20], [-18, 12], [-12, 0], [-18, -12], [-4, -20], [14, -14]],
       "color": "#3a3d42",
       "glow": "#7affd2"
+    },
+    "rivet_mine": {
+      "name": "Rivet Mine",
+      "behaviour": "mine",
+      "hp": 30,
+      "radius": 22,
+      "speed": 0,
+      "accel": 0,
+      "turn": 0,
+      "life": 900,
+      "arm": 30,
+      "blast": { "fuse": 70, "radius": 170, "damage": 55 },
+      "shape": [[16, 0], [11, 11], [0, 16], [-11, 11], [-16, 0], [-11, -11], [0, -16], [11, -11]],
+      "color": "#4a4136",
+      "glow": "#ffb347"
     }
   }
 }

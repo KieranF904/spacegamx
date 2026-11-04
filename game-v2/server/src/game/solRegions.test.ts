@@ -91,7 +91,9 @@ describe('Sol: a safe inner system, a contested middle, a hostile rim', () => {
     const cat = w.bridge.catalog, tun = w.bridge.tuning;
     const drone = createShipState(cat, tun, 0, w.bridge.enemyDesigns.helios_drone, 0).derived;
     const starter = createShipState(cat, tun, 0, w.bridge.playerBlueprint, 0).derived;
-    expect(w.bridge.validate(w.bridge.enemyDesigns.helios_drone).ok).toBe(true);
+    // (its own design now, docs/enemies/custom-roster.md: not a player's, so no design check; small and slow all the same)
+    expect(w.bridge.enemyDesigns.helios_drone.rigid).toBe(true);
+    expect(drone.radius).toBeLessThan(starter.radius);
     expect(drone.maxThrust.forward / drone.mass * (w.bridge.enemyDesigns.helios_drone.drive ?? 1)).toBeLessThan((starter.maxThrust.forward / starter.mass) * 0.6);
     const f = (files.factions as any).factions.helios;
     expect(f.damageScale).toBeLessThan(0.2);

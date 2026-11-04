@@ -11,12 +11,16 @@
  * Helpers copied from scripts/bespoke/scrap_mother.mjs and maw_heart.mjs (docs/boss-design.md section 3), plus a
  * `group` on every part: the destroyable piece it belongs to (a few parts drawn as one piece break as one).
  */
-import { writeFileSync, mkdirSync } from 'fs';
+import { writeFileSync, mkdirSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 export const root = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 export const OUT = process.env.DESIGNS_DIR ?? join(root, 'docs/enemies/designs');
+/** The game's copy (data/ships): its hull's pieces and its design, each part numbered by its group (unset GAME_DIR='': design only) */
+export const GAME = process.env.GAME_DIR ?? join(root, 'data/ships');
+/** Each design's groups, in the order the game numbers them (common bodies/custom/roster.json: core first) */
+const ROSTER = JSON.parse(readFileSync(join(root, 'common/src/bodies/custom/roster.json'), 'utf8')).designs;
 export const DEG = Math.PI / 180;
 export const round = (v) => Math.round(v * 1000) / 1000;
 export const flipX = ([x, y]) => [round(-x), y];
@@ -144,6 +148,15 @@ export function design(id, card) {
       const gone = new Set(damaged);
       for (const g of gone) if (!parts.some((q) => q._group === g)) throw new Error(`${id}: no group ${g}`);
       const left = ordered.filter((q) => !gone.has(q._group));
+      // The game's files: each part's group by its number in the roster
+      const order = ROSTER.find((r) => r.id === id)?.groups;
+      if (GAME && order) {
+        for (const q of parts) if (!order.includes(q._group)) throw new Error(`${id}: group ${q._group} isn't in roster.json`);
+        const numbered = ordered.map((q, k) => { const { _group, ...rest } = q; return { ...rest, uid: k, group: order.indexOf(_group) }; });
+        mkdirSync(join(GAME, 'bespoke'), { recursive: true });
+        writeFileSync(join(GAME, 'bespoke', `${id}.json`), JSON.stringify({ _comment: `${card.name}'s own hull (docs/enemies/custom-roster.md). Written by scripts/bespoke/enemies/${id}.mjs: edit that, not this.`, pieces }, null, 1) + '\n');
+        writeFileSync(join(GAME, 'blueprints', 'enemy', `${id}.json`), JSON.stringify({ name: card.name, catalogVersion: 1, paint, rigid: true, parts: numbered }, null, 1) + '\n');
+      }
       writeFileSync(join(OUT, `${id}.pieces.json`), JSON.stringify({ _comment: `DESIGN ONLY, not loaded by the game: ${card.name} (docs/enemies/custom-roster.md). Written by scripts/bespoke/enemies/${id}.mjs.`, pieces }, null, 1) + '\n');
       writeFileSync(join(OUT, `${id}.json`), JSON.stringify(bp(card.name, ordered), null, 1) + '\n');
       writeFileSync(join(OUT, `${id}_damaged.json`), JSON.stringify(bp(`${card.name} (damaged)`, left), null, 1) + '\n');

@@ -66,4 +66,4 @@ d.part('drum', 'conduit', STEEL, gear(DC, 1.85, 2.2, 10), {
   ],
 });
 
-d.write({ damaged: ['pannier_r', 'sensors'], scale: 0.78 });
+d.write({ damaged: ['pannier_r', 'sensors'], scale: 0.5 });
