@@ -366,6 +366,8 @@ const TABLE: Handlers = {
   hpCheck: (h, msg) => { h.shipClient.onHpCheck(msg); },
   // (Client-detected hits, part D: a correction, and the caps in effect from the next snapshot)
   hitFix: (h, msg) => { h.shipClient.onHitFix(msg, (m) => handleServerMessage(h, m)); },
+  // (Its system's crowd level, CAPS.CROWD: the focus radius and fade, the window, its clock's rate from a tick)
+  crowd: (h, msg) => { h.state.onCrowd(msg); },
   netCaps: (h, msg) => { h.shipClient.onNetCaps(msg.caps, msg.lvl); h.network.useCaps?.(msg.caps); h.state.coalesceMs = coalesceDelayMs(msg.caps, msg.hold, msg.lvl); },
   projectileHit: (h, msg) => {
     h.renderer.showProjectileHit(msg.id, msg.x, msg.y);

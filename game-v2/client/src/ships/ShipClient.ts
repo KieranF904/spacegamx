@@ -29,7 +29,7 @@ import {
   jumpFieldAt, fieldRangeBoost, fieldCharge, primeBoost, pilotJumpStep, withEmp, lodestonePosition, type JumpField, type LodestoneData,
   ShipReplicaSet, ServerSnapshotMessage,
   packCursorWeaponState, rebuildVolley, WEAPON_KIND_TYPE, EntityState, accelAlong, turnAccel, rateShip, stepGuns, volleyShells, firesStraight, partWeaponDef,
-  type ServerHitsMessage, type ServerHpCheckMessage, type ServerHitFixMessage, type HitReport, type OwnCheck, type BodyCheck, CAPS, SIDE, ownSimCaps, bodiesFor, focusFor, causesFor, waypointsFor, ghostWeight,
+  type ServerHitsMessage, type ServerHpCheckMessage, type ServerHitFixMessage, type HitReport, type OwnCheck, type BodyCheck, CAPS, SIDE, ownSimCaps, bodiesFor, focusFor, causesFor, waypointsFor, ghostWeight, FOCUS_RANGE,
 } from '@space-game/common';
 import type { MenuShipInfo } from '../ui/GameMenuUI';
 import type { GameState, InterpolatedEntity } from '../state/GameState';
@@ -304,6 +304,8 @@ export class ShipClient {
   private ghosts: GhostLayer | null = null;
   private ghostList: Ghost[] = [];
   private ghostOwn = { x: 0, y: 0 };
+  /** The focus radius in effect (a crowd shrinks it: GameState.crowd, CAPS.CROWD): the ghost fade is its last km */
+  private ghostFocus = FOCUS_RANGE;
 
   /** The focus grid's ghosts this frame (CAPS.FOCUS): the ring's ships from their legs, and held ships 18 km off and more */
   private drawGhosts(): void {
@@ -314,7 +316,7 @@ export class ShipClient {
     if (this.focusOn) {
       for (const [id, e] of state.entities) {
         if (id === state.playerId || (e.type !== EntityType.Player && e.type !== EntityType.ShipBody) || !this.store.get(id)) continue;
-        const w = ghostWeight(Math.hypot(e.renderX - this.ghostOwn.x, e.renderY - this.ghostOwn.y));
+        const w = ghostWeight(Math.hypot(e.renderX - this.ghostOwn.x, e.renderY - this.ghostOwn.y), this.ghostFocus);
         if (w > 0) list.push({ x: e.renderX, y: e.renderY, kind: e.type === EntityType.Player ? 4 : e.data?.[0] ?? 0, rank: e.type === EntityType.ShipBody ? (e.data?.[4] ?? 0) : 0, w });
       }
       for (const f of state.farShips.list(state.systemId, state.getRawServerTick(), (id) => state.entities.has(id) || id === state.playerId)) {
@@ -724,7 +726,7 @@ export class ShipClient {
     this.renderer.ghostOf = (id) => {
       if (!this.focusOn || id === this.opts.state.playerId) return 0;
       const e = this.opts.state.entities.get(id);
-      return e ? ghostWeight(Math.hypot(e.renderX - this.ghostOwn.x, e.renderY - this.ghostOwn.y)) : 0;
+      return e ? ghostWeight(Math.hypot(e.renderX - this.ghostOwn.x, e.renderY - this.ghostOwn.y), this.ghostFocus) : 0;
     };
     renderer.onMuzzle = (owner, x, y, power) => {
       this.renderer?.kick(owner, x, y, power);
@@ -1478,7 +1480,7 @@ export class ShipClient {
         if (mine.data && this.features.hasParsers) this.features.parsePilot(mine.data, chargeGroupsEnd(mine.data), mine.fx ??= {});
         else mine.fx = undefined;
       } }
-    { const me = state.entities.get(state.playerId); if (me) { this.ghostOwn.x = me.renderX; this.ghostOwn.y = me.renderY; } }
+    { const me = state.entities.get(state.playerId); if (me) { this.ghostOwn.x = me.renderX; this.ghostOwn.y = me.renderY; } this.ghostFocus = state.crowd.focus; }
     this.renderer?.update();
     this.drawGhosts();
     this.hud.update();

@@ -35,7 +35,7 @@ import {
   BOOST_REGEN,
   BOOST_REGEN_DELAY,
   TICK_RATE,
-  TICK_MS,
+  TICK_MS, FOCUS_RANGE, CROWD_BASE_WINDOW, CROWD_RATE_LEAD, crowdPeriodMs,
   INTERP_MAX_DELAY_MS,
   INTERP_MIN_DELAY_MS,
   INTERP_SLEW_MS_PER_SEC,
@@ -297,6 +297,48 @@ export class GameState {
   public interpDelayMs: number = 120;
   /** Coalesced frames (CAPS.COALESCE) may come this much later: the interpolation delay is that much longer (network/netCaps.ts) */
   public coalesceMs = 0;
+  /**
+   * Its system's crowd level (CAPS.CROWD; common network/crowd.ts): the focus radius (the ghost fade is its last km), the
+   * snapshot window, the system's ticks a second. Its clock runs at tickMs a tick: TICK_MS, longer while the system is
+   * slowed (a rate change is said ahead and turns the clock at its tick: crowdTurn)
+   */
+  public crowd = { lv: 0, focus: FOCUS_RANGE, window: CROWD_BASE_WINDOW, rate: TICK_RATE };
+  public tickMs = TICK_MS;
+  private tickMsNext: { at: number; ms: number } | null = null;
+  /** Interpolation delay added for a wider window: the snapshots come further apart */
+  public crowdDelayMs = 0;
+
+  /** Its system's crowd level, from a tick (crowd message) */
+  onCrowd(msg: { tick: number; lv: number; f: number; w: number; r: number }, now: number = performance.now()): void {
+    this.crowd = { lv: msg.lv, focus: msg.f, window: msg.w, rate: msg.r };
+    const ms = crowdPeriodMs(msg.r);
+    this.crowdDelayMs = Math.max(0, msg.w - CROWD_BASE_WINDOW) * ms;
+    const est = this.tickOffset === null ? null : this.getEstimatedServerTick(now);
+    // (Another system's clock, or the first word of one: its tick now, at its rate, from here)
+    if (est === null || Math.abs(msg.tick - est) > CROWD_RATE_LEAD + 30) {
+      this.tickMs = ms;
+      this.tickMsNext = null;
+      this.serverTickTarget = msg.tick + (this.smoothedPing / 2) / ms;
+      this.serverTickTargetTime = now;
+      this.tickOffset = null;
+      return;
+    }
+    if (ms !== this.tickMs) this.tickMsNext = { at: msg.tick, ms };
+  }
+
+  /** A rate said ahead: the clock turns at its tick, carrying on from where it is */
+  private crowdTurn(now: number): void {
+    const n = this.tickMsNext;
+    if (!n || this.tickOffset === null) return;
+    const est = now / this.tickMs + this.tickOffset;
+    if (est < n.at) return;
+    const raw = this.serverTickTarget + (now - this.serverTickTargetTime) / this.tickMs;
+    this.tickMs = n.ms;
+    this.tickMsNext = null;
+    this.tickOffset = est - now / this.tickMs;
+    this.serverTickTarget = raw;
+    this.serverTickTargetTime = now;
+  }
   private targetInterpDelayMs: number = 120;
   private pingHistory: number[] = [];
   private smoothedPing: number = 0;
@@ -402,17 +444,17 @@ export class GameState {
     while (this.jitterGraphHistory.length > this.GRAPH_HISTORY_SIZE) this.jitterGraphHistory.shift();
     
     // Update server tick target (account for half RTT transit)
-    const halfRttTicks = (rtt / 2) / TICK_MS;
+    const halfRttTicks = (rtt / 2) / this.tickMs;
     this.serverTickTarget = serverTick + halfRttTicks;
     this.serverTickTargetTime = now;
     
-    if (this.tickOffset === null) this.tickOffset = this.serverTickTarget - now / TICK_MS;
+    if (this.tickOffset === null) this.tickOffset = this.serverTickTarget - now / this.tickMs;
     this.clockSynced = true;
     
     // Adaptive interpolation delay formula
     const baseMin = this.smoothedPing < 60 ? 80 : 110;
     const target = Math.max(baseMin, Math.min(INTERP_MAX_DELAY_MS,
-      this.smoothedPing * 0.7 + this.smoothedJitter * 4 + 90 + this.coalesceMs
+      this.smoothedPing * 0.7 + this.smoothedJitter * 4 + 90 + this.coalesceMs + this.crowdDelayMs
     ));
     this.targetInterpDelayMs = Math.max(INTERP_MIN_DELAY_MS, target);
   }
@@ -426,17 +468,18 @@ export class GameState {
    * behind the server and every input arrived late.)
    */
   getEstimatedServerTick(now: number = performance.now()): number {
-    const target = this.serverTickTarget - this.serverTickTargetTime / TICK_MS;
+    this.crowdTurn(now);
+    const target = this.serverTickTarget - this.serverTickTargetTime / this.tickMs;
     if (this.tickOffset === null || Math.abs(target - this.tickOffset) > SERVER_TICK_SNAP) this.tickOffset = target;
     else this.tickOffset += (target - this.tickOffset) * TICK_OFFSET_SMOOTHING;
-    return now / TICK_MS + this.tickOffset;
+    return now / this.tickMs + this.tickOffset;
   }
 
   /**
    * Raw server tick (no smoothing) for deterministic systems like asteroids.
    */
   getRawServerTick(now: number = performance.now()): number {
-    return this.serverTickTarget + (now - this.serverTickTargetTime) / TICK_MS;
+    return this.serverTickTarget + (now - this.serverTickTargetTime) / this.tickMs;
   }
 
   /** The world drawn is caught up: a snapshot is buffered and the last frame's render tick has reached the oldest one
@@ -447,7 +490,7 @@ export class GameState {
   }
 
   getRenderTick(now: number = performance.now()): number {
-    const interpDelayTicks = this.interpDelayMs / TICK_MS;
+    const interpDelayTicks = this.interpDelayMs / this.tickMs;
     return Math.max(0, this.getEstimatedServerTick(now) - interpDelayTicks);
   }
 
@@ -510,7 +553,7 @@ export class GameState {
   public leadTicks = 1;
 
   private updateLead(): void {
-    const want = (this.smoothedPing / 2 + this.smoothedJitter * 2) / TICK_MS + 0.5;
+    const want = (this.smoothedPing / 2 + this.smoothedJitter * 2) / this.tickMs + 0.5;
     if (want > this.leadTicks + 0.3 || want < this.leadTicks - 1.3) this.leadTicks = Math.max(1, Math.min(15, Math.ceil(want)));
   }
 
@@ -1115,7 +1158,7 @@ export class GameState {
     const deltaDelay = Math.max(-maxStep, Math.min(maxStep, this.targetInterpDelayMs - this.interpDelayMs));
     this.interpDelayMs = Math.max(INTERP_MIN_DELAY_MS, Math.min(INTERP_MAX_DELAY_MS, this.interpDelayMs + deltaDelay));
     
-    const interpDelayTicks = this.interpDelayMs / TICK_MS;
+    const interpDelayTicks = this.interpDelayMs / this.tickMs;
     const renderTick = Math.max(0, estimatedTick - interpDelayTicks);
     this.renderTickNow = renderTick;
     

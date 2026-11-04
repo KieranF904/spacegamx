@@ -25,6 +25,7 @@ import { GameState } from './state/GameState';
 
 
 import { RegionUI } from './ui/RegionUI';
+import { TimeScaleBadge } from './ui/TimeScaleBadge';
 
 import { PilotState, createClientEconomy } from './econ/clientEcon';
 import { LoginUI } from './ui/LoginUI';
@@ -115,6 +116,8 @@ export class Game {
   /** Every window and HUD component (built in init; see app/windows.ts) */
   private w = {} as WindowSet;
   private shipClient: ShipClient;
+  /** The time-scale badge: the system slowed in a crowd (CAPS.CROWD) */
+  private timeBadge: TimeScaleBadge | null = typeof document !== 'undefined' ? new TimeScaleBadge() : null;
   private hazards = new HazardOverlay();
   /** The cold on screen: frost in from the edges as the ship's warmth runs down */
   private frost = new FrostVignette();
@@ -981,6 +984,7 @@ this.xpFillEl = document.getElementById('xpFill');
     this.jumpZoom += ((burning && settings.data.display.jumpCamera ? 0.72 : 1) - this.jumpZoom) * Math.min(1, delta * (burning ? 3 : 1.5));
     this.renderer.cameraFollow = burning ? 0.85 : Math.max(0.1, this.renderer.cameraFollow * 0.97);
     this.renderer.setZoom(this.input.zoom * this.jumpZoom);
+    this.timeBadge?.update(this.state.crowd);
     
     if (this.loggedIn && this.state.playerId && this.network.isConnected()) {
       if (this.proto) {
