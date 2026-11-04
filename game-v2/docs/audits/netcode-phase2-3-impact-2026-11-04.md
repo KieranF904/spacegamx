@@ -424,3 +424,36 @@ Two client-side fixes went in alongside (no bytes): shells made and gone inside 
 shell stops at the surface it touches as drawn, the server's hits only confirming (docs/areas/weapons.md; live proof
 in docs/panels, projectile-surface-impacts: shells drawn through a hull before their impact 20-120 a scenario before,
 0 after, across 12 live runs at point-blank, 300 and 1,000 with caps 15 and 0).
+
+## Follow-up 2 (2026-11-04, later): zero disagreements, and rough validation
+
+Same probe (session scratchpad `net/zero/netAuditZero.ts`, `run.sh`; `PREDERR=5` moves the fake's prediction by up to
+5 units and 0.05 rad, cosmetic layer only; `WARM`, `SECS`, `DESYNC=a,b` for the runs below). Details and design:
+docs/design/confirmed-hits.md F3 and part E.
+
+**Disagreements** (shooter's journal, caps 31; before = this audit's step 2 tree):
+
+| scenario | before | after (3812fb1, e72b8d6) | prediction off: after (before) | corrections before -> after | hpCheck mismatches |
+|---|---|---|---|---|---|
+| Idle, beam, cruising | 0 | 0 | 0 (0) | 0 -> 0 | 0 -> 0 |
+| 2 Pips | 0 | 0 | 0 (106) | 0 -> 0 | 0 -> 0 |
+| Hammerhead | 0 | 0 | 0 (190) | 0 -> 0 | 0 -> 0 |
+| Gale | 0 | 0 | 0 (197) | 0 -> 0 | 0 -> 0 |
+| Pirates fight | 0 | 0 | 0 (2) | 0 -> 0 | 0 -> 0 |
+| Scrap Mother | 0 | 0 | 0 (4) | 0 -> 0 | 0 -> 0 |
+| Debris | **32** | **0** | 0 (182) | 16 -> 0 | 3 -> 0 |
+
+The causes: the client searched a window before the frame's told records were in (a shell told as striking debris
+flew on into the hauler behind: the debris case), its layer ran in f32 where the server runs f64, and its own shells
+were built from its prediction (exact only while that held: the "prediction off" column). The step-2 note that 2 of
+109 boss and 7 of 821 debris own shells were "built off" was wrong: the probe could not check those (spent inside the
+tick they were fired); every one it checked was exact then and is now. Payload (caps 31): debris 2,011 -> 1,962 B/s,
+Pirates 560 -> 680 and boss 1,936 -> 2,118 (the pilot's own ship's control rows and keyframes, now sent to it), the
+rest within 3 B/s.
+
+**Rough validation** (caps 63 = 31 + ROUGH, measured after 800 ticks so it is ROUGH throughout, against caps 31 on the
+same fights): reports up 4.45-9.9 -> 0.15-1.0 a second (Hammerhead 9.2 -> 1.0, Gale 9.9 -> 1.0, debris 6.1 -> 0.7),
+13-30 -> 0-3 B/s of report bytes, hpCheck 4.8 -> 1.7 B/s down, messages down unchanged, 0 disagreements, server
+stepMs unchanged (0.25-0.41 against 0.26-0.39). A forced desync (a third of found hits thrown away from 5 to 8 s of a
+40 s run) went STRICT 0.3-1.4 s after it began (after 1-5 hits thrown away), NORMAL after 10 s, ROUGH after 10 more;
+STRICT's records cost Hammerhead 58 B/s over the run against 20, Gale 55 against 12.
