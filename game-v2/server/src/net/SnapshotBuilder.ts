@@ -20,6 +20,7 @@ import {
   ASTEROID_SEED, MAP_DOT_SLACK, STATION_DESIGNS, STATION_WEAPONS, EntityType, packCursorWeaponState, quantizeShipValue, packCharge, gunStateAt, packGunState, PILOT_ROW,
   warmthPercent, fartherThan, hpWire, derivedRow, type BlockStore,
   mapDotFlags, legAt, packMapLeg, packMapRoute, unpackMapLegs, nearerThan, packIds, packRuns, packRanges, DEBRIS_STATUS, TICK_RATE,
+  FOCUS_RANGE, CROWD_BASE_WINDOW,
   type Leg, type EntityState, type ShipState, type ClientSocket, type ServerMessage, type ServerAsteroidSeedMessage, type StarSystemData, type AsteroidSpawnData, dhypot,
 } from '@space-game/common';
 import type { GameData } from '../data/GameData.js';
@@ -41,6 +42,7 @@ import type { HitLedger } from './hits/HitLedger.js';
 import { ownShotsFor, ownVolleyExact, ownSimFor } from './snapshot/ownShots.js';
 import { bodiesFor, pilotsFor, focusFor, causesFor, waypointsFor, replicasByte, jumpPhase, jumpTuning } from '@space-game/common';
 import { FocusCells } from './cells/FocusCells.js';
+import type { CrowdControl } from './crowd/CrowdControl.js';
 import type { BodyNet } from './decisions/BodyNet.js';
 import type { GuideNet } from './guides/GuideNet.js';
 import type { OwnChecks } from './own/OwnChecks.js';
@@ -146,6 +148,8 @@ export interface SnapshotHost {
   readonly guides?: GuideNet | null;
   /** Encode-once blocks (CAPS.BLOCKS, Outbox.blocks): told what was removed, so wire ids go back */
   readonly blocks?: BlockStore | null;
+  /** Crowd fallbacks (net/crowd/CrowdControl.ts): each system's window and focus radius, charged its rounds' time */
+  readonly crowd?: CrowdControl | null;
 }
 
 export class SnapshotBuilder {
@@ -183,6 +187,7 @@ export class SnapshotBuilder {
   private readonly bodies: BodyNet | null;
   private readonly guides: GuideNet | null;
   private readonly blocks: BlockStore | null;
+  private readonly crowd: CrowdControl | null;
   /** Each fire event's row this snapshot (one array for every client, so it's encoded once: CAPS.BLOCKS) */
   private fireRows = new WeakMap<object, number[]>();
   /** The server itself, for its tick (read, never held) */
@@ -223,6 +228,7 @@ export class SnapshotBuilder {
     this.bodies = host.bodies ?? null;
     this.guides = host.guides ?? null;
     this.blocks = host.blocks ?? null;
+    this.crowd = host.crowd ?? null;
     this.ticks = ticks;
     this.focus = new FocusCells({
       bodies: () => this.ships.bodies.keys(),
@@ -233,6 +239,7 @@ export class SnapshotBuilder {
       send: (conn, msg) => this.send(conn.ws, msg),
       rowsSent: (conn) => this.lastEntityStates.get(conn.playerId),
       transit: (eid) => jumpPhase(this.ships.get(eid)?.jump ?? 0, jumpTuning(this.ships.tuning)).phase === 'burn',
+      focusOf: (system) => this.crowd?.focusOf(system) ?? FOCUS_RANGE,
     }, this.replication);
   }
 
@@ -555,31 +562,59 @@ export class SnapshotBuilder {
     return { need, fix, key, flight, version };
   }
 
-  sendSnapshots(): void {
+  /** Base tick of the last round, and each widened system's last (crowd fallbacks: its window, CrowdControl) */
+  private lastRound = 0;
+  private readonly lastWide = new Map<number, number>();
+
+  /**
+   * Once a tick: is a snapshot round due (every CROWD_BASE_WINDOW ticks, as always; false: not this tick)? It is for every
+   * system but the ones returned, whose wider window (crowd fallbacks) hasn't come round yet (null: none)
+   */
+  due(): ReadonlySet<number> | null | false {
+    const t = this.currentTick;
+    if (t - this.lastRound < CROWD_BASE_WINDOW) return false;
+    this.lastRound = t;
+    let skip: Set<number> | null = null;
+    if (this.crowd) {
+      for (const [sys, w] of this.crowd.widened()) {
+        const last = this.lastWide.get(sys);
+        if (last !== undefined && t - last < w) (skip ??= new Set()).add(sys);
+        else this.lastWide.set(sys, t);
+      }
+      for (const sys of this.lastWide.keys()) if (this.crowd.windowOf(sys) <= CROWD_BASE_WINDOW) this.lastWide.delete(sys);
+    }
+    return skip;
+  }
+
+  sendSnapshots(skip: ReadonlySet<number> | null = null): void {
+    // (A round for some systems only, crowd fallbacks: what's kept for a round is let go only for theirs)
+    const due = skip ? (eid: number) => !skip.has(InSystem.systemId[eid]) : undefined;
     // Skip entirely when no clients are connected — avoids building
     // per-entity state objects and JSON keys for nothing.
     if (this.clients.size === 0) {
-      this.blocks?.removed(this.pendingRemovedEntities.keys());
-      this.pendingRemovedEntities.clear();
-      this.ships.fired.length = 0;
-      this.ships.debrisNet.afterSnapshot((id) => this.ships.has(id));
+      this.flushRound(due);
       return;
     }
     this.snapshotCount++;
     for (const id of this.hpWire.keys()) if (!this.ships.has(id)) this.hpWire.delete(id);
     this.syncWire.clear();
     const bySystem = new Map<number, SnapRow[]>();
-    this.replication.beginSnapshot();
+    this.replication.beginSnapshot(due);
     // (The focus grid's home cells, for the systems with a client holding cells: CAPS.FOCUS)
     const focusSystems = new Set<number>();
-    for (const conn of this.clients.values()) if (focusFor(conn.caps) && hasComponent(this.world, Player, conn.playerId)) focusSystems.add(InSystem.systemId[conn.playerId]);
+    for (const conn of this.clients.values()) if (focusFor(conn.caps) && hasComponent(this.world, Player, conn.playerId) && !skip?.has(InSystem.systemId[conn.playerId])) focusSystems.add(InSystem.systemId[conn.playerId]);
     if (focusSystems.size) this.focus.beginRound(this.currentTick, focusSystems);
+    const crowd = this.crowd;
+    let t0 = crowd ? performance.now() : 0;
 
     for (const conn of this.clients.values()) {
       // No snapshot this round: it misses the control changes, so it starts over with keyframes
       if (!conn.ws.isOpen() || !hasComponent(this.world, Player, conn.playerId)) { conn.repKnown.clear(); if (conn.focus) this.focus.reset(conn); continue; }
 
       const playerSystemId = InSystem.systemId[conn.playerId];
+      // (Its system's window hasn't come round: crowd fallbacks)
+      if (skip?.has(playerSystemId)) continue;
+      if (crowd) { const t1 = performance.now(); crowd.charge(this.chargeTo, t1 - t0); t0 = t1; this.chargeTo = playerSystemId; }
       if (conn.lastSystemId !== playerSystemId) this.enterSystem(conn, playerSystemId);
       let rows = bySystem.get(playerSystemId);
       if (!rows) { rows = this.systemRows(playerSystemId); bySystem.set(playerSystemId, rows); }
@@ -746,8 +781,8 @@ export class SnapshotBuilder {
       }
       if (hitsOn && removed.length) this.hits!.dropShells(conn, removed);
 
-      // HUD numbers (fuel, XP) once a second, whether or not anything else goes
-      if (this.currentTick % 60 === 0) this.sendPlayerState(conn);
+      // HUD numbers (fuel, XP) once a second, whether or not anything else goes (the round in each second's first window)
+      if (this.currentTick % 60 < (crowd ? crowd.windowOf(playerSystemId) : CROWD_BASE_WINDOW)) this.sendPlayerState(conn);
 
       // (Records count from the snapshot they follow: one always goes with them)
       const shouldSend = conn.forceSnapshot || entities.length > 0 || removed.length > 0 || rep.ships.length > 0 || rep.ctl.length > 0 || out.length > 0 || fire.length > 0 || !!rep.own?.length || !!rep.causes?.length || !!decisions?.length || !!guided?.active || !!guided?.rows.length
@@ -787,18 +822,17 @@ export class SnapshotBuilder {
       if (conn.focus) this.focus.after(conn);
     }
 
+    if (crowd) { crowd.charge(this.chargeTo, performance.now() - t0); this.chargeTo = -1; }
     // Clear pending removed entities after sending to all clients
     // Also remove from knownEntities so they can be re-sent if respawned
     for (const [eid] of this.pendingRemovedEntities) {
+      if (due && !due(eid)) continue;
       for (const conn of this.clients.values()) conn.knownEntities.delete(eid);
     }
-    // (Encode-once blocks: the removed give their wire ids back; ones no block has named for a while too)
-    if (this.blocks) { this.blocks.removed(this.pendingRemovedEntities.keys()); this.blocks.sweep(this.currentTick); }
-    this.pendingRemovedEntities.clear();
-    this.ships.debrisNet.afterSnapshot((id) => this.ships.has(id));
-    this.replication.endSnapshot();
+    // (Encode-once blocks: the removed give their wire ids back, flushRound; ones no block has named for a while too)
+    this.flushRound(due, true);
+    this.replication.endSnapshot(due);
     this.guides?.sweep();
-    this.ships.fired.length = 0;
     [this.keysWere, this.keysNow] = [this.keysNow, this.keysWere];
     this.keysNow.clear();
     const dotsDue = this.currentTick - this.lastMapDotsTick >= MAP_DOTS_TICKS;
@@ -807,6 +841,33 @@ export class SnapshotBuilder {
   }
 
   private lastMapDotsTick = -Infinity;
+  /** The system the time since the last charge goes to (crowd fallbacks; -1: none) */
+  private chargeTo = -1;
+
+  /**
+   * What a round lets go of, for the systems it was for (all: due undefined): removals (encode-once wire ids back),
+   * fire events, debris splits told
+   */
+  private flushRound(due: ((eid: number) => boolean) | undefined, sweep = false): void {
+    if (!due) {
+      this.blocks?.removed(this.pendingRemovedEntities.keys());
+      if (sweep) this.blocks?.sweep(this.currentTick);
+      this.pendingRemovedEntities.clear();
+      this.ships.fired.length = 0;
+      this.ships.debrisNet.afterSnapshot((id) => this.ships.has(id));
+      return;
+    }
+    const gone: number[] = [];
+    for (const [eid] of this.pendingRemovedEntities) if (due(eid)) gone.push(eid);
+    this.blocks?.removed(gone);
+    if (sweep) this.blocks?.sweep(this.currentTick);
+    for (const eid of gone) this.pendingRemovedEntities.delete(eid);
+    const fired = this.ships.fired;
+    let n = 0;
+    for (const f of fired) if (!due(f.owner)) fired[n++] = f;
+    fired.length = n;
+    this.ships.debrisNet.afterSnapshot((id) => this.ships.has(id), due);
+  }
 
   /** A client taking confirmed hits, after its snapshot: its records (and what goes the old way), then its HP, then a check */
   private afterHits(conn: ClientConnection, systemId: number): void {
@@ -958,6 +1019,7 @@ export class SnapshotBuilder {
   /** A client's first snapshot in a system: world events, the asteroid seed, and a clean slate */
   enterSystem(conn: ClientConnection, playerSystemId: number): void {
     conn.lastSystemId = playerSystemId;
+    this.crowd?.enter(conn, playerSystemId);
     this.focus.reset(conn);
     for (const m of this.events.briefing(playerSystemId)) this.send(conn.ws, m);
     for (const m of this.surfaces.briefing(playerSystemId)) this.send(conn.ws, m);

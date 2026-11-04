@@ -184,6 +184,7 @@ import { BodyNet } from './net/decisions/BodyNet.js';
 import { GuideNet } from './net/guides/GuideNet.js';
 import type { BodyState } from '@space-game/common';
 import { ownSimFor } from './net/snapshot/ownShots.js';
+import { CrowdControl } from './net/crowd/CrowdControl.js';
 import { SnapshotBuilder, designHash, playerQuery, projectileQuery, droppedItemQuery } from './net/SnapshotBuilder.js';
 
 // ============================================
@@ -559,7 +560,6 @@ export class GameServer implements ServerCtx {
   private lastTickTime = 0;
   private tickAccumulator = 0;
   
-  private lastSnapshotTick = 0;
   
   // Input queue — messages arrive instantly between ticks, get applied at tick boundaries
   readonly inputQueue: Array<{ conn: ClientConnection; msg: any }> = [];
@@ -673,6 +673,8 @@ export class GameServer implements ServerCtx {
   readonly netCaps: number;
   /** The snapshot path: rows, snapshots, ship structure, map dots, entering a system (net/SnapshotBuilder.ts) */
   readonly snapshots: SnapshotBuilder;
+  /** Crowd fallbacks (CAPS.CROWD allowed: net/crowd/CrowdControl.ts): each system's level, from its measured cost */
+  readonly crowd: CrowdControl | null;
 
   // Admin server for dev tools
   private adminServer: AdminServer | null = null;
@@ -991,6 +993,14 @@ export class GameServer implements ServerCtx {
 this.devTeleport = opts.devTeleport ?? false;
     if (opts.devRange && this.devTeleport && process.env.NODE_ENV !== 'production') this.range = this.createRange(opts.devRange);
     
+    // Crowd fallbacks (net/crowd/CrowdControl.ts), where the server allows them
+    this.crowd = this.netCaps & CAPS.CROWD ? new CrowdControl({
+      clients: () => this.clients.values(),
+      systemOf: (conn) => (hasComponent(this.world, Player, conn.playerId) ? InSystem.systemId[conn.playerId] : -1),
+      send: (conn, msg) => this.send(conn.ws, msg),
+      tickOf: () => this.currentTick,
+    }) : null;
+
     // The snapshot path (net/SnapshotBuilder.ts): built once, after every module it reads
     this.snapshots = new SnapshotBuilder({
       world: this.world,
@@ -1025,6 +1035,7 @@ this.devTeleport = opts.devTeleport ?? false;
       bodies: this.bodies,
       guides: this.guides,
       blocks: this.net.blocks,
+      crowd: this.crowd,
     }, this);
 
     // Hook up admin server events
@@ -1069,14 +1080,18 @@ this.devTeleport = opts.devTeleport ?? false;
     try {
       this.guard('inputs', () => this.drainInputQueue());
       this.tick();
-      if (this.currentTick - this.lastSnapshotTick >= TICK_RATE / SNAPSHOT_RATE) {
-        this.lastSnapshotTick = this.currentTick;
-        this.guard('snapshots', () => this.sendSnapshots());
-      }
+      this.guard('snapshots', () => this.snapshotRound());
     } finally {
       this.net.batching--;
       this.flushOutbox();
     }
+  }
+
+  /** The snapshot round when one is due, then the crowd levels (their costs: this tick's and its round's) */
+  private snapshotRound(): void {
+    const skip = this.snapshots.due();
+    if (skip !== false) this.sendSnapshots(skip);
+    this.crowd?.endTick();
   }
 
   /** Pause the real-time loop (hangar editor). Messages are still accepted. */
@@ -1931,6 +1946,7 @@ this.devTeleport = opts.devTeleport ?? false;
         return true;
       },
       hitStats: () => this.hits.stats,
+      crowd: (c, to) => this.crowd?.admin(InSystem.systemId[C(c).playerId], to) ?? { ok: false, text: "This server doesn't take crowd fallbacks" },
       freeBuildChanged: (c) => this.hangar.send(C(c)),
       setAdminLive: (c, on) => {
         C(c).isAdmin = on;
@@ -3279,11 +3295,8 @@ this.devTeleport = opts.devTeleport ?? false;
         this.tickAccumulator = 0;
       }
     
-      // Send snapshots at snapshot rate
-      if (this.currentTick - this.lastSnapshotTick >= TICK_RATE / SNAPSHOT_RATE) {
-        this.lastSnapshotTick = this.currentTick;
-        this.guard('snapshots', () => this.sendSnapshots());
-      }
+      // Send snapshots at snapshot rate (each system at its own window: crowd fallbacks)
+      this.guard('snapshots', () => this.snapshotRound());
     } catch (e) {
       // (Whatever got past the guards: logged, and the loop goes on: it's scheduled below either way)
       this.tickAccumulator = 0;
@@ -3479,6 +3492,8 @@ this.devTeleport = opts.devTeleport ?? false;
     
     // Report to admin server and update performance metrics
     const tickTime = performance.now() - tickStart;
+    // (Crowd fallbacks: the tick's time charged to the systems by their ships)
+    this.crowd?.shareByBodies(tickTime, this.ships.bodies.keys());
     this.updatePerfMetrics(tickTime);
     this.reportAdminStats(tickTime);
   }
@@ -4215,11 +4230,12 @@ this.devTeleport = opts.devTeleport ?? false;
   }
 
   /** A snapshot to every client, then the map's dots (net/SnapshotBuilder.ts; netBench and tests wrap this name) */
-  private sendSnapshots(): void {
+  private sendSnapshots(skip: ReadonlySet<number> | null = null): void {
     // (The damage summed since the last one goes first, to ride the same frame; confirmed hits' clients get theirs after their records)
     this.net.flushDamage(this.hits.active ? CAPS.HITS : 0);
-    // (Its hits are dropped even if the snapshot fails part way: never told twice)
-    try { this.snapshots.sendSnapshots(); } finally { this.hits.endSnapshot(); }
+    // (Its hits are dropped even if the snapshot fails part way: never told twice. `skip`: systems whose wider window
+    // hasn't come round, crowd fallbacks: theirs wait)
+    try { this.snapshots.sendSnapshots(skip); } finally { this.hits.endSnapshot(skip); }
   }
 
   /** Clients in a system near a point (net/snapshot/Outbox.ts) */

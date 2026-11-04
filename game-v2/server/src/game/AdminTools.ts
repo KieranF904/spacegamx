@@ -86,6 +86,8 @@ export interface AdminHost {
   setHits?(c: AdminConn, on: boolean): boolean;
   /** Confirmed hits' counters (net/hits/HitLedger.ts) */
   hitStats?(): { hits: number; records: number; legacy: number; d: number; s: number; i: number; checks: number; why: Record<string, number> };
+  /** Crowd fallbacks in their system (net/crowd/CrowdControl.ts admin): `to` a level, 'auto', or '' (the status) */
+  crowd?(c: AdminConn, to: string): Result;
 }
 
 type Args = Record<string, unknown>;
@@ -121,6 +123,7 @@ const HELP = [
   '/contributor name on|off (the contributor rank: map notes, F6) · /contributors (who has it)',
   '/freebuild [on|off] (dev servers: place any part in the hangar, nothing taken)',
   '/hits [on|off] [name] (confirmed hits: the network test switch; no on/off: the counters)',
+  '/crowd [0-8|auto] (crowd fallbacks in your system: force a level, or back to automatic; none: the levels and costs)',
   '/players [name] (online or not) · /rank name player|contributor|admin (admin: the owner only) · /ban name 1h|1d|7d|perm [reason] · /unban name',
   'Party: /p message · /invite name · /leave · /kick name · /promote name',
 ];
@@ -322,6 +325,11 @@ export class AdminTools {
         const on = onOff(a.on, false);
         if (!this.host.setHits?.(t, on)) return { ok: false, text: `${t.username}'s client didn't offer confirmed hits (or this server doesn't take them)` };
         return { ok: true, text: `Confirmed hits ${on ? 'on' : 'off'} for ${t.username} (from the next snapshot)` };
+      }
+
+      case 'crowd': {
+        here(me);
+        return this.host.crowd?.(me, str(a.to)) ?? { ok: false, text: "This server doesn't take crowd fallbacks" };
       }
 
       case 'heal': {
@@ -617,6 +625,7 @@ export class AdminTools {
         return { cmd, args: { on: flag, player: a[0] } };
       }
       case 'freebuild': return { cmd, args: { on: a[0] } };
+      case 'crowd': return { cmd, args: { to: a[0] ?? '' } };
       case 'hits': {
         const flag = a[0] === 'on' || a[0] === 'off' ? a.shift() : undefined;
         return { cmd, args: { on: flag, player: a[0] } };

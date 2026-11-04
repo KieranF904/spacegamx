@@ -33,9 +33,9 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
  * has updated PROTOCOL_VERSION and PROTOCOL_WIRE_HASH.
  */
 // History: PROTOCOL_CHANGELOG.md. Re-pin with `npm run wire:bump "reason"` (game-v2/), never by hand.
-export const PROTOCOL_VERSION = 40;
+export const PROTOCOL_VERSION = 41;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
-export const PROTOCOL_WIRE_HASH = '53bf1fa0';
+export const PROTOCOL_WIRE_HASH = '7e6039e7';
 /** WebSocket close code (and reason) for a client on another protocol version */
 export const PROTOCOL_MISMATCH_CLOSE = 4002;
 export const PROTOCOL_MISMATCH_REASON = 'version';
@@ -885,6 +885,7 @@ export type ServerMessage =
   | ServerShipHpBatchMessage
   | ServerDebrisSplitMessage
   | ServerCellsMessage
+  | ServerCrowdMessage
   | ServerShipEditResultMessage
   | ServerProjectileHitMessage
   | ServerHitsMessage
@@ -1388,6 +1389,20 @@ export interface ServerCellsMessage {
   l?: number[];
 }
 
+/**
+ * Its system's crowd level (CAPS.CROWD, protocol 41; network/crowd.ts), from system tick `tick` on: `lv` the level,
+ * `f` the focus radius (the ghost fade is its last km), `w` the snapshot window (ticks), `r` the system's ticks a
+ * second (60: none slowed; less: its clock turns at `tick`). Sent on a change and on entering a system that has one
+ */
+export interface ServerCrowdMessage {
+  type: 'crowd';
+  tick: number;
+  lv: number;
+  f: number;
+  w: number;
+  r: number;
+}
+
 /** What it kept of dropped cells the server asked about (cells `b`): [cell, T, hash (0: none kept)] per cell (CAPS.FOCUS) */
 export interface ClientCellCacheMessage {
   type: 'cellCache';
@@ -1672,6 +1687,8 @@ const COMPACT: [string, string[]][] = [
   ['rangeRow', ['i', 'dead', 'hull', 'shield', 'dmg5', 'dps', 'fight', 'total', 'ttk']],
   // (Appended, protocol 38: the focus grid's drops, offers and logs, cells.ts)
   ['cells', ['tick', 'd', 'b', 'l']],
+  // (Appended, protocol 41: a system's crowd level, crowd.ts)
+  ['crowd', ['tick', 'lv', 'f', 'w', 'r']],
 ];
 
 /**

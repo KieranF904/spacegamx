@@ -21,7 +21,7 @@
  *
  * Entries are encoded once already: with CAPS.BLOCKS each entering ship's keyframe and status row is one shared block.
  */
-import { InSystem, Position, CELL_HOLD_TICKS, CELL_ENTRY_BYTES, focusCells, ringCells, homeCell, cellHash, packCellLog, cellLogBytes, type CellLogShip } from '@space-game/common';
+import { InSystem, Position, FOCUS_RANGE, CELL_HOLD_TICKS, CELL_ENTRY_BYTES, focusCells, ringCells, homeCell, cellHash, packCellLog, cellLogBytes, type CellLogShip } from '@space-game/common';
 import type { ClientConnection } from '../ClientConnection.js';
 import type { Replication } from '../Replication.js';
 
@@ -40,6 +40,8 @@ export interface FocusHost {
   rowsSent(conn: ClientConnection): Map<number, string> | undefined;
   /** Its ship is in a jump's burn (20 km/s: a cell every 24 ticks): its focus holds still till it ends */
   transit(eid: number): boolean;
+  /** The focus radius in a system (19 km; less in a crowd: net/crowd/CrowdControl.ts) */
+  focusOf?(system: number): number;
 }
 
 /** One client's focus (ClientConnection.focus) */
@@ -134,8 +136,9 @@ export class FocusCells {
     st.leaving.length = 0; st.restore.length = 0; st.skip.clear(); st.b.length = 0; st.l.length = 0;
     // (In a jump's burn: the focus it had holds, no cell dropped or entered on the way; the burn's end is one change)
     const transit = st.cells.size > 0 && this.host.transit(conn.playerId);
-    const now = transit ? st.cells : new Set(focusCells(px, py));
-    if (!transit) st.ring = new Set(ringCells(px, py));
+    const range = this.host.focusOf?.(system) ?? FOCUS_RANGE;
+    const now = transit ? st.cells : new Set(focusCells(px, py, undefined, range));
+    if (!transit) st.ring = new Set(ringCells(px, py, undefined, range));
     this.answers(conn, st, now);
     for (const c of st.cells) {
       if (now.has(c)) continue;

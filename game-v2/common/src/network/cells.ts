@@ -91,24 +91,28 @@ export function cellsNear(x: number, y: number, range: number, out: number[] = [
   return out;
 }
 
-/** A client's focus cells round its ship */
-export function focusCells(x: number, y: number, out?: number[]): number[] {
-  return cellsNear(x, y, FOCUS_RANGE, out);
+/** A client's focus cells round its ship (`range`: its focus radius, less than FOCUS_RANGE in a crowd: network/crowd.ts) */
+export function focusCells(x: number, y: number, out?: number[], range = FOCUS_RANGE): number[] {
+  return cellsNear(x, y, range, out);
 }
 
-/** ...and its ring: within RING_RANGE and not in the focus */
-export function ringCells(x: number, y: number, out: number[] = []): number[] {
+/** ...and its ring: within RING_RANGE and not in the focus (of radius `range`) */
+export function ringCells(x: number, y: number, out: number[] = [], range = FOCUS_RANGE): number[] {
   cellsNear(x, y, RING_RANGE, out);
-  const f2 = FOCUS_RANGE * FOCUS_RANGE;
+  const f2 = range * range;
   let n = 0;
   for (const k of out) if (cellDist2(k, x, y) > f2) out[n++] = k;
   out.length = n;
   return out;
 }
 
-/** How much of a ghost a ship this far from the client's own is drawn as (0 not at all, 1 fully): drawing only */
-export function ghostWeight(dist: number): number {
-  return dist <= GHOST_FADE_FROM ? 0 : dist >= GHOST_FADE_TO ? 1 : (dist - GHOST_FADE_FROM) / (GHOST_FADE_TO - GHOST_FADE_FROM);
+/**
+ * How much of a ghost a ship this far from the client's own is drawn as (0 not at all, 1 fully): drawing only. `focus`:
+ * the focus radius in effect (a crowd shrinks it, network/crowd.ts); the fade runs over the last km inside it
+ */
+export function ghostWeight(dist: number, focus = FOCUS_RANGE): number {
+  const to = focus - FOCUS_RANGE + GHOST_FADE_TO, from = focus - FOCUS_RANGE + GHOST_FADE_FROM;
+  return dist <= from ? 0 : dist >= to ? 1 : (dist - from) / (to - from);
 }
 
 // ---- The dropped-cell cache's check ----

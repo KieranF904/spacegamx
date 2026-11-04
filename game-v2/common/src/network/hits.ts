@@ -45,8 +45,15 @@
  *   PILOTS     (with BODIES, protocol 41) the enemy AI's ships flown by their pilot's body on its tick layer (bodies/
  *              aiPilot.ts, docs/design/decision-inputs.md 6.5): the server's commander sends its orders, targets and
  *              strafe sides as decisions; no control rows of them
+ *   CROWD      (protocol 41) crowd fallbacks (network/crowd.ts): it takes its system's crowd level (crowd message: a
+ *              smaller focus radius and ghost fade, a wider snapshot window, a slower tick clock from a stated tick)
  */
-export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16, ROUGH: 32, OWN_SIM: 64, INPUTS: 128, BODIES: 256, BLOCKS: 512, FOCUS: 1024, CAUSES: 2048, WAYPOINTS: 4096, PILOTS: 8192 } as const;
+export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16, ROUGH: 32, OWN_SIM: 64, INPUTS: 128, BODIES: 256, BLOCKS: 512, FOCUS: 1024, CAUSES: 2048, WAYPOINTS: 4096, PILOTS: 8192, CROWD: 16384 } as const;
+
+/** Does this client take its system's crowd level (CAPS.CROWD)? */
+export function crowdFor(caps: number | undefined): boolean {
+  return ((caps ?? 0) & CAPS.CROWD) !== 0;
+}
 
 /** Does this client hold the focus grid's cells rather than the view circle (CAPS.FOCUS)? */
 export function focusFor(caps: number | undefined): boolean {

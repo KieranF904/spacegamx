@@ -490,13 +490,21 @@ export class HitLedger {
   }
 
   /** The snapshot's gone: drop its hits, switch any client's caps, and see whether the next one keeps hits */
-  endSnapshot(): void {
-    this.hits.length = 0;
-    this.byProj.clear();
+  endSnapshot(skip?: ReadonlySet<number> | null): void {
+    // (A round for some systems only, crowd fallbacks: the others' hits wait for theirs)
+    if (skip?.size) {
+      this.hits = this.hits.filter((h) => skip.has(h.sys));
+      this.byProj.clear();
+      for (const h of this.hits) this.byProj.set(h.proj, h);
+    } else {
+      this.hits.length = 0;
+      this.byProj.clear();
+    }
     this.plans.clear();
     this.last = null;
     let on = false;
     for (const c of this.host.clients.values()) {
+      if (skip?.size && skip.has(InSystem.systemId[c.playerId])) { if ((c.caps ?? 0) & CAPS.HITS) on = true; continue; }
       if (c.capsNext !== undefined && c.capsNext !== c.caps) {
         const was = c.caps ?? 0;
         c.caps = c.capsNext;

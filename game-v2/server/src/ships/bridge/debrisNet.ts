@@ -62,8 +62,10 @@ export class DebrisNet {
   }
 
   /** The snapshot told this round's splits: they go, and what's kept of ships that are gone */
-  afterSnapshot(alive: (eid: number) => boolean): void {
-    this.splits.clear();
+  afterSnapshot(alive: (eid: number) => boolean, due?: (eid: number) => boolean): void {
+    // (Only the systems whose round it was, crowd fallbacks: the rest are told at theirs)
+    if (due) { for (const p of [...this.splits.keys()]) if (due(p)) this.splits.delete(p); }
+    else this.splits.clear();
     for (const eid of this.coms.keys()) if (!alive(eid)) this.coms.delete(eid);
   }
 
@@ -129,7 +131,8 @@ export class DebrisNet {
   }
 
   /** The snapshot took them (keyframes) */
-  clearTouched(): void {
+  clearTouched(due?: (eid: number) => boolean): void {
+    if (due) { for (const id of [...this.touched]) if (due(id)) this.touched.delete(id); return; }
     this.touched.clear();
   }
 }

@@ -393,10 +393,12 @@ export class Replication {
   }
 
   /** Before building snapshots: ships that left their predicted path get a new keyframe */
-  beginSnapshot(): void {
+  beginSnapshot(due?: (eid: number) => boolean): void {
     for (const [eid, s] of this.shadows) {
       // Gone since the tick ended (taken out of the world between): nothing to send
       if (!this.ships.has(eid)) { this.shadows.delete(eid); continue; }
+      // (A system whose round this isn't: a wider window, crowd fallbacks; its window goes on)
+      if (due && !due(eid)) continue;
       s.keyRow = s.ctlRow = undefined;
       // (A pilot's own, CAPS.OWN_SIM: something its client couldn't work out moved it: a keyframe of its own ship)
       if (s.own?.hard) {
@@ -420,11 +422,13 @@ export class Replication {
   }
 
   /** After the snapshots: the control changes have been delivered */
-  endSnapshot(): void {
-    this.knocks.length = 0;
-    this.ships.debrisNet.clearTouched();
+  endSnapshot(due?: (eid: number) => boolean): void {
+    if (due) { let n = 0; for (const k of this.knocks) if (!due(k[0]) && !due(k[1])) this.knocks[n++] = k; this.knocks.length = n; }
+    else this.knocks.length = 0;
+    this.ships.debrisNet.clearTouched(due);
     const keep = this.host.tick() - LOG_TICKS;
-    for (const s of this.shadows.values()) {
+    for (const [eid, s] of this.shadows) {
+      if (due && !due(eid)) continue;
       // (Kept a while for the focus grid's logs: a dropped cell's ships fast-forward from them)
       if (s.events.length) { (s.log ??= []).push(...s.events); s.events = []; }
       if (s.log) { let n = 0; while (n < s.log.length && s.log[n] < keep) n += 3; if (n) s.log.splice(0, n); }
