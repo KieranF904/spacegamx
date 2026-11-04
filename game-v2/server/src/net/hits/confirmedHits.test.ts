@@ -262,8 +262,7 @@ describe('confirmed hits: a capable client and a legacy one see the same fight',
   }, 120_000);
 
   it('magma: fire and a blast', () => {
-    // (long enough for debris past its grace: the burning freighter's hits all go the old way, a piece's go as records)
-    const r = run({ gun: 'magma_cannon', ticks: 900 });
+    const r = run({ gun: 'magma_cannon' });
     expectParity(r);
     expect(r.A.ignites.length).toBeGreaterThan(0);
   }, 120_000);

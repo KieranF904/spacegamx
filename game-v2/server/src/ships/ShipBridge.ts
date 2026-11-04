@@ -585,9 +585,6 @@ export class ShipBridge {
   /** Mid-jump (the burn itself): no guns, and the ship passes through other hulls */
   isJumping(ship: ShipState): boolean { return sync.isJumping(this.ctx, ship); }
 
-  /** Nothing hits it, it hits nothing: only to be seen, or a piece of debris in its grace (common DEBRIS_GRACE_TICKS) */
-  private aloof(eid: number): boolean { return this.intangible.has(eid) || this.debrisNet.young(this.bodies.get(eid), this.host.getTick()); }
-
   private writeBody(eid: number, ship: ShipState, b: { x: number; y: number; vx: number; vy: number; angle: number; angVel: number; jump?: number; jumpScale?: number; cargo?: number; dodge?: number; dodgeDir?: number }): void { return sync.writeBody(eid, ship, b); }
 
   worldToGrid(eid: number, ship: ShipState, x: number, y: number): Vec2 { return sync.worldToGrid(this.ctx, eid, ship, x, y); }

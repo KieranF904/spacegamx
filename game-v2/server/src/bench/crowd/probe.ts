@@ -58,6 +58,8 @@ export class Probe {
   clientMs = 0;
   /** Of which its debris world (ShipReplicaSet.stepDebrisTo) */
   debrisMs = 0;
+  /** Pieces of debris it was sent (a removal's id is one after the piece is gone) */
+  private readonly debrisSeen = new Set<number>();
 
   constructor(private server: GameServer, readonly name: string, caps: number, lat: number, private ring: PoseRing, private classOf: (id: number) => Klass, private onTick = 0,
     /** Its system's tick (its own clock once dilated, --crowd: latency is counted in its ticks too) */
@@ -78,7 +80,15 @@ export class Probe {
     f.handle = (m: any) => {
       if (this.measuring) {
         const id = m.id ?? m.bodyId, t = m.type === 'debrisSplit' || (id !== undefined && (m.kind === 'debris' || server.getShips().get(id)?.kind === 'debris')) ? (m.type === 'shipSync' ? (m.blueprint ? 'shipSync+bp' : m.hp ? 'shipSync+new' : 'shipSync+re') : m.type) + ':debris' : m.type;
-        this.sub[t] = (this.sub[t] ?? 0) + encodeMessage(m).length;
+        const n = encodeMessage(m).length;
+        this.sub[t] = (this.sub[t] ?? 0) + n;
+        // (A snapshot's share for debris: what it would be without the pieces' keyframes, rows and removals)
+        if (m.type === 'snapshot') {
+          const deb = (id: number) => server.getShips().get(id)?.kind === 'debris' || this.debrisSeen.has(id);
+          for (const k of m.ships ?? []) if (server.getShips().get(k[0])?.kind === 'debris') this.debrisSeen.add(k[0]);
+          const bare = { ...m, ships: m.ships?.filter((k: number[]) => !deb(k[0])), entities: m.entities?.filter((e: { id: number }) => !deb(e.id)), removed: m.removed?.filter((id: number) => !deb(id)), out: m.out?.filter((id: number) => !deb(id)) };
+          this.sub['snapshot:debris'] = (this.sub['snapshot:debris'] ?? 0) + n - encodeMessage(bare).length;
+        }
       }
       return oHandle(m);
     };

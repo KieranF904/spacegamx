@@ -208,9 +208,9 @@ export function stepDebrisBody(body: FlightBody, k: DriftConstants): void {
 
 /**
  * A new piece's grace (ticks after the tick it spawned at): it takes force only from its parent's break-up (its spawn
- * motion) and applies none and receives none from anything else: no knocks (stepDebrisWorld), no shots, splash or
- * blasts (the server's hit rules, ShipBridge.aloof). Its spawn is all a client needs to have it exactly, whatever is
- * about; after it, it knocks as any piece does
+ * motion) and applies none and receives none from anything else: no knocks (stepDebrisWorld). Its spawn is all a client
+ * needs to have its motion exactly, whatever is about; after it, it knocks as any piece does. (Shots still hit it: that
+ * is damage, not force, and a piece shot is told from then on)
  */
 export const DEBRIS_GRACE_TICKS = 90;
 
