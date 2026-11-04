@@ -103,6 +103,13 @@ const PICK = `float px = aSurf.w * s * uZoom;
 const LIGHTS = `uniform vec3 uAmbient; uniform vec4 uSun; uniform vec3 uSunColor; uniform vec2 uSunElev; uniform float uCount;
 uniform vec4 uLightPos[${MAX_LIGHTS}]; uniform vec4 uLightCol[${MAX_LIGHTS}]; uniform vec4 uLightCone[${MAX_LIGHTS}];`;
 
+/**
+ * The shadow side (both shaders, after the sun: \`n\` the normal, \`sl\` the way to the sun, \`sunK\` its strength): a
+ * faint cool fill from the far side, off the belt's dust, so a rock's form still reads where the sun doesn't reach.
+ * It follows the ambient (none in the dark) and the sun (none without one). A few multiply-adds a vertex.
+ */
+const FILL = `L += uAmbient * vec3(0.6, 0.72, 0.9) * (min(sunK * 2.0, 1.0) * max(0.0, -dot(n.xy, sl.xy)) / max(uSunElev.x, 0.05));`;
+
 const vertex = (slots: number) => `#version 300 es
 in vec2 aPosition; in vec3 aNormal; in vec4 aColor; in float aSlot;
 in vec4 aSurf;     // the surface's own coordinates (u, v over it from the top, ÷ size), height ÷ size, size
@@ -145,6 +152,7 @@ void main() {
     L += uLightCol[i].rgb * (k * max(dot(n, ld), 0.0));
     dsum += ld * k; csum += uLightCol[i].rgb * k;
   }
+  ${FILL}
   float fade = uFade[slot / 4][slot % 4], k = clamp((px - uLod.y) / max(uLod.z - uLod.y, 1.0), 0.0, 1.0), h = aMat.y;
   vec3 Lc = min(L, vec3(1.6)), cl = min(csum, vec3(1.6));
   float lum = dot(Lc, LUM), rim = 1.0 - clamp(n.z, 0.0, 1.0);
@@ -154,8 +162,11 @@ void main() {
   albedo = mix(albedo, MC.rgb * dot(albedo, LUM), clamp(-mot, 0.0, 1.0) * MC.w * 0.5 * k);
   vColor = albedo * mix(Lc, vec3(1.0), aColor.a) * fade;
   // ice: light scattered inside lifts the shadow side, a cold blue, and a cold rim where the surface turns away
-  vColor += aColor.rgb * vec3(0.55, 0.8, 1.0) * MA.z * max(0.0, 0.7 - lum) * k * fade;
-  vColor += vec3(0.6, 0.85, 1.0) * MA.z * rim * rim * (0.35 + lum * 0.5) * k * fade;
+  // (each material's own terms only where it has them: a chunk's rocks mostly share a few materials)
+  if (MA.z > 0.0) {
+    vColor += aColor.rgb * vec3(0.55, 0.8, 1.0) * MA.z * max(0.0, 0.7 - lum) * k * fade;
+    vColor += vec3(0.6, 0.85, 1.0) * MA.z * rim * rim * (0.35 + lum * 0.5) * k * fade;
+  }
   // the surface's frame (from the smooth normal) and the texture's axes in it, turned by the rock's seed
   float ang = h * 6.2831, ca = cos(ang), sa = sin(ang);
   vec3 sN = vec3(cs.x * aSmooth.x - cs.y * aSmooth.y, cs.y * aSmooth.x + cs.x * aSmooth.y, aSmooth.z);
@@ -173,8 +184,9 @@ void main() {
   float rough = 0.55 + 0.45 * sin(aSurf.x * 2.3 + aSurf.y * 1.7 + h * 11.0) * sin(aSurf.y * 1.9 - aSurf.x * 1.1 + h * 7.0);
   float kx = k * rough * MB.x;
   float nh = clamp(dot(n, Hv), 0.0, 1.0), sp = pow(nh, MA.y), dsp = min(MA.y * sp / max(nh, 0.05), 4.0) * 1.2 * kx;
-  vec3 irid = 0.5 + 0.5 * cos(6.2831 * (nh * 1.7 + rim + h + vec3(0.0, 0.33, 0.67)));
-  vec3 S = mix(mix(vec3(1.0), aColor.rgb * 1.6, MA.w), irid * 1.4, MD.x) * cl * MA.x * k * (1.0 - aColor.a) * fade * mix(1.0, rough, MD.w);
+  vec3 S = mix(vec3(1.0), aColor.rgb * 1.6, MA.w);
+  if (MD.x > 0.0) S = mix(S, (0.7 + 0.7 * cos(6.2831 * (nh * 1.7 + rim + h + vec3(0.0, 0.33, 0.67)))), MD.x);
+  S *= cl * MA.x * k * (1.0 - aColor.a) * fade * mix(1.0, rough, MD.w);
   vColor += S * (sp + MD.y * rim * rim * rim);
   vCx = D * (0.6 * kx * Lt.x) + S * (dsp * Ht.x);
   vCy = D * (0.6 * kx * Lt.y) + S * (dsp * Ht.y);
@@ -195,14 +207,24 @@ uniform sampler2D uDetail;
 out vec4 fragColor;
 void main() {
   // the material's tile of the atlas (gradients from the unwrapped coordinates, so no seams in the mip choice)
-  vec2 g = vec2(1.0 / 3.0, 0.5);
-  vec4 t = textureGrad(uDetail, (vTile + fract(vUV.xy)) * g, dFdx(vUV.xy) * g, dFdy(vUV.xy) * g);
+  vec2 g = vec2(1.0 / 3.0, 0.5), ux = dFdx(vUV.xy), uy = dFdy(vUV.xy);
+  vec4 t = textureGrad(uDetail, (vTile + fract(vUV.xy)) * g, ux * g, uy * g);
   vec2 sl = t.rg * 2.0 - 1.0;
   float d = t.b - 0.5;
-  vec3 c = vColor * (1.0 + d * vUV.z) + min(d, 0.0) * vTint + vCx * sl.x + vCy * sl.y;
-  // greyseam, shaded by the same relief
-  float shade = dot(c, vec3(0.3, 0.5, 0.2)) / max(dot(vColor, vec3(0.3, 0.5, 0.2)), 0.02);
-  c = mix(c, vVein.rgb * shade, t.a * vVein.a);
+  vec3 r = vCx * sl.x + vCy * sl.y;
+  vec3 c = vColor * (1.0 + d * vUV.z) + min(d, 0.0) * vTint + r;
+  // glints, on metal and crystal only (tiles (1, 0) and (0, 1); the same all over a rock, so the GPU skips them
+  // together elsewhere): a few grains of the relief, picked by its own values, where the relief's tilt brightens
+  // them most (they catch the light just so: as the rock turns, others do); gone once a grain is smaller than a pixel
+  if (vTile.x + vTile.y == 1.0) {
+    float grain = step(0.94, fract(t.b * 31.0 + t.r * 13.0)) * (1.0 - smoothstep(2.5, 6.0, 512.0 * length(ux + uy)));
+    c += vec3(1.0, 0.95, 0.86) * (grain * 2.4 * smoothstep(0.06, 0.2, r.g / max(vColor.g, 0.02)) * vColor.g);
+  }
+  // greyseam, shaded by the same relief (only on a rock that has it: most don't)
+  if (vVein.a > 0.0) {
+    float shade = dot(c, vec3(0.3, 0.5, 0.2)) / max(dot(vColor, vec3(0.3, 0.5, 0.2)), 0.02);
+    c = mix(c, vVein.rgb * shade, t.a * vVein.a);
+  }
   fragColor = vec4(max(c, 0.0), 1.0);
 }`;
 
@@ -225,7 +247,9 @@ void main() {
   vec2 ds = uSun.xy - w;
   float dist = length(ds);
   vec3 sl = vec3(ds / max(dist, 1.0) * uSunElev.x, uSunElev.y);
-  L += uSunColor * (uSun.w / (1.0 + dist * dist / (uSun.z * uSun.z))) * max(dot(n, sl), 0.0);
+  float sunK = uSun.w / (1.0 + dist * dist / (uSun.z * uSun.z));
+  L += uSunColor * sunK * max(dot(n, sl), 0.0);
+  ${FILL}
   for (int i = 0; i < ${MAX_LIGHTS}; i++) {
     if (float(i) >= uCount) break;
     vec4 P = uLightPos[i];
