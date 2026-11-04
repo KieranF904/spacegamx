@@ -1,5 +1,5 @@
 /**
- * Crowd fallbacks on the server (CAPS.CROWD; common network/crowd.ts; docs/design/awareness-model.md section 7.5).
+ * Crowd fallbacks on the server (CAPS.CROWD; common network/crowd.ts; docs/design/awareness-model.md section 7.11).
  *
  * Each system's tick cost is measured (what its share of the tick and of the snapshot rounds took, in ms per base
  * tick), smoothed, and held against a budget with hysteresis: over CROWD_HIGH_MS for a while and the system goes up a

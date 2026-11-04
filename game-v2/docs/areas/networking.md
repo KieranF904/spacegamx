@@ -185,6 +185,24 @@ quantised aim. Its body is off while its target is a pilotless ship (wards, sieg
 pack mate it stopped reading this window that's gone, is keyed too (BodyNet `readersOf`, `dropped`).
 Tests: server/src/net/decisions/pilots.test.ts, common/src/bodies/bodies.test.ts. Measured: docs/audits/decisions-2026-11-04.md.
 
+### Crowd fallbacks (protocol 41, `CAPS.CROWD` 16384, docs/design/awareness-model.md 7.11)
+
+A system over budget degrades by itself, in order: focus radius 19 -> 16 -> 13 -> 10 km, snapshot window 3 -> 6 -> 9
+ticks, then time dilation (45, 30, 20, 15 ticks a second). Costs are measured per system (the tick shared by ships,
+each client's share of the rounds, an own-clock pass whole), smoothed, held against 13 ms up / 6 ms down with holds and
+dwells. Each change goes to the system's clients as a `crowd` message stamped with the system tick it takes effect
+from (rates 30 ticks ahead). `/crowd [0-9|auto]` forces a level.
+- **Server:** `net/crowd/CrowdControl.ts` (levels), `SnapshotBuilder.due()/ownRound()` (rounds per system, flushes
+  per system), `FocusCells` (`focusOf`), `sim/SystemClocks.ts` (own clocks, `SimPass`), `GameServer.tick/ownPasses`
+  (passes; table entries with `pass: true` run in every pass and skip other systems), `changeClock` (travel between
+  clocks).
+- **Client:** `GameState.onCrowd` (the clock turns at the stated tick; another system's clock is taken at once; wider
+  windows add interpolation delay), `ShipClient` ghost fade by the focus radius, `ui/TimeScaleBadge.ts`. `?crowd=0|1`.
+- **Bench:** `npm run bench:crowd -- --crowd --layouts ball --n 300 --secs 40` (level and base-tick time by second).
+- **Tests:** `server/src/net/crowd/crowd.test.ts` (focus shrink and back, windows 6/9/3, dilation and undo, travel
+  into and out of a dilated system, automatic levels without flapping; every held ship exact), `client/src/state/
+  crowdClock.test.ts`.
+
 ### Debris (protocol 25)
 When a part's loss splits a ship (rebuildNow's orphan groups; not boss sheds, which are scenery), a client that has the ship as it was (its last sync's centre of mass is the split's: `DebrisNet.comAt`) and replicates it gets a `debrisSplit` `[id, tick, e (piece ids, packIds), p (the parts that left, packRuns)]` before the ship's own sync, and works the pieces out itself (`deriveSplit`: the parts' joins into groups in rebuild order, each piece's blueprint, HP as it has them, its pose from the ship's replica at the split's tick, push and spin seeded by ship, tick and group, deterministic trig). It adds them to its store and replicas, makes their status rows (`DEBRIS_STATUS`) and acks each with `debrisHash`. The server holds the pieces back from that client meanwhile (`ClientConnection.debrisHeld`: no sync, keyframe, row or HP); a right ack marks them sent (`SnapshotBuilder.ackDebris`); a wrong one, or none within `DEBRIS_ACK_TICKS` plus twice the ping, and they go as any ship does. Debris then drifts and knocks into other debris only (ships ignore it), push only, all pieces of a system stepped together in id order (`stepDebrisWorld`) on the server and in `ShipReplicaSet` (`stepDebrisTo`: a keyframe or new piece is how its tick ended; the world is stepped again from the tick before). A piece moved by anything else (a rebuild's shift, a blast, a tow), and whatever knocked into it before the snapshot, is keyframed (`DebrisNet.touched`, Replication `Drift:moved`); so is a piece knocked by one a client doesn't step (out of view, or not had yet). Damage, crumbling and removal stay server-told.
 

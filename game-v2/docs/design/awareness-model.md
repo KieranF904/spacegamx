@@ -27,6 +27,10 @@ to the working tree on `refactor/split` at 764619d.
   (not fixed) cadence when the server wants one.
 - **Rebuilds at most once per ship per tick**, batched like damage.
 - **Large ships** (255-part limits, turret arcs) are out of scope here.
+- **Crowds (added 2026-11-05).** 300 pilots in one system is not a target: up to about 100 a system is, in smaller
+  groups. A dense system degrades gracefully by three fallbacks, per system and automatic, each told to its clients
+  stamped with a tick: a smaller focus, a wider snapshot window, then time dilation. They replace the per-entity crowd
+  budget (phase 7, open question 7). Built: section 7.11.
 
 Where the text below says "3x3", "9 cells", "the 16-cell ring", "anchor cell", "anchor hysteresis" (h_f) or "recentre",
 read the rule above. What this changes:
@@ -929,11 +933,81 @@ Rocks are already seeded, plus an override table. With cells:
   - The VPS's uplink is shared with other projects (memory: vps-deploy), and 300 × 45 KB/s is 13.5 MB/s (108 Mbit/s).
 - **Client CPU** stepping 300 replicas and casting every shell against every ship is the unmeasured risk. A client
   broadphase grid in SelfHits is needed past about 50 ships.
-- **The answer is phase 7's in-focus budget.** Exact simulation for the nearest K (default 64) plus anything targeting
-  or targeted by you. The rest go on their rows variant, at a lower rate, ordered by a priority accumulator. Their shells
-  are derived only if aimed into your 2 km, otherwise ghosts.
-  - This keeps the server's work shared: blocks are still encoded once; only the choice is per client.
-  - It is the one place this design trades exactness for bytes, and it touches only far parts of a crowd.
+- **The answer is the crowd fallbacks (section 7.11), not a per-entity budget** (Kieran, 2026-11-05: they replace it).
+  Everything held stays exact; a crowded system shrinks its focus, widens its window, then slows its clock.
+
+### 7.11 Crowd fallbacks (built 2026-11-05: `CAPS.CROWD` 16384, protocol 41)
+
+Kieran's decision: up to about 100 pilots a system is the target; these are tools for the rare dense case, per system
+and automatic, applied in this order as the system's tick cost rises over budget and undone in reverse as it falls.
+Each is told to the system's clients as a `crowd` message (tick, level, focus radius, window, rate), stamped with the
+system tick it takes effect from. Code: common `network/crowd.ts` (the levels), server `net/crowd/CrowdControl.ts`
+(costs, levels, telling), `sim/SystemClocks.ts` (each system's clock), client `state/GameState.ts` (`onCrowd`, the
+clock) and `ui/TimeScaleBadge.ts`.
+
+| level | focus | window | ticks/s | stage |
+|--:|--:|--:|--:|---|
+| 0 | 19 km | 3 | 60 | none |
+| 1-3 | 16, 13, 10 km | 3 | 60 | 1: focus |
+| 4-5 | 10 km | 6, 9 | 60 | 2: window |
+| 6-9 | 10 km | 9 | 45, 30, 20, 15 | 3: dilation |
+
+**Measuring and hysteresis.** Each base tick, the tick's time is shared out to systems by how many ships each has, and
+each snapshot round's per-client time goes to that client's system; an own-clock pass (below) is charged whole to its
+system. The cost is smoothed (α 1/30 per base tick). A system goes up a level when its cost has been over 13 ms for 30
+base ticks running, at least 90 after its last change; down one when under 6 ms for 300 running, at least 300 after.
+The gap (more than 2×) is wider than any one level's saving. `/crowd [0-9|auto]` (admin) pins a level for testing; with
+no argument it prints the level and cost.
+
+**1. Focus.** `FocusCells.view` takes the radius from the system's level; the ring stays 35 km. Cells past the new
+radius drop as any leaving cell does (kept 10 s, the cache answers on the way back). The client's ghost fade follows:
+the last km inside the radius (`ghostWeight(dist, focus)`).
+
+**2. Window.** Snapshot rounds are per system: `SnapshotBuilder.due()` runs every 3 base ticks as always, minus the
+systems whose wider window hasn't come round. What a round lets go of is let go only for the systems it was for:
+removals and their wire ids, fire events, debris splits and touches, knocks, the shadows' windows (`Replication.begin/
+endSnapshot(due)`), the hit records (`HitLedger.endSnapshot(skip)`). HUD numbers go in the round inside each second's
+first window. Clients' own inputs still go on change; other pilots' ride the snapshots, so they relay later. The tick
+layer simply waits longer (it was already driven by snapshot ticks); the client adds `(window - 3) × tick` to its
+interpolation delay.
+
+**3. Dilation.** Systems used to tick together, so this needed per-system scheduling:
+- **Own clocks.** A dilated system takes a clock of its own (`SystemClocks`): an integer accumulator steps it `rate` of
+  every 60 base ticks. Its tick is its own count of steps, so it falls behind the server's; the step is the same (same
+  dt), so its simulation is unchanged and deterministic, only slower in real time. A rate change is said 30 of its
+  ticks ahead and takes effect there on both sides. Back at full rate it keeps its own clock (still behind) until
+  nobody is in it, then rejoins the server's.
+- **Passes.** `GameServer.tick` walks the table in passes (`SimPass`): the main pass is every system on the server's
+  clock at the server's tick; then each own-clock system due a step has its own pass at its own tick (`currentTick` is
+  that tick for the pass, so everything that reads the tick reads the system's): its clients' inputs, the tick entries
+  marked `pass` in the table (tickOrder.ts), then its snapshot round when its window comes (`ownRound`). Pass-aware
+  entries skip what isn't the pass's (`SimPass.on`): station orbits, pilots, tows, docking, rifts, guns, shells, enemies,
+  bosses, mobs, collisions, lod, the ships' walks (bodiesNow, shields, blasts, burns, kits, repair, rounding, contacts),
+  replication, self hashes, lifetimes. The rest (economy, events, sieges, surfaces, pods, mining, hazards, cleanup) run
+  in the main pass only, at the server's tick, for every system: in a dilated system they run at real-time pace.
+- **Messages** from a client in an own-clock system are handled at that system's tick (`handleMessage`).
+- **Travel** between systems on different clocks moves the ship's tick fields by the difference (`rebaseShipTicks`)
+  and the server's tick-keyed notes of its client (`changeClock`: scheduled inputs and hashes dropped, live and sent
+  ticks moved, its hit journal afresh). The client is told the new system's clock on entering (its tick now, its rate)
+  and takes it at once.
+- **Client.** `GameState.onCrowd`: a rate change turns the clock at its tick, carrying on from where it is; a tick far
+  from its estimate (another system's clock) is taken at once. Prediction follows the clock (one step per tick number),
+  so the pilot's own ship slows with the system. The HUD shows `TIME ×0.50` while slowed.
+
+**Measured** (crowd bench `--crowd`, blocks bulk; docs/audits/crowd-fallbacks-2026-11-05.md): ball 300 climbs to level 9
+in about 25 s and settles at 13.1 ms a base tick (budget 16.7; 35-48 ms without), 16 tick-layer disagreements in
+150,753 checks. Ball 100 stays at level 0 until its hostiles pile up, then settles at level 5 (14.4 ms). Ball 50 and
+spread 50/100 stay at level 0.
+
+**Known gaps.**
+- A dilated system's step lands in one base tick: at level 9 the base tick that carries it costs about 45 ms (p95 37-68
+  ms at ball 300). Spreading a step over base ticks would need the step itself split.
+- Main-pass-only entries see a dilated system at the server's tick: an event's or a zone's timers, set there, run in
+  real time; one module setting a tick that a pass-aware one compares (an event's arrivals for the enemies) is off by
+  the lag. Rare paths; none on the tick layer.
+- A dilated system rejoins the server's clock only once nobody is in it.
+- Legacy clients in a dilated system get snapshots at its ticks; their clock follows pongs (it snaps when far off),
+  so they see it slowed with some jitter.
 
 ## 8. Today's mechanisms, mapped
 
@@ -1074,9 +1148,8 @@ pays.
 6. **Waypoint spacing and the swerve rule** (6.3). Default: the spacing table as written, a 16-tick lead, a swerve
    check every 4 ticks at max(64, 15% of the remaining distance). Missiles get a little more dodgeable at range: is
    that wanted? Default: yes, then a balance pass. The resolved-stream budget per client: 64.
-7. **The crowd budget (phase 7).** Default: exact simulation for the nearest 64, plus anyone targeting or targeted by
-   you; the rest on their rows variant at a lower rate. Is a little inexactness for far members of a 300-pilot ball
-   acceptable?
+7. **The crowd budget (phase 7).** Answered 2026-11-05: no per-entity budget; the crowd fallbacks instead (section 0,
+   section 7.11).
 8. **Jump transit.** Default: no tick layer during the burn; the destination's 3×3 prefetched from charge start.
 9. **Hidden information.** Are cloaks, stealth or team-only things planned? Default: no, so one block per entity.
 10. **Deflate off for packed clients.** Default: yes.
@@ -1203,8 +1276,8 @@ the probes, and the parity tests (replication, confirmedHits, selfHits, bodies, 
   - Resolved-stream bytes in the L2 bench near section 6.6's estimate.
   - Injected drift (a cell entity moved 1 unit) is caught within one cadence and fixed by a cell snapshot.
 
-**Phase 7: the crowd.**
-- The in-focus priority budget (exact K, rows variant beyond, accumulator ordering).
+**Phase 7: the crowd.** Status: **crowd fallbacks built** (section 7.11), in place of the in-focus budget.
+- ~~The in-focus priority budget (exact K, rows variant beyond, accumulator ordering).~~ Replaced by the fallbacks.
 - A client broadphase in SelfHits.
 - The client frame profiled in a real browser (one headless browser, closed after: memory: dev-process-hygiene).
 - *Checkpoint:* L1 at 300 within the target bandwidth (open question 7) and the client's tick layer under its frame

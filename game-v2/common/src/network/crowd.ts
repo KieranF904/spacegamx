@@ -1,5 +1,5 @@
 /**
- * Crowd fallbacks (CAPS.CROWD, protocol 41; docs/design/awareness-model.md section 7.5): what a system does, all on its
+ * Crowd fallbacks (CAPS.CROWD, protocol 41; docs/design/awareness-model.md section 7.11): what a system does, all on its
  * own and automatically, when its tick cost goes over budget. Up to about 100 pilots in a system is the target; these
  * are for the rare dense case, applied in this order as the cost rises and undone in reverse as it falls:
  *

@@ -1,6 +1,6 @@
 /**
  * Each system's own clock (crowd fallbacks, stage 3: time dilation; common network/crowd.ts; docs/design/awareness-model.md
- * section 7.5).
+ * section 7.11).
  *
  * The server's loop runs base ticks (TICK_RATE a second). Every system steps once a base tick, and its tick IS the
  * server's tick, until it is dilated: from then on it has a clock of its own, stepping `rate` of every TICK_RATE base
