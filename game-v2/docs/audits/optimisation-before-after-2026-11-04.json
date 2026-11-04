@@ -1,0 +1,3435 @@
+{
+ "method": "scratchpad net/ba/netAuditBA.ts (download, server) and scripts/net/inputProbe.ts (upload)",
+ "baseline": "56389a3 (protocol 24)",
+ "head": "235dc46 (protocol 35, caps 255)",
+ "scenarios": {
+  "idle": {
+   "before": {
+    "scenario": "idle",
+    "ship": "sparrow-t",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 0,
+    "protocol": 24,
+    "fakeClients": false,
+    "cpu": {
+     "stepMs": 0.248,
+     "stepP50": 0.208,
+     "stepP95": 0.495
+    },
+    "A_shooter": {
+     "payloadBps": 302,
+     "deflatedBps": 300,
+     "wsMsgsPerSec": 12.5,
+     "protoMsgsPerSec": 12.8,
+     "wireBps": 1127,
+     "wireDeflatedBps": 1125,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 280,
+      "toast": 6,
+      "playerState": 2,
+      "contact": 2
+     }
+    },
+    "B_observer": {
+     "payloadBps": 324,
+     "deflatedBps": 320,
+     "wsMsgsPerSec": 12.4,
+     "protoMsgsPerSec": 12.7,
+     "wireBps": 1142,
+     "wireDeflatedBps": 1138,
+     "up": {
+      "msgsPerSec": 5.85,
+      "payloadBps": 64,
+      "baseLayoutBps": 64,
+      "wireBps": 450,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 302,
+      "toast": 6,
+      "playerState": 2,
+      "contact": 2
+     }
+    },
+    "C_far": {
+     "payloadBps": 186,
+     "deflatedBps": 184,
+     "wsMsgsPerSec": 7.5,
+     "protoMsgsPerSec": 7.8,
+     "wireBps": 681,
+     "wireDeflatedBps": 679,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 169,
+      "toast": 6,
+      "playerState": 2,
+      "contact": 2
+     }
+    }
+   },
+   "after": {
+    "scenario": "idle",
+    "ship": "sparrow-t",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 255,
+    "protocol": 35,
+    "fakeClients": true,
+    "cpu": {
+     "stepMs": 0.272,
+     "stepP50": 0.229,
+     "stepP95": 0.57
+    },
+    "A_shooter": {
+     "payloadBps": 145,
+     "deflatedBps": 145,
+     "wsMsgsPerSec": 7.85,
+     "protoMsgsPerSec": 12.4,
+     "wireBps": 663,
+     "wireDeflatedBps": 663,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {}
+    },
+    "B_observer": {
+     "payloadBps": 141,
+     "deflatedBps": 141,
+     "wsMsgsPerSec": 7.8,
+     "protoMsgsPerSec": 12.3,
+     "wireBps": 656,
+     "wireDeflatedBps": 656,
+     "up": {
+      "msgsPerSec": 7.9,
+      "payloadBps": 95,
+      "baseLayoutBps": 95,
+      "wireBps": 617,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 2.85
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {}
+    },
+    "C_far": {
+     "payloadBps": 93,
+     "deflatedBps": 92,
+     "wsMsgsPerSec": 5.5,
+     "protoMsgsPerSec": 7.8,
+     "wireBps": 456,
+     "wireDeflatedBps": 455,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {}
+    }
+   },
+   "headCaps0": {
+    "scenario": "idle",
+    "ship": "sparrow-t",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 0,
+    "protocol": 35,
+    "fakeClients": true,
+    "cpu": {
+     "stepMs": 0.254,
+     "stepP50": 0.21,
+     "stepP95": 0.532
+    },
+    "A_shooter": {
+     "payloadBps": 288,
+     "deflatedBps": 287,
+     "wsMsgsPerSec": 12.35,
+     "protoMsgsPerSec": 12.5,
+     "wireBps": 1103,
+     "wireDeflatedBps": 1103,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 266,
+      "toast": 6,
+      "playerState": 2,
+      "contact": 2
+     }
+    },
+    "B_observer": {
+     "payloadBps": 304,
+     "deflatedBps": 304,
+     "wsMsgsPerSec": 12.2,
+     "protoMsgsPerSec": 12.3,
+     "wireBps": 1110,
+     "wireDeflatedBps": 1109,
+     "up": {
+      "msgsPerSec": 5.85,
+      "payloadBps": 64,
+      "baseLayoutBps": 64,
+      "wireBps": 450,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 282,
+      "toast": 6,
+      "playerState": 2,
+      "contact": 2
+     }
+    },
+    "C_far": {
+     "payloadBps": 186,
+     "deflatedBps": 184,
+     "wsMsgsPerSec": 7.45,
+     "protoMsgsPerSec": 7.7,
+     "wireBps": 678,
+     "wireDeflatedBps": 676,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 169,
+      "toast": 6,
+      "playerState": 2,
+      "contact": 2
+     }
+    }
+   }
+  },
+  "cruise": {
+   "before": {
+    "scenario": "cruise",
+    "ship": "sparrow-t",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 0,
+    "protocol": 24,
+    "fakeClients": false,
+    "cpu": {
+     "stepMs": 0.259,
+     "stepP50": 0.218,
+     "stepP95": 0.508
+    },
+    "A_shooter": {
+     "payloadBps": 871,
+     "deflatedBps": 867,
+     "wsMsgsPerSec": 16.3,
+     "protoMsgsPerSec": 16.8,
+     "wireBps": 1946,
+     "wireDeflatedBps": 1942,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 841,
+      "contact": 4,
+      "toast": 6,
+      "playerState": 2,
+      "damage": 2
+     }
+    },
+    "B_observer": {
+     "payloadBps": 895,
+     "deflatedBps": 889,
+     "wsMsgsPerSec": 16.05,
+     "protoMsgsPerSec": 16.4,
+     "wireBps": 1954,
+     "wireDeflatedBps": 1949,
+     "up": {
+      "msgsPerSec": 5.85,
+      "payloadBps": 64,
+      "baseLayoutBps": 64,
+      "wireBps": 450,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 868,
+      "contact": 3,
+      "toast": 6,
+      "playerState": 2
+     }
+    },
+    "C_far": {
+     "payloadBps": 765,
+     "deflatedBps": 763,
+     "wsMsgsPerSec": 12.45,
+     "protoMsgsPerSec": 12.7,
+     "wireBps": 1586,
+     "wireDeflatedBps": 1585,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 741,
+      "contact": 3,
+      "toast": 6,
+      "playerState": 2
+     }
+    }
+   },
+   "after": {
+    "scenario": "cruise",
+    "ship": "sparrow-t",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 255,
+    "protocol": 35,
+    "fakeClients": true,
+    "cpu": {
+     "stepMs": 0.31,
+     "stepP50": 0.255,
+     "stepP95": 0.654
+    },
+    "A_shooter": {
+     "payloadBps": 163,
+     "deflatedBps": 163,
+     "wsMsgsPerSec": 8.05,
+     "protoMsgsPerSec": 13.9,
+     "wireBps": 695,
+     "wireDeflatedBps": 695,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {}
+    },
+    "B_observer": {
+     "payloadBps": 162,
+     "deflatedBps": 162,
+     "wsMsgsPerSec": 8,
+     "protoMsgsPerSec": 13.9,
+     "wireBps": 690,
+     "wireDeflatedBps": 690,
+     "up": {
+      "msgsPerSec": 7.9,
+      "payloadBps": 96,
+      "baseLayoutBps": 96,
+      "wireBps": 617,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 2.9
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {}
+    },
+    "C_far": {
+     "payloadBps": 234,
+     "deflatedBps": 234,
+     "wsMsgsPerSec": 6.6,
+     "protoMsgsPerSec": 11.5,
+     "wireBps": 669,
+     "wireDeflatedBps": 669,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {}
+    }
+   },
+   "headCaps0": {
+    "scenario": "cruise",
+    "ship": "sparrow-t",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 0,
+    "protocol": 35,
+    "fakeClients": true,
+    "cpu": {
+     "stepMs": 0.261,
+     "stepP50": 0.221,
+     "stepP95": 0.55
+    },
+    "A_shooter": {
+     "payloadBps": 321,
+     "deflatedBps": 320,
+     "wsMsgsPerSec": 13.5,
+     "protoMsgsPerSec": 14,
+     "wireBps": 1212,
+     "wireDeflatedBps": 1211,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 293,
+      "contact": 4,
+      "toast": 6,
+      "playerState": 2,
+      "damage": 1,
+      "shipSync": 2
+     }
+    },
+    "B_observer": {
+     "payloadBps": 345,
+     "deflatedBps": 344,
+     "wsMsgsPerSec": 13.45,
+     "protoMsgsPerSec": 13.9,
+     "wireBps": 1232,
+     "wireDeflatedBps": 1231,
+     "up": {
+      "msgsPerSec": 5.85,
+      "payloadBps": 64,
+      "baseLayoutBps": 64,
+      "wireBps": 450,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 316,
+      "contact": 4,
+      "toast": 6,
+      "playerState": 2,
+      "damage": 1,
+      "shipSync": 2
+     }
+    },
+    "C_far": {
+     "payloadBps": 589,
+     "deflatedBps": 586,
+     "wsMsgsPerSec": 11.15,
+     "protoMsgsPerSec": 11.4,
+     "wireBps": 1325,
+     "wireDeflatedBps": 1322,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 567,
+      "contact": 3,
+      "toast": 6,
+      "playerState": 2
+     }
+    }
+   }
+  },
+  "pip": {
+   "before": {
+    "scenario": "pip",
+    "ship": "sparrow-t",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 0,
+    "protocol": 24,
+    "fakeClients": false,
+    "cpu": {
+     "stepMs": 0.27,
+     "stepP50": 0.232,
+     "stepP95": 0.543
+    },
+    "A_shooter": {
+     "payloadBps": 1236,
+     "deflatedBps": 621,
+     "wsMsgsPerSec": 16.85,
+     "protoMsgsPerSec": 47,
+     "wireBps": 2348,
+     "wireDeflatedBps": 1733,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 544,
+      "damage": 170,
+      "projectileHit": 104,
+      "detonation": 312,
+      "shipHps": 78,
+      "contact": 2,
+      "toast": 6,
+      "playerState": 2,
+      "shipSync": 1
+     }
+    },
+    "B_observer": {
+     "payloadBps": 1177,
+     "deflatedBps": 558,
+     "wsMsgsPerSec": 16.85,
+     "protoMsgsPerSec": 46.8,
+     "wireBps": 2289,
+     "wireDeflatedBps": 1670,
+     "up": {
+      "msgsPerSec": 5.85,
+      "payloadBps": 64,
+      "baseLayoutBps": 64,
+      "wireBps": 450,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 488,
+      "damage": 168,
+      "projectileHit": 104,
+      "detonation": 312,
+      "shipHps": 78,
+      "contact": 1,
+      "toast": 6,
+      "playerState": 2,
+      "shipSync": 1
+     }
+    },
+    "C_far": {
+     "payloadBps": 583,
+     "deflatedBps": 483,
+     "wsMsgsPerSec": 11.25,
+     "protoMsgsPerSec": 19.4,
+     "wireBps": 1326,
+     "wireDeflatedBps": 1225,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 251,
+      "detonation": 312,
+      "contact": 1,
+      "toast": 6,
+      "playerState": 2
+     }
+    }
+   },
+   "after": {
+    "scenario": "pip",
+    "ship": "sparrow-t",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 255,
+    "protocol": 35,
+    "fakeClients": true,
+    "cpu": {
+     "stepMs": 0.315,
+     "stepP50": 0.27,
+     "stepP95": 0.658
+    },
+    "A_shooter": {
+     "payloadBps": 234,
+     "deflatedBps": 234,
+     "wsMsgsPerSec": 9.2,
+     "protoMsgsPerSec": 19.4,
+     "wireBps": 841,
+     "wireDeflatedBps": 842,
+     "up": {
+      "msgsPerSec": 4.9,
+      "payloadBps": 31,
+      "baseLayoutBps": 70,
+      "wireBps": 354,
+      "acksPerSec": 0,
+      "reportsPerSec": 2.15,
+      "checksPerSec": 3.25
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {}
+    },
+    "B_observer": {
+     "payloadBps": 238,
+     "deflatedBps": 238,
+     "wsMsgsPerSec": 9.2,
+     "protoMsgsPerSec": 19.4,
+     "wireBps": 845,
+     "wireDeflatedBps": 846,
+     "up": {
+      "msgsPerSec": 9.55,
+      "payloadBps": 123,
+      "baseLayoutBps": 123,
+      "wireBps": 754,
+      "acksPerSec": 0,
+      "reportsPerSec": 2.15,
+      "checksPerSec": 3.9
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {}
+    },
+    "C_far": {
+     "payloadBps": 110,
+     "deflatedBps": 110,
+     "wsMsgsPerSec": 5.75,
+     "protoMsgsPerSec": 8.2,
+     "wireBps": 489,
+     "wireDeflatedBps": 489,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {}
+    }
+   },
+   "headCaps0": {
+    "scenario": "pip",
+    "ship": "sparrow-t",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 0,
+    "protocol": 35,
+    "fakeClients": true,
+    "cpu": {
+     "stepMs": 0.288,
+     "stepP50": 0.246,
+     "stepP95": 0.562
+    },
+    "A_shooter": {
+     "payloadBps": 855,
+     "deflatedBps": 814,
+     "wsMsgsPerSec": 17.15,
+     "protoMsgsPerSec": 37.4,
+     "wireBps": 1987,
+     "wireDeflatedBps": 1945,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 558,
+      "projectileHit": 104,
+      "damage": 83,
+      "shipHps": 78,
+      "contact": 3,
+      "toast": 6,
+      "playerState": 2,
+      "shipSync": 4
+     }
+    },
+    "B_observer": {
+     "payloadBps": 789,
+     "deflatedBps": 750,
+     "wsMsgsPerSec": 17.2,
+     "protoMsgsPerSec": 37.4,
+     "wireBps": 1925,
+     "wireDeflatedBps": 1885,
+     "up": {
+      "msgsPerSec": 5.85,
+      "payloadBps": 64,
+      "baseLayoutBps": 64,
+      "wireBps": 450,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 492,
+      "projectileHit": 104,
+      "damage": 83,
+      "shipHps": 78,
+      "contact": 3,
+      "toast": 6,
+      "playerState": 2,
+      "shipSync": 4
+     }
+    },
+    "C_far": {
+     "payloadBps": 214,
+     "deflatedBps": 213,
+     "wsMsgsPerSec": 7.95,
+     "protoMsgsPerSec": 8.1,
+     "wireBps": 739,
+     "wireDeflatedBps": 738,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 197,
+      "contact": 1,
+      "toast": 6,
+      "playerState": 2
+     }
+    }
+   }
+  },
+  "hammerhead": {
+   "before": {
+    "scenario": "hammerhead",
+    "ship": "hammerhead",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 0,
+    "protocol": 24,
+    "fakeClients": false,
+    "cpu": {
+     "stepMs": 0.38,
+     "stepP50": 0.298,
+     "stepP95": 0.831
+    },
+    "A_shooter": {
+     "payloadBps": 5021,
+     "deflatedBps": 2045,
+     "wsMsgsPerSec": 19.6,
+     "protoMsgsPerSec": 156.6,
+     "wireBps": 6315,
+     "wireDeflatedBps": 3338,
+     "up": {
+      "msgsPerSec": 1.45,
+      "payloadBps": 16,
+      "baseLayoutBps": 16,
+      "wireBps": 112,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 1766,
+      "damage": 794,
+      "projectileHit": 515,
+      "detonation": 1546,
+      "shipSync": 109,
+      "shipHps": 236,
+      "partDestroyed": 26,
+      "toast": 6,
+      "playerState": 2,
+      "contact": 1
+     }
+    },
+    "B_observer": {
+     "payloadBps": 4519,
+     "deflatedBps": 1612,
+     "wsMsgsPerSec": 19.4,
+     "protoMsgsPerSec": 156.3,
+     "wireBps": 5800,
+     "wireDeflatedBps": 2893,
+     "up": {
+      "msgsPerSec": 6.6,
+      "payloadBps": 73,
+      "baseLayoutBps": 73,
+      "wireBps": 508,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 1264,
+      "damage": 794,
+      "projectileHit": 515,
+      "detonation": 1546,
+      "shipSync": 109,
+      "shipHps": 236,
+      "partDestroyed": 26,
+      "toast": 6,
+      "playerState": 2,
+      "contact": 1
+     }
+    },
+    "C_far": {
+     "payloadBps": 2192,
+     "deflatedBps": 968,
+     "wsMsgsPerSec": 17.7,
+     "protoMsgsPerSec": 57.5,
+     "wireBps": 3360,
+     "wireDeflatedBps": 2136,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 618,
+      "detonation": 1546,
+      "toast": 6,
+      "playerState": 2,
+      "contact": 1
+     }
+    }
+   },
+   "after": {
+    "scenario": "hammerhead",
+    "ship": "hammerhead",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 255,
+    "protocol": 35,
+    "fakeClients": true,
+    "cpu": {
+     "stepMs": 0.401,
+     "stepP50": 0.336,
+     "stepP95": 0.894
+    },
+    "A_shooter": {
+     "payloadBps": 595,
+     "deflatedBps": 590,
+     "wsMsgsPerSec": 9.95,
+     "protoMsgsPerSec": 43.5,
+     "wireBps": 1251,
+     "wireDeflatedBps": 1247,
+     "up": {
+      "msgsPerSec": 7.1,
+      "payloadBps": 102,
+      "baseLayoutBps": 102,
+      "wireBps": 571,
+      "acksPerSec": 0.1,
+      "reportsPerSec": 3.55,
+      "checksPerSec": 4.3
+     },
+     "debrisDerived": 2,
+     "baseBytesByType": {}
+    },
+    "B_observer": {
+     "payloadBps": 617,
+     "deflatedBps": 608,
+     "wsMsgsPerSec": 9.9,
+     "protoMsgsPerSec": 43.3,
+     "wireBps": 1271,
+     "wireDeflatedBps": 1262,
+     "up": {
+      "msgsPerSec": 10.65,
+      "payloadBps": 141,
+      "baseLayoutBps": 141,
+      "wireBps": 844,
+      "acksPerSec": 0.1,
+      "reportsPerSec": 3.5,
+      "checksPerSec": 4.45
+     },
+     "debrisDerived": 2,
+     "baseBytesByType": {}
+    },
+    "C_far": {
+     "payloadBps": 183,
+     "deflatedBps": 182,
+     "wsMsgsPerSec": 6.7,
+     "protoMsgsPerSec": 10.7,
+     "wireBps": 625,
+     "wireDeflatedBps": 625,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {}
+    }
+   },
+   "headCaps0": {
+    "scenario": "hammerhead",
+    "ship": "hammerhead",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 0,
+    "protocol": 35,
+    "fakeClients": true,
+    "cpu": {
+     "stepMs": 0.344,
+     "stepP50": 0.285,
+     "stepP95": 0.74
+    },
+    "A_shooter": {
+     "payloadBps": 2811,
+     "deflatedBps": 1707,
+     "wsMsgsPerSec": 19.6,
+     "protoMsgsPerSec": 96,
+     "wireBps": 4104,
+     "wireDeflatedBps": 3001,
+     "up": {
+      "msgsPerSec": 1.5,
+      "payloadBps": 17,
+      "baseLayoutBps": 17,
+      "wireBps": 116,
+      "acksPerSec": 0.1,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 2,
+     "baseBytesByType": {
+      "snapshot": 1652,
+      "projectileHit": 515,
+      "damage": 251,
+      "shipSync": 94,
+      "shipHps": 240,
+      "partDestroyed": 26,
+      "debrisSplit": 2,
+      "toast": 6,
+      "playerState": 2,
+      "contact": 3
+     }
+    },
+    "B_observer": {
+     "payloadBps": 2188,
+     "deflatedBps": 1337,
+     "wsMsgsPerSec": 19.45,
+     "protoMsgsPerSec": 95.9,
+     "wireBps": 3472,
+     "wireDeflatedBps": 2621,
+     "up": {
+      "msgsPerSec": 6.6,
+      "payloadBps": 73,
+      "baseLayoutBps": 73,
+      "wireBps": 509,
+      "acksPerSec": 0.1,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 2,
+     "baseBytesByType": {
+      "snapshot": 1029,
+      "projectileHit": 515,
+      "damage": 251,
+      "shipSync": 94,
+      "shipHps": 240,
+      "partDestroyed": 26,
+      "debrisSplit": 2,
+      "toast": 6,
+      "playerState": 2,
+      "contact": 3
+     }
+    },
+    "C_far": {
+     "payloadBps": 449,
+     "deflatedBps": 447,
+     "wsMsgsPerSec": 10.5,
+     "protoMsgsPerSec": 10.7,
+     "wireBps": 1142,
+     "wireDeflatedBps": 1140,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 429,
+      "toast": 6,
+      "playerState": 2,
+      "contact": 1
+     }
+    }
+   }
+  },
+  "spark": {
+   "before": {
+    "scenario": "spark",
+    "ship": "ports-gale",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 0,
+    "protocol": 24,
+    "fakeClients": false,
+    "cpu": {
+     "stepMs": 0.341,
+     "stepP50": 0.28,
+     "stepP95": 0.681
+    },
+    "A_shooter": {
+     "payloadBps": 5974,
+     "deflatedBps": 1703,
+     "wsMsgsPerSec": 20,
+     "protoMsgsPerSec": 184.1,
+     "wireBps": 7294,
+     "wireDeflatedBps": 3023,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "damage": 876,
+      "projectileHit": 451,
+      "ignite": 1152,
+      "detonation": 1353,
+      "shipHps": 377,
+      "snapshot": 1721,
+      "shipSync": 14,
+      "toast": 6,
+      "playerState": 2,
+      "contact": 3
+     }
+    },
+    "B_observer": {
+     "payloadBps": 5556,
+     "deflatedBps": 1435,
+     "wsMsgsPerSec": 20,
+     "protoMsgsPerSec": 184.1,
+     "wireBps": 6876,
+     "wireDeflatedBps": 2755,
+     "up": {
+      "msgsPerSec": 5.85,
+      "payloadBps": 64,
+      "baseLayoutBps": 64,
+      "wireBps": 450,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "damage": 876,
+      "projectileHit": 451,
+      "ignite": 1152,
+      "detonation": 1353,
+      "shipHps": 377,
+      "snapshot": 1302,
+      "shipSync": 14,
+      "toast": 6,
+      "playerState": 2,
+      "contact": 3
+     }
+    },
+    "C_far": {
+     "payloadBps": 3249,
+     "deflatedBps": 776,
+     "wsMsgsPerSec": 18.4,
+     "protoMsgsPerSec": 85.4,
+     "wireBps": 4464,
+     "wireDeflatedBps": 1991,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "ignite": 1152,
+      "detonation": 1353,
+      "snapshot": 715,
+      "toast": 6,
+      "playerState": 2,
+      "contact": 3
+     }
+    }
+   },
+   "after": {
+    "scenario": "spark",
+    "ship": "ports-gale",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 255,
+    "protocol": 35,
+    "fakeClients": true,
+    "cpu": {
+     "stepMs": 0.403,
+     "stepP50": 0.338,
+     "stepP95": 0.841
+    },
+    "A_shooter": {
+     "payloadBps": 490,
+     "deflatedBps": 486,
+     "wsMsgsPerSec": 10,
+     "protoMsgsPerSec": 40.8,
+     "wireBps": 1150,
+     "wireDeflatedBps": 1146,
+     "up": {
+      "msgsPerSec": 6.95,
+      "payloadBps": 45,
+      "baseLayoutBps": 101,
+      "wireBps": 504,
+      "acksPerSec": 0,
+      "reportsPerSec": 4,
+      "checksPerSec": 4.05
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {}
+    },
+    "B_observer": {
+     "payloadBps": 495,
+     "deflatedBps": 496,
+     "wsMsgsPerSec": 10,
+     "protoMsgsPerSec": 40.8,
+     "wireBps": 1155,
+     "wireDeflatedBps": 1156,
+     "up": {
+      "msgsPerSec": 9.8,
+      "payloadBps": 132,
+      "baseLayoutBps": 132,
+      "wireBps": 779,
+      "acksPerSec": 0,
+      "reportsPerSec": 4,
+      "checksPerSec": 4.2
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {}
+    },
+    "C_far": {
+     "payloadBps": 228,
+     "deflatedBps": 228,
+     "wsMsgsPerSec": 7.55,
+     "protoMsgsPerSec": 11.8,
+     "wireBps": 727,
+     "wireDeflatedBps": 726,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {}
+    }
+   },
+   "headCaps0": {
+    "scenario": "spark",
+    "ship": "ports-gale",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 0,
+    "protocol": 35,
+    "fakeClients": true,
+    "cpu": {
+     "stepMs": 0.31,
+     "stepP50": 0.273,
+     "stepP95": 0.632
+    },
+    "A_shooter": {
+     "payloadBps": 3378,
+     "deflatedBps": 1400,
+     "wsMsgsPerSec": 20,
+     "protoMsgsPerSec": 160.7,
+     "wireBps": 4698,
+     "wireDeflatedBps": 2720,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "projectileHit": 451,
+      "ignite": 288,
+      "detonation": 416,
+      "damage": 271,
+      "shipHps": 377,
+      "snapshot": 1527,
+      "shipSync": 16,
+      "toast": 6,
+      "playerState": 2,
+      "contact": 4
+     }
+    },
+    "B_observer": {
+     "payloadBps": 2816,
+     "deflatedBps": 1151,
+     "wsMsgsPerSec": 20,
+     "protoMsgsPerSec": 160.7,
+     "wireBps": 4136,
+     "wireDeflatedBps": 2471,
+     "up": {
+      "msgsPerSec": 5.85,
+      "payloadBps": 64,
+      "baseLayoutBps": 64,
+      "wireBps": 450,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "projectileHit": 451,
+      "ignite": 288,
+      "detonation": 416,
+      "damage": 271,
+      "shipHps": 377,
+      "snapshot": 965,
+      "shipSync": 16,
+      "toast": 6,
+      "playerState": 2,
+      "contact": 4
+     }
+    },
+    "C_far": {
+     "payloadBps": 569,
+     "deflatedBps": 562,
+     "wsMsgsPerSec": 11.45,
+     "protoMsgsPerSec": 11.8,
+     "wireBps": 1325,
+     "wireDeflatedBps": 1318,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 547,
+      "toast": 6,
+      "playerState": 2,
+      "contact": 3
+     }
+    }
+   }
+  },
+  "npcfight": {
+   "before": {
+    "scenario": "npcfight",
+    "ship": "corsair",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 0,
+    "protocol": 24,
+    "fakeClients": false,
+    "cpu": {
+     "stepMs": 0.329,
+     "stepP50": 0.272,
+     "stepP95": 0.692
+    },
+    "A_shooter": {
+     "payloadBps": 1268,
+     "deflatedBps": 1091,
+     "wsMsgsPerSec": 20,
+     "protoMsgsPerSec": 27.4,
+     "wireBps": 2588,
+     "wireDeflatedBps": 2411,
+     "up": {
+      "msgsPerSec": 60,
+      "payloadBps": 660,
+      "baseLayoutBps": 660,
+      "wireBps": 4620,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 1122,
+      "contact": 8,
+      "damage": 35,
+      "shipSync": 19,
+      "partDestroyed": 6,
+      "shipHps": 13,
+      "toast": 6,
+      "playerState": 2,
+      "projectileHit": 25,
+      "detonation": 12
+     }
+    },
+    "B_observer": {
+     "payloadBps": 1305,
+     "deflatedBps": 1133,
+     "wsMsgsPerSec": 20,
+     "protoMsgsPerSec": 27.4,
+     "wireBps": 2625,
+     "wireDeflatedBps": 2453,
+     "up": {
+      "msgsPerSec": 58.5,
+      "payloadBps": 644,
+      "baseLayoutBps": 644,
+      "wireBps": 4505,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 1160,
+      "contact": 8,
+      "damage": 35,
+      "shipSync": 19,
+      "partDestroyed": 6,
+      "shipHps": 13,
+      "toast": 6,
+      "playerState": 2,
+      "projectileHit": 25,
+      "detonation": 12
+     }
+    },
+    "C_far": {
+     "payloadBps": 216,
+     "deflatedBps": 211,
+     "wsMsgsPerSec": 9,
+     "protoMsgsPerSec": 9.3,
+     "wireBps": 810,
+     "wireDeflatedBps": 805,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 188,
+      "toast": 6,
+      "playerState": 2,
+      "detonation": 12
+     }
+    }
+   },
+   "after": {
+    "scenario": "npcfight",
+    "ship": "corsair",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 255,
+    "protocol": 35,
+    "fakeClients": true,
+    "cpu": {
+     "stepMs": 0.373,
+     "stepP50": 0.301,
+     "stepP95": 0.79
+    },
+    "A_shooter": {
+     "payloadBps": 706,
+     "deflatedBps": 703,
+     "wsMsgsPerSec": 10,
+     "protoMsgsPerSec": 25.1,
+     "wireBps": 1366,
+     "wireDeflatedBps": 1363,
+     "up": {
+      "msgsPerSec": 60,
+      "payloadBps": 678,
+      "baseLayoutBps": 678,
+      "wireBps": 4638,
+      "acksPerSec": 0,
+      "reportsPerSec": 0.2,
+      "checksPerSec": 5.65
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {}
+    },
+    "B_observer": {
+     "payloadBps": 768,
+     "deflatedBps": 745,
+     "wsMsgsPerSec": 10,
+     "protoMsgsPerSec": 24.9,
+     "wireBps": 1428,
+     "wireDeflatedBps": 1405,
+     "up": {
+      "msgsPerSec": 58.5,
+      "payloadBps": 661,
+      "baseLayoutBps": 661,
+      "wireBps": 4522,
+      "acksPerSec": 0,
+      "reportsPerSec": 0.2,
+      "checksPerSec": 5.65
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {}
+    },
+    "C_far": {
+     "payloadBps": 100,
+     "deflatedBps": 100,
+     "wsMsgsPerSec": 6.3,
+     "protoMsgsPerSec": 8.3,
+     "wireBps": 516,
+     "wireDeflatedBps": 516,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {}
+    }
+   },
+   "headCaps0": {
+    "scenario": "npcfight",
+    "ship": "corsair",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 0,
+    "protocol": 35,
+    "fakeClients": true,
+    "cpu": {
+     "stepMs": 0.324,
+     "stepP50": 0.273,
+     "stepP95": 0.668
+    },
+    "A_shooter": {
+     "payloadBps": 1266,
+     "deflatedBps": 1099,
+     "wsMsgsPerSec": 20,
+     "protoMsgsPerSec": 26.6,
+     "wireBps": 2586,
+     "wireDeflatedBps": 2419,
+     "up": {
+      "msgsPerSec": 60,
+      "payloadBps": 660,
+      "baseLayoutBps": 660,
+      "wireBps": 4620,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 1145,
+      "contact": 8,
+      "damage": 22,
+      "shipSync": 19,
+      "partDestroyed": 6,
+      "shipHps": 13,
+      "toast": 6,
+      "playerState": 2,
+      "projectileHit": 25
+     }
+    },
+    "B_observer": {
+     "payloadBps": 1334,
+     "deflatedBps": 1155,
+     "wsMsgsPerSec": 20,
+     "protoMsgsPerSec": 26.8,
+     "wireBps": 2654,
+     "wireDeflatedBps": 2475,
+     "up": {
+      "msgsPerSec": 58.45,
+      "payloadBps": 643,
+      "baseLayoutBps": 643,
+      "wireBps": 4501,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 1195,
+      "shipSync": 38,
+      "contact": 8,
+      "damage": 22,
+      "partDestroyed": 6,
+      "shipHps": 13,
+      "toast": 6,
+      "playerState": 2,
+      "projectileHit": 25
+     }
+    },
+    "C_far": {
+     "payloadBps": 191,
+     "deflatedBps": 190,
+     "wsMsgsPerSec": 8.2,
+     "protoMsgsPerSec": 8.3,
+     "wireBps": 732,
+     "wireDeflatedBps": 732,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 175,
+      "toast": 6,
+      "playerState": 2
+     }
+    }
+   }
+  },
+  "boss": {
+   "before": {
+    "scenario": "boss",
+    "ship": "hammerhead",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 0,
+    "protocol": 24,
+    "fakeClients": false,
+    "aliveA": true,
+    "cpu": {
+     "stepMs": 0.497,
+     "stepP50": 0.343,
+     "stepP95": 1.257
+    },
+    "A_shooter": {
+     "payloadBps": 5372,
+     "deflatedBps": 3511,
+     "wsMsgsPerSec": 21.15,
+     "protoMsgsPerSec": 77.8,
+     "wireBps": 6767,
+     "wireDeflatedBps": 4907,
+     "up": {
+      "msgsPerSec": 55.9,
+      "payloadBps": 615,
+      "baseLayoutBps": 615,
+      "wireBps": 4304,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "bossTelegraph": 156,
+      "damage": 332,
+      "projectileHit": 116,
+      "detonation": 478,
+      "shipHps": 113,
+      "snapshot": 3824,
+      "contact": 77,
+      "shipSync": 158,
+      "effect": 10,
+      "partDestroyed": 78,
+      "toast": 6,
+      "playerState": 2,
+      "death": 0
+     }
+    },
+    "B_observer": {
+     "payloadBps": 4320,
+     "deflatedBps": 2698,
+     "wsMsgsPerSec": 14.95,
+     "protoMsgsPerSec": 64.8,
+     "wireBps": 5307,
+     "wireDeflatedBps": 3685,
+     "up": {
+      "msgsPerSec": 58.35,
+      "payloadBps": 642,
+      "baseLayoutBps": 642,
+      "wireBps": 4493,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "bossTelegraph": 108,
+      "damage": 299,
+      "projectileHit": 111,
+      "detonation": 399,
+      "shipHps": 106,
+      "snapshot": 2884,
+      "contact": 63,
+      "shipSync": 106,
+      "effect": 6,
+      "playerState": 5,
+      "partDestroyed": 51,
+      "toast": 15,
+      "items": 75,
+      "wreck": 1,
+      "death": 0,
+      "systemMessage": 4,
+      "hangar": 72
+     }
+    },
+    "C_far": {
+     "payloadBps": 1299,
+     "deflatedBps": 850,
+     "wsMsgsPerSec": 17.2,
+     "protoMsgsPerSec": 30.2,
+     "wireBps": 2434,
+     "wireDeflatedBps": 1985,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "bossTelegraph": 156,
+      "detonation": 478,
+      "snapshot": 618,
+      "contact": 6,
+      "effect": 10,
+      "damage": 3,
+      "shipHps": 2,
+      "toast": 6,
+      "playerState": 2,
+      "death": 0
+     }
+    }
+   },
+   "after": {
+    "scenario": "boss",
+    "ship": "hammerhead",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 255,
+    "protocol": 35,
+    "fakeClients": true,
+    "aliveA": true,
+    "cpu": {
+     "stepMs": 0.471,
+     "stepP50": 0.375,
+     "stepP95": 1.025
+    },
+    "A_shooter": {
+     "payloadBps": 2056,
+     "deflatedBps": 1877,
+     "wsMsgsPerSec": 13.75,
+     "protoMsgsPerSec": 45.6,
+     "wireBps": 2964,
+     "wireDeflatedBps": 2784,
+     "up": {
+      "msgsPerSec": 58.05,
+      "payloadBps": 684,
+      "baseLayoutBps": 684,
+      "wireBps": 4515,
+      "acksPerSec": 0,
+      "reportsPerSec": 2.9,
+      "checksPerSec": 12.25
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {}
+    },
+    "B_observer": {
+     "payloadBps": 2103,
+     "deflatedBps": 1933,
+     "wsMsgsPerSec": 14.6,
+     "protoMsgsPerSec": 47.1,
+     "wireBps": 3067,
+     "wireDeflatedBps": 2897,
+     "up": {
+      "msgsPerSec": 59.75,
+      "payloadBps": 704,
+      "baseLayoutBps": 704,
+      "wireBps": 4648,
+      "acksPerSec": 0.15,
+      "reportsPerSec": 2.8,
+      "checksPerSec": 12.7
+     },
+     "debrisDerived": 3,
+     "baseBytesByType": {}
+    },
+    "C_far": {
+     "payloadBps": 318,
+     "deflatedBps": 318,
+     "wsMsgsPerSec": 9,
+     "protoMsgsPerSec": 15.7,
+     "wireBps": 912,
+     "wireDeflatedBps": 912,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {}
+    }
+   },
+   "headCaps0": {
+    "scenario": "boss",
+    "ship": "hammerhead",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 0,
+    "protocol": 35,
+    "fakeClients": true,
+    "aliveA": true,
+    "cpu": {
+     "stepMs": 0.449,
+     "stepP50": 0.346,
+     "stepP95": 1.166
+    },
+    "A_shooter": {
+     "payloadBps": 4046,
+     "deflatedBps": 2878,
+     "wsMsgsPerSec": 21.1,
+     "protoMsgsPerSec": 54.2,
+     "wireBps": 5439,
+     "wireDeflatedBps": 4270,
+     "up": {
+      "msgsPerSec": 56.95,
+      "payloadBps": 626,
+      "baseLayoutBps": 626,
+      "wireBps": 4385,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "bossTelegraph": 60,
+      "projectileHit": 97,
+      "damage": 108,
+      "shipHps": 89,
+      "snapshot": 3384,
+      "contact": 51,
+      "shipSync": 110,
+      "effect": 10,
+      "partDestroyed": 65,
+      "detonation": 45,
+      "toast": 6,
+      "playerState": 2
+     }
+    },
+    "B_observer": {
+     "payloadBps": 3969,
+     "deflatedBps": 2828,
+     "wsMsgsPerSec": 21.1,
+     "protoMsgsPerSec": 54.5,
+     "wireBps": 5362,
+     "wireDeflatedBps": 4220,
+     "up": {
+      "msgsPerSec": 59.55,
+      "payloadBps": 656,
+      "baseLayoutBps": 656,
+      "wireBps": 4586,
+      "acksPerSec": 0.15,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 3,
+     "baseBytesByType": {
+      "bossTelegraph": 60,
+      "projectileHit": 97,
+      "damage": 108,
+      "shipHps": 89,
+      "snapshot": 3301,
+      "contact": 51,
+      "shipSync": 110,
+      "effect": 10,
+      "playerState": 6,
+      "partDestroyed": 65,
+      "detonation": 45,
+      "toast": 6,
+      "debrisSplit": 2
+     }
+    },
+    "C_far": {
+     "payloadBps": 665,
+     "deflatedBps": 656,
+     "wsMsgsPerSec": 13.8,
+     "protoMsgsPerSec": 15.7,
+     "wireBps": 1576,
+     "wireDeflatedBps": 1567,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "bossTelegraph": 60,
+      "snapshot": 564,
+      "contact": 6,
+      "effect": 10,
+      "damage": 2,
+      "shipHps": 2,
+      "toast": 6,
+      "playerState": 2
+     }
+    }
+   }
+  },
+  "debris": {
+   "before": {
+    "scenario": "debris",
+    "ship": "hammerhead",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 0,
+    "protocol": 24,
+    "fakeClients": false,
+    "cpu": {
+     "stepMs": 0.509,
+     "stepP50": 0.436,
+     "stepP95": 1.009
+    },
+    "A_shooter": {
+     "payloadBps": 8442,
+     "deflatedBps": 4480,
+     "wsMsgsPerSec": 20,
+     "protoMsgsPerSec": 186.3,
+     "wireBps": 9762,
+     "wireDeflatedBps": 5800,
+     "up": {
+      "msgsPerSec": 14.4,
+      "payloadBps": 158,
+      "baseLayoutBps": 158,
+      "wireBps": 1109,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "damage": 745,
+      "projectileHit": 532,
+      "detonation": 1595,
+      "shipHps": 288,
+      "snapshot": 4141,
+      "partDestroyed": 218,
+      "shipSync": 884,
+      "contact": 12,
+      "toast": 6,
+      "playerState": 2
+     }
+    },
+    "B_observer": {
+     "payloadBps": 8077,
+     "deflatedBps": 4124,
+     "wsMsgsPerSec": 20,
+     "protoMsgsPerSec": 186.3,
+     "wireBps": 9397,
+     "wireDeflatedBps": 5444,
+     "up": {
+      "msgsPerSec": 18.15,
+      "payloadBps": 200,
+      "baseLayoutBps": 200,
+      "wireBps": 1398,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "damage": 745,
+      "projectileHit": 532,
+      "detonation": 1595,
+      "shipHps": 288,
+      "snapshot": 3777,
+      "partDestroyed": 218,
+      "shipSync": 884,
+      "contact": 12,
+      "toast": 6,
+      "playerState": 2
+     }
+    },
+    "C_far": {
+     "payloadBps": 2418,
+     "deflatedBps": 1172,
+     "wsMsgsPerSec": 19.1,
+     "protoMsgsPerSec": 60.4,
+     "wireBps": 3679,
+     "wireDeflatedBps": 2433,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "detonation": 1595,
+      "snapshot": 792,
+      "contact": 1,
+      "damage": 2,
+      "shipSync": 1,
+      "shipHps": 1,
+      "toast": 6,
+      "playerState": 2
+     }
+    }
+   },
+   "after": {
+    "scenario": "debris",
+    "ship": "hammerhead",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 255,
+    "protocol": 35,
+    "fakeClients": true,
+    "cpu": {
+     "stepMs": 0.602,
+     "stepP50": 0.498,
+     "stepP95": 1.224
+    },
+    "A_shooter": {
+     "payloadBps": 1261,
+     "deflatedBps": 1202,
+     "wsMsgsPerSec": 9.95,
+     "protoMsgsPerSec": 80.2,
+     "wireBps": 1918,
+     "wireDeflatedBps": 1858,
+     "up": {
+      "msgsPerSec": 18.9,
+      "payloadBps": 244,
+      "baseLayoutBps": 244,
+      "wireBps": 1491,
+      "acksPerSec": 2.4,
+      "reportsPerSec": 3.9,
+      "checksPerSec": 5
+     },
+     "debrisDerived": 52,
+     "baseBytesByType": {}
+    },
+    "B_observer": {
+     "payloadBps": 1317,
+     "deflatedBps": 1249,
+     "wsMsgsPerSec": 9.95,
+     "protoMsgsPerSec": 80.3,
+     "wireBps": 1974,
+     "wireDeflatedBps": 1906,
+     "up": {
+      "msgsPerSec": 23.35,
+      "payloadBps": 292,
+      "baseLayoutBps": 292,
+      "wireBps": 1834,
+      "acksPerSec": 2.4,
+      "reportsPerSec": 3.9,
+      "checksPerSec": 4.9
+     },
+     "debrisDerived": 52,
+     "baseBytesByType": {}
+    },
+    "C_far": {
+     "payloadBps": 258,
+     "deflatedBps": 258,
+     "wsMsgsPerSec": 7,
+     "protoMsgsPerSec": 11.9,
+     "wireBps": 720,
+     "wireDeflatedBps": 720,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {}
+    }
+   },
+   "headCaps0": {
+    "scenario": "debris",
+    "ship": "hammerhead",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 0,
+    "protocol": 35,
+    "fakeClients": true,
+    "cpu": {
+     "stepMs": 0.579,
+     "stepP50": 0.456,
+     "stepP95": 1.314
+    },
+    "A_shooter": {
+     "payloadBps": 3776,
+     "deflatedBps": 2426,
+     "wsMsgsPerSec": 19.95,
+     "protoMsgsPerSec": 131.7,
+     "wireBps": 5093,
+     "wireDeflatedBps": 3742,
+     "up": {
+      "msgsPerSec": 13.8,
+      "payloadBps": 162,
+      "baseLayoutBps": 162,
+      "wireBps": 1072,
+      "acksPerSec": 2.55,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 52,
+     "baseBytesByType": {
+      "projectileHit": 532,
+      "damage": 364,
+      "shipHps": 281,
+      "snapshot": 1897,
+      "partDestroyed": 212,
+      "shipSync": 414,
+      "contact": 4,
+      "debrisSplit": 44,
+      "toast": 6,
+      "playerState": 2
+     }
+    },
+    "B_observer": {
+     "payloadBps": 3359,
+     "deflatedBps": 2006,
+     "wsMsgsPerSec": 19.95,
+     "protoMsgsPerSec": 131.7,
+     "wireBps": 4676,
+     "wireDeflatedBps": 3323,
+     "up": {
+      "msgsPerSec": 19.8,
+      "payloadBps": 228,
+      "baseLayoutBps": 228,
+      "wireBps": 1534,
+      "acksPerSec": 2.55,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 52,
+     "baseBytesByType": {
+      "projectileHit": 532,
+      "damage": 364,
+      "shipHps": 281,
+      "snapshot": 1479,
+      "partDestroyed": 212,
+      "shipSync": 414,
+      "contact": 4,
+      "debrisSplit": 44,
+      "toast": 6,
+      "playerState": 2
+     }
+    },
+    "C_far": {
+     "payloadBps": 619,
+     "deflatedBps": 610,
+     "wsMsgsPerSec": 11.55,
+     "protoMsgsPerSec": 11.9,
+     "wireBps": 1381,
+     "wireDeflatedBps": 1373,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 596,
+      "contact": 1,
+      "damage": 1,
+      "shipSync": 1,
+      "shipHps": 1,
+      "toast": 6,
+      "playerState": 2
+     }
+    }
+   }
+  },
+  "beam": {
+   "before": {
+    "scenario": "beam",
+    "ship": "ports-heron",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 0,
+    "protocol": 24,
+    "fakeClients": false,
+    "cpu": {
+     "stepMs": 0.337,
+     "stepP50": 0.265,
+     "stepP95": 0.709
+    },
+    "A_shooter": {
+     "payloadBps": 1317,
+     "deflatedBps": 967,
+     "wsMsgsPerSec": 17.85,
+     "protoMsgsPerSec": 29.6,
+     "wireBps": 2495,
+     "wireDeflatedBps": 2145,
+     "up": {
+      "msgsPerSec": 2.1,
+      "payloadBps": 23,
+      "baseLayoutBps": 23,
+      "wireBps": 162,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 977,
+      "playerState": 16,
+      "shipHps": 85,
+      "damage": 38,
+      "shipSync": 159,
+      "contact": 3,
+      "partDestroyed": 14,
+      "toast": 6
+     }
+    },
+    "B_observer": {
+     "payloadBps": 1227,
+     "deflatedBps": 965,
+     "wsMsgsPerSec": 17.4,
+     "protoMsgsPerSec": 28.4,
+     "wireBps": 2375,
+     "wireDeflatedBps": 2114,
+     "up": {
+      "msgsPerSec": 6.45,
+      "payloadBps": 71,
+      "baseLayoutBps": 71,
+      "wireBps": 497,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 900,
+      "shipHps": 85,
+      "damage": 40,
+      "shipSync": 159,
+      "contact": 4,
+      "partDestroyed": 14,
+      "toast": 6,
+      "playerState": 2
+     }
+    },
+    "C_far": {
+     "payloadBps": 765,
+     "deflatedBps": 764,
+     "wsMsgsPerSec": 12.5,
+     "protoMsgsPerSec": 12.8,
+     "wireBps": 1590,
+     "wireDeflatedBps": 1589,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 742,
+      "contact": 3,
+      "toast": 6,
+      "playerState": 2
+     }
+    }
+   },
+   "after": {
+    "scenario": "beam",
+    "ship": "ports-heron",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 255,
+    "protocol": 35,
+    "fakeClients": true,
+    "cpu": {
+     "stepMs": 0.342,
+     "stepP50": 0.279,
+     "stepP95": 0.713
+    },
+    "A_shooter": {
+     "payloadBps": 307,
+     "deflatedBps": 280,
+     "wsMsgsPerSec": 9,
+     "protoMsgsPerSec": 26,
+     "wireBps": 901,
+     "wireDeflatedBps": 874,
+     "up": {
+      "msgsPerSec": 5.35,
+      "payloadBps": 69,
+      "baseLayoutBps": 69,
+      "wireBps": 422,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 3.4
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {}
+    },
+    "B_observer": {
+     "payloadBps": 244,
+     "deflatedBps": 245,
+     "wsMsgsPerSec": 8.75,
+     "protoMsgsPerSec": 24.3,
+     "wireBps": 822,
+     "wireDeflatedBps": 822,
+     "up": {
+      "msgsPerSec": 8.75,
+      "payloadBps": 105,
+      "baseLayoutBps": 105,
+      "wireBps": 682,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 2.85
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {}
+    },
+    "C_far": {
+     "payloadBps": 234,
+     "deflatedBps": 234,
+     "wsMsgsPerSec": 6.6,
+     "protoMsgsPerSec": 11.5,
+     "wireBps": 669,
+     "wireDeflatedBps": 669,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {}
+    }
+   },
+   "headCaps0": {
+    "scenario": "beam",
+    "ship": "ports-heron",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 0,
+    "protocol": 35,
+    "fakeClients": true,
+    "cpu": {
+     "stepMs": 0.354,
+     "stepP50": 0.266,
+     "stepP95": 0.751
+    },
+    "A_shooter": {
+     "payloadBps": 598,
+     "deflatedBps": 521,
+     "wsMsgsPerSec": 16.65,
+     "protoMsgsPerSec": 26,
+     "wireBps": 1696,
+     "wireDeflatedBps": 1619,
+     "up": {
+      "msgsPerSec": 2.05,
+      "payloadBps": 23,
+      "baseLayoutBps": 23,
+      "wireBps": 158,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 416,
+      "shipHps": 84,
+      "damage": 23,
+      "playerState": 18,
+      "shipSync": 23,
+      "contact": 4,
+      "toast": 6,
+      "partDestroyed": 6
+     }
+    },
+    "B_observer": {
+     "payloadBps": 524,
+     "deflatedBps": 503,
+     "wsMsgsPerSec": 15.85,
+     "protoMsgsPerSec": 24.4,
+     "wireBps": 1571,
+     "wireDeflatedBps": 1550,
+     "up": {
+      "msgsPerSec": 6.75,
+      "payloadBps": 74,
+      "baseLayoutBps": 74,
+      "wireBps": 520,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 360,
+      "shipHps": 84,
+      "damage": 23,
+      "shipSync": 23,
+      "contact": 4,
+      "toast": 6,
+      "playerState": 2,
+      "partDestroyed": 6
+     }
+    },
+    "C_far": {
+     "payloadBps": 589,
+     "deflatedBps": 586,
+     "wsMsgsPerSec": 11.15,
+     "protoMsgsPerSec": 11.4,
+     "wireBps": 1325,
+     "wireDeflatedBps": 1322,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 567,
+      "contact": 3,
+      "toast": 6,
+      "playerState": 2
+     }
+    }
+   }
+  },
+  "mining": {
+   "before": {
+    "scenario": "mining",
+    "ship": "prospector",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 0,
+    "protocol": 24,
+    "fakeClients": false,
+    "aliveA": true,
+    "cpu": {
+     "stepMs": 0.22,
+     "stepP50": 0.164,
+     "stepP95": 0.387
+    },
+    "A_shooter": {
+     "payloadBps": 276,
+     "deflatedBps": 275,
+     "wsMsgsPerSec": 10.85,
+     "protoMsgsPerSec": 11.2,
+     "wireBps": 992,
+     "wireDeflatedBps": 991,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 253,
+      "toast": 6,
+      "playerState": 2,
+      "contact": 1,
+      "damage": 2,
+      "shipSync": 2
+     }
+    },
+    "B_observer": {
+     "payloadBps": 268,
+     "deflatedBps": 267,
+     "wsMsgsPerSec": 10.75,
+     "protoMsgsPerSec": 11.1,
+     "wireBps": 978,
+     "wireDeflatedBps": 977,
+     "up": {
+      "msgsPerSec": 6.15,
+      "payloadBps": 68,
+      "baseLayoutBps": 68,
+      "wireBps": 474,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 245,
+      "toast": 6,
+      "playerState": 2,
+      "contact": 1,
+      "damage": 2,
+      "shipSync": 2
+     }
+    },
+    "C_far": {
+     "payloadBps": 39,
+     "deflatedBps": 38,
+     "wsMsgsPerSec": 0.65,
+     "protoMsgsPerSec": 0.7,
+     "wireBps": 82,
+     "wireDeflatedBps": 81,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 30,
+      "toast": 6,
+      "playerState": 2
+     }
+    }
+   },
+   "after": {
+    "scenario": "mining",
+    "ship": "prospector",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 255,
+    "protocol": 35,
+    "fakeClients": true,
+    "aliveA": true,
+    "cpu": {
+     "stepMs": 0.201,
+     "stepP50": 0.176,
+     "stepP95": 0.431
+    },
+    "A_shooter": {
+     "payloadBps": 129,
+     "deflatedBps": 129,
+     "wsMsgsPerSec": 7.05,
+     "protoMsgsPerSec": 11.1,
+     "wireBps": 594,
+     "wireDeflatedBps": 594,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {}
+    },
+    "B_observer": {
+     "payloadBps": 125,
+     "deflatedBps": 125,
+     "wsMsgsPerSec": 6.95,
+     "protoMsgsPerSec": 11,
+     "wireBps": 584,
+     "wireDeflatedBps": 584,
+     "up": {
+      "msgsPerSec": 8.8,
+      "payloadBps": 107,
+      "baseLayoutBps": 107,
+      "wireBps": 688,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 3.3
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {}
+    },
+    "C_far": {
+     "payloadBps": 26,
+     "deflatedBps": 26,
+     "wsMsgsPerSec": 0.65,
+     "protoMsgsPerSec": 0.7,
+     "wireBps": 69,
+     "wireDeflatedBps": 69,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {}
+    }
+   },
+   "headCaps0": {
+    "scenario": "mining",
+    "ship": "prospector",
+    "secs": 20,
+    "latencyTicks": 3,
+    "caps": 0,
+    "protocol": 35,
+    "fakeClients": true,
+    "cpu": {
+     "stepMs": 0.221,
+     "stepP50": 0.176,
+     "stepP95": 0.469
+    },
+    "A_shooter": {
+     "payloadBps": 275,
+     "deflatedBps": 274,
+     "wsMsgsPerSec": 10.8,
+     "protoMsgsPerSec": 11.1,
+     "wireBps": 988,
+     "wireDeflatedBps": 987,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 252,
+      "toast": 6,
+      "playerState": 2,
+      "contact": 1,
+      "damage": 1,
+      "shipSync": 2
+     }
+    },
+    "B_observer": {
+     "payloadBps": 267,
+     "deflatedBps": 266,
+     "wsMsgsPerSec": 10.7,
+     "protoMsgsPerSec": 11,
+     "wireBps": 973,
+     "wireDeflatedBps": 972,
+     "up": {
+      "msgsPerSec": 6.15,
+      "payloadBps": 68,
+      "baseLayoutBps": 68,
+      "wireBps": 474,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 244,
+      "toast": 6,
+      "playerState": 2,
+      "contact": 1,
+      "damage": 1,
+      "shipSync": 2
+     }
+    },
+    "C_far": {
+     "payloadBps": 38,
+     "deflatedBps": 37,
+     "wsMsgsPerSec": 0.6,
+     "protoMsgsPerSec": 0.7,
+     "wireBps": 78,
+     "wireDeflatedBps": 77,
+     "up": {
+      "msgsPerSec": 0,
+      "payloadBps": 0,
+      "baseLayoutBps": 0,
+      "wireBps": 0,
+      "acksPerSec": 0,
+      "reportsPerSec": 0,
+      "checksPerSec": 0
+     },
+     "debrisDerived": 0,
+     "baseBytesByType": {
+      "snapshot": 30,
+      "toast": 6,
+      "playerState": 2
+     }
+    }
+   }
+  }
+ },
+ "upload": {
+  "idle": {
+   "before": {
+    "scenario": "idle",
+    "secs": 20,
+    "compact": false,
+    "pilotCaps": 0,
+    "docked": false,
+    "up": {
+     "msgsPerSec": 0,
+     "payloadBps": 0,
+     "wireBps": 0,
+     "meanBytes": 0,
+     "sizes": {},
+     "why": {}
+    },
+    "down": {
+     "B_legacy": {
+      "ctlBps": 0,
+      "ctlBpsIfAimFree": 0,
+      "ctlRowsPerSec": 0,
+      "ctlEventsPerSec": 0,
+      "statusRowBps": 0,
+      "allFramesBps": 621.9
+     },
+     "P_packed": {
+      "ctlBps": 0,
+      "ctlBpsIfAimFree": 0,
+      "ctlRowsPerSec": 0,
+      "ctlEventsPerSec": 0,
+      "statusRowBps": 0,
+      "allFramesBps": 668
+     }
+    },
+    "parity": {
+     "ticks": 1200,
+     "same": 1200,
+     "angleOff": 0,
+     "keysOff": 0,
+     "firstOff": []
+    }
+   },
+   "after": {
+    "scenario": "idle",
+    "secs": 20,
+    "compact": true,
+    "pilotCaps": 128,
+    "docked": false,
+    "up": {
+     "msgsPerSec": 0,
+     "payloadBps": 0,
+     "wireBps": 0,
+     "meanBytes": 0,
+     "sizes": {},
+     "why": {}
+    },
+    "down": {
+     "B_legacy": {
+      "ctlBps": 0,
+      "ctlBpsIfAimFree": 0,
+      "ctlRowsPerSec": 0,
+      "ctlEventsPerSec": 0,
+      "statusRowBps": 0,
+      "allFramesBps": 694.2
+     },
+     "P_packed": {
+      "ctlBps": 0,
+      "ctlBpsIfAimFree": 0,
+      "ctlRowsPerSec": 0,
+      "ctlEventsPerSec": 0,
+      "statusRowBps": null,
+      "allFramesBps": 311.2
+     }
+    },
+    "parity": {
+     "ticks": 1200,
+     "same": 1200,
+     "angleOff": 0,
+     "keysOff": 0,
+     "firstOff": []
+    }
+   }
+  },
+  "keys": {
+   "before": {
+    "scenario": "keys",
+    "secs": 20,
+    "compact": false,
+    "pilotCaps": 0,
+    "docked": false,
+    "up": {
+     "msgsPerSec": 56.9,
+     "payloadBps": 625.4,
+     "wireBps": 4377.5,
+     "meanBytes": 11,
+     "sizes": {
+      "11B": 1137
+     },
+     "why": {
+      "aim": 1106,
+      "keys": 19,
+      "dist": 12
+     }
+    },
+    "down": {
+     "B_legacy": {
+      "ctlBps": 177.3,
+      "ctlBpsIfAimFree": 177.3,
+      "ctlRowsPerSec": 20,
+      "ctlEventsPerSec": 56.4,
+      "statusRowBps": 16.3,
+      "allFramesBps": 1125.8
+     },
+     "P_packed": {
+      "ctlBps": 177.3,
+      "ctlBpsIfAimFree": 177.3,
+      "ctlRowsPerSec": 20,
+      "ctlEventsPerSec": 56.4,
+      "statusRowBps": 16.3,
+      "allFramesBps": 1142.8
+     }
+    },
+    "parity": {
+     "ticks": 1200,
+     "same": 1200,
+     "angleOff": 0,
+     "keysOff": 0,
+     "firstOff": []
+    }
+   },
+   "after": {
+    "scenario": "keys",
+    "secs": 20,
+    "compact": true,
+    "pilotCaps": 128,
+    "docked": false,
+    "up": {
+     "msgsPerSec": 15.3,
+     "payloadBps": 56.3,
+     "wireBps": 1062.8,
+     "meanBytes": 3.7,
+     "sizes": {
+      "3B": 108,
+      "4B": 183,
+      "5B": 14
+     },
+     "why": {
+      "aim": 286,
+      "keys": 19
+     }
+    },
+    "down": {
+     "B_legacy": {
+      "ctlBps": 99,
+      "ctlBpsIfAimFree": 99,
+      "ctlRowsPerSec": 13.2,
+      "ctlEventsPerSec": 15.3,
+      "statusRowBps": 16.3,
+      "allFramesBps": 842.4
+     },
+     "P_packed": {
+      "ctlBps": 59,
+      "ctlBpsIfAimFree": 48.5,
+      "ctlRowsPerSec": 13.2,
+      "ctlEventsPerSec": 15.3,
+      "statusRowBps": null,
+      "allFramesBps": 394.9
+     }
+    },
+    "parity": {
+     "ticks": 1200,
+     "same": 1200,
+     "angleOff": 0,
+     "keysOff": 0,
+     "firstOff": []
+    }
+   }
+  },
+  "steer": {
+   "before": {
+    "scenario": "steer",
+    "secs": 20,
+    "compact": false,
+    "pilotCaps": 0,
+    "docked": false,
+    "up": {
+     "msgsPerSec": 54.9,
+     "payloadBps": 603.9,
+     "wireBps": 4227.3,
+     "meanBytes": 11,
+     "sizes": {
+      "11B": 1098
+     },
+     "why": {
+      "aim": 1068,
+      "dist": 16,
+      "keys": 14
+     }
+    },
+    "down": {
+     "B_legacy": {
+      "ctlBps": 160.9,
+      "ctlBpsIfAimFree": 152.3,
+      "ctlRowsPerSec": 19.3,
+      "ctlEventsPerSec": 54.1,
+      "statusRowBps": 55,
+      "allFramesBps": 1050.8
+     },
+     "P_packed": {
+      "ctlBps": 160.9,
+      "ctlBpsIfAimFree": 152.3,
+      "ctlRowsPerSec": 19.3,
+      "ctlEventsPerSec": 54.1,
+      "statusRowBps": 55,
+      "allFramesBps": 1068.6
+     }
+    },
+    "parity": {
+     "ticks": 1200,
+     "same": 1200,
+     "angleOff": 0,
+     "keysOff": 0,
+     "firstOff": []
+    }
+   },
+   "after": {
+    "scenario": "steer",
+    "secs": 20,
+    "compact": true,
+    "pilotCaps": 128,
+    "docked": false,
+    "up": {
+     "msgsPerSec": 29.6,
+     "payloadBps": 91.5,
+     "wireBps": 2045.1,
+     "meanBytes": 3.1,
+     "sizes": {
+      "4B": 108,
+      "3B": 396,
+      "2B": 77,
+      "5B": 11
+     },
+     "why": {
+      "aim": 578,
+      "keys": 14
+     }
+    },
+    "down": {
+     "B_legacy": {
+      "ctlBps": 109.5,
+      "ctlBpsIfAimFree": 100.9,
+      "ctlRowsPerSec": 14,
+      "ctlEventsPerSec": 29.5,
+      "statusRowBps": 55,
+      "allFramesBps": 886.3
+     },
+     "P_packed": {
+      "ctlBps": 82.5,
+      "ctlBpsIfAimFree": 56.9,
+      "ctlRowsPerSec": 14,
+      "ctlEventsPerSec": 29.5,
+      "statusRowBps": null,
+      "allFramesBps": 438.6
+     }
+    },
+    "parity": {
+     "ticks": 1200,
+     "same": 1200,
+     "angleOff": 0,
+     "keysOff": 0,
+     "firstOff": []
+    }
+   }
+  },
+  "fight": {
+   "before": {
+    "scenario": "fight",
+    "secs": 20,
+    "compact": false,
+    "pilotCaps": 0,
+    "docked": false,
+    "up": {
+     "msgsPerSec": 55.5,
+     "payloadBps": 610,
+     "wireBps": 4269.7,
+     "meanBytes": 11,
+     "sizes": {
+      "11B": 1109
+     },
+     "why": {
+      "aim(firing)": 663,
+      "keys": 36,
+      "aim": 389,
+      "dist": 21
+     }
+    },
+    "down": {
+     "B_legacy": {
+      "ctlBps": 159.8,
+      "ctlBpsIfAimFree": 151.8,
+      "ctlRowsPerSec": 19.2,
+      "ctlEventsPerSec": 54.2,
+      "statusRowBps": 68.8,
+      "allFramesBps": 899.8
+     },
+     "P_packed": {
+      "ctlBps": 159.8,
+      "ctlBpsIfAimFree": 151.8,
+      "ctlRowsPerSec": 19.2,
+      "ctlEventsPerSec": 54.2,
+      "statusRowBps": 68.8,
+      "allFramesBps": 914.8
+     }
+    },
+    "parity": {
+     "ticks": 1200,
+     "same": 1200,
+     "angleOff": 0,
+     "keysOff": 0,
+     "firstOff": []
+    }
+   },
+   "after": {
+    "scenario": "fight",
+    "secs": 20,
+    "compact": true,
+    "pilotCaps": 128,
+    "docked": false,
+    "up": {
+     "msgsPerSec": 42.4,
+     "payloadBps": 114.5,
+     "wireBps": 2912.9,
+     "meanBytes": 2.7,
+     "sizes": {
+      "2B": 328,
+      "3B": 455,
+      "4B": 56,
+      "5B": 9
+     },
+     "why": {
+      "aim(firing)": 632,
+      "dist": 30,
+      "keys": 36,
+      "aim": 150
+     }
+    },
+    "down": {
+     "B_legacy": {
+      "ctlBps": 131,
+      "ctlBpsIfAimFree": 123.1,
+      "ctlRowsPerSec": 16.2,
+      "ctlEventsPerSec": 40.6,
+      "statusRowBps": 68.8,
+      "allFramesBps": 806.7
+     },
+     "P_packed": {
+      "ctlBps": 93.2,
+      "ctlBpsIfAimFree": 69.8,
+      "ctlRowsPerSec": 16.2,
+      "ctlEventsPerSec": 40.6,
+      "statusRowBps": null,
+      "allFramesBps": 450.5
+     }
+    },
+    "parity": {
+     "ticks": 1200,
+     "same": 1200,
+     "angleOff": 0,
+     "keysOff": 0,
+     "firstOff": []
+    }
+   }
+  },
+  "docked": {
+   "before": {
+    "scenario": "docked",
+    "secs": 20,
+    "compact": false,
+    "pilotCaps": 0,
+    "docked": true,
+    "up": {
+     "msgsPerSec": 34,
+     "payloadBps": 373.5,
+     "wireBps": 2614.2,
+     "meanBytes": 11,
+     "sizes": {
+      "11B": 679
+     },
+     "why": {
+      "aim": 608,
+      "keys": 26,
+      "aim(firing)": 39,
+      "dist": 6
+     }
+    },
+    "down": {
+     "B_legacy": {
+      "ctlBps": 0,
+      "ctlBpsIfAimFree": 0,
+      "ctlRowsPerSec": 0,
+      "ctlEventsPerSec": 0,
+      "statusRowBps": 35,
+      "allFramesBps": 333.3
+     },
+     "P_packed": {
+      "ctlBps": 0,
+      "ctlBpsIfAimFree": 0,
+      "ctlRowsPerSec": 0,
+      "ctlEventsPerSec": 0,
+      "statusRowBps": 35,
+      "allFramesBps": 333.3
+     }
+    },
+    "parity": {
+     "ticks": 0,
+     "same": 0,
+     "angleOff": 0,
+     "keysOff": 0,
+     "firstOff": []
+    }
+   },
+   "after": {
+    "scenario": "docked",
+    "secs": 20,
+    "compact": true,
+    "pilotCaps": 128,
+    "docked": true,
+    "up": {
+     "msgsPerSec": 0,
+     "payloadBps": 0,
+     "wireBps": 0,
+     "meanBytes": 0,
+     "sizes": {},
+     "why": {}
+    },
+    "down": {
+     "B_legacy": {
+      "ctlBps": 0,
+      "ctlBpsIfAimFree": 0,
+      "ctlRowsPerSec": 0,
+      "ctlEventsPerSec": 0,
+      "statusRowBps": 0,
+      "allFramesBps": 291.7
+     },
+     "P_packed": {
+      "ctlBps": 0,
+      "ctlBpsIfAimFree": 0,
+      "ctlRowsPerSec": 0,
+      "ctlEventsPerSec": 0,
+      "statusRowBps": null,
+      "allFramesBps": 149.6
+     }
+    },
+    "parity": {
+     "ticks": 0,
+     "same": 0,
+     "angleOff": 0,
+     "keysOff": 0,
+     "firstOff": []
+    }
+   }
+  }
+ },
+ "busyModel": {
+  "pip": {
+   "before": {
+    "aloneDeflatedPayload": 184,
+    "ownFightExtraPayload": 321,
+    "perNeighbourPayload": 354,
+    "headersDown": 1112,
+    "upWire": 4269.7,
+    "downPerPlayer": {
+     "1": 1617,
+     "2": 1971,
+     "5": 3033,
+     "10": 4803,
+     "20": 8343
+    },
+    "totalPerPlayer": {
+     "1": 5887,
+     "2": 6241,
+     "5": 7303,
+     "10": 9073,
+     "20": 12613
+    },
+    "serverEgressAtN": {
+     "1": 1617,
+     "2": 3942,
+     "5": 15165,
+     "10": 48030,
+     "20": 166860
+    }
+   },
+   "after": {
+    "aloneDeflatedPayload": 92,
+    "ownFightExtraPayload": 89,
+    "perNeighbourPayload": 150,
+    "headersDown": 607,
+    "upWire": 2912.9,
+    "downPerPlayer": {
+     "1": 788,
+     "2": 938,
+     "5": 1388,
+     "10": 2138,
+     "20": 3638
+    },
+    "totalPerPlayer": {
+     "1": 3701,
+     "2": 3851,
+     "5": 4301,
+     "10": 5051,
+     "20": 6551
+    },
+    "serverEgressAtN": {
+     "1": 788,
+     "2": 1876,
+     "5": 6940,
+     "10": 21380,
+     "20": 72760
+    }
+   }
+  },
+  "hammerhead": {
+   "before": {
+    "aloneDeflatedPayload": 184,
+    "ownFightExtraPayload": 1745,
+    "perNeighbourPayload": 1408,
+    "headersDown": 1294,
+    "upWire": 4269.7,
+    "downPerPlayer": {
+     "1": 3223,
+     "2": 4631,
+     "5": 8855,
+     "10": 15895,
+     "20": 29975
+    },
+    "totalPerPlayer": {
+     "1": 7493,
+     "2": 8901,
+     "5": 13125,
+     "10": 20165,
+     "20": 34245
+    },
+    "serverEgressAtN": {
+     "1": 3223,
+     "2": 9262,
+     "5": 44275,
+     "10": 158950,
+     "20": 599500
+    }
+   },
+   "after": {
+    "aloneDeflatedPayload": 92,
+    "ownFightExtraPayload": 445,
+    "perNeighbourPayload": 520,
+    "headersDown": 657,
+    "upWire": 2912.9,
+    "downPerPlayer": {
+     "1": 1194,
+     "2": 1714,
+     "5": 3274,
+     "10": 5874,
+     "20": 11074
+    },
+    "totalPerPlayer": {
+     "1": 4107,
+     "2": 4627,
+     "5": 6187,
+     "10": 8787,
+     "20": 13987
+    },
+    "serverEgressAtN": {
+     "1": 1194,
+     "2": 3428,
+     "5": 16370,
+     "10": 58740,
+     "20": 221480
+    }
+   }
+  },
+  "npcfight": {
+   "before": {
+    "aloneDeflatedPayload": 184,
+    "ownFightExtraPayload": 791,
+    "perNeighbourPayload": 929,
+    "headersDown": 1320,
+    "upWire": 4269.7,
+    "downPerPlayer": {
+     "1": 2295,
+     "2": 3224,
+     "5": 6011,
+     "10": 10656,
+     "20": 19946
+    },
+    "totalPerPlayer": {
+     "1": 6565,
+     "2": 7494,
+     "5": 10281,
+     "10": 14926,
+     "20": 24216
+    },
+    "serverEgressAtN": {
+     "1": 2295,
+     "2": 6448,
+     "5": 30055,
+     "10": 106560,
+     "20": 398920
+    }
+   },
+   "after": {
+    "aloneDeflatedPayload": 92,
+    "ownFightExtraPayload": 558,
+    "perNeighbourPayload": 657,
+    "headersDown": 660,
+    "upWire": 2912.9,
+    "downPerPlayer": {
+     "1": 1310,
+     "2": 1967,
+     "5": 3938,
+     "10": 7223,
+     "20": 13793
+    },
+    "totalPerPlayer": {
+     "1": 4223,
+     "2": 4880,
+     "5": 6851,
+     "10": 10136,
+     "20": 16706
+    },
+    "serverEgressAtN": {
+     "1": 1310,
+     "2": 3934,
+     "5": 19690,
+     "10": 72230,
+     "20": 275860
+    }
+   }
+  }
+ },
+ "date": "2026-11-04",
+ "definitions": {
+  "payloadBps": "decoded bytes of every WebSocket message the client received, per second",
+  "deflatedBps": "the same through permessage-deflate (level 4, 8 KB window, frames under 96 B left alone), as SocketTransport",
+  "wsMsgsPerSec": "WebSocket messages per second (what pays headers)",
+  "protoMsgsPerSec": "protocol messages inside them",
+  "wireBps": "payload + 66 x WS messages/s",
+  "wireDeflatedBps": "deflated + 66 x WS messages/s (closest to what a player pays)",
+  "busyModel": "per player(N) = alone floor + own fight extra + (N-1) x per-neighbour + headers at the fighting shooter's message rate; per neighbour = (A_idle - C_idle) + (B_fight - B_idle), deflated payloads"
+ },
+ "clientFrame": {
+  "source": [
+   "docs/audits/weapon-fx-audit-2026-11-04.md",
+   "docs/audits/client-perf-2026-11-04.md"
+  ],
+  "heavyFightRenderGpuMedianMs": {
+   "before": [
+    3.6,
+    4.2,
+    3.6
+   ],
+   "after": [
+    2.5,
+    2.5,
+    2.5
+   ]
+  },
+  "heavyFightRenderGpuMeanMs": {
+   "before": [
+    4.2,
+    6.3,
+    3.9
+   ],
+   "after": [
+    3,
+    3.1,
+    2.8
+   ]
+  },
+  "heavyFightRenderGpuP95Ms": {
+   "before": [
+    7.1,
+    12.7,
+    5.8
+   ],
+   "after": [
+    5.3,
+    5,
+    4.7
+   ]
+  },
+  "idleRenderMs": {
+   "before": 1.85,
+   "after": [
+    1.85,
+    1.92
+   ]
+  },
+  "fightOverIdleMs": {
+   "before": 2,
+   "after": 0.6
+  },
+  "siegeMarksUpdateMs": {
+   "before": [
+    0.064,
+    0.048,
+    0.037
+   ],
+   "after": [
+    0.013,
+    0.006,
+    0.009
+   ],
+   "note": "db74ff9 then 56e4351, A/B pairs"
+  },
+  "bastionViewUpdateMs": {
+   "before": [
+    0.088,
+    0.076,
+    0.064
+   ],
+   "after": [
+    0.055,
+    0.044,
+    0.039
+   ]
+  },
+  "siegePixiRenderMs": {
+   "before": [
+    0.5,
+    0.44,
+    0.4
+   ],
+   "after": [
+    0.46,
+    0.34,
+    0.32
+   ]
+  },
+  "weaponRingUpdateMs": {
+   "before": [
+    0.013,
+    0.016,
+    0.01
+   ],
+   "after": [
+    0.002,
+    0.003,
+    0.001
+   ]
+  },
+  "navMarkersUpdateMs": {
+   "before": [
+    0.075,
+    0.071,
+    0.068
+   ],
+   "after": [
+    0.065,
+    0.065,
+    0.06
+   ]
+  },
+  "floatingRewardsDrawMs": {
+   "before": [
+    0.213,
+    0.214,
+    0.186
+   ],
+   "after": [
+    0.193,
+    0.184,
+    0.19
+   ]
+  }
+ }
+}
