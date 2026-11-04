@@ -24,7 +24,8 @@ const RUNS = STRUCTS | CAPS.DEBRIS;
 
 interface Seen { kfRun: number; syncRun: number; crumbleRun: number; checked: number; off: string[]; keyframes: number }
 
-function fight(ticks: number) {
+/** A server, three clients (runs its debris, keeps structures, legacy) and what each was sent and holds, checked */
+function world() {
   resetGlobals();
   const clock = { t: 1_000_000 };
   const server = new GameServer({
@@ -64,14 +65,13 @@ function fight(ticks: number) {
   const sys = InSystem.systemId[A.pid];
   const x0 = Position.x[A.pid] + 30000, y0 = Position.y[A.pid] + 30000;
   for (const [k, f] of fakes.entries()) { Position.x[f.pid] = x0 - 200 * k; Position.y[f.pid] = y0 + 300 * k; Velocity.x[f.pid] = 0; Velocity.y[f.pid] = 0; }
-  const bp = ships.library.get('hauler')!;
-  const haulers = [0, 1, 2].map((i) => ships.spawnDummy(bp, x0 + 700 + 260 * i, y0 - 150 + 170 * i, 0.4 * i, sys));
   // What each client is sent of the pieces it runs, and its state of every piece it holds against the server's
   for (const f of fakes) {
     const s = seen.get(f)!, fa = f as unknown as { handle(m: ServerMessage): void; snapshot(m: ServerSnapshotMessage): void };
     const oh = fa.handle.bind(f), os = fa.snapshot.bind(f);
     fa.handle = (m) => {
-      if (m.type === 'shipSync' && f.debris.lives.has(m.id)) s.syncRun++;
+      // (A sync of one it runs is only for one something else touched: told from then on)
+      if (m.type === 'shipSync' && f.debris.lives.has(m.id) && !ships.debrisNet.told.has(m.id)) s.syncRun++;
       if (m.type === 'partDestroyed' && m.how === 'crumble' && f.debris.lives.has(m.bodyId)) s.crumbleRun++;
       oh(m);
     };
@@ -89,11 +89,26 @@ function fight(ticks: number) {
       }
     };
   }
+  // (Knocks between pieces just past their grace: the grace ends with them where it found them, overlapping or not)
+  const pairsYoung = { justPast: 0 };
+  const run = (ticks: number, each: (t: number) => void) => {
+    for (let t = 0; t < ticks; t++) {
+      each(t);
+      step();
+      for (const [a, c] of ships.debrisNet.pairs) for (const id of [a, c]) { const age = server.getTick() - (ships.get(id)?.spawnTick ?? -1e9); if (age > DEBRIS_GRACE_TICKS && age <= DEBRIS_GRACE_TICKS + 60) pairsYoung.justPast++; }
+    }
+  };
+  return { server, ships, A, B, C, sys, x0, y0, run, seen: (f: FakeHitsClient) => seen.get(f)!, pairsYoung };
+}
+
+function fight(ticks: number) {
+  const w = world(), { ships, sys, x0, y0, server } = w;
+  const bp = ships.library.get('hauler')!;
+  const haulers = [0, 1, 2].map((i) => ships.spawnDummy(bp, x0 + 700 + 260 * i, y0 - 150 + 170 * i, 0.4 * i, sys));
   // Parts shot away, a few at a time, seeded
   let r = 7;
   const rnd = () => { r = (Math.imul(r, 1664525) + 1013904223) >>> 0; return r / 4294967296; };
-  const pairsYoung = { justPast: 0 };
-  for (let t = 0; t < ticks; t++) {
+  w.run(ticks, (t) => {
     if (t < 420 && t % 10 === 0) {
       const live = haulers.filter((h) => ships.has(h));
       const h = live[Math.floor(rnd() * live.length)], sp = h !== undefined ? ships.get(h) : undefined;
@@ -102,11 +117,22 @@ function fight(ticks: number) {
     }
     // One blown up whole: its core gone, every part breaks away
     if (t === 300 && ships.has(haulers[2])) { const sp = ships.get(haulers[2])!; ships.damagePartFraction(haulers[2], sp.blueprint.parts.findIndex((p) => p.fn === 'core'), 1); }
-    step();
-    // (Knocks between pieces just past their grace: the grace ends with them where it found them, overlapping or not)
-    for (const [a, c] of ships.debrisNet.pairs) for (const id of [a, c]) { const age = server.getTick() - (ships.get(id)?.spawnTick ?? -1e9); if (age > DEBRIS_GRACE_TICKS && age <= DEBRIS_GRACE_TICKS + 60) pairsYoung.justPast++; }
-  }
-  return { server, A, B, C, seen: (f: FakeHitsClient) => seen.get(f)!, pairsYoung };
+  });
+  void server;
+  return w;
+}
+
+/** The Scrap Mother made to shed through her stages (dev forceShed: a step every so often), then blowing apart */
+function shedding(ticks: number) {
+  const w = world(), { server, ships, sys, x0, y0 } = w;
+  const eid = server.bosses.spawnAt('boss_scrap_mother', sys, x0 + 1500, y0);
+  const brain = server.bosses.brainOf(eid)!;
+  let n = 0;
+  const shed = { pieces: 0, aloof: 0 };
+  const before = new Set(ships.bodies.keys());
+  w.run(ticks, (t) => { if (t > 30 && t % 24 === 0 && ships.has(eid)) brain.forceShed!(++n); });
+  for (const id of w.A.debris.lives.ids()) if (!before.has(id)) shed.pieces++;
+  return { ...w, eid, shed };
 }
 
 describe('debris a client runs itself (CAPS.DEBRIS)', () => {
@@ -128,5 +154,19 @@ describe('debris a client runs itself (CAPS.DEBRIS)', () => {
     // snapshot that recentred it, so a piece or two it gets wrong; its check says so and that one is sent to it)
     expect(b.keyframes).toBeGreaterThan(a.keyframes + 50);
     expect(b.off.length).toBeLessThanOrEqual(3);
+  }, 240_000);
+
+  it('a boss shedding its plates and stages, then blowing apart: its flung pieces worked out and run too', () => {
+    const r = shedding(1800);
+    const a = r.seen(r.A), c = r.seen(r.C), b = r.seen(r.B);
+    const acks = (r.server as unknown as { snapshots: { debrisAcks: { ok: number; wrong: number } } }).snapshots.debrisAcks;
+    if (process.env.DEBRIS_DEBUG) console.log(JSON.stringify({ a, c, b, lives: r.A.debris.lives.stats, splits: r.A.debris.stats, acks, gone: !r.ships.has(r.eid), aloof: r.A.store.aloof.size }));
+    // Its sheds came as splits the clients worked out, the pieces only to be seen, and every one exact
+    expect(r.A.debris.stats.pieces).toBeGreaterThan(20);
+    expect(r.ships.has(r.eid)).toBe(false);
+    expect(a.off).toEqual([]);
+    expect(c.off).toEqual([]);
+    expect(a.kfRun + a.syncRun + a.crumbleRun).toBe(0);
+    expect(b.keyframes).toBeGreaterThan(a.keyframes);
   }, 240_000);
 });

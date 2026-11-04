@@ -4,11 +4,14 @@
  * piece was spawned as (its check), and which pieces something other than the shared drift-and-knock step moved this
  * tick (they need a keyframe). The step itself is flight.ts stepDebrisWorld.
  */
-import { InSystem, Position, stepDebrisWorld as stepWorld, debrisYoung, quantizeShipBody, type DebrisBody, type FlightBody, type ShipState, type Vec2 } from '@space-game/common';
+import { InSystem, Position, stepDebrisWorld as stepWorld, debrisYoung, quantizeShipBody, type ShedSpec, type DebrisBody, type FlightBody, type ShipState, type Vec2 } from '@space-game/common';
 import { K, type BridgeCtx } from './core.js';
 
-/** A split a client may work out itself: the ship, the tick, its centre of mass then (grid), the pieces and their parts */
-export interface DebrisSplit { ship: ShipState; tick: number; com: Vec2; ids: number[]; groups: number[][]; parts: number[] }
+/**
+ * A split a client may work out itself: the ship, the tick, its centre of mass then (grid), the pieces and their parts
+ * (what it shed whole first, `sheds`, then the orphaned groups, whose parts are `parts`)
+ */
+export interface DebrisSplit { ship: ShipState; tick: number; com: Vec2; ids: number[]; groups: number[][]; parts: number[]; sheds?: ShedSpec[] }
 
 /** How far past touching a piece near an off one counts as within its reach (touchNear): more than an off piece strays before its keyframe */
 const NEAR_SLACK = 8;
@@ -34,6 +37,8 @@ export class DebrisNet {
    * one (CAPS.DEBRIS) is told it from then on (a shipSync), and its rebuilds go as any ship's
    */
   readonly told = new Set<number>();
+  /** What ships shed this tick, to leave at the rebuild point (bridge/rebuild.ts shed, rebuildNow) */
+  readonly sheds = new Map<number, ShedSpec[]>();
   /** Pieces recentred by a rebuild since the last snapshot (a client that can't work that out knocks them wrong meanwhile) */
   readonly recentred = new Set<number>();
   /** ...and those, with what's near them and what they knocked into: off for such a client till their keyframes (Replication) */
@@ -71,6 +76,7 @@ export class DebrisNet {
   forget(eid: number): void {
     this.spawns.delete(eid);
     this.told.delete(eid);
+    this.sheds.delete(eid);
     this.expect.delete(eid);
     this.last.delete(eid);
     // (Not its splits nor its centre of mass yet: a ship blown apart is gone before the snapshot tells its pieces: afterSnapshot)

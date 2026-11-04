@@ -19,7 +19,7 @@ import {
   Position, Velocity, Rotation, Radius, InSystem, Player, Dead, Health, Boost, Input, Projectile, Lifetime, DroppedItem, Station, Portal,
   ASTEROID_SEED, MAP_DOT_SLACK, STATION_DESIGNS, STATION_WEAPONS, EntityType, packCursorWeaponState, quantizeShipValue, packCharge, gunStateAt, packGunState, PILOT_ROW,
   warmthPercent, fartherThan, hpWire, derivedRow, type BlockStore,
-  mapDotFlags, legAt, packMapLeg, packMapRoute, unpackMapLegs, nearerThan, packIds, packRuns, packRanges, DEBRIS_STATUS, TICK_RATE,
+  mapDotFlags, legAt, packMapLeg, packMapRoute, unpackMapLegs, nearerThan, packIds, packRuns, packSheds, packRanges, DEBRIS_STATUS, TICK_RATE,
   FOCUS_RANGE, CROWD_BASE_WINDOW, structsFor, cargoFor, debrisFor,
   type Leg, type EntityState, type ShipState, type ClientSocket, type ServerMessage, type ServerAsteroidSeedMessage, type StarSystemData, type AsteroidSpawnData, dhypot,
 } from '@space-game/common';
@@ -980,7 +980,7 @@ export class SnapshotBuilder {
         // (Its to run from their spawn, CAPS.DEBRIS: pieces of a ship, or of a piece it runs: it knows when each part crumbles)
         const l = debrisFor(conn.caps) && (sp.ship.kind !== 'debris' || runs);
         sp.ids.forEach((id, k) => conn.debrisHeld.set(id, { until, hp: sp.groups[k].map((i) => had[i] ?? 0), live: l }));
-        this.send(conn.ws, { type: 'debrisSplit', id: parent, tick: sp.tick, e: packIds(sp.ids), p: packRuns(sp.parts), l: l ? 1 : undefined });
+        this.send(conn.ws, { type: 'debrisSplit', id: parent, tick: sp.tick, e: packIds(sp.ids), p: packRuns(sp.parts), l: l ? 1 : undefined, g: sp.sheds ? packSheds(sp.sheds) : undefined });
       }
     }
   }

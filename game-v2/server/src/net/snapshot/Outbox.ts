@@ -238,7 +238,8 @@ export class Outbox {
   /** Clients in a system near a point (combat effects: nobody further out has the ships involved) */
   broadcastNear(systemId: number, x: number, y: number, msg: ServerMessage, also: number[] = [], skipCaps = 0): void {
     const data = encodeServerMessage(msg);
-    // (A part of a piece of debris crumbling: a client running the piece shows that itself, CAPS.DEBRIS)
+    // (A part of a piece of debris crumbling: a client running the piece (or told to, its check on the way) shows that
+    // itself, CAPS.DEBRIS)
     const crumble = msg.type === 'partDestroyed' && msg.how === 'crumble' ? msg.bodyId : -1;
     for (const client of this.clients.values()) {
       if (InSystem.systemId[client.playerId] !== systemId) continue;
@@ -246,7 +247,7 @@ export class Outbox {
       const pid = client.playerId;
       if (dhypot(Position.x[pid] - x, Position.y[pid] - y) > FX_RANGE && !also.includes(pid)) continue;
       if (skipCaps && (client.caps ?? 0) & skipCaps) continue;
-      if (crumble >= 0 && client.debrisLive?.has(crumble)) continue;
+      if (crumble >= 0 && (client.debrisLive?.has(crumble) || client.debrisHeld.get(crumble)?.live)) continue;
       if (this.packedOf(client)) { this.packedQueue(client, msg, data); continue; }
       this.queue(client.ws, data, LAZY_TYPES.has(msg.type));
       this.snapshotBytesSent += this.getMessageByteLength(data);

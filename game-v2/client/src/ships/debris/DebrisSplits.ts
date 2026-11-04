@@ -11,7 +11,7 @@
  * Shared by the game client (ShipClient) and the test and bench fakes (server net/hits/fakeHitsClient.testkit.ts).
  */
 import {
-  EntityType, deriveSplit, debrisDecay, unpackIds, unpackRuns, computeJoins, recentreShift, quantizeShipBody, DEBRIS_STATUS,
+  EntityType, deriveSplit, debrisDecay, unpackSheds, unpackIds, unpackRuns, computeJoins, recentreShift, quantizeShipBody, DEBRIS_STATUS,
   type ShipReplicaSet, type ServerShipSyncMessage, type ShipState, type ServerDebrisSplitMessage, type ServerPartDestroyedMessage, type DebrisShape, type DebrisWorld,
   type EntityState, type Vec2, type FlightBody, type ShipDerived,
 } from '@space-game/common';
@@ -154,14 +154,19 @@ export class DebrisSplits implements DebrisWorld {
   private derive(msg: ServerDebrisSplitMessage, parent: ShipState, joins: ReturnType<typeof computeJoins>, body: FlightBody): void {
     const { store } = this.host, reps = this.host.reps();
     const parts = new Set(unpackRuns(msg.p, parent.blueprint.parts.length));
-    const got = deriveSplit(store.catalog, store.tuning, parent, msg.id, msg.tick, unpackIds(msg.e), parts, joins, body, (i) => parent.hp[i]);
+    const sheds = msg.g ? unpackSheds(msg.g, parent.blueprint.parts.length) : undefined;
+    const got = deriveSplit(store.catalog, store.tuning, parent, msg.id, msg.tick, unpackIds(msg.e), parts, joins, body, (i) => parent.hp[i], sheds);
     if (!got) return;
     this.stats.splits++;
-    // (Its to run from now: each part's crumble time, its parent's if that's one it runs, else seeded by the piece)
+    // (Its to run from now: each part's crumble time, a shed's own, else its parent's if that's one it runs, else
+    // seeded by the piece)
     const decay = msg.l ? this.lives.decayOf(msg.id) : undefined;
+    const aloof = store.aloof.has(msg.id);
     for (const d of got) {
       store.bodies.set(d.id, d.ship);
-      if (msg.l) this.lives.add(d.id, msg.tick, d.ship, decay ? d.parts.map((i) => decay[i]) : debrisDecay(d.id, msg.tick, d.parts.length, store.tuning));
+      // (Only to be seen: shed so, or breaking off one that is)
+      if (d.aloof || (d.aloof === undefined && aloof)) store.aloof.add(d.id); else store.aloof.delete(d.id);
+      if (msg.l) this.lives.add(d.id, msg.tick, d.ship, d.decay ?? (decay ? d.parts.map((i) => decay[i]) : debrisDecay(d.id, msg.tick, d.parts.length, store.tuning)));
       reps.spawnDebris(d.id, msg.tick, d.body);
       this.rows.push({ id: d.id, type: EntityType.ShipBody, x: d.body.x, y: d.body.y, angle: d.body.angle, data: [...DEBRIS_STATUS] });
       this.acks.push(d.id, d.hash);

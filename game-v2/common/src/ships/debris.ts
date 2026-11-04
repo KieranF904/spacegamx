@@ -105,29 +105,72 @@ export function partGroups(count: number, joins: readonly [number, number][], pa
   return out;
 }
 
+/**
+ * Parts a ship sheds whole at its rebuild point (a boss's plates, a stage blown away), each group a piece of its own:
+ * `fling` each thrown out from the ship's middle this fast, `crumble` each part crumbling within this many ticks (0: as
+ * any piece), `aloof` only to be seen (it knocks nothing, nothing hits it). Its pieces come before the split's others
+ */
+export interface ShedSpec { groups: number[][]; fling: number; crumble: number; aloof: boolean }
+
+/** A shed's crumble times: each part within `crumble` ticks of `tick` (the random numbers after the spin's) */
+export function shedCrumble(tick: number, crumble: number, n: number, rng: () => number): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < n; i++) out.push(tick + Math.round(crumble * (0.5 + 0.5 * rng())));
+  return out;
+}
+
+/** Sheds on the wire (debrisSplit `g`): each [fling, crumble, aloof 0/1, then each group as its length and its parts] */
+export function packSheds(sheds: readonly ShedSpec[]): number[][] {
+  return sheds.map((s) => [s.fling, s.crumble, s.aloof ? 1 : 0, ...s.groups.flatMap((g) => [g.length, ...g])]);
+}
+
+export function unpackSheds(rows: readonly (readonly number[])[], max = 4096): ShedSpec[] {
+  return rows.map((r) => {
+    const groups: number[][] = [];
+    for (let i = 3; i < r.length;) {
+      const n = Math.max(0, Math.min(max, r[i] | 0));
+      groups.push(r.slice(i + 1, i + 1 + n).map((v) => v | 0));
+      i += 1 + n;
+    }
+    return { fling: Number(r[0]) || 0, crumble: r[1] | 0, aloof: !!r[2], groups };
+  });
+}
+
 /** One piece a client worked out from a split */
-export interface DerivedDebris { id: number; ship: ShipState; body: FlightBody; hash: number; /** The parent's parts it is (its blueprint's, in order) */ parts: number[] }
+export interface DerivedDebris {
+  id: number; ship: ShipState; body: FlightBody; hash: number;
+  /** The parent's parts it is (its blueprint's, in order) */
+  parts: number[];
+  /** Shed: each part's crumble time (a shed with its own), and whether it's only to be seen */
+  decay?: number[];
+  aloof?: boolean;
+}
 
 /**
  * A client's side of a split (the server's: ships/bridge/rebuild.ts spawnDebris, with the same functions): the pieces
- * `parts` (the parts that left the ship, as connected groups) became, as entities `ids` (the server's, in group
- * order), at `tick`, from the parent as it was then. `parent` is the client's copy of the ship before the split (its
- * structure as the server had it then: the caller checks the rebuild count); `pose` its replicated state at `tick`;
- * `hpOf` each part's HP as last sent. null when the groups don't match the ids (the server sends the pieces then).
+ * a ship's rebuild point made, as entities `ids` (the server's, in order), at `tick`, from the parent as it was then:
+ * first what it shed (`sheds`, each group whole), then `parts` (what then joined nothing, as connected groups).
+ * `parent` is the client's copy of the ship before the split (its structure as the server had it then: the caller
+ * checks the rebuild count); `pose` its replicated state at `tick`; `hpOf` each part's HP as last sent. null when the
+ * groups don't match the ids (the server sends the pieces then).
  */
 export function deriveSplit(catalog: Catalog, tuning: ShipTuning, parent: ShipState, parentId: number, tick: number,
-  ids: readonly number[], parts: ReadonlySet<number>, joins: readonly [number, number][], pose: FlightBody, hpOf: (part: number) => number): DerivedDebris[] | null {
-  const groups = partGroups(parent.blueprint.parts.length, joins, parts);
-  if (groups.length !== ids.length) return null;
+  ids: readonly number[], parts: ReadonlySet<number>, joins: readonly [number, number][], pose: FlightBody, hpOf: (part: number) => number,
+  sheds: readonly ShedSpec[] = []): DerivedDebris[] | null {
+  const shed = sheds.flatMap((s) => s.groups.map((g) => ({ g, s })));
+  const groups = [...shed.map((e) => e.g), ...partGroups(parent.blueprint.parts.length, joins, parts)];
+  if (groups.length !== ids.length || groups.some((g) => !g.length || g.some((i) => !(i >= 0 && i < parent.blueprint.parts.length)))) return null;
   const p = splitPose(pose.x, pose.y, pose.angle, pose.vx, pose.vy, pose.angVel);
   const out: DerivedDebris[] = [];
   groups.forEach((g, k) => {
+    const s = shed[k]?.s;
     const rng = splitRng(parentId, tick, k);
     const spin = debrisSpin(p.angVel, rng, tuning.debris.pushSpin);
     const ship = createShipState(catalog, tuning, ids[k], debrisBlueprint(parent.blueprint, g), tick, { kind: 'debris', hp: g.map(hpOf), angVel: spin });
-    const body = debrisMotion(p, parent.derived.com, ship.derived.com, tuning.cellSize, spin, rng, tuning.debris.pushSpeed);
+    const decay = s && s.crumble > 0 ? shedCrumble(tick, s.crumble, g.length, rng) : undefined;
+    const body = debrisMotion(p, parent.derived.com, ship.derived.com, tuning.cellSize, spin, rng, tuning.debris.pushSpeed, s?.fling ?? 0);
     ship.angVel = body.angVel;
-    out.push({ id: ids[k], ship, body, hash: debrisHash(body), parts: g });
+    out.push({ id: ids[k], ship, body, hash: debrisHash(body), parts: g, decay, aloof: s?.aloof });
   });
   return out;
 }

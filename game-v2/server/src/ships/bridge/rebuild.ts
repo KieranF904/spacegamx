@@ -389,20 +389,28 @@ export function rebuildNow(b: BridgeCtx, eid: number, ship: ShipState, derivable
     if (before.alive.some((a, i) => a && ship.hp[i] <= 0 && !(at && at[i] <= tick))) b.debrisNet.told.add(eid);
   }
 
-  // Orphaned groups leave as debris (for a ship with no core, that's everything)
+  // What it shed this tick leaves first, each group whole (shed), then the orphaned groups (for a ship with no core,
+  // that's everything)
+  const sheds = b.debrisNet.sheds.get(eid) ?? [];
+  b.debrisNet.sheds.delete(eid);
   const groups = ship.derived.orphanGroups;
-  if (groups.length) {
+  if (groups.length || sheds.length) {
+    let k = 0;
+    const ids: number[] = [];
+    for (const s of sheds) for (const g of s.groups) { const d = b.spawnDebris(eid, ship, g, oldCom, pose, k++, s.fling, s.crumble); if (s.aloof) b.intangible.add(d); ids.push(d); }
     // (what breaks off debris only to be seen is only to be seen too)
-    const ids = groups.map((g, k) => { const d = b.spawnDebris(eid, ship, g, oldCom, pose, k); if (b.intangible.has(eid)) b.intangible.add(d); return d; });
+    for (const g of groups) { const d = b.spawnDebris(eid, ship, g, oldCom, pose, k++); if (b.intangible.has(eid)) b.intangible.add(d); ids.push(d); }
     // Clients that have this ship as it was can work the pieces out themselves (bridge/debrisNet.ts, SnapshotBuilder)
-    if (derivable && !b.intangible.has(eid)) {
+    if (derivable) {
       const parts = groups.flat().sort((x, y) => x - y);
-      b.debrisNet.noteSplit(eid, { ship, tick: b.host.getTick(), com: oldCom, ids, groups: groups.map((g) => [...g]), parts });
+      b.debrisNet.noteSplit(eid, { ship, tick: b.host.getTick(), com: oldCom, ids, groups: [...sheds.flatMap((s) => s.groups), ...groups.map((g) => [...g])], parts, sheds: sheds.length ? sheds : undefined });
       for (const d of ids) { const sp = b.bodies.get(d); if (sp) b.debrisNet.spawns.set(d, { hash: debrisHash(b.readBody(d, sp)), rebuilds: sp.rebuilds }); }
     }
     for (const g of groups) for (const i of g) ship.detached[i] = true;
-    rebuildShip(ship, b.catalog, b.tuning);
-    b.debrisNet.noteCom(eid, ship.rebuilds, ship.derived.com);
+    if (groups.length) {
+      rebuildShip(ship, b.catalog, b.tuning);
+      b.debrisNet.noteCom(eid, ship.rebuilds, ship.derived.com);
+    }
   }
   b.structLog.note(eid, ship, b.host.systemTick?.(eid) ?? b.host.getTick());
   const held = b.charge.get(eid);
@@ -450,12 +458,13 @@ export function shed(b: BridgeCtx, eid: number, groups: number[][], fling = 0, c
   // (Not what's gone already this tick: its rebuild is still to come)
   const live = groups.map((g) => g.filter((i) => ship.derived.alive[i] && !ship.detached[i])).filter((g) => g.length);
   if (!live.length) return;
-  const pose = b.pose(eid), com = ship.derived.com;
-  live.forEach((g, k) => { const d = b.spawnDebris(eid, ship, g, com, pose, k, fling, crumble); if (intangible) b.intangible.add(d); });
   for (const g of live) for (const i of g) ship.detached[i] = true;
-  // (Pieces shed whole aren't for clients to work out: what then hangs off nothing isn't either, it goes as before).
-  // Rebuilt at the tick's rebuild point
-  b.markRebuild(eid, ship, false);
+  // (Its pieces leave at the tick's rebuild point, before what then hangs off nothing, as a split clients work out:
+  // common ships/debris.ts deriveSplit's sheds)
+  let list = b.debrisNet.sheds.get(eid);
+  if (!list) b.debrisNet.sheds.set(eid, (list = []));
+  list.push({ groups: live, fling, crumble, aloof: intangible });
+  b.markRebuild(eid, ship);
 }
 
 /** A connected group of parts leaves `ship` as a new debris body built from the same parts and HP. */
