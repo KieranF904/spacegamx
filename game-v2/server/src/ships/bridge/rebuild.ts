@@ -401,6 +401,8 @@ export function rebuildNow(b: BridgeCtx, eid: number, ship: ShipState, derivable
     rebuildShip(ship, b.catalog, b.tuning);
     b.debrisNet.noteCom(eid, ship.rebuilds, ship.derived.com);
   }
+  // (What clients' syncs carry until the next: the live fields move on before it, a part dying, a shed)
+  ship.built = { hp: ship.rebuildHp.slice(), detached: ship.detached.slice(), ghost: ship.ghost.slice() };
   const held = b.charge.get(eid);
   if (held) b.setCharge(eid, remapCharge(before, ship.derived, held));
 

@@ -123,6 +123,9 @@ const LOG_TICKS = CELL_HOLD_TICKS + 120;
 
 const sameDock = (a: Shadow['dock'], b: Shadow['dock']) => (!a && !b) || (!!a && !!b && a.station === b.station && a.ox === b.ox && a.oy === b.oy);
 
+/** How long a removed ship's causes are remembered (causedInWindow): longer than the widest snapshot window */
+const GONE_CAUSED_TICKS = 16;
+
 export class Replication {
   private shadows = new Map<number, Shadow>();
   /** Pairs of debris that knocked since the last snapshot (a client with one in view and not the other is off on it) */
@@ -151,7 +154,13 @@ export class Replication {
    */
   endTick(): void {
     const tick = this.host.tick();
-    for (const id of this.shadows.keys()) if (!this.ships.has(id)) this.shadows.delete(id);
+    for (const [id, s] of this.shadows) {
+      if (this.ships.has(id)) continue;
+      // (Gone with causes this window, which then never go: what clients have of it at its end is off, causedInWindow)
+      if (s.causes.length) this.goneCaused.set(id, tick);
+      this.shadows.delete(id);
+    }
+    for (const [id, t] of this.goneCaused) if (t < tick - GONE_CAUSED_TICKS) this.goneCaused.delete(id);
     const docks = this.host.docks?.();
     const occupied = this.host.occupied?.();
     for (const [eid, ship] of this.ships.bodies) {
@@ -388,6 +397,26 @@ export class Replication {
     ships.push(s.keyRow ??= packKeyframe({ id: eid, mode: s.mode, body: this.real(eid), ctl: { bits: s.bits, targetAngle: 0 }, q: s.q, dock: s.dock ?? undefined }));
     this.keyframes++;
     if (s.bodied) this.bodyStats.keyframes++;
+  }
+
+  /** Ships removed lately that had causes in their last window, and when (causedInWindow) */
+  private readonly goneCaused = new Map<number, number>();
+
+  /**
+   * Did something besides its controls move this ship in its window so far (or before it was removed lately)? Its
+   * causes go only with it: one leaving a client's view (dying) leaves that client's replica of it off at the end
+   */
+  causedInWindow(eid: number): boolean {
+    return !!this.shadows.get(eid)?.causes.length || this.goneCaused.has(eid);
+  }
+
+  /**
+   * Has this ship rebuilt already in its snapshot window (a REBUILD among its causes since the last round)? A second
+   * waits for the next window (ShipBridge.tick step 3): clients have one structure of it a window to work one out from
+   */
+  rebuiltInWindow(eid: number): boolean {
+    const s = this.shadows.get(eid);
+    return !!s && s.causes.some((e) => e.row[0] === OWN_CAUSE.REBUILD);
   }
 
   /** A ship's keyframe version (bumped whenever it left its predicted path) */

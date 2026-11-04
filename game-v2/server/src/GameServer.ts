@@ -2465,6 +2465,7 @@ this.devTeleport = opts.devTeleport ?? false;
       cargoMass: (eid) => this.pilots.cargoMass(eid),
       featureCargo: (eid) => this.features?.cargoMass(eid) ?? 0,
       shipRebuilt: (eid) => this.features?.onShipRebuilt(eid),
+      rebuildWaits: (eid) => this.replication.rebuiltInWindow(eid),
       shieldBroken: (eid) => this.features?.onShieldBreak(eid),
       shipForgotten: (eid) => this.features?.onLeave(eid),
       onRepairKit: (eid, left, total, broken) => {

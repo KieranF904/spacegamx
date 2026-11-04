@@ -20,6 +20,11 @@ export interface ShipState {
   scaledHp?: boolean;
   /** HP as it was at the last rebuild (what `derived` was computed from; clients rebuild from this) */
   rebuildHp: number[];
+  /**
+   * (Server) its HP, detached and ghost parts as its last rebuild had them, copied: what clients' syncs carry. The live
+   * fields move on before the next rebuild (a part dying, a shed), which can wait a window (ShipBridge.tick step 3)
+   */
+  built?: { hp: number[]; detached: boolean[]; ghost: boolean[] };
   /** Part left this body as debris (its blueprint entry stays for repair) */
   detached: boolean[];
   /** Not built yet (hangar ghosts): flight doesn't count these as lost */

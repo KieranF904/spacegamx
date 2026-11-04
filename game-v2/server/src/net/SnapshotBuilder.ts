@@ -294,8 +294,9 @@ export class SnapshotBuilder {
     const e = this.syncWire.get(id);
     if (e && e.ship === ship && e.rebuilds === ship.rebuilds) return e;
     const next = {
-      ship, rebuilds: ship.rebuilds, hp: ship.rebuildHp.map(hpWire), detached: ship.detached.flatMap((d, i) => (d ? [i] : [])),
-      ghosts: ship.ghost.some(Boolean) ? ship.ghost.flatMap((g, i) => (g ? [i] : [])) : undefined,
+      // (As its last rebuild had them: ShipState.built)
+      ship, rebuilds: ship.rebuilds, hp: (ship.built?.hp ?? ship.rebuildHp).map(hpWire), detached: (ship.built?.detached ?? ship.detached).flatMap((d, i) => (d ? [i] : [])),
+      ghosts: (ship.built?.ghost ?? ship.ghost).some(Boolean) ? (ship.built?.ghost ?? ship.ghost).flatMap((g, i) => (g ? [i] : [])) : undefined,
     };
     this.syncWire.set(id, next);
     return next;
@@ -910,6 +911,11 @@ export class SnapshotBuilder {
     }
     for (const [parent, splits] of this.ships.debrisNet.splits) {
       if (parent === conn.playerId || !conn.shipView.has(parent) || !conn.repKnown.has(parent)) continue;
+      // (Dead or gone, with causes this window: those never reach it, so its pose at the split is off there: sent in full)
+      const dead = !this.ships.has(parent) || (hasComponent(this.world, Player, parent) && Health.current[parent] <= 0);
+      if (dead && this.replication.causedInWindow(parent)) continue;
+      // (A piece of debris something moved this window: its replica there is off till its keyframe, so its pieces would be)
+      if (this.ships.debrisNet.touched.has(parent)) continue;
       const synced = conn.shipSynced.get(parent), had = conn.shipHpSent.get(parent);
       if (!synced || !had) continue;
       // (Its copy is the structure the split started from if its centre of mass is that one: HP-band rebuilds don't move it)
