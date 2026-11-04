@@ -231,6 +231,8 @@ private xpFillEl: HTMLElement | null;
   // Auth state
   private authToken: string | null = null;
   private isAdmin = false;
+  /** The owner rank (above admin: isAdmin is true too) */
+  private isOwner = false;
   /** A guest's name, to join with once connected (signed-in pilots join with authToken) */
   private pendingAuth: { type: 'guest'; username: string } | null = null;
   /** This build speaks another protocol than the server: nothing more until the player reloads */
@@ -556,6 +558,7 @@ this.xpFillEl = document.getElementById('xpFill');
           system: sys?.name ?? this.systemNames.get(this.state.systemId) ?? 'Deep space',
           sector: (sys?.sector ?? 'uncharted').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) + ' sector',
           admin: this.isAdmin,
+          owner: this.isOwner,
         };
       },
       ship: () => this.shipClient.menuShipInfo(),
@@ -1418,16 +1421,17 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'none';
     this.w.inventoryWindow.close();
   }
 
-  private handleAuthResult(msg: { success: boolean; username?: string; token?: string; isAdmin?: boolean; isContributor?: boolean; error?: string }): void {
+  private handleAuthResult(msg: { success: boolean; username?: string; token?: string; isAdmin?: boolean; isOwner?: boolean; isContributor?: boolean; error?: string }): void {
     if (msg.success) {
-      console.log(`Authenticated as ${msg.username}${msg.isAdmin ? ' (admin)' : ''}`);
+      console.log(`Authenticated as ${msg.username}${msg.isOwner ? ' (owner)' : msg.isAdmin ? ' (admin)' : ''}`);
       if (msg.username) this.state.playerName = msg.username;
       if (msg.token) {
         this.authToken = msg.token;
         // Save token for reconnection
         try { localStorage.setItem('authToken', msg.token); } catch (e) {}
       }
-      this.isAdmin = !!msg.isAdmin;
+      this.isOwner = !!msg.isOwner;
+      this.isAdmin = !!msg.isAdmin || this.isOwner;
       // Map warp (Ctrl-click) is an admin tool: the server refuses it for anyone else, so only admins see it offered
       this.w.systemMapUI.onWarp = this.isAdmin ? (systemId, x, y) => this.network.send({ type: 'devTeleport', systemId, x, y }) : null;
       
@@ -1518,6 +1522,7 @@ if (this.boostHudEl) this.boostHudEl.style.display = 'none';
     this.adminPanel?.destroy();
     this.adminPanel = null;
     this.isAdmin = false;
+    this.isOwner = false;
   }
 
   /** Contributor notes (contributors and admins; F6) */

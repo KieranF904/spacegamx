@@ -39,6 +39,8 @@ export interface MenuPilotInfo {
   system: string;
   sector: string;
   admin: boolean;
+  /** The owner rank (admin is true for them too) */
+  owner?: boolean;
 }
 
 export interface MenuServerInfo {
@@ -362,7 +364,7 @@ export class GameMenuUI {
     let html = `<h2>Pilot & ship</h2><p class="muted">Live readout</p>
       <h3>Pilot</h3>
       <div class="grid">
-        <div class="stat"><span>Callsign</span><b>${esc(p.name)}${p.admin ? ' <small class="muted">admin</small>' : ''}</b></div>
+        <div class="stat"><span>Callsign</span><b>${esc(p.name)}${p.owner ? ' <small class="muted">owner</small>' : p.admin ? ' <small class="muted">admin</small>' : ''}</b></div>
         <div class="stat"><span>Level ${p.level}</span><b>${p.xp} / ${p.xpToNext} XP</b><div class="bar"><i style="width:${pct(p.xp, p.xpToNext)}%"></i></div></div>
         <div class="stat"><span>Credits</span><b>${p.credits.toLocaleString()}</b></div>
         <div class="stat"><span>Location</span><b>${esc(p.system)}</b></div>

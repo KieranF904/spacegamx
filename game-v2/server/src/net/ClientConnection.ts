@@ -16,6 +16,8 @@ export interface ClientConnection {
   username: string;  // Player display name
   userId: number | null;  // DB user ID (null for guests)
   isAdmin: boolean;
+  /** The owner rank (above admin: isAdmin is true for an owner too). Missing: not the owner */
+  isOwner?: boolean;
   /** Contributor rank (ContributorNotes: the notes tools; admins have them anyway) */
   isContributor: boolean;
   authToken: string | null;

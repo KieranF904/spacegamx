@@ -10,6 +10,8 @@ export interface UserRecord {
   username: string;
   email: string;
   is_admin: boolean;
+  /** The owner rank, above admin (an owner is an admin too: is_admin is true for one). Missing: not the owner */
+  is_owner?: boolean;
   created_at: string;
 }
 
@@ -48,7 +50,10 @@ export interface UserStore {
 export interface AccountInfo {
   id: number;
   username: string;
+  /** Admin or owner */
   isAdmin: boolean;
+  /** The owner (above admin; set only on the lobby's side). Missing (an older lobby): not */
+  isOwner?: boolean;
   createdAt: string;
   /** Banned (null: not, or the ban's over): until when (null: for good), why, by whom */
   ban: { until: number | null; reason: string; by: string } | null;
@@ -57,15 +62,16 @@ export interface AccountInfo {
 /**
  * Managing accounts (the admin tools' players, ranks and bans), by username.
  * Each throws an Error saying what went wrong (the lobby's answer, or that it
- * can't be reached).
+ * can't be reached). `actor`: the signed-in admin it's done for (the lobby
+ * applies the ranks' rules to them too: server-browser routes.ts rankRefusal).
  */
 export interface AccountAdmin {
   /** Accounts whose username starts with `search` ('' for all), a page at a time */
   list(search: string, offset: number, limit: number): Promise<{ users: AccountInfo[]; total: number }>;
   /** One account (null: no such account) */
   get(username: string): Promise<AccountInfo | null>;
-  setAdmin(username: string, on: boolean): Promise<AccountInfo>;
+  setAdmin(username: string, on: boolean, actor?: string): Promise<AccountInfo>;
   /** Ban until `until` (epoch ms; null: for good) */
-  ban(username: string, until: number | null, reason: string, by: string): Promise<AccountInfo>;
-  unban(username: string): Promise<AccountInfo>;
+  ban(username: string, until: number | null, reason: string, by: string, actor?: string): Promise<AccountInfo>;
+  unban(username: string, actor?: string): Promise<AccountInfo>;
 }

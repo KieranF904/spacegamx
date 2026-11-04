@@ -66,7 +66,8 @@ export class LobbyAccounts implements UserStore {
     const r = await this.post('validate', { token });
     // (Only a ban's refusal is worth passing on: anything else is "sign in again")
     if (!r?.success) return { user: null, error: r?.banned ? String(r.error) : '' };
-    return { user: { id: r.id, username: r.username, email: '', is_admin: !!r.isAdmin, created_at: '' } };
+    // (An owner is an admin too, whatever an older lobby says)
+    return { user: { id: r.id, username: r.username, email: '', is_admin: !!r.isAdmin || !!r.isOwner, is_owner: !!r.isOwner, created_at: '' } };
   }
 
   async logout(token: string): Promise<void> {
@@ -108,15 +109,15 @@ class LobbyAccountAdmin implements AccountAdmin {
     return (await this.post('user', { username }, true))?.user ?? null;
   }
 
-  async setAdmin(username: string, on: boolean): Promise<AccountInfo> {
-    return (await this.post('set-admin', { username, isAdmin: on })).user;
+  async setAdmin(username: string, on: boolean, actor?: string): Promise<AccountInfo> {
+    return (await this.post('set-admin', { username, isAdmin: on, actor })).user;
   }
 
-  async ban(username: string, until: number | null, reason: string, by: string): Promise<AccountInfo> {
-    return (await this.post('ban', { username, until, reason, by })).user;
+  async ban(username: string, until: number | null, reason: string, by: string, actor?: string): Promise<AccountInfo> {
+    return (await this.post('ban', { username, until, reason, by, actor })).user;
   }
 
-  async unban(username: string): Promise<AccountInfo> {
-    return (await this.post('unban', { username })).user;
+  async unban(username: string, actor?: string): Promise<AccountInfo> {
+    return (await this.post('unban', { username, actor })).user;
   }
 }

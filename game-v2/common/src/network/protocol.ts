@@ -696,6 +696,8 @@ export interface ServerAuthResultMessage {
   username?: string;
   token?: string;
   isAdmin?: boolean;
+  /** The owner rank, above admin (isAdmin is true for the owner too); missing: not the owner */
+  isOwner?: boolean;
   /** Contributor rank (admins are contributors too): the contributor tools */
   isContributor?: boolean;
   error?: string;
@@ -723,6 +725,8 @@ export interface ServerAdminStatsMessage {
 /** A player as the admin panel sees them */
 export interface AdminPlayerInfo {
   id: number; name: string; ping: number; admin: boolean;
+  /** The owner rank (admin is true for them too); missing: not */
+  owner?: boolean;
   system: string; x: number; y: number; dead: boolean;
   god: boolean; hidden: boolean;
   /** Has the contributor rank (admins have it anyway) */
@@ -745,7 +749,7 @@ export interface AdminAccountInfo {
   online: number | null;
   /** Signed in to an account (guests aren't: no rank or ban for them) */
   account: boolean;
-  rank: 'player' | 'contributor' | 'admin';
+  rank: 'player' | 'contributor' | 'admin' | 'owner';
   /** Banned: until when (epoch ms; null: for good), why, by whom */
   ban: { until: number | null; reason: string; by: string } | null;
 }

@@ -17,36 +17,40 @@ const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
 const files = readGameDataFiles(dataDir);
 
-/** A lobby in memory: accounts by name, and tokens "tok:<name>" that sign in as them (refused while banned) */
+/**
+ * A lobby in memory: accounts by name, and tokens "tok:<name>" that sign in as them (refused while banned).
+ * boss is the owner; chief and deputy are admins. `actors`: who each change was made for (the lobby checks them too)
+ */
 function fakeLobby(names: string[]) {
   const users = new Map<string, AccountInfo>();
-  names.forEach((n, i) => users.set(n.toLowerCase(), { id: i + 1, username: n, isAdmin: n === 'boss' || n === 'chief', createdAt: '', ban: null }));
+  names.forEach((n, i) => users.set(n.toLowerCase(), { id: i + 1, username: n, isAdmin: ['boss', 'chief', 'deputy'].includes(n), isOwner: n === 'boss', createdAt: '', ban: null }));
   const need = (n: string) => { const u = users.get(n.toLowerCase()); if (!u) throw new Error(`No account "${n}"`); return u; };
+  const actors: (string | undefined)[] = [];
   const admin: AccountAdmin = {
     list: async (search, offset, limit) => {
       const all = [...users.values()].filter((u) => u.username.toLowerCase().startsWith(search.toLowerCase()));
       return { users: all.slice(offset, offset + limit).map((u) => ({ ...u })), total: all.length };
     },
     get: async (n) => { const u = users.get(n.toLowerCase()); return u ? { ...u } : null; },
-    setAdmin: async (n, on) => { const u = need(n); u.isAdmin = on; return { ...u }; },
-    ban: async (n, until, reason, by) => { const u = need(n); u.ban = { until, reason, by }; return { ...u }; },
-    unban: async (n) => { const u = need(n); u.ban = null; return { ...u }; },
+    setAdmin: async (n, on, actor) => { actors.push(actor); const u = need(n); u.isAdmin = on; return { ...u }; },
+    ban: async (n, until, reason, by, actor) => { actors.push(actor); const u = need(n); u.ban = { until, reason, by }; return { ...u }; },
+    unban: async (n, actor) => { actors.push(actor); const u = need(n); u.ban = null; return { ...u }; },
   };
   const checkSession = async (t: string) => {
     const u = users.get(t.split(':')[1].toLowerCase());
     if (!u) return { user: null, error: '' };
     if (u.ban) return { user: null, error: `This account is banned: ${u.ban.reason}` };
-    return { user: { id: u.id, username: u.username, email: '', is_admin: u.isAdmin, created_at: '' } };
+    return { user: { id: u.id, username: u.username, email: '', is_admin: u.isAdmin, is_owner: !!u.isOwner, created_at: '' } };
   };
   return {
-    users,
+    users, actors,
     userDB: { checkSession, validateSession: async (t: string) => (await checkSession(t)).user, cleanupExpiredSessions: async () => {}, admin },
   };
 }
 
-function world(lobby: boolean, profileStore?: JsonProfileStore) {
+function world(lobby: boolean, profileStore?: JsonProfileStore, names = ['boss', 'chief', 'pilot', 'helper', 'away', 'awol']) {
   resetGlobals();
-  const fake = fakeLobby(['boss', 'chief', 'pilot', 'helper', 'away', 'awol']);
+  const fake = fakeLobby(names);
   const userDB = lobby ? fake.userDB : { ...fake.userDB, admin: null };
   const server = new GameServer({
     gameData: new GameData(files), userDB: userDB as any, scene: 'sectors', autoStart: false,
@@ -94,7 +98,7 @@ describe('managing players (online or not)', () => {
     const list = of(boss.got, 'adminAccounts').at(-1)!;
     expect(list.error).toBeUndefined();
     expect(list.players.map((p) => [p.name, p.online !== null, p.rank, p.account])).toEqual([
-      ['boss', true, 'admin', true], ['pilot', true, 'player', true], ['Visitor', true, 'player', false],
+      ['boss', true, 'owner', true], ['pilot', true, 'player', true], ['Visitor', true, 'player', false],
       ['chief', false, 'admin', true], ['helper', false, 'contributor', true], ['away', false, 'player', true], ['awol', false, 'player', true],
     ]);
     expect(list.players.find((p) => p.name === 'awol')?.ban?.reason).toBe('cheating');
@@ -162,13 +166,13 @@ describe('managing players (online or not)', () => {
     expect((await boss.admin('rank', { player: 'away', rank: 'king' })).ok).toBe(false);
   });
 
-  it('an admin can\'t demote or ban themselves, or ban another admin', async () => {
+  it('an admin can\'t demote or ban themselves, or ban the owner', async () => {
     const { join, lobby } = world(true);
-    const boss = await join('boss');
-    expect((await boss.chat('/rank boss player')).text).toBe("You can't demote yourself");
-    expect((await boss.admin('ban', { player: 'boss', duration: '1h' })).text).toBe("You can't ban yourself");
-    expect((await boss.admin('ban', { player: 'chief', duration: '1h' })).text).toMatch(/is an admin: take the rank away first/);
-    expect([lobby.users.get('boss')!.isAdmin, lobby.users.get('boss')!.ban, lobby.users.get('chief')!.ban]).toEqual([true, null, null]);
+    const chief = await join('chief');
+    expect((await chief.chat('/rank chief player')).text).toBe("You can't demote yourself");
+    expect((await chief.admin('ban', { player: 'chief', duration: '1h' })).text).toBe("You can't ban yourself");
+    expect((await chief.admin('ban', { player: 'boss', duration: '1h' })).text).toBe("boss is the owner: owners can't be banned");
+    expect([lobby.users.get('chief')!.isAdmin, lobby.users.get('chief')!.ban, lobby.users.get('boss')!.ban]).toEqual([true, null, null]);
     // Players can't use any of it
     const pilot = await join('pilot');
     expect((await pilot.admin('ban', { player: 'away', duration: 'perm' }))?.ok).toBe(false);
@@ -189,6 +193,56 @@ describe('managing players (online or not)', () => {
     const list = of(boss.got, 'adminAccounts').at(-1)!;
     expect(list.error).toMatch(/no lobby/);
     expect(list.players.map((p) => p.name)).toEqual(['boss', 'pilot']);
+  });
+});
+
+describe('the owner rank', () => {
+  const names = ['boss', 'chief', 'deputy', 'pilot', 'away'];
+
+  it('an owner passes every admin check, and is shown as the owner', async () => {
+    const { join } = world(true, undefined, names);
+    const boss = await join('boss');
+    expect([boss.conn.isAdmin, boss.conn.isOwner]).toEqual([true, true]);
+    expect(of(boss.got, 'authResult').at(-1)).toMatchObject({ success: true, isAdmin: true, isOwner: true });
+    expect((await boss.admin('heal'))?.ok).toBe(true);
+    const chief = await join('chief');
+    expect(of(chief.got, 'authResult').at(-1)?.isOwner).toBeUndefined();
+    await chief.admin('players', { quiet: true });
+    expect(of(chief.got, 'adminAccounts').at(-1)!.players.find((p) => p.name === 'boss')?.rank).toBe('owner');
+  });
+
+  it("an admin can't grant or revoke admin, or ban or unban an admin; nor change the owner's rank", async () => {
+    const { join, lobby } = world(true, undefined, names);
+    const chief = await join('chief');
+    await join('pilot');
+    expect((await chief.chat('/rank pilot admin')).text).toBe('Only the owner can grant or revoke admin');
+    expect(lobby.users.get('pilot')!.isAdmin).toBe(false);
+    expect((await chief.admin('rank', { player: 'deputy', rank: 'player' })).text).toBe("deputy is an admin: only the owner can change an admin's rank");
+    expect((await chief.admin('ban', { player: 'deputy', duration: 'perm' })).text).toBe('deputy is an admin: only the owner can ban an admin');
+    expect((await chief.admin('rank', { player: 'boss', rank: 'player' })).text).toBe('boss is the owner: the owner rank is set on the server only');
+    lobby.users.get('deputy')!.ban = { until: null, reason: 'x', by: 'boss' };
+    expect((await chief.admin('unban', { player: 'deputy' })).text).toBe('deputy is an admin: only the owner can change that');
+    expect([lobby.users.get('deputy')!.isAdmin, lobby.users.get('boss')!.isAdmin, lobby.actors]).toEqual([true, true, []]);
+    // Pilots are still theirs to moderate (and the lobby is told who did it)
+    expect((await chief.admin('ban', { player: 'away', duration: '1d', reason: 'rude' })).ok).toBe(true);
+    expect((await chief.admin('rank', { player: 'away', rank: 'contributor' })).ok).toBe(true);
+    expect(lobby.actors).toEqual(['chief']);
+  });
+
+  it('the owner can grant and revoke admin and ban an admin; nobody bans or demotes the owner', async () => {
+    const { join, lobby } = world(true, undefined, names);
+    const boss = await join('boss');
+    const pilot = await join('pilot');
+    expect((await boss.chat('/rank pilot admin')).text).toBe('pilot is now an admin');
+    expect([pilot.conn.isAdmin, lobby.users.get('pilot')!.isAdmin]).toEqual([true, true]);
+    expect((await boss.admin('rank', { player: 'deputy', rank: 'player' })).text).toBe('deputy is now a player (offline)');
+    expect((await boss.admin('ban', { player: 'chief', duration: '1d', reason: 'rogue' })).ok).toBe(true);
+    expect(lobby.users.get('chief')!.ban?.reason).toBe('rogue');
+    expect((await boss.admin('unban', { player: 'chief' })).ok).toBe(true);
+    expect(lobby.actors).toEqual(['boss', 'boss', 'boss', 'boss']);
+    expect((await boss.chat('/rank boss player')).text).toBe('boss is the owner: the owner rank is set on the server only');
+    expect((await boss.admin('ban', { player: 'boss', duration: '1h' })).ok).toBe(false);
+    expect([lobby.users.get('boss')!.isOwner, lobby.users.get('boss')!.ban]).toEqual([true, null]);
   });
 });
 

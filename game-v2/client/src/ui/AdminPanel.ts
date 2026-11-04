@@ -519,7 +519,7 @@ export class AdminPanel {
     const myId = this.deps.state.playerId;
     const mySystem = this.deps.state.systemId;
     const name = (sys: string) => this.info?.systems.find((s) => s.id === sys)?.name ?? sys;
-    const rankOf = (r: PlayerRow) => (r.on ? (r.on.admin ? 'admin' : r.on.contributor ? 'contributor' : 'player') : r.acc?.rank ?? 'player');
+    const rankOf = (r: PlayerRow) => this.rankOf(r);
     const note = this.accounts?.error ? `<div class="adm-err">${esc(this.accounts.error)}</div>` : '';
     const more = this.accounts?.more && this.accounts.search === this.search
       ? `<div class="sub" style="color:#8a7f86;margin-top:6px">${this.accounts.total} accounts match: type more of the name</div>` : '';
@@ -530,7 +530,7 @@ export class AdminPanel {
     listEl.innerHTML = `${note}<table class="adm-pl">${rows.map((r) => {
       const p = r.on;
       const rank = rankOf(r);
-      const tags = `${rank !== 'player' ? `<span class="adm-tag">${rank === 'admin' ? 'admin' : 'contrib'}</span>` : ''}${r.acc && !r.acc.account ? '<span class="adm-tag">guest</span>' : ''}${r.acc?.ban ? '<span class="adm-tag ban">banned</span>' : ''}`
+      const tags = `${rank !== 'player' ? `<span class="adm-tag">${rank === 'owner' ? 'owner' : rank === 'admin' ? 'admin' : 'contrib'}</span>` : ''}${r.acc && !r.acc.account ? '<span class="adm-tag">guest</span>' : ''}${r.acc?.ban ? '<span class="adm-tag ban">banned</span>' : ''}`
         + (p ? `${p.god ? '<span class="adm-tag">god</span>' : ''}${p.hidden ? '<span class="adm-tag">hidden</span>' : ''}${p.dead ? '<span class="adm-tag">dead</span>' : ''}` : '');
       const sub = p ? `#${p.id} · ${esc(name(p.system))} · ${fmt(p.x)}, ${fmt(p.y)} · ${p.ping}ms` : `offline${r.acc?.ban ? ` · ${esc(banText(r.acc.ban))}` : ''}`;
       return `
@@ -557,11 +557,17 @@ export class AdminPanel {
     const guest = r.acc ? !r.acc.account : false;
     const ban = r.acc?.ban;
     const len = BAN_LENGTHS.find(([v]) => v === m.dur)?.[1] ?? m.dur;
+    // Ranks: the owner's is set on the server only; an admin's is the owner's to change (and so is banning one)
+    const iOwn = !!this.me()?.owner;
+    const locked = !me && (rank === 'owner' || (rank === 'admin' && !iOwn));
+    const ranks = iOwn || rank === 'admin' ? ['player', 'contributor', 'admin'] : ['player', 'contributor'];
     const rankRow = guest ? '<div class="adm-row"><span class="sub">A guest: no account to rank or ban (kick only)</span></div>'
+      : rank === 'owner' ? '<div class="adm-row"><span class="lbl">Rank</span><span class="sub adm-grow">Owner (set on the server only)</span></div>'
+      : locked ? '<div class="adm-row"><span class="lbl">Rank</span><span class="sub adm-grow">Admin (only the owner can change an admin\'s rank or ban them)</span></div>'
       : `<div class="adm-row"><span class="lbl">Rank</span>
-          <select class="adm-in adm-grow" data-m="rank"${me ? ' disabled title="You can\'t demote yourself"' : ''}>${['player', 'contributor', 'admin'].map((k) => `<option value="${k}"${k === m.rank ? ' selected' : ''}>${k[0].toUpperCase() + k.slice(1)}</option>`).join('')}</select>
+          <select class="adm-in adm-grow" data-m="rank"${me ? ' disabled title="You can\'t demote yourself"' : ''}>${ranks.map((k) => `<option value="${k}"${k === m.rank ? ' selected' : ''}>${k[0].toUpperCase() + k.slice(1)}</option>`).join('')}</select>
           <button class="adm-btn sm${m.rank === rank || me ? ' off' : ''}" data-m="setrank">Set</button></div>`;
-    const banRow = guest || me ? '' : ban
+    const banRow = guest || me || locked ? '' : ban
       ? `<div class="adm-row"><span class="lbl">Ban</span><span class="adm-grow sub">${esc(banText(ban))}</span><button class="adm-btn sm" data-m="unban">Unban</button></div>`
       : m.ask === 'ban'
         ? `<div class="adm-row"><span class="adm-ask adm-grow">Ban ${esc(r.name)} ${m.dur === 'perm' ? 'for good' : `for ${esc(len)}`}${m.reason ? ` (${esc(m.reason)})` : ''}${r.on ? ' and kick them' : ''}?</span>
@@ -633,9 +639,14 @@ export class AdminPanel {
     }));
   }
 
+  /** owner > admin > contributor > player (online: as their connection says; offline: as the lobby does) */
+  private rankOf(r: PlayerRow): string {
+    return r.on ? (r.on.owner ? 'owner' : r.on.admin ? 'admin' : r.on.contributor ? 'contributor' : 'player') : r.acc?.rank ?? 'player';
+  }
+
   /** Open (or shut) a row's Manage strip, maybe straight at a question */
   private openManage(r: PlayerRow, ask: 'kick' | null = null): void {
-    const rank = r.on ? (r.on.admin ? 'admin' : r.on.contributor ? 'contributor' : 'player') : r.acc?.rank ?? 'player';
+    const rank = this.rankOf(r);
     this.manage = this.manage?.key === r.key && !ask ? null : { key: r.key, rank, dur: '1d', reason: '', ask };
     this.renderPlayers(true);
   }

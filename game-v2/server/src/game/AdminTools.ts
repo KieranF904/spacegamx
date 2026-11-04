@@ -10,8 +10,13 @@
  * Managing players (players, rank, ban, unban) works on accounts whether
  * they're online or not, by username: admin rank and bans are kept by the
  * lobby (AdminHost.accounts), the contributor rank here (ContributorNotes).
- * No admin can demote or ban themselves, and an admin has to lose the rank
- * before they can be banned.
+ * No admin can demote or ban themselves. Ranks: owner > admin > contributor >
+ * player; an owner is an admin for every check. Granting or revoking admin is
+ * the owner's; an admin can't change an admin's or the owner's rank, or ban or
+ * unban them (an admin has to lose the rank before an admin can ban them; the
+ * owner can ban one outright). Nobody bans or demotes the owner here: that
+ * rank is set on the lobby's side only. The lobby checks the same rules again
+ * (each call names the acting admin).
  */
 
 import type { AdminAccountInfo, Bag } from '@space-game/common';
@@ -21,6 +26,8 @@ export interface AdminConn {
   playerId: number;
   username: string;
   isAdmin: boolean;
+  /** The owner rank (isAdmin is true for an owner too) */
+  isOwner?: boolean;
   ping: number;
   /** Join caps in effect, and switched to (common network/hits.ts CAPS: confirmed hits) */
   caps?: number;
@@ -86,6 +93,7 @@ type Args = Record<string, unknown>;
 export type Result = { ok: boolean; text: string; quiet?: boolean };
 type Rank = AdminAccountInfo['rank'];
 
+const OWNER_ONLY = 'Only the owner can grant or revoke admin';
 const NO_LOBBY = "This server has no lobby to keep accounts (or no LOBBY_ADMIN_SECRET): admin rank and bans can't be changed here";
 /** Accounts in one `players` answer */
 const PAGE = 50;
@@ -113,7 +121,7 @@ const HELP = [
   '/contributor name on|off (the contributor rank: map notes, F6) · /contributors (who has it)',
   '/freebuild [on|off] (dev servers: place any part in the hangar, nothing taken)',
   '/hits [on|off] [name] (confirmed hits: the network test switch; no on/off: the counters)',
-  '/players [name] (online or not) · /rank name player|contributor|admin · /ban name 1h|1d|7d|perm [reason] · /unban name',
+  '/players [name] (online or not) · /rank name player|contributor|admin (admin: the owner only) · /ban name 1h|1d|7d|perm [reason] · /unban name',
   'Party: /p message · /invite name · /leave · /kick name · /promote name',
 ];
 
@@ -169,7 +177,7 @@ export class AdminTools {
     return this.host.conns().map((c) => {
       const w = this.host.where(c);
       return {
-        id: c.playerId, name: c.username, ping: c.ping, admin: c.isAdmin,
+        id: c.playerId, name: c.username, ping: c.ping, admin: c.isAdmin, ...(c.isOwner ? { owner: true } : {}),
         system: w?.system ?? '?', x: Math.round(w?.x ?? 0), y: Math.round(w?.y ?? 0), dead: w?.dead ?? true,
         god: this.god.has(c), hidden: this.hidden.has(c), contributor: !!c.isContributor, freeBuild: this.freeBuild(c),
       };
@@ -407,7 +415,7 @@ export class AdminTools {
       case 'players': return this.listPlayers(me, str(a.search), Math.max(0, Math.round(num(a.offset))), a.quiet === true);
       case 'rank': return this.setRank(me, str(a.player), str(a.rank).toLowerCase());
       case 'ban': return this.ban(me, str(a.player), str(a.duration), str(a.reason).slice(0, 200));
-      case 'unban': return this.unban(str(a.player));
+      case 'unban': return this.unban(me, str(a.player));
 
       case 'codex': {
         const t = target();
@@ -446,12 +454,12 @@ export class AdminTools {
       ...online.map((c) => {
         // (By account id: a guest may have picked an account's name)
         const acc = c.userId != null ? accounts.find((u) => u.id === c.userId) : undefined;
-        const rank: Rank = c.isAdmin ? 'admin' : c.isContributor ? 'contributor' : 'player';
+        const rank: Rank = c.isOwner ? 'owner' : c.isAdmin ? 'admin' : c.isContributor ? 'contributor' : 'player';
         return { name: c.username, online: c.playerId, account: c.userId != null, rank, ban: acc?.ban ?? null };
       }),
       ...accounts.filter((u) => !online.some((c) => c.userId === u.id)).map((u): AdminAccountInfo => ({
         name: u.username, online: null, account: true,
-        rank: u.isAdmin ? 'admin' : contributors.has(u.username.toLowerCase()) ? 'contributor' : 'player', ban: u.ban,
+        rank: u.isOwner ? 'owner' : u.isAdmin ? 'admin' : contributors.has(u.username.toLowerCase()) ? 'contributor' : 'player', ban: u.ban,
       })),
     ];
     const more = total > offset + accounts.length;
@@ -492,10 +500,14 @@ export class AdminTools {
     if (rank !== 'player' && rank !== 'contributor' && rank !== 'admin') return { ok: false, text: 'Which rank? player, contributor or admin' };
     const t = await this.resolve(ref);
     if (t.online && t.online.userId == null) return { ok: false, text: `${t.name} is a guest: only signed-in accounts have ranks` };
+    const owner = this.isOwner(t);
+    if (owner) return { ok: false, text: `${t.name} is the owner: the owner rank is set on the server only` };
     if (this.isMe(me, t) && rank !== 'admin') return { ok: false, text: "You can't demote yourself" };
     const accounts = this.host.accounts;
     const wasAdmin = t.info?.isAdmin ?? t.online?.isAdmin ?? false;
     const adminChanges = (rank === 'admin') !== wasAdmin;
+    if (wasAdmin && !me.isOwner && !this.isMe(me, t)) return { ok: false, text: `${t.name} is an admin: only the owner can change an admin's rank` };
+    if (adminChanges && !me.isOwner) return { ok: false, text: OWNER_ONLY };
     if (adminChanges && !accounts) return { ok: false, text: NO_LOBBY };
     // Admins keep a contributor rank they had (it's theirs if they're demoted); players lose it
     // (first: then the admin rank's change tells their client both at once)
@@ -505,7 +517,7 @@ export class AdminTools {
       if (!r.ok) return r;
     }
     if (adminChanges) {
-      await accounts!.setAdmin(t.name, rank === 'admin');
+      await accounts!.setAdmin(t.name, rank === 'admin', this.actor(me));
       for (const c of this.sessions(t)) {
         // (A demoted admin's god mode and hiding go with the rank)
         if (rank !== 'admin') this.forget(c);
@@ -524,8 +536,9 @@ export class AdminTools {
     const t = await this.resolve(ref);
     if (!t.info) return { ok: false, text: `${t.name} is a guest (no account to ban): /boot them instead` };
     if (this.isMe(me, t)) return { ok: false, text: "You can't ban yourself" };
-    if (t.info.isAdmin) return { ok: false, text: `${t.name} is an admin: take the rank away first (/rank ${t.name} player)` };
-    const info = await accounts.ban(t.name, length === null ? null : Date.now() + length, reason, me.username);
+    if (this.isOwner(t)) return { ok: false, text: `${t.name} is the owner: owners can't be banned` };
+    if (t.info.isAdmin && !me.isOwner) return { ok: false, text: `${t.name} is an admin: only the owner can ban an admin` };
+    const info = await accounts.ban(t.name, length === null ? null : Date.now() + length, reason, me.username, this.actor(me));
     const ban = info.ban ?? { until: null, reason, by: me.username };
     // Everyone on that account goes, told why (their sessions are refused until it's over)
     const gone = this.sessions(t);
@@ -533,14 +546,25 @@ export class AdminTools {
     return { ok: true, text: `Banned ${t.name} ${banText(ban)}${gone.length ? ' (kicked)' : ''}` };
   }
 
-  private async unban(ref: string): Promise<Result> {
+  private async unban(me: AdminConn, ref: string): Promise<Result> {
     const accounts = this.host.accounts;
     if (!accounts) return { ok: false, text: NO_LOBBY };
     const t = await this.resolve(ref);
     if (!t.info) return { ok: false, text: `${t.name} is a guest: guests can't be banned` };
     if (!t.info.ban) return { ok: false, text: `${t.name} isn't banned` };
-    await accounts.unban(t.name);
+    if (t.info.isAdmin && !me.isOwner) return { ok: false, text: `${t.name} is ${this.isOwner(t) ? 'the owner' : 'an admin'}: only the owner can change that` };
+    await accounts.unban(t.name, this.actor(me));
     return { ok: true, text: `Unbanned ${t.name}` };
+  }
+
+  /** Has the owner rank (by their account, or their connection) */
+  private isOwner(t: { online: AdminConn | null; info: AccountInfo | null }): boolean {
+    return !!(t.info?.isOwner ?? t.online?.isOwner);
+  }
+
+  /** Who the lobby is told the change is for (the lobby checks their rank too): a signed-in admin, by account name */
+  private actor(me: AdminConn): string | undefined {
+    return me.userId != null ? me.username : undefined;
   }
 
   /** Every connection signed in to that account */

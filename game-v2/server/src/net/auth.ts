@@ -44,13 +44,13 @@ export async function handleJoin(ctx: ServerCtx, conn: ClientConnection, msg: an
     if (user) {
       conn.username = user.username;
       conn.userId = user.id;
-      conn.isAdmin = user.is_admin || ctx.guestAdmin;
+      setRanks(ctx, conn, user);
       conn.isContributor = ctx.contrib.hasRank(user.id, user.username);
       conn.authToken = msg.token;
       ctx.loginPilot(conn, user.id).catch((e) => ctx.fault('login', e));
-      console.log(`Player ${conn.playerId} authenticated as ${user.username}${user.is_admin ? ' (admin)' : ''}`);
+      console.log(`Player ${conn.playerId} authenticated as ${user.username}${user.is_owner ? ' (owner)' : user.is_admin ? ' (admin)' : ''}`);
       // (a notice to Kieran's phone on the live server; not for admins)
-      if (!user.is_admin) notifier.join(user.username, false, online(ctx));
+      if (!user.is_admin && !user.is_owner) notifier.join(user.username, false, online(ctx));
     } else {
       // Expired, signed out or banned (or the lobby's unreachable): back to the sign-in screen, not in as a guest
       rejectAuth(ctx, conn, error || 'Your session has ended. Sign in again.');
@@ -70,6 +70,7 @@ export async function handleJoin(ctx: ServerCtx, conn: ClientConnection, msg: an
     conn.username = name || `Guest_${Math.floor(Math.random() * 10000)}`;
     conn.userId = null;
     conn.isAdmin = ctx.everyoneAdmin || ctx.guestAdmin;
+    conn.isOwner = false;
     conn.isContributor = false;
     notifier.join(conn.username, true, online(ctx));
   }
@@ -80,6 +81,7 @@ export async function handleJoin(ctx: ServerCtx, conn: ClientConnection, msg: an
     success: true,
     username: conn.username,
     isAdmin: conn.isAdmin,
+    ...(conn.isOwner ? { isOwner: true } : {}),
     isContributor: ctx.contrib.allowed(conn),
     ...(conn.capsOffered ? { caps: conn.capsOffered } : {}),
   });
@@ -91,7 +93,7 @@ export async function handleAuthLogin(ctx: ServerCtx, conn: ClientConnection, ms
     conn.username = result.user.username;
     conn.userId = result.user.id;
     ctx.loginPilot(conn, result.user.id).catch((e) => ctx.fault('login', e));
-    conn.isAdmin = result.user.is_admin || ctx.guestAdmin;
+    setRanks(ctx, conn, result.user);
     conn.isContributor = ctx.contrib.hasRank(result.user.id, result.user.username);
     conn.authToken = result.token;
     
@@ -101,11 +103,18 @@ export async function handleAuthLogin(ctx: ServerCtx, conn: ClientConnection, ms
       username: result.user.username,
       token: result.token,
       isAdmin: conn.isAdmin,
+      ...(conn.isOwner ? { isOwner: true } : {}),
       isContributor: ctx.contrib.allowed(conn),
     });
   } else {
     rejectAuth(ctx, conn, result.error);
   }
+}
+
+/** An account's ranks on its connection: owner > admin > pilot (an owner passes every admin check) */
+function setRanks(ctx: ServerCtx, conn: ClientConnection, user: { is_admin: boolean; is_owner?: boolean }): void {
+  conn.isOwner = !!user.is_owner;
+  conn.isAdmin = user.is_admin || conn.isOwner || ctx.guestAdmin;
 }
 
 /** Pilots on the server now (joined connections) */
@@ -144,7 +153,7 @@ export async function handleAuthRegister(ctx: ServerCtx, conn: ClientConnection,
     conn.username = result.user.username;
     conn.userId = result.user.id;
     ctx.loginPilot(conn, result.user.id).catch((e) => ctx.fault('login', e));
-    conn.isAdmin = result.user.is_admin || ctx.guestAdmin;
+    setRanks(ctx, conn, result.user);
     conn.isContributor = ctx.contrib.hasRank(result.user.id, result.user.username);
     conn.authToken = result.token;
     
@@ -154,6 +163,7 @@ export async function handleAuthRegister(ctx: ServerCtx, conn: ClientConnection,
       username: result.user.username,
       token: result.token,
       isAdmin: conn.isAdmin,
+      ...(conn.isOwner ? { isOwner: true } : {}),
       isContributor: ctx.contrib.allowed(conn),
     });
   } else {
