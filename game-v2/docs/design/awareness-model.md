@@ -1181,6 +1181,12 @@ the probes, and the parity tests (replication, confirmedHits, selfHits, bodies, 
   v_max · T_fix arrived as a record.
 
 **Phase 6: resolved streams, waypoint laws and the cell hash.**
+- *Status (2026-11-04, `CAPS.WAYPOINTS` 4096, protocol 40):* the waypoint law is built for homing shells and mobs
+  (common guidance/; docs/areas/networking.md "Scheduled waypoints"): the server flies on it, a client derives the
+  waypoints when it held the target through a window and takes the server's records otherwise (MODE per window),
+  exact through the switch; checked on its own check. Measured in docs/audits/waypoints-2026-11-04.md (a missile
+  barrage in focus: 2,168 -> 657 B/s). Not built: the AI pilot (needs the commander/pilot split), guided shells,
+  the bodied boss's rows variant, the per-cell hash. A shell's or mob's "focus" is the 12 km projectile range.
 - The waypoint law in common (6.3): the planner, spacing, swerve check and steering law.
   - Homing shells first; then mobs; then the AI pilot, with the commander/pilot split (decision-inputs stage 7).
   - The server flies on it. Goldens move: guidance changes behaviour, on purpose.

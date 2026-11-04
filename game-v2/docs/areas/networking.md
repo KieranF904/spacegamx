@@ -149,6 +149,29 @@ with a ship whose structure it lacks, two rebuilds in a window, a rebuild betwee
 (the parent's pose as the server split it: ShipCauses.beforeRebuild; client ships/debris/DebrisSplits.ts, shared with
 the fakes). Tests: server/src/net/causes/causes.test.ts. Measured: docs/audits/effects-2026-11-04.md.
 
+### Scheduled waypoints (protocol 40, `CAPS.WAYPOINTS` 4096, common guidance/)
+With OWN_SIM (dev builds; `?waypoints=0|1`). Homing shells (missiles, hive seekers, salvo and boss homing volleys: any
+`def.homing` that isn't `guided`) and mobs fly by one shared law, on the server and on a WAYPOINTS client's tick layer
+(common guidance/waypoints.ts): a waypoint is a point on the 4-unit grid and the tick the next takes over; the planner
+makes the first from the target's state, checks for a swerve every 4 ticks (staggered by id; replaced past
+max(64, 0.15 × the distance left)), and queues the next min(16, L/2) ticks before the current ends, spacing L 48..4
+(mobs 32..4) by the ticks to the target; the steer turns toward it (a mob: points, thrusts, sideways drift 0.86).
+State is on the 1/256 grid (a mob's heading 1/65536), so a SYNC carries it exactly. The server (Weapons.home, Mobs.tick)
+reads the target as it is then: a pilot after its step, anything else as it ended the tick before; the client reads
+`preAt` and `at(t - 1)` alike (GuideRunner.targetAt). net/guides/GuideNet.ts keeps one log of each one's records
+(sources: Weapons, Mobs) and gives a WAYPOINTS client, in snapshot field `guides` (`w`, index 13; packed as the
+decisions are) `[id, dt, op, ...]`: SYNC when one comes within the projectile range (12 km), then per window MODE when
+it changes (derived: it held the target, or it's its own ship, at its last snapshot and now and the target isn't
+keyframed in this one; else sent), WP/NEXT in sent windows, LOST and TARGET (a mob's brain's pick) always, OFF out of
+range. It gets no projectile rows of a shell it runs after the first, and a mob's row only when its HP changes; a
+snapshot always goes while it runs one. The client (client ships/guides/GuideRunner.ts, shared with the fakes) steps
+each to the snapshot's tick (LOST/TARGET, the queue, then the planner or the sent records, the steer, the move) and
+draws it from there (`draw`: the rows it would have had). Its own check's state byte adds a byte over the ones it runs
+(`GuideRunner.byte`, server `GuideNet.heldSum`); off, all are SYNCed again (`GuideNet.resync`). A told hit ends one
+too (`remove`). Not on it: guided shells (they follow the owner's cursor), AI ships (control rows, already exact).
+Tests: common/src/guidance/waypoints.test.ts, server/src/net/guides/guides.test.ts (scene:
+server/src/bench/guides/guideScene.testkit.ts). Measured: docs/audits/waypoints-2026-11-04.md.
+
 ### Debris (protocol 25)
 When a part's loss splits a ship (rebuildNow's orphan groups; not boss sheds, which are scenery), a client that has the ship as it was (its last sync's centre of mass is the split's: `DebrisNet.comAt`) and replicates it gets a `debrisSplit` `[id, tick, e (piece ids, packIds), p (the parts that left, packRuns)]` before the ship's own sync, and works the pieces out itself (`deriveSplit`: the parts' joins into groups in rebuild order, each piece's blueprint, HP as it has them, its pose from the ship's replica at the split's tick, push and spin seeded by ship, tick and group, deterministic trig). It adds them to its store and replicas, makes their status rows (`DEBRIS_STATUS`) and acks each with `debrisHash`. The server holds the pieces back from that client meanwhile (`ClientConnection.debrisHeld`: no sync, keyframe, row or HP); a right ack marks them sent (`SnapshotBuilder.ackDebris`); a wrong one, or none within `DEBRIS_ACK_TICKS` plus twice the ping, and they go as any ship does. Debris then drifts and knocks into other debris only (ships ignore it), push only, all pieces of a system stepped together in id order (`stepDebrisWorld`) on the server and in `ShipReplicaSet` (`stepDebrisTo`: a keyframe or new piece is how its tick ended; the world is stepped again from the tick before). A piece moved by anything else (a rebuild's shift, a blast, a tow), and whatever knocked into it before the snapshot, is keyframed (`DebrisNet.touched`, Replication `Drift:moved`); so is a piece knocked by one a client doesn't step (out of view, or not had yet). Damage, crumbling and removal stay server-told.
 
@@ -185,6 +208,7 @@ When a part's loss splits a ship (rebuildNow's orphan groups; not boss sheds, wh
 - `npx vitest run server/src/net/snapshot` : packed frames on a real fight (every packed message decoded on the side and compared; a packed and a base-format observer see the same; switching off and on; coalescing).
 - `npx vitest run server/src/net` : replication/keyframes (`replication.test.ts`), lodestones, ship view, socket limits (`socketTransport.test.ts`), confirmed hits parity (`hits/confirmedHits.test.ts`: a capable and a legacy client in the same fight end with the same HP, damage, fires and removals).
 - `npx vitest run server/src/proto server/src/game/robustness.test.ts` : transport and hostile input.
+- `npx vitest run common/src/guidance server/src/net/guides` : homing shells and mobs on the tick layer (CAPS.WAYPOINTS): derived, sent, the switch, a drift caught, legacy rows.
 - Bandwidth bench: `cd server && npm run bench:net` (server/src/bench/netBench.ts).
 
 ## Gotchas
