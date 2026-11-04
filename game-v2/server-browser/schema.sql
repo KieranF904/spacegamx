@@ -27,6 +27,10 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS banned_until BIGINT;   -- epoch ms; N
 ALTER TABLE users ADD COLUMN IF NOT EXISTS ban_reason   TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS banned_by    TEXT;     -- the admin's username
 
+-- The owner rank, above admin (added later, the same way; PostgresUserStore.upgrade() also adds it at start).
+-- Set only from the server side: the lobby's /admin/set-owner (behind LOBBY_ADMIN_SECRET) or OWNER_USERNAMES.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_owner     BOOLEAN NOT NULL DEFAULT FALSE;
+
 CREATE TABLE IF NOT EXISTS sessions (
     token      TEXT PRIMARY KEY,          -- 48 random bytes, hex
     user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

@@ -3,7 +3,7 @@
  *
  * These mirror the PostgreSQL schema in ../../schema.sql exactly:
  *
- *   users:    (id, username, email, password_hash, salt, is_admin, created_at,
+ *   users:    (id, username, email, password_hash, salt, is_admin, is_owner, created_at,
  *              banned_until, ban_reason, banned_by)
  *   sessions: (token, user_id, expires_at)
  *
@@ -17,6 +17,8 @@ export interface UserRecord {
   username: string;
   email: string;
   is_admin: boolean;
+  /** The owner rank (above admin: an owner is an admin everywhere). Set only server-side: set-owner, OWNER_USERNAMES */
+  is_owner: boolean;
   created_at: string;
   /** Banned until this time (epoch ms; BAN_FOREVER for good). null, or past: not banned */
   banned_until: number | null;
@@ -68,6 +70,9 @@ export interface UserStore {
   getUserByUsername(username: string): Promise<UserRecord | null>;
 
   setAdmin(userId: number, isAdmin: boolean): Promise<void>;
+
+  /** The owner rank (only the lobby's set-owner and OWNER_USERNAMES call this) */
+  setOwner(userId: number, isOwner: boolean): Promise<void>;
 
   /** Ban until `until` (epoch ms; BAN_FOREVER for good), or lift the ban (null) */
   setBan(userId: number, until: number | null, reason: string, by: string): Promise<void>;

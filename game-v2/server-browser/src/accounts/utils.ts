@@ -15,6 +15,18 @@ export const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 /** A ban that never ends (the year 9999): banned_until at or past this is for good */
 export const BAN_FOREVER = 253_402_300_799_000;
 
+/** Ranks, highest first: an owner is an admin everywhere (every admin check passes for one) */
+export type Rank = 'owner' | 'admin' | 'pilot';
+
+export function rankOf(user: { is_admin: boolean; is_owner?: boolean }): Rank {
+  return user.is_owner ? 'owner' : user.is_admin ? 'admin' : 'pilot';
+}
+
+/** Admin or owner */
+export function isAdminRank(user: { is_admin: boolean; is_owner?: boolean }): boolean {
+  return rankOf(user) !== 'pilot';
+}
+
 /** Why this account can't sign in (null: it's not banned, or the ban is over) */
 export function banMessage(user: { banned_until: number | null; ban_reason: string | null }, now = Date.now()): string | null {
   if (user.banned_until === null || user.banned_until <= now) return null;

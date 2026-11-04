@@ -3,7 +3,7 @@
  *
  * Persists the exact same schema as the PostgreSQL backend:
  *
- *   users:    (id, username, email, password_hash, salt, is_admin, created_at,
+ *   users:    (id, username, email, password_hash, salt, is_admin, is_owner, created_at,
  *              banned_until, ban_reason, banned_by)
  *   sessions: (token, user_id, expires_at)
  *
@@ -47,6 +47,8 @@ interface StoredUser {
   password_hash: string;
   salt: string;
   is_admin: boolean;
+  /** The owner rank (see UserRecord); missing in records from before it: false */
+  is_owner?: boolean;
   created_at: string;
   /** Ban (see UserRecord); missing in records from before bans */
   banned_until?: number | null;
@@ -223,6 +225,7 @@ export class JsonUserStore implements UserStore {
       password_hash: passwordHash,
       salt,
       is_admin: false,
+      is_owner: false,
       created_at: new Date().toISOString(),
     };
     this.users.push(user);
@@ -299,6 +302,14 @@ export class JsonUserStore implements UserStore {
     const user = this.users.find(u => u.id === userId);
     if (user) {
       user.is_admin = isAdmin;
+      this.save();
+    }
+  }
+
+  async setOwner(userId: number, isOwner: boolean): Promise<void> {
+    const user = this.users.find(u => u.id === userId);
+    if (user) {
+      user.is_owner = isOwner;
       this.save();
     }
   }
@@ -392,6 +403,7 @@ export class JsonUserStore implements UserStore {
       username: user.username,
       email: user.email,
       is_admin: user.is_admin,
+      is_owner: user.is_owner === true,
       created_at: user.created_at,
       banned_until: user.banned_until ?? null,
       ban_reason: user.ban_reason ?? null,

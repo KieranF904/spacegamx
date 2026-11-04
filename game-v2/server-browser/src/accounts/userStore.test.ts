@@ -63,6 +63,12 @@ function contract(name: string, make: () => Promise<{ store: UserStore; done: ()
       expect((await store.getUserById(id))?.banned_until).toBeNull();
       await store.setAdmin(id, true);
       expect((await store.getUserByUsername('CONTRACT-CY'))?.is_admin).toBe(true);
+      expect(reg.user.is_owner).toBe(false);
+      await store.setOwner(id, true);
+      expect((await store.getUserById(id))?.is_owner).toBe(true);
+      expect((await store.validateSession(reg.token))?.is_owner).toBe(true);
+      await store.setOwner(id, false);
+      expect((await store.getUserByUsername('contract-cy'))?.is_owner).toBe(false);
       const page = await store.listUsers('contract-', 0, 10);
       expect(page.users.map((u) => u.username)).toContain('contract-cy');
       expect(page.total).toBeGreaterThanOrEqual(1);

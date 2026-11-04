@@ -50,6 +50,8 @@ export interface StoredUser {
   password_hash: string;
   salt: string;
   is_admin: boolean;
+  /** Missing in records from before the owner rank: false */
+  is_owner?: boolean;
   created_at: string;
   banned_until?: number | null;
   ban_reason?: string | null;
@@ -270,9 +272,9 @@ export async function writePlan(plan: Plan, opts: MigrateOptions): Promise<Migra
     }
     for (const u of plan.users) {
       await client.query(
-        `INSERT INTO users (id, username, email, password_hash, salt, is_admin, created_at, banned_until, ban_reason, banned_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-        [u.id, u.username, u.email, u.password_hash, u.salt, !!u.is_admin, u.created_at, u.banned_until ?? null, u.ban_reason ?? null, u.banned_by ?? null]);
+        `INSERT INTO users (id, username, email, password_hash, salt, is_admin, is_owner, created_at, banned_until, ban_reason, banned_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        [u.id, u.username, u.email, u.password_hash, u.salt, !!u.is_admin, u.is_owner === true, u.created_at, u.banned_until ?? null, u.ban_reason ?? null, u.banned_by ?? null]);
     }
     for (const s of plan.sessions) {
       await client.query('INSERT INTO sessions (token, user_id, expires_at) VALUES ($1, $2, $3)', [s.token, s.user_id, s.expires_at]);
@@ -358,7 +360,7 @@ export interface Check { name: string; ok: boolean; detail: string }
 
 function publicRecord(u: StoredUser): UserRecord {
   return {
-    id: u.id, username: u.username, email: u.email, is_admin: u.is_admin, created_at: u.created_at,
+    id: u.id, username: u.username, email: u.email, is_admin: u.is_admin, is_owner: u.is_owner === true, created_at: u.created_at,
     banned_until: u.banned_until ?? null, ban_reason: u.ban_reason ?? null, banned_by: u.banned_by ?? null,
   };
 }
@@ -389,7 +391,7 @@ export async function verify(databaseUrl: string, plan: Plan, src: JsonSource, n
       if (!got) { add(tag, false, 'missing'); continue; }
       const exp = publicRecord(u);
       const diffs: string[] = [];
-      for (const k of ['id', 'username', 'email', 'is_admin', 'banned_until', 'ban_reason', 'banned_by'] as const) {
+      for (const k of ['id', 'username', 'email', 'is_admin', 'is_owner', 'banned_until', 'ban_reason', 'banned_by'] as const) {
         if (got[k] !== exp[k]) diffs.push(k === 'email' ? 'email differs' : `${k}: ${String(got[k])} vs ${String(exp[k])}`);
       }
       if (Date.parse(got.created_at) !== Date.parse(exp.created_at)) diffs.push(`created_at: ${got.created_at} vs ${exp.created_at}`);

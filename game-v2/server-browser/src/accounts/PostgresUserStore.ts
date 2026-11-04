@@ -4,7 +4,7 @@
  * Implements the same UserStore interface as JsonUserStore, using the
  * schema defined in ../../schema.sql:
  *
- *   users:    (id, username, email, password_hash, salt, is_admin, created_at,
+ *   users:    (id, username, email, password_hash, salt, is_admin, is_owner, created_at,
  *              banned_until, ban_reason, banned_by)
  *   sessions: (token, user_id, expires_at)
  *
@@ -59,6 +59,7 @@ interface UserRow {
   password_hash: string;
   salt: string;
   is_admin: boolean;
+  is_owner: boolean;
   created_at: Date | string;
   banned_until: string | number | null;
   ban_reason: string | null;
@@ -66,7 +67,10 @@ interface UserRow {
 }
 
 /** The public columns (no credentials) */
-const PUBLIC = 'id, username, email, is_admin, created_at, banned_until, ban_reason, banned_by';
+const PUBLIC = 'id, username, email, is_admin, is_owner, created_at, banned_until, ban_reason, banned_by';
+
+/** schema.sql's statement for the owner rank (upgrade() runs it on a database from before it) */
+export const OWNER_COLUMN = 'ALTER TABLE users ADD COLUMN IF NOT EXISTS is_owner BOOLEAN NOT NULL DEFAULT FALSE';
 
 export class PostgresUserStore implements UserStore {
   private pool: PgPool;
@@ -84,7 +88,28 @@ export class PostgresUserStore implements UserStore {
     // Non-literal specifier so TypeScript doesn't require 'pg' at compile time
     const moduleName = 'pg';
     const pg: any = await import(moduleName);
-    return new PostgresUserStore(new pg.Pool({ connectionString }) as unknown as PgPool);
+    const store = new PostgresUserStore(new pg.Pool({ connectionString }) as unknown as PgPool);
+    await store.upgrade();
+    return store;
+  }
+
+  /**
+   * Columns added to users since a database was made (schema.sql adds them too, but nobody re-applies it on a
+   * deploy), added at start: the same statement as schema.sql, run only when missing (the check needs no special
+   * rights; the ALTER needs the table's owner). No users table at all: schema.sql hasn't been applied, left alone.
+   */
+  async upgrade(): Promise<void> {
+    const r = await this.pool.query(
+      `SELECT to_regclass('users') IS NOT NULL AS users,
+              EXISTS (SELECT 1 FROM information_schema.columns
+                      WHERE table_schema = current_schema() AND table_name = 'users' AND column_name = 'is_owner') AS owner`);
+    if (!r.rows[0]?.users || r.rows[0]?.owner) return;
+    try {
+      await this.pool.query(OWNER_COLUMN);
+      console.log('[UserStore] Added users.is_owner');
+    } catch (e) {
+      throw new Error(`users has no "is_owner" column and this database user can't add it: run server-browser/schema.sql as the table's owner (${e})`);
+    }
   }
 
   // ============================================
@@ -116,8 +141,8 @@ export class PostgresUserStore implements UserStore {
       const passwordHash = await hashPassword(password, salt);
 
       const result = await client.query(
-        `INSERT INTO users (username, email, password_hash, salt, is_admin)
-         VALUES ($1, $2, $3, $4, false)
+        `INSERT INTO users (username, email, password_hash, salt, is_admin, is_owner)
+         VALUES ($1, $2, $3, $4, false, false)
          RETURNING ${PUBLIC}`,
         [username, email, passwordHash, salt]
       );
@@ -150,7 +175,7 @@ export class PostgresUserStore implements UserStore {
 
   async validateSession(token: string): Promise<UserRecord | null> {
     const result = await this.pool.query(
-      `SELECT u.id, u.username, u.email, u.is_admin, u.created_at, u.banned_until, u.ban_reason, u.banned_by
+      `SELECT u.id, u.username, u.email, u.is_admin, u.is_owner, u.created_at, u.banned_until, u.ban_reason, u.banned_by
        FROM sessions s
        JOIN users u ON u.id = s.user_id
        WHERE s.token = $1 AND s.expires_at > $2`,
@@ -195,6 +220,10 @@ export class PostgresUserStore implements UserStore {
 
   async setAdmin(userId: number, isAdmin: boolean): Promise<void> {
     await this.pool.query('UPDATE users SET is_admin = $1 WHERE id = $2', [isAdmin, userId]);
+  }
+
+  async setOwner(userId: number, isOwner: boolean): Promise<void> {
+    await this.pool.query('UPDATE users SET is_owner = $1 WHERE id = $2', [isOwner, userId]);
   }
 
   async setBan(userId: number, until: number | null, reason: string, by: string): Promise<void> {
@@ -272,6 +301,7 @@ export class PostgresUserStore implements UserStore {
       username: row.username,
       email: row.email,
       is_admin: !!row.is_admin,
+      is_owner: !!row.is_owner,
       created_at: row.created_at instanceof Date
         ? row.created_at.toISOString()
         : String(row.created_at || ''),
