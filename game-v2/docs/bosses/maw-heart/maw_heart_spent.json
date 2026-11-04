@@ -97,8 +97,8 @@
   {
    "uid": 9,
    "piece": "mawheart_s3_core_spent",
-   "fn": "core",
-   "material": "maw_coreglass",
+   "fn": "armor",
+   "material": "maw_crust",
    "x": 0,
    "y": 0,
    "rot": 0,

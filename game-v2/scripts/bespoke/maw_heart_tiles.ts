@@ -13,7 +13,7 @@
 //   19 maw_heartstone  dense stone in strata, warped; fine grain; pits; hairline cracks across the strata
 //   20 maw_seamglass   dark glass with a flow through it; fissures, most of them lit
 //   21 maw_bone        bone: a fibrous grain one way, pores, faint growth rings
-//   22 maw_coreglass   the core's glass: smooth, so its feathered light isn't broken up (in place of the Scrap Mother's 22)
+//   22 maw_coreglass   the core's glass: smooth, slow cells of light in it, as a sun's surface (in place of the Scrap Mother's 22)
 
 function mawTile(kind: number, h: Float32Array, e: Float32Array, groove: (d: number, w: number) => number): Tile {
   const k = new Float32Array(N * N);
@@ -57,8 +57,12 @@ function mawTile(kind: number, h: Float32Array, e: Float32Array, groove: (d: num
       if (hash2(Math.min(c.id, c.id2), Math.max(c.id, c.id2), 423) < 0.35 && c.gap < 2.0) e[o] = (1 - c.gap / 2.0) * 0.55;
       k[o] = (fbm(i, j, 6, 424, 2) - 0.5) * 0.3;
     } else if (kind === 22) {
-      // the core's glass: smooth, a faint swirl in it, nothing to break up its light
-      v = (fbm(i, j, 4, 441, 2) - 0.5) * 0.25;
+      // the core's glass: smooth to the touch, cells of light slowly turning in it (as a sun's surface), bright in their
+      // middles, dimmer in the lanes between; a faint swirl over all
+      const cell = voronoi(i, j, 9, 451), swirl = fbm(i, j, 3, 452, 3);
+      v = Math.sqrt(Math.min(1, cell.gap / 9)) * 0.18 + (swirl - 0.5) * 0.35;
+      e[o] = 0.012 + 0.05 * Math.min(1, cell.gap / 7) * (0.6 + 0.8 * swirl);
+      k[o] = -Math.max(0, 1 - cell.gap / 3) * 0.12;
     } else {
       // bone: a fibrous grain one way, pores, faint growth rings
       v = (vnoise2(i, j, 64, 4, 431) - 0.5) * 1.4 + Math.sin(j * 0.9 + fbm(i, j, 8, 432, 2) * 6) * 0.12;

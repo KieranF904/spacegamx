@@ -83,6 +83,16 @@ await esbuild.build({
         src = src.replace(hook, '  if (kind >= 18 && kind <= 22) return mawTile(kind, h, e, groove);\n' + hook);
         return { contents: src + '\n' + readFileSync(join(root, 'scripts/bespoke/maw_heart_tiles.ts'), 'utf8'), loader: 'ts' };
       });
+      // (smooth glows and veins: scripts/bespoke/maw_heart_relief.ts in place of the stacked discs and the stepped bars)
+      b.onLoad({ filter: /client[\\/]src[\\/]ships[\\/]bespokeRelief\.ts$/ }, (args) => {
+        let src = readFileSync(args.path, 'utf8');
+        const a = src.indexOf("    case 'vein':"), z = src.indexOf("    case 'cable':");
+        if (a < 0 || z < a || !src.includes('function glowDisc(')) throw new Error('bespokeRelief.ts changed: the vein or glow code is gone');
+        src = src.slice(0, a) + "    case 'vein':\n      if (poly && poly.length >= 4) mawVein(g, poly, w, own ?? col.glow, col.body);\n      break;\n" + src.slice(z);
+        src = src.replace('function glowDisc(', 'function glowDiscStacked(');
+        src += '\nfunction glowDisc(g: ShipGeometry, x: number, y: number, r: number, sides: number, rim: number, rot = 0): void { mawGlow(g, x, y, r, sides, rim, rot); }\n';
+        return { contents: src + readFileSync(join(root, 'scripts/bespoke/maw_heart_relief.ts'), 'utf8'), loader: 'ts' };
+      });
       b.onLoad({ filter: /client[\\/]src[\\/]ships[\\/]hullLook\.ts$/ }, (args) => {
         let src = readFileSync(args.path, 'utf8').replace(/^\s*scrap_(iron|rust|paint|steel|seam):.*$/gm, '');
         const at = src.indexOf('  pyre_glass:');

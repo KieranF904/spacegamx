@@ -38,7 +38,8 @@ four-fold about its middle (the four axes), mirrored left to right, with **delib
 apex only, longer roots behind (the side it lies buried on), and a lump of overgrowth on its right shoulder. So it
 reads as one thing with a front and a back, not as a wheel.
 
-How the look got here (each pass is kept in the panels folder: `maw-heart-v1-vs-v2.png`, `maw-heart-v2-vs-v3.png`):
+How the look got here (each pass is kept in the panels folder: `maw-heart-v1-vs-v2.png`, `maw-heart-v2-vs-v3.png`,
+`maw-heart-v3-vs-v4.png`):
 1. **First pass:** chaotic. Ten roots and seven crown shards of uneven length, crust in many same-sized slabs, gold as
    thin slivers.
 2. **Second pass** (after "a bit chaotic and flat"): a clear hierarchy. A few big masses (caps, buttresses, four roots),
@@ -57,8 +58,13 @@ How the look got here (each pass is kept in the panels folder: `maw-heart-v1-vs-
      round a deep, wet, dark hollow with gold pooled at the bottom. The ladder struts are now **sinew and bone braces**.
    - **The node: half made, half grown.** A machined collar of dark metal (eight equal plates, exact gaps, true rings,
      bolts) with the last four roots grown over and through it. The roots are curved and uneven, not mirrored. Round
-     the collar sit small knobs of growth. The core is smooth glass with a **feathered light**: thirty steps from ember
-     at its rim to white at its middle, so it falls off smoothly instead of as a hard disc.
+     the collar sit small knobs of growth. The core is a **glowing orb**: dark at its limb, cells of light slowly
+     turning in its glass (as a sun's surface, kept faint), and a feathered white light at its middle.
+   - **Fourth pass** (close-ups, `maw-heart-v3-vs-v4.png`):
+     - The veins are smooth tapered strokes with pointed ends, no overlapping bars, with a soft halo on the rock.
+     - Every glow (core, eye, knots, ventricle lights) is a smooth gradient, with no rings.
+     - The spent core is a cooled, cracked, dark orb with one last ember.
+     - Both changes to the renderer are prototyped (section "Surface texture").
    - **The root knots** are no longer ringed portholes. Each is a lump of seam glass with a clutch of crystal grown out
      of it round a small light.
    - **Surface texture** (below): the stone, glass and bone now have visible grain, strata, pits and cracks up close.
@@ -133,10 +139,20 @@ The close-ups (`maw-heart-closeups.png`: crust, a ventricle, the core, at zoom 1
 - [ ] **Not possible today: texture on the skeleton.** The lattice is drawn by `skeletonBuild.ts` as lit geometry in
       its palette, with no atlas tile, so its bone can be coloured but not grained. Grain there would need the lit
       shader to sample a tile: small shader work, optional.
-- [ ] **A true soft glow** (optional): the core's feathered light is thirty stacked `glow` discs. Up close a few faint
-      steps still show at its very middle. A `flare` detail drawn as one radial-gradient sprite (the native renderer
-      already draws `sprite` draws for bloom) would be smoother and cheaper. That is new detail-kind work in
-      `bespokeRelief.ts` and the renderers.
+- [ ] **Smooth glows and veins** (fourth pass; prototyped in `scripts/bespoke/maw_heart_relief.ts`, spliced into the
+      private bundle's copy of `client/src/ships/bespokeRelief.ts`). The game's `glowDisc` stacks five flat discs, so
+      every glow posterises into rings. Its `vein` draws one quad a step plus a dark groove under each, so up close a
+      vein is a run of overlapping bars with square ends. The prototype uses per-vertex colour, which the hull geometry
+      already carries, and lets the GPU blend:
+      - a glow is one disc of rings, its rim colour running through gold to white at its middle;
+      - a vein is one stroke along a smoothed path, tapering to a point: hot down its middle, gold at its sides, and a
+        halo either side fading into the stone's own colour.
+
+      It costs no shader work: about 60 lines replacing two functions in `bespokeRelief.ts`. A glow goes from about 120
+      vertices to about 650 and a vein from about 40 to about 150, which is negligible for a boss's hull, built once in
+      the worker. **It changes every boss's glows and veins**, the Pyreclast's and the Brood Mother's included, so check
+      them when it's built. Up close the veins still catch the light like polished metal, because the hull shader lights
+      them. That is acceptable, or the veins can be drawn unlit (`aGlow` 1) all the way across.
 
 ### Materials (and how they reflect the Maw)
 

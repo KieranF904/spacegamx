@@ -183,12 +183,8 @@ const clutch = (c, n, len, seed, color = '#c79a52') => Array.from({ length: n },
   const a = (i / n) * 360 + nz(seed + i) * 40;
   return crystal([round(c[0] + Math.sin(a * DEG) * 0.6), round(c[1] - Math.cos(a * DEG) * 0.6)], [Math.sin(a * DEG), -Math.cos(a * DEG)], len * (0.7 + nz(seed * 3 + i) * 0.6), len * 0.32, color);
 });
-/** A feathered light: many thin steps from ember at its edge to white at its middle, so it falls off smoothly */
-function feather(c, r, steps = 14) {
-  const ramp = [[0, [0x4a, 0x26, 0x0a]], [0.3, [0x9a, 0x54, 0x14]], [0.55, [0xe0, 0x90, 0x2c]], [0.75, [0xff, 0xc8, 0x66]], [0.9, [0xff, 0xea, 0xb8]], [1, [0xff, 0xfb, 0xf2]]];
-  const at = (t) => { let k = 0; while (k < ramp.length - 2 && t > ramp[k + 1][0]) k++; const [t0, a] = ramp[k], [t1, b] = ramp[k + 1], f = (t - t0) / (t1 - t0); return '#' + a.map((v, i) => Math.round(v + (b[i] - v) * f).toString(16).padStart(2, '0')).join(''); };
-  return Array.from({ length: steps }, (_, k) => { const t = k / (steps - 1); return { kind: 'glow', at: c, r: round(r * (1 - t * 0.82)), color: at(t), sides: 40 }; });
-}
+/** A feathered light: one glow, ember at its rim to white at its middle (the renderer blends it smoothly: maw_heart_relief.ts) */
+const feather = (c, r) => [{ kind: 'glow', at: c, r, color: '#241103', sides: 48 }];
 
 // =====================================================================================================================
 // Stage 3, the node: beneath everything (drawn first), bared when its chambers burst. Half made, half grown: a machined
@@ -227,7 +223,7 @@ part('s3_core', 'core', 'maw_coreglass', ringPts([0, 0], 7.6, 40, 0), {
   ...S3, ruin: true,
   detail: [
     recess(ringPts([0, 0], 7.0, 40, 0), '#120e0a'),
-    ...feather([0, 0], 6.4, 30),
+    ...feather([0, 0], 6.0),
   ],
 });
 
@@ -257,7 +253,7 @@ onAxes((k, deg, emit) => {
     detail: [
       raise(chip(oval(c, 6.2, 3.9, dir, 16), 0.06, sd + 1), '#3e2c24'),
       recess(chip(oval(c, 5.0, 2.9, dir, 16), 0.08, sd + 2), '#060504'),
-      glow(P(r1 - 2.1, deg), 1.6, '#5a3410'), glow(P(r1 - 2.0, deg), 0.9, '#c47a24'), glow(P(r1 - 2.0, deg), 0.4, GOLD2),
+      glow(P(r1 - 2.0, deg), 1.9, '#2a1406'),
       raise(strip([P(r1 + 1.9, deg - 7), P(r1 + 2.5, deg - 2), P(r1 + 2.4, deg + 3)], 0.35, 0.12), '#8a7a72'),
     ],
   });
@@ -267,8 +263,8 @@ part('septum', 'armor', STONE, chip(ringPts([0, 0], 11.5, 22, 0.13), 0.06, 21), 
   ...S2, relief: 'plate',
   detail: [
     raise(chip(ringPts([0, 0], 10, 16, 0.3), 0.1, 22), FACE), raise(chip(ringPts([0, 0], 8.2, 12, 0.1), 0.12, 23), TOP),
-    ...[0, 90, 180, 270].flatMap((d, i) => veinTree(4.4, 11, d, 0.36, 40 + i, 2)),
-    recess(chip(ringPts([0, 0], 4.3, 14, 0.2), 0.12, 24), '#0d0c0b'), ...feather([0, 0], 3.6, 18),
+    ...[0, 90, 180, 270].flatMap((d, i) => veinTree(4.4, 11, d, 0.3, 40 + i, 2)),
+    recess(chip(ringPts([0, 0], 4.3, 14, 0.2), 0.12, 24), '#0d0c0b'), ...feather([0, 0], 3.6),
   ],
 });
 // Its braces on the diagonals, between the chambers: sinew and bone, not pipes (optional: they feed its pull)
@@ -321,8 +317,7 @@ onAxes((k, deg, emit) => {
       raise(chip(oval(P(r1 - 2.4, deg + half - 9), 1.1, 0.7, [1, -0.2], 7), 0.25, sd + 4), '#55585e'),
       raise(chip(oval(P(16.5, deg + half - 5), 0.9, 0.6, [0.4, 1], 6), 0.25, sd + 5), '#55585e'),
       // (warm stone round the vein, near the heart only)
-      raise(chip(strip(radial(14, 22, deg), 3.6, 1.6), 0.08, sd + 6), WARM2),
-      ...veinTree(14, r1 - 2.5, deg, 1.0, sd * 19),
+      ...veinTree(14, r1 - 2.5, deg, 0.6, sd * 19),
     ],
   });
 });
@@ -343,9 +338,9 @@ part('crust_key', 'armor', STONE, chip(ringPts([0, 0], 15, 22, 0.13), 0.05, 31),
   detail: [
     raise(chip(ringPts([0, 0], 13.2, 14, 0.3), 0.1, 32), FACE), raise(chip(ringPts([0, 0], 10.6, 11, 0.1), 0.14, 33), TOP),
     raise(chip(ringPts([0, 0], 8.0, 9, 0.5), 0.12, 34), '#3c3d42'),
-    ...[0, 90, 180, 270].flatMap((d, i) => [raise(chip(strip(radial(5.2, 11, d), 3.8, 2.0), 0.1, 35 + i), WARM1), ...veinTree(5.4, 15.2, d, 1.6, 50 + i * 7, 2)]),
+    ...[0, 90, 180, 270].flatMap((d, i) => veinTree(5.4, 15.2, d, 0.85, 50 + i * 7, 2)),
     recess(chip(ringPts([0, 0], 5.4, 14, 0.1), 0.1, 39), '#0c0b0a'),
-    ...feather([0, 0], 4.8, 24),
+    ...feather([0, 0], 4.8),
   ],
 });
 // The crown: three shards of glass on the apex only (the first break in its symmetry)
@@ -373,7 +368,7 @@ for (const [k, deg, len, curl] of [[0, -45, 25, -26], [1, -135, 33, -24]]) {
     detail: [
       raise(chip(oval(kc, 3.6, 3.0, [1, 0.4], 11), 0.18, 72 + k), '#3e2c24'),
       ...clutch(kc, 7, 2.3, 74 + k * 9),
-      glow(kc, 1.3, '#a8661a'), glow(kc, 0.6, GOLD2),
+      glow(kc, 1.5, '#3a1e08'),
     ],
   });
 }
@@ -439,8 +434,18 @@ for (const p of pieces) {
 
 // ---- Spent: the node as it is after the end (render only): its light gone out ----
 const SPENT = '#2b2722';
+// (its core cooled: a dark orb, cracked, a last ember deep in it; a lit crescent on its upper side so it reads round)
+const CRACKS = [[[-1, -0.5], [-2.6, -2.2], [-3.4, -4.6], [-5.6, -4.4]], [[0.4, 0.2], [2.4, 0.8], [4.4, 2.6], [6.2, 2.4]], [[-0.3, 0.6], [-0.8, 2.8], [-2.6, 4.6], [-2.2, 6.4]], [[0.5, -0.7], [2.2, -3.2], [3.0, -5.8]]];
+const SPENT_CORE = [
+  recess(ringPts([0, 0], 7.0, 40, 0), '#0e0c0a'),
+  raise(ringPts([0, 0], 6.4, 40, 0), '#2a2724'),
+  raise(ringPts([-0.9, -1.0], 4.6, 32, 0), '#33302c'),
+  raise(oval([-2.6, -3.4], 2.6, 0.7, [1, -0.6], 16), '#4a4640'),
+  ...CRACKS.map((c) => recess(strip(c, 0.4, 0.08), '#0a0807')),
+  glow([0.2, 0.1], 0.8, '#2a1404'),
+].map(scaleDetail);
 for (const p of pieces.filter((q) => q.stage === 3)) {
-  const detail = (p.detail ?? []).filter((d) => d.kind !== 'glow' && d.kind !== 'vein').map((d) => (d.color && d.kind !== 'recess' && d.kind !== 'raise' ? { ...d, color: SPENT } : d));
+  const detail = p.id.endsWith('s3_core') ? SPENT_CORE : (p.detail ?? []).filter((d) => d.kind !== 'glow' && d.kind !== 'vein').map((d) => (d.color && d.kind !== 'recess' && d.kind !== 'raise' ? { ...d, color: SPENT } : d));
   pieces.push({ ...p, id: `${p.id}_spent`, detail });
 }
 
@@ -477,7 +482,7 @@ const VARIANTS = {
   maw_heart_cracked: design('Heart of the Maw (redesign), stage 1 half shot', order.filter((q) => !CRACKED_GONE.test(q.piece))),
   maw_heart_chambers: design('Heart of the Maw (redesign), stage 2: the chambers', order.filter((q) => stageOfPart(q) >= 2)),
   maw_heart_node: design('Heart of the Maw (redesign), stage 3: the node', order.filter((q) => stageOfPart(q) === 3)),
-  maw_heart_spent: design('Heart of the Maw (redesign), spent', order.filter((q) => stageOfPart(q) === 3).map((q) => ({ ...q, piece: `${q.piece}_spent`, ...(q.fn === 'generator' ? { fn: 'armor', material: METAL } : {}) }))),
+  maw_heart_spent: design('Heart of the Maw (redesign), spent', order.filter((q) => stageOfPart(q) === 3).map((q) => ({ ...q, piece: `${q.piece}_spent`, ...(q.fn === 'generator' ? { fn: 'armor', material: METAL } : {}), ...(q.fn === 'core' ? { fn: 'armor', material: ROCK } : {}) }))),
 };
 mkdirSync(OUT, { recursive: true });
 const pieceFile = { _comment: 'DESIGN ONLY, not loaded by the game: the redesigned Heart of the Maw (docs/bosses/maw-heart-redesign.md). Written by scripts/bespoke/maw_heart.mjs.', pieces };
