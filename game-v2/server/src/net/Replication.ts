@@ -298,7 +298,8 @@ export class Replication {
       const same = o.held === mode && (mode === ReplicaMode.Docked ? sameDock(o.heldDock ?? null, s.dock) : sameBody(s.body, this.real(eid)));
       // (Its shadow stays what its keyframe carried: what its client has, and checks against. A docked ship's velocity
       // isn't its client's to follow)
-      if (same) { if (o.hard) s.body = this.real(eid); return; }
+      // (Nor its controls: held neutral there, no exceptions row)
+      if (same) { if (o.hard) s.body = this.real(eid); o.exc = o.excLast = false; return; }
       o.held = mode;
       o.heldDock = s.dock;
       return hard('mode');

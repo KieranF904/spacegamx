@@ -360,6 +360,15 @@ export class ShipReplicaSet {
     r.last = Math.max(...r.hist.keys(), -Infinity);
   }
 
+  /**
+   * Docked: its replica as its keyframe had it (`at` rides the station as drawn, which isn't tick-exact): what a pilot's
+   * own check hashes while docked (client OwnTick; the server's Replication.ownHeld). Null when it isn't docked
+   */
+  docked(id: number): Step | null {
+    const r = this.reps.get(id);
+    return r && r.mode === ReplicaMode.Docked ? r.hist.get(r.last) ?? null : null;
+  }
+
   /** Its replica's mode as last heard (undefined: not held): a pilot's is stepped before other ships each tick */
   modeOf(id: number): ReplicaMode | undefined {
     return this.reps.get(id)?.mode;

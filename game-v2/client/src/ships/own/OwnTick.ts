@@ -217,7 +217,8 @@ export class OwnTick implements OwnTimeline {
     if (this.level > CONFIRM.ROUGH && tick - this.levelSince >= CLEAN_TICKS) { this.level--; this.levelSince = tick; }
     const rules = ownCheckRules(this.level), since = tick - this.last.tick;
     if (since < rules.ride || (!riding && since < rules.alone)) return undefined;
-    const self = this.host.self(), st = this.host.reps.at(self, this.snapTick), ship = this.host.store.get(self);
+    // (Docked: as its keyframe had it, the server's too: Replication.ownHeld)
+    const self = this.host.self(), st = this.host.reps.docked(self) ?? this.host.reps.at(self, this.snapTick), ship = this.host.store.get(self);
     if (!st || !ship) return undefined;
     const body = (ownBodyHash(st.body, st.bits, st.q) + (this.host.extraHash?.(this.snapTick) ?? 0)) & 0xff, hp = ownHpHash(ship.hp);
     if (!riding && body === this.last.body && hp === this.last.hp) return undefined;
