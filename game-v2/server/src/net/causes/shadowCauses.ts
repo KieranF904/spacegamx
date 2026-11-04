@@ -16,6 +16,8 @@ export interface CauseEvent {
   /** Its place among the tick's causes, every ship's (the order clients work them out in) */
   seq: number;
   row: number[];
+  /** A rebuild: its centres of mass either side (a client works it out from the structures it has before and after its sync) */
+  rebuild?: { from: readonly number[]; to: readonly number[] };
   /**
    * A contact: whether a replica of the other before that tick's causes is the pass's (then the row may go without the
    * state), the other's versions then (a keyframe of it since: the client's replica moved), and its rebuilds then
@@ -28,7 +30,7 @@ export interface CauseEvent {
 }
 
 /** A tick's causes as rows (a contact with the other's state), with what applying them needs */
-export interface WorkedCauses { rows: number[][]; seqs: number[]; env: OwnCauseEnv; contacts: Map<number, OwnContact> }
+export interface WorkedCauses { rows: number[][]; seqs: number[]; env: OwnCauseEnv; contacts: Map<number, OwnContact>; rebuilt: { from: [number, number]; to: [number, number] } | null }
 
 /**
  * A ship's causes on one tick, made into rows; a string instead when a client couldn't work them out from rows (why:
@@ -58,7 +60,7 @@ export function workCauses(causes: readonly OwnCause[], window: readonly CauseEv
     other: (id) => { const c = contacts.get(id); return c ? { shape: c.otherShape, body: { ...c.pre } } : null; },
     rebuilt: () => rebuilt,
   };
-  return { rows, seqs, env, contacts };
+  return { rows, seqs, env, contacts, rebuilt };
 }
 
 /** The worked rows as this window's events (a contact's other settled later: settleContacts) */
@@ -66,7 +68,7 @@ export function recordCauses(list: CauseEvent[], w: WorkedCauses, tick: number):
   for (let i = 0; i < w.rows.length; i++) {
     const r = w.rows[i];
     const c = r[0] === OWN_CAUSE.CONTACT ? w.contacts.get(r[1])! : null;
-    list.push({ tick, seq: w.seqs[i], row: r, contact: c ? { other: c.other, inStep: false, version: -1, cver: -1, rebuilds: c.otherRebuilds } : undefined });
+    list.push({ tick, seq: w.seqs[i], row: r, rebuild: r[0] === OWN_CAUSE.REBUILD && w.rebuilt ? w.rebuilt : undefined, contact: c ? { other: c.other, inStep: false, version: -1, cver: -1, rebuilds: c.otherRebuilds } : undefined });
   }
 }
 
