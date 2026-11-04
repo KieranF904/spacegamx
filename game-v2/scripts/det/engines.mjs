@@ -29,7 +29,8 @@ const arg = (k, d) => { const i = process.argv.indexOf(k); return i >= 0 ? proce
 const TICKS = Number(arg('--ticks', 1200));
 const NATIVE = process.argv.includes('--native');
 const NATIVE_TRIG = `export const dsin = Math.sin, dcos = Math.cos, datan = Math.atan, datan2 = Math.atan2, dhypot = Math.hypot,
-  dexp = Math.exp, dlog = Math.log, dlog2 = Math.log2, dpow = Math.pow;
+  dexp = Math.exp, dlog = Math.log, dlog2 = Math.log2, dpow = Math.pow, dsinh = Math.sinh, dcosh = Math.cosh, dtanh = Math.tanh,
+  dasinh = Math.asinh, dlog1p = Math.log1p;
 export function dsincos(x, out = [0, 0]) { out[0] = Math.sin(x); out[1] = Math.cos(x); return out; }`;
 const PW = join(process.env.LOCALAPPDATA ?? join(process.env.USERPROFILE ?? '', 'AppData/Local'), 'ms-playwright');
 const findIn = (prefix, rel) => {

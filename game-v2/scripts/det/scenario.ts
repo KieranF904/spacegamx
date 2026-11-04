@@ -12,6 +12,12 @@
  * - hits: a shell's segment against each other ship's parts in its grid frame (worldToLocalDir, castParts), the
  *   confirmed-hits rule a client applies (deriveShellHit), a rebuild when a part goes; against three spinning
  *   asteroids (getAsteroidPolygon, raycastPolygon); ships repaired every 400 ticks so the fight goes on.
+ * - debris: every 150 ticks a ship sheds groups of parts as a client works a split out (deriveSplit: push and spin
+ *   seeded by ship, tick and group), and every piece drifts and knocks into the others (stepDebrisWorld, with a gravity
+ *   well), as the server and every client's replicas step it;
+ * - asteroid orbits: 240 seeded Kepler orbits of every kind (elliptic, hyperbolic, parabolic, fixed) at each tick and
+ *   at a tick hours into a server's run (calcOrbitStateRaw), new belt rocks' params (makeAsteroidParams, a stationary
+ *   ring's spots with a lane), the planets', moons' and a comet's positions, and pods' drift (podDrift).
  *
  * Plus a primitive check: detTrig's functions over seeded inputs, hashed, and the same for native Math (which is
  * allowed to differ between engines: informational, it shows what detTrig is for).
@@ -23,9 +29,11 @@ import {
   loadCatalog, createShipState, rebuildShip, repairShip, stepShipPhysics, stepGuns, volleyShells, steerToward, castParts,
   blueprintGeometry, deriveShellHit, gunShell, worldToLocalDir, gunLoad, FULL_CHARGE, mulberry32, getAsteroidPolygon,
   raycastPolygon, asteroidSpin, replicaAngle, quantizeReplicaAngle, ReplicaMode, parseBlueprint,
-  dsin, dcos, datan2, dhypot, dexp, dlog, dpow,
+  dsin, dcos, datan2, dhypot, dexp, dlog, dpow, dsinh, dcosh, dtanh, dasinh,
+  partGroups, computeJoins, deriveSplit, stepDebrisWorld, SHIP_FLIGHT_CONSTANTS, calcOrbitStateRaw, OrbitType, makeAsteroidParams,
+  planetPosition, moonOffset, cometPosition, podDrift, type DebrisBody,
   type CatalogFiles, type ShipTuning, type ShipState, type FlightBody, type FlightControls, type Charge, type PlacedGeom,
-  type HitCtx, type WeaponTuning,
+  type HitCtx, type WeaponTuning, type AsteroidBeltData, type PlanetData, type CometData,
 } from '../../common/src/index.js';
 
 export interface DetData {
@@ -66,6 +74,22 @@ const hex = (v: number) => (v >>> 0).toString(16).padStart(8, '0');
 interface Shell { id: number; owner: number; target: number; x: number; y: number; vx: number; vy: number; life: number; gun: number; homing: boolean }
 interface Pilot { ship: ShipState; body: FlightBody; charge: Charge; keys: Partial<FlightControls>; until: number; aimJitter: number; firing: boolean; jumpAt: number }
 
+/** A belt with a stationary ring (sunflower spots, a lane through it) beside a moving one */
+const BELT = { count: 6, innerRadius: 20000, outerRadius: 26000, extra: [{ count: 6, innerRadius: 30000, outerRadius: 33000, stationary: true, lane: { angle: 0.7, width: 900 } }] } as unknown as AsteroidBeltData;
+const PLANET = { orbit: { radius: 42000, period: 30, phase: 1.1 }, moons: [{ distance: 2600, period: 3, phase: 0.4 }] } as unknown as PlanetData;
+const COMET = { orbit: { a: 90000, e: 0.82, argP: 2.2, period: 45, phase: 0.3 } } as unknown as CometData;
+
+/** Seeded orbits of every kind the game has (asteroid/orbit.ts) */
+function seededOrbits(): { type: number; a: number; e: number; w: number; m0: number }[] {
+  const r = mulberry32(0x0b17);
+  const types = [OrbitType.Elliptic, OrbitType.Elliptic, OrbitType.Elliptic, OrbitType.Hyperbolic, OrbitType.Parabolic, OrbitType.Fixed];
+  return Array.from({ length: 240 }, (_, i) => {
+    const type = types[i % types.length];
+    const e = type === OrbitType.Hyperbolic ? 1.05 + r() * 2 : type === OrbitType.Elliptic ? r() * 0.92 : 0;
+    return { type, a: 8000 + r() * 90000, e, w: r() * 2 * Math.PI, m0: (r() - 0.5) * (type === OrbitType.Elliptic ? 2 * Math.PI : 3) };
+  });
+}
+
 const ROCKS = [{ id: 101, x: 0, y: 0, size: 70 }, { id: 202, x: 520, y: -380, size: 55 }, { id: 303, x: -480, y: 300, size: 90 }];
 
 export function runScenario(data: DetData, ticks = 1200): DetResult {
@@ -77,7 +101,7 @@ export function runScenario(data: DetData, ticks = 1200): DetResult {
   const geometry = (s: ShipState) => { let g = geoms.get(s.blueprint); if (!g) geoms.set(s.blueprint, (g = blueprintGeometry(catalog, s.blueprint))); return g; };
   const ctx: HitCtx = { catalog, tuning, geometry };
   const rng = mulberry32(0x5eed);
-  const stats: Record<string, number> = { shots: 0, shells: 0, shipHits: 0, rockHits: 0, partsLost: 0, rebuilds: 0, jumps: 0 };
+  const stats: Record<string, number> = { shots: 0, shells: 0, shipHits: 0, rockHits: 0, partsLost: 0, rebuilds: 0, jumps: 0, debris: 0, knocks: 0 };
 
   const pilots: Pilot[] = SHIPS.map((file, i) => {
     const ship = createShipState(catalog, tuning, i + 1, parseBlueprint(data.blueprints[file]), 0);
@@ -90,6 +114,10 @@ export function runScenario(data: DetData, ticks = 1200): DetResult {
   const shells: Shell[] = [];
   let nextShell = 1;
   const hashes: string[] = [];
+  const debris: DebrisBody[] = [];
+  let nextDebris = 1000;
+  const drift = { ...SHIP_FLIGHT_CONSTANTS, gravity: { strength: 4000, minRadius: 300 } };
+  const orbits = seededOrbits();
 
   for (let tick = 1; tick <= ticks; tick++) {
     // ---- pilots: new seeded inputs now and then, aim at the next ship
@@ -178,6 +206,46 @@ export function runScenario(data: DetData, ticks = 1200): DetResult {
       if (--s.life <= 0) shells.splice(k, 1);
     }
 
+    // ---- debris: a ship sheds some of its parts as groups (as a client works out a split), then every piece drifts and knocks
+    if (tick % 150 === 75) {
+      const k = Math.floor(tick / 150), p = pilots[k % pilots.length], geom = geometry(p.ship);
+      const joins = computeJoins(geom);
+      const parts = new Set<number>();
+      geom.forEach((_, n) => { if (p.ship.derived.alive[n] && n % 4 === k % 4) parts.add(n); });
+      const groups = partGroups(p.ship.blueprint.parts.length, joins, parts);
+      const ids = groups.map(() => nextDebris++);
+      const pieces = deriveSplit(catalog, tuning, p.ship, p.ship.id, tick, ids, parts, joins, p.body, (n) => p.ship.hp[n]) ?? [];
+      for (const d of pieces) {
+        const shape: [number, number][][] = [];
+        geometry(d.ship).forEach((g, n) => { if (d.ship.derived.alive[n]) for (const c of g.convexShrunk) shape.push(c as [number, number][]); });
+        debris.push({ id: d.id, body: d.body, mass: d.ship.derived.mass, radius: d.ship.derived.radius, com: d.ship.derived.com, pieces: shape });
+        mix(d.hash);
+        stats.debris++;
+      }
+      while (debris.length > 48) debris.shift();
+    }
+    stats.knocks += stepDebrisWorld(debris, drift, tuning.cellSize, tuning.collision?.restitution ?? 0.3).length;
+
+    // ---- asteroid orbits, belt rocks, planets, pods: everything that moves on its own clock
+    for (const o of orbits) {
+      for (const at of [tick, 4_000_000 + tick * 37]) {
+        const st = calcOrbitStateRaw(o.type, o.a, o.e, o.w, o.m0, 0, at);
+        mix(st.x); mix(st.y); mix(st.r); mix(st.trueAnomaly);
+      }
+    }
+    if (tick % 20 === 0) {
+      for (let i = 0; i < 12; i++) {
+        const r = makeAsteroidParams('sol', i + tick, 'det', tick, BELT);
+        mix(r.semiMajorAxis); mix(r.eccentricity); mix(r.argPeriapsis); mix(r.meanAnomaly0); mix(r.size);
+      }
+      for (const at of [tick, 3_000_000 + tick]) {
+        const pp = planetPosition(PLANET, at), mo = moonOffset(PLANET, 0, at), co = cometPosition(COMET, at);
+        mix(pp.x); mix(pp.y); mix(mo.x); mix(mo.y); mix(co.x); mix(co.y);
+      }
+      const pod = podDrift({ x: 10, y: -20, vx: 3.3, vy: -1.7 }, tick);
+      mix(pod.x); mix(pod.y); mix(pod.vx); mix(pod.vy);
+    }
+
     // ---- repairs, so the fight goes on
     if (tick % 400 === 0) for (const p of pilots) { repairShip(p.ship); rebuildShip(p.ship, catalog, tuning); }
 
@@ -192,6 +260,8 @@ export function runScenario(data: DetData, ticks = 1200): DetResult {
     }
     mix(shells.length);
     for (const s of shells) { mix(s.x); mix(s.y); mix(s.vx); mix(s.vy); }
+    mix(debris.length);
+    for (const d of debris) { const b = d.body; mix(b.x); mix(b.y); mix(b.vx); mix(b.vy); mix(b.angle); mix(b.angVel); }
     hashes.push(hex(h));
   }
 
@@ -201,8 +271,10 @@ export function runScenario(data: DetData, ticks = 1200): DetResult {
 /** detTrig (or native Math) over seeded inputs, one hash per function */
 function primitives(native: boolean): Record<string, string> {
   const fns: Record<string, (a: number, b: number) => number> = native
-    ? { sin: (a) => Math.sin(a), cos: (a) => Math.cos(a), atan2: (a, b) => Math.atan2(a, b), hypot: (a, b) => Math.hypot(a, b), exp: (a) => Math.exp(a), log: (a) => Math.log(Math.abs(a)), pow: (a, b) => Math.pow(Math.abs(a), b * 0.1) }
-    : { sin: (a) => dsin(a), cos: (a) => dcos(a), atan2: (a, b) => datan2(a, b), hypot: (a, b) => dhypot(a, b), exp: (a) => dexp(a), log: (a) => dlog(Math.abs(a)), pow: (a, b) => dpow(Math.abs(a), b * 0.1) };
+    ? { sin: (a) => Math.sin(a), cos: (a) => Math.cos(a), atan2: (a, b) => Math.atan2(a, b), hypot: (a, b) => Math.hypot(a, b), exp: (a) => Math.exp(a), log: (a) => Math.log(Math.abs(a)), pow: (a, b) => Math.pow(Math.abs(a), b * 0.1),
+      sinh: (a) => Math.sinh(a * 0.5), cosh: (a) => Math.cosh(a * 0.5), tanh: (a) => Math.tanh(a * 0.2), asinh: (a, b) => Math.asinh(a * b) }
+    : { sin: (a) => dsin(a), cos: (a) => dcos(a), atan2: (a, b) => datan2(a, b), hypot: (a, b) => dhypot(a, b), exp: (a) => dexp(a), log: (a) => dlog(Math.abs(a)), pow: (a, b) => dpow(Math.abs(a), b * 0.1),
+      sinh: (a) => dsinh(a * 0.5), cosh: (a) => dcosh(a * 0.5), tanh: (a) => dtanh(a * 0.2), asinh: (a, b) => dasinh(a * b) };
   const out: Record<string, string> = {};
   for (const [name, fn] of Object.entries(fns)) {
     const r = mulberry32(0xd37);
