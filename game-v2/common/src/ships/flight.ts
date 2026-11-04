@@ -40,7 +40,8 @@ export interface FlightControls {
   /**
    * Helm controls: left/right turn the ship, forward/backward and
    * strafeLeft/strafeRight thrust relative to it. Otherwise (mouse-steer) the
-   * ship turns to targetAngle and the four directions are screen-relative.
+   * ship turns to targetAngle and the four directions are screen-relative
+   * (world-aligned), or ship-relative with both strafe bits held (noseFrame).
    */
   helm?: boolean;
   strafeLeft?: boolean;
@@ -264,6 +265,16 @@ export function jumpReachAt(d: { jumpRange?: number }, t: JumpTuning, fieldBoost
 
 /** The charge waits on its last tick until the nose is this close to the aim (radians); the burn then goes along the aim itself */
 export const JUMP_ALIGN = 0.03;
+
+/**
+ * Mouse-steer with the movement keys pushing along the ship (W the nose, A/D sideways), for the view that follows the
+ * heading (hits.ts CAPS.NOSE; client input/viewMode.ts). Said by both strafe bits with helm off: a pair no input sent
+ * before (mouse-steer never sent a strafe, and at the helm the two cancel), so it needs no new wire field and replicas
+ * get it in the control bits they already carry.
+ */
+export function noseFrame(input: { helm?: boolean; strafeLeft?: boolean; strafeRight?: boolean }): boolean {
+  return !input.helm && !!input.strafeLeft && !!input.strafeRight;
+}
 
 /** Is the ship pointed for a jump: helm (the nose is the aim), or the nose within JUMP_ALIGN of the aim */
 export function jumpAimed(body: { angle: number }, input: { helm?: boolean; targetAngle: number }): boolean {
@@ -511,7 +522,8 @@ export function stepFlight(
   runHooks(H.steer, c);
 
   // --- Thrust: force from whatever points the requested way.
-  // Mouse-steer asks in screen space; helm asks in ship space (forward = the nose).
+  // Mouse-steer asks in screen space; helm asks in ship space (forward = the nose), as does mouse-steer in the nose
+  // frame (noseFrame: its left/right keys push sideways)
   let ix = 0, iy = 0;
   if (input.helm) {
     let lx = 0, ly = 0;
@@ -520,6 +532,13 @@ export function stepFlight(
     if (input.strafeLeft) lx -= 1;
     if (input.strafeRight) lx += 1;
     [ix, iy] = localToWorldDir([lx, ly], body.angle);
+  } else if (noseFrame(input)) {
+    let lx = 0, ly = 0;
+    if (input.forward) ly -= 1;
+    if (input.backward) ly += 1;
+    if (input.left) lx -= 1;
+    if (input.right) lx += 1;
+    if (lx || ly) [ix, iy] = localToWorldDir([lx, ly], body.angle);
   } else {
     if (input.forward) iy -= 1;
     if (input.backward) iy += 1;

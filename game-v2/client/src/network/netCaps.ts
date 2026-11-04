@@ -9,7 +9,8 @@
  * dropped cells kept a while: common network/cells.ts) and `?causes=0|1` (other ships' causes on its tick layer, with
  * ownsim: common network/causes.ts) and `?waypoints=0|1` (homing shells flown on its tick layer by the waypoint law, with
  * ownsim: common guidance/) and `?pilots=0|1` (the enemy AI's ships flown by their pilot's body from the commander's
- * orders, with bodies: common bodies/aiPilot.ts) and `?crowd=0|1` (its system's crowd fallbacks: common network/crowd.ts).
+ * orders, with bodies: common bodies/aiPilot.ts) and `?crowd=0|1` (its system's crowd fallbacks: common network/crowd.ts)
+ * and `?nose=0|1` (mouse-steer's keys along the ship when the view follows the heading: client input/viewMode.ts).
  * The server takes what it allows (netCaps).
  */
 import { CAPS, TICK_MS, confirmRules } from '@space-game/common';
@@ -62,9 +63,11 @@ export function netCaps(): number {
   const debris = flag('debris', 'sg.debris') ?? dev;
   // (a volley of mobs laid at once, a Rivet Sower's mines, as one row: each one run from it, no SYNC a mob)
   const launches = waypoints && (flag('launches', 'sg.launches') ?? dev);
+  // (mouse-steer's keys pushing along the ship, for the view on the heading: input/viewMode.ts, common flight.ts noseFrame)
+  const nose = flag('nose', 'sg.nose') ?? dev;
   return hits | (compact ? CAPS.INPUTS : 0) | (packed ? CAPS.PACKED : 0) | (coalesce ? CAPS.COALESCE : 0) | (ownShots ? CAPS.OWN_SHOTS : 0) | (rough ? CAPS.ROUGH : 0) | (ownSim ? CAPS.OWN_SIM : 0) | (bodies ? CAPS.BODIES : 0)
     | (blocks ? CAPS.BLOCKS : 0) | (focus ? CAPS.FOCUS : 0) | (causes ? CAPS.CAUSES : 0) | (waypoints ? CAPS.WAYPOINTS : 0) | (pilots ? CAPS.PILOTS : 0) | (crowd ? CAPS.CROWD : 0)
-    | (structs ? CAPS.STRUCTS : 0) | (cargo ? CAPS.CARGO : 0) | (debris ? CAPS.DEBRIS : 0) | (launches ? CAPS.LAUNCHES : 0);
+    | (structs ? CAPS.STRUCTS : 0) | (cargo ? CAPS.CARGO : 0) | (debris ? CAPS.DEBRIS : 0) | (launches ? CAPS.LAUNCHES : 0) | (nose ? CAPS.NOSE : 0);
 }
 
 /**

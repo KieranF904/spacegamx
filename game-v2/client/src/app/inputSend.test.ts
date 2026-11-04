@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { CURSOR_DIST_STEP, dequantizeCursorAngle, quantizeCursorAngle, type ClientInputMessage } from '@space-game/common';
+import { CURSOR_DIST_STEP, dequantizeCursorAngle, quantizeCursorAngle, noseFrame, type ClientInputMessage } from '@space-game/common';
 import { tickInput, sendNeutralInput, newInputSendState, type InputSendCtx } from './inputSend';
+import { ViewMode, type CameraMode } from '../input/viewMode';
 
 /** A scripted pilot: keys, mouse and a few ship/menu switches the test flips between ticks */
 interface Script {
@@ -182,5 +183,47 @@ describe('inputSend: an input-script replay', () => {
     (ctx as unknown as { loggedIn: boolean }).loggedIn = false;
     sendNeutralInput(ctx);
     expect(log).toEqual([]);
+  });
+});
+
+describe('inputSend: the four control / view combinations (input/viewMode.ts)', () => {
+  // (What Game's noseThrust getter is: the server took CAPS.NOSE and the aim is pinned, viewMode.pinnedAim)
+  const combos: [string, boolean, CameraMode][] = [
+    ['mouse + north up', false, 'north'],
+    ['helm + follow heading', true, 'heading'],
+    ['helm + north up', true, 'north'],
+    ['mouse + follow heading', false, 'heading'],
+  ];
+  const keysOf = (m: ClientInputMessage) => [m.forward, m.backward, m.left, m.right, m.strafeLeft, m.strafeRight, m.helm];
+
+  it.each(combos)('%s', (name, helm, camera) => {
+    for (const caps of [true, false]) {
+      const { ctx, sc, sent, tick } = fakeCtx();
+      const v = new ViewMode(() => camera);
+      (ctx as unknown as { noseThrust: boolean }).noseThrust = caps && v.pinnedAim(helm);
+      sc.helm = helm;
+      sc.keys.add('KeyW'); sc.keys.add('KeyD'); sc.keys.add('KeyQ');
+      tick();
+      const m = sent[sent.length - 1];
+      const nose = caps && name === 'mouse + follow heading';
+      // Helm (either view): W along the nose, D turns, Q strafes. Mouse: W/D as they are, along the screen; with the
+      // view on the heading (and the server taking it) both strafe bits say "along the ship" (common flight.ts noseFrame)
+      expect(keysOf(m)).toEqual(helm ? [true, false, false, true, true, false, true] : [true, false, false, true, nose, nose, false]);
+      expect(noseFrame(m)).toBe(nose);
+      // The view never changes the aim the input carries: the cursor's world point (renderer.screenToWorld) is all it reads
+      expect(m.targetAngle).toBe(0);
+    }
+  });
+
+  it('mouse + follow heading: the pair stays on with no key held (no mode bits flapping), and goes with the autopilot', () => {
+    const { ctx, sc, sent, predicted, tick } = fakeCtx();
+    (ctx as unknown as { noseThrust: boolean }).noseThrust = true;
+    tick();
+    expect([sent[0].strafeLeft, sent[0].strafeRight, sent[0].forward]).toEqual([true, true, false]);
+    sc.auto = { forward: true, backward: false, left: false, right: false, boost: false, jump: false, targetAngle: 1, cursorDist: 100 };
+    tick();
+    const m = sent.length > 1 ? sent[sent.length - 1] : predicted[predicted.length - 1];
+    // (The autopilot's keys are along the world)
+    expect([m.forward, m.strafeLeft, m.strafeRight]).toEqual([true, false, false]);
   });
 });

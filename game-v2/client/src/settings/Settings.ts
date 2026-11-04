@@ -5,6 +5,7 @@
 
 import { ACTIONS } from '../input/keybindings';
 import type { QualitySetting } from './quality';
+import type { CameraMode } from '../input/viewMode';
 
 /** Mouse-aim always, unless the pilot picks helm (the old 'auto' is read as mouse) */
 export type ControlMode = 'mouse' | 'helm';
@@ -39,7 +40,11 @@ export interface SettingsData {
     /** The objective guide: the next waypoint under the tracker, and chevrons from your ship towards it */
     questGuide: boolean;
   };
-  gameplay: { controlMode: ControlMode; jumpMode: JumpMode; invertZoom: boolean; zoomSpeed: number };
+  gameplay: {
+    controlMode: ControlMode; jumpMode: JumpMode; invertZoom: boolean; zoomSpeed: number;
+    /** The view (input/viewMode.ts): 'auto' follows the controls (helm turned, mouse-steer north up), as before it was a setting */
+    cameraMode: CameraMode;
+  };
   /** Action id → key code (KeyboardEvent.code) */
   bindings: Record<string, string>;
 }
@@ -49,7 +54,7 @@ export function defaultSettings(): SettingsData {
     audio: { master: 0.8, sfx: 1, music: 0.5, muteUnfocused: true },
     display: { screenShake: 1, jumpEffects: true, jumpCamera: true, planets: true, damageNumbers: true, playerNames: true, bloom: true, lighting: true, renderScale: 1, quality: 'high', fpsCap: 0, ownShield: 0.6 },
     ui: { navMarkers: true, minimap: true, shipHud: true, netStats: false, chat: true, hazardEffects: true, questTracker: true, questGuide: true },
-    gameplay: { controlMode: 'mouse', jumpMode: 'tap', invertZoom: false, zoomSpeed: 1 },
+    gameplay: { controlMode: 'mouse', jumpMode: 'tap', invertZoom: false, zoomSpeed: 1, cameraMode: 'auto' },
     bindings: Object.fromEntries(ACTIONS.filter((a) => a.rebindable !== false).map((a) => [a.id, a.key])),
   };
 }
@@ -68,6 +73,18 @@ function merge<T>(base: T, saved: unknown): T {
   return out;
 }
 
+/** Saved settings (any age) over the defaults, with values that are no longer offered put right */
+export function loadSettings(saved: unknown): SettingsData {
+  const data = merge(defaultSettings(), saved);
+  // (Saved before helm was opt-in: 'auto', or anything else unknown, is mouse-aim)
+  if (data.gameplay.controlMode !== 'helm') data.gameplay.controlMode = 'mouse';
+  // (Saved before the view was its own setting: it follows the controls, as it did)
+  if (!['auto', 'north', 'heading'].includes(data.gameplay.cameraMode)) data.gameplay.cameraMode = 'auto';
+  if (!['auto', 'low', 'medium', 'high'].includes(data.display.quality)) data.display.quality = 'high';
+  if (![0, 30, 60, 120, 144].includes(data.display.fpsCap)) data.display.fpsCap = 0;
+  return data;
+}
+
 class SettingsStore {
   data: SettingsData;
   private listeners = new Set<(s: SettingsData) => void>();
@@ -75,11 +92,7 @@ class SettingsStore {
   constructor() {
     let saved: unknown = null;
     try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null'); } catch { /* private window, corrupt data */ }
-    this.data = merge(defaultSettings(), saved);
-    // (Saved before helm was opt-in: 'auto', or anything else unknown, is mouse-aim)
-    if (this.data.gameplay.controlMode !== 'helm') this.data.gameplay.controlMode = 'mouse';
-    if (!['auto', 'low', 'medium', 'high'].includes(this.data.display.quality)) this.data.display.quality = 'high';
-    if (![0, 30, 60, 120, 144].includes(this.data.display.fpsCap)) this.data.display.fpsCap = 0;
+    this.data = loadSettings(saved);
   }
 
   /** Call `fn` now and on every change. */
