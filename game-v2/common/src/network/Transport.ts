@@ -36,8 +36,12 @@ export interface ClientTransport {
 /** Server side: one connected client, as seen by GameServer. */
 export interface ClientSocket {
   isOpen(): boolean;
-  /** An encoded frame (serverFrame) */
-  send(data: string | ArrayBuffer | Uint8Array): void;
+  /**
+   * An encoded frame (serverFrame). `opts.raw`: don't compress it (permessage-deflate) even when the socket would:
+   * encode-once frames (CAPS.BLOCKS) are bit-packed already and copied for many clients, so deflating each socket's
+   * copy would spend per-client CPU on next to nothing
+   */
+  send(data: string | ArrayBuffer | Uint8Array, opts?: { raw?: boolean }): void;
   /** Hang up (a failed sign-in: code 4001; another protocol version: PROTOCOL_MISMATCH_CLOSE, 'version') */
   close?(code?: number, reason?: string): void;
 }

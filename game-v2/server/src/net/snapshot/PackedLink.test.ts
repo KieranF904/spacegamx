@@ -3,7 +3,7 @@
  * the base format, in order, and the next packed message starts afresh, so the client's reader stays in step.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { PackedEncoder, ServerFrameReader, type ServerMessage } from '@space-game/common';
+import { BlockStore, CAPS, PackedEncoder, ServerFrameReader, type ServerMessage } from '@space-game/common';
 import type { ClientConnection } from '../ClientConnection.js';
 import { PackedLink } from './PackedLink.js';
 
@@ -47,5 +47,44 @@ describe('PackedLink', () => {
     expect(ticks).toEqual([3, 6, 9, 12]);
     expect(reader.needsResync).toBe(false);
     expect(link.waiting).toBe(false);
+  });
+
+  it('encode-once blocks (CAPS.BLOCKS): snapshots go as blocks, undeflated; a failed encode resets the blocks too', () => {
+    const sent: { d: Uint8Array; raw: boolean }[] = [];
+    const conn = {
+      playerId: 9, caps: CAPS.PACKED | CAPS.BLOCKS,
+      ws: { isOpen: () => true, send: (d: Uint8Array, o?: { raw?: boolean }) => { sent.push({ d: Uint8Array.from(d), raw: !!o?.raw }); } },
+    } as unknown as ClientConnection;
+    const link = new PackedLink(conn, new BlockStore(() => 1));
+    const reader = new ServerFrameReader();
+    const xs: number[] = [];
+    const read = () => { for (const { d } of sent.splice(0)) for (const f of reader.read(d)) for (const m of f) if (m.type === 'snapshot') xs.push(m.entities[0].x!); };
+    link.add({ msg: snap(3, 100) }, false, 3);
+    link.flush(3, 0);
+    expect(sent[0].raw).toBe(true);
+    expect(link.enc.stats.blocks).toBe(1);
+    read();
+    const orig = PackedEncoder.prototype.encode;
+    const spy = vi.spyOn(PackedEncoder.prototype, 'encode').mockImplementationOnce(function (this: PackedEncoder, subs, you) {
+      orig.call(this, subs, you);
+      throw new Error('boom');
+    });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    link.add({ msg: snap(6, 103) }, false, 6);
+    link.flush(6, 0);
+    spy.mockRestore();
+    read();
+    // (The chains the failed message moved on are forgotten at both ends: the next block is absolute, and reads)
+    link.add({ msg: snap(9, 106) }, false, 9);
+    link.add({ msg: snap(12, 109) }, false, 12);
+    link.flush(12, 0);
+    read();
+    expect(xs).toEqual([100, 103, 106, 109]);
+    expect(reader.needsResync).toBe(false);
+    // Without BLOCKS: deflated as ever
+    (conn as { caps: number }).caps = CAPS.PACKED;
+    link.add({ msg: snap(15, 112) }, false, 15);
+    link.flush(15, 0);
+    expect(sent[0].raw).toBe(false);
   });
 });

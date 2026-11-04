@@ -167,15 +167,24 @@ export async function runCase(o: CaseOpts): Promise<any> {
   };
   const bulk: Counter[] = [...counters.values()];
   const bulkRaw = bulk.map((c) => c.raw / secs), bulkMsgs = bulk.map((c) => c.msgs / secs);
-  const wireOf = async (frames: Buffer[], msgs: number) => { const d = await deflated(frames); return d / secs + (WS_HEADER * msgs) / secs; };
+  // (Packed frames from a CAPS.BLOCKS link go undeflated: PackedLink.emit)
+  const wireOf = async (frames: Buffer[], msgs: number, raw = false) => {
+    const d = raw ? frames.reduce((n, f) => n + (f[0] === 4 ? f.length : 0), 0) + (await deflated(frames.filter((f) => f[0] !== 4))) : await deflated(frames);
+    return d / secs + (WS_HEADER * msgs) / secs;
+  };
+  const blocksOn = (caps: number) => (caps & (4 | 512)) === (4 | 512);
   const bulkSampled = [...sampledBulk].map((i) => counters.get(i)!);
   const bulkWire: number[] = [];
-  for (const c of bulkSampled) bulkWire.push(await wireOf(c.frames, c.msgs));
+  // (What deflating a bulk client's frames costs the server, per message as permessage-deflate does: timed on the
+  // sampled sockets, times the bulk clients, per tick. CAPS.BLOCKS frames go undeflated, so for those it's saved)
+  const d0 = performance.now();
+  for (const c of bulkSampled) bulkWire.push(await wireOf(c.frames, c.msgs, blocksOn(bulkCaps)));
+  const deflateMsPerTick = bulkSampled.length ? ((performance.now() - d0) / bulkSampled.length) * counters.size / (secs * 60) : 0;
   const sub: Record<string, number> = {};
   for (const c of bulkSampled) for (const [t, b] of Object.entries(c.sub)) sub[t] = (sub[t] ?? 0) + b / secs / Math.max(1, bulkSampled.length);
   const probeList = [...probes.values()];
   const probeWire: number[] = [];
-  for (const p of probeList) probeWire.push(await wireOf(p.frames, p.messages));
+  for (const p of probeList) probeWire.push(await wireOf(p.frames, p.messages, blocksOn(o.caps)));
   const bytesBlock = (raw: number[], wire: number[], msgs: number[]) => ({
     clients: raw.length, rawBpsMean: Math.round(mean(raw)), rawBpsP95: Math.round(pct(raw, 0.95)), rawBpsMax: Math.round(Math.max(0, ...raw)),
     wireBpsMean: Math.round(mean(wire)), wireSampled: wire.length, msgsPerSecMean: r2(mean(msgs)),
@@ -186,7 +195,7 @@ export async function runCase(o: CaseOpts): Promise<any> {
   const out = {
     layout: o.layout, n: o.n, secs, bulk: o.bulk, probes: k, caps: o.caps, lat: o.lat,
     scene: { alive, hostiles: srv.enemies.count(scene.num), boss: scene.bossId >= 0 && ships.has(scene.bossId), ships: ships.bodies.size },
-    timing,
+    timing: { ...timing, deflateMsPerTickEst: r2(deflateMsPerTick) },
     bytes: {
       legacyOrBulk: { kind: o.bulk, ...bytesBlock(bulkRaw, bulkWire, bulkMsgs), subTypesBps: Object.fromEntries(Object.entries(sub).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([t, b]) => [t, Math.round(b)])) },
       capable: bytesBlock(probeList.map((p) => p.rawBytes / secs), probeWire, probeList.map((p) => p.messages / secs)),

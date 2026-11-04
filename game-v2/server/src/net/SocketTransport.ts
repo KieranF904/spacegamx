@@ -116,10 +116,11 @@ export class SocketTransport {
 
     const socket: ClientSocket = {
       isOpen: () => ws.readyState === WebSocket.OPEN,
-      send: (data) => {
+      send: (data, opts) => {
         // A client that's stopped reading: dropped, rather than its snapshots queued without end
         if (ws.bufferedAmount > MAX_BUFFERED_BYTES) { ws.terminate(); return; }
-        ws.send(data);
+        if (opts?.raw) ws.send(data, { compress: false });
+        else ws.send(data);
       },
       close: () => ws.close(4001, 'Sign-in failed'),
     };

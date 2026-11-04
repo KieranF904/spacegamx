@@ -45,6 +45,8 @@ export function quietHits(caps: number | undefined): boolean {
   return ((caps ?? 0) & (CAPS.HITS | CAPS.SELF_HITS)) === (CAPS.HITS | CAPS.SELF_HITS);
 }
 
+const RAW = { raw: true } as const;
+
 /** Does this client take its snapshots in encode-once blocks (CAPS.BLOCKS, with PACKED: common network/packed/blocks.ts)? */
 export function blocksFor(caps: number | undefined): boolean {
   return ((caps ?? 0) & (CAPS.PACKED | CAPS.BLOCKS)) === (CAPS.PACKED | CAPS.BLOCKS);
@@ -171,7 +173,8 @@ export class PackedLink {
     this.held = [];
     this.heldSince = -1;
     this.urgent = false;
-    if (this.conn.ws.isOpen()) this.conn.ws.send(data);
+    // (Encode-once frames go undeflated: bit-packed already, and deflate is per socket: docs/design/awareness-model.md 7.6)
+    if (this.conn.ws.isOpen()) this.conn.ws.send(data, blocksFor(this.conn.caps) ? RAW : undefined);
     return data.length;
   }
 
