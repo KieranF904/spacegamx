@@ -19,8 +19,13 @@
  *              did; rows (told, not found) for a window its ship is keyframed in (server ownShots.ts)
  *   ROUGH      (with SELF_HITS) adaptive validation (part E): its hit chain is checked as closely as its record calls for,
  *              at the level the server's netCaps.lvl says (CONFIRM)
+ *   OWN_SIM    (with OWN_SHOTS) its own ship on its tick-aligned layer is its own: stepped from its own inputs at the
+ *              ticks the server ran them, with the causes of anything else that moved it (a snapshot's own rows: pulls,
+ *              contacts, rebuilds) worked out alike on both sides (network/ownTick.ts, part G). It is sent no control
+ *              rows or keyframes of its own ship unless its inputs don't say what it flew with, and checks its own
+ *              state with a hash on its inputs (OwnCheck)
  */
-export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16, ROUGH: 32 } as const;
+export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16, ROUGH: 32, OWN_SIM: 64 } as const;
 
 /**
  * Adaptive validation (CAPS.ROUGH; docs/design/confirmed-hits.md part E): how closely the server checks a finding

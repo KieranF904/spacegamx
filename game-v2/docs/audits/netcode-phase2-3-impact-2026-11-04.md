@@ -457,3 +457,38 @@ same fights): reports up 4.45-9.9 -> 0.15-1.0 a second (Hammerhead 9.2 -> 1.0, G
 stepMs unchanged (0.25-0.41 against 0.26-0.39). A forced desync (a third of found hits thrown away from 5 to 8 s of a
 40 s run) went STRICT 0.3-1.4 s after it began (after 1-5 hits thrown away), NORMAL after 10 s, ROUGH after 10 more;
 STRICT's records cost Hammerhead 58 B/s over the run against 20, Gale 55 against 12.
+
+## Follow-up 3 (2026-11-04, later): the own ship stepped by its client (CAPS.OWN_SIM)
+
+Kieran: no snapshots sent just in case; a cheap check, and what fixes it only when needed. The own ship's control rows
+(an echo of its own inputs) and keyframes are gone: the client steps its tick-aligned ship from its own inputs, and the
+few things that moved it otherwise go as their causes (pulls, contacts, rebuilds), worked out on both sides with the
+same functions; a 3-byte hash on its inputs checks it. Design and the cause-by-cause table: docs/design/confirmed-hits.md
+part G. Probe: session scratchpad `net/own/netAuditOwn2.ts` (`run.sh`; `PREDERR=5`, `WARM=1400`); the pilot now flies
+by input messages on time, its reports and checks riding them, so this table's "before" is a fresh run of the old
+tree with the same probe (caps 63) and "after" caps 127.
+
+| scenario | own ship B/s before -> after | own keyframes /min | own control rows /min | causes /min | disagreements | own checks off | input msgs up /s steady | payload B/s before -> after |
+|---|---|---|---|---|---|---|---|---|
+| Idle | -1 -> -1 | 0 -> 0 | 0 -> 0 | 0 | 0 | 0 / 2 | 0 | 337 -> 343 |
+| 2 Pips | -1 -> -1 | 0 -> 0 | 0 -> 0 | 0 | 0 | 0 / 90 | 2.0 | 354 -> 355 |
+| Hammerhead | 2 -> -1 | 0 -> 0 | 60 -> 0 | 0 | 0 | 0 / 110 | 2.45 | 787 -> 789 |
+| Gale | -1 -> -1 | 0 -> 0 | 0 -> 0 | 0 | 0 | 0 / 110 | 4.75 | 852 -> 853 |
+| Pirates fight | **122 -> 2** | 12 -> 0 | 1,191 -> 0 | 12 | 0 | 0 / 144 | 59.5 (aim every tick) | 755 -> 638 |
+| Scrap Mother | **173 -> 204** | 291 -> 3 | 876 -> 0 | 1,497 | 0 | 0 / 283 | 59.2 | 1,957 -> 2,205 |
+| Debris | 13 -> -1 | 0 -> 0 | 276 -> 0 | 0 | 0 | 0 / 121 | 0.65 | 2,016 -> 2,005 |
+| Beam | 0 -> 0 | 0 | 3 -> 0 | 0 | 0 | 0 / 101 | 0.2 | 363 -> 365 |
+| Cruising | 2 -> 2 | 0 | 0 | 0 | 0 | 0 / 2 | 0 | 221 -> 223 |
+
+- Disagreements and hit corrections: 0 in every scenario, before and after, and the same with the prediction off by up
+  to 5 units (`PREDERR=5`: every number above to the byte).
+- Mismatches found by the check: 0 in every scenario; keyframes sent to fix the own ship: 0 a minute in every fight bar
+  the boss's 3 in 20 s (the probe placing the ship, and one window with two rebuilds of it). The own layer against the
+  server's ship, every tick: 0 off of 1,153-1,197 ticks a scenario, the boss 2.
+- The boss costs more: nearly every contact carries the boss's pose (its drive isn't replicated: AI) and its magnet's
+  push goes every tick (both TEMPORARY, until boss decisions are inputs); steady it is 93 B/s.
+- Upstream: the check is 3 B on an input, about once a second steady; idle and cruising send none (their state doesn't
+  change). In the first 20 s of a run (a fix at the start puts the check STRICT for 10 s) checks run 3-5.6 a second,
+  and lone ones take Pips from 2.25 to 4.9 messages a second up.
+- Other ships' keyframes are unchanged (Pips 122 B/s, Hammerhead 172, Gale 355, pirates 46, boss 385, debris 577):
+  the same detect-then-send scheme for them is proposed in part G7 (about two thirds less, estimated).

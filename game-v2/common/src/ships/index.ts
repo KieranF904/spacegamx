@@ -54,3 +54,4 @@ export * from './features/index.js';
 export * from './rangeRig.js';
 // Debris worked out alike on both sides (deterministic trig, push-only knocks): ships/debris.ts
 export * from './debris.js';
+export * from './contact.js';

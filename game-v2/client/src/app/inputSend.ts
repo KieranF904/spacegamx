@@ -228,7 +228,10 @@ export function tickInput(s: InputSendCtx): void {
   // Client-detected hits: the hit chain's report rides on an input going anyway, or goes on its own after a few ticks (SelfHits)
   const hitReport = s.shipClient?.takeHitReport?.(changed || !!acks);
   if (hitReport) msg.hitReport = hitReport;
-  const send = changed || !!acks || !!hitReport;
+  // Its own ship's check (CAPS.OWN_SIM) rides too, or goes on its own now and then (ShipClient.takeOwnCheck)
+  const ownCheck = s.shipClient?.takeOwnCheck?.(changed || !!acks || !!hitReport);
+  if (ownCheck) msg.ownCheck = ownCheck;
+  const send = changed || !!acks || !!hitReport || !!ownCheck;
 
   // Proto: no targetTick (applied on the next tick) and no prediction queue.
   if (s.proto) {
@@ -245,6 +248,8 @@ export function tickInput(s: InputSendCtx): void {
   if (send) {
     msg.seq = s.state.nextInputSeq();
     s.network.send(msg);
+    // Its own ship on the tick-aligned layer flies it from its target tick (CAPS.OWN_SIM)
+    s.shipClient?.noteInput?.(msg);
     // Queue for delayed application (physics runs when targetTick is reached)
     s.state.applyInput(msg);
     markSent(s, msg, quantized, cursorDistQ);
@@ -296,6 +301,7 @@ export function sendNeutralInput(s: InputSendCtx): void {
     dodge: false,
   };
   s.network.send(msg);
+  s.shipClient?.noteInput?.(msg);
   // The prediction steps the same input (proto has none)
   if (!s.proto) s.state.applyInput(msg);
   for (let i = 0; i < INPUT_HELD.length; i++) s.lastSent[INPUT_HELD[i]] = false;

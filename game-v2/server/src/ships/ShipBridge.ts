@@ -26,6 +26,7 @@ import * as dmg from './bridge/damage.js';
 import * as flt from './bridge/flight.js';
 import * as plt from './bridge/pilotless.js';
 import { DebrisNet } from './bridge/debrisNet.js';
+import { OwnCauses } from './bridge/ownCauses.js';
 
 // (The engine interface, events and constants now live in bridge/core.ts; re-exported for everything that imports them from here)
 export { STAGE_COVER };
@@ -47,6 +48,8 @@ export class ShipBridge {
    * ship replays exactly this, with the structure the step used)
    */
   readonly replicaCtl = new Map<number, { mode: ReplicaMode; bits: number; q: number; derived: ShipState['derived'] }>();
+  /** What moved each pilot's ship this tick besides its controls (CAPS.OWN_SIM: Replication hands them to its client as causes) */
+  readonly ownCauses = new OwnCauses();
   /** Repair kits only work on a ship holding still (world units per tick) */
   static readonly KIT_STILL_SPEED = 0.8;
   /** Shots fired since the last snapshot (sent as fire events: see launch.ts); the server clears it */
@@ -213,6 +216,12 @@ export class ShipBridge {
 
   /** Move a ship instantly (boss blinks) */
   teleport(eid: number, x: number, y: number): void { return flt.teleport(this.ctx, eid, x, y); }
+
+  /**
+   * A pull on a body's velocity (a boss's magnet, a collapsing star). A pilot's is rounded to the PULL grid and noted as
+   * its client's cause (TEMPORARY: until boss decisions are inputs its client steps itself, network/ownTick.ts)
+   */
+  push(eid: number, ax: number, ay: number): void { return flt.push(this.ctx, eid, ax, ay); }
 
   /** Fix a pilotless ship where it stands (or free it): rams and blasts no longer move it */
   pin(eid: number, on = true): void { return flt.pin(this.ctx, eid, on); }

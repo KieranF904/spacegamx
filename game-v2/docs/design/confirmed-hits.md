@@ -1,6 +1,6 @@
 # Confirmed hits (design, 2026-11-04)
 
-Status: **built** (A: protocol 26; B: no wire change; C: protocol 27, on for the dev server only; D, client-detected hits: protocol 28, on for the dev server only; F3, zero disagreements by construction, and E, rough adaptive validation (CAPS.ROUGH): no protocol change, dev server only). What differs from the design is in the "as built" sections at the end; the measured result is docs/audits/confirmed-hits-impact-2026-11-04.md.
+Status: **built** (A: protocol 26; B: no wire change; C: protocol 27, on for the dev server only; D, client-detected hits: protocol 28, on for the dev server only; F3, zero disagreements by construction, and E, rough adaptive validation (CAPS.ROUGH): no protocol change, dev server only; G, the own ship stepped by its client (CAPS.OWN_SIM): protocol 34, dev server only). What differs from the design is in the "as built" sections at the end; the measured result is docs/audits/confirmed-hits-impact-2026-11-04.md.
 
 Today the server works out every hit and sends the results: ~40 B a landed hit over four messages (`projectileHit`,
 the shell again in `removed`, `damage`, a `shipHps` entry), plus `ignite` and `detonation` as plain keyed objects. In
@@ -886,3 +886,141 @@ untouched).
   it like any other. Its delay could rise with its ping instead (not built).
 - The switch: on in dev builds with client-detected hits (`?rough=0|1`, remembered); the dev server allows it
   (`NET_CAPS` 63 elsewhere).
+
+---
+
+## Part G: the own ship stepped by its client (CAPS.OWN_SIM = 64, protocol 34)
+
+Kieran (2026-11-04): "i don't want to send snapshots just in case, constantly, it's better to have a cheap method to
+detect disagreements, then send them as needed", and "why can't a knock's push be deterministic?". F3 made the
+client's own shells exact by sending it its own ship's replication: its control rows (an echo of the inputs it sent
+itself) and a keyframe whenever the shadow left its path. That cost the pirates fight +122 B/s and the boss +173.
+
+### G1. What the client steps (client ships/own/OwnTick.ts, common network/ownTick.ts)
+
+Its tick-aligned own ship is still a replica in ShipReplicaSet, but stepped from an `OwnTimeline` instead of rows:
+
+- **controls**: its own inputs, each from its target tick (`noteInput`: `controlBits(buildFlightInputs(msg, false))`
+  and the quantized aim, exactly what the server applies on that tick). Where the ship flew with controls its inputs
+  don't say (the engines short of power, an EMP, the cold, a server's release), the server sends that window's real
+  controls as a control row of its own ship (from aim 0), and the client puts them in place of its inputs'.
+- **causes**, after each tick's step, in the order the server's step had them (a snapshot's `own` rows,
+  `[ago, kind, ...]`), then rounded as every body is: PULL, CONTACT, REBUILD (below).
+- **structure**: the one it flew each tick with (a REBUILD row's tick splits the structure it had before the shipSync
+  from the new one).
+- **its guns** fire before a tick's pulls and contacts, so its own volleys are built from the body before that tick's
+  causes (`firePose`).
+
+The drawn ship (the prediction) and the drawn shells are untouched; hits, damage and the hash come from this layer.
+
+### G2. Every cause found, and its fix (probe: what moved the pilot's ship off its replica path, all scenarios)
+
+| cause | seen in | fix | status |
+|---|---|---|---|
+| its own control changes (aim, keys) | every fight: pirates 1,191 rows/min, boss 876, debris 276, Hammerhead 60 | stepped from its own inputs at their target ticks; nothing sent | **fixed** (deterministic) |
+| engines short of power, EMP, cold, slowed, a server override (idle release) | none in the probe's fights | that window's real controls (`ownStats.exc`; test: an EMP) | fixed: the small input it needs |
+| a contact with another ship | pirates 3 windows / 20 s, boss 55 | the push is worked out on the client with the server's own maths, moved to common (`ships/contact.ts`: `contactPieces`, `contactPair`; the server's pass calls them). Cause: `[ago, 1, other, flags]`. Made deterministic: a pilotless ship's body is now rounded right after its step (as a pilot's is), so the contact pass sees what every replica has (golden shift: hitRules shells, frame hash) | fixed for ships whose replica is the server's |
+| ...with a ship whose replica isn't the pass's (an AI ship's drive impulse, a boss; one keyframed or rebuilt in that window) | boss: 828 of 834 contacts; pirates all 12 | the cause carries the other's pose and velocity as the pass had them (`CONTACT_FLAG.STATE`, delta-coded against its last keyframe), the client still works the push out | **TEMPORARY** (AI decisions: goes when they are inputs) |
+| a rebuild (parts lost or regrown: the centre of mass moves) | boss 22 windows | `recentreShift` in common (the server's rebuildNow calls it); cause `[ago, 2]`, the client keeps the structure it had before the shipSync. Rebuilds that change nothing it flies or touches aren't sent. Own volleys fired up to the rebuild go as rows (built from the structure it has now) | fixed; **deferred**: two rebuilds in one window (the structure between isn't on the client): a keyframe, 1 in the boss run |
+| a boss's magnet (Scrap Mother) and a collapsing star's pull | boss 33 windows | the push, rounded on the server to 1e-5 (`quantizePull`) and sent: `[ago, 0, dvx, dvy]` (ShipBridge.push) | **TEMPORARY** (boss decisions: goes when they are inputs) |
+| an input applied late, or dropped by a flood guard | none in the probe | a keyframe of its own ship (the server can't place it on the client's timeline) | deferred (rare: a network stall) |
+| server-only actions: respawn, teleport, docking, a rift's bounce, cargo taken on | the probe's set-up only (the first `unexplained`) | a keyframe, as before | as briefed: they have their own messages |
+| asteroid orbits, Math.random in AI | not a cause of own-ship mismatches: ships don't collide with rocks; AI randomness reaches the own ship only through the other's pose in a contact (above) | - | left to the deterministic-maths and decision-input workflows |
+
+### G3. The server (net/Replication.ts `stepOwn`, `ownFor`; ships/bridge/ownCauses.ts)
+
+- The bridge notes what moved a pilot's ship in the tick (a pull, a contact with the other's pre-pair state and both
+  structures, a rebuild's centres of mass). Replication's shadow of a pilot whose client has OWN_SIM is exactly its
+  client's own layer: the replica step with the controls flown, then those causes worked out by the client's own
+  function (`applyOwnCauses`). If that isn't the real ship, something its client can't work out moved it (`hard`): a
+  keyframe of its own ship (its own version, counting down). Every other client gets keyframes of it as before.
+- `ownFor`: its own keyframe only on that version; the exceptions row; the causes, a contact's state left out when the
+  client's replica of the other is the contact pass's (stepped that tick in step, the same numbers, no keyframe or
+  rebuild of it since). A contact whose other the client can't have (rebuilt with the structure lost, not had): a
+  keyframe.
+- The own row correcting the prediction is unchanged.
+
+### G4. The check (net/own/OwnChecks.ts; input `ownCheck`, flags2 0x80, 3 bytes)
+
+- Client: `ownBodyHash` (8 bits: place, velocity, heading, turn, jump drive, hold, dodge, and the controls it flew the
+  tick with, the engines' power among them) and `ownHpHash` (4 bits of hpChecksum of its own part HP) as of the last
+  snapshot's tick (12 bits). The battery itself isn't on the tick layer: what the engines got reaches the motion only
+  through the controls, which are in the hash.
+- Cadence by the part E levels, kept by the client from its own record: NORMAL to start, ROUGH after 10 s clean, STRICT
+  after a fix (a keyframe of its own ship after the first), back down a level per clean 10 s. ROUGH: at most one a
+  second, riding an input that goes anyway, or alone after 10 s if its state changed; NORMAL 15 / 120 ticks; STRICT
+  3 / 6.
+- Server: the expected hashes per snapshot sent (80 kept); off: a keyframe of its own ship next snapshot (state) or its
+  part HP again (HP); checks made before the fix went are not judged again. A lying client only spoils its own view.
+
+### G5. Measured (probe `net/own/netAuditOwn2.ts`, session scratchpad)
+
+The pilot flies by input messages, on time; its hit reports and checks ride them LAT ticks later; own-ship B/s is a
+twin packed encoder fed the same frames without its own keyframes, control rows and causes. Caps 63 before, 127 after;
+20 s, 3 ticks each way, the same seeded fights.
+
+| scenario | own ship B/s before -> after | own keyframes /min | own control rows /min | causes /min after (pull, contact with state, rebuild) | disagreements | checks off / made |
+|---|---|---|---|---|---|---|
+| Idle | -1 -> -1 | 0 -> 0 | 0 -> 0 | 0 | 0 | 0 / 2 |
+| 2 Pips | -1 -> -1 | 0 -> 0 | 0 -> 0 | 0 | 0 | 0 / 90 |
+| Hammerhead | 2 -> -1 | 0 -> 0 | 60 -> 0 | 0 | 0 | 0 / 110 |
+| Gale | -1 -> -1 | 0 -> 0 | 0 -> 0 | 0 | 0 | 0 / 110 |
+| Pirates fight | **122 -> 2** | 12 -> 0 | 1,191 -> 0 | 12 (0, 12, 0) | 0 | 0 / 144 |
+| Scrap Mother | **173 -> 204** | 291 -> 3 | 876 -> 0 | 1,497 (600, 828, 63) | 0 | 0 / 283 |
+| Debris | 13 -> -1 | 0 -> 0 | 276 -> 0 | 0 | 0 | 0 / 121 |
+| Beam, cruising | 0 -> 0, 2 -> 2 | 0 | 3 -> 0 | 0 | 0 | 0 |
+
+(+-2 B/s is the twin encoder's noise.) The prediction-off run (`PREDERR=5`) gives the same numbers to the byte: the
+layer never reads the prediction. The own layer was compared with the server's ship on every tick of every window:
+0 ticks off in every scenario bar the boss's 2 (inside the one window keyframed for two rebuilds). Own shells from fire
+events: every one checked exact (Pips 160/160, Hammerhead 822/822, Gale 694/694, boss 111 built of 123, 0 off).
+The 3 boss keyframes: the probe placing the ship (start, unexplained) and the two-rebuild window.
+
+The boss is dearer than before: its contacts carry the boss's pose (its drive isn't replicated) and its magnet's push
+goes every tick it pulls. Both are the temporary AI and boss-attack causes: with boss decisions as inputs the boss's
+replica is the pass's, the contact rows go without its state (~2 B instead of ~10) and the pull is worked out too.
+Steady (measured after 1,400 ticks, the checks at ROUGH) the boss fight costs 93 B/s for its own ship, pirates 1.
+
+Upstream (the check): 3 B riding an input, about 1 a second steady; input messages a second steady Pips 2.0,
+Hammerhead 2.45, Gale 4.75 (before: 2.25, 4.7, 3.95 with hit reports at their part D rate over the first 20 s), beam
+0.2, cruising 0. Over the first 20 s (the start's fix puts it STRICT for 10 s) checks run 3-5.6 a second and lone ones
+raise Pips to 4.9 messages/s up (394 B/s on the wire against 180).
+
+### G6. Tests
+
+`server/src/net/own/ownSim.test.ts` (a real server, the pilot flying by input messages): no control rows or keyframes
+of its own ship, its layer the server's ship at every snapshot, every check agreeing; pulled and touched: causes, worked
+out exactly; an EMP: that window's real controls go, still exact; a cause dropped: its check catches it, a keyframe puts
+it right. `common/src/network/ownTick.test.ts`: the input's check and the snapshot's own rows through both formats; the
+pull grid, the 12-bit tick and the hashes; a contact's push and a rebuild's recentring from the cause equal the
+server's pass to the bit.
+
+### G7. Other ships: still keyframed "just in case"? A proposal (not built)
+
+Yes. Every other ship's replica gets a keyframe whenever its shadow leaves its path, to every client that has it. The
+probe's keyframes of other ships: Pips 122 B/s, Hammerhead 172, Gale 355, pirates 46, boss 385, debris 577 (shadows'
+reasons over 20 s: pilotless ships off their path 236-832 times, rebuilds 1-165). The same scheme fits them, the
+server's shadow being exact knowledge of where a replica goes wrong:
+
+- **rebuilds** (a part shot off moves the centre of mass): a `[ago, REBUILD]` cause, recentred by each client from the
+  shipSync it gets anyway, as for its own ship; ~2 B instead of a ~15-25 B keyframe;
+- **contacts** among ships: each pair as a cause, worked out by every client that has both (`contactPair`); ~3 B a pair;
+- **AI drive impulses** (bosses, dashes) and pulls: the decision-input workflow; meanwhile the impulse as a cause on a
+  grid, ~3 B;
+- **debris** knocked by something a client doesn't step: as today;
+- detection stays the shadow (free); a per-client hash of the replicas it has (a byte over all of them, on its
+  inputs) would catch the rest, answered with that ship's keyframe.
+
+Estimate from the reasons: most of the 122-577 B/s is pilotless ships moved by contacts, impulses and rebuilds, so
+other ships' keyframe bytes would fall by about two thirds (Gale ~355 -> ~110, debris ~577 -> ~200, boss ~385 -> ~150
+B/s before AI inputs, most of the rest after), for a few bytes a cause and the server stepping causes on each shadow.
+
+### G8. Left
+
+- Two rebuilds of the ship in one window (the structure between): a keyframe. The partDestroyed messages could
+  rebuild it on the client.
+- Late or dropped inputs: a keyframe. The server could say on which tick it applied a late one.
+- A contact chain (the other pushed earlier in the same pass) goes with the other's state as the pass had it (raw,
+  off the grid: the codec escapes it).
+- The switch: on in dev builds with own shots (`?ownsim=0|1`, remembered); the dev server allows it (`NET_CAPS` 127
+  elsewhere).

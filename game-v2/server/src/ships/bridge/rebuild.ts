@@ -10,7 +10,7 @@ import { hasComponent } from 'bitecs';
 import {
   Position, Velocity, Rotation, Radius, Health, Player, Dead, InSystem, Blueprint, ShipState, Vec2,
   validateBlueprint, ValidationResult, createShipState, rebuildShip, fillClips, damagePart, repairShip, healPart, restorePart,
-  computeJoins, localToWorldDir, seededRng, hashInts, splitPose, splitRng, debrisSpin, debrisMotion, debrisBlueprint, debrisHash, shipPointToWorld, remapCharge, chargeTotal, fullPortsCharge, blueprintGeometry,
+  computeJoins, seededRng, hashInts, splitPose, splitRng, debrisSpin, debrisMotion, debrisBlueprint, debrisHash, shipPointToWorld, remapCharge, chargeTotal, fullPortsCharge, blueprintGeometry, recentreShift, flightSignature,
   type PlacedGeom,
 } from '@space-game/common';
 import { type BridgeCtx } from './core.js';
@@ -384,12 +384,14 @@ export function rebuildNow(b: BridgeCtx, eid: number, ship: ShipState, derivable
 
   // Keep the remaining parts where they were: the centre of mass moved in grid space
   const newCom = ship.derived.com;
-  if (newCom[0] !== oldCom[0] || newCom[1] !== oldCom[1]) {
-    const cs = b.tuning.cellSize;
-    const [wx, wy] = localToWorldDir([(newCom[0] - oldCom[0]) * cs, (newCom[1] - oldCom[1]) * cs], pose.angle);
-    Position.x[eid] += wx;
-    Position.y[eid] += wy;
+  const w = recentreShift(oldCom, newCom, b.tuning.cellSize, pose.angle);
+  if (w) {
+    Position.x[eid] += w[0];
+    Position.y[eid] += w[1];
   }
+  // (A pilot's client recentres its own tick-aligned ship alike, from the structures it has: network/ownTick.ts REBUILD;
+  // a rebuild that changes nothing it flies or touches with isn't one for it)
+  if (hasComponent(b.host.world, Player, eid) && (w || before.alive.some((a, i) => a !== ship.derived.alive[i]) || flightSignature(before) !== flightSignature(ship.derived))) b.ownCauses.add(eid, { kind: 2, from: oldCom, to: newCom });
   Radius.value[eid] = Math.max(1, ship.derived.radius);
   b.host.shipRebuilt?.(eid);
 }

@@ -8,7 +8,7 @@
 
 import type { IWorld } from 'bitecs';
 import {
-  FRICTION, BOOST_FACTOR, WORLD_SIZE,
+  FRICTION, BOOST_FACTOR, WORLD_SIZE, CONTACT_BIG_BODY,
   type Blueprint, type Catalog, type ShipState, type ShipTuning, type PlacedPart, type Vec2, type InventoryStub,
   type GravityWell, type FlightConstants, type HitInfo, type FieldEnv, type WeaponMods, type ShipDerived, type Terrain,
 } from '@space-game/common';
@@ -192,17 +192,11 @@ export interface ShipBridgeStats {
 
 export const K = { friction: FRICTION, boostFactor: BOOST_FACTOR, worldSize: WORLD_SIZE };
 
-export function centroidOf(poly: Vec2[]): Vec2 {
-  let x = 0, y = 0;
-  for (const p of poly) { x += p[0]; y += p[1]; }
-  return [x / poly.length, y / poly.length];
-}
+// (Contacts are worked out in common ships/contact.ts, alike on the server and on a pilot's own tick-aligned ship)
+export { centroidOf, type ContactPiece } from '@space-game/common';
 
 /** After an EMP wears off, the ship can't be knocked out again for this long */
 export const EMP_IMMUNE_TICKS = 240;
-
-/** A part's convex piece in world space, with its bounding box (contacts) */
-export interface ContactPiece { part: number; poly: Vec2[]; x0: number; x1: number; y0: number; y1: number }
 
 /**
  * Contact pairs are looked for this much beyond touching bounding circles:
@@ -216,7 +210,7 @@ export const CONTACT_MARGIN = 256;
 export const BEAM_PAD = 120;
 
 /** Bodies with more parts than this only have the pieces near what they touch put in world space (contacts) */
-export const BIG_BODY = 40;
+export const BIG_BODY = CONTACT_BIG_BODY;
 
 /**
  * The bridge's private state (and, as later cuts need them, the private methods its modules call back through).

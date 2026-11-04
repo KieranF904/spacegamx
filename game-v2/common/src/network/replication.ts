@@ -173,6 +173,21 @@ function fixWeight(f: { t: number; s: number }, t: number): number {
 const cloneBody = (b: FlightBody): FlightBody => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, angle: b.angle, angVel: b.angVel, jump: b.jump, jumpScale: b.jumpScale, cargo: b.cargo, dodge: b.dodge, dodgeDir: b.dodgeDir });
 
 /**
+ * A pilot's own ship on its tick-aligned layer (CAPS.OWN_SIM, network/ownTick.ts): its controls are its own inputs
+ * (and what the server says where they don't tell), its structure the one it flew on each tick, and after each step
+ * that tick's causes (pulls, contacts, a rebuild). The replica set steps it like any other ship but asks this instead
+ * of its control rows.
+ */
+export interface OwnTimeline {
+  /** The control change on tick t (its input with that target tick, or what the server said for it), if any */
+  ctl(t: number): readonly [number, number] | undefined;
+  /** The structure it flew tick t with */
+  derived(t: number): ShipDerived | null | undefined;
+  /** After its step at tick t: that tick's causes, then rounded */
+  after(t: number, body: FlightBody): void;
+}
+
+/**
  * Every replicated ship a client knows: keyframes and control changes from
  * snapshots go in, states at any tick come out (stepped with the shared
  * replicaStep, exactly as the server's shadow does). A control change that
@@ -253,6 +268,21 @@ export class ShipReplicaSet {
 
   has(id: number): boolean {
     return this.reps.has(id);
+  }
+
+  /** The pilot's own ship, stepped from its own timeline (CAPS.OWN_SIM; null: from its control rows like any other) */
+  private own: { id: number; src: OwnTimeline } | null = null;
+  setOwn(id: number, src: OwnTimeline | null): void {
+    this.own = src ? { id, src } : null;
+    this.rewind(id, -Infinity);
+  }
+
+  /** What it was stepped to from tick t on must be stepped again (its timeline changed there); its keyframe stays */
+  rewind(id: number, t: number): void {
+    const r = this.reps.get(id);
+    if (!r || t > r.last) return;
+    for (const h of [...r.hist.keys()]) if (h >= t && h !== r.kf) r.hist.delete(h);
+    r.last = Math.max(...r.hist.keys(), -Infinity);
   }
 
   /** Is this ship docked (riding inside its station) as last heard */
@@ -345,6 +375,7 @@ export class ShipReplicaSet {
       for (const [t, s] of r.hist) if (t >= tick && t < bt) { bt = t; best = s; }
       return best ?? r.hist.get(r.last)!;
     }
+    const own = this.own?.id === id ? this.own.src : null;
     const d = this.derived(id);
     let cur = r.hist.get(r.last)!;
     if (r.mode === ReplicaMode.Docked) {
@@ -359,10 +390,11 @@ export class ShipReplicaSet {
     const to = Math.min(tick, r.last + 600);
     while (r.last < to) {
       const t = r.last + 1;
-      const ev = r.events.get(t);
+      const ev = own ? own.ctl(t) : r.events.get(t);
       const bits = ev ? ev[0] : cur.bits, q = ev ? ev[1] : cur.q;
       const body = cloneBody(cur.body);
-      replicaStep(r.mode, body, { bits, targetAngle: replicaAngle(r.mode, q) }, d, this.tuning, env, t);
+      replicaStep(r.mode, body, { bits, targetAngle: replicaAngle(r.mode, q) }, (own && own.derived(t)) || d, this.tuning, env, t);
+      if (own) own.after(t, body);
       cur = { body, bits, q };
       r.hist.set(t, cur);
       r.last = t;

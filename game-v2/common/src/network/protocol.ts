@@ -11,6 +11,7 @@ import { fxKindCode, fxKindName, FX_KINDS } from './fxKinds.js';
 import { packedTables } from './packed/tables.js';
 import { quantizeCursorAngle, dequantizeCursorAngle } from './cursorState.js';
 import type { HitReport } from './hits.js';
+import type { OwnCheck } from './ownTick.js';
 /**
  * Network Protocol - All client/server message types
  */
@@ -31,9 +32,9 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
  * has updated PROTOCOL_VERSION and PROTOCOL_WIRE_HASH.
  */
 // History: PROTOCOL_CHANGELOG.md. Re-pin with `npm run wire:bump "reason"` (game-v2/), never by hand.
-export const PROTOCOL_VERSION = 33;
+export const PROTOCOL_VERSION = 34;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
-export const PROTOCOL_WIRE_HASH = '9d46a0db';
+export const PROTOCOL_WIRE_HASH = '24baa0c1';
 /** WebSocket close code (and reason) for a client on another protocol version */
 export const PROTOCOL_MISMATCH_CLOSE = 4002;
 export const PROTOCOL_MISMATCH_REASON = 'version';
@@ -70,6 +71,8 @@ export interface ClientInputMessage {
   acks?: number[];
   /** Client-detected hits (hits.ts CAPS.SELF_HITS): its hit chain's low byte as of a snapshot's tick (14 bits on the wire) */
   hitReport?: HitReport;
+  /** Its own ship on its tick-aligned layer (hits.ts CAPS.OWN_SIM): a hash of its state as of a snapshot's tick (network/ownTick.ts) */
+  ownCheck?: OwnCheck;
 }
 
 /** Cursor distance is sent in steps of this many world units, up to CURSOR_DIST_MAX */
@@ -432,6 +435,11 @@ export interface ServerSnapshotMessage {
    * (common/src/ships/launch.ts): [owner, ticksAgo, part, aimQ, ...shell ids]
    */
   fire?: number[][];
+  /**
+   * Its own ship's tick-layer causes (hits.ts CAPS.OWN_SIM, network/ownTick.ts): [ticksAgo, kind, ...], in the order
+   * the server's step had them
+   */
+  own?: number[][];
 }
 
 export interface ServerPlayerStateMessage {
@@ -1367,7 +1375,7 @@ const BINARY_MSG_INPUT = 0x03;
 // [5]    : flags (forward, backward, left, right, boost, fireLeft, fireRight)
 // [6-7]  : aim angle in the 13-bit cursor quantization (the client only ever sends those)
 // [8-9]  : cursorDist / CURSOR_DIST_STEP (16 bits)
-// [10]   : flags2 (strafeLeft, strafeRight, helm, jump, has targetTick, hit report, dodge, -)  (0x80 free)
+// [10]   : flags2 (strafeLeft, strafeRight, helm, jump, has targetTick, hit report, dodge, own check)
 // The tick the client was at isn't sent: nothing reads it.
 // (The old 17-byte form, type 0x01, still decodes.)
 
@@ -1386,6 +1394,9 @@ const INPUT_BYTES = 11;
 const MAX_INPUT_ACKS = 32;
 const HIT_REPORT = 0x20;
 const HIT_REPORT_BYTES = 3;
+/** (protocol 34, flags2 0x80: an own check after the hit report: the state hash's byte, then 16 bits: the hp hash's 4 and the tick's low 12) */
+const OWN_CHECK = 0x80;
+const OWN_CHECK_BYTES = 3;
 
 function ackTail(acks: number[] | undefined): number[] {
   if (!acks?.length) return [];
@@ -1413,13 +1424,17 @@ function readAcks(view: DataView, at = INPUT_BYTES): number[] | undefined {
 }
 
 export function encodeInputBinary(msg: ClientInputMessage): ArrayBuffer {
-  const tail = ackTail(msg.acks), rep = msg.hitReport, at = INPUT_BYTES + (rep ? HIT_REPORT_BYTES : 0);
+  const tail = ackTail(msg.acks), rep = msg.hitReport, chk = msg.ownCheck, at0 = INPUT_BYTES + (rep ? HIT_REPORT_BYTES : 0), at = at0 + (chk ? OWN_CHECK_BYTES : 0);
   const buffer = new ArrayBuffer(at + tail.length);
   const view = new DataView(buffer);
   for (let i = 0; i < tail.length; i++) view.setUint8(at + i, tail[i]);
   if (rep) {
     view.setUint8(INPUT_BYTES, rep.hash & 0xff);
     view.setUint16(INPUT_BYTES + 1, (rep.tick & 0x3fff) | ((rep.epoch & 3) << 14), true);
+  }
+  if (chk) {
+    view.setUint8(at0, chk.body & 0xff);
+    view.setUint16(at0 + 1, (chk.tick & 0xfff) | ((chk.hp & 15) << 12), true);
   }
   view.setUint8(0, BINARY_MSG_INPUT);
   view.setUint16(1, msg.seq & 0xFFFF, true);
@@ -1441,7 +1456,8 @@ export function encodeInputBinary(msg: ClientInputMessage): ArrayBuffer {
     (msg.jump ? 0x08 : 0) |
     (msg.targetTick !== undefined ? 0x10 : 0) |
     (rep ? HIT_REPORT : 0) |
-    (msg.dodge ? 0x40 : 0));
+    (msg.dodge ? 0x40 : 0) |
+    (chk ? OWN_CHECK : 0));
   return buffer;
 }
 
@@ -1453,6 +1469,9 @@ export function decodeInputBinary(data: ArrayBuffer | Uint8Array): ClientInputMe
   const flags2 = view.getUint8(10);
   const rep = flags2 & HIT_REPORT && view.byteLength >= INPUT_BYTES + HIT_REPORT_BYTES;
   const tt = rep ? view.getUint16(INPUT_BYTES + 1, true) : 0;
+  const at0 = rep ? INPUT_BYTES + HIT_REPORT_BYTES : INPUT_BYTES;
+  const chk = flags2 & OWN_CHECK && view.byteLength >= at0 + OWN_CHECK_BYTES;
+  const ct = chk ? view.getUint16(at0 + 1, true) : 0;
   return {
     type: 'input',
     seq: view.getUint16(1, true),
@@ -1473,8 +1492,9 @@ export function decodeInputBinary(data: ArrayBuffer | Uint8Array): ClientInputMe
     jump: (flags2 & 0x08) !== 0,
     dodge: (flags2 & 0x40) !== 0,
     cursorDist: view.getUint16(8, true) * CURSOR_DIST_STEP,
-    acks: readAcks(view, rep ? INPUT_BYTES + HIT_REPORT_BYTES : INPUT_BYTES),
+    acks: readAcks(view, chk ? at0 + OWN_CHECK_BYTES : at0),
     ...(rep ? { hitReport: { hash: view.getUint8(INPUT_BYTES), tick: tt & 0x3fff, epoch: tt >>> 14 } } : {}),
+    ...(chk ? { ownCheck: { body: view.getUint8(at0), hp: ct >>> 12, tick: ct & 0xfff } } : {}),
   };
 }
 
@@ -1555,7 +1575,7 @@ const COMPACT: [string, string[]][] = [
   ['stationFire', ['station', 'target', 'turret']],
   ['playerState', ['hp', 'maxHp', 'boostFuel', 'maxBoostFuel', 'xp', 'level', 'credits', 'systemId']],
   // (Packed first: see packSnapshot)
-  ['snapshot', ['t', 'lp', 'e', 'p', 'r', 'k', 'c', 'o', 'f']],
+  ['snapshot', ['t', 'lp', 'e', 'p', 'r', 'k', 'c', 'o', 'f', 'n']],
   ['mapDots', ['tick', 'dots', 'routes', 'info', 'gone', 'names', 'full']],
   // (Appended, protocol 26: the hot plain messages. Values change on the way in and out: COMPACT_HOOKS)
   ['ignite', ['bodyId', 'part', 'ticks']],
@@ -1660,7 +1680,7 @@ export function wireTables(): Record<string, unknown> {
   };
 }
 
-interface PackedSnapshot { type: 'snapshot'; t: number; lp: number; e?: unknown[][]; p?: (number | null)[][]; r?: number[]; k?: number[][]; c?: number[][]; o?: number[]; f?: number[][] }
+interface PackedSnapshot { type: 'snapshot'; t: number; lp: number; e?: unknown[][]; p?: (number | null)[][]; r?: number[]; k?: number[][]; c?: number[][]; o?: number[]; f?: number[][]; n?: number[][] }
 
 /**
  * Projectiles have rows of their own (they're most of a fight's rows):
@@ -1717,6 +1737,7 @@ export function packSnapshot(m: ServerSnapshotMessage): PackedSnapshot {
   if (m.ctl?.length) out.c = packCtlIds(m.ctl);
   if (m.out?.length) out.o = m.out;
   if (m.fire?.length) out.f = packFire(m.fire);
+  if (m.own?.length) out.n = m.own;
   return out;
 }
 
@@ -1772,7 +1793,7 @@ export function unpackSnapshot(p: PackedSnapshot): ServerSnapshotMessage {
     return s as unknown as EntityState;
   });
   for (const r of p.p ?? []) entities.push(unpackProjectile(r, p.t));
-  return { type: 'snapshot', tick: p.t, lastProcessedInput: p.lp, entities, removed: p.r ?? [], ships: p.k, ctl: p.c && unpackCtlIds(p.c), out: p.o, fire: p.f && unpackFire(p.f) };
+  return { type: 'snapshot', tick: p.t, lastProcessedInput: p.lp, entities, removed: p.r ?? [], ships: p.k, ctl: p.c && unpackCtlIds(p.c), out: p.o, fire: p.f && unpackFire(p.f), ...(p.n ? { own: p.n } : {}) };
 }
 
 /**
@@ -1830,10 +1851,10 @@ function rowBytes(cache: WeakMap<readonly number[], Uint8Array>, row: readonly n
 
 function encodeSnapshot(m: ServerSnapshotMessage): Uint8Array {
   const { e, p } = packEntities(m);
-  // (The compact row: [code, t, lp, e, p, r, k, c, o, f], absent ones null and trailing nulls dropped)
+  // (The compact row: [code, t, lp, e, p, r, k, c, o, f, n], absent ones null and trailing nulls dropped)
   const row: unknown[] = [SNAPSHOT_CODE, m.tick ?? null, m.lastProcessedInput ?? null, e.length ? e : null, p.length ? p : null,
     m.removed.length ? m.removed : null, m.ships?.length ? m.ships : null, m.ctl?.length ? m.ctl : null,
-    m.out?.length ? m.out : null, m.fire?.length ? packFire(m.fire) : null];
+    m.out?.length ? m.out : null, m.fire?.length ? packFire(m.fire) : null, m.own?.length ? m.own : null];
   while (row.length > 1 && row[row.length - 1] === null) row.pop();
   const w = snapWriter;
   w.arrayHeader(row.length);

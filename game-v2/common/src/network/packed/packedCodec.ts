@@ -589,8 +589,10 @@ const isArr = Array.isArray;
 
 /** Can the snapshot's row go packed (ids where ids go, rows the shapes the packing expects)? */
 function snapshotOk(w: unknown[]): boolean {
-  if (w.length > 10) return false;
-  const [, , , e, p, r, k, c, o, f] = w as unknown[][];
+  if (w.length > 11) return false;
+  const [, , , e, p, r, k, c, o, f, n] = w as unknown[][];
+  // (Own-ship causes: rows of numbers, a kind the packing knows: ownIO)
+  if (n != null && !(isArr(n) && n.every((row) => isArr(row) && row.length >= 2 && row.length <= 15 && row.every((v) => typeof v === 'number') && Number.isInteger(row[0]) && (row[0] as number) >= 0 && Number.isInteger(row[1]) && (row[1] as number) >= 0 && (row[1] as number) < 4))) return false;
   if (e != null && !(isArr(e) && e.every((row) => isArr(row) && row.length >= 2 && row.length <= 15 && isId(row[0]) && Number.isInteger(row[1]) && (row[1] as number) >= 0 && (row[1] as number) < 32))) return false;
   if (p != null && !(isArr(p) && p.every((row) => isArr(row) && row.length >= 8 && row.length <= 15 && isId(row[0]) && isId(row[7])))) return false;
   if (r != null && !(isArr(r) && r.every(isId))) return false;
@@ -618,11 +620,11 @@ function snapshotOk(w: unknown[]): boolean {
   return true;
 }
 
-/** A snapshot's compact row ([code, t, lp, e, p, r, k, c, o, f], trailing nulls dropped) */
+/** A snapshot's compact row ([code, t, lp, e, p, r, k, c, o, f, n], trailing nulls dropped) */
 function snapshotIO(io: PackedIO, w: unknown[] | null): unknown[] {
   let mask = 0;
   if (w) for (let i = 1; i < w.length; i++) if (w[i] != null) mask |= 1 << (i - 1);
-  mask = io.u(mask, 9);
+  mask = io.u(mask, 10);
   const out: unknown[] = [SNAPSHOT_CODE];
   const has = (i: number) => (mask & (1 << (i - 1))) !== 0;
   const at = (i: number) => (w ? w[i] : null) as unknown[][];
@@ -651,6 +653,8 @@ function snapshotIO(io: PackedIO, w: unknown[] | null): unknown[] {
   } else out[8] = null;
   sec?.('f', io.bitLength);
   out[9] = has(9) ? fireIO(io, at(9)) : null;
+  sec?.('n', io.bitLength);
+  out[10] = has(10) ? ownIO(io, at(10), tick) : null;
   sec?.('end', io.bitLength);
   while (out.length > 1 && out[out.length - 1] === null) out.pop();
   return out;
@@ -777,6 +781,42 @@ function keyframesIO(io: PackedIO, rows: unknown[][] | null, tick: number): unkn
       if (!delta) { o.push(io.num(v, d, c)); continue; }
       if (by) io.guess(pv, K + i - 1, K + by - 1, d, PK_KEYFRAME[by - 1][0], dt);
       o.push(io.num(v, d, c, pv, K + i - 1));
+    }
+    out.push(o);
+  }
+  return out;
+}
+
+/**
+ * A pilot's own-ship causes (network/ownTick.ts: [ago, kind, ...]): ago and kind, then each value at its field's
+ * decimals (a pull's push at PULL_PLACES; a contact's other by its slot, its flags, and the other's pose and velocity
+ * as steps from that ship's last keyframe or contact values, its place guessed on by its velocity: the slots and guesses
+ * keyframesIO keeps)
+ */
+const OWN_STATE: readonly [number, number, number, number][] = [[2, 6, K + 1, K + 3], [2, 6, K + 2, K + 4], [5, 6, K + 5, K + 6], [4, 6, K + 3, -1], [4, 6, K + 4, -1]];
+function ownIO(io: PackedIO, rows: unknown[][] | null, tick: number): unknown[][] {
+  const n = io.vu(rows?.length ?? 0, 1);
+  const out: unknown[][] = [];
+  for (let r = 0; r < n; r++) {
+    const row = rows?.[r];
+    const len = io.u(row?.length ?? 2, 4);
+    const ago = io.vu((row?.[0] as number) ?? 0, 2), kind = io.u((row?.[1] as number) ?? 0, 2);
+    const o: unknown[] = [ago, kind];
+    let pv: number[] | null = null, dt = 0;
+    for (let i = 2; i < len; i++) {
+      const v = row?.[i];
+      // (a pull's push: the step from the last one, a pull lasting many ticks pushes much alike each)
+      if (kind === 0) o.push(io.num(v, 5, 5, io.prevOf(-1), i - 2));
+      else if (kind === 1 && i === 2) { const id = io.thing((v as number) ?? 0); o.push(id); pv = io.prevOf(id); }
+      else if (kind === 1 && i === 3) o.push(io.u((v as number) ?? 0, 5));
+      else if (kind === 1 && pv && i <= 8) {
+        if (i === 4) dt = ticksSince(pv, K_TICK, tick - ago);
+        const [d, c, k, by] = OWN_STATE[i - 4];
+        if (by >= 0) io.guess(pv, k, by, d, by === K + 6 ? 6 : 4, dt);
+        o.push(io.num(v, d, c, pv, k));
+      }
+      else if (kind === 1) o.push(io.num(v, 0, 3));
+      else o.push(io.num(v, 0, 3));
     }
     out.push(o);
   }

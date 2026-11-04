@@ -11,7 +11,7 @@ import { hasComponent, entityExists, removeEntity, defineQuery } from 'bitecs';
 import {
   Position, Velocity, Rotation, Health, Player, Input, Boost, Portal, InSystem, Dead,
   TICK_RATE, inSafeSpace, unwrapTick16, computeStateHash, PROTOCOL_VERSION,
-  replicaAngle, quantizeReplicaAngle, ReplicaMode, INPUT_BOOLS, INPUT_HELD, dcos, dsin, hashUnit,
+  replicaAngle, quantizeReplicaAngle, ReplicaMode, INPUT_BOOLS, INPUT_HELD, controlBits, buildFlightInputs, dcos, dsin, hashUnit,
 } from '@space-game/common';
 import type { FactionsFile } from '../../game/Enemies.js';
 import type { ClientConnection } from '../ClientConnection.js';
@@ -31,9 +31,12 @@ export function registerFlightHandlers(t: HandlerRegistry): void {
     if (Array.isArray(msg.acks) && msg.acks.length) ctx.snapshots.ackDebris(conn, msg.acks);
     // (Client-detected hits: its hit chain's report rides here too, protocol 28: net/hits/HitLedger.ts)
     if (msg.hitReport) ctx.hits.report(conn, msg.hitReport);
+    // (Its own ship's check, CAPS.OWN_SIM: net/own/OwnChecks.ts)
+    if (msg.ownCheck) ctx.ownChecks.check(conn, msg.ownCheck);
     // Queue for next tick boundary — don't apply mid-frame.
     // Messages still arrive instantly via setImmediate event loop.
-    if (++conn.inputsThisTick > MAX_INPUTS_PER_TICK) return;
+    // (Dropped: a client stepping its own ship had it on its target tick, so its ship is off: Replication ownLate)
+    if (++conn.inputsThisTick > MAX_INPUTS_PER_TICK) { conn.ownLate = true; return; }
     ctx.inputQueue.push({ conn, msg });
   });
   t.on('ping', handlePing);
@@ -114,14 +117,15 @@ export function handleInput(ctx: ServerCtx, conn: ClientConnection, msg: any): v
   conn.liveTick = ctx.currentTick;
   if (targetTick !== undefined && targetTick > ctx.currentTick) {
     // Schedule for future tick (no further ahead than a client could predict, and only so many)
-    if (targetTick > ctx.currentTick + MAX_INPUT_LEAD) return;
+    if (targetTick > ctx.currentTick + MAX_INPUT_LEAD) { conn.ownLate = true; return; }
     conn.scheduledInputs.push({ targetTick, msg });
-    if (conn.scheduledInputs.length > MAX_SCHEDULED_INPUTS) conn.scheduledInputs.shift();
+    if (conn.scheduledInputs.length > MAX_SCHEDULED_INPUTS) { conn.scheduledInputs.shift(); conn.ownLate = true; }
   } else {
     // No targetTick (old client) or late arrival — apply immediately. The client
     // predicted it on an earlier tick, so its ship needs correcting
     applyInputToEntity(ctx, conn, msg);
     conn.selfLate = true;
+    conn.ownLate = true;
   }
 }
 
@@ -141,6 +145,13 @@ export function applyInputToEntity(ctx: ServerCtx, conn: ClientConnection, msg: 
   Input.sequence[eid] = seq;
   
   conn.lastInputSeq = seq;
+  // What its client steps its own ship with from this tick (CAPS.OWN_SIM: Replication compares the controls flown)
+  conn.ownCtl = ownControlsOf(msg);
+}
+
+/** The controls an input says, as a client stepping its own ship works them out (network/ownTick.ts: no EMP, no power) */
+export function ownControlsOf(msg: any): { bits: number; q: number } {
+  return { bits: controlBits(buildFlightInputs(msg, false)), q: quantizeReplicaAngle(Number(msg.targetAngle) || 0) };
 }
 
 export function handlePing(ctx: ServerCtx, conn: ClientConnection, msg: any): void {

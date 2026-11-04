@@ -179,6 +179,8 @@ import * as flight from './net/handlers/flight.js';
 import { registerFlightHandlers, portalQuery } from './net/handlers/flight.js';
 import { Outbox } from './net/snapshot/Outbox.js';
 import { HitLedger } from './net/hits/HitLedger.js';
+import { OwnChecks } from './net/own/OwnChecks.js';
+import { ownSimFor } from './net/snapshot/ownShots.js';
 import { SnapshotBuilder, designHash, playerQuery, projectileQuery, droppedItemQuery } from './net/SnapshotBuilder.js';
 
 // ============================================
@@ -658,6 +660,8 @@ export class GameServer implements ServerCtx {
   readonly net: Outbox;
   /** Confirmed hits: what capable clients are told of shells' hits on ships instead (net/hits/HitLedger.ts) */
   readonly hits: HitLedger;
+  /** Pilots' own ships on their clients' tick-aligned layer: the checks they send of them (CAPS.OWN_SIM, net/own/OwnChecks.ts) */
+  readonly ownChecks: OwnChecks;
   /** The join caps this server takes (GameServerOptions.netCaps) */
   readonly netCaps: number;
   /** The snapshot path: rows, snapshots, ship structure, map dots, entering a system (net/SnapshotBuilder.ts) */
@@ -682,6 +686,11 @@ export class GameServer implements ServerCtx {
     this.world = createWorld();
     this.net = new Outbox(this);
     this.hits = new HitLedger(this);
+    this.ownChecks = new OwnChecks({
+      tick: () => this.currentTick,
+      rekey: (conn) => { conn.repKnown.delete(conn.playerId); },
+      resyncHp: (conn) => { conn.shipHpSent.delete(conn.playerId); conn.shipSynced.delete(conn.playerId); },
+    });
     this.netCaps = opts.netCaps ?? 0;
     this.gameData = opts.gameData;
     this.adminServer = opts.adminServer || null;
@@ -726,11 +735,8 @@ export class GameServer implements ServerCtx {
       broadcast: (num, msg) => this.broadcastToSystem(num, msg),
       hitFx: (proj, msg) => this.hits.hitFx(proj, msg),
       remove: (eid) => { addComponent(this.world, Dead, eid); this.pendingRemovedEntities.add(eid); },
-      nudge: (eid, ax, ay) => {
-        if (hasComponent(this.world, Dead, eid) || this.ships.get(eid)?.kind === 'debris') return;
-        Velocity.x[eid] += ax;
-        Velocity.y[eid] += ay;
-      },
+      // (A pilot's push is told to its client, TEMPORARY: ShipBridge.push)
+      nudge: (eid, ax, ay) => this.ships.push(eid, ax, ay),
       miningTool: (kind, turret) => {
         const t = this.gameData.miningTable.tools as unknown as Record<string, { yield: number; hardness: number }>;
         return kind === 'cannon' ? t[turret ? 'turret' : 'fixed'] : t[kind] ?? { yield: 0.05, hardness: 1 };
@@ -915,6 +921,10 @@ export class GameServer implements ServerCtx {
         for (const c of this.clients.values()) out.add(InSystem.systemId[c.playerId]);
         return out;
       },
+      // (A pilot's client stepping its own ship, CAPS.OWN_SIM: network/ownTick.ts)
+      ownSim: (eid) => ownSimFor(this.liveConn(eid)?.caps),
+      ownControls: (eid) => this.liveConn(eid)?.ownCtl ?? null,
+      ownLate: (eid) => { const c = this.liveConn(eid); if (!c?.ownLate) return false; c.ownLate = false; return true; },
     }, this.ships);
     this.lod = new SimLod({
       tick: () => this.currentTick,
@@ -992,6 +1002,7 @@ this.devTeleport = opts.devTeleport ?? false;
       pendingRemovedEntities: this.pendingRemovedEntities,
       lastEntityStates: this.lastEntityStates,
       hits: this.hits,
+      ownChecks: this.ownChecks,
     }, this);
 
     // Hook up admin server events

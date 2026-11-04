@@ -13,6 +13,8 @@ import {
 import { ShipStore } from '../../../../client/src/ships/ShipStore.js';
 import { ConfirmedHits, type HitShell, type HitsOutcome, type OwnHit } from '../../../../client/src/ships/hits/ConfirmedHits.js';
 import { SelfHits, toldHits } from '../../../../client/src/ships/hits/SelfHits.js';
+import { OwnTick } from '../../../../client/src/ships/own/OwnTick.js';
+import { ownSimFor } from '../snapshot/ownShots.js';
 import type { GameServer } from '../../GameServer.js';
 
 export interface FakeHitsOptions {
@@ -37,6 +39,8 @@ export class FakeHitsClient {
   readonly reps: ShipReplicaSet;
   readonly hits: ConfirmedHits | null = null;
   readonly selfHits: SelfHits | null = null;
+  /** Its own ship on its tick-aligned layer, stepped by itself (CAPS.OWN_SIM: client ships/own/OwnTick.ts) */
+  readonly own: OwnTick | null = null;
   readonly shells = new Map<number, HitShell>();
   /** Entity types and ship-body status data, as the snapshots said */
   private kinds = new Map<number, { type: number; side: number }>();
@@ -95,6 +99,7 @@ export class FakeHitsClient {
         passes: (shell) => this.hits!.passesOf(shell),
       });
     }
+    if (ownSimFor(opts.caps)) this.own = new OwnTick({ store: this.store, reps: this.reps, self: () => this.pid, tuning: ships.tuning });
     const socket: ClientSocket = {
       isOpen: () => true,
       send: (data) => {
@@ -125,6 +130,11 @@ export class FakeHitsClient {
     const e = this.opts.predictionError?.(t);
     this.selfHist.set(t, { x: Position.x[this.pid] + (e?.dx ?? 0), y: Position.y[this.pid] + (e?.dy ?? 0), angle: Rotation.angle[this.pid] + (e?.da ?? 0), vx: Velocity.x[this.pid], vy: Velocity.y[this.pid] });
     this.selfHist.delete(t - 240);
+  }
+
+  /** An input it sent (the probe and tests fly it by inputs): its own ship's controls on the tick-aligned layer (OwnTick) */
+  noteInput(msg: ClientMessage): void {
+    if (msg.type === 'input') this.own?.noteInput(msg as never);
   }
 
   /** Base-format frames and bit-packed messages (CAPS.PACKED: one or more frames each) */
@@ -160,12 +170,13 @@ export class FakeHitsClient {
 
   private handle(m: ServerMessage): void {
     switch (m.type) {
-      case 'shipSync': this.selfHits?.onSync(m.id); this.store.onSync(m); break;
+      case 'shipSync': this.selfHits?.onSync(m.id); this.own?.beforeSync(m.id); this.store.onSync(m); break;
       case 'shipHps': this.findHits(); this.store.onHps(m); break;
       case 'netCaps':
         this.findHits();
         this.selfHits?.setOn((m.caps & (CAPS.HITS | CAPS.SELF_HITS)) === (CAPS.HITS | CAPS.SELF_HITS), this.snapTick);
         this.selfHits?.setLevel(m.caps & CAPS.ROUGH ? m.lvl : undefined);
+        this.own?.setOn(ownSimFor(m.caps));
         this.levels.push([this.snapTick, m.caps & CAPS.ROUGH ? m.lvl ?? 1 : 1]);
         break;
       case 'snapshot': this.snapshot(m as ServerSnapshotMessage); break;
@@ -203,6 +214,8 @@ export class FakeHitsClient {
     this.snapTick = s.tick;
     this.sawSnapshot = true;
     this.reps.apply(s.tick, s.ships, s.ctl);
+    // (its own ship's causes and controls, CAPS.OWN_SIM, before its fire events are built from it)
+    this.own?.onSnapshot(s);
     for (const e of s.entities) {
       const d = e.data;
       if (e.type === EntityType.Player || e.type === EntityType.ShipBody) this.kinds.set(e.id, { type: e.type, side: e.type === EntityType.ShipBody && d ? d[10] ?? 0 : 0 });
@@ -219,7 +232,8 @@ export class FakeHitsClient {
       if (owner === this.pid) this.ownFired += ids.length;
       const tick = s.tick - ago, part = partAmmo % 256, ammo = Math.floor(partAmmo / 256) % 256, aug = partAmmo >= 65536 ? (1 as const) : undefined;
       // (its own too, CAPS.OWN_SHOTS: from its confirmed ship, replicated to it as to everyone; never its prediction)
-      const ship = this.store.get(owner), body = this.reps.at(owner, tick)?.body;
+      // (its own, CAPS.OWN_SIM: where it was as it fired, before that tick's pulls and contacts: OwnTick.firePose)
+      const ship = this.store.get(owner), body = owner === this.pid && this.own?.on ? this.own.firePose(tick) : this.reps.at(owner, tick)?.body;
       const v = ship && body ? rebuildVolley({ owner, tick, part, aimQ, ids, ammo, aug }, ship as ShipState, body, this.server.getShips().tuning) : null;
       const spawnTick = owner === this.pid || this.kinds.get(owner)?.type === EntityType.Player ? tick - 1 : tick;
       for (const id of ids) {

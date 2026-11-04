@@ -6,7 +6,7 @@
  * What an AI pilot decides (its PilotOrders) is worked out by its controller, in server/src/game (Enemies.ts, Bosses.ts).
  */
 
-import { collideTerrain, terrainRadius } from '@space-game/common';
+import { collideTerrain, terrainRadius, quantizeShipBody } from '@space-game/common';
 import {
   Position, Velocity, Rotation, FRICTION, stepFlight, withEmp, withSlowed, ReplicaMode, CTL, controlBits, replicaAngle,
   quantizeReplicaAngle, powerTick, gunLoadTick, FULL_CHARGE, type ShipState, type FlightConstants,
@@ -90,6 +90,9 @@ export function stepPilotless(b: BridgeCtx, eid: number, ship: ShipState, k: Fli
   stepFlight(body, controls, ship.derived, b.tuning, { charge: FULL_CHARGE, drainRate: 0 }, emp ? { ...k, hazard: withEmp(hazard) } : hazard ? { ...k, hazard } : k);
   // A surface's rock (as the replicas have it: replicaStep)
   collideTerrain(body, terrainRadius(ship.derived.radius), b.host.terrainAt?.(eid));
+  // On the replicated grid at once, as a pilot's step leaves it: what the rest of the tick (contacts) sees of it is then
+  // what every client's replica has of it, so a pilot's client can work a contact with it out (network/ownTick.ts)
+  quantizeShipBody(body);
   b.writeBody(eid, ship, body);
   const pin = b.pinned.get(eid);
   if (pin) { Position.x[eid] = pin.x; Position.y[eid] = pin.y; Velocity.x[eid] = 0; Velocity.y[eid] = 0; }

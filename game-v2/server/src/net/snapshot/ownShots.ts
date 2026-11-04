@@ -32,3 +32,11 @@ export function ownVolleyExact(ships: ShipBridge, f: FireRecord): boolean {
   const sh = ship ? gunShell(ships.tuning, ship, f.part + 256 * (f.ammo ?? 0) + (f.aug ? 65536 : 0)) : null;
   return !!sh && firesStraight(sh.def) && !sh.def.lob && !sh.def.arm;
 }
+
+/**
+ * Does this client step its own ship itself (CAPS.OWN_SIM, with OWN_SHOTS: common network/ownTick.ts)? Then it isn't
+ * sent its own ship's control rows or keyframes but the causes of what moved it, and checks it (net/own/OwnChecks.ts)
+ */
+export function ownSimFor(caps: number | undefined): boolean {
+  return ((caps ?? 0) & (CAPS.OWN_SHOTS | CAPS.OWN_SIM)) === (CAPS.OWN_SHOTS | CAPS.OWN_SIM);
+}

@@ -11,13 +11,14 @@
 import { hasComponent, entityExists } from 'bitecs';
 import {
   Position, Velocity, Rotation, Input, Boost, Player, Dead, InSystem, stepShipPhysics, quantizeShipBody, damagePart,
-  stepDrift, withEmp, withNumb, withSlowed, jumpTuning, pilotJumpStep, NO_FIELDS, convexPenetration, ReplicaMode, CTL,
+  stepDrift, withEmp, withNumb, withSlowed, jumpTuning, pilotJumpStep, NO_FIELDS, ReplicaMode, CTL,
   controlBits, quantizeReplicaAngle, partWeaponDef, partMaterial, powerTick, gunLoadTick, quantizeCargo,
-  buildFlightInputs, newFlightControls, chargeTotal, getPlan,
-  type ShipState, type Vec2, type GravityWell, type FlightConstants, type FlightInputSource,
+  buildFlightInputs, newFlightControls, chargeTotal, getPlan, contactPieces, contactPair, quantizePull, CONTACT_FLAG,
+  type ShipState, type GravityWell, type FlightConstants, type FlightInputSource,
 } from '@space-game/common';
-import { K, centroidOf, CONTACT_MARGIN, BIG_BODY, type ContactPiece, type BridgeCtx } from './core.js';
-import { dcos, dhypot, dsin } from '@space-game/common';
+import { K, CONTACT_MARGIN, BIG_BODY, type ContactPiece, type BridgeCtx } from './core.js';
+import { ownShape } from './ownCauses.js';
+import { dhypot } from '@space-game/common';
 
 /** stepMovement's scratch: the held keys read from Input, and the controls built from them (reused every call; the step never keeps them) */
 const MOVE_SRC: FlightInputSource = {
@@ -166,6 +167,23 @@ export function teleport(b: BridgeCtx, eid: number, x: number, y: number): void 
 export function pin(b: BridgeCtx, eid: number, on = true): void {
   if (on && b.bodies.has(eid)) b.pinned.set(eid, { x: Position.x[eid], y: Position.y[eid] });
   else b.pinned.delete(eid);
+}
+
+/**
+ * A pull on a body's velocity (a boss's magnet, a collapsing star). A pilot's is put on the PULL grid and noted as its
+ * client's cause (TEMPORARY, network/ownTick.ts PULL: until boss decisions are inputs). Debris isn't pulled.
+ */
+export function push(b: BridgeCtx, eid: number, ax: number, ay: number): void {
+  const ship = b.bodies.get(eid);
+  if (ship?.kind === 'debris' || hasComponent(b.host.world, Dead, eid)) return;
+  if (ship && hasComponent(b.host.world, Player, eid)) {
+    const dvx = quantizePull(ax), dvy = quantizePull(ay);
+    Velocity.x[eid] += dvx; Velocity.y[eid] += dvy;
+    b.ownCauses.add(eid, { kind: 0, dvx, dvy });
+    return;
+  }
+  Velocity.x[eid] += ax;
+  Velocity.y[eid] += ay;
 }
 
 /** Player movement. Returns false for non-ship entities so the legacy path runs. */
@@ -347,33 +365,7 @@ export function withGravity(b: BridgeCtx, gravity: GravityWell): FlightConstants
  * touch don't collide), each with its bounding box
  */
 export function worldPieces(b: BridgeCtx, eid: number, ship: ShipState, near?: { x: number; y: number; r: number }): ContactPiece[] {
-  const cs = b.tuning.cellSize;
-  const [cx, cy] = ship.derived.com;
-  const px = Position.x[eid], py = Position.y[eid];
-  const phi = Rotation.angle[eid] + Math.PI / 2;
-  const c = dcos(phi), s = dsin(phi);
-  const out: ContactPiece[] = [];
-  // Only the parts that could reach a circle (the other body's bounds): a boss's far side isn't transformed for a ship grinding its flank
-  let nx = 0, ny = 0, nr = Infinity;
-  if (near) { [nx, ny] = b.worldToGrid(eid, ship, near.x, near.y); nr = near.r / cs + 1; }
-  b.geometry(ship).forEach((g, i) => {
-    if (!ship.derived.alive[i]) return;
-    if (near && (g.bbox.maxX < nx - nr || g.bbox.minX > nx + nr || g.bbox.maxY < ny - nr || g.bbox.minY > ny + nr)) return;
-    for (const piece of g.convexShrunk) {
-      let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-      const poly = piece.map(([x, y]) => {
-        const lx = (x - cx) * cs, ly = (y - cy) * cs;
-        const wx = px + lx * c - ly * s, wy = py + lx * s + ly * c;
-        if (wx < x0) x0 = wx;
-        if (wx > x1) x1 = wx;
-        if (wy < y0) y0 = wy;
-        if (wy > y1) y1 = wy;
-        return [wx, wy] as Vec2;
-      });
-      out.push({ part: i, poly, x0, x1, y0, y1 });
-    }
-  });
-  return out;
+  return contactPieces(b.geometry(ship), ship.derived.alive, ship.derived.com, b.tuning.cellSize, { x: Position.x[eid], y: Position.y[eid], angle: Rotation.angle[eid] }, near);
 }
 
 /**
@@ -438,53 +430,28 @@ export function resolveContacts(ctx: BridgeCtx): void {
     const dx = Position.x[eb] - Position.x[ea], dy = Position.y[eb] - Position.y[ea];
     if (dhypot(dx, dy) > A.derived.radius + B.derived.radius) continue;
 
-    let deepest: { depth: number; nx: number; ny: number } | null = null;
-    let at: Vec2 = [0, 0];
-    const partsA = new Set<number>(), partsB = new Set<number>();
     const pa = piecesOf(ea, A, eb, B), pb = piecesOf(eb, B, ea, A);
-    // All of B's pieces lie in this box: A's pieces outside it touch nothing
-    let bx0 = Infinity, bx1 = -Infinity, by0 = Infinity, by1 = -Infinity;
-    for (const q of pb) {
-      if (q.x0 < bx0) bx0 = q.x0;
-      if (q.x1 > bx1) bx1 = q.x1;
-      if (q.y0 < by0) by0 = q.y0;
-      if (q.y1 > by1) by1 = q.y1;
-    }
-    for (const p of pa) {
-      if (p.x1 < bx0 || p.x0 > bx1 || p.y1 < by0 || p.y0 > by1) continue;
-      for (const q of pb) {
-        if (p.x1 < q.x0 || q.x1 < p.x0 || p.y1 < q.y0 || q.y1 < p.y0) continue;
-        const pen = convexPenetration(p.poly, q.poly);
-        if (!pen) continue;
-        partsA.add(p.part);
-        partsB.add(q.part);
-        if (!deepest || pen.depth > deepest.depth) {
-          deepest = pen;
-          // Contact point: between the two overlapping pieces
-          const ca = centroidOf(p.poly), cb = centroidOf(q.poly);
-          at = [(ca[0] + cb[0]) / 2, (ca[1] + cb[1]) / 2];
-        }
-      }
-    }
-    if (!deepest) continue;
-
     // Pinned structures don't give: whatever hits them takes all the push
-    const invA = ctx.pinned.has(ea) ? 0 : 1 / A.derived.mass, invB = ctx.pinned.has(eb) ? 0 : 1 / B.derived.mass;
-    if (invA + invB === 0) continue;
-    const { nx, ny, depth } = deepest;
-    const corr = depth / (invA + invB);
-    Position.x[ea] -= nx * corr * invA; Position.y[ea] -= ny * corr * invA;
-    Position.x[eb] += nx * corr * invB; Position.y[eb] += ny * corr * invB;
+    const pinA = ctx.pinned.has(ea), pinB = ctx.pinned.has(eb);
+    const invA = pinA ? 0 : 1 / A.derived.mass, invB = pinB ? 0 : 1 / B.derived.mass;
+    // (The bodies as they are before this pair, for a pilot's client to work its push out: common ships/contact.ts)
+    const a = { x: Position.x[ea], y: Position.y[ea], vx: Velocity.x[ea], vy: Velocity.y[ea] };
+    const b = { x: Position.x[eb], y: Position.y[eb], vx: Velocity.x[eb], vy: Velocity.y[eb] };
+    const preA = { ...a, angle: Rotation.angle[ea] }, preB = { ...b, angle: Rotation.angle[eb] };
+    const res = contactPair(pa, pb, a, b, invA, invB, ct.restitution);
+    if (!res) continue;
+    Position.x[ea] = a.x; Position.y[ea] = a.y;
+    Position.x[eb] = b.x; Position.y[eb] = b.y;
     pieces.delete(ea);
     pieces.delete(eb);
-
-    const vrel = (Velocity.x[eb] - Velocity.x[ea]) * nx + (Velocity.y[eb] - Velocity.y[ea]) * ny;
-    if (vrel >= 0) continue; // already separating
-    const jImp = -(1 + ct.restitution) * vrel / (invA + invB);
-    Velocity.x[ea] -= jImp * invA * nx; Velocity.y[ea] -= jImp * invA * ny;
-    Velocity.x[eb] += jImp * invB * nx; Velocity.y[eb] += jImp * invB * ny;
-
-    const closing = -vrel;
+    Velocity.x[ea] = a.vx; Velocity.y[ea] = a.vy;
+    Velocity.x[eb] = b.vx; Velocity.y[eb] = b.vy;
+    // A pilot's ship pushed: its client works the push out (CAPS.OWN_SIM, network/ownTick.ts), told whom it touched
+    if (hasComponent(ctx.host.world, Player, ea)) ctx.ownCauses.add(ea, { kind: 1, other: eb, flags: (pinB ? CONTACT_FLAG.OTHER_PINNED : 0) | (pinA ? CONTACT_FLAG.SELF_PINNED : 0), pre: preB, self: ownShape(A, ctx.geometry(A)), otherShape: ownShape(B, ctx.geometry(B)), otherRebuilds: B.rebuilds });
+    if (hasComponent(ctx.host.world, Player, eb)) ctx.ownCauses.add(eb, { kind: 1, other: ea, flags: CONTACT_FLAG.SECOND | (pinA ? CONTACT_FLAG.OTHER_PINNED : 0) | (pinB ? CONTACT_FLAG.SELF_PINNED : 0), pre: preA, self: ownShape(B, ctx.geometry(B)), otherShape: ownShape(A, ctx.geometry(A)), otherRebuilds: A.rebuilds });
+    const { nx, ny, at, partsA, partsB } = res;
+    if (res.closing <= 0) continue; // already separating
+    const closing = res.closing;
     // Sparks and a thud, at most once per pair per cooldown
     if (closing > (ct.fxMinSpeed ?? 0.6)) {
       const fk = ea < eb ? `${ea}:${eb}` : `${eb}:${ea}`;

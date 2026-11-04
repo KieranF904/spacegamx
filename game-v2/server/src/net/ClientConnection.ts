@@ -81,6 +81,13 @@ export interface ClientConnection {
    * later than its target tick makes it wrong...
    */
   selfLate: boolean;
+  /**
+   * CAPS.OWN_SIM (network/ownTick.ts): the controls its last input applied says (what its client steps its own ship
+   * with), and an input that wasn't applied on its target tick (late, or dropped by a flood guard): its client's own
+   * ship is then off, and gets a keyframe (Replication)
+   */
+  ownCtl?: { bits: number; q: number };
+  ownLate?: boolean;
   /** ...as does anything that moves the ship besides its inputs (a new keyframe version), or a status change */
   selfVersion: number;
   selfKey: string;

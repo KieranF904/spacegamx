@@ -292,8 +292,8 @@ export abstract class StagedBrain implements BossBrain {
       const dx = x - Position.x[q], dy = y - Position.y[q], d = dhypot(dx, dy);
       if (d > r || d < 1) continue;
       const f = k * (1 - d / r);
-      Velocity.x[q] += (dx / d) * f;
-      Velocity.y[q] += (dy / d) * f;
+      // (Through the bridge: a pilot's client is told the push, TEMPORARY until boss decisions are inputs: ShipBridge.push)
+      this.host.ships.push(q, (dx / d) * f, (dy / d) * f);
     }
   }
 
