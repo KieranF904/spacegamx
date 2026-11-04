@@ -97,7 +97,7 @@ Wire = payload + 66 B x messages/s. Deflated = the server's permessage-deflate (
 - `shipSync` with a blueprint, `items`, toasts, boss telegraphs go as the base format (rare; big when they come).
 - Coalescing for the shooter: own hits are urgent by rule; a client that shows its own hits from its cosmetic layer
   could let them wait.
-- Client -> server is untouched (inputs are already 11-14 bytes).
+- Client -> server: compact inputs since protocol 35 (CAPS.INPUTS: 2-4 bytes, fewer of them): docs/audits/input-compaction-2026-11-04.md.
 
 ## Review fixes (2026-11-04)
 
