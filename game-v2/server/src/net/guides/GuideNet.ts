@@ -76,16 +76,25 @@ export class GuideNet {
     return this.clients.get(conn)?.runs.has(eid) ?? false;
   }
 
+  /** Every shell as this tick ended, gathered once for every client's snapshot */
+  private list: { eid: number; g: Guide; born: number; body: GuideBody | null; system: number }[] = [];
+  private listTick = -1;
+  private shells(tick: number) {
+    if (this.listTick === tick) return this.list;
+    this.listTick = tick;
+    this.list = [];
+    for (const [eid, g] of this.host.guided()) this.list.push({ eid, g, born: this.host.born(eid), body: this.host.body(eid), system: this.host.systemOf(eid) });
+    return this.list;
+  }
+
   /** One snapshot's guide rows for a client ([id, dt, op, ...args]); `active`: it runs one (a snapshot must go) */
   forClient(conn: object, v: GuideView, tick: number): { rows: number[][]; active: boolean } {
     const c = this.client(conn), rows: number[][] = [], seen = new Set<number>();
-    for (const [eid, g] of this.host.guided()) {
-      const born = this.host.born(eid);
+    for (const { eid, g, born, body, system } of this.shells(tick)) {
       let run = c.runs.get(eid);
       // (its id was another shell's: that one is gone, this one is new to it)
       if (run && run.born !== born) { c.runs.delete(eid); run = undefined; }
-      const body = this.host.body(eid);
-      if (!body || this.host.systemOf(eid) !== v.systemId || !v.near(eid)) {
+      if (!body || system !== v.systemId || !v.near(eid)) {
         if (run && body) { rows.push([eid, 0, GUIDE.OFF]); this.stats.offs++; c.runs.delete(eid); }
         continue;
       }
