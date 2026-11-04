@@ -18,7 +18,7 @@ import { hasComponent } from 'bitecs';
 import {
   Position, Velocity, Rotation, Radius, Health, Player, Dead, InSystem, Blueprint, ShipState, Vec2,
   validateBlueprint, ValidationResult, createShipState, rebuildShip, fillClips, damagePart, repairShip, healPart, restorePart,
-  computeJoins, seededRng, hashInts, debrisDecay, splitPose, splitRng, debrisSpin, debrisMotion, debrisBlueprint, debrisHash, shipPointToWorld, remapCharge, chargeTotal, fullPortsCharge, blueprintGeometry, recentreShift, flightSignature,
+  computeJoins, seededRng, hashInts, hpWire, debrisDecay, splitPose, splitRng, debrisSpin, debrisMotion, debrisBlueprint, debrisHash, shipPointToWorld, remapCharge, chargeTotal, fullPortsCharge, blueprintGeometry, recentreShift, flightSignature,
   type PlacedGeom,
 } from '@space-game/common';
 import { type BridgeCtx } from './core.js';
@@ -406,7 +406,8 @@ export function rebuildNow(b: BridgeCtx, eid: number, ship: ShipState, derivable
       // (Where it was, common ships/debris.ts splitPose: a split says it when nothing is left of it (it goes now, and
       // what its clients had of it this window may never come right), and to a pilot of its own ship's)
       const at = splitPose(pose.x, pose.y, pose.angle, Velocity.x[eid], Velocity.y[eid], ship.angVel);
-      b.debrisNet.noteSplit(eid, { ship, tick: b.host.getTick(), com: oldCom, ids, groups: [...sheds.flatMap((s) => s.groups), ...groups.map((g) => [...g])], parts, sheds: sheds.length ? sheds : undefined, pose: at, gone: ship.derived.root < 0 });
+      const all = [...sheds.flatMap((s) => s.groups), ...groups.map((g) => [...g])];
+      b.debrisNet.noteSplit(eid, { ship, tick: b.host.getTick(), com: oldCom, ids, groups: all, parts, sheds: sheds.length ? sheds : undefined, pose: at, gone: ship.derived.root < 0, hp: all.map((g) => g.map((i) => hpWire(ship.hp[i]))) });
       for (const d of ids) { const sp = b.bodies.get(d); if (sp) b.debrisNet.spawns.set(d, { hash: debrisHash(b.readBody(d, sp)), rebuilds: sp.rebuilds }); }
     }
     for (const g of groups) for (const i of g) ship.detached[i] = true;

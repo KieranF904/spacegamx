@@ -11,7 +11,7 @@ import { K, type BridgeCtx } from './core.js';
  * A split a client may work out itself: the ship, the tick, its centre of mass then (grid), the pieces and their parts
  * (what it shed whole first, `sheds`, then the orphaned groups, whose parts are `parts`)
  */
-export interface DebrisSplit { ship: ShipState; tick: number; com: Vec2; ids: number[]; groups: number[][]; parts: number[]; sheds?: ShedSpec[]; /** Where it was (splitPose), and whether nothing is left of it */ pose?: FlightBody; gone?: boolean }
+export interface DebrisSplit { ship: ShipState; tick: number; com: Vec2; ids: number[]; groups: number[][]; parts: number[]; sheds?: ShedSpec[]; /** Where it was (splitPose), and whether nothing is left of it */ pose?: FlightBody; gone?: boolean; /** Each piece's parts' HP as spawned, to a tenth */ hp?: number[][] }
 
 /** How far past touching a piece near an off one counts as within its reach (touchNear): more than an off piece strays before its keyframe */
 const NEAR_SLACK = 8;

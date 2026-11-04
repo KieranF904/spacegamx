@@ -978,15 +978,23 @@ export class SnapshotBuilder {
       // (Its copy is the structure the split started from if its centre of mass is that one: HP-band rebuilds don't move it)
       const com = net.comAt(parent, synced.rebuilds);
       for (const sp of splits) {
-        const told = sp.gone || own;
-        if (synced.ship !== sp.ship || (!runs && (!com || com[0] !== sp.com[0] || com[1] !== sp.com[1])) || (unsure && !told)) continue;
+        if (synced.ship !== sp.ship) continue;
+        // (Not the structure it has (rebuilt again in the window, say): the split says all it needs, the centre of mass it
+        // started from, where it was and the pieces' HP; it has the design)
+        const whole = !runs && (!com || com[0] !== sp.com[0] || com[1] !== sp.com[1]);
+        if (whole && (!sp.pose || !sp.hp)) continue;
+        const told = sp.gone || own || whole;
+        if (unsure && !told) continue;
         const until = now + DEBRIS_ACK_TICKS + 2 * Math.ceil(conn.ping / (1000 / TICK_RATE));
         // (Its to run from their spawn, CAPS.DEBRIS: pieces of a ship, or of a piece it runs: it knows when each part crumbles)
         const l = debrisFor(conn.caps) && (sp.ship.kind !== 'debris' || runs);
-        sp.ids.forEach((id, k) => conn.debrisHeld.set(id, { until, hp: sp.groups[k].map((i) => had[i] ?? 0), live: l }));
+        sp.ids.forEach((id, k) => conn.debrisHeld.set(id, { until, hp: whole ? [...sp.hp![k]] : sp.groups[k].map((i) => had[i] ?? 0), live: l }));
         // (A ship destroyed, or its own: where it was, for what it has of it then isn't sure to be the server's)
         const at = told && sp.pose ? [sp.pose.x, sp.pose.y, sp.pose.angle, sp.pose.vx, sp.pose.vy, sp.pose.angVel] : undefined;
-        this.send(conn.ws, { type: 'debrisSplit', id: parent, tick: sp.tick, e: packIds(sp.ids), p: packRuns(sp.parts), l: l ? 1 : undefined, g: sp.sheds ? packSheds(sp.sheds) : undefined, s: at });
+        this.send(conn.ws, {
+          type: 'debrisSplit', id: parent, tick: sp.tick, e: packIds(sp.ids), p: packRuns(sp.parts), l: l ? 1 : undefined, g: sp.sheds ? packSheds(sp.sheds) : undefined, s: at,
+          c: whole ? [...sp.com] : undefined, h: whole ? sp.hp!.flat() : undefined,
+        });
       }
     }
   }

@@ -11,7 +11,7 @@
  * Shared by the game client (ShipClient) and the test and bench fakes (server net/hits/fakeHitsClient.testkit.ts).
  */
 import {
-  EntityType, deriveSplit, debrisDecay, unpackSheds, unpackIds, unpackRuns, computeJoins, recentreShift, quantizeShipBody, DEBRIS_STATUS,
+  EntityType, deriveSplit, debrisDecay, unpackSheds, partGroups, unpackIds, unpackRuns, computeJoins, recentreShift, quantizeShipBody, DEBRIS_STATUS,
   type ShipReplicaSet, type ServerShipSyncMessage, type ShipState, type ServerDebrisSplitMessage, type ServerPartDestroyedMessage, type DebrisShape, type DebrisWorld,
   type EntityState, type Vec2, type FlightBody, type ShipDerived,
 } from '@space-game/common';
@@ -125,9 +125,17 @@ export class DebrisSplits implements DebrisWorld {
     const parent = run ?? store.get(msg.id);
     if (!parent) return;
     const joins = computeJoins(store.geometry(parent));
-    // (A ship destroyed: the split says where it was)
+    // (A ship destroyed, its own, or one rebuilt again since its last sync: the split says where it was, and in the last
+    // case the structure's centre of mass and the pieces' HP too)
     const s = msg.s;
-    if (s && s.length >= 6) { this.derive(msg, parent, joins, { x: s[0], y: s[1], angle: s[2], vx: s[3], vy: s[4], angVel: s[5] }); return; }
+    if (s && s.length >= 6) {
+      const body = { x: s[0], y: s[1], angle: s[2], vx: s[3], vy: s[4], angVel: s[5] };
+      if (msg.c && msg.h) {
+        const hp = msg.h;
+        this.derive(msg, { ...parent, derived: { ...parent.derived, com: [msg.c[0], msg.c[1]] } }, joins, body, (order) => new Map(order.map((part, i) => [part, hp[i] ?? 0])));
+      } else this.derive(msg, parent, joins, body);
+      return;
+    }
     if (run) { this.waiting.push({ msg, parent: run, joins, run: true }); return; }
     // (With causes: once the snapshot's are in, flush; the parent as it is now, its sync comes after this)
     if (this.host.splitPose?.()) {
@@ -163,11 +171,14 @@ export class DebrisSplits implements DebrisWorld {
     }
   }
 
-  private derive(msg: ServerDebrisSplitMessage, parent: ShipState, joins: ReturnType<typeof computeJoins>, body: FlightBody): void {
+  /** `hps`: the pieces' HP the split gave, by part, from its parts in piece order (else the parent's as last sent) */
+  private derive(msg: ServerDebrisSplitMessage, parent: ShipState, joins: ReturnType<typeof computeJoins>, body: FlightBody, hps?: (order: number[]) => Map<number, number>): void {
     const { store } = this.host, reps = this.host.reps();
-    const parts = new Set(unpackRuns(msg.p, parent.blueprint.parts.length));
-    const sheds = msg.g ? unpackSheds(msg.g, parent.blueprint.parts.length) : undefined;
-    const got = deriveSplit(store.catalog, store.tuning, parent, msg.id, msg.tick, unpackIds(msg.e), parts, joins, body, (i) => parent.hp[i], sheds);
+    const n = parent.blueprint.parts.length;
+    const parts = new Set(unpackRuns(msg.p, n));
+    const sheds = msg.g ? unpackSheds(msg.g, n) : undefined;
+    const given = hps?.([...(sheds?.flatMap((x) => x.groups) ?? []), ...partGroups(n, joins, parts)].flat());
+    const got = deriveSplit(store.catalog, store.tuning, parent, msg.id, msg.tick, unpackIds(msg.e), parts, joins, body, (i) => given?.get(i) ?? parent.hp[i], sheds);
     if (!got) return;
     this.stats.splits++;
     // (Its to run from now: each part's crumble time, a shed's own, else its parent's if that's one it runs, else

@@ -36,3 +36,4 @@ except to fix a typo. A bump makes old clients reload (see PROTOCOL_VERSION in p
 - 44 (2026-11-04): debrisSplit l: the pieces are the client's to run from their spawn (CAPS.DEBRIS 131072)
 - 45 (2026-11-04): debrisSplit g: what a ship shed whole, derived as the split's first pieces (fling, crumble, aloof)
 - 46 (2026-11-04): debrisSplit s: a destroyed ship's pose as its split took it
+- 47 (2026-11-04): debrisSplit c, h: a split whose parent the client has rebuilt since says its centre of mass and the pieces' HP
