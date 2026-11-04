@@ -125,6 +125,8 @@ function run(sc: Scenario) {
   // Let the last reports and any correction land
   for (const k of ['fireLeft', 'fireRight'] as const) Input[k][A.pid] = 0;
   for (let t = 0; t < 90; t++) step();
+  // (...and end on a snapshot: a part still burning loses HP between them, and its HP goes with the next one)
+  for (let t = 0; t < 6; t++) { for (const f of fakes) f.sawSnapshot = false; step(); if (fakes.every((f) => f.sawSnapshot)) break; }
   const finalOff: string[] = [];
   for (const f of fakes) {
     const conn = server.pilots.connOf(f.pid)!;
@@ -181,7 +183,8 @@ describe('client-detected hits: finders and a legacy client see the same fight',
   }, 120_000);
 
   it('magma: fire and a blast (the burning target rebuilds most snapshots: told)', () => {
-    const r = run({ gun: 'magma_cannon' });
+    // (long enough for debris past its grace: the burning freighter's hits all go the old way, a piece's go as records)
+    const r = run({ gun: 'magma_cannon', ticks: 900 });
     expectAgree(r, false);
     expect(r.A.ignites.length).toBeGreaterThan(0);
   }, 120_000);

@@ -163,6 +163,19 @@ export function stepDebrisBody(body: FlightBody, k: DriftConstants): void {
   quantizeShipBody(body);
 }
 
+/**
+ * A new piece's grace (ticks after the tick it spawned at): it takes force only from its parent's break-up (its spawn
+ * motion) and applies none and receives none from anything else: no knocks (stepDebrisWorld), no shots, splash or
+ * blasts (the server's hit rules, ShipBridge.aloof). Its spawn is all a client needs to have it exactly, whatever is
+ * about; after it, it knocks as any piece does
+ */
+export const DEBRIS_GRACE_TICKS = 90;
+
+/** Is a piece spawned at tick `born` still in its grace on tick `tick`'s step? */
+export function debrisYoung(born: number | undefined, tick: number): boolean {
+  return born !== undefined && tick - born <= DEBRIS_GRACE_TICKS;
+}
+
 /** A piece of debris for the knocks: its state (stepped in place) and shape */
 export interface DebrisBody {
   id: number;
@@ -176,6 +189,8 @@ export interface DebrisBody {
   pieces: readonly (readonly Vec2[])[];
   /** Held where it is this tick (a client's keyframe for it): it pushes, isn't pushed and isn't stepped */
   fixed?: boolean;
+  /** The tick it spawned at (its grace: DEBRIS_GRACE_TICKS); unset, none */
+  born?: number;
 }
 
 interface WorldPiece { poly: Vec2[]; x0: number; x1: number; y0: number; y1: number }
@@ -202,11 +217,12 @@ function worldPiecesOf(d: DebrisBody, cs: number): WorldPiece[] {
 }
 
 /**
- * One tick of every piece of debris in a system: each drifts (stepDebrisBody), then overlapping pieces are pushed
- * apart and bounce, push only, pairs in id order (`list` must be sorted by id). The same on the server and in every
- * client's replicas. Returns the pairs that touched (the server keyframes a piece whose partner some client lacks).
+ * One tick (`tick`'s step) of every piece of debris in a system: each drifts (stepDebrisBody), then overlapping pieces
+ * are pushed apart and bounce, push only, pairs in id order (`list` must be sorted by id); a piece in its grace
+ * (debrisYoung) takes no part in the knocks. The same on the server and in every client's replicas. Returns the pairs
+ * that touched (the server keyframes a piece whose partner some client lacks).
  */
-export function stepDebrisWorld(list: readonly DebrisBody[], k: DriftConstants, cellSize: number, restitution: number): [number, number][] {
+export function stepDebrisWorld(list: readonly DebrisBody[], k: DriftConstants, cellSize: number, restitution: number, tick?: number): [number, number][] {
   for (const d of list) if (!d.fixed) stepDebrisBody(d.body, k);
   const touched: [number, number][] = [];
   const n = list.length;
@@ -214,9 +230,11 @@ export function stepDebrisWorld(list: readonly DebrisBody[], k: DriftConstants, 
   const pieces: (WorldPiece[] | undefined)[] = new Array(n);
   for (let i = 0; i < n; i++) {
     const A = list[i];
+    if (tick !== undefined && debrisYoung(A.born, tick)) continue;
     for (let j = i + 1; j < n; j++) {
       const B = list[j];
       if (A.fixed && B.fixed) continue;
+      if (tick !== undefined && debrisYoung(B.born, tick)) continue;
       const dx = B.body.x - A.body.x, dy = B.body.y - A.body.y, rr = A.radius + B.radius;
       if (dx * dx + dy * dy > rr * rr) continue;
       const pa = (pieces[i] ??= worldPiecesOf(A, cellSize)), pb = (pieces[j] ??= worldPiecesOf(B, cellSize));

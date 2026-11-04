@@ -380,6 +380,9 @@ export class SnapshotBuilder {
           rebuilds: ship.rebuilds,
           ghosts: sync.ghosts,
           at,
+          // (A piece of debris new to it: its grace, and whether it knocks at all, as its debris world steps it)
+          born: fresh && ship.kind === 'debris' ? ship.spawnTick : undefined,
+          aloof: fresh && ship.kind === 'debris' && this.ships.debrisNet.intangible.has(id) ? 1 : undefined,
         });
       }
       if (!hps_ || !synced) continue;

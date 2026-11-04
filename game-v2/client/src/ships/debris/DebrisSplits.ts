@@ -56,8 +56,8 @@ export class DebrisSplits {
     const had = this.shapes.get(ship);
     if (had && had.rebuilds === ship.rebuilds) return had.shape;
     const pieces: Vec2[][] = [];
-    store.geometry(ship).forEach((g, i) => { if (ship.derived.alive[i]) for (const p of g.convexShrunk) pieces.push(p); });
-    const shape = { mass: ship.derived.mass, radius: ship.derived.radius, com: ship.derived.com, pieces };
+    if (!store.aloof.has(id)) store.geometry(ship).forEach((g, i) => { if (ship.derived.alive[i]) for (const p of g.convexShrunk) pieces.push(p); });
+    const shape = { mass: ship.derived.mass, radius: ship.derived.radius, com: ship.derived.com, pieces, born: ship.spawnTick };
     this.shapes.set(ship, { rebuilds: ship.rebuilds, shape });
     return shape;
   }

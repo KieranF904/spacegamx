@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { dsin, dcos, datan2, dsincos } from '../math/detTrig.js';
 import {
   packIds, unpackIds, packRuns, unpackRuns, partGroups, splitPose, splitRng, debrisSpin, debrisMotion, debrisHash, deriveSplit,
-  stepDebrisWorld, debrisBlueprint, type DebrisBody,
+  stepDebrisWorld, debrisBlueprint, DEBRIS_GRACE_TICKS, type DebrisBody,
 } from './debris.js';
 import { createShipState } from './state.js';
 import { computeJoins, blueprintGeometry } from './index.js';
@@ -91,5 +91,22 @@ describe('debris both sides work out alike', () => {
     expect(a.map((d) => d.body)).toEqual(b.map((d) => d.body));
     // (10-unit squares 15 apart at cell size 10: they overlapped, and were pushed apart)
     expect(a[1].body.x - a[0].body.x).toBeGreaterThan(15);
+  });
+
+  it('a piece in its grace neither knocks nor is knocked; once it ends, mid-overlap, they are pushed apart alike', () => {
+    const square: [number, number][] = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+    const k = { friction: 0.99, worldSize: 1e6, gravity: null };
+    // (id 1 is old; id 2 spawned at tick 100, overlapping it)
+    const make = (): DebrisBody[] => [1, 2].map((id) => ({ id, body: { x: id * 15, y: 0, vx: 0, vy: 0, angle: 0, angVel: 0 }, mass: 4, radius: 15, com: [0, 0], pieces: [square], born: id === 2 ? 100 : 0 }));
+    const a = make(), b = make();
+    let t = 101;
+    for (; t <= 100 + DEBRIS_GRACE_TICKS; t++) expect(stepDebrisWorld(a, k, tuning.cellSize, 0.3, t)).toEqual([]);
+    // (in its grace: still overlapping, where they were)
+    expect(a[1].body.x - a[0].body.x).toBe(15);
+    expect(stepDebrisWorld(a, k, tuning.cellSize, 0.3, t)).toEqual([[1, 2]]);
+    expect(a[1].body.x - a[0].body.x).toBeGreaterThan(15);
+    // (stepped again from its spawn, as a client does: the same bits)
+    for (let u = 101; u <= t; u++) stepDebrisWorld(b, k, tuning.cellSize, 0.3, u);
+    expect(b.map((d) => d.body)).toEqual(a.map((d) => d.body));
   });
 });

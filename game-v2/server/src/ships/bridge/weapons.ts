@@ -151,7 +151,7 @@ export function stepMiners(b: BridgeCtx, eid: number, ship: ShipState, on: boole
     let shipHit: { eid: number; ship: ShipState; part: number; t: number } | null = null;
     for (const other of b.alongBeam(InSystem.systemId[eid], x, y, x1, y1, 0)) {
       const os = b.bodies.get(other);
-      if (!os || other === eid || InSystem.systemId[other] !== InSystem.systemId[eid] || b.dormant.has(other) || b.intangible.has(other) || !b.nearSegment(other, os, x, y, x1, y1) || b.isJumping(os)) continue;
+      if (!os || other === eid || InSystem.systemId[other] !== InSystem.systemId[eid] || b.dormant.has(other) || b.aloof(other) || !b.nearSegment(other, os, x, y, x1, y1) || b.isJumping(os)) continue;
       if (b.host.canDamage && !b.host.canDamage(eid, other)) continue;
       const h = b.castShip(other, os, x, y, x1, y1);
       if (h && (!shipHit || h.t < shipHit.t)) shipHit = { eid: other, ship: os, ...h };
@@ -368,7 +368,7 @@ export function fireBeam(b: BridgeCtx, eid: number, ship: ShipState, w: WeaponIn
   const half = (pulse ? pulse.width : def.width ?? 0) / 2;
   for (const other of b.alongBeam(InSystem.systemId[eid], x, y, x1, y1, half)) {
     const os = b.bodies.get(other);
-    if (!os || other === eid || InSystem.systemId[other] !== InSystem.systemId[eid] || b.isJumping(os) || b.intangible.has(other) || b.dormant.has(other)) continue;
+    if (!os || other === eid || InSystem.systemId[other] !== InSystem.systemId[eid] || b.isJumping(os) || b.aloof(other) || b.dormant.has(other)) continue;
     if (!b.nearSegment(other, os, x, y, x1, y1, half)) continue;
     if (b.host.canDamage && !b.host.canDamage(eid, other)) continue;
     // (Its whole width against the parts' real shapes: a capsule, collide.ts)
@@ -503,7 +503,7 @@ export function hitProjectile(
   const systemNum = InSystem.systemId[proj];
   for (const { id: eid } of nearby) {
     // (Instanced copies share coordinates: only ships in the shot's own copy)
-    if (eid === ownerId || exclude?.has(eid) || InSystem.systemId[eid] !== systemNum || b.intangible.has(eid)) continue;
+    if (eid === ownerId || exclude?.has(eid) || InSystem.systemId[eid] !== systemNum || b.aloof(eid)) continue;
     const ship = b.bodies.get(eid);
     if (!ship) continue;
     // Shots pass straight through ships they may not hurt

@@ -75,8 +75,6 @@ export class ShipBridge {
   private blasts: PendingBlast[] = [];
   /** Debris: the tick each part crumbles away, by part index */
   private decayAt = new Map<number, number[]>();
-  /** Debris that's only to be seen (a boss blowing apart): nothing hits it, it hits nothing, shots and blasts pass through */
-  private intangible = new Set<number>();
   /** Parts that just crumbled (decay, not damage): they don't blow up */
   private crumbled = new Set<string>();
   /** Last tick each body took damage (station repair waits a while after) */
@@ -87,6 +85,8 @@ export class ShipBridge {
   private contactFx = new Map<string, number>();
   /** Debris clients work out themselves: splits to tell, spawn checks, what moved otherwise (bridge/debrisNet.ts) */
   readonly debrisNet = new DebrisNet();
+  /** Debris that's only to be seen (a boss blowing apart): nothing hits it, it hits nothing, shots and blasts pass through (the debris bookkeeping's set: a piece's sync says so) */
+  private intangible = this.debrisNet.intangible;
   /** Each ship's structures after its last few rebuild ticks, for clients keeping each (CAPS.STRUCTS, bridge/structLog.ts) */
   readonly structLog = new StructLog();
   private joinCache = new WeakMap<Blueprint, [number, number][]>();
@@ -584,6 +584,9 @@ export class ShipBridge {
 
   /** Mid-jump (the burn itself): no guns, and the ship passes through other hulls */
   isJumping(ship: ShipState): boolean { return sync.isJumping(this.ctx, ship); }
+
+  /** Nothing hits it, it hits nothing: only to be seen, or a piece of debris in its grace (common DEBRIS_GRACE_TICKS) */
+  private aloof(eid: number): boolean { return this.intangible.has(eid) || this.debrisNet.young(this.bodies.get(eid), this.host.getTick()); }
 
   private writeBody(eid: number, ship: ShipState, b: { x: number; y: number; vx: number; vy: number; angle: number; angVel: number; jump?: number; jumpScale?: number; cargo?: number; dodge?: number; dodgeDir?: number }): void { return sync.writeBody(eid, ship, b); }
 

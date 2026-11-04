@@ -4,7 +4,7 @@
  * piece was spawned as (its check), and which pieces something other than the shared drift-and-knock step moved this
  * tick (they need a keyframe). The step itself is flight.ts stepDebrisWorld.
  */
-import { InSystem, Position, stepDebrisWorld as stepWorld, type DebrisBody, type FlightBody, type ShipState, type Vec2 } from '@space-game/common';
+import { InSystem, Position, stepDebrisWorld as stepWorld, debrisYoung, type DebrisBody, type FlightBody, type ShipState, type Vec2 } from '@space-game/common';
 import { K, type BridgeCtx } from './core.js';
 
 /** A split a client may work out itself: the ship, the tick, its centre of mass then (grid), the pieces and their parts */
@@ -17,6 +17,8 @@ const same = (a: FlightBody, b: FlightBody) => a.x === b.x && a.y === b.y && a.v
 const copy = (b: FlightBody): FlightBody => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, angle: b.angle, angVel: b.angVel });
 
 export class DebrisNet {
+  /** Bodies only to be seen (ShipBridge.intangible: the same set): a piece's sync says so */
+  readonly intangible = new Set<number>();
   /** Splits since the last snapshot that clients may derive (SnapshotBuilder takes them; cleared after each snapshot) */
   readonly splits = new Map<number, DebrisSplit[]>();
   /** Each derivable piece as spawned: its check (debrisHash) and rebuild count */
@@ -95,17 +97,17 @@ export class DebrisNet {
       const was = this.last.get(eid);
       if (was && !same(was, body)) this.touched.add(eid);
       const sys = InSystem.systemId[eid];
-      const d: DebrisBody = { id: eid, body, mass: ship.derived.mass, radius: ship.derived.radius, com: ship.derived.com, pieces: b.intangible.has(eid) ? [] : this.piecesOf(b, ship) };
+      const d: DebrisBody = { id: eid, body, mass: ship.derived.mass, radius: ship.derived.radius, com: ship.derived.com, pieces: b.intangible.has(eid) ? [] : this.piecesOf(b, ship), born: ship.spawnTick };
       let list = bySys.get(sys);
       if (!list) bySys.set(sys, (list = []));
       list.push({ eid, ship, d });
     }
-    const restitution = b.tuning.collision.restitution;
+    const restitution = b.tuning.collision.restitution, tick = b.host.getTick();
     for (const list of bySys.values()) {
       list.sort((p, q) => p.eid - q.eid);
       const gravity = b.host.gravityAt(list[0].eid);
       const k = gravity ? b.withGravity(gravity) : K;
-      for (const pair of stepWorld(list.map((e) => e.d), k, b.tuning.cellSize, restitution)) this.pairs.push(pair);
+      for (const pair of stepWorld(list.map((e) => e.d), k, b.tuning.cellSize, restitution, tick)) this.pairs.push(pair);
       for (const e of list) {
         b.writeBody(e.eid, e.ship, e.d.body);
         this.expect.set(e.eid, copy(e.d.body));
@@ -154,6 +156,11 @@ export class DebrisNet {
         if (o.sys === sys && dx * dx + dy * dy < reach * reach) { this.touched.add(eid); break; }
       }
     }
+  }
+
+  /** A piece still in its grace (common DEBRIS_GRACE_TICKS): nothing touches it but its own drift */
+  young(ship: ShipState | undefined, tick: number): boolean {
+    return ship?.kind === 'debris' && debrisYoung(ship.spawnTick, tick);
   }
 
   /** The snapshot took them (keyframes) */

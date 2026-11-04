@@ -27,7 +27,7 @@ import { SHIP_FLIGHT_CONSTANTS } from '../ships/physics.js';
 import type { Vec2 } from '../ships/types.js';
 
 /** A piece of debris's shape for the knocks (ShipReplicaSet's debrisShape): its mass, radius, centre and convex pieces */
-export interface DebrisShape { mass: number; radius: number; com: Vec2; pieces: readonly (readonly Vec2[])[] }
+export interface DebrisShape { mass: number; radius: number; com: Vec2; pieces: readonly (readonly Vec2[])[]; born?: number }
 import { quantizeCursorAngle, dequantizeCursorAngle } from './cursorState.js';
 import { dhypot } from '../math/detTrig.js';
 
@@ -301,10 +301,10 @@ export class ShipReplicaSet {
         const prev = r.hist.get(t - 1);
         if (!prev) continue;
         const shape = this.debrisShape?.(id);
-        list.push({ id, body: cloneBody(prev.body), mass: shape?.mass ?? 0, radius: shape?.radius ?? 0, com: shape?.com ?? [0, 0], pieces: shape?.pieces ?? [] });
+        list.push({ id, body: cloneBody(prev.body), mass: shape?.mass ?? 0, radius: shape?.radius ?? 0, com: shape?.com ?? [0, 0], pieces: shape?.pieces ?? [], born: shape?.born });
         reps.push(r);
       }
-      stepDebrisWorld(list, k, cs, restitution);
+      stepDebrisWorld(list, k, cs, restitution, t);
       for (let i = 0; i < list.length; i++) {
         reps[i].hist.set(t, { body: list[i].body, bits: 0, q: 0 });
         reps[i].last = t;

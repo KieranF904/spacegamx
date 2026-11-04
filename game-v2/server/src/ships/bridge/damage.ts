@@ -307,7 +307,7 @@ export function splashAt(b: BridgeCtx, systemNum: number, x: number, y: number, 
   for (const [eid, ship] of b.bodies) {
     // (Out of reach first: the cheapest test, and it rules out most; the rest have no side effects)
     if (eid === source || InSystem.systemId[eid] !== systemNum || fartherThan(Position.x[eid] - x, Position.y[eid] - y, radius + ship.derived.radius)) continue;
-    if (b.isJumping(ship) || b.intangible.has(eid) || b.dormant.has(eid)) continue;
+    if (b.isJumping(ship) || b.aloof(eid) || b.dormant.has(eid)) continue;
     if (source >= 0 && b.host.canDamage && !b.host.canDamage(source, eid)) continue;
     // Each part by how far the blast is from its own outline (not its middle: a boss's great plate is hit where it's struck)
     const cs = b.tuning.cellSize, [gx, gy] = b.worldToGrid(eid, ship, x, y), at: Vec2 = [gx, gy];
@@ -508,7 +508,7 @@ export function partDeaths(b: BridgeCtx, eid: number, ship: ShipState, tick: num
 export function applyBlast(bridge: BridgeCtx, b: PendingBlast): void {
   const tick = bridge.host.getTick();
   for (const [eid, ship] of bridge.bodies) {
-    if (InSystem.systemId[eid] !== b.systemId || bridge.intangible.has(eid)) continue;
+    if (InSystem.systemId[eid] !== b.systemId || bridge.aloof(eid)) continue;
     if (dhypot(Position.x[eid] - b.x, Position.y[eid] - b.y) > b.radius + ship.derived.radius) continue;
     let dealt = 0;
     // (By each part's own outline, as splash goes)

@@ -41,6 +41,8 @@ export class ShipStore implements ShipSource, StructSource {
    * sync comes, stamped `at`): the one it flew on any tick since the first. A sync without `at` starts it over
    */
   private structs = new Map<number, { at: number; derived: ShipDerived }[]>();
+  /** Debris only to be seen (a boss's shed plates): it knocks nothing */
+  readonly aloof = new Set<number>();
 
   constructor(readonly catalog: Catalog, readonly tuning: ShipTuning) {}
 
@@ -87,6 +89,10 @@ export class ShipStore implements ShipSource, StructSource {
     rebuildShip(ship, this.catalog, this.tuning);
     ship.rebuilds = msg.rebuilds;
     if (sameShape && prev) ship.angVel = prev.angVel;
+    // (A piece of debris: when it spawned, for its grace, and whether it knocks at all: its debris world, DebrisSplits.shape)
+    if (msg.born !== undefined) ship.spawnTick = msg.born;
+    if (msg.aloof) this.aloof.add(msg.id);
+    else if (!sameShape) this.aloof.delete(msg.id);
     this.bodies.set(msg.id, ship);
     this.noteStruct(msg.id, msg.at, ship.derived, !sameShape);
     return wasAlive && ship.kind === 'ship' ? ship.derived.alive.map((a, i) => (a && !wasAlive[i] ? i : -1)).filter((i) => i >= 0) : [];
@@ -121,6 +127,7 @@ export class ShipStore implements ShipSource, StructSource {
     this.bodies.delete(id);
     this.lastSeen.delete(id);
     this.structs.delete(id);
+    this.aloof.delete(id);
   }
 
   private noteStruct(id: number, at: number | undefined, derived: ShipDerived, fresh: boolean): void {
