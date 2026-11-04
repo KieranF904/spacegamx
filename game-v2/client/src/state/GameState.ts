@@ -582,6 +582,14 @@ export class GameState {
   }
 
   /**
+   * Would an input for this tick reach the server after it ran it? Only while the prediction catches up after a hitch
+   * (on time, a tick goes the trip and the input delay ahead of the server's: frameTick is its tick plus the trip)
+   */
+  inputLate(targetTick: number): boolean {
+    return this.predictedTick > 0 && targetTick < this.frameTick;
+  }
+
+  /**
    * Drain the delay queue: apply inputs whose targetTick <= cachedServerTick, then run physics ONCE.
    * Called once per client tick from Game.ts (after tickInput).
    * 

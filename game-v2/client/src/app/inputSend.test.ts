@@ -26,6 +26,9 @@ function fakeCtx(proto = false) {
     serverTick: 1000, playerId: 7, tick: 1000,
     getPlayerPosition: () => ({ x: 0, y: 0 }),
     getInputTargetTick() { return this.tick + 3; },
+    // (Catching up after a hitch: ticks before this one would reach the server late)
+    lateBefore: -Infinity,
+    inputLate(t: number) { return t < this.lateBefore; },
     nextInputSeq: () => ++seq,
     applyInput: (m: ClientInputMessage) => { log.push(`apply:${m.seq}`); },
     predictTick: (m: ClientInputMessage) => { log.push(`predict:${m.targetTick}`); predicted.push({ ...m }); },
@@ -63,6 +66,20 @@ function fakeCtx(proto = false) {
 }
 
 describe('inputSend: an input-script replay', () => {
+  it('catching up after a hitch: late ticks go as what was last sent (held), the change from the first on time', () => {
+    const { sc, sent, predicted, tick, ctx } = fakeCtx();
+    const st = (ctx as unknown as { state: { tick: number; lateBefore: number } }).state;
+    tick();                              // the cursor distance: sent
+    st.lateBefore = st.tick + 3 + 2;     // the next two ticks' inputs would be late
+    sc.keys.add('KeyW');
+    tick(); tick();                      // late: held as last sent, not sent
+    tick();                              // on time: thrust goes
+    expect(predicted.slice(-2).map((m) => m.forward)).toEqual([false, false]);
+    expect(sent.length).toBe(2);
+    expect(sent[1].forward).toBe(true);
+    expect(sent[1].targetTick).toBe(st.tick - 1 + 3);
+  });
+
   it('sends only on change, predicts otherwise, in order, with the same seq, ticks and quantisation', () => {
     const { ctx, sc, log, sent, predicted, tick } = fakeCtx();
 

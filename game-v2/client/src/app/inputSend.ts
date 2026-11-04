@@ -254,6 +254,15 @@ export function tickInput(s: InputSendCtx): void {
     quantized = s.lastSentAngle;
     cursorDistQ = quantizeCursorDist(msg.cursorDist);
     changed = false;
+  } else if (!s.proto && s.state.inputLate?.(targetTick)) {
+    // Catching up after a hitch: a tick the server has run (or will before this gets there) flew what it last had, so
+    // it goes as that, held (the server takes it as nothing new: no correction); what changed goes from the next on time
+    for (let i = 0; i < INPUT_BOOLS.length; i++) { const k = INPUT_BOOLS[i]; (msg as unknown as Record<string, boolean>)[k] = !!s.lastSent[k]; }
+    msg.targetAngle = dequantizeCursorAngle(s.lastSentAngle);
+    msg.cursorDist = compact ? s.sentDist : s.lastSentCursorDist * CURSOR_DIST_STEP;
+    quantized = s.lastSentAngle;
+    cursorDistQ = quantizeCursorDist(msg.cursorDist);
+    changed = false;
   } else if (compact) {
     // (What goes and when: inputCompactSend.ts; the aim and distance become what goes, or what the server holds)
     const plan = compactSend(s, msg, quantized, auto?.jump ? auto.cursorDist : aimDist, !inputEnabled || s.stationOpen);
