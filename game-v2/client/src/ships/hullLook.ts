@@ -57,6 +57,12 @@ export const HULL_MAT: Record<string, { tile: number; tint: number; metal: numbe
   brood_gland: { tile: 23, tint: 0.9, metal: 0.4, glow: 0.6, boost: 0.6, any: true, emit: [0.82, 0.42, 1.0], hot: 1.2 },
   brood_rime: { tile: 22, tint: 0.9, metal: 0.6, glow: 0.35, boost: 1.0, any: true, emit: [0.82, 0.42, 1.0], hot: 2.4 },
   brood_ice: { tile: 17, tint: 0.9, metal: 0.7, glow: 0.4, boost: 0.9, any: true, emit: [0.82, 0.42, 1.0], hot: 1.2 },
+  // (custom enemies' own, docs/enemies/custom-roster.md: the Maw's slate crust and glass (its heartbeat's gold where light
+  // runs), the pirates' grimy plate and chipped red paint)
+  maw_slate: { tile: 18, tint: 0.9, metal: 0.35, glow: 0.3, boost: 0.35, any: true, emit: [1.0, 0.7, 0.3], hot: 2.2, wear: [0.8, 0.74, 0.66] },
+  maw_glass: { tile: 17, tint: 0.88, metal: 0.7, glow: 0.6, boost: 1.2, any: true, emit: [1.0, 0.7, 0.3], hot: 1.6 },
+  pirate_plate: { tile: 21, tint: 0.95, metal: 0.75, glow: 0, boost: 0.7, any: true, emit: [1.0, 0.45, 0.25], hot: 1, wear: [0.7, 0.6, 0.5] },
+  pirate_paint: { tile: 20, tint: 0.95, metal: 0.4, glow: 0, boost: 0.3, any: true, emit: [1.0, 0.45, 0.25], hot: 1, wear: [1.2, 1.15, 1.15] },
   alloy: { tile: 0, tint: 0.3, metal: 0.7, glow: 0, boost: 0 },
   composite: { tile: 4, tint: 0.4, metal: 0.1, glow: 0, boost: -0.3 },
   steel: { tile: 5, tint: 0.5, metal: 0.8, glow: 0, boost: 0.15 },

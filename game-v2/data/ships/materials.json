@@ -415,6 +415,50 @@
       "density": 0.5,
       "toughness": 5000,
       "resist": {}
+    },
+    {
+      "id": "maw_slate",
+      "name": "Maw Slate",
+      "exclusive": "boss",
+      "grade": 3,
+      "output": 1.4,
+      "color": "#46474d",
+      "density": 0.9,
+      "toughness": 100,
+      "resist": {"thermal": 0.95, "energy": 1.05}
+    },
+    {
+      "id": "maw_glass",
+      "name": "Maw Glass",
+      "exclusive": "boss",
+      "grade": 3,
+      "output": 1.4,
+      "color": "#5a4a3c",
+      "density": 0.7,
+      "toughness": 86,
+      "resist": {"energy": 0.85, "kinetic": 1.15}
+    },
+    {
+      "id": "pirate_plate",
+      "name": "Pirate Plate",
+      "exclusive": "boss",
+      "grade": 3,
+      "output": 1.4,
+      "color": "#6b6f76",
+      "density": 0.85,
+      "toughness": 96,
+      "resist": {"kinetic": 0.92}
+    },
+    {
+      "id": "pirate_paint",
+      "name": "Pirate Paint",
+      "exclusive": "boss",
+      "grade": 3,
+      "output": 1.4,
+      "color": "#8e2a22",
+      "density": 0.8,
+      "toughness": 90,
+      "resist": {"thermal": 1.05}
     }
   ]
 }

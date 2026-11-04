@@ -92,7 +92,11 @@
   "feed_tank_reaction",
   "feed_tank_burstgel",
   "engine_reaction_thruster",
-  "cannon_slurry"
+  "cannon_slurry",
+  "maw_slate",
+  "maw_glass",
+  "pirate_plate",
+  "pirate_paint"
  ],
  "skip": [
   "power_pulse_dynamo",
