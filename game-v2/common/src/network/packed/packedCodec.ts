@@ -19,7 +19,7 @@ import {
 } from './snapshotSections.js';
 
 import type { BlockStore } from './blocks.js';
-import { planBlocks, blocksWrite, blocksRead, type BlocksPlan } from './blocksSnapshot.js';
+import { planBlocks, blocksWrite, blocksRead, blockBits, type BlocksPlan, type BlockBits } from './blocksSnapshot.js';
 
 export type { PackedPart } from './packedIO.js';
 
@@ -139,6 +139,8 @@ export class PackedEncoder {
   private started = false;
   /** Messages by how they went (the netcode probe): packed, or as the base format's bytes; snapshots as blocks */
   readonly stats = { packed: 0, legacy: 0, resets: 0, blocks: 0 };
+  /** What its BLOCKS snapshots came to, by part (blocksSnapshot.ts BlockBits) */
+  readonly blockBits: BlockBits = blockBits();
   /** Snapshots planned as blocks (prepare), each when it was queued (null: it goes as PK.SNAPSHOT) */
   private plans = new WeakMap<ServerMessage, BlocksPlan | null>();
 
@@ -182,7 +184,7 @@ export class PackedEncoder {
   private message(part: PackedPart): void {
     const io = this.io;
     const plan = this.store && part.msg.type === 'snapshot' ? this.plans.get(part.msg) : undefined;
-    if (plan) { io.u(PK.BLOCKS, PK_BITS); blocksWrite(io, plan); this.stats.packed++; this.stats.blocks++; return; }
+    if (plan) { io.u(PK.BLOCKS, PK_BITS); blocksWrite(io, plan, this.blockBits); this.stats.packed++; this.stats.blocks++; return; }
     const wire = serverWire(part.msg);
     if (isArr(wire)) {
       const code = wire[0] as number;

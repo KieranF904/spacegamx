@@ -11,8 +11,8 @@ export interface CaseOpts {
   layout: Layout;
   n: number;
   secs: number;
-  /** The counting sockets: 'legacy' (no caps) or 'packed' (PACKED | COALESCE, nothing they owe) */
-  bulk: 'legacy' | 'packed';
+  /** The counting sockets: 'legacy' (no caps), 'packed' (PACKED | COALESCE, nothing they owe) or 'blocks' (and BLOCKS) */
+  bulk: 'legacy' | 'packed' | 'blocks';
   /** Full probe clients among the n */
   probes: number;
   /** The probes' caps (default everything) and latency in ticks */
@@ -57,7 +57,7 @@ export async function runCase(o: CaseOpts): Promise<any> {
   Math.random = seed;
   clock.t = 1_000_000;
   const wallStart = performance.now();
-  const server = makeServer(511);
+  const server = makeServer(1023);
   const ships = server.getShips() as any, srv = server as any;
 
   // ---- the meter: wrapped before anything else, so the probes' own wrappers sit outside it ----
@@ -95,7 +95,7 @@ export async function runCase(o: CaseOpts): Promise<any> {
   let scene!: Scene;
   const ring = new PoseRing(server);
   const klass = classifier(server, () => scene?.bossId ?? -1);
-  const bulkCaps = o.bulk === 'packed' ? 4 | 8 : 0;
+  const bulkCaps = o.bulk === 'packed' ? 4 | 8 : o.bulk === 'blocks' ? 4 | 8 | 512 : 0;
   const counters = new Map<number, Counter>();
   const sampledBulk = new Set<number>();
   const probes = new Map<number, Probe>();

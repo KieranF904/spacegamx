@@ -104,6 +104,26 @@ describe('encode-once blocks', () => {
     expect(store.size).toBe(3);
   });
 
+  it('a client never told of a removal: the wid, then the entity id, reused for others still decode right', () => {
+    const store = new BlockStore(() => 1);
+    const a = client(store, 7001), b = client(store, 7002);
+    const row = (id: number, hp: number) => ({ id, type: 2, x: 10.5 + hp, y: 20, angle: 0, vx: 1, vy: 0, hp, maxHp: 50, data: [1] }) as EntityState;
+    const msg = (tick: number, ents: EntityState[], removed: number[] = []) => ({ type: 'snapshot', tick, lastProcessedInput: 1, entities: ents, removed } as unknown as ServerMessage);
+    send(a, [msg(10, [row(600, 1), row(601, 1)])]);
+    send(b, [msg(10, [row(600, 1), row(601, 1)])]);
+    // 600 goes; only b is told. 602 takes its wid; a sees 602 (told the wid is 602's now)
+    send(b, [msg(13, [row(601, 2)], [600])]);
+    store.removed([600]);
+    send(a, [msg(16, [row(602, 1), row(601, 3)])]);
+    send(b, [msg(16, [row(602, 1), row(601, 3)])]);
+    // 602 goes too (a not told); the id 600 comes back as a new entity and gets the freed wid: a must be told again
+    send(b, [msg(19, [row(601, 4)], [602])]);
+    store.removed([602]);
+    send(a, [msg(22, [row(600, 9), row(601, 5)])]);
+    send(b, [msg(22, [row(600, 9), row(601, 5)])]);
+    send(a, [msg(25, [row(600, 10), row(601, 6)])]);
+  });
+
   it('a block whose wire id or chain the client has not got stops its reader (it asks to start afresh)', () => {
     const store = new BlockStore(() => 1);
     const a = client(store, 7001);

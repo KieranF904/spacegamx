@@ -2,9 +2,9 @@
  * A snapshot in encode-once blocks (CAPS.BLOCKS, PK.BLOCKS; blocks.ts): the same message as PK.SNAPSHOT, decoding to
  * the same compact row, laid out as
  *
- *   field mask (11 bits) | tick, last input (the connection's steps) | intros: count, then (wid, entity id step) each
- *   | e: count, each a bit (1: a block, then a bit and the name when it has one; 0: the client's own row, the connection's
- *   way) | p, r: the connection's way | k: count, blocks | c: count, blocks (in id order) | o: the connection's way
+ *   field mask (11 bits) | tick, last input (the connection's steps) | intros: a bit (any?), count - 1, then (wid,
+ *   entity id step) each | e: count, the client's own row's place (a bit, then it), the names (count, then place step
+ *   and name each), then each row: a block, or at its place the own row the connection's way | p, r: the connection's way | k: count, blocks | c: count, blocks (in id order) | o: the connection's way
  *   | f: count, blocks (in owner order) | n, d: the connection's way
  *
  * after which both ends forget the chains of whatever the removed and out lists named. Blocks are copied bit for bit
@@ -79,19 +79,26 @@ export function planBlocks(store: BlockStore, m: ServerSnapshotMessage, you: num
   return plan;
 }
 
+/** What a client's BLOCKS snapshots came to: bits by part, intros, and the chained blocks it got in each form */
+export interface BlockBits { head: number; intro: number; e: number; p: number; r: number; k: number; c: number; o: number; f: number; nd: number; intros: number; delta: number; abs: number }
+export const blockBits = (): BlockBits => ({ head: 0, intro: 0, e: 0, p: 0, r: 0, k: 0, c: 0, o: 0, f: 0, nd: 0, intros: 0, delta: 0, abs: 0 });
+
 /** A chained block for this client: its form by the generation it holds, and the one it then holds */
-function copyChained(io: PackedIO, rec: BlockRec, k: boolean): void {
+function copyChained(io: PackedIO, rec: BlockRec, k: boolean, st: BlockBits): void {
   const f = formFor(rec, io.blk.gen(rec.eid, k));
   io.copyBits(f.bits.b, f.bits.n);
   io.blk.setGen(rec.eid, k, f.gen);
+  if (f.bits === rec.abs) st.abs++; else st.delta++;
 }
 
-/** Writes a BLOCKS snapshot (after its PK code) */
-export function blocksWrite(io: PackedIO, plan: BlocksPlan): void {
+/** Writes a BLOCKS snapshot (after its PK code); `st` adds up what each part came to */
+export function blocksWrite(io: PackedIO, plan: BlocksPlan, st: BlockBits = blockBits()): void {
   const { m, mask } = plan;
   const has = (i: number) => (mask & (1 << (i - 1))) !== 0;
   const tick = m.tick;
   const blk = io.blk;
+  let at = io.bitLength;
+  const part = (k: keyof BlockBits) => { const now = io.bitLength; st[k] += now - at; at = now; };
   io.u(mask, 11);
   io.num(tick, 0, 3, io.head, 0);
   if (has(2)) io.num(m.lastProcessedInput, 0, 2, io.head, 1);
@@ -102,26 +109,38 @@ export function blocksWrite(io: PackedIO, plan: BlocksPlan): void {
   for (const r of plan.k) note(r);
   for (const r of plan.c) note(r);
   for (const r of plan.f) note(r);
-  io.vu(intro.length, 3);
+  part('head');
+  if (io.bit(intro.length > 0)) io.vu(intro.length - 1, 3);
   let prev = 0;
   for (const r of intro) { io.wid(r.wid); io.vs(r.eid - prev, 6); prev = r.eid; }
+  st.intros += intro.length;
+  part('intro');
   if (has(3)) {
-    io.vu(plan.e.length, 2);
-    for (const x of plan.e) {
-      if (io.bit(!!x.rec)) {
-        copyChained(io, x.rec!, false);
-        if (io.bit(x.name != null)) io.any(x.name);
-      } else entityRowIO(io, x.own, tick);
+    const e = plan.e;
+    io.vu(e.length, 2);
+    // (Its own row's place, if it's there; then the names, by place: both are rare, so no bit on every row)
+    const ownAt = e.findIndex((x) => !x.rec);
+    if (io.bit(ownAt >= 0)) io.vu(ownAt, 3);
+    let names = 0;
+    for (const x of e) if (x.rec && x.name != null) names++;
+    io.vu(names, 1);
+    let last = 0;
+    for (let i = 0; i < e.length; i++) if (e[i].rec && e[i].name != null) { io.vu(i - last, 3); io.any(e[i].name); last = i; }
+    for (const x of e) {
+      if (x.rec) copyChained(io, x.rec, false, st);
+      else entityRowIO(io, x.own, tick);
     }
+    part('e');
   }
-  if (has(4)) projectilesIO(io, plan.p);
-  if (has(5)) removedIO(io, m.removed);
-  if (has(6)) { io.vu(plan.k.length, 2); for (const r of plan.k) copyChained(io, r, true); }
-  if (has(7)) { io.vu(plan.c.length, 3); for (const r of plan.c) io.copyBits(r.abs.b, r.abs.n); }
-  if (has(8)) outIO(io, m.out!);
-  if (has(9)) { io.vu(plan.f.length, 2); for (const r of plan.f) io.copyBits(r.abs.b, r.abs.n); }
+  if (has(4)) { projectilesIO(io, plan.p); part('p'); }
+  if (has(5)) { removedIO(io, m.removed); part('r'); }
+  if (has(6)) { io.vu(plan.k.length, 2); for (const r of plan.k) copyChained(io, r, true, st); part('k'); }
+  if (has(7)) { io.vu(plan.c.length, 3); for (const r of plan.c) io.copyBits(r.abs.b, r.abs.n); part('c'); }
+  if (has(8)) { outIO(io, m.out!); part('o'); }
+  if (has(9)) { io.vu(plan.f.length, 2); for (const r of plan.f) io.copyBits(r.abs.b, r.abs.n); part('f'); }
   if (has(10)) ownIO(io, m.own as unknown[][], tick);
   if (has(11)) decisionsIO(io, m.decisions as unknown[][]);
+  part('nd');
   for (const id of m.removed) blk.forget(id);
   if (m.out) for (const id of m.out) blk.forget(id);
 }
@@ -135,7 +154,7 @@ export function blocksRead(io: PackedIO): unknown[] {
   const tick = io.num(null, 0, 3, io.head, 0) as number;
   out[1] = tick;
   if (has(2)) out[2] = io.num(null, 0, 2, io.head, 1);
-  const n = io.vu(0, 3);
+  const n = io.bit(false) ? io.vu(0, 3) + 1 : 0;
   let prev = 0;
   for (let i = 0; i < n; i++) { const wid = io.wid(0); prev += io.vs(0, 6); blk.wids.set(wid, prev); }
   const who = (): number => {
@@ -159,12 +178,16 @@ export function blocksRead(io: PackedIO): unknown[] {
   if (has(3)) {
     const rows: unknown[][] = [];
     const ne = io.vu(0, 2);
+    const ownAt = io.bit(false) ? io.vu(0, 3) : -1;
+    const named = new Map<number, unknown>();
+    const nn = io.vu(0, 1);
+    let last = 0;
+    for (let j = 0; j < nn; j++) { last += io.vu(0, 3); named.set(last, io.any(null)); }
     for (let i = 0; i < ne; i++) {
-      if (io.bit(false)) {
-        const o = chained(false);
-        if (io.bit(false)) { while (o.length < 10) o.push(null); o[10] = io.any(null); }
-        rows.push(o);
-      } else rows.push(entityRowIO(io, undefined, tick));
+      if (i === ownAt) { rows.push(entityRowIO(io, undefined, tick)); continue; }
+      const o = chained(false);
+      if (named.has(i)) { while (o.length < 10) o.push(null); o[10] = named.get(i); }
+      rows.push(o);
     }
     out[3] = rows;
   }

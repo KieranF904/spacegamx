@@ -6,7 +6,7 @@
  *
  *   npm run bench:crowd                    quick: n 20 and 50; spread, ball, boss(20); ~10 s measured each
  *   npm run bench:crowd -- --full          n 20, 50, 100, 300 (boss: 20), 15 s each
- *   --n 20,100  --layouts spread,ball  --secs 10  --bulk packed  --probes 4  --out file.json
+ *   --n 20,100  --layouts spread,ball  --secs 10  --bulk packed|blocks  --caps 1023  --probes 4  --out file.json
  *   --case <layout>:<n>                    one case in this process (what the matrix runs), prints one JSON line
  */
 import { spawnSync } from 'child_process';
@@ -21,7 +21,7 @@ const flag = (name: string) => argv.includes(`--${name}`);
 
 const full = flag('full');
 const opts = (layout: Layout, n: number): CaseOpts => ({
-  layout, n, secs: Number(arg('secs', full ? '15' : '10')), bulk: (arg('bulk', 'legacy') as 'legacy' | 'packed'),
+  layout, n, secs: Number(arg('secs', full ? '15' : '10')), bulk: (arg('bulk', 'legacy') as 'legacy' | 'packed' | 'blocks'),
   probes: Number(arg('probes', '4')), caps: Number(arg('caps', '511')), lat: Number(arg('lat', '3')), warm: Number(arg('warm', '240')), sample: Number(arg('sample', '4')),
 });
 
