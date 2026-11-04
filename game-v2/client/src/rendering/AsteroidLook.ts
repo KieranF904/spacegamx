@@ -41,14 +41,19 @@ function scale(c: number, k: number): number {
 
 /**
  * A rock's own shade of its ore's colour (from its id: the same every time): a little lighter or darker, nudged
- * warmer or cooler, a touch greyer, so a belt of one ore isn't all one colour
+ * warmer or cooler, a touch greyer, so a belt of one ore isn't all one colour. Ice goes further: each body its
+ * own ice, from clean blue-white through grey-green to dirty, dusty ice
  */
-function toneOf(color: number, id: number): number {
+function toneOf(color: number, id: number, ice = false): number {
   const r = mulberry32(hashString(`asteroid-tone:${id}`));
-  const value = 0.86 + r() * 0.26, warm = r() - 0.5, grey = r();
+  const value = 0.8 + r() * 0.38, warm = r() - 0.5, grey = r();
   const l = (((color >> 16) & 255) * 0.3 + ((color >> 8) & 255) * 0.5 + (color & 255) * 0.2) | 0;
-  let c = mix(color, warm > 0 ? 0xa8805a : 0x6f8096, Math.abs(warm) * 0.32);
-  c = mix(c, (l << 16) | (l << 8) | l, grey * 0.22);
+  let c = mix(color, warm > 0 ? 0xa8805a : 0x6f8096, Math.abs(warm) * 0.5);
+  c = mix(c, (l << 16) | (l << 8) | l, grey * 0.3);
+  if (ice) {
+    const kind = r(), k = 0.35 + r() * 0.45;
+    c = mix(c, kind < 0.3 ? 0xd2e6f0 : kind < 0.55 ? 0x93b2a6 : kind < 0.8 ? 0x8d918f : 0x8a8070, k);
+  }
   return scale(c, value);
 }
 
@@ -67,15 +72,15 @@ export interface AsteroidSeams {
 
 /**
  * How smoothly a rock's facets blend into each other (0 crisp … 1 smooth):
- * crystal is cut glass, ice nearly so, hard rock and metal have edges, and
+ * crystal is cut glass, ice is worn soft between sharp fractures, hard rock and metal have edges, and
  * loose stony rock is rounded. Mixed rocks blend by their ore weights.
  */
 const ORE_SMOOTHING: Record<string, number> = {
-  crystal: 0, ice: 0.2, titanium_ore: 0.35, cobalt_ore: 0.35, nickel_ore: 0.5, iron_ore: 0.55,
+  crystal: 0, ice: 0.45, titanium_ore: 0.35, cobalt_ore: 0.35, nickel_ore: 0.5, iron_ore: 0.55,
   copper_ore: 0.6, helium3: 0.7, silicate: 0.85,
 };
 /** Some kinds of asteroid have a character whatever their ore mix */
-const TYPE_SMOOTHING: Record<string, number> = { asteroid_crystal: 0.05, asteroid_ice: 0.2, comet: 0.3 };
+const TYPE_SMOOTHING: Record<string, number> = { asteroid_crystal: 0.05, asteroid_ice: 0.45, comet: 0.5 };
 
 export function rockSmoothing(comp?: Composition): number {
   if (!comp) return 0.65;
@@ -267,11 +272,11 @@ export function drawAsteroid(container: Container, id: number, size: number, com
   const jitter = mulberry32(hashString(`asteroid-normals:${id}`));
   const base = comp ? ORE_COLOR[comp.primary] ?? 0x777777 : [0x666666, 0x886644, 0x4488aa][Math.floor(rng() * 3)];
   const hard = (comp?.hardness ?? 1) >= 2;
-  const fill = toneOf(hard ? mix(base, 0x1a1d24, 0.25) : base, id);
-  // Hard rock: a sharper-edged rim
-  const edge = mix(fill, 0xffffff, hard ? 0.22 : 0.12), smooth = rockSmoothing(comp);
   // Its material, its own seed (turning and shifting the relief), and greyseam: one rock in three (or the system's share), never in ice
-  const material = rockMaterial(comp);
+  const material = rockMaterial(comp), ice = material === 'ice';
+  const fill = toneOf(hard ? mix(base, 0x1a1d24, 0.25) : base, id, ice);
+  // Hard rock: a sharper-edged rim; ice: a frosted one, lit through
+  const edge = mix(fill, 0xffffff, ice ? 0.34 : hard ? 0.22 : 0.12), smooth = rockSmoothing(comp);
   const veined = !!comp && material !== 'ice' && !NO_GREYSEAM.has(comp.type) && comp.primary !== 'ice' && size >= 14 && mulberry32(hashString(`greyseam:${id}`))() <= greyseam;
   const seed = mulberry32(hashString(`rock-detail:${id}`))();
   const mat = [ROCK_MATERIALS.indexOf(material), seed, veined ? 0.9 : 0, 0], light = [mat[0], seed, 0, 1];
@@ -292,6 +297,15 @@ export function drawAsteroid(container: Container, id: number, size: number, com
   const tris = refineRock(coarse, levels, mulberry32(hashString(`rock-shape:${id}`)));
   const faces = shadeRock(tris);
   rockOcclusion(tris);
+  if (ice) {
+    // Grit frozen into the ice: dark inclusions at some of its points (seeded, so the same every time)
+    const grit = mulberry32(hashString(`ice-grit:${id}`)), dirt = 0.12 + grit() * 0.3, seen = new Set<RockPoint>();
+    for (const t of tris) for (const p of t) {
+      if (p.rim || seen.has(p)) continue;
+      seen.add(p);
+      if (grit() < dirt) p.ao *= 0.5 + grit() * 0.3;
+    }
+  }
   tris.forEach((t, i) => {
     const f = faces[i];
     const ids = t.map((p) => {
