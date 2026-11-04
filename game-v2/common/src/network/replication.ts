@@ -358,6 +358,8 @@ export class ShipReplicaSet {
     if (!r || t > r.last) return;
     for (const h of [...r.hist.keys()]) if (h >= t && h !== r.kf) r.hist.delete(h);
     r.last = Math.max(...r.hist.keys(), -Infinity);
+    // (Debris steps as a world (stepDebrisTo): left as it is, the world, already past t, never stepped it again: frozen)
+    if (r.mode === ReplicaMode.Drift) this.dDirty = Math.min(this.dDirty, t - 1);
   }
 
   /**
@@ -443,7 +445,8 @@ export class ShipReplicaSet {
     for (const packed of ctl ?? []) {
       const id = controlRowId(packed);
       const r = this.reps.get(id);
-      if (!r) continue;
+      // (Debris has no controls; it steps as a world, and a rewind here would leave it unstepped)
+      if (!r || r.mode === ReplicaMode.Drift) continue;
       const events = unpackControlRow(packed, r.q);
       if (events.length) r.q = events[events.length - 1][2];
       for (const [ago, bits, q] of events) {

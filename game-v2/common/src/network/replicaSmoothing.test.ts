@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ShipReplicaSet, packKeyframe } from './replication.js';
+import { ShipReplicaSet, packKeyframe, packControlRow } from './replication.js';
 import { ReplicaMode, type ShipDerived, type ShipTuning, type ReplicaEnv } from '../ships/index.js';
 
 /** A drifting ship (no controls: the client steps it exactly as it was sent) */
@@ -48,5 +48,22 @@ describe('a keyframe moving a drawn ship off its predicted path (ShipReplicaSet.
     r.apply(100, [key(0, 4)]);
     const path = draw(r, 100, 108, [{ at: 102, tick: 106, row: key(5000, 4) }]);
     expect(path.find((p) => p.t === 106)!.x).toBe(5000);
+  });
+});
+
+describe('debris steps as a world (ShipReplicaSet.stepDebrisTo)', () => {
+  it('a control row or a rewind for a piece already stepped past leaves it moving, not frozen', () => {
+    const r = set();
+    r.apply(100, [key(0, 4)]);
+    const at104 = r.at(1, 104)!.body.x;
+    expect(at104).toBeGreaterThan(0);
+    // (a control row naming it: debris has no controls, ignored)
+    r.apply(104, [], [packControlRow(1, [[2, 0, 0]], 0)]);
+    expect(r.at(1, 106)!.body.x).toBeGreaterThan(at104);
+    // (a rewind, as the causes layer does: stepped again from there)
+    const at106 = r.at(1, 106)!.body.x;
+    r.rewind(1, 102);
+    expect(r.at(1, 106)!.body.x).toBe(at106);
+    expect(r.at(1, 108)!.body.x).toBeGreaterThan(at106);
   });
 });

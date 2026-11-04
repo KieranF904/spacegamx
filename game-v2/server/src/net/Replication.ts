@@ -188,7 +188,8 @@ export class Replication {
       const dock = docks ? docks.get(eid) ?? null : this.host.dockOf(eid);
       // (A piece of debris spawned this tick had no step yet: it drifts from the next, so it starts as Drift, not a keyframe later)
       const mode = dock ? ReplicaMode.Docked : rec?.mode ?? (ship.kind === 'debris' ? ReplicaMode.Drift : ReplicaMode.Pilotless);
-      const bits = dock ? 0 : rec?.bits ?? CTL.hold;
+      // (Debris drifts with no controls: 0, as flight.ts records it from its first step; hold here sent a control row next tick)
+      const bits = dock ? 0 : rec?.bits ?? (ship.kind === 'debris' ? 0 : CTL.hold);
       const q = dock ? 0 : rec?.q ?? 0;
       let s = this.shadows.get(eid);
       if (!s) {
