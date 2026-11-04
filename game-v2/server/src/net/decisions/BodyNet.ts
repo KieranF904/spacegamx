@@ -103,7 +103,9 @@ export class BodyNet {
    */
   forClient(conn: object, self: number, systemOf: (eid: number) => number, systemId: number, known: Map<number, number>, tick: number, view: (eid: number) => boolean, rekeyed?: (eid: number) => boolean, pilots = false): number[][] {
     const c = this.client(conn), rows: number[][] = [];
-    const holds = (id: number) => id === self || known.has(id) || view(id);
+    // (In its view now: a ship leaving it this snapshot (known, not in view) is gone from the client from here, so a
+    // body reading it would fly blind from this tick: off now, with a keyframe, not a keyframe every snapshot it stays out)
+    const holds = (id: number) => id === self || view(id);
     for (const [eid, b] of this.bosses) {
       if (!this.host.has(eid)) { this.bosses.delete(eid); c.runs.delete(eid); continue; }
       const s = b.state, kind = BODY_KINDS[s.kind];
@@ -111,9 +113,9 @@ export class BodyNet {
       if (!runs && (!s.on || systemOf(eid) !== systemId)) continue;
       // (Every ship its body reads held: its target, a pack's other ships. The enemy AI's pilots only with CAPS.PILOTS)
       const reads = kind?.reads(eid, s) ?? [];
-      // (A pack's ship it reads gone (shot down, out of view) while it runs it: what it made of it this window was off,
-      // so it goes again with a keyframe; its next order no longer reads it)
-      const gone = runs && kind?.pilot ? reads.filter((r) => r !== s.target && (!this.host.has(r) || !holds(r))) : [];
+      // (A pack's ship it reads shot down while it runs it: what it made of it this window was off, so it goes again with
+      // a keyframe; its next order no longer reads it. One alive out of view: off, as for any read it doesn't hold)
+      const gone = runs && kind?.pilot ? reads.filter((r) => r !== s.target && !this.host.has(r)) : [];
       const can = !!kind && s.on && (pilots || !kind.pilot) && systemOf(eid) === systemId && view(eid) && reads.every((r) => holds(r) || gone.includes(r));
       if (can && runs && (gone.length || b.dropped.some(([t, r]) => t > c.through && (!this.host.has(r) || !holds(r))))) { rekey(known, eid); this.stats.targetKeyed++; }
       if (can && !runs) {
