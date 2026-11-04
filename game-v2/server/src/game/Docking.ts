@@ -19,6 +19,7 @@ import type { ClientConnection } from '../net/ClientConnection.js';
 import type { Pilots } from './Pilots.js';
 import type { Ammo } from './Ammo.js';
 import type { Quests } from './Quests.js';
+import { SimPass } from '../sim/SystemClocks.js';
 
 /** Every station (GameServer reads the same query) */
 export const stationQuery = defineQuery([Station, Position]);
@@ -125,11 +126,14 @@ export class Docking {
 
   /** Berthed ships ride along inside their station, holding still. */
   dockingSystem(): void {
-    this.dockedShips.clear();
+    // (Its system's pass only, crowd dilation: sim/SystemClocks.ts; the rest keep theirs)
+    if (SimPass.all) this.dockedShips.clear();
+    else for (const eid of [...this.dockedShips]) if (SimPass.on(InSystem.systemId[eid])) this.dockedShips.delete(eid);
     for (const conn of this.clients.values()) {
       const d = conn.docked;
       if (!d) continue;
       const eid = conn.playerId;
+      if (!SimPass.all && hasComponent(this.world, Player, eid) && !SimPass.on(InSystem.systemId[eid])) continue;
       if (!hasComponent(this.world, Player, eid) || hasComponent(this.world, Dead, eid) || !entityExists(this.world, d.station)) {
         conn.docked = null;
         continue;

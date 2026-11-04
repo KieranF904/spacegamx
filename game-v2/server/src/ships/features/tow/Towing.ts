@@ -18,6 +18,7 @@ import { Position, Velocity, InSystem, Dead, Input, canTow, feedShare, towLoad, 
 import type { ShipBridge } from '../../ShipBridge.js';
 import type { LootPods } from '../../../game/LootPods.js';
 import type { FeatureHost, FeatureInstance, FeatureMessageHandler } from '../types.js';
+import { SimPass } from '../../../sim/SystemClocks.js';
 
 interface Tow { target: number; kind: TowKind }
 
@@ -133,6 +134,8 @@ export class Towing implements FeatureInstance {
     const w = this.host.world;
     const t = towTuning(this.tuning);
     for (const [pilot, tow] of [...this.tows]) {
+      // (Its system's pass: crowd dilation, sim/SystemClocks.ts)
+      if (!SimPass.on(InSystem.systemId[pilot])) continue;
       const ship = this.ships.get(pilot);
       if (!ship || ship.kind !== 'ship' || hasComponent(w, Dead, pilot)) { this.release(pilot); continue; }
       if (!canTow(ship.derived)) { this.release(pilot, 'Tow Beam lost: the tether let go'); continue; }

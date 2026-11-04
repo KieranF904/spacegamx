@@ -15,6 +15,7 @@ import {
 } from '@space-game/common';
 import { GLANCING, EMP_IMMUNE_TICKS, type PendingBlast, type BridgeCtx } from './core.js';
 import { dhypot, dpow } from '@space-game/common';
+import { SimPass } from '../../sim/SystemClocks.js';
 
 /** Seize a ship up (as an EMP) for `ticks`: hazards' storms */
 export function emp(b: BridgeCtx, eid: number, ticks: number): void {
@@ -447,6 +448,8 @@ export function nearestPart(b: BridgeCtx, eid: number, ship: ShipState, x: numbe
 export function stepBurns(bridge: BridgeCtx, tick: number): void {
   const keep: typeof bridge.burns = [];
   for (const b of bridge.burns) {
+    // (Another pass's: crowd dilation, sim/SystemClocks.ts)
+    if (!SimPass.on(InSystem.systemId[b.eid])) { keep.push(b); continue; }
     const ship = bridge.bodies.get(b.eid);
     if (!ship || tick >= b.until || ship.kind !== 'ship') continue;
     if (ship.hp[b.part] <= 0 || ship.detached[b.part]) {

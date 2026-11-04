@@ -185,7 +185,8 @@ import { GuideNet } from './net/guides/GuideNet.js';
 import type { BodyState } from '@space-game/common';
 import { ownSimFor } from './net/snapshot/ownShots.js';
 import { CrowdControl } from './net/crowd/CrowdControl.js';
-import { SnapshotBuilder, designHash, playerQuery, projectileQuery, droppedItemQuery } from './net/SnapshotBuilder.js';
+import { SystemClocks, SimPass } from './sim/SystemClocks.js';
+import { SnapshotBuilder, type RoundSkip, designHash, playerQuery, projectileQuery, droppedItemQuery } from './net/SnapshotBuilder.js';
 
 // ============================================
 // SPATIAL PARTITIONING
@@ -675,6 +676,8 @@ export class GameServer implements ServerCtx {
   readonly snapshots: SnapshotBuilder;
   /** Crowd fallbacks (CAPS.CROWD allowed: net/crowd/CrowdControl.ts): each system's level, from its measured cost */
   readonly crowd: CrowdControl | null;
+  /** Systems' own clocks (crowd dilation: sim/SystemClocks.ts) */
+  readonly clocks: SystemClocks | null;
 
   // Admin server for dev tools
   private adminServer: AdminServer | null = null;
@@ -998,7 +1001,13 @@ this.devTeleport = opts.devTeleport ?? false;
       clients: () => this.clients.values(),
       systemOf: (conn) => (hasComponent(this.world, Player, conn.playerId) ? InSystem.systemId[conn.playerId] : -1),
       send: (conn, msg) => this.send(conn.ws, msg),
-      tickOf: () => this.currentTick,
+      tickOf: (s) => this.clocks?.tickOf(s) ?? this.currentTick,
+      setRate: (s, r, at) => this.clocks?.setRate(s, r, at),
+    }) : null;
+    // Each system's own clock once it's dilated (sim/SystemClocks.ts): with crowd fallbacks only
+    this.clocks = this.crowd ? new SystemClocks({
+      baseTick: () => this.currentTick,
+      occupied: (s) => { for (const c of this.clients.values()) if (hasComponent(this.world, Player, c.playerId) && InSystem.systemId[c.playerId] === s) return true; return false; },
     }) : null;
 
     // The snapshot path (net/SnapshotBuilder.ts): built once, after every module it reads
@@ -1080,7 +1089,9 @@ this.devTeleport = opts.devTeleport ?? false;
     try {
       this.guard('inputs', () => this.drainInputQueue());
       this.tick();
+      this.ownPasses();
       this.guard('snapshots', () => this.snapshotRound());
+      this.crowd?.endTick();
     } finally {
       this.net.batching--;
       this.flushOutbox();
@@ -1091,7 +1102,33 @@ this.devTeleport = opts.devTeleport ?? false;
   private snapshotRound(): void {
     const skip = this.snapshots.due();
     if (skip !== false) this.sendSnapshots(skip);
-    this.crowd?.endTick();
+  }
+
+  /**
+   * Systems with a clock of their own (crowd dilation, sim/SystemClocks.ts), after the main pass: each one due a step
+   * has its pass at its own tick (its clients' inputs, the tick entries that touch its world, then its snapshot round
+   * when its window comes round), charged to it
+   */
+  private ownPasses(): void {
+    if (!this.clocks || !SimPass.own.size) { this.clocks?.due(); return; }
+    const base = this.currentTick;
+    for (const sys of this.clocks.due()) {
+      const t0 = performance.now();
+      this.currentTick = this.clocks.step(sys);
+      SimPass.main = false;
+      SimPass.system = sys;
+      try {
+        this.guard('inputs', () => this.drainInputQueue());
+        this.tick(true);
+        const skip = this.snapshots.ownRound(sys);
+        if (skip) this.guard('snapshots', () => this.sendSnapshots(skip));
+      } finally {
+        SimPass.main = true;
+        SimPass.system = -1;
+        this.currentTick = base;
+      }
+      this.crowd?.charge(sys, performance.now() - t0);
+    }
   }
 
   /** Pause the real-time loop (hangar editor). Messages are still accepted. */
@@ -2996,6 +3033,13 @@ this.devTeleport = opts.devTeleport ?? false;
   }
 
   private handleMessage(conn: ClientConnection, msg: ClientMessage): void {
+    // (Its system keeps a clock of its own, crowd dilation: handled at that system's tick)
+    if (SimPass.own.size && this.clocks && hasComponent(this.world, Player, conn.playerId) && this.clocks.owns(InSystem.systemId[conn.playerId])) {
+      const was = this.currentTick;
+      this.currentTick = this.clocks.tickOf(InSystem.systemId[conn.playerId]);
+      try { dispatch(this.handlers, this, conn, msg); } finally { this.currentTick = was; }
+      return;
+    }
     dispatch(this.handlers, this, conn, msg);
   }
 
@@ -3217,7 +3261,7 @@ this.devTeleport = opts.devTeleport ?? false;
   private riftSystem(): void {
     for (const conn of this.clients.values()) {
       const eid = conn.playerId;
-      if (!hasComponent(this.world, Player, eid) || hasComponent(this.world, Dead, eid)) continue;
+      if (!hasComponent(this.world, Player, eid) || hasComponent(this.world, Dead, eid) || !SimPass.on(InSystem.systemId[eid])) continue;
       const cooling = (this.riftCooldown.get(eid) ?? 0) > this.currentTick;
       for (const rift of portalQuery(this.world)) {
         if (Portal.kind[rift] !== 1 || InSystem.systemId[rift] !== InSystem.systemId[eid]) continue;
@@ -3286,6 +3330,8 @@ this.devTeleport = opts.devTeleport ?? false;
         this.guard('inputs', () => this.drainInputQueue());
       
         this.tick();
+        this.ownPasses();
+        this.crowd?.endTick();
         this.tickAccumulator -= TICK_MS;
         ticksThisFrame++;
       }
@@ -3327,18 +3373,24 @@ this.devTeleport = opts.devTeleport ?? false;
    * simulation, so every input lands on the earliest tick boundary.
    */
   private drainInputQueue(): void {
+    // (Systems with a clock of their own, crowd dilation: each pass drains its own clients' inputs, at its tick)
+    const sysOf = (c: ClientConnection) => (hasComponent(this.world, Player, c.playerId) ? InSystem.systemId[c.playerId] : -1);
+    const mine = SimPass.all ? null : (c: ClientConnection) => SimPass.on(sysOf(c));
     // 1. Process newly received inputs (may schedule them for future ticks)
+    let kept = 0;
     for (let i = 0; i < this.inputQueue.length; i++) {
-      const { conn, msg } = this.inputQueue[i];
+      const q = this.inputQueue[i];
+      if (mine && !mine(q.conn)) { this.inputQueue[kept++] = q; continue; }
       // (One bad input is dropped on its own; the queue's still cleared below)
-      this.guard('input', () => this.handleInput(conn, msg));
+      this.guard('input', () => this.handleInput(q.conn, q.msg));
     }
-    this.inputQueue.length = 0; // clear without re-allocation
-    
+    this.inputQueue.length = kept; // clear without re-allocation
+
     // 2. Apply per-player scheduled inputs whose targetTick has arrived
     const nextTick = this.currentTick + 1;
     let drainedCount = 0;
     for (const conn of this.clients.values()) {
+      if (mine && !mine(conn)) continue;
       conn.inputsThisTick = 0;
       // A client whose game loop has gone quiet (a hidden tab, a hung browser) stops flying and firing
       if (conn.hashSeen && this.currentTick - conn.liveTick > INPUT_TIMEOUT_TICKS) this.releaseControls(conn.playerId);
@@ -3406,34 +3458,34 @@ this.devTeleport = opts.devTeleport ?? false;
     const systems: TickSystem[] = [
       // ---- pilots-move ----
       // (Asteroids aren't moved: their positions are worked out when something needs them, see placeAsteroid)
-      { name: 'stationOrbitSystem', phase: 'pilots-move', run: () => this.stationOrbitSystem() },
+      { name: 'stationOrbitSystem', pass: true, phase: 'pilots-move', run: () => this.stationOrbitSystem() },
       // Systems pilots are in or coming to are in the world; ones left a while are put away (before anything's spawned)
       { name: 'memory', phase: 'pilots-move', scene: 'sectors', run: () => this.memory.tick() },
       // Reset spatial grid and rebuild
       { name: 'spatialGrid', phase: 'pilots-move', run: () => { this.spatialGrid.clear(); this.buildSpatialGrid(); } },
-      { name: 'playerMovementSystem', phase: 'pilots-move', run: () => this.playerMovementSystem() },
+      { name: 'playerMovementSystem', pass: true, phase: 'pilots-move', run: () => this.playerMovementSystem() },
       // (Part features tick here, after the pilots fly and before wrecks and pods move: a Tow Beam pulls what it tows. ships/features/host.ts)
-      { name: 'towing', phase: 'pilots-move', run: () => { this.features.tick(); } },
-      { name: 'dockingSystem', phase: 'pilots-move', run: () => this.docking.dockingSystem() },
-      { name: 'riftSystem', phase: 'pilots-move', run: () => this.riftSystem() },
+      { name: 'towing', pass: true, phase: 'pilots-move', run: () => { this.features.tick(); } },
+      { name: 'dockingSystem', pass: true, phase: 'pilots-move', run: () => this.docking.dockingSystem() },
+      { name: 'riftSystem', pass: true, phase: 'pilots-move', run: () => this.riftSystem() },
       // ---- combat ----
       // (Boost fuel is the ship's battery now: it charges in the flight step, energy.ts)
-      { name: 'weaponSystem', phase: 'combat', run: () => this.weaponSystem() },
-      { name: 'projectileSystem', phase: 'combat', run: () => this.projectileSystem() },
-      { name: 'enemies', phase: 'combat', scene: 'sectors', run: () => { this.enemies.tick(); this.range?.tick(); } },
-      { name: 'bosses', phase: 'combat', scene: 'sectors', run: () => this.bosses.tick() },
-      { name: 'mobs', phase: 'combat', scene: 'sectors', run: () => this.mobs.tick() },
+      { name: 'weaponSystem', pass: true, phase: 'combat', run: () => this.weaponSystem() },
+      { name: 'projectileSystem', pass: true, phase: 'combat', run: () => this.projectileSystem() },
+      { name: 'enemies', pass: true, phase: 'combat', scene: 'sectors', run: () => { this.enemies.tick(); this.range?.tick(); } },
+      { name: 'bosses', pass: true, phase: 'combat', scene: 'sectors', run: () => this.bosses.tick() },
+      { name: 'mobs', pass: true, phase: 'combat', scene: 'sectors', run: () => this.mobs.tick() },
       { name: 'events', phase: 'combat', scene: 'sectors', run: () => this.events.tick() },
       { name: 'surfaces', phase: 'combat', scene: 'sectors', run: () => this.surfaces.tick() },
       { name: 'sieges', phase: 'combat', scene: 'sectors', run: () => this.sieges.tick() },
       { name: 'arenas', phase: 'combat', scene: 'sectors', run: () => this.arenas.tick() },
-      { name: 'collisionSystem', phase: 'combat', run: () => this.collisionSystem() },
+      { name: 'collisionSystem', pass: true, phase: 'combat', run: () => this.collisionSystem() },
       // Check for destroyed asteroids
       { name: 'asteroidDeathSystem', phase: 'combat', run: () => this.asteroidDeathSystem() },
-      { name: 'lod', phase: 'combat', run: () => this.lod.tick() },
-      { name: 'ships', phase: 'combat', run: () => this.ships.tick() },
-      { name: 'replication.endTick', phase: 'combat', run: () => this.replication.endTick() },
-      { name: 'recordSelfHashes', phase: 'combat', run: () => this.recordSelfHashes() },
+      { name: 'lod', pass: true, phase: 'combat', run: () => this.lod.tick() },
+      { name: 'ships', pass: true, phase: 'combat', run: () => this.ships.tick() },
+      { name: 'replication.endTick', pass: true, phase: 'combat', run: () => this.replication.endTick() },
+      { name: 'recordSelfHashes', pass: true, phase: 'combat', run: () => this.recordSelfHashes() },
       // ---- world ----
       { name: 'pods', phase: 'world', run: () => this.pods.tick() },
       { name: 'mining', phase: 'world', run: () => this.mining.tick() },
@@ -3464,7 +3516,7 @@ this.devTeleport = opts.devTeleport ?? false;
       { name: 'lingerSystem', phase: 'persist', run: () => this.lingerSystem() },
       { name: 'derelictRespawnSystem', phase: 'persist', run: () => this.derelictsMod.derelictRespawnSystem() },
       { name: 'trafficSystem', phase: 'persist', run: () => this.trafficSystem() },
-      { name: 'lifetimeSystem', phase: 'persist', run: () => this.lifetimeSystem() },
+      { name: 'lifetimeSystem', pass: true, phase: 'persist', run: () => this.lifetimeSystem() },
       { name: 'cleanupSystem', phase: 'persist', run: () => this.cleanupSystem() },
     ];
     checkTickOrder(systems);
@@ -3476,13 +3528,15 @@ this.devTeleport = opts.devTeleport ?? false;
     return this.tickSystems.map((s) => ({ name: s.name, phase: s.phase, every: s.every, scene: s.scene, perClient: s.perClient }));
   }
 
-  private tick(): void {
+  private tick(own = false): void {
     const tickStart = performance.now();
-    this.currentTick++;
-    
+    // (A system with a clock of its own: its pass, its tick already set, ownPasses)
+    if (!own) this.currentTick++;
+
     // The guarded systems, in order: tickOrder.ts (the table is built once, in buildTickSystems)
     const tick = this.currentTick, scene = this.scene;
     for (const s of this.tickSystems) {
+      if (own && !s.pass) continue;
       if (s.scene !== undefined && s.scene !== scene) continue;
       if (s.every !== undefined && tick % s.every !== 0) continue;
       if (s.when !== undefined && !s.when()) continue;
@@ -3490,10 +3544,11 @@ this.devTeleport = opts.devTeleport ?? false;
       else this.guard(s.name, s.run);
     }
     
+    if (own) return;
     // Report to admin server and update performance metrics
     const tickTime = performance.now() - tickStart;
     // (Crowd fallbacks: the tick's time charged to the systems by their ships)
-    this.crowd?.shareByBodies(tickTime, this.ships.bodies.keys());
+    this.crowd?.shareByBodies(tickTime, this.ships.bodies.keys(), (s) => SimPass.on(s));
     this.updatePerfMetrics(tickTime);
     this.reportAdminStats(tickTime);
   }
@@ -3549,11 +3604,11 @@ this.devTeleport = opts.devTeleport ?? false;
   // ============================================
 
   private playerMovementSystem(): void {
-    for (const eid of playerQuery(this.world)) this.ships.stepMovement(eid);
+    for (const eid of playerQuery(this.world)) if (SimPass.on(InSystem.systemId[eid])) this.ships.stepMovement(eid);
   }
-  
+
   private weaponSystem(): void {
-    for (const eid of playerQuery(this.world)) this.ships.stepWeapons(eid);
+    for (const eid of playerQuery(this.world)) if (SimPass.on(InSystem.systemId[eid])) this.ships.stepWeapons(eid);
   }
 
   private fireCannon(shooterEid: number, x: number, y: number, angle: number, item: any, systemId: number, spawnOffset = 30,
@@ -3616,6 +3671,7 @@ this.devTeleport = opts.devTeleport ?? false;
     const projectiles = projectileQuery(this.world);
 
     for (const eid of projectiles) {
+      if (!SimPass.on(InSystem.systemId[eid])) continue;
 // Update position
       Position.x[eid] += Velocity.x[eid];
       Position.y[eid] += Velocity.y[eid];
@@ -3646,7 +3702,7 @@ this.devTeleport = opts.devTeleport ?? false;
     const stations = stationQuery(this.world);
 
     for (const eid of stations) {
-      if (Station.orbitType[eid] === 255 || Station.semiMajorAxis[eid] <= 0) continue;
+      if (Station.orbitType[eid] === 255 || Station.semiMajorAxis[eid] <= 0 || !SimPass.on(InSystem.systemId[eid])) continue;
       const state = calcOrbitStateRaw(
         Station.orbitType[eid],
         Station.semiMajorAxis[eid],
@@ -3759,7 +3815,7 @@ this.devTeleport = opts.devTeleport ?? false;
     
     // Projectiles vs ships and asteroids
     for (const proj of projectiles) {
-      if (hasComponent(this.world, Dead, proj)) continue;
+      if (hasComponent(this.world, Dead, proj) || !SimPass.on(InSystem.systemId[proj])) continue;
       // A lobbed shell passes over everything until it comes down
       if (this.weapons.lobbed(proj) || this.weapons.unarmed(proj)) continue;
       // A charge stuck in rock rides it (and hurts nothing else)
@@ -4174,6 +4230,7 @@ this.devTeleport = opts.devTeleport ?? false;
     const entities = lifetimeQuery(this.world);
     
     for (const eid of entities) {
+      if (!SimPass.on(InSystem.systemId[eid])) continue;
       Lifetime.remaining[eid]--;
       
       if (Lifetime.remaining[eid] <= 0) {
@@ -4230,7 +4287,7 @@ this.devTeleport = opts.devTeleport ?? false;
   }
 
   /** A snapshot to every client, then the map's dots (net/SnapshotBuilder.ts; netBench and tests wrap this name) */
-  private sendSnapshots(skip: ReadonlySet<number> | null = null): void {
+  private sendSnapshots(skip: RoundSkip | null = null): void {
     // (The damage summed since the last one goes first, to ride the same frame; confirmed hits' clients get theirs after their records)
     this.net.flushDamage(this.hits.active ? CAPS.HITS : 0);
     // (Its hits are dropped even if the snapshot fails part way: never told twice. `skip`: systems whose wider window

@@ -44,6 +44,7 @@ import {
   type Leg, type Motion, type Patrol, type PatrolState, type ShipDerived, type ShipState, type Blueprint, type ShipTuning, datan2, dcos, dhypot, dsin,
 } from '@space-game/common';
 import type { ShipBridge } from './ShipBridge.js';
+import { SimPass } from '../sim/SystemClocks.js';
 
 /** What a pilotless ship is doing, as far as a distant one needs to know */
 export type Intent =
@@ -249,7 +250,7 @@ export class SimLod {
       for (const id of this.seen.keys()) if (!this.ships.has(id) || dormant.has(id)) this.seen.delete(id);
       for (const id of this.far.keys()) if (!dormant.has(id)) this.far.delete(id);
       for (const [eid, ship] of this.ships.bodies) {
-        if (dormant.has(eid) || ship.kind !== 'ship') continue;
+        if (dormant.has(eid) || ship.kind !== 'ship' || !SimPass.on(InSystem.systemId[eid])) continue;
         const o = obs.get(InSystem.systemId[eid]);
         if (o && (watched?.has(eid) || nearest(o, Position.x[eid], Position.y[eid]) < DEMOTE_RADIUS + ship.derived.radius)) { this.seen.set(eid, now); continue; }
         if (!this.seen.has(eid)) this.seen.set(eid, now);
@@ -266,6 +267,8 @@ export class SimLod {
 
     // The distant: plan the legs that have ended, look for pilots where they're due (or the system's had someone arrive)
     for (const [eid] of dormant) {
+      // (Another pass's: crowd dilation, sim/SystemClocks.ts)
+      if (!SimPass.on(InSystem.systemId[eid])) continue;
       const ship = this.ships.get(eid);
       if (!ship) { this.far.delete(eid); continue; }
       const far = this.far.get(eid) ?? this.adopt(eid, now);

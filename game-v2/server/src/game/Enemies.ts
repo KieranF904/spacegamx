@@ -39,6 +39,7 @@ import { nestBand, clampBand, stepRound, placesOfInterest, looseWaypoint, nomadD
 import type { ShipBridge, PilotOrders } from '../ships/ShipBridge.js';
 import type { Intent, Plan, FarPose } from '../ships/SimLod.js';
 import { shipMemory, restoreHp, type ShipMemory } from './SystemMemory.js';
+import { SimPass } from '../sim/SystemClocks.js';
 
 export interface FactionDef {
   name: string;
@@ -681,7 +682,8 @@ export class Enemies {
     if (now % 30 === 0) {
       for (const [sysId, sp] of Object.entries(this.data.spawns)) {
         const num = this.host.systemNum(sysId);
-        if (num < 0) continue;
+        // (Its system's pass: crowd dilation, sim/SystemClocks.ts)
+        if (num < 0 || !SimPass.on(num)) continue;
         const players = this.host.players(num);
         const all = [...this.packs.values()].filter((p) => p.systemNum === num && !p.boss);
         const packs = all.filter((p) => !p.zone && !p.nest);
@@ -711,7 +713,7 @@ export class Enemies {
     // Ships coming through gates, once they've spooled up
     for (let i = this.arrivals.length - 1; i >= 0; i--) {
       const a = this.arrivals[i];
-      if (now < a.due) continue;
+      if (now < a.due || !SimPass.on(a.num)) continue;
       this.arrivals.splice(i, 1);
       this.host.effect?.(a.num, a.x, a.y, 'warpIn');
       const eids = this.spawnPack(a.num, a.group, a.x, a.y, a.zone);
@@ -1358,6 +1360,7 @@ export class Enemies {
       // (Distant ships are out of every fight: ships/SimLod.ts)
       if (this.ships.isDormant(e.eid)) continue;
       const num = InSystem.systemId[e.eid];
+      if (!SimPass.on(num)) continue;
       const list = bySystem.get(num);
       if (list) list.push(e.eid);
       else bySystem.set(num, [e.eid]);

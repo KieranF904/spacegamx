@@ -43,6 +43,10 @@ import { ownShotsFor, ownVolleyExact, ownSimFor } from './snapshot/ownShots.js';
 import { bodiesFor, pilotsFor, focusFor, causesFor, waypointsFor, replicasByte, jumpPhase, jumpTuning } from '@space-game/common';
 import { FocusCells } from './cells/FocusCells.js';
 import type { CrowdControl } from './crowd/CrowdControl.js';
+import { SimPass } from '../sim/SystemClocks.js';
+
+/** The systems a snapshot round is not for (a wider window not come round, a clock of their own): a Set will do */
+export interface RoundSkip { has(system: number): boolean; readonly size: number }
 import type { BodyNet } from './decisions/BodyNet.js';
 import type { GuideNet } from './guides/GuideNet.js';
 import type { OwnChecks } from './own/OwnChecks.js';
@@ -570,11 +574,13 @@ export class SnapshotBuilder {
    * Once a tick: is a snapshot round due (every CROWD_BASE_WINDOW ticks, as always; false: not this tick)? It is for every
    * system but the ones returned, whose wider window (crowd fallbacks) hasn't come round yet (null: none)
    */
-  due(): ReadonlySet<number> | null | false {
+  due(): RoundSkip | null | false {
     const t = this.currentTick;
     if (t - this.lastRound < CROWD_BASE_WINDOW) return false;
     this.lastRound = t;
     let skip: Set<number> | null = null;
+    // (Systems with a clock of their own have their rounds in their own passes: ownRound)
+    if (!SimPass.all) for (const s of SimPass.own) (skip ??= new Set()).add(s);
     if (this.crowd) {
       for (const [sys, w] of this.crowd.widened()) {
         const last = this.lastWide.get(sys);
@@ -586,7 +592,17 @@ export class SnapshotBuilder {
     return skip;
   }
 
-  sendSnapshots(skip: ReadonlySet<number> | null = null): void {
+  /** A system with a clock of its own, in its pass: is its round due (its window, in its ticks)? The skip if so */
+  ownRound(system: number): RoundSkip | false {
+    const t = this.currentTick, last = this.lastOwn.get(system);
+    const w = this.crowd?.windowOf(system) ?? CROWD_BASE_WINDOW;
+    if (last !== undefined && t - last < w && t > last) return false;
+    this.lastOwn.set(system, t);
+    return { has: (s: number) => s !== system, size: 1 };
+  }
+  private readonly lastOwn = new Map<number, number>();
+
+  sendSnapshots(skip: RoundSkip | null = null): void {
     // (A round for some systems only, crowd fallbacks: what's kept for a round is let go only for theirs)
     const due = skip ? (eid: number) => !skip.has(InSystem.systemId[eid]) : undefined;
     // Skip entirely when no clients are connected — avoids building

@@ -27,6 +27,7 @@ import {
 } from '@space-game/common';
 import type { ShipBridge } from '../ships/ShipBridge.js';
 import { datan2, dcos, dhypot, dsin } from '@space-game/common';
+import { SimPass } from '../sim/SystemClocks.js';
 
 export interface WeaponsHost {
   readonly world: IWorld;
@@ -218,6 +219,8 @@ export class Weapons {
     const w = this.host.world;
     for (const [eid, x] of this.extras) {
       if (!entityExists(w, eid) || hasComponent(w, Dead, eid)) { this.extras.delete(eid); continue; }
+      // (Its system's pass: crowd dilation, sim/SystemClocks.ts)
+      if (!SimPass.on(InSystem.systemId[eid])) continue;
       if (x.def.guided) this.guide(eid, x);
       else if (x.guide) this.home(eid, x.guide);
       // A held orb parks where it was aimed (its endTick) and pulls from there

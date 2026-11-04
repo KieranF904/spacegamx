@@ -31,6 +31,11 @@ export interface TickSystem {
   readonly when?: () => boolean;
   /** The entry guards per client inside run (the walker does not guard it) */
   readonly perClient?: boolean;
+  /**
+   * It touches a system's world: it runs in every pass (a system with a clock of its own has its own, at its tick:
+   * sim/SystemClocks.ts) and steps only what is the pass's (SimPass.on). Without: the main pass only, every system
+   */
+  readonly pass?: true;
   readonly run: () => void;
 }
 

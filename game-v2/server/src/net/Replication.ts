@@ -27,6 +27,7 @@ import {
 import type { ShipBridge } from '../ships/ShipBridge.js';
 import type { OwnCause } from '../ships/bridge/ownCauses.js';
 import { workCauses, recordCauses, settleContacts, causeRow, causeRecords, type CauseEvent, type WorkedCauses } from './causes/shadowCauses.js';
+import { SimPass } from '../sim/SystemClocks.js';
 
 export interface ReplicationHost {
   tick(): number;
@@ -154,6 +155,8 @@ export class Replication {
     const docks = this.host.docks?.();
     const occupied = this.host.occupied?.();
     for (const [eid, ship] of this.ships.bodies) {
+      // (Another pass's: crowd dilation, sim/SystemClocks.ts)
+      if (!SimPass.on(InSystem.systemId[eid])) continue;
       // Distant (ships/SimLod.ts): no client has it in view (it wakes before it can be); whoever gets it next gets its real state
       if (this.ships.isDormant(eid)) {
         const s = this.shadows.get(eid);

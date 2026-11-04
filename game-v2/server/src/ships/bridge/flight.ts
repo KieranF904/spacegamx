@@ -19,6 +19,7 @@ import {
 import { K, CONTACT_MARGIN, BIG_BODY, type ContactPiece, type BridgeCtx } from './core.js';
 import { ownShape } from './ownCauses.js';
 import { dhypot } from '@space-game/common';
+import { SimPass } from '../../sim/SystemClocks.js';
 
 /** stepMovement's scratch: the held keys read from Input, and the controls built from them (reused every call; the step never keeps them) */
 const MOVE_SRC: FlightInputSource = {
@@ -238,7 +239,11 @@ export function addToSpatialGrid(b: BridgeCtx, add: (eid: number, x: number, y: 
  * count from), rather than a pair for each (that was most of what such a loop cost)
  */
 export function bodiesNow(b: BridgeCtx): [number[], ShipState[], number] {
-  return [[...b.bodies.keys()], [...b.bodies.values()], 0];
+  if (SimPass.all) return [[...b.bodies.keys()], [...b.bodies.values()], 0];
+  // (The pass's systems only: crowd dilation, sim/SystemClocks.ts; the tick's walks are the only callers)
+  const ids: number[] = [], ships: ShipState[] = [];
+  for (const [eid, s] of b.bodies) if (SimPass.on(InSystem.systemId[eid])) { ids.push(eid); ships.push(s); }
+  return [ids, ships, 0];
 }
 
 /** End of tick: pilotless motion, contacts, rebuilds, detachment, debris lifetime, health sync. */
@@ -285,7 +290,7 @@ export function tick(ctx: BridgeCtx): void {
   // Shields recharge once they've gone a while without a hit
   {
     for (const ship of ctx.bodies.values()) {
-      if (ctx.dormant.has(ship.id)) continue; // (caught up when it wakes)
+      if (ctx.dormant.has(ship.id) || !SimPass.on(InSystem.systemId[ship.id])) continue; // (caught up when it wakes; another pass's)
       const max = ship.derived.shieldMax;
       if (max <= 0) { ship.shield = 0; continue; }
       if (ship.shield > max) ship.shield = max;
@@ -316,7 +321,7 @@ export function tick(ctx: BridgeCtx): void {
     let more = false;
     for (let [ids, ships, bi] = ctx.bodiesNow(); bi < ids.length; bi++) if (!ctx.dormant.has(ids[bi])) more = ctx.partDeaths(ids[bi], ships[bi], tick) || more;
     for (let i = ctx.blasts.length - 1; i >= 0; i--) {
-      if (ctx.blasts[i].due > tick) continue;
+      if (ctx.blasts[i].due > tick || !SimPass.on(ctx.blasts[i].systemId)) continue;
       const b = ctx.blasts[i];
       ctx.blasts.splice(i, 1);
       ctx.applyBlast(b);
@@ -329,7 +334,7 @@ export function tick(ctx: BridgeCtx): void {
   // Station repair
   const rp = ctx.tuning.repair;
   if (rp && tick % rp.intervalTicks === 0) {
-    for (const [eid, ship] of ctx.bodies) if (!ctx.dormant.has(eid)) ctx.repairStep(eid, ship, tick);
+    for (const [eid, ship] of ctx.bodies) if (!ctx.dormant.has(eid) && SimPass.on(InSystem.systemId[eid])) ctx.repairStep(eid, ship, tick);
   }
 
   // 3. The tick's one rebuild point: whatever changed a ship this tick (hits, heals, sheds, repairs, ghosts, saved
@@ -343,7 +348,7 @@ export function tick(ctx: BridgeCtx): void {
   // 4. Round every body to snapshot precision, so what the server holds is
   //    exactly what clients receive (client prediction replays from it)
   for (const [eid, ship] of ctx.bodies) {
-    if (ctx.dormant.has(eid)) continue; // (SimLod rounds what it writes)
+    if (ctx.dormant.has(eid) || !SimPass.on(InSystem.systemId[eid])) continue; // (SimLod rounds what it writes; another pass's)
     const body = ctx.readBody(eid, ship);
     quantizeShipBody(body);
     ctx.writeBody(eid, ship, body);
@@ -384,7 +389,7 @@ export function resolveContacts(ctx: BridgeCtx): void {
   // Who can touch anything at all (none of it changes while this runs)
   const list: [number, ShipState][] = [];
   for (const e of ctx.bodies) {
-    if (e[1].kind !== 'debris' && e[1].derived.mass > 0 && !ctx.dormant.has(e[0]) && !ctx.isJumping(e[1]) && !ctx.host.sheltered?.(e[0]) && !ctx.intangible.has(e[0])) list.push(e);
+    if (e[1].kind !== 'debris' && e[1].derived.mass > 0 && !ctx.dormant.has(e[0]) && SimPass.on(InSystem.systemId[e[0]]) && !ctx.isJumping(e[1]) && !ctx.host.sheltered?.(e[0]) && !ctx.intangible.has(e[0])) list.push(e);
   }
   const n = list.length;
   const pairs: number[] = [];

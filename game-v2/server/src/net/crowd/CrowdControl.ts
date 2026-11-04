@@ -120,10 +120,10 @@ export class CrowdControl {
 
   /** Charge time spent on every system's ships (the tick), split by how many each has */
   private readonly counts = new Map<number, number>();
-  shareByBodies(ms: number, bodies: Iterable<number>): void {
+  shareByBodies(ms: number, bodies: Iterable<number>, on?: (system: number) => boolean): void {
     const c = this.counts;
     c.clear();
-    for (const eid of bodies) { const s = InSystem.systemId[eid]; c.set(s, (c.get(s) ?? 0) + 1); }
+    for (const eid of bodies) { const s = InSystem.systemId[eid]; if (!on || on(s)) c.set(s, (c.get(s) ?? 0) + 1); }
     this.share(ms, c);
   }
 

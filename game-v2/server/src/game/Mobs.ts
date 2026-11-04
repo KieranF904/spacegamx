@@ -22,6 +22,7 @@ import {
   Position, Velocity, Rotation, Radius, InSystem, segmentNearCircle, insideTerrain, type Terrain, dcos, dhypot, dsin,
   FLIGHT_MOB, GUIDE, PLAN_NONE, PLAN_WP, guideKind, guideRetarget, guideTick, newGuide, qAngle, qGuide, wpArgs, type Guide, type GuideBody,
 } from '@space-game/common';
+import { SimPass } from '../sim/SystemClocks.js';
 
 export interface MobDef {
   name: string;
@@ -161,6 +162,8 @@ export class Mobs {
     for (const m of [...this.live.values()]) {
       const { eid, def, guide: g } = m;
       const num = InSystem.systemId[eid];
+      // (Its system's pass: crowd dilation, sim/SystemClocks.ts)
+      if (!SimPass.on(num)) continue;
       const age = now - m.born;
       if (age >= def.life) { this.kill(m, true); continue; }
       const x = Position.x[eid], y = Position.y[eid];

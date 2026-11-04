@@ -28,6 +28,7 @@ import type { BossBrain, BrainHost } from './brains/kit.js';
 import { PyreclastBrain } from './brains/pyreclast.js';
 import { ScrapMotherBrain } from './brains/scrapMother.js';
 import { BroodMotherBrain } from './brains/broodMother.js';
+import { SimPass } from '../sim/SystemClocks.js';
 
 /** Bosses with a mind of their own (bosses.json `brain`): their moves are written out in server/src/game/brains */
 const BRAINS: Record<string, (host: BrainHost) => BossBrain> = {
@@ -315,12 +316,14 @@ export class Bosses {
       for (const [id, def] of Object.entries(this.file.bosses)) {
         if (def.arena || this.live.has(id)) continue;
         const num = this.host.systemNum(def.system);
-        if (num < 0) continue;
+        if (num < 0 || !SimPass.on(num)) continue;
         if (this.host.players(num).length > 0 && now >= (this.nextSpawn.get(id) ?? 0)) this.spawn(id);
       }
     }
     for (const b of [...this.live.values()]) {
       if (!this.ships.has(b.eid)) { this.forget(b); continue; }
+      // (Its system's pass: crowd dilation, sim/SystemClocks.ts)
+      if (!SimPass.on(InSystem.systemId[b.eid])) continue;
       this.stepPhases(b, now);
     }
   }

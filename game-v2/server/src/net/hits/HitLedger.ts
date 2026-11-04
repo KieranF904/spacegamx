@@ -490,7 +490,7 @@ export class HitLedger {
   }
 
   /** The snapshot's gone: drop its hits, switch any client's caps, and see whether the next one keeps hits */
-  endSnapshot(skip?: ReadonlySet<number> | null): void {
+  endSnapshot(skip?: { has(system: number): boolean; readonly size: number } | null): void {
     // (A round for some systems only, crowd fallbacks: the others' hits wait for theirs)
     if (skip?.size) {
       this.hits = this.hits.filter((h) => skip.has(h.sys));

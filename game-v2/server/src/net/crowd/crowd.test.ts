@@ -74,9 +74,11 @@ function world(o: { fire?: boolean; far?: number; free?: boolean } = {}) {
     }
   };
   let seq = 1;
+  /** The watcher's system's tick (its own clock once dilated: sim/SystemClocks.ts) */
+  const now = () => server.clocks!.tickOf(InSystem.systemId[A.pid]);
   const fly = (f: FakeHitsClient, t: number, k: number) => {
     const phase = Math.floor((t + 17 * k) / 40) % 4;
-    const msg = { type: 'input', seq: seq++, tick: 0, targetTick: server.getTick() + 1, forward: phase !== 2, backward: false, left: phase === 1, right: phase === 3,
+    const msg = { type: 'input', seq: seq++, tick: 0, targetTick: now() + 1, forward: phase !== 2, backward: false, left: phase === 1, right: phase === 3,
       boost: false, fireLeft: false, fireRight: false, targetAngle: (k ? Math.PI : 0) + 0.2 * phase, cursorDist: 700 };
     f.link!.receive(decodeMessage(encodeMessage(msg as unknown as ClientMessage) as ArrayBuffer) as ClientMessage);
   };
@@ -96,8 +98,8 @@ function world(o: { fire?: boolean; far?: number; free?: boolean } = {}) {
     t++;
     const m = new Map<number, number[]>();
     for (const [eid] of server.getShips().bodies) m.set(eid, [Position.x[eid], Position.y[eid], Velocity.x[eid], Velocity.y[eid], Rotation.angle[eid]]);
-    truth.set(server.getTick(), m);
-    truth.delete(server.getTick() - 64);
+    truth.set(now(), m);
+    truth.delete(now() - 64);
     clock.t += 1000 / 60;
     for (const f of [A, L, ...P]) f.flushUp();
     check();
@@ -120,7 +122,7 @@ function world(o: { fire?: boolean; far?: number; free?: boolean } = {}) {
   if (o.free) { step(); where = null; }
   const run = (n: number) => { for (let i = 0; i < n; i++) step(); };
   const system = () => InSystem.systemId[A.pid];
-  return { server, A, L, P, seen, run, conn: server.pilots.connOf(A.pid)! as ClientConnection, system };
+  return { server, A, L, P, seen, run, now, conn: server.pilots.connOf(A.pid)! as ClientConnection, system };
 }
 
 const gaps = (ticks: number[]) => ticks.slice(1).map((t, i) => t - ticks[i]);
@@ -187,6 +189,39 @@ describe('crowd fallbacks (CAPS.CROWD)', () => {
     // the server finds it 'late' now and then whatever the window; and no hit of its own put right)
     const rate = (a: number, b: number) => w.seen.ownKf.filter((k) => k > a && k <= b).length / (b - a);
     expect(rate(t4, t0)).toBeLessThanOrEqual(rate(0, t4) * 1.25);
+    expect(w.seen.fixes).toBe(0);
+    expect((w.server as unknown as { hits: { stats: { hits: number } } }).hits.stats.hits).toBeGreaterThan(20);
+  });
+
+  it('dilation: the system steps 30 times a second on its own clock, told from a tick ahead; undone, 60 again; exact throughout', () => {
+    const w = world({ fire: true, far: 1500, free: true });
+    w.run(90);
+    const sys = w.system();
+    const base0 = w.server.getTick();
+    w.server.crowd!.force(sys, 7);
+    const told = w.seen.crowd.at(-1)!;
+    expect(told).toMatchObject({ lv: 7, r: 30, w: 9 });
+    expect(told.tick).toBe(w.now() + 30);
+    w.run(300);
+    // (30 ticks at full rate to the stated tick, then half: about 30 + 135 of its ticks in 300 base ticks)
+    const ran = w.now() - base0;
+    expect(ran).toBeGreaterThan(160);
+    expect(ran).toBeLessThan(170);
+    expect(w.server.getTick() - w.now()).toBeGreaterThan(130);
+    const s1 = w.seen.snaps.length;
+    w.run(300);
+    expect(gaps(w.seen.snaps.slice(s1)).every((g) => g === 9)).toBe(true);
+    w.server.crowd!.force(sys, 0);
+    expect(w.seen.crowd.at(-1)).toMatchObject({ lv: 0, r: 60, w: 3 });
+    // (the rate changes at the stated tick, 30 of its ticks on: at half rate, 60 base ticks)
+    w.run(70);
+    const t1 = w.now(), b1 = w.server.getTick();
+    w.run(240);
+    // (back to full rate on its own clock: still behind the server's, never catching up while anyone's there)
+    expect(w.now() - t1).toBeGreaterThan(200);
+    expect(w.server.getTick() - w.now()).toBe(b1 - t1);
+    expect(w.seen.checked).toBeGreaterThan(300);
+    expect(w.seen.offIds).toEqual([]);
     expect(w.seen.fixes).toBe(0);
     expect((w.server as unknown as { hits: { stats: { hits: number } } }).hits.stats.hits).toBeGreaterThan(20);
   });

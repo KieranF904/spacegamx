@@ -17,6 +17,7 @@ import type { FactionsFile } from '../../game/Enemies.js';
 import type { ClientConnection } from '../ClientConnection.js';
 import { MAX_INPUTS_PER_TICK, type HandlerRegistry } from '../dispatch.js';
 import type { ServerCtx } from '../ServerCtx.js';
+import { SimPass } from '../../sim/SystemClocks.js';
 
 /** Input flood guards (the per-tick one, MAX_INPUTS_PER_TICK, is in net/dispatch.ts): how far ahead one may be scheduled, and how many may wait */
 const MAX_INPUT_LEAD = 64;
@@ -95,7 +96,7 @@ export function handleStateHash(ctx: ServerCtx, conn: ClientConnection, msg: { t
 export function recordSelfHashes(ctx: ServerCtx, ): void {
   for (const conn of ctx.clients.values()) {
     const eid = conn.playerId;
-    if (!hasComponent(ctx.world, Player, eid) || hasComponent(ctx.world, Dead, eid)) continue;
+    if (!hasComponent(ctx.world, Player, eid) || hasComponent(ctx.world, Dead, eid) || !SimPass.on(InSystem.systemId[eid])) continue;
     const h = computeStateHash(Position.x[eid], Position.y[eid], Rotation.angle[eid], Velocity.x[eid], Velocity.y[eid],
       Health.current[eid], Boost.fuel[eid], ctx.gameData.getSystemByNum(InSystem.systemId[eid])?.id || 'sol');
     conn.selfHashes.set(ctx.currentTick, h);

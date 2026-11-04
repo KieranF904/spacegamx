@@ -22,6 +22,7 @@ import {
   type PlacedGeom,
 } from '@space-game/common';
 import { type BridgeCtx } from './core.js';
+import { SimPass } from '../../sim/SystemClocks.js';
 
 /** A blueprint's placed geometry, built once per blueprint (geomCache) */
 export function geometry(b: BridgeCtx, ship: ShipState): PlacedGeom[] {
@@ -174,6 +175,8 @@ export function repairKitLeft(b: BridgeCtx, eid: number): number {
 export function stepRepairKits(b: BridgeCtx, tick: number): void {
   const step = 15;
   for (const [eid, kit] of b.kits) {
+    // (Another pass's: crowd dilation, sim/SystemClocks.ts)
+    if (!SimPass.on(InSystem.systemId[eid])) continue;
     const ship = b.bodies.get(eid);
     if (!ship || ship.kind !== 'ship' || ship.derived.root < 0) { b.kits.delete(eid); continue; }
     // A hit or moving off breaks the repair: whatever was left of the kit is wasted

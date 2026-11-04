@@ -4,8 +4,9 @@
  * share, the share is back at once and the banks lose the energy; otherwise it is back whole FLASH_RESTORE_TICKS later
  * (`tick`). Either way the screens bloom white where the ship is, for everyone in the system.
  */
-import { EffectType, FLASH_RESTORE_TICKS, flashPay, type Charge } from '@space-game/common';
+import { InSystem, EffectType, FLASH_RESTORE_TICKS, flashPay, type Charge } from '@space-game/common';
 import type { FeatureHost, FeatureInstance } from '../types.js';
+import { SimPass } from '../../../sim/SystemClocks.js';
 
 export class Flash implements FeatureInstance {
   /** Ships whose Flash Screens are on their way back: the tick they return, and the points */
@@ -28,7 +29,7 @@ export class Flash implements FeatureInstance {
     if (this.due.size === 0) return;
     const now = this.host.getTick();
     for (const [eid, at] of this.due) {
-      if (now < at) continue;
+      if (now < at || !SimPass.on(InSystem.systemId[eid])) continue;
       this.due.delete(eid);
       const max = this.host.ships.get(eid)?.derived.fx?.flash?.max ?? 0;
       if (max > 0) this.restore(eid, max);
