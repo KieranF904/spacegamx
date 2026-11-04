@@ -25,9 +25,9 @@ export function isRuined(catalog: Catalog, ship: ShipState, i: number): boolean 
   return !!catalog.pieces.get(ship.blueprint.parts[i]?.piece)?.ruin && ship.hp[i] <= RUIN_HP;
 }
 
-/** Can a shot hit it */
+/** Can a shot hit it (not if it's gone, shed this tick ahead of the ship's rebuild included) */
 export function standing(catalog: Catalog, ship: ShipState, i: number): boolean {
-  if (!ship.derived.alive[i]) return false;
+  if (!ship.derived.alive[i] || ship.detached[i]) return false;
   const pc = catalog.pieces.get(ship.blueprint.parts[i]?.piece);
   return !pc?.skeleton && !(pc?.ruin && ship.hp[i] <= RUIN_HP);
 }

@@ -30,6 +30,8 @@ interface Opts {
   each?: (t: number, w: World) => void;
   /** A pull on its ship during the tick (as a boss's magnet pulls, in its brain's step after the pilots have moved) */
   pull?: (t: number) => [number, number] | null;
+  /** Something during the tick, after the pilots have moved (where a boss's brain acts) */
+  mid?: (t: number, w: World) => void;
   /** The client drops the own-ship causes of this snapshot (the forced miss) */
   dropAt?: number;
   ticks?: number;
@@ -104,12 +106,25 @@ function fly(o: Opts = {}) {
   const target = ships.spawnDummy(ships.library.get('hauler')!, x0 + 700, y0, 0, num);
   const w: World = { server, A, target, x0, y0 };
   let now = -1;
-  { const en = server.enemies as unknown as { tick(): void }, o0 = en.tick.bind(en); en.tick = () => { o0(); const p = o.pull?.(now); if (p) ships.push(A.pid, p[0], p[1]); }; }
+  { const en = server.enemies as unknown as { tick(): void }, o0 = en.tick.bind(en); en.tick = () => { o0(); const p = o.pull?.(now); if (p) ships.push(A.pid, p[0], p[1]); o.mid?.(now, w); }; }
+  // Rebuilds of its ship, and of a ship already rebuilt that tick (bridge/rebuild.ts: none)
+  const reb = { own: 0, repeats: 0 };
+  {
+    const sb = ships as unknown as { rebuildNow(eid: number, ...a: unknown[]): void }, o1 = sb.rebuildNow.bind(sb);
+    let tickOf = -1;
+    const seen = new Set<number>();
+    sb.rebuildNow = (eid, ...a) => {
+      if (server.getTick() !== tickOf) { tickOf = server.getTick(); seen.clear(); }
+      if (seen.has(eid)) reb.repeats++; else seen.add(eid);
+      if (eid === A.pid) reb.own++;
+      return o1(eid, ...a);
+    };
+  }
   for (let t = 0; t < 40; t++) step(t);
   const at0 = { ...got }, own0 = { ...server.replication.ownStats }, chk0 = { ...server.ownChecks.stats };
   for (let t = 40; t < (o.ticks ?? 600); t++) { now = t; o.each?.(t, w); step(t); }
   const d = (a: Record<string, number>, b: Record<string, number>) => Object.fromEntries(Object.keys(a).filter((k) => typeof a[k] === 'number').map((k) => [k, a[k] - (b[k] ?? 0)]));
-  return { w, got: d(got, at0), own: d(server.replication.ownStats as never, own0 as never), checks: d(server.ownChecks.stats as never, chk0 as never), journal: server.hits.journalStats([server.pilots.connOf(A.pid)!]) };
+  return { w, reb, got: d(got, at0), own: d(server.replication.ownStats as never, own0 as never), checks: d(server.ownChecks.stats as never, chk0 as never), journal: server.hits.journalStats([server.pilots.connOf(A.pid)!]) };
 }
 
 describe('its own ship stepped by itself (CAPS.OWN_SIM)', () => {
@@ -150,6 +165,34 @@ describe('its own ship stepped by itself (CAPS.OWN_SIM)', () => {
     expect(r.got.ctlRows).toBeGreaterThan(0);
     expect(r.got.off).toBe(0);
     expect(r.checks.bodyOff).toBe(0);
+  }, 120_000);
+
+  it('rebuilt at one point a tick: parts lost, healed, repaired and regrown between ticks and mid-tick, once each tick, its layer exact', () => {
+    const wing = (w: World) => {
+      const s = w.server.getShips().get(w.A.pid)!;
+      return s.blueprint.parts.map((p, i) => (p.fn !== 'core' && s.derived.alive[i] ? i : -1)).filter((i) => i >= 0);
+    };
+    const r = fly({
+      // Between ticks (as a message is): two parts shot away and a heal, then a repair; each lands on the next tick's rebuild point
+      each: (t, w) => {
+        const ships = w.server.getShips();
+        if (t === 150 || t === 330) { const live = wing(w); for (const i of live.slice(-2)) ships.damagePartFraction(w.A.pid, i, 1); ships.healAll(w.A.pid, 0.1); }
+        if (t === 250 || t === 420) ships.repair(w.A.pid);
+      },
+      // During a tick (where a boss's brain acts): parts lost and the ship repaired in the same tick, then more lost
+      mid: (t, w) => {
+        const ships = w.server.getShips();
+        if (t === 200) { for (const i of wing(w).slice(0, 2)) ships.damagePartFraction(w.A.pid, i, 1); ships.repair(w.A.pid); ships.damagePartFraction(w.A.pid, wing(w)[0], 1); }
+      },
+    });
+    if (process.env.OWN_DEBUG) console.log('OWN', JSON.stringify({ reb: r.reb, got: r.got, own: r.own, checks: r.checks, client: r.w.A.own?.stats }));
+    expect(r.reb.repeats).toBe(0);
+    expect(r.reb.own).toBeGreaterThanOrEqual(5);
+    expect(r.own.rebuild).toBeGreaterThanOrEqual(3);
+    expect(r.got.keyframes).toBe(0);
+    expect(r.got.off).toBe(0);
+    expect(r.checks.bodyOff).toBe(0);
+    expect(r.journal.disagreed).toBe(0);
   }, 120_000);
 
   it('a cause it missed: its check catches it, a keyframe of its own ship puts it right, and it checks closely for a while', () => {

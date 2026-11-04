@@ -231,7 +231,7 @@ export interface BridgeInternals {
   pulseHit: ShipBridge['pulseHit']; apHeading: ShipBridge['apHeading']; controllers: ShipBridge['controllers'];
   dormant: ShipBridge['dormant']; lastFired: ShipBridge['lastFired']; damageMuls: ShipBridge['damageMuls'];
   wing: ShipBridge['wing']; targets: ShipBridge['targets']; kits: ShipBridge['kits'];
-  ghosts: ShipBridge['ghosts']; lastThrough: ShipBridge['lastThrough']; coverMemo: ShipBridge['coverMemo'];
+  ghosts: ShipBridge['ghosts']; underivable: ShipBridge['underivable']; lastThrough: ShipBridge['lastThrough']; coverMemo: ShipBridge['coverMemo'];
   beams: ShipBridge['beams']; pdList: ShipBridge['pdList']; pdOn: ShipBridge['pdOn'];
   ungridded: ShipBridge['ungridded']; castOn: ShipBridge['castOn']; castOk: ShipBridge['castOk'];
   gravityK: ShipBridge['gravityK'];
@@ -239,7 +239,7 @@ export interface BridgeInternals {
   guides: ShipBridge['guides']; ramps: ShipBridge['ramps']; beamStruck: ShipBridge['beamStruck'];
   // Private methods modules call back through
   fieldAt: ShipBridge['fieldAt'];
-  rebuildNow: ShipBridge['rebuildNow']; syncHealth: ShipBridge['syncHealth']; cover: ShipBridge['cover'];
+  rebuildNow: ShipBridge['rebuildNow']; markRebuild: ShipBridge['markRebuild']; rebuildMarked: ShipBridge['rebuildMarked']; syncHealth: ShipBridge['syncHealth']; cover: ShipBridge['cover'];
   fireWeapons: ShipBridge['fireWeapons']; stepMiners: ShipBridge['stepMiners']; pose: ShipBridge['pose'];
   alongBeam: ShipBridge['alongBeam']; nearSegment: ShipBridge['nearSegment']; castShip: ShipBridge['castShip'];
   coldStage: ShipBridge['coldStage']; fireBeam: ShipBridge['fireBeam'];

@@ -5,7 +5,7 @@
  * going to sleep and waking (SimLod.ts), teleports and pins. ShipBridge keeps one-line delegators with the same names.
  *
  * tick, stepMovement, resolveContacts and worldPieces run every tick: plain functions, scratch kept at module level.
- * Sibling behaviour is reached through the bridge (b.hurt, b.fireWeapons, b.rebuildNow), never by import.
+ * Sibling behaviour is reached through the bridge (b.hurt, b.fireWeapons, b.markRebuild), never by import.
  */
 
 import { hasComponent, entityExists } from 'bitecs';
@@ -332,10 +332,11 @@ export function tick(ctx: BridgeCtx): void {
     for (const [eid, ship] of ctx.bodies) if (!ctx.dormant.has(eid)) ctx.repairStep(eid, ship, tick);
   }
 
-  // 3. Rebuild what changed, then mirror core HP into the engine's health
+  // 3. The tick's one rebuild point: whatever changed a ship this tick (hits, heals, sheds, repairs, ghosts, saved
+  //    HP: bridge/rebuild.ts markRebuild) rebuilds it once, here; then mirror core HP into the engine's health
   for (let [ids, ships, bi] = ctx.bodiesNow(); bi < ids.length; bi++) {
     const eid = ids[bi], ship = ships[bi];
-    if (ship.dirty) ctx.rebuildNow(eid, ship);
+    if (ship.dirty) ctx.rebuildMarked(eid, ship);
     if (ctx.bodies.has(eid) && hasComponent(world, Player, eid)) ctx.syncHealth(eid, ship);
   }
 

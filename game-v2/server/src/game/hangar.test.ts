@@ -262,6 +262,7 @@ describe('hangar slots', () => {
     if (!added) bp.parts.push({ uid: 200, piece: 'sq', fn: 'hull', material: 'alloy', x: 0, y: 6, rot: 0, flip: false } as any);
     t.send({ type: 'slotSave', slot: 0, blueprint: bp } as any);
     expect(profile().ship.ghosts).toEqual([200]);
+    dock(server, pid); // (the ship is rebuilt at the next tick's rebuild point)
     const ship = ships.get(pid)!;
     const gi = ship.blueprint.parts.findIndex((p) => p.uid === 200);
     expect(ship.derived.alive[gi]).toBe(false);

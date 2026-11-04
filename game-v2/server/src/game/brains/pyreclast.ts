@@ -898,7 +898,8 @@ export class PyreclastBrain implements BossBrain {
 
   /** Shed what's left of these (as built: it isn't damage); flung, thrown out from its middle (`whole`: together, else each on its own), crumbling within `crumble` ticks */
   private drop(parts: number[], fling = 0, whole = false, crumble = 0, clusters = false): void {
-    const live = parts.filter((i) => this.ship.derived.alive[i]);
+    // (Not what's gone already this tick, ahead of its rebuild: bridge/rebuild.ts)
+    const live = parts.filter((i) => this.ship.derived.alive[i] && !this.ship.detached[i]);
     if (!live.length) return;
     // (all of it only to be seen: a boss's debris is scenery, not more bodies in the fight; `clusters`: a few great chunks by where they lie)
     const groups = clusters ? this.sectors(live) : fling && !whole ? live.map((i) => [i]) : [live];
@@ -983,6 +984,7 @@ export class PyreclastBrain implements BossBrain {
       () => { this.dying = true; this.stop(); this.burst(); },
     ];
     this.blows = [];
-    for (; this.forced < Math.min(n, steps.length); this.forced++) steps[this.forced]();
+    // (Each step as if a tick apart: what it changed rebuilt before the next looks)
+    for (; this.forced < Math.min(n, steps.length); this.forced++) { steps[this.forced](); this.host.ships.settle(this.view.eid); }
   }
 }

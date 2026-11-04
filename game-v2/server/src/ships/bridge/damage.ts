@@ -3,7 +3,7 @@
  * cold (empUntil, warmth), fire (ignite, stepBurns), nearest-part queries, part hp edits (heal, scale, harden, ghosts),
  * and the end of a hit: partDeaths. ShipBridge keeps one-line delegators with the same names.
  *
- * Modules reach each other through the bridge (b.rebuildNow, b.hurt), never by import, so they can't form a cycle.
+ * Modules reach each other through the bridge (b.markRebuild, b.hurt), never by import, so they can't form a cycle.
  */
 
 import { hasComponent } from 'bitecs';
@@ -114,7 +114,7 @@ export function setGhosts(b: BridgeCtx, eid: number, uids: number[]): void {
     ship.detached[i] = false;
   });
   if (set.size) b.ghosts.set(eid, set); else b.ghosts.delete(eid);
-  b.rebuildNow(eid, ship);
+  b.markRebuild(eid, ship);
   if (hasComponent(b.host.world, Player, eid)) b.syncHealth(eid, ship);
 }
 
@@ -180,7 +180,7 @@ export function setPartHp(b: BridgeCtx, eid: number, fraction: (uid: number) => 
     ship.detached[i] = false;
     ship.rebuildHp[i] = ship.hp[i];
   });
-  b.rebuildNow(eid, ship);
+  b.markRebuild(eid, ship);
   if (hasComponent(b.host.world, Player, eid)) b.syncHealth(eid, ship);
 }
 
@@ -189,7 +189,7 @@ export function healAll(b: BridgeCtx, eid: number, fraction: number): void {
   const ship = b.bodies.get(eid);
   if (!ship) return;
   ship.hp.forEach((_, i) => { if (ship.derived.alive[i]) healPart(ship, i, ship.maxHp[i] * fraction, b.tuning); });
-  if (ship.dirty) b.rebuildNow(eid, ship);
+  // (A band crossed marks it: rebuilt at the tick's rebuild point)
   if (hasComponent(b.host.world, Player, eid)) b.syncHealth(eid, ship);
 }
 

@@ -51,9 +51,9 @@ for (const [layout, n] of cases) {
 }
 
 const f = (v: number, d = 1) => v.toFixed(d);
-const head = ['layout', 'n', 'tick ms', 'p95', 'max', 'budget%', 'snap ms', 'repl ms', 'enc ms', 'rebuild ms', 'rebuilds/s', 'cap raw B/s', 'cap wire B/s', 'bulk raw B/s', 'bulk wire B/s', 'msgs/s cap', 'msgs/s bulk', 'checked', 'disagree', 'other dis.', 'kf corr/s', 'hit fixes'];
+const head = ['layout', 'n', 'tick ms', 'p95', 'max', 'budget%', 'snap ms', 'repl ms', 'enc ms', 'rebuild ms', 'rebuilds/s', 'reb. repeats', 'cap raw B/s', 'cap wire B/s', 'bulk raw B/s', 'bulk wire B/s', 'msgs/s cap', 'msgs/s bulk', 'checked', 'disagree', 'other dis.', 'kf corr/s', 'hit fixes'];
 const rows = results.map((r) => [
-  r.layout, r.n, f(r.timing.tickMeanMs, 2), f(r.timing.tickP95Ms, 2), f(r.timing.tickMaxMs, 1), f(r.timing.budgetPct, 0), f(r.timing.snapshotsMsPerTick, 2), f(r.timing.replicationMsPerTick, 2), f(r.timing.encodeSendMsPerTick, 2), f(r.timing.rebuildMsPerTick, 3), f(r.timing.rebuildsPerSec, 1),
+  r.layout, r.n, f(r.timing.tickMeanMs, 2), f(r.timing.tickP95Ms, 2), f(r.timing.tickMaxMs, 1), f(r.timing.budgetPct, 0), f(r.timing.snapshotsMsPerTick, 2), f(r.timing.replicationMsPerTick, 2), f(r.timing.encodeSendMsPerTick, 2), f(r.timing.rebuildMsPerTick, 3), f(r.timing.rebuildsPerSec, 1), r.timing.rebuildRepeats ?? 0,
   r.bytes.capable.rawBpsMean, r.bytes.capable.wireBpsMean, r.bytes.legacyOrBulk.rawBpsMean, r.bytes.legacyOrBulk.wireBpsMean, f(r.bytes.capable.msgsPerSecMean, 1), f(r.bytes.legacyOrBulk.msgsPerSecMean, 1),
   r.agreement.checked, r.agreement.disagreeNoKeyframe, `${r.agreement.otherDisagree}/${r.agreement.otherChecked}`, f(r.agreement.keyframeCorrectionsPerSecPerProbe, 2), r.agreement.server.hits.fixes ?? 0,
 ].map(String));

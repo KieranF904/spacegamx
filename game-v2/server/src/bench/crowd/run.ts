@@ -62,8 +62,10 @@ export async function runCase(o: CaseOpts): Promise<any> {
 
   // ---- the meter: wrapped before anything else, so the probes' own wrappers sit outside it ----
   let measuring = false;
-  const tickMs: number[] = [], snapMs: number[] = [], replMs: number[] = [], flushMs: number[] = [], rebuildMs: number[] = [], rebuildCount: number[] = [];
-  let aSnap = 0, aRepl = 0, aFlush = 0, aReb = 0, nReb = 0;
+  const tickMs: number[] = [], snapMs: number[] = [], replMs: number[] = [], flushMs: number[] = [], rebuildMs: number[] = [], rebuildCount: number[] = [], rebuildRepeat: number[] = [];
+  let aSnap = 0, aRepl = 0, aFlush = 0, aReb = 0, nReb = 0, nRepeat = 0;
+  // (Rebuilds of a ship already rebuilt this tick: the batching's target is none)
+  const rebuiltThisTick = new Set<number>();
   const timed = (obj: any, name: string, add: (ms: number) => void) => {
     const orig = obj[name].bind(obj);
     obj[name] = (...a: any[]) => { const t0 = performance.now(); try { return orig(...a); } finally { add(performance.now() - t0); } };
@@ -73,12 +75,16 @@ export async function runCase(o: CaseOpts): Promise<any> {
   timed(srv.net, 'flushOutbox', (ms) => { aFlush += ms; });
   timed(ships, 'rebuildNow', (ms) => { aReb += ms; nReb++; });
   {
+    const orig = ships.rebuildNow;
+    ships.rebuildNow = (eid: number, ...a: any[]) => { if (rebuiltThisTick.has(eid)) nRepeat++; else rebuiltThisTick.add(eid); return orig(eid, ...a); };
+  }
+  {
     const orig = server.step.bind(server);
     server.step = () => {
-      aSnap = aRepl = aFlush = aReb = 0; nReb = 0;
+      aSnap = aRepl = aFlush = aReb = 0; nReb = 0; nRepeat = 0; rebuiltThisTick.clear();
       const t0 = performance.now();
       orig();
-      if (measuring) { tickMs.push(performance.now() - t0); snapMs.push(aSnap); replMs.push(aRepl); flushMs.push(aFlush); rebuildMs.push(aReb); rebuildCount.push(nReb); }
+      if (measuring) { tickMs.push(performance.now() - t0); snapMs.push(aSnap); replMs.push(aRepl); flushMs.push(aFlush); rebuildMs.push(aReb); rebuildCount.push(nReb); rebuildRepeat.push(nRepeat); }
     };
   }
 
@@ -157,7 +163,7 @@ export async function runCase(o: CaseOpts): Promise<any> {
     tickMeanMs: r2(mean(tickMs)), tickP95Ms: r2(pct(tickMs, 0.95)), tickMaxMs: r2(Math.max(...tickMs)),
     budgetPct: r2((mean(tickMs) / (1000 / 60)) * 100),
     snapshotsMsPerTick: r2(mean(snapMs)), replicationMsPerTick: r2(mean(replMs)), encodeSendMsPerTick: r2(mean(flushMs)),
-    rebuildMsPerTick: r2(mean(rebuildMs)), rebuildsPerSec: r2(sum(rebuildCount) / secs),
+    rebuildMsPerTick: r2(mean(rebuildMs)), rebuildsPerSec: r2(sum(rebuildCount) / secs), rebuildRepeats: sum(rebuildRepeat),
   };
   const bulk: Counter[] = [...counters.values()];
   const bulkRaw = bulk.map((c) => c.raw / secs), bulkMsgs = bulk.map((c) => c.msgs / secs);

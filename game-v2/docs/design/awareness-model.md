@@ -1103,6 +1103,13 @@ the probes, and the parity tests (replication, confirmedHits, selfHits, bodies, 
 - *Checkpoint:* a table replacing section 9's guesses, committed with the bench.
 
 **Phase 1: rebuilds at most once per ship per tick.**
+- *Status (2026-11-04):* the batching is built. Every `rebuildNow` call except a body being made (spawnOn, spawnWreck)
+  now marks the ship (`markRebuild`: shed, healAll, repair, setGhosts, setPartHp), and ShipBridge.tick step 3 rebuilds
+  it once (bridge/rebuild.ts header). `standing()` and the boss brains' `drop` skip parts shed earlier in the tick; the
+  dev `forceShed` settles between its steps. The crowd bench now counts repeats: 0 before and after, because its
+  scenes never hit the off-tick paths, and its sim is byte-identical. The own-sim test with parts lost and a repair
+  in the same tick showed 1 repeat and 3 keyframes of the pilot's own ship with the old code, and 0 and 0 now.
+  The stamp, structure hash and cached sync wire form are still to do.
 - Route every `rebuildNow` through `ship.dirty` and one rebuild pass at a fixed phase each tick.
 - Stamp the rebuild tick and a structure hash.
 - Cache the sync's wire form per ship per rebuild (a step past `syncWireOf`).

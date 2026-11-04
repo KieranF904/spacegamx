@@ -39,10 +39,12 @@ describe('damage cripples a ship', () => {
   });
 
   it('unbuilt (ghost) parts aren\'t damage', () => {
-    const { ships } = world();
+    const { server, ships } = world();
     const e = ships.spawnDummy(ships.playerBlueprint, 0, 0, 0, 0);
     const bp = ships.get(e)!.blueprint;
     ships.setGhosts(e, bp.parts.filter((p) => p.fn !== 'core' && p.fn !== 'thruster').slice(0, 4).map((p) => p.uid));
+    server.step(); // (rebuilt at the tick's rebuild point)
+    expect(ships.get(e)!.derived.alive.filter((a) => !a).length).toBeGreaterThanOrEqual(4);
     const d = ships.get(e)!.derived;
     expect(d.drive).toBe(1);
     expect(d.fullMass).toBeCloseTo(d.mass, 6);

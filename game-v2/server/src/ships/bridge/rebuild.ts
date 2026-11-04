@@ -1,9 +1,17 @@
 /**
  * ShipBridge rebuild: a ship's body coming and going. Its geometry (cached per blueprint), spawning (spawnOn,
- * dummies, wrecks, players), removal (removeShip, forget, removeBody), the rebuild after parts are lost (rebuildNow,
- * shed, spawnDebris, decay), and repair (kits, station repair, respawnInPlace). ShipBridge keeps one-line delegators with the same names.
+ * dummies, wrecks, players), removal (removeShip, forget, removeBody), the rebuild after parts are lost (markRebuild,
+ * rebuildMarked, rebuildNow, shed, spawnDebris, decay), and repair (kits, station repair, respawnInPlace). ShipBridge keeps one-line delegators with the same names.
  *
  * Modules reach each other through the bridge (b.hurt, b.rebuildNow), never by import, so they can't form a cycle.
+ *
+ * A ship rebuilds at most once a tick, at one fixed point: ShipBridge.tick step 3 (bridge/flight.ts), after the
+ * combat phase and before replication's end of tick. Everything that changes a ship's structure (a hit, a heal, a
+ * boss shedding its plates, a repair, ghosts, saved HP) only marks it (markRebuild, or `ship.dirty` from the common
+ * state functions); the rebuild point rebuilds it once, however many asked. Changes between ticks (messages) land on
+ * the next tick's point, before the next snapshot. So a ship flies a tick with the structure it began it with, on the
+ * server as on a pilot's tick-aligned client (network/ownTick.ts REBUILD: the old structure up to and on the rebuild's
+ * tick). The one exception is a body being made (spawnOn, spawnWreck): its first structure is part of its spawn.
  */
 
 import { hasComponent } from 'bitecs';
@@ -76,6 +84,7 @@ export function spawnWreck(b: BridgeCtx, bp: Blueprint, x: number, y: number, an
     if (r < 0.07) ship.hp[i] = 0; // holes in the hull (orphaned bits drift off as debris)
     else if (r < 0.55) ship.hp[i] = ship.maxHp[i] * (0.2 + 0.55 * rng());
   });
+  // (Its battle damage is part of how it spawns: built now, not at the tick's rebuild point)
   ship.dirty = true;
   b.rebuildNow(eid, ship);
   ship.angVel = (rng() - 0.5) * 0.0006;
@@ -125,6 +134,7 @@ export function forget(b: BridgeCtx, eid: number): void {
   b.targets.delete(eid);
   b.kits.delete(eid);
   b.ghosts.delete(eid);
+  b.underivable.delete(eid);
   b.beams.delete(eid);
   b.dormant.delete(eid);
   b.lastFired.delete(eid);
@@ -253,7 +263,8 @@ export function repair(b: BridgeCtx, eid: number): void {
   const ship = b.bodies.get(eid);
   if (!ship || ship.kind !== 'ship') return;
   repairShip(ship);
-  b.rebuildNow(eid, ship);
+  // (Rebuilt at the tick's rebuild point; a gun that comes back then comes back full, rebuildShip)
+  b.markRebuild(eid, ship);
   fillClips(ship); // a full repair: every clip full
   b.syncHealth(eid, ship);
 }
@@ -341,6 +352,27 @@ export function noteRebuild(b: BridgeCtx, t0: number): void {
   b.stats.rebuildCount++;
 }
 
+/**
+ * Rebuild this ship at the tick's rebuild point (ShipBridge.tick step 3), once however many things ask this tick.
+ * `derivable: false`: what breaks off then isn't for clients to work out (pieces shed whole, and what then hangs off nothing)
+ */
+export function markRebuild(b: BridgeCtx, eid: number, ship: ShipState, derivable = true): void {
+  ship.dirty = true;
+  if (!derivable) b.underivable.add(eid);
+}
+
+/** (Dev tools that move a fight on several steps at once, outside the tick) rebuild now what's marked, as a tick would */
+export function settle(b: BridgeCtx, eid: number): void {
+  const ship = b.bodies.get(eid);
+  if (ship?.dirty) b.rebuildMarked(eid, ship);
+}
+
+/** The tick's rebuild point, for one marked ship (ShipBridge.tick step 3) */
+export function rebuildMarked(b: BridgeCtx, eid: number, ship: ShipState): void {
+  b.rebuildNow(eid, ship, !b.underivable.delete(eid));
+}
+
+/** Rebuild now. Only the rebuild point (rebuildMarked) and a body being made (spawnWreck) call this: everything else marks */
 export function rebuildNow(b: BridgeCtx, eid: number, ship: ShipState, derivable = true): void {
   const oldCom: Vec2 = ship.derived.com;
   // (Its banks may split or join, its pool grow or shrink: each store keeps what it held, energy.ts remapCharge)
@@ -405,13 +437,15 @@ export function rebuildNow(b: BridgeCtx, eid: number, ship: ShipState, derivable
 export function shed(b: BridgeCtx, eid: number, groups: number[][], fling = 0, crumble = 0, intangible = false): void {
   const ship = b.bodies.get(eid);
   if (!ship) return;
-  const live = groups.map((g) => g.filter((i) => ship.derived.alive[i])).filter((g) => g.length);
+  // (Not what's gone already this tick: its rebuild is still to come)
+  const live = groups.map((g) => g.filter((i) => ship.derived.alive[i] && !ship.detached[i])).filter((g) => g.length);
   if (!live.length) return;
   const pose = b.pose(eid), com = ship.derived.com;
   live.forEach((g, k) => { const d = b.spawnDebris(eid, ship, g, com, pose, k, fling, crumble); if (intangible) b.intangible.add(d); });
   for (const g of live) for (const i of g) ship.detached[i] = true;
-  // (Pieces shed whole aren't for clients to work out: what then hangs off nothing isn't either, it goes as before)
-  b.rebuildNow(eid, ship, false);
+  // (Pieces shed whole aren't for clients to work out: what then hangs off nothing isn't either, it goes as before).
+  // Rebuilt at the tick's rebuild point
+  b.markRebuild(eid, ship, false);
 }
 
 /** A connected group of parts leaves `ship` as a new debris body built from the same parts and HP. */

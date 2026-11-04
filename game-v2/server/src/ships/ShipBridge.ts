@@ -136,6 +136,8 @@ export class ShipBridge {
   private kits = new Map<number, { left: number; total: number; hpPerSec: number; restoreTicks: number; progress: number; since: number }>();
   /** Parts designed but not built yet, by ship (part indices): absent, and never regrown by station repair */
   private ghosts = new Map<number, Set<number>>();
+  /** Ships marked for a rebuild whose pieces breaking off aren't for clients to work out (shed whole): bridge/rebuild.ts markRebuild */
+  private underivable = new Set<number>();
   /** How much of the last hit got through the armour it struck (hitMultiplier): under GLANCING it shows as glancing */
   private lastThrough = 1;
   /** While a splash hurts one body's parts (all from the point `at`): the part cover last sent a hit to, and in what stage */
@@ -518,6 +520,15 @@ export class ShipBridge {
   private noteRebuild(t0: number): void { return rbd.noteRebuild(this.ctx, t0); }
 
   private rebuildNow(eid: number, ship: ShipState, derivable = true): void { return rbd.rebuildNow(this.ctx, eid, ship, derivable); }
+
+  /** Rebuild at the tick's one rebuild point (tick step 3), however many things asked for it: bridge/rebuild.ts */
+  private markRebuild(eid: number, ship: ShipState, derivable = true): void { return rbd.markRebuild(this.ctx, eid, ship, derivable); }
+
+  /** (Dev tools moving a fight on outside the tick) rebuild now what's marked, as a tick would: bridge/rebuild.ts */
+  settle(eid: number): void { return rbd.settle(this.ctx, eid); }
+
+  /** The tick's rebuild point: every ship marked since the last, rebuilt once (bridge/rebuild.ts) */
+  private rebuildMarked(eid: number, ship: ShipState): void { return rbd.rebuildMarked(this.ctx, eid, ship); }
 
   shed(eid: number, groups: number[][], fling = 0, crumble = 0, intangible = false): void { return rbd.shed(this.ctx, eid, groups, fling, crumble, intangible); }
 
