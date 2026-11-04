@@ -6,9 +6,9 @@
  "parts": [
   {
    "uid": 0,
-   "piece": "mawheart_s3_valve0_l",
-   "fn": "generator",
-   "material": "pyre_glass",
+   "piece": "mawheart_s3_ring",
+   "fn": "conduit",
+   "material": "leaded_iridium",
    "x": 0,
    "y": 0,
    "rot": 0,
@@ -16,9 +16,9 @@
   },
   {
    "uid": 1,
-   "piece": "mawheart_s3_valve0_r",
+   "piece": "mawheart_s3_valve0_l",
    "fn": "generator",
-   "material": "pyre_glass",
+   "material": "steel",
    "x": 0,
    "y": 0,
    "rot": 0,
@@ -26,9 +26,9 @@
   },
   {
    "uid": 2,
-   "piece": "mawheart_s3_valve1_l",
+   "piece": "mawheart_s3_valve0_r",
    "fn": "generator",
-   "material": "pyre_glass",
+   "material": "steel",
    "x": 0,
    "y": 0,
    "rot": 0,
@@ -36,9 +36,9 @@
   },
   {
    "uid": 3,
-   "piece": "mawheart_s3_valve1_r",
+   "piece": "mawheart_s3_valve1_l",
    "fn": "generator",
-   "material": "pyre_glass",
+   "material": "steel",
    "x": 0,
    "y": 0,
    "rot": 0,
@@ -46,9 +46,9 @@
   },
   {
    "uid": 4,
-   "piece": "mawheart_s3_ring",
-   "fn": "conduit",
-   "material": "pyre_glass",
+   "piece": "mawheart_s3_valve1_r",
+   "fn": "generator",
+   "material": "steel",
    "x": 0,
    "y": 0,
    "rot": 0,
@@ -58,7 +58,7 @@
    "uid": 5,
    "piece": "mawheart_s3_stub_apex",
    "fn": "conduit",
-   "material": "pyre_glass",
+   "material": "leaded_iridium",
    "x": 0,
    "y": 0,
    "rot": 0,
@@ -66,9 +66,9 @@
   },
   {
    "uid": 6,
-   "piece": "mawheart_s3_stub_base",
+   "piece": "mawheart_s3_stub_flank_l",
    "fn": "conduit",
-   "material": "pyre_glass",
+   "material": "leaded_iridium",
    "x": 0,
    "y": 0,
    "rot": 0,
@@ -76,9 +76,9 @@
   },
   {
    "uid": 7,
-   "piece": "mawheart_s3_stub_flank_l",
+   "piece": "mawheart_s3_stub_flank_r",
    "fn": "conduit",
-   "material": "pyre_glass",
+   "material": "leaded_iridium",
    "x": 0,
    "y": 0,
    "rot": 0,
@@ -86,9 +86,9 @@
   },
   {
    "uid": 8,
-   "piece": "mawheart_s3_stub_flank_r",
+   "piece": "mawheart_s3_stub_base",
    "fn": "conduit",
-   "material": "pyre_glass",
+   "material": "leaded_iridium",
    "x": 0,
    "y": 0,
    "rot": 0,
@@ -106,9 +106,9 @@
   },
   {
    "uid": 10,
-   "piece": "mawheart_ch_apex_root",
+   "piece": "mawheart_ch_apex_walla",
    "fn": "armor",
-   "material": "leestone",
+   "material": "leaded_iridium",
    "x": 0,
    "y": 0,
    "rot": 0,
@@ -116,9 +116,9 @@
   },
   {
    "uid": 11,
-   "piece": "mawheart_ch_apex_walla",
+   "piece": "mawheart_ch_apex_wallb",
    "fn": "armor",
-   "material": "leestone",
+   "material": "leaded_iridium",
    "x": 0,
    "y": 0,
    "rot": 0,
@@ -126,16 +126,6 @@
   },
   {
    "uid": 12,
-   "piece": "mawheart_ch_apex_wallb",
-   "fn": "armor",
-   "material": "leestone",
-   "x": 0,
-   "y": 0,
-   "rot": 0,
-   "flip": false
-  },
-  {
-   "uid": 13,
    "piece": "mawheart_ch_apex_valve",
    "fn": "generator",
    "material": "pyre_glass",
@@ -145,10 +135,20 @@
    "flip": false
   },
   {
-   "uid": 14,
-   "piece": "mawheart_ch_base_root",
+   "uid": 13,
+   "piece": "mawheart_ch_flank_walla_l",
    "fn": "armor",
-   "material": "leestone",
+   "material": "leaded_iridium",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 14,
+   "piece": "mawheart_ch_flank_walla_r",
+   "fn": "armor",
+   "material": "leaded_iridium",
    "x": 0,
    "y": 0,
    "rot": 0,
@@ -156,9 +156,9 @@
   },
   {
    "uid": 15,
-   "piece": "mawheart_ch_base_walla",
+   "piece": "mawheart_ch_flank_wallb_l",
    "fn": "armor",
-   "material": "leestone",
+   "material": "leaded_iridium",
    "x": 0,
    "y": 0,
    "rot": 0,
@@ -166,9 +166,9 @@
   },
   {
    "uid": 16,
-   "piece": "mawheart_ch_base_wallb",
+   "piece": "mawheart_ch_flank_wallb_r",
    "fn": "armor",
-   "material": "leestone",
+   "material": "leaded_iridium",
    "x": 0,
    "y": 0,
    "rot": 0,
@@ -176,76 +176,6 @@
   },
   {
    "uid": 17,
-   "piece": "mawheart_ch_base_valve",
-   "fn": "generator",
-   "material": "pyre_glass",
-   "x": 0,
-   "y": 0,
-   "rot": 0,
-   "flip": false
-  },
-  {
-   "uid": 18,
-   "piece": "mawheart_ch_flank_root_l",
-   "fn": "armor",
-   "material": "leestone",
-   "x": 0,
-   "y": 0,
-   "rot": 0,
-   "flip": false
-  },
-  {
-   "uid": 19,
-   "piece": "mawheart_ch_flank_root_r",
-   "fn": "armor",
-   "material": "leestone",
-   "x": 0,
-   "y": 0,
-   "rot": 0,
-   "flip": false
-  },
-  {
-   "uid": 20,
-   "piece": "mawheart_ch_flank_walla_l",
-   "fn": "armor",
-   "material": "leestone",
-   "x": 0,
-   "y": 0,
-   "rot": 0,
-   "flip": false
-  },
-  {
-   "uid": 21,
-   "piece": "mawheart_ch_flank_walla_r",
-   "fn": "armor",
-   "material": "leestone",
-   "x": 0,
-   "y": 0,
-   "rot": 0,
-   "flip": false
-  },
-  {
-   "uid": 22,
-   "piece": "mawheart_ch_flank_wallb_l",
-   "fn": "armor",
-   "material": "leestone",
-   "x": 0,
-   "y": 0,
-   "rot": 0,
-   "flip": false
-  },
-  {
-   "uid": 23,
-   "piece": "mawheart_ch_flank_wallb_r",
-   "fn": "armor",
-   "material": "leestone",
-   "x": 0,
-   "y": 0,
-   "rot": 0,
-   "flip": false
-  },
-  {
-   "uid": 24,
    "piece": "mawheart_ch_flank_valve_l",
    "fn": "generator",
    "material": "pyre_glass",
@@ -255,7 +185,7 @@
    "flip": false
   },
   {
-   "uid": 25,
+   "uid": 18,
    "piece": "mawheart_ch_flank_valve_r",
    "fn": "generator",
    "material": "pyre_glass",
@@ -265,7 +195,37 @@
    "flip": false
   },
   {
-   "uid": 26,
+   "uid": 19,
+   "piece": "mawheart_ch_base_walla",
+   "fn": "armor",
+   "material": "leaded_iridium",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 20,
+   "piece": "mawheart_ch_base_wallb",
+   "fn": "armor",
+   "material": "leaded_iridium",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 21,
+   "piece": "mawheart_ch_base_valve",
+   "fn": "generator",
+   "material": "pyre_glass",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 22,
    "piece": "mawheart_septum",
    "fn": "armor",
    "material": "leestone",
@@ -275,7 +235,7 @@
    "flip": false
   },
   {
-   "uid": 27,
+   "uid": 23,
    "piece": "mawheart_artery0_l",
    "fn": "conduit",
    "material": "pyre_glass",
@@ -285,7 +245,7 @@
    "flip": false
   },
   {
-   "uid": 28,
+   "uid": 24,
    "piece": "mawheart_artery0_r",
    "fn": "conduit",
    "material": "pyre_glass",
@@ -295,7 +255,7 @@
    "flip": false
   },
   {
-   "uid": 29,
+   "uid": 25,
    "piece": "mawheart_artery1_l",
    "fn": "conduit",
    "material": "pyre_glass",
@@ -305,7 +265,7 @@
    "flip": false
   },
   {
-   "uid": 30,
+   "uid": 26,
    "piece": "mawheart_artery1_r",
    "fn": "conduit",
    "material": "pyre_glass",

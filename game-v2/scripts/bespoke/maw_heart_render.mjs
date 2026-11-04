@@ -10,7 +10,7 @@
  *   (outDir default docs/panels/2026-11-04/bosses/maw-heart; mirrorDir default <os tmp>/maw-heart-render)
  */
 import { spawn } from 'child_process';
-import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, symlinkSync, writeFileSync, copyFileSync } from 'fs';
+import { readFileSync, cpSync, existsSync, mkdirSync, readdirSync, rmSync, symlinkSync, writeFileSync, copyFileSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
@@ -33,6 +33,14 @@ copyFileSync(join(DESIGN, 'maw_heart.pieces.json'), join(ships, 'bespoke/maw_hea
 for (const f of readdirSync(DESIGN).filter((f) => /^maw_heart.*\.json$/.test(f) && !f.includes('pieces'))) copyFileSync(join(DESIGN, f), join(ships, 'blueprints/maw', f));
 // (the live Heart's design too, for a before still at the same scale)
 copyFileSync(join(root, 'data/ships/blueprints/enemy/maw_heart_titan.json'), join(ships, 'blueprints/maw/maw_heart_titan.json'));
+// (EXTRA=<dir>: test designs too, its *.pieces.json as bespoke pieces, its other *.json as designs; SHOTS_JSON=<file>: the shots to take instead)
+if (process.env.EXTRA) for (const f of readdirSync(process.env.EXTRA).filter((f) => f.endsWith('.json'))) copyFileSync(join(process.env.EXTRA, f), f.endsWith('.pieces.json') ? join(ships, 'bespoke', f.replace('.pieces', '')) : join(ships, 'blueprints/maw', f));
+// (REFS=1: the Pyreclast and the Scrap Mother as well, to judge it against)
+const REFS = process.env.REFS === '1';
+if (REFS) for (const id of ['pyreclast', 'pyreclast_heart', 'scrap_mother']) {
+  copyFileSync(join(root, 'data/ships/bespoke', `${id}.json`), join(ships, 'bespoke', `${id}.json`));
+  copyFileSync(join(root, 'data/ships/blueprints/enemy', `${id}.json`), join(ships, 'blueprints/maw', `${id}.json`));
+}
 const nr = join(M, 'scripts/native-render');
 mkdirSync(nr, { recursive: true });
 for (const f of ['gl_worker.py', 'ui.html']) cpSync(join(root, 'scripts/native-render', f), join(nr, f));
@@ -61,8 +69,9 @@ const SHOTS = [
   ['maw-heart-stage1-calving', 'maw_heart_cracked', { light: 'sun', heat: 1, damage: 0.35, lightDir: 300 }],
   ['maw-heart-stage2-chambers', 'maw_heart_chambers', { light: 'sun', heat: 1, damage: 0.1, lightDir: 300 }],
   ['maw-heart-stage3-node', 'maw_heart_node', { light: 'sun', heat: 1, damage: 0.1, lightDir: 300, zoom: 0.7 }],
-  ['maw-heart-dead', 'maw_heart_spent', { light: 'dark', heat: 0, damage: 0.85, lightDir: 300, zoom: 0.7 }],
-];
+  ['maw-heart-dead', 'maw_heart_spent', { light: 'dark', heat: 0, damage: 0.5, lightDir: 300, zoom: 0.7 }],
+  ...(REFS ? [['ref-pyreclast', 'pyreclast', { light: 'sun', heat: 1, damage: 0, lightDir: 300 }], ['ref-scrap-mother', 'scrap_mother', { light: 'sun', heat: 1, damage: 0, lightDir: 300 }]] : []),
+].concat(process.env.SHOTS_JSON ? JSON.parse(readFileSync(process.env.SHOTS_JSON, 'utf8')) : []).filter(([f]) => !process.env.ONLY || process.env.ONLY.split(',').some((o) => f.includes(o)));
 
 const log = join(M, 'service.log');
 const { openSync } = await import('fs');
