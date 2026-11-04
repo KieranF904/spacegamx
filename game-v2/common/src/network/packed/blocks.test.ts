@@ -37,7 +37,11 @@ function world(tick: number, k: number) {
   const keys = [[4253, 1, 69746.51 + k * 20, 29807.51 + k * 3, 2.0934, 6.505, 0.20401 + k * 0.001, 0.005012, 0, 1, 6, 2592], [4242, 1, 69000.25 + k, 29000.5, 1.5, 1.25, 0, 0, 0, 1, 0, 100]];
   const ctl = [[4262, 2, 8, 8, 8], [-1 - 4263, 2, 7, 1, 0], [4265, 0, 29 + k]];
   const fire = [[4300, 1, 255 + 256 * 255, 400], [4253, 2, 153 + 256, -1200 + k, 5000 + k * 10, 5001 + k * 10]];
-  return { tick, mob, pilot, pilotFirst, wreck, keys, ctl, fire };
+  // Shell rows: two from one gun (a chain), one with no gun, a missile off its line
+  const shells = [0, 1].map((i) => ({ id: 6000 + k * 10 + i, type: 7, vx: 48.16 - i * 0.3, vy: 2.16 + i, data: [1, 1, 0, tick - 3, 67859.7 - i * 0.2 + k, 28042.4 + i * 48, 4253, 1, 0, 0, 143] }) as EntityState);
+  shells.push({ id: 6000 + k * 10 + 5, type: 7, vx: 12.5, vy: -3, data: [2, 1, 0, tick - 1, 1000.5, 2000, 4300, 1, 0, 0, -1] } as EntityState);
+  shells.push({ id: 6000 + k * 10 + 9, type: 7, vx: -28.32, vy: 19.85, x: 70100.1 + k, y: 29100.2, data: [26, 3, 0, tick - 2, 70160.2, 29128.4, 4253, 1.7, 1, tick + 40, 144] } as EntityState);
+  return { tick, mob, pilot, pilotFirst, wreck, keys, ctl, fire, shells };
 }
 
 function own(you: number, k: number): EntityState {
@@ -52,7 +56,8 @@ describe('encode-once blocks', () => {
       const w = world(300 + 3 * k, k);
       const snapFor = (c: Client, first: boolean) => ({
         type: 'snapshot', tick: w.tick, lastProcessedInput: 9 + k,
-        entities: [own(c.you, k), first ? derivedRow(w.pilotFirst, { name: 'Ace' }) : w.pilot, w.mob, ...(first ? [derivedRow(w.wreck, { name: 'Scrap Mite' })] : k % 4 === 0 ? [w.wreck] : [])],
+        entities: [own(c.you, k), first ? derivedRow(w.pilotFirst, { name: 'Ace' }) : w.pilot, w.mob, ...(first ? [derivedRow(w.wreck, { name: 'Scrap Mite' })] : k % 4 === 0 ? [w.wreck] : []),
+          ...w.shells.filter((_, i) => c !== b || i !== k % 3)],
         removed: k === 6 ? [4419] : [], ships: w.keys, ctl: w.ctl, fire: w.fire,
       }) as unknown as ServerMessage;
       send(a, [snapFor(a, k === 0)]);
@@ -64,6 +69,7 @@ describe('encode-once blocks', () => {
     expect(store.stats.k).toBe(24);
     expect(store.stats.c).toBe(36);
     expect(store.stats.f).toBe(24);
+    expect(store.stats.p).toBe(48);
     expect(a.enc.stats.blocks).toBe(12);
     expect(a.enc.stats.legacy).toBe(0);
   });

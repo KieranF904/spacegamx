@@ -17,8 +17,8 @@
  * sight (a ship's or pilot's row that carries where it is: only new holders get that one). Fire events and control
  * rows have no base: one form each.
  */
-import { EntityType, SNAP_FIELDS, type EntityState } from '../protocol.js';
-import { PK_ENTITY, PK_ENTITY_DEFAULT, PK_KEYFRAME, PK_CONTROL } from './tables.js';
+import { EntityType, SNAP_FIELDS, packProjectile, type EntityState } from '../protocol.js';
+import { PK_ENTITY, PK_ENTITY_DEFAULT, PK_KEYFRAME, PK_CONTROL, PK_PROJECTILE } from './tables.js';
 import { PackedIO, POW10, isId, E_X, E_Y, E_ANGLE, E_VX, E_VY, E_AV, E_HP, E_MAXHP, E_TICK } from './packedIO.js';
 import { entityFieldsIO, keyframeFieldsIO } from './rowsIO.js';
 
@@ -37,6 +37,8 @@ export interface BlockRec {
   before: number;
   /** The generation its holders end at (-1: not canonical, they hold none they can step from) */
   after: number;
+  /** A shell row's gun chain (owner and gun: gunKey), -1 none */
+  gun?: number;
 }
 
 /** A status row made from another (a name added for one client): the row its block is made from */
@@ -73,6 +75,19 @@ export function settleKeyframe(pv: number[], o: readonly unknown[], tick: number
   pv[K_TICK_AT] = tick;
 }
 
+/** A shell row's chain: its owner's gun (as the per-connection codec's gunPrev keys it), or -1 (no whole gun: no chain) */
+export function gunKey(owner: number, gun: unknown): number {
+  return typeof gun === 'number' && Number.isInteger(gun) && gun >= 0 && gun < 2 ** 20 && owner < 2 ** 28 ? owner * 2 ** 20 + gun : -1;
+}
+/** A shell row chain's fields: PK_PROJECTILE's, then the last shell's id */
+export const P_ID = PK_PROJECTILE.length;
+
+/** A shell row's chain after it: its delta fields, and its id */
+export function settleProjectile(pv: number[], o: readonly unknown[]): void {
+  for (let i = 1; i <= PK_PROJECTILE.length; i++) pv[i - 1] = i !== 7 && i !== 8 && PK_PROJECTILE[i - 1][2] ? mant(o[i], PK_PROJECTILE[i - 1][0]) : 0;
+  pv[P_ID] = o[0] as number;
+}
+
 // ---- Block bodies: each writes (or reads) a block after its wid ----
 
 /** A status row's block body: absolute bit, length, type, fields (no name) from `pv`. Returns the row with id slot 0 */
@@ -98,6 +113,29 @@ export function controlBody(io: PackedIO, row: readonly number[] | undefined): {
   const rest: unknown[] = [];
   for (let i = 1; i < len; i++) rest.push(io.num(row?.[i], 0, PK_CONTROL[Math.min(i, PK_CONTROL.length) - 1]));
   return { run, rest };
+}
+
+/**
+ * A shell row's block body after its owner's wid (protocol.ts packProjectile's row: [id, vx, vy, weaponType, ticks since
+ * fired, spawnX, spawnY, owner, gun?, ...]): the absolute bit, the length, the gun (as itself: it picks the chain), the
+ * shell's id as the step from the gun's last shell, then the rest as projectilesIO has them, from `pv`. `pv`: the gun's
+ * chain, or (absolute) zeros; returns the row with the owner's slot 0
+ */
+export function projectileBody(io: PackedIO, row: readonly unknown[] | undefined, abs: boolean, chainOf: (gun: unknown) => number[], gotAbs?: (abs: boolean) => void): unknown[] {
+  const a = io.bit(abs);
+  gotAbs?.(a);
+  const len = io.u((row?.length ?? 8) - 8, 3) + 8;
+  const o: unknown[] = new Array(len);
+  o[7] = 0;
+  if (len > 8) o[8] = io.num(row?.[8], 0, PK_PROJECTILE[7][1]);
+  const pv = chainOf(o[8]);
+  o[0] = (pv[P_ID] ?? 0) + io.vs(((row?.[0] as number) ?? 0) - (pv[P_ID] ?? 0), 6);
+  for (let i = 1; i < len; i++) {
+    if (i === 7 || i === 8) continue;
+    const [d, c, delta] = PK_PROJECTILE[i - 1];
+    o[i] = delta ? io.num(row?.[i], d, c, pv, i - 1) : io.num(row?.[i], d, c);
+  }
+  return o;
 }
 
 /** A fire event's block body after the owner's wid ([owner, ticksAgo, part, aimQ, ...shell ids], all absolute) */
@@ -175,7 +213,7 @@ export class BlockStore {
   private readonly recF = new WeakMap<object, BlockRec | null>();
   private sweptAt = 0;
   /** Blocks encoded (each once, whoever gets it), by kind; and the bits each form came to */
-  readonly stats = { e: 0, k: 0, c: 0, f: 0, delta: 0, abs: 0, bits: 0 };
+  readonly stats = { e: 0, k: 0, c: 0, f: 0, p: 0, delta: 0, abs: 0, bits: 0 };
 
   /** `systemOf`: the system an entity is in now (ids are per system) */
   constructor(private readonly systemOf: (eid: number) => number) {}
@@ -211,6 +249,7 @@ export class BlockStore {
     if (tick - this.sweptAt < idle / 2) return;
     this.sweptAt = tick;
     for (const [eid, e] of this.ents) if (tick - e.seen > idle) { this.poolOf(e.sys).give(e.wid); this.ents.delete(eid); }
+    for (const [k, g] of this.guns) if (tick - g.seen > idle) this.guns.delete(k);
   }
 
   /** How many entities hold a wire id (tests, stats) */
@@ -288,6 +327,44 @@ export class BlockStore {
     const wid = this.ent(id, tick).wid;
     const rec: BlockRec = { eid: id, wid, tick, abs: this.bits((io) => { io.wid(wid); controlBody(io, row); }), before: -1, after: -1 };
     this.recC.set(row, rec);
+    return rec;
+  }
+
+  /** Shell rows' chains, by gunKey */
+  private guns = new Map<number, Chain & { seen: number }>();
+  private readonly recP = new WeakMap<object, BlockRec | null | false>();
+
+  /**
+   * A shell's row as a block (its status as SnapshotBuilder makes it once: packProjectile's row); false: it isn't a
+   * shell row (it goes as a status row); null: it can't go as a block
+   */
+  projectile(s: EntityState, tick: number): BlockRec | null | false {
+    const had = this.recP.get(s);
+    if (had !== undefined && (had === null || had === false || had.tick === tick)) return had;
+    const row = packProjectile(s, tick);
+    if (!row) { this.recP.set(s, false); return false; }
+    if (row.length > 15 || !isId(row[0]) || !isId(row[7])) { this.recP.set(s, null); return null; }
+    const owner = row[7] as number;
+    const wid = this.ent(owner, tick).wid;
+    const key = gunKey(owner, row[8]);
+    const zero = new Array<number>(P_ID + 1).fill(0);
+    const abs = this.bits((io) => { io.wid(wid); projectileBody(io, row, true, () => zero); });
+    this.stats.p++;
+    const rec: BlockRec = { eid: owner, wid, tick, abs, before: -1, after: -1, gun: key };
+    if (key >= 0) {
+      let chain = this.guns.get(key);
+      if (!chain) { chain = { pv: new Array<number>(P_ID + 1).fill(0), gen: ++this.gen, tick: -1, seen: tick }; this.guns.set(key, chain); }
+      chain.seen = tick;
+      const pv = chain.pv;
+      let o: unknown[] = [];
+      rec.before = chain.gen;
+      rec.delta = this.bits((io) => { io.wid(wid); o = projectileBody(io, row, false, () => pv); });
+      o[7] = owner;
+      settleProjectile(pv, o);
+      chain.gen = ++this.gen;
+      rec.after = chain.gen;
+    }
+    this.recP.set(s, rec);
     return rec;
   }
 

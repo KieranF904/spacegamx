@@ -4,18 +4,20 @@
  *
  *   field mask (11 bits) | tick, last input (the connection's steps) | intros: a bit (any?), count - 1, then (wid,
  *   entity id step) each | e: count, the client's own row's place (a bit, then it), the names (count, then place step
- *   and name each), then each row: a block, or at its place the own row the connection's way | p, r: the connection's way | k: count, blocks | c: count, blocks (in id order) | o: the connection's way
+ *   and name each), then each row: a block, or at its place the own row the connection's way | p: count, blocks (shell
+ *   rows, each from its gun's chain) | r: the connection's way | k: count, blocks | c: count, blocks (in id order) | o: the connection's way
  *   | f: count, blocks (in owner order) | n, d: the connection's way
  *
  * after which both ends forget the chains of whatever the removed and out lists named. Blocks are copied bit for bit
  * from the store (`planBlocks`, made when the snapshot was queued); everything else is the connection's own.
  */
-import { EntityType, SNAP_FIELDS, packProjectile, type ServerSnapshotMessage } from '../protocol.js';
+import { EntityType, SNAP_FIELDS, type ServerSnapshotMessage } from '../protocol.js';
 import type { PackedIO } from './packedIO.js';
 import {
   type BlockStore, type BlockRec, controlBody, entityBody, fireBody, formFor, keyframeBody, settleEntity, settleKeyframe,
+  projectileBody, settleProjectile, gunKey, P_ID,
 } from './blocks.js';
-import { SNAPSHOT_CODE, snapshotOk, entityRowIO, projectilesIO, removedIO, outIO, ownIO, decisionsIO } from './snapshotSections.js';
+import { SNAPSHOT_CODE, snapshotOk, entityRowIO, removedIO, outIO, ownIO, decisionsIO } from './snapshotSections.js';
 
 /** A snapshot's parts for the blocks form: shared blocks where it can, the rest the connection's way */
 export interface BlocksPlan {
@@ -23,7 +25,7 @@ export interface BlocksPlan {
   mask: number;
   /** Status rows in order: a block (and its name, which goes apart), or the client's own row as the connection codes it */
   e: { rec?: BlockRec; name?: unknown; own?: unknown[] }[];
-  p: unknown[][];
+  p: BlockRec[];
   k: BlockRec[];
   c: BlockRec[];
   f: BlockRec[];
@@ -44,8 +46,11 @@ export function planBlocks(store: BlockStore, m: ServerSnapshotMessage, you: num
     return w === rec.wid;
   };
   for (const s of m.entities) {
-    const pr = s.type === EntityType.Projectile ? packProjectile(s, tick) : null;
-    if (pr) { plan.p.push(pr); continue; }
+    if (s.type === EntityType.Projectile) {
+      const rec = store.projectile(s, tick);
+      if (rec === null || (rec && !ok(rec))) return null;
+      if (rec) { plan.p.push(rec); continue; }
+    }
     if (s.id === you) {
       const fields = s as unknown as Record<string, unknown>;
       const row: unknown[] = SNAP_FIELDS.map((k) => fields[k] ?? null);
@@ -70,7 +75,7 @@ export function planBlocks(store: BlockStore, m: ServerSnapshotMessage, you: num
     for (const r of sorted) { const rec = store.fire(r, tick); if (!ok(rec)) return null; plan.f.push(rec); }
   }
   // (What goes the connection's way is checked as a snapshot's is)
-  const w = [SNAPSHOT_CODE, tick, m.lastProcessedInput ?? null, own.length ? own : null, plan.p.length ? plan.p : null, m.removed.length ? m.removed : null,
+  const w = [SNAPSHOT_CODE, tick, m.lastProcessedInput ?? null, own.length ? own : null, null, m.removed.length ? m.removed : null,
     null, null, m.out?.length ? m.out : null, null, m.own?.length ? m.own : null, m.decisions?.length ? m.decisions : null];
   if (!snapshotOk(w)) return null;
   const present = [true, m.lastProcessedInput != null, plan.e.length > 0, plan.p.length > 0, m.removed.length > 0, plan.k.length > 0,
@@ -84,6 +89,16 @@ export interface BlockBits { head: number; intro: number; e: number; p: number; 
 export const blockBits = (): BlockBits => ({ head: 0, intro: 0, e: 0, p: 0, r: 0, k: 0, c: 0, o: 0, f: 0, nd: 0, intros: 0, delta: 0, abs: 0 });
 
 /** A chained block for this client: its form by the generation it holds, and the one it then holds */
+/** A shell row's block: by its gun chain's generation (no chain: the one form) */
+function copyShell(io: PackedIO, rec: BlockRec, st: BlockBits): void {
+  const key = rec.gun ?? -1;
+  if (key < 0) { io.copyBits(rec.abs.b, rec.abs.n); return; }
+  const f = formFor(rec, io.blk.gunGens.get(key) ?? -1);
+  io.copyBits(f.bits.b, f.bits.n);
+  io.blk.gunGens.set(key, f.gen);
+  if (f.bits === rec.abs) st.abs++; else st.delta++;
+}
+
 function copyChained(io: PackedIO, rec: BlockRec, k: boolean, st: BlockBits): void {
   const f = formFor(rec, io.blk.gen(rec.eid, k));
   io.copyBits(f.bits.b, f.bits.n);
@@ -106,6 +121,7 @@ export function blocksWrite(io: PackedIO, plan: BlocksPlan, st: BlockBits = bloc
   const intro: BlockRec[] = [];
   const note = (rec: BlockRec | undefined) => { if (rec && !blk.knows(rec.eid, rec.wid)) { blk.introduce(rec.eid, rec.wid); intro.push(rec); } };
   for (const x of plan.e) note(x.rec);
+  for (const r of plan.p) note(r);
   for (const r of plan.k) note(r);
   for (const r of plan.c) note(r);
   for (const r of plan.f) note(r);
@@ -132,7 +148,7 @@ export function blocksWrite(io: PackedIO, plan: BlocksPlan, st: BlockBits = bloc
     }
     part('e');
   }
-  if (has(4)) { projectilesIO(io, plan.p); part('p'); }
+  if (has(4)) { io.vu(plan.p.length, 3); for (const r of plan.p) copyShell(io, r, st); part('p'); }
   if (has(5)) { removedIO(io, m.removed); part('r'); }
   if (has(6)) { io.vu(plan.k.length, 2); for (const r of plan.k) copyChained(io, r, true, st); part('k'); }
   if (has(7)) { io.vu(plan.c.length, 3); for (const r of plan.c) io.copyBits(r.abs.b, r.abs.n); part('c'); }
@@ -143,6 +159,7 @@ export function blocksWrite(io: PackedIO, plan: BlocksPlan, st: BlockBits = bloc
   part('nd');
   for (const id of m.removed) blk.forget(id);
   if (m.out) for (const id of m.out) blk.forget(id);
+  blk.trimGuns();
 }
 
 /** Reads a BLOCKS snapshot back into the snapshot's compact row (what snapshotIO reads), its blocks by this client's chains */
@@ -191,7 +208,30 @@ export function blocksRead(io: PackedIO): unknown[] {
     }
     out[3] = rows;
   }
-  if (has(4)) out[4] = projectilesIO(io, null);
+  if (has(4)) {
+    const rows: unknown[][] = [];
+    const np = io.vu(0, 3);
+    for (let i = 0; i < np; i++) {
+      const owner = who();
+      let key = -1, abs = false;
+      const o = projectileBody(io, undefined, false, (gun) => {
+        // (the absolute bit was read first: it's the block's first bit after the wid)
+        key = gunKey(owner, gun);
+        const c = key >= 0 ? blk.guns.get(key) : undefined;
+        if (abs) return new Array<number>(P_ID + 1).fill(0);
+        if (!c) throw new Error('packed: a shell row steps from a gun chain this end has not got');
+        return c;
+      }, (a) => { abs = a; });
+      o[7] = owner;
+      if (key >= 0) {
+        const pv = abs ? new Array<number>(P_ID + 1).fill(0) : blk.guns.get(key)!;
+        settleProjectile(pv, o);
+        blk.guns.set(key, pv);
+      }
+      rows.push(o);
+    }
+    out[4] = rows;
+  }
   if (has(5)) out[5] = removedIO(io, null);
   if (has(6)) {
     const rows: unknown[][] = [];
@@ -230,6 +270,7 @@ export function blocksRead(io: PackedIO): unknown[] {
   if (has(11)) out[11] = decisionsIO(io, null);
   for (const id of (out[5] as number[] | null) ?? []) blk.forget(id);
   for (const id of (out[8] as number[] | null) ?? []) blk.forget(id);
+  blk.trimGuns();
   while (out.length > 1 && out[out.length - 1] === null) out.pop();
   return out;
 }

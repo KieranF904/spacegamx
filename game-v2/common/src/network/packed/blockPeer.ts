@@ -17,8 +17,13 @@ export class BlockPeer {
   readonly intro = new Map<number, number>();
   readonly owner = new Map<number, number>();
   readonly gens = new Map<number, { e: number; k: number }>();
+  /** Shell rows' gun chains (blocks.ts gunKey): the reader's bases, the writer's generations. Both ends hold the same keys */
+  readonly guns = new Map<number, number[]>();
+  readonly gunGens = new Map<number, number>();
 
   reset(): void {
+    this.guns.clear();
+    this.gunGens.clear();
     this.wids.clear();
     this.chains.clear();
     this.intro.clear();
@@ -51,6 +56,12 @@ export class BlockPeer {
     let g = this.gens.get(eid);
     if (!g) { g = { e: -1, k: -1 }; this.gens.set(eid, g); }
     if (k) g.k = gen; else g.e = gen;
+  }
+
+  /** Both ends, after each BLOCKS snapshot: the gun chains start afresh when there are many (both ends have the same keys) */
+  trimGuns(): void {
+    if (this.guns.size > 4096) this.guns.clear();
+    if (this.gunGens.size > 4096) this.gunGens.clear();
   }
 
   /** Both ends, after a snapshot that removed or dropped an entity (its removed and out lists): its chains go */
