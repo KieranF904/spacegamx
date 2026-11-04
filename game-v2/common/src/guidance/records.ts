@@ -12,6 +12,7 @@
  *   MODE  [sent]: from this tick it takes the server's WP and NEXT (1: it lacks the target), or plans them itself (0)
  *   OFF   []: it stops running it (out of range: rows again)
  *   TARGET [target + 1]: a mob's brain chose a new target (0: none): planned afresh from it
+ *   LAUNCH [...]: a volley of mobs laid at once, each one's run from it in place of its SYNC (launch.ts; CAPS.LAUNCHES)
  *
  * WP and NEXT go only to a client in "sent" mode for that tick; the rest to every client running it.
  */
@@ -22,9 +23,9 @@ import {
   FLIGHT_MISSILE, FLIGHT_MOB, GUIDE_KQ, GUIDE_Q, WP_GRID, guideLost, guideKind, guideRetarget, newGuide, type Guide, type GuideBody, type Waypoint,
 } from './waypoints.js';
 
-export const GUIDE = { SYNC: 0, WP: 1, NEXT: 2, LOST: 3, MODE: 4, OFF: 5, TARGET: 6 } as const;
+export const GUIDE = { SYNC: 0, WP: 1, NEXT: 2, LOST: 3, MODE: 4, OFF: 5, TARGET: 6, LAUNCH: 7 } as const;
 /** Ops there are (a row whose op is past this is dropped) */
-export const GUIDE_OPS = 7;
+export const GUIDE_OPS = 8;
 /** A missile's mode for a tick: it plans its waypoints itself, or takes the server's */
 export const MODE_DERIVED = 0, MODE_SENT = 1;
 

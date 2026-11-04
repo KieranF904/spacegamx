@@ -51,7 +51,8 @@ export function run(o: Opts) {
     scene: 'sectors', autoStart: false,
     ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
     clock: () => clock.t,
-    netCaps: ALL,
+    // (the server allows LAUNCHES too: a client asking for it takes volleys as one row)
+    netCaps: ALL | CAPS.LAUNCHES,
   });
   const ships = server.getShips();
   const weapons = (server as unknown as { weapons: Weapons }).weapons;

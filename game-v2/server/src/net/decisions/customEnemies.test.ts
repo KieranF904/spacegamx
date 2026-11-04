@@ -7,8 +7,8 @@
  * of two drives). No control rows of them; every body check agrees.
  */
 import { describe, it, expect } from 'vitest';
-import { customGroups } from '@space-game/common';
-import { fight } from '../../testkits/decisionFight.testkit.js';
+import { CAPS, customGroups } from '@space-game/common';
+import { fight, ALL } from '../../testkits/decisionFight.testkit.js';
 
 /** What each design loses mid-fight: the pieces that change how it flies */
 const LOSE: Record<string, string[]> = {
@@ -20,9 +20,9 @@ const DESIGN: Record<string, string> = {
   'Rivet Sower': 'rivet_sower', 'Slag Ray': 'slag_ray', Clinker: 'clinker', 'Helios Drone': 'helios_drone',
 };
 
-function run(packs: { ships: string[]; dx: number; dy: number; faction: string }[], lose: boolean, ticks = 1500) {
+function run(packs: { ships: string[]; dx: number; dy: number; faction: string }[], lose: boolean, ticks = 1500, caps?: number) {
   return fight({
-    ticks, packs, loseAt: lose ? 700 : undefined, prey: true,
+    ticks, packs, caps, loseAt: lose ? 700 : undefined, prey: true,
     lose: (ship, uid) => {
       const name = ship.blueprint.name, part = ship.blueprint.parts.find((p) => p.uid === uid);
       if (!part || part.group === undefined || !LOSE[name]) return false;
@@ -50,16 +50,20 @@ describe('custom enemies: their moves and lost pieces on the tick layer (CAPS.PI
     expect(r.stats.off).toBe(0);
   }, 300_000);
 
-  it('the dens\' (Scrap Crawler, Rivet Sower, Slag Ray, Clinker): the same', () => {
+  it('the dens\' (Scrap Crawler, Rivet Sower, Slag Ray, Clinker): the same, and the Sower\'s mines as LAUNCH rows, every one exact', () => {
     const r = run([
       { ships: ['scrap_crawler', 'rivet_sower'], dx: 1100, dy: 600, faction: 'scrapborn' },
       { ships: ['slag_ray', 'clinker'], dx: -1400, dy: -500, faction: 'cinder' },
-    ], false);
+    ], false, 1500, ALL | CAPS.WAYPOINTS | CAPS.LAUNCHES);
     const moves = r.server.enemies.custom.stats.moves;
     if (process.env.BODY_DEBUG) console.log('DENS', JSON.stringify({ moves, got: { ...r.got.A, ran: r.got.A.ran.size }, stats: r.stats }));
     for (const m of ['scrap_crawler.pull', 'rivet_sower.lay', 'slag_ray.pass', 'clinker.volley']) expect(moves[m] ?? 0, m).toBeGreaterThan(0);
     expect(r.got.A.ran.size).toBeGreaterThanOrEqual(4);
     expect(r.got.A.off).toBe(0);
+    // (laid in the tick, each mine run from its volley's row: exact on every tick it's stepped)
+    expect(r.server.guides.stats.launched).toBeGreaterThanOrEqual(6);
+    expect(r.mobs.checked).toBeGreaterThan(500);
+    expect(r.mobs.off, r.mobs.firstOff).toBe(0);
     expect(r.got.A.ctlRows).toBe(0);
     expect(r.stats.off).toBe(0);
   }, 300_000);

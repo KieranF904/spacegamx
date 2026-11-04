@@ -60,9 +60,11 @@ export function netCaps(): number {
   const cargo = ownSim && (flag('cargo', 'sg.cargo') ?? dev);
   // (debris it works out run from then on: its parts crumble on their own ticks here, nothing more sent of it but its removal)
   const debris = flag('debris', 'sg.debris') ?? dev;
+  // (a volley of mobs laid at once, a Rivet Sower's mines, as one row: each one run from it, no SYNC a mob)
+  const launches = waypoints && (flag('launches', 'sg.launches') ?? dev);
   return hits | (compact ? CAPS.INPUTS : 0) | (packed ? CAPS.PACKED : 0) | (coalesce ? CAPS.COALESCE : 0) | (ownShots ? CAPS.OWN_SHOTS : 0) | (rough ? CAPS.ROUGH : 0) | (ownSim ? CAPS.OWN_SIM : 0) | (bodies ? CAPS.BODIES : 0)
     | (blocks ? CAPS.BLOCKS : 0) | (focus ? CAPS.FOCUS : 0) | (causes ? CAPS.CAUSES : 0) | (waypoints ? CAPS.WAYPOINTS : 0) | (pilots ? CAPS.PILOTS : 0) | (crowd ? CAPS.CROWD : 0)
-    | (structs ? CAPS.STRUCTS : 0) | (cargo ? CAPS.CARGO : 0) | (debris ? CAPS.DEBRIS : 0);
+    | (structs ? CAPS.STRUCTS : 0) | (cargo ? CAPS.CARGO : 0) | (debris ? CAPS.DEBRIS : 0) | (launches ? CAPS.LAUNCHES : 0);
 }
 
 /**

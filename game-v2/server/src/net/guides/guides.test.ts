@@ -6,9 +6,9 @@
  * rows. The scene: bench/guides/guideScene.testkit.ts.
  */
 import { describe, it, expect } from 'vitest';
-import { Position, Velocity } from '@space-game/common';
+import { Position, Velocity, InSystem, CAPS, launchPattern, quantizeCursorAngle } from '@space-game/common';
 import type { Weapons } from '../../game/Weapons.js';
-import { run, BASE } from '../../bench/guides/guideScene.testkit.js';
+import { run, BASE, ALL } from '../../bench/guides/guideScene.testkit.js';
 
 describe('homing shells on the tick layer (CAPS.WAYPOINTS)', () => {
   it('both ends held: it plans their waypoints itself, nothing sent; every shell exact, no rows after the first', () => {
@@ -84,6 +84,32 @@ describe('homing shells on the tick layer (CAPS.WAYPOINTS)', () => {
     expect(r.runner!.blind).toBe(0);
     expect(r.rows.Aafter).toBeLessThan(r.rows.syncs);
     expect(r.checks.bodyOff).toBe(0);
+  }, 120_000);
+
+  it('a volley of mines laid at once (a Rivet Sower\'s): one LAUNCH row each, no SYNCs, every mine exact; without LAUNCHES, SYNCs', () => {
+    const lay = (caps: number) => run({
+      every: 1e9, from: [2500, -800], at: (w) => w.A.pid, ticks: 400, caps,
+      each: (t, w) => {
+        // (a line across, then a ring, then a line the other way: every 80 ticks)
+        if (t % 80 !== 5) return;
+        const a = w.A.pid, k = (t - 5) / 80;
+        w.server.mobs.launch('rivet_mine', InSystem.systemId[a], launchPattern(Position.x[a] + 900 + k * 40.37, Position.y[a] - 300 + k * 17.11, quantizeCursorAngle(0.4 + k), 6, k % 2 === 1, k % 2 ? 260 : 170), w.D);
+      },
+    });
+    const r = lay(ALL | CAPS.LAUNCHES), legacy = lay(ALL);
+    if (process.env.GUIDE_DEBUG) console.log('LAUNCH', JSON.stringify({ got: r.got, rows: r.rows, net: r.net, runner: r.runner, legacy: legacy.rows }));
+    expect(r.net.launches).toBe(5);
+    expect(r.net.launched).toBe(30);
+    expect(r.runner!.launches).toBe(5);
+    expect(r.rows.syncs).toBe(legacy.rows.syncs - 30);
+    expect(r.got.checked).toBeGreaterThan(5000);
+    expect(r.got.off, r.got.firstOff).toBe(0);
+    expect(r.checks.bodyOff).toBe(0);
+    // (the same mines as SYNCs to a client without the bit; both exact, fewer bytes with it)
+    expect(legacy.rows.syncs).toBeGreaterThanOrEqual(30);
+    expect(legacy.net.launches).toBe(0);
+    expect(legacy.got.off, legacy.got.firstOff).toBe(0);
+    expect(r.bytes.A).toBeLessThan(legacy.bytes.A);
   }, 120_000);
 
   it('legacy clients (no WAYPOINTS) get rows as before', () => {

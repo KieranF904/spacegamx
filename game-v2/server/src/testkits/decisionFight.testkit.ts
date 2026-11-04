@@ -54,12 +54,24 @@ export function fight(o: Opts = {}) {
     scene: 'sectors', autoStart: false,
     ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
     clock: () => clock.t,
-    netCaps: ALL,
+    // (mobs on the tick layer too, a volley as one row: a client asking for them, CAPS.WAYPOINTS and LAUNCHES)
+    netCaps: ALL | CAPS.WAYPOINTS | CAPS.LAUNCHES,
   });
   const ships = server.getShips();
   const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
   const caps = o.caps ?? ALL;
-  const A = new FakeHitsClient(server, { name: 'pilots_a', caps, env });
+  /** Every mob's state at each tick's end, and A's mobs (CAPS.WAYPOINTS) against it on every tick it steps them */
+  const mobTruth = new Map<string, number[]>();
+  const mobs = { checked: 0, off: 0, firstOff: '' };
+  const A = new FakeHitsClient(server, {
+    name: 'pilots_a', caps, env,
+    onGuideStep: (id, t, m) => {
+      const s = mobTruth.get(`${id}:${t}`);
+      if (!s) return;
+      mobs.checked++;
+      if (s[0] !== m.x || s[1] !== m.y || s[2] !== m.vx || s[3] !== m.vy || s[4] !== (m.a ?? 0)) { mobs.off++; if (!mobs.firstOff) mobs.firstOff = `${id}@${t}: ${JSON.stringify(m)} vs ${s}`; }
+    },
+  });
   const B = new FakeHitsClient(server, { name: 'legacy_b', caps: 0, env });
   // (every hostile, escorts spawned mid-fight too)
   const foe = { has: (id: number) => ships.has(id) && !!server.enemies.factionOf(id) };
@@ -129,6 +141,7 @@ export function fight(o: Opts = {}) {
     server.step();
     truth.set(server.getTick(), now());
     truth.delete(server.getTick() - 120);
+    for (const [eid] of server.mobs.guided()) mobTruth.set(`${eid}:${server.getTick()}`, [Position.x[eid], Position.y[eid], Velocity.x[eid], Velocity.y[eid], Rotation.angle[eid]]);
     clock.t += 1000 / 60;
     chk = A.own?.takeCheck(true, server.getTick());
     const rep = A.selfHits?.takeReport(true);
@@ -158,5 +171,5 @@ export function fight(o: Opts = {}) {
     if (o.loseAt === t && o.lose) for (const id of foeIds()) { const sh = ships.get(id)!; ships.setPartHp(id, (uid) => (o.lose!(sh, uid) ? 0 : 1)); }
     step(t);
   }
-  return { server, got, A, boss, stats: server.bodies.stats, rep: server.replication.bodyStats };
+  return { server, got, A, boss, mobs, stats: server.bodies.stats, rep: server.replication.bodyStats };
 }

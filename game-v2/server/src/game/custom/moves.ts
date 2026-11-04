@@ -6,7 +6,7 @@
 import {
   Position, Velocity, Rotation, quantizeCursorAngle, dequantizeCursorAngle, datan2, dcos, dhypot, dsin, hashUnit,
   CENSER_WARN, CENSER_BURN, LURKER_WARN, HOOK_WARN, BELL_WARN, CRAWLER_PULL, CRAWLER_SNAP, SOWER_AHEAD, RAY_PASS,
-  CLINKER_WARN, CLINKER_SHELLS, CLINKER_GAP, TORCH_TICKS, customGroups,
+  CLINKER_WARN, CLINKER_SHELLS, CLINKER_GAP, TORCH_TICKS, customGroups, launchPattern,
 } from '@space-game/common';
 import { beamFx, burnLine, gun, leadAngle, lineFirst, lineWarn, pullTowards, ringWarn, strikeAt } from './kit.js';
 import type { Act, DesignMoves } from './types.js';
@@ -110,14 +110,10 @@ export const MOVES: Record<string, DesignMoves> = {
       if (k !== SOWER_AHEAD || !a.has('drum') || !a.host.mobs) return;
       const drum = a.at('drum');
       if (!drum) return;
-      const n = Math.round(num(a, 'lay', 'mines', 6)), line = dequantizeCursorAngle(m.arg), ring = !a.has('sensors');
-      const spots: { x: number; y: number }[] = [];
-      for (let i = 0; i < n; i++) {
-        // Along the line across your path, or (blind) in a ring round itself
-        if (ring) { const t = (i / n) * Math.PI * 2; spots.push({ x: drum.x + dcos(t) * num(a, 'lay', 'ring', 260), y: drum.y + dsin(t) * num(a, 'lay', 'ring', 260) }); }
-        else { const o = (i - (n - 1) / 2) * 170; spots.push({ x: drum.x + dcos(line) * o, y: drum.y + dsin(line) * o }); }
-      }
-      a.host.mobs.launch('rivet_mine', a.num, spots, a.eid, a.live.dmg);
+      // Along the line across your path, or (blind: no sensors) in a ring round itself; one LAUNCH row to its clients
+      const ring = !a.has('sensors');
+      const p = launchPattern(drum.x, drum.y, m.arg, Math.round(num(a, 'lay', 'mines', 6)), ring, ring ? num(a, 'lay', 'ring', 260) : num(a, 'lay', 'gap', 170));
+      a.host.mobs.launch('rivet_mine', a.num, p, a.eid, a.live.dmg);
       a.host.launchFx?.(a.num, drum.x, drum.y);
     },
     lost(a, newly) {

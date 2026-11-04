@@ -15,7 +15,7 @@
  * hash as of the snapshot's tick, on its own check (OwnTick extraHash).
  */
 import {
-  EntityType, GUIDE, MODE_SENT, ReplicaMode, applyGuideRec, guideFirst, guideAdvance, guideHash, guideOfSync, guidePlan, guideRowOk, guideSteer, replicasByte,
+  EntityType, GUIDE, MODE_SENT, ReplicaMode, applyGuideRec, launchOfArgs, guideFirst, guideAdvance, guideHash, guideOfSync, guidePlan, guideRowOk, guideSteer, replicasByte,
   type EntityState, type Guide, type GuideBody, type ShipReplicaSet,
 } from '@space-game/common';
 
@@ -49,7 +49,7 @@ export class GuideRunner {
   private readonly held = new Map<number, [number, number][]>();
   /** Shells gone since the last snapshot was noted (a told hit ends one after its snapshot went in) */
   private readonly dead = new Set<number>();
-  readonly stats = { syncs: 0, offs: 0, records: 0, plans: 0, blind: 0, steps: 0 };
+  readonly stats = { syncs: 0, offs: 0, records: 0, plans: 0, blind: 0, steps: 0, launches: 0 };
 
   constructor(private readonly host: GuideRunnerHost) {}
 
@@ -87,6 +87,12 @@ export class GuideRunner {
         const s = guideOfSync(args, t);
         this.runs.set(id, { m: s.m, g: s.g, last: t, syncTick: t, modes: [[t + 1, s.sent ? MODE_SENT : 0]], recs: new Map() });
         this.stats.syncs++;
+        continue;
+      }
+      if (op === GUIDE.LAUNCH) {
+        // (A volley laid at once, CAPS.LAUNCHES: each mob as its SYNC would have had it, common guidance/launch.ts)
+        for (const l of launchOfArgs(args, t) ?? []) this.runs.set(l.id, { m: l.m, g: l.g, last: t, syncTick: t, modes: [[t + 1, 0]], recs: new Map() });
+        this.stats.launches++;
         continue;
       }
       if (op === GUIDE.OFF) { if (this.runs.delete(id)) this.stats.offs++; continue; }

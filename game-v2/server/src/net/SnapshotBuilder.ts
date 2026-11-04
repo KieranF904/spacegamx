@@ -41,7 +41,7 @@ import { portalQuery } from './handlers/flight.js';
 import { SELF_SAFETY_TICKS, SNAP_PROJECTILE_RANGE, SNAP_POD_RANGE, SHIP_VIEW_IN, SHIP_VIEW_OUT, MAP_DOTS_TICKS, DEBRIS_ACK_TICKS } from './snapshot/constants.js';
 import type { HitLedger } from './hits/HitLedger.js';
 import { ownShotsFor, ownVolleyExact, ownSimFor } from './snapshot/ownShots.js';
-import { bodiesFor, pilotsFor, focusFor, causesFor, waypointsFor, replicasByte, jumpPhase, jumpTuning } from '@space-game/common';
+import { bodiesFor, pilotsFor, focusFor, causesFor, waypointsFor, launchesFor, replicasByte, jumpPhase, jumpTuning } from '@space-game/common';
 import { FocusCells } from './cells/FocusCells.js';
 import type { CrowdControl } from './crowd/CrowdControl.js';
 import { SimPass } from '../sim/SystemClocks.js';
@@ -729,6 +729,7 @@ export class SnapshotBuilder {
         near: (e) => !fartherThan(Position.x[e] - px, Position.y[e] - py, SNAP_PROJECTILE_RANGE),
         holds: (e) => conn.shipView.has(e) && conn.repKnown.has(e),
         rekeyed: (e) => this.replication.keysFor(e, conn.playerId, conn.repKnown, causes),
+        launches: launchesFor(conn.caps),
       }, this.currentTick);
       const rep = this.replication.forClient(playerSystemId, conn.playerId, conn.repKnown, this.currentTick, conn.shipView, conn.debrisHeld, ownShots, (id) => conn.shipSynced.get(id)?.rebuilds, bodies ? (id) => bodies.runs(conn, id) : undefined, causes, structsFor(conn.caps) ? (id) => this.keptAfter(conn, id, playerSystemId) : undefined,
         // (A ship a body it runs reads, keyframed now: the body's ship goes again too, Replication.forClient)

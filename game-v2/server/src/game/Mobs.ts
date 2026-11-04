@@ -22,7 +22,7 @@
 import { addComponent, addEntity, removeEntity, IWorld } from 'bitecs';
 import {
   Position, Velocity, Rotation, Radius, InSystem, segmentNearCircle, insideTerrain, type Terrain, dcos, dhypot, dsin,
-  FLIGHT_MOB, GUIDE, PLAN_NONE, PLAN_WP, guideKind, guideRetarget, guideTick, newGuide, qAngle, qGuide, wpArgs, type Guide, type GuideBody,
+  FLIGHT_MOB, GUIDE, PLAN_NONE, PLAN_WP, guideKind, launchArgs, launchSpots, type LaunchPattern, guideRetarget, guideTick, newGuide, qAngle, qGuide, wpArgs, type Guide, type GuideBody,
 } from '@space-game/common';
 import { SimPass } from '../sim/SystemClocks.js';
 
@@ -71,8 +71,6 @@ export interface MobHost {
   terrain?(systemNum: number): Terrain | undefined;
   /** Is this ship still there to hunt (gone: it lets go, and its clients are told) */
   alive?(eid: number): boolean;
-  /** A volley laid at once (Mobs.launch): its ids, in order */
-  launched?(systemNum: number, owner: number, ids: readonly number[]): void;
   /** A mob's guide record at this tick (common guidance/records.ts: WP, NEXT, TARGET), for its clients (GuideNet) */
   guided?(eid: number, tick: number, op: number, args: number[]): void;
 }
@@ -116,16 +114,17 @@ export class Mobs {
   }
 
   /**
-   * A volley laid at once (a Rivet Sower's mines): one at each spot, still, for `owner`. Their ids in order (a LAUNCH:
-   * the run of ids a body's volley took, docs/design/decision-inputs.md 6.3)
+   * A volley laid at once (a Rivet Sower's mines): one still at each spot of the pattern (common guidance/launch.ts),
+   * for `owner`. Its ids in spot order; its clients get it as one LAUNCH row, not a SYNC a mob (GuideNet, CAPS.LAUNCHES)
    */
-  launch(id: string, systemNum: number, spots: readonly { x: number; y: number }[], owner: number, scale = 1): number[] {
+  launch(id: string, systemNum: number, p: LaunchPattern, owner: number, scale = 1): number[] {
     const out: number[] = [];
-    for (const p of spots) {
-      const eid = this.spawn(id, systemNum, p.x, p.y, 0, 0, owner, scale);
+    for (const at of launchSpots(p)) {
+      const eid = this.spawn(id, systemNum, at.x, at.y, 0, 0, owner, scale);
       if (eid >= 0) out.push(eid);
     }
-    if (out.length) this.host.launched?.(systemNum, owner, out);
+    const first = this.live.get(out[0]);
+    if (first && out.length === p.n) this.host.guided?.(out[0], this.host.tick(), GUIDE.LAUNCH, launchArgs(first.guide.kind, first.born, p, out));
     return out;
   }
 
