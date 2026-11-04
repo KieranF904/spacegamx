@@ -76,6 +76,10 @@ export async function runCase(o: CaseOpts): Promise<any> {
   timed(srv.replication, 'forClient', (ms) => { aRepl += ms; });
   timed(srv.net, 'flushOutbox', (ms) => { aFlush += ms; });
   timed(ships, 'rebuildNow', (ms) => { aReb += ms; nReb++; });
+  // (Debris: the shared drift-and-knock step's cost, and how many pieces there are)
+  let aDeb = 0;
+  const debrisMs: number[] = [], debrisN: number[] = [];
+  timed(ships, 'stepDebrisWorld', (ms) => { aDeb += ms; });
   {
     const orig = ships.rebuildNow;
     ships.rebuildNow = (eid: number, ...a: any[]) => { if (rebuiltThisTick.has(eid)) nRepeat++; else rebuiltThisTick.add(eid); return orig(eid, ...a); };
@@ -83,10 +87,10 @@ export async function runCase(o: CaseOpts): Promise<any> {
   {
     const orig = server.step.bind(server);
     server.step = () => {
-      aSnap = aRepl = aFlush = aReb = 0; nReb = 0; nRepeat = 0; rebuiltThisTick.clear();
+      aSnap = aRepl = aFlush = aReb = aDeb = 0; nReb = 0; nRepeat = 0; rebuiltThisTick.clear();
       const t0 = performance.now();
       orig();
-      if (measuring) { tickMs.push(performance.now() - t0); snapMs.push(aSnap); replMs.push(aRepl); flushMs.push(aFlush); rebuildMs.push(aReb); rebuildCount.push(nReb); rebuildRepeat.push(nRepeat); }
+      if (measuring) { tickMs.push(performance.now() - t0); snapMs.push(aSnap); replMs.push(aRepl); flushMs.push(aFlush); rebuildMs.push(aReb); rebuildCount.push(nReb); rebuildRepeat.push(nRepeat); debrisMs.push(aDeb); debrisN.push(ships.stats.debrisCount ?? 0); }
     };
   }
 
@@ -185,6 +189,7 @@ export async function runCase(o: CaseOpts): Promise<any> {
     budgetPct: r2((mean(tickMs) / (1000 / 60)) * 100),
     snapshotsMsPerTick: r2(mean(snapMs)), replicationMsPerTick: r2(mean(replMs)), encodeSendMsPerTick: r2(mean(flushMs)),
     rebuildMsPerTick: r2(mean(rebuildMs)), rebuildsPerSec: r2(sum(rebuildCount) / secs), rebuildRepeats: sum(rebuildRepeat),
+    debrisStepMsPerTick: r2(mean(debrisMs)), debrisMean: r2(mean(debrisN)), debrisMax: Math.max(0, ...debrisN),
   };
   const bulk: Counter[] = [...counters.values()];
   const bulkRaw = bulk.map((c) => c.raw / secs), bulkMsgs = bulk.map((c) => c.msgs / secs);
@@ -224,7 +229,8 @@ export async function runCase(o: CaseOpts): Promise<any> {
     timing: { ...timing, deflateMsPerTickEst: r2(deflateMsPerTick) },
     bytes: {
       legacyOrBulk: { kind: o.bulk, ...bytesBlock(bulkRaw, bulkWire, bulkMsgs), subTypesBps: Object.fromEntries(Object.entries(sub).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([t, b]) => [t, Math.round(b)])) },
-      capable: { ...bytesBlock(probeList.map((p) => p.rawBytes / secs), probeWire, probeList.map((p) => p.messages / secs)), subTypesBps: subOf(probeList.map((p) => p.sub)) },
+      capable: { ...bytesBlock(probeList.map((p) => p.rawBytes / secs), probeWire, probeList.map((p) => p.messages / secs)), subTypesBps: subOf(probeList.map((p) => p.sub)),
+        debrisBps: Object.fromEntries(Object.entries(subOf(probeList.map((p) => Object.fromEntries(Object.entries(p.sub).filter(([t]) => t.endsWith(':debris')))))).map(([t, b]) => [t.replace(':debris', ''), b])) },
       capableUp: { msgsPerSec: r2(mean(probeList.map((p) => p.upMsgs / secs))), bps: Math.round(mean(probeList.map((p) => p.upBytes / secs))) },
     },
     messages: { capableFramesPerSec: r2(mean(probeList.map((p) => p.fake.frames / (secs + 3)))) },
@@ -233,7 +239,8 @@ export async function runCase(o: CaseOpts): Promise<any> {
       // (the tick layer proper: own ship, other pilots, AI, the boss; `other` is wrecks, debris and the rest)
       disagreeNoKeyframe: ['self', 'player', 'ai', 'boss'].reduce((n, k) => n + (agree[k]?.offNoKf ?? 0), 0),
       checked: ['self', 'player', 'ai', 'boss'].reduce((n, k) => n + (agree[k]?.checked ?? 0), 0),
-      otherDisagree: agree.other?.offNoKf ?? 0, otherChecked: agree.other?.checked ?? 0,
+      otherDisagree: (agree.other?.offNoKf ?? 0) + (agree.debris?.offNoKf ?? 0), otherChecked: (agree.other?.checked ?? 0) + (agree.debris?.checked ?? 0),
+      debrisDisagree: agree.debris?.offNoKf ?? 0, debrisOff: agree.debris?.off ?? 0, debrisChecked: agree.debris?.checked ?? 0,
       keyframeCorrectionsPerSecPerProbe: r2(mean(probeList.map((p) => p.keyframesCorrect / secs))),
       correctionsByClass: probeList.reduce((acc, p) => { for (const [k, v] of Object.entries(p.corrections)) { const a = (acc[k] ??= { n: 0, same: 0 }); a.n += v!.n; a.same += v!.same; } return acc; }, {} as Record<string, { n: number; same: number }>),
       keyframeEntriesPerSecPerProbe: r2(mean(probeList.map((p) => p.keyframesEntry / secs))),
@@ -247,6 +254,7 @@ export async function runCase(o: CaseOpts): Promise<any> {
         logShipsPerSec: per(d.logShips ?? 0), refused: (d.refusedHash ?? 0) + (d.refusedSize ?? 0) + (d.refusedLate ?? 0) + (d.refusedNone ?? 0) };
     })(),
     probeClientMsPerTick: r2(mean(probeList.map((p) => p.clientMs / ticks))),
+    probeDebrisMsPerTick: r2(mean(probeList.map((p) => p.debrisMs / ticks))),
     crowd: o.crowd ? {
       bySecond: crowdSecs,
       log: srv.crowd?.log ?? [],

@@ -25,7 +25,7 @@ export class PoseRing {
 }
 
 export interface Agreement { checked: number; off: number; offNoKf: number }
-const klass = ['self', 'player', 'ai', 'boss', 'other'] as const;
+const klass = ['self', 'player', 'ai', 'boss', 'debris', 'other'] as const;
 export type Klass = typeof klass[number];
 
 export class Probe {
@@ -56,6 +56,8 @@ export class Probe {
   readonly corrections: Partial<Record<Klass, { n: number; same: number }>> = {};
   snapshots = 0;
   clientMs = 0;
+  /** Of which its debris world (ShipReplicaSet.stepDebrisTo) */
+  debrisMs = 0;
 
   constructor(private server: GameServer, readonly name: string, caps: number, lat: number, private ring: PoseRing, private classOf: (id: number) => Klass, private onTick = 0,
     /** Its system's tick (its own clock once dilated, --crowd: latency is counted in its ticks too) */
@@ -73,7 +75,16 @@ export class Probe {
     this.pid = this.fake.pid;
     this.lat = lat;
     const f = this.fake as any, oSnap = f.snapshot.bind(f), oHandle = f.handle.bind(f);
-    f.handle = (m: any) => { if (this.measuring) this.sub[m.type] = (this.sub[m.type] ?? 0) + encodeMessage(m).length; return oHandle(m); };
+    f.handle = (m: any) => {
+      if (this.measuring) {
+        const id = m.id ?? m.bodyId, t = m.type === 'debrisSplit' || (id !== undefined && (m.kind === 'debris' || server.getShips().get(id)?.kind === 'debris')) ? (m.type === 'shipSync' ? (m.blueprint ? 'shipSync+bp' : m.hp ? 'shipSync+new' : 'shipSync+re') : m.type) + ':debris' : m.type;
+        this.sub[t] = (this.sub[t] ?? 0) + encodeMessage(m).length;
+      }
+      return oHandle(m);
+    };
+    // (The client's debris world: drift and knocks stepped, and stepped again from a keyframe or new piece)
+    const reps = f.reps, oDeb = reps.stepDebrisTo.bind(reps);
+    reps.stepDebrisTo = (to: number) => { const t0 = performance.now(); try { return oDeb(to); } finally { if (this.measuring) this.debrisMs += performance.now() - t0; } };
     f.snapshot = (s: any) => {
       const held = new Set<number>(f.reps.ids());
       const kf = new Set<number>((s.ships ?? []).map((k: number[]) => k[0]));
@@ -143,6 +154,7 @@ export function classifier(server: GameServer, bossId: () => number): (id: numbe
   return (id) => {
     if (id === bossId()) return 'boss';
     if (server.enemies.factionOf(id)) return 'ai';
+    if (server.getShips().get(id)?.kind === 'debris') return 'debris';
     return server.getShips().has(id) && InSystem.systemId[id] !== undefined && server.pilots.connOf(id) ? 'player' : 'other';
   };
 }

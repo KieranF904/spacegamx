@@ -67,6 +67,12 @@ const line = (r: string[]) => r.map((c, i) => c.padStart(w[i])).join('  ');
 console.log(`\nbulk sockets: ${arg('bulk', 'legacy')}; probes: ${arg('probes', '4')} (caps ${arg('caps', '511')}, latency ${arg('lat', '3')} ticks)\n`);
 console.log(line(head)); console.log(w.map((x) => '-'.repeat(x)).join('  ')); for (const r of rows) console.log(line(r));
 
+console.log('\ndebris: pieces mean/max, server step ms/tick, probe client debris-world ms/tick, capable debris B/s by type, debris corrections, off/checked (no keyframe)');
+for (const r of results) {
+  const d = r.bytes.capable.debrisBps ?? {}, tot = Object.values(d).reduce((a: number, b) => a + (b as number), 0), c = r.agreement.correctionsByClass?.debris;
+  console.log(`${r.layout} ${r.n}: ${r.timing.debrisMean}/${r.timing.debrisMax}, ${r.timing.debrisStepMsPerTick} ms, client ${r.probeDebrisMsPerTick} ms, ${tot} B/s ${JSON.stringify(d)}, corr ${c?.n ?? 0}, ${r.agreement.debrisOff}/${r.agreement.debrisChecked} (${r.agreement.debrisDisagree})`);
+}
+
 if (flag('crowd')) {
   console.log('\ncrowd fallbacks (automatic): level and base-tick ms by second; settled = the last third');
   for (const r of results) {
