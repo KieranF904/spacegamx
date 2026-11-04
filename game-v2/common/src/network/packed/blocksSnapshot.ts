@@ -88,7 +88,6 @@ export function planBlocks(store: BlockStore, m: ServerSnapshotMessage, you: num
 export interface BlockBits { head: number; intro: number; e: number; p: number; r: number; k: number; c: number; o: number; f: number; nd: number; intros: number; delta: number; abs: number }
 export const blockBits = (): BlockBits => ({ head: 0, intro: 0, e: 0, p: 0, r: 0, k: 0, c: 0, o: 0, f: 0, nd: 0, intros: 0, delta: 0, abs: 0 });
 
-/** A chained block for this client: its form by the generation it holds, and the one it then holds */
 /** A shell row's block: by its gun chain's generation (no chain: the one form) */
 function copyShell(io: PackedIO, rec: BlockRec, st: BlockBits): void {
   const key = rec.gun ?? -1;
@@ -99,6 +98,7 @@ function copyShell(io: PackedIO, rec: BlockRec, st: BlockBits): void {
   if (f.bits === rec.abs) st.abs++; else st.delta++;
 }
 
+/** A chained block for this client: its form by the generation it holds, and the one it then holds */
 function copyChained(io: PackedIO, rec: BlockRec, k: boolean, st: BlockBits): void {
   const f = formFor(rec, io.blk.gen(rec.eid, k));
   io.copyBits(f.bits.b, f.bits.n);

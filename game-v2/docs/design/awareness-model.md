@@ -1125,6 +1125,14 @@ the probes, and the parity tests (replication, confirmedHits, selfHits, bodies, 
   phase 0.
 
 **Phase 3: encode once.**
+- *Status (2026-11-04):* built behind `CAPS.BLOCKS` (512, protocol 37), on the dev server by default. Done ahead of
+  phase 2 (the snapshot walk is unchanged). Built: per-system wire ids (prefix widths, lowest free, told once per client);
+  blocks for status rows, shell rows, keyframes, control rows and fire events, each made once a snapshot
+  (`BlockStore`) and copied bit for bit; delta bases per entity (and per gun for shell rows), each block in a delta and
+  an absolute form so holders that missed one get back in step with the next; per client only the wids it was told and
+  its chain generations (`BlockPeer`); deflate off for blocks frames. Not built: shells named (owner, counter); effects,
+  shipHps, shipSync and hits on the shared path. At ball 300 the tick goes from 48 to 36 ms, encode from 21.7 to 7.5 ms,
+  and raw bytes rise 2 to 7%; agreement is identical (docs/audits/encode-once-2026-11-04.md).
 - Per-system wire ids with prefix widths.
 - Shells named (owner, shot counter).
 - Per-entity blocks (sim and rows variants), delta-coded per entity.
