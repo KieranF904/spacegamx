@@ -21,10 +21,11 @@ import {
   type OwnTimeline, type ShipReplicaSet, type ShipDerived, type ShipState, type ShipTuning, type FlightBody, type OwnCheck,
   type OwnCauseEnv, type OwnShape, type PlacedGeom, type ServerSnapshotMessage, type ClientInputMessage, type Vec2,
 } from '@space-game/common';
+import type { StructSource } from '../ShipStore.js';
 
 export interface OwnTickHost {
   /** The ships' structures (its own and the others it touches) */
-  store: { get(id: number): ShipState | undefined; geometry(ship: ShipState): PlacedGeom[] };
+  store: StructSource;
   reps: ShipReplicaSet;
   /** Its own ship's id */
   self(): number;
@@ -154,6 +155,9 @@ export class OwnTick implements OwnTimeline {
   }
 
   derived(t: number): ShipDerived | null | undefined {
+    // (Each structure kept by its tick, CAPS.STRUCTS: the one it flew then)
+    const kept = this.host.store.derivedAt?.(this.host.self(), t);
+    if (kept) return kept;
     if (this.until && t <= this.until.tick) return this.until.derived;
     return this.host.store.get(this.host.self())?.derived;
   }
@@ -178,9 +182,13 @@ export class OwnTick implements OwnTimeline {
         // (Its replica on that tick before its own causes there: CAPS.CAUSES works them out on it, ShipReplicaSet.preAt)
         const ship = store.get(id) ?? this.kept.get(t + ':' + id), at = reps.preAt(id, t);
         // (No replica of it left, removed in that snapshot: the row carries its state, the server sees to that)
-        return ship ? { shape: shapeOf(ship, this.touched.get(t + ':' + id) ?? ship.derived, store.geometry(ship)), body: at ? { x: at.x, y: at.y, angle: at.angle, vx: at.vx, vy: at.vy } : { x: 0, y: 0, angle: 0, vx: 0, vy: 0 } } : null;
+        return ship ? { shape: shapeOf(ship, store.derivedAt?.(id, t) ?? this.touched.get(t + ':' + id) ?? ship.derived, store.geometry(ship)), body: at ? { x: at.x, y: at.y, angle: at.angle, vx: at.vx, vy: at.vy } : { x: 0, y: 0, angle: 0, vx: 0, vy: 0 } } : null;
       },
-      rebuilt: () => (this.until && this.until.tick === t ? { from: this.until.from, to: this.until.to } : null),
+      rebuilt: () => {
+        const kept = store.rebuildAt?.(this.host.self(), t);
+        if (kept !== undefined) return kept;
+        return this.until && this.until.tick === t ? { from: this.until.from, to: this.until.to } : null;
+      },
     };
   }
 

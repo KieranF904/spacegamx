@@ -24,7 +24,7 @@ const BASE = CAPS.HITS | CAPS.SELF_HITS | CAPS.PACKED | CAPS.COALESCE | CAPS.OWN
 
 interface Seen { held: number; keyframes: number; entries: number; records: number; checked: number; off: number; offTicks: number; lastOff: number }
 
-function fight(caps: number, extra = 0, dropAt = -1) {
+function fight(caps: number, extra = 0, dropAt = -1, hurtEvery = 45) {
   resetGlobals();
   const clock = { t: 1_000_000 };
   const server = new GameServer({
@@ -33,7 +33,7 @@ function fight(caps: number, extra = 0, dropAt = -1) {
     scene: 'sectors', autoStart: false,
     ships: createShipBridge(loadShipConfigFromDisk(dataDir)),
     clock: () => clock.t,
-    netCaps: 4095,
+    netCaps: 4095 | CAPS.STRUCTS,
   });
   const ships = server.getShips();
   const env = (id: number) => (server.replication as unknown as { host: { env(eid: number): ReplicaEnv } }).host.env(id);
@@ -98,10 +98,10 @@ function fight(caps: number, extra = 0, dropAt = -1) {
     if (i === 120) measuring = true;
     // (the packs keep pressing in: their autopilots aim past each other)
     if (t % 90 === 0) for (const [k, d] of dummies.entries()) if (ships.has(d)) ships.setAutopilot(d, { x: x0 + 930 + (k % 2 ? 300 : -300) * Math.sign(Math.sin(t / 90)), y: y0, arriveRadius: 10 });
-    if (t % 45 === 0 && ships.has(hauler)) {
+    if (t % hurtEvery === 0 && ships.has(hauler)) {
       const sp = ships.get(hauler)!;
       const parts = sp.blueprint.parts.map((_, k) => k).filter((k) => sp.derived.alive[k] && sp.blueprint.parts[k].fn !== 'core');
-      if (parts.length > 3) ships.damagePartFraction(hauler, parts[(t / 45) % parts.length], 1);
+      if (parts.length > 3) ships.damagePartFraction(hauler, parts[(t / hurtEvery) % parts.length], hurtEvery < 45 ? 0.2 : 1);
     }
     server.step();
     clock.t += 1000 / 60;
@@ -147,6 +147,21 @@ describe('other ships\' causes (CAPS.CAUSES)', () => {
     expect(a.lastOff).toBeLessThan(600);
     expect(checks.agreed).toBeGreaterThan(10);
   }, 120_000);
+
+  it('rebuilt twice in a window: a client keeping each structure (CAPS.STRUCTS) works it out; without, a keyframe', () => {
+    // (the hauler hurt every other tick: a rebuild each time, two or more in every snapshot window)
+    const kept = fight(BASE, CAPS.CAUSES | CAPS.STRUCTS, -1, 2);
+    expect(kept.stats.failed).toEqual({});
+    expect(kept.client?.failed).toBe(0);
+    expect(kept.a.offTicks).toBe(0);
+    expect(kept.checks.bodyOff).toBe(0);
+    const plain = fight(BASE, CAPS.CAUSES, -1, 2);
+    expect(plain.a.offTicks).toBe(0);
+    // (every window's causes worked out with the structures kept; without them, those windows' ships keyframed)
+    expect(kept.stats.unworkable).toBe(0);
+    expect(plain.stats.unworkable).toBeGreaterThan(5);
+    expect(kept.a.keyframes).toBeLessThan(plain.a.keyframes);
+  }, 240_000);
 
   it('without the cap, the same client is keyframed as before', () => {
     const { a } = fight(BASE);

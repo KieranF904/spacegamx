@@ -33,9 +33,9 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
  * has updated PROTOCOL_VERSION and PROTOCOL_WIRE_HASH.
  */
 // History: PROTOCOL_CHANGELOG.md. Re-pin with `npm run wire:bump "reason"` (game-v2/), never by hand.
-export const PROTOCOL_VERSION = 41;
+export const PROTOCOL_VERSION = 42;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
-export const PROTOCOL_WIRE_HASH = '7e6039e7';
+export const PROTOCOL_WIRE_HASH = 'c4d5b726';
 /** WebSocket close code (and reason) for a client on another protocol version */
 export const PROTOCOL_MISMATCH_CLOSE = 4002;
 export const PROTOCOL_MISMATCH_REASON = 'version';
@@ -1346,6 +1346,11 @@ export interface ServerShipSyncMessage {
   /** Part indices not built yet (hangar ghosts) */
   ghosts?: number[];
   rebuilds: number;
+  /**
+   * The tick of the rebuild that made this structure (CAPS.STRUCTS): it flew it from the tick after. Each rebuild tick's
+   * goes, in order, so the client keeps them all (ShipStore.derivedAt)
+   */
+  at?: number;
 }
 
 /** Part HP changes between rebuilds (visual only: the client doesn't rebuild on these) */
@@ -1661,7 +1666,7 @@ const COMPACT: [string, string[]][] = [
   ['contact', ['x', 'y', 'nx', 'ny', 'speed']],
   ['shipHps', ['ships']],
   ['debrisSplit', ['id', 'tick', 'e', 'p']],
-  ['shipSync', ['id', 'kind', 'hp', 'detached', 'rebuilds', 'design', 'blueprint', 'hpd', 'ghosts']],
+  ['shipSync', ['id', 'kind', 'hp', 'detached', 'rebuilds', 'design', 'blueprint', 'hpd', 'ghosts', 'at']],
   ['effect', ['effectType', 'x', 'y', 'targetX', 'targetY', 'entityId', 'data']],
   ['death', ['entityId', 'entityType', 'killerId']],
   ['stationFire', ['station', 'target', 'turret']],

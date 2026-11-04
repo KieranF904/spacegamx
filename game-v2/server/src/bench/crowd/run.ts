@@ -59,7 +59,7 @@ export async function runCase(o: CaseOpts): Promise<any> {
   Math.random = seed;
   clock.t = 1_000_000;
   const wallStart = performance.now();
-  const server = makeServer(o.crowd ? 32767 : 16383);
+  const server = makeServer(o.crowd ? 65535 : 16383);
   const ships = server.getShips() as any, srv = server as any;
 
   // ---- the meter: wrapped before anything else, so the probes' own wrappers sit outside it ----
@@ -201,6 +201,11 @@ export async function runCase(o: CaseOpts): Promise<any> {
   const d0 = performance.now();
   for (const c of bulkSampled) bulkWire.push(await wireOf(c.frames, c.msgs, blocksOn(bulkCaps)));
   const deflateMsPerTick = bulkSampled.length ? ((performance.now() - d0) / bulkSampled.length) * counters.size / (secs * 60) : 0;
+  const subOf = (subs: Record<string, number>[]) => {
+    const t: Record<string, number> = {};
+    for (const s of subs) for (const [k, b] of Object.entries(s)) t[k] = (t[k] ?? 0) + b / secs / Math.max(1, subs.length);
+    return Object.fromEntries(Object.entries(t).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([k, b]) => [k, Math.round(b)]));
+  };
   const sub: Record<string, number> = {};
   for (const c of bulkSampled) for (const [t, b] of Object.entries(c.sub)) sub[t] = (sub[t] ?? 0) + b / secs / Math.max(1, bulkSampled.length);
   const probeList = [...probes.values()];
@@ -219,7 +224,7 @@ export async function runCase(o: CaseOpts): Promise<any> {
     timing: { ...timing, deflateMsPerTickEst: r2(deflateMsPerTick) },
     bytes: {
       legacyOrBulk: { kind: o.bulk, ...bytesBlock(bulkRaw, bulkWire, bulkMsgs), subTypesBps: Object.fromEntries(Object.entries(sub).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([t, b]) => [t, Math.round(b)])) },
-      capable: bytesBlock(probeList.map((p) => p.rawBytes / secs), probeWire, probeList.map((p) => p.messages / secs)),
+      capable: { ...bytesBlock(probeList.map((p) => p.rawBytes / secs), probeWire, probeList.map((p) => p.messages / secs)), subTypesBps: subOf(probeList.map((p) => p.sub)) },
       capableUp: { msgsPerSec: r2(mean(probeList.map((p) => p.upMsgs / secs))), bps: Math.round(mean(probeList.map((p) => p.upBytes / secs))) },
     },
     messages: { capableFramesPerSec: r2(mean(probeList.map((p) => p.fake.frames / (secs + 3)))) },

@@ -5,7 +5,7 @@
  */
 
 import {
-  Blueprint, Catalog, PlacedGeom, ShipState, ShipTuning,
+  Blueprint, Catalog, PlacedGeom, ShipState, ShipTuning, ShipDerived, Vec2,
   ServerShipSyncMessage, ServerShipHpMessage, ServerShipHpBatchMessage,
   blueprintGeometry, createShipState, rebuildShip,
 } from '@space-game/common';
@@ -19,7 +19,15 @@ export interface ShipSource {
   geometry(ship: ShipState): PlacedGeom[];
 }
 
-export class ShipStore implements ShipSource {
+/** Ships' structures as the store has them: each kept by its rebuild's tick too, with CAPS.STRUCTS (ShipStore.derivedAt) */
+export interface StructSource {
+  get(id: number): ShipState | undefined;
+  geometry(ship: ShipState): PlacedGeom[];
+  derivedAt?(id: number, t: number): ShipDerived | undefined;
+  rebuildAt?(id: number, t: number): { from: Vec2; to: Vec2 } | null | undefined;
+}
+
+export class ShipStore implements ShipSource, StructSource {
   readonly bodies = new Map<number, ShipState>();
   private geomCache = new WeakMap<Blueprint, PlacedGeom[]>();
   private lastSeen = new Map<number, number>();
@@ -28,6 +36,11 @@ export class ShipStore implements ShipSource {
   onMissing: ((id: number) => void) | null = null;
   /** Designs by hash: the server sends another ship of a design we have by its hash alone */
   private designs = new Map<string, Blueprint>();
+  /**
+   * Each ship's structures by the tick of the rebuild that made them, oldest first (CAPS.STRUCTS: every rebuild tick's
+   * sync comes, stamped `at`): the one it flew on any tick since the first. A sync without `at` starts it over
+   */
+  private structs = new Map<number, { at: number; derived: ShipDerived }[]>();
 
   constructor(readonly catalog: Catalog, readonly tuning: ShipTuning) {}
 
@@ -75,6 +88,7 @@ export class ShipStore implements ShipSource {
     ship.rebuilds = msg.rebuilds;
     if (sameShape && prev) ship.angVel = prev.angVel;
     this.bodies.set(msg.id, ship);
+    this.noteStruct(msg.id, msg.at, ship.derived, !sameShape);
     return wasAlive && ship.kind === 'ship' ? ship.derived.alive.map((a, i) => (a && !wasAlive[i] ? i : -1)).filter((i) => i >= 0) : [];
   }
 
@@ -106,6 +120,39 @@ export class ShipStore implements ShipSource {
   remove(id: number): void {
     this.bodies.delete(id);
     this.lastSeen.delete(id);
+    this.structs.delete(id);
+  }
+
+  private noteStruct(id: number, at: number | undefined, derived: ShipDerived, fresh: boolean): void {
+    let list = this.structs.get(id);
+    if (at === undefined || fresh) { this.structs.delete(id); list = undefined; }
+    if (at === undefined) return;
+    if (!list) this.structs.set(id, (list = []));
+    if (list.length && list[list.length - 1].at >= at) list.length = list.findIndex((e) => e.at >= at);
+    list.push({ at, derived });
+    if (list.length > 16) list.shift();
+  }
+
+  /**
+   * The structure a ship flew on tick t (it rebuilt at the end of a tick: the one made before t), as its syncs kept it by
+   * tick (CAPS.STRUCTS); undefined: none kept from that far back
+   */
+  derivedAt(id: number, t: number): ShipDerived | undefined {
+    const list = this.structs.get(id);
+    if (!list) return undefined;
+    for (let i = list.length - 1; i >= 0; i--) if (list[i].at < t) return list[i].derived;
+    return undefined;
+  }
+
+  /**
+   * A rebuild on tick t: its centres of mass either side (null: kept, and none on t); undefined: not kept from then
+   * (CAPS.STRUCTS)
+   */
+  rebuildAt(id: number, t: number): { from: Vec2; to: Vec2 } | null | undefined {
+    const list = this.structs.get(id);
+    if (!list?.length || t <= list[0].at) return undefined;
+    for (let i = list.length - 1; i > 0; i--) if (list[i].at === t) return { from: list[i - 1].derived.com, to: list[i].derived.com };
+    return null;
   }
 }
 

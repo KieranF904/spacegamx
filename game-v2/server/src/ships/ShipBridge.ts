@@ -26,6 +26,7 @@ import * as dmg from './bridge/damage.js';
 import * as flt from './bridge/flight.js';
 import * as plt from './bridge/pilotless.js';
 import { DebrisNet } from './bridge/debrisNet.js';
+import { StructLog } from './bridge/structLog.js';
 import { OwnCauses } from './bridge/ownCauses.js';
 
 // (The engine interface, events and constants now live in bridge/core.ts; re-exported for everything that imports them from here)
@@ -86,6 +87,8 @@ export class ShipBridge {
   private contactFx = new Map<string, number>();
   /** Debris clients work out themselves: splits to tell, spawn checks, what moved otherwise (bridge/debrisNet.ts) */
   readonly debrisNet = new DebrisNet();
+  /** Each ship's structures after its last few rebuild ticks, for clients keeping each (CAPS.STRUCTS, bridge/structLog.ts) */
+  readonly structLog = new StructLog();
   private joinCache = new WeakMap<Blueprint, [number, number][]>();
   /** EMP'd ships: engines and guns dead until this tick */
   private empUntil = new Map<number, number>();

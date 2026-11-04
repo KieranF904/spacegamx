@@ -53,8 +53,11 @@ export function netCaps(): number {
   const pilots = bodies && (flag('pilots', 'sg.pilots') ?? dev);
   // (crowd fallbacks: its system's level, a smaller focus, a wider window, a slower clock: common network/crowd.ts)
   const crowd = flag('crowd', 'sg.crowd') ?? dev;
+  // (every structure a ship it holds flew, kept by its rebuild's tick: two rebuilds in a window worked out, not keyframed)
+  const structs = causes && (flag('structs', 'sg.structs') ?? dev);
   return hits | (compact ? CAPS.INPUTS : 0) | (packed ? CAPS.PACKED : 0) | (coalesce ? CAPS.COALESCE : 0) | (ownShots ? CAPS.OWN_SHOTS : 0) | (rough ? CAPS.ROUGH : 0) | (ownSim ? CAPS.OWN_SIM : 0) | (bodies ? CAPS.BODIES : 0)
-    | (blocks ? CAPS.BLOCKS : 0) | (focus ? CAPS.FOCUS : 0) | (causes ? CAPS.CAUSES : 0) | (waypoints ? CAPS.WAYPOINTS : 0) | (pilots ? CAPS.PILOTS : 0) | (crowd ? CAPS.CROWD : 0);
+    | (blocks ? CAPS.BLOCKS : 0) | (focus ? CAPS.FOCUS : 0) | (causes ? CAPS.CAUSES : 0) | (waypoints ? CAPS.WAYPOINTS : 0) | (pilots ? CAPS.PILOTS : 0) | (crowd ? CAPS.CROWD : 0)
+    | (structs ? CAPS.STRUCTS : 0);
 }
 
 /**

@@ -92,6 +92,7 @@
   "stepDebrisWorld",
   "stepMovement",
   "stepWeapons",
+  "structLog",
   "targetOf",
   "teleport",
   "tick",

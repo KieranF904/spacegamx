@@ -46,9 +46,10 @@ export interface ClientConnection {
   /**
    * Ship bodies this client has been synced to: entity id → the ship state and rebuild count sent, the snapshot its HP
    * was last brought up to date at (`hpAt`: skip it while the ship's HP hasn't changed since), and the tick a shipSync
-   * last went (`at`: a client finding its own hits leaves a ship synced in that snapshot to the records, HitLedger)
+   * last went (`at`: a client finding its own hits leaves a ship synced in that snapshot to the records, HitLedger);
+   * `kept`: the rebuild counts whose structures it keeps by tick, oldest first (CAPS.STRUCTS: every one since went)
    */
-  shipSynced: Map<number, { ship: ShipState; rebuilds: number; hpAt?: number; at?: number }>;
+  shipSynced: Map<number, { ship: ShipState; rebuilds: number; hpAt?: number; at?: number; kept?: number[] }>;
   /** Last part HP sent to this client, per ship body */
   shipHpSent: Map<number, number[]>;
   /** Entity names this client has been sent (names go once) */

@@ -17,9 +17,10 @@ import {
   type ReplicaCauses, type ShipReplicaSet, type ShipDerived, type ShipState, type ShipTuning, type FlightBody,
   type OwnCauseEnv, type OwnShape, type PlacedGeom, type ServerSnapshotMessage, type Vec2,
 } from '@space-game/common';
+import type { StructSource } from '../ShipStore.js';
 
 export interface ShipCausesHost {
-  store: { get(id: number): ShipState | undefined; geometry(ship: ShipState): PlacedGeom[] };
+  store: StructSource;
   reps: ShipReplicaSet;
   /** Its own ship's id */
   self(): number;
@@ -159,6 +160,9 @@ export class ShipCauses implements ReplicaCauses {
   // ---- ReplicaCauses (ShipReplicaSet asks these as it steps another ship) ----
 
   derived(id: number, t: number): ShipDerived | undefined {
+    // (Each structure kept by its tick, CAPS.STRUCTS: the one it flew then)
+    const kept = this.host.store.derivedAt?.(id, t);
+    if (kept) return kept;
     const u = this.until.get(id);
     return u && t <= u.tick ? u.derived : undefined;
   }
@@ -209,7 +213,7 @@ export class ShipCauses implements ReplicaCauses {
       other: (o) => {
         const os = store.get(o) ?? this.kept.get(t + ':' + o);
         if (!os) return null;
-        const od = this.touched.get(t + ':' + o) ?? (o === this.host.self() ? this.host.ownDerived?.(t) : this.derived(o, t)) ?? os.derived;
+        const od = store.derivedAt?.(o, t) ?? this.touched.get(t + ':' + o) ?? (o === this.host.self() ? this.host.ownDerived?.(t) : this.derived(o, t)) ?? os.derived;
         if (!od) return null;
         // (Its replica as the pass had it: a row with the state doesn't read it, and one not held has none)
         const row = rows.find((r) => r.row[0] === OWN_CAUSE.CONTACT && r.row[1] === o);
@@ -217,7 +221,11 @@ export class ShipCauses implements ReplicaCauses {
         const at = !stateless ? null : o === this.host.self() ? this.host.ownMid?.(t, id) ?? null : this.midOf(o, t, row.seq);
         return { shape: shapeOf(os, od, store.geometry(os)), body: at ? { x: at.x, y: at.y, angle: at.angle, vx: at.vx, vy: at.vy } : { x: 0, y: 0, angle: 0, vx: 0, vy: 0 } };
       },
-      rebuilt: () => (u && u.tick === t ? { from: u.from, to: u.to } : null),
+      rebuilt: () => {
+        const kept = store.rebuildAt?.(id, t);
+        if (kept !== undefined) return kept;
+        return u && u.tick === t ? { from: u.from, to: u.to } : null;
+      },
     };
   }
 }

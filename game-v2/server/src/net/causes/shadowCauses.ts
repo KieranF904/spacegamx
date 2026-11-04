@@ -34,8 +34,7 @@ export interface WorkedCauses { rows: number[][]; seqs: number[]; env: OwnCauseE
 
 /**
  * A ship's causes on one tick, made into rows; a string instead when a client couldn't work them out from rows (why:
- * the ship gets a keyframe). `window`: its causes earlier in the snapshot window (a second rebuild in one can't be: the
- * structure between isn't on the client)
+ * the ship gets a keyframe). `window`: its causes earlier in the snapshot window
  */
 export function workCauses(causes: readonly OwnCause[], window: readonly CauseEvent[], cellSize: number, restitution: number): WorkedCauses | string {
   const rows: number[][] = [], seqs: number[] = [];
@@ -50,7 +49,8 @@ export function workCauses(causes: readonly OwnCause[], window: readonly CauseEv
       self ??= c.self;
       rows.push([OWN_CAUSE.CONTACT, c.other, c.flags | CONTACT_FLAG.STATE, c.pre.x, c.pre.y, c.pre.angle, c.pre.vx, c.pre.vy]);
     } else {
-      if (rebuilt || window.some((e) => e.row[0] === OWN_CAUSE.REBUILD)) return 'rebuilt twice in a window';
+      // (Two in a window: a client keeping each structure works them out (CAPS.STRUCTS); the rest are keyframed, Replication.rebuildOk)
+      if (rebuilt) return 'rebuilt twice in a tick';
       rebuilt = { from: [c.from[0], c.from[1]], to: [c.to[0], c.to[1]] };
       rows.push([OWN_CAUSE.REBUILD]);
     }

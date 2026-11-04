@@ -49,6 +49,7 @@ export function spawnOn(b: BridgeCtx, eid: number, bp: Blueprint, kind: 'ship' |
   b.bodies.set(eid, ship);
   b.ungridded.add(eid);
   b.debrisNet.noteCom(eid, ship.rebuilds, ship.derived.com);
+  b.structLog.note(eid, ship, b.host.getTick());
   Radius.value[eid] = Math.max(1, ship.derived.radius);
   return ship;
 }
@@ -141,6 +142,7 @@ export function forget(b: BridgeCtx, eid: number): void {
   b.lastFired.delete(eid);
   b.ungridded.delete(eid);
   b.debrisNet.forget(eid);
+  b.structLog.forget(eid);
   b.host.shipForgotten?.(eid);
   for (const [k, v] of b.targets) if (v === eid) b.targets.delete(k);
 }
@@ -401,6 +403,7 @@ export function rebuildNow(b: BridgeCtx, eid: number, ship: ShipState, derivable
     rebuildShip(ship, b.catalog, b.tuning);
     b.debrisNet.noteCom(eid, ship.rebuilds, ship.derived.com);
   }
+  b.structLog.note(eid, ship, b.host.getTick());
   const held = b.charge.get(eid);
   if (held) b.setCharge(eid, remapCharge(before, ship.derived, held));
 

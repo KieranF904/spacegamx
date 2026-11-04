@@ -20,12 +20,13 @@ import {
   ASTEROID_SEED, MAP_DOT_SLACK, STATION_DESIGNS, STATION_WEAPONS, EntityType, packCursorWeaponState, quantizeShipValue, packCharge, gunStateAt, packGunState, PILOT_ROW,
   warmthPercent, fartherThan, hpWire, derivedRow, type BlockStore,
   mapDotFlags, legAt, packMapLeg, packMapRoute, unpackMapLegs, nearerThan, packIds, packRuns, packRanges, DEBRIS_STATUS, TICK_RATE,
-  FOCUS_RANGE, CROWD_BASE_WINDOW,
+  FOCUS_RANGE, CROWD_BASE_WINDOW, structsFor,
   type Leg, type EntityState, type ShipState, type ClientSocket, type ServerMessage, type ServerAsteroidSeedMessage, type StarSystemData, type AsteroidSpawnData, dhypot,
 } from '@space-game/common';
 import type { GameData } from '../data/GameData.js';
 import type { ClientConnection } from './ClientConnection.js';
 import type { ShipBridge } from '../ships/ShipBridge.js';
+import { nextSync, type StructEntry } from '../ships/bridge/structLog.js';
 import type { SimLod } from '../ships/SimLod.js';
 import type { Enemies } from '../game/Enemies.js';
 import type { Party } from '../game/Party.js';
@@ -302,6 +303,31 @@ export class SnapshotBuilder {
   }
 
   /**
+   * The rebuild counts whose structures a client will keep once this frame's syncs are in (CAPS.STRUCTS; they go after
+   * its replication is worked out but before its snapshot: sendShipUpdates)
+   */
+  private keptAfter(conn: ClientConnection, id: number, systemId: number): readonly number[] | undefined {
+    const ship = this.ships.bodies.get(id), synced = conn.shipSynced.get(id);
+    if (!ship) return undefined;
+    // (Not synced this frame: what it has)
+    if (!conn.shipView.has(id) || InSystem.systemId[id] !== systemId || conn.debrisHeld.has(id)) return synced?.ship === ship ? synced.kept : undefined;
+    if (synced?.ship === ship && synced.rebuilds === ship.rebuilds) return synced.kept;
+    return nextSync(this.ships.structLog, id, ship, synced).kept;
+  }
+
+  /** A structure a ship flew between the one a client has and its current one (CAPS.STRUCTS: bridge/structLog.ts), as its sync */
+  private sendBetween(conn: ClientConnection, id: number, ship: ShipState, e: StructEntry): void {
+    const hp = e.hp.map(hpWire), had = conn.shipHpSent.get(id);
+    const hpd = had && had.length === hp.length ? hp.flatMap((h, i) => (had[i] !== h ? [[i, h] as [number, number]] : [])) : undefined;
+    conn.shipHpSent.set(id, [...hp]);
+    this.send(conn.ws, {
+      type: 'shipSync', id, kind: ship.kind, hp: hpd ? undefined : hp, hpd: hpd?.length ? hpd : undefined,
+      maxHp: !hpd && ship.scaledHp ? ship.maxHp.map(hpWire) : undefined,
+      detached: [...e.detached], rebuilds: e.rebuilds, ghosts: e.ghosts ? [...e.ghosts] : undefined, at: e.tick,
+    });
+  }
+
+  /**
    * `syncs` and `hps`: a client taking confirmed hits gets its syncs before its snapshot (as everyone does) and its HP
    * after its records (HitLedger: they bring its copy up to date first), so the two go separately
    */
@@ -321,7 +347,15 @@ export class SnapshotBuilder {
       // A refit or respawn replaces the ShipState (its rebuild count restarts), so compare both
       if (syncs && (!synced || synced.ship !== ship || synced.rebuilds !== ship.rebuilds)) {
         const fresh = !synced || synced.ship !== ship;
-        synced = { ship, rebuilds: ship.rebuilds, at: this.currentTick };
+        // (Keeping each structure by its tick, CAPS.STRUCTS: the ones between go first, in order, each with its tick)
+        let kept: number[] | undefined, at: number | undefined;
+        if (structsFor(conn.caps)) {
+          const next = nextSync(this.ships.structLog, id, ship, synced);
+          for (const e of next.between) this.sendBetween(conn, id, ship, e);
+          kept = next.kept;
+          at = next.at;
+        }
+        synced = { ship, rebuilds: ship.rebuilds, at: this.currentTick, kept };
         conn.shipSynced.set(id, synced);
         const sync = this.syncWireOf(id, ship);
         const hp = sync.hp;
@@ -345,6 +379,7 @@ export class SnapshotBuilder {
           detached: sync.detached,
           rebuilds: ship.rebuilds,
           ghosts: sync.ghosts,
+          at,
         });
       }
       if (!hps_ || !synced) continue;
@@ -678,7 +713,7 @@ export class SnapshotBuilder {
         holds: (e) => conn.shipView.has(e) && conn.repKnown.has(e),
         rekeyed: (e) => this.replication.keysFor(e, conn.playerId, conn.repKnown, causes),
       }, this.currentTick);
-      const rep = this.replication.forClient(playerSystemId, conn.playerId, conn.repKnown, this.currentTick, conn.shipView, conn.debrisHeld, ownShots, (id) => conn.shipSynced.get(id)?.rebuilds, bodies ? (id) => bodies.runs(conn, id) : undefined, causes);
+      const rep = this.replication.forClient(playerSystemId, conn.playerId, conn.repKnown, this.currentTick, conn.shipView, conn.debrisHeld, ownShots, (id) => conn.shipSynced.get(id)?.rebuilds, bodies ? (id) => bodies.runs(conn, id) : undefined, causes, structsFor(conn.caps) ? (id) => this.keptAfter(conn, id, playerSystemId) : undefined);
       // Shots from ships it replicates go as fire events: it builds the shells itself (launch.ts).
       // Not for a ship it's only now getting a keyframe for (it can't place it back then), nor its
       // own unless it replicates that too; those shells, and any flying in from further off, go as rows.

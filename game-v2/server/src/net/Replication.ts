@@ -131,6 +131,11 @@ const sameDock = (a: Shadow['dock'], b: Shadow['dock']) => (!a && !b) || (!!a &&
 /** How long a removed ship's causes are remembered (causedInWindow): longer than the widest snapshot window */
 const GONE_CAUSED_TICKS = 16;
 
+/** A client's kept structures of a ship (CAPS.STRUCTS: ClientConnection.shipSynced kept), its rebuild counts oldest first; undefined: none kept */
+export type Kept = (id: number) => readonly number[] | undefined;
+
+const sameVec = (a: readonly number[], b: readonly number[]) => a[0] === b[0] && a[1] === b[1];
+
 export class Replication {
   private shadows = new Map<number, Shadow>();
   /** Pairs of debris that knocked since the last snapshot (a client with one in view and not the other is off on it) */
@@ -508,7 +513,7 @@ export class Replication {
    * it, so it has its ship as the server's shadow has it, tick by tick, beside its
    * prediction (its own shells are built from that: SnapshotBuilder, ownShots.ts)
    */
-  forClient(systemId: number, self: number, known: Map<number, number>, snapshotTick: number, view?: Set<number>, held?: ReadonlyMap<number, unknown>, own = false, synced?: (id: number) => number | undefined, bodies?: (id: number) => boolean, causes = false): { ships: KeyframeRow[]; ctl: ControlRow[]; own?: number[][]; ownRebuild?: number; causes?: number[][]; caused?: number[] } {
+  forClient(systemId: number, self: number, known: Map<number, number>, snapshotTick: number, view?: Set<number>, held?: ReadonlyMap<number, unknown>, own = false, synced?: (id: number) => number | undefined, bodies?: (id: number) => boolean, causes = false, kept?: Kept): { ships: KeyframeRow[]; ctl: ControlRow[]; own?: number[][]; ownRebuild?: number; causes?: number[][]; caused?: number[] } {
     const ships: KeyframeRow[] = [];
     const ctl: ControlRow[] = [];
     const out: { own?: number[][]; ownRebuild?: number; causes?: number[][]; caused?: number[]; ownEvents?: CauseEvent[] } = {};
@@ -518,7 +523,7 @@ export class Replication {
     // Its own ship, stepped by itself (CAPS.OWN_SIM): this window's causes, the real controls only where its inputs
     // don't say them, and a keyframe only when it can't have its ship otherwise (first, before the others' versions move on)
     const mine = own && this.host.ownSim?.(self) ? this.shadows.get(self) : undefined;
-    if (mine?.own && InSystem.systemId[self] === systemId && (!view || view.has(self))) this.ownFor(self, mine, mine.own, known, snapshotTick, ships, ctl, out, synced, causes);
+    if (mine?.own && InSystem.systemId[self] === systemId && (!view || view.has(self))) this.ownFor(self, mine, mine.own, known, snapshotTick, ships, ctl, out, synced, causes, kept);
     for (const id of known.keys()) if (!this.shadows.has(id)) known.delete(id);
     // (Not sent its own: what it has of it goes stale, so it starts again from a keyframe when it is)
     if (!own) known.delete(self);
@@ -537,7 +542,7 @@ export class Replication {
       // Out of the client's view: nothing (and a keyframe when it comes back)
       if (view && !view.has(eid)) { known.delete(eid); continue; }
       // (Causes it can't work out: a contact with a ship whose structure it hasn't got as the pass had it: a keyframe)
-      if (causes && s.causes.length && !this.workable(s, synced, self, mine, view, eid)) { known.delete(eid); this.causeStats.unworkable++; }
+      if (causes && s.causes.length && !this.workable(s, synced, self, mine, view, eid, kept)) { known.delete(eid); this.causeStats.unworkable++; }
       // Flown by its body on this client's tick layer (CAPS.BODIES): a keyframe only when its bodied shadow left the ship
       if (s.bodied && bodies?.(eid)) {
         if (known.get(eid) !== bver(s)) {
@@ -612,13 +617,15 @@ export class Replication {
    * Can a client work this window's causes of a ship out: has it each contact's other's structure as the pass had it
    * (or will it, by this frame's sync: one in view rebuilt no further since; syncs go before the snapshot)
    */
-  private workable(s: Shadow, synced: ((id: number) => number | undefined) | undefined, self: number, mine: Shadow | undefined, view?: Set<number>, eid?: number): boolean {
+  private workable(s: Shadow, synced: ((id: number) => number | undefined) | undefined, self: number, mine: Shadow | undefined, view?: Set<number>, eid?: number, kept?: Kept): boolean {
     for (const e of s.causes) {
-      if (e.rebuild && !this.rebuildOk(eid!, e.rebuild, synced)) return false;
+      if (e.rebuild && !this.rebuildOk(eid!, e, s.causes, synced, kept)) return false;
       const c = e.contact;
       if (!c) continue;
       // (Its own ship: it has the structure it flew each tick with)
       if (c.other === self) { if (!mine?.own) return false; continue; }
+      // (Keeping every structure by its tick, CAPS.STRUCTS: the one the other had then)
+      if (kept?.(c.other)?.includes(c.rebuilds)) continue;
       const now = this.ships.get(c.other)?.rebuilds, has = synced ? synced(c.other) : now;
       if (has === c.rebuilds || (now === c.rebuilds && (!view || view.has(c.other)))) continue;
       return false;
@@ -631,7 +638,16 @@ export class Replication {
    * after, so those must be the rebuild's either side (none of its other rebuilds in between: a death's, say, that
    * isn't a cause)
    */
-  private rebuildOk(eid: number, r: NonNullable<CauseEvent['rebuild']>, synced?: (id: number) => number | undefined): boolean {
+  private rebuildOk(eid: number, e: CauseEvent, window: readonly CauseEvent[], synced?: (id: number) => number | undefined, kept?: Kept): boolean {
+    const r = e.rebuild!;
+    // (Keeping every structure by its tick, CAPS.STRUCTS: this rebuild's and the one before it, in that order)
+    const k = kept?.(eid);
+    if (k) {
+      const pr = this.ships.structLog.around(eid, e.tick), i = pr ? k.indexOf(pr[1].rebuilds) : -1;
+      return !!pr && i > 0 && k[i - 1] === pr[0].rebuilds && sameVec(pr[1].com, r.to) && sameVec(pr[0].com, r.from);
+    }
+    // (Else from the one it has before this frame's sync to the one after: a second in the window has the one between)
+    if (window.filter((w) => w.rebuild).length > 1) return false;
     const ship = this.ships.get(eid);
     if (!ship || ship.derived.com[0] !== r.to[0] || ship.derived.com[1] !== r.to[1]) return false;
     const has = synced ? synced(eid) : undefined, had = has === undefined ? undefined : this.ships.debrisNet.comAt(eid, has);
@@ -639,7 +655,7 @@ export class Replication {
   }
 
   /** One pilot's own ship (CAPS.OWN_SIM): see forClient */
-  private ownFor(eid: number, s: Shadow, o: OwnShadow, known: Map<number, number>, snapshotTick: number, ships: KeyframeRow[], ctl: ControlRow[], out: { own?: number[][]; ownRebuild?: number; ownEvents?: CauseEvent[] }, synced?: (id: number) => number | undefined, causes = false): void {
+  private ownFor(eid: number, s: Shadow, o: OwnShadow, known: Map<number, number>, snapshotTick: number, ships: KeyframeRow[], ctl: ControlRow[], out: { own?: number[][]; ownRebuild?: number; ownEvents?: CauseEvent[] }, synced?: (id: number) => number | undefined, causes = false, kept?: Kept): void {
     // (A contact whose other it can't have as the pass had it: rebuilt since, or a ship this client doesn't have)
     for (const e of o.events) {
       const c = e.contact;
@@ -647,10 +663,10 @@ export class Replication {
       // (Rebuilt since, while its client still had it as it was: it keeps that structure when the new one comes, OTHER_BEFORE)
       const now = this.ships.get(c.other)?.rebuilds ?? -1;
       c.before = this.before(c, synced);
-      if (!known.has(c.other) || (now !== c.rebuilds && !c.before)) { o.version--; this.ownWhy('contact: other not had'); break; }
+      if (!known.has(c.other) || (now !== c.rebuilds && !c.before && !kept?.(c.other)?.includes(c.rebuilds))) { o.version--; this.ownWhy('contact: other not had'); break; }
     }
     // (A rebuild it can't work out from the structures it has either side of this frame's sync)
-    for (const e of o.events) if (e.rebuild && !this.rebuildOk(eid, e.rebuild, synced)) { o.version--; this.ownWhy('rebuild not had'); break; }
+    for (const e of o.events) if (e.rebuild && !this.rebuildOk(eid, e, o.events, synced, kept)) { o.version--; this.ownWhy('rebuild not had'); break; }
     if (known.get(eid) !== o.version) {
       known.set(eid, o.version);
       ships.push(s.keyRow ??= packKeyframe({ id: eid, mode: s.mode, body: this.real(eid), ctl: { bits: s.bits, targetAngle: 0 }, q: s.q, dock: s.dock ?? undefined }));

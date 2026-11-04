@@ -42,6 +42,8 @@ export class Probe {
   measuring = false;
   frames: Buffer[] = [];
   rawBytes = 0;
+  /** Bytes by message type, each message as the plain codec encodes it (blocks frames pack them: a guide to the share, not the wire) */
+  readonly sub: Record<string, number> = {};
   messages = 0;
   upMsgs = 0;
   upBytes = 0;
@@ -62,13 +64,16 @@ export class Probe {
     this.fake = new FakeHitsClient(server, {
       name, caps, env,
       defer: (data) => {
-        if (this.measuring) { this.frames.push(Buffer.from(data)); this.rawBytes += data.length; this.messages++; }
+        if (this.measuring) {
+          this.frames.push(Buffer.from(data)); this.rawBytes += data.length; this.messages++;
+        }
         this.down.push({ at: this.tick() + lat, data });
       },
     });
     this.pid = this.fake.pid;
     this.lat = lat;
-    const f = this.fake as any, oSnap = f.snapshot.bind(f);
+    const f = this.fake as any, oSnap = f.snapshot.bind(f), oHandle = f.handle.bind(f);
+    f.handle = (m: any) => { if (this.measuring) this.sub[m.type] = (this.sub[m.type] ?? 0) + encodeMessage(m).length; return oHandle(m); };
     f.snapshot = (s: any) => {
       const held = new Set<number>(f.reps.ids());
       const kf = new Set<number>((s.ships ?? []).map((k: number[]) => k[0]));
