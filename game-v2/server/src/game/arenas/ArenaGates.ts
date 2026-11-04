@@ -40,6 +40,11 @@ export class ArenaGates {
 
   constructor(private host: GatesHost) {}
 
+  /** Who was last in combat, and last hurt (leaving; a boss's recovery) */
+  get combat(): CombatClock {
+    return this.host.combat;
+  }
+
   /** The arena a ship is in the system of, if any */
   arenaAt(eid: number): ArenaDef | undefined {
     return this.host.arenaOf(InSystem.systemId[eid]);

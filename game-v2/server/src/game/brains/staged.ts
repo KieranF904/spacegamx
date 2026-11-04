@@ -289,6 +289,15 @@ export abstract class StagedBrain implements BossBrain {
     this.restUntil = 0;
   }
 
+  /** Shed to the start of stage n (from a fresh boss: forceShed's steps for every stage before it) */
+  devToStage(n: number): void {
+    if (!this.ship) return;
+    const cat = this.host.ships.catalog, last = this.tables.loop.length;
+    let steps = 0;
+    for (let st = 1; st < Math.min(n, last + 1); st++) steps += this.outermostFirst(this.ofStage(st, (i) => deciding(cat, this.ship, i))).length + 1;
+    this.forceShed(steps);
+  }
+
   /** A window now: its signature's if it has one by this name, else the dev default */
   devWindow(name?: string): void {
     if (!this.view) return;
@@ -400,7 +409,7 @@ export abstract class StagedBrain implements BossBrain {
   /** Every pilot within `reach` of a point catches fire */
   protected scorch(x: number, y: number, reach: number, dps: number): void {
     for (const q of this.host.players(this.view.systemNum)) {
-      if (dhypot(Position.x[q] - x, Position.y[q] - y) > reach) continue;
+      if (dhypot(Position.x[q] - x, Position.y[q] - y) > reach || this.walled(x, y, q)) continue;
       const part = this.host.ships.ignite(q, x, y, dps * this.view.damage, 150, 1.2, this.view.eid);
       if (part >= 0) this.host.send(this.view.systemNum, { type: 'ignite', bodyId: q, part, ticks: 150 });
     }
@@ -410,11 +419,17 @@ export abstract class StagedBrain implements BossBrain {
   protected pull(x: number, y: number, r: number, k: number): void {
     for (const q of this.host.players(this.view.systemNum)) {
       const dx = x - Position.x[q], dy = y - Position.y[q], d = dhypot(dx, dy);
-      if (d > r || d < 1) continue;
+      if (d > r || d < 1 || this.walled(x, y, q)) continue;
       const f = k * (1 - d / r);
       // (Through the bridge: a pilot's client is told the push, TEMPORARY until boss decisions are inputs: ShipBridge.push)
       this.host.ships.push(q, (dx / d) * f, (dy / d) * f);
     }
+  }
+
+  /** Rock (or an arena's barrier) between a point and a pilot: pulls and burns don't reach through it */
+  protected walled(x: number, y: number, q: number): boolean {
+    const t = this.host.terrain?.(this.view.systemNum);
+    return !!t && rayTerrain(t, x, y, Position.x[q], Position.y[q]) < 1;
   }
 
   /** Aimed at where a pilot will be when a shot `speed` fast gets there */

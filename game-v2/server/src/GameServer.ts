@@ -149,6 +149,7 @@ import { Arenas, type ArenaHost } from './game/Arenas.js';
 import { Bosses, BossesFile } from './game/Bosses.js';
 import { ArenaGates } from './game/arenas/ArenaGates.js';
 import { CombatClock } from './game/arenas/CombatClock.js';
+import { BossDev } from './game/dev/bossDev.js';
 import { Mobs, MobsFile } from './game/Mobs.js';
 import { Events } from './game/Events.js';
 import { AdminTools, type AdminConn, type AdminHost } from './game/AdminTools.js';
@@ -637,6 +638,8 @@ export class GameServer implements ServerCtx {
   readonly combat = new CombatClock();
   /** Boss arenas' barriers: passing them (game/arenas/ArenaGates.ts) */
   readonly arenaGates: ArenaGates;
+  /** (dev) The boss tools: dev servers and admins only (game/dev/bossDev.ts) */
+  readonly bossDev: BossDev<ClientConnection>;
   /** Single-body enemies (data/mobs.json): what boss bays launch */
   readonly mobs: Mobs;
   readonly events: Events;
@@ -902,6 +905,24 @@ export class GameServer implements ServerCtx {
       combat: this.combat,
     });
     this.bosses.gates = this.arenaGates;
+    this.bossDev = new BossDev<ClientConnection>({
+      tick: () => this.currentTick,
+      bosses: this.bosses,
+      gates: this.arenaGates,
+      ships: this.ships,
+      send: (conn, msg) => this.send(conn.ws, msg),
+      toast: (conn, text, kind) => this.pilots.toast(conn, text, kind),
+      nameOf: (eid) => this.pilots.connOf(eid)?.username ?? (this.bosses.unhurt.has(eid) ? `dummy ${eid}` : `#${eid}`),
+      teleport: (eid, x, y) => { this.ships.teleport(eid, x, y); Velocity.x[eid] = 0; Velocity.y[eid] = 0; },
+      slow: (num, rate) => {
+        if (!this.crowd || !this.clocks) return false;
+        // (a crowd level with that rate, pinned: CrowdControl leaves a forced level alone; 60 lets it go)
+        this.crowd.force(num, rate === 30 ? 7 : rate === 15 ? 9 : null);
+        return true;
+      },
+      rateOf: (num) => this.clocks?.rateOf(num) ?? 60,
+      live: (conn) => this.clients.has(conn.ws),
+    });
     this.enemies.mobs = this.mobs;
     this.events = new Events(this.createEventHost(), this.enemies, this.gameData.factionsFile as FactionsFile, this.gameData.rulesFile.events, this.gameData.stringsFile);
     this.party = new Party(this.createPartyHost());
@@ -2435,6 +2456,7 @@ this.devTeleport = opts.devTeleport ?? false;
       beamAsteroid: (eid, x, y, angle, range, damage, kind) => this.beamAsteroid(eid, x, y, angle, range, damage, kind),
       notifyDamage: (targetEid, amount, sourceEid, glancing) => {
         this.combat.note(targetEid, sourceEid, this.currentTick);
+        this.bossDev?.onDamage(targetEid, amount, sourceEid);
         this.bosses?.onDamage(targetEid, amount, sourceEid);
         this.range?.onDamage(targetEid, amount);
         // (Summed per target and source until the next snapshot, net/snapshot/Outbox.ts flushDamage)
@@ -3050,6 +3072,11 @@ this.devTeleport = opts.devTeleport ?? false;
       }
       this.pilots.toast(conn, `Boss worn to ${Math.round(this.ships.integrity(boss) * 100)}%`, 'info');
     });
+    // The boss tools (game/dev/bossDev.ts): dev servers and admins, never in production
+    t.on('bossDevTool', (_ctx, conn, msg) => {
+      if (process.env.NODE_ENV === 'production' || (!this.devTeleport && !conn.isAdmin)) return;
+      this.bossDev.handle(conn, msg);
+    });
     t.on('devRange', (_ctx, conn, msg) => {
       this.handleDevRange(conn, msg);
     });
@@ -3529,7 +3556,7 @@ this.devTeleport = opts.devTeleport ?? false;
       { name: 'weaponSystem', pass: true, phase: 'combat', run: () => this.weaponSystem() },
       { name: 'projectileSystem', pass: true, phase: 'combat', run: () => this.projectileSystem() },
       { name: 'enemies', pass: true, phase: 'combat', scene: 'sectors', run: () => { this.enemies.tick(); this.range?.tick(); } },
-      { name: 'bosses', pass: true, phase: 'combat', scene: 'sectors', run: () => this.bosses.tick() },
+      { name: 'bosses', pass: true, phase: 'combat', scene: 'sectors', run: () => { this.bosses.tick(); this.bossDev.tick(); } },
       { name: 'mobs', pass: true, phase: 'combat', scene: 'sectors', run: () => this.mobs.tick() },
       { name: 'events', phase: 'combat', scene: 'sectors', run: () => this.events.tick() },
       { name: 'surfaces', phase: 'combat', scene: 'sectors', run: () => this.surfaces.tick() },

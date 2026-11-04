@@ -85,6 +85,7 @@ export interface BossDevHooks {
   devMoves(): string[];
   devPersonal(): string[];
   devPlay(name: string): void;
+  devToStage(n: number): void;
   devWindow(name?: string): void;
   devPersonalOn(name: string, target: number): boolean;
   readonly fight: import('./fightRules.js').FightRules;

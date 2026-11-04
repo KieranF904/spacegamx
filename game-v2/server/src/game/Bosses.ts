@@ -35,7 +35,7 @@ import { BroodMotherBrain } from './brains/broodMother.js';
 import { SimPass } from '../sim/SystemClocks.js';
 import { Lifecycle } from './bosses/Lifecycle.js';
 import type { ArenaGates } from './arenas/ArenaGates.js';
-import { LIFE_ASLEEP_RESET, type ArenaDef } from '@space-game/common';
+import { LIFE_ASLEEP_RESET, type ArenaDef, type LifeState } from '@space-game/common';
 
 /** Bosses with a mind of their own (bosses.json `brain`): their moves are written out in server/src/game/brains */
 const BRAINS: Record<string, (host: BrainHost) => BossBrain> = {
@@ -207,7 +207,7 @@ export class Bosses {
       active: (num) => SimPass.on(num),
       present: (num) => this.gatesRef?.present(num) ?? [],
       players: (num) => host.players(num),
-      lastHurt: (eid) => ships.lastDamagedTick(eid),
+      lastHurt: (eid) => this.gatesRef?.combat.lastHurt(eid) ?? ships.lastDamagedTick(eid),
       spawn: (id) => { const d = this.file.bosses[id], num = d ? host.systemNum(d.system) : -1; return d && num >= 0 ? this.create(id, id, d, num, d.lair.x, d.lair.y, true) : -1; },
       remove: (eid) => { const b = this.byEid.get(eid); if (b) this.despawn(b); },
       heal: (eid, share) => ships.healAll(eid, share),
@@ -615,6 +615,34 @@ export class Bosses {
   /** Living pilots in a system (as bosses count them: not hidden admins, not docked) */
   livePlayers(num: number): number[] {
     return this.host.players(num);
+  }
+
+  /** (dev) The bosses of a system as the boss tools list them: living ones, and lair bosses lying dormant there */
+  devList(num: number): { id: string; name: string; eid: number; life: LifeState | 'live' }[] {
+    const out = [...this.live.values()].filter((b) => b.systemNum === num).map((b) => ({ id: b.id, name: b.def.name, eid: b.eid, life: this.life.stateOf(b.id) ?? ('live' as const) }));
+    for (const [id, def] of Object.entries(this.file.bosses)) {
+      if (this.live.has(id) || def.arena || this.host.systemNum(def.system) !== num) continue;
+      if (this.arenaFor(id, def)) out.push({ id, name: def.name, eid: -1, life: this.life.stateOf(id) ?? 'dormant' });
+    }
+    return out;
+  }
+
+  /** (dev) Where to be put to visit it: outside its barrier, or beside its lair */
+  devOutside(id: string): { x: number; y: number } | null {
+    const def = this.file.bosses[id];
+    if (!def) return null;
+    const a = this.arenaFor(id, def);
+    return a ? a.outside : { x: def.lair.x, y: def.lair.y + 2500 };
+  }
+
+  /** (dev) Every living boss's ship */
+  devLive(): number[] {
+    return [...this.byEid.keys()];
+  }
+
+  /** Is this ship a boss */
+  isBossShip(eid: number): boolean {
+    return eid >= 0 && this.byEid.has(eid);
   }
 
   /** Living bosses in a system, for the snapshot */
