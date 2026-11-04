@@ -45,6 +45,8 @@ chown -R spacegame:spacegame "$APP"
 #   ADMIN_SERVER_PASSWORD  the game server's admin dashboard (127.0.0.1:3105 only; see it with
 #                       sudo grep ADMIN_SERVER_PASSWORD /etc/spacegame/secrets.env). Not ADMIN_PASSWORD: the lobby
 #                       reads that one to make an admin account
+# Not made here (add by hand if wanted): OWNER_USERNAMES, comma-separated usernames the lobby makes the owner (the rank
+# above admin) at every start, e.g. OWNER_USERNAMES=brotherk3d. Not a secret, but the lobby reads this file.
 SECRETS=/etc/spacegame/secrets.env
 install -d -m 700 /etc/spacegame
 for name in LOBBY_ADMIN_SECRET SITE_SECRET ADMIN_SERVER_PASSWORD; do

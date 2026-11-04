@@ -15,14 +15,16 @@ import { JsonSiteStore } from './store/JsonSiteStore.js';
 import { Uploads } from './uploads.js';
 import { RateLimiter } from './security.js';
 
-interface FakeUser { id: number; username: string; email: string; password: string; isAdmin: boolean }
+interface FakeUser { id: number; username: string; email: string; password: string; isAdmin: boolean; isOwner?: boolean }
 
+/** (The account "admin" is the owner; the ranks' rules are the lobby's own, tested there: this records what it's asked) */
 class FakeLobby implements Lobby {
-  users: FakeUser[] = [{ id: 1, username: 'admin', email: 'a@x.io', password: 'admin', isAdmin: true }];
+  users: FakeUser[] = [{ id: 1, username: 'admin', email: 'a@x.io', password: 'admin', isAdmin: true, isOwner: true }];
+  calls: unknown[][] = [];
   tokens = new Map<string, number>();
   private n = 0;
   private session(u: FakeUser) { const t = `tok${++this.n}`.padEnd(32, 'x'); this.tokens.set(t, u.id); return { ok: true as const, token: t, user: this.pub(u) }; }
-  private pub(u: FakeUser): LobbyUser { return { id: u.id, username: u.username, isAdmin: u.isAdmin }; }
+  private pub(u: FakeUser): LobbyUser { return { id: u.id, username: u.username, isAdmin: u.isAdmin, isOwner: !!u.isOwner }; }
   private by(token: string) { const id = this.tokens.get(token); return this.users.find((u) => u.id === id) ?? null; }
   async login(username: string, password: string) {
     const u = this.users.find((x) => x.username.toLowerCase() === username.toLowerCase());
@@ -30,7 +32,7 @@ class FakeLobby implements Lobby {
   }
   async register(username: string, email: string, password: string) {
     if (this.users.some((u) => u.username.toLowerCase() === username.toLowerCase())) return { ok: false as const, error: 'Username already taken', status: 400 };
-    const u = { id: this.users.length + 1, username, email, password, isAdmin: false };
+    const u = { id: Math.max(...this.users.map((x) => x.id)) + 1, username, email, password, isAdmin: false };
     this.users.push(u);
     return this.session(u);
   }
@@ -56,11 +58,25 @@ class FakeLobby implements Lobby {
     this.users = this.users.filter((x) => x !== u);
     return { ok: true as const, id: u.id };
   }
-  private admin(u: FakeUser): AdminUser { return { id: u.id, username: u.username, isAdmin: u.isAdmin, createdAt: '', ban: null }; }
+  private admin(u: FakeUser): AdminUser { return { id: u.id, username: u.username, isAdmin: u.isAdmin, isOwner: !!u.isOwner, createdAt: '', ban: null }; }
   async findUser(username: string) { const u = this.users.find((x) => x.username.toLowerCase() === username.toLowerCase()); return u ? this.admin(u) : null; }
   async listUsers() { return { ok: true as const, users: this.users.map((u) => this.admin(u)), total: this.users.length }; }
-  async ban(username: string) { const u = this.users.find((x) => x.username === username)!; return { ok: true as const, user: this.admin(u) }; }
-  async unban(username: string) { return this.ban(username); }
+  async ban(username: string, ...rest: unknown[]) { this.calls.push(['ban', username, ...rest]); const u = this.users.find((x) => x.username === username)!; return { ok: true as const, user: this.admin(u) }; }
+  async unban(username: string, actor?: string) { this.calls.push(['unban', username, actor]); const u = this.users.find((x) => x.username === username)!; return { ok: true as const, user: this.admin(u) }; }
+  async setAdmin(username: string, on: boolean, actor: string) {
+    this.calls.push(['setAdmin', username, on, actor]);
+    const u = this.users.find((x) => x.username === username);
+    if (!u) return { ok: false as const, error: `No account "${username}"`, status: 404 };
+    u.isAdmin = on;
+    return { ok: true as const, user: this.admin(u) };
+  }
+  async deleteUser(username: string, actor: string) {
+    this.calls.push(['deleteUser', username, actor]);
+    const u = this.users.find((x) => x.username === username);
+    if (!u) return { ok: false as const, error: `No account "${username}"`, status: 404 };
+    this.users = this.users.filter((x) => x !== u);
+    return { ok: true as const, id: u.id };
+  }
 }
 
 const pilots: PilotSource = {
@@ -318,6 +334,62 @@ describe('site routes', () => {
     const after = await anon.page('/updates/pictures');
     expect(after.text).not.toContain('Lovely sun');
     expect(after.text.match(/class="pic-count"/g)).toHaveLength(1); // only the moon's
+  });
+
+  it("owner-only pages and actions refuse admins: tokens, publishing, admin rank, deleting accounts", async () => {
+    lobby.users.push({ id: 900, username: 'mod', email: 'm@x.io', password: 'pw', isAdmin: true }, { id: 901, username: 'target', email: 't@x.io', password: 'pw', isAdmin: false });
+    const mod = new Browser();
+    await mod.signin('mod', 'pw');
+    // Moderation stays theirs
+    expect((await mod.page('/admin')).status).toBe(200);
+    expect((await mod.page('/admin/comments')).status).toBe(200);
+    const pilots = await mod.page('/admin/pilots');
+    expect(pilots.status).toBe(200);
+    expect(pilots.text).not.toContain('Make admin');
+    expect(pilots.text).toContain('<span class="pill pill-admin">owner</span>');
+    expect((await mod.req('/admin/pilots/ban', { method: 'POST', form: { username: 'target', days: '1', reason: 'spam' } })).status).toBe(303);
+    expect(lobby.calls.at(-1)).toEqual(['ban', 'target', expect.any(Number), 'spam', 'mod', 'mod']);
+    // The owner's: refused, saying so
+    const tokens = await mod.page('/admin/tokens');
+    expect(tokens.status).toBe(403);
+    expect(tokens.text).toContain('Owner only');
+    expect((await mod.page('/admin')).text).not.toContain('href="/admin/tokens"');
+    expect((await mod.req('/admin/tokens', { method: 'POST', form: { name: 'sneaky' } })).status).toBe(403);
+    expect((await store.listTokens()).some((t) => t.name === 'sneaky')).toBe(false);
+    const live = await mod.req('/admin/posts', { method: 'POST', form: { title: 'Mod news', body: 'hi', tags: '', status: 'published' } });
+    expect(live.status).toBe(403);
+    expect(live.text).toContain('Only the owner can publish');
+    const draft = await mod.req('/admin/posts', { method: 'POST', form: { title: 'Mod draft', body: 'hi', tags: '', status: 'draft' } });
+    expect(draft.status).toBe(303);
+    const id = Number(/\/admin\/posts\/(\d+)/.exec(draft.location)![1]);
+    expect((await mod.req(`/admin/posts/${id}/publish`, { method: 'POST', form: {} })).status).toBe(403);
+    expect((await store.getPost(id))?.status).toBe('draft');
+    expect((await mod.req(`/admin/posts/${id}`, { method: 'POST', form: { title: 'Mod draft', body: 'hi', tags: '', status: 'published' } })).status).toBe(403);
+    expect((await mod.req('/admin/pilots/admin', { method: 'POST', form: { username: 'target', on: '1' } })).status).toBe(403);
+    expect((await mod.req('/admin/pilots/delete', { method: 'POST', form: { username: 'target' } })).status).toBe(403);
+    expect(lobby.calls.some((c) => c[0] === 'setAdmin' || c[0] === 'deleteUser')).toBe(false);
+    expect(lobby.users.find((u) => u.username === 'target')?.isAdmin).toBe(false);
+    // The API, on a mod's lobby session: drafts yes, publishing no
+    const session = await lobby.login('mod', 'pw');
+    const api = (path: string, init: RequestInit = {}) => fetch(base + path, { ...init, headers: { authorization: `Bearer ${session.ok ? session.token : ''}`, 'content-type': 'application/json' } });
+    expect((await api('/api/v1/posts', { method: 'POST', body: JSON.stringify({ title: 'Api mod', body: 'x', status: 'published' }) })).status).toBe(403);
+    expect((await api('/api/v1/posts', { method: 'POST', body: JSON.stringify({ title: 'Api mod', body: 'x', status: 'draft' }) })).status).toBe(201);
+    expect((await api('/api/v1/posts/api-mod', { method: 'PATCH', body: JSON.stringify({ status: 'published' }) })).status).toBe(403);
+    expect((await store.getPostBySlug('api-mod'))?.status).toBe('draft');
+
+    // The owner can do all of it
+    const owner = new Browser();
+    await owner.signin('admin', 'admin');
+    expect((await owner.page('/admin/pilots')).text).toContain('Make admin');
+    expect((await owner.req(`/admin/posts/${id}/publish`, { method: 'POST', form: {} })).status).toBe(303);
+    expect((await store.getPost(id))?.status).toBe('published');
+    expect((await owner.req('/admin/pilots/admin', { method: 'POST', form: { username: 'target', on: '1' } })).location).toContain('ok=promoted');
+    expect(lobby.calls.at(-1)).toEqual(['setAdmin', 'target', true, 'admin']);
+    expect((await owner.req('/admin/pilots/delete', { method: 'POST', form: { username: 'target' } })).location).toContain('ok=accountdeleted');
+    expect(lobby.calls.at(-1)).toEqual(['deleteUser', 'target', 'admin']);
+    expect(lobby.users.some((u) => u.username === 'target')).toBe(false);
+    // And the account page says owner
+    expect((await owner.page('/account')).text).toContain('<span class="gold">owner</span>');
   });
 
   it('pilot pages and Play (link mode redirects; no token in the URL)', async () => {

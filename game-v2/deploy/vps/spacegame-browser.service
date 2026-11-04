@@ -13,6 +13,8 @@ Environment=BROWSER_PORT=8790
 # This machine only: nginx, the game server and the site all reach it at 127.0.0.1:8790
 Environment=BROWSER_HOST=127.0.0.1
 # LOBBY_ADMIN_SECRET (shared with the game server; remote-install.sh makes it)
+# OWNER_USERNAMES (optional, comma-separated: made the owner, the rank above admin, at every start; put it in
+# secrets.env by hand, e.g. OWNER_USERNAMES=brotherk3d; nothing sets it for you)
 EnvironmentFile=-/etc/spacegame/secrets.env
 Restart=always
 RestartSec=3

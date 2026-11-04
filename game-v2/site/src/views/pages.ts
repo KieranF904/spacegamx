@@ -460,7 +460,7 @@ export function accountPage(ctx: PageCtx, d: { account: LobbyAccount; card: Pilo
 <section class="page-head wrap">
   <p class="eyebrow">Account</p>
   <h1>${a.username}</h1>
-  <p class="lede">Pilot since ${fmtDate(a.createdAt)}${a.isAdmin ? html` · <span class="gold">admin</span>` : ''}. <a href="/pilots/${encodeURIComponent(a.username)}">Public profile</a></p>
+  <p class="lede">Pilot since ${fmtDate(a.createdAt)}${a.isOwner ? html` · <span class="gold">owner</span>` : a.isAdmin ? html` · <span class="gold">admin</span>` : ''}. <a href="/pilots/${encodeURIComponent(a.username)}">Public profile</a></p>
 </section>
 <section class="wrap block-tight account-grid">
   <div class="account-main">

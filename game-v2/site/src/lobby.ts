@@ -9,12 +9,17 @@
  * on localhost, and nginx sets that header itself for the public /lobby/auth/).
  *
  * The admin calls (account search, bans) use LOBBY_ADMIN_SECRET, the secret the
- * game servers already share with the lobby; it never leaves the server.
+ * game servers already share with the lobby; it never leaves the server. The ones
+ * that change an account name the signed-in admin (`actor`), and the lobby applies
+ * the ranks' rules to them too (server-browser routes.ts rankRefusal).
+ *
+ * Ranks: owner > admin > pilot. isAdmin is true for the owner too (every admin
+ * check passes); isOwner is the owner's alone (missing: false).
  */
 
-export interface LobbyUser { id: number; username: string; isAdmin: boolean }
+export interface LobbyUser { id: number; username: string; isAdmin: boolean; isOwner?: boolean }
 export interface LobbyAccount extends LobbyUser { email: string; createdAt: string }
-export interface AdminUser { id: number; username: string; isAdmin: boolean; createdAt: string; ban: { until: number | null; reason: string; by: string } | null }
+export interface AdminUser { id: number; username: string; isAdmin: boolean; isOwner?: boolean; createdAt: string; ban: { until: number | null; reason: string; by: string } | null }
 
 export type Result<T> = ({ ok: true } & T) | { ok: false; error: string; status: number };
 
@@ -32,8 +37,12 @@ export interface Lobby {
   /** Admin (LOBBY_ADMIN_SECRET) */
   findUser(username: string): Promise<AdminUser | null>;
   listUsers(search: string, offset: number, limit: number): Promise<Result<{ users: AdminUser[]; total: number }>>;
-  ban(username: string, until: number | null, reason: string, by: string): Promise<Result<{ user: AdminUser }>>;
-  unban(username: string): Promise<Result<{ user: AdminUser }>>;
+  ban(username: string, until: number | null, reason: string, by: string, actor?: string): Promise<Result<{ user: AdminUser }>>;
+  unban(username: string, actor?: string): Promise<Result<{ user: AdminUser }>>;
+  /** Grant or revoke admin (the lobby allows it for the owner only, as `actor`) */
+  setAdmin(username: string, isAdmin: boolean, actor: string): Promise<Result<{ user: AdminUser }>>;
+  /** Delete someone's account for good (the owner only, as `actor`) */
+  deleteUser(username: string, actor: string): Promise<Result<{ id: number }>>;
 }
 
 export class HttpLobby implements Lobby {
@@ -72,7 +81,7 @@ export class HttpLobby implements Lobby {
   async validate(token: string): Promise<LobbyUser | null> {
     const r = await this.call('/auth/validate', { token });
     if (!r.body?.success) return null;
-    return { id: Number(r.body.id), username: String(r.body.username), isAdmin: !!r.body.isAdmin };
+    return { id: Number(r.body.id), username: String(r.body.username), isAdmin: !!r.body.isAdmin || !!r.body.isOwner, isOwner: !!r.body.isOwner };
   }
 
   async logout(token: string) { await this.call('/auth/logout', { token }); }
@@ -81,7 +90,7 @@ export class HttpLobby implements Lobby {
     const r = await this.call('/auth/account', { token });
     if (!r.body?.success) return this.fail(r);
     const b = r.body;
-    return { ok: true as const, account: { id: Number(b.id), username: b.username, email: b.email, isAdmin: !!b.isAdmin, createdAt: b.createdAt } };
+    return { ok: true as const, account: { id: Number(b.id), username: b.username, email: b.email, isAdmin: !!b.isAdmin || !!b.isOwner, isOwner: !!b.isOwner, createdAt: b.createdAt } };
   }
 
   async changePassword(token: string, password: string, newPassword: string, ip: string) {
@@ -115,13 +124,23 @@ export class HttpLobby implements Lobby {
     return r.body?.success ? { ok: true as const, users: r.body.users as AdminUser[], total: Number(r.body.total) } : this.fail(r);
   }
 
-  async ban(username: string, until: number | null, reason: string, by: string) {
-    const r = await this.call('/admin/ban', { username, until, reason, by }, { admin: true });
+  async ban(username: string, until: number | null, reason: string, by: string, actor?: string) {
+    const r = await this.call('/admin/ban', { username, until, reason, by, actor }, { admin: true });
     return r.body?.success ? { ok: true as const, user: r.body.user as AdminUser } : this.fail(r);
   }
 
-  async unban(username: string) {
-    const r = await this.call('/admin/unban', { username }, { admin: true });
+  async unban(username: string, actor?: string) {
+    const r = await this.call('/admin/unban', { username, actor }, { admin: true });
     return r.body?.success ? { ok: true as const, user: r.body.user as AdminUser } : this.fail(r);
+  }
+
+  async setAdmin(username: string, isAdmin: boolean, actor: string) {
+    const r = await this.call('/admin/set-admin', { username, isAdmin, actor }, { admin: true });
+    return r.body?.success ? { ok: true as const, user: r.body.user as AdminUser } : this.fail(r);
+  }
+
+  async deleteUser(username: string, actor: string) {
+    const r = await this.call('/admin/delete', { username, actor }, { admin: true });
+    return r.body?.success ? { ok: true as const, id: Number(r.body.id) } : this.fail(r);
   }
 }

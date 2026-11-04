@@ -1,4 +1,4 @@
-/** The admin panel (isAdmin from the lobby) */
+/** The admin panel (isAdmin from the lobby; the owner's own tools, isOwner, only shown to the owner: app.ts says which) */
 
 import { html, raw, SafeHtml } from '../html.js';
 import { renderMarkdown, safeUrl } from '../markdown.js';
@@ -14,17 +14,34 @@ const TABS: [Tab, string, string][] = [
   ['suggestions', 'Suggestions', '/admin/suggestions'], ['shoutbox', 'Shoutbox', '/admin/shoutbox'], ['ships', 'Shared ships', '/admin/ships'],
   ['pilots', 'Pilots & bans', '/admin/pilots'], ['tokens', 'API tokens', '/admin/tokens'],
 ];
+/** The owner's tabs (app.ts requireOwner) */
+const OWNER_TABS: Tab[] = ['tokens'];
+
+const isOwner = (ctx: PageCtx) => !!ctx.user?.isOwner;
+
+/** A rank's badge: owner, admin, or nothing */
+export function rankPill(u: { isAdmin: boolean; isOwner?: boolean }): SafeHtml | '' {
+  return u.isOwner ? html` <span class="pill pill-admin">owner</span>` : u.isAdmin ? html` <span class="pill pill-admin">admin</span>` : '';
+}
 
 function shell(ctx: PageCtx, tab: Tab, title: string, content: SafeHtml, notice?: { kind: 'ok' | 'error'; text: string } | null): SafeHtml {
   const body = html`
 <section class="admin wrap">
   <nav class="admin-nav" aria-label="Admin">
     <p class="eyebrow">Admin</p>
-    ${TABS.map(([t, label, href]) => html`<a href="${href}"${t === tab ? raw(' aria-current="page"') : ''}>${label}</a>`)}
+    ${TABS.filter(([t]) => isOwner(ctx) || !OWNER_TABS.includes(t)).map(([t, label, href]) => html`<a href="${href}"${t === tab ? raw(' aria-current="page"') : ''}>${label}</a>`)}
   </nav>
   <div class="admin-main">${content}</div>
 </section>`;
   return layout(ctx, { title: `Admin: ${title}`, body, bodyClass: 'admin-page', notice });
+}
+
+/** An owner-only page, asked for by an admin */
+export function ownerOnly(ctx: PageCtx): SafeHtml {
+  return shell(ctx, 'overview', 'Owner only', html`
+  <h1>Owner only</h1>
+  <p>Only the owner can do this: publishing and unpublishing posts, API tokens, admin rank and deleting accounts.</p>
+  <p><a href="/admin">Back to the admin overview</a></p>`);
 }
 
 function back(path: string): SafeHtml { return html`<input type="hidden" name="back" value="${path}">`; }
@@ -44,15 +61,15 @@ export function adminOverview(ctx: PageCtx, d: { posts: { published: number; dra
   </div>
   <div class="admin-quick">
     <a class="btn btn-primary" href="/admin/posts/new">Write an update</a>
-    <a class="btn" href="/admin/tokens">API tokens for the CLI</a>
+    ${isOwner(ctx) ? html`<a class="btn" href="/admin/tokens">API tokens for the CLI</a>` : ''}
   </div>
-  <section class="panel">
+  ${isOwner(ctx) ? html`<section class="panel">
     <div class="panel-head"><h2>Posting from the terminal</h2></div>
     <p class="small">Make a token under <a href="/admin/tokens">API tokens</a>, then:</p>
     <pre class="code"><code>cd game-v2/site
 SITE_TOKEN=sgs_… npm run post-update -- path/to/post.md --publish</code></pre>
     <p class="dim small">Front matter sets the title, tags and draft or published; local images are uploaded. See DEVELOPMENT.md, "Website".</p>
-  </section>
+  </section>` : html`<p class="dim small">You can write drafts; the owner publishes them.</p>`}
   ${d.lobbyAdmin ? '' : html`<p class="form-error">LOBBY_ADMIN_SECRET isn't set: the Pilots &amp; bans tools are off.</p>`}
   <p class="dim small">${d.streams} open shoutbox ${d.streams === 1 ? 'stream' : 'streams'}.</p>`);
 }
@@ -69,7 +86,7 @@ export function adminPosts(ctx: PageCtx, posts: Post[], notice?: { kind: 'ok' | 
       <td class="small">${when(p.updatedAt)}</td>
       <td class="actions">
         <a class="link-btn" href="/updates/${encodeURIComponent(p.slug)}">View</a>
-        <form method="post" action="/admin/posts/${p.id}/${p.status === 'published' ? 'unpublish' : 'publish'}">${csrfField(ctx)}<button class="link-btn" type="submit">${p.status === 'published' ? 'Unpublish' : 'Publish'}</button></form>
+        ${isOwner(ctx) ? html`<form method="post" action="/admin/posts/${p.id}/${p.status === 'published' ? 'unpublish' : 'publish'}">${csrfField(ctx)}<button class="link-btn" type="submit">${p.status === 'published' ? 'Unpublish' : 'Publish'}</button></form>` : ''}
       </td>
     </tr>`)}</tbody></table></div>`
     : empty('No posts yet', 'Write the first update, or post one from the terminal.', html`<a class="btn btn-primary" href="/admin/posts/new">Write an update</a>`)}`, notice);
@@ -104,11 +121,13 @@ export function adminEditor(ctx: PageCtx, d: { post: Partial<Post> & { id?: numb
     ${d.error ? html`<p class="form-error" role="alert">${d.error}</p>` : ''}
     <div class="editor-actions">
       <span class="dim small">${p.status ? html`Now: <span class="pill pill-${p.status}">${p.status}</span>` : ''}${p.publishedAt ? html` · first published ${fmtDate(p.publishedAt)}` : ''}</span>
-      <button class="btn" type="submit" name="status" value="draft">${p.status === 'published' ? 'Save and unpublish' : 'Save draft'}</button>
-      <button class="btn btn-primary" type="submit" name="status" value="published">${p.status === 'published' ? 'Save' : 'Publish'}</button>
+      ${isOwner(ctx) ? html`<button class="btn" type="submit" name="status" value="draft">${p.status === 'published' ? 'Save and unpublish' : 'Save draft'}</button>
+      <button class="btn btn-primary" type="submit" name="status" value="published">${p.status === 'published' ? 'Save' : 'Publish'}</button>`
+      : p.status === 'published' ? html`<span class="dim small">Published: only the owner can change it.</span>`
+      : html`<button class="btn btn-primary" type="submit" name="status" value="draft">Save draft</button><span class="dim small">The owner publishes it.</span>`}
     </div>
   </form>
-  ${p.id ? html`<form method="post" action="/admin/posts/${p.id}/delete" class="danger-line" data-confirm="Delete this post and its comments for good?">
+  ${p.id && (isOwner(ctx) || p.status !== 'published') ? html`<form method="post" action="/admin/posts/${p.id}/delete" class="danger-line" data-confirm="Delete this post and its comments for good?">
     ${csrfField(ctx)}<button class="btn btn-danger btn-sm" type="submit">Delete post</button></form>` : ''}`, d.notice);
 }
 
@@ -202,7 +221,8 @@ export function adminPilots(ctx: PageCtx, d: { users: AdminUser[]; total: number
   const banText = (u: AdminUser) => u.ban ? (u.ban.until === null ? 'for good' : `until ${new Date(u.ban.until).toISOString().slice(0, 16).replace('T', ' ')} UTC`) : '';
   return shell(ctx, 'pilots', 'Pilots & bans', html`
   <h1>Pilots &amp; bans</h1>
-  <p class="dim">Accounts are the lobby's; these use its admin routes (the same ones the in-game admin tools use). A ban stops sign-in on the site and in the game, and ends live sessions.</p>
+  <p class="dim">Accounts are the lobby's; these use its admin routes (the same ones the in-game admin tools use). A ban stops sign-in on the site and in the game, and ends live sessions.
+    Admins ban pilots; the owner can also ban admins, grant and revoke admin, and delete accounts. Nobody bans the owner here.</p>
   ${!d.enabled ? html`<p class="form-error">LOBBY_ADMIN_SECRET isn't set, so these tools are off.</p>` : html`
   <form method="get" action="/admin/pilots" class="inline-form" role="search">
     <label for="ps">Name starts with</label><input id="ps" name="q" value="${d.search}" maxlength="20">
@@ -210,17 +230,26 @@ export function adminPilots(ctx: PageCtx, d: { users: AdminUser[]; total: number
   </form>
   ${d.error ? html`<p class="form-error">${d.error}</p>` : ''}
   <div class="table-wrap"><table class="table">
-    <thead><tr><th>Pilot</th><th>Joined</th><th>Status</th><th>Ban</th></tr></thead>
-    <tbody>${d.users.map((u) => html`<tr>
-      <td><a href="/pilots/${encodeURIComponent(u.username)}"><b>${u.username}</b></a>${u.isAdmin ? html` <span class="pill pill-admin">admin</span>` : ''}<br><span class="dim small">#${u.id}</span></td>
+    <thead><tr><th>Pilot</th><th>Joined</th><th>Status</th><th>Ban</th>${isOwner(ctx) ? html`<th>Owner tools</th>` : ''}</tr></thead>
+    <tbody>${d.users.map((u) => {
+      const me = u.username === ctx.user?.username;
+      // (Admins can't act on admins or the owner; nobody acts on the owner here)
+      const locked = u.isOwner || (u.isAdmin && !isOwner(ctx));
+      const user = html`<input type="hidden" name="username" value="${u.username}">`;
+      return html`<tr>
+      <td><a href="/pilots/${encodeURIComponent(u.username)}"><b>${u.username}</b></a>${rankPill(u)}<br><span class="dim small">#${u.id}</span></td>
       <td class="small">${fmtDate(u.createdAt)}</td>
       <td class="small">${u.ban ? html`<span class="pill pill-banned">banned ${banText(u)}</span><br><span class="dim">${u.ban.reason}${u.ban.by ? ` (by ${u.ban.by})` : ''}</span>` : 'active'}</td>
-      <td>${u.ban
-        ? html`<form method="post" action="/admin/pilots/unban">${csrfField(ctx)}<input type="hidden" name="username" value="${u.username}"><button class="btn btn-sm" type="submit">Lift ban</button></form>`
-        : u.username === ctx.user?.username ? html`<span class="dim small">you</span>` : html`<form method="post" action="/admin/pilots/ban" class="ban-form">${csrfField(ctx)}<input type="hidden" name="username" value="${u.username}">
+      <td>${me ? html`<span class="dim small">you</span>` : locked ? html`<span class="dim small">${u.isOwner ? 'the owner' : 'the owner\'s to change'}</span>` : u.ban
+        ? html`<form method="post" action="/admin/pilots/unban">${csrfField(ctx)}${user}<button class="btn btn-sm" type="submit">Lift ban</button></form>`
+        : html`<form method="post" action="/admin/pilots/ban" class="ban-form">${csrfField(ctx)}${user}
             <select name="days" aria-label="Ban length"><option value="1">1 day</option><option value="7">7 days</option><option value="30">30 days</option><option value="forever">For good</option></select>
             <input name="reason" maxlength="200" placeholder="Reason" aria-label="Reason" required>
             <button class="btn btn-sm btn-danger" type="submit">Ban</button></form>`}</td>
-    </tr>`)}</tbody></table></div>
+      ${isOwner(ctx) ? html`<td class="actions">${me || u.isOwner ? '' : html`
+        <form method="post" action="/admin/pilots/admin">${csrfField(ctx)}${user}<input type="hidden" name="on" value="${u.isAdmin ? '0' : '1'}"><button class="btn btn-sm" type="submit">${u.isAdmin ? 'Remove admin' : 'Make admin'}</button></form>
+        <form method="post" action="/admin/pilots/delete" data-confirm="Delete ${u.username}'s account and pilot for good?">${csrfField(ctx)}${user}<button class="btn btn-sm btn-danger" type="submit">Delete account</button></form>`}</td>` : ''}
+    </tr>`;
+    })}</tbody></table></div>
   <p class="dim small">${d.total} ${d.total === 1 ? 'account' : 'accounts'}${d.search ? ` matching "${d.search}"` : ''}${d.users.length < d.total ? `, first ${d.users.length} shown` : ''}.</p>`}`, notice);
 }

@@ -45,6 +45,7 @@ Never leave dev servers or headless browsers running after a check.
 | `ADMIN_SERVER_PASSWORD` | dev `admin`; production none | Admin dashboard password (then `ADMIN_PASSWORD`, then `LOBBY_ADMIN_SECRET`). With none in production the dashboard does not start. The VPS deploy makes one in `/etc/spacegame/secrets.env` |
 | `BROWSER_URL` | `http://localhost:8787` | Server browser URL |
 | `LOBBY_ADMIN_SECRET` | dev fixed; production none | Shared by the lobby and game servers for admin account commands (admin rank, bans); same value on both; with none in production those commands are refused |
+| `OWNER_USERNAMES` | none | Lobby: comma-separated usernames made the owner (the rank above admin) at every start; removing a name doesn't revoke (the lobby's `/admin/set-owner` does). See web-accounts, Ranks |
 | `PUBLIC_HOST` | `localhost` | Host reported to the browser |
 | `USER_STORE_BACKEND` | `json` | `json` or `postgres` (production is `postgres`, set by systemd drop-ins) |
 | `DATABASE_URL` | none | PostgreSQL connection string |

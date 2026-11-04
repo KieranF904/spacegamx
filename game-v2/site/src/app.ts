@@ -20,6 +20,12 @@
  *   GET  /play                     the game, handed this session (play.ts)
  *   /admin/...                     posts, comments, suggestions, shoutbox, pilots & bans, API tokens
  *
+ * Ranks (the lobby's): owner > admin. Admins moderate (comments, suggestions, the shoutbox, shared ships, bans
+ * of pilots) and write drafts. The owner alone (requireOwner, and `api.owner` for the API) publishes and
+ * unpublishes posts, changes or deletes a published one, makes and revokes API tokens, grants and revokes admin,
+ * bans admins and deletes other people's accounts. Nobody bans or demotes the owner here. (The site has no
+ * settings pages: its settings are the environment, src/config.ts.)
+ *
  * The API (JSON; admin: Bearer sgs_ token, Bearer lobby session of an admin, or the
  * admin's cookie session plus X-CSRF-Token):
  *   GET  /api/v1/status            public: online, pilots, and what else the game reports
@@ -92,8 +98,8 @@ export interface Ctx {
   user: LobbyUser | null;
   csrf: string;
   csrfSeed: string;
-  /** How an API call was authenticated */
-  api: { via: 'token' | 'lobby' | 'session'; name: string; userId: number; author: string } | null;
+  /** How an API call was authenticated (owner: may publish; a token is its maker's, as their rank is now) */
+  api: { via: 'token' | 'lobby' | 'session'; name: string; userId: number; author: string; owner: boolean } | null;
   /** The call carries the game server's key (SITE_GAME_KEY): it may share ships, and nothing else */
   game: boolean;
   page: PageCtx;
@@ -106,7 +112,11 @@ const NOTICES: Record<string, string> = {
   deleted: 'Account deleted.', suggested: 'Suggestion posted.', commented: 'Comment posted.',
   saved: 'Saved.', published: 'Published.', unpublished: 'Unpublished: it is a draft again.', postdeleted: 'Post deleted.',
   hidden: 'Hidden.', shown: 'Shown again.', removed: 'Deleted.', banned: 'Banned.', unbanned: 'Ban lifted.', revoked: 'Token revoked.',
+  promoted: 'Now an admin.', demoted: 'No longer an admin.', accountdeleted: 'Account deleted for good.',
 };
+
+/** Why an admin's change to a post was refused (publishing is the owner's) */
+const OWNER_PUBLISHES = 'Only the owner can publish, unpublish, or change a published post. Save it as a draft.';
 
 const STATIC_TYPES: Record<string, string> = {
   '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png',
@@ -194,6 +204,14 @@ export function createApp(deps: AppDeps) {
     if (!ctx.user) { redirect(ctx.res, `/signin?next=${encodeURIComponent(ctx.path)}`); return null; }
     if (!ctx.user.isAdmin) { page(ctx, 404, V.notFoundPage(ctx.page)); return null; }
     return ctx.user;
+  }
+
+  /** The owner only: signed out goes to sign in, a pilot gets "not found", an admin a page saying it's the owner's */
+  function requireOwner(ctx: Ctx): LobbyUser | null {
+    const user = requireAdmin(ctx);
+    if (!user) return null;
+    if (!user.isOwner) { page(ctx, 403, A.ownerOnly(ctx.page)); return null; }
+    return user;
   }
 
   /** The form or JSON body (the CSRF check may have read a form already) */
@@ -545,29 +563,37 @@ export function createApp(deps: AppDeps) {
     const f = await fields(ctx, 512 * 1024);
     const c = checkPost(f, false);
     if (!c.ok) return page(ctx, 400, A.adminEditor(ctx.page, { post: formPost(f), error: c.error }));
+    if (c.value.status === 'published' && !admin.isOwner) return page(ctx, 403, A.adminEditor(ctx.page, { post: formPost(f), error: OWNER_PUBLISHES }));
     const post = await store.createPost({ ...c.value, authorId: admin.id, authorName: admin.username });
     if (!post) return page(ctx, 400, A.adminEditor(ctx.page, { post: formPost(f), error: `There's already a post at /updates/${c.value.slug}: pick another slug.` }));
     redirect(ctx.res, `/admin/posts/${post.id}?ok=${post.status === 'published' ? 'published' : 'saved'}`);
   });
 
   router.post('/admin/posts/:id', async (ctx, p) => {
-    if (!requireAdmin(ctx)) return;
+    const admin = requireAdmin(ctx);
+    if (!admin) return;
     const existing = await store.getPost(Number(p.id));
     if (!existing) { page(ctx, 404, V.notFoundPage(ctx.page, 'post')); return; }
     const f = await fields(ctx, 512 * 1024);
     const c = checkPost(f, false);
     if (!c.ok) return page(ctx, 400, A.adminEditor(ctx.page, { post: { ...existing, ...formPost(f) }, error: c.error }));
+    if ((existing.status === 'published' || c.value.status === 'published') && !admin.isOwner) {
+      return page(ctx, 403, A.adminEditor(ctx.page, { post: { ...existing, ...formPost(f) }, error: OWNER_PUBLISHES }));
+    }
     const post = await store.updatePost(existing.id, c.value);
     if (!post) return page(ctx, 400, A.adminEditor(ctx.page, { post: { ...existing, ...formPost(f) }, error: `There's already a post at /updates/${c.value.slug}: pick another slug.` }));
     redirect(ctx.res, `/admin/posts/${post.id}?ok=${post.status === 'published' && existing.status !== 'published' ? 'published' : post.status === 'draft' && existing.status === 'published' ? 'unpublished' : 'saved'}`);
   });
 
   router.post('/admin/posts/:id/:action', async (ctx, p) => {
-    if (!requireAdmin(ctx)) return;
+    const admin = requireAdmin(ctx);
+    if (!admin) return;
     await fields(ctx);
     const id = Number(p.id);
     const post = await store.getPost(id);
     if (!post) { page(ctx, 404, V.notFoundPage(ctx.page, 'post')); return; }
+    // (Publishing, and taking down or deleting what's live, are the owner's)
+    if ((p.action === 'publish' || p.action === 'unpublish' || post.status === 'published') && !requireOwner(ctx)) return;
     if (p.action === 'publish' || p.action === 'unpublish') {
       await store.updatePost(id, { status: p.action === 'publish' ? 'published' : 'draft' });
       return redirect(ctx.res, `/admin/posts?ok=${p.action === 'publish' ? 'published' : 'unpublished'}`);
@@ -628,12 +654,12 @@ export function createApp(deps: AppDeps) {
   });
 
   router.get('/admin/tokens', async (ctx) => {
-    if (!requireAdmin(ctx)) return;
+    if (!requireOwner(ctx)) return;
     page(ctx, 200, A.adminTokens(ctx.page, { tokens: await store.listTokens() }, notice(ctx)));
   });
 
   router.post('/admin/tokens', async (ctx) => {
-    const admin = requireAdmin(ctx);
+    const admin = requireOwner(ctx);
     if (!admin) return;
     const f = await fields(ctx);
     const name = str(f.name, 60).replace(/\s+/g, ' ').trim() || 'token';
@@ -645,37 +671,59 @@ export function createApp(deps: AppDeps) {
   });
 
   router.post('/admin/tokens/:id/revoke', async (ctx, p) => {
-    if (!requireAdmin(ctx)) return;
+    if (!requireOwner(ctx)) return;
     await fields(ctx);
     await store.revokeToken(Number(p.id));
     redirect(ctx.res, '/admin/tokens?ok=revoked');
   });
 
-  router.get('/admin/pilots', async (ctx) => {
-    if (!requireAdmin(ctx)) return;
-    const search = (ctx.url.searchParams.get('q') ?? '').trim().slice(0, 20);
+  /** The pilots list (a refusal from the lobby shown above it, with the status it came with) */
+  async function pilotsPage(ctx: Ctx, search: string, refused?: { error: string; status: number }) {
     if (!cfg.lobbyAdminSecret) return page(ctx, 200, A.adminPilots(ctx.page, { users: [], total: 0, search, enabled: false }));
     const r = await lobby.listUsers(search, 0, 100);
-    page(ctx, 200, A.adminPilots(ctx.page, r.ok ? { users: r.users, total: r.total, search, enabled: true } : { users: [], total: 0, search, enabled: true, error: r.error }, notice(ctx)));
+    const status = refused ? (refused.status === 403 ? 403 : 400) : 200;
+    const n = refused ? { kind: 'error' as const, text: refused.error } : notice(ctx);
+    page(ctx, status, A.adminPilots(ctx.page, r.ok ? { users: r.users, total: r.total, search, enabled: true } : { users: [], total: 0, search, enabled: true, error: r.error }, n));
+  }
+
+  router.get('/admin/pilots', async (ctx) => {
+    if (!requireAdmin(ctx)) return;
+    await pilotsPage(ctx, (ctx.url.searchParams.get('q') ?? '').trim().slice(0, 20));
   });
 
+  // Bans are moderation (admins, of pilots; the owner, of admins too); admin rank and deleting accounts are the owner's.
+  // Each names the signed-in admin to the lobby, which checks the same rules.
   router.post('/admin/pilots/:action', async (ctx, p) => {
     const admin = requireAdmin(ctx);
     if (!admin) return;
     const f = await fields(ctx);
     const username = str(f.username, 40);
+    const done = (r: { ok: true } | { ok: false; error: string; status: number }, ok: string) => {
+      if (!r.ok) return pilotsPage(ctx, username, r);
+      sessions.clear(); // (cached sessions carry the old rank, or a deleted account)
+      redirect(ctx.res, `/admin/pilots?q=${encodeURIComponent(username)}&ok=${ok}`);
+    };
     if (p.action === 'ban') {
       if (username.toLowerCase() === admin.username.toLowerCase()) return redirect(ctx.res, '/admin/pilots');
       const days = str(f.days);
       const until = days === 'forever' ? null : Date.now() + Math.max(1, Math.min(3650, Number(days) || 1)) * 86_400_000;
-      const r = await lobby.ban(username, until, str(f.reason, 200).trim() || 'No reason given', admin.username);
-      sessions.clear();
+      const r = await lobby.ban(username, until, str(f.reason, 200).trim() || 'No reason given', admin.username, admin.username);
       if (r.ok) console.log(`[Site] ${admin.username} banned ${username}`);
-      return redirect(ctx.res, r.ok ? `/admin/pilots?q=${encodeURIComponent(username)}&ok=banned` : '/admin/pilots');
+      return done(r, 'banned');
     }
-    if (p.action === 'unban') {
-      const r = await lobby.unban(username);
-      return redirect(ctx.res, r.ok ? `/admin/pilots?q=${encodeURIComponent(username)}&ok=unbanned` : '/admin/pilots');
+    if (p.action === 'unban') return done(await lobby.unban(username, admin.username), 'unbanned');
+    if (p.action === 'admin') {
+      if (!requireOwner(ctx)) return;
+      const on = str(f.on) === '1';
+      const r = await lobby.setAdmin(username, on, admin.username);
+      if (r.ok) console.log(`[Site] ${admin.username} ${on ? 'made' : 'removed'} ${username} ${on ? 'an admin' : 'as admin'}`);
+      return done(r, on ? 'promoted' : 'demoted');
+    }
+    if (p.action === 'delete') {
+      if (!requireOwner(ctx)) return;
+      const r = await lobby.deleteUser(username, admin.username);
+      if (r.ok) console.log(`[Site] ${admin.username} deleted the account ${username}`);
+      return done(r, 'accountdeleted');
     }
     page(ctx, 404, V.notFoundPage(ctx.page));
   });
@@ -685,9 +733,16 @@ export function createApp(deps: AppDeps) {
   /** Who's calling the admin API (null: it has answered 401/403) */
   async function apiAdmin(ctx: Ctx): Promise<Ctx['api']> {
     if (ctx.api) return ctx.api;
-    if (ctx.user?.isAdmin) return (ctx.api = { via: 'session', name: ctx.user.username, userId: ctx.user.id, author: ctx.user.username });
+    if (ctx.user?.isAdmin) return (ctx.api = { via: 'session', name: ctx.user.username, userId: ctx.user.id, author: ctx.user.username, owner: !!ctx.user.isOwner });
     sendJson(ctx.res, ctx.user ? 403 : 401, { error: ctx.user ? 'Admins only' : 'Send Authorization: Bearer <token> (an API token from /admin/tokens)' });
     return null;
+  }
+
+  /** A change to what's live (publishing, unpublishing, editing or deleting a published post) by a caller who isn't the owner: refused (true) */
+  function notOwners(ctx: Ctx, who: NonNullable<Ctx['api']>, live: boolean): boolean {
+    if (!live || who.owner) return false;
+    sendJson(ctx.res, 403, { error: OWNER_PUBLISHES });
+    return true;
   }
 
   function postJson(p: Post) {
@@ -724,10 +779,12 @@ export function createApp(deps: AppDeps) {
       // Upsert: re-posting the same file updates it (fields not sent keep their values)
       const patch = checkPost(f, true);
       if (!patch.ok) return sendJson(ctx.res, 400, { error: patch.error });
+      if (notOwners(ctx, who, existing.status === 'published' || patch.value.status === 'published')) return;
       const post = await store.updatePost(existing.id, { ...patch.value, slug: existing.slug });
       console.log(`[Site] API: ${who.name} updated "${existing.slug}" (${post?.status})`);
       return sendJson(ctx.res, 200, { created: false, post: postJson(post!) });
     }
+    if (notOwners(ctx, who, c.value.status === 'published')) return;
     const post = await store.createPost({ ...c.value, authorId: who.userId, authorName: who.author });
     if (!post) return sendJson(ctx.res, 409, { error: 'That slug is taken' });
     console.log(`[Site] API: ${who.name} created "${post.slug}" (${post.status})`);
@@ -735,21 +792,25 @@ export function createApp(deps: AppDeps) {
   });
 
   async function patchPost(ctx: Ctx, p: Params) {
-    if (!(await apiAdmin(ctx))) return;
+    const who = await apiAdmin(ctx);
+    if (!who) return;
     const existing = await store.getPostBySlug(p.slug);
     if (!existing) return sendJson(ctx.res, 404, { error: 'No such post' });
     const f = await fields(ctx, 512 * 1024);
     const c = checkPost(f, true);
     if (!c.ok) return sendJson(ctx.res, 400, { error: c.error });
+    if (notOwners(ctx, who, existing.status === 'published' || c.value.status === 'published')) return;
     const post = await store.updatePost(existing.id, c.value);
     post ? sendJson(ctx.res, 200, { post: postJson(post) }) : sendJson(ctx.res, 409, { error: 'That slug is taken' });
   }
   router.on('PATCH', '/api/v1/posts/:slug', patchPost);
 
   router.on('DELETE', '/api/v1/posts/:slug', async (ctx, p) => {
-    if (!(await apiAdmin(ctx))) return;
+    const who = await apiAdmin(ctx);
+    if (!who) return;
     const existing = await store.getPostBySlug(p.slug);
     if (!existing) return sendJson(ctx.res, 404, { error: 'No such post' });
+    if (notOwners(ctx, who, existing.status === 'published')) return;
     await store.deletePost(existing.id);
     sendJson(ctx.res, 200, { deleted: true });
   });
@@ -872,10 +933,15 @@ export function createApp(deps: AppDeps) {
       if (limiter.retryAfter(failKey, LIMITS.apiAuthFail.limit, LIMITS.apiAuthFail.windowMs) > 0) { sendJson(res, 429, { error: 'Too many bad tokens; wait a few minutes' }); return; }
       if (bearer.startsWith(TOKEN_PREFIX)) {
         const t = await store.findToken(hashToken(bearer));
-        if (t) { api = { via: 'token', name: `${t.createdByName} (${t.name})`, userId: t.createdBy, author: t.createdByName }; void store.touchToken(t.id); }
+        if (t) {
+          // (A token can publish while its maker is the owner: asked of the lobby each call, so a demoted maker's can't)
+          const maker = await lobby.findUser(t.createdByName);
+          api = { via: 'token', name: `${t.createdByName} (${t.name})`, userId: t.createdBy, author: t.createdByName, owner: !!maker?.isOwner && maker.id === t.createdBy };
+          void store.touchToken(t.id);
+        }
       } else {
         const u = await userFor(bearer);
-        if (u?.isAdmin) api = { via: 'lobby', name: u.username, userId: u.id, author: u.username };
+        if (u?.isAdmin) api = { via: 'lobby', name: u.username, userId: u.id, author: u.username, owner: !!u.isOwner };
       }
       if (!api) { limiter.hit(failKey, LIMITS.apiAuthFail.limit, LIMITS.apiAuthFail.windowMs); sendJson(res, 401, { error: 'That token is not valid (or not an admin\'s)' }); return; }
       user = null; token = null; // a bearer call never acts as the browser's session
