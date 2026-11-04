@@ -150,6 +150,10 @@ interface Rep {
    * out after t, over SMOOTH_TICKS.
    */
   fixes?: { t: number; s: number; dx: number; dy: number; da: number }[];
+  /** Where pose last drew it, before any bending (its path as it was then) */
+  raw?: { t: number; x: number; y: number; angle: number };
+  /** Its path was stepped again (control rows, decisions, causes for ticks already drawn) since: pose eases the change out */
+  moved?: boolean;
 }
 
 const HISTORY = 240;
@@ -165,6 +169,18 @@ const GAP_MAX = 60;
 const smoothstep = (u: number) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
 
 /** How much of a correction is added to the drawn pose at tick t (drawn = stepped path + d × this) */
+/** An angle difference into (-pi, pi] */
+function wrapAngle(d: number): number {
+  while (d > Math.PI) d -= 2 * Math.PI;
+  while (d < -Math.PI) d += 2 * Math.PI;
+  return d;
+}
+
+/** A path stepped again from tick t: drawn there already, pose eases the change out */
+function rewrote(r: Rep, t: number): void {
+  if (r.raw && t <= Math.floor(r.raw.t) + 1) r.moved = true;
+}
+
 function fixWeight(f: { t: number; s: number }, t: number): number {
   // Between the tick before the keyframe and the keyframe, the stepped path runs from the old path into the new
   // one (pose's lerp): k of the correction comes in with it
@@ -266,6 +282,7 @@ export class ShipReplicaSet {
       let last = -Infinity;
       for (const t of [...r.hist.keys()]) { if (t > from && t !== r.kf) r.hist.delete(t); else if (t > last) last = t; }
       r.last = last;
+      rewrote(r, from + 1);
     }
     const env = this.env();
     const k = env.gravity ? { ...SHIP_FLIGHT_CONSTANTS, gravity: env.gravity } : SHIP_FLIGHT_CONSTANTS;
@@ -358,6 +375,7 @@ export class ShipReplicaSet {
     if (!r || t > r.last) return;
     for (const h of [...r.hist.keys()]) if (h >= t && h !== r.kf) r.hist.delete(h);
     r.last = Math.max(...r.hist.keys(), -Infinity);
+    rewrote(r, t);
     // (Debris steps as a world (stepDebrisTo): left as it is, the world, already past t, never stepped it again: frozen)
     if (r.mode === ReplicaMode.Drift) this.dDirty = Math.min(this.dDirty, t - 1);
   }
@@ -416,6 +434,7 @@ export class ShipReplicaSet {
         r.last = Math.max(...r.hist.keys(), -Infinity);
       }
     }
+    r.raw = undefined;
     this.reps.set(id, r);
   }
 
@@ -439,6 +458,9 @@ export class ShipReplicaSet {
       r.hist.set(tick, { body: k.body, bits: k.ctl.bits, q: k.q });
       r.last = tick;
       r.kf = tick;
+      // (Its keyframe's own correction bends it (correction): not this path's being stepped again)
+      r.moved = false;
+      r.raw = undefined;
       // (Debris: its keyframe is how that tick ended, so that tick is stepped again, the others without it: stepDebrisTo)
       if (k.mode === ReplicaMode.Drift) this.dDirty = Math.min(this.dDirty, tick - 1);
     }
@@ -457,6 +479,7 @@ export class ShipReplicaSet {
         if (t <= r.last) {
           for (const h of [...r.hist.keys()]) if (h >= t) r.hist.delete(h);
           r.last = Math.max(...r.hist.keys(), -Infinity);
+          rewrote(r, t);
         }
       }
       if (!r.hist.size) this.reps.delete(id); // nothing to replay from: wait for a keyframe
@@ -544,23 +567,40 @@ export class ShipReplicaSet {
     return cur;
   }
 
+  /** Its pose at a fractional tick between two stepped states, unbent */
+  private rawPose(id: number, t: number): { x: number; y: number; angle: number; b: Step } | null {
+    const f = Math.floor(t);
+    const a = this.at(id, f);
+    if (!a) return null;
+    const b = this.at(id, f + 1) ?? a;
+    const k = Math.max(0, Math.min(1, t - f));
+    const da = wrapAngle(b.body.angle - a.body.angle);
+    return { x: a.body.x + (b.body.x - a.body.x) * k, y: a.body.y + (b.body.y - a.body.y) * k, angle: a.body.angle + da * k, b };
+  }
+
   /**
    * Where a ship is drawn at a fractional tick: between two stepped states, with any keyframe's correction blended
    * in (fixWeight), so a ship pushed off its predicted path (a boss's drive, a collision) bends onto the true one
    * instead of stepping. Drawing only: the states themselves (`at`) stay exact.
    */
   pose(id: number, t: number): { x: number; y: number; angle: number; vx: number; vy: number; jump: number; jumpScale: number; dodge: number; dodgeDir: number; aim: number; bits: number } | null {
-    const f = Math.floor(t);
-    const a = this.at(id, f);
-    if (!a) return null;
-    const b = this.at(id, f + 1) ?? a;
-    const k = Math.max(0, Math.min(1, t - f));
-    let da = b.body.angle - a.body.angle;
-    while (da > Math.PI) da -= 2 * Math.PI;
-    while (da < -Math.PI) da += 2 * Math.PI;
+    const raw = this.rawPose(id, t);
+    if (!raw) return null;
+    const { b } = raw;
     const rep = this.reps.get(id)!;
     const mode = rep.mode;
-    let x = a.body.x + (b.body.x - a.body.x) * k, y = a.body.y + (b.body.y - a.body.y) * k, angle = a.body.angle + da * k;
+    // (Its path stepped again where it was drawn already (a control row, a decision, a cause for a tick it had run
+    // ahead to): the change eases out from where it was drawn, as a late keyframe's does, instead of a jump)
+    if (rep.moved && rep.raw && rep.raw.t <= t) {
+      const now = this.rawPose(id, rep.raw.t);
+      if (now) {
+        const dx = rep.raw.x - now.x, dy = rep.raw.y - now.y, da = wrapAngle(rep.raw.angle - now.angle);
+        if ((dx || dy || da) && dhypot(dx, dy) < SMOOTH_MAX) (rep.fixes ??= []).push({ t: rep.raw.t, s: rep.raw.t, dx, dy, da });
+      }
+    }
+    rep.moved = false;
+    rep.raw = { t, x: raw.x, y: raw.y, angle: raw.angle };
+    let { x, y, angle } = raw;
     rep.drawn = t;
     if (rep.fixes) {
       let n = 0;

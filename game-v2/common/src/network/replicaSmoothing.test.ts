@@ -67,3 +67,24 @@ describe('debris steps as a world (ShipReplicaSet.stepDebrisTo)', () => {
     expect(r.at(1, 108)!.body.x).toBeGreaterThan(at106);
   });
 });
+
+describe('a path stepped again where it was drawn already (ShipReplicaSet.pose)', () => {
+  it('eases the change out from where it was drawn, no jump; exact again once eased out', () => {
+    const square: [number, number][] = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+    const shape = { mass: 4, radius: 15, com: [0, 0] as [number, number], pieces: [square] };
+    const r = new ShipReplicaSet({ cellSize: 10 } as ShipTuning, () => ({}) as ShipDerived, () => ({}) as ReplicaEnv, undefined, () => shape);
+    r.apply(100, [key(0, 1)]);
+    // Drawn ahead of what it's been told, to 103.5
+    for (let t = 100; t <= 103.5; t += 0.25) r.pose(1, t);
+    const was = r.pose(1, 103.5)!.x;
+    // A piece it hadn't heard of turns up at 101, right beside it: it was knocked from 102 on
+    r.spawnDebris(2, 101, { x: -12, y: 0, vx: 0, vy: 0, angle: 0, angVel: 0 });
+    const truth = r.at(1, 104)!.body.x;
+    const next = r.pose(1, 103.75)!.x;
+    // (the new path is well off the drawn one; the drawing carries on from where it was)
+    expect(Math.abs(r.at(1, 103)!.body.x - was)).toBeGreaterThan(1);
+    expect(Math.abs(next - was)).toBeLessThan(1);
+    expect(r.pose(1, 104)!.x).not.toBe(truth);
+    expect(r.pose(1, 116)!.x).toBe(r.at(1, 116)!.body.x);
+  });
+});
