@@ -35,6 +35,8 @@ interface Opts {
   mid?: (t: number, w: World) => void;
   /** The client drops the own-ship causes of this snapshot (the forced miss) */
   dropAt?: number;
+  /** A hitch: no inputs sent from `from` until `to`, then those ticks' inputs all at once (late), the controls it had before (`same`) or changed */
+  hitch?: { from: number; to: number; same: boolean };
   ticks?: number;
 }
 interface World { server: GameServer; A: FakeHitsClient; target: number; x0: number; y0: number }
@@ -70,12 +72,21 @@ function fly(o: Opts = {}) {
     if (A.own?.on && st && r) { got.checked++; if (st.x !== r[0] || st.y !== r[1] || st.vx !== r[2] || st.vy !== r[3] || st.angle !== r[4]) got.off++; }
   };
   void ServerFrameReader;
-  let seq = 1;
+  let seq = 1, lastT = -1;
+  // (A hitch: the ticks it sent nothing for, the server holding what it had; sent late once it's over)
+  const backlog: number[] = [];
   const send = (t: number) => {
+    const h = o.hitch;
+    if (h && t >= h.from && t < h.to) { backlog.push(server.getTick() + 1); return; }
+    if (h && t === h.to) for (const tt of backlog.splice(0)) post(h.same ? lastT : t + 20, tt);
+    post(t, server.getTick() + 1);
+    lastT = t;
+  };
+  const post = (t: number, targetTick: number) => {
     // Its controls for the next tick: thrust that changes now and then, the aim sweeping, firing
     const phase = Math.floor(t / 40) % 4;
     const msg = {
-      type: 'input', seq: seq++, tick: 0, targetTick: server.getTick() + 1,
+      type: 'input', seq: seq++, tick: 0, targetTick,
       forward: phase === 0, backward: phase === 2, left: phase === 1, right: phase === 3, boost: false,
       fireLeft: t % 50 < 30, fireRight: false, targetAngle: Math.sin(t / 30) * 1.2, cursorDist: 700,
       ...(chk ? { ownCheck: chk } : {}),
@@ -203,6 +214,17 @@ describe('its own ship stepped by itself (CAPS.OWN_SIM)', () => {
     expect(r.w.A.own!.stats.fixes).toBeGreaterThan(0);
     // (put right: the last snapshots' own layer is the server's again)
     expect(r.got.off).toBeLessThan(40);
+  }, 120_000);
+
+  it('late inputs after a hitch: the same controls as it flew cost nothing; changed ones a keyframe, then exact again', () => {
+    const same = fly({ hitch: { from: 200, to: 210, same: true } });
+    expect(same.got.keyframes).toBe(0);
+    expect(same.got.off).toBe(0);
+    expect(same.own.keyframes).toBe(0);
+    const changed = fly({ hitch: { from: 200, to: 210, same: false } });
+    expect(changed.got.keyframes).toBeGreaterThan(0);
+    expect(changed.w.server.replication.ownStats.why['late input']).toBeGreaterThan(0);
+    expect(changed.got.off).toBeLessThan(5);
   }, 120_000);
 
   it('docked: one keyframe of its own ship as it docks and one as it leaves, none between, its checks agreeing', () => {

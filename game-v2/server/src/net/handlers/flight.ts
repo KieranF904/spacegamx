@@ -142,10 +142,12 @@ export function handleInput(ctx: ServerCtx, conn: ClientConnection, msg: any): v
     if (conn.scheduledInputs.length > MAX_SCHEDULED_INPUTS) { conn.scheduledInputs.shift(); conn.ownLate = true; }
   } else {
     // No targetTick (old client) or late arrival — apply immediately. The client
-    // predicted it on an earlier tick, so its ship needs correcting
+    // predicted it on an earlier tick, so its ship needs correcting, unless its controls are the ones the ship flew
+    // since (a client catching up after a hitch, the keys held: its own ship stepped by itself is the server's)
+    const held = conn.ownCtl, now = ownControlsOf(msg);
     applyInputToEntity(ctx, conn, msg);
     conn.selfLate = true;
-    conn.ownLate = true;
+    if (targetTick === undefined || !held || held.bits !== now.bits || held.q !== now.q) conn.ownLate = true;
   }
 }
 
