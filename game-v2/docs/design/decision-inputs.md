@@ -556,3 +556,31 @@ replica after) and her removal mid-fight; BodyNet.test.ts the forgotten boss (it
    the target re-keys (a pilot's replica exact for everyone: its pulls as causes for all, not only its own client).
 2. Stage 3 (novas, blinks, phases), stage 4 (her moves, with `taken`/`invulnerable` in the body, so hits on her are
    found by the client), then stages 5-8 as section 10.
+
+## 12. Built: stage 7, the enemy AI's pilots (2026-11-04, `CAPS.PILOTS` 8192, no wire change)
+
+- **common/src/bodies/aiPilot.ts**: the pilot half of `Enemies.fly` as a body. Orders are wants: PATROL `[0, wx, wy,
+  pace, pauseUntil]`, RETURN `[1, hx, hy]`, ENGAGE `[2, range, reach, hitBy, errMax, seed, strafe, flank, ...mates]`,
+  FLEE `[3]`; with TARGET and SIDE (the strafe way). Its aim error is re-rolled every 12 + id % 7 ticks from the order's
+  seed (`aiAimError`, rolled once by the commander) instead of at each think; `hitBy` (the damage ledger's "its target
+  shot it lately") is the commander's, a WANT when it flips; a pack's side is its centroid as it ended the last tick,
+  summed in id order (mates as ids less its own; the server's `Pack.cent` is taken at the start of `Enemies.tick`, the
+  client reads `at(mate, t - 1)`); its heading is held against the aim it flew with last tick (`BodyDriver.step`'s new
+  `prevQ`), as `e.face` held it. `BODY_KINDS` is generic now (`reads`, `step`, `toldHits`, `pilot`).
+- **Server**: `game/brains/aiPilot.ts` (`AiPilots`) decides and flies; Enemies keeps the think. Every AI ship flies by
+  the body whether or not anyone runs it (one simulation); its body is ON while its target is a pilot's ship or there's
+  none (pilotless targets are stepped in the server's own order among pilotless ships: rows). `Enemies.pilot` (a
+  staged brain's base) flies it with no decisions. Bosses without a brain fly on it too (6.4's flight).
+- **BodyNet**: a client must hold every ship a body reads; a body whose read was keyframed late (`readersOf`, an own
+  keyframe from a contact) or whose dropped read is gone this window (`dropped`) is keyed too. Hits on AI ships stay
+  the client's to find (`toldHits` false; `HitLedger` 'body' only for staged bosses).
+- **Tests**: server/src/net/decisions/pilots.test.ts (pirate packs, Rustjaw with escorts into phase 3, Hushwing into
+  its blink phase: every hostile run is the server's ship at every snapshot, no control rows, checks agreeing; a lost
+  second of decisions caught; a BODIES client without PILOTS runs none). Behaviour moved on purpose: frameHash
+  regenerated (world and streams).
+- **Measured**: docs/audits/decisions-2026-11-04.md. Section 11.4's gap (-7% for bodies) is closed by CAUSES: bodies
+  now -25.6% payload, -18% wire on the Scrap Mother; the wire gap left is stage 4's (telegraphs and own-row urgent frames).
+
+Left, in order: stage 4 (her moves: telegraphs, beams, strikes, LAUNCH ids, pulls, taken/invulnerable), stage 3
+(NOVA/BLINK/PHASE: now the AI-flown bosses' flight is a body, these are the next bytes there), 5, 6, 8 (mob LAUNCH:
+mobs already fly by the waypoint law), and stage 7's second half (siege turrets and roles, station defence, traffic).

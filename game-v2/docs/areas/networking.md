@@ -172,6 +172,19 @@ too (`remove`). Not on it: guided shells (they follow the owner's cursor), AI sh
 Tests: common/src/guidance/waypoints.test.ts, server/src/net/guides/guides.test.ts (scene:
 server/src/bench/guides/guideScene.testkit.ts). Measured: docs/audits/waypoints-2026-11-04.md.
 
+### The enemy AI's pilots (`CAPS.PILOTS` 8192, with BODIES; protocol 40, no wire change)
+Dev builds (`?pilots=0|1`). Enemies.ts's think is the commander (server only: state, target, waypoint, strafe side,
+aim-error seed); the rest of its flight is common bodies/aiPilot.ts, run for every AI ship on the server
+(server game/brains/aiPilot.ts `AiPilots`) and, from the same decisions, on a PILOTS client's tick layer (body kind 2,
+`ai`, in common bodies/registry.ts). Orders go as body wants (PATROL/RETURN/ENGAGE/FLEE, whole numbers) with TARGET,
+SIDE, SYNC and OFF through BodyNet, as the staged bosses' do; a running client gets no control rows of the ship. Aim
+error is re-rolled every 12 + id % 7 ticks from the order's seed; a pack's side is its centroid as it ended the last
+tick, summed in id order (the client reads its replicas at t - 1); the heading is held against the last tick's
+quantised aim. Its body is off while its target is a pilotless ship (wards, siege prey: rows). Bosses without a brain
+(Rustjaw, Hushwing, the giants...) fly on it too. A body whose read (target or pack mate) was keyframed late, or a
+pack mate it stopped reading this window that's gone, is keyed too (BodyNet `readersOf`, `dropped`).
+Tests: server/src/net/decisions/pilots.test.ts, common/src/bodies/bodies.test.ts. Measured: docs/audits/decisions-2026-11-04.md.
+
 ### Debris (protocol 25)
 When a part's loss splits a ship (rebuildNow's orphan groups; not boss sheds, which are scenery), a client that has the ship as it was (its last sync's centre of mass is the split's: `DebrisNet.comAt`) and replicates it gets a `debrisSplit` `[id, tick, e (piece ids, packIds), p (the parts that left, packRuns)]` before the ship's own sync, and works the pieces out itself (`deriveSplit`: the parts' joins into groups in rebuild order, each piece's blueprint, HP as it has them, its pose from the ship's replica at the split's tick, push and spin seeded by ship, tick and group, deterministic trig). It adds them to its store and replicas, makes their status rows (`DEBRIS_STATUS`) and acks each with `debrisHash`. The server holds the pieces back from that client meanwhile (`ClientConnection.debrisHeld`: no sync, keyframe, row or HP); a right ack marks them sent (`SnapshotBuilder.ackDebris`); a wrong one, or none within `DEBRIS_ACK_TICKS` plus twice the ping, and they go as any ship does. Debris then drifts and knocks into other debris only (ships ignore it), push only, all pieces of a system stepped together in id order (`stepDebrisWorld`) on the server and in `ShipReplicaSet` (`stepDebrisTo`: a keyframe or new piece is how its tick ended; the world is stepped again from the tick before). A piece moved by anything else (a rebuild's shift, a blast, a tow), and whatever knocked into it before the snapshot, is keyframed (`DebrisNet.touched`, Replication `Drift:moved`); so is a piece knocked by one a client doesn't step (out of view, or not had yet). Damage, crumbling and removal stay server-told.
 
