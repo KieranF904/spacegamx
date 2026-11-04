@@ -50,6 +50,8 @@ export class Probe {
   /** Ships it was given a keyframe for that it already held (a correction), and new ones (an entry) */
   keyframesCorrect = 0;
   keyframesEntry = 0;
+  /** The corrections by what the ship is: how many, and how many found it already where the server had it */
+  readonly corrections: Partial<Record<Klass, { n: number; same: number }>> = {};
   snapshots = 0;
   clientMs = 0;
 
@@ -70,7 +72,17 @@ export class Probe {
     f.snapshot = (s: any) => {
       const held = new Set<number>(f.reps.ids());
       const kf = new Set<number>((s.ships ?? []).map((k: number[]) => k[0]));
-      if (this.measuring) for (const id of kf) if (held.has(id)) this.keyframesCorrect++; else this.keyframesEntry++;
+      if (this.measuring) {
+        for (const id of kf) {
+          if (!held.has(id)) { this.keyframesEntry++; continue; }
+          this.keyframesCorrect++;
+          // (By what it is, and whether what it had at that tick was already the server's: a keyframe that changed nothing)
+          const c = (this.corrections[id === this.pid ? 'self' : this.classOf(id)] ??= { n: 0, same: 0 });
+          c.n++;
+          const r = ring.at(s.tick, id), st = f.reps.at(id, s.tick)?.body;
+          if (r && st && st.x === r[0] && st.y === r[1] && st.vx === r[2] && st.vy === r[3] && st.angle === r[4] && st.angVel === r[5]) c.same++;
+        }
+      }
       oSnap(s);
       if (!this.measuring) return;
       this.snapshots++;
