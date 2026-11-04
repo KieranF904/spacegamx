@@ -9,6 +9,9 @@ interface Script {
   mouseWorld: { x: number; y: number };
   helm: boolean;
   menuOpen: boolean;
+  /** Berthed at a station (the server holds the controls neutral), and the station's screen up */
+  berthed: boolean;
+  station: boolean;
   auto: null | { forward: boolean; backward: boolean; left: boolean; right: boolean; boost: boolean; jump: boolean; targetAngle: number; cursorDist: number };
 }
 
@@ -17,7 +20,7 @@ function fakeCtx(proto = false) {
   const log: string[] = [];
   const sent: ClientInputMessage[] = [];
   const predicted: ClientInputMessage[] = [];
-  const sc: Script = { keys: new Set(), mouse: new Set(), mouseWorld: { x: 100, y: 0 }, helm: false, menuOpen: false, auto: null };
+  const sc: Script = { keys: new Set(), mouse: new Set(), mouseWorld: { x: 100, y: 0 }, helm: false, menuOpen: false, auto: null, berthed: false, station: false };
   let seq = 0;
   const state = {
     serverTick: 1000, playerId: 7, tick: 1000,
@@ -28,7 +31,8 @@ function fakeCtx(proto = false) {
     predictTick: (m: ClientInputMessage) => { log.push(`predict:${m.targetTick}`); predicted.push({ ...m }); },
   };
   const ctx = {
-    loggedIn: true, stationOpen: false,
+    loggedIn: true,
+    get stationOpen() { return sc.station; },
     proto: proto ? { inputEnabled: () => true } : null,
     get menu() { return { isOpen: sc.menuOpen }; },
     adminPanel: null,
@@ -39,6 +43,7 @@ function fakeCtx(proto = false) {
       helmMode: () => sc.helm,
       jumpHeld: () => false,
       dodgeControl: () => sc.keys.has('Space'),
+      berthed: () => sc.berthed,
     },
     autopilot: { get active() { return !!sc.auto; }, cancel: () => { log.push('ap.cancel'); }, tick: () => sc.auto },
     context: { flight: () => null, withholdingLeft: () => false, jumpMark: () => false, cancel: () => false },
@@ -135,6 +140,24 @@ describe('inputSend: an input-script replay', () => {
     expect(log).toEqual(['send:1', 'send:2', 'send:3']);
     expect(sent.map((m) => m.targetTick)).toEqual([undefined, undefined, undefined]);
     expect(sent[1].right).toBe(true);
+  });
+
+  it('berthed: nothing is sent (the server let go of the controls), the prediction steps them neutral; a station click is no shot', () => {
+    const { ctx, sc, log, sent, predicted, tick } = fakeCtx();
+    sc.keys.add('KeyW'); tick();
+    sc.berthed = true; sc.station = true; sc.mouse.add(0);
+    for (let i = 0; i < 5; i++) { sc.mouseWorld = { x: 100, y: i * 20 }; tick(); }
+    sendNeutralInput(ctx);
+    expect(log.filter((l) => l.startsWith('send'))).toEqual(['send:1']);
+    expect(predicted.every((m) => !m.forward && !m.fireLeft)).toBe(true);
+    // Out again with W held: sent (it was let go of at the dock)
+    sc.berthed = false; sc.station = false; sc.mouse.clear(); tick();
+    expect(sent[1].forward).toBe(true);
+    // The station's screen up but not berthed (the dev hangar anywhere): a click isn't fire
+    const n = sent.length;
+    sc.station = true; sc.mouse.add(0); tick();
+    expect(sent.length).toBe(n);
+    expect(predicted[predicted.length - 1].fireLeft).toBe(false);
   });
 
   it('neutral input does nothing when not connected or not in the game', () => {

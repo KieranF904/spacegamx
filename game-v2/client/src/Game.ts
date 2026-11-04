@@ -1139,6 +1139,8 @@ this.xpFillEl = document.getElementById('xpFill');
     return {
       get loggedIn() { return g.loggedIn; },
       get stationOpen() { return g.stationOpen; },
+      get localDead() { return g.localDead; },
+      get compactInputs() { return g.network instanceof NetworkManager && g.network.compactInputs; },
       get proto() { return g.proto; },
       get menu() { return g.menu; },
       get adminPanel() { return g.adminPanel; },
@@ -1157,6 +1159,9 @@ this.xpFillEl = document.getElementById('xpFill');
       lastSent: st.lastSent,
       lastSentAngle: st.lastSentAngle,
       lastSentCursorDist: st.lastSentCursorDist,
+      sentDist: st.sentDist,
+      aimSeen: st.aimSeen,
+      aimStill: st.aimStill,
       lastFireLeft: st.lastFireLeft,
       lastFireRight: st.lastFireRight,
     };

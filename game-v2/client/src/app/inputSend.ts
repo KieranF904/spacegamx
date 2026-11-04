@@ -8,6 +8,11 @@
  * order and the send-vs-predict branch must match what the server replays (server/src/golden/parity.test.ts).
  * The "last sent" bookkeeping uses common inputFields.ts INPUT_BOOLS / INPUT_HELD, so it cannot drift from the message.
  *
+ * With compact inputs (CAPS.INPUTS) what goes and when is decided by inputCompactSend.ts (aim past a small step, a
+ * settle send, every tick while firing). In both layouts nothing is sent where the server already knows the controls:
+ * berthed at a station (it let go of them when it docked us) or dead (a new ship starts with none); the last-sent state
+ * goes the same way, so the first input after is the change from there. A click on the station's screen isn't fire.
+ *
  * Per tick: no closures here; the context object (host getters plus the last-sent state) is built once by Game.
  */
 import {
@@ -20,6 +25,7 @@ import {
   INPUT_BOOLS, INPUT_HELD, type InputBool,
   CURSOR_DIST_STEP,
 } from '@space-game/common';
+import { compactSend } from './inputCompactSend';
 import type { GameMenuUI } from '../ui/GameMenuUI';
 import type { PlayerStatsUI } from '../ui/PlayerStatsUI';
 import type { SystemMapUI } from '../ui/SystemMapUI';
@@ -38,6 +44,10 @@ import type { ProtoHooks } from '../Game';
 export interface InputSendHost {
   readonly loggedIn: boolean;
   readonly stationOpen: boolean;
+  /** Our ship is gone (the death screen): the server takes no input for it */
+  readonly localDead?: boolean;
+  /** The server took CAPS.INPUTS: compact inputs, by inputCompactSend.ts's rules */
+  readonly compactInputs?: boolean;
   readonly proto: ProtoHooks | null;
   readonly menu: GameMenuUI;
   readonly adminPanel: AdminPanel | null;
@@ -62,6 +72,11 @@ export interface InputSendState {
   readonly lastSent: Record<InputBool, boolean | undefined>;
   lastSentAngle: number;          // quantized angle (int)
   lastSentCursorDist: number;
+  /** The cursor distance last sent, as sent (compact inputs: the server holds it until the next) */
+  sentDist: number;
+  /** The mouse's aim last tick, and for how many ticks it hasn't changed (compact inputs: the settle send) */
+  aimSeen: number;
+  aimStill: number;
   // Weapon firing state (for the shots-fired stat)
   lastFireLeft: boolean;
   lastFireRight: boolean;
@@ -79,6 +94,9 @@ export function newInputSendState(): InputSendState {
     },
     lastSentAngle: 0,
     lastSentCursorDist: 0,
+    sentDist: 0,
+    aimSeen: -1,
+    aimStill: 0,
     lastFireLeft: false,
     lastFireRight: false,
   };
@@ -145,8 +163,9 @@ export function tickInput(s: InputSendCtx): void {
     s.systemMapUI.jumpAim = { angle: rawAngle, dist: aimDist, label: best?.name ?? null };
   }
 
-  let fireLeft = inputEnabled && ((s.input.isMouseDown(0) && !s.context.withholdingLeft()) || s.systemMapUI.firing());
-  let fireRight = inputEnabled && s.rightHeld();
+  // (A click on the station's screen is a click on the screen)
+  let fireLeft = inputEnabled && !s.stationOpen && ((s.input.isMouseDown(0) && !s.context.withholdingLeft()) || s.systemMapUI.firing());
+  let fireRight = inputEnabled && !s.stationOpen && s.rightHeld();
   // A click calls off a menu jump too
   if (fireLeft && s.context.jumpMark()) s.context.cancel('Jump cancelled');
   // The autopilot flies until a click (or a flight key) takes over
@@ -220,8 +239,31 @@ export function tickInput(s: InputSendCtx): void {
     dodge,
   };
 
-  // Check if anything changed from last sent state
-  const changed = inputChanged(s, msg, quantized, cursorDistQ);
+  // Where the server already knows the controls (berthed: Docking let go of them; dead: a new ship starts with none),
+  // they're neutral on both sides and nothing is sent but what rides on inputs
+  const berthed = !!s.shipClient.berthed?.(), dead = !!s.localDead;
+  if (dead) forgetSent(s);
+  else if (berthed) for (let i = 0; i < INPUT_HELD.length; i++) s.lastSent[INPUT_HELD[i]] = false;
+  const compact = !!s.compactInputs && !s.proto;
+  let changed: boolean;
+  if (berthed || dead) {
+    for (let i = 0; i < INPUT_HELD.length; i++) msg[INPUT_HELD[i]] = false;
+    msg.helm = !!s.lastSent.helm;
+    msg.targetAngle = dequantizeCursorAngle(s.lastSentAngle);
+    msg.cursorDist = compact ? s.sentDist : s.lastSentCursorDist * CURSOR_DIST_STEP;
+    quantized = s.lastSentAngle;
+    cursorDistQ = quantizeCursorDist(msg.cursorDist);
+    changed = false;
+  } else if (compact) {
+    // (What goes and when: inputCompactSend.ts; the aim and distance become what goes, or what the server holds)
+    const plan = compactSend(s, msg, quantized, auto?.jump ? auto.cursorDist : aimDist, !inputEnabled || s.stationOpen);
+    quantized = plan.q;
+    cursorDistQ = quantizeCursorDist(msg.cursorDist ?? 0);
+    changed = plan.send;
+  } else {
+    // Check if anything changed from last sent state
+    changed = inputChanged(s, msg, quantized, cursorDistQ);
+  }
   // Debris worked out here is confirmed on the next input, which goes now if nothing else would (ShipClient.takeAcks)
   const acks = s.shipClient?.takeAcks?.();
   if (acks) msg.acks = acks;
@@ -265,11 +307,21 @@ export function inputChanged(s: InputSendState, msg: ClientInputMessage, quantiz
   return quantized !== s.lastSentAngle || cursorDistQ !== s.lastSentCursorDist;
 }
 
+/** Back to nothing sent: a new ship's controls start neutral on the server, aim and distance 0 (Input is zeroed) */
+export function forgetSent(s: InputSendState): void {
+  const n = newInputSendState();
+  for (let i = 0; i < INPUT_BOOLS.length; i++) { const k = INPUT_BOOLS[i]; s.lastSent[k] = n.lastSent[k]; }
+  s.lastSentAngle = n.lastSentAngle;
+  s.lastSentCursorDist = n.lastSentCursorDist;
+  s.sentDist = n.sentDist;
+}
+
 /** Remember this input as the last one sent */
 export function markSent(s: InputSendState, msg: ClientInputMessage, quantized: number, cursorDistQ: number): void {
   for (let i = 0; i < INPUT_BOOLS.length; i++) { const k = INPUT_BOOLS[i]; s.lastSent[k] = msg[k]; }
   s.lastSentAngle = quantized;
   s.lastSentCursorDist = cursorDistQ;
+  s.sentDist = msg.cursorDist ?? 0;
 }
 
 /**
@@ -280,6 +332,8 @@ export function markSent(s: InputSendState, msg: ClientInputMessage, quantized: 
  */
 export function sendNeutralInput(s: InputSendCtx): void {
   if (!s.loggedIn || !s.state.playerId || !s.network.isConnected()) return;
+  // (Berthed or dead: the server holds them neutral already)
+  if (s.localDead || s.shipClient.berthed?.()) return;
   const msg: ClientInputMessage = {
     type: 'input',
     seq: s.state.nextInputSeq(),
@@ -296,7 +350,7 @@ export function sendNeutralInput(s: InputSendCtx): void {
     strafeLeft: false,
     strafeRight: false,
     helm: s.lastSent.helm,
-    cursorDist: s.lastSentCursorDist * CURSOR_DIST_STEP,
+    cursorDist: s.compactInputs && !s.proto ? s.sentDist : s.lastSentCursorDist * CURSOR_DIST_STEP,
     jump: false,
     dodge: false,
   };

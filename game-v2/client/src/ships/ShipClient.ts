@@ -1329,6 +1329,11 @@ export class ShipClient {
     return this.stationInRange() !== null;
   }
 
+  /** Berthed at a station (the server took the dock: it holds our controls neutral, so no inputs go: app/inputSend.ts) */
+  berthed(): boolean {
+    return this.docked;
+  }
+
   /**
    * Client prediction for the local ship: the same shared physics the server
    * runs. Returns the new boost fuel, or null if there's no ship to predict.

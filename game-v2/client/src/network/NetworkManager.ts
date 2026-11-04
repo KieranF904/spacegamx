@@ -10,6 +10,8 @@ import {
   ClientTransport,
   DisconnectInfo,
   PROTOCOL_MISMATCH_CLOSE,
+  InputEncoder,
+  CAPS,
 } from '@space-game/common';
 
 /** Waits before each reconnect attempt (ms): backs off, then gives up */
@@ -36,6 +38,10 @@ export class NetworkManager implements ClientTransport {
   private reader = new ServerFrameReader();
   /** When it last asked the server to start its packed frames afresh (performance.now) */
   private resyncAt = -Infinity;
+  /** Inputs on this socket (compact ones say what changed since the last: common network/inputCompact.ts); one per socket */
+  private inputs = new InputEncoder();
+  /** The server took CAPS.INPUTS for this socket (its netCaps): inputs go compact, by app/inputCompactSend.ts's rules */
+  compactInputs = false;
 
   connect(url: string): void {
     this.connectSocket(url, false);
@@ -59,6 +65,8 @@ export class NetworkManager implements ClientTransport {
     }
     this.ws = ws;
     this.reader = new ServerFrameReader();
+    this.inputs = new InputEncoder();
+    this.compactInputs = false;
     ws.binaryType = 'arraybuffer'; // Enable binary message handling
 
     ws.onopen = () => {
@@ -164,11 +172,16 @@ export class NetworkManager implements ClientTransport {
 
   send(msg: ClientMessage): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      const data = encodeMessage(msg);
+      const data = msg.type === 'input' ? this.inputs.encode(msg, this.compactInputs) : encodeMessage(msg);
       this.traffic.framesOut++;
       this.traffic.bytesOut += typeof data === 'string' ? data.length : data.byteLength;
       this.ws.send(data);
     }
+  }
+
+  /** The caps the server says are in effect (netCaps) */
+  useCaps(caps: number): void {
+    this.compactInputs = !!(caps & CAPS.INPUTS);
   }
 
   isConnected(): boolean {
