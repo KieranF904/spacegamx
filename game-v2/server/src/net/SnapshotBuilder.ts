@@ -294,9 +294,8 @@ export class SnapshotBuilder {
     const e = this.syncWire.get(id);
     if (e && e.ship === ship && e.rebuilds === ship.rebuilds) return e;
     const next = {
-      // (As its last rebuild had them: ShipState.built)
-      ship, rebuilds: ship.rebuilds, hp: (ship.built?.hp ?? ship.rebuildHp).map(hpWire), detached: (ship.built?.detached ?? ship.detached).flatMap((d, i) => (d ? [i] : [])),
-      ghosts: (ship.built?.ghost ?? ship.ghost).some(Boolean) ? (ship.built?.ghost ?? ship.ghost).flatMap((g, i) => (g ? [i] : [])) : undefined,
+      ship, rebuilds: ship.rebuilds, hp: ship.rebuildHp.map(hpWire), detached: ship.detached.flatMap((d, i) => (d ? [i] : [])),
+      ghosts: ship.ghost.some(Boolean) ? ship.ghost.flatMap((g, i) => (g ? [i] : [])) : undefined,
     };
     this.syncWire.set(id, next);
     return next;

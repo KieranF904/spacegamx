@@ -65,11 +65,6 @@ export interface ShipHost {
   featureCargo?(eid: number): number;
   /** A ship was rebuilt (ships/features: features re-check what depends on its parts) */
   shipRebuilt?(eid: number): void;
-  /**
-   * Has this ship already rebuilt in its snapshot window (net/Replication.ts rebuiltInWindow)? A second rebuild then
-   * waits for the next window: a client works a rebuild out from the structures it is sent, one per window
-   */
-  rebuildWaits?(eid: number): boolean;
   /** A ship's shield broke (ships/features: a Flash Screen starts its return) */
   shieldBroken?(eid: number): void;
   /** Everything kept about an entity id was dropped (ships/features: features forget it) */

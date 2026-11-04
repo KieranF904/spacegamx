@@ -434,15 +434,6 @@ export class Replication {
     return !!this.shadows.get(eid)?.causes.length || this.goneCaused.has(eid);
   }
 
-  /**
-   * Has this ship rebuilt already in its snapshot window (a REBUILD among its causes since the last round)? A second
-   * waits for the next window (ShipBridge.tick step 3): clients have one structure of it a window to work one out from
-   */
-  rebuiltInWindow(eid: number): boolean {
-    const s = this.shadows.get(eid);
-    return !!s && s.causes.some((e) => e.row[0] === OWN_CAUSE.REBUILD);
-  }
-
   /** A ship's keyframe version (bumped whenever it left its predicted path) */
   versionOf(eid: number): number {
     return this.shadows.get(eid)?.version ?? 0;

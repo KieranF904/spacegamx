@@ -341,8 +341,7 @@ export function tick(ctx: BridgeCtx): void {
   //    HP: bridge/rebuild.ts markRebuild) rebuilds it once, here; then mirror core HP into the engine's health
   for (let [ids, ships, bi] = ctx.bodiesNow(); bi < ids.length; bi++) {
     const eid = ids[bi], ship = ships[bi];
-    // (A second in one snapshot window waits for the next, unless it loses its root: rebuildWaits)
-    if (ship.dirty && !(ctx.host.rebuildWaits?.(eid) && rootStands(ship))) ctx.rebuildMarked(eid, ship);
+    if (ship.dirty) ctx.rebuildMarked(eid, ship);
     if (ctx.bodies.has(eid) && hasComponent(world, Player, eid)) ctx.syncHealth(eid, ship);
   }
 
@@ -494,10 +493,4 @@ export function contactScale(b: BridgeCtx, ship: ShipState, part: number): numbe
   const q = ship.blueprint.parts[part];
   const piece = b.catalog.pieces.get(q.piece);
   return (piece?.contact ?? 1) * (partMaterial(b.catalog, q)?.traits?.includes('brittle') ? 2 : 1);
-}
-
-/** Is the part the ship hangs from (its core, or a piece of debris' root) still whole: a rebuild then can wait */
-function rootStands(ship: ShipState): boolean {
-  const r = ship.derived.root;
-  return r >= 0 && ship.hp[r] > 0 && !ship.detached[r];
 }
