@@ -22,7 +22,7 @@
 import {
   Position, Velocity, Rotation, InSystem, FlightBody, ReplicaMode, ReplicaEnv, CTL, KeyframeRow, ControlRow,
   replicaStep, replicaAngle, packKeyframe, packControlRow, flightSignature, applyOwnCauses, quantizeShipBody, OWN_CAUSE,
-  type ShipState, CELL_HOLD_TICKS, cellMemberHash,
+  type ShipState, CELL_HOLD_TICKS, cellMemberHash, replicaHash, replicasByte,
 } from '@space-game/common';
 import type { ShipBridge } from '../ships/ShipBridge.js';
 import type { OwnCause } from '../ships/bridge/ownCauses.js';
@@ -360,6 +360,21 @@ export class Replication {
     if (!s) return out;
     for (const a of [s.log ?? [], s.events]) for (let i = 0; i + 2 < a.length; i += 3) if (a[i] > T) out.push([a[i], a[i + 1], a[i + 2]]);
     return out;
+  }
+
+  /**
+   * The check's byte for every ship a CAUSES client holds now (its own check adds it, network/causes.ts replicasByte):
+   * the shadow it has of each (in step: its causes clients' version; one its body flies there, that one), no debris, none docked
+   */
+  heldByte(known: ReadonlyMap<number, number>, self: number, bodies?: (id: number) => boolean): number {
+    let sum = 0;
+    for (const [id, v] of known) {
+      const s = this.shadows.get(id);
+      if (id === self || !s || s.mode === ReplicaMode.Drift || s.mode === ReplicaMode.Docked || this.ships.get(id)?.kind !== 'ship') continue;
+      const b = s.bodied && bodies?.(id) && v === s.bodied.cver ? s.bodied.body : v === s.cver ? s.body : null;
+      if (b) sum = (sum + replicaHash(id, b)) >>> 0;
+    }
+    return replicasByte(sum);
   }
 
   /** A ship's keyframe version (bumped whenever it left its predicted path) */

@@ -284,7 +284,7 @@ export class ShipClient {
       side: (id) => this.sideOf(id),
       passes: (shell) => this.hits.passesOf(shell),
     });
-    this.own = new OwnTick({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, tuning: opts.tuning, restep: () => this.bodies.on });
+    this.own = new OwnTick({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, tuning: opts.tuning, restep: () => this.bodies.on, extraHash: (t) => this.causes.heldByte(t) });
     this.bodies = new BodyRunner({ reps: this.replicas });
     // (Other ships' causes on the tick layer, CAPS.CAUSES: ships/causes/ShipCauses.ts)
     this.causes = new ShipCauses({ store: this.store, reps: this.replicas, self: () => opts.state.playerId, ownDerived: (t) => this.own.derived(t), ownMid: (t, o) => (this.own.on ? this.own.midOf(t, o) : null), tuning: opts.tuning });
@@ -663,6 +663,8 @@ export class ShipClient {
     for (const s of m.entities) if (s.type === EntityType.ShipBody) this.fillHull(s.id);
     for (const id of m.removed) { this.bodies.remove(id); this.causes.remove(id); this.replicas.remove(id); }
     for (const id of m.out ?? []) { this.bodies.remove(id); this.causes.remove(id); this.replicas.remove(id); }
+    // (the ships it holds now, for its check: CAPS.CAUSES)
+    this.causes.noteHeld(m.tick);
   }
 
   /** Place a replicated ship for this frame (false: not one, or not ready yet) */

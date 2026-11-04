@@ -34,6 +34,8 @@ export interface OwnTickHost {
    * body reading its target, CAPS.BODIES)? Then each snapshot steps it again from just after the last. Unset: always
    */
   restep?(): boolean;
+  /** What its check's state byte adds for a snapshot (CAPS.CAUSES: every other ship it holds, ShipCauses.heldByte) */
+  extraHash?(tick: number): number | undefined;
 }
 
 /** Ticks of inputs kept (a snapshot window is never this far behind the inputs it needs) */
@@ -217,7 +219,7 @@ export class OwnTick implements OwnTimeline {
     if (since < rules.ride || (!riding && since < rules.alone)) return undefined;
     const self = this.host.self(), st = this.host.reps.at(self, this.snapTick), ship = this.host.store.get(self);
     if (!st || !ship) return undefined;
-    const body = ownBodyHash(st.body, st.bits, st.q), hp = ownHpHash(ship.hp);
+    const body = (ownBodyHash(st.body, st.bits, st.q) + (this.host.extraHash?.(this.snapTick) ?? 0)) & 0xff, hp = ownHpHash(ship.hp);
     if (!riding && body === this.last.body && hp === this.last.hp) return undefined;
     this.last = { tick, snap: this.snapTick, body, hp };
     this.stats.checks++;

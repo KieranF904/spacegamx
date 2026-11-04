@@ -121,7 +121,7 @@ import { GameData } from './data/GameData.js';
 import type { UserStore } from './auth/types.js';
 import type { ClientSocket, ClientLink } from '@space-game/common';
 import type { ShipBridge, ShipHost } from './ships/ShipBridge.js';
-import { portsSwitchFeeds, CAPS } from '@space-game/common';
+import { portsSwitchFeeds, CAPS, causesFor } from '@space-game/common';
 import { Blueprint, ShipState, quantizeShipValue, skillValue, hasAll, removeAll, Economy, Bag, StarterKit, jumpTuning, jumpPhase, partItemId, rateShip, ratingOf, createShipState, gradeReward, gradeOf, accrueTraces, releaseTraces, unlocks, stationPerks, hazardFlight, stationTable, blueprintGrade, lookFn, warmthPercent, packCharge, nearerThan, fartherThan, type ShipDerived } from '@space-game/common';
 
 /** A station site by id */
@@ -692,7 +692,8 @@ export class GameServer implements ServerCtx {
     this.hits = new HitLedger(this);
     this.ownChecks = new OwnChecks({
       tick: () => this.currentTick,
-      rekey: (conn) => { conn.repKnown.delete(conn.playerId); },
+      // (CAPS.CAUSES: its check covers every ship it holds, so all of them go again: OwnChecks)
+      rekey: (conn) => { if (causesFor(conn.caps)) conn.repKnown.clear(); else conn.repKnown.delete(conn.playerId); },
       resyncHp: (conn) => { conn.shipHpSent.delete(conn.playerId); conn.shipSynced.delete(conn.playerId); },
     });
     this.bodies = new BodyNet({

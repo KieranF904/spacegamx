@@ -22,9 +22,9 @@ const files = readGameDataFiles(dataDir);
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
 const BASE = CAPS.HITS | CAPS.SELF_HITS | CAPS.PACKED | CAPS.COALESCE | CAPS.OWN_SHOTS | CAPS.ROUGH | CAPS.OWN_SIM | CAPS.INPUTS | CAPS.BODIES;
 
-interface Seen { held: number; keyframes: number; entries: number; records: number; checked: number; off: number; offTicks: number }
+interface Seen { held: number; keyframes: number; entries: number; records: number; checked: number; off: number; offTicks: number; lastOff: number }
 
-function fight(caps: number, extra = 0) {
+function fight(caps: number, extra = 0, dropAt = -1) {
   resetGlobals();
   const clock = { t: 1_000_000 };
   const server = new GameServer({
@@ -65,6 +65,8 @@ function fight(caps: number, extra = 0) {
     const o = fa.snapshot.bind(f);
     let last = -1;
     fa.snapshot = (s) => {
+      // (The forced miss: this client loses one snapshot's causes)
+      if (f === A && dropAt >= 0 && s.tick >= dropAt && s.causes?.length) { s = { ...s, causes: undefined }; dropAt = -1; }
       const held = new Set<number>(f.reps.ids());
       if (on()) for (const k of s.ships ?? []) if (k[0] !== f.pid) { if (held.has(k[0])) seen.keyframes++; else seen.entries++; }
       if (on()) seen.records += s.causes?.length ?? 0;
@@ -78,15 +80,17 @@ function fight(caps: number, extra = 0) {
           const st = f.reps.at(id, t)?.body, r = truth.get(t)?.get(id);
           if (!st || !r) continue;
           seen.checked++;
-          if (st.x !== r[0] || st.y !== r[1] || st.vx !== r[2] || st.vy !== r[3] || st.angle !== r[4]) { seen.offTicks++; if (t === s.tick) seen.off++; }
+          if (st.x !== r[0] || st.y !== r[1] || st.vx !== r[2] || st.vy !== r[3] || st.angle !== r[4]) { seen.offTicks++; seen.lastOff = s.tick; if (t === s.tick) seen.off++; }
         }
       }
       last = s.tick;
     };
   };
   let measuring = false;
-  const a: Seen = { held: 0, keyframes: 0, entries: 0, records: 0, checked: 0, off: 0, offTicks: 0 };
-  const b: Seen = { held: 0, keyframes: 0, entries: 0, records: 0, checked: 0, off: 0, offTicks: 0 };
+  const a: Seen = { held: 0, keyframes: 0, entries: 0, records: 0, checked: 0, off: 0, offTicks: 0, lastOff: -1 };
+  const b: Seen = { held: 0, keyframes: 0, entries: 0, records: 0, checked: 0, off: 0, offTicks: 0, lastOff: -1 };
+  // Its own check (with every ship it holds, CAPS.CAUSES) as each input would carry it
+  const checks = (server as unknown as { ownChecks: { check(c: unknown, k: unknown): void; stats: { agreed: number; bodyOff: number } } }).ownChecks;
   watch(A, a, () => measuring);
   watch(B, b, () => measuring);
   for (let i = 0; i < 900; i++) {
@@ -102,14 +106,17 @@ function fight(caps: number, extra = 0) {
     server.step();
     clock.t += 1000 / 60;
     record();
+    const chk = A.own?.takeCheck(true, server.getTick());
+    if (chk) checks.check(server.pilots.connOf(A.pid), chk);
   }
-  return { a, b, stats: (server.replication as unknown as { causeStats: { worked: number; rows: number; stateless: number; unworkable: number; failed: Record<string, number> } }).causeStats, client: A.causes?.stats };
+  return { a, b, checks: { ...checks.stats }, stats: (server.replication as unknown as { causeStats: { worked: number; rows: number; stateless: number; unworkable: number; failed: Record<string, number> } }).causeStats, client: A.causes?.stats };
 }
 
 describe('other ships\' causes (CAPS.CAUSES)', () => {
   it('a client taking them holds every ship exactly, every tick, with no keyframe of one it holds; a legacy one is keyframed', () => {
-    const { a, b, stats, client } = fight(BASE, CAPS.CAUSES);
-    if (process.env.CAUSES_DEBUG) console.log('CAUSESDBG', JSON.stringify({ a, b, stats, client }));
+    const { a, b, stats, client, checks } = fight(BASE, CAPS.CAUSES);
+    expect(checks.bodyOff).toBe(0);
+    expect(checks.agreed).toBeGreaterThan(10);
     // (the fight had contacts and rebuilds to tell)
     expect(stats.worked).toBeGreaterThan(50);
     expect(a.records).toBeGreaterThan(20);
@@ -130,6 +137,15 @@ describe('other ships\' causes (CAPS.CAUSES)', () => {
     expect(a.checked).toBeGreaterThan(5000);
     expect(a.offTicks).toBe(0);
     expect(a.keyframes * 50).toBeLessThan(b.keyframes);
+  }, 120_000);
+
+  it('a client that misses some causes is caught by its check and put right: every ship it holds again', () => {
+    const { a, checks } = fight(BASE, CAPS.CAUSES, 400);
+    expect(a.offTicks).toBeGreaterThan(0);
+    expect(checks.bodyOff).toBeGreaterThan(0);
+    // (off only until the check's keyframes came: none in the last 300 ticks)
+    expect(a.lastOff).toBeLessThan(600);
+    expect(checks.agreed).toBeGreaterThan(10);
   }, 120_000);
 
   it('without the cap, the same client is keyframed as before', () => {

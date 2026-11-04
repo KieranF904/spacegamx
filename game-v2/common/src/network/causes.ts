@@ -73,3 +73,25 @@ export function causesByShip(rows: readonly (readonly number[])[] | undefined, s
   }
   return out;
 }
+
+// ---- The check: a byte over every ship a client holds, on its own check (OwnCheck.body) ----
+
+const mixH = (h: number, v: number) => Math.imul(h ^ (v | 0), 0x9e3779b1) ^ (Math.imul(h, 0x85ebca6b) >>> 13);
+
+/** One held ship's share of the check: its id, place, velocity and heading, on the snapshot grid */
+export function replicaHash(id: number, b: { x: number; y: number; vx: number; vy: number; angle: number }): number {
+  let h = mixH(0x6a09e667, id);
+  h = mixH(h, Math.round(b.x * 100)); h = mixH(h, Math.round(b.y * 100));
+  h = mixH(h, Math.round(b.vx * 1e4)); h = mixH(h, Math.round(b.vy * 1e4)); h = mixH(h, Math.round(b.angle * 1e5));
+  h ^= h >>> 15;
+  return Math.imul(h, 0x2c1b3c6d) >>> 0;
+}
+
+/**
+ * What a CAUSES client adds to its own check's state byte (OwnCheck.body): the sum of every ship it holds (not its own,
+ * no debris, none docked) as of the snapshot's tick, once that snapshot is taken in (keyframes, causes, removals). The
+ * server sums its shadows of the same ships; off, it keyframes them all again (and its own ship)
+ */
+export function replicasByte(sum: number): number {
+  return (sum ^ (sum >>> 8) ^ (sum >>> 16) ^ (sum >>> 24)) & 0xff;
+}

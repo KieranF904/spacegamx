@@ -32,10 +32,11 @@ export class OwnChecks {
   constructor(private readonly host: OwnChecksHost) {}
 
   /** A snapshot went to it: its own ship then (real: what its own layer has, keyframed or stepped), its controls and HP copy */
-  note(conn: ClientConnection, tick: number, body: FlightBody, bits: number, q: number, hp: readonly number[] | undefined): void {
+  note(conn: ClientConnection, tick: number, body: FlightBody, bits: number, q: number, hp: readonly number[] | undefined, extra = 0): void {
     let e = this.by.get(conn);
     if (!e) this.by.set(conn, (e = { ticks: [], at: new Map(), fixedAt: -Infinity }));
-    e.at.set(tick, ownBodyHash(body, bits, q) | ((hp ? ownHpHash(hp) : 0) << 8));
+    // (`extra`: CAPS.CAUSES, every other ship it holds then, Replication.heldByte; off, they're all keyframed again too)
+    e.at.set(tick, ((ownBodyHash(body, bits, q) + extra) & 0xff) | ((hp ? ownHpHash(hp) : 0) << 8));
     e.ticks.push(tick);
     while (e.ticks.length > KEEP) e.at.delete(e.ticks.shift()!);
   }

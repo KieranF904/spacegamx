@@ -525,7 +525,9 @@ export class SnapshotBuilder {
     const id = conn.playerId, ship = this.ships.get(id), ctl = this.replication.controlsOf(id);
     if (!ship || !ctl) return;
     const body = { x: Position.x[id], y: Position.y[id], vx: Velocity.x[id], vy: Velocity.y[id], angle: Rotation.angle[id], angVel: ship.angVel, jump: ship.jump, jumpScale: ship.jumpScale, cargo: ship.cargo, dodge: ship.dodge, dodgeDir: ship.dodgeDir };
-    this.ownChecks!.note(conn, this.currentTick, body, ctl.bits, ctl.q, conn.shipHpSent.get(id));
+    // (CAPS.CAUSES: every other ship it holds goes in the check too)
+    const held = causesFor(conn.caps) ? this.replication.heldByte(conn.repKnown, id, this.bodies ? (e) => this.bodies!.runs(conn, e) : undefined) : 0;
+    this.ownChecks!.note(conn, this.currentTick, body, ctl.bits, ctl.q, conn.shipHpSent.get(id), held);
   }
 
   private snapshotCount = 0;

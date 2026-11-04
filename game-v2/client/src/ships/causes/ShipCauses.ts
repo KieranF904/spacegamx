@@ -13,7 +13,7 @@
  * The own ship's causes are OwnTick's (ships/own/OwnTick.ts); it is never one of these.
  */
 import {
-  applyOwnCauses, applyCauseRows, causesByShip, type CauseRow, CONTACT_BIG_BODY, OWN_CAUSE, CONTACT_FLAG,
+  applyOwnCauses, applyCauseRows, causesByShip, replicaHash, replicasByte, type CauseRow, CONTACT_BIG_BODY, OWN_CAUSE, CONTACT_FLAG,
   type ReplicaCauses, type ShipReplicaSet, type ShipDerived, type ShipState, type ShipTuning, type FlightBody,
   type OwnCauseEnv, type OwnShape, type PlacedGeom, type ServerSnapshotMessage, type Vec2,
 } from '@space-game/common';
@@ -46,6 +46,8 @@ export class ShipCauses implements ReplicaCauses {
   /** A contact's other as the snapshot found it, by tick and id (it may be gone by the time the replica is stepped: removed in that very snapshot) */
   private readonly kept = new Map<string, ShipState>();
   readonly stats = { rows: 0, failed: 0 };
+  /** The check's byte for each snapshot taken in (by its tick): every ship held then (noteHeld) */
+  private readonly held = new Map<number, number>();
 
   constructor(private readonly host: ShipCausesHost) {}
 
@@ -110,6 +112,28 @@ export class ShipCauses implements ReplicaCauses {
     for (const m of [this.touched, this.kept] as Map<string, unknown>[]) if (m.size > 64) for (const k of [...m.keys()]) if (Number(k.split(':')[0]) < old) m.delete(k);
   }
 
+  /**
+   * A snapshot fully taken in (keyframes, causes, removals): the check's byte for it, every ship held (not its own, no
+   * debris, none docked), its state at the snapshot's tick (network/causes.ts replicasByte)
+   */
+  noteHeld(tick: number): void {
+    if (!this.on) return;
+    const { reps, store } = this.host, self = this.host.self();
+    let sum = 0;
+    for (const id of reps.ids()) {
+      if (id === self || store.get(id)?.kind !== 'ship' || reps.isDocked(id)) continue;
+      const st = reps.at(id, tick);
+      if (st) sum = (sum + replicaHash(id, st.body)) >>> 0;
+    }
+    this.held.set(tick, replicasByte(sum));
+    if (this.held.size > 64) for (const t of [...this.held.keys()]) if (t < tick - KEEP_TICKS) this.held.delete(t);
+  }
+
+  /** The check's byte for a snapshot (its own check adds it: OwnTick.takeCheck); undefined: not noted */
+  heldByte(tick: number): number | undefined {
+    return this.held.get(tick);
+  }
+
   /** A ship gone (removed, out of view): its causes with it */
   remove(id: number): void {
     this.rows.delete(id);
@@ -150,11 +174,14 @@ export class ShipCauses implements ReplicaCauses {
 
   /**
    * A ship's body on tick t as the server rebuilt it (after that tick's contacts, before its recentring: where a split's
-   * pieces start, DebrisSplits); null: no rebuild of it that tick here
+   * pieces start, DebrisSplits); null: no causes of it that tick here (its replica's state is it)
    */
   beforeRebuild(id: number, t: number): FlightBody | null {
-    const row = this.rows.get(id)?.get(t)?.find((r) => r.row[0] === OWN_CAUSE.REBUILD);
-    return row ? this.midOf(id, t, row.seq) : null;
+    const rows = this.rows.get(id)?.get(t);
+    if (!rows) return null;
+    // (No rebuild among them, a death's say: after them all, unrounded)
+    const row = rows.find((r) => r.row[0] === OWN_CAUSE.REBUILD);
+    return this.midOf(id, t, row ? row.seq : Infinity);
   }
 
   /**

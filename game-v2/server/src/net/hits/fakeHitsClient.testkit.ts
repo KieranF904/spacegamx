@@ -114,7 +114,7 @@ export class FakeHitsClient {
         passes: (shell) => this.hits!.passesOf(shell),
       });
     }
-    if (ownSimFor(opts.caps)) this.own = new OwnTick({ store: this.store, reps: this.reps, self: () => this.pid, tuning: ships.tuning, restep: () => !!this.bodies?.on });
+    if (ownSimFor(opts.caps)) this.own = new OwnTick({ store: this.store, reps: this.reps, self: () => this.pid, tuning: ships.tuning, restep: () => !!this.bodies?.on, extraHash: (t) => this.causes?.heldByte(t) });
     if (bodiesFor(opts.caps)) this.bodies = new BodyRunner({ reps: this.reps });
     if (causesFor(opts.caps)) this.causes = new ShipCauses({ store: this.store, reps: this.reps, self: () => this.pid, ownDerived: (t) => this.own?.derived(t), ownMid: (t, o) => (this.own?.on ? this.own.midOf(t, o) : null), tuning: ships.tuning });
     this.cells = new CellCache({ reps: this.reps, send: (m) => this.outbox.push(m), forget: (id) => this.bodies?.remove(id) });
@@ -281,6 +281,8 @@ export class FakeHitsClient {
     // (The game's client steps every replica as it draws, each frame; drawing nothing, this does it here. Left alone,
     // a replica no one asked for in 600 ticks stops short: ShipReplicaSet.at won't run that far in one go)
     for (const id of this.reps.ids()) this.reps.at(id, s.tick);
+    // (the ships it holds now, for its check: CAPS.CAUSES)
+    this.causes?.noteHeld(s.tick);
     // Hits found here, once the frame's told records are in (ShipClient.afterSnapshot, findHits)
     if (this.selfHits) {
       this.selfHits.onKeyframes(s.ships);
