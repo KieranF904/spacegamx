@@ -39,7 +39,7 @@ import { portalQuery } from './handlers/flight.js';
 import { SELF_SAFETY_TICKS, SNAP_PROJECTILE_RANGE, SNAP_POD_RANGE, SHIP_VIEW_IN, SHIP_VIEW_OUT, MAP_DOTS_TICKS, DEBRIS_ACK_TICKS } from './snapshot/constants.js';
 import type { HitLedger } from './hits/HitLedger.js';
 import { ownShotsFor, ownVolleyExact, ownSimFor } from './snapshot/ownShots.js';
-import { bodiesFor, focusFor } from '@space-game/common';
+import { bodiesFor, focusFor, jumpPhase, jumpTuning } from '@space-game/common';
 import { FocusCells } from './cells/FocusCells.js';
 import type { BodyNet } from './decisions/BodyNet.js';
 import type { OwnChecks } from './own/OwnChecks.js';
@@ -227,6 +227,7 @@ export class SnapshotBuilder {
       runsBody: (conn, eid) => !!this.bodies && bodiesFor(conn.caps) && this.bodies.runs(conn, eid),
       send: (conn, msg) => this.send(conn.ws, msg),
       rowsSent: (conn) => this.lastEntityStates.get(conn.playerId),
+      transit: (eid) => jumpPhase(this.ships.get(eid)?.jump ?? 0, jumpTuning(this.ships.tuning)).phase === 'burn',
     }, this.replication);
   }
 
@@ -864,8 +865,8 @@ export class SnapshotBuilder {
     const now = this.currentTick;
     for (const conn of this.clients.values()) {
       // (Holding cells with its map shut: its ghosts, the ring's ships as legs: CAPS.FOCUS)
+      if (!(conn.mapOpen || conn.focus) || !(due || conn.mapDotsDue) || !conn.ws.isOpen() || !hasComponent(this.world, Player, conn.playerId)) continue;
       const ghost = conn.mapOpen ? null : this.focus.ghost(conn);
-      if (!(conn.mapOpen || ghost) || !(due || conn.mapDotsDue) || !conn.ws.isOpen() || !hasComponent(this.world, Player, conn.playerId)) continue;
       conn.mapDotsDue = false;
       const sent = (conn.mapSent ??= new Map());
       const full = conn.mapFresh === true;

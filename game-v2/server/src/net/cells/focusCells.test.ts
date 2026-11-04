@@ -199,6 +199,24 @@ describe('the focus grid (CAPS.FOCUS)', () => {
     expect(w.seen.offIds).toEqual([]);
   });
 
+  it("a jump's burn is a transit: the focus holds still till it ends, then changes once", () => {
+    const w = world(CAPS.FOCUS);
+    w.run(60);
+    const focus = w.server.snapshots.focus as unknown as { host: { transit(eid: number): boolean } };
+    let burning = true;
+    focus.host.transit = () => burning;
+    const d0 = w.server.snapshots.focus.stats.drops, cells0 = new Set(w.conn.focus!.cells);
+    // (flown 30 km in steps, as a burn carries it)
+    for (let k = 1; k <= 10; k++) w.run(9, [w.x0 + 3000 * k, w.y0]);
+    expect(w.server.snapshots.focus.stats.drops).toBe(d0);
+    expect([...w.conn.focus!.cells]).toEqual([...cells0]);
+    burning = false;
+    w.run(6);
+    expect(w.server.snapshots.focus.stats.drops).toBeGreaterThan(d0);
+    expect(w.conn.focus!.cells).not.toEqual(cells0);
+    expect(w.seen.offIds).toEqual([]);
+  });
+
   it('a new system starts afresh (no offer from before the jump)', () => {
     const w = world(CAPS.FOCUS);
     w.run(60);

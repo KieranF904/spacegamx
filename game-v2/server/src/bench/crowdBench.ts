@@ -6,7 +6,8 @@
  *
  *   npm run bench:crowd                    quick: n 20 and 50; spread, ball, boss(20); ~10 s measured each
  *   npm run bench:crowd -- --full          n 20, 50, 100, 300 (boss: 20), 15 s each
- *   --n 20,100  --layouts spread,ball  --secs 10  --bulk packed|blocks  --caps 1023  --probes 4  --out file.json
+ *   --n 20,100  --layouts spread,ball,cruise  --secs 10  --bulk packed|blocks|focus  --caps 2047  --probes 4  --out file.json
+ *   (cruise: pilots flying out and back over 24 km, the focus grid's churn; caps 2047 = with CAPS.FOCUS)
  *   --case <layout>:<n>                    one case in this process (what the matrix runs), prints one JSON line
  */
 import { spawnSync } from 'child_process';
@@ -21,7 +22,7 @@ const flag = (name: string) => argv.includes(`--${name}`);
 
 const full = flag('full');
 const opts = (layout: Layout, n: number): CaseOpts => ({
-  layout, n, secs: Number(arg('secs', full ? '15' : '10')), bulk: (arg('bulk', 'legacy') as 'legacy' | 'packed' | 'blocks'),
+  layout, n, secs: Number(arg('secs', full ? '15' : '10')), bulk: (arg('bulk', 'legacy') as 'legacy' | 'packed' | 'blocks' | 'focus'),
   probes: Number(arg('probes', '4')), caps: Number(arg('caps', '511')), lat: Number(arg('lat', '3')), warm: Number(arg('warm', '240')), sample: Number(arg('sample', '4')),
 });
 
@@ -51,11 +52,12 @@ for (const [layout, n] of cases) {
 }
 
 const f = (v: number, d = 1) => v.toFixed(d);
-const head = ['layout', 'n', 'tick ms', 'p95', 'max', 'budget%', 'snap ms', 'repl ms', 'enc ms', 'rebuild ms', 'rebuilds/s', 'reb. repeats', 'cap raw B/s', 'cap wire B/s', 'bulk raw B/s', 'bulk wire B/s', 'msgs/s cap', 'msgs/s bulk', 'checked', 'disagree', 'other dis.', 'kf corr/s', 'hit fixes'];
+const head = ['layout', 'n', 'tick ms', 'p95', 'max', 'budget%', 'snap ms', 'repl ms', 'enc ms', 'rebuild ms', 'rebuilds/s', 'reb. repeats', 'cap raw B/s', 'cap wire B/s', 'bulk raw B/s', 'bulk wire B/s', 'msgs/s cap', 'msgs/s bulk', 'checked', 'disagree', 'other dis.', 'kf corr/s', 'hit fixes', 'held', 'drops/s', 'entries/s', 'offers/s', 'logs/s', 'refused'];
 const rows = results.map((r) => [
   r.layout, r.n, f(r.timing.tickMeanMs, 2), f(r.timing.tickP95Ms, 2), f(r.timing.tickMaxMs, 1), f(r.timing.budgetPct, 0), f(r.timing.snapshotsMsPerTick, 2), f(r.timing.replicationMsPerTick, 2), f(r.timing.encodeSendMsPerTick, 2), f(r.timing.rebuildMsPerTick, 3), f(r.timing.rebuildsPerSec, 1), r.timing.rebuildRepeats ?? 0,
   r.bytes.capable.rawBpsMean, r.bytes.capable.wireBpsMean, r.bytes.legacyOrBulk.rawBpsMean, r.bytes.legacyOrBulk.wireBpsMean, f(r.bytes.capable.msgsPerSecMean, 1), f(r.bytes.legacyOrBulk.msgsPerSecMean, 1),
   r.agreement.checked, r.agreement.disagreeNoKeyframe, `${r.agreement.otherDisagree}/${r.agreement.otherChecked}`, f(r.agreement.keyframeCorrectionsPerSecPerProbe, 2), r.agreement.server.hits.fixes ?? 0,
+  f(r.focus?.heldMean ?? 0, 1), f(r.focus?.dropsPerSec ?? 0, 2), f(r.focus?.entriesPerSec ?? 0, 2), f(r.focus?.offersPerSec ?? 0, 2), f(r.focus?.logsPerSec ?? 0, 2), r.focus?.refused ?? 0,
 ].map(String));
 const w = head.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i].length)));
 const line = (r: string[]) => r.map((c, i) => c.padStart(w[i])).join('  ');

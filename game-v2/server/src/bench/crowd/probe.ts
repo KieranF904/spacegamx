@@ -83,9 +83,9 @@ export class Probe {
   private lat: number;
 
   /** Before the server's step: send this tick's input (when it changed or something rides on it) */
-  fly(target: number, now: number): void {
+  fly(target: number, now: number, ctl?: Ctl): void {
     const f = this.fake as any;
-    const c: Ctl = controlsFor(this.pid, target, (t) => this.server.getShips().has(t));
+    const c: Ctl = ctl ?? controlsFor(this.pid, target, (t) => this.server.getShips().has(t));
     const key = inputKey(c);
     let rep: unknown, chk: unknown, bck: unknown;
     while (this.bckQ.length && this.bckQ[0].at <= now) bck = this.bckQ.shift()!.v;

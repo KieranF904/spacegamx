@@ -15,6 +15,8 @@
  *   shadow keeps them, Replication.eventsSince) smaller than an entry, goes back as a log (`l`) for the ships still on
  *   their path and in focus: the client fast-forwards them, and they come into view the next round on control rows.
  *   Otherwise (no answer, a different hash, a long log) `l` with none, and they enter as new: keyframes, rows, syncs.
+ * - **Jumps.** While its ship is in a jump's burn its focus holds as it was (a transit: no cell dropped or entered on the
+ *   way); the burn's end drops the old cells and enters the new ones at once.
  * - **Ghosts.** The ring (cells within 35 km), pending cells, party and target: map-dot legs (sendMapDots), not held.
  *
  * Entries are encoded once already: with CAPS.BLOCKS each entering ship's keyframe and status row is one shared block.
@@ -36,6 +38,8 @@ export interface FocusHost {
   send(conn: ClientConnection, msg: { type: 'cells'; tick: number; d?: number[]; b?: number[]; l?: number[] }): void;
   /** Its status rows as last sent (dropped ships are forgotten there, so their rows go afresh) */
   rowsSent(conn: ClientConnection): Map<number, string> | undefined;
+  /** Its ship is in a jump's burn (20 km/s: a cell every 24 ticks): its focus holds still till it ends */
+  transit(eid: number): boolean;
 }
 
 /** One client's focus (ClientConnection.focus) */
@@ -128,8 +132,10 @@ export class FocusCells {
       st = conn.focus = { system, cells: new Set(), ring: new Set(), pending: new Map(), dropped: new Map(), replies: [], leaving: [], restore: [], skip: new Set(), b: [], l: [] };
     }
     st.leaving.length = 0; st.restore.length = 0; st.skip.clear(); st.b.length = 0; st.l.length = 0;
-    const now = new Set(focusCells(px, py));
-    st.ring = new Set(ringCells(px, py));
+    // (In a jump's burn: the focus it had holds, no cell dropped or entered on the way; the burn's end is one change)
+    const transit = st.cells.size > 0 && this.host.transit(conn.playerId);
+    const now = transit ? st.cells : new Set(focusCells(px, py));
+    if (!transit) st.ring = new Set(ringCells(px, py));
     this.answers(conn, st, now);
     for (const c of st.cells) {
       if (now.has(c)) continue;

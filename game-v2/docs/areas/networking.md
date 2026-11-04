@@ -26,6 +26,7 @@ How client and server talk: message types (objects over a WebSocket), the compac
 | server/src/net/SnapshotBuilder.ts | 828 | the snapshot path (`SnapshotBuilder`, built once from a `SnapshotHost`): `sendSnapshots`, `systemRows` (the pilot row), `sendShipUpdates`, `rowKey`/`internKey`, `sendMapDots`, `updateShipView`, `enterSystem`, `sendPlayerState`, `sendSystemInfo`; `SnapRow`, `designHash` (`hpWire` is common hitRules.ts), the player/projectile/pod queries |
 | server/src/net/snapshot/Outbox.ts, constants.ts | 177 / 27 | the sending side: `send`, `queue`, `flushOutbox`, `flushLazy` (the lazy effects), `broadcastToSystem` (an eye-and-ear effect, `LAZY_TYPES`, with a place goes `broadcastNear` instead: `fxPoint`), `broadcastNear`, `broadcastProjectileHit`, `addDamage`/`flushDamage` (damage summed per target, source and glancing till the next snapshot, to a tenth), the byte counters; the snapshot tuning (`LAZY_TYPES`/`LAZY_TICKS`, `SHIP_VIEW_IN/OUT`, `SELF_SAFETY_TICKS`, `DEBRIS_ACK_TICKS`, ranges). GameServer keeps one-line delegates (`send`, `flushOutbox`, `sendSnapshots`, ...) |
 | common/src/ships/debris.ts, common/src/math/detTrig.ts | 291 / 389 | debris both sides work out alike: a split's pieces (`deriveSplit`, `splitPose`, `splitRng`, `debrisSpin`, `debrisMotion`, `debrisHash`), the drift and push-only knocks (`stepDebrisWorld`, `stepDebrisBody`), the wire packing (`packIds`, `packRuns`); deterministic `dsin`/`dcos`/`dsincos`/`datan2`/`dhypot`/`dexp`/`dlog`/`dlog2`/`dpow` (only exact operations: the same bits in every engine), which flight and shells use too (docs/design/deterministic-maths.md; checked across engines by `npm run det:engines`) |
+| common/src/network/cells.ts | 170 | the focus grid (protocol 38, `CAPS.FOCUS` 1024): cells, home cells, focus/ring, ghost weight, the dropped-cell hashes and log wire form |
 | common/src/network/hits.ts | 100 | confirmed hits on the wire: `CAPS` (the join's bit mask), `ShellHitRecord`, `packHits`/`unpackHits`, `hpChecksum` |
 | server/src/net/hits/HitLedger.ts | 475 | confirmed hits, the server side: `shellHit`/`hitFx`/`end` during the tick, then per capable client `plan` (in the snapshot loop; for a client finding its own, which hits it can find: `unfindable`), `write` (after its snapshot; then `judge` its journal, a `hitFix` if need be), `check` (after its HP); `report` (a client's hit report); `endSnapshot` switches caps and tells the client (`netCaps`). `confirmedHits.test.ts` beside it is the parity test |
 | client/src/ships/hits/ConfirmedHits.ts | 370 | confirmed hits, the client side: `expand` (a record into the messages the server would have sent, HP into the ship store), `check` (hpCheck), `clientCaps()` (the `?hits=0|1` and `?selfhits=0|1` switches); for client-detected hits `own` / `told` / `oldWay` / `flushPending` (a frame's hits) and `corrected` (a hitFix) |
@@ -89,6 +90,27 @@ packed by a per-connection `PackedEncoder` (slots for entities and shells, steps
 pack goes as base bytes inside). With COALESCE, a sub-frame with nothing urgent waits up to `COALESCE_TICKS` (3) for
 the next; the client widens its interpolation delay by `netCaps.hold`. A packed message that doesn't decode stops the
 reader until the server starts afresh (`packedResync`).
+
+### The focus grid (protocol 38, `CAPS.FOCUS` 1024, docs/design/awareness-model.md section 0)
+Dev builds (`?focus=0|1`). Shared rules in common network/cells.ts: 8,192-unit cells from the system centre, a ship's
+home cell (changes 256 past the border), the focus (every cell whose nearest point is within 19 km of the client's ship,
+flat, no hysteresis) and the ring (within 35 km). Server net/cells/FocusCells.ts (built by SnapshotBuilder, `focus`):
+once a round the home cells and each cell's ships (systems with a capable client only); a capable client's
+`shipView` is its own ship plus the ships homed in its held focus cells (`view`, in place of `updateShipView`'s 40/48 km
+circle, party and target included). A cell leaving the focus keeps its ships in view for that snapshot, then a `cells`
+message after it (`d`: [cell, n, ids]) drops them: the client (client ships/cells/CellCache.ts, shared with the fake
+clients) detaches their replicas as of that tick (`ShipReplicaSet.detach`) with a hash (`cellMemberHash`/`cellHash`) and
+keeps them 10 s (their structure stays in the ShipStore; the server keeps `shipSynced`/`shipHpSent` for them). The
+server records each such ship's keyframe version and hash once per (cell, tick), shared. A dropped cell back in focus
+within the hold is pending (`b`: [cell, T]; its ships out of view, ghosts) till the client's `cellCache` [cell, T, hash
+or 0] or a timeout (30 ticks + 2 pings): a matching hash, with the ships' control changes since T (every Replication
+shadow keeps its last 12 s: `eventsSince`) smaller than an entry (40 B a ship), goes back as a log (`l`: [cell, T, n, (id,
+k, (dt, bits, q) x k) x n]) and the client attaches and fast-forwards them (`ShipReplicaSet.attach`, at most 600 ticks);
+otherwise `l` with none and they enter as new (keyframes, rows; syncs only if rebuilt). Ghosts: with the map shut a
+capable client still gets `mapDots`, for ships homed in its ring, focus or pending cells it doesn't hold, its party and
+its target (`FocusCells.ghost`); the client draws them as markers (client ships/cells/GhostLayer.ts) and fades held
+ships from hull to marker over 18-19 km (`ShipRenderer.ghostOf`). A new system, death or switching the cap off starts it
+afresh. Tests: server/src/net/cells/focusCells.test.ts; bench: `npm run bench:crowd -- --layouts cruise --caps 2047 --bulk focus`.
 
 ### Encode-once blocks (protocol 37, `CAPS.BLOCKS` 512, docs/design/awareness-model.md 7.6)
 With PACKED (dev builds; `?blocks=0|1`). A snapshot's rows about other entities (status rows, shell rows, keyframes,

@@ -11,8 +11,8 @@ export interface CaseOpts {
   layout: Layout;
   n: number;
   secs: number;
-  /** The counting sockets: 'legacy' (no caps), 'packed' (PACKED | COALESCE, nothing they owe) or 'blocks' (and BLOCKS) */
-  bulk: 'legacy' | 'packed' | 'blocks';
+  /** The counting sockets: 'legacy' (no caps), 'packed' (PACKED | COALESCE, nothing they owe), 'blocks' (and BLOCKS) or 'focus' (and FOCUS: they never answer an offer back) */
+  bulk: 'legacy' | 'packed' | 'blocks' | 'focus';
   /** Full probe clients among the n */
   probes: number;
   /** The probes' caps (default everything) and latency in ticks */
@@ -57,7 +57,7 @@ export async function runCase(o: CaseOpts): Promise<any> {
   Math.random = seed;
   clock.t = 1_000_000;
   const wallStart = performance.now();
-  const server = makeServer(1023);
+  const server = makeServer(2047);
   const ships = server.getShips() as any, srv = server as any;
 
   // ---- the meter: wrapped before anything else, so the probes' own wrappers sit outside it ----
@@ -95,7 +95,7 @@ export async function runCase(o: CaseOpts): Promise<any> {
   let scene!: Scene;
   const ring = new PoseRing(server);
   const klass = classifier(server, () => scene?.bossId ?? -1);
-  const bulkCaps = o.bulk === 'packed' ? 4 | 8 : o.bulk === 'blocks' ? 4 | 8 | 512 : 0;
+  const bulkCaps = o.bulk === 'packed' ? 4 | 8 : o.bulk === 'blocks' ? 4 | 8 | 512 : o.bulk === 'focus' ? 4 | 8 | 512 | 1024 : 0;
   const counters = new Map<number, Counter>();
   const sampledBulk = new Set<number>();
   const probes = new Map<number, Probe>();
@@ -136,8 +136,9 @@ export async function runCase(o: CaseOpts): Promise<any> {
     const now = server.getTick();
     scene.tick(now, (b) => {
       const p = probes.get(b.index);
-      if (p) p.fly(b.target, now);
-      else applyDirect(b.pid, controlsFor(b.pid, b.target, (t) => ships.has(t)));
+      const c = scene.controls(b);
+      if (p) p.fly(b.target, now, c);
+      else applyDirect(b.pid, c);
     });
     server.step();
     clock.t += 1000 / 60;
@@ -149,10 +150,16 @@ export async function runCase(o: CaseOpts): Promise<any> {
   // ---- measure ----
   measuring = true;
   for (const p of probes.values()) p.measuring = true;
+  const focus0 = snap(srv.snapshots.focus.stats), cells0 = [...probes.values()].map((p) => snap(p.fake.cells.stats));
+  const held: number[] = [];
   const hits0 = snap(srv.hits.stats), reasons0 = snap(srv.replication.reasons), bodies0 = snap({ net: srv.bodies?.stats, rep: srv.replication.bodyStats });
   const m0 = server.getTick();
   const ticks = o.secs * 60;
-  for (let i = 0; i < ticks; i++) stepOnce();
+  for (let i = 0; i < ticks; i++) {
+    stepOnce();
+    // (what each probe holds on its tick layer: the focus grid's view, or the 40 km circle)
+    if (i % 30 === 0) for (const p of probes.values()) held.push([...p.fake.reps.ids()].length);
+  }
   measuring = false;
   const secs = o.secs;
   const alive = [...pids].filter((p) => ships.has(p)).length;
@@ -212,6 +219,13 @@ export async function runCase(o: CaseOpts): Promise<any> {
       keyframeEntriesPerSecPerProbe: r2(mean(probeList.map((p) => p.keyframesEntry / secs))),
       server: { hits: hitsDiff, reasons: numericDiff(snap(srv.replication.reasons), reasons0), bodies: numericDiff(snap({ net: srv.bodies?.stats, rep: srv.replication.bodyStats }), bodies0) },
     },
+    focus: (() => {
+      const d = numericDiff(snap(srv.snapshots.focus.stats), focus0), c: Record<string, number> = {};
+      [...probes.values()].forEach((p, i) => { for (const [kk, v] of Object.entries(numericDiff(snap(p.fake.cells.stats), cells0[i]))) c[kk] = (c[kk] ?? 0) + (v as number); });
+      const per = (v: number) => r2(v / secs);
+      return { heldMean: r2(mean(held)), server: d, probes: c, dropsPerSec: per(d.drops ?? 0), entriesPerSec: per(d.entries ?? 0), offersPerSec: per(d.offers ?? 0), logsPerSec: per(d.logs ?? 0),
+        logShipsPerSec: per(d.logShips ?? 0), refused: (d.refusedHash ?? 0) + (d.refusedSize ?? 0) + (d.refusedLate ?? 0) + (d.refusedNone ?? 0) };
+    })(),
     probeClientMsPerTick: r2(mean(probeList.map((p) => p.clientMs / ticks))),
     wallSeconds: r2((performance.now() - wallStart) / 1000),
     ticks: server.getTick() - m0,

@@ -1,6 +1,6 @@
 # Awareness: cells, effects not sources, encode once (design, 2026-11-04)
 
-Status: **design only**. Nothing here is built. It sits on docs/design/netcode-lockstep.md (the lab's awareness,
+Status: **partly built** (phases 1, 3 and 4: see section 11's status lines). It sits on docs/design/netcode-lockstep.md (the lab's awareness,
 pull-in and slots), docs/design/decision-inputs.md, docs/design/confirmed-hits.md parts C-G,
 docs/design/packed-frames.md, docs/design/deterministic-maths.md and the two 2026-11-04 audits
 (docs/audits/lockstep-alignment-2026-11-04.md, docs/audits/optimisation-before-after-2026-11-04.md). Code references are
@@ -1144,6 +1144,17 @@ the probes, and the parity tests (replication, confirmedHits, selfHits, bodies, 
   little, padding a little); packedFrames' lossless test rewritten against blocks.
 
 **Phase 4: cells and the focus.**
+- *Status (2026-11-04):* built behind `CAPS.FOCUS` (1024, protocol 38), on the dev server by default, per section 0:
+  common network/cells.ts (cells, home cells with 256 slack, the flat 19 km focus and 35 km ring, hashes, the log form),
+  server net/cells/FocusCells.ts (the view by cells in place of `updateShipView` for capable clients; drops after the
+  snapshot; shared per-(cell, tick) records; offers, logs from each shadow's kept control changes, refusals; ghosts as map
+  dots; a jump's burn holds the focus still), client ships/cells/CellCache.ts (detach, hash, answer, attach and
+  fast-forward) and GhostLayer.ts (markers; hulls fade over 18-19 km). Entries are not a separate cell snapshot: with
+  BLOCKS each entering ship's keyframe and status row is already one shared block. Logs are kept per shadow (a ship moves
+  between cells) and gathered per cell at re-entry; they are not pre-encoded bytes. On the crowd bench a capable client
+  holds a third of the ships in spread and cruise layouts and gets 40-65% fewer bytes, agreement unchanged; the ball is
+  4-7% up (ghost legs) (docs/audits/focus-grid-2026-11-04.md). Not done: design/name prefetch for the ring, the
+  screenshot pass and panels.
 - Home cells with hysteresis; anchor and 3×3 focus replacing `shipView`.
 - Cell snapshots, shared and cached with a tail; exits.
 - Ring ghosts from the map-dot legs; design and name prefetch.

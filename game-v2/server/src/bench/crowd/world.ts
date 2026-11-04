@@ -44,7 +44,12 @@ export function blueprint(server: GameServer, name: string): any {
   throw new Error(`no blueprint ${name}`);
 }
 
-export type Layout = 'spread' | 'ball' | 'boss';
+/**
+ * spread: a 10 km grid, each pilot fighting near home; ball: everyone within 5 km; boss: round a boss; cruise: a 12 km
+ * grid, each pilot flying out and back along a 24 km leg (the focus grid's churn: cells dropped behind, entered ahead,
+ * dropped ones met again on the way back)
+ */
+export type Layout = 'spread' | 'ball' | 'boss' | 'cruise';
 export const LAYOUTS: Layout[] = ['spread', 'ball', 'boss'];
 
 export interface Ctl { forward: boolean; backward: boolean; left: boolean; right: boolean; boost: boolean; fireLeft: boolean; fireRight: boolean; targetAngle: number; cursorDist: number }
@@ -77,7 +82,22 @@ export function applyDirect(p: number, c: Ctl): void {
 }
 export const inputKey = (c: Ctl) => JSON.stringify([c.forward, c.backward, c.left, c.right, c.boost, c.fireLeft, c.fireRight, quantizeCursorAngle(c.targetAngle), Math.round(c.cursorDist / 4)]);
 
-export interface Bot { index: number; pid: number; ship: string; home: { x: number; y: number }; target: number; probe: boolean }
+export interface Bot { index: number; pid: number; ship: string; home: { x: number; y: number }; target: number; probe: boolean; leg?: { x: number; y: number; out: boolean } }
+
+/** Cruising to a point: full ahead (boosting while far), nothing fired */
+export function cruiseControls(p: number, x: number, y: number): Ctl {
+  const c: Ctl = { forward: false, backward: false, left: false, right: false, boost: false, fireLeft: false, fireRight: false, targetAngle: Input.targetAngle[p], cursorDist: Input.cursorDist[p] };
+  const dx = x - Position.x[p], dy = y - Position.y[p], d = Math.hypot(dx, dy) || 1;
+  c.targetAngle = Math.atan2(dy, dx);
+  c.cursorDist = 2000;
+  const ux = dx / d, uy = dy / d;
+  if (uy < -0.38) c.forward = true;
+  if (uy > 0.38) c.backward = true;
+  if (ux < -0.38) c.left = true;
+  if (ux > 0.38) c.right = true;
+  c.boost = d > 4000;
+  return c;
+}
 
 /** The scene: where every pilot starts, the AI around them, and what keeps the fight going */
 export class Scene {
@@ -98,7 +118,11 @@ export class Scene {
       const ship = SHIP_POOL[Math.floor(r() * SHIP_POOL.length)];
       ships.respawnInPlace(pid, blueprint(s, ship));
       let x: number, y: number;
-      if (this.layout === 'spread') {
+      if (this.layout === 'cruise') {
+        const side = Math.ceil(Math.sqrt(this.n));
+        x = base.x + ((i % side) - side / 2) * 12000 + (r() - 0.5) * 3000;
+        y = base.y + (Math.floor(i / side) - side / 2) * 12000 + (r() - 0.5) * 3000;
+      } else if (this.layout === 'spread') {
         // a square grid, 10 km apart, jittered
         const side = Math.ceil(Math.sqrt(this.n));
         x = base.x + ((i % side) - side / 2) * 10000 + (r() - 0.5) * 3000;
@@ -111,17 +135,18 @@ export class Scene {
         x = base.x + Math.cos(a) * d; y = base.y + Math.sin(a) * d;
       }
       Position.x[pid] = x; Position.y[pid] = y; Velocity.x[pid] = 0; Velocity.y[pid] = 0;
-      this.bots.push({ index: i, pid, ship, home: { x, y }, target: -1, probe: probeIdx.has(i) });
+      const la = r() * Math.PI * 2;
+      this.bots.push({ index: i, pid, ship, home: { x, y }, target: -1, probe: probeIdx.has(i), ...(this.layout === 'cruise' ? { leg: { x: x + Math.cos(la) * 24000, y: y + Math.sin(la) * 24000, out: true } } : {}) });
     });
     if (this.layout === 'boss') {
       this.bossId = s.bosses.spawnAt('boss_scrap_mother', this.num, base.x, base.y);
     } else {
       // an AI pack for every few pilots (spread: beside a pilot; ball: around the ball)
-      const packs = Math.max(2, Math.min(40, Math.round(this.n / 4)));
+      const packs = this.layout === 'cruise' ? 2 : Math.max(2, Math.min(40, Math.round(this.n / 4)));
       for (let k = 0; k < packs; k++) {
         const b = this.bots[Math.floor((k / packs) * this.n)];
         const a = r() * Math.PI * 2;
-        this.anchors.push(this.layout === 'spread' ? { x: b.home.x + Math.cos(a) * 1800, y: b.home.y + Math.sin(a) * 1800 } : { x: base.x + Math.cos(a) * 3500, y: base.y + Math.sin(a) * 3500 });
+        this.anchors.push(this.layout !== 'ball' ? { x: b.home.x + Math.cos(a) * 1800, y: b.home.y + Math.sin(a) * 1800 } : { x: base.x + Math.cos(a) * 3500, y: base.y + Math.sin(a) * 3500 });
       }
       for (const a of this.anchors) this.spawn(a);
     }
@@ -149,6 +174,15 @@ export class Scene {
       if ((now + b.index) % 10 === 0 || !ships.has(b.target)) b.target = this.nearest(b.pid);
       fly(b);
     }
+  }
+
+  /** A bot's controls this tick (fighting its target, or cruising its leg) */
+  controls(b: Bot): Ctl {
+    const l = b.leg;
+    if (!l) return controlsFor(b.pid, b.target, (t) => this.server.getShips().has(t));
+    const tx = l.out ? l.x : b.home.x, ty = l.out ? l.y : b.home.y;
+    if (Math.hypot(tx - Position.x[b.pid], ty - Position.y[b.pid]) < 1500) l.out = !l.out;
+    return cruiseControls(b.pid, l.out ? l.x : b.home.x, l.out ? l.y : b.home.y);
   }
 
   private nearest(p: number): number {
