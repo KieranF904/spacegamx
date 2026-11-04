@@ -32,7 +32,7 @@ Everything hostile and pilotless: faction packs and nests (Enemies.ts), single-b
 ## Invariants
 - Every attack that hurts is telegraphed first (`bossTelegraph`); move order is a fixed `LOOP` per stage, random only inside a move.
 - All boss damage and parts changes use ShipBridge APIs (`hurt`, `shed(eid, groups, fling, crumble)`); mid-fight debris must `crumble`.
-- Brain code is server-only and may use the host `rng()` (not `Math.random`) so tests are repeatable. Its maths is deterministic (common/src/math/detTrig.ts: dsin, dcos, datan2, dhypot ...; the guard common/src/math/simMaths.test.ts fails on Math.sin/Math.random here), so a brain can later run on both sides from a small decision input (docs/design/deterministic-maths.md).
+- Brain code is server-only and may use the host `rng()` (not `Math.random`) so tests are repeatable. Its maths is deterministic (common/src/math/detTrig.ts: dsin, dcos, datan2, dhypot ...; the guard common/src/math/simMaths.test.ts fails on Math.sin/Math.random here), so a brain can later run on both sides from a small decision input (docs/design/deterministic-maths.md). The plan for that (server brain, shared body, decisions stamped 16 ticks ahead on a 4-tick grid, per boss and AI): docs/design/decision-inputs.md.
 - `idle()` must return true only when nothing is under way; otherwise SimLod keeps the boss live and `Bosses.busy` blocks sleep.
 - Hits on later-stage parts pass to the current stage at `stageCover` (rules 0.4; per-boss override).
 - A boss's lore text (name, intro, phase `say`) must follow docs/lore-canon.md: every lore claim has an in-game owner; no contested lore as fact.
