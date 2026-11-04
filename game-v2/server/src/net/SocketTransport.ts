@@ -9,7 +9,7 @@
 import http from 'http';
 import type { IncomingMessage } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
-import { decodeMessage, isBinaryMessage, ClientMessage, ClientSocket } from '@space-game/common';
+import { isBinaryMessage, InputDecoder, ClientMessage, ClientSocket } from '@space-game/common';
 import type { GameServer } from '../GameServer.js';
 
 /**
@@ -134,6 +134,8 @@ export class SocketTransport {
       return;
     }
 
+    // (Inputs on this socket, in order: a compact one says only what changed since the last, CAPS.INPUTS)
+    const inputs = new InputDecoder();
     ws.on('message', (data) => {
       try {
         // Handle both binary and JSON messages
@@ -141,7 +143,7 @@ export class SocketTransport {
         if (Buffer.isBuffer(data)) {
           // Binary input messages start with their type id
           if (isBinaryMessage(data)) {
-            msg = decodeMessage(data) as ClientMessage;
+            msg = inputs.decode(data);
           } else {
             msg = JSON.parse(data.toString());
           }

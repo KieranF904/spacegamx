@@ -33,6 +33,8 @@ export function registerFlightHandlers(t: HandlerRegistry): void {
     if (msg.hitReport) ctx.hits.report(conn, msg.hitReport);
     // (Its own ship's check, CAPS.OWN_SIM: net/own/OwnChecks.ts)
     if (msg.ownCheck) ctx.ownChecks.check(conn, msg.ownCheck);
+    // (The bosses' bodies it runs, CAPS.BODIES: net/decisions/BodyNet.ts)
+    if (msg.bodyCheck) ctx.bodies.check(conn, msg.bodyCheck);
     // Queue for next tick boundary — don't apply mid-frame.
     // Messages still arrive instantly via setImmediate event loop.
     // (Dropped: a client stepping its own ship had it on its target tick, so its ship is off: Replication ownLate)
@@ -106,10 +108,23 @@ export function recordSelfHashes(ctx: ServerCtx, ): void {
 /**
  * Schedule an input for future application at its targetTick.
  * If no targetTick or it's in the past, apply immediately (backward compat).
+ *
+ * The rules (net/handlers/inputRules.test.ts): an input never rewrites a tick already stepped (a late one is applied
+ * on the next step, and its client corrected); one stamped more than MAX_INPUT_LEAD ticks ahead is dropped, as is one
+ * past MAX_SCHEDULED_INPUTS waiting; and while berthed (conn.docked) the controls stay as the dock left them (neutral):
+ * an input its client sent before it knew is dropped (only its seq is taken), and the client sends none meanwhile
+ * (client app/inputSend.ts).
  */
 export function handleInput(ctx: ServerCtx, conn: ClientConnection, msg: any): void {
   const eid = conn.playerId;
   if (!hasComponent(ctx.world, Player, eid)) return;
+  if (conn.docked) {
+    const seq = Number.isFinite(msg.seq) ? msg.seq : 0;
+    Input.sequence[eid] = seq;
+    conn.lastInputSeq = seq;
+    conn.liveTick = ctx.currentTick;
+    return;
+  }
   
   // Inputs carry the low 16 bits of their target tick: the one nearest ours
   if (msg.targetTick !== undefined) msg.targetTick = unwrapTick16(msg.targetTick & 0xFFFF, ctx.currentTick);
@@ -225,6 +240,10 @@ export function handleRespawn(ctx: ServerCtx, conn: ClientConnection, rally?: st
     // For now, just recreate the player
     const newPlayerId = ctx.createPlayer();
     conn.playerId = newPlayerId;
+    // A new ship's controls start neutral (aim and distance 0) on both sides: its client sent none while dead, and
+    // starts again from there (client app/inputSend.ts forgetSent); nothing from before waits for a tick
+    neutralInput(newPlayerId);
+    conn.scheduledInputs.length = 0;
     Player.clientId[newPlayerId] = Player.clientId[eid];
     if (hasComponent(ctx.world, Dead, eid)) removeEntity(ctx.world, eid);
     ctx.pilots.onRespawn(conn);
@@ -258,6 +277,13 @@ export function handleRespawn(ctx: ServerCtx, conn: ClientConnection, rally?: st
  */
 export function releaseControls(eid: number): void {
   for (let i = 0; i < INPUT_HELD.length; i++) Input[INPUT_HELD[i]][eid] = 0;
+}
+
+/** Every control at rest, the aim and distance 0 and helm off: a new ship's (handleRespawn) */
+export function neutralInput(eid: number): void {
+  for (let i = 0; i < INPUT_BOOLS.length; i++) Input[INPUT_BOOLS[i]][eid] = 0;
+  Input.targetAngle[eid] = 0;
+  Input.cursorDist[eid] = 0;
 }
 
 /** A Helios drone 1400 ahead of a pilot in safe space, to practise on: it only fights back once shot */

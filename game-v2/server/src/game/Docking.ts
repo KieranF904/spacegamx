@@ -96,6 +96,9 @@ export class Docking {
     conn.docked = { station: st, ox: 0, oy: 0, exit: { x: Position.x[eid] - Position.x[st], y: Position.y[eid] - Position.y[st] } };
     this.dockedShips.add(eid);
     this.releaseControls(eid);
+    // (Berthed, the controls stay neutral: inputs still waiting for their tick are dropped, as are any that come before
+    // the client knows: net/handlers/flight.ts handleInput)
+    conn.scheduledInputs.length = 0;
     const sd = this.gameData.getStationByNum(Station.stationId[st]);
     if (sd?.dockingFee) this.pilots.payDockFee(conn, sd.id, sd.dockingFee);
     // (Quiet when there was nothing to load: every dock shouldn't say so)
