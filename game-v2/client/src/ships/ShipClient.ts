@@ -25,7 +25,7 @@ import type { Application } from 'pixi.js';
 import {
   Blueprint, Catalog, ClientInputMessage, ClientMessage, EntityType, InventoryStub, ServerMessage, ShipTuning,
   stationInteractRadius, stepShipPhysics, stepTurretAim, shipPointToWorld, unpackCursorWeaponState, GravityWell,
-  JumpTuning, jumpPhase, jumpTuning, coreHp, FRICTION, worldToLocalDir, partItemId, inSolarRing, jumpRange,
+  JumpTuning, jumpPhase, jumpTuning, coreHp, FRICTION, worldToLocalDir, partItemId, inSolarRing, jumpReachAt, jumpLanding,
   jumpFieldAt, fieldRangeBoost, fieldCharge, primeBoost, pilotJumpStep, withEmp, lodestonePosition, type JumpField, type LodestoneData,
   ShipReplicaSet, ServerSnapshotMessage,
   packCursorWeaponState, rebuildVolley, WEAPON_KIND_TYPE, EntityState, accelAlong, turnAccel, rateShip, stepGuns, volleyShells, firesStraight, partWeaponDef,
@@ -132,7 +132,7 @@ export class ShipClient {
   private hazardSys: { hazardRatings?: Record<string, number>; starRadius?: number; centralBody?: { type?: string } } | null = null;
   private hazardFor = (d: ShipDerived, x: number, y: number) => (this.hazardSys ? hazardFlight(HAZARD_RULES, this.hazardSys, d, x, y) : undefined);
   /** Where the next jump is aimed: distance, and what it locked on to */
-  private jumpAimInfo: { dist: number; label: string | null } = { dist: 0, label: null };
+  private jumpAimInfo: { dist: number; label: string | null; bearing?: number; sent?: number } = { dist: 0, label: null };
   private dockHint: HTMLDivElement;
   private planetHint: string | null = null;
   private planetVerb = 'Descend to';
@@ -811,12 +811,28 @@ export class ShipClient {
     return fieldRangeBoost(inSolarRing(x, y, this.central, this.jump), primed, this.jump);
   }
 
-  /** How far the local ship's drive reaches here */
+  /** How far the local ship's drive reaches here (the burn's own rule: jumpReachAt, a gravity hazard's share too) */
   jumpReach(): number {
     const me = this.opts.state.entities.get(this.opts.state.playerId);
     const ship = me && this.store.get(me.id);
     if (!me || !ship) return 0;
-    return jumpRange(ship.derived, this.jump, this.jumpBoostAt(me.x, me.y, me.jumpPrime ?? 0));
+    return jumpReachAt(ship.derived, this.jump, this.jumpBoostAt(me.x, me.y, me.jumpPrime ?? 0), this.hazardFor(ship.derived, me.x, me.y));
+  }
+
+  /**
+   * Where the local ship's jump would stop it (null: no ship or no reach): its slide while the drive spools, then the
+   * aimed distance along the aim (the cursor's bearing; helm: the nose), as stepFlight flies it (jumpAim.ts). Drawn
+   * from where the ship is drawn
+   */
+  jumpLanding(): { x: number; y: number; reach: number } | null {
+    const me = this.opts.state.entities.get(this.opts.state.playerId);
+    const ship = me && this.store.get(me.id);
+    const reach = this.jumpReach();
+    if (!me || !ship || !reach) return null;
+    const bearing = this.helmMode() ? me.renderAngle : this.jumpAimInfo.bearing ?? me.renderAngle;
+    const at = jumpLanding({ x: me.renderX, y: me.renderY, vx: me.vx, vy: me.vy }, me.jump ?? 0, bearing, this.jumpAimInfo.sent ?? this.jumpAimInfo.dist, reach, this.jump,
+      { friction: FRICTION, gravity: this.gravity, hazard: this.hazardFor(ship.derived, me.x, me.y) });
+    return { x: at[0], y: at[1], reach };
   }
 
   /** The charging fields the local ship is in now, and how long its drive stays primed (ticks) */
@@ -923,11 +939,9 @@ export class ShipClient {
    * star's (or a black hole's) hazard, or among hostiles that aren't calm.
    */
   jumpDanger(): string | null {
-    const me = this.opts.state.entities.get(this.opts.state.playerId);
-    const reach = this.jumpReach();
-    if (!me || !reach) return null;
-    const d = Math.max(this.jump.minRange, Math.min(reach, this.jumpAimInfo.dist || reach));
-    const x = me.renderX + Math.cos(me.renderAngle) * d, y = me.renderY + Math.sin(me.renderAngle) * d;
+    const at = this.jumpLanding();
+    if (!at) return null;
+    const { x, y } = at;
     const body = this.central?.radius ?? 0;
     if (body > 0 && this.central?.type !== 'none' && Math.hypot(x, y) < body + (this.central?.type === 'black_hole' ? 2500 : 1500)) {
       return this.central?.type === 'black_hole' ? 'That drops you into the black hole\'s pull' : 'That drops you into the star\'s heat';
@@ -948,7 +962,13 @@ export class ShipClient {
 
   /** Where the jump is aimed (Game sets it from the cursor, snapped to a destination) */
   setJumpAim(dist: number, label: string | null): void {
-    this.jumpAimInfo = { dist, label };
+    this.jumpAimInfo = { dist, label, bearing: this.jumpAimInfo.bearing, sent: this.jumpAimInfo.sent };
+  }
+
+  /** The aim and distance the input says this tick, as the server gets them (the burn goes along the aim, that far: flight.ts) */
+  setJumpSent(angle: number, dist: number): void {
+    this.jumpAimInfo.bearing = angle;
+    this.jumpAimInfo.sent = dist;
   }
 
   /** Is the jump control on this tick? (J latches it; it releases once the burn starts.) */
@@ -1492,7 +1512,7 @@ export class ShipClient {
     this.jumpFx?.update(dt, {
       hidden: this.hangarOpen || !this.store.get(state.playerId), latched: this.jumpLatched,
       aiming: this.jumpAiming(), aimDist: this.jumpAimInfo.dist, aimLabel: this.jumpAimInfo.label,
-      reach: this.jumpReach(), field: me ? this.gaugeField() : undefined, danger: this.jumpAiming() ? this.jumpDanger() : null,
+      reach: this.jumpReach(), landing: this.jumpAiming() ? this.jumpLanding() : null, field: me ? this.gaugeField() : undefined, danger: this.jumpAiming() ? this.jumpDanger() : null,
     });
     // (Part features' chips: the Burst Strafer's, ready or cooling and whether the ship can pay; the Tow Beam's while it tows)
     this.features.updateIndicators();

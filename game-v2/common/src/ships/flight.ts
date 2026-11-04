@@ -122,15 +122,16 @@ export interface FlightResult {
 // ---------------------------------------------------------------------------
 
 /**
- * The jump drive: spool up for a moment, then the ship is flung along its nose
+ * The jump drive: spool up for a moment, then the ship is flung along the aim
  * for a fixed, short burn (a longer jump just goes faster), then the drive
- * cools down. The burn lets the ship go at exitSpeed, so it coasts the last
- * stretch (jumpCoast) and comes to rest where it was aimed, or flies on with a
- * head start. Its whole state is one integer counter, so it rides in snapshots
- * and prediction replays it exactly:
+ * cools down. The charge waits on its last tick until the nose is within
+ * JUMP_ALIGN of the aim (jumpAimed), and the burn then goes exactly along the
+ * aim. The burn ends at exitSpeed (0: dead still, right where it was aimed;
+ * above 0 the ship coasts the rest, jumpCoast). Its whole state is one integer
+ * counter, so it rides in snapshots and prediction replays it exactly:
  *
  *   0                                  ready
- *   1 .. chargeTicks-1                 charging (counts up while the jump control is held)
+ *   1 .. chargeTicks-1                 charging (counts up while the jump control is held; waits at chargeTicks-1 until aimed)
  *   chargeTicks .. +burnTicks-1        burn (the jump itself)
  *   .. +cooldownTicks-1                cooling down, then back to 0
  */
@@ -141,7 +142,7 @@ export interface JumpTuning {
   cooldownTicks: number;
   /** World units / tick at full burn (jumpScale 1; a jump's own scale sets how fast it really goes) */
   speed: number;
-  /** Speed the ship leaves the burn at, whatever the jump's length (then friction takes over: jumpCoast) */
+  /** Speed the ship leaves the burn at, whatever the jump's length (then friction takes over: jumpCoast). 0: it stops dead where it was aimed */
   exitSpeed: number;
   /** Ticks to reach full speed, and to slow down to exitSpeed at the end */
   rampTicks: number;
@@ -196,7 +197,7 @@ export interface JumpTuning {
 
 export const DEFAULT_JUMP: JumpTuning = {
   chargeTicks: 90, burnTicks: 90, cooldownTicks: 900,
-  speed: 340, exitSpeed: 30, rampTicks: 5, slowTicks: 16, chargeDamping: 0.96,
+  speed: 340, exitSpeed: 0, rampTicks: 5, slowTicks: 16, chargeDamping: 0.96,
   baseRange: 50000, minRange: 5000,
   coreCapacity: 40, gradeCapacity: 0.1, gradeRange: 0.05, gradeCooldown: 0.0625,
   overRange: 0.15, overRangeMax: 0.35, overCooldown: 0.2, cooldownFloor: 0.7, minCooldownTicks: 600,
@@ -252,6 +253,23 @@ export function jumpRange(d: { jumpRange?: number }, t: JumpTuning, boost = 1): 
   return (d.jumpRange ?? t.baseRange) * boost;
 }
 
+/**
+ * The one reach rule: the drive's range × the charging fields' boost (a star's ring, a primed drive: jumpFields.ts
+ * fieldRangeBoost) × a gravity hazard's jump share (hazards.ts hazardFlight). The burn fixes its length by it, and the
+ * pilot's overlay draws it
+ */
+export function jumpReachAt(d: { jumpRange?: number }, t: JumpTuning, fieldBoost = 1, hazard?: { jump: number } | null): number {
+  return jumpRange(d, t, fieldBoost * (hazard?.jump ?? 1));
+}
+
+/** The charge waits on its last tick until the nose is this close to the aim (radians); the burn then goes along the aim itself */
+export const JUMP_ALIGN = 0.03;
+
+/** Is the ship pointed for a jump: helm (the nose is the aim), or the nose within JUMP_ALIGN of the aim */
+export function jumpAimed(body: { angle: number }, input: { helm?: boolean; targetAngle: number }): boolean {
+  return !!input.helm || Math.abs(wrapAngle(input.targetAngle - body.angle)) <= JUMP_ALIGN;
+}
+
 /** Is (x, y) inside a system's charging ring (stars and pulsars; black holes have none) */
 export function inSolarRing(x: number, y: number, body: { type?: string; radius?: number } | null | undefined, t: JumpTuning): boolean {
   if (!body || body.type === 'black_hole' || body.type === 'none' || !body.radius) return false;
@@ -283,10 +301,10 @@ export function jumpPhase(j: number, t: JumpTuning): { phase: JumpPhase; progres
   return { phase: 'cooldown', progress: (b - t.burnTicks) / t.cooldownTicks };
 }
 
-/** Advance the counter one tick. */
-export function stepJump(j: number, want: boolean, t: JumpTuning): number {
+/** Advance the counter one tick. `hold`: not aimed yet, so a full charge waits on its last tick (jumpAimed) */
+export function stepJump(j: number, want: boolean, t: JumpTuning, hold = false): number {
   if (j <= 0) return want ? 1 : 0;
-  if (j < t.chargeTicks) return want ? j + 1 : 0; // let go: the charge collapses (no cooldown)
+  if (j < t.chargeTicks) return !want ? 0 : hold && j + 1 >= t.chargeTicks ? j : j + 1; // let go: the charge collapses (no cooldown)
   return j + 1 >= t.chargeTicks + t.burnTicks + t.cooldownTicks ? 0 : j + 1;
 }
 
@@ -445,11 +463,13 @@ export function stepFlight(
   const jt = d.jumpCooldown ? { ...jt0, cooldownTicks: d.jumpCooldown } : jt0;
   const prev = body.jump ?? 0;
   const cargo = body.cargo ?? 0;
-  const j = stepJump(prev, !!input.jump && d.mass > 0, jt);
+  const j = stepJump(prev, !!input.jump && d.mass > 0, jt, !jumpAimed(body, input));
   body.jump = j;
-  // The burn starts: fix how far this jump goes (where you aimed, within the drive's reach)
+  // The burn starts: fix how far this jump goes (where you aimed, within the drive's reach), and along the aim itself
+  // (the nose is within JUMP_ALIGN of it: the last of the turn is taken in the launch flash)
   if (j === jt.chargeTicks && prev === jt.chargeTicks - 1) {
-    const range = jumpRange(d, jt, (k.jumpBoost ?? 1) * (k.hazard?.jump ?? 1));
+    if (!input.helm) body.angle = wrapAngle(input.targetAngle);
+    const range = jumpReachAt(d, jt, k.jumpBoost, k.hazard);
     const want = input.jumpDist && input.jumpDist > 0 ? input.jumpDist : range;
     body.jumpScale = jumpScaleFor(Math.max(jt.minRange, Math.min(range, want)), jt, k.friction);
   }

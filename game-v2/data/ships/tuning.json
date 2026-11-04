@@ -29,7 +29,7 @@
     "burnTicks": 90,
     "cooldownTicks": 900,
     "speed": 340,
-    "exitSpeed": 30,
+    "exitSpeed": 0,
     "rampTicks": 5,
     "slowTicks": 16,
     "chargeDamping": 0.96,

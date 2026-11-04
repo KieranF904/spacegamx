@@ -18,6 +18,7 @@ export * from './rebuild.js';
 export * from './state.js';
 export * from './stages.js';
 export * from './flight.js';
+export * from './jumpAim.js';
 export * from './farRoute.js';
 export * from './jumpFields.js';
 export * from './shot.js';

@@ -273,6 +273,8 @@ export function tickInput(s: InputSendCtx): void {
     // Check if anything changed from last sent state
     changed = inputChanged(s, msg, quantized, cursorDistQ);
   }
+  // (The jump overlay draws from the aim and distance the server flies: the burn goes along the aim, flight.ts jumpAimed)
+  s.shipClient.setJumpSent?.(msg.targetAngle, msg.cursorDist ?? 0);
   // Debris worked out here is confirmed on the next input, which goes now if nothing else would (ShipClient.takeAcks)
   const acks = s.shipClient?.takeAcks?.();
   if (acks) msg.acks = acks;

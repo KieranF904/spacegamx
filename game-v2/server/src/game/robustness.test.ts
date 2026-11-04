@@ -7,7 +7,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
 import type { ClientSocket, ServerMessage } from '@space-game/common';
-import { decodeServerFrame, Player, Dead, bountyIds } from '@space-game/common';
+import { decodeServerFrame, Player, Dead, bountyIds, Input, CURSOR_DIST_MAX } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
 import { clientBlueprint } from '../net/handlers/shipEdit.js';
 import { GameData } from '../data/GameData.js';
@@ -277,6 +277,10 @@ describe('hostile messages (fuzz)', () => {
     expect(conn.lastInputSeq).toBe(0);
     s(server).applyInputToEntity(conn, { cursorDist: 1e39, seq: 5 });
     expect(conn.lastInputSeq).toBe(5);
+    expect(Input.cursorDist[conn.playerId]).toBe(CURSOR_DIST_MAX);
+    // A jump aimed past 65,535 (a star's ring reaches that far) goes as far as it was aimed
+    s(server).applyInputToEntity(conn, { cursorDist: 80000, seq: 6 });
+    expect(Input.cursorDist[conn.playerId]).toBe(80000);
   });
 });
 

@@ -11,7 +11,7 @@ import { hasComponent, entityExists, removeEntity, defineQuery } from 'bitecs';
 import {
   Position, Velocity, Rotation, Health, Player, Input, Boost, Portal, InSystem, Dead,
   TICK_RATE, inSafeSpace, unwrapTick16, computeStateHash, PROTOCOL_VERSION,
-  replicaAngle, quantizeReplicaAngle, ReplicaMode, INPUT_BOOLS, INPUT_HELD, controlBits, buildFlightInputs, dcos, dsin, hashUnit,
+  replicaAngle, quantizeReplicaAngle, ReplicaMode, INPUT_BOOLS, INPUT_HELD, controlBits, buildFlightInputs, dcos, dsin, hashUnit, CURSOR_DIST_MAX,
 } from '@space-game/common';
 import type { FactionsFile } from '../../game/Enemies.js';
 import type { ClientConnection } from '../ClientConnection.js';
@@ -156,9 +156,10 @@ export function applyInputToEntity(ctx: ServerCtx, conn: ClientConnection, msg: 
   const eid = conn.playerId;
   // The on/off keys (inputFields.ts); the numbers below each have their own coercion
   for (let i = 0; i < INPUT_BOOLS.length; i++) { const k = INPUT_BOOLS[i]; Input[k][eid] = msg[k] ? 1 : 0; }
-  // (The binary input carries it as a uint16; a JSON one could say NaN, Infinity or a string)
+  // (The binary input carries it in 4-unit steps, the compact one on its grid, both up to CURSOR_DIST_MAX: a jump aimed
+  // far out in a star's ring goes that far. A JSON one could say NaN, Infinity or a string)
   const cursorDist = Number(msg.cursorDist);
-  Input.cursorDist[eid] = Number.isFinite(cursorDist) ? Math.min(65535, Math.max(0, cursorDist)) : 0;
+  Input.cursorDist[eid] = Number.isFinite(cursorDist) ? Math.min(CURSOR_DIST_MAX, Math.max(0, cursorDist)) : 0;
   // The client sends dequantized(quantized(rawAngle)) as a float32, which is already on the
   // replicated grid (replicaAngle gives back exactly that value). Anything else (a JSON input,
   // a bot) is put on the grid too, so every client replays this ship's turning exactly.

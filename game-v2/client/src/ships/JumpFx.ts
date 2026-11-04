@@ -99,7 +99,7 @@ export class JumpFx {
     return (local ? e.jump : undefined) ?? e.data?.[3] ?? 0;
   }
 
-  update(dt: number, opts: { hidden: boolean; latched: boolean; aiming?: boolean; aimDist?: number; aimLabel?: string | null; reach?: number; field?: GaugeField; danger?: string | null }): void {
+  update(dt: number, opts: { hidden: boolean; latched: boolean; aiming?: boolean; aimDist?: number; aimLabel?: string | null; reach?: number; landing?: { x: number; y: number } | null; field?: GaugeField; danger?: string | null }): void {
     this.time += dt;
     const g = this.g;
     clearIfDrawn(g);
@@ -116,10 +116,9 @@ export class JumpFx {
       const tt = ship.derived.jumpCooldown ? { ...t, cooldownTicks: ship.derived.jumpCooldown } : t;
       const ph = jumpPhase(JumpFx.counter(e, local), tt);
       if (local) this.localCooldown = tt.cooldownTicks;
-      // Where this jump will land: a reticle out along the nose, inside the drive's reach (a ring round the ship)
-      if (local && opts.aiming && !opts.hidden && opts.reach) {
-        const d = Math.max(t.minRange, Math.min(opts.reach, opts.aimDist || opts.reach));
-        const lx = e.renderX + Math.cos(e.renderAngle) * d, ly = e.renderY + Math.sin(e.renderAngle) * d;
+      // Where this jump will land (ShipClient.jumpLanding: the spool's slide, then along the aim), inside the drive's reach (a ring round the ship)
+      if (local && opts.aiming && !opts.hidden && opts.reach && opts.landing) {
+        const lx = opts.landing.x, ly = opts.landing.y;
         const pulse = 0.6 + 0.4 * Math.sin(this.time * 6);
         const col = opts.danger ? WARN : opts.aimLabel ? 0xfbbf24 : BLUE;
         // The reach: dashes round the ship, drifting slowly
@@ -129,7 +128,8 @@ export class JumpFx {
           g.moveTo(e.renderX + Math.cos(a0) * opts.reach, e.renderY + Math.sin(a0) * opts.reach)
             .arc(e.renderX, e.renderY, opts.reach, a0, a1).stroke({ color: (opts.field?.boost ?? 1) > 1 ? LODE : BLUE, width: 6, alpha: 0.22 });
         }
-        g.moveTo(e.renderX + Math.cos(e.renderAngle) * Math.max(12, ship.derived.radius) * 1.5, e.renderY + Math.sin(e.renderAngle) * Math.max(12, ship.derived.radius) * 1.5)
+        const la = Math.atan2(ly - e.renderY, lx - e.renderX), lr = Math.max(12, ship.derived.radius) * 1.5;
+        g.moveTo(e.renderX + Math.cos(la) * lr, e.renderY + Math.sin(la) * lr)
           .lineTo(lx, ly).stroke({ color: col, width: 2, alpha: opts.danger ? 0.35 : 0.18 });
         g.circle(lx, ly, 160).stroke({ color: col, width: 4, alpha: 0.5 * pulse });
         g.circle(lx, ly, 60).stroke({ color: opts.danger ? WARN : CORE, width: 3, alpha: 0.6 });
@@ -297,6 +297,8 @@ export class JumpFx {
         break;
       case 'charging':
         text = settings.data.gameplay.jumpMode === 'hold' ? 'SPOOLING · RELEASE TO ABORT' : `SPOOLING · <kbd>${key}</kbd> ABORT`;
+        // (Charged, waiting for the nose to come round to the aim: flight.ts jumpAimed)
+        if (ph.progress >= (this.tuning.chargeTicks - 1) / this.tuning.chargeTicks) text = text.replace('SPOOLING', 'CHARGED · ALIGNING');
         {
           const reach = opts.reach ?? 0, want = opts.aimDist || reach;
           const go = fmtK(Math.max(this.tuning.minRange, Math.min(reach, want)));

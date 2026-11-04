@@ -629,10 +629,11 @@ describe('jump drive', () => {
 
   it('charges, then flies as far as the drive reaches along the nose, then cools down and is ready again', () => {
     const total = jt.chargeTicks + jt.burnTicks;
-    // The burn lets go at exitSpeed, short of the mark; the coast carries the ship the rest of the way
+    // The burn ends dead still (exitSpeed 0), right on the mark: no coast for input or a gravity well to push about
     const burnt = fly(total - 1, () => true).body; // (its last burn tick)
-    expect(Math.hypot(burnt.vx, burnt.vy)).toBeCloseTo(jt.exitSpeed, 3);
-    expect(Math.hypot(burnt.x, burnt.y)).toBeLessThan(R - jumpCoast(jt, FRICTION) * 0.9);
+    expect(jt.exitSpeed).toBe(0);
+    expect(Math.hypot(burnt.vx, burnt.vy)).toBe(0);
+    expect(Math.hypot(burnt.x, burnt.y)).toBeCloseTo(R, -2);
     const { body, trace } = fly(total + 600, (t) => t < total);
     const dist = Math.hypot(body.x, body.y);
     expect(dist).toBeGreaterThan(R * 0.99);
@@ -698,7 +699,7 @@ describe('jump drive', () => {
     return Infinity;
   };
 
-  it('beats flying on long legs; flying wins short hops', () => {
+  it('beats flying on long legs; flying keeps up on short hops', () => {
     const lancer = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/lancer.json'), 'utf-8'));
     for (const b of [sparrow(), withCoils(lancer, 12)]) {
       // A long trip: chaining jumps (flying while the drive recharges) is at least twice as quick
@@ -707,8 +708,9 @@ describe('jump drive', () => {
     }
     // A big hull on the core's coil alone: a poor drive, but still quicker than flying
     for (const dist of [50000, 150000]) expect(travel(lancer, dist, true), `${dist}`).toBeLessThan(travel(lancer, dist, false) * 0.8);
-    // The starter ship hops a few thousand units quicker under its own power
-    expect(travel(sparrow(), 6000, false)).toBeLessThan(travel(sparrow(), 6000, true));
+    // A short hop: the starter ship under its own power is not far behind a jump's spool and burn (the jump stops dead on
+    // the mark, exitSpeed 0, with no coast: it used to be the slower of the two here)
+    expect(travel(sparrow(), 6000, false)).toBeLessThan(travel(sparrow(), 6000, true) * 1.5);
   });
 
   /** A blueprint with its first `n` hull parts made jump coils (Mk I) */
