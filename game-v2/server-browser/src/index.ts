@@ -12,7 +12,8 @@
 import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import crypto from 'crypto';
-import { AccountRoutes } from './accounts/routes.js';
+import { AccountRoutes, DATA_DIR } from './accounts/routes.js';
+import { InboxRoutes } from './inbox/routes.js';
 import { BodyError, clientIp, readJson } from './accounts/request.js';
 import { MAX_SERVERS, listing, parseHeartbeat, type ServerEntry } from './servers.js';
 
@@ -527,6 +528,9 @@ function escapeHtml(str: string): string {
 
 // Accounts: one for every game server (see accounts/routes.ts)
 const accounts = await AccountRoutes.create(sendJson, parseJson, getClientIp);
+// The player inbox: messages from admins to accounts, kept beside them (see inbox/routes.ts)
+const inbox = await InboxRoutes.create(accounts.users, sendJson, parseJson, getClientIp, { adminSecret: accounts.secret, dataDir: DATA_DIR });
+accounts.onAccountDeleted = (id) => inbox.forgetUser(id);
 
 const server = http.createServer(async (req, res) => {
   setCors(res);
@@ -540,6 +544,8 @@ const server = http.createServer(async (req, res) => {
   const url = req.url?.split('?')[0] || '/';
   
   try {
+    // (The inbox first: its /admin/mail would otherwise be one of the accounts' /admin/ calls)
+    if (await inbox.handle(req, res, url)) return;
     if (await accounts.handle(req, res, url)) return;
 
     // Server registration (from game servers)
@@ -623,6 +629,7 @@ server.listen({ port: PORT, host: process.env.BROWSER_HOST || undefined }, () =>
   console.log(`     GET  /stream     - SSE log stream`);
   console.log(`     GET  /health     - Health check`);
   console.log(`     POST /auth/*     - Accounts: login, register, validate, logout, account, change-password/email, logout-all, delete-account`);
+  console.log(`     POST /inbox/*    - Player inbox: list, read, delete; admins: send, sent`);
 });
 
 // Periodic cleanup
@@ -633,7 +640,9 @@ let stopping = false;
 function stop(code: number): void {
   if (stopping) return;
   stopping = true;
-  accounts.close()
+  inbox.close()
+    .catch((err) => console.error('[browser] closing the inbox failed:', err))
+    .then(() => accounts.close())
     .catch((err) => console.error('[browser] closing the accounts failed:', err))
     .finally(() => process.exit(code));
 }

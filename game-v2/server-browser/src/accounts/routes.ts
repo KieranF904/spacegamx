@@ -86,7 +86,7 @@ const lockedOut = (seconds: number) => `Too many wrong passwords for this accoun
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 /** Accounts live beside the game's data (kept across deploys): ../../data/lobby from dist/accounts or src/accounts */
-const DATA_DIR = process.env.ACCOUNTS_DIR || path.resolve(here, '../../../data/lobby');
+export const DATA_DIR = process.env.ACCOUNTS_DIR || path.resolve(here, '../../../data/lobby');
 /** Shared with the game servers for /admin/* (dev servers share a fixed one, so it works out of the box) */
 const ADMIN_SECRET = process.env.LOBBY_ADMIN_SECRET || (process.env.NODE_ENV === 'production' ? '' : 'dev-lobby-admin-secret');
 /** Account management actions (handleAccount) */
@@ -170,7 +170,20 @@ export class AccountRoutes {
   /** Wrong passwords by "name:<what was typed>" from any address (a spread-out guesser has many) */
   private nameFailures = new RateLimiter(NAME_FAIL_LIMIT, FAIL_WINDOW_MS);
 
+  /** An account was deleted (by its pilot or an admin): the lobby's other stores forget it (the inbox) */
+  onAccountDeleted: ((userId: number) => void) | null = null;
+
   private constructor(private store: UserStore, private sendJson: Json, private parseJson: Body, private ipOf: (req: http.IncomingMessage) => string, private adminSecret: string, private deleted: DeletedAccounts) {}
+
+  /** The accounts, for the lobby's other routes (the inbox) */
+  get users(): UserStore {
+    return this.store;
+  }
+
+  /** The game servers' shared secret ('' when off), for the lobby's other /admin/ routes */
+  get secret(): string {
+    return this.adminSecret;
+  }
 
   /** (Tests pass their own store and secret) */
   /** (`ownerUsernames`: OWNER_USERNAMES, comma-separated, by default) */
@@ -283,6 +296,7 @@ export class AccountRoutes {
     // delete-account
     await this.store.deleteUser(user.id);
     this.deleted.add(user.id);
+    this.onAccountDeleted?.(user.id);
     console.log(`[Accounts] ${user.username} (id ${user.id}) deleted their account`);
     this.sendJson(res, 200, { success: true, id: user.id });
   }
@@ -319,6 +333,7 @@ export class AccountRoutes {
     if (action === 'delete') {
       await this.store.deleteUser(found.id);
       this.deleted.add(found.id);
+      this.onAccountDeleted?.(found.id);
       console.log(`[Accounts] ${found.username} (id ${found.id}) deleted${actor ? ` by ${actor.username}` : ' (server side)'}`);
       this.sendJson(res, 200, { success: true, id: found.id, username: found.username });
       return;

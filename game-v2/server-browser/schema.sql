@@ -59,3 +59,23 @@ CREATE TABLE IF NOT EXISTS game_docs (
 );
 
 -- No seeded accounts: never ship an account with a known password (make admins through the lobby or by hand).
+
+-- The player inbox (server-browser/src/inbox): one row per recipient, so a message to everyone is a copy per account
+-- sharing a `batch`. PostgresMessageStore makes this at start too when it is missing. The JSON store
+-- (JsonMessageStore, data/lobby/messages.json) holds the same rows.
+CREATE TABLE IF NOT EXISTS messages (
+    id           BIGSERIAL PRIMARY KEY,
+    user_id      BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,  -- the recipient
+    from_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,          -- the sending admin; NULL: the game ("system")
+    from_name    TEXT NOT NULL,                                          -- their username at the time, or 'system'
+    subject      TEXT NOT NULL,                                          -- plain text (escaped on display)
+    body         TEXT NOT NULL,
+    important    BOOLEAN NOT NULL DEFAULT FALSE,                         -- the join screen's banner until read
+    batch        TEXT NOT NULL,                                          -- one send (a broadcast's copies share it)
+    sent_to      TEXT NOT NULL,                                          -- a username, or '*' for everyone
+    created_at   BIGINT NOT NULL,                                        -- epoch ms
+    read_at      BIGINT,
+    archived_at  BIGINT                                                  -- deleted by the player
+);
+CREATE INDEX IF NOT EXISTS idx_messages_user  ON messages(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_batch ON messages(batch);
