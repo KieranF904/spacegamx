@@ -3297,7 +3297,7 @@
     {
       "id": "sol_scrap_nest",
       "name": "The Scrap Mother's Nest",
-      "description": "The Scrap Mother's nest in the Drift: a thick field of rock and junk round an open hollow where she waits. A lane runs in from the south.",
+      "description": "The Scrap Mother's nest in the Drift: a hollowed asteroid, its chambers worked by scrapborn, her own at its heart behind a barrier. Junk drifts round it, and scrapborn patrol its face.",
       "danger": 2,
       "starColor": "#FFDD44",
       "starRadius": 0,
@@ -3321,21 +3321,37 @@
         },
         "landing": {
           "x": 0,
-          "y": 21000
+          "y": 26500
         },
-        "radius": 23500,
+        "radius": 29000,
         "dread": {
           "x": 0,
           "y": 0,
           "from": 16000,
-          "full": 7000
+          "full": 6000
         }
       },
       "arena": {
         "boss": "boss_scrap_mother",
-        "centre": { "x": 0, "y": 0 },
-        "radius": 7000,
-        "outside": { "x": 0, "y": 7900 }
+        "centre": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 6400,
+        "barrier": [
+          [
+            -1900,
+            6250
+          ],
+          [
+            1900,
+            6250
+          ]
+        ],
+        "outside": {
+          "x": 0,
+          "y": 7700
+        }
       },
       "centralBody": {
         "type": "none"
@@ -3347,74 +3363,247 @@
       "hazards": [],
       "asteroidDensity": 1,
       "asteroidBelt": {
-        "innerRadius": 9000,
-        "outerRadius": 20000,
-        "count": 1100,
+        "innerRadius": 22800,
+        "outerRadius": 28200,
+        "count": 220,
         "stationary": true,
         "lane": {
           "angle": 1.5708,
-          "width": 2200
+          "width": 4200
         },
         "extra": [
           {
-            "innerRadius": 6800,
-            "outerRadius": 9000,
-            "count": 36,
+            "innerRadius": 0,
+            "outerRadius": 30000,
+            "count": 3,
             "stationary": true,
-            "lane": {
-              "angle": 1.5708,
-              "width": 2200
-            }
+            "field": "scrap_seam",
+            "at": [
+              [
+                13700,
+                3300
+              ],
+              [
+                12500,
+                5500
+              ],
+              [
+                14900,
+                5600
+              ]
+            ]
+          },
+          {
+            "innerRadius": 0,
+            "outerRadius": 30000,
+            "count": 3,
+            "stationary": true,
+            "field": "scrap_seam",
+            "at": [
+              [
+                23300,
+                -3400
+              ],
+              [
+                23900,
+                600
+              ],
+              [
+                23000,
+                4300
+              ]
+            ]
           }
         ]
       },
-      "asteroidField": "scrap_nest",
+      "asteroidField": "scrap_nest_junk",
       "stations": [],
       "portals": [],
-      "derelicts": [
+      "nests": [
         {
-          "id": "wreck_nest_hauler",
-          "name": "Stripped Hauler",
-          "blueprint": "hauler",
-          "position": {
-            "x": -12500,
-            "y": -6400
+          "id": "nest_gullet",
+          "name": "Gullet Heap",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "orbit": {
+            "radius": 11573,
+            "phase": 1.3531,
+            "period": 0
           },
-          "angle": 0.6,
-          "salvage": 200
+          "description": "A heap of scrap in the Gullet's east alcove. Crawlers sit in it."
         },
         {
-          "id": "wreck_nest_corsair",
+          "id": "nest_sorting",
+          "name": "Sorting Heap",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "orbit": {
+            "radius": 17109,
+            "phase": 2.8328,
+            "period": 0
+          },
+          "description": "Scrap piled against the Sorting Floor's west wall, where the belts end. Sowers and darters come out of it."
+        },
+        {
+          "id": "nest_smelter",
+          "name": "Smelter Heap",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "orbit": {
+            "radius": 15642,
+            "phase": 0.5295,
+            "period": 0
+          },
+          "description": "Scrap heaped by the Smelter's pool. Crawlers keep pilots off the lodes."
+        },
+        {
+          "id": "nest_gallery",
+          "name": "Gallery Heap",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "orbit": {
+            "radius": 16700,
+            "phase": -1.5708,
+            "period": 0
+          },
+          "description": "The heap the Wreck Gallery's hauler is guarded from."
+        },
+        {
+          "id": "nest_rim_w",
+          "name": "West Face Heap",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "orbit": {
+            "radius": 25179,
+            "phase": 3.0222,
+            "period": 0
+          },
+          "description": "Junk welded to drifting rock off the Nest Rock's west face."
+        },
+        {
+          "id": "nest_rim_n",
+          "name": "North Face Heap",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "orbit": {
+            "radius": 25318,
+            "phase": -1.4121,
+            "period": 0
+          },
+          "description": "Junk welded to drifting rock off the Nest Rock's north face."
+        },
+        {
+          "id": "nest_seam",
+          "name": "Seam Heap",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "orbit": {
+            "radius": 25828,
+            "phase": 0.0465,
+            "period": 0
+          },
+          "description": "A heap by the lodes on the Nest Rock's east face. Sowers patrol it."
+        }
+      ],
+      "derelicts": [
+        {
+          "id": "wreck_nest_gullet_a",
           "name": "Gutted Corsair",
           "blueprint": "corsair",
           "position": {
-            "x": 10200,
-            "y": -11600
+            "x": -2300,
+            "y": 11200
           },
-          "angle": 2.4,
-          "salvage": 180
+          "angle": 0.9,
+          "salvage": 70
         },
         {
-          "id": "wreck_nest_lancer",
-          "name": "Gutted Lancer",
+          "id": "wreck_nest_gullet_b",
+          "name": "Stripped Lancer",
           "blueprint": "lancer",
           "position": {
-            "x": 14600,
-            "y": 4300
+            "x": 2500,
+            "y": 13600
           },
-          "angle": -1.2,
-          "salvage": 160
+          "angle": 2.6,
+          "salvage": 85
         },
         {
-          "id": "wreck_nest_barge",
-          "name": "Hollowed Barge",
+          "id": "wreck_nest_gallery",
+          "name": "The Hoarded Hauler",
           "blueprint": "hauler",
           "position": {
-            "x": -9400,
-            "y": 12800
+            "x": 0,
+            "y": -14300
+          },
+          "angle": 1.4,
+          "salvage": 200
+        },
+        {
+          "id": "wreck_nest_floor_a",
+          "name": "Stripped Drum",
+          "blueprint": "drum",
+          "position": {
+            "x": -12000,
+            "y": 4200
+          },
+          "angle": 0.2,
+          "salvage": 45
+        },
+        {
+          "id": "wreck_nest_floor_b",
+          "name": "Stripped Drum",
+          "blueprint": "drum",
+          "position": {
+            "x": -14600,
+            "y": 5500
+          },
+          "angle": 2.4,
+          "salvage": 45
+        },
+        {
+          "id": "wreck_nest_floor_c",
+          "name": "Stripped Drum",
+          "blueprint": "drum",
+          "position": {
+            "x": -13000,
+            "y": 6800
+          },
+          "angle": 4.0,
+          "salvage": 45
+        },
+        {
+          "id": "wreck_nest_hulk_w",
+          "name": "Drifting Hauler",
+          "blueprint": "hauler",
+          "position": {
+            "x": -24000,
+            "y": 9500
           },
           "angle": 3.6,
-          "salvage": 220
+          "salvage": 110
+        },
+        {
+          "id": "wreck_nest_hulk_ne",
+          "name": "Drifting Corsair",
+          "blueprint": "corsair",
+          "position": {
+            "x": 17000,
+            "y": -17500
+          },
+          "angle": 2.4,
+          "salvage": 80
+        },
+        {
+          "id": "wreck_nest_hulk_nw",
+          "name": "Drifting Lancer",
+          "blueprint": "lancer",
+          "position": {
+            "x": -15500,
+            "y": -19500
+          },
+          "angle": 0.6,
+          "salvage": 65
         }
       ]
     }

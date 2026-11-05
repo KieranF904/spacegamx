@@ -86,6 +86,8 @@ interface Live {
   target: number;
   /** Damage scale (its owner's) */
   scale: number;
+  /** A pilot it hunts whatever its owner fights (a boss's personal attack), -1: its owner's target */
+  hunt: number;
   /** Its flight (the waypoint law; its target is the guide's) */
   guide: Guide;
 }
@@ -128,8 +130,8 @@ export class Mobs {
     return out;
   }
 
-  /** Launch one: out of (x, y) heading `angle` at `speed`, flying for `owner` (whose target it hunts) */
-  spawn(id: string, systemNum: number, x: number, y: number, angle: number, speed: number, owner: number, scale = 1): number {
+  /** Launch one: out of (x, y) heading `angle` at `speed`, flying for `owner` (whose target it hunts, or `hunt`'s ship) */
+  spawn(id: string, systemNum: number, x: number, y: number, angle: number, speed: number, owner: number, scale = 1, hunt = -1): number {
     const def = this.file.mobs[id];
     if (!def) return -1;
     const w = this.host.world;
@@ -148,7 +150,7 @@ export class Mobs {
     const born = this.host.tick();
     // (A mine never arms its flight: it drifts as laid for its whole life)
     const guide = newGuide(-1, guideKind(def.turn, def.accel, def.speed, FLIGHT_MOB, born + (def.behaviour === 'mine' ? def.life : def.arm ?? 0)));
-    this.live.set(eid, { eid, id, def, index: this.ids.indexOf(id), hp: def.hp, owner, born, target: -1, scale, guide });
+    this.live.set(eid, { eid, id, def, index: this.ids.indexOf(id), hp: def.hp, owner, born, target: -1, scale, hunt, guide });
     return eid;
   }
 
@@ -195,7 +197,8 @@ export class Mobs {
       if (armed) {
         // Its owner's target, or the nearest pilot about (its brain: told to its clients when it changes)
         if (now % 15 === m.eid % 15 || m.target < 0) {
-          const t = this.host.targetOf(m.owner);
+          const own = m.hunt >= 0 && InSystem.systemId[m.hunt] === num && (this.host.alive?.(m.hunt) ?? true) ? m.hunt : -1;
+          const t = own >= 0 ? own : this.host.targetOf(m.owner);
           const pick = t >= 0 && InSystem.systemId[t] === num ? t : this.host.nearestPlayer(num, x, y, 4000);
           if (pick !== m.target) this.retarget(m, pick, now);
         }

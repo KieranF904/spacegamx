@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
-import { Asteroid, Position, Velocity, InSystem, OrbitType, ASTEROID_SEED, asteroidParamsAt, calcAsteroidPosition, pocketAt, type ServerMessage } from '@space-game/common';
+import { Asteroid, Position, Velocity, InSystem, OrbitType, ASTEROID_SEED, asteroidParamsAt, calcAsteroidPosition, pocketAt, rayTerrain, insideTerrain, type ServerMessage } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
@@ -95,7 +95,7 @@ describe("the Scrap Mother's nest", () => {
 
   it('she lies dormant in the middle of it until a pilot passes the barrier of her arena, then rises there', () => {
     const { server, pid, step, num, t } = world();
-    place(pid, num, 0, 18000);
+    place(pid, num, 0, 20000);
     step(130);
     expect(server.bosses.inSystem(num)).toEqual([]);
     // (her arena: game/arenas/bossArena.test.ts)
@@ -111,7 +111,7 @@ describe("the Scrap Mother's nest", () => {
   it('its rocks keep still: where they are a while later is where they were, and where a client works out they are', () => {
     const { server, step, sys, num, rocks, at } = world();
     const all = rocks();
-    expect(all.length).toBeGreaterThan(800);
+    expect(all.length).toBeGreaterThanOrEqual(220);
     const seedTick = (server as any).asteroidSeedTickBySystem.get(num) as number;
     const before = new Map(all.map((r) => [r.eid, at(r.eid)]));
     step(600);
@@ -128,25 +128,77 @@ describe("the Scrap Mother's nest", () => {
     }
   });
 
-  it('its middle is open for her fight, the field thick round it, and a lane leads in from the south', () => {
-    const { sys, rocks, at } = world();
-    const all = rocks().map((r) => ({ ...at(r.eid), size: Asteroid.size[r.eid] }));
-    // (her moves keep her within 5000 of her lair, her hull 1365 across: nothing within 6500)
-    for (const r of all) expect(Math.hypot(r.x - def.lair.x, r.y - def.lair.y) - r.size).toBeGreaterThan(6500);
-    // A few rocks at the arena's edge, the most in the ring past it
-    const edge = all.filter((r) => Math.hypot(r.x, r.y) < 9000).length;
-    expect(edge).toBeGreaterThan(20);
-    expect(all.length - edge).toBeGreaterThan(800);
-    // The lane: from where you arrive to the arena, nothing within 600 of the line
-    const land = sys.pocket!.landing;
-    for (const r of all) {
-      if (r.y < 6000 || r.y > land.y) continue;
-      expect(Math.abs(r.x) - r.size, `rock at ${Math.round(r.x)}, ${Math.round(r.y)}`).toBeGreaterThan(600);
+  it('the Nest Rock: chambers open and walled off from each other, tunnels 3,000 wide or more, a mouth from the south', () => {
+    const { server, num, sys } = world();
+    const rock = server.terrainOf(num)!;
+    const clear = (x0: number, y0: number, x1: number, y1: number) => rayTerrain(rock, x0, y0, x1, y1) >= 1;
+    // (the chambers: the Heart at her lair, the Gullet, the Sorting Floor, the Smelter, the Wreck Gallery)
+    const chambers: [number, number, number][] = [[0, 0, 5400], [0, 12500, 3000], [-13500, 5500, 3800], [13500, 4500, 3800], [0, -14000, 3200]];
+    for (const [x, y, r] of chambers) for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2;
+      expect(clear(x, y, x + Math.cos(a) * r * 0.85, y + Math.sin(a) * r * 0.85), `chamber at ${x}, ${y}`).toBe(true);
     }
-    // Where you arrive is clear, and inside the edge
-    for (const r of all) expect(Math.hypot(r.x - land.x, r.y - land.y) - r.size).toBeGreaterThan(800);
+    // (rock between them: nothing crosses from the Heart to a side chamber but by the tunnels)
+    for (const [x, y] of [[-13500, 5500], [13500, 4500], [0, -14000]]) expect(clear(0, 0, x, y)).toBe(false);
+    // Tunnels: across each, rock no closer than 1,500 either side of its line (the barrier aside)
+    const across: [number, number, number][] = [[0, 8000, 0], [0, 17500, 0], [-7000, 11600, 0.48], [7000, 11400, -0.5], [-14000, -5000, 1.57], [14000, -5000, 1.57], [-10000, -10600, 2.4], [10000, -10600, 0.75]];
+    for (const [x, y, a] of across) {
+      const nx = Math.cos(a + Math.PI / 2), ny = Math.sin(a + Math.PI / 2);
+      for (const s of [-1, 1]) expect(rayTerrain(rock, x, y, x + nx * s * 3000, y + ny * s * 3000) * 3000, `tunnel at ${x}, ${y}`).toBeGreaterThan(1450);
+    }
+    // The Mouth: from where you arrive, straight in to the Gullet
+    const land = sys.pocket!.landing;
+    expect(clear(land.x, land.y, 0, 12500)).toBe(true);
     expect(Math.hypot(land.x, land.y)).toBeLessThan(sys.pocket!.radius - 1000);
+    // Her barrier closes the Throat: the only way into the Heart
+    expect(clear(0, 7500, 0, 4000)).toBe(false);
   });
+
+  it('its rocks: junk drifting round the rock, clear of the way in, and six rich lodes (three in the Smelter, three on the east face)', () => {
+    const { server, sys, rocks, at, num } = world();
+    const all = rocks().map((r) => ({ ...at(r.eid), size: Asteroid.size[r.eid], index: r.index }));
+    const rock = server.terrainOf(num)!;
+    const lodes = all.filter((r) => asteroidParamsAt(NEST, r.index, ASTEROID_SEED, 0, sys.asteroidBelt, sys.asteroidField).definitionId === 'scrap_seam_rich');
+    expect(lodes.length).toBe(6);
+    expect(lodes.filter((r) => Math.hypot(r.x - 13500, r.y - 4500) < 3000).length).toBe(3);
+    // (no rich rock anywhere else: the old high-value field is gone)
+    // (no rich rock anywhere else: the old high-value field is gone; the junk is plain metal, slag and fuel)
+    const kinds = new Set(all.filter((r) => !lodes.includes(r)).map((r) => asteroidParamsAt(NEST, r.index, ASTEROID_SEED, 0, sys.asteroidBelt, sys.asteroidField).definitionId));
+    for (const k of kinds) expect(['asteroid_metal', 'rock_slag', 'asteroid_fuel']).toContain(k);
+    // (a lode is about twice a junk rock)
+    const mean = all.filter((r) => !lodes.includes(r)).reduce((a, r) => a + r.size, 0) / (all.length - lodes.length);
+    for (const l of lodes) { expect(l.size).toBeGreaterThan(mean * 1.4); expect(l.size).toBeLessThan(mean * 2.4); }
+    for (const r of all) {
+      if (lodes.includes(r)) continue;
+      // Junk: outside the rock, and not in the way in from the south
+      expect(Math.hypot(r.x, r.y - 800), `rock at ${Math.round(r.x)}, ${Math.round(r.y)}`).toBeGreaterThan(21000);
+      if (r.y > 15000) expect(Math.abs(r.x) - r.size).toBeGreaterThan(1500);
+    }
+    // Nothing sits in the rock itself
+    for (const r of all) expect(insideTerrain(rock, r.x, r.y)).toBe(false);
+  });
+
+  it('its den: scrapborn heaps in its chambers and off its faces launch crawlers, sowers and darters; none comes into the Heart', () => {
+    const { server, pid, step, num } = world();
+    server.bosses.unhurt.add(pid);
+    place(pid, num, 0, 20000);
+    const seen = new Map<string, number>();
+    let inHeart = 0;
+    for (let i = 0; i < 60 * 40; i++) {
+      step();
+      if (i % 30) continue;
+      place(pid, num, 0, 20000);
+      for (const [eid, e] of (server.enemies as any).enemies as Map<number, { type: string; faction: string; boss?: string; behaviour?: { aggro: number } }>) {
+        if (InSystem.systemId[eid] !== num || e.boss) continue;
+        seen.set(e.type, (seen.get(e.type) ?? 0) + 1);
+        if (Math.hypot(Position.x[eid], Position.y[eid]) < 5600) inHeart++;
+        // (a den's packs are keener than the Drift's)
+        expect(e.behaviour?.aggro).toBe(2600);
+      }
+    }
+    for (const t of ['scrap_crawler', 'rivet_sower', 'scrap_darter']) expect(seen.get(t) ?? 0, t).toBeGreaterThan(0);
+    expect(inHeart).toBe(0);
+  }, 120_000);
 
   it('its rocks are mined, and found by shots, as anywhere', () => {
     const { server, pid, step, num, rocks, at } = world();

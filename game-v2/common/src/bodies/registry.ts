@@ -34,8 +34,8 @@ export interface BodyKind {
   step(id: number, s: BodyState, me: BodyPose, read: BodyReads, t: number, prevQ: number): BodyOut | null;
 }
 
-/** The Scrap Mother's flight: her hoard holds off, her mill closes in, her seed is quick (brains/scrapMother.ts) */
-const SCRAP_MOTHER: StagedFlightTables = { range: [2100, 1500, 1200], circle: [0.3, 0.4, 0.55], drive: [0.12, 0.2, 0.3], homeR: 5000 };
+/** The Scrap Mother's flight: her hoard holds off, her mill closes in, her seed is quick; held to the middle of her Heart (brains/scrapMother.ts) */
+const SCRAP_MOTHER: StagedFlightTables = { range: [1800, 1200, 1100], circle: [0.3, 0.4, 0.55], drive: [0.12, 0.2, 0.3], homeR: 3500 };
 
 /** A staged boss's body: its flight at its target */
 function staged(brain: string, flight: StagedFlightTables): BodyKind {

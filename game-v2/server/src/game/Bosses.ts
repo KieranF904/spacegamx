@@ -34,6 +34,7 @@ import { ScrapMotherBrain } from './brains/scrapMother.js';
 import { BroodMotherBrain } from './brains/broodMother.js';
 import { SimPass } from '../sim/SystemClocks.js';
 import { Lifecycle } from './bosses/Lifecycle.js';
+import { applyStageHp } from './bosses/stageHp.js';
 import type { ArenaGates } from './arenas/ArenaGates.js';
 import { LIFE_ASLEEP_RESET, type ArenaDef, type LifeState } from '@space-game/common';
 
@@ -96,6 +97,8 @@ export interface BossDef {
   brain?: string;
   /** Staged: what share of a hit on a later stage's part reaches the current stage's plates (unset: rules.stageCover) */
   stageCover?: number;
+  /** Staged: each stage's deciding HP (its deciding parts rescaled to sum to it, the core's x2.5 counted): bosses/stageHp.ts */
+  stageHp?: number[];
 }
 
 export interface BossesFile {
@@ -313,6 +316,7 @@ export class Bosses {
     this.ships.scaleHp(eid, def.hp);
     // A boss dies when its core does: keep that for the end of the fight, not a lucky shot through a gap
     this.ships.hardenParts(eid, 'core', 2.5);
+    if (def.stageHp) applyStageHp(this.ships, eid, def.stageHp);
     this.ships.setDamageScale(eid, def.damage);
     this.enemies.addBoss(eid, id, def.faction, num, { x, y }, def.behaviour);
     if (def.fixed) this.ships.pin(eid);

@@ -20,6 +20,7 @@
       },
       "level": 8,
       "hp": 0.14,
+      "stageHp": [3600, 5200, 4300],
       "damage": 1,
       "xp": 2400,
       "credits": 2400,
@@ -37,12 +38,8 @@
         "leash": 8000,
         "accuracy": 0.85
       },
-      "intro": "Something huge and patched together stirs in the hollow at the heart of the junk, grey veins glinting in the rock around it. The Scrap Mother wakes, and the nest hums with drones.",
+      "intro": "Something huge and patched together heaves up out of the scrap heap at the heart of the rock, grey veins glinting in the walls around it. The Scrap Mother wakes, and the nest hums with drones.",
       "phases": [
-        {
-          "at": 0.85,
-          "say": "The Scrap Mother's brood racks crack open."
-        },
         {
           "at": 0.667,
           "say": "The Scrap Mother's nest tears away from her."
@@ -53,8 +50,7 @@
         },
         {
           "at": 0.15,
-          "say": "The Scrap Mother is coming apart, and faster for it.",
-          "enrage": 1.3
+          "say": "The Scrap Mother is coming apart."
         }
       ],
       "loot": [

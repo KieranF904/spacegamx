@@ -27,8 +27,8 @@ const files = readGameDataFiles(dataDir);
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
 const ALL = CAPS.HITS | CAPS.SELF_HITS | CAPS.PACKED | CAPS.COALESCE | CAPS.OWN_SHOTS | CAPS.ROUGH | CAPS.OWN_SIM | CAPS.INPUTS | CAPS.BODIES;
 
-interface Got { snapshots: number; checked: number; off: number; keyframes: number; ctlRows: number; decisions: number; syncs: number; running: number; ctlWhileOff: number }
-const zero = (): Got => ({ snapshots: 0, checked: 0, off: 0, keyframes: 0, ctlRows: 0, decisions: 0, syncs: 0, running: 0, ctlWhileOff: 0 });
+interface Got { snapshots: number; checked: number; off: number; keyframes: number; ctlRows: number; decisions: number; syncs: number; running: number; ctlWhileOff: number; keyWhileOff: number }
+const zero = (): Got => ({ snapshots: 0, checked: 0, off: 0, keyframes: 0, ctlRows: 0, decisions: 0, syncs: 0, running: 0, ctlWhileOff: 0, keyWhileOff: 0 });
 
 interface Opts {
   ticks?: number;
@@ -70,10 +70,12 @@ function fight(o: Opts = {}) {
     const fa = f as unknown as { snapshot(s: ServerSnapshotMessage): void };
     const orig = fa.snapshot.bind(f);
     fa.snapshot = (s) => {
-      if (drop?.() && s.decisions?.some((d) => d[0] === boss && d[2] !== DECISION.SYNC)) s = { ...s, decisions: s.decisions.filter((d) => d[0] !== boss || d[2] === DECISION.SYNC) };
+      // (a decision her flight follows: a personal attack's draw doesn't move her)
+      const flying = (d: number[]) => d[0] === boss && d[2] !== DECISION.SYNC && d[2] !== DECISION.PERSONAL;
+      if (s.decisions?.some(flying) && drop?.()) s = { ...s, decisions: s.decisions.filter((d) => !flying(d)) };
       orig(s);
       g.snapshots++;
-      if (s.ships?.some((k) => k[0] === boss)) g.keyframes++;
+      if (s.ships?.some((k) => k[0] === boss)) { g.keyframes++; if (capsOff) g.keyWhileOff++; }
       if (s.ctl?.some((r) => controlRowId(r) === boss)) { g.ctlRows++; if (capsOff) g.ctlWhileOff++; }
       for (const d of s.decisions ?? []) if (d[0] === boss) { g.decisions++; if (d[2] === DECISION.SYNC) g.syncs++; }
       if (!f.bodies || ![...f.bodies.ids()].includes(boss)) return;
@@ -129,6 +131,8 @@ function fight(o: Opts = {}) {
   Position.x[A.pid] = x0; Position.y[A.pid] = y0; Velocity.x[A.pid] = 0; Velocity.y[A.pid] = 0;
   Position.x[B.pid] = x0 - 300; Position.y[B.pid] = y0 + 1400;
   boss = server.bosses.spawnAt('boss_scrap_mother', num, x0 + 1800, y0);
+  // (tough as she was before the rework's starter armour: the pilot's shots mustn't strip her, so her rows stay rows)
+  ships.scaleHp(boss, 40);
   const brain = server.bosses.brainOf(boss) as unknown as StagedBrain & { stage: number };
   const stages = [...(o.stagesAt ?? [])];
   for (let t = 0; t < (o.ticks ?? 900); t++) {
@@ -194,8 +198,9 @@ describe('decision inputs: the Scrap Mother flown by her body on both sides (CAP
   it('the cap switched off mid-fight: her rows the old way, no checks judged; back on: a SYNC, her replica exact again', () => {
     const r = fight({ ticks: 900, capsOffAt: 300, capsOnAt: 550 });
     const conn = r.server.pilots.connOf(r.A.pid)!;
-    // (off: the client runs her no longer, nor does the server think it does: her rows came again)
-    expect(r.got.A.ctlWhileOff).toBeGreaterThan(0);
+    // (off: the client runs her no longer, nor does the server think it does: her rows came again, or her keyframes
+    // while her drive pushes her, which rows can't carry)
+    expect(r.got.A.ctlWhileOff + r.got.A.keyWhileOff).toBeGreaterThan(0);
     // (on again: synced afresh, her replica the server's ship from there, the checks agreeing)
     expect(r.got.A.syncs).toBeGreaterThan(1);
     expect(r.A.bodies!.on).toBe(true);

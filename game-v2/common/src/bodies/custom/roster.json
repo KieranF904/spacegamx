@@ -9,6 +9,7 @@
   { "id": "rivet_sower", "groups": ["core", "drum", "sensors", "pannier_l", "pannier_r", "drive"] },
   { "id": "slag_ray", "groups": ["core", "horns", "tail", "wing_l", "wing_r"] },
   { "id": "clinker", "groups": ["core", "chimney_l", "chimney_r", "plate_front", "plate_right", "plate_back", "plate_left"] },
-  { "id": "helios_drone", "groups": ["core", "torch", "eye", "panel_l", "panel_r", "drive"] }
+  { "id": "helios_drone", "groups": ["core", "torch", "eye", "panel_l", "panel_r", "drive"] },
+  { "id": "scrap_darter", "groups": ["core", "gun", "fin_l", "fin_r", "pod", "drive"] }
  ]
 }

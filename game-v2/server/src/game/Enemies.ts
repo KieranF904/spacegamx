@@ -77,6 +77,8 @@ export interface SpawnNest {
   respawnSeconds?: number;
   /** How far its ships chase from it (default their faction's leash) */
   leash?: number;
+  /** How close a pilot comes before its ships go for them (default their faction's aggro: a den's are keener) */
+  aggro?: number;
   /** How far round it they patrol (default 2400): anchored packs keep within it, loose ones stray a few times it */
   roam?: number;
   /** How its packs get about (default loose: Roaming.ts), and how strongly loose ones are drawn back to it (0..1, default 0.5) */
@@ -851,7 +853,7 @@ export class Enemies {
       Velocity.x[eid] = dcos(h) * v; Velocity.y[eid] = dsin(h) * v;
       Rotation.angle[eid] = h;
       const e = this.enemies.get(eid)!;
-      if (leash && f) e.behaviour = { ...f.behaviour, leash };
+      if ((leash || n.aggro) && f) e.behaviour = { ...f.behaviour, ...(leash ? { leash } : {}), ...(n.aggro ? { aggro: n.aggro } : {}) };
       e.waypoint = { x: at.x + c * roam * 0.6, y: at.y + s * roam * 0.6 };
     });
     // First out a little way from the hull; a nomad lingers a moment before it sets off

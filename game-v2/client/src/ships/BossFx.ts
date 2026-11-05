@@ -23,6 +23,7 @@ import { Container, Graphics } from 'pixi.js';
 import { rayTerrain, type ServerBossBeamMessage, type ServerBossTelegraphMessage } from '@space-game/common';
 import { terrainFor } from '../rendering/terrainData';
 import type { GameState } from '../state/GameState';
+import { CRANE_BEAM, CRANE_BITE, drawCraneLash, drawTell, isTell, tellSound } from './bossTells';
 
 const COLOR: Record<string, number> = { charge: 0xff2a1a, lance: 0xff2a1a, dash: 0xff9a2a, impact: 0xff6a1a, crystal: 0xffc040, synapse: 0xffd060, ring: 0xffe0a0, vent: 0xffb040,
   // (the Scrap Mother's: hazard yellow for her guns, greyseam green for what pulls, pools and burns)
@@ -32,6 +33,7 @@ const BEAM: Record<string, { halo: number; glow: number; body: number; core: num
   lance: { halo: 0xff3a0a, glow: 0xff6a1a, body: 0xffa040, core: 0xfff4e0, flare: 0xff8a3a, hot: 0xfff0d0 },
   crystal: { halo: 0xff5a0a, glow: 0xff9a1a, body: 0xffd060, core: 0xfffbe8, flare: 0xffb040, hot: 0xfff6d8 },
   weld: { halo: 0x1aa080, glow: 0x3affc0, body: 0x9affe0, core: 0xf4fffb, flare: 0x6affd0, hot: 0xeafff8 },
+  crane: CRANE_BEAM,
 };
 /** The lance's charge sound's length to its fire (sfx.ts boss_charge): played faster for a shorter charge */
 const CHARGE_SOUND = 2.7;
@@ -78,6 +80,8 @@ export class BossFx {
     this.warns.push({ m, age: 0, life: m.ticks * TICK });
     const at = this.where(m);
     if (!at) return;
+    // (light tells and their sounds: bossTells.ts)
+    if (isTell(m.kind)) { const s = tellSound(m.kind); if (s) this.sound(s[0], at, s[1], s[2]); return; }
     // The lance gathering: a deep swell to the moment it fires (sped up as its charge shortens)
     if (m.kind === 'lance') this.sound('boss_charge', at, 1, Math.max(0.85, Math.min(2, CHARGE_SOUND / (m.ticks * TICK))));
     else if (m.kind === 'magma') this.sound('magma_charge', at, 0.8, Math.max(0.8, Math.min(1.6, MAGMA_SOUND / (m.ticks * TICK))));
@@ -132,6 +136,7 @@ export class BossFx {
     // Brighter as it comes, a hard flash at the end
     const ramp = 0.35 + 0.65 * k * k;
     const blink = k > 0.82 ? 0.6 + 0.4 * Math.sin(this.t * 40) : 1;
+    if (isTell(m.kind)) { drawTell(g, m, at, x.age, x.life, this.t, terrainFor(this.state.systemId)); return; }
     if (m.kind === 'magma') { this.drawMagma(g, x, at); return; }
     if (m.kind === 'vent') { this.drawVent(g, x, at); return; }
     if (m.kind === 'iris') { this.drawVent(g, x, at, IRIS); return; }
@@ -226,15 +231,19 @@ export class BossFx {
 
   private drawBeam(g: Graphics, b: Beam, at: { x: number; y: number; angle: number }, dt: number): void {
     const m = b.m, k = b.age / b.life;
+    // (a crane's arm swinging, not a beam: bossTells.ts)
+    if (m.kind === 'crane') { drawCraneLash(g, m, at, k, Math.min(1, b.age / 0.08) * Math.min(1, (b.life - b.age) / 0.15)); return; }
     const a = at.angle + m.a0 + (m.a1 - m.a0) * k;
     const ux = Math.cos(a), uy = Math.sin(a);
     // It burns out against rock (the server stops it there too), or against the first ship in its way
     const rock = m.length * rayTerrain(terrainFor(this.state.systemId), at.x, at.y, at.x + ux * m.length, at.y + uy * m.length);
     let len = rock, onShip = -1;
+    // (a crane's lash bites from a quarter out: close in, it passes over)
+    const bite = m.kind === 'crane' ? m.length * CRANE_BITE : 0;
     for (const e of this.state.entities.values()) {
       if (!SHIPS.has(e.type) || e.id === m.bodyId) continue;
       const along = (e.renderX - at.x) * ux + (e.renderY - at.y) * uy;
-      if (along <= 0 || along >= len) continue;
+      if (along <= bite || along >= len) continue;
       const off = Math.abs((e.renderX - at.x) * -uy + (e.renderY - at.y) * ux), r = e.id === this.state.playerId ? 90 : 120;
       if (off < r + m.width / 2) { len = Math.max(0, along - Math.sqrt(Math.max(0, r * r - off * off)) * 0.6); onShip = e.id; }
     }
@@ -242,14 +251,15 @@ export class BossFx {
     // Up to full in a moment, off at the end
     const on = Math.min(1, b.age / 0.08) * Math.min(1, (b.life - b.age) / 0.12);
     const flick = 0.85 + 0.15 * Math.sin(this.t * 55);
-    const line = (width: number, color: number, alpha: number) => g.moveTo(at.x, at.y).lineTo(ex, ey).stroke({ color, width, alpha: alpha * on });
+    const s0 = Math.min(len, bite), sx = at.x + ux * s0, sy = at.y + uy * s0;
+    const line = (width: number, color: number, alpha: number) => g.moveTo(sx, sy).lineTo(ex, ey).stroke({ color, width, alpha: alpha * on });
     const p = BEAM[m.kind ?? 'lance'] ?? BEAM.lance;
     line(m.width * 3.2, p.halo, 0.14 * flick);
     line(m.width * 1.6, p.glow, 0.4 * flick);
     line(m.width * 0.8, p.body, 0.7);
     line(m.width * 0.28, p.core, 0.95);
-    g.circle(at.x, at.y, m.width * 1.4).fill({ color: p.flare, alpha: 0.5 * on });
-    g.circle(at.x, at.y, m.width * 0.6).fill({ color: p.hot, alpha: 0.9 * on });
+    g.circle(sx, sy, m.width * (s0 ? 0.6 : 1.4)).fill({ color: p.flare, alpha: 0.5 * on });
+    g.circle(sx, sy, m.width * (s0 ? 0.3 : 0.6)).fill({ color: p.hot, alpha: 0.9 * on });
     const struck = len < m.length - 1;
     if (!struck) return;
     // The strike: a white-hot flare, a halo, shock rings thrown off, sparks and molten spatter sprayed back

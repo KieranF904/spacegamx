@@ -70,6 +70,8 @@ export interface AsteroidRingData {
   count: number;
   stationary?: boolean;
   lane?: { angle: number; width: number };
+  /** A stationary ring's rocks set down at these spots, one each (rock k at at[k]), not spread over the ring */
+  at?: [number, number][];
 }
 
 export interface AsteroidBeltData extends AsteroidRingData {

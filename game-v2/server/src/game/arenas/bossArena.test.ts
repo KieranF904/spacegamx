@@ -94,11 +94,11 @@ describe('boss arenas', () => {
     w.place(0, w.arena.radius + 600, 0, -30);
     w.step(40);
     expect(insideArena(w.arena, Position.x[w.pid], Position.y[w.pid])).toBe(false);
-    // The boss, flung at it, stays in
+    // The boss, flung at it down the Throat (the Heart's one way out), stays in
     wake(w);
-    const b = w.boss();
-    w.server.ships.teleport(b, w.arena.radius - 900, 0);
-    Velocity.x[b] = 60;
+    const b = w.boss(), gy = w.arena.barrier![0][1];
+    w.server.ships.teleport(b, 0, gy - 1900);
+    Velocity.y[b] = 60;
     w.step(30);
     expect(insideArena(w.arena, Position.x[b], Position.y[b])).toBe(true);
   });
@@ -163,7 +163,8 @@ describe('boss arenas', () => {
     const w = world();
     wake(w);
     const b = w.boss(), hooks = devHooks(w.server.bosses.brainOf(b))!;
-    expect(w.server.bosses.taken(b)).toBe(1);
+    // (outside her windows the Mother takes her own x0.3: brains/scrapMother.ts)
+    expect(w.server.bosses.taken(b)).toBeCloseTo(0.3);
     w.t.send({ type: 'bossDevTool', action: 'window' } as any);
     expect(w.server.bosses.taken(b)).toBe(WINDOW.inside);
     const cap = hooks.fight.window!.cap;
@@ -173,7 +174,7 @@ describe('boss arenas', () => {
     expect(hooks.fight.window!.crackAt).toBeGreaterThanOrEqual(0);
     expect(hooks.fight.stats.cracks).toBe(1);
     // (staggered: outside rate, and it holds still)
-    expect(w.server.bosses.taken(b)).toBeCloseTo(1);
+    expect(w.server.bosses.taken(b)).toBeCloseTo(0.3);
     w.step(8);
     const told = w.msgs('bossWindow');
     expect(told[0]).toMatchObject({ bodyId: b, fill: 0, cap });

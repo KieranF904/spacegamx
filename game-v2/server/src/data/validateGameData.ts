@@ -369,7 +369,7 @@ const SHAPES: Record<string, Spec> = {
         at: 'number', 'say?': 'string', 'escorts?': 'string[]', 'enrage?': 'number', 'heal?': 'number', 'blink?': 'number',
         'nova?': obj({ every: 'number', kind: 'string', count: 'number', warnTicks: 'number', 'intercept?': 'boolean' }),
       })),
-      loot: lootSpec, 'design?': 'string', 'arena?': 'boolean', 'fixed?': 'boolean', 'grade?': 'number', 'plating?': 'number', 'asDesigned?': 'boolean', 'speed?': 'number', 'turn?': 'number', 'stageCover?': 'number',
+      loot: lootSpec, 'design?': 'string', 'arena?': 'boolean', 'fixed?': 'boolean', 'grade?': 'number', 'plating?': 'number', 'asDesigned?': 'boolean', 'speed?': 'number', 'turn?': 'number', 'stageCover?': 'number', 'stageHp?': 'number[]',
       'roam?': obj({ radius: 'number', everySeconds: 'number' }), 'brain?': oneOf(...BRAIN_IDS),
     })),
   }),
@@ -383,7 +383,7 @@ const SHAPES: Record<string, Spec> = {
       spawns: rec(strict({
         'grade?': 'number', packs: 'number', groups: arr(group),
         'zones?': arr(obj({ id: 'string', inner: 'number', outer: 'number', 'x?': 'number', 'y?': 'number', packs: 'number', 'respawnSeconds?': 'number', groups: arr(group) })),
-        'nests?': arr(obj({ id: 'string', packs: 'number', 'respawnSeconds?': 'number', 'leash?': 'number', 'roam?': 'number', 'style?': oneOf('anchored', 'loose', 'nomad'), 'bias?': 'number', groups: arr(group) })),
+        'nests?': arr(obj({ id: 'string', packs: 'number', 'respawnSeconds?': 'number', 'leash?': 'number', 'aggro?': 'number', 'roam?': 'number', 'style?': oneOf('anchored', 'loose', 'nomad'), 'bias?': 'number', groups: arr(group) })),
         'events?': strict({
           'raidStations?': 'string[]', 'raidZone?': 'string', 'salvageZone?': 'string', 'salvageBelt?': 'number',
           'warband?': obj({ zone: 'string', share: 'number', groups: arr(group) }),
@@ -443,7 +443,7 @@ const SHAPES: Record<string, Spec> = {
           else if (!(typeof r === 'number' && r >= 0 && r <= 5)) c.err(join(path, k), 'must be 0-5');
         }
       },
-      asteroidDensity: 'number', asteroidBelt: obj({ innerRadius: 'number', outerRadius: 'number', count: 'number', 'stationary?': 'boolean', 'lane?': obj({ angle: 'number', width: 'number' }), 'extra?': arr(obj({ innerRadius: 'number', outerRadius: 'number', count: 'number', 'field?': 'string', 'stationary?': 'boolean', 'lane?': obj({ angle: 'number', width: 'number' }) })) }),
+      asteroidDensity: 'number', asteroidBelt: obj({ innerRadius: 'number', outerRadius: 'number', count: 'number', 'stationary?': 'boolean', 'lane?': obj({ angle: 'number', width: 'number' }), 'extra?': arr(obj({ innerRadius: 'number', outerRadius: 'number', count: 'number', 'field?': 'string', 'stationary?': 'boolean', 'lane?': obj({ angle: 'number', width: 'number' }), 'at?': arr(arr('number')) })) }),
       'asteroidField?': 'string', stations: 'string[]',
       portals: arr(obj({ id: 'string', targetSystem: 'string', position: 'xy' })),
       'rifts?': arr(obj({ id: 'string', position: 'xy', destination: obj({ system: 'string', x: 'number', y: 'number' }) })),

@@ -63,9 +63,16 @@ export function withArenaGates(file: TerrainFile | undefined, arena: ArenaDef | 
   return { ...(file ?? { rocks: [] }), gates: gatePieces(arena) };
 }
 
-/** Is a point inside the arena (within its radius of the centre) */
+/**
+ * Is a point inside the arena: within its radius of the centre, and (with a barrier) on the centre's side of the
+ * barrier's line, so the stretch of tunnel beyond the barrier that the circle takes in counts as outside
+ */
 export function insideArena(a: ArenaDef, x: number, y: number): boolean {
-  return dhypot(x - a.centre.x, y - a.centre.y) < a.radius;
+  if (dhypot(x - a.centre.x, y - a.centre.y) >= a.radius) return false;
+  if (!a.barrier) return true;
+  const [[x0, y0], [x1, y1]] = a.barrier, nx = -(y1 - y0), ny = x1 - x0;
+  const side = (px: number, py: number) => (px - x0) * nx + (py - y0) * ny;
+  return side(x, y) * side(a.centre.x, a.centre.y) > 0;
 }
 
 /** The nearest point of the barrier to (x, y), and how far it is */

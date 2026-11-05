@@ -33,6 +33,31 @@ export interface TerrainFile {
   ridges?: { pts: Vec2[]; w: number[]; h: number[] }[];
   /** A boss arena's barrier (world/gates.ts, from systems.json `arena`): solid both ways, drawn as a shimmer, not rock */
   gates?: Vec2[][];
+  /**
+   * More outlines like `cliff` (look only), for rock in several pieces or open ground in several places (a hollowed
+   * asteroid: its shell and its core): each with the way into the rock at every point, and how deep the rock goes there
+   * (its drawn top stops there, so walls between two chambers meet in the middle)
+   */
+  cliffs?: { pts: Vec2[]; in: Vec2[]; depth?: number[] }[];
+  /** The rock's colours (look only: CSS hex), instead of the cavern's: its foot, its face, its top, rock further off */
+  palette?: { foot: string; face: string; top: string; far: string; floor?: string };
+  /** The floor under open ground inside the rock (look only: a hollowed asteroid's chambers), drawn under everything */
+  floor?: Vec2[][];
+  /** Things in and on the rock that aren't rock (look only: client rendering/DenDressing.ts) */
+  dressing?: {
+    /** Work lamps on the walls */
+    lamps?: Vec2[];
+    /** Cables slung across chambers */
+    cables?: Vec2[][];
+    /** Glowing veins in the rock's cracks */
+    veins?: Vec2[][];
+    /** Conveyor belts, running the way their points go */
+    belts?: { pts: Vec2[]; w: number }[];
+    /** Plates welded over the rock */
+    plates?: Vec2[][];
+    /** Rust bleeding down the rock (wide faint streaks) */
+    rust?: Vec2[][];
+  };
 }
 
 interface Piece { pts: number[]; x0: number; y0: number; x1: number; y1: number }
