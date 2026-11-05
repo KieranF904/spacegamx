@@ -18,6 +18,7 @@ import { Position, Velocity, Input, InSystem } from '@space-game/common';
 import type { GameServer } from '../../GameServer.js';
 import type { PilotOrders } from '../../ships/ShipBridge.js';
 import { idle, type Bag, type Controls, type DepositMode, type DepositResult, type PilotDriver, type Pose } from '../core/types.js';
+import { BotInputSource, keysOfInput } from '../core/controlSource.js';
 import { miningFill, poseOf, radiusOf, volumeOf } from './shipInfo.js';
 
 /** LootPods' numbers: the tractor's reach beyond the hull, and the pickup distance */
@@ -36,6 +37,8 @@ export class NpcDriver implements PilotDriver {
   readonly eid: number;
   private c: Controls = idle();
   private berthed = false;
+  /** Its orders as an InputSource (decided): the controller and the flush read the ship's inputs from it */
+  readonly source = new BotInputSource(() => (this.berthed ? idle(this.c.aim) : this.c));
   private items: Bag = {};
   /** What it has stored at the station (virtual: the NPC has no profile) */
   readonly stored: Bag = {};
@@ -61,9 +64,9 @@ export class NpcDriver implements PilotDriver {
   }
 
   private orders(): PilotOrders | null {
-    const c = this.berthed ? idle(this.c.aim) : this.c;
+    const inp = this.source.inputAt(this.server.getTick());
     return {
-      controls: { forward: c.forward, backward: c.backward, left: c.left, right: c.right, boost: c.boost, targetAngle: c.aim },
+      controls: keysOfInput(inp),
       firing: false,
     };
   }
@@ -136,9 +139,9 @@ export class NpcDriver implements PilotDriver {
   }
 
   flush(): void {
-    const eid = this.eid, c = this.berthed ? idle(this.c.aim) : this.c;
-    Input.fireRight[eid] = c.mine ? 1 : 0;
-    Input.fireLeft[eid] = 0;
+    const eid = this.eid, c = this.berthed ? idle(this.c.aim) : this.c, inp = this.source.inputAt(this.server.getTick());
+    Input.fireRight[eid] = inp.fireAlt ? 1 : 0;
+    Input.fireLeft[eid] = inp.fire ? 1 : 0;
     Input.targetAngle[eid] = c.aim;
     Input.cursorDist[eid] = c.aimDist;
     if (this.berthed) { Velocity.x[eid] = 0; Velocity.y[eid] = 0; }
