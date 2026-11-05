@@ -5,7 +5,7 @@
  * there once a pilot comes near): it costs no bytes beyond the alive bits, sent when they change.
  */
 
-import { spawnersOf, ghostCentre, ghostShip, slotStyle, unpackPopSlot, type PopSpawnerDef, type ServerPopsMessage, type Spawner, type StarSystemData } from '@space-game/common';
+import { spawnersOf, ghostCentre, ghostShip, slotStyle, unpackPopSlot, type Lure, type PopSpawnerDef, type ServerPopsMessage, type Spawner, type StarSystemData } from '@space-game/common';
 
 /** A ghost ship for the maps: where it is, whose it is (faction index), and whether its pack leaves pilots be */
 export interface PopGhost { x: number; y: number; faction: number; calm: boolean }
@@ -13,13 +13,17 @@ export interface PopGhost { x: number; y: number; faction: number; calm: boolean
 export class Populations {
   /** Each spawner's slot codes (packPopSlot), by spawner index */
   private slots = new Map<number, number[]>();
+  /** Each spawner's nomads' lure (where its band's pilots were last seen), by spawner index */
+  private lures = new Map<number, Lure>();
   private system = '';
   private spawners: { sys: string; list: Spawner[] } | null = null;
 
   constructor(private readonly spawns: Record<string, { nests?: PopSpawnerDef[]; zones?: PopSpawnerDef[] }>, private readonly factions: string[]) {}
 
   apply(msg: ServerPopsMessage, system: string): void {
-    if (system !== this.system || msg.full) { this.slots.clear(); this.system = system; }
+    if (system !== this.system || msg.full) { this.slots.clear(); this.lures.clear(); this.system = system; }
+    const n = msg.n ?? [];
+    for (let i = 0; i + 5 <= n.length; i += 5) this.lures.set(n[i], { l1: n[i + 1], s1: n[i + 2], l2: n[i + 3], s2: n[i + 4] });
     const p = msg.p;
     for (let i = 0; i + 1 < p.length;) {
       const index = p[i], n = p[i + 1];
@@ -30,6 +34,7 @@ export class Populations {
 
   clear(): void {
     this.slots.clear();
+    this.lures.clear();
     this.system = '';
   }
 
@@ -52,7 +57,7 @@ export class Populations {
         const s = unpackPopSlot(code);
         const g = sp.def.groups[s.group];
         if (s.loaded || !s.alive || !g) return;
-        const c = ghostCentre(sys, system, sp, slot, slotStyle(sp, s.group), tick);
+        const c = ghostCentre(sys, system, sp, slot, slotStyle(sp, s.group), tick, this.lures.get(sp.index));
         const faction = this.factions.indexOf(g.faction);
         for (let k = 0; k < g.ships.length; k++) {
           if (!(s.alive & (1 << k))) continue;

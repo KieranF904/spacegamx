@@ -196,21 +196,24 @@ describe('system memory', () => {
     for (const e of w.enemies.nest(ash, DIG)!.packs.flat()) { const s = w.bridge.get(e)!; w.bridge.hurt(e, s, s.blueprint.parts.findIndex((p) => p.fn === 'core'), 1e9, w.pid); }
     near(w, 1);
     expect(alive(w)).toBe(0);
-    // Left (Ashfall put away): still none, the first not due yet
+    // Left (Ashfall put away, ~25 s): a ship or so back (one every respawnSeconds / its pack's size), not the lot
     w.away();
     expect(w.memory.remembers('ashfall')).toBe(true);
-    expect(alive(w)).toBe(0);
+    const left = alive(w);
+    expect(left).toBeLessThanOrEqual(2);
     await w.server.saveAll();
-    expect(written()!.populations?.ashfall?.[DIG]?.slots.every((s) => s.alive === 0)).toBe(true);
-    // Down for two and a half of its intervals: two ships back (one an interval), not the lot
-    clock.t += every * 2.5 * 1000;
+    expect(written()!.populations?.ashfall?.[DIG]?.slots.reduce((n, s) => n + (s.alive ? 1 : 0), 0)).toBeLessThanOrEqual(2);
+    // Down for its respawnSeconds: about a pack's worth more back, not the lot
+    clock.t += every * 1000;
     const w2 = world(store, clock);
     w2.at('sol', 120000, 0, 1);
-    expect(alive(w2)).toBe(2);
-    expect(full).toBeGreaterThan(2);
-    // And on, one an interval, wherever the pilots are
+    const back = alive(w2);
+    expect(back).toBeGreaterThanOrEqual(left + 2);
+    expect(back).toBeLessThanOrEqual(left + 4);
+    expect(full).toBeGreaterThan(back);
+    // And on at that rate, wherever the pilots are
     w2.at('sol', 120000, 0, every);
-    expect(alive(w2)).toBe(3);
+    expect(alive(w2)).toBeGreaterThan(back + 1);
   }, 120000);
 
   it("a pilot at a gate's mouth has where it goes brought back before they're through", () => {

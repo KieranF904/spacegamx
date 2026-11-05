@@ -42,3 +42,4 @@ except to fix a typo. A bump makes old clients reload (see PROTOCOL_VERSION in p
 - 50 (2026-11-05): shipSync dmg: a ship's shells' damage multiplier, so clients find hits by a boss's guns
 - 51 (2026-11-05): rock hits: no LaserHit effect (clients draw a rock's sparks where their shell meets it) and no projectileHit for a client finding its own hits; encode-once fire blocks carry the augmented flag as a bit (wire hash now covers a fire block)
 - 52 (2026-11-05): pops: hostile populations per spawner (slot codes: group, loaded, alive mask), mapDots pts for loaded hostiles out of view
+- 53 (2026-11-05): pops n: nomads' lures (the sector their band's pilots were last seen in), ghosts drift towards it

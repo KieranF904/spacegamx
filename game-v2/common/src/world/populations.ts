@@ -87,7 +87,41 @@ export function pickGroup(groups: readonly PopGroup[], taken: readonly number[],
 }
 
 /** Where a slot's pack is while it's a ghost: its lead's place at `tick` (stepped to GHOST_STEP) */
-export function ghostCentre(sys: StarSystemData | undefined, sysId: string, sp: Spawner, slot: number, style: RoamStyle, tick: number): XY {
+/**
+ * Where a spawner's nomads are drawn to (both ends have it: the server works it out, `pops` tells the clients): the
+ * sector of the system (LURE_SECTORS round the star) its band's pilots were last seen in, `l2`, from coarse tick `s2`
+ * (in GHOST_STEPs), and the one before it, `l1` from `s1` (its pull frozen at `s2`, so a new lure starts from where the
+ * ghosts had got to). -1: none. Nobody in the band any more leaves the last one standing: they stay where pilots were.
+ */
+export interface Lure { l1: number; s1: number; l2: number; s2: number }
+export const LURE_SECTORS = 16;
+/** How long a lure takes to draw its nomads (ticks) as far as they go: LURE_PULL of the way round to its sector */
+export const LURE_RAMP = 60 * 240;
+export const LURE_PULL = 0.9;
+
+/** Which lure sector a point is in */
+export function lureSector(x: number, y: number): number {
+  const a = datan2(y, x);
+  return ((Math.floor((a / (Math.PI * 2)) * LURE_SECTORS) % LURE_SECTORS) + LURE_SECTORS) % LURE_SECTORS;
+}
+
+/** A lure on the wire (pops `n`): [spawner index, l1, s1, l2, s2] */
+export function packLure(out: number[], index: number, l: Lure): void {
+  out.push(index, l.l1, l.s1, l.l2, l.s2);
+}
+
+/** An angle drawn round towards its lures by coarse tick `t` */
+function lured(a: number, l: Lure, t: number): number {
+  const pull = (sector: number, since: number, until: number, at: number) => {
+    const w = Math.min(LURE_PULL, Math.max(0, (until - since * GHOST_STEP) / LURE_RAMP));
+    if (sector < 0 || w <= 0) return at;
+    const to = ((sector + 0.5) / LURE_SECTORS) * Math.PI * 2;
+    return at + datan2(dsin(to - at), dcos(to - at)) * w;
+  };
+  return pull(l.l2, l.s2, t, pull(l.l1, l.s1, Math.min(t, l.s2 * GHOST_STEP), a));
+}
+
+export function ghostCentre(sys: StarSystemData | undefined, sysId: string, sp: Spawner, slot: number, style: RoamStyle, tick: number, lure?: Lure): XY {
   const t = Math.floor(tick / GHOST_STEP) * GHOST_STEP;
   const rng = dice(sysId, sp, slot);
   const h1 = rng(), h2 = rng(), h3 = rng(), h4 = rng(), h5 = rng();
@@ -107,7 +141,9 @@ export function ghostCentre(sys: StarSystemData | undefined, sysId: string, sp: 
     const span = Math.max(0, band.max - band.min);
     const r = band.min + span * (0.3 + 0.4 * h1 + 0.2 * dsin((Math.PI * 2 * t) / (60 * (900 + 900 * h2)) + h5 * 6.283));
     const home = nestPosition(n, planets, 0);
-    const a = datan2(home.y, home.x) + h4 * Math.PI * 2 + (dir * Math.PI * 2 * t) / (60 * (2400 + 2400 * h2));
+    const a0 = datan2(home.y, home.x) + h4 * Math.PI * 2 + (dir * Math.PI * 2 * t) / (60 * (2400 + 2400 * h2));
+    // (Drawn round towards where its band's pilots were last seen)
+    const a = lure ? lured(a0, lure, t) : a0;
     return clampBand({ x: dcos(a) * r, y: dsin(a) * r }, band);
   }
   // Round the nest as it goes round its orbit: guards close, loose packs wider
