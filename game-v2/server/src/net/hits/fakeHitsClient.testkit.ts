@@ -380,7 +380,7 @@ export class FakeHitsClient {
     this.hits?.forget(s.removed);
     this.away.onSnapshot(s.tick, s.removed);
     this.selfHits?.onRemoved(s.removed);
-    for (const id of s.removed) { if (this.known.has(id)) this.removed.add(id); this.shells.delete(id); this.store.remove(id); this.bodies?.remove(id); this.causes?.remove(id); this.reps.remove(id); this.guides?.remove(id, s.tick); }
+    for (const id of s.removed) { if (this.known.has(id)) this.removed.add(id); this.shells.delete(id); this.store.remove(id); this.bodies?.remove(id); this.causes?.remove(id); this.reps.remove(id, s.tick); this.guides?.remove(id, s.tick); }
     for (const id of s.out ?? []) { this.bodies?.remove(id); this.causes?.remove(id); this.reps.remove(id); }
     // (The game's client steps every replica as it draws, each frame; drawing nothing, this does it here. Left alone,
     // a replica no one asked for in 600 ticks stops short: ShipReplicaSet.at won't run that far in one go)

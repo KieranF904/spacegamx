@@ -721,7 +721,8 @@ export class SnapshotBuilder {
       // (the client dead-reckons in between); distant projectiles and loot not at all
       const px = Position.x[conn.playerId], py = Position.y[conn.playerId];
       // Debris it can work out itself: told how (first, before the ship's own sync), and held back till it confirms
-      this.holdDebris(conn);
+      // (a split told goes with a snapshot: its client works it out once that snapshot's causes are in, DebrisSplits.flush)
+      const split = this.holdDebris(conn);
       // Ships that left its view: the ships homed in its focus cells (net/cells/FocusCells.ts); it keeps them while
       // they're away, and gets only what changed when they're back (net/cells/AwayNet.ts)
       const out = this.focus.view(conn, playerSystemId, px, py);
@@ -891,7 +892,7 @@ export class SnapshotBuilder {
       if (this.currentTick % 60 < (crowd ? crowd.windowOf(playerSystemId) : CROWD_BASE_WINDOW)) this.sendPlayerState(conn);
 
       // (Records count from the snapshot they follow: one always goes with them)
-      const shouldSend = conn.forceSnapshot || !!rep.found?.count || entities.length > 0 || removed.length > 0 || rep.ships.length > 0 || rep.ctl.length > 0 || out.length > 0 || fire.length > 0 || !!rep.own?.length || !!rep.causes?.length || !!decisions?.length || !!guided?.active || !!guided?.rows.length
+      const shouldSend = conn.forceSnapshot || split || !!rep.found?.count || entities.length > 0 || removed.length > 0 || rep.ships.length > 0 || rep.ctl.length > 0 || out.length > 0 || fire.length > 0 || !!rep.own?.length || !!rep.causes?.length || !!decisions?.length || !!guided?.active || !!guided?.rows.length
         || (hitsOn && this.hits!.pending(conn));
       if (!shouldSend) {
         this.lastEntityStates.set(conn.playerId, newStates);
@@ -1018,8 +1019,9 @@ export class SnapshotBuilder {
    * sync and the snapshot, and its pieces are held back (no sync, keyframe, status row or HP) until the client
    * confirms them (ackDebris), or its time runs out and they go as any ship does. Its own ship's too, with its pose.
    */
-  private holdDebris(conn: ClientConnection): void {
+  private holdDebris(conn: ClientConnection): boolean {
     const now = this.currentTick;
+    let sent = false;
     const net = this.ships.debrisNet, live = conn.debrisLive;
     // (Rebuilt since its spawn (a crumble): a client that doesn't run it can't work that out, nor get its sync while held)
     const rebuilt = (id: number) => { const ship = this.ships.bodies.get(id); return !!ship && ship.rebuilds !== net.spawns.get(id)?.rebuilds; };
@@ -1067,8 +1069,10 @@ export class SnapshotBuilder {
           type: 'debrisSplit', id: parent, tick: sp.tick, e: packIds(sp.ids), p: packRuns(sp.parts), l: l ? 1 : undefined, g: sp.sheds ? packSheds(sp.sheds) : undefined, s: at,
           c: whole ? [...sp.com] : undefined, h: whole ? sp.hp!.flat() : undefined,
         });
+        sent = true;
       }
     }
+    return sent;
   }
 
   /** A client's confirmations of debris it worked out ([id, check, ...], on its input): right, it counts as sent */

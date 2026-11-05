@@ -47,6 +47,8 @@ export interface DebrisWorld {
    * (`body` moved). False: nothing was left of it (it went at t)
    */
   after?(id: number, t: number, body: FlightBody): boolean;
+  /** One it runs itself (its whole life worked out here, its end too: a removal of it is no news) */
+  runs?(id: number): boolean;
 }
 import { quantizeCursorAngle, dequantizeCursorAngle } from './cursorState.js';
 import { dhypot } from '../math/detTrig.js';
@@ -538,7 +540,14 @@ export class ShipReplicaSet {
     return this.reps.get(id)?.mode === ReplicaMode.Docked;
   }
 
-  remove(id: number): void {
+  /**
+   * A ship gone. `tick`: a snapshot's removal at that tick. A piece of debris the client runs itself (DebrisWorld.runs)
+   * knocked others in the world up to its end, which it knows (gone, after), and the snapshot's window can be long: the
+   * world is stepped to the tick first, with it in. (One it's sent goes at once: the server keyframes what it knocked
+   * in the window, Replication.forClient)
+   */
+  remove(id: number, tick?: number): void {
+    if (tick !== undefined && this.reps.get(id)?.mode === ReplicaMode.Drift && this.debris?.runs?.(id)) this.at(id, tick);
     if (this.reps.delete(id)) this.dropped(id, -Infinity);
     this.ring.remove(id);
     this.pre.remove(id);

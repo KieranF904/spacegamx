@@ -28,6 +28,8 @@ interface Life {
   pre: Map<number, FlightBody>;
   /** Crumbles shown up to this tick (each once, however often the world is stepped again) */
   shown: number;
+  /** Only to be seen (it never knocks): kept here as the store's goes with the snapshot's removal, before the world's last steps of it */
+  aloof: boolean;
 }
 
 const clone = (s: ShipState): ShipState => ({
@@ -54,8 +56,8 @@ export class DebrisLives {
   }
 
   /** A piece it runs from its spawn: `ship` its state as spawned at `born`, `decay` each part's crumble tick */
-  add(id: number, born: number, ship: ShipState, decay: readonly number[]): void {
-    this.lives.set(id, { decay, versions: [{ from: born + 1, ship }], pre: new Map(), shown: born });
+  add(id: number, born: number, ship: ShipState, decay: readonly number[], aloof = false): void {
+    this.lives.set(id, { decay, versions: [{ from: born + 1, ship }], pre: new Map(), shown: born, aloof });
     this.stats.pieces++;
   }
 
@@ -67,6 +69,11 @@ export class DebrisLives {
   /** The server tells it from now on (a shipSync), or it's gone */
   drop(id: number): void {
     if (this.lives.delete(id)) this.stats.dropped++;
+  }
+
+  /** Only to be seen (undefined: not one it runs) */
+  aloofOf(id: number): boolean | undefined {
+    return this.lives.get(id)?.aloof;
   }
 
   /** Each part's crumble tick (a piece breaking off it keeps its parts') */

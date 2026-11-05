@@ -755,7 +755,8 @@ export class ShipClient {
   /** After a snapshot: ships that are gone (and new status rows get their hull %) */
   onReplication(m: ServerSnapshotMessage): void {
     for (const s of m.entities) if (s.type === EntityType.ShipBody) this.fillHull(s.id);
-    for (const id of m.removed) { this.bodies.remove(id); this.causes.remove(id); this.replicas.remove(id); }
+    // (debris it runs knocks in the world till the removal's tick: ShipReplicaSet.remove)
+    for (const id of m.removed) { this.bodies.remove(id); this.causes.remove(id); this.replicas.remove(id, m.tick); }
     for (const id of m.out ?? []) { this.bodies.remove(id); this.causes.remove(id); this.replicas.remove(id); }
     // (the ships it holds now, for its check: CAPS.CAUSES)
     this.causes.noteHeld(m.tick);
