@@ -86,8 +86,10 @@ function run(sc: Scenario) {
   place(A.pid, x0, y0);
   place(B.pid, x0 - 300, y0 + 400);
   place(C.pid, x0 - 300, y0 - 400);
-  const target = sc.boss ? server.bosses.spawnAt(sc.boss, num, x0 + 1500, y0) : ships.spawnDummy(ships.library.get('hauler')!, x0 + 700, y0, 0, num);
-  if (sc.behind) ships.spawnDummy(ships.library.get('hauler')!, x0 + 1300, y0, 0, num);
+  // (Piercing two: the old unarmed, unshielded Hauler, so the slugs reach the second hull whatever the world's freighters carry)
+  const freighter = sc.behind ? ships.devDesigns['target-freighter'] : ships.library.get('hauler')!;
+  const target = sc.boss ? server.bosses.spawnAt(sc.boss, num, x0 + 1500, y0) : ships.spawnDummy(freighter, x0 + 700, y0, 0, num);
+  if (sc.behind) ships.spawnDummy(freighter, x0 + 1300, y0, 0, num);
   const ship = ships.get(target)!;
   if (sc.hpScale) for (let i = 0; i < ship.hp.length; i++) ship.hp[i] *= sc.hpScale;
   const ticks = sc.ticks ?? 600;

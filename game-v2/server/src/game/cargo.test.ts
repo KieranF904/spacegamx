@@ -65,14 +65,18 @@ describe('cargo mass in the server', () => {
     const rep = (server as any).replication;
     input({ forward: true, targetAngle: 0.4 });
     run(30);
-    const before = { ...rep.reasons }, v0 = rep.versionOf(pid), worked0 = rep.causeStats.worked;
+    const before = { ...rep.reasons }, v0 = rep.versionOf(pid);
+    // (The pilot's own causes worked out: whatever else is about, say two pirates bumping, has its own)
+    let worked = 0;
+    const work = rep.work.bind(rep);
+    rep.work = (eid: number, ...rest: unknown[]) => { const w = work(eid, ...rest); if (eid === pid && w) worked++; return w; };
     server.pilots.get(conn)!.cargo.push({ id: 'iron_ore', n: 20 });
     run(30);
     const after = Object.fromEntries(Object.entries(rep.reasons as Record<string, number>).map(([k, v]) => [k, v - (before[k] ?? 0)]).filter(([k, v]) => k.startsWith('Player:') && (v as number) > 0));
     // (The shadow worked the new mass out: never off its path, so no divergence; its version moved once, the keyframe a
     // client without the cap gets)
     expect(after).toEqual({});
-    expect(rep.causeStats.worked - worked0).toBe(1);
+    expect(worked).toBe(1);
     expect(rep.versionOf(pid) - v0).toBe(1);
   });
 });
