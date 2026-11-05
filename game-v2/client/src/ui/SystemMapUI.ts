@@ -29,6 +29,7 @@ import { nestPosition, pocketsFrom, type NestData } from '@space-game/common';
 import factionsFile from '../../../data/factions.json';
 import shipTuning from '../../../data/ships/tuning.json';
 import { THREAT_COLOR, threatTag } from './threat';
+import { drawStructure } from './mapStructures';
 import { hazardRows } from './hazardSums';
 import type { GameState } from '../state/GameState';
 import { etaText, type AutoDest, type RouteView } from '../ships/Autopilot';
@@ -1228,11 +1229,7 @@ export class SystemMapUI {
 
     // Built structures (a ring about the star)
     for (const st of sys?.structures ?? []) {
-      ctx.strokeStyle = 'rgba(232, 197, 106, 0.75)';
-      ctx.lineWidth = Math.max(2, 140 * S);
-      ctx.setLineDash([Math.max(2, 200 * S), Math.max(2, 120 * S)]);
-      ctx.beginPath(); ctx.arc(ox, oy, st.radius * S, 0, Math.PI * 2); ctx.stroke();
-      ctx.setLineDash([]);
+      drawStructure(ctx, st, ox, oy, S, this.state.getRawServerTick());
       const lx = ox, ly = oy - st.radius * S;
       this.label(ctx, st.name, lx, ly - 10, '#f0d99a', 3, ly);
       this.hits.push({ kind: 'structure', structure: st, x: 0, y: -st.radius, sx: lx, sy: ly });

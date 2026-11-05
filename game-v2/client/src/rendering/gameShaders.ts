@@ -16,6 +16,7 @@ import { asteroidPrograms } from './lighting/AsteroidBatch';
 import { stationProgram } from './stations/StationMaterials';
 import { nestProgram } from './nests/nestShader';
 import { particlePrograms } from './particlePool';
+import { solarRingProgram } from './solarRing';
 
 export function gameShaders(renderer: Renderer, signIn: Container | null, stage: Container, systems: StarSystemData[]): GlProgram[] {
   const batch = batchProgram(renderer);
@@ -25,7 +26,9 @@ export function gameShaders(renderer: Renderer, signIn: Container | null, stage:
   // (litProgram(2): a single lit object's, a station's before its bake or a stillstone; the sky's ring last, and only
   // if a system has a black hole)
   const ring = systems.some((s) => s.centralBody?.type === 'black_hole') ? [skyRingProgram()] : [];
-  for (const p of [sunProgram(), ...skyPrograms(), ...world, ...pipePrograms(renderer), shipHullProgram(), stationProgram(), litProgram(2), ...asteroidPrograms(), ...particlePrograms(), nestProgram(), ...planetPrograms(), ...ring]) {
+  // (the Helios Array's, if a system has a solar ring)
+  const solar = systems.some((s) => s.structures?.some((st) => st.kind === 'solar_ring')) ? [solarRingProgram()] : [];
+  for (const p of [sunProgram(), ...skyPrograms(), ...world, ...pipePrograms(renderer), shipHullProgram(), stationProgram(), litProgram(2), ...asteroidPrograms(), ...particlePrograms(), nestProgram(), ...solar, ...planetPrograms(), ...ring]) {
     if (!out.includes(p)) out.push(p);
   }
   return out;
