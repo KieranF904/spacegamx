@@ -5,8 +5,9 @@
  *
  *   /rockery drones [n]                       a Helios drone pack (default 5, up to 12)
  *   /rockery dummy [ship]                     a still dummy ship (default halberd), parked beside you
- *   /rockery bots [n] [twitch] [shoot]        n bot "players" (1-4 at a time) on random flight: real connections flying through
- *                                             the input path; twitch = calm|mid|twitchy|0..1; `shoot` makes them fire at you
+ *   /rockery bots [n] [twitch] [shoot] [near] n bot "players" (1-4 at a time) on random flight: real connections flying through
+ *                                             the input path; twitch = calm|mid|twitchy|0..1; `shoot` makes them fire at you;
+ *                                             `near` keeps them within about 900 of you wherever you go (the prediction demo)
  *   /rockery clear                            the bots and dummies it made, and the hostiles near you
  *   /rockery list                             what it has made
  *
@@ -68,10 +69,11 @@ export function installRockeryTools(server: GameServer, manager: BotManager): Ro
         }
         case 'bots': {
           live();
-          let n = 1, twitch = 'mid', shoot = false;
+          let n = 1, twitch = 'mid', shoot = false, near = false;
           for (const word of rest) {
             if (/^\d+$/.test(word)) n = Number(word);
             else if (word === 'shoot') shoot = true;
+            else if (word === 'near') near = true;
             else twitch = word;
           }
           n = Math.max(1, Math.min(MAX_BOTS, n));
@@ -80,7 +82,8 @@ export function installRockeryTools(server: GameServer, manager: BotManager): Ro
           for (let i = 0; i < n; i++) {
             const id = nextId++;
             const name = `rockery_bot_${id - 999}`;
-            const task = new RandomFlight(flightOpts({ twitch, shoot: shoot ? '1' : '0', seed: id }));
+            const task = new RandomFlight(flightOpts({ twitch, shoot: shoot ? '1' : '0', seed: id, ...(near ? { leash: '900' } : {}) }));
+            if (near) task.homeOf = () => (Number.isFinite(Position.x[c.playerId]) ? { x: Position.x[c.playerId], y: Position.y[c.playerId] } : null);
             if (shoot) task.target = () => (Number.isFinite(Position.x[c.playerId]) ? { x: Position.x[c.playerId], y: Position.y[c.playerId] } : null);
             // (its /goto takes it beside the asker: a player's name is as good a "station" as any for the driver)
             const driver = new ClientDriver(server, name, { name, ship: BOT_SHIP, station: c.username, price: () => 0 });

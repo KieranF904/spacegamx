@@ -1675,6 +1675,11 @@ export class Renderer {
     this.weaponFx.firePose = fn;
   }
 
+  /** Each drawn strike and told hit, by shell (dev Sim tools' hit agreement: WeaponFx.tally) */
+  set shotTally(fn: WeaponFx['tally']) {
+    this.weaponFx.tally = fn;
+  }
+
   /** The model and damage of the gun a fire-event shell came from (WeaponFx.shellLook) */
   set shellLookOf(fn: WeaponFx['shellLook']) {
     this.weaponFx.shellLook = fn;

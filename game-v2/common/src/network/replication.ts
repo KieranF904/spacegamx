@@ -511,6 +511,20 @@ export class ShipReplicaSet {
   }
 
   /**
+   * One tick of a ship stepped off its timeline: from `prev` with the controls given (bits, aim q), its structure now,
+   * no causes, nothing kept or rewound. The same step `at` takes for a tick without causes, so a state stepped here
+   * equals the ring's when the controls and what came before agree. For a layer kept beside the ring (the dev
+   * prediction modes' PT layer, client dev/predict). Null: not held, no structure yet, docked or debris
+   */
+  stepAlone(id: number, prev: Readonly<Step>, t: number, bits: number, q: number): ReplicaState | null {
+    const r = this.reps.get(id), d = this.derived(id);
+    if (!r || !d || r.mode === ReplicaMode.Docked || r.mode === ReplicaMode.Drift) return null;
+    const body = cloneBody(prev.body);
+    replicaStep(r.mode, body, { bits, targetAngle: replicaAngle(r.mode, q) }, d, this.tuning, this.env(), t);
+    return new ReplicaState(id, r.mode, body, bits, q);
+  }
+
+  /**
    * What it was stepped to from tick t on must be stepped again (its timeline changed there); its keyframe stays, and
    * so does what came before it. A path steps on from its keyframe, never from before it, so those ticks can't be
    * stepped again: they are the path it was drawn on, which the keyframe's correction bends onto it (pose). Wiped, the

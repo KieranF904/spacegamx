@@ -17,6 +17,7 @@ import { FULL_CHARGE, unpackCharge, pilotExtras, PILOT_ROW, Timeline, type Charg
 export interface OwnStepped { body: Readonly<FlightBody>; charge?: Charge; jumpPrime: number }
 import { FarShips } from './FarShips';
 import { Populations } from './Populations';
+import type { DrawModeHook } from './drawMode';
 import factionsFile from '../../../data/factions.json';
 import {
   ServerSnapshotMessage,
@@ -257,6 +258,8 @@ export class GameState {
   public preSnapshot: ((snapshot: ServerSnapshotMessage) => EntityState[]) | null = null;
   /** ...and each frame, every other ship is placed by its replica (true = placed) */
   public replicaPose: ((entity: InterpolatedEntity, renderTick: number) => boolean) | null = null;
+  /** The prediction-mode hook (state/drawMode.ts): null is mode A, today's drawing; only the dev Sim tools set it */
+  public drawMode: DrawModeHook | null = null;
   public playerName: string = '';
   public hp: number = PLAYER_MAX_HP;
   public maxHp: number = PLAYER_MAX_HP;
@@ -570,7 +573,8 @@ export class GameState {
    * on that came out where the ship had been that many ticks before. Without prediction, the server's tick.
    */
   ownDrawTick(now: number = performance.now()): number {
-    return this.timelineAt(now).ownDraw();
+    const t = this.timelineAt(now).ownDraw();
+    return this.drawMode?.own ? this.drawMode.own(t) : t;
   }
 
   /**
@@ -1093,6 +1097,7 @@ export class GameState {
     const interpDelayTicks = this.interpDelayMs / this.tickMs;
     const renderTick = Math.max(0, estimatedTick - interpDelayTicks);
     this.renderTickNow = renderTick;
+    this.drawMode?.frame?.(now);
     
     // Find bracketing snapshots
     const buffer = this.snapshotBuffer;
@@ -1133,7 +1138,9 @@ export class GameState {
     for (const entity of this.entities.values()) {
       if (entity.id === this.playerId) continue;
       // Replicated ships: stepped from their keyframe and controls
-      if (this.replicaPose?.(entity, renderTick)) continue;
+      // (A dev prediction mode may place it at another tick, and move it after: state/drawMode.ts)
+      const dm = this.drawMode;
+      if (this.replicaPose?.(entity, dm?.ship ? dm.ship(entity, renderTick) : renderTick)) { dm?.placed?.(entity); continue; }
 
       // Loot pods drifting from their anchor (data[3] its tick: see podDrift)
       if (entity.type === EntityType.DroppedItem && entity.data && entity.data.length >= 4 && entity.hist?.length) {

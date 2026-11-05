@@ -4,6 +4,8 @@
  *   Network simulator   ping, jitter and loss added on this client's connection, both ways (client dev/netSim.ts). Off until
  *                       "Enabled" is ticked; the sliders do nothing while it is off. Loss drops inputs going out and snapshots
  *                       coming in, nothing else.
+ *   Prediction mode     how other ships (and yours) are drawn, switched live (dev/predict/modes.ts): A today, B prediction
+ *                       off, C1 AI ahead, C2 PT/ST rubber band, C3 C2 + touch register; the ease time for C2/C3.
  *   Overlay             the ST ghost, PT pose, correction vectors and counters (dev/simOverlay); also Shift+F7.
  *   Rockery             warp there, and spawn test traffic beside you: a Helios drone pack, a still dummy, 1-4 bot players
  *                       on random flight (calm to twitchy, optionally shooting back at you). These send `/rockery ...` chat
@@ -12,9 +14,20 @@
 import type { NetSim } from '../dev/netSim';
 import type { SimOverlay } from '../dev/simOverlay/SimOverlay';
 
+/** The prediction-mode switch (dev/predict/PredictController.ts) as the panel uses it */
+export interface DevPredictModes {
+  readonly modes: readonly { id: string; label: string; blurb: string }[];
+  readonly mode: { id: string; blurb: string };
+  set(id: string): boolean;
+  lerpMs: number;
+  onChange: ((m: { id: string; blurb: string }) => void) | null;
+}
+
 export interface DevSimDeps {
   net: NetSim | null;
   overlay: SimOverlay;
+  /** The prediction modes (null: not in this client) */
+  predict?: DevPredictModes | null;
   /** Chat lines as the player (the server's `/` commands) */
   say: (text: string) => void;
   warp: (systemId: string, x: number, y: number) => void;
@@ -28,6 +41,7 @@ export class DevSimPanel {
   private timer = 0;
   private twitch = 'mid';
   private shoot = false;
+  private near = true;
   private readonly onKey = (e: KeyboardEvent) => {
     if (e.code !== 'F7' || e.shiftKey) return;
     e.preventDefault();
@@ -58,6 +72,23 @@ export class DevSimPanel {
       this.el.appendChild(this.text('Not available (no browser transport here).', { color: '#9bb6cc', marginBottom: '6px' }));
     }
 
+    // --- Prediction mode
+    if (d.predict) {
+      const pm = d.predict;
+      this.head('Prediction mode (drawing only: the server is the same)');
+      const buttons = new Map<string, HTMLButtonElement>();
+      const blurb = this.text('', { fontSize: '11px', color: '#9bb6cc', margin: '2px 0 6px', whiteSpace: 'normal' });
+      const show = (m: { id: string; blurb: string }) => {
+        for (const [id, b] of buttons) Object.assign(b.style, id === m.id ? { background: '#2f6a9a', borderColor: '#7fb3d9', color: '#fff' } : { background: BTN.background, borderColor: '#2c4a66', color: BTN.color });
+        blurb.textContent = m.blurb;
+      };
+      this.row(pm.modes.map((m) => { const b = this.button(m.id, () => pm.set(m.id)); b.title = m.label; buttons.set(m.id, b); return b; }));
+      this.el.appendChild(blurb);
+      this.slider('C2/C3 ease (old PT -> new)', 0, 500, 10, pm.lerpMs, 'ms', (v) => { pm.lerpMs = v; });
+      pm.onChange = show;
+      show(pm.mode);
+    }
+
     // --- Overlay
     this.head('Overlay (ST ghost, PT pose, corrections, counters)');
     const ov = d.overlay;
@@ -79,8 +110,8 @@ export class DevSimPanel {
     for (const t of ['calm', 'mid', 'twitchy']) { const o = document.createElement('option'); o.value = o.textContent = t; if (t === this.twitch) o.selected = true; sel.appendChild(o); }
     sel.addEventListener('change', () => { this.twitch = sel.value; });
     Object.assign(sel.style, { background: '#0e2236', color: '#cfe3f5', border: '1px solid #2c4a66', borderRadius: '4px', padding: '3px' });
-    this.row([sel, this.checkBox('shoot back', false, (on) => { this.shoot = on; })]);
-    this.row([1, 2, 3, 4].map((n) => this.button(`+${n} bot${n > 1 ? 's' : ''}`, () => d.say(`/rockery bots ${n} ${this.twitch}${this.shoot ? ' shoot' : ''}`))));
+    this.row([sel, this.checkBox('shoot back', false, (on) => { this.shoot = on; }), this.checkBox('stay near', true, (on) => { this.near = on; })]);
+    this.row([1, 2, 3, 4].map((n) => this.button(`+${n} bot${n > 1 ? 's' : ''}`, () => d.say(`/rockery bots ${n} ${this.twitch}${this.shoot ? ' shoot' : ''}${this.near ? ' near' : ''}`))));
     this.row([this.button('Clear everything spawned', () => d.say('/rockery clear')), this.button('List', () => d.say('/rockery list'))]);
 
     document.body.appendChild(this.el);

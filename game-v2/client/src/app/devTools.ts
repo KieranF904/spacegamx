@@ -10,6 +10,8 @@ import { DevSimPanel } from '../ui/DevSimPanel';
 import { NetSim } from '../dev/netSim';
 import { SimOverlay } from '../dev/simOverlay/SimOverlay';
 import { GameStateSource } from '../dev/simOverlay/gameStateSource';
+import { PredictSource } from '../dev/simOverlay/predictSource';
+import { PredictController } from '../dev/predict/PredictController';
 import type { GameState } from '../state/GameState';
 import type { ShipClient } from '../ships/ShipClient';
 import { devFeeds } from './devFeeds';
@@ -48,10 +50,18 @@ function installSimTools(host: { readonly renderer: Renderer; readonly network: 
   let net: NetSim | null = null;
   if ('netSim' in transport) { net = new NetSim(); transport.netSim = net; }
   if (!host.state || !host.shipClient) return null;
-  const source = new GameStateSource({ state: host.state, shipClient: host.shipClient, renderer: host.renderer });
-  const overlay = new SimOverlay(source, { attach: () => source.attach(), detach: () => source.detach() });
+  const base = new GameStateSource({ state: host.state, shipClient: host.shipClient, renderer: host.renderer });
+  // (The prediction modes: mode A until switched; `?predict=C2` starts in one, `?simOverlay=1` with the overlay on)
+  const predict = new PredictController(host.state, host.shipClient, host.renderer);
+  const source = new PredictSource(base, predict, { state: host.state, shipClient: host.shipClient });
+  const overlay = new SimOverlay(source, { attach: () => base.attach(), detach: () => base.detach() });
+  const q = new URLSearchParams(location.search);
+  if (q.get('predict')) predict.set(q.get('predict')!);
+  if (q.get('simOverlay') === '1') overlay.setOn(true);
+  // (For the demo scripts and the console: switch, read the numbers)
+  (window as unknown as { __simTools?: unknown }).__simTools = { predict, overlay, net, read: () => ({ mode: predict.mode.id, ...source.read(), ...source.counters() }) };
   return new DevSimPanel({
-    net, overlay,
+    net, overlay, predict,
     say: (text) => host.network.send({ type: 'chat', text } as never),
     warp: (systemId, x, y) => host.network.send({ type: 'devTeleport', systemId, x, y }),
   });
