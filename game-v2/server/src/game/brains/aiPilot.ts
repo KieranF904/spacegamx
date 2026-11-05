@@ -29,6 +29,8 @@ interface Flown {
   body: BodyState;
   /** The aim it flew with last tick (its held heading) */
   q?: number;
+  /** The controls it flew with last tick (a custom enemy's module holds a thrust it's making: common bodies/custom keepAt) */
+  bits?: number;
 }
 
 export class AiPilots {
@@ -63,9 +65,10 @@ export class AiPilots {
       const [emp, slowed] = this.host.status(eid), st = statusArgs(b, now, emp, slowed);
       if (st) this.decide(eid, b, DECISION.STATUS, st);
     }
-    const out = aiPilot(b, me, tgt, centroid, now, eid, f.q ?? quantizeCursorAngle(me.angle));
+    const out = aiPilot(b, me, tgt, centroid, now, eid, f.q ?? quantizeCursorAngle(me.angle), f.bits ?? 0);
     if (bodied) out.bits |= bodyStatusBits(b, now);
     f.q = out.q;
+    f.bits = out.bits;
     return out;
   }
 

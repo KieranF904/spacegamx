@@ -6,7 +6,8 @@
 import {
   Position, Velocity, Rotation, quantizeCursorAngle, dequantizeCursorAngle, datan2, dcos, dhypot, dsin, hashUnit,
   CENSER_WARN, CENSER_BURN, LURKER_WARN, HOOK_WARN, BELL_WARN, CRAWLER_PULL, CRAWLER_SNAP, SOWER_AHEAD, RAY_PASS,
-  CLINKER_WARN, CLINKER_SHELLS, CLINKER_GAP, TORCH_TICKS, DART_IN, DART_WARN, DART_FIRE, customGroups, launchPattern,
+  CLINKER_WARN, CLINKER_SHELLS, CLINKER_GAP, TORCH_TICKS, DART_IN, DART_WARN, DART_FIRE, RAY_RUN, RAY_EMBER_SPEED, customGroups, launchPattern,
+  leadFrom, offBy,
 } from '@space-game/common';
 import { beamFx, burnLine, gun, leadAngle, lineFirst, lineWarn, pullTowards, ringWarn, strikeAt } from './kit.js';
 import type { Act, DesignMoves } from './types.js';
@@ -14,10 +15,34 @@ import type { Act, DesignMoves } from './types.js';
 const num = (a: Act, move: string, key: string, dflt = 0) => a.live.stats.moves[move]?.[key] ?? dflt;
 const due = (a: Act, move: string) => a.now >= a.live.next && a.d <= a.live.stats.reach;
 const nose = (a: Act) => Rotation.angle[a.eid];
+/** Its target as its body reads it (where, how fast) */
+const tpose = (a: Act) => ({ x: Position.x[a.target], y: Position.y[a.target], vx: Velocity.x[a.target], vy: Velocity.y[a.target] });
+/**
+ * A line drawn now and fired down `warn` ticks on (a shell `speed` fast, or a beam: Infinity): at where its target will
+ * be then if it holds its course. Drawn where it was, a line was dodged by flying on, by anyone moving at all
+ */
+const lineAt = (a: Act, x: number, y: number, warn: number, speed = Infinity) => {
+  // (its time there: the warning, and the shot's flight to where it will be, worked out twice)
+  let t = warn + dhypot(Position.x[a.target] - x, Position.y[a.target] - y) / speed;
+  let p = a.ahead(t);
+  t = warn + dhypot(p.x - x, p.y - y) / speed;
+  p = a.ahead(t);
+  // (at most LEAD_MOST ahead of it)
+  const lx = p.x - Position.x[a.target], ly = p.y - Position.y[a.target], l = dhypot(lx, ly), k = l > LEAD_MOST ? LEAD_MOST / l : 1;
+  return datan2(Position.y[a.target] + ly * k - y, Position.x[a.target] + lx * k - x);
+};
+/** The furthest ahead of its target a line or a shell is led (world units) */
+const LEAD_MOST = 1400;
+/** Ember cones spat only with the Slag Ray's nose this close to where they'd meet its target (radians) */
+const CONE_ON = 0.15;
+/** The Hookboat's reel draws what it harpooned in no faster than this (world units a tick, closing) */
+const REEL_MAX = 5;
+/** The Helios Drone's torch burns only pointed this close at what it welds (radians) */
+const TORCH_ON = 0.6;
 
 export const MOVES: Record<string, DesignMoves> = {
   censer: {
-    pick: (a) => (due(a, 'lance') && a.has('lance') ? { move: 0, arg: quantizeCursorAngle(leadAngle(a.target, Position.x[a.eid], Position.y[a.eid], 400)) } : null),
+    pick: (a) => (due(a, 'lance') && a.has('lance') ? { move: 0, arg: quantizeCursorAngle(lineAt(a, Position.x[a.eid], Position.y[a.eid], CENSER_WARN + CENSER_BURN / 2)) } : null),
     step(a, m, k) {
       const line = dequantizeCursorAngle(m.arg), tip = a.at('lance');
       if (!tip) return;
@@ -29,7 +54,7 @@ export const MOVES: Record<string, DesignMoves> = {
   },
 
   maw_lurker: {
-    pick: (a) => (due(a, 'aim') && a.has('rail') ? { move: 0, arg: quantizeCursorAngle(leadAngle(a.target, Position.x[a.eid], Position.y[a.eid], 150)) } : null),
+    pick: (a) => (due(a, 'aim') && a.has('rail') ? { move: 0, arg: quantizeCursorAngle(lineAt(a, Position.x[a.eid], Position.y[a.eid], LURKER_WARN, 150)) } : null),
     step(a, m, k) {
       const tip = a.at('rail');
       if (!tip) return;
@@ -42,7 +67,7 @@ export const MOVES: Record<string, DesignMoves> = {
   },
 
   hookboat: {
-    pick: (a) => (due(a, 'harpoon') && a.has('harpoon') && !a.live.tether && a.d < num(a, 'harpoon', 'length', 1300) ? { move: 0, arg: quantizeCursorAngle(leadAngle(a.target, Position.x[a.eid], Position.y[a.eid], 120)) } : null),
+    pick: (a) => (due(a, 'harpoon') && a.has('harpoon') && !a.live.tether && a.d < num(a, 'harpoon', 'length', 1300) ? { move: 0, arg: quantizeCursorAngle(lineAt(a, Position.x[a.eid], Position.y[a.eid], HOOK_WARN)) } : null),
     step(a, m, k) {
       const tip = a.at('harpoon');
       if (!tip) return;
@@ -63,7 +88,10 @@ export const MOVES: Record<string, DesignMoves> = {
       if (!t) return;
       if (a.now >= t.until || !a.has('harpoon') || !a.host.ships.has(t.target)) { a.live.tether = undefined; return; }
       const d = dhypot(Position.x[t.target] - Position.x[a.eid], Position.y[t.target] - Position.y[a.eid]);
-      if (d > num(a, 'harpoon', 'slack', 320)) pullTowards(a, t.target, Position.x[a.eid], Position.y[a.eid], num(a, 'harpoon', 'length', 1300) * 1.6, num(a, 'harpoon', 'pull', 0.4) * 1.6);
+      // (a tow, not a sling: no more pull once it's coming in at REEL_MAX, so it isn't hurled into the boat's hull)
+      const ux = (Position.x[a.eid] - Position.x[t.target]) / (d || 1), uy = (Position.y[a.eid] - Position.y[t.target]) / (d || 1);
+      const closing = (Velocity.x[t.target] - Velocity.x[a.eid]) * ux + (Velocity.y[t.target] - Velocity.y[a.eid]) * uy;
+      if (d > num(a, 'harpoon', 'slack', 320) && closing < REEL_MAX) pullTowards(a, t.target, Position.x[a.eid], Position.y[a.eid], num(a, 'harpoon', 'length', 1300) * 1.6, num(a, 'harpoon', 'pull', 0.4) * 1.6);
     },
   },
 
@@ -131,8 +159,12 @@ export const MOVES: Record<string, DesignMoves> = {
     pick: (a) => (due(a, 'pass') && a.d < a.live.stats.reach * 1.6 ? { move: 0, arg: a.rng() < 0.5 ? 0 : 1 } : null),
     step(a, _m, k) {
       // Embers spat ahead in a cone (its horns), slag left in its wake (its tail)
+      // (on its run only, its nose on where they'd meet its target, in reach: a cone spat across its turn away was wasted)
       const horns = a.at('horns');
-      if (horns && k % num(a, 'pass', 'cone', 30) === 0) for (const o of [-0.22, 0, 0.22]) a.host.fire?.(a.eid, 'cannon', horns.x, horns.y, nose(a) + o, num(a, 'pass', 'damage', 0.9) * a.live.dmg);
+      if (horns && k < RAY_RUN && a.now >= (a.live.coneAt ?? 0) && a.d <= a.live.stats.reach && offBy(nose(a), leadFrom(horns.x, horns.y, tpose(a), RAY_EMBER_SPEED)) < CONE_ON) {
+        a.live.coneAt = a.now + num(a, 'pass', 'cone', 30);
+        for (const o of [-0.22, 0, 0.22]) a.host.fire?.(a.eid, 'cannon', horns.x, horns.y, nose(a) + o, num(a, 'pass', 'damage', 0.9) * a.live.dmg);
+      }
       const tail = a.at('tail');
       if (tail && k % num(a, 'pass', 'wake', 20) === 0 && k < RAY_PASS - 10) {
         const R = num(a, 'pass', 'pool', 140), T = num(a, 'pass', 'poolTicks', 150);
@@ -154,34 +186,45 @@ export const MOVES: Record<string, DesignMoves> = {
     pick: (a) => (due(a, 'volley') && (a.has('chimney_l') || a.has('chimney_r')) ? { move: 0, arg: 0 } : null),
     step(a, m, k) {
       const R = num(a, 'volley', 'radius', 170), S = num(a, 'volley', 'spread', 220);
-      if (k === 0) {
-        // Where its four shells come down, round its target (the move's seed scatters them), left chimney then right
-        a.live.due = [];
-        for (let i = 0; i < CLINKER_SHELLS; i++) {
-          const t = hashUnit(m.seed, i, 1) * Math.PI * 2, r = hashUnit(m.seed, i, 2) * S;
-          const x = Position.x[a.target] + Velocity.x[a.target] * (CLINKER_WARN * 0.5) + dcos(t) * r, y = Position.y[a.target] + Velocity.y[a.target] * (CLINKER_WARN * 0.5) + dsin(t) * r;
-          const at = a.now + CLINKER_WARN + i * CLINKER_GAP;
-          a.live.due.push({ x, y, at, group: i % 2 ? 'chimney_r' : 'chimney_l' });
-        }
+      if (k === 0) a.live.due = [];
+      // Each shell aimed as it's lobbed, left chimney then right, at where its target will be when it comes down if it
+      // holds its course: the first dead on that, the next where it is now (for one that stops), the last two scattered
+      // round where it's going by the move's seed. (All four picked at the first lob, round where it had been, the
+      // rest came down behind anyone moving)
+      const i = k / CLINKER_GAP, group = i % 2 ? 'chimney_r' : 'chimney_l';
+      // (Lobbed only from a chimney still on: rule 6)
+      if (Number.isInteger(i) && i < CLINKER_SHELLS && a.has(group)) {
+        const t = hashUnit(m.seed, i, 1) * Math.PI * 2, r = i < 2 ? 0 : (0.4 + 0.6 * hashUnit(m.seed, i, 2)) * S;
+        const p = i === 1 ? { x: Position.x[a.target], y: Position.y[a.target] } : a.ahead(CLINKER_WARN);
+        let lx = p.x - Position.x[a.target], ly = p.y - Position.y[a.target];
+        const l = dhypot(lx, ly), most = num(a, 'volley', 'lead', 900);
+        if (l > most) { lx *= most / l; ly *= most / l; }
+        const s = { x: Position.x[a.target] + lx + dcos(t) * r, y: Position.y[a.target] + ly + dsin(t) * r, at: a.now + CLINKER_WARN, group };
+        (a.live.due ??= []).push(s);
+        const c = a.at(group);
+        if (c) a.host.launchFx?.(a.num, c.x, c.y);
+        ringWarn(a, 'impact', R, CLINKER_WARN, s);
       }
-      for (const s of a.live.due ?? []) {
-        const lob = s.at - CLINKER_WARN;
-        // (Lobbed only from a chimney still on: rule 6)
-        if (a.now === lob && a.has(s.group)) { const c = a.at(s.group); if (c) a.host.launchFx?.(a.num, c.x, c.y); ringWarn(a, 'impact', R, CLINKER_WARN, s); }
-        if (a.now === s.at && a.has(s.group)) strikeAt(a, s.x, s.y, R, num(a, 'volley', 'damage', 60) * a.live.dmg, 'eruption');
-      }
+      for (const s of a.live.due ?? []) if (a.now === s.at && a.has(s.group)) strikeAt(a, s.x, s.y, R, num(a, 'volley', 'damage', 60) * a.live.dmg, 'eruption');
     },
   },
 
   helios_drone: {
-    pick: (a) => (due(a, 'torch') && a.has('torch') && a.d < a.live.stats.reach ? { move: 0, arg: 0 } : null),
+    // (it welds only what comes within its torch's reach: it never closes in to do it)
+    pick: (a) => (due(a, 'torch') && a.has('torch') && a.d < num(a, 'torch', 'reach', 230) + 140 ? { move: 0, arg: 0 } : null),
     step(a, _m, k) {
       const tip = a.at('torch');
       if (!tip || k < 10 || k >= TORCH_TICKS) return;
       const R = num(a, 'torch', 'reach', 230), aim = datan2(Position.y[a.target] - tip.y, Position.x[a.target] - tip.x);
-      if (dhypot(Position.x[a.target] - tip.x, Position.y[a.target] - tip.y) > R + 120) return;
+      // (lit only near enough, and pointed at what it welds: not burning sideways as it comes round)
+      if (dhypot(Position.x[a.target] - tip.x, Position.y[a.target] - tip.y) > R + 120 || offBy(nose(a), aim) > TORCH_ON) return;
       if (k % 15 === 10) beamFx(a, 'weld', tip, aim, R, 10, 15);
       burnLine(a, tip.x, tip.y, aim, R, 14, num(a, 'torch', 'damage', 0.25) * a.live.dmg);
+    },
+    always(a) {
+      // Sparks plinked from its torch, from off at its range: only with its nose on you (never as it comes round)
+      const tip = a.at('torch');
+      if (tip && offBy(nose(a), datan2(Position.y[a.target] - tip.y, Position.x[a.target] - tip.x)) < TORCH_ON) gun(a, 'torch', [0], 54);
     },
   },
 
@@ -191,9 +234,10 @@ export const MOVES: Record<string, DesignMoves> = {
     step(a, _m, k) {
       const gunAt = a.at('gun');
       if (!gunAt) return;
-      // On the flank: its line drawn at where you are (never ahead), then a short burst raked down it
+      // On the flank: its line drawn at where you'll be when its rivets get there if you hold your course, then a short
+      // burst raked down it (drawn where you were, flying on took you off it)
       if (k === DART_IN) {
-        a.live.aim = datan2(Position.y[a.target] - gunAt.y, Position.x[a.target] - gunAt.x);
+        a.live.aim = lineAt(a, gunAt.x, gunAt.y, DART_WARN + DART_FIRE / 2, DART_RIVET_SPEED);
         lineWarn(a, 'rivet', gunAt.x, gunAt.y, a.live.aim, num(a, 'dart', 'length', 1800), 40, DART_WARN);
       }
       const f = k - DART_IN - DART_WARN;
@@ -209,6 +253,9 @@ export const MOVES: Record<string, DesignMoves> = {
     },
   },
 };
+
+/** The Scrap Darter's rivets' speed (tuning.json weapons rivet) */
+const DART_RIVET_SPEED = 34;
 
 /** A gun firing a fan of its kind (the Rime Bell's splinters) */
 function gunFrom(a: Act, group: string, fan: number[]): void {

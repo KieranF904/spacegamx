@@ -134,8 +134,8 @@ export function design(id, card) {
       d.part(`${name}_r`, fn, opts.matR ?? material, mirror(polygon), { ...opts, group: gr, mount: m, detail: opts.detail?.map(mirrorDetail) });
       return d;
     },
-    /** Write the files; `damaged`: the groups shot off in the damaged still */
-    write({ damaged = [], paint = '#34363c', scale = 1 } = {}) {
+    /** Write the files; `damaged`: the groups shot off in the damaged still; `drive`: its engines' output (Blueprint drive, 0.1-1: a slow design) */
+    write({ damaged = [], paint = '#34363c', scale = 1, drive } = {}) {
       mkdirSync(OUT, { recursive: true });
       // (painted detail toned to the game's palette: its plates, trim, rings and cables a quarter of the way to their
       // own grey, so a brass strip reads as worn metal beside the grid ships, not a flat saturated fill; lights keep theirs)
@@ -170,7 +170,7 @@ export function design(id, card) {
         const numbered = ordered.map((q, k) => { const { _group, ...rest } = q; return { ...rest, uid: k, group: order.indexOf(_group) }; });
         mkdirSync(join(GAME, 'bespoke'), { recursive: true });
         writeFileSync(join(GAME, 'bespoke', `${id}.json`), JSON.stringify({ _comment: `${card.name}'s own hull (docs/enemies/custom-roster.md). Written by scripts/bespoke/enemies/${id}.mjs: edit that, not this.`, pieces }, null, 1) + '\n');
-        writeFileSync(join(GAME, 'blueprints', 'enemy', `${id}.json`), JSON.stringify({ name: card.name, catalogVersion: 1, paint, rigid: true, parts: numbered }, null, 1) + '\n');
+        writeFileSync(join(GAME, 'blueprints', 'enemy', `${id}.json`), JSON.stringify({ name: card.name, catalogVersion: 1, paint, rigid: true, parts: numbered, ...(drive !== undefined ? { drive } : {}) }, null, 1) + '\n');
       }
       writeFileSync(join(OUT, `${id}.pieces.json`), JSON.stringify({ _comment: `DESIGN ONLY, not loaded by the game: ${card.name} (docs/enemies/custom-roster.md). Written by scripts/bespoke/enemies/${id}.mjs.`, pieces }, null, 1) + '\n');
       writeFileSync(join(OUT, `${id}.json`), JSON.stringify(bp(card.name, ordered), null, 1) + '\n');

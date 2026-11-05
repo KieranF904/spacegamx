@@ -95,4 +95,5 @@ d.part('drive', 'thruster', STEEL, [[-0.42, 2.4], [0.42, 2.4], [0.5, 3.25], [-0.
   detail: [ring([0, 2.7], 0.36, 0.05, BRASS2, 12), bell([0, 3.25], [0, 1], 0.6, 0.42)],
 });
 
-d.write({ damaged: ['torch', 'panel_r'], paint: '#c9ccd2', scale: 0.62 });
+// (drive: about half a starter's cruise and acceleration, as a starter's first kill should be: docs/enemies/custom-roster.md)
+d.write({ damaged: ['torch', 'panel_r'], paint: '#c9ccd2', scale: 0.62, drive: 0.4 });

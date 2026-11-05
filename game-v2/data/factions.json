@@ -537,7 +537,7 @@
       "description": "Maintenance drones strayed from the Helios Directorate's Array: slow, half-blind, and armed with welding torches. They keep a schedule nobody at the Array wrote. Harmless unless you start it, and not much even then.",
       "behaviour": {
         "aggro": 900,
-        "range": 420,
+        "range": 900,
         "flee": 0,
         "leash": 4000,
         "accuracy": 0.35,
@@ -915,13 +915,14 @@
         },
         {
           "id": "sol_dock_helios_east",
-          "packs": 2,
+          "packs": 3,
           "respawnSeconds": 40,
           "roam": 3000,
           "groups": [
             {
               "faction": "helios",
               "ships": [
+                "helios_drone",
                 "helios_drone",
                 "helios_drone",
                 "helios_drone"
@@ -932,6 +933,7 @@
             {
               "faction": "helios",
               "ships": [
+                "helios_drone",
                 "helios_drone",
                 "helios_drone"
               ],
@@ -942,13 +944,14 @@
         },
         {
           "id": "sol_dock_helios_west",
-          "packs": 2,
+          "packs": 3,
           "respawnSeconds": 40,
           "roam": 3000,
           "groups": [
             {
               "faction": "helios",
               "ships": [
+                "helios_drone",
                 "helios_drone",
                 "helios_drone",
                 "helios_drone"
@@ -959,6 +962,7 @@
             {
               "faction": "helios",
               "ships": [
+                "helios_drone",
                 "helios_drone",
                 "helios_drone"
               ],
@@ -969,13 +973,14 @@
         },
         {
           "id": "sol_dock_helios_survey",
-          "packs": 1,
+          "packs": 2,
           "respawnSeconds": 40,
           "roam": 3000,
           "groups": [
             {
               "faction": "helios",
               "ships": [
+                "helios_drone",
                 "helios_drone",
                 "helios_drone",
                 "helios_drone"
@@ -986,6 +991,7 @@
             {
               "faction": "helios",
               "ships": [
+                "helios_drone",
                 "helios_drone",
                 "helios_drone"
               ],
@@ -2636,7 +2642,7 @@
       "scrap_darter": {"range": 700, "reach": 1500, "firepower": 110, "hp": {"core": 200, "gun": 60, "fin_l": 50, "fin_r": 50, "pod": 70, "drive": 50}, "moves": {"dart": {"every": 240, "length": 1800, "damage": 0.8}}, "pod": {"radius": 260, "damage": 70}},
       "slag_ray": {"range": 800, "reach": 1400, "firepower": 220, "hp": {"core": 1100, "horns": 300, "tail": 260, "wing_l": 380, "wing_r": 380}, "moves": {"pass": {"every": 220, "cone": 30, "damage": 0.9, "wake": 20, "pool": 140, "poolTicks": 150, "burn": 3}}},
       "clinker": {"range": 1500, "reach": 2200, "firepower": 260, "hp": {"core": 900, "chimney_l": 300, "chimney_r": 300, "plate_front": 700, "plate_right": 700, "plate_back": 700, "plate_left": 700}, "moves": {"volley": {"every": 230, "radius": 170, "damage": 60, "spread": 220}}},
-      "helios_drone": {"range": 300, "reach": 420, "firepower": 8, "hp": {"core": 80, "torch": 30, "eye": 20, "panel_l": 20, "panel_r": 20, "drive": 15}, "moves": {"torch": {"every": 150, "reach": 230, "damage": 0.25}}}
+      "helios_drone": {"range": 900, "reach": 1300, "firepower": 8, "hp": {"core": 40, "torch": 20, "eye": 12, "panel_l": 12, "panel_r": 12, "drive": 10}, "moves": {"torch": {"every": 150, "reach": 230, "damage": 0.25}}, "guns": {"torch": {"kind": "autocannon", "every": 50, "damage": 0.3, "reach": 1300}}}
     }
   },
   "rules": {

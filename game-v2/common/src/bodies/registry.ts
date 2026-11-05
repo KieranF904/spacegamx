@@ -30,8 +30,8 @@ export interface BodyKind {
   pilot?: boolean;
   /** Ships its body reads besides its own (a client must hold every one to run it) */
   reads(id: number, s: BodyState): number[];
-  /** Tick t's controls and push (null: it can't be flown now); `prevQ` the aim it flew with the tick before */
-  step(id: number, s: BodyState, me: BodyPose, read: BodyReads, t: number, prevQ: number): BodyOut | null;
+  /** Tick t's controls and push (null: it can't be flown now); `prevQ` the aim and `prevBits` the controls it flew with the tick before */
+  step(id: number, s: BodyState, me: BodyPose, read: BodyReads, t: number, prevQ: number, prevBits: number): BodyOut | null;
 }
 
 /** The Scrap Mother's flight: her hoard holds off, her mill closes in, her seed is quick; held to the middle of her Heart (brains/scrapMother.ts) */
@@ -57,14 +57,14 @@ function staged(brain: string, flight: StagedFlightTables): BodyKind {
 const AI_PILOT: BodyKind = {
   brain: 'ai', toldHits: false, pilot: true,
   reads: aiReads,
-  step: (id, s, me, read, t, prevQ) => {
+  step: (id, s, me, read, t, prevQ, prevBits) => {
     const reads = aiReads(id, s);
     let tg = null;
     if (s.target >= 0 && reads.length) { tg = read.now(s.target); if (!tg) return null; }
     const pack = orderPack(id, s.want);
     const c = pack ? packCentroid(pack, read.before) : null;
     if (pack && !c) return null;
-    const out = aiPilot(s, me, tg, c, t, id, prevQ);
+    const out = aiPilot(s, me, tg, c, t, id, prevQ, prevBits);
     // (EMP'd or slowed: its drive crippled as the server's ship's is, STATUS)
     out.bits |= bodyStatusBits(s, t);
     return out;

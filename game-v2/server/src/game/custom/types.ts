@@ -65,6 +65,8 @@ export interface CustomLive {
   due?: { x: number; y: number; at: number; group: string }[];
   /** A line drawn to rake (the Scrap Darter's burst) */
   aim?: number;
+  /** No ember cone before this tick (the Slag Ray's, spat only with its nose on you) */
+  coneAt?: number;
 }
 
 /** What a design's moves see this tick */
@@ -83,6 +85,11 @@ export interface Act {
   /** Where a piece is in the world (its mount, else its middle) and the way its mount points (null: it's gone, unless `evenGone`) */
   at(group: string, evenGone?: boolean): { x: number; y: number; dir: number } | null;
   rng(): number;
+  /**
+   * Where its target will be in `ticks` if it keeps on as it's going: its speed, and its turn as its heading changed
+   * over the last few ticks (a pilot circling you is led round the circle, not off along a tangent)
+   */
+  ahead(ticks: number): { x: number; y: number };
 }
 
 export interface DesignMoves {

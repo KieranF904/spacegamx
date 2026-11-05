@@ -12,16 +12,21 @@
  * Grades scale its hp and damage (custom.grades), not its materials: its look is its design's at every grade.
  */
 import {
-  AI_ORDER, InSystem, Position, Rotation, customIndex, customOrder, customGroups, groupsGone, localToWorldDir, mulberry32, shipPointToWorld, datan2, dhypot,
+  AI_ORDER, InSystem, Position, Rotation, Velocity, customIndex, customOrder, customGroups, groupsGone, localToWorldDir, mulberry32, shipPointToWorld, datan2, dcos, dhypot, dsin,
   CUSTOM_DESIGNS, type ShipState, type WantRec,
 } from '@space-game/common';
 import { MOVES } from './moves.js';
 import type { Act, CustomHost, CustomLive, CustomStats, CustomTable } from './types.js';
 
+/** Ticks of a target's velocity kept, to see how it's turning; the most it's taken to turn a tick (radians) */
+const TRAIL = 10, TURN_MAX = 0.05;
+
 export class CustomEnemies {
   /** Moves started, by design and move ("censer.lance"), and pieces lost */
   readonly stats = { moves: {} as Record<string, number>, lost: 0 };
   private readonly live = new Map<number, CustomLive>();
+  /** Each target's velocity over its last TRAIL ticks (newest last), and the tick it was last noted */
+  private readonly trail = new Map<number, { at: number; v: number[] }>();
   private readonly rng = mulberry32(0xc0ffee);
 
   constructor(private readonly host: CustomHost, private readonly table: CustomTable | undefined) {}
@@ -90,12 +95,40 @@ export class CustomEnemies {
     const a = this.act(eid, ship, L, target, now), moves = MOVES[L.design];
     if (gone !== L.gone) { const newly = gone & ~L.gone; L.gone = gone; if (newly) { this.stats.lost++; moves?.lost?.(a, newly); } }
     if (!fighting || target < 0) return;
+    this.note(target, now);
     const spec = CUSTOM_DESIGNS[L.index];
     if (L.move) {
       const k = now - L.move.start;
       if (k >= 0 && k < (spec.moves[L.move.move]?.ticks ?? 0)) moves?.step?.(a, L.move, k);
     }
     moves?.always?.(a);
+  }
+
+  /** A target's velocity this tick, once a tick however many fight it (its trail: `ahead`) */
+  private note(target: number, now: number): void {
+    let tr = this.trail.get(target);
+    if (tr?.at === now) return;
+    if (!tr || now - tr.at > 1) this.trail.set(target, (tr = { at: now, v: [] }));
+    tr.at = now;
+    tr.v.push(Velocity.x[target], Velocity.y[target]);
+    if (tr.v.length > TRAIL * 2) tr.v.splice(0, 2);
+    // (now and then, the trails of targets no longer fought)
+    if (now % 600 === 0) for (const [id, t] of this.trail) if (now - t.at > 60) this.trail.delete(id);
+  }
+
+  /** Where a target will be `ticks` on: its speed held, its heading turning as it turned over its trail (at most TURN_MAX a tick) */
+  private ahead(target: number, ticks: number): { x: number; y: number } {
+    let x = Position.x[target], y = Position.y[target];
+    const vx = Velocity.x[target], vy = Velocity.y[target], s = dhypot(vx, vy), tr = this.trail.get(target)?.v;
+    let w = 0;
+    if (tr && tr.length >= 4 && s > 2) {
+      const n = tr.length / 2 - 1, ox = tr[0], oy = tr[1];
+      if (dhypot(ox, oy) > 2) w = Math.max(-TURN_MAX, Math.min(TURN_MAX, datan2(ox * vy - oy * vx, ox * vx + oy * vy) / n));
+    }
+    if (!w) return { x: x + vx * ticks, y: y + vy * ticks };
+    let a = datan2(vy, vx);
+    for (let k = 0; k < ticks; k++) { a += w; x += dcos(a) * s; y += dsin(a) * s; }
+    return { x, y };
   }
 
   private scale(what: 'hp' | 'damage', grade: number): number {
@@ -118,6 +151,7 @@ export class CustomEnemies {
         return groupAt(host, eid, ship, groups.indexOf(g));
       },
       rng: () => rng(),
+      ahead: (ticks) => (target >= 0 ? this.ahead(target, Math.max(0, Math.round(ticks))) : { x: 0, y: 0 }),
     };
   }
 }
