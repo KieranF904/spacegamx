@@ -91,6 +91,8 @@ describe('energy: migration', () => {
     const rows: string[] = [];
     for (const f of LIBRARY) {
       const b = design(f);
+      // (Ports designs, the dev player remakes among them, have no pool or banks)
+      if (b.power === 'ports') continue;
       const log = fight(b);
       const d = createShipState(catalog, tuning, 1, b, 0).derived;
       const L = d.power!;
