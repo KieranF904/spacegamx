@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const chrome = process.argv[2] || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const PORT = 5611, DBG = 9333;
-const modes = (process.argv[3] || 'pixi-webgl,pixi-webgpu,direct').split(',');
+const modes = (process.argv[3] || 'pixi-webgl,pixi-webgpu,direct,pixi-graphics').split(',');
 const types = { '.html': 'text/html', '.js': 'text/javascript' };
 const srv = http.createServer((req, res) => {
   const f = path.join(dir, req.url.split('?')[0] === '/' ? 'index.html' : req.url.split('?')[0]);

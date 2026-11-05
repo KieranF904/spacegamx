@@ -10,9 +10,9 @@ select,input,button{background:#123;color:#cde;border:1px solid #456;font:inheri
 </style></head><body>
 <div id="bar">
  <label>mode <select id="mode">
-  <option value="pixi-webgl">Pixi WebGL (as game: Graphics bullets, Container hulls)</option>
-  <option value="pixi-webgpu">Pixi WebGPU preference</option>
-  <option value="direct">Direct WebGL2 instanced</option></select></label>
+  <option value="pixi-webgl">(a) Pixi WebGL as the game: ParticleContainers + chunked hull mesh</option><option value="pixi-graphics">(old) Pixi per-object Graphics/Container</option>
+  <option value="pixi-webgpu">(b) Pixi WebGPU preference (same pools, default shader)</option>
+  <option value="direct">(c) Direct WebGL2 instanced</option></select></label>
  <label>particles <input id="p" type="number" value="10000" step="1000" style="width:70px"></label>
  <label>bullets <input id="b" type="number" value="1000" step="100" style="width:60px"></label>
  <label>hulls <input id="k" type="number" value="100" step="10" style="width:50px"></label>

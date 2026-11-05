@@ -1,5 +1,5 @@
 // Standalone renderer comparison. Same CPU sim in every mode; only submission differs.
-// URL: ?mode=pixi-webgl|pixi-webgpu|direct&p=10000&b=1000&k=100&auto=1
+// URL: ?mode=pixi-webgl|pixi-webgpu|pixi-graphics|direct&p=10000&b=1000&k=100&auto=1
 const W = 1280, H = 720;
 const q = new URLSearchParams(location.search);
 const $ = id => document.getElementById(id);
@@ -86,6 +86,76 @@ async function makePixi(mode, s) {
   };
 }
 
+// Mirrors the game's pattern (rendering/particlePool.ts, spritePool.ts, lighting/ShipBatch.ts):
+//  - effects and bullets: one ParticleContainer each, Particle objects reused (begin/take/end), all properties dynamic,
+//    one draw for the lot. (The game's pool swaps in a shader that picks one of 4 textures per particle; this uses Pixi's
+//    default particle shader with one texture: same per-particle CPU, slightly cheaper fragment work.)
+//  - hulls: chunks of 32 ships sharing one merged mesh, placed in the vertex shader from a uniform array (uXform),
+//    as ShipBatch does (no lighting/damage here, so the hull shader is simpler than the game's).
+// The WebGPU variant can only use Pixi's built-in particle shader and a built-in Mesh path for hulls: the game's
+// custom shaders are GLSL (GlProgram) and would have to be rewritten in WGSL to run there.
+const PER_CHUNK = 32;
+async function makePixiGame(mode, s) {
+  const gpu = mode === 'pixi-webgpu';
+  const app = new PIXI.Application();
+  await app.init({ width: W, height: H, backgroundColor: 0x000011, antialias: true, preference: gpu ? 'webgpu' : 'webgl', resolution: 1 });
+  $('stage').replaceChildren(app.canvas);
+  const c = document.createElement('canvas'); c.width = c.height = 32; const x = c.getContext('2d');
+  const g = x.createRadialGradient(16, 16, 0, 16, 16, 16); g.addColorStop(0, '#fff'); g.addColorStop(1, '#fff0'); x.fillStyle = g; x.fillRect(0, 0, 32, 32);
+  const tex = PIXI.Texture.from(c);
+  const dyn = { vertex: true, position: true, rotation: true, uvs: true, color: true };
+  const mkPC = () => { const pc = new PIXI.ParticleContainer({ texture: tex, dynamicProperties: dyn }); pc.blendMode = 'add'; return pc; };
+  const pcP = mkPC(), pcB = mkPC();
+  const rgb = c => ((c & 0xff) << 16) + (c & 0xff00) + ((c >> 16) & 0xff);
+  const mk = (pc, n) => { for (let i = 0; i < n; i++) { const p = new PIXI.Particle(tex); p.anchorX = p.anchorY = 0.5; pc.particleChildren.push(p); } };
+  mk(pcP, s.P); mk(pcB, s.B);
+  const hullLayer = new PIXI.Container();
+  app.stage.addChild(hullLayer, pcB, pcP);
+  const chunks = [];
+  if (!gpu) {
+    const vertex = `in vec2 aPos; in float aSlot; in vec3 aCol; uniform mat3 uProjectionMatrix; uniform mat3 uWorldTransformMatrix; uniform vec4 uXform[${PER_CHUNK}];
+      out vec3 vCol; void main(){ vec4 t=uXform[int(aSlot)]; vec2 w=vec2(aPos.x*t.z-aPos.y*t.w, aPos.x*t.w+aPos.y*t.z)+t.xy;
+      gl_Position=vec4((uProjectionMatrix*uWorldTransformMatrix*vec3(w,1.)).xy,0.,1.); vCol=aCol; }`;
+    const fragment = `in vec3 vCol; out vec4 o; void main(){ o=vec4(vCol,1.); }`;
+    const prog = PIXI.GlProgram.from({ vertex, fragment, name: 'bench-hull' });
+    for (let c0 = 0; c0 < s.K; c0 += PER_CHUNK) {
+      const n = Math.min(PER_CHUNK, s.K - c0), pos = [], slot = [], col = [], idx = [];
+      for (let i = 0; i < n; i++) for (const [ox, oy, w, h, cl] of HULL) {
+        const b = pos.length / 2;
+        for (const [qx, qy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { pos.push(ox + qx * w / 2, oy + qy * h / 2); slot.push(i); col.push((cl >> 16 & 255) / 255, (cl >> 8 & 255) / 255, (cl & 255) / 255); }
+        idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
+      }
+      const geometry = new PIXI.Geometry({ attributes: { aPos: new Float32Array(pos), aSlot: new Float32Array(slot), aCol: new Float32Array(col) }, indexBuffer: new Uint32Array(idx) });
+      const xf = new Float32Array(PER_CHUNK * 4);
+      const ug = new PIXI.UniformGroup({ uXform: { value: xf, type: 'vec4<f32>', size: PER_CHUNK } });
+      const shader = new PIXI.Shader({ glProgram: prog, resources: { chunk: ug } });
+      const mesh = new PIXI.Mesh({ geometry, shader }); hullLayer.addChild(mesh);
+      chunks.push({ c0, n, xf, ug });
+    }
+  } else { // fallback hull path under WebGPU: Container of Graphics parts (needs no custom shader)
+    for (let i = 0; i < s.K; i++) {
+      const ct = new PIXI.Container();
+      for (const [ox, oy, w, h, cl] of HULL) { const gr = new PIXI.Graphics(); gr.roundRect(-w / 2, -h / 2, w, h, 3).fill({ color: cl }); gr.position.set(ox, oy); ct.addChild(gr); }
+      hullLayer.addChild(ct); chunks.push(ct);
+    }
+  }
+  return {
+    name: app.renderer.name || mode,
+    update() {
+      const P = pcP.particleChildren, B = pcB.particleChildren;
+      for (let i = 0; i < s.P; i++) { const p = P[i]; p.x = s.px[i]; p.y = s.py[i]; p.scaleX = p.scaleY = .5; p.color = rgb(s.pc[i]) + ((s.pl[i] * 255 | 0) << 24); }
+      for (let i = 0; i < s.B; i++) { const p = B[i]; p.x = s.bx[i]; p.y = s.by[i]; p.rotation = Math.atan2(s.bvy[i], s.bvx[i]); p.scaleX = 1.5; p.scaleY = .25; p.color = rgb(s.bc[i]) + (255 << 24); }
+      pcP.update(); pcB.update();
+      if (!gpu) for (const ch of chunks) {
+        for (let i = 0; i < ch.n; i++) { const k = ch.c0 + i; ch.xf[i * 4] = s.kx[k]; ch.xf[i * 4 + 1] = s.ky[k]; ch.xf[i * 4 + 2] = Math.cos(s.ka[k]); ch.xf[i * 4 + 3] = Math.sin(s.ka[k]); }
+        ch.ug.update();
+      } else chunks.forEach((ct, k) => { ct.x = s.kx[k]; ct.y = s.ky[k]; ct.rotation = s.ka[k]; });
+    },
+    render() { app.renderer.render(app.stage); },
+    destroy() { app.destroy(true, { children: true, texture: true }); },
+  };
+}
+
 function makeDirect(s) {
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H; $('stage').replaceChildren(cv);
   const gl = cv.getContext('webgl2', { antialias: true, alpha: false });
@@ -143,7 +213,7 @@ async function start() {
   cancelAnimationFrame(raf); cur?.be.destroy(); cur = null;
   const mode = $('mode').value, P = +$('p').value, B = +$('b').value, K = +$('k').value;
   const s = makeSim(P, B, K);
-  const be = mode === 'direct' ? makeDirect(s) : await makePixi(mode, s);
+  const be = mode === 'direct' ? makeDirect(s) : mode === 'pixi-graphics' ? await makePixi('pixi-webgl', s) : await makePixiGame(mode, s);
   cur = { be, s, mode, P, B, K };
   let last = performance.now(), acc = { n: 0, dt: 0, cpu: 0, dr: 0 }, lastShow = last;
   const loop = (t) => {

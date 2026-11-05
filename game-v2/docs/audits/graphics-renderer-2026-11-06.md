@@ -2,66 +2,66 @@
 
 Question: is it worth moving off Pixi's current renderer to WebGPU, or to direct GPU code (custom WebGL2/WebGPU) for particles, bullets and ship hulls?
 
-Short answer: not worth switching Pixi to WebGPU. Worth a staged hybrid: keep Pixi for the scene, UI and one-off effects, and move the high-count layers (particles, then bullets, then hull parts) to one instanced draw each.
+Short answer: no to both, for now. The game already does most of what a direct-GPU rewrite would do (pooled particle containers, chunked hull meshes placed in the shader). A direct instanced path is still 2.5 to 4x less CPU in the bench, but the saving is a fraction of a millisecond at the object counts the game actually draws. Profile the real game before spending any effort here.
 
-## Current state
+(An earlier version of this audit was written against an old base commit and compared against per-object Graphics. That comparison is kept below as "old pattern", but it is not what the game does.)
 
-Note: this audit was done in an agent worktree whose `client/src` is older than the `refactor/split` head. I did not find `ParticlePool` or `DamageFx` there, so the notes on those two come from the task brief, not from code I read. Re-check them before acting.
+## Current state (refactor/split head)
 
-- Pixi `^8.0.0` (installed 8.16.0). `Application.init` in `client/src/Game.ts` (line ~176) sets only size, `antialias: true`, `resolution: devicePixelRatio`, `autoDensity`. No `preference`, so Pixi 8 picks WebGL. WebGPU is never used today.
-- Ships, projectiles, asteroids, stations: `Renderer.ts` (3127 lines) builds a `Container` per entity with `Graphics` children. Projectiles get one pooled `Graphics` each (`GraphicsPool`, `createProjectileGraphics`). Trails and glows are more Graphics, plus separate Sun/Corona/Nebula/Starfield/Glow renderers (shaders).
-- `ParticleSystem.ts` (in this tree) is a CPU pool (max 2000) drawn with Canvas2D (`ctx.arc`, `globalCompositeOperation = 'lighter'`), not Pixi. Per-particle `save/translate/rotate/fill`.
-- Known issues from the brief: ParticlePool hit the "more than 4 textures" limit once; shield bubbles got their own pool. Both are symptoms of the same thing: Pixi's batcher breaks on texture or blend changes, and per-object state is expensive.
+- Pixi 8.16.0. `Game.ts` `init()`: `new Application().init({... antialias: PROFILES[tier].msaa, resolution: renderResolution(), autoDensity, eventFeatures off})`. No `preference`, so Pixi picks WebGL. MSAA comes from the quality profile.
+- Effects and tracers: `rendering/particlePool.ts`. One `ParticleContainer` per pool (`isRenderGroup`), `Particle` objects reused (`begin/take/end`, spares kept up to 4096), all properties dynamic, one draw for the whole pool. Because Pixi particles share one texture, it swaps in its own GLSL shader that picks one of up to 4 textures per particle (index carried in the u coordinate). The "more than 4 textures" error is that limit. A second shader draws rings and discs per pixel. `spritePool.ts` is the older sprite version with trimming. Shield bubbles got their own pool for the same texture-count reason. `weapons/WeaponFx.ts`, `fxTextures.ts`, `ships/DamageFx.ts` and the thruster/beam effects feed these pools. `rendering/gfx.ts` (`clearIfDrawn`) avoids rebuilding empty Graphics.
+- Ship hulls: `rendering/lighting/ShipBatch.ts`. Up to 32 hulls (`PER_CHUNK`) share one merged mesh and one draw; each hull is placed by the vertex shader from a `uXform` uniform array, lit per vertex, damage in a small per-chunk texture. Nearby ships share a chunk, off-screen chunks are skipped, far chunks use a simplified hull, geometry rebuilds are rate-limited. Asteroids use the same scheme (`AsteroidBatch`). Hulls are built in a worker.
+- Bloom: `rendering/Bloom.ts`. The glow layers are replayed into a quarter-size render texture, blurred there, and added over the scene. About one sixteenth of the pixels, so cheap.
+- All of the above uses custom GLSL `GlProgram`s (`particlePool`, `ShipBatch`, `litShader`, sun/corona/nebula/starfield, bloom blur). Nothing here is WebGPU-ready without a WGSL port of each.
 
 ## Measurements
 
-Demo: `prototypes/gfx-bench/` (see below). Same CPU simulation in every mode, so only submission differs. Scene per tier: P additive soft particles (Sprites), B bullets (one `Graphics` each, as the game does), K hulls (a `Container` of 4 `Graphics` parts each). 1280x720, 120 frames after 40 warm-up, vsync and frame cap disabled.
+Demo: `prototypes/gfx-bench/`. Same CPU simulation in every mode, so only submission differs. Scene: P additive soft particles, B bullets, K hulls of 4 parts. 1280x720, 120 frames after 40 warm-up, vsync and frame cap off, headless Chrome 156 on Windows 11 with an NVIDIA Blackwell GPU. Other agents were using the machine, so read the ratios within the run, not the absolute numbers. The GPU runs async and the cap is off, so these are essentially CPU costs; GPU fill cost is not captured (and bloom, lighting and MSAA are not in the demo).
 
-Environment: headless Chrome 156 on Windows 11, NVIDIA Blackwell GPU, WebGPU available. Other agents were using the machine, so treat absolute numbers as indicative; the ratios within one run are what matter. "JS cpu ms" is the time to simulate, update scene objects and submit the frame. Because the GPU runs async and the frame cap is off, frame ms is essentially CPU-bound here: it does not capture GPU fill cost.
+Modes:
+- (a) Pixi WebGL as the game does it: two `ParticleContainer`s (particles, bullets) with reused `Particle`s, hulls as 32-per-chunk merged meshes placed by a `uXform` uniform array. Simplification: Pixi's default particle shader with one texture, not the game's 4-texture shader (same per-particle CPU work).
+- (b) Pixi WebGPU preference: same particle containers. The game's custom GLSL can't run on WebGPU, so hulls fall back to a Container of Graphics parts (slower than (a)'s hulls; an unfair comparison on the hull part only, which is the point: it shows the porting cost).
+- (c) Direct WebGL2: one instanced draw each for particles, bullets and hull parts (hull parts = K x 4 instances).
+- old pattern: per-object Graphics for bullets and Container-of-Graphics hulls, plain Sprites for particles.
 
-| P / B / K | Pixi WebGL ms (cpu) | Pixi WebGPU ms (cpu) | Direct WebGL2 ms (cpu) |
-|---|---|---|---|
-| 1k / 200 / 30 | 0.30 (0.17) | 1.39* (0.26) | 0.24 (0.07) |
-| 10k / 1k / 100 | 1.37 (1.23) | 1.56 (1.40) | 0.26 (0.14) |
-| 50k / 5k / 300 | 7.97 (7.67) | 7.90 (7.57) | 0.60 (0.54) |
-| 100k / 10k / 300 | 27.8 (26.9), p95 47 | 16.4 (15.8), p95 18 | 1.14 (1.07) |
+CPU ms per frame (frame ms in brackets; p95 not shown):
 
-*first-tier WebGPU includes warm-up; p95 was 0.8.
+| P / B / K | (a) Pixi WebGL, game pattern | (b) Pixi WebGPU | (c) Direct WebGL2 | old pattern |
+|---|---|---|---|---|
+| 1k / 200 / 30 | 0.10 (0.31) | 0.16 (0.91) | 0.04 (0.24) | 0.20 (0.35) |
+| 10k / 1k / 100 | 0.35 (0.73) | 0.71 (1.40) | 0.13 (0.31) | 1.23 (1.40) |
+| 50k / 5k / 300 | 1.56 (2.77) | 8.22 (9.62) | 0.50 (0.68) | 7.67 (7.99) |
+| 100k / 10k / 300 | 4.28 (6.54) | 13.7 (17.9), p95 37.6 | 0.96 (1.13) | 26.8 (27.7), p95 47.5 |
 
-Draw calls reported: Pixi 2 (both backends), direct 3. Pixi 8 batches Graphics and same-blend Sprites into very few draws, so draw call count is not the bottleneck. The cost is the per-object CPU work: scene-graph transforms, `Graphics` geometry, vertex batching. WebGL vs WebGPU in Pixi is the same within noise up to 50k objects (identical CPU path); WebGPU only pulled ahead at the extreme tier (100k particles, 10k bullets), and that tier is far beyond the game's intended scale.
+Draw calls: (a) 3 to 12 (chunks of 32 hulls, 2 particle layers), (b) 3, (c) 3, old pattern 2 (Pixi batches Graphics well; draw count was never the cost).
 
-Direct instanced WebGL2 is 5 to 14x less CPU at 10k to 50k particles and about 24x at 100k, with the particle/bullet/hull data written as a flat typed array and uploaded with one `bufferSubData` per layer.
-
-Caveats: the demo hull and bullet looks are simple shapes, not the game's art, so the direct path ignores shaders, glows and trail geometry the real game has. Real hulls with many parts, gradients or per-hull shader effects will cost more in both paths.
+Reading it:
+- The game's pattern is already 3 to 6x cheaper than the old per-object pattern at 10k to 100k objects.
+- Direct instanced is a further 2.7x (10k), 3.1x (50k), 4.5x (100k) cheaper than (a) in CPU. In absolute terms: 0.2 ms saved at 10k particles, about 1 ms at 50k, 3.3 ms at 100k.
+- The game's pool spare cap is 4096 and a busy scene is hundreds to low thousands of particles. At that scale the saving from going direct is well under 0.1 ms per frame. It does not pay today.
+- Pixi WebGPU is slower than WebGL in the same scene here (mostly the hull fallback, but particle-only parts also trail at 50k), and needs every custom shader ported. No case for it.
 
 ## Options
 
-1. Stay on Pixi WebGL. Zero risk. Fine up to the several-thousand-object range (1.2 ms CPU at 10k/1k/100). The game's current ParticleSystem cap is 2000, so it is nowhere near the wall today; the limit is design (more particles/bullets in boss fights), not capacity.
-2. Pixi with `preference: 'webgpu'`. One line of config, but the measurements show no gain below ~50k objects, and some risk: WebGPU still has uneven support, custom filters/shaders written in GLSL need WGSL (or Pixi falls back), and the existing Sun/Corona/Nebula shader renderers would need checking. Not recommended as a goal; revisit when Pixi's WebGPU path matures or you need compute.
-3. Hybrid direct-GPU layers (recommended direction). Render particles, then bullets (and optionally hull parts) to their own WebGL2 canvas or a Pixi custom render pass using instanced quads: one draw call per layer, one buffer upload per frame. Pixi keeps everything else.
-   - Particles: lowest risk, biggest win. Replaces the Canvas2D path and any Pixi particle sprites. Simple additive soft sprite shader. Effort: about 2 to 3 days including camera transform, additive blending and a texture atlas for shapes.
-   - Bullets: moderate. Needs trail and glow handled as instanced quads or a trail ribbon shader; per-weapon looks via atlas or a small shape id in the instance data. About 3 to 5 days.
-   - Hulls: highest effort. Composite parts per hull, damage states, tint, shields, and ship-editor parity. Only worth it if ship counts reach the hundreds. 1 to 2 weeks and a parity test plan.
-   - Risk: layering/z-order against Pixi content (the glow/sun renderers, UI), resize/DPR handling, and context loss. Mitigate by drawing the direct layers into the same canvas through a Pixi custom render pipe, or by stacking a second canvas where z-order allows (particles above ships, below UI is the usual case).
-4. Full custom WebGPU renderer. Not justified: large rewrite, no measured benefit over a WebGL2 instanced path for this workload.
+1. Stay on Pixi WebGL with the current pools and ShipBatch (recommended). Zero risk, and the measured headroom is large: (a) draws 10k particles + 1k bullets + 100 hulls in 0.35 ms CPU.
+2. Pixi WebGPU. One config line, but `particlePool`, `ShipBatch`, `litShader`, the sky shaders and Bloom are GLSL `GlProgram`s and would need WGSL ports and a visual parity pass. Measured: no benefit. Revisit only if Pixi's WebGPU path overtakes WebGL or compute is wanted.
+3. Direct instanced layers for particles/bullets (hulls already are chunked-instanced in effect). 2 to 5 days for particles with layering against the bloom pass, the lighting and UI, resize/DPR, and context loss to handle. Gain: roughly 0.1 to 3 ms CPU depending on scale. Only worth it if profiling the real game shows particles/bullets submission as a top cost at a target count well beyond today's, for example 20k+ simultaneous effect particles.
+4. Full custom WebGPU renderer: not justified.
 
-## WebGPU browser support (as of late 2026, from general knowledge, not tested here besides Chrome)
+## WebGPU browser support (general knowledge, only Chrome tested here)
 
-Chrome/Edge: shipped on desktop and recent Android. Safari: shipped in recent releases (macOS/iOS 26). Firefox: shipping on Windows, partial elsewhere. Linux and older GPUs/drivers are the weak spot, and blocklists can disable it. A WebGPU-only path would need a WebGL fallback anyway, so WebGL2 stays the baseline.
+Chrome/Edge: shipped on desktop and recent Android. Safari: shipped in recent releases. Firefox: shipping on Windows, partial elsewhere. Linux and older GPUs are the weak spot, and driver blocklists apply. A WebGL fallback would be needed anyway, so WebGL2 stays the baseline.
 
-## Recommendation and staged plan
+## Recommendation and plan
 
-Do not move the game to Pixi WebGPU. Go hybrid, staged, each stage behind a dev flag that defaults off (for example `?gfx=direct`):
-
-1. Stage 1 (about 2 to 3 days): direct-instanced particle layer replacing Canvas2D / Pixi particle sprites, flag off by default. Compare frame time against the demo at the game's real particle counts. Raise the 2000 cap only after this lands.
-2. Stage 2 (about 3 to 5 days): bullets and bullet trails as an instanced layer. Keep Pixi `Graphics` as the fallback when the flag is off.
-3. Stage 3 (decide after stage 2, only if ship count demands it): instanced hull parts.
-4. Meanwhile, cheap wins inside Pixi: avoid per-frame `Graphics.clear()`/redraw on entities, pool and reuse textures to stay inside batch texture limits, and use a texture atlas for effects to avoid the 4-texture batch break.
-5. Re-run the bench on a mid/low-end laptop GPU and on a real browser (not headless) before committing to stage 2, since this audit ran one fast GPU in headless mode and measured CPU cost only.
+1. Stay on Pixi WebGL. Do not enable WebGPU.
+2. Before any renderer work, profile the real game in a busy fight (browser performance trace) and see where frame time goes: scene-graph and Graphics rebuilds for non-pooled effects, lighting uniform uploads, MSAA/bloom fill, or server-driven entity work. The bench says particle/bullet submission is not where the CPU goes at today's counts.
+3. If a profile does show effects submission as the hot spot, the cheaper step is inside the current design: move more effects from Graphics/Sprites into `ParticlePool`, and keep pools below the 4-texture limit with an atlas.
+4. Only if counts need to grow by roughly 10x: build a direct instanced particle layer behind a dev flag that defaults off, and re-run this bench on a laptop-class GPU in a real browser first.
 
 ## The demo
 
-Folder `game-v2/prototypes/gfx-bench/`, plain HTML and JS, no build step. Pixi 8.16.0 is loaded from jsDelivr, so it needs internet.
+Folder `game-v2/prototypes/gfx-bench/`, plain HTML and JS, no build step. Pixi 8.16.0 loads from jsDelivr, so it needs internet.
 
-- Interactive: serve the folder (for example `npx http-server prototypes/gfx-bench -p 5611`, or `python -m http.server 5611`) and open `http://localhost:5611/`. Pick the mode, set particle/bullet/hull counts, watch fps, frame ms, JS cpu ms and draw calls in the bar. "run scaling table" prints the 1k / 10k / 50k / 100k table for the chosen mode.
-- Headless: `node prototypes/gfx-bench/run.mjs` runs all three modes in one Chrome on port 5611 (debug port 9333), prints JSON, then closes Chrome and the server.
+- Interactive: serve the folder (`python -m http.server 5611` from inside it) and open `http://localhost:5611/`. Pick the mode, set counts, watch fps, frame ms, JS cpu ms and draw calls. "run scaling table" prints the 1k / 10k / 50k / 100k table for the chosen mode.
+- Headless: `node prototypes/gfx-bench/run.mjs [chromePath] [modes]` (modes: `pixi-webgl,pixi-webgpu,direct,pixi-graphics`). Starts one Chrome (debug port 9333) and a server on port 5611, prints JSON, closes both. Running all four modes in one go can exceed ten minutes because the old pattern is slow at 100k; run them separately as was done here.
