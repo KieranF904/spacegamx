@@ -96,6 +96,8 @@ export interface ShipClientOptions {
   localAim(): { angle: number; dist: number };
   /** False while a menu has the keyboard */
   inputEnabled?(): boolean;
+  /** Mouse-steer's keys push along the ship (the view on the heading, CAPS.NOSE: common flight.ts noseFrame) */
+  noseThrust?(): boolean;
   /** Is this (game) key held? */
   isKeyDown(code: string): boolean;
   /** Play a sound (at a world position, or for the local pilot when `at` is absent); returns a stop function */
@@ -1004,6 +1006,10 @@ export class ShipClient {
     if (this.helm) {
       dir = [k('KeyE') - k('KeyQ'), back - fwd];
       turn = right - left;
+    } else if (this.opts.noseThrust?.()) {
+      // Along the ship (W the nose); turning follows the spin
+      dir = [right - left, back - fwd];
+      turn = Math.max(-1, Math.min(1, (me.angVel ?? 0) / 0.05));
     } else {
       // Screen-relative keys, turned into the ship's frame; turning follows the spin
       dir = worldToLocalDir([right - left, back - fwd], me.renderAngle) as [number, number];

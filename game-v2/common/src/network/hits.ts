@@ -58,8 +58,11 @@
  *              removal, until something else touches it (a shot, a tow: a shipSync, and it's told from then)
  *   LAUNCHES   (with WAYPOINTS: no wire change) a volley of mobs laid at once (a Rivet Sower's mines) comes as one guide
  *              LAUNCH row, its pattern and ids, each mob's run made from it in place of a SYNC a mob (guidance/launch.ts)
+ *   NOSE       (no wire change) mouse-steer with its movement keys pushing along the ship (W the nose), for the view that
+ *              follows the heading (client input/viewMode.ts): said by both strafe bits with helm off (ships/flight.ts
+ *              noseFrame), a pair no input sent before. Without it such a client's keys push along the world, as ever
  */
-export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16, ROUGH: 32, OWN_SIM: 64, INPUTS: 128, BODIES: 256, BLOCKS: 512, FOCUS: 1024, CAUSES: 2048, WAYPOINTS: 4096, PILOTS: 8192, CROWD: 16384, STRUCTS: 32768, CARGO: 65536, DEBRIS: 131072, LAUNCHES: 262144 } as const;
+export const CAPS = { HITS: 1, SELF_HITS: 2, PACKED: 4, COALESCE: 8, OWN_SHOTS: 16, ROUGH: 32, OWN_SIM: 64, INPUTS: 128, BODIES: 256, BLOCKS: 512, FOCUS: 1024, CAUSES: 2048, WAYPOINTS: 4096, PILOTS: 8192, CROWD: 16384, STRUCTS: 32768, CARGO: 65536, DEBRIS: 131072, LAUNCHES: 262144, NOSE: 524288 } as const;
 
 /** Does this client run the debris it works out from then on (CAPS.DEBRIS)? */
 export function debrisFor(caps: number | undefined): boolean {

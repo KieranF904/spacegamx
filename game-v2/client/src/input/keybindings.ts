@@ -31,6 +31,7 @@ export const ACTIONS: ActionDef[] = [
   { id: 'strafeRight', label: 'Strafe right (helm)', category: 'Flight', key: 'KeyE' },
   { id: 'boost', label: 'Boost', category: 'Flight', key: 'ShiftLeft', alt: 'ShiftRight' },
   { id: 'jump', label: 'Jump drive', category: 'Flight', key: 'KeyJ', hint: 'Jumps to your cursor (or the station, gate or marker you point at), within range' },
+  { id: 'camera', label: 'Switch view: north up / follow heading', category: 'Flight', key: 'Backquote', hint: 'For this session; the default is in Settings, Gameplay' },
   { id: 'helm', label: 'Switch mouse-steer / helm', category: 'Flight', key: 'KeyV' },
   { id: 'aim', label: 'Aim / steer', category: 'Flight', key: 'Mouse', rebindable: false },
   { id: 'fire', label: 'Fire', category: 'Combat', key: 'Mouse0', alt: 'Mouse2', rebindable: false },

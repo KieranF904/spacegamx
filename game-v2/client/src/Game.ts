@@ -18,6 +18,8 @@ import { NetworkManager } from './network/NetworkManager';
 import { InputManager } from './input/InputManager';
 import { Renderer } from './rendering/Renderer';
 import { noseUpAngle } from './rendering/cameraView';
+import { viewMode } from './input/viewMode';
+import { AimPin, AimPinView } from './input/aimPin';
 import { attachShaderWarmup, warmShaders } from './rendering/shaderWarmup';
 import { gameShaders } from './rendering/gameShaders';
 import { GameState } from './state/GameState';
@@ -210,6 +212,8 @@ private xpFillEl: HTMLElement | null;
   private bankBars: BankBars | null = null;
   /** The weapon ring round the cursor (ui/WeaponRing.ts) */
   private weaponRing: WeaponRing | null = null;
+  /** Mouse-steer with the view on the heading: the aim pinned in the world, and its drawn cursor (input/aimPin.ts) */
+  private aimPinView: AimPinView | null = null;
   private levelEl: HTMLElement | null;
   private xpEl: HTMLElement | null;
   private xpToNextEl: HTMLElement | null;
@@ -276,6 +280,7 @@ private xpFillEl: HTMLElement | null;
       localAim: () => this.localAim(),
       isKeyDown: (code) => this.input.isKeyDown(code),
       inputEnabled: () => !this.menu?.isOpen,
+      noseThrust: () => !!this.inputCtx?.noseThrust,
       sound: (id, at, volume, pitch) => (at ? this.audio.play(id, at.x, at.y, { volume, pitch }) : this.audio.playUI(id, volume, pitch)),
       editAnywhere: options.ships?.editAnywhere,
       onHangarOpen: options.ships?.onHangarOpen,
@@ -418,6 +423,9 @@ this.xpFillEl = document.getElementById('xpFill');
 
     // Set up input handlers
     this.input.init(this.app.canvas as HTMLCanvasElement);
+    this.input.pin = new AimPin(() => this.renderer.screenSize(), () => this.renderer.getCameraAngle());
+    this.aimPinView = new AimPinView(this.app.canvas as HTMLCanvasElement, this.input.pin,
+      () => ({ x: this.input.mouseX, y: this.input.mouseY, rawX: this.input.rawX, rawY: this.input.rawY }));
     this.input.onFocusLost = () => { this.w.context.resetPress(); sendNeutralInput(this.inputCtx); };
     this.input.onMouseButton = (button, down, x, y) => this.w.context.mouse(button, down, x, y);
     this.w.context.attach(this.app.canvas as HTMLCanvasElement);
@@ -1072,10 +1080,14 @@ this.xpFillEl = document.getElementById('xpFill');
     // Update screen shake
     this.state.updateScreenShake(delta);
     
-    // Helm: the view turns to put the ship's nose up the screen; otherwise it eases back to north-up
+    // The view follows the heading (input/viewMode.ts: helm by default, or as picked) to put the ship's nose up the
+    // screen; otherwise it eases back to north-up. Mouse-steer so: the aim is pinned in the world (input/aimPin.ts)
     {
       const me = this.state.entities.get(this.state.playerId);
-      this.renderer.setCameraHeading(this.loggedIn && me && this.shipClient.helmMode() && !this.shipClient.hangarOpen ? noseUpAngle(me.renderAngle) : null);
+      const helm = this.shipClient.helmMode(), flying = this.loggedIn && !!me && !this.shipClient.hangarOpen;
+      this.renderer.setCameraHeading(flying && viewMode.followsHeading(helm) ? noseUpAngle(me!.renderAngle) : null);
+      this.aimPinView?.frame(flying && viewMode.pinnedAim(helm),
+        !blocked && !windowOpen && !this.localDead && !this.chatFocused && !this.w.context.menuOpen && !this.w.dialogue?.isOpen);
     }
 
     // Update floating rewards with camera position
@@ -1148,6 +1160,7 @@ this.xpFillEl = document.getElementById('xpFill');
       get stationOpen() { return g.stationOpen; },
       get localDead() { return g.localDead; },
       get compactInputs() { return g.network instanceof NetworkManager && g.network.compactInputs; },
+      get noseThrust() { return g.network instanceof NetworkManager && g.network.noseThrust && viewMode.pinnedAim(g.shipClient.helmMode()); },
       get proto() { return g.proto; },
       get menu() { return g.menu; },
       get adminPanel() { return g.adminPanel; },

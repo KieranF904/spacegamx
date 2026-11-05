@@ -7,6 +7,8 @@
  * (hangar, menu) keys mean themselves.
  */
 
+import type { AimPin } from './aimPin';
+
 export class InputManager {
   /** Held keys, as the game sees them (translated codes) */
   private keys: Set<string> = new Set();
@@ -22,8 +24,14 @@ export class InputManager {
   public zoomSpeedScale = 1;
   private mouseButtons: Set<number> = new Set();
   
-  public mouseX = 0;
-  public mouseY = 0;
+  /** Where the pointer last was over the canvas */
+  public rawX = 0;
+  public rawY = 0;
+  /** The aim pinned in the world (mouse-steer with the view on the heading, input/aimPin.ts): the cursor is drawn there */
+  public pin: AimPin | null = null;
+  /** The cursor as the game sees it: the pointer, or the pinned aim's place on the screen */
+  get mouseX(): number { return this.pin?.pinned ? this.pin.screen().x : this.rawX; }
+  get mouseY(): number { return this.pin?.pinned ? this.pin.screen().y : this.rawY; }
   private canvas: HTMLCanvasElement | null = null;
   
   // Zoom
@@ -98,18 +106,23 @@ export class InputManager {
     canvas.addEventListener('mousedown', (e) => {
       this.mouseButtons.add(e.button);
       e.preventDefault();
-      this.onMouseButton?.(e.button, true, e.clientX, e.clientY, e.timeStamp);
+      // (Pinned: the click is where the cursor is drawn)
+      const pinned = !!this.pin?.pinned;
+      this.onMouseButton?.(e.button, true, pinned ? this.mouseX : e.clientX, pinned ? this.mouseY : e.clientY, e.timeStamp);
     });
     
     // (On the window: a button let go over the map or a panel still lets go)
     window.addEventListener('mouseup', (e) => {
       const was = this.mouseButtons.delete(e.button);
-      if (was) this.onMouseButton?.(e.button, false, e.clientX, e.clientY, e.timeStamp);
+      const pinned = !!this.pin?.pinned;
+      if (was) this.onMouseButton?.(e.button, false, pinned ? this.mouseX : e.clientX, pinned ? this.mouseY : e.clientY, e.timeStamp);
     });
     
     canvas.addEventListener('mousemove', (e) => {
-      this.mouseX = e.clientX;
-      this.mouseY = e.clientY;
+      // (Pinned: the aim moves by the mouse's movement, the pointer captured or not)
+      if (this.pin?.pinned) this.pin.move(e.movementX || 0, e.movementY || 0);
+      this.rawX = e.clientX;
+      this.rawY = e.clientY;
     });
     
     // Mouse wheel for zoom

@@ -48,6 +48,11 @@ export interface InputSendHost {
   readonly localDead?: boolean;
   /** The server took CAPS.INPUTS: compact inputs, by inputCompactSend.ts's rules */
   readonly compactInputs?: boolean;
+  /**
+   * Mouse-steer with the view on the heading (input/viewMode.ts pinnedAim) and the server took CAPS.NOSE: the movement
+   * keys push along the ship, said by both strafe bits (common flight.ts noseFrame)
+   */
+  readonly noseThrust?: boolean;
   readonly proto: ProtoHooks | null;
   readonly menu: GameMenuUI;
   readonly adminPanel: AdminPanel | null;
@@ -192,8 +197,10 @@ export function tickInput(s: InputSendCtx): void {
   let boost = inputEnabled && (s.input.isKeyDown('ShiftLeft') || s.input.isKeyDown('ShiftRight'));
   // Proto helm controls: left/right turn the ship, Q/E strafe
   let helm = s.shipClient.helmMode();
-  let strafeLeft = helm && inputEnabled && s.input.isKeyDown('KeyQ');
-  let strafeRight = helm && inputEnabled && s.input.isKeyDown('KeyE');
+  // (Mouse-steer, the view on the heading: WASD along the ship, as the screen shows it, said by both strafe bits)
+  const nose = !helm && !!s.noseThrust;
+  let strafeLeft = nose || (helm && inputEnabled && s.input.isKeyDown('KeyQ'));
+  let strafeRight = nose || (helm && inputEnabled && s.input.isKeyDown('KeyE'));
   // Jump drive: J latches it on, and it stays on until the jump fires (or J again cancels)
   let jump = inputEnabled && s.shipClient.jumpHeld();
   // Burst Strafer: a press of the dodge key (Space) asks for one burst, the way you're steering (ShipClient.dodgeControl)

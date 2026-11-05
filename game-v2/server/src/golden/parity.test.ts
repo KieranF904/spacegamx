@@ -456,6 +456,37 @@ describe('prediction parity: the firing models (the pilot\'s guns keep the serve
   });
 });
 
+// ---- Mouse-steer in the nose frame (hits.ts CAPS.NOSE, flight.ts noseFrame: the view on the heading): both strafe bits
+// with helm off push the movement keys along the ship. The server, the pilot's prediction and a replica on the control
+// bits (which carry both strafe bits already) must fly it to the same numbers, tick by tick.
+describe('prediction parity: mouse-steer in the nose frame (server, client prediction and replica)', () => {
+  const plain = SCENARIOS.find((s) => s.name === 'plain-thrust-turn')!;
+  const nose = { strafeLeft: true, strafeRight: true };
+  const turning = (i: number) => -1.5 + i * 0.03;
+  const script: ScriptTick[] = [
+    ...Array.from({ length: 40 }, (): ScriptTick => ({ keys: { ...nose, forward: true }, aim: -1.5 })),
+    ...Array.from({ length: 60 }, (_, i): ScriptTick => ({ keys: { ...nose, forward: true, right: i > 20 }, aim: turning(i) })),
+    ...Array.from({ length: 40 }, (): ScriptTick => ({ keys: { ...nose, left: true, backward: true, boost: true }, aim: 0.3 })),
+    ...Array.from({ length: 30 }, (): ScriptTick => ({ keys: { forward: true }, aim: 0.3 })),
+    ...Array.from({ length: 30 }, (): ScriptTick => ({ keys: { ...nose }, aim: 2.4 })),
+  ];
+  const sc: Scenario = { ...plain, name: 'nose-frame', script, replayAt: [55, 145], replicaDiverges: false };
+
+  it('the client prediction, a reconciling client and a replica match the server tick by tick', () => {
+    const r = runServer(sc);
+    expect(firstDiff(r.ticks, runClient(sc, r, -1).out, 0)).toBeNull();
+    for (const at of sc.replayAt ?? []) expect([at, firstDiff(r.ticks, runClient(sc, r, at).out, at + 1)]).toEqual([at, null]);
+    expect(runReplica(sc, r, -1)).toEqual([]);
+    for (const at of sc.replayAt ?? []) expect(runReplica(sc, r, at)).toEqual([]);
+  });
+
+  it('it flies otherwise than the same keys along the world', () => {
+    const r = runServer(sc);
+    const world = runServer({ ...sc, script: script.map((s) => ({ ...s, keys: { ...s.keys, strafeLeft: false, strafeRight: false } })) });
+    expect(firstDiff(world.ticks, r.ticks.map((t) => ({ body: bodyRow(t.body) })), 0)).not.toBeNull();
+  });
+});
+
 // ---- Slowed (features/weaponry: a Frostbite's beam on the pilot): thrust and turning × SLOW_CONTROL while lit and
 // 0.7 s after. The server flies it from its clock, the pilot's prediction from the slowed ticks its row tells, a
 // replica from CTL.slowed in the control bits: all three must land on the same numbers, tick by tick.

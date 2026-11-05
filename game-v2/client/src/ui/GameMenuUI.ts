@@ -476,6 +476,8 @@ export class GameMenuUI {
       body.append(
         segmented('Default controls', 'Which mode a ship starts in', [['mouse', 'Mouse-steer'], ['helm', 'Helm']], s.gameplay.controlMode,
           (v) => upd((d) => { d.gameplay.controlMode = v as any; }, true)),
+        segmented('View', 'North up, or turned so your nose points up the screen', [['auto', 'With controls'], ['north', 'North up'], ['heading', 'Follow heading']], s.gameplay.cameraMode,
+          (v) => upd((d) => { d.gameplay.cameraMode = v as any; }, true)),
         segmented('Jump drive key', 'Tap to engage, or hold to spool (let go to abort)', [['tap', 'Tap'], ['hold', 'Hold']], s.gameplay.jumpMode,
           (v) => upd((d) => { d.gameplay.jumpMode = v as any; }, true)),
         slider('Zoom speed', s.gameplay.zoomSpeed, 0.4, 2, 0.1, (v) => `${v.toFixed(1)}×`, (v) => upd((d) => { d.gameplay.zoomSpeed = v; })),
@@ -484,7 +486,9 @@ export class GameMenuUI {
       const note = document.createElement('p');
       note.className = 'muted';
       note.style.marginTop = '12px';
-      note.textContent = `Mouse-steer unless you pick helm here (or switch with ${keyName(s.bindings.helm ?? 'KeyV')}). Helm turns the view with your ship.`;
+      note.textContent = `Mouse-steer unless you pick helm here (or switch with ${keyName(s.bindings.helm ?? 'KeyV')}). `
+        + `The view: "With controls" turns it with your ship at the helm and keeps it north up for mouse-steer; or pick one for both (or switch with ${keyName(s.bindings.camera ?? 'Backquote')}). `
+        + 'Mouse-steer with the view following your heading: the cursor stays on its spot in space as the view turns, WASD push along your ship, and a click captures the mouse (Esc lets it go).';
       body.appendChild(note);
     }
     const actions = document.createElement('div');

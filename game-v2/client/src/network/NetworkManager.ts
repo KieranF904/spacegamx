@@ -42,6 +42,8 @@ export class NetworkManager implements ClientTransport {
   private inputs = new InputEncoder();
   /** The server took CAPS.INPUTS for this socket (its netCaps): inputs go compact, by app/inputCompactSend.ts's rules */
   compactInputs = false;
+  /** The server took CAPS.NOSE for this socket: mouse-steer's keys may push along the ship (common flight.ts noseFrame) */
+  noseThrust = false;
 
   connect(url: string): void {
     this.connectSocket(url, false);
@@ -67,6 +69,7 @@ export class NetworkManager implements ClientTransport {
     this.reader = new ServerFrameReader();
     this.inputs = new InputEncoder();
     this.compactInputs = false;
+    this.noseThrust = false;
     ws.binaryType = 'arraybuffer'; // Enable binary message handling
 
     ws.onopen = () => {
@@ -182,6 +185,7 @@ export class NetworkManager implements ClientTransport {
   /** The caps the server says are in effect (netCaps) */
   useCaps(caps: number): void {
     this.compactInputs = !!(caps & CAPS.INPUTS);
+    this.noseThrust = !!(caps & CAPS.NOSE);
   }
 
   isConnected(): boolean {

@@ -33,6 +33,7 @@ import type { Autopilot } from '../ships/Autopilot';
 import type { ContextActions } from '../input/ContextActions';
 import type { ProtoHooks } from '../Game';
 import { settings } from '../settings/Settings';
+import { viewMode } from '../input/viewMode';
 
 /** What the key handlers read from the game (Game supplies it as getters, so late-built windows resolve at use) */
 export interface KeyHost {
@@ -191,6 +192,13 @@ export const POST_KEYS: Readonly<Record<string, KeyFn>> = {
     return true;
   },
   // N key - toggle navigation markers
+  // The view: north up or following the heading, for this session (input/viewMode.ts; V switches the controls)
+  Backquote: (h) => {
+    if (!h.loggedIn || h.shipClient.hangarOpen) return false;
+    const v = viewMode.toggle(h.shipClient.helmMode());
+    h.showSystemMessage(v === 'heading' ? 'View: follows your heading' : 'View: north up');
+    return true;
+  },
   KeyN: (h) => {
     if (!(h.loggedIn && h.navMarkers)) return false;
     const on = !settings.data.ui.navMarkers;
