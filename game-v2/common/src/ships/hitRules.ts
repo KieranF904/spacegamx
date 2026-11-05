@@ -359,6 +359,15 @@ export function sidesHurt(a: number, t: number): 0 | 1 | 2 {
   return both ? 2 : 1;
 }
 
+/**
+ * Does a collision between two ships hurt them (their factions: a hostile's, undefined for anything else)? Not between
+ * hostiles of one faction (a pack's ships, or packs of one side bumping as they mill about): they're pushed apart as
+ * any two ships are, but take no damage of it. Anything else hurts as ever (GameServer.contactHurts)
+ */
+export function contactHurts(a: string | undefined, b: string | undefined): boolean {
+  return a === undefined || a !== b;
+}
+
 /** Does a world-space segment come within a ship's bounding circle (radius + 1 + margin) at (px, py)? */
 export function nearShipSegment(px: number, py: number, radius: number, x0: number, y0: number, x1: number, y1: number, margin = 0): boolean {
   const dx = x1 - x0, dy = y1 - y0;

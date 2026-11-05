@@ -482,6 +482,8 @@ export function resolveContacts(ctx: BridgeCtx): void {
     }
     if (closing <= ct.minDamageSpeed) continue;
     if (ctx.host.canDamage && !(ctx.host.canDamage(ea, eb) && ctx.host.canDamage(eb, ea))) continue;
+    // (hostiles of one faction bump without hurting each other: hitRules.ts contactHurts)
+    if (ctx.host.contactHurts && !ctx.host.contactHurts(ea, eb)) continue;
     const base = (closing - ct.minDamageSpeed) * ct.damagePerSpeed;
     const total = A.derived.mass + B.derived.mass;
     ctx.damageContact(ea, A, partsA, base * (2 * B.derived.mass / total), eb);

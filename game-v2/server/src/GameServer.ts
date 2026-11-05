@@ -78,7 +78,7 @@ asteroidParamsAt,
   OrbitType,
   asteroidRegistry,
   buildRangeRig,
-  sidesHurt,
+  sidesHurt, contactHurts,
   SIDE, datan2, dcos, dhypot, dsin,
 } from '@space-game/common';
 
@@ -2522,6 +2522,7 @@ this.devTeleport = opts.devTeleport ?? false;
       payRebuild: (eid, part) => this.pilots.payRebuild(eid, part),
       payRepair: (eid, hp) => this.pilots.payRepair(eid, hp, this.repairRate(eid)),
       canDamage: (a, b) => this.canDamage(a, b),
+      contactHurts: (a, b) => contactHurts(this.enemies.factionOf(a), this.enemies.factionOf(b)),
       // --- Support weapons (common/src/ships/features/support/support.ts) ---
       canHeal: (a, b) => this.canHeal(a, b),
       onHeal: (healer, target, hp) => this.support.note(healer, target, hp, this.currentTick),
