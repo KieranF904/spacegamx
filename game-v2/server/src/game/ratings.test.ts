@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
-import { createShipState, rateShip, regrade, partDemand, weaponStrength, partThrust, type Blueprint } from '@space-game/common';
+import { createShipState, rateShip, regrade, partDemand, weaponStrength, partThrust, boostOf, parseBlueprint, type Blueprint } from '@space-game/common';
+import { readFileSync } from 'fs';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { readGameDataFiles } from '../data/loadGameDataFromDisk.js';
@@ -58,10 +59,14 @@ describe('grades, sizes and ship ratings', () => {
     // A plasma drive out-pushes an ion thruster its size, and draws more power for it
     expect(partThrust(cat, plasma, 2, alloy)).toBeGreaterThan(partThrust(cat, ion, 2, alloy));
     expect(partDemand(plasma, 2, alloy)).toBeGreaterThan(partDemand(ion, 2, alloy));
-    // The starter's boost is its Ion Drives'; an afterburner ship's kicks harder and drains faster
+    // The starter's boost is its Ion Drives' (on the ports core, each engine's own: energy.ts boostOf)
     const starter = createShipState(ships.catalog, ships.tuning, 0, ships.playerBlueprint, 0).derived;
-    expect(starter.boostFactor).toBeCloseTo(cat.functions.get('engine_ion_drive')!.boost!, 6);
-    const swapped = { ...ships.playerBlueprint, parts: ships.playerBlueprint.parts.map((p) => (p.fn === 'engine_ion_drive' ? { ...p, fn: 'engine_afterburner' } : p)) };
+    expect(boostOf(starter)).toBeCloseTo(cat.functions.get('engine_ion_drive')!.boost!, 6);
+    // An afterburner ship's kicks harder and drains faster: the pool core's ship-wide boost and drain, on the pool-era
+    // starter (a fixture)
+    const pool: Blueprint = parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/fixtures/sparrow-t.json'), 'utf-8'));
+    expect(createShipState(ships.catalog, ships.tuning, 0, pool, 0).derived.boostFactor).toBeCloseTo(cat.functions.get('engine_ion_drive')!.boost!, 6);
+    const swapped = { ...pool, parts: pool.parts.map((p) => (p.fn === 'engine_ion_drive' ? { ...p, fn: 'engine_afterburner' } : p)) };
     const d = createShipState(ships.catalog, ships.tuning, 0, swapped, 0).derived;
     expect(d.boostFactor).toBeGreaterThan(3);
     expect(d.boostDrain).toBeGreaterThan(2);

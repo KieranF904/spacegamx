@@ -27,8 +27,8 @@ const files = readGameDataFiles(dataDir);
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
 const ALL = CAPS.HITS | CAPS.SELF_HITS | CAPS.PACKED | CAPS.COALESCE | CAPS.OWN_SHOTS | CAPS.ROUGH | CAPS.OWN_SIM | CAPS.INPUTS | CAPS.BODIES;
 
-interface Got { snapshots: number; checked: number; off: number; keyframes: number; ctlRows: number; decisions: number; syncs: number; running: number; ctlWhileOff: number; keyWhileOff: number }
-const zero = (): Got => ({ snapshots: 0, checked: 0, off: 0, keyframes: 0, ctlRows: 0, decisions: 0, syncs: 0, running: 0, ctlWhileOff: 0, keyWhileOff: 0 });
+interface Got { snapshots: number; checked: number; off: number; keyframes: number; unexplained: number; ctlRows: number; decisions: number; syncs: number; running: number; ctlWhileOff: number; keyWhileOff: number }
+const zero = (): Got => ({ snapshots: 0, checked: 0, off: 0, keyframes: 0, unexplained: 0, ctlRows: 0, decisions: 0, syncs: 0, running: 0, ctlWhileOff: 0, keyWhileOff: 0 });
 
 interface Opts {
   ticks?: number;
@@ -66,16 +66,24 @@ function fight(o: Opts = {}) {
   const truth = new Map<number, number[]>();
   const got = { A: zero(), B: zero(), C: zero() };
   const now = () => (ships.has(boss) ? [Position.x[boss], Position.y[boss], Velocity.x[boss], Velocity.y[boss], Rotation.angle[boss], ships.get(boss)!.angVel] : undefined);
+  /** Ticks something her body doesn't model moved her: a contact, or a rebuild (a part lost, a stage shed) */
+  const unmodelled = new Set<number>();
   const watch = (f: FakeHitsClient, g: Got, drop?: () => boolean) => {
     const fa = f as unknown as { snapshot(s: ServerSnapshotMessage): void };
     const orig = fa.snapshot.bind(f);
+    let last = -1;
     fa.snapshot = (s) => {
+      // (a keyframe of her with nothing unmodelled in the window, or the few ticks before it: a rebuild's structure goes
+      // with a later snapshot)
+      let moved = last < 0;
+      for (let t = last - 8; t <= s.tick && !moved; t++) moved = unmodelled.has(t);
+      last = s.tick;
       // (a decision her flight follows: a personal attack's draw doesn't move her)
       const flying = (d: number[]) => d[0] === boss && d[2] !== DECISION.SYNC && d[2] !== DECISION.PERSONAL;
       if (s.decisions?.some(flying) && drop?.()) s = { ...s, decisions: s.decisions.filter((d) => !flying(d)) };
       orig(s);
       g.snapshots++;
-      if (s.ships?.some((k) => k[0] === boss)) { g.keyframes++; if (capsOff) g.keyWhileOff++; }
+      if (s.ships?.some((k) => k[0] === boss)) { g.keyframes++; if (!moved) g.unexplained++; if (capsOff) g.keyWhileOff++; }
       if (s.ctl?.some((r) => controlRowId(r) === boss)) { g.ctlRows++; if (capsOff) g.ctlWhileOff++; }
       for (const d of s.decisions ?? []) if (d[0] === boss) { g.decisions++; if (d[2] === DECISION.SYNC) g.syncs++; }
       if (!f.bodies || ![...f.bodies.ids()].includes(boss)) return;
@@ -131,6 +139,8 @@ function fight(o: Opts = {}) {
   Position.x[A.pid] = x0; Position.y[A.pid] = y0; Velocity.x[A.pid] = 0; Velocity.y[A.pid] = 0;
   Position.x[B.pid] = x0 - 300; Position.y[B.pid] = y0 + 1400;
   boss = server.bosses.spawnAt('boss_scrap_mother', num, x0 + 1800, y0);
+  const add = ships.ownCauses.add.bind(ships.ownCauses);
+  ships.ownCauses.add = ((eid: number, c: { kind: number }) => { if (eid === boss && (c.kind === 1 || c.kind === 2)) unmodelled.add(server.getTick()); return add(eid, c as never); }) as typeof ships.ownCauses.add;
   // (tough as she was before the rework's starter armour: the pilot's shots mustn't strip her, so her rows stay rows)
   ships.scaleHp(boss, 40);
   const brain = server.bosses.brainOf(boss) as unknown as StagedBrain & { stage: number };
@@ -141,6 +151,7 @@ function fight(o: Opts = {}) {
       // (her fight moved on to her next stage at once: the dev shed, a step at a time until it's there)
       const st = brain.stage;
       for (let n = 1; n < 400 && brain.stage === st; n++) brain.forceShed(n);
+      unmodelled.add(server.getTick());
     }
     if (o.capsOffAt === t) { server.pilots.connOf(A.pid)!.capsNext = ALL & ~CAPS.BODIES; capsOff = true; }
     if (o.capsOnAt === t) { server.pilots.connOf(A.pid)!.capsNext = ALL; capsOff = false; }
@@ -168,8 +179,11 @@ describe('decision inputs: the Scrap Mother flown by her body on both sides (CAP
     expect(r.got.A.ctlRows).toBe(0);
     expect(r.got.A.decisions).toBeGreaterThan(5);
     // (keyframes of her: the first, and only what her body doesn't model: the stage sheds, and contacts: her phases ram
-    // twice in stage two, and these pilots sit in her way)
-    expect(r.got.A.keyframes).toBeLessThan(r.got.B.keyframes / 2.5);
+    // twice in stage two, and these pilots sit in her way. How many contacts there are is the world's (the starter's shape
+    // moves where she grinds: on the idle observer, 1 tick of contact or 123), so each keyframe is matched to one)
+    // (the two that aren't: her arrival, and her body taking her over on the client)
+    expect(r.got.A.unexplained).toBeLessThanOrEqual(2);
+    expect(r.got.A.keyframes).toBeLessThan(r.got.B.keyframes);
     expect(r.stats.checks).toBeGreaterThan(10);
     expect(r.stats.off).toBe(0);
     expect(r.stats.agreed).toBe(r.stats.checks - r.stats.stale - r.stats.unknown);

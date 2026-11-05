@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
-import { FLASH_RESTORE_TICKS, type Blueprint } from '@space-game/common';
+import { FLASH_RESTORE_TICKS, parseBlueprint, type Blueprint } from '@space-game/common';
+import { readFileSync } from 'fs';
 import { GameServer } from '../../../GameServer.js';
 import { GameData } from '../../../data/GameData.js';
 import { readGameDataFiles } from '../../../data/loadGameDataFromDisk.js';
@@ -24,10 +25,13 @@ function withParts(base: Blueprint, extra: { fn: string; x: number; y: number }[
   return bp;
 }
 
+/** The pool-era starter (a fixture): its Capacitor banks are the pool core's (Charge.b) */
+const poolSparrow = (): Blueprint => parseBlueprint(readFileSync(join(dataDir, 'ships/blueprints/fixtures/sparrow-t.json'), 'utf-8'));
+
 describe('Flash Screen (server half)', () => {
-  const spawn = (extra: { fn: string; x: number; y: number }[]) => {
+  const spawn = (extra: { fn: string; x: number; y: number }[], pool = false) => {
     const w = world();
-    const e = w.ships.spawnDummy(withParts(w.ships.playerBlueprint, extra), 0, 300000, 0, 0);
+    const e = w.ships.spawnDummy(withParts(pool ? poolSparrow() : w.ships.playerBlueprint, extra), 0, 300000, 0, 0);
     return { ...w, e, ship: w.ships.get(e)! };
   };
 
@@ -43,8 +47,12 @@ describe('Flash Screen (server half)', () => {
     expect(ship.shield).toBe(36);
   });
 
+  // (A bank paying for it is the pool core's: on the ports core the Flash Screen draws nothing yet, a known gap the owner
+  // deferred with the ports switch (with Tow, Strafer and Gyro), so these run on the pool-era starter)
+  it.todo('on the ports core: a store touching it pays to bring it back at once (deferred: Flash draws nothing on ports)');
+
   it('with a Capacitor bank touching it that can pay 4 E a point, comes back at once and the bank pays', () => {
-    const { ships, e, ship } = spawn([{ fn: 'shield_flash_screen', x: -2, y: 0 }, { fn: 'power_capacitor', x: -2, y: -1 }]);
+    const { ships, e, ship } = spawn([{ fn: 'shield_flash_screen', x: -2, y: 0 }, { fn: 'power_capacitor', x: -2, y: -1 }], true);
     expect(ships.chargeOf(e).b[0] ?? 100).toBe(100);
     ships.hurt(e, ship, 0, 36);
     expect(ship.shield).toBe(36);
@@ -53,7 +61,7 @@ describe('Flash Screen (server half)', () => {
   });
 
   it('with a bank touching it that is too empty to pay, waits like the rest', () => {
-    const { server, ships, e, ship } = spawn([{ fn: 'shield_flash_screen', x: -2, y: 0 }, { fn: 'power_capacitor', x: -2, y: -1 }]);
+    const { server, ships, e, ship } = spawn([{ fn: 'shield_flash_screen', x: -2, y: 0 }, { fn: 'power_capacitor', x: -2, y: -1 }], true);
     const c = ships.chargeOf(e);
     ships.setCharge(e, { ...c, b: [50] });
     ships.hurt(e, ship, 0, 36);
