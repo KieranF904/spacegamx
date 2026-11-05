@@ -288,7 +288,9 @@ describe('simulation level of detail', () => {
     // A hostile goes as its place (not a route: it's loaded and active, not this client's to work out), where it is
     expect(legs.get(foe)?.patrol).toBeFalsy();
     expect(pts.get(foe)?.length).toBe(1);
-    expect(Math.hypot(drawn(foe).x - w.at(foe).x, drawn(foe).y - w.at(foe).y)).toBeLessThan(10);
+    // (Where it was when the place was sent: it has flown on since, at its speed, for the ticks between)
+    const since = (w.server as any).currentTick - first.tick, f = w.at(foe);
+    expect(Math.hypot(drawn(foe).x - f.x, drawn(foe).y - f.y)).toBeLessThan(10 + Math.hypot(f.vx, f.vy) * since);
     // A minute on: past inner Sol's line it's sent at most every 5 s (FEED_TIERS.farTicks), never named again
     for (let s = 0; s < 60; s++) {
       const n = dots().length;

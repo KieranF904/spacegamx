@@ -25,17 +25,19 @@ describe('portsReport', () => {
     expect(r.unfed).toEqual([]);
     expect(r.partly).toEqual([]);
     expect(r.wasting).toEqual([]);
-    expect(r.supply).toBe(140);
+    expect(r.supply).toBe(70);
   });
 
-  it('a reactor taken away leaves its gun unfed; one turned away wastes its line', () => {
+  it('a gun moved off the core is unfed; a reactor turned away from the core wastes its line', () => {
     const bp = clone(cfg.library!['sparrow-t']);
-    const pipFeeder = bp.parts.findIndex((p) => p.fn === 'power_cell_reactor' && p.rot === 0);
-    const fed = bp.parts.findIndex((p) => p.fn === 'cannon_pip' && p.x === bp.parts[pipFeeder].x);
-    bp.parts[pipFeeder].rot = 2;
+    // (The left reactor feeds the core's left side; the left Pip sits on the core's nose)
+    const reactor = bp.parts.findIndex((p) => p.fn === 'power_cell_reactor' && p.x < 0);
+    const pip = bp.parts.findIndex((p) => p.fn === 'cannon_pip' && p.x === 0);
+    bp.parts[reactor].rot = 3;
+    bp.parts[pip].x = -1;
     const r = report(bp);
-    expect(r.unfed).toEqual([fed]);
-    expect(r.wasting).toEqual([pipFeeder]);
+    expect(r.unfed).toEqual([pip]);
+    expect(r.wasting).toEqual([reactor]);
     expect(portsWarnings(r, name(bp))).toEqual(['Pip has no power: nothing feeds its in port', 'Cell Reactor gives into nothing on one side: that line is wasted']);
   });
 });

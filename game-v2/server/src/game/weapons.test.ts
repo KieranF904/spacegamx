@@ -107,7 +107,7 @@ describe('weapons', () => {
   it('shields soak damage first and recharge after a pause', () => {
     const { bridge, step, pid } = setup();
     const bp = JSON.parse(JSON.stringify(sparrow));
-    const cap = bp.parts.find((p: any) => p.piece === 'cap');
+    const cap = bp.parts.find((p: any) => p.fn === 'hull' && p.piece === 'tri');
     Object.assign(cap, { piece: 'sq', fn: 'shield' });
     bridge.respawnInPlace(pid, bp);
     const ship = bridge.get(pid)!;

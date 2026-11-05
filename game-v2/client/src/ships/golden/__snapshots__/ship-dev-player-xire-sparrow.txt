@@ -1,0 +1,34 @@
+{
+  "rating": 99.90791132668008,
+  "parts": 85,
+  "mass": 142.97079632679493,
+  "topSpeed": 690.0542106130099,
+  "accel": 630.5063853316848,
+  "turn180": 1.2429055945065988,
+  "dps": 822.8571429599998,
+  "hull": 9300.409724509618,
+  "shield": 0,
+  "cargo": 180,
+  "jump": 47.902,
+  "jumpCooldown": 15.733333333333333,
+  "jumpRatio": 0.9,
+  "power": {
+    "supply": 560,
+    "demand": 32
+  },
+  "energy": {
+    "max": 2040,
+    "driveMax": 0,
+    "weaponMax": 0,
+    "spare": 528,
+    "engineDraw": 172,
+    "weaponDraw": 120,
+    "boostDraw": 251.20000000000002
+  },
+  "guns": 12,
+  "turrets": 0,
+  "miners": 0,
+  "dodge": 0,
+  "tow": 0,
+  "rebuild": 754.8000000000001
+}
