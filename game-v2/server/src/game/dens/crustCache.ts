@@ -22,7 +22,7 @@ export function crustBlueprint(c: DenCacheData): Blueprint {
   const parts: PlacedPart[] = [];
   const r = c.cells / 2, h = Math.floor(r);
   for (let y = -h; y <= h; y++) for (let x = -h; x <= h; x++) {
-    if (Math.hypot(x, y) > r - 0.15) continue;
+    if (x * x + y * y > (r - 0.15) * (r - 0.15)) continue;
     parts.push({ uid: parts.length, piece: 'sq', fn: x === 0 && y === 0 ? 'core' : 'armor', material: c.material, x, y, rot: 0, flip: false });
   }
   return { name: c.name, catalogVersion: 1, parts, ...(c.paint ? { paint: c.paint } : {}) } as Blueprint;
