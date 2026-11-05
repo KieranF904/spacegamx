@@ -294,7 +294,8 @@ describe('quests: nothing is forced', () => {
     t.send({ type: 'slotFly', slot: 1 } as any);
     goTo(server, pid, 'sol_station_central');
     expect(profile().quests.done).toContain('main_02');
-    expect(profile().plans).toContain('drum');
+    // (Ships are not rewards: the Prospector is the one design a job hands out)
+    expect(profile().plans).toEqual(['sparrow-t', 'prospector']);
   });
 
   it('any job can be abandoned: its own items go back, and its person offers it again', () => {
@@ -674,6 +675,8 @@ describe('quests: bounties', () => {
       }
       for (const id of Object.keys(q!.rewards.items ?? {})) expect(items.has(id), `${q!.id} reward ${id}`).toBe(true);
       for (const f of q!.rewards.plans ?? []) expect(server.getShips().library.has(f), `${q!.id} plan ${f}`).toBe(true);
+      // Ships are not rewards: only the first job hands out a design (the Prospector, for the build tutorial)
+      expect(q!.rewards.plans ?? [], `${q!.id} plans`).toEqual(q!.id === 'main_01' ? ['prospector'] : []);
     };
     for (const q of server.quests.file.quests) check(q);
     const kinds = new Set<string>();

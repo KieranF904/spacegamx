@@ -79,8 +79,7 @@ export function shipText(c: Catalog, s: CatalogShip): string {
   if (s.blurb) return s.blurb;
   const g = s.stats.guns;
   const guns = g.fixed + g.turret ? `${g.fixed + g.turret} ${g.fixed + g.turret === 1 ? 'gun' : 'guns'} (${g.fixed} fixed, ${g.turret} turret)` : 'no guns';
-  const where = s.soldAt.length ? `The plan is sold at ${s.soldAt.map((x) => stationName(c, x)).join(', ')}.` : 'Not sold at a station.';
-  return `${s.stats.parts} parts, mass ${num(s.stats.mass, 1)}, ${guns}. Makes ${num(s.stats.gen)} E/s and uses up to ${num(s.stats.draw)} E/s. ${where}`;
+  return `${s.stats.parts} parts, mass ${num(s.stats.mass, 1)}, ${guns}. Makes ${num(s.stats.gen)} E/s and uses up to ${num(s.stats.draw)} E/s.`;
 }
 
 export function bossText(c: Catalog, b: CatalogBoss): string {

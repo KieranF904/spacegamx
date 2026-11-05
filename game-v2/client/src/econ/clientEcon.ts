@@ -118,8 +118,4 @@ export class PilotState {
   count(id: string): number {
     return countOf(this.cargo, id) + countOf(this.storage, id);
   }
-
-  knowsPlan(file: string): boolean {
-    return !!this.profile?.plans.includes(file);
-  }
 }

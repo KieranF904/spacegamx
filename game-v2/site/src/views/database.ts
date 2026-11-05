@@ -67,7 +67,7 @@ export function databaseIndex(ctx: PageCtx, c: Catalog | null, q: Query): SafeHt
   } : null;
   const n = counts(c);
   const body = html`
-${head(c, null, 'Database', 'Every part, item, ship plan, boss and station in the game, with its numbers.')}
+${head(c, null, 'Database', 'Every part, item, ship, boss and station in the game, with its numbers.')}
 <section class="wrap block-tight">
   ${searchBox('/database', q)}
   ${found
@@ -83,13 +83,13 @@ ${head(c, null, 'Database', 'Every part, item, ship plan, boss and station in th
     </div>`}
   ${dataLine(c)}
 </section>`;
-  return layout(ctx, { title: 'Database', body, description: 'Every part, item, ship plan, boss and station in the game, with its numbers.' });
+  return layout(ctx, { title: 'Database', body, description: 'Every part, item, ship, boss and station in the game, with its numbers.' });
 }
 
 const KIND_BLURB: Record<CatalogKind, string> = {
   parts: 'Guns, engines, reactors, shields and structure, with HP, mass, power and cost.',
   items: 'Ores, materials, components and loot: value, where it comes from, where it sells.',
-  ships: 'The ship plans in the game, drawn, with their totals.',
+  ships: 'The ships in the game, drawn, with their totals.',
   bosses: 'Level, rewards, loot and respawn time.',
   stations: 'Services, what each market sells, and what it pays extra for.',
 };
@@ -156,14 +156,14 @@ export function shipsList(ctx: PageCtx, c: Catalog | null, q: Query): SafeHtml {
   if (!c) return noData(ctx, 'ships');
   const list = filterShips(c.ships, q);
   const body = html`
-${head(c, 'ships', 'Ships', 'The ship plans in the game, from the starter up. Drawn from above, nose up.')}
+${head(c, 'ships', 'Ships', 'The ships in the game, from the starter up. Drawn from above, nose up.')}
 <section class="wrap block-tight">
   ${searchBox('/database/ships', q)}
   ${list.length ? html`<div class="ship-grid">${list.map((s) => shipCard(c, s))}</div>` : empty('Nothing found', 'No ship matches.')}
   <p class="dim small">Ships other pilots have shared are in the <a href="/ships">gallery</a>.</p>
   ${dataLine(c)}
 </section>`;
-  return layout(ctx, { title: 'Ships', body, description: 'The ship plans in the game, drawn, with parts, mass and power totals.' });
+  return layout(ctx, { title: 'Ships', body, description: 'The ships in the game, drawn, with parts, mass and power totals.' });
 }
 
 export function bossesList(ctx: PageCtx, c: Catalog | null, q: Query): SafeHtml {
@@ -300,12 +300,11 @@ export function shipPage(ctx: PageCtx, c: Catalog, s: CatalogShip): SafeHtml {
       ['Thrust', num(st.thrust, 1)], ['Shield', st.shield ? num(st.shield) : ''], ['Hold space', st.cargo ? num(st.cargo) : ''],
       ['Power system', s.power === 'ports' ? 'Ports' : 'Pool and banks'],
     ])}
-    <p class="small dim mt">Sold at: ${s.soldAt.length ? join(s.soldAt.map((x) => stationLink(c, x))) : 'not sold at a station'}.</p>
   </section>
 </div>
 <section class="panel mt"><div class="panel-head"><h2>Parts</h2></div>
   <ul class="plain cols">${[...byFn].sort((a, b) => b[1] - a[1]).map(([fn, n]) => html`<li>${n} x ${c.part.has(fn) ? html`<a href="${href('parts', fn)}">${c.part.get(fn)!.name}</a>` : fn.replace(/_/g, ' ')}</li>`)}</ul></section>`;
-  return entry(ctx, c, 'ships', s.name, 'Ship plan', shipText(c, s), inner);
+  return entry(ctx, c, 'ships', s.name, 'Ship', shipText(c, s), inner);
 }
 
 export function bossPage(ctx: PageCtx, c: Catalog, b: CatalogBoss): SafeHtml {
@@ -334,8 +333,8 @@ export function stationPage(ctx: PageCtx, c: Catalog, s: CatalogStation): SafeHt
     ${s.pays.length ? html`<ul class="plain">${s.pays.map((p) => html`<li>${itemLink(c, p.item)} <span class="dim">x${p.mult}</span></li>`)}</ul>` : html`<p class="dim">Standard prices.</p>`}</section>
 </div>
 <section class="panel mt"><div class="panel-head"><h2>Sells</h2></div>
-  ${s.sells.items.length || s.sells.plans.length || s.sells.parts.length
-    ? html`<ul class="plain cols">${s.sells.items.map((id) => html`<li>${itemLink(c, id)}</li>`)}${s.sells.parts.map((p) => html`<li>${c.part.has(p.part) ? html`<a href="${href('parts', p.part)}">${p.label}</a>` : p.label}</li>`)}${s.sells.plans.map((id) => html`<li>${c.ship.has(id) ? html`<a href="${href('ships', id)}">${c.ship.get(id)!.name} plan</a>` : `${id} plan`}</li>`)}</ul>`
+  ${s.sells.items.length || s.sells.parts.length
+    ? html`<ul class="plain cols">${s.sells.items.map((id) => html`<li>${itemLink(c, id)}</li>`)}${s.sells.parts.map((p) => html`<li>${c.part.has(p.part) ? html`<a href="${href('parts', p.part)}">${p.label}</a>` : p.label}</li>`)}</ul>`
     : html`<p class="dim">Nothing for sale.</p>`}</section>`;
   return entry(ctx, c, 'stations', s.name, 'Station', stationText(c, s), inner);
 }

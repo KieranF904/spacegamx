@@ -110,8 +110,6 @@ export interface CatalogShip {
   /** 'ports' for designs on the newer power system */
   power: 'ports' | 'pool';
   plan: PlanPart[];
-  /** Stations that sell the plan */
-  soldAt: string[];
   blurb?: string;
 }
 
@@ -137,7 +135,7 @@ export interface CatalogStation {
   services: string[];
   repairCostPerHp: number;
   refuelCostPerUnit: number;
-  sells: { items: string[]; plans: string[]; parts: { part: string; material: string; label: string }[] };
+  sells: { items: string[]; parts: { part: string; material: string; label: string }[] };
   pays: { item: string; mult: number }[];
   blurb?: string;
 }

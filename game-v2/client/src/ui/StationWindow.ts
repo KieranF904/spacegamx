@@ -243,7 +243,7 @@ export class StationWindow {
     const empty = (hs?.slots ?? []).findIndex((s) => !s);
     const plans = (p.profile?.plans ?? []).map((f) => ({ f, bp: econ.plans[f] })).filter((x) => x.bp).sort((a, c) => a.bp.parts.length - c.bp.parts.length);
     right.innerHTML = `<h4>Your ship plans <span class="r">${empty < 0 ? 'no empty hangar slot' : `build one in slot ${empty + 1}`}</span></h4>`;
-    if (!plans.length) right.innerHTML += '<div class="sgw-empty" style="padding:8px">No plans yet. Jobs give them out.</div>';
+    if (!plans.length) right.innerHTML += '<div class="sgw-empty" style="padding:8px">No plans yet. Design a ship in the hangar.</div>';
     for (const { f, bp } of plans) right.appendChild(this.planRow(bp, empty, f));
     // Designs saved in the hangar's design slots
     const designs = hs?.designs ?? [];

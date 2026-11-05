@@ -46,7 +46,7 @@ const ships: unknown[] = [];
 // The hand-built review ships (dev/review-*.json) come first; the rest of the dev folder (test ships) goes last
 const GROUPS: [string, string, (f: string) => boolean][] = [
   ['Review ships', 'data/ships/blueprints/dev', (f) => f.startsWith('review-')],
-  ['Player ships', 'data/ships/blueprints', (f) => f !== 'bastion.json'], // bastion.json: a copy of bastion-dreadnought
+  ['Player ships', 'data/ships/blueprints', () => true],
   ['Enemy ships', 'data/ships/blueprints/enemy', () => true],
   ['Dev test ships', 'data/ships/blueprints/dev', (f) => !f.startsWith('review-')],
 ];

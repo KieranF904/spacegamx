@@ -19,8 +19,7 @@ export class Economy {
   tuning?: ShipTuning;
 
   constructor(itemsFile: ItemsFile, recipesFile: RecipesFile, readonly ships: Catalog, readonly plans: Record<string, Blueprint>) {
-    const planInfo = Object.fromEntries(Object.entries(plans).map(([file, bp]) => [file, { name: bp.name, parts: bp.parts.length }]));
-    this.items = new ItemCatalog(itemsFile, ships, planInfo);
+    this.items = new ItemCatalog(itemsFile, ships);
     this.recipes = new RecipeBook(recipesFile, ships);
     this.items.priceParts((id) => this.recipes.partValue(id, this.items));
   }

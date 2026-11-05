@@ -1,5 +1,5 @@
 {
-  "_comment": "Quests. Steps run in order: travel {system}, dock {station}, mine/loot/refine {item?, count}, craft {item?, category? ('part'), count}, refit {fn?, material?, count?, minParts?}, kill {faction?, enemy?, system?, count}, deliver {items} (handed over at the giver's station), sell {credits}, level {level}, boss {boss}. 'auto' quests start themselves when their prerequisites are met (the story). Rewards: xp, credits, items (to storage), plans (ship blueprints), recipes (fn:* / material:* fabrication licences), licences (system ids), reputation, skillPoints. Station bounties are generated (common/src/econ/quests.ts).",
+  "_comment": "Quests. Steps run in order: travel {system}, dock {station}, mine/loot/refine {item?, count}, craft {item?, category? ('part'), count}, refit {fn?, material?, count?, minParts?}, kill {faction?, enemy?, system?, count}, deliver {items} (handed over at the giver's station), sell {credits}, level {level}, boss {boss}. 'auto' quests start themselves when their prerequisites are met (the story). Rewards: xp, credits, items (to storage), plans (ship designs to build in the hangar: only main_01, the Prospector for the build tutorial; ships are not rewards), recipes (fn:* / material:* fabrication licences), licences (system ids), reputation, skillPoints. Station bounties are generated (common/src/econ/quests.ts).",
   "reputations": {
     "sol_patrol": {
       "name": "Sol Patrol",
@@ -463,10 +463,7 @@
       "outro": "Now that's a ship. A mining laser, a real hold, and a gun for anyone who argues. Go and earn your keep.",
       "rewards": {
         "xp": 300,
-        "credits": 45,
-        "plans": [
-          "drum"
-        ],
+        "credits": 120,
         "items": {
           "boost_cell": 2
         }
@@ -496,17 +493,15 @@
           "count": 3
         }
       ],
-      "outro": "Pirates don't usually swarm empty space. They're looking for something. Take these Arrow plans (a proper fighter) and a pair of coil windings for when you can fit a jump coil: bolt a coil or two on and your drive will reach a lot further. And talk to Harbourmaster Okafor about lane clearance: you'll need it to follow this anywhere.",
+      "outro": "Pirates don't usually swarm empty space. They're looking for something. Take this targeting chip for your next gun, and a pair of coil windings for when you can fit a jump coil: bolt a coil or two on and your drive will reach a lot further. And talk to Harbourmaster Okafor about lane clearance: you'll need it to follow this anywhere.",
       "rewards": {
         "xp": 400,
-        "credits": 60,
-        "plans": [
-          "arrow"
-        ],
+        "credits": 150,
         "items": {
           "crystal": 2,
           "power_coupling": 1,
-          "coil_winding": 2
+          "coil_winding": 2,
+          "targeting_chip": 1
         },
         "reputation": {
           "sol_patrol": 5
@@ -647,13 +642,14 @@
           "count": 6
         }
       ],
-      "outro": "His raiders carry receivers tuned to the pulse. He's using it to find wrecks before anyone else. These Corsair plans came off one of his own ships; turn his design against him.",
+      "outro": "His raiders carry receivers tuned to the pulse. He's using it to find wrecks before anyone else. These guns came off one of his own ships; turn them against him.",
       "rewards": {
         "xp": 1800,
-        "credits": 270,
-        "plans": [
-          "corsair"
-        ],
+        "credits": 450,
+        "items": {
+          "part:alloy:autocannon_rattler:sq": 2,
+          "barrel_assembly": 1
+        },
         "reputation": {
           "sol_patrol": 5
         }
@@ -719,15 +715,13 @@
           }
         }
       ],
-      "outro": "Titanium dust and something else, something that was alive. Take the Lancer plans and this titanium plate. You'll need a real warship for what they worship.",
+      "outro": "Titanium dust and something else, something that was alive. Take this titanium plate and a reactor core to build round. You'll need a real warship for what they worship.",
       "rewards": {
         "xp": 3200,
-        "credits": 525,
-        "plans": [
-          "lancer"
-        ],
+        "credits": 800,
         "items": {
-          "titanium_plate": 10
+          "titanium_plate": 20,
+          "reactor_core": 1
         }
       }
     },
@@ -785,13 +779,13 @@
           "count": 6
         }
       ],
-      "outro": "You held. Take these: plans for a Galleon. The Watch builds them to go where nothing else survives.",
+      "outro": "You held. Take these shield emitters from the Watch's own stores. We fit them to ships that go where nothing else survives.",
       "rewards": {
         "xp": 5000,
-        "credits": 900,
-        "plans": [
-          "galleon"
-        ]
+        "credits": 1400,
+        "items": {
+          "shield_emitter": 2
+        }
       }
     },
     {
@@ -816,13 +810,14 @@
           "text": "Defeat the Void Leviathan"
         }
       ],
-      "outro": "The wraiths scattered when the Leviathan died. Our receivers say the heartbeat runs loudest now at the centre of the Maw; the observatory says that's the black hole and nothing more. Take the Hammerhead plans. You're going to need a carrier.",
+      "outro": "The wraiths scattered when the Leviathan died. Our receivers say the heartbeat runs loudest now at the centre of the Maw; the observatory says that's the black hole and nothing more. Take this nav computer and a pair of thrust nozzles. You're going to need a ship that can get in there and back out.",
       "rewards": {
         "xp": 7000,
-        "credits": 1200,
-        "plans": [
-          "hammerhead"
-        ],
+        "credits": 1800,
+        "items": {
+          "nav_computer": 1,
+          "thrust_nozzle": 2
+        },
         "skillPoints": 1
       }
     },
@@ -844,13 +839,13 @@
           "text": "Defeat the Heart of the Maw"
         }
       ],
-      "outro": "When the Heart died, pilots all over the cluster heard the heartbeat stop. A moment later it was back. The observatory says its instruments logged nothing unusual. Kerr says it isn't the same, and that she doesn't know what that means. The Watch builds one Bastion a generation. These plans are yours.",
+      "outro": "When the Heart died, pilots all over the cluster heard the heartbeat stop. A moment later it was back. The observatory says its instruments logged nothing unusual. Kerr says it isn't the same, and that she doesn't know what that means. The Watch has kept this quantum core back a long time, for whoever came home from the Heart. It's yours.",
       "rewards": {
         "xp": 12000,
-        "credits": 3750,
-        "plans": [
-          "bastion"
-        ],
+        "credits": 5000,
+        "items": {
+          "quantum_core": 1
+        },
         "skillPoints": 2
       }
     },
@@ -980,13 +975,13 @@
           }
         }
       ],
-      "outro": "Ceres Hauler plans. Eighty-odd parts of armour and nothing to shoot with, but it'll carry a fortune if you fit cargo pods.",
+      "outro": "A Guild mining laser, off the rack we keep for our own. Fit it beside the one you've got and you'll cut twice as fast. Put a big hold behind them and you'll carry a fortune home.",
       "rewards": {
         "xp": 1200,
-        "credits": 225,
-        "plans": [
-          "hauler"
-        ],
+        "credits": 450,
+        "items": {
+          "part:alloy:utility_mining_laser:sq": 1
+        },
         "reputation": {
           "miners": 10
         }
@@ -1115,18 +1110,15 @@
           "text": "Fly a ship with 4 armour plates"
         }
       ],
-      "outro": "Good placement. Here: Bulwark plans. A brick with guns, and the best first warship I know of.",
+      "outro": "Good placement. Here's sheet for more of it, and something towards the yard fees. A brick with guns is the best first warship I know of: go and build yourself one.",
       "rewards": {
         "xp": 500,
-        "credits": 75,
-        "plans": [
-          "bulwark"
-        ],
+        "credits": 150,
         "reputation": {
           "shipwrights": 8
         },
         "items": {
-          "composite_sheet": 6
+          "composite_sheet": 12
         }
       }
     },
@@ -3154,11 +3146,13 @@
           "text": "Fly the Lagrange test run in your leestone-plated ship: 6 rings in 2 minutes"
         }
       ],
-      "outro": "Marrow sent us your time, with notes. Most of the notes are laughter. Heavier and slower, yes. We build it for tradition, and for durability. Here are the plans for a tender of our own, plated the same way. Fly it or don't. It will last either way.",
+      "outro": "Marrow sent us your time, with notes. Most of the notes are laughter. Heavier and slower, yes. We build it for tradition, and for durability. Here is more of our stone, enough to plate the rest of her the way we plate our tenders. Fly her or don't. She will last either way.",
       "rewards": {
         "xp": 2600,
-        "credits": 400,
-        "plans": ["ark-tender"],
+        "credits": 600,
+        "items": {
+          "leestone_plate": 10
+        },
         "reputation": {
           "ark": 10
         }

@@ -140,7 +140,7 @@ function check(c: Ctx, spec: Spec, v: unknown, path: string): void {
 // Shapes of each file
 // ---------------------------------------------------------------------------
 
-const ITEM_CATEGORIES = ['mineral', 'gem', 'volatile', 'refined', 'component', 'artefact', 'consumable', 'ammo', 'jewel', 'part', 'plan', 'quest'];
+const ITEM_CATEGORIES = ['mineral', 'gem', 'volatile', 'refined', 'component', 'artefact', 'consumable', 'ammo', 'jewel', 'part', 'quest'];
 const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
 const STATION_SERVICES = ['repair', 'storage', 'refinery', 'fabricator', 'market', 'shipyard', 'refuel', 'shop', 'bank', 'quests'];
 /** Profile stats that something bumps (Pilots.bumpStat callers), plus the two computed ones */
@@ -295,7 +295,7 @@ const SHAPES: Record<string, Spec> = {
   'items.json': strict({
     items: arr(strict({
       id: 'string', name: 'string', category: oneOf(...ITEM_CATEGORIES), rarity: oneOf(...RARITIES), value: 'number', color: 'string', description: 'string',
-      'volume?': 'number', 'part?': obj({ material: 'string', fn: 'string', piece: 'string' }), 'plan?': 'string', 'quest?': 'string',
+      'volume?': 'number', 'part?': obj({ material: 'string', fn: 'string', piece: 'string' }), 'quest?': 'string',
       'repair?': obj({ budget: 'number', hpPerSec: 'number', restoreSec: 'number' }),
       'family?': oneOf(...MINERAL_FAMILIES), 'tier?': 'number', 'trace?': 'boolean', 'short?': 'string', 'socket?': obj({ type: 'string', level: 'number' }),
       'ammoFor?': obj({ weapon: 'string', rounds: 'number', 'mods?': 'any' }), 'codex?': 'string',
@@ -717,10 +717,9 @@ export function validateGameData(files: GameDataFiles, opts: ValidateOptions = {
   const material = (file: string, path: string, id: unknown) => ships && ref(file, path, 'material (ships/materials.json)', materials, id);
   const piece = (file: string, path: string, id: unknown) => ships && ref(file, path, 'piece (ships/pieces.json)', pieces, id);
 
-  /** Items: listed, or a generated part (part:<material>:<fn>:<piece>) or plan (plan:<file>) */
+  /** Items: listed, or a generated part (part:<material>:<fn>:<piece>) */
   const item = (file: string, path: string, id: unknown): void => {
     if (typeof id !== 'string' || itemRows.has(id)) return;
-    if (id.startsWith('plan:')) { if (ships) ref(file, path, 'ship plan (ships/blueprints) in item', library, id.slice(5)); return; }
     if (id.startsWith('part:')) {
       const p = parsePartItemId(id);
       if (!p) { c.err(path, `malformed part id "${id}" (part:<material>:<fn>:<piece>)`, file); return; }
@@ -909,7 +908,6 @@ export function validateGameData(files: GameDataFiles, opts: ValidateOptions = {
   // items.json
   list(f.items?.items).forEach((it, i) => {
     const F = 'items.json', P = `items[${i}]`;
-    if (it?.plan !== undefined) plan(F, `${P}.plan`, it.plan);
     if (it?.quest !== undefined) quest(F, `${P}.quest`, it.quest);
     if (it?.codex !== undefined) record(F, `${P}.codex`, it.codex);
     if (isObj(it?.part)) { material(F, `${P}.part.material`, it.part.material); fn(F, `${P}.part.fn`, it.part.fn); piece(F, `${P}.part.piece`, it.part.piece); }
@@ -1052,6 +1050,9 @@ export function validateGameData(files: GameDataFiles, opts: ValidateOptions = {
   {
     const F = 'quests.json';
     const qf = f.quests;
+    // Ships are not rewards: a job hands out a design only for a build job to use (main_01's Prospector, for main_02)
+    const builtPlans = new Set<unknown>();
+    for (const q of list(qf?.quests)) for (const s of list(q?.steps)) if (s?.type === 'slot' || s?.type === 'build' || s?.type === 'fly') builtPlans.add(s.plan);
     list(qf?.quests).forEach((q, i) => {
       const P = `quests[${i}]`;
       if (q?.giver !== undefined) station(F, `${P}.giver`, q.giver);
@@ -1110,7 +1111,9 @@ export function validateGameData(files: GameDataFiles, opts: ValidateOptions = {
       });
       const r = q?.rewards;
       bag(F, `${P}.rewards.items`, r?.items);
-      list(r?.plans).forEach((x, j) => plan(F, `${P}.rewards.plans[${j}]`, x));
+      list(r?.plans).forEach((x, j) => {
+        if (plan(F, `${P}.rewards.plans[${j}]`, x) && !builtPlans.has(x)) c.err(`${P}.rewards.plans[${j}]`, `ship plans are not rewards: "${x}" is no build job's design (slot/build/fly steps)`, F);
+      });
       list(r?.recipes).forEach((x, j) => licence(F, `${P}.rewards.recipes[${j}]`, x));
       list(r?.licences).forEach((x, j) => ref(F, `${P}.rewards.licences[${j}]`, 'sector licence (quests.json restricted)', licences, x));
       for (const [k] of entries(r?.reputation)) ref(F, `${P}.rewards.reputation.${k}`, 'reputation (quests.json reputations)', reputations, k);

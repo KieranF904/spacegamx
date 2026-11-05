@@ -6,7 +6,7 @@
  * mirror it for the snapshot. This module loads profiles on login, applies
  * them to the player's entity, saves them (autosave, dock, logout, shutdown),
  * and handles every item action the client asks for:
- *   - cargo ↔ storage (only near a station), jettison, consumables, plans
+ *   - cargo ↔ storage (only near a station), jettison, consumables
  *   - hangar refits, which may only use parts the pilot owns
  *   - the rebuild bill when a station regrows lost parts (lent, if they can't pay)
  *   - death: cargo dropped as a pod, the ship wrecked down to its core
@@ -727,7 +727,7 @@ export class Pilots {
     this.sendItems(conn);
   }
 
-  /** Consumables, and plans (learning them) */
+  /** Consumables */
   handleUse(conn: PilotConn, msg: { id: string }): void {
     const s = this.sessions.get(conn);
     const eid = conn.playerId;
@@ -735,15 +735,6 @@ export class Pilots {
     const def = this.econ.items.get(msg.id);
     if (!def || this.available(conn, msg.id) <= 0) return;
     const alive = hasComponent(this.host.world, Player, eid) && !hasComponent(this.host.world, Dead, eid);
-    if (def.category === 'plan' && def.plan) {
-      if (s.profile.plans.includes(def.plan)) return this.toast(conn, `You already know the ${def.name.replace(/ Plan$/, '')}`, 'info');
-      this.take(conn, { [msg.id]: 1 });
-      s.profile.plans.push(def.plan);
-      this.toast(conn, `Learned: ${def.name}. Build it in the hangar.`, 'good');
-      this.sendProfile(conn);
-      this.saveNow(conn);
-      return;
-    }
     if (!alive) return;
     if (def.repair) {
       if (!this.ships.needsRepair(eid)) return this.toast(conn, 'Your ship is already in one piece', 'info');

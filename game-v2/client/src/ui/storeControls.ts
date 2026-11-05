@@ -33,7 +33,7 @@ function restockable(pilot: PilotState): number {
 const LABELS: Record<StoreSweep, [string, string]> = {
   safe: ['Store all but ammo & utility', 'Everything except ammunition, your loadout, repair kits and other consumables, quick bar items and job items'],
   ores: ['Store ore & materials', 'Raw ore, gems, volatiles and refined plate and wire'],
-  loot: ['Store loot', 'Components, artefacts, cut gems, plans and modules'],
+  loot: ['Store loot', 'Components, artefacts, cut gems and modules'],
   all: ['Store everything', 'The whole hold, ammunition and utility too (click twice)'],
 };
 

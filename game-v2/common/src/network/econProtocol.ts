@@ -155,7 +155,7 @@ export interface ClientItemJettisonMessage {
   n: number;
 }
 
-/** Use a consumable, or learn a plan */
+/** Use a consumable */
 export interface ClientItemUseMessage {
   type: 'itemUse';
   id: string;

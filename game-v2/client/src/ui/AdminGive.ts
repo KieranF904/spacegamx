@@ -45,7 +45,6 @@ const GROUPS: { id: string; label: string; test(d: ItemDef): boolean }[] = [
   { id: 'artefact', label: 'Artefacts', test: (d) => d.category === 'artefact' },
   { id: 'consumable', label: 'Consumables', test: (d) => d.category === 'consumable' },
   { id: 'ammo', label: 'Ammo', test: (d) => d.category === 'ammo' },
-  { id: 'plan', label: 'Ship plans', test: (d) => d.category === 'plan' },
   { id: 'quest', label: 'Job items', test: (d) => d.category === 'quest' },
   { id: 'part', label: 'Ship parts', test: (d) => d.category === 'part' },
 ];

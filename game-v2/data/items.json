@@ -1,5 +1,5 @@
 {
-  "_comment": "Item catalogue. Ship parts (part:<material>:<fn>:<piece>) and ship plans (plan:<blueprint>) are generated from the ship catalogue and blueprint library, not listed here. value = base credits; volume = cargo space per unit (default 1).",
+  "_comment": "Item catalogue. Ship parts (part:<material>:<fn>:<piece>) are generated from the ship catalogue, not listed here (ship plans are not items). value = base credits; volume = cargo space per unit (default 1).",
   "items": [
     {
       "id": "iron_ore",
