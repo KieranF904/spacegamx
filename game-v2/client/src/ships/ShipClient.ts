@@ -801,6 +801,7 @@ export class ShipClient {
       (id, at, volume) => { this.opts.sound?.(id, at, volume); }, this.opts.tuning.repair?.range ?? 0);
     this.damageFx.setQuality(this.quality.particles, this.quality.effectCap);
     this.bossFx = new BossFx(renderer.getEffectLayer(), this.opts.state, (id, at, volume, pitch) => this.opts.sound?.(id, at, volume, pitch) ?? null);
+    this.bossFx.partsAt = (id, byStage) => this.renderer?.exposedAt(id, byStage) ?? [];
     // What glows gets bloom
     for (const c of [...this.renderer.glowLayers(), this.damageFx.glowLayer, this.beamFx.glowLayer, this.bossFx.glowLayer]) renderer.addBloomSource(c);
     this.jumpFx.onPhase = (id, prev, next, x, y) => {
@@ -1161,6 +1162,10 @@ export class ShipClient {
       case 'bossBeam':
         this.bossFx?.onBeam(msg);
         return true;
+      case 'bossWindow':
+        // Its exposed pieces blaze while its window runs (drawn from this message alone)
+        this.bossFx?.onWindow(msg);
+        return false; // the game shows the meter too
       case 'bossBlow':
         this.renderer?.blow(msg.bodyId, msg.part);
         return true;

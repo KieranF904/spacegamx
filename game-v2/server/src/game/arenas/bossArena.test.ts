@@ -163,8 +163,8 @@ describe('boss arenas', () => {
     const w = world();
     wake(w);
     const b = w.boss(), hooks = devHooks(w.server.bosses.brainOf(b))!;
-    // (outside her windows the Mother takes her own x0.3: brains/scrapMother.ts)
-    expect(w.server.bosses.taken(b)).toBeCloseTo(0.3);
+    // (outside her windows the Mother takes her own x0.25: brains/scrapMother.ts)
+    expect(w.server.bosses.taken(b)).toBeCloseTo(0.25);
     w.t.send({ type: 'bossDevTool', action: 'window' } as any);
     expect(w.server.bosses.taken(b)).toBe(WINDOW.inside);
     const cap = hooks.fight.window!.cap;
@@ -174,7 +174,7 @@ describe('boss arenas', () => {
     expect(hooks.fight.window!.crackAt).toBeGreaterThanOrEqual(0);
     expect(hooks.fight.stats.cracks).toBe(1);
     // (staggered: outside rate, and it holds still)
-    expect(w.server.bosses.taken(b)).toBeCloseTo(0.3);
+    expect(w.server.bosses.taken(b)).toBeCloseTo(0.25);
     w.step(8);
     const told = w.msgs('bossWindow');
     expect(told[0]).toMatchObject({ bodyId: b, fill: 0, cap });
@@ -183,7 +183,7 @@ describe('boss arenas', () => {
     expect(w.msgs('bossWindow').at(-1)!.ticks).toBe(0);
   });
 
-  it('personal attacks: each beat each pilot present may draw one, the loose cap holds with 12 dummies, none in a signature move', () => {
+  it('personal attacks: each beat each pilot present may draw one, the loose cap holds with 12 dummies, none in a window\'s rest beat', () => {
     const w = world();
     wake(w, true);
     const b = w.boss(), brain = w.server.bosses.brainOf(b)!, hooks = devHooks(brain)!;
@@ -202,13 +202,19 @@ describe('boss arenas', () => {
     for (const [, slot] of drawn) expect(slot).toBeLessThan(13);
     // Every draw names the slot's pilot, and the dummies are among those drawn
     expect(new Set(drawn.map((d) => d[1])).size).toBeGreaterThan(1);
-    // A signature move holds them off
-    tables.signature = { barrage: { ticks: 300, cap: 99999 }, haul: { ticks: 300, cap: 99999 }, brood: { ticks: 300, cap: 99999 } };
-    drawn.length = 0;
-    const during: string[] = [];
-    host.decide = (eid: number, op: number, args: number[], s: unknown) => { if (op === DECISION.PERSONAL) during.push(hooks.moveName); decide?.(eid, op, args, s); };
-    w.step(1500);
-    for (const m of during) expect(['barrage', 'haul', 'brood']).not.toContain(m);
+    // (her attack phases: they come in her signature moves too; only a window's rest beat holds them off)
+    let inMoves = 0, inRest = 0;
+    host.decide = (eid: number, op: number, args: number[], s: unknown) => {
+      if (op === DECISION.PERSONAL) {
+        const win = hooks.fight.window, now = w.server.currentTick;
+        if (hooks.fight.isSignature(hooks.moveName)) inMoves++;
+        if (win && now >= win.at && now < win.at + WINDOW.rest) inRest++;
+      }
+      decide?.(eid, op, args, s);
+    };
+    w.step(2400);
+    expect(inMoves).toBeGreaterThan(0);
+    expect(inRest).toBe(0);
   }, 60_000);
 
   it('the boss tools: hold, play a move, stage jump, dummies that deal damage, the damage log and the summary', () => {
@@ -239,7 +245,8 @@ describe('boss arenas', () => {
     const log = w.msgs('bossDev').at(-1)!.log;
     expect(log.some((e) => e.attack === 'personal mark' && /Scrap Mother/.test(e.source))).toBe(true);
     w.t.send({ type: 'bossDevTool', action: 'summary' } as any);
-    expect(w.msgs('bossDev').at(-1)!.summary).toMatch(/Personal attacks drawn: arena 1/);
+    // (the one forced on me at least: her own rolls come in her moves too now)
+    expect(w.msgs('bossDev').at(-1)!.summary).toMatch(/Personal attacks drawn: (.*, )?arena [1-9]/);
     w.server.bosses.unhurt.add(w.pid);
     w.t.send({ type: 'bossDevTool', action: 'stage', n: 2 } as any);
     w.step(2);

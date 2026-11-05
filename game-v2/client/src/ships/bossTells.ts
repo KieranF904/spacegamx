@@ -14,6 +14,8 @@
  *   sparks      sparks spitting (claws jammed, an arm overextended: a window)
  *   drip        white drips off cooling welders (a window)
  *   grind       rotors grinding up: a spinning ring
+ *   glint       a hard white glint on a gun, a spike or a core: an aimed shot coming at where you are (any boss's
+ *               light threat between its moves: sidestep)
  *   rivet, claw, intake, weld, crane, ram, sludge   the Scrap Mother's lanes and landing circle, thin and faint
  */
 import type { Graphics } from 'pixi.js';
@@ -32,13 +34,14 @@ export function tellSound(kind: string): [string, number, number] | null {
     // (A pull, the magnets' or the throat's: a low muffled inhale, not the old charging whine. Kieran 2026-11-05)
     case 'glow_green': return ['suck_whoosh', 0.55, 1];
     case 'glow_amber': return ['ui_click', 0.7, 0.5];
-    case 'glow_white': return ['jump_charge', 0.6, 1.2];
+    case 'glow_white': return ['target_tone', 0.45, 1.25];
     case 'chime': return ['laser_pulse', 0.5, 1.6];
     case 'smoke': return ['gun_vent', 0.6, 0.7];
     // (The rotors grind with the throat's pull: its whoosh is theirs, not one more sound a rotor)
     case 'grind': return null;
     case 'steam': case 'drip': return ['gun_vent', 0.4, 0.9];
     case 'sparks': return ['hit', 0.35, 0.7];
+    case 'glint': return ['gun_clack', 0.4, 1.5];
     case 'glow_red': case 'crane': case 'ram': case 'claw': case 'intake': case 'weld': case 'sludge': return null;
   }
   return null;
@@ -65,7 +68,7 @@ export const WARN_GAP_DEFAULT_MS = 250;
 
 /** Is this one of the kinds drawn here */
 export function isTell(kind: string): boolean {
-  return kind in GLOW || kind in LANE || ['chime', 'smoke', 'steam', 'sparks', 'drip', 'grind', 'sludge'].includes(kind);
+  return kind in GLOW || kind in LANE || ['chime', 'smoke', 'steam', 'sparks', 'drip', 'grind', 'sludge', 'glint'].includes(kind);
 }
 
 const hash = (i: number) => { const s = Math.sin(i * 127.1 + 31.7) * 43758.5453; return s - Math.floor(s); };
@@ -95,6 +98,16 @@ export function drawTell(g: Graphics, m: { kind: string; shape: string; radius?:
       g.circle(at.x, at.y, r * (0.3 + 1.6 * ph)).stroke({ color: 0xc8fff0, width: 3, alpha: 0.6 * (1 - ph) * fade });
     }
     g.circle(at.x, at.y, r * 0.35).fill({ color: 0xc8fff0, alpha: 0.35 * fade });
+    return;
+  }
+  if (kind === 'glint') {
+    // A four-pointed star swelling to the moment it fires, a hard white core
+    const s = r * (0.5 + 1.1 * k), a = t * 1.5;
+    for (let i = 0; i < 4; i++) {
+      const d = a + (i * Math.PI) / 2, ux = Math.cos(d), uy = Math.sin(d);
+      g.moveTo(at.x - uy * s * 0.12, at.y + ux * s * 0.12).lineTo(at.x + ux * s, at.y + uy * s).lineTo(at.x + uy * s * 0.12, at.y - ux * s * 0.12).fill({ color: 0xffffff, alpha: (0.35 + 0.5 * k) * fade });
+    }
+    g.circle(at.x, at.y, r * 0.3).fill({ color: 0xffffff, alpha: (0.5 + 0.5 * k) * fade });
     return;
   }
   if (kind === 'grind') {

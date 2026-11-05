@@ -1,40 +1,48 @@
 /**
  * The Scrap Mother (her Nest Rock in the Drift, past Nereid): a nest the size of a station, welded out of salvage
- * (scripts/bespoke/scrap_mother.mjs). The generalist starter boss (docs/bosses/rework-2026-11.md section 4): any loadout
- * works. Three stages, each a loop of three signature moves, one at a time and never scaled by how many fight her. Each
- * has one light tell on her hull (always the same for the same move), one dodge rule that always works, and a window
- * after it (fightRules.ts: x2 up to its cap; outside windows she takes x0.35). Between moves she only flies: no filler fire.
+ * (scripts/bespoke/scrap_mother.mjs). The generalist starter boss (docs/bosses/rework-2026-11.md sections 4 and 15): any
+ * loadout works. Each stage is an attack phase: its signature moves chained back to back (a short beat between them),
+ * then one short window (fightRules.ts: x2 up to its cap; outside it she takes x0.3), then the phase again. Nothing is
+ * scaled by how many fight her. Each move has one light tell on her hull (always the same for the same move) and one
+ * dodge rule that always works. Between moves and in her window (after its 1 s rest beat) she keeps up a light threat:
+ * a gun's aimed rivets down a drawn line (stages one and two), a spike's aimed chunks (stage three).
  *
- * Stage one, the hoard (her nest wings, crane arms, grapple booms): she holds off.
+ * Stage one, the hoard (her nest wings, crane arms, grapple booms): she holds off. Phase: barrage, crane, haul.
  *
- *   barrage   tell: a wing gun swings onto you with a clank, a faint yellow line. Each gun in turn, clockwise, once
- *             round: 4 rivets down its line, drawn at you, never ahead.        Rule: cross the line.     Window: breeches open
- *   haul      tell: her magnets hum and glow green. A pull towards her front (only her front), then her claws snap shut
- *             across it.                                                         Rule: get out of her front. Window: claws jammed
+ *   barrage   tell: a wing gun swings onto you with a clank, a faint yellow line. Her guns in turn, clockwise, a new
+ *             line every 0.45 s (two or three live at once), 5 rivets down each, drawn at you, never ahead.
+ *                                                                                Rule: cross the line
  *   crane     tell: a crane arm's elbow lamp blinks amber twice. The arm swings across her front from that side, its
- *             claw a wide hit from 800 out to 3,200.                             Rule: get in close.       Window: overextended
+ *             claw a wide hit from 600 off her hull out; the other arm blinks as it goes and swings back 0.4 s after.
+ *                                                                                Rule: get in close
+ *   haul      tell: her magnets hum and glow green. A strong pull towards her front (only her front), then her claws
+ *             snap shut across it (the crane drew you in close: now slide off her front). Rule: get out of her front
  *
- * Stage two, the mill (her body): she closes in.
+ * Stage two, the mill (her body): she closes in. Phase: shrapnel, charge, intake, charge.
  *
- *   intake    tell: her throat glows, her rotors grind up. Her maw's lane pulls you in towards the rotors.
- *                                                                                Rule: leave the lane sideways. Window: choked
- *   shrapnel  tell: her stacks puff black smoke, three puffs. Three rings of chunks, a gap in every ring at her left and
- *             right flanks as she faced at the tell.                            Rule: get level with her side. Window: stacks overheated
+ *   shrapnel  tell: her stacks puff black smoke, three puffs. Four rings of fast chunks out to the nest's walls; the gap
+ *             in every ring is at her flanks as she faces when it's thrown, and she turns a little between rings.
+ *                                                                                Rule: stay level with her side
  *   charge    tell: her drives flare white. She lines up on where you are and rams, not turning once she goes.
- *                                                                                Rule: sidestep.           Window: overshoot
+ *                                                                                Rule: sidestep
+ *   intake    tell: her throat glows, her rotors grind up. Her maw's lane pulls you in towards the rotors, and turns
+ *             slowly after you.                                                  Rule: leave the lane sideways
  *
- * Stage three, the seed (her heart): small and quick; she repositions once a loop, during the spiral's tell.
+ * Stage three, the seed (her heart): small and quick. Phase: spiral, scissor, seekers, scissor.
  *
- *   scissor   tell: her welder tips glow blue-white. Two beams sweep in from wide until they cross ahead of her.
- *                                                                                Rule: get in close.       Window: welders cooling
- *   spiral    tell: her core pulses green, she darts to a new angle. Four arms of chunks spun out one way only.
- *                                                                                Rule: circle with the spin. Window: her iris open
- *   seekers   tell: her four spikes chime in turn. Eight slow-turning seekers in all, shared among the pilots she sees.
- *                                                                                Rule: turn hard across them. Window: spikes spent
+ *   spiral    tell: her core pulses green, she darts to a new angle. Four arms of fast chunks spun out one way only,
+ *             out to the walls.                                                  Rule: circle with the spin
+ *   scissor   tell: her welder tips glow blue-white. Two beams sweep in from wide until they cross ahead of her, then
+ *             back out.                                                          Rule: get in close
+ *   seekers   tell: her four spikes chime in turn. Eight slow-turning seekers in all, two waves of four, shared among
+ *             the pilots she sees.                                               Rule: turn hard across them
  *
- * Per pilot (fightRules.ts personal): marked rivets and a mite pair (stage one), marked rivets and a sludge drop (two),
- * a sludge drop and a lone seeker (three). Breaking a move's part takes the move away: she only flies in its slot, then
- * its window opens as ever (safer, not slower).
+ * Her window (one a phase) is drawn by clients from the window alone (BossFx: the stage's pieces in bosses.json
+ * `exposed`): her breeches and magnets (stage one), her throat and stacks (two), her core (three).
+ *
+ * Per pilot (fightRules.ts personal, held only in a window's rest beat and a stagger): marked rivets and a mite pair
+ * (stage one), marked rivets and a sludge drop (two), a sludge drop and a lone seeker (three). Breaking a move's part
+ * takes that move out of her phase (she goes straight on to the next): safer, not slower; her window still comes.
  */
 
 import { Position, Velocity, WINDOW, datan2, dcos, dhypot, dsin, wantAim, wantDrive, wantFace, wantFly, wantHold, windowOpen, type WindowSpec } from '@space-game/common';
@@ -45,90 +53,71 @@ import { StagedBrain, type Move } from './staged.js';
 const P = (name: string) => `scrapmother_${name}`;
 
 /**
- * Her signature moves' windows (rework 4.2): 7 s, scissor and seekers 6 s. Caps are what lands, after her armour: her
- * plating (armour 2 where a piece is plate) lets a starter's Pip through at about 0.40-0.48, not the model's 0.74, so
- * caps and stage HP (bosses.json stageHp) are the model's x that share: a solo starter still fills about 2/3 of one
+ * Her attack phases' windows (rework section 15), by stage: one a phase, 5 s (4.5 s in stage three). Caps are what
+ * lands after her armour (her plating lets a starter's Pip through at about 0.40-0.48): a solo starter fills about two
+ * thirds of one, two or more crack it
  */
-const WIN = 420, WIN_SHORT = 360;
-const win = (ticks: number, cap: number): WindowSpec => ({ ticks, cap });
+export const MOTHER_EXPOSURE: WindowSpec[] = [{ ticks: 300, cap: 440 }, { ticks: 300, cap: 470 }, { ticks: 300, cap: 480 }];
+/** Her signature moves (what counts as one: fightRules.ts), each with its stage's window */
 export const MOTHER_SIGNATURE: Record<string, WindowSpec> = {
-  barrage: win(WIN, 760), haul: win(WIN, 760), crane: win(WIN, 760),
-  intake: win(WIN, 820), shrapnel: win(WIN, 820), charge: win(WIN, 820),
-  scissor: win(WIN_SHORT, 900), spiral: win(WIN, 900), seekers: win(WIN_SHORT, 900),
+  barrage: MOTHER_EXPOSURE[0], haul: MOTHER_EXPOSURE[0], crane: MOTHER_EXPOSURE[0],
+  intake: MOTHER_EXPOSURE[1], shrapnel: MOTHER_EXPOSURE[1], charge: MOTHER_EXPOSURE[1],
+  scissor: MOTHER_EXPOSURE[2], spiral: MOTHER_EXPOSURE[2], seekers: MOTHER_EXPOSURE[2],
 };
+/** Her phases: the moves chained in order, the beat between two of them, her rest after a window (ticks), by stage */
+export const MOTHER_LOOP = [['barrage', 'crane', 'haul'], ['shrapnel', 'charge', 'intake', 'charge'], ['spiral', 'scissor', 'seekers', 'scissor']];
+const CHAIN = [30, 24, 18], REST = [30, 24, 18];
+/** Her light threat between moves and in her windows: a harassing shot every this many ticks, by stage */
+const HARASS = [90, 80, 70];
 /** Outside her windows she takes this (not the shared x0.35): a group's extra pilots add less (rework 3.3's lever) */
-const OUTSIDE = 0.3;
-/** A move whose part is gone: she idles in its slot this long (its tell and active part's time), then its window */
-const DISABLED_REST = 360;
+const OUTSIDE = 0.25;
 /** A signature move puts at most this many shots within DENSITY_R of any pilot (rework 2.3) */
 const DENSITY = 6, DENSITY_R = 800;
-/** Tells (ticks): a line attack's warning, an area one's */
-const TELL_LINE = 60, TELL_AREA = 78;
+/** Tells (ticks): a line attack's warning, an area one's (never shorter: rework 2.4) */
+const TELL_LINE = 54, TELL_AREA = 72;
 /** The crane's claw: within CRANE_CLEAR of her hull it passes over you; it bites from CRANE_BITE of its reach out (client bossTells.ts the same) */
-const CRANE_CLEAR = 600, CRANE_BITE = 0.52, CRANE_W = 260, CRANE_SWEEP = 150;
-/** Her rings: chunks in one, and the gap's width (chunks) at each flank */
-const RING_N = 26, RING_GAP = 3;
+const CRANE_CLEAR = 600, CRANE_BITE = 0.52, CRANE_W = 260, CRANE_SWEEP = 96, CRANE_BACK = 24;
+/** Her rings: chunks in one, the gap's width (chunks) at each flank, how many, how far apart (ticks), and how far she turns between */
+const RING_N = 26, RING_GAP = 3, RINGS = 4, RING_EVERY = 36, RING_TURN = 0.2;
+/** Her stage-three harassing shot: a spike's glint, then three chunks at where you were (sidestep) */
+const POT_WARN = 40, POT_FAN = 0.12;
 
 export class ScrapMotherBrain extends StagedBrain {
   /** Rivets due down a gun's line (its own frame: where on her, which way) */
   private rivets: { part: number; rel: number; at: number; left: number; scale: number }[] = [];
   /** Sludge pools still burning */
   private pools: { x: number; y: number; next: number; until: number }[] = [];
+  /** Harassing chunks due (stage three: from a spike, at where its pilot was when it glinted) */
+  private pots: { spike: number; x: number; y: number; at: number }[] = [];
 
   constructor(host: BrainHost) {
     super(host, {
-      loop: [['barrage', 'haul', 'crane'], ['intake', 'shrapnel', 'charge'], ['scissor', 'spiral', 'seekers']],
-      // (after a window: 2 s she only flies, before the next move's tell)
-      rest: [120, 120, 120], haste: [1, 1, 1],
-      signature: MOTHER_SIGNATURE,
+      loop: MOTHER_LOOP, rest: REST, haste: [1, 1, 1], chain: CHAIN, harass: HARASS,
+      signature: MOTHER_SIGNATURE, exposure: MOTHER_EXPOSURE,
       personal: { beat: 120, chance: 0.2, ticks: 300, pool: [['rivets', 'mites'], ['rivets', 'sludge'], ['sludge', 'seeker']] },
     }, 'scrap_mother');
   }
 
+  /** A move by name, or null when its part is shot off (her phase goes straight on without it) */
   protected make(id: string): Move | null {
-    const can = (() => {
-      switch (id) {
-        case 'barrage': return this.working('autocannon').length > 0;
-        case 'haul': return this.magnets().length > 0;
-        case 'crane': return this.cranes().length > 0;
-        case 'intake': return this.named(P('throat')) >= 0;
-        case 'shrapnel': return this.named(P('stacks')) >= 0;
-        case 'charge': return this.drives().length > 0;
-        case 'scissor': return this.working('arc').length > 0;
-        case 'spiral': return this.core() >= 0;
-        case 'seekers': return this.spikes().length > 0;
-      }
-      return null;
-    })();
-    if (can === null) return null;
-    if (!can) return this.resting(id);
     switch (id) {
-      case 'barrage': return this.barrage();
-      case 'haul': return this.haul();
-      case 'crane': return this.crane();
-      case 'intake': return this.intake();
-      case 'shrapnel': return this.shrapnel();
-      case 'charge': return this.charge();
-      case 'scissor': return this.scissor();
-      case 'spiral': return this.spiral();
-      default: return this.seekers();
+      case 'barrage': return this.working('autocannon').length ? this.barrage() : null;
+      case 'haul': return this.magnets().length ? this.haul() : null;
+      case 'crane': return this.cranes().length ? this.crane() : null;
+      case 'intake': return this.named(P('throat')) >= 0 ? this.intake() : null;
+      case 'shrapnel': return this.named(P('stacks')) >= 0 ? this.shrapnel() : null;
+      case 'charge': return this.drives().length ? this.charge() : null;
+      case 'scissor': return this.working('arc').length ? this.scissor() : null;
+      case 'spiral': return this.core() >= 0 ? this.spiral() : null;
+      case 'seekers': return this.spikes().length ? this.seekers() : null;
     }
-  }
-
-  /**
-   * A move whose part is shot off: she only flies in its slot (no attack, so personal attacks may come), then shows its
-   * window as ever (the stump sparking). Breaking a move off makes her safer, not slower: every part of stage one has
-   * to come off to beat it, so without this the end of each stage would have no windows at all
-   */
-  private *resting(id: string): Move {
-    this.moveName = 'rest';
-    for (let i = 0; i < DISABLED_REST; i++) { this.want = wantFly(); yield; }
-    this.moveName = id;
+    return null;
   }
 
   protected onStop(): void {
     this.rivets = [];
     this.pools = [];
+    this.pots = [];
   }
 
   // ---- Her parts ----
@@ -153,6 +142,13 @@ export class ScrapMotherBrain extends StagedBrain {
     return { x: me.x + dcos(me.angle) * d, y: me.y + dsin(me.angle) * d };
   }
 
+  /** Of these parts, the one whose mount faces a pilot best (round her middle) */
+  private facing(parts: number[], t: number): number {
+    const me = pose(this.view.eid), to = datan2(Position.y[t] - me.y, Position.x[t] - me.x);
+    const off = (g: number) => { const m = this.mount(g); return Math.abs(wrap(datan2(m.y - me.y, m.x - me.x) - to)); };
+    return parts.reduce((a, b) => (off(b) < off(a) ? b : a));
+  }
+
   // ---- Tells: light, on her hull, the same for the same move ----
 
   /** A glow on a part (`kind`: its colour, BossFx) for `ticks` */
@@ -160,11 +156,6 @@ export class ScrapMotherBrain extends StagedBrain {
     if (part < 0) return;
     const at = bodyFrame(this.host, this.view.eid, this.ship, part);
     this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'circle', kind, bodyId: this.view.eid, x: Math.round(at.x), y: Math.round(at.y), radius, ticks });
-  }
-
-  /** Her window's look on the parts it's about (steam, sparks, a red glow), for the window's time */
-  private windowLook(parts: number[], kind: string, ticks: number, radius = 260): void {
-    for (const p of parts) this.glow(p, kind, ticks, radius);
   }
 
   /** Hold still, facing a heading, for `ticks` */
@@ -192,7 +183,7 @@ export class ScrapMotherBrain extends StagedBrain {
     });
   }
 
-  /** One scrap chunk out of a point this way (`speed`: x a chunk's) */
+  /** One scrap chunk out of a point this way (`speed`: x a chunk's: tuning.json scrap_chunk flies to the nest's walls) */
   private chunk(x: number, y: number, a: number, speed = 1, off = 150): void {
     this.host.fire(this.view.eid, 'scrap_chunk', x + dcos(a) * off, y + dsin(a) * off, a, this.view.damage, { speed });
   }
@@ -222,20 +213,19 @@ export class ScrapMotherBrain extends StagedBrain {
     }
   }
 
-  /** Her wing guns one after another, clockwise, once round; she holds still so every line stays where it was drawn */
+  /** Her wing guns one after another, clockwise, a new line every 27 ticks; she holds still so every line stays where it was drawn */
   private *barrage(): Move {
-    const order = this.clockwise(this.working('autocannon')), gap = 48, heading = pose(this.view.eid).angle;
+    const order = this.clockwise(this.working('autocannon')), gap = 27, heading = pose(this.view.eid).angle;
     for (const part of order) {
-      if (this.ship.derived.alive[part]) this.gun(part, this.target, TELL_LINE - 6, 4);
+      if (this.ship.derived.alive[part]) this.gun(part, this.target, TELL_LINE, 5);
       yield* this.face(heading, gap);
     }
     while (this.rivets.length) { this.want = wantFace(heading); yield; }
-    this.windowLook(this.working('autocannon'), 'steam', WIN, 180);
   }
 
-  /** Her magnets hum and glow; a pull towards her front (only there); her claws snap shut across it */
+  /** Her magnets hum and glow; a strong pull towards her front (only there); her claws snap shut across it */
   private *haul(): Move {
-    const eid = this.view.eid, pullTicks = 100, reach = 3600, r = this.ship.derived.radius;
+    const eid = this.view.eid, pullTicks = 90, reach = 3600, r = this.ship.derived.radius;
     for (const m of this.magnets()) this.glow(m, 'glow_green', TELL_AREA + pullTicks, 200);
     yield* this.hold(TELL_AREA);
     const snapAt = pullTicks - 30, claws = this.wrists().length > 0;
@@ -246,7 +236,7 @@ export class ScrapMotherBrain extends StagedBrain {
         // (her front only: beside or behind her, nothing pulls)
         const dx = Position.x[q] - me.x, dy = Position.y[q] - me.y;
         if (dx * dcos(me.angle) + dy * dsin(me.angle) <= 0) continue;
-        this.pullOne(q, p.x, p.y, reach, 0.55);
+        this.pullOne(q, p.x, p.y, reach, 0.75);
       }
       if (claws && i === snapAt) {
         const tx = r * 0.75;
@@ -271,55 +261,62 @@ export class ScrapMotherBrain extends StagedBrain {
       }
       this.land(due, 260, 110, 'eruption');
     }
-    yield* this.hold(20);
-    this.windowLook(this.wrists(), 'sparks', WIN, 220);
+    yield* this.hold(12);
   }
 
   /**
    * A crane arm's elbow lamp blinks amber twice and the arm draws back; then it swings across her front half from that
-   * side to the other, its claw hitting from CRANE_CLEAR off her hull out (once a pilot a swing). Close in, it passes over
+   * side to the other, its claw hitting from CRANE_CLEAR off her hull out (once a pilot a swing). The other arm blinks
+   * as it goes and swings back the other way CRANE_BACK ticks after. Close in, both pass over
    */
   private *crane(): Move {
     const eid = this.view.eid, arms = this.cranes();
-    // (the arm on the side her target's on, else the one left)
+    // (the arm on the side her target's on first, else the one left)
     const me0 = pose(eid), t = this.target;
     const right = t >= 0 && -(Position.x[t] - me0.x) * dsin(me0.angle) + (Position.y[t] - me0.y) * dcos(me0.angle) > 0;
-    const elbow = arms.find((e) => this.ship.blueprint.parts[e].piece.endsWith(right ? '_r' : '_l')) ?? arms[0];
-    const side = this.ship.blueprint.parts[elbow].piece.endsWith('_r') ? 1 : -1;
+    const first = arms.find((e) => this.ship.blueprint.parts[e].piece.endsWith(right ? '_r' : '_l')) ?? arms[0];
+    const order = [first, ...arms.filter((e) => e !== first)];
     const heading = me0.angle, inner = this.ship.derived.radius + CRANE_CLEAR, outer = Math.round(inner / CRANE_BITE);
-    // Tell: two amber blinks on the elbow (two short glows), the arm's start line faint
-    this.glow(elbow, 'glow_amber', 26, 170);
-    this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'line', kind: 'crane', bodyId: eid, x: 0, y: 0, angle: side * 1.75, length: outer, width: CRANE_W, ticks: TELL_AREA });
+    const sideOf = (e: number) => (this.ship.blueprint.parts[e].piece.endsWith('_r') ? 1 : -1);
+    // Tell: two amber blinks on the first elbow (two short glows), the arm's start line faint
+    this.glow(first, 'glow_amber', 26, 170);
+    this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'line', kind: 'crane', bodyId: eid, x: 0, y: 0, angle: sideOf(first) * 1.75, length: outer, width: CRANE_W, ticks: TELL_AREA });
     yield* this.face(heading, 34);
-    this.glow(elbow, 'glow_amber', 26, 170);
+    this.glow(first, 'glow_amber', 26, 170);
     yield* this.face(heading, TELL_AREA - 34);
-    if (this.named(this.ship.blueprint.parts[elbow].piece) < 0) return;
-    const a0 = side * 1.75, a1 = -side * 1.75;
-    this.host.send(this.view.systemNum, { type: 'bossBeam', kind: 'crane', bodyId: eid, x: 0, y: 0, a0, a1, ticks: CRANE_SWEEP, length: outer, width: CRANE_W });
-    const struck = new Set<number>();
-    for (let i = 0; i < CRANE_SWEEP; i++) {
-      const me = pose(eid), a = me.angle + a0 + (a1 - a0) * (i / CRANE_SWEEP);
-      const x0 = me.x + dcos(a) * inner, y0 = me.y + dsin(a) * inner, x1 = me.x + dcos(a) * outer, y1 = me.y + dsin(a) * outer;
-      for (const q of this.host.players(this.view.systemNum)) {
-        if (struck.has(q)) continue;
-        const sh = this.host.ships.get(q);
-        const h = sh && this.host.ships.segmentHit(q, sh, x0, y0, x1, y1, CRANE_W / 2);
-        if (!h) continue;
-        struck.add(q);
-        this.host.ships.damagePartBy(q, h.part, 75 * this.view.damage, eid, { type: 'kinetic', pen: 1 });
-        this.host.send(this.view.systemNum, { type: 'detonation', kind: 'scrap', x: Math.round(Position.x[q]), y: Math.round(Position.y[q]), radius: 180 });
+    for (let n = 0; n < order.length; n++) {
+      const elbow = order[n], side = sideOf(elbow);
+      if (this.named(this.ship.blueprint.parts[elbow].piece) < 0) continue;
+      const a0 = side * 1.75, a1 = -side * 1.75;
+      this.host.send(this.view.systemNum, { type: 'bossBeam', kind: 'crane', bodyId: eid, x: 0, y: 0, a0, a1, ticks: CRANE_SWEEP, length: outer, width: CRANE_W });
+      const struck = new Set<number>(), next = order[n + 1];
+      for (let i = 0; i < CRANE_SWEEP; i++) {
+        // (the next arm's lamp blinks as this one goes: it's coming back the other way)
+        if (next !== undefined && (i === CRANE_SWEEP - 50 || i === CRANE_SWEEP - 20)) this.glow(next, 'glow_amber', 22, 170);
+        const me = pose(eid), a = me.angle + a0 + (a1 - a0) * (i / CRANE_SWEEP);
+        const x0 = me.x + dcos(a) * inner, y0 = me.y + dsin(a) * inner, x1 = me.x + dcos(a) * outer, y1 = me.y + dsin(a) * outer;
+        for (const q of this.host.players(this.view.systemNum)) {
+          if (struck.has(q)) continue;
+          const sh = this.host.ships.get(q);
+          const h = sh && this.host.ships.segmentHit(q, sh, x0, y0, x1, y1, CRANE_W / 2);
+          if (!h) continue;
+          struck.add(q);
+          this.host.ships.damagePartBy(q, h.part, 75 * this.view.damage, eid, { type: 'kinetic', pen: 1 });
+          this.host.send(this.view.systemNum, { type: 'detonation', kind: 'scrap', x: Math.round(Position.x[q]), y: Math.round(Position.y[q]), radius: 180 });
+        }
+        this.want = wantFace(heading);
+        yield;
       }
-      this.want = wantFace(heading);
-      yield;
+      if (next !== undefined) yield* this.face(heading, CRANE_BACK);
     }
-    this.windowLook([elbow], 'sparks', WIN, 240);
   }
 
   // ---- Stage two: the mill ----
 
-  /** Her throat glows and her rotors grind up; her maw's lane (her front, 1,000 wide) pulls you towards the rotors */
+  /** Her throat glows and her rotors grind up; her maw's lane (her front, 1,000 wide) pulls you towards the rotors, turning slowly after you */
   private *intake(): Move {
-    const eid = this.view.eid, ticks = 110, r = this.ship.derived.radius, half = 500, heading = pose(eid).angle;
+    const eid = this.view.eid, ticks = 120, r = this.ship.derived.radius, half = 500, turn = 0.09;
+    let heading = pose(eid).angle;
     const throat = this.named(P('throat')), at = bodyFrame(this.host, eid, this.ship, throat);
     this.glow(throat, 'glow_green', TELL_AREA + ticks, 260);
     for (const ro of this.rotors()) this.glow(ro, 'grind', TELL_AREA + ticks, 160);
@@ -336,30 +333,36 @@ export class ScrapMotherBrain extends StagedBrain {
         this.pullOne(q, maw.x, maw.y, 3000, 0.6);
       }
       if (grind && i % 10 === 0) this.land([{ x: maw.x, y: maw.y, at: 0 }], 420 + 100 * grind, 26 * grind, 'scrap');
+      // (the lane follows its target, slowly, a step every 15 ticks (each a want: a decision): keep going sideways)
+      const t = this.target;
+      if (t >= 0 && i % 15 === 14) heading += Math.max(-turn, Math.min(turn, wrap(datan2(Position.y[t] - me.y, Position.x[t] - me.x) - heading)));
       this.want = wantFace(heading);
       yield;
     }
-    this.windowLook([throat], 'steam', WIN, 320);
   }
 
-  /** Her stacks puff three times; three rings of chunks, the gaps at her flanks as she faced at the tell */
+  /**
+   * Her stacks puff three times; four rings of fast chunks out to the walls, the gaps at her flanks as she faces when
+   * each is thrown; she turns a little between rings (always the same way in one volley), so the gaps follow her flanks
+   */
   private *shrapnel(): Move {
-    const stacks = this.named(P('stacks')), heading = pose(this.view.eid).angle;
-    for (let k = 0; k < 3; k++) { this.glow(stacks, 'smoke', 22, 260); yield* this.face(heading, 26); }
-    for (let ring = 0; ring < 3; ring++) {
+    const stacks = this.named(P('stacks')), turn = this.host.rng() < 0.5 ? RING_TURN : -RING_TURN;
+    let heading = pose(this.view.eid).angle;
+    for (let k = 0; k < 3; k++) { this.glow(stacks, 'smoke', 22, 260); yield* this.face(heading, 24); }
+    for (let ring = 0; ring < RINGS; ring++) {
       if (this.named(P('stacks')) < 0) return;
-      const c = this.mount(stacks), angles: number[] = [];
+      const c = this.mount(stacks), h = pose(this.view.eid).angle, angles: number[] = [];
       for (let j = 0; j < RING_N; j++) {
-        const a = heading + (j / RING_N) * Math.PI * 2;
+        const a = h + (j / RING_N) * Math.PI * 2;
         // (the gaps: either side of her flanks, every ring)
-        const off = wrap(a - heading);
+        const off = wrap(a - h);
         if (Math.abs(Math.abs(off) - Math.PI / 2) < (RING_GAP / RING_N) * Math.PI) continue;
         angles.push(a);
       }
       for (const a of this.capped(c.x, c.y, angles)) this.chunk(c.x, c.y, a);
-      yield* this.face(heading, 60);
+      heading = h + turn;
+      yield* this.face(heading, RING_EVERY);
     }
-    this.windowLook([stacks], 'glow_red', WIN, 300);
   }
 
   /** Her drives flare white as she lines up on where you are; then she rams straight, not turning; spent, she drifts */
@@ -367,7 +370,7 @@ export class ScrapMotherBrain extends StagedBrain {
     const t = this.target, r = this.ship.derived.radius, drives = this.drives();
     for (const d of drives) this.glow(d, 'glow_white', TELL_LINE + 6, 180);
     for (let i = 0; i < TELL_LINE; i++) {
-      if (i === 20) this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'line', kind: 'ram', bodyId: this.view.eid, x: 0, y: 0, angle: 0, length: 3600, width: Math.round(r * 1.1), ticks: TELL_LINE - 20 });
+      if (i === 18) this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'line', kind: 'ram', bodyId: this.view.eid, x: 0, y: 0, angle: 0, length: 3600, width: Math.round(r * 1.1), ticks: TELL_LINE - 18 });
       this.want = t >= 0 ? wantAim() : wantHold();
       yield;
     }
@@ -375,20 +378,22 @@ export class ScrapMotherBrain extends StagedBrain {
     const vx = dcos(me.angle), vy = dsin(me.angle);
     let room = 0;
     for (let s = 0; s < 4 * this.flight.homeR; s += 200) { if (this.fromHome(me.x + vx * s, me.y + vy * s) > this.flight.homeR + 1500) break; room = s; }
-    const speed = Math.max(12, Math.min(24, room / 66));
+    const speed = Math.max(12, Math.min(26, room / 60));
     this.want = wantDrive(me.angle, me.angle, speed);
     yield;
-    for (let i = 0; i < 40; i++) { this.want = wantDrive(me.angle, me.angle); yield; }
-    for (let i = 0; i < 30; i++) { this.want = wantHold(); yield; }
-    this.windowLook(this.drives(), 'glow_red', WIN, 200);
+    for (let i = 0; i < 38; i++) { this.want = wantDrive(me.angle, me.angle); yield; }
+    for (let i = 0; i < 18; i++) { this.want = wantHold(); yield; }
   }
 
   // ---- Stage three: the seed ----
 
-  /** Her welder tips glow; two beams sweep in from wide either side until they cross ahead of her */
+  /** Her welder tips glow; two beams sweep in from wide either side until they cross ahead of her, then back out */
   private *scissor(): Move {
-    const eid = this.view.eid, welders = this.working('arc');
-    const heading = pose(eid).angle, ticks = 85, length = 7000, width = 70;
+    const eid = this.view.eid, welders = this.working('arc'), t = this.target;
+    // (she turns onto her target first: the cross is ahead of her, where you are)
+    let heading = pose(eid).angle;
+    if (t >= 0) { const me = pose(eid); heading = datan2(Position.y[t] - me.y, Position.x[t] - me.x); }
+    const sweep = 64, length = 7000, width = 70;
     for (const w of welders) this.glow(w, 'glow_white', TELL_LINE, 150);
     const arms = welders.map((w) => {
       const at = bodyFrame(this.host, eid, this.ship, w), side = at.y < 0 ? -1 : 1;
@@ -396,18 +401,22 @@ export class ScrapMotherBrain extends StagedBrain {
     });
     for (const a of arms) this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'line', kind: 'weld', bodyId: eid, x: Math.round(a.at.x), y: Math.round(a.at.y), angle: a.a0, length, width, ticks: TELL_LINE });
     yield* this.face(heading, TELL_LINE);
-    for (const a of arms) this.host.send(this.view.systemNum, { type: 'bossBeam', kind: 'weld', bodyId: eid, x: Math.round(a.at.x), y: Math.round(a.at.y), a0: a.a0, a1: a.a1, ticks, length, width });
-    for (let i = 0; i < ticks; i++) {
-      for (const a of arms) if (this.ship.derived.alive[a.w]) this.beam(a.at, a.a0 + (a.a1 - a.a0) * (i / ticks), length, width, 9);
+    // In until they cross, then straight back out
+    for (let i = 0; i < sweep * 2; i++) {
+      if (i === 0 || i === sweep) for (const a of arms) {
+        const [b0, b1] = i === 0 ? [a.a0, a.a1] : [a.a1, a.a0];
+        this.host.send(this.view.systemNum, { type: 'bossBeam', kind: 'weld', bodyId: eid, x: Math.round(a.at.x), y: Math.round(a.at.y), a0: b0, a1: b1, ticks: sweep, length, width });
+      }
+      const k = i < sweep ? i / sweep : 1 - (i - sweep) / sweep;
+      for (const a of arms) if (this.ship.derived.alive[a.w]) this.beam(a.at, a.a0 + (a.a1 - a.a0) * k, length, width, 9);
       this.want = wantFace(heading);
       yield;
     }
-    this.windowLook(this.working('arc'), 'drip', WIN_SHORT, 160);
   }
 
-  /** Her core pulses green twice as she darts once to a new angle; then four arms of chunks spun out one way only */
+  /** Her core pulses green twice as she darts once to a new angle; then four arms of fast chunks spun out one way only, out to the walls */
   private *spiral(): Move {
-    const ticks = 200, every = 12, arms = 4, spin = this.host.rng() < 0.5 ? 0.2 : -0.2;
+    const ticks = 180, every = 10, arms = 4, spin = this.host.rng() < 0.5 ? 0.2 : -0.2;
     this.glow(this.core(), 'glow_green', 36, 260);
     yield* this.dart(1000, 20, 30);
     this.glow(this.core(), 'glow_green', 36, 260);
@@ -418,29 +427,54 @@ export class ScrapMotherBrain extends StagedBrain {
       if (i % every === 0) {
         const c = this.mount(this.core()), angles: number[] = [];
         for (let k = 0; k < arms; k++) angles.push(base + (k / arms) * Math.PI * 2);
-        for (const a of this.capped(c.x, c.y, angles)) this.chunk(c.x, c.y, a, 0.8);
+        for (const a of this.capped(c.x, c.y, angles)) this.chunk(c.x, c.y, a);
         base += spin;
       }
       this.want = wantHold();
       yield;
     }
-    // (her iris opens: the old iris, harmless now: the window)
-    this.host.send(this.view.systemNum, { type: 'bossTelegraph', shape: 'circle', kind: 'iris', bodyId: this.view.eid, x: 0, y: 0, radius: Math.round(this.ship.derived.radius * 0.55 + 300), ticks: WIN });
   }
 
-  /** Her four spikes chime one after another; then eight seekers in all, shared among the pilots she can see */
+  /** Her four spikes chime one after another; then eight seekers in all, two waves of four, shared among the pilots she can see */
   private *seekers(): Move {
     const eid = this.view.eid, who = this.pilots(6000);
-    for (const s of this.spikes()) { this.glow(s, 'chime', 30, 140); yield* this.hold(18); }
+    for (const s of this.spikes()) { this.glow(s, 'chime', 30, 140); yield* this.hold(14); }
     if (!who.length) return;
-    const spikes = this.spikes();
-    for (let k = 0; k < 8 && spikes.length; k++) {
-      const s = spikes[k % spikes.length], m = this.mount(s), out = datan2(m.y - Position.y[eid], m.x - Position.x[eid]);
-      const a = out + ((k >> 2) - 0.5) * 0.5;
-      this.host.fire(eid, 'seam_seeker', m.x + dcos(a) * 60, m.y + dsin(a) * 60, a, this.view.damage, { target: who[k % who.length] });
+    for (let wave = 0; wave < 2; wave++) {
+      const spikes = this.spikes();
+      for (let k = 0; k < 4 && spikes.length; k++) {
+        const n = wave * 4 + k, s = spikes[k % spikes.length], m = this.mount(s), out = datan2(m.y - Position.y[eid], m.x - Position.x[eid]);
+        const a = out + (wave - 0.5) * 0.5;
+        this.host.fire(eid, 'seam_seeker', m.x + dcos(a) * 60, m.y + dsin(a) * 60, a, this.view.damage, { target: who[n % who.length] });
+      }
+      for (let i = 0; i < 40; i++) { this.want = wantFly(); yield; }
     }
-    for (let i = 0; i < 50; i++) { this.want = wantFly(); yield; }
-    this.windowLook(this.spikes(), 'steam', WIN_SHORT, 140);
+  }
+
+  // ---- Her light threat (staged.ts harass): between moves and in her window ----
+
+  /** A gun facing the pilot draws a thin line and puts 2 rivets down it (stages one and two); a spike glints (the glint: an aimed shot) and throws three chunks at where they were (three) */
+  protected harassShot(t: number): boolean {
+    const guns = [...this.working('autocannon'), ...this.working('flak')];
+    if (guns.length) { this.gun(this.facing(guns, t), t, TELL_LINE, 2, 0.8); return true; }
+    const spikes = this.spikes();
+    if (!spikes.length) return false;
+    const s = this.facing(spikes, t);
+    this.glow(s, 'glint', POT_WARN, 120);
+    this.pots.push({ spike: s, x: Position.x[t], y: Position.y[t], at: this.host.tick() + POT_WARN });
+    return true;
+  }
+
+  /** Harassing chunks due: three at where the pilot was when the spike glinted (sidestep) */
+  private throwPots(now: number): void {
+    for (let k = this.pots.length - 1; k >= 0; k--) {
+      const p = this.pots[k];
+      if (now < p.at) continue;
+      this.pots.splice(k, 1);
+      if (!this.ship.derived.alive[p.spike]) continue;
+      const m = this.mount(p.spike), a = datan2(p.y - m.y, p.x - m.x);
+      for (let j = -1; j <= 1; j++) this.chunk(m.x, m.y, a + j * POT_FAN, 1, 60);
+    }
   }
 
   // ---- Personal attacks (rework 4.3): one pilot's own, local to them ----
@@ -459,18 +493,13 @@ export class ScrapMotherBrain extends StagedBrain {
   private *markedRivets(t: number): Move {
     const guns = [...this.working('autocannon'), ...this.working('flak')];
     if (!guns.length || !this.ship) return;
-    const me = pose(this.view.eid), to = datan2(Position.y[t] - me.y, Position.x[t] - me.x);
-    const facing = (g: number) => { const m = this.mount(g); return Math.abs(wrap(datan2(m.y - me.y, m.x - me.x) - to)); };
-    const gun = guns.reduce((a, b) => (facing(b) < facing(a) ? b : a));
-    this.gun(gun, t, 54, 4);
+    this.gun(this.facing(guns, t), t, 54, 4);
     for (let i = 0; i < 70; i++) yield;
   }
 
   /** A brood rack on the pilot's side flickers amber; two mites hunt them (55 HP, 19 u/tick) until they burst or run out */
   private *mites(t: number, seed: number): Move {
-    const me = pose(this.view.eid), to = datan2(Position.y[t] - me.y, Position.x[t] - me.x);
-    const racks = this.working('brood_bay');
-    const rack = racks.reduce((a, b) => { const ma = this.mount(a), mb = this.mount(b); return Math.abs(wrap(datan2(mb.y - me.y, mb.x - me.x) - to)) < Math.abs(wrap(datan2(ma.y - me.y, ma.x - me.x) - to)) ? b : a; });
+    const rack = this.facing(this.working('brood_bay'), t);
     this.glow(rack, 'glow_amber', 50, 180);
     for (let i = 0; i < 50; i++) yield;
     if (!this.ship.derived.alive[rack] || !this.host.mobs) return;
@@ -512,9 +541,7 @@ export class ScrapMotherBrain extends StagedBrain {
 
   /** One spike on the pilot's side chimes; one seeker after them */
   private *loneSeeker(t: number): Move {
-    const me = pose(this.view.eid), to = datan2(Position.y[t] - me.y, Position.x[t] - me.x);
-    const spikes = this.spikes();
-    const s = spikes.reduce((a, b) => { const ma = this.mount(a), mb = this.mount(b); return Math.abs(wrap(datan2(mb.y - me.y, mb.x - me.x) - to)) < Math.abs(wrap(datan2(ma.y - me.y, ma.x - me.x) - to)) ? b : a; });
+    const me = pose(this.view.eid), s = this.facing(this.spikes(), t);
     this.glow(s, 'chime', 40, 140);
     for (let i = 0; i < 40; i++) yield;
     if (!this.ship.derived.alive[s]) return;
@@ -540,5 +567,6 @@ export class ScrapMotherBrain extends StagedBrain {
   protected passives(now: number): void {
     this.hammer(now);
     this.burnPools(now);
+    this.throwPots(now);
   }
 }

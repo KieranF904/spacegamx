@@ -18,7 +18,7 @@ import { HullWorker } from './hullWorkerClient';
 import { fromWire, type HullJob } from './hullWire';
 import { buildHull, skeletonCovered, type HullBuild } from './hullBuild';
 import { beam } from '../rendering/fxTextures';
-import { EntityType, ShipState, SIDE_NORMAL, Side, facingEdges, isOpen, isWeaponFn, STATUS_SLOWED, type Blueprint, type WeaponInfo } from '@space-game/common';
+import { EntityType, ShipState, SIDE_NORMAL, Side, currentStage, facingEdges, isOpen, isWeaponFn, STATUS_SLOWED, type Blueprint, type WeaponInfo } from '@space-game/common';
 import type { ShipSource } from './ShipStore';
 import type { GameState, InterpolatedEntity } from '../state/GameState';
 import type { Renderer } from '../rendering/Renderer';
@@ -930,6 +930,25 @@ export class ShipRenderer {
     let b = this.blown.get(id);
     if (!b) this.blown.set(id, (b = new Set()));
     b.add(part);
+  }
+
+  /**
+   * Where a boss's laid-open pieces are drawn now (world): of `byStage` (bosses.json `exposed`), the list for the stage
+   * it's fighting, standing pieces only (its window's effect rides them: BossFx)
+   */
+  exposedAt(id: number, byStage: readonly (readonly string[])[]): { x: number; y: number }[] {
+    const ship = this.bridge.bodies.get(id), view = this.views.get(id);
+    if (!ship || !view || !byStage.length) return [];
+    const st = currentStage(this.bridge.catalog, ship) || byStage.length;
+    const names = byStage[Math.max(0, Math.min(byStage.length - 1, st - 1))];
+    const geo = this.bridge.geometry(ship), [cx, cy] = ship.derived.com, cs = this.bridge.tuning.cellSize;
+    const c = view.container, cos = Math.cos(c.rotation), sin = Math.sin(c.rotation), out: { x: number; y: number }[] = [];
+    ship.blueprint.parts.forEach((p, i) => {
+      if (!ship.derived.alive[i] || !names.includes(p.piece) || !geo[i]) return;
+      const lx = (geo[i].centroid[0] - cx) * cs, ly = (geo[i].centroid[1] - cy) * cs;
+      out.push({ x: c.x + lx * cos - ly * sin, y: c.y + lx * sin + ly * cos });
+    });
+    return out;
   }
 
   /** How hot a ship's frame glows (a boss's later stage): eased towards (kept while its view comes and goes) */
