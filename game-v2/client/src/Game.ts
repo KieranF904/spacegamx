@@ -628,7 +628,6 @@ this.xpFillEl = document.getElementById('xpFill');
       if (this.heard.has(e.id)) continue;
       this.heard.add(e.id);
       if (settled && shots < 4) {
-        const own = e.data?.[6] === this.state.playerId;
         // Its gun's model, known from its fire event (no wire bytes: ShipClient.shellInfo), has its own sound; else the
         // kind's, by data[0] (the weapon type) and data[8] (fired by a turret)
         const wt = e.data?.[0] ?? 1;
@@ -640,7 +639,7 @@ this.xpFillEl = document.getElementById('xpFill');
         shots++;
         // (A cannon heard by its kind's sound: data[1], its grade, nudges the pitch, heavier marks deeper)
         const pitch = wt === 1 && !hasOwnShotSound(model) ? CANNON_GRADE_PITCH[Math.max(0, Math.min(4, (e.data?.[1] ?? 1) - 1))] : 1;
-        if (id) this.audio.play(id, e.spawnX ?? e.x, e.spawnY ?? e.y, { volume: own ? 0.6 : 0.8, pitch: pitch * (0.94 + Math.random() * 0.12) });
+        if (id) this.audio.play(id, e.spawnX ?? e.x, e.spawnY ?? e.y, { volume: 0.8, pitch });
       }
     }
     for (const id of this.heard) if (!alive.has(id)) this.heard.delete(id);

@@ -35,6 +35,9 @@ const MAX_VOICES: Record<string, number> = { shot: 10, turret_shot: 10, flak_sho
   blackout_shot: 2, leviathan_launch: 2, lance_fire: 3,
   // (Warnings: soft, and never a stack: BossFx also spaces them)
   target_tone: 2, suck_whoosh: 2 };
+/** A weapon's shot or launch: one take, no variation */
+const WEAPON_SOUND = /(_shot|_launch|_fire)$/;
+
 /** Effects that, at their cap, cut the oldest copy short rather than stay silent (a ship's lasers fire in turn: each pulse must be heard) */
 const STEAL = new Set(['laser_pulse', 'mining_pulse']);
 
@@ -53,12 +56,12 @@ export const FILE_GAIN: Record<string, number> = {
   engine: 0.9, boost: 0.9, mining: 0.7, scan_ping: 0.6, craft_done: 0.6, sell: 0.5,
   railgun_shot: 0.9, flak_shot: 0.6, missile_launch: 0.7, emp_shot: 0.7, laser_loop: 0.6, lance_loop: 0.7, shield_hit: 0.5,
   boss_roar: 0.9, hive_launch: 0.6, cinder_shot: 0.75, prism_shot: 0.6, phase_shot: 0.8, singularity_fire: 0.85,
-  autocannon_shot: 0.55, pulse_shot: 0.6, arc_shot: 0.65, mortar_shot: 0.75, torpedo_launch: 0.85, charge_launch: 0.6, pd_shot: 0.4,
+  autocannon_shot: 0.75, pulse_shot: 0.7, arc_shot: 0.65, mortar_shot: 0.75, torpedo_launch: 0.85, charge_launch: 0.6, pd_shot: 0.4,
   arc_loop: 0.6, frost_loop: 0.6, repair_loop: 0.55,
   rivet_shot: 0.6, scrap_chunk_shot: 0.75, seeker_launch: 0.6, heart_spark: 0.6, heart_seeker: 0.65,
   // (Each weapon model's own shot: the heavy marks louder than the quick ones)
-  pip_shot: 0.7, hammer_shot: 0.9, twinlink_shot: 0.6, longbarrel_shot: 0.95, bastion_shot: 1, slurry_shot: 0.75, chainsaw_shot: 0.45, stinger_shot: 0.6,
-  cloudmaker_shot: 0.7, quake_shot: 0.85, overpulse_shot: 0.55, swarm_launch: 0.55, hammerhead_launch: 0.85, coilgun_shot: 0.8, spear_shot: 0.95, rail_driver_shot: 0.75,
+  pip_shot: 0.7, hammer_shot: 0.9, twinlink_shot: 0.6, longbarrel_shot: 0.95, bastion_shot: 1, slurry_shot: 0.75, chainsaw_shot: 0.8, stinger_shot: 0.75,
+  cloudmaker_shot: 0.7, quake_shot: 0.85, overpulse_shot: 0.7, swarm_launch: 0.7, hammerhead_launch: 0.85, coilgun_shot: 0.8, spear_shot: 0.95, rail_driver_shot: 0.75,
   blackout_shot: 0.85, leviathan_launch: 0.95, lance_fire: 0.85, searchlight_loop: 0.65,
   // (Warnings sit under the shots)
   target_tone: 0.4, suck_whoosh: 0.5,
@@ -211,8 +214,9 @@ export class AudioManager {
   /** Returns a function that fades the sound out early (e.g. an aborted jump charge). */
   private start(id: string, volume: number, pan: number, pitch = 1, wet = 0): StopSound | null {
     if (!this.enabled || !this.initialized || !this.context || !this.sfxGain) return null;
-    // A random variant, so repeated sounds don't repeat exactly
-    const buffer = this.buffers.get(variantKey(id, Math.floor(Math.random() * (this.variants[id] ?? 1))));
+    // A random variant, so repeated sounds don't repeat exactly; a weapon always sounds the same, so it's recognisable
+    const take = WEAPON_SOUND.test(id) ? 0 : Math.floor(Math.random() * (this.variants[id] ?? 1));
+    const buffer = this.buffers.get(variantKey(id, take));
     if (!buffer) return null;
     let playing = this.voices.get(id) ?? 0;
     if (playing >= (MAX_VOICES[id] ?? 4)) {
@@ -399,11 +403,16 @@ export function prepare(ctx: BaseAudioContext, src: AudioBuffer, loop: boolean, 
     data = out;
   }
 
-  // Loudness of the audible part (ignoring near-silence), matched to a common target
-  let sum = 0, count = 0;
+  // Loudness of the audible part (ignoring near-silence), matched to a common target. Measured above ~150 Hz, the
+  // way ears weigh it: deep bass carries energy we barely hear, so a bassy shot matched on raw energy came out quiet
+  const hp = 1 - Math.exp(-2 * Math.PI * 150 / src.sampleRate);
+  let sum = 0, count = 0, lo1 = 0, lo2 = 0;
   for (let i = 0; i < data.length; i++) {
+    lo1 += hp * (data[i] - lo1);
+    lo2 += hp * (lo1 - lo2);
     if (Math.abs(data[i]) < gate) continue;
-    sum += data[i] * data[i];
+    const heard = data[i] - lo2;
+    sum += heard * heard;
     count++;
   }
   const rms = Math.sqrt(sum / Math.max(1, count)) || 1e-6;
