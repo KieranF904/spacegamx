@@ -73,6 +73,11 @@ export class Lifecycle {
     return undefined;
   }
 
+  /** Is this ship a boss kept by its lifecycle (it recovers its own way, not as every enemy does) */
+  holds(eid: number): boolean {
+    return !!this.byEid(eid);
+  }
+
   /** Can it be hurt and does it fight (a boss not kept this way: always) */
   engageable(eid: number): boolean {
     const l = this.byEid(eid);

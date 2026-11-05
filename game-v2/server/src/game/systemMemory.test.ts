@@ -126,8 +126,8 @@ describe('system memory', () => {
     expect(w.memory.isResident(ash)).toBe(false);
     expect(own.concat(visitor).some((e) => w.bridge.has(e))).toBe(false);
     expect(w.enemies.count(ash)).toBe(0);
-    // Ten minutes go by (the world's clock), and a pilot comes back
-    w.memory.offset += 60 * 60 * 10;
+    // Two minutes go by (the world's clock: under an enemy's whole recovery, LIFE_ASLEEP_RESET), and a pilot comes back
+    w.memory.offset += 60 * 60 * 2;
     w.at('ashfall', 0, 60000, 1);
     expect(w.memory.isResident(ash)).toBe(true);
     const back = w.shipsIn('ashfall').filter((e) => w.enemies.factionOf(e) === 'pirates');
@@ -135,7 +135,7 @@ describe('system memory', () => {
     const raider = back.find((e) => w.enemies.info(e)?.name.startsWith(ship.blueprint.name ?? '') || w.bridge.get(e)!.blueprint.parts.length === ship.blueprint.parts.length)!;
     const hp = w.bridge.get(raider)!.hp[part] / w.bridge.get(raider)!.maxHp[part];
     // Mended by memory.healPerMinute a minute (from half)
-    expect(hp).toBeGreaterThan(0.5 + 10 * w.memory.rules.healPerMinute - 0.05);
+    expect(hp).toBeGreaterThan(0.5 + 2 * w.memory.rules.healPerMinute - 0.05);
     expect(hp).toBeLessThan(1);
     // Flown on along its patrol while it was away (not where it was left, not far off its home)
     const now = w.server.lod.where(raider);

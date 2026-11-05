@@ -38,7 +38,7 @@ function world() {
   /** Her nest's rocks (the server's), each with its belt index */
   const rocks = () => ((server as any).asteroidIdsBySystem.get(num) as number[]).map((eid) => ({ eid, index: (server as any).asteroidIndexById.get(eid) as number }));
   const at = (eid: number) => { (server as any).placeAsteroid(eid); return { x: Position.x[eid], y: Position.y[eid] }; };
-  return { server, got, pid, step, gd, num, sys, rocks, at };
+  return { server, t, got, pid, step, gd, num, sys, rocks, at };
 }
 
 const place = (pid: number, num: number, x: number, y: number) => {
@@ -93,10 +93,15 @@ describe("the Scrap Mother's nest", () => {
     expect(got.some((m) => m.type === 'toast' && /Back out of the Scrap Mother's nest/.test((m as any).text ?? (m as any).message ?? ''))).toBe(true);
   });
 
-  it('she appears in the middle of it while a pilot is there', () => {
-    const { server, pid, step, num } = world();
+  it('she lies dormant in the middle of it until a pilot passes her arena's barrier, then rises there', () => {
+    const { server, pid, step, num, t } = world();
     place(pid, num, 0, 18000);
     step(130);
+    expect(server.bosses.inSystem(num)).toEqual([]);
+    // (her arena: game/arenas/bossArena.test.ts)
+    place(pid, num, 0, server['gameData'].getSystem(NEST)!.arena!.radius + 260);
+    t.send({ type: 'interact' } as any);
+    step(2);
     const here = server.bosses.inSystem(num);
     expect(here.length).toBe(1);
     expect(Math.hypot(Position.x[here[0]] - def.lair.x, Position.y[here[0]] - def.lair.y)).toBeLessThan(1500);

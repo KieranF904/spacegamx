@@ -150,6 +150,7 @@ import { Bosses, BossesFile } from './game/Bosses.js';
 import { ArenaGates } from './game/arenas/ArenaGates.js';
 import { CombatClock } from './game/arenas/CombatClock.js';
 import { BossDev } from './game/dev/bossDev.js';
+import { EnemyRecovery } from './game/enemies/recovery.js';
 import { Mobs, MobsFile } from './game/Mobs.js';
 import { Events } from './game/Events.js';
 import { AdminTools, type AdminConn, type AdminHost } from './game/AdminTools.js';
@@ -638,6 +639,8 @@ export class GameServer implements ServerCtx {
   readonly combat = new CombatClock();
   /** Boss arenas' barriers: passing them (game/arenas/ArenaGates.ts) */
   readonly arenaGates: ArenaGates;
+  /** Every enemy heals out of combat (game/enemies/recovery.ts) */
+  readonly recovery: EnemyRecovery;
   /** (dev) The boss tools: dev servers and admins only (game/dev/bossDev.ts) */
   readonly bossDev: BossDev<ClientConnection>;
   /** Single-body enemies (data/mobs.json): what boss bays launch */
@@ -905,6 +908,15 @@ export class GameServer implements ServerCtx {
       combat: this.combat,
     });
     this.bosses.gates = this.arenaGates;
+    this.recovery = new EnemyRecovery({
+      tick: () => this.currentTick,
+      heals: (eid) => this.enemies.isAlive(eid) && !this.bosses.life.holds(eid),
+      active: (eid) => SimPass.on(InSystem.systemId[eid]),
+      custom: (eid) => this.enemies.custom.has(eid),
+      lastCombat: (eid) => this.combat.lastOf(eid),
+      heal: (eid, share) => this.ships.healAll(eid, share),
+      restore: (eid) => this.ships.repair(eid),
+    });
     this.bossDev = new BossDev<ClientConnection>({
       tick: () => this.currentTick,
       bosses: this.bosses,
@@ -2457,6 +2469,7 @@ this.devTeleport = opts.devTeleport ?? false;
       notifyDamage: (targetEid, amount, sourceEid, glancing) => {
         this.combat.note(targetEid, sourceEid, this.currentTick);
         this.bossDev?.onDamage(targetEid, amount, sourceEid);
+        this.recovery?.hurt(targetEid, sourceEid);
         this.bosses?.onDamage(targetEid, amount, sourceEid);
         this.range?.onDamage(targetEid, amount);
         // (Summed per target and source until the next snapshot, net/snapshot/Outbox.ts flushDamage)
@@ -3555,7 +3568,7 @@ this.devTeleport = opts.devTeleport ?? false;
       // (Boost fuel is the ship's battery now: it charges in the flight step, energy.ts)
       { name: 'weaponSystem', pass: true, phase: 'combat', run: () => this.weaponSystem() },
       { name: 'projectileSystem', pass: true, phase: 'combat', run: () => this.projectileSystem() },
-      { name: 'enemies', pass: true, phase: 'combat', scene: 'sectors', run: () => { this.enemies.tick(); this.range?.tick(); } },
+      { name: 'enemies', pass: true, phase: 'combat', scene: 'sectors', run: () => { this.enemies.tick(); this.range?.tick(); this.recovery.tick(); } },
       { name: 'bosses', pass: true, phase: 'combat', scene: 'sectors', run: () => { this.bosses.tick(); this.bossDev.tick(); } },
       { name: 'mobs', pass: true, phase: 'combat', scene: 'sectors', run: () => this.mobs.tick() },
       { name: 'events', phase: 'combat', scene: 'sectors', run: () => this.events.tick() },

@@ -34,7 +34,7 @@ import { readFileSync, renameSync } from 'fs';
 import { mkdir } from 'fs/promises';
 import { writeFileDurable } from '../profile/durableWrite.js';
 import { dirname } from 'path';
-import type { ShipState } from '@space-game/common';
+import { LIFE_ASLEEP_RESET, type ShipState } from '@space-game/common';
 import type { ShipBridge } from '../ships/ShipBridge.js';
 import type { FarPose } from '../ships/SimLod.js';
 import type { PackMemory } from './Enemies.js';
@@ -233,7 +233,8 @@ export class SystemMemory {
     this.kept.delete(id);
     if (!snap) return;
     const away = Math.max(0, this.worldTick() - snap.at), minutes = away / 3600;
-    const mend = { ships: Math.min(1, minutes * this.rules.healPerMinute), bosses: Math.min(1, minutes * this.rules.bossHealPerMinute) };
+    // (Away as long as an enemy's recovery takes, LIFE_ASLEEP_RESET: its packs are back full, common bosses/lifecycle.ts)
+    const mend = { ships: away >= LIFE_ASLEEP_RESET ? 1 : Math.min(1, minutes * this.rules.healPerMinute), bosses: Math.min(1, minutes * this.rules.bossHealPerMinute) };
     const from = this.host.tick() - Math.min(away, this.rules.fastForwardMinutes * 3600);
     const [first, ...parts] = batches(snap, MEMORY_BATCH);
     this.host.restore(num, first, this.offset, mend, from);
