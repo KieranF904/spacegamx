@@ -39,9 +39,12 @@ describe('the Drift (outer Sol)', () => {
     for (let i = 0; i < 60 * 40 && scrap().length < 6; i++) { const n = nest(); hold(pid, n.x + 15000, n.y); server.step(); }
     const found = nest().packs.flat();
     expect(found.length).toBeGreaterThanOrEqual(3);
+    // Its packs are always out (populations): a loose pack's ghost keeps 0.6-1.8× the nest's roam off it, each ship a
+    // pack spacing (380) off its lead, and it's loaded right there, so that's how far round the nest they are
+    const roam = (server.gameData.factionsFile as any).spawns.sol.nests.find((q: any) => q.id === 'sol_nest_drift_east').roam as number;
     for (const e of found) {
       expect(Math.hypot(Position.x[e], Position.y[e])).toBeGreaterThan(90000);
-      expect(Math.hypot(Position.x[e] - nest().x, Position.y[e] - nest().y)).toBeLessThan(6000);
+      expect(Math.hypot(Position.x[e] - nest().x, Position.y[e] - nest().y)).toBeLessThan(roam * 1.8 + 380 + 500);
       // Junk: flimsy for its weight
       const s = ships.get(e)!;
       expect(s.maxHp.reduce((a, b) => a + b, 0)).toBeLessThan(800);

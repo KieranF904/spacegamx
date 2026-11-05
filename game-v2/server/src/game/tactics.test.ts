@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
-import { Position, Velocity, InSystem, ServerMessage, EffectType } from '@space-game/common';
+import { Position, Velocity, InSystem, ServerMessage, EffectType, FOCUS_RANGE } from '@space-game/common';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
@@ -35,27 +35,50 @@ const foes = (w: ReturnType<typeof world>) => [...w.bridge.bodies.keys()].filter
 
 describe('arrivals: nothing appears out of nowhere beside you', () => {
   it('packs come in from past the radar (or launch from their outpost, or out of a gate)', () => {
+    // A system's packs are always out (populations): a ghost is loaded as a pilot comes within the load range (36 km),
+    // so flying in, they turn up far off; loaded inside the focus range (jumped in beside them) they're seen warping
+    // in, and a ship back comes out of its nest's hull, seen launching. Nothing just appears beside you.
     const w = world();
-    const { pid, conn } = w.pilots[0];
+    const { pid, conn, got } = w.pilots[0];
     const num = w.gd.getSystemNum('ashfall');
-    (w.server as any).travelTo(conn, num, 9000, -30000, false);
-    w.step(5);
-    const at = { x: 9000, y: -30000 };
     const lair = (w.gd.bossesFile as any).bosses.boss_redtooth_hold.lair;
     const gates = w.gd.getSystem('ashfall')!.portals.map((p) => p.position);
     const seen = new Set<number>();
-    for (let i = 0; i < 60 * 60 && seen.size < 6; i++) {
-      hold(pid, at.x, at.y);
-      w.step();
+    let far = 0, shown = 0;
+    const look = (at: { x: number; y: number }, from: number) => {
+      const fx = got.slice(from).filter((m) => m.type === 'effect' && ((m as any).effectType === EffectType.WarpIn || (m as any).effectType === EffectType.WarpOut)) as any[];
       for (const e of foes(w)) {
-        if (seen.has(e)) continue;
+        if (seen.has(e) || InSystem.systemId[e] !== num) continue;
         seen.add(e);
         const near = (p: { x: number; y: number }, r: number) => Math.hypot(Position.x[e] - p.x, Position.y[e] - p.y) < r;
         const fromBase = near(lair, 2500) || gates.some((g) => near(g, 2500));
-        expect(fromBase || !near(at, 9000), `enemy ${e} turned up ${Math.round(Math.hypot(Position.x[e] - at.x, Position.y[e] - at.y))} away`).toBe(true);
+        const withFx = fx.some((m) => near(m, 1500));
+        if (!near(at, FOCUS_RANGE)) far++;
+        else if (withFx) shown++;
+        expect(fromBase || withFx || !near(at, FOCUS_RANGE), `enemy ${e} turned up ${Math.round(Math.hypot(Position.x[e] - at.x, Position.y[e] - at.y))} away`).toBe(true);
       }
+    };
+    // Flying in from far out: a nest's packs turn up at the load range, well past the radar
+    const nest0 = w.enemies.nest(num, 'ashfall_nest_scrap')!;
+    const a = Math.atan2(nest0.y, nest0.x);
+    let at = { x: nest0.x + Math.cos(a) * 70000, y: nest0.y + Math.sin(a) * 70000 };
+    (w.server as any).travelTo(conn, num, at.x, at.y, false);
+    for (let i = 0; i < 60 * 30; i++) {
+      const n = w.enemies.nest(num, 'ashfall_nest_scrap')!, d = Math.hypot(at.x - n.x, at.y - n.y);
+      if (d > 12000) at = { x: at.x + ((n.x - at.x) / d) * 60, y: at.y + ((n.y - at.y) / d) * 60 };
+      const from = got.length;
+      hold(pid, at.x, at.y);
+      w.step();
+      look(at, from);
     }
-    expect(seen.size).toBeGreaterThan(0);
+    expect(far).toBeGreaterThan(0);
+    // Jumped in beside another nest: what's loaded inside the focus range is seen warping in
+    const dig = w.enemies.nest(num, 'ashfall_dig_cinderjack')!;
+    at = { x: dig.x + 6000, y: dig.y };
+    const before = shown, from = got.length;
+    (w.server as any).travelTo(conn, num, at.x, at.y, false);
+    for (let i = 0; i < 30; i++) { hold(pid, at.x, at.y); w.step(); look(at, from); }
+    expect(shown).toBeGreaterThan(before);
   });
 
   it('out of a gate: it spools up for all to see, then they come through', () => {

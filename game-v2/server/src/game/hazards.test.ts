@@ -12,7 +12,10 @@ import { MemoryProfileStore } from '../profile/ProfileStore.js';
 
 const dataDir = join(__dirname, '../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
+// (The void's own Wraith packs are always out now, pre-placed round their knots: the one near enough kills the pilot
+// before the test is done, and a dead ship isn't short of anything. This is about the hazard, so the void is empty)
 const files = readGameDataFiles(dataDir);
+(files.factions as any).spawns.void_sector.nests = [];
 
 describe('hazards', () => {
   it("a ship short of a system's radiation wears down, and its pilot is told what and why", () => {

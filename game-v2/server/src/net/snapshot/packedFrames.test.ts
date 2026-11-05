@@ -202,8 +202,12 @@ describe('packed frames: a packed and a base-format observer see the same fight'
     expect(st.why.hitSnapshot ?? 0).toBe(0);
     // (what is left: the test re-placing its ship each tick, a correction; the join)
     expect(st.urgent).toBeLessThan(st.messages * 0.2);
-    // ...so its sub-frames share messages as an idle pilot's do
-    expect(st.subFrames).toBeGreaterThan(st.messages * 1.6);
+    // ...so its sub-frames share messages as an idle pilot's do: as well as the packed observer's beside it, near
+    // enough (how many frames share depends on how busy the world round the fight is: with nobody else about, as now
+    // the system's packs keep to their nests, there are fewer frames between snapshots to share with)
+    const idle = r.counts[1].frames / r.counts[1].messages;
+    expect(idle).toBeGreaterThan(1.3);
+    expect(st.subFrames / st.messages).toBeGreaterThan(idle * 0.9);
     // The same hits, fires and blasts as the legacy observer, its shells gone the same, and the server's HP
     expectSameView(r.S, r.B);
     expect(hpOff(r.server, r.S, 'S').slice(0, 5)).toEqual([]);
