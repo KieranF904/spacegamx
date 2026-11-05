@@ -190,5 +190,65 @@
   "singularity_fire": {
     "variants": 1,
     "loop": false
+  },
+  "autocannon_shot": {
+    "variants": 2,
+    "loop": false
+  },
+  "pulse_shot": {
+    "variants": 2,
+    "loop": false
+  },
+  "arc_shot": {
+    "variants": 2,
+    "loop": false
+  },
+  "arc_loop": {
+    "variants": 1,
+    "loop": true
+  },
+  "frost_loop": {
+    "variants": 1,
+    "loop": true
+  },
+  "repair_loop": {
+    "variants": 1,
+    "loop": true
+  },
+  "torpedo_launch": {
+    "variants": 1,
+    "loop": false
+  },
+  "mortar_shot": {
+    "variants": 2,
+    "loop": false
+  },
+  "charge_launch": {
+    "variants": 1,
+    "loop": false
+  },
+  "pd_shot": {
+    "variants": 2,
+    "loop": false
+  },
+  "rivet_shot": {
+    "variants": 2,
+    "loop": false
+  },
+  "scrap_chunk_shot": {
+    "variants": 1,
+    "loop": false
+  },
+  "seeker_launch": {
+    "variants": 1,
+    "loop": false
+  },
+  "heart_spark": {
+    "variants": 2,
+    "loop": false
+  },
+  "heart_seeker": {
+    "variants": 1,
+    "loop": false
   }
 }

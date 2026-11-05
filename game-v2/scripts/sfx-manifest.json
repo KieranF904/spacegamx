@@ -238,7 +238,7 @@
   {
    "id": "emp_shot",
    "prompt": "EMP projector firing, deep electrical charge release with a low buzzing thrum",
-   "duration": 1.0,
+   "duration": 1,
    "influence": 0.6
   },
   {
@@ -295,6 +295,106 @@
    "id": "singularity_fire",
    "prompt": "Ominous deep gravitational implosion charge, warping bass drone sucking inward, sci-fi, cinematic",
    "duration": 2,
+   "influence": 0.7
+  },
+  {
+   "id": "autocannon_shot",
+   "prompt": "Single short autocannon round firing, deep low punchy thump with a dull mechanical knock, bassy, tight, no echo, sci-fi spaceship gun",
+   "duration": 0.5,
+   "influence": 0.7,
+   "variants": 2
+  },
+  {
+   "id": "pulse_shot",
+   "prompt": "Short deep plasma pulse bolt fired, low bassy energy thump with a soft electric buzz, smooth, sci-fi, not shrill",
+   "duration": 0.6,
+   "influence": 0.7,
+   "variants": 2
+  },
+  {
+   "id": "arc_shot",
+   "prompt": "Low electric arc discharge, deep bassy crackling zap with a heavy thump, short, sci-fi tesla weapon, not shrill",
+   "duration": 0.7,
+   "influence": 0.7,
+   "variants": 2
+  },
+  {
+   "id": "arc_loop",
+   "prompt": "Continuous deep electric arc beam, low buzzing crackling tesla hum, steady, bassy, sci-fi, no high whine",
+   "duration": 3,
+   "influence": 0.6,
+   "loop": true
+  },
+  {
+   "id": "frost_loop",
+   "prompt": "Continuous freezing ice beam, deep cold resonant hum with soft crystalline crackle of ice forming, low and smooth, sci-fi",
+   "duration": 3,
+   "influence": 0.6,
+   "loop": true
+  },
+  {
+   "id": "repair_loop",
+   "prompt": "Continuous gentle repair beam, warm low soothing hum with soft mechanical whirr, steady, calm, sci-fi",
+   "duration": 3,
+   "influence": 0.6,
+   "loop": true
+  },
+  {
+   "id": "torpedo_launch",
+   "prompt": "Heavy space torpedo launched from a tube, deep pneumatic thud and a low rumbling rocket roar moving away, powerful, bassy",
+   "duration": 1.6,
+   "influence": 0.7
+  },
+  {
+   "id": "mortar_shot",
+   "prompt": "Heavy mortar firing, deep hollow thoomp from a large tube, low bassy boom, short, muffled",
+   "duration": 0.9,
+   "influence": 0.7,
+   "variants": 2
+  },
+  {
+   "id": "charge_launch",
+   "prompt": "Launcher firing a heavy sticky demolition charge, low dull pneumatic thunk with a short whoosh, deep, muffled",
+   "duration": 0.9,
+   "influence": 0.7
+  },
+  {
+   "id": "pd_shot",
+   "prompt": "Very short point defense turret burst, quick low thudding double tap, dull and deep, tight, sci-fi, not loud",
+   "duration": 0.5,
+   "influence": 0.7,
+   "variants": 2
+  },
+  {
+   "id": "rivet_shot",
+   "prompt": "Giant industrial rivet gun firing a hot rivet, heavy low pneumatic clank and thump, metallic, deep, short",
+   "duration": 0.5,
+   "influence": 0.7,
+   "variants": 2
+  },
+  {
+   "id": "scrap_chunk_shot",
+   "prompt": "Huge chunk of scrap metal hurled by a machine, deep heavy metallic heave and grinding thunk, low rumble, short",
+   "duration": 0.9,
+   "influence": 0.7
+  },
+  {
+   "id": "seeker_launch",
+   "prompt": "Industrial homing drone launched from a rusty bay, low mechanical clunk and a deep sputtering engine whoosh, muffled",
+   "duration": 1,
+   "influence": 0.7
+  },
+  {
+   "id": "heart_spark",
+   "prompt": "Molten ember spark spat from a burning core, deep bassy fiery throb with a short soft crackle, low pitched, short, not shrill",
+   "duration": 0.7,
+   "influence": 0.7,
+   "variants": 2
+  },
+  {
+   "id": "heart_seeker",
+   "prompt": "Burning magma seeker launched from a molten core, deep fiery whoosh with a low rumbling roar and soft crackle, bassy, muffled",
+   "duration": 1.1,
    "influence": 0.7
   }
  ]
