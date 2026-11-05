@@ -93,7 +93,7 @@ describe("the Scrap Mother's nest", () => {
     expect(got.some((m) => m.type === 'toast' && /Back out of the Scrap Mother's nest/.test((m as any).text ?? (m as any).message ?? ''))).toBe(true);
   });
 
-  it('she lies dormant in the middle of it until a pilot passes her arena's barrier, then rises there', () => {
+  it('she lies dormant in the middle of it until a pilot passes the barrier of her arena, then rises there', () => {
     const { server, pid, step, num, t } = world();
     place(pid, num, 0, 18000);
     step(130);
