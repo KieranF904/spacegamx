@@ -12,9 +12,10 @@ import { RIVET_SOWER } from './rivetSower.js';
 import { SLAG_RAY } from './slagRay.js';
 import { CLINKER } from './clinker.js';
 import { HELIOS_DRONE } from './heliosDrone.js';
+import { SCRAP_DARTER } from './scrapDarter.js';
 import type { CustomDesign } from './types.js';
 
-export const CUSTOM_DESIGNS: readonly CustomDesign[] = [CENSER, MAW_LURKER, HOOKBOAT, RIME_BELL, SCRAP_CRAWLER, RIVET_SOWER, SLAG_RAY, CLINKER, HELIOS_DRONE];
+export const CUSTOM_DESIGNS: readonly CustomDesign[] = [CENSER, MAW_LURKER, HOOKBOAT, RIME_BELL, SCRAP_CRAWLER, RIVET_SOWER, SLAG_RAY, CLINKER, HELIOS_DRONE, SCRAP_DARTER];
 CUSTOM_DESIGNS.forEach((d, i) => { if (roster.designs[i]?.id !== d.id) throw new Error(`custom enemies: ${d.id} isn't roster.json's design ${i}`); });
 
 /** A design's place (-1: not a custom enemy) */
@@ -39,3 +40,4 @@ export { SOWER_AHEAD, SOWER_SOW, SOWER_LEAD } from './rivetSower.js';
 export { RAY_PASS } from './slagRay.js';
 export { CLINKER_WARN, CLINKER_SHELLS, CLINKER_GAP } from './clinker.js';
 export { TORCH_TICKS } from './heliosDrone.js';
+export { DART_IN, DART_WARN, DART_FIRE, DART_OUT, DART_FLANK, DART_CRAWL } from './scrapDarter.js';

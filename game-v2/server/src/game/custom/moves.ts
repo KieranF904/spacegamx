@@ -6,7 +6,7 @@
 import {
   Position, Velocity, Rotation, quantizeCursorAngle, dequantizeCursorAngle, datan2, dcos, dhypot, dsin, hashUnit,
   CENSER_WARN, CENSER_BURN, LURKER_WARN, HOOK_WARN, BELL_WARN, CRAWLER_PULL, CRAWLER_SNAP, SOWER_AHEAD, RAY_PASS,
-  CLINKER_WARN, CLINKER_SHELLS, CLINKER_GAP, TORCH_TICKS, customGroups, launchPattern,
+  CLINKER_WARN, CLINKER_SHELLS, CLINKER_GAP, TORCH_TICKS, DART_IN, DART_WARN, DART_FIRE, customGroups, launchPattern,
 } from '@space-game/common';
 import { beamFx, burnLine, gun, leadAngle, lineFirst, lineWarn, pullTowards, ringWarn, strikeAt } from './kit.js';
 import type { Act, DesignMoves } from './types.js';
@@ -182,6 +182,30 @@ export const MOVES: Record<string, DesignMoves> = {
       if (dhypot(Position.x[a.target] - tip.x, Position.y[a.target] - tip.y) > R + 120) return;
       if (k % 15 === 10) beamFx(a, 'weld', tip, aim, R, 10, 15);
       burnLine(a, tip.x, tip.y, aim, R, 14, num(a, 'torch', 'damage', 0.25) * a.live.dmg);
+    },
+  },
+
+  scrap_darter: {
+    // (it darts only while its gun's on: without it, it rams, by its range alone)
+    pick: (a) => (due(a, 'dart') && a.has('gun') && a.d < a.live.stats.reach * 1.5 ? { move: 0, arg: a.rng() < 0.5 ? 0 : 1 } : null),
+    step(a, _m, k) {
+      const gunAt = a.at('gun');
+      if (!gunAt) return;
+      // On the flank: its line drawn at where you are (never ahead), then a short burst raked down it
+      if (k === DART_IN) {
+        a.live.aim = datan2(Position.y[a.target] - gunAt.y, Position.x[a.target] - gunAt.x);
+        lineWarn(a, 'rivet', gunAt.x, gunAt.y, a.live.aim, num(a, 'dart', 'length', 1800), 40, DART_WARN);
+      }
+      const f = k - DART_IN - DART_WARN;
+      if (f >= 0 && f < DART_FIRE && f % 4 === 0 && a.live.aim !== undefined) a.host.fire?.(a.eid, 'rivet', gunAt.x, gunAt.y, a.live.aim, num(a, 'dart', 'damage', 0.8) * a.live.dmg);
+    },
+    lost(a, newly) {
+      // Its fuel pod shot through: it bursts, hurting it and anything beside it (a packmate it was passing)
+      if (!(newly & groupBit(a, 'pod'))) return;
+      const p = a.live.stats.pod as { radius: number; damage: number } | undefined, at = a.at('pod', true);
+      if (!at) return;
+      a.host.ships.splashAt(a.num, at.x, at.y, p?.radius ?? 260, (p?.damage ?? 70) * a.live.dmg, -1);
+      a.host.send?.(a.num, { type: 'detonation', kind: 'eruption', x: Math.round(at.x), y: Math.round(at.y), radius: p?.radius ?? 260 });
     },
   },
 };

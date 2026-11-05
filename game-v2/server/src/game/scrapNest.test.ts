@@ -178,6 +178,28 @@ describe("the Scrap Mother's nest", () => {
     for (const r of all) expect(insideTerrain(rock, r.x, r.y)).toBe(false);
   });
 
+  it('its den: scrapborn heaps in its chambers and off its faces launch crawlers, sowers and darters; none comes into the Heart', () => {
+    const { server, pid, step, num } = world();
+    server.bosses.unhurt.add(pid);
+    place(pid, num, 0, 20000);
+    const seen = new Map<string, number>();
+    let inHeart = 0;
+    for (let i = 0; i < 60 * 40; i++) {
+      step();
+      if (i % 30) continue;
+      place(pid, num, 0, 20000);
+      for (const [eid, e] of (server.enemies as any).enemies as Map<number, { type: string; faction: string; boss?: string; behaviour?: { aggro: number } }>) {
+        if (InSystem.systemId[eid] !== num || e.boss) continue;
+        seen.set(e.type, (seen.get(e.type) ?? 0) + 1);
+        if (Math.hypot(Position.x[eid], Position.y[eid]) < 5600) inHeart++;
+        // (a den's packs are keener than the Drift's)
+        expect(e.behaviour?.aggro).toBe(2600);
+      }
+    }
+    for (const t of ['scrap_crawler', 'rivet_sower', 'scrap_darter']) expect(seen.get(t) ?? 0, t).toBeGreaterThan(0);
+    expect(inHeart).toBe(0);
+  }, 120_000);
+
   it('its rocks are mined, and found by shots, as anywhere', () => {
     const { server, pid, step, num, rocks, at } = world();
     place(pid, num, 0, 18000);

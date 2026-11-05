@@ -1,0 +1,59 @@
+{
+ "name": "Scrap Darter (damaged)",
+ "catalogVersion": 1,
+ "paint": "#34363c",
+ "rigid": true,
+ "parts": [
+  {
+   "uid": 0,
+   "piece": "scrap_darter_fin_l",
+   "fn": "armor",
+   "material": "scrap_rust",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 1,
+   "piece": "scrap_darter_spine",
+   "fn": "hull",
+   "material": "scrap_iron",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 2,
+   "piece": "scrap_darter_lamp",
+   "fn": "core",
+   "material": "scrap_seam",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  },
+  {
+   "uid": 3,
+   "piece": "scrap_darter_gun",
+   "fn": "autocannon",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false,
+   "mount": "turret"
+  },
+  {
+   "uid": 4,
+   "piece": "scrap_darter_drive",
+   "fn": "plasma_drive",
+   "material": "scrap_steel",
+   "x": 0,
+   "y": 0,
+   "rot": 0,
+   "flip": false
+  }
+ ]
+}

@@ -63,6 +63,8 @@ export interface CustomLive {
   tether?: { target: number; until: number };
   pools?: { x: number; y: number; until: number }[];
   due?: { x: number; y: number; at: number; group: string }[];
+  /** A line drawn to rake (the Scrap Darter's burst) */
+  aim?: number;
 }
 
 /** What a design's moves see this tick */

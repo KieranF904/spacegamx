@@ -1,0 +1,37 @@
+{
+ "id": "scrap_darter",
+ "name": "Scrap Darter",
+ "faction": "scrapborn",
+ "sky": "sol_scrap_nest",
+ "role": "flanker",
+ "level": "4-8",
+ "threat": "medium",
+ "parts": 7,
+ "groups": {
+  "fin_l": [
+   "fin_l"
+  ],
+  "fin_r": [
+   "fin_r"
+  ],
+  "core": [
+   "spine",
+   "lamp"
+  ],
+  "pod": [
+   "pod"
+  ],
+  "gun": [
+   "gun"
+  ],
+  "drive": [
+   "drive"
+  ]
+ },
+ "damaged": [
+  "fin_r",
+  "pod"
+ ],
+ "radiusCells": 3.216,
+ "radius": 77
+}

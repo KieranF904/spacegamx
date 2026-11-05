@@ -32,8 +32,8 @@ describe('custom enemies: groups, the under rule, their tables', () => {
       for (const p of bp.parts) expect(p.group, `${design} ${p.piece}`).toBeLessThan(groups.length);
       expect(Object.keys(factions.custom.designs[design].hp).sort(), type).toEqual([...groups].sort());
     }
-    // (the five replacements and the Helios drone, live; the dens' four for their bosses' stages to place)
-    expect(Object.keys(factions.custom.types).sort()).toEqual(['cinder_zealot', 'clinker', 'frost_shard', 'helios_drone', 'maw_lurker', 'pirate_raider', 'rivet_sower', 'scrap_crawler', 'slag_ray']);
+    // (the five replacements and the Helios drone, live; the dens' four, and the Scrap Mother's den's Darter)
+    expect(Object.keys(factions.custom.types).sort()).toEqual(['cinder_zealot', 'clinker', 'frost_shard', 'helios_drone', 'maw_lurker', 'pirate_raider', 'rivet_sower', 'scrap_crawler', 'scrap_darter', 'slag_ray']);
   });
 
   it('every design holds together as built: each part reaches the core (a loose one would fall off at its first rebuild)', () => {

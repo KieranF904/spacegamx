@@ -27,6 +27,14 @@
           "xp": 40,
           "credits": 8
         },
+        "rivet_sower": {
+          "xp": 40,
+          "credits": 8
+        },
+        "scrap_darter": {
+          "xp": 35,
+          "credits": 7
+        },
         "scrap_swarmer": {
           "xp": 8,
           "credits": 1
@@ -2187,6 +2195,199 @@
         }
       ]
     },
+    "sol_scrap_nest": {
+      "grade": 1,
+      "packs": 0,
+      "groups": [],
+      "nests": [
+        {
+          "id": "nest_gullet",
+          "packs": 1,
+          "respawnSeconds": 90,
+          "roam": 1500,
+          "style": "anchored",
+          "aggro": 2600,
+          "leash": 5000,
+          "groups": [
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_crawler",
+                "scrap_crawler"
+              ],
+              "weight": 1
+            }
+          ]
+        },
+        {
+          "id": "nest_sorting",
+          "packs": 2,
+          "respawnSeconds": 80,
+          "roam": 2400,
+          "style": "anchored",
+          "aggro": 2600,
+          "leash": 6000,
+          "groups": [
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "rivet_sower",
+                "rivet_sower"
+              ],
+              "weight": 3,
+              "limit": 1
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_darter",
+                "scrap_darter"
+              ],
+              "weight": 2,
+              "limit": 1
+            }
+          ]
+        },
+        {
+          "id": "nest_smelter",
+          "packs": 1,
+          "respawnSeconds": 90,
+          "roam": 2400,
+          "style": "anchored",
+          "aggro": 2600,
+          "leash": 6000,
+          "groups": [
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_crawler",
+                "scrap_crawler",
+                "scrap_crawler"
+              ],
+              "weight": 1
+            }
+          ]
+        },
+        {
+          "id": "nest_gallery",
+          "packs": 1,
+          "respawnSeconds": 600,
+          "roam": 2000,
+          "style": "anchored",
+          "aggro": 2600,
+          "leash": 6000,
+          "groups": [
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_crawler",
+                "scrap_crawler",
+                "scrap_crawler",
+                "scrap_darter",
+                "scrap_darter"
+              ],
+              "weight": 1
+            }
+          ]
+        },
+        {
+          "id": "nest_rim_w",
+          "packs": 2,
+          "respawnSeconds": 70,
+          "roam": 3500,
+          "style": "anchored",
+          "aggro": 2600,
+          "groups": [
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_crawler",
+                "rivet_sower"
+              ],
+              "weight": 3
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_darter",
+                "scrap_darter"
+              ],
+              "weight": 3
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_crawler",
+                "scrap_crawler",
+                "scrap_darter"
+              ],
+              "weight": 2
+            }
+          ]
+        },
+        {
+          "id": "nest_rim_n",
+          "packs": 2,
+          "respawnSeconds": 70,
+          "roam": 3500,
+          "style": "anchored",
+          "aggro": 2600,
+          "groups": [
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_crawler",
+                "rivet_sower"
+              ],
+              "weight": 3
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_darter",
+                "scrap_darter"
+              ],
+              "weight": 3
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "scrap_crawler",
+                "scrap_crawler",
+                "scrap_darter"
+              ],
+              "weight": 2
+            }
+          ]
+        },
+        {
+          "id": "nest_seam",
+          "packs": 1,
+          "respawnSeconds": 80,
+          "roam": 3000,
+          "style": "anchored",
+          "aggro": 2600,
+          "groups": [
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "rivet_sower",
+                "rivet_sower"
+              ],
+              "weight": 2
+            },
+            {
+              "faction": "scrapborn",
+              "ships": [
+                "rivet_sower",
+                "scrap_darter"
+              ],
+              "weight": 1
+            }
+          ]
+        }
+      ]
+    },
     "ashfall": {
       "grade": 1,
       "packs": 0,
@@ -2378,7 +2579,7 @@
   "custom": {
     "_comment": "Custom enemies (docs/enemies/custom-roster.md; server/src/game/custom): `types` puts a design (data/ships/blueprints/enemy, its moves common/src/bodies/custom) in a ship type's place wherever it spawns; each design's `range`/`reach` (its fighting range, and how far its moves reach), `hp` per destroyable piece and its moves' and guns' numbers at Mk I, `firepower` for ratings. A grade scales hp and damage by `grades` (Mk I-V) instead of regrading its materials; elites take rules.eliteHp too. Faction hpScale/damageScale don't apply: these numbers are the design's own.",
     "grades": {"hp": [1, 1.45, 2.0, 2.7, 3.6], "damage": [1, 1.3, 1.65, 2.1, 2.6]},
-    "types": {"cinder_zealot": "censer", "maw_lurker": "maw_lurker", "pirate_raider": "hookboat", "frost_shard": "rime_bell", "scrap_crawler": "scrap_crawler", "helios_drone": "helios_drone", "rivet_sower": "rivet_sower", "slag_ray": "slag_ray", "clinker": "clinker"},
+    "types": {"cinder_zealot": "censer", "maw_lurker": "maw_lurker", "pirate_raider": "hookboat", "frost_shard": "rime_bell", "scrap_crawler": "scrap_crawler", "helios_drone": "helios_drone", "rivet_sower": "rivet_sower", "slag_ray": "slag_ray", "clinker": "clinker", "scrap_darter": "scrap_darter"},
     "designs": {
       "censer": {"range": 1300, "reach": 1800, "firepower": 260, "hp": {"core": 700, "lance": 260, "brazier": 220, "vane_l": 180, "vane_r": 180, "drive": 140}, "moves": {"lance": {"every": 200, "length": 1800, "width": 46, "damage": 7}}, "brazier": {"reach": 900, "haste": 0.8}},
       "maw_lurker": {"range": 2000, "reach": 2600, "firepower": 300, "hp": {"core": 1300, "eye": 260, "rail": 420, "root_l": 220, "root_r": 220, "tail": 240}, "moves": {"aim": {"every": 230, "damage": 2.6, "spread": 0.12}}},
@@ -2386,6 +2587,7 @@
       "rime_bell": {"range": 700, "reach": 900, "firepower": 40, "hp": {"core": 300, "frill": 130, "tendril_l": 45, "tendril_c": 45, "tendril_r": 45}, "moves": {"pulse": {"every": 300, "radius": 520, "emp": 75}}, "guns": {"tendrils": {"kind": "prism_shard", "every": 50, "damage": 0.5, "reach": 650}}},
       "scrap_crawler": {"range": 500, "reach": 1300, "firepower": 90, "hp": {"core": 260, "magnet": 90, "claw_l": 70, "claw_r": 70, "shell_l": 90, "shell_r": 90, "legs": 60, "drive": 40}, "moves": {"pull": {"every": 260, "radius": 1300, "pull": 0.45, "snap": 150, "snapRadius": 150, "damage": 50}}},
       "rivet_sower": {"range": 900, "reach": 1600, "firepower": 70, "hp": {"core": 180, "drum": 90, "sensors": 50, "pannier_l": 50, "pannier_r": 50, "drive": 60}, "moves": {"lay": {"every": 360, "mines": 6, "gap": 170, "ring": 260}}, "pannier": {"radius": 220, "damage": 60}},
+      "scrap_darter": {"range": 700, "reach": 1500, "firepower": 110, "hp": {"core": 200, "gun": 60, "fin_l": 50, "fin_r": 50, "pod": 70, "drive": 50}, "moves": {"dart": {"every": 240, "length": 1800, "damage": 0.8}}, "pod": {"radius": 260, "damage": 70}},
       "slag_ray": {"range": 800, "reach": 1400, "firepower": 220, "hp": {"core": 1100, "horns": 300, "tail": 260, "wing_l": 380, "wing_r": 380}, "moves": {"pass": {"every": 220, "cone": 30, "damage": 0.9, "wake": 20, "pool": 140, "poolTicks": 150, "burn": 3}}},
       "clinker": {"range": 1500, "reach": 2200, "firepower": 260, "hp": {"core": 900, "chimney_l": 300, "chimney_r": 300, "plate_front": 700, "plate_right": 700, "plate_back": 700, "plate_left": 700}, "moves": {"volley": {"every": 230, "radius": 170, "damage": 60, "spread": 220}}},
       "helios_drone": {"range": 300, "reach": 420, "firepower": 8, "hp": {"core": 80, "torch": 30, "eye": 20, "panel_l": 20, "panel_r": 20, "drive": 15}, "moves": {"torch": {"every": 150, "reach": 230, "damage": 0.25}}}

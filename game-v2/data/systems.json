@@ -3419,6 +3419,92 @@
       "asteroidField": "scrap_nest_junk",
       "stations": [],
       "portals": [],
+      "nests": [
+        {
+          "id": "nest_gullet",
+          "name": "Gullet Heap",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "orbit": {
+            "radius": 11573,
+            "phase": 1.3531,
+            "period": 0
+          },
+          "description": "A heap of scrap in the Gullet's east alcove. Crawlers sit in it."
+        },
+        {
+          "id": "nest_sorting",
+          "name": "Sorting Heap",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "orbit": {
+            "radius": 17109,
+            "phase": 2.8328,
+            "period": 0
+          },
+          "description": "Scrap piled against the Sorting Floor's west wall, where the belts end. Sowers and darters come out of it."
+        },
+        {
+          "id": "nest_smelter",
+          "name": "Smelter Heap",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "orbit": {
+            "radius": 15642,
+            "phase": 0.5295,
+            "period": 0
+          },
+          "description": "Scrap heaped by the Smelter's pool. Crawlers keep pilots off the lodes."
+        },
+        {
+          "id": "nest_gallery",
+          "name": "Gallery Heap",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "orbit": {
+            "radius": 16700,
+            "phase": -1.5708,
+            "period": 0
+          },
+          "description": "The heap the Wreck Gallery's hauler is guarded from."
+        },
+        {
+          "id": "nest_rim_w",
+          "name": "West Face Heap",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "orbit": {
+            "radius": 25179,
+            "phase": 3.0222,
+            "period": 0
+          },
+          "description": "Junk welded to drifting rock off the Nest Rock's west face."
+        },
+        {
+          "id": "nest_rim_n",
+          "name": "North Face Heap",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "orbit": {
+            "radius": 25318,
+            "phase": -1.4121,
+            "period": 0
+          },
+          "description": "Junk welded to drifting rock off the Nest Rock's north face."
+        },
+        {
+          "id": "nest_seam",
+          "name": "Seam Heap",
+          "faction": "scrapborn",
+          "kind": "scrap",
+          "orbit": {
+            "radius": 25828,
+            "phase": 0.0465,
+            "period": 0
+          },
+          "description": "A heap by the lodes on the Nest Rock's east face. Sowers patrol it."
+        }
+      ],
       "derelicts": [
         {
           "id": "wreck_nest_gullet_a",
