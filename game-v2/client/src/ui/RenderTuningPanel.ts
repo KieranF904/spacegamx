@@ -28,7 +28,7 @@ export class RenderTuningPanel {
     this.toggle();
   };
 
-  constructor(private deps: { zoom: () => number; warp: (systemId: string, x: number, y: number) => void }) {
+  constructor(private deps: { zoom: () => number; warp: (systemId: string, x: number, y: number) => void; openSim?: () => void }) {
     try {
       const saved = JSON.parse(localStorage.getItem(STORE) ?? 'null') as Partial<typeof ROCK_LOD> | null;
       if (saved) for (const s of SLIDERS) if (typeof saved[s.key] === 'number') ROCK_LOD[s.key] = saved[s.key]!;
@@ -84,6 +84,13 @@ export class RenderTuningPanel {
     };
     warp('Warp to Rockery', 'dev_rockery', 6500, 0);
     warp('Back to Sol', 'sol', 50000, 0);
+    if (this.deps.openSim) {
+      const sim = document.createElement('button');
+      sim.textContent = 'Sim tools (F7): net sim, overlay, spawn';
+      Object.assign(sim.style, { display: 'block', marginTop: '8px', background: '#16304a', color: '#cfe3f5', border: '1px solid #2c4a66', borderRadius: '4px', padding: '4px 10px', cursor: 'pointer' });
+      sim.addEventListener('click', () => this.deps.openSim?.());
+      this.el.appendChild(sim);
+    }
     document.body.appendChild(this.el);
     window.addEventListener('keydown', this.onKey, true);
   }

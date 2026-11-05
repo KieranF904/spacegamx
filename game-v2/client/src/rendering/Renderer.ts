@@ -1769,6 +1769,11 @@ export class Renderer {
     return this.cameraZoom;
   }
 
+  /** The camera's world point and the screen size (dev overlays place world points with these) */
+  getCameraView(): { x: number; y: number; width: number; height: number } {
+    return { x: this.cameraX, y: this.cameraY, width: this.app.screen.width, height: this.app.screen.height };
+  }
+
   /** Share of the small effect particles spawned (the quality setting) */
   private particleKeep = 1;
   private minimapMs = 50;

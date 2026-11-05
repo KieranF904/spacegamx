@@ -19,6 +19,7 @@ import { createProfileStore } from './profile/index.js';
 import { contribFileStore } from './game/contribFiles.js';
 import { worldFileStore } from './game/SystemMemory.js';
 import { BotManager } from './bots/index.js';
+import { installRockeryTools } from './bots/rockeryTools.js';
 import { DEFAULT_CAPS } from '@space-game/common';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -104,6 +105,8 @@ const gameServer = new GameServer({
 // (task:count:driver, comma separated) at start. Never in production: BotManager refuses to exist there.
 if (DEV_MODE) {
   const bots = new BotManager(gameServer, { statsDir: join(__dirname, '..', 'stats', 'bots') });
+  // The Rockery spawn tools (client F7 panel): drones, a still dummy, bot players on random flight (docs/areas/bots.md)
+  installRockeryTools(gameServer, bots);
   for (const spec of (process.env.BOTS ?? '').split(',').filter(Boolean)) {
     const [task, n, kind] = spec.split(':');
     for (let i = 0; i < Math.max(1, Number(n) || 1); i++) bots.spawn(task, kind === 'npc' ? 'npc' : 'client');

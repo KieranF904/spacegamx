@@ -43,10 +43,10 @@ const SCENARIOS: Record<string, { label: string; secs: number }> = {
   'rock-starter': { label: 'Starter (Sparrow T, 2 Pips) firing at a rock', secs: 20 },
   'rock-gale': { label: 'Gale (2 Sparks, 2 Chainsaws) firing at a rock', secs: 20 },
   map: { label: 'System map open (idle in Sol)', secs: 20 },
-  mother: { label: 'Scrap Mother (Hammerhead)', secs: 20 },
-  pyreclast: { label: 'Pyreclast (Hammerhead)', secs: 20 },
-  pirates: { label: 'Pirates (Corsair vs two packs)', secs: 20 },
-  custom: { label: 'Custom enemies (Corsair vs two packs)', secs: 20 },
+  mother: { label: 'Scrap Mother (Halberd)', secs: 20 },
+  pyreclast: { label: 'Pyreclast (Halberd)', secs: 20 },
+  pirates: { label: 'Pirates (Sunspear vs two packs)', secs: 20 },
+  custom: { label: 'Custom enemies (Sunspear vs two packs)', secs: 20 },
   reentry: { label: 'A ship re-entering the focus (another pilot 5 s beside A, 5 s 60 km away)', secs: 240 },
 };
 const WS_HEADER = 66;
@@ -244,7 +244,7 @@ async function runCase(sc: string): Promise<void> {
       if (measIdx.has(i)) { const m = measured(`nt_m${i}`); meas.push(m); pids.push(m.pid); } else pids.push(bot(`nt_b${i}`));
     }
     for (let i = 0; i < 20; i++) { server.step(); clock.t += 1000 / 60; }
-    const pool = ['sparrow-t', 'hammerhead', 'corsair', 'ports-gale', 'ports-heron', 'ports-wasp', 'ports-brawler', 'lancer'];
+    const pool = ['sparrow-t', 'halberd', 'sunspear', 'ports-gale', 'ports-heron', 'ports-wasp', 'ports-brawler', 'wisp'];
     const base = { x: Position.x[pids[0]], y: Position.y[pids[0]] }, side = Math.ceil(Math.sqrt(crowdN));
     pids.forEach((pid, i) => {
       ships.respawnInPlace(pid, lib(pool[Math.floor(r() * pool.length)]));
@@ -261,7 +261,7 @@ async function runCase(sc: string): Promise<void> {
   }
   const A = meas[0];
   const num = InSystem.systemId[A.pid];
-  const shipFor: Record<string, string> = { 'rock-gale': 'ports-gale', mother: 'hammerhead', pyreclast: 'hammerhead', pirates: 'corsair', custom: 'corsair' };
+  const shipFor: Record<string, string> = { 'rock-gale': 'ports-gale', mother: 'halberd', pyreclast: 'halberd', pirates: 'sunspear', custom: 'sunspear' };
   if (!crowdN) ships.respawnInPlace(A.pid, lib(shipFor[sc] ?? 'sparrow-t'));
   const start = { x: Position.x[A.pid], y: Position.y[A.pid] };
   let target = -1, rock = -1, B = -1;
