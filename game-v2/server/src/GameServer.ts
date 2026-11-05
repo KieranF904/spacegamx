@@ -1034,6 +1034,8 @@ export class GameServer implements ServerCtx {
     // (A distant pack sent somewhere new is flown there from where its route has it)
     this.enemies.onOrders = (eid) => this.lod.replan(eid);
     this.memory = new SystemMemory(this.createMemoryHost(), this.gameData.rulesFile.memory, opts.worldStore);
+    // (A population's hurt ships mend while they're ghosts as a system's do while it's put away)
+    this.enemies.mendPerMinute = this.memory.rules.healPerMinute;
     this.derelictsMod = new Derelicts({
       world: this.world,
       gameData: this.gameData,
@@ -1911,6 +1913,7 @@ this.devTeleport = opts.devTeleport ?? false;
         return out;
       },
       stations: (num: number) => [...stationQuery(this.world)].filter((st) => InSystem.systemId[st] === num),
+      where: (eid: number) => this.lod.where(eid),
       effect: (num: number, x: number, y: number, kind: 'warning' | 'warpIn' | 'launch') => this.arrivalEffect(num, x, y, kind),
       gates: (num: number) => [...portalQuery(this.world)].filter((g) => InSystem.systemId[g] === num && Portal.kind[g] === 0).map((g) => ({ x: Position.x[g], y: Position.y[g] })),
       safeAt: (num: number, x: number, y: number) => inSafeSpace(this.gameData.getSystemByNum(num), x, y),
@@ -4279,6 +4282,8 @@ this.devTeleport = opts.devTeleport ?? false;
       },
       timers: (offset) => ({ enemies: this.enemies.timers(offset), bosses: this.bosses.timers(offset) }),
       setTimers: (t, offset) => { this.enemies.setTimers(t.enemies ?? {}, offset); this.bosses.setTimers(t.bosses ?? {}, offset); },
+      populations: (offset) => this.enemies.popMemory(offset),
+      setPopulations: (p, offset) => this.enemies.setPopMemory(p, offset),
     };
   }
 

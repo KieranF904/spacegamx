@@ -22,7 +22,7 @@ import { LAZY_TICKS } from './constants.js';
 /** The tick's stream: these can wait for the next frame; anything else is urgent */
 const CAN_WAIT = new Set([
   'snapshot', 'damage', 'projectileHit', 'partDestroyed', 'contact', 'detonation', 'ignite', 'stationFire', 'intercept',
-  'shipHps', 'shipSync', 'debrisSplit', 'hits', 'hpCheck', 'mapDots', 'playerState', 'effect', 'party', 'ops',
+  'shipHps', 'shipSync', 'debrisSplit', 'hits', 'hpCheck', 'mapDots', 'pops', 'playerState', 'effect', 'party', 'ops',
   // (The economy views: a purchase's or a pickup's answer is up to COALESCE_TICKS late, 50 ms, and shares the next frame's headers)
   'items', 'profile', 'quests', 'people',
 ]);

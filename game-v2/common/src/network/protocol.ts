@@ -35,9 +35,9 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
  * has updated PROTOCOL_VERSION and PROTOCOL_WIRE_HASH.
  */
 // History: PROTOCOL_CHANGELOG.md. Re-pin with `npm run wire:bump "reason"` (game-v2/), never by hand.
-export const PROTOCOL_VERSION = 50;
+export const PROTOCOL_VERSION = 51;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
-export const PROTOCOL_WIRE_HASH = 'd403f503';
+export const PROTOCOL_WIRE_HASH = '549a81a3';
 /** WebSocket close code (and reason) for a client on another protocol version */
 export const PROTOCOL_MISMATCH_CLOSE = 4002;
 export const PROTOCOL_MISMATCH_REASON = 'version';
@@ -901,6 +901,7 @@ export type ServerMessage =
   | ServerInterceptMessage
   | ServerStationFireMessage
   | ServerMapDotsMessage
+  | ServerPopsMessage
   | ServerIgniteMessage
   | ServerBossIntroMessage
   | ServerBossChargeMessage
@@ -942,6 +943,10 @@ export type ServerMessage =
  *   gone   ships no longer on it
  *   names  [id, name, ...] for the ones it hasn't been told the name of
  *   full   a fresh list (just opened, or another system): anything not in it is gone
+ *   pts    MAP_PT_STRIDE numbers a hostile: [id, x / 10, y / 10], where it is at `tick`. Hostiles go as places, not
+ *          legs (they're loaded and active, not predictable from here: a ghost nobody's near isn't a ship at all,
+ *          the client works it out, ServerPopsMessage), at the rate their distance earns (common FEED_TIERS): in
+ *          the client's ring every message, in the system's first band (inner Sol) every 2 s, past it every 5 s
  */
 export interface ServerMapDotsMessage {
   type: 'mapDots';
@@ -951,6 +956,23 @@ export interface ServerMapDotsMessage {
   info?: number[];
   gone?: number[];
   names?: (number | string)[];
+  full?: 1;
+  pts?: number[];
+}
+export const MAP_PT_STRIDE = 3;
+/** A hostile whose tier is due goes again only once it has moved this far (world units): one sitting still costs nothing */
+export const MAP_PT_SLACK = 60;
+
+/**
+ * Hostile populations of the client's system (common world/populations.ts): which of each nest's and zone's packs'
+ * ships are alive, each pack's group, and whether it's loaded (real ships, sent as ships) or a ghost (the client works
+ * out where it is). `p`: for each spawner that changed, [spawner index, slots, ...a packPopSlot code a slot]; `full`:
+ * every spawner (a new system or connection): what isn't in it is all dead. Sent only when something changes: a
+ * death, a ship back, a pack loaded or put back.
+ */
+export interface ServerPopsMessage {
+  type: 'pops';
+  p: number[];
   full?: 1;
 }
 export const MAP_DOT_STRIDE = 8;
@@ -1697,7 +1719,7 @@ const COMPACT: [string, string[]][] = [
   ['playerState', ['hp', 'maxHp', 'boostFuel', 'maxBoostFuel', 'xp', 'level', 'credits', 'systemId']],
   // (Packed first: see packSnapshot)
   ['snapshot', ['t', 'lp', 'e', 'p', 'r', 'k', 'c', 'o', 'f', 'n', 'd', 'x', 'w']],
-  ['mapDots', ['tick', 'dots', 'routes', 'info', 'gone', 'names', 'full']],
+  ['mapDots', ['tick', 'dots', 'routes', 'info', 'gone', 'names', 'full', 'pts']],
   // (Appended, protocol 26: the hot plain messages. Values change on the way in and out: COMPACT_HOOKS)
   ['ignite', ['bodyId', 'part', 'ticks']],
   ['detonation', ['kind', 'x', 'y', 'radius', 'from', 'mob']],
@@ -1718,6 +1740,8 @@ const COMPACT: [string, string[]][] = [
   ['cells', ['tick', 'b', 'k']],
   // (Appended, protocol 41: a system's crowd level, crowd.ts)
   ['crowd', ['tick', 'lv', 'f', 'w', 'r']],
+  // (Appended, protocol 51: hostile populations, populations.ts; mapDots' pts follow its other fields)
+  ['pops', ['p', 'full']],
 ];
 
 /**

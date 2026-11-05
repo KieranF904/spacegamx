@@ -40,3 +40,4 @@ except to fix a typo. A bump makes old clients reload (see PROTOCOL_VERSION in p
 - 48 (2026-11-04): custom enemies: the Maw's and the pirates' own materials (maw_slate, maw_glass, pirate_plate, pirate_paint)
 - 49 (2026-11-05): focus re-entry deltas: cells message is now {tick, b, k} before the snapshot (ships back, ships kept); cellCache removed
 - 50 (2026-11-05): shipSync dmg: a ship's shells' damage multiplier, so clients find hits by a boss's guns
+- 51 (2026-11-05): hostile populations: pops message (alive bits, ghosts worked out by both ends), mapDots pts (hostiles as places at distance tiers)

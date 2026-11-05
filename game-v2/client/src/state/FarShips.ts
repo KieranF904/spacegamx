@@ -11,10 +11,11 @@
  * difference is eased out over a moment instead of jumping.
  */
 
-import { unpackMapLegs, unpackMapRoutes, unpackMapInfo, legAt, patrolNext, type Leg, type MapDot, type Patrol, type PatrolState, type ServerMapDotsMessage } from '@space-game/common';
+import { unpackMapLegs, unpackMapRoutes, unpackMapInfo, legAt, patrolNext, MAP_PT_STRIDE, type Leg, type MapDot, type Patrol, type PatrolState, type ServerMapDotsMessage } from '@space-game/common';
 
-/** How long a correction takes to ease out (ticks) */
+/** How long a correction takes to ease out (ticks); a hostile's place (pts: sent every 1-5 s) glides over longer */
 const EASE_TICKS = 40;
+const PT_EASE_TICKS = 100;
 
 export interface FarShip extends MapDot {
   name?: string;
@@ -29,7 +30,7 @@ export interface FarShip extends MapDot {
 }
 
 /** A ship's leg from `tick` (on patrol: the leg it's got to, moved on as time passes), and the correction being eased out */
-interface Track { leg: Leg; tick: number; patrol?: { p: Patrol; s: PatrolState }; ox: number; oy: number; eased: number }
+interface Track { leg: Leg; tick: number; patrol?: { p: Patrol; s: PatrolState }; ox: number; oy: number; eased: number; ease?: number }
 
 /** Most of a patrol's legs worked out in one go (a list left alone a long while just carries on from there) */
 const MAX_LEGS = 2000;
@@ -62,6 +63,11 @@ export class FarShips {
     };
     for (const { id, leg } of unpackMapLegs(msg.dots)) take(id, { leg, tick: msg.tick, ox: 0, oy: 0, eased: tick });
     for (const { id, patrol, state } of unpackMapRoutes(msg.routes ?? [], msg.tick)) take(id, { leg: state.leg, tick: state.t0, patrol: { p: patrol, s: state }, ox: 0, oy: 0, eased: tick });
+    // (Hostiles' places: held where they were last seen, the step from the last one eased)
+    const pts = msg.pts ?? [];
+    for (let i = 0; i + MAP_PT_STRIDE <= pts.length; i += MAP_PT_STRIDE) {
+      take(pts[i], { leg: { x: pts[i + 1] * 10, y: pts[i + 2] * 10, vx: 0, vy: 0, wx: 0, wy: 0, thrust: -1 }, tick: msg.tick, ox: 0, oy: 0, eased: tick, ease: PT_EASE_TICKS });
+    }
     for (const id of msg.gone ?? []) { this.tracks.delete(id); this.looks.delete(id); }
   }
 
@@ -96,7 +102,7 @@ export class FarShips {
       t.leg = t.patrol.s.leg; t.tick = t.patrol.s.t0;
     }
     const p = legAt(t.leg, tick - t.tick);
-    const e = Math.max(0, 1 - (tick - t.eased) / EASE_TICKS);
+    const e = Math.max(0, 1 - (tick - t.eased) / (t.ease ?? EASE_TICKS));
     // (Smoothstep: no kink at either end)
     const s = e * e * (3 - 2 * e);
     return { x: p.x + t.ox * s, y: p.y + t.oy * s };

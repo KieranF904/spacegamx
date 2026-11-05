@@ -1940,6 +1940,8 @@ export class Renderer {
   
   /** The minimap's nests and way-ins together (reused) */
   private nestScratch: typeof this.wayIns = [];
+  /** The populations' ghosts (packs nobody's near: state/Populations.ts), reused */
+  private ghostScratch: import('../state/Populations').PopGhost[] = [];
 
   private updateMinimap(): void {
     if (!this.minimapGraphics || !this.minimapContainer) return;
@@ -1980,7 +1982,15 @@ export class Renderer {
       g.fill({ color: nestColor(n.faction), alpha: 0.35 });
       g.stroke({ color: nestColor(n.faction), width: 1.5, alpha: 0.95 });
     }
-    
+
+    // Ghosts: packs nobody's near, as faint rings in their faction's colour (real ships once a pilot comes near)
+    for (const gh of this.state.populations.ghosts(this.state.systemId, this.sys.data, this.state.getRawServerTick(), this.ghostScratch)) {
+      const dx = gh.x - playerPos.x, dy = gh.y - playerPos.y;
+      if (dx * dx + dy * dy > this.MINIMAP_RANGE * this.MINIMAP_RANGE) continue;
+      g.circle(center + dx * scale, center + dy * scale, 3);
+      g.stroke({ color: gh.calm ? 0x9ca3af : FACTION_COLORS[gh.faction] ?? 0xff4444, width: 1, alpha: 0.5 });
+    }
+
     // Draw entities
     for (const [id, entity] of this.state.entities) {
       const dx = entity.renderX - playerPos.x;

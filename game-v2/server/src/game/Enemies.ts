@@ -2,16 +2,19 @@
  * Enemies: hostile ships built from blueprints (data/ships/blueprints/enemy),
  * flown by a simple AI, in packs by faction (data/factions.json).
  *
- * Packs appear in a system while players are there: out of sight of players,
- * well away from stations. They stay (far from pilots they're distant:
- * ships/SimLod.ts), and a system left empty is remembered as it is, through
- * restarts too, each spawner keeping its own clock (SystemMemory.ts). A system can also have zones (a ring between two
- * distances from its centre, like outer Sol's Drift) with packs of their own,
- * which appear only around pilots inside the ring. Most live in nests
- * (systems.json `nests`): orbiting homes they launch from while pilots are
- * near, rebuilt from it over time once they're shot down (the heavies
- * slowest); their packs guard it close, wander widely round it, or go
- * nomad across the system (Roaming.ts). Each ship patrols around its pack's home, engages
+ * Most live in nests (systems.json `nests`: orbiting homes), and a zone (a
+ * ring of a system, or a spot) can have packs of its own: each nest's and
+ * zone's packs are a population (below; common world/populations.ts), always
+ * there, ship by ship. A pack nobody's near isn't simulated: it's a ghost
+ * whose place both ends work out from the seed and the tick, loaded where its
+ * ghost is once a pilot comes within rules.nestWake, put back once nobody's
+ * near and it isn't fighting. Ships shot down are remembered (through the
+ * system being put away and restarts: SystemMemory.ts) and come back one at a
+ * time, one every respawnSeconds of their spawner (the heavies' group not
+ * until it's rebuilt), time away counting; a loaded pack's come out of the
+ * nest's hull. Nest packs guard it close, wander widely round it, or go
+ * nomad across the system (Roaming.ts). A system's own `packs` (none in the
+ * data now) come in from outside, out of sight of players. Each ship patrols around its pack's home, engages
  * the nearest player in range (closing to its preferred range, then circling
  * and firing), runs when badly hurt (if its faction does), and goes after
  * whoever shoots its pack from wherever they are. It gives up the chase once
@@ -33,7 +36,8 @@ import {
   Blueprint, Bag, ShipState, partItemId, mulberry32,
   MAX_GRADE, markName, regrade, blueprintGrade, gradeReward, rateShip, ratingOf, createShipState, placeCost, type Economy, plated, partWeaponDef, endsAtAim, migratePartItem,
   nestPosition, NEST_RADIUS, type NestData, type PlanetData, type StarSystemData, datan2, dcos, dhypot, dsin,
-  orderEngage, orderFlee, orderPatrol, orderReturn, aiAimError, type BodyState, type WantRec } from '@space-game/common';
+  orderEngage, orderFlee, orderPatrol, orderReturn, aiAimError, type BodyState, type WantRec,
+  spawnersOf, seedGroups, pickGroup, ghostCentre, ghostShip, slotStyle, packPopSlot, LIFE_ASLEEP_RESET, type Spawner } from '@space-game/common';
 import { AiPilots } from './brains/aiPilot.js';
 import { CustomEnemies } from './custom/CustomEnemies.js';
 import type { CustomTable } from './custom/types.js';
@@ -137,7 +141,7 @@ export interface FactionsFile {
     approachChance?: number;
     gateChance?: number;
     warnSeconds?: number;
-    /** A nest launches only while a pilot is this close to it (default 36000) */
+    /** A nest's or zone's ghost pack is loaded (made real ships, where its ghost is) once a pilot is this close to it, and put back once none is within 1.25 times this (default 36000) */
     nestWake?: number;
     /** Station turrets by weapon: reach past the hull, damage a shot, ticks between shots, flak's blast radius */
     stationDefence: Record<string, StationGun>;
@@ -220,6 +224,8 @@ export interface EnemyHost {
   players(systemNum: number): number[];
   /** Station entities in a system */
   stations(systemNum: number): number[];
+  /** Where a ship is now (a distant one's route worked out: SimLod.where; none: its components) */
+  where?(eid: number): XY;
   systemNum(id: string): number;
   systemId(num: number): string | undefined;
   /** Rough size of the playable area of a system (for picking spawn points) */
@@ -293,7 +299,21 @@ interface Enemy {
   /** One target it goes for first while it stands, from any distance (a siege's sapper on a turret); `preyOnly`: it ignores everything else, even what shoots it (a runner on the bastion) */
   prey?: number;
   preyOnly?: boolean;
+  /** One of a population's ships (its slot's ship k): its death is remembered there */
+  pop?: { p: Population; slot: number; k: number };
 }
+
+/**
+ * A pack slot of a population (common world/populations.ts): which group it is, which of its ships are alive (bit k),
+ * which of those are elites, each one's part HP if it's hurt (shares of max), and the pack it's loaded as (none: a ghost)
+ */
+interface PopSlot { group: number; alive: number; elite: number; hp: (number[] | undefined)[]; pack?: number; leftAt?: number }
+
+/** A nest's or zone's packs, ship by ship, there whether anyone's near or not (`next`: its next ship back, 0: it's full) */
+interface Population { num: number; sysId: string; sp: Spawner; sys?: StarSystemData; nest?: SpawnNest; zone?: SpawnZone; key: string; slots: PopSlot[]; next: number; changed: boolean }
+
+/** A population as remembered (SystemMemory.ts: the file's `populations`), times as world ticks */
+export interface PopulationMemory { next?: number; slots: { group: number; alive: number; elite?: number; hp?: (number[] | null)[]; leftAt?: number }[] }
 
 interface Pack {
   id: number;
@@ -331,6 +351,8 @@ interface Pack {
   settleUntil?: number;
   /** Its ships (in id order) and their centroid as they ended the last tick: where a pack's fighters spread round from */
   cent?: { ids: number[]; x: number; y: number };
+  /** A population's slot loaded as this pack */
+  pop?: { p: Population; slot: number };
 }
 
 /** How fast a nest's ships come out of it (units a tick) */
@@ -354,12 +376,12 @@ export class Enemies {
   private packs = new Map<number, Pack>();
   private nextPack = 1;
   private nextSpawn = new Map<number, number>();
-  private nextZoneSpawn = new Map<string, number>();
-  /** Each nest's next launch (`${system}:${id}`), and when each of its groups may go again (`${system}:${id}:${group}`) */
-  private nestNext = new Map<string, number>();
+  /** When each of a nest's groups may be sent again once a pack of it is wiped out (`${system}:${id}:${group}`: its heavies) */
   private nestLock = new Map<string, number>();
-  /** Until when a nest that lost a pack is still rebuilding (it isn't found fully stocked again before then) */
-  private nestRebuilt = new Map<string, number>();
+  /** Every system's populations (its nests' and zones' packs, ship by ship), by system number; built on first use */
+  private pops: Map<number, Population[]> | null = null;
+  /** Time away mends a population's hurt ships by this share of each part's max a minute (SystemMemory's healPerMinute) */
+  mendPerMinute = 0.04;
   private rng = mulberry32(0x5eed);
   bosses: BossHooks | null = null;
   /** For salvage: what structure drops as (materials) */
@@ -698,6 +720,7 @@ export class Enemies {
         this.pilots.forget(eid);
         this.custom.forget(eid);
         this.packs.get(e.pack)?.members.delete(eid);
+        this.popLost(e, now);
       }
     }
     for (const [id, p] of this.packs) {
@@ -711,11 +734,13 @@ export class Enemies {
       } else p.cent = undefined;
       if (p.members.size) continue;
       this.packs.delete(id);
-      if (p.nest) this.nestCleared(p, now);
+      if (p.pop?.p.slots[p.pop.slot].pack === id) p.pop.p.slots[p.pop.slot].pack = undefined;
     }
 
     // Keep each occupied system stocked (one nobody's in is put away whole: SystemMemory.ts)
     if (now % 30 === 0) {
+      // Populations ship by ship back at their spawners' rates, wherever they are (time away counts: it's caught up on)
+      for (const list of this.populations().values()) for (const pop of list) this.regrow(pop, now);
       for (const [sysId, sp] of Object.entries(this.data.spawns)) {
         const num = this.host.systemNum(sysId);
         // (Its system's pass: crowd dilation, sim/SystemClocks.ts)
@@ -723,19 +748,16 @@ export class Enemies {
         const players = this.host.players(num);
         const all = [...this.packs.values()].filter((p) => p.systemNum === num && !p.boss);
         const packs = all.filter((p) => !p.zone && !p.nest);
-        // Zones: kept stocked around the pilots inside them; a zone's packs nobody's been near for a while are recycled (new ones come in where the pilots are)
+        // Nests' and zones' packs: ghosts a pilot comes near are loaded where they are, loaded ones nobody's near any more go back to ghosts
+        this.tendPops(num, players, now);
+        // (A zone's own packs are its population; its packs from elsewhere, an event's say, recycled once nobody's near)
         for (const z of sp.zones ?? []) {
-          const inside = players.filter((p) => { const r = dhypot(Position.x[p] - (z.x ?? 0), Position.y[p] - (z.y ?? 0)); return r > z.inner - 3000 && r < z.outer + 3000; });
-          const mine = all.filter((p) => p.zone === z.id);
-          if (inside.length) for (const p of mine) p.lastSeen = now;
-          const key = `${num}:${z.id}`;
-          if (!inside.length || mine.length >= z.packs || now < (this.nextZoneSpawn.get(key) ?? 0)) continue;
-          this.arrive(num, this.pickGroup(z.groups), inside, z);
-          this.nextZoneSpawn.set(key, now + ((z.respawnSeconds ?? this.data.rules.respawnSeconds) * 60) / Math.max(1, z.packs));
+          const inside = players.some((p) => { const r = dhypot(Position.x[p] - (z.x ?? 0), Position.y[p] - (z.y ?? 0)); return r > z.inner - 3000 && r < z.outer + 3000; });
+          if (inside) for (const p of all) if (p.zone === z.id) p.lastSeen = now;
         }
         for (const n of sp.nests ?? []) this.tendNest(num, n, players, all, now);
         for (const p of all) {
-          if (p.zone && players.length && now - p.lastSeen > this.data.rules.idleDespawnSeconds * 60 && [...p.members].every((m) => this.ships.isDormant(m))) {
+          if (p.zone && !p.pop && players.length && now - p.lastSeen > this.data.rules.idleDespawnSeconds * 60 && [...p.members].every((m) => this.ships.isDormant(m))) {
             for (const m of p.members) this.ships.removeShip(m);
             this.packs.delete(p.id);
           }
@@ -766,23 +788,18 @@ export class Enemies {
   // ---------------------------------------------------------------------------
 
   /**
-   * A nest, every half second: its packs' home follows it round its orbit;
-   * while a pilot is near it, it keeps its packs out (launching one at a
-   * time, paced). Its packs stay out (far from pilots they're distant:
-   * SimLod; a system left empty is remembered as it is: SystemMemory).
-   * Woken with none out (and not just cleared), it's already stocked: all its
-   * packs are out on patrol round it as the pilot arrives, none seen launching.
+   * A nest, every half second: its loaded packs' home follows it round its
+   * orbit, and a loaded nomad near a pilot travels on (its home slides to
+   * where it's heading). Its packs are its population (below): they're out
+   * round it whether anyone's near or not, and nothing is launched here.
    */
   private tendNest(num: number, n: SpawnNest, players: number[], all: Pack[], now: number): void {
     if (!n.place) return;
     const key = `${num}:${n.id}`;
     const at = nestPosition(n.place, n.planets, now);
-    const wake = this.data.rules.nestWake ?? 36000;
-    const near = players.some((p) => dhypot(Position.x[p] - at.x, Position.y[p] - at.y) < wake);
-    let out = 0;
+    const wake = this.loadRange();
     for (const p of all) {
       if (p.nest !== key) continue;
-      out++;
       // A nomad is awake while a pilot is near it, wherever it's got to; the rest go where the nest goes
       if (p.style === 'nomad') {
         if (players.some((q) => dhypot(Position.x[q] - p.home.x, Position.y[q] - p.home.y) < wake)) this.steerNomad(num, n, p, players, now);
@@ -790,81 +807,320 @@ export class Enemies {
       }
       p.home = at;
     }
-    // Nobody near it: it still sends its nomads out while there are pilots in its band of the system for them to find
-    const band = n.band;
-    const nomadsOnly = !near && !!band && n.groups.some((g) => (g.style ?? n.style) === 'nomad')
-      && players.some((q) => { const r = dhypot(Position.x[q], Position.y[q]); return r > band.min - 10000 && r < band.max + 10000; });
-    if ((!near && !nomadsOnly) || out >= n.packs) return;
-    if (!out && now >= (this.nestRebuilt.get(key) ?? 0)) {
-      const stocked = [...all];
-      for (let i = 0; i < n.packs; i++) {
-        const gi = this.pickNestGroup(key, n, stocked, now, nomadsOnly);
-        if (gi < 0) break;
-        const eids = this.launch(num, n, key, gi, at, true);
-        const pack = eids.length ? this.packs.get(this.enemies.get(eids[0])!.pack) : undefined;
-        if (pack) stocked.push(pack);
-      }
-      this.nestNext.set(key, now + Math.round(((n.respawnSeconds ?? this.data.rules.respawnSeconds) * 60) / Math.max(1, n.packs)));
-      return;
-    }
-    if (now < (this.nestNext.get(key) ?? 0)) return;
-    const gi = this.pickNestGroup(key, n, all, now, nomadsOnly);
-    if (gi < 0) return;
-    this.launch(num, n, key, gi, at);
-    this.nestNext.set(key, now + Math.round(((n.respawnSeconds ?? this.data.rules.respawnSeconds) * 60) / Math.max(1, n.packs)));
   }
 
-  /** Which of a nest's groups goes next: by weight, among those under their limit and not still being rebuilt (-1: none) */
-  private pickNestGroup(key: string, n: SpawnNest, all: Pack[], now: number, nomadsOnly = false): number {
-    const ok = n.groups.map((g, i) => {
-      if (now < (this.nestLock.get(`${key}:${i}`) ?? 0) || (nomadsOnly && (g.style ?? n.style) !== 'nomad')) return false;
-      return g.limit === undefined || all.filter((p) => p.nest === key && p.group === i).length < g.limit;
-    });
-    const total = n.groups.reduce((t, g, i) => t + (ok[i] ? g.weight : 0), 0);
-    if (total <= 0) return -1;
-    let roll = this.rng() * total;
-    for (let i = 0; i < n.groups.length; i++) {
-      if (!ok[i]) continue;
-      roll -= n.groups[i].weight;
-      if (roll <= 0) return i;
+  // ---------------------------------------------------------------------------
+  // Populations: every nest's and zone's packs, ship by ship (common world/populations.ts)
+  // ---------------------------------------------------------------------------
+
+  /** How close a pilot comes to a ghost pack before it's loaded (rules.nestWake); it's put back once none is within 1.25 times this */
+  private loadRange(): number {
+    return this.data.rules.nestWake ?? 36000;
+  }
+
+  /** Every system's populations, built the first time they're wanted: a fresh world's are full, their groups from the seed */
+  private populations(): Map<number, Population[]> {
+    if (this.pops) return this.pops;
+    const out = new Map<number, Population[]>();
+    for (const [sysId, spawns] of Object.entries(this.data.spawns)) {
+      const num = this.host.systemNum(sysId);
+      if (num < 0) continue;
+      const sys = spawns.nests?.find((n) => n.sys)?.sys;
+      const list: Population[] = [];
+      for (const sp of spawnersOf(spawns, sys)) {
+        const groups = seedGroups(sysId, sp);
+        const slots = groups.map((g): PopSlot => {
+          const n = g >= 0 ? sp.def.groups[g].ships.length : 0;
+          return { group: g, alive: n ? (1 << n) - 1 : 0, elite: n && this.rng() < this.data.rules.eliteChance ? 1 : 0, hp: [] };
+        });
+        list.push({
+          num, sysId, sp, sys, key: `${num}:${sp.def.id}`, slots, next: 0, changed: true,
+          ...(sp.kind === 'nest' ? { nest: spawns.nests!.find((q) => q.id === sp.def.id) } : { zone: spawns.zones!.find((q) => q.id === sp.def.id) }),
+        });
+      }
+      if (list.length) out.set(num, list);
     }
-    return n.groups.findIndex((_, i) => ok[i]);
+    this.pops = out;
+    return out;
+  }
+
+  /** Between one ship coming back and the next (ticks): its spawner's respawnSeconds */
+  private interval(pop: Population): number {
+    return Math.max(60, ((pop.nest?.respawnSeconds ?? pop.zone?.respawnSeconds) ?? this.data.rules.respawnSeconds) * 60);
+  }
+
+  private full(pop: Population, s: PopSlot): number {
+    const n = s.group >= 0 ? pop.sp.def.groups[s.group]?.ships.length ?? 0 : 0;
+    return n ? (1 << n) - 1 : 0;
+  }
+
+  private short(pop: Population): boolean {
+    return pop.slots.some((s) => s.group < 0 || s.alive !== this.full(pop, s));
   }
 
   /**
-   * A pack comes out of its nest: from the hull's edge, in line, flying
-   * outward, seen launching; or, `out`, already out on patrol somewhere round
-   * it (the nest stocked as a pilot arrives)
+   * A population short of ships gets one back every interval (`next`), the first an interval after it was first
+   * short: a hurt pack's missing ships first, then a wiped-out one, as a group by weight (its heavies not until
+   * they're rebuilt, `nestLock`). However long it's been (a system nobody's in, a restart), it's caught up on here.
    */
-  private launch(num: number, n: SpawnNest, key: string, gi: number, at: { x: number; y: number }, out = false): number[] {
-    const g = n.groups[gi];
-    const a = this.rng() * Math.PI * 2, c = dcos(a), s = dsin(a);
-    const from = out ? NEST_RADIUS + (n.roam ?? 2400) * (0.3 + 0.7 * this.rng()) : NEST_RADIUS;
-    const mx = at.x + c * from, my = at.y + s * from;
-    // (A hidden nest has no hull to launch from: a den's post)
-    if (!out && !n.place?.hidden) this.host.effect?.(num, mx, my, 'launch');
-    const eids = this.spawnPack(num, g, mx, my);
-    const pack = eids.length ? this.packs.get(this.enemies.get(eids[0])!.pack) : undefined;
-    if (!pack) return eids;
-    const style: RoamStyle = g.style ?? n.style ?? 'loose', roam = n.roam ?? 2400, now = this.host.tick();
-    Object.assign(pack, { nest: key, nestDef: n, group: gi, roam, home: { ...at }, style, pace: 0.4 + this.rng() * 0.45, origin: 'nest' });
-    const f = this.data.factions[g.faction];
-    // A loose pack's leash reaches past where it strays; a nomad's is round wherever it's got to
-    const leash = style === 'loose' ? Math.max(n.leash ?? f?.behaviour.leash ?? 0, roam * LOOSE_REACH + 2500) : n.leash;
-    eids.forEach((eid, i) => {
-      Position.x[eid] = mx + c * i * 170; Position.y[eid] = my + s * i * 170;
-      const v = out ? LAUNCH_SPEED * 0.3 : LAUNCH_SPEED, h = out ? a + (this.rng() - 0.5) * 2 : a;
+  private regrow(pop: Population, now: number): void {
+    if (!this.short(pop)) { pop.next = 0; return; }
+    const every = this.interval(pop);
+    if (!pop.next) pop.next = now + every;
+    for (let guard = 0; pop.next <= now && guard < 1000 && this.short(pop); guard++) {
+      this.regrowOne(pop, pop.next, now);
+      pop.next += every;
+    }
+    if (!this.short(pop)) pop.next = 0;
+  }
+
+  private regrowOne(pop: Population, at: number, now: number): void {
+    let i = pop.slots.findIndex((s) => s.group >= 0 && s.alive && s.alive !== this.full(pop, s));
+    if (i < 0) i = pop.slots.findIndex((s) => !s.alive);
+    if (i < 0) return;
+    const slot = pop.slots[i], empty = !slot.alive;
+    if (empty) {
+      const taken = pop.slots.filter((s, j) => j !== i && s.alive).map((s) => s.group);
+      const g = pickGroup(pop.sp.def.groups, taken, this.rng, (q) => at >= (this.nestLock.get(`${pop.key}:${q}`) ?? -Infinity));
+      if (g < 0) return;
+      slot.group = g; slot.elite = 0; slot.hp = [];
+    }
+    const n = pop.sp.def.groups[slot.group].ships.length;
+    let k = 0;
+    while (k < n && slot.alive & (1 << k)) k++;
+    if (k >= n) return;
+    slot.alive |= 1 << k;
+    slot.elite = k === 0 && this.rng() < this.data.rules.eliteChance ? slot.elite | 1 : slot.elite & ~(1 << k);
+    slot.hp[k] = undefined;
+    pop.changed = true;
+    // Loaded: it comes out of the nest and joins its pack; a wiped-out pack's first ship with a pilot near the nest is
+    // seen launching; otherwise its ghost is a ship stronger (loaded where it is once a pilot's near)
+    const pack = slot.pack !== undefined ? this.packs.get(slot.pack) : undefined;
+    if (pack) this.launchInto(pop, i, pack, k, now);
+    else if (empty && now - at < 60 && pop.nest?.place && this.host.players(pop.num).some((p) => {
+      const c = nestPosition(pop.nest!.place!, pop.nest!.planets, now);
+      return dhypot(Position.x[p] - c.x, Position.y[p] - c.y) < this.loadRange();
+    })) this.loadSlot(pop, i, now, true);
+  }
+
+  /** One of a population's ships made real in this pack: its type, faction, grade, elite, its nest's leash and keenness */
+  private spawnPopShip(pop: Population, i: number, pack: Pack, k: number, x: number, y: number, angle: number): number {
+    const slot = pop.slots[i], g = pop.sp.def.groups[slot.group] as SpawnGroup;
+    const flank = k === 0 ? 0 : (k % 2 ? 1 : -1) * Math.min(1.6, 0.55 * Math.ceil(k / 2));
+    const eid = this.spawnShip(pack, g.ships[k], g.faction, this.gradeOf(pop.num), g.plating ?? 0, !!(slot.elite & (1 << k)), x, y, angle, flank);
+    if (eid < 0) return -1;
+    const e = this.enemies.get(eid)!;
+    e.pop = { p: pop, slot: i, k };
+    const n = pop.nest, f = this.data.factions[g.faction];
+    if (n && f) {
+      // A loose pack's leash reaches past where it strays; a nomad's is round wherever it's got to
+      const roam = n.roam ?? 2400, leash = pack.style === 'loose' ? Math.max(n.leash ?? f.behaviour.leash ?? 0, roam * LOOSE_REACH + 2500) : n.leash;
+      if (leash || n.aggro) e.behaviour = { ...f.behaviour, ...(leash ? { leash } : {}), ...(n.aggro ? { aggro: n.aggro } : {}) };
+    }
+    return eid;
+  }
+
+  /** A ship back while its pack's loaded: out of the nest's hull, seen launching (a zone's: where its pack's ghost would be) */
+  private launchInto(pop: Population, i: number, pack: Pack, k: number, now: number): void {
+    const n = pop.nest, a = this.rng() * Math.PI * 2, c = dcos(a), s = dsin(a);
+    const at = n?.place ? nestPosition(n.place, n.planets, now) : ghostCentre(pop.sys, pop.sysId, pop.sp, i, slotStyle(pop.sp, pop.slots[i].group), now);
+    const from = n?.place ? NEST_RADIUS : 0, x = at.x + c * from, y = at.y + s * from;
+    if (n?.place && !n.place.hidden) this.host.effect?.(pop.num, x, y, 'launch');
+    const eid = this.spawnPopShip(pop, i, pack, k, x, y, a);
+    if (eid < 0) { pop.slots[i].alive &= ~(1 << k); return; }
+    Velocity.x[eid] = c * LAUNCH_SPEED; Velocity.y[eid] = s * LAUNCH_SPEED;
+    const roam = pack.roam ?? 2400;
+    this.enemies.get(eid)!.waypoint = { x: at.x + c * roam * 0.6, y: at.y + s * roam * 0.6 };
+    pack.size0 = Math.max(pack.size0 ?? 0, pack.members.size);
+  }
+
+  /**
+   * A ghost pack made real: each of its live ships exactly where its ghost is (common ghostShip), hurt as it was
+   * (mended for the time since it was put back), on patrol; `launch`: a wiped-out pack's first ship back, seen
+   * coming out of the nest's hull instead
+   */
+  private loadSlot(pop: Population, i: number, now: number, launch = false): void {
+    const slot = pop.slots[i], g = pop.sp.def.groups[slot.group] as SpawnGroup | undefined;
+    if (!g || !slot.alive) return;
+    const style = slotStyle(pop.sp, slot.group), n = pop.nest, roam = pop.sp.def.roam ?? 2400;
+    const nestAt = n?.place ? nestPosition(n.place, n.planets, now) : undefined;
+    const c = ghostCentre(pop.sys, pop.sysId, pop.sp, i, style, now);
+    const pack: Pack = {
+      id: this.nextPack++, systemNum: pop.num, home: nestAt && style !== 'nomad' ? { ...nestAt } : { ...c }, members: new Set(), lastSeen: now,
+      passive: g.passive, origin: n ? 'nest' : 'zone', pop: { p: pop, slot: i }, roam, pace: 0.4 + this.rng() * 0.45,
+      ...(pop.zone ? { zone: pop.zone.id } : {}),
+      ...(n ? { nest: pop.key, nestDef: n, group: slot.group, style } : {}),
+    };
+    this.packs.set(pack.id, pack);
+    const away = now - (slot.leftAt ?? now);
+    const heal = away >= LIFE_ASLEEP_RESET ? 1 : (away / 3600) * this.mendPerMinute;
+    const a0 = this.rng() * Math.PI * 2;
+    for (let k = 0; k < g.ships.length; k++) {
+      if (!(slot.alive & (1 << k))) continue;
+      const out = launch && nestAt;
+      const at = out ? { x: nestAt.x + dcos(a0) * (NEST_RADIUS + k * 170), y: nestAt.y + dsin(a0) * (NEST_RADIUS + k * 170) } : ghostShip(c, k);
+      const h = out ? a0 : this.rng() * Math.PI * 2;
+      const eid = this.spawnPopShip(pop, i, pack, k, at.x, at.y, h);
+      if (eid < 0) { slot.alive &= ~(1 << k); continue; }
+      const v = out ? LAUNCH_SPEED : 0;
       Velocity.x[eid] = dcos(h) * v; Velocity.y[eid] = dsin(h) * v;
-      Rotation.angle[eid] = h;
-      const e = this.enemies.get(eid)!;
-      if ((leash || n.aggro) && f) e.behaviour = { ...f.behaviour, ...(leash ? { leash } : {}), ...(n.aggro ? { aggro: n.aggro } : {}) };
-      e.waypoint = { x: at.x + c * roam * 0.6, y: at.y + s * roam * 0.6 };
-    });
-    // First out a little way from the hull; a nomad lingers a moment before it sets off
-    pack.wp = clampBand({ x: at.x + c * roam, y: at.y + s * roam }, n.band ?? { min: 0, max: 1e9 });
-    pack.wpUntil = now + 60 * 20;
-    if (style === 'nomad') pack.settleUntil = now + 60 * 15;
-    return eids;
+      const hp = slot.hp[k];
+      if (hp) restoreHp(this.ships, eid, hp, heal);
+      this.enemies.get(eid)!.waypoint = { ...c };
+    }
+    slot.hp = []; slot.leftAt = undefined;
+    pop.changed = true;
+    if (!pack.members.size) { this.packs.delete(pack.id); return; }
+    pack.size0 = pack.members.size;
+    slot.pack = pack.id;
+    if (launch && nestAt && n?.place && !n.place.hidden) this.host.effect?.(pop.num, nestAt!.x + dcos(a0) * NEST_RADIUS, nestAt!.y + dsin(a0) * NEST_RADIUS, 'launch');
+    if (n) {
+      pack.wp = clampBand(launch && nestAt ? { x: nestAt.x + dcos(a0) * roam, y: nestAt.y + dsin(a0) * roam } : c, n.band ?? { min: 0, max: 1e9 });
+      pack.wpUntil = now + 60 * 20;
+      if (style === 'nomad') pack.settleUntil = now + 60 * 15;
+    }
+  }
+
+  /** A loaded pack nobody's near any more, all asleep and none fighting, back to a ghost (each ship's hurt kept) */
+  private unloadSlot(pop: Population, i: number, now: number): void {
+    const slot = pop.slots[i], pack = slot.pack !== undefined ? this.packs.get(slot.pack) : undefined;
+    slot.pack = undefined;
+    pop.changed = true;
+    if (!pack) return;
+    for (const m of pack.members) {
+      const e = this.enemies.get(m), ship = this.ships.get(m);
+      if (e?.pop && ship) slot.hp[e.pop.k] = hpShares(ship);
+      // (Out of the books first: put away, not lost)
+      this.enemies.delete(m); this.pilots.forget(m); this.custom.forget(m);
+      if (this.ships.has(m)) this.ships.removeShip(m);
+    }
+    this.packs.delete(pack.id);
+    slot.leftAt = now;
+  }
+
+  /** A system's ghosts a pilot's near are loaded; loaded packs nobody's near, all asleep and calm, go back to ghosts */
+  private tendPops(num: number, players: number[], now: number): void {
+    const list = this.populations().get(num);
+    if (!list) return;
+    const R = this.loadRange(), far = R * 1.25;
+    const near = (x: number, y: number, r: number) => players.some((p) => dhypot(Position.x[p] - x, Position.y[p] - y) < r);
+    for (const pop of list) {
+      pop.slots.forEach((slot, i) => {
+        if (slot.pack !== undefined) {
+          const pack = this.packs.get(slot.pack);
+          if (!pack) { slot.pack = undefined; pop.changed = true; return; }
+          // (Kept while anyone's within 1.25 times the load range of any of its ships, or any of them is fighting)
+          for (const m of pack.members) {
+            const e = this.enemies.get(m), at = this.host.where?.(m) ?? { x: Position.x[m], y: Position.y[m] };
+            if (near(at.x, at.y, far) || (e && (e.state === 'engage' || e.state === 'flee' || e.target >= 0))) return;
+          }
+          this.unloadSlot(pop, i, now);
+          return;
+        }
+        if (!slot.alive || !players.length) return;
+        const c = ghostCentre(pop.sys, pop.sysId, pop.sp, i, slotStyle(pop.sp, slot.group), now);
+        if (near(c.x, c.y, R)) this.loadSlot(pop, i, now);
+      });
+    }
+  }
+
+  /** A population's ship is gone (shot down, or gone some other way): its slot remembers, and the spawner starts on its replacement */
+  private popLost(e: Enemy, now: number): void {
+    const at = e.pop;
+    if (!at) return;
+    e.pop = undefined;
+    const pop = at.p, slot = pop.slots[at.slot];
+    slot.alive &= ~(1 << at.k);
+    slot.elite &= ~(1 << at.k);
+    slot.hp[at.k] = undefined;
+    pop.changed = true;
+    if (!pop.next) pop.next = now + this.interval(pop);
+    // (A wiped-out heavy pack's group isn't sent again until it's rebuilt)
+    const g = pop.sp.def.groups[slot.group] as SpawnGroup | undefined;
+    if (!slot.alive && g?.respawnSeconds) this.nestLock.set(`${pop.key}:${slot.group}`, now + g.respawnSeconds * 60);
+  }
+
+  /** A system's populations as the wire has them (common packPopSlot): [spawner index, slots, ...a code a slot] for each */
+  popRows(num: number): number[] {
+    const out: number[] = [];
+    for (const pop of this.populations().get(num) ?? []) this.popRow(pop, out);
+    return out;
+  }
+
+  private popRow(pop: Population, out: number[]): void {
+    out.push(pop.sp.index, pop.slots.length, ...pop.slots.map((s) => packPopSlot(s.group, s.pack !== undefined, s.alive)));
+  }
+
+  /** What's changed in each system's populations since last asked (a death, a ship back, a pack loaded or put back): its rows */
+  popChanges(): Map<number, number[]> {
+    const out = new Map<number, number[]>();
+    for (const [num, list] of this.populations()) {
+      for (const pop of list) {
+        if (!pop.changed) continue;
+        pop.changed = false;
+        let rows = out.get(num);
+        if (!rows) out.set(num, (rows = []));
+        this.popRow(pop, rows);
+      }
+    }
+    return out;
+  }
+
+  /** A population's slots now (tests, tools): each one's group, ships alive (bit k), and whether it's loaded */
+  population(systemNum: number, id: string): { next: number; slots: { group: number; alive: number; loaded: boolean; ships: number[] }[] } | null {
+    const pop = this.populations().get(systemNum)?.find((p) => p.sp.def.id === id);
+    if (!pop) return null;
+    return { next: pop.next, slots: pop.slots.map((s) => ({ group: s.group, alive: s.alive, loaded: s.pack !== undefined, ships: s.pack !== undefined ? [...(this.packs.get(s.pack)?.members ?? [])] : [] })) };
+  }
+
+  /** Where a population's slot's pack is while it's a ghost, at `tick` (tests, tools: the clients work out the same) */
+  ghostAt(systemNum: number, id: string, slot: number, tick = this.host.tick()): XY | null {
+    const pop = this.populations().get(systemNum)?.find((p) => p.sp.def.id === id), s = pop?.slots[slot];
+    if (!pop || !s || s.group < 0) return null;
+    return ghostCentre(pop.sys, pop.sysId, pop.sp, slot, slotStyle(pop.sp, s.group), tick);
+  }
+
+  /** Every population as remembered (the memory file): times as world ticks; a loaded pack's ships as hurt as they are now */
+  popMemory(offset: number): Record<string, Record<string, PopulationMemory>> {
+    const out: Record<string, Record<string, PopulationMemory>> = {};
+    for (const list of this.populations().values()) {
+      for (const pop of list) {
+        const pack = (s: PopSlot) => (s.pack !== undefined ? this.packs.get(s.pack) : undefined);
+        (out[pop.sysId] ??= {})[pop.sp.def.id] = {
+          ...(pop.next ? { next: pop.next + offset } : {}),
+          slots: pop.slots.map((s) => {
+            const hp = [...s.hp];
+            for (const m of pack(s)?.members ?? []) { const e = this.enemies.get(m), ship = this.ships.get(m); if (e?.pop && ship) hp[e.pop.k] = hpShares(ship); }
+            const kept = hp.some((h) => h) ? { hp: hp.map((h) => h ?? null) } : {};
+            return { group: s.group, alive: s.alive, ...(s.elite ? { elite: s.elite } : {}), ...kept, ...(s.leftAt !== undefined ? { leftAt: s.leftAt + offset } : {}) };
+          }),
+        };
+      }
+    }
+    return out;
+  }
+
+  /** Populations back as remembered (a spawner's data changed since: what still fits; a new one's full) */
+  setPopMemory(data: Record<string, Record<string, PopulationMemory>> | undefined, offset: number): void {
+    for (const list of this.populations().values()) {
+      for (const pop of list) {
+        const m = data?.[pop.sysId]?.[pop.sp.def.id];
+        if (!m || !Array.isArray(m.slots)) continue;
+        pop.slots.forEach((slot, i) => {
+          const r = m.slots[i];
+          if (!r || typeof r.group !== 'number' || r.group >= pop.sp.def.groups.length) return;
+          slot.group = r.group;
+          const n = r.group >= 0 ? pop.sp.def.groups[r.group].ships.length : 0;
+          slot.alive = (r.alive | 0) & (n ? (1 << n) - 1 : 0);
+          slot.elite = (r.elite ?? 0) & slot.alive;
+          slot.hp = (r.hp ?? []).map((h) => (Array.isArray(h) ? h : undefined));
+          slot.leftAt = typeof r.leftAt === 'number' ? r.leftAt - offset : undefined;
+          slot.pack = undefined;
+        });
+        pop.next = typeof m.next === 'number' ? m.next - offset : 0;
+        pop.changed = true;
+      }
+    }
   }
 
   /** Places a pack might head for: planets, belts, stations' outskirts, gates, the system's other nests (in its band) */
@@ -909,17 +1165,6 @@ export class Enemies {
     return p.wp;
   }
 
-  /** A nest's pack was wiped out: the nest takes its time replacing it, and longer to rebuild a heavy one */
-  private nestCleared(p: Pack, now: number): void {
-    const n = p.nestDef;
-    if (!n || !p.nest) return;
-    const wait = (n.respawnSeconds ?? this.data.rules.respawnSeconds) * 60;
-    this.nestNext.set(p.nest, Math.max(this.nestNext.get(p.nest) ?? 0, now + wait));
-    this.nestRebuilt.set(p.nest, Math.max(this.nestRebuilt.get(p.nest) ?? 0, now + wait));
-    const g = p.group !== undefined ? n.groups[p.group] : undefined;
-    if (g?.respawnSeconds) this.nestLock.set(`${p.nest}:${p.group}`, now + g.respawnSeconds * 60);
-  }
-
   /** A nest's packs out now (their ships), and where it is (tests, tools) */
   nest(systemNum: number, id: string): { x: number; y: number; packs: number[][] } | null {
     const sp = this.data.spawns[this.host.systemId(systemNum) ?? ''];
@@ -947,6 +1192,8 @@ export class Enemies {
     const w = (t?: number) => (t === undefined ? undefined : t + offset);
     for (const [id, p] of this.packs) {
       if (p.systemNum !== num || p.boss) continue;
+      // (A population's pack is its population's: put away, it's a ghost again)
+      if (p.pop) { if (evict) this.unloadSlot(p.pop.p, p.pop.slot, this.host.tick()); continue; }
       const members: EnemyMemory[] = [];
       for (const m of p.origin ? p.members : []) {
         const e = this.enemies.get(m), ship = this.ships.get(m);
@@ -977,16 +1224,13 @@ export class Enemies {
    * `adopt` (put to sleep and flown on from then: SimLod.adopt)
    */
   restore(num: number, packs: PackMemory[], offset: number, heal: number, adopt: (eid: number, pose: FarPose) => void): void {
-    const nests = this.data.spawns[this.host.systemId(num) ?? '']?.nests ?? [];
     const l = (t?: number) => (t === undefined ? undefined : t - offset);
     for (const m of packs) {
-      const n = m.nest !== undefined ? nests.find((q) => q.id === m.nest) : undefined;
-      // (A nest since gone from the data takes its packs with it)
-      if (m.nest !== undefined && !n) continue;
+      // (Nests' and zones' packs are their populations' now: a file from before them has them as ships, left out)
+      if (m.nest !== undefined || m.origin === 'zone') continue;
       const pack: Pack = {
         id: this.nextPack++, systemNum: num, home: { ...m.home }, members: new Set(), lastSeen: this.host.tick(), origin: m.origin, passive: m.passive,
         angryUntil: l(m.angryUntil), zone: m.zone, size0: m.size0, wp: m.wp, wpUntil: l(m.wpUntil), pauseUntil: l(m.pauseUntil), pace: m.pace, dest: m.dest, settleUntil: l(m.settleUntil),
-        ...(n ? { nest: `${num}:${n.id}`, nestDef: n, group: m.group, roam: m.roam, style: m.style } : {}),
       };
       this.packs.set(pack.id, pack);
       for (const s of m.members) {
@@ -1045,7 +1289,7 @@ export class Enemies {
 
   /** The spawners' clocks, by name (keys: a system's number, or `${number}:...`) */
   private clocks(): [string, Map<string, number> | Map<number, number>][] {
-    return [['spawn', this.nextSpawn], ['zone', this.nextZoneSpawn], ['nestNext', this.nestNext], ['nestRebuilt', this.nestRebuilt], ['nestLock', this.nestLock]];
+    return [['spawn', this.nextSpawn], ['nestLock', this.nestLock]];
   }
 
   private pickGroup(groups: { faction: string; ships: string[]; weight: number }[]) {
@@ -1335,6 +1579,7 @@ export class Enemies {
     if (!e) return;
     this.enemies.delete(eid);
     this.packs.get(e.pack)?.members.delete(eid);
+    this.popLost(e, this.host.tick());
     // A range target pays nothing, drops nothing, counts for nothing
     if (e.dummy) return;
     if (e.boss) { this.bosses?.onDestroyed(eid, killer, ship); return; }
@@ -1452,4 +1697,10 @@ export class Enemies {
       if (eid !== target && dhypot(Position.x[eid] - x, Position.y[eid] - y) < gun.splash) hit(eid, gun.damage * 0.5);
     }
   }
+}
+
+/** A ship's parts' HP as shares of their max (undefined: it's whole) */
+function hpShares(ship: ShipState): number[] | undefined {
+  const hp = ship.hp.map((h, i) => (ship.detached[i] || !(ship.maxHp[i] > 0) ? 0 : Math.round(Math.min(1, h / ship.maxHp[i]) * 1000) / 1000));
+  return hp.every((h) => h >= 1) ? undefined : hp;
 }
