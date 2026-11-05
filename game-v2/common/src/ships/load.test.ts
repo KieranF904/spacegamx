@@ -13,6 +13,7 @@ import type { ShipDerived } from './rebuild.js';
 import type { FlightBody, FlightControls } from './flight.js';
 import { stepShipPhysics } from './physics.js';
 import { replicaStep, ReplicaMode, controlBits } from './replica.js';
+import { gridAim } from '../sim/a-adapt.js';
 import { cargoThrust, cargoTurn, cargoEffect, quantizeCargo } from './load.js';
 import { FULL_CHARGE } from './energy.js';
 import { packKeyframe, unpackKeyframe } from '../network/replication.js';
@@ -64,6 +65,7 @@ describe('prediction and replicas fly the same load', () => {
     const script = (t: number): Partial<FlightControls> => (t < 40 ? { forward: true, targetAngle: 0.7 } : t < 140 ? { targetAngle: 1.4 } : { right: true, targetAngle: -0.3 });
     for (let t = 0; t < 260; t++) {
       const c = { ...NONE, ...script(t) };
+      c.targetAngle = gridAim(c.targetAngle); // (aims come on the grid: sim/input.ts simAim)
       stepShipPhysics(server, c, d, tuning, { charge: FULL_CHARGE, drainRate: 0 });
       replicaStep(ReplicaMode.Player, replica, { bits: controlBits(c), targetAngle: c.targetAngle }, d, tuning, env as never, t);
       expect(replica).toEqual(server);

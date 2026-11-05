@@ -20,7 +20,7 @@ import { quantizeCursorDist, CURSOR_DIST_STEP } from '../network/protocol.js';
 import { SCENARIOS, corsair, bodyRow, chargeRow, hashRows, type Scenario } from '../ships/golden/testData.js';
 import {
   stepShip, newSimShip, simAimQ, simAim, NO_INPUT, shotId, shotIdParts, SHOT_ID_TICKS, Timeline, AHEAD_BACK, hitStateTick,
-  StateRing, shipHash, tickHash, cloneSimShip, packHeadHash, unpackHeadHash, headAgrees, HEAD_HASH_HELD, HEAD_HASH_ROW,
+  StateRing, shipHash, tickHash, cloneSimShip, headHashWord, headHashOfWord, headAgrees, HEAD_HASH_HELD, HEAD_HASH_ROW,
   InputSlots, ScriptedInputs, runDeterminism, assertDeterministic, eventKey, SIM_PHASES, runTick,
   type SimEnv, type SimInput, type SimShipState, type HarnessScenario, type StepShipFn, type TimelineClock,
 } from './index.js';
@@ -253,11 +253,12 @@ describe('state ring, hashes, head hash, input slots, phases', () => {
   });
 
   it('head hash round-trips and compares only when it should', () => {
-    const b = packHeadHash({ own: 0xbeef, flags: HEAD_HASH_HELD });
-    expect(unpackHeadHash(b)).toEqual({ own: 0xbeef, flags: HEAD_HASH_HELD });
-    expect(headAgrees(unpackHeadHash(b), 0x1234beef)).toBe(true);
-    expect(headAgrees(unpackHeadHash(b), 0x1234beee)).toBe(false);
-    expect(headAgrees(unpackHeadHash(b), undefined)).toBe(false);
+    const b = headHashWord({ own: 0xbeef, flags: HEAD_HASH_HELD });
+    expect(b).toBeLessThan(2 ** 24);
+    expect(headHashOfWord(b)).toEqual({ own: 0xbeef, flags: HEAD_HASH_HELD });
+    expect(headAgrees(headHashOfWord(b), 0x1234beef)).toBe(true);
+    expect(headAgrees(headHashOfWord(b), 0x1234beee)).toBe(false);
+    expect(headAgrees(headHashOfWord(b), undefined)).toBe(false);
     expect(headAgrees({ own: 1, flags: HEAD_HASH_HELD | HEAD_HASH_ROW }, 2)).toBe(true);
     expect(headAgrees({ own: 1, flags: 0 }, 2)).toBe(true);
   });

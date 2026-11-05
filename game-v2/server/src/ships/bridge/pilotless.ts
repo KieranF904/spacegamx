@@ -6,12 +6,12 @@
  * What an AI pilot decides (its PilotOrders) is worked out by its controller, in server/src/game (Enemies.ts, Bosses.ts).
  */
 
-import { collideTerrain, terrainRadius, quantizeShipBody } from '@space-game/common';
 import {
-  Position, Velocity, Rotation, FRICTION, stepFlight, withEmp, withSlowed, ReplicaMode, CTL, controlBits, replicaAngle,
-  quantizeReplicaAngle, powerTick, gunLoadTick, FULL_CHARGE, type ShipState, type FlightConstants,
+  Position, Velocity, Rotation, FRICTION, ReplicaMode, NO_FIELDS, stepShip, SimShipView,
+  powerTick, gunLoadTick, FULL_CHARGE, type ShipState, type FlightConstants, type SimEnv, type SimEvent, type SimInput, type FieldEnv, type ShipDerived,
 } from '@space-game/common';
 import type { PilotOrders, BridgeCtx } from './core.js';
+import { controllerInput } from './inputs.js';
 import { datan2, dcos, dhypot, dsin } from '@space-game/common';
 
 /** Reused each tick (powerTick reads it and keeps nothing) */
@@ -74,27 +74,19 @@ export function stepPilotless(b: BridgeCtx, eid: number, ship: ShipState, k: Fli
   const orders = ai ? ai(eid, ship) : null;
   const target = b.autopilot.get(eid);
   const emp = b.isEmped(eid);
-  const hold = { forward: false, backward: false, left: false, right: false, boost: false, targetAngle: body.angle };
-  let controls = orders ? orders.controls : target ? b.autopilotControls(eid, target) : hold;
-  // Aim in the replicated quantization, so every client steps it exactly the same
-  let q = 0;
-  if (controls !== hold) {
-    q = quantizeReplicaAngle(controls.targetAngle);
-    controls = { ...controls, targetAngle: replicaAngle(ReplicaMode.Pilotless, q) };
-    // (Pinned: it only turns. Its thrust would move it on every replica while the pin holds it here)
-    if (b.pinned.has(eid)) controls = { ...controls, forward: false, backward: false, left: false, right: false, boost: false };
-  }
-  // EMP'd: it keeps flying, crippled (as a pilot does); slowed by a Frostbite's beam, sluggish (features/weaponry)
-  const slowed = b.slowedUntil.size > 0 && b.slowedTicksLeft(eid) > 0;
-  b.replicaCtl.set(eid, { mode: ReplicaMode.Pilotless, bits: (controls === hold ? CTL.hold : controlBits(controls)) | (emp ? CTL.emp : 0) | (slowed ? CTL.slowed : 0), q, derived: ship.derived, body: orders?.body });
-  if (orders?.impulse && !emp) { body.vx += orders.impulse[0]; body.vy += orders.impulse[1]; }
-  const hazard = withSlowed(undefined, slowed);
-  stepFlight(body, controls, ship.derived, b.tuning, { charge: FULL_CHARGE, drainRate: 0 }, emp ? { ...k, hazard: withEmp(hazard) } : hazard ? { ...k, hazard } : k);
-  // A surface's rock (as the replicas have it: replicaStep)
-  collideTerrain(body, terrainRadius(ship.derived.radius), b.host.terrainAt?.(eid));
-  // On the replicated grid at once, as a pilot's step leaves it: what the rest of the tick (contacts) sees of it is then
-  // what every client's replica has of it, so a pilot's client can work a contact with it out (network/ownTick.ts)
-  quantizeShipBody(body);
+  // One tick of the one stepper (common sim/step.ts stepShip), in place on a view of the ship, as every replica steps it:
+  // the aim on the replicated grid (simAim), EMP'd it keeps flying crippled (as a pilot does), slowed by a Frostbite's
+  // beam sluggish (features/weaponry), terrain, and on the replicated grid at once, as a pilot's step leaves it: what
+  // the rest of the tick (contacts) sees of it is then what every client's replica has of it (network/ownTick.ts)
+  const s = PILOTLESS_VIEW.load(eid, ReplicaMode.Pilotless, body, ship.derived, ship, FULL_CHARGE, false, ship.jumpPrime ?? 0);
+  s.hazard.empUntil = b.empUntil.get(eid) ?? 0;
+  s.hazard.slowUntil = b.slowedUntil.size > 0 ? tick + b.slowedTicksLeft(eid) : 0;
+  s.hazard.numb = b.coldStage(eid).control;
+  // (Its input from its source, bridge/inputs.ts: the orders asked once above, as their aim, target and body are read here too)
+  stepShip(s, controllerInput(b, eid, orders, target, PILOTLESS_IN), pilotlessEnv(b, eid, k, tick), s, PILOTLESS_EVENTS);
+  PILOTLESS_EVENTS.length = 0;
+  if (s.jumpPrime || ship.jumpPrime !== undefined) ship.jumpPrime = s.jumpPrime;
+  b.replicaCtl.set(eid, { mode: ReplicaMode.Pilotless, bits: s.ctl.bits, q: s.ctl.q, derived: ship.derived, body: orders?.body });
   b.writeBody(eid, ship, body);
   const pin = b.pinned.get(eid);
   if (pin) { Position.x[eid] = pin.x; Position.y[eid] = pin.y; Velocity.x[eid] = 0; Velocity.y[eid] = 0; }
@@ -105,4 +97,23 @@ export function stepPilotless(b: BridgeCtx, eid: number, ship: ShipState, k: Fli
   PILOTLESS_USE.load = undefined;
   b.fireWeapons(eid, ship, !!orders?.firing && !emp && !b.isJumping(ship), orders?.aim, orders?.aimDist ?? 0, orders?.target ?? -1, energy);
   b.charge.set(eid, energy.charge);
+}
+
+/** stepPilotless' scratch: the view, its input and env (reused every call; the step keeps none of them) */
+const PILOTLESS_VIEW = new SimShipView();
+const PILOTLESS_IN: SimInput = { bits: 0, q: 0, jumpDist: -1, fire: false, fireAlt: false, aimDist: 0 };
+const PILOTLESS_FIELDS: FieldEnv = { central: null };
+const PILOTLESS_ENV: SimEnv = { tick: 0, tuning: undefined as unknown as SimEnv['tuning'], gravity: null, fields: PILOTLESS_FIELDS, terrain: null, gunsByHost: true };
+/** (Empty: its guns are fireWeapons', env.gunsByHost) */
+const PILOTLESS_EVENTS: SimEvent[] = [];
+let envEid = 0, envB: BridgeCtx | undefined;
+const pilotlessHazard = (d: ShipDerived, x: number, y: number) => envB!.host.hazardFlight?.(envEid, d, x, y);
+function pilotlessEnv(b: BridgeCtx, eid: number, k: FlightConstants, tick: number): SimEnv {
+  const f = b.host.jumpFields?.(eid) ?? NO_FIELDS;
+  PILOTLESS_FIELDS.central = f.central; PILOTLESS_FIELDS.lodestones = f.lodestones;
+  envB = b; envEid = eid;
+  const e = PILOTLESS_ENV;
+  e.tick = tick; e.tuning = b.tuning; e.gravity = k.gravity ?? null; e.terrain = b.host.terrainAt?.(eid) ?? null;
+  e.hazard = b.host.hazardFlight ? pilotlessHazard : undefined;
+  return e;
 }

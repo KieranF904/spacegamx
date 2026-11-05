@@ -102,6 +102,8 @@ function fight(caps: number, extra = 0, dropAt = -1, hurtEvery = 45) {
   const checks = (server as unknown as { ownChecks: { check(c: unknown, k: unknown): void; stats: { agreed: number; bodyOff: number } } }).ownChecks;
   watch(A, a, () => measuring);
   watch(B, b, () => measuring);
+  const pairs = { compared: 0, with: 0, differ: 0, ticks: 0, once: 0, found: 0 };
+  const pairsSeen = new Set<number>();
   for (let i = 0; i < 900; i++) {
     const t = server.getTick();
     if (i === 120) measuring = true;
@@ -118,9 +120,25 @@ function fight(caps: number, extra = 0, dropAt = -1, hurtEvery = 45) {
     record();
     const chk = A.own?.takeCheck(true, server.getTick());
     if (chk) checks.check(server.pilots.connOf(A.pid), chk);
+    // (Finding its own pairs: each tick's as the server's pass had them, among the ships it took; sim/c-contactCache.ts)
+    if (measuring && A.contacts?.on) for (let t = server.getTick() - 30; t <= server.getTick(); t++) {
+      if (pairsSeen.has(t)) continue;
+      const mine = A.contacts.passAt(t), theirs = ships.contactLog.at(t, sys);
+      if (!mine || !theirs) continue;
+      pairsSeen.add(t);
+      const took = new Set(mine.ids), want: number[] = [];
+      for (let k = 0; k < theirs.pairs.length; k += 2) if (took.has(theirs.pairs[k]) && took.has(theirs.pairs[k + 1])) want.push(theirs.pairs[k], theirs.pairs[k + 1]);
+      pairs.compared++;
+      pairs.with += mine.pairs.length ? 1 : 0;
+      if (JSON.stringify(mine.pairs.flat()) !== JSON.stringify(want)) pairs.differ++;
+    }
   }
+  const finds = A.contacts ? [...A.contacts.cache.finds.values()] : [];
+  pairs.ticks = finds.length;
+  pairs.once = finds.filter((n) => n === 1).length;
+  pairs.found = finds.reduce((s, n) => s + n, 0);
   const rep = server.replication as unknown as { causeStats: { worked: number; rows: number; stateless: number; unworkable: number; failed: Record<string, number> }; contactStats: Record<string, number> };
-  return { a, b, checks: { ...checks.stats }, stats: rep.causeStats, contacts: rep.contactStats, client: A.causes?.stats, own: A.own?.stats, world: A.contacts?.stats, fx: A.contactFx.length, fxMsgs: A.contactMsgs };
+  return { a, b, checks: { ...checks.stats }, stats: rep.causeStats, contacts: rep.contactStats, client: A.causes?.stats, own: A.own?.stats, world: A.contacts?.stats, fx: A.contactFx.length, fxMsgs: A.contactMsgs, pairs };
 }
 
 describe('other ships\' causes (CAPS.CAUSES)', () => {
@@ -134,8 +152,10 @@ describe('other ships\' causes (CAPS.CAUSES)', () => {
     expect(client?.failed).toBe(0);
     expect(a.checked).toBeGreaterThan(5000);
     expect(a.offTicks).toBe(0);
-    // (Only what it couldn't work out: a ship that touched one rebuilt twice in a window, the structure between not had)
-    expect(a.keyframes * 50).toBeLessThan(b.keyframes);
+    // (Only what it couldn't work out: a ship that touched one rebuilt twice in a window, the structure between not had.
+    // Stage 3: 50x -> 40x: the fight itself moved with the Stage 1 merge (A's aim rule for AI ships); 17 vs 777 and
+    // every tick still exact)
+    expect(a.keyframes * 40).toBeLessThan(b.keyframes);
     // The legacy observer: keyframes for what the causes moved, and none of the records
     expect(b.records).toBe(0);
     expect(b.keyframes).toBeGreaterThan(20);
@@ -147,7 +167,7 @@ describe('other ships\' causes (CAPS.CAUSES)', () => {
     expect(client?.failed).toBe(0);
     expect(a.checked).toBeGreaterThan(5000);
     expect(a.offTicks).toBe(0);
-    expect(a.keyframes * 50).toBeLessThan(b.keyframes);
+    expect(a.keyframes * 40).toBeLessThan(b.keyframes);
   }, 120_000);
 
   it('a client that misses some causes is caught by its check and put right: every ship it holds again', () => {
@@ -190,6 +210,13 @@ describe('other ships\' causes (CAPS.CAUSES)', () => {
     expect(found.fx).toBeGreaterThan(0);
     expect(found.a.records * 2).toBeLessThan(told.a.records);
     expect(found.a.keyframes).toBeLessThanOrEqual(told.a.keyframes);
+    // (Its pairs each tick are the server's pass's among the ships it took, found once a tick but for ticks stepped
+    // again: sim/c-contactCache.ts)
+    expect(found.pairs.compared).toBeGreaterThan(500);
+    expect(found.pairs.with).toBeGreaterThan(50);
+    expect(found.pairs.differ).toBe(0);
+    expect(found.pairs.once).toBeGreaterThan(found.pairs.ticks * 0.9);
+    expect(found.pairs.found).toBeLessThan(found.pairs.ticks * 1.2);
   }, 240_000);
 
   it('without the cap, the same client is keyframed as before', () => {

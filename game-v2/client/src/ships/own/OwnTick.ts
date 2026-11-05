@@ -20,6 +20,7 @@ import {
   ownCheckRules, CONFIRM, CONTACT_BIG_BODY, OWN_CAUSE, CONTACT_FLAG, placeRows, pairPlace, type CauseRow,
   type OwnTimeline, type ShipReplicaSet, type ShipDerived, type ShipState, type ShipTuning, type FlightBody, type OwnCheck,
   type OwnCauseEnv, type OwnShape, type PlacedGeom, type ServerSnapshotMessage, type ClientInputMessage, type Vec2,
+  headAgrees, headHashOfWord, ownHeadHash, type HeadHash,
 } from '@space-game/common';
 import type { StructSource } from '../ShipStore.js';
 import type { ContactWorld } from '../causes/ContactWorld.js';
@@ -73,7 +74,10 @@ export class OwnTick implements OwnTimeline {
   level: number = CONFIRM.NORMAL;
   private levelSince = 0;
   private last = { tick: -Infinity, snap: -Infinity, body: -1, hp: -1 };
-  readonly stats = { inputs: 0, causes: 0, failed: 0, fixes: 0, exc: 0, checks: 0 };
+  readonly stats = { inputs: 0, causes: 0, failed: 0, fixes: 0, exc: 0, checks: 0, heads: 0, headMisses: 0 };
+  /** The newest snapshot's head hash, to judge at its next check (sim/headHash.ts), and a miss not yet sent */
+  private head: { tick: number; h: HeadHash } | null = null;
+  private missed = false;
 
   constructor(private readonly host: OwnTickHost) {}
 
@@ -113,6 +117,8 @@ export class OwnTick implements OwnTimeline {
     const self = this.host.self(), prev = this.snapTick;
     this.snapTick = m.tick;
     if (!this.on) { this.before = null; this.othersBefore.clear(); return; }
+    // (Its head hash: judged once the snapshot is all in, at the next check)
+    if (m.hh !== undefined) this.head = { tick: m.tick, h: headHashOfWord(m.hh) };
     // (What it stepped past the last snapshot is stepped again: something may have asked for its ship there before this
     // frame's structure and causes were in, a boss's body reading its target, CAPS.BODIES)
     let earliest = (this.host.restep?.() ?? true) ? prev + 1 : Infinity;
@@ -275,20 +281,49 @@ export class OwnTick implements OwnTimeline {
   // ---- Its check ----
 
   /**
+   * The newest snapshot's head hash against its own ship on its layer at that tick (common sim/headHash.ts): held
+   * and not keyed in that snapshot, they must agree; a miss sends its check at once (takeCheck), which the server
+   * judges and puts right (its own ship keyed, its row with it)
+   */
+  private judgeHead(): void {
+    const hd = this.head;
+    if (!hd) return;
+    this.head = null;
+    const self = this.host.self();
+    if (this.host.reps.docked(self)) return;
+    const st = this.host.reps.at(self, hd.tick);
+    this.stats.heads++;
+    if (headAgrees(hd.h, st ? ownHeadHash(self, st.body, st.bits, st.q) : undefined)) return;
+    this.stats.headMisses++;
+    this.missed = true;
+  }
+
+  /** Did the newest snapshot's head hash agree with its layer (tests)? Judges it now if it wasn't yet */
+  headOk(): boolean {
+    this.judgeHead();
+    return !this.missed;
+  }
+
+  /**
    * Its check, if one is due (`riding`: an input goes anyway; else only after its level's `alone` ticks, and only if
    * its state changed since the last): a hash of its own ship as of the last snapshot's tick
    */
   takeCheck(riding: boolean, tick: number): OwnCheck | undefined {
-    if (!this.on || !this.keyed || this.snapTick === this.last.snap) return undefined;
+    if (!this.on || !this.keyed) return undefined;
+    this.judgeHead();
+    // (Its layer disagreed with a snapshot's head hash: the check goes now, whatever its level, sim/headHash.ts)
+    const force = this.missed;
+    if (!force && this.snapTick === this.last.snap) return undefined;
     // (A clean stretch at a level steps it down one)
     if (this.level > CONFIRM.ROUGH && tick - this.levelSince >= CLEAN_TICKS) { this.level--; this.levelSince = tick; }
     const rules = ownCheckRules(this.level), since = tick - this.last.tick;
-    if (since < rules.ride || (!riding && since < rules.alone)) return undefined;
+    if (!force && (since < rules.ride || (!riding && since < rules.alone))) return undefined;
     // (Docked: as its keyframe had it, the server's too: Replication.ownHeld)
     const self = this.host.self(), st = this.host.reps.docked(self) ?? this.host.reps.at(self, this.snapTick), ship = this.host.store.get(self);
     if (!st || !ship) return undefined;
     const body = (ownBodyHash(st.body, st.bits, st.q) + (this.host.extraHash?.(this.snapTick) ?? 0)) & 0xff, hp = ownHpHash(ship.hp);
-    if (!riding && body === this.last.body && hp === this.last.hp) return undefined;
+    if (!force && !riding && body === this.last.body && hp === this.last.hp) return undefined;
+    this.missed = false;
     this.last = { tick, snap: this.snapTick, body, hp };
     this.stats.checks++;
     return { body, hp, tick: this.snapTick & 0xfff };

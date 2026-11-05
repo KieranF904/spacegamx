@@ -43,3 +43,4 @@ except to fix a typo. A bump makes old clients reload (see PROTOCOL_VERSION in p
 - 51 (2026-11-05): rock hits: no LaserHit effect (clients draw a rock's sparks where their shell meets it) and no projectileHit for a client finding its own hits; encode-once fire blocks carry the augmented flag as a bit (wire hash now covers a fire block)
 - 52 (2026-11-05): pops: hostile populations per spawner (slot codes: group, loaded, alive mask), mapDots pts for loaded hostiles out of view
 - 53 (2026-11-05): pops n: nomads' lures (the sector their band's pilots were last seen in), ghosts drift towards it
+- 54 (2026-11-05): snapshot head hash (hh: the own ship's state hash and flags, 24 bits) for CAPS.OWN_SIM clients, in place of the own row's 2 s safety copy (sim foundation 1C)

@@ -139,7 +139,17 @@ export class HitLedger {
     levels: [0, 0, 0],
   };
 
+  /**
+   * A shell's name to one client (CAPS.SHOT_IDS: its own straight shells are named by shot id, sim/b-shots.ts
+   * ownShotWire; the SnapshotBuilder sets this). Kept by entity id inside; named only in what goes to the client
+   */
+  shellName: ((conn: ClientConnection, proj: number) => number) | null = null;
+
   constructor(private host: HitLedgerHost) {}
+
+  private nameFor(conn: ClientConnection, proj: number): number {
+    return this.shellName ? this.shellName(conn, proj) : proj;
+  }
 
   /** Does this snapshot keep hits (some client takes records)? */
   get active(): boolean {
@@ -216,7 +226,7 @@ export class HitLedger {
     if (finds) {
       const mine: Hit[] = [], rest: Hit[] = [];
       for (const h of this.hits) if (h.sys === sys) (this.findable(conn, h, ships, keyframed) ? mine : rest).push(h);
-      mine.sort((a, b) => a.tick - b.tick || a.proj - b.proj);
+      mine.sort((a, b) => a.tick - b.tick || this.nameFor(conn, a.proj) - this.nameFor(conn, b.proj));
       findable = mine.length;
       order = mine.concat(rest);
     }
@@ -367,7 +377,7 @@ export class HitLedger {
     view.hp = sent;
     view.shield = 0;
     const p = passes.get(h.proj) ?? 0;
-    const rec: ShellHitRecord = { shell: h.proj, ago: tick - h.tick, target: h.target, part: h.part, gone: h.gone, glancing: h.glancing };
+    const rec: ShellHitRecord = { shell: this.nameFor(conn, h.proj), ago: tick - h.tick, target: h.target, part: h.part, gone: h.gone, glancing: h.glancing };
     let ignite: number;
     if (h.soak > 0) {
       // (A shield took some: it leaves the HP to the shipHps after)
@@ -428,7 +438,7 @@ export class HitLedger {
       if (recs.length) net.send(conn.ws, { type: 'hits', h: packHits(recs) });
     }
     for (const h of plan.legacy) {
-      if (net.nearClient(conn, h.sys, h.x, h.y)) net.send(conn.ws, projectileHitMessage(h.proj, h.x, h.y));
+      if (net.nearClient(conn, h.sys, h.x, h.y)) net.send(conn.ws, projectileHitMessage(this.nameFor(conn, h.proj), h.x, h.y));
       for (const m of h.fx) net.sendAsSystem(conn, h.sys, m);
     }
     // (A told shell spent by its record never comes in a removed list: it goes from the told set here, so a reused id is new)

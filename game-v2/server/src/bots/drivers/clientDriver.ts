@@ -11,6 +11,7 @@ import type { ClientLink, ClientMessage, ClientSocket } from '@space-game/common
 import type { GameServer } from '../../GameServer.js';
 import type { ClientConnection } from '../../net/ClientConnection.js';
 import { idle, type Bag, type Controls, type DepositMode, type DepositResult, type PilotDriver, type Pose } from '../core/types.js';
+import { BotInputSource, keysOfInput } from '../core/controlSource.js';
 import { miningFill, poseOf, radiusOf } from './shipInfo.js';
 
 export interface ClientDriverOpts {
@@ -36,6 +37,8 @@ export class ClientDriver implements PilotDriver {
   private readonly conn: ClientConnection;
   private seq = 1;
   private c: Controls = idle();
+  /** Its orders as an InputSource (decided): the input message is built from it */
+  readonly source = new BotInputSource(() => this.c);
   private sent: Controls | null = null;
   private sentTick = -999;
 
@@ -108,10 +111,11 @@ export class ClientDriver implements PilotDriver {
     this.sent = { ...c };
     this.sentTick = tick;
     this.inputsSent++;
+    const inp = this.source.inputAt(tick + 1), k = keysOfInput(inp);
     this.link.receive({
       type: 'input', seq: this.seq++, tick: 0, targetTick: tick + 1,
-      forward: c.forward, backward: c.backward, left: c.left, right: c.right, boost: c.boost,
-      fireLeft: false, fireRight: c.mine, targetAngle: c.aim, cursorDist: Math.round(c.aimDist),
+      forward: k.forward, backward: k.backward, left: k.left, right: k.right, boost: k.boost,
+      fireLeft: inp.fire, fireRight: inp.fireAlt, targetAngle: c.aim, cursorDist: Math.round(c.aimDist),
     } as ClientMessage);
   }
 

@@ -21,7 +21,8 @@ import { ShipCauses } from '../../../../client/src/ships/causes/ShipCauses.js';
 import { DebrisSplits } from '../../../../client/src/ships/debris/DebrisSplits.js';
 import { MoveRunner } from '../../../../client/src/ships/bodies/MoveRunner.js';
 import { ContactWorld, type ContactFx } from '../../../../client/src/ships/causes/ContactWorld.js';
-import { bodiesFor, causesFor, contactsFor, movesFor, waypointsFor, type GuideBody, type CustomStats } from '@space-game/common';
+import { bodiesFor, causesFor, contactsFor, movesFor, waypointsFor, shotIdsFor, stepShipGuns, newSimShip, cloneCharge, simAimQ, NO_INPUT, ownShotWireOf, type GuideBody, type CustomStats, type SimEvent, type Charge, type FireRecord } from '@space-game/common';
+import { OwnShells } from '../../../../client/src/ships/hits/OwnShells.js';
 import factionsFile from '../../../../data/factions.json' with { type: 'json' };
 import { ownSimFor } from '../snapshot/ownShots.js';
 import type { GameServer } from '../../GameServer.js';
@@ -97,10 +98,21 @@ export class FakeHitsClient {
   /** Its own shells as projectile rows, and as fire events (CAPS.OWN_SHOTS: built from its own pose) */
   ownRows = 0;
   ownFired = 0;
+  /** Its own shells it built itself (CAPS.SHOT_IDS) */
+  ownDerived = 0;
   /** Its confirmation levels as told (netCaps.lvl, CAPS.ROUGH): [the snapshot tick it came after, level] */
   readonly levels: [number, number][] = [];
   /** Its own shells that came as rows (ids) */
   readonly ownRowIds = new Set<number>();
+  /**
+   * Its own straight shells worked out here, named by shot id (CAPS.SHOT_IDS: client ships/hits/OwnShells.ts). Which of
+   * its guns fired is its own gun step's (common sim/guns.ts stepShipGuns), run on the inputs the server's fireWeapons
+   * gets (a perfect prediction); `shotPairs` its shot ids beside the server's records' for the same ticks
+   */
+  readonly ownShells: OwnShells | null = null;
+  readonly shotPairs: { tick: number; client: number[]; server: number[] }[] = [];
+  /** Its own shells it built, by wire name: the server's entity id (from its records), for the tests */
+  readonly ownWire = new Map<number, number>();
   link: { receive(msg: ClientMessage): void } | null = null;
   /** What it sends the server (hpResync, reports), delivered after the step (a real socket is never re-entered) */
   outbox: ClientMessage[] = [];
@@ -139,6 +151,10 @@ export class FakeHitsClient {
     }
     if (ownSimFor(opts.caps)) this.own = new OwnTick({ store: this.store, reps: this.reps, self: () => this.pid, tuning: ships.tuning, restep: () => !!this.bodies?.on, extraHash: (t) => (this.causes?.heldByte(t) ?? 0) + (this.guides?.byte(t) ?? 0),
       contacts: () => this.contacts, otherMid: (id, t, place) => this.causes ? this.causes.midOf(id, t, place) : this.reps.preAt(id, t) });
+    if (shotIdsFor(opts.caps)) {
+      this.ownShells = new OwnShells({ self: () => this.pid, ship: (id) => this.store.get(id), tuning: ships.tuning, firePose: (t) => this.own?.firePose(t) ?? null });
+      this.watchOwnGuns();
+    }
     if (bodiesFor(opts.caps)) this.bodies = new BodyRunner({ reps: this.reps });
     if (this.bodies && movesFor(opts.caps)) {
       this.moves = new MoveRunner({
@@ -172,6 +188,38 @@ export class FakeHitsClient {
     // (its own ship's pose every tick, not only those a frame went on: the server's step, wrapped)
     const step = server.step.bind(server);
     server.step = () => { step(); this.noteSelf(); };
+  }
+
+  /**
+   * Its own gun step (CAPS.SHOT_IDS), as its prediction would run it: the step's gun phase (stepShipGuns) on a copy of
+   * the inputs the server's fireWeapons gets for its ship (gun state, charge, pose, trigger, aim on the cursor grid), so
+   * which guns fired and the shot ids are its own; the server's records for the tick are noted beside them
+   */
+  private watchOwnGuns(): void {
+    const ships = this.server.getShips() as unknown as { fireWeapons: (eid: number, ship: ShipState, firing: boolean, aimWorld?: number, aimDist?: number, target?: number, energy?: { charge: Charge }) => void; fired: FireRecord[]; pose(eid: number): { x: number; y: number; angle: number }; tuning: never };
+    const orig = ships.fireWeapons.bind(ships);
+    ships.fireWeapons = (eid, ship, firing, aimWorld, aimDist = 0, target = -1, energy) => {
+      if (eid !== this.pid || !this.ownShells?.on) return orig(eid, ship, firing, aimWorld, aimDist, target, energy);
+      const tick = this.server.getTick(), p = ships.pose(eid);
+      const st = newSimShip({ id: eid, derived: ship.derived, ship, body: { x: p.x, y: p.y, angle: p.angle, vx: Velocity.x[eid], vy: Velocity.y[eid], angVel: 0, jump: ship.jump, cargo: 0 }, charge: cloneCharge(energy?.charge ?? { g: 0, b: [] }), accounted: !!energy });
+      const evs: SimEvent[] = [];
+      stepShipGuns(st, { ...NO_INPUT, q: simAimQ(aimWorld ?? 0), fire: firing, aimDist }, { tick, tuning: ships.tuning, gravity: null, fields: { central: null, lodestones: [] } as never, terrain: null }, evs);
+      const n0 = ships.fired.length;
+      orig(eid, ship, firing, aimWorld, aimDist, target, energy);
+      const client: number[] = [], server: number[] = [];
+      for (const e of evs) {
+        if (e.k !== 'fire') continue;
+        if (e.barrel === 0 && this.ownShells.derivable(ship, e.slot + ((e as { aug?: 1 }).aug ? 65536 : 0))) this.ownShells.fired({ tick, part: e.slot, aimQ: e.aimQ, ammo: 0, aug: (e as { aug?: 1 }).aug });
+        if (this.ownShells.derivable(ship, e.slot)) client.push(e.shot);
+      }
+      for (let i = n0; i < ships.fired.length; i++) {
+        const f = ships.fired[i];
+        if (f.owner !== eid || !f.shots) continue;
+        server.push(...f.shots);
+        f.shots.forEach((sh, k) => this.ownWire.set(ownShotWireOf(sh), f.ids[k]));
+      }
+      if (client.length || server.length) this.shotPairs.push({ tick, client, server });
+    };
   }
 
   /**
@@ -241,6 +289,7 @@ export class FakeHitsClient {
         this.guides?.setOn(waypointsFor(m.caps));
         this.causes?.setOn(causesFor(m.caps));
         this.contacts?.setOn(contactsFor(m.caps));
+        this.ownShells?.setOn(shotIdsFor(m.caps));
         this.levels.push([this.snapTick, m.caps & CAPS.ROUGH ? m.lvl ?? 1 : 1]);
         break;
       case 'snapshot': this.snapshot(m as ServerSnapshotMessage); break;
@@ -328,6 +377,18 @@ export class FakeHitsClient {
         if (sh) this.selfHits?.addShell(id, owner, partAmmo, spawnTick, sh.x, sh.y, sh.vx, sh.vy, sh.size);
       }
     }
+    // Its own straight shells, CAPS.SHOT_IDS: built here from its own gun step, named by shot id; those ended removed here (ShipClient.preSnapshot)
+    if (this.ownShells?.on) {
+      const keyed = !!s.ships?.some((k) => k[0] === this.pid);
+      for (const e of this.ownShells.snapshot(s.tick, s.removed, keyed)) {
+        const d = e.data!;
+        this.known.add(e.id);
+        this.ownDerived++;
+        this.shells.set(e.id, { owner: d[6], gun: d[10], spawnTick: d[3], x: d[4], y: d[5], vx: e.vx ?? 0, vy: e.vy ?? 0 });
+        if (this.ownShells.freshExact(e.id)) this.selfHits?.addShell(e.id, d[6], d[10], d[3], d[4], d[5], e.vx ?? 0, e.vy ?? 0, d[7]);
+        else this.selfHits?.row(e.id);
+      }
+    }
     // (as ShipClient: the ledger sees the removed list before the shells go)
     this.hits?.forget(s.removed);
     this.away.onSnapshot(s.tick, s.removed);
@@ -377,6 +438,7 @@ export class FakeHitsClient {
     this.handingOut = true;
     try { for (const m of r.msgs) this.handle(m); } finally { this.handingOut = false; }
     for (const id of r.gone) { this.removed.add(id); this.shells.delete(id); this.guides?.remove(id); }
+    this.ownShells?.gone(r.gone);
     this.selfHits?.spent(r.gone);
   }
 }

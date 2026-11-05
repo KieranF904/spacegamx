@@ -264,6 +264,8 @@ export interface FireRecord {
   aimQ: number;
   /** The shells' entity ids, in spawn order */
   ids: number[];
+  /** (the server's) Each shell's shot id, by its place: sim/events.ts shotId(owner, tick, part, place). What a CAPS.SHOT_IDS pilot names its own by */
+  shots?: number[];
 }
 
 export interface FirePose { x: number; y: number; angle: number; vx: number; vy: number }
@@ -273,14 +275,30 @@ export interface FirePose { x: number; y: number; angle: number; vx: number; vy:
  * and velocity on that tick. Null if the ship has no such weapon.
  */
 export function rebuildVolley(rec: FireRecord, ship: ShipState, pose: FirePose, tuning: ShipTuning): { kind: string; turret: boolean; shells: Launched[] } | null {
+  const v = fireVolley(rec, ship, pose, tuning);
+  if (!v || v.shells.length !== rec.ids.length) return null;
+  return { kind: v.kind, turret: v.turret, shells: v.shells.map((s, i) => ({ ...s, id: rec.ids[i] })) };
+}
+
+/**
+ * A volley's shells (without ids) from what fired it: the gun (`part`), its tick, aim and ammunition, the firing ship's
+ * structure and its pose that tick. What a fire event (a record, or the step's own: sim/guns.ts) comes to on every end
+ */
+export function fireVolley(rec: Omit<FireRecord, 'ids'>, ship: ShipState, pose: FirePose, tuning: ShipTuning): { kind: string; turret: boolean; w: WeaponInfo; shells: Omit<Launched, 'id'>[] } | null {
   const w = ship.derived.weapons.find((x) => x.part === rec.part);
   if (!w) return null;
   const aim = [...ship.aim];
   aim[rec.part] = rec.aimQ / SHOT_AIM_STEPS;
   const shot = buildShot(w, { ...ship, aim }, pose, rec.tick, tuning);
   const shells = volleyShells(rec.owner, ship, w, shot, pose, rec.tick, tuning, stackMods(ammoByCode(rec.ammo ?? 0)?.mods, rec.aug ? ship.derived.ports?.augMods[rec.part] : undefined));
-  if (shells.length !== rec.ids.length) return null;
-  return { kind: w.kind, turret: shot.mount === 'turret', shells: shells.map((s, i) => ({ ...s, id: rec.ids[i] })) };
+  return { kind: w.kind, turret: shot.mount === 'turret', w, shells };
+}
+
+/** The code of a crate whose mods these are (0: none, or not a crate's): a pilot's client knows its rounds by their mods */
+export function ammoCodeOfMods(mods: WeaponMods | undefined): number {
+  if (!mods) return 0;
+  const i = crates.findIndex((c) => c.mods === mods);
+  return i < 0 ? 0 : i + 1;
 }
 
 /** A volley's shells (without entity ids), in spawn order: a burst's fanned extras, then the main shell */

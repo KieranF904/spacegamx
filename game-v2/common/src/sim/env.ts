@@ -49,11 +49,20 @@ export interface SimEnv {
   /** What hazards do to a ship here (ships/hazards.ts hazardFlight); absent: none */
   hazard?: (derived: ShipDerived, x: number, y: number) => HazardFlight | undefined;
   pulls?: PullSource;
+  /**
+   * The host runs this ship's guns itself, once per tick in its guns phase (the server's fireWeapons, the client's
+   * predictGuns, both through guns.ts gunsTick on the ShipState): the step skips its gun phase (4) so they never run
+   * twice. Absent: the step runs them (stepShipGuns) and emits their events. Settled in Stage 3: the server keeps its
+   * guns phase after every ship has moved (SIM_PHASES), and its projectiles need the gun step's specs (damage scale)
+   */
+  gunsByHost?: boolean;
 }
 
 export interface StepResult {
   state: SimShipState;
   events: SimEvent[];
+  /** The drive boosted this tick (not state: never stored, never hashed; the server's pilot step stamps Boost.lastUseTick) */
+  isBoosting: boolean;
 }
 
 /**

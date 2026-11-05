@@ -203,7 +203,9 @@ const PENDING_FRAMES = 40;
  * before), everyone else's at the tick interpolate placed them at
  */
 export function shotTimelines(state: GameState): [present: number, render: number] {
-  return [state.ownDrawTick(), state.renderTickNow];
+  // (One Timeline for every kind's draw tick: common sim/timeline.ts, GameState.timeline)
+  const tl = state.timelineAt();
+  return [tl.drawTick('ownShot'), tl.drawTick('pilotShot')];
 }
 
 export interface ShellLook { model?: string; damage?: number; splash?: number; pierce?: number; life?: number; arm?: number }

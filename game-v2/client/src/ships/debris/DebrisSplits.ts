@@ -11,12 +11,15 @@
  * Shared by the game client (ShipClient) and the test and bench fakes (server net/hits/fakeHitsClient.testkit.ts).
  */
 import {
-  EntityType, deriveSplit, debrisDecay, unpackSheds, partGroups, unpackIds, unpackRuns, computeJoins, recentreShift, quantizeShipBody, DEBRIS_STATUS,
+  EntityType, deriveSplit, debrisDecay, unpackSheds, partGroups, unpackIds, unpackRuns, computeJoins, recentreShift, quantizeShipBody, DEBRIS_STATUS, StateRing, ReplicaState, ReplicaMode,
   type ShipReplicaSet, type ServerShipSyncMessage, type ShipState, type ServerDebrisSplitMessage, type ServerPartDestroyedMessage, type DebrisShape, type DebrisWorld,
   type EntityState, type Vec2, type FlightBody, type ShipDerived,
 } from '@space-game/common';
 import type { ShipStore } from '../ShipStore';
 import { DebrisLives } from './DebrisLives';
+
+/** Ticks of bodies before a rebuild kept (a split is worked out within its snapshot's window) */
+const PRE_TICKS = 128;
 
 export class DebrisSplits implements DebrisWorld {
   /** The pieces it runs itself (CAPS.DEBRIS) */
@@ -56,8 +59,11 @@ export class DebrisSplits implements DebrisWorld {
     if (msg.at !== undefined && msg.kind === 'debris' && this.host.store.get(msg.id)?.rebuilds !== msg.rebuilds) this.host.reps().rewind(msg.id, msg.at);
   }
 
-  /** Bodies before a rebuild recentred them, by id and tick (a split from it starts there) */
-  private readonly pre = new Map<number, { t: number; body: FlightBody }[]>();
+  /**
+   * Bodies before a rebuild recentred them, by id and tick (a split from it starts there): a StateRing of their replica
+   * states, the ticks of a window (sim foundation 1C, common sim/ring.ts)
+   */
+  private readonly pre = new StateRing(PRE_TICKS);
 
   /**
    * A connection afresh (ShipClient.resetHits): the old server's pieces, checks and waiting splits are no part of the new
@@ -82,19 +88,15 @@ export class DebrisSplits implements DebrisWorld {
     if (this.lives.has(id)) return this.lives.after(id, t, body);
     const r = this.host.store.rebuildAt(id, t);
     if (!r) return true;
-    let list = this.pre.get(id);
-    if (!list) this.pre.set(id, (list = []));
-    const i = list.findIndex((e) => e.t === t);
-    if (i >= 0) list[i].body = { ...body }; else list.push({ t, body: { ...body } });
-    if (list.length > 4) list.shift();
-    const w = recentreShift(r.from, r.to, this.host.store.tuning.cellSize, body.angle);
+    this.pre.keep(t, new ReplicaState(id, ReplicaMode.Drift, { ...body }, 0, 0));
+    const w =recentreShift(r.from, r.to, this.host.store.tuning.cellSize, body.angle);
     if (w) { body.x += w[0]; body.y += w[1]; quantizeShipBody(body); }
     return true;
   }
 
   /** Its body on tick t before a rebuild there recentred it (null: none) */
   private preAt(id: number, t: number): FlightBody | null {
-    return this.lives.preAt(id, t) ?? this.pre.get(id)?.find((e) => e.t === t)?.body ?? null;
+    return this.lives.preAt(id, t) ?? this.pre.get(id, t)?.body ?? null;
   }
 
   /** The debris to confirm, taken (the input path sends them) */
@@ -166,7 +168,7 @@ export class DebrisSplits implements DebrisWorld {
     // (Pieces it ran that it no longer holds: removed, or out of view)
     const reps = this.host.reps();
     for (const id of [...this.lives.ids()]) if (!reps.has(id)) this.lives.drop(id);
-    for (const id of [...this.pre.keys()]) if (!reps.has(id)) this.pre.delete(id);
+    for (const id of [...this.pre.ids()]) if (!reps.has(id)) this.pre.remove(id);
     const pose = this.host.splitPose?.();
     for (const w of this.waiting.splice(0)) {
       // (A piece it runs: its world stepped to the tick, the snapshot's keyframes in, and its body before it was recentred)

@@ -38,8 +38,12 @@ export function shotIdParts(id: number): { tick16: number; owner: number; slot: 
  * Every field is plain data (numbers, short strings): events cross workers and the wire unchanged.
  */
 export type SimEvent =
-  /** A gun fired one shell (one per barrel). Shape and spread are re-derived from (owner, slot, tick, aimQ) on every end */
-  | { k: 'fire'; tick: number; owner: number; slot: number; barrel: number; shot: number; aimQ: number }
+  /**
+   * A gun fired one shell (one per barrel). Shape and spread are re-derived from (owner, slot, tick, aimQ) on every end.
+   * `aug`: a ports ship's augmented shot (its augment's mods go on the shell: power/ports.ts augMods). Open: the damage
+   * scale (the server reads it off the gun step's shot spec, not the event) and ammunition (outside the step)
+   */
+  | { k: 'fire'; tick: number; owner: number; slot: number; barrel: number; shot: number; aimQ: number; aug?: 1 }
   /** A shell reached the end of its life (deterministic: never sent) */
   | { k: 'shotEnd'; tick: number; shot: number }
   /** A shell struck a ship's part (or a rock: target -1, until rocks are on the tick layer) */

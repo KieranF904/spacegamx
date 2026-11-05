@@ -1,8 +1,9 @@
 /**
  * The sim foundation: one deterministic ship stepper for PT/ST prediction (and lockstep later). Plan and Stage 1
- * briefs: the sim-foundation plan. Contract files (Stage 1 sections don't edit them; contract notes go in their
- * reports): state.ts, input.ts, events.ts, env.ts, phases.ts, timeline.ts (API), ring.ts (API + hashed fields),
- * headHash.ts. Implementation files with an owner: step.ts (1A), guns.ts (1B), pulls.ts + ring/timeline internals (1C).
+ * briefs: the sim-foundation plan. Contract files: state.ts, input.ts, events.ts, env.ts, phases.ts, timeline.ts (API),
+ * ring.ts (API + hashed fields), headHash.ts (Stage 3 settled the Stage 1 contract notes into them). Implementation
+ * files: step.ts (1A), guns.ts + b-shots.ts (1B), pulls.ts + ring/timeline internals + c-*.ts (1C), a-adapt.ts (1A's
+ * caller adapters), d-sources.ts (1D's shared input sources).
  */
 export * from './state.js';
 export * from './input.js';
@@ -16,3 +17,10 @@ export * from './step.js';
 export * from './guns.js';
 export * from './pulls.js';
 export * from './harness.js';
+// Callers' adapters (SimShipView, simStructureOf, pilotInput) and the shared input sources
+export * from './a-adapt.js';
+export * from './d-sources.js';
+// Replica states, contact pairs, pull sources
+export * from './c-replicaState.js';
+export * from './c-contactCache.js';
+export * from './c-pulls.js';

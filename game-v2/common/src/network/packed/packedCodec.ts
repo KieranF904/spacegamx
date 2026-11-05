@@ -29,11 +29,11 @@ const HITS_CODE = COMPACT_TYPES.indexOf('hits');
 const HPS_CODE = COMPACT_TYPES.indexOf('shipHps');
 const isArr = Array.isArray;
 
-/** A snapshot's compact row ([code, t, lp, e, p, r, k, c, o, f, n, d, x, w], trailing nulls dropped) */
+/** A snapshot's compact row ([code, t, lp, e, p, r, k, c, o, f, n, d, x, w, h], trailing nulls dropped) */
 function snapshotIO(io: PackedIO, w: unknown[] | null): unknown[] {
   let mask = 0;
   if (w) for (let i = 1; i < w.length; i++) if (w[i] != null) mask |= 1 << (i - 1);
-  mask = io.u(mask, 13);
+  mask = io.u(mask, 14);
   const out: unknown[] = [SNAPSHOT_CODE];
   const has = (i: number) => (mask & (1 << (i - 1))) !== 0;
   const at = (i: number) => (w ? w[i] : null) as unknown[][];
@@ -64,6 +64,8 @@ function snapshotIO(io: PackedIO, w: unknown[] | null): unknown[] {
   sec?.('w', io.bitLength);
   // (homing shells' guide records: the decisions' shape, guidance/records.ts)
   out[13] = has(13) ? decisionsIO(io, at(13)) : null;
+  // (the head hash, 24 bits: sim/headHash.ts)
+  out[14] = has(14) ? io.u((w?.[14] as number) ?? 0, 24) : null;
   sec?.('end', io.bitLength);
   while (out.length > 1 && out[out.length - 1] === null) out.pop();
   return out;

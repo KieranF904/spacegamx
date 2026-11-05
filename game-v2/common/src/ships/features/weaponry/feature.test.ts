@@ -21,6 +21,7 @@ import { FULL_CHARGE } from '../../energy.js';
 import { withSlowed, SLOW_CONTROL, type FlightBody } from '../../flight.js';
 import { withEmp } from '../../hazards.js';
 import { CTL, ReplicaMode, controlBits, flightControls, replicaStep } from '../../replica.js';
+import { gridAim } from '../../../sim/a-adapt.js';
 import { newFlightControls } from '../../flightInputs.js';
 import { NO_FIELDS } from '../../jumpFields.js';
 
@@ -158,7 +159,7 @@ function fly(mode: ReplicaMode.Player | ReplicaMode.Pilotless, replica: boolean,
   const rows: number[][] = [];
   for (let t = 0; t < 200; t++) {
     const keys = { forward: t < 150, left: t >= 40 && t < 60, right: t >= 120, boost: t >= 70 && t < 90, strafeLeft: t >= 100 && t < 115 };
-    const aim = -Math.PI / 2 + Math.sin(t / 20) * 0.8;
+    const aim = gridAim(-Math.PI / 2 + Math.sin(t / 20) * 0.8); // (aims come on the grid: sim/input.ts simAim)
     const slowed = slowedOn(t), emp = t >= 160 && t < 175;
     if (replica) {
       const bits = controlBits(keys) | (slowed ? CTL.slowed : 0) | (emp ? CTL.emp : 0);

@@ -11,7 +11,7 @@
  * CRITICAL: Uses BitBuffer precision for all physics to match server exactly.
  */
 
-import { FULL_CHARGE, unpackCharge, pilotExtras, PILOT_ROW, type Charge } from '@space-game/common';
+import { FULL_CHARGE, unpackCharge, pilotExtras, PILOT_ROW, Timeline, type Charge, type TimelineClock } from '@space-game/common';
 import { FarShips } from './FarShips';
 import { Populations } from './Populations';
 import factionsFile from '../../../data/factions.json';
@@ -573,9 +573,38 @@ export class GameState {
    * on that came out where the ship had been that many ticks before. Without prediction, the server's tick.
    */
   ownDrawTick(now: number = performance.now()): number {
-    if (!this.predictionEnabled || this.predictedTick <= 0) return this.getRawServerTick(now);
-    if (!this.selfPrev) return this.predictedTick;
-    return this.predictedTick - 1 + Math.max(0, Math.min(1, this.frameTick - this.predictedTick + 0.5));
+    return this.timelineAt(now).ownDraw();
+  }
+
+  /**
+   * Which tick each kind of thing is confirmed at, predicted to and drawn at (common sim/timeline.ts, sim foundation
+   * 1C): ownDrawTick, renderTickNow and the shells' timelines (WeaponFx shotTimelines) read it. Up to date as of the
+   * last timelineAt (every ownDrawTick, aheadTick)
+   */
+  readonly timeline = new Timeline({ predictionEnabled: false, confirmedTick: 0, predictedTick: 0, frameTick: 0, rawServerTick: 0, renderTick: 0, hasPrev: false });
+
+  /** The timeline as of `now` (its clock read from this frame's state) */
+  timelineAt(now: number = performance.now()): Timeline {
+    this.timeline.set(this.timelineClock(now));
+    return this.timeline;
+  }
+
+  /** Ships stepped ahead from their decisions (AI pilots, custom enemies) and their shells: drawn at this tick (Timeline 'ahead') */
+  aheadTick(now: number = performance.now()): number {
+    return this.timelineAt(now).drawTick('ahead');
+  }
+
+  private timelineClock(now: number): TimelineClock {
+    return {
+      predictionEnabled: this.predictionEnabled,
+      confirmedTick: this.serverTick,
+      predictedTick: this.predictedTick,
+      frameTick: this.frameTick,
+      // (Read only when it's what the own ship is drawn at: prediction off, or not started)
+      rawServerTick: !this.predictionEnabled || this.predictedTick <= 0 ? this.getRawServerTick(now) : 0,
+      renderTick: this.renderTickNow,
+      hasPrev: !!this.selfPrev,
+    };
   }
 
   /** How many steps the prediction is behind where it should be this frame */

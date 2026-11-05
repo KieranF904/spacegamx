@@ -10,54 +10,18 @@
 
 import { hasComponent, entityExists } from 'bitecs';
 import {
-  Position, Velocity, Rotation, Input, Boost, Player, Dead, InSystem, stepShipPhysics, quantizeShipBody, damagePart,
-  stepDrift, withEmp, withNumb, withSlowed, jumpTuning, pilotJumpStep, NO_FIELDS, ReplicaMode, CTL,
+  Position, Velocity, Rotation, Boost, Player, Dead, InSystem, quantizeShipBody, damagePart,
+  stepDrift, NO_FIELDS, ReplicaMode, CTL, stepShip, SimShipView,
   controlBits, quantizeReplicaAngle, partWeaponDef, partMaterial, powerTick, gunLoadTick, quantizeCargo,
-  buildFlightInputs, newFlightControls, chargeTotal, getPlan, contactPieces, contactPair, quantizePull, CONTACT_FLAG, contactCandidates, contactFxDue,
-  type ShipState, type GravityWell, type FlightConstants, type FlightInputSource,
+  chargeTotal, contactPieces, contactPair, quantizePull, CONTACT_FLAG, contactFxDue,
+  ContactPairCache, contactPairs, type ContactPair,
+  type ShipState, type GravityWell, type FlightConstants, type SimEnv, type SimEvent, type SimInput, type FieldEnv, type ShipDerived,
 } from '@space-game/common';
 import { K, BIG_BODY, type ContactPiece, type BridgeCtx } from './core.js';
 import { ownShape } from './ownCauses.js';
+import { readPilotInput } from './inputs.js';
 import { dhypot } from '@space-game/common';
 import { SimPass } from '../../sim/SystemClocks.js';
-
-/** stepMovement's scratch: the held keys read from Input, and the controls built from them (reused every call; the step never keeps them) */
-const MOVE_SRC: FlightInputSource = {
-  forward: false, backward: false, left: false, right: false, boost: false, targetAngle: 0,
-  helm: false, strafeLeft: false, strafeRight: false, jump: false, cursorDist: 0,
-};
-/** Part features' held inputs and the Input fields that hold them (the Burst Strafer's dodge: features/plan.ts held), resolved on first use */
-let HELD: { name: string; field: ArrayLike<number> }[] | undefined;
-function heldInputs(): { name: string; field: ArrayLike<number> }[] {
-  return HELD ??= getPlan().held.map((name) => {
-    const field = (Input as unknown as Record<string, ArrayLike<number> | undefined>)[name];
-    if (!field) throw new Error(`part feature input ${name}: the Input component has no field of that name (ecs/components.ts, network/inputFields.ts)`);
-    return { name, field };
-  });
-}
-const MOVE_CTL = newFlightControls();
-/** resolveContacts' scratch: a system's candidate pairs */
-const CAND: number[] = [];
-const NONE: readonly number[] = [];
-
-/** Read a player's held keys from the Input component into `src` */
-function readInputsInto(eid: number, src: FlightInputSource): FlightInputSource {
-  src.forward = Input.forward[eid] === 1;
-  src.backward = Input.backward[eid] === 1;
-  src.left = Input.left[eid] === 1;
-  src.right = Input.right[eid] === 1;
-  src.boost = Input.boost[eid] === 1;
-  src.targetAngle = Input.targetAngle[eid];
-  src.helm = Input.helm[eid] === 1;
-  src.strafeLeft = Input.strafeLeft[eid] === 1;
-  src.strafeRight = Input.strafeRight[eid] === 1;
-  src.jump = Input.jump[eid] === 1;
-  src.cursorDist = Input.cursorDist[eid];
-  // (Part features' held inputs, by name: the Burst Strafer's dodge)
-  const H = heldInputs(), held = src as unknown as Record<string, boolean>;
-  for (let i = 0; i < H.length; i++) held[H[i].name] = H[i].field[eid] === 1;
-  return src;
-}
 
 export function isDormant(b: BridgeCtx, eid: number): boolean {
   return b.dormant.has(eid);
@@ -203,34 +167,44 @@ export function stepMovement(b: BridgeCtx, eid: number): boolean {
   body.cargo = quantizeCargo((b.host.cargoMass?.(eid) ?? 0) + (b.host.featureCargo?.(eid) ?? 0));
   // (Changed since its last step, a pickup, a sale, a tow: its clients fly the new mass from this step on, CAPS.CARGO)
   if (body.cargo !== had) b.ownCauses.add(eid, { kind: 3, cargo: body.cargo });
-  // (Part features' held inputs, a Burst Strafer's dodge, come with the keys: readInputsInto)
-  const q = quantizeReplicaAngle(Input.targetAngle[eid]);
-  // An EMP cripples the drive (thrust and steering × EMP_CONTROL) and stops a jump starting; the pilot's prediction flies it the same
-  const emp = b.isEmped(eid);
-  // The controls the step reads (flightInputs.ts: jump && !emp, jumpDist = cursorDist); the replica's bits read the same
-  const controls = buildFlightInputs(readInputsInto(eid, MOVE_SRC), emp, MOVE_CTL);
-  // Numb with cold, the drive is sluggish (warmth.ts): its pilot's prediction works it out from the warmth it's told, replicas from CTL.numb
-  const cold = b.coldStage(eid);
-  // Slowed by a Frostbite's beam (features/weaponry): after the cold, before an EMP, as its prediction and replicas (CTL.slowed) have it
-  const slowed = b.slowedUntil.size > 0 && b.slowedTicksLeft(eid) > 0;
-  const hazard = withSlowed(withNumb(b.host.hazardFlight?.(eid, ship.derived, body.x, body.y), cold), slowed);
-  b.replicaCtl.set(eid, {
-    mode: ReplicaMode.Player, q, derived: ship.derived,
-    bits: controlBits(controls) | (emp ? CTL.emp : 0) | (cold.control < 1 ? CTL.numb : 0) | (slowed ? CTL.slowed : 0),
-  });
-  // Charging fields round the step (a star's ring, a lodestone's): the range boost from where it starts, then a faster
-  // cooldown and a lodestone's priming from where it ends (the pilot's prediction runs the same: ShipClient.predict)
-  const jt = jumpTuning(b.tuning);
-  let res!: ReturnType<typeof stepShipPhysics>;
-  ship.jumpPrime = pilotJumpStep(body, ship.jumpPrime ?? 0, b.host.jumpFields?.(eid) ?? NO_FIELDS, b.host.getTick(), ship.derived.jumpCooldown || jt.cooldownTicks, jt, (rangeBoost) => {
-    res = stepShipPhysics(body, controls, ship.derived, b.tuning, { charge: b.chargeOf(eid), drainRate: 1, load: gunLoadTick(ship, b.host.getTick()), tick: b.host.getTick() }, b.host.gravityAt(eid), rangeBoost, emp ? withEmp(hazard) : hazard, b.host.terrainAt?.(eid));
-  });
-  b.setCharge(eid, res.charge);
-  // (What the engines got, and a boost the stores refused, go in the replicated controls: replicas have no charge)
-  if (res.ctlPower) b.replicaCtl.get(eid)!.bits |= res.ctlPower;
+  // One tick of the one stepper (common sim/step.ts stepShip), in place on a view of the ship: the hazard chain (the env
+  // hazard, numb with cold, slowed by a Frostbite's beam, an EMP's crippled drive and no jump starting), the charging
+  // fields round the flight (range boost from where it starts, a faster cooldown and a stillstone's priming from where it
+  // ends), the aim on the replicated grid. The pilot's prediction (ShipClient.predict) and every replica step the same
+  const tick = b.host.getTick();
+  const s = MOVE_VIEW.load(eid, ReplicaMode.Player, body, ship.derived, ship, b.chargeOf(eid), true, ship.jumpPrime ?? 0);
+  s.hazard.empUntil = b.empUntil.get(eid) ?? 0;
+  s.hazard.slowUntil = b.slowedUntil.size > 0 ? tick + b.slowedTicksLeft(eid) : 0;
+  // (Numb: its pilot's prediction works it out from the warmth it's told, replicas from CTL.numb)
+  s.hazard.numb = b.coldStage(eid).control;
+  // (Its inputs from its source: bridge/inputs.ts, the pilot's held keys off the Input component)
+  const { isBoosting } = stepShip(s, readPilotInput(eid, MOVE_IN), moveEnv(b, eid, tick), s, MOVE_EVENTS);
+  ship.jumpPrime = s.jumpPrime;
+  b.setCharge(eid, s.charge);
+  // (What it flew: its keys, its hazards' bits, the engines' power and a boost the stores refused: replicas have no charge)
+  b.replicaCtl.set(eid, { mode: ReplicaMode.Player, q: s.ctl.q, derived: ship.derived, bits: s.ctl.bits });
   b.writeBody(eid, ship, body);
-  if (res.isBoosting) Boost.lastUseTick[eid] = b.host.getTick();
+  MOVE_EVENTS.length = 0;
+  if (isBoosting) Boost.lastUseTick[eid] = tick;
   return true;
+}
+
+/** stepMovement's scratch: the view, its input and env (reused every call; the step keeps none of them) */
+const MOVE_VIEW = new SimShipView();
+const MOVE_IN: SimInput = { bits: 0, q: 0, jumpDist: -1, fire: false, fireAlt: false, aimDist: 0 };
+/** (Empty: its guns are fireWeapons', env.gunsByHost; the step emits nothing else for a pilot yet) */
+const MOVE_EVENTS: SimEvent[] = [];
+const MOVE_FIELDS: FieldEnv = { central: null };
+const MOVE_ENV: SimEnv = { tick: 0, tuning: undefined as unknown as SimEnv['tuning'], gravity: null, fields: MOVE_FIELDS, terrain: null, gunsByHost: true };
+let moveEid = 0, moveB: BridgeCtx | undefined;
+const moveHazard = (d: ShipDerived, x: number, y: number) => moveB!.host.hazardFlight?.(moveEid, d, x, y);
+function moveEnv(b: BridgeCtx, eid: number, tick: number): SimEnv {
+  const f = b.host.jumpFields?.(eid) ?? NO_FIELDS;
+  MOVE_FIELDS.central = f.central; MOVE_FIELDS.lodestones = f.lodestones;
+  moveB = b; moveEid = eid;
+  MOVE_ENV.tick = tick; MOVE_ENV.tuning = b.tuning; MOVE_ENV.gravity = b.host.gravityAt(eid); MOVE_ENV.terrain = b.host.terrainAt?.(eid) ?? null;
+  MOVE_ENV.hazard = b.host.hazardFlight ? moveHazard : undefined;
+  return MOVE_ENV;
 }
 
 export function addToSpatialGrid(b: BridgeCtx, add: (eid: number, x: number, y: number, r: number) => void): void {
@@ -389,6 +363,48 @@ export function worldPieces(b: BridgeCtx, eid: number, ship: ShipState, near?: {
 }
 
 /**
+ * Each bridge's contact pairs by tick, a cache per pass (sim/c-contactCache.ts: found once, then read; a system with
+ * a clock of its own has its own pass and ticks: SimPass)
+ */
+const PAIRS = new WeakMap<BridgeCtx, Map<number, ContactPairCache>>();
+
+/**
+ * Tick t's candidate pairs, every system's one after another: who can touch anything at all (none of it changes
+ * while the pass runs), by id: a pair's first body is its lower id, and pairs go in that order, as a client finding
+ * them itself takes them (CAPS.CONTACTS, common ships/contactPass.ts). Notes each system's pass for those clients
+ */
+function findPairs(ctx: BridgeCtx, tick: number): ContactPair[] {
+  const list: [number, ShipState][] = [];
+  for (const e of ctx.bodies) {
+    if (e[1].kind !== 'debris' && e[1].derived.mass > 0 && !ctx.dormant.has(e[0]) && SimPass.on(InSystem.systemId[e[0]]) && !ctx.isJumping(e[1]) && !ctx.host.sheltered?.(e[0]) && !ctx.intangible.has(e[0])) list.push(e);
+  }
+  list.sort((p, q) => p[0] - q[0]);
+  const bySys = new Map<number, [number, ShipState][]>();
+  for (const e of list) {
+    const sys = InSystem.systemId[e[0]];
+    let l = bySys.get(sys);
+    if (!l) bySys.set(sys, (l = []));
+    l.push(e);
+  }
+  const log = ctx.contactLog, seq0 = ctx.ownCauses.peek();
+  const pairs: ContactPair[] = [];
+  for (const [sys, l] of bySys) {
+    if (l.length < 2 && !log.wanted) continue;
+    const entries = l.map(([id, s]) => ({ id, x: Position.x[id], y: Position.y[id], r: s.derived.radius }));
+    const from = pairs.length;
+    if (l.length >= 2) contactPairs(entries, pairs);
+    // (What a client finding its own pairs needs of this pass: net/causes/contactLog.ts)
+    if (log.wanted) {
+      const pinned: number[] = [], ap: number[] = [];
+      for (const e of entries) if (ctx.pinned.has(e.id)) pinned.push(e.id);
+      for (let k = from; k < pairs.length; k++) ap.push(pairs[k][0], pairs[k][1]);
+      log.note(tick, sys, { ids: entries.map((e) => e.id), rebuilds: l.map(([, s]) => s.rebuilds), pinned, pairs: ap, seq: seq0 });
+    }
+  }
+  return pairs;
+}
+
+/**
  * Push overlapping bodies apart, exchange an impulse along the contact
  * normal, and damage the touching parts on both sides when the closing speed
  * is high enough (scaled by the other body's share of the mass).
@@ -400,36 +416,14 @@ export function worldPieces(b: BridgeCtx, eid: number, ship: ShipState, near?: {
  */
 export function resolveContacts(ctx: BridgeCtx): void {
   const ct = ctx.tuning.collision;
-  // Who can touch anything at all (none of it changes while this runs), by id: a pair's first body is its lower id,
-  // and pairs go in that order, as a client finding them itself takes them (CAPS.CONTACTS, common ships/contactPass.ts)
-  const list: [number, ShipState][] = [];
-  for (const e of ctx.bodies) {
-    if (e[1].kind !== 'debris' && e[1].derived.mass > 0 && !ctx.dormant.has(e[0]) && SimPass.on(InSystem.systemId[e[0]]) && !ctx.isJumping(e[1]) && !ctx.host.sheltered?.(e[0]) && !ctx.intangible.has(e[0])) list.push(e);
-  }
-  list.sort((p, q) => p[0] - q[0]);
-  const bySys = new Map<number, number[]>();
-  for (let i = 0; i < list.length; i++) {
-    const sys = InSystem.systemId[list[i][0]];
-    let ids = bySys.get(sys);
-    if (!ids) bySys.set(sys, (ids = []));
-    ids.push(i);
-  }
-  const tick = ctx.host.getTick(), log = ctx.contactLog, seq0 = ctx.ownCauses.peek();
-  // Each system's candidate pairs (indices into `list`), systems one after another
-  const pairs: number[] = [];
-  for (const [sys, ids] of bySys) {
-    if (ids.length < 2 && !log.wanted) continue;
-    const entries = ids.map((i) => ({ id: list[i][0], x: Position.x[list[i][0]], y: Position.y[list[i][0]], r: list[i][1].derived.radius }));
-    const found = ids.length < 2 ? NONE : contactCandidates(entries, CAND);
-    for (let k = 0; k < found.length; k++) pairs.push(ids[found[k]]);
-    // (What a client finding its own pairs needs of this pass: net/causes/contactLog.ts)
-    if (log.wanted) {
-      const pinned: number[] = [], ap: number[] = [];
-      for (const e of entries) if (ctx.pinned.has(e.id)) pinned.push(e.id);
-      for (let k = 0; k < found.length; k++) ap.push(entries[found[k]].id);
-      log.note(tick, sys, { ids: entries.map((e) => e.id), rebuilds: ids.map((i) => list[i][1].rebuilds), pinned, pairs: ap, seq: seq0 });
-    }
-  }
+  const tick = ctx.host.getTick();
+  // (The tick's pairs, found once by the one function a client finding its own takes them by: sim/c-contactCache.ts)
+  let caches = PAIRS.get(ctx);
+  if (!caches) PAIRS.set(ctx, (caches = new Map()));
+  const pass = SimPass.main ? -1 : SimPass.system;
+  let cache = caches.get(pass);
+  if (!cache) caches.set(pass, (cache = new ContactPairCache((t) => findPairs(ctx, t), 2)));
+  const pairs = cache.pairs(tick);
 
   const pieces = new Map<number, ContactPiece[]>();
   // A small body's pieces are kept for the pass (until it's pushed); a big one's (a boss's) are only those near the other body
@@ -439,13 +433,12 @@ export function resolveContacts(ctx: BridgeCtx): void {
     if (!p) { p = ctx.worldPieces(eid, ship); pieces.set(eid, p); }
     return p;
   };
-  for (let k = 0; k < pairs.length; k += 2) {
-    const i = pairs[k], j = pairs[k + 1];
-    const [ea, A] = list[i];
-    const [eb, B] = list[j];
+  for (let k = 0; k < pairs.length; k++) {
+    const [ea, eb] = pairs[k];
+    const A = ctx.bodies.get(ea), B = ctx.bodies.get(eb);
+    if (!A || !B) continue;
     const dx = Position.x[eb] - Position.x[ea], dy = Position.y[eb] - Position.y[ea];
     if (dhypot(dx, dy) > A.derived.radius + B.derived.radius) continue;
-
     const pa = piecesOf(ea, A, eb, B), pb = piecesOf(eb, B, ea, A);
     // Pinned structures don't give: whatever hits them takes all the push
     const pinA = ctx.pinned.has(ea), pinB = ctx.pinned.has(eb);
