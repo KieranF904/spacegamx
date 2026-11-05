@@ -18,6 +18,12 @@ Environment=BROWSER_HOST=127.0.0.1
 EnvironmentFile=-/etc/spacegame/secrets.env
 Restart=always
 RestartSec=3
+# A small service on a shared 2 vCPU / 4 GB box
+CPUWeight=100
+MemoryHigh=256M
+MemoryMax=384M
+# Files it makes (accounts): not readable by other users
+UMask=0027
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
