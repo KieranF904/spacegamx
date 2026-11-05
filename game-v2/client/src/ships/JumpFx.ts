@@ -99,7 +99,7 @@ export class JumpFx {
     return (local ? e.jump : undefined) ?? e.data?.[3] ?? 0;
   }
 
-  update(dt: number, opts: { hidden: boolean; latched: boolean; aiming?: boolean; aimDist?: number; aimLabel?: string | null; reach?: number; landing?: { x: number; y: number } | null; field?: GaugeField; danger?: string | null }): void {
+  update(dt: number, opts: { hidden: boolean; latched: boolean; aiming?: boolean; aimDist?: number; aimLabel?: string | null; reach?: number; need?: number; landing?: { x: number; y: number } | null; field?: GaugeField; danger?: string | null }): void {
     this.time += dt;
     const g = this.g;
     clearIfDrawn(g);
@@ -114,7 +114,8 @@ export class JumpFx {
       if (!e) continue;
       const local = id === me;
       const tt = ship.derived.jumpCooldown ? { ...t, cooldownTicks: ship.derived.jumpCooldown } : t;
-      const ph = jumpPhase(JumpFx.counter(e, local), tt);
+      // (Your own charge's progress is against what your jump, aimed as it is, needs: a short one charges longer)
+      const ph = jumpPhase(JumpFx.counter(e, local), tt, local ? opts.need : undefined);
       if (local) this.localCooldown = tt.cooldownTicks;
       // Where this jump will land (ShipClient.jumpLanding: the spool's slide, then along the aim), inside the drive's reach (a ring round the ship)
       if (local && opts.aiming && !opts.hidden && opts.reach && opts.landing) {
@@ -284,21 +285,26 @@ export class JumpFx {
   /** The local ship's cooldown (ticks), for the HUD */
   private localCooldown = 0;
 
-  private drawHud(ph: { phase: JumpPhase; progress: number } | null, opts: { hidden: boolean; latched: boolean; aiming?: boolean; aimDist?: number; aimLabel?: string | null; reach?: number; field?: GaugeField; danger?: string | null }): void {
+  private drawHud(ph: { phase: JumpPhase; progress: number } | null, opts: { hidden: boolean; latched: boolean; aiming?: boolean; aimDist?: number; aimLabel?: string | null; reach?: number; need?: number; field?: GaugeField; danger?: string | null }): void {
     if (!ph || opts.hidden) { if (this.hudShown) { this.hud.style.display = 'none'; this.hudShown = false; } return; }
     if (!this.hudShown) { this.hud.style.display = 'block'; this.hudShown = true; }
     const key = boundKeyName('jump', settings.data.bindings);
+    const need = opts.need ?? this.tuning.chargeTicks;
     let text: string, fill: number, color = '#9fd8ff';
     switch (ph.phase) {
       case 'ready':
         text = opts.latched ? 'JUMP DRIVE · ENGAGING' : `JUMP DRIVE READY · <kbd>${key}</kbd> · ${fmtK(opts.reach ?? 0)} range`;
         if (opts.aiming && opts.aimLabel) text += ` · ◎ ${opts.aimLabel}`;
+        // (A short jump charges longer: flight.ts jumpChargeNeed)
+        if (opts.aiming && need > this.tuning.chargeTicks) text += ` · ${chargeSecs(need)} charge`;
         fill = 1;
         break;
       case 'charging':
         text = settings.data.gameplay.jumpMode === 'hold' ? 'SPOOLING · RELEASE TO ABORT' : `SPOOLING · <kbd>${key}</kbd> ABORT`;
         // (Charged, waiting for the nose to come round to the aim: flight.ts jumpAimed)
-        if (ph.progress >= (this.tuning.chargeTicks - 1) / this.tuning.chargeTicks) text = text.replace('SPOOLING', 'CHARGED · ALIGNING');
+        if (ph.progress >= (need - 1) / need) text = text.replace('SPOOLING', 'CHARGED · ALIGNING');
+        // (A short jump's longer charge: the time it has left)
+        else if (need > this.tuning.chargeTicks) text = text.replace('SPOOLING', `SPOOLING · ${chargeSecs((1 - ph.progress) * need)}`);
         {
           const reach = opts.reach ?? 0, want = opts.aimDist || reach;
           const go = fmtK(Math.max(this.tuning.minRange, Math.min(reach, want)));
@@ -339,4 +345,9 @@ export class JumpFx {
 /** A distance with its unit, as the action menu writes it (input/contextClick.ts km) */
 function fmtK(d: number): string {
   return d >= 1000 ? `${(d / 1000).toFixed(d >= 10000 ? 0 : 1)} km` : `${Math.round(d)} m`;
+}
+
+/** A charge time (ticks) as the HUD writes it: whole seconds, rounded up */
+export function chargeSecs(ticks: number): string {
+  return `${Math.max(1, Math.ceil(ticks / 60))}s`;
 }

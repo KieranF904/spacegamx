@@ -26,6 +26,10 @@
   "jump": {
     "_comment": "The drive's reach and cooldown come from coil capacity (the core's own coreCapacity cells of hull, plus jump coils' functions.json jumpCapacity per cell) over the hull's cells: at ratio 1, baseRange and cooldownTicks; over, diminishing returns; under, less range and a longer cooldown (common/src/ships/flight.ts jumpDriveStats).",
     "chargeTicks": 90,
+    "_short": "A short jump charges longer (flight.ts jumpChargeNeed): up to shortRange the charge adds the ticks to fly it at shortCruise (units a tick, about a starter at cruise), so it is never quicker than flying; that extra tapers off to none by shortTaper.",
+    "shortCruise": 20,
+    "shortRange": 12000,
+    "shortTaper": 25000,
     "burnTicks": 90,
     "cooldownTicks": 900,
     "speed": 340,

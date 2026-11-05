@@ -8,14 +8,14 @@
  * the aim, and ends at exitSpeed (0: dead still).
  */
 
-import { applyGravity, jumpCoast, jumpDistance, jumpScaleFor, type FlightConstants, type JumpTuning } from './flight.js';
+import { applyGravity, jumpChargeNeed, jumpCoast, jumpDistance, jumpGoFor, jumpScaleFor, type FlightConstants, type JumpTuning } from './flight.js';
 import { dhypot, dsincos } from '../math/detTrig.js';
 
 const SC: [number, number] = [0, 0];
 
 /** How far a jump asked for `dist` goes (0: as far as it reaches), the way the burn fixes it */
 export function jumpGo(dist: number, reach: number, t: JumpTuning): number {
-  return Math.max(t.minRange, Math.min(reach, dist > 0 ? dist : reach));
+  return jumpGoFor(Math.max(0, dist), reach, t);
 }
 
 /**
@@ -30,7 +30,9 @@ export function jumpLanding(
   const p = { x: body.x, y: body.y, vx: body.vx, vy: body.vy };
   const damp = k.friction * t.chargeDamping;
   const drift = k.hazard?.driftAccel ?? 0;
-  for (let n = t.chargeTicks - 1 - Math.max(0, jump); n > 0; n--) {
+  // (The charge left: a short jump's is longer, jumpChargeNeed)
+  const go = jumpGo(dist, reach, t);
+  for (let n = jumpChargeNeed(go, t) - 1 - Math.max(0, jump); n > 0; n--) {
     applyGravity(p, k.gravity);
     if (drift) {
       const r = dhypot(p.x, p.y);
@@ -39,7 +41,6 @@ export function jumpLanding(
     p.vx *= damp; p.vy *= damp;
     p.x += p.vx; p.y += p.vy;
   }
-  const go = jumpGo(dist, reach, t);
   const along = jumpDistance(t, jumpScaleFor(go, t, k.friction)) + (t.exitSpeed > 0 ? jumpCoast(t, k.friction) : 0);
   dsincos(bearing, SC);
   out[0] = p.x + SC[1] * along;

@@ -8,8 +8,8 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { parseBlueprint } from './blueprint.js';
 import { createShipState } from './state.js';
-import { jumpTuning, jumpPhase, jumpReachAt, JUMP_ALIGN, wrapAngle, type GravityWell, type FlightConstants } from './flight.js';
-import { jumpLanding } from './jumpAim.js';
+import { jumpTuning, jumpPhase, jumpReachAt, jumpBurnAt, jumpChargeNeed, JUMP_ALIGN, wrapAngle, type GravityWell, type FlightConstants } from './flight.js';
+import { jumpLanding, jumpGo } from './jumpAim.js';
 import { stepShipPhysics } from './physics.js';
 import { FULL_CHARGE, type Charge } from './energy.js';
 import { readShipJson, testCatalog, SHIP_DATA_DIR } from './testData.js';
@@ -45,17 +45,19 @@ function jump(c: Case) {
   const k = { friction: FRICTION, gravity: c.gravity ?? null, hazard: c.hazard };
   const predicted: [number, number][] = [];
   let held = 0;
-  for (let t = 0; t < 1200; t++) {
+  // (A short jump charges longer: jumpChargeNeed)
+  const need = jumpChargeNeed(jumpGo(jumpDist, reach, jt), jt), burnAt = jumpBurnAt(jt);
+  for (let t = 0; t < 4000; t++) {
     const ph = jumpPhase(body.jump, jt).phase;
     if (ph === 'ready' || ph === 'charging') predicted.push(jumpLanding(body, body.jump, c.helm ? body.angle : targetAngle, jumpDist, reach, jt, k));
-    if (body.jump === jt.chargeTicks - 1) held++;
+    if (ph === 'charging' && body.jump >= need - 1) held++;
     const burning = ph === 'burn' || ph === 'cooldown';
     stepShipPhysics(body, {
       forward: !!(c.holdW && burning), backward: false, left: false, right: false, boost: false, targetAngle, helm: !!c.helm,
       strafeLeft: false, strafeRight: false, jump: !burning, jumpDist,
     }, d, tuning, { charge, drainRate: 1, tick: t }, c.gravity ?? null, boost, c.hazard);
     // Where the burn leaves it: its last tick
-    if (body.jump === jt.chargeTicks + jt.burnTicks - 1) {
+    if (body.jump === burnAt + jt.burnTicks - 1) {
       const off = predicted.map(([x, y]) => Math.hypot(x - body.x, y - body.y));
       return { off: Math.max(...off), at: [body.x, body.y], speed: Math.hypot(body.vx, body.vy), angle: body.angle, held, reach };
     }
@@ -77,6 +79,8 @@ describe('the jump overlay is where the jump lands', () => {
     ['odd angles', { angle: 1.234, aim: -2.7, dist: 27777, vx: 13, vy: -21 }],
     ['past its reach (max range)', { aim: 0.2, dist: 150000 }],
     ['the shortest jump', { aim: -1, dist: 100 }],
+    ['a short jump, sliding (a longer charge)', { aim: 0.3, dist: 8000, vx: 25, vy: -10 }],
+    ['a jump in the taper', { aim: -0.4, dist: 17000, vy: 18 }],
     ['a star\'s ring, 80k', { aim: 0, dist: 80000, boost: 1.6 }],
     ['a gravity hazard', { x: 30000, y: 8000, vx: -6, aim: 2.5, dist: 40000, hazard: { control: 0.7, driftAccel: 0.007, jump: 0.55, cap: 1 } }],
     ['a black hole\'s well', { x: 20000, y: -15000, aim: 1, dist: 30000, gravity: { strength: 2e6, minRadius: 3000 } }],

@@ -48,7 +48,7 @@ export interface FlightControls {
   strafeRight?: boolean;
   /** Jump drive: held (or latched) to spool up; releasing during the charge cancels it */
   jump?: boolean;
-  /** How far to jump (world units; the cursor distance): where the ship comes to rest. 0 = as far as the drive goes */
+  /** How far to jump (world units; the cursor distance): where the ship comes to rest. 0 = as far as the drive goes; below 0: not known (a replica: the charge waits) */
   jumpDist?: number;
   /** Burst Strafer: held to dodge, the way the movement keys ask; one burst a press (features/strafer: its input, filled from the plan's held inputs) */
   dodge?: boolean;
@@ -129,15 +129,30 @@ export interface FlightResult {
  * JUMP_ALIGN of the aim (jumpAimed), and the burn then goes exactly along the
  * aim. The burn ends at exitSpeed (0: dead still, right where it was aimed;
  * above 0 the ship coasts the rest, jumpCoast). Its whole state is one integer
- * counter, so it rides in snapshots and prediction replays it exactly:
+ * counter, so it rides in snapshots and prediction replays it exactly.
+ *
+ * A short jump charges longer (Kieran, 2026-11-05: "Short jumps are allowed,
+ * just add more charge time"): up to shortRange the charge adds the time it
+ * would take to fly there at shortCruise, so a short jump is never quicker
+ * than flying it; past shortRange that extra tapers off, gone by shortTaper
+ * (jumpChargeNeed). The counter counts the ticks charged, so the burn starts
+ * at a fixed count past the longest charge (jumpBurnAt):
  *
  *   0                                  ready
- *   1 .. chargeTicks-1                 charging (counts up while the jump control is held; waits at chargeTicks-1 until aimed)
- *   chargeTicks .. +burnTicks-1        burn (the jump itself)
+ *   1 .. burnAt-1                      charging (counts the ticks charged while the jump control is held; the burn
+ *                                      starts once it has charged jumpChargeNeed for the jump aimed, and the nose is
+ *                                      aimed; till then it waits, at burnAt-1 at most)
+ *   burnAt .. +burnTicks-1             burn (the jump itself)
  *   .. +cooldownTicks-1                cooling down, then back to 0
  */
 export interface JumpTuning {
+  /** The charge for a long jump (ticks); a short one adds to it (jumpChargeNeed) */
   chargeTicks: number;
+  /** Short jumps: a reference cruise speed (world units a tick); up to shortRange the charge adds the time to fly the jump at it */
+  shortCruise: number;
+  shortRange: number;
+  /** ...and past shortRange that extra tapers off, gone by here (world units) */
+  shortTaper: number;
   burnTicks: number;
   /** Cooldown at the sweet spot (coils just right for the hull, Mk I: jumpDriveStats) */
   cooldownTicks: number;
@@ -198,6 +213,7 @@ export interface JumpTuning {
 
 export const DEFAULT_JUMP: JumpTuning = {
   chargeTicks: 90, burnTicks: 90, cooldownTicks: 900,
+  shortCruise: 20, shortRange: 12000, shortTaper: 25000,
   speed: 340, exitSpeed: 0, rampTicks: 5, slowTicks: 16, chargeDamping: 0.96,
   baseRange: 50000, minRange: 5000,
   coreCapacity: 40, gradeCapacity: 0.1, gradeRange: 0.05, gradeCooldown: 0.0625,
@@ -263,6 +279,15 @@ export function jumpReachAt(d: { jumpRange?: number }, t: JumpTuning, fieldBoost
   return jumpRange(d, t, fieldBoost * (hazard?.jump ?? 1));
 }
 
+/**
+ * How far a jump aimed `dist` away goes (0 or none: as far as it reaches `reach`; never short of minRange). Below 0:
+ * not known (a replica's controls: flightControls), -1
+ */
+export function jumpGoFor(dist: number | undefined, reach: number, t: JumpTuning): number {
+  if (dist !== undefined && dist < 0) return -1;
+  return Math.max(t.minRange, Math.min(reach, dist && dist > 0 ? dist : reach));
+}
+
 /** The charge waits on its last tick until the nose is this close to the aim (radians); the burn then goes along the aim itself */
 export const JUMP_ALIGN = 0.03;
 
@@ -303,20 +328,52 @@ export function jumpTuning(t: ShipTuning): JumpTuning {
 }
 const jumpCache = new WeakMap<object, JumpTuning>();
 
-/** Phase of a jump counter, and progress through that phase in [0, 1]. */
-export function jumpPhase(j: number, t: JumpTuning): { phase: JumpPhase; progress: number } {
+/** The extra charge a jump of `dist` (world units, as it goes: jumpGo) needs: the time to fly it at shortCruise up to shortRange, tapering to none by shortTaper */
+export function jumpExtraCharge(dist: number, t: JumpTuning): number {
+  if (!(t.shortCruise > 0) || dist >= t.shortTaper) return 0;
+  if (dist <= t.shortRange) return Math.ceil(Math.max(0, dist) / t.shortCruise);
+  return Math.ceil((t.shortRange / t.shortCruise) * ((t.shortTaper - dist) / (t.shortTaper - t.shortRange)));
+}
+
+/** Ticks a jump of `dist` charges for (the counter's count when the burn can start). Negative `dist`: not known (a replica's: it waits for the burn's keyframe) */
+export function jumpChargeNeed(dist: number, t: JumpTuning): number {
+  return dist >= 0 ? t.chargeTicks + jumpExtraCharge(dist, t) : Infinity;
+}
+
+/** The counter's value as the burn starts: past the longest charge any jump needs */
+export function jumpBurnAt(t: JumpTuning): number {
+  return t.chargeTicks + (t.shortCruise > 0 ? Math.ceil(t.shortRange / t.shortCruise) : 0);
+}
+
+/** Phase of a jump counter, and progress through that phase in [0, 1]. `need`: the charge the jump aimed needs (jumpChargeNeed; a long jump's by default) */
+export function jumpPhase(j: number, t: JumpTuning, need = t.chargeTicks): { phase: JumpPhase; progress: number } {
   if (j <= 0) return { phase: 'ready', progress: 1 };
-  if (j < t.chargeTicks) return { phase: 'charging', progress: j / t.chargeTicks };
-  const b = j - t.chargeTicks;
+  const at = jumpBurnAt(t);
+  if (j < at) return { phase: 'charging', progress: Math.min(1, j / Math.min(need, at)) };
+  const b = j - at;
   if (b < t.burnTicks) return { phase: 'burn', progress: b / t.burnTicks };
   return { phase: 'cooldown', progress: (b - t.burnTicks) / t.cooldownTicks };
 }
 
-/** Advance the counter one tick. `hold`: not aimed yet, so a full charge waits on its last tick (jumpAimed) */
-export function stepJump(j: number, want: boolean, t: JumpTuning, hold = false): number {
+/**
+ * Advance the counter one tick. Charging, it counts the ticks charged; once it has charged `need` (jumpChargeNeed) the
+ * burn starts, unless `hold`: not aimed yet (jumpAimed), so it waits (counting on, to burnAt-1 at most)
+ */
+export function stepJump(j: number, want: boolean, t: JumpTuning, hold = false, need = t.chargeTicks): number {
   if (j <= 0) return want ? 1 : 0;
-  if (j < t.chargeTicks) return !want ? 0 : hold && j + 1 >= t.chargeTicks ? j : j + 1; // let go: the charge collapses (no cooldown)
-  return j + 1 >= t.chargeTicks + t.burnTicks + t.cooldownTicks ? 0 : j + 1;
+  const at = jumpBurnAt(t);
+  if (j < at) {
+    if (!want) return 0; // let go: the charge collapses (no cooldown)
+    if (j + 1 >= need && !hold) return at;
+    return Math.min(j + 1, at - 1);
+  }
+  return j + 1 >= at + t.burnTicks + t.cooldownTicks ? 0 : j + 1;
+}
+
+/** Is the drive mid-burn at counter `j` */
+export function jumpBurning(j: number, t: JumpTuning): boolean {
+  const at = jumpBurnAt(t);
+  return j >= at && j < at + t.burnTicks;
 }
 
 /** The burn's shape `b` ticks in: up to 1 over rampTicks, down to 0 over slowTicks (exactly 0 on its last tick) */
@@ -474,19 +531,25 @@ export function stepFlight(
   const jt = d.jumpCooldown ? { ...jt0, cooldownTicks: d.jumpCooldown } : jt0;
   const prev = body.jump ?? 0;
   const cargo = body.cargo ?? 0;
-  const j = stepJump(prev, !!input.jump && d.mass > 0, jt, !jumpAimed(body, input));
+  const burnAt = jumpBurnAt(jt);
+  // How far this jump goes (where you aimed, within the drive's reach), and so how long it charges (a short one longer)
+  // (A replica's jumpDist is below 0: where it lands isn't known, so its charge waits for the burn's keyframe)
+  let go = 0, need = jt.chargeTicks;
+  if (prev > 0 && prev < burnAt) {
+    go = jumpGoFor(input.jumpDist, jumpReachAt(d, jt, k.jumpBoost, k.hazard), jt);
+    need = jumpChargeNeed(go, jt);
+  }
+  const j = stepJump(prev, !!input.jump && d.mass > 0, jt, !jumpAimed(body, input), need);
   body.jump = j;
-  // The burn starts: fix how far this jump goes (where you aimed, within the drive's reach), and along the aim itself
+  // The burn starts: fix how far this jump goes, and along the aim itself
   // (the nose is within JUMP_ALIGN of it: the last of the turn is taken in the launch flash)
-  if (j === jt.chargeTicks && prev === jt.chargeTicks - 1) {
+  if (j === burnAt && prev > 0 && prev < burnAt) {
     if (!input.helm) body.angle = wrapAngle(input.targetAngle);
-    const range = jumpReachAt(d, jt, k.jumpBoost, k.hazard);
-    const want = input.jumpDist && input.jumpDist > 0 ? input.jumpDist : range;
-    body.jumpScale = jumpScaleFor(Math.max(jt.minRange, Math.min(range, want)), jt, k.friction);
+    body.jumpScale = jumpScaleFor(go, jt, k.friction);
   }
   const jp = jumpPhase(j, jt).phase;
   if (jp === 'burn') {
-    const speed = jumpBurnSpeed(j - jt.chargeTicks, jt, body.jumpScale ?? 1);
+    const speed = jumpBurnSpeed(j - burnAt, jt, body.jumpScale ?? 1);
     body.angVel = 0;
     dsincos(body.angle, SC);
     body.vx = SC[1] * speed;

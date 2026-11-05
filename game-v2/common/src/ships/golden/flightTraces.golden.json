@@ -37,17 +37,17 @@
   },
   "jump-burn": {
     "ticks": 220,
-    "trace": "3bc84fcdb0f62a60",
+    "trace": "0c075aed01517e8f",
     "charge": "cde88f61bc36848b",
     "final": {
-      "x": 5906.05,
-      "y": -19337.22,
+      "x": 8858.72,
+      "y": -28892.33,
       "vx": 0,
       "vy": -5.6828,
       "angle": -1.27106,
       "angVel": 0.000001,
-      "jump": 200,
-      "jumpScale": 0.74,
+      "jump": 800,
+      "jumpScale": 1.11,
       "cargo": 0,
       "dodge": 0,
       "dodgeDir": 0

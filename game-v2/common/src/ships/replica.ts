@@ -83,8 +83,9 @@ export function flightControls(c: ReplicaControls, body: FlightBody): FlightCont
     boost: (b & CTL.boost) !== 0, helm: (b & CTL.helm) !== 0, strafeLeft: (b & CTL.strafeLeft) !== 0, strafeRight: (b & CTL.strafeRight) !== 0,
     jump: (b & CTL.jump) !== 0,
     targetAngle: (b & CTL.hold) !== 0 ? body.angle : c.targetAngle,
-    // Where a jump lands isn't replicated: the burn's start brings a keyframe
-    jumpDist: 0,
+    // Where a jump lands isn't replicated, nor so how long a short one charges (flight.ts jumpChargeNeed): -1, not
+    // known, so the charge waits, and the burn's start brings a keyframe
+    jumpDist: -1,
   };
   // (Part features' held inputs from their control bits: the Burst Strafer's dodge)
   const X = getPlan().controls, held = out as unknown as Record<string, boolean>;

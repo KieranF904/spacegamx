@@ -15,7 +15,7 @@ import { createShipState } from '../state.js';
 import { readShipJson, testCatalog } from '../testData.js';
 import type { ShipTuning } from '../tuning.js';
 import type { FlightBody, FlightControls } from '../flight.js';
-import { jumpTuning } from '../flight.js';
+import { jumpTuning, jumpBurnAt } from '../flight.js';
 import { stepShipPhysics } from '../physics.js';
 import { pilotJumpStep, NO_FIELDS } from '../jumpFields.js';
 import { FULL_CHARGE, gunLoad, chargeTotal, type Charge } from '../energy.js';
@@ -96,7 +96,7 @@ describe('golden flight traces (the shared pilot step, scripted)', () => {
     expect(Math.max(...col(run('tow').rows, 'cargo'))).toBeGreaterThan(0);
     expect(col(run('heavy-cargo').rows, 'cargo').every((c) => c === 6)).toBe(true);
     const jt = jumpTuning(tuning);
-    expect(Math.max(...col(run('jump-burn').rows, 'jump'))).toBeGreaterThan(jt.chargeTicks + jt.burnTicks);
+    expect(Math.max(...col(run('jump-burn').rows, 'jump'))).toBeGreaterThan(jumpBurnAt(jt) + jt.burnTicks);
     // (The plain run's jump was charged and let go: cancelled, no burn)
     expect(Math.max(...col(run('plain-thrust-turn').rows, 'jump'))).toBeLessThan(jt.chargeTicks);
   });

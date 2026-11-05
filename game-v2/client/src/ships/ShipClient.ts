@@ -26,7 +26,7 @@ import type { Application } from 'pixi.js';
 import {
   Blueprint, Catalog, ClientInputMessage, ClientMessage, EntityType, InventoryStub, ServerMessage, ShipTuning,
   stationInteractRadius, stepShipPhysics, stepTurretAim, shipPointToWorld, unpackCursorWeaponState, GravityWell,
-  JumpTuning, jumpPhase, jumpTuning, coreHp, FRICTION, worldToLocalDir, partItemId, inSolarRing, jumpReachAt, jumpLanding,
+  JumpTuning, jumpPhase, jumpTuning, coreHp, FRICTION, worldToLocalDir, partItemId, inSolarRing, jumpReachAt, jumpLanding, jumpGo, jumpChargeNeed,
   jumpFieldAt, fieldRangeBoost, fieldCharge, primeBoost, pilotJumpStep, withEmp, lodestonePosition, type JumpField, type LodestoneData,
   ShipReplicaSet, ServerSnapshotMessage,
   packCursorWeaponState, rebuildVolley, WEAPON_KIND_TYPE, EntityState, accelAlong, turnAccel, rateShip, stepGuns, volleyShells, firesStraight, partWeaponDef,
@@ -848,7 +848,13 @@ export class ShipClient {
   localJump(): ReturnType<typeof jumpPhase> {
     const me = this.opts.state.entities.get(this.opts.state.playerId);
     const ship = me && this.store.get(me.id);
-    return jumpPhase(me ? JumpFx.counter(me, true) : 0, ship?.derived.jumpCooldown ? { ...this.jump, cooldownTicks: ship.derived.jumpCooldown } : this.jump);
+    return jumpPhase(me ? JumpFx.counter(me, true) : 0, ship?.derived.jumpCooldown ? { ...this.jump, cooldownTicks: ship.derived.jumpCooldown } : this.jump, this.jumpNeed());
+  }
+
+  /** Ticks the local ship's jump, aimed as the input says, charges for (a short one longer: flight.ts jumpChargeNeed) */
+  jumpNeed(): number {
+    const reach = this.jumpReach();
+    return reach ? jumpChargeNeed(jumpGo(this.jumpAimInfo.sent ?? this.jumpAimInfo.dist, reach, this.jump), this.jump) : this.jump.chargeTicks;
   }
 
   /** Jump range multiplier at a point (a star's charging ring), for a drive with `primed` ticks of a stillstone's priming (jumpFields.ts stepPrime) */
@@ -1561,7 +1567,7 @@ export class ShipClient {
     this.jumpFx?.update(dt, {
       hidden: this.hangarOpen || !this.store.get(state.playerId), latched: this.jumpLatched,
       aiming: this.jumpAiming(), aimDist: this.jumpAimInfo.dist, aimLabel: this.jumpAimInfo.label,
-      reach: this.jumpReach(), landing: this.jumpAiming() ? this.jumpLanding() : null, field: me ? this.gaugeField() : undefined, danger: this.jumpAiming() ? this.jumpDanger() : null,
+      reach: this.jumpReach(), need: this.jumpNeed(), landing: this.jumpAiming() ? this.jumpLanding() : null, field: me ? this.gaugeField() : undefined, danger: this.jumpAiming() ? this.jumpDanger() : null,
     });
     // (Part features' chips: the Burst Strafer's, ready or cooling and whether the ship can pay; the Tow Beam's while it tows)
     this.features.updateIndicators();

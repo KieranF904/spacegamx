@@ -65,7 +65,7 @@ describe('route planning', () => {
 
   it('calls at a lodestone on the way when it makes the trip quicker, and not when it is a detour', () => {
     const from = { x: 0, y: 0 }, to = { x: 92000, y: 0 };
-    const on = empty({ lodestones: [{ id: 'l', position: { x: 21000, y: 800 } }] });
+    const on = empty({ lodestones: [{ id: 'l', position: { x: 26000, y: 800 } }] });
     const viaOn = planRoute({ sys: on, tick: 0, from, to, ship: sparrow(), obstacles: [] });
     const direct = planRoute({ sys: on, tick: 0, from, to, ship: sparrow(), obstacles: [], noLodestones: true });
     expect(viaOn.lodestone).toBe(0);
@@ -77,16 +77,16 @@ describe('route planning', () => {
     expect(planRoute({ sys: on, tick: 0, from, to, ship: flyer, obstacles: [] }).lodestone).toBe(-1);
     // Camped by a nest out in a hostile band: never
     const camped = empty({
-      lodestones: [{ id: 'l', position: { x: 21000, y: 800 } }],
+      lodestones: [{ id: 'l', position: { x: 26000, y: 800 } }],
       regions: [{ id: 'r', name: 'r', outer: 1e6, danger: 'hostile' }],
-      nests: [{ id: 'n', name: 'n', faction: 'pirates', kind: 'den', orbit: { radius: 21500, phase: 0.1, period: 0 } }],
+      nests: [{ id: 'n', name: 'n', faction: 'pirates', kind: 'den', orbit: { radius: 26500, phase: 0.1, period: 0 } }],
     } as Partial<StarSystemData>);
     expect(planRoute({ sys: camped, tick: 0, from, to, ship: sparrow(), obstacles: systemObstacles(camped, 0, [], []) }).lodestone).toBe(-1);
   });
 
   it('never calls at a dead or shattered stillstone, and values a scarred one at its weaker field', () => {
     const from = { x: 0, y: 0 }, to = { x: 92000, y: 0 };
-    const at = (state?: 'scarred' | 'dead' | 'shattered') => empty({ lodestones: [{ id: 'l', position: { x: 21000, y: 800 }, ...(state ? { state } : {}) }] });
+    const at = (state?: 'scarred' | 'dead' | 'shattered') => empty({ lodestones: [{ id: 'l', position: { x: 26000, y: 800 }, ...(state ? { state } : {}) }] });
     for (const state of ['dead', 'shattered'] as const) expect(planRoute({ sys: at(state), tick: 0, from, to, ship: sparrow(), obstacles: [] }).lodestone).toBe(-1);
     // From cooling down, a whole one charges the drive faster than a scarred one
     const cooling = () => sparrow(875);
@@ -129,17 +129,20 @@ describe('route planning', () => {
   });
 
   it("times trips as the jump bench measures them (the starter: fly, and jump)", () => {
-    // jumpbench.mjs, sparrow-t: 50k flown 23.1 s; 20k / 50k / 100k / 150k jumping 3.8 / 3.8 / 21.4 / 27.9 s
+    // jumpbench.mjs, sparrow-t: 50k flown 23.1 s; 20k / 50k / 100k / 150k jumping 3.8 / 3.8 / 21.4 / 27.9 s (since 2026-11-05 a
+    // short jump charges longer, flight.ts jumpChargeNeed: 20k, in the taper, 7.7 s; 100k's last leg too, 25.9 s)
     const secs = (d: number, ship: PlanShip) => routeTime({ x: 0, y: 0 }, [{ x: d, y: 0 }], ship, undefined).eta / 60;
     const near = (got: number, want: number) => expect(Math.abs(got - want) / want).toBeLessThan(0.25);
     near(secs(50000, flyer), 23.1);
     near(secs(100000, flyer), 47.5);
-    near(secs(20000, sparrow()), 3.8);
+    near(secs(20000, sparrow()), 7.7);
     near(secs(50000, sparrow()), 3.8);
-    near(secs(100000, sparrow()), 21.4);
+    near(secs(100000, sparrow()), 25.9);
     near(secs(150000, sparrow()), 27.9);
     // Short hops aren't worth the spool
     expect(routeTime({ x: 0, y: 0 }, [{ x: 3000, y: 0 }], sparrow(), undefined).legs.map((l) => l.mode)).toEqual(['fly']);
+    // ...nor a 10k one now a short jump charges about as long as flying it (flight.ts jumpChargeNeed)
+    expect(routeTime({ x: 0, y: 0 }, [{ x: 10000, y: 0 }], sparrow(), undefined).legs.map((l) => l.mode)).toEqual(['fly']);
     // A drive still cooling down: fly till it's ready
     expect(routeTime({ x: 0, y: 0 }, [{ x: 50000, y: 0 }], sparrow(240), undefined).legs[0].mode).toBe('fly');
   });

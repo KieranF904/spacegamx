@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'path';
 import * as bitecs from 'bitecs';
-import { Position, Velocity, InSystem, Health, Player, Projectile, ServerMessage } from '@space-game/common';
+import { Position, Velocity, InSystem, Health, Player, Projectile, ServerMessage, jumpBurnAt, jumpTuning } from '@space-game/common';
 import { GameServer } from './GameServer.js';
 import { GameData } from './data/GameData.js';
 import { LocalTransport } from './net/LocalTransport.js';
@@ -229,7 +229,7 @@ describe('jump drive and stars', () => {
       const { server, pid } = live();
       const ship = server.getShips().get(pid)!;
       const jt = server.getShips().tuning.jump!;
-      ship.jump = jt.chargeTicks! + jt.burnTicks! + 1; // just into the cooldown
+      ship.jump = jumpBurnAt(jumpTuning(server.getShips().tuning)) + jt.burnTicks! + 1; // just into the cooldown
       let ticks = 0;
       while (ship.jump !== 0 && ticks < 5000) { Position.x[pid] = x; Position.y[pid] = 0; Velocity.x[pid] = 0; Velocity.y[pid] = 0; server.step(); ticks++; }
       return ticks;
