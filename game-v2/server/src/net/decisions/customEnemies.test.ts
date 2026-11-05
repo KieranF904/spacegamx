@@ -7,7 +7,8 @@
  * of two drives). No control rows of them; every body check agrees.
  */
 import { describe, it, expect } from 'vitest';
-import { CAPS, customGroups } from '@space-game/common';
+import { CAPS, Position, customGroups } from '@space-game/common';
+import type { GameServer } from '../../GameServer.js';
 import { fight, ALL } from '../../testkits/decisionFight.testkit.js';
 
 /** What each design loses mid-fight: the pieces that change how it flies */
@@ -20,9 +21,21 @@ const DESIGN: Record<string, string> = {
   'Rivet Sower': 'rivet_sower', 'Slag Ray': 'slag_ray', Clinker: 'clinker', 'Helios Drone': 'helios_drone',
 };
 
+/**
+ * The Helios Drones keep well off and weld only what comes within their torch's reach: now and then each is brought in
+ * beside the pilot (moved there on the server: a keyframe of it), so their torch is lit too
+ */
+function closeIn(t: number, server: GameServer, foes: number[]) {
+  if (t % 400 !== 300) return;
+  for (const id of foes) {
+    const pid = server.enemies.targetOf(id);
+    if (server.enemies.factionOf(id) === 'helios' && pid >= 0) { Position.x[id] = Position.x[pid] + 260; Position.y[id] = Position.y[pid] + 40; }
+  }
+}
+
 function run(packs: { ships: string[]; dx: number; dy: number; faction: string }[], lose: boolean, ticks = 1500, caps?: number) {
   return fight({
-    ticks, packs, caps, loseAt: lose ? 700 : undefined, prey: true,
+    ticks, packs, caps, loseAt: lose ? 700 : undefined, prey: true, each: closeIn,
     lose: (ship, uid) => {
       const name = ship.blueprint.name, part = ship.blueprint.parts.find((p) => p.uid === uid);
       if (!part || part.group === undefined || !LOSE[name]) return false;

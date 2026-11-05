@@ -91,6 +91,8 @@ export interface ShipHost {
   payRepair?(eid: number, hp: number): number;
   /** May `attacker` hurt `target`? (Players can't hurt each other outside PvP zones.) Default: yes. */
   canDamage?(attacker: number, target: number): boolean;
+  /** Does a collision between these two hurt them (common hitRules.ts contactHurts)? Default: yes. They're pushed apart either way */
+  contactHurts?(a: number, b: number): boolean;
   // --- Support weapons (common/src/ships/features/support/support.ts) ---
   /** May `healer`'s Repair Beam mend `target`? (A friendly ship: absent, nobody) */
   canHeal?(healer: number, target: number): boolean;

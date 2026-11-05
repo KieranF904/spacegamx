@@ -45,6 +45,8 @@ export const ALWAYS_STRAFE = 180;
 
 /** The 13-bit aim's whole turn */
 const AIM_TURN = 8191;
+/** Its thrust's controls */
+const THRUST = CTL.forward | CTL.backward | CTL.left | CTL.right;
 
 export const orderPatrol = (wx: number, wy: number, pace: number, pauseUntil: number): WantRec =>
   [AI_ORDER.PATROL, Math.round(wx), Math.round(wy), Math.floor(120 * pace), Math.max(0, Math.ceil(pauseUntil))];
@@ -112,13 +114,14 @@ export interface AiPilotOut extends BodyOut {
 
 /**
  * This tick's controls. `tgt`: its target as the step reads it (null: none, or not known); `centroid`: its pack's (an
- * ENGAGE order with mates); `prevQ`: the aim it steered by last tick
+ * ENGAGE order with mates); `prevQ`: the aim it steered by last tick; `prevBits`: the controls it flew with then (a
+ * custom enemy's module holds a thrust it's making rather than flick it on and off: bodies/custom/flight.ts keepAt)
  */
-export function aiPilot(s: BodyState, me: BodyPose, tgt: BodyPose | null, centroid: readonly [number, number] | null, tick: number, id: number, prevQ: number): AiPilotOut {
+export function aiPilot(s: BodyState, me: BodyPose, tgt: BodyPose | null, centroid: readonly [number, number] | null, tick: number, id: number, prevQ: number, prevBits = 0): AiPilotOut {
   const w = s.want, state = w[0];
   let mx = 0, my = 0, face = me.angle, boost = false, aim: number | undefined, aimDist = 0, d = 0, across = 0, tof = 0;
   // (A custom enemy: its module, the move under way and its pieces gone: bodies/custom)
-  const custom = state === AI_ORDER.CUSTOM && tgt ? customCtx(w, id, tick, me, tgt) : null;
+  const custom = state === AI_ORDER.CUSTOM && tgt ? customCtx(w, id, tick, me, tgt, prevBits) : null;
   if ((state === AI_ORDER.ENGAGE || state === AI_ORDER.CUSTOM) && tgt) {
     const tx = tgt.x, ty = tgt.y, dx = tx - me.x, dy = ty - me.y;
     d = dhypot(dx, dy) || 1;
@@ -174,9 +177,9 @@ export function aiPilot(s: BodyState, me: BodyPose, tgt: BodyPose | null, centro
 }
 
 /** A custom enemy's module and what it reads this tick (null: its design isn't known: it flies as the plain AI) */
-function customCtx(w: WantRec, id: number, t: number, me: BodyPose, tgt: BodyPose): { design: (typeof CUSTOM_DESIGNS)[number]; c: CustomCtx } | null {
+function customCtx(w: WantRec, id: number, t: number, me: BodyPose, tgt: BodyPose, bits: number): { design: (typeof CUSTOM_DESIGNS)[number]; c: CustomCtx } | null {
   const design = CUSTOM_DESIGNS[w[CO.DESIGN]];
   if (!design) return null;
   const m = moveAt(w, t, (i) => design.moves[i]?.ticks ?? 0);
-  return { design, c: { w, id, t, me, tgt, gone: w[CO.GONE], move: m ? m.move : -1, k: m ? m.k : -1, arg: w[CO.ARG], seed: w[CO.MSEED] } };
+  return { design, c: { w, id, t, me, tgt, gone: w[CO.GONE], move: m ? m.move : -1, k: m ? m.k : -1, arg: w[CO.ARG], seed: w[CO.MSEED], bits: bits & THRUST } };
 }

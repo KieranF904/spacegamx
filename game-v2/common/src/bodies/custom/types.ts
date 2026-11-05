@@ -26,6 +26,8 @@ export interface CustomCtx {
   /** The move's argument (an angle in the 13-bit aim quantisation, or a small number) and its 8-bit seed */
   arg: number;
   seed: number;
+  /** The thrust it flew with the tick before (CTL forward, backward, left, right: the replica's on a client) */
+  bits: number;
 }
 
 /** One move: its name (the stats table's key, factions.json custom) and how long it lasts (ticks) */

@@ -145,13 +145,13 @@ export class BodyRunner {
 
   private driver(id: number, run: Run): BodyDriver {
     return {
-      step: (t: number, prev: FlightBody, prevQ: number) => {
+      step: (t: number, prev: FlightBody, prevQ: number, prevBits: number) => {
         const s = this.stateAt(run, t);
         const kind = s?.on ? BODY_KINDS[s.kind] : undefined;
         if (!s || !kind) return null;
         // (its target as the server's step reads it; the rest as they ended the tick before)
         const read: BodyReads = { now: (o) => this.host.reps.preAt(o, t), before: (o) => this.host.reps.at(o, t - 1)?.body ?? null };
-        const out = kind.step(id, s, prev, read, t, prevQ);
+        const out = kind.step(id, s, prev, read, t, prevQ, prevBits);
         if (!out) this.stats.blind++;
         return out;
       },

@@ -88,3 +88,35 @@ describe('a path stepped again where it was drawn already (ShipReplicaSet.pose)'
     expect(r.pose(1, 116)!.x).toBe(r.at(1, 116)!.body.x);
   });
 });
+
+describe('a ship keyed again, or just come into view (ShipReplicaSet.rewind, pose)', () => {
+  /** A coasting ship that isn't debris (an anchored wreck: it coasts, nothing else moves it) */
+  const coast = (x: number, vx: number) => packKeyframe({ id: 1, mode: ReplicaMode.Anchored, body: { x, y: 0, vx, vy: 0, angle: 0, angVel: 0 }, ctl: { bits: 0, targetAngle: 0 }, q: 0 });
+
+  it('a rewind to before its keyframe keeps the path it was drawn on there: it moves on, never jumping ahead to stand at the keyframe', () => {
+    const r = set();
+    r.apply(100, [coast(0, 4)]);
+    for (let t = 100; t <= 102; t += 0.25) r.pose(1, t);
+    r.at(1, 105);
+    // Keyed again at 106 (a body's SYNC, its target keyed) while drawn at 102, a little off where it was going; then
+    // stepped again from 101 (a body runner steps its ship again from just after the last snapshot)
+    const truth = r.at(1, 106)!.body.x + 6;
+    r.apply(106, [coast(truth, 4)]);
+    r.rewind(1, 101);
+    const path: number[] = [];
+    for (let t = 102.25; t <= 114; t += 0.25) path.push(r.pose(1, t)!.x);
+    // (wiped back to the keyframe, 102 to 105 were drawn at it: a jump of ~20, then standing still)
+    for (let i = 1; i < path.length; i++) { expect(path[i] - path[i - 1]).toBeGreaterThan(0); expect(path[i] - path[i - 1]).toBeLessThan(2); }
+    expect(r.at(1, 106)!.body.x).toBe(truth);
+    expect(r.pose(1, 114)!.x).toBeCloseTo(r.at(1, 114)!.body.x, 6);
+  });
+
+  it('drawn before its first state, it comes in along its way from there (it stood at it, then went on)', () => {
+    const r = set();
+    r.apply(106, [coast(100, 4)]);
+    const path: number[] = [];
+    for (let t = 100; t <= 110; t += 0.25) path.push(r.pose(1, t)!.x);
+    expect(path[0]).toBeCloseTo(100 - 4 * 6, 6);
+    for (let i = 1; i < path.length; i++) { expect(path[i] - path[i - 1]).toBeGreaterThan(0); expect(path[i] - path[i - 1]).toBeLessThan(2); }
+  });
+});

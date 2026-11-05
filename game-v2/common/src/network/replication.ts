@@ -178,6 +178,8 @@ const SMOOTH_TICKS = 8;
 const SMOOTH_MAX = 400;
 /** The old path is stepped up to a keyframe's tick only if it's this close (ticks) */
 const GAP_MAX = 60;
+/** A ship drawn before its first state is drawn back along its way from it by at most this many ticks */
+const BACK_TICKS = 20;
 
 const smoothstep = (u: number) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
 
@@ -227,8 +229,8 @@ export interface OwnTimeline {
  * from `step`: not this tick (the body is off: the rows fly it).
  */
 export interface BodyDriver {
-  /** Tick t's controls and push, from the ship as it ended tick t - 1 and the aim it flew that tick with */
-  step(t: number, prev: FlightBody, prevQ: number): { bits: number; q: number; ix: number; iy: number } | null;
+  /** Tick t's controls and push, from the ship as it ended tick t - 1 and the aim and controls it flew that tick with */
+  step(t: number, prev: FlightBody, prevQ: number, prevBits: number): { bits: number; q: number; ix: number; iy: number } | null;
   /** After its step at tick t (the body's check is of this) */
   after?(t: number, body: FlightBody): void;
 }
@@ -392,13 +394,21 @@ export class ShipReplicaSet {
     return body;
   }
 
-  /** What it was stepped to from tick t on must be stepped again (its timeline changed there); its keyframe stays */
+  /**
+   * What it was stepped to from tick t on must be stepped again (its timeline changed there); its keyframe stays, and
+   * so does what came before it. A path steps on from its keyframe, never from before it, so those ticks can't be
+   * stepped again: they are the path it was drawn on, which the keyframe's correction bends onto it (pose). Wiped, the
+   * ticks between t and the keyframe were drawn at the keyframe (`at` gives the earliest state after a gap): a ship
+   * keyed again (a body's SYNC, its target keyed) jumped ahead to it and stood there until the view caught up
+   */
   rewind(id: number, t: number): void {
     const r = this.reps.get(id);
     if (!r || t > r.last) return;
-    for (const h of [...r.hist.keys()]) if (h >= t && h !== r.kf) r.hist.delete(h);
+    // (Debris steps as a world, from where it was rewound to: stepDebrisTo does its own)
+    const from = r.mode === ReplicaMode.Drift ? t : Math.max(t, r.kf + 1);
+    for (const h of [...r.hist.keys()]) if (h >= from && h !== r.kf) r.hist.delete(h);
     r.last = Math.max(...r.hist.keys(), -Infinity);
-    rewrote(r, t);
+    rewrote(r, from);
     // (Debris steps as a world (stepDebrisTo): left as it is, the world, already past t, never stepped it again: frozen)
     if (r.mode === ReplicaMode.Drift) this.dDirty = Math.min(this.dDirty, t - 1);
   }
@@ -532,7 +542,7 @@ export class ShipReplicaSet {
       const t = r.last + 1;
       const ev = own ? own.ctl(t) : r.events.get(t);
       // (Flown by its body: its controls and push from that, CAPS.BODIES)
-      const by = driver?.step(t, cur.body, cur.q);
+      const by = driver?.step(t, cur.body, cur.q, cur.bits);
       const bits = by ? by.bits : ev ? ev[0] : cur.bits, q = by ? by.q : ev ? ev[1] : cur.q;
       const body = cloneBody(cur.body);
       if (by) { body.vx += by.ix; body.vy += by.iy; }
@@ -567,6 +577,19 @@ export class ShipReplicaSet {
   /** Its pose at a fractional tick between two stepped states, unbent */
   private rawPose(id: number, t: number): { x: number; y: number; angle: number; b: Step } | null {
     const f = Math.floor(t);
+    // Before its first state (a ship just come into view, or back into it): drawn coming in along its way, back from that
+    // state, not standing at it until the view reaches its tick (it stood there, then went on: a snap and a stall). Not
+    // debris (nothing before it split), a docked ship or one mid-jump; at most BACK_TICKS back
+    const r = this.reps.get(id);
+    if (r && r.hist.size && !r.hist.has(f) && r.mode !== ReplicaMode.Drift && r.mode !== ReplicaMode.Docked) {
+      let first = Infinity;
+      for (const k of r.hist.keys()) if (k < first) first = k;
+      const s = first > f ? r.hist.get(first)! : null;
+      if (s && !s.body.jump) {
+        const back = Math.min(BACK_TICKS, first - t);
+        return { x: s.body.x - s.body.vx * back, y: s.body.y - s.body.vy * back, angle: s.body.angle - s.body.angVel * back, b: s };
+      }
+    }
     const a = this.at(id, f);
     if (!a) return null;
     const b = this.at(id, f + 1) ?? a;

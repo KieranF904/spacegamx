@@ -63,6 +63,31 @@ both jobs at den size.
 - **Pulls.** A pull on a pilot made while the pilotless ships step is applied after they all have
   (`ShipBridge.pushQueue`). This way a body reads its target as its clients do.
 
+**The AI pass (2026-11-05, after Kieran's playtest).** "Pretty hopeless": a Slag Ray aimed its first cone at you and
+spat the rest along its arc, and every line drawn now and fired later was drawn where you were, so anyone moving flew
+off it. Measured with `server/src/bench/customFight.ts` (a pilot with every cap, frames 3 ticks late, against each
+design: shells that came near where the pilot really went, strikes that landed, damage a second, corrections and
+disagreements a second, thrust flicker, the drawn pose against the server's path).
+- **Lead.** Lines and lobs go where you'll be if you hold your course, turn and all (`CustomEnemies.ahead`: your speed
+  and how your heading turned over the last 10 ticks): the Censer's lance, the Maw Lurker's rail, the Hookboat's
+  harpoon and the Scrap Darter's burst over their warnings. The Clinker aims each shell as it's lobbed: the first at
+  where you're going, the next at where you are (for one who stops), the last two scattered round where you're going.
+- **Slag Ray PASS** is a run and a turn away: in at you to pass just off your side (`RAY_RUN` ticks), its nose on where
+  its embers would meet you, spitting only while it's on (`CONE_ON`); past you it follows through, then arcs round at
+  its range to come in again, spitting nothing.
+- **Helios Drone** (Kieran: "they act like missiles"; the brief was weak, slow and low-threat): its blueprint's
+  `drive` is 0.4 (its cruise 11 units a tick against the Sparrow T's 21; it was 29, and 63 boosting), it turns at most
+  0.035 rad a tick, never boosts, and keeps station 900 off you (`keepAt`: matching your way, thrust in bursts) while it
+  plinks sparks from its torch (an autocannon at 0.3 damage, 1300 reach, only with its torch on you). The torch burns
+  only what comes within its reach; it never closes in. Its pieces' HP is halved (106 in all, was 185). More of them:
+  three packs at each dock and two at the survey, of four or three (were two, two and one, of three or two): about 29
+  round the docks, was about 13. A starter kills a pack of four in 14 to 30 s and keeps 96 to 100% of its hull.
+- **Hookboat reel** tows, not slings: no more pull once you're coming in at 5 units a tick.
+- **Hostiles of one faction** bump without hurting each other (`hitRules.ts contactHurts`); they're pushed apart as
+  ever, and collisions with anyone else hurt as ever.
+- `keepAt` holds a thrust it's making (the controls it flew last tick, `CustomCtx.bits`, the replica's on a client)
+  rather than flick its engines on and off every tick.
+
 **The Clinker's `under` rule.** It now works outside a boss's stages (`common/src/ships/hitRules.ts underCover`).
 While a plate covers a spot, a hit on the magma there goes to the plate. Once the plate is gone, the magma takes it.
 
@@ -260,9 +285,10 @@ engineering:
 
 It is a starter's first kill, a little smaller than the starter ship.
 
-- **Behaviour:** passive. It drifts on its round and noses in to weld whatever comes within reach (`torch`).
+- **Behaviour:** passive, slow and weak. It drifts on its round; riled, it keeps well off you and plinks sparks from
+  its torch, and welds only what comes within its torch's reach (`torch`). It never rams (the AI pass above).
 - **Pieces:**
-  - `torch`: gone, it can't weld.
+  - `torch`: gone, it can't weld or spark.
   - `eye`, `panel_l`, `panel_r`: these do nothing to its flight.
   - `drive`: gone, it drifts.
   - `core`: the service cell under the chassis.
