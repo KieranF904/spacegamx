@@ -41,7 +41,7 @@
 <div id="status" class="box" hidden></div>
 <div id="noteBox" class="box" hidden><label for="noteIn">Note for Claude</label><input id="noteIn" placeholder="what to look at (Enter saves, Esc cancels)"></div>
 <div id="stamp" hidden></div>
-<div id="help" class="box">Space / → next · ← back · Home start · wheel zoom · drag pan · 0 or double-click reset · F full screen · C caption · H hide this<br>M review mode<span id="reviewKeys" hidden> · X hide from the slideshow · R flag for Claude · N note for Claude (flags it too)</span></div>
+<div id="help" class="box">Space / → next · ← back · Home start · wheel zoom · drag pan · 0 or double-click reset · F full screen · C caption · H hide this<br>M mode<span id="hideKeys" hidden> · X hide from the slideshow</span><span id="flagKeys" hidden> · R flag for Claude · N note for Claude (flags it too)</span></div>
 <script>
 const SLIDES = [
 ];
@@ -74,11 +74,12 @@ function setFlag(name, patch) {
   flags[name] = { ...f(name), ...patch }; save(); refresh();
   stampEl.classList.remove('pop'); void stampEl.offsetWidth; stampEl.classList.add('pop'); // replay the pop
 }
-const stampEl = document.getElementById('stamp'), reviewKeys = document.getElementById('reviewKeys');
+const stampEl = document.getElementById('stamp'), hideKeys = document.getElementById('hideKeys'), flagKeys = document.getElementById('flagKeys');
 
-// Present skips hidden slides; Review shows every slide with its flags
-let review = false, i = 0;
-const visible = (k) => review || !f(SLIDES[k]).hide;
+// Present skips hidden slides. Hiding mode shows every slide and only the hide marks; Flagging mode only the flags and notes for Claude
+const MODES = ['present', 'hide', 'flag'];
+let mode = 'present', i = 0;
+const visible = (k) => mode === 'hide' || !f(SLIDES[k]).hide;
 // Zoom and pan of the current slide: scale z about the top-left, then shift by (x, y) screen pixels
 let z = 1, x = 0, y = 0;
 function apply() {
@@ -97,17 +98,20 @@ function refresh() {
   const shown = SLIDES.map((_, k) => k).filter(visible), at = shown.indexOf(i), fl = f(SLIDES[i]);
   const vals = Object.values(flags);
   cap.textContent = `${at + 1} / ${shown.length} · ${SLIDES[i]}`;
-  modeEl.hidden = !review;
-  modeEl.innerHTML = '<b>Review</b>'
-    + (fl.hide ? '<span class="chip hide">hidden from slideshow</span>' : '')
-    + (fl.review ? '<span class="chip review">flagged for Claude</span>' : '')
-    + `<span style="color:#889">${vals.filter((v) => v.hide).length} hidden · ${vals.filter((v) => v.review).length} flagged</span>`;
-  // The middle of the slide says what it's marked with, in review mode only
-  stampEl.innerHTML = (fl.hide ? '<div class="hide">HIDDEN FROM SLIDESHOW</div>' : '') + (fl.review ? '<div class="review">FLAGGED FOR CLAUDE</div>' : '');
-  stampEl.hidden = !review || !stampEl.innerHTML;
-  reviewKeys.hidden = !review;
-  if (!review) noteBox.hidden = true;
-  noteEl.hidden = !review || !fl.note;
+  modeEl.hidden = mode === 'present';
+  modeEl.innerHTML = mode === 'hide'
+    ? '<b>Hiding</b>' + (fl.hide ? '<span class="chip hide">hidden from slideshow</span>' : '')
+      + `<span style="color:#889">${vals.filter((v) => v.hide).length} hidden</span>`
+    : '<b>Flagging</b>' + (fl.review ? '<span class="chip review">flagged for Claude</span>' : '')
+      + `<span style="color:#889">${vals.filter((v) => v.review).length} flagged</span>`;
+  // The middle of the slide says what it's marked with, for the current mode only
+  stampEl.innerHTML = mode === 'hide' ? (fl.hide ? '<div class="hide">HIDDEN FROM SLIDESHOW</div>' : '')
+    : mode === 'flag' ? (fl.review ? '<div class="review">FLAGGED FOR CLAUDE</div>' : '') : '';
+  stampEl.hidden = !stampEl.innerHTML;
+  hideKeys.hidden = mode !== 'hide';
+  flagKeys.hidden = mode !== 'flag';
+  if (mode !== 'flag') noteBox.hidden = true;
+  noteEl.hidden = mode !== 'flag' || !fl.note;
   noteEl.textContent = fl.note ? 'Note: ' + fl.note : '';
 }
 function show(n) {
@@ -150,14 +154,14 @@ addEventListener('keydown', (e) => {
   else if (k === 'c') cap.hidden = !cap.hidden;
   else if (k === 'h') help.hidden = !help.hidden;
   else if (k === 'm') {
-    review = !review;
+    mode = MODES[(MODES.indexOf(mode) + 1) % MODES.length];
     if (!visible(i) && !step(1)) step(-1);
     refresh();
-    say(review ? 'Review mode: every slide · X hide · R flag for Claude · N note' : 'Present mode: hidden slides skipped');
+    say({ present: 'Slideshow: hidden slides skipped', hide: 'Hiding mode: every slide · X hides or shows it in the slideshow', flag: 'Flagging mode: R flag for Claude · N note' }[mode]);
   }
-  else if (review && k === 'x') setFlag(SLIDES[i], { hide: !f(SLIDES[i]).hide });
-  else if (review && k === 'r') setFlag(SLIDES[i], { review: !f(SLIDES[i]).review });
-  else if (review && k === 'n') { e.preventDefault(); openNote(); }
+  else if (mode === 'hide' && k === 'x') setFlag(SLIDES[i], { hide: !f(SLIDES[i]).hide });
+  else if (mode === 'flag' && k === 'r') setFlag(SLIDES[i], { review: !f(SLIDES[i]).review });
+  else if (mode === 'flag' && k === 'n') { e.preventDefault(); openNote(); }
   else if (e.key === '0') resetView();
   else if (e.key === '+' || e.key === '=') zoomAt(innerWidth / 2, innerHeight / 2, 1.25);
   else if (e.key === '-') zoomAt(innerWidth / 2, innerHeight / 2, 0.8);
