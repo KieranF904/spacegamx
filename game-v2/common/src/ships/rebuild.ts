@@ -7,12 +7,12 @@
 
 import type { Blueprint, FireSpec, FunctionDef, MaterialDef, Vec2, WeaponMods, WireSeg } from './types.js';
 import type { Catalog } from './catalog.js';
-import { PlacedGeom, computeJoins, mountOf, placeGeometry } from './grid.js';
+import { designOf, newDesign, wholeBuilt, turretFrameOf, wholeExhaust, wholeTurret, type DesignInfo } from './design.js';
 import { floodFill, partMount } from './blueprint.js';
 import { ShipTuning, healthFactor } from './tuning.js';
-import { TurretWindow, computeTurretWindow } from './turret.js';
+import { type TurretRays, type TurretWindow, castTurret } from './turret.js';
 import { DEFAULT_JUMP, coilCapacity, jumpDriveStats } from './flight.js';
-import { fnOutput, isEngine, partDemand, partGrade, partMaterial, partSupply, partThrust, weaponBaseArea, weaponStrength } from './grades.js';
+import { fnOutput, isEngine, partDemand, partGrade, partSupply, partThrust, weaponBaseArea, weaponStrength } from './grades.js';
 import { netJoins, wireNetworks } from './wires.js';
 import { groupsGone } from './groups.js';
 import { gunRate } from './launch.js';
@@ -230,6 +230,30 @@ export interface RebuildInput {
   ghost?: boolean[];
   /** 'core' for ships, 'largest' for debris (the biggest connected group stays) */
   rootMode: 'core' | 'largest';
+  /** The ship's own memo of its last rebuild (ShipState.memo): read, and replaced by this one. Absent, nothing is kept */
+  memo?: RebuildMemo;
+  /** (Tests: the design worked out afresh, and every turret ray and exhaust lane cast afresh, as the memo's parity check) */
+  fresh?: boolean;
+}
+
+/**
+ * What a rebuild keeps for the ship's next one: its turrets' rays and its engines' exhaust, and which parts were alive.
+ * Losing parts can only open a turret's ray or an engine's lane, never close one, so a rebuild where every part alive
+ * was alive last time (and the design and tuning are the same) casts only the rays whose blocker went, and checks only
+ * the engines that were blocked. After anything that adds a part (a repair, a ghost built, a new ship) it carries on
+ * the same way from the design's rays and exhaust with every part standing (design.ts), which every ship of it is a
+ * subset of. The result is the same either way: the memo only saves work, so ships with different histories (the
+ * server's, a client's) still rebuild alike (rebuildMemo.test.ts checks that against every ray cast afresh).
+ */
+export interface RebuildMemo {
+  last?: {
+    design: DesignInfo;
+    tuning: ShipTuning;
+    alive: Uint8Array;
+    turrets: Map<number, TurretRays>;
+    /** Each live engine's exhaust share */
+    exhaust: Map<number, number>;
+  };
 }
 
 /**
@@ -301,34 +325,36 @@ export function rebuild(input: RebuildInput): ShipDerived {
   if (!bp.rigid || input.rootMode !== 'core') return d;
   let whole = AS_BUILT.get(bp);
   if (!whole) {
-    const n = bp.parts.length, full = rebuildAsIs({ ...input, hp: [...input.maxHp], detached: new Array(n).fill(false), ghost: undefined });
+    const n = bp.parts.length, full = rebuildAsIs({ ...input, hp: [...input.maxHp], detached: new Array(n).fill(false), ghost: undefined, memo: undefined });
     whole = Object.fromEntries(RIGID.map((k) => [k, full[k]])) as Pick<ShipDerived, typeof RIGID[number]>;
     AS_BUILT.set(bp, whole);
   }
   return { ...d, ...whole };
 }
 
-function rebuildAsIs(input: RebuildInput): ShipDerived {
-  const { catalog, tuning, blueprint, hp, maxHp, detached } = input;
+/** What holds together: the joins between intact parts, the root, what's still joined to it, and the groups that aren't */
+export interface Structure {
+  intact: (i: number) => boolean;
+  joins: [number, number][];
+  root: number;
+  alive: boolean[];
+  orphanGroups: number[][];
+}
+
+/** A rebuild's first steps alone (state.ts splitRebuild looks ahead with it): `allJoins`, the design's (design.ts) */
+export function structureOf(blueprint: Blueprint, hp: readonly number[], detached: readonly boolean[], rootMode: 'core' | 'largest', allJoins: [number, number][]): Structure {
   const parts = blueprint.parts;
   const n = parts.length;
-  const geoms: PlacedGeom[] = parts.map((p) => placeGeometry(catalog, p));
-  // Where each part points out (a facing edge, or a bespoke piece's mount)
-  const mounts = geoms.map((g) => mountOf(g));
-  const fns = parts.map((p) => catalog.functions.get(p.fn)!);
-  // (A model is made of its own material, whatever the part says)
-  const mats = parts.map((p) => partMaterial(catalog, p)!);
   // (A custom enemy's piece breaks as one: a part of a group that's gone isn't intact either, groups.ts)
   const gone = groupsGone(blueprint, hp, detached);
   const intact = gone ? (i: number) => hp[i] > 0 && !detached[i] && !(parts[i].group !== undefined && gone & (1 << parts[i].group!)) : (i: number) => hp[i] > 0 && !detached[i];
 
   // 1. Joins (between intact parts only: dead parts don't hold anything together)
-  const allJoins = computeJoins(geoms);
   const joins = allJoins.filter(([a, b]) => intact(a) && intact(b));
 
   // 2. Structure
   let root = -1;
-  if (input.rootMode === 'core') {
+  if (rootMode === 'core') {
     root = parts.findIndex((p, i) => p.fn === 'core' && intact(i));
   } else {
     const groups = components(n, joins, intact);
@@ -336,9 +362,32 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     for (const g of groups) if (!best || g.length > best.length) best = g;
     root = best ? best[0] : -1;
   }
-  const reached = floodFill(n, joins, root, intact);
-  const alive = reached;
+  const alive = floodFill(n, joins, root, intact);
   const orphanGroups = components(n, joins, (i) => intact(i) && !alive[i]);
+  return { intact, joins, root, alive, orphanGroups };
+}
+
+function rebuildAsIs(input: RebuildInput): ShipDerived {
+  const { catalog, tuning, blueprint, hp, maxHp } = input;
+  const parts = blueprint.parts;
+  const n = parts.length;
+  // What the design fixes, worked out once per blueprint (design.ts)
+  const D = input.fresh ? newDesign(catalog, blueprint) : designOf(catalog, blueprint);
+  const { geoms, mounts, fns, mats } = D;
+  const allJoins = D.joins;
+  const { joins, root, alive, orphanGroups } = structureOf(blueprint, hp, input.detached, input.rootMode, allJoins);
+  // (Parts only went since the last rebuild: its turrets' rays and engines' exhaust carry on from it, RebuildMemo)
+  const last = input.fresh ? undefined : input.memo?.last;
+  let shrunk = !!last && last.design === D && last.tuning === tuning;
+  if (shrunk) for (let i = 0; i < n; i++) if (alive[i] && !last!.alive[i]) { shrunk = false; break; }
+  const was = shrunk ? last : undefined;
+  const turretRays = new Map<number, TurretRays>(), exhaustOf = new Map<number, number>();
+  // A turret's window (turret.ts): its rays carried on from the last rebuild when they can be
+  const turretWindow = (i: number): TurretWindow => {
+    const rays = castTurret(turretFrameOf(D, i, tuning), geoms, alive, input.fresh ? undefined : was?.turrets.get(i) ?? wholeTurret(D, i, tuning));
+    turretRays.set(i, rays);
+    return rays.win;
+  };
 
   // 3. Power networks: what the live wires join, and what's plugged into a generator (wires.ts)
   const wn = wireNetworks(catalog, blueprint, geoms, alive, joins);
@@ -346,7 +395,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   const flowJoins = netJoins(joins, network);
 
   // 4. Power, per network
-  const area = geoms.map((g) => g.area);
+  const area = D.area;
   const satisfaction = new Array<number>(n).fill(1);
   // (Part features: which ones each part's function gives (features/plan.ts); a `burst` feature's parts draw by the tick too, as a
   // Tow Beam's and a Burst Strafer's)
@@ -410,9 +459,9 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   }
   const com: Vec2 = mass > 0 ? [mx / mass, my / mass] : [0, 0];
   // The same for the ship as built: every part but ghosts, held on through built parts
-  const core = parts.findIndex((p) => p.fn === 'core');
+  const core = D.core;
   const asBuilt = core >= 0 && input.rootMode === 'core'
-    ? floodFill(n, allJoins.filter(([a, b]) => !input.ghost?.[a] && !input.ghost?.[b]), core, (i) => !input.ghost?.[i])
+    ? !input.ghost?.some(Boolean) ? wholeBuilt(D) : floodFill(n, allJoins.filter(([a, b]) => !input.ghost?.[a] && !input.ghost?.[b]), core, (i) => !input.ghost?.[i])
     : parts.map((_, i) => !input.ghost?.[i]);
   const built = (i: number) => asBuilt[i];
   let fullMass = 0, fx = 0, fy = 0;
@@ -449,7 +498,9 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   for (let i = 0; i < n; i++) {
     if (!alive[i] || !isEngine(fns[i]) || !mounts[i]) continue;
     const nrm = mounts[i]!.dir, side = parts[i].facing;
-    const exhaust = side && !geoms[i].bespoke ? engineExhaust(geoms, i, side, standing ??= cellMap(geoms, (j) => alive[j])).share : 1;
+    // (A lane only opens as parts go: an engine that was clear still is, RebuildMemo)
+    const exhaust = !side || geoms[i].bespoke ? 1 : !input.fresh && (was ? was.exhaust.get(i) : wholeExhaust(D, i, side)) === 1 ? 1 : engineExhaust(geoms, i, side, standing ??= cellMap(geoms, (j) => alive[j])).share;
+    exhaustOf.set(i, exhaust);
     const mag = partThrust(catalog, fns[i], area[i], mats[i]) * satisfaction[i] * exhaust;
     thrustSum += mag;
     boostSum += mag * (fns[i].boost ?? 2.2);
@@ -508,7 +559,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
       muzzle,
       dir,
       mount,
-      window: mount === 'turret' ? computeTurretWindow(geoms, alive, i, dir, tuning, fns[i].mounting?.arc) : undefined,
+      window: mount === 'turret' ? turretWindow(i) : undefined,
     });
     // (What it draws firing flat out, by its firing model: an ammunition gun nothing, a clip gun its reloads, a spinning one spun up: energy.ts)
     weaponDraw += gunDrawFlatOut(weapons[weapons.length - 1], draw);
@@ -604,6 +655,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   // ---- (end power layout)
 
   const jump = jumpDriveStats(jumpCap, hullCells, jumpCap > 0 ? jumpGradeSum / jumpCap : 1, jt);
+  if (input.memo) input.memo.last = { design: D, tuning, alive: Uint8Array.from(alive, Number), turrets: turretRays, exhaust: exhaustOf };
 
   return {
     root,

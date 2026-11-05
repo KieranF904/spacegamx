@@ -17,7 +17,7 @@
 import { hasComponent } from 'bitecs';
 import {
   Position, Velocity, Rotation, Radius, Health, Player, Dead, InSystem, Blueprint, ShipState, Vec2,
-  validateBlueprint, ValidationResult, createShipState, rebuildShip, fillClips, damagePart, repairShip, healPart, restorePart,
+  validateBlueprint, ValidationResult, createShipState, splitRebuild, fillClips, damagePart, repairShip, healPart, restorePart,
   computeJoins, seededRng, hashInts, hpWire, debrisDecay, splitPose, splitRng, debrisSpin, debrisMotion, debrisBlueprint, debrisHash, shipPointToWorld, remapCharge, chargeTotal, fullPortsCharge, blueprintGeometry, recentreShift, flightSignature,
   type PlacedGeom,
 } from '@space-game/common';
@@ -380,9 +380,14 @@ export function rebuildNow(b: BridgeCtx, eid: number, ship: ShipState, derivable
   const before = ship.derived;
   const pose = b.pose(eid);
   const t0 = b.now();
-  rebuildShip(ship, b.catalog, b.tuning);
+  // What no longer joins breaks off, its parts detached, and the ship is rebuilt as what's left (common ships/state.ts
+  // splitRebuild: a split counts as two rebuilds, the split's and what's left's)
+  let gone: boolean | undefined;
+  const groups = splitRebuild(ship, b.catalog, b.tuning, (rebuilds, d) => {
+    gone ??= d.root < 0;
+    b.debrisNet.noteCom(eid, rebuilds, d.com);
+  });
   b.noteRebuild(t0);
-  b.debrisNet.noteCom(eid, ship.rebuilds, ship.derived.com);
   // (A piece of debris that lost a part before its time: not its crumbling, so its clients are told it from now on)
   if (ship.kind === 'debris' && !b.debrisNet.told.has(eid)) {
     const at = b.decayAt.get(eid), tick = b.host.getTick();
@@ -393,7 +398,6 @@ export function rebuildNow(b: BridgeCtx, eid: number, ship: ShipState, derivable
   // that's everything)
   const sheds = b.debrisNet.sheds.get(eid) ?? [];
   b.debrisNet.sheds.delete(eid);
-  const groups = ship.derived.orphanGroups;
   if (groups.length || sheds.length) {
     let k = 0;
     const ids: number[] = [];
@@ -407,13 +411,8 @@ export function rebuildNow(b: BridgeCtx, eid: number, ship: ShipState, derivable
       // what its clients had of it this window may never come right), and to a pilot of its own ship's)
       const at = splitPose(pose.x, pose.y, pose.angle, Velocity.x[eid], Velocity.y[eid], ship.angVel);
       const all = [...sheds.flatMap((s) => s.groups), ...groups.map((g) => [...g])];
-      b.debrisNet.noteSplit(eid, { ship, tick: b.host.getTick(), com: oldCom, ids, groups: all, parts, sheds: sheds.length ? sheds : undefined, pose: at, gone: ship.derived.root < 0, hp: all.map((g) => g.map((i) => hpWire(ship.hp[i]))) });
+      b.debrisNet.noteSplit(eid, { ship, tick: b.host.getTick(), com: oldCom, ids, groups: all, parts, sheds: sheds.length ? sheds : undefined, pose: at, gone: gone!, hp: all.map((g) => g.map((i) => hpWire(ship.hp[i]))) });
       for (const d of ids) { const sp = b.bodies.get(d); if (sp) b.debrisNet.spawns.set(d, { hash: debrisHash(b.readBody(d, sp)), rebuilds: sp.rebuilds }); }
-    }
-    for (const g of groups) for (const i of g) ship.detached[i] = true;
-    if (groups.length) {
-      rebuildShip(ship, b.catalog, b.tuning);
-      b.debrisNet.noteCom(eid, ship.rebuilds, ship.derived.com);
     }
   }
   b.structLog.note(eid, ship, b.host.systemTick?.(eid) ?? b.host.getTick());

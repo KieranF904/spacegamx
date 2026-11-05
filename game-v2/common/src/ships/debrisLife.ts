@@ -9,7 +9,7 @@
  *             no longer joins breaks off as pieces of its own, and what's left is recentred where it was
  */
 import { hashInts, seededRng } from './rng.js';
-import { damagePart, rebuildShip, type ShipState } from './state.js';
+import { damagePart, splitRebuild, type ShipState } from './state.js';
 import type { Catalog } from './catalog.js';
 import type { ShipTuning } from './tuning.js';
 
@@ -35,11 +35,5 @@ export function crumblingParts(ship: ShipState, decay: readonly number[], tick: 
  */
 export function crumbleRebuild(ship: ShipState, parts: readonly number[], catalog: Catalog, tuning: ShipTuning): number[][] {
   for (const i of parts) damagePart(ship, i, Infinity, tuning);
-  rebuildShip(ship, catalog, tuning);
-  const groups = ship.derived.orphanGroups.map((g) => [...g]);
-  if (groups.length) {
-    for (const g of groups) for (const i of g) ship.detached[i] = true;
-    rebuildShip(ship, catalog, tuning);
-  }
-  return groups;
+  return splitRebuild(ship, catalog, tuning);
 }

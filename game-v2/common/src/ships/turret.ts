@@ -33,42 +33,13 @@ export interface TurretWindow {
   barrel: number;
 }
 
-export function computeTurretWindow(
-  geoms: PlacedGeom[],
-  alive: boolean[],
-  self: number,
-  facing: Side | Vec2,
-  tuning: ShipTuning,
-  /** Its traverse (degrees, centred on its facing): a model's mounting arc (ships/mounting.ts). Default the tuning's */
-  arcDeg?: number,
-): TurretWindow {
-  const t = tuning.turret;
-  const halfDeg = arcDeg !== undefined ? Math.max(0.5, Math.min(180, arcDeg / 2)) : t.halfArcDeg;
-  // (A grid part's facing side, or a bespoke mount's direction)
-  const n = typeof facing === 'string' ? SIDE_NORMAL[facing] : facing;
-  const center = datan2(n[1], n[0]);
-  const half = halfDeg * DEG;
-  const g = geoms[self];
-  const pivot = g.centroid;
-  let barrel = 0;
-  for (const p of g.polygon) barrel = Math.max(barrel, dhypot(p[0] - pivot[0], p[1] - pivot[1]));
-  barrel += t.barrelMargin;
+/** Each part's bounding circle round its shrunk pieces, a hair larger (cr -1: it has none) */
+export interface PartCircles { cx: Float64Array; cy: Float64Array; cr: Float64Array }
 
-  // Long enough to clear the whole ship
-  let reach = 1;
-  for (let i = 0; i < geoms.length; i++) {
-    if (!alive[i]) continue;
-    for (const p of geoms[i].polygon) reach = Math.max(reach, dhypot(p[0] - pivot[0], p[1] - pivot[1]) + 1);
-  }
-
-  // Each other live part's bounding circle (round its shrunk pieces, a hair larger): a ray that
-  // misses it can't enter any of them, so most parts are passed over without clipping
-  const cx: number[] = [], cy: number[] = [], cr: number[] = [];
-  for (let i = 0; i < geoms.length; i++) {
-    cx.push(0); cy.push(0); cr.push(-1);
-    if (i === self || !alive[i]) continue;
-    // (The part it sits on doesn't block it: a turret rides above the hull, as a bespoke one sat on a plate does)
-    if (geoms[i].convexShrunk.some((c) => pointInConvex(c, pivot[0], pivot[1]))) continue;
+/** A ray that misses a part's circle can't enter any of its pieces, so most parts are passed over without clipping */
+export function partCircles(geoms: readonly PlacedGeom[]): PartCircles {
+  const n = geoms.length, cx = new Float64Array(n), cy = new Float64Array(n), cr = new Float64Array(n).fill(-1);
+  for (let i = 0; i < n; i++) {
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const c of geoms[i].convexShrunk) for (const p of c) {
       if (p[0] < x0) x0 = p[0];
@@ -80,37 +51,146 @@ export function computeTurretWindow(
     cx[i] = (x0 + x1) / 2; cy[i] = (y0 + y1) / 2;
     cr[i] = dhypot(x1 - x0, y1 - y0) / 2 + 1e-6;
   }
+  return { cx, cy, cr };
+}
 
+/** What a turret's window is cast from that its design fixes (design.ts keeps one per turret) */
+export interface TurretFrame {
+  center: number;
+  half: number;
+  pivot: Vec2;
+  barrel: number;
+  /** Rays are cast at steps + 1 angles across the base window: each one's cos and sin */
+  steps: number;
+  ca: Float64Array;
+  sa: Float64Array;
+  /** Parts that never block it: itself, and the part it sits on (a turret rides above the hull, as a bespoke one sat on a plate does) */
+  skip: Uint8Array;
+  /** Per part, how far its outline reaches from the pivot, plus one (a ray must clear the whole ship) */
+  reachOf: Float64Array;
+  circles: PartCircles;
+}
+
+export function turretFrame(
+  geoms: readonly PlacedGeom[],
+  self: number,
+  facing: Side | Vec2,
+  tuning: ShipTuning,
+  /** Its traverse (degrees, centred on its facing): a model's mounting arc (ships/mounting.ts). Default the tuning's */
+  arcDeg: number | undefined,
+  circles: PartCircles = partCircles(geoms),
+): TurretFrame {
+  const t = tuning.turret;
+  const halfDeg = arcDeg !== undefined ? Math.max(0.5, Math.min(180, arcDeg / 2)) : t.halfArcDeg;
+  // (A grid part's facing side, or a bespoke mount's direction)
+  const n = typeof facing === 'string' ? SIDE_NORMAL[facing] : facing;
+  const center = datan2(n[1], n[0]);
+  const half = halfDeg * DEG;
+  const g = geoms[self];
+  const pivot = g.centroid;
+  let barrel = 0;
+  for (const p of g.polygon) barrel = Math.max(barrel, dhypot(p[0] - pivot[0], p[1] - pivot[1]));
+  barrel += t.barrelMargin;
   const steps = Math.max(1, Math.round((2 * halfDeg) / t.sampleDeg));
-  const free: boolean[] = [];
+  const ca = new Float64Array(steps + 1), sa = new Float64Array(steps + 1);
   for (let k = 0; k <= steps; k++) {
     const a = center - half + (k / steps) * 2 * half;
-    const ca = dcos(a), sa = dsin(a);
-    const x1 = pivot[0] + ca * reach, y1 = pivot[1] + sa * reach;
-    let blocked = false;
-    for (let i = 0; i < geoms.length && !blocked; i++) {
-      if (i === self || !alive[i]) continue;
-      const ox = cx[i] - pivot[0], oy = cy[i] - pivot[1], r = cr[i];
-      if (r < 0 || Math.abs(ox * sa - oy * ca) > r || ox * ca + oy * sa < -r) continue;
-      // Shrunk pieces, so parts that merely touch the turret don't count as cover
-      for (const c of geoms[i].convexShrunk) {
-        if (segmentConvexEntry(c, pivot[0], pivot[1], x1, y1) !== null) { blocked = true; break; }
-      }
-    }
-    free.push(!blocked);
+    ca[k] = dcos(a); sa[k] = dsin(a);
   }
+  const N = geoms.length, skip = new Uint8Array(N), reachOf = new Float64Array(N).fill(-Infinity);
+  for (let i = 0; i < N; i++) {
+    for (const p of geoms[i].polygon) reachOf[i] = Math.max(reachOf[i], dhypot(p[0] - pivot[0], p[1] - pivot[1]) + 1);
+    if (i === self || geoms[i].convexShrunk.some((c) => pointInConvex(c, pivot[0], pivot[1]))) skip[i] = 1;
+  }
+  return { center, half, pivot, barrel, steps, ca, sa, skip, reachOf, circles };
+}
 
+/**
+ * A turret's window as cast, and per ray the part that closed it (-1: open). rebuild.ts keeps it from one rebuild to the
+ * next: losing parts can only open rays, so after a rebuild where parts only went away (castTurret's `prev`), a window
+ * already wide open stays as it is, and only the rays whose blocker went are cast again.
+ */
+export interface TurretRays {
+  win: TurretWindow;
+  reach: number;
+  blocker: Int32Array;
+  /** Rays closed */
+  closed: number;
+}
+
+/** Ray k cast `reach` long: does part j block it? (Shrunk pieces, so parts that merely touch the turret don't count as cover) */
+function rayBlockedBy(f: TurretFrame, geoms: readonly PlacedGeom[], j: number, k: number, reach: number): boolean {
+  const { pivot, circles } = f, ca = f.ca[k], sa = f.sa[k];
+  const ox = circles.cx[j] - pivot[0], oy = circles.cy[j] - pivot[1], r = circles.cr[j];
+  if (r < 0 || Math.abs(ox * sa - oy * ca) > r || ox * ca + oy * sa < -r) return false;
+  const x1 = pivot[0] + ca * reach, y1 = pivot[1] + sa * reach;
+  for (const c of geoms[j].convexShrunk) if (segmentConvexEntry(c, pivot[0], pivot[1], x1, y1) !== null) return true;
+  return false;
+}
+
+/** The first live part (in part order) that blocks ray k, -1 none */
+function firstBlocker(f: TurretFrame, geoms: readonly PlacedGeom[], alive: readonly boolean[], k: number, reach: number): number {
+  for (let j = 0; j < geoms.length; j++) {
+    if (f.skip[j] || !alive[j]) continue;
+    if (rayBlockedBy(f, geoms, j, k, reach)) return j;
+  }
+  return -1;
+}
+
+function windowOf(f: TurretFrame, blocker: Int32Array): TurretWindow {
+  const { steps, half } = f;
   const open: [number, number][] = [];
   let start = -1;
   for (let k = 0; k <= steps + 1; k++) {
-    const isFree = k <= steps && free[k];
+    const isFree = k <= steps && blocker[k] < 0;
     if (isFree && start < 0) start = k;
     if (!isFree && start >= 0) {
       open.push([-half + (start / steps) * 2 * half, -half + ((k - 1) / steps) * 2 * half]);
       start = -1;
     }
   }
-  return { center, half, open, pivot, barrel };
+  return { center: f.center, half, open, pivot: f.pivot, barrel: f.barrel };
+}
+
+/**
+ * Cast a turret's window among the live parts. `prev`: its rays from the last rebuild, of the same design, when every
+ * part alive now was alive then (rebuild.ts checks that); without it, every ray is cast.
+ */
+export function castTurret(f: TurretFrame, geoms: readonly PlacedGeom[], alive: readonly boolean[], prev?: TurretRays): TurretRays {
+  // (A window wide open stays so: parts going can't close a ray)
+  if (prev && prev.closed === 0) return prev;
+  // Long enough to clear the whole ship
+  let reach = 1;
+  for (let j = 0; j < geoms.length; j++) if (alive[j] && f.reachOf[j] > reach) reach = f.reachOf[j];
+  const blocker = new Int32Array(f.steps + 1);
+  let closed = 0, opened = false;
+  for (let k = 0; k <= f.steps; k++) {
+    let b: number;
+    if (!prev) b = firstBlocker(f, geoms, alive, k, reach);
+    else {
+      const was = prev.blocker[k];
+      if (was < 0) b = -1;
+      // (Its blocker's still there: still closed. A ray cast shorter is checked against it again)
+      else if (alive[was] && (reach === prev.reach || rayBlockedBy(f, geoms, was, k, reach))) b = was;
+      else { b = firstBlocker(f, geoms, alive, k, reach); if (b < 0) opened = true; }
+    }
+    blocker[k] = b;
+    if (b >= 0) closed++;
+  }
+  return { win: prev && !opened ? prev.win : windowOf(f, blocker), reach, blocker, closed };
+}
+
+/** A turret's window among the live parts, every ray cast (rebuild.ts keeps its rays from one rebuild to the next: castTurret) */
+export function computeTurretWindow(
+  geoms: PlacedGeom[],
+  alive: boolean[],
+  self: number,
+  facing: Side | Vec2,
+  tuning: ShipTuning,
+  /** Its traverse (degrees, centred on its facing): a model's mounting arc (ships/mounting.ts). Default the tuning's */
+  arcDeg?: number,
+): TurretWindow {
+  return castTurret(turretFrame(geoms, self, facing, tuning, arcDeg), geoms, alive).win;
 }
 
 export function wrapPi(a: number): number {

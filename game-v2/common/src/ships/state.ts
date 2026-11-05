@@ -7,8 +7,9 @@ import type { Blueprint } from './types.js';
 import type { Catalog } from './catalog.js';
 import type { ShipTuning } from './tuning.js';
 import { partMaxHp } from './blueprint.js';
-import { ShipDerived, rebuild } from './rebuild.js';
-import { shedGroup } from './groups.js';
+import { type RebuildMemo, ShipDerived, rebuild, structureOf } from './rebuild.js';
+import { hasGroups, shedGroup } from './groups.js';
+import { designOf } from './design.js';
 
 export interface ShipState {
   /** Engine entity id */
@@ -77,6 +78,18 @@ export interface ShipState {
   /** The trigger was held last tick, and the tick of the latest click not yet spent on a semi-automatic shot (guns.ts) */
   triggerHeld: boolean;
   clickAt: number;
+  /**
+   * What its last rebuild kept for the next one (rebuild.ts RebuildMemo): only saves work, never changes a result. Not
+   * state: not enumerable, so never copied, sent, hashed or compared
+   */
+  readonly memo?: RebuildMemo;
+}
+
+function memoOf(state: ShipState): RebuildMemo {
+  if (state.memo) return state.memo;
+  const memo: RebuildMemo = {};
+  Object.defineProperty(state, 'memo', { value: memo, enumerable: false, writable: false, configurable: true });
+  return memo;
 }
 
 export function rebuildShip(state: ShipState, catalog: Catalog, tuning: ShipTuning): void {
@@ -90,6 +103,7 @@ export function rebuildShip(state: ShipState, catalog: Catalog, tuning: ShipTuni
     detached: state.detached,
     ghost: state.ghost,
     rootMode: state.kind === 'ship' ? 'core' : 'largest',
+    memo: memoOf(state),
   });
   state.rebuildHp = [...state.hp];
   state.dirty = false;
@@ -104,6 +118,39 @@ export function rebuildShip(state: ShipState, catalog: Catalog, tuning: ShipTuni
       state.spin[w.part] = 0;
     }
   }
+}
+
+/**
+ * The rebuild point's rebuild (the server's ShipBridge rebuildNow, a client's crumbling debris): what no longer joins
+ * the root breaks off (its parts detached), and the ship is rebuilt as what's left. Returns the groups that broke off, in
+ * the order their pieces spawn. `rebuilt`: told each rebuild it counts, with the structure as of that one.
+ *
+ * A split counts as two rebuilds, as it always has: the split (the groups still on it, joined to nothing), then what's
+ * left. Both have the same live parts (so the same root and centre of mass), so the groups are found first
+ * (structureOf) and the ship is built once, as what's left. A design whose parts break by groups (groups.ts) is still
+ * built twice: a group's part breaking off takes the rest of its group, which changes what's left.
+ */
+export function splitRebuild(state: ShipState, catalog: Catalog, tuning: ShipTuning, rebuilt?: (rebuilds: number, derived: ShipDerived) => void): number[][] {
+  if (hasGroups(state.blueprint)) {
+    rebuildShip(state, catalog, tuning);
+    rebuilt?.(state.rebuilds, state.derived);
+    const groups = state.derived.orphanGroups.map((g) => [...g]);
+    if (groups.length) {
+      for (const g of groups) for (const i of g) state.detached[i] = true;
+      rebuildShip(state, catalog, tuning);
+      rebuilt?.(state.rebuilds, state.derived);
+    }
+    return groups;
+  }
+  const groups = structureOf(state.blueprint, state.hp, state.detached, state.kind === 'ship' ? 'core' : 'largest', designOf(catalog, state.blueprint).joins).orphanGroups;
+  for (const g of groups) for (const i of g) state.detached[i] = true;
+  rebuildShip(state, catalog, tuning);
+  if (groups.length) {
+    rebuilt?.(state.rebuilds, state.derived);
+    state.rebuilds++;
+  }
+  rebuilt?.(state.rebuilds, state.derived);
+  return groups;
 }
 
 export function createShipState(
