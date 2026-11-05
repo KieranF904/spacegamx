@@ -13,6 +13,7 @@ How the game gets onto the user's shared VPS (space.brotherk3d.com), how it is b
 | `scripts/notify.mjs` | | Pushover: `node --env-file=.env scripts/notify.mjs "Title" "Message"` (`PUSHOVER_TOKEN`/`PUSHOVER_USER` in `game-v2/.env`) |
 | `scripts/contributor-notes.mjs` | | Reads map notes from the live VPS (`/opt/spacegame/data/contributor`) over ssh; `--author`, `--mark-done <id> --note ".."`; needs `npm run build:common` first; docs `docs/contributor-notes.md` |
 | `scripts/db/{migrateJsonToPostgres.ts,vps-sync.sh}` | | JSON to Postgres copy/verify (`--dry-run|--verify-only|--replace`); docs `docs/ops/postgres-migration.md` |
+| `scripts/db/{shipWipe.ts,vps-shipwipe.sh}` | | The v5 ship wipe over every profile in Postgres (`--dry-run|--apply`; `--game-data`): `migrateProfile` with the game's starter kit and economy, one JSON row per player plus totals. Steps below (How to extend 8) |
 | `scripts/render/{render,daemon,daemonClient,cdp}.mjs`, `scripts/native-render/*` | | Stills. `npm run render -- ship:sparrow-t --out x.png` uses the native renderer (Node + Python/OpenGL service, port 5311, no browser, `--list`, `--status`, `--stop`); `--browser` uses the render daemon (`npm run render-daemon`), one headless Chrome |
 | `scripts/shipgen/*`, `data/shipgen/roles.json` | | Ship design generator on the owner's local LLMs (Ollama :11434; LM Studio :1234 with `LM_API_TOKEN` is list-only unless `LMSTUDIO_CHAT=1` or the page toggle, since asking it loads the model). Page: `npm run shipgen` then http://127.0.0.1:5320/. Headless: `npx tsx scripts/shipgen/cli.ts --list` / `--model gemma4:12b --role starter --rounds 5` / `--mode compare --models a,b --trials 3` / `--build staged` (skeleton, then power, guns, engines, armour); mirror mode on by default (`--no-mirror`), `--contract auto|grid-text|grid-json|parts` (auto: per-model table in `loop/modelPrefs.ts`). Everything (parts, rules, power, tiers) is read from the game; only `roles.json` is hand-written. Output in `scripts/shipgen/out/` (gitignored). Trial results: `scripts/shipgen/TRIAL.md`. A concept step (a short plan the model writes first, kept in later prompts; `--no-concept` skips it, checkbox on the page) and an overnight batch mode: `--mode batch --model <id> [--roles a,b] [--build auto|staged|oneshot] [--out dir] [--stop-file path] [--max-ships N] [--notify-every-mins 60] [--ship-minutes 45]` loops over the roles, refines each valid on-brief ship with evolve, saves it under `<out>/<role>/<NNN>-<slug>/` and rewrites `summary.json` and a static `index.html` gallery (`loop/batch.ts`). Fixes from the 2026-11-01 audit (`docs/audits/shipgen-audit-2026-11-01.md`) are in: a short prompt, truncation detection, a shape step in the staged build and a silhouette score |
 | `scripts/boss-shots/shoot.mjs` | | Live-game screenshots via DevTools in a tab leased from the daemon's Chrome: `node shoot.mjs <url> <outPrefix> [steps json|@file]` |
@@ -48,6 +49,26 @@ How the game gets onto the user's shared VPS (space.brotherk3d.com), how it is b
 5. **Add a bench/profiler**: `server/src/bench/<x>Bench.ts` (copy `tickBench.ts` header and flags); register an npm script in `server/package.json` if it should be routine.
 6. **Fetch contributor notes**: `node scripts/contributor-notes.mjs --author <name>`; after implementing `--mark-done <id> --note "..."`.
 7. **Postgres re-sync / switch**: `scripts/db/vps-sync.sh --verify-only|--dry-run|--replace`; full steps in `docs/ops/postgres-migration.md`.
+8. **v5 ship wipe** (PROFILE_VERSION 5, `common/src/econ/profile.ts` `migrateProfileShips`; owner's call, 2026-11). Every ship goes: hangar slots (the active one too), designs, roster, wreck marker, ship loadouts; each record's built parts come back to storage as raw materials in full (`salvageParts` at 1) plus its socketed gems (nothing for a loaner, a ghost part or a part at 0 HP; a lost ship only what was rebuilt; the free stock Sparrow T only the parts beyond the starter's). Each pilot gets a fresh starter (the release's `sparrow-t`) in slot 1, at home, hold moved to storage, rebuild debt forgiven, `plan:*` items dropped, plans trimmed to `sparrow-t` (+ `prospector` if known), ship-bound fabricator jobs detached (kept, for storage), and a one-time login toast listing the refund. Logins, levels, credits, storage, quests, reputation and skills stay; a job at main_02's build/fly step goes back to its "start the Prospector" step at login (`Quests.rewindShipSteps`). The game runs the same migration on any save below v5 at login, so anyone the bulk run misses is wiped when they next sign in. Run it with the deploy, as root on the VPS unless noted:
+   ```bash
+   # 1. Before the deploy, with the old release still installed: stop the game server (it saves every pilot as it stops)
+   systemctl stop spacegame-server
+   # 2. Backups, while every save is still v4: a dump of the two tables, and a copy of profiles inside the database
+   ( set -a; . /etc/spacegame/secrets.env; set +a
+     umask 077; d=/opt/spacegame/data/backups/db; mkdir -p "$d"
+     pg_dump --no-owner -t profiles -t game_docs "$DATABASE_URL" | gzip > "$d/pre-shipwipe-$(date +%Y%m%d-%H%M%S).sql.gz"
+     psql "$DATABASE_URL" -c 'CREATE TABLE profiles_pre_shipwipe AS SELECT * FROM profiles' )
+   # 3. From game-v2/ on this machine: deploy (bash deploy/vps/deploy.sh). It installs /opt/spacegame/data with the new
+   #    starter and starts the server again: stop it straight away (anyone who signed in meanwhile was wiped at login,
+   #    by the same migration, and is skipped below)
+   systemctl stop spacegame-server                      # a running server saves over what the wipe writes
+   # 4. From game-v2/ on this machine: look, then apply (one transaction; rows at v5 skipped; reports kept in /root/ship-wipe)
+   scripts/db/vps-shipwipe.sh --dry-run
+   scripts/db/vps-shipwipe.sh --apply
+   # 5. Start the game server again
+   systemctl start spacegame-server
+   ```
+   (The `pg_dump`/`psql` lines put the URL on a command line for the moment they run: fine on this box as root with no other users signed in; otherwise use the PG* + PGPASSFILE shape of `deploy/vps/spacegame-dbdump.sh`.) Undo before anyone plays: `systemctl stop spacegame-server`, then `psql "$DATABASE_URL" -c 'BEGIN; DELETE FROM profiles; INSERT INTO profiles SELECT * FROM profiles_pre_shipwipe; COMMIT'` and deploy the previous release (`deploy.sh rollback`), or the v4 saves are wiped again at login. Drop `profiles_pre_shipwipe` once the update has settled. Locally: `DATABASE_URL=... npx tsx scripts/db/shipWipe.ts --dry-run` (default game data: this repo's `data/`).
 
 ## Tests
 - `npx vitest run` from `game-v2/` (root config includes common, server, client, server-browser, site, `scripts/db` tests; heap raised to 6 GB, each server test loads all systems so it is heavy).

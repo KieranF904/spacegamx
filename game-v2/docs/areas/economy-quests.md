@@ -13,7 +13,7 @@ Everything a pilot owns and earns: the item catalogue and recipes, cargo/storage
 | common/src/econ/stacks.ts | 90 | `Stack`, `Bag`, `addTo/removeFrom/hasAll/removeAll/shortfall`, `secureHold` |
 | common/src/econ/market.ts | 196 | prices (`sellPrice/buyPrice/unitSellPrice/saleTotal`), saturation and demand shifts, licences (`partLicensed`, `canCraft`), `queueSlots`, vendor prices |
 | common/src/econ/quests.ts | 628 | `QuestDef`/`QuestStep` union (step kinds), generated bounties and fleet jobs (`bountyDef`, `fleetDef`), reputation ranks, skills (`SKILLS`, `giveSkillPoints`) |
-| common/src/econ/profile.ts, retired.ts | 381/57 | `PlayerProfile`, `PROFILE_VERSION` (4), `newProfile`, `migrateProfile`, `migrateProfileParts`; retired schematics cleanup |
+| common/src/econ/profile.ts, retired.ts | 381/57 | `PlayerProfile`, `PROFILE_VERSION` (5), `starterKit`, `newProfile`, `migrateProfile`, `migrateProfileParts` (v4), `migrateProfileShips` (v5 ship wipe: every ship broken down into storage, a fresh starter; bulk run `scripts/db/shipWipe.ts`), `notices` (one-time login toasts); retired schematics cleanup |
 | common/src/econ/salvage.ts, hangar.ts, loadout.ts, orders.ts | | salvage fractions (`SALVAGE` 0.7, `salvageParts`, `placeCost`), hangar slots, ammo loadouts, fabrication order planning (`planOrders`) |
 | common/src/econ/outpost.ts, mining.ts, traces.ts, gems.ts, levels.ts, unlocks.ts, ribbons.ts, dialogue.ts, codex.ts, track.ts | | outpost tracks, mining yield, rare traces, gem cuts, XP curve, level unlocks, ribbon defs, dialogue shapes, codex, the unlock track |
 | common/src/network/econProtocol.ts | 381 | every economy/quest/station message (see networking.md) |
@@ -30,7 +30,7 @@ Everything a pilot owns and earns: the item catalogue and recipes, cargo/storage
 - Quests (server): `quests.onKill(conn, enemy, faction, system)`, `acceptFrom`, `opCount/opAdvance/fail`, `canEnter(conn, systemId)` (sector licences).
 - Pods: `pods.spawn/scatter/take/near`; Towing: `towDelivered(pilot, target, kind)` in game/Derelicts.ts (GameServer calls it); Support: `support.note(healer, target, hp, now)`, `supporters(target, now)`.
 - Kill pay: `Enemies.onDestroyed` (game/Enemies.ts ~l.1255): `faction.ships[type].xp/credits` x `gradeReward` (xp) and x `rules.gradeCredits[grade-1]` (credits), elite x `rules.eliteLoot`, party members 0.75 xp / 0.4 credits within `PARTY_SHARE_RANGE`, supporters (Support ledger) paid like party but without job credit. Bosses: Bosses.onDestroyed.
-- Profile persistence: `PlayerProfile`, `migrateProfile(raw, kit, catalog)`; stores in server-core.md.
+- Profile persistence: `PlayerProfile`, `migrateProfile(raw, kit, catalog, { econ })` (without `catalog` a pre-v4 save waits, without `econ` a pre-v5 one); stores in server-core.md.
 
 ## Invariants
 - The server is the only authority: every economy message is a request, checked (docked/in range? licence? goods held? room?) and answered with new state. The client never changes inventory.

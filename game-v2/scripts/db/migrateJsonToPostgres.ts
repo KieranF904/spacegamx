@@ -36,7 +36,7 @@ import type { SessionRecord, UserRecord } from '../../server-browser/src/account
 import { JsonProfileStore } from '../../server/src/profile/JsonProfileStore.js';
 import { PostgresProfileStore } from '../../server/src/profile/PostgresProfileStore.js';
 import { loadShipConfigFromDisk } from '../../server/src/ships/loadShipConfig.js';
-import { loadCatalog, migrateProfile, type Catalog, type StarterKit } from '../../common/src/index.js';
+import { loadCatalog, migrateProfile, starterKit, type Catalog, type StarterKit } from '../../common/src/index.js';
 
 // ============================================================
 // The JSON side
@@ -321,15 +321,8 @@ export interface Normaliser { kit: StarterKit; catalog: Catalog }
 export function loadNormaliser(gameDataDir: string): Normaliser {
   const cfg = loadShipConfigFromDisk(gameDataDir);
   const catalog = loadCatalog(cfg.catalog, { overlapShrink: cfg.tuning.overlapShrink });
-  // (GameServer.starterKit(): kept in step by hand; it only fills fields a save is missing)
-  const kit: StarterKit = {
-    blueprint: cfg.starter,
-    planFile: 'sparrow-t',
-    credits: 300,
-    storage: { iron_ore: 40, nickel_ore: 20, silicate: 20, copper_ore: 10, alloy_plate: 14, copper_wire: 6, repair_kit: 2, boost_cell: 2 },
-    home: 'sol_station_central',
-    position: { system: 'sol', x: 0, y: 0 },
-  };
+  // (GameServer.starterKit(): the same kit around the same starter)
+  const kit: StarterKit = starterKit(cfg.starter);
   return { kit, catalog };
 }
 
