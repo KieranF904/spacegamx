@@ -500,7 +500,7 @@ describe('energy: proportional sharing (Kieran, 2026-11-04)', () => {
 });
 
 describe('engines with no boost (Vernier, Torch)', () => {
-  /** A ship with the engine under the hull; the tri piece is turned and faced until it has a mount */
+  /** A ship with the engine under the hull; the tri piece is turned and faced until it has a mount with a clear exhaust */
   const withEngine = (fn: string, piece: string): ShipDerived => {
     const bases = [p(20, 'sq', 'hull', 2, 1), p(21, 'sq', 'hull', 0, 1), p(22, 'sq', 'hull', 1, 1)];
     for (const rot of [0, 1, 2, 3] as Rot[]) for (const facing of ['N', 'E', 'S', 'W'] as const) {
@@ -508,7 +508,8 @@ describe('engines with no boost (Vernier, Torch)', () => {
       b.parts = b.parts.filter((q) => q.fn !== 'engine_ion_drive' && q.fn !== 'hull');
       b.parts.push(...bases, piece === 'tri' ? p(23, piece, fn, 2, 2, { facing, rot }) : p(23, piece, fn, 0, 2, { facing: 'S' }));
       const d = createShipState(catalog, tuning, 1, b, 0).derived;
-      if (d.thrusters.length === 1 && d.thrusters[0].part >= 0) return d;
+      // (and its exhaust out of the ship, not into the hull: mounting.ts engineExhaust)
+      if (d.thrusters.length === 1 && d.thrusters[0].part >= 0 && (d.thrusters[0].force[0] || d.thrusters[0].force[1])) return d;
     }
     throw new Error('no mount for ' + fn);
   };
