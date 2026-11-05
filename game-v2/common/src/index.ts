@@ -71,6 +71,3 @@ export * from './bosses/index.js';
 export * from './guidance/index.js';
 // The sim foundation: one deterministic ship stepper, its events, inputs, timeline, state ring (sim/index.ts)
 export * from './sim/index.js';
-// (Stage 1A's caller adapters: SimShipView, pilotInput, aimQ; sim/index.ts is a frozen contract file, so here)
-export * from './sim/a-adapt.js';
-export * from './sim/c-index.js';
