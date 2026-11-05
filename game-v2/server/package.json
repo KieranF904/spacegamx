@@ -8,7 +8,8 @@
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "bench:net": "tsx src/bench/netBench.ts",
-    "bench:crowd": "tsx src/bench/crowdBench.ts"
+    "bench:crowd": "tsx src/bench/crowdBench.ts",
+    "bench:table": "tsx --tsconfig ../scripts/net/tsconfig.json src/bench/netTable.ts"
   },
   "dependencies": {
     "@space-game/common": "file:../common",

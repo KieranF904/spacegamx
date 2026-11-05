@@ -1,0 +1,813 @@
+{
+ "method": "server/src/bench/netTable.ts, the same file on each build",
+ "builds": {
+  "nov3": {
+   "commit": "3eeec9d",
+   "results": [
+    {
+     "scenario": "idle",
+     "label": "Idle in Sol (Sparrow T parked, alone)",
+     "secs": 20,
+     "protocol": 24,
+     "caps": 0,
+     "client": "plain socket",
+     "payloadBps": 1579,
+     "wsMsgsPerSec": 16.45,
+     "wireBps": 2664,
+     "upBps": 0,
+     "upMsgsPerSec": 0,
+     "msPerTick": 0.232,
+     "notes": [],
+     "byType": {
+      "snapshot": 1533,
+      "contact": 9,
+      "toast": 6,
+      "shipSync": 6,
+      "damage": 5,
+      "playerState": 2
+     }
+    },
+    {
+     "scenario": "cruise",
+     "label": "Cruise (Sparrow T flying 24 km legs, alone)",
+     "secs": 20,
+     "protocol": 24,
+     "caps": 0,
+     "client": "plain socket",
+     "payloadBps": 1641,
+     "wsMsgsPerSec": 16.4,
+     "wireBps": 2724,
+     "upBps": 280,
+     "upMsgsPerSec": 25.45,
+     "msPerTick": 0.301,
+     "notes": [],
+     "byType": {
+      "snapshot": 1575,
+      "shipSync": 16,
+      "contact": 14,
+      "damage": 9,
+      "toast": 6,
+      "shipHps": 3
+     }
+    },
+    {
+     "scenario": "crowd-20",
+     "label": "Crowd cruise, 20 pilots",
+     "secs": 15,
+     "protocol": 24,
+     "caps": 0,
+     "client": "plain socket",
+     "payloadBps": 6293,
+     "wsMsgsPerSec": 20,
+     "wireBps": 7613,
+     "upBps": 290,
+     "upMsgsPerSec": 26.4,
+     "msPerTick": 0.846,
+     "notes": [
+      "mean of 2 pilots"
+     ],
+     "byType": {
+      "snapshot": 6151,
+      "shipSync": 102,
+      "toast": 8,
+      "damage": 4,
+      "contact": 4,
+      "partDestroyed": 2
+     }
+    },
+    {
+     "scenario": "crowd-50",
+     "label": "Crowd cruise, 50 pilots",
+     "secs": 15,
+     "protocol": 24,
+     "caps": 0,
+     "client": "plain socket",
+     "payloadBps": 9146,
+     "wsMsgsPerSec": 20,
+     "wireBps": 10466,
+     "upBps": 246,
+     "upMsgsPerSec": 22.4,
+     "msPerTick": 1.645,
+     "notes": [
+      "mean of 2 pilots"
+     ],
+     "byType": {
+      "snapshot": 8970,
+      "shipSync": 131,
+      "toast": 8,
+      "damage": 5,
+      "contact": 5,
+      "partDestroyed": 5
+     }
+    },
+    {
+     "scenario": "crowd-100",
+     "label": "Crowd cruise, 100 pilots",
+     "secs": 15,
+     "protocol": 24,
+     "caps": 0,
+     "client": "plain socket",
+     "payloadBps": 10313,
+     "wsMsgsPerSec": 20.53,
+     "wireBps": 11668,
+     "upBps": 198,
+     "upMsgsPerSec": 18,
+     "msPerTick": 3.952,
+     "notes": [
+      "mean of 2 pilots"
+     ],
+     "byType": {
+      "snapshot": 9741,
+      "shipSync": 176,
+      "bossIntro": 154,
+      "damage": 74,
+      "detonation": 49,
+      "projectileHit": 47
+     }
+    },
+    {
+     "scenario": "rock-starter",
+     "label": "Starter (Sparrow T, 2 Pips) firing at a rock",
+     "secs": 20,
+     "protocol": 24,
+     "caps": 0,
+     "client": "plain socket",
+     "payloadBps": 953,
+     "wsMsgsPerSec": 16.7,
+     "wireBps": 2056,
+     "upBps": 80,
+     "upMsgsPerSec": 7.25,
+     "msPerTick": 0.853,
+     "notes": [
+      "rock size 88.92827606201172",
+      "firing 100% of ticks"
+     ],
+     "byType": {
+      "snapshot": 604,
+      "effect": 157,
+      "projectileHit": 68,
+      "items": 42,
+      "profile": 40,
+      "gained": 11
+     }
+    },
+    {
+     "scenario": "rock-gale",
+     "label": "Gale (2 Sparks, 2 Chainsaws) firing at a rock",
+     "secs": 20,
+     "protocol": 24,
+     "caps": 0,
+     "client": "plain socket",
+     "payloadBps": 2198,
+     "wsMsgsPerSec": 27.85,
+     "wireBps": 4036,
+     "upBps": 80,
+     "upMsgsPerSec": 7.25,
+     "msPerTick": 0.273,
+     "notes": [
+      "rock size 88.92827606201172",
+      "firing 100% of ticks"
+     ],
+     "byType": {
+      "snapshot": 1490,
+      "effect": 423,
+      "projectileHit": 186,
+      "items": 31,
+      "profile": 13,
+      "gained": 8
+     }
+    },
+    {
+     "scenario": "map",
+     "label": "System map open (idle in Sol)",
+     "secs": 20,
+     "protocol": 24,
+     "caps": 0,
+     "client": "plain socket",
+     "payloadBps": 1696,
+     "wsMsgsPerSec": 16.7,
+     "wireBps": 2798,
+     "upBps": 0,
+     "upMsgsPerSec": 0,
+     "msPerTick": 0.4,
+     "notes": [],
+     "byType": {
+      "snapshot": 1533,
+      "mapDots": 117,
+      "contact": 9,
+      "toast": 6,
+      "shipSync": 6,
+      "damage": 5
+     }
+    },
+    {
+     "scenario": "mother",
+     "label": "Scrap Mother (Hammerhead)",
+     "secs": 20,
+     "protocol": 24,
+     "caps": 0,
+     "client": "plain socket",
+     "payloadBps": 4657,
+     "wsMsgsPerSec": 20.9,
+     "wireBps": 6036,
+     "upBps": 635,
+     "upMsgsPerSec": 57.75,
+     "msPerTick": 0.754,
+     "notes": [
+      "boss alive at the end",
+      "firing 51% of ticks"
+     ],
+     "byType": {
+      "snapshot": 3202,
+      "detonation": 528,
+      "damage": 237,
+      "shipSync": 207,
+      "projectileHit": 135,
+      "bossTelegraph": 132
+     }
+    },
+    {
+     "scenario": "pyreclast",
+     "label": "Pyreclast (Hammerhead)",
+     "secs": 20,
+     "protocol": 24,
+     "caps": 0,
+     "client": "plain socket",
+     "payloadBps": 3864,
+     "wsMsgsPerSec": 20.9,
+     "wireBps": 5243,
+     "upBps": 659,
+     "upMsgsPerSec": 59.95,
+     "msPerTick": 0.781,
+     "notes": [
+      "boss alive at the end",
+      "firing 27% of ticks"
+     ],
+     "byType": {
+      "snapshot": 1409,
+      "detonation": 647,
+      "shipHps": 595,
+      "damage": 579,
+      "projectileHit": 181,
+      "bossTelegraph": 158
+     }
+    },
+    {
+     "scenario": "pirates",
+     "label": "Pirates (Corsair vs two packs)",
+     "secs": 20,
+     "protocol": 24,
+     "caps": 0,
+     "client": "plain socket",
+     "payloadBps": 651,
+     "wsMsgsPerSec": 19.35,
+     "wireBps": 1929,
+     "upBps": 660,
+     "upMsgsPerSec": 60,
+     "msPerTick": 0.385,
+     "notes": [
+      "firing 100% of ticks",
+      "35 hostiles at the end"
+     ],
+     "byType": {
+      "snapshot": 580,
+      "shipSync": 40,
+      "toast": 6,
+      "partDestroyed": 2,
+      "playerState": 2,
+      "damage": 1
+     }
+    },
+    {
+     "scenario": "custom",
+     "label": "Custom enemies (Corsair vs two packs)",
+     "secs": 20,
+     "protocol": 24,
+     "caps": 0,
+     "client": "plain socket",
+     "payloadBps": 1070,
+     "wsMsgsPerSec": 19.4,
+     "wireBps": 2351,
+     "upBps": 644,
+     "upMsgsPerSec": 58.5,
+     "msPerTick": 0.437,
+     "notes": [
+      "firing 100% of ticks",
+      "30 hostiles at the end"
+     ],
+     "byType": {
+      "snapshot": 921,
+      "damage": 27,
+      "shipHps": 26,
+      "shipSync": 24,
+      "detonation": 24,
+      "partDestroyed": 8
+     }
+    },
+    {
+     "scenario": "reentry",
+     "label": "A ship re-entering the focus (another pilot 5 s beside A, 5 s 60 km away)",
+     "secs": 240,
+     "protocol": 24,
+     "caps": 0,
+     "client": "plain socket",
+     "payloadBps": 380,
+     "wsMsgsPerSec": 14.41,
+     "wireBps": 1331,
+     "upBps": 0,
+     "upMsgsPerSec": 0,
+     "msPerTick": 0.242,
+     "notes": [
+      "24 re-entries"
+     ],
+     "byType": {
+      "snapshot": 337,
+      "shipSync": 24,
+      "playerState": 2,
+      "toast": 1,
+      "contact": 1,
+      "worldEvent": 1
+     }
+    }
+   ]
+  },
+  "prerun": {
+   "commit": "9d59fc8",
+   "results": [
+    {
+     "scenario": "idle",
+     "label": "Idle in Sol (Sparrow T parked, alone)",
+     "secs": 20,
+     "protocol": 36,
+     "caps": 511,
+     "client": "FakeHitsClient",
+     "payloadBps": 663,
+     "wsMsgsPerSec": 9.7,
+     "wireBps": 1303,
+     "upBps": 0,
+     "upMsgsPerSec": 0,
+     "msPerTick": 0.487,
+     "notes": [],
+     "byType": {}
+    },
+    {
+     "scenario": "cruise",
+     "label": "Cruise (Sparrow T flying 24 km legs, alone)",
+     "secs": 20,
+     "protocol": 36,
+     "caps": 511,
+     "client": "FakeHitsClient",
+     "payloadBps": 717,
+     "wsMsgsPerSec": 9.3,
+     "wireBps": 1331,
+     "upBps": 115,
+     "upMsgsPerSec": 28.15,
+     "msPerTick": 0.364,
+     "notes": [],
+     "byType": {}
+    },
+    {
+     "scenario": "crowd-20",
+     "label": "Crowd cruise, 20 pilots",
+     "secs": 15,
+     "protocol": 36,
+     "caps": 511,
+     "client": "FakeHitsClient",
+     "payloadBps": 2514,
+     "wsMsgsPerSec": 10.03,
+     "wireBps": 3176,
+     "upBps": 119,
+     "upMsgsPerSec": 29.83,
+     "msPerTick": 1.019,
+     "notes": [
+      "mean of 2 pilots"
+     ],
+     "byType": {}
+    },
+    {
+     "scenario": "crowd-50",
+     "label": "Crowd cruise, 50 pilots",
+     "secs": 15,
+     "protocol": 36,
+     "caps": 511,
+     "client": "FakeHitsClient",
+     "payloadBps": 3222,
+     "wsMsgsPerSec": 10.03,
+     "wireBps": 3884,
+     "upBps": 114,
+     "upMsgsPerSec": 27.53,
+     "msPerTick": 2.696,
+     "notes": [
+      "mean of 2 pilots"
+     ],
+     "byType": {}
+    },
+    {
+     "scenario": "crowd-100",
+     "label": "Crowd cruise, 100 pilots",
+     "secs": 15,
+     "protocol": 36,
+     "caps": 511,
+     "client": "FakeHitsClient",
+     "payloadBps": 3868,
+     "wsMsgsPerSec": 10.07,
+     "wireBps": 4533,
+     "upBps": 94,
+     "upMsgsPerSec": 22.47,
+     "msPerTick": 4.304,
+     "notes": [
+      "mean of 2 pilots"
+     ],
+     "byType": {}
+    },
+    {
+     "scenario": "rock-starter",
+     "label": "Starter (Sparrow T, 2 Pips) firing at a rock",
+     "secs": 20,
+     "protocol": 36,
+     "caps": 511,
+     "client": "FakeHitsClient",
+     "payloadBps": 458,
+     "wsMsgsPerSec": 9,
+     "wireBps": 1052,
+     "upBps": 61,
+     "upMsgsPerSec": 13.85,
+     "msPerTick": 0.681,
+     "notes": [
+      "rock size 61.559139251708984",
+      "firing 100% of ticks"
+     ],
+     "byType": {}
+    },
+    {
+     "scenario": "rock-gale",
+     "label": "Gale (2 Sparks, 2 Chainsaws) firing at a rock",
+     "secs": 20,
+     "protocol": 36,
+     "caps": 511,
+     "client": "FakeHitsClient",
+     "payloadBps": 914,
+     "wsMsgsPerSec": 11.7,
+     "wireBps": 1686,
+     "upBps": 67,
+     "upMsgsPerSec": 14.7,
+     "msPerTick": 0.448,
+     "notes": [
+      "rock size 61.559139251708984",
+      "firing 100% of ticks"
+     ],
+     "byType": {}
+    },
+    {
+     "scenario": "map",
+     "label": "System map open (idle in Sol)",
+     "secs": 20,
+     "protocol": 36,
+     "caps": 511,
+     "client": "FakeHitsClient",
+     "payloadBps": 756,
+     "wsMsgsPerSec": 9.75,
+     "wireBps": 1399,
+     "upBps": 0,
+     "upMsgsPerSec": 0,
+     "msPerTick": 0.65,
+     "notes": [],
+     "byType": {}
+    },
+    {
+     "scenario": "mother",
+     "label": "Scrap Mother (Hammerhead)",
+     "secs": 20,
+     "protocol": 36,
+     "caps": 511,
+     "client": "FakeHitsClient",
+     "payloadBps": 1398,
+     "wsMsgsPerSec": 12.75,
+     "wireBps": 2239,
+     "upBps": 671,
+     "upMsgsPerSec": 58.15,
+     "msPerTick": 1.054,
+     "notes": [
+      "boss alive at the end",
+      "firing 49% of ticks"
+     ],
+     "byType": {}
+    },
+    {
+     "scenario": "pyreclast",
+     "label": "Pyreclast (Hammerhead)",
+     "secs": 20,
+     "protocol": 36,
+     "caps": 511,
+     "client": "FakeHitsClient",
+     "payloadBps": 1052,
+     "wsMsgsPerSec": 11.6,
+     "wireBps": 1818,
+     "upBps": 679,
+     "upMsgsPerSec": 59.85,
+     "msPerTick": 0.825,
+     "notes": [
+      "boss alive at the end",
+      "firing 32% of ticks"
+     ],
+     "byType": {}
+    },
+    {
+     "scenario": "pirates",
+     "label": "Pirates (Corsair vs two packs)",
+     "secs": 20,
+     "protocol": 36,
+     "caps": 511,
+     "client": "FakeHitsClient",
+     "payloadBps": 378,
+     "wsMsgsPerSec": 9.75,
+     "wireBps": 1021,
+     "upBps": 675,
+     "upMsgsPerSec": 59.8,
+     "msPerTick": 0.365,
+     "notes": [
+      "firing 100% of ticks",
+      "29 hostiles at the end"
+     ],
+     "byType": {}
+    },
+    {
+     "scenario": "custom",
+     "label": "Custom enemies (Corsair vs two packs)",
+     "secs": 20,
+     "protocol": 36,
+     "caps": 511,
+     "client": "FakeHitsClient",
+     "payloadBps": 800,
+     "wsMsgsPerSec": 10.15,
+     "wireBps": 1470,
+     "upBps": 668,
+     "upMsgsPerSec": 58.7,
+     "msPerTick": 0.455,
+     "notes": [
+      "firing 100% of ticks",
+      "30 hostiles at the end"
+     ],
+     "byType": {}
+    },
+    {
+     "scenario": "reentry",
+     "label": "A ship re-entering the focus (another pilot 5 s beside A, 5 s 60 km away)",
+     "secs": 240,
+     "protocol": 36,
+     "caps": 511,
+     "client": "FakeHitsClient",
+     "payloadBps": 288,
+     "wsMsgsPerSec": 9.05,
+     "wireBps": 885,
+     "upBps": 0,
+     "upMsgsPerSec": 0,
+     "msPerTick": 0.245,
+     "notes": [
+      "24 re-entries"
+     ],
+     "byType": {}
+    }
+   ]
+  },
+  "now": {
+   "commit": "024c944",
+   "results": [
+    {
+     "scenario": "idle",
+     "label": "Idle in Sol (Sparrow T parked, alone)",
+     "secs": 20,
+     "protocol": 53,
+     "caps": 1048575,
+     "client": "FakeHitsClient",
+     "payloadBps": 121,
+     "wsMsgsPerSec": 1.8,
+     "wireBps": 240,
+     "upBps": 3,
+     "upMsgsPerSec": 0.45,
+     "msPerTick": 0.465,
+     "notes": [],
+     "byType": {}
+    },
+    {
+     "scenario": "cruise",
+     "label": "Cruise (Sparrow T flying 24 km legs, alone)",
+     "secs": 20,
+     "protocol": 53,
+     "caps": 1048575,
+     "client": "FakeHitsClient",
+     "payloadBps": 295,
+     "wsMsgsPerSec": 3.45,
+     "wireBps": 523,
+     "upBps": 108,
+     "upMsgsPerSec": 26.9,
+     "msPerTick": 0.538,
+     "notes": [],
+     "byType": {}
+    },
+    {
+     "scenario": "crowd-20",
+     "label": "Crowd cruise, 20 pilots",
+     "secs": 15,
+     "protocol": 53,
+     "caps": 1048575,
+     "client": "FakeHitsClient",
+     "payloadBps": 859,
+     "wsMsgsPerSec": 8.27,
+     "wireBps": 1405,
+     "upBps": 125,
+     "upMsgsPerSec": 30.6,
+     "msPerTick": 1.373,
+     "notes": [
+      "mean of 2 pilots"
+     ],
+     "byType": {}
+    },
+    {
+     "scenario": "crowd-50",
+     "label": "Crowd cruise, 50 pilots",
+     "secs": 15,
+     "protocol": 53,
+     "caps": 1048575,
+     "client": "FakeHitsClient",
+     "payloadBps": 1426,
+     "wsMsgsPerSec": 8.13,
+     "wireBps": 1962,
+     "upBps": 107,
+     "upMsgsPerSec": 24.3,
+     "msPerTick": 3.499,
+     "notes": [
+      "mean of 2 pilots"
+     ],
+     "byType": {}
+    },
+    {
+     "scenario": "crowd-100",
+     "label": "Crowd cruise, 100 pilots",
+     "secs": 15,
+     "protocol": 53,
+     "caps": 1048575,
+     "client": "FakeHitsClient",
+     "payloadBps": 1655,
+     "wsMsgsPerSec": 8.73,
+     "wireBps": 2231,
+     "upBps": 102,
+     "upMsgsPerSec": 25.1,
+     "msPerTick": 5.127,
+     "notes": [
+      "mean of 2 pilots"
+     ],
+     "byType": {}
+    },
+    {
+     "scenario": "rock-starter",
+     "label": "Starter (Sparrow T, 2 Pips) firing at a rock",
+     "secs": 20,
+     "protocol": 53,
+     "caps": 1048575,
+     "client": "FakeHitsClient",
+     "payloadBps": 266,
+     "wsMsgsPerSec": 6.4,
+     "wireBps": 689,
+     "upBps": 59,
+     "upMsgsPerSec": 13.6,
+     "msPerTick": 0.432,
+     "notes": [
+      "rock size 61.559139251708984",
+      "firing 100% of ticks"
+     ],
+     "byType": {}
+    },
+    {
+     "scenario": "rock-gale",
+     "label": "Gale (2 Sparks, 2 Chainsaws) firing at a rock",
+     "secs": 20,
+     "protocol": 53,
+     "caps": 1048575,
+     "client": "FakeHitsClient",
+     "payloadBps": 564,
+     "wsMsgsPerSec": 10,
+     "wireBps": 1224,
+     "upBps": 62,
+     "upMsgsPerSec": 14.1,
+     "msPerTick": 0.662,
+     "notes": [
+      "rock size 61.559139251708984",
+      "firing 100% of ticks"
+     ],
+     "byType": {}
+    },
+    {
+     "scenario": "map",
+     "label": "System map open (idle in Sol)",
+     "secs": 20,
+     "protocol": 53,
+     "caps": 1048575,
+     "client": "FakeHitsClient",
+     "payloadBps": 168,
+     "wsMsgsPerSec": 1.8,
+     "wireBps": 287,
+     "upBps": 3,
+     "upMsgsPerSec": 0.45,
+     "msPerTick": 0.532,
+     "notes": [],
+     "byType": {}
+    },
+    {
+     "scenario": "mother",
+     "label": "Scrap Mother (Hammerhead)",
+     "secs": 20,
+     "protocol": 53,
+     "caps": 1048575,
+     "client": "FakeHitsClient",
+     "payloadBps": 810,
+     "wsMsgsPerSec": 9.5,
+     "wireBps": 1437,
+     "upBps": 619,
+     "upMsgsPerSec": 53.3,
+     "msPerTick": 1.776,
+     "notes": [
+      "boss alive at the end",
+      "firing 99% of ticks"
+     ],
+     "byType": {}
+    },
+    {
+     "scenario": "pyreclast",
+     "label": "Pyreclast (Hammerhead)",
+     "secs": 20,
+     "protocol": 53,
+     "caps": 1048575,
+     "client": "FakeHitsClient",
+     "payloadBps": 1193,
+     "wsMsgsPerSec": 9.4,
+     "wireBps": 1813,
+     "upBps": 459,
+     "upMsgsPerSec": 37.95,
+     "msPerTick": 1.519,
+     "notes": [
+      "boss alive at the end",
+      "firing 92% of ticks"
+     ],
+     "byType": {}
+    },
+    {
+     "scenario": "pirates",
+     "label": "Pirates (Corsair vs two packs)",
+     "secs": 20,
+     "protocol": 53,
+     "caps": 1048575,
+     "client": "FakeHitsClient",
+     "payloadBps": 514,
+     "wsMsgsPerSec": 7.7,
+     "wireBps": 1023,
+     "upBps": 652,
+     "upMsgsPerSec": 56.9,
+     "msPerTick": 0.686,
+     "notes": [
+      "firing 100% of ticks",
+      "17 hostiles at the end"
+     ],
+     "byType": {}
+    },
+    {
+     "scenario": "custom",
+     "label": "Custom enemies (Corsair vs two packs)",
+     "secs": 20,
+     "protocol": 53,
+     "caps": 1048575,
+     "client": "FakeHitsClient",
+     "payloadBps": 237,
+     "wsMsgsPerSec": 4.3,
+     "wireBps": 520,
+     "upBps": 604,
+     "upMsgsPerSec": 53.8,
+     "msPerTick": 0.613,
+     "notes": [
+      "firing 100% of ticks",
+      "18 hostiles at the end"
+     ],
+     "byType": {}
+    },
+    {
+     "scenario": "reentry",
+     "label": "A ship re-entering the focus (another pilot 5 s beside A, 5 s 60 km away)",
+     "secs": 240,
+     "protocol": 53,
+     "caps": 1048575,
+     "client": "FakeHitsClient",
+     "payloadBps": 119,
+     "wsMsgsPerSec": 2.11,
+     "wireBps": 258,
+     "upBps": 1,
+     "upMsgsPerSec": 0.16,
+     "msPerTick": 0.285,
+     "notes": [
+      "24 re-entries"
+     ],
+     "byType": {}
+    }
+   ]
+  }
+ }
+}
