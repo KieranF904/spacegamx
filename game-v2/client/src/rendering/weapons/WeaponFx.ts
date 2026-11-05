@@ -196,6 +196,16 @@ const ADOPT_TICKS = 40;
 const PENDING_FRAMES = 40;
 
 /** What a shell's gun is: its model's look (MODEL_STYLES), its damage, its blast radius, and the ticks it flies (straight shells: Shot.endAt) */
+/**
+ * The two timelines shells are drawn on this frame (WeaponFx.update's present and render ticks), each the one its
+ * firing ship is drawn at: yours at your predicted ship's drawn tick (GameState.ownDrawTick: the server's tick runs the
+ * prediction's lead behind it, and your shells drawn on that came out where your ship had been that many ticks
+ * before), everyone else's at the tick interpolate placed them at
+ */
+export function shotTimelines(state: GameState): [present: number, render: number] {
+  return [state.ownDrawTick(), state.renderTickNow];
+}
+
 export interface ShellLook { model?: string; damage?: number; splash?: number; pierce?: number; life?: number; arm?: number }
 
 export interface FirePoseXY { x: number; y: number; angle: number }
