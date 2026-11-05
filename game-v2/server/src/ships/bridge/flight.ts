@@ -13,7 +13,8 @@ import {
   Position, Velocity, Rotation, Input, Boost, Player, Dead, InSystem, quantizeShipBody, damagePart,
   stepDrift, NO_FIELDS, ReplicaMode, CTL, stepShip, lastStep, SimShipView, pilotInput,
   controlBits, quantizeReplicaAngle, partWeaponDef, partMaterial, powerTick, gunLoadTick, quantizeCargo,
-  chargeTotal, getPlan, contactPieces, contactPair, quantizePull, CONTACT_FLAG, contactCandidates, contactFxDue,
+  chargeTotal, getPlan, contactPieces, contactPair, quantizePull, CONTACT_FLAG, contactFxDue,
+  ContactPairCache, contactPairs, type ContactPair,
   type ShipState, type GravityWell, type FlightConstants, type FlightInputSource, type SimEnv, type FieldEnv, type ShipDerived,
 } from '@space-game/common';
 import { K, BIG_BODY, type ContactPiece, type BridgeCtx } from './core.js';
@@ -35,9 +36,6 @@ function heldInputs(): { name: string; field: ArrayLike<number> }[] {
     return { name, field };
   });
 }
-/** resolveContacts' scratch: a system's candidate pairs */
-const CAND: number[] = [];
-const NONE: readonly number[] = [];
 
 /** Read a player's held keys from the Input component into `src` */
 function readInputsInto(eid: number, src: FlightInputSource): FlightInputSource {
@@ -394,6 +392,48 @@ export function worldPieces(b: BridgeCtx, eid: number, ship: ShipState, near?: {
 }
 
 /**
+ * Each bridge's contact pairs by tick, a cache per pass (sim/c-contactCache.ts: found once, then read; a system with
+ * a clock of its own has its own pass and ticks: SimPass)
+ */
+const PAIRS = new WeakMap<BridgeCtx, Map<number, ContactPairCache>>();
+
+/**
+ * Tick t's candidate pairs, every system's one after another: who can touch anything at all (none of it changes
+ * while the pass runs), by id: a pair's first body is its lower id, and pairs go in that order, as a client finding
+ * them itself takes them (CAPS.CONTACTS, common ships/contactPass.ts). Notes each system's pass for those clients
+ */
+function findPairs(ctx: BridgeCtx, tick: number): ContactPair[] {
+  const list: [number, ShipState][] = [];
+  for (const e of ctx.bodies) {
+    if (e[1].kind !== 'debris' && e[1].derived.mass > 0 && !ctx.dormant.has(e[0]) && SimPass.on(InSystem.systemId[e[0]]) && !ctx.isJumping(e[1]) && !ctx.host.sheltered?.(e[0]) && !ctx.intangible.has(e[0])) list.push(e);
+  }
+  list.sort((p, q) => p[0] - q[0]);
+  const bySys = new Map<number, [number, ShipState][]>();
+  for (const e of list) {
+    const sys = InSystem.systemId[e[0]];
+    let l = bySys.get(sys);
+    if (!l) bySys.set(sys, (l = []));
+    l.push(e);
+  }
+  const log = ctx.contactLog, seq0 = ctx.ownCauses.peek();
+  const pairs: ContactPair[] = [];
+  for (const [sys, l] of bySys) {
+    if (l.length < 2 && !log.wanted) continue;
+    const entries = l.map(([id, s]) => ({ id, x: Position.x[id], y: Position.y[id], r: s.derived.radius }));
+    const from = pairs.length;
+    if (l.length >= 2) contactPairs(entries, pairs);
+    // (What a client finding its own pairs needs of this pass: net/causes/contactLog.ts)
+    if (log.wanted) {
+      const pinned: number[] = [], ap: number[] = [];
+      for (const e of entries) if (ctx.pinned.has(e.id)) pinned.push(e.id);
+      for (let k = from; k < pairs.length; k++) ap.push(pairs[k][0], pairs[k][1]);
+      log.note(tick, sys, { ids: entries.map((e) => e.id), rebuilds: l.map(([, s]) => s.rebuilds), pinned, pairs: ap, seq: seq0 });
+    }
+  }
+  return pairs;
+}
+
+/**
  * Push overlapping bodies apart, exchange an impulse along the contact
  * normal, and damage the touching parts on both sides when the closing speed
  * is high enough (scaled by the other body's share of the mass).
@@ -405,36 +445,14 @@ export function worldPieces(b: BridgeCtx, eid: number, ship: ShipState, near?: {
  */
 export function resolveContacts(ctx: BridgeCtx): void {
   const ct = ctx.tuning.collision;
-  // Who can touch anything at all (none of it changes while this runs), by id: a pair's first body is its lower id,
-  // and pairs go in that order, as a client finding them itself takes them (CAPS.CONTACTS, common ships/contactPass.ts)
-  const list: [number, ShipState][] = [];
-  for (const e of ctx.bodies) {
-    if (e[1].kind !== 'debris' && e[1].derived.mass > 0 && !ctx.dormant.has(e[0]) && SimPass.on(InSystem.systemId[e[0]]) && !ctx.isJumping(e[1]) && !ctx.host.sheltered?.(e[0]) && !ctx.intangible.has(e[0])) list.push(e);
-  }
-  list.sort((p, q) => p[0] - q[0]);
-  const bySys = new Map<number, number[]>();
-  for (let i = 0; i < list.length; i++) {
-    const sys = InSystem.systemId[list[i][0]];
-    let ids = bySys.get(sys);
-    if (!ids) bySys.set(sys, (ids = []));
-    ids.push(i);
-  }
-  const tick = ctx.host.getTick(), log = ctx.contactLog, seq0 = ctx.ownCauses.peek();
-  // Each system's candidate pairs (indices into `list`), systems one after another
-  const pairs: number[] = [];
-  for (const [sys, ids] of bySys) {
-    if (ids.length < 2 && !log.wanted) continue;
-    const entries = ids.map((i) => ({ id: list[i][0], x: Position.x[list[i][0]], y: Position.y[list[i][0]], r: list[i][1].derived.radius }));
-    const found = ids.length < 2 ? NONE : contactCandidates(entries, CAND);
-    for (let k = 0; k < found.length; k++) pairs.push(ids[found[k]]);
-    // (What a client finding its own pairs needs of this pass: net/causes/contactLog.ts)
-    if (log.wanted) {
-      const pinned: number[] = [], ap: number[] = [];
-      for (const e of entries) if (ctx.pinned.has(e.id)) pinned.push(e.id);
-      for (let k = 0; k < found.length; k++) ap.push(entries[found[k]].id);
-      log.note(tick, sys, { ids: entries.map((e) => e.id), rebuilds: ids.map((i) => list[i][1].rebuilds), pinned, pairs: ap, seq: seq0 });
-    }
-  }
+  const tick = ctx.host.getTick();
+  // (The tick's pairs, found once by the one function a client finding its own takes them by: sim/c-contactCache.ts)
+  let caches = PAIRS.get(ctx);
+  if (!caches) PAIRS.set(ctx, (caches = new Map()));
+  const pass = SimPass.main ? -1 : SimPass.system;
+  let cache = caches.get(pass);
+  if (!cache) caches.set(pass, (cache = new ContactPairCache((t) => findPairs(ctx, t), 2)));
+  const pairs = cache.pairs(tick);
 
   const pieces = new Map<number, ContactPiece[]>();
   // A small body's pieces are kept for the pass (until it's pushed); a big one's (a boss's) are only those near the other body
@@ -444,13 +462,12 @@ export function resolveContacts(ctx: BridgeCtx): void {
     if (!p) { p = ctx.worldPieces(eid, ship); pieces.set(eid, p); }
     return p;
   };
-  for (let k = 0; k < pairs.length; k += 2) {
-    const i = pairs[k], j = pairs[k + 1];
-    const [ea, A] = list[i];
-    const [eb, B] = list[j];
+  for (let k = 0; k < pairs.length; k++) {
+    const [ea, eb] = pairs[k];
+    const A = ctx.bodies.get(ea), B = ctx.bodies.get(eb);
+    if (!A || !B) continue;
     const dx = Position.x[eb] - Position.x[ea], dy = Position.y[eb] - Position.y[ea];
     if (dhypot(dx, dy) > A.derived.radius + B.derived.radius) continue;
-
     const pa = piecesOf(ea, A, eb, B), pb = piecesOf(eb, B, ea, A);
     // Pinned structures don't give: whatever hits them takes all the push
     const pinA = ctx.pinned.has(ea), pinB = ctx.pinned.has(eb);

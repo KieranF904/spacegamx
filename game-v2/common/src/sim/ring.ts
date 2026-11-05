@@ -69,63 +69,138 @@ export function tickHash(ships: Iterable<Readonly<SimShipState>>): number {
   return fin(h);
 }
 
+/** One ship's ticks: states by tick, hashes worked out when first asked (a stored state never changes), its span */
+interface Track {
+  by: Map<number, SimShipState>;
+  hashes: Map<number, number>;
+  /** Lowest tick that may be held (a lower bound: pruning and `first` walk up from it) */
+  lo: number;
+  /** Highest tick held (exact while anything is held) */
+  hi: number;
+}
+
+const NOTHING = new Map<number, SimShipState>();
+
 /**
  * k ticks of states per ship. `put` stores a copy (later mutation of the caller's object can't reach the ring);
  * `get` returns the stored object, read-only by contract (clone it to step from it: stepShip does).
+ *
+ * (Stage 1C internals: a ship's hash is worked out the first time it's asked for, from the stored state, so storing
+ * costs no hash; the window is pruned from its low end rather than by walking every tick held. Beyond the Stage 0
+ * API, additive: `keep` stores without the copy, for a caller that hands the object over (the replica set's per-tick
+ * states, network/replication.ts); `has`, `first`, `size`, `ticks`, `delete`, `clear`.)
  */
 export class StateRing {
-  private readonly by = new Map<number, Map<number, SimShipState>>();
-  private readonly hashes = new Map<number, Map<number, number>>();
+  private readonly tracks = new Map<number, Track>();
 
   constructor(readonly k = 64) {}
 
   put(t: number, s: Readonly<SimShipState>): void {
-    let m = this.by.get(s.id), hm = this.hashes.get(s.id);
-    if (!m) this.by.set(s.id, (m = new Map()));
-    if (!hm) this.hashes.set(s.id, (hm = new Map()));
-    m.set(t, cloneSimShip(s));
-    hm.set(t, shipHash(s));
-    if (m.size > this.k) for (const old of [...m.keys()]) if (old <= t - this.k) { m.delete(old); hm.delete(old); }
+    this.keep(t, cloneSimShip(s));
+  }
+
+  /** Store `s` itself for ship `id` (default s.id): the caller hands it over and must not change it after */
+  keep(t: number, s: SimShipState, id: number = s.id): void {
+    let tr = this.tracks.get(id);
+    if (!tr) this.tracks.set(id, (tr = { by: new Map(), hashes: new Map(), lo: t, hi: t }));
+    if (!tr.by.size) { tr.lo = t; tr.hi = t; }
+    tr.by.set(t, s);
+    tr.hashes.delete(t);
+    if (t > tr.hi) tr.hi = t;
+    if (t < tr.lo) tr.lo = t;
+    const floor = tr.hi - this.k;
+    if (tr.lo <= floor) {
+      // (Walked up from the low end when that's shorter than walking what's held)
+      if (floor - tr.lo < tr.by.size) { for (let u = tr.lo; u <= floor; u++) if (tr.by.delete(u)) tr.hashes.delete(u); }
+      else for (const u of [...tr.by.keys()]) if (u <= floor) { tr.by.delete(u); tr.hashes.delete(u); }
+      tr.lo = floor + 1;
+    }
   }
 
   get(id: number, t: number): Readonly<SimShipState> | undefined {
-    return this.by.get(id)?.get(t);
+    return this.tracks.get(id)?.by.get(t);
+  }
+
+  has(id: number, t: number): boolean {
+    return this.tracks.get(id)?.by.has(t) ?? false;
   }
 
   hash(id: number, t: number): number | undefined {
-    return this.hashes.get(id)?.get(t);
+    const tr = this.tracks.get(id);
+    if (!tr) return undefined;
+    let h = tr.hashes.get(t);
+    if (h === undefined) {
+      const s = tr.by.get(t);
+      if (!s) return undefined;
+      tr.hashes.set(t, (h = shipHash(s)));
+    }
+    return h;
   }
 
   /** The tick hash over every ship held at t (ascending ids) */
   tickHash(t: number): number {
-    const ids = [...this.by.keys()].filter((id) => this.by.get(id)!.has(t)).sort((a, b) => a - b);
+    const ids = [...this.tracks.keys()].filter((id) => this.tracks.get(id)!.by.has(t)).sort((a, b) => a - b);
     let h = 0x6a09e667;
-    for (const id of ids) h = mix(h, this.hashes.get(id)!.get(t)!);
+    for (const id of ids) h = mix(h, this.hash(id, t)!);
     return fin(h);
   }
 
   /** The newest tick held for a ship */
   last(id: number): number | undefined {
-    const m = this.by.get(id);
-    if (!m || m.size === 0) return undefined;
-    let best = -Infinity;
-    for (const t of m.keys()) if (t > best) best = t;
-    return best;
+    const tr = this.tracks.get(id);
+    return tr && tr.by.size ? tr.hi : undefined;
+  }
+
+  /** The oldest tick held for a ship */
+  first(id: number): number | undefined {
+    const tr = this.tracks.get(id);
+    if (!tr || !tr.by.size) return undefined;
+    if (tr.hi - tr.lo > 4 * tr.by.size) { let lo = Infinity; for (const k of tr.by.keys()) if (k < lo) lo = k; tr.lo = lo; }
+    while (!tr.by.has(tr.lo)) tr.lo++;
+    return tr.lo;
+  }
+
+  /** How many ticks are held for a ship */
+  size(id: number): number {
+    return this.tracks.get(id)?.by.size ?? 0;
+  }
+
+  /** A ship's held ticks, in no particular order */
+  ticks(id: number): IterableIterator<number> {
+    return (this.tracks.get(id)?.by ?? NOTHING).keys();
   }
 
   /** Forget a ship's ticks >= t (it will be re-stepped from t - 1) */
   dropFrom(id: number, t: number): void {
-    const m = this.by.get(id), hm = this.hashes.get(id);
-    if (!m) return;
-    for (const k of [...m.keys()]) if (k >= t) { m.delete(k); hm!.delete(k); }
+    const tr = this.tracks.get(id);
+    if (!tr || !tr.by.size || t > tr.hi) return;
+    if (t > tr.lo && tr.hi - t < tr.by.size) { for (let u = t; u <= tr.hi; u++) if (tr.by.delete(u)) tr.hashes.delete(u); }
+    else for (const u of [...tr.by.keys()]) if (u >= t) { tr.by.delete(u); tr.hashes.delete(u); }
+    if (!tr.by.size) return;
+    // (The newest left: usually just below t)
+    let u = Math.min(t, tr.hi + 1) - 1;
+    if (u - tr.lo <= 4 * tr.by.size) { while (!tr.by.has(u)) u--; tr.hi = u; }
+    else { let hi = -Infinity; for (const k of tr.by.keys()) if (k > hi) hi = k; tr.hi = hi; }
+  }
+
+  /** Forget one tick of a ship's */
+  delete(id: number, t: number): void {
+    const tr = this.tracks.get(id);
+    if (!tr || !tr.by.has(t)) return;
+    if (t === tr.hi) { this.dropFrom(id, t); return; }
+    tr.by.delete(t);
+    tr.hashes.delete(t);
   }
 
   remove(id: number): void {
-    this.by.delete(id);
-    this.hashes.delete(id);
+    this.tracks.delete(id);
+  }
+
+  clear(): void {
+    this.tracks.clear();
   }
 
   ids(): IterableIterator<number> {
-    return this.by.keys();
+    return this.tracks.keys();
   }
 }

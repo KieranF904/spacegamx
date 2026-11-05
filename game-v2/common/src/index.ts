@@ -73,3 +73,4 @@ export * from './guidance/index.js';
 export * from './sim/index.js';
 // (Stage 1A's caller adapters: SimShipView, pilotInput, aimQ; sim/index.ts is a frozen contract file, so here)
 export * from './sim/a-adapt.js';
+export * from './sim/c-index.js';

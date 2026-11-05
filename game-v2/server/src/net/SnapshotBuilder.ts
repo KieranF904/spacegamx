@@ -22,6 +22,7 @@ import {
   mapDotFlags, legAt, packMapLeg, packMapRoute, unpackMapLegs, nearerThan, packIds, packRuns, packSheds, packRanges, DEBRIS_STATUS, TICK_RATE,
   FOCUS_RANGE, RING_RANGE, CROWD_BASE_WINDOW, structsFor, cargoFor, debrisFor, FEED_TIERS, feedMidRadius,
   type Leg, type EntityState, type ShipState, type ClientSocket, type ServerMessage, type ServerAsteroidSeedMessage, type StarSystemData, type AsteroidSpawnData, dhypot,
+  headWord, HEAD_HASH_ROW,
 } from '@space-game/common';
 import type { GameData } from '../data/GameData.js';
 import type { ClientConnection } from './ClientConnection.js';
@@ -606,6 +607,19 @@ export class SnapshotBuilder {
     this.ownChecks!.note(conn, this.currentTick, body, ctl.bits, ctl.q, conn.shipHpSent.get(id), held);
   }
 
+  /**
+   * The head hash for a client stepping its own ship (CAPS.OWN_SIM; common sim/c-headHash.ts): its own ship as it is
+   * now, its tick layer's (the real ship and the controls it flew), unless it isn't held (docked, dead, not yet known
+   * to it). `keyed`: its own ship's keyframe goes in this snapshot (nothing to compare)
+   */
+  private headHash(conn: ClientConnection, keyed: boolean): number {
+    const id = conn.playerId, ship = this.ships.get(id), ctl = this.replication.controlsOf(id);
+    const flags = keyed ? HEAD_HASH_ROW : 0;
+    if (!ship || !ctl || !conn.repKnown.has(id) || this.replication.ownHeld(id) || hasComponent(this.world, Dead, id)) return headWord(null, flags);
+    const body = { x: Position.x[id], y: Position.y[id], vx: Velocity.x[id], vy: Velocity.y[id], angle: Rotation.angle[id], angVel: ship.angVel, jump: ship.jump, jumpScale: ship.jumpScale, cargo: ship.cargo, dodge: ship.dodge, dodgeDir: ship.dodgeDir };
+    return headWord({ id, body, bits: ctl.bits, q: ctl.q }, flags);
+  }
+
   private snapshotCount = 0;
 
   /**
@@ -622,7 +636,9 @@ export class SnapshotBuilder {
     // itself (a contact, a pull) is no correction; its drawn ship follows its tick layer, ShipClient.ownMoved)
     const version = (ownSimFor(conn.caps) ? this.replication.ownVersionOf(r.id) : undefined) ?? this.replication.versionOf(r.id);
     const fix = conn.forceSnapshot || conn.selfLate || version !== conn.selfVersion || !prevStates.has(r.id) || flight !== conn.selfFlight;
-    const need = fix || key !== conn.selfKey || this.currentTick - conn.selfSentTick >= SELF_SAFETY_TICKS;
+    // (Now and then just in case, unless its snapshots carry the head hash (CAPS.OWN_SIM: sim/c-headHash.ts): a client
+    // that disagrees with it checks at once, and the fix brings the row)
+    const need = fix || key !== conn.selfKey || (!ownSimFor(conn.caps) && this.currentTick - conn.selfSentTick >= SELF_SAFETY_TICKS);
     return { need, fix, key, flight, version };
   }
 
@@ -918,6 +934,7 @@ export class SnapshotBuilder {
         decisions: decisions?.length ? decisions : undefined,
         causes: rep.causes,
         guides: guided?.rows.length ? guided.rows : undefined,
+        hh: ownSimFor(conn.caps) ? this.headHash(conn, keyed.has(conn.playerId)) : undefined,
       });
 
       conn.forceSnapshot = false;
