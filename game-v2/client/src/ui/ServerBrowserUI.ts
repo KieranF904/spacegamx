@@ -1,7 +1,7 @@
 /**
  * Join screen - shown after sign-in. There is one main server, so it's a Join button for it, a short
  * description of the game with a few photos, and the development news feed (join/news.json).
- * Any other servers the lobby lists, and direct connect, sit under "Other servers".
+ * The server is the one this page belongs to: the dev server on the dev client, the live server on the VPS.
  */
 
 import { LOBBY_URL } from '../network/lobby';
@@ -36,7 +36,6 @@ export class ServerBrowserUI {
   private visible = false;
   private servers: ServerInfo[] = [];
   private loading = false;
-  private showOthers = false;
 
   // Server browser URL (override with VITE_BROWSER_URL at build/dev time)
   private browserUrl = LOBBY_URL;
@@ -104,19 +103,6 @@ export class ServerBrowserUI {
       .join-stats { display: flex; justify-content: space-between; margin-top: 12px; font-size: 13px; color: #9fb4cc; }
       .join-stats b { color: #88ff88; font-weight: normal; }
       .ping-good { color: #88ff88; } .ping-medium { color: #ffdd88; } .ping-bad { color: #ff8888; }
-      .join-link { background: none; border: none; color: #6f8fb5; font-size: 13px; cursor: pointer; padding: 0; text-align: left; }
-      .join-link:hover { color: #aaccff; }
-      .other-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
-      .other-server { display: flex; justify-content: space-between; align-items: center; gap: 8px;
-        padding: 8px 10px; background: rgba(20, 40, 70, 0.8); border: 1px solid #335; border-radius: 6px;
-        color: #dde8f5; font-size: 13px; cursor: pointer; text-align: left; }
-      .other-server:hover { border-color: #558; }
-      .direct-connect { display: flex; gap: 6px; margin-top: 8px; }
-      .direct-input { flex: 1; min-width: 0; padding: 7px 10px; background: rgba(0, 30, 60, 0.8);
-        border: 1px solid #335; border-radius: 6px; color: #fff; font-size: 13px; }
-      .direct-input:focus { border-color: #66aaff; outline: none; }
-      .direct-btn { padding: 7px 10px; background: rgba(30, 60, 100, 0.8); border: 1px solid #446;
-        border-radius: 6px; color: #88aacc; cursor: pointer; font-size: 13px; }
       .logout-btn { align-self: flex-start; padding: 8px 16px; background: transparent; border: 1px solid #664444;
         border-radius: 6px; color: #aa6666; font-size: 13px; cursor: pointer; }
       .logout-btn:hover { background: rgba(150, 50, 50, 0.2); color: #ff8888; }
@@ -124,14 +110,15 @@ export class ServerBrowserUI {
     document.head.appendChild(style);
   }
 
-  /** The server the Join button connects to: the lobby's first (lowest ping) */
+  /** The server the Join button connects to: the one on this page's own host (dev client: the dev server; the VPS: the
+   *  live one), else the lobby's first */
   private mainServer(): ServerInfo | undefined {
-    return this.getSortedServers()[0];
+    const here = window.location.hostname;
+    return this.servers.find((s) => s.host === here) ?? this.getSortedServers()[0];
   }
 
   private render(): void {
     const main = this.mainServer();
-    const others = this.getSortedServers().slice(1);
     const news = (NEWS as NewsItem[]);
 
     this.panel.innerHTML = `
@@ -171,21 +158,6 @@ export class ServerBrowserUI {
               </div>` : ''}
           </div>
 
-          <div class="join-box">
-            <button class="join-link others-toggle">${this.showOthers ? '▾' : '▸'} Other servers</button>
-            ${this.showOthers ? `
-              <div class="other-list">
-                ${others.map((s, k) => `
-                  <button class="other-server" data-k="${k + 1}">
-                    <span>${this.escapeHtml(s.name)}</span><span>${s.players}/${s.maxPlayers} · ${this.renderPing(s)}</span>
-                  </button>`).join('')}
-                ${others.length === 0 ? '<div class="news-empty">None listed.</div>' : ''}
-              </div>
-              <div class="direct-connect">
-                <input type="text" class="direct-input" id="direct-input" placeholder="ws://host:port" />
-                <button class="direct-btn">Connect</button>
-              </div>` : ''}
-          </div>
 
           <button class="logout-btn">← Log out</button>
         </div>
@@ -223,33 +195,7 @@ export class ServerBrowserUI {
       const main = this.mainServer();
       if (main && !this.loading) this.onServerSelect?.(main);
     });
-    q('.others-toggle')?.addEventListener('click', () => { this.showOthers = !this.showOthers; this.render(); });
-    const sorted = this.getSortedServers();
-    this.panel.querySelectorAll<HTMLElement>('.other-server').forEach((el) => {
-      el.addEventListener('click', () => {
-        const s = sorted[Number(el.dataset.k)];
-        if (s) this.onServerSelect?.(s);
-      });
-    });
     q('.logout-btn')?.addEventListener('click', () => this.onLogout?.());
-
-    const directInput = q<HTMLInputElement>('.direct-input');
-    const directBtn = q('.direct-btn');
-    const direct = () => {
-      const url = directInput?.value.trim();
-      const match = url?.match(/^(wss?):\/\/([^:\/]+)(?::(\d+))?/);
-      if (!match) return;
-      this.onServerSelect?.({
-        host: match[2],
-        port: parseInt(match[3] || (match[1] === 'wss' ? '443' : '80'), 10),
-        name: 'Direct Connect',
-        maxPlayers: 32,
-        players: 0,
-        secure: match[1] === 'wss',
-      });
-    };
-    directBtn?.addEventListener('click', direct);
-    directInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') direct(); });
   }
 
   async refresh(): Promise<void> {
