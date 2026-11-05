@@ -5,6 +5,8 @@
 <title>Slideshow</title>
 <style>
   html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  /* (the boxes below set display: flex, which would otherwise beat the hidden attribute) */
+  [hidden] { display: none !important; }
   body.idle { cursor: none; }
   img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; transition: opacity .25s; transform-origin: 0 0; user-select: none; -webkit-user-drag: none; }
   img.on { opacity: 1; }
