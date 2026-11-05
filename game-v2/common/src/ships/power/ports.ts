@@ -79,6 +79,8 @@ export interface PortsLayout {
   cap: Int32Array;
   /** eu a tick: a generator's output per out port is on the links; a consumer's intake sums its in links */
   rate: Int32Array;
+  /** eu a tick: a consumer's own intake before its lines cap it (rate is the lower of the two): the hangar's load test */
+  intake: Int32Array;
   /** Thrusters: burn a tick, boosted burn, boost multiplier */
   burn: Int32Array;
   bBurn: Int32Array;
@@ -164,8 +166,8 @@ export interface PortsLayout {
   /** Per part: open in ports (a consumer's with nothing across) and open out ports (a generator's), for the hangar */
   openIn: Uint8Array;
   openOut: Uint8Array;
-  /** Every port, placed, for the hangar: part, dir (0 in, 1 out), x, y (its cell), side, rate (E/s), linked (0/1), a weapon's augment input (1) */
-  ports: { part: number; dir: 0 | 1; x: number; y: number; side: Side; rate: number; link: number; aug: 0 | 1 }[];
+  /** Every port, placed, for the hangar: part, dir (0 in, 1 out), x, y (its cell), side, rate (E/s), linked (0/1), its link's id (-1 none), a weapon's augment input (1) */
+  ports: { part: number; dir: 0 | 1; x: number; y: number; side: Side; rate: number; link: number; l: number; aug: 0 | 1 }[];
   /** Every feed point, placed: part, x, y, side, joined (0/1) */
   feedPts: { part: number; x: number; y: number; side: Side; joined: number; i: number }[];
 
@@ -512,6 +514,7 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
   // (A consumer takes at most what its own lines can bring: its main lines; an augment's are its own. A thruster takes
   // all its lines bring (its in ports are rated for its boosted burn: a store or a strong line in front keeps a boost going,
   // a weak one gives a short dash from its buffer); a gun or a tool no more than its own intake, which keeps its rhythm)
+  const intake = Int32Array.from(rate);
   for (let i = 0; i < n; i++) if (role[i] === P_WEAPON || role[i] === P_THRUSTER || role[i] === P_TOOL) {
     let r = 0; for (let x = inStart[i]; x < inStart[i + 1]; x++) if (!linkAug[inLink[x]]) r += linkCap[inLink[x]];
     rate[i] = role[i] === P_THRUSTER ? (fns[i].touch ? Math.min(r, Math.max(rate[i], bBurn[i])) : r) || rate[i] : Math.min(rate[i] || r, r) || rate[i];
@@ -562,11 +565,11 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
   for (let i = 0; i < n; i++) if (role[i] === P_THRUSTER || role[i] === P_TOOL || role[i] === P_WEAPON) consumers.push(i);
   let gaugeMax = 0; for (const r of relays) gaugeMax += cap[r];
   const L: PortsLayout = {
-    n, sig: 0, role, cap, rate, burn, bBurn, boostMul, tierDmg, gun, shot, rounds, relight, passive, discharge, rest, burst, steady, pieces, pieceE, pieceT, spikeLo, spikeHi, spikeIn, spikeOut, augCap, augCost, augRate, augSteady, augDps, augMods, augName, shield, miner, minePulse, carrier, matCap, matUse, takes, tankFeed, feedPort,
+    n, sig: 0, role, cap, rate, intake, burn, bBurn, boostMul, tierDmg, gun, shot, rounds, relight, passive, discharge, rest, burst, steady, pieces, pieceE, pieceT, spikeLo, spikeHi, spikeIn, spikeOut, augCap, augCost, augRate, augSteady, augDps, augMods, augName, shield, miner, minePulse, carrier, matCap, matUse, takes, tankFeed, feedPort,
     mShot, mDamage, mCycle, mDischarge, mRest, mBurn, mSteady, mThrust, mBoost, mBoostDrain, feeds, feedDefs,
     links: linkFrom.length, linkFrom: Int32Array.from(linkFrom), linkTo: Int32Array.from(linkTo), linkCap: Int32Array.from(linkCap), linkAug: Uint8Array.from(linkAug),
     outStart, outLink: Int32Array.from(outLink), inStart, inLink: Int32Array.from(inLink), openIn, openOut,
-    ports: ports.map((p) => ({ part: p.part, dir: p.dir, x: p.x, y: p.y, side: p.side, rate: p.rate, link: p.link >= 0 ? 1 : 0, aug: p.aug })),
+    ports: ports.map((p) => ({ part: p.part, dir: p.dir, x: p.x, y: p.y, side: p.side, rate: p.rate, link: p.link >= 0 ? 1 : 0, l: p.link, aug: p.aug })),
     feedPts: fps.map((f) => ({ part: f.part, x: f.x, y: f.y, side: f.side, joined: f.joined, i: f.i })),
     netOf, nets, selIn, selOut, drawers: Int32Array.from(drawers),
     gens: list(P_GEN), relays, thrusters: list(P_THRUSTER), tools: list(P_TOOL), weapons: list(P_WEAPON), tanks: list(P_TANK), carriers: Int32Array.from([...relays].filter((r) => carrier[r])),
@@ -659,6 +662,8 @@ export function portsThrustFrac(): Float64Array { return sFrac; }
 export function portsThrustMul(): Float64Array { return sMul; }
 /** Per part, eu that arrived this tick (the hangar's flow) */
 export function portsInflow(): Int32Array { return sInNow; }
+/** Per link, eu that crossed it this tick (the hangar's link overlay). Module scratch, valid straight after portsTick */
+export function portsLinkSend(): Int32Array { return sSend; }
 
 /** Water-fill `supply` over the wants in sList[0..cnt) (sWant by part), smallest want first; writes the grants back into sWant */
 function waterfill(cnt: number, supply: number): void {
@@ -667,7 +672,8 @@ function waterfill(cnt: number, supply: number): void {
   let left = supply < 0 ? 0 : supply, k = cnt;
   for (let y = 0; y < cnt; y++) { const p = sList[y], share = Math.floor(left / k--), g = sWant[p] < share ? sWant[p] : share; sWant[p] = g > 0 ? g : 0; left -= sWant[p]; }
 }
-/** A taker's space this tick: its room, or nothing while its ports are shut (discharge, rest, a lit burst beam) */
+/** A taker's space this tick: its room, or nothing while its ports are shut (discharge, rest, a lit burst beam). Exported as portsSpace for the hangar's load test */
+export function portsSpace(L: PortsLayout, e: PortsState, p: number): number { return spaceOf(L, e, p); }
 function spaceOf(L: PortsLayout, e: PortsState, p: number): number {
   if (L.role[p] === P_RELAY) return L.cap[p] - e.held[p];
   if (L.role[p] === P_WEAPON && (e.closed[p] > 0 || (L.burst[p] && (e.flags[p] & PF_LIT)))) return 0;

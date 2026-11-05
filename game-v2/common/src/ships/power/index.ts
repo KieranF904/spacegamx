@@ -10,3 +10,5 @@ export * from './tick.js';
 export * from './wire.js';
 export * from './blueprint.js';
 export * from './ports.js';
+export * from './portStates.js';
+export * from './portsLoadTest.js';
