@@ -94,11 +94,11 @@ describe('boss arenas', () => {
     w.place(0, w.arena.radius + 600, 0, -30);
     w.step(40);
     expect(insideArena(w.arena, Position.x[w.pid], Position.y[w.pid])).toBe(false);
-    // The boss, flung at it, stays in
+    // The boss, flung at it down the Throat (the Heart's one way out), stays in
     wake(w);
-    const b = w.boss();
-    w.server.ships.teleport(b, w.arena.radius - 900, 0);
-    Velocity.x[b] = 60;
+    const b = w.boss(), gy = w.arena.barrier![0][1];
+    w.server.ships.teleport(b, 0, gy - 1900);
+    Velocity.y[b] = 60;
     w.step(30);
     expect(insideArena(w.arena, Position.x[b], Position.y[b])).toBe(true);
   });

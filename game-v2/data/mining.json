@@ -258,6 +258,22 @@
         80
       ],
       "like": "asteroid_metal"
+    },
+    "scrap_seam_rich": {
+      "_comment": "The Scrap Mother's Nest Rock (systems.json sol_scrap_nest): a few lodes set down in her Smelter and on the rock's east face, each one big (about twice a belt rock's ore): worth a starter's while, take-or-leave later",
+      "name": "Greyseam Lode",
+      "hardness": 2,
+      "ores": {
+        "iron_ore": 38,
+        "copper_ore": 32,
+        "nickel_ore": 15,
+        "crystal": 15
+      },
+      "size": [
+        100,
+        140
+      ],
+      "like": "asteroid_metal"
     }
   },
   "oreHardness": {
@@ -583,14 +599,13 @@
   },
   "_fieldsComment": "Each belt's mix of rock types by weight (econ/rocks.ts): a type with a name and a size band is a rock type of its own; the rest are built in (AsteroidDefinition).",
   "fields": {
-    "scrap_nest": {
-      "asteroid_metal": 40,
-      "rock_slag": 20,
-      "asteroid_crystal": 12,
-      "rock_cuprite": 12,
-      "rock_rutile": 8,
-      "asteroid_fuel": 8,
-      "asteroid_mega": 6
+    "scrap_nest_junk": {
+      "asteroid_metal": 50,
+      "rock_slag": 40,
+      "asteroid_fuel": 10
+    },
+    "scrap_seam": {
+      "scrap_seam_rich": 1
     },
     "sol_belt": {
       "asteroid_metal": 35,

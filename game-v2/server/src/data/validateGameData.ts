@@ -443,7 +443,7 @@ const SHAPES: Record<string, Spec> = {
           else if (!(typeof r === 'number' && r >= 0 && r <= 5)) c.err(join(path, k), 'must be 0-5');
         }
       },
-      asteroidDensity: 'number', asteroidBelt: obj({ innerRadius: 'number', outerRadius: 'number', count: 'number', 'stationary?': 'boolean', 'lane?': obj({ angle: 'number', width: 'number' }), 'extra?': arr(obj({ innerRadius: 'number', outerRadius: 'number', count: 'number', 'field?': 'string', 'stationary?': 'boolean', 'lane?': obj({ angle: 'number', width: 'number' }) })) }),
+      asteroidDensity: 'number', asteroidBelt: obj({ innerRadius: 'number', outerRadius: 'number', count: 'number', 'stationary?': 'boolean', 'lane?': obj({ angle: 'number', width: 'number' }), 'extra?': arr(obj({ innerRadius: 'number', outerRadius: 'number', count: 'number', 'field?': 'string', 'stationary?': 'boolean', 'lane?': obj({ angle: 'number', width: 'number' }), 'at?': arr(arr('number')) })) }),
       'asteroidField?': 'string', stations: 'string[]',
       portals: arr(obj({ id: 'string', targetSystem: 'string', position: 'xy' })),
       'rifts?': arr(obj({ id: 'string', position: 'xy', destination: obj({ system: 'string', x: 'number', y: 'number' }) })),

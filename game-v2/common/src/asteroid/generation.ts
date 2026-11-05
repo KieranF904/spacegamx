@@ -42,6 +42,9 @@ const GOLDEN = Math.PI * (3 - Math.sqrt(5));
  */
 export function stationarySpot(systemId: string, seed: string, belt: AsteroidBeltData, index: number, size: number): { r: number; angle: number } {
   const { ring, k } = beltRing(belt, index);
+  // (set down at a spot of its own: a den's rich rocks)
+  const spot = ring.at?.[k];
+  if (spot) return { r: dhypot(spot[0], spot[1]), angle: datan2(spot[1], spot[0]) };
   const n = Math.max(1, ring.count), r0 = ring.innerRadius, r1 = ring.outerRadius;
   const rng = mulberry32(hashString(`still:${seed}:${systemId}:${index}`));
   const spacing = Math.sqrt((Math.PI * (r1 * r1 - r0 * r0)) / n);
