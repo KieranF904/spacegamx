@@ -57,21 +57,6 @@
         }
       },
       "visuals": {
-        "music": {
-          "root": 50,
-          "scale": "major",
-          "progression": [
-            0,
-            4,
-            5,
-            3
-          ],
-          "bar": 9,
-          "pad": "sawtooth",
-          "brightness": 900,
-          "bells": 2.2,
-          "bellOctave": 2
-        },
         "starHueShift": 0
       },
       "hazards": [],
@@ -930,21 +915,6 @@
         "hue": 14
       },
       "visuals": {
-        "music": {
-          "root": 45,
-          "scale": "dorian",
-          "progression": [
-            0,
-            3,
-            5,
-            3
-          ],
-          "bar": 9,
-          "pad": "sawtooth",
-          "brightness": 700,
-          "bells": 1.4,
-          "bellOctave": 2
-        },
         "starHueShift": -25,
         "hasNebula": true,
         "nebulaHue": 18,
@@ -1157,21 +1127,6 @@
         "coronaStyle": "softGlow"
       },
       "visuals": {
-        "music": {
-          "root": 52,
-          "scale": "aeolian",
-          "progression": [
-            0,
-            5,
-            3,
-            6
-          ],
-          "bar": 10,
-          "pad": "triangle",
-          "brightness": 1400,
-          "bells": 3,
-          "bellOctave": 2
-        },
         "starHueShift": 20,
         "specialStarChance": 0.05,
         "specialStarHue": 240
@@ -1478,21 +1433,6 @@
         "coronaStyle": "plasmaStreams"
       },
       "visuals": {
-        "music": {
-          "root": 53,
-          "scale": "lydian",
-          "progression": [
-            0,
-            1,
-            0,
-            4
-          ],
-          "bar": 11,
-          "pad": "sawtooth",
-          "brightness": 1100,
-          "bells": 2.6,
-          "bellOctave": 2
-        },
         "starHueShift": -30,
         "hasNebula": true,
         "nebulaHue": 300
@@ -1688,21 +1628,6 @@
         }
       },
       "visuals": {
-        "music": {
-          "root": 41,
-          "scale": "phrygian",
-          "progression": [
-            0,
-            1,
-            0,
-            6
-          ],
-          "bar": 13,
-          "pad": "sawtooth",
-          "brightness": 420,
-          "bells": 0.8,
-          "bellOctave": 1
-        },
         "starHueShift": -60
       },
       "hazards": [
@@ -1941,21 +1866,6 @@
         }
       },
       "visuals": {
-        "music": {
-          "root": 45,
-          "scale": "dorian",
-          "progression": [
-            0,
-            3,
-            6,
-            4
-          ],
-          "bar": 8,
-          "pad": "sawtooth",
-          "brightness": 700,
-          "bells": 1.6,
-          "bellOctave": 1
-        },
         "starHueShift": 25,
         "hasNebula": true,
         "nebulaHue": 12,
@@ -2175,21 +2085,6 @@
         }
       },
       "visuals": {
-        "music": {
-          "root": 38,
-          "scale": "phrygian",
-          "progression": [
-            0,
-            6,
-            5,
-            1
-          ],
-          "bar": 14,
-          "pad": "sawtooth",
-          "brightness": 380,
-          "bells": 0.6,
-          "bellOctave": 1
-        },
         "starHueShift": -15,
         "specialStarChance": 0.02,
         "specialStarHue": 35
@@ -2377,21 +2272,6 @@
         "beamHue": 186
       },
       "visuals": {
-        "music": {
-          "root": 55,
-          "scale": "lydian",
-          "progression": [
-            0,
-            4,
-            1,
-            4
-          ],
-          "bar": 8,
-          "pad": "triangle",
-          "brightness": 1800,
-          "bells": 4,
-          "bellOctave": 2
-        },
         "starHueShift": 60,
         "hasNebula": true,
         "nebulaHue": 170,

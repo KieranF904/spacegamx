@@ -7,11 +7,12 @@
 import { describe, expect, it } from 'vitest';
 import shipFunctions from '../../../data/ships/functions.json';
 import shipModels from '../../../data/ships/models.json';
-import systemsData from '../../../data/systems.json';
+import tuningData from '../../../data/ships/tuning.json';
 import { DECOR_SHAPES } from './partDecor';
 import { RARITIES, WEAPON_KIND_TYPE, type FunctionDef } from '@space-game/common';
 import sfxIndex from '../../public/sfx/index.json';
 import { SFX_VARIANTS } from '../audio/sfx';
+import { BEAM_LOOP, KIND_SFX, shotSoundForKind, shotSoundForType } from '../audio/weaponSounds';
 
 const fns = [...(shipFunctions as unknown as { functions: FunctionDef[] }).functions, ...(shipModels as unknown as { models: FunctionDef[] }).models];
 /** What a pilot is shown (the legacy functions models replaced aren't) */
@@ -54,15 +55,38 @@ describe('part presentation data', () => {
     expect(new Set(guide).size).toBe(guide.length);
   });
 
-  it('system music moods are well formed', () => {
-    const systems = (systemsData as unknown as { systems: { id: string; visuals?: { music?: Record<string, unknown> } }[] }).systems;
-    const withMusic = systems.filter((s) => s.visuals?.music);
-    expect(withMusic.map((s) => s.id)).toContain('sol');
-    for (const s of withMusic) {
-      const m = s.visuals!.music!;
-      for (const k of ['root', 'bar', 'brightness', 'bells', 'bellOctave']) expect(typeof m[k], `${s.id}.${k}`).toBe('number');
-      expect(Array.isArray(m.progression)).toBe(true);
-      expect(['major', 'lydian', 'dorian', 'aeolian', 'phrygian']).toContain(m.scale);
+  it('every part of one weapon kind makes the same sound (a projectile carries only its kind)', () => {
+    const byKind = new Map<string, string>();
+    for (const f of fns) {
+      if (!f.weapon) continue;
+      const s = `${f.sfx ?? ''}/${f.sfxTurret ?? ''}`;
+      if (f.sfx === undefined) continue;
+      expect(byKind.get(f.weapon) ?? s, `${f.id} (${f.weapon})`).toBe(s);
+      byKind.set(f.weapon, s);
     }
+  });
+
+  it('every weapon kind is heard: a shot sound, a held beam loop, or its own pulses', () => {
+    const tuning = (tuningData as unknown as { weapons: Record<string, unknown> }).weapons;
+    // Pulse lasers' pulses: ShipClient beamFx.onPulse (laser_pulse); the Lance's own beam: LanceFx
+    const ownSound = new Set(['laser']);
+    for (const kind of Object.keys(tuning)) {
+      const parts = fns.filter((f) => f.weapon === kind);
+      const beam = parts.some((f) => (f as { fire?: { model?: string } }).fire?.model === 'beam');
+      if (beam) expect(BEAM_LOOP.get(kind), `${kind}: a held beam with no loop`).toBeTruthy();
+      if (ownSound.has(kind)) continue;
+      const shot = KIND_SFX.get(kind);
+      if (kind === 'lance' || kind === 'frostbite' || kind === 'repair') { expect(BEAM_LOOP.get(kind), kind).toBeTruthy(); continue; }
+      expect(shot, `${kind}: no shot sound`).toBeDefined();
+      if (shot!.sfx) expect(SOUNDS[shot!.sfx], `${kind}: ${shot!.sfx} exists`).toBeDefined();
+    }
+    // The bosses' own projectiles don't fall back on the plain cannon shot
+    for (const k of ['rivet', 'scrap_chunk', 'seam_seeker', 'heart_spark', 'heart_seeker']) expect(shotSoundForType(WEAPON_KIND_TYPE[k], false), k).not.toBe('shot');
+  });
+
+  it('weapon families that differ sound different', () => {
+    const shot = (k: string) => KIND_SFX.get(k)?.sfx;
+    for (const [a, b] of [['cannon', 'autocannon'], ['cannon', 'pulse'], ['emp', 'arc'], ['missile', 'torpedo'], ['missile', 'charge'], ['flak', 'mortar']]) expect(shot(a), `${a} vs ${b}`).not.toBe(shot(b));
+    expect(shotSoundForKind('point_defence', true, 'turret_shot')).not.toBe('turret_shot');
   });
 });

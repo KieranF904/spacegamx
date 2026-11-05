@@ -33,6 +33,10 @@ import type { GameState } from '../state/GameState';
 import type { ShipSource } from './ShipStore';
 import type { Lighting } from '../rendering/lighting/Lighting';
 import { AnchorList, type ImpactAnchor } from '../rendering/weapons/impactAnchor';
+import { shotSoundForKind } from '../audio/weaponSounds';
+
+/** A point-defence turret's shot (its part's sfxTurret) */
+const PD_SOUND = shotSoundForKind('point_defence', true, 'turret_shot');
 
 type Sound = (id: string, at?: { x: number; y: number }, volume?: number) => void;
 
@@ -385,7 +389,7 @@ export class DamageFx {
       for (let i = 0; i < 2; i++) this.dustPuff(m.x, m.y, (Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 0.8, 18 + Math.random() * 10, 40, 0x3a3634, 0.45, 0.3);
       this.sound('explosion_small', { x: m.x, y: m.y }, 0.35);
     } else this.burstSparks(m.x, m.y, 0, 0, 4, 1, 4, 0xffd080);
-    this.sound('turret_shot', { x: m.fx, y: m.fy }, 0.35);
+    this.sound(PD_SOUND, { x: m.fx, y: m.fy }, 0.35);
   }
 
   onStationFire(from: { x: number; y: number; weapon: string; color: number }, target: number): void {

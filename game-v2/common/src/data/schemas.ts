@@ -409,33 +409,12 @@ export interface SystemVisualsData {
   /** Nebula presence + hue */
   hasNebula?: boolean;
   nebulaHue?: number;
-  /** The system's ambient music (client/src/audio/MusicEngine.ts; default: Sol's) */
-  music?: MusicMoodData;
   /** Share of its (non-ice) rocks drawn veined with greyseam (default a third) */
   greyseam?: number;
   /** Ambient light level (default: from its sky) */
   ambient?: number;
 }
-
-/** A generative-music mood: key, harmony, tempo and timbre */
-export interface MusicMoodData {
-  /** MIDI note of the tonic */
-  root: number;
-  /** A named mode, or scale steps in semitones from the root */
-  scale: 'major' | 'lydian' | 'dorian' | 'aeolian' | 'phrygian' | number[];
-  /** Chord roots as scale degrees (0-based), one per bar */
-  progression: number[];
-  /** Seconds per bar */
-  bar: number;
-  /** Pad oscillator */
-  pad: 'sine' | 'square' | 'sawtooth' | 'triangle';
-  /** Pad filter cutoff, Hz */
-  brightness: number;
-  /** Bell notes per bar (average) */
-  bells: number;
-  /** Octave offset of the bells */
-  bellOctave: number;
-}
+// (A system's music: data/audio.json `music`, client/src/audio/musicProfiles.ts)
 
 /** A named ring of a system, between two distances from its centre */
 export interface SystemZoneData {

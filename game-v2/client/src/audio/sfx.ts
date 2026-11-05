@@ -655,7 +655,8 @@ function loopBuffer(ctx: BaseAudioContext, kind: 'engine' | 'boost'): AudioBuffe
   return buf;
 }
 
-export type LoopId = 'engine' | 'boost' | 'mining' | 'laser_loop' | 'lance_loop';
+/** A looping sound: the engine, boost and mining hums, and each held beam's (its part's sfxLoop) */
+export type LoopId = 'engine' | 'boost' | 'mining' | (string & {});
 
 /** How many variants each effect has (rendered as id, id#1, id#2, ...) */
 export const SFX_VARIANTS: Record<string, number> = Object.fromEntries(Object.entries(RECIPES).map(([id, r]) => [id, r.variants ?? 1]));
