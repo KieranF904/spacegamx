@@ -25,6 +25,12 @@ Environment=SITE_STATUS_FILE=/opt/spacegame/data/status/live.json
 EnvironmentFile=/etc/spacegame/secrets.env
 Restart=always
 RestartSec=3
+# Below the game server on a shared 2 vCPU / 4 GB box
+CPUWeight=80
+MemoryHigh=384M
+MemoryMax=512M
+# Files it makes (posts, uploads): not readable by other users (nginx never serves data/site directly)
+UMask=0027
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true

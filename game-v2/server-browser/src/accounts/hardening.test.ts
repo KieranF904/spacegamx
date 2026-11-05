@@ -10,7 +10,7 @@ import { DeletedAccounts } from './DeletedAccounts.js';
 import { RateLimiter } from './RateLimiter.js';
 import { BodyError, clientIp, readJson } from './request.js';
 import { safeEqual } from './utils.js';
-import { MAX_SERVERS, parseHeartbeat } from '../servers.js';
+import { MAX_SERVERS, listing, parseHeartbeat } from '../servers.js';
 
 const dirs: string[] = [];
 afterEach(() => { for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true }); });
@@ -250,6 +250,15 @@ describe('game server heartbeat', () => {
     expect(parseHeartbeat({ host: 'space.example.com', port: 443, name: 'Main', region: 'eu', maxPlayers: 32, players: 3, secure: true, version: '2.0.0', adminPort: 3101 }, '127.0.0.1'))
       .toEqual({ host: 'space.example.com', port: 443, name: 'Main', region: 'eu', maxPlayers: 32, players: 3, secure: true, version: '2.0.0', adminPort: 3101 });
     expect(parseHeartbeat({}, '::ffff:127.0.0.1')).toMatchObject({ host: '::ffff:127.0.0.1', port: 3000, name: 'Game Server', maxPlayers: 32, players: 0, adminPort: undefined });
+  });
+
+  it('lists no admin port in production (the dev lobby keeps it for the sandbox)', () => {
+    const s = { host: 'space.example.com', port: 443, name: 'Main', region: 'eu', maxPlayers: 32, players: 3, secure: true, version: '2.0.0', lastSeen: 1, adminPort: 3105 };
+    const prod = listing(s, true);
+    expect('adminPort' in prod).toBe(false);
+    expect('lastSeen' in prod).toBe(false);
+    expect(prod).toEqual({ host: 'space.example.com', port: 443, name: 'Main', region: 'eu', maxPlayers: 32, players: 3, secure: true, version: '2.0.0' });
+    expect(listing(s, false).adminPort).toBe(3105);
   });
 
   it('refuses hosts that could break the page, and bad ports; bounds the rest', () => {

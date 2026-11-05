@@ -1,0 +1,2 @@
+# Everything here runs on Linux (bash, nginx, systemd, sshd): LF in every checkout, even with core.autocrlf on Windows
+* text=auto eol=lf

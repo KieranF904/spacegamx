@@ -33,4 +33,17 @@ grep -qi '^passwordauthentication no' <<<"$MON" || undo "monitor could use a pas
 grep -qi '^permittty no' <<<"$MON" || undo "monitor could get a terminal"
 grep -qi '^forcecommand none' <<<"$ROOT" || undo "root caught by the monitor's rules"
 systemctl reload ssh
+# The game's status file: data/ is the game's own (750), so the monitor reads data/status through an ACL (deploys
+# set the same: remote-install.sh data_perms)
+if [ -d /opt/spacegame/data ]; then
+  if command -v setfacl >/dev/null 2>&1; then
+    install -d -o spacegame -g spacegame -m 750 /opt/spacegame/data/status
+    setfacl -m u:vpsmon:x /opt/spacegame/data
+    setfacl -m u:vpsmon:rx /opt/spacegame/data/status
+    setfacl -d -m u::rwx,g::rx,o::-,u:vpsmon:r /opt/spacegame/data/status
+    if [ -f /opt/spacegame/data/status/live.json ]; then setfacl -m u:vpsmon:r /opt/spacegame/data/status/live.json; fi
+  else
+    echo "no setfacl (apt install acl): the monitor can't read the game's status file" >&2
+  fi
+fi
 echo "vpsmon ready"

@@ -52,11 +52,13 @@ export default defineConfig(({ command, mode }) => ({
   },
   build: {
     target: 'esnext',
-    sourcemap: true,
+    // (maps are written for local debugging, but no bundle links to them: nothing tells a browser they exist)
+    sourcemap: 'hidden',
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
-        sandbox: resolve(__dirname, 'sandbox.html'),
+        // The sandbox (a developer tool) only in non-production builds, or with SANDBOX_BUILD=1
+        ...(mode !== 'production' || process.env.SANDBOX_BUILD === '1' ? { sandbox: resolve(__dirname, 'sandbox.html') } : {}),
       },
     },
   },

@@ -104,14 +104,13 @@ thing that is manual:
   lobby's `LOBBY_ADMIN_SECRET`, which the site shares). The site refuses to start in production without
   `SITE_SECRET`, `LOBBY_ADMIN_SECRET` and an https `SITE_ORIGIN`, and says which is missing.
   API tokens for posting updates are made in the admin panel after the first deploy. `.env.example` lists every name.
-- **nginx**: the site's routes are a snippet, `deploy/vps/nginx-spacegame-site.conf`, installed to
-  `/etc/nginx/snippets/spacegame-site.conf` on every deploy. The live site file (certbot has edited it) is not
-  overwritten: the first deploy swaps its old `location /` for `include /etc/nginx/snippets/spacegame-site.conf;`,
-  keeps the old file as `/etc/nginx/sites-available/spacegame.before-website`, and puts it back if `nginx -t`
-  fails. If that happens, the manual step is to replace the `location / { ... }` block in
-  `/etc/nginx/sites-available/spacegame` with that include line and run `nginx -t && systemctl reload nginx`.
+- **nginx**: the site's routes are a snippet, `deploy/vps/nginx-spacegame-site.conf`, installed as the root snippet
+  `/etc/nginx/snippets/spacegame-root.conf` by a `WITH_SITE=1` deploy (and kept by later game-only deploys while the
+  site runs; without the site the root snippet is `nginx-spacegame-play.conf`, the game alone). The game's own routes
+  are `nginx-spacegame-game.conf`, which includes it. Every deploy tests them with `nginx -t` and puts the old files back
+  if it fails (see docs/areas/ops-tools.md).
 - **What changes for players**: `https://space.brotherk3d.com/` becomes the website, and the game is at `/play`
-  (signed in from the site). The game's socket, `/lobby/`, `/auth/`, `/health`, `/assets/` and `/sfx/` stay where they
+  (signed in from the site). The game's socket, `/lobby/`, `/health`, `/assets/` and `/sfx/` stay where they
   were. Old bookmarks to the root show the website, with a Play button.
 - **Admin**: the lobby seeds an admin only with `ADMIN_PASSWORD` set; on the VPS the existing admin account is the
   site's admin.

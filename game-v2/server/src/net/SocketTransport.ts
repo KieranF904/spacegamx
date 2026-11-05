@@ -40,7 +40,7 @@ export class SocketTransport {
   private lastBadLog = 0;
   private badSince = 0;
 
-  constructor(private server: GameServer, port: number) {
+  constructor(private server: GameServer, port: number, host?: string) {
     this.httpServer = http.createServer((req, res) => {
       // CORS headers for all responses
       res.setHeader('Access-Control-Allow-Origin', '*');
@@ -54,7 +54,7 @@ export class SocketTransport {
         return;
       }
 
-      // Health check endpoint for Fly.io
+      // Health check (the join screen's ping, nginx /health)
       if (req.url === '/health' || req.url === '/') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ status: 'ok', players: this.server.getPlayerCount() }));
@@ -101,8 +101,9 @@ export class SocketTransport {
     this.wss.on('error', (e) => console.error('[Socket] server error:', e));
     this.httpServer.on('clientError', (_e, sock) => { try { sock.destroy(); } catch { /* gone */ } });
 
-    this.httpServer.listen(port, () => {
-      console.log(`Game server started on port ${port}`);
+    // (host: every interface when not given; the VPS listens on 127.0.0.1 only, behind nginx)
+    this.httpServer.listen(port, host, () => {
+      console.log(`Game server started on ${host ?? '*'}:${port}`);
     });
   }
 
