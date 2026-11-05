@@ -1,3 +1,6 @@
 
 # Ships the ports evolver saves for the lab (ports.html#file=evolved/<scenario>.json)
 prototypes/energy-lab/evolved/
+
+# Player-bot stats (server/src/bots): JSON lines and summaries, one file per bot per run
+server/stats/

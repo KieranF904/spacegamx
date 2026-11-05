@@ -19,6 +19,7 @@ How the game gets onto the user's shared VPS (space.brotherk3d.com), how it is b
 | `scripts/boss-shots/shoot.mjs` | | Live-game screenshots via DevTools in a tab leased from the daemon's Chrome: `node shoot.mjs <url> <outPrefix> [steps json|@file]` |
 | `scripts/profile/{clientProfile,loadTime,precacheAudit,bossBulletHell}.mjs` | | Client frame/CPU profiling (needs Vite 5273 + server 3000), load time, precache audit |
 | `server/src/bench/{tickBench,netBench,collisionBench,profileBench,bulletHellBench}.ts` | | Benches. `cd server && npx tsx src/bench/tickBench.ts [--seconds N] [--pilots N]`; `npm run bench:net` (in `server/`) |
+| `server/src/bench/playerBot.ts`, `server/src/bots/` | | Dev-only player bots and their accelerated bench: `cd server && npx tsx src/bench/playerBot.ts 30` (DRIVER=client, npc or both), `/bot` in dev chat. Docs: [bots](bots.md) |
 | `scripts/gen-sfx.mjs`, `gen-*.mjs`, `scripts/{sun-sky-proto,planet-proto,surface-art,terrain,bespoke}` | | Asset generators and render prototypes (`npm run gen:sfx` reads `.env`) |
 | `docs/panels/` (`index.md`, `<date>/<category>/`) | | Before/after panels for dev updates |
 | `docs/ops/`, `docs/audits/` | | Ops runbooks and audits (`server-robustness.md` lists what guards the live server) |
