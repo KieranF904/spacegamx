@@ -38,7 +38,8 @@ import {
   BlueprintError, TurretWindow, computeTurretWindow, ClientMessage, ServerHangarMessage, partDemand, parsePartItemId,
   isStructural, ghostBill, SALVAGE, ShipState, buildPoints, DAMAGE_NAMES, type DamageType,
   loadoutKinds, cratesFor, crateOrder, MAX_LOADOUT_CRATES, wireCells, cellKey,
-  type FunctionDef, mountingOf, weaponSides, clearCells, partMountingProblems, type MountingProblem } from '@space-game/common';
+  type FunctionDef, mountingOf, weaponSides, clearCells, partMountingProblems, type MountingProblem,
+  cellMap, exhaustProblem } from '@space-game/common';
 import { cargoEffect, CATEGORY_MASS, strafeForce, bestDodge, burstEnergy, DODGE_FORWARD, DODGE_BACK, DODGE_LEFT, DODGE_RIGHT } from '@space-game/common';
 import { bankKind, gunDrawFlatOut, energyTuning, loadTest, BROWNOUT, type LoadTestResult } from '@space-game/common';
 import { settings } from '../settings/Settings';
@@ -768,7 +769,13 @@ export class HangarUI {
     this.errors = validateBlueprint(catalog, this.bp, tuning, null).errors;
     // (Each gun's broken mounting rules, by index: drawn on the grid and listed in its tooltip)
     this.mountingBroken = new Map();
-    this.geoms.forEach((_, i) => { const b = partMountingProblems(catalog, this.geoms, i); if (b.length) this.mountingBroken.set(i, b); });
+    // (and each engine whose exhaust the ship blocks: a warning, its lost thrust, never a refusal: common mounting.ts engineExhaust)
+    const standing = cellMap(this.geoms);
+    this.geoms.forEach((_, i) => {
+      const b = partMountingProblems(catalog, this.geoms, i), ex = exhaustProblem(catalog, this.geoms, i, standing);
+      if (ex) b.push(ex);
+      if (b.length) this.mountingBroken.set(i, b);
+    });
     this.freeTag.style.display = this.freeBuild ? '' : 'none';
     for (const q of this.bp.parts) {
       const id = partItemId(q);
@@ -1661,7 +1668,7 @@ export class HangarUI {
       drawDecor2d(ctx, g, (x, y) => [sx(x), sy(y)], px, ghost ? 0.35 : 1, gradeGlow(look.grade), !ghost);
       if (p.facing) this.drawFacing(g, p.facing as Side, sx, sy);
     });
-    // Guns that break their mounting rules (a ship fitted before a rule changed): what's wrong, in red
+    // Guns that break their mounting rules (a ship fitted before a rule changed), engines with a blocked exhaust: what's wrong, in red
     this.geoms.forEach((g, i) => {
       const broken = this.mountingBroken.get(i);
       if (broken) this.drawMounting(g, broken, sx, sy, false);
@@ -1982,6 +1989,16 @@ if (d && this.overlays.com && d.mass > 0) {
    */
   private drawMounting(g: PlacedGeom, broken: MountingProblem[], sx: (x: number) => number, sy: (y: number) => number, all: boolean): void {
     const { catalog } = this.deps, ctx = this.ctx, px = this.view.px;
+    // An engine's blocked exhaust: the first cell in the way on each blocked lane, in red
+    for (const [x, y] of broken.find((b) => b.rule === 'exhaust')?.cells ?? []) {
+      ctx.fillStyle = 'rgba(248, 113, 113, 0.35)';
+      ctx.fillRect(sx(x) + 2, sy(y) + 2, px - 4, px - 4);
+      ctx.strokeStyle = '#f87171';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.strokeRect(sx(x) + 2, sy(y) + 2, px - 4, px - 4);
+      ctx.setLineDash([]);
+    }
     const m = mountingOf(catalog, g.part.fn, undefined, g.part.mount);
     const sides = weaponSides(catalog, g.part);
     if (!m || !sides) return;

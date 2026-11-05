@@ -409,8 +409,11 @@ export function buildPortsLayout(input: PortsLayoutInput): PortsLayout {
     const specs: (PortSpec & { aug?: 1 })[] = ag ? [...(fns[i].ports ?? []), { dir: 'in', side: ag.side, cell: ag.cell, rate: ag.rate, aug: 1 }] : fns[i].ports ?? [];
     for (const q of specs) {
       const e = placeEdge(parts[i], frames[i], q.side, q.cell ?? 0), dir = q.dir === 'out' ? 1 : 0;
-      // (A port past the piece's side lands on its last cell: a second one there is the same port, once. A 1-cell core has one N port, a 2-cell one two)
-      if (byPart[i].some((o) => o.x === e.x && o.y === e.y && o.side === e.side && o.dir === dir)) continue;
+      // (A port past the piece's side lands on its last cell: a second one there is the same port, once. A 1-cell core has one N port, a 2-cell one two.
+      // An engine's are one port rated for both: a Torch stood along its thrust (one cell across its back) can still be fed its whole burn, as it pushes
+      // with every cell, mounting.ts engineExhaust)
+      const same = byPart[i].find((o) => o.x === e.x && o.y === e.y && o.side === e.side && o.dir === dir);
+      if (same) { if (role[i] === P_THRUSTER && !q.aug) same.rate += q.rate; continue; }
       const port: Port = { part: i, dir, x: e.x, y: e.y, side: e.side, nx: e.nx, ny: e.ny, rate: q.rate * (role[i] === P_GEN ? health(i) : 1), link: -1, aug: q.aug ? 1 : 0 };
       ports.push(port); byPart[i].push(port);
     }

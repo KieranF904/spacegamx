@@ -137,7 +137,9 @@ export function previewPorts(L: PortsLayout | undefined, part: PlacedPart, fn: F
   const out: PortPreview[] = [];
   for (const q of specs) {
     const e = placeEdge(part, F, q.side, q.cell ?? 0), dir = q.dir === 'out' ? 1 : 0;
-    if (out.some((o) => o.x === e.x && o.y === e.y && o.side === e.side && o.dir === dir)) continue;
+    // (Two on one cell are one port; an engine's rated for both, as buildPortsLayout makes it)
+    const same = out.find((o) => o.x === e.x && o.y === e.y && o.side === e.side && o.dir === dir);
+    if (same) { if (isEngine(fn) && !q.aug) same.rate += q.rate; continue; }
     const k = at.get(edgeKey(e.nx, e.ny, OPP[e.side]));
     const other = k === undefined || !L ? undefined : L.ports[k];
     let state: PortState, to = -1;

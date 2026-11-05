@@ -16,6 +16,7 @@ import { fnOutput, isEngine, partDemand, partGrade, partMaterial, partSupply, pa
 import { netJoins, wireNetworks } from './wires.js';
 import { groupsGone } from './groups.js';
 import { gunRate } from './launch.js';
+import { type CellMap, cellMap, engineExhaust } from './mounting.js';
 import { type EnergyInfo, gunDrawFlatOut } from './energy.js';
 import { type PowerLayout, bankKind, powerLayout } from './circuits.js';
 import { type PortsLayout, buildPortsLayout } from './power/ports.js';
@@ -54,6 +55,8 @@ export interface ThrusterInfo {
   torque: number;
   /** A model engine's rated speed (world units a tick): its thrust fades out towards it (flight.ts); absent, it never fades */
   rated?: number;
+  /** The share of its exhaust lanes the ship leaves clear, when some are blocked (mounting.ts engineExhaust; `force` is already scaled by it) */
+  exhaust?: number;
 }
 
 export interface WeaponInfo {
@@ -441,10 +444,13 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
   const maxThrust = { forward: 0, back: 0, left: 0, right: 0 };
   let torqueCw = 0, torqueCcw = 0;
   let thrustSum = 0, boostSum = 0, drainSum = 0, demandSum = 0;
+  // (An engine keeps the share of its exhaust lanes the ship as it stands leaves clear: mounting.ts engineExhaust)
+  let standing: CellMap | null = null;
   for (let i = 0; i < n; i++) {
     if (!alive[i] || !isEngine(fns[i]) || !mounts[i]) continue;
-    const nrm = mounts[i]!.dir;
-    const mag = partThrust(catalog, fns[i], area[i], mats[i]) * satisfaction[i];
+    const nrm = mounts[i]!.dir, side = parts[i].facing;
+    const exhaust = side && !geoms[i].bespoke ? engineExhaust(geoms, i, side, standing ??= cellMap(geoms, (j) => alive[j])).share : 1;
+    const mag = partThrust(catalog, fns[i], area[i], mats[i]) * satisfaction[i] * exhaust;
     thrustSum += mag;
     boostSum += mag * (fns[i].boost ?? 2.2);
     // (The drain is weighted by what each engine draws, as the power tick adds it up engine by engine)
@@ -454,7 +460,7 @@ function rebuildAsIs(input: RebuildInput): ShipDerived {
     const force: Vec2 = [-nrm[0] * mag || 0, -nrm[1] * mag || 0];
     const pos = geoms[i].centroid;
     const torque = cross2([pos[0] - com[0], pos[1] - com[1]], force) * cs;
-    thrusters.push({ part: i, force, pos, torque, ...(fns[i].rated ? { rated: fns[i].rated } : {}) });
+    thrusters.push({ part: i, force, pos, torque, ...(fns[i].rated ? { rated: fns[i].rated } : {}), ...(exhaust < 1 ? { exhaust } : {}) });
     maxThrust.forward += Math.max(0, -force[1]);
     maxThrust.back += Math.max(0, force[1]);
     maxThrust.left += Math.max(0, -force[0]);

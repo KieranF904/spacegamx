@@ -130,13 +130,11 @@
     {"uid":124,"piece":"rect2","fn":"engine_torch","material":"alloy","x":4,"y":7,"rot":0,"flip":false,"facing":"S"},
     {"uid":125,"piece":"sq","fn":"power_cell_reactor","material":"alloy","x":4,"y":6,"rot":2,"flip":false},
     {"uid":126,"piece":"sq","fn":"power_cell_reactor","material":"alloy","x":5,"y":6,"rot":2,"flip":false},
-    {"uid":127,"piece":"sq","fn":"engine_ion_drive","material":"alloy","x":-7,"y":7,"rot":0,"flip":false,"facing":"S"},
+    {"uid":127,"piece":"rect2","fn":"engine_torch","material":"alloy","x":-7,"y":7,"rot":0,"flip":false,"facing":"S"},
     {"uid":128,"piece":"sq","fn":"power_cell_reactor","material":"alloy","x":-7,"y":6,"rot":2,"flip":false},
-    {"uid":129,"piece":"sq","fn":"engine_ion_drive","material":"alloy","x":-6,"y":7,"rot":0,"flip":false,"facing":"S"},
     {"uid":130,"piece":"sq","fn":"power_cell_reactor","material":"alloy","x":-6,"y":6,"rot":2,"flip":false},
-    {"uid":131,"piece":"sq","fn":"engine_ion_drive","material":"alloy","x":6,"y":7,"rot":0,"flip":false,"facing":"S"},
+    {"uid":131,"piece":"rect2","fn":"engine_torch","material":"alloy","x":6,"y":7,"rot":0,"flip":false,"facing":"S"},
     {"uid":132,"piece":"sq","fn":"power_cell_reactor","material":"alloy","x":6,"y":6,"rot":2,"flip":false},
-    {"uid":133,"piece":"sq","fn":"engine_ion_drive","material":"alloy","x":7,"y":7,"rot":0,"flip":false,"facing":"S"},
     {"uid":134,"piece":"sq","fn":"power_cell_reactor","material":"alloy","x":7,"y":6,"rot":2,"flip":false}
   ]
 }
