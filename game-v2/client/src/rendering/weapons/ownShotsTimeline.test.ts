@@ -32,7 +32,7 @@ function rig() {
   st.serverTickTarget = 1000; st.serverTickTargetTime = now; st.tickOffset = 1000 - now / s.tickMs;
   // (a lead of LEAD ticks, as a 60-100 ms connection with some jitter has)
   st.updateLead = () => { s.leadTicks = LEAD; };
-  const player = { id: ME, type: EntityType.Ship, x: 0, y: 0, vx: SHIP_V, vy: 0, angle: 0, angVel: 0, renderX: 0, renderY: 0, renderAngle: 0, data: [] } as unknown as InterpolatedEntity;
+  const player = { id: ME, type: EntityType.Player, x: 0, y: 0, vx: SHIP_V, vy: 0, angle: 0, angVel: 0, renderX: 0, renderY: 0, renderAngle: 0, data: [] } as unknown as InterpolatedEntity;
   s.entities.set(ME, player);
   // (snapshots in the buffer: interpolate draws the local ship between its last two steps)
   s.applySnapshot(snap(990));
