@@ -1655,7 +1655,7 @@
       "speed": 2.5,
       "turn": 1,
       "brain": "pyreclast",
-      "stageHp": [23400, 31200, 23400],
+      "stageHp": [33000, 44000, 33000],
       "limbs": {
         "scythe_gun": 1200, "wing_flak": 1200, "bay": 1100, "scythe_root": 1300,
         "horn_gun": 1100, "mortar": 1300, "coil": 1300, "lance": 2000, "vent": 1200, "spine": 1500,
