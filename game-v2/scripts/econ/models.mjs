@@ -952,6 +952,46 @@ for (const m of models) {
 }
 
 // ---------------------------------------------------------------------------
+// Sounds: every weapon model is heard as its own (client/src/audio/weaponSounds.ts). A model takes its kind's sounds
+// (legacyLook) unless it's here; `sfx` here replaces both its kind's plain and turret shot (a model is one or the
+// other), `sfxLoop` is a held beam's loop (its `sfx` then plays as it lights). Files: scripts/sfx-manifest.json.
+// ---------------------------------------------------------------------------
+
+const MODEL_SOUND = {
+  cannon_pip: { sfx: 'pip_shot' },
+  cannon_hammer: { sfx: 'hammer_shot' },
+  cannon_twinlink: { sfx: 'twinlink_shot' },
+  cannon_longbarrel: { sfx: 'longbarrel_shot' },
+  cannon_bastion: { sfx: 'bastion_shot' },
+  cannon_slurry: { sfx: 'slurry_shot' },
+  autocannon_chainsaw: { sfx: 'chainsaw_shot' },
+  autocannon_stinger: { sfx: 'stinger_shot' },
+  flak_cloudmaker: { sfx: 'cloudmaker_shot' },
+  mortar_quake: { sfx: 'quake_shot' },
+  laser_cutter: { sfxLoop: 'laser_loop' },
+  laser_searchlight: { sfxLoop: 'searchlight_loop' },
+  pulse_overpulse: { sfx: 'overpulse_shot' },
+  missile_swarm: { sfx: 'swarm_launch' },
+  missile_hammerhead: { sfx: 'hammerhead_launch' },
+  railgun_coilgun: { sfx: 'coilgun_shot' },
+  railgun_spear: { sfx: 'spear_shot' },
+  railgun_rail_driver: { sfx: 'rail_driver_shot' },
+  emp_blackout: { sfx: 'blackout_shot' },
+  arc_tesla: { sfxLoop: 'arc_loop' },
+  torpedo_leviathan: { sfx: 'leviathan_launch' },
+  lance_lance: { sfx: 'lance_fire', sfxLoop: 'lance_loop' },
+  utility_repair_beam: { sfxLoop: 'repair_loop' },
+  point_defence_turret: { sfx: 'pd_shot' },
+};
+for (const m of models) {
+  const s = MODEL_SOUND[m.id];
+  if (!s) continue;
+  if (s.sfx) { delete m.sfxTurret; m.sfx = s.sfx; }
+  if (s.sfxLoop) m.sfxLoop = s.sfxLoop;
+}
+for (const id of Object.keys(MODEL_SOUND)) if (!models.some((m) => m.id === id)) throw new Error(`MODEL_SOUND: no model ${id}`);
+
+// ---------------------------------------------------------------------------
 // Write
 // ---------------------------------------------------------------------------
 

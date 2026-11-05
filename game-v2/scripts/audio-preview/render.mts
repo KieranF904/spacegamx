@@ -5,6 +5,10 @@
  *
  *   npm i --no-save node-web-audio-api        (once: a Web Audio implementation for Node)
  *   server/node_modules/.bin/tsx scripts/audio-preview/render.mts [out dir] [only ids...]
+ *   (NODE_WEB_AUDIO_API=<an installed node-web-audio-api's index.js>: use one installed elsewhere)
+ *
+ * Ids: a scene's id, `weapons` (the first board, by kind) or `weapons_v2` (every weapon model's own sound, as the game
+ * picks it: weaponSounds.ts; then the enemies' warnings, old and new).
  *
  * Default out dir: docs/panels/<today>/audio (WAVs there stay local: .gitignore).
  */
@@ -15,11 +19,14 @@ import { fileURLToPath } from 'url';
 import { MusicEngine } from '../../client/src/audio/MusicEngine';
 import type { MusicPlace } from '../../client/src/audio/musicProfiles';
 import { prepare, FILE_GAIN, FILE_LOWPASS, FILE_PITCH } from '../../client/src/audio/AudioManager';
+import { beamLightSound, beamLoopFor, shotSoundFor } from '../../client/src/audio/weaponSounds';
+import { WEAPON_KIND_TYPE } from '@space-game/common';
+import { pathToFileURL } from 'url';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let WA: any;
 try {
-  WA = await import('node-web-audio-api');
+  WA = await import(process.env.NODE_WEB_AUDIO_API ? pathToFileURL(process.env.NODE_WEB_AUDIO_API).href : 'node-web-audio-api');
 } catch {
   console.error('needs node-web-audio-api: npm i --no-save node-web-audio-api');
   process.exit(1);
@@ -152,5 +159,107 @@ async function renderBoard(): Promise<void> {
   console.log('ok weapons_board.wav (+ weapons_board.txt: what plays when)');
 }
 
+/**
+ * The weapon board, v2: every weapon model in data/ships/models.json, each with the sound the game now picks for it
+ * (weaponSounds.ts: its own shot, beam loop and ignition), then the custom enemies' and bosses' warnings, old and new.
+ */
+async function renderBoardV2(): Promise<void> {
+  const sfxDir = join(root, 'client/public/sfx');
+  const index = JSON.parse(readFileSync(join(sfxDir, 'index.json'), 'utf-8')) as Record<string, { variants: number; loop?: boolean }>;
+  const models = (JSON.parse(readFileSync(join(root, 'data/ships/models.json'), 'utf-8')) as { models: { id: string; name: string; weapon?: string; mount?: string; fire?: { model?: string; interval?: number; clip?: number } }[] }).models;
+  const tuning = JSON.parse(readFileSync(join(root, 'data/ships/tuning.json'), 'utf-8')) as { weapons: Record<string, { pulse?: unknown }> };
+  const dec = new OfflineAudioContext(1, SR, SR);
+  const cache = new Map<string, AudioBuffer[]>();
+  const load = async (id: string): Promise<AudioBuffer[] | null> => {
+    if (cache.has(id)) return cache.get(id)!;
+    const info = index[id];
+    if (!info) return null;
+    const bufs: AudioBuffer[] = [];
+    for (let v = 0; v < info.variants; v++) {
+      const bytes = readFileSync(join(sfxDir, `${v ? `${id}_${v}` : id}.mp3`));
+      const raw = await dec.decodeAudioData(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.length));
+      bufs.push(prepare(dec as unknown as BaseAudioContext, raw, !!info.loop, FILE_GAIN[id] ?? 0.6, FILE_LOWPASS[id]));
+    }
+    cache.set(id, bufs);
+    return bufs;
+  };
+  const clips: { at: number; buf: AudioBuffer; rate: number; gain: number; stop?: number }[] = [];
+  const lines: string[] = ['Weapons board v2: every weapon model with the sound the game plays for it (a new sound marked *new*).', ''];
+  const NEW = new Set(['pip_shot', 'hammer_shot', 'twinlink_shot', 'longbarrel_shot', 'bastion_shot', 'slurry_shot', 'chainsaw_shot', 'stinger_shot',
+    'cloudmaker_shot', 'quake_shot', 'overpulse_shot', 'swarm_launch', 'hammerhead_launch', 'coilgun_shot', 'spear_shot', 'rail_driver_shot', 'blackout_shot',
+    'leviathan_launch', 'searchlight_loop', 'lance_fire', 'lance_loop', 'target_tone', 'suck_whoosh']);
+  const tag = (id: string) => (NEW.has(id) ? `${id} *new*` : id);
+  let t = 0.3;
+  /** A one-shot `reps` times, `gap` s apart (rapid fire as the gun's interval has it, capped) */
+  const shots = async (id: string, reps: number, gap: number, gain = 0.7): Promise<boolean> => {
+    const bufs = await load(id);
+    if (!bufs) return false;
+    const rate = FILE_PITCH[id] ?? 1;
+    for (let r = 0; r < reps; r++) { clips.push({ at: t, buf: bufs[r % bufs.length], rate: rate * (0.94 + Math.random() * 0.12), gain }); t += gap; }
+    t += Math.min(1.2, bufs[0].duration / rate) * 0.6;
+    return true;
+  };
+  /** A beam's loop held `seconds`, looped back to back as the game loops it */
+  const loop = async (id: string, seconds: number): Promise<boolean> => {
+    const bufs = await load(id);
+    if (!bufs) return false;
+    for (let at = 0; at < seconds; at += bufs[0].duration) clips.push({ at: t + at, buf: bufs[0], rate: 1, gain: 0.7, stop: t + seconds });
+    t += seconds;
+    return true;
+  };
+  for (const m of models) {
+    if (!m.weapon) continue;
+    const label = `${m.name} (${m.id})`;
+    const start = t;
+    if (m.fire?.model === 'beam') {
+      const light = beamLightSound(m.id), lp = beamLoopFor(m.id, m.weapon);
+      if (light) await shots(light, 1, 0.25);
+      if (lp) await loop(lp, 2.5);
+      lines.push(`${start.toFixed(1).padStart(5)} s  ${label}: ${light ? `${tag(light)} as it lights, then ` : ''}${lp ? `${tag(lp)} (held beam loop)` : 'SILENT'}`);
+    } else if (tuning.weapons[m.weapon]?.pulse) {
+      lines.push(`   --    ${label}: laser_pulse (synthesised in game, sfx.ts; not on this board)`);
+      continue;
+    } else {
+      const id = shotSoundFor(m.id, WEAPON_KIND_TYPE[m.weapon] ?? -1, m.mount === 'turret');
+      const iv = m.fire?.interval ?? 60;
+      const reps = m.fire?.model === 'charge' ? 1 : Math.min(m.fire?.clip ?? 6, iv <= 8 ? 6 : iv <= 20 ? 4 : iv <= 60 ? 3 : 2);
+      const ok = !!id && (await shots(id, reps, Math.max(0.09, Math.min(0.5, iv / 60))));
+      lines.push(`${start.toFixed(1).padStart(5)} s  ${label}: ${ok ? `${tag(id)}${reps > 1 ? ` x${reps}` : ''}` : `MISSING ${id}`}`);
+    }
+    t += 0.8;
+  }
+  lines.push('', 'Enemy and boss warnings (the custom enemies\' aim lines and rings, the Scrap Mother\'s pulls):');
+  const warnings: [string, string, number, number][] = [
+    ['OLD targeting (jump_charge, was on every aim line and ring)', 'jump_charge', 1, 0.5],
+    ['NEW targeting', 'target_tone', 1, 0.5],
+    ['NEW targeting, a pack at once (spaced 0.7 s at least: BossFx)', 'target_tone', 3, 0.7],
+    ['NEW Scrap Mother pull / intake (was a charging whine plus a grind a rotor)', 'suck_whoosh', 1, 0.5],
+  ];
+  for (const [label, id, reps, gap] of warnings) {
+    const start = t;
+    await shots(id, reps, gap);
+    lines.push(`${start.toFixed(1).padStart(5)} s  ${label}: ${tag(id)}${reps > 1 ? ` x${reps}` : ''}`);
+    t += 0.8;
+  }
+  const ctx = new OfflineAudioContext(2, Math.ceil(SR * (t + 1)), SR);
+  const dest = master(ctx, 0.8);
+  for (const c of clips) {
+    const src = ctx.createBufferSource();
+    src.buffer = c.buf;
+    src.playbackRate.value = c.rate;
+    const g = ctx.createGain();
+    g.gain.value = c.gain;
+    src.connect(g).connect(dest);
+    src.start(c.at);
+    if (c.stop !== undefined) src.stop(c.stop);
+    else if (c.buf.duration > 2.5) src.stop(c.at + 2.5);
+  }
+  const b = await ctx.startRendering();
+  wav(join(out, 'weapons_board_v2.wav'), [b.getChannelData(0), b.getChannelData(1)]);
+  writeFileSync(join(out, 'weapons_board_v2.txt'), lines.join('\n') + '\n');
+  console.log('ok weapons_board_v2.wav (+ weapons_board_v2.txt: what plays when)');
+}
+
 for (const s of SCENES) if (!only.size || only.has(s.id)) await renderScene(s);
 if (!only.size || only.has('weapons')) await renderBoard();
+if (!only.size || only.has('weapons_v2')) await renderBoardV2();

@@ -250,9 +250,9 @@
   },
   {
    "id": "lance_loop",
-   "prompt": "Heavy plasma lance beam, steady deep roaring plasma hiss and rumble",
+   "prompt": "Continuous heavy plasma lance beam, deep low roaring blowtorch rumble with a gritty crackling electric buzz on top, powerful and bassy, sci-fi spaceship weapon",
    "duration": 3,
-   "influence": 0.6,
+   "influence": 0.7,
    "loop": true
   },
   {
@@ -396,6 +396,147 @@
    "prompt": "Burning magma seeker launched from a molten core, deep fiery whoosh with a low rumbling roar and soft crackle, bassy, muffled",
    "duration": 1.1,
    "influence": 0.7
+  },
+  {
+   "id": "pip_shot",
+   "prompt": "Loud single shot from a small spaceship cannon, crisp punchy low thump with a short sharp pop, compact, sci-fi, bassy",
+   "duration": 0.8,
+   "influence": 0.7,
+   "variants": 3
+  },
+  {
+   "id": "hammer_shot",
+   "prompt": "Heavy slow cannon shot, huge deep booming slam like a hammer on an anvil, weighty low thud with a metallic clang, sci-fi spaceship weapon, bassy, no high whine, no echo",
+   "duration": 0.9,
+   "influence": 0.75,
+   "variants": 2
+  },
+  {
+   "id": "twinlink_shot",
+   "prompt": "Twin-barrel rapid cannon turret, quick double-tap low thump, two fast punchy shots, tight, sci-fi spaceship weapon, bassy, no high whine, no echo",
+   "duration": 0.5,
+   "influence": 0.75,
+   "variants": 2
+  },
+  {
+   "id": "longbarrel_shot",
+   "prompt": "Long-barrel siege cannon firing after charging, enormous deep cannon blast with a long rolling low rumble tail, powerful, sci-fi spaceship weapon, bassy, no high whine, no echo",
+   "duration": 1.6,
+   "influence": 0.75
+  },
+  {
+   "id": "bastion_shot",
+   "prompt": "Massive fortress cannon firing, extremely deep heavy boom with a concussive thud and rattling metal, very weighty, sci-fi spaceship weapon, bassy, no high whine, no echo",
+   "duration": 1.3,
+   "influence": 0.75
+  },
+  {
+   "id": "slurry_shot",
+   "prompt": "Cannon firing a wet heavy slug, deep thick gloopy thump with a hissing squelch, low and muffled, sci-fi spaceship weapon, bassy, no high whine, no echo",
+   "duration": 0.8,
+   "influence": 0.75,
+   "variants": 2
+  },
+  {
+   "id": "chainsaw_shot",
+   "prompt": "Single round from a spinning gatling autocannon, very short low buzzing thud with a mechanical rattle, tight, sci-fi spaceship weapon, bassy, no high whine, no echo",
+   "duration": 0.5,
+   "influence": 0.75,
+   "variants": 2
+  },
+  {
+   "id": "stinger_shot",
+   "prompt": "Loud single shot from a heavy burst-fire autocannon, sharp punchy crack with a solid low knock, sci-fi spaceship weapon, bassy",
+   "duration": 0.8,
+   "influence": 0.75,
+   "variants": 2
+  },
+  {
+   "id": "cloudmaker_shot",
+   "prompt": "Heavy flak barrage cannon firing, deep muffled boom with a scattering crackle of fragments, low, sci-fi spaceship weapon, bassy, no high whine, no echo",
+   "duration": 0.8,
+   "influence": 0.75
+  },
+  {
+   "id": "quake_shot",
+   "prompt": "Giant earthquake mortar firing a triple salvo, three deep hollow thoomps in quick succession, ground shaking low boom, sci-fi spaceship weapon, bassy, no high whine, no echo",
+   "duration": 1.4,
+   "influence": 0.75
+  },
+  {
+   "id": "overpulse_shot",
+   "prompt": "Rapid heavy plasma pulse cannon bolt, short deep electric thrum with a fat buzzing snap, smooth, sci-fi spaceship weapon, bassy, no high whine, no echo",
+   "duration": 0.5,
+   "influence": 0.75,
+   "variants": 2
+  },
+  {
+   "id": "swarm_launch",
+   "prompt": "Small swarm rocket launch, quick low whoosh with a soft ignition pop, light, muffled, sci-fi spaceship weapon, bassy, no high whine, no echo",
+   "duration": 0.8,
+   "influence": 0.75
+  },
+  {
+   "id": "hammerhead_launch",
+   "prompt": "Huge heavy missile launch, deep powerful ignition boom followed by a thick low rocket roar, weighty, sci-fi spaceship weapon, bassy, no high whine, no echo",
+   "duration": 1.6,
+   "influence": 0.75
+  },
+  {
+   "id": "coilgun_shot",
+   "prompt": "Coilgun firing, deep magnetic thump with a rising electric thrum and a heavy slug crack, low, sci-fi spaceship weapon, bassy, no high whine, no echo",
+   "duration": 1.0,
+   "influence": 0.75
+  },
+  {
+   "id": "spear_shot",
+   "prompt": "Heavy railgun spear launch, colossal deep electromagnetic boom with a sharp sonic crack and low rumble tail, powerful, sci-fi spaceship weapon, bassy, no high whine, no echo",
+   "duration": 1.4,
+   "influence": 0.75
+  },
+  {
+   "id": "rail_driver_shot",
+   "prompt": "Semi-automatic rail rifle shot, crisp mid-low electromagnetic snap with a tight punchy thump, short, sci-fi spaceship weapon, bassy, no high whine, no echo",
+   "duration": 0.6,
+   "influence": 0.75,
+   "variants": 2
+  },
+  {
+   "id": "blackout_shot",
+   "prompt": "Huge EMP blast release after a charge, deep electrical whomp with a crackling surge and power-down drone, low, sci-fi spaceship weapon, bassy, no high whine, no echo",
+   "duration": 1.6,
+   "influence": 0.75
+  },
+  {
+   "id": "leviathan_launch",
+   "prompt": "Gigantic torpedo launched from a heavy tube, very deep pneumatic boom and a slow monstrous rumbling roar, weighty, sci-fi spaceship weapon, bassy, no high whine, no echo",
+   "duration": 1.8,
+   "influence": 0.75
+  },
+  {
+   "id": "searchlight_loop",
+   "prompt": "Continuous wide energy beam, low throbbing electric buzz that slowly wavers up and down like a warbling generator, with soft static crackle, sci-fi spaceship weapon, bassy, no shrill whine",
+   "duration": 3,
+   "influence": 0.6,
+   "loop": true
+  },
+  {
+   "id": "lance_fire",
+   "prompt": "Heavy plasma lance igniting, deep explosive whoomp of plasma lighting with a sharp crackling sizzle, powerful, sci-fi spaceship weapon, bassy, no high whine, no echo",
+   "duration": 0.9,
+   "influence": 0.75
+  },
+  {
+   "id": "target_tone",
+   "prompt": "Soft subtle low warning tone, a gentle low hum slowly rising in pitch, quiet and smooth, muffled, sci-fi targeting lock, not shrill, not harsh, no beeps",
+   "duration": 1.2,
+   "influence": 0.75
+  },
+  {
+   "id": "suck_whoosh",
+   "prompt": "Low muffled suction whoosh, a deep soft airy inhale pulling inward, gentle rumble, quiet, sci-fi machine intake, not shrill, not harsh",
+   "duration": 1.6,
+   "influence": 0.75
   }
  ]
 }

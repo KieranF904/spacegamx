@@ -23,7 +23,7 @@ import { Container, Graphics } from 'pixi.js';
 import { rayTerrain, type ServerBossBeamMessage, type ServerBossTelegraphMessage } from '@space-game/common';
 import { terrainFor } from '../rendering/terrainData';
 import type { GameState } from '../state/GameState';
-import { CRANE_BEAM, CRANE_BITE, drawCraneLash, drawTell, isTell, tellSound } from './bossTells';
+import { CRANE_BEAM, CRANE_BITE, WARN_GAP_DEFAULT_MS, WARN_GAP_MS, drawCraneLash, drawTell, isTell, tellSound, warnSound } from './bossTells';
 
 const COLOR: Record<string, number> = { charge: 0xff2a1a, lance: 0xff2a1a, dash: 0xff9a2a, impact: 0xff6a1a, crystal: 0xffc040, synapse: 0xffd060, ring: 0xffe0a0, vent: 0xffb040,
   // (the Scrap Mother's: hazard yellow for her guns, greyseam green for what pulls, pools and burns)
@@ -91,11 +91,20 @@ export class BossFx {
     const at = this.where(m);
     if (!at) return;
     // (light tells and their sounds: bossTells.ts)
-    if (isTell(m.kind)) { const s = tellSound(m.kind); if (s) this.sound(s[0], at, s[1], s[2]); return; }
+    if (isTell(m.kind)) { const s = tellSound(m.kind); if (s) this.warnSound(s[0], at, s[1], s[2]); return; }
     // The lance gathering: a deep swell to the moment it fires (sped up as its charge shortens)
-    if (m.kind === 'lance') this.sound('boss_charge', at, 1, Math.max(0.85, Math.min(2, CHARGE_SOUND / (m.ticks * TICK))));
+    if (m.kind === 'lance') this.warnSound('boss_charge', at, 1, Math.max(0.85, Math.min(2, CHARGE_SOUND / (m.ticks * TICK))));
     else if (m.kind === 'magma') this.sound('magma_charge', at, 0.8, Math.max(0.8, Math.min(1.6, MAGMA_SOUND / (m.ticks * TICK))));
-    else this.sound(m.kind === 'impact' ? 'warning' : m.kind === 'dash' ? 'thruster_blast' : 'jump_charge', at, m.kind === 'impact' ? 0.35 : 0.7, m.kind === 'charge' ? 0.7 : 1);
+    else { const s = warnSound(m.kind); if (s) this.warnSound(s[0], at, s[1], s[2]); }
+  }
+
+  /** When each warning sound last played (performance.now ms): WARN_GAP_MS apart at least */
+  private warnedAt = new Map<string, number>();
+  private warnSound(id: string, at: { x: number; y: number }, volume: number, pitch: number): void {
+    const now = performance.now(), last = this.warnedAt.get(id);
+    if (last !== undefined && now - last < (WARN_GAP_MS[id] ?? WARN_GAP_DEFAULT_MS)) return;
+    this.warnedAt.set(id, now);
+    this.sound(id, at, volume, pitch);
   }
 
   onBeam(m: ServerBossBeamMessage): void {

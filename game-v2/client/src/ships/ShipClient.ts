@@ -45,7 +45,7 @@ import { JumpFx } from './JumpFx';
 import { terrainFor } from '../rendering/terrainData';
 import { BossFx } from './BossFx';
 import { DamageFx, PLAIN_HIT_LOOKS } from './DamageFx';
-import { MiningBeamFx } from './MiningBeamFx';
+import { MiningBeamFx, type LitBeam } from './MiningBeamFx';
 import { ScannerFx } from './ScannerFx';
 import { IncomingWarning } from '../ui/IncomingWarning';
 import type { ShellLook } from '../rendering/weapons/WeaponFx';
@@ -1241,16 +1241,9 @@ export class ShipClient {
     return this.beamFx?.localActive ?? false;
   }
 
-  /** Your own beam weapon firing now (predicted, or the server's flag without prediction): 'laser', 'lance' or null */
-  weaponBeamKind(): string | null {
-    const e = this.opts.state.entities.get(this.opts.state.playerId);
-    const ship = this.store.get(this.opts.state.playerId);
-    if (!ship) return null;
-    const predicted = this.opts.state.predictionEnabled;
-    if (predicted ? !this.ownBeams.size : !e?.data?.length || !unpackCursorWeaponState(e.data[0]).leftActive) return null;
-    // (Pulse lasers have their own sound, a pulse at a time: only held beams count)
-    const beam = ship.derived.weapons.find((w) => w.fire.model === 'beam' && (!predicted || this.ownBeams.has(w.part)));
-    return beam?.kind ?? null;
+  /** Every ship's held beams lit this frame, as drawn (MiningBeamFx: yours as predicted, others' by their flag or piece clock) */
+  litBeams(): readonly LitBeam[] {
+    return this.beamFx?.litBeams ?? [];
   }
 
   /**

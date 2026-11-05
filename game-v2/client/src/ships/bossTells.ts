@@ -29,18 +29,39 @@ const FAINT = 0.35;
 export function tellSound(kind: string): [string, number, number] | null {
   switch (kind) {
     case 'rivet': return ['gun_clack', 0.6, 0.8];
-    case 'glow_green': return ['gun_charge', 0.6, 0.6];
+    // (A pull, the magnets' or the throat's: a low muffled inhale, not the old charging whine. Kieran 2026-11-05)
+    case 'glow_green': return ['suck_whoosh', 0.55, 1];
     case 'glow_amber': return ['ui_click', 0.7, 0.5];
     case 'glow_white': return ['jump_charge', 0.6, 1.2];
     case 'chime': return ['laser_pulse', 0.5, 1.6];
     case 'smoke': return ['gun_vent', 0.6, 0.7];
-    case 'grind': return ['gun_spin', 0.7, 0.6];
+    // (The rotors grind with the throat's pull: its whoosh is theirs, not one more sound a rotor)
+    case 'grind': return null;
     case 'steam': case 'drip': return ['gun_vent', 0.4, 0.9];
     case 'sparks': return ['hit', 0.35, 0.7];
     case 'glow_red': case 'crane': case 'ram': case 'claw': case 'intake': case 'weld': case 'sludge': return null;
   }
   return null;
 }
+
+/**
+ * The sound of any other warning (a lane or ring aimed at you: a custom enemy's rail, harpoon or EMP, a boss's charge
+ * or shells coming down): a soft low rising tone, quieter than shots (it was the bright jump charge, and 'warning').
+ * null: none (a Slag Ray's pools, dropped in its wake every third of a second, aren't aimed at anyone)
+ */
+export function warnSound(kind: string): [string, number, number] | null {
+  switch (kind) {
+    case 'pool': return null;
+    case 'dash': return ['thruster_blast', 0.7, 1];
+    case 'impact': return ['target_tone', 0.35, 1.12];
+    case 'charge': return ['target_tone', 0.5, 0.8];
+  }
+  return ['target_tone', 0.5, 1];
+}
+
+/** The least time between two plays of one warning's sound (ms): a pack, or a boss's many parts, can't stack it */
+export const WARN_GAP_MS: Record<string, number> = { target_tone: 700, suck_whoosh: 1500, boss_charge: 900 };
+export const WARN_GAP_DEFAULT_MS = 250;
 
 /** Is this one of the kinds drawn here */
 export function isTell(kind: string): boolean {
