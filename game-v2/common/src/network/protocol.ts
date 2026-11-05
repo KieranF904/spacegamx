@@ -14,6 +14,7 @@ import { packedTables } from './packed/tables.js';
 import { quantizeCursorAngle, dequantizeCursorAngle } from './cursorState.js';
 import type { HitReport } from './hits.js';
 import type { OwnCheck } from './ownTick.js';
+import type { ServerOwnSyncMessage } from '../sim/ownStep.js';
 import { CI_FLAG, compactInputTables } from './inputCompactTables.js';
 /**
  * Network Protocol - All client/server message types
@@ -35,7 +36,7 @@ import type { AsteroidBeltData, LodestoneData } from '../data/schemas.js';
  * has updated PROTOCOL_VERSION and PROTOCOL_WIRE_HASH.
  */
 // History: PROTOCOL_CHANGELOG.md. Re-pin with `npm run wire:bump "reason"` (game-v2/), never by hand.
-export const PROTOCOL_VERSION = 55;
+export const PROTOCOL_VERSION = 56;
 /** The hash of the wire tables PROTOCOL_VERSION was recorded for (see protocol.test.ts) */
 export const PROTOCOL_WIRE_HASH = 'c61407f3';
 /** WebSocket close code (and reason) for a client on another protocol version */
@@ -898,6 +899,7 @@ export type ServerMessage =
   | ServerHpCheckMessage
   | ServerHitFixMessage
   | ServerNetCapsMessage
+  | ServerOwnSyncMessage
   | ServerDockResultMessage
   | ServerPartDestroyedMessage
   | ServerContactMessage

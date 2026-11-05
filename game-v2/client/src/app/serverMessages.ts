@@ -379,6 +379,8 @@ const TABLE: Handlers = {
   hitFix: (h, msg) => { h.shipClient.onHitFix(msg, (m) => handleServerMessage(h, m)); },
   // (Its system's crowd level: the focus radius and fade, the window, its clock's rate from a tick)
   crowd: (h, msg) => { h.state.onCrowd(msg); },
+  // (Its own ship's stores, guns, hazards and priming put right, exact: its tick layer steps again from there)
+  ownSync: (h, msg) => { h.shipClient.onOwnSync(msg); },
   netCaps: (h, msg) => { h.shipClient.onNetCaps(msg.lvl); h.state.coalesceMs = coalesceDelayMs(msg.hold, msg.lvl); },
   projectileHit: (h, msg) => {
     h.renderer.showProjectileHit(msg.id, msg.x, msg.y);

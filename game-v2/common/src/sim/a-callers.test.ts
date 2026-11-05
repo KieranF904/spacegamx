@@ -1,7 +1,8 @@
 /**
  * Stage 1A: every caller moves ships through the one stepper (step.ts). One script is flown through each caller's real
  * code (the server's pilot step bridge/flight.ts stepMovement and pilotless step bridge/pilotless.ts stepPilotless, each
- * on a small fake bridge; ShipClient.predict on the state it reads; replicaStep on the bits the server's step sent) and
+ * on a small fake bridge; the pilot's own tick layer, client OwnTick.step's stepOwnShip, on the input message as it takes it;
+ * replicaStep on the bits the server's step sent) and
  * through stepShip itself, with the hazard chain (env hazard, numb, slowed, EMP) and a stillstone's priming in play, and
  * every path must land on the same state, tick by tick. Plus the distant tier's cruise measurement (SimLod.ts), the aim
  * grid's round trip, and step.ts's own copies of CTL's bits.
@@ -23,13 +24,13 @@ import { quantizeCursorAngle, dequantizeCursorAngle } from '../network/cursorSta
 import { quantizeCursorDist, CURSOR_DIST_STEP } from '../network/protocol.js';
 import { SCENARIOS, bodyRow, chargeRow, type Scenario } from '../ships/golden/testData.js';
 import type { LodestoneData } from '../data/schemas.js';
-import { stepShip, newSimShip, cloneCharge, simAim, CTL_STATE_BITS, type SimEnv, type SimShipState } from './index.js';
+import { stepShip, newSimShip, cloneCharge, simAim, simAimQ, CTL_STATE_BITS, stepOwnShip, ownStructure, seedOwnExtras, type SimEnv, type SimShipState, type OwnExtras } from './index.js';
+import { buildFlightInputs } from '../ships/flightInputs.js';
 import { aimQ, pilotInput, gridAim } from './a-adapt.js';
 import { stepMovement } from '../../../server/src/ships/bridge/flight.js';
 import { stepPilotless } from '../../../server/src/ships/bridge/pilotless.js';
 import { controllerInput } from '../../../server/src/ships/bridge/inputs.js';
 import { cruiseOf } from '../../../server/src/ships/SimLod.js';
-import { ShipClient } from '../../../client/src/ships/ShipClient.js';
 
 const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
@@ -92,7 +93,7 @@ const START: FlightBody = { x: 0, y: 0, vx: 0, vy: 0, angle: -Math.PI / 2, angVe
 
 describe('every caller flies the one stepper (stepShip) to the same state', () => {
   for (const name of ['plain-thrust-turn', 'strafer-replay', 'drive-bank-boost']) {
-    it(`a pilot: stepMovement, predict, replicaStep and stepShip agree tick by tick (${name}, hazards and priming in play)`, () => {
+    it(`a pilot: stepMovement, its own tick layer, replicaStep and stepShip agree tick by tick (${name}, hazards and priming in play)`, () => {
       const sc = SCENARIOS.find((s) => s.name === name)!;
       const eid = 7;
       const mk = () => createShipState(catalog, tuning, eid, sc.ship(), 0);
@@ -100,15 +101,9 @@ describe('every caller flies the one stepper (stepShip) to the same state', () =
       const serverShip = mk();
       serverShip.cargo = 0;
       const server = fakeBridge(eid, serverShip, START, cloneCharge(FULL_CHARGE));
-      // The pilot's prediction (ShipClient.predict with the state it reads)
+      // The pilot's own ship on its tick layer (client OwnTick.step: stepOwnShip on its extras, its hazards as the server tells them)
       const clientShip = mk();
-      const self = {
-        store: { get: () => clientShip }, docked: false, berth: null, opts: { state: { entities: new Map() }, tuning },
-        hazardFor: hazardAt, central: null, lodestones: [STONE], gravity: null, terrain: null, jump: undefined,
-      };
-      const predict = ShipClient.prototype.predict as (this: unknown, ...a: Parameters<ShipClient['predict']>) => Charge | null;
-      const player = { id: eid, x: 0, y: 0, vx: 0, vy: 0, angle: START.angle, angVel: 0, jump: 0, cargoMass: 0, dodge: 0, dodgeDir: 0, jumpPrime: 0, warmth: 100, empUntil: 0, slowUntil: 0 } as Record<string, number>;
-      let clientCharge = cloneCharge(FULL_CHARGE);
+      const own: { body: FlightBody; x: OwnExtras; bits: number } = { body: { ...START }, x: seedOwnExtras(clientShip, cloneCharge(FULL_CHARGE)), bits: 0 };
       // A replica on the bits the server's step sent, and stepShip itself
       const replica: FlightBody = { ...START };
       let direct: SimShipState = newSimShip({ id: eid, derived: mk().derived, ship: mk(), body: START, charge: FULL_CHARGE });
@@ -122,12 +117,14 @@ describe('every caller flies the one stepper (stepShip) to the same state', () =
         Input.targetAngle[eid] = wireAim(s.aim);
         Input.cursorDist[eid] = distOf(s);
         expect(stepMovement(server.b, eid)).toBe(true);
-        // Client: the input message, the hazards as the pilot's row tells them
-        player.empUntil = empAt(t) ? EMP_END : 0;
-        player.slowUntil = slowedAt(t) ? SLOW_END : 0;
-        player.warmth = numbAt(t) ? 10 : 100;
+        // Client: the input message as OwnTick.noteInput takes it, the hazards as the server tells them (ownSync)
+        own.x.hazard.empUntil = empAt(t) ? EMP_END : 0;
+        own.x.hazard.slowUntil = slowedAt(t) ? SLOW_END : 0;
+        own.x.hazard.numb = numbAt(t) ? COLD.control : 1;
         const msg = { type: 'input', seq: t, tick: 0, fireLeft: false, fireRight: false, forward: false, backward: false, left: false, right: false, boost: false, ...keys, targetAngle: wireAim(s.aim), cursorDist: distOf(s) };
-        clientCharge = predict.call(self, player as never, msg as never, clientCharge, t)!;
+        const os = stepOwnShip(eid, own.x, own.body, controlBits(buildFlightInputs(msg as never, false)), simAimQ(msg.targetAngle), { fire: false, fireAlt: false, jumpDist: msg.cursorDist, aimDist: msg.cursorDist }, ownStructure(clientShip.derived, clientShip), simEnv(t), []);
+        own.x = { charge: os.charge, guns: os.guns, hazard: os.hazard, jumpPrime: os.jumpPrime };
+        own.bits = os.ctl.bits;
         // Replica: the server's replicated controls
         const ctl = (server.b as unknown as { replicaCtl: Map<number, { bits: number; q: number }> }).replicaCtl.get(eid)!;
         replicaStep(ReplicaMode.Player, replica, { bits: ctl.bits, targetAngle: replicaAngle(ReplicaMode.Player, ctl.q) }, serverShip.derived, tuning, REPLICA_ENV, t);
@@ -140,16 +137,17 @@ describe('every caller flies the one stepper (stepShip) to the same state', () =
         const sb = { ...server.st.body, jump: serverShip.jump, jumpScale: serverShip.jumpScale, cargo: serverShip.cargo, dodge: serverShip.dodge, dodgeDir: serverShip.dodgeDir };
         const at = `${name} tick ${t}`;
         expect(bodyRow(direct.body), at).toEqual(bodyRow(sb));
-        expect(bodyRow({ ...player, cargo: player.cargoMass } as unknown as FlightBody), at).toEqual(bodyRow(sb));
+        expect(bodyRow(own.body), at).toEqual(bodyRow(sb));
         expect(bodyRow(replica), at).toEqual(bodyRow(sb));
         expect(chargeRow(direct.charge), at).toEqual(chargeRow(server.st.charge));
-        expect(chargeRow(clientCharge), at).toEqual(chargeRow(server.st.charge));
+        expect(chargeRow(own.x.charge), at).toEqual(chargeRow(server.st.charge));
         // The priming, everywhere (state, replicas included)
-        expect(player.jumpPrime, at).toBe(serverShip.jumpPrime);
+        expect(own.x.jumpPrime, at).toBe(serverShip.jumpPrime);
         expect(direct.jumpPrime, at).toBe(serverShip.jumpPrime);
         expect(replica.jumpPrime ?? 0, at).toBe(serverShip.jumpPrime);
         // The controls it flew, as replicated
         expect(direct.ctl.bits, at).toBe(ctl.bits);
+        expect(own.bits, at).toBe(ctl.bits);
         expect(direct.ctl.q, at).toBe(ctl.q);
         primed = Math.max(primed, serverShip.jumpPrime ?? 0);
       });

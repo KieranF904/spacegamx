@@ -9,7 +9,7 @@
  * forced-mismatch test). What a test compares it with is the server's own record (spawns, hits, state), not another client.
  */
 import {
-  DEFAULT_CAPS, PROTOCOL_VERSION, SIDE, EntityType, Position, Rotation, Velocity, ServerFrameReader, encodeMessage, decodeMessage, rebuildVolley, ShipReplicaSet,
+  DEFAULT_CAPS, PROTOCOL_VERSION, SIDE, EntityType, Position, Rotation, Velocity, Input, InSystem, INPUT_BOOLS, ServerFrameReader, encodeMessage, decodeMessage, rebuildVolley, ShipReplicaSet,
   type ClientMessage, type ClientSocket, type ServerMessage, type ServerSnapshotMessage, type ShipState, type ReplicaEnv,
 } from '@space-game/common';
 import { ShipStore } from '../../../../client/src/ships/ShipStore.js';
@@ -23,7 +23,7 @@ import { ShipCauses } from '../../../../client/src/ships/causes/ShipCauses.js';
 import { DebrisSplits } from '../../../../client/src/ships/debris/DebrisSplits.js';
 import { MoveRunner } from '../../../../client/src/ships/bodies/MoveRunner.js';
 import { ContactWorld, type ContactFx } from '../../../../client/src/ships/causes/ContactWorld.js';
-import { stepShipGuns, newSimShip, cloneCharge, simAimQ, NO_INPUT, ownShotWireOf, type GuideBody, type CustomStats, type SimEvent, type Charge, type FireRecord } from '@space-game/common';
+import { ownShotWireOf, type GuideBody, type CustomStats, type Charge, type FireRecord, type ClientInputMessage } from '@space-game/common';
 import { OwnShells } from '../../../../client/src/ships/hits/OwnShells.js';
 import factionsFile from '../../../../data/factions.json' with { type: 'json' };
 import type { GameServer } from '../../GameServer.js';
@@ -106,8 +106,9 @@ export class FakeHitsClient {
   readonly ownRowIds = new Set<number>();
   /**
    * Its own straight shells worked out here, named by shot id (CAPS.SHOT_IDS: client ships/hits/OwnShells.ts). Which of
-   * its guns fired is its own gun step's (common sim/guns.ts stepShipGuns), run on the inputs the server's fireWeapons
-   * gets (a perfect prediction); `shotPairs` its shot ids beside the server's records' for the same ticks
+   * its guns fired is its own tick layer's (OwnTick's whole step, guns included: the events it hands out as each
+   * snapshot reaches a tick, as the game's client draws them as its prediction does); `shotPairs` its shot ids beside the
+   * server's records' for the same ticks
    */
   readonly ownShells: OwnShells;
   readonly shotPairs: { tick: number; client: number[]; server: number[] }[] = [];
@@ -131,6 +132,7 @@ export class FakeHitsClient {
         pose: (id, tick) => (id === this.pid ? this.selfHist.get(tick) : this.reps.at(id, tick)?.body) ?? null,
         pilot: (id) => id === this.pid || this.kinds.get(id)?.type === EntityType.Player,
         send: (m) => this.outbox.push(m),
+        self: () => this.pid,
       });
     this.selfHits = new SelfHits({
         store: this.store,
@@ -148,7 +150,7 @@ export class FakeHitsClient {
     this.own = new OwnTick({ store: this.store, reps: this.reps, self: () => this.pid, tuning: ships.tuning, extraHash: (t) => (this.causes.heldByte(t) ?? 0) + this.guides.byte(t),
       contacts: () => this.contacts, otherMid: (id, t, place) => this.causes.midOf(id, t, place) });
     this.ownShells = new OwnShells({ self: () => this.pid, ship: (id) => this.store.get(id), tuning: ships.tuning, firePose: (t) => this.own.firePose(t) });
-    this.watchOwnGuns();
+    this.watchServerShots();
     this.bodies = new BodyRunner({ reps: this.reps });
     this.moves = new MoveRunner({
       reps: this.reps, bodies: this.bodies, store: this.store, tuning: ships.tuning, terrain: () => opts.env(this.pid).terrain,
@@ -167,8 +169,10 @@ export class FakeHitsClient {
       isOpen: () => true,
       send: (data) => {
         const bytes = data as Uint8Array;
-        // (frames go at the step's end: its ship is where this tick left it)
+        // (frames go at the step's end: its ship is where this tick left it, and the controls it flew are on its layer
+        // before the frame's own rows say otherwise)
         this.noteSelf();
+        this.noteFlown(false);
         if (opts.defer) opts.defer(Uint8Array.from(bytes)); else this.frame(bytes);
       },
     };
@@ -177,41 +181,76 @@ export class FakeHitsClient {
     this.pid = server.getPlayerId(socket);
     // (its pilot known: its own ship stepped on its tick layer from here, as ShipClient.onWelcome)
     this.own.start();
-    // (its own ship's pose every tick, not only those a frame went on: the server's step, wrapped)
+    // (its own ship's pose every tick, not only those a frame went on, and the controls it flew: the server's step, wrapped)
     const step = server.step.bind(server);
-    server.step = () => { step(); this.noteSelf(); };
+    server.step = () => { step(); this.noteSelf(); this.noteFlown(true); };
   }
 
-  /**
-   * Its own gun step (CAPS.SHOT_IDS), as its prediction would run it: the step's gun phase (stepShipGuns) on a copy of
-   * the inputs the server's fireWeapons gets for its ship (gun state, charge, pose, trigger, aim on the cursor grid), so
-   * which guns fired and the shot ids are its own; the server's records for the tick are noted beside them
-   */
-  private watchOwnGuns(): void {
-    const ships = this.server.getShips() as unknown as { fireWeapons: (eid: number, ship: ShipState, firing: boolean, aimWorld?: number, aimDist?: number, target?: number, energy?: { charge: Charge }) => void; fired: FireRecord[]; pose(eid: number): { x: number; y: number; angle: number }; tuning: never };
+  /** The server's own-shot ids by the tick it fired them (watchServerShots), to pair with its own layer's (shotPairs) */
+  private readonly serverShots = new Map<number, number[]>();
+  private pairedTo = -Infinity;
+
+  /** The server's records of its own ship's shots, by tick, and their wire names (its fireWeapons, wrapped) */
+  private watchServerShots(): void {
+    const ships = this.server.getShips() as unknown as { fireWeapons: (eid: number, ship: ShipState, firing: boolean, aimWorld?: number, aimDist?: number, target?: number, energy?: { charge: Charge }) => void; fired: FireRecord[] };
     const orig = ships.fireWeapons.bind(ships);
     ships.fireWeapons = (eid, ship, firing, aimWorld, aimDist = 0, target = -1, energy) => {
       if (eid !== this.pid) return orig(eid, ship, firing, aimWorld, aimDist, target, energy);
-      const tick = this.server.getTick(), p = ships.pose(eid);
-      const st = newSimShip({ id: eid, derived: ship.derived, ship, body: { x: p.x, y: p.y, angle: p.angle, vx: Velocity.x[eid], vy: Velocity.y[eid], angVel: 0, jump: ship.jump, cargo: 0 }, charge: cloneCharge(energy?.charge ?? { g: 0, b: [] }), accounted: !!energy });
-      const evs: SimEvent[] = [];
-      stepShipGuns(st, { ...NO_INPUT, q: simAimQ(aimWorld ?? 0), fire: firing, aimDist }, { tick, tuning: ships.tuning, gravity: null, fields: { central: null, lodestones: [] } as never, terrain: null }, evs);
-      const n0 = ships.fired.length;
+      const tick = this.server.getTick(), n0 = ships.fired.length;
       orig(eid, ship, firing, aimWorld, aimDist, target, energy);
-      const client: number[] = [], server: number[] = [];
-      for (const e of evs) {
-        if (e.k !== 'fire') continue;
-        if (e.barrel === 0 && this.ownShells.derivable(ship, e.slot + ((e as { aug?: 1 }).aug ? 65536 : 0))) this.ownShells.fired({ tick, part: e.slot, aimQ: e.aimQ, ammo: 0, aug: (e as { aug?: 1 }).aug });
-        if (this.ownShells.derivable(ship, e.slot)) client.push(e.shot);
-      }
       for (let i = n0; i < ships.fired.length; i++) {
         const f = ships.fired[i];
         if (f.owner !== eid || !f.shots) continue;
-        server.push(...f.shots);
+        const at = this.serverShots.get(tick);
+        if (at) at.push(...f.shots); else this.serverShots.set(tick, [...f.shots]);
         f.shots.forEach((sh, k) => this.ownWire.set(ownShotWireOf(sh), f.ids[k]));
       }
-      if (client.length || server.length) this.shotPairs.push({ tick, client, server });
     };
+  }
+
+  /**
+   * Its own tick layer stepped to a snapshot's tick: what its guns fired on each tick since the last, handed out (its
+   * own shells' volleys, ShipClient.presentOwn's), and paired with the server's records of the same ticks
+   */
+  private ownFires(tick: number): void {
+    if (!this.own.on || this.pid < 0) return;
+    this.reps.at(this.pid, tick);
+    const ship = this.store.get(this.pid);
+    const client = new Map<number, number[]>();
+    for (const { tick: t, events } of this.own.takeConfirmed(tick)) {
+      for (const e of events) {
+        if (e.k !== 'fire' || !ship) continue;
+        const aug = (e as { aug?: 1 }).aug;
+        if (e.barrel === 0 && this.ownShells.derivable(ship, e.slot + (aug ? 65536 : 0))) this.ownShells.fired({ tick: t, part: e.slot, aimQ: e.aimQ, ammo: 0, aug });
+        if (this.ownShells.derivable(ship, e.slot)) { const at = client.get(t); if (at) at.push(e.shot); else client.set(t, [e.shot]); }
+      }
+    }
+    const from = Number.isFinite(this.pairedTo) ? this.pairedTo + 1 : Math.min(tick, ...client.keys(), ...this.serverShots.keys());
+    for (let t = from; t <= tick; t++) {
+      const c = client.get(t) ?? [], sv = this.serverShots.get(t) ?? [];
+      this.serverShots.delete(t);
+      if (c.length || sv.length) this.shotPairs.push({ tick: t, client: c, server: sv });
+    }
+    this.pairedTo = Math.max(this.pairedTo, tick);
+  }
+
+  /**
+   * The controls its ship flew this tick, as a client that sent them has them on its tick layer (a perfect client:
+   * OwnTick), and its own ship stepped there, as the game's client steps it ahead of the snapshots (its prediction)
+   */
+  private flownKey = '';
+  private noteFlown(ahead: boolean): void {
+    if (this.pid < 0) return;
+    const held: Record<string, unknown> = {};
+    for (const k of INPUT_BOOLS) held[k] = Input[k][this.pid] === 1;
+    const msg = { type: 'input', seq: 0, tick: 0, ...held, targetAngle: Input.targetAngle[this.pid], cursorDist: Input.cursorDist[this.pid] } as Record<string, unknown>;
+    const key = JSON.stringify(msg), tick = this.server.clocks?.tickOf(InSystem.systemId[this.pid]) ?? this.server.getTick();
+    if (key !== this.flownKey) {
+      this.flownKey = key;
+      msg.targetTick = tick;
+      this.own.noteInput(msg as unknown as ClientInputMessage);
+    }
+    if (ahead && this.own.on) this.reps.at(this.pid, tick);
   }
 
   /**
@@ -258,11 +297,18 @@ export class FakeHitsClient {
     // (its bodies' check rides along, CAPS.BODIES)
     const bck = this.bodies.takeCheck(true, this.server.getTick());
     if (rep || bck) {
-      const msg = { type: 'input', seq: this.seq++, tick: 0, forward: false, backward: false, left: false, right: false, boost: false, fireLeft: false, fireRight: false, targetAngle: 0, ...(rep ? { hitReport: rep } : {}), ...(bck ? { bodyCheck: bck } : {}) } as ClientMessage;
+      // (It rides an input as a client's does: the controls it is flying (the server's Input, whoever set them), for its
+      // system's next tick, so it lands on time: not a late input, which would mark its own ship off)
+      const held: Record<string, unknown> = {};
+      for (const k of INPUT_BOOLS) held[k] = Input[k][this.pid] === 1;
+      const sys = InSystem.systemId[this.pid], next = (this.server.clocks?.tickOf(sys) ?? this.server.getTick()) + 1;
+      const msg = { type: 'input', seq: this.seq++, tick: 0, targetTick: next, ...held, targetAngle: Input.targetAngle[this.pid], cursorDist: Input.cursorDist[this.pid], ...(rep ? { hitReport: rep } : {}), ...(bck ? { bodyCheck: bck } : {}) } as ClientMessage;
       const enc = encodeMessage(msg);
       this.upBytes += (rep ? 3 : 0) + (bck ? 3 : 0);
       if (rep) this.reports++;
-      this.outbox.push(decodeMessage(enc) as ClientMessage);
+      const sent = decodeMessage(enc) as ClientMessage;
+      this.noteInput(sent);
+      this.outbox.push(sent);
     }
     for (const m of this.outbox.splice(0)) this.link?.receive(m);
   }
@@ -272,6 +318,7 @@ export class FakeHitsClient {
       case 'shipSync': this.debris.onSync(m); this.selfHits?.onSync(m.id); this.own?.beforeSync(m.id); this.causes?.beforeSync(m.id); this.store.onSync(m); break;
       case 'shipHps': this.findHits(); this.store.onHps(m); break;
       case 'welcome': if (this.pid >= 0) this.own.start(); break;
+      case 'ownSync': this.own.onOwnSync(m); break;
       case 'netCaps':
         // (the first after its join: finding hits here starts with the next snapshot; each says its level, ShipClient.onNetCaps)
         this.findHits();
@@ -365,8 +412,9 @@ export class FakeHitsClient {
       }
     }
     // Its own straight shells, CAPS.SHOT_IDS: built here from its own gun step, named by shot id; those ended removed here (ShipClient.preSnapshot)
+    this.ownFires(s.tick);
     {
-      const keyed = !!s.ships?.some((k) => k[0] === this.pid);
+      const keyed = !!s.ships?.some((k) => k[0] === this.pid) || this.own.syncedAt === s.tick;
       for (const e of this.ownShells.snapshot(s.tick, s.removed, keyed)) {
         const d = e.data!;
         this.known.add(e.id);
@@ -380,7 +428,7 @@ export class FakeHitsClient {
     this.hits?.forget(s.removed);
     this.away.onSnapshot(s.tick, s.removed);
     this.selfHits?.onRemoved(s.removed);
-    for (const id of s.removed) { if (this.known.has(id)) this.removed.add(id); this.shells.delete(id); this.store.remove(id); this.bodies?.remove(id); this.causes?.remove(id); this.reps.remove(id); this.guides?.remove(id, s.tick); }
+    for (const id of s.removed) { if (this.known.has(id)) this.removed.add(id); this.shells.delete(id); this.store.remove(id); this.bodies?.remove(id); this.causes?.remove(id); this.reps.remove(id, s.tick); this.guides?.remove(id, s.tick); }
     for (const id of s.out ?? []) { this.bodies?.remove(id); this.causes?.remove(id); this.reps.remove(id); }
     // (The game's client steps every replica as it draws, each frame; drawing nothing, this does it here. Left alone,
     // a replica no one asked for in 600 ticks stops short: ShipReplicaSet.at won't run that far in one go)

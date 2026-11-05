@@ -45,3 +45,4 @@ except to fix a typo. A bump makes old clients reload (see PROTOCOL_VERSION in p
 - 53 (2026-11-05): pops n: nomads' lures (the sector their band's pilots were last seen in), ghosts drift towards it
 - 54 (2026-11-05): snapshot head hash (hh: the own ship's state hash and flags, 24 bits) for CAPS.OWN_SIM clients, in place of the own row's 2 s safety copy (sim foundation 1C)
 - 55 (2026-11-06): legacy caps removed; netCaps/authResult lose their caps field and joins must offer the full set (wire hash unchanged: those messages are outside the hashed tables)
+- 56 (2026-11-06): own ship drawn from the replica layer; head hash covers the full own state; ownSync message; own control rows drop engine power/share/no-boost bits (wire hash unchanged: plain messages)

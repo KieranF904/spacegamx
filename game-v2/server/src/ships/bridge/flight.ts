@@ -14,7 +14,7 @@ import {
   stepDrift, NO_FIELDS, ReplicaMode, CTL, stepShip, SimShipView,
   controlBits, quantizeReplicaAngle, partWeaponDef, partMaterial, powerTick, gunLoadTick, quantizeCargo,
   chargeTotal, contactPieces, contactPair, quantizePull, CONTACT_FLAG, contactFxDue,
-  ContactPairCache, contactPairs, type ContactPair,
+  ContactPairCache, contactPairs, cloneCharge, gunStateOf, type ContactPair, type HazardState, type OwnExtras,
   type ShipState, type GravityWell, type FlightConstants, type SimEnv, type SimEvent, type SimInput, type FieldEnv, type ShipDerived,
 } from '@space-game/common';
 import { K, BIG_BODY, type ContactPiece, type BridgeCtx } from './core.js';
@@ -173,10 +173,7 @@ export function stepMovement(b: BridgeCtx, eid: number): boolean {
   // ends), the aim on the replicated grid. The pilot's prediction (ShipClient.predict) and every replica step the same
   const tick = b.host.getTick();
   const s = MOVE_VIEW.load(eid, ReplicaMode.Player, body, ship.derived, ship, b.chargeOf(eid), true, ship.jumpPrime ?? 0);
-  s.hazard.empUntil = b.empUntil.get(eid) ?? 0;
-  s.hazard.slowUntil = b.slowedUntil.size > 0 ? tick + b.slowedTicksLeft(eid) : 0;
-  // (Numb: its pilot's prediction works it out from the warmth it's told, replicas from CTL.numb)
-  s.hazard.numb = b.coldStage(eid).control;
+  pilotHazards(b, eid, tick, s.hazard);
   // (Its inputs from its source: bridge/inputs.ts, the pilot's held keys off the Input component)
   const { isBoosting } = stepShip(s, readPilotInput(eid, MOVE_IN), moveEnv(b, eid, tick), s, MOVE_EVENTS);
   ship.jumpPrime = s.jumpPrime;
@@ -187,6 +184,30 @@ export function stepMovement(b: BridgeCtx, eid: number): boolean {
   MOVE_EVENTS.length = 0;
   if (isBoosting) Boost.lastUseTick[eid] = tick;
   return true;
+}
+
+/**
+ * A pilot's hazards as its step at `tick` reads them (stepMovement; ownExtras, its client's view of them): EMP'd and
+ * slowed until, numb with cold (its own client steps it with the same, told by ownSync; replicas read CTL.numb)
+ */
+export function pilotHazards(b: BridgeCtx, eid: number, tick: number, out: HazardState): HazardState {
+  out.empUntil = b.empUntil.get(eid) ?? 0;
+  out.slowUntil = b.slowedUntil.size > 0 ? tick + b.slowedTicksLeft(eid) : 0;
+  out.numb = b.coldStage(eid).control;
+  return out;
+}
+
+/**
+ * A pilot's stores, guns, hazards and priming as tick `tick` ended (now, in the snapshot after it): what its own client
+ * steps the next tick from (common sim/ownStep.ts), for its head hash and an ownSync. A copy. Null: not a ship
+ */
+export function ownExtras(b: BridgeCtx, eid: number, tick: number): OwnExtras | null {
+  const ship = b.bodies.get(eid);
+  if (!ship || ship.kind !== 'ship') return null;
+  return {
+    charge: cloneCharge(b.chargeOf(eid)), guns: gunStateOf(ship), jumpPrime: ship.jumpPrime ?? 0,
+    hazard: pilotHazards(b, eid, tick + 1, { empUntil: 0, slowUntil: 0, numb: 1 }),
+  };
 }
 
 /** stepMovement's scratch: the view, its input and env (reused every call; the step keeps none of them) */

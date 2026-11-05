@@ -11,7 +11,10 @@
  * CRITICAL: Uses BitBuffer precision for all physics to match server exactly.
  */
 
-import { FULL_CHARGE, unpackCharge, pilotExtras, PILOT_ROW, Timeline, type Charge, type TimelineClock } from '@space-game/common';
+import { FULL_CHARGE, unpackCharge, pilotExtras, PILOT_ROW, Timeline, type Charge, type TimelineClock, type FlightBody } from '@space-game/common';
+
+/** The own ship on its tick layer at a tick (GameState.ownStep): its body, its stores and priming (no stores: docked, unchanged) */
+export interface OwnStepped { body: Readonly<FlightBody>; charge?: Charge; jumpPrime: number }
 import { FarShips } from './FarShips';
 import { Populations } from './Populations';
 import factionsFile from '../../../data/factions.json';
@@ -164,11 +167,10 @@ const JITTER_ALPHA = 0.08;         // EMA smoothing for jitter
 const SNAPSHOT_BUFFER_SIZE = 6;    // Keep last N snapshots for interpolation
 const RENDER_SMOOTH_SELF = 1.0;    // Render lerp rate for local player (1.0 = no smoothing, instant)
 const RENDER_SMOOTH_OTHER = 0.25;  // Render lerp rate for other entities
-const SNAP_THRESHOLD = 260;        // Teleport if error > this
+/** A correction of the own ship this far (world units) or more counts as a snap (the overlay's counters) */
+const SNAP_THRESHOLD = 260;
 /** Rocks out of sight are placed every this many ticks (see orbitFocus) */
 const ORBIT_FAR_TICKS = 8;
-const SMOOTH_THRESHOLD = 12;       // Snap if error < this
-const RECONCILE_SMOOTH = 0.5;      // Reconciliation smoothing rate
 
 // Input delay buffer: inputs are stamped this many ticks ahead (33ms, imperceptible)
 const INPUT_DELAY_INITIAL_TICKS = 2;
@@ -237,23 +239,20 @@ export class GameState {
   /** Off in proto mode: the client reads the in-process simulation directly. */
   public predictionEnabled = true;
   /**
-   * Ship prediction (set by Game): steps the local ship with the shared ship
-   * physics and returns the new boost fuel, or null when there's no ship yet.
+   * The own ship on its tick layer (set by Game: ShipClient.ownStepTo): stepped to a tick (once per tick: its whole step,
+   * guns included, common sim/ownStep.ts; what it fired that tick drawn as it gets there), its state there. Null when
+   * there's no own ship on the layer yet (before its first keyframe): it follows the server's rows meanwhile
    */
-  public shipPhysics: ((player: InterpolatedEntity, input: ClientInputMessage, charge: Charge, tick: number) => Charge | null) | null = null;
-  /** After each forward prediction step (never a replay): the local ship's guns fire on that tick (ShipClient.predictGuns) */
-  public shipGuns: ((player: InterpolatedEntity, input: ClientInputMessage, tick: number, charge: Charge) => Charge | null) | null = null;
-  /** The pilot row's gun state on reconciling (ShipClient.syncGuns: the clip and charge correction) */
-  public shipGunSync: ((data: number[] | undefined, tick: number) => void) | null = null;
+  public ownStep: ((tick: number) => OwnStepped | null) | null = null;
+  /** Where the own ship is drawn at a fractional tick (its layer's pose, corrections eased in: ShipClient.ownPose) */
+  public ownPose: ((tick: number) => { x: number; y: number; angle: number } | null) | null = null;
   /** The batteries' charge as one percentage, for the HUD (ShipClient: energy.ts chargeTotal) */
   public chargeTotal: ((charge: Charge) => number) | null = null;
-  /** The batteries' charge, predicted (energy.ts), and the server's last word on it */
+  /** The batteries' charge, as the own ship's tick layer has it at the prediction's tick (energy.ts), and the server's row's */
   public charge: Charge = { ...FULL_CHARGE };
   public serverCharge: Charge = { ...FULL_CHARGE };
   /** Replicated ships: a snapshot's keyframes and control changes go here... */
   public onReplication: ((snapshot: ServerSnapshotMessage) => void) | null = null;
-  /** Its own ship on the tick layer at a snapshot's tick, when causes moved it there (CAPS.OWN_SIM: ShipClient.ownTickPose) */
-  public ownTickPose: ((tick: number) => { x: number; y: number; angle: number; vx: number; vy: number; angVel: number } | null) | null = null;
   /** First thing with each snapshot: replicated motion is brought up to date, and fire events become shells */
   public preSnapshot: ((snapshot: ServerSnapshotMessage) => EntityState[]) | null = null;
   /** ...and each frame, every other ship is placed by its replica (true = placed) */
@@ -399,8 +398,6 @@ export class GameState {
   // INPUT
   // ============================================
   private inputSeq: number = 0;
-  // Track inputs by tick for reconciliation - stores (tick, input) pairs
-  private pendingInputsByTick: { tick: number; input: ClientInputMessage }[] = [];
   
   // ============================================
   // ENTITY STATE
@@ -640,60 +637,44 @@ export class GameState {
   }
 
   /**
-   * Drain the delay queue: apply inputs whose targetTick <= cachedServerTick, then run physics ONCE.
-   * Called once per client tick from Game.ts (after tickInput).
-   * 
-   * CRITICAL FOR DETERMINISM:
-   * - Server applies ALL inputs with targetTick <= currentTick + 1 (nextTick), then runs physics ONCE
-   * - We do the same: collect all ready inputs, use the LAST one for physics
-   * - cachedServerTick is incremented after each drain to ensure unique targetTicks
+   * One prediction tick (Game.update, once per tick number): the inputs due are taken off the delay queue (the own
+   * ship's tick layer already has them: OwnTick, by their target ticks, as the server runs them), and the own ship is
+   * stepped to the next tick on its layer.
    */
   drainDelayQueue(): void {
-    // Collect all inputs that are ready (targetTick <= cachedServerTick + 1)
-    // The +1 matches the server's "nextTick = currentTick + 1" logic
+    // (The server runs an input on its target tick; the layer has every sent input by its target tick, and those not
+    // sent are the last one sent again)
     const nextTick = this.cachedServerTick + 1;
-    // Everything due, oldest first: the newest is the one in effect (as on the server)
-    const due = this.inputDelayQueue.filter((input) => (input.targetTick ?? 0) <= nextTick)
-      .sort((a, b) => (a.targetTick ?? 0) - (b.targetTick ?? 0) || (a.seq || 0) - (b.seq || 0));
-    let lastInput: ClientInputMessage | null = null;
-    for (const input of due) {
-      // Track by the tick we're APPLYING physics for (nextTick), not targetTick
-      // This is the tick that matches server simulation
-      this.pendingInputsByTick.push({ tick: nextTick, input });
-      lastInput = input;
-    }
-    if (due.length) this.inputDelayQueue = this.inputDelayQueue.filter((input) => (input.targetTick ?? 0) > nextTick);
-    
+    if (this.inputDelayQueue.length) this.inputDelayQueue = this.inputDelayQueue.filter((input) => (input.targetTick ?? 0) > nextTick);
     // (Where the ship was, to draw it between that and the new step)
     const me = this.entities.get(this.playerId);
     if (me) this.selfPrev = { x: me.x, y: me.y, angle: me.angle };
-    // Run physics ONCE with the last applied input (or repeat last if none)
-    if (lastInput) {
-      this.applyPhysics(lastInput, nextTick);
-    } else if (this.pendingInputsByTick.length > 0) {
-      // No new input this tick — repeat last known input (server does this too)
-      const last = this.pendingInputsByTick[this.pendingInputsByTick.length - 1].input;
-      this.applyPhysics(last, nextTick);
-    }
-    // If no inputs at all, don't run physics (shouldn't happen in normal play)
+    this.applyPhysics(nextTick);
   }
 
   /**
-   * Apply one tick of prediction to the local ship (the shared ship physics,
-   * via the shipPhysics hook). Until the ship's structure has synced there is
-   * nothing to predict with, so the ship simply follows the server.
+   * The own ship stepped to `tick` on its tick layer (once per tick: its whole step, ShipClient.ownStepTo) and its
+   * entity put there; its stores to the HUD. Until its layer has it (its first keyframe), it follows the server's rows.
    */
-  private applyPhysics(input: ClientInputMessage, tick: number): void {
+  private applyPhysics(tick: number): void {
     const player = this.entities.get(this.playerId);
     if (!player) return;
-    // The batteries: the engines draw and the generators charge them in the flight step,
-    // then the guns fire on this tick (as the server's will), each shot (and laser segment) spending from them
-    const c = this.shipPhysics?.(player, input, this.charge, tick);
-    if (c != null) this.charge = c;
-    const after = this.shipGuns?.(player, input, tick, this.charge);
-    if (after != null) this.charge = after;
-    this.boostFuel = this.chargeTotal?.(this.charge) ?? this.serverBoostFuel;
+    const st = this.ownStep?.(tick);
+    if (!st) return;
+    this.takeOwn(player, st);
     this.noteSelf(player, tick);
+  }
+
+  /** The own ship's entity from its tick layer's state */
+  private takeOwn(player: InterpolatedEntity, st: OwnStepped): void {
+    const b = st.body;
+    player.x = b.x; player.y = b.y; player.vx = b.vx; player.vy = b.vy; player.angle = b.angle; player.angVel = b.angVel;
+    player.jump = b.jump ?? 0; player.jumpScale = b.jumpScale; player.dodge = b.dodge ?? 0; player.dodgeDir = b.dodgeDir ?? 0;
+    player.jumpPrime = st.jumpPrime;
+    if (st.charge) {
+      this.charge = st.charge;
+      this.boostFuel = this.chargeTotal?.(this.charge) ?? this.serverBoostFuel;
+    }
   }
 
   /**
@@ -1038,192 +1019,55 @@ export class GameState {
     }
   }
 
+  /**
+   * A snapshot in: the own ship's tick layer has taken its keyframe, causes and corrections (ShipClient.preSnapshot),
+   * so its state at the prediction's tick may have moved (stepped again from there); the entity follows it, and the
+   * size of the move is the reconcile statistics (the overlay's corrections). Its own row, when one came, gives the
+   * status the HUD reads (HP, EMP, warmth, slowed and marked ticks, the stores as the server packed them)
+   */
   private reconcilePlayer(snapshot: ServerSnapshotMessage): void {
     const player = this.entities.get(this.playerId);
     if (!player) return;
-    
     const serverState = snapshot.entities.find(e => e.id === this.playerId);
-    if (!serverState) { this.followOwnTick(player, snapshot.tick); return; }
-    
-    // --- Prediction disagreement: measure BEFORE snapping ---
-    // player.x/y = our predicted position; serverState.x/y = authoritative
-    const preErrorX = player.x - serverState.x;
-    const preErrorY = player.y - serverState.y;
-    const preError = Math.hypot(preErrorX, preErrorY);
-    
-    const velErrorX = player.vx - (serverState.vx || 0);
-    const velErrorY = player.vy - (serverState.vy || 0);
-    const velError = Math.hypot(velErrorX, velErrorY);
-    
-    const angleError = Math.abs(player.angle - (serverState.angle || 0));
-    
-    // Store pre-error for logging after filter (so we see actual pending count)
-    const preErrorForLog = preError;
-    const velErrorForLog = velError;
-    const angleErrorForLog = angleError;
-    
-    this.predErrorPre = preError;
-    this.predErrorPreAvg = this.predErrorPreAvg * (1 - this.predStatsAlpha) + preError * this.predStatsAlpha;
-    this.predErrorPreMax = Math.max(this.predErrorPreMax * this.predMaxDecay, preError);
-    
-    this.predVelError = velError;
-    this.predVelErrorAvg = this.predVelErrorAvg * (1 - this.predStatsAlpha) + velError * this.predStatsAlpha;
-    
-    this.predErrorHistory.push(preError);
-    if (this.predErrorHistory.length > this.PRED_HISTORY_SIZE) {
-      this.predErrorHistory.shift();
+    if (serverState) {
+      player.hp = serverState.hp || player.hp;
+      player.maxHp = serverState.maxHp || player.maxHp;
+      player.data = serverState.data;
+      player.empUntil = snapshot.tick + (serverState.data?.[5] ?? 0);
+      player.warmth = serverState.data?.[PILOT_ROW.warmth] ?? 100;
+      player.cargoMass = serverState.data?.[PILOT_ROW.cargo] ?? 0;
+      { const x = pilotExtras(serverState.data); player.slowUntil = snapshot.tick + x.slowed; player.markUntil = snapshot.tick + x.marked; }
+      if (serverState.data && serverState.data.length >= 2) {
+        this.serverBoostFuel = serverState.data[1];
+        this.serverCharge = unpackCharge(serverState.data);
+      }
     }
-    
-    // --- End pre-reconciliation measurement ---
-    
-    const oldRenderX = player.renderX;
-    const oldRenderY = player.renderY;
-    
-    // Snap physics to server state
-    player.x = serverState.x;
-    player.y = serverState.y;
-    player.angle = serverState.angle ?? player.angle;
-    player.angVel = serverState.av ?? 0;
-    player.vx = serverState.vx || 0;
-    player.vy = serverState.vy || 0;
-    player.hp = serverState.hp || player.hp;
-    player.maxHp = serverState.maxHp || player.maxHp;
-    player.data = serverState.data;
-    player.jump = serverState.data?.[3] ?? 0;
-    if (serverState.data && serverState.data.length > PILOT_ROW.jumpScale) player.jumpScale = serverState.data[PILOT_ROW.jumpScale] / 1000;
-    player.jumpPrime = serverState.data?.[PILOT_ROW.prime] ?? 0;
-    player.empUntil = snapshot.tick + (serverState.data?.[5] ?? 0);
-    player.warmth = serverState.data?.[PILOT_ROW.warmth] ?? 100;
-    player.cargoMass = serverState.data?.[PILOT_ROW.cargo] ?? 0;
-    // (The gun state the server's guns hold, against our own: the clip and charge correction, ShipClient.syncGuns)
-    this.shipGunSync?.(serverState.data, snapshot.tick);
-    // (After the charge groups: the Burst Strafer's dodge and way, strafer.ts pilotExtras)
-    // (and the ticks left slowed and marked: features/weaponry, the prediction flies a slowed ship as the server does)
-    { const x = pilotExtras(serverState.data); player.dodge = x.dodge; player.dodgeDir = x.dodgeDir;
-      player.slowUntil = snapshot.tick + x.slowed; player.markUntil = snapshot.tick + x.marked; }
-
-    // Reset boost fuel to server-reported value before replaying inputs.
-    // Boost fuel is now in entity data[1] for every snapshot (not just playerState).
-    // This ensures reconciliation uses fresh fuel data, not 1-second-stale data.
-    if (serverState.data && serverState.data.length >= 2) {
-      this.serverBoostFuel = serverState.data[1];
-      // (The ship's pool and each bank's, energy.ts unpackCharge)
-      this.serverCharge = unpackCharge(serverState.data);
+    if (this.predictedTick <= 0) return;
+    const st = this.ownStep?.(this.predictedTick);
+    if (!st) {
+      // (Not on its layer yet: the server's row places it)
+      if (serverState) {
+        player.x = serverState.x; player.y = serverState.y; player.angle = serverState.angle ?? player.angle;
+        player.vx = serverState.vx || 0; player.vy = serverState.vy || 0; player.angVel = serverState.av ?? 0;
+      }
+      return;
     }
-    this.charge = { ...this.serverCharge };
-    this.noteSelf(player, snapshot.tick);
-    
-    // Debug: log pending ticks BEFORE filtering
-    const preFilterCount = this.pendingInputsByTick.length;
-    const preFilterTicks = this.pendingInputsByTick.slice(-5).map(e => e.tick);
-    
-    // Remove acknowledged inputs - filter by TICK (snapshot represents server state at snapshot.tick)
-    // Keep inputs for ticks AFTER the snapshot tick (those haven't been simulated by server yet)
-    this.pendingInputsByTick = this.pendingInputsByTick.filter(
-      entry => entry.tick > snapshot.tick
-    );
-    
-    this.predPendingCount = this.pendingInputsByTick.length;
-    
-    // Debug spike detection - log detailed info when error exceeds threshold (AFTER filter)
-    const SPIKE_THRESHOLD = 1.0; // Log when error > 1px
-    if (this.logSpikes && preErrorForLog > SPIKE_THRESHOLD) {
-      const pendingCount = this.pendingInputsByTick.length;
-      const lastTick = this.pendingInputsByTick.length > 0 ? this.pendingInputsByTick[this.pendingInputsByTick.length - 1].tick : 0;
-      const firstTick = this.pendingInputsByTick.length > 0 ? this.pendingInputsByTick[0].tick : 0;
-      console.warn(
-        `[RECON SPIKE] preErr=${preErrorForLog.toFixed(3)} velErr=${velErrorForLog.toFixed(5)} angleErr=${angleErrorForLog.toFixed(4)}\n` +
-        `  server: (${serverState.x}, ${serverState.y}) v=(${serverState.vx}, ${serverState.vy}) a=${serverState.angle}\n` +
-        `  snapshot tick=${snapshot.tick} lastProcessedSeq=${snapshot.lastProcessedInput}\n` +
-        `  BEFORE filter: ${preFilterCount} inputs, last ticks: [${preFilterTicks.join(',')}]\n` +
-        `  pending AFTER filter: ${pendingCount} inputs (tick ${firstTick}-${lastTick}) inputDelayTicks=${this.inputDelayTicks}\n` +
-        `  boostFuel: client=${this.boostFuel.toFixed(1)} server=${serverState.data?.[1]}`
-      );
-    }
-    
-    // Save state before replay for post-reconciliation debug
-    const preReplayX = player.x;
-    const preReplayY = player.y;
-    const preReplayVx = player.vx;
-    const preReplayVy = player.vy;
-    
-    // Replay unacknowledged inputs - sort by tick to ensure correct order
-    this.pendingInputsByTick.sort((a, b) => a.tick - b.tick);
-    this.selfPrev = { x: player.x, y: player.y, angle: player.angle };
-    for (const entry of this.pendingInputsByTick) {
-      this.selfPrev = { x: player.x, y: player.y, angle: player.angle };
-      this.reapplyInput(player, entry.input, entry.tick);
-    }
-    
-    // Smooth render position to prevent rubber banding
-    const errorX = player.x - oldRenderX;
-    const errorY = player.y - oldRenderY;
-    const errorDist = Math.hypot(errorX, errorY);
-    
-    // --- Post-reconciliation measurement (render error) ---
-    this.predErrorPost = errorDist;
-    this.predErrorPostAvg = this.predErrorPostAvg * (1 - this.predStatsAlpha) + errorDist * this.predStatsAlpha;
-    this.predErrorPostMax = Math.max(this.predErrorPostMax * this.predMaxDecay, errorDist);
-    
-    // Debug post-reconciliation spike
-    const POST_SPIKE_THRESHOLD = 1.0;
-    if (this.logSpikes && errorDist > POST_SPIKE_THRESHOLD && preError <= 1.0) {
-      console.warn(
-        `[POST-RECON SPIKE] postErr=${errorDist.toFixed(3)} (preErr was ${preError.toFixed(3)})\n` +
-        `  after snap: (${preReplayX.toFixed(2)}, ${preReplayY.toFixed(2)}) v=(${preReplayVx.toFixed(4)}, ${preReplayVy.toFixed(4)})\n` +
-        `  after replay ${this.pendingInputsByTick.length} inputs: (${player.x.toFixed(2)}, ${player.y.toFixed(2)}) v=(${player.vx.toFixed(4)}, ${player.vy.toFixed(4)})\n` +
-        `  oldRender: (${oldRenderX.toFixed(2)}, ${oldRenderY.toFixed(2)})`
-      );
-    }
-    
-    if (errorDist > SNAP_THRESHOLD) {
-      player.renderX = player.x;
-      player.renderY = player.y;
-      this.predSnapCount++;
-    } else if (errorDist > SMOOTH_THRESHOLD) {
-      player.renderX = oldRenderX + errorX * RECONCILE_SMOOTH;
-      player.renderY = oldRenderY + errorY * RECONCILE_SMOOTH;
-    } else {
-      player.renderX = player.x;
-      player.renderY = player.y;
-    }
-  }
-
-  /**
-   * No own row, but its tick layer worked out what moved its ship in this snapshot's window (CAPS.OWN_SIM: a contact,
-   * a pull, a rebuild's recentring; the server no longer sends a row for those): where the prediction had it at the
-   * snapshot's tick differs from where the tick layer has it, so it's put there and its inputs since replayed, as a
-   * row would have. Its energy and fuel stay the prediction's (a row's own values only come with a row)
-   */
-  private followOwnTick(player: InterpolatedEntity, tick: number): void {
-    const p = this.ownTickPose?.(tick);
-    const was = p && this.selfPoses.get(tick);
-    if (!p || !was) return;
-    const d = Math.abs(was.x - p.x) + Math.abs(was.y - p.y) + Math.abs(was.vx - p.vx) + Math.abs(was.vy - p.vy) + Math.abs(was.angle - p.angle);
-    if (d < 1e-4) return;
-    const oldRenderX = player.renderX, oldRenderY = player.renderY;
-    player.x = p.x; player.y = p.y; player.angle = p.angle; player.vx = p.vx; player.vy = p.vy; player.angVel = p.angVel;
-    this.noteSelf(player, tick);
-    this.pendingInputsByTick = this.pendingInputsByTick.filter((entry) => entry.tick > tick);
-    this.pendingInputsByTick.sort((a, b) => a.tick - b.tick);
-    const charge = this.charge, fuel = this.boostFuel;
-    for (const entry of this.pendingInputsByTick) {
-      this.selfPrev = { x: player.x, y: player.y, angle: player.angle };
-      this.reapplyInput(player, entry.input, entry.tick);
-    }
-    this.charge = charge; this.boostFuel = fuel;
-    const errorX = player.x - oldRenderX, errorY = player.y - oldRenderY, errorDist = Math.hypot(errorX, errorY);
-    if (errorDist > SNAP_THRESHOLD) { player.renderX = player.x; player.renderY = player.y; }
-    else if (errorDist > SMOOTH_THRESHOLD) { player.renderX = oldRenderX + errorX * RECONCILE_SMOOTH; player.renderY = oldRenderY + errorY * RECONCILE_SMOOTH; }
-    else { player.renderX = player.x; player.renderY = player.y; }
-  }
-
-  /** Replay an unacknowledged input during reconciliation. */
-  private reapplyInput(player: InterpolatedEntity, input: ClientInputMessage, tick: number): void {
-    const c = this.shipPhysics?.(player, input, this.charge, tick);
-    if (c != null) this.charge = c;
-    this.boostFuel = this.chargeTotal?.(this.charge) ?? this.serverBoostFuel;
-    this.noteSelf(player, tick);
+    const ex = player.x - st.body.x, ey = player.y - st.body.y, err = Math.hypot(ex, ey);
+    const verr = Math.hypot(player.vx - st.body.vx, player.vy - st.body.vy);
+    this.takeOwn(player, st);
+    this.noteSelf(player, this.predictedTick);
+    if (err === 0 && verr === 0) return;
+    this.predErrorPre = err;
+    this.predErrorPreAvg = this.predErrorPreAvg * (1 - this.predStatsAlpha) + err * this.predStatsAlpha;
+    this.predErrorPreMax = Math.max(this.predErrorPreMax * this.predMaxDecay, err);
+    this.predVelError = verr;
+    this.predVelErrorAvg = this.predVelErrorAvg * (1 - this.predStatsAlpha) + verr * this.predStatsAlpha;
+    this.predErrorHistory.push(err);
+    if (this.predErrorHistory.length > this.PRED_HISTORY_SIZE) this.predErrorHistory.shift();
+    // (The ticks stepped again: from the snapshot's to the prediction's)
+    this.predPendingCount = Math.max(0, this.predictedTick - snapshot.tick);
+    if (err > SNAP_THRESHOLD) this.predSnapCount++;
+    if (this.logSpikes && err > 1) console.warn(`[OWN CORRECTION] ${err.toFixed(3)} at tick ${this.predictedTick} (snapshot ${snapshot.tick})`);
   }
 
   // ============================================
@@ -1374,7 +1218,13 @@ export class GameState {
     // The local ship: drawn between its last two steps, half a tick behind the estimate, so it
     // moves evenly even when a frame runs no step or two (frames and ticks don't line up)
     const player = this.entities.get(this.playerId);
-    if (player) {
+    // (On its tick layer: drawn there at its draw tick, a correction eased in (ShipReplicaSet.pose))
+    const drawn = player && this.predictionEnabled && this.predictedTick > 0 ? this.ownPose?.(this.ownDrawTick()) : null;
+    if (player && drawn) {
+      player.renderX = drawn.x;
+      player.renderY = drawn.y;
+      player.renderAngle = drawn.angle;
+    } else if (player) {
       const prev = this.selfPrev;
       if (prev && this.predictionEnabled && this.predictedTick > 0) {
         // (the same k as ownDrawTick: your shells are drawn at the tick your ship is)

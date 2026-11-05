@@ -153,9 +153,11 @@ describe('decision inputs: the Pyreclast flown by its body on both sides (CAPS.B
     const r = fight({ ticks: 2400, stagesAt: [800, 1600] });
     if (process.env.BODY_DEBUG) console.log('BODIES', JSON.stringify({ got: r.got, stats: r.stats, rep: r.rep, runner: r.A.bodies?.stats }));
     expect(r.brain.stage).toBe(3);
-    // (a snapshot only when it has something to say: with every cap on, about every sixth tick for the pilot here)
-    expect(r.got.A.running).toBeGreaterThan(350);
-    expect(r.got.A.checked).toBeGreaterThan(350);
+    // (a snapshot only when it has something to say: with every cap on, about every seventh tick for the pilot here. It
+    // was every sixth while the fake clients' hit reports went as late inputs, each bringing a correction of their own
+    // ship and a snapshot with it: Stage 3b sends them on time)
+    expect(r.got.A.running).toBeGreaterThan(300);
+    expect(r.got.A.checked).toBeGreaterThan(300);
     expect(r.got.A.off).toBe(0);
     expect(r.got.A.ctlRows).toBe(0);
     expect(r.got.A.decisions).toBeGreaterThan(10);

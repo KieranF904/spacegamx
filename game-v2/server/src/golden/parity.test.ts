@@ -4,15 +4,18 @@
  *
  *   server   a full GameServer: inputs through LocalTransport (the real encode/decode and input handler), the
  *            server's tick (ShipBridge's flight step, Towing, cargo, energy), read back from the ECS and the ShipState
- *   client   ShipClient.prototype.predict, the pilot's prediction, called as Game.ts calls it (the aim quantised and
- *            dequantised, the cursor distance in steps), from the server's starting state and charge, told the
- *            hold's mass and the tow as the pilot's snapshot row does
+ *   client   the pilot's own ship on its tick layer: its whole step (common sim/ownStep.ts stepOwnShip, what
+ *            client OwnTick.step runs for every tick, guns included), the input as Game.ts builds it (the aim
+ *            quantised and dequantised, the cursor distance in steps), from the server's starting state and charge,
+ *            told the hold's mass, the tow and the slowed ticks as the server tells them
  *   replica  replicaStep on the control bits (the server's shadow, what clients replay), keyframed through
  *            packKeyframe/unpackKeyframe; where it leaves the real path (full charge, no tick, cargo changes, a jump's
  *            distance) it is re-keyframed, and those ticks are pinned in parity.golden.json
  *
  * Plus snapshot replays: a client reconciling from the server's state mid-scenario (mid-burst for the strafer
- * scripts) and a replica keyframed there both land on the server's states to the end.
+ * scripts) and a replica keyframed there both land on the server's states to the end. And the correction: a client
+ * whose guns went wrong (a lost input) finds it by the full-state hash (sim/headHash.ts ownStateHash) and is put right
+ * exactly by the server's ownSync, stepping on from it on the server's numbers.
  *
  * Regenerate the keyframe pins deliberately with `UPDATE_GOLDEN=1 npx vitest run server/src/golden/parity.test.ts`.
  */
@@ -22,11 +25,11 @@ import * as bitecs from 'bitecs';
 import {
   Position, Velocity, Rotation, InSystem, createShipState, flightSignature, controlBits, replicaStep, ReplicaMode, CTL,
   quantizeCursorAngle, dequantizeCursorAngle, quantizeCursorDist, CURSOR_DIST_STEP, jumpTuning, packKeyframe, unpackKeyframe,
-  packGunState, gunStateAt, gunStateValue, GUN_STATE_RELOADING, GUN_STATE_PATIENCE, CHARGE_GROUPS_AT, PILOT_ROW, SNAPSHOT_RATE, TICK_RATE,
-  type FlightBody, type Charge, type ShipState, type ShipTuning, type ReplicaEnv, type ClientInputMessage,
+  packGunState, CHARGE_GROUPS_AT, PILOT_ROW, SNAPSHOT_RATE, TICK_RATE, simAimQ, buildFlightInputs, stepOwnShip, ownStructure, seedOwnExtras,
+  ownStateHash, packOwnSync, unpackOwnSync, cloneOwnExtras,
+  type FlightBody, type Charge, type ShipState, type ShipTuning, type ReplicaEnv, type ClientInputMessage, type OwnExtras, type SimEnv,
 } from '@space-game/common';
 import { PILOT_EXTRAS } from '../../../common/src/ships/features/plan.js';
-import { GunSync } from '../../../client/src/ships/gunSync.js';
 import { replicaAngle, quantizeReplicaAngle } from '../../../common/src/network/replication.js';
 import { readShipJson, testCatalog } from '../../../common/src/ships/testData.js';
 import { SCENARIOS, corsair, type Scenario, type ScriptTick } from '../../../common/src/ships/golden/testData.js';
@@ -40,7 +43,6 @@ function snapCharge(c: Charge): Charge {
   return { ...c, e: { ...e, held: e.held.slice(), flags: e.flags.slice(), amt: e.amt.slice(), mat: e.mat.slice(), closed: e.closed.slice(), aug: e.aug.slice(), sat: e.sat.slice() } };
 }
 import { bodyRow, chargeRow, hashRows, goldenFile, ranges, BODY_FIELDS } from '../../../common/src/ships/golden/testData.js';
-import { ShipClient } from '../../../client/src/ships/ShipClient.js';
 import { GameServer } from '../GameServer.js';
 import { GameData } from '../data/GameData.js';
 import { LocalTransport } from '../net/LocalTransport.js';
@@ -75,6 +77,9 @@ interface Tick {
   slowedBit: boolean;
   /** What the engines and the part features' bursts got and a refused boost, as its replica control bits carried them (flight.ts ctlOfPower, ctlOfShare, CTL.noBoost) */
   powerBits: number;
+  /** The control bits it flew (all of them) and its stores, guns, hazards and priming as the tick ended (ShipBridge.ownExtras: an ownSync's, the head hash's) */
+  bits: number;
+  extras: OwnExtras;
 }
 
 /** A scenario some of whose ticks the pilot's ship is slowed on (a Frostbite's beam on it: [from, to) 0-based, renewed each tick as a held beam does) */
@@ -126,7 +131,7 @@ function runServer(sc: Scenario) {
   ship.angVel = 0;
   if (sc.cargoOre) server.pilots.get(conn)!.cargo.push({ id: 'iron_ore', n: sc.cargoOre });
   const wreck = sc.tow ? ships.spawnWreck(corsair(), 40000 - sc.tow.wreckDist, 40000, 0, InSystem.systemId[pid], 7) : 0;
-  const read = (): Omit<Tick, 'tick' | 'slowUntil' | 'slowedBit' | 'powerBits'> => ({
+  const read = (): Omit<Tick, 'tick' | 'slowUntil' | 'slowedBit' | 'powerBits' | 'bits' | 'extras'> => ({
     body: {
       x: Position.x[pid], y: Position.y[pid], vx: Velocity.x[pid], vy: Velocity.y[pid], angle: Rotation.angle[pid], angVel: ship.angVel,
       jump: ship.jump, jumpScale: ship.jumpScale, cargo: ship.cargo, dodge: ship.dodge, dodgeDir: ship.dodgeDir,
@@ -154,54 +159,61 @@ function runServer(sc: Scenario) {
     if ((sc as SlowScenario).slow?.some(([a, b]) => i >= a && i < b)) ships.slow(pid, 42);
     const left = ships.slowedTicksLeft(pid);
     slowKnown = left > 0 ? server.getTick() + left : 0;
-    ticks.push({ ...read(), tick: server.getTick(), slowUntil, slowedBit, powerBits });
+    ticks.push({ ...read(), tick: server.getTick(), slowUntil, slowedBit, powerBits, bits: ctlBits, extras: ships.ownExtras(pid, server.getTick())! });
   });
   const env: ReplicaEnv = (server as any).replicaEnv(InSystem.systemId[pid]);
   return { start, ticks, derived: ship.derived, env, wreck, ships, pid };
 }
 
-/** The pilot's prediction: ShipClient.predict with just the state it reads (the rest of the client is the renderer's) */
-function clientPredictor(sc: Scenario, env: ReplicaEnv, sync?: GunSync) {
+type Start = Omit<Tick, 'tick' | 'slowUntil' | 'slowedBit' | 'powerBits' | 'bits' | 'extras'>;
+
+/** The input as Game.ts builds it (the aim through its 13 bits, the cursor distance in steps) */
+function inputOf(s: ScriptTick, i: number, aim: 'wire' | 'game'): ClientInputMessage {
+  return {
+    type: 'input', seq: i + 1, tick: 0, fireLeft: !!(s as FireTick).fire, fireRight: false, ...keysOf(s),
+    targetAngle: aim === 'wire' ? Math.fround(dequantizeCursorAngle(quantizeCursorAngle(s.aim))) : dequantizeCursorAngle(quantizeCursorAngle(s.aim)), cursorDist: quantizeCursorDist(s.dist ?? 0) * CURSOR_DIST_STEP,
+  } as ClientInputMessage;
+}
+
+/**
+ * The pilot's own ship on its tick layer: OwnTick.step's whole step (stepOwnShip) from its body and extras, the
+ * controls and the rest of its input as OwnTick takes them from the input message (noteInput)
+ */
+function clientPredictor(sc: Scenario, env: ReplicaEnv) {
   const ship: ShipState = createShipState(catalog, tuning, 1, sc.ship(), 0);
-  const self = {
-    store: { get: () => ship }, docked: false, berth: null,
-    // (What predictGuns reaches for: the scene its shells go to, and the gun-state history)
-    scene: { predictShot: () => {} }, gunSync: sync ?? { record: () => {} }, gunFeel: { own: () => {} },
-    opts: { state: { entities: new Map() }, tuning },
-    hazardFor: (d: never, x: number, y: number) => env.hazard?.(d, x, y),
-    central: env.central, lodestones: env.lodestones ?? [], gravity: env.gravity, terrain: env.terrain ?? null,
-    jump: jumpTuning(tuning),
-  };
-  const predict = ShipClient.prototype.predict as (this: unknown, ...a: Parameters<ShipClient['predict']>) => Charge | null;
-  const predictGuns = ShipClient.prototype.predictGuns as (this: unknown, ...a: Parameters<ShipClient['predictGuns']>) => Charge | null;
+  const fields = { central: env.central, lodestones: env.lodestones ?? [] };
+  const simEnv = (tick: number): SimEnv => ({ tick, tuning, gravity: env.gravity, fields, terrain: env.terrain ?? null, hazard: env.hazard });
   return {
     ship,
-    /** A player entity as the pilot's snapshot gives it */
-    player(t: Omit<Tick, 'tick' | 'slowUntil' | 'slowedBit' | 'powerBits'>) {
-      const b = t.body;
-      return { id: 1, x: b.x, y: b.y, vx: b.vx, vy: b.vy, angle: b.angle, angVel: b.angVel, jump: b.jump ?? 0, jumpScale: b.jumpScale, cargoMass: b.cargo ?? 0, dodge: b.dodge ?? 0, dodgeDir: b.dodgeDir ?? 0, jumpPrime: t.jumpPrime, warmth: 100 } as any;
+    /** Its state as the pilot's snapshot (and an ownSync) gives it */
+    player(t: Start, extras?: OwnExtras): { body: FlightBody; x: OwnExtras; bits: number } {
+      const x = extras ? cloneOwnExtras(extras) : seedOwnExtras(ship, t.charge);
+      x.jumpPrime = t.jumpPrime;
+      return { body: { ...t.body }, x, bits: 0 };
     },
     /**
-     * One predicted tick, the input as Game.ts builds it (the aim through its 13 bits, the cursor distance in steps).
-     * `aim` 'wire': the aim as the server has it from the wire (float32, protocol.ts decodeInputBinary); 'game': as
-     * Game.ts hands it to predict today (dequantized, not float32-rounded: a known divergence, pinned below)
+     * One tick of its layer. `aim` 'wire': the aim as the server has it from the wire (float32, protocol.ts
+     * decodeInputBinary); 'game': as Game.ts hands its input over (dequantized, not float32-rounded). The layer puts
+     * either on the grid (simAimQ), so both fly what the server flies
      */
-    step(player: any, s: ScriptTick, i: number, charge: Charge, tick: number, server: Tick, aim: 'wire' | 'game' = 'wire'): Charge {
-      // (What the pilot's snapshot row tells it: the load it flies with, and the tow its beam draws for)
-      player.cargoMass = server.body.cargo ?? 0;
-      ship.tow = server.tow;
-      // (and the slowed ticks it tells: GameState sets slowUntil from the pilot row's weaponry extras)
-      player.slowUntil = server.slowUntil;
-      const input: ClientInputMessage = {
-        type: 'input', seq: i + 1, tick: 0, fireLeft: !!(s as FireTick).fire, fireRight: false, ...keysOf(s),
-        targetAngle: aim === 'wire' ? Math.fround(dequantizeCursorAngle(quantizeCursorAngle(s.aim))) : dequantizeCursorAngle(quantizeCursorAngle(s.aim)), cursorDist: quantizeCursorDist(s.dist ?? 0) * CURSOR_DIST_STEP,
-      } as ClientInputMessage;
-      const after = predict.call(self, player, input, charge, tick)!;
-      // (Then the guns, as Game.ts has GameState call them after the ship's step: forward only)
-      return (s as FireTick).fire !== undefined ? predictGuns.call(self, player, input, tick, after) ?? after : after;
+    step(player: { body: FlightBody; x: OwnExtras; bits: number }, s: ScriptTick, i: number, charge: Charge, tick: number, server: Tick, aim: 'wire' | 'game' = 'wire'): Charge {
+      // (What the server tells it: the load it flies with, the tow its beam draws for, the slowed ticks)
+      player.body.cargo = server.body.cargo ?? 0;
+      player.x.guns.tow = server.tow;
+      player.x.hazard.slowUntil = server.slowUntil;
+      player.x.charge = charge;
+      const input = inputOf(s, i, aim);
+      const dist = Number(input.cursorDist) || 0;
+      const st = stepOwnShip(1, player.x, player.body, controlBits(buildFlightInputs(input, false)), simAimQ(input.targetAngle), { fire: !!input.fireLeft, fireAlt: !!input.fireRight, jumpDist: dist, aimDist: dist }, ownStructure(ship.derived, ship), simEnv(tick), []);
+      player.x = { charge: st.charge, guns: st.guns, hazard: st.hazard, jumpPrime: st.jumpPrime };
+      player.bits = st.ctl.bits;
+      // (Its gun state onto its record, as ShipClient's drawing side has it: gunRow reads it)
+      const g = st.guns;
+      ship.cooldown = [...g.cooldown]; ship.rounds = [...g.rounds]; ship.reload = [...g.reload]; ship.charge = [...g.charge]; ship.spin = [...g.spin]; ship.aim = [...g.aim];
+      return st.charge;
     },
-    body(player: any): FlightBody {
-      return { x: player.x, y: player.y, vx: player.vx, vy: player.vy, angle: player.angle, angVel: player.angVel, jump: player.jump, jumpScale: player.jumpScale, cargo: player.cargoMass, dodge: player.dodge, dodgeDir: player.dodgeDir };
+    body(player: { body: FlightBody }): FlightBody {
+      return { ...player.body };
     },
   };
 }
@@ -226,6 +238,11 @@ function runReplica(sc: Scenario, run: ReturnType<typeof runServer>, from: numbe
   return keyframes;
 }
 
+/** The aim it flew tick i with (the script's, on the grid) */
+function aimAt(script: ScriptTick[], i: number): number {
+  return simAimQ(Math.fround(dequantizeCursorAngle(quantizeCursorAngle(script[i].aim))));
+}
+
 const sameRow = (a: number[], b: number[]) => a.length === b.length && a.every((v, i) => v === b[i]);
 
 /** The first tick (and field) where two runs differ, or null */
@@ -246,7 +263,8 @@ function firstDiff(server: Tick[], other: { body: number[]; charge?: number[] }[
 function runClient(sc: Scenario, run: ReturnType<typeof runServer>, from: number, aim: 'wire' | 'game' = 'wire') {
   const c = clientPredictor(sc, run.env);
   const st = from < 0 ? run.start : run.ticks[from];
-  const player = c.player(st);
+  // (Reconciling from a snapshot: its keyframe and an ownSync of that tick, packed and unpacked as the wire has it)
+  const player = from < 0 ? c.player(st) : c.player(st, unpackOwnSync(packOwnSync(run.ticks[from].tick, run.ticks[from].extras)));
   let charge = st.charge;
   const out: { body: number[]; charge: number[] }[] = [];
   for (let i = from + 1; i < sc.script.length; i++) {
@@ -287,10 +305,10 @@ describe('prediction parity: server, client prediction and replicas fly the same
         expect(actual).toEqual(pins.check(`${sc.name}/replica`, actual));
       });
 
-      it('known divergence, pinned: Game.ts predicts with the aim unrounded, the server flies it as float32', () => {
-        // Game.ts sends dequantizeCursorAngle(q) to predict; the server's input handler and decodeInputBinary give the
-        // step Math.fround of it. Where that moves a quantised body, the pilot rubber-bands a little. Pinned as found
-        // (the first tick and field it shows, or null), so a fix or a new divergence is a deliberate change
+      it('known divergence, pinned: Game.ts hands its input over with the aim unrounded, the server flies it as float32', () => {
+        // Game.ts keeps dequantizeCursorAngle(q); the server's input handler and decodeInputBinary give the step
+        // Math.fround of it. The own layer puts both on the grid (OwnTick.noteInput: simAimQ), so this is null now.
+        // Pinned as found (the first tick and field it shows, or null), so a new divergence is a deliberate change
         const r = server();
         const actual = firstDiff(r.ticks, runClient(sc, r, -1, 'game').out, 0);
         expect(actual).toEqual(pins.check(`${sc.name}/unrounded-aim`, actual));
@@ -362,7 +380,7 @@ const FIRE_SCENARIOS: Scenario[] = [
     script: fireScript([300, { forward: true }, true, (i) => UP + Math.sin(i / 60) * 0.15], [40, {}, false, UP], [300, { forward: true, boost: true }, true, UP]),
   },
 ];
-/** The first four on the pool-era Sparrow (a fixture): the pool core's clip reload eighths and feed shares, which the GunSync
+/** The first four on the pool-era Sparrow (a fixture): the pool core's clip reload eighths and feed shares, which the correction
  * and sputter checks below are written for (the ports core's guns are checked tick by tick above) */
 const POOL_PAIRS: [string, string][] = [['railgun_rail_driver', 'cannon_longbarrel'], ['autocannon_chainsaw', 'lance_lance'], ['legendary_hive', 'autocannon_stinger'], ['flak_cloudmaker', 'emp_blackout']];
 const POOL_FIRE: Scenario[] = POOL_PAIRS.map(([l, r], k) => ({ ...FIRE_SCENARIOS[k], ship: armedSparrow(l, r, 'blueprints/fixtures/sparrow-t.json') }));
@@ -389,60 +407,52 @@ describe('prediction parity: the firing models (the pilot\'s guns keep the serve
     });
   }
 
-  it('under latency and a missed shot: the real GunSync pulls the pilot clip and charge back to the server within 30 ticks plus the snapshot gap', () => {
-    const sc = POOL_FIRE[0];
-    const r = runServer(sc);
-    const gap = Math.round(TICK_RATE / SNAPSHOT_RATE);
-    // The pilot's guns agree with the server's: a clip by rounds and reloading, a charge to within a few ticks
-    const agree = (mine: ShipState, theirs: number[]) => {
-      const at = gunStateAt(theirs);
-      const reloading = (v: number) => v >= GUN_STATE_RELOADING;
-      for (let k = 0; k < theirs[at]; k++) {
-        const part = theirs[at + 1 + 2 * k], v = theirs[at + 2 + 2 * k];
-        const w = mine.derived.weapons.find((x) => x.part === part)!;
-        const m = gunStateValue(mine, w);
-        if (w.fire.model === 'clip' ? m % GUN_STATE_RELOADING !== v % GUN_STATE_RELOADING || reloading(m) !== reloading(v) : Math.abs(m - v) > 3) return false;
+  it('a missed shot: the full-state hash finds it at the next snapshot, and the ownSync puts the pilot\'s guns and stores back on the server\'s exactly', () => {
+    for (const sc of POOL_FIRE.slice(0, 2)) {
+      const r = runServer(sc);
+      const gap = Math.round(TICK_RATE / SNAPSHOT_RATE);
+      const c = clientPredictor(sc, r.env);
+      // Its layer by tick (its state as each tick ended), stepped again from a correction as OwnTick is
+      const layer: { body: FlightBody; x: OwnExtras; bits: number }[] = [];
+      let player = c.player(r.start);
+      // The pilot's client loses ticks 20-31 of its held fire (a lost input: shots missed, a charge not built)
+      const DROP_FROM = 20, DROP_TO = 32;
+      const script = sc.script.map((s, i) => (i >= DROP_FROM && i < DROP_TO ? { ...s, fire: false } : s));
+      const stepTo = (i: number) => {
+        c.step(player, script[i], i, player.x.charge, r.ticks[i].tick, r.ticks[i]);
+        layer[i] = { body: { ...player.body }, x: cloneOwnExtras(player.x), bits: player.bits };
+      };
+      const hashOf = (tick: number, body: FlightBody, bits: number, x: OwnExtras) => ownStateHash(1, body, bits, aimAt(script, tick), x, r.ticks[tick].tick);
+      let misses = 0, firstMiss = -1, lastMiss = -1;
+      for (let i = 0; i < script.length; i++) {
+        stepTo(i);
+        // A snapshot of tick j reaches it 5 ticks on: its head hash against its layer there
+        const j = i - 5;
+        if (j < 0 || j % gap) continue;
+        const srv = r.ticks[j], mine = layer[j];
+        if (hashOf(j, srv.body, srv.bits, srv.extras) === hashOf(j, mine.body, mine.bits, mine.x)) continue;
+        misses++;
+        if (firstMiss < 0) firstMiss = j;
+        lastMiss = j;
+        // Off: the server's keyframe and ownSync of tick j (packed and unpacked as the wire has it); stepped again from there
+        player = c.player(srv, unpackOwnSync(packOwnSync(srv.tick, srv.extras)));
+        player.bits = srv.bits;
+        for (let k = j + 1; k <= i; k++) stepTo(k);
       }
-      return true;
-    };
-    // Held fire for the first 200 ticks; the pilot's client loses ticks 100-111 of it (a lost input: the Rail Driver's shot
-    // and the Longbarrel's charge are missed there)
-    const EIGHTH = Math.ceil((r.derived.weapons[0].fire.reload ?? 60) / 8);
-    const DROP_FROM = 20, DROP_TO = 32;
-    const flown = (delay: number, drop: boolean) => {
-      const sync = new GunSync();
-      const c = clientPredictor(sc, r.env, sync);
-      const player = c.player(r.start);
-      let charge = r.start.charge;
-      const disagree: boolean[] = [];
-      let adopted = 0;
-      for (let i = 0; i < sc.script.length; i++) {
-        const s = drop && i >= DROP_FROM && i < DROP_TO ? { ...sc.script[i], fire: false } : sc.script[i];
-        charge = c.step(player, s, i, charge, r.ticks[i].tick, r.ticks[i]);
-        // The server's row of step j reaches the client `delay` ticks later, on the snapshot ticks
-        const j = i - delay;
-        if (j >= 0 && j % gap === 0) adopted += sync.onRow(c.ship, r.ticks[j].wire, r.ticks[j].tick);
-        // (Compared with the server's row of the same tick: the latest the server has, which is what the HUD would settle to)
-        // (A reload is carried in eighths and adopted mid-eighth, so a reload may be an eighth early or late: the pilot
-        // agrees when its guns hold the value the server held at some tick within that of this one)
-        let ok = false;
-        for (let k = Math.max(0, i - EIGHTH); k <= Math.min(r.ticks.length - 1, i + EIGHTH) && !ok; k++) ok = agree(c.ship, r.ticks[k].wire);
-        disagree.push(!ok);
+      // It went wrong in the drop and was found at the first snapshot that showed it, put right at each snapshot while
+      // its inputs still said otherwise (none after the drop's last tick has shown), and from the last correction on
+      // it is the server's, tick by tick
+      expect([sc.name, firstMiss >= DROP_FROM, lastMiss <= DROP_TO + gap]).toEqual([sc.name, true, true]);
+      expect(misses).toBeGreaterThan(0);
+      expect(misses).toBeLessThanOrEqual(Math.ceil((DROP_TO - DROP_FROM) / gap) + 1);
+      let diff: string | null = null;
+      for (let i = lastMiss + 1; i < script.length && !diff; i++) {
+        const s = r.ticks[i], m = layer[i];
+        if (!sameRow(bodyRow(s.body), bodyRow(m.body))) diff = `tick ${i}: body`;
+        else if (!sameRow(chargeRow(s.charge), chargeRow(m.x.charge))) diff = `tick ${i}: charge`;
+        else if (hashOf(i, s.body, s.bits, s.extras) !== hashOf(i, m.body, m.bits, m.x)) diff = `tick ${i}: full state`;
       }
-      return { disagree, adopted };
-    };
-    for (const delay of [3, 5, 8]) {
-      const clean = flown(delay, false);
-      // Without a missed shot and with the server's rows late, the pilot's guns never leave the server's
-      expect([delay, clean.disagree.indexOf(true), clean.adopted]).toEqual([delay, -1, 0]);
-      const lost = flown(delay, true);
-      // With it they leave (a shot was missed) ...
-      const first = lost.disagree.indexOf(true);
-      expect(first).toBeGreaterThanOrEqual(DROP_FROM);
-      expect(lost.adopted).toBeGreaterThan(0);
-      // ... and are back in step within GUN_STATE_PATIENCE ticks plus the gap and the delay of when they left, to the end of the held fire
-      const by = DROP_FROM + GUN_STATE_PATIENCE + gap + delay + 12;
-      expect([delay, lost.disagree.slice(by, 200).indexOf(true)]).toEqual([delay, -1]);
+      expect([sc.name, diff]).toEqual([sc.name, null]);
     }
   });
 

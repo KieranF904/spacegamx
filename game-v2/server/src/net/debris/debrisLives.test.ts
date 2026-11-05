@@ -3,7 +3,7 @@
  * shot apart a part at a time, then one blown up whole, and every piece left to drift, knock and crumble away. A client
  * running its pieces has each exactly as the server does at every snapshot, through their grace and its end, every
  * crumble and the pieces those break into, with no keyframe, sync or crumble effect of a piece it runs after its spawn.
- * Checked against the server's own state of every piece at each snapshot's tick (every client runs its debris: the
+ * Checked against the server's own state of every piece at every tick up to each snapshot (every client runs its debris: the
  * structs-only and legacy observers went with the per-cap fallbacks).
  */
 import { describe, it, expect } from 'vitest';
@@ -20,7 +20,7 @@ import { FakeHitsClient } from '../hits/fakeHitsClient.testkit.js';
 const dataDir = join(__dirname, '../../../../data');
 const resetGlobals = (bitecs as unknown as { resetGlobals: () => void }).resetGlobals;
 
-interface Seen { kfAt: [number, number][]; kfRun: number; syncRun: number; crumbleRun: number; checked: number; off: string[]; keyframes: number }
+interface Seen { kfAt: [number, number][]; kfRun: number; syncRun: number; crumbleRun: number; checked: number; off: string[]; keyframes: number; last: number }
 
 /** A server, a client running its debris, and what it was sent and holds, checked against the server's state */
 function world() {
@@ -40,14 +40,14 @@ function world() {
   const C = new FakeHitsClient(server, { name: 'runs_c', env });
   const B = new FakeHitsClient(server, { name: 'runs_b', env });
   const fakes = [A, C, B];
-  const seen = new Map<FakeHitsClient, Seen>(fakes.map((f) => [f, { kfAt: [], kfRun: 0, syncRun: 0, crumbleRun: 0, checked: 0, off: [], keyframes: 0 }]));
+  const seen = new Map<FakeHitsClient, Seen>(fakes.map((f) => [f, { kfAt: [], kfRun: 0, syncRun: 0, crumbleRun: 0, checked: 0, off: [], keyframes: 0, last: -1 }]));
   let seq = 1;
   // (Pieces knocked by one gone that tick or out of the running client's view: what it has of the other may not be how
   // that one ended (its removal can come before it stepped there), so the server keyframes it: Replication.forClient)
   // (told after the snapshot's step, so counted at the end)
   const excused = new Map<number, number[]>();
   const excuse = (id: number, tick: number) => !!excused.get(id)?.some((t) => t > tick - 30 && t <= tick);
-  // (Each piece's state as each tick left it: frames may wait a few ticks, coalesced)
+  // (Each piece's state as each tick left it: frames may wait a few ticks, coalesced, and a quiet window be long)
   const real = new Map<number, Map<number, number[]>>();
   const step = () => {
     server.step();
@@ -55,7 +55,7 @@ function world() {
     const now = new Map<number, number[]>();
     for (const [id, ship] of ships.bodies) if (ship.kind === 'debris') now.set(id, [Position.x[id], Position.y[id], Velocity.x[id], Velocity.y[id], Rotation.angle[id], ship.angVel]);
     real.set(server.getTick(), now);
-    real.delete(server.getTick() - 30);
+    real.delete(server.getTick() - 300);
     for (const f of fakes) {
       // (Its confirmations of the pieces it worked out, on an input as a client sends them)
       const acks = f.debris.takeAcks();
@@ -81,15 +81,21 @@ function world() {
     fa.snapshot = (m) => {
       for (const k of m.ships ?? []) { if (f.debris.lives.has(k[0])) s.kfAt.push([k[0], m.tick]); if (ships.get(k[0])?.kind === 'debris') s.keyframes++; }
       os(m);
+      const check = (id: number, t: number, want: number[] | undefined, st: { x: number; y: number; vx: number; vy: number; angle: number; angVel: number } | undefined) => {
+        if (!want || !st) return;
+        s.checked++;
+        const mine = [st.x, st.y, st.vx, st.vy, st.angle, st.angVel];
+        if (mine.some((v, i) => v !== want[i]) && s.off.length < 10) s.off.push(`${f === A ? "A" : f === C ? "C" : "B"} tick ${t} piece ${id} (${f.debris.lives.has(id) ? 'runs' : 'sent'}): ${mine.join(',')} vs ${want.join(',')}`);
+      };
       for (const id of f.reps.ids()) {
         // (A frame that went at once: sent at the tick's end, the state now)
         const ship = ships.get(id), now = m.tick === server.getTick() && ship?.kind === 'debris' ? [Position.x[id], Position.y[id], Velocity.x[id], Velocity.y[id], Rotation.angle[id], ship.angVel] : undefined;
-        const want = real.get(m.tick)?.get(id) ?? now, st = f.reps.at(id, m.tick)?.body;
-        if (!want || !st) continue;
-        s.checked++;
-        const mine = [st.x, st.y, st.vx, st.vy, st.angle, st.angVel];
-        if (mine.some((v, i) => v !== want[i]) && s.off.length < 10) s.off.push(`${f === A ? "A" : f === C ? "C" : "B"} tick ${m.tick} piece ${id} (${f.debris.lives.has(id) ? 'runs' : 'sent'}): ${mine.join(',')} vs ${want.join(',')}`);
+        check(id, m.tick, real.get(m.tick)?.get(id) ?? now, f.reps.at(id, m.tick)?.body);
+        // (...and every tick of the window since its last snapshot from its keyframe or spawn on, as it stepped them: a
+        // snapshot goes only when there's something to say, so a quiet window can be long)
+        for (let t = Math.max(s.last + 1, f.reps.kfOf(id) ?? Infinity); t < m.tick; t++) check(id, t, real.get(t)?.get(id), f.reps.ring.get(id, t)?.body);
       }
+      s.last = m.tick;
     };
   }
   // (Knocks between pieces just past their grace: the grace ends with them where it found them, overlapping or not)
@@ -145,22 +151,20 @@ function shedding(ticks: number) {
 }
 
 describe('debris a client runs itself (CAPS.DEBRIS)', () => {
-  // SKIPPED (sim foundation stage 2, open for stage 3): before stage 2 this ran a client with only the debris-related
-  // caps; with the full set (focus grid, contacts, waypoints, pilots, moves, cargo), which no test had run debris under,
-  // pieces come out a few units off (one sent piece ~22 units off for 150+ ticks: a missed recentre?), 2 syncs and 5
-  // crumble effects go for pieces it runs, and about a third of splits go unacked within DEBRIS_ACK_TICKS. The
-  // full-caps server path here is unchanged by stage 2 (kept structures were always passed for such a client), so this
-  // looks pre-existing under full caps; to be diagnosed, not loosened. The boss-shedding test below passes.
-  it.skip('freighters shot apart and blown up: every piece exact through its life, nothing sent of the ones it runs', () => {
+  it('freighters shot apart and blown up: every piece exact through its life, nothing sent of the ones it runs', () => {
     const r = fight(1500);
     const a = r.seen(r.A);
-    if (process.env.DEBRIS_DEBUG) console.log(JSON.stringify({ a, lives: r.A.debris.lives.stats, splits: r.A.debris.stats, acks: (r.server as unknown as { snapshots: { debrisAcks: object } }).snapshots.debrisAcks, pairs: r.pairsYoung }));
+    const acks = (r.server as unknown as { snapshots: { debrisAcks: { ok: number; late: number } } }).snapshots.debrisAcks;
+    if (process.env.DEBRIS_DEBUG) console.log(JSON.stringify({ a, lives: r.A.debris.lives.stats, splits: r.A.debris.stats, acks, pairs: r.pairsYoung }));
     // It ran pieces, which crumbled and broke up, and it worked every bit of it out
     expect(r.A.debris.lives.stats.pieces).toBeGreaterThan(20);
     expect(r.A.debris.lives.stats.crumbles).toBeGreaterThan(20);
     expect(a.off).toEqual([]);
     expect(a.checked).toBeGreaterThan(1000);
     expect(a.kfRun + a.syncRun + a.crumbleRun).toBe(0);
+    // (every split worked out and confirmed in time: a split told goes with a snapshot, which its client waits for)
+    expect(acks.ok).toBeGreaterThan(0);
+    expect(acks.late).toBe(0);
     // (...pieces knocking just past their grace among them: the grace ends where it found them, in contact or not)
     expect(r.pairsYoung.justPast).toBeGreaterThan(0);
   }, 240_000);

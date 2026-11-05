@@ -37,6 +37,8 @@ export class DebrisSplits implements DebrisWorld {
    * they were before its sync
    */
   private waiting: { msg: ServerDebrisSplitMessage; parent: ShipState; joins: ReturnType<typeof computeJoins>; now?: FlightBody; run?: boolean }[] = [];
+  /** Ships synced while splits wait (onSync): a piece among them the server sent in full, not to be worked out over it */
+  private readonly told = new Set<number>();
 
   constructor(private readonly host: {
     store: ShipStore;
@@ -55,6 +57,8 @@ export class DebrisSplits implements DebrisWorld {
    */
   onSync(msg: ServerShipSyncMessage): void {
     this.lives.drop(msg.id);
+    // (A piece of a split still waiting for its snapshot, sent in full meanwhile (its hold ran out): it has it so)
+    if (this.waiting.length) this.told.add(msg.id);
     // (A structure it has already, one it ran told now, say: nothing to step again)
     if (msg.at !== undefined && msg.kind === 'debris' && this.host.store.get(msg.id)?.rebuilds !== msg.rebuilds) this.host.reps().rewind(msg.id, msg.at);
   }
@@ -73,6 +77,7 @@ export class DebrisSplits implements DebrisWorld {
     this.lives.clear();
     this.pre.clear();
     this.waiting.length = 0;
+    this.told.clear();
     this.acks = [];
     this.rows = [];
   }
@@ -81,6 +86,10 @@ export class DebrisSplits implements DebrisWorld {
 
   gone(id: number, t: number): boolean {
     return this.lives.gone(id, t);
+  }
+
+  runs(id: number): boolean {
+    return this.lives.has(id);
   }
 
   /** After tick t's step: one it runs, its crumbling; one it's sent, a rebuild its syncs keep by tick, recentred alike */
@@ -121,12 +130,14 @@ export class DebrisSplits implements DebrisWorld {
     const ship = (t !== undefined ? this.lives.versionAt(id, t) : null) ?? store.get(id);
     if (!ship || ship.kind !== 'debris') return null;
     const d = (t !== undefined && !this.lives.has(id) ? store.derivedAt(id, t) : undefined) ?? ship.derived;
+    // (one it runs: its own say, as the store's goes with its removal before the world's last steps of it)
+    const aloof = this.lives.aloofOf(id) ?? store.aloof.has(id);
     const had = this.shapes.get(d);
-    if (had && had.aloof === store.aloof.has(id) && had.born === ship.spawnTick) return had.shape;
+    if (had && had.aloof === aloof && had.born === ship.spawnTick) return had.shape;
     const pieces: Vec2[][] = [];
-    if (!store.aloof.has(id)) store.geometry(ship).forEach((g, i) => { if (d.alive[i]) for (const p of g.convexShrunk) pieces.push(p); });
+    if (!aloof) store.geometry(ship).forEach((g, i) => { if (d.alive[i]) for (const p of g.convexShrunk) pieces.push(p); });
     const shape = { mass: d.mass, radius: d.radius, com: d.com, pieces, born: ship.spawnTick };
-    this.shapes.set(d, { aloof: store.aloof.has(id), born: ship.spawnTick, shape });
+    this.shapes.set(d, { aloof, born: ship.spawnTick, shape });
     return shape;
   }
 
@@ -170,9 +181,11 @@ export class DebrisSplits implements DebrisWorld {
     for (const id of [...this.lives.ids()]) if (!reps.has(id)) this.lives.drop(id);
     for (const id of [...this.pre.ids()]) if (!reps.has(id)) this.pre.remove(id);
     const pose = this.host.splitPose?.();
+    // (Pieces the server sent in full meanwhile, its hold of them over: their sync or this snapshot's keyframe is theirs)
+    const told = this.told, sent = (id: number) => told.has(id) || !!keyed?.has(id);
     for (const w of this.waiting.splice(0)) {
       // (A piece it runs: its world stepped to the tick, the snapshot's keyframes in, and its body before it was recentred)
-      if (w.run) { reps.at(w.msg.id, w.msg.tick); const pre = this.preAt(w.msg.id, w.msg.tick); if (pre) this.derive(w.msg, w.parent, w.joins, pre); continue; }
+      if (w.run) { reps.at(w.msg.id, w.msg.tick); const pre = this.preAt(w.msg.id, w.msg.tick); if (pre) this.derive(w.msg, w.parent, w.joins, pre, undefined, sent); continue; }
       // (No rebuild of it among the causes: its replica's at the tick, now the snapshot's controls and decisions are in,
       // when its structures are kept by tick (CAPS.STRUCTS: it flew that tick as it was); else as it was when the split
       // came, before its sync)
@@ -181,12 +194,16 @@ export class DebrisSplits implements DebrisWorld {
       // (stepped there first: a piece's sync since may have it stepped again, recentred at the tick)
       if (kept) reps.at(w.msg.id, w.msg.tick);
       const body = this.preAt(w.msg.id, w.msg.tick) ?? pose?.(w.msg.id, w.msg.tick) ?? (kept ? reps.at(w.msg.id, w.msg.tick)?.body : undefined) ?? w.now;
-      if (body) this.derive(w.msg, w.parent, w.joins, body);
+      if (body) this.derive(w.msg, w.parent, w.joins, body, undefined, sent);
     }
+    told.clear();
   }
 
-  /** `hps`: the pieces' HP the split gave, by part, from its parts in piece order (else the parent's as last sent) */
-  private derive(msg: ServerDebrisSplitMessage, parent: ShipState, joins: ReturnType<typeof computeJoins>, body: FlightBody, hps?: (order: number[]) => Map<number, number>): void {
+  /**
+   * `hps`: the pieces' HP the split gave, by part, from its parts in piece order (else the parent's as last sent);
+   * `sent`: pieces the server sent in full already (left as they came: no store, replica, life, row or check)
+   */
+  private derive(msg: ServerDebrisSplitMessage, parent: ShipState, joins: ReturnType<typeof computeJoins>, body: FlightBody, hps?: (order: number[]) => Map<number, number>, sent?: (id: number) => boolean): void {
     const { store } = this.host, reps = this.host.reps();
     const n = parent.blueprint.parts.length;
     const parts = new Set(unpackRuns(msg.p, n));
@@ -198,12 +215,14 @@ export class DebrisSplits implements DebrisWorld {
     // (Its to run from now: each part's crumble time, a shed's own, else its parent's if that's one it runs, else
     // seeded by the piece)
     const decay = msg.l ? this.lives.decayOf(msg.id) : undefined;
-    const aloof = store.aloof.has(msg.id);
+    const aloof = this.lives.aloofOf(msg.id) ?? store.aloof.has(msg.id);
     for (const d of got) {
+      if (sent?.(d.id)) continue;
       store.bodies.set(d.id, d.ship);
       // (Only to be seen: shed so, or breaking off one that is)
-      if (d.aloof || (d.aloof === undefined && aloof)) store.aloof.add(d.id); else store.aloof.delete(d.id);
-      if (msg.l) this.lives.add(d.id, msg.tick, d.ship, d.decay ?? (decay ? d.parts.map((i) => decay[i]) : debrisDecay(d.id, msg.tick, d.parts.length, store.tuning)));
+      const only = !!(d.aloof || (d.aloof === undefined && aloof));
+      if (only) store.aloof.add(d.id); else store.aloof.delete(d.id);
+      if (msg.l) this.lives.add(d.id, msg.tick, d.ship, d.decay ?? (decay ? d.parts.map((i) => decay[i]) : debrisDecay(d.id, msg.tick, d.parts.length, store.tuning)), only);
       reps.spawnDebris(d.id, msg.tick, d.body);
       this.rows.push({ id: d.id, type: EntityType.ShipBody, x: d.body.x, y: d.body.y, angle: d.body.angle, data: [...DEBRIS_STATUS] });
       this.acks.push(d.id, d.hash);

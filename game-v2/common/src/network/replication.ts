@@ -47,6 +47,8 @@ export interface DebrisWorld {
    * (`body` moved). False: nothing was left of it (it went at t)
    */
   after?(id: number, t: number, body: FlightBody): boolean;
+  /** One it runs itself (its whole life worked out here, its end too: a removal of it is no news) */
+  runs?(id: number): boolean;
 }
 import { quantizeCursorAngle, dequantizeCursorAngle } from './cursorState.js';
 import { dhypot } from '../math/detTrig.js';
@@ -227,6 +229,13 @@ export interface OwnTimeline {
   after(t: number, body: FlightBody): void;
   /** Before its step at tick t: what goes in first (a CARGO cause: the hold's mass it flies the step with) */
   preStep?(t: number, body: FlightBody): void;
+  /**
+   * Its whole step at tick t, flown (a pilot's): the one stepper on its full state (stores, guns, hazards, priming:
+   * the source keeps those by tick), `body` stepped in place from its state at t - 1, with the controls the timeline
+   * says (`bits`, `q`). Returns the CTL bits it flew (its power and hazard bits the step's own). Absent (or null back):
+   * stepped as any replica is (replicaStep, its power from the bits)
+   */
+  step?(t: number, body: FlightBody, bits: number, q: number, derived: ShipDerived, env: ReplicaEnv): number | null;
 }
 
 /**
@@ -492,8 +501,11 @@ export class ShipReplicaSet {
     // (The hold's mass it flies this step with, if that changed: a CARGO cause, CAPS.CARGO)
     if (own) own.preStep?.(t, body);
     else cs?.preStep?.(id, t, body);
-    replicaStep(r.mode, body, { bits, targetAngle: replicaAngle(r.mode, q) }, (own ? own.derived(t) : cs?.derived(id, t)) || d, this.tuning, this.env(), t);
-    const st = new ReplicaState(id, r.mode, body, bits, q);
+    const dt = (own ? own.derived(t) : cs?.derived(id, t)) || d;
+    // (Its own ship, flown: its whole step, once, by its own timeline (OwnTimeline.step); anything else its replica's)
+    const flown = own && r.mode === ReplicaMode.Player && own.step ? own.step(t, body, bits, q, dt, this.env()) : null;
+    if (flown === null) replicaStep(r.mode, body, { bits, targetAngle: replicaAngle(r.mode, q) }, dt, this.tuning, this.env(), t);
+    const st = new ReplicaState(id, r.mode, body, flown ?? bits, q);
     this.ahead.keep(t, st);
     return st;
   }
@@ -538,7 +550,14 @@ export class ShipReplicaSet {
     return this.reps.get(id)?.mode === ReplicaMode.Docked;
   }
 
-  remove(id: number): void {
+  /**
+   * A ship gone. `tick`: a snapshot's removal at that tick. A piece of debris the client runs itself (DebrisWorld.runs)
+   * knocked others in the world up to its end, which it knows (gone, after), and the snapshot's window can be long: the
+   * world is stepped to the tick first, with it in. (One it's sent goes at once: the server keyframes what it knocked
+   * in the window, Replication.forClient)
+   */
+  remove(id: number, tick?: number): void {
+    if (tick !== undefined && this.reps.get(id)?.mode === ReplicaMode.Drift && this.debris?.runs?.(id)) this.at(id, tick);
     if (this.reps.delete(id)) this.dropped(id, -Infinity);
     this.ring.remove(id);
     this.pre.remove(id);
@@ -563,8 +582,11 @@ export class ShipReplicaSet {
     for (const row of ships ?? []) {
       const k = unpackKeyframe(row);
       let r = this.reps.get(k.id);
+      // (Its own ship, drawn ahead of the snapshots: drawn already past the keyframe's tick, so the change eases out from
+      // where it was drawn, as a path stepped again does (pose: `moved`), rather than bending in before the keyframe)
+      const ownKf = !!r && this.own?.id === k.id && !!r.raw && k.mode === r.mode && k.mode !== ReplicaMode.Docked;
       if (!r) { r = { mode: k.mode, events: new Map(), kf: tick, q: k.q }; this.reps.set(k.id, r); this.ring.remove(k.id); }
-      else this.correction(k.id, r, tick, k);
+      else if (!ownKf) this.correction(k.id, r, tick, k);
       r.q = k.q;
       r.mode = k.mode;
       r.dock = k.dock;
@@ -575,8 +597,8 @@ export class ShipReplicaSet {
       this.ring.keep(tick, new ReplicaState(k.id, k.mode, k.body, k.ctl.bits, k.q));
       r.kf = tick;
       // (Its keyframe's own correction bends it (correction): not this path's being stepped again)
-      r.moved = false;
-      r.raw = undefined;
+      if (ownKf) { r.fixes = r.fixes?.filter((f) => f.t < tick); r.moved = true; }
+      else { r.moved = false; r.raw = undefined; }
       // (Debris: its keyframe is how that tick ended, so that tick is stepped again, the others without it: stepDebrisTo)
       if (k.mode === ReplicaMode.Drift) this.dDirty = Math.min(this.dDirty, tick - 1);
     }

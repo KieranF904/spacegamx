@@ -96,10 +96,8 @@ function world(o: { fire?: boolean; far?: number; free?: boolean } = {}) {
     truth.set(now(), m);
     truth.delete(now() - 64);
     clock.t += 1000 / 60;
-    // (The pilots only take what they owe (resyncs): flushUp's report rides an input of its own with no target tick, applied
-    // at once and counted late; they fire nothing, and their inputs are the ones fly() sends)
-    A.flushUp();
-    for (const f of P) for (const m of f.outbox.splice(0)) f.link!.receive(m);
+    // (What each owes the server: a hit report rides an input for its next tick, its controls the ones it flies)
+    for (const f of [A, ...P]) f.flushUp();
     check();
     if (where) for (const f of [A]) { Position.x[f.pid] = where[0]; Position.y[f.pid] = where[1]; Velocity.x[f.pid] = Velocity.y[f.pid] = 0; }
   };
@@ -175,9 +173,14 @@ describe('crowd fallbacks (CAPS.CROWD)', () => {
     const s0 = at(), t0 = w.server.getTick();
     w.server.crowd!.force(sys, 0);
     w.run(120);
-    expect(gaps(w.seen.snaps.slice(s4 + 1, s5))).toEqual(Array(s5 - s4 - 2).fill(6));
-    expect(gaps(w.seen.snaps.slice(s5 + 1, s0))).toEqual(Array(s0 - s5 - 2).fill(9));
-    expect(gaps(w.seen.snaps.slice(s0 + 1))).toEqual(Array(w.seen.snaps.length - s0 - 2).fill(3));
+    // (Snapshots go on the windows' ticks, and only with something in them: a stretch with nothing to say skips a window
+    // or more (the head hash's floor sends one at least about every second, HEAD_HASH_TICKS). Every gap is whole windows,
+    // and some are one: the grid is that window, not a wider one. It was one every window while the fake clients' hit
+    // reports went as late inputs, each bringing a correction of their own ship: Stage 3b sends them on time)
+    const onGrid = (g: number[], w: number) => g.length > 3 && g.every((x) => x % w === 0) && g.includes(w);
+    expect(onGrid(gaps(w.seen.snaps.slice(s4 + 1, s5)), 6)).toBe(true);
+    expect(onGrid(gaps(w.seen.snaps.slice(s5 + 1, s0)), 9)).toBe(true);
+    expect(onGrid(gaps(w.seen.snaps.slice(s0 + 1)), 3)).toBe(true);
     expect(w.seen.crowd.map((m) => m.w)).toEqual([6, 9, 3]);
     expect(w.seen.checked).toBeGreaterThan(300);
     expect(w.seen.offIds).toEqual([]);

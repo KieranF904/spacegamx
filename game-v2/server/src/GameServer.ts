@@ -722,7 +722,7 @@ export class GameServer implements ServerCtx {
     this.ownChecks = new OwnChecks({
       tick: () => this.currentTick,
       // (Its check covers every ship it holds, so all of them go again: OwnChecks)
-      rekey: (conn) => { conn.repKnown.clear(); this.guides.resync(conn); },
+      rekey: (conn) => { conn.repKnown.clear(); conn.ownSyncDue = true; this.guides.resync(conn); },
       resyncHp: (conn) => { conn.shipHpSent.delete(conn.playerId); conn.shipSynced.delete(conn.playerId); },
     });
     this.bodies = new BodyNet({

@@ -241,10 +241,13 @@ function scenario(): Result {
   const lastFired = new Map<number, number>();
   let lastDodge = 0;
   for (let t = 0; t < TICKS; t++) {
+    // (Each input for the tick about to run, as a client's lands: on time, not late (a late one is applied at once, the
+    // same tick, but marks its own ship off: its row and a keyframe every round, docs: Stage 3b))
+    const next = server.getTick() + 1;
     pilots.forEach((p, i) => {
-      p.send({ type: 'input', seq: p.seq++, tick: 0, forward: false, backward: false, left: false, right: false, boost: false, fireLeft: false, fireRight: false, targetAngle: 0, ...controls(i, t) });
+      p.send({ type: 'input', seq: p.seq++, tick: 0, targetTick: next, forward: false, backward: false, left: false, right: false, boost: false, fireLeft: false, fireRight: false, targetAngle: 0, ...controls(i, t) });
     });
-    if (t === 120) { tug.send({ type: 'input', seq: tug.seq++, tick: 0, ...controls(1, t), targetAngle: Math.PI, cursorDist: 300 }); tug.send({ type: 'tow', on: true }); }
+    if (t === 120) { tug.send({ type: 'input', seq: tug.seq++, tick: 0, targetTick: next, ...controls(1, t), targetAngle: Math.PI, cursorDist: 300 }); tug.send({ type: 'tow', on: true }); }
     if (t === 700) tug.send({ type: 'tow', on: false });
     server.step();
     if (ships.get(tug.pid)?.tow !== undefined) probes.towTicks++;

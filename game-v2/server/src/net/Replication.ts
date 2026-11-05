@@ -22,9 +22,12 @@
 import {
   Position, Velocity, Rotation, InSystem, FlightBody, ReplicaMode, ReplicaEnv, CTL, KeyframeRow, ControlRow,
   replicaStep, replicaAngle, packKeyframe, packControlRow, flightSignature, applyOwnCauses, cargoBefore, quantizeShipBody, OWN_CAUSE,
-  type ShipState, replicaHash, replicasByte,
+  type ShipState, replicaHash, replicasByte, CTL_POWER_MASK, CTL_SHARE_MASK, CTL_NO_BOOST,
 } from '@space-game/common';
 import type { ShipBridge } from '../ships/ShipBridge.js';
+
+/** CTL bits a pilot's own client works out itself (its engines' power, share, a refused boost: common sim/ownStep.ts) */
+const OWN_DERIVED_BITS = CTL_POWER_MASK | CTL_SHARE_MASK | CTL_NO_BOOST;
 import type { OwnCause } from '../ships/bridge/ownCauses.js';
 import { workCauses, recordCauses, settleContacts, causeRow, causeRecords, type CauseEvent, type WorkedCauses } from './causes/shadowCauses.js';
 import { contactWindow, type ContactWindow } from './causes/contactsFor.js';
@@ -331,8 +334,10 @@ export class Replication {
     const hard = (why: string) => { if (!o.hard) o.why = why; o.hard = true; s.diverged = true; s.body = this.real(eid); };
     // Its controls: what its inputs say, or (the engines short of power, an EMP, the cold, an override) the window's
     // real controls go to it (ownFor)
+    // (Its engines' power, share and a refused boost it works out itself, its own step being the whole one, stores and
+    // all (common sim/ownStep.ts): no row for those; the held controls, aim and hazard bits it can't)
     const want = this.host.ownControls?.(eid);
-    o.excLast = !want || want.bits !== bits || want.q !== q;
+    o.excLast = !want || want.bits !== (bits & ~OWN_DERIVED_BITS) || want.q !== q;
     if (o.excLast) o.exc = true;
     if (this.host.ownLate?.(eid)) return hard('late input');
     // (Not flown by its pilot: its client has it from its last keyframe, so another only when that's out of date. Docked,

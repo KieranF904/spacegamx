@@ -25,5 +25,11 @@ export const COALESCE_TICKS = 3;
 
 /** Combat effects (hits, damage numbers, parts blown off) only go to clients this near them */
 export const FX_RANGE = SHIP_VIEW_OUT;
+/**
+ * The head hash's floor (common sim/headHash.ts): a client holding its own ship that hasn't had a snapshot for this many
+ * ticks gets one in the round its HUD numbers go (once a second, SnapshotBuilder), whatever else it has to say, so its
+ * own ship's full state is checked at least that often. Riding the HUD numbers' frame it costs a few bytes, not a message
+ */
+export const HEAD_HASH_TICKS = 30;
 /** Debris a client was told to work out itself waits this long (plus twice its ping) for its confirmation, then goes as any ship does */
 export const DEBRIS_ACK_TICKS = 30;

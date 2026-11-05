@@ -22,9 +22,18 @@ import {
   mapDotFlags, legAt, packMapLeg, packMapRoute, unpackMapLegs, nearerThan, packIds, packRuns, packSheds, packRanges, DEBRIS_STATUS, TICK_RATE,
   FOCUS_RANGE, RING_RANGE, CROWD_BASE_WINDOW, FEED_TIERS, feedMidRadius,
   type Leg, type EntityState, type ShipState, type ClientSocket, type ServerMessage, type ServerAsteroidSeedMessage, type StarSystemData, type AsteroidSpawnData, dhypot,
-  headWord, HEAD_HASH_ROW,
+  headWord, HEAD_HASH_ROW, ownStateHash, ownBodyHash, packOwnSync, type OwnExtras,
 } from '@space-game/common';
 import type { GameData } from '../data/GameData.js';
+
+/** A pilot's own ship as its client's tick layer should have it at the snapshot's tick (SnapshotBuilder.ownNow) */
+interface OwnNow { x: OwnExtras; hash: number }
+
+/** Its hazards as an ownSync tells them (EMP's end, slowing's end, numb's factor): a change is one its client can't foresee */
+function ownHazardKey(x: OwnExtras, tick: number): string {
+  const h = x.hazard, next = tick + 1;
+  return `${h.empUntil > next ? h.empUntil : 0}|${h.slowUntil > next ? h.slowUntil : 0}|${h.numb}`;
+}
 import type { ClientConnection } from './ClientConnection.js';
 import type { ShipBridge } from '../ships/ShipBridge.js';
 import { nextSync, type StructEntry } from '../ships/bridge/structLog.js';
@@ -39,7 +48,7 @@ import type { LootPods } from '../game/LootPods.js';
 import type { ServerFeatures } from '../ships/features/host.js';
 import { stationQuery } from '../game/Docking.js';
 import { portalQuery } from './handlers/flight.js';
-import { SNAP_PROJECTILE_RANGE, SNAP_POD_RANGE, MAP_DOTS_TICKS, DEBRIS_ACK_TICKS, FX_RANGE as FX_NEAR } from './snapshot/constants.js';
+import { SNAP_PROJECTILE_RANGE, SNAP_POD_RANGE, MAP_DOTS_TICKS, DEBRIS_ACK_TICKS, HEAD_HASH_TICKS, FX_RANGE as FX_NEAR } from './snapshot/constants.js';
 import type { HitLedger } from './hits/HitLedger.js';
 import { ownVolleyExact, OwnShotLog } from './snapshot/ownShots.js';
 import { replicasByte, jumpPhase, jumpTuning } from '@space-game/common';
@@ -590,30 +599,36 @@ export class SnapshotBuilder {
     return key;
   }
 
-  /** Its own ship as its tick-aligned layer has it now (the real ship: its shadow is), its controls, its HP copy */
-  private noteOwn(conn: ClientConnection): void {
+  /** Its own ship as its tick-aligned layer has it now (its full state, `now`; docked, its shadow), its HP copy */
+  private noteOwn(conn: ClientConnection, now: OwnNow | null): void {
     const id = conn.playerId, ship = this.ships.get(id), ctl = this.replication.controlsOf(id);
     if (!ship || !ctl) return;
-    // (Docked, its shadow: what its last keyframe carried, Replication.stepOwn)
-    const body = this.replication.ownHeld(id) ?? { x: Position.x[id], y: Position.y[id], vx: Velocity.x[id], vy: Velocity.y[id], angle: Rotation.angle[id], angVel: ship.angVel, jump: ship.jump, jumpScale: ship.jumpScale, cargo: ship.cargo, dodge: ship.dodge, dodgeDir: ship.dodgeDir };
+    // (Docked, its shadow: what its last keyframe carried, Replication.stepOwn; its pose only)
+    const held = this.replication.ownHeld(id);
+    const own = held ? ownBodyHash(held, ctl.bits, ctl.q) : now?.hash;
+    if (own === undefined) return;
     // (Every other ship it holds goes in the check too, and the homing shells it runs)
-    let held = this.replication.heldByte(conn.repKnown, id, this.bodies ? (e) => this.bodies!.runs(conn, e) : undefined);
-    if (this.guides) held += replicasByte(this.guides.heldSum(conn));
-    this.ownChecks!.note(conn, this.currentTick, body, ctl.bits, ctl.q, conn.shipHpSent.get(id), held);
+    let others = this.replication.heldByte(conn.repKnown, id, this.bodies ? (e) => this.bodies!.runs(conn, e) : undefined);
+    if (this.guides) others += replicasByte(this.guides.heldSum(conn));
+    this.ownChecks!.note(conn, this.currentTick, own, conn.shipHpSent.get(id), others);
   }
 
   /**
-   * The head hash (every client steps its own ship; common sim/headHash.ts): its own ship as it is
-   * now, its tick layer's (the real ship and the controls it flew), unless it isn't held (docked, dead, not yet known
-   * to it). `keyed`: its own ship's keyframe goes in this snapshot (nothing to compare)
+   * Its own ship as its tick layer should have it now (every client steps its own ship; common sim/headHash.ts): its
+   * full state (the real ship, the controls it flew, its stores, guns, hazards and priming) and that state's hash.
+   * Null when it isn't held (docked, dead, not yet known to it)
    */
-  private headHash(conn: ClientConnection, keyed: boolean): number {
+  private ownNow(conn: ClientConnection): OwnNow | null {
     const id = conn.playerId, ship = this.ships.get(id), ctl = this.replication.controlsOf(id);
-    const flags = keyed ? HEAD_HASH_ROW : 0;
-    if (!ship || !ctl || !conn.repKnown.has(id) || this.replication.ownHeld(id) || hasComponent(this.world, Dead, id)) return headWord(null, flags);
+    if (!ship || !ctl || !conn.repKnown.has(id) || this.replication.ownHeld(id) || hasComponent(this.world, Dead, id)) return null;
+    const x = this.ships.ownExtras(id, this.currentTick);
+    if (!x) return null;
     const body = { x: Position.x[id], y: Position.y[id], vx: Velocity.x[id], vy: Velocity.y[id], angle: Rotation.angle[id], angVel: ship.angVel, jump: ship.jump, jumpScale: ship.jumpScale, cargo: ship.cargo, dodge: ship.dodge, dodgeDir: ship.dodgeDir };
-    return headWord({ id, body, bits: ctl.bits, q: ctl.q }, flags);
+    return { x, hash: ownStateHash(id, body, ctl.bits, ctl.q, x, this.currentTick) };
   }
+
+  /** ownSyncs sent (its own ship's state put right, exact: net/own, common sim/ownStep.ts) */
+  ownSyncs = 0;
 
   private snapshotCount = 0;
 
@@ -721,7 +736,8 @@ export class SnapshotBuilder {
       // (the client dead-reckons in between); distant projectiles and loot not at all
       const px = Position.x[conn.playerId], py = Position.y[conn.playerId];
       // Debris it can work out itself: told how (first, before the ship's own sync), and held back till it confirms
-      this.holdDebris(conn);
+      // (a split told goes with a snapshot: its client works it out once that snapshot's causes are in, DebrisSplits.flush)
+      const split = this.holdDebris(conn);
       // Ships that left its view: the ships homed in its focus cells (net/cells/FocusCells.ts); it keeps them while
       // they're away, and gets only what changed when they're back (net/cells/AwayNet.ts)
       const out = this.focus.view(conn, playerSystemId, px, py);
@@ -756,15 +772,27 @@ export class SnapshotBuilder {
       // Its own row: whether it goes, and whether to correct its prediction
       const selfRow = rows.find((r) => r.id === conn.playerId);
       const self = selfRow ? this.selfRowState(conn, selfRow, prevStates) : null;
+      // (Its own ship's full state now: the head hash, its check's expectation, and an ownSync (its stores, guns, hazards
+      // and priming put right, exact) when its client can't have them: its check found them off (OwnChecks), first sight,
+      // a new keyframe version (a new ship, a teleport), a late input, or its hazards changed (an EMP, a Frostbite's
+      // slowing, the cold's stage). Anything else off its head hash finds within a second or so, and its check brings it)
+      const ownNow = this.ownNow(conn);
+      const hazKey = ownNow ? ownHazardKey(ownNow.x, this.currentTick) : '';
+      const syncing = !!ownNow && (!!conn.ownSyncDue || hazKey !== conn.ownHazards || (!!self && (!prevStates.has(conn.playerId) || conn.selfLate || self.version !== conn.selfVersion)));
+      if (syncing) conn.ownHazards = hazKey;
       const fire: number[][] = [];
       const covered = new Set<number>();
+      // (Its ship keyframed in this snapshot, or its state put right (an ownSync): what its layer built its own shells of
+      // the window from isn't the server's; their hits are told, as rows' are, every one since the last snapshot it got.
+      // Client ShipClient.preSnapshot, OwnShells.snapshot's `keyed`)
+      const ownTold = keyed.has(conn.playerId) || syncing;
       // (its own straight shells it works out itself, CAPS.SHOT_IDS: no record, no row, named by shot id in its hits and removals)
       if (this.hits && !this.hits.shellName) { const log = this.ownShotLog; this.hits.shellName = (c, id) => log.wireOf(c, id) ?? id; }
       for (const f of this.ships.fired) {
         if (f.owner === conn.playerId && OwnShotLog.derivable(this.ships, f)) {
           this.ownShotLog.derive(conn, f);
-          // (its ship keyframed in this window: what its layer built them from isn't the server's; their hits are told, as rows' are. Client ShipClient.ownShells)
-          if (keyed.has(f.owner)) for (const id of f.ids) this.hits?.rowShell(conn, id);
+          // (its own shells since the last snapshot it was sent: its client builds them all with the next it gets)
+          (conn.ownWindow ??= []).push(...f.ids);
           continue;
         }
         // (its own, CAPS.OWN_SIM: not one fired before a rebuild in this window: it's built from the structure it has now)
@@ -777,6 +805,7 @@ export class SnapshotBuilder {
         fire.push(row);
         for (const id of f.ids) covered.add(id);
       }
+      if (ownTold && conn.ownWindow) for (const id of conn.ownWindow) this.hits?.rowShell(conn, id);
       for (const r of rows) {
         if ((r.kind === 'player' || r.kind === 'ship') && !conn.shipView.has(r.id)) continue;
         // (Debris it's working out itself: nothing till it confirms; once it has, the status row it made itself counts as sent)
@@ -888,17 +917,23 @@ export class SnapshotBuilder {
       if (renamed) for (let i = 0; i < removed.length; i++) removed[i] = renamed.get(removed[i]) ?? removed[i];
 
       // HUD numbers (fuel, XP) once a second, whether or not anything else goes (the round in each second's first window)
-      if (this.currentTick % 60 < (crowd ? crowd.windowOf(playerSystemId) : CROWD_BASE_WINDOW)) this.sendPlayerState(conn);
+      const hudRound = this.currentTick % 60 < (crowd ? crowd.windowOf(playerSystemId) : CROWD_BASE_WINDOW);
+      if (hudRound) this.sendPlayerState(conn);
+      // (and with them, a snapshot for its head hash if it has had none lately: HEAD_HASH_TICKS)
+      const headDue = hudRound && !!ownNow && this.currentTick - conn.lastSnapshotSentTick >= HEAD_HASH_TICKS;
 
       // (Records count from the snapshot they follow: one always goes with them)
-      const shouldSend = conn.forceSnapshot || !!rep.found?.count || entities.length > 0 || removed.length > 0 || rep.ships.length > 0 || rep.ctl.length > 0 || out.length > 0 || fire.length > 0 || !!rep.own?.length || !!rep.causes?.length || !!decisions?.length || !!guided?.active || !!guided?.rows.length
-        || (hitsOn && this.hits!.pending(conn));
+      const shouldSend = conn.forceSnapshot || split || !!rep.found?.count || entities.length > 0 || removed.length > 0 || rep.ships.length > 0 || rep.ctl.length > 0 || out.length > 0 || fire.length > 0 || !!rep.own?.length || !!rep.causes?.length || !!decisions?.length || !!guided?.active || !!guided?.rows.length
+        || (hitsOn && this.hits!.pending(conn)) || syncing || headDue;
       if (!shouldSend) {
         this.lastEntityStates.set(conn.playerId, newStates);
         if (hitsOn) this.afterHits(conn, playerSystemId);
         continue;
       }
 
+      // (The ownSync goes first: its client takes it before the snapshot's own processing, OwnTick.onOwnSync)
+      if (syncing) { this.send(conn.ws, packOwnSync(this.currentTick, ownNow!.x)); this.ownSyncs++; }
+      if (ownNow) conn.ownSyncDue = false;
       this.send(conn.ws, {
         type: 'snapshot',
         tick: this.currentTick,
@@ -913,15 +948,16 @@ export class SnapshotBuilder {
         decisions: decisions?.length ? decisions : undefined,
         causes: rep.causes,
         guides: guided?.rows.length ? guided.rows : undefined,
-        hh: this.headHash(conn, keyed.has(conn.playerId)),
+        hh: headWord(ownNow ? ownNow.hash : null, keyed.has(conn.playerId) ? HEAD_HASH_ROW : 0),
       });
 
       conn.forceSnapshot = false;
       conn.lastSnapshotSentTick = this.currentTick;
+      if (conn.ownWindow) conn.ownWindow.length = 0;
       this.lastEntityStates.set(conn.playerId, newStates);
       if (hitsOn) this.afterHits(conn, playerSystemId);
       // What its check of its own ship should say for this snapshot (net/own/OwnChecks.ts)
-      if (this.ownChecks && conn.repKnown.has(conn.playerId)) this.noteOwn(conn);
+      if (this.ownChecks && conn.repKnown.has(conn.playerId)) this.noteOwn(conn, ownNow);
       // ...and of the bodies it runs (net/decisions/BodyNet.ts)
       bodies?.note(conn, this.currentTick);
     }
@@ -1018,8 +1054,9 @@ export class SnapshotBuilder {
    * sync and the snapshot, and its pieces are held back (no sync, keyframe, status row or HP) until the client
    * confirms them (ackDebris), or its time runs out and they go as any ship does. Its own ship's too, with its pose.
    */
-  private holdDebris(conn: ClientConnection): void {
+  private holdDebris(conn: ClientConnection): boolean {
     const now = this.currentTick;
+    let sent = false;
     const net = this.ships.debrisNet, live = conn.debrisLive;
     // (Rebuilt since its spawn (a crumble): a client that doesn't run it can't work that out, nor get its sync while held)
     const rebuilt = (id: number) => { const ship = this.ships.bodies.get(id); return !!ship && ship.rebuilds !== net.spawns.get(id)?.rebuilds; };
@@ -1067,8 +1104,10 @@ export class SnapshotBuilder {
           type: 'debrisSplit', id: parent, tick: sp.tick, e: packIds(sp.ids), p: packRuns(sp.parts), l: l ? 1 : undefined, g: sp.sheds ? packSheds(sp.sheds) : undefined, s: at,
           c: whole ? [...sp.com] : undefined, h: whole ? sp.hp!.flat() : undefined,
         });
+        sent = true;
       }
     }
+    return sent;
   }
 
   /** A client's confirmations of debris it worked out ([id, check, ...], on its input): right, it counts as sent */

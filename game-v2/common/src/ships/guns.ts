@@ -129,7 +129,8 @@ export function clipReloading(ship: Pick<ShipState, 'reload'>, w: WeaponInfo): b
 // ---- The gun-state correction (docs/design/rework-2026-11.md §3.3): the pilot row's last slot, own ship only.
 // A count, then that many (part index, value) pairs for the ship's clip and charge guns (the first GUN_STATE_MAX in
 // weapon order): a clip gun's rounds (+ GUN_STATE_RELOADING while it reloads), a charge gun's charge in whole ticks.
-// The client adopts the server's value only after disagreeing for GUN_STATE_PATIENCE ticks running (client gunSync.ts).
+// (The client no longer reads it: its own ship's gun state is stepped whole on its tick layer and put right exactly by an
+// ownSync, sim/ownStep.ts. The slot still rides the row: dropping it is a row-layout change, a protocol bump.)
 
 /** The most guns the gun-state slot carries */
 export const GUN_STATE_MAX = 8;

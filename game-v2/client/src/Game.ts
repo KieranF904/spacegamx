@@ -290,15 +290,14 @@ private xpFillEl: HTMLElement | null;
       onHangarOpen: options.ships?.onHangarOpen,
       onHangarClose: options.ships?.onHangarClose,
     });
-    this.state.shipPhysics = (player, input, fuel, tick) => this.shipClient.predict(player, input, fuel, tick);
-    this.state.shipGuns = (player, input, tick, charge) => this.shipClient.predictGuns(player, input, tick, charge);
-    this.state.shipGunSync = (data, tick) => this.shipClient.syncGuns(data, tick);
     this.state.chargeTotal = (charge) => this.shipClient.chargeTotal(charge);
     // Every other ship moves by replication (proto writes its state straight in instead)
     if (!this.proto) {
       this.state.preSnapshot = (m) => this.shipClient.preSnapshot(m);
       this.state.onReplication = (m) => this.shipClient.onReplication(m);
-      this.state.ownTickPose = (t) => this.shipClient.ownTickPose(t);
+      // (Your own ship: on its tick layer, stepped once a tick to the prediction's and drawn from there)
+      this.state.ownStep = (t) => this.shipClient.ownStepTo(t);
+      this.state.ownPose = (t) => this.shipClient.ownPose(t);
       this.state.replicaPose = (e, t) => this.shipClient.placeReplica(e, t);
     }
     this.audio = new AudioManager();

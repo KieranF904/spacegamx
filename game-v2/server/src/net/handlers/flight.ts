@@ -11,7 +11,7 @@ import { hasComponent, entityExists, removeEntity, defineQuery } from 'bitecs';
 import {
   Position, Velocity, Rotation, Health, Player, Input, Boost, Portal, InSystem, Dead,
   TICK_RATE, inSafeSpace, unwrapTick16, computeStateHash, PROTOCOL_VERSION,
-  replicaAngle, quantizeReplicaAngle, ReplicaMode, INPUT_BOOLS, INPUT_HELD, controlBits, buildFlightInputs, dcos, dsin, hashUnit, CURSOR_DIST_MAX,
+  replicaAngle, quantizeReplicaAngle, pilotAimQ, ReplicaMode, INPUT_BOOLS, INPUT_HELD, controlBits, buildFlightInputs, dcos, dsin, hashUnit, CURSOR_DIST_MAX,
 } from '@space-game/common';
 import type { FactionsFile } from '../../game/Enemies.js';
 import type { ClientConnection } from '../ClientConnection.js';
@@ -168,9 +168,12 @@ export function applyInputToEntity(ctx: ServerCtx, conn: ClientConnection, msg: 
   conn.ownCtl = ownControlsOf(msg);
 }
 
-/** The controls an input says, as a client stepping its own ship works them out (network/ownTick.ts: no EMP, no power) */
+/**
+ * The controls an input says, as a client stepping its own ship works them out (client OwnTick.noteInput: no EMP, no
+ * power; the aim as the pilot's step flies it, common sim/ownStep.ts pilotAimQ)
+ */
 export function ownControlsOf(msg: any): { bits: number; q: number } {
-  return { bits: controlBits(buildFlightInputs(msg, false)), q: quantizeReplicaAngle(Number(msg.targetAngle) || 0) };
+  return { bits: controlBits(buildFlightInputs(msg, false)), q: pilotAimQ(Number(msg.targetAngle) || 0) };
 }
 
 export function handlePing(ctx: ServerCtx, conn: ClientConnection, msg: any): void {
