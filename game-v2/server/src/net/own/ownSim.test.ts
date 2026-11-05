@@ -196,7 +196,7 @@ describe('its own ship stepped by itself (CAPS.OWN_SIM)', () => {
     expect(r.got.off).toBe(0);
     expect(r.checks.checks).toBeGreaterThan(5);
     expect(r.checks.agreed).toBe(r.checks.checks - r.checks.stale);
-    // (Every snapshot's head hash agreed with its layer: sim/c-headHash.ts)
+    // (Every snapshot's head hash agreed with its layer: sim/headHash.ts)
     expect(r.w.A.own!.stats.heads).toBeGreaterThan(40);
     expect(r.w.A.own!.stats.headMisses).toBe(0);
     expect(r.journal.disagreed).toBe(0);

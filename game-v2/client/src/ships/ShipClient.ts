@@ -18,7 +18,7 @@ import './energyLooks';
 import { ChargeFx } from './ChargeFx';
 import { RingModel, type RingGroup, type RingSources } from './gunHud';
 import { stepShip, SimShipView, pilotInput, ReplicaMode, type SimInput, type SimEnv, type FieldEnv } from '@space-game/common';
-import { boostOf, buildFlightInputs, newFlightControls, gunLoadTick, payMining, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, warmthStage, withNumb, withSlowed, type WeaponInfo, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules, type FlightBody } from '@space-game/common';
+import { boostOf, stagedIntegrity, type Terrain, chargeTotal, hazardFlight, warmthStage, type WeaponInfo, type Charge, type ShipState, type WeaponMods, type ShipDerived, type HazardRules, type FlightBody } from '@space-game/common';
 import hazardData from '../../../data/hazards.json';
 
 const HAZARD_RULES = hazardData as unknown as HazardRules;
@@ -123,7 +123,7 @@ export interface ShipClientOptions {
 const PREDICT_VIEW = new SimShipView();
 const PREDICT_IN: SimInput = { bits: 0, q: 0, jumpDist: 0, fire: false, fireAlt: false, aimDist: 0 };
 const PREDICT_FIELDS: FieldEnv = { central: null };
-const PREDICT_ENV: SimEnv = { tick: 0, tuning: undefined as unknown as SimEnv['tuning'], gravity: null, fields: PREDICT_FIELDS, terrain: null };
+const PREDICT_ENV: SimEnv = { tick: 0, tuning: undefined as unknown as SimEnv['tuning'], gravity: null, fields: PREDICT_FIELDS, terrain: null, gunsByHost: true };
 
 /** The gun step's events on a predicted tick (ShipClient.predictGuns' scratch) */
 const GUN_EVENTS: SimEvent[] = [];

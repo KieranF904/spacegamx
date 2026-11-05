@@ -10,51 +10,18 @@
 
 import { hasComponent, entityExists } from 'bitecs';
 import {
-  Position, Velocity, Rotation, Input, Boost, Player, Dead, InSystem, quantizeShipBody, damagePart,
-  stepDrift, NO_FIELDS, ReplicaMode, CTL, stepShip, lastStep, SimShipView, pilotInput,
+  Position, Velocity, Rotation, Boost, Player, Dead, InSystem, quantizeShipBody, damagePart,
+  stepDrift, NO_FIELDS, ReplicaMode, CTL, stepShip, SimShipView,
   controlBits, quantizeReplicaAngle, partWeaponDef, partMaterial, powerTick, gunLoadTick, quantizeCargo,
-  chargeTotal, getPlan, contactPieces, contactPair, quantizePull, CONTACT_FLAG, contactFxDue,
+  chargeTotal, contactPieces, contactPair, quantizePull, CONTACT_FLAG, contactFxDue,
   ContactPairCache, contactPairs, type ContactPair,
-  type ShipState, type GravityWell, type FlightConstants, type FlightInputSource, type SimEnv, type FieldEnv, type ShipDerived,
+  type ShipState, type GravityWell, type FlightConstants, type SimEnv, type SimEvent, type SimInput, type FieldEnv, type ShipDerived,
 } from '@space-game/common';
 import { K, BIG_BODY, type ContactPiece, type BridgeCtx } from './core.js';
 import { ownShape } from './ownCauses.js';
+import { readPilotInput } from '../inputs.js';
 import { dhypot } from '@space-game/common';
 import { SimPass } from '../../sim/SystemClocks.js';
-
-/** stepMovement's scratch: the held keys read from Input, and the controls built from them (reused every call; the step never keeps them) */
-const MOVE_SRC: FlightInputSource = {
-  forward: false, backward: false, left: false, right: false, boost: false, targetAngle: 0,
-  helm: false, strafeLeft: false, strafeRight: false, jump: false, cursorDist: 0,
-};
-/** Part features' held inputs and the Input fields that hold them (the Burst Strafer's dodge: features/plan.ts held), resolved on first use */
-let HELD: { name: string; field: ArrayLike<number> }[] | undefined;
-function heldInputs(): { name: string; field: ArrayLike<number> }[] {
-  return HELD ??= getPlan().held.map((name) => {
-    const field = (Input as unknown as Record<string, ArrayLike<number> | undefined>)[name];
-    if (!field) throw new Error(`part feature input ${name}: the Input component has no field of that name (ecs/components.ts, network/inputFields.ts)`);
-    return { name, field };
-  });
-}
-
-/** Read a player's held keys from the Input component into `src` */
-function readInputsInto(eid: number, src: FlightInputSource): FlightInputSource {
-  src.forward = Input.forward[eid] === 1;
-  src.backward = Input.backward[eid] === 1;
-  src.left = Input.left[eid] === 1;
-  src.right = Input.right[eid] === 1;
-  src.boost = Input.boost[eid] === 1;
-  src.targetAngle = Input.targetAngle[eid];
-  src.helm = Input.helm[eid] === 1;
-  src.strafeLeft = Input.strafeLeft[eid] === 1;
-  src.strafeRight = Input.strafeRight[eid] === 1;
-  src.jump = Input.jump[eid] === 1;
-  src.cursorDist = Input.cursorDist[eid];
-  // (Part features' held inputs, by name: the Burst Strafer's dodge)
-  const H = heldInputs(), held = src as unknown as Record<string, boolean>;
-  for (let i = 0; i < H.length; i++) held[H[i].name] = H[i].field[eid] === 1;
-  return src;
-}
 
 export function isDormant(b: BridgeCtx, eid: number): boolean {
   return b.dormant.has(eid);
@@ -210,21 +177,25 @@ export function stepMovement(b: BridgeCtx, eid: number): boolean {
   s.hazard.slowUntil = b.slowedUntil.size > 0 ? tick + b.slowedTicksLeft(eid) : 0;
   // (Numb: its pilot's prediction works it out from the warmth it's told, replicas from CTL.numb)
   s.hazard.numb = b.coldStage(eid).control;
-  stepShip(s, pilotInput(readInputsInto(eid, MOVE_SRC), MOVE_IN), moveEnv(b, eid, tick), s);
+  // (Its inputs from its source: ships/inputs.ts, the pilot's held keys off the Input component)
+  const { isBoosting } = stepShip(s, readPilotInput(eid, MOVE_IN), moveEnv(b, eid, tick), s, MOVE_EVENTS);
   ship.jumpPrime = s.jumpPrime;
   b.setCharge(eid, s.charge);
   // (What it flew: its keys, its hazards' bits, the engines' power and a boost the stores refused: replicas have no charge)
   b.replicaCtl.set(eid, { mode: ReplicaMode.Player, q: s.ctl.q, derived: ship.derived, bits: s.ctl.bits });
   b.writeBody(eid, ship, body);
-  if (lastStep.isBoosting) Boost.lastUseTick[eid] = tick;
+  MOVE_EVENTS.length = 0;
+  if (isBoosting) Boost.lastUseTick[eid] = tick;
   return true;
 }
 
 /** stepMovement's scratch: the view, its input and env (reused every call; the step keeps none of them) */
 const MOVE_VIEW = new SimShipView();
-const MOVE_IN = pilotInput(MOVE_SRC);
+const MOVE_IN: SimInput = { bits: 0, q: 0, jumpDist: -1, fire: false, fireAlt: false, aimDist: 0 };
+/** (Empty: its guns are fireWeapons', env.gunsByHost; the step emits nothing else for a pilot yet) */
+const MOVE_EVENTS: SimEvent[] = [];
 const MOVE_FIELDS: FieldEnv = { central: null };
-const MOVE_ENV: SimEnv = { tick: 0, tuning: undefined as unknown as SimEnv['tuning'], gravity: null, fields: MOVE_FIELDS, terrain: null };
+const MOVE_ENV: SimEnv = { tick: 0, tuning: undefined as unknown as SimEnv['tuning'], gravity: null, fields: MOVE_FIELDS, terrain: null, gunsByHost: true };
 let moveEid = 0, moveB: BridgeCtx | undefined;
 const moveHazard = (d: ShipDerived, x: number, y: number) => moveB!.host.hazardFlight?.(moveEid, d, x, y);
 function moveEnv(b: BridgeCtx, eid: number, tick: number): SimEnv {

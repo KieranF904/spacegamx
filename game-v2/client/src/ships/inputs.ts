@@ -8,13 +8,12 @@
  *  - `BodyDriverSource` (decided): a BodyRunner driver (CAPS.BODIES): its bits, q and push each tick; where the body is
  *    off (`step` null) the rows fly it, so it answers from `fallback`.
  *
- * Plumbing only: replication.ts stepPre still picks its own controls. Stage 3 (and C) swap its pick for these.
+ * Since Stage 3, replication.ts stepPreNow picks through the shared stateless forms of these (common sim/d-sources.ts
+ * CtlChangeInputs for own and rows, DriverInputs for a body's driver); these stay for hosts holding a source per ship.
  */
 
-import { HeldInputs, InputSlots, NO_INPUT } from '@space-game/common';
-import type { BodyDriver, FlightBody, InputSource, OwnTimeline, SimInput } from '@space-game/common';
-
-type Prev = Parameters<InputSource['inputAt']>[1];
+import { DriverInputs, HeldInputs, InputSlots, NO_INPUT } from '@space-game/common';
+import type { BodyDriver, InputSource, OwnTimeline, SimInput } from '@space-game/common';
 
 /** What an input message carries besides the held controls (the own client has it; the timeline's ctl does not) */
 export interface OwnExtras { jumpDist?: number; fire?: boolean; fireAlt?: boolean; aimDist?: number }
@@ -52,26 +51,12 @@ export class ReplicaRowSource implements InputSource {
   confirmedThrough(): number { return this.held.confirmedThrough(); }
 }
 
-export class BodyDriverSource implements InputSource {
-  readonly knowledge = 'decided' as const;
-  private bits = 0;
-  private q = 0;
-  private answered = -Infinity;
-  constructor(private readonly driver: BodyDriver, private readonly fallback: InputSource = new ReplicaRowSource()) {}
-
-  inputAt(t: number, prev: Prev): SimInput {
-    if (t > this.answered) this.answered = t;
-    const by = this.driver.step(t, prev.body as FlightBody, this.q, this.bits);
-    if (!by) {
-      const f = this.fallback.inputAt(t, prev);
-      this.bits = f.bits; this.q = f.q;
-      return f;
-    }
-    this.bits = by.bits; this.q = by.q;
-    return { ...NO_INPUT, bits: by.bits, q: by.q, impulse: [by.ix, by.iy] };
+/** (common sim/d-sources.ts DriverInputs: stateless since Stage 3, reading the ship's last controls off `prev.ctl`) */
+export class BodyDriverSource extends DriverInputs {
+  constructor(driver: BodyDriver, fallback: InputSource = new ReplicaRowSource()) {
+    super(driver);
+    this.fallback = fallback;
   }
-
-  confirmedThrough(): number { return this.answered; }
 }
 
 /** The client's per-ship sources, with the possess hook (an admin's live known source swaps in for the ship's own) */

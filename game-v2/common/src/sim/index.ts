@@ -20,8 +20,7 @@ export * from './harness.js';
 // Callers' adapters (SimShipView, simStructureOf, pilotInput) and the shared input sources
 export * from './a-adapt.js';
 export * from './d-sources.js';
-// Replica states, contact pairs, pull sources, the head hash's own-state form
+// Replica states, contact pairs, pull sources
 export * from './c-replicaState.js';
 export * from './c-contactCache.js';
 export * from './c-pulls.js';
-export * from './c-headHash.js';

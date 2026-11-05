@@ -16,21 +16,15 @@ import type { FlightInputSource } from '../ships/flightInputs.js';
 import { buildFlightInputs, newFlightControls } from '../ships/flightInputs.js';
 import { controlBits, ReplicaMode } from '../ships/replica.js';
 import { FULL_CHARGE } from '../ships/energy.js';
-import { quantizeCursorAngle, dequantizeCursorAngle } from '../network/cursorState.js';
+import { dequantizeCursorAngle } from '../network/cursorState.js';
 import { newGunState, type GunState, type SimShipState, type SimStructure } from './state.js';
-import type { SimInput } from './input.js';
+import { simAimQ, type SimInput } from './input.js';
 
-/** (cursorState.ts AIM_STEPS: the top of the 13-bit aim grid) */
-const AIM_TOP = 8191;
-
-/**
- * An angle onto the aim grid, so that simAim(aimQ(simAim(q))) === simAim(q) for every q. (quantizeCursorAngle alone
- * sends the top step, whose angle is 2π, back to 0: a different float, steered on differently. Contract note.)
- */
+/** An angle onto the aim grid (input.ts simAimQ, canonical at the top step; the name callers had in Stage 1A) */
 export function aimQ(angle: number): number {
-  const q = quantizeCursorAngle(angle);
-  return q === 0 && angle > Math.PI ? AIM_TOP : q;
+  return simAimQ(angle);
 }
+// (a function, not `= simAimQ`: this file is in replica.ts's import cycle, so nothing here reads an import at load)
 
 /** An angle as every ship steers on it: onto the grid and back (input.ts simAim) */
 export function gridAim(angle: number): number {

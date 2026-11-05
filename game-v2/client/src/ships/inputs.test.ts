@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { InputSlots, type BodyDriver } from '@space-game/common';
 import { OwnInputSource, ReplicaRowSource, BodyDriverSource } from './inputs.js';
 
-const PREV = { id: 1, body: { x: 0, y: 0, angle: 0 } };
+const PREV = { id: 1, body: { x: 0, y: 0, angle: 0 }, ctl: { bits: 0, q: 0 } };
 
 describe('client input sources', () => {
   it('own: known, holds between control changes', () => {
@@ -35,7 +35,8 @@ describe('client input sources', () => {
     on = false;
     expect(s.inputAt(2, PREV)).toMatchObject({ bits: 4, q: 2 });
     on = true;
-    s.inputAt(3, PREV);
+    // (the driver reads the ship's last controls off prev.ctl: stateless, rollback safe)
+    s.inputAt(3, { ...PREV, ctl: { bits: 4, q: 2 } });
     expect(seen[2]).toEqual([2, 4]);
     expect(s.knowledge).toBe('decided');
     expect(s.confirmedThrough()).toBe(3);

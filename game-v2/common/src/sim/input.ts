@@ -55,9 +55,17 @@ export function simAim(q: number): number {
   return Math.fround(dequantizeCursorAngle(q));
 }
 
-/** A raw aim angle onto the grid */
+/** (cursorState.ts AIM_STEPS: the top of the 13-bit aim grid) */
+const AIM_TOP = 8191;
+
+/**
+ * A raw aim angle onto the grid, canonical: simAimQ(simAim(q)) === q for every q. (quantizeCursorAngle alone sends the
+ * top step, whose angle is just under 2π, back to 0: a different float, steered on differently; settled in Stage 3
+ * from Stage 1A's aimQ)
+ */
 export function simAimQ(angle: number): number {
-  return quantizeCursorAngle(angle);
+  const q = quantizeCursorAngle(angle);
+  return q === 0 && angle > Math.PI ? AIM_TOP : q;
 }
 
 /** The FlightControls one tick flies with (CTL.hold: keep the heading, as flightControls has it). Jump stays the input's; the step clears it under EMP */
@@ -69,13 +77,18 @@ export function simControls(input: Readonly<SimInput>, body: { angle: number }):
 
 export type InputKnowledge = 'known' | 'decided' | 'assumed' | 'confirmed';
 
+/** What a source may read of the ship before the tick (a SimShipState is one) */
+export type InputPrev = Readonly<{ id: number; body: { x: number; y: number; angle: number }; ctl: { bits: number; q: number } }>;
+
 export interface InputSource {
   readonly knowledge: InputKnowledge;
   /**
-   * The input ship `id` flies tick t with. A decided source may read the ship's own state before the tick (`prev`)
-   * and anything else deterministic both ends hold; never wall-clock time or randomness outside common/math/rng.
+   * The input ship `id` flies tick t with. A decided source may read the ship's own state before the tick (`prev`:
+   * its pose, and the controls it flew tick t - 1 with, `ctl`, so a driver that steers from its last bits/q needs no
+   * memory of its own and a rollback's re-ask answers the same) and anything else deterministic both ends hold; never
+   * wall-clock time or randomness outside common/math/rng.
    */
-  inputAt(t: number, prev: Readonly<{ id: number; body: { x: number; y: number; angle: number } }>): SimInput;
+  inputAt(t: number, prev: InputPrev): SimInput;
   /** The last tick whose input is final (known and decided sources: every tick they have answered for) */
   confirmedThrough(): number;
 }

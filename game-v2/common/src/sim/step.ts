@@ -9,7 +9,8 @@
  *   2. a decided source's impulse (unless EMP'd)
  *   3. the motion (stepShipMotion): pilotJumpStep (range boost, fields' cooldown, stillstone priming) round
  *      stepShipPhysics (stepFlight, terrain, quantisation), steering on the one aim rule (input.ts simAim)
- *   4. guns (guns.ts, Stage 1B): fire events
+ *   4. guns (guns.ts, Stage 1B): fire events (skipped when the host runs the ship's guns itself, env.gunsByHost: the
+ *      server's fireWeapons and the client's predictGuns, through gunsTick; never both)
  *   5. pulls (pulls.ts, Stage 1C): forces both ends derive, then the body is quantised again
  *   6. the controls it flew (`ctl`), as the replicated row carries them
  *
@@ -55,11 +56,12 @@ const CTL_REPLAY_BITS = CTL_POWER_MASK | CTL_SHARE_MASK | CTL_NO_BOOST;
 /** Modes the env hazard (SimEnv.hazard) applies to: pilots only (see the header) */
 export const ENV_HAZARD_MODES: ReadonlySet<ReplicaMode> = new Set([0 /* ReplicaMode.Player */]);
 
-/**
- * What the host reads off the last step besides the state (not state: never stored, never hashed). The server's
- * pilot step stamps Boost.lastUseTick from it.
- */
-export const lastStep = { isBoosting: false };
+/** What the motion phases report besides the state (StepResult.isBoosting; not state: never stored, never hashed) */
+export interface MotionOut {
+  /** The CTL power bits it flew with (0 for anything but a pilot) */
+  ctlPower: number;
+  isBoosting: boolean;
+}
 
 function copyInto(out: SimShipState, from: SimShipState): void {
   Object.assign(out, cloneSimShip(from));
@@ -88,25 +90,28 @@ export function stepShip(prev: SimShipState, input: Readonly<SimInput>, env: Rea
   const s = out ?? cloneSimShip(prev);
   if (out && out !== prev) copyInto(out, prev);
   const hz = stepHazards(s, input, env.tick, HZ);
-  const ctlPower = stepShipMotion(s, input, env, hz);
-  // 4. Guns (Stage 1B)
-  stepShipGuns(s, input, env, events);
+  const m = stepShipMotion(s, input, env, hz, MOTION);
+  const ctlPower = m.ctlPower, isBoosting = m.isBoosting;
+  // 4. Guns (Stage 1B), unless the host runs them
+  if (!env.gunsByHost) stepShipGuns(s, input, env, events);
   // 5. Pulls (Stage 1C), then back on the snapshot grid
   if (env.pulls) { applyPulls(s, env, events); quantizeShipBody(s.body); }
   // 6. What it flew with (an EMP'd drive starts no jump: the bit goes as the step read it)
   const hazBits = (hz.emp ? BIT_EMP : 0) | (hz.numb < 1 ? BIT_NUMB : 0) | (hz.slowed ? BIT_SLOWED : 0);
   s.ctl.bits = (input.bits & ~CTL_STATE_BITS & ~(hz.emp ? BIT_JUMP : 0)) | hazBits | ctlPower;
   s.ctl.q = input.q;
-  return { state: s, events };
+  return { state: s, events, isBoosting };
 }
 
+const MOTION: MotionOut = { ctlPower: 0, isBoosting: false };
+
 /**
- * Phases 1-3 of the step, in place on `s`: the impulse and the motion of whatever mode it is in. Returns the CTL
- * power bits it flew with (0 for anything but a pilot). replicaStep is this, on a replica's view.
+ * Phases 1-3 of the step, in place on `s`: the impulse and the motion of whatever mode it is in. Writes the CTL power
+ * bits it flew with and whether it boosted into `out` (returned). replicaStep is this, on a replica's view.
  */
-export function stepShipMotion(s: SimShipState, input: Readonly<SimInput>, env: Readonly<SimEnv>, hz: Readonly<StepHazards>): number {
+export function stepShipMotion(s: SimShipState, input: Readonly<SimInput>, env: Readonly<SimEnv>, hz: Readonly<StepHazards>, out: MotionOut = MOTION): MotionOut {
+  out.ctlPower = 0; out.isBoosting = false;
   const t = env.tick, body = s.body, d = s.structure.derived;
-  lastStep.isBoosting = false;
   switch (s.mode) {
     case ReplicaMode.Player:
     case ReplicaMode.Pilotless: {
@@ -122,32 +127,31 @@ export function stepShipMotion(s: SimShipState, input: Readonly<SimInput>, env: 
       const pilot = s.mode === ReplicaMode.Player;
       const accounted = pilot && s.accounted;
       const jt = jumpTuning(env.tuning);
-      let ctlPower = 0;
       s.jumpPrime = pilotJumpStep(body, s.jumpPrime, env.fields, t, d.jumpCooldown || jt.cooldownTicks, jt, (rangeBoost) => {
         const energy = accounted ? { charge: s.charge, drainRate: 1, load: gunLoadTick(gunLoadOf(s), t), tick: t }
           // (A replica: no stores, the engines' power replayed from the authority's bits; pilotless: full charge)
           : pilot ? { charge: FULL_CHARGE, drainRate: 0, replay: input.bits } : { charge: FULL_CHARGE, drainRate: 0 };
         const res = stepShipPhysics(body, controls, d, env.tuning, energy, env.gravity, rangeBoost, hazard, env.terrain);
-        if (accounted) { s.charge = res.charge; ctlPower = res.ctlPower; } else if (pilot) ctlPower = input.bits & CTL_REPLAY_BITS;
-        lastStep.isBoosting = res.isBoosting;
+        if (accounted) { s.charge = res.charge; out.ctlPower = res.ctlPower; } else if (pilot) out.ctlPower = input.bits & CTL_REPLAY_BITS;
+        out.isBoosting = res.isBoosting;
       });
-      return ctlPower;
+      return out;
     }
     case ReplicaMode.Drift:
       // (Debris: the deterministic drift every side runs, ships/debris.ts)
       stepDebrisBody(body, env.gravity ? { ...SHIP_FLIGHT_CONSTANTS, gravity: env.gravity } : SHIP_FLIGHT_CONSTANTS);
-      return 0;
+      return out;
     case ReplicaMode.Anchored: {
       // (A wreck held in place: coasts and spins, no gravity)
       const spin = body.angVel;
       stepDrift(body, SHIP_FLIGHT_CONSTANTS as FlightConstants);
       body.angVel = spin;
       quantizeShipBody(body);
-      return 0;
+      return out;
     }
     case ReplicaMode.Docked:
     default:
-      return 0;
+      return out;
   }
 }
 

@@ -7,10 +7,11 @@
  */
 
 import {
-  Position, Velocity, Rotation, FRICTION, ReplicaMode, CTL, controlBits, NO_FIELDS, stepShip, SimShipView, aimQ,
-  powerTick, gunLoadTick, FULL_CHARGE, type ShipState, type FlightConstants, type SimEnv, type SimInput, type FieldEnv, type ShipDerived,
+  Position, Velocity, Rotation, FRICTION, ReplicaMode, NO_FIELDS, stepShip, SimShipView,
+  powerTick, gunLoadTick, FULL_CHARGE, type ShipState, type FlightConstants, type SimEnv, type SimEvent, type SimInput, type FieldEnv, type ShipDerived,
 } from '@space-game/common';
 import type { PilotOrders, BridgeCtx } from './core.js';
+import { controllerInput } from '../inputs.js';
 import { datan2, dcos, dhypot, dsin } from '@space-game/common';
 
 /** Reused each tick (powerTick reads it and keeps nothing) */
@@ -81,8 +82,9 @@ export function stepPilotless(b: BridgeCtx, eid: number, ship: ShipState, k: Fli
   s.hazard.empUntil = b.empUntil.get(eid) ?? 0;
   s.hazard.slowUntil = b.slowedUntil.size > 0 ? tick + b.slowedTicksLeft(eid) : 0;
   s.hazard.numb = b.coldStage(eid).control;
-  const input = pilotlessInput(orders ? orders.controls : target ? b.autopilotControls(eid, target) : null, b.pinned.has(eid), orders?.impulse);
-  stepShip(s, input, pilotlessEnv(b, eid, k, tick), s);
+  // (Its input from its source, ships/inputs.ts: the orders asked once above, as their aim, target and body are read here too)
+  stepShip(s, controllerInput(b, eid, orders, target, PILOTLESS_IN), pilotlessEnv(b, eid, k, tick), s, PILOTLESS_EVENTS);
+  PILOTLESS_EVENTS.length = 0;
   if (s.jumpPrime || ship.jumpPrime !== undefined) ship.jumpPrime = s.jumpPrime;
   b.replicaCtl.set(eid, { mode: ReplicaMode.Pilotless, bits: s.ctl.bits, q: s.ctl.q, derived: ship.derived, body: orders?.body });
   b.writeBody(eid, ship, body);
@@ -97,29 +99,13 @@ export function stepPilotless(b: BridgeCtx, eid: number, ship: ShipState, k: Fli
   b.charge.set(eid, energy.charge);
 }
 
-type PilotlessControls = PilotOrders['controls'];
-
-/**
- * A pilotless ship's orders as the step's input (today's logic): no orders and no autopilot, it holds its heading
- * (CTL.hold, aim 0); else its controls' bits and its aim on the grid. Pinned, it only turns (its thrust would move it on
- * every replica while the pin holds it here). An order's impulse is the step's (not while EMP'd)
- */
-export function pilotlessInput(controls: PilotlessControls | null, pinned: boolean, impulse?: readonly [number, number]): SimInput {
-  const i = PILOTLESS_IN;
-  if (!controls) { i.bits = CTL.hold; i.q = 0; }
-  else {
-    i.bits = pinned ? controlBits({ ...controls, forward: false, backward: false, left: false, right: false, boost: false }) : controlBits(controls);
-    i.q = aimQ(controls.targetAngle);
-  }
-  i.impulse = impulse;
-  return i;
-}
-
 /** stepPilotless' scratch: the view, its input and env (reused every call; the step keeps none of them) */
 const PILOTLESS_VIEW = new SimShipView();
 const PILOTLESS_IN: SimInput = { bits: 0, q: 0, jumpDist: -1, fire: false, fireAlt: false, aimDist: 0 };
 const PILOTLESS_FIELDS: FieldEnv = { central: null };
-const PILOTLESS_ENV: SimEnv = { tick: 0, tuning: undefined as unknown as SimEnv['tuning'], gravity: null, fields: PILOTLESS_FIELDS, terrain: null };
+const PILOTLESS_ENV: SimEnv = { tick: 0, tuning: undefined as unknown as SimEnv['tuning'], gravity: null, fields: PILOTLESS_FIELDS, terrain: null, gunsByHost: true };
+/** (Empty: its guns are fireWeapons', env.gunsByHost) */
+const PILOTLESS_EVENTS: SimEvent[] = [];
 let envEid = 0, envB: BridgeCtx | undefined;
 const pilotlessHazard = (d: ShipDerived, x: number, y: number) => envB!.host.hazardFlight?.(envEid, d, x, y);
 function pilotlessEnv(b: BridgeCtx, eid: number, k: FlightConstants, tick: number): SimEnv {

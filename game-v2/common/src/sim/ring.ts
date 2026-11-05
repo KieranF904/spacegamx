@@ -11,6 +11,10 @@
  * Not hashed: `structure` itself (only its version), an unaccounted charge (a replica's FULL_CHARGE stand-in).
  *
  * The tick hash folds the ship hashes in ascending id order.
+ *
+ * ## API (contract; settled in Stage 3 with Stage 1C's additions)
+ * put (a copy), keep (by reference: the caller hands the state over, e.g. a ReplicaState), get, has, hash, tickHash,
+ * last, first, size, ticks, ids, dropFrom, delete (one tick), remove (one ship), clear.
  */
 
 import type { SimShipState } from './state.js';

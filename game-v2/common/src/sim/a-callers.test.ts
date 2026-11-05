@@ -26,7 +26,8 @@ import type { LodestoneData } from '../data/schemas.js';
 import { stepShip, newSimShip, cloneCharge, simAim, CTL_STATE_BITS, type SimEnv, type SimShipState } from './index.js';
 import { aimQ, pilotInput, gridAim } from './a-adapt.js';
 import { stepMovement } from '../../../server/src/ships/bridge/flight.js';
-import { stepPilotless, pilotlessInput } from '../../../server/src/ships/bridge/pilotless.js';
+import { stepPilotless } from '../../../server/src/ships/bridge/pilotless.js';
+import { controllerInput } from '../../../server/src/ships/inputs.js';
 import { cruiseOf } from '../../../server/src/ships/SimLod.js';
 import { ShipClient } from '../../../client/src/ships/ShipClient.js';
 
@@ -183,7 +184,7 @@ describe('every caller flies the one stepper (stepShip) to the same state', () =
         direct.hazard.empUntil = empAt(t) ? EMP_END : 0;
         direct.hazard.slowUntil = slowedAt(t) ? SLOW_END : 0;
         direct.hazard.numb = numbAt(t) ? COLD.control : 1;
-        direct = stepShip(direct, { ...pilotlessInput(o?.controls ?? null, false, o?.impulse) }, simEnv(t)).state;
+        direct = stepShip(direct, { ...controllerInput({ pinned: new Map() } as never, eid, o as never, undefined) }, simEnv(t)).state;
         const sb = { ...server.st.body, jump: ship.jump, jumpScale: ship.jumpScale, cargo: ship.cargo };
         const at = `tick ${t}`;
         expect(bodyRow(direct.body), at).toEqual(bodyRow(sb));

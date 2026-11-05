@@ -27,6 +27,8 @@ import { SHIP_FLIGHT_CONSTANTS } from '../ships/physics.js';
 import type { Vec2 } from '../ships/types.js';
 import { StateRing } from '../sim/ring.js';
 import { ReplicaState } from '../sim/c-replicaState.js';
+import { CtlChangeInputs, DriverInputs } from '../sim/d-sources.js';
+import type { InputSource } from '../sim/input.js';
 
 /** A piece of debris's shape for the knocks (ShipReplicaSet's debrisShape): its mass, radius, centre and convex pieces */
 export interface DebrisShape { mass: number; radius: number; com: Vec2; pieces: readonly (readonly Vec2[])[]; born?: number }
@@ -150,6 +152,8 @@ interface Rep {
   dock?: { station: number; ox: number; oy: number };
   /** Control changes not yet folded into a stepped state: tick → [bits, q] */
   events: Map<number, [number, number]>;
+  /** Its input source over `events` (assumed: held between rows), made on first step */
+  src?: CtlChangeInputs;
   /** The latest keyframe's tick (nothing before it can change) */
   kf: number;
   /** The newest aim it was sent (control rows give aims as steps from it) */
@@ -181,6 +185,8 @@ const GAP_MAX = 60;
 /** A ship drawn before its first state is drawn back along its way from it by at most this many ticks */
 const BACK_TICKS = 20;
 
+/** stepPreNow's scratch: the ship before the step, as its input source reads it */
+const PREV: { id: number; body: FlightBody; ctl: { bits: number; q: number } } = { id: 0, body: undefined as unknown as FlightBody, ctl: { bits: 0, q: 0 } };
 const smoothstep = (u: number) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
 
 /** How much of a correction is added to the drawn pose at tick t (drawn = stepped path + d × this) */
@@ -382,16 +388,16 @@ export class ShipReplicaSet {
   }
 
   /** The pilot's own ship, stepped from its own timeline (CAPS.OWN_SIM; null: from its control rows like any other) */
-  private own: { id: number; src: OwnTimeline } | null = null;
+  private own: { id: number; src: OwnTimeline; inputs: CtlChangeInputs } | null = null;
   setOwn(id: number, src: OwnTimeline | null): void {
-    this.own = src ? { id, src } : null;
+    this.own = src ? { id, src, inputs: new CtlChangeInputs('known', (t) => src.ctl(t)) } : null;
     this.rewind(id, -Infinity);
   }
 
   /** Ships flown by their bodies (CAPS.BODIES), by id */
-  private drivers = new Map<number, BodyDriver>();
+  private drivers = new Map<number, DriverInputs>();
   setDriver(id: number, d: BodyDriver | null): void {
-    if (d) this.drivers.set(id, d); else this.drivers.delete(id);
+    if (d) this.drivers.set(id, new DriverInputs(d)); else this.drivers.delete(id);
     this.rewind(id, -Infinity);
   }
 
@@ -472,12 +478,16 @@ export class ShipReplicaSet {
 
   private stepPreNow(id: number, r: Rep, t: number, prev: ReplicaState, d: ShipDerived): ReplicaState {
     const own = this.own?.id === id ? this.own.src : null;
-    const ev = own ? own.ctl(t) : r.events.get(t);
-    // (Flown by its body: its controls and push from that, CAPS.BODIES)
-    const by = this.drivers.get(id)?.step(t, prev.body, prev.q, prev.bits);
-    const bits = by ? by.bits : ev ? ev[0] : prev.bits, q = by ? by.q : ev ? ev[1] : prev.q;
+    // Its input from its source (sim/d-sources.ts): its own timeline (known) or its control rows (assumed), held
+    // between changes; flown by its body, its driver's controls and push (decided, CAPS.BODIES), the rows where it doesn't
+    const rows: InputSource = own ? this.own!.inputs : (r.src ??= new CtlChangeInputs('assumed', (k) => r.events.get(k)));
+    const drv = this.drivers.get(id);
+    if (drv) drv.fallback = rows;
+    PREV.id = id; PREV.body = prev.body; PREV.ctl.bits = prev.bits; PREV.ctl.q = prev.q;
+    const input = (drv ?? rows).inputAt(t, PREV);
+    const bits = input.bits, q = input.q;
     const body = cloneBody(prev.body);
-    if (by) { body.vx += by.ix; body.vy += by.iy; }
+    if (input.impulse) { body.vx += input.impulse[0]; body.vy += input.impulse[1]; }
     const cs = own ? null : this.causes;
     // (The hold's mass it flies this step with, if that changed: a CARGO cause, CAPS.CARGO)
     if (own) own.preStep?.(t, body);
@@ -635,7 +645,7 @@ export class ShipReplicaSet {
       return (ring.get(id, bt) ?? ring.get(id, last)!) as ReplicaState;
     }
     const own = this.own?.id === id ? this.own.src : null;
-    const driver = this.drivers.get(id);
+    const driver = this.drivers.get(id)?.driver;
     const d = this.derived(id);
     let cur = ring.get(id, last)! as ReplicaState;
     if (r.mode === ReplicaMode.Docked) {

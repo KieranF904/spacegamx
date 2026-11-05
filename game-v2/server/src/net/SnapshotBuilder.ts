@@ -608,7 +608,7 @@ export class SnapshotBuilder {
   }
 
   /**
-   * The head hash for a client stepping its own ship (CAPS.OWN_SIM; common sim/c-headHash.ts): its own ship as it is
+   * The head hash for a client stepping its own ship (CAPS.OWN_SIM; common sim/headHash.ts): its own ship as it is
    * now, its tick layer's (the real ship and the controls it flew), unless it isn't held (docked, dead, not yet known
    * to it). `keyed`: its own ship's keyframe goes in this snapshot (nothing to compare)
    */
@@ -636,7 +636,7 @@ export class SnapshotBuilder {
     // itself (a contact, a pull) is no correction; its drawn ship follows its tick layer, ShipClient.ownMoved)
     const version = (ownSimFor(conn.caps) ? this.replication.ownVersionOf(r.id) : undefined) ?? this.replication.versionOf(r.id);
     const fix = conn.forceSnapshot || conn.selfLate || version !== conn.selfVersion || !prevStates.has(r.id) || flight !== conn.selfFlight;
-    // (Now and then just in case, unless its snapshots carry the head hash (CAPS.OWN_SIM: sim/c-headHash.ts): a client
+    // (Now and then just in case, unless its snapshots carry the head hash (CAPS.OWN_SIM: sim/headHash.ts): a client
     // that disagrees with it checks at once, and the fix brings the row)
     const need = fix || key !== conn.selfKey || (!ownSimFor(conn.caps) && this.currentTick - conn.selfSentTick >= SELF_SAFETY_TICKS);
     return { need, fix, key, flight, version };

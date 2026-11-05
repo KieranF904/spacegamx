@@ -27,22 +27,21 @@ import { gunDef } from '../ships/launch.js';
 import { ensurePortsCharge, payMining, type Charge } from '../ships/energy.js';
 import { portsMinePhase, portsPiecePhase, type PortsState } from '../ships/power/ports.js';
 import { jumpPhase, jumpTuning } from '../ships/flight.js';
-import { CTL } from '../ships/replica.js';
 import type { SimShipState } from './state.js';
 import { simAim, type SimInput } from './input.js';
 import type { SimEnv } from './env.js';
 import { SHOT_ID_BARRELS, SHOT_ID_OWNERS, SHOT_ID_SLOTS, shotId, type SimEvent } from './events.js';
+
+// (CTL.emp as a number: replica.ts imports step.ts, which imports this file, so nothing from it is read here)
+const BIT_EMP = 512;
 
 // (Own shells' wire names, CAPS.SHOT_IDS: exported with the gun phase, as sim/index.ts is a contract file)
 export * from './b-shots.js';
 
 /** A fire event */
 export type FireEvent = Extract<SimEvent, { k: 'fire' }>;
-/**
- * A fire event as the gun phase makes it: with `aug` when a ports ship's shot was augmented (its augment's mods go on
- * the shells: power/ports.ts augMods). The contract's fire event has no field for it (contract note, Stage 1B)
- */
-export type GunFireEvent = FireEvent & { aug?: 1 };
+/** (The name Stage 1B used while the contract's fire event lacked `aug`) */
+export type GunFireEvent = FireEvent;
 
 /** The fx names the gun phase emits */
 export const GUN_FX = {
@@ -141,7 +140,7 @@ export function stepShipGuns(state: SimShipState, input: Readonly<SimInput>, env
   const d = state.structure.derived;
   if (!d.weapons.length && !d.miners.length) return;
   const t = env.tick, body = state.body;
-  const emp = t < state.hazard.empUntil || (input.bits & CTL.emp) !== 0;
+  const emp = t < state.hazard.empUntil || (input.bits & BIT_EMP) !== 0;
   const burning = jumpPhase(body.jump ?? 0, jumpTuning(env.tuning)).phase === 'burn';
   const view = gunView(state);
   const c = gunControls(view, input.fire, input.fireAlt, burning || emp);

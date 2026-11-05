@@ -1,15 +1,15 @@
 /**
  * Shared pieces of the input sources (sim foundation, Stage 1 section D): the plumbing the server's and the client's
- * adapters (server/src/ships/inputs.ts, client/src/ships/inputs.ts) and the bots (server/src/bots) build on. Nothing here
- * is wired into a step: call sites keep their inputs until Stage 3 swaps them for these.
+ * adapters (server/src/ships/inputs.ts, client/src/ships/inputs.ts) and the bots (server/src/bots) build on. Since
+ * Stage 3 the client's replica set (network/replication.ts stepPreNow) picks each ship's input through
+ * CtlChangeInputs (own timeline: known; control rows: assumed) and DriverInputs (a body's driver: decided).
  */
 
 import { controlBits, flightControls } from '../ships/replica.js';
-import type { FlightControls } from '../ships/flight.js';
+import type { FlightBody, FlightControls } from '../ships/flight.js';
+import type { BodyDriver } from '../network/replication.js';
 import { quantizeCursorDist } from '../network/protocol.js';
-import { NO_INPUT, simAimQ, type InputKnowledge, type InputSource, type SimInput } from './input.js';
-
-export type InputPrev = Parameters<InputSource['inputAt']>[1];
+import { NO_INPUT, simAimQ, type InputKnowledge, type InputPrev, type InputSource, type SimInput } from './input.js';
 
 /** A SimInput from held flight controls (their `targetAngle` onto the grid), as controlBits/simAimQ have them */
 export function inputOfControls(
@@ -87,4 +87,61 @@ export class HeldInputs implements InputSource {
     while (i + 1 < k.length && k[i + 1] <= t) { this.at.delete(k[i]); i++; }
     if (i) k.splice(0, i);
   }
+}
+
+/** Where a ship's control changes are held: the [bits, q] that took effect on tick t, if one did */
+export type CtlChanges = (t: number) => readonly [number, number] | undefined;
+
+/**
+ * Controls that change only where a change took effect (control rows; the own timeline's input messages) and are
+ * otherwise held: what the ship flew tick t - 1 with, read off the ship itself (`prev.ctl`). Stateless, so a rollback's
+ * re-ask answers the same. The answer is a scratch object, read at once (the replica set's stepPreNow)
+ */
+export class CtlChangeInputs implements InputSource {
+  private through = -Infinity;
+  private readonly out: SimInput = { ...NO_INPUT };
+  constructor(readonly knowledge: InputKnowledge, private readonly changes: CtlChanges) {}
+
+  inputAt(t: number, prev: InputPrev): SimInput {
+    const ev = this.changes(t), o = this.out;
+    o.bits = ev ? ev[0] : prev.ctl.bits;
+    o.q = ev ? ev[1] : prev.ctl.q;
+    return o;
+  }
+
+  /** Every change up to tick t has arrived */
+  confirm(t: number): void { if (t > this.through) this.through = t; }
+  confirmedThrough(): number { return this.through; }
+}
+
+/**
+ * A ship flown by a driver (decided: a BodyRunner's, CAPS.BODIES): its controls and push each tick, from the ship
+ * before it (`prev`, its body and controls: no memory here, rollback safe); where it doesn't fly the ship (null), the
+ * fallback answers (the ship's rows; set by the caller before asking). The answer is a scratch object, read at once
+ */
+export class DriverInputs implements InputSource {
+  readonly knowledge = 'decided' as const;
+  /** Who answers where the driver doesn't fly the ship (none: it holds its last controls) */
+  fallback: InputSource | null = null;
+  private answered = -Infinity;
+  private readonly out: SimInput = { ...NO_INPUT };
+  private readonly push: [number, number] = [0, 0];
+  constructor(readonly driver: BodyDriver) {}
+
+  inputAt(t: number, prev: InputPrev): SimInput {
+    if (t > this.answered) this.answered = t;
+    const by = this.driver.step(t, prev.body as FlightBody, prev.ctl.q, prev.ctl.bits);
+    const o = this.out;
+    if (!by) {
+      if (this.fallback) return this.fallback.inputAt(t, prev);
+      o.bits = prev.ctl.bits; o.q = prev.ctl.q; o.impulse = undefined;
+      return o;
+    }
+    o.bits = by.bits; o.q = by.q;
+    this.push[0] = by.ix; this.push[1] = by.iy;
+    o.impulse = this.push;
+    return o;
+  }
+
+  confirmedThrough(): number { return this.answered; }
 }

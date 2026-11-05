@@ -75,7 +75,7 @@ export class OwnTick implements OwnTimeline {
   private levelSince = 0;
   private last = { tick: -Infinity, snap: -Infinity, body: -1, hp: -1 };
   readonly stats = { inputs: 0, causes: 0, failed: 0, fixes: 0, exc: 0, checks: 0, heads: 0, headMisses: 0 };
-  /** The newest snapshot's head hash, to judge at its next check (sim/c-headHash.ts), and a miss not yet sent */
+  /** The newest snapshot's head hash, to judge at its next check (sim/headHash.ts), and a miss not yet sent */
   private head: { tick: number; h: HeadHash } | null = null;
   private missed = false;
 
@@ -281,7 +281,7 @@ export class OwnTick implements OwnTimeline {
   // ---- Its check ----
 
   /**
-   * The newest snapshot's head hash against its own ship on its layer at that tick (common sim/c-headHash.ts): held
+   * The newest snapshot's head hash against its own ship on its layer at that tick (common sim/headHash.ts): held
    * and not keyed in that snapshot, they must agree; a miss sends its check at once (takeCheck), which the server
    * judges and puts right (its own ship keyed, its row with it)
    */
@@ -311,7 +311,7 @@ export class OwnTick implements OwnTimeline {
   takeCheck(riding: boolean, tick: number): OwnCheck | undefined {
     if (!this.on || !this.keyed) return undefined;
     this.judgeHead();
-    // (Its layer disagreed with a snapshot's head hash: the check goes now, whatever its level, sim/c-headHash.ts)
+    // (Its layer disagreed with a snapshot's head hash: the check goes now, whatever its level, sim/headHash.ts)
     const force = this.missed;
     if (!force && this.snapTick === this.last.snap) return undefined;
     // (A clean stretch at a level steps it down one)
