@@ -566,6 +566,18 @@ export class GameState {
     if (want > this.leadTicks + 0.3 || want < this.leadTicks - 1.3) this.leadTicks = Math.max(1, Math.min(15, Math.ceil(want)));
   }
 
+  /**
+   * The tick the local ship is drawn at this frame (interpolate): between its last two predicted steps, half a tick
+   * behind the estimate plus the lead. Your own shells are drawn on this timeline (WeaponFx's present), so they leave
+   * the barrels of the ship as drawn; the server's tick (getRawServerTick) runs leadTicks behind it, and a shell drawn
+   * on that came out where the ship had been that many ticks before. Without prediction, the server's tick.
+   */
+  ownDrawTick(now: number = performance.now()): number {
+    if (!this.predictionEnabled || this.predictedTick <= 0) return this.getRawServerTick(now);
+    if (!this.selfPrev) return this.predictedTick;
+    return this.predictedTick - 1 + Math.max(0, Math.min(1, this.frameTick - this.predictedTick + 0.5));
+  }
+
   /** How many steps the prediction is behind where it should be this frame */
   ticksDue(now: number = performance.now()): number {
     this.updateLead();
@@ -1336,6 +1348,7 @@ export class GameState {
     if (player) {
       const prev = this.selfPrev;
       if (prev && this.predictionEnabled && this.predictedTick > 0) {
+        // (the same k as ownDrawTick: your shells are drawn at the tick your ship is)
         const k = Math.max(0, Math.min(1, this.frameTick - this.predictedTick + 0.5));
         let da = player.angle - prev.angle;
         while (da > Math.PI) da -= 2 * Math.PI;

@@ -28,7 +28,7 @@ import {
   Color,
 } from 'pixi.js';
 import { GameState } from '../state/GameState';
-import { WeaponFx, type PredictedShell } from './weapons/WeaponFx';
+import { WeaponFx, shotTimelines, type PredictedShell } from './weapons/WeaponFx';
 import { MiningStrikeFx } from './weapons/MiningStrikeFx';
 import { LootPodView } from './LootPodView';
 import { TerrainView } from './TerrainView';
@@ -43,7 +43,6 @@ import type { StarBody } from './sun/plasmaSun';
 import {
   EntityType,
   EffectType,
-  TICK_MS,
   getAsteroidPolygon,
   nestPosition,
   pocketsFrom,
@@ -1211,8 +1210,8 @@ export class Renderer {
     }
 
     // Projectile tracers, muzzle flashes and impacts
-    const presentTick = this.state.getRawServerTick();
-    this.weaponFx.update(this.state, delta, presentTick, presentTick - this.state.interpDelayMs / TICK_MS);
+    // (Each shell on the timeline its firing ship is drawn on: shotTimelines)
+    this.weaponFx.update(this.state, delta, ...shotTimelines(this.state));
 }
 
   /** Convert HSL to hex color (matching original game's color system) */
