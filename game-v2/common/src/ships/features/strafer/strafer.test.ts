@@ -9,6 +9,7 @@ import type { ShipDerived } from '../../rebuild.js';
 import { worldToLocalDir, type FlightBody, type FlightControls } from '../../flight.js';
 import { stepShipPhysics, quantizeShipBody } from '../../physics.js';
 import { replicaStep, ReplicaMode, controlBits, CTL, flightSignature } from '../../replica.js';
+import { gridAim } from '../../../sim/a-adapt.js';
 import {
   dodgePhase, stepDodge, strafeForce, dodgeLoad, burstEnergy, pilotExtras, chooseDodgeDir, dodgeDirOf, dodgeVec, oppositeDir, bestDodge,
   dodgeAffordable, DODGE_DIRS, DODGE_LEFT, DODGE_RIGHT, DODGE_FORWARD, DODGE_BACK, type StrafeInfo,
@@ -306,7 +307,7 @@ describe('Burst Strafer: flight', () => {
   it('prediction replays a dodge exactly from any snapshot, and replicas fly it from the control bits', () => {
     const d = ship([RIGHT_FLANK, LEFT_FLANK]).derived;
     const inputs: Partial<FlightControls>[] = [];
-    for (let t = 0; t < 160; t++) inputs.push({ forward: t < 60, right: t >= 45 && t < 52, left: t >= 90 && t < 95, targetAngle: -1.2 + t * 0.01, dodge: (t >= 10 && t < 20) || (t >= 45 && t < 50) || (t >= 90 && t < 93) || (t >= 120 && t < 125) });
+    for (let t = 0; t < 160; t++) inputs.push({ forward: t < 60, right: t >= 45 && t < 52, left: t >= 90 && t < 95, targetAngle: gridAim(-1.2 + t * 0.01), dodge: (t >= 10 && t < 20) || (t >= 45 && t < 50) || (t >= 90 && t < 93) || (t >= 120 && t < 125) });
     // The server's run
     const states: FlightBody[] = [];
     const s = body();

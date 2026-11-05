@@ -13,15 +13,13 @@
 import type { Terrain } from '../terrain.js';
 import { FULL_CHARGE } from './energy.js';
 import type { FlightBody, FlightControls, GravityWell } from './flight.js';
-import { stepDrift, jumpTuning, inSolarRing, withSlowed, CTL_NO_BOOST, CTL_POWER_MASK, CTL_SHARE_MASK, type FlightConstants } from './flight.js';
-import { jumpFieldAt, fieldCooldown, fieldRangeBoost, type FieldEnv } from './jumpFields.js';
-import { stepShipPhysics, quantizeShipBody, SHIP_FLIGHT_CONSTANTS } from './physics.js';
-import { withEmp } from './hazards.js';
-import { stepDebrisBody } from './debris.js';
-import { warmthStage, withNumb } from './warmth.js';
-
-/** (What a numb drive flies with) */
-const NUMB = warmthStage(1);
+import { CTL_NO_BOOST, CTL_POWER_MASK, CTL_SHARE_MASK, type FlightConstants } from './flight.js';
+import type { FieldEnv } from './jumpFields.js';
+// (A cycle: sim/step.ts imports this file; neither reads the other while loading)
+import { stepShipMotion, stepHazards, type StepHazards } from '../sim/step.js';
+import { SimShipView, aimQ } from '../sim/a-adapt.js';
+import type { SimInput } from '../sim/input.js';
+import type { SimEnv } from '../sim/env.js';
 import type { ShipDerived } from './rebuild.js';
 import type { ShipTuning } from './tuning.js';
 import { getPlan } from './features/plan.js';
@@ -118,41 +116,26 @@ export interface ReplicaEnv extends FieldEnv {
 
 /**
  * One tick of a replicated ship, exactly as the server moves it when nothing
- * else interferes. Docked ships aren't stepped (they ride their station).
- * `tick` is the tick being stepped into (lodestones move with it).
+ * else interferes: the motion of the one stepper (sim/step.ts stepShipMotion),
+ * on a replica's view (no stores, the authority's power and hazard bits, the
+ * aim put back on its grid). Docked ships aren't stepped (they ride their
+ * station). `tick` is the tick being stepped into (lodestones move with it).
+ * A stillstone's priming is state here too: kept on the body (`jumpPrime`).
  */
 export function replicaStep(mode: ReplicaMode, body: FlightBody, c: ReplicaControls, derived: ShipDerived, tuning: ShipTuning, env: ReplicaEnv, tick = 0): void {
-  const k = env.gravity ? { ...SHIP_FLIGHT_CONSTANTS, gravity: env.gravity } : SHIP_FLIGHT_CONSTANTS;
-  switch (mode) {
-    case ReplicaMode.Player: {
-      const jt = jumpTuning(tuning);
-      // (A stillstone's priming isn't replicated: a burn's start brings a keyframe anyway)
-      const boost = fieldRangeBoost(inSolarRing(body.x, body.y, env.central, jt), 0, jt);
-      const hazard = env.hazard?.(derived, body.x, body.y);
-      // (numb with cold, then slowed, then EMP'd: the order the server and the pilot's prediction apply them in)
-      const flown = withSlowed(c.bits & CTL.numb ? withNumb(hazard, NUMB) : hazard, (c.bits & CTL.slowed) !== 0);
-      stepShipPhysics(body, flightControls(c, body), derived, tuning, { charge: FULL_CHARGE, drainRate: 0, replay: c.bits }, env.gravity, boost, c.bits & CTL.emp ? withEmp(flown) : flown, env.terrain);
-      // A charging field (a star's ring, a stillstone's): the drive cools down faster
-      body.jump = fieldCooldown(body.jump ?? 0, derived.jumpCooldown || jt.cooldownTicks, jumpFieldAt(body.x, body.y, env, tick, jt), jt, tick);
-      return;
-    }
-    case ReplicaMode.Pilotless: {
-      const slowed = withSlowed(undefined, (c.bits & CTL.slowed) !== 0);
-      stepShipPhysics(body, flightControls(c, body), derived, tuning, { charge: FULL_CHARGE, drainRate: 0 }, env.gravity, 1, c.bits & CTL.emp ? withEmp(slowed) : slowed, env.terrain);
-      return;
-    }
-    case ReplicaMode.Drift:
-      // (Debris: the deterministic drift every side runs, ships/debris.ts; ShipReplicaSet steps debris as a world, knocks and all)
-      stepDebrisBody(body, k);
-      return;
-    case ReplicaMode.Anchored: {
-      const spin = body.angVel;
-      stepDrift(body, SHIP_FLIGHT_CONSTANTS);
-      body.angVel = spin;
-      quantizeShipBody(body);
-      return;
-    }
-    case ReplicaMode.Docked:
-      return;
-  }
+  if (mode === ReplicaMode.Docked) return;
+  const s = (VIEW ??= new SimShipView()).load(0, mode, body, derived, undefined, FULL_CHARGE, false, body.jumpPrime ?? 0);
+  IN.bits = c.bits;
+  IN.q = aimQ(c.targetAngle);
+  ENV.tick = tick; ENV.tuning = tuning; ENV.gravity = env.gravity; ENV.terrain = env.terrain ?? null; ENV.hazard = env.hazard;
+  FIELDS.central = env.central; FIELDS.lodestones = env.lodestones;
+  stepShipMotion(s, IN, ENV, stepHazards(s, IN, tick, HZ));
+  if (s.jumpPrime || body.jumpPrime !== undefined) body.jumpPrime = s.jumpPrime;
 }
+
+/** (replicaStep's scratch: the view, its input (where a jump lands isn't replicated: -1, the charge waits), env, hazards) */
+let VIEW: SimShipView | undefined;
+const IN: SimInput = { bits: 0, q: 0, jumpDist: -1, fire: false, fireAlt: false, aimDist: 0 };
+const FIELDS: FieldEnv = { central: null, lodestones: undefined };
+const ENV: SimEnv = { tick: 0, tuning: undefined as unknown as ShipTuning, gravity: null, fields: FIELDS, terrain: null };
+const HZ: StepHazards = { emp: false, slowed: false, numb: 1 };

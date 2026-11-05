@@ -30,6 +30,7 @@ import { stepShipPhysics } from '../physics.js';
 import { FULL_CHARGE, gunLoad, CHARGE_GROUPS_AT } from '../energy.js';
 import { gunDef } from '../launch.js';
 import { CTL, ReplicaMode, controlBits, flightControls, replicaStep } from '../replica.js';
+import { gridAim } from '../../sim/a-adapt.js';
 import { newFlightControls } from '../flightInputs.js';
 import { NO_FIELDS } from '../jumpFields.js';
 import { packKeyframe, unpackKeyframe } from '../../network/replication.js';
@@ -157,7 +158,8 @@ export function runPartContract(id: string, opts: PartContractOptions = {}): voi
         const body: FlightBody = { x: 0, y: 0, vx: 0, vy: 0, angle: opts.startAngle ?? -Math.PI / 2, angVel: 0, jump: 0, cargo: 0 };
         const rows: number[][] = [];
         for (let t = 0; t < ticks; t++) {
-          const { keys, aim } = script(t);
+          const { keys, aim: raw } = script(t);
+          const aim = gridAim(raw); // (aims come on the grid: sim/input.ts simAim)
           if (off) for (const n of mine) (keys as Record<string, boolean>)[n] = false;
           if (replica) {
             // (What a replica has: the control bits and the aim, not the keys)
