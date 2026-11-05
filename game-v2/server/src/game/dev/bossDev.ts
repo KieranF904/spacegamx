@@ -47,7 +47,7 @@ const DUMMY_DPS = { off: 0, starter: 112, l30: 450 } as const;
 /** How far out dummies orbit, and how many log entries each pilot keeps */
 const DUMMY_RANGE = 1600, LOG_KEEP = 60;
 /** The ships dummies fly (the first the library has) */
-const DUMMY_SHIPS = ['sparrow-t', 'arrow', 'lancer'];
+const DUMMY_SHIPS = ['sparrow-t', 'arrow', 'halberd'];
 
 interface Dummy { eid: number; boss: number; dps: number; phase: number }
 

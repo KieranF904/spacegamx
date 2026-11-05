@@ -33,7 +33,7 @@ export function makeServer(netCaps: number): GameServer {
 }
 
 /** Real ships, a mix of light and heavy (blueprint names under data/ships) */
-export const SHIP_POOL = ['sparrow-t', 'hammerhead', 'corsair', 'ports-gale', 'ports-heron', 'ports-wasp', 'ports-brawler', 'lancer'];
+export const SHIP_POOL = ['sparrow-t', 'sunspear', 'wisp', 'ports-gale', 'ports-heron', 'ports-wasp', 'ports-brawler', 'halberd'];
 
 export function blueprint(server: GameServer, name: string): any {
   const hit = server.getShips().library.get(name);

@@ -21,7 +21,7 @@ const tuning: ShipTuning = readShipJson('tuning.json');
 const GYRO = (x: number, y: number, uid = 60) => ({ uid, piece: 'sq', fn: 'utility_gyro', material: 'alloy', x, y, rot: 0, flip: false });
 const HEAVY = (x: number, y: number, uid = 61) => ({ uid, piece: 'block2', fn: 'utility_heavy_gyro', material: 'titanium', x, y, rot: 0, flip: false });
 const ship = (extra: object[] = []): ShipDerived => {
-  const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/sparrow-t.json'), 'utf-8'));
+  const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/sparrow-t.json'), 'utf-8'));
   bp.parts.push(...(extra as never[]));
   return createShipState(catalog, tuning, 1, bp, 0).derived;
 };
@@ -61,7 +61,7 @@ describe('gyro: torque', () => {
       return last;
     };
     const dread = (at: [number, number][]) => {
-      const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/bastion.json'), 'utf-8'));
+      const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/bastion.json'), 'utf-8'));
       at.forEach(([x, y], k) => bp.parts.push(HEAVY(x, y, 240 + k) as never));
       const d = createShipState(catalog, tuning, 1, bp, 0).derived;
       expect(d.fx?.gyro?.parts.length ?? 0).toBe(at.length);

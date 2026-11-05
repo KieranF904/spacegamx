@@ -120,8 +120,8 @@ async function run(bossId: string, PILOTS: number, secs: number, quiet = false):
   const num = S.gameData.getSystemNum(def.system);
   const lair = def.lair;
   const spot = (i: number) => { const a = (i / Math.max(1, PILOTS)) * Math.PI * 2 + 0.3; return { x: lair.x + Math.cos(a) * 1800, y: lair.y + Math.sin(a) * 1800 }; };
-  // Gun ships (the Lancer: forward cannons, one of the boss doc's reference ships), not the guest's beam Sparrow
-  const SHIP = argS('--ship', 'lancer');
+  // Gun ships (the Halberd: forward guns), not the guest's beam Sparrow
+  const SHIP = argS('--ship', 'halberd');
   const bp = bridge.library.get(SHIP);
   if (bp) for (const c of conns) { S.pilots.devSwapShip(c, bp); S.ammo?.restock?.(c, { report: false, quiet: true }); }
   pilots.length = 0; for (const c of conns) pilots.push(c.playerId);

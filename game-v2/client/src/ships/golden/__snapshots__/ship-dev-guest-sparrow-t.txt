@@ -23,7 +23,7 @@
     "spare": 2012,
     "engineDraw": 752,
     "weaponDraw": 0,
-    "boostDraw": 2371.2000000000003
+    "boostDraw": 1484.16
   },
   "guns": 0,
   "turrets": 0,

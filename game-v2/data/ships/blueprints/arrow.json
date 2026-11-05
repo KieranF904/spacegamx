@@ -1,17 +1,18 @@
 {
   "name": "Arrow",
   "catalogVersion": 1,
+  "power": "ports",
   "parts": [
     {"uid":0,"piece":"rect2","fn":"core","material":"alloy","x":0,"y":0,"rot":0,"flip":false},
     {"uid":1,"piece":"slope2","fn":"hull","material":"composite","x":0,"y":-1,"rot":3,"flip":false},
     {"uid":2,"piece":"slope2","fn":"hull","material":"composite","x":1,"y":-1,"rot":1,"flip":true},
     {"uid":3,"piece":"sq","fn":"cannon_pip","material":"alloy","x":-1,"y":0,"rot":0,"flip":false,"facing":"N"},
     {"uid":4,"piece":"sq","fn":"cannon_pip","material":"alloy","x":2,"y":0,"rot":0,"flip":false,"facing":"N"},
-    {"uid":5,"piece":"rect2","fn":"power_overclock_reactor","material":"titanium","x":0,"y":1,"rot":0,"flip":false},
-    {"uid":6,"piece":"sq","fn":"hull","material":"alloy","x":0,"y":2,"rot":0,"flip":false},
-    {"uid":7,"piece":"sq","fn":"hull","material":"alloy","x":1,"y":2,"rot":0,"flip":false},
-    {"uid":8,"piece":"sq","fn":"hull","material":"alloy","x":0,"y":3,"rot":0,"flip":false},
-    {"uid":9,"piece":"sq","fn":"hull","material":"alloy","x":1,"y":3,"rot":0,"flip":false},
+    {"uid":5,"piece":"rect2","fn":"power_overclock_reactor","material":"titanium","x":1,"y":1,"rot":2,"flip":false},
+    {"uid":6,"piece":"sq","fn":"power_conduit","material":"alloy","x":0,"y":2,"rot":2,"flip":false},
+    {"uid":7,"piece":"sq","fn":"power_conduit","material":"alloy","x":1,"y":2,"rot":2,"flip":false},
+    {"uid":8,"piece":"sq","fn":"power_conduit","material":"alloy","x":0,"y":3,"rot":2,"flip":false},
+    {"uid":9,"piece":"sq","fn":"power_conduit","material":"alloy","x":1,"y":3,"rot":2,"flip":false},
     {"uid":10,"piece":"slope2","fn":"hull","material":"composite","x":-1,"y":2,"rot":0,"flip":true},
     {"uid":11,"piece":"slope2","fn":"hull","material":"composite","x":2,"y":2,"rot":0,"flip":false},
     {"uid":12,"piece":"round","fn":"hull","material":"composite","x":-2,"y":3,"rot":2,"flip":false},
@@ -20,8 +21,8 @@
     {"uid":15,"piece":"round","fn":"hull","material":"composite","x":3,"y":3,"rot":1,"flip":false},
     {"uid":16,"piece":"tri","fn":"hull","material":"composite","x":-1,"y":4,"rot":2,"flip":false},
     {"uid":17,"piece":"rect2","fn":"engine_plasma_drive","material":"steel","x":0,"y":4,"rot":0,"flip":false,"facing":"S"},
-    {"uid":18,"piece":"sq","fn":"hull","material":"composite","x":-1,"y":1,"rot":0,"flip":false},
+    {"uid":18,"piece":"sq","fn":"power_cell_reactor","material":"alloy","x":-1,"y":1,"rot":0,"flip":false},
     {"uid":19,"piece":"tri","fn":"hull","material":"composite","x":2,"y":4,"rot":1,"flip":false},
-    {"uid":20,"piece":"sq","fn":"hull","material":"composite","x":2,"y":1,"rot":0,"flip":false}
+    {"uid":20,"piece":"sq","fn":"power_cell_reactor","material":"alloy","x":2,"y":1,"rot":0,"flip":false}
   ]
 }

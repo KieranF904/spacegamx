@@ -31,10 +31,10 @@ function p(uid: number, piece: string, fn: string, x: number, y: number, extra: 
 const design = (path: string): Blueprint => parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints', path), 'utf-8'));
 const codes = (b: Blueprint) => validateBlueprint(catalog, b, tuning, null).errors.map((e) => e.code);
 
-/** Every library design, the dev guests' and the starter (Sparrow T is the starter: it's in the library) */
+/** Every pool-era design (the library before it moved to the ports core, kept as fixtures) and the dev guests' */
 // (test-brownout.json is short of power on purpose; devTestShips.test.ts in the server covers the test-* ships)
 const LIBRARY = [
-  ...readdirSync(join(SHIP_DATA_DIR, 'blueprints')).filter((f) => f.endsWith('.json')),
+  ...readdirSync(join(SHIP_DATA_DIR, 'blueprints/fixtures')).filter((f) => f.endsWith('.json')).map((f) => `fixtures/${f}`),
   ...readdirSync(join(SHIP_DATA_DIR, 'blueprints/dev')).filter((f) => f.endsWith('.json') && f !== 'test-brownout.json' && !f.startsWith('ports-')).map((f) => `dev/${f}`),
 ];
 
@@ -104,7 +104,7 @@ describe('energy: migration', () => {
   });
 
   it('the starter (Sparrow T) and the dev guests never brown out at all in that fight', () => {
-    for (const f of ['sparrow-t.json', ...LIBRARY.filter((x) => x.startsWith('dev/guest-'))]) {
+    for (const f of ['fixtures/sparrow-t.json', ...LIBRARY.filter((x) => x.startsWith('dev/guest-'))]) {
       const log = fight(design(f));
       expect(log.brownTicks, f).toBe(0);
     }
@@ -212,7 +212,7 @@ describe('energy: the pool and the powered rule', () => {
 
   it('a store gives no more than its rate: past its Output a boosting, firing ship browns out with charge still stored', () => {
     // The Galleon with Isotope Piles for its Fusion Plants: little spare, so its Output is mostly the core's and Heavy Banks' rates
-    const g = design('galleon.json');
+    const g = design('fixtures/galleon.json');
     const pile = catalog.functions.get('power_isotope_pile')!;
     g.parts.filter((q) => q.fn === 'power_fusion_plant').forEach((q) => Object.assign(q, { fn: pile.id, piece: 'round', material: pile.material }));
     const d = derived(g), L = d.power!;
@@ -233,7 +233,7 @@ describe('energy: the pool and the powered rule', () => {
     const lt = loadTest(d, tuning, { fire: true, thrust: true, boost: true, seconds: 3 });
     expect(lt.guns).toBeLessThan(BROWNOUT);
     expect(lt.brownAt).toBe(0);
-    expect(powerTick(derived(design('galleon.json')), FULL_CHARGE, { thrusting: true, boosting: true, dir: [0, -1] }, tuning).power).toBe(1);
+    expect(powerTick(derived(design('fixtures/galleon.json')), FULL_CHARGE, { thrusting: true, boosting: true, dir: [0, -1] }, tuning).power).toBe(1);
   });
 
   it('the Heavy Bank holds 450 and gives 150/s a cell (deeper a cell than any Mk I store); the Battery 200 and 600/s', () => {
@@ -303,7 +303,7 @@ describe('energy: banks', () => {
   });
 
   it('a Drive Cell gives a Burst Strafer 2 full bursts on an empty pool', () => {
-    const bp = design('sparrow-t.json');
+    const bp = design('fixtures/sparrow-t.json');
     bp.parts.push(
       { uid: 60, piece: 'sq', fn: 'engine_burst_strafer', material: 'steel', x: 3, y: 0, rot: 0, flip: false, facing: 'E' } as PlacedPart,
       { uid: 62, piece: 'sq', fn: 'power_drive_cell', material: 'steel', x: 3, y: -1, rot: 0, flip: false } as PlacedPart,
@@ -335,7 +335,7 @@ describe('energy: banks', () => {
     // (The third has only what's left in the cell and the ship's spare generation)
     expect(kicks[2]).toBeLessThan(full * 0.9);
     // Without the Drive Cell, the first burst on an empty pool is refused or weak
-    const plain = design('sparrow-t.json');
+    const plain = design('fixtures/sparrow-t.json');
     plain.parts.push({ uid: 60, piece: 'sq', fn: 'engine_burst_strafer', material: 'steel', x: 3, y: 0, rot: 0, flip: false, facing: 'E' } as PlacedPart);
     const dp = derived(plain), b0: FlightBody = { x: 0, y: 0, vx: 0, vy: 0, angle: -Math.PI / 2, angVel: 0, jump: 0 };
     let c0: Charge = { g: 0, b: [] };
@@ -474,7 +474,7 @@ describe('energy: proportional sharing (Kieran, 2026-11-04)', () => {
   it('a boost held on an empty store gives the guns their share every tick (engines first left them nothing every other tick)', () => {
     // The Drum: 124 spare against 168 boosting and 24 of guns. A boost re-arms on each tick's trickle into the pool, so the
     // ticks alternate boosting and cruising; the guns now share both
-    const d = derived(design('drum.json')), L = d.power!;
+    const d = derived(design('fixtures/drum.json')), L = d.power!;
     const load = L.feeds.map(() => 0);
     for (const w of d.weapons) load[L.feedOf[w.part]] += gunDrawFlatOut(w, L.draw[w.part]);
     let c: Charge = { g: 0, b: [] };

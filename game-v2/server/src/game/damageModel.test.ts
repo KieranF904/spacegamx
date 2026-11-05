@@ -116,7 +116,7 @@ describe('damage: penetration, armour and materials', () => {
     t.connect();
     t.send({ type: 'join', username: 'builder' } as any);
     const conn = server.pilots.connOf(t.getPlayerId())!;
-    const big = server.getShips().library.get('lancer')!;
+    const big = server.getShips().library.get('sunspear')!;
     const why = server.hangar.save(conn, 1, JSON.parse(JSON.stringify(big)));
     expect(why.join(' ')).toContain('build points');
   });

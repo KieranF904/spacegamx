@@ -116,8 +116,9 @@ describe('models', () => {
     expect(sparrow.parts.filter((q) => FN(q.fn).model).every((q) => FN(q.fn).unlock?.level === 0)).toBe(true);
     expect(validateBlueprint(catalog, sparrow, tuning, null).errors).toEqual([]);
     const d = createShipState(catalog, tuning, 1, sparrow, 0).derived;
-    // Two Cell Reactors where its rect2 generator was: the same power
-    expect(d.energy.supply).toBeCloseTo(2 * FN('generator').produce!, 9);
+    // On the ports core: a Cell Reactor straight behind each Pip and each Ion Drive (the starter's answer: one line each)
+    expect(d.ports).toBeDefined();
+    expect(d.energy.supply).toBeCloseTo(4 * FN('generator').produce!, 9);
     // Its push: two ion drives, as two thrusters pushed
     expect(d.maxThrust.forward).toBeCloseTo(2 * FN('thruster').thrust!, 6);
     expect(d.weapons).toHaveLength(2);
@@ -444,16 +445,22 @@ describe('migration: legacy parts become models', () => {
     expect(migrateBlueprint(catalog, m.blueprint).changed).toBe(false);
   });
 
-  it('the library ships were converted in place: valid, nothing legacy, every power part wired', () => {
-    for (const name of ['sparrow-t', 'arrow', 'bulwark', 'corsair', 'drum', 'prospector', 'lancer', 'hauler', 'galleon', 'hammerhead', 'bastion', 'ark-tender']) {
+  it('the library ships run on the ports core: valid, nothing legacy, every gun, engine and tool fed through its ports', () => {
+    const names = readdirSync(join(SHIP_DATA_DIR, 'blueprints')).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5));
+    expect(names.sort()).toEqual(['ark-tender', 'arrow', 'bulwark', 'drum', 'halberd', 'hauler', 'prospector', 'quarry', 'sparrow-t', 'sunspear', 'wisp']);
+    for (const name of names) {
       const b = blueprint(name);
+      expect(b.power, name).toBe('ports');
       expect(b.parts.filter((q) => FN(q.fn).legacy).map((q) => q.fn), name).toEqual([]);
       expect(validateBlueprint(catalog, b, tuning, null).errors, name).toEqual([]);
       const d = createShipState(catalog, tuning, 1, b, 0).derived;
       expect(d.alive.every(Boolean), name).toBe(true);
-      b.parts.forEach((q, i) => { if (isPowerPart(FN(q.fn))) expect(d.networks[d.network[i]]?.powered, `${name} ${q.fn}`).toBe(true); });
+      const L = d.ports!;
+      const unfed = [...L.weapons, ...L.thrusters, ...L.tools].filter((i) => L.inStart[i + 1] === L.inStart[i] || L.openIn[i]).map((i) => b.parts[i].fn);
+      expect(unfed, name).toEqual([]);
     }
   });
+
 
   // A pilot's save from before models (version 3): a refitted Sparrow (a steel gun, a wedge gun, a 2×2 flak gun
   // half-built), a design, parts in the hold and storage, a fabricator job, and the railgun licence

@@ -11,7 +11,7 @@ const catalog = testCatalog();
 const tuning: ShipTuning = readShipJson('tuning.json');
 const part = (uid: number, fn: string, x: number, y: number, piece = 'sq') => ({ uid, piece, fn, material: 'steel', x, y, rot: 0, flip: false });
 const ship = (extra: object[]) => {
-  const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/sparrow-t.json'), 'utf-8'));
+  const bp = parseBlueprint(readFileSync(join(SHIP_DATA_DIR, 'blueprints/fixtures/sparrow-t.json'), 'utf-8'));
   bp.parts.push(...(extra as never[]));
   return createShipState(catalog, tuning, 1, bp, 0);
 };

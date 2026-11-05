@@ -55,7 +55,7 @@ export interface DetResult {
   ms: number;
 }
 
-export const SHIPS = ['corsair.json', 'hammerhead.json', 'lancer.json', 'arrow.json', 'bastion.json', 'sparrow-t.json'];
+export const SHIPS = ['fixtures/corsair.json', 'fixtures/hammerhead.json', 'fixtures/lancer.json', 'arrow.json', 'fixtures/bastion.json', 'sparrow-t.json'];
 
 // ---- hashing: FNV-1a over a double's bits (-0 as 0), no allocation per value
 const F = new Float64Array(1);

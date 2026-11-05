@@ -214,7 +214,7 @@ const E = [
   ['engine_torch', 'Torch', 'afterburner', 'rect2', 8, 4.0, 34, 70, 1, 0, 30, 40, 'alloy', 'Brutal thrust at full power all the time, and a brutal drain. It has no boost: nothing is held back to give.'],
   ['engine_plasma_drive', 'Plasma Drive', 'plasma', 'rect2', 16, 3.1, 20, 55, 1.8, 0.8, 25, 60, 'steel', 'The balanced main engine.'],
   ['engine_drift_sail', 'Drift Sail', 'ion', 'round', 22, 0.9, 3, 26, 1.3, 0.5, 3, 6, 'titanium', 'Near-free cruising, never in a hurry.'],
-  ['engine_fusion_torch', 'Fusion Torch', 'plasma', 'block2', 30, 3.6, 28, 85, 1.7, 1.0, 32.5, 100, 'cobalt', 'The long-haul racer: fast, and faster still.'],
+  ['engine_fusion_torch', 'Fusion Torch', 'plasma', 'block2', 30, 3.6, 28, 85, 1.7, 0.4, 32.5, 100, 'cobalt', 'The long-haul racer: fast, and faster still.'],
 ];
 
 const BLAST = TUNING.partBlast;
