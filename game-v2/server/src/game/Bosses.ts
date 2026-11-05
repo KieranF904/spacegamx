@@ -132,7 +132,7 @@ export interface BossHost {
   /** A notice to every player in a system */
   announce(systemNum: number, text: string, kind: 'info' | 'warn' | 'good' | 'bad'): void;
   /** Fire a shot from a ship (novas) */
-  fire(owner: number, kind: string, x: number, y: number, angle: number, damageScale: number, opts?: { target?: number; speed?: number; intercept?: boolean }): void;
+  fire(owner: number, kind: string, x: number, y: number, angle: number, damageScale: number, opts?: { target?: number; speed?: number; intercept?: boolean; seed?: string }): void;
   /** Warp flash at a point (blinks) */
   warpFx(systemNum: number, x: number, y: number, out: boolean): void;
   /** Pay a player for the kill: XP, credits, loot into storage, quest credit */
@@ -155,6 +155,10 @@ export interface BossHost {
   supportersOf?(player: number): number[];
   /** A brain's decision for its body (BrainHost.decide): to the clients that run bodies (net/decisions/BodyNet.ts) */
   decide?(eid: number, op: number, args: readonly number[], state: import('@space-game/common').BodyState): void;
+  /** A move's look, not to the clients that work it out (BrainHost.moveFx: net/decisions/BodyNet.ts derives) */
+  moveFx?(systemNum: number, eid: number, origin: import('@space-game/common').MoveOrigin, msg: ServerMessage): void;
+  /** A move's straight shell, its row not to the clients that work it out (BrainHost.moveShot) */
+  moveShot?(owner: number, kind: string, x: number, y: number, angle: number, damageScale: number, speed: number | undefined, seed: string, origin: import('@space-game/common').MoveOrigin): void;
   /** A system's boss arena (systems.json `arena`) */
   arenaOf?(num: number): ArenaDef | undefined;
 }
@@ -375,6 +379,8 @@ export class Bosses {
       players: (num) => host.players(num),
       terrain: (num) => host.terrain?.(num),
       decide: host.decide ? (eid, op, args, state) => host.decide!(eid, op, args, state) : undefined,
+      moveFx: host.moveFx ? (num, eid, o, msg) => host.moveFx!(num, eid, o, msg) : undefined,
+      moveShot: host.moveShot ? (owner, kind, x, y, a, k, speed, seed, o) => host.moveShot!(owner, kind, x, y, a, k, speed, seed, o) : undefined,
       hint: (player, kind) => this.hint(b, player, kind),
     };
   }

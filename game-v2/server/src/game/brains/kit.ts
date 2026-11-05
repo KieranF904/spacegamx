@@ -9,7 +9,7 @@
  * (PilotOrders.impulse); a heavy hull turns as its blueprint's `turn` lets it (flight.ts), as every client replays it.
  */
 
-import { Position, Velocity, Rotation, InSystem, ServerMessage, ShipState, shipPointToWorld, localToWorldDir, isRuined, type Vec2, type Terrain, type BodyState, datan2, dcos, dsin } from '@space-game/common';
+import { Position, Velocity, Rotation, InSystem, ServerMessage, ShipState, shipPointToWorld, localToWorldDir, isRuined, type Vec2, type Terrain, type BodyState, type MoveOrigin, datan2, dcos, dsin } from '@space-game/common';
 import type { ShipBridge, PilotOrders } from '../../ships/ShipBridge.js';
 import type { Mobs } from '../Mobs.js';
 
@@ -20,7 +20,7 @@ export interface BrainHost {
   readonly mobs: Mobs | undefined;
   send(systemNum: number, msg: ServerMessage): void;
   /** Fire a shot from the boss (its own volleys): `target`, who a homing one hunts; `speed`, × its usual speed */
-  fire(owner: number, kind: string, x: number, y: number, angle: number, damageScale: number, opts?: { target?: number; speed?: number }): void;
+  fire(owner: number, kind: string, x: number, y: number, angle: number, damageScale: number, opts?: { target?: number; speed?: number; seed?: string }): void;
   /** A flash where something comes out of its hull */
   launchFx(systemNum: number, x: number, y: number): void;
   /** Living pilots in the boss's system */
@@ -34,6 +34,14 @@ export interface BrainHost {
   decide?(eid: number, op: number, args: readonly number[], state: BodyState): void;
   /** A plain hint to one pilot, the first time this fight (its text: bosses.json `hints`, by kind). Absent: none */
   hint?(player: number, kind: string): void;
+  /**
+   * What a move draws (a telegraph, a beam, a strike's look, a launch flash), as `send`, but not to the clients that work
+   * it out themselves (CAPS.MOVES: running the boss's body since before `origin`, and its pilot if it's one's own:
+   * net/decisions/BodyNet.ts derives). Absent: `send`
+   */
+  moveFx?(systemNum: number, eid: number, origin: MoveOrigin, msg: ServerMessage): void;
+  /** A move's straight shell (as `fire`, seeded by `seed`), its row not sent to the clients that work it out themselves */
+  moveShot?(owner: number, kind: string, x: number, y: number, angle: number, damageScale: number, speed: number | undefined, seed: string, origin: MoveOrigin): void;
 }
 
 /** A brain's view of its boss right now */

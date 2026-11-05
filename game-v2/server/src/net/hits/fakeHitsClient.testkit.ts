@@ -19,7 +19,9 @@ import { GuideRunner } from '../../../../client/src/ships/guides/GuideRunner.js'
 import { ShipMemory } from '../../../../client/src/ships/cells/ShipMemory.js';
 import { ShipCauses } from '../../../../client/src/ships/causes/ShipCauses.js';
 import { DebrisSplits } from '../../../../client/src/ships/debris/DebrisSplits.js';
-import { bodiesFor, causesFor, waypointsFor, type GuideBody } from '@space-game/common';
+import { MoveRunner } from '../../../../client/src/ships/bodies/MoveRunner.js';
+import { bodiesFor, causesFor, movesFor, waypointsFor, type GuideBody, type CustomStats } from '@space-game/common';
+import factionsFile from '../../../../data/factions.json' with { type: 'json' };
 import { ownSimFor } from '../snapshot/ownShots.js';
 import type { GameServer } from '../../GameServer.js';
 
@@ -53,6 +55,15 @@ export class FakeHitsClient {
   readonly bodies: BodyRunner | null = null;
   /** Homing shells flown on its tick-aligned layer (CAPS.WAYPOINTS: client ships/guides/GuideRunner.ts) */
   readonly guides: GuideRunner | null = null;
+  /** Its bodies' moves worked out on its tick-aligned layer (CAPS.MOVES: client ships/bodies/MoveRunner.ts) */
+  readonly moves: MoveRunner | null = null;
+  /**
+   * Bodies' moves' looks it was sent, and those it worked out itself (CAPS.MOVES), each with the snapshot tick it was
+   * handled at; the shells it made (as rows) by their spawn tick
+   */
+  readonly fxSent: { tick: number; msg: ServerMessage }[] = [];
+  readonly fxMade: { tick: number; msg: ServerMessage }[] = [];
+  readonly shellsMade: { tick: number; owner: number; x: number; y: number; vx: number; vy: number }[] = [];
   readonly shells = new Map<number, HitShell>();
   /** Ships out of view it keeps (CAPS.FOCUS: client ships/cells/ShipMemory.ts): their entity kinds here */
   readonly away: ShipMemory<{ type: number; side: number }>;
@@ -122,6 +133,12 @@ export class FakeHitsClient {
     }
     if (ownSimFor(opts.caps)) this.own = new OwnTick({ store: this.store, reps: this.reps, self: () => this.pid, tuning: ships.tuning, restep: () => !!this.bodies?.on, extraHash: (t) => (this.causes?.heldByte(t) ?? 0) + (this.guides?.byte(t) ?? 0) });
     if (bodiesFor(opts.caps)) this.bodies = new BodyRunner({ reps: this.reps });
+    if (this.bodies && movesFor(opts.caps)) {
+      this.moves = new MoveRunner({
+        reps: this.reps, bodies: this.bodies, store: this.store, tuning: ships.tuning, terrain: () => opts.env(this.pid).terrain,
+        custom: (factionsFile as { custom?: { designs: Record<string, CustomStats> } }).custom,
+      });
+    }
     if (waypointsFor(opts.caps)) this.guides = new GuideRunner({ reps: this.reps, onStep: opts.onGuideStep });
     if (causesFor(opts.caps)) this.causes = new ShipCauses({ store: this.store, reps: this.reps, self: () => this.pid, ownDerived: (t) => this.own?.derived(t), ownMid: (t, o) => (this.own?.on ? this.own.midOf(t, o) : null), tuning: ships.tuning });
     this.away = new ShipMemory({ entity: (id) => this.kinds.get(id), restore: (id, e) => this.kinds.set(id, e), send: (m) => this.outbox.push(m) });
@@ -205,6 +222,7 @@ export class FakeHitsClient {
         this.selfHits?.setLevel(m.caps & CAPS.ROUGH ? m.lvl : undefined);
         this.own?.setOn(ownSimFor(m.caps));
         this.bodies?.setOn(bodiesFor(m.caps));
+        this.moves?.setOn(movesFor(m.caps));
         this.guides?.setOn(waypointsFor(m.caps));
         this.causes?.setOn(causesFor(m.caps));
         this.levels.push([this.snapTick, m.caps & CAPS.ROUGH ? m.lvl ?? 1 : 1]);
@@ -234,10 +252,12 @@ export class FakeHitsClient {
       case 'ignite': this.ignites.push(`${m.bodyId}:${m.part}:${m.ticks}`); break;
       case 'projectileHit':
         if (this.selfHits?.on && !this.handingOut) { this.hits!.oldWay(m.id); this.selfHits.drop(m.id); }
+        if (this.moves?.on && !this.known.has(m.id)) this.moves.struck(m.x, m.y, this.snapTick);
         this.projectileHits++;
         this.impacts.push({ id: m.id, x: m.x, y: m.y });
         break;
-      case 'detonation': this.detonations++; break;
+      case 'detonation': this.detonations++; this.fxSent.push({ tick: this.snapTick, msg: m }); break;
+      case 'bossTelegraph': case 'bossBeam': case 'bossWindow': case 'effect': this.fxSent.push({ tick: this.snapTick, msg: m }); break;
     }
   }
 
@@ -257,6 +277,12 @@ export class FakeHitsClient {
     this.debris.takeRows();
     // (homing shells, CAPS.WAYPOINTS: flown from their SYNCs and waypoints)
     this.guides?.onSnapshot(s.tick, s.guides);
+    // (bodies' moves through this window, CAPS.MOVES: their looks and straight shells, as ShipClient.preSnapshot)
+    if (this.moves) {
+      const mv = this.moves.advance(s.tick, this.pid);
+      for (const r of mv.rows) { const d = r.data!; this.shellsMade.push({ tick: d[3], owner: d[6], x: d[4], y: d[5], vx: r.vx ?? 0, vy: r.vy ?? 0 }); }
+      for (const msg of this.moves.take()) this.fxMade.push({ tick: s.tick, msg });
+    }
     for (const e of s.entities) {
       const d = e.data;
       if (e.type === EntityType.Player || e.type === EntityType.ShipBody) this.kinds.set(e.id, { type: e.type, side: e.type === EntityType.ShipBody && d ? d[10] ?? 0 : 0 });

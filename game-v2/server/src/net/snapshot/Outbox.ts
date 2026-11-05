@@ -176,12 +176,15 @@ export class Outbox {
     for (const conn of this.packedWaiting) if (conn.packed) this.countPacked(conn.packed.flushLazy(this.currentTick));
   }
 
-  /** `skipCaps`: leave out the clients with any of these caps on (confirmed hits: they're told their own way) */
-  broadcastToSystem(systemId: number, msg: ServerMessage, skipCaps = 0): void {
+  /**
+   * `skipCaps`: leave out the clients with any of these caps on (confirmed hits: they're told their own way); `skip`:
+   * and those it says (a move's look a client works out itself: GameServer.moveFx)
+   */
+  broadcastToSystem(systemId: number, msg: ServerMessage, skipCaps = 0, skip?: (client: ClientConnection) => boolean): void {
     // An effect only for the eye and ear (LAZY_TYPES) that happens somewhere goes only to clients near enough to see it
     if (LAZY_TYPES.has(msg.type)) {
       const at = fxPoint(msg);
-      if (at) { this.broadcastNear(systemId, at[0], at[1], msg, [], skipCaps); return; }
+      if (at) { this.broadcastNear(systemId, at[0], at[1], msg, [], skipCaps, skip); return; }
     }
     const data = encodeServerMessage(msg);
     const byteLen = this.getMessageByteLength(data);
@@ -191,6 +194,7 @@ export class Outbox {
       if (InSystem.systemId[client.playerId] !== systemId) continue;
       if (!client.ws.isOpen() || !hasComponent(this.world, Player, client.playerId)) continue;
       if (skipCaps && (client.caps ?? 0) & skipCaps) continue;
+      if (skip?.(client)) continue;
       if (this.packedOf(client)) this.packedQueue(client, msg, data);
       else { this.queue(client.ws, data, LAZY_TYPES.has(msg.type)); sent++; }
     }
@@ -236,7 +240,7 @@ export class Outbox {
   }
 
   /** Clients in a system near a point (combat effects: nobody further out has the ships involved) */
-  broadcastNear(systemId: number, x: number, y: number, msg: ServerMessage, also: number[] = [], skipCaps = 0): void {
+  broadcastNear(systemId: number, x: number, y: number, msg: ServerMessage, also: number[] = [], skipCaps = 0, skip?: (client: ClientConnection) => boolean): void {
     const data = encodeServerMessage(msg);
     // (A part of a piece of debris crumbling: a client running the piece (or told to, its check on the way) shows that
     // itself, CAPS.DEBRIS)
@@ -248,6 +252,7 @@ export class Outbox {
       if (dhypot(Position.x[pid] - x, Position.y[pid] - y) > FX_RANGE && !also.includes(pid)) continue;
       if (skipCaps && (client.caps ?? 0) & skipCaps) continue;
       if (crumble >= 0 && (client.debrisLive?.has(crumble) || client.debrisHeld.get(crumble)?.live)) continue;
+      if (skip?.(client)) continue;
       if (this.packedOf(client)) { this.packedQueue(client, msg, data); continue; }
       this.queue(client.ws, data, LAZY_TYPES.has(msg.type));
       this.snapshotBytesSent += this.getMessageByteLength(data);

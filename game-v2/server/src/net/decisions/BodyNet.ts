@@ -16,7 +16,7 @@
  * A body is only as exact as what it reads: a target whose replica was off on a client this window (it gets a
  * keyframe of it) costs that client a keyframe of the boss too.
  */
-import { DECISION, BODY_KINDS, bodyHash, bodyCheckByte, syncArgs, unwrapTick12, type BodyState, type FlightBody } from '@space-game/common';
+import { DECISION, BODY_KINDS, MOVES_HOLD, MOVE_OPS, bodyHash, bodyCheckByte, syncArgs, unwrapTick12, type BodyState, type FlightBody, type MoveOrigin } from '@space-game/common';
 
 /** Decisions kept a boss (ticks): longer than any client's snapshots are apart */
 const KEEP_TICKS = 600;
@@ -44,6 +44,11 @@ interface Boss {
 interface Client {
   /** Bosses it runs (synced, and not stopped since) */
   runs: Set<number>;
+  /** The tick each was synced at (CAPS.MOVES: a move it works out is one decided after it) */
+  since: Map<number, number>;
+  /** It works out the moves of the bodies it runs (CAPS.MOVES), and the move shells it made itself so (no rows of them) */
+  moves: boolean;
+  derived: Set<number>;
   /** The last snapshot tick it was sent decisions to */
   through: number;
   expect: Map<number, number>;
@@ -52,8 +57,10 @@ interface Client {
 }
 
 export class BodyNet {
-  readonly stats = { decisions: 0, rows: 0, syncs: 0, offs: 0, targetKeyed: 0, checks: 0, agreed: 0, off: 0, stale: 0, unknown: 0 };
+  readonly stats = { decisions: 0, rows: 0, syncs: 0, offs: 0, targetKeyed: 0, checks: 0, agreed: 0, off: 0, stale: 0, unknown: 0, moveShells: 0, shellsDerived: 0 };
   private readonly bosses = new Map<number, Boss>();
+  /** Move shells alive (CAPS.MOVES): whose, and the decision they came of */
+  private readonly shells = new Map<number, { owner: number; origin: MoveOrigin }>();
   private readonly clients = new WeakMap<object, Client>();
 
   constructor(private readonly host: BodyNetHost) {}
@@ -79,8 +86,46 @@ export class BodyNet {
 
   private client(conn: object): Client {
     let c = this.clients.get(conn);
-    if (!c) this.clients.set(conn, (c = { runs: new Set(), through: -Infinity, expect: new Map(), ticks: [], fixedAt: -Infinity }));
+    if (!c) this.clients.set(conn, (c = { runs: new Set(), since: new Map(), moves: false, derived: new Set(), through: -Infinity, expect: new Map(), ticks: [], fixedAt: -Infinity }));
     return c;
+  }
+
+  // ---- Moves (decision-inputs stage 4, CAPS.MOVES: common bodies/moves) ----
+
+  /**
+   * Does this client work out what a body's move does (its look, its straight shells) itself: it runs the body's moves,
+   * began running it before the decision `origin` came of, and the move is anyone's or its own pilot's (`self`)
+   */
+  derives(conn: object, self: number, eid: number, origin: MoveOrigin): boolean {
+    const c = this.clients.get(conn);
+    if (!c?.moves || !c.runs.has(eid) || (origin.who >= 0 && origin.who !== self)) return false;
+    return origin.t > (c.since.get(eid) ?? Infinity);
+  }
+
+  /** A move's straight shell (GameServer.moveShot): its row goes only to the clients that don't make it themselves */
+  moveShell(id: number, owner: number, origin: MoveOrigin): void {
+    this.shells.set(id, { owner, origin });
+    this.stats.moveShells++;
+  }
+
+  /** Is this shell's row one this client makes itself (a move's it works out, not sent it before) */
+  shellDerived(conn: object, self: number, id: number, sent: boolean): boolean {
+    const c = this.clients.get(conn);
+    if (!c) return false;
+    if (c.derived.has(id)) return true;
+    const s = this.shells.get(id);
+    if (!s || sent || !this.derives(conn, self, s.owner, s.origin)) return false;
+    c.derived.add(id);
+    this.stats.shellsDerived++;
+    return true;
+  }
+
+  /** Shells gone (a snapshot round's removals, after every client's): forgotten */
+  shellsGone(ids: Iterable<number>, conns: Iterable<object>): void {
+    for (const id of ids) {
+      if (!this.shells.delete(id)) continue;
+      for (const conn of conns) this.clients.get(conn)?.derived.delete(id);
+    }
   }
 
   /** Does this client run this boss's body (no rows or keyframes but its bodied shadow's: Replication.forClient) */
@@ -101,8 +146,9 @@ export class BodyNet {
    * SYNC). `rekeyed(id)`: this snapshot brings it a keyframe of that ship (what it had of it this window was off): a
    * boss whose target that is gets one too, as its body read the target off
    */
-  forClient(conn: object, self: number, systemOf: (eid: number) => number, systemId: number, known: Map<number, number>, tick: number, view: (eid: number) => boolean, rekeyed?: (eid: number) => boolean, pilots = false): number[][] {
+  forClient(conn: object, self: number, systemOf: (eid: number) => number, systemId: number, known: Map<number, number>, tick: number, view: (eid: number) => boolean, rekeyed?: (eid: number) => boolean, pilots = false, moves = false): number[][] {
     const c = this.client(conn), rows: number[][] = [];
+    c.moves = moves;
     // (In its view now: a ship leaving it this snapshot (known, not in view) is gone from the client from here, so a
     // body reading it would fly blind from this tick: off now, with a keyframe, not a keyframe every snapshot it stays out)
     const holds = (id: number) => id === self || view(id);
@@ -122,8 +168,12 @@ export class BodyNet {
         rows.push([eid, 0, DECISION.SYNC, ...syncArgs(s)]);
         // (its drive EMP'd or slowed now: a SYNC clears that, so it goes after)
         if ((s.empUntil ?? 0) > tick || (s.slowUntil ?? 0) > tick) rows.push([eid, 0, DECISION.STATUS, Math.max(0, (s.empUntil ?? 0) - tick), Math.max(0, (s.slowUntil ?? 0) - tick)]);
+        // (its moves held or stopped now, a custom enemy's pieces gone as its moves read them: a SYNC says nothing of those, CAPS.MOVES)
+        if (moves && (s.hold ?? MOVES_HOLD.RUN) !== MOVES_HOLD.RUN) rows.push([eid, 0, DECISION.HOLD, s.hold!]);
+        if (moves && s.gone !== undefined) rows.push([eid, 0, DECISION.GONE, s.gone]);
         rekey(known, eid);
         c.runs.add(eid);
+        c.since.set(eid, tick);
         this.stats.syncs++;
       } else if (can) {
         // (a ship it reads was off on this client this window: so was what its body made of it)
@@ -131,6 +181,8 @@ export class BodyNet {
         for (const d of b.log) {
           if (d[0] <= c.through) continue;
           if (d[0] > tick) break;
+          // (its moves' decisions only to a client working them out, CAPS.MOVES)
+          if (!moves && MOVE_OPS.has(d[1])) continue;
           rows.push([eid, d[0] - tick, ...d.slice(1)]);
         }
       } else if (runs) {

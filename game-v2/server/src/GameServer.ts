@@ -187,7 +187,7 @@ import { HitLedger } from './net/hits/HitLedger.js';
 import { OwnChecks } from './net/own/OwnChecks.js';
 import { BodyNet } from './net/decisions/BodyNet.js';
 import { GuideNet } from './net/guides/GuideNet.js';
-import type { BodyState } from '@space-game/common';
+import type { BodyState, MoveOrigin } from '@space-game/common';
 import { ownSimFor } from './net/snapshot/ownShots.js';
 import { CrowdControl } from './net/crowd/CrowdControl.js';
 import { SystemClocks, SimPass, rebaseShipTicks } from './sim/SystemClocks.js';
@@ -1652,10 +1652,24 @@ this.devTeleport = opts.devTeleport ?? false;
   }
 
   /** A shot a boss's or a custom enemy's move fires (not from a part gun) */
-  private hostileShot(owner: number, kind: string, x: number, y: number, angle: number, scale: number, opts?: { target?: number; speed?: number; intercept?: boolean }): void {
+  private hostileShot(owner: number, kind: string, x: number, y: number, angle: number, scale: number, opts?: { target?: number; speed?: number; intercept?: boolean; seed?: string }): number {
     // (A boss's nova punches through as its own grade does; `intercept: false`, point defence can't touch it: support.ts)
     const ship = this.ships.get(owner);
-    this.weapons.spawn(owner, kind, x, y, angle, scale, { speedScale: opts?.speed ?? 1, sizeScale: 1, turret: false, noBurst: true, target: opts?.target, grade: ship ? blueprintGrade(this.ships.catalog, ship.blueprint) : 1, intercept: opts?.intercept });
+    return this.weapons.spawn(owner, kind, x, y, angle, scale, { speedScale: opts?.speed ?? 1, sizeScale: 1, turret: false, noBurst: true, target: opts?.target, grade: ship ? blueprintGrade(this.ships.catalog, ship.blueprint) : 1, intercept: opts?.intercept, seed: opts?.seed });
+  }
+
+  /**
+   * A body's move's look (a telegraph, a beam, a strike's look, a launch flash; decision-inputs stage 4): to every
+   * client in the system but those working it out themselves (CAPS.MOVES, net/decisions/BodyNet.ts derives)
+   */
+  private moveFx(num: number, eid: number, origin: MoveOrigin, msg: ServerMessage): void {
+    this.net.broadcastToSystem(num, msg, 0, (c) => this.bodies.derives(c, c.playerId, eid, origin));
+  }
+
+  /** A body's move's straight shell (seeded, so its clients make the same one): its row not to those working it out */
+  private moveShot(owner: number, kind: string, x: number, y: number, angle: number, scale: number, speed: number | undefined, seed: string, origin: MoveOrigin): void {
+    const id = this.hostileShot(owner, kind, x, y, angle, scale, { speed, seed });
+    if (id >= 0) this.bodies.moveShell(id, owner, origin);
   }
 
   private createBossHost() {
@@ -1684,7 +1698,10 @@ this.devTeleport = opts.devTeleport ?? false;
       supportersOf: (player: number) => this.support.supporters(player, this.currentTick),
       // (Decision inputs, CAPS.BODIES: net/decisions/BodyNet.ts)
       decide: (eid: number, op: number, args: readonly number[], state: BodyState) => this.bodies.decide(eid, op, args, state),
-      fire: (owner: number, kind: string, x: number, y: number, angle: number, scale: number, opts?: { target?: number; speed?: number; intercept?: boolean }) => this.hostileShot(owner, kind, x, y, angle, scale, opts),
+      fire: (owner: number, kind: string, x: number, y: number, angle: number, scale: number, opts?: { target?: number; speed?: number; intercept?: boolean; seed?: string }) => { this.hostileShot(owner, kind, x, y, angle, scale, opts); },
+      // (Its moves on its clients' tick layers, CAPS.MOVES: what they work out isn't sent them)
+      moveFx: (num: number, eid: number, origin: MoveOrigin, msg: ServerMessage) => this.moveFx(num, eid, origin, msg),
+      moveShot: (owner: number, kind: string, x: number, y: number, angle: number, scale: number, speed: number | undefined, seed: string, origin: MoveOrigin) => this.moveShot(owner, kind, x, y, angle, scale, speed, seed, origin),
       warpFx: (num: number, x: number, y: number, out: boolean) => {
         this.broadcastToSystem(num, { type: 'effect', effectType: out ? EffectType.WarpOut : EffectType.WarpIn, x, y });
       },
@@ -1912,8 +1929,11 @@ this.devTeleport = opts.devTeleport ?? false;
       // (the enemy AI's pilots' decisions, CAPS.PILOTS: net/decisions/BodyNet.ts)
       decide: (eid: number, op: number, args: readonly number[], state: BodyState) => this.bodies.decide(eid, op, args, state),
       // (custom enemies' moves: game/custom; their shots go as a boss's do)
-      fire: (owner: number, kind: string, x: number, y: number, angle: number, scale: number, opts?: { target?: number; speed?: number }) => this.hostileShot(owner, kind, x, y, angle, scale, opts),
+      fire: (owner: number, kind: string, x: number, y: number, angle: number, scale: number, opts?: { target?: number; speed?: number; seed?: string }) => { this.hostileShot(owner, kind, x, y, angle, scale, opts); },
       send: (num: number, msg: ServerMessage) => this.broadcastToSystem(num, msg),
+      // (their moves on their clients' tick layers, CAPS.MOVES: what they work out isn't sent them)
+      moveFx: (num: number, eid: number, origin: MoveOrigin, msg: ServerMessage) => this.moveFx(num, eid, origin, msg),
+      moveShot: (owner: number, kind: string, x: number, y: number, angle: number, scale: number, speed: number | undefined, seed: string, origin: MoveOrigin) => this.moveShot(owner, kind, x, y, angle, scale, speed, seed, origin),
       systemNum: (id: string) => (this.gameData.getSystem(id) ? this.gameData.getSystemNum(id) : -1),
       systemId: (num: number) => this.gameData.getSystemByNum(num)?.id,
       systemRadius: (num: number) => {

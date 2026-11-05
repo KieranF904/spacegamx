@@ -255,8 +255,11 @@ export interface EnemyHost {
   /** A pilot's decision, for the clients that run its body (CAPS.PILOTS: net/decisions/BodyNet.ts) */
   decide?(eid: number, op: number, args: readonly number[], state: BodyState): void;
   /** Custom enemies' moves (custom/): a shot from a ship (tuning.json weapons kind), a message to a system */
-  fire?(owner: number, kind: string, x: number, y: number, angle: number, damageScale: number, opts?: { target?: number; speed?: number }): void;
+  fire?(owner: number, kind: string, x: number, y: number, angle: number, damageScale: number, opts?: { target?: number; speed?: number; seed?: string }): void;
   send?(systemNum: number, msg: import('@space-game/common').ServerMessage): void;
+  /** Their moves on their clients' tick layers (CAPS.MOVES): a move's look and straight shells, not to the clients working them out */
+  moveFx?(systemNum: number, eid: number, origin: import('@space-game/common').MoveOrigin, msg: import('@space-game/common').ServerMessage): void;
+  moveShot?(owner: number, kind: string, x: number, y: number, angle: number, damageScale: number, speed: number | undefined, seed: string, origin: import('@space-game/common').MoveOrigin): void;
 }
 
 /** Party members this close to a kill share it */
@@ -424,7 +427,9 @@ export class Enemies {
       tick: () => host.tick(), ships, players: (num) => host.players(num), get mobs() { return self.mobs; },
       fire: host.fire ? (o, k, x, y, a, d, opts) => host.fire!(o, k, x, y, a, d, opts) : undefined,
       send: host.send ? (num, msg) => host.send!(num, msg) : undefined,
-      launchFx: host.effect ? (num, x, y) => host.effect!(num, x, y, 'launch') : undefined,
+      moveFx: host.moveFx ? (num, eid, o, msg) => host.moveFx!(num, eid, o, msg) : undefined,
+      moveShot: host.moveShot ? (owner, kind, x, y, a, k, speed, seed, o) => host.moveShot!(owner, kind, x, y, a, k, speed, seed, o) : undefined,
+      decide: (eid, op, args) => self.pilots.note(eid, op, args),
     }, data.custom);
   }
 
@@ -1548,7 +1553,7 @@ export class Enemies {
     const bodied = asBody && !this.ships.isPinned(eid) && (!fights || hasComponent(this.host.world, Player, t));
     const out = this.pilots.fly(eid, fights ? t : -1, e.strafe, want, pose(eid), fights ? pose(t) : null, cent, bodied);
     let firing = false;
-    // (Its moves and guns: what they do this tick, custom/moves.ts; it fires no part guns)
+    // (Its moves and guns: what they do this tick, common bodies/moves/custom.ts; it fires no part guns)
     if (cs) { if (asBody) this.custom.step(eid, t, e.state === 'engage'); }
     else if (e.state === 'engage') {
       // Fire within its guns' real reach, when a hit is likely: a big, slow, near target, or a lobbed shell

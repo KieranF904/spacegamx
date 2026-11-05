@@ -1,5 +1,5 @@
 /**
- * The Scrap Darter (the Scrap Mother's den; common bodies/custom/scrapDarter.ts, server game/custom/moves.ts) on the tick
+ * The Scrap Darter (the Scrap Mother's den; common bodies/custom/scrapDarter.ts, its moves common bodies/moves/custom.ts) on the tick
  * layer: its darts onto a flank and away, and its flight after a fin or its fuel pod is shot off, are the server's ship
  * bit for bit at every snapshot on a capable client (customEnemies.test.ts for the rest of the roster).
  */
